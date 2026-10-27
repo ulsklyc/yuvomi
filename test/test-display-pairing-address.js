@@ -41,7 +41,7 @@ test('with no tablet and no code, the page names the address and both steps', as
   assert.equal(items.length, 2, 'two steps');
   assert.match(items[0], /settings\.displayPairStepCode/, 'step 1: create a tablet and a code here');
   assert.match(items[1], /settings\.displayPairStepOpen/, 'step 2: open the address on the tablet');
-  assert.match(items[1], /<code id="display-pair-address">https:\/\/family\.example\/pair<\/code>/,
+  assert.match(items[1], /<code id="display-pair-address" dir="ltr">https:\/\/family\.example\/pair<\/code>/,
     'the address carries this instance\'s own origin');
 
   const at = html.indexOf('id="display-pair-steps"');

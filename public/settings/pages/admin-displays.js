@@ -172,7 +172,7 @@ function renderPage(container) {
         <ol class="settings-provider__steps" id="display-pair-steps">
           <li>${esc(t('settings.displayPairStepCode'))}</li>
           <li>${esc(t('settings.displayPairStepOpen'))}
-            <code id="display-pair-address">${esc(`${window.location.origin}/pair`)}</code></li>
+            <code id="display-pair-address" dir="ltr">${esc(`${window.location.origin}/pair`)}</code></li>
         </ol>
         <ul class="settings-cards" id="display-list"></ul>
         <form id="display-form" class="settings-form" autocomplete="off" novalidate>
