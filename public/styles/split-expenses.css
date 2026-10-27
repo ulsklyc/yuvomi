@@ -427,11 +427,22 @@
 }
 
 /* Die Ausgaben stehen links neben ALLEN Abschnitten der rechten Spalte - seit
- * #1647 drei (Salden, Wiederkehrend, Verlauf). Reichte die Spanne nur ueber
- * zwei, schoebe eine lange Ausgabenliste den Verlauf unter ihr Ende. */
-.split-content-grid > .split-section:nth-child(2) {
+ * #1647 drei (Salden, Wiederkehrend, Verlauf), seit #1888/#1941 bis zu fuenf
+ * (dazu die Summen je Person und je Kategorie). Reichte die Spanne nicht ueber
+ * alle, schoebe eine lange Ausgabenliste den Verlauf unter ihr Ende. Die Liste
+ * heisst nach ihrer Rolle, nicht nach ihrer Stelle; die rechte Spalte fuellt
+ * sich in DOM-Folge um sie herum. */
+.split-content-grid > .split-section--expenses {
   grid-column: 1;
-  grid-row: 1 / span 3;
+  grid-row: 1 / span 5;
+}
+
+/* Der Kategoriefilter (#1941) steht in der Zeile des Listentitels, so breit
+ * wie sein laengster Eintrag und nie breiter als die Spalte. */
+.split-category-filter {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 100%;
 }
 
 .split-section-head {
@@ -1029,7 +1040,7 @@ button.split-expense:hover {
   }
 
   .split-content-grid > .split-section,
-  .split-content-grid > .split-section:nth-child(2) {
+  .split-content-grid > .split-section--expenses {
     grid-column: auto;
     grid-row: auto;
   }

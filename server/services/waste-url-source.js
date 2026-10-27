@@ -209,7 +209,7 @@ function buildAutoMappingDecisions(preview) {
   const decisions = [];
   for (const label of preview.labels) {
     if (label.remembered_ignored) decisions.push({ normalized_label: label.normalized_label, ignored: true });
-    else if (label.remembered_type_id != null) decisions.push({ normalized_label: label.normalized_label, type_id: label.remembered_type_id });
+    else if (label.remembered_type_ids.length) decisions.push({ normalized_label: label.normalized_label, type_ids: label.remembered_type_ids });
     else return null; // an unmapped label - cannot auto-decide
   }
   const unresolvedBlocking = preview.diagnostics.some((diag) => diag.severity === 'blocking');

@@ -178,7 +178,7 @@ const SEVERAL = '#event-sync-target-several-hint';
 const AMBIGUOUS = '#event-sync-target-assignee-hint';
 
 // Der Loader-Stub von t() gibt den Schluessel zurueck, mit Werten dahinter.
-const severalText = (target) => `calendar.syncTargetSeveralAssignees${JSON.stringify({ target })}`;
+const severalText = (target) => `calendar.syncTargetNoCalendarForPeople${JSON.stringify({ target })}`;
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -531,4 +531,20 @@ test('Bearbeiten eines fremden Termins: es zaehlt created_by, nicht wer bearbeit
     const eigen = await openForm({ mode: 'edit', event: { ...base, created_by: 3, assigned_users: [{ id: 3 }] }, assigned: [3] });
     assert.equal(hint(eigen, PRIVATE_ASSIGNED).hidden, true, 'die Erstellerin sieht ihren Termin, gleich wer ihn bearbeitet');
   });
+});
+
+// #1840 (Codex-Befund in #2280): ein Kalender, der inzwischen nur lesbar ist,
+// steht nicht mehr in `/calendar/sync-targets`. Das gespeicherte Ziel eines
+// Termins bleibt trotzdem gewaehlt - sonst schickte schon das Umbenennen
+// `null` und leerte es still.
+test('#1840: ein gespeichertes CalDAV-Ziel, das die Liste nicht mehr nennt, bleibt gewaehlt', async () => {
+  const sharedUrl = 'https://dav.example.org/cal/verein/';
+  const event = {
+    id: 14, title: 'Training', start_datetime: '2026-10-02T19:00', end_datetime: '2026-10-02T20:30',
+    all_day: 0, created_by: 1, recurrence_rule: null, assigned_users: [],
+    target_caldav_account_id: 4, target_caldav_calendar_url: sharedUrl,
+  };
+  const panel = await openForm({ mode: 'edit', event });
+  assert.equal(target(panel), `caldav:4|${sharedUrl}`, 'das gespeicherte Ziel bleibt gewaehlt');
+  assert.equal(panel.querySelectorAll('option').filter((o) => o.value === `caldav:4|${sharedUrl}`).length, 1);
 });

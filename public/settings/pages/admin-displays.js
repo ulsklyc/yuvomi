@@ -162,6 +162,18 @@ function renderPage(container) {
             <p class="form-hint" id="display-wall-mode">${esc(t('settings.displaysWallModeLinkHint'))}
               <a href="/settings/personal/device" id="display-wall-mode-link">${esc(t('settings.pageDevice'))}</a></p>`,
         })}
+        ${/* Der Weg des Tabletts, bevor es einen Code gibt (#2294). Es koppelt
+             unter /pair, einer oeffentlichen Route, nicht ueber die
+             Anmeldeseite - bei reinem OIDC-Login gaebe es dort nicht einmal
+             ein Passwortfeld. Deshalb steht die Adresse mit dem eigenen
+             Ursprung sichtbar vor der Liste, nicht im Aufklapper und nicht
+             erst neben einem frischen Code. Dieselbe Ziffernliste wie die
+             Google-Einrichtung (settings-provider__steps). */ ''}
+        <ol class="settings-provider__steps" id="display-pair-steps">
+          <li>${esc(t('settings.displayPairStepCode'))}</li>
+          <li>${esc(t('settings.displayPairStepOpen'))}
+            <code id="display-pair-address" dir="ltr">${esc(`${window.location.origin}/pair`)}</code></li>
+        </ol>
         <ul class="settings-cards" id="display-list"></ul>
         <form id="display-form" class="settings-form" autocomplete="off" novalidate>
           ${/* displayDeviceNameLabel, NICHT displayNameLabel: der zweite heisst

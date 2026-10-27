@@ -56,13 +56,15 @@ function buildDb() {
     CREATE TABLE caldav_calendar_selection (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-      calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+      calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
     );
     CREATE TABLE external_calendars (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       source TEXT NOT NULL, external_id TEXT NOT NULL, name TEXT, color TEXT,
       default_assignee_user_id INTEGER, UNIQUE(source, external_id)
     );
+    CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
     CREATE TABLE calendar_events (
       -- Konto der Zeile (Migration 238, #1860)
       caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,

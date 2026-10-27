@@ -1208,7 +1208,6 @@
         "pickOne": "Pumili ng event",
         "pickOneHint": "Dito lalabas ang oras, lugar at mga paalala.",
         "syncTargetAssigneeAmbiguous": "Ilang kalendaryo ang may taong ito bilang default na nakatalaga. Piliin mismo ang target.",
-        "syncTargetSeveralAssignees": "Maraming tao ang nakatalaga, kaya walang kalendaryong pinipili ang pagtatalaga. Ginagamit sa halip: {{target}}.",
         "filtersSources": "Mga kalendaryo",
         "filterUnassigned": "Walang nakatalaga",
         "dateSpanSpoken": "{{from}} hanggang {{to}}",
@@ -1247,7 +1246,10 @@
         "errorDeleteFeedAdminOnly": "Ine-export ang kalendaryong ito. Admin lang ang makakapag-delete nito.",
         "errorEventGone": "Wala na ang pangyayaring ito.",
         "errorSelectedCalendarGone": "Wala na ang napiling kalendaryo.",
-        "errorSeriesNoOccurrence": "Sa pag-uulit na ito, walang kahit isang pangyayari mula sa petsa ng simula."
+        "errorSeriesNoOccurrence": "Sa pag-uulit na ito, walang kahit isang pangyayari mula sa petsa ng simula.",
+        "localCalendarUploadsHint": "Ina-upload sa iCloud sa pamamagitan ng Apple Calendar ang mga event sa kalendaryong ito.",
+        "overlapOpenSchedule": "Buksan ang iskedyul ng shift",
+        "syncTargetNoCalendarForPeople": "Walang kalendaryong may eksaktong mga taong ito bilang default na naaatasan, kaya walang pinipili ang pag-aatas. Ginagamit sa halip: {{target}}."
     },
     "noteCategories": {
         "categories": "Mga kategorya",
@@ -1318,7 +1320,11 @@
         "checklistDone": "Tapos",
         "checklistOpen": "Bukas",
         "errorNoteGone": "Wala na ang talang ito.",
-        "errorSelectedCategoryGone": "Wala na ang isa sa mga napiling kategorya."
+        "errorSelectedCategoryGone": "Wala na ang isa sa mga napiling kategorya.",
+        "lockedToggle": "I-lock ang pag-edit",
+        "lockedBadge": "Naka-lock",
+        "lockedHint": "Ikaw at ang mga administrator lang ang makakapagbago, makakapag-pin o makakapagbura ng talang ito - kasama ang pag-tsek ng mga item sa checklist nito. Mababasa pa rin ito ng iba.",
+        "errorLocked": "Naka-lock ang talang ito. Ang gumawa nito at ang mga administrator lang ang makakapagbago nito."
     },
     "markdown": {
         "bold": "Bold (Ctrl+B)",
@@ -1790,6 +1796,8 @@
         "planSavingsDeleteConfirm": "Tanggalin ang layunin sa pag-iipon?",
         "accountsTab": "Mga Account",
         "netWorth": "Kabuuang yaman",
+        "netWorthApproxNote": "Na-convert sa palitan noong {{date}}",
+        "netWorthPerCurrencyNote": "Walang palitan - kabuuan bawat currency",
         "addAccount": "Magdagdag ng account",
         "accountsEmptyTitle": "Wala pang account",
         "accountsEmptyDescription": "Magdagdag ng mga account tulad ng checking o savings para masubaybayan ang iyong balanse.",
@@ -1883,6 +1891,7 @@
         "saveFailed": "Hindi ito na-save. Pakisuri ang mga inilagay.",
         "loanAlreadyPaid": "Bayad na nang buo ang utang na ito.",
         "loanInstallmentAlreadyPaid": "Bayad na ang hulog na ito.",
+        "loanPaymentRateUnavailable": "Walang kilalang palitan para sa currency ng account. Pumili ng ibang account sa utang, o wala.",
         "amountExceedsLoanRemaining": "Mas malaki ang halaga kaysa sa natitira sa utang",
         "responsibleNotMember": "Mga miyembro lamang ng sambahayan ang maaaring maging responsable.",
         "seriesStartTooEarly": "Hindi maaaring nasa buwan bago ang unang entry ng serye ang araw ng simula",
@@ -2484,7 +2493,10 @@
             "errorNoCalendarName": "Maglagay ng pangalan para sa bagong kalendaryo.",
             "dropzoneTitle": "I-drag dito ang ICS file o pumili ng isa",
             "dropzoneTitleTouch": "I-tap para pumili ng ICS file",
-            "dropzoneHint": "Mga .ics file lang"
+            "dropzoneHint": "Mga .ics file lang",
+            "assigneesLabel": "Iatas kay",
+            "assigneesHint": "Makukuha ng mga bagong kaganapan ang mga taong ito. Idaragdag sila sa kaganapang na-import na may parehong ID - kahit inalis nang manu-mano ang pag-aatas nito.",
+            "successWithAssigned": "Na-import: {{imported}}, umiiral na: {{skipped}}, sa mga ito ay naiatas na ngayon: {{assigned}}."
         },
         "memberPhoneLabel": "Numero ng telepono (opsyonal)",
         "memberEmailLabel": "Email (opsyonal)",
@@ -3115,10 +3127,7 @@
         "notificationChannelDeleteConfirmDetail": "Wala nang abisong lalabas sa channel na ito mula ngayon, kahit ang mga agaran. Kailangang ilagay muli ang address at mga kredensyal para sa bagong channel.",
         "apiTokensMcpHint": "Gumagana rin ang mga token na ito bilang Bearer token para sa MCP endpoint sa /mcp (hal. sa Claude Desktop, para gumawa ng mga gawain, item sa pamimili at kaganapan sa pamamagitan ng AI).",
         "sync": {
-            "defaultAssignee": "Default na naaatasan",
             "defaultAssigneeNone": "Wala",
-            "defaultAssigneeHint": "Awtomatikong inaatasan sa taong ito ang mga bagong naka-sync na kaganapan.",
-            "defaultAssigneeRoutingHint": "Default na naaatasan: ang mga event mula sa kalendaryo ay itinatalaga sa taong pinili rito, at ang bagong event na itinalaga lamang sa taong iyon ay nilikha sa kalendaryong iyon. Para sa mga kalendaryong Google at CalDAV, hindi para sa Apple o Outlook.",
             "backfillTitle": "Punan ang mga pag-aatas",
             "backfillDescription": "Ang default na naaatasan ay nalalapat lamang sa mga appointment na na-import matapos itong itakda. Dito ay maaari mong ilapat ito nang minsan sa mga appointment na na-import na mula sa lahat ng account.",
             "backfillAction": "Ilapat sa mga kasalukuyang appointment",
@@ -3138,7 +3147,10 @@
             "backfillMovedNext": "Ipakita ang susunod",
             "backfillMovedAll": "Piliin lahat",
             "backfillMovedChange": "Mula kay {{from}} papunta kay {{to}}",
-            "backfillDescriptionMore": "Direktang matatanggap ito ng mga appointment na walang naaatasan. Ang mga appointment na dala pa rin ang default na naaatasan ng ibang kalendaryo ay ipinapakita nang isa-isa para mapili mo. Hindi binabago ang anumang ibang pag-aatas."
+            "backfillDescriptionMore": "Direktang matatanggap ito ng mga appointment na walang naaatasan. Ang mga appointment na dala pa rin ang default na naaatasan ng ibang kalendaryo ay ipinapakita nang isa-isa para mapili mo. Hindi binabago ang anumang ibang pag-aatas.",
+            "defaultAssignees": "Mga default na naaatasan",
+            "defaultAssigneesHint": "Awtomatikong iaatas sa mga taong ito ang mga bagong na-sync na kaganapan. Ang una ang nagtatakda ng kulay.",
+            "defaultAssigneesRoutingHint": "Mga default na naaatasan: nakukuha ng mga kaganapan mula sa isang kalendaryo ang mga taong pinili roon, at ang bagong kaganapang iniatas sa eksaktong mga taong ito ay nililikha sa kalendaryong iyon. Para ito sa mga kalendaryong Google at CalDAV, hindi sa Apple o Outlook."
         },
         "calendarAssignMeLabel": "Iatas sa akin ang mga bagong kaganapan",
         "calendarDefaultRemindersLabel": "Mga default na paalala",
@@ -3320,6 +3332,8 @@
         "displayDeleteConfirm": "Burahin ang “{{name}}”?",
         "displayPairingCodeLabel": "Pairing code",
         "displayPairingCodeHint": "Balido sa loob ng 15 minuto at isang beses lang gumagana. Buksan ang /pair sa tablet at i-type ito doon. Ipinapakita lang ito ngayon.",
+        "displayPairStepCode": "Magdagdag ng wall tablet dito at gumawa ng pairing code.",
+        "displayPairStepOpen": "Sa tablet, buksan ang address na ito at i-type doon ang code:",
         "displayDeviceUnnamed": "Device na walang pangalan",
         "displayDeviceLastSeen": "Huling nakita: {{when}}",
         "displayDeviceNeverSeen": "Hindi pa kailanman nakakonekta",
@@ -3424,7 +3438,16 @@
         "permChildRoleHint": "Ang mga bagong account ng bata ay may sarili ring panimulang pahintulot pagkagawa: {{list}}. Pagkatapos, nakalista ang mga ito sa miyembrong iyon.",
         "activeModulesHintMore": "Para itago lang para sa iyo, pumunta sa Mga Modyul → Nabigasyon.",
         "permIntroMore": "Maaaring magkaiba ang mga indibidwal na miyembro sa default ng papel. Kapag walang nakatakda, may buong access ang bawat papel; palaging mayroon nito ang mga administrator.",
-        "preferenceSaveFailed": "Hindi ma-save ang setting."
+        "preferenceSaveFailed": "Hindi ma-save ang setting.",
+        "caldavCalendarReadOnly": "Read-only: hindi maaaring mag-save ng bagong event dito",
+        "caldavCalendarReadOnlyWaiting_one": "Read-only: hindi darating ang {{count}} event na naghihintay ma-upload dito",
+        "caldavCalendarReadOnlyWaiting": "Read-only: hindi darating ang {{count}} event na naghihintay ma-upload dito",
+        "reminderListReadOnly": "Read-only: hindi maaaring mag-save ng bagong entry dito",
+        "reminderListReadOnlyWaiting_one": "Read-only: hindi darating ang {{count}} entry na naghihintay ma-upload dito",
+        "reminderListReadOnlyWaiting": "Read-only: hindi darating ang {{count}} entry na naghihintay ma-upload dito",
+        "reminderListAssigneesTasksOnly": "Maitatakda lang ang mga tao para sa mga listahang napupunta sa Mga Gawain.",
+        "syncAssigneeNotMember": "Mga miyembro lang ng sambahayan ang mapipili rito.",
+        "syncAssigneeUnknown": "Wala na ang taong ito. I-reload ang pahina."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",
@@ -3739,7 +3762,8 @@
         "banner": "Offline - muling kumokonekta…",
         "staleData": "Offline - noong: {{time}}",
         "pageTitle": "Offline ka",
-        "pageDescription": "Kailangan ng koneksyon ang pahinang ito. Kapag online na ulit ang device mo, kusa itong maglo-load."
+        "pageDescription": "Kailangan ng koneksyon ang pahinang ito. Kapag online na ulit ang device mo, kusa itong maglo-load.",
+        "snapshot": "Walang koneksyon sa server - naka-save na data, pagbasa lang"
     },
     "emptyHint": {
         "tasks": "I-tap ang + para gawin ang iyong unang gawain. I-swipe pakaliwa ang isang card para tapusin, pakanan para tingnan.",
@@ -4366,6 +4390,11 @@
             "missedBook": "Itala ang nalampasan mula {{date}}",
             "missedDetail": "{{count}} petsa ang nalampasan mula {{date}}.",
             "missedDetail_one": "{{count}} petsa ang nalampasan mula {{date}}.",
+            "failing": "Nabigo ang pagtala - sinusubukang muli bawat oras",
+            "pastQuestion": "Nasa nakaraan ang petsa",
+            "pastSkip": "Simulan mula {{date}}",
+            "pastDetail": "{{count}} petsa sana ang dumating mula {{date}}.",
+            "pastDetail_one": "{{count}} petsa sana ang dumating mula {{date}}.",
             "deleteConfirm": "Tanggalin ang paulit-ulit na gastos na ito?",
             "deleteConfirmDetail": "Wala nang bagong gastos na malilikha. Mananatili ang mga gastos na naitala na.",
             "show": "Ipakita",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "May utang sa iyo si {{name}}",
         "debtOwes": "{{from}} may utang kay {{to}}",
         "balanced": "Ayos na",
-        "balancedInGroup": "{{group}}: Ayos na"
+        "balancedInGroup": "{{group}}: Ayos na",
+        "totalsByMember": "Binayaran ng bawat isa",
+        "totalsByMemberHint": "Ang inabono, at sa ilalim ang sariling bahagi",
+        "ownShare": "Sariling bahagi: {{amount}}",
+        "paidLabel": "Binayaran",
+        "totalsByCategory": "Ayon sa kategorya",
+        "categoryFilter": "I-filter ang mga gastos ayon sa kategorya",
+        "noExpensesInCategory": "Walang gastos sa kategoryang ito."
     },
     "wmo": {
         "0": "Maaliwalas na langit",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "Halaga",
         "detailNextPaymentLabel": "Susunod na bayad",
         "renewedNamed": "Nabayaran ang \"{{name}}\" - susunod na bayad sa {{date}}.",
-        "completedNamed": "Nabayaran at natapos ang \"{{name}}\"."
+        "completedNamed": "Nabayaran at natapos ang \"{{name}}\".",
+        "accountHint": "Bawat bayad ng subscription na ito ay itinatala sa account na ito. Baguhin ang isang bayad sa budget.",
+        "accountArchivedHint": "Naka-archive ang account na ito. Itinatala ang subscription nang walang account hanggang pumili ka ng iba.",
+        "accountArchivedOption": "{{name}} (naka-archive)",
+        "accountArchivedMeta": "{{name}} naka-archive - itinatala nang walang account",
+        "visibilityHint_private": "Ikaw lang ang nakakakita ng subscription na ito at ng mga bayad nito.",
+        "visibilityHint_shared": "Nakikita ng lahat sa sambahayan ang subscription na ito at ang mga bayad nito.",
+        "errorAccountGone": "Wala na ang napiling account."
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "Hindi ma-save ang sukat.",
             "invalidValue": "Pakilagay ang wastong halaga.",
             "range": {
+                "day": "Araw",
                 "week": "Linggo",
                 "month": "Buwan",
                 "year": "Taon"
@@ -5003,6 +5047,7 @@
                 "family": "Pamilya"
             },
             "sparse": "Kulang ang sukat para magpakita ng takbo.",
+            "bandValue": "{{mean}}, mula {{low}} hanggang {{high}}",
             "recentMeasurements": "Mga kamakailang sukat",
             "deleteMeasurement": "Tanggalin ang sukat na {{value}} ({{date}})",
             "measurementDeleted": "Natanggal ang sukat",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "{{count}} duplicadong pagkuha (parehong pagkakakilanlan) ang pinagsama sa isa.",
         "importDiagnosticOther": "May entry sa kalendaryo na hindi tugma sa inaasahang format.",
         "importUnresolvedBlockingError": "Ayusin muna ang bawat blocking na babala, o tahasang laktawan ang mga apektadong event.",
-        "importIgnoreLabel": "Balewalain",
         "importCreateNewType": "Gumawa ng bagong uri ng basura",
+        "importLabelsHint": "Kung maraming basurahan ang nakasaad sa isang entry, piliin silang lahat - bawat isa ay may sariling koleksyon.",
+        "importLabelIgnoredHint": "Walang napiling uri ng basura - hindi ito ii-import.",
         "importNewTypeNameRequiredError": "Maglagay ng pangalan para sa bagong uri ng basura.",
         "importDefaultSourceName": "Na-import na file",
         "importCommittedToast": "Na-apply ang import: {{added}} idinagdag, {{changed}} binago, {{removed}} tinanggal.",
@@ -6198,6 +6244,13 @@
         "badgeLow": "Nauubos na",
         "badgeOut": "Wala nang stock",
         "bestBefore": "Mainam bago ang {{date}}",
+        "noBestBefore": "Walang petsa ng bisa",
+        "errorProductHasStock": "May stock na ulit ang produktong ito kaya hindi ito binura.",
+        "productTotal": "{{quantity}} lahat-lahat",
+        "productPlaces": "{{count}} lugar",
+        "productPlaces_one": "{{count}} lugar",
+        "productBatches": "{{count}} pangkat",
+        "productBatches_one": "{{count}} pangkat",
         "increase": "Dagdagan ang dami",
         "decrease": "Bawasan ang dami",
         "toShoppingAll": "Idagdag lahat sa listahan ng pamimili",

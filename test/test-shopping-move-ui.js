@@ -169,6 +169,31 @@ test('Der Dialog sieht mit einer Liste aus wie mit mehreren - nur ohne die Zeile
 });
 
 
+test('Eine nur lesbar gespiegelte Liste steht nicht zur Wahl, die eigene schon (#2283)', () => {
+  zustand();
+  shopping.state.lists = [
+    ...LISTEN(),
+    { id: 3, name: 'Geteilt', item_total: 0, item_checked: 0, accepts_new_items: 0 },
+    { id: 4, name: 'Alt', item_total: 0, item_checked: 0 }, // ohne Feld: wie bisher waehlbar
+  ];
+  const zeile = oeffne().content;
+  assert.match(zeile, /<option value="2" >/);
+  assert.match(zeile, /<option value="4" >Alt<\/option>/);
+  assert.ok(!zeile.includes('value="3"'), 'die nur lesbare Liste wird als Ziel angeboten');
+
+  // Steht der Artikel schon auf ihr, bleibt sie gewaehlt und waehlbar.
+  shopping.state.activeListId = 3;
+  shopping.state.items = [item({ list_id: 3 })];
+  assert.match(oeffne().content, /<option value="3" selected>Geteilt<\/option>/);
+});
+
+test('Bleibt neben der eigenen keine waehlbare Liste, faellt die Zeile ganz weg (#2283)', () => {
+  zustand();
+  shopping.state.lists = [LISTEN()[0], { ...LISTEN()[1], accepts_new_items: 0 }];
+  const { content } = oeffne();
+  assert.ok(!content.includes('item-details-list'), 'eine Auswahl mit nur einer Moeglichkeit');
+});
+
 // -------------------------------------------------------------------------
 // Speichern
 // -------------------------------------------------------------------------

@@ -1269,7 +1269,6 @@
         "pickOne": "Vyberte událost",
         "pickOneHint": "Čas, místo a připomenutí se zobrazí zde.",
         "syncTargetAssigneeAmbiguous": "Tuto osobu má jako výchozí přiřazení více kalendářů. Vyber cíl sám.",
-        "syncTargetSeveralAssignees": "Je přiřazeno více osob, proto přiřazení nevybírá žádný kalendář. Místo toho platí: {{target}}.",
         "filtersSources": "Kalendáře",
         "filterUnassigned": "Nepřiřazeno",
         "dateSpanSpoken": "od {{from}} do {{to}}",
@@ -1310,7 +1309,10 @@
         "errorDeleteFeedAdminOnly": "Tento kalendář se exportuje. Smazat ho může jen správce.",
         "errorEventGone": "Tento termín už neexistuje.",
         "errorSelectedCalendarGone": "Vybraný kalendář už neexistuje.",
-        "errorSeriesNoOccurrence": "S tímto opakováním by od data zahájení nebyl žádný termín."
+        "errorSeriesNoOccurrence": "S tímto opakováním by od data zahájení nebyl žádný termín.",
+        "localCalendarUploadsHint": "Události v tomto kalendáři se nahrávají do iCloudu přes Apple Calendar.",
+        "overlapOpenSchedule": "Otevřít rozpis směn",
+        "syncTargetNoCalendarForPeople": "Žádný kalendář nemá jako výchozí přiřazení přesně tyto osoby, proto přiřazení žádný nevybere. Místo toho platí: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategorie",
@@ -1382,7 +1384,11 @@
         "checklistDone": "Hotovo",
         "checklistOpen": "Otevřeno",
         "errorNoteGone": "Tato poznámka už neexistuje.",
-        "errorSelectedCategoryGone": "Jedna z vybraných kategorií už neexistuje."
+        "errorSelectedCategoryGone": "Jedna z vybraných kategorií už neexistuje.",
+        "lockedToggle": "Zamknout úpravy",
+        "lockedBadge": "Zamčeno",
+        "lockedHint": "Tuto poznámku můžete měnit, připínat nebo mazat jen vy a správci - včetně odškrtávání položek seznamu. Ostatní ji mohou dál číst.",
+        "errorLocked": "Tato poznámka je zamčená. Měnit ji může jen osoba, která ji vytvořila, a správci."
     },
     "markdown": {
         "bold": "Tučné (Ctrl+B)",
@@ -1858,6 +1864,8 @@
         "planSavingsDeleteConfirm": "Odstranit cíl úspor?",
         "accountsTab": "Účty",
         "netWorth": "Čisté jmění",
+        "netWorthApproxNote": "Přepočteno kurzy ze dne {{date}}",
+        "netWorthPerCurrencyNote": "Bez směnného kurzu - součet za každou měnu",
         "addAccount": "Přidat účet",
         "accountsEmptyTitle": "Zatím žádné účty",
         "accountsEmptyDescription": "Přidejte účty jako běžný nebo spořicí a sledujte zůstatky.",
@@ -1952,6 +1960,7 @@
         "saveFailed": "Uložení se nezdařilo. Zkontrolujte prosím údaje.",
         "loanAlreadyPaid": "Tato půjčka je již zcela splacena.",
         "loanInstallmentAlreadyPaid": "Tato splátka je již zaplacena.",
+        "loanPaymentRateUnavailable": "Pro měnu účtu není znám směnný kurz. U půjčky zvolte jiný účet, nebo žádný.",
         "amountExceedsLoanRemaining": "Částka je vyšší než zbývající část půjčky",
         "responsibleNotMember": "Odpovídat mohou jen členové domácnosti.",
         "seriesStartTooEarly": "První den nemůže ležet v měsíci před prvním záznamem série",
@@ -2522,7 +2531,10 @@
             "errorNoCalendarName": "Zadej název nového kalendáře.",
             "dropzoneTitle": "Přetáhněte sem soubor ICS nebo ho vyberte",
             "dropzoneTitleTouch": "Klepnutím vyberte soubor ICS",
-            "dropzoneHint": "Jen soubory .ics"
+            "dropzoneHint": "Jen soubory .ics",
+            "assigneesLabel": "Přiřadit",
+            "assigneesHint": "Nové události dostanou tyto osoby. Již importované události se stejným ID je dostanou navíc - i když bylo jejich přiřazení ručně odebráno.",
+            "successWithAssigned": "Naimportováno: {{imported}}, již existovalo: {{skipped}}, z toho nyní přiřazeno: {{assigned}}."
         },
         "memberPhoneLabel": "Telefonní číslo (volitelné)",
         "memberEmailLabel": "E-mail (volitelné)",
@@ -3162,10 +3174,7 @@
         "notificationChannelDeleteConfirmDetail": "Tímto kanálem už neodejde žádné upozornění, ani naléhavé. Adresu i přihlašovací údaje bude nutné pro nový kanál zadat celé znovu.",
         "apiTokensMcpHint": "Tyto tokeny fungují také jako Bearer tokeny pro koncový bod MCP na /mcp (např. v Claude Desktop pro vytváření úkolů, položek nákupu a událostí pomocí AI).",
         "sync": {
-            "defaultAssignee": "Výchozí přiřazení",
             "defaultAssigneeNone": "Žádné",
-            "defaultAssigneeHint": "Nově synchronizované události se automaticky přiřadí této osobě.",
-            "defaultAssigneeRoutingHint": "Výchozí přiřazení: události z kalendáře dostanou osobu zvolenou u něj a nová událost přiřazená jen této osobě se vytvoří v tomto kalendáři. Platí pro kalendáře Google a CalDAV, ne pro Apple ani Outlook.",
             "backfillTitle": "Doplnit přiřazení",
             "backfillDescription": "Výchozí přiřazení platí jen pro události přenesené po jeho nastavení. Zde ho můžete jednorázově použít na události už přenesené ze všech účtů.",
             "backfillAction": "Použít na stávající události",
@@ -3188,7 +3197,10 @@
             "backfillMovedNext": "Zobrazit další",
             "backfillMovedAll": "Vybrat vše",
             "backfillMovedChange": "Z {{from}} na {{to}}",
-            "backfillDescriptionMore": "Nepřiřazené události ho dostanou přímo. Události, které stále nesou výchozí přiřazení jiného kalendáře, se zobrazí jednotlivě k výběru. Jakékoli jiné přiřazení zůstane beze změny."
+            "backfillDescriptionMore": "Nepřiřazené události ho dostanou přímo. Události, které stále nesou výchozí přiřazení jiného kalendáře, se zobrazí jednotlivě k výběru. Jakékoli jiné přiřazení zůstane beze změny.",
+            "defaultAssignees": "Výchozí přiřazení",
+            "defaultAssigneesHint": "Nově synchronizované události se automaticky přiřadí těmto osobám. První určuje barvu.",
+            "defaultAssigneesRoutingHint": "Výchozí přiřazení: události z kalendáře dostanou osoby zvolené u něj a nová událost přiřazená přesně těmto osobám se vytvoří v tomto kalendáři. Platí pro kalendáře Google a CalDAV, ne pro Apple ani Outlook."
         },
         "calendarAssignMeLabel": "Přiřazovat nové události mně",
         "calendarDefaultRemindersLabel": "Výchozí připomenutí",
@@ -3409,6 +3421,8 @@
         "displayDeleteConfirm": "Odstranit „{{name}}“?",
         "displayPairingCodeLabel": "Párovací kód",
         "displayPairingCodeHint": "Platí 15 minut a lze jej použít právě jednou. Otevřete na tabletu /pair a zadejte jej tam. Zobrazí se pouze teď.",
+        "displayPairStepCode": "Přidejte zde nástěnný tablet a vygenerujte párovací kód.",
+        "displayPairStepOpen": "Otevřete na tabletu tuto adresu a zadejte tam kód:",
         "displayDeviceUnnamed": "Nepojmenované zařízení",
         "displayDeviceLastSeen": "Naposledy viděno: {{when}}",
         "displayDeviceNeverSeen": "Nikdy nepřipojeno",
@@ -3516,7 +3530,20 @@
         "permChildRoleHint": "Nové dětské účty dostanou při vytvoření navíc vlastní počáteční oprávnění: {{list}}. Potom jsou uvedena u daného člena.",
         "activeModulesHintMore": "Skrýt modul jen u sebe můžeš v Moduly → Navigace.",
         "permIntroMore": "Jednotliví členové se mohou od výchozího nastavení role lišit. Bez nastavení má každá role plný přístup; správci vždy.",
-        "preferenceSaveFailed": "Nastavení se nepodařilo uložit."
+        "preferenceSaveFailed": "Nastavení se nepodařilo uložit.",
+        "caldavCalendarReadOnly": "Jen pro čtení: sem nelze uložit nové události",
+        "caldavCalendarReadOnlyWaiting_one": "Jen pro čtení: {{count}} událost čekající na nahrání sem nedorazí",
+        "caldavCalendarReadOnlyWaiting": "Jen pro čtení: {{count}} události čekající na nahrání sem nedorazí",
+        "reminderListReadOnly": "Jen pro čtení: sem nelze uložit nové položky",
+        "reminderListReadOnlyWaiting_one": "Jen pro čtení: {{count}} položka čekající na nahrání sem nedorazí",
+        "reminderListReadOnlyWaiting": "Jen pro čtení: {{count}} položky čekající na nahrání sem nedorazí",
+        "caldavCalendarReadOnlyWaiting_few": "Jen pro čtení: {{count}} události čekající na nahrání sem nedorazí",
+        "caldavCalendarReadOnlyWaiting_many": "Jen pro čtení: {{count}} události čekající na nahrání sem nedorazí",
+        "reminderListReadOnlyWaiting_few": "Jen pro čtení: {{count}} položky čekající na nahrání sem nedorazí",
+        "reminderListReadOnlyWaiting_many": "Jen pro čtení: {{count}} položky čekající na nahrání sem nedorazí",
+        "reminderListAssigneesTasksOnly": "Osoby lze nastavit jen u seznamů, které jdou do Úkolů.",
+        "syncAssigneeNotMember": "Zde lze vybrat pouze členy domácnosti.",
+        "syncAssigneeUnknown": "Tato osoba již neexistuje. Načtěte stránku znovu."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",
@@ -3685,7 +3712,8 @@
         "banner": "Offline - obnovování připojení…",
         "staleData": "Offline - stav: {{time}}",
         "pageTitle": "Jsi offline",
-        "pageDescription": "Tato stránka potřebuje připojení. Jakmile bude zařízení opět online, načte se sama."
+        "pageDescription": "Tato stránka potřebuje připojení. Jakmile bude zařízení opět online, načte se sama.",
+        "snapshot": "Bez připojení k serveru - uložený stav, jen pro čtení"
     },
     "onboarding": {
         "step1Title": "Vítejte v {{name}}",
@@ -3989,6 +4017,12 @@
             "missedDetail": "Od {{date}} bylo zmeškáno {{count}} termínů.",
             "missedDetail_one": "Od {{date}} byl zmeškán {{count}} termín.",
             "missedDetail_few": "Od {{date}} byly zmeškány {{count}} termíny.",
+            "failing": "Zaúčtování selhalo - opakuje se každou hodinu",
+            "pastQuestion": "Datum je v minulosti",
+            "pastSkip": "Začít od {{date}}",
+            "pastDetail": "Od {{date}} by bylo splatných {{count}} termínů.",
+            "pastDetail_one": "Od {{date}} by byl splatný {{count}} termín.",
+            "pastDetail_few": "Od {{date}} by byly splatné {{count}} termíny.",
             "deleteConfirm": "Smazat tento opakující se výdaj?",
             "deleteConfirmDetail": "Nové výdaje už nevzniknou. Již zaúčtované výdaje zůstanou zachovány.",
             "show": "Zobrazit",
@@ -4077,7 +4111,14 @@
         "debtOwesYou": "{{name}} vám dluží",
         "debtOwes": "{{from}} dluží {{to}}",
         "balanced": "Vyrovnáno",
-        "balancedInGroup": "{{group}}: Vyrovnáno"
+        "balancedInGroup": "{{group}}: Vyrovnáno",
+        "totalsByMember": "Zaplaceno podle osob",
+        "totalsByMemberHint": "Kolik kdo vyložil, pod tím jeho vlastní podíl",
+        "ownShare": "Vlastní podíl: {{amount}}",
+        "paidLabel": "Zaplaceno",
+        "totalsByCategory": "Podle kategorie",
+        "categoryFilter": "Filtrovat výdaje podle kategorie",
+        "noExpensesInCategory": "V této kategorii nejsou žádné výdaje."
     },
     "documents": {
         "title": "Dokumenty",
@@ -4923,7 +4964,14 @@
         "detailAmountLabel": "Částka",
         "detailNextPaymentLabel": "Další platba",
         "renewedNamed": "„{{name}}“ zaplaceno - další platba {{date}}.",
-        "completedNamed": "„{{name}}“ zaplaceno a ukončeno."
+        "completedNamed": "„{{name}}“ zaplaceno a ukončeno.",
+        "accountHint": "Každá platba tohoto předplatného se zaúčtuje na tento účet. Jednotlivou platbu změníš v rozpočtu.",
+        "accountArchivedHint": "Tento účet je archivovaný. Předplatné se účtuje bez účtu, dokud nevybereš jiný.",
+        "accountArchivedOption": "{{name}} (archivováno)",
+        "accountArchivedMeta": "{{name}} archivováno - účtuje se bez účtu",
+        "visibilityHint_private": "Toto předplatné a jeho platby vidíš jen ty.",
+        "visibilityHint_shared": "Celá domácnost vidí toto předplatné a jeho platby.",
+        "errorAccountGone": "Vybraný účet už neexistuje."
     },
     "health": {
         "fasting": {
@@ -5096,6 +5144,7 @@
             "saveError": "Měření se nepodařilo uložit.",
             "invalidValue": "Zadejte platné hodnoty.",
             "range": {
+                "day": "Den",
                 "week": "Týden",
                 "month": "Měsíc",
                 "year": "Rok"
@@ -5135,6 +5184,7 @@
                 "family": "Rodina"
             },
             "sparse": "Příliš málo měření pro zobrazení trendu.",
+            "bandValue": "{{mean}}, od {{low}} do {{high}}",
             "recentMeasurements": "Poslední měření",
             "deleteMeasurement": "Smazat měření {{value}} z {{date}}",
             "measurementDeleted": "Měření smazáno",
@@ -6034,8 +6084,9 @@
         "importDiagnosticOther": "Jedna položka kalendáře neodpovídá očekávanému formátu.",
         "importDiagnosticDuplicateInstance_few": "{{count}} duplicitní termíny svozu (stejná identita) byly sloučeny do jednoho.",
         "importUnresolvedBlockingError": "Nejprve vyřešte všechna blokující upozornění, nebo explicitně přeskočte dotčené události.",
-        "importIgnoreLabel": "Ignorovat",
         "importCreateNewType": "Vytvořit nový druh odpadu",
+        "importLabelsHint": "Pokud záznam uvádí více nádob, vyberte všechny - každá dostane vlastní svoz.",
+        "importLabelIgnoredHint": "Není vybrán žádný druh odpadu - nebude importováno.",
         "importNewTypeNameRequiredError": "Zadejte prosím název nového druhu odpadu.",
         "importDefaultSourceName": "Importovaný soubor",
         "importCommittedToast": "Import použit: přidáno {{added}}, změněno {{changed}}, odebráno {{removed}}.",
@@ -6346,6 +6397,15 @@
         "badgeLow": "Téměř došlo",
         "badgeOut": "Došlo",
         "bestBefore": "MT {{date}}",
+        "noBestBefore": "Bez data trvanlivosti",
+        "errorProductHasStock": "Tento produkt je znovu na skladě a nebyl smazán.",
+        "productTotal": "{{quantity}} celkem",
+        "productPlaces": "{{count}} míst",
+        "productPlaces_one": "{{count}} místo",
+        "productPlaces_few": "{{count}} místa",
+        "productBatches": "{{count}} šarží",
+        "productBatches_one": "{{count}} šarže",
+        "productBatches_few": "{{count}} šarže",
         "increase": "Zvýšit množství",
         "decrease": "Snížit množství",
         "toShoppingAll": "Vše na nákupní seznam",

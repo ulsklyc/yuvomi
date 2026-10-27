@@ -390,10 +390,10 @@
 
 .waste-source-mapping-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -401,13 +401,36 @@
 
 .waste-source-mapping-row__label {
   font-size: var(--text-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
-.waste-source-mapping-row select {
-  max-width: 55%;
+/* EIN EINTRAG, MEHRERE TONNEN (#2273): die Abfallarten eines Labels als
+ * umbrechende Chip-Reihe, dieselbe Geometrie wie die Wochentage
+ * (.waste-weekday-picker). Die Glyphe traegt die Farbe der Art; der Chip
+ * selbst bleibt im Aktiv-Zustand des Kanons (filter-chip.css). */
+.waste-label-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.waste-label-types[aria-invalid="true"] {
+  outline: var(--focus-ring-width) solid var(--color-danger);
+  outline-offset: var(--space-1);
+  border-radius: var(--radius-md);
+}
+
+/* Kein Chip an: das Label wird nicht uebernommen. Ein ruhiger Satz unter der
+ * Reihe statt eines "Ignorieren"-Chips zwischen den Arten. */
+.waste-label-types__ignored {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
 }
 
 /* -------------------------------------------------------------------- */
@@ -445,37 +468,39 @@
 .waste-import-labels {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+}
+
+.waste-import-labels-hint {
+  font-size: var(--type-caption);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-2);
 }
 
 .waste-import-label-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: var(--space-2);
-  padding: var(--space-2) 0;
+  padding: var(--space-3) 0;
   border-bottom: 1px solid var(--color-border);
 }
 
 .waste-import-label-row:last-child { border-bottom: none; }
 
 .waste-import-label-row__name {
-  flex: 1 1 auto;
-  min-width: 120px;
   font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
 .waste-import-label-row__count {
   color: var(--color-text-secondary);
   font-size: var(--text-2xs);
-}
-
-.waste-import-label-row select {
-  flex: 1 1 160px;
-}
-
-.waste-import-new-type-name {
-  flex: 1 1 160px;
+  font-weight: var(--font-weight-regular);
 }
 
 /* -------------------------------------------------------------------- */

@@ -101,12 +101,15 @@ export function recipesPaths() {
 // #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
 // englischen `error` - je Operation der Satz, der sie nennt.
 const RECIPE_GONE = '`recipes_recipe_not_found` (404, the recipe does not exist - deleted, or removed by the sync with its recipe provider)';
+const MIRRORED = '`recipe_mirrored` (403, the recipe comes from a connected recipe provider and is changed there)';
+const SHOPPING_WRITE_REQUIRED = '`cross_module_access` (403, the caller has no write access to the shopping module - for API tokens a `shopping:write` scope)';
+const PANTRY_WRITE_REQUIRED = '`cross_module_access` (403, the caller has no write access to the pantry module - for API tokens a `pantry:write` scope)';
 const CASE_REASONS = {
-  '/api/v1/recipes/{id}': { put: RECIPE_GONE, delete: RECIPE_GONE },
+  '/api/v1/recipes/{id}': { put: `${RECIPE_GONE}, ${MIRRORED}`, delete: `${RECIPE_GONE}, ${MIRRORED}` },
   '/api/v1/recipes/{id}/to-shopping-list': {
-    post: `${RECIPE_GONE}, \`shopping_list_not_found\` (404, the chosen shopping list does not exist)`,
+    post: `${RECIPE_GONE}, \`shopping_list_not_found\` (404, the chosen shopping list does not exist), ${SHOPPING_WRITE_REQUIRED}`,
   },
   '/api/v1/recipes/{id}/ingredient-match': {
-    put: `${RECIPE_GONE}, \`recipes_ingredient_not_found\` (404, the recipe no longer has this ingredient), \`recipes_selected_pantry_item_not_found\` (404, the chosen pantry item does not exist)`,
+    put: `${RECIPE_GONE}, \`recipes_ingredient_not_found\` (404, the recipe no longer has this ingredient), \`recipes_selected_pantry_item_not_found\` (404, the chosen pantry item does not exist), ${PANTRY_WRITE_REQUIRED}`,
   },
 };

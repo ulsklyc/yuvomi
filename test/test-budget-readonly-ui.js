@@ -1286,7 +1286,7 @@ test('Abo: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlu
 
 const ausgabe = {
   id: 40, title: 'Ferienwohnung', amount: 600, currency: 'EUR', payer_id: 1, payer_name: 'Alex',
-  expense_date: '2026-08-02', split_method: 'exact', description: 'Anzahlung', attachments: [beleg],
+  expense_date: '2026-08-02', split_method: 'exact', category: 'travel', description: 'Anzahlung', attachments: [beleg],
   splits: [
     { user_id: 1, display_name: 'Alex', amount: 400, currency: 'EUR' },
     { user_id: 3, display_name: 'Emma', amount: 200, currency: 'EUR' },
@@ -1296,7 +1296,7 @@ const ausgabe = {
 test('Ausgabe: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlung', () => {
   const vorher = { ...split.state };
   Object.assign(split.state, {
-    activeGroupId: 2, groups: [{ id: 2, default_currency: 'EUR' }], meta: { currencies: ['EUR', 'USD'] },
+    activeGroupId: 2, groups: [{ id: 2, default_currency: 'EUR' }], meta: { currencies: ['EUR', 'USD'], categories: ['groceries', 'travel', 'general'] },
     groupMembers: [{ id: 1, display_name: 'Alex' }, { id: 3, display_name: 'Emma' }],
   });
   const werte = {
@@ -1306,6 +1306,8 @@ test('Ausgabe: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Ha
     'splitExpenses.paidBy': [[/<option value="1" selected>Alex</], /^Alex$/],
     'splitExpenses.date': [[/name="expense_date"[^>]*value="2026-08-02"/], /^2026-08-02$/],
     'splitExpenses.splitMethod': [[/<option value="exact" selected>/], /^splitExpenses\.splitExact$/],
+    // Die Kategorie (#1941): im Dialog gewaehlt, in der Leseansicht benannt.
+    'splitExpenses.categoryLabel': [[/<option value="travel" selected>/], /^splitExpenses\.category\.travel$/],
     'splitExpenses.participants': [[/name="split_value_1"[^>]*value="400,00"/, /name="split_value_3"[^>]*value="200,00"/],
       /^Alex: 400,00\s€\nEmma: 200,00\s€$/],
     'splitExpenses.notes': [[/Anzahlung<\/textarea>/], /^Anzahlung$/],

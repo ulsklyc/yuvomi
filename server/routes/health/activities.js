@@ -77,7 +77,7 @@ router.patch('/activities/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const w = writableClause('', viewer);
     const existing = db.get().prepare(`SELECT * FROM health_activities WHERE id = ? AND ${w.sql}`).get(id, ...w.params);
@@ -112,7 +112,7 @@ router.delete('/activities/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const w = writableClause('', viewer);
     const existing = db.get().prepare(`SELECT id FROM health_activities WHERE id = ? AND ${w.sql}`).get(id, ...w.params);

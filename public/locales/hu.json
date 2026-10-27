@@ -1190,7 +1190,6 @@
         "pickOne": "Válassz egy eseményt",
         "pickOneHint": "Az időpont, a helyszín és az emlékeztetők itt jelennek meg.",
         "syncTargetAssigneeAmbiguous": "Több naptárnak is ez a személy az alapértelmezett hozzárendelése. Válaszd ki magad a célt.",
-        "syncTargetSeveralAssignees": "Több személy van hozzárendelve, ezért a hozzárendelés nem választ naptárat. Helyette ez érvényes: {{target}}.",
         "filtersSources": "Naptárak",
         "filterUnassigned": "Senkihez sincs rendelve",
         "dateSpanSpoken": "{{from}} és {{to}} között",
@@ -1229,7 +1228,10 @@
         "errorDeleteFeedAdminOnly": "Ez a naptár exportálva van. Csak egy rendszergazda törölheti.",
         "errorEventGone": "Ez az esemény már nem létezik.",
         "errorSelectedCalendarGone": "A kiválasztott naptár már nem létezik.",
-        "errorSeriesNoOccurrence": "Ezzel az ismétléssel a kezdő dátumtól egyetlen esemény sem lenne."
+        "errorSeriesNoOccurrence": "Ezzel az ismétléssel a kezdő dátumtól egyetlen esemény sem lenne.",
+        "localCalendarUploadsHint": "Az ebben a naptárban lévő események az Apple Calendaron keresztül feltöltődnek az iCloudba.",
+        "overlapOpenSchedule": "Műszakbeosztás megnyitása",
+        "syncTargetNoCalendarForPeople": "Egyik naptár alapértelmezett hozzárendelése sem pontosan ezek a személyek, ezért a hozzárendelés nem választ naptárt. Helyette: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategóriák",
@@ -1300,7 +1302,11 @@
         "checklistDone": "Kész",
         "checklistOpen": "Nyitott",
         "errorNoteGone": "Ez a jegyzet már nem létezik.",
-        "errorSelectedCategoryGone": "Az egyik kiválasztott kategória már nem létezik."
+        "errorSelectedCategoryGone": "Az egyik kiválasztott kategória már nem létezik.",
+        "lockedToggle": "Szerkesztés zárolása",
+        "lockedBadge": "Zárolva",
+        "lockedHint": "Ezt a jegyzetet csak te és a rendszergazdák módosíthatjátok, tűzhetitek ki vagy törölhetitek - a lista elemeinek kipipálását is beleértve. Mindenki más továbbra is olvashatja.",
+        "errorLocked": "Ez a jegyzet zárolva van. Csak az módosíthatja, aki létrehozta, és a rendszergazdák."
     },
     "markdown": {
         "bold": "Félkövér (Ctrl+B)",
@@ -1772,6 +1778,8 @@
         "planSavingsDeleteConfirm": "Törli a megtakarítási célt?",
         "accountsTab": "Számlák",
         "netWorth": "Nettó vagyon",
+        "netWorthApproxNote": "Átszámítva a(z) {{date}} árfolyamaival",
+        "netWorthPerCurrencyNote": "Árfolyam nélkül - összeg pénznemenként",
         "addAccount": "Számla hozzáadása",
         "accountsEmptyTitle": "Még nincsenek számlák",
         "accountsEmptyDescription": "Adj hozzá számlákat, például folyó- vagy megtakarítási számlát az egyenlegek követéséhez.",
@@ -1865,6 +1873,7 @@
         "saveFailed": "A mentés nem sikerült. Kérjük, ellenőrizze az adatokat.",
         "loanAlreadyPaid": "Ez a hitel már teljesen ki van fizetve.",
         "loanInstallmentAlreadyPaid": "Ez a részlet már ki van fizetve.",
+        "loanPaymentRateUnavailable": "A számla pénznemére nem ismert árfolyam. Válasszon másik számlát a kölcsönhöz, vagy egyet sem.",
         "amountExceedsLoanRemaining": "Az összeg nagyobb, mint a hitel fennmaradó része",
         "responsibleNotMember": "Felelős csak a háztartás tagja lehet.",
         "seriesStartTooEarly": "A kezdőnap nem eshet a sorozat első tételét megelőző hónapra",
@@ -2402,7 +2411,10 @@
             "errorNoCalendarName": "Adj meg egy nevet az új naptárhoz.",
             "dropzoneTitle": "Húzz ide egy ICS-fájlt, vagy válassz egyet",
             "dropzoneTitleTouch": "Koppintson egy ICS-fájl kiválasztásához",
-            "dropzoneHint": "Csak .ics fájlok"
+            "dropzoneHint": "Csak .ics fájlok",
+            "assigneesLabel": "Hozzárendelés",
+            "assigneesHint": "Az új események ezeket a személyeket kapják. Egy azonos azonosítóval már importált esemény pluszban kapja őket - akkor is, ha a hozzárendelését kézzel eltávolították.",
+            "successWithAssigned": "Importálva: {{imported}}, már létezett: {{skipped}}, ebből most hozzárendelve: {{assigned}}."
         },
         "birthdayFeedTitle": "Születésnaptár exportálása",
         "birthdayFeedDescription": "Minden mentett születésnap és névnap évente ismétlődő egész napos eseményként, emlékeztető nélkül is. Bármely ICS-t támogató naptáralkalmazásban használható.",
@@ -3060,10 +3072,7 @@
         "notificationChannelDeleteConfirmDetail": "Ezen a csatornán mostantól semmilyen értesítés nem megy ki, még sürgős sem. A címet és a belépési adatokat új csatornához teljesen újra meg kell adni.",
         "apiTokensMcpHint": "Ezek a tokenek Bearer tokenként is működnek a /mcp címen elérhető MCP-végponthoz (pl. a Claude Desktopban, feladatok, bevásárlólista-tételek és események MI-vel történő létrehozásához).",
         "sync": {
-            "defaultAssignee": "Alapértelmezett hozzárendelés",
             "defaultAssigneeNone": "Nincs",
-            "defaultAssigneeHint": "Az újonnan szinkronizált események automatikusan ehhez a személyhez lesznek rendelve.",
-            "defaultAssigneeRoutingHint": "Alapértelmezett hozzárendelés: egy naptár eseményei az ott kiválasztott személyhez kerülnek, és a csak neki kiosztott új esemény abban a naptárban jön létre. Google- és CalDAV-naptárakra vonatkozik, Apple-re és Outlookra nem.",
             "backfillTitle": "Hozzárendelések pótlása",
             "backfillDescription": "Az alapértelmezett hozzárendelés csak a beállítása után behozott időpontokra vonatkozik. Itt egyszer alkalmazhatja az összes fiókból már behozott időpontokra.",
             "backfillAction": "Alkalmazás a meglévő időpontokra",
@@ -3083,7 +3092,10 @@
             "backfillMovedNext": "Következők",
             "backfillMovedAll": "Összes kijelölése",
             "backfillMovedChange": "{{from}} helyett {{to}}",
-            "backfillDescriptionMore": "A hozzárendelés nélküli időpontok közvetlenül megkapják. Azok az időpontok, amelyek még egy másik naptár alapértelmezett hozzárendelését viselik, egyenként jelennek meg választásra. Minden más hozzárendelés változatlan marad."
+            "backfillDescriptionMore": "A hozzárendelés nélküli időpontok közvetlenül megkapják. Azok az időpontok, amelyek még egy másik naptár alapértelmezett hozzárendelését viselik, egyenként jelennek meg választásra. Minden más hozzárendelés változatlan marad.",
+            "defaultAssignees": "Alapértelmezett hozzárendelés",
+            "defaultAssigneesHint": "Az újonnan szinkronizált események automatikusan ezekhez a személyekhez kerülnek. Az első határozza meg a színt.",
+            "defaultAssigneesRoutingHint": "Alapértelmezett hozzárendelés: egy naptár eseményei az ott választott személyeket kapják, és egy pontosan ezekhez a személyekhez rendelt új esemény ebben a naptárban jön létre. Google és CalDAV naptárakra érvényes, Apple-re és Outlookra nem."
         },
         "calendarAssignMeLabel": "Új események hozzám rendelése",
         "calendarDefaultRemindersLabel": "Alapértelmezett emlékeztetők",
@@ -3302,6 +3314,8 @@
         "displayDeleteConfirm": "Törli a következőt: „{{name}}”?",
         "displayPairingCodeLabel": "Párosítókód",
         "displayPairingCodeHint": "15 percig érvényes, és pontosan egyszer használható. Nyisd meg a táblagépen a /pair címet, és írd be ott. Csak most jelenik meg.",
+        "displayPairStepCode": "Adj hozzá itt egy fali táblagépet, és hozz létre párosítókódot.",
+        "displayPairStepOpen": "Nyisd meg a táblagépen ezt a címet, és írd be ott a kódot:",
         "displayDeviceUnnamed": "Névtelen eszköz",
         "displayDeviceLastSeen": "Utoljára látva: {{when}}",
         "displayDeviceNeverSeen": "Még soha nem csatlakozott",
@@ -3406,7 +3420,16 @@
         "permChildRoleHint": "Az új gyerekfiókok létrehozáskor saját kezdő jogosultságokat is kapnak: {{list}}. Ezek utána az adott tagnál láthatók.",
         "activeModulesHintMore": "Ha csak magadnál rejtenéd el, nézd meg a Modulok → Navigáció oldalt.",
         "permIntroMore": "Az egyes tagok eltérhetnek a szerep alapértelmezésétől. Beállítás nélkül minden szerep teljes hozzáférést kap; a rendszergazdák mindig.",
-        "preferenceSaveFailed": "A beállítás nem menthető."
+        "preferenceSaveFailed": "A beállítás nem menthető.",
+        "caldavCalendarReadOnly": "Csak olvasható: ide nem menthetők új események",
+        "caldavCalendarReadOnlyWaiting_one": "Csak olvasható: {{count}} ide feltöltésre váró esemény nem érkezik meg",
+        "caldavCalendarReadOnlyWaiting": "Csak olvasható: {{count}} ide feltöltésre váró esemény nem érkezik meg",
+        "reminderListReadOnly": "Csak olvasható: ide nem menthetők új bejegyzések",
+        "reminderListReadOnlyWaiting_one": "Csak olvasható: {{count}} ide feltöltésre váró bejegyzés nem érkezik meg",
+        "reminderListReadOnlyWaiting": "Csak olvasható: {{count}} ide feltöltésre váró bejegyzés nem érkezik meg",
+        "reminderListAssigneesTasksOnly": "Személyek csak a Feladatokba kerülő listákhoz állíthatók be.",
+        "syncAssigneeNotMember": "Itt csak a háztartás tagjai választhatók.",
+        "syncAssigneeUnknown": "Ez a személy már nem létezik. Töltsd újra az oldalt."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",
@@ -3739,7 +3762,8 @@
         "banner": "Offline - újracsatlakozás…",
         "staleData": "Offline - állapot: {{time}}",
         "pageTitle": "Offline vagy",
-        "pageDescription": "Ehhez az oldalhoz kapcsolat kell. Amint az eszközöd újra online, magától betöltődik."
+        "pageDescription": "Ehhez az oldalhoz kapcsolat kell. Amint az eszközöd újra online, magától betöltődik.",
+        "snapshot": "Nincs kapcsolat a szerverrel - mentett állapot, csak olvasható"
     },
     "shortcuts": {
         "search": "Keresés megnyitása",
@@ -4366,6 +4390,11 @@
             "missedBook": "Utólagos könyvelés ettől: {{date}}",
             "missedDetail": "{{date}} óta {{count}} időpont maradt ki.",
             "missedDetail_one": "{{date}} óta {{count}} időpont maradt ki.",
+            "failing": "A könyvelés sikertelen - óránként újrapróbálja",
+            "pastQuestion": "A dátum a múltban van",
+            "pastSkip": "Kezdés ettől: {{date}}",
+            "pastDetail": "{{date}} óta {{count}} időpont lett volna esedékes.",
+            "pastDetail_one": "{{date}} óta {{count}} időpont lett volna esedékes.",
             "deleteConfirm": "Törli ezt az ismétlődő költséget?",
             "deleteConfirmDetail": "Új költség nem jön létre. A már lekönyvelt költségek megmaradnak.",
             "show": "Megjelenítés",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}} tartozik Önnek",
         "debtOwes": "{{from}} tartozik neki: {{to}}",
         "balanced": "Rendezve",
-        "balancedInGroup": "{{group}}: Rendezve"
+        "balancedInGroup": "{{group}}: Rendezve",
+        "totalsByMember": "Személyenként fizetve",
+        "totalsByMemberHint": "Amit kiki kifizetett, alatta a saját része",
+        "ownShare": "Saját rész: {{amount}}",
+        "paidLabel": "Fizetve",
+        "totalsByCategory": "Kategória szerint",
+        "categoryFilter": "Kiadások szűrése kategória szerint",
+        "noExpensesInCategory": "Ebben a kategóriában nincs kiadás."
     },
     "wmo": {
         "0": "Tiszta égbolt",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "Összeg",
         "detailNextPaymentLabel": "Következő fizetés",
         "renewedNamed": "„{{name}}” kifizetve - következő fizetés: {{date}}.",
-        "completedNamed": "„{{name}}” kifizetve és lezárva."
+        "completedNamed": "„{{name}}” kifizetve és lezárva.",
+        "accountHint": "Az előfizetés minden fizetése erre a számlára kerül. Egy-egy fizetést a költségvetésben módosíthatsz.",
+        "accountArchivedHint": "Ez a számla archivált. Az előfizetés számla nélkül könyvel, amíg másikat nem választasz.",
+        "accountArchivedOption": "{{name}} (archivált)",
+        "accountArchivedMeta": "{{name}} archivált - számla nélkül könyvel",
+        "visibilityHint_private": "Ezt az előfizetést és a fizetéseit csak te látod.",
+        "visibilityHint_shared": "A háztartás minden tagja látja ezt az előfizetést és a fizetéseit.",
+        "errorAccountGone": "A kiválasztott számla már nem létezik."
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "A mérés nem menthető.",
             "invalidValue": "Adj meg érvényes értékeket.",
             "range": {
+                "day": "Nap",
                 "week": "Hét",
                 "month": "Hónap",
                 "year": "Év"
@@ -5003,6 +5047,7 @@
                 "family": "Család"
             },
             "sparse": "Túl kevés mérés a trend megjelenítéséhez.",
+            "bandValue": "{{mean}}, {{low}} és {{high}} között",
             "recentMeasurements": "Legutóbbi mérések",
             "deleteMeasurement": "Mérés törlése: {{value}} ({{date}})",
             "measurementDeleted": "Mérés törölve",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "{{count}} duplikált begyűjtési előfordulás (azonos azonosítóval) egybe lett vonva.",
         "importDiagnosticOther": "Egy naptárbejegyzés nem a várt formátumú.",
         "importUnresolvedBlockingError": "Először oldjon meg minden blokkoló figyelmeztetést, vagy kifejezetten hagyja ki az érintett eseményeket.",
-        "importIgnoreLabel": "Figyelmen kívül hagyás",
         "importCreateNewType": "Új hulladéktípus létrehozása",
+        "importLabelsHint": "Ha egy bejegyzés több kukát nevez meg, válaszd ki mindet - mindegyik saját ürítést kap.",
+        "importLabelIgnoredHint": "Nincs kiválasztott hulladéktípus - nem kerül importálásra.",
         "importNewTypeNameRequiredError": "Adjon nevet az új hulladéktípusnak.",
         "importDefaultSourceName": "Importált fájl",
         "importCommittedToast": "Az import alkalmazva: {{added}} hozzáadva, {{changed}} módosítva, {{removed}} eltávolítva.",
@@ -6198,6 +6244,13 @@
         "badgeLow": "Majdnem elfogyott",
         "badgeOut": "Elfogyott",
         "bestBefore": "MMD {{date}}",
+        "noBestBefore": "MMD nélkül",
+        "errorProductHasStock": "Ez a termék ismét készleten van, ezért nem lett törölve.",
+        "productTotal": "összesen {{quantity}}",
+        "productPlaces": "{{count}} hely",
+        "productPlaces_one": "{{count}} hely",
+        "productBatches": "{{count}} adag",
+        "productBatches_one": "{{count}} adag",
         "increase": "Mennyiség növelése",
         "decrease": "Mennyiség csökkentése",
         "toShoppingAll": "Mindent a bevásárlólistára",

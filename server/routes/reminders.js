@@ -364,7 +364,7 @@ router.get('/all', (req, res) => {
     const entityId   = parseInt(req.query.entity_id, 10);
 
     if (!VALID_ENTITY_TYPES.includes(entityType) || !entityId) {
-      return res.status(400).json({ error: 'entity_type und entity_id sind erforderlich.', code: 400 });
+      return res.status(400).json({ error: 'entity_type and entity_id are required.', code: 400 });
     }
     if (!mayTouchOrigin(req, entityType)) {
       return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
@@ -395,7 +395,7 @@ router.get('/', (req, res) => {
     const entityId    = parseInt(req.query.entity_id, 10);
 
     if (!VALID_ENTITY_TYPES.includes(entityType) || !entityId) {
-      return res.status(400).json({ error: 'entity_type und entity_id sind erforderlich.', code: 400 });
+      return res.status(400).json({ error: 'entity_type and entity_id are required.', code: 400 });
     }
     if (!mayTouchOrigin(req, entityType)) {
       return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
@@ -492,7 +492,7 @@ router.put('/', (req, res) => {
     const remindAts  = req.body?.remind_ats;
 
     if (!VALID_ENTITY_TYPES.includes(entityType) || !entityId) {
-      return res.status(400).json({ error: 'entity_type und entity_id sind erforderlich.', code: 400 });
+      return res.status(400).json({ error: 'entity_type and entity_id are required.', code: 400 });
     }
     // DERSELBE RIEGEL WIE IN POST. Er fehlte hier zunächst, und das war der
     // teurere Weg: PUT ersetzt die ganze Menge und darf bis zu fünf Termine
@@ -509,7 +509,7 @@ router.put('/', (req, res) => {
       return res.status(404).json(TARGET_NOT_FOUND);
     }
     if (!Array.isArray(remindAts)) {
-      return res.status(400).json({ error: 'remind_ats muss ein Array sein.', code: 400 });
+      return res.status(400).json({ error: 'remind_ats must be an array.', code: 400 });
     }
 
     // Jeden Eintrag validieren und nach naiv-UTC bringen (#1364), DANACH
@@ -523,7 +523,7 @@ router.put('/', (req, res) => {
     }
     const unique = [...new Set(checked.map((result) => result.value))];
     if (unique.length > MAX_REMINDERS_PER_ENTITY) {
-      return res.status(400).json({ error: `Maximal ${MAX_REMINDERS_PER_ENTITY} Erinnerungen je Eintrag.`, code: 400 });
+      return res.status(400).json({ error: `At most ${MAX_REMINDERS_PER_ENTITY} reminders per entity.`, code: 400 });
     }
 
     const replace = db.get().transaction((values) => {
@@ -567,7 +567,7 @@ router.patch('/:id/dismiss', (req, res) => {
     const reminderId = parseInt(req.params.id, 10);
 
     if (!reminderId) {
-      return res.status(400).json({ error: 'Ungültige Erinnerungs-ID.', code: 400 });
+      return res.status(400).json({ error: 'Invalid reminder ID.', code: 400 });
     }
 
     const reminder = db.get().prepare(
@@ -575,7 +575,7 @@ router.patch('/:id/dismiss', (req, res) => {
     ).get(reminderId, userId);
 
     if (!reminder) {
-      return res.status(404).json({ error: 'Erinnerung nicht gefunden.', code: 404 });
+      return res.status(404).json({ error: 'Reminder not found.', code: 404 });
     }
     // Verwerfen ist ein Schreibvorgang am fremden Modul: ein Token mit
     // `calendar:write` durfte hier bis zur Review von #811 eine Vorrats- oder
@@ -603,7 +603,7 @@ router.delete('/:id', (req, res) => {
     const reminderId = parseInt(req.params.id, 10);
 
     if (!reminderId) {
-      return res.status(400).json({ error: 'Ungültige Erinnerungs-ID.', code: 400 });
+      return res.status(400).json({ error: 'Invalid reminder ID.', code: 400 });
     }
 
     const reminder = db.get().prepare(
@@ -611,7 +611,7 @@ router.delete('/:id', (req, res) => {
     ).get(reminderId, userId);
 
     if (!reminder) {
-      return res.status(404).json({ error: 'Erinnerung nicht gefunden.', code: 404 });
+      return res.status(404).json({ error: 'Reminder not found.', code: 404 });
     }
     if (!mayTouchOrigin(req, reminder.entity_type, 'write')) {
       return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
@@ -643,7 +643,7 @@ router.delete('/', (req, res) => {
     const entityId   = parseInt(req.query.entity_id, 10);
 
     if (!VALID_ENTITY_TYPES.includes(entityType) || !entityId) {
-      return res.status(400).json({ error: 'entity_type und entity_id sind erforderlich.', code: 400 });
+      return res.status(400).json({ error: 'entity_type and entity_id are required.', code: 400 });
     }
     if (!mayTouchOrigin(req, entityType, 'write')) {
       return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });

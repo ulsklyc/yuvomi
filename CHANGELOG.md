@@ -33,6 +33,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   all-day - and says so ("6 events left"), dropping the part once none is left. A coming one names
   "15:00 · in 2 hrs" or "in 25 min" in its module's colour. The timeline only appears when the Calendar tile is not on the overview, so
   it never repeats it.
+- **A closed app opened without a connection shows your saved lists** (#2293). Until now only an
+  app left in the background kept them; a fresh start without signal stopped at "server can't be
+  reached". Now calendar, tasks, the shopping list, contacts and the overview open on the state
+  this device last loaded, read-only, with a strip at the top that says so. As soon as your server
+  answers again, the session is checked and the page refreshes; an expired session goes to the
+  sign-in as before, and once the session has expired the saved state is not shown and is deleted.
+  A remote sign-out reaches the device when it is back online. Split guests keep their old
+  behaviour; a wall display has no session and gets its own limit (see Changed). Signing out now always deletes the saved data on the device, also when the app
+  was not yet controlled by its service worker. After this update, a device shows its saved state
+  again once it has been online with the app.
+- **One entry of a waste calendar can fill several bins** (#2273). Some cities name two bins in
+  one entry when they share a day - Dresden writes "Leerung Bio-Tonne, Blaue Tonne". In the import
+  and in a source's mappings, each label now shows your waste types as chips: pick every bin the
+  entry names, and each gets its own pickup on that day, with its own colour and reminder. No chip
+  picked means the label is not imported. Existing mappings carry over (migration 267). API
+  clients send and read `type_ids`; the single `type_id` is still accepted and returned.
+- **A synced calendar can bring its events in for several people** (#1897). The default
+  assignee of a Google or CalDAV calendar and of a calendar subscription is now a set: a shared
+  "Together" calendar assigns its events to both of you, your own calendars stay with one person
+  each. The field in each calendar row opens a menu with one switch per member; the first person
+  chosen gives an event its colour. The other rules follow the set: an event moved between two
+  calendars takes the new calendar's people while its assignment is still exactly the old
+  calendar's, "Apply to existing appointments" fills in all of them, and a new event assigned to
+  exactly the people of one calendar is created there. Existing single assignments carry over
+  (migration 265). API clients send `default_assignee_user_ids`; the single
+  `default_assignee_user_id` is still accepted and returned.
+- **A reminder list mapped to Tasks can assign its new tasks** (#1221). Next to the list in the
+  reminder sync settings, choose who gets the tasks the sync brings in from it. Only new tasks get
+  them; an assignment you change or clear later stays.
+- **A calendar import can assign its events** (#1940). Choose people in the import form: every
+  new event of the run is assigned to them, and an event you imported before - the same
+  appointment in a second family member's link - is not created again but gets them added. So two
+  children's feeds leave a shared dentist appointment as one event with both, and running an
+  earlier import again with a person assigns what it brought in. Without a person the import works
+  as before.
+- **A recurring shared expense that keeps failing says so on its row** (#1746). When the hourly
+  run cannot book a series for an unexpected reason, the series keeps running and is retried
+  every hour, as before - so a fault on our side never stops a household's rent - but its row,
+  read view and edit dialog now say "Booking failed - retrying every hour" instead of the error
+  living only in the server log. A booking, an edit or a pause for a known reason clears it. API
+  clients see `failed_at` on each recurring expense (migration 263).
+- **A subscription books to an account, and can be shared or private** (#1277, #1701). The
+  subscription dialog has an Account field once the budget has accounts: every payment the
+  subscription books goes to it, the next one as soon as you save. A payment already booked is an
+  ordinary entry - change its account in the budget for a month someone else paid, and a later
+  edit of the subscription leaves it alone. When the chosen account is archived, the subscription
+  books without an account and says so quietly on its row and under the field; restoring the
+  account books to it again, and deleting it clears the choice. In the personal budget mode the
+  dialog also has Visibility, as on a budget entry: a new subscription starts shared, a private one
+  and its payments are seen only by you. For API clients `account_id` is new on
+  `/api/v1/budget/subscriptions`, with `account_name` and `account_archived` in the answer;
+  `/meta` adds `budget_mode` and `accounts`, and an unknown account answers `400` with reason
+  `subscriptions_account_not_found` (migration 264).
+- **A recurring shared expense with a start date in the past asks before booking the gap**
+  (#1748). Creating one, or moving its next date, to a day before today used to book one missed
+  date per hour until it had caught up. The dialog now asks, as resuming does: start from the next
+  date (the default) or book the missed dates. API clients send `missed: "skip"` or `"book"` on
+  `POST` and `PUT`; without it the date stays as before.
+- **A note can be private, and a note can be locked to its author** (#1514, #1602). The note
+  editor has Visibility - "All family members" or "Only me" - and "Lock editing", next to colour
+  and pin. A private note is gone for everybody else, administrators included: from Notes, the
+  Overview tile and its counts, and search. A locked note can still be read by everyone, but only
+  its creator and administrators can change, pin, file into categories or delete it - ticking its
+  checklist items included, unlike a locked task. Only the creator changes the visibility; the
+  lock is the creator's and the administrators'. Cards show a lock or a crossed-out eye next to the
+  name. Existing notes stay visible to everyone and unlocked. For API clients the fields are
+  `visibility` and `locked` on `/api/v1/notes`; a locked note answers `403` with reason
+  `note_locked`.
+- **Health vitals show every reading, not only a daily average** (#1699, #1798). Week, month and
+  year draw a low-high band per day (per month in the year) with the mean as the dot on it, so a 55
+  in the morning and a 190 at lunch no longer become one unremarkable point; a day with a single
+  reading looks as before. A new Day range shows one date on an hour axis with each reading at its
+  time. Blood pressure is one bar per reading from diastolic to systolic, readings of the same day
+  side by side, a value without its pair as a point; the pulse keeps its own chart below. "Recent
+  measurements" now shows the time and the note of each reading.
+- **A shared-expenses group shows what each person paid and where the money went** (#1888, #1941).
+  Below the balances, each person has one line per currency with what they paid at the till and,
+  under it, their own share - paid minus share is their balance before any payment between members.
+  Next to it, the group adds up its expenses per category and currency, largest first. Both count
+  every expense of the group, not only the ones the list has loaded, in the currency the balances
+  are kept in, without conversion; deleted expenses and payments between members do not count.
+  Expenses and recurring expenses now have a Category field, and a filter next to the expense list
+  shows one category at a time - it offers the categories the group uses, and an empty result says
+  the filter is why. Editing an expense without sending a category, through the app or `PUT
+  /api/v1/split-expenses/expenses/{id}`, now keeps its category instead of resetting it to
+  "General". For API clients the totals are `member_totals` and `category_totals` on `GET
+  /api/v1/split-expenses/groups/{id}/balances`; the OpenAPI description lists both.
 - **Choose the night hours on each device, and the screensaver dims in them too** (#2234, #1901).
   Settings - This device - Night hours sets "dim from" and "dim until" by whole hour, 22:00 to 06:00
   as before unless you change it, on the household's clock and for this device only. Wall mode dims
@@ -70,8 +157,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Lissy93/portainer-templates](https://github.com/Lissy93/portainer-templates) catalog, which
   pulls it from `main` every night, so the template never pins an older version. The installer
   schema tests check that every field exists in the stack and that no field locks a setting.
+- **Stock: the page lists products, with their batches underneath** (part 2 of #1448). Without a
+  filter, stock is sorted into sections by category, in the order of your shopping categories.
+  A product with one batch looks as before and now names its storage location. A product with
+  several batches shows its total and where it is, such as "4 l in all · 2 places", and warns
+  when one of them has expired or expires soon; tap it to open the batches, each with its own
+  location, best-before date, stepper and cart. A product whose last batch is used up stays
+  listed as out of stock, with a cart that puts it on the shopping list; swipe it away or use
+  its menu to delete it, with undo like a batch. The expired, expiring soon and running low
+  filters still list single batches, now with the product's total where it has several, and a
+  chip for each storage location that holds stock lists what is there. For API clients,
+  `GET /api/v1/pantry` additionally returns `products`, `import-pantry` accepts
+  `pantry_product_id`, and `DELETE /api/v1/pantry/products/{id}` deletes a product without
+  batches.
 
 ### Changed
+- **A wall display keeps its saved lists for 72 hours after its last contact with your server.**
+  Until now a display kept the lists it had loaded for as long as it stayed open without a
+  connection, with no end. Saved data on a device now ends with its session, and a display has
+  none, so your server now gives it a sliding limit: every answer it receives moves the limit to
+  72 hours from now. A display that loses the connection over a weekend still shows its calendar
+  and tasks; one that has been offline longer shows the unreachable state and deletes the saved
+  lists. A display you remove or block in the settings deletes them as soon as it is online again.
+  **A display restarted without a connection now opens on its saved lists** instead of "server
+  can't be reached", with the same strip as on a phone. For that it keeps a small record of its
+  own: its name and colour, which modules it may show, and the size of the household - no names
+  of family members, no contact details and no sign-in data. It ends with the same 72 hours.
+- **The calendar head names the period, not the module** (#1797, #1462). On a computer
+  "October 2026" (in the agenda its span) is now the title of the head, the year in grey, the
+  arrows right in front of it and "Today" behind it; the arrows no longer stand 300px apart, and
+  nothing behind the title moves when the month changes. "Calendar" stays the page heading for
+  screen readers. Overlapping shift schedules no longer add a row to the head on phones and
+  tablets: a warning sign sits in the title row, and tapping it shows every overlap with a link
+  to the schedule (on a computer the short text stays and opens the same list).
+- **A dialog sheet lightens its backdrop as you drag it, and sheets rise from the bottom edge** (#1801,
+  #1802). On a phone, pulling a dialog down now fades the dimmed, blurred page behind it with your
+  finger, like the "More" sheet already did; the sheet itself stays solid, and released early both
+  come back. Dialogs, the "More" sheet and search now rise over their full height from the bottom
+  edge on a damped spring that never swings past its place, instead of appearing 24px above it with
+  a fade. Closing by tap or Esc is unchanged. Browsers without CSS `linear()` easing (Chrome before
+  113, Safari before 17.2, Firefox before 112) keep the previous entrance, and with reduced motion
+  sheets still only fade. The sidebar's active pill glides on the same kind of spring, as far as
+  before but settling sooner.
 - **Every tile on the overview is as tall as what it shows.** From tablet width up, a tile used to
   take the height of its neighbours in the same row, so a list with two entries stood as tall as one
   with five and the rest was blank card - with every tile shown, a fifth to a quarter of the card
@@ -171,6 +298,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The calendar sync settings no longer show that text: a failed Google or Outlook action says so in
   your language, and an expired Google sign-in that cannot be reconnected on the spot says to
   reconnect.
+- **Managing local calendars refuses in English and names its reason in the API description**
+  (#1695, #2267). `/api/v1/calendar/calendars` answered a server error with "Interner Fehler"; it now
+  says "Internal server error.". The OpenAPI description now lists `cross_module_access` (403
+  without write access to the calendar) at creating, reordering, renaming and deleting a calendar
+  and at `GET /calendar/sync-targets`, where the routes already sent it.
+- **The reminders API refuses in English and names its reason in the API description** (#1695,
+  #2267). `/api/v1/reminders` still sent its refusals in German ("entity_type und entity_id sind
+  erforderlich.", "Erinnerung nicht gefunden."); every `error` there is English now, with the same
+  status codes. The OpenAPI description now lists `module_access_denied` (403 when the caller may
+  not read or write the module the reminder's entry belongs to) at every reminders route that
+  already sent it.
+- **The notes API refuses in English** (#1695, #2267). `/api/v1/notes` still answered in German or
+  with German field names ("Inhalt is required.", "Die Notiz hat sich inzwischen geändert.",
+  "Interner Fehler"); every `error` there is English now and names the request field (`content`,
+  `title`, `color`), with the same status codes. The OpenAPI description now lists the reasons of a
+  refused checklist tick (`stale`, `out_of_range`, `not_a_checklist_line`). Editing a note with a
+  number as its text or title no longer fails with a server error; it is saved as text, as creating
+  a note already did.
+- **The quick links API refuses in English** (#1695). `/api/v1/quick-links` still answered
+  "Schnellzugriff nicht gefunden", "Keine Berechtigung", "ids muss ein Array sein" and "Interner
+  Fehler"; every `error` there is English now, with the same status codes and reasons.
+- **The inventory API refuses in English and names its reason in the API description** (#1695,
+  #2267). `/api/v1/inventory/items` and its tracked dates, service log and booking links still
+  answered in German or with German field names ("Kilometerstand darf nicht negativ sein.",
+  "Kategorie must be one of: ...", "Maximal 10 Fristen je Gegenstand."); every `error` there is
+  English now and names the request field (`odometer`, `category`, `interval_months` ...), with the
+  same status codes. The OpenAPI description now lists `inventory_item_not_found` (404) at the
+  history and service log routes, where they already sent it.
+- **The contacts API refuses in English and names its reasons in the API description** (#1695,
+  #2267). `/api/v1/contacts` still answered "Interner Fehler", "Familienmitglieder können nicht aus
+  der Kontaktliste gelöscht werden." and sentences with German field names ("Telefon may be at most
+  100 characters long.", "Geburtstag must be in YYYY-MM-DD format."); every `error` there is English
+  now and names the request field (`phone`, `birthday`, `firstName` ...), with the same status codes
+  and reasons. The OpenAPI description now lists `category_exists`, `category_in_use`,
+  `category_last`, `contact_email_protected` and `family_member_contact` at the contact routes, and
+  `contacts_contact_not_found` at the vCard download, where they already sent them.
+- **The health API refuses in English** (#1695, #2267). `/api/v1/health` still answered "Ungültige
+  ID.", "Ungültige Person.", "Person nicht gefunden.", "caregiver_ids muss eine Liste sein.",
+  "value_num kann nicht geleert werden." and two German 403 sentences; every `error` there is English
+  now, with the same status codes. The OpenAPI description of `PUT /health/caregivers/{subjectId}`
+  now names `account_deactivated`, which it already sent.
+- **Calendar subscriptions, the Apple connection and event targets refuse in English** (#1695).
+  `/api/v1/calendar` still answered "Abonnement nicht gefunden.", "name: Pflichtfeld, max. 100
+  Zeichen.", "from/to müssen YYYY-MM-DD sein", "target_caldav_account_id: ungültige Konto-ID." and
+  "Interner Fehler" for subscriptions, the Apple connection, reading a range, the holiday feed and
+  the sync target of an event; every `error` there is English now, with the same status codes.
+- **The shopping, tasks, push and weather APIs refuse in English** (#1695). They still answered
+  "order muss ein nicht-leeres Array von IDs sein.", "Menge may be at most 100 characters long.",
+  "sync_target: erwartet ...", "Maximal 2 Verschachtelungsebenen erlaubt.", "endpoint ist
+  erforderlich." or "Ungültiger Icon-Code."; every `error` there is English now and names the request
+  field (`quantity`, `notes`, `category`, `name`), with the same status codes and reasons.
+- **The meal plan, pantry and recipes APIs refuse in English** (#1695, #2267). They still answered
+  "Mahlzeit nicht gefunden", "Mindestens eine Mahlzeit ist erforderlich.", "Menge darf nicht negativ
+  sein.", "Lagerort nicht gefunden." and sentences with German field names ("Titel is required.",
+  "Mahlzeit-Typ must be one of: ..."); every `error` there is English now and names the request field
+  (`title`, `meal_type`, `quantity` ...), with the same status codes and reasons. The meal plan and
+  the pantry no longer show the server's sentence in a toast but their own, in your language. The
+  OpenAPI description now lists `recipe_mirrored` and `cross_module_access` at the recipe, meal and
+  pantry routes that already sent them.
+- **The API description names every reason a route sends** (#2267). The OpenAPI spec now lists
+  the `reason` values of the sign-in and account routes (`invalid_code`, `not_enabled`,
+  `account_cannot_sign_in`, `password_login_disabled`, `browser_session_required`,
+  `setup_completed`, `account_deactivated`), the category and subcategory management of budget and
+  tasks, the shopping lists (`shopping_list_not_found`, `nothing_open`, `recipient_no_email`,
+  `smtp_unconfigured`), `display_only` and `display_action` for paired displays, and
+  `cross_module_access` where a route needs a second module. A failed SSO link names its
+  `oidc_link_error` values.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the
@@ -185,6 +379,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A key figure no longer runs to the edge of its card.** A figure that only ran into the card's
   padding kept its full size - on an overview tile it stood 3px from the edge; it now steps down a
   size like one that overflows the card, on the overview and in the modules alike.
+- **A subscription or loan payment booked to an account in another currency is in that account's
+  currency** (#2302). An account in US dollars got its subscription payments and loan installments
+  in the household currency, so its balance added dollars and euros as if they were one. A
+  subscription now converts its payment into the account's currency with the cached exchange rate;
+  a loan installment books unconverted when the loan is in the account's currency, with the loan's
+  fixed rate when the account is in the household currency, and through both rates for a third
+  currency - without a known rate the installment is refused instead of booked with a wrong
+  amount. Archiving, deleting or switching the currency of an account converts the subscription
+  payment still waiting on it. Bookings made before this update stay as they are and count as the
+  account's currency: payments a subscription or loan booked earlier on such an account are still
+  in the household currency and can be corrected by hand.
+- **Accounts in another currency show their own currency** (#2302). The accounts page wrote every
+  balance, starting balance and available credit with the household currency sign, so 5,000 yen
+  read as 5,000 euros. Each account now shows its amounts in its currency, and the amount field
+  of a budget entry follows the account you pick, with its sign and decimal places. Net worth over
+  accounts in several currencies is converted with the cached exchange rates and marked as an
+  approximation (≈, with the date of the rates); without a rate it shows the total per currency
+  instead of adding dollars and euros.
+- **Filtered to one account, the budget overview is in that account's currency** (#2302). The
+  balance, income, expenses, transfers, pending amount and category chart of an account in
+  dollars still showed euros, so the numbers next to the statement were not the statement's. All
+  of them now switch together to the account's currency while the filter is set, and each entry
+  in the list shows its own account's currency. Without a filter the overview stays in the
+  household currency as before.
+- **Settings - Wall tablets names the pairing address before a code exists** (#2294). A tablet
+  pairs at your instance's `/pair` address, not through the sign-in page, but the page only said
+  so next to a freshly generated code. It now shows the two steps and the full address up front,
+  so an admin who opens the page first - or whose instance signs in through OIDC only - knows
+  where the tablet goes.
+- **A recurring event from a one-time calendar import keeps its time zone** (#2306). An imported
+  weekly appointment at 17:00 in Vienna moved to 16:00 after the clocks changed, and an occurrence
+  the file had cancelled after the change could show up again or take its neighbour with it. The
+  import now keeps the time zone of the series, as calendar subscriptions, CalDAV and iCloud do,
+  so the time stays put and the cancelled occurrence is gone on its own day. Events imported
+  before stay as they are.
+- **A shared reminder list connected through two CalDAV accounts shows each task and shopping
+  item once** (#1906). When two family members each connected their own account to the same
+  list, every task and item stood in Yuvomi twice. Now the account that brings an entry in first
+  owns it, and the other account neither adds, changes nor removes it, as for events since
+  #1879. Entries that are already double are merged on update (migration 268): the older one
+  stays and takes over the comments, documents and assignees of the other; the other's
+  completions are dropped, since they mirror the same tick. Deleting a CalDAV account now leaves
+  its tasks and shopping items synced without an account, and the next account that has them
+  takes them over instead of adding them again (#1885).
+- **A CalDAV or iCloud server that says "too many requests" or "unavailable" gets a rest for the
+  rest of the run** (#2135). Since #2133 a sync stopped sending deletions and changes to an
+  account after such an answer, but the same run still cleaned up leftovers of unconfirmed uploads
+  and uploaded new events, tasks and shopping items to it. Now nothing more goes to that account
+  until the next run, in the full sync and in the attempt right after an edit; a calendar or list
+  that is only read-only for you still holds up nothing else. A leftover past its one-day grace is
+  no longer given up on such an answer either, so it cannot come back as an entry.
+- **"List" in a shopping item's edit dialog no longer offers lists you cannot add to** (#2283).
+  A shopping list that mirrors a reminder list shared with you read-only is left out of the
+  choice, as calendars and reminder lists already are for events and tasks: an item moved there
+  would have stayed on Yuvomi only, because the server refuses it. An item already on such a list
+  keeps it. API clients see `accepts_new_items` on each list, and a move to a list without it is
+  refused with 400.
+- **A synced entry is removed only after a sync has seen it on the server** (#1839). Before
+  #1837 an upload the server refused still marked the entry as synced, and the next sync took the
+  missing object for "deleted elsewhere" and removed the entry here; a few such entries can still
+  be in a database. Now an event, task or shopping item counts as synced to CalDAV or iCloud only
+  once a sync has found it there. One that was created in Yuvomi and never found becomes local
+  again and is uploaded once more instead of being deleted; an entry a sync has seen and someone
+  then deleted elsewhere goes as before. Existing entries start as not seen, so the first sync
+  after the update deletes nothing it has not seen (migration 266).
+- **An occurrence cancelled in a subscribed or synced calendar stays cancelled after a clock
+  change** (#2000). For a series with its own time zone, an occurrence the provider cancelled or
+  moved could stay visible once its UTC day and its local day fell apart: a New York series at
+  19:30 kept showing a cancelled winter occurrence, a daily Berlin series at 01:30 hid the
+  occurrence before the cancelled one after the switch to summer time, and the countdown named a
+  different next occurrence than the calendar. ICS subscriptions, CalDAV and iCloud now match a
+  cancellation by the occurrence's original start, and the next CalDAV or iCloud sync corrects one
+  stored the old way. Google Calendar and cancellations a provider no longer sends follow
+  separately.
 - **"New - Task" on the Overview opens the new-task form again.** The "+ New" button on a computer
   and the quick-action button on a phone switched to Tasks and stopped there, because they still
   looked for the add button under the name it had before the add buttons were unified. Event, Note
@@ -195,6 +463,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to the height of the screen and a computer scrolled back to the top. The Overview now updates in
   place - the row that goes away closes, the scroll position and the focus stay - and the
   half-hourly weather update only redraws it when the forecast changed.
+- **A long reminder list name no longer squeezes the module picker in the sync settings** (#2284).
+  The picker keeps the width of its value; next to a long name on a phone it moves below the name,
+  and a long name wraps instead of running past the row.
+- **A read-only shared calendar or reminder list is no longer offered as a target** (#1840). The
+  CalDAV sync now reads, for each calendar and list, whether your account may add entries to it.
+  The target pickers for events and tasks offer only those that take new entries, and nothing is
+  sent to one that does not - until now every upload there was refused and retried on every sync.
+  A read-only calendar or list can still be selected for reading. An event, task or shopping item
+  that already waits for one keeps its target, and the sync settings name the calendar or list as
+  read-only with the number of entries that will not arrive. The legacy Apple Calendar connection
+  uploads into the first iCloud calendar that takes new events instead of simply the first one.
+  Servers that do not report permissions behave as before.
+- **The event form says when an event will upload to iCloud** (#1927). With the legacy Apple
+  Calendar connection set up, a quiet line under the calendar picker says that events in the chosen
+  calendar are uploaded to iCloud, as soon as you pick the default calendar - also when you move an
+  event there from a calendar that stays local. A household with only the default calendar has no
+  picker; there the same line sits under the date and time, unless the event goes to a Google or
+  CalDAV calendar instead. Without the connection the form is unchanged.
 - **Deleting a CalDAV account no longer leaves events and tasks pointing at it** (#1885). An event
   or task created in Yuvomi and meant for that account's calendar or reminder list kept the deleted
   account as its target, and the event stood in no calendar at all. The target now goes with the
@@ -294,6 +580,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same entry in the standings menu, and only the menu entry was wired. With no participants this
   button is the only way to enroll the first family member. Both now share one hook, and a test
   checks that each of them opens the dialog.
+
+### Security
+- **An account's currency must be a real currency code** (#2302). The budget API stored any text up
+  to eight characters as an account currency, and a code like "XYZ1" stopped the whole budget page
+  from rendering for everyone in the household. Accounts now take only the supported ISO 4217
+  codes, and the app shows an unusable stored code in the household currency instead of failing.
+- **The Docker image runs on Node.js 24.22.1, which fixes CVE-2026-111497** (#2286). The Brotli
+  decoder built into Node.js could write past its buffer on a crafted compressed stream, which can
+  crash the server or, in the worst case, run code. The image was pinned to an earlier Node.js 24
+  release that does not have the fix.
 
 ## [2.81.0] - 2026-10-25
 

@@ -1208,7 +1208,6 @@
         "pickOne": "일정을 선택하세요",
         "pickOneHint": "시간, 장소, 알림이 여기에 표시됩니다.",
         "syncTargetAssigneeAmbiguous": "여러 캘린더에서 이 사람이 기본 할당으로 지정되어 있습니다. 대상을 직접 선택하세요.",
-        "syncTargetSeveralAssignees": "여러 사람이 할당되어 있어 할당으로는 캘린더를 선택하지 않습니다. 대신 사용: {{target}}",
         "filtersSources": "캘린더",
         "filterUnassigned": "할당되지 않음",
         "dateSpanSpoken": "{{from}}부터 {{to}}까지",
@@ -1247,7 +1246,10 @@
         "errorDeleteFeedAdminOnly": "이 캘린더는 내보내는 중입니다. 관리자만 삭제할 수 있습니다.",
         "errorEventGone": "이 일정은 더 이상 없습니다.",
         "errorSelectedCalendarGone": "선택한 캘린더가 더 이상 없습니다.",
-        "errorSeriesNoOccurrence": "이 반복 설정으로는 시작일부터 일정이 하나도 생기지 않습니다."
+        "errorSeriesNoOccurrence": "이 반복 설정으로는 시작일부터 일정이 하나도 생기지 않습니다.",
+        "localCalendarUploadsHint": "이 캘린더의 일정은 Apple Calendar를 통해 iCloud에 업로드됩니다.",
+        "overlapOpenSchedule": "근무표 열기",
+        "syncTargetNoCalendarForPeople": "정확히 이 사람들을 기본 담당자로 둔 캘린더가 없어 지정으로 캘린더를 고르지 않습니다. 대신 사용: {{target}}."
     },
     "noteCategories": {
         "categories": "카테고리",
@@ -1318,7 +1320,11 @@
         "checklistDone": "완료",
         "checklistOpen": "미완료",
         "errorNoteGone": "이 메모는 더 이상 없습니다.",
-        "errorSelectedCategoryGone": "선택한 카테고리 중 하나가 더 이상 존재하지 않습니다."
+        "errorSelectedCategoryGone": "선택한 카테고리 중 하나가 더 이상 존재하지 않습니다.",
+        "lockedToggle": "편집 잠금",
+        "lockedBadge": "잠김",
+        "lockedHint": "이 메모는 나와 관리자만 변경, 고정, 삭제할 수 있습니다. 체크리스트 항목 체크도 포함됩니다. 다른 사람은 계속 읽을 수 있습니다.",
+        "errorLocked": "이 메모는 잠겨 있습니다. 만든 사람과 관리자만 변경할 수 있습니다."
     },
     "markdown": {
         "bold": "굵게 (Ctrl+B)",
@@ -1790,6 +1796,8 @@
         "planSavingsDeleteConfirm": "저축 목표를 삭제할까요?",
         "accountsTab": "계좌",
         "netWorth": "순자산",
+        "netWorthApproxNote": "{{date}} 환율로 환산",
+        "netWorthPerCurrencyNote": "환율 없음 - 통화별 합계",
         "addAccount": "계좌 추가",
         "accountsEmptyTitle": "아직 계좌가 없습니다",
         "accountsEmptyDescription": "입출금이나 저축 같은 계좌를 추가해 잔액을 관리하세요.",
@@ -1883,6 +1891,7 @@
         "saveFailed": "저장하지 못했습니다. 입력 내용을 확인해 주세요.",
         "loanAlreadyPaid": "이 대출은 이미 모두 상환되었습니다.",
         "loanInstallmentAlreadyPaid": "이 회차는 이미 상환되었습니다.",
+        "loanPaymentRateUnavailable": "계좌 통화의 환율을 알 수 없습니다. 대출에 다른 계좌를 선택하거나 계좌 없이 두세요.",
         "amountExceedsLoanRemaining": "금액이 대출의 미상환 금액보다 큽니다",
         "responsibleNotMember": "가구 구성원만 담당이 될 수 있습니다.",
         "seriesStartTooEarly": "시작일은 시리즈의 첫 항목보다 앞선 달에 둘 수 없습니다",
@@ -2447,7 +2456,10 @@
             "errorNoCalendarName": "새 캘린더 이름을 입력하세요.",
             "dropzoneTitle": "ICS 파일을 여기로 끌어 오거나 선택하세요",
             "dropzoneTitleTouch": "탭하여 ICS 파일 선택",
-            "dropzoneHint": ".ics 파일만 가능"
+            "dropzoneHint": ".ics 파일만 가능",
+            "assigneesLabel": "담당자 지정",
+            "assigneesHint": "새 일정은 이 사람들을 받습니다. 같은 ID로 이미 가져온 일정에는 추가됩니다 - 지정을 직접 지웠더라도 마찬가지입니다.",
+            "successWithAssigned": "가져옴: {{imported}}, 이미 있음: {{skipped}}, 그중 이번에 지정: {{assigned}}."
         },
         "memberPhoneLabel": "전화번호 (선택 사항)",
         "memberEmailLabel": "이메일 (선택 사항)",
@@ -3078,10 +3090,7 @@
         "notificationChannelDeleteConfirmDetail": "이 채널로는 앞으로 어떤 알림도 나가지 않습니다. 긴급 알림도 마찬가지입니다. 새 채널을 만들려면 주소와 접속 정보를 처음부터 다시 입력해야 합니다.",
         "apiTokensMcpHint": "이 토큰은 /mcp의 MCP 엔드포인트용 Bearer 토큰으로도 작동합니다(예: Claude Desktop에서 AI로 할 일, 장보기 항목, 일정을 만들 때).",
         "sync": {
-            "defaultAssignee": "기본 담당자",
             "defaultAssigneeNone": "없음",
-            "defaultAssigneeHint": "새로 동기화된 일정은 자동으로 이 사람에게 할당됩니다.",
-            "defaultAssigneeRoutingHint": "기본 담당자: 캘린더의 일정은 그곳에서 선택한 사람에게 할당되고, 그 사람에게만 할당된 새 일정은 해당 캘린더에 만들어집니다. Google 및 CalDAV 캘린더에 적용되며 Apple이나 Outlook에는 적용되지 않습니다.",
             "backfillTitle": "담당자 채우기",
             "backfillDescription": "기본 담당자는 설정한 뒤에 가져온 일정에만 적용됩니다. 여기서 모든 계정에서 이미 가져온 일정에 한 번 적용할 수 있습니다.",
             "backfillAction": "기존 일정에 적용",
@@ -3101,7 +3110,10 @@
             "backfillMovedNext": "다음 보기",
             "backfillMovedAll": "모두 선택",
             "backfillMovedChange": "{{from}}에서 {{to}}(으)로",
-            "backfillDescriptionMore": "담당자가 없는 일정에는 바로 지정됩니다. 아직 다른 캘린더의 기본 담당자가 지정된 일정은 하나씩 표시되어 직접 고를 수 있습니다. 그 밖의 할당은 그대로 유지됩니다."
+            "backfillDescriptionMore": "담당자가 없는 일정에는 바로 지정됩니다. 아직 다른 캘린더의 기본 담당자가 지정된 일정은 하나씩 표시되어 직접 고를 수 있습니다. 그 밖의 할당은 그대로 유지됩니다.",
+            "defaultAssignees": "기본 담당자",
+            "defaultAssigneesHint": "새로 동기화된 일정은 자동으로 이 사람들에게 지정됩니다. 첫 번째 사람이 색상을 정합니다.",
+            "defaultAssigneesRoutingHint": "기본 담당자: 캘린더의 일정은 그곳에서 고른 사람들을 받고, 정확히 이 사람들에게 지정된 새 일정은 그 캘린더에 만들어집니다. Google 및 CalDAV 캘린더에 적용되며 Apple이나 Outlook에는 적용되지 않습니다."
         },
         "calendarAssignMeLabel": "새 일정을 나에게 배정",
         "calendarDefaultRemindersLabel": "기본 알림",
@@ -3320,6 +3332,8 @@
         "displayDeleteConfirm": "“{{name}}”을(를) 삭제할까요?",
         "displayPairingCodeLabel": "페어링 코드",
         "displayPairingCodeHint": "15분 동안 유효하며 정확히 한 번만 사용할 수 있습니다. 태블릿에서 /pair 를 열고 코드를 입력하세요. 코드는 지금만 표시됩니다.",
+        "displayPairStepCode": "여기에서 벽면 태블릿을 추가하고 페어링 코드를 생성하세요.",
+        "displayPairStepOpen": "태블릿에서 이 주소를 열고 코드를 입력하세요:",
         "displayDeviceUnnamed": "이름 없는 기기",
         "displayDeviceLastSeen": "마지막 접속: {{when}}",
         "displayDeviceNeverSeen": "접속한 적 없음",
@@ -3424,7 +3438,16 @@
         "permChildRoleHint": "새 자녀 계정은 만들 때 자체 시작 권한도 받습니다: {{list}}. 이후에는 해당 구성원에게 표시됩니다.",
         "activeModulesHintMore": "내 화면에서만 숨기려면 모듈 → 내비게이션으로 가세요.",
         "permIntroMore": "개별 구성원은 역할 기본값과 다르게 설정할 수 있습니다. 설정하지 않으면 모든 역할이 전체 접근 권한을 가지며 관리자는 항상 전체 접근 권한을 가집니다.",
-        "preferenceSaveFailed": "설정을 저장할 수 없습니다."
+        "preferenceSaveFailed": "설정을 저장할 수 없습니다.",
+        "caldavCalendarReadOnly": "읽기 전용: 여기에는 새 일정을 저장할 수 없습니다",
+        "caldavCalendarReadOnlyWaiting_one": "읽기 전용: 여기로 업로드를 기다리는 일정 {{count}}개는 도착하지 않습니다",
+        "caldavCalendarReadOnlyWaiting": "읽기 전용: 여기로 업로드를 기다리는 일정 {{count}}개는 도착하지 않습니다",
+        "reminderListReadOnly": "읽기 전용: 여기에는 새 항목을 저장할 수 없습니다",
+        "reminderListReadOnlyWaiting_one": "읽기 전용: 여기로 업로드를 기다리는 항목 {{count}}개는 도착하지 않습니다",
+        "reminderListReadOnlyWaiting": "읽기 전용: 여기로 업로드를 기다리는 항목 {{count}}개는 도착하지 않습니다",
+        "reminderListAssigneesTasksOnly": "사람은 할 일로 가는 목록에만 정할 수 있습니다.",
+        "syncAssigneeNotMember": "여기서는 가구 구성원만 고를 수 있습니다.",
+        "syncAssigneeUnknown": "이 사람은 더 이상 없습니다. 페이지를 새로 고치세요."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",
@@ -3739,7 +3762,8 @@
         "banner": "오프라인 - 연결을 복구하는 중…",
         "staleData": "오프라인 - 기준: {{time}}",
         "pageTitle": "오프라인 상태입니다",
-        "pageDescription": "이 페이지는 연결이 필요합니다. 기기가 다시 온라인이 되면 자동으로 불러옵니다."
+        "pageDescription": "이 페이지는 연결이 필요합니다. 기기가 다시 온라인이 되면 자동으로 불러옵니다.",
+        "snapshot": "서버에 연결할 수 없음 - 저장된 데이터, 읽기 전용"
     },
     "emptyHint": {
         "tasks": "+ 를 탭하여 첫 할 일을 만드세요. 카드를 왼쪽으로 밀면 완료, 오른쪽으로 밀면 보기가 열립니다.",
@@ -4366,6 +4390,11 @@
             "missedBook": "{{date}}부터 놓친 날짜 기록",
             "missedDetail": "{{date}} 이후 {{count}}회를 놓쳤습니다.",
             "missedDetail_one": "{{date}} 이후 {{count}}회를 놓쳤습니다.",
+            "failing": "기록 실패 - 매시간 다시 시도합니다",
+            "pastQuestion": "날짜가 과거입니다",
+            "pastSkip": "{{date}}부터 시작",
+            "pastDetail": "{{date}} 이후 {{count}}회의 기한이 지났습니다.",
+            "pastDetail_one": "{{date}} 이후 {{count}}회의 기한이 지났습니다.",
             "deleteConfirm": "이 반복 지출을 삭제하시겠습니까?",
             "deleteConfirmDetail": "새 지출이 더 이상 생성되지 않습니다. 이미 기록된 지출은 유지됩니다.",
             "show": "보기",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}}님에게 받을 금액",
         "debtOwes": "{{from}}님이 {{to}}님에게 줄 금액",
         "balanced": "정산 완료",
-        "balancedInGroup": "{{group}}: 정산 완료"
+        "balancedInGroup": "{{group}}: 정산 완료",
+        "totalsByMember": "사람별 결제액",
+        "totalsByMemberHint": "각자 낸 금액과 그 아래 본인 부담분",
+        "ownShare": "본인 부담분: {{amount}}",
+        "paidLabel": "결제액",
+        "totalsByCategory": "카테고리별",
+        "categoryFilter": "카테고리로 지출 필터링",
+        "noExpensesInCategory": "이 카테고리에는 지출이 없습니다."
     },
     "wmo": {
         "0": "맑음",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "금액",
         "detailNextPaymentLabel": "다음 결제",
         "renewedNamed": "'{{name}}' 결제했습니다 - 다음 결제일은 {{date}}입니다.",
-        "completedNamed": "'{{name}}' 결제 후 종료했습니다."
+        "completedNamed": "'{{name}}' 결제 후 종료했습니다.",
+        "accountHint": "이 구독의 모든 결제는 이 계좌로 기록됩니다. 개별 결제는 예산에서 바꿀 수 있습니다.",
+        "accountArchivedHint": "이 계좌는 보관되었습니다. 다른 계좌를 고를 때까지 구독은 계좌 없이 기록됩니다.",
+        "accountArchivedOption": "{{name}} (보관됨)",
+        "accountArchivedMeta": "{{name}} 보관됨 - 계좌 없이 기록",
+        "visibilityHint_private": "이 구독과 결제 내역은 나만 볼 수 있습니다.",
+        "visibilityHint_shared": "가구의 모든 구성원이 이 구독과 결제 내역을 볼 수 있습니다.",
+        "errorAccountGone": "선택한 계좌가 더 이상 존재하지 않습니다."
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "측정값을 저장하지 못했습니다.",
             "invalidValue": "유효한 값을 입력하세요.",
             "range": {
+                "day": "일",
                 "week": "주",
                 "month": "월",
                 "year": "년"
@@ -5003,6 +5047,7 @@
                 "family": "가족"
             },
             "sparse": "추세를 표시하기에 측정값이 너무 적습니다.",
+            "bandValue": "{{mean}}, {{low}}~{{high}}",
             "recentMeasurements": "최근 측정",
             "deleteMeasurement": "{{date}} 측정값 {{value}} 삭제",
             "measurementDeleted": "측정이 삭제되었습니다",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "중복된 수거 항목 {{count}}개(동일 식별자)를 하나로 병합했습니다.",
         "importDiagnosticOther": "일정 항목 하나가 예상한 형식과 맞지 않습니다.",
         "importUnresolvedBlockingError": "먼저 차단 진단을 모두 해결하거나, 해당 이벤트를 명시적으로 건너뛰세요.",
-        "importIgnoreLabel": "무시",
         "importCreateNewType": "새 쓰레기 종류 만들기",
+        "importLabelsHint": "한 항목에 여러 수거통이 적혀 있으면 모두 선택하세요. 각각 따로 수거 일정이 생깁니다.",
+        "importLabelIgnoredHint": "선택한 쓰레기 종류가 없습니다. 가져오지 않습니다.",
         "importNewTypeNameRequiredError": "새 쓰레기 종류의 이름을 입력해 주세요.",
         "importDefaultSourceName": "가져온 파일",
         "importCommittedToast": "가져오기가 적용되었습니다: {{added}}개 추가, {{changed}}개 변경, {{removed}}개 삭제.",
@@ -6198,6 +6244,13 @@
         "badgeLow": "거의 소진",
         "badgeOut": "소진됨",
         "bestBefore": "유통기한 {{date}}",
+        "noBestBefore": "유통기한 없음",
+        "errorProductHasStock": "이 제품의 재고가 다시 생겨 삭제하지 않았습니다.",
+        "productTotal": "총 {{quantity}}",
+        "productPlaces": "{{count}}곳",
+        "productPlaces_one": "{{count}}곳",
+        "productBatches": "{{count}}묶음",
+        "productBatches_one": "{{count}}묶음",
         "increase": "수량 늘리기",
         "decrease": "수량 줄이기",
         "toShoppingAll": "모두 장보기 목록에 추가",

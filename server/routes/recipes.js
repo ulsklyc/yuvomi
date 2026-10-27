@@ -216,9 +216,9 @@ router.post('/', (req, res) => {
     const vIngredients = validateIngredients(body.ingredients);
     const ingredients = vIngredients.value;
 
-    const vTitle = str(body.title, 'Titel', { max: MAX_TITLE });
-    const vNotes = str(body.notes, 'Notizen', { max: MAX_TEXT, required: false });
-    const vRecipeUrl = str(body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
+    const vTitle = str(body.title, 'title', { max: MAX_TITLE });
+    const vNotes = str(body.notes, 'notes', { max: MAX_TEXT, required: false });
+    const vRecipeUrl = str(body.recipe_url, 'recipe_url', { max: MAX_TEXT, required: false });
     const mealTypes = normalizeRecipeMealTypes(body.meal_types);
 
     const vImage = validateRecipeImage(body.image_data);
@@ -279,9 +279,9 @@ router.put('/:id', (req, res) => {
     const vIngredients = validateIngredients(body.ingredients);
     const ingredients = vIngredients.value;
 
-    const vTitle = str(body.title, 'Titel', { max: MAX_TITLE });
-    const vNotes = str(body.notes, 'Notizen', { max: MAX_TEXT, required: false });
-    const vRecipeUrl = str(body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
+    const vTitle = str(body.title, 'title', { max: MAX_TITLE });
+    const vNotes = str(body.notes, 'notes', { max: MAX_TEXT, required: false });
+    const vRecipeUrl = str(body.recipe_url, 'recipe_url', { max: MAX_TEXT, required: false });
     // Fehlt das Feld, bleibt die gespeicherte Auswahl stehen - ein Teil-Update
     // darf sie nicht mitnehmen. Ohne den Rückgriff schriebe jeder Aufruf ohne
     // meal_types wieder alle vier Mahlzeiten hin und machte eine bewusst leere
@@ -649,7 +649,7 @@ router.put('/:id/ingredient-match', (req, res) => {
       });
     }
 
-    const vItem = num(raw, 'Vorrats-ID', { required: true });
+    const vItem = num(raw, 'pantry_item_id', { required: true });
     const itemErrors = collectErrors([vItem]);
     if (itemErrors.length) return res.status(400).json({ error: itemErrors.join(' '), code: 400 });
 

@@ -825,12 +825,38 @@
  * (`.chart__axis`), halbfett, damit sie sich vom Gitter abhebt. */
 .health-chart__series-label {
   font-weight: var(--font-weight-semibold);
+  /* Ein Rand in der Flaechenfarbe (#1798): im dichten Monat liegt der Name
+   * ueber den Balken der Vortage und bliebe sonst nur halb lesbar. */
+  paint-order: stroke;
+  stroke: var(--color-surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
 
 /* Die zweite Achse einer Messart (der Puls unter dem Blutdruck) folgt direkt;
  * sie ist ein Teil desselben Diagramms, keine neue Karte. */
 .health-chart--secondary {
   margin-block-start: var(--space-2);
+}
+
+/* DAS TAGESBAND (#1699): ein senkrechter Strich vom kleinsten zum groessten
+ * Wert des Tages, das Mittel als Punkt darauf. Voller Kanalton (`stroke` am
+ * Element), weil seine Enden Werte sind: eine Tonung unter 70 % fiele im
+ * dunklen Thema unter 3:1. Schmaler als die Kurve breit, damit der Punkt
+ * darauf als Mittel lesbar bleibt. */
+.health-chart__range {
+  /* In festen Pixeln: im 330px schmalen Blatt waere er sonst duenner als die Kurve. */
+  stroke-width: 3px;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+}
+
+/* DER BLUTDRUCK ALS BALKEN JE MESSUNG (#1798): von diastolisch bis
+ * systolisch, die Breite setzt das Diagramm (`stroke-width`, schmaler bei
+ * mehreren Messungen eines Tages). Die runde Kappe macht beide Enden zu
+ * ablesbaren Punkten. */
+.health-chart__bp {
+  stroke-linecap: round;
 }
 
 .health-chart-empty {
@@ -3852,14 +3878,52 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 
 .health-recent__row:first-child { border-top: none; }
 
+/* Tag und Uhrzeit untereinander (#1699): drei Werte eines Tages stehen sonst
+ * als drei gleiche Daten da. */
+.health-recent__when {
+  display: flex;
+  flex-direction: column;
+  min-width: 96px;
+  padding-block: var(--space-1);
+}
+
 .health-recent__date {
   color: var(--color-text-secondary);
-  min-width: 96px;
+}
+
+.health-recent__time {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.health-recent__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  padding-block: var(--space-1);
 }
 
 .health-recent__value {
-  flex: 1;
   font-variant-numeric: tabular-nums;
+}
+
+/* Die Notiz der Messung ("vor dem Fruehstueck"), hoechstens zwei Zeilen -
+ * der volle Text steht im Bearbeiten-Dialog. */
+.health-recent__note {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .health-recent__value small {

@@ -324,6 +324,12 @@ function dateKeyOf(measuredAt) {
   return String(measuredAt).slice(0, 10);
 }
 
+/** Minuten seit Mitternacht eines measured_at-Zeitstempels (Wanduhr, ohne Zone). */
+function minutesOf(measuredAt) {
+  const m = /T(\d{2}):(\d{2})/.exec(String(measuredAt));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
+}
+
 function toFiniteOrNull(value) {
   // Ein fehlender Wert ist keine Null (Re-Critique 2026-10-17, P1): Number(null)
   // und Number('') sind 0, und ein Blutdruck ohne Puls zeichnete Puls 0 - die
@@ -374,7 +380,7 @@ export function isRollingAnchor(range, anchorKey, weekStartsOn = 1, { today = to
  * Monat blaettert ueber den Monatsersten: `setMonth()` auf einem 31. lief in
  * den uebernaechsten Monat ueber und liess einen ganzen Monat aus.
  *
- * @param {'week'|'month'|'year'} range
+ * @param {'day'|'week'|'month'|'year'} range
  * @param {string} anchorKey  YYYY-MM-DD
  * @param {number} dir        -1 zurueck, +1 weiter
  * @param {number} [weekStartsOn=1]
@@ -383,6 +389,7 @@ export function isRollingAnchor(range, anchorKey, weekStartsOn = 1, { today = to
  */
 export function stepVitalAnchor(range, anchorKey, dir, weekStartsOn = 1, { today = todayKey() } = {}) {
   const anchor = anchorKey || today;
+  if (range === 'day') return addLocalDays(anchor, dir);
   if (range === 'year') {
     const d = parseLocalDateKey(anchor);
     d.setFullYear(d.getFullYear() + dir);
@@ -410,6 +417,7 @@ export function stepVitalAnchor(range, anchorKey, dir, weekStartsOn = 1, { today
 
 /**
  * Baut die Bucket-Achse für einen Zeitraum.
+ * - day:   ein Bucket (der Tag), Achse in Stunden
  * - week:  7 Tages-Buckets
  * - month: ein Tages-Bucket je Tag
  * - year:  12 Monats-Buckets (Jan–Dez) des Anker-Jahres
@@ -442,6 +450,14 @@ export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1, { today = 
     }
     return { buckets, from: buckets[0].date, to: today, gran: 'day' };
   };
+
+  // DER TAG (#1699) ist kein vierter Bucket-Zuschnitt: sein einziger Bucket
+  // traegt die Kennzahlen, gezeichnet werden die einzelnen Messungen
+  // (`readings`) an ihrer Uhrzeit. `gran: 'hour'` sagt dem Diagramm, dass die
+  // X-Achse die Stunden des Tages sind.
+  if (range === 'day') {
+    return { buckets: [{ key: anchor, date: anchor, gran: 'day' }], from: anchor, to: anchor, gran: 'hour' };
+  }
 
   if (range === 'year') {
     const year = parseLocalDateKey(anchor).getFullYear();
@@ -491,14 +507,17 @@ export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1, { today = 
  *                                 unit, measured_at.
  * @param {Object} opts
  * @param {string} opts.type            - Metrik-Typ (bp|glucose|weight|spo2|temp)
- * @param {'week'|'month'|'year'} [opts.range='month']
+ * @param {'day'|'week'|'month'|'year'} [opts.range='month']
  * @param {string} [opts.anchor]        - Anker-Datum (YYYY-MM-DD) im Zeitraum
  * @param {number} [opts.weekStartsOn=1]
  * @returns {{
  *   type: string, range: string, from: string, to: string, gran: string,
  *   channels: string[],
  *   points: Array<{ key:string, date:string, count:number,
- *                   value_num:number|null, value_num2:number|null, value_num3:number|null }>,
+ *                   value_num:number|null, value_num2:number|null, value_num3:number|null,
+ *                   min: Object, max: Object }>,  // je Kanal kleinster/groesster Wert
+ *   readings: Array<{ id, index:number, date:string, minutes:number, measured_at:string,
+ *                     note:string|null, value_num, value_num2, value_num3 }>,
  *   hasData: boolean,
  *   latest: Object|null, previous: Object|null,
  *   deltas: { value_num:number|null, value_num2:number|null, value_num3:number|null }
@@ -538,8 +557,17 @@ export function computeVitalSeries(rows, opts = {}) {
     count: 0,
     sums: { value_num: 0, value_num2: 0, value_num3: 0 },
     counts: { value_num: 0, value_num2: 0, value_num3: 0 },
+    min: { value_num: null, value_num2: null, value_num3: null },
+    max: { value_num: null, value_num2: null, value_num3: null },
   }));
 
+  // DIE EINZELNEN MESSUNGEN BLEIBEN STEHEN (#1699, #1798). Der Mittelwert je
+  // Bucket machte aus 55 um 07:00 und 190 um 13:00 einen unauffaelligen Punkt.
+  // Jeder Bucket fuehrt deshalb auch den kleinsten und den groessten Wert (das
+  // Tagesband), und `readings` traegt jede Messung des Fensters mit Uhrzeit:
+  // die Tagesansicht zeichnet sie an ihrer Stunde, der Blutdruck als eigenen
+  // Balken.
+  const readings = [];
   for (const row of typeRows) {
     const dk = dateKeyOf(row.measured_at);
     if (dk < from || dk > to) continue;
@@ -547,11 +575,25 @@ export function computeVitalSeries(rows, opts = {}) {
     const i = index.get(bucketKey);
     if (i === undefined) continue;
     acc[i].count += 1;
+    const reading = { id: row.id, index: i, date: dk, minutes: minutesOf(row.measured_at), measured_at: row.measured_at, note: row.note ?? null };
     for (const key of CHANNEL_KEYS) {
       const val = toFiniteOrNull(row[key]);
-      if (val !== null) { acc[i].sums[key] += val; acc[i].counts[key] += 1; }
+      reading[key] = val;
+      if (val === null) continue;
+      const a = acc[i];
+      a.sums[key] += val;
+      a.counts[key] += 1;
+      if (a.min[key] === null || val < a.min[key]) a.min[key] = val;
+      if (a.max[key] === null || val > a.max[key]) a.max[key] = val;
     }
+    readings.push(reading);
   }
+  readings.sort((a, b) => {
+    const ka = String(a.measured_at);
+    const kb = String(b.measured_at);
+    if (ka === kb) return (a.id || 0) - (b.id || 0);
+    return ka < kb ? -1 : 1;
+  });
 
   const points = buckets.map((b, i) => {
     const a = acc[i];
@@ -563,6 +605,8 @@ export function computeVitalSeries(rows, opts = {}) {
       value_num: avg('value_num'),
       value_num2: avg('value_num2'),
       value_num3: avg('value_num3'),
+      min: { ...a.min },
+      max: { ...a.max },
     };
   });
 
@@ -574,6 +618,7 @@ export function computeVitalSeries(rows, opts = {}) {
     gran,
     channels,
     points,
+    readings,
     hasData: points.some((p) => p.count > 0),
     latest,
     previous,

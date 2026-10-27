@@ -1,7 +1,7 @@
-import { idParam, op } from '../helpers.js';
+import { idParam, op, withCaseReasons } from '../helpers.js';
 
 export function displaysPaths() {
-  return {
+  return withCaseReasons('displays', CASE_REASONS, {
     '/api/v1/displays': {
       get: op({
         summary: 'List wall displays and their paired devices',
@@ -160,5 +160,10 @@ export function displaysPaths() {
         },
       }),
     },
-  };
+  });
 }
+
+// #2267: der Grund, den die Route neben `error` sendet.
+const CASE_REASONS = {
+  '/api/v1/displays/people': { get: '`display_only` (403, the route answers only a paired display)' },
+};

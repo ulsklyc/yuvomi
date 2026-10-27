@@ -47,6 +47,7 @@ const {
 } = await import('../server/utils/caldav-client.js');
 const {
   classifyOutboundError, outboundFailureAction, davFailureAction, MAX_OUTBOUND_ATTEMPTS, queueDeletion, queueEventDeletion,
+  eventUidFor,
 } = await import('../server/services/calendar-outbound.js');
 const todoOutbound   = await import('../server/services/caldav-todo-outbound.js');
 const remindersSync  = await import('../server/services/caldav-reminders-sync.js');
@@ -68,7 +69,7 @@ function reset() {
     'calendar_pending_deletions', 'calendar_events', 'external_calendars',
     'caldav_calendar_selection', 'caldav_todo_pending_deletions', 'tasks',
     'shopping_items', 'shopping_lists', 'caldav_reminder_selection', 'caldav_accounts',
-    'carddav_addressbook_selection', 'carddav_accounts',
+    'carddav_addressbook_selection', 'carddav_accounts', 'caldav_upload_attempts',
   ]) db.prepare(`DELETE FROM ${table}`).run();
   appleCalendar.clearCredentials();
   dav.reset();
@@ -1899,6 +1900,391 @@ test('Stoppsignal: ein 403 sperrt nur seinen Kalender, ein anderer Kalender dess
   assert.equal(dav.getObject(own.url, 'mine@test.ics'), null, 'der 403 eines anderen Kalenders hielt das Löschen auf');
   assert.equal(event(id).outbound_dirty, 0, 'der 403 eines anderen Kalenders hielt die Änderung auf');
   assert.deepEqual(eventTombstones().map((t) => [t.event_external_id, t.attempts]), [['ro-1@test', 0], ['ro-2@test', 0]]);
+});
+
+// Stoppsignal über ALLE Phasen eines Durchgangs (#2135): das Signal galt nur
+// Löschen und Ändern. Das Aufräumen alter Upload-Reste davor und die Uploads
+// danach fragten es nicht und schickten demselben Konto, das gerade "429"
+// oder "503" gesagt hatte, je Phase wieder etwas. Gezählt werden ALLE
+// Anfragen nach der ersten kontoweiten Absage, nicht nur die schreibenden.
+
+/** Anfragen, die nach der ersten Absage mit diesem Status noch ankamen. */
+function requestsAfterFirst(status) {
+  const first = dav.requests.findIndex((r) => r.status === status);
+  assert.ok(first >= 0, `der Server hat nichts mit ${status} beantwortet - der Fall ist nicht nachgestellt`);
+  return dav.requests.slice(first + 1).map((r) => `${r.method} ${r.path}`);
+}
+
+/** Der Rest eines nie bestätigten Uploads: Objekt auf dem Server, Notiz hier, Zeile fort. */
+function leftoverUpload({ source = 'caldav', kind, uid, rowId, collectionUrl, data, expired = false }) {
+  const { url } = dav.putObject(collectionUrl, `${uid}.ics`, data);
+  db.prepare(`
+    INSERT INTO caldav_upload_attempts (source, account_id, kind, row_id, collection_url, uid, object_url, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(source, source === 'caldav' ? accountId : null, kind, rowId, collectionUrl, uid, url,
+    expired ? '2020-01-01T00:00:00Z' : new Date().toISOString());
+  return { uid, url };
+}
+
+const leftoverEvent = (cal, rowId = 9001, opts = {}) => {
+  const uid = eventUidFor(rowId);
+  return leftoverUpload({ kind: 'event', uid, rowId, collectionUrl: cal.url, data: vevent(uid, 'Rest'), ...opts });
+};
+const leftoverTask = (listUrl, rowId = 9002) => {
+  const uid = todoOutbound.todoUidFor('tasks', rowId);
+  return leftoverUpload({ kind: 'task', uid, rowId, collectionUrl: listUrl, data: vtodo(uid, 'Rest') });
+};
+const uploadNotes = () => db.prepare('SELECT * FROM caldav_upload_attempts').all();
+
+test('Stoppsignal über alle Phasen, Termine im Sync-Lauf: Rest, Löschen und Uploads - nach dem 429 keine Anfrage mehr (#2135)', async () => {
+  reset();
+  const cal = calendar();
+  leftoverEvent(cal);
+  pendingEventDeletion(cal);
+  const ids = [localEvent(cal.url, 'Eins'), localEvent(cal.url, 'Zwei')];
+
+  refuseWrites({ status: 429 });
+  await caldavSync.sync();
+  assert.deepEqual(requestsAfterFirst(429), [], 'nach der kontoweiten Absage gingen weitere Anfragen an das Konto');
+  assert.equal(writesSent(), 1);
+  assert.equal(uploadNotes().length, 1, 'die Notiz des Rests fiel');
+  assert.deepEqual(eventTombstones().map((t) => t.attempts), [0]);
+  for (const id of ids) assert.equal(event(id).external_source, 'local');
+
+  // Der nächste Lauf fängt neu an: alles geht hinaus.
+  dav.allowAll();
+  await caldavSync.sync();
+  assert.equal(uploadNotes().length, 0);
+  assert.equal(eventTombstones().length, 0);
+  for (const id of ids) assert.equal(event(id).external_source, 'caldav');
+});
+
+test('Stoppsignal über alle Phasen, iCloud: Rest, Löschen und Uploads - nach dem 503 keine Anfrage mehr (#2135)', async () => {
+  reset();
+  const url = dav.addCollection('icloud', { name: 'iCloud' });
+  dav.putObject(url, 'neighbour.ics', vevent('apple-neighbour@test', 'Nachbar'));
+  appleCalendar.saveCredentials(dav.url, 'u', 'p');
+  try {
+    leftoverUpload({ source: 'apple', kind: 'event', uid: eventUidFor(9001), rowId: 9001, collectionUrl: url, data: vevent(eventUidFor(9001), 'Rest') });
+    const gone = dav.putObject(url, 'gone.ics', vevent('apple-gone@test', 'Gelöscht'));
+    queueDeletion({ source: 'apple', calendarExternalId: url, eventExternalId: 'apple-gone@test', objectUrl: gone.url });
+    for (const title of ['Eins', 'Zwei']) {
+      db.prepare(`
+        INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, created_by, external_source)
+        VALUES (?, '2035-03-10T09:00', '2035-03-10T10:00', 0, 1, 'local')
+      `).run(title);
+    }
+
+    refuseWrites({ status: 503 });
+    await appleCalendar.sync();
+    assert.deepEqual(requestsAfterFirst(503), [], 'nach der kontoweiten Absage gingen weitere Anfragen an das Konto');
+    assert.equal(writesSent(), 1);
+    assert.equal(uploadNotes().length, 1, 'die Notiz des Rests fiel');
+    assert.equal(eventTombstones().length, 1);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM calendar_events WHERE external_source = 'local'").get().n, 2);
+  } finally {
+    appleCalendar.clearCredentials();
+  }
+});
+
+/** Aufgaben- und Einkaufsliste mit allem, was ein Durchgang schreiben kann. */
+function todoWorkInEveryPhase() {
+  const list = taskList();
+  const { listId } = shoppingList();
+  leftoverTask(list);
+  pendingTaskDeletion(list);
+  const tasks = [localTask(list, 'Eins'), localTask(list, 'Zwei')];
+  db.prepare('INSERT INTO shopping_items (list_id, name) VALUES (?, ?)').run(listId, 'Milch');
+  return { list, tasks };
+}
+
+test('Stoppsignal über alle Phasen, Erinnerungen im Sync-Lauf: Löschen, Rest und Uploads - nach dem 429 keine Anfrage mehr (#2135)', async () => {
+  reset();
+  const { tasks } = todoWorkInEveryPhase();
+
+  refuseWrites({ status: 429 });
+  await remindersSync.sync();
+  assert.deepEqual(requestsAfterFirst(429), [], 'nach der kontoweiten Absage gingen weitere Anfragen an das Konto');
+  assert.equal(writesSent(), 1);
+  assert.equal(uploadNotes().length, 1, 'die Notiz des Rests fiel');
+  assert.deepEqual(todoTombstones().map((t) => t.attempts), [0]);
+  for (const id of tasks) assert.equal(task(id).external_source, 'local');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM shopping_items WHERE external_source = 'local'").get().n, 1);
+
+  dav.allowAll();
+  await remindersSync.sync();
+  assert.equal(uploadNotes().length, 0);
+  assert.equal(todoTombstones().length, 0);
+  for (const id of tasks) assert.equal(task(id).external_source, 'caldav');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM shopping_items WHERE external_source = 'local'").get().n, 0);
+});
+
+test('Stoppsignal über alle Phasen, Erinnerungen im Sofortversuch: nach dem ersten 503 keine Anfrage mehr, auch kein Abruf (#2135)', async () => {
+  reset();
+  const { tasks } = todoWorkInEveryPhase();
+
+  refuseWrites({ status: 503 });
+  await todoOutbound.flushOutbound();
+  assert.deepEqual(requestsAfterFirst(503), [], 'nach der kontoweiten Absage gingen weitere Anfragen an das Konto');
+  assert.equal(writesSent(), 1);
+  assert.equal(uploadNotes().length, 1);
+  assert.deepEqual(todoTombstones().map((t) => t.attempts), [0]);
+  for (const id of tasks) assert.equal(task(id).external_source, 'local');
+
+  dav.allowAll();
+  await todoOutbound.flushOutbound();
+  assert.equal(uploadNotes().length, 0);
+  assert.equal(todoTombstones().length, 0);
+  for (const id of tasks) assert.equal(task(id).external_source, 'caldav');
+});
+
+test('Stoppsignal über alle Phasen: ein 403 auf einer Liste lässt die Uploads in eine andere Liste desselben Kontos hinaus (#2135)', async () => {
+  reset();
+  const shared = taskList();
+  const own = dav.addCollection('own', { name: 'Eigen', components: ['VTODO'] });
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled)
+    VALUES (?, ?, 'Eigen', 'tasks', 1)
+  `).run(accountId, own);
+  pendingTaskDeletion(shared);
+  const id = localTask(own, 'Eigen');
+
+  const onShared = (req) => req.path.startsWith(new URL(shared).pathname);
+  dav.refuse({ method: 'DELETE', status: 403, when: onShared });
+  dav.refuse({ method: 'PUT', status: 403, when: onShared });
+  for (const run of [() => todoOutbound.flushOutbound(), () => remindersSync.sync()]) {
+    await run();
+    assert.equal(task(id).external_source, 'caldav', 'der 403 einer anderen Liste hielt den Upload auf');
+  }
+  assert.equal(todoTombstones().length, 1);
+});
+
+for (const status of [429, 503]) {
+  test(`Rest eines Uploads nach der Frist, DELETE ${status}: die Notiz bleibt, das Objekt kommt nicht als Termin herein (#2135)`, async () => {
+    reset();
+    const cal = calendar();
+    const { uid } = leftoverEvent(cal, 9001, { expired: true });
+
+    dav.allowAll();
+    dav.refuse({ method: 'DELETE', status });
+    await caldavSync.sync();
+    assertRefused('DELETE', status);
+    assert.equal(uploadNotes().length, 1, 'eine kontoweite Absage hat die Notiz nach der Frist fallen lassen');
+
+    // Der Lauf danach: die Notiz verdeckt das Objekt weiter.
+    await caldavSync.sync();
+    assert.equal(
+      db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE external_calendar_id = ?').get(uid).n, 0,
+      'der Rest kam als Termin herein'
+    );
+
+    dav.allowAll();
+    await caldavSync.sync();
+    assert.equal(uploadNotes().length, 0);
+    assert.equal(dav.getObject(cal.url, `${uid}.ics`), null);
+  });
+}
+
+// ── Gespiegelt heisst gesehen (#1839) ───────────────────────────────────────────
+//
+// Vor #1837 stempelte ein abgelehnter Upload die Zeile zum Spiegel eines
+// Objekts, das es nie gab, und der naechste Prune loeschte sie als "anderswo
+// entfernt". Entschieden am 9.10.: eine Zeile gilt erst als Spiegel, wenn ein
+// Abruf ihr Objekt gesehen hat. Nachgestellt wird die Zeile, wie die alte
+// Buchung sie hinterliess (Spiegel ohne Objekt, nie gesehen), und die Zeile,
+// die ein Abruf gesehen hat und die danach anderswo geloescht wurde.
+
+const seenOf = (table, id) => db.prepare(`SELECT seen_on_server FROM ${table} WHERE id = ?`).get(id).seen_on_server;
+
+/** Eine Aufgabe, die die alte Buchung zum Spiegel gestempelt hat: kein Objekt oben. */
+function phantomTask(listUrl, title = 'Phantom') {
+  const id = localTask(listUrl, title);
+  const uid = todoOutbound.todoUidFor('tasks', id);
+  db.prepare(`
+    UPDATE tasks SET external_source = 'caldav', external_uid = ?, external_account_id = ?, external_object_url = ?,
+                     target_caldav_account_id = NULL, target_caldav_list_url = NULL
+     WHERE id = ?
+  `).run(uid, accountId, `${listUrl}${uid}.ics`, id);
+  return { id, uid };
+}
+
+test('Gesehen: eine nie gesehene, hier angelegte Aufgabe ohne Objekt wird nicht geloescht, sondern hochgeladen (#1839)', async () => {
+  reset();
+  const list = taskList();
+  const { id, uid } = phantomTask(list);
+
+  await remindersSync.sync();
+  assert.ok(task(id), 'die Aufgabe wurde als "anderswo geloescht" entfernt');
+  assert.equal(task(id).external_source, 'caldav', 'die Aufgabe ging nicht wieder hinauf');
+  assert.equal(task(id).external_uid, uid, 'dieselbe UID wie zuvor');
+  assert.ok(dav.getObject(list, `${uid}.ics`), 'das Objekt liegt nicht auf dem Server');
+  assert.equal(seenOf('tasks', id), 0, 'der Upload selbst belegt nichts');
+
+  // Der naechste Abruf findet es: ab jetzt gesehen.
+  await remindersSync.sync();
+  assert.equal(seenOf('tasks', id), 1);
+});
+
+test('Gesehen: eine Aufgabe, deren Objekt ein Abruf gesehen hat, faellt, wenn es anderswo geloescht wird (#1839)', async () => {
+  reset();
+  const list = taskList();
+  const { id, url } = mirroredTask(list, 'todo-seen@test', 'Gesehen');
+
+  await remindersSync.sync();
+  assert.equal(seenOf('tasks', id), 1, 'der Abruf hat die Aufgabe nicht als gesehen markiert');
+  dav.removeObject(list, 'todo-seen@test.ics');
+  assert.ok(url);
+  await remindersSync.sync();
+  assert.equal(task(id), undefined, 'eine anderswo geloeschte Aufgabe blieb stehen');
+});
+
+test('Gesehen: der erste Lauf nach dem Update loescht nichts, was er nicht gesehen hat (#1839)', async () => {
+  reset();
+  const list = taskList();
+  // Eine fremde Aufgabe aus der Zeit vor der Spalte, deren Objekt fehlt.
+  const id = Number(db.prepare(`
+    INSERT INTO tasks (title, created_by, external_uid, external_source, external_account_id, external_object_url)
+    VALUES ('Fremd', 1, 'foreign@test', 'caldav', ?, ?)
+  `).run(accountId, `${list}foreign@test.ics`).lastInsertRowid);
+  const phantom = phantomTask(list);
+
+  await remindersSync.sync();
+  assert.equal(task(id)?.external_source, 'caldav', 'eine nie gesehene fremde Aufgabe wurde geloescht');
+  assert.ok(task(phantom.id), 'eine nie gesehene eigene Aufgabe wurde geloescht');
+});
+
+test('Gesehen: ein nie gesehener, hier angelegter Einkaufsartikel ohne Objekt geht wieder hinauf (#1839)', async () => {
+  reset();
+  const { url, listId } = shoppingList();
+  const id = Number(db.prepare('INSERT INTO shopping_items (list_id, name) VALUES (?, ?)').run(listId, 'Phantom').lastInsertRowid);
+  const uid = todoOutbound.todoUidFor('shopping', id);
+  db.prepare(`
+    UPDATE shopping_items SET external_source = 'caldav', external_uid = ?, external_account_id = ?, external_object_url = ?
+     WHERE id = ?
+  `).run(uid, accountId, `${url}${uid}.ics`, id);
+
+  await remindersSync.sync();
+  const now = db.prepare('SELECT * FROM shopping_items WHERE id = ?').get(id);
+  assert.ok(now, 'der Artikel wurde als "anderswo geloescht" entfernt');
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.list_id, listId);
+  assert.ok(dav.getObject(url, `${uid}.ics`), 'das Objekt liegt nicht auf dem Server');
+});
+
+/** Ein Termin, den die alte Buchung zum Spiegel gestempelt hat: kein Objekt oben. */
+function phantomEvent(cal) {
+  const id = localEvent(cal.url, 'Phantom');
+  const uid = eventUidFor(id);
+  db.prepare(`
+    UPDATE calendar_events SET external_source = 'caldav', external_calendar_id = ?, calendar_ref_id = ?,
+                               external_object_url = ?, caldav_account_id = ?
+     WHERE id = ?
+  `).run(uid, cal.refId, `${cal.url}${uid}.ics`, accountId, id);
+  return { id, uid };
+}
+
+test('Gesehen: ein nie gesehener, hier angelegter Termin ohne Objekt wird nicht geloescht, sondern hochgeladen (#1839)', async () => {
+  reset();
+  const cal = calendar();
+  const { id, uid } = phantomEvent(cal);
+
+  await caldavSync.sync();
+  assert.ok(event(id), 'der Termin wurde als "anderswo geloescht" entfernt');
+  assert.equal(event(id).external_source, 'caldav', 'der Termin ging nicht wieder hinauf');
+  assert.equal(event(id).external_calendar_id, uid);
+  assert.ok(dav.getObject(cal.url, `${uid}.ics`), 'das Objekt liegt nicht auf dem Server');
+
+  await caldavSync.sync();
+  assert.equal(seenOf('calendar_events', id), 1);
+});
+
+test('Gesehen: ein gesehener Termin faellt, wenn er anderswo geloescht wird; ein nie gesehener fremder bleibt (#1839)', async () => {
+  reset();
+  const cal = calendar();
+  const seen = mirroredEvent(cal, 'evt-seen@test', 'Gesehen');
+  const foreign = mirroredEvent(cal, 'evt-foreign@test', 'Fremd');
+  dav.removeObject(cal.url, 'evt-foreign@test.ics');
+
+  await caldavSync.sync();
+  assert.equal(seenOf('calendar_events', seen.id), 1);
+  assert.ok(event(foreign.id), 'ein nie gesehener fremder Termin wurde geloescht');
+
+  dav.removeObject(cal.url, 'evt-seen@test.ics');
+  await caldavSync.sync();
+  assert.equal(event(seen.id), undefined, 'ein anderswo geloeschter Termin blieb stehen');
+});
+
+test('Gesehen: iCloud - ein nie gesehener, hier angelegter Termin ohne Objekt geht wieder hinauf (#1839)', async () => {
+  reset();
+  const url = dav.addCollection('icloud', { name: 'iCloud' });
+  dav.putObject(url, 'neighbour.ics', vevent('apple-neighbour@test', 'Nachbar'));
+  appleCalendar.saveCredentials(dav.url, 'u', 'p');
+  try {
+    await appleCalendar.sync();
+    const refId = db.prepare("SELECT id FROM external_calendars WHERE source = 'apple' AND external_id = ?").get(url).id;
+    const id = Number(db.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, created_by, external_source)
+      VALUES ('Phantom', '2035-03-10T09:00', '2035-03-10T10:00', 0, 1, 'local')
+    `).run().lastInsertRowid);
+    const uid = eventUidFor(id);
+    db.prepare(`
+      UPDATE calendar_events SET external_source = 'apple', external_calendar_id = ?, calendar_ref_id = ?, external_object_url = ?
+       WHERE id = ?
+    `).run(uid, refId, `${url}${uid}.ics`, id);
+
+    await appleCalendar.sync();
+    assert.ok(event(id), 'der Termin wurde als "anderswo geloescht" entfernt');
+    assert.equal(event(id).external_source, 'apple', 'der Termin ging nicht wieder hinauf');
+    assert.ok(dav.getObject(url, `${uid}.ics`), 'das Objekt liegt nicht in iCloud');
+  } finally {
+    appleCalendar.clearCredentials();
+  }
+});
+
+test('Gesehen: auch ein Lauf, der wegen einer nicht abgerufenen Liste nicht prunt, markiert, was er gesehen hat (#1839, Review)', async () => {
+  reset();
+  const list = taskList();
+  const broken = dav.addCollection('broken', { name: 'Kaputt', components: ['VTODO'] });
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled)
+    VALUES (?, ?, 'Kaputt', 'tasks', 1)
+  `).run(accountId, broken);
+  const { id } = mirroredTask(list, 'todo-partial@test', 'Teilweise');
+
+  dav.refuse({ method: 'REPORT', status: 503, when: (req) => req.path === new URL(broken).pathname });
+  await remindersSync.sync();
+  assertRefused('REPORT', 503);
+  assert.equal(seenOf('tasks', id), 1, 'der Abruf hat die Aufgabe geliefert, sie gilt aber nicht als gesehen');
+});
+
+test('Gesehen: ein nie gesehener Termin mit wartendem Umzug geht in den Kalender des Umzugs hinauf (#1839, Review)', async () => {
+  reset();
+  const cal = calendar();
+  const other = calendar('other', 'Anderer');
+  const { id, uid } = phantomEvent(cal);
+  db.prepare('UPDATE calendar_events SET outbound_move_to = ?, target_caldav_calendar_url = ? WHERE id = ?')
+    .run(other.url, other.url, id);
+
+  await caldavSync.sync();
+  assert.equal(event(id).external_source, 'caldav', 'der Termin ging nicht wieder hinauf');
+  assert.ok(dav.getObject(other.url, `${uid}.ics`), 'der Termin liegt nicht im Kalender, den der Nutzer gewaehlt hat');
+  assert.equal(dav.getObject(cal.url, `${uid}.ics`), null, 'der Termin ging in den alten Kalender');
+});
+
+test('Gesehen: eine nie gesehene Aufgabe mit UID nach dem alten Muster bleibt Spiegel - ein Upload ginge unter neuer UID hinauf (#1839, Review)', async () => {
+  reset();
+  const list = taskList();
+  const id = localTask(list, 'Alt');
+  const uid = `yuvomi-task-${id}@yuvomi.local`;
+  db.prepare(`
+    UPDATE tasks SET external_source = 'caldav', external_uid = ?, external_account_id = ?, external_object_url = ?,
+                     target_caldav_account_id = NULL, target_caldav_list_url = NULL
+     WHERE id = ?
+  `).run(uid, accountId, `${list}${uid}.ics`, id);
+
+  await remindersSync.sync();
+  assert.equal(task(id)?.external_uid, uid, 'die Aufgabe mit alter UID wurde geloescht oder zurueckgesetzt');
+  assert.equal(dav.seen('PUT').length, 0, 'ein Upload unter neuer UID ging hinaus');
 });
 
 // ── CardDAV-Verbindungstest: die Absage erreicht den Nutzer ─────────────────────

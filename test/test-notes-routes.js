@@ -281,6 +281,14 @@ test('PUT /:id: aktualisiert Inhalt/Titel/Farbe/pinned', async () => {
   assert.equal(r.body.data.pinned, 1);
 });
 
+test('PUT /:id: Inhalt und Titel als Zahl werden wie beim Anlegen als Text gespeichert, nicht mit 500 abgelehnt', async () => {
+  const note = (await call('POST', '/', { content: 'C', title: 'T' })).body.data;
+  const r = await call('PUT', `/${note.id}`, { content: 5, title: 7 });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.content, '5');
+  assert.equal(r.body.data.title, '7');
+});
+
 test('PUT /:id: leerer Titel → null', async () => {
   const note = (await call('POST', '/', { content: 'C', title: 'Hat Titel' })).body.data;
   const r = await call('PUT', `/${note.id}`, { title: '' });

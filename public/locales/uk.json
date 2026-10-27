@@ -1342,7 +1342,6 @@
         "pickOne": "Виберіть подію",
         "pickOneHint": "Тут з’являться час, місце та нагадування.",
         "syncTargetAssigneeAmbiguous": "Кілька календарів мають цю особу як призначення за замовчуванням. Обери ціль сам.",
-        "syncTargetSeveralAssignees": "Призначено кількох осіб, тому призначення не вибирає календар. Замість цього діє: {{target}}.",
         "filtersSources": "Календарі",
         "filterUnassigned": "Не призначені",
         "dateSpanSpoken": "з {{from}} по {{to}}",
@@ -1385,7 +1384,10 @@
         "errorDeleteFeedAdminOnly": "Цей календар експортується. Видалити його може лише адміністратор.",
         "errorEventGone": "Цієї події більше немає.",
         "errorSelectedCalendarGone": "Вибраного календаря більше немає.",
-        "errorSeriesNoOccurrence": "З таким повторенням від дати початку не було б жодної події."
+        "errorSeriesNoOccurrence": "З таким повторенням від дати початку не було б жодної події.",
+        "localCalendarUploadsHint": "Події цього календаря завантажуються в iCloud через Apple Calendar.",
+        "overlapOpenSchedule": "Відкрити графік змін",
+        "syncTargetNoCalendarForPeople": "Жоден календар не має саме цих людей як призначення за замовчуванням, тож призначення не вибирає календар. Натомість: {{target}}."
     },
     "noteCategories": {
         "categories": "Категорії",
@@ -1458,7 +1460,11 @@
         "checklistDone": "Виконано",
         "checklistOpen": "Відкрито",
         "errorNoteGone": "Цієї нотатки більше немає.",
-        "errorSelectedCategoryGone": "Однієї з вибраних категорій більше немає."
+        "errorSelectedCategoryGone": "Однієї з вибраних категорій більше немає.",
+        "lockedToggle": "Заблокувати редагування",
+        "lockedBadge": "Заблоковано",
+        "lockedHint": "Лише ви та адміністратори можете змінювати, закріплювати чи видаляти цю нотатку - зокрема позначати пункти її списку. Інші й далі можуть її читати.",
+        "errorLocked": "Ця нотатка заблокована. Змінити її можуть лише той, хто її створив, та адміністратори."
     },
     "markdown": {
         "bold": "Жирний (Ctrl+B)",
@@ -1938,6 +1944,8 @@
         "planSavingsDeleteConfirm": "Видалити ціль заощаджень?",
         "accountsTab": "Рахунки",
         "netWorth": "Чисті активи",
+        "netWorthApproxNote": "Перераховано за курсами на {{date}}",
+        "netWorthPerCurrencyNote": "Без курсу - сума за кожною валютою",
         "addAccount": "Додати рахунок",
         "accountsEmptyTitle": "Рахунків ще немає",
         "accountsEmptyDescription": "Додайте рахунки, наприклад поточний або ощадний, щоб відстежувати баланси.",
@@ -2033,6 +2041,7 @@
         "saveFailed": "Не вдалося зберегти. Перевірте введені дані.",
         "loanAlreadyPaid": "Цю позику вже повністю сплачено.",
         "loanInstallmentAlreadyPaid": "Цей платіж уже сплачено.",
+        "loanPaymentRateUnavailable": "Курс для валюти рахунку невідомий. Оберіть для позики інший рахунок або приберіть рахунок.",
         "amountExceedsLoanRemaining": "Сума більша за залишок позики",
         "responsibleNotMember": "Відповідальними можуть бути лише члени домогосподарства.",
         "seriesStartTooEarly": "День початку не може припадати на місяць до першого запису серії",
@@ -2469,7 +2478,10 @@
             "errorNoCalendarName": "Введіть назву нового календаря.",
             "dropzoneTitle": "Перетягніть ICS-файл сюди або виберіть його",
             "dropzoneTitleTouch": "Торкніться, щоб вибрати ICS-файл",
-            "dropzoneHint": "Лише файли .ics"
+            "dropzoneHint": "Лише файли .ics",
+            "assigneesLabel": "Призначити",
+            "assigneesHint": "Нові події отримують цих людей. Уже імпортована подія з тим самим ID отримує їх додатково - навіть якщо призначення було знято вручну.",
+            "successWithAssigned": "Імпортовано: {{imported}}, уже існувало: {{skipped}}, з них тепер призначено: {{assigned}}."
         },
         "memberPhoneLabel": "Номер телефону (необов'язково)",
         "memberEmailLabel": "Електронна пошта (необов'язково)",
@@ -3258,10 +3270,7 @@
         "notificationChannelDeleteConfirmDetail": "Цим каналом більше не піде жодне сповіщення, навіть термінове. Адресу й облікові дані для нового каналу доведеться вводити заново.",
         "apiTokensMcpHint": "Ці токени також працюють як токени Bearer для кінцевої точки MCP за адресою /mcp (наприклад, у Claude Desktop для створення завдань, покупок і подій за допомогою ШІ).",
         "sync": {
-            "defaultAssignee": "Призначення за замовчуванням",
             "defaultAssigneeNone": "Немає",
-            "defaultAssigneeHint": "Нові синхронізовані події автоматично призначаються цій особі.",
-            "defaultAssigneeRoutingHint": "Призначення за замовчуванням: події з календаря отримують вибрану там особу, а нова подія, призначена лише їй, створюється в цьому календарі. Це стосується календарів Google і CalDAV, але не Apple чи Outlook.",
             "backfillTitle": "Доповнити призначення",
             "backfillDescription": "Призначення за замовчуванням діє лише для подій, завантажених після його встановлення. Тут його можна один раз застосувати до вже завантажених подій з усіх облікових записів.",
             "backfillAction": "Застосувати до наявних подій",
@@ -3287,7 +3296,10 @@
             "backfillMovedNext": "Показати наступні",
             "backfillMovedAll": "Вибрати всі",
             "backfillMovedChange": "З {{from}} на {{to}}",
-            "backfillDescriptionMore": "Події без призначення отримують його одразу. Події, які досі мають призначення за замовчуванням іншого календаря, показано по одній для вибору. Будь-яке інше призначення не змінюється."
+            "backfillDescriptionMore": "Події без призначення отримують його одразу. Події, які досі мають призначення за замовчуванням іншого календаря, показано по одній для вибору. Будь-яке інше призначення не змінюється.",
+            "defaultAssignees": "Призначення за замовчуванням",
+            "defaultAssigneesHint": "Нові синхронізовані події автоматично призначаються цим людям. Перша особа визначає колір.",
+            "defaultAssigneesRoutingHint": "Призначення за замовчуванням: події з календаря отримують людей, вибраних там, а нова подія, призначена саме цим людям, створюється в цьому календарі. Діє для календарів Google і CalDAV, але не для Apple чи Outlook."
         },
         "calendarAssignMeLabel": "Призначати нові події мені",
         "calendarDefaultRemindersLabel": "Нагадування за замовчуванням",
@@ -3510,6 +3522,8 @@
         "displayDeleteConfirm": "Видалити «{{name}}»?",
         "displayPairingCodeLabel": "Код підключення",
         "displayPairingCodeHint": "Дійсний 15 хвилин і спрацьовує рівно один раз. Відкрийте на планшеті /pair і введіть його там. Він показується лише зараз.",
+        "displayPairStepCode": "Додайте тут настінний планшет і створіть код підключення.",
+        "displayPairStepOpen": "Відкрийте на планшеті цю адресу й введіть там код:",
         "displayDeviceUnnamed": "Пристрій без назви",
         "displayDeviceLastSeen": "Востаннє в мережі: {{when}}",
         "displayDeviceNeverSeen": "Жодного разу не підключався",
@@ -3620,7 +3634,20 @@
         "permChildRoleHint": "Нові дитячі облікові записи під час створення також отримують власні стартові права: {{list}}. Потім вони вказані в цього учасника.",
         "activeModulesHintMore": "Щоб сховати модуль лише в себе, відкрий Модулі → Навігація.",
         "permIntroMore": "Окремі учасники можуть відрізнятися від типового значення ролі. Без налаштувань кожна роль має повний доступ; адміністратори - завжди.",
-        "preferenceSaveFailed": "Не вдалося зберегти налаштування."
+        "preferenceSaveFailed": "Не вдалося зберегти налаштування.",
+        "caldavCalendarReadOnly": "Лише читання: сюди не можна зберегти нові події",
+        "caldavCalendarReadOnlyWaiting_one": "Лише читання: {{count}} подія, що чекає на завантаження сюди, не дійде",
+        "caldavCalendarReadOnlyWaiting": "Лише читання: {{count}} подій, що чекають на завантаження сюди, не дійдуть",
+        "reminderListReadOnly": "Лише читання: сюди не можна зберегти нові записи",
+        "reminderListReadOnlyWaiting_one": "Лише читання: {{count}} запис, що чекає на завантаження сюди, не дійде",
+        "reminderListReadOnlyWaiting": "Лише читання: {{count}} записів, що чекають на завантаження сюди, не дійдуть",
+        "caldavCalendarReadOnlyWaiting_few": "Лише читання: {{count}} події, що чекають на завантаження сюди, не дійдуть",
+        "caldavCalendarReadOnlyWaiting_many": "Лише читання: {{count}} подій, що чекають на завантаження сюди, не дійдуть",
+        "reminderListReadOnlyWaiting_few": "Лише читання: {{count}} записи, що чекають на завантаження сюди, не дійдуть",
+        "reminderListReadOnlyWaiting_many": "Лише читання: {{count}} записів, що чекають на завантаження сюди, не дійдуть",
+        "reminderListAssigneesTasksOnly": "Людей можна задати лише для списків, що йдуть у Завдання.",
+        "syncAssigneeNotMember": "Тут можна вибрати лише членів родини.",
+        "syncAssigneeUnknown": "Цієї людини більше немає. Перезавантажте сторінку."
     },
     "login": {
         "tagline": "З поверненням. Ваш дім - в одному місці.",
@@ -3959,7 +3986,8 @@
         "banner": "Офлайн - повторне підключення…",
         "staleData": "Офлайн - станом на: {{time}}",
         "pageTitle": "Ти офлайн",
-        "pageDescription": "Цій сторінці потрібне з’єднання. Щойно пристрій знову буде онлайн, вона завантажиться сама."
+        "pageDescription": "Цій сторінці потрібне з’єднання. Щойно пристрій знову буде онлайн, вона завантажиться сама.",
+        "snapshot": "Немає з’єднання із сервером - збережені дані, лише перегляд"
     },
     "emptyHint": {
         "tasks": "Натисніть +, щоб створити перше завдання. Проведіть картку вліво, щоб позначити виконаною, вправо - щоб переглянути.",
@@ -4606,6 +4634,13 @@
             "missedDetail_one": "З {{date}} пропущено {{count}} дату.",
             "missedDetail_few": "З {{date}} пропущено {{count}} дати.",
             "missedDetail_many": "З {{date}} пропущено {{count}} дат.",
+            "failing": "Не вдалося провести - повтор щогодини",
+            "pastQuestion": "Дата в минулому",
+            "pastSkip": "Почати з {{date}}",
+            "pastDetail": "З {{date}} настало б {{count}} дати.",
+            "pastDetail_one": "З {{date}} настала б {{count}} дата.",
+            "pastDetail_few": "З {{date}} настало б {{count}} дати.",
+            "pastDetail_many": "З {{date}} настало б {{count}} дат.",
             "deleteConfirm": "Видалити цю повторювану витрату?",
             "deleteConfirmDetail": "Нові витрати більше не створюватимуться. Уже проведені витрати залишаться.",
             "show": "Показати",
@@ -4696,7 +4731,14 @@
         "debtOwesYou": "Борг вам: {{name}}",
         "debtOwes": "{{from}} винен {{to}}",
         "balanced": "Розраховано",
-        "balancedInGroup": "{{group}}: Розраховано"
+        "balancedInGroup": "{{group}}: Розраховано",
+        "totalsByMember": "Сплачено кожним",
+        "totalsByMemberHint": "Скільки вніс кожен, нижче його власна частка",
+        "ownShare": "Власна частка: {{amount}}",
+        "paidLabel": "Сплачено",
+        "totalsByCategory": "За категоріями",
+        "categoryFilter": "Фільтрувати витрати за категорією",
+        "noExpensesInCategory": "У цій категорії немає витрат."
     },
     "wmo": {
         "0": "Ясне небо",
@@ -5046,7 +5088,14 @@
         "detailAmountLabel": "Сума",
         "detailNextPaymentLabel": "Наступний платіж",
         "renewedNamed": "«{{name}}» оплачено - наступний платіж {{date}}.",
-        "completedNamed": "«{{name}}» оплачено й завершено."
+        "completedNamed": "«{{name}}» оплачено й завершено.",
+        "accountHint": "Кожен платіж за цією підпискою записується на цей рахунок. Окремий платіж можна змінити в бюджеті.",
+        "accountArchivedHint": "Цей рахунок в архіві. Підписка записується без рахунку, доки ви не виберете інший.",
+        "accountArchivedOption": "{{name}} (в архіві)",
+        "accountArchivedMeta": "{{name}} в архіві - записується без рахунку",
+        "visibilityHint_private": "Цю підписку та її платежі бачите тільки ви.",
+        "visibilityHint_shared": "Усі вдома бачать цю підписку та її платежі.",
+        "errorAccountGone": "Вибраного рахунку більше немає."
     },
     "health": {
         "fasting": {
@@ -5220,6 +5269,7 @@
             "saveError": "Не вдалося зберегти вимірювання.",
             "invalidValue": "Введіть коректні значення.",
             "range": {
+                "day": "День",
                 "week": "Тиждень",
                 "month": "Місяць",
                 "year": "Рік"
@@ -5259,6 +5309,7 @@
                 "family": "Родина"
             },
             "sparse": "Замало вимірювань, щоб показати тренд.",
+            "bandValue": "{{mean}}, від {{low}} до {{high}}",
             "recentMeasurements": "Останні вимірювання",
             "deleteMeasurement": "Видалити вимірювання {{value}} від {{date}}",
             "measurementDeleted": "Вимірювання видалено",
@@ -6169,8 +6220,9 @@
         "importDiagnosticDuplicateInstance_few": "Об'єднано дублікатів вивезення (з однаковим ідентифікатором): {{count}}.",
         "importDiagnosticDuplicateInstance_many": "Об'єднано дублікатів вивезення (з однаковим ідентифікатором): {{count}}.",
         "importUnresolvedBlockingError": "Спершу усуньте всі блокувальні попередження або явно пропустіть відповідні події.",
-        "importIgnoreLabel": "Ігнорувати",
         "importCreateNewType": "Створити новий вид сміття",
+        "importLabelsHint": "Якщо запис називає кілька контейнерів, виберіть усі - кожен отримає власний вивіз.",
+        "importLabelIgnoredHint": "Вид сміття не вибрано - запис не буде імпортовано.",
         "importNewTypeNameRequiredError": "Введіть назву для нового виду сміття.",
         "importDefaultSourceName": "Імпортований файл",
         "importCommittedToast": "Імпорт застосовано: додано {{added}}, змінено {{changed}}, видалено {{removed}}.",
@@ -6485,6 +6537,17 @@
         "badgeLow": "Майже закінчилося",
         "badgeOut": "Закінчилося",
         "bestBefore": "Придатний до {{date}}",
+        "noBestBefore": "Без терміну придатності",
+        "errorProductHasStock": "Цей продукт знову є в запасах і не був видалений.",
+        "productTotal": "усього {{quantity}}",
+        "productPlaces": "{{count}} місця",
+        "productPlaces_one": "{{count}} місце",
+        "productPlaces_few": "{{count}} місця",
+        "productPlaces_many": "{{count}} місць",
+        "productBatches": "{{count}} партії",
+        "productBatches_one": "{{count}} партія",
+        "productBatches_few": "{{count}} партії",
+        "productBatches_many": "{{count}} партій",
         "increase": "Збільшити кількість",
         "decrease": "Зменшити кількість",
         "toShoppingAll": "Усе до списку покупок",

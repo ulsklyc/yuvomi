@@ -71,7 +71,7 @@ router.get('/calendars', (req, res) => {
     });
   } catch (err) {
     log.error('GET /calendars', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -94,7 +94,7 @@ router.post('/calendars', (req, res) => {
     res.status(201).json({ data: serializeCalendar(req, row, feedUrl) });
   } catch (err) {
     log.error('POST /calendars', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -127,7 +127,7 @@ router.patch('/calendars/reorder', (req, res) => {
     res.json({ data: true });
   } catch (err) {
     log.error('PATCH /calendars/reorder', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -176,7 +176,7 @@ router.put('/calendars/:id', (req, res) => {
     res.json({ data: serializeCalendar(req, localCalendarById(database, id), feedUrl, { includeFeedToken: isAdminUser(req) }) });
   } catch (err) {
     log.error('PUT /calendars/:id', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -201,7 +201,7 @@ router.delete('/calendars/:id', (req, res) => {
     res.status(204).end();
   } catch (err) {
     log.error('DELETE /calendars/:id', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -215,7 +215,7 @@ router.post('/calendars/:id/feed/regenerate', requireAdmin, (req, res) => {
     res.json({ data: { token, url: feedUrl(req, token) } });
   } catch (err) {
     log.error('POST /calendars/:id/feed/regenerate', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -229,7 +229,7 @@ router.delete('/calendars/:id/feed', requireAdmin, (req, res) => {
     res.json({ data: { token: null } });
   } catch (err) {
     log.error('DELETE /calendars/:id/feed', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 

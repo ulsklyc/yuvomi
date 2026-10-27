@@ -1190,7 +1190,6 @@
         "pickOne": "Bir etkinlik seçin",
         "pickOneHint": "Saat, yer ve hatırlatıcılar burada görünür.",
         "syncTargetAssigneeAmbiguous": "Birden fazla takvimde bu kişi varsayılan atama olarak ayarlı. Hedefi kendin seç.",
-        "syncTargetSeveralAssignees": "Birden fazla kişi atanmış, bu yüzden atama bir takvim seçmez. Bunun yerine kullanılan: {{target}}.",
         "filtersSources": "Takvimler",
         "filterUnassigned": "Atanmamış",
         "dateSpanSpoken": "{{from}} ile {{to}} arası",
@@ -1229,7 +1228,10 @@
         "errorDeleteFeedAdminOnly": "Bu takvim dışa aktarılıyor. Yalnızca bir yönetici silebilir.",
         "errorEventGone": "Bu etkinlik artık yok.",
         "errorSelectedCalendarGone": "Seçilen takvim artık yok.",
-        "errorSeriesNoOccurrence": "Bu tekrarla başlangıç tarihinden itibaren hiç etkinlik olmazdı."
+        "errorSeriesNoOccurrence": "Bu tekrarla başlangıç tarihinden itibaren hiç etkinlik olmazdı.",
+        "localCalendarUploadsHint": "Bu takvimdeki etkinlikler Apple Calendar üzerinden iCloud’a yüklenir.",
+        "overlapOpenSchedule": "Vardiya planını aç",
+        "syncTargetNoCalendarForPeople": "Hiçbir takvimin varsayılan ataması tam olarak bu kişiler değil, bu yüzden atama bir takvim seçmez. Bunun yerine: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategoriler",
@@ -1300,7 +1302,11 @@
         "checklistDone": "Tamamlandı",
         "checklistOpen": "Açık",
         "errorNoteGone": "Bu not artık yok.",
-        "errorSelectedCategoryGone": "Seçilen kategorilerden biri artık mevcut değil."
+        "errorSelectedCategoryGone": "Seçilen kategorilerden biri artık mevcut değil.",
+        "lockedToggle": "Düzenlemeyi kilitle",
+        "lockedBadge": "Kilitli",
+        "lockedHint": "Bu notu yalnızca sen ve yöneticiler değiştirebilir, sabitleyebilir veya silebilir - listedeki öğeleri işaretlemek de buna dahildir. Diğer herkes okumaya devam edebilir.",
+        "errorLocked": "Bu not kilitli. Yalnızca onu oluşturan kişi ve yöneticiler değiştirebilir."
     },
     "markdown": {
         "bold": "Kalın (Ctrl+B)",
@@ -1772,6 +1778,8 @@
         "planSavingsDeleteConfirm": "Tasarruf hedefi silinsin mi?",
         "accountsTab": "Hesaplar",
         "netWorth": "Net değer",
+        "netWorthApproxNote": "{{date}} tarihli kurlarla çevrildi",
+        "netWorthPerCurrencyNote": "Döviz kuru yok - para birimi başına toplam",
         "addAccount": "Hesap ekle",
         "accountsEmptyTitle": "Henüz hesap yok",
         "accountsEmptyDescription": "Bakiyeleri takip etmek için vadesiz veya tasarruf gibi hesaplar ekleyin.",
@@ -1865,6 +1873,7 @@
         "saveFailed": "Kaydedilemedi. Lütfen bilgileri kontrol edin.",
         "loanAlreadyPaid": "Bu borcun tamamı zaten ödendi.",
         "loanInstallmentAlreadyPaid": "Bu taksit zaten ödendi.",
+        "loanPaymentRateUnavailable": "Hesabın para birimi için bilinen bir döviz kuru yok. Kredi için başka bir hesap seçin ya da hiçbirini.",
         "amountExceedsLoanRemaining": "Tutar, borcun kalan kısmından fazla",
         "responsibleNotMember": "Yalnızca hane üyeleri sorumlu olabilir.",
         "seriesStartTooEarly": "Başlangıç günü, serinin ilk kaydından önceki bir ayda olamaz",
@@ -2291,7 +2300,10 @@
             "errorNoCalendarName": "Yeni takvim için bir ad gir.",
             "dropzoneTitle": "Bir ICS dosyasını buraya sürükleyin veya seçin",
             "dropzoneTitleTouch": "ICS dosyası seçmek için dokunun",
-            "dropzoneHint": "Yalnızca .ics dosyaları"
+            "dropzoneHint": "Yalnızca .ics dosyaları",
+            "assigneesLabel": "Ata",
+            "assigneesHint": "Yeni etkinlikler bu kişileri alır. Aynı kimlikle daha önce içe aktarılmış bir etkinliğe de eklenirler - ataması elle kaldırılmış olsa bile.",
+            "successWithAssigned": "İçe aktarılan: {{imported}}, zaten vardı: {{skipped}}, bunlardan şimdi atanan: {{assigned}}."
         },
         "memberPhoneLabel": "Telefon numarası (isteğe bağlı)",
         "memberEmailLabel": "E-posta (isteğe bağlı)",
@@ -3060,10 +3072,7 @@
         "notificationChannelDeleteConfirmDetail": "Bu kanaldan artık hiçbir bildirim gitmez, acil olanlar da dahil. Adres ve erişim bilgileri yeni bir kanal için baştan girilmelidir.",
         "apiTokensMcpHint": "Bu belirteçler /mcp adresindeki MCP uç noktası için Bearer belirteci olarak da çalışır (örn. Claude Desktop'ta yapay zekâ ile görev, alışveriş öğesi ve etkinlik oluşturmak için).",
         "sync": {
-            "defaultAssignee": "Varsayılan atama",
             "defaultAssigneeNone": "Yok",
-            "defaultAssigneeHint": "Yeni eşitlenen etkinlikler otomatik olarak bu kişiye atanır.",
-            "defaultAssigneeRoutingHint": "Varsayılan atama: bir takvimdeki etkinlikler orada seçilen kişiye atanır ve yalnızca o kişiye atanan yeni bir etkinlik o takvimde oluşturulur. Google ve CalDAV takvimleri için geçerlidir, Apple veya Outlook için değil.",
             "backfillTitle": "Atamaları tamamla",
             "backfillDescription": "Varsayılan atama yalnızca ayarlandıktan sonra içe aktarılan randevulara uygulanır. Burada bunu tüm hesaplardan zaten içe aktarılmış randevulara bir kez uygulayabilirsiniz.",
             "backfillAction": "Mevcut randevulara uygula",
@@ -3083,7 +3092,10 @@
             "backfillMovedNext": "Sonrakileri göster",
             "backfillMovedAll": "Tümünü seç",
             "backfillMovedChange": "{{from}} yerine {{to}}",
-            "backfillDescriptionMore": "Atanmamış randevular onu doğrudan alır. Hâlâ başka bir takvimin varsayılan atamasını taşıyan randevular seçmeniz için tek tek listelenir. Diğer tüm atamalar değişmez."
+            "backfillDescriptionMore": "Atanmamış randevular onu doğrudan alır. Hâlâ başka bir takvimin varsayılan atamasını taşıyan randevular seçmeniz için tek tek listelenir. Diğer tüm atamalar değişmez.",
+            "defaultAssignees": "Varsayılan atama",
+            "defaultAssigneesHint": "Yeni eşitlenen etkinlikler otomatik olarak bu kişilere atanır. İlk kişi rengi belirler.",
+            "defaultAssigneesRoutingHint": "Varsayılan atama: bir takvimdeki etkinlikler orada seçilen kişileri alır ve tam olarak bu kişilere atanan yeni bir etkinlik o takvimde oluşturulur. Bu, Google ve CalDAV takvimleri için geçerlidir; Apple veya Outlook için değil."
         },
         "calendarAssignMeLabel": "Yeni etkinlikleri bana ata",
         "calendarDefaultRemindersLabel": "Varsayılan hatırlatıcılar",
@@ -3302,6 +3314,8 @@
         "displayDeleteConfirm": "“{{name}}” silinsin mi?",
         "displayPairingCodeLabel": "Eşleştirme kodu",
         "displayPairingCodeHint": "15 dakika geçerlidir ve tam olarak bir kez kullanılır. Tablette /pair adresini aç ve kodu oraya gir. Yalnızca şimdi gösterilir.",
+        "displayPairStepCode": "Buradan bir duvar tableti ekle ve eşleştirme kodu oluştur.",
+        "displayPairStepOpen": "Tablette bu adresi aç ve kodu oraya gir:",
         "displayDeviceUnnamed": "Adsız cihaz",
         "displayDeviceLastSeen": "Son görülme: {{when}}",
         "displayDeviceNeverSeen": "Hiç bağlanmadı",
@@ -3406,7 +3420,16 @@
         "permChildRoleHint": "Yeni çocuk hesapları oluşturulurken ayrıca kendi başlangıç izinlerini alır: {{list}}. Sonra bunlar ilgili üyede görünür.",
         "activeModulesHintMore": "Bir modülü yalnızca kendinde gizlemek için Modüller → Gezinme sayfasına git.",
         "permIntroMore": "Bireysel üyeler rol varsayılanından farklı olabilir. Ayar yapılmazsa her rol tam erişime sahiptir; yöneticiler her zaman.",
-        "preferenceSaveFailed": "Ayar kaydedilemedi."
+        "preferenceSaveFailed": "Ayar kaydedilemedi.",
+        "caldavCalendarReadOnly": "Salt okunur: buraya yeni etkinlik kaydedilemez",
+        "caldavCalendarReadOnlyWaiting_one": "Salt okunur: buraya yüklenmeyi bekleyen {{count}} etkinlik ulaşmayacak",
+        "caldavCalendarReadOnlyWaiting": "Salt okunur: buraya yüklenmeyi bekleyen {{count}} etkinlik ulaşmayacak",
+        "reminderListReadOnly": "Salt okunur: buraya yeni kayıt eklenemez",
+        "reminderListReadOnlyWaiting_one": "Salt okunur: buraya yüklenmeyi bekleyen {{count}} kayıt ulaşmayacak",
+        "reminderListReadOnlyWaiting": "Salt okunur: buraya yüklenmeyi bekleyen {{count}} kayıt ulaşmayacak",
+        "reminderListAssigneesTasksOnly": "Kişiler yalnızca Görevler’e giden listeler için ayarlanabilir.",
+        "syncAssigneeNotMember": "Burada yalnızca hane üyeleri seçilebilir.",
+        "syncAssigneeUnknown": "Bu kişi artık yok. Sayfayı yeniden yükleyin."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",
@@ -3739,7 +3762,8 @@
         "banner": "Çevrimdışı - yeniden bağlanılıyor…",
         "staleData": "Çevrimdışı - son güncelleme: {{time}}",
         "pageTitle": "Çevrimdışısın",
-        "pageDescription": "Bu sayfanın bağlantıya ihtiyacı var. Cihazın yeniden çevrimiçi olunca kendiliğinden yüklenir."
+        "pageDescription": "Bu sayfanın bağlantıya ihtiyacı var. Cihazın yeniden çevrimiçi olunca kendiliğinden yüklenir.",
+        "snapshot": "Sunucuya bağlantı yok - kayıtlı veriler, salt okunur"
     },
     "emptyHint": {
         "recipes": "Bir tarif doğrudan öğün planına ya da alışveriş listesine gider.",
@@ -4366,6 +4390,11 @@
             "missedBook": "{{date}} tarihinden itibaren kaçanları kaydet",
             "missedDetail": "{{date}} tarihinden beri {{count}} tarih kaçırıldı.",
             "missedDetail_one": "{{date}} tarihinden beri {{count}} tarih kaçırıldı.",
+            "failing": "Kayıt başarısız - her saat yeniden deneniyor",
+            "pastQuestion": "Tarih geçmişte",
+            "pastSkip": "{{date}} tarihinden başla",
+            "pastDetail": "{{date}} tarihinden beri {{count}} tarihin vadesi gelmiş olurdu.",
+            "pastDetail_one": "{{date}} tarihinden beri {{count}} tarihin vadesi gelmiş olurdu.",
             "deleteConfirm": "Bu tekrarlanan gider silinsin mi?",
             "deleteConfirmDetail": "Artık yeni gider oluşturulmaz. Kaydedilmiş giderler kalır.",
             "show": "Göster",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}} sana borçlu",
         "debtOwes": "{{from}}, {{to}} kişisine borçlu",
         "balanced": "Hesap kapalı",
-        "balancedInGroup": "{{group}}: Hesap kapalı"
+        "balancedInGroup": "{{group}}: Hesap kapalı",
+        "totalsByMember": "Kişi başına ödenen",
+        "totalsByMemberHint": "Ödenen tutar, altında kişinin kendi payı",
+        "ownShare": "Kendi payı: {{amount}}",
+        "paidLabel": "Ödenen",
+        "totalsByCategory": "Kategoriye göre",
+        "categoryFilter": "Harcamaları kategoriye göre filtrele",
+        "noExpensesInCategory": "Bu kategoride harcama yok."
     },
     "wmo": {
         "0": "Açık",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "Tutar",
         "detailNextPaymentLabel": "Sonraki ödeme",
         "renewedNamed": "\"{{name}}\" ödendi - sonraki ödeme {{date}}.",
-        "completedNamed": "\"{{name}}\" ödendi ve tamamlandı."
+        "completedNamed": "\"{{name}}\" ödendi ve tamamlandı.",
+        "accountHint": "Bu aboneliğin her ödemesi bu hesaba işlenir. Tek bir ödemeyi bütçede değiştirebilirsin.",
+        "accountArchivedHint": "Bu hesap arşivlendi. Başka bir hesap seçene kadar abonelik hesapsız işlenir.",
+        "accountArchivedOption": "{{name}} (arşivlendi)",
+        "accountArchivedMeta": "{{name}} arşivlendi - hesapsız işlenir",
+        "visibilityHint_private": "Bu aboneliği ve ödemelerini yalnızca sen görürsün.",
+        "visibilityHint_shared": "Ev halkındaki herkes bu aboneliği ve ödemelerini görür.",
+        "errorAccountGone": "Seçilen hesap artık mevcut değil."
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "Ölçüm kaydedilemedi.",
             "invalidValue": "Lütfen geçerli değerler girin.",
             "range": {
+                "day": "Gün",
                 "week": "Hafta",
                 "month": "Ay",
                 "year": "Yıl"
@@ -5003,6 +5047,7 @@
                 "family": "Aile"
             },
             "sparse": "Bir eğilim göstermek için ölçüm sayısı çok az.",
+            "bandValue": "{{mean}}, {{low}} ile {{high}} arası",
             "recentMeasurements": "Son ölçümler",
             "deleteMeasurement": "Ölçümü sil: {{value}} ({{date}})",
             "measurementDeleted": "Ölçüm silindi",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "{{count}} yinelenen alım örneği (aynı kimlik) tek kayıtta birleştirildi.",
         "importDiagnosticOther": "Bir takvim girişi beklenen biçimle eşleşmiyor.",
         "importUnresolvedBlockingError": "Önce tüm engelleyici uyarıları çözün ya da etkilenen etkinlikleri açıkça atlayın.",
-        "importIgnoreLabel": "Yok say",
         "importCreateNewType": "Yeni bir atık türü oluştur",
+        "importLabelsHint": "Bir kayıt birden fazla çöp kutusu adlandırıyorsa hepsini seçin - her biri kendi toplama gününü alır.",
+        "importLabelIgnoredHint": "Atık türü seçilmedi - içe aktarılmayacak.",
         "importNewTypeNameRequiredError": "Lütfen yeni atık türü için bir ad girin.",
         "importDefaultSourceName": "İçe aktarılan dosya",
         "importCommittedToast": "İçe aktarma uygulandı: {{added}} eklendi, {{changed}} değiştirildi, {{removed}} kaldırıldı.",
@@ -6198,6 +6244,13 @@
         "badgeLow": "Neredeyse bitti",
         "badgeOut": "Bitti",
         "bestBefore": "STT {{date}}",
+        "noBestBefore": "STT yok",
+        "errorProductHasStock": "Bu ürün yeniden stokta ve silinmedi.",
+        "productTotal": "toplam {{quantity}}",
+        "productPlaces": "{{count}} yer",
+        "productPlaces_one": "{{count}} yer",
+        "productBatches": "{{count}} parti",
+        "productBatches_one": "{{count}} parti",
         "increase": "Miktarı artır",
         "decrease": "Miktarı azalt",
         "toShoppingAll": "Hepsini alışveriş listesine",

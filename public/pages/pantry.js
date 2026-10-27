@@ -29,10 +29,12 @@ import { mayWritePath } from '/utils/module-access.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { rowMenuHtml } from '/utils/row-action.js';
+import { errorSentence } from '/utils/friendly-error.js';
 // Alias, weil dieses Modul selbst eine `emptyStateEl()`-Funktion hat, die den
 // Renderer mit den Vorrats-Texten füllt.
 import { emptyStateEl as emptyStateComponentEl, mountLoadError, searchEmptyEl } from '/utils/empty-state.js';
-import { scheduleUndoableDelete, vibrate, wireScrollFade, collapseOut, expandIn } from '/utils/ux.js';
+import { scheduleUndoableDelete, vibrate, wireScrollFade, collapseOut, expandIn, toggleRegion } from '/utils/ux.js';
 import { redrawList } from '/utils/list-motion.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { todayKey } from '/utils/date.js';
@@ -57,6 +59,8 @@ let _search = null;
 
 const state = {
   items: [],
+  /** Die Haushaltsprodukte ueber den Chargen (#1448), auch die ohne Charge. */
+  products: [],
   locations: [],
   categories: [],
   /** Einkaufslisten - erst beim ersten „Auf die Einkaufsliste" nachgeladen. */
@@ -90,6 +94,27 @@ const state = {
  *     vorher losgeschickt wurde, ihn nicht zurueckdreht.
  */
 const intents = new Map();
+
+/**
+ * Products whose batches are open (product keys, see productKeyOf). Held for
+ * the visit of the page only, like the open overdue group on the dashboard:
+ * a redraw after a step or a save keeps it, a new visit starts collapsed.
+ */
+const expandedProducts = new Set();
+
+/**
+ * Batches deleted but still inside the undo window (removeItem). They stay in
+ * `state.items` until the delete commits, so a product row would otherwise go
+ * on counting the batch the user has just swiped away.
+ */
+const pendingDeletes = new Set();
+
+/**
+ * Products without batches deleted but still inside the undo window
+ * (removeProduct). productSections() leaves them out, so a redraw in the window
+ * (a search, a chip) does not bring the row back before the delete commits.
+ */
+const pendingProductDeletes = new Set();
 let QUANTITY_DEBOUNCE_MS_OVERRIDE = null; // nur fuer Tests, siehe __test unten
 const QUANTITY_DEBOUNCE_MS = 450;
 /** Monotone Folgenummer, die überholte PATCH-Antworten erkennbar macht. */
@@ -203,6 +228,7 @@ async function loadPantry() {
     }
   }
   state.items = frisch;
+  state.products = res.products ?? [];
   state.locations = res.locations ?? [];
   state.categories = res.categories ?? [];
 }
@@ -219,12 +245,20 @@ async function ensureLists() {
 // Auswahl / Gruppierung
 // --------------------------------------------------------
 
+/** The storage location of a place chip ("place:3"), or null for the other filters. */
+function placeFilterId(filter = state.filter) {
+  const match = /^place:(\d+)$/.exec(String(filter ?? ''));
+  return match ? Number(match[1]) : null;
+}
+
 function visibleItems() {
   const q = state.query.toLowerCase();
+  const place = placeFilterId();
   // Gefiltert wird nach dem, was die Zeile ZEIGT - sonst faellt ein Artikel aus
   // „Fast leer", waehrend die Zeile ihn noch dort zeigt.
   return state.items.map(withIntent).filter((item) => {
-    if (!matchesPantryFilter(item, state.filter, state.todayKey)) return false;
+    // A place chip (#1448) asks "what is in the freezer?": the batches there.
+    if (place != null ? item.location_id !== place : !matchesPantryFilter(item, state.filter, state.todayKey)) return false;
     if (!q) return true;
     return item.name?.toLowerCase().includes(q)
       || item.notes?.toLowerCase().includes(q)
@@ -233,39 +267,152 @@ function visibleItems() {
 }
 
 /**
- * Ohne Filter nach Lagerort gruppiert („wo liegt was?"). Sobald ein Filter
- * aktiv ist, ist der Ort nicht mehr die Frage - dann ist eine flache, nach
- * Dringlichkeit sortierte Liste die ehrlichere Antwort. Der Ort wandert in
- * die Meta-Zeile und geht dabei nicht verloren.
+ * Mit einem Filter eine flache, nach Dringlichkeit sortierte Chargenliste: die
+ * Chips fragen „welche Packung", und die Antwort ist eine Charge. Der Ort steht
+ * in der Meta-Zeile, bei mehreren Chargen eines Produkts auch dessen Summe.
  */
-function groupedItems(items) {
-  if (state.filter !== 'all') {
-    const flat = [...items];
-    if (state.filter === 'expired' || state.filter === 'soon') {
-      flat.sort((a, b) => String(a.expires_on).localeCompare(String(b.expires_on)));
-    } else {
-      flat.sort((a, b) => Number(a.quantity) - Number(b.quantity));
-    }
-    return [{ key: 'flat', label: null, items: flat }];
+function flatItems(items) {
+  const flat = [...items];
+  if (placeFilterId() != null) {
+    // A place lists its batches like the page lists products: by name, then
+    // best-before (none last), then id.
+    flat.sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), undefined, { sensitivity: 'base' })
+      || (a.expires_on ? 0 : 1) - (b.expires_on ? 0 : 1)
+      || String(a.expires_on ?? '').localeCompare(String(b.expires_on ?? ''))
+      || a.id - b.id);
+  } else if (state.filter === 'expired' || state.filter === 'soon') {
+    flat.sort((a, b) => String(a.expires_on).localeCompare(String(b.expires_on)));
+  } else {
+    flat.sort((a, b) => Number(a.quantity) - Number(b.quantity));
+  }
+  return flat;
+}
+
+/** The product a batch belongs to; a batch without one stands for itself. */
+function productKeyOf(item) {
+  return item.product_id != null ? `p${item.product_id}` : `b${item.id}`;
+}
+
+/** Every batch of the household per product, as the rows show them (with intent). */
+function batchesByProduct() {
+  const byProduct = new Map();
+  for (const item of state.items) {
+    const key = productKeyOf(item);
+    if (!byProduct.has(key)) byProduct.set(key, []);
+    byProduct.get(key).push(withIntent(item));
+  }
+  return byProduct;
+}
+
+/** Sum of the batches' quantities, as the product's total. */
+function productTotal(batches) {
+  return normalizePantryQuantity(batches.reduce((sum, b) => sum + Number(b.quantity || 0), 0), { fallback: 0 });
+}
+
+/** "4 l in all": the total in the product's unit, inflected like a row's quantity. */
+function productTotalText(total, unit) {
+  return t('pantry.productTotal', { quantity: quantityText({ quantity: total, unit }) });
+}
+
+/** " · 2 places", or " · 2 batches · Pantry cupboard" when all share one place. */
+function productWhereText(batches) {
+  const places = new Set(batches.map((b) => b.location_id ?? 'none')).size;
+  return places > 1
+    ? ` · ${t('pantry.productPlaces', { count: places })}`
+    : ` · ${t('pantry.productBatches', { count: batches.length })} · ${placeText(batches[0])}`;
+}
+
+/**
+ * The most urgent expiry among a product's batches, as the batch row says it
+ * ("Expired yesterday", "3 days left"): the earliest best-before date that is
+ * expired or soon, so expired beats soon. Only the expiry: low and out over
+ * the product come with the minimum on the product (#1448, step 3).
+ */
+function productExpiryBadge(batches) {
+  const urgent = batches
+    .filter((b) => b.expires_on && pantryItemStatus(b, state.todayKey).expiry)
+    .sort((a, b) => String(a.expires_on).localeCompare(String(b.expires_on)));
+  return urgent.length ? expiryBadge(urgent[0]) : null;
+}
+
+/** Fills the badge slot of a product row (empty when nothing is urgent). */
+function fillProductBadge(slot, batches) {
+  slot.replaceChildren();
+  const badge = productExpiryBadge(batches);
+  if (!badge) return;
+  const el = document.createElement('span');
+  el.className = `pantry-badge pantry-badge--${badge.tone}`;
+  el.textContent = badge.text;
+  slot.appendChild(el);
+}
+
+/**
+ * Without a filter the page lists PRODUCTS, in sections by category (#1448,
+ * step 2): "the total on top and the batches underneath" (discussion #1077).
+ * Category, not place: a product with batches in the fridge and the cellar has
+ * one place in the list only this way, and the food / household view (#1756)
+ * keys on the same category. The place moves into the row.
+ *
+ * A product is shown whole when its name, or the name, note or place of one of
+ * its batches, matches the search. A product without batches (it outlives its
+ * last one) is listed with its name only. Sections follow the category order
+ * of Shopping (`sort_order`), a category without a known entry goes last, and
+ * no category means the default one ("Other"). Products sort by name like the
+ * server sorts batches (case-insensitive); batches by place order, best-before
+ * (none last) and id.
+ *
+ * @returns {Array<{ key: string, label: string, products: object[] }>}
+ */
+function productSections(matching) {
+  const byProduct = batchesByProduct();
+  const known = new Map(state.products.map((p) => [`p${p.id}`, p]));
+  const q = state.query.toLowerCase();
+  const keys = new Set(matching.map(productKeyOf));
+  for (const p of state.products) {
+    if (pendingProductDeletes.has(p.id)) continue;
+    if (!byProduct.has(`p${p.id}`) && (!q || p.name?.toLowerCase().includes(q))) keys.add(`p${p.id}`);
   }
 
-  const byLocation = new Map();
-  for (const item of items) {
-    const key = item.location_id ?? 'none';
-    if (!byLocation.has(key)) byLocation.set(key, []);
-    byLocation.get(key).push(item);
-  }
+  const placeOrder = new Map(state.locations.map((loc, idx) => [loc.id, idx]));
+  const last = state.locations.length;
+  const placeRank = (item) => (item.location_id == null ? last + 1 : (placeOrder.get(item.location_id) ?? last));
+  // Best-before ascending, a batch without a date after the dated ones.
+  const dateRank = (a, b) => (a.expires_on ? 0 : 1) - (b.expires_on ? 0 : 1)
+    || String(a.expires_on ?? '').localeCompare(String(b.expires_on ?? ''));
+  const byBatchOrder = (a, b) => (placeRank(a) - placeRank(b)) || dateRank(a, b) || (a.id - b.id);
 
-  const groups = [];
-  for (const loc of state.locations) {
-    const rows = byLocation.get(loc.id);
-    if (rows?.length) groups.push({ key: loc.id, label: locationLabel(loc.name), items: rows });
+  const products = [...keys].map((key) => {
+    const batches = [...(byProduct.get(key) ?? [])].sort(byBatchOrder);
+    const product = known.get(key);
+    const first = batches[0];
+    return {
+      key,
+      id: product?.id ?? null,
+      name: product?.name ?? first?.name ?? '',
+      unit: product?.unit ?? first?.unit,
+      category: product?.category || first?.category || DEFAULT_CATEGORY_NAME,
+      batches,
+      // Matched through a batch only (a place, a note): open it, so the hit is
+      // visible. The remembered state stays as it is.
+      openForSearch: Boolean(q) && batches.length > 1 && !(product?.name ?? first?.name ?? '').toLowerCase().includes(q),
+    };
+  });
+
+  const catOrder = new Map(state.categories.map((c, idx) => [c.name, idx]));
+  const sections = new Map();
+  for (const product of products) {
+    if (!sections.has(product.category)) sections.set(product.category, []);
+    sections.get(product.category).push(product);
   }
-  const orphans = byLocation.get('none');
-  if (orphans?.length) {
-    groups.push({ key: 'none', label: t('pantry.unlocated'), items: orphans });
-  }
-  return groups;
+  const rank = (name) => catOrder.get(name) ?? state.categories.length;
+  const nameOrder = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+  return [...sections.entries()]
+    .sort(([a], [b]) => (rank(a) - rank(b)) || nameOrder(a, b))
+    .map(([category, list]) => ({
+      key: category,
+      label: categoryLabel(category),
+      products: list.sort((a, b) => nameOrder(a.name, b.name) || ((a.id ?? 0) - (b.id ?? 0))),
+    }));
 }
 
 // --------------------------------------------------------
@@ -277,6 +424,7 @@ export async function render(container) {
   state.todayKey = todayKey();
   // Frische Seite: die Chip-Leiste darf beim ersten Zeichnen wieder scrollen.
   _scrolledFilter = null;
+  expandedProducts.clear();
   // Deep-Link der Dashboard-Kachel „Läuft bald ab" (`?filter=expired|soon`).
   // Trifft der Chip gerade nichts, setzt die Chip-Leiste ohnehin auf „Alle"
   // zurück - ein veralteter Link endet nie in einer leeren Liste.
@@ -426,6 +574,8 @@ export async function render(container) {
   });
 
   list.addEventListener('click', onListClick);
+  // The row menu of a product without batches (its delete) is a popover menu.
+  installPopoverMenus(list);
   watch.addEventListener('click', onWatchClick);
 
   try {
@@ -492,12 +642,15 @@ function renderFilters() {
     wireScrollFade(bar);
   }
 
-  const counts = pantryFilterCounts(state.items.map(withIntent), state.todayKey);
+  const shown = state.items.map(withIntent);
+  const counts = pantryFilterCounts(shown, state.todayKey);
   const active = PANTRY_FILTERS.filter((key) => counts[key] > 0);
+  const places = placeChips(shown);
+  const ids = [...active, ...places.map((chip) => chip.id)];
 
   // Der aktive Filter hat gerade seinen letzten Treffer verloren → zurück auf Alle.
   const previousFilter = state.filter;
-  if (state.filter !== 'all' && !active.includes(state.filter)) state.filter = 'all';
+  if (state.filter !== 'all' && !ids.includes(state.filter)) state.filter = 'all';
   const wasReset = state.filter !== previousFilter;
 
   // replaceChildren zerstört den fokussierten Chip; ohne Rettung landet der
@@ -505,7 +658,7 @@ function renderFilters() {
   const hadFocus = bar.contains(document.activeElement);
 
   bar.replaceChildren();
-  if (!active.length || !state.items.length) {
+  if (!ids.length || !state.items.length) {
     bar.hidden = true;
     return { wasReset };
   }
@@ -521,6 +674,7 @@ function renderFilters() {
   for (const key of active) {
     chips.push({ id: key, label: t(labels[key].key), icon: labels[key].icon, count: counts[key] });
   }
+  chips.push(...places);
 
   bar.insertAdjacentHTML('beforeend', chips.map((chip) => `
     <button type="button" class="filter-chip filter-chip--sm${chip.id === state.filter ? ' filter-chip--active' : ''}"
@@ -545,6 +699,27 @@ function renderFilters() {
   }
 
   return { wasReset };
+}
+
+/**
+ * One chip per storage location that holds a batch (#1448): grouped by
+ * category, the page no longer answers "what is in the freezer?" at a glance,
+ * so the place gets a direct way in. Same chips as expired, soon and low, in
+ * the same single-select bar: a tap on a place replaces a status filter, the
+ * search narrows either. In the order of the locations (`sort_order`, as the
+ * server sends them), with the number of batches there. Every place that holds
+ * a batch gets its chip, also when it is the only one (as asked on #2085); no
+ * chip for a place without a batch (a dead end), and batches without a place
+ * get none either.
+ */
+function placeChips(items) {
+  const counts = new Map();
+  for (const item of items) {
+    if (item.location_id != null) counts.set(item.location_id, (counts.get(item.location_id) ?? 0) + 1);
+  }
+  return state.locations
+    .filter((loc) => counts.has(loc.id))
+    .map((loc) => ({ id: `place:${loc.id}`, label: locationLabel(loc.name), icon: loc.icon || 'map-pin', count: counts.get(loc.id) }));
 }
 
 /**
@@ -622,7 +797,7 @@ function readOnly() {
  * `read` zu, bis sie hier ausdruecklich steht. `to-shopping` schreibt in den
  * Einkauf und traegt seinen eigenen Riegel (`sendToShopping`).
  */
-const READ_SAFE_ACTIONS = new Set(['details', 'to-shopping']);
+const READ_SAFE_ACTIONS = new Set(['details', 'to-shopping', 'toggle-product', 'to-shopping-product']);
 
 const PANTRY_ROW = '.pantry-swipe[data-swipe-id]';
 
@@ -642,24 +817,33 @@ function drawList(list) {
   list.removeAttribute('aria-busy');
   // Die Chipreihe ist das erste Kind des Ports und ueberlebt den Neuaufbau.
   const chipRow = list.querySelector(':scope > #pantry-filters');
+  // Taking the row out and back in resets its scroll position, the one
+  // renderFilters() has just set to show the active chip. With a chip per place
+  // the active one often sits beyond the edge at 375px (#1448), so keep it.
+  const chipScroll = chipRow?.scrollLeft ?? 0;
   list.replaceChildren(...(chipRow ? [chipRow] : []));
+  if (chipRow && chipScroll) chipRow.scrollLeft = chipScroll;
   renderBulkBar();
   renderWatch();
 
-  if (!state.items.length) {
+  // A product outlives its last batch (#1448): with products left, the page is
+  // not empty, it shows them as out of stock.
+  if (!state.items.length && !state.products.length) {
     list.appendChild(emptyStateEl());
     if (window.lucide) window.lucide.createIcons({ el: list });
     return;
   }
 
   const items = visibleItems();
+  const sections = state.filter === 'all' ? productSections(items) : null;
+  const shown = sections ? sections.reduce((n, s) => n + s.products.length, 0) : items.length;
   // Filtern und Suchen ändern die Liste, ohne dass sich der Fokus bewegt -
   // ohne Ansage bleibt die neue Trefferzahl für Screenreader unsichtbar.
   if (state.filter !== 'all' || state.query) {
-    announce(t('pantry.resultCount', { count: items.length }));
+    announce(t('pantry.resultCount', { count: shown }));
   }
 
-  if (!items.length) {
+  if (!shown) {
     // Dieselbe .empty-state-Grammatik wie der leere Vorrat: davor stand hier ein
     // nackter Satz in einer großen Leere, direkt neben einem reich gestalteten
     // Nachbarzustand - und ohne Ausweg (Critique P2).
@@ -672,7 +856,8 @@ function drawList(list) {
   // (renderBulkBar oben), nicht mehr als erstes Kind der Liste - dort scrollte
   // sie weg, obwohl sie die ganze gefilterte Liste betrifft.
 
-  for (const group of groupedItems(items)) {
+  const groups = sections ?? [{ key: 'flat', label: null, items: flatItems(items) }];
+  for (const group of groups) {
     const section = document.createElement('section');
     // Geteilte Gruppen-Grammatik (styles/list-row.css): die Gruppe trägt die
     // weiße Fläche, die Zeilen darin nur Trennlinien.
@@ -685,14 +870,19 @@ function drawList(list) {
       name.textContent = group.label;
       const count = document.createElement('span');
       count.className = 'list-group__count';
-      count.textContent = String(group.items.length);
+      count.textContent = String(group.products.length);
       heading.append(name, count);
       section.appendChild(heading);
     }
 
     const rows = document.createElement('ul');
     rows.className = 'row-carrier pantry-rows';
-    for (const item of group.items) rows.appendChild(rowEl(withIntent(item)));
+    if (group.products) {
+      for (const product of group.products) rows.appendChild(productEl(product));
+    } else {
+      const byProduct = batchesByProduct();
+      for (const item of group.items) rows.appendChild(rowEl(withIntent(item), rowOptions(item, byProduct)));
+    }
     section.appendChild(rows);
     list.appendChild(section);
   }
@@ -808,9 +998,11 @@ function onWatchClick(e) {
 function noResultsEl() {
   // Der geteilte Leerzustand einer leeren Suche (R19): Begriff und Filter als
   // Chips, EIN Knopf hebt beide auf.
-  const filters = state.filter !== 'all'
-    ? [t({ expired: 'pantry.filterExpired', soon: 'pantry.filterSoon', low: 'pantry.filterLow' }[state.filter])]
-    : [];
+  const place = placeFilterId();
+  const placeName = state.locations.find((loc) => loc.id === place)?.name;
+  const filters = state.filter === 'all' ? []
+    : place != null ? [placeName ? locationLabel(placeName) : t('pantry.unlocated')]
+      : [t({ expired: 'pantry.filterExpired', soon: 'pantry.filterSoon', low: 'pantry.filterLow' }[state.filter])];
   return searchEmptyEl({
     query: state.query,
     filters,
@@ -845,9 +1037,45 @@ function emptyStateEl() {
   });
 }
 
-/** Eine Vorratszeile. */
-function rowEl(item) {
+/** The place of a batch as the row names it. */
+function placeText(item) {
+  return item.location_name ? locationLabel(item.location_name) : t('pantry.unlocated');
+}
+
+/**
+ * How a batch row is drawn, from the state alone, so a row rebuilt after a step
+ * (refreshRowQuantity) reads like the one it replaces. `batch`: the row stands
+ * under its product (several batches, no filter). `byDate`: all batches of the
+ * product share one place, which the product row already names; the batch is
+ * then titled by its best-before date, otherwise by its place. `total`: the
+ * product's total, when it has several batches.
+ */
+function rowOptions(item, byProduct = batchesByProduct()) {
+  const siblings = byProduct.get(productKeyOf(item)) ?? [item];
+  const several = siblings.length > 1;
+  const batch = several && state.filter === 'all';
+  return {
+    batch,
+    byDate: batch && new Set(siblings.map((b) => b.location_id ?? 'none')).size === 1,
+    total: several ? productTotal(siblings) : null,
+  };
+}
+
+/** The title of a batch under its product: its date when the place is the same for all. */
+function batchTitle(item, opts) {
+  if (!opts.byDate) return placeText(item);
+  return item.expires_on
+    ? t('pantry.bestBefore', { date: dateText(item.expires_on) })
+    : t('pantry.noBestBefore');
+}
+
+/** Eine Vorratszeile (eine Charge). */
+function rowEl(item, opts = rowOptions(item)) {
   const status = pantryItemStatus(item, state.todayKey);
+  const place = placeText(item);
+  // Under its product a batch is told apart by its place; the controls name
+  // both, or "Increase: Milk" would be said for every batch alike.
+  const controlName = opts.batch ? `${item.name}, ${batchTitle(item, opts)}` : item.name;
 
   // DIE ZEILE LAESST SICH WEGWISCHEN (R16 Schritt 2b, Kuechenregel in
   // DESIGN.md: Loeschen = Wisch mobil + ein fester Ort am Desktop). Der Vorrat
@@ -877,8 +1105,9 @@ function rowEl(item) {
   // Geteilte Zeilen-Grammatik (styles/list-row.css). Ohne --reserve-end: der
   // Warenkorb sitzt nicht mehr an der Zeilenkante, sondern in einem festen Slot
   // am Anfang der Bedienzone (siehe unten).
-  li.className = 'list-row pantry-row';
+  li.className = opts.batch ? 'list-row pantry-row pantry-row--batch' : 'list-row pantry-row';
   li.dataset.id = String(item.id);
+  li.dataset.productKey = productKeyOf(item);
   if (status.out) li.classList.add('pantry-row--out');
 
   // Klickfläche: öffnet das Bearbeiten-Formular. Die Stepper-Buttons daneben
@@ -904,7 +1133,16 @@ function rowEl(item) {
 
   const name = document.createElement('span');
   name.className = 'list-row__name';
-  name.textContent = item.name;
+  if (opts.batch) {
+    // The product row above says the name once; a screen reader that lands on
+    // the batch still hears whose batch it is.
+    const product = document.createElement('span');
+    product.className = 'sr-only';
+    product.textContent = `${item.name}: `;
+    name.append(product, batchTitle(item, opts));
+  } else {
+    name.textContent = item.name;
+  }
   headline.appendChild(name);
 
   // DIE BADGES SIND EIN PAAR, ALSO EIN KNOTEN (Critique 2026-08-13).
@@ -970,19 +1208,46 @@ function rowEl(item) {
    *
    * Das Trennzeichen steht IM Knoten, sonst bliebe es beim Weglassen als
    * einsames „·" zurück. */
-  if (item.expires_on) {
+  // Titled by its date (one place for all batches), the meta line has only the
+  // quantity: the date stands in the title, the place in the product row.
+  if (item.expires_on && opts.batch && !opts.byDate) {
+    // UNDER ITS PRODUCT THE DATE IS WHAT TELLS TWO BATCHES OF ONE PLACE APART,
+    // so it may not be dropped on a narrow row like `.pantry-row__expiry` (two
+    // "Fridge" rows would be left that differ in nothing). It stands as the
+    // bare date, which fits beside cart and stepper at 375px; the words come
+    // along for screen readers.
+    const date = document.createElement('span');
+    date.className = 'pantry-row__date';
+    const shown = document.createElement('span');
+    shown.setAttribute('aria-hidden', 'true');
+    shown.textContent = ` · ${dateText(item.expires_on)}`;
+    const spoken = document.createElement('span');
+    spoken.className = 'sr-only';
+    spoken.textContent = `, ${t('pantry.bestBefore', { date: dateText(item.expires_on) })}`;
+    date.append(shown, spoken);
+    meta.appendChild(date);
+  } else if (item.expires_on && !opts.batch) {
     const expiry = document.createElement('span');
     expiry.className = 'pantry-row__expiry';
     expiry.textContent = ` · ${t('pantry.bestBefore', { date: dateText(item.expires_on) })}`;
     meta.appendChild(expiry);
   }
-  // Im gefilterten (flachen) Modus trägt die Meta-Zeile den Lagerort, den sonst
-  // die Gruppen-Überschrift zeigt.
-  if (state.filter !== 'all') {
-    const place = document.createElement('span');
-    place.className = 'pantry-row__place';
-    place.textContent = ` · ${item.location_name ? locationLabel(item.location_name) : t('pantry.unlocated')}`;
-    meta.appendChild(place);
+  // Seit die Seite nach Produkten statt nach Lagerort gliedert (#1448), traegt
+  // jede Zeile ihren Ort selbst - wie vorher nur im gefilterten Modus. Unter
+  // ihrem Produkt steht er schon als Name der Zeile, unter einem Ort-Chip im Chip.
+  if (!opts.batch && placeFilterId() == null) {
+    const placeEl = document.createElement('span');
+    placeEl.className = 'pantry-row__place';
+    placeEl.textContent = ` · ${place}`;
+    meta.appendChild(placeEl);
+  }
+  // In the flat filter list a batch of a product with several batches says the
+  // product's total: "1 l" alone does not tell that 3 more are in the cellar.
+  if (!opts.batch && opts.total != null) {
+    const total = document.createElement('span');
+    total.className = 'pantry-row__total';
+    total.textContent = ` · ${productTotalText(opts.total, item.unit)}`;
+    meta.appendChild(total);
   }
   main.appendChild(meta);
 
@@ -1032,7 +1297,7 @@ function rowEl(item) {
   cartSlot.className = 'pantry-row__cart-slot';
   // Der Warenkorb schreibt in den EINKAUF, gefragt wird also dessen Recht
   // (#1265, Regel 1 in utils/module-access.js). Der Slot bleibt trotzdem.
-  if ((status.out || status.low) && mayTransferPantryToShopping()) cartSlot.appendChild(cartEl(item));
+  if ((status.out || status.low) && mayTransferPantryToShopping()) cartSlot.appendChild(cartEl(item, controlName));
   actions.appendChild(cartSlot);
 
   // Nur-lesen: KEIN Stepper (Regel 2). Die Menge steht als Zeichen in der
@@ -1059,7 +1324,7 @@ function rowEl(item) {
   minus.className = 'pantry-stepper__btn';
   minus.dataset.action = 'decrease';
   minus.disabled = Number(item.quantity) <= 0;
-  minus.setAttribute('aria-label', `${t('pantry.decrease')}: ${item.name}`);
+  minus.setAttribute('aria-label', `${t('pantry.decrease')}: ${controlName}`);
   minus.insertAdjacentHTML('beforeend', '<i data-lucide="minus" class="icon-md" aria-hidden="true"></i>');
 
   // Der Wert steht in der Meta-Zeile (siehe dort). BEWUSST keine eigene
@@ -1073,7 +1338,7 @@ function rowEl(item) {
   plus.type = 'button';
   plus.className = 'pantry-stepper__btn';
   plus.dataset.action = 'increase';
-  plus.setAttribute('aria-label', `${t('pantry.increase')}: ${item.name}`);
+  plus.setAttribute('aria-label', `${t('pantry.increase')}: ${controlName}`);
   plus.insertAdjacentHTML('beforeend', '<i data-lucide="plus" class="icon-md" aria-hidden="true"></i>');
 
   stepper.dataset.step = String(step);
@@ -1091,6 +1356,205 @@ function rowEl(item) {
 }
 
 /**
+ * A product of the stock list (#1448, step 2), in one of three shapes:
+ *
+ * - ONE BATCH: exactly today's row, with its place in the meta line. Grouping
+ *   must not cost the common case anything.
+ * - SEVERAL BATCHES: a product row with the total ("4 l in all") and where it
+ *   is ("2 places", or "2 batches" in one place), and the batches underneath,
+ *   each one today's row named by its place, or by its best-before date when
+ *   all of them share one place (the product row names it once). The product
+ *   row only opens and closes, the dashboard's overdue group is the pattern (a
+ *   button with
+ *   `aria-expanded`/`aria-controls`, the region switched in place by
+ *   `toggleRegion`, the open state kept for the visit). Its one badge is the
+ *   most urgent expiry of its batches, so a collapsed product still says that
+ *   a batch has expired. No stepper, no cart, no swipe, no "Running low" on it
+ *   yet: a step on a total has no batch to book, and low and out over the
+ *   product come with the minimum on the product (step 3).
+ * - NO BATCH: the product outlived its last batch. It reads as out of stock,
+ *   with the cart that hands its name to Shopping (emptyProductEl).
+ */
+function productEl(product) {
+  if (!product.batches.length) return emptyProductEl(product);
+  if (product.batches.length === 1) return rowEl(product.batches[0], { batch: false, total: null });
+
+  const open = expandedProducts.has(product.key) || product.openForSearch;
+  const regionId = `pantry-batches-${product.key}`;
+  const total = productTotal(product.batches);
+  const places = new Set(product.batches.map((b) => b.location_id ?? 'none')).size;
+
+  const li = document.createElement('li');
+  li.className = 'pantry-product';
+  li.dataset.productKey = product.key;
+
+  const row = document.createElement('div');
+  row.className = 'list-row pantry-product__row';
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'list-row__main list-row__main--interactive pantry-product__toggle';
+  toggle.dataset.action = 'toggle-product';
+  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  toggle.setAttribute('aria-controls', regionId);
+
+  const text = document.createElement('span');
+  text.className = 'pantry-product__text';
+  // Name and the most urgent expiry in one line, like a batch row: collapsed,
+  // the product row is the only place that can say a batch has expired.
+  const headline = document.createElement('span');
+  headline.className = 'pantry-row__headline';
+  const name = document.createElement('span');
+  name.className = 'list-row__name';
+  name.textContent = product.name;
+  const badges = document.createElement('span');
+  badges.className = 'pantry-row__badges pantry-product__badges';
+  fillProductBadge(badges, product.batches);
+  headline.append(name, badges);
+  const meta = document.createElement('span');
+  meta.className = 'list-row__meta';
+  const totalEl = document.createElement('span');
+  totalEl.className = 'pantry-product__total';
+  totalEl.textContent = productTotalText(total, product.unit);
+  const where = document.createElement('span');
+  where.className = 'pantry-product__where';
+  where.textContent = productWhereText(product.batches);
+  meta.append(totalEl, where);
+  text.append(headline, meta);
+
+  toggle.append(text);
+  toggle.insertAdjacentHTML('beforeend',
+    `<i data-lucide="chevron-down" class="icon-sm list-group__chevron${open ? '' : ' list-group__chevron--collapsed'}" aria-hidden="true"></i>`);
+  row.appendChild(toggle);
+
+  const batches = document.createElement('ul');
+  batches.className = 'pantry-batches';
+  batches.id = regionId;
+  batches.hidden = !open;
+  for (const batch of product.batches) batches.appendChild(rowEl(batch, { batch: true, byDate: places === 1, total }));
+
+  li.append(row, batches);
+  return li;
+}
+
+/**
+ * A product without batches: out of stock, with 0 in its unit. Nothing to step
+ * and nothing to edit yet (editing a product is step 5); the cart hands its
+ * name and category to Shopping without a quantity, like an empty batch without
+ * a minimum. The minimum it will show comes in step 3.
+ *
+ * It can be deleted (brought forward from step 5, only while it has no batch):
+ * the same swipe to the row end as a batch on touch, and, since it has no
+ * dialog whose footer would be the fixed place, the row's more button with
+ * "Delete" (component canon: destructive actions sit behind it). Both with
+ * the undo toast of a batch (removeProduct).
+ */
+function emptyProductEl(product) {
+  const deletable = !readOnly() && product.id != null;
+  const li = document.createElement('li');
+  li.className = deletable
+    ? 'swipe-row pantry-swipe pantry-product pantry-product--empty'
+    : 'pantry-product pantry-product--empty';
+  li.dataset.productKey = product.key;
+  if (deletable) {
+    // Its own key space: a batch's swipe id is its id, and the ids may meet.
+    li.dataset.swipeId = `product-${product.id}`;
+    li.insertAdjacentHTML('beforeend', `
+    <div class="swipe-reveal swipe-reveal--delete swipe-reveal--trailing" aria-hidden="true">
+      <i data-lucide="trash-2" class="icon-md"></i>
+      <span>${esc(t('common.delete'))}</span>
+    </div>`);
+  }
+
+  const row = document.createElement('div');
+  row.className = 'list-row pantry-row pantry-row--out';
+
+  const main = document.createElement('div');
+  main.className = 'list-row__main pantry-row__main';
+  const headline = document.createElement('span');
+  headline.className = 'pantry-row__headline';
+  const name = document.createElement('span');
+  name.className = 'list-row__name';
+  name.textContent = product.name;
+  const badges = document.createElement('span');
+  badges.className = 'pantry-row__badges';
+  const badge = document.createElement('span');
+  badge.className = 'pantry-badge pantry-badge--danger';
+  badge.textContent = t('pantry.badgeOut');
+  badges.appendChild(badge);
+  headline.append(name, badges);
+  const meta = document.createElement('span');
+  meta.className = 'list-row__meta';
+  const quantity = document.createElement('span');
+  quantity.className = 'pantry-row__quantity';
+  quantity.textContent = quantityText({ quantity: 0, unit: product.unit });
+  meta.appendChild(quantity);
+  main.append(headline, meta);
+  row.appendChild(main);
+
+  // Der Warenkorb schreibt in den EINKAUF: gefragt wird dessen Recht (#1265).
+  const cartAllowed = product.id != null && mayTransferPantryToShopping();
+  if (cartAllowed || deletable) {
+    const actions = document.createElement('div');
+    actions.className = 'list-row__actions';
+    const cartSlot = document.createElement('div');
+    cartSlot.className = 'pantry-row__cart-slot';
+    if (cartAllowed) {
+      const cart = cartEl(product);
+      cart.dataset.action = 'to-shopping-product';
+      cart.dataset.productId = String(product.id);
+      cartSlot.appendChild(cart);
+    }
+    actions.appendChild(cartSlot);
+    if (deletable) {
+      actions.insertAdjacentHTML('beforeend', rowMenuHtml({
+        id: `pantry-product-menu-${product.id}`,
+        label: t('common.moreActionsNamed', { name: product.name }),
+        items: [{ action: 'delete-product', id: product.id, icon: 'trash-2', label: t('common.delete'), danger: true }],
+      }));
+    }
+    row.appendChild(actions);
+  }
+
+  li.appendChild(row);
+  return li;
+}
+
+/** Opens or closes a product's batches in place; the button keeps the focus. */
+function toggleProduct(btn) {
+  const li = btn.closest('.pantry-product');
+  const region = li?.querySelector(':scope > .pantry-batches');
+  if (!li || !region) return;
+  const open = btn.getAttribute('aria-expanded') !== 'true';
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  btn.querySelector('.list-group__chevron')?.classList.toggle('list-group__chevron--collapsed', !open);
+  if (open) expandedProducts.add(li.dataset.productKey);
+  else expandedProducts.delete(li.dataset.productKey);
+  toggleRegion(region, open);
+}
+
+/**
+ * After a step the product's total follows: on the product row and, in the flat
+ * filter list, on every batch row of that product that names it.
+ */
+function refreshProductTotals(item, { speak = true } = {}) {
+  const key = productKeyOf(item);
+  // What the user sees: a batch in its undo window is gone from the list.
+  const batches = (batchesByProduct().get(key) ?? []).filter((b) => !pendingDeletes.has(b.id));
+  if (!batches.length || !_container) return;
+  const text = productTotalText(productTotal(batches), item.unit);
+  const head = `.pantry-product[data-product-key="${key}"] > .pantry-product__row`;
+  for (const el of _container.querySelectorAll(`${head} .pantry-product__total`)) el.textContent = text;
+  for (const el of _container.querySelectorAll(`${head} .pantry-product__where`)) el.textContent = productWhereText(batches);
+  for (const el of _container.querySelectorAll(`${head} .pantry-product__badges`)) fillProductBadge(el, batches);
+  for (const el of _container.querySelectorAll(`.pantry-row[data-product-key="${key}"] .pantry-row__total`)) {
+    el.textContent = ` · ${text}`;
+  }
+  // The one live region says the new total with the batch's quantity.
+  if (speak && batches.length > 1) announce(`${item.name}: ${quantityText(item)}, ${text}`);
+}
+
+/**
  * Wisch zum Zeilenende loescht - mit dem Rueckweg, den removeItem() schon hat
  * (Undo-Toast). Die Karte federt zurueck statt hinauszufliegen: removeItem()
  * blendet die Zeile selbst aus und holt sie bei "Rueckgaengig" wieder.
@@ -1102,10 +1566,13 @@ function wirePantrySwipe(list) {
   if (readOnly()) return null;
   const optionen = {
     card: '.pantry-row',
-    ignore: '.pantry-stepper, .pantry-row__cart',
+    ignore: '.pantry-stepper, .pantry-row__cart, .popover-menu__trigger',
     trailing: {
       reveal: '.swipe-reveal--delete',
       run: (row) => {
+        // A product without batches carries `product-<id>` (emptyProductEl).
+        const product = state.products.find((p) => `product-${p.id}` === row.dataset.swipeId);
+        if (product) { removeProduct(product); return; }
         const item = state.items.find((i) => String(i.id) === row.dataset.swipeId);
         if (item) removeItem(item);
       },
@@ -1117,12 +1584,12 @@ function wirePantrySwipe(list) {
 }
 
 /** Kontextuelle Einkaufs-Aktion einer Zeile; nur bei leeren/knappen Artikeln. */
-function cartEl(item) {
+function cartEl(item, label = item.name) {
   const cart = document.createElement('button');
   cart.type = 'button';
   cart.className = 'row-action pantry-row__cart';
   cart.dataset.action = 'to-shopping';
-  cart.setAttribute('aria-label', `${t('common.toShoppingList')}: ${item.name}`);
+  cart.setAttribute('aria-label', `${t('common.toShoppingList')}: ${label}`);
   cart.title = t('common.toShoppingList');
   cart.insertAdjacentHTML('beforeend', '<i data-lucide="shopping-cart" class="icon-md" aria-hidden="true"></i>');
   return cart;
@@ -1135,15 +1602,29 @@ function cartEl(item) {
 function onListClick(e) {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
-  const row = btn.closest('.pantry-row[data-id]');
-  if (!row) return;
-  const item = state.items.find((i) => i.id === Number(row.dataset.id));
-  if (!item) return;
 
   // Der eine Riegel fuer alle Aktionen darunter (siehe READ_SAFE_ACTIONS): das
   // Markup nimmt die Affordanz, diese Zeile den Effekt eines Knotens, den ein
   // Rechtewechsel ueberholt hat.
   if (readOnly() && !READ_SAFE_ACTIONS.has(btn.dataset.action)) return;
+
+  // The product row and the cart of a product without batches carry no batch.
+  if (btn.dataset.action === 'toggle-product') { toggleProduct(btn); return; }
+  if (btn.dataset.action === 'to-shopping-product') {
+    const product = state.products.find((p) => p.id === Number(btn.dataset.productId));
+    if (product) sendToShopping([product], btn, [{ pantry_product_id: product.id }]);
+    return;
+  }
+  if (btn.dataset.action === 'delete-product') {
+    const product = state.products.find((p) => p.id === Number(btn.dataset.id));
+    if (product) removeProduct(product);
+    return;
+  }
+
+  const row = btn.closest('.pantry-row[data-id]');
+  if (!row) return;
+  const item = state.items.find((i) => i.id === Number(row.dataset.id));
+  if (!item) return;
 
   if (btn.dataset.action === 'details') { openItemReadModal(item); return; }
   if (btn.dataset.action === 'edit') { openItemModal('edit', item); return; }
@@ -1211,7 +1692,7 @@ function adjustQuantity(item, direction, row) {
       if (!rowNow) return;
       if (current) refreshRowQuantity(rowNow, withIntent(current));
       if (renderFilters().wasReset) renderList();
-      window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(err), 'danger');
     }
   }, QUANTITY_DEBOUNCE_MS_OVERRIDE ?? QUANTITY_DEBOUNCE_MS);
 
@@ -1306,6 +1787,7 @@ function refreshRowQuantity(row, item) {
   const fresh = rowEl(item);
   row.querySelector('.pantry-row__main')?.replaceWith(fresh.querySelector('.pantry-row__main'));
   row.querySelector('.pantry-row__cart-slot')?.replaceWith(fresh.querySelector('.pantry-row__cart-slot'));
+  refreshProductTotals(item);
 
   if (window.lucide) window.lucide.createIcons({ el: row });
   // Das Panel spricht von denselben Mengen: ein Schritt, der einen Artikel
@@ -1329,7 +1811,11 @@ function shortfallText(item) {
   return pantryQuantityLabel(missing, item.unit, { t, formatNumber: formatQuantity });
 }
 
-async function sendToShopping(items, btn) {
+/**
+ * `entries` overrides what goes over: a product without batches is handed over
+ * by its product id (`pantry_product_id`), without a quantity.
+ */
+async function sendToShopping(items, btn, entries = null) {
   if (!items.length) return;
   // Zweite Linie hinter Warenkorb und Pille - auch fuer einen Knoten, den ein
   // Rechtewechsel ueberholt hat.
@@ -1339,7 +1825,7 @@ async function sendToShopping(items, btn) {
   try {
     lists = await ensureLists();
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
     return;
   }
 
@@ -1355,7 +1841,7 @@ async function sendToShopping(items, btn) {
   if (btn) btn.disabled = true;
   try {
     const res = await api.post(`/shopping/${target.id}/import-pantry`, {
-      items: items.map((item) => ({ pantry_item_id: item.id, quantity: shortfallText(item) })),
+      items: entries ?? items.map((item) => ({ pantry_item_id: item.id, quantity: shortfallText(item) })),
     });
     const { added = 0, skipped = 0, added_ids: addedIds = [] } = res.data ?? {};
     if (!added) {
@@ -1380,7 +1866,7 @@ async function sendToShopping(items, btn) {
     // bedeuten das Gegenteil voneinander (Critique 2026-07-30).
     announceTransfer({ message, addedIds });
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -1580,7 +2066,7 @@ async function saveItem(panel, mode, item) {
     window.yuvomi?.showToast(mode === 'create' ? t('pantry.created') : t('pantry.updated'), 'success');
   } catch (err) {
     saveBtn.disabled = false;
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
   }
 }
 
@@ -1598,6 +2084,9 @@ async function removeItem(item) {
   // `animate`): der Zustand "weg" haengt an keiner Animation.
   let restored = false;
   if (rowEl_) collapseOut(rowEl_).then(() => { if (!restored) rowEl_.style.display = 'none'; });
+  // The product row above counts what is left (#1448); undo gives it back.
+  pendingDeletes.add(item.id);
+  refreshProductTotals(item, { speak: false });
 
   scheduleUndoableDelete({
     message: t('pantry.deleted'),
@@ -1605,11 +2094,14 @@ async function removeItem(item) {
       await api.delete(`/pantry/${item.id}`, { keepalive });
       if (keepalive) return;
       state.items = state.items.filter((i) => i.id !== item.id);
+      pendingDeletes.delete(item.id);
       renderFilters();
       renderList();
     },
     restore: (err) => {
       restored = true;
+      pendingDeletes.delete(item.id);
+      refreshProductTotals(item, { speak: false });
       if (rowEl_) {
         rowEl_.style.display = '';
         // collapseOut haelt die Hoehe 0 (fill: forwards) - verwerfen, dann aufziehen.
@@ -1617,7 +2109,54 @@ async function removeItem(item) {
         rowEl_.style.overflow = '';
         expandIn(rowEl_);
       }
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) window.yuvomi?.showToast(errorSentence(err), 'danger');
+    },
+  });
+}
+
+/**
+ * Deletes a product without batches (#1448, brought forward from step 5), with
+ * the undo window of a batch: the row folds away at once, undo brings it back,
+ * and only the commit calls the server. The server refuses a product that has
+ * batches again (409, `pantry_product_has_batches`, say someone booked one in
+ * meanwhile): then the row comes back, the toast says why, and the page reloads
+ * to show the new batch.
+ */
+function removeProduct(product) {
+  if (readOnly()) return;
+  const stage = _container?.querySelector(`.pantry-product[data-product-key="p${product.id}"]`);
+  let restored = false;
+  if (stage) collapseOut(stage).then(() => { if (!restored) stage.style.display = 'none'; });
+  pendingProductDeletes.add(product.id);
+
+  scheduleUndoableDelete({
+    message: t('pantry.deleted'),
+    commit: async ({ keepalive }) => {
+      await api.delete(`/pantry/products/${product.id}`, { keepalive });
+      if (keepalive) return;
+      state.products = state.products.filter((p) => p.id !== product.id);
+      pendingProductDeletes.delete(product.id);
+      renderFilters();
+      renderList();
+    },
+    restore: (err) => {
+      restored = true;
+      pendingProductDeletes.delete(product.id);
+      if (stage?.isConnected) {
+        stage.style.display = '';
+        stage.getAnimations?.().forEach((anim) => anim.cancel());
+        stage.style.overflow = '';
+        expandIn(stage);
+      } else {
+        // Redrawn in the window (search, chip): the row is drawn anew.
+        renderList();
+      }
+      if (!err) return;
+      // The sentence of the app, not the server's (#1909, CASE_MESSAGES).
+      window.yuvomi?.showToast(errorSentence(err, 'common.unknownError'), 'danger');
+      if (err.data?.reason === 'pantry_product_has_batches') {
+        loadPantry().then(() => { renderFilters(); renderList(); }).catch(() => {});
+      }
     },
   });
 }
@@ -1652,7 +2191,7 @@ async function openLocationManager() {
       // ankommt, ist immer ein Fehler DIESER Auffrischung - und der erklaert als
       // einziger, warum die Seite den alten Stand behaelt.
       console.error('[Pantry] Auffrischen nach Ort-Aenderung fehlgeschlagen:', err);
-      window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(err), 'danger');
     }
   };
 
@@ -1710,6 +2249,26 @@ export const __test = {
   // (test-shopping-readonly-ui.js).
   rowEl,
   sendToShopping,
+  // #1448 step 2: products in sections by category, the product row and the
+  // product without batches (test-pantry-ux.js).
+  productSections,
+  productEl,
+  rowOptions,
+  toggleProduct,
+  expandedProducts,
+  pendingDeletes,
+  refreshProductTotals,
+  // Review of #2085: the product without batches can be deleted, a step
+  // refreshes the product total, and one chip per place.
+  removeProduct,
+  pendingProductDeletes,
+  emptyProductEl,
+  renderFilters,
+  visibleItems,
+  flatItems,
+  placeChips,
+  noResultsEl,
+  refreshRowQuantity,
   // R10 L4: das Nebenpanel ordnet wie die Filterchips (test-pantry-ux.js).
   pantryWatchGroups,
   renderWatch,

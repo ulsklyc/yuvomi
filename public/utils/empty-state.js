@@ -258,7 +258,7 @@ export function mountEmptyState(target, opts) {
  *      Stellen "Bitte pruefe die Verbindung", auch bei einer Bremse (429) oder
  *      einem Serverfehler -, und darunter stand ein roher Chip "HTTP 429".
  *      Jetzt kommt der Satz aus dem Fehler (`loadErrorSentence`, dieselbe
- *      Zuordnung wie friendlyError, aber nie der Servertext). Die
+ *      Zuordnung wie unhandledErrorSentence). Die
  *      `description` des Aufrufers ist nur noch der Rueckfall fuer eine
  *      Ursache ohne eigenen Satz. Der Statuscode wandert in die aufklappbaren
  *      Details - fuer den Selbsthoster da, fuer alle anderen kein Raetsel.

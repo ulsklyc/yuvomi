@@ -68,17 +68,17 @@ function loadTrackedDate(id) {
 
 function validateTrackedDateRow(row) {
   const results = [];
-  const vLabel = str(row?.label, 'Bezeichnung', { max: 100 });
+  const vLabel = str(row?.label, 'label', { max: 100 });
   results.push(vLabel);
-  const vDate = date(row?.date, 'Datum', true);
+  const vDate = date(row?.date, 'date', true);
   results.push(vDate);
 
   let offsetDays = DEFAULT_REMINDER_OFFSET_DAYS;
   if (row?.reminder_offset_days !== undefined && row.reminder_offset_days !== null && row.reminder_offset_days !== '') {
-    const vOffset = num(row.reminder_offset_days, 'Erinnerungs-Vorlauf');
+    const vOffset = num(row.reminder_offset_days, 'reminder_offset_days');
     results.push(vOffset);
     if (vOffset.value !== null && (!Number.isInteger(vOffset.value) || vOffset.value < 0 || vOffset.value > 365)) {
-      results.push({ error: 'Erinnerungs-Vorlauf muss eine ganze Zahl zwischen 0 und 365 sein.' });
+      results.push({ error: 'reminder_offset_days must be a whole number from 0 to 365.' });
     } else if (vOffset.value !== null) {
       offsetDays = vOffset.value;
     }
@@ -89,10 +89,10 @@ function validateTrackedDateRow(row) {
   // umgeschrieben, sondern bleibt NULL (server/db.js Migration 224).
   let intervalMonths = null;
   if (row?.interval_months !== undefined && row.interval_months !== null && row.interval_months !== '') {
-    const vInterval = num(row.interval_months, 'Wiederholung (Monate)');
+    const vInterval = num(row.interval_months, 'interval_months');
     results.push(vInterval);
     if (vInterval.value !== null && (!Number.isInteger(vInterval.value) || vInterval.value < 1 || vInterval.value > 600)) {
-      results.push({ error: 'Wiederholung muss eine ganze Zahl zwischen 1 und 600 Monaten sein.' });
+      results.push({ error: 'interval_months must be a whole number of months from 1 to 600.' });
     } else if (vInterval.value !== null) {
       intervalMonths = vInterval.value;
     }
@@ -102,10 +102,10 @@ function validateTrackedDateRow(row) {
   // deshalb reicht hier eine reine Bereichspruefung, kein Default.
   let intervalDistance = null;
   if (row?.interval_distance !== undefined && row.interval_distance !== null && row.interval_distance !== '') {
-    const vDistance = num(row.interval_distance, 'Distanz-Intervall');
+    const vDistance = num(row.interval_distance, 'interval_distance');
     results.push(vDistance);
     if (vDistance.value !== null && (!Number.isInteger(vDistance.value) || vDistance.value <= 0)) {
-      results.push({ error: 'Distanz-Intervall muss eine positive ganze Zahl sein.' });
+      results.push({ error: 'interval_distance must be a positive whole number.' });
     } else if (vDistance.value !== null) {
       intervalDistance = vDistance.value;
     }
@@ -129,7 +129,7 @@ function validateTrackedDateRow(row) {
 function validateTrackedDatesInput(rows) {
   const input = Array.isArray(rows) ? rows : [];
   if (input.length > MAX_TRACKED_DATES_PER_ITEM) {
-    return { values: null, errors: [`Maximal ${MAX_TRACKED_DATES_PER_ITEM} Fristen je Gegenstand.`] };
+    return { values: null, errors: [`At most ${MAX_TRACKED_DATES_PER_ITEM} tracked dates per item.`] };
   }
 
   const values = [];

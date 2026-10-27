@@ -21,7 +21,7 @@ import {
   generateRecurringInstances, RECURRENCE_INTERVAL_KEYS, MAX_INTERVAL_COUNT,
   normalizeIntervalCount, effectiveMonthly, occurrencesPerYear,
   validCategoryKeys, defaultCategory, validateSubcategory, validateAccountRef, transferCurrenciesMatch, isArchivedBudgetAccount, transferAmountFitsCurrency,
-  entryWithLoanMeta, refreshLoanStatus, fromBudgetAmount, bookingFor,
+  entryWithLoanMeta, refreshLoanStatus, loanEntryRate, bookingFor,
   RESPONSIBLE_USERS_SQL, replaceResponsibles, withResponsibles, responsibleNonMembers,
   replaceSeriesResponsibles, seedSeriesResponsibles, materializeSeriesStart, freezeSeriesPast,
   refusal, refusals, refuse,
@@ -143,13 +143,11 @@ router.get('/summary', (req, res) => {
     // fuer den es `pending` gibt. Gerechnet beim Lesen
     // (services/subscription-budget-projection.js), mit demselben Filter wie
     // die Buchungen: was der Betrachter nicht sieht, zaehlt er auch nicht.
-    // Mit Kontofilter keine: eine erwartete Abo-Zahlung haengt an keinem Konto,
-    // und die Liste laesst sie aus demselben Grund weg.
-    const expected = accountFiltered
-      ? { count: 0, income: 0, expenses: 0, omitted: false }
-      : expectedSubscriptionTotals(db.get(), {
-        from, to, filter: expectedSubscriptionFilter(req),
-      });
+    // Mit Kontofilter nur die des Kontos: seit #1277 bucht ein Abo seine
+    // Folgezahlungen auf sein Konto, und die Liste zeigt sie aus demselben Grund.
+    const expected = expectedSubscriptionTotals(db.get(), {
+      from, to, filter: expectedSubscriptionFilter(req), accountId: accountFiltered ? accountId : null,
+    });
 
     res.json({
       data: {
@@ -374,17 +372,18 @@ router.get('/', (req, res) => {
     // einzigen Monat. Gerechnet beim Lesen, nichts wird angelegt - Regeln und
     // Begruendung in services/subscription-budget-projection.js.
     //
-    // NUR IN DER MONATSLISTE: der Darlehens-Drilldown fragt nach Raten, und ein
-    // Kontofilter nach dem, was ueber ein Konto lief - eine erwartete
-    // Abo-Zahlung haengt an keinem. Wer sie sieht, entscheidet
+    // NUR IN DER MONATSLISTE: der Darlehens-Drilldown fragt nach Raten. Ein
+    // Kontofilter bekommt die Zahlungen der Abos, die auf dieses Konto buchen
+    // (#1277). Wer sie sieht, entscheidet
     // expectedSubscriptionFilter() - ausgelassen, nie maskiert; der
     // Kategoriefilter trifft sie deshalb unter ihrer echten Kategorie.
     const accountFiltered = Number.isInteger(parseInt(req.query.account_id, 10))
       && parseInt(req.query.account_id, 10) > 0;
     let expectedOmitted = false;
-    if (!loanId && !accountFiltered) {
+    if (!loanId) {
       const expected = expectedSubscriptionEntries(db.get(), {
         from, to, filter: expectedSubscriptionFilter(req),
+        accountId: accountFiltered ? parseInt(req.query.account_id, 10) : null,
       });
       expectedOmitted = expected.omitted;
       const rows = expected.entries
@@ -1005,10 +1004,23 @@ router.put('/:id', (req, res) => {
     // Die Rate selbst bleibt vorzeichenlos: budget_loan_payments.amount trägt einen
     // CHECK(amount > 0) und wird gegen die Restschuld gerechnet.
     const linkedSign = linkedPayment ? bookingFor(linkedLoan?.direction).sign : 1;
-    const linkedPaymentAmount = linkedPayment && amount !== undefined
-      ? Math.abs(fromBudgetAmount(amount, linkedLoan))
+    // Die Buchung steht in der Waehrung ihres Kontos (#2302). Fuehrt der Weg
+    // ueber den Kurs-Cache (dritte Waehrung) und bleibt das Konto, gilt der
+    // Kurs der Buchung selbst - Betrag der Buchung durch Betrag der Rate -,
+    // nicht der heutige Cache (Codex zu #2302): sonst verschoebe ein
+    // unveraendert gespeicherter Betrag die Restschuld.
+    const linkedAccount = req.body.account_id !== undefined ? (parseInt(req.body.account_id, 10) || null) : entry.account_id;
+    const bookedRate = linkedAccount === entry.account_id
+      ? Math.abs(Number(entry.amount)) / Number(linkedPayment?.amount)
       : null;
+    const linkedRate = linkedPayment && amount !== undefined
+      ? loanEntryRate(linkedLoan, linkedAccount, { bookedRate })
+      : null;
+    const linkedPaymentAmount = linkedRate ? Math.abs(cents(Number(amount || 0) / linkedRate)) : null;
     if (linkedPayment && amount !== undefined) {
+      if (linkedRate == null) {
+        return refuse(res, [refusal('loan_payment_rate_unavailable', 'No exchange rate is known for the account currency.')], 409);
+      }
       if (!(linkedPaymentAmount > 0)) {
         return refuse(res, [refusal('entry_amount_invalid', 'Amount must be greater than zero.')]);
       }

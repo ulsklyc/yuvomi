@@ -1190,7 +1190,6 @@
         "pickOne": "Choose an event",
         "pickOneHint": "Time, place and reminders appear here.",
         "syncTargetAssigneeAmbiguous": "Several calendars have this person as their default assignee. Choose the target yourself.",
-        "syncTargetSeveralAssignees": "Several people are assigned, so the assignment does not pick a calendar. Used instead: {{target}}.",
         "filtersSources": "Calendars",
         "filterUnassigned": "Unassigned",
         "dateSpanSpoken": "{{from}} to {{to}}",
@@ -1229,7 +1228,10 @@
         "errorDeleteFeedAdminOnly": "This calendar is being exported. Only an admin can delete it.",
         "errorEventGone": "This event no longer exists.",
         "errorSelectedCalendarGone": "The chosen calendar no longer exists.",
-        "errorSeriesNoOccurrence": "With this repeat there would be no event at all from the start date."
+        "errorSeriesNoOccurrence": "With this repeat there would be no event at all from the start date.",
+        "localCalendarUploadsHint": "Events in this calendar are uploaded to iCloud through Apple Calendar.",
+        "overlapOpenSchedule": "Open schedule",
+        "syncTargetNoCalendarForPeople": "No calendar has exactly these people as its default assignees, so the assignment does not pick one. Used instead: {{target}}."
     },
     "noteCategories": {
         "categories": "Categories",
@@ -1300,7 +1302,11 @@
         "checklistDone": "Done",
         "checklistOpen": "Open",
         "errorNoteGone": "This note no longer exists.",
-        "errorSelectedCategoryGone": "A selected category no longer exists."
+        "errorSelectedCategoryGone": "A selected category no longer exists.",
+        "lockedToggle": "Lock editing",
+        "lockedBadge": "Locked",
+        "lockedHint": "Only you and administrators can change, pin or delete this note - ticking its checklist items included. Everyone else can still read it.",
+        "errorLocked": "This note is locked. Only the person who created it and administrators can change it."
     },
     "markdown": {
         "bold": "Bold (Ctrl+B)",
@@ -1772,6 +1778,8 @@
         "planSavingsDeleteConfirm": "Delete the savings goal?",
         "accountsTab": "Accounts",
         "netWorth": "Net worth",
+        "netWorthApproxNote": "Converted at rates from {{date}}",
+        "netWorthPerCurrencyNote": "No exchange rate - total per currency",
         "addAccount": "Add account",
         "accountsEmptyTitle": "No accounts yet",
         "accountsEmptyDescription": "Add accounts like checking or savings to track your balances.",
@@ -1865,6 +1873,7 @@
         "saveFailed": "This could not be saved. Please check your entries.",
         "loanAlreadyPaid": "This loan is already paid in full.",
         "loanInstallmentAlreadyPaid": "This installment is already paid.",
+        "loanPaymentRateUnavailable": "No exchange rate is known for the account's currency. Choose another account on the loan, or none.",
         "amountExceedsLoanRemaining": "The amount is higher than what is left of the loan",
         "responsibleNotMember": "Only members of the household can be responsible.",
         "seriesStartTooEarly": "The start day cannot lie in a month before the first entry of the series",
@@ -2439,7 +2448,10 @@
             "errorNoCalendarName": "Enter a name for the new calendar.",
             "dropzoneTitle": "Drop a ICS file here or choose one",
             "dropzoneTitleTouch": "Tap to choose a ICS file",
-            "dropzoneHint": "Only .ics files"
+            "dropzoneHint": "Only .ics files",
+            "assigneesLabel": "Assign to",
+            "assigneesHint": "New events get these people. An event already imported with the same ID gets them added - even if its assignment was removed by hand.",
+            "successWithAssigned": "Imported: {{imported}}, already there: {{skipped}}, of these now assigned: {{assigned}}."
         },
         "memberPhoneLabel": "Phone number (optional)",
         "memberEmailLabel": "Email (optional)",
@@ -3097,10 +3109,7 @@
         "notificationChannelDeleteConfirmDetail": "No notification will go out through this channel from now on, not even urgent ones. Address and credentials have to be entered again for a new channel.",
         "apiTokensMcpHint": "These tokens also work as Bearer tokens for the MCP endpoint at /mcp (e.g. in Claude Desktop, to create tasks, shopping items and events via AI).",
         "sync": {
-            "defaultAssignee": "Default assignee",
             "defaultAssigneeNone": "None",
-            "defaultAssigneeHint": "Newly synced events are automatically assigned to this person.",
-            "defaultAssigneeRoutingHint": "Default assignee: events from a calendar get the person chosen there, and a new event assigned only to that person is created in that calendar. This applies to Google and CalDAV calendars, not to Apple or Outlook.",
             "backfillTitle": "Fill in assignments",
             "backfillDescription": "A default assignee only applies to appointments imported after it was set. Here you can apply it once to the appointments already imported from all accounts.",
             "backfillAction": "Apply to existing appointments",
@@ -3120,7 +3129,10 @@
             "backfillMovedNext": "Show next",
             "backfillMovedAll": "Select all",
             "backfillMovedChange": "From {{from}} to {{to}}",
-            "backfillDescriptionMore": "Unassigned appointments get it directly. Appointments that still carry the default assignee of another calendar are listed one by one for you to choose. Any other assignment stays as it is."
+            "backfillDescriptionMore": "Unassigned appointments get it directly. Appointments that still carry the default assignee of another calendar are listed one by one for you to choose. Any other assignment stays as it is.",
+            "defaultAssignees": "Default assignees",
+            "defaultAssigneesHint": "Newly synced events are assigned to these people automatically. The first one sets the colour.",
+            "defaultAssigneesRoutingHint": "Default assignees: events from a calendar get the people chosen there, and a new event assigned to exactly these people is created in that calendar. This applies to Google and CalDAV calendars, not to Apple or Outlook."
         },
         "calendarAssignMeLabel": "Assign new events to me",
         "calendarDefaultRemindersLabel": "Default reminders",
@@ -3302,6 +3314,8 @@
         "displayDeleteConfirm": "Delete “{{name}}”?",
         "displayPairingCodeLabel": "Pairing code",
         "displayPairingCodeHint": "Valid for 15 minutes and works exactly once. Open /pair on the tablet and type it in there. It is shown only now.",
+        "displayPairStepCode": "Add a wall tablet here and generate a pairing code.",
+        "displayPairStepOpen": "On the tablet, open this address and type the code in there:",
         "displayDeviceUnnamed": "Unnamed device",
         "displayDeviceLastSeen": "Last seen: {{when}}",
         "displayDeviceNeverSeen": "Never connected",
@@ -3406,7 +3420,16 @@
         "permChildRoleHint": "New child accounts also get their own starting permissions when they are created: {{list}}. Afterwards they are listed with that member.",
         "activeModulesHintMore": "To take a module out of your own navigation only, go to Modules → Navigation.",
         "permIntroMore": "Individual members can differ from the role default. With nothing set, every role has full access; administrators always do.",
-        "preferenceSaveFailed": "The setting could not be saved."
+        "preferenceSaveFailed": "The setting could not be saved.",
+        "caldavCalendarReadOnly": "Read-only: new events cannot be saved here",
+        "caldavCalendarReadOnlyWaiting_one": "Read-only: {{count}} event waiting to upload here will not arrive",
+        "caldavCalendarReadOnlyWaiting": "Read-only: {{count}} events waiting to upload here will not arrive",
+        "reminderListReadOnly": "Read-only: new entries cannot be saved here",
+        "reminderListReadOnlyWaiting_one": "Read-only: {{count}} entry waiting to upload here will not arrive",
+        "reminderListReadOnlyWaiting": "Read-only: {{count}} entries waiting to upload here will not arrive",
+        "reminderListAssigneesTasksOnly": "People can only be set for lists that go to Tasks.",
+        "syncAssigneeNotMember": "Only household members can be chosen here.",
+        "syncAssigneeUnknown": "This person no longer exists. Reload the page."
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",
@@ -3739,7 +3762,8 @@
         "banner": "Offline - reconnecting…",
         "staleData": "Offline - as of: {{time}}",
         "pageTitle": "You are offline",
-        "pageDescription": "This page needs a connection. As soon as your device is back online, it loads by itself."
+        "pageDescription": "This page needs a connection. As soon as your device is back online, it loads by itself.",
+        "snapshot": "No connection to the server - saved data, read-only"
     },
     "shortcuts": {
         "search": "Open search",
@@ -4366,6 +4390,11 @@
             "missedBook": "Book missed dates from {{date}}",
             "missedDetail": "{{count}} dates have been missed since {{date}}.",
             "missedDetail_one": "{{count}} date has been missed since {{date}}.",
+            "failing": "Booking failed - retrying every hour",
+            "pastQuestion": "The date is in the past",
+            "pastSkip": "Start from {{date}}",
+            "pastDetail": "{{count}} dates would have been due since {{date}}.",
+            "pastDetail_one": "{{count}} date would have been due since {{date}}.",
             "deleteConfirm": "Delete this recurring expense?",
             "deleteConfirmDetail": "No new expenses will be created. Expenses already booked are kept.",
             "show": "Show",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}} owes you",
         "debtOwes": "{{from}} owes {{to}}",
         "balanced": "Settled up",
-        "balancedInGroup": "{{group}}: Settled up"
+        "balancedInGroup": "{{group}}: Settled up",
+        "totalsByMember": "Paid by each person",
+        "totalsByMemberHint": "Laid out, with each person's own share below",
+        "ownShare": "Own share: {{amount}}",
+        "paidLabel": "Paid",
+        "totalsByCategory": "By category",
+        "categoryFilter": "Filter expenses by category",
+        "noExpensesInCategory": "No expenses in this category."
     },
     "wmo": {
         "0": "Clear sky",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "Amount",
         "detailNextPaymentLabel": "Next payment",
         "renewedNamed": "“{{name}}” paid - next payment on {{date}}.",
-        "completedNamed": "“{{name}}” paid and completed."
+        "completedNamed": "“{{name}}” paid and completed.",
+        "accountHint": "Every payment of this subscription is booked to this account. Change a single payment in the budget.",
+        "accountArchivedHint": "This account is archived. The subscription books without an account until you choose another one.",
+        "accountArchivedOption": "{{name}} (archived)",
+        "accountArchivedMeta": "{{name}} archived - books without an account",
+        "visibilityHint_private": "Only you see this subscription and its payments.",
+        "visibilityHint_shared": "Everyone in the household sees this subscription and its payments.",
+        "errorAccountGone": "The selected account no longer exists."
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "Measurement could not be saved.",
             "invalidValue": "Please enter valid values.",
             "range": {
+                "day": "Day",
                 "week": "Week",
                 "month": "Month",
                 "year": "Year"
@@ -5003,6 +5047,7 @@
                 "family": "Family"
             },
             "sparse": "Too few readings to show a trend.",
+            "bandValue": "{{mean}}, from {{low}} to {{high}}",
             "recentMeasurements": "Recent measurements",
             "deleteMeasurement": "Delete measurement {{value}} from {{date}}",
             "measurementDeleted": "Measurement deleted",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "{{count}} duplicate pickup instance (same identity) was collapsed into one.",
         "importDiagnosticOther": "A calendar entry does not match the expected format.",
         "importUnresolvedBlockingError": "Resolve every blocking diagnostic first, or explicitly skip the affected events.",
-        "importIgnoreLabel": "Ignore",
         "importCreateNewType": "Create a new waste type",
+        "importLabelsHint": "If an entry names several bins, pick them all - each gets its own pickup.",
+        "importLabelIgnoredHint": "No waste type selected - this will not be imported.",
         "importNewTypeNameRequiredError": "Please enter a name for the new waste type.",
         "importDefaultSourceName": "Imported file",
         "importCommittedToast": "Import applied: {{added}} added, {{changed}} changed, {{removed}} removed.",
@@ -6198,6 +6244,13 @@
         "badgeLow": "Running low",
         "badgeOut": "Out of stock",
         "bestBefore": "Best before {{date}}",
+        "noBestBefore": "No best-before date",
+        "errorProductHasStock": "This product is in stock again and was not deleted.",
+        "productTotal": "{{quantity}} in all",
+        "productPlaces": "{{count}} places",
+        "productPlaces_one": "{{count}} place",
+        "productBatches": "{{count}} batches",
+        "productBatches_one": "{{count}} batch",
         "increase": "Increase quantity",
         "decrease": "Decrease quantity",
         "toShoppingAll": "Add all to shopping list",

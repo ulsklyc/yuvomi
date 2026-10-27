@@ -62,9 +62,13 @@ function addUser(username, color) {
 /** Der Kalender, wie ihn die Admin-Seite anlegt: mit Standard-Person (#459). */
 function externalCalendar(source, externalId, name, defaultAssignee) {
   const id = Number(db.prepare(`
-    INSERT INTO external_calendars (source, external_id, name, color, default_assignee_user_id)
-    VALUES (?, ?, ?, '#4A90E2', ?) RETURNING id
-  `).get(source, externalId, name, defaultAssignee).id);
+    INSERT INTO external_calendars (source, external_id, name, color)
+    VALUES (?, ?, ?, '#4A90E2') RETURNING id
+  `).get(source, externalId, name).id);
+  // Die Standard-Personen stehen seit #1897 in der Join-Tabelle (Migration 265).
+  if (defaultAssignee != null) {
+    db.prepare('INSERT INTO external_calendar_assignees (calendar_id, user_id) VALUES (?, ?)').run(id, defaultAssignee);
+  }
   return id;
 }
 
@@ -351,7 +355,7 @@ describe('#1270 - der Helfer selbst', () => {
     const id = seedEvent(null, [ANNA]);
     assert.equal(
       reassignDefaultOnCalendarMove(db, id, {
-        fromCalRefId: null, toCalRefId: refB, toDefaultUserId: BEN,
+        fromCalRefId: null, toCalRefId: refB, toDefaultUserIds: BEN,
       }),
       false,
     );
@@ -363,7 +367,7 @@ describe('#1270 - der Helfer selbst', () => {
     const id = seedEvent(refA, [ANNA]);
     assert.equal(
       reassignDefaultOnCalendarMove(db, id, {
-        fromCalRefId: refA, toCalRefId: refA, toDefaultUserId: ANNA,
+        fromCalRefId: refA, toCalRefId: refA, toDefaultUserIds: ANNA,
       }),
       false,
     );
@@ -375,7 +379,7 @@ describe('#1270 - der Helfer selbst', () => {
     const id = seedEvent(refA, [ANNA]);
     assert.equal(
       reassignDefaultOnCalendarMove(db, id, {
-        fromCalRefId: refA, toCalRefId: refB, toDefaultUserId: BEN,
+        fromCalRefId: refA, toCalRefId: refB, toDefaultUserIds: BEN,
       }),
       false,
     );
@@ -388,7 +392,7 @@ describe('#1270 - der Helfer selbst', () => {
     const id = seedEvent(refA, [ANNA]);
     assert.equal(
       reassignDefaultOnCalendarMove(db, id, {
-        fromCalRefId: refA, toCalRefId: refB, toDefaultUserId: 9999,
+        fromCalRefId: refA, toCalRefId: refB, toDefaultUserIds: 9999,
       }),
       false,
     );
@@ -401,7 +405,7 @@ describe('#1270 - der Helfer selbst', () => {
     const id = seedEvent(refA, [ANNA]);
     assert.equal(
       reassignDefaultOnCalendarMove(db, id, {
-        fromCalRefId: refA, toCalRefId: refB, toDefaultUserId: ANNA,
+        fromCalRefId: refA, toCalRefId: refB, toDefaultUserIds: ANNA,
       }),
       false,
     );
@@ -416,7 +420,7 @@ describe('#1270 - der Helfer selbst', () => {
     const id = seedEvent(refA, [ANNA], CHRIS);
     assert.equal(
       reassignDefaultOnCalendarMove(db, id, {
-        fromCalRefId: refA, toCalRefId: refB, toDefaultUserId: BEN,
+        fromCalRefId: refA, toCalRefId: refB, toDefaultUserIds: BEN,
       }),
       false,
     );
@@ -429,7 +433,7 @@ describe('#1270 - der Helfer selbst', () => {
     const id = seedEvent(refA, [ANNA], null);
     assert.equal(
       reassignDefaultOnCalendarMove(db, id, {
-        fromCalRefId: refA, toCalRefId: refB, toDefaultUserId: BEN,
+        fromCalRefId: refA, toCalRefId: refB, toDefaultUserIds: BEN,
       }),
       true,
     );
@@ -610,7 +614,7 @@ describe('#1358 - der Umzug oeffnet kein Anhang-Dokument', () => {
       .all(documentId).map((r) => Number(r.user_id)),
   });
   const move = (id, refA, refB) => reassignDefaultOnCalendarMove(db, id, {
-    fromCalRefId: refA, toCalRefId: refB, toDefaultUserId: BEN,
+    fromCalRefId: refA, toCalRefId: refB, toDefaultUserIds: BEN,
   });
 
   it('ein privates Dokument bleibt privat, auch an einem Termin fuer alle', () => {

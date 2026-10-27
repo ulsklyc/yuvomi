@@ -15,6 +15,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { formatMoney, formatSignedAmount, formatMoneyAxis, currencySymbol, setFallbackCurrency } from '../public/utils/money.js';
 import { toDecimalString, amountInputToCents, centsToAmountInput, amountToInput, breaksOffAtSeparator, toStoredNumber, amountInputProblem, amountExample, currencyFractionDigits, parseAmountInput, smallestUnitLabel } from '../public/utils/money.js';
 import { parseQuantity } from '../server/services/shopping-import.js';
 
@@ -508,4 +509,24 @@ test('smallestUnitLabel schreibt die kleinste Einheit in der Schreibweise der Re
   });
   withFormatLocale('en-US', () => assert.equal(smallestUnitLabel('EUR'), '0.01'));
   withFormatLocale('ar-EG', () => assert.equal(smallestUnitLabel('EUR'), '٠٫٠١'));
+});
+
+// #2302 (Security-Befund): ein Budget-Konto nahm bis dahin einen freien Text bis
+// 8 Zeichen als Waehrung an. "XYZ1" liess Intl.NumberFormat werfen, und die
+// Budget-Seite renderte fuer den ganzen Haushalt nicht mehr. Die Formatierer
+// fallen auf die Haushaltswaehrung zurueck, statt zu werfen.
+test('ein unbrauchbarer Waehrungscode faellt auf die Haushaltswaehrung zurueck', () => {
+  setFallbackCurrency('CHF');
+  try {
+    for (const bad of ['XYZ1', '', undefined, 'eu ro']) {
+      assert.equal(formatMoney(5, bad), formatMoney(5, 'CHF'), `formatMoney(${bad})`);
+      assert.equal(formatSignedAmount(-5, { currency: bad, role: 'flow' }).text, formatSignedAmount(-5, { currency: 'CHF', role: 'flow' }).text);
+      assert.equal(formatMoneyAxis(5, bad), formatMoneyAxis(5, 'CHF'));
+      assert.equal(currencySymbol(bad), currencySymbol('CHF'));
+    }
+    assert.equal(formatMoney(5, 'USD'), formatMoney(5, 'USD'), 'ein gueltiger Code bleibt');
+    assert.notEqual(formatMoney(5, 'USD'), formatMoney(5, 'CHF'));
+  } finally {
+    setFallbackCurrency('EUR');
+  }
 });

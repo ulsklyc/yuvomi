@@ -252,7 +252,7 @@ router.get('/suggestions', (req, res) => {
     res.json({ data: rows });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -365,7 +365,7 @@ router.get('/', (req, res) => {
     res.json({ data: result, weekStart: from, weekEnd: to });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -384,18 +384,18 @@ router.get('/', (req, res) => {
 router.post('/', (req, res) => {
   try {
     const { ingredients = [] } = req.body;
-    const vDate       = date(req.body.date, 'Datum', true);
-    const vType       = oneOf(req.body.meal_type, VALID_MEAL_TYPES, 'Mahlzeit-Typ');
-    const vTitle      = str(req.body.title, 'Titel', { max: MAX_TITLE });
-    const vNotes      = str(req.body.notes, 'Notizen', { max: MAX_TEXT, required: false });
-    const vRecipeUrl  = str(req.body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
-    const vRecipeId   = num(req.body.recipe_id, 'Rezept-ID', { required: false });
+    const vDate       = date(req.body.date, 'date', true);
+    const vType       = oneOf(req.body.meal_type, VALID_MEAL_TYPES, 'meal_type');
+    const vTitle      = str(req.body.title, 'title', { max: MAX_TITLE });
+    const vNotes      = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
+    const vRecipeUrl  = str(req.body.recipe_url, 'recipe_url', { max: MAX_TEXT, required: false });
+    const vRecipeId   = num(req.body.recipe_id, 'recipe_id', { required: false });
     const vCook       = cookField(req.body.cook_user_id);
     const repeatWeekly = req.body.repeat_weekly === true;
     // Leeres/fehlendes repeat_until heißt „ohne Ende" - die Serie bleibt dann
     // unbegrenzt, wie vor #619, aber jetzt als bewusste Wahl statt als einziger Zustand.
     const vRepeatUntil = repeatWeekly
-      ? date(req.body.repeat_until, 'Wiederholungs-Ende')
+      ? date(req.body.repeat_until, 'repeat_until')
       : { value: null, error: null };
     const errors = collectErrors([vDate, vType, vTitle, vNotes, vRecipeUrl, vRecipeId, vCook, vRepeatUntil]);
     if (!req.body.meal_type) errors.push('Mahlzeit-Typ ist erforderlich.');
@@ -464,7 +464,7 @@ router.post('/', (req, res) => {
     res.status(201).json({ data: meal });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -486,26 +486,26 @@ router.post('/apply-plan', (req, res) => {
     // liefe sonst still im additiven Modus und fuellte belegte Slots doppelt.
     // replace_existing bleibt, wie es war (`=== true`), sonst bricht ein Client.
     if (req.body.skip_occupied !== undefined && typeof req.body.skip_occupied !== 'boolean') {
-      return res.status(400).json({ error: 'skip_occupied muss true oder false sein.', code: 400 });
+      return res.status(400).json({ error: 'skip_occupied must be true or false.', code: 400 });
     }
     const skipOccupied = req.body.skip_occupied === true;
     if (replaceExisting && skipOccupied) {
-      return res.status(400).json({ error: 'skip_occupied und replace_existing schliessen sich aus.', code: 400 });
+      return res.status(400).json({ error: 'skip_occupied and replace_existing cannot be combined.', code: 400 });
     }
     if (!assignments.length) {
-      return res.status(400).json({ error: 'Mindestens eine Mahlzeit ist erforderlich.', code: 400 });
+      return res.status(400).json({ error: 'At least one meal is required.', code: 400 });
     }
 
     const prepared = [];
     const recipeIds = new Set();
     const cookIds = new Set();
     for (const assignment of assignments) {
-      const vDate = date(assignment.date, 'Datum', true);
-      const vType = oneOf(assignment.meal_type, VALID_MEAL_TYPES, 'Mahlzeit-Typ');
-      const vTitle = str(assignment.title, 'Titel', { max: MAX_TITLE });
-      const vNotes = str(assignment.notes, 'Notizen', { max: MAX_TEXT, required: false });
-      const vRecipeUrl = str(assignment.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false });
-      const vRecipeId = num(assignment.recipe_id, 'Rezept-ID', { required: false });
+      const vDate = date(assignment.date, 'date', true);
+      const vType = oneOf(assignment.meal_type, VALID_MEAL_TYPES, 'meal_type');
+      const vTitle = str(assignment.title, 'title', { max: MAX_TITLE });
+      const vNotes = str(assignment.notes, 'notes', { max: MAX_TEXT, required: false });
+      const vRecipeUrl = str(assignment.recipe_url, 'recipe_url', { max: MAX_TEXT, required: false });
+      const vRecipeId = num(assignment.recipe_id, 'recipe_id', { required: false });
       const vCook = cookField(assignment.cook_user_id);
       const errors = collectErrors([vDate, vType, vTitle, vNotes, vRecipeUrl, vRecipeId, vCook]);
       if (!assignment.meal_type) errors.push('Mahlzeit-Typ ist erforderlich.');
@@ -573,7 +573,7 @@ router.post('/apply-plan', (req, res) => {
     res.status(201).json(skipOccupied ? { data: created, skipped } : { data: created });
   } catch (err) {
     log.error('POST /apply-plan', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -590,15 +590,15 @@ router.put('/:id', (req, res) => {
   try {
     const id   = parseInt(req.params.id, 10);
     const meal = db.get().prepare('SELECT * FROM meals WHERE id = ?').get(id);
-    if (!meal) return res.status(404).json({ error: 'Mahlzeit nicht gefunden', code: 404 });
+    if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
 
     const checks = [];
-    if (req.body.date       !== undefined) checks.push(date(req.body.date, 'Datum'));
-    if (req.body.meal_type  !== undefined) checks.push(oneOf(req.body.meal_type, VALID_MEAL_TYPES, 'Mahlzeit-Typ'));
-    if (req.body.title      !== undefined) checks.push(str(req.body.title, 'Titel', { max: MAX_TITLE, required: false }));
-    if (req.body.notes      !== undefined) checks.push(str(req.body.notes, 'Notizen', { max: MAX_TEXT, required: false }));
-    if (req.body.recipe_url !== undefined) checks.push(str(req.body.recipe_url, 'Rezept-URL', { max: MAX_TEXT, required: false }));
-    if (req.body.recipe_id  !== undefined) checks.push(num(req.body.recipe_id, 'Rezept-ID', { required: false }));
+    if (req.body.date       !== undefined) checks.push(date(req.body.date, 'date'));
+    if (req.body.meal_type  !== undefined) checks.push(oneOf(req.body.meal_type, VALID_MEAL_TYPES, 'meal_type'));
+    if (req.body.title      !== undefined) checks.push(str(req.body.title, 'title', { max: MAX_TITLE, required: false }));
+    if (req.body.notes      !== undefined) checks.push(str(req.body.notes, 'notes', { max: MAX_TEXT, required: false }));
+    if (req.body.recipe_url !== undefined) checks.push(str(req.body.recipe_url, 'recipe_url', { max: MAX_TEXT, required: false }));
+    if (req.body.recipe_id  !== undefined) checks.push(num(req.body.recipe_id, 'recipe_id', { required: false }));
     const vCook = cookField(req.body.cook_user_id);
     checks.push(vCook);
     const errors = collectErrors(checks);
@@ -647,10 +647,10 @@ router.put('/:id', (req, res) => {
       // Feld lässt die bestehende Grenze stehen.
       let nEndDate = tpl.end_date;
       if (req.body.repeat_until !== undefined) {
-        const vRepeatUntil = date(req.body.repeat_until, 'Wiederholungs-Ende');
+        const vRepeatUntil = date(req.body.repeat_until, 'repeat_until');
         if (vRepeatUntil.error) return res.status(400).json({ error: vRepeatUntil.error, code: 400 });
         if (vRepeatUntil.value && vRepeatUntil.value < tpl.start_date) {
-          return res.status(400).json({ error: 'Wiederholungs-Ende darf nicht vor dem Serienbeginn liegen.', code: 400 });
+          return res.status(400).json({ error: 'repeat_until must not be before the start of the series.', code: 400 });
         }
         nEndDate = vRepeatUntil.value;
       }
@@ -747,7 +747,7 @@ router.put('/:id', (req, res) => {
     res.json({ data: loadMealWithIngredients(id) });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -760,7 +760,7 @@ router.delete('/:id', (req, res) => {
   try {
     const id     = parseInt(req.params.id, 10);
     const meal   = db.get().prepare('SELECT * FROM meals WHERE id = ?').get(id);
-    if (!meal) return res.status(404).json({ error: 'Mahlzeit nicht gefunden', code: 404 });
+    if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
 
     // scope=series entfernt die gesamte Serie: alle materialisierten Instanzen plus
     // das Template (CASCADE räumt Template-Zutaten und Ausnahmen ab). Da
@@ -807,11 +807,11 @@ router.delete('/:id', (req, res) => {
     deleteMealOccurrence(meal, req.authUserId || req.session.userId);
     const result = { changes: 1 };
     if (result.changes === 0)
-      return res.status(404).json({ error: 'Mahlzeit nicht gefunden', code: 404 });
+      return res.status(404).json({ error: 'Meal not found.', code: 404 });
     res.status(204).end();
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -829,11 +829,11 @@ router.post('/:id/ingredients', (req, res) => {
   try {
     const mealId = parseInt(req.params.id, 10);
     const meal   = db.get().prepare('SELECT id FROM meals WHERE id = ?').get(mealId);
-    if (!meal) return res.status(404).json({ error: 'Mahlzeit nicht gefunden', code: 404 });
+    if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
 
     const { name, quantity = null, category = 'Sonstiges' } = req.body;
     if (!name || !name.trim())
-      return res.status(400).json({ error: 'Name ist erforderlich', code: 400 });
+      return res.status(400).json({ error: 'name is required.', code: 400 });
 
     const result = db.get().prepare(`
       INSERT INTO meal_ingredients (meal_id, name, quantity, category) VALUES (?, ?, ?, ?)
@@ -846,7 +846,7 @@ router.post('/:id/ingredients', (req, res) => {
     res.status(201).json({ data: ing });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -860,7 +860,7 @@ router.patch('/ingredients/:ingId', (req, res) => {
   try {
     const ingId = parseInt(req.params.ingId, 10);
     const ing   = db.get().prepare('SELECT * FROM meal_ingredients WHERE id = ?').get(ingId);
-    if (!ing) return res.status(404).json({ error: 'Zutat nicht gefunden', code: 404 });
+    if (!ing) return res.status(404).json({ error: 'Ingredient not found.', code: 404 });
 
     const { name, quantity, on_shopping_list, category } = req.body;
 
@@ -886,7 +886,7 @@ router.patch('/ingredients/:ingId', (req, res) => {
     res.json({ data: updated });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -900,11 +900,11 @@ router.delete('/ingredients/:ingId', (req, res) => {
     const ingId  = parseInt(req.params.ingId, 10);
     const result = db.get().prepare('DELETE FROM meal_ingredients WHERE id = ?').run(ingId);
     if (result.changes === 0)
-      return res.status(404).json({ error: 'Zutat nicht gefunden', code: 404 });
+      return res.status(404).json({ error: 'Ingredient not found.', code: 404 });
     res.status(204).end();
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -951,14 +951,14 @@ router.post('/:id/to-shopping-list', (req, res) => {
 
     const mealId = parseInt(req.params.id, 10);
     const meal   = db.get().prepare('SELECT id, recipe_id FROM meals WHERE id = ?').get(mealId);
-    if (!meal) return res.status(404).json({ error: 'Mahlzeit nicht gefunden', code: 404 });
+    if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
 
     const { listId } = req.body;
     if (!listId)
-      return res.status(400).json({ error: 'listId ist erforderlich', code: 400 });
+      return res.status(400).json({ error: 'listId is required.', code: 400 });
 
     const list = db.get().prepare('SELECT id FROM shopping_lists WHERE id = ?').get(listId);
-    if (!list) return res.status(404).json({ error: 'Einkaufsliste nicht gefunden', code: 404 });
+    if (!list) return res.status(404).json({ error: 'Shopping list not found.', code: 404 });
 
     // Rezept-Mahlzeiten bekommen beim ersten Transfer ihre Rezeptzutaten als
     // echte meal_ingredients (materializeRecipeIngredients, dort begruendet) -
@@ -974,7 +974,7 @@ router.post('/:id/to-shopping-list', (req, res) => {
     res.json({ data: { transferred: result.added_ids.length, ...result } });
   } catch (err) {
     log.error('POST /:id/to-shopping-list', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -1002,12 +1002,12 @@ router.post('/week-to-shopping-list', (req, res) => {
     const { listId, week } = req.body;
 
     if (!listId)
-      return res.status(400).json({ error: 'listId ist erforderlich', code: 400 });
+      return res.status(400).json({ error: 'listId is required.', code: 400 });
     if (!week || !DATE_RE.test(week))
-      return res.status(400).json({ error: 'Gültiges Datum (YYYY-MM-DD) erforderlich', code: 400 });
+      return res.status(400).json({ error: 'A valid date (YYYY-MM-DD) is required.', code: 400 });
 
     const list = db.get().prepare('SELECT id FROM shopping_lists WHERE id = ?').get(listId);
-    if (!list) return res.status(404).json({ error: 'Einkaufsliste nicht gefunden', code: 404 });
+    if (!list) return res.status(404).json({ error: 'Shopping list not found.', code: 404 });
 
     const from = weekStart(week);
     const to   = weekEnd(week);
@@ -1023,7 +1023,7 @@ router.post('/week-to-shopping-list', (req, res) => {
     res.json({ data: { transferred: result.added_ids.length, ...result } });
   } catch (err) {
     log.error('POST /week-to-shopping-list', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 

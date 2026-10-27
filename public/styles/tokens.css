@@ -2176,8 +2176,16 @@
    * 300ms, Mehr-Blatt Vollhub in 250ms, Suche Vollhub. Der Eintritt federt,
    * der Austritt ist kuerzer und ohne Ueberschwinger. Die Feder vertraegt nur
    * den kurzen Hub (`--sheet-lift`): ueber einen Vollhub wirft sie das Blatt
-   * sichtbar ueber seine Ruhelage (gemessen 28,5px bei 40 %, test:motion). */
-  --sheet-in:   var(--duration-xl) var(--ease-glass);
+   * sichtbar ueber seine Ruhelage (gemessen 28,5px bei 40 %, test:motion).
+   *
+   * DIE BLATTFEDER (#1802): wo der Browser `linear()` kennt, ist sie eine
+   * kritisch gedaempfte Feder (unten im @supports-Rahmen) - kein
+   * Ueberschwinger, also traegt sie den vollen Weg (`--sheet-rise`), und das
+   * Blatt steigt vom unteren Rand auf, statt 24px ueber einer Blende zu
+   * erscheinen. Ohne `linear()` bleibt sie die Glasfeder von heute, mit dem
+   * kurzen Hub und der Blende (glass.css, `glass-sheet-in`). */
+  --ease-sheet: var(--ease-glass);
+  --sheet-in:   var(--duration-xl) var(--ease-sheet);
   /* Die BLENDE der Einfahrt federt nicht (Critique 2026-10-16, A5): eine
    * Deckkraft ueber 1 gibt es nicht, die Feder kappte bei 1 und das Blatt
    * stand nach rund einem Drittel der Zeit voll da, waehrend es noch hob.
@@ -2185,6 +2193,11 @@
   --sheet-fade-in: var(--duration-xl) var(--ease-out);
   --sheet-out:  var(--duration-md) var(--ease-out);
   --sheet-lift: 24px;
+  /* Der volle Weg der Einfahrt: die eigene Hoehe plus der Abstand zum unteren
+   * Rand (das Polster des Dialogs), sonst stuende im ersten Frame ein Streifen
+   * im Bild. Prozent meint die Box des Blatts selbst. Das Mehr-Blatt setzt
+   * seinen Abstand ueber der Leiste selbst (layout.css). */
+  --sheet-rise: calc(100% + max(var(--space-3), env(safe-area-inset-bottom)));
 
   /* h) Liquid Glass - Saettigung.
    *    Hier standen bis R18 (2026-10-07) drei Werte fuer einen Backdrop, den
@@ -2226,6 +2239,20 @@
       0.853 20%, 0.934 22.5%, 0.997 25%, 1.042 27.5%, 1.071 30%, 1.088 32.5%, 1.094 35%, 1.093 37.5%,
       1.086 40%, 1.076 42.5%, 1.063 45%, 1.05 47.5%, 1.038 50%, 1.026 52.5%, 1.016 55%, 1.008 57.5%,
       1.002 60%, 0.997 62.5%, 0.992 67.5%, 0.991 72.5%, 0.994 80%, 0.998 90%, 1);
+    /* Die Feder der Sidebar-Pille (#1802): Daempfung 0,78, Eigenfrequenz
+     * 11/Dauer - derselbe Gipfel wie die Bezier (1,018 gegen 1,020), aber er
+     * liegt bei 46 statt 57 % und die Pille steht ab 59 statt 76 % der Zeit. */
+    --ease-sidebar-glide: linear(0, 0.006 1%, 0.027 2.25%, 0.068 3.75%, 0.133 5.5%, 0.243 8%, 0.498 13.5%,
+      0.614 16.25%, 0.705 18.75%, 0.782 21.25%, 0.846 23.75%, 0.902 26.5%, 0.946 29.5%, 0.98 32.75%,
+      1.004 36.75%, 1.018 41.75%, 1.018 49.75%, 1.002 73%, 1);
+    /* Die Blattfeder (#1802): kritisch gedaempft, x(t) = 1 - (1 + wt)e^-wt
+     * mit w = 10/Dauer. Kein Ueberschwinger und monoton, deshalb faehrt sie
+     * den vollen Weg (`--sheet-rise`): bei 1 % Rest steht sie nach 66 % der
+     * Zeit, am Ende fehlen 0,05 % (0,4px bei 740px). Stuetzstellen mit einem
+     * Interpolationsfehler unter 0,15 %. */
+    --ease-sheet: linear(0, 0.005 1%, 0.022 2.25%, 0.055 3.75%, 0.106 5.5%, 0.191 8%, 0.4 13.75%,
+      0.499 16.75%, 0.587 19.75%, 0.657 22.5%, 0.723 25.5%, 0.781 28.75%, 0.832 32.25%, 0.874 36%,
+      0.91 40.25%, 0.94 45.25%, 0.964 51.5%, 0.982 59.5%, 0.994 71.5%, 0.999 96.75%, 1);
   }
 }
 

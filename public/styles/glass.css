@@ -224,9 +224,10 @@
 
 /* Blur nur wenn unterstützt */
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  /* Der Grund des nativen Dialogs (`::backdrop`, D7) traegt dasselbe Glas. */
+  /* Der Grund des nativen Dialogs (`.modal-overlay__scrim`, #1801) traegt
+   * dasselbe Glas. */
   .modal-overlay,
-  dialog.modal-overlay::backdrop,
+  .modal-overlay__scrim,
   dialog.dialog-surface::backdrop {
     background-color: var(--color-overlay-glass);
     backdrop-filter: var(--blur-xs) saturate(120%);
@@ -594,6 +595,37 @@ textarea.form-input {
 @media (max-width: 767px) {
   dialog.dialog-surface:not(.dialog-surface--closing) {
     animation: glass-sheet-in var(--sheet-in) forwards;
+  }
+}
+
+/* DAS BLATT STEIGT VOM UNTEREN RAND AUF (#1802). Mit der kritisch gedaempften
+ * Blattfeder (`--ease-sheet`, tokens.css) faehrt es seinen vollen Weg - die
+ * eigene Hoehe plus den Abstand zum Rand (`--sheet-rise`) - und blendet nicht:
+ * es kommt von irgendwo, statt 24px ueber einer Blende zu erscheinen. Vorher
+ * trug die Back-Out-Feder nur den kurzen Hub, ueber die volle Hoehe warf sie
+ * das Blatt gemessen 28,5px ueber seine Ruhelage.
+ *
+ * NUR MIT `linear()`: ohne die Feder liefe der Vollhub auf der Bezier von
+ * heute, und genau die schiesst ueber. Ein alter Browser (Wand-WebView 106)
+ * behaelt `glass-sheet-in` oben - Kurve und Hub von heute. Unter reduzierter
+ * Bewegung steht das Blatt ohne Weg (modal.js blendet, reset.css).
+ *
+ * Dieselben Selektoren wie oben, also gewinnt diese Regel (spaeter in der
+ * Datei); die Ausgangsregeln tragen eine Klasse mehr und schlagen sie. Das
+ * Mehr-Blatt und die Suche steigen genauso (layout.css). */
+@keyframes sheet-rise {
+  from { transform: translateY(var(--sheet-rise)); }
+  to   { transform: translateY(0); }
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  @media (prefers-reduced-motion: no-preference) {
+    @media (max-width: 767px) {
+      .modal-panel:not(.modal-panel--closing),
+      dialog.dialog-surface:not(.dialog-surface--closing) {
+        animation: sheet-rise var(--sheet-in) forwards;
+      }
+    }
   }
 }
 

@@ -535,16 +535,34 @@ test('privacy: with one member, the protective fields stay while another account
 const { __test: icsSettings } = await import('../public/settings/pages/personal-calendar-subscriptions.js');
 
 test('settings: saving a calendar subscription keeps a stored assignee that is not on offer', () => {
-  // Die Optionen laden asynchron nach. Steht die gespeicherte Zuweisung nicht
-  // darunter - die Liste laedt noch, oder das Laden ist fehlgeschlagen -, zeigt
-  // die Auswahl "niemand", und Speichern von Name oder Farbe truege das ein.
-  const select = (value, ...ids) => ({ value, options: [{ value: '' }, ...ids.map((id) => ({ value: String(id) }))] });
-  assert.deepEqual(icsSettings.assigneePatch(select('', ANNA.id), CLARA.id), {},
+  // Die Personen laden im Knopf nach (settings/assignee-menu.js). Bis dahin -
+  // oder wenn das Laden scheitert - traegt der Knopf die gespeicherte Menge,
+  // und solange niemand sie anfasst, bleibt das Feld aus der Anfrage: ein
+  // Speichern von Name oder Farbe traegt nichts ein, was nicht angeboten war.
+  const field = (...ids) => ({ dataset: { assigneeIds: ids.join(',') } });
+  assert.deepEqual(icsSettings.assigneePatch(field(CLARA.id), [CLARA.id]), {},
     'the field stays out of the request, so the server keeps the stored assignee');
-  assert.deepEqual(icsSettings.assigneePatch(select(String(CLARA.id), ANNA.id, CLARA.id), CLARA.id), { default_assignee_user_id: CLARA.id });
-  assert.deepEqual(icsSettings.assigneePatch(select('', ANNA.id, CLARA.id), CLARA.id), { default_assignee_user_id: null },
+  assert.deepEqual(icsSettings.assigneePatch(field(CLARA.id, ANNA.id), [CLARA.id]), { default_assignee_user_ids: [CLARA.id, ANNA.id] },
+    'a person added keeps the order of the choice (#1897)');
+  assert.deepEqual(icsSettings.assigneePatch(field(), [CLARA.id]), { default_assignee_user_ids: [] },
     'removing an assignee who is on offer still works');
-  assert.deepEqual(icsSettings.assigneePatch(select(String(ANNA.id), ANNA.id), null), { default_assignee_user_id: ANNA.id });
+  assert.deepEqual(icsSettings.assigneePatch(field(ANNA.id), []), { default_assignee_user_ids: [ANNA.id] });
+  assert.deepEqual(icsSettings.storedAssigneeIds({ default_assignee_user_id: CLARA.id }), [CLARA.id],
+    'an answer in the earlier form still names its person');
+});
+
+const assigneeMenu = await import('../public/settings/assignee-menu.js');
+
+test('settings: the default-assignee menu keeps the order of the choice and names everyone (#1897)', () => {
+  // Die erste Person wird die primaere Zuweisung eines neuen Termins (ihre
+  // Farbe); wer dazukommt, steht hinten, wer geht, faellt heraus.
+  assert.deepEqual(assigneeMenu.toggleAssignee([], CLARA.id), [CLARA.id]);
+  assert.deepEqual(assigneeMenu.toggleAssignee([CLARA.id], ANNA.id), [CLARA.id, ANNA.id]);
+  assert.deepEqual(assigneeMenu.toggleAssignee([CLARA.id, ANNA.id], CLARA.id), [ANNA.id]);
+  const names = new Map([[ANNA.id, 'Anna'], [CLARA.id, 'Clara']]);
+  assert.equal(assigneeMenu.assigneeSummary([CLARA.id, ANNA.id], names), 'Clara, Anna');
+  assert.equal(assigneeMenu.assigneeIdsOf({ dataset: { assigneeIds: '3,1' } }).join(), '3,1');
+  assert.deepEqual(assigneeMenu.assigneeIdsOf({ dataset: { assigneeIds: '' } }), []);
 });
 
 // --------------------------------------------------------------------------

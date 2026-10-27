@@ -19,6 +19,8 @@ let patchResult = () => Promise.resolve({ data: {} });
 
 globalThis.window = {
   yuvomi: { showToast: (message, type) => toasts.push({ message, type }) },
+  // render() names the pairing address with the page origin (#2294).
+  location: { origin: 'https://family.example' },
 };
 globalThis.__apiStub = {
   get: async () => ({ data: [] }),

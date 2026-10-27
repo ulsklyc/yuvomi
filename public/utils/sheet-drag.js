@@ -145,9 +145,10 @@ function mark(sheet, value) {
  *   Aenderungen): dann federt das Blatt in die Ruhelage.
  * @param {number} [opts.handleZone=SHEET_HANDLE_ZONE_PX]
  * @param {() => (HTMLElement|null)} [opts.dim]  die Abdunklung hinter dem Blatt,
- *   wenn sie ein EIGENES Element ist (Backdrop des Mehr-Blatts): sie bekommt
- *   `--sheet-pull`. Das Dialog-Overlay ist Abdunklung UND Elternknoten der
- *   Tafel - seine Deckkraft naehme die Tafel mit, es bleibt deshalb aussen vor.
+ *   ein EIGENES Element (Backdrop des Mehr-Blatts, Grund des Dialogs
+ *   `.modal-overlay__scrim`): sie bekommt `--sheet-pull`. Nie ein Vorfahre des
+ *   Blatts - dessen Deckkraft naehme das Blatt mit (deshalb hat der Dialog
+ *   seit #1801 einen eigenen Grund unter der Tafel).
  * @param {boolean} [opts.resetAfterDismiss=false]  das Blatt bleibt im DOM
  *   (Mehr-Blatt): nach dem Ausfahren den Zug ohne Bewegung zuruecknehmen,
  *   sonst oeffnete es beim naechsten Mal um den alten Zug versetzt.

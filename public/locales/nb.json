@@ -1190,7 +1190,6 @@
         "pickOne": "Velg en begivenhet",
         "pickOneHint": "Tid, sted og påminnelser vises her.",
         "syncTargetAssigneeAmbiguous": "Flere kalendere har denne personen som standardansvarlig. Velg målet selv.",
-        "syncTargetSeveralAssignees": "Flere personer er tildelt, så tildelingen velger ikke en kalender. Brukte i stedet: {{target}}.",
         "filtersSources": "Kalendere",
         "filterUnassigned": "Ikke tildelt",
         "dateSpanSpoken": "{{from}} til {{to}}",
@@ -1229,7 +1228,10 @@
         "errorDeleteFeedAdminOnly": "Denne kalenderen eksporteres. Bare en administrator kan slette den.",
         "errorEventGone": "Denne avtalen finnes ikke lenger.",
         "errorSelectedCalendarGone": "Den valgte kalenderen finnes ikke lenger.",
-        "errorSeriesNoOccurrence": "Med denne gjentakelsen ville det ikke vært en eneste avtale fra startdatoen."
+        "errorSeriesNoOccurrence": "Med denne gjentakelsen ville det ikke vært en eneste avtale fra startdatoen.",
+        "localCalendarUploadsHint": "Avtaler i denne kalenderen lastes opp til iCloud via Apple Calendar.",
+        "overlapOpenSchedule": "Åpne planlegging",
+        "syncTargetNoCalendarForPeople": "Ingen kalender har nøyaktig disse personene som standardansvarlige, så tildelingen velger ingen. Brukes i stedet: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategorier",
@@ -1300,7 +1302,11 @@
         "checklistDone": "Ferdig",
         "checklistOpen": "Åpen",
         "errorNoteGone": "Dette notatet finnes ikke lenger.",
-        "errorSelectedCategoryGone": "En valgt kategori finnes ikke lenger."
+        "errorSelectedCategoryGone": "En valgt kategori finnes ikke lenger.",
+        "lockedToggle": "Lås redigering",
+        "lockedBadge": "Låst",
+        "lockedHint": "Bare du og administratorer kan endre, feste eller slette dette notatet - også krysse av punkter i listen. Alle andre kan fortsatt lese det.",
+        "errorLocked": "Dette notatet er låst. Bare personen som opprettet det og administratorer kan endre det."
     },
     "markdown": {
         "bold": "Fet (Ctrl+B)",
@@ -1772,6 +1778,8 @@
         "planSavingsDeleteConfirm": "Slett sparemålet?",
         "accountsTab": "Kontoer",
         "netWorth": "Nettoformue",
+        "netWorthApproxNote": "Omregnet med kurser fra {{date}}",
+        "netWorthPerCurrencyNote": "Uten valutakurs - sum per valuta",
         "addAccount": "Legg til konto",
         "accountsEmptyTitle": "Ingen kontoer ennå",
         "accountsEmptyDescription": "Legg til kontoer som brukskonto eller sparekonto for å spore saldoen din.",
@@ -1865,6 +1873,7 @@
         "saveFailed": "Dette kunne ikke lagres. Vennligst kontroller opplysningene.",
         "loanAlreadyPaid": "Dette lånet er allerede betalt i sin helhet.",
         "loanInstallmentAlreadyPaid": "Dette avdraget er allerede betalt.",
+        "loanPaymentRateUnavailable": "Ingen valutakurs er kjent for kontoens valuta. Velg en annen konto for lånet, eller ingen.",
         "amountExceedsLoanRemaining": "Beløpet er høyere enn det som gjenstår av lånet",
         "responsibleNotMember": "Bare medlemmer av husstanden kan være ansvarlige.",
         "seriesStartTooEarly": "Startdagen kan ikke ligge i en måned før seriens første oppføring",
@@ -2439,7 +2448,10 @@
             "errorNoCalendarName": "Skriv inn et navn på den nye kalenderen.",
             "dropzoneTitle": "Dra en ICS-fil hit eller velg en",
             "dropzoneTitleTouch": "Trykk for å velge en ICS-fil",
-            "dropzoneHint": "Bare .ics-filer"
+            "dropzoneHint": "Bare .ics-filer",
+            "assigneesLabel": "Tildel til",
+            "assigneesHint": "Nye hendelser får disse personene. En hendelse som allerede er importert med samme ID, får dem i tillegg - også om tildelingen ble fjernet for hånd.",
+            "successWithAssigned": "Importert: {{imported}}, fantes allerede: {{skipped}}, av disse nå tildelt: {{assigned}}."
         },
         "memberPhoneLabel": "Telefonnummer (valgfritt)",
         "memberEmailLabel": "E-post (valgfritt)",
@@ -3097,10 +3109,7 @@
         "notificationChannelDeleteConfirmDetail": "Ingen varslinger vil bli sendt gjennom denne kanalen fra nå av, ikke en gang hastevarsler. Adresse og påloggingsinformasjon må legges inn på nytt for en ny kanal.",
         "apiTokensMcpHint": "Disse tokenene fungerer også som Bearer-tokens for MCP-endepunktet på /mcp (f.eks. i Claude Desktop, for å opprette oppgaver, handlevarer og hendelser via AI).",
         "sync": {
-            "defaultAssignee": "Standardansvarlig",
             "defaultAssigneeNone": "Ingen",
-            "defaultAssigneeHint": "Nytt synkroniserte hendelser blir automatisk tildelt denne personen.",
-            "defaultAssigneeRoutingHint": "Standardansvarlig: hendelser fra en kalender får personen som er valgt der, og en ny hendelse tildelt kun til den personen blir opprettet i den kalenderen. Dette gjelder for Google- og CalDAV-kalendere, ikke for Apple eller Outlook.",
             "backfillTitle": "Fyll ut tildelinger",
             "backfillDescription": "En standardansvarlig gjelder kun for avtaler som er importert etter at den ble satt. Her kan du bruke den én gang på avtaler som allerede er importert fra alle kontoer.",
             "backfillAction": "Bruk på eksisterende avtaler",
@@ -3120,7 +3129,10 @@
             "backfillMovedNext": "Vis neste",
             "backfillMovedAll": "Velg alle",
             "backfillMovedChange": "Fra {{from}} til {{to}}",
-            "backfillDescriptionMore": "Utildelte avtaler får den direkte. Avtaler som fortsatt har standardansvarlig fra en annen kalender, blir listet opp én etter én slik at du kan velge. Alle andre tildelinger forblir som de er."
+            "backfillDescriptionMore": "Utildelte avtaler får den direkte. Avtaler som fortsatt har standardansvarlig fra en annen kalender, blir listet opp én etter én slik at du kan velge. Alle andre tildelinger forblir som de er.",
+            "defaultAssignees": "Standardansvarlige",
+            "defaultAssigneesHint": "Nylig synkroniserte hendelser tildeles automatisk disse personene. Den første bestemmer fargen.",
+            "defaultAssigneesRoutingHint": "Standardansvarlige: hendelser fra en kalender får personene som er valgt der, og en ny hendelse tildelt nøyaktig disse personene opprettes i den kalenderen. Dette gjelder Google- og CalDAV-kalendere, ikke Apple eller Outlook."
         },
         "calendarAssignMeLabel": "Tildel nye hendelser til meg",
         "calendarDefaultRemindersLabel": "Standardpåminnelser",
@@ -3302,6 +3314,8 @@
         "displayDeleteConfirm": "Slett «{{name}}»?",
         "displayPairingCodeLabel": "Paringskode",
         "displayPairingCodeHint": "Gyldig i 15 minutter og fungerer kun én gang. Åpne /pair på nettbrettet og skriv den inn der. Den vises kun nå.",
+        "displayPairStepCode": "Legg til et nettbrett her og generer en paringskode.",
+        "displayPairStepOpen": "Åpne denne adressen på nettbrettet og skriv inn koden der:",
         "displayDeviceUnnamed": "Navnløs enhet",
         "displayDeviceLastSeen": "Sist sett: {{when}}",
         "displayDeviceNeverSeen": "Aldri koblet til",
@@ -3406,7 +3420,16 @@
         "permChildRoleHint": "Nye barnekontoer får i tillegg egne startrettigheter når de opprettes: {{list}}. Etterpå står de hos det aktuelle medlemmet.",
         "activeModulesHintMore": "For å fjerne en modul kun fra din egen navigasjon, gå til Moduler → Navigasjon.",
         "permIntroMore": "Individuelle medlemmer kan avvike fra standardinnstillingene for rollen. Hvis ingenting er angitt, har alle roller full tilgang; administratorer har alltid full tilgang.",
-        "preferenceSaveFailed": "Innstillingen kunne ikke lagres."
+        "preferenceSaveFailed": "Innstillingen kunne ikke lagres.",
+        "caldavCalendarReadOnly": "Skrivebeskyttet: nye avtaler kan ikke lagres her",
+        "caldavCalendarReadOnlyWaiting_one": "Skrivebeskyttet: {{count}} avtale som venter på opplasting hit, kommer ikke frem",
+        "caldavCalendarReadOnlyWaiting": "Skrivebeskyttet: {{count}} avtaler som venter på opplasting hit, kommer ikke frem",
+        "reminderListReadOnly": "Skrivebeskyttet: nye oppføringer kan ikke lagres her",
+        "reminderListReadOnlyWaiting_one": "Skrivebeskyttet: {{count}} oppføring som venter på opplasting hit, kommer ikke frem",
+        "reminderListReadOnlyWaiting": "Skrivebeskyttet: {{count}} oppføringer som venter på opplasting hit, kommer ikke frem",
+        "reminderListAssigneesTasksOnly": "Personer kan bare settes for lister som går til Oppgaver.",
+        "syncAssigneeNotMember": "Bare medlemmer av husstanden kan velges her.",
+        "syncAssigneeUnknown": "Denne personen finnes ikke lenger. Last inn siden på nytt."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",
@@ -3739,7 +3762,8 @@
         "banner": "Uten nett - kobler til på nytt…",
         "staleData": "Uten nett - per: {{time}}",
         "pageTitle": "Du er frakoblet",
-        "pageDescription": "Denne siden trenger tilkobling. Så snart enheten er tilkoblet igjen, lastes den av seg selv."
+        "pageDescription": "Denne siden trenger tilkobling. Så snart enheten er tilkoblet igjen, lastes den av seg selv.",
+        "snapshot": "Ingen forbindelse til serveren - lagrede data, kun lesing"
     },
     "shortcuts": {
         "search": "Åpne søk",
@@ -4366,6 +4390,11 @@
             "missedBook": "Bokfør tapte datoer fra {{date}}",
             "missedDetail": "{{count}} datoer er gått tapt siden {{date}}.",
             "missedDetail_one": "{{count}} dato er gått tapt siden {{date}}.",
+            "failing": "Bokføringen mislyktes - prøver igjen hver time",
+            "pastQuestion": "Datoen er i fortiden",
+            "pastSkip": "Start fra {{date}}",
+            "pastDetail": "{{count}} datoer ville ha forfalt siden {{date}}.",
+            "pastDetail_one": "{{count}} dato ville ha forfalt siden {{date}}.",
             "deleteConfirm": "Slette denne gjentakende utgiften?",
             "deleteConfirmDetail": "Det opprettes ingen nye utgifter. Utgifter som allerede er bokført, beholdes.",
             "show": "Vis",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}} skylder deg",
         "debtOwes": "{{from}} skylder {{to}}",
         "balanced": "Gjort opp",
-        "balancedInGroup": "{{group}}: Gjort opp"
+        "balancedInGroup": "{{group}}: Gjort opp",
+        "totalsByMember": "Betalt per person",
+        "totalsByMemberHint": "Lagt ut, med egen andel under",
+        "ownShare": "Egen andel: {{amount}}",
+        "paidLabel": "Betalt",
+        "totalsByCategory": "Etter kategori",
+        "categoryFilter": "Filtrer utgifter etter kategori",
+        "noExpensesInCategory": "Ingen utgifter i denne kategorien."
     },
     "wmo": {
         "0": "Skyfri",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "Beløp",
         "detailNextPaymentLabel": "Neste betaling",
         "renewedNamed": "«{{name}}» betalt - neste betaling {{date}}.",
-        "completedNamed": "«{{name}}» betalt og avsluttet."
+        "completedNamed": "«{{name}}» betalt og avsluttet.",
+        "accountHint": "Hver betaling for dette abonnementet bokføres på denne kontoen. En enkelt betaling endrer du i budsjettet.",
+        "accountArchivedHint": "Denne kontoen er arkivert. Abonnementet bokføres uten konto til du velger en annen.",
+        "accountArchivedOption": "{{name}} (arkivert)",
+        "accountArchivedMeta": "{{name}} arkivert - bokføres uten konto",
+        "visibilityHint_private": "Bare du ser dette abonnementet og betalingene.",
+        "visibilityHint_shared": "Alle i husholdningen ser dette abonnementet og betalingene.",
+        "errorAccountGone": "Den valgte kontoen finnes ikke lenger."
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "Målingen kunne ikke lagres.",
             "invalidValue": "Vennligst skriv inn gyldige verdier.",
             "range": {
+                "day": "Dag",
                 "week": "Uke",
                 "month": "Måned",
                 "year": "År"
@@ -5003,6 +5047,7 @@
                 "family": "Familie"
             },
             "sparse": "For få målinger til å vise en trend.",
+            "bandValue": "{{mean}}, fra {{low}} til {{high}}",
             "recentMeasurements": "Nylige målinger",
             "deleteMeasurement": "Slett måling {{value}} fra {{date}}",
             "measurementDeleted": "Måling slettet",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "{{count}} duplikate hentinger tilfeller (samme identitet) ble slått sammen til ett.",
         "importDiagnosticOther": "En kalenderoppføring har ikke det forventede formatet.",
         "importUnresolvedBlockingError": "Løs alle blokkerende feilmeldinger først, eller hopp over de berørte hendelsene eksplisitt.",
-        "importIgnoreLabel": "Ignorer",
         "importCreateNewType": "Opprett en ny avfallstype",
+        "importLabelsHint": "Hvis en oppføring nevner flere dunker, velg alle - hver får sin egen tømming.",
+        "importLabelIgnoredHint": "Ingen avfallstype valgt - blir ikke importert.",
         "importNewTypeNameRequiredError": "Vennligst skriv inn et navn for den nye avfallstypen.",
         "importDefaultSourceName": "Importert fil",
         "importCommittedToast": "Import utført: {{added}} lagt til, {{changed}} endret, {{removed}} fjernet.",
@@ -6198,6 +6244,13 @@
         "badgeLow": "Lave beholdninger",
         "badgeOut": "Utsolgt",
         "bestBefore": "Best før {{date}}",
+        "noBestBefore": "Uten best før-dato",
+        "errorProductHasStock": "Dette produktet er på lager igjen og ble ikke slettet.",
+        "productTotal": "{{quantity}} totalt",
+        "productPlaces": "{{count}} steder",
+        "productPlaces_one": "{{count}} sted",
+        "productBatches": "{{count}} partier",
+        "productBatches_one": "{{count}} parti",
         "increase": "Øk antall",
         "decrease": "Reduser antall",
         "toShoppingAll": "Legg alt i handlelisten",

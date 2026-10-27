@@ -2027,6 +2027,7 @@ cdb.exec(`
     source TEXT NOT NULL DEFAULT 'google', external_id TEXT,
     name TEXT NOT NULL, color TEXT
   );
+  CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
   -- color gehoert dazu: sie ist die GEERBTE Farbe eines Abos und wird seit #891
   -- als cal_color mitgelesen, weil ein Abo-Termin keinen external_calendars-
   -- Eintrag hat. Fehlt sie hier, misst dieses verkuerzte Schema an der echten

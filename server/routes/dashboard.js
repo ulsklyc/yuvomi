@@ -15,7 +15,8 @@ import { taskScopeWhere, taskCategoryWhere, categoryBindings, normalizeCategoryF
 import { getCountdowns } from '../services/countdowns.js';
 import { listQuickLinksFor } from './quick-links.js';
 import {
-  asksHouseholdAudience, householdAudienceAnswer, householdAudienceShows, householdVisibleWhere, visibilityWhere,
+  asksHouseholdAudience, householdAudienceAnswer, householdAudienceShows, householdVisibleWhere, noteVisibleWhere,
+  visibilityWhere,
 } from '../services/visibility.js';
 import { resolveBudgetMode } from '../services/budget-visibility.js';
 import { hiddenModulesFor, requestHasCapability } from '../permissions.js';
@@ -794,7 +795,7 @@ router.get('/', (req, res) => {
       SELECT n.*, u.display_name AS author_name, u.avatar_color AS author_color
       FROM notes n
       LEFT JOIN users u ON n.created_by = u.id
-      WHERE 1 = 1 ${noteCategoryAnd}
+      WHERE ${noteVisibleWhere('n', '@me')} ${noteCategoryAnd}
       ORDER BY n.pinned DESC, n.updated_at DESC
       -- FUENF, WEIL DIE KACHEL ZWEI HOCH SEIN DARF - dieselbe Korrektur, die
       -- die Geburtstage oben schon bekommen haben und bei der die Notizen
@@ -815,7 +816,7 @@ router.get('/', (req, res) => {
      * braucht deshalb eine eigene, echte Zahl. */
     result.pinnedNotesCount = d.prepare(`
       SELECT COUNT(*) AS n FROM notes n
-      WHERE n.pinned = 1 ${noteCategoryAnd}
+      WHERE n.pinned = 1 AND ${noteVisibleWhere('n', '@me')} ${noteCategoryAnd}
     `).get({ me: userId, ...noteCategoryBinds }).n;
     /* UND DIE MENGE, AUS DER DIE VORSCHAU SCHOEPFT - fuer die Badge und das
      * „+N weitere" der Kachel. `pinnedNotesCount` ist dafuer die falsche Zahl:
@@ -825,7 +826,7 @@ router.get('/', (req, res) => {
      * (#814: Filter vor Schnitt UND Zahl). */
     result.notesTotal = d.prepare(`
       SELECT COUNT(*) AS n FROM notes n
-      WHERE 1 = 1 ${noteCategoryAnd}
+      WHERE ${noteVisibleWhere('n', '@me')} ${noteCategoryAnd}
     `).get({ me: userId, ...noteCategoryBinds }).n;
   } catch (err) {
     log.error('pinnedNotes error:', err.message);

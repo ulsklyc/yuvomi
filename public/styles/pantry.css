@@ -264,6 +264,17 @@
   align-items: center;
   gap: var(--space-1) var(--space-2);
   flex-shrink: 0;
+  /* ...ausser das Paar ist allein schon breiter als die Textspalte (#1448):
+   * eine Charge unter ihrem Produkt hat 16px weniger, und bei 375px lief
+   * "Gestern abgelaufen · Fast leer" ueber den Warenkorb. Gedeckelt auf die
+   * Spaltenbreite bricht es dann in sich um, statt hinauszuragen. */
+  flex-wrap: wrap;
+  max-width: 100%;
+  /* Der Mittelpunkt haengt im Zwischenraum VOR der zweiten Marke (unten). Bricht
+   * das Paar um, steht er links vor der Kante des Traegers und wird hier
+   * abgeschnitten, statt die zweite Zeile mit "· Fast leer" zu beginnen. */
+  column-gap: calc(var(--space-4) + 0.3em);
+  overflow: hidden;
 }
 
 /* Name und Metazeile kommen aus .list-row__name / .list-row__meta. Die
@@ -315,9 +326,16 @@
  * Der Mittelpunkt ist dieselbe Trennung, die die Metazeile der Zeile darunter
  * seit jeher fuehrt, und er kommt ueber den `+`-Kombinator: er gehoert zum
  * ZWISCHENRAUM, nicht zum Badge (Zeilenlisten-Regel). */
+.pantry-badge + .pantry-badge {
+  position: relative;
+}
+
 .pantry-badge + .pantry-badge::before {
   content: '·';
-  margin-inline-end: var(--space-2);
+  position: absolute;
+  inset-inline-start: calc(-1 * (var(--space-2) + 0.3em));
+  width: 0.3em;
+  text-align: center;
   color: var(--color-text-tertiary);
 }
 
@@ -475,6 +493,78 @@
   .pantry-row:has(.pantry-row__cart):has(.pantry-stepper) .pantry-row__expiry {
     display: none;
   }
+}
+
+/* --------------------------------------------------------
+ * Produkte ueber den Chargen (#1448, Schritt 2)
+ * --------------------------------------------------------
+ * Die Produktzeile ist ein Aufklapp-Knopf in der Zeilengrammatik: Name, darunter
+ * die Summe ("4 l insgesamt · 2 Orte"), am Ende der Winkel der Gruppenkoepfe
+ * (`.list-group__chevron`, list-row.css), der zugeklappt zur Seite zeigt. Er
+ * steht dort, wo in den Chargenzeilen der Stepper steht - die Zeile hat keine
+ * Bedienung ausser dem Aufklappen, also gehoert ihr die ganze Breite. */
+.pantry-product__toggle {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-2);
+}
+
+.pantry-product__text {
+  display: grid;
+  gap: var(--space-0h);
+  min-width: 0;
+}
+
+.pantry-product__row .list-row__meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pantry-product__total {
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+}
+
+.pantry-product__badges:empty {
+  display: none;
+}
+
+.pantry-product__toggle .list-group__chevron {
+  color: var(--color-text-tertiary);
+  margin-inline-end: var(--space-2);
+}
+
+/* Die Chargen haengen unter ihrem Produkt: eingerueckt, mit einer Linie an der
+ * Einrueckkante, die sie als Teil des Produkts zeigt. Einruecken per Rand der
+ * Liste, nicht per Innenabstand der Zeile - die Zeilengeometrie traegt
+ * `.list-row` allein (test-frontend-audit.js). */
+.pantry-batches {
+  margin: 0;
+  margin-inline-start: var(--space-4);
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border-subtle);
+  border-inline-start: 2px solid var(--color-border-subtle);
+}
+
+.pantry-batches > * + * {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* Unter dem Produkt ist der Ort der Name der Charge: eine Stufe leiser als der
+ * Produktname darueber. */
+.pantry-row--batch .list-row__name {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+/* Das Datum einer Charge unter ihrem Produkt bleibt auch auf der schmalen Zeile
+ * stehen (`.pantry-row__date`, nicht `.pantry-row__expiry`): es unterscheidet
+ * zwei Chargen desselben Ortes. */
+.pantry-row__date {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Touch: das iOS-Minimum von 44pt gilt für Finger, nicht für Mauszeiger. */

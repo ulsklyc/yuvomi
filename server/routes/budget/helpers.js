@@ -15,6 +15,7 @@ import {
 } from '../../services/budget-visibility.js';
 import { computeLoanSchedule, remainingPrincipalFromPayments, remainingInstallmentsForBalance, rateForInstallment } from '../../services/loan-amortization.js';
 import { todayKey } from '../../utils/timezone.js';
+import { cachedRate, cachedRateInfo } from '../../services/subscription-rates.js';
 import { DEFAULT_LOCALE, resolveHouseholdLocale, supportedLocaleFor } from '../../utils/i18n.js';
 import { newNonMembers } from '../../services/household-members.js';
 import { MAX_INTERVAL_COUNT } from '../../../public/utils/budget-recurrence.js';
@@ -889,9 +890,62 @@ export function toBudgetAmount(amount, loan) {
   return cents(Number(amount || 0) * loanRate(loan));
 }
 
-/** Gegenrichtung zu toBudgetAmount: Budget-Betrag zurück in die Darlehenswährung (#582). */
-export function fromBudgetAmount(amount, loan) {
-  return cents(Number(amount || 0) / loanRate(loan));
+/**
+ * Kurs von der Darlehenswaehrung in die Waehrung der Buchung einer Rate
+ * (#2302): eine Buchung steht in der Waehrung ihres Kontos, ohne Konto in der
+ * Budget-Waehrung. Traegt das Konto die Darlehenswaehrung, bucht die Rate
+ * ohne Umrechnung; traegt es die Budget-Waehrung, gilt der feste Kurs des
+ * Darlehens (#582). Eine dritte Waehrung geht ueber den festen Kurs bis zur
+ * Budget-Waehrung und von dort ueber den Kurs-Cache - null, wenn der keinen
+ * kennt: dann gibt es keine richtige Zahl, und der Aufrufer lehnt ab.
+ */
+export function loanEntryRate(loan, accountId, { bookedRate = null } = {}) {
+  const base = budgetCurrency();
+  const target = accountId != null ? budgetAccountCurrency(accountId) : base;
+  if (target === (loan?.currency || base)) return 1;
+  if (target === base) return loanRate(loan);
+  // Eine schon gebuchte Rate behaelt ihren Kurs: der Cache aendert sich, die
+  // Buchung nicht (Codex zu #2302).
+  if (bookedRate > 0 && Number.isFinite(bookedRate)) return bookedRate;
+  const onward = cachedRate(base, target);
+  return onward == null ? null : loanRate(loan) * onward;
+}
+
+/**
+ * Das Nettovermoegen der aktiven Konten (#2302). Jedes Konto fuehrt seinen
+ * Saldo in seiner Waehrung; eine Rohsumme ueber Dollar und Euro waere eine
+ * falsche Zahl. Stehen alle in der Budget-Waehrung, bleibt es die Summe. Sonst
+ * rechnet der Kurs-Cache in die Budget-Waehrung um, und die Antwort sagt, dass
+ * es eine Naeherung ist und von wann ihr aeltester Kurs stammt. Fehlt ein Kurs,
+ * ist `net_worth` null, und `net_worth_by_currency` traegt die Summe je Waehrung -
+ * keine Zahl ist besser als eine falsche.
+ */
+export function netWorthSummary(accounts) {
+  const base = budgetCurrency();
+  const totals = new Map();
+  for (const a of accounts) {
+    if (a.archived) continue;
+    const currency = a.currency || base;
+    totals.set(currency, (totals.get(currency) ?? 0) + Number(a.current_balance || 0));
+  }
+  // Jede Teilsumme in den Stellen IHRER Waehrung (KWD drei, JPY keine) -
+  // gerundet wird erst die umgerechnete Summe (Codex zu #2335).
+  const inDigits = (amount, currency) => {
+    const f = 10 ** accountFractionDigits(currency);
+    return Math.round(amount * f) / f;
+  };
+  const byCurrency = [...totals].map(([currency, amount]) => ({ currency, amount: inDigits(amount, currency) }))
+    .sort((x, y) => (x.currency === base ? -1 : y.currency === base ? 1 : x.currency.localeCompare(y.currency)));
+  if (byCurrency.every((p) => p.currency === base)) return { net_worth: byCurrency[0]?.amount ?? 0 };
+  let sum = 0;
+  let ratesAt = null;
+  for (const part of byCurrency) {
+    const info = cachedRateInfo(part.currency, base);
+    if (!info) return { net_worth: null, net_worth_by_currency: byCurrency };
+    sum += part.amount * info.rate;
+    if (info.fetchedAt && (!ratesAt || info.fetchedAt < ratesAt)) ratesAt = info.fetchedAt;
+  }
+  return { net_worth: cents(sum), net_worth_approx: true, net_worth_rates_at: ratesAt, net_worth_by_currency: byCurrency };
 }
 
 // --------------------------------------------------------

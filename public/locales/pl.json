@@ -1360,7 +1360,6 @@
         "pickOne": "Wybierz wydarzenie",
         "pickOneHint": "Tutaj pojawią się godzina, miejsce i przypomnienia.",
         "syncTargetAssigneeAmbiguous": "Kilka kalendarzy ma tę osobę jako domyślne przypisanie. Wybierz cel samodzielnie.",
-        "syncTargetSeveralAssignees": "Przypisano kilka osób, więc przypisanie nie wybiera kalendarza. Zamiast tego obowiązuje: {{target}}.",
         "filtersSources": "Kalendarze",
         "filterUnassigned": "Nieprzypisane",
         "dateSpanSpoken": "od {{from}} do {{to}}",
@@ -1403,7 +1402,10 @@
         "errorDeleteFeedAdminOnly": "Ten kalendarz jest eksportowany. Usunąć go może tylko administrator.",
         "errorEventGone": "To wydarzenie już nie istnieje.",
         "errorSelectedCalendarGone": "Wybrany kalendarz już nie istnieje.",
-        "errorSeriesNoOccurrence": "Przy tym powtarzaniu od daty rozpoczęcia nie byłoby ani jednego wydarzenia."
+        "errorSeriesNoOccurrence": "Przy tym powtarzaniu od daty rozpoczęcia nie byłoby ani jednego wydarzenia.",
+        "localCalendarUploadsHint": "Wydarzenia z tego kalendarza są przesyłane do iCloud przez Apple Calendar.",
+        "overlapOpenSchedule": "Otwórz grafik",
+        "syncTargetNoCalendarForPeople": "Żaden kalendarz nie ma dokładnie tych osób jako domyślnego przypisania, więc przypisanie nie wybiera kalendarza. Zamiast tego: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategorie",
@@ -1476,7 +1478,11 @@
         "checklistDone": "Zrobione",
         "checklistOpen": "Otwarte",
         "errorNoteGone": "Ta notatka już nie istnieje.",
-        "errorSelectedCategoryGone": "Jedna z wybranych kategorii już nie istnieje."
+        "errorSelectedCategoryGone": "Jedna z wybranych kategorii już nie istnieje.",
+        "lockedToggle": "Zablokuj edycję",
+        "lockedBadge": "Zablokowana",
+        "lockedHint": "Tylko ty i administratorzy możecie zmieniać, przypinać lub usuwać tę notatkę - również odhaczać pozycje jej listy. Pozostali nadal mogą ją czytać.",
+        "errorLocked": "Ta notatka jest zablokowana. Zmienić ją może tylko osoba, która ją utworzyła, i administratorzy."
     },
     "markdown": {
         "bold": "Pogrubienie (Ctrl+B)",
@@ -1956,6 +1962,8 @@
         "planSavingsDeleteConfirm": "Usunąć cel oszczędności?",
         "accountsTab": "Konta",
         "netWorth": "Wartość netto",
+        "netWorthApproxNote": "Przeliczono po kursach z {{date}}",
+        "netWorthPerCurrencyNote": "Bez kursu wymiany - suma dla każdej waluty",
         "addAccount": "Dodaj konto",
         "accountsEmptyTitle": "Brak kont",
         "accountsEmptyDescription": "Dodaj konta, np. osobiste lub oszczędnościowe, aby śledzić salda.",
@@ -2051,6 +2059,7 @@
         "saveFailed": "Nie udało się zapisać. Sprawdź wprowadzone dane.",
         "loanAlreadyPaid": "Ta pożyczka jest już w całości spłacona.",
         "loanInstallmentAlreadyPaid": "Ta rata jest już zapłacona.",
+        "loanPaymentRateUnavailable": "Kurs wymiany dla waluty konta jest nieznany. Wybierz inne konto dla pożyczki albo żadne.",
         "amountExceedsLoanRemaining": "Kwota jest wyższa niż pozostała część pożyczki",
         "responsibleNotMember": "Odpowiedzialni mogą być tylko członkowie gospodarstwa domowego.",
         "seriesStartTooEarly": "Dzień rozpoczęcia nie może przypadać w miesiącu przed pierwszym wpisem serii",
@@ -2627,7 +2636,10 @@
             "errorNoCalendarName": "Podaj nazwę nowego kalendarza.",
             "dropzoneTitle": "Przeciągnij tu plik ICS lub wybierz go",
             "dropzoneTitleTouch": "Dotknij, aby wybrać plik ICS",
-            "dropzoneHint": "Tylko pliki .ics"
+            "dropzoneHint": "Tylko pliki .ics",
+            "assigneesLabel": "Przypisz do",
+            "assigneesHint": "Nowe wydarzenia dostają te osoby. Wydarzenie już zaimportowane z tym samym ID dostaje je dodatkowo - nawet jeśli jego przypisanie usunięto ręcznie.",
+            "successWithAssigned": "Zaimportowano: {{imported}}, już istniało: {{skipped}}, z tego teraz przypisano: {{assigned}}."
         },
         "memberPhoneLabel": "Numer telefonu (opcjonalnie)",
         "memberEmailLabel": "E-mail (opcjonalnie)",
@@ -3276,10 +3288,7 @@
         "notificationChannelDeleteConfirmDetail": "Tym kanałem nie wyjdzie już żadne powiadomienie, nawet pilne. Adres i dane logowania trzeba będzie wprowadzić od nowa dla kolejnego kanału.",
         "apiTokensMcpHint": "Te tokeny działają również jako tokeny Bearer dla punktu końcowego MCP pod adresem /mcp (np. w Claude Desktop, aby tworzyć zadania, produkty na liście zakupów i wydarzenia za pomocą AI).",
         "sync": {
-            "defaultAssignee": "Domyślne przypisanie",
             "defaultAssigneeNone": "Brak",
-            "defaultAssigneeHint": "Nowo zsynchronizowane wydarzenia są automatycznie przypisywane do tej osoby.",
-            "defaultAssigneeRoutingHint": "Domyślne przypisanie: wydarzenia z kalendarza otrzymują wybraną tam osobę, a nowe wydarzenie przypisane tylko tej osobie jest tworzone w tym kalendarzu. Dotyczy kalendarzy Google i CalDAV, nie Apple ani Outlook.",
             "backfillTitle": "Uzupełnij przypisania",
             "backfillDescription": "Domyślne przypisanie dotyczy tylko terminów pobranych po jego ustawieniu. Tutaj możesz jednorazowo zastosować je do terminów już pobranych ze wszystkich kont.",
             "backfillAction": "Zastosuj do istniejących terminów",
@@ -3305,7 +3314,10 @@
             "backfillMovedNext": "Pokaż następne",
             "backfillMovedAll": "Zaznacz wszystkie",
             "backfillMovedChange": "Z {{from}} na {{to}}",
-            "backfillDescriptionMore": "Terminy bez przypisania otrzymują je od razu. Terminy, które wciąż mają domyślne przypisanie innego kalendarza, są pokazane pojedynczo do wyboru. Każde inne przypisanie pozostaje bez zmian."
+            "backfillDescriptionMore": "Terminy bez przypisania otrzymują je od razu. Terminy, które wciąż mają domyślne przypisanie innego kalendarza, są pokazane pojedynczo do wyboru. Każde inne przypisanie pozostaje bez zmian.",
+            "defaultAssignees": "Domyślne przypisanie",
+            "defaultAssigneesHint": "Nowo zsynchronizowane wydarzenia są automatycznie przypisywane tym osobom. Pierwsza określa kolor.",
+            "defaultAssigneesRoutingHint": "Domyślne przypisanie: wydarzenia z kalendarza dostają wybrane tam osoby, a nowe wydarzenie przypisane dokładnie tym osobom powstaje w tym kalendarzu. Dotyczy kalendarzy Google i CalDAV, nie Apple ani Outlook."
         },
         "calendarAssignMeLabel": "Przypisuj nowe wydarzenia do mnie",
         "calendarDefaultRemindersLabel": "Domyślne przypomnienia",
@@ -3528,6 +3540,8 @@
         "displayDeleteConfirm": "Usunąć „{{name}}”?",
         "displayPairingCodeLabel": "Kod parowania",
         "displayPairingCodeHint": "Ważny 15 minut i działa dokładnie raz. Otwórz na tablecie /pair i wpisz go tam. Jest pokazywany tylko teraz.",
+        "displayPairStepCode": "Dodaj tutaj tablet ścienny i wygeneruj kod parowania.",
+        "displayPairStepOpen": "Otwórz na tablecie ten adres i wpisz tam kod:",
         "displayDeviceUnnamed": "Urządzenie bez nazwy",
         "displayDeviceLastSeen": "Ostatnio widziane: {{when}}",
         "displayDeviceNeverSeen": "Nigdy nie połączono",
@@ -3638,7 +3652,20 @@
         "permChildRoleHint": "Nowe konta dzieci dostają przy tworzeniu także własne uprawnienia początkowe: {{list}}. Potem widnieją przy danym członku.",
         "activeModulesHintMore": "Aby ukryć moduł tylko u siebie, wejdź w Moduły → Nawigacja.",
         "permIntroMore": "Poszczególni członkowie mogą różnić się od domyślnych ustawień roli. Bez ustawienia każda rola ma pełny dostęp; administratorzy zawsze.",
-        "preferenceSaveFailed": "Nie udało się zapisać ustawienia."
+        "preferenceSaveFailed": "Nie udało się zapisać ustawienia.",
+        "caldavCalendarReadOnly": "Tylko do odczytu: nie można tu zapisać nowych wydarzeń",
+        "caldavCalendarReadOnlyWaiting_one": "Tylko do odczytu: {{count}} wydarzenie czekające na przesłanie tutaj nie dotrze",
+        "caldavCalendarReadOnlyWaiting": "Tylko do odczytu: {{count}} wydarzenia czekającego na przesłanie tutaj nie dotrze",
+        "reminderListReadOnly": "Tylko do odczytu: nie można tu zapisać nowych wpisów",
+        "reminderListReadOnlyWaiting_one": "Tylko do odczytu: {{count}} wpis czekający na przesłanie tutaj nie dotrze",
+        "reminderListReadOnlyWaiting": "Tylko do odczytu: {{count}} wpisu czekającego na przesłanie tutaj nie dotrze",
+        "caldavCalendarReadOnlyWaiting_few": "Tylko do odczytu: {{count}} wydarzenia czekające na przesłanie tutaj nie dotrą",
+        "caldavCalendarReadOnlyWaiting_many": "Tylko do odczytu: {{count}} wydarzeń czekających na przesłanie tutaj nie dotrze",
+        "reminderListReadOnlyWaiting_few": "Tylko do odczytu: {{count}} wpisy czekające na przesłanie tutaj nie dotrą",
+        "reminderListReadOnlyWaiting_many": "Tylko do odczytu: {{count}} wpisów czekających na przesłanie tutaj nie dotrze",
+        "reminderListAssigneesTasksOnly": "Osoby można ustawić tylko dla list trafiających do Zadań.",
+        "syncAssigneeNotMember": "Tutaj można wybrać tylko członków gospodarstwa domowego.",
+        "syncAssigneeUnknown": "Ta osoba już nie istnieje. Odśwież stronę."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",
@@ -3959,7 +3986,8 @@
         "banner": "Offline - przywracanie połączenia…",
         "staleData": "Offline - stan z: {{time}}",
         "pageTitle": "Jesteś offline",
-        "pageDescription": "Ta strona wymaga połączenia. Gdy tylko urządzenie znów będzie online, załaduje się sama."
+        "pageDescription": "Ta strona wymaga połączenia. Gdy tylko urządzenie znów będzie online, załaduje się sama.",
+        "snapshot": "Brak połączenia z serwerem - zapisane dane, tylko do odczytu"
     },
     "emptyHint": {
         "tasks": "Stuknij +, aby utworzyć pierwsze zadanie. Przesuń kartę w lewo, aby oznaczyć jako ukończone, w prawo, aby wyświetlić.",
@@ -4606,6 +4634,13 @@
             "missedDetail_one": "Od {{date}} pominięto {{count}} termin.",
             "missedDetail_few": "Od {{date}} pominięto {{count}} terminy.",
             "missedDetail_many": "Od {{date}} pominięto {{count}} terminów.",
+            "failing": "Księgowanie nie powiodło się - ponowna próba co godzinę",
+            "pastQuestion": "Data jest w przeszłości",
+            "pastSkip": "Zacznij od {{date}}",
+            "pastDetail": "Od {{date}} przypadłoby {{count}} terminu.",
+            "pastDetail_one": "Od {{date}} przypadłby {{count}} termin.",
+            "pastDetail_few": "Od {{date}} przypadłyby {{count}} terminy.",
+            "pastDetail_many": "Od {{date}} przypadłoby {{count}} terminów.",
             "deleteConfirm": "Usunąć ten cykliczny wydatek?",
             "deleteConfirmDetail": "Nowe wydatki nie będą już tworzone. Zaksięgowane wydatki pozostaną.",
             "show": "Pokaż",
@@ -4696,7 +4731,14 @@
         "debtOwesYou": "{{name}} ma ci oddać",
         "debtOwes": "{{from}} jest winien {{to}}",
         "balanced": "Rozliczone",
-        "balancedInGroup": "{{group}}: Rozliczone"
+        "balancedInGroup": "{{group}}: Rozliczone",
+        "totalsByMember": "Zapłacono według osób",
+        "totalsByMemberHint": "Ile kto wyłożył, pod spodem jego własny udział",
+        "ownShare": "Własny udział: {{amount}}",
+        "paidLabel": "Zapłacono",
+        "totalsByCategory": "Według kategorii",
+        "categoryFilter": "Filtruj wydatki według kategorii",
+        "noExpensesInCategory": "Brak wydatków w tej kategorii."
     },
     "wmo": {
         "0": "Bezchmurnie",
@@ -5046,7 +5088,14 @@
         "detailAmountLabel": "Kwota",
         "detailNextPaymentLabel": "Następna płatność",
         "renewedNamed": "„{{name}}” opłacone - następna płatność {{date}}.",
-        "completedNamed": "„{{name}}” opłacone i zakończone."
+        "completedNamed": "„{{name}}” opłacone i zakończone.",
+        "accountHint": "Każda płatność tej subskrypcji trafia na to konto. Pojedynczą płatność zmienisz w budżecie.",
+        "accountArchivedHint": "To konto jest zarchiwizowane. Subskrypcja księguje bez konta, dopóki nie wybierzesz innego.",
+        "accountArchivedOption": "{{name}} (zarchiwizowane)",
+        "accountArchivedMeta": "{{name}} zarchiwizowane - księguje bez konta",
+        "visibilityHint_private": "Tylko Ty widzisz tę subskrypcję i jej płatności.",
+        "visibilityHint_shared": "Całe gospodarstwo widzi tę subskrypcję i jej płatności.",
+        "errorAccountGone": "Wybrane konto już nie istnieje."
     },
     "health": {
         "fasting": {
@@ -5220,6 +5269,7 @@
             "saveError": "Nie udało się zapisać pomiaru.",
             "invalidValue": "Wprowadź prawidłowe wartości.",
             "range": {
+                "day": "Dzień",
                 "week": "Tydzień",
                 "month": "Miesiąc",
                 "year": "Rok"
@@ -5259,6 +5309,7 @@
                 "family": "Rodzina"
             },
             "sparse": "Za mało pomiarów, aby pokazać trend.",
+            "bandValue": "{{mean}}, od {{low}} do {{high}}",
             "recentMeasurements": "Ostatnie pomiary",
             "deleteMeasurement": "Usuń pomiar {{value}} z {{date}}",
             "measurementDeleted": "Pomiar usunięty",
@@ -6169,8 +6220,9 @@
         "importDiagnosticDuplicateInstance_few": "{{count}} zduplikowane terminy odbioru (ta sama tożsamość) scalono w jeden.",
         "importDiagnosticDuplicateInstance_many": "{{count}} zduplikowanych terminów odbioru (ta sama tożsamość) scalono w jeden.",
         "importUnresolvedBlockingError": "Najpierw rozwiąż wszystkie blokujące ostrzeżenia albo jawnie pomiń odpowiednie wydarzenia.",
-        "importIgnoreLabel": "Ignoruj",
         "importCreateNewType": "Utwórz nowy rodzaj odpadów",
+        "importLabelsHint": "Jeśli wpis wymienia kilka pojemników, wybierz wszystkie - każdy dostanie własny odbiór.",
+        "importLabelIgnoredHint": "Nie wybrano rodzaju odpadów - nie zostanie zaimportowane.",
         "importNewTypeNameRequiredError": "Wpisz nazwę nowego rodzaju odpadów.",
         "importDefaultSourceName": "Zaimportowany plik",
         "importCommittedToast": "Import zastosowany: dodano {{added}}, zmieniono {{changed}}, usunięto {{removed}}.",
@@ -6485,6 +6537,17 @@
         "badgeLow": "Prawie wyczerpane",
         "badgeOut": "Brak",
         "bestBefore": "Data {{date}}",
+        "noBestBefore": "Bez daty ważności",
+        "errorProductHasStock": "Ten produkt jest znowu w zapasie i nie został usunięty.",
+        "productTotal": "{{quantity}} łącznie",
+        "productPlaces": "{{count}} miejsca",
+        "productPlaces_one": "{{count}} miejsce",
+        "productPlaces_few": "{{count}} miejsca",
+        "productPlaces_many": "{{count}} miejsc",
+        "productBatches": "{{count}} partii",
+        "productBatches_one": "{{count}} partia",
+        "productBatches_few": "{{count}} partie",
+        "productBatches_many": "{{count}} partii",
         "increase": "Zwiększ ilość",
         "decrease": "Zmniejsz ilość",
         "toShoppingAll": "Wszystko na listę zakupów",

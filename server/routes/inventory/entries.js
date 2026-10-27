@@ -21,7 +21,7 @@ const router = express.Router();
 // --------------------------------------------------------
 router.get('/:entryId/items', (req, res) => {
   try {
-    const vEntryId = idParam(req.params.entryId, 'Buchung-ID');
+    const vEntryId = idParam(req.params.entryId, 'entryId');
     if (vEntryId.error) return res.status(400).json({ error: vEntryId.error, code: 400 });
     const entry = visibleEntry(vEntryId.value, budgetViewer(req));
     if (!entry) return res.status(404).json({ error: 'Booking not found.', code: 404 });

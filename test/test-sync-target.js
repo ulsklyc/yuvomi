@@ -194,3 +194,35 @@ test('#1060: nennen zwei Kalender dieselbe Person, wird nicht geraten', () => {
   };
   assert.deepEqual(assigneeSyncTarget(doppelt, [3]), { value: null, ambiguous: true, severalAssignees: false });
 });
+
+// --------------------------------------------------------
+// #1897: ein Kalender nennt eine Menge von Personen
+// --------------------------------------------------------
+
+const MENGEN = {
+  google: [
+    { id: 'zusammen@group.calendar.google.com', summary: 'Zusammen', defaultAssigneeUserIds: [3, 4], defaultAssigneeUserId: null },
+    { id: 'emma@group.calendar.google.com', summary: 'Emma', defaultAssigneeUserIds: [3], defaultAssigneeUserId: 3 },
+  ],
+  caldav: [
+    { accountId: 4, accountName: 'Nextcloud', calendarUrl: 'https://dav.example.org/cal/leo/', calendarName: 'Leo', defaultAssigneeUserIds: [4], defaultAssigneeUserId: 4 },
+  ],
+};
+
+test('#1897: genau die Personen eines Kalenders - das ist sein Ziel, in jeder Reihenfolge', () => {
+  assert.deepEqual(assigneeSyncTarget(MENGEN, [3, 4]), { value: 'google:zusammen@group.calendar.google.com', ambiguous: false, severalAssignees: false });
+  assert.deepEqual(assigneeSyncTarget(MENGEN, ['4', 3]), { value: 'google:zusammen@group.calendar.google.com', ambiguous: false, severalAssignees: false });
+  assert.deepEqual(assigneeSyncTarget(MENGEN, [3]), { value: 'google:emma@group.calendar.google.com', ambiguous: false, severalAssignees: false },
+    'eine Person allein geht in ihren eigenen Kalender, nicht in den gemeinsamen');
+});
+
+test('#1897: eine Teilmenge oder Obermenge ist kein Treffer', () => {
+  assert.deepEqual(assigneeSyncTarget(MENGEN, [3, 4, 2]), { value: null, ambiguous: false, severalAssignees: true });
+  assert.deepEqual(assigneeSyncTarget({ google: [MENGEN.google[0]] }, [3]), KEIN_ZIEL,
+    'Emma allein ist nicht "Zusammen"');
+});
+
+test('#1897: zwei Kalender mit derselben Menge - es wird nicht geraten', () => {
+  const doppelt = { google: [...MENGEN.google, { id: 'z2', summary: 'Auch zusammen', defaultAssigneeUserIds: [4, 3] }] };
+  assert.deepEqual(assigneeSyncTarget(doppelt, [3, 4]), { value: null, ambiguous: true, severalAssignees: false });
+});

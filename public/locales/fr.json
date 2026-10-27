@@ -1190,7 +1190,6 @@
         "pickOne": "Choisissez un événement",
         "pickOneHint": "L’heure, le lieu et les rappels apparaissent ici.",
         "syncTargetAssigneeAmbiguous": "Plusieurs calendriers ont cette personne comme attribution par défaut. Choisis toi-même la destination.",
-        "syncTargetSeveralAssignees": "Plusieurs personnes sont assignées, l'attribution ne choisit donc aucun calendrier. Utilisé à la place : {{target}}.",
         "filtersSources": "Calendriers",
         "filterUnassigned": "Non attribués",
         "dateSpanSpoken": "du {{from}} au {{to}}",
@@ -1229,7 +1228,10 @@
         "errorDeleteFeedAdminOnly": "Ce calendrier est exporté. Seul un administrateur peut le supprimer.",
         "errorEventGone": "Cet événement n’existe plus.",
         "errorSelectedCalendarGone": "Le calendrier choisi n’existe plus.",
-        "errorSeriesNoOccurrence": "Avec cette répétition, il n’y aurait aucun événement à partir de la date de début."
+        "errorSeriesNoOccurrence": "Avec cette répétition, il n’y aurait aucun événement à partir de la date de début.",
+        "localCalendarUploadsHint": "Les événements de cet agenda sont envoyés vers iCloud via Apple Calendar.",
+        "overlapOpenSchedule": "Ouvrir le planning",
+        "syncTargetNoCalendarForPeople": "Aucun calendrier n’a exactement ces personnes comme attribution par défaut, l’attribution n’en choisit donc aucun. Utilisé à la place : {{target}}."
     },
     "noteCategories": {
         "categories": "Catégories",
@@ -1300,7 +1302,11 @@
         "checklistDone": "Terminé",
         "checklistOpen": "Ouvert",
         "errorNoteGone": "Cette note n’existe plus.",
-        "errorSelectedCategoryGone": "Une catégorie choisie n’existe plus."
+        "errorSelectedCategoryGone": "Une catégorie choisie n’existe plus.",
+        "lockedToggle": "Verrouiller la modification",
+        "lockedBadge": "Verrouillée",
+        "lockedHint": "Seuls vous et les administrateurs pouvez modifier, épingler ou supprimer cette note, y compris cocher les éléments de sa liste. Les autres peuvent toujours la lire.",
+        "errorLocked": "Cette note est verrouillée. Seuls la personne qui l'a créée et les administrateurs peuvent la modifier."
     },
     "markdown": {
         "bold": "Gras (Ctrl+B)",
@@ -1772,6 +1778,8 @@
         "planSavingsDeleteConfirm": "Supprimer l’objectif d’épargne ?",
         "accountsTab": "Comptes",
         "netWorth": "Patrimoine net",
+        "netWorthApproxNote": "Converti aux taux du {{date}}",
+        "netWorthPerCurrencyNote": "Sans taux de change - total par devise",
         "addAccount": "Ajouter un compte",
         "accountsEmptyTitle": "Aucun compte pour l’instant",
         "accountsEmptyDescription": "Ajoutez des comptes comme un compte courant ou d’épargne pour suivre vos soldes.",
@@ -1865,6 +1873,7 @@
         "saveFailed": "L’enregistrement a échoué. Veuillez vérifier les informations saisies.",
         "loanAlreadyPaid": "Ce prêt est déjà entièrement remboursé.",
         "loanInstallmentAlreadyPaid": "Cette échéance est déjà payée.",
+        "loanPaymentRateUnavailable": "Aucun taux de change n'est connu pour la devise du compte. Choisissez un autre compte pour le prêt, ou aucun.",
         "amountExceedsLoanRemaining": "Le montant dépasse ce qu’il reste du prêt",
         "responsibleNotMember": "Seuls les membres du foyer peuvent être responsables.",
         "seriesStartTooEarly": "Le jour de début ne peut pas se situer dans un mois antérieur à la première écriture de la série",
@@ -2291,7 +2300,10 @@
             "errorNoCalendarName": "Saisis un nom pour le nouveau calendrier.",
             "dropzoneTitle": "Déposez un fichier ICS ici ou choisissez-en un",
             "dropzoneTitleTouch": "Touchez pour choisir un fichier ICS",
-            "dropzoneHint": "Fichiers .ics uniquement"
+            "dropzoneHint": "Fichiers .ics uniquement",
+            "assigneesLabel": "Attribuer à",
+            "assigneesHint": "Les nouveaux événements reçoivent ces personnes. Un événement déjà importé avec le même identifiant les reçoit en plus - même si son attribution a été retirée à la main.",
+            "successWithAssigned": "Importés : {{imported}}, déjà présents : {{skipped}}, dont attribués maintenant : {{assigned}}."
         },
         "memberPhoneLabel": "Numéro de téléphone (facultatif)",
         "memberEmailLabel": "E-mail (facultatif)",
@@ -3060,10 +3072,7 @@
         "notificationChannelDeleteConfirmDetail": "Plus aucune notification ne partira par ce canal, pas même les urgentes. Adresse et identifiants devront être ressaisis intégralement pour un nouveau canal.",
         "apiTokensMcpHint": "Ces jetons fonctionnent aussi comme jetons Bearer pour le point de terminaison MCP sur /mcp (p. ex. dans Claude Desktop, pour créer des tâches, des articles de courses et des événements via l'IA).",
         "sync": {
-            "defaultAssignee": "Attribution par défaut",
             "defaultAssigneeNone": "Aucune",
-            "defaultAssigneeHint": "Les événements nouvellement synchronisés sont automatiquement attribués à cette personne.",
-            "defaultAssigneeRoutingHint": "Attribution par défaut: les événements d'un calendrier reçoivent la personne choisie pour lui, et un nouvel événement attribué uniquement à cette personne est créé dans ce calendrier. Cela vaut pour les calendriers Google et CalDAV, pas pour Apple ni Outlook.",
             "backfillTitle": "Compléter les attributions",
             "backfillDescription": "L’attribution par défaut ne s’applique qu’aux rendez-vous importés après sa définition. Ici, vous pouvez l’appliquer une fois aux rendez-vous déjà importés de tous les comptes.",
             "backfillAction": "Appliquer aux rendez-vous existants",
@@ -3083,7 +3092,10 @@
             "backfillMovedNext": "Afficher les suivants",
             "backfillMovedAll": "Tout sélectionner",
             "backfillMovedChange": "De {{from}} à {{to}}",
-            "backfillDescriptionMore": "Les rendez-vous sans attribution la reçoivent directement. Les rendez-vous qui portent encore l’attribution par défaut d’un autre calendrier sont proposés un par un. Toute autre attribution reste inchangée."
+            "backfillDescriptionMore": "Les rendez-vous sans attribution la reçoivent directement. Les rendez-vous qui portent encore l’attribution par défaut d’un autre calendrier sont proposés un par un. Toute autre attribution reste inchangée.",
+            "defaultAssignees": "Attribution par défaut",
+            "defaultAssigneesHint": "Les événements nouvellement synchronisés sont attribués automatiquement à ces personnes. La première définit la couleur.",
+            "defaultAssigneesRoutingHint": "Attribution par défaut : les événements d’un calendrier reçoivent les personnes choisies pour lui, et un nouvel événement attribué exactement à ces personnes est créé dans ce calendrier. Cela vaut pour les calendriers Google et CalDAV, pas pour Apple ni Outlook."
         },
         "calendarAssignMeLabel": "M'attribuer les nouveaux événements",
         "calendarDefaultRemindersLabel": "Rappels par défaut",
@@ -3302,6 +3314,8 @@
         "displayDeleteConfirm": "Supprimer « {{name}} » ?",
         "displayPairingCodeLabel": "Code d'appairage",
         "displayPairingCodeHint": "Valable 15 minutes et utilisable une seule fois. Ouvrez /pair sur la tablette et saisissez-le. Il n'est affiché que maintenant.",
+        "displayPairStepCode": "Ajoutez ici une tablette murale et générez un code d'appairage.",
+        "displayPairStepOpen": "Sur la tablette, ouvrez cette adresse et saisissez-y le code :",
         "displayDeviceUnnamed": "Appareil sans nom",
         "displayDeviceLastSeen": "Vu pour la dernière fois : {{when}}",
         "displayDeviceNeverSeen": "Jamais connecté",
@@ -3406,7 +3420,16 @@
         "permChildRoleHint": "Les nouveaux comptes enfant reçoivent aussi, à leur création, leurs propres droits de départ : {{list}}. Ils figurent ensuite chez le membre concerné.",
         "activeModulesHintMore": "Pour masquer un module seulement pour toi, va dans Modules → Navigation.",
         "permIntroMore": "Chaque membre peut s'écarter de la valeur par défaut du rôle. Sans réglage, chaque rôle a un accès complet ; les administrateurs toujours.",
-        "preferenceSaveFailed": "Le réglage n’a pas pu être enregistré."
+        "preferenceSaveFailed": "Le réglage n’a pas pu être enregistré.",
+        "caldavCalendarReadOnly": "Lecture seule : impossible d’enregistrer de nouveaux événements ici",
+        "caldavCalendarReadOnlyWaiting_one": "Lecture seule : {{count}} événement en attente d’envoi ici n’arrivera pas",
+        "caldavCalendarReadOnlyWaiting": "Lecture seule : {{count}} événements en attente d’envoi ici n’arriveront pas",
+        "reminderListReadOnly": "Lecture seule : impossible d’enregistrer de nouvelles entrées ici",
+        "reminderListReadOnlyWaiting_one": "Lecture seule : {{count}} entrée en attente d’envoi ici n’arrivera pas",
+        "reminderListReadOnlyWaiting": "Lecture seule : {{count}} entrées en attente d’envoi ici n’arriveront pas",
+        "reminderListAssigneesTasksOnly": "Les personnes ne se définissent que pour les listes qui vont dans les Tâches.",
+        "syncAssigneeNotMember": "Seuls les membres du foyer peuvent être choisis ici.",
+        "syncAssigneeUnknown": "Cette personne n’existe plus. Rechargez la page."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",
@@ -3739,7 +3762,8 @@
         "banner": "Hors ligne - reconnexion…",
         "staleData": "Hors ligne - état : {{time}}",
         "pageTitle": "Tu es hors ligne",
-        "pageDescription": "Cette page a besoin d’une connexion. Dès que ton appareil est de nouveau en ligne, elle se charge toute seule."
+        "pageDescription": "Cette page a besoin d’une connexion. Dès que ton appareil est de nouveau en ligne, elle se charge toute seule.",
+        "snapshot": "Pas de connexion au serveur - données enregistrées, lecture seule"
     },
     "emptyHint": {
         "recipes": "Une recette va directement au plan de repas ou sur la liste de courses.",
@@ -4366,6 +4390,11 @@
             "missedBook": "Rattraper depuis le {{date}}",
             "missedDetail": "{{count}} échéances ont été manquées depuis le {{date}}.",
             "missedDetail_one": "{{count}} échéance a été manquée depuis le {{date}}.",
+            "failing": "Échec de l’enregistrement - nouvel essai toutes les heures",
+            "pastQuestion": "La date est dans le passé",
+            "pastSkip": "Commencer le {{date}}",
+            "pastDetail": "{{count}} échéances seraient tombées depuis le {{date}}.",
+            "pastDetail_one": "{{count}} échéance serait tombée depuis le {{date}}.",
             "deleteConfirm": "Supprimer cette dépense récurrente ?",
             "deleteConfirmDetail": "Aucune nouvelle dépense ne sera créée. Les dépenses déjà enregistrées sont conservées.",
             "show": "Afficher",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}} vous doit",
         "debtOwes": "{{from}} doit à {{to}}",
         "balanced": "Réglé",
-        "balancedInGroup": "{{group}} : Réglé"
+        "balancedInGroup": "{{group}} : Réglé",
+        "totalsByMember": "Payé par personne",
+        "totalsByMemberHint": "Montant avancé, avec la part de chacun en dessous",
+        "ownShare": "Part personnelle : {{amount}}",
+        "paidLabel": "Payé",
+        "totalsByCategory": "Par catégorie",
+        "categoryFilter": "Filtrer les dépenses par catégorie",
+        "noExpensesInCategory": "Aucune dépense dans cette catégorie."
     },
     "wmo": {
         "0": "Ciel dégagé",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "Montant",
         "detailNextPaymentLabel": "Prochain paiement",
         "renewedNamed": "« {{name}} » payé - prochain paiement le {{date}}.",
-        "completedNamed": "« {{name}} » payé et terminé."
+        "completedNamed": "« {{name}} » payé et terminé.",
+        "accountHint": "Chaque paiement de cet abonnement est imputé sur ce compte. Un paiement isolé se modifie dans le budget.",
+        "accountArchivedHint": "Ce compte est archivé. L’abonnement est imputé sans compte jusqu’à ce que vous en choisissiez un autre.",
+        "accountArchivedOption": "{{name}} (archivé)",
+        "accountArchivedMeta": "{{name}} archivé - imputé sans compte",
+        "visibilityHint_private": "Vous seul voyez cet abonnement et ses paiements.",
+        "visibilityHint_shared": "Tout le foyer voit cet abonnement et ses paiements.",
+        "errorAccountGone": "Le compte choisi n’existe plus."
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "Impossible d'enregistrer la mesure.",
             "invalidValue": "Veuillez saisir des valeurs valides.",
             "range": {
+                "day": "Jour",
                 "week": "Semaine",
                 "month": "Mois",
                 "year": "Année"
@@ -5003,6 +5047,7 @@
                 "family": "Famille"
             },
             "sparse": "Trop peu de mesures pour afficher une tendance.",
+            "bandValue": "{{mean}}, de {{low}} à {{high}}",
             "recentMeasurements": "Dernières mesures",
             "deleteMeasurement": "Supprimer la mesure {{value}} du {{date}}",
             "measurementDeleted": "Mesure supprimée",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "{{count}} occurrence de collecte en double (même identité) a été fusionnée en une seule.",
         "importDiagnosticOther": "Une entrée du calendrier ne correspond pas au format attendu.",
         "importUnresolvedBlockingError": "Résolvez d'abord chaque alerte bloquante, ou ignorez explicitement les événements concernés.",
-        "importIgnoreLabel": "Ignorer",
         "importCreateNewType": "Créer un nouveau type de déchet",
+        "importLabelsHint": "Si une entrée nomme plusieurs bacs, choisissez-les tous : chacun aura sa propre collecte.",
+        "importLabelIgnoredHint": "Aucun type de déchet choisi : cette entrée ne sera pas importée.",
         "importNewTypeNameRequiredError": "Veuillez saisir un nom pour le nouveau type de déchet.",
         "importDefaultSourceName": "Fichier importé",
         "importCommittedToast": "Import validé : {{added}} ajoutées, {{changed}} modifiées, {{removed}} supprimées.",
@@ -6198,6 +6244,13 @@
         "badgeLow": "Presque épuisé",
         "badgeOut": "Épuisé",
         "bestBefore": "DDM {{date}}",
+        "noBestBefore": "Sans DDM",
+        "errorProductHasStock": "Ce produit est de nouveau en stock et n'a pas été supprimé.",
+        "productTotal": "{{quantity}} au total",
+        "productPlaces": "{{count}} lieux",
+        "productPlaces_one": "{{count}} lieu",
+        "productBatches": "{{count}} lots",
+        "productBatches_one": "{{count}} lot",
         "increase": "Augmenter la quantité",
         "decrease": "Diminuer la quantité",
         "toShoppingAll": "Tout mettre sur la liste de courses",

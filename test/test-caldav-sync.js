@@ -42,12 +42,15 @@ describe('CalDAV Multi-Account Sync', () => {
         calendar_name   TEXT NOT NULL,
         calendar_color  TEXT,
         enabled         INTEGER NOT NULL DEFAULT 1,
+        writable        INTEGER,
         created_at      TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (account_id) REFERENCES caldav_accounts(id) ON DELETE CASCADE,
         UNIQUE(account_id, calendar_url)
       );
 
       CREATE TABLE calendar_events (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -74,6 +77,7 @@ describe('CalDAV Multi-Account Sync', () => {
         color       TEXT,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
 
       CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -174,6 +178,8 @@ describe('CalDAV Multi-Account Sync', () => {
     const db2 = new DatabaseSync(':memory:');
     db2.exec(`
       CREATE TABLE calendar_events (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -249,6 +255,8 @@ describe('pruneDeletedEvents (#508)', () => {
     // fragt der Prune nicht danach - so laeuft er fuer Apple.
     db.exec(`
       CREATE TABLE calendar_events (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id                   INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -426,7 +434,8 @@ describe('CalDAV sync yields to the event loop (#519)', () => {
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -434,7 +443,10 @@ describe('CalDAV sync yields to the event loop (#519)', () => {
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -602,14 +614,18 @@ describe('CalDAV: RECURRENCE-ID-Overrides killen die Serie nicht (#549)', () => 
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         source TEXT NOT NULL, external_id TEXT NOT NULL, name TEXT, color TEXT,
         default_assignee_user_id INTEGER, UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -716,8 +732,9 @@ describe('CalDAV: RECURRENCE-ID-Overrides killen die Serie nicht (#549)', () => 
       const ex = d.prepare(
         'SELECT exception_date FROM calendar_event_exceptions WHERE event_id = ? ORDER BY exception_date'
       ).all(master.id).map((r) => r.exception_date);
-      assert.ok(ex.includes('2026-07-21'), 'Original-Slot des Overrides ausgenommen');
-      assert.ok(ex.includes('2026-08-03'), 'EXDATE (Feiertag) übernommen');
+      // Seit #2034 Schritt 5 im Schluessel der Serie (Format A: Originalstart).
+      assert.ok(ex.includes('2026-07-21T08:00:00Z'), 'Original-Slot des Overrides ausgenommen');
+      assert.ok(ex.includes('2026-08-03T08:00:00Z'), 'EXDATE (Feiertag) übernommen');
     } finally {
       _resetTestDatabase();
       d.close();
@@ -805,7 +822,8 @@ describe('CalDAV: No-op-Syncs bleiben im Standard-Log-Level still', () => {
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -813,7 +831,10 @@ describe('CalDAV: No-op-Syncs bleiben im Standard-Log-Level still', () => {
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -1063,7 +1084,8 @@ describe('CalDAV: eine Bearbeitung friert die Farbe nicht mehr ein (#899)', () =
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1071,7 +1093,10 @@ describe('CalDAV: eine Bearbeitung friert die Farbe nicht mehr ein (#899)', () =
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -1268,7 +1293,8 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1276,7 +1302,10 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -2223,7 +2252,8 @@ describe('CalDAV: eine Aufgabenliste bleibt kein Terminziel (#617)', () => {
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2231,7 +2261,10 @@ describe('CalDAV: eine Aufgabenliste bleibt kein Terminziel (#617)', () => {
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -2402,7 +2435,8 @@ describe('CalDAV: die Kalenderauswahl überlebt das Aktualisieren (#732)', () =>
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2410,6 +2444,7 @@ describe('CalDAV: die Kalenderauswahl überlebt das Aktualisieren (#732)', () =>
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
 
       INSERT INTO caldav_accounts (name, caldav_url, username, password)
         VALUES ('Mailbox', 'https://dav.example/', 'u', 'p');
@@ -2510,7 +2545,8 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2518,7 +2554,10 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -2559,6 +2598,8 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
       -- detachAccountRows() entkoppelt die gespiegelten Aufgaben/Einkaufsposten
       -- und braucht dafuer deren volle Outbound-Spalten.
       CREATE TABLE tasks (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         external_source TEXT NOT NULL DEFAULT 'local', external_uid TEXT,
         external_account_id INTEGER, external_object_url TEXT,
@@ -2567,6 +2608,8 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
         target_caldav_account_id INTEGER, target_caldav_list_url TEXT
       );
       CREATE TABLE shopping_items (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         external_source TEXT NOT NULL DEFAULT 'local', external_uid TEXT,
         external_account_id INTEGER, external_object_url TEXT,
@@ -2738,14 +2781,18 @@ describe('CalDAV: neue Kalender sind opt-in (#732)', () => {
       CREATE TABLE caldav_calendar_selection (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER, calendar_url TEXT, calendar_name TEXT,
-        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1
+        calendar_color TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+        writable INTEGER
       );
       CREATE TABLE external_calendars (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         source TEXT NOT NULL, external_id TEXT NOT NULL, name TEXT, color TEXT,
         default_assignee_user_id INTEGER, UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab

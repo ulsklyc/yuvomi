@@ -3185,7 +3185,7 @@ const FAQ_CLAIMS = [
     },
     what: 'Read-only-Cache der fuenf Module (public/sw.js API_CACHE_WHITELIST)' },
   { where: 'long_a6', says: { en: /ticking something off while offline is refused with a note/, de: /Abhaken ohne Netz lehnt Yuvomi mit einem Hinweis ab/ },
-    holds: (s) => /err\?\.status === 0\) return 'common\.errorOfflineMutation'/.test(s.friendlyError),
+    holds: (s) => /err\?\.status === 0\) return 'common\.errorOfflineMutation'/.test(s.friendlyErrorModule),
     what: 'Offline-Hinweis bei Aenderungen (public/utils/friendly-error.js common.errorOfflineMutation)' },
   { where: 'long_a7', says: { en: /It is not a CalDAV server itself/, de: /Ein CalDAV-Server ist es selbst aber nicht/ },
     // `client.propfind(...)` in cardav-sync.js ist der ausgehende Abgleich und
@@ -3234,7 +3234,7 @@ function faqSources() {
   return {
     manifest: src('public/manifest.json'),
     sw: src('public/sw.js'),
-    friendlyError: src('public/utils/friendly-error.js'),
+    friendlyErrorModule: src('public/utils/friendly-error.js'),
     serverSources: serverSources(),
     caldavOutbound: has('server/services/caldav-outbound.js'),
     caldavReminders: src('server/services/caldav-reminders-sync.js'),

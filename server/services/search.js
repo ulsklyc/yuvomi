@@ -6,7 +6,7 @@
  * Abhaengigkeiten: server/services/visibility.js, document-access.js und
  *        budget-visibility.js (reine SQL-Bausteine, kein db.js)
  */
-import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
+import { icsSubscriptionVisibleWhere, noteVisibleWhere, visibilityWhere } from './visibility.js';
 import { documentVisibleSql } from './document-access.js';
 import { budgetDetailsVisibleWhere, resolveBudgetMode } from './budget-visibility.js';
 
@@ -482,6 +482,10 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     JOIN notes n ON n.id = s.entity_id
     WHERE s.entity = 'note' AND s.search_index MATCH @match
       AND n.created_by = @userId
+      -- Die Sichtbarkeitsregel (#1514) steht auch hier, obwohl die Suche heute
+      -- nur eigene Notizen findet: wer die engere Klausel loest, soll die
+      -- private Notiz eines anderen nicht mit freigeben.
+      AND ${noteVisibleWhere('n', '@userId')}
     ORDER BY n.pinned DESC, n.updated_at DESC
     LIMIT @limit
   `).all({ match, userId, limit }).map((row) => withExcerpt(row, q, [row.content]));

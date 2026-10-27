@@ -1270,6 +1270,10 @@ const SHAPE_EXEMPT = new Map([
   ['week-event', 'Rasterzelle: Terminblock im Zeitraster der Woche, Hoehe = Dauer'],
   ['day-event', 'Rasterzelle: Terminblock im Zeitraster des Tages, Hoehe = Dauer'],
   ['allday-event', 'Rasterzelle: Ganztags-Balken der Woche/des Tages, gleiche Bar wie .month-day__event'],
+  // Die Zeitleiste im Heute-Blatt (#2278) legt ihre Termine auf dasselbe
+  // Zeitraster (time-grid.js), nur waagerecht: Breite = Dauer. Ein Klick
+  // klappt die Zeile des Termins darunter auf.
+  ['today-timeline__event', 'Rasterzelle: Terminblock der Tageszeitleiste, Breite = Dauer (time-grid.js)'],
   // Seit R9 M13 (Re-Critique 2026-09-27) oeffnet die Notizkarte als GANZE
   // Karte: der Oeffnen-Knopf liegt unsichtbar ueber ihr (notes.css, keine
   // Flaeche, keine Kante) und erbt ihren Radius nur, damit der Fokusring die

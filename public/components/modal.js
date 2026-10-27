@@ -865,7 +865,7 @@ function _removeOverlay(overlay) {
 
 /**
  * In die Top-Layer: `showModal()` macht den Hintergrund inert, faengt Tab im
- * Dialog und legt `::backdrop` darunter. Ohne `<dialog>`-Unterstuetzung (Node-
+ * Dialog (die Abdunklung traegt sein erstes Kind, `.modal-overlay__scrim`). Ohne `<dialog>`-Unterstuetzung (Node-
  * Sonden) bleibt es beim Div-Verhalten.
  */
 function _enterTopLayer(overlay) {
@@ -887,9 +887,8 @@ function _enterTopLayer(overlay) {
  * 150-400 ms inert - und wer nach `await closeModal()` ein Feld fokussiert
  * (Restore-Dialog, neu gezeichnete Listen), fokussierte ins Leere. `close()`
  * hebt die Sperre sofort; `.modal-overlay--closing` haelt den Knoten sichtbar
- * (layout.css), jetzt als gewoehnliche Ebene auf `--z-modal`, mit der Abdunklung
- * auf ihm selbst statt auf `::backdrop` (das gibt es ausserhalb der Top-Layer
- * nicht) - dieselbe Blende wie vorher.
+ * (layout.css), jetzt als gewoehnliche Ebene auf `--z-modal`; die Abdunklung
+ * ist sein eigener Knoten (`.modal-overlay__scrim`, #1801) und blendet dort aus.
  *
  * Der Browser gibt beim `close()` den Fokus an das Element zurueck, das ihn vor
  * `showModal()` hatte. Das ist hier gemerkt (`_nativeRestored`), damit
@@ -946,13 +945,21 @@ function _reducedMotion() {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-function _fade(el, from, to) {
-  if (typeof el?.animate !== 'function') return null;
-  return el.animate([{ opacity: from }, { opacity: to }], {
+function _fade(overlay, from, to) {
+  // GRUND UND TAFEL, NICHT DER DIALOG (#1801): eine Deckkraft unter 1 am
+  // Dialog machte ihn zur Backdrop Root, und der Blur des Grunds saehe die
+  // Seite nicht mehr. Die beiden Kinder blenden gemeinsam; das Ende der
+  // Tafel ist das Ende der Blende.
+  const timing = {
     duration: durationToken('--duration-sm', 150),
     easing: easingToken('--ease-out'),
     fill: to === 0 ? 'forwards' : 'none',
-  });
+  };
+  let last = null;
+  for (const el of [overlay?.querySelector?.('.modal-overlay__scrim'), overlay?.querySelector?.('.modal-panel')]) {
+    if (typeof el?.animate === 'function') last = el.animate([{ opacity: from }, { opacity: to }], timing);
+  }
+  return last;
 }
 
 /** Close-Request (Esc ohne unseren Handler, Zurueck-Geste): durch closeModal(). */
@@ -975,9 +982,13 @@ function _onCancel(event) {
 // Bei ungespeicherten Aenderungen schliesst `closeModal()` nicht, sondern
 // fragt nach - dann federt die Tafel in ihre Ruhelage unter die Rueckfrage,
 // statt am alten Zug stehen zu bleiben.
+//
+// Der Grund folgt dem Zug (#1801): er ist ein eigener Knoten unter der Tafel
+// (`.modal-overlay__scrim`), also nimmt seine Deckkraft die Tafel nicht mit.
 function _wireSheetSwipe(panel) {
   return wireSheetDrag(panel, {
     scroller: () => panel.querySelector('.modal-panel__body') ?? panel,
+    dim: () => panel.parentElement?.querySelector(':scope > .modal-overlay__scrim') ?? null,
     onDismiss: () => {
       const dirty = isFormDirty(panel);
       closeModal();
@@ -2177,6 +2188,7 @@ export function openModal({
   const markup = () => (typeof content === 'function' ? content() : content);
   const html = `
     <dialog class="modal-overlay" id="shared-modal-overlay" aria-labelledby="shared-modal-title">
+      <div class="modal-overlay__scrim" aria-hidden="true"></div>
       <div class="modal-panel${sizeClass}${stage ? ' modal-panel--pending' : ''}">
         <div class="modal-panel__header">
           <h2 class="modal-panel__title" id="shared-modal-title">${esc(title)}</h2>

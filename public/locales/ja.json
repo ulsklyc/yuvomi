@@ -1190,7 +1190,6 @@
         "pickOne": "予定を選択",
         "pickOneHint": "時間、場所、リマインダーがここに表示されます。",
         "syncTargetAssigneeAmbiguous": "複数のカレンダーでこの人が既定の割り当てになっています。保存先を自分で選んでください。",
-        "syncTargetSeveralAssignees": "複数の人が割り当てられているため、割り当てではカレンダーを選びません。代わりに使用: {{target}}",
         "filtersSources": "カレンダー",
         "filterUnassigned": "割り当てなし",
         "dateSpanSpoken": "{{from}}から{{to}}まで",
@@ -1229,7 +1228,10 @@
         "errorDeleteFeedAdminOnly": "このカレンダーは書き出し中です。削除できるのは管理者だけです。",
         "errorEventGone": "この予定はもう存在しません。",
         "errorSelectedCalendarGone": "選んだカレンダーはもう存在しません。",
-        "errorSeriesNoOccurrence": "この繰り返しでは、開始日以降に予定が1件もありません。"
+        "errorSeriesNoOccurrence": "この繰り返しでは、開始日以降に予定が1件もありません。",
+        "localCalendarUploadsHint": "このカレンダーの予定は Apple Calendar を通じて iCloud にアップロードされます。",
+        "overlapOpenSchedule": "シフト表を開く",
+        "syncTargetNoCalendarForPeople": "ちょうどこれらの人を既定の割り当て先にしているカレンダーがないため、割り当てからはカレンダーを選びません。代わりに使用: {{target}}。"
     },
     "noteCategories": {
         "categories": "カテゴリー",
@@ -1300,7 +1302,11 @@
         "checklistDone": "完了",
         "checklistOpen": "未完了",
         "errorNoteGone": "このメモはもうありません。",
-        "errorSelectedCategoryGone": "選択したカテゴリの一つがもう存在しません。"
+        "errorSelectedCategoryGone": "選択したカテゴリの一つがもう存在しません。",
+        "lockedToggle": "編集をロックする",
+        "lockedBadge": "ロック中",
+        "lockedHint": "このメモを変更・ピン留め・削除できるのは、あなたと管理者だけです。チェックリストの項目にチェックを入れることも含みます。ほかの人は引き続き読むことができます。",
+        "errorLocked": "このメモはロックされています。変更できるのは作成した人と管理者だけです。"
     },
     "markdown": {
         "bold": "太字 (Ctrl+B)",
@@ -1772,6 +1778,8 @@
         "planSavingsDeleteConfirm": "貯蓄目標を削除しますか？",
         "accountsTab": "口座",
         "netWorth": "純資産",
+        "netWorthApproxNote": "{{date}} のレートで換算",
+        "netWorthPerCurrencyNote": "為替レートなし - 通貨ごとの合計",
         "addAccount": "口座を追加",
         "accountsEmptyTitle": "口座がまだありません",
         "accountsEmptyDescription": "普通預金や貯蓄などの口座を追加して残高を管理しましょう。",
@@ -1865,6 +1873,7 @@
         "saveFailed": "保存できませんでした。入力内容を確認してください。",
         "loanAlreadyPaid": "この貸付はすでに完済されています。",
         "loanInstallmentAlreadyPaid": "この回はすでに支払い済みです。",
+        "loanPaymentRateUnavailable": "口座の通貨の為替レートが不明です。ローンに別の口座を選ぶか、口座なしにしてください。",
         "amountExceedsLoanRemaining": "金額が貸付の残額を超えています",
         "responsibleNotMember": "担当にできるのは世帯のメンバーだけです。",
         "seriesStartTooEarly": "開始日をシリーズの最初の項目より前の月にすることはできません",
@@ -2291,7 +2300,10 @@
             "errorNoCalendarName": "新しいカレンダーの名前を入力してください。",
             "dropzoneTitle": "ICS ファイルをここにドロップするか選択",
             "dropzoneTitleTouch": "タップしてICSファイルを選択",
-            "dropzoneHint": ".ics ファイルのみ"
+            "dropzoneHint": ".ics ファイルのみ",
+            "assigneesLabel": "割り当て先",
+            "assigneesHint": "新しい予定にはこれらの人が割り当てられます。同じ ID ですでにインポートされた予定には追加されます（割り当てが手動で外されていた場合も）。",
+            "successWithAssigned": "インポート: {{imported}} 件、既存: {{skipped}} 件、そのうち今回割り当て: {{assigned}} 件。"
         },
         "memberPhoneLabel": "電話番号（任意）",
         "memberEmailLabel": "メールアドレス（任意）",
@@ -3060,10 +3072,7 @@
         "notificationChannelDeleteConfirmDetail": "このチャネルからは今後いっさい通知が送られません。緊急のものも同様です。新しいチャネルには宛先と認証情報を一から入力し直す必要があります。",
         "apiTokensMcpHint": "これらのトークンは、/mcp の MCP エンドポイント用の Bearer トークンとしても機能します（例: Claude Desktop で、AI によりタスク・買い物リスト・予定を作成）。",
         "sync": {
-            "defaultAssignee": "既定の割り当て先",
             "defaultAssigneeNone": "なし",
-            "defaultAssigneeHint": "新しく同期された予定は自動的にこの人に割り当てられます。",
-            "defaultAssigneeRoutingHint": "既定の割り当て先: カレンダーの予定にはそこで選んだ人が割り当てられ、その人だけに割り当てた新しい予定はそのカレンダーに作成されます。Google と CalDAV のカレンダーが対象で、Apple と Outlook は対象外です。",
             "backfillTitle": "割り当てを補完",
             "backfillDescription": "既定の割り当て先は、設定後に取り込まれた予定にだけ適用されます。ここでは、すべてのアカウントからすでに取り込まれた予定に一度だけ適用できます。",
             "backfillAction": "既存の予定に適用",
@@ -3083,7 +3092,10 @@
             "backfillMovedNext": "次を表示",
             "backfillMovedAll": "すべて選択",
             "backfillMovedChange": "{{from}} から {{to}} へ",
-            "backfillDescriptionMore": "割り当てのない予定にはそのまま設定されます。別のカレンダーの既定の割り当て先が残っている予定は、1件ずつ表示されるので選んでください。それ以外の割り当ては変更されません。"
+            "backfillDescriptionMore": "割り当てのない予定にはそのまま設定されます。別のカレンダーの既定の割り当て先が残っている予定は、1件ずつ表示されるので選んでください。それ以外の割り当ては変更されません。",
+            "defaultAssignees": "既定の割り当て先",
+            "defaultAssigneesHint": "新しく同期された予定は自動的にこれらの人に割り当てられます。最初の人が色を決めます。",
+            "defaultAssigneesRoutingHint": "既定の割り当て先: カレンダーの予定にはそこで選んだ人が割り当てられ、ちょうどこれらの人に割り当てた新しい予定はそのカレンダーに作成されます。Google と CalDAV のカレンダーが対象で、Apple や Outlook は対象外です。"
         },
         "calendarAssignMeLabel": "新しい予定を自分に割り当てる",
         "calendarDefaultRemindersLabel": "既定のリマインダー",
@@ -3302,6 +3314,8 @@
         "displayDeleteConfirm": "「{{name}}」を削除しますか？",
         "displayPairingCodeLabel": "ペアリングコード",
         "displayPairingCodeHint": "有効期限は15分で、使えるのは1回だけです。タブレットで /pair を開き、そこに入力してください。表示されるのは今だけです。",
+        "displayPairStepCode": "ここで壁掛けタブレットを追加し、ペアリングコードを発行します。",
+        "displayPairStepOpen": "タブレットでこのアドレスを開き、そこにコードを入力します:",
         "displayDeviceUnnamed": "名前のない端末",
         "displayDeviceLastSeen": "最終接続: {{when}}",
         "displayDeviceNeverSeen": "まだ接続されていません",
@@ -3406,7 +3420,16 @@
         "permChildRoleHint": "新しい子どものアカウントには、作成時に独自の初期権限も付きます: {{list}}。その後は各メンバーに表示されます。",
         "activeModulesHintMore": "自分の画面だけで隠す場合は「モジュール → ナビゲーション」へ。",
         "permIntroMore": "個々のメンバーは役割の既定値と異なる設定にできます。未設定の場合、すべての役割がフルアクセスを持ち、管理者は常にフルアクセスです。",
-        "preferenceSaveFailed": "設定を保存できませんでした。"
+        "preferenceSaveFailed": "設定を保存できませんでした。",
+        "caldavCalendarReadOnly": "読み取り専用：ここには新しい予定を保存できません",
+        "caldavCalendarReadOnlyWaiting_one": "読み取り専用：ここへのアップロードを待っている予定 {{count}} 件は届きません",
+        "caldavCalendarReadOnlyWaiting": "読み取り専用：ここへのアップロードを待っている予定 {{count}} 件は届きません",
+        "reminderListReadOnly": "読み取り専用：ここには新しい項目を保存できません",
+        "reminderListReadOnlyWaiting_one": "読み取り専用：ここへのアップロードを待っている項目 {{count}} 件は届きません",
+        "reminderListReadOnlyWaiting": "読み取り専用：ここへのアップロードを待っている項目 {{count}} 件は届きません",
+        "reminderListAssigneesTasksOnly": "人を設定できるのはタスクに入るリストだけです。",
+        "syncAssigneeNotMember": "ここで選べるのは世帯のメンバーだけです。",
+        "syncAssigneeUnknown": "この人はもう存在しません。ページを再読み込みしてください。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",
@@ -3739,7 +3762,8 @@
         "banner": "オフライン - 再接続しています…",
         "staleData": "オフライン - 最終更新: {{time}}",
         "pageTitle": "オフラインです",
-        "pageDescription": "このページには接続が必要です。端末がオンラインに戻ると自動で読み込まれます。"
+        "pageDescription": "このページには接続が必要です。端末がオンラインに戻ると自動で読み込まれます。",
+        "snapshot": "サーバーに接続できません - 保存済みのデータ（閲覧のみ）"
     },
     "emptyHint": {
         "recipes": "レシピは献立にも買い物リストにも直接送れます。",
@@ -4366,6 +4390,11 @@
             "missedBook": "{{date}}以降の分を記帳",
             "missedDetail": "{{date}}以降、{{count}}回分が未記帳です。",
             "missedDetail_one": "{{date}}以降、{{count}}回分が未記帳です。",
+            "failing": "記帳に失敗しました - 1時間ごとに再試行します",
+            "pastQuestion": "日付が過去です",
+            "pastSkip": "{{date}}から開始",
+            "pastDetail": "{{date}}以降、{{count}}回分の期日が過ぎています。",
+            "pastDetail_one": "{{date}}以降、{{count}}回分の期日が過ぎています。",
             "deleteConfirm": "この定期費用を削除しますか？",
             "deleteConfirmDetail": "新しい費用は作成されなくなります。記帳済みの費用は残ります。",
             "show": "表示",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}}さんから受け取り",
         "debtOwes": "{{from}}さんから{{to}}さんへ支払い",
         "balanced": "精算済み",
-        "balancedInGroup": "{{group}}: 精算済み"
+        "balancedInGroup": "{{group}}: 精算済み",
+        "totalsByMember": "各自の支払額",
+        "totalsByMemberHint": "立て替えた額と、その下に自分の負担分",
+        "ownShare": "自分の負担分: {{amount}}",
+        "paidLabel": "支払額",
+        "totalsByCategory": "カテゴリ別",
+        "categoryFilter": "カテゴリで支出を絞り込む",
+        "noExpensesInCategory": "このカテゴリの支出はありません。"
     },
     "wmo": {
         "0": "快晴",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "金額",
         "detailNextPaymentLabel": "次回支払い",
         "renewedNamed": "「{{name}}」を支払いました - 次回の支払いは{{date}}です。",
-        "completedNamed": "「{{name}}」を支払い、終了しました。"
+        "completedNamed": "「{{name}}」を支払い、終了しました。",
+        "accountHint": "このサブスクリプションの支払いはすべてこの口座に記録されます。個別の支払いは予算で変更できます。",
+        "accountArchivedHint": "この口座はアーカイブ済みです。別の口座を選ぶまで、サブスクリプションは口座なしで記録されます。",
+        "accountArchivedOption": "{{name}}（アーカイブ済み）",
+        "accountArchivedMeta": "{{name}} はアーカイブ済み - 口座なしで記録",
+        "visibilityHint_private": "このサブスクリプションとその支払いはあなただけが見られます。",
+        "visibilityHint_shared": "世帯の全員がこのサブスクリプションとその支払いを見られます。",
+        "errorAccountGone": "選択した口座はもう存在しません。"
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "測定値を保存できませんでした。",
             "invalidValue": "有効な値を入力してください。",
             "range": {
+                "day": "日",
                 "week": "週",
                 "month": "月",
                 "year": "年"
@@ -5003,6 +5047,7 @@
                 "family": "家族"
             },
             "sparse": "傾向を表示するには測定値が少なすぎます。",
+            "bandValue": "{{mean}}（{{low}}～{{high}}）",
             "recentMeasurements": "最近の測定",
             "deleteMeasurement": "測定 {{value}}（{{date}}）を削除",
             "measurementDeleted": "測定を削除しました",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "重複した回収予定{{count}}件（同一の識別情報）を1件にまとめました。",
         "importDiagnosticOther": "予定の1件が想定された形式と一致しません。",
         "importUnresolvedBlockingError": "先にブロック中のすべての警告を解決するか、該当する予定を明示的にスキップしてください。",
-        "importIgnoreLabel": "無視",
         "importCreateNewType": "新しいごみの種類を作成",
+        "importLabelsHint": "1つの項目に複数のごみ箱が書かれている場合は、すべて選んでください。それぞれに収集日が作られます。",
+        "importLabelIgnoredHint": "ごみの種類が選ばれていません。取り込まれません。",
         "importNewTypeNameRequiredError": "新しいごみの種類の名前を入力してください。",
         "importDefaultSourceName": "インポートされたファイル",
         "importCommittedToast": "インポートを反映しました: {{added}} 件追加、{{changed}} 件変更、{{removed}} 件削除。",
@@ -6198,6 +6244,13 @@
         "badgeLow": "残りわずか",
         "badgeOut": "在庫なし",
         "bestBefore": "賞味期限 {{date}}",
+        "noBestBefore": "賞味期限なし",
+        "errorProductHasStock": "この商品は在庫が戻ったため、削除されませんでした。",
+        "productTotal": "合計 {{quantity}}",
+        "productPlaces": "{{count}}か所",
+        "productPlaces_one": "{{count}}か所",
+        "productBatches": "{{count}}ロット",
+        "productBatches_one": "{{count}}ロット",
         "increase": "数量を増やす",
         "decrease": "数量を減らす",
         "toShoppingAll": "すべて買い物リストへ",

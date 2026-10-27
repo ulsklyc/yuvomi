@@ -1190,7 +1190,6 @@
         "pickOne": "選擇一個日程",
         "pickOneHint": "時間、地點和提醒會顯示在這裡。",
         "syncTargetAssigneeAmbiguous": "多個日曆將此人設為預設分配物件。請自行選擇目標。",
-        "syncTargetSeveralAssignees": "已分配多人，因此不會根據分配選擇日曆。改為使用：{{target}}。",
         "filtersSources": "日曆",
         "filterUnassigned": "未分配",
         "dateSpanSpoken": "{{from}}至{{to}}",
@@ -1229,7 +1228,10 @@
         "errorDeleteFeedAdminOnly": "此日曆正在匯出。只有管理員可以刪除它。",
         "errorEventGone": "此日程已不存在。",
         "errorSelectedCalendarGone": "所選的日曆已不存在。",
-        "errorSeriesNoOccurrence": "依此重複設定，從開始日期起不會有任何日程。"
+        "errorSeriesNoOccurrence": "依此重複設定，從開始日期起不會有任何日程。",
+        "localCalendarUploadsHint": "此行事曆中的活動會透過 Apple Calendar 上傳到 iCloud。",
+        "overlapOpenSchedule": "開啟排班",
+        "syncTargetNoCalendarForPeople": "沒有日曆的預設分配恰好是這些人，因此分配不會選擇日曆。改用：{{target}}。"
     },
     "noteCategories": {
         "categories": "分類",
@@ -1300,7 +1302,11 @@
         "checklistDone": "已完成",
         "checklistOpen": "待處理",
         "errorNoteGone": "這則便籤已不存在。",
-        "errorSelectedCategoryGone": "所選的其中一個分類已不存在。"
+        "errorSelectedCategoryGone": "所選的其中一個分類已不存在。",
+        "lockedToggle": "鎖定編輯",
+        "lockedBadge": "已鎖定",
+        "lockedHint": "只有你和管理員可以變更、釘選或刪除這則筆記，包括勾選清單項目。其他人仍可閱讀。",
+        "errorLocked": "這則筆記已鎖定。只有建立者和管理員可以變更。"
     },
     "markdown": {
         "bold": "加粗 (Ctrl+B)",
@@ -1772,6 +1778,8 @@
         "planSavingsDeleteConfirm": "刪除儲蓄目標？",
         "accountsTab": "帳戶",
         "netWorth": "淨資產",
+        "netWorthApproxNote": "依 {{date}} 匯率換算",
+        "netWorthPerCurrencyNote": "無匯率 - 依幣別分別合計",
         "addAccount": "新增帳戶",
         "accountsEmptyTitle": "還沒有帳戶",
         "accountsEmptyDescription": "新增活期或儲蓄等帳戶來追蹤你的餘額。",
@@ -1865,6 +1873,7 @@
         "saveFailed": "未能儲存。請檢查填寫的內容。",
         "loanAlreadyPaid": "這筆借款已全部還清。",
         "loanInstallmentAlreadyPaid": "這一期已支付。",
+        "loanPaymentRateUnavailable": "帳戶幣別沒有已知的匯率。請為貸款選擇其他帳戶，或不選帳戶。",
         "amountExceedsLoanRemaining": "金額超過借款的剩餘金額",
         "responsibleNotMember": "只有家庭成員才能擔任負責人。",
         "seriesStartTooEarly": "開始日不能早於系列第一筆條目所在的月份",
@@ -2291,7 +2300,10 @@
             "allDuplicates": "沒有新活動——全部已存在。",
             "dropzoneTitle": "將 ICS 檔案拖到此處或選擇檔案",
             "dropzoneTitleTouch": "點選以選擇 ICS 檔案",
-            "dropzoneHint": "僅限 .ics 檔案"
+            "dropzoneHint": "僅限 .ics 檔案",
+            "assigneesLabel": "分配給",
+            "assigneesHint": "新活動會分配給這些人。以相同 ID 已匯入的活動會額外加上他們，即使其分配曾被手動移除。",
+            "successWithAssigned": "已匯入：{{imported}}，已存在：{{skipped}}，其中現已分配：{{assigned}}。"
         },
         "memberPhoneLabel": "電話號碼（可選）",
         "memberEmailLabel": "電子郵件（可選）",
@@ -3060,10 +3072,7 @@
         "notificationChannelDeleteConfirmDetail": "今後不會再有任何通知透過該渠道發出，緊急通知也不例外。新建渠道需要重新完整填寫地址和登入憑據。",
         "apiTokensMcpHint": "這些令牌也可用作 /mcp 上 MCP 端點的 Bearer 令牌（例如在 Claude Desktop 中，透過 AI 建立任務、購物項和日程）。",
         "sync": {
-            "defaultAssignee": "預設分配",
             "defaultAssigneeNone": "無",
-            "defaultAssigneeHint": "新同步的日程會自動分配給此人。",
-            "defaultAssigneeRoutingHint": "預設分配: 日曆中的事件會分配給在此選擇的人，僅分配給此人的新事件會建立在該日曆中。適用於 Google 和 CalDAV 日曆，不適用於 Apple 或 Outlook。",
             "backfillTitle": "補充分配",
             "backfillDescription": "預設分配只適用於設定之後匯入的日程。你可以在這裡將其一次性套用到所有帳戶中已匯入的日程。",
             "backfillAction": "應用到現有日程",
@@ -3083,7 +3092,10 @@
             "backfillMovedNext": "顯示下一批",
             "backfillMovedAll": "全選",
             "backfillMovedChange": "從 {{from}} 改為 {{to}}",
-            "backfillDescriptionMore": "未分配的日程會直接套用預設分配。仍帶有其他日曆預設分配的日程會逐筆列出，供你選擇。其他任何分配保持不變。"
+            "backfillDescriptionMore": "未分配的日程會直接套用預設分配。仍帶有其他日曆預設分配的日程會逐筆列出，供你選擇。其他任何分配保持不變。",
+            "defaultAssignees": "預設分配",
+            "defaultAssigneesHint": "新同步的活動會自動分配給這些人。第一位決定顏色。",
+            "defaultAssigneesRoutingHint": "預設分配：日曆中的活動會分配給在那裡選擇的人，而恰好分配給這些人的新活動會建立在該日曆中。適用於 Google 和 CalDAV 日曆，不適用於 Apple 或 Outlook。"
         },
         "calendarAssignMeLabel": "將新事件分配給我",
         "calendarDefaultRemindersLabel": "預設提醒",
@@ -3302,6 +3314,8 @@
         "displayDeleteConfirm": "刪除「{{name}}」？",
         "displayPairingCodeLabel": "配對碼",
         "displayPairingCodeHint": "有效期 15 分鐘，且僅能使用一次。在平板上開啟 /pair 並在那裡輸入。它只在此刻顯示。",
+        "displayPairStepCode": "在這裡新增壁掛平板並生成配對碼。",
+        "displayPairStepOpen": "在平板上開啟這個位址，並在那裡輸入配對碼：",
         "displayDeviceUnnamed": "未命名裝置",
         "displayDeviceLastSeen": "最後連線：{{when}}",
         "displayDeviceNeverSeen": "從未連線過",
@@ -3406,7 +3420,16 @@
         "permChildRoleHint": "新的兒童帳戶在建立時還會獲得自己的初始權限：{{list}}。之後會顯示在該成員處。",
         "activeModulesHintMore": "只想在自己這裡隱藏，請前往「模組 → 導航」。",
         "permIntroMore": "各個成員可以不同於角色的預設設定。若不設定，每個角色都擁有完全存取權限；管理員始終如此。",
-        "preferenceSaveFailed": "無法儲存設定。"
+        "preferenceSaveFailed": "無法儲存設定。",
+        "caldavCalendarReadOnly": "唯讀：無法在此儲存新活動",
+        "caldavCalendarReadOnlyWaiting_one": "唯讀：等待上傳到這裡的 {{count}} 個活動不會送達",
+        "caldavCalendarReadOnlyWaiting": "唯讀：等待上傳到這裡的 {{count}} 個活動不會送達",
+        "reminderListReadOnly": "唯讀：無法在此儲存新項目",
+        "reminderListReadOnlyWaiting_one": "唯讀：等待上傳到這裡的 {{count}} 個項目不會送達",
+        "reminderListReadOnlyWaiting": "唯讀：等待上傳到這裡的 {{count}} 個項目不會送達",
+        "reminderListAssigneesTasksOnly": "只有進入任務的清單才能設定人員。",
+        "syncAssigneeNotMember": "這裡只能選擇家庭成員。",
+        "syncAssigneeUnknown": "此人已不存在。請重新載入頁面。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",
@@ -3739,7 +3762,8 @@
         "banner": "離線 - 正在重新連線…",
         "staleData": "離線 - 資料截至：{{time}}",
         "pageTitle": "你已離線",
-        "pageDescription": "此頁面需要網路連線。裝置恢復連線後會自動載入。"
+        "pageDescription": "此頁面需要網路連線。裝置恢復連線後會自動載入。",
+        "snapshot": "無法連線到伺服器 - 已儲存的資料，唯讀"
     },
     "emptyHint": {
         "recipes": "食譜可以直接進入用餐計劃或購物清單。",
@@ -4366,6 +4390,11 @@
             "missedBook": "補記自 {{date}} 起的日期",
             "missedDetail": "自 {{date}} 起已錯過 {{count}} 個日期。",
             "missedDetail_one": "自 {{date}} 起已錯過 {{count}} 個日期。",
+            "failing": "記帳失敗 - 每小時重試一次",
+            "pastQuestion": "日期已過",
+            "pastSkip": "從 {{date}} 開始",
+            "pastDetail": "自 {{date}} 起本應有 {{count}} 個到期日期。",
+            "pastDetail_one": "自 {{date}} 起本應有 {{count}} 個到期日期。",
             "deleteConfirm": "刪除此定期支出？",
             "deleteConfirmDetail": "不會再建立新的支出。已入帳的支出會保留。",
             "show": "顯示",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}} 欠你",
         "debtOwes": "{{from}} 欠 {{to}}",
         "balanced": "已結清",
-        "balancedInGroup": "{{group}}：已結清"
+        "balancedInGroup": "{{group}}：已結清",
+        "totalsByMember": "每人已付",
+        "totalsByMemberHint": "各自墊付的金額，下方為自己的份額",
+        "ownShare": "自己的份額：{{amount}}",
+        "paidLabel": "已付",
+        "totalsByCategory": "依類別",
+        "categoryFilter": "依類別篩選支出",
+        "noExpensesInCategory": "此類別沒有支出。"
     },
     "wmo": {
         "0": "晴天",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "金額",
         "detailNextPaymentLabel": "下次付款",
         "renewedNamed": "「{{name}}」已付款 - 下次付款日 {{date}}。",
-        "completedNamed": "「{{name}}」已付款並結束。"
+        "completedNamed": "「{{name}}」已付款並結束。",
+        "accountHint": "此訂閱的每筆付款都記入這個帳戶。單筆付款可在預算中修改。",
+        "accountArchivedHint": "這個帳戶已歸檔。在你選擇其他帳戶之前，訂閱將不帶帳戶記帳。",
+        "accountArchivedOption": "{{name}}（已歸檔）",
+        "accountArchivedMeta": "{{name}} 已歸檔 - 不帶帳戶記帳",
+        "visibilityHint_private": "只有你能看到這個訂閱及其付款。",
+        "visibilityHint_shared": "家庭中的每個人都能看到這個訂閱及其付款。",
+        "errorAccountGone": "所選帳戶已不存在。"
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "無法儲存測量值。",
             "invalidValue": "請輸入有效的數值。",
             "range": {
+                "day": "日",
                 "week": "週",
                 "month": "月",
                 "year": "年"
@@ -5003,6 +5047,7 @@
                 "family": "家庭"
             },
             "sparse": "測量資料太少，無法顯示趨勢。",
+            "bandValue": "{{mean}}，{{low}} 至 {{high}}",
             "recentMeasurements": "最近的測量",
             "deleteMeasurement": "刪除測量 {{value}}（{{date}}）",
             "measurementDeleted": "測量已刪除",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "已將 {{count}} 個重複的收運實例（相同標識）合併為一個。",
         "importDiagnosticOther": "有一個日曆條目不符合預期格式。",
         "importUnresolvedBlockingError": "請先解決所有阻斷性提示，或明確跳過受影響的事件。",
-        "importIgnoreLabel": "忽略",
         "importCreateNewType": "建立新的垃圾類型",
+        "importLabelsHint": "若一個項目列出多個垃圾桶，請全部選取 - 每個都會有自己的收運。",
+        "importLabelIgnoredHint": "未選擇垃圾類型 - 不會匯入。",
         "importNewTypeNameRequiredError": "請輸入新垃圾類型的名稱。",
         "importDefaultSourceName": "已匯入的檔案",
         "importCommittedToast": "匯入已應用：新增 {{added}} 項，變更 {{changed}} 項，移除 {{removed}} 項。",
@@ -6198,6 +6244,13 @@
         "badgeLow": "即將用完",
         "badgeOut": "已用完",
         "bestBefore": "保質期 {{date}}",
+        "noBestBefore": "無保質期",
+        "errorProductHasStock": "此商品又有庫存了，未被刪除。",
+        "productTotal": "共 {{quantity}}",
+        "productPlaces": "{{count}} 處",
+        "productPlaces_one": "{{count}} 處",
+        "productBatches": "{{count}} 批",
+        "productBatches_one": "{{count}} 批",
         "increase": "增加數量",
         "decrease": "減少數量",
         "toShoppingAll": "全部加入購物清單",

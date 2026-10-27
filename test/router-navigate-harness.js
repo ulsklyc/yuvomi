@@ -37,6 +37,8 @@ export const HARNESS_ROUTES = Object.freeze([
  * @param {object|null} [options.user] - schon angemeldet (laufende Sitzung)
  * @param {object|null} [options.sessionUser] - was `auth.me()` beim Kaltstart liefert; null: 401
  * @param {unknown} [options.sessionError] - statt des 401: dieser Fehler (429, 503, Netz)
+ * @param {() => Promise<object>} [options.me] - `auth.me()` selbst (etwa ueber den
+ *   echten Service Worker, #2293); ersetzt sessionUser und sessionError
  * @param {boolean} [options.preferencesLoaded] - Vorgabe: ob `user` gesetzt ist
  * @param {boolean} [options.setupRequired]
  * @param {(module: string) => boolean} [options.canAccess]
@@ -55,6 +57,7 @@ export function createNavigateHarness({
   user = null,
   sessionUser = null,
   sessionError = null,
+  me = null,
   preferencesLoaded = Boolean(user),
   setupRequired = false,
   canAccess = () => true,
@@ -68,7 +71,7 @@ export function createNavigateHarness({
   routes = HARNESS_ROUTES,
 } = {}) {
   /** Was nach aussen sichtbar wurde, in der Reihenfolge des Geschehens. */
-  const log = { rendered: [], swapped: [], history: [], toasts: [], leaveAsked: [], authCalls: 0, unreachable: [], forgotten: 0, nav: [], renderStarted: [] };
+  const log = { rendered: [], swapped: [], history: [], toasts: [], leaveAsked: [], authCalls: 0, unreachable: [], forgotten: 0, offlineSessions: [], reminders: 0, push: 0, nav: [], renderStarted: [] };
   let shell = false;
 
   const env = {
@@ -113,6 +116,7 @@ export function createNavigateHarness({
     auth: {
       me: async () => {
         log.authCalls += 1;
+        if (me) return me();
         if (env.sessionError) throw env.sessionError;
         if (!sessionUser) throw Object.assign(new Error('Sitzung abgelaufen.'), { status: 401 });
         return { user: sessionUser };
@@ -136,8 +140,10 @@ export function createNavigateHarness({
     startThirdPartyModulePolling: () => {},
     armScreensaver: () => { armScreensaver?.(); },
     loadReminderStyles: () => {},
-    initReminders: () => {},
-    initPush: () => {},
+    initReminders: () => { log.reminders += 1; },
+    initPush: () => { log.push += 1; },
+    // Kaltstart aus dem Abzug (#2293): mitschreiben, wer gerade ungeprueft ist.
+    holdOfflineSession: () => { log.offlineSessions.push(env.currentUser); },
     // ── Seite ──
     rememberScrollPosition: () => {},
     scrollPositionFor: () => 0,

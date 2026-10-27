@@ -1170,6 +1170,10 @@ router.put('/expenses/:id', (req, res) => {
     const archived = archivedRefusal(existing.group_id);
     if (archived) return sendRefusal(res, archived);
     const parsed = parseExpenseBody(req.body, existing.converted_currency);
+    // Die Kategorie (#1941) wie beim Bearbeiten einer Serie: ein Aufruf, der
+    // sie nicht nennt (oder `null` schickt), laesst sie stehen. Sonst setzte
+    // jedes PUT, das nur den Betrag korrigiert, sie still auf `general`.
+    if (req.body.category === undefined || req.body.category === null) parsed.category = existing.category;
     const payerId = Number(req.body.payer_id || existing.payer_id);
     const participants = Array.isArray(req.body.participants) ? req.body.participants : db.get().prepare('SELECT user_id FROM expense_splits WHERE expense_id = ?').all(existing.id).map((r) => r.user_id);
     const refusal = membershipRefusal(db.get(), existing.group_id, payerId, participants);
@@ -1287,6 +1291,63 @@ router.post('/expenses/:id/comments', (req, res) => {
   }
 });
 
+/**
+ * Was jede Person in der Gruppe bezahlt hat und was davon ihr eigener Anteil
+ * ist (#1888), je Person und Waehrung, ueber ALLE aktiven Ausgaben - nicht
+ * ueber die geladene Seite der Liste.
+ *
+ * DIE WAEHRUNG DER SALDEN: gezaehlt wird in `converted_currency` und mit
+ * `converted_amount_minor`, denn nur dort stehen Anteile und Ledger. So ist
+ * bezahlt minus Anteil genau der Saldo vor allen Ausgleichen, und die Summen
+ * nennen keine Waehrung, die die Salden nicht kennen. Ausgleiche zaehlen
+ * nicht: eine Zahlung zwischen zwei Personen ist keine Ausgabe.
+ *
+ * Eine Zeile je Person und Waehrung, in der sie bezahlt ODER einen Anteil hat;
+ * wer in einer Waehrung weder das eine noch das andere hat, hat dort keine.
+ * Gaeste und Ehemalige zaehlen wie jede Person, die zahlt oder teilt.
+ */
+function groupMemberTotals(groupId) {
+  return db.get().prepare(`
+    SELECT t.currency, t.user_id, u.display_name,
+           SUM(t.paid_minor) AS paid_minor, SUM(t.share_minor) AS share_minor
+    FROM (
+      SELECT e.converted_currency AS currency, e.payer_id AS user_id,
+             e.converted_amount_minor AS paid_minor, 0 AS share_minor
+      FROM expenses e
+      WHERE e.group_id = @groupId AND e.status = 'active'
+      UNION ALL
+      SELECT s.currency, s.user_id, 0, s.amount_minor
+      FROM expense_splits s
+      JOIN expenses e ON e.id = s.expense_id
+      WHERE e.group_id = @groupId AND e.status = 'active'
+    ) t
+    LEFT JOIN users u ON u.id = t.user_id
+    GROUP BY t.currency, t.user_id
+    HAVING paid_minor != 0 OR share_minor != 0
+    ORDER BY t.currency ASC, ${memberOrderSql('u')}
+  `).all({ groupId }).map((row) => ({
+    ...row,
+    paid: minorToDecimal(row.paid_minor, row.currency),
+    share: minorToDecimal(row.share_minor, row.currency),
+  }));
+}
+
+/**
+ * Wohin das Geld der Gruppe ging (#1941): je Kategorie und Waehrung die Summe
+ * der aktiven Ausgaben, in derselben Waehrung wie die Summen je Person
+ * (`converted_currency`). Je Waehrung die groesste zuerst; eine Kategorie
+ * ohne Ausgaben hat keine Zeile.
+ */
+function groupCategoryTotals(groupId) {
+  return db.get().prepare(`
+    SELECT e.category, e.converted_currency AS currency, SUM(e.converted_amount_minor) AS total_minor
+    FROM expenses e
+    WHERE e.group_id = ? AND e.status = 'active'
+    GROUP BY e.converted_currency, e.category
+    ORDER BY currency ASC, total_minor DESC, e.category ASC
+  `).all(groupId).map((row) => ({ ...row, total: minorToDecimal(row.total_minor, row.currency) }));
+}
+
 router.get('/groups/:id/balances', (req, res) => {
   try {
     const groupId = Number(req.params.id);
@@ -1298,6 +1359,8 @@ router.get('/groups/:id/balances', (req, res) => {
       data: {
         balances: rows.map((row) => ({ ...row, net: minorToDecimal(row.net_minor, row.currency) })),
         simplified_debts: simplifyDebts(rows),
+        member_totals: groupMemberTotals(groupId),
+        category_totals: groupCategoryTotals(groupId),
       },
     });
   } catch (err) {
@@ -1585,6 +1648,9 @@ const RECURRING_SELECT = `
  *   fortsetzen darf - die Regel der Ausgaben (`mayChangeGroupRecord`). Vom
  *   Server, damit die Oberflaeche sie nicht nachbaut; das Modulrecht fragt sie
  *   selbst.
+ * - `failed_at` (Spalte, #1746): seit wann der Lauf sie unerwartet nicht
+ *   buchen kann, oder null. Sie bleibt dabei unpausiert und wird stuendlich
+ *   neu versucht; die Zeile sagt das.
  * - `missed_count` / `resume_date`: nur an einer pausierten Serie. Wie viele
  *   Termine ein Fortsetzen ohne `missed: "book"` ueberspringt und auf welchem
  *   Termin es landet - dieselbe Rechnung, die die Pause-Route faehrt.
@@ -1654,6 +1720,36 @@ function parseRecurringBody(body, groupId, fallbackCurrency, fallbackPayerId) {
   return { parsed, frequency, payerId, snapshot };
 }
 
+// Was mit den Terminen geschieht, die vor heute liegen: beim Fortsetzen die
+// waehrend der Pause faelligen, beim Anlegen und Verlegen die zwischen dem
+// gesetzten Datum und heute (#1748). `skip` heisst: ab dem ersten Termin, der
+// nicht vor heute liegt; `book`: der Lauf bucht sie nach.
+const MISSED_MODES = ['skip', 'book'];
+
+/**
+ * `missed` aus dem Aufruf, oder null, wenn er es nicht nennt. Beim Anlegen und
+ * Verlegen (#1748) laesst null das Datum stehen wie vor der Frage: der Lauf
+ * bucht dann je Lauf einen versaeumten Termin nach, und ein Client, der die
+ * Frage nicht kennt, verhaelt sich wie bisher.
+ */
+function parseMissed(body) {
+  const missed = body?.missed;
+  if (missed === undefined || missed === null) return null;
+  if (!MISSED_MODES.includes(missed)) throw new Refusal(400, 'missed must be "skip" or "book".', 'invalid_missed');
+  return missed;
+}
+
+/**
+ * Der Termin, auf dem eine angelegte oder verlegte Serie steht (#1748). Mit
+ * `skip` und einem Datum vor heute der erste Termin ab heute, gezaehlt mit der
+ * Rechnung des Laufs und dem Ankertag des gesetzten Datums - derselben, mit der
+ * der Dialog die Frage stellt (public/utils/interval-date.js). Sonst das Datum.
+ */
+function startingRunDate(date, frequency, anchorDay, missed) {
+  if (missed !== 'skip') return date;
+  return nextRunNotBefore(date, frequency, todayKey(db.get()), anchorDay).date;
+}
+
 /** Eine Serie samt Zugang: null, wenn es sie nicht gibt oder die Gruppe dem Aufrufer verschlossen ist. */
 function loadRecurring(id, req) {
   const row = db.get().prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id);
@@ -1683,18 +1779,23 @@ router.post('/groups/:id/recurring', (req, res) => {
     if (!group) return res.status(404).json({ error: 'Group not found.', code: 404 });
     const archived = archivedRefusal(groupId);
     if (archived) return sendRefusal(res, archived);
+    const missed = parseMissed(req.body);
     const { parsed, frequency, payerId, snapshot } = parseRecurringBody(req.body, groupId, group.default_currency, userId(req));
     // Der Ankertag (#1721): der Tag des ersten Termins ist der Tag, fuer den
     // die Serie gedacht ist. Der Lauf klemmt in kuerzeren Monaten aufs
     // Monatsende und hebt danach wieder auf diesen Tag (31 -> 28/29 -> 31).
     // Gesetzt wird er hier und beim Bearbeiten (PUT /recurring/:id), sobald
     // dort Datum oder Rhythmus wechseln; das Fortsetzen zaehlt nur weiter.
+    // Ein Datum vor heute fragt der Dialog wie das Fortsetzen (#1748): mit
+    // `missed: "skip"` steht die Serie auf ihrem ersten Termin ab heute, der
+    // Anker bleibt der Tag des eingegebenen Datums.
     const anchorDay = Number(parsed.expenseDate.slice(8, 10));
+    const nextRunDate = startingRunDate(parsed.expenseDate, frequency, anchorDay, missed);
     const result = db.get().prepare(`
       INSERT INTO recurring_expenses
         (group_id, title, description, amount_minor, currency, payer_id, category, split_method, split_snapshot, frequency, next_run_date, anchor_day, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, parsed.category, parsed.method, JSON.stringify(snapshot), frequency, parsed.expenseDate, anchorDay, userId(req));
+    `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, parsed.category, parsed.method, JSON.stringify(snapshot), frequency, nextRunDate, anchorDay, userId(req));
     activity(groupId, userId(req), 'recurring_created', 'recurring_expense', result.lastInsertRowid, { title: parsed.title, frequency });
     res.status(201).json({ data: recurringResponse(result.lastInsertRowid, req) });
   } catch (err) {
@@ -1734,6 +1835,16 @@ router.post('/groups/:id/recurring', (req, res) => {
  * Serie am 31. steht im Februar auf dem 28., und ein Speichern, das nur den
  * Titel aendert, liesse sie sonst fuer immer auf dem 28. (#1721).
  *
+ * EIN GESETZTER TERMIN VOR HEUTE nimmt `missed` wie das Anlegen (#1748):
+ * `skip` stellt die Serie auf ihren ersten Termin ab heute, `book` und ein
+ * Aufruf ohne `missed` lassen das Datum stehen. Ohne Verlegung zaehlt `missed`
+ * nicht - ein faelliger Termin, den niemand angefasst hat, rueckt nicht still
+ * weiter.
+ *
+ * Ein unerwarteter Fehlschlag des Laufs (`failed_at`, #1746) wird geleert:
+ * wer die Serie bearbeitet hat, hat sie gesehen, und der naechste Lauf misst
+ * neu. Scheitert sie wieder, steht er wieder da.
+ *
  * `paused_at` bleibt: wer eine automatisch pausierte Serie repariert, setzt sie
  * danach selbst fort und entscheidet dabei ueber die versaeumten Termine.
  *
@@ -1746,6 +1857,7 @@ router.put('/recurring/:id', (req, res) => {
     const id = Number(req.params.id);
     const sent = req.body && typeof req.body === 'object' ? req.body : {};
     const given = (key) => sent[key] !== undefined;
+    const missed = parseMissed(sent);
     db.transaction(() => {
       const existing = loadRecurring(id, req);
       if (!existing) throw new Refusal(404, 'Recurring expense not found.');
@@ -1781,12 +1893,15 @@ router.put('/recurring/:id', (req, res) => {
         }
       }
       const anchorDay = dateMoved || frequency !== existing.frequency ? Number(parsed.expenseDate.slice(8, 10)) : existing.anchor_day;
+      // `missed` gilt nur fuer einen Termin, den der Aufruf SETZT: ein
+      // faelliger Termin, den niemand angefasst hat, rueckt nicht still weiter.
+      const nextRunDate = dateMoved ? startingRunDate(parsed.expenseDate, frequency, anchorDay, missed) : parsed.expenseDate;
       db.get().prepare(`
         UPDATE recurring_expenses
         SET title = ?, description = ?, amount_minor = ?, currency = ?, payer_id = ?, category = ?,
-            split_method = ?, split_snapshot = ?, frequency = ?, next_run_date = ?, anchor_day = ?
+            split_method = ?, split_snapshot = ?, frequency = ?, next_run_date = ?, anchor_day = ?, failed_at = NULL
         WHERE id = ?
-      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, category, parsed.method, JSON.stringify(snapshot), frequency, parsed.expenseDate, anchorDay, existing.id);
+      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, category, parsed.method, JSON.stringify(snapshot), frequency, nextRunDate, anchorDay, existing.id);
       activity(existing.group_id, userId(req), 'recurring_edited', 'recurring_expense', existing.id, expenseSnapshot(parsed.title, parsed.amountMinor, parsed.currency));
     });
     res.json({ data: recurringResponse(id, req) });
@@ -1823,10 +1938,6 @@ router.delete('/recurring/:id', (req, res) => {
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
-
-// Was beim Fortsetzen mit den Terminen geschieht, die waehrend der Pause
-// faellig gewesen waeren. `skip` ist die Vorgabe.
-const MISSED_MODES = ['skip', 'book'];
 
 router.post('/recurring/:id/pause', (req, res) => {
   try {
