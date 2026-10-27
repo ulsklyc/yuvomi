@@ -586,12 +586,35 @@ const PRUNABLE_TABLES = new Set(['tasks', 'shopping_items']);
  *
  * @returns {number} Anzahl gelöschter Einträge.
  */
-export function pruneRemoved(database, table, accountId, seenUids) {
+/**
+ * Markiert die Zeilen dieses Kontos, deren UID ein Abruf geliefert hat, als
+ * gesehen (#1839). Unabhängig vom Prune: auch ein Lauf, der wegen einer nicht
+ * abgerufenen Liste nicht prunt, hat die übrigen gesehen.
+ */
+export function markSeen(database, table, accountId, seenUids) {
+  if (!PRUNABLE_TABLES.has(table)) {
+    throw new Error(`markSeen: refusing to mark unknown table "${table}".`);
+  }
+  const seen = new Set(seenUids);
+  if (!seen.size) return;
+  const rows = database.prepare(
+    `SELECT id, external_uid FROM ${table}
+     WHERE external_source = 'caldav' AND external_account_id = ? AND seen_on_server = 0`
+  ).all(accountId);
+  const mark = database.prepare(`UPDATE ${table} SET seen_on_server = 1 WHERE id = ?`);
+  for (const row of rows) if (seen.has(row.external_uid)) mark.run(row.id);
+}
+
+/**
+ * @param {string[]} [keepUids]  UIDs, die nicht fallen, ohne gesehen zu sein
+ *        (ein wartender Umzug aus einer nicht abgerufenen Liste, #1700)
+ */
+export function pruneRemoved(database, table, accountId, seenUids, keepUids = []) {
   if (!PRUNABLE_TABLES.has(table)) {
     throw new Error(`pruneRemoved: refusing to prune unknown table "${table}".`);
   }
 
-  const uids = [...new Set(seenUids)];
+  const uids = [...new Set([...seenUids, ...keepUids])];
 
   if (uids.length === 0) {
     const remaining = database.prepare(
@@ -608,17 +631,13 @@ export function pruneRemoved(database, table, accountId, seenUids) {
     return 0;
   }
 
+  // Gesehen (#1839): was dieser Abruf liefert, ist ab jetzt belegt gespiegelt.
+  markSeen(database, table, accountId, seenUids);
   const seen = new Set(uids);
   const rows = database.prepare(
     `SELECT id, external_uid, seen_on_server FROM ${table}
      WHERE external_source = 'caldav' AND external_account_id = ?`
   ).all(accountId);
-
-  // Gesehen (#1839): was dieser Abruf liefert, ist ab jetzt belegt gespiegelt.
-  const markSeen = database.prepare(`UPDATE ${table} SET seen_on_server = 1 WHERE id = ?`);
-  for (const row of rows) {
-    if (!row.seen_on_server && seen.has(row.external_uid)) markSeen.run(row.id);
-  }
 
   // NUR WAS GESEHEN WURDE, FÄLLT (#1839), wie beim Termin (`pruneDeletedEvents`):
   // eine nie gesehene, hier angelegte Zeile geht zurück auf lokal und erneut
@@ -951,6 +970,7 @@ async function runSync({ createClient: makeClient } = {}) {
       if (hasTasks) {
         if (incompleteModules.has('tasks')) {
           log.warn(`Account ${account.id}: a reminder list could not be fetched, skipping task deletion.`);
+          markSeen(db.get(), 'tasks', account.id, seenByModule.tasks);
         } else {
           pruneRemoved(db.get(), 'tasks', account.id, seenByModule.tasks);
         }
@@ -959,6 +979,7 @@ async function runSync({ createClient: makeClient } = {}) {
       if (hasShopping) {
         if (incompleteModules.has('shopping')) {
           log.warn(`Account ${account.id}: a reminder list could not be fetched, skipping shopping deletion.`);
+          markSeen(db.get(), 'shopping_items', account.id, seenByModule.shopping);
         } else {
           // Ein wartender Umzug, dessen Objekt in einer nicht abgerufenen
           // Liste liegt (#1700), ist nicht "auf dem Server gelöscht".
@@ -979,7 +1000,8 @@ async function runSync({ createClient: makeClient } = {}) {
               enabledLists.filter((s) => s.target_module === 'shopping').map((s) => s.list_url),
             )
             : [];
-          pruneRemoved(db.get(), 'shopping_items', account.id, [...seenByModule.shopping, ...shielded]);
+          // `shielded` hält, ohne als gesehen zu gelten (#1839).
+          pruneRemoved(db.get(), 'shopping_items', account.id, seenByModule.shopping, shielded);
         }
       }
 

@@ -128,7 +128,7 @@ export function pruneDeletedEvents(database, {
 /**
  * Macht einen nie gesehenen, hier angelegten Termin wieder lokal (#1839): er
  * verliert, was ihn als Spiegel ausweist, und behält sein Ziel - über CalDAV
- * Konto und Kalender, aus denen er kam; die alte iCloud-Verbindung lädt jeden
+ * Konto und Kalender, aus denen er kam, oder den eines wartenden Umzugs; die alte iCloud-Verbindung lädt jeden
  * lokalen Termin ohne lokalen Kalender hinauf. Der nächste Upload trägt
  * dieselbe UID: liegt das Objekt doch oben, übernimmt er es (412).
  * @returns {number} 1, wenn die Zeile zurückgesetzt wurde
@@ -142,7 +142,9 @@ function backToLocal(database, eventId, { source, accountId, calRefId }) {
     UPDATE calendar_events
        SET external_source = 'local', external_calendar_id = NULL, external_object_url = NULL,
            calendar_ref_id = NULL, caldav_account_id = NULL,${forCaldav ? `
-           target_caldav_account_id = ?, target_caldav_calendar_url = ?,` : ''}
+           -- Ein wartender Umzug ist der letzte Wunsch des Nutzers: er wird
+           -- das Ziel, nicht der Kalender, aus dem der Termin kam.
+           target_caldav_account_id = ?, target_caldav_calendar_url = COALESCE(outbound_move_to, ?),` : ''}
            outbound_dirty = 0, outbound_attempts = 0, outbound_move_to = NULL,
            outbound_snapshot = NULL, seen_on_server = 0
      WHERE id = ? AND external_source = ?

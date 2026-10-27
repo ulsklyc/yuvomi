@@ -2241,6 +2241,36 @@ test('Gesehen: iCloud - ein nie gesehener, hier angelegter Termin ohne Objekt ge
   }
 });
 
+test('Gesehen: auch ein Lauf, der wegen einer nicht abgerufenen Liste nicht prunt, markiert, was er gesehen hat (#1839, Review)', async () => {
+  reset();
+  const list = taskList();
+  const broken = dav.addCollection('broken', { name: 'Kaputt', components: ['VTODO'] });
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled)
+    VALUES (?, ?, 'Kaputt', 'tasks', 1)
+  `).run(accountId, broken);
+  const { id } = mirroredTask(list, 'todo-partial@test', 'Teilweise');
+
+  dav.refuse({ method: 'REPORT', status: 503, when: (req) => req.path === new URL(broken).pathname });
+  await remindersSync.sync();
+  assertRefused('REPORT', 503);
+  assert.equal(seenOf('tasks', id), 1, 'der Abruf hat die Aufgabe geliefert, sie gilt aber nicht als gesehen');
+});
+
+test('Gesehen: ein nie gesehener Termin mit wartendem Umzug geht in den Kalender des Umzugs hinauf (#1839, Review)', async () => {
+  reset();
+  const cal = calendar();
+  const other = calendar('other', 'Anderer');
+  const { id, uid } = phantomEvent(cal);
+  db.prepare('UPDATE calendar_events SET outbound_move_to = ?, target_caldav_calendar_url = ? WHERE id = ?')
+    .run(other.url, other.url, id);
+
+  await caldavSync.sync();
+  assert.equal(event(id).external_source, 'caldav', 'der Termin ging nicht wieder hinauf');
+  assert.ok(dav.getObject(other.url, `${uid}.ics`), 'der Termin liegt nicht im Kalender, den der Nutzer gewaehlt hat');
+  assert.equal(dav.getObject(cal.url, `${uid}.ics`), null, 'der Termin ging in den alten Kalender');
+});
+
 // ── CardDAV-Verbindungstest: die Absage erreicht den Nutzer ─────────────────────
 
 test('CardDAV-Konto anlegen: eine Absage des Servers kommt als Meldung an, nicht als "Internal error"', async () => {
