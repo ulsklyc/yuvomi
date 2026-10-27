@@ -1660,11 +1660,30 @@
   margin-inline-end: calc(-1 * var(--space-1));
 }
 
+/* Am Zeiger sieht er aus wie die Kopfknoepfe (40px), trifft aber wie die
+ * Kopfzeile, in der er steht: der "Alle"-Link daneben dehnt seine Flaeche per
+ * `::before` auf 48px, und `--target-base` (44px am Zeiger) ist das Mass jedes
+ * Bedienelements, das nicht selbst zwischen Zeiger und Finger unterscheidet.
+ * Seit DW p7 traf er nur 40x40 (test:dashboard-a11y-browser, Fall 1); vorher
+ * dehnte der Eigenbau-Kreis seine 34px ebenso auf `--target-base`. */
 @media (min-width: 1024px) and (hover: hover) {
   .widget__header > .weather-widget__refresh {
+    position: relative;
     min-height: var(--target-md);
     min-width: var(--target-md);
     margin-block: calc((var(--target-sm) - var(--target-md)) / 2);
+  }
+
+  /* Mittig gesetzt statt per `inset`: der Bezug ist die Polsterbox, und die
+   * Haarlinie des Knopfs nahm je Seite einen Pixel (gemessen 42 statt 44). */
+  .widget__header > .weather-widget__refresh::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--target-base);
+    height: var(--target-base);
+    transform: translate(-50%, -50%);
   }
 }
 

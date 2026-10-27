@@ -1483,7 +1483,7 @@
    *    GEMESSEN WIRD DIE TREFFERFLÄCHE, NICHT DIE BOX. Der „Alle"-Link im
    *    Widget-Kopf (.widget__link) ist 32px hoch und dehnt seine Fläche per
    *    ::before auf 48px aus; eine Box-Messung meldet ihn als Verstoß, obwohl
-   *    der Finger 48px findet (bis DW p7 war der Wetter-Knopf der Musterfall). Das ist zugleich das Rezept für „kompakt aussehen, voll
+   *    der Finger 48px findet (ebenso der Wetter-Knopf: 40px am Zeiger, 44px Fläche). Das ist zugleich das Rezept für „kompakt aussehen, voll
    *    treffen".
    *
    *    Geprüft auf Ebene 4 (Dokument, Puppeteer: `Sonde 4` in

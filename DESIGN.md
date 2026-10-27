@@ -2493,9 +2493,9 @@ als freistehend. Drei `--high`-Chips blieben so gemeldet, waehrend die uebrigen 
 erkannt wurden. Die Sonde fuehrt jetzt zusaetzlich jede EINZELKLASSE - dieselbe Blindheit, die
 Sonde 6 hatte, als sie nach `.metric-grid` fragte und die Reihe nicht sah.
 
-**Gemessen wird die TREFFERFLAECHE, nicht die Box.** `.weather-widget__refresh` ist 34x34
-gross und dehnt seine Flaeche per `::before` auf `--target-base` aus; eine Box-Messung meldet
-ihn als Verstoss, obwohl der Finger 44px findet. Das ist zugleich das Rezept fuer „kompakt
+**Gemessen wird die TREFFERFLAECHE, nicht die Box.** `.weather-widget__refresh` ist am Zeiger
+40x40 gross wie die Kopfknoepfe und dehnt seine Flaeche per `::before` auf `--target-base` aus;
+eine Box-Messung meldet ihn als Verstoss, obwohl der Zeiger 44px findet. Das ist zugleich das Rezept fuer „kompakt
 aussehen, voll treffen".
 
 **Wo gedehnt wird, gehoert die sichtbare Flaeche immer dem eigenen Ziel** (2026-09-24). Die
