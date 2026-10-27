@@ -450,7 +450,7 @@ test('dashboard: the schedule slice brings the names of every plan owner, and th
   try {
     const slice = await dashboard.loadScheduleSlice('2030-05-01');
     const html = dashboard.renderScheduleWidget(slice, [ANNA], '1x2');
-    assert.match(html, /class="schedule-widget-row__name">Clara</, 'the row of a stored plan owner carries a name');
+    assert.match(html, /class="list-row__name schedule-widget-row__name">Clara</, 'the row of a stored plan owner carries a name');
   } finally {
     delete globalThis.__apiStub;
   }

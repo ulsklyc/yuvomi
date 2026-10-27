@@ -151,7 +151,7 @@ function occurrence(typeId, dateKey, overrides = {}) {
 
 test('renderWasteWidget: ein Eintrag je aktivem Typ, Zeilendeckel aus der Kachelgroesse (wie listRowCap)', () => {
   const items = [1, 2, 3, 4, 5, 6, 7].map((id) => ({ type: type(id), next: occurrence(id, `2026-06-${10 + id}`) }));
-  const zeilen = (html) => (html.match(/class="waste-widget-row"/g) || []).length;
+  const zeilen = (html) => (html.match(/class="list-row waste-widget-row"/g) || []).length;
 
   const wide = renderWasteWidget({ items, needsRefresh: false }, '1x2');
   assert.equal(zeilen(wide), listRowCap('1x2'), 'die hohe Kachel muss beim Zeilendeckel (5) stoppen, nicht alle 7 zeigen');

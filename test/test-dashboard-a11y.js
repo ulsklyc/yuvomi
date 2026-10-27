@@ -1073,10 +1073,46 @@ test('U7: jede Kachel hat ein Menue mit Nach vorn / Nach hinten - Eintraege mit 
     assert.deepEqual(entries(last).map((e) => e.replace(/\{.*$/, '')).slice(0, 2), expected(false, true), `${id}: an letzter Stelle nicht weiter nach hinten`);
     assert.match(mid, /data-widget-move="down" data-widget-id="[^"]+"/, 'der Eintrag traegt seine Kachel - derselbe Handler wie Hoch/Runter');
   }
-  // Am Finger stehen Hoch/Runter schon in der Leiste: ein Menue, das nur sie
-  // wiederholte, faellt dort weg - eines mit Optionen bleibt.
-  assert.match(__test.renderWidgetCustomizeControls({ id: 'birthdays', size: '1x1' }, 1, 3), /widget-edit-controls__menu widget-edit-controls__menu--move-only/);
-  assert.doesNotMatch(__test.renderWidgetCustomizeControls({ id: 'calendar', size: '1x1' }, 1, 3), /widget-edit-controls__menu--move-only/);
+});
+
+// U10 (Ulas 2026-10-27): AM FINGER IST DER OPTIONEN-KNOPF EIN TIPP. Mit U7
+// standen die Optionen im "..."-Menue - am Telefon zwei Tipps fuer die
+// haeufigere Handlung, und das Menue wiederholte dort nur Hoch/Runter aus der
+// Leiste. Jetzt traegt jede Kachel mit Optionen zusaetzlich den direkten Knopf;
+// die Zeigerart entscheidet, welcher Ausloeser steht: am Finger der Knopf, am
+// Zeiger das Menue (mit Nach vorn/hinten). Nie beide, nie keiner.
+test('U10: am Finger oeffnet EIN Tipp die Optionen - der direkte Knopf statt des Menues, am Zeiger umgekehrt', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const dashboardCss = await readFile(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const visible = (html) => html.replace(/<template[\s\S]*?<\/template>/g, '');
+  const direct = (html) => [...visible(html).matchAll(/<button type="button" class="widget-edit-controls__options widget-edit-controls__options--direct" data-widget-options="([^"]+)"\s+aria-label="([^"]+)"/g)];
+  const withOptions = __test.renderWidgetCustomizeControls({ id: 'calendar', size: '1x1' }, 1, 3);
+  const [hit] = direct(withOptions);
+  assert.ok(hit, 'eine Kachel mit Optionen traegt den direkten Knopf - ausserhalb des Menues, also ohne Oeffnen erreichbar');
+  assert.equal(hit[1], 'calendar', 'er nennt seine Kachel - derselbe Handler wie der Menue-Eintrag ([data-widget-options])');
+  assert.match(hit[2], /dashboard\.optionsFor/, 'derselbe Name wie der Eintrag im Menue');
+  assert.equal(direct(__test.renderWidgetCustomizeControls({ id: 'birthdays', size: '1x1' }, 1, 3)).length, 0,
+    'ohne Optionen kein Knopf - er oeffnete nichts');
+  assert.match(withOptions, /class="widget-edit-controls__menu"/, 'das Menue bleibt im Markup: am Zeiger ist es der Weg zu Nach vorn/hinten');
+
+  // Welcher Ausloeser steht, entscheidet die Zeigerart.
+  const rules = [...eachRule(dashboardCss)];
+  const displayOf = (selector, coarse) => rules
+    .filter((r) => r.selector.split(',').map((x) => x.trim()).includes(selector)
+      && (coarse ? r.at.some((a) => /\(pointer:\s*coarse\)/.test(a)) : !r.at.length))
+    .map((r) => /(?:^|;)\s*display:\s*([^;]+)/.exec(r.body)?.[1]?.trim())
+    .filter(Boolean)
+    .at(-1);
+  assert.equal(displayOf('.widget-edit-controls__options--direct', false), 'none', 'am Zeiger steht der direkte Knopf nicht - die Optionen liegen im Menue');
+  assert.equal(displayOf('.widget-edit-controls__options--direct', true), 'inline-flex', 'am Finger steht der direkte Knopf');
+  assert.equal(displayOf('.widget-edit-controls__menu', true), 'none', 'am Finger kein Menue: Hoch/Runter stehen in der Leiste, die Optionen am Knopf');
+  assert.equal(displayOf('.widget-edit-controls__menu', false), 'inline-flex', 'am Zeiger das Menue');
+
+  // Ein Tipp: der Klick auf den Knopf geht ohne Umweg an den Optionen-Dialog.
+  const wiring = dashboardSource.slice(dashboardSource.indexOf('function wireDashboardEditMode() {'));
+  const click = wiring.slice(wiring.indexOf("shell.addEventListener('click', (event) => {"));
+  assert.match(click.slice(0, 900), /else if \(btn\.matches\('\[data-widget-options\]'\)\) void editOptions\(btn\);/,
+    'der Knopf laeuft durch denselben Handler wie der Menue-Eintrag');
 });
 
 test('U7: die Sperre der Menue-Eintraege folgt dem Platz - auch im noch nicht geoeffneten Menue', () => {

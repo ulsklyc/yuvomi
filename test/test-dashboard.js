@@ -1212,7 +1212,7 @@ test('Aufgaben-Kachel: begonnene Aufgabe traegt das Zeichen der Aufgabenliste, s
     { id: 1, title: 'Offen', priority: 'none', due_date: todayStr, status: 'open' },
     { id: 2, title: 'Angefangen', priority: 'none', due_date: todayStr, status: 'in_progress' },
   ]);
-  const rows = html.split('class="task-item"').slice(1);
+  const rows = html.split('class="list-row task-item"').slice(1);
   nodeAssert.equal(rows.length, 2);
   const [offen, angefangen] = rows;
   nodeAssert.match(angefangen, /class="task-status-btn task-status-btn--in_progress task-status-btn--static"[^>]*aria-hidden="true"/,
@@ -3746,7 +3746,7 @@ test('Schedule-Widget: die Zeilenzahl kommt aus der Kachelgroesse, nicht aus der
     hasTypes: true,
     entries: users.map((u) => ({ user_id: u.id, shift_type: type })),
   };
-  const zeilen = (html) => (html.match(/class="schedule-widget-row"/g) || []).length;
+  const zeilen = (html) => (html.match(/class="list-row schedule-widget-row"/g) || []).length;
 
   // Die hohe Kachel (1x2, ihr eigener Standard) zeigt fuenf von sechs Zeilen -
   // genau hier stand der Fehler: ohne Deckel waeren es alle sechs gewesen.
@@ -4620,7 +4620,7 @@ test('DW-P1-2 + DW-P3-13: onChanged eines Blatts gleicht still ab - kein render(
   let shellHtml = '';
   let rows = new Map();
   const shell = makeNode();
-  const taskRows = () => [...shellHtml.matchAll(/class="task-item" data-task-id="(\d+)"/g)].map(([, id]) => {
+  const taskRows = () => [...shellHtml.matchAll(/class="list-row task-item" data-task-id="(\d+)"/g)].map(([, id]) => {
     if (!rows.has(id)) {
       const row = makeNode(new Map([['data-task-id', id]]));
       row.dataset.taskId = id;
@@ -4818,7 +4818,7 @@ test('U2: "+ Neu" oeffnet das Anlegen-Blatt ueber der Uebersicht - kein navigate
   let shellHtml = '';
   let rows = new Map();
   const shell = makeNode();
-  const taskRows = () => [...shellHtml.matchAll(/class="task-item" data-task-id="(\d+)"/g)].map(([, id]) => {
+  const taskRows = () => [...shellHtml.matchAll(/class="list-row task-item" data-task-id="(\d+)"/g)].map(([, id]) => {
     if (!rows.has(id)) {
       const row = makeNode(new Map([['data-task-id', id]]));
       row.dataset.taskId = id;

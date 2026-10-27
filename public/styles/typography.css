@@ -373,6 +373,22 @@
 }
 
 /* --------------------------------------------------------------------------
+ * DIE ENDZONE EINER ZEILE: Footnote 13, halbfett, gleich breite Ziffern
+ * (Critique DW 2026-10-26, DW-P1-4)
+ *
+ * Die eine Angabe am Ende einer Zeile (`.list-row__end`, list-row.css):
+ * "wird 41", "Noch 2 Tage", "120 Punkte", "3/26". Sie steht eine Stufe unter
+ * dem Namen und eine Gewichtsstufe ueber der Metazeile - sie ist der Grund,
+ * warum man auf die Zeile schaut, aber nicht ihr Name. Auf der Uebersicht
+ * standen dafuer vier Formen (Pille 13/600 auf Mulde, 15/700, 12/500, 15/600).
+ * ------------------------------------------------------------------------ */
+.list-row__end {
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
  * DIE METAZEILE: Footnote 13, regular (R21, Critique 2026-10-21, D4)
  *
  * EINE ZEILE IST TITEL 16 + METAZEILE 13. Was unter dem Namen einer Zeile,

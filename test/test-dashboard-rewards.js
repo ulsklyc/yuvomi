@@ -277,12 +277,12 @@ test('Groessen: die Kachel entscheidet, wie viel davon steht', () => {
   const kids = ['Anna', 'Ben', 'Carla'].map((name, i) => ({ id: 20 + i, display_name: name, balance: 10 }));
   const parent = (size) => renderRewardsWidget({ view: 'approver', me: 1, standings: kids, catalog: [KINO], pending: 1 }, size);
   const short = parent('1x1');
-  assert.equal((short.match(/class="rewards-member"/g) || []).length, 2);
+  assert.equal((short.match(/class="list-row rewards-member"/g) || []).length, 2);
   assert.match(short, /dashboard\.shoppingMore\{"count":1\}/, 'wer nicht passt, wird gezaehlt');
   assert.doesNotMatch(short, /class="rewards-goal__label"/, 'die flache Kachel zeigt den Balken ohne Satz');
   assert.match(short, /aria-valuetext="rewards\.remainingToReward/, 'die Ansage behaelt den Satz');
   const tall = parent('1x2');
-  assert.equal((tall.match(/class="rewards-member"/g) || []).length, 3);
+  assert.equal((tall.match(/class="list-row rewards-member"/g) || []).length, 3);
   assert.match(tall, /class="rewards-goal__label"/);
 });
 

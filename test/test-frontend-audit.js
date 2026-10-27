@@ -11907,7 +11907,13 @@ test('D8: eine Hoehe je Kopfzeile - Reiter, Listen-Kapseln, Kalender-Lupe und St
 // galt auch waagerecht) und Agenda (eigene Polsterung rundum).
 const ROW_CLASSES = ['list-row', 'agenda-event', 'task-card__main', 'shopping-item', 'recipe-row', 'pantry-row',
   'contact-item', 'birthday-item', 'budget-entry', 'document-row', 'documents-folder-item', 'rw-standing',
-  'rw-ledger-row', 'health-dose', 'health-area-row', 'housekeeping-visit-row'];
+  'rw-ledger-row', 'health-dose', 'health-area-row', 'housekeeping-visit-row',
+  // Die Listen-Kacheln der Uebersicht (DW-P1-4): ihre Zeilen standen auf
+  // 0 (Aufgaben, Termine, Geburtstage) oder 8px (Countdown, Vorrat, Schichtplan,
+  // Entsorgung) und lehnten sich an das Polster der Kachel; jetzt fluchten sie
+  // mit dem 16er Traeger (`.widget__rows > .list-row`, --space-4).
+  'task-item', 'event-item', 'birthday-widget-item', 'countdown-item', 'pantry-widget-row', 'schedule-widget-row',
+  'waste-widget-row', 'shopping-widget-list', 'rewards-member'];
 test('D8: keine Zeilenliste steht waagerecht unter dem Einzug der geteilten Zeile', () => {
   const narrow = /var\(--space-(?:0h|1|1h|2)\)|\b0\b|\d+px/;
   const leaf = new RegExp(`\\.(?:${ROW_CLASSES.join('|')})(?![\\w-])[^\\s>+~]*$`);
@@ -13579,12 +13585,10 @@ test('row lists sit in exactly one carrier', () => {
   // der Guard nicht mehr trifft, ist eine Ausnahme ohne Gegenstand und faellt
   // unten als veraltet auf. Der Schluessel traegt den WERT - ein anderer
   // Radius an derselben Zeile ist wieder ein Befund.
-  const EXEMPT = new Map([
-    ['dashboard.css .countdown-item border-radius: var(--radius-sm)',
-      'Radius fuer Fokusring und Hover-Flaeche, keine Flaeche und kein Schatten im Ruhezustand '
-      + '(Begruendung am Selektor). Ob ein solcher Radius an einer flachen Zeile als Kartenmerkmal '
-      + 'zaehlt, ist offen (#1456) - `.list-row` traegt keinen.'],
-  ]);
+  // (Hier stand `.countdown-item border-radius: var(--radius-sm)` - die Zeile ist
+  // seit DW-P1-4 die geteilte `.list-row` und traegt keinen Radius mehr; #1456
+  // ist damit fuer die Uebersicht beantwortet: der Fokusring rueckt nach innen.)
+  const EXEMPT = new Map();
   const exemptSeen = new Set();
   let rowCount = 0;
 
@@ -13623,6 +13627,51 @@ test('row lists sit in exactly one carrier', () => {
           }
         }
       }
+    }
+  }
+
+  // DIE LISTEN-KACHELN DER UEBERSICHT (Critique DW 2026-10-26, DW-P1-4). Ihre
+  // Zeilen trennten sich auf drei Arten: Haarlinie per `border-bottom` samt
+  // `:last-child`-Ausnahme und Radius (Aufgaben, Termine - die Linie bog an
+  // beiden Enden hoch, DW-P3-1), eigene `X + X`-Linie (Geburtstage, Vorrat,
+  // Countdown, Einkauf), oder gar nicht (Schichtplan, Entsorgung). Der Traeger
+  // ist die Kachel: die Folge traegt `.row-divided` (`widgetRows`), die Zeile
+  // ist die geteilte `.list-row` und zeichnet weder Linie noch Karte selbst.
+  const dash = [...eachRule(read('../public/styles/dashboard.css'))];
+  const DASH_ROWS = ['task-item', 'event-item', 'birthday-widget-item', 'countdown-item', 'pantry-widget-row',
+    'schedule-widget-row', 'waste-widget-row', 'shopping-widget-list', 'rewards-member', 'family-member'];
+  const lastBorderNone = new Set(dash.filter((r) => /(?:^|;)\s*border-bottom:\s*(?:none|0)/.test(r.body))
+    .flatMap((r) => r.selector.split(',').map((x) => x.trim()))
+    .map((x) => x.match(/^(\.[\w-]+):last-child$/)?.[1]).filter(Boolean));
+  for (const rule of dash) {
+    for (const part of rule.selector.split(',').map((x) => x.trim())) {
+      if (lastBorderNone.has(part) && /(?:^|;)\s*border-bottom:\s*1px/.test(rule.body)) {
+        offenders.push(`dashboard.css ${part} trennt per border-bottom + :last-child - die Linie gehoert dem Traeger (+-Kombinator)`);
+      }
+      const leaf = part.split(/\s*[\s>+~]\s*/).pop();
+      const row = DASH_ROWS.find((cls) => new RegExp(`^\\.${cls}(?![\\w-])(?::[\\w-]+(?:\\([^)]*\\))?)*$`).test(leaf));
+      if (!row) continue;
+      for (const prop of ['border-top', 'border-bottom']) {
+        for (const value of declared(rule.body, prop)) {
+          if (!/^(?:0|none)$/.test(value)) offenders.push(`dashboard.css ${part} zeichnet ${prop}: ${value} selbst - die Haarlinie zieht der Traeger (.row-divided)`);
+        }
+      }
+      for (const marker of CARD_MARKERS) {
+        for (const value of declared(rule.body, marker.prop)) {
+          if (marker.isCard(value)) offenders.push(`dashboard.css ${part} traegt ${marker.prop}: ${value} - eine Zeile in einer Kachel ist keine Karte`);
+        }
+      }
+    }
+  }
+  const page = read('../public/pages/dashboard.js');
+  assert.match(page, /function widgetRows\([^)]*\) \{\s*return `<\$\{tag\} class="widget__rows row-divided/,
+    'die Zeilenfolge einer Kachel traegt `.row-divided`: die Kachel ist ihr EINER Traeger');
+  for (const row of DASH_ROWS) {
+    const uses = [...page.matchAll(new RegExp(`class="([^"]*\\b${row}\\b(?![\\w-])[^"]*)"`, 'g'))].map((m) => m[1]);
+    assert.ok(uses.length, `${row}: steht nicht mehr im Markup`);
+    for (const cls of uses) {
+      if (/--more\b/.test(cls)) continue;
+      assert.match(cls, /(?:^|\s)list-row(?:\s|$)/, `${row} ist die geteilte Zeile (class="${cls}")`);
     }
   }
 
@@ -23114,7 +23163,10 @@ test('DW-P3-15: dashboard.css traegt kein :hover ausserhalb von @media (hover: h
     seen += 1;
     if (!rule.at.some((at) => /\(hover:\s*hover\)/.test(at))) stray.push(rule.selector.replace(/\s+/g, ' ').trim());
   }
-  assert.ok(seen >= 20, `Reichweite: nur ${seen} Hover-Regeln gesehen`);
+  // 20 -> 15: mit DW-P1-4 gingen die eigenen Hover der Widget-Zeilen (Aufgaben,
+  // Termine, Countdown, Vorrat, Schichtplan, Entsorgung, Einkauf) in die eine
+  // Regel der geteilten Zeile (list-row.css) auf.
+  assert.ok(seen >= 15, `Reichweite: nur ${seen} Hover-Regeln gesehen`);
   assert.deepEqual(stray, [], `Hover ohne (hover: hover) - auf Touch klebt er:\n${stray.join('\n')}`);
 });
 

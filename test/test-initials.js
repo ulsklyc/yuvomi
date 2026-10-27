@@ -395,8 +395,8 @@ test('Avatar-Stapel kippt mit der Schreibrichtung (alle Stylesheets)', () => {
 
   // Im Dashboard schiebt der Rand am Zeilenanfang den Stapel ans Zeilenende.
   const dashboard = [...eachRule(read('styles/dashboard.css'))]
-    .find((r) => r.at.length === 0 && r.selector === '.event-item .avatar-stack');
-  assert.ok(dashboard, 'Regel nicht gefunden: .event-item .avatar-stack');
+    .find((r) => r.at.length === 0 && r.selector === '.widget__rows > .list-row > .avatar-stack');
+  assert.ok(dashboard, 'Regel nicht gefunden: .widget__rows > .list-row > .avatar-stack (Zeilen der Listen-Kacheln, DW-P1-4)');
   assert.match(dashboard.body, /margin-inline-start:\s*auto/, 'der Stapel steht am Zeilenende');
 });
 test('Avatar-Stapel und Personenauswahl (components/user-multi-select.js)', async () => {

@@ -208,7 +208,7 @@ components:
   widget-header:
     backgroundColor: "{colors.surface} (bandlos seit 2026-08-17; Absender ist das Vollton-Siegel)"
     padding: "12px 16px 8px (die .widget__header-Basisregel; keine Dashboard-Sonderregel mehr)"
-    height: "52px (Titelzeile 32px + 12/8px Polster; keine Kante, keine min-height)"
+    height: "52px (Titelzeile 32px + 12/8px Polster; keine Kante, keine min-height); unter 640px 44px (8/4px Polster, DW-P2-10)"
   day-sheet:
     backgroundColor: "{colors.surface}"
     rounded: "{rounded.xl}"
@@ -2752,6 +2752,24 @@ die links ein BILD statt eines Bedienelements fuehrt (Kontakte). Mehr Stufen gib
 eine dritte Zahl in einem Modul-Stylesheet ist ein Nachbau, und ein Guard sagt das auch so
 („Abweichen ist erlaubt, wiederholen nicht").
 
+**Fuehrung und Endzone (Critique DW 2026-10-26, DW-P1-4).** Die geteilte Zeile hat zwei
+benannte Teile mehr: `.list-row__lead` - EIN Zeichen vor dem Namen, 32px im Quadrat (Avatar,
+Siegel oder Glyphe; ein Punkt oder Ring steht mittig darin), damit jeder Name an derselben Kante
+beginnt - und `.list-row__end` - EINE Angabe am Ende, Footnote halbfett mit gleich breiten
+Ziffern (Rolle in typography.css), ohne Flaeche: "wird 41" ist ein Satzteil, kein Etikett. Erster
+Nutzer sind die Listen-Kacheln der Uebersicht: Aufgaben, Termine, Geburtstage, Countdown, Vorrat,
+Schichtplan, Entsorgung, Familie, Belohnungen und Einkauf trugen neun Zeilen-Dialekte (Titel
+15/600 bis 17/600, Fuehrung 5 bis 40px, drei Trennerformen, kein Druckbild) und sind jetzt
+`.list-row` in der Kachel als ihrem EINEN Traeger (`widgetRows`: `.widget__rows.row-divided`).
+Die Abweichungen der Kachel stehen an EINER Stelle (dashboard.css, "EIN ZEILENGERUEST"): die
+Zeilen reichen bis an die Kartenkanten wie im Heute-Blatt (Einzug 16 = Kante des Kopf-Siegels),
+4px Polster und 52px Mindesthoehe statt 64 (eine Vorschau, keine Arbeitsliste), die Metazeile
+bricht nicht um ("Heute · 17:00 · Ort"). Druck und Hover nur, wo die Zeile ein Ziel ist; reine
+Auskunftszeilen (Familie, Belohnungsstand) bleiben still. Ausgenommen sind wie bisher Notizen,
+Mahlzeiten-Slots und das Heute-Blatt; am Telefon bleibt die Familie die Avatar-Reihe (R19).
+Guards: `test:typography` "R21 S5 + DW-P1-4", `test:frontend-audit` "row lists sit in exactly
+one carrier" und "D8".
+
 **Der Zeileneinzug (R22, D8).** Waagerecht steht eine Zeile auf `--space-3` (12px, `.list-row`),
 `--roomy` und Zeilen, die mit einem 16er Traeger fluchten (Dosis, Besuche), auf `--space-4`.
 Darunter gibt es nichts: Aufgaben mobil (die 8px-Polsterung des Takts galt auch waagerecht) und
@@ -4721,8 +4739,11 @@ der Leiste; damit niemand ziehen muss, traegt jede Kachel im Anpassen-Modus ein 
 hinten" - ein Platz in der Lesereihenfolge, ueber `placeWidget` wie Hoch/Runter, Ansage "Platz n
 von m", der Fokus bleibt am Ausloeser - und, wo vorhanden, den Optionen der Kachel. Am Rand ist
 der Eintrag gesperrt (Menue-Kanon), `syncCustomizeControls` haelt die Sperre auch im noch nicht
-geoeffneten Menue. Am Finger, wo Hoch/Runter in der Leiste stehen, faellt ein Menue ohne
-Optionen weg.
+geoeffneten Menue. **Das Menue steht nur am Zeiger (U10, Ulas 2026-10-27):** am Finger stehen
+Hoch und Runter in der Leiste, und die Optionen waren im Menue zwei Tipps entfernt. Dort steht
+statt des Menues wieder der direkte Optionen-Knopf (`.widget-edit-controls__options--direct`,
+`renderWidgetOptionsButton`, nur an Kacheln mit Optionen) - ein Tipp, derselbe Handler
+`[data-widget-options]`. Welcher Ausloeser steht, entscheidet `(pointer: coarse)`; nie beide.
 
 **Die Kacheln ziehen nach N3** (DW-P2-3, DW-P2-9). Jede Kachelleiste endet im Griff
 (`[data-widget-drag-handle]`), an dem `makeSortable` zieht - per Maus und per Finger (Halten

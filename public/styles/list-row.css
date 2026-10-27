@@ -561,6 +561,38 @@
 }
 
 /* --------------------------------------------------------
+ * Fuehrung und Endzone (Critique DW 2026-10-26, DW-P1-4)
+ *
+ * Was links vor dem Namen steht und was rechts am Ende, hatte die geteilte
+ * Zeile bisher jedem Modul ueberlassen - und die Listen-Kacheln der Uebersicht
+ * zeigten, was daraus wird: Fuehrungen von 5 bis 40px (Punkt, Scheibe,
+ * Avatar 32/38/40), Endangaben als Pille, als fetter Satzteil, als
+ * Kleinschrift. Die beiden Teile sind jetzt benannt:
+ *
+ * - `.list-row__lead`: EIN Zeichen, 32px (`--target-sm`) im Quadrat - ein
+ *   Avatar, ein Siegel oder eine Glyphe; ein kleineres Zeichen (Punkt, Ring)
+ *   steht mittig darin. So beginnt jeder Name an derselben Kante, gleich was
+ *   davor steht.
+ * - `.list-row__end`: EINE Angabe, Footnote halbfett mit gleich breiten
+ *   Ziffern (Rolle in typography.css); der Ton einer Dringlichkeit kommt vom
+ *   Modul, die Flaeche nie - eine Pille hiesse "Etikett", und die Angabe ist
+ *   ein Satzteil.
+ * -------------------------------------------------------- */
+.list-row__lead {
+  flex: none;
+  inline-size: var(--target-sm);
+  block-size: var(--target-sm);
+  display: inline-grid;
+  place-items: center;
+}
+
+.list-row__end {
+  flex: none;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------
    Gespiegelte VTODO-CATEGORIES einer Zeile (#586)
    Anzeige, keine Bedienung: die Etiketten gehören der CalDAV-Quellliste.
    Optisch leiser als der Name, damit sie die Zeile ordnen und nicht führen.

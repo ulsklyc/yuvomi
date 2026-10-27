@@ -1563,6 +1563,20 @@ function skeletonWidget(lines = 3) {
 
 const TASK_STATUS_IN_PROGRESS = () => t('tasks.statusInProgress');
 
+/* EIN ZEILENGERUEST FUER ALLE LISTEN-KACHELN (Critique DW, DW-P1-4). Die
+ * Kachel ist der EINE Traeger ihrer Zeilen (Zeilenlisten-Regel, Fall "Liste IN
+ * einer Karte"): die Folge traegt nur `.row-divided`, jede Zeile ist die
+ * geteilte `.list-row` mit Fuehrung (`.list-row__lead`, 32px: Avatar, Siegel
+ * oder Glyphe), Textspalte (`.list-row__name` 16/500 + `.list-row__meta` 13)
+ * und hoechstens einer Endzone (`.list-row__end`). Vorher standen neun
+ * Zeilen-Dialekte in einem Raster (Titel 15/600 bis 17/600, Fuehrung 5 bis
+ * 40px, drei Trennerformen). Was die Liste kommentiert ("+N weitere"), steht
+ * ausserhalb - eine Fussnote ist kein Eintrag. */
+function widgetRows(rows, { tag = 'div', className = '' } = {}) {
+  return `<${tag} class="widget__rows row-divided${className ? ` ${className}` : ''}">${rows}</${tag}>`;
+}
+
+
 /* Die Zeilen folgen der Groesse wie bei jeder Liste (`listRowCap`, #2087):
  * der Server liefert die fuenf dringendsten fuer die hohe Fassung, eine
  * 1x1-Kachel zeigt davon drei. Ohne Groesse ist es die Vorgabe der Kachel. */
@@ -1578,22 +1592,24 @@ function renderUrgentTasks(allTasks, openTotal = null, size = '1x2') {
   const items = tasks.map((t) => {
     const due = formatDueDate(t.due_date, t.due_time);
     // Begonnen traegt dasselbe Zeichen wie in der Aufgabenliste (#1251), keine
-    // eigene Bauart. Nur dort: eine offene Zeile bekommt keinen leeren Ring, sonst
-    // haette jede Zeile ein viertes Zeichen. Das Wort steht als sr-only daneben,
-    // weil die Zeile role="button" ist und ihre Kinder damit keine eigene Rolle
-    // mehr tragen - ein role="img" am Ring waere dort verloren.
-    const started = t.status === 'in_progress'
-      ? `<span class="task-status-btn task-status-btn--in_progress task-status-btn--static" aria-hidden="true"></span>
-        <span class="sr-only">${esc(TASK_STATUS_IN_PROGRESS())}</span>`
-      : '';
+    // eigene Bauart, und es steht in der Fuehrung der Zeile: dort, wo sonst der
+    // Prioritaetspunkt steht (DW-P1-4 - EIN Zeichen je Fuehrung). Das Wort steht
+    // als sr-only daneben, weil die Zeile role="button" ist und ihre Kinder damit
+    // keine eigene Rolle mehr tragen - ein role="img" am Ring waere dort verloren.
+    const started = t.status === 'in_progress';
+    const lead = started
+      ? '<span class="task-status-btn task-status-btn--in_progress task-status-btn--static" aria-hidden="true"></span>'
+      : t.priority !== 'none'
+        ? `<span class="task-item__priority task-item__priority--${t.priority}" title="${esc(PRIORITY_LABELS()[t.priority] ?? t.priority)}"></span>`
+        : '';
     return `
-      <div class="task-item" data-task-id="${t.id}" data-task-title="${esc(t.title)}" role="button" tabindex="0">
-        ${t.priority !== 'none' ? `<div class="task-item__priority task-item__priority--${t.priority}" title="${esc(PRIORITY_LABELS()[t.priority] ?? t.priority)}" aria-hidden="true"></div>` : ''}
+      <div class="list-row task-item" data-task-id="${t.id}" data-task-title="${esc(t.title)}" role="button" tabindex="0">
+        <span class="list-row__lead task-item__lead" aria-hidden="true">${lead}</span>
         <span class="sr-only">${PRIORITY_LABELS()[t.priority] ?? t.priority}</span>
-        ${started}
-        <div class="task-item__content">
-          <div class="task-item__title">${esc(t.title)}</div>
-          ${due ? `<div class="task-item__meta ${due.overdue ? 'task-item__meta--overdue' : ''} ${due.soon ? 'task-item__meta--soon' : ''}">${due.text}</div>` : ''}
+        ${started ? `<span class="sr-only">${esc(TASK_STATUS_IN_PROGRESS())}</span>` : ''}
+        <div class="list-row__main task-item__content">
+          <div class="list-row__name task-item__title">${esc(t.title)}</div>
+          ${due ? `<div class="list-row__meta task-item__meta${due.overdue ? ' task-item__meta--overdue' : ''}${due.soon ? ' task-item__meta--soon' : ''}">${due.text}</div>` : ''}
         </div>
         ${renderAvatarStack(t.assigned_users ?? [], { size: 28 })}
       </div>
@@ -1605,7 +1621,7 @@ function renderUrgentTasks(allTasks, openTotal = null, size = '1x2') {
   const total = listTotal(openTotal, allTasks.length);
   return `<div class="widget widget--tasks">
     ${widgetHeader('tasks', t('nav.tasks'), total, '/tasks')}
-    <div class="widget__body">${items}${listMoreLine('dashboard.tasksMore', total - tasks.length)}</div>
+    <div class="widget__body widget__body--rows">${widgetRows(items)}${listMoreLine('dashboard.tasksMore', total - tasks.length)}</div>
   </div>`;
 }
 
@@ -1669,24 +1685,24 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
     const timeStr = span.until || span.allDay
       ? overviewEventTime(e, span)
       : `${formatTime(e.start_datetime)}${_suffix ? ' ' + _suffix : ''}`.trim();
-    const badge = isEnded
-      ? `<span class="event-time-badge">${esc(t('dashboard.eventEnded'))}</span>`
-      : `<span class="event-time-badge ${isToday ? 'event-time-badge--today' : ''}">${isToday ? t('common.today') : relativeDateLabel(dayKey)}</span>`;
+    // EINE METAZEILE: "Heute · 17:00 · Sportplatz West" (DW-P2-10). Das Etikett
+    // stand als Pille vor der Zeit und brach am Telefon in eine eigene Zeile
+    // (Termin dreizeilig); der Kalendername stand immer allein darunter. Jetzt
+    // ist der Tag das erste Wort der Zeile, der Zustand haengt weiter nicht an
+    // der Farbe allein ("Vorbei" statt "Heute").
+    const when = isEnded ? t('dashboard.eventEnded') : isToday ? t('common.today') : relativeDateLabel(dayKey);
+    const rest = [timeStr, e.location ? fmtLocation(e.location) : '', e.cal_name || ''].filter(Boolean).map((part) => esc(part));
+    const whenClass = isToday && !isEnded ? ' event-item__when--today' : '';
     return `
-      <div class="event-item${isEnded ? ' event-item--ended' : ''}" data-route="${esc(calendarEventRoute(e))}" role="button" tabindex="0">
+      <div class="list-row event-item${isEnded ? ' event-item--ended' : ''}" data-route="${esc(calendarEventRoute(e))}" role="button" tabindex="0">
         <!-- Dieselbe Regel wie im Kalender, aus derselben Datei. Hier stand
              e.color || e.cal_color - dieselbe Frage ohne den Zweig fuer die
              zugewiesene Person, was seit #891 zwei verschiedene Antworten
              gegeben haette. -->
-        <div class="event-item__bar" style="background-color:${esc(resolveEventColor(e))}"></div>
-        <div class="event-item__content">
-          <div class="event-item__title">${esc(e.title)}</div>
-          <div class="event-item__time">
-            ${badge}
-            ${timeStr}
-            ${e.location ? ` · ${esc(fmtLocation(e.location))}` : ''}
-            ${e.cal_name ? `<span class="event-item__cal">${esc(e.cal_name)}</span>` : ''}
-          </div>
+        <span class="list-row__lead event-item__lead" aria-hidden="true"><span class="event-item__bar" style="background-color:${esc(resolveEventColor(e))}"></span></span>
+        <div class="list-row__main event-item__content">
+          <div class="list-row__name event-item__title">${esc(e.title)}</div>
+          <div class="list-row__meta event-item__time"><span class="event-item__when${whenClass}">${esc(when)}</span>${rest.map((part) => ` · ${part}`).join('')}</div>
         </div>
         ${renderAvatarStack(e.assigned_users ?? [], { size: 28 })}
       </div>
@@ -1716,7 +1732,7 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
     : '';
   return `<div class="widget widget--calendar">
     ${widgetHeader('calendar', t('nav.calendar'), null, '/calendar')}
-    <div class="widget__body">${earlier}${items}${more}</div>
+    <div class="widget__body widget__body--rows">${earlier}${widgetRows(items)}${more}</div>
   </div>`;
 }
 
@@ -1951,15 +1967,15 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
         ? t('birthdays.turnsAge', { age: b.next_age })
         : '';
     return `
-      <div class="birthday-widget-item" data-route="${esc(b.id != null ? `/birthdays?open=${encodeURIComponent(String(b.id))}` : '/birthdays')}" role="button" tabindex="0">
-        <div class="birthday-widget-item__avatar"${avatarStyle}>
+      <div class="list-row birthday-widget-item" data-route="${esc(b.id != null ? `/birthdays?open=${encodeURIComponent(String(b.id))}` : '/birthdays')}" role="button" tabindex="0">
+        <div class="list-row__lead birthday-widget-item__avatar"${avatarStyle}>
           ${b.photo_data ? `<img src="${esc(b.photo_data)}" alt="" loading="lazy">` : `<span>${esc(initials(b.name))}</span>`}
         </div>
-        <div class="birthday-widget-item__body">
-          <div class="birthday-widget-item__name">${esc(b.name)}</div>
-          <div class="birthday-widget-item__meta">${dateAndCount(relativeDateLabel(b.next_date ?? b.next_birthday), daysLabel)}</div>
+        <div class="list-row__main birthday-widget-item__body">
+          <div class="list-row__name birthday-widget-item__name">${esc(b.name)}</div>
+          <div class="list-row__meta birthday-widget-item__meta">${dateAndCount(relativeDateLabel(b.next_date ?? b.next_birthday), daysLabel)}</div>
         </div>
-        ${occasionLabel ? `<div class="birthday-widget-item__age">${esc(occasionLabel)}</div>` : ''}
+        ${occasionLabel ? `<div class="list-row__end birthday-widget-item__age">${esc(occasionLabel)}</div>` : ''}
       </div>
     `;
   }).join('');
@@ -1967,7 +1983,7 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
   const gesamt = listTotal(total, allBirthdays.length);
   return `<div class="widget widget--birthdays">
     ${widgetHeader('birthdays', t('nav.birthdays'), gesamt, '/birthdays')}
-    <div class="widget__body">${items}${listMoreLine('dashboard.birthdaysMore', gesamt - birthdays.length)}</div>
+    <div class="widget__body widget__body--rows">${widgetRows(items)}${listMoreLine('dashboard.birthdaysMore', gesamt - birthdays.length)}</div>
   </div>`;
 }
 
@@ -2000,7 +2016,7 @@ function renderCountdowns(allItems, size, total = null) {
     // Sagt der Zaehler rechts schon „Heute"/„Morgen", traegt die Zeile kein
     // zweites (#1454).
     const when = relativeDateLabel(c.date);
-    const meta = when && when !== label ? `<div class="countdown-item__meta">${esc(when)}</div>` : '';
+    const meta = when && when !== label ? `<div class="list-row__meta countdown-item__meta">${esc(when)}</div>` : '';
     // Die Farbe des Termins trägt die Zeile als schmale Marke - dieselbe
     // Zuordnung, die er im Kalender hat. Eine Aufgabe hat keine, sie bekommt
     // den Modulton.
@@ -2024,15 +2040,15 @@ function renderCountdowns(allItems, size, total = null) {
       ? ` data-task-id="${esc(String(c.id))}" data-task-title="${esc(c.title)}"`
       : ` data-route="/calendar?open=${encodeURIComponent(String(c.id))}&date=${encodeURIComponent(c.date)}"`;
     return `
-      <div class="countdown-item" role="button" tabindex="0"${anchor}${accent}>
-        <span class="countdown-item__icon" aria-hidden="true">
+      <div class="list-row countdown-item" role="button" tabindex="0"${anchor}${accent}>
+        <span class="list-row__lead countdown-item__icon" aria-hidden="true">
           <i data-lucide="${esc(c.icon || 'calendar')}"></i>
         </span>
-        <div class="countdown-item__body">
-          <div class="countdown-item__title">${esc(c.title)}</div>
+        <div class="list-row__main countdown-item__body">
+          <div class="list-row__name countdown-item__title">${esc(c.title)}</div>
           ${meta}
         </div>
-        <div class="countdown-item__days countdown-item__days--${countdownRank(c.days_until)}">${esc(label)}</div>
+        <div class="list-row__end countdown-item__days countdown-item__days--${countdownRank(c.days_until)}">${esc(label)}</div>
       </div>
     `;
   }).join('');
@@ -2065,7 +2081,7 @@ function renderCountdowns(allItems, size, total = null) {
 
   return `<div class="widget widget--countdown">
     ${widgetHeader('countdown', t('dashboard.countdownTitle'), gesamt, null, null, 'dashboard')}
-    <div class="widget__body">${rows}${more}</div>
+    <div class="widget__body widget__body--rows">${widgetRows(rows)}${more}</div>
   </div>`;
 }
 
@@ -2409,13 +2425,13 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
       ? t('dashboard.familyEveryone')
       : familyNameList(who.map((u) => u.display_name));
     sharedRow = `
-      <div class="family-member family-member--shared">
-        <span class="family-widget-avatar family-widget-avatar--group" aria-hidden="true">
+      <div class="list-row family-member family-member--shared">
+        <span class="list-row__lead family-widget-avatar family-widget-avatar--group" aria-hidden="true">
           <i data-lucide="users"></i>
         </span>
-        <span class="family-member__body">
-          <span class="family-member__name">${esc(label)}</span>
-          <span class="family-member__status">${familyEventLabel(sharedNext, todayKey)}</span>
+        <span class="list-row__main family-member__body">
+          <span class="list-row__name family-member__name">${esc(label)}</span>
+          <span class="list-row__meta family-member__status">${familyEventLabel(sharedNext, todayKey)}</span>
         </span>
       </div>`;
   }
@@ -2463,8 +2479,8 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
     // sind Malerei (`aria-hidden`), der Satz sagt dasselbe.
     const firstName = String(u.display_name || '').trim().split(/\s+/)[0] || '';
     return `
-      <div class="family-member">
-        <span class="family-member__face">
+      <div class="list-row family-member">
+        <span class="list-row__lead family-member__face">
           <span class="family-widget-avatar" style="background:${esc(u.avatar_color || AVATAR_FALLBACK_COLOR)};color:${getReadableTextColor(u.avatar_color || AVATAR_FALLBACK_COLOR)}">
             ${u.avatar_data ? `<img src="${esc(u.avatar_data)}" alt="" loading="lazy">` : esc(initials(u.display_name))}
           </span>
@@ -2475,9 +2491,9 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
           ${open > 0 ? `<span class="family-member__count" aria-hidden="true"><i data-lucide="${MODULE_ICON.tasks}" class="family-member__count-icon"></i>${esc(getNumberFormat().format(open))}</span>` : ''}
         </span>
         <span class="family-member__short" aria-hidden="true">${esc(firstName)}</span>
-        <span class="family-member__body">
-          <span class="family-member__name">${esc(u.display_name)}</span>
-          <span class="family-member__status${free ? ' family-member__status--free' : ''}">${status}</span>
+        <span class="list-row__main family-member__body">
+          <span class="list-row__name family-member__name">${esc(u.display_name)}</span>
+          <span class="list-row__meta family-member__status${free ? ' family-member__status--free' : ''}">${status}</span>
         </span>
       </div>`;
   }).join('');
@@ -2510,7 +2526,7 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
          denselben Weg, die ganze Liste. */ ''}
     ${widgetHeader('family', t('dashboard.familyTitle'), null, manageHref, null, 'contacts')}
     <div class="family-widget">
-      <div class="family-widget__list">
+      <div class="widget__rows row-divided family-widget__list">
         ${sharedRow}
         ${rows}
         ${moreCount > 0 ? `<div class="family-member family-member--more">${esc(t('dashboard.shoppingMore', { count: moreCount }))}</div>` : ''}
@@ -3098,13 +3114,21 @@ function rewardAvatarHTML(m) {
   const inner = m.avatar_data
     ? `<img src="${esc(m.avatar_data)}" alt="" loading="lazy">`
     : esc(initials(m.display_name));
-  return `<span class="rewards-member__avatar" aria-hidden="true" style="background:${esc(color)};color:${getReadableTextColor(color)}">${inner}</span>`;
+  return `<span class="list-row__lead rewards-member__avatar" aria-hidden="true" style="background:${esc(color)};color:${getReadableTextColor(color)}">${inner}</span>`;
 }
 
+/* DIE FREIGABE IST EINE ZEILE, KEINE KAPSEL (DW-P3-6). "2 zu bestaetigen"
+ * stand als 44px-Mulde ueber die volle Breite und las sich wie ein
+ * abgeschalteter Knopf; DESIGN.md sagt seit R10: ein getoentes Well ist die
+ * Form der Handlungsaufforderung, nicht der Auskunft - und ein Knopf, der wie
+ * ausgegraut aussieht, ist keins von beidem. Jetzt steht sie im Zeilengeruest
+ * der Kachel: Zeichen vorn, der Satz als Titel, der Druck auf der ganzen
+ * Zeile, der Pfeil sagt "fuehrt weiter". */
 function rewardsFooterHTML(text) {
-  return `<a class="rewards-widget__footer" href="/rewards" data-route="/rewards">
-      <i data-lucide="clock" aria-hidden="true"></i>
-      <span>${esc(text)}</span>
+  return `<a class="list-row rewards-widget__footer" href="/rewards" data-route="/rewards">
+      <span class="list-row__lead rewards-widget__footer-icon" aria-hidden="true"><i data-lucide="clock"></i></span>
+      <span class="list-row__main"><span class="list-row__name">${esc(text)}</span></span>
+      <i data-lucide="chevron-right" class="rewards-widget__footer-chevron" aria-hidden="true"></i>
     </a>`;
 }
 
@@ -3185,21 +3209,19 @@ function renderRewardsFamily(members, rewards, spans) {
   const cap = spans.rows >= 2 ? REWARD_MEMBERS_TALL : REWARD_MEMBERS_SHORT;
   const shown = sorted.slice(0, cap);
   const rows = shown.map((m) => `
-      <li class="rewards-member">
+      <li class="list-row rewards-member">
         ${rewardAvatarHTML(m)}
-        <span class="rewards-member__body">
-          <span class="rewards-member__head">
-            <span class="rewards-member__name">${esc(m.display_name)}</span>
-            <span class="rewards-member__points">${esc(t('dashboard.metricPoints', { count: Number(m.balance) || 0 }))}</span>
-          </span>
+        <span class="list-row__main rewards-member__body">
+          <span class="list-row__name rewards-member__name">${esc(m.display_name)}</span>
           ${rewardGoalHTML(m.balance, rewards.catalog, m.display_name, { compact: spans.rows < 2 })}
         </span>
+        <span class="list-row__end rewards-member__points">${esc(t('dashboard.metricPoints', { count: Number(m.balance) || 0 }))}</span>
       </li>`).join('');
   const more = sorted.length - shown.length;
   const pending = rewards.view === 'approver' ? (Number(rewards.pending) || 0) + (Number(rewards.moneyPending) || 0) : 0;
   return `
-    <div class="widget__body rewards-widget">
-      <ul class="rewards-widget__members">${rows}</ul>
+    <div class="widget__body widget__body--rows rewards-widget">
+      ${widgetRows(rows, { tag: 'ul', className: 'rewards-widget__members' })}
       ${more > 0 ? `<p class="rewards-widget__more">${esc(t('dashboard.shoppingMore', { count: more }))}</p>` : ''}
       ${pending > 0 ? rewardsFooterHTML(t('dashboard.rewardsPending', { count: pending })) : ''}
     </div>`;
@@ -3587,18 +3609,18 @@ function renderScheduleWidget(schedule, users, size) {
     const icon = type?.icon ? `<i data-lucide="${esc(type.icon)}" class="schedule-widget-row__icon" aria-hidden="true"></i>` : '';
     const badge = entry.source === 'extra' ? `<i data-lucide="layers" class="schedule-widget-row__extra-badge" aria-label="${esc(t('schedule.extraBadgeLabel'))}"></i>` : '';
     return `
-      <div class="schedule-widget-row" data-route="/schedule/patterns" role="button" tabindex="0">
-        <span class="schedule-widget-row__avatar" style="background:${esc(accent)};color:${getReadableTextColor(accent)}">${avatarInner}</span>
-        <span class="schedule-widget-row__name">${esc(user?.display_name ?? '')}</span>
-        <span class="schedule-widget-row__shift">${icon}<span class="schedule-widget-row__dot" style="--schedule-color:${esc(swatchColor)}"></span>${shiftLabel}${badge}</span>
+      <div class="list-row schedule-widget-row" data-route="/schedule/patterns" role="button" tabindex="0">
+        <span class="list-row__lead schedule-widget-row__avatar" style="background:${esc(accent)};color:${getReadableTextColor(accent)}">${avatarInner}</span>
+        <span class="list-row__main">
+          <span class="list-row__name schedule-widget-row__name">${esc(user?.display_name ?? '')}</span>
+          <span class="list-row__meta schedule-widget-row__shift"><span class="schedule-widget-row__dot" style="--schedule-color:${esc(swatchColor)}"></span>${icon}${shiftLabel}${badge}</span>
+        </span>
       </div>`;
   }).join('');
 
   return `<div class="widget widget--schedule">
     ${widgetHeader('schedule', t('nav.schedule'), onShift, '/schedule/patterns')}
-    <div class="widget__body">
-      <div class="schedule-widget">${rows}</div>
-    </div>
+    <div class="widget__body widget__body--rows">${widgetRows(rows, { className: 'schedule-widget' })}</div>
   </div>`;
 }
 
@@ -3657,13 +3679,13 @@ function renderPantryWidget(pantry, size) {
       .filter(Boolean).join(' · ');
     const filter = tone === 'expired' ? 'expired' : 'soon';
     return `
-      <div class="pantry-widget-row" data-route="/pantry?filter=${filter}" role="button" tabindex="0">
-        <span class="pantry-widget-row__icon" aria-hidden="true"><i data-lucide="${esc(icon)}"></i></span>
-        <div class="pantry-widget-row__body">
-          <div class="pantry-widget-row__name">${esc(item.name)}</div>
-          <div class="pantry-widget-row__meta">${esc(meta)}</div>
+      <div class="list-row pantry-widget-row" data-route="/pantry?filter=${filter}" role="button" tabindex="0">
+        <span class="list-row__lead pantry-widget-row__icon" aria-hidden="true"><i data-lucide="${esc(icon)}"></i></span>
+        <div class="list-row__main pantry-widget-row__body">
+          <div class="list-row__name pantry-widget-row__name">${esc(item.name)}</div>
+          <div class="list-row__meta pantry-widget-row__meta">${esc(meta)}</div>
         </div>
-        <div class="pantry-widget-row__days pantry-widget-row__days--${tone}">${esc(label)}</div>
+        <div class="list-row__end pantry-widget-row__days pantry-widget-row__days--${tone}">${esc(label)}</div>
       </div>`;
   }).join('');
 
@@ -3678,7 +3700,7 @@ function renderPantryWidget(pantry, size) {
 
   return `<div class="widget widget--pantry">
     ${widgetHeader('pantry', title, total, '/pantry')}
-    <div class="widget__body">${rows}${more}</div>
+    <div class="widget__body widget__body--rows">${widgetRows(rows)}${more}</div>
   </div>`;
 }
 
@@ -3728,10 +3750,10 @@ function renderWasteWidget(waste, size) {
 
     if (!next) {
       return `
-        <div class="waste-widget-row" data-route="${esc(`/waste?type=${encodeURIComponent(String(type.id))}`)}" role="button" tabindex="0">
-          <span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span>
-          <span class="waste-widget-row__name">${icon}${esc(type.name)}</span>
-          <span class="waste-widget-row__date waste-widget-row__date--none">${esc(t('waste.noUpcomingPickup'))}</span>
+        <div class="list-row waste-widget-row" data-route="${esc(`/waste?type=${encodeURIComponent(String(type.id))}`)}" role="button" tabindex="0">
+          <span class="list-row__lead" aria-hidden="true"><span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span></span>
+          <span class="list-row__main"><span class="list-row__name waste-widget-row__name">${icon}${esc(type.name)}</span></span>
+          <span class="list-row__end waste-widget-row__date waste-widget-row__date--none">${esc(t('waste.noUpcomingPickup'))}</span>
         </div>`;
     }
 
@@ -3750,10 +3772,10 @@ function renderWasteWidget(waste, size) {
     const emphasize = next.date_key === earliestDate ? ' waste-widget-row__date--next' : '';
 
     return `
-      <div class="waste-widget-row" data-route="${esc(`/waste${next.deep_link}`)}" role="button" tabindex="0">
-        <span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span>
-        <span class="waste-widget-row__name">${icon}${esc(type.name)}${moved}${coalesced}</span>
-        <span class="waste-widget-row__date${emphasize}">${esc(relativeDateLabel(next.date_key))}</span>
+      <div class="list-row waste-widget-row" data-route="${esc(`/waste${next.deep_link}`)}" role="button" tabindex="0">
+        <span class="list-row__lead" aria-hidden="true"><span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span></span>
+        <span class="list-row__main"><span class="list-row__name waste-widget-row__name">${icon}${esc(type.name)}${moved}${coalesced}</span></span>
+        <span class="list-row__end waste-widget-row__date${emphasize}">${esc(relativeDateLabel(next.date_key))}</span>
       </div>`;
   }).join('');
 
@@ -3773,8 +3795,8 @@ function renderWasteWidget(waste, size) {
 
   return `<div class="widget widget--waste">
     ${widgetHeader('waste', t('nav.waste'), upcomingCount, '/waste')}
-    <div class="widget__body">
-      <div class="waste-widget">${rows}${more}</div>
+    <div class="widget__body widget__body--rows">
+      ${widgetRows(rows, { className: 'waste-widget' })}${more}
       ${refreshWarning}
     </div>
   </div>`;
@@ -6789,6 +6811,7 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
           </button>
         </div>
         ${renderWidgetSizeMenu(w.id, activeSize)}
+        ${renderWidgetOptionsButton(w)}
         ${renderWidgetTileMenu(w, index, total)}
         <button type="button" class="widget-edit-controls__hide" data-widget-hide="${esc(w.id)}" aria-label="${esc(t('dashboard.customizeHide', { widget: widgetLabel(w.id) }))}">
           <i data-lucide="eye-off" aria-hidden="true"></i>
@@ -6813,6 +6836,23 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
  * des Menues, layout.css: "nach oben" an der ersten Kategorie). Die Eintraege
  * entstehen erst beim Oeffnen (`defer`); `syncCustomizeControls` haelt ihre
  * Sperre auch im ungeoeffneten Menue richtig. */
+/* AM FINGER IST DER OPTIONEN-KNOPF WIEDER EIN TIPP (U10, Ulas 2026-10-27).
+ * Mit U7 oeffnete der Regler-Knopf ein Menue, und die Optionen standen dort
+ * als dritter Eintrag: am Telefon zwei Tipps fuer die haeufigere Handlung,
+ * damit am Zeiger "Nach vorn"/"Nach hinten" einen Ort haben. Am Finger
+ * brauchen sie ihn nicht - dort stehen Hoch und Runter in der Leiste. Darum
+ * zwei Ausloeser, und die Zeigerart entscheidet, welcher steht (dashboard.css):
+ * am Finger dieser Knopf (nur an Kacheln mit Optionen), am Zeiger das Menue.
+ * Derselbe Handler (`[data-widget-options]`), dieselbe Form, derselbe Name
+ * wie der Eintrag im Menue. */
+function renderWidgetOptionsButton(w) {
+  if (!widgetHasOptions(w.id)) return '';
+  return `<button type="button" class="widget-edit-controls__options widget-edit-controls__options--direct" data-widget-options="${esc(w.id)}"
+            aria-label="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}">
+      <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+    </button>`;
+}
+
 function renderWidgetTileMenu(w, index = 0, total = 1) {
   const label = widgetLabel(w.id);
   const hasOptions = widgetHasOptions(w.id);
@@ -6826,7 +6866,7 @@ function renderWidgetTileMenu(w, index = 0, total = 1) {
       { action: 'widget-options', icon: 'sliders-horizontal', label: t('dashboard.optionsFor', { widget: label }), attrs: { 'data-widget-options': w.id } },
     ] : []),
   ];
-  return `<div class="widget-edit-controls__menu${hasOptions ? '' : ' widget-edit-controls__menu--move-only'}">${popoverMenuHtml({
+  return `<div class="widget-edit-controls__menu">${popoverMenuHtml({
     id: `widget-tile-menu-${w.id}`,
     label: t('common.moreActionsNamed', { name: label }),
     icon: 'ellipsis',
@@ -7225,7 +7265,6 @@ function renderShoppingLists(lists, openTotal = null, listTotalCount = null) {
 
     const itemsHtml = list.items.map((item) => `
       <div class="shopping-widget-item">
-        <span class="shopping-widget-item__dot"></span>
         <span class="shopping-widget-item__name">${esc(item.name)}</span>
         ${item.quantity ? `<span class="shopping-widget-item__qty">${esc(item.quantity)}</span>` : ''}
       </div>
@@ -7243,10 +7282,12 @@ function renderShoppingLists(lists, openTotal = null, listTotalCount = null) {
     const listRoute = `/shopping?list=${encodeURIComponent(String(list.id))}`;
 
     return `
-      <div class="shopping-widget-list" data-route="${esc(listRoute)}" role="button" tabindex="0">
+      <div class="list-row shopping-widget-list" data-route="${esc(listRoute)}" role="button" tabindex="0">
+        <span class="list-row__lead shopping-widget-list__icon" aria-hidden="true"><i data-lucide="${MODULE_ICON.shopping}"></i></span>
+        <div class="list-row__main">
         <div class="shopping-widget-list__header">
-          <span class="shopping-widget-list__name">${esc(list.name)}</span>
-          <span class="shopping-widget-list__count">${list.total_count - list.open_count}/${list.total_count}</span>
+          <span class="list-row__name shopping-widget-list__name">${esc(list.name)}</span>
+          <span class="list-row__end shopping-widget-list__count">${list.total_count - list.open_count}/${list.total_count}</span>
         </div>
         <div class="shopping-widget-list__progress">
           <div class="shopping-widget-list__bar" style="--progress-scale:${progress / 100}"></div>
@@ -7258,13 +7299,14 @@ function renderShoppingLists(lists, openTotal = null, listTotalCount = null) {
                 Zeile bleibt der Weg zu ihr und sagt, warum sie leer ist. */ ''}
           ${list.open_count === 0 ? `<div class="shopping-widget-item shopping-widget-item--more">${esc(t('dashboard.shoppingListNothingOpen'))}</div>` : ''}
         </div>
+        </div>
       </div>
     `;
   }).join('');
 
   return `<div class="widget widget--shopping">
     ${widgetHeader('shopping', t('nav.shopping'), totalOpen, '/shopping')}
-    <div class="widget__body">${listsHtml}${listMoreLine('dashboard.shoppingMoreLists', moreLists)}</div>
+    <div class="widget__body widget__body--rows">${widgetRows(listsHtml)}${listMoreLine('dashboard.shoppingMoreLists', moreLists)}</div>
   </div>`;
 }
 

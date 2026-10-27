@@ -572,7 +572,7 @@ test('der Rueckgaengig-Streifen blendet JEDE Darstellung der Aufgabe aus (#918)'
   const dash = await dashboardJs();
   assert.match(dash, /data-object-kind="\$\{esc\(row\.kind\)\}" data-object-id=/,
     'die Cockpit-Zeile benennt ihr Objekt');
-  assert.match(dash, /class="task-item" data-task-id=/, 'die Widget-Zeile nennt ihre Aufgabe');
+  assert.match(dash, /class="list-row task-item" data-task-id=/, 'die Widget-Zeile nennt ihre Aufgabe');
 });
 
 test('wer die Aufgabe von aussen oeffnet, bekommt ihr Blatt (#918)', async () => {

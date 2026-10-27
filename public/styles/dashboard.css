@@ -665,43 +665,106 @@
  * Behälter; sie reagiert nicht, ihr Inhalt tut es. */
 
 /* --------------------------------------------------------
- * Aufgaben-Widget
- * Kompakte Items: 8px vertikales Padding, enger Spacing.
+ * EIN ZEILENGERUEST FUER ALLE LISTEN-KACHELN (Critique DW 2026-10-26, DW-P1-4)
+ *
+ * Gemessen (1440, Seed) standen in einem Raster neun Zeilen-Dialekte: Titel
+ * 15/600 (Aufgaben, Termine, Geburtstage, Belohnungen), 16/600 (Vorrat),
+ * 16/500 (Schichtplan), 17/600 (Familie), 15/400 (Einkauf); Fuehrung 5 bis
+ * 40px; Trenner als Haarlinie mit Radius (sie bog an beiden Enden hoch,
+ * DW-P3-1), ohne Radius oder gar nicht; Zeilen 44 bis 83px hoch; und keine
+ * antippbare Zeile quittierte den Druck. Das Auge musste je Kachel neu
+ * lernen, wo Name, Zeit und Wer stehen.
+ *
+ * JETZT IST ES DIE GETEILTE ZEILE (`.list-row`, list-row.css), mit ihren
+ * Rollen: Name 16/500, Metazeile 13, eine Fuehrung von 32px, eine Endzone.
+ * Kein Nachbau daneben - die Abweichungen der Kachel stehen hier und nur hier:
+ *
+ * - DER TRAEGER IST DIE KACHEL. `.widget__rows` traegt nur `.row-divided`
+ *   (Haarlinie per `+`-Kombinator) und reicht bis an die Kartenkanten, wie die
+ *   Zeilen des Heute-Blatts: Druck- und Hoverflaeche laufen ueber die ganze
+ *   Breite, die Karte schneidet sie an ihrem Radius. Der Einzug der Zeile ist
+ *   der der Karte (16, `--space-4`): Siegel im Kopf und Fuehrung der Zeilen
+ *   stehen an derselben Kante.
+ * - DICHTER ALS IM MODUL: 4px Polster oben und unten, Mindesthoehe 52px
+ *   (`--target-lg` + `--space-1`) - eine Zeile mit Name und Metazeile misst
+ *   52-53px, eine einzeilige dieselben 52. Im Modul sind es 64; die Kachel
+ *   ist eine Vorschau, und vier Zeilen mehr je Schirm sind ihr Zweck.
+ * - DIE METAZEILE BRICHT NICHT UM: Tag, Zeit und Ort stehen in EINER Zeile
+ *   mit Ellipse ("Heute · 17:00 · Sportplatz West"); ein Termin war am
+ *   Telefon dreizeilig, weil das Tagesetikett eine eigene Zeile nahm.
+ * - DRUCK nur, wo die Zeile ein Ziel ist (`[role="button"]`, `a`): der
+ *   Press-Baustein in list-row.css greift dort von selbst; eine reine
+ *   Auskunftszeile (Familie, Belohnungsstand) zeigt auch keinen Hover.
  * -------------------------------------------------------- */
-.task-item {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--color-border-subtle);
-  cursor: pointer;
-  touch-action: pan-y pinch-zoom;
-  transition: background-color var(--transition-fast);
+.widget__rows {
+  margin: 0 calc(-1 * var(--space-4));
+  padding: 0;
+  list-style: none;
 }
 
-.task-item:last-child {
-  border-bottom: none;
+.widget__rows > .list-row {
+  min-height: calc(var(--target-lg) + var(--space-1));
+  padding: var(--space-1) var(--space-4);
+}
+
+.widget__rows > .list-row:is([role="button"], a) {
+  cursor: pointer;
+  touch-action: pan-y pinch-zoom;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Die Karte clippt (Radius) - der Ring rueckt nach innen, statt an den
+ * Kanten beschnitten zu werden (wie die Zeilen des Heute-Blatts). */
+.widget__rows > .list-row:focus-visible {
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 @media (hover: hover) {
-  .task-item:hover {
-    background-color: var(--color-surface-hover);
+  .widget__rows > .list-row:not([role="button"], a):hover {
+    background-color: transparent;
   }
 }
 
+/* Wer dran ist (Aufgaben, Termine): der Avatar-Stapel steht am Zeilenende und
+ * gibt nicht nach - der Name schrumpft, nicht die Gesichter. */
+.widget__rows > .list-row > .avatar-stack {
+  flex: none;
+  margin-inline-start: auto;
+}
+
+.widget__rows .list-row__meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Die Fussnote ("+N weitere") und die Faltzeile der beendeten Termine stehen
+ * an der Kante der Namen, nicht an der Kartenkante: sie gehoeren zur Liste. */
+.widget__rows ~ :is(.widget-list-more, .countdown-more, .pantry-widget-more, .waste-widget-more, .rewards-widget__more),
+.event-list__earlier {
+  padding-inline: calc(var(--target-sm) + var(--space-3)) 0;
+}
+
+/* Der Koerper einer Zeilenkachel: oben nur so viel Luft, dass Kopf und erste
+ * Zeile (die ihr eigenes Polster mitbringt) wie im Heute-Blatt stehen. */
+.dashboard .widget > .widget__body--rows {
+  padding-block: var(--space-2) var(--space-3);
+}
+
+/* Aufgaben: der Prioritaetspunkt bzw. der Ring "Begonnen" in der Fuehrung.
+ * Zweite, farbunabhaengige Kodierung (WCAG 1.4.1): hohe Prioritaet = gefuellt +
+ * groesser, niedrige = hohler Ring + kleiner. So unterscheidet auch eine
+ * farbfehlsichtige sehende Person die Dringlichkeit an Form und Groesse, nicht
+ * nur am Farbton. Screenreader lesen zusaetzlich das sr-only-Label. */
 .task-item__priority {
+  display: block;
   width: var(--space-2);
   height: var(--space-2);
   border-radius: var(--radius-full);
-  flex-shrink: 0;
-  margin-top: var(--space-1);
   box-sizing: border-box;
 }
 
-/* Zweite, farbunabhängige Kodierung (WCAG 1.4.1): hohe Priorität = gefüllt +
- * größer, niedrige = hohler Ring + kleiner. So unterscheidet auch eine
- * farbfehlsichtige sehende Person die Dringlichkeit an Form und Größe, nicht
- * nur am Farbton. Screenreader lesen zusätzlich das sr-only-Label. */
 .task-item__priority--urgent {
   background-color: var(--color-priority-urgent);
   width: 11px;
@@ -735,7 +798,6 @@
  * mit. */
 .task-item .task-status-btn--in_progress {
   display: flex;
-  flex-shrink: 0;
   width: var(--space-5);
   height: var(--space-5);
   margin-top: 0;
@@ -747,23 +809,7 @@
   height: var(--space-5);
   border-radius: var(--radius-full);
   border: 2px solid var(--color-warning);
-}
-
-.task-item__content {
-  flex: 1;
-  min-width: 0;
-}
-
-.task-item__title {
-  color: var(--color-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.task-item__meta {
-  color: var(--color-text-tertiary);
-  margin-top: 1px;
+  box-sizing: border-box;
 }
 
 .task-item__meta--overdue {
@@ -776,126 +822,36 @@
   font-weight: var(--font-weight-medium);
 }
 
-.task-item__avatar {
-  width: var(--space-5);
-  height: var(--space-5);
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-on-accent);
-  flex-shrink: 0;
-  margin-top: 1px;
-  overflow: hidden;
-}
-
-.task-item__avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* --------------------------------------------------------
- * Termine-Widget
- * Kompakt: Farbbalken + Inhalt, enge Abstände.
- * -------------------------------------------------------- */
-.event-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--color-border-subtle);
-  cursor: pointer;
-  touch-action: pan-y pinch-zoom;
-  transition: background-color var(--transition-fast);
-}
-
-.event-item:last-child {
-  border-bottom: none;
-}
-
-@media (hover: hover) {
-  .event-item:hover {
-    background-color: var(--color-surface-hover);
-  }
-}
-
-/* Kalenderfarbe als Dot statt Seitenstreifen — gleiches Vokabular wie die
- * farbigen Status-Dots der Aufgabenliste. */
+/* Termine: die Kalenderfarbe als Punkt in der Fuehrung - dasselbe Vokabular
+ * wie der Prioritaetspunkt der Aufgaben daneben. */
 .event-item__bar {
+  display: block;
   width: var(--space-2);
   height: var(--space-2);
-  align-self: center;
   border-radius: var(--radius-full);
-  flex-shrink: 0;
   background-color: var(--color-accent);
 }
 
-.event-item__content {
-  flex: 1;
-  min-width: 0;
-}
-
-.event-item .avatar-stack {
-  flex-shrink: 0;
-  margin-inline-start: auto;
-  padding-inline-start: var(--space-1);
-}
-
-.event-item__title {
+/* "Heute" ist das erste Wort der Metazeile und traegt dort das Gewicht, das
+ * vorher die Pille trug - in der Schrift, nicht in einer Flaeche. */
+.event-item__when--today {
   color: var(--color-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.event-item__time {
-  font-size: var(--type-secondary);
-  color: var(--color-text-tertiary);
-  margin-top: 1px;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-.event-item__cal {
-  width: 100%;
-  /* Sichtbarer Kalendername = echter Meta-Text → lesbares Tertiär-Token
-   * (WCAG AA verifiziert) statt der disabled-Farbe (Critique/Assessment B). */
-  color: var(--color-text-tertiary);
-}
-
-.event-time-badge {
-  font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
-  padding: var(--space-px) var(--space-1);
-  border-radius: var(--radius-full);
-  background-color: var(--color-surface-3);
-  color: var(--color-text-secondary);
-}
-
-.event-time-badge--today {
-  background-color: var(--color-accent-light);
-  color: var(--color-accent);
 }
 
 /* Beendet heute (#1449): der Termin tritt zurueck, ueber die Farbe und nicht
- * ueber die Deckung (#1230). Der Titel geht auf die Sekundaerstimme, das
- * Etikett sagt „Vorbei" statt „Heute" - der Zustand haengt nicht an der Farbe
- * allein. Die Zeile bleibt antippbar: der Termin ist vorbei, nicht weg. */
+ * ueber die Deckung (#1230). Der Titel geht auf die Sekundaerstimme, die
+ * Metazeile sagt „Vorbei" statt „Heute" - der Zustand haengt nicht an der
+ * Farbe allein. Die Zeile bleibt antippbar: der Termin ist vorbei, nicht weg. */
 .event-item--ended .event-item__title {
   color: var(--color-text-secondary);
 }
 
 /* „+N frühere heute": die gefalteten beendeten Termine als ruhige Zahl ueber
- * den zwei, die noch einzeln stehen. */
+ * den zwei, die noch einzeln stehen - eine Fussnote wie "+N weitere", ohne
+ * eigene Linie (der Traeger darunter hat keine Kante oben). */
 .event-list__earlier {
-  margin: 0;
-  padding: var(--space-1) 0;
-  border-bottom: 1px solid var(--color-border-subtle);
+  margin: 0 0 var(--space-1);
   font-size: var(--type-caption);
   color: var(--color-text-tertiary);
 }
@@ -1178,42 +1134,33 @@
 /* --------------------------------------------------------
  * Shopping-Widget
  * -------------------------------------------------------- */
-/* Zeile im Widget-Träger (Zeilenlisten-Regel, tokens.css): kein eigener Radius,
- * und ENTWEDER Haarlinie ODER Abstand - beides zugleich zeichnet die Trennung
- * doppelt. Der Hover läuft dafür über die volle Zeilenbreite. */
+/* Eine Liste ist eine Zeile der Kachel (DW-P1-4): Zeichen vorn, der Name
+ * 16/500, rechts die Zahl erledigt/gesamt als Endzone, darunter Balken und die
+ * offenen Artikel. Der Druck liegt auf der ganzen Liste - sie fuehrt in genau
+ * diese Liste. Vorher trug die Liste einen Nachbau der Zeile (eigenes Polster,
+ * negativer Rand, eigene Haarlinie, eigener Hover). */
 .shopping-widget-list {
-  cursor: pointer;
-  touch-action: pan-y pinch-zoom;
-  transition: background-color var(--transition-fast);
-  padding: var(--space-2) var(--space-4);
-  margin-inline: calc(var(--space-4) * -1);
+  align-items: start;
+  padding-block: var(--space-2);
 }
 
-@media (hover: hover) {
-  .shopping-widget-list:hover {
-    background-color: var(--color-surface-hover);
-  }
+.shopping-widget-list__icon {
+  border-radius: var(--radius-full);
+  background: var(--color-fill-well);
+  color: var(--color-text-secondary);
 }
 
-.shopping-widget-list + .shopping-widget-list {
-  border-top: 1px solid var(--color-border-subtle);
+.shopping-widget-list__icon svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
 }
 
 .shopping-widget-list__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-1);
-}
-
-.shopping-widget-list__name {
-  color: var(--color-text-primary);
-}
-
-.shopping-widget-list__count {
-  font-size: var(--text-xs);
-  color: var(--color-text-tertiary);
-  font-weight: var(--font-weight-medium);
+  gap: var(--space-2);
+  min-height: var(--target-sm);
 }
 
 .shopping-widget-list__progress {
@@ -1248,19 +1195,11 @@
 
 .shopping-widget-item {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2);
   font-size: var(--type-secondary);
   color: var(--color-text-secondary);
-  line-height: 1.4;
-}
-
-.shopping-widget-item__dot {
-  width: 5px;
-  height: 5px;
-  border-radius: var(--radius-full);
-  background-color: var(--color-text-disabled);
-  flex-shrink: 0;
+  line-height: var(--line-height-snug);
 }
 
 .shopping-widget-item__name {
@@ -1274,6 +1213,7 @@
 .shopping-widget-item__qty {
   color: var(--color-text-tertiary);
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 /* "Nichts offen" einer gewaehlten Liste (#1818): ein Zustand der Liste, leise,
@@ -4654,17 +4594,29 @@ button.today-cockpit__more--link {
 
 /* DAS MENUE DER KACHEL (U7): Nach vorn, Nach hinten und - wo vorhanden - die
  * Optionen. Sein Ausloeser ist der Kreis `.widget-edit-controls__options`.
- * Am Finger stehen Hoch und Runter schon in der Leiste; ein Menue, das nur sie
- * wiederholte, waere ein zweiter Weg zur selben Handlung und kostete der
- * Telefonzeile 48px Name - dort steht es nur, wo es Optionen traegt. */
+ *
+ * NUR AM ZEIGER (U10, Ulas 2026-10-27). Am Finger stehen Hoch und Runter
+ * schon in der Leiste; das Menue wiederholte sie und machte aus den Optionen
+ * zwei Tipps (Menue, dann Eintrag). Dort steht statt seiner wieder der
+ * direkte Optionen-Knopf (`--direct`, nur an Kacheln mit Optionen): ein Tipp.
+ * Am Zeiger ist es umgekehrt - der direkte Knopf fehlt, das Menue traegt die
+ * Optionen mit. Nie beide: zwei Kreise fuer dieselbe Handlung. */
 .widget-edit-controls__menu {
   display: inline-flex;
   flex: 0 0 auto;
 }
 
+.widget-edit-controls__options--direct {
+  display: none;
+}
+
 @media (pointer: coarse) {
-  .widget-edit-controls__menu--move-only {
+  .widget-edit-controls__menu {
     display: none;
+  }
+
+  .widget-edit-controls__options--direct {
+    display: inline-flex;
   }
 }
 
@@ -5140,38 +5092,19 @@ button.today-cockpit__more--link {
   padding: var(--space-4);
 }
 
-.dashboard .task-item,
-.dashboard .event-item,
 .dashboard .meal-slot,
-.dashboard .shopping-widget-list,
 .dashboard .note-item {
   border-radius: var(--radius-sm);
 }
 
-/* Touch-Targets: bei Fingereingabe die Zeilen-Trefferflächen auf das
-   iOS-Minimum (44px) heben, ohne die Desktop-Dichte anzufassen. */
+/* Touch-Targets: bei Fingereingabe die Slot-Trefferflaechen auf das
+   iOS-Minimum (44px) heben, ohne die Desktop-Dichte anzufassen. Die Zeilen
+   der Listen-Kacheln brauchen das nicht mehr: sie sind 52px hoch
+   (`.widget__rows > .list-row`). */
 @media (pointer: coarse) {
-  .dashboard .task-item,
-  .dashboard .event-item,
-  .dashboard .birthday-widget-item,
-  .dashboard .countdown-item,
-  .dashboard .shopping-widget-list,
   .dashboard .meal-slot {
     min-height: var(--target-base);
     box-sizing: border-box;
-  }
-}
-
-@media (hover: hover) {
-  .dashboard .task-item:hover,
-  .dashboard .event-item:hover,
-  .dashboard .shopping-widget-list:hover {
-    /* Konsistent mit task/event: Hover gibt Feedback OHNE Lesbarkeit zu senken.
-     * Farbige Zettel vertragen keinen Flächen-Tint → sanfter Schatten-Lift statt
-     * des früheren opacity:0.8-Dimmens. */
-    transform: none;
-    opacity: 1;
-    box-shadow: var(--shadow-sm);
   }
 }
 
@@ -5191,40 +5124,20 @@ button.today-cockpit__more--link {
  * Schlagschatten und der Glas-Refresh-Knopf entfallen: auf einer opaken Karte
  * braucht ein Icon keinen Schatten, um zu sitzen. Die Basisregel oben trägt
  * das Widget jetzt allein. */
-.birthday-widget-item {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
-  /* Inset-Rows statt Karte-in-Karte (Apple: Zeilen trennen sich per Hairline,
-   * nie per Rahmen): kein eigener Rahmen, keine eigene Flaeche. */
-  cursor: pointer;
-  touch-action: pan-y pinch-zoom;
-}
-
-.birthday-widget-item + .birthday-widget-item {
-  border-top: 1px solid var(--color-border-subtle);
-}
-
+/* Geburtstage: der Avatar ist die Fuehrung. EIN KONTAKT OHNE HAUSHALTS-
+ * VERKNUEPFUNG HAT KEINE IDENTITAETSFARBE, und genau das soll die Scheibe
+ * sagen. v2.19 hat das schon so begruendet („contacts without a link keep the
+ * neutral tint on purpose"), aber der „neutrale" Ton war der MODULTON - eine
+ * Farbaussage, nur eine leise. Wer verknuepft ist, traegt seine Mitgliedsfarbe;
+ * wer es nicht ist, traegt gar keine. Vollton-Regel, zweiter Zweig (DESIGN.md,
+ * Colors). 32px wie jede Fuehrung (vorher 40). */
 .birthday-widget-item__avatar {
-  width: 40px;
-  height: 40px;
   border-radius: var(--radius-full);
   overflow: hidden;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  /* EIN KONTAKT OHNE HAUSHALTS-VERKNUEPFUNG HAT KEINE IDENTITAETSFARBE, und
-   * genau das soll die Scheibe sagen. v2.19 hat das schon so begruendet
-   * („contacts without a link keep the neutral tint on purpose"), aber der
-   * „neutrale" Ton war der MODULTON - eine Farbaussage, nur eine leise. Wer
-   * verknuepft ist, traegt seine Mitgliedsfarbe; wer es nicht ist, traegt gar
-   * keine. Vollton-Regel, zweiter Zweig (DESIGN.md, Colors). */
   background: var(--color-fill-well);
   color: var(--color-text-secondary);
   font-weight: var(--font-weight-bold);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
 }
 
 .birthday-widget-item__avatar img {
@@ -5233,111 +5146,20 @@ button.today-cockpit__more--link {
   object-fit: cover;
 }
 
-.birthday-widget-item__body {
-  min-width: 0;
-}
+/* "wird 41" ist die Endzone der Zeile - Footnote halbfett, ohne Pille: seit
+ * Etappe 4 (2026-08-17) steht dort der ganze Satz (birthdays.turnsAge), und
+ * ein Satzteil in einer Mulde las sich als Etikett neben "13 Tage". */
 
-.birthday-widget-item__name {
-  color: var(--color-text-primary);
-  /* Zeilentitel der Uebersicht: 15px semibold wie der Notiztitel daneben
-   * (vorher geerbte 16px - siehe "VIER LESESTUFEN" am Dateiende). */
-  font-size: var(--type-secondary);
-  font-weight: var(--font-weight-semibold);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.birthday-widget-item__meta {
-  margin-top: var(--space-0h);
-  color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.birthday-widget-item__age {
-  min-width: 34px;
-  text-align: center;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-full);
-  /* Trailing Badge statt eingefasster Mini-Box: getoent wie der Avatar,
-   * Textfarbe zur Ink-Seite gemischt (AA, Konvention siehe tokens.css).
-   * Seit Etappe 4 (2026-08-17) steht im Badge der ganze Satz („wird 37",
-   * birthdays.turnsAge) statt der nackten Zahl: „37" neben „13 Tage" verlangte
-   * Kopfrechnen, und das Label stand unsichtbar schon im title-Attribut.
-   *
-   * NEUTRAL SEIT 2026-08-18: „getoent wie der Avatar" stimmt nicht mehr - der
-   * Avatar traegt die Farbe des MITGLIEDS, das Badge trug die des Moduls, und
-   * eine Zahl nennt ohnehin keine Identitaet. Zwei Toenungen nebeneinander,
-   * von denen eine gar nichts sagt (Skalen-Regel, Gegenrichtung). */
-  white-space: nowrap;
-  background: var(--color-fill-well);
-  color: var(--color-text-secondary);
-  /* Footnote semibold statt 14px fett ("VIER LESESTUFEN" am Dateiende). */
-  font-size: var(--type-caption);
-  font-weight: var(--font-weight-semibold);
-}
-
-/* Countdown-Kachel (#647). Bewusst dieselbe Zeilenform wie die Geburtstage
- * darueber - drei Spalten, Hairline per +-Kombinator, kein eigener Rahmen:
- * beide beantworten dieselbe Frage („was, wann, noch wie lange"), und zwei
- * Formen dafuer waeren zwei Sorten Eintrag.
+/* Countdown-Kachel (#647). Bewusst dieselbe Zeile wie die Geburtstage
+ * darueber: beide beantworten dieselbe Frage („was, wann, noch wie lange"),
+ * und zwei Formen dafuer waeren zwei Sorten Eintrag.
  *
- * Der Unterschied steht in der ersten Spalte: statt eines Avatars die Marke der
+ * Der Unterschied steht in der Fuehrung: statt eines Avatars die Marke der
  * Herkunft. Ihre Farbe kommt aus `--countdown-accent`, das die Zeile setzt -
  * beim Termin seine eigene Kalenderfarbe, bei der Aufgabe der Modulton. Ohne
  * diese Zuordnung waere die Liste eine dritte Sorte Eintrag ohne Heimat. */
-.countdown-item {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-2);
-  cursor: pointer;
-  touch-action: pan-y pinch-zoom;
-  /* Der Radius dient dem Fokusring: ohne ihn saesse ein hartes Rechteck genau
-   * auf den Haarlinien der Nachbarzeilen. Er zieht der Zeile keine Karte an -
-   * es gibt weder Flaeche noch Schatten im Ruhezustand. */
-  border-radius: var(--radius-sm);
-  transition: background-color var(--transition-fast);
-}
-
-.countdown-item + .countdown-item {
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-/* DAS BENANNTE TOKEN, KEIN SCHATTEN. Die Zeile trug `cursor: pointer` und
- * antwortete dem Zeiger nicht - der einzige klickbare Bereich des Dashboards
- * ohne Rueckmeldung (Critique 2026-08-17).
- *
- * Sie haengt sich dabei NICHT an die Hover-Gruppe von `.task-item`/`.event-item`
- * weiter unten, obwohl das der kuerzere Weg gewesen waere: die Gruppe hebt per
- * `box-shadow`, und ein Schatten auf einer Haarlinien-Zeile ist genau das
- * „einer Zeile in einer Liste eine Karte anziehen", das DESIGN.md verbietet.
- * Jene Zeilen sind eigene Bloecke, diese ist eine Zeile in EINEM Traeger.
- *
- * `--color-surface-hover` ist der dokumentierte Schritt von `--color-surface`
- * aus - dieselbe Antwort, die `.list-row:hover` app-weit gibt. Eine eigene
- * Mischung stand hier im ersten Anlauf und waere eine 38. Prozentstufe
- * gewesen, wo ein benanntes Token existiert. */
-@media (hover: hover) {
-  .dashboard .countdown-item:hover {
-    background-color: var(--color-surface-hover);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .countdown-item { transition: none; }
-}
-
 .countdown-item__icon {
-  width: 32px;
-  height: 32px;
   border-radius: var(--radius-full);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   background: color-mix(in srgb, var(--countdown-accent, var(--color-accent)) var(--tint-surface), transparent);
   /* DER RING TRAEGT DIE FARBE, DIE FLAECHE KANN ES NICHT (Vollton-Regel,
    * zweiter Zweig - DESIGN.md, Colors). Eine Vollton-FUELLUNG braucht eine
@@ -5347,69 +5169,21 @@ button.today-cockpit__more--link {
    * Ring liegt daneben statt darunter und braucht deshalb keine - dieselbe
    * Antwort wie die 3px-Kante am Kalenderblock, nur rund. */
   box-shadow: inset 0 0 0 var(--space-0h) var(--countdown-accent, var(--color-accent));
-  /* Tinte und Toenung bleiben unveraendert: sie nehmen das gemessene
-   * 35-%-Rezept und
-   * nicht den vollen Akzent, den DESIGN.md fuer Icons nennt: der Satz „Icons
-   * tragen den vollen Akzent (dort gilt 3:1)" steht INNERHALB der
-   * Akzent-auf-Toenung-Regel, deren Grenze ein Absatz weiter oben gezogen ist -
-   * kuratierte Modultoene. Hier steht ein Zwitter: Modulton bei der Aufgabe,
-   * freie Terminfarbe beim Termin.
-   *
-   * Gemessen im Dunkelmodus, weil die 3:1 eine Anforderung ist und keine
-   * Zusage: mit vollem Akzent lag ein Termin in #111111 bei 1.22:1 und ein
-   * blauer bei 3.86:1 - der eine unsichtbar, der andere hart an der Kante. Mit
-   * 35 % liegt derselbe schwarze Fall bei 6.2:1, und die Farbfamilie bleibt
-   * lesbar. Die 16-%-Toenung der Flaeche darunter traegt sie mit. */
+  /* Tinte und Toenung nehmen das gemessene 35-%-Rezept und nicht den vollen
+   * Akzent: gemessen im Dunkelmodus lag ein Termin in #111111 mit vollem
+   * Akzent bei 1.22:1 und ein blauer bei 3.86:1 - der eine unsichtbar, der
+   * andere hart an der Kante. Mit 35 % liegt derselbe schwarze Fall bei 6.2:1,
+   * und die Farbfamilie bleibt lesbar. */
   color: color-mix(in srgb, var(--countdown-accent, var(--color-accent)) 35%, var(--color-text-primary));
 }
 
-.countdown-item__body {
-  min-width: 0;
-}
-
-.countdown-item__title {
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-semibold);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.countdown-item__meta {
-  margin-top: var(--space-0h);
-  color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* DIE ZAHL IST DER GRUND, WARUM DIE ZEILE DA STEHT, und sie steht deshalb
- * rechts und traegt Gewicht - anders als beim Geburtstagsalter aber ohne
- * Badge-Flaeche: „ca. 3 Jahre" ist ein Satzteil, keine Ziffer, und in einer
- * Pille umgebrochen saehe er wie ein Etikett aus.
- *
- * DIE FARBE SAGT „WIE BALD", NICHT „WOHER". Hier stand die Terminfarbe (erst
- * als 70-%-Ink-Mix, dann als gemessene 35 %), und damit kodierte der lauteste
- * Kanal der Zeile die Herkunft - eine Frage, die das Zeichen links schon
- * beantwortet. Gemessen las die Kachel „Heute / Heute / Heute / Morgen /
- * Morgen": fuenf Zeilen, zwei Werte, keine Rangfolge, und die auffaelligste war
- * die mit der dunkelsten Kalenderfarbe. Die Herkunftsfarbe blieb auf der
- * Zeichenscheibe, wo sie hingehoert.
- *
- * Vier Raenge aus `countdownRank()` (utils/countdown.js), damit Schwelle und
- * Formulierung dieselbe Vorstellung von „nah" haben: die 30-Tage-Grenze ist
- * hier dieselbe, an der der Text von exakt auf grob schaltet. */
-.countdown-item__days {
-  color: var(--color-text-secondary);
-  font-weight: var(--font-weight-bold);
-  white-space: nowrap;
-}
-
-/* Der Rest, der nicht in die Kachel passt. Sekundaerton und keine Trennlinie
- * davor: die Zeile ist eine Fussnote zur Liste, kein weiterer Eintrag darin. */
+/* DIE ZAHL IST DER GRUND, WARUM DIE ZEILE DA STEHT - sie ist die Endzone.
+ * DIE FARBE SAGT „WIE BALD", NICHT „WOHER": die Herkunftsfarbe steht auf der
+ * Zeichenscheibe, wo sie hingehoert. Vier Raenge aus `countdownRank()`
+ * (utils/countdown.js), damit Schwelle und Formulierung dieselbe Vorstellung
+ * von „nah" haben. */
 .countdown-more {
   margin: var(--space-2) 0 0;
-  padding: 0 var(--space-2);
   color: var(--color-text-tertiary);
 }
 
@@ -5419,10 +5193,8 @@ button.today-cockpit__more--link {
 /* Heute und morgen - die Zahl, wegen der jemand hinsieht. */
 .countdown-item__days--now     { color: var(--color-warning); }
 /* Der exakt gezaehlte Bereich traegt Label-Farbe: nah genug, um zu zaehlen,
- * nicht nah genug, um zu rufen. */
+ * nicht nah genug, um zu rufen. `later` bleibt beim Sekundaerton der Endzone. */
 .countdown-item__days--soon    { color: var(--color-text-primary); }
-/* `later` bleibt beim Sekundaerton der Basisregel - eine eigene Regel dafuer
- * waere eine Wiederholung, die beim naechsten Umbau auseinanderlaeuft. */
 
 /* „Heute dran"-Karte (Seele-Paket): pro Mitglied eine Zeile mit Avatar, Name
  * und heutiger Kurzlage - statt einer Stat-Zahl, die sich nie aendert.
@@ -5431,11 +5203,6 @@ button.today-cockpit__more--link {
   display: flex;
   flex-direction: column;
   padding: var(--space-2) var(--space-4) var(--space-4);
-}
-
-.family-widget__list {
-  display: flex;
-  flex-direction: column;
 }
 
 /* Die Tagesbilanz des Haushalts schliesst die Karte ab - als hairline-getrennte
@@ -5453,67 +5220,32 @@ button.today-cockpit__more--link {
   line-height: var(--line-height-tight);
 }
 
-.family-member {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  /* space-2h statt space-2: eine Handvoll Personen auf einer 1x2-Kachel duerfen
-   * atmen - die Enge stammte aus der Zeit, als die Karte noch um ihren Platz
-   * rang, und sie war der Grund, warum der Ueberschuss unten so gross wurde. */
-  padding: var(--space-2h) 0;
-}
-
-.family-member + .family-member {
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-.family-member__body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0h);
-  min-width: 0;
-}
-
-.family-member__name {
-  color: var(--color-text-primary);
-  /* Der Name ist der Titel seiner Zeile und traegt jetzt dieselbe Stufe wie
-   * jeder andere Zeilentitel des Boards (--type-card-title). 14px war die
-   * Ausnahme, nicht die Regel - in derselben Karte, in der ein Avatar 38px
-   * misst, las der Name daneben wie eine Bildunterschrift. */
-  font-size: var(--type-card-title);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-snug);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.family-member__status {
-  overflow: hidden;
-  color: var(--color-text-secondary);
-  font-size: var(--type-caption);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* „Heute frei" ist Ruhe, keine Information, die um Aufmerksamkeit bittet. */
+/* Die Zeile einer Person ist die geteilte Zeile der Kachel (DW-P1-4): Gesicht
+ * als Fuehrung, Name 16/500, Kurzlage als Metazeile. Sie ist Auskunft, kein
+ * Ziel - kein Druck, kein Hover. */
+/* "Heute frei" ist Ruhe, keine Information, die um Aufmerksamkeit bittet. */
 .family-member__status--free {
   color: var(--color-text-tertiary);
 }
 
 .family-member--more {
+  padding: var(--space-2) 0 0 calc(var(--target-sm) + var(--space-3));
   color: var(--color-text-tertiary);
   font-size: var(--type-caption);
 }
 
+/* Der Rest der Familie ist eine Fussnote, kein Eintrag: ohne Linie davor. */
+.family-widget__list > .family-member--more {
+  border-top: 0;
+}
+
 .family-widget-avatar {
-  /* 38px: die Familienkarte ist die einzige, in der das Gesicht der Person das
-   * Erkennungsmerkmal der Zeile ist - nicht ein Modulton, nicht ein Icon. Sie
-   * darf dafuer groesser sein als ein Listen-Avatar, und die Karte hat die
-   * Hoehe dafuer laengst. */
-  width: 38px;
-  height: 38px;
+  /* 32px wie jede Fuehrung (DW-P1-4; vorher 38: "das Gesicht ist das
+   * Erkennungsmerkmal der Zeile" - das ist es in Geburtstagen, Schichtplan und
+   * Belohnungen genauso, und dort stand es 32 bzw. 40 gross). Die Avatar-Reihe
+   * am Telefon nimmt ihr eigenes Mass (unten). */
+  width: var(--target-sm);
+  height: var(--target-sm);
   border-radius: var(--radius-full);
   display: inline-flex;
   align-items: center;
@@ -5576,21 +5308,33 @@ button.today-cockpit__more--link {
  * Fusszeile steht in den Marken. Gemessen 390px: Karte 427 -> 166px. */
 @media (max-width: 639px) {
   .family-widget__list {
+    display: flex;
     flex-flow: row wrap;
     justify-content: space-around;
     gap: var(--space-2) var(--space-1);
+    margin-inline: 0;
   }
 
-  .family-member {
+  /* Die Reihe ist keine Zeilenliste: die Zelle einer Person nimmt nichts von
+   * der geteilten Zeile (Polster, Mindesthoehe, Haarlinie). */
+  .family-widget__list > .family-member {
     flex: 1 1 0;
     flex-direction: column;
     gap: var(--space-1);
     min-width: 0;
+    min-height: 0;
     padding: 0;
+    border-top: 0;
   }
 
-  .family-member + .family-member {
-    border-top: 0;
+  .family-member__face.list-row__lead {
+    inline-size: auto;
+    block-size: auto;
+  }
+
+  .family-member__face > .family-widget-avatar {
+    width: 38px;
+    height: 38px;
   }
 
   .family-member:not(.family-member--shared) > .family-member__body {
@@ -5602,7 +5346,7 @@ button.today-cockpit__more--link {
     white-space: nowrap;
   }
 
-  .family-member--shared {
+  .family-widget__list > .family-member--shared {
     order: 1;
     flex: 1 0 100%;
     flex-direction: row;
@@ -5614,25 +5358,32 @@ button.today-cockpit__more--link {
   }
 
   .family-member--shared > .family-member__body {
-    flex-direction: row;
+    display: flex;
+    flex: 0 1 auto;
     gap: var(--space-1);
+    min-inline-size: 0;
     max-inline-size: 100%;
   }
 
-  /* NICHT ZWEIMAL VOLLE BREITE (R21 S7). Teilt nur ein Teil der Familie den
-   * Termin, steht hier statt "Alle" die Namensliste - bei sechs Personen 391px
-   * in einer 332px-Zeile: sie schob den Termin ganz hinaus und endete
-   * abgeschnitten ohne Ellipse ("... und Linda Joh"). Die Liste kuerzt mit
-   * Ellipse, der Termin daneben bleibt lesbar - er ist die Nachricht, die
-   * Namen sind ihr Absender. */
+  /* DER TERMIN NIMMT DIE VOLLE BREITE (DW-P2-10). Hier stand
+   * `max-inline-size: 60%` am Termin - 60 % eines Koerpers, der selbst nur so
+   * breit wie sein Inhalt ist: gemessen 390px stand "20:00 Filmabend" auf 82px
+   * gekuerzt neben "Alle", in einer 332px-Zeile. Jetzt kuerzt zuerst die
+   * Namensliste (R21 S7: "... und Linda Joh" schob den Termin hinaus) - sie
+   * schrumpft hundertfach schneller -, der Termin erst, wenn auch sie am Ende
+   * ist. Er ist die Nachricht, die Namen sind ihr Absender. */
   .family-member--shared .family-member__status {
-    flex: 0 0 auto;
-    max-inline-size: 60%;
+    flex: 0 1 auto;
+    min-inline-size: 0;
   }
 
   .family-member--shared .family-member__name {
-    flex: 0 1 auto;
+    display: block;
+    flex: 0 100 auto;
     min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--color-text-secondary);
     font-size: var(--type-caption);
     font-weight: var(--font-weight-regular);
@@ -5709,6 +5460,7 @@ button.today-cockpit__more--link {
   .family-member--more {
     flex: 0 0 auto;
     align-self: center;
+    padding: 0;
   }
 
   .family-widget__footer {
@@ -6144,33 +5896,14 @@ button.today-cockpit__more--link {
   white-space: nowrap;
 }
 
-/* Die Eltern-Sicht: je Kind eine Zelle, nebeneinander, soweit die Breite
- * reicht - auf einer breiten Karte stehen die Kinder Seite an Seite, auf einer
- * schmalen untereinander. Nach Namen geordnet, keine Zelle hervorgehoben. */
-.rewards-widget__members {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
-  gap: var(--space-3) var(--space-5);
-}
-
-.rewards-member {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  align-items: start;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
+/* Die Eltern-Sicht: je Kind eine Zeile im Zeilengeruest der Kachel (DW-P1-4),
+ * nach Namen geordnet, keine hervorgehoben. Vorher standen die Kinder als
+ * Zellen nebeneinander, soweit die Breite reichte - mit eigenem Kopf (Name
+ * 15/600 + Punkte rechts) und eigener Fuehrung; jetzt Avatar vorn, unter dem
+ * Namen der Weg zur Praemie, der Stand in der Endzone. Eine Auskunft, kein
+ * Ziel: die Zeile selbst fuehrt nirgends hin. */
 .rewards-member__avatar {
-  width: 32px;
-  height: 32px;
   border-radius: var(--radius-full);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   font-size: var(--text-xs);
   font-weight: var(--font-weight-bold);
   overflow: hidden;
@@ -6182,82 +5915,59 @@ button.today-cockpit__more--link {
   object-fit: cover;
 }
 
+.widget__rows > .rewards-member {
+  padding-block: var(--space-2);
+}
+
 .rewards-member__body {
-  display: flex;
-  flex-direction: column;
   gap: var(--space-1h);
-  min-width: 0;
-}
-
-.rewards-member__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.rewards-member__name {
-  color: var(--color-text-primary);
-  /* Zeilentitel: 15px semibold (vorher geerbte 16px medium). */
-  font-size: var(--type-secondary);
-  font-weight: var(--font-weight-semibold);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rewards-member__points {
-  color: var(--color-text-secondary);
-  font-size: var(--type-caption);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
 
 .rewards-widget__more {
-  margin: var(--space-2) 0 0;
+  margin: 0;
   color: var(--color-text-tertiary);
   font-size: var(--type-caption);
 }
 
-/* Der Fuss-Chip ist ein Bedienelement (ein Link, er springt in die
- * Belohnungen, wo die Freigaben stehen) und war 38px hoch - unter der Zielgroesse der Geraetewelt.
- * Die Breite trug die Zeile ohnehin; gefehlt hat nur die Hoehe, deshalb
- * min-height statt eines groesseren Innenabstands: der Chip soll ein Chip
- * bleiben und nicht zur Schaltflaeche werden. */
-.rewards-widget__footer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-  min-height: var(--target-base);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-full);
-  /* NEUTRAL: der Chip ist ein BEDIENELEMENT, und ein Bedienelement traegt die
-   * Stimme oder gar nichts, nie den Modulton (Eine-Stimme-Regel). Die Herkunft
-   * nennt das Vollton-Siegel im Kopf desselben Widgets. */
-  background: var(--color-fill-well);
-  color: var(--color-text-primary);
-  font-size: var(--type-secondary);
-  font-weight: var(--font-weight-medium);
+/* DIE FREIGABE IST EINE ZEILE (DW-P3-6): Zeichen vorn, der Satz als Titel,
+ * der Pfeil am Ende sagt "fuehrt weiter"; Druck und Hover der geteilten Zeile.
+ * Vorher eine 44px-Mulde ueber die volle Breite, die wie ein abgeschalteter
+ * Knopf aussah. Sie reicht wie die Zeilen bis an die Kartenkanten und trennt
+ * sich von den Staenden darueber mit derselben Haarlinie. */
+.dashboard .rewards-widget > .rewards-widget__footer {
+  margin-inline: calc(-1 * var(--space-4));
+  min-height: calc(var(--target-lg) + var(--space-1));
+  padding: var(--space-1) var(--space-4);
+  color: inherit;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color var(--transition-fast);
+  touch-action: pan-y pinch-zoom;
 }
 
-/* Der Ruhezustand ist bereits eine erhoehte Flaeche (--color-fill-well =
- * --color-surface-3), der Hover nimmt deshalb die Stufe ueber DIESER, nicht die
- * ueber der Grundflaeche - sonst faellt er im Dark auf seine eigene Farbe. */
-@media (hover: hover) {
-  .rewards-widget__footer:hover {
-    background: var(--color-surface-elevated-hover);
-  }
+.dashboard .rewards-widget > .rewards-widget__members + .rewards-widget__footer,
+.dashboard .rewards-widget > .rewards-widget__more + .rewards-widget__footer {
+  border-top: 1px solid var(--color-border-subtle);
 }
 
-.rewards-widget__footer svg {
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
+.dashboard .rewards-widget > .rewards-widget__footer:focus-visible {
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+.rewards-widget__footer-icon {
+  border-radius: var(--radius-full);
+  background: var(--color-fill-well);
+  color: var(--color-text-secondary);
+}
+
+.rewards-widget__footer-icon svg,
+.rewards-widget__footer-chevron {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: none;
+}
+
+.rewards-widget__footer-chevron {
+  color: var(--color-text-tertiary);
 }
 
 /* --------------------------------------------------------
@@ -6266,37 +5976,12 @@ button.today-cockpit__more--link {
  * rechtsbuendiger Zustand), ohne Rang: eine feste Reihenfolge waere hier
  * eine erfundene Rangfolge unter Diensten.
  * -------------------------------------------------------- */
-.schedule-widget {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.schedule-widget-row {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1h) var(--space-2);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  touch-action: pan-y pinch-zoom;
-  transition: background-color var(--transition-fast);
-}
-
-@media (hover: hover) {
-  .schedule-widget-row:hover {
-    background-color: var(--color-surface-2);
-  }
-}
-
+/* Die Zeile einer Person: Avatar als Fuehrung, Name, darunter die Schicht
+ * als Metazeile (Punkt in der Schichtfarbe, Zeichen, Wort). Vorher stand die
+ * Schicht rechts in derselben Zeile - 44px hoch, Name 16/500 neben 16/600
+ * der Nachbarkacheln. */
 .schedule-widget-row__avatar {
-  width: 32px;
-  height: 32px;
   border-radius: var(--radius-full);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   font-size: var(--text-xs);
   font-weight: var(--font-weight-bold);
   overflow: hidden;
@@ -6308,41 +5993,30 @@ button.today-cockpit__more--link {
   object-fit: cover;
 }
 
-.schedule-widget-row__name {
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-medium);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.schedule-widget-row__shift {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--color-text-tertiary);
-  white-space: nowrap;
+.schedule-widget-row__dot,
+.schedule-widget-row__icon,
+.schedule-widget-row__extra-badge {
+  display: inline-block;
+  vertical-align: text-bottom;
+  margin-inline-end: var(--space-1);
 }
 
 .schedule-widget-row__dot {
-  display: inline-block;
-  width: .7rem;
-  height: .7rem;
-  border-radius: 50%;
+  width: var(--space-2h);
+  height: var(--space-2h);
+  vertical-align: baseline;
+  border-radius: var(--radius-full);
   background: var(--schedule-color);
-  flex: 0 0 auto;
 }
 
-.schedule-widget-row__icon {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
+.schedule-widget-row__icon,
+.schedule-widget-row__extra-badge {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 
 .schedule-widget-row__extra-badge {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
+  margin-inline: var(--space-1) 0;
   color: var(--color-text-tertiary);
 }
 
@@ -6356,67 +6030,31 @@ button.today-cockpit__more--link {
  * Zustand), nur ohne Avatar: die Identitaet der Zeile ist der Typ, nicht eine
  * Person, daher ein Farbpunkt statt eines Avatars.
  * -------------------------------------------------------- */
-.waste-widget {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.waste-widget-row {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1h) var(--space-2);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  touch-action: pan-y pinch-zoom;
-  transition: background-color var(--transition-fast);
-}
-
-@media (hover: hover) {
-  .waste-widget-row:hover {
-    background-color: var(--color-surface-2);
-  }
-}
-
+/* Abfuhr: der Punkt in der Farbe der Abfallart in der Fuehrung, die Art als
+ * Name, das Datum als Endzone (DW-P1-4). */
 .waste-widget-row__dot {
-  display: inline-block;
-  width: .7rem;
-  height: .7rem;
-  border-radius: 50%;
+  display: block;
+  width: var(--space-2h);
+  height: var(--space-2h);
+  border-radius: var(--radius-full);
   background: var(--waste-color);
-  flex: 0 0 auto;
 }
 
-.waste-widget-row__name {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-medium);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.waste-widget-row__icon,
+.waste-widget-row__flag {
+  display: inline-block;
+  vertical-align: text-bottom;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--color-text-tertiary);
 }
 
 .waste-widget-row__icon {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-  color: var(--color-text-tertiary);
+  margin-inline-end: var(--space-1);
 }
 
 .waste-widget-row__flag {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-  color: var(--color-text-tertiary);
-}
-
-.waste-widget-row__date {
-  color: var(--color-text-tertiary);
-  white-space: nowrap;
+  margin-inline-start: var(--space-1);
 }
 
 .waste-widget-row__date--none {
@@ -6428,12 +6066,10 @@ button.today-cockpit__more--link {
  * hier gibt es nur "der naechste" und "der Rest". */
 .waste-widget-row__date--next {
   color: var(--widget-accent);
-  font-weight: var(--font-weight-semibold);
 }
 
 .waste-widget-more {
-  margin: var(--space-1) 0 0;
-  padding: 0 var(--space-2);
+  margin: var(--space-2) 0 0;
   color: var(--color-text-tertiary);
 }
 
@@ -6468,103 +6104,38 @@ button.today-cockpit__more--link {
  * neutral auf der Mulde: die Farbe der Zeile gehoert der Dringlichkeit, der
  * Modulton steht einmal im Siegel des Kopfes.
  * -------------------------------------------------------- */
-.pantry-widget-row {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2);
-  /* Kein Radius: eine Zeile in EINEM Traeger ist keine Karte (Zeilenlisten-
-   * Regel, test:frontend-audit „row lists sit in exactly one carrier"). */
-  cursor: pointer;
-  touch-action: pan-y pinch-zoom;
-  transition: background-color var(--transition-fast);
-}
-
-.pantry-widget-row + .pantry-widget-row {
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-/* Das benannte Token, kein Schatten - dieselbe Antwort wie .countdown-item. */
-@media (hover: hover) {
-  .dashboard .pantry-widget-row:hover {
-    background-color: var(--color-surface-hover);
-  }
-}
-
-@media (pointer: coarse) {
-  .dashboard .pantry-widget-row {
-    min-height: var(--target-base);
-    box-sizing: border-box;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pantry-widget-row { transition: none; }
-}
-
 .pantry-widget-row__icon {
-  width: 32px;
-  height: 32px;
   border-radius: var(--radius-full);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   background: var(--color-fill-well);
   color: var(--color-text-secondary);
 }
 
 .pantry-widget-row__icon svg,
 .pantry-widget-row__icon i {
-  width: 16px;
-  height: 16px;
-}
-
-.pantry-widget-row__body {
-  min-width: 0;
-}
-
-.pantry-widget-row__name {
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-semibold);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  width: var(--icon-md);
+  height: var(--icon-md);
 }
 
 .pantry-widget-row__meta {
-  margin-top: var(--space-0h);
-  color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-/* Die Resttage sind der Grund, warum die Zeile da steht: rechts, mit Gewicht,
- * ohne Badge-Flaeche - „Laeuft morgen ab" ist ein Satzteil, kein Etikett.
+/* Die Resttage sind der Grund, warum die Zeile da steht: die Endzone, ohne
+ * Badge-Flaeche - „Laeuft morgen ab" ist ein Satzteil, kein Etikett.
  * Drei Raenge aus pantryExpiryTone() (utils/pantry-status.js): */
-.pantry-widget-row__days {
-  color: var(--color-text-secondary);
-  font-weight: var(--font-weight-semibold);
-  white-space: nowrap;
-}
-
 /* Abgelaufen - das Einzige, das jetzt eine Entscheidung verlangt (essen,
  * pruefen, wegwerfen). Der Gefahrenton steht nur hier, in der Schrift. */
 .pantry-widget-row__days--expired {
   color: var(--color-danger);
-  font-weight: var(--font-weight-bold);
 }
 /* Heute und morgen - der Tag, an dem man es noch verbrauchen kann. */
 .pantry-widget-row__days--now { color: var(--color-warning); }
-/* `soon` bleibt beim Sekundaerton der Basisregel: nah genug fuer die Liste,
+/* `soon` bleibt beim Sekundaerton der Endzone: nah genug fuer die Liste,
  * nicht nah genug, um zu rufen. */
 
 /* Der Rest, der nicht in die Kachel passt - eine Fussnote, kein Eintrag. */
 .pantry-widget-more {
   margin: var(--space-2) 0 0;
-  padding: 0 var(--space-2);
   color: var(--color-text-tertiary);
 }
 
@@ -6839,11 +6410,23 @@ button.today-cockpit__more--link {
     padding-right: var(--space-3);
   }
 
+  /* EIN RHYTHMUS: zwischen Blatt und Raster derselbe Abstand wie zwischen
+   * zwei Kacheln (16, DW-P2-10) - vorher 12 gegen 16. */
   .dashboard-shell {
-    gap: var(--space-3);
+    gap: var(--space-4);
     /* Bewusst ohne eigene Bottom-Reserve: die FAB-Clearance traegt bereits
      * .dashboard (116px). Beide zusammen ergaben ~200px toten Raum vor der
      * Bottom-Bar (Audit A1-16). */
+  }
+
+  /* MOBIL GEHOERT DER PLATZ DEM INHALT (DW-P2-10). Vom Fensterrand bis zum
+   * Heute-Blatt standen 157px: 16 Seite + 8 Kopfband + 12 + 93 Kopf + 12 +
+   * 16. Das Kopfband und der Kopf polstern oben nicht mehr doppelt (die Seite
+   * hat ihre 16 schon - das Datum steht damit wie der Titel jedes Moduls)
+   * und unten gar nicht: den Abstand zum Blatt traegt allein die Luecke des
+   * Kopfbands. Gemessen 157 -> 129px; das Blatt selbst ist unveraendert. */
+  .dashboard-masthead {
+    padding-top: 0;
   }
 
   .dashboard-overview {
@@ -6852,7 +6435,24 @@ button.today-cockpit__more--link {
     border-left: 0;
     border-right: 0;
     gap: var(--space-3);
-    padding: var(--space-3);
+    padding: var(--space-1) var(--space-3) 0;
+  }
+
+  /* DER KACHELKOPF MOBIL: 44 statt 52px, und die erste Zeile steht 4px
+   * darunter (vorher 12) - Kopf und Polster bis zum Inhalt 48 statt 64px
+   * (DW-P2-10, H6). Sechs Kacheln im Seed geben so 96px an den Inhalt zurueck.
+   * Siegel, Titel und "Alle" bleiben, wie sie sind; nur die Luft schrumpft. */
+  .widget__header {
+    padding: var(--space-2) var(--space-4) var(--space-1);
+  }
+
+  .dashboard .widget > .widget__body--rows {
+    padding-block-start: var(--space-1);
+  }
+
+  .dashboard .widget > .widget__body:not(.widget__body--rows),
+  .family-widget {
+    padding-block-start: var(--space-2);
   }
 
   .dashboard-overview__header {
@@ -8593,4 +8193,11 @@ button.today-cockpit__more--link {
  * (1440, hell): 22 -> 16 Groesse/Gewicht-Paare; bei 390px in `fi` und `de`
  * weder Umbruch noch Ellipse an den umgestellten Klassen.
  * Guard: test-dashboard-clarity.js (die genannten Klassen stehen auf
- * Leiter-Tokens). */
+ * Leiter-Tokens).
+ *
+ * DIE ZEILEN DER LISTEN-KACHELN STEHEN SEIT DW-P1-4 NICHT MEHR HIER: ihr Titel
+ * ist der Zeilentitel der App (16/500, `.list-row__name`), ihre Metazeile
+ * Footnote 13, ihre Endangabe Footnote halbfett (`.list-row__end`). Die
+ * 15/600 von R18 waren eine Zeilenstimme NUR der Uebersicht - dieselbe
+ * Aufgabe las in der Kachel anders als in ihrer Liste. Guard: test:typography
+ * "R21 S5 + DW-P1-4". */

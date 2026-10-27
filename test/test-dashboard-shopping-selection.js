@@ -555,7 +555,7 @@ test('Kachel: eine gewaehlte Liste ohne Offenes sagt, dass nichts offen ist, und
     { id: 5, name: 'Fest', open_count: 0, total_count: 4, items: [] },
   ];
   const html = dash.renderShoppingTile({ shoppingTile: { lists, openCount: 1, listCount: 2 }, shoppingLists: [], shoppingOpenCount: 14, shoppingOpenLists: 4 });
-  const rows = html.split('class="shopping-widget-list"').slice(1);
+  const rows = html.split('class="list-row shopping-widget-list"').slice(1);
   assert.equal(rows.length, 2);
   assert.ok(!/shoppingListNothingOpen/.test(rows[0]), 'eine Liste mit Offenem traegt den Satz nicht');
   assert.match(rows[1], /dashboard\.shoppingListNothingOpen/);
@@ -574,7 +574,7 @@ test('Kachel: eine gewaehlte Liste, die der Deckel abschneidet, ist als "+1 weit
   // und CHANGELOG sagen, eine gewaehlte Liste bleibe stehen.
   const four = await getJson(query(FEST, GARTEN, WOCHE, BAUMARKT));
   const html = dash.renderShoppingTile(four);
-  assert.equal(html.split('class="shopping-widget-list"').length - 1, 3);
+  assert.equal(html.split('class="list-row shopping-widget-list"').length - 1, 3);
   assert.ok(!html.includes('>Fest<'), 'Vorbedingung: die fertig gekaufte Liste ist abgeschnitten');
   assert.match(html, /dashboard\.shoppingMoreLists\{&quot;count&quot;:1\}/);
 

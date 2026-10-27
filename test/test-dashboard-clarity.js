@@ -103,7 +103,7 @@ function onPhone(fn) {
     globalThis.window = prev;
   }
 }
-const taskRows = (html) => (html.match(/class="task-item"/g) ?? []).length;
+const taskRows = (html) => (html.match(/class="list-row task-item"/g) ?? []).length;
 
 test('Aufgaben: die Kachel folgt ihrer Groesse wie jede Liste (#2087)', () => {
   const tasks = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, title: `Aufgabe ${i}`, priority: 'none', status: 'open' }));
@@ -177,7 +177,7 @@ test('Einkauf: jede Listenzeile fuehrt zu IHRER Liste, per Klick und per Tastatu
     return {
       tagName: m[1].toUpperCase(),
       id: '',
-      isListRow: /class="shopping-widget-list"/.test(m[2]),
+      isListRow: /class="list-row shopping-widget-list"/.test(m[2]),
       attrs: m[2],
       dataset: { route: unesc(m[3]) },
       closest: () => null,
@@ -238,7 +238,7 @@ test('Einkauf: jede Listenzeile fuehrt zu IHRER Liste, per Klick und per Tastatu
 function rowRoutesOf(html, className) {
   const unesc = (v) => v.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
   return [...html.matchAll(/<[a-z]+\b([^>]*\bdata-route="([^"]*)"[^>]*)>/g)]
-    .filter((m) => new RegExp(`class="${className}(?:["\\s])`).test(m[1]))
+    .filter((m) => new RegExp(`class="(?:list-row )?${className}(?:["\\s])`).test(m[1]))
     .map((m) => unesc(m[2]));
 }
 
@@ -751,7 +751,7 @@ const ev = (id, title, start, end, people, allDay = 0) => ({
 
 /** Der Status-Text der Zeile, die mit diesem Namen beginnt. */
 function rowStatus(html, name) {
-  const rows = html.split('<div class="family-member');
+  const rows = html.split('<div class="list-row family-member');
   const row = rows.find((chunk) => chunk.includes(`family-member__name">${name}<`));
   if (!row) return null;
   return (/family-member__status[^"]*">([\s\S]*?)<\/span>/.exec(row) || [])[1]?.trim() ?? null;
@@ -1106,7 +1106,7 @@ test('#1455: leerer Mahlzeiten-Slot und Sparquote ohne Einnahmen zeigen "-"', ()
 // Dieselbe Stufung wie `relativeDateLabel` gilt jetzt fuer alles Kommende der
 // Uebersicht; der letzte Besuch liest rueckwaerts (`earnedWhenLabel`). Nennt
 // die Zeile daneben schon „Heute"/„Morgen", steht das Wort einmal da.
-const metaOf = (html, cls) => [...html.matchAll(new RegExp(`class="${cls}">([^<]*)<`, 'g'))].map((m) => m[1]);
+const metaOf = (html, cls) => [...html.matchAll(new RegExp(`class="(?:list-row__meta )?${cls}">([^<]*)<`, 'g'))].map((m) => m[1]);
 
 test('#1454: die Geburtstagszeile sagt Wochentag, Tag+Monat oder Datum mit Jahr', () => {
   at(CRITIQUE_NOW, 'Europe/Berlin', () => {
@@ -1365,9 +1365,10 @@ test('R18: die umgestellten Inhaltsklassen der Uebersicht stehen auf der Lese-Le
     '.budget-widget__savings span': '--type-caption',
     '.budget-widget__savings strong': '--type-card-title',
     '.budget-widget__flow-item > strong': '--type-caption',
-    '.birthday-widget-item__name': '--type-secondary',
-    '.birthday-widget-item__age': '--type-caption',
-    '.rewards-member__name': '--type-secondary',
+    // Die Zeilentitel und Endangaben der Listen-Kacheln (Geburtstage,
+    // Belohnungen) stehen seit DW-P1-4 in den Rollen der geteilten Zeile
+    // (`.list-row__name` 16/500, `.list-row__end` 13/600) - gehalten von
+    // test:typography "R21 S5 + DW-P1-4".
   };
   const rules = [...eachRule(css)];
   for (const [selector, token] of Object.entries(expected)) {
@@ -1380,7 +1381,7 @@ test('R18: die umgestellten Inhaltsklassen der Uebersicht stehen auf der Lese-Le
     assert.ok(sized.some((r) => r.at.length === 0 && new RegExp(`font-size:\\s*var\\(${token}\\)`).test(r.body)), `${selector}: Basis ${token}`);
   }
   // Kein Fett auf den Nebenwerten: semibold traegt die Zahl, bold bleibt Kennzahl und Avatar.
-  for (const selector of ['.budget-widget__savings strong', '.budget-widget__flow-item > strong', '.birthday-widget-item__age']) {
+  for (const selector of ['.budget-widget__savings strong', '.budget-widget__flow-item > strong']) {
     const body = rules.filter((r) => r.at.length === 0 && r.selector.split(',').some((s) => s.trim() === selector)).map((r) => r.body).join(';');
     assert.match(body, /font-weight:\s*var\(--font-weight-semibold\)/, selector);
   }
@@ -1495,13 +1496,13 @@ test('R19 mobil: die Familie ist eine Avatar-Reihe mit Zaehler, Name und Satz bl
   // Gesicht las sich wie eine Benachrichtigung - eins wovon? Vor der Zahl
   // steht das Zeichen der Aufgaben (MODULE_ICON.tasks), dasselbe wie in der
   // Leiste; die Zahl allein sagte nichts.
-  assert.match(html, /<span class="family-member__face">[\s\S]*?class="family-widget-avatar"[\s\S]*?<span class="family-member__count" aria-hidden="true"><i data-lucide="check-square" class="family-member__count-icon"><\/i>2<\/span>/,
+  assert.match(html, /<span class="list-row__lead family-member__face">[\s\S]*?class="family-widget-avatar"[\s\S]*?<span class="family-member__count" aria-hidden="true"><i data-lucide="check-square" class="family-member__count-icon"><\/i>2<\/span>/,
     'die Zahl offener Aufgaben steht als Marke am Gesicht, mit dem Aufgaben-Zeichen als Einheit');
   const badge = [...eachRule(css)].filter((r) => r.selector.trim() === '.family-member__count-icon');
   assert.ok(badge.some((r) => /inline-size:\s*var\(--icon-sm\)/.test(r.body)), 'das Zeichen hat die Groesse eines Inline-Markers');
   assert.equal((html.match(/family-member__count"/g) || []).length, 1, 'nur wer offene Aufgaben hat, traegt eine Marke');
   assert.match(html, /<span class="family-member__short" aria-hidden="true">Alex<\/span>/, 'der Vorname unter dem Gesicht');
-  assert.match(html, /<span class="family-member__name">Alex<\/span>/, 'der volle Name bleibt der Name fuer Screenreader');
+  assert.match(html, /<span class="list-row__name family-member__name">Alex<\/span>/, 'der volle Name bleibt der Name fuer Screenreader');
   const phone = css.slice(css.indexOf('MOBIL IST DIE FAMILIE EINE AVATAR-REIHE'));
   const block = phone.slice(phone.indexOf('@media (max-width: 639px) {'), phone.indexOf('\n}\n') + 2);
   assert.match(block, /\.family-widget__list \{[^}]*flex-flow:\s*row wrap/, 'eine Reihe statt einer Liste');
@@ -1528,11 +1529,16 @@ test('R21 S7 mobil: ab sechs Gesichtern liegt keine Marke auf dem Nachbarn, der 
   assert.match(narrow.body, /inset-inline-end:\s*calc\(-1 \* var\(--space-1\)\)/);
   // Teilt nur ein Teil der Familie den Termin, stehen die Namen statt "Alle":
   // sie kuerzen, der Termin nicht.
+  // DW-P2-10: der Termin nimmt die volle Breite - kein Prozentdeckel mehr (60 %
+  // eines inhaltsbreiten Koerpers kuerzten "20:00 Filmabend" auf 82px neben
+  // "Alle"); die Namen schrumpfen zuerst, hundertfach schneller als er.
   const name = rules.find((r) => r.selector.trim() === '.family-member--shared .family-member__name');
-  assert.match(name.body, /flex:\s*0 1 auto/, 'die Namensliste darf schrumpfen');
+  const shrink = (body) => Number(/flex:\s*0 (\d+) auto/.exec(body)?.[1]);
+  assert.ok(shrink(name.body) >= 100, 'die Namensliste schrumpft zuerst');
   assert.match(name.body, /min-inline-size:\s*0/);
   const status = rules.find((r) => r.selector.trim() === '.family-member--shared .family-member__status');
-  assert.ok(status && /flex:\s*0 0 auto/.test(status.body), 'der Termin behaelt seine Breite');
+  assert.ok(status && shrink(status.body) === 1, 'der Termin schrumpft erst, wenn die Namen am Ende sind');
+  assert.doesNotMatch(status.body, /max-inline-size:\s*\d+%/, 'kein Prozentdeckel am Termin');
 });
 
 test('R19 mobil: die Wetterzeile steht im Masthead auch neben der Karte, breit schliessen sich beide aus', async () => {

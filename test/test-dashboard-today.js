@@ -349,12 +349,14 @@ const BERLIN_DAY = [
 ];
 
 function tileRows(html) {
-  return [...html.matchAll(/<div class="event-item([^"]*)"[\s\S]*?event-item__title">([^<]*)<\/div>[\s\S]*?event-item__time">([\s\S]*?)<\/div>/g)]
+  // Seit DW-P2-10 ist der Tag das erste Wort der Metazeile ("Heute · 17:00 ·
+  // Ort"), nicht mehr eine Pille davor; `badge` liest dieses Wort.
+  return [...html.matchAll(/<div class="list-row event-item([^"]*)"[\s\S]*?event-item__title">([^<]*)<\/div>[\s\S]*?event-item__time">([\s\S]*?)<\/div>/g)]
     .map(([, cls, title, time]) => ({
       title,
       ended: cls.includes('event-item--ended'),
-      badge: (/event-time-badge[^>]*>([^<]*)</.exec(time) || [])[1],
-      time: time.replace(/<span[^>]*>[^<]*<\/span>/g, '').replace(/\s+/g, ' ').trim(),
+      badge: (/event-item__when[^>]*>([^<]*)</.exec(time) || [])[1],
+      time: time.replace(/<span[^>]*>[^<]*<\/span>/g, '').replace(/\s+/g, ' ').trim().replace(/^·\s*/, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&'),
     }));
 }
 
@@ -457,7 +459,7 @@ test('#1449 Browser: die Karte liest familyEvents, nicht die Liste der Kachel', 
     upcomingEvents: tile,
     familyEvents: [...morning, ...afternoon, evening],
   });
-  const statusOf = (name) => (new RegExp(`family-member__name">${name}</span>\\s*<span class="family-member__status[^"]*">([^<]*)<`).exec(html) || [])[1];
+  const statusOf = (name) => (new RegExp(`family-member__name">${name}</span>\\s*<span class="list-row__meta family-member__status[^"]*">([^<]*)<`).exec(html) || [])[1];
   assert.equal(statusOf('Leo'), '2026-09-24T21:00 Leo Abend', `Leo hat heute noch den Abend, bekam ${statusOf('Leo')}`);
 }));
 

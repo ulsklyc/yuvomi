@@ -72,6 +72,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema tests check that every field exists in the stack and that no field locks a setting.
 
 ### Changed
+- **Every list on the overview reads the same, and a phone shows more of it.** Tasks, appointments,
+  birthdays, countdowns, expiring food, shifts, waste pickups, family, rewards and shopping lists
+  now share one row: a mark at the front of the same size (a face, a symbol or a dot), the title in
+  the weight it has in its module, one line beneath it, and at most one detail at the end ("turns 41",
+  "2 days left", "30 points") - nine different row styles had made each tile a new thing to learn.
+  Every row you can tap now darkens as you press it. An appointment's line says "Today · 17:00 ·
+  Sportplatz West" instead of a badge that pushed the time to a line of its own on a phone, so
+  every appointment takes two lines at most, and the family tile's shared appointment uses the full
+  width instead of being cut short. "2 to approve" in the rewards tile is a row that leads to the
+  approvals rather than a grey bar that looked disabled. On a phone, tile headers and the space
+  above the first row are 16px slimmer, the header of the overview sits 28px higher, and the
+  "Today" sheet and the tiles below it are spaced like the tiles themselves. In Customize on a phone
+  or tablet, a tile with options has its options button back - one tap - while "Move forward" and
+  "Move back" stay in the menu for mouse and trackpad.
 - **"+ New" on the overview adds a task, an appointment or a note right where you are.** The
   form opens over the overview - the same one as in the module - instead of switching to the
   module first, and after saving the overview stays where you scrolled it: no loading placeholders,
