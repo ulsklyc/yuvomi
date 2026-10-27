@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A synced calendar can bring its events in for several people** (#1897). The default
+  assignee of a Google or CalDAV calendar and of a calendar subscription is now a set: a shared
+  "Together" calendar assigns its events to both of you, your own calendars stay with one person
+  each. The field in each calendar row opens a menu with one switch per member; the first person
+  chosen gives an event its colour. The other rules follow the set: an event moved between two
+  calendars takes the new calendar's people while its assignment is still exactly the old
+  calendar's, "Apply to existing appointments" fills in all of them, and a new event assigned to
+  exactly the people of one calendar is created there. Existing single assignments carry over
+  (migration 265). API clients send `default_assignee_user_ids`; the single
+  `default_assignee_user_id` is still accepted and returned.
+- **A reminder list mapped to Tasks can assign its new tasks** (#1221). Next to the list in the
+  reminder sync settings, choose who gets the tasks the sync brings in from it. Only new tasks get
+  them; an assignment you change or clear later stays.
+- **A calendar import can assign its events** (#1940). Choose people in the import form: every
+  new event of the run is assigned to them, and an event you imported before - the same
+  appointment in a second family member's link - is not created again but gets them added. So two
+  children's feeds leave a shared dentist appointment as one event with both, and running an
+  earlier import again with a person assigns what it brought in. Without a person the import works
+  as before.
 - **A recurring shared expense that keeps failing says so on its row** (#1746). When the hourly
   run cannot book a series for an unexpected reason, the series keeps running and is retried
   every hour, as before - so a fault on our side never stops a household's rent - but its row,
