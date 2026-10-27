@@ -403,6 +403,10 @@
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
   overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
 /* EIN EINTRAG, MEHRERE TONNEN (#2273): die Abfallarten eines Labels als
@@ -467,7 +471,7 @@
 }
 
 .waste-import-labels-hint {
-  font-size: var(--text-sm);
+  font-size: var(--type-caption);
   color: var(--color-text-secondary);
   margin: 0 0 var(--space-2);
 }
@@ -487,6 +491,10 @@
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
   overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
 .waste-import-label-row__count {
