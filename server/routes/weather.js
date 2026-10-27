@@ -530,13 +530,13 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null, logger 
   router.get('/icon/:code', async (req, res) => {
     const { code } = req.params;
     if (!/^[a-zA-Z0-9]{2,4}$/.test(code)) {
-      return res.status(400).json({ error: 'Ungültiger Icon-Code.', code: 400 });
+      return res.status(400).json({ error: 'Invalid icon code.', code: 400 });
     }
     try {
       const url = `https://openweathermap.org/img/wn/${code}@2x.png`;
       const upstream = await doFetch(url, { signal: AbortSignal.timeout(5000) });
       if (!upstream.ok) {
-        return res.status(502).json({ error: 'Icon nicht verfügbar.', code: 502 });
+        return res.status(502).json({ error: 'Icon not available.', code: 502 });
       }
       res.setHeader('Content-Type', 'image/png');
       // no-store wie jede Medienroute: die Antwort liegt hinter der Anmeldung,

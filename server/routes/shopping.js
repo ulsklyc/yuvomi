@@ -197,7 +197,7 @@ router.get('/categories', (_req, res) => {
 // --------------------------------------------------------
 router.post('/categories', (req, res) => {
   try {
-    const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
+    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
     const existing = db.get()
@@ -236,7 +236,7 @@ router.put('/categories/:catId', (req, res) => {
       .get(req.params.catId);
     if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'shopping_category_not_found' });
 
-    const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
+    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
     const conflict = db.get()
@@ -332,7 +332,7 @@ router.patch('/categories/reorder', (req, res) => {
   try {
     const { order } = req.body;
     if (!Array.isArray(order) || order.length === 0)
-      return res.status(400).json({ error: 'order muss ein nicht-leeres Array von IDs sein.', code: 400 });
+      return res.status(400).json({ error: 'order must be a non-empty array of ids.', code: 400 });
 
     const update = db.get().prepare('UPDATE shopping_categories SET sort_order = ? WHERE id = ?');
     db.get().transaction(() => {
@@ -446,7 +446,7 @@ router.get('/stores', (_req, res) => {
 // POST /api/v1/shopping/stores  Body: { name }
 router.post('/stores', (req, res) => {
   try {
-    const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
+    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
     const errors = collectErrors([vName]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -478,7 +478,7 @@ router.put('/stores/:id', (req, res) => {
     const store = db.get().prepare('SELECT * FROM shopping_stores WHERE id = ?').get(id);
     if (!store) return res.status(404).json({ error: 'Store not found.', code: 404, reason: 'shopping_store_not_found' });
 
-    const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
+    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
     const errors = collectErrors([vName]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -565,7 +565,7 @@ router.patch('/items/:itemId', (req, res) => {
         // Ganze Cent, nicht negativ, und eine Obergrenze, damit ein Vertipper
         // nicht als Millionenbetrag in der spaeteren Historie steht.
         if (!Number.isInteger(n) || n < 0 || n > 100_000_000) {
-          return res.status(400).json({ error: 'price_cents muss eine ganze Zahl in Cent zwischen 0 und 100000000 sein.', code: 400 });
+          return res.status(400).json({ error: 'price_cents must be a whole number of cents from 0 to 100000000.', code: 400 });
         }
         priceCents = n;
       }
@@ -579,7 +579,7 @@ router.patch('/items/:itemId', (req, res) => {
       else {
         const n = bodyId(roh);
         if (n === null) {
-          return res.status(400).json({ error: 'store_id muss eine Laden-ID sein.', code: 400 });
+          return res.status(400).json({ error: 'store_id must be a store id.', code: 400 });
         }
         // Ein unbekannter Laden wird abgelehnt statt still verworfen: anders als
         // bei einer Personenauswahl ist das hier ein Aufruffehler - die Liste
@@ -591,7 +591,7 @@ router.patch('/items/:itemId', (req, res) => {
       }
     }
 
-    if (!name?.trim()) return res.status(400).json({ error: 'name darf nicht leer sein.', code: 400 });
+    if (!name?.trim()) return res.status(400).json({ error: 'name must not be empty.', code: 400 });
 
     // ZIELLISTE (#1700). Nicht mitgeschickt oder die eigene Liste heisst: kein
     // Umzug. Geprüft wird hier, nicht nur im Dialog: die Route ist Teil der
@@ -604,7 +604,7 @@ router.patch('/items/:itemId', (req, res) => {
     if (req.body.list_id !== undefined && req.body.list_id !== null) {
       const n = bodyId(req.body.list_id);
       if (n === null) {
-        return res.status(400).json({ error: 'list_id muss eine Listen-ID sein.', code: 400 });
+        return res.status(400).json({ error: 'list_id must be a list id.', code: 400 });
       }
       const target = n === item.list_id ? null : db.get().prepare(
         `SELECT ${ACCEPTS_NEW_ITEMS_SQL} AS accepts_new_items FROM shopping_lists sl WHERE sl.id = ?`
@@ -627,7 +627,7 @@ router.patch('/items/:itemId', (req, res) => {
       return res.status(400).json({ error: 'Invalid category.', code: 400, reason: 'shopping_category_not_found' });
 
     // notes/url gleich validieren wie beim Anlegen (URL nur http/https → XSS-sicher).
-    const vNotes = str(notes, 'Notiz', { max: MAX_TEXT, required: false });
+    const vNotes = str(notes, 'notes', { max: MAX_TEXT, required: false });
     const vUrl   = url(urlVal, 'URL');
     const fieldErrors = collectErrors([vNotes, vUrl]);
     if (fieldErrors.length) return res.status(400).json({ error: fieldErrors.join(' '), code: 400 });
@@ -846,7 +846,7 @@ router.get('/', (req, res) => {
 // --------------------------------------------------------
 router.post('/', (req, res) => {
   try {
-    const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
+    const vName = str(req.body.name, 'name', { max: MAX_TITLE });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
     const result = db.get()
@@ -871,7 +871,7 @@ router.post('/', (req, res) => {
 // --------------------------------------------------------
 router.put('/:listId', (req, res) => {
   try {
-    const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
+    const vName = str(req.body.name, 'name', { max: MAX_TITLE });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
     const result = db.get()
@@ -929,7 +929,7 @@ router.post('/:listId/duplicate', (req, res) => {
 
     // Express 5 laesst req.body bei einem POST ohne Body undefined -
     // ohne das ?. antwortete die Route hier mit 500 statt 400.
-    const vName = str(req.body?.name, 'Name', { max: MAX_TITLE });
+    const vName = str(req.body?.name, 'name', { max: MAX_TITLE });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
     // Die drei Flags sind optional, aber wenn gesetzt, echte Booleans. Ohne
@@ -1062,18 +1062,18 @@ router.patch('/:listId/items/reorder', (req, res) => {
 
     const { category, order } = req.body;
     if (!Array.isArray(order) || order.length === 0)
-      return res.status(400).json({ error: 'order muss ein nicht-leeres Array von IDs sein.', code: 400 });
+      return res.status(400).json({ error: 'order must be a non-empty array of ids.', code: 400 });
 
     const ids = order.map(Number);
     if (ids.some((id) => !Number.isInteger(id)))
-      return res.status(400).json({ error: 'order darf nur Artikel-IDs enthalten.', code: 400 });
+      return res.status(400).json({ error: 'order may only contain item ids.', code: 400 });
     if (new Set(ids).size !== ids.length)
-      return res.status(400).json({ error: 'order darf keine ID doppelt enthalten.', code: 400 });
+      return res.status(400).json({ error: 'order must not contain an id twice.', code: 400 });
 
     // oneOf lässt Leerwerte durch (es validiert optionale Felder); hier ist die
     // Kategorie der Geltungsbereich der Ränge und damit Pflicht.
-    if (!category) return res.status(400).json({ error: 'category ist erforderlich.', code: 400 });
-    const vCat = oneOf(category, validCategoryNames(), 'Kategorie');
+    if (!category) return res.status(400).json({ error: 'category is required.', code: 400 });
+    const vCat = oneOf(category, validCategoryNames(), 'category');
     if (vCat.error) return res.status(400).json({ error: vCat.error, code: 400 });
 
     // Die Kategorie ist der Geltungsbereich der Ränge - eine fremde ID darin
@@ -1084,9 +1084,9 @@ router.patch('/:listId/items/reorder', (req, res) => {
       .map((r) => r.id);
     const ownSet = new Set(own);
     if (ids.some((id) => !ownSet.has(id)))
-      return res.status(400).json({ error: 'order enthält Artikel außerhalb dieser Liste oder Kategorie.', code: 400 });
+      return res.status(400).json({ error: 'order contains items outside this list or category.', code: 400 });
     if (ids.length !== own.length)
-      return res.status(400).json({ error: 'order muss alle Artikel der Kategorie enthalten.', code: 400 });
+      return res.status(400).json({ error: 'order must contain every item of the category.', code: 400 });
 
     const update = db.get().prepare('UPDATE shopping_items SET sort_order = ? WHERE id = ?');
     const { list_change } = withListChange(req.params.listId, () => {
@@ -1132,10 +1132,10 @@ router.post('/:listId/items', (req, res) => {
     const defaultCat = (validNames.includes('Sonstiges') ? 'Sonstiges' : validNames.at(-1)) ?? 'Sonstiges';
     const requestedCat = req.body.category || defaultCat;
 
-    const vName  = str(req.body.name, 'Name', { max: MAX_TITLE });
-    const vQty   = str(req.body.quantity, 'Menge', { max: MAX_SHORT, required: false });
-    const vCat   = oneOf(requestedCat, validNames, 'Kategorie');
-    const vNotes = str(req.body.notes, 'Notiz', { max: MAX_TEXT, required: false });
+    const vName  = str(req.body.name, 'name', { max: MAX_TITLE });
+    const vQty   = str(req.body.quantity, 'quantity', { max: MAX_SHORT, required: false });
+    const vCat   = oneOf(requestedCat, validNames, 'category');
+    const vNotes = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
     const vUrl   = url(req.body.url, 'URL');
     const errors = collectErrors([vName, vQty, vCat, vNotes, vUrl]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
@@ -1403,7 +1403,7 @@ router.post('/:listId/import-pantry', (req, res) => {
         if (!pantryItem) { missing += 1; continue; }
         // A product without batches has no stock to measure a shortfall
         // against: it goes over without a quantity.
-        const vQty = byProduct ? { value: null } : str(entry.quantity, 'Menge', { max: MAX_SHORT, required: false });
+        const vQty = byProduct ? { value: null } : str(entry.quantity, 'quantity', { max: MAX_SHORT, required: false });
         const category = validNames.includes(pantryItem.category) ? pantryItem.category : defaultCat;
         rows.push({ name: pantryItem.name, quantity: vQty.value, category });
       }
@@ -1435,10 +1435,10 @@ router.delete('/:listId/items/checked', (req, res) => {
     let ids = null;
     if (req.body?.ids !== undefined) {
       if (!Array.isArray(req.body.ids) || req.body.ids.length === 0)
-        return res.status(400).json({ error: 'ids muss ein nicht-leeres Array von Artikel-IDs sein.', code: 400 });
+        return res.status(400).json({ error: 'ids must be a non-empty array of item ids.', code: 400 });
       ids = req.body.ids.map(Number);
       if (ids.some((id) => !Number.isInteger(id) || id <= 0))
-        return res.status(400).json({ error: 'ids darf nur Artikel-IDs enthalten.', code: 400 });
+        return res.status(400).json({ error: 'ids may only contain item ids.', code: 400 });
     }
     const scope = ids
       ? { where: `list_id = ? AND is_checked = 1 AND id IN (${ids.map(() => '?').join(',')})`, params: [req.params.listId, ...ids] }

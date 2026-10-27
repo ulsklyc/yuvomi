@@ -212,6 +212,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Zeichen.", "from/to müssen YYYY-MM-DD sein", "target_caldav_account_id: ungültige Konto-ID." and
   "Interner Fehler" for subscriptions, the Apple connection, reading a range, the holiday feed and
   the sync target of an event; every `error` there is English now, with the same status codes.
+- **The shopping, tasks, push and weather APIs refuse in English** (#1695). They still answered
+  "order muss ein nicht-leeres Array von IDs sein.", "Menge may be at most 100 characters long.",
+  "sync_target: erwartet ...", "Maximal 2 Verschachtelungsebenen erlaubt.", "endpoint ist
+  erforderlich." or "Ungültiger Icon-Code."; every `error` there is English now and names the request
+  field (`quantity`, `notes`, `category`, `name`), with the same status codes and reasons.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the

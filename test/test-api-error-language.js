@@ -46,6 +46,9 @@
  *        und die Kalenderziele (calendar/{apple,feed,helpers,read,subscriptions}.js,
  *        46 Stellen): Bein 2 nennt 26 der 28 gefuehrten Absagen deutsch; "url:
  *        Pflichtfeld." sah die Regel erst mit diesem Wort.
+ *        Ebenso fuer Einkauf, Aufgaben, Push und Wetter (shopping.js 19 mit
+ *        "Menge" in der Regel, tasks.js 4, push.js 3, weather.js 2): Bein 2
+ *        nennt alle 29 gefuehrten Absagen deutsch.
  *
  * Ausführen: npm run test:api-error-language
  */
@@ -67,15 +70,12 @@ const ROUTES = new URL('../server/routes/', import.meta.url);
  * Modul umstellt, streicht seine Zeile - der Test verlangt es.
  */
 // meals.js und recipes.js stiegen mit den Kontakt-Feldnamen der Regel (Notizen,
-// Geburtstag ...): dieselben Stellen, jetzt gesehen, keine neuen.
+// Geburtstag ...): dieselben Stellen, jetzt gesehen, keine neuen. pantry.js
+// ebenso mit "Menge".
 const GERMAN_LEFT = new Map([
   ['meals.js', 37],
-  ['pantry.js', 5],
-  ['push.js', 3],
+  ['pantry.js', 6],
   ['recipes.js', 4],
-  ['shopping.js', 17],
-  ['tasks.js', 4],
-  ['weather.js', 2],
 ]);
 
 function routeFiles(dir = ROUTES, prefix = '') {
@@ -112,6 +112,7 @@ test('die Regel erkennt die alten Saetze der uebrigen Module und laesst englisch
     'calendar_default_target: maximal 300 Zeichen',
     'Unbekannte Nutzer-ID.',
     'target_google_calendar_id: zu lang.',
+    'Menge may be at most 100 characters long.',
     'url: Pflichtfeld.',
     'Telefon is too long.',
     'Geburtstag must be a valid date.',
@@ -748,5 +749,84 @@ test('keine Absage der Kalender-Abos, Apple-Anbindung und Kalenderziele traegt d
     assertRefusedInEnglish(seen);
   } finally {
     calServer.close();
+  }
+});
+
+test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortlaut', async () => {
+  const { default: shoppingRouter } = await import('../server/routes/shopping.js');
+  const { default: tasksRouter } = await import('../server/routes/tasks.js');
+  const { default: pushRouter } = await import('../server/routes/push.js');
+  const { buildRouter: buildWeatherRouter } = await import('../server/routes/weather.js');
+  const gApp = express();
+  gApp.use(express.json());
+  gApp.use((req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  });
+  gApp.use('/shopping', shoppingRouter);
+  gApp.use('/tasks', tasksRouter);
+  gApp.use('/push', pushRouter);
+  gApp.use('/weather', buildWeatherRouter({ fetchFn: async () => ({ ok: false, status: 404 }) }));
+  const gServer = gApp.listen(0, '127.0.0.1');
+  const gUrl = await new Promise((r) => gServer.on('listening', () => r(`http://127.0.0.1:${gServer.address().port}`)));
+  try {
+    const seen = [];
+    const call = async (method, route, body) => {
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${gUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      return { status: res.status, body: json };
+    };
+    const run = async (label, method, route, body) => {
+      const r = await call(method, route, body);
+      seen.push({ label, status: r.status, error: r.body?.error ?? null });
+    };
+    const list = await call('POST', '/shopping', { name: 'L' });
+    assert.equal(list.status, 201, 'Vorbedingung: die Liste wird angelegt');
+    const listId = list.body.data.id;
+    const item = await call('POST', `/shopping/${listId}/items`, { name: 'Milch' });
+    assert.equal(item.status, 201, 'Vorbedingung: der Artikel wird angelegt');
+    const itemId = item.body.data.id;
+    const category = item.body.data.category;
+    const top = await call('POST', '/tasks', { title: 'A' });
+    const sub = await call('POST', '/tasks', { title: 'B', parent_task_id: top.body.data.id });
+    assert.equal(sub.status, 201, 'Vorbedingung: die Unteraufgabe wird angelegt');
+    const long = 'x'.repeat(500);
+
+    await run('categories-order', 'PATCH', '/shopping/categories/reorder', { order: [] });
+    await run('item-price', 'PATCH', `/shopping/items/${itemId}`, { price_cents: -1 });
+    await run('item-store', 'PATCH', `/shopping/items/${itemId}`, { store_id: 'x' });
+    await run('item-name', 'PATCH', `/shopping/items/${itemId}`, { name: ' ' });
+    await run('item-list', 'PATCH', `/shopping/items/${itemId}`, { list_id: 'x' });
+    await run('item-notes', 'PATCH', `/shopping/items/${itemId}`, { notes: 'x'.repeat(20000) });
+    await run('reorder-empty', 'PATCH', `/shopping/${listId}/items/reorder`, { category, order: [] });
+    await run('reorder-ids', 'PATCH', `/shopping/${listId}/items/reorder`, { category, order: ['x'] });
+    await run('reorder-twice', 'PATCH', `/shopping/${listId}/items/reorder`, { category, order: [itemId, itemId] });
+    await run('reorder-category', 'PATCH', `/shopping/${listId}/items/reorder`, { order: [itemId] });
+    await run('reorder-category-unknown', 'PATCH', `/shopping/${listId}/items/reorder`, { category: 'nope', order: [itemId] });
+    await run('reorder-foreign', 'PATCH', `/shopping/${listId}/items/reorder`, { category, order: [987654] });
+    await run('add-quantity', 'POST', `/shopping/${listId}/items`, { name: 'A', quantity: long });
+    await run('add-notes', 'POST', `/shopping/${listId}/items`, { name: 'A', notes: 'x'.repeat(20000) });
+    await run('add-category', 'POST', `/shopping/${listId}/items`, { name: 'A', category: 'nope' });
+    await run('checked-ids', 'DELETE', `/shopping/${listId}/items/checked`, { ids: [] });
+    await run('checked-ids-shape', 'DELETE', `/shopping/${listId}/items/checked`, { ids: ['x'] });
+    await run('task-sync-shape', 'POST', '/tasks', { title: 'C', sync_target: 'nope' });
+    await run('task-sync-google', 'POST', '/tasks', { title: 'C', sync_target: 'google:primary' });
+    await run('task-sync-list', 'POST', '/tasks', { title: 'C', sync_target: 'caldav:1|https://dav.example/list/' });
+    await run('task-nesting', 'POST', '/tasks', { title: 'C', parent_task_id: sub.body.data.id });
+    await run('push-subscribe', 'POST', '/push/subscribe', {});
+    await run('push-unsubscribe', 'POST', '/push/unsubscribe', {});
+    await run('push-wall-mode', 'PUT', '/push/wall-mode', {});
+    await run('weather-icon-code', 'GET', '/weather/icon/!!');
+    await run('weather-icon-upstream', 'GET', '/weather/icon/01d');
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    gServer.close();
   }
 });
