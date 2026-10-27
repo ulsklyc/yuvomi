@@ -1784,6 +1784,8 @@
         "planSavingsDeleteConfirm": "Tanggalin ang layunin sa pag-iipon?",
         "accountsTab": "Mga Account",
         "netWorth": "Kabuuang yaman",
+        "netWorthApproxNote": "Na-convert sa palitan noong {{date}}",
+        "netWorthPerCurrencyNote": "Walang palitan - kabuuan bawat currency",
         "addAccount": "Magdagdag ng account",
         "accountsEmptyTitle": "Wala pang account",
         "accountsEmptyDescription": "Magdagdag ng mga account tulad ng checking o savings para masubaybayan ang iyong balanse.",

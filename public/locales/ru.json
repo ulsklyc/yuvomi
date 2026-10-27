@@ -1928,6 +1928,8 @@
         "planSavingsDeleteConfirm": "Удалить цель накоплений?",
         "accountsTab": "Счета",
         "netWorth": "Чистые активы",
+        "netWorthApproxNote": "Пересчитано по курсам на {{date}}",
+        "netWorthPerCurrencyNote": "Без курса - сумма по каждой валюте",
         "addAccount": "Добавить счёт",
         "accountsEmptyTitle": "Счетов пока нет",
         "accountsEmptyDescription": "Добавьте счета, например текущий или сберегательный, чтобы отслеживать балансы.",

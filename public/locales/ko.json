@@ -1784,6 +1784,8 @@
         "planSavingsDeleteConfirm": "저축 목표를 삭제할까요?",
         "accountsTab": "계좌",
         "netWorth": "순자산",
+        "netWorthApproxNote": "{{date}} 환율로 환산",
+        "netWorthPerCurrencyNote": "환율 없음 - 통화별 합계",
         "addAccount": "계좌 추가",
         "accountsEmptyTitle": "아직 계좌가 없습니다",
         "accountsEmptyDescription": "입출금이나 저축 같은 계좌를 추가해 잔액을 관리하세요.",

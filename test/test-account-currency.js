@@ -295,3 +295,51 @@ test('Projektion: eine auf ein Euro-Konto gestellte Zahlung verschiebt die Folge
   assert.equal(entries.length, 1);
   assert.equal(entries[0].amount, -33, 'USD 33 wie die Vorgabe, nicht die 30 EUR der umgestellten Zahlung');
 });
+
+test('Nettovermoegen: nur Budget-Waehrung bleibt die schlichte Summe', async () => {
+  const giro = await account('Giro', null);
+  await call('PUT', `/accounts/${giro}`, { starting_balance: 250 });
+  const r = await call('GET', '/accounts');
+  assert.equal(r.body.data.net_worth, 250);
+  assert.equal(r.body.data.net_worth_approx, undefined);
+  assert.equal(r.body.data.net_worth_by_currency, undefined);
+});
+
+test('Nettovermoegen: ein USD-Konto geht ueber den Kurs-Cache ein und ist als Naeherung markiert', async () => {
+  const giro = await account('Giro', null);
+  const usd = await account('Chase', 'USD');
+  await call('PUT', `/accounts/${giro}`, { starting_balance: 100 });
+  await call('PUT', `/accounts/${usd}`, { starting_balance: 110 });
+  db.prepare(`INSERT INTO subscription_exchange_rates (base_currency, quote_currency, rate, fetched_at)
+              VALUES ('USD', 'EUR', 1.1, '2026-10-20T06:00:00Z')`).run();
+  const r = await call('GET', '/accounts');
+  assert.equal(r.body.data.net_worth, 200, '100 EUR + 110 USD (= 100 EUR), nicht 210');
+  assert.equal(r.body.data.net_worth_approx, true);
+  assert.equal(r.body.data.net_worth_rates_at, '2026-10-20T06:00:00Z');
+  assert.deepEqual(r.body.data.net_worth_by_currency, [{ currency: 'EUR', amount: 100 }, { currency: 'USD', amount: 110 }]);
+});
+
+test('Nettovermoegen: ohne Kurs keine Gesamtzahl, sondern die Summe je Waehrung', async () => {
+  const giro = await account('Giro', null);
+  const usd = await account('Chase', 'USD');
+  await call('PUT', `/accounts/${giro}`, { starting_balance: 100 });
+  await call('PUT', `/accounts/${usd}`, { starting_balance: 110 });
+  const r = await call('GET', '/accounts');
+  assert.equal(r.body.data.net_worth, null, 'eine Rohsumme 210 waere falsch');
+  assert.deepEqual(r.body.data.net_worth_by_currency, [{ currency: 'EUR', amount: 100 }, { currency: 'USD', amount: 110 }]);
+});
+
+test('Nettovermoegen: eine Teilsumme behaelt die Stellen ihrer Waehrung', async () => {
+  // KWD fuehrt drei Stellen; es steht nicht in CURRENCY_CODES, also ein
+  // Bestandskonto aus der Zeit davor, mit einer Buchung von 1,234 KWD.
+  await account('Giro', null);
+  const kwd = db.prepare(`INSERT INTO budget_accounts (name, type, starting_balance, currency, sort_order, created_by)
+                          VALUES ('Kuwait', 'checking', 0, 'KWD', 99, ?)`).run(ADA).lastInsertRowid;
+  db.prepare(`INSERT INTO budget_entries (title, amount, category, date, created_by, account_id)
+              VALUES ('Zins', 1.234, 'other_income', '2026-10-01', ?, ?)`).run(ADA, kwd);
+  db.prepare(`INSERT INTO subscription_exchange_rates (base_currency, quote_currency, rate, fetched_at)
+              VALUES ('EUR', 'KWD', 3, '2026-10-27T00:00:00Z')`).run();
+  const r = await call('GET', '/accounts');
+  assert.deepEqual(r.body.data.net_worth_by_currency.find((p) => p.currency === 'KWD'), { currency: 'KWD', amount: 1.234 });
+  assert.equal(r.body.data.net_worth, 3.7, '1,234 KWD zu 3 sind 3,70 EUR, nicht 3,69');
+});

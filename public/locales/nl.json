@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "Spaardoel verwijderen?",
         "accountsTab": "Rekeningen",
         "netWorth": "Nettovermogen",
+        "netWorthApproxNote": "Omgerekend tegen koersen van {{date}}",
+        "netWorthPerCurrencyNote": "Zonder wisselkoers - totaal per valuta",
         "addAccount": "Rekening toevoegen",
         "accountsEmptyTitle": "Nog geen rekeningen",
         "accountsEmptyDescription": "Voeg rekeningen toe zoals betaal- of spaarrekening om je saldi te volgen.",

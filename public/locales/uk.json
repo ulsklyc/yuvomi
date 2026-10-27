@@ -1928,6 +1928,8 @@
         "planSavingsDeleteConfirm": "Видалити ціль заощаджень?",
         "accountsTab": "Рахунки",
         "netWorth": "Чисті активи",
+        "netWorthApproxNote": "Перераховано за курсами на {{date}}",
+        "netWorthPerCurrencyNote": "Без курсу - сума за кожною валютою",
         "addAccount": "Додати рахунок",
         "accountsEmptyTitle": "Рахунків ще немає",
         "accountsEmptyDescription": "Додайте рахунки, наприклад поточний або ощадний, щоб відстежувати баланси.",

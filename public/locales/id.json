@@ -1784,6 +1784,8 @@
         "planSavingsDeleteConfirm": "Hapus target tabungan?",
         "accountsTab": "Akun",
         "netWorth": "Kekayaan bersih",
+        "netWorthApproxNote": "Dikonversi dengan kurs per {{date}}",
+        "netWorthPerCurrencyNote": "Tanpa kurs - total per mata uang",
         "addAccount": "Tambah akun",
         "accountsEmptyTitle": "Belum ada akun",
         "accountsEmptyDescription": "Tambahkan akun seperti giro atau tabungan untuk melacak saldo Anda.",

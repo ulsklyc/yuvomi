@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "刪除儲蓄目標？",
         "accountsTab": "帳戶",
         "netWorth": "淨資產",
+        "netWorthApproxNote": "依 {{date}} 匯率換算",
+        "netWorthPerCurrencyNote": "無匯率 - 依幣別分別合計",
         "addAccount": "新增帳戶",
         "accountsEmptyTitle": "還沒有帳戶",
         "accountsEmptyDescription": "新增活期或儲蓄等帳戶來追蹤你的餘額。",

@@ -10,7 +10,7 @@ import { str, oneOf, num, color as validateColor, MAX_SHORT } from '../../middle
 import { resyncSubscriptionBookings } from '../subscriptions.js';
 import { CURRENCY_CODES } from '../../../public/utils/currency-codes.js';
 import {
-  budgetFilter, listAccounts, accountGoneFor, ACCOUNT_SHELL, ACCOUNT_TYPE_KEYS, nextAccountSortOrder, cents, refusal, refusals, refuse,
+  budgetFilter, listAccounts, netWorthSummary, accountGoneFor, ACCOUNT_SHELL, ACCOUNT_TYPE_KEYS, nextAccountSortOrder, cents, refusal, refusals, refuse,
 } from './helpers.js';
 
 const log = createLogger('Budget');
@@ -20,16 +20,14 @@ const router = express.Router();
  * GET /api/v1/budget/accounts
  * Listet Konten mit Startsaldo und laufendem Saldo; zusätzlich das Gesamt-Nettovermögen.
  * Query: ?include_archived=1  (default: nur aktive Konten)
- * Response: { data: { accounts: [], net_worth } }
+ * Response: { data: { accounts: [], net_worth, net_worth_approx?, net_worth_rates_at?, net_worth_by_currency? } }
+ * (netWorthSummary in helpers.js, #2302)
  */
 router.get('/accounts', (req, res) => {
   try {
     const includeArchived = req.query.include_archived === '1' || req.query.include_archived === 'true';
     const accounts = listAccounts(includeArchived, budgetFilter(req, 'e', { scoped: false }));
-    const netWorth = cents(accounts
-      .filter((a) => !a.archived)
-      .reduce((sum, a) => sum + a.current_balance, 0));
-    res.json({ data: { accounts, net_worth: netWorth } });
+    res.json({ data: { accounts, ...netWorthSummary(accounts) } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Internal error', code: 500 });

@@ -1946,6 +1946,8 @@
         "planSavingsDeleteConfirm": "Usunąć cel oszczędności?",
         "accountsTab": "Konta",
         "netWorth": "Wartość netto",
+        "netWorthApproxNote": "Przeliczono po kursach z {{date}}",
+        "netWorthPerCurrencyNote": "Bez kursu wymiany - suma dla każdej waluty",
         "addAccount": "Dodaj konto",
         "accountsEmptyTitle": "Brak kont",
         "accountsEmptyDescription": "Dodaj konta, np. osobiste lub oszczędnościowe, aby śledzić salda.",

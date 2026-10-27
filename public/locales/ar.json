@@ -2010,6 +2010,8 @@
         "planSavingsDeleteConfirm": "حذف هدف الادخار؟",
         "accountsTab": "الحسابات",
         "netWorth": "صافي الثروة",
+        "netWorthApproxNote": "محوّل بأسعار صرف بتاريخ {{date}}",
+        "netWorthPerCurrencyNote": "بلا سعر صرف - المجموع لكل عملة",
         "addAccount": "إضافة حساب",
         "accountsEmptyTitle": "لا توجد حسابات بعد",
         "accountsEmptyDescription": "أضف حسابات مثل الجاري أو التوفير لتتبع أرصدتك.",

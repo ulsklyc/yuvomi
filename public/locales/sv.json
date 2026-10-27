@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "Ta bort sparmålet?",
         "accountsTab": "Konton",
         "netWorth": "Nettoförmögenhet",
+        "netWorthApproxNote": "Omräknat till kurser från {{date}}",
+        "netWorthPerCurrencyNote": "Utan växelkurs - summa per valuta",
         "addAccount": "Lägg till konto",
         "accountsEmptyTitle": "Inga konton ännu",
         "accountsEmptyDescription": "Lägg till konton som lönekonto eller sparkonto för att följa dina saldon.",

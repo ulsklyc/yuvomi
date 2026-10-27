@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "Delete the savings goal?",
         "accountsTab": "Accounts",
         "netWorth": "Net worth",
+        "netWorthApproxNote": "Converted at rates from {{date}}",
+        "netWorthPerCurrencyNote": "No exchange rate - total per currency",
         "addAccount": "Add account",
         "accountsEmptyTitle": "No accounts yet",
         "accountsEmptyDescription": "Add accounts like checking or savings to track your balances.",

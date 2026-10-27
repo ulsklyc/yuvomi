@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "Xoá mục tiêu tiết kiệm?",
         "accountsTab": "Tài khoản",
         "netWorth": "Giá trị ròng",
+        "netWorthApproxNote": "Quy đổi theo tỷ giá ngày {{date}}",
+        "netWorthPerCurrencyNote": "Không có tỷ giá - tổng theo từng loại tiền",
         "addAccount": "Thêm tài khoản",
         "accountsEmptyTitle": "Chưa có tài khoản",
         "accountsEmptyDescription": "Thêm các tài khoản như thanh toán hoặc tiết kiệm để theo dõi số dư.",

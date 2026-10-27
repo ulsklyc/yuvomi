@@ -1784,6 +1784,8 @@
         "planSavingsDeleteConfirm": "Sparziel wirklich löschen?",
         "accountsTab": "Konten",
         "netWorth": "Nettovermögen",
+        "netWorthApproxNote": "Umgerechnet zu Kursen vom {{date}}",
+        "netWorthPerCurrencyNote": "Ohne Wechselkurs - Summe je Währung",
         "addAccount": "Konto hinzufügen",
         "accountsEmptyTitle": "Noch keine Konten",
         "accountsEmptyDescription": "Lege Konten wie Girokonto oder Sparkonto an, um deine Kontostände zu verfolgen.",
