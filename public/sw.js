@@ -51,8 +51,9 @@ const API_CACHE_EXCLUDE = ['/shopping/versions'];
 // Update) und nur mit dem, was die Shell zum Zeichnen braucht:
 //   /auth/me      Konto ohne Kontaktdaten, Rechte, Haushalt - NIE das
 //                 CSRF-Token und keine Kopfzeile der Antwort (kein Set-Cookie).
-//                 Nur fuer normale Sitzungen: Wanddisplay und Split-Gast
-//                 behalten ihr Verhalten, ihr Abzug wird geloescht.
+//                 Fuer normale Sitzungen; ein Wanddisplay bekommt einen
+//                 eigenen, noch engeren Abzug (DISPLAY_SNAPSHOT_*), ein
+//                 Split-Gast keinen, ein vorhandener wird geloescht.
 //   /preferences  Modulreihenfolge, abgeschaltete Module, Zone, Formate und
 //                 die Anordnung der Uebersicht.
 // Der Abzug traegt `offlineSnapshot: true`. Er wird nur bei einem Netzfehler
@@ -65,7 +66,7 @@ const API_CACHE_EXCLUDE = ['/shopping/versions'];
 // den Abzug noch die Listen, und der API-Cache wird geloescht - ein Geraet mit
 // abgelaufener oder widerrufener Sitzung zeigt den Haushalt nicht beliebig
 // lange. Ohne Ablauf vom Server gibt es keinen Abzug.
-const SESSION_SNAPSHOT_SCOPES = ['family'];
+const SESSION_SNAPSHOT_SCOPES = ['family', 'display'];
 const SESSION_SNAPSHOT_USER_FIELDS = [
   'id', 'username', 'display_name', 'avatar_color', 'avatar_data', 'role', 'family_role',
   'access_scope', 'onboarding_version', 'changelog_seen_version', 'changelog_seen_latest',
@@ -94,14 +95,34 @@ function sessionExpiryOf(body) {
   return Number.isFinite(value) ? value : null;
 }
 
+// WANDDISPLAY: EIN EIGENER ABZUG FUER DEN KALTSTART (Folge von #2342). Ohne ihn
+// startete ein Tablett, das ohne Netz neu hochfaehrt, bei "Server nicht
+// erreichbar", obwohl seine Listen im Cache lagen. Die Allowlist ist am Code
+// gemessen, nicht geraten: die Shell liest Name, Farbe und Bild fuer die
+// Kontozeile (router.js `syncSidebarAccount`), der Router `id`, `role` und
+// `access_scope`, `permissions` steuern Leiste und Kacheln, `householdSize`
+// die Avatar-Marken. Das Bild bleibt weg (die Kontozeile faellt auf die
+// Initialen zurueck), ebenso der Anmeldename, `initialsRoster` (die Namen des
+// Haushalts) und `othersCanRead` (nur fuer Formulare, ein Display hat keine).
+// Zone, Formate und App-Name kommen aus dem `/preferences`-Abzug. Die Frist ist
+// dieselbe gleitende wie fuer die Listen (72 h, server/services/display-accounts.js).
+const DISPLAY_SNAPSHOT_USER_FIELDS = ['id', 'display_name', 'avatar_color', 'role', 'access_scope'];
+const DISPLAY_SNAPSHOT_FIELDS = ['permissions', 'householdSize'];
+
+const SNAPSHOT_ALLOWLISTS = {
+  family: [SESSION_SNAPSHOT_USER_FIELDS, SESSION_SNAPSHOT_FIELDS],
+  display: [DISPLAY_SNAPSHOT_USER_FIELDS, DISPLAY_SNAPSHOT_FIELDS],
+};
+
 function reduceSessionSnapshot(body) {
   const user = body && typeof body.user === 'object' ? body.user : null;
   if (!user || !SESSION_SNAPSHOT_SCOPES.includes(user.access_scope)) return null;
   const expiresAt = sessionExpiryOf(body);
   if (expiresAt === null || expiresAt <= Date.now()) return null;
+  const [userFields, fields] = SNAPSHOT_ALLOWLISTS[user.access_scope];
   return {
-    user: pickFields(user, SESSION_SNAPSHOT_USER_FIELDS),
-    ...pickFields(body, SESSION_SNAPSHOT_FIELDS),
+    user: pickFields(user, userFields),
+    ...pickFields(body, fields),
     expiresAt,
     offlineSnapshot: true,
   };

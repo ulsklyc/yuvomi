@@ -154,8 +154,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   72 hours from now. A display that loses the connection over a weekend still shows its calendar
   and tasks; one that has been offline longer shows the unreachable state and deletes the saved
   lists. A display you remove or block in the settings deletes them as soon as it is online again.
-  A display that is restarted without a connection still opens on the unreachable state, as
-  before.
+  **A display restarted without a connection now opens on its saved lists** instead of "server
+  can't be reached", with the same strip as on a phone. For that it keeps a small record of its
+  own: its name and colour, which modules it may show, and the size of the household - no names
+  of family members, no contact details and no sign-in data. It ends with the same 72 hours.
 - **The calendar head names the period, not the module** (#1797, #1462). On a computer
   "October 2026" (in the agenda its span) is now the title of the head, the year in grey, the
   arrows right in front of it and "Today" behind it; the arrows no longer stand 300px apart, and

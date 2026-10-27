@@ -477,7 +477,9 @@ test('offline Kaltstart: /auth/me kommt als reduzierter Abzug, ohne CSRF, Kontak
   assert.equal(offline.headers.get('x-csrf-token'), null, 'keine CSRF-Kopfzeile im Abzug');
 });
 
-for (const scope of ['display', 'split_guest']) {
+// Ein Wanddisplay bekommt seit dem Folgeauftrag zu #2342 einen eigenen,
+// reduzierten Abzug (Tests unten, "Display-Kaltstart"); hier bleibt der Gast.
+for (const scope of ['split_guest']) {
   test(`kein Abzug fuer ${scope}: ein vorhandener wird geloescht, offline bleibt es bei 503`, async () => {
     const env = loadSw({ fetchImpl: async () => meResponse() });
     const req = new MockRequest(apiUrl('/auth/me'), { method: 'GET' });
@@ -891,7 +893,8 @@ test('Display: online abgerufen, offline kommen die Listen aus dem Cache', async
   assert.equal(list.status, 200, 'die Aufgaben sind offline da');
   assert.deepEqual((await list.json()).data, [{ id: 1, title: 'Muell raus' }]);
   const me = await get(sw, '/auth/me');
-  assert.equal(me.status, 503, 'aber kein Sitzungsabzug fuer ein Display');
+  assert.equal(me.status, 200, 'und der reduzierte Display-Abzug fuer den Kaltstart');
+  assert.equal((await me.json()).offlineSnapshot, true);
 });
 
 test('Display: nach mehr als 72 Stunden ohne Serverkontakt sind die Listen weg', async () => {
@@ -989,4 +992,121 @@ test('Display: auch /preferences rueckt die Frist vor', async () => {
   sw.setFetch(down);
   clock.now += 70 * HOUR;
   assert.equal((await get(sw, '/tasks')).status, 200);
+});
+
+// --------------------------------------------------------
+// Display-Kaltstart (Folge von #2342): ein eigener, reduzierter Abzug
+// --------------------------------------------------------
+// Ein Tablett, das ohne Netz neu startet, zeichnete trotz gefuelltem Cache
+// "Server nicht erreichbar": ohne `/auth/me` kennt der Router niemanden. Der
+// Abzug traegt nur, was Shell und Router fuer ein Display lesen.
+const DISPLAY_ME = {
+  user: {
+    id: 42, username: 'display-kueche-7f3a', display_name: 'Kueche', avatar_color: '#336699',
+    avatar_data: 'data:image/png;base64,AAAA', role: 'member', family_role: null, access_scope: 'display',
+    email: 'tablet@example.test', phone: '+49 555', birth_date: '1999-09-09', created_at: '2026-01-01',
+    onboarding_pending: true, changelog_seen: { version: '2.80.0', latest: '2.81.0' },
+    sort_order: null, is_household_member: false, sso_only: false,
+  },
+  permissions: { admin: false, modules: { tasks: 'read', calendar: 'read' }, widgets: { tasks: 'read' }, capabilities: {} },
+  householdSize: 4,
+  initialsRoster: ['Ana Beispiel', 'Ben Beispiel'],
+  othersCanRead: ['tasks'],
+  gravatarAvailable: true,
+  gravatarHost: 'gravatar.example',
+  csrfToken: 'geheimes-csrf-token',
+};
+
+function displayColdServer(clock) {
+  return async (req) => {
+    const until = clock.now + DISPLAY_GRACE;
+    if (req.url.endsWith('/auth/me')) {
+      return new MockResponse(JSON.stringify({ ...DISPLAY_ME, sessionExpiresAt: until }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Set-Cookie': 'csrf-token=geheimes-csrf-token', 'x-csrf-token': 'geheimes-csrf-token', [OFFLINE_HEADER]: String(until) },
+      });
+    }
+    return new MockResponse(JSON.stringify({ data: [{ id: 1, title: 'Muell raus' }] }), {
+      status: 200, headers: { 'Content-Type': 'application/json', [OFFLINE_HEADER]: String(until) },
+    });
+  };
+}
+
+async function displayOnline(clock) {
+  const sw = loadSw({ clock, fetchImpl: displayColdServer(clock) });
+  await get(sw, '/auth/me');
+  await get(sw, '/tasks');
+  return sw;
+}
+
+test('Display-Abzug: nur Kennung, Name, Farbe, Rolle, Bereich, Rechte und Haushaltsgroesse', async () => {
+  const clock = { now: Date.now() };
+  const sw = await displayOnline(clock);
+  sw.setFetch(down);
+  const res = await get(sw, '/auth/me');
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(Object.keys(body).sort(), ['expiresAt', 'householdSize', 'offlineSnapshot', 'permissions', 'user']);
+  assert.deepEqual(body.user, { id: 42, display_name: 'Kueche', avatar_color: '#336699', role: 'member', access_scope: 'display' });
+  assert.deepEqual(body.permissions, DISPLAY_ME.permissions);
+  assert.equal(body.householdSize, 4);
+  assert.equal(body.offlineSnapshot, true);
+  const raw = JSON.stringify(body);
+  for (const secret of ['geheimes-csrf-token', 'tablet@example.test', '+49 555', 'Ana Beispiel', 'display-kueche-7f3a', 'data:image']) {
+    assert.ok(!raw.includes(secret), `${secret} gehoert nicht in den Display-Abzug`);
+  }
+  assert.equal(res.headers.get('set-cookie'), null);
+  assert.equal(res.headers.get('x-csrf-token'), null);
+  assert.equal(res.headers.get(OFFLINE_HEADER), null, 'keine Kopfzeile der Netzantwort');
+});
+
+test('Display-Kaltstart ohne Netz mit gefuelltem Cache zeigt die Aufgaben, nicht "nicht erreichbar"', async () => {
+  const clock = { now: Date.now() };
+  const sw = await displayOnline(clock);
+  sw.setFetch(down);
+  clock.now += 48 * HOUR;
+  const routes = [...HARNESS_ROUTES, { path: '/tasks', requiresAuth: true, module: 'tasks' }];
+  const { navigate, log, env } = createNavigateHarness({ routes, me: () => pageGet(sw, '/auth/me', down) });
+  await navigate('/tasks');
+  assert.deepEqual(log.unreachable, [], 'kein "Server nicht erreichbar"');
+  assert.deepEqual(log.rendered, ['/tasks']);
+  assert.equal(env.currentUser?.access_scope, 'display');
+  assert.equal(log.offlineSessions.length, 1, 'die ungepruefte Sitzung wird gehalten und spaeter geprueft');
+  assert.equal(log.reminders + log.push, 0, 'Erinnerungen und Push bleiben aus');
+  const list = await pageGet(sw, '/tasks', down);
+  assert.deepEqual(list.data, [{ id: 1, title: 'Muell raus' }]);
+});
+
+test('Display-Kaltstart nach Ablauf der Frist: kein Abzug, der bestehende Hinweis', async () => {
+  const clock = { now: Date.now() };
+  const sw = await displayOnline(clock);
+  sw.setFetch(down);
+  clock.now += DISPLAY_GRACE + 1;
+  assert.equal((await get(sw, '/auth/me')).status, 503);
+  const routes = [...HARNESS_ROUTES, { path: '/tasks', requiresAuth: true, module: 'tasks' }];
+  const { navigate, log } = createNavigateHarness({ routes, me: () => pageGet(sw, '/auth/me', down) });
+  await navigate('/tasks');
+  assert.equal(log.unreachable.length, 1);
+  assert.deepEqual(log.rendered, []);
+});
+
+test('Display: eine 401 auf /auth/me loescht den Abzug', async () => {
+  const clock = { now: Date.now() };
+  const sw = await displayOnline(clock);
+  sw.setFetch(async () => new MockResponse(JSON.stringify({ error: 'Not authenticated.' }), { status: 401 }));
+  assert.equal((await get(sw, '/auth/me')).status, 401);
+  sw.setFetch(down);
+  assert.equal((await get(sw, '/auth/me')).status, 503);
+});
+
+test('Display: ein Abzug aus der Zeit vor CLEAR_API_CACHE wird verworfen', async () => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const clock = { now: Date.now() };
+  const sw = loadSw({ clock, withSession: true, fetchImpl: () => pending });
+  const inFlight = dispatchFetch(sw, new MockRequest(apiUrl('/auth/me'), { method: 'GET' }));
+  await dispatchMessage(sw, { type: 'CLEAR_API_CACHE' });
+  release(await displayColdServer(clock)(new MockRequest(apiUrl('/auth/me'))));
+  await inFlight.result;
+  assert.equal(await apiCacheName(sw), undefined);
 });
