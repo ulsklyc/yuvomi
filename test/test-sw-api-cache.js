@@ -783,3 +783,35 @@ test('nach dem Anmelden fragt navigate() /auth/me, bevor die Seite laedt', async
   assert.deepEqual(seenBeforeRender, [true], 'vor der Seite, damit ihre Listen in den Cache duerfen');
   assert.deepEqual(harness.log.rendered, ['/tasks']);
 });
+
+// Codex, zweite Runde: ohne Marker holt der Worker den Sitzungsablauf SELBST,
+// statt darauf zu warten, dass die Seite `/auth/me` fragt. Sonst fehlt er nach
+// einem Update (Bypass-Fenster verschluckt die Startabfrage) oder wenn
+// `/preferences` beim Start vor `/auth/me` ankommt - und die ganze Sitzung
+// bliebe ohne Offline-Stand.
+function onlineHousehold() {
+  return async (req) => {
+    if (req.url.endsWith('/auth/me')) return meResponse();
+    if (req.url.endsWith('/preferences')) return new MockResponse(JSON.stringify({ data: { module_order: ['shopping'] } }), { status: 200 });
+    return new MockResponse(JSON.stringify({ data: [{ id: 1, name: 'Milch' }] }), { status: 200 });
+  };
+}
+
+test('kommt /preferences vor /auth/me an, landet der Abzug trotzdem im Cache', async () => {
+  const sw = loadSw({ fetchImpl: onlineHousehold() });
+  await dispatchFetch(sw, new MockRequest(apiUrl('/preferences'), { method: 'GET' })).result;
+  sw.setFetch(async () => { throw new TypeError('Failed to fetch'); });
+  const res = await dispatchFetch(sw, new MockRequest(apiUrl('/preferences'), { method: 'GET' })).result;
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).data.module_order, ['shopping']);
+});
+
+test('eine Liste ohne vorheriges /auth/me (nach Update oder Anmeldung) holt den Ablauf nach und bleibt offline lesbar', async () => {
+  const sw = loadSw({ fetchImpl: onlineHousehold() });
+  await dispatchFetch(sw, new MockRequest(apiUrl('/shopping'), { method: 'GET' })).result;
+  sw.setFetch(async () => { throw new TypeError('Failed to fetch'); });
+  const list = await dispatchFetch(sw, new MockRequest(apiUrl('/shopping'), { method: 'GET' })).result;
+  assert.equal(list.status, 200, 'die Liste ist offline da');
+  const session = await dispatchFetch(sw, new MockRequest(apiUrl('/auth/me'), { method: 'GET' })).result;
+  assert.equal(session.status, 200, 'und mit ihr der Sitzungsabzug');
+});

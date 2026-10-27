@@ -943,7 +943,7 @@ async function precacheAvatars(baseUrl, text) {
   let body;
   try { body = JSON.parse(text); } catch { return; }
   const paths = [...avatarPathsIn(body)];
-  if (!paths.length || !(await hasValidSessionExpiry())) return;
+  if (!paths.length || !(await ensureSessionExpiry())) return;
   const cache = await caches.open(API_CACHE);
   await Promise.all(paths.map(async (path) => {
     const url = new URL(path, baseUrl).href;
@@ -969,7 +969,7 @@ async function networkFirstApi(request, event) {
     // Nur erfolgreiche, gleichoriginäre (basic) Antworten cachen - und nur
     // neben einem gueltigen Sitzungsablauf (#2293): ohne ihn entstuende ein
     // Eintrag, den der Offline-Pfad ohnehin nie mehr ausliefert.
-    if (response.ok && response.type === 'basic' && await hasValidSessionExpiry()) {
+    if (response.ok && response.type === 'basic' && await ensureSessionExpiry()) {
       const cache   = await caches.open(API_CACHE);
       const cloned  = response.clone();
       const headers = new Headers(cloned.headers);
@@ -1059,28 +1059,55 @@ async function networkFirstSnapshot(request, reduce) {
     if (await dropApiCacheIfSessionExpired()) return offlineResponse();
     return (await cachedApiResponse(request)) || offlineResponse();
   }
+  await storeSnapshot(request, response, reduce);
+  return response;
+}
+
+/** Legt den Abzug einer Netzantwort ab (oder raeumt ihn weg). Wirft nie. */
+async function storeSnapshot(request, response, reduce) {
   try {
-    const cache = await caches.open(API_CACHE);
     if (response.ok && response.type === 'basic') {
       const body = await response.clone().json();
       // `/auth/me` schreibt den Ablauf; jeder andere Abzug nur neben einem gueltigen.
       const allowed = reduce === reduceSessionSnapshot
-        ? await rememberSessionExpiry(cache, body)
-        : await hasValidSessionExpiry();
+        ? await rememberSessionExpiry(await caches.open(API_CACHE), body)
+        : await ensureSessionExpiry();
       const snapshot = allowed ? reduce(body) : null;
       if (snapshot) {
-        await cache.put(request, new Response(JSON.stringify(snapshot), {
+        await (await caches.open(API_CACHE)).put(request, new Response(JSON.stringify(snapshot), {
           status: 200,
           headers: { 'Content-Type': 'application/json; charset=utf-8', 'x-cached-at': String(Date.now()) },
         }));
-      } else {
-        await cache.delete(request);
+      } else if (await caches.has(API_CACHE)) {
+        await (await caches.open(API_CACHE)).delete(request);
       }
-    } else if (response.status === 401) {
-      await cache.delete(request);
+    } else if (response.status === 401 && await caches.has(API_CACHE)) {
+      await (await caches.open(API_CACHE)).delete(request);
     }
   } catch { /* Speicher voll oder kein JSON: die Antwort geht trotzdem raus */ }
-  return response;
+}
+
+/**
+ * DER WORKER HOLT DEN SITZUNGSABLAUF SELBST, wenn er fehlt (Codex, #2293).
+ * Ohne ihn legt er keine Liste ab - und die Seite fragt `/auth/me` nicht
+ * zuverlaessig vorher: nach einem Update geht die Startabfrage im
+ * Bypass-Fenster am Cache vorbei, beim Start kann `/preferences` vor
+ * `/auth/me` ankommen. Eine Abfrage zur Zeit; schlaegt sie fehl, bleibt es
+ * beim fail-closed.
+ */
+let _sessionProbe = null;
+async function ensureSessionExpiry() {
+  if (await hasValidSessionExpiry()) return true;
+  if (!_sessionProbe) {
+    _sessionProbe = (async () => {
+      try {
+        const request = new Request(`${self.location.origin}/api/v1/auth/me`, { credentials: 'same-origin' });
+        await storeSnapshot(request, await fetch(request), reduceSessionSnapshot);
+      } catch { /* offline oder abgewiesen: kein Ablauf, also nichts ablegen */ }
+    })().finally(() => { _sessionProbe = null; });
+  }
+  await _sessionProbe;
+  return hasValidSessionExpiry();
 }
 
 // Prüft, ob ein API-Pfad (inkl. /api/v1-Prefix) zur Read-only-Offline-Whitelist
