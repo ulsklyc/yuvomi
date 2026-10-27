@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "“{{name}}” silinsin mi?",
         "displayPairingCodeLabel": "Eşleştirme kodu",
         "displayPairingCodeHint": "15 dakika geçerlidir ve tam olarak bir kez kullanılır. Tablette /pair adresini aç ve kodu oraya gir. Yalnızca şimdi gösterilir.",
+        "displayPairStepCode": "Buradan bir duvar tableti ekle ve eşleştirme kodu oluştur.",
+        "displayPairStepOpen": "Tablette bu adresi aç ve kodu oraya gir:",
         "displayDeviceUnnamed": "Adsız cihaz",
         "displayDeviceLastSeen": "Son görülme: {{when}}",
         "displayDeviceNeverSeen": "Hiç bağlanmadı",

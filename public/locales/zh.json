@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "删除「{{name}}」？",
         "displayPairingCodeLabel": "配对码",
         "displayPairingCodeHint": "有效期 15 分钟，且仅能使用一次。在平板上打开 /pair 并在那里输入。它只在此刻显示。",
+        "displayPairStepCode": "在这里添加壁挂平板并生成配对码。",
+        "displayPairStepOpen": "在平板上打开这个地址，并在那里输入配对码：",
         "displayDeviceUnnamed": "未命名设备",
         "displayDeviceLastSeen": "最后连接：{{when}}",
         "displayDeviceNeverSeen": "从未连接过",

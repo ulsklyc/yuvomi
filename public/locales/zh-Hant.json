@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "刪除「{{name}}」？",
         "displayPairingCodeLabel": "配對碼",
         "displayPairingCodeHint": "有效期 15 分鐘，且僅能使用一次。在平板上開啟 /pair 並在那裡輸入。它只在此刻顯示。",
+        "displayPairStepCode": "在這裡新增壁掛平板並生成配對碼。",
+        "displayPairStepOpen": "在平板上開啟這個位址，並在那裡輸入配對碼：",
         "displayDeviceUnnamed": "未命名裝置",
         "displayDeviceLastSeen": "最後連線：{{when}}",
         "displayDeviceNeverSeen": "從未連線過",

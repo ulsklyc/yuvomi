@@ -3317,6 +3317,8 @@
         "displayDeleteConfirm": "„{{name}}“ löschen?",
         "displayPairingCodeLabel": "Kopplungscode",
         "displayPairingCodeHint": "15 Minuten gültig, gilt genau einmal. Öffne auf dem Tablet /pair und tippe ihn dort ein. Er wird nur jetzt angezeigt.",
+        "displayPairStepCode": "Lege hier ein Wandtablett an und erzeuge einen Kopplungscode.",
+        "displayPairStepOpen": "Öffne auf dem Tablett diese Adresse und tippe den Code dort ein:",
         "displayDeviceUnnamed": "Unbenanntes Gerät",
         "displayDeviceLastSeen": "Zuletzt gesehen: {{when}}",
         "displayDeviceNeverSeen": "Noch nie verbunden",

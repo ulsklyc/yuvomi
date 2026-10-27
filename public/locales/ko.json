@@ -3317,6 +3317,8 @@
         "displayDeleteConfirm": "“{{name}}”을(를) 삭제할까요?",
         "displayPairingCodeLabel": "페어링 코드",
         "displayPairingCodeHint": "15분 동안 유효하며 정확히 한 번만 사용할 수 있습니다. 태블릿에서 /pair 를 열고 코드를 입력하세요. 코드는 지금만 표시됩니다.",
+        "displayPairStepCode": "여기에서 벽면 태블릿을 추가하고 페어링 코드를 생성하세요.",
+        "displayPairStepOpen": "태블릿에서 이 주소를 열고 코드를 입력하세요:",
         "displayDeviceUnnamed": "이름 없는 기기",
         "displayDeviceLastSeen": "마지막 접속: {{when}}",
         "displayDeviceNeverSeen": "접속한 적 없음",

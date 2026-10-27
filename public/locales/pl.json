@@ -3521,6 +3521,8 @@
         "displayDeleteConfirm": "Usunąć „{{name}}”?",
         "displayPairingCodeLabel": "Kod parowania",
         "displayPairingCodeHint": "Ważny 15 minut i działa dokładnie raz. Otwórz na tablecie /pair i wpisz go tam. Jest pokazywany tylko teraz.",
+        "displayPairStepCode": "Dodaj tutaj tablet ścienny i wygeneruj kod parowania.",
+        "displayPairStepOpen": "Otwórz na tablecie ten adres i wpisz tam kod:",
         "displayDeviceUnnamed": "Urządzenie bez nazwy",
         "displayDeviceLastSeen": "Ostatnio widziane: {{when}}",
         "displayDeviceNeverSeen": "Nigdy nie połączono",

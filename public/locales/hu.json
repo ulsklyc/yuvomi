@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "Törli a következőt: „{{name}}”?",
         "displayPairingCodeLabel": "Párosítókód",
         "displayPairingCodeHint": "15 percig érvényes, és pontosan egyszer használható. Nyisd meg a táblagépen a /pair címet, és írd be ott. Csak most jelenik meg.",
+        "displayPairStepCode": "Adj hozzá itt egy fali táblagépet, és hozz létre párosítókódot.",
+        "displayPairStepOpen": "Nyisd meg a táblagépen ezt a címet, és írd be ott a kódot:",
         "displayDeviceUnnamed": "Névtelen eszköz",
         "displayDeviceLastSeen": "Utoljára látva: {{when}}",
         "displayDeviceNeverSeen": "Még soha nem csatlakozott",

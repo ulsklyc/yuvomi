@@ -3402,6 +3402,8 @@
         "displayDeleteConfirm": "Odstranit „{{name}}“?",
         "displayPairingCodeLabel": "Párovací kód",
         "displayPairingCodeHint": "Platí 15 minut a lze jej použít právě jednou. Otevřete na tabletu /pair a zadejte jej tam. Zobrazí se pouze teď.",
+        "displayPairStepCode": "Přidejte zde nástěnný tablet a vygenerujte párovací kód.",
+        "displayPairStepOpen": "Otevřete na tabletu tuto adresu a zadejte tam kód:",
         "displayDeviceUnnamed": "Nepojmenované zařízení",
         "displayDeviceLastSeen": "Naposledy viděno: {{when}}",
         "displayDeviceNeverSeen": "Nikdy nepřipojeno",

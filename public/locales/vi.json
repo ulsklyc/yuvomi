@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "Xóa “{{name}}”?",
         "displayPairingCodeLabel": "Mã ghép nối",
         "displayPairingCodeHint": "Có hiệu lực 15 phút và chỉ dùng được đúng một lần. Mở /pair trên máy tính bảng và nhập mã ở đó. Mã chỉ hiển thị lúc này.",
+        "displayPairStepCode": "Thêm máy tính bảng gắn tường tại đây và tạo mã ghép nối.",
+        "displayPairStepOpen": "Trên máy tính bảng, mở địa chỉ này và nhập mã ở đó:",
         "displayDeviceUnnamed": "Thiết bị chưa đặt tên",
         "displayDeviceLastSeen": "Lần cuối nhìn thấy: {{when}}",
         "displayDeviceNeverSeen": "Chưa từng kết nối",

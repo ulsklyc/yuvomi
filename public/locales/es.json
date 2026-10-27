@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "¿Eliminar «{{name}}»?",
         "displayPairingCodeLabel": "Código de vinculación",
         "displayPairingCodeHint": "Válido 15 minutos y se puede usar una sola vez. Abre /pair en la tableta e introdúcelo allí. Solo se muestra ahora.",
+        "displayPairStepCode": "Añade aquí una tableta de pared y genera un código de vinculación.",
+        "displayPairStepOpen": "En la tableta, abre esta dirección e introduce allí el código:",
         "displayDeviceUnnamed": "Dispositivo sin nombre",
         "displayDeviceLastSeen": "Visto por última vez: {{when}}",
         "displayDeviceNeverSeen": "Nunca se ha conectado",

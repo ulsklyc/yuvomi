@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "Διαγραφή «{{name}}»;",
         "displayPairingCodeLabel": "Κωδικός σύζευξης",
         "displayPairingCodeHint": "Ισχύει για 15 λεπτά και χρησιμοποιείται ακριβώς μία φορά. Άνοιξε στο tablet τη διεύθυνση /pair και πληκτρολόγησέ τον εκεί. Εμφανίζεται μόνο τώρα.",
+        "displayPairStepCode": "Πρόσθεσε εδώ ένα επιτοίχιο tablet και δημιούργησε κωδικό σύζευξης.",
+        "displayPairStepOpen": "Άνοιξε στο tablet αυτή τη διεύθυνση και πληκτρολόγησε εκεί τον κωδικό:",
         "displayDeviceUnnamed": "Συσκευή χωρίς όνομα",
         "displayDeviceLastSeen": "Τελευταία εμφάνιση: {{when}}",
         "displayDeviceNeverSeen": "Δεν έχει συνδεθεί ποτέ",

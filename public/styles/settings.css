@@ -2100,9 +2100,10 @@
   color: var(--color-text-primary);
 }
 
-/* Einrichtung eines Anbieters, solange Zugangsdaten fehlen (#2221). Die
-   Schritte haben eine Reihenfolge, deshalb Ziffern - dieselbe Liste wie die
-   Zwei-Faktor-Einrichtung (.settings-2fa__steps). */
+/* Einrichtung eines Anbieters, solange Zugangsdaten fehlen (#2221), und die
+   Kopplung eines Wandtabletts (#2294). Die Schritte haben eine Reihenfolge,
+   deshalb Ziffern - dieselbe Liste wie die Zwei-Faktor-Einrichtung
+   (.settings-2fa__steps). */
 .settings-provider__steps {
   list-style: decimal;
   margin: var(--space-3) 0 0;

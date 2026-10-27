@@ -3317,6 +3317,8 @@
         "displayDeleteConfirm": "Hapus “{{name}}”?",
         "displayPairingCodeLabel": "Kode pemasangan",
         "displayPairingCodeHint": "Berlaku 15 menit dan hanya sekali pakai. Buka /pair di tablet lalu ketikkan di sana. Kode ini hanya ditampilkan sekarang.",
+        "displayPairStepCode": "Tambahkan tablet dinding di sini dan buat kode pemasangan.",
+        "displayPairStepOpen": "Di tablet, buka alamat ini lalu ketikkan kodenya di sana:",
         "displayDeviceUnnamed": "Perangkat tanpa nama",
         "displayDeviceLastSeen": "Terakhir terlihat: {{when}}",
         "displayDeviceNeverSeen": "Belum pernah terhubung",

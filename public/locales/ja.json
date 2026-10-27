@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "「{{name}}」を削除しますか？",
         "displayPairingCodeLabel": "ペアリングコード",
         "displayPairingCodeHint": "有効期限は15分で、使えるのは1回だけです。タブレットで /pair を開き、そこに入力してください。表示されるのは今だけです。",
+        "displayPairStepCode": "ここで壁掛けタブレットを追加し、ペアリングコードを発行します。",
+        "displayPairStepOpen": "タブレットでこのアドレスを開き、そこにコードを入力します:",
         "displayDeviceUnnamed": "名前のない端末",
         "displayDeviceLastSeen": "最終接続: {{when}}",
         "displayDeviceNeverSeen": "まだ接続されていません",

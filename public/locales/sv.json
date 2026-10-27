@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "Ta bort ”{{name}}”?",
         "displayPairingCodeLabel": "Parkopplingskod",
         "displayPairingCodeHint": "Giltig i 15 minuter och fungerar exakt en gång. Öppna /pair på plattan och skriv in den där. Den visas bara nu.",
+        "displayPairStepCode": "Lägg till en väggplatta här och skapa en parkopplingskod.",
+        "displayPairStepOpen": "Öppna den här adressen på plattan och skriv in koden där:",
         "displayDeviceUnnamed": "Namnlös enhet",
         "displayDeviceLastSeen": "Senast sedd: {{when}}",
         "displayDeviceNeverSeen": "Har aldrig anslutit",

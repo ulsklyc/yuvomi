@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "Delete “{{name}}”?",
         "displayPairingCodeLabel": "Pairing code",
         "displayPairingCodeHint": "Valid for 15 minutes and works exactly once. Open /pair on the tablet and type it in there. It is shown only now.",
+        "displayPairStepCode": "Add a wall tablet here and generate a pairing code.",
+        "displayPairStepOpen": "On the tablet, open this address and type the code in there:",
         "displayDeviceUnnamed": "Unnamed device",
         "displayDeviceLastSeen": "Last seen: {{when}}",
         "displayDeviceNeverSeen": "Never connected",

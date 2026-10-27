@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "Eliminare «{{name}}»?",
         "displayPairingCodeLabel": "Codice di associazione",
         "displayPairingCodeHint": "Valido 15 minuti e utilizzabile una sola volta. Apri /pair sul tablet e digitalo lì. Viene mostrato solo adesso.",
+        "displayPairStepCode": "Aggiungi qui un tablet da parete e genera un codice di associazione.",
+        "displayPairStepOpen": "Sul tablet apri questo indirizzo e digita lì il codice:",
         "displayDeviceUnnamed": "Dispositivo senza nome",
         "displayDeviceLastSeen": "Visto l'ultima volta: {{when}}",
         "displayDeviceNeverSeen": "Mai connesso",

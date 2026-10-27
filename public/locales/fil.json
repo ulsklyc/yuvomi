@@ -3317,6 +3317,8 @@
         "displayDeleteConfirm": "Burahin ang “{{name}}”?",
         "displayPairingCodeLabel": "Pairing code",
         "displayPairingCodeHint": "Balido sa loob ng 15 minuto at isang beses lang gumagana. Buksan ang /pair sa tablet at i-type ito doon. Ipinapakita lang ito ngayon.",
+        "displayPairStepCode": "Magdagdag ng wall tablet dito at gumawa ng pairing code.",
+        "displayPairStepOpen": "Sa tablet, buksan ang address na ito at i-type doon ang code:",
         "displayDeviceUnnamed": "Device na walang pangalan",
         "displayDeviceLastSeen": "Huling nakita: {{when}}",
         "displayDeviceNeverSeen": "Hindi pa kailanman nakakonekta",

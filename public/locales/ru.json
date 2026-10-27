@@ -3503,6 +3503,8 @@
         "displayDeleteConfirm": "Удалить «{{name}}»?",
         "displayPairingCodeLabel": "Код подключения",
         "displayPairingCodeHint": "Действует 15 минут и срабатывает ровно один раз. Откройте на планшете /pair и введите его там. Он показывается только сейчас.",
+        "displayPairStepCode": "Добавьте здесь настенный планшет и создайте код подключения.",
+        "displayPairStepOpen": "Откройте на планшете этот адрес и введите там код:",
         "displayDeviceUnnamed": "Устройство без названия",
         "displayDeviceLastSeen": "Последний раз в сети: {{when}}",
         "displayDeviceNeverSeen": "Ни разу не подключалось",

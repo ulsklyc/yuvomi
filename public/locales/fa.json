@@ -3317,6 +3317,8 @@
         "displayDeleteConfirm": "«{{name}}» حذف شود؟",
         "displayPairingCodeLabel": "کد جفت‌سازی",
         "displayPairingCodeHint": "۱۵ دقیقه اعتبار دارد و دقیقاً یک بار کار می‌کند. روی تبلت نشانی /pair را باز کنید و آن را همان‌جا وارد کنید. فقط همین حالا نمایش داده می‌شود.",
+        "displayPairStepCode": "اینجا یک تبلت دیواری بیفزایید و کد جفت‌سازی بسازید.",
+        "displayPairStepOpen": "روی تبلت این نشانی را باز کنید و کد را همان‌جا وارد کنید:",
         "displayDeviceUnnamed": "دستگاه بدون نام",
         "displayDeviceLastSeen": "آخرین بار دیده شده: {{when}}",
         "displayDeviceNeverSeen": "هرگز متصل نشده",

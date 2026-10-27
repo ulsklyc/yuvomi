@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "“{{name}}” verwijderen?",
         "displayPairingCodeLabel": "Koppelcode",
         "displayPairingCodeHint": "15 minuten geldig en precies één keer te gebruiken. Open /pair op het tablet en voer hem daar in. Hij wordt alleen nu getoond.",
+        "displayPairStepCode": "Voeg hier een wandtablet toe en genereer een koppelcode.",
+        "displayPairStepOpen": "Open op het tablet dit adres en voer daar de code in:",
         "displayDeviceUnnamed": "Naamloos apparaat",
         "displayDeviceLastSeen": "Laatst gezien: {{when}}",
         "displayDeviceNeverSeen": "Nog nooit verbonden",

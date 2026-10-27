@@ -3298,6 +3298,8 @@
         "displayDeleteConfirm": "Eliminar “{{name}}”?",
         "displayPairingCodeLabel": "Código de pareamento",
         "displayPairingCodeHint": "Válido durante 15 minutos e funciona exatamente uma vez. Abra /pair no tablet e escreva-o aí. Só é mostrado agora.",
+        "displayPairStepCode": "Adicione aqui um tablet de parede e gere um código de pareamento.",
+        "displayPairStepOpen": "No tablet, abra este endereço e digite o código lá:",
         "displayDeviceUnnamed": "Dispositivo sem nome",
         "displayDeviceLastSeen": "Visto pela última vez: {{when}}",
         "displayDeviceNeverSeen": "Nunca se ligou",

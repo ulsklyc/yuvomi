@@ -3606,6 +3606,8 @@
         "displayDeleteConfirm": "حذف «{{name}}»؟",
         "displayPairingCodeLabel": "رمز الاقتران",
         "displayPairingCodeHint": "صالح لمدة 15 دقيقة ويُستخدم مرة واحدة فقط. افتح /pair على الجهاز اللوحي وأدخله هناك. لا يظهر إلا الآن.",
+        "displayPairStepCode": "أضف هنا جهازًا لوحيًا جداريًا وأنشئ رمز اقتران.",
+        "displayPairStepOpen": "افتح هذا العنوان على الجهاز اللوحي وأدخل الرمز هناك:",
         "displayDeviceUnnamed": "جهاز بلا اسم",
         "displayDeviceLastSeen": "آخر ظهور: {{when}}",
         "displayDeviceNeverSeen": "لم يتصل قط",

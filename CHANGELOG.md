@@ -195,6 +195,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scopes` stay optional for integrations that create tokens themselves.
 
 ### Fixed
+- **Settings - Wall tablets names the pairing address before a code exists** (#2294). A tablet
+  pairs at your instance's `/pair` address, not through the sign-in page, but the page only said
+  so next to a freshly generated code. It now shows the two steps and the full address up front,
+  so an admin who opens the page first - or whose instance signs in through OIDC only - knows
+  where the tablet goes.
 - **A shared reminder list connected through two CalDAV accounts shows each task and shopping
   item once** (#1906). When two family members each connected their own account to the same
   list, every task and item stood in Yuvomi twice. Now the account that brings an entry in first

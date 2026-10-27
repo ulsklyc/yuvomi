@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "Slett «{{name}}»?",
         "displayPairingCodeLabel": "Paringskode",
         "displayPairingCodeHint": "Gyldig i 15 minutter og fungerer kun én gang. Åpne /pair på nettbrettet og skriv den inn der. Den vises kun nå.",
+        "displayPairStepCode": "Legg til et nettbrett her og generer en paringskode.",
+        "displayPairStepOpen": "Åpne denne adressen på nettbrettet og skriv inn koden der:",
         "displayDeviceUnnamed": "Navnløs enhet",
         "displayDeviceLastSeen": "Sist sett: {{when}}",
         "displayDeviceNeverSeen": "Aldri koblet til",

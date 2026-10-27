@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "Supprimer « {{name}} » ?",
         "displayPairingCodeLabel": "Code d'appairage",
         "displayPairingCodeHint": "Valable 15 minutes et utilisable une seule fois. Ouvrez /pair sur la tablette et saisissez-le. Il n'est affiché que maintenant.",
+        "displayPairStepCode": "Ajoutez ici une tablette murale et générez un code d'appairage.",
+        "displayPairStepOpen": "Sur la tablette, ouvrez cette adresse et saisissez-y le code :",
         "displayDeviceUnnamed": "Appareil sans nom",
         "displayDeviceLastSeen": "Vu pour la dernière fois : {{when}}",
         "displayDeviceNeverSeen": "Jamais connecté",

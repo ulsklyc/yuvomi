@@ -3299,6 +3299,8 @@
         "displayDeleteConfirm": "“{{name}}” हटाएँ?",
         "displayPairingCodeLabel": "जोड़ने का कोड",
         "displayPairingCodeHint": "15 मिनट तक वैध और ठीक एक बार ही चलता है। टैबलेट पर /pair खोलें और वहाँ यह कोड डालें। यह केवल अभी दिखाया जाता है।",
+        "displayPairStepCode": "यहाँ एक दीवार टैबलेट जोड़ें और जोड़ने का कोड बनाएँ।",
+        "displayPairStepOpen": "टैबलेट पर यह पता खोलें और वहाँ कोड डालें:",
         "displayDeviceUnnamed": "बिना नाम का डिवाइस",
         "displayDeviceLastSeen": "आखिरी बार देखा गया: {{when}}",
         "displayDeviceNeverSeen": "कभी कनेक्ट नहीं हुआ",
