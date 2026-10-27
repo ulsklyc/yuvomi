@@ -933,8 +933,13 @@ function openNoteReadModal(note) {
  * @param {{ user?: object|null, onChanged?: () => (void|Promise<void>), signal?: AbortSignal|null }} [options]
  */
 export async function openNewNote({ user = null, onChanged = null, signal = null } = {}) {
-  if (readOnly()) return;
+  if (readOnly() || signal?.aborted) return;
   const [categoriesRes] = await Promise.all([api.get('/notes/categories'), lendPageStyle('/styles/notes.css', signal)]);
+  // DIE SEITE DARUNTER IST GEGANGEN, waehrend geladen wurde (Review p11):
+  // der Editor ginge sonst ueber der neuen Seite auf, mit `onChanged` der
+  // alten. Geprueft VOR dem ersten Schreiben in `state` - steht inzwischen die
+  // Notizenseite selbst, gehoert er ihr.
+  if (signal?.aborted) return;
   state.categories = categoriesRes?.data || [];
   state.canManageHousehold = !!categoriesRes?.meta?.can_manage_household;
   if (user) state.user = user;

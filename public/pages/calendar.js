@@ -7748,8 +7748,12 @@ export async function openEventById(id, { date = null, anchor = null, user = nul
  * @param {{ user?: object|null, onChanged?: () => (void|Promise<void>), signal?: AbortSignal|null }} [options]
  */
 export async function openNewEvent({ user = null, onChanged = null, signal = null } = {}) {
-  if (readOnly()) return;
+  if (readOnly() || signal?.aborted) return;
   await Promise.all([loadAwayFormContext(user), lendPageStyle('/styles/calendar.css', signal)]);
+  // DIE SEITE DARUNTER IST GEGANGEN, waehrend geladen wurde (Review p11): das
+  // Formular ginge sonst ueber der neuen Seite auf, und `_away` meldete das
+  // Speichern einer Seite, die nicht mehr steht.
+  if (signal?.aborted) return;
   _away = { onChanged, onRemoving: null, ready: Promise.resolve() };
   openEventModal({ mode: 'create', date: todayKey() });
 }

@@ -6308,11 +6308,16 @@ async function ensureAwayMeta(user) {
  * OHNE KATEGORIEN KEIN FORMULAR (wie in openTaskById): die Auswahl kaeme leer,
  * und das Speichern liefe in einen Fehler. Dann wirft der Aufruf, und der
  * Aufrufer nimmt den Weg ins Modul.
- * @param {{user?: object|null, onChanged?: () => (void|Promise<void>)}} [opts]
+ * @param {{user?: object|null, onChanged?: () => (void|Promise<void>), signal?: AbortSignal|null}} [opts]
+ *        `signal` ist das der aufrufenden Seite: geht sie, bevor das Formular
+ *        bereit ist, geht es nicht mehr auf.
  */
-export async function openNewTask({ user = null, onChanged = () => {} } = {}) {
-  if (readOnly()) return;
+export async function openNewTask({ user = null, onChanged = () => {}, signal = null } = {}) {
+  if (readOnly() || signal?.aborted) return;
   await Promise.all([ensureTaskStyles(), ensureAwayMeta(user)]);
+  // DIE SEITE DARUNTER IST GEGANGEN, waehrend geladen wurde (Review p11): das
+  // Formular ginge sonst ueber der neuen Seite auf, mit `onChanged` der alten.
+  if (signal?.aborted) return;
   if (!state.categories.length) throw new Error(t('tasks.loadError'));
   openTaskModal({ users: state.users, onChanged }, null);
 }

@@ -5763,6 +5763,47 @@ test('U14: der Server liefert Geburtstage und Ausgabenkategorien ueber die hohe 
   }
 });
 
+// --------------------------------------------------------
+// Review p11: SCHEITERT EIN ANLEGEN-BLATT, NACHDEM DIE UEBERSICHT GEGANGEN IST,
+// bleibt man, wo man jetzt steht. Der Ausweichweg ins Modul (openNewTarget)
+// riss einen sonst von der neuen Seite weg. Dass das Blatt selbst nicht mehr
+// aufgeht, haelt test:dashboard-a11y "DW p11".
+// --------------------------------------------------------
+const beforeNewSheetAbort = pendingTests.slice();
+test('Review p11: ein Anlegen-Blatt, das erst nach dem Verlassen der Uebersicht scheitert, wechselt nicht ins Modul', async () => {
+  await Promise.allSettled(beforeNewSheetAbort);
+  const names = ['window', 'document', '__openNewSheet'];
+  const saved = Object.fromEntries(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const visited = [];
+  const set = (name, value) => Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  set('window', { ...(globalThis.window ?? {}), yuvomi: { navigate: async (route) => { visited.push(route); } } });
+  set('document', { getElementById: () => null });
+  let page = null;
+  set('__openNewSheet', async () => {
+    page?.abort();
+    throw new Error('offline');
+  });
+  const origError = console.error;
+  console.error = () => {};
+  try {
+    const { __test: dash } = await import('../public/pages/dashboard.js');
+    // Gegenprobe: steht die Uebersicht noch, nimmt das Anlegen den Weg ins Modul.
+    page = null;
+    await dash.openNewTarget('/notes', { signal: new AbortController().signal });
+    nodeAssert.deepEqual(visited, ['/notes'], 'das Blatt laedt nicht - der Weg ins Modul');
+    visited.length = 0;
+    page = new AbortController();
+    await dash.openNewTarget('/notes', { signal: page.signal });
+    nodeAssert.deepEqual(visited, [], 'die Uebersicht ist schon gegangen - kein Sprung ins Modul');
+  } finally {
+    console.error = origError;
+    for (const name of names) {
+      if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
+      else delete globalThis[name];
+    }
+  }
+});
+
 await Promise.all(pendingTests);
 
 console.log(`\n[Dashboard-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

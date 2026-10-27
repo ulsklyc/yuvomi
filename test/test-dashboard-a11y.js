@@ -1211,6 +1211,85 @@ test('DW p7: openEventById leiht calendar.css fuer sein Formular - mit dem Signa
 });
 
 // --------------------------------------------------------------------------
+// DW p11 (Review zu U2): DAS ANLEGEN-BLATT GEHOERT DER SEITE, VON DER ES KAM.
+// "+ Neu" wartet vor dem Oeffnen auf Daten und Seitenblatt (Kategorien,
+// Mitglieder, Praeferenzen). Wechselte man in der Zeit die Seite, ging das
+// Formular trotzdem auf - ueber der neuen Seite, mit `onChanged` der alten.
+// Das Signal der Uebersicht nahm nur das geliehene Seitenblatt mit.
+// --------------------------------------------------------------------------
+test('DW p11: verlaesst man die Uebersicht, waehrend ein Anlegen-Blatt laedt, geht es nicht ueber der naechsten Seite auf', async () => {
+  const savedDoc = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const head = [];
+  const makeLink = () => {
+    const listeners = {};
+    return {
+      rel: '', href: '', dataset: {}, isConnected: false, sheet: null, listeners,
+      getAttribute(name) { return this[name] ?? null; },
+      addEventListener(type, fn) { listeners[type] = fn; },
+      remove() { head.splice(head.indexOf(this), 1); this.isConnected = false; },
+    };
+  };
+  const fakeDoc = {
+    // Ein Blatt laedt einen Takt spaeter - wie im Browser nie im selben Task.
+    head: { appendChild(el) { head.push(el); el.isConnected = true; setImmediate(() => { el.onload?.(); el.listeners.load?.(); }); return el; } },
+    styleSheets: [],
+    querySelectorAll: () => [],
+    querySelector: () => null,
+    getElementById: () => null,
+    createElement: () => makeLink(),
+    addEventListener() {}, removeEventListener() {},
+    documentElement: { dataset: {} },
+  };
+  Object.defineProperty(globalThis, 'document', { value: fakeDoc, configurable: true, writable: true });
+  globalThis.window ??= {};
+  globalThis.window.matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  const priorYuvomi = globalThis.window.yuvomi;
+  globalThis.window.yuvomi = { showToast: () => {}, navigate: () => {} };
+  globalThis.__apiStub = {
+    get: async (path) => {
+      // /tasks/meta/options antwortet ohne data-Huelle (ensureAwayMeta).
+      if (path === '/tasks/meta/options') return { users: [{ id: 1, display_name: 'Linda' }], categories: [{ key: 'household', label: 'Haushalt' }], tags: [] };
+      if (path === '/notes/categories') return { data: [], meta: { can_manage_household: true } };
+      if (path === '/preferences') return { data: {} };
+      return { data: [] };
+    },
+  };
+  const opened = [];
+  globalThis.__openModal = () => { opened.push('modal'); };
+  const user = { id: 1, role: 'admin' };
+  // notes.js zieht Custom Elements (category-manager) mit.
+  const customGlobals = { HTMLElement: class {}, customElements: { define() {}, get() {} } };
+  const missingGlobals = Object.keys(customGlobals).filter((name) => !(name in globalThis));
+  for (const name of missingGlobals) globalThis[name] = customGlobals[name];
+  try {
+    const sheets = {
+      '/tasks': (await import('../public/pages/tasks.js')).openNewTask,
+      '/calendar': (await import('../public/pages/calendar.js')).openNewEvent,
+      '/notes': (await import('../public/pages/notes.js')).openNewNote,
+    };
+    for (const [route, openNew] of Object.entries(sheets)) {
+      // Gegenprobe: bleibt die Uebersicht stehen, geht das Formular auf.
+      opened.length = 0;
+      await openNew({ user, onChanged: () => {}, signal: new AbortController().signal });
+      assert.equal(opened.length, 1, `${route}: das Formular geht ueber der Uebersicht auf`);
+      // Die Uebersicht geht, waehrend das Blatt noch vorbereitet.
+      opened.length = 0;
+      const page = new AbortController();
+      const pending = openNew({ user, onChanged: () => {}, signal: page.signal });
+      page.abort();
+      await pending;
+      assert.equal(opened.length, 0, `${route}: das Formular geht nicht ueber der naechsten Seite auf`);
+    }
+  } finally {
+    for (const name of missingGlobals) delete globalThis[name];
+    delete globalThis.__apiStub;
+    delete globalThis.__openModal;
+    globalThis.window.yuvomi = priorYuvomi;
+    if (savedDoc) Object.defineProperty(globalThis, 'document', savedDoc); else delete globalThis.document;
+  }
+});
+
+// --------------------------------------------------------------------------
 // DW-P2-11: EINE LEERZEILE. Naehrwerte, Entsorgung und Schnellzugriffe sagten
 // "noch nichts" in drei Formen (Glyphe + Caption + Akzent-Textknopf, der je
 // nach Breite rechts stand oder unter den Satz brach). Jetzt die ruhige Zeile

@@ -8968,6 +8968,10 @@ async function openNewTarget(route, { user = null, refresh = null, signal = null
     } catch (err) {
       console.error('[Dashboard] Anlegen-Blatt konnte nicht geöffnet werden:', err);
     }
+    // Wer die Uebersicht inzwischen verlassen hat, steht schon woanders: der
+    // Weg ins Modul risse ihn von dort weg (Review p11). Das Blatt selbst
+    // prueft dasselbe Signal, bevor es aufgeht.
+    if (signal?.aborted) return;
   }
   await window.yuvomi.navigate(route);
   const id = FAB_NEW_BTN[route];
@@ -11371,6 +11375,8 @@ Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderShoppin
 
 // Test-Tor fuer die Uebersichts-Bugs vom 2026-09-29 (#1449, #1451-#1457).
 Object.assign(__test, { renderBudgetWidget });
+// Review p11: der Weg zum Anlegen-Blatt, wenn die Seite waehrenddessen geht.
+Object.assign(__test, { openNewTarget });
 
 // Test-Tor fuer die Kalender-Auswahl der Kalender-Kachel (#2062).
 Object.assign(__test, { loadCalendarSources });
