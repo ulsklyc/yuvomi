@@ -2818,6 +2818,12 @@ router.get('/me', requireAuth, (req, res) => {
       othersCanRead: othersCanRead(db.get(), user.id),
       ...gravatarClientState(user.id),
       csrfToken: req.session.csrfToken,
+      // Wann diese Sitzung ohne weitere Benutzung endet: der Ablauf, den der
+      // Browser fuer sein Session-Cookie zuletzt bekommen hat (bei der Anmeldung
+      // oder von refreshSessionCookieIfDue). Der Service Worker haelt den
+      // Offline-Abzug samt Listen nicht laenger (#2293, public/sw.js); ohne
+      // diesen Wert legt er keinen an.
+      sessionExpiresAt: req.session.cookie?.expires instanceof Date ? req.session.cookie.expires.getTime() : null,
     });
   } catch (err) {
     log.error('/me error:', err);

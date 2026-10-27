@@ -57,6 +57,13 @@ const API_CACHE_EXCLUDE = ['/shopping/versions'];
 // Der Abzug traegt `offlineSnapshot: true`. Er wird nur bei einem Netzfehler
 // ausgeliefert (Network-First), und der Router liest daran, dass die Sitzung
 // NICHT geprueft ist. Eine 401 loescht ihn.
+//
+// DER ABZUG ENDET MIT DER SITZUNG. `/auth/me` nennt `sessionExpiresAt`, den
+// Ablauf des Session-Cookies (server/auth.js); der Worker legt ihn neben die
+// Antworten (SESSION_EXPIRY_KEY). Ist er vorbei, liefert ein Netzfehler weder
+// den Abzug noch die Listen, und der API-Cache wird geloescht - ein Geraet mit
+// abgelaufener oder widerrufener Sitzung zeigt den Haushalt nicht beliebig
+// lange. Ohne Ablauf vom Server gibt es keinen Abzug.
 const SESSION_SNAPSHOT_SCOPES = ['family'];
 const SESSION_SNAPSHOT_USER_FIELDS = [
   'id', 'username', 'display_name', 'avatar_color', 'avatar_data', 'role', 'family_role',
@@ -77,12 +84,20 @@ function pickFields(source, fields) {
   return out;
 }
 
+function sessionExpiryOf(body) {
+  const value = body && body.sessionExpiresAt;
+  return Number.isFinite(value) ? value : null;
+}
+
 function reduceSessionSnapshot(body) {
   const user = body && typeof body.user === 'object' ? body.user : null;
   if (!user || !SESSION_SNAPSHOT_SCOPES.includes(user.access_scope)) return null;
+  const expiresAt = sessionExpiryOf(body);
+  if (expiresAt === null || expiresAt <= Date.now()) return null;
   return {
     user: pickFields(user, SESSION_SNAPSHOT_USER_FIELDS),
     ...pickFields(body, SESSION_SNAPSHOT_FIELDS),
+    expiresAt,
     offlineSnapshot: true,
   };
 }
@@ -97,6 +112,58 @@ const API_SNAPSHOTS = {
   '/auth/me': reduceSessionSnapshot,
   '/preferences': reducePreferencesSnapshot,
 };
+
+// Ablauf der Sitzung, deren Antworten im API-Cache liegen. Eigener Eintrag,
+// weil er fuer jede Sitzung gilt, auch die ohne Abzug (Display, Split-Gast).
+const SESSION_EXPIRY_KEY = `${self.location.origin}/api/v1/__offline/session-expires-at`;
+
+async function rememberSessionExpiry(cache, body) {
+  const expiresAt = sessionExpiryOf(body);
+  if (expiresAt === null) {
+    await cache.delete(SESSION_EXPIRY_KEY);
+    return;
+  }
+  await cache.put(SESSION_EXPIRY_KEY, new Response(JSON.stringify({ expiresAt }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  }));
+}
+
+/**
+ * Ist die Sitzung, der der API-Cache gehoert, abgelaufen? Dann ist er jetzt
+ * geloescht, und der Aufrufer liefert nichts aus ihm.
+ */
+async function dropApiCacheIfSessionExpired() {
+  try {
+    if (!(await caches.has(API_CACHE))) return false;
+    const cache = await caches.open(API_CACHE);
+    const marker = await cache.match(SESSION_EXPIRY_KEY);
+    if (!marker) return false;
+    const { expiresAt } = await marker.json();
+    if (Number.isFinite(expiresAt) && expiresAt > Date.now()) return false;
+    await caches.delete(API_CACHE);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Der gespeicherte Stand zu einem Abruf - ohne den Cache dafuer neu anzulegen. */
+async function cachedApiResponse(request) {
+  try {
+    if (!(await caches.has(API_CACHE))) return null;
+    return (await (await caches.open(API_CACHE)).match(request)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function offlineResponse() {
+  return new Response(JSON.stringify({ error: 'offline' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
+}
 
 /** Der Abzug-Reduzierer zu einem API-Pfad (exakter Pfad, keine Unterpfade), sonst null. */
 function apiSnapshotReducer(pathname) {
@@ -877,7 +944,8 @@ async function precacheAvatars(baseUrl, text) {
 // --------------------------------------------------------
 // Strategie: Network-First für GET-API (Read-only-Offline)
 // Erfolg → Antwort klonen, x-cached-at-Header ergänzen, in API_CACHE legen.
-// Netzfehler → Cache-Fallback, sonst 503-JSON {error:'offline'}.
+// Netzfehler → Cache-Fallback, sonst 503-JSON {error:'offline'}; nach dem
+//          Sitzungsablauf (#2293) kein Fallback, der API-Cache geht weg.
 // --------------------------------------------------------
 async function networkFirstApi(request, event) {
   try {
@@ -906,13 +974,8 @@ async function networkFirstApi(request, event) {
     }
     return response;
   } catch {
-    const cache  = await caches.open(API_CACHE);
-    const cached = await cache.match(request);
-    if (cached) return cached;
-    return new Response(JSON.stringify({ error: 'offline' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    });
+    if (await dropApiCacheIfSessionExpired()) return offlineResponse();
+    return (await cachedApiResponse(request)) || offlineResponse();
   }
 }
 
@@ -967,24 +1030,23 @@ function isMutableAppResource(pathname) {
 // Strategie: Network-First fuer die Abzuege (#2293, API_SNAPSHOTS oben)
 // Erfolg → nur der reduzierte Abzug in API_CACHE, die Netzantwort unveraendert
 //          an die Seite. Kein Abzug (Display, Split-Gast) oder 401 → Eintrag weg.
-// Netzfehler → Abzug, sonst 503-JSON {error:'offline'} wie networkFirstApi.
+// Netzfehler → Abzug, sonst 503-JSON {error:'offline'} wie networkFirstApi;
+//          nach dem Sitzungsablauf keins von beiden (dropApiCacheIfSessionExpired).
 // --------------------------------------------------------
 async function networkFirstSnapshot(request, reduce) {
   let response;
   try {
     response = await fetch(request);
   } catch {
-    const cached = await caches.open(API_CACHE).then((cache) => cache.match(request)).catch(() => null);
-    if (cached) return cached;
-    return new Response(JSON.stringify({ error: 'offline' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    });
+    if (await dropApiCacheIfSessionExpired()) return offlineResponse();
+    return (await cachedApiResponse(request)) || offlineResponse();
   }
   try {
     const cache = await caches.open(API_CACHE);
     if (response.ok && response.type === 'basic') {
-      const snapshot = reduce(await response.clone().json());
+      const body = await response.clone().json();
+      if (reduce === reduceSessionSnapshot) await rememberSessionExpiry(cache, body);
+      const snapshot = reduce(body);
       if (snapshot) {
         await cache.put(request, new Response(JSON.stringify(snapshot), {
           status: 200,

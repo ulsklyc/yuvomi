@@ -13,9 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reached". Now calendar, tasks, the shopping list, contacts and the overview open on the state
   this device last loaded, read-only, with a strip at the top that says so. As soon as your server
   answers again, the session is checked and the page refreshes; an expired session goes to the
-  sign-in as before. Wall displays and split guests keep their old behaviour. Signing out now
-  always deletes the saved data on the device, also when the app was not yet controlled by its
-  service worker.
+  sign-in as before, and once the session has expired the saved state is not shown and is deleted.
+  A remote sign-out reaches the device when it is back online. Wall displays and split guests
+  keep their old behaviour. Signing out now always deletes the saved data on the device, also
+  when the app was not yet controlled by its service worker.
 - **One entry of a waste calendar can fill several bins** (#2273). Some cities name two bins in
   one entry when they share a day - Dresden writes "Leerung Bio-Tonne, Blaue Tonne". In the import
   and in a source's mappings, each label now shows your waste types as chips: pick every bin the

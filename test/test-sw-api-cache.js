@@ -431,6 +431,7 @@ const ME_BODY = {
   gravatarAvailable: true,
   gravatarHost: 'gravatar.example',
   csrfToken: 'geheimes-csrf-token',
+  sessionExpiresAt: Date.now() + 24 * 60 * 60 * 1000,
 };
 
 function meResponse(body = ME_BODY, status = 200) {
@@ -651,4 +652,53 @@ test('ungepruefte Sitzung: eine 401 beendet sie ohne Freigabe', async () => {
   await session.check();
   assert.equal(session.isActive(), false);
   assert.deepEqual(seen.verified, [], 'die Abmeldung macht auth:expired, nicht onVerified');
+});
+
+// --------------------------------------------------------
+// Der Abzug endet mit der Sitzung (#2293, Security-Befund im Review)
+// --------------------------------------------------------
+// Ohne Grenze zeigte ein Geraet, dessen Sitzung laengst abgelaufen oder
+// widerrufen ist, offline beliebig lange die Haushaltsdaten. Die Grenze kommt
+// vom Server (`sessionExpiresAt` aus `/auth/me`, der Ablauf des Session-Cookies).
+test('nach dem Sitzungsablauf liefert der Worker offline weder Abzug noch Listen und raeumt den Cache', async () => {
+  const online = async (req) => {
+    if (req.url.endsWith('/auth/me')) return meResponse({ ...ME_BODY, sessionExpiresAt: Date.now() + 40 });
+    return new MockResponse(JSON.stringify({ data: [{ id: 1, name: 'Milch' }] }), { status: 200 });
+  };
+  const sw = loadSw({ fetchImpl: online });
+  await pageGet(sw, '/auth/me', online);
+  await pageGet(sw, '/shopping', online);
+  await new Promise((r) => setTimeout(r, 60));
+
+  const down = async () => { throw new TypeError('Failed to fetch'); };
+  sw.setFetch(down);
+  for (const path of ['/auth/me', '/shopping']) {
+    const res = await dispatchFetch(sw, new MockRequest(apiUrl(path), { method: 'GET' })).result;
+    assert.equal(res.status, 503, `${path} nach Ablauf: kein gespeicherter Stand`);
+  }
+  assert.equal(await apiCacheName(sw), undefined, 'der abgelaufene API-Cache ist geloescht');
+
+  const routes = [...HARNESS_ROUTES, { path: '/shopping', requiresAuth: true, module: 'shopping' }];
+  const { navigate, log } = createNavigateHarness({ routes, me: () => pageGet(sw, '/auth/me', down) });
+  await navigate('/shopping');
+  assert.equal(log.unreachable.length, 1, 'der bestehende Hinweis statt der Liste');
+  assert.deepEqual(log.rendered, []);
+});
+
+test('vor dem Sitzungsablauf bleibt der Stand lesbar', async () => {
+  const sw = loadSw({ fetchImpl: async () => meResponse() });
+  await pageGet(sw, '/auth/me', async () => meResponse());
+  sw.setFetch(async () => { throw new TypeError('Failed to fetch'); });
+  const res = await dispatchFetch(sw, new MockRequest(apiUrl('/auth/me'), { method: 'GET' })).result;
+  assert.equal(res.status, 200);
+});
+
+test('ohne Ablauf vom Server legt der Worker keinen Sitzungsabzug an', async () => {
+  const { sessionExpiresAt, ...withoutExpiry } = ME_BODY;
+  assert.ok(sessionExpiresAt);
+  const sw = loadSw({ fetchImpl: async () => meResponse(withoutExpiry) });
+  await dispatchFetch(sw, new MockRequest(apiUrl('/auth/me'), { method: 'GET' })).result;
+  sw.setFetch(async () => { throw new TypeError('Failed to fetch'); });
+  const res = await dispatchFetch(sw, new MockRequest(apiUrl('/auth/me'), { method: 'GET' })).result;
+  assert.equal(res.status, 503);
 });
