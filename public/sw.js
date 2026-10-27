@@ -476,6 +476,7 @@ const APP_SHELL = [
   '/utils/reload-after-save.js',
   '/utils/background-inert.js',
   '/utils/today-sheet.js',
+  '/utils/today-timeline.js',
   '/utils/shift-label.js',
   '/utils/time-grid.js',
   '/utils/unknown-route.js',
