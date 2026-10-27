@@ -196,6 +196,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   until the next run, in the full sync and in the attempt right after an edit; a calendar or list
   that is only read-only for you still holds up nothing else. A leftover past its one-day grace is
   no longer given up on such an answer either, so it cannot come back as an entry.
+- **"List" in a shopping item's edit dialog no longer offers lists you cannot add to** (#2283).
+  A shopping list that mirrors a reminder list shared with you read-only is left out of the
+  choice, as calendars and reminder lists already are for events and tasks: an item moved there
+  would have stayed on Yuvomi only, because the server refuses it. An item already on such a list
+  keeps it. API clients see `accepts_new_items` on each list, and a move to a list without it is
+  refused with 400.
 - **An occurrence cancelled in a subscribed or synced calendar stays cancelled after a clock
   change** (#2000). For a series with its own time zone, an occurrence the provider cancelled or
   moved could stay visible once its UTC day and its local day fell apart: a New York series at

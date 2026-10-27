@@ -2849,12 +2849,16 @@ function openItemDetails(itemId, container) {
   // Kein eigener "Verschieben"-Weg und kein Ziehen: der Dialog ist ohnehin der
   // Ort, an dem man einen Artikel umhaengt.
   const fromListId = state.activeListId;
-  const listRow = state.lists.length > 1 ? formRowsHtml(formRowHtml({
+  // Ziel ist nur eine Liste, die neue Artikel annimmt (#2283): eine nur lesbar
+  // gespiegelte wiese den Upload ab. Die eigene bleibt immer stehen - sie ist
+  // kein Umzug. Ohne das Feld (ältere Antwort) gilt eine Liste als offen.
+  const targets = state.lists.filter((l) => l.id === fromListId || l.accepts_new_items !== 0);
+  const listRow = targets.length > 1 ? formRowsHtml(formRowHtml({
     label: t('shopping.itemListLabel'),
     labelFor: 'item-details-list',
     field: true,
     control: `<select class="form-input" id="item-details-list">
-              ${state.lists.map((l) => `<option value="${l.id}" ${l.id === fromListId ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}
+              ${targets.map((l) => `<option value="${l.id}" ${l.id === fromListId ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}
             </select>`,
   })) : '';
 

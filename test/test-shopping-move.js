@@ -301,6 +301,69 @@ test('Die eigene Liste oder gar keine: kein Umzug, der Rang bleibt', async () =>
 });
 
 // --------------------------------------------------------------------------
+// Nur lesbar gespiegelte Listen (#2283)
+// --------------------------------------------------------------------------
+//
+// Seit #2280 bieten die Ziel-Auswahlen fuer Termine und Aufgaben nur
+// Collections an, die neue Eintraege annehmen (`writable`). Eine Einkaufsliste,
+// die eine nur lesbar geteilte Erinnerungsliste spiegelt, wiese den Upload
+// eines hierher verschobenen Artikels ab: sie ist kein Umzugsziel. NULL
+// (der Server sagt es nicht) zaehlt als beschreibbar, wie ueberall.
+
+function readOnlyMirror(accountId, listUrl, listId, writable = 0) {
+  db.prepare(`
+    INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled, target_list_id, writable)
+    VALUES (?, ?, 'Geteilt', 'shopping', 1, ?, ?)
+  `).run(accountId, listUrl, listId, writable);
+}
+
+test('Listen: jede sagt, ob sie neue Artikel annimmt - nur lesbar gespiegelt nein, sonst ja (#2283)', async () => {
+  reset();
+  const lokal = list('Lokal');
+  const offen = list('Beschreibbar');
+  const unbekannt = list('Unbekannt');
+  const geteilt = list('Nur lesbar');
+  const aus = list('Abgeschaltet');
+  const acc = account();
+  readOnlyMirror(acc, URL_A, offen, 1);
+  readOnlyMirror(acc, URL_B, unbekannt, null);
+  readOnlyMirror(acc, 'https://dav.example/dav/u/geteilt/', geteilt, 0);
+  // Eine abgeschaltete Zuordnung schickt nichts hinauf und zaehlt nicht.
+  readOnlyMirror(acc, 'https://dav.example/dav/u/aus/', aus, 0);
+  db.prepare("UPDATE caldav_reminder_selection SET enabled = 0 WHERE list_url = 'https://dav.example/dav/u/aus/'").run();
+
+  const r = await call('GET', '/');
+  assert.equal(r.status, 200);
+  const annimmt = Object.fromEntries(r.body.data.map((l) => [l.id, l.accepts_new_items]));
+  assert.deepEqual(annimmt, { [lokal]: 1, [offen]: 1, [unbekannt]: 1, [geteilt]: 0, [aus]: 1 });
+});
+
+test('Umzug auf eine nur lesbar gespiegelte Liste: 400, der Artikel bleibt, wo und wie er ist (#2283)', async () => {
+  reset();
+  const a = list('A');
+  const geteilt = list('Nur lesbar');
+  readOnlyMirror(account(), URL_B, geteilt, 0);
+  const item = localItem(a, { name: 'Milch', sort_order: 3 });
+
+  const r = await call('PATCH', `/items/${item.id}`, { list_id: geteilt, name: 'Hafermilch' });
+  assert.equal(r.status, 400);
+  assert.deepEqual(row(item.id), item, 'auch der mitgeschickte Name ist nicht geschrieben');
+});
+
+test('Ein Artikel, der schon auf einer nur lesbaren Liste steht, laesst sich weiter bearbeiten (#2283)', async () => {
+  reset();
+  const geteilt = list('Nur lesbar');
+  readOnlyMirror(account(), URL_B, geteilt, 0);
+  const item = localItem(geteilt, { name: 'Milch' });
+
+  for (const body of [{ list_id: geteilt, name: 'Hafermilch' }, { quantity: '2' }]) {
+    const r = await call('PATCH', `/items/${item.id}`, body);
+    assert.equal(r.status, 200, JSON.stringify(body));
+  }
+  assert.deepEqual([row(item.id).list_id, row(item.id).name, row(item.id).quantity], [geteilt, 'Hafermilch', '2']);
+});
+
+// --------------------------------------------------------------------------
 // Gespiegelte Listen
 // --------------------------------------------------------------------------
 
