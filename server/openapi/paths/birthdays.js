@@ -104,7 +104,10 @@ export function birthdaysPaths() {
 const BIRTHDAY_GONE = '`birthdays_birthday_not_found` (404, the birthday does not exist - deleted)';
 // D7 (Critique R22): POST und PUT verknuepfen per `contact_id`.
 const CONTACT_LINK = '`birthdays_contact_linked` (409, the contact is already linked to another birthday), `birthdays_selected_contact_not_found` (400, no such contact)';
+const CONTACTS_READ_REQUIRED = '`cross_module_access` (403, importing birthdays reads contacts and needs read access to them - for API tokens a `contacts:read` scope)';
 const CASE_REASONS = {
   '/api/v1/birthdays': { post: CONTACT_LINK },
   '/api/v1/birthdays/{id}': { put: `${BIRTHDAY_GONE}, ${CONTACT_LINK}`, delete: BIRTHDAY_GONE },
+  '/api/v1/birthdays/import/candidates': { get: CONTACTS_READ_REQUIRED },
+  '/api/v1/birthdays/import': { post: CONTACTS_READ_REQUIRED },
 };

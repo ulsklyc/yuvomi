@@ -1,7 +1,7 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 export function authPaths() {
-  return {
+  return withCaseReasons('auth', CASE_REASONS, {
     '/api/v1/auth/login': {
       post: op({
         summary: 'Login with username and password',
@@ -183,7 +183,8 @@ export function authPaths() {
           + 'It links only an account whose address nobody but an admin can have set: an account without a password (SSO-only) or an admin account. '
           + 'Two or more matching accounts redirect to /login?error=oidc_email_ambiguous; a single matching member account that has a password redirects to /login?error=oidc_link_required, and that member links SSO while signed in (POST /api/v1/auth/oidc/link/start). '
           + 'Neither case creates or links an account, whatever OIDC_ALLOW_SIGNUP says. '
-          + 'With OIDC_ALLOW_SIGNUP=false an identity that matches no existing account is redirected to /login?error=oidc_signup_disabled instead of being provisioned.',
+          + 'With OIDC_ALLOW_SIGNUP=false an identity that matches no existing account is redirected to /login?error=oidc_signup_disabled instead of being provisioned. '
+          + 'A link run started while signed in (POST /api/v1/auth/oidc/link/start) redirects to /settings/personal/account?oidc_linked=1, or on refusal to /settings/personal/account?oidc_link_error=<reason>: `user_gone` (the account no longer exists or can no longer sign in), `already_linked` (the account is linked to another identity), `sub_taken` (the identity is linked to another account).',
         responses: {
           302: { description: 'Redirect to app or login error page' },
         },
@@ -675,5 +676,22 @@ export function authPaths() {
         },
       }),
     },
-  };
+  });
 }
+
+// #2267: die Gruende, die die Anmelde- und Kontorouten neben `error` senden.
+const INVALID_CODE = '`invalid_code` (400, the code is wrong or expired)';
+const NOT_ENABLED = '`not_enabled` (409, two-factor authentication is not turned on)';
+const DEACTIVATED_SUBJECT = '`account_deactivated` (400, the chosen account is deactivated)';
+const CASE_REASONS = {
+  '/api/v1/auth/login': {
+    post: '`account_cannot_sign_in` (403, the account is deactivated or may not sign in), `password_login_disabled` (403, password login is turned off for this instance)',
+  },
+  '/api/v1/auth/2fa/enable': { post: INVALID_CODE },
+  '/api/v1/auth/2fa/disable': { post: `${INVALID_CODE}, ${NOT_ENABLED}` },
+  '/api/v1/auth/2fa/recovery-codes': { post: `${INVALID_CODE}, ${NOT_ENABLED}` },
+  '/api/v1/auth/logout-others': { post: '`browser_session_required` (403, only a signed-in browser session can sign out the other sessions, not an API token)' },
+  '/api/v1/auth/setup': { post: '`setup_completed` (403, setup has already been completed)' },
+  '/api/v1/auth/users/{id}': { patch: '`account_deactivated` (400, a deactivated account cannot become an administrator)' },
+  '/api/v1/auth/api-tokens': { post: DEACTIVATED_SUBJECT },
+};

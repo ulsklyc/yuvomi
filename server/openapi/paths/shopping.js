@@ -1,7 +1,7 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 export function shoppingPaths() {
-  return {
+  return withCaseReasons('shopping', CASE_REASONS, {
     '/api/v1/shopping': {
       get: op({ summary: 'List shopping lists', tag: 'Shopping', description: 'Each list carries `item_total`, `item_checked` and `accepts_new_items` (1 or 0). `accepts_new_items` is 0 when the list mirrors a CalDAV reminder list that is read-only for its account: such a list is not offered as the target of a move, and moving an item there is refused.' }),
       post: op({ summary: 'Create shopping list', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
@@ -181,5 +181,25 @@ export function shoppingPaths() {
         },
       }),
     },
-  };
+  });
 }
+
+// #2267: die Gruende, die die Routen neben `error` senden.
+const LIST_GONE = '`shopping_list_not_found` (404, the list does not exist - deleted)';
+const MEALS_WRITE_REQUIRED = '`cross_module_access` (403, the caller has no write access to the meal plan - for API tokens a `meals:write` scope)';
+const PANTRY_READ_REQUIRED = '`cross_module_access` (403, the caller has no read access to the pantry - for API tokens a `pantry:read` scope)';
+const CASE_REASONS = {
+  '/api/v1/shopping/{listId}': { put: LIST_GONE, delete: LIST_GONE },
+  '/api/v1/shopping/{listId}/duplicate': { post: LIST_GONE },
+  '/api/v1/shopping/{listId}/items': { get: LIST_GONE, post: LIST_GONE },
+  '/api/v1/shopping/{listId}/items/reorder': { patch: LIST_GONE },
+  '/api/v1/shopping/{listId}/import-meal-plan': { post: `${LIST_GONE}, ${MEALS_WRITE_REQUIRED}` },
+  '/api/v1/shopping/{listId}/import-pantry': { post: `${LIST_GONE}, ${PANTRY_READ_REQUIRED}` },
+  '/api/v1/shopping/{listId}/send': {
+    post: `${LIST_GONE}, \`nothing_open\` (422, the list has no open item to send), `
+      + '`recipient_no_email` (422, the chosen member has no email address on their contact), '
+      + '`smtp_unconfigured` (422, email is not set up for this instance)',
+  },
+  '/api/v1/shopping/items/{itemId}': { delete: '`shopping_item_not_found` (404, the item does not exist - deleted)' },
+  '/api/v1/shopping/items/undo-transfer': { post: `${MEALS_WRITE_REQUIRED}, when the undo touches meal ingredients` },
+};

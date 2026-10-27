@@ -225,6 +225,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the pantry no longer show the server's sentence in a toast but their own, in your language. The
   OpenAPI description now lists `recipe_mirrored` and `cross_module_access` at the recipe, meal and
   pantry routes that already sent them.
+- **The API description names every reason a route sends** (#2267). The OpenAPI spec now lists
+  the `reason` values of the sign-in and account routes (`invalid_code`, `not_enabled`,
+  `account_cannot_sign_in`, `password_login_disabled`, `browser_session_required`,
+  `setup_completed`, `account_deactivated`), the category and subcategory management of budget and
+  tasks, the shopping lists (`shopping_list_not_found`, `nothing_open`, `recipient_no_email`,
+  `smtp_unconfigured`), `display_only` and `display_action` for paired displays, and
+  `cross_module_access` where a route needs a second module. A failed SSO link names its
+  `oidc_link_error` values.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the

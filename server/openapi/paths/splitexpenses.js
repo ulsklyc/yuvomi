@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam, DOCUMENT_LINKS_READ_NOTE } from '../helpers.js';
+import { op, jsonBody, idParam, DOCUMENT_LINKS_READ_NOTE, withCaseReasons } from '../helpers.js';
 
 // Betraege im Request (#1607): eine Regel fuer Ausgabe, Genau-Anteil und Zahlung,
 // durchgesetzt in parseMoneyToMinor().
@@ -170,7 +170,7 @@ function refuseWhenArchived(paths) {
 }
 
 export function splitexpensesPaths() {
-  return refuseWhenArchived({
+  return withCaseReasons('split-expenses', CASE_REASONS, refuseWhenArchived({
     '/api/v1/split-expenses/meta': { get: op({ summary: 'Get split expenses metadata', tag: 'SplitExpenses' }) },
     '/api/v1/split-expenses/dashboard': { get: op({ summary: 'Get split expenses dashboard summary', tag: 'SplitExpenses' }) },
     '/api/v1/split-expenses/groups': {
@@ -359,5 +359,12 @@ export function splitexpensesPaths() {
     '/api/v1/split-expenses/search': {
       get: op({ summary: 'Search split-expense groups, expenses, and people', tag: 'SplitExpenses' }),
     },
-  });
+  }));
 }
+
+// #2267: der Grund, den die Route neben `error` sendet.
+const CASE_REASONS = {
+  '/api/v1/split-expenses/groups/{id}/members': {
+    post: '`cross_module_access` (403, adding a person without an account creates a contact and needs write access to contacts - for API tokens a `contacts:write` scope)',
+  },
+};

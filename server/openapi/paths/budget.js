@@ -196,4 +196,14 @@ const CASE_REASONS = {
     delete: '`subscriptions_payment_method_not_found` (404)',
   },
   '/api/v1/budget/subscriptions/logo-search': { post: '`subscriptions_no_logo_found` (404, no supported logo was found)' },
+  '/api/v1/budget/categories': { post: '`category_exists` (409, a category with this name already exists)' },
+  '/api/v1/budget/categories/{key}': {
+    put: '`category_exists` (409, a category with this name already exists)',
+    delete: '`category_in_use` (409, entries still use the category; `count` carries how many), `category_last` (409, the last category cannot be deleted)',
+  },
+  '/api/v1/budget/categories/{categoryKey}/subcategories': { post: '`subcategory_exists` (409, a subcategory with this name already exists)' },
+  '/api/v1/budget/categories/{key}/subcategories/{subKey}': {
+    put: '`subcategory_exists` (409, a subcategory with this name already exists)',
+    delete: '`subcategory_in_use` (409, entries still use the subcategory; `count` carries how many), `subcategory_last` (409, the last subcategory cannot be deleted)',
+  },
 };
