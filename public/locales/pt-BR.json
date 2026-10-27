@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "Excluir a meta de poupança?",
         "accountsTab": "Contas",
         "netWorth": "Patrimônio líquido",
+        "netWorthApproxNote": "Convertido pelas taxas de {{date}}",
+        "netWorthPerCurrencyNote": "Sem taxa de câmbio - total por moeda",
         "addAccount": "Adicionar conta",
         "accountsEmptyTitle": "Ainda não há contas",
         "accountsEmptyDescription": "Adicione contas como corrente ou poupança para acompanhar os seus saldos.",

@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "Törli a megtakarítási célt?",
         "accountsTab": "Számlák",
         "netWorth": "Nettó vagyon",
+        "netWorthApproxNote": "Átszámítva a(z) {{date}} árfolyamaival",
+        "netWorthPerCurrencyNote": "Árfolyam nélkül - összeg pénznemenként",
         "addAccount": "Számla hozzáadása",
         "accountsEmptyTitle": "Még nincsenek számlák",
         "accountsEmptyDescription": "Adj hozzá számlákat, például folyó- vagy megtakarítási számlát az egyenlegek követéséhez.",

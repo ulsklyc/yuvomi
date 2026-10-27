@@ -1271,7 +1271,7 @@ test('gespeicherte Beträge werden beim Öffnen nicht gerundet', () => {
 // in den Stellen der Waehrung, nur mit Nullen aufgefuellt (test:money-utils).
 test('Betragsfelder zeigen den Bestand in den Stellen der Waehrung (200,00 statt 200)', () => {
   const felder = [
-    ['budget.js', budget, 'bm-amount', /amountInputAttrs\(state\.currency, absAmount\)/],
+    ['budget.js', budget, 'bm-amount', /amountInputAttrs\(entryCurrency, absAmount\)/], // #2302: Waehrung des Kontos
     ['budget.js', budget, 'cb-amount', /amountInputAttrs\(currency, absAmount\)/],
     ['budget.js', budget, 'lm-amount', /amountInputAttrs\(loanCurrency, loan \? loan\.total_amount : ''\)/],
     ['budget-plans.js', plans, 'plan-amount', /amountInputAttrs\(view\.ctx\.currency, value\)/],
@@ -3234,7 +3234,7 @@ test('Buchungsdialog: Betrag zuerst und gross, Seltenes hinter „Weitere Angabe
   assert.ok(pos('id="bm-amount"') < pos('id="bm-title"'), 'der Betrag steht vor dem Titel - und bekommt als erstes Feld den Erstfokus');
   assert.ok(pos('id="bm-title"') < pos('id="bm-category"'));
   assert.ok(pos('id="bm-category"') < pos('id="bm-date"'));
-  assert.match(modal, /class="form-input budget-amount-input" id="bm-amount"\$\{amountInputAttrs\(state\.currency, absAmount\)\}/, 'der Betrag ist der D1-Baustein');
+  assert.match(modal, /class="form-input budget-amount-input" id="bm-amount"\$\{amountInputAttrs\(entryCurrency, absAmount\)\}/, 'der Betrag ist der D1-Baustein');
   const adv = pos('${advancedSection(`');
   for (const rare of ['id="bm-visibility"', 'responsiblePickerHtml(', "budgetToggleHtml('bm-recurring'", 'renderDocumentAttachField(']) {
     assert.ok(pos(rare) > adv, `${rare} gehoert hinter „Weitere Angaben"`);

@@ -236,6 +236,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   payment still waiting on it. Bookings made before this update stay as they are and count as the
   account's currency: payments a subscription or loan booked earlier on such an account are still
   in the household currency and can be corrected by hand.
+- **Accounts in another currency show their own currency** (#2302). The accounts page wrote every
+  balance, starting balance and available credit with the household currency sign, so 5,000 yen
+  read as 5,000 euros. Each account now shows its amounts in its currency, and the amount field
+  of a budget entry follows the account you pick, with its sign and decimal places. Net worth over
+  accounts in several currencies is converted with the cached exchange rates and marked as an
+  approximation (≈, with the date of the rates); without a rate it shows the total per currency
+  instead of adding dollars and euros.
 - **Settings - Wall tablets names the pairing address before a code exists** (#2294). A tablet
   pairs at your instance's `/pair` address, not through the sign-in page, but the page only said
   so next to a freshly generated code. It now shows the two steps and the full address up front,

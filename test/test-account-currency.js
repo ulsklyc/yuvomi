@@ -295,3 +295,36 @@ test('Projektion: eine auf ein Euro-Konto gestellte Zahlung verschiebt die Folge
   assert.equal(entries.length, 1);
   assert.equal(entries[0].amount, -33, 'USD 33 wie die Vorgabe, nicht die 30 EUR der umgestellten Zahlung');
 });
+
+test('Nettovermoegen: nur Budget-Waehrung bleibt die schlichte Summe', async () => {
+  const giro = await account('Giro', null);
+  await call('PUT', `/accounts/${giro}`, { starting_balance: 250 });
+  const r = await call('GET', '/accounts');
+  assert.equal(r.body.data.net_worth, 250);
+  assert.equal(r.body.data.net_worth_approx, undefined);
+  assert.equal(r.body.data.net_worth_by_currency, undefined);
+});
+
+test('Nettovermoegen: ein USD-Konto geht ueber den Kurs-Cache ein und ist als Naeherung markiert', async () => {
+  const giro = await account('Giro', null);
+  const usd = await account('Chase', 'USD');
+  await call('PUT', `/accounts/${giro}`, { starting_balance: 100 });
+  await call('PUT', `/accounts/${usd}`, { starting_balance: 110 });
+  db.prepare(`INSERT INTO subscription_exchange_rates (base_currency, quote_currency, rate, fetched_at)
+              VALUES ('USD', 'EUR', 1.1, '2026-10-20T06:00:00Z')`).run();
+  const r = await call('GET', '/accounts');
+  assert.equal(r.body.data.net_worth, 200, '100 EUR + 110 USD (= 100 EUR), nicht 210');
+  assert.equal(r.body.data.net_worth_approx, true);
+  assert.equal(r.body.data.net_worth_rates_at, '2026-10-20T06:00:00Z');
+  assert.deepEqual(r.body.data.net_worth_by_currency, [{ currency: 'EUR', amount: 100 }, { currency: 'USD', amount: 110 }]);
+});
+
+test('Nettovermoegen: ohne Kurs keine Gesamtzahl, sondern die Summe je Waehrung', async () => {
+  const giro = await account('Giro', null);
+  const usd = await account('Chase', 'USD');
+  await call('PUT', `/accounts/${giro}`, { starting_balance: 100 });
+  await call('PUT', `/accounts/${usd}`, { starting_balance: 110 });
+  const r = await call('GET', '/accounts');
+  assert.equal(r.body.data.net_worth, null, 'eine Rohsumme 210 waere falsch');
+  assert.deepEqual(r.body.data.net_worth_by_currency, [{ currency: 'EUR', amount: 100 }, { currency: 'USD', amount: 110 }]);
+});

@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "Tasarruf hedefi silinsin mi?",
         "accountsTab": "Hesaplar",
         "netWorth": "Net değer",
+        "netWorthApproxNote": "{{date}} tarihli kurlarla çevrildi",
+        "netWorthPerCurrencyNote": "Döviz kuru yok - para birimi başına toplam",
         "addAccount": "Hesap ekle",
         "accountsEmptyTitle": "Henüz hesap yok",
         "accountsEmptyDescription": "Bakiyeleri takip etmek için vadesiz veya tasarruf gibi hesaplar ekleyin.",

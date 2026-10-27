@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "Supprimer l’objectif d’épargne ?",
         "accountsTab": "Comptes",
         "netWorth": "Patrimoine net",
+        "netWorthApproxNote": "Converti aux taux du {{date}}",
+        "netWorthPerCurrencyNote": "Sans taux de change - total par devise",
         "addAccount": "Ajouter un compte",
         "accountsEmptyTitle": "Aucun compte pour l’instant",
         "accountsEmptyDescription": "Ajoutez des comptes comme un compte courant ou d’épargne pour suivre vos soldes.",

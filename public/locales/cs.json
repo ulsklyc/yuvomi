@@ -1848,6 +1848,8 @@
         "planSavingsDeleteConfirm": "Odstranit cíl úspor?",
         "accountsTab": "Účty",
         "netWorth": "Čisté jmění",
+        "netWorthApproxNote": "Přepočteno kurzy ze dne {{date}}",
+        "netWorthPerCurrencyNote": "Bez směnného kurzu - součet za každou měnu",
         "addAccount": "Přidat účet",
         "accountsEmptyTitle": "Zatím žádné účty",
         "accountsEmptyDescription": "Přidejte účty jako běžný nebo spořicí a sledujte zůstatky.",

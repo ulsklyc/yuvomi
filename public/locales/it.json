@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "Eliminare l’obiettivo di risparmio?",
         "accountsTab": "Conti",
         "netWorth": "Patrimonio netto",
+        "netWorthApproxNote": "Convertito ai cambi del {{date}}",
+        "netWorthPerCurrencyNote": "Senza tasso di cambio - totale per valuta",
         "addAccount": "Aggiungi conto",
         "accountsEmptyTitle": "Ancora nessun conto",
         "accountsEmptyDescription": "Aggiungi conti come corrente o di risparmio per tenere traccia dei saldi.",

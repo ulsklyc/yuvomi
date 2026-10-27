@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "Διαγραφή του στόχου αποταμίευσης;",
         "accountsTab": "Λογαριασμοί",
         "netWorth": "Καθαρή θέση",
+        "netWorthApproxNote": "Μετατροπή με ισοτιμίες της {{date}}",
+        "netWorthPerCurrencyNote": "Χωρίς ισοτιμία - σύνολο ανά νόμισμα",
         "addAccount": "Προσθήκη λογαριασμού",
         "accountsEmptyTitle": "Δεν υπάρχουν λογαριασμοί ακόμη",
         "accountsEmptyDescription": "Προσθέστε λογαριασμούς όπως τρεχούμενο ή αποταμιευτικό για να παρακολουθείτε τα υπόλοιπα.",

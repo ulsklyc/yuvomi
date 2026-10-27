@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "बचत लक्ष्य हटाएँ?",
         "accountsTab": "खाते",
         "netWorth": "निवल संपत्ति",
+        "netWorthApproxNote": "{{date}} की दरों पर परिवर्तित",
+        "netWorthPerCurrencyNote": "विनिमय दर नहीं - हर मुद्रा का अलग योग",
         "addAccount": "खाता जोड़ें",
         "accountsEmptyTitle": "अभी कोई खाता नहीं",
         "accountsEmptyDescription": "शेष राशि ट्रैक करने के लिए चालू या बचत जैसे खाते जोड़ें।",

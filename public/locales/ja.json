@@ -1766,6 +1766,8 @@
         "planSavingsDeleteConfirm": "貯蓄目標を削除しますか？",
         "accountsTab": "口座",
         "netWorth": "純資産",
+        "netWorthApproxNote": "{{date}} のレートで換算",
+        "netWorthPerCurrencyNote": "為替レートなし - 通貨ごとの合計",
         "addAccount": "口座を追加",
         "accountsEmptyTitle": "口座がまだありません",
         "accountsEmptyDescription": "普通預金や貯蓄などの口座を追加して残高を管理しましょう。",

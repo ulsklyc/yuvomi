@@ -1784,6 +1784,8 @@
         "planSavingsDeleteConfirm": "هدف پس‌انداز حذف شود؟",
         "accountsTab": "حساب‌ها",
         "netWorth": "ارزش خالص",
+        "netWorthApproxNote": "تبدیل‌شده با نرخ‌های {{date}}",
+        "netWorthPerCurrencyNote": "بدون نرخ تبدیل - جمع برای هر ارز",
         "addAccount": "افزودن حساب",
         "accountsEmptyTitle": "هنوز حسابی نیست",
         "accountsEmptyDescription": "حساب‌هایی مانند جاری یا پس‌انداز اضافه کنید تا موجودی‌ها را دنبال کنید.",
