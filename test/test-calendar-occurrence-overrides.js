@@ -87,7 +87,9 @@ test('body-free event projection mirrors every calendar_events column but the in
   // outbound_snapshot (#1956): what the last aligned push sent. Its only reader
   // is the inbound sync, with its own SELECT; no read path needs it, and an API
   // answer should not carry it.
-  const EXCLUDED = ['attachment_data', 'outbound_snapshot'];
+  // seen_on_server (#1839): sync bookkeeping, read and written only by the
+  // inbound prune with its own SELECT; no read path or API answer needs it.
+  const EXCLUDED = ['attachment_data', 'outbound_snapshot', 'seen_on_server'];
   const schema = get().prepare('PRAGMA table_info(calendar_events)').all()
     .map((column) => column.name);
   assert.ok(EXCLUDED.every((name) => schema.includes(name)),
