@@ -23866,3 +23866,35 @@ test('F4.8: in der schmalen Listenbahn traegt der Aufgaben-Platzhalter die zweiz
   assert.equal(i, p, 'contain-intrinsic-size und Platzhalter muessen dieselbe Content-Box tragen');
   assert.ok(intrinsic.at.some((a) => /@supports \(content-visibility: auto\)/.test(a)), 'ohne @supports greift contain-intrinsic-size auch ohne content-visibility');
 });
+
+/*
+ * DW-P2-3 (Polish Dashboard-Widgets, p5): EINE ZIEHGRAMMATIK. Die Uebersicht
+ * zog als einzige Stelle der App per HTML5-Drag-and-Drop: `draggable="true"`
+ * am Wrapper, die Quelle als `opacity: 0.45`-Abbild, ein Browser-Geisterbild,
+ * eine 4-px-Linie als Ziel, die Nachbarn standen still - und per Finger ging
+ * es nicht. Seit N3 (R23) zieht jede Liste ueber utils/sortable.js: der Platz
+ * ist der geteilte Schlitz `.sortable-ghost` (layout.css), das Ziehbild deckend
+ * (`liftDragImage`). Das DOM-Attribut `draggable` schaltete natives Ziehen ein
+ * und naehme SortableJS die Geste (Lehre draggable/SortableJS). Eine Zieh-
+ * Regel der Uebersicht, die selbst Deckkraft setzt, waere das 45-%-Abbild
+ * zurueck - Deckkraft beim Ziehen gehoert dem geteilten Baustein.
+ */
+test('DW-P2-3: die Uebersicht zieht ueber den geteilten Baustein - kein natives draggable, keine eigene Zieh-Deckkraft', () => {
+  const js = withoutBlockComments(read('../public/pages/dashboard.js'));
+  assert.doesNotMatch(js, /draggable="true"/, 'kein natives draggable am Kachel-Wrapper');
+  for (const type of ['dragstart', 'dragover', 'dragleave', 'dragend', 'drop']) {
+    assert.doesNotMatch(js, new RegExp(`addEventListener\\('${type}'`), `kein HTML5-Zuhoerer "${type}" mehr`);
+  }
+  assert.match(js, /import\('\/utils\/sortable\.js'\)/, 'gezogen wird ueber utils/sortable.js');
+
+  const offenders = [];
+  let dragRules = 0;
+  for (const { selector, body } of eachRule(read('../public/styles/dashboard.css'))) {
+    if (/\[draggable/.test(selector)) offenders.push(`${selector.trim()}: Selektor auf das DOM-Attribut draggable`);
+    if (!/drag|drop-(?:before|after)|sortable-/.test(selector)) continue;
+    dragRules += 1;
+    if (/(?:^|[;{\s])opacity\s*:/.test(body)) offenders.push(`${selector.trim()}: setzt opacity`);
+  }
+  assert.ok(dragRules >= 2, `Reichweite: nur ${dragRules} Zieh-Regeln in dashboard.css gesehen`);
+  assert.deepEqual(offenders, [], `Zieh-Regeln der Uebersicht mit eigener Deckkraft oder draggable-Selektor:\n  ${offenders.join('\n  ')}`);
+});

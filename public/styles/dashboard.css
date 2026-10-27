@@ -4384,18 +4384,73 @@ button.today-cockpit__more--link {
  * Vorgabe" nicht als ein Widerspruch in einem Satz stehen: das eine sagt, wen
  * eine Aenderung trifft, das andere, woher der aktuelle Stand kommt. */
 .dashboard-customize-scope {
-  margin: 0 0 var(--space-2) 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  column-gap: var(--space-2);
+  align-self: center;
+  min-block-size: var(--target-md);
+  margin: 0;
   text-align: right;
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
 }
 
-.dashboard-customize-scope p {
+.dashboard-customize-scope p,
+.dashboard-customize-footnote p {
   margin: 0;
 }
 
 .dashboard-customize-scope__state {
   color: var(--color-text-tertiary);
+}
+
+/* "MEHR DAZU" WIE IN DEN EINSTELLUNGEN (DW-P2-9; settings.css
+ * `.settings-hint-fold`, R22 D13): ein Textknopf in Akzenttinte auf der
+ * Hinweisstufe, der Pfeil zeigt die Richtung, natives `<details>`. Offen
+ * steht der Hintergrund in eigener Zeile unter dem Satz. */
+.dashboard-customize-scope__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-block-size: var(--target-base);
+  color: var(--color-accent);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  list-style: none;
+}
+
+.dashboard-customize-scope__summary::-webkit-details-marker {
+  display: none;
+}
+
+.dashboard-customize-scope__summary:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+.dashboard-customize-scope__icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: 0 0 auto;
+  transition: transform var(--transition-fast);
+}
+
+.dashboard-customize-scope__more[open] {
+  flex-basis: 100%;
+}
+
+.dashboard-customize-scope__more[open] .dashboard-customize-scope__icon {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-customize-scope__icon {
+    transition: none;
+  }
 }
 
 /* DER ANPASSEN-KOPF MOBIL: EINE ZEILE [Abbrechen] Titel [Fertig] (R9 M7).
@@ -4514,17 +4569,24 @@ button.today-cockpit__more--link {
      den Inhalt exakt um ihre echte Höhe nach unten. */
   padding: 6px;
   gap: var(--space-2);
+}
+
+/* Die Kante gehoert der Kachel, nicht ihrem Platz beim Ziehen: der leere
+ * Schlitz (`.sortable-ghost`, layout.css) traegt seine eigene, gestrichelte. */
+.widget-wrapper--editing:not(.sortable-ghost) {
   outline: 1px solid color-mix(in srgb, var(--module-accent) var(--tint-hint), var(--color-border));
   outline-offset: -1px;
   border-radius: var(--radius-sm);
 }
 
-.widget-wrapper--editing[draggable="true"] {
-  cursor: grab;
-}
-
-.widget-wrapper--dragging {
-  opacity: 0.45;
+/* DAS ZIEHBILD IST DIE KACHEL, DECKEND UND GEHOBEN (DW-P2-3, N3). Der Platz
+ * an der Zielstelle ist der geteilte leere Schlitz (`.sortable-ghost`); das
+ * Abbild unter dem Zeiger bekommt hier Flaeche und Schatten - die Deckkraft
+ * gibt ihm utils/sortable.js zurueck (`liftDragImage`). */
+.widget-wrapper.sortable-drag {
+  background: var(--color-surface-elevated);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
 }
 
 .widget-edit-controls {
@@ -4593,8 +4655,15 @@ button.today-cockpit__more--link {
   flex: 0 0 auto;
 }
 
+/* Der Griff nimmt die Geste selbst: ohne `touch-action: none` uebernaehme
+ * der Browser den Zug am Finger als Seiten-Scroll (wie `.list-row__drag`). */
 .widget-edit-controls__handle {
   cursor: grab;
+  touch-action: none;
+}
+
+.widget-wrapper.sortable-chosen .widget-edit-controls__handle {
+  cursor: grabbing;
 }
 
 .widget-edit-controls__hide,
@@ -4602,8 +4671,9 @@ button.today-cockpit__more--link {
   cursor: pointer;
 }
 
-/* Up/Down-Reorder: auf dem Desktop übernimmt der Grip (Maus-Drag), daher
-   standardmäßig aus; auf Fingereingabe (wo Drag nicht feuert) eingeblendet. */
+/* Hoch/Runter: am Zeiger tragen Griff und Pfeiltasten das Umordnen, daher
+   standardmaessig aus; am Finger stehen sie neben dem Griff - Ziehen ist nie
+   der einzige Weg (WCAG 2.5.7, utils/sortable.js). */
 .widget-edit-controls__move {
   display: none;
   gap: var(--space-1);
@@ -4642,13 +4712,36 @@ button.today-cockpit__more--link {
   height: 15px;
 }
 
+/* DIE GROESSE IST DAS SEGMENT DER SHELL (DW-P2-9; `.segmented`, panel.css):
+ * vier beschriftete Werte im Well statt vier unbeschrifteter Mini-Raster in
+ * Rahmenknoepfen. Es steht vorn, Optionen, Auge und Griff am Ende der Leiste.
+ * Aussen so hoch wie die Kreise daneben (Rechnung wie `.page-toolbar
+ * .segmented`): am Finger 44px je Segment, am Zeiger 36 in der 40er-Leiste. */
 .widget-edit-controls__size {
+  flex: 0 1 auto;
+  padding: var(--space-px);
+}
+
+/* Die Handlungen der Kachel (Hoch/Runter, Optionen, Auge, Griff) als EINE
+ * Gruppe am Ende: wird die Kachel zu schmal, bricht sie als Ganzes unter das
+ * Segment - zwei Zeilen statt drei, und der Griff bleibt bei seinen Nachbarn. */
+.widget-edit-controls__actions {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+
+.widget-edit-controls__size > .segmented__item {
+  min-height: calc(var(--target-base) - 4 * var(--space-px));
+  padding-inline: var(--space-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .widget-edit-controls__size > .segmented__item {
+    min-height: calc(var(--target-md) - 4 * var(--space-px));
+  }
 }
 
 /* DAS GROESSEN-MENUE DER EINSPALTIGEN BUEHNE (R9 M7, dashboard.js
@@ -4716,19 +4809,38 @@ button.today-cockpit__more--link {
 
   .widget-wrapper--editing {
     padding: 0;
+  }
+
+  .widget-wrapper--editing:not(.sortable-ghost) {
     outline: none;
   }
 
+  /* Die Liste ist hier selbst das Zeichen des Modus (Zeilen statt Kacheln):
+   * die gestrichelte Kante faellt weg und gibt ihre 18px den Namen. */
   .dashboard__grid--editing {
     gap: var(--space-2);
+    padding: 0;
+    border: none;
   }
 
+  /* Die ringlosen Zeichen am Ende stehen ohne Luecke: jedes ist schon 48px
+   * breit und traegt seinen Abstand in sich. Mit dem Griff (DW-P2-3) kamen
+   * ~31px dazu - die Luecken zahlen sie, nicht der Name. */
   .widget-wrapper--editing > .widget-edit-controls {
     flex-wrap: nowrap;
+    gap: 0;
     min-height: var(--target-base);
     padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
     border-radius: var(--radius-md);
     background: var(--color-surface);
+  }
+
+  .widget-wrapper--editing > .widget-edit-controls .widget-edit-controls__actions {
+    gap: 0;
+  }
+
+  .widget-wrapper--editing > .widget-edit-controls .widget-edit-controls__move {
+    margin-inline: var(--space-2);
   }
 
   .widget-edit-controls__caption {
@@ -4776,6 +4888,19 @@ button.today-cockpit__more--link {
     border-radius: var(--radius-full) 0 0 var(--radius-full);
   }
 
+  /* DER GRIFF AM ZEILENENDE, SCHMAL ABER HOCH (DW-P2-3) - wie `.list-row__drag`
+   * in jeder sortierbaren Liste: die Zieh-Achse ist senkrecht, also nimmt er
+   * die Hoehe der Zeile als Greifzone und laesst dem Namen die Breite. */
+  .widget-wrapper--editing > .widget-edit-controls .widget-edit-controls__handle {
+    width: auto;
+    height: auto;
+    min-width: 0;
+    align-self: stretch;
+    padding-inline: var(--space-1h);
+    border-color: transparent;
+    background: transparent;
+  }
+
   .widget-wrapper--editing > .widget-edit-controls :is(.widget-edit-controls__hide, .widget-edit-controls__move-btn) svg {
     width: var(--icon-md);
     height: var(--icon-md);
@@ -4793,34 +4918,6 @@ button.today-cockpit__more--link {
   }
 }
 
-/* Segmentierter Größen-Button: ein klickbares Mini-Grid pro Preset. Ersetzt das
- * frühere Mini-Grid+Select+Label-Trio — eine Kontrolle, glanzbar, platzsparend. */
-.widget-size-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xs);
-  background: var(--color-surface);
-  cursor: pointer;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
-}
-
-.widget-size-btn:hover {
-  border-color: var(--module-accent);
-}
-
-.widget-size-btn--active {
-  border-color: var(--module-accent);
-  background: color-mix(in srgb, var(--module-accent) var(--tint-state), var(--color-surface));
-}
-
-.widget-size-btn:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
-}
-
 /* Edit-Mode-Controls sind auf dem Desktop bewusst kompakt (40px = --target-md,
    Maus-Minimum), müssen auf Fingereingabe aber das 44px-Minimum erreichen. */
 @media (pointer: coarse) {
@@ -4829,47 +4926,20 @@ button.today-cockpit__more--link {
     min-height: var(--target-base);
   }
 
-  .widget-size-btn,
+  .widget-edit-controls__handle,
   .widget-edit-controls__hide,
+  .widget-edit-controls__options,
   .widget-edit-controls__size-trigger,
   .widget-edit-controls__move-btn {
     min-width: var(--target-base);
     min-height: var(--target-base);
   }
 
-  /* Der Drag-Grip feuert auf Touch nicht — durch die Up/Down-Buttons ersetzen. */
-  .widget-edit-controls__handle {
-    display: none;
-  }
-
+  /* Am Finger zieht der Griff (SortableJS, Halten 120 ms); Hoch und Runter
+   * stehen daneben als Weg ohne Ziehen. */
   .widget-edit-controls__move {
     display: inline-flex;
   }
-}
-
-.widget-wrapper--drop-before::after,
-.widget-wrapper--drop-after::after {
-  content: '';
-  position: absolute;
-  z-index: 5;
-  border-radius: var(--radius-full);
-  background: var(--module-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-accent) var(--tint-shadow), transparent);
-  pointer-events: none;
-}
-
-.widget-wrapper--drop-before::after {
-  left: 4px;
-  top: -7px;
-  right: 4px;
-  height: 4px;
-}
-
-.widget-wrapper--drop-after::after {
-  left: 4px;
-  right: 4px;
-  bottom: -7px;
-  height: 4px;
 }
 
 .widget-size-mini {

@@ -619,19 +619,32 @@ test('Raster: Ziehen und Ablegen ordnet im dichten Raster weiter um', async () =
   await saveLayout(page, REORDERED);
   await gotoRoute(page, '/');
   await enterEditMode(page);
-  // Natives HTML5-Drag (draggable="true" am Wrapper): dieselben Ereignisse, die
-  // der Browser beim Ziehen schickt, mit einem echten DataTransfer.
-  await page.evaluate(() => {
-    const grid = document.getElementById('dashboard-widget-grid');
-    const from = grid.querySelector('[data-widget-id="notes"]');
-    const to = grid.querySelector('[data-widget-id="calendar"]').getBoundingClientRect();
-    const dt = new DataTransfer();
-    const at = { clientX: to.left + 10, clientY: to.top + to.height / 2 };
-    from.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
-    grid.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt, ...at }));
-    grid.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt, ...at }));
+  // Gezogen wird am Griff ueber SortableJS (DW-P2-3, utils/sortable.js) - mit
+  // echter Maus, denn der Baustein simuliert das Ziehen selbst (forceFallback)
+  // und hoert auf Zeiger-, nicht auf HTML5-Drag-Ereignisse. Er wird erst im
+  // Anpassen-Modus geladen: erst warten, bis er am Raster haengt.
+  await page.waitForFunction(async () => {
+    const { default: Sortable } = await import('/vendor/sortablejs/sortable.esm.min.js');
+    return !!Sortable.get(document.getElementById('dashboard-widget-grid'));
+  }, { timeout: 10000 });
+  const handle = await page.$('#dashboard-widget-grid [data-widget-id="notes"] [data-widget-drag-handle]');
+  await handle.scrollIntoView();
+  const from = await handle.boundingBox();
+  const to = await page.$eval('#dashboard-widget-grid [data-widget-id="calendar"]', (el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width * 0.25, y: r.top + r.height / 2 };
   });
-  await wait(300);
+  const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) {
+    await page.mouse.move(start.x + (to.x - start.x) * i / 12, start.y + (to.y - start.y) * i / 12);
+    await wait(30);
+  }
+  await wait(200);
+  await page.mouse.up();
+  await wait(400);
+  await freeze(page);
   const after = await gridCells(page);
   await page.close();
   assert.deepEqual(after.order, ['notes', 'calendar', 'tasks'], `Ablegen vor "calendar" ergab ${after.order.join(', ')}`);

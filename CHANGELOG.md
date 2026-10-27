@@ -72,6 +72,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema tests check that every field exists in the stack and that no field locks a setting.
 
 ### Changed
+- **Tiles on the overview are dragged like every list in the app, by finger too.** In Customize,
+  each tile now has a grip at the end of its bar: hold it and drag, with the mouse or on a phone or
+  tablet. The tile you hold stays fully visible and lifted, the place it will land is an empty
+  dashed slot, and the neighbouring tiles make room as you move - as when reordering a shopping
+  list. Up and down buttons and the arrow keys on the grip still work as before. The tile size is
+  chosen with a labelled segment - Small, Wide, Tall, Square - instead of four unlabelled shapes,
+  and the note about who a change applies to is one line now, with "More about this" for the rest.
 - **Arranging the overview changes only the tile you touch.** In Customize, moving a tile,
   changing its size or options, hiding it or bringing it back no longer redraws the whole overview:
   the tile changes in place and responds noticeably faster, its neighbours glide to their new

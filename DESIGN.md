@@ -4689,8 +4689,21 @@ Ursache aus `friendlyError` den Satz, dass der Rest weiterlaeuft, und bietet neb
 ist Region-Fokusziel ohne Rahmen (`.page-crash`, wie `.page-unreachable`).
 
 **Anpassen am Telefon** (unter 640px): Hoch und Runter liegen in EINER Kapsel auf
-`--color-fill-well` mit Haarlinie, Groesse, Optionen und Ausblenden stehen ohne Ring daneben;
-die Ziele bleiben 48px. Vorher vier umrandete Kreise je Zeile.
+`--color-fill-well` mit Haarlinie, Groesse, Optionen und Ausblenden stehen ohne Ring und ohne
+Luecke daneben, am Ende der schmale, zeilenhohe Griff; die Ziele bleiben 48px. Die Liste ist dort
+selbst das Zeichen des Modus, die gestrichelte Rasterkante faellt weg. Vorher vier umrandete
+Kreise je Zeile.
+
+**Die Kacheln ziehen nach N3** (DW-P2-3, DW-P2-9). Jede Kachelleiste endet im Griff
+(`[data-widget-drag-handle]`), an dem `makeSortable` zieht - per Maus und per Finger (Halten
+120 ms), geladen erst im Anpassen-Modus. Der Platz ist der geteilte leere Schlitz
+`.sortable-ghost`, das Ziehbild die Kachel selbst, deckend auf `--color-surface-elevated` mit
+`--shadow-lg`; die Nachbarn weichen in `--duration-sm` + `--ease-out`. Ablegen, Hoch/Runter und
+die Pfeiltasten am Griff legen ueber denselben Weg (`placeWidget`: reorderWidgetConfig +
+patchCustomize). Kein `draggable` am Wrapper. Die Groesse waehlt das Shell-Segment `.segmented`
+mit den Namen der Groessen (Klein, Breit, Hoch, Quadrat; die Massangabe nur fuer den
+Screenreader), aussen so hoch wie die Kreise der Leiste. Im Kopf steht der Reichweiten-Satz in
+EINER Zeile, woher der Stand kommt hinter "Mehr dazu" (natives `<details>` wie `hintFoldHtml`).
 
 **Eine Anpassen-Geste aendert nur die Kachel, die sie trifft** (DW-P2-1, DW-P2-2, DW-P3-9,
 DW-P3-12). Verschieben, Groesse, Optionen, Aus und Ein patchen die Flaeche an Ort und Stelle

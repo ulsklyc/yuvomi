@@ -69,6 +69,7 @@ import { quickLinkHost } from '/utils/quick-link-url.js';
 import { hasIcon } from '/utils/lucide-icons.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { fitMetricLeads } from '/utils/metric-card.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { attachOverlay, pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { mealTypeList, primeMealTypeNames } from '/utils/meal-types.js';
@@ -5687,10 +5688,25 @@ function renderCustomizeFootnote({ followsDefault = true, canPublish = false } =
   const actions = renderCustomizeScopeActions({ followsDefault, canPublish });
   return `
     <section class="dashboard-customize-footnote" aria-label="${esc(t('dashboard.customizeTitle'))}">
-      <p>${t('dashboard.customizeScopeHint')}</p>
-      ${followsDefault ? `<p class="dashboard-customize-scope__state">${t('dashboard.customizeFollowsDefault')}</p>` : ''}
+      ${renderCustomizeScopeHint(followsDefault)}
       ${actions.trim() ? `<div class="dashboard-customize-footnote__actions">${actions}</div>` : ''}
     </section>`;
+}
+
+/* DIE REICHWEITE IN EINER ZEILE, DER HINTERGRUND DAHINTER (DW-P2-9).
+ * Im Kopf standen zwei Saetze rechtsbuendig uebereinander, neben vier
+ * Knoepfen - der Kopf las sich wie eine Fussnote. Die Frage im Moment ist
+ * "trifft das die anderen?", und die beantwortet der erste Satz; woher der
+ * aktuelle Stand kommt (die Vorgabe des Haushalts), steht hinter "Mehr dazu" -
+ * dasselbe native `<details>` wie die Erklaerungen der Einstellungen
+ * (hintFoldHtml, R22 D13). Ohne Vorgabe gibt es nichts aufzuklappen. */
+function renderCustomizeScopeHint(followsDefault) {
+  const more = followsDefault ? `
+      <details class="dashboard-customize-scope__more">
+        <summary class="dashboard-customize-scope__summary">${esc(t('settings.hintMore'))}<i data-lucide="chevron-down" class="dashboard-customize-scope__icon" aria-hidden="true"></i></summary>
+        <p class="dashboard-customize-scope__state">${t('dashboard.customizeFollowsDefault')}</p>
+      </details>` : '';
+  return `<p class="dashboard-customize-scope__lead">${t('dashboard.customizeScopeHint')}</p>${more}`;
 }
 
 /* DER KOPF DER UEBERSICHT: Datumszeile mit Werkzeugen, darunter der Large
@@ -5744,8 +5760,7 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
                2026-08-16). Ein Satz im Anpassen-Modus beantwortet sie im
                richtigen Moment. -->
           <div class="dashboard-customize-scope">
-            <p>${t('dashboard.customizeScopeHint')}</p>
-            ${followsDefault ? `<p class="dashboard-customize-scope__state">${t('dashboard.customizeFollowsDefault')}</p>` : ''}
+            ${renderCustomizeScopeHint(followsDefault)}
           </div>
           <!-- MOBIL EINE ZEILE: [Abbrechen] Titel [Fertig] (R9 M7, iOS-Muster).
                Der Titel ist nur dort sichtbar (dashboard.css); am Desktop steht
@@ -6276,7 +6291,7 @@ function syncCustomizeControls(wrapper, w, index, total) {
   const active = nearestPreset(w.size);
   for (const btn of controls.querySelectorAll('.widget-edit-controls__size > [data-widget-size-preset]')) {
     const on = btn.dataset.widgetSizePreset === active;
-    btn.classList.toggle('widget-size-btn--active', on);
+    btn.classList.toggle('is-active', on);
     if (btn.getAttribute('aria-pressed') !== String(on)) btn.setAttribute('aria-pressed', String(on));
   }
   const menu = controls.querySelector('.widget-edit-controls__size-menu');
@@ -6686,57 +6701,94 @@ async function openWidgetOptions(id, current = {}, {
   });
 }
 
+/* DIE GROESSE GLEITET WIE JEDES SEGMENT (Kanon D1, utils/segment-indicator.js).
+ * Die Kapsel misst ihren Eintrag; je Kachel einmal Layout lesen, darum erst
+ * nach dem naechsten Bild - der Moduswechsel und die Geste stehen dann schon,
+ * und bis dahin traegt das aktive Segment seine eigene Flaeche (`.is-active`).
+ * Unter 768px ist das Segment aus (dort waehlt das Menue), also auch keine
+ * Kapsel. Eine Leiste, die mit ihrer Kachel geht, raeumt sich selbst ab. */
+function attachSizeIndicators(root, signal) {
+  if (!root || typeof requestAnimationFrame !== 'function') return;
+  if (!globalThis.matchMedia?.('(min-width: 768px)').matches) return;
+  requestAnimationFrame(() => setTimeout(() => {
+    if (signal?.aborted || !root.isConnected) return;
+    for (const bar of root.querySelectorAll('.widget-edit-controls__size:not(.has-seg-indicator)')) {
+      attachSegmentIndicator(bar);
+    }
+  }, 0));
+}
+
+/** Name und Massangabe einer Groesse: „Breit (2×1)" -> „Breit" + „(2×1)".
+ *  Jede Sprache fuehrt ihre Groessen so (test:dashboard-clarity haelt das
+ *  Format); ohne Klammer bleibt der ganze Text der Name. */
+function sizeLabelParts(label) {
+  const match = /^(.*\S)\s*(\([^()]*\))$/u.exec(label);
+  return match ? { name: match[1], dims: match[2] } : { name: label, dims: '' };
+}
+
 function renderWidgetCustomizeControls(w, index = 0, total = 1) {
   const isFirst = index === 0;
   const isLast = index === total - 1;
   const activeSize = nearestPreset(w.size);
 
-  // Segmentiertes Größen-Steuerelement: vier klickbare Mini-Grid-Presets ersetzen
-  // die frühere Kombination aus dekorativem Mini-Grid + „Größe"-Label + 132px-
-  // <select> (Critique P1: doppelte Kontrolle + Overflow auf 1×1-Kacheln). Jeder
-  // Button zeigt seine Form direkt und markiert die aktive Größe.
+  /* DIE GROESSE IST EIN BESCHRIFTETES SEGMENT (DW-P2-9). Vier Mini-Raster ohne
+   * Text verlangten, die Form zu deuten; man las die Wahl erst am Tooltip.
+   * Jetzt traegt jedes Segment den Namen der Groesse („Klein", „Breit",
+   * „Hoch", „Quadrat"), die Massangabe liest nur der Screenreader mit - der
+   * Name des Knopfs ist damit derselbe wie im Menue und in der Ansage, und
+   * der sichtbare Text steht an seinem Anfang (WCAG 2.5.3). Die Wahl zeigt
+   * die Kachel selbst; das Segment sagt nur, welche es ist. */
   const sizeButtons = WIDGET_SIZE_PRESETS.map((p) => {
     const active = p.value === activeSize;
-    return `<button type="button" class="widget-size-btn${active ? ' widget-size-btn--active' : ''}"
+    const { name, dims } = sizeLabelParts(t(p.labelKey));
+    return `<button type="button" class="segmented__item${active ? ' is-active' : ''}"
               data-widget-size-preset="${p.value}" data-widget-id="${esc(w.id)}"
-              aria-pressed="${active ? 'true' : 'false'}" aria-label="${esc(t(p.labelKey))}" title="${esc(t(p.labelKey))}">
-        ${renderSizeMiniGrid(p.value)}
-      </button>`;
+              aria-pressed="${active ? 'true' : 'false'}">${esc(name)}${dims ? `<span class="sr-only"> ${esc(dims)}</span>` : ''}</button>`;
   }).join('');
 
   // Die Leiste steht VOR der Ueberschrift der Kachel. Ohne eigenen Namen hoerte
   // man per Tab je Kachel denselben Griff und dieselben Groessen - welche Kachel
   // man anfasst, sagt erst die Gruppe.
+  //
+  // DER GRIFF STEHT AM ENDE (DW-P2-3), wie in jeder sortierbaren Zeile der App
+  // (Schnellzugriffe #2152, Mitglieder, Navigation): erst was die Kachel IST
+  // (Groesse, Optionen, Auge), dann woran man sie zieht. Er ist der Griff fuer
+  // SortableJS (makeSortable in wireDashboardEditMode) - per Maus und per
+  // Finger - und der Tastaturweg (Pfeil hoch/runter). Die Handlungen stehen
+  // als EINE Gruppe hinter dem Segment: reicht die Breite nicht, bricht die
+  // Gruppe als Ganzes in die zweite Zeile, statt den Griff allein zu lassen.
   return `
     <div class="widget-edit-controls" role="group" aria-label="${esc(widgetLabel(w.id))}" data-widget-controls>
       <span class="widget-edit-controls__caption" aria-hidden="true">${esc(widgetLabel(w.id))}</span>
-      <button type="button" class="widget-edit-controls__handle" data-widget-drag-handle
-              aria-label="${t('dashboard.customizeReorderHandle')}" aria-keyshortcuts="ArrowUp ArrowDown">
-        <i data-lucide="grip-vertical" aria-hidden="true"></i>
-      </button>
-      <div class="widget-edit-controls__move">
-        <button type="button" class="widget-edit-controls__move-btn" data-widget-move="up" data-widget-id="${esc(w.id)}"
-                ${isFirst ? 'disabled' : ''} aria-label="${t('dashboard.customizeMoveUp')}">
-          <i data-lucide="chevron-up" aria-hidden="true"></i>
-        </button>
-        <button type="button" class="widget-edit-controls__move-btn" data-widget-move="down" data-widget-id="${esc(w.id)}"
-                ${isLast ? 'disabled' : ''} aria-label="${t('dashboard.customizeMoveDown')}">
-          <i data-lucide="chevron-down" aria-hidden="true"></i>
-        </button>
-      </div>
-      <div class="widget-edit-controls__size" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
+      <div class="widget-edit-controls__size segmented" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
         ${sizeButtons}
       </div>
-      ${renderWidgetSizeMenu(w.id, activeSize)}
-      ${widgetHasOptions(w.id) ? `
-      <button type="button" class="widget-edit-controls__options" data-widget-options="${esc(w.id)}"
-              aria-label="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}"
-              title="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}">
-        <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
-      </button>` : ''}
-      <button type="button" class="widget-edit-controls__hide" data-widget-hide="${esc(w.id)}" aria-label="${esc(t('dashboard.customizeHide', { widget: widgetLabel(w.id) }))}">
-        <i data-lucide="eye-off" aria-hidden="true"></i>
-      </button>
+      <div class="widget-edit-controls__actions">
+        <div class="widget-edit-controls__move">
+          <button type="button" class="widget-edit-controls__move-btn" data-widget-move="up" data-widget-id="${esc(w.id)}"
+                  ${isFirst ? 'disabled' : ''} aria-label="${t('dashboard.customizeMoveUp')}">
+            <i data-lucide="chevron-up" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="widget-edit-controls__move-btn" data-widget-move="down" data-widget-id="${esc(w.id)}"
+                  ${isLast ? 'disabled' : ''} aria-label="${t('dashboard.customizeMoveDown')}">
+            <i data-lucide="chevron-down" aria-hidden="true"></i>
+          </button>
+        </div>
+        ${renderWidgetSizeMenu(w.id, activeSize)}
+        ${widgetHasOptions(w.id) ? `
+        <button type="button" class="widget-edit-controls__options" data-widget-options="${esc(w.id)}"
+                aria-label="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}"
+                title="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}">
+          <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+        </button>` : ''}
+        <button type="button" class="widget-edit-controls__hide" data-widget-hide="${esc(w.id)}" aria-label="${esc(t('dashboard.customizeHide', { widget: widgetLabel(w.id) }))}">
+          <i data-lucide="eye-off" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="widget-edit-controls__handle" data-widget-drag-handle
+                aria-label="${t('dashboard.customizeReorderHandle')}" aria-keyshortcuts="ArrowUp ArrowDown">
+          <i data-lucide="grip-vertical" aria-hidden="true"></i>
+        </button>
+      </div>
     </div>
   `;
 }
@@ -6902,10 +6954,12 @@ function renderWidgetBody(w, renderers) {
   }
 }
 
-/** Der Rahmen um den Koerper: Groesse, Id, im Anpassen-Modus die Leiste. */
+/** Der Rahmen um den Koerper: Groesse, Id, im Anpassen-Modus die Leiste.
+ *  Kein `draggable="true"` (DW-P2-3): gezogen wird ueber SortableJS am Griff,
+ *  und das DOM-Attribut schaltete natives Ziehen ein, das ihm die Geste nimmt. */
 function renderWidgetWrapper(w, html, { editing = false, index = 0, total = 1 } = {}) {
   return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
-                   data-widget-id="${esc(w.id)}"${calendarListRows(w)} ${editing ? 'draggable="true"' : ''}>
+                   data-widget-id="${esc(w.id)}"${calendarListRows(w)}>
         ${editing ? renderWidgetCustomizeControls(w, index, total) : ''}
         ${html}
       </div>`;
@@ -8709,35 +8763,6 @@ function reorderWidgetConfig(config, fromId, toId, placement = 'before') {
   return next.map((w, i) => ({ ...w, order: i }));
 }
 
-function closestWidgetDrop(grid, event, draggedId) {
-  const candidates = [...grid.querySelectorAll('.widget-wrapper[data-widget-id]')]
-    .filter((item) => item.dataset.widgetId !== draggedId);
-  if (!candidates.length) return null;
-
-  let nearest = null;
-  let nearestDistance = Number.POSITIVE_INFINITY;
-  for (const item of candidates) {
-    const rect = item.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const dx = event.clientX - centerX;
-    const dy = event.clientY - centerY;
-    const distance = (dy * dy * 1.7) + (dx * dx);
-    if (distance < nearestDistance) {
-      nearestDistance = distance;
-      nearest = { item, rect };
-    }
-  }
-  if (!nearest) return null;
-
-  const sameRow = event.clientY >= nearest.rect.top && event.clientY <= nearest.rect.bottom;
-  const placement = sameRow
-    ? (event.clientX > nearest.rect.left + nearest.rect.width / 2 ? 'after' : 'before')
-    : (event.clientY > nearest.rect.top + nearest.rect.height / 2 ? 'after' : 'before');
-
-  return { id: nearest.item.dataset.widgetId, placement, item: nearest.item };
-}
-
 /* DER LOCH-HINWEIS IM BEARBEITEN-MODUS (Critique 2026-09-23).
  *
  * Das Raster packt immer dicht; was dann noch leer bleibt, liegt an den
@@ -9801,6 +9826,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   function wireFreshTiles(shell, wrappers) {
     if (!wrappers.length) return;
     const ids = new Set(wrappers.map((el) => el.dataset.widgetId));
+    if (isCustomizing) attachSizeIndicators(shell.querySelector('#dashboard-widget-grid'), editWiring?.signal);
     for (const el of wrappers) {
       wireRecipeThumbs(el);
       fitMetricLeads(el);
@@ -9845,10 +9871,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Groessen-Menue (R9 M7): Position, Pfeiltasten, Schliessen - einmal an der
     // stabilen Seitenwurzel, idempotent ueber sein data-Attribut.
     installPopoverMenus(container);
-    let draggedId = '';
-    let currentDrop = null;
 
     syncGridHint(grid);
+    attachSizeIndicators(grid, editWiring.signal);
     if (typeof ResizeObserver === 'function') {
       let columns = gridColumnCount(grid);
       gridHintObserver = new ResizeObserver(() => {
@@ -9859,66 +9884,6 @@ export async function render(container, { user, signal: routeSignal = null } = {
       });
       gridHintObserver.observe(grid);
     }
-
-    const clearDropHint = () => {
-      grid.querySelectorAll('.widget-wrapper--drop-before, .widget-wrapper--drop-after').forEach((el) => {
-        el.classList.remove('widget-wrapper--drop-before', 'widget-wrapper--drop-after');
-      });
-    };
-
-    const updateDropHint = (event) => {
-      if (!draggedId) return null;
-      clearDropHint();
-      currentDrop = closestWidgetDrop(grid, event, draggedId);
-      if (currentDrop) {
-        currentDrop.item.classList.add(currentDrop.placement === 'after' ? 'widget-wrapper--drop-after' : 'widget-wrapper--drop-before');
-      }
-      return currentDrop;
-    };
-
-    const tileOf = (event) => {
-      const wrapper = event.target?.closest?.('.widget-wrapper[data-widget-id]');
-      return wrapper?.parentElement === grid ? wrapper : null;
-    };
-
-    grid.addEventListener('dragstart', (event) => {
-      const wrapper = tileOf(event);
-      if (!wrapper) return;
-      draggedId = wrapper.dataset.widgetId;
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', draggedId);
-      wrapper.classList.add('widget-wrapper--dragging');
-    }, wired);
-    grid.addEventListener('dragend', (event) => {
-      draggedId = '';
-      tileOf(event)?.classList.remove('widget-wrapper--dragging');
-      currentDrop = null;
-      clearDropHint();
-    }, wired);
-
-    grid.addEventListener('dragover', (event) => {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-      updateDropHint(event);
-    }, wired);
-
-    grid.addEventListener('dragleave', (event) => {
-      if (!grid.contains(event.relatedTarget)) {
-        currentDrop = null;
-        clearDropHint();
-      }
-    }, wired);
-
-    grid.addEventListener('drop', (event) => {
-      event.preventDefault();
-      const fromId = event.dataTransfer.getData('text/plain') || draggedId;
-      const drop = currentDrop || updateDropHint(event);
-      clearDropHint();
-      if (fromId && drop) {
-        widgetConfig = reorderWidgetConfig(widgetConfig, fromId, drop.id, drop.placement);
-        patchCustomize();
-      }
-    }, wired);
 
     const resize = (btn) => {
       const size = btn.dataset.widgetSizePreset;
@@ -10005,25 +9970,38 @@ export async function render(container, { user, signal: routeSignal = null } = {
       announceDashboard(t(visible ? 'dashboard.customizeShownDone' : 'dashboard.customizeHiddenDone', { widget: t('dashboard.todayTitle') }));
     };
 
-    // Reorder ohne HTML5-DnD (das feuert nicht per Finger und ist nicht per
-    // Tastatur bedienbar). Ein Pfad für drei Auslöser: Touch-Up/Down-Buttons,
-    // Desktop-Grip-Pfeiltasten und (indirekt) das Modal — alle über den Nachbarn
-    // aus der gerenderten Grid-Reihenfolge und dasselbe reorderWidgetConfig.
-    const moveWidget = (id, dir) => {
-      const wrapper = grid.querySelector(`.widget-wrapper[data-widget-id="${CSS.escape(id)}"]`);
-      const sibling = dir === 'up' ? wrapper?.previousElementSibling : wrapper?.nextElementSibling;
-      const siblingId = sibling?.dataset?.widgetId;
-      if (!id || !siblingId) return false;
-      widgetConfig = reorderWidgetConfig(widgetConfig, id, siblingId, dir === 'up' ? 'before' : 'after');
+    /* EIN WEG FUER JEDES UMORDNEN. Hoch/Runter (Finger, Screenreader), die
+     * Pfeiltasten am Griff und das Ziehen (SortableJS, unten) legen eine Kachel
+     * neben eine andere - ueber dasselbe reorderWidgetConfig und denselben
+     * Patch (patchCustomize), nie ueber einen Neuaufbau. Gesagt wird der neue
+     * Platz: wohin sie gerutscht ist, sieht nur, wer hinsieht. */
+    const placeWidget = (id, targetId, placement) => {
+      widgetConfig = reorderWidgetConfig(widgetConfig, id, targetId, placement);
       patchCustomize();
-      // Der Fokus folgt der Kachel (die Aufrufer unten), aber wohin sie
-      // gerutscht ist, sieht nur, wer hinsieht: gesagt wird der neue Platz.
       const order = [...grid.querySelectorAll(':scope > .widget-wrapper[data-widget-id]')]
         .map((w) => w.dataset.widgetId);
       announceDashboard(t('dashboard.customizeMovedTo', {
         widget: widgetLabel(id), position: order.indexOf(id) + 1, total: order.length,
       }));
+    };
+
+    const moveWidget = (id, dir) => {
+      const wrapper = grid.querySelector(`.widget-wrapper[data-widget-id="${CSS.escape(id)}"]`);
+      const sibling = dir === 'up' ? wrapper?.previousElementSibling : wrapper?.nextElementSibling;
+      const siblingId = sibling?.dataset?.widgetId;
+      if (!id || !siblingId) return false;
+      placeWidget(id, siblingId, dir === 'up' ? 'before' : 'after');
       return true;
+    };
+
+    // Nach dem Ablegen steht die Kachel schon an ihrem Platz (SortableJS haengt
+    // sie selbst um); der Stand folgt dem Platz, den sie im Raster hat.
+    const dropWidget = (item) => {
+      const id = item?.dataset?.widgetId;
+      const nextId = item?.nextElementSibling?.dataset?.widgetId;
+      const prevId = item?.previousElementSibling?.dataset?.widgetId;
+      if (!id || !(nextId || prevId)) return;
+      placeWidget(id, nextId || prevId, nextId ? 'before' : 'after');
     };
 
     const move = (btn) => {
@@ -10052,9 +10030,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
       else glance(btn.matches('[data-glance-show]'));
     }, wired);
 
-    // Desktop-Tastatur: der Grip ist ein fokussierbarer Button — Pfeil hoch/runter
-    // ordnet um. Schließt die Inline-Reorder-Lücke für Tastatur-Nutzer, ohne die
-    // schmale Edit-Leiste mit zusätzlichen Buttons zu überladen (Drag bleibt Maus).
+    // Tastatur: der Griff ist ein fokussierbarer Button - Pfeil hoch/runter
+    // ordnet um. Schliesst die Inline-Reorder-Luecke fuer Tastatur-Nutzer, ohne die
+    // schmale Edit-Leiste mit zusaetzlichen Buttons zu ueberladen.
     grid.addEventListener('keydown', (event) => {
       const handle = event.target?.closest?.('[data-widget-drag-handle]');
       if (!handle) return;
@@ -10064,6 +10042,31 @@ export async function render(container, { user, signal: routeSignal = null } = {
       const id = handle.closest('.widget-wrapper[data-widget-id]')?.dataset.widgetId;
       if (moveWidget(id, dir) && document.activeElement !== handle) handle.focus({ preventScroll: true });
     }, wired);
+
+    /* ZIEHEN NACH N3 (DW-P2-3). Bis hier zog die Uebersicht als einzige Stelle
+     * der App per HTML5-Drag-and-Drop: die Quelle blieb als 45-%-Abbild stehen,
+     * der Browser malte sein eigenes durchscheinendes Ziehbild, das Ziel war
+     * eine 4-px-Linie, die Nachbarn standen still bis zum Loslassen - und per
+     * Finger ging es gar nicht. Jetzt derselbe Baustein wie jede Liste
+     * (utils/sortable.js): Ziehen am Griff, per Maus und per Finger (Halten
+     * 120 ms), der Platz ist der leere Schlitz `.sortable-ghost`, das Ziehbild
+     * die Kachel selbst, deckend, und die Nachbarn weichen in --duration-sm.
+     * Geladen erst hier: der Anpassen-Modus ist selten, der Startgraph der
+     * Uebersicht bleibt ohne sortable.js. Scheitert das Laden, bleiben Hoch,
+     * Runter und die Pfeiltasten. */
+    const ownWiring = editWiring;
+    void import('/utils/sortable.js')
+      .then(({ makeSortable }) => (ownWiring.signal.aborted ? null : makeSortable(grid, {
+        handle: '[data-widget-drag-handle]',
+        draggable: '.widget-wrapper[data-widget-id]',
+        onEnd: (evt) => dropWidget(evt.item),
+      })))
+      .then((sortable) => {
+        if (!sortable) return;
+        if (ownWiring.signal.aborted || !grid.isConnected) { sortable.destroy(); return; }
+        ownWiring.signal.addEventListener('abort', () => sortable.destroy(), { once: true });
+      })
+      .catch(() => { /* ohne SortableJS bleiben Hoch/Runter und die Pfeiltasten */ });
   }
 
   let disposeNoteCategories = () => {};

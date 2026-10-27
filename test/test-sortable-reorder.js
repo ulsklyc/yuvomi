@@ -418,3 +418,62 @@ test('sortable.js: Filtern heisst nicht ziehen, nicht: nicht bedienen', () => {
   assert.match(source, /preventOnFilter:\s*false/,
     'ein gefiltertes Element bleibt bedienbar');
 });
+
+// --------------------------------------------------------
+// Uebersicht: Ziehen nach N3 (DW-P2-3, Polish Dashboard-Widgets p5)
+//
+// Die Uebersicht zog als letzte Stelle der App per HTML5-Drag-and-Drop -
+// Quelle als 45-%-Abbild, Browser-Geisterbild, Nachbarn standen still, per
+// Finger ging nichts. Jetzt derselbe Wrapper wie jede Liste: Griff, Schlitz,
+// deckendes Ziehbild, und das Ablegen geht denselben Weg wie Hoch/Runter.
+// --------------------------------------------------------
+
+test('Uebersicht: die Kacheln ziehen ueber den Wrapper, am Griff, nicht ueber natives DnD', async () => {
+  const { register } = await import('node:module');
+  register('./test-browser-loader.mjs', import.meta.url);
+  const { __test } = await import('../public/pages/dashboard.js');
+  const html = __test.renderWidgetWrapper({ id: 'notes', size: '1x1', visible: true }, '<div class="widget"></div>', { editing: true, index: 0, total: 2 });
+  assert.doesNotMatch(html, /\bdraggable\b/, 'das DOM-Attribut schaltet natives Ziehen ein und nimmt SortableJS die Geste');
+  const handles = html.match(/<button[^>]*data-widget-drag-handle[^>]*>/g) ?? [];
+  assert.equal(handles.length, 1, 'genau ein Griff je Kachel');
+  assert.match(handles[0], /aria-keyshortcuts="ArrowUp ArrowDown"/, 'der Griff ist zugleich der Tastaturweg');
+
+  const source = read('../public/pages/dashboard.js');
+  assert.match(source, /import\('\/utils\/sortable\.js'\)/,
+    'erst im Anpassen-Modus geladen - der Startgraph der Uebersicht bleibt ohne sortable.js');
+  const call = callBlockOf(source, 'makeSortable(grid, {');
+  assert.match(call, /handle:\s*'\[data-widget-drag-handle\]'/, 'gezogen wird am Griff, nicht an der ganzen Kachel');
+  assert.match(call, /draggable:\s*'\.widget-wrapper\[data-widget-id\]'/, 'nur Kacheln sind ziehbar');
+  assert.match(call, /onEnd:\s*\(evt\)\s*=>\s*dropWidget\(evt\.item\)/, 'das Ablegen laeuft durch dropWidget');
+  for (const rest of ["addEventListener('dragstart'", "addEventListener('drop'", 'closestWidgetDrop', 'widget-wrapper--drop-', 'widget-wrapper--dragging']) {
+    assert.ok(!source.includes(rest), `Rueckstand des alten Drags: ${rest}`);
+  }
+});
+
+test('Uebersicht: Ablegen, Hoch/Runter und Pfeiltaste gehen denselben Weg', () => {
+  const source = read('../public/pages/dashboard.js');
+  // Die Zusage aus dem Kopf von sortable.js: Ziehen ist nie der einzige Weg,
+  // und beide Wege rufen denselben Persistenz-Pfad.
+  const body = (head) => {
+    const at = source.indexOf(head);
+    assert.ok(at > -1, `Reichweite: ${head}`);
+    return source.slice(at, source.indexOf('\n    };\n', at));
+  };
+  assert.match(body('const placeWidget = '), /reorderWidgetConfig\([\s\S]*patchCustomize\(\)/, 'placeWidget ordnet und patcht');
+  assert.doesNotMatch(body('const placeWidget = '), /rebuildDashboard\(/, 'ein Ablegen baut die Uebersicht nicht neu (DW-P2-1)');
+  assert.match(body('const dropWidget = '), /placeWidget\(/, 'das Ablegen legt ueber placeWidget');
+  assert.match(body('const moveWidget = '), /placeWidget\(/, 'Hoch/Runter und die Pfeiltaste ebenso');
+});
+
+test('Uebersicht: der Griff zieht auch am Finger', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(read('../public/styles/dashboard.css'))];
+  const handle = rules.filter((r) => /\.widget-edit-controls__handle(?![\w-])/.test(r.selector));
+  assert.ok(handle.length >= 2, 'Reichweite: Griff-Regeln gefunden');
+  // Bis p5 blendete `@media (pointer: coarse)` den Griff aus - am Finger gab es
+  // dann nur Hoch/Runter.
+  const hidden = handle.filter((r) => /display:\s*none/.test(r.body));
+  assert.deepEqual(hidden.map((r) => `${r.at.join(' ')} ${r.selector.trim()}`), [], 'kein Zustand blendet den Griff aus');
+  assert.ok(handle.some((r) => !r.at.length && /touch-action:\s*none/.test(r.body)),
+    'ohne touch-action: none nimmt der Browser den Zug am Finger als Scroll');
+});

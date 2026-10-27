@@ -4866,12 +4866,19 @@ test('DW-P2-1: eine Anpassen-Geste ruft rebuildDashboard nicht, sie haengt Knote
   for (const [name, body] of [['wireDashboardEditMode', wiring], ['applyGridHint', hint]]) {
     nodeAssert.doesNotMatch(body, /rebuildDashboard\(/, `${name}: eine Geste baut die Uebersicht neu`);
   }
-  // Jede Geste geht ueber den Patch: Ziehen, Groesse, Optionen, Aus, Ein,
-  // Kopfband, Verschieben (Knopf und Pfeiltaste ueber moveWidget), Lueckenhinweis.
-  for (const gesture of ['const resize = ', 'const editOptions = ', 'const hide = ', 'const show = ', 'const glance = ', 'const moveWidget = ', "grid.addEventListener('drop'"]) {
+  // Jede Geste geht ueber den Patch: Groesse, Optionen, Aus, Ein, Kopfband,
+  // Umordnen (placeWidget), Lueckenhinweis.
+  for (const gesture of ['const resize = ', 'const editOptions = ', 'const hide = ', 'const show = ', 'const glance = ', 'const placeWidget = ']) {
     const at = wiring.indexOf(gesture);
     nodeAssert.ok(at > -1, `Geste ${gesture} nicht gefunden`);
     nodeAssert.match(wiring.slice(at, at + 1600), /patchCustomize\(/, `${gesture} patcht nicht`);
+  }
+  // Umordnen per Knopf, Pfeiltaste und Ziehen (DW-P2-3) ist EIN Weg: moveWidget
+  // und das Ablegen (dropWidget, der onEnd von makeSortable) legen ueber placeWidget.
+  for (const gesture of ['const moveWidget = ', 'const dropWidget = ']) {
+    const at = wiring.indexOf(gesture);
+    nodeAssert.ok(at > -1, `Geste ${gesture} nicht gefunden`);
+    nodeAssert.match(wiring.slice(at, wiring.indexOf('\n    };\n', at)), /placeWidget\(/, `${gesture} legt nicht ueber placeWidget`);
   }
   nodeAssert.match(hint, /patchCustomize\(/, 'der Lueckenhinweis patcht nicht');
   nodeAssert.doesNotMatch(patch, /rebuildDashboard\(|setHtml\(/, 'der Patch zeichnet die Flaeche doch neu');
