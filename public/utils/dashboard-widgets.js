@@ -292,7 +292,20 @@ export function normalizeDashboardConfig(input) {
 
 /**
  * Belegung eines dicht gepackten Rasters.
- * @param {{ id: string, cols: number, rows: number }[]} items in Rangfolge
+ *
+ * GLEICH FRUEH, WENIGER LOCH (U1 b). Seit die Kacheln so hoch sind wie ihr
+ * Inhalt, enden die Spalten verschieden tief, und eine breite Kachel passt oft
+ * an zwei Stellen gleich frueh. `dense` naehme die linke - auch wenn darueber
+ * dann ein Loch bleibt, das eine Nachbarin mit Hoehe ohne Inhalt fuellen muss
+ * (gemessen 1440px im Demo-Haushalt: "Familie" 195px leer). Hier nimmt eine
+ * breite Kachel unter den gleich fruehen Stellen die mit dem kleinsten Loch
+ * ueber sich, bei Gleichstand die linke. Die Rangfolge bleibt die
+ * Reihenfolge, frueher wird keine Kachel - nur die Spalte ist eine andere.
+ * Weil CSS das nicht kann, setzt `applyRowFill` die Spalte breiter Kacheln
+ * fest (`col`, `--tile-col`); mit fester Spalte rechnet diese Funktion wie
+ * CSS: erste passende Zeile in genau dieser Spalte.
+ *
+ * @param {{ id: string, cols: number, rows: number, col?: number }[]} items in Rangfolge
  * @param {number} columns Spaltenzahl des Rasters
  * @returns {(string|null)[][]} Zeilen x Spalten, belegt mit der Widget-Id
  */
@@ -300,36 +313,90 @@ export function packGrid(items, columns) {
   const cols = Math.max(1, Math.floor(columns) || 1);
   const cells = [];
   const row = (r) => (cells[r] ??= Array(cols).fill(null));
-  const free = (r, c, w, h) => {
-    for (let a = r; a < r + h; a += 1) {
-      for (let b = c; b < c + w; b += 1) if (row(a)[b]) return false;
+  // Die erste Zeile ab `r`, in der die Kachel an Spalte `c` passt: stoesst die
+  // Probe auf eine belegte Zelle, geht es unter ihr weiter, nicht eine Zeile
+  // tiefer (bei feinen Spuren sonst tausende Proben je Kachel).
+  const fitFrom = (r, c, w, h) => {
+    for (let top = r; ; ) {
+      let blocked = -1;
+      for (let a = top; a < top + h && blocked < 0; a += 1) {
+        for (let b = c; b < c + w; b += 1) if (cells[a]?.[b]) { blocked = a; break; }
+      }
+      if (blocked < 0) return top;
+      top = blocked + 1;
     }
-    return true;
+  };
+  // Die oberste freie Zeile je Spalte: darueber ist alles belegt.
+  const firstFree = Array(cols).fill(0);
+  // Wo die Spalte ueber Zeile r zuletzt belegt ist (fuer das Loch ueber einer Stelle).
+  const bottomAbove = (c, r) => {
+    for (let a = r - 1; a >= 0; a -= 1) if (cells[a]?.[c]) return a + 1;
+    return 0;
   };
   for (const item of items) {
     // Breiter als das Raster geht nicht: CSS legte dafuer eine implizite
     // Spalte an, die das Raster nie zeigen soll - gerechnet wird mit der Kante.
     const w = Math.min(Math.max(1, item.cols | 0), cols);
     const h = Math.max(1, item.rows | 0);
-    let placed = false;
-    for (let r = 0; !placed; r += 1) {
-      for (let c = 0; c + w <= cols && !placed; c += 1) {
-        if (!free(r, c, w, h)) continue;
-        for (let a = r; a < r + h; a += 1) for (let b = c; b < c + w; b += 1) row(a)[b] = item.id;
-        placed = true;
-      }
+    const locked = Number.isInteger(item.col) && item.col >= 0 && item.col + w <= cols ? item.col : null;
+    let place = null;
+    for (let c = locked ?? 0; c + w <= cols; c += 1) {
+      const start = Math.min(...firstFree.slice(c, c + w));
+      const r = fitFrom(start, c, w, h);
+      const hole = w > 1 && locked === null
+        ? Array.from({ length: w }, (_, k) => r - bottomAbove(c + k, r)).reduce((a, b) => a + b, 0)
+        : 0;
+      // Frueher gewinnt; gleich frueh: die breite Kachel mit dem kleineren
+      // Loch darueber, sonst die linke (wie `dense`).
+      if (!place || r < place.r || (r === place.r && hole < place.hole)) place = { r, c, hole };
+      if (locked !== null) break;
     }
+    for (let a = place.r; a < place.r + h; a += 1) for (let b = place.c; b < place.c + w; b += 1) row(a)[b] = item.id;
+    for (let b = 0; b < cols; b += 1) while (cells[firstFree[b]]?.[b]) firstFree[b] += 1;
   }
   return cells;
 }
 
 /**
- * Leere Zellen VOR der letzten Zeile. Die letzte Zeile darf auslaufen - dort
- * endet das Raster ruhig, statt ein Loch mitten in die Flaeche zu setzen.
+ * Die Spalte jeder breiten Kachel in der Packung (`packGrid`): Id -> erste
+ * Spalte (0-basiert). `applyRowFill` setzt sie fest, damit CSS dasselbe
+ * Raster legt wie diese Rechnung.
+ */
+export function wideTileColumns(items, columns) {
+  const cells = packGrid(items, columns);
+  const placed = new Map();
+  for (const item of items) {
+    if (Math.min(item.cols | 0, columns) < 2) continue;
+    for (let r = 0; r < cells.length && !placed.has(item.id); r += 1) {
+      const c = cells[r].indexOf(item.id);
+      if (c >= 0) placed.set(item.id, c);
+    }
+  }
+  return placed;
+}
+
+/**
+ * Leere Zellen, unter denen in derselben Spalte noch eine Kachel steht - ein
+ * Loch MITTEN in der Flaeche. Was unter der letzten Kachel einer Spalte frei
+ * bleibt, ist kein Loch: dort endet die Spalte ruhig (DW-P1-3, U1 b).
+ *
+ * Seit die Hoehe aus dem Inhalt kommt, enden die Spalten verschieden tief; die
+ * alte Regel ("leer vor der letzten Zeile") hielt jedes kuerzere Spaltenende
+ * fuer ein Loch und liess es von der Kachel darueber auffuellen - genau die
+ * gestreckte Leere, die U1 abgeschafft hat. Fuer das alte Raster aus ganzen
+ * Zeilen ist das Ergebnis dasselbe, solange die letzte Zeile die einzige ist,
+ * die auslaeuft.
  */
 export function gridHoleCount(cells) {
   let holes = 0;
-  for (let r = 0; r < cells.length - 1; r += 1) holes += cells[r].filter((v) => !v).length;
+  const width = cells[0]?.length ?? 0;
+  for (let c = 0; c < width; c += 1) {
+    let below = false;
+    for (let r = cells.length - 1; r >= 0; r -= 1) {
+      if (cells[r][c]) below = true;
+      else if (below) holes += 1;
+    }
+  }
   return holes;
 }
 
@@ -399,16 +466,39 @@ export function suggestGridHoleFill(items, columns, candidatesFor) {
  * Breite nicht, und die eigene ist weiterhin frei. Der Test packt beide
  * Fassungen und vergleicht die Positionen.
  *
- * @param {{ id: string, cols: number, rows: number }[]} items in Rangfolge
+ * NUR, WAS BREITE IN INHALT UMSETZT (DW-P2-6, U1 b): `wide: true`. Gemessen
+ * 1440px: Wetter, Kennzahlen, Notizen und Uhr wuchsen auf 1156px und zeigten
+ * dort dasselbe wie auf 764px - Breite ohne Information ist Leere quer. Das
+ * Wetter zeigt in der Breite mehr Tage; alles andere bleibt so breit, wie es
+ * gewaehlt ist, und den Platz daneben nimmt die naechste Kachel (die Packung
+ * ist dicht).
+ *
+ * DER LETZTE AUSWEG (`holes: true`): bleibt nach dem Wachsen nach unten ein
+ * Loch, das keine Kachel darueber erreicht - es liegt unter einem Teil einer
+ * breiten Kachel, gemessen 1024px neben "Belohnungen" (246px, darunter die
+ * Notizen) -, waechst die Kachel LINKS daneben hinein, auch ohne Mehrinhalt.
+ * Eine schmale Kachel nur in Zellen, unter denen noch eine Kachel steht (ein
+ * Spaltenende neben ihr ist kein Loch); eine breite auch in den Rest ihrer
+ * Zeile, wenn die Spalte daneben dort endet - drei breite Kacheln in drei
+ * Spalten liessen sonst eine ganze Spalte leer. Ein Loch im Raster liest als
+ * kaputt, eine breitere Karte nicht.
+ *
+ * @param {{ id: string, cols: number, rows: number, wide?: boolean }[]} items in Rangfolge
  * @param {number} columns Spaltenzahl des Rasters
+ * @param {{ holes?: boolean }} [options]
  * @returns {Map<string, number>} Id -> neue Spaltenbreite, nur fuer Kacheln, die wachsen
  */
-export function rowFillSpans(items, columns) {
+export function rowFillSpans(items, columns, { holes = false } = {}) {
   const cols = Math.max(1, Math.floor(columns) || 1);
   const grown = new Map();
   if (cols < 2) return grown;
   const cells = packGrid(items, cols);
+  const enclosed = (r, c) => {
+    for (let below = r + 1; below < cells.length; below += 1) if (cells[below][c]) return true;
+    return false;
+  };
   for (const item of items) {
+    if (!holes && item.wide !== true) continue;
     // Die Stelle der Kachel: ihre erste Zelle in Lesereihenfolge.
     let top = -1;
     let left = -1;
@@ -422,7 +512,7 @@ export function rowFillSpans(items, columns) {
     let end = left + w;
     const columnFree = (c) => {
       for (let r = top; r < top + h; r += 1) if (!cells[r] || cells[r][c]) return false;
-      return true;
+      return !holes || w >= 2 || enclosed(top + h - 1, c);
     };
     while (end < cols && columnFree(end)) {
       for (let r = top; r < top + h; r += 1) cells[r][end] = item.id;
@@ -444,8 +534,10 @@ export function rowFillSpans(items, columns) {
  *
  * Dieselbe Regel, um neunzig Grad gedreht: nach dem Wachsen nach rechts waechst
  * jede Kachel nach unten ueber die Zellen, die in ALLEN ihren Spalten frei sind,
- * bis zur naechsten belegten Zelle oder zur letzten Zeile des Rasters. Hoeher
- * wird das Raster dadurch nie. `grow: false` nimmt eine Kachel aus (die
+ * bis zur naechsten belegten Zelle. Seit die Hoehe aus dem Inhalt kommt (U1 b,
+ * `contentSpanRows`), nur noch dorthin: ein freies Spaltenende ist kein Loch
+ * (`gridHoleCount`), und wer es fuellte, setzte Hoehe ohne Inhalt in die
+ * Kachel. Hoeher wird das Raster dadurch nie. `grow: false` nimmt eine Kachel aus (die
  * Kennzahlreihe ist so hoch wie ihr Inhalt, gestreckt laege die Leere nur in
  * ihr statt neben ihr).
  *
@@ -473,18 +565,130 @@ export function columnFillSpans(items, columns) {
     }
     if (top < 0) continue;
     const w = Math.min(Math.max(1, item.cols | 0), cols);
-    let end = top + Math.max(1, item.rows | 0);
+    const own = top + Math.max(1, item.rows | 0);
+    let end = own;
     const rowFree = (r) => {
       for (let c = left; c < left + w; c += 1) if (!cells[r] || cells[r][c]) return false;
       return true;
     };
-    while (end < cells.length && rowFree(end)) {
-      for (let c = left; c < left + w; c += 1) cells[end][c] = item.id;
-      end += 1;
-    }
-    if (end > top + Math.max(1, item.rows | 0)) grown.set(item.id, end - top);
+    while (end < cells.length && rowFree(end)) end += 1;
+    // NUR EIN ECHTES LOCH (U1 b): darunter steht noch eine Kachel. Laeuft die
+    // freie Strecke bis ans Ende des Rasters, endet die Spalte dort ruhig -
+    // wer sie fuellte, setzte Hoehe ohne Inhalt in die Kachel.
+    if (end >= cells.length || end === own) continue;
+    for (let r = own; r < end; r += 1) for (let c = left; c < left + w; c += 1) cells[r][c] = item.id;
+    grown.set(item.id, end - top);
   }
   return grown;
+}
+
+/**
+ * DAS GANZE FUELLEN IN EINER RECHNUNG (U1 b) - fuer `applyRowFill` und die
+ * Tests dieselbe. Nach der dichten Packung (`packGrid`, breite Kacheln mit
+ * fester Spalte, `wideTileColumns`):
+ *   1. das Wetter waechst in den Platz daneben (`rowFillSpans`, `wide`) und
+ *      zeigt dort mehr Tage;
+ *   2. ein Loch unter einer Kachel fuellt die Kachel darueber
+ *      (`columnFillSpans`);
+ *   3. was dann noch Loch ist, nimmt die Kachel links daneben in die Breite
+ *      (`rowFillSpans`, `holes`), danach noch einmal 2. - hoechstens drei
+ *      Runden, solange sich etwas tut.
+ * Jede Kachel bleibt dabei, wo sie steht (gewachsen wird nur in Zellen, die
+ * nach der vollen Packung leer sind); gespeichert wird nichts.
+ *
+ * @param {{ id: string, cols: number, rows: number, wide?: boolean, grow?: boolean }[]} items in Rangfolge
+ * @param {number} columns
+ * @returns {{ id: string, cols: number, rows: number, col?: number }[]} je Kachel die gezeichnete Spanne
+ */
+export function fillGridSpans(items, columns) {
+  const cols = Math.max(1, Math.floor(columns) || 1);
+  if (cols < 2) return items.map((item) => ({ ...item }));
+  const locks = wideTileColumns(items, cols);
+  let spans = items.map((item) => (locks.has(item.id) ? { ...item, col: locks.get(item.id) } : { ...item }));
+  const widen = (grown) => { spans = spans.map((item) => ({ ...item, cols: grown.get(item.id) ?? item.cols })); };
+  const deepen = (grown) => { spans = spans.map((item) => ({ ...item, rows: grown.get(item.id) ?? item.rows })); };
+  widen(rowFillSpans(spans, cols));
+  deepen(columnFillSpans(spans, cols));
+  for (let round = 0; round < 3; round += 1) {
+    const across = rowFillSpans(spans, cols, { holes: true });
+    widen(across);
+    const down = columnFillSpans(spans, cols);
+    deepen(down);
+    if (!across.size && !down.size) break;
+  }
+  return spans;
+}
+
+/* DIE HOEHE KOMMT AUS DEN DATEN, NICHT AUS DER NACHBARKACHEL (DW-P1-3, U1 b,
+ * Entscheidung Ulas 2026-10-26; revidiert R10 L9 / R21 D5, docs/DECISIONS.md).
+ *
+ * Bis hierher war jede Kachel so hoch wie die Rasterzeilen, die ihre Groesse
+ * belegte, und eine Rasterzeile so hoch wie ihre hoechste Kachel: gemessen
+ * 1440px mit allen Kacheln 19 %, 1920px 27 % der Kachelflaeche leer unter dem
+ * letzten Inhalt - Schichtplan 608 von 759px, die leere Entsorgung 629 von 759.
+ * Ein Apple-Widget hat nie Hoehe ohne Inhalt.
+ *
+ * Jetzt meldet jede Kachel aus ihren DATEN, wie hoch sie ist: so viele Zeilen,
+ * wie sie zeigt (hoechstens so viele, wie ihre Groesse erlaubt - die gewaehlte
+ * Groesse ist die OBERGRENZE, `listRowCap`), mal der Zeilenhoehe des
+ * Zeilengeruests, dazu Kopf und Polster; leer genau eine Zeile. Das Raster
+ * rechnet in feinen Spuren (`--dashboard-row-unit`, 4px) und packt dicht wie
+ * bisher - eine Kachel nimmt dabei so viele Spuren, wie ihr Inhalt hoch ist.
+ * Deterministisch VOR dem Zeichnen und ohne Layout-Messung: das Skelett und
+ * der Layout-Hinweis kennen dieselbe Spanne, und in jedem Browser steht
+ * dasselbe Raster (grid-lanes/Masonry hat keine Mehrheit, PLAN U1 a).
+ *
+ * Die Masse sind die des Stylesheets (dashboard.css, Abschnitt "EIN
+ * ZEILENGERUEST" und "Widget-Grid"); `test:dashboard` haelt beide Seiten
+ * zusammen. Sie gelten ab 768px, wo das Raster Spalten hat - am Telefon steht
+ * jede Kachel ohnehin in ihrer eigenen Hoehe untereinander. */
+export const TILE_GEOMETRY = Object.freeze({
+  unit: 4,     // eine Rasterspur: --dashboard-row-unit (--space-1)
+  frame: 2,    // Haarlinie der Karte oben und unten
+  head: 52,    // Widget-Kopf (.widget__header, ab 640px)
+  rowsPad: 20, // .widget__body--rows: --space-2 oben, --space-3 unten
+  row: 54,     // eine Zeile des Zeilengeruests ab 768px (--target-lg + --space-1h, Haarlinie innen)
+  more: 27,    // "+N weitere" (Footnote) samt Abstand zur Liste
+  empty: 72,   // die Leerzeile (`cardEmptyRowHtml` im `.widget__empty`)
+});
+
+/**
+ * Wie hoch eine Kachel aus ihren Daten ist - in Rasterspuren.
+ *
+ * Eine Listenkachel nennt `items` (geladene Eintraege), `total` (alle, fuer
+ * "+N weitere") und `cap` (die Zeilen ihrer Groesse); gezeigt werden
+ * hoechstens `cap`, ohne Eintrag steht genau die Leerzeile. Eine Kachel mit
+ * eigenem Aufbau (Wetter, Uhr, Budget ...) nennt statt dessen `body`, die Hoehe
+ * unter dem Kopf. `row` ersetzt die Zeilenhoehe, `extra` traegt feste Teile
+ * unter der Liste (eine Fusszeile). `more: false`: die Kachel nennt den Rest
+ * nicht (sie hat keine Zeile "+N weitere"). `bare: true` mit `body`: die
+ * Kachel hat weder Karte noch Kopf.
+ *
+ * @param {{ items?: number, total?: number, cap?: number, row?: number, extra?: number, body?: number, more?: boolean, bare?: boolean }} content
+ * @param {Partial<typeof TILE_GEOMETRY>} [geometry]
+ * @returns {{ shown: number, rest: number, px: number, rows: number }} `rows` = Spuren
+ */
+export function contentSpanRows(content = {}, geometry = {}) {
+  const g = { ...TILE_GEOMETRY, ...geometry };
+  const count = (v) => Math.max(0, Math.floor(Number(v) || 0));
+  let shown = 0;
+  let rest = 0;
+  let px;
+  if (content.body !== undefined && content.body !== null) {
+    // `bare`: ohne Karte und Kopf (die Kennzahlreihe ist selbst Kacheln).
+    px = (content.bare ? 0 : g.frame + g.head) + Math.max(0, Number(content.body) || 0);
+  } else {
+    const items = count(content.items);
+    const cap = content.cap === undefined || content.cap === null ? Infinity : count(content.cap);
+    shown = Math.min(items, cap);
+    rest = Math.max(items, count(content.total)) - shown;
+    px = shown
+      ? g.frame + g.head + g.rowsPad + shown * (Number(content.row) || g.row) + (rest > 0 && content.more !== false ? g.more : 0)
+        + Math.max(0, Number(content.extra) || 0)
+      : g.frame + g.head + g.empty;
+  }
+  // Eine Spur Toleranz gegen Rundungsreste (52.6 + ...), nie weniger als eine Spur.
+  return { shown, rest, px, rows: Math.max(1, Math.ceil(px / g.unit - 1e-6)) };
 }
 
 export function sameWidgetConfig(a, b) {

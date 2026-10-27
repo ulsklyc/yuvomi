@@ -937,17 +937,22 @@ test('FLIP: jede Kachel laeuft von ihrer alten Lage in die neue, statt zu spring
   assert.ok(tiles.every((t) => t.calls.length === 0));
 });
 
-test('FLIP haengt am Neuaufbau: vorher messen, nach dem setHtml abspielen - nur innerhalb des Anpassen-Modus', async () => {
+test('FLIP haengt am Neuaufbau: vorher messen, nach dem setHtml abspielen - im Anpassen-Modus und beim stillen Abgleich', async () => {
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   const body = src.match(/function rebuildDashboard\(cfg\) \{[\s\S]*?\n {2}\}\n/)?.[0];
   assert.ok(body, 'rebuildDashboard() nicht gefunden - die Signatur greift nicht mehr');
-  const capture = body.search(/const tileRectsBefore = isCustomizing && renderedCustomizing === true \? captureTileRects\(shell\) : null;/);
+  // U1 b: auch ein stiller Abgleich gleitet (die Spanne einer Kachel folgt ihren
+  // Daten) - nicht aus dem Skelett und nicht beim Moduswechsel.
+  const quiet = body.search(/const quietRebuild = !isCustomizing && !modeChanged && !shell\.querySelector\('\.widget-skeleton'\);/);
+  const capture = body.search(/const tileRectsBefore = \(isCustomizing && renderedCustomizing === true\) \|\| quietRebuild \? captureTileRects\(shell\) : null;/);
   // Das Markup kommt seit DW-P1-2 aus dashboardShellHtml(cfg).
   const rebuild = body.search(/setHtml\(shell, html\);/);
-  const play = body.search(/playTileFlip\(shell, tileRectsBefore\)/);
-  assert.ok(capture > -1 && rebuild > -1 && play > -1, 'Messen, Neuaufbau und Abspielen stehen alle drei im Neuaufbau');
-  assert.ok(capture < rebuild && rebuild < play, 'erst messen, dann neu bauen, dann abspielen');
+  const restore = body.search(/if \(scroller && scroller\.scrollTop !== keptScroll\) scroller\.scrollTop = keptScroll;/);
+  const play = body.search(/if \(tileRectsBefore\?\.size\) playTileFlip\(shell, tileRectsBefore\)/);
+  assert.ok(quiet > -1 && capture > -1 && rebuild > -1 && play > -1, 'Messen, Neuaufbau und Abspielen stehen alle drei im Neuaufbau');
+  assert.ok(quiet < capture && capture < rebuild && rebuild < restore && restore < play,
+    'erst messen, dann neu bauen, die Scrolllage zurueck, dann abspielen');
   assert.ok(capture < body.indexOf('renderedCustomizing = isCustomizing;'),
     'gemessen wird, bevor der Modus des letzten Aufbaus ueberschrieben ist - sonst gleitet auch das Betreten des Modus');
 });
@@ -993,8 +998,14 @@ test('Anpassen-Modus: das Raster traegt eine Kante, keine Toenung ueber allen Ka
   const rules = [...eachRule(css)].filter((r) => r.selector.split(',').some((s) => s.trim().startsWith('.dashboard__grid--editing')));
   assert.ok(rules.length > 0, 'die Regel fuer das Raster im Anpassen-Modus fehlt');
   assert.ok(rules.some((r) => /border:\s*1px dashed/.test(r.body)), 'die Kante bleibt');
-  assert.deepEqual(rules.filter((r) => /background(-color|-image)?\s*:/.test(r.body)).map((r) => r.selector), [],
-    'keine Flaeche ueber dem ganzen Raster');
+  // U1 b / DW-P2-9: ab 768px liegt die Kante ausserhalb (outline) - ein Polster
+  // machte die Spalten im Anpassen-Modus schmaler als danach.
+  assert.ok(rules.some((r) => r.selector.trim() === '.dashboard__grid--editing' && r.at.some((a) => /min-width:\s*768px/.test(a))
+    && /outline:[^;]*dashed/.test(r.body) && /padding:\s*0/.test(r.body)), 'breit: die Kante als outline, ohne Polster');
+  // Flaechen tragen nur die Leiste und der Geist einer Fuellung, nie das Raster.
+  assert.deepEqual(rules.filter((r) => /background(-color|-image)?\s*:/.test(r.body)
+    && !/widget-edit-controls|::after/.test(r.selector)).map((r) => r.selector), [],
+  'keine Flaeche ueber dem ganzen Raster');
 });
 
 // --------------------------------------------------------

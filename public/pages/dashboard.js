@@ -43,7 +43,7 @@ import { findSettingsLeaf } from '/settings/registry.js';
 import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
   COCKPIT_COVERED_WIDGETS,
-  nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans, columnFillSpans,
+  nearestPreset, sameWidgetConfig, suggestGridHoleFill, fillGridSpans, contentSpanRows, TILE_GEOMETRY,
   dashboardQuery, dashboardQueryFiltersCounts, dashboardRequest, normalizeShoppingListSelection,
   normalizeCalendarSelection,
   fetchPendingReminders, childDefaultWidgetConfig,
@@ -1582,8 +1582,9 @@ function widgetRows(rows, { tag = 'div', className = '' } = {}) {
  * 1x1-Kachel zeigt davon drei. Ohne Groesse ist es die Vorgabe der Kachel. */
 function renderUrgentTasks(allTasks, openTotal = null, size = '1x2') {
   const tasks = allTasks.slice(0, listRowCap(size));
+  const span = tileSpanAttrs((s) => ({ items: allTasks.length, total: listTotal(openTotal, allTasks.length), cap: listRowCap(s) }), size);
   if (!tasks.length) {
-    return `<div class="widget widget--tasks">
+    return `<div class="widget widget--tasks"${span}>
       ${widgetHeader('tasks', t('nav.tasks'), 0, '/tasks')}
       ${widgetEmptyHtml(t('dashboard.allDone'))}
     </div>`;
@@ -1619,7 +1620,7 @@ function renderUrgentTasks(allTasks, openTotal = null, size = '1x2') {
   // `urgentTasks` sind die fuenf dringendsten, `openTaskCount` alle offenen
   // (siehe listTotal); die Fusszeile nennt, was nicht in DIESER Groesse steht.
   const total = listTotal(openTotal, allTasks.length);
-  return `<div class="widget widget--tasks">
+  return `<div class="widget widget--tasks"${span}>
     ${widgetHeader('tasks', t('nav.tasks'), total, '/tasks')}
     <div class="widget__body widget__body--rows">${widgetRows(items)}${listMoreLine('dashboard.tasksMore', total - tasks.length)}</div>
   </div>`;
@@ -1655,7 +1656,7 @@ const ENDED_EVENTS_SHOWN = 2;
  * Anpassen-Modus steht bis zum Speichern die alte Antwort da, und wer von
  * zwoelf auf fuenf zurueckstellt, soll fuenf sehen und nicht zwoelf bis zum
  * naechsten Abruf. */
-function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT_DEFAULT, rows = clampEventLimit(limit) } = {}) {
+function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT_DEFAULT, rows = clampEventLimit(limit), span = '' } = {}) {
   const todayKey = zonedDateKey(now);
   const nowStamp = householdNowStamp(now);
   const endedToday = allEvents.filter((e) => overviewEventSpan(e, todayKey).day === todayKey && eventHasEnded(e, nowStamp));
@@ -1666,7 +1667,7 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
   const folded = endedToday.length - ended.length;
   const events = [...ended, ...ahead];
   if (!events.length) {
-    return `<div class="widget widget--calendar">
+    return `<div class="widget widget--calendar"${span}>
       ${widgetHeader('calendar', t('nav.calendar'), 0, '/calendar')}
       ${widgetEmptyHtml(t('dashboard.noEvents'))}
     </div>`;
@@ -1730,7 +1731,7 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
   const more = moreAhead
     ? `<p class="widget-list-more">${esc([earlierText, t('dashboard.eventsMoreAhead')].filter(Boolean).join(' · '))}</p>`
     : '';
-  return `<div class="widget widget--calendar">
+  return `<div class="widget widget--calendar"${span}>
     ${widgetHeader('calendar', t('nav.calendar'), null, '/calendar')}
     <div class="widget__body widget__body--rows">${earlier}${widgetRows(items)}${more}</div>
   </div>`;
@@ -1753,7 +1754,7 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
 const WEEKDAY_SHORT_KEYS = ['dayShortSunday', 'dayShortMonday', 'dayShortTuesday', 'dayShortWednesday', 'dayShortThursday', 'dayShortFriday', 'dayShortSaturday'];
 const WEEKDAY_LONG_KEYS = ['dayLongSunday', 'dayLongMonday', 'dayLongTuesday', 'dayLongWednesday', 'dayLongThursday', 'dayLongFriday', 'dayLongSaturday'];
 
-function renderWeekStrip(weekEvents) {
+function renderWeekStrip(weekEvents, span = '') {
   // Geburtstage tragen serverseitig einen sprachneutralen Titel (#524) - hier
   // und nicht im Ladepfad uebersetzt, weil der Titel nur im Tagesnamen steht.
   const events = (Array.isArray(weekEvents) ? weekEvents : []).map(localizeBirthdayEvent);
@@ -1784,7 +1785,7 @@ function renderWeekStrip(weekEvents) {
   const empty = strip.days.every((day) => day.count === 0)
     ? `<p class="week-strip__empty">${t('dashboard.weekStripEmpty')}</p>`
     : '';
-  return `<div class="widget widget--calendar widget--week">
+  return `<div class="widget widget--calendar widget--week"${span}>
     ${widgetHeader('calendar', t('dashboard.weekStripTitle'), null, '/calendar')}
     <div class="widget__body">
       <div class="week-strip">${days}${bands}</div>
@@ -1797,9 +1798,41 @@ function renderWeekStrip(weekEvents) {
  *  Die Stufe aus den Optionen (#1680) gilt nur der hohen Liste - die Woche
  *  zeigt sieben Tage, keine Zeilen, und 1x1 die Zeilen seiner Groesse. */
 function renderCalendarWidget(data, size, options = {}) {
+  const span = tileSpanAttrs(calendarTileModel(data, options), size ?? '1x2');
   return nearestPreset(size ?? '1x2') === '2x1'
-    ? renderWeekStrip(data?.weekEvents)
-    : renderUpcomingEvents(data?.upcomingEvents ?? [], { limit: options?.limit, rows: calendarRowCap(size, options?.limit) });
+    ? renderWeekStrip(data?.weekEvents, span)
+    : renderUpcomingEvents(data?.upcomingEvents ?? [], { limit: options?.limit, rows: calendarRowCap(size, options?.limit), span });
+}
+
+/* Die Hoehe der Kalenderkachel in jeder Groesse (U1 b) - dieselbe Rechnung wie
+ * renderUpcomingEvents: wie viele Kommende, wie viele Beendete, und ob unter
+ * der Liste "+N weitere" oder ueber ihr die Faltzeile steht (beide eine
+ * Footnote-Zeile). 2x1 ist der Wochenstreifen: Kopfzeile, eine Spur je
+ * Mehrtagesband, die Punktzeile und ggf. der Satz "keine Termine". */
+function calendarTileModel(data, options = {}, now = new Date()) {
+  const limit = options?.limit;
+  const allEvents = data?.upcomingEvents ?? [];
+  const todayKey = zonedDateKey(now);
+  const nowStamp = householdNowStamp(now);
+  const endedToday = allEvents.filter((e) => overviewEventSpan(e, todayKey).day === todayKey && eventHasEnded(e, nowStamp));
+  const aheadAll = allEvents.length - endedToday.length;
+  let week = null;
+  return (s) => {
+    if (nearestPreset(s) === '2x1') {
+      week ??= (() => {
+        const strip = buildWeekStrip((Array.isArray(data?.weekEvents) ? data.weekEvents : []).map(localizeBirthdayEvent), householdToday());
+        const empty = strip.days.every((day) => day.count === 0);
+        return { body: TILE_PARTS.weekBase + strip.laneCount * TILE_PARTS.weekLane + (empty ? TILE_PARTS.weekEmpty : 0) };
+      })();
+      return week;
+    }
+    const cap = calendarRowCap(s, limit);
+    const aheadN = Math.min(aheadAll, cap);
+    const endedN = Math.min(endedToday.length, Math.max(0, Math.min(ENDED_EVENTS_SHOWN, cap - aheadN)));
+    const moreAhead = cap < clampEventLimit(limit) && aheadAll > aheadN;
+    const aux = moreAhead ? TILE_GEOMETRY.more : endedToday.length > endedN ? TILE_PARTS.earlier : 0;
+    return { items: aheadN + endedN, extra: aux };
+  };
 }
 
 /**
@@ -1823,11 +1856,12 @@ function renderCalendarWidget(data, size, options = {}) {
  * Zeile mit ihrer hoechsten Kachel waechst (`grid-auto-rows: minmax(132px,
  * auto)`), stand bei den Nachbarn „+N weitere" ueber leerem Raum. Jetzt:
  *   - 1x1 zeigt drei Zeilen, auch Kalender und Aufgaben, plus Fusszeile.
- *   - Hoch zeigt fuenf; beim Kalender die Stufe aus seinen Optionen, und die
- *     Stufe bestimmt, wie viele Rasterzeilen die Kachel belegt (5/8/12 ->
- *     2/3/4, `calendarListRows` + dashboard.css). Eine laengere Liste ist eine
- *     hoehere Kachel, nicht eine hoehere Zeile der Nachbarn. Darstellung,
- *     keine gespeicherte Groesse.
+ *   - Hoch zeigt fuenf; beim Kalender die Stufe aus seinen Optionen. Eine
+ *     laengere Liste ist eine hoehere Kachel, nicht eine hoehere Zeile der
+ *     Nachbarn. Seit U1 b (DW-P1-3) ist das die Regel fuer JEDE Liste: die
+ *     Zahl hier ist die Obergrenze, die Hoehe kommt aus den gezeigten Zeilen
+ *     (`tileSpanAttrs` -> `contentSpanRows`). Darstellung, keine gespeicherte
+ *     Groesse.
  *   - Beendete Termine zaehlen innerhalb der Zeilen, nach dem Kommenden
  *     (`ENDED_EVENTS_SHOWN`).
  *   - Die Wand hat ihren eigenen Deckel (`WALL_ROW_CAP`) und liest weder
@@ -1873,28 +1907,163 @@ function calendarRowCap(size, limit) {
   return isTallSize(size ?? '1x2') ? clampEventLimit(limit) : listRowCap(size);
 }
 
-/* Wie viele Rasterzeilen eine hohe Kalenderliste belegt, sagt dashboard.css
- * (`[data-list-rows]` an den hohen Groessenklassen, ab 1024px). Das Attribut
- * traegt nur die Stufe, nicht die Spanne - die Groessenklasse entscheidet, ob
- * es greift. So liest `spansForSize` beim Probieren einer anderen Groesse
- * auch die richtige Spanne: an 1x1 passt keine Regel. Die Vorgabe fuenf ist
- * die normale hohe Kachel und braucht kein Attribut. */
-function calendarListRowsOf(w) {
-  if (w?.id !== 'calendar') return null;
-  const limit = clampEventLimit(w.options?.limit);
-  return limit === EVENT_LIMIT_DEFAULT ? null : limit;
+/* DIE KACHEL SAGT AUS IHREN DATEN, WIE HOCH SIE IST (DW-P1-3, U1 b).
+ *
+ * Jeder Renderer beschreibt seinen Inhalt als Funktion der Groesse
+ * (`model(size)` -> `contentSpanRows`, utils/dashboard-widgets.js): so viele
+ * Zeilen, wie die Daten hergeben und die Groesse erlaubt, oder die Hoehe seines
+ * festen Aufbaus. Daraus wird die Zahl der Rasterspuren, die er belegt -
+ * `data-span-rows` an seiner Wurzel, beim Zeichnen ausgerechnet, bevor das
+ * Raster ausgelegt wird. Fuer die anderen drei Groessen steht die Zahl gleich
+ * daneben (`data-span-sizes`): der Lueckenhinweis probiert Groessen aus und
+ * muss wissen, wie hoch die Kachel in jeder waere, ohne sie neu zu zeichnen.
+ *
+ * Der Rahmen (`renderWidgetWrapper`) hebt beides an sich und setzt
+ * `--tile-rows`; dashboard.css macht daraus die Spanne. Die Stufe der
+ * Kalenderliste (#2087, 5/8/12 Termine) war bis hierher ein eigenes Attribut
+ * mit eigenen Spannen - jetzt ist sie, was sie immer war: die Obergrenze einer
+ * Liste, deren Hoehe aus ihren Zeilen kommt. */
+const SPAN_SIZES = WIDGET_SIZE_PRESETS.map((p) => p.value);
+
+/* FESTE TEILE EINZELNER KACHELN in px, ab 768px (dashboard.css; gemessen
+ * 2026-10-27 bei 768, 1024, 1440 und 1920px, Grundschrift 16px). Was eine
+ * Liste aus Zeilen ist, rechnet TILE_GEOMETRY; hier steht, was eine Kachel
+ * ausser Zeilen traegt. Aendert sich eine dieser Regeln, aendert sich hier die
+ * Zahl - `test:dashboard` haelt die Liste vollstaendig. */
+const TILE_PARTS = Object.freeze({
+  // Kalender 2x1, der Wochenstreifen: Kopf- und Punktzeile, je Band eine Spur.
+  weekBase: 100.4,
+  weekLane: 10,
+  weekEmpty: 27,
+  // Die Faltzeile "N frueher" ueber der Terminliste (Footnote + 4px).
+  earlier: 23,
+  wasteWarning: 40,
+  // Koerper (unter dem Kopf) der Kacheln mit eigenem Aufbau, je Groesse.
+  weather: { '1x1': 102, '1x2': 234, '2x1': 125, '2x2': 142 },
+  clock: { '1x1': 109, '1x2': 133, '2x1': 111, '2x2': 135 },
+  // Koerper- plus Innenpolster der Kacheln Gesundheit, Zyklus, Haushaltshilfe.
+  statusPad: 60,
+  healthProgress: 26.5,
+  statusLine: 35.5,
+  statusChip: 46,
+  healthNone: 23.5,
+  cycleRing: 60,
+  cycleInfo: 44.6,
+  cycleDate: 21.1,
+  housekeepingStatus: 44.6,
+  // Fasten: Ring neben Satz und Knoepfen; schmal stehen die Knoepfe untereinander.
+  fasting: { wide: 148, narrow: 166.2 },
+  fastingActive: { wide: 243.9, narrow: 335.9 },
+  nutritionPad: 60,
+  nutritionRow: 22,
+  nutritionGap: 8,
+  nutritionCount: 31.1,
+  budgetPad: 32,
+  budgetHeadline: 68,
+  budgetSavings: 53,
+  budgetSavingsBare: 37,
+  budgetGoal: 52,
+  budgetFlow: 48.2,
+  budgetTopOne: 34,
+  budgetTopList: 46.2,
+  budgetTopRow: 25,
+  mealsPad: 28,
+  mealSlot: 69.2,
+  mealSlotTwoLines: 91.2,
+  mealGap: 8,
+  familyPad: 24,
+  familyMore: 27.1,
+  familyFooter: 28.7,
+  rewardsMember: 77.4,
+  rewardsMemberCompact: 54.5,
+  rewardsGap: 12,
+  rewardsFooter: 52,
+  rewardsMore: 19.1,
+  rewardsSelfPad: 28,
+  rewardsSelfGoal: 67.5,
+  rewardsRecentTitle: 30,
+  rewardsRecentRow: 28,
+  notesPad: 28,
+  notesGap: 12,
+  noteCard: 24,
+  noteTitle: 24.1,
+  noteContent: 41.5,
+  noteCategories: 26,
+  notesMore: 31.1,
+  shoppingList: 58,
+  shoppingItem: 19.5,
+  shoppingItemGap: 4,
+  shoppingMore: 31.1,
+  shoppingNothing: 23.5,
+  metricCard: 119,
+  metricGap: 20,
+  quickLinksPad: 12,
+  quickLinkTile: 100.3,
+  quickLinkGap: 8,
+});
+
+/** Die Spalten, die eine Groesse ab 768px belegt: 1 oder 2 (3x/4x auch 2+). */
+function tileColumns(size) {
+  return Number(String(size ?? '1x1').split('x')[0]) >= 2 ? 2 : 1;
 }
 
-/* Das Attribut aus einer Stufe - fuer das Raster und fuer das Skelett, das
- * sie aus dem Layout-Hinweis liest. Nur eine der Stufen wird zum Attribut:
- * der Hinweis liegt im localStorage und ist von der Seite aus beschreibbar. */
-function listRowsAttr(rows) {
-  const limit = Number(rows);
-  return limit !== EVENT_LIMIT_DEFAULT && clampEventLimit(limit) === limit ? ` data-list-rows="${limit}"` : '';
+/** Eine Kachel ohne Eintrag: Kopf und genau die Leerzeile, in jeder Groesse. */
+function emptySpanAttrs(size) {
+  return tileSpanAttrs(() => ({ items: 0 }), size ?? '1x1');
 }
 
-function calendarListRows(w) {
-  return listRowsAttr(calendarListRowsOf(w));
+function tileSpanAttrs(model, size) {
+  // Am Telefon steht jede Kachel in ihrer eigenen Hoehe untereinander (eine
+  // Spalte, kein Raster aus Spuren): dort wird nichts gerechnet. Ein Wechsel
+  // zur breiten Buehne baut die Uebersicht neu (createPhoneProgramFit).
+  if (onPhoneStage()) return '';
+  const rowsAt = (s) => contentSpanRows(model(s) ?? {}).rows;
+  const sizes = [...new Set([...SPAN_SIZES, size].filter(Boolean))];
+  return ` data-span-rows="${rowsAt(size)}" data-span-sizes="${sizes.map((s) => `${s}:${rowsAt(s)}`).join(',')}"`;
+}
+
+/** Die Spanne aus dem Markup eines Renderers (erstes `data-span-rows`). */
+function tileSpanOf(html) {
+  const rows = /\sdata-span-rows="(\d+)"/.exec(String(html ?? ''))?.[1];
+  const sizes = /\sdata-span-sizes="([0-9x:,]*)"/.exec(String(html ?? ''))?.[1];
+  return rows ? { rows: Number(rows), sizes: sizes ?? '' } : null;
+}
+
+/** Die Attribute des Rahmens: Spanne und, als Wert fuer dashboard.css, `--tile-rows`. */
+function tileSpanWrapperAttrs(html) {
+  const span = tileSpanOf(html);
+  return span
+    ? ` data-span-rows="${span.rows}" data-span-sizes="${esc(span.sizes)}" style="--tile-rows: ${span.rows}"`
+    : '';
+}
+
+/* Die zuletzt gezeichnete Spanne je Kachel - fuer den Layout-Hinweis, der dem
+ * Skelett beim naechsten Laden dieselben Hoehen vorhersagt (DW-P2-5, U1 b). */
+const drawnSpanRows = new Map();
+function drawnSpanOf(w) {
+  return drawnSpanRows.get(w?.id) ?? null;
+}
+
+/** Ein neu gezeichneter Koerper bringt seine Spanne an den vorhandenen Rahmen (Geste, U1 b). */
+function setTileSpan(el, html) {
+  const span = tileSpanOf(html);
+  if (el.dataset?.widgetId) drawnSpanRows.set(el.dataset.widgetId, span?.rows ?? 0);
+  if (!span) {
+    el.removeAttribute('data-span-rows');
+    el.removeAttribute('data-span-sizes');
+    el.style.removeProperty('--tile-rows');
+    return;
+  }
+  el.dataset.spanRows = String(span.rows);
+  el.dataset.spanSizes = span.sizes;
+  el.style.setProperty('--tile-rows', String(span.rows));
+}
+
+/** Spuren einer Kachel in einer anderen Groesse (aus `data-span-sizes`), sonst null. */
+function spanRowsForSize(el, size) {
+  const entry = String(el?.dataset?.spanSizes ?? '').split(',').find((part) => part.startsWith(`${size}:`));
+  const rows = Number(entry?.slice(size.length + 1));
+  return Number.isInteger(rows) && rows > 0 ? rows : null;
 }
 
 /*
@@ -1942,8 +2111,9 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
   // gezeigten Zeilen und sagte damit „5" bei acht anstehenden Anlaessen - jetzt
   // nennt sie `birthdayTotal`, und der Rest steht als Fusszeile da (listTotal).
   const birthdays = allBirthdays.slice(0, listRowCap(size));
+  const span = tileSpanAttrs((s) => ({ items: allBirthdays.length, total: listTotal(total, allBirthdays.length), cap: listRowCap(s) }), size);
   if (!birthdays.length) {
-    return `<div class="widget widget--birthdays">
+    return `<div class="widget widget--birthdays"${span}>
       ${widgetHeader('birthdays', t('nav.birthdays'), 0, '/birthdays')}
       ${widgetEmptyHtml(t('dashboard.noBirthdays'))}
     </div>`;
@@ -1981,7 +2151,7 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
   }).join('');
 
   const gesamt = listTotal(total, allBirthdays.length);
-  return `<div class="widget widget--birthdays">
+  return `<div class="widget widget--birthdays"${span}>
     ${widgetHeader('birthdays', t('nav.birthdays'), gesamt, '/birthdays')}
     <div class="widget__body widget__body--rows">${widgetRows(items)}${listMoreLine('dashboard.birthdaysMore', gesamt - birthdays.length)}</div>
   </div>`;
@@ -2079,13 +2249,14 @@ function renderCountdowns(allItems, size, total = null) {
     ? `<p class="countdown-more">${esc(t('dashboard.countdownMore', { count: rest }))}</p>`
     : '';
 
-  return `<div class="widget widget--countdown">
+  const span = tileSpanAttrs((s) => ({ items: shown.length, total: gesamt, cap: listRowCap(s) }), size);
+  return `<div class="widget widget--countdown"${span}>
     ${widgetHeader('countdown', t('dashboard.countdownTitle'), gesamt, null, null, 'dashboard')}
     <div class="widget__body widget__body--rows">${widgetRows(rows)}${more}</div>
   </div>`;
 }
 
-function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER, users = []) {
+function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER, users = [], size = '2x1') {
   const mealLabels = MEAL_LABELS();
   const safeMeals = Array.isArray(meals) ? meals : [];
   const slots = normalizeVisibleMealTypes(visibleMealTypes).map((type) => {
@@ -2123,7 +2294,14 @@ function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER, users = []) {
     `;
   }).join('');
 
-  return `<div class="widget widget--meals">
+  // Zwei Slots je Zeile; der Gerichtname steht breit in einer, schmal in zwei
+  // Zeilen (dashboard.css, "MIT SPALTEN IST DIE ZEILE EIN TAKT").
+  const slotRows = Math.ceil(normalizeVisibleMealTypes(visibleMealTypes).length / 2);
+  const span = tileSpanAttrs((s) => {
+    const slot = tileColumns(s) >= 2 ? TILE_PARTS.mealSlot : TILE_PARTS.mealSlotTwoLines;
+    return { body: TILE_PARTS.mealsPad + slotRows * slot + Math.max(0, slotRows - 1) * TILE_PARTS.mealGap };
+  }, size);
+  return `<div class="widget widget--meals"${span}>
     ${widgetHeader('meals', t('dashboard.todayMeals'), null, '/meals', t('dashboard.weekLink'))}
     <div class="meals-widget">
       <div class="meal-slots">${slots}</div>
@@ -2141,8 +2319,24 @@ function renderPinnedNotes(allNotes, size, total = null) {
    * uebrigen (#928). Dieselbe Korrektur haben die Geburtstage schon bekommen;
    * die Notizen wurden dabei uebersehen. */
   const notes = allNotes.slice(0, listRowCap(size));
+  /* Notizkarten in Reihen (U1 b): schmal eine Spalte, breit drei (dashboard.css
+   * "MIT SPALTEN"), jede Reihe so hoch wie ihre hoechste Karte - Titel und
+   * Kategorien sind Daten, die Vorschau steht in genau zwei Zeilen. */
+  const notesTotal = listTotal(total, allNotes.length);
+  const span = tileSpanAttrs((s) => {
+    const shown = allNotes.slice(0, listRowCap(s));
+    if (!shown.length) return { items: 0 };
+    const cols = tileColumns(s) >= 2 ? 3 : 1;
+    const card = (n) => TILE_PARTS.noteCard + (n.title ? TILE_PARTS.noteTitle : 0) + TILE_PARTS.noteContent
+      + ((n.categories || []).length ? TILE_PARTS.noteCategories : 0);
+    let body = TILE_PARTS.notesPad;
+    for (let i = 0; i < shown.length; i += cols) {
+      body += Math.max(...shown.slice(i, i + cols).map(card)) + (i ? TILE_PARTS.notesGap : 0);
+    }
+    return { body: body + (notesTotal > shown.length ? TILE_PARTS.notesMore : 0) };
+  }, size);
   if (!notes.length) {
-    return `<div class="widget widget--notes">
+    return `<div class="widget widget--notes"${span}>
       ${widgetHeader('notes', t('nav.notes'), 0, '/notes')}
       ${widgetEmptyHtml(t('dashboard.noPinnedNotes'))}
     </div>`;
@@ -2187,7 +2381,7 @@ function renderPinnedNotes(allNotes, size, total = null) {
   // gezaehlt wird deshalb die Menge, aus der sie schoepft (`notesTotal`, mit
   // demselben Kategoriefilter), nicht nur die angehefteten (listTotal).
   const gesamt = listTotal(total, allNotes.length);
-  return `<div class="widget widget--notes">
+  return `<div class="widget widget--notes"${span}>
     ${widgetHeader('notes', t('nav.notes'), gesamt, '/notes')}
     <div class="notes-grid-widget">${items}</div>
     ${listMoreLine('dashboard.notesMore', gesamt - notes.length)}
@@ -2264,22 +2458,29 @@ function renderQuickLinkTile(s) {
   </a>`;
 }
 
-function renderQuickLinks(items) {
+function renderQuickLinks(items, size = '2x1') {
   const list = Array.isArray(items) ? items : [];
   const header = widgetHeader('quicklinks', t('dashboard.quickLinksTitle'), list.length, null, null, 'dashboard');
+  // Feste Spalten je Breite ab 768px (dashboard.css): drei schmal, sechs breit;
+  // dazu die Kachel "Verwalten".
+  const span = tileSpanAttrs((s) => {
+    if (!list.length) return { items: 0 };
+    const rows = Math.ceil((list.length + 1) / (tileColumns(s) >= 2 ? 6 : 3));
+    return { body: TILE_PARTS.quickLinksPad + rows * TILE_PARTS.quickLinkTile + (rows - 1) * TILE_PARTS.quickLinkGap };
+  }, size);
 
   if (!list.length) {
     // Der Leerzustand ist hier der WICHTIGSTE Zustand: das Widget kommt
     // ausgeblendet ins Haus, wer es holt, hat noch nichts angelegt, und es gibt
     // keine zweite Seite, auf der er anfangen könnte. Deshalb nicht der stumme
     // Hinweis der anderen Kacheln, sondern der Weg selbst.
-    return `<div class="widget widget--quicklinks">
+    return `<div class="widget widget--quicklinks"${span}>
       ${header}
       ${widgetEmptyHtml(t('quickLinks.emptyTitle'), { label: t('common.add'), attrs: { 'data-quick-links-manage': '' } }, 'quicklinks')}
     </div>`;
   }
 
-  return `<div class="widget widget--quicklinks">
+  return `<div class="widget widget--quicklinks"${span}>
     ${header}
     <div class="quick-link-row">
       ${list.map(renderQuickLinkTile).join('')}
@@ -2376,7 +2577,7 @@ function familyManageHref(user) {
   return findSettingsLeaf(FAMILY_SETTINGS_LEAF, user)?.path ?? null;
 }
 
-function renderFamilyWidget(users, data, { manageHref = null } = {}) {
+function renderFamilyWidget(users, data, { manageHref = null, size = '1x2' } = {}) {
   // IM SOLO-HAUSHALT GIBT ES DIESES WIDGET NICHT - entschieden in
   // `isWidgetModuleEnabled`, damit es auch aus der „Anpassen"-Ablage faellt.
   // Es war das prominenteste Widget rechts oben und zeigte einer Solo-Nutzerin
@@ -2520,7 +2721,13 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
     ? esc(t('dashboard.familyDayTally', { open: openToday, done: doneToday }))
     : esc(t('dashboard.familyDayCalm'));
 
-  return `<div class="widget widget--family">
+  // Breit stehen Zeilen (am Telefon die Gesichterreihe, R19): die gemeinsame
+  // Zeile, eine je Mitglied, der Rest als Fussnote, darunter die Tagesbilanz.
+  const familyRows = (sharedRow ? 1 : 0) + shown.length;
+  const span = tileSpanAttrs(() => ({
+    body: TILE_PARTS.familyPad + familyRows * TILE_GEOMETRY.row + (moreCount > 0 ? TILE_PARTS.familyMore : 0) + TILE_PARTS.familyFooter,
+  }), size);
+  return `<div class="widget widget--family"${span}>
     ${/* EIN WORT FUER DEN KOPF-LINK (Critique 2026-10-16): jede Kachel fuehrt
          mit „Alle" zu ihrer Seite, nur die Familie sagte „Verwalten" - fuer
          denselben Weg, die ganze Liste. */ ''}
@@ -2632,15 +2839,24 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
   const savingsRate = income > 0 ? Math.round((balance / income) * 100) : 0;
   const balanceTone = balance >= 0 ? 'positive' : 'negative';
   const hasData = (budget?.entryCount || 0) > 0;
+  const topCount = (Array.isArray(budget?.topExpenses) && budget.topExpenses.length
+    ? budget.topExpenses.length : budget?.topExpenseCategory ? 1 : 0);
+  const span = tileSpanAttrs((s) => {
+    if (!hasData) return { items: 0 };
+    const n = Math.min(topCount, listRowCap(s) === LIST_ROWS_TALL ? 3 : 1);
+    const savings = budget?.savingsGoal > 0 ? TILE_PARTS.budgetGoal : income > 0 ? TILE_PARTS.budgetSavings : TILE_PARTS.budgetSavingsBare;
+    const top = n === 0 ? 0 : n === 1 ? TILE_PARTS.budgetTopOne : TILE_PARTS.budgetTopList + n * TILE_PARTS.budgetTopRow - 4;
+    return { body: TILE_PARTS.budgetPad + TILE_PARTS.budgetHeadline + savings + TILE_PARTS.budgetFlow + top };
+  }, size);
 
   if (!hasData) {
-    return `<div class="widget widget--budget">
+    return `<div class="widget widget--budget"${span}>
       ${widgetHeader('budget', t('nav.budget'), null, BUDGET_MONTH_ROUTE)}
       ${widgetEmptyHtml(t('dashboard.noBudgetData'), emptyRouteAction(BUDGET_MONTH_ROUTE, t('common.add')), 'budget')}
     </div>`;
   }
 
-  return `<div class="widget widget--budget">
+  return `<div class="widget widget--budget"${span}>
     ${widgetHeader('budget', t('nav.budget'), null, BUDGET_MONTH_ROUTE)}
     <div class="budget-widget">
       <div class="budget-widget__headline">
@@ -3021,9 +3237,14 @@ function selectMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new 
 /* Die AUSWAHL steht getrennt von der DARSTELLUNG, damit die Zusage pruefbar ist,
  * ohne ein Dokument zu bauen: was die Reihe zeigt, ist die Aussage - dass sie es
  * in einem <a> zeigt, ist ihre Form. */
-function renderMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new Set()) {
+function renderMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new Set(), size = '2x1') {
   const tiles = selectMetricTiles(data, currency, shown, sheetSpeaks);
   if (!tiles.length) return '';
+  // Keine Karte, kein Kopf: vier Kacheln je Reihe breit, zwei schmal (U1 b).
+  const span = tileSpanAttrs((s) => {
+    const rows = Math.ceil(tiles.length / (tileColumns(s) >= 2 ? 4 : 2));
+    return { bare: true, body: rows * TILE_PARTS.metricCard + (rows - 1) * TILE_PARTS.metricGap };
+  }, size);
   // Die Reihe war das einzige Widget ohne Ueberschrift: per H-Taste sprang man
   // an ihr vorbei, und ihre vier Zahlen hingen unter der vorigen Kachel. Die
   // Ueberschrift ist sr-only, weil jede Kachel ihr Modul schon sichtbar nennt -
@@ -3031,7 +3252,7 @@ function renderMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new 
   // nur Kopfhoehe. Sie steht VOR der Reihe, nicht in ihr: `.metric-tiles` ist
   // selbst das Raster der Kacheln.
   return `<h3 class="sr-only">${esc(t('dashboard.metrics'))}</h3>
-    <div class="metric-tiles">${tiles.map(renderMetricTile).join('')}</div>`;
+    <div class="metric-tiles"${span}>${tiles.map(renderMetricTile).join('')}</div>`;
 }
 
 // --------------------------------------------------------
@@ -3234,6 +3455,7 @@ function renderRewardsWidget(rewards, size) {
   // Das Kind sieht NUR sich, auch wenn eine Antwort mehr mitbraechte.
   const members = r.view === 'self' ? (own ? [own] : []) : standings;
   const header = widgetHeader('rewards', t('nav.rewards'), null, '/rewards');
+  const span = tileSpanAttrs((sz) => rewardsTileModel(r, own, members, sizeSpans(sz)), size);
 
   if (!members.length) {
     // Praemien anlegen ist Elternsache: einem Kind einen Knopf zu zeigen, der
@@ -3241,7 +3463,7 @@ function renderRewardsWidget(rewards, size) {
     // Zusage aus #700.
     const cta = r.view === 'approver' && navModuleAccess('rewards') === 'write'
       ? emptyRouteAction('/rewards', t('common.add')) : null;
-    return `<div class="widget widget--rewards">
+    return `<div class="widget widget--rewards"${span}>
       ${header}
       ${widgetEmptyHtml(t('dashboard.noRewards'), cta, 'rewards')}
     </div>`;
@@ -3254,19 +3476,50 @@ function renderRewardsWidget(rewards, size) {
   const body = own && members.length === 1
     ? renderRewardsSelf(own, r, spans)
     : renderRewardsFamily(members, r, spans);
-  return `<div class="widget widget--rewards">
+  return `<div class="widget widget--rewards"${span}>
     ${header}
     ${body}
   </div>`;
+}
+
+/* Die Hoehe der Belohnungskachel aus denselben Zahlen wie ihre zwei Fassungen
+ * (U1 b): die eigene (Stand, Ziel, juengste Punkte, offene Freigaben) oder die
+ * der Familie (eine Zeile mit Balken je Mitglied, flach in 1x1). */
+function rewardsTileModel(r, own, members, spans) {
+  if (!members.length) return { items: 0 };
+  const pendingAll = (Number(r.pending) || 0) + (Number(r.moneyPending) || 0);
+  const recentAll = Array.isArray(r.recent) ? r.recent : [];
+  if (own && members.length === 1) {
+    const recentCap = spans.rows >= 2 ? 3 : spans.cols >= 2 ? 2 : 0;
+    const recent = recentAll.slice(0, recentCap).length;
+    // Die Fuell-Liste (`rewards-recent--fill`) ist ohne Ueberschuss 0px hoch:
+    // sie zeigt die juengsten Punkte nur in Hoehe, die die Kachel zum Fuellen
+    // eines Lochs bekommt - und macht sie so zu Inhalt statt Leere.
+    return {
+      body: TILE_PARTS.rewardsSelfPad + TILE_PARTS.rewardsSelfGoal
+        + (recent ? TILE_PARTS.rewardsGap + TILE_PARTS.rewardsRecentTitle + recent * TILE_PARTS.rewardsRecentRow : 0)
+        + (pendingAll > 0 ? TILE_PARTS.rewardsGap + TILE_PARTS.rewardsFooter : 0),
+    };
+  }
+  const cap = spans.rows >= 2 ? REWARD_MEMBERS_TALL : REWARD_MEMBERS_SHORT;
+  const shown = Math.min(members.length, cap);
+  const pending = r.view === 'approver' ? pendingAll : 0;
+  const more = members.length > shown;
+  return {
+    items: shown,
+    row: spans.rows < 2 ? TILE_PARTS.rewardsMemberCompact : TILE_PARTS.rewardsMember,
+    more: false,
+    extra: (more ? TILE_PARTS.rewardsGap + TILE_PARTS.rewardsMore : 0) + (pending > 0 ? TILE_PARTS.rewardsGap + TILE_PARTS.rewardsFooter : 0),
+  };
 }
 
 // --------------------------------------------------------
 // Gesundheit-Widget (heutige Medikamenten-Dosen)
 // --------------------------------------------------------
 
-function renderHealthWidget(health) {
+function renderHealthWidget(health, size = '2x1') {
   if (!health?.hasMeds) {
-    return `<div class="widget widget--health">
+    return `<div class="widget widget--health"${emptySpanAttrs(size)}>
       ${widgetHeader('health', t('nav.health'), null, '/health')}
       ${widgetEmptyHtml(t('dashboard.healthNoMeds'), emptyRouteAction('/health', t('common.add')), 'health')}
     </div>`;
@@ -3308,7 +3561,13 @@ function renderHealthWidget(health) {
     `;
   }
 
-  return `<div class="widget widget--health">
+  // Fortschritt und Satz darunter, oder "heute nichts"; dazu ggf. der Chip.
+  const span = tileSpanAttrs(() => ({
+    body: TILE_PARTS.statusPad
+      + (total === 0 ? TILE_PARTS.healthNone : TILE_PARTS.healthProgress + (allTaken || health?.nextDose ? TILE_PARTS.statusLine : 0))
+      + (lowStock > 0 ? TILE_PARTS.statusChip : 0),
+  }), size);
+  return `<div class="widget widget--health"${span}>
     ${widgetHeader('health', t('nav.health'), null, '/health')}
     <div class="widget__body">
       <div class="health-widget">${main}${lowChip}</div>
@@ -3346,7 +3605,7 @@ function cycleWidgetCountdown(prediction) {
   return t('health.cycle.status.inDays', { count: d });
 }
 
-function renderCycleWidget(cycle) {
+function renderCycleWidget(cycle, size = '2x1') {
   // cycle: { periods, settings } (owner-only) | null (Ladefehler) | undefined (Kachel versteckt)
   const prediction = cycle
     ? predictCycle(cycle.periods || [], cycle.settings || {})
@@ -3354,7 +3613,7 @@ function renderCycleWidget(cycle) {
 
   // Ohne Historie: Onboarding-Empty statt Fehlerkachel — führt in den Zyklus-Flow.
   if (!prediction.hasData) {
-    return `<div class="widget widget--cycle">
+    return `<div class="widget widget--cycle"${emptySpanAttrs(size)}>
       ${widgetHeader('cycle', t('health.cycle.title'), null, '/health/cycle')}
       ${widgetEmptyHtml(t('health.cycle.emptyTitle'), emptyRouteAction('/health/cycle', t('health.cycle.add')), 'cycle')}
     </div>`;
@@ -3386,7 +3645,11 @@ function renderCycleWidget(cycle) {
       <text class="cycle-widget__ring-num" x="32" y="32" text-anchor="middle" dominant-baseline="central">${esc(prediction.cycleDay)}</text>
     </svg>`;
 
-  return `<div class="widget widget--cycle">
+  // Ring neben Phase, Countdown und ggf. Datum - die hoehere der beiden Spalten.
+  const span = tileSpanAttrs(() => ({
+    body: TILE_PARTS.statusPad + Math.max(TILE_PARTS.cycleRing, TILE_PARTS.cycleInfo + (cycleDate ? TILE_PARTS.cycleDate : 0)),
+  }), size);
+  return `<div class="widget widget--cycle"${span}>
     ${widgetHeader('cycle', t('health.cycle.title'), null, '/health/cycle')}
     <div class="widget__body">
       <div class="cycle-widget" data-phase="${esc(prediction.phase)}">
@@ -3413,11 +3676,14 @@ function renderCycleWidget(cycle) {
  * Text daneben, und "Fasten starten/beenden" ist sekundaer: der eine gefuellte
  * Knopf des Schirms ist das Anlegen. Die Selektoren der Uhr (`data-fasting-*`)
  * gelten fuer die ganze Kachel, nicht nur fuer den Ring. */
-function renderFastingWidget(fasting) {
+function renderFastingWidget(fasting, size = '2x1') {
   if (!fasting) throw new Error('fasting widget slice failed to load');
   const active = fasting.active;
   const writable = moduleAccess('health') === 'write';
-  return `<div class="widget widget--fasting">${widgetHeader('fasting', t('health.fasting.title'), null, null, null, 'health')}
+  const span = tileSpanAttrs((s) => ({
+    body: (active ? TILE_PARTS.fastingActive : TILE_PARTS.fasting)[tileColumns(s) >= 2 ? 'wide' : 'narrow'],
+  }), size);
+  return `<div class="widget widget--fasting"${span}>${widgetHeader('fasting', t('health.fasting.title'), null, null, null, 'health')}
     <div class="fasting-widget">
       <div class="fasting-dial fasting-dial--segmented" data-fasting-progress><div data-fasting-segments></div></div>
       <div class="fasting-widget__controls">
@@ -3472,13 +3738,13 @@ function wireFastingWidget(container, refresh, fasting, signal) {
  *   - ein Ziel von 0 (etwa Zucker) -> ein echtes Ziel, gegen das gemessen wird.
  *     `nutrientProgress()` haelt diesen Fall von "kein Ziel" getrennt.
  */
-function renderNutritionWidget(nutrition) {
+function renderNutritionWidget(nutrition, size = '2x1') {
   if (nutrition === null || nutrition === undefined) throw new Error('nutrition widget slice failed to load');
   const target = nutrition.target;
   const writable = moduleAccess('health') === 'write';
 
   if (!target) {
-    return `<div class="widget widget--nutrition">
+    return `<div class="widget widget--nutrition"${emptySpanAttrs(size)}>
       ${widgetHeader('nutrition', t('health.nutrition.title'), null, '/health/nutrition')}
       ${widgetEmptyHtml(t('dashboard.nutritionNoTarget'), writable ? emptyRouteAction('/health/nutrition', t('health.nutrition.targetSet')) : null, 'nutrition')}
     </div>`;
@@ -3509,7 +3775,13 @@ function renderNutritionWidget(nutrition) {
     ? `<ul class="nutrition-widget__rows">${rows.join('')}</ul>`
     : cardEmptyRowHtml(t('dashboard.nutritionNoTarget'));
 
-  return `<div class="widget widget--nutrition">
+  // Eine Zeile je Naehrwert mit Ziel (Wort, Zahl, Balken darunter), dann die Zaehlzeile.
+  const span = tileSpanAttrs(() => ({
+    body: TILE_PARTS.nutritionPad + (rows.length
+      ? rows.length * TILE_PARTS.nutritionRow + (rows.length - 1) * TILE_PARTS.nutritionGap
+      : TILE_GEOMETRY.empty) + TILE_PARTS.nutritionCount,
+  }), size);
+  return `<div class="widget widget--nutrition"${span}>
     ${widgetHeader('nutrition', t('health.nutrition.title'), null, '/health/nutrition')}
     <div class="widget__body">
       <div class="nutrition-widget">
@@ -3553,16 +3825,18 @@ function renderScheduleWidget(schedule, users, size) {
   if (schedule === null) throw new Error('schedule widget slice failed to load');
   const entries = schedule?.entries ?? [];
   const hasTypes = Boolean(schedule?.hasTypes);
+  // Kein "+N weitere": die Kachel nennt die Zahl der Schichten im Kopf.
+  const span = tileSpanAttrs((s) => ({ items: hasTypes ? entries.length : 0, cap: listRowCap(s), more: false }), size);
 
   if (!hasTypes) {
-    return `<div class="widget widget--schedule">
+    return `<div class="widget widget--schedule"${span}>
       ${widgetHeader('schedule', t('nav.schedule'), null, '/schedule')}
       ${widgetEmptyHtml(t('dashboard.scheduleEmpty'), emptyRouteAction('/schedule', t('common.add')), 'schedule')}
     </div>`;
   }
 
   if (!entries.length) {
-    return `<div class="widget widget--schedule">
+    return `<div class="widget widget--schedule"${span}>
       ${widgetHeader('schedule', t('nav.schedule'), null, '/schedule/patterns')}
       ${widgetEmptyHtml(t('schedule.empty'))}
     </div>`;
@@ -3618,7 +3892,7 @@ function renderScheduleWidget(schedule, users, size) {
       </div>`;
   }).join('');
 
-  return `<div class="widget widget--schedule">
+  return `<div class="widget widget--schedule"${span}>
     ${widgetHeader('schedule', t('nav.schedule'), onShift, '/schedule/patterns')}
     <div class="widget__body widget__body--rows">${widgetRows(rows, { className: 'schedule-widget' })}</div>
   </div>`;
@@ -3660,9 +3934,11 @@ function renderPantryWidget(pantry, size) {
   if (pantry === null || pantry === undefined) throw new Error('pantry widget slice failed to load');
   const title = t('dashboard.pantryExpiringTitle');
   const items = Array.isArray(pantry.items) ? pantry.items : [];
+  const pantryTotal = Number.isFinite(Number(pantry.total)) ? Number(pantry.total) : items.length;
+  const span = tileSpanAttrs((s) => ({ items: items.length, total: pantryTotal, cap: listRowCap(s) }), size);
 
   if (!items.length) {
-    return `<div class="widget widget--pantry">
+    return `<div class="widget widget--pantry"${span}>
       ${widgetHeader('pantry', title, null, '/pantry')}
       ${widgetEmptyHtml(t('dashboard.pantryExpiringEmpty', { count: EXPIRY_SOON_DAYS }))}
     </div>`;
@@ -3698,7 +3974,7 @@ function renderPantryWidget(pantry, size) {
     ? `<p class="pantry-widget-more">${esc(t('dashboard.pantryExpiringMore', { count: rest }))}</p>`
     : '';
 
-  return `<div class="widget widget--pantry">
+  return `<div class="widget widget--pantry"${span}>
     ${widgetHeader('pantry', title, total, '/pantry')}
     <div class="widget__body widget__body--rows">${widgetRows(rows)}${more}</div>
   </div>`;
@@ -3719,9 +3995,10 @@ function renderPantryWidget(pantry, size) {
 function renderWasteWidget(waste, size) {
   if (waste === null) throw new Error('waste widget slice failed to load');
   const items = waste?.items ?? [];
+  const span = tileSpanAttrs((s) => ({ items: items.length, cap: listRowCap(s), extra: waste?.needsRefresh ? TILE_PARTS.wasteWarning : 0 }), size);
 
   if (!items.length) {
-    return `<div class="widget widget--waste">
+    return `<div class="widget widget--waste"${span}>
       ${widgetHeader('waste', t('nav.waste'), null, '/waste')}
       ${widgetEmptyHtml(t('waste.emptyTypesTitle'), emptyRouteAction('/waste', t('common.add')), 'waste')}
     </div>`;
@@ -3793,7 +4070,7 @@ function renderWasteWidget(waste, size) {
       </div>`
     : '';
 
-  return `<div class="widget widget--waste">
+  return `<div class="widget widget--waste"${span}>
     ${widgetHeader('waste', t('nav.waste'), upcomingCount, '/waste')}
     <div class="widget__body widget__body--rows">
       ${widgetRows(rows, { className: 'waste-widget' })}${more}
@@ -3806,9 +4083,9 @@ function renderWasteWidget(waste, size) {
 // Haushaltshilfe-Widget (Anwesenheit + offene Zahlung)
 // --------------------------------------------------------
 
-function renderHousekeepingWidget(hk, currency) {
+function renderHousekeepingWidget(hk, currency, size = '1x1') {
   if (!hk?.configured) {
-    return `<div class="widget widget--housekeeping">
+    return `<div class="widget widget--housekeeping"${emptySpanAttrs(size)}>
       ${widgetHeader('housekeeping', t('nav.housekeeping'), null, '/housekeeping')}
       ${widgetEmptyHtml(t('dashboard.housekeepingNone'), emptyRouteAction('/housekeeping', t('common.add')), 'housekeeping')}
     </div>`;
@@ -3838,7 +4115,10 @@ function renderHousekeepingWidget(hk, currency) {
     ? `<div class="housekeeping-widget__unpaid"><i data-lucide="banknote" aria-hidden="true"></i><span>${t('dashboard.housekeepingUnpaid', { amount: formatCurrency(unpaid, currency) })}</span></div>`
     : '';
 
-  return `<div class="widget widget--housekeeping">
+  const span = tileSpanAttrs(() => ({
+    body: TILE_PARTS.statusPad + TILE_PARTS.housekeepingStatus + (unpaid > 0 ? TILE_PARTS.statusChip : 0),
+  }), size);
+  return `<div class="widget widget--housekeeping"${span}>
     ${widgetHeader('housekeeping', t('nav.housekeeping'), null, '/housekeeping')}
     <div class="widget__body">
       <div class="housekeeping-widget">${statusBlock}${unpaidChip}</div>
@@ -4127,7 +4407,7 @@ const tileSizeKey = (width, id) => `${width}:${id}`;
  * gezeichnet hat (`drawn` in renderDashboardLayout).
  */
 function rememberGridHint(drawn, cfg) {
-  rememberLayoutHint(drawn, dashboardQuery(cfg), calendarListRowsOf);
+  rememberLayoutHint(drawn, dashboardQuery(cfg), drawnSpanOf);
 }
 
 /** Der Schluessel der Kopfhoehe (headHint): die Fenstergroesse. */
@@ -6986,23 +7266,23 @@ function dashboardTileRenderers(cfg, data, weather, currency, { visibleMealTypes
     countdown: (size) => renderCountdowns(data.countdowns ?? [], size, data.countdownTotal),
     budget: (size) => renderBudgetWidget(data.budget ?? {}, currency, size),
     rewards: (size) => renderRewardsWidget(data.rewards ?? {}, size),
-    health: () => renderHealthWidget(data.health ?? {}),
-    cycle: () => renderCycleWidget(data.cycle),
-    fasting: () => renderFastingWidget(data.fasting),
-    nutrition: () => renderNutritionWidget(data.nutrition),
-    housekeeping: () => renderHousekeepingWidget(data.housekeeping ?? {}, currency),
+    health: (size) => renderHealthWidget(data.health ?? {}, size),
+    cycle: (size) => renderCycleWidget(data.cycle, size),
+    fasting: (size) => renderFastingWidget(data.fasting, size),
+    nutrition: (size) => renderNutritionWidget(data.nutrition, size),
+    housekeeping: (size) => renderHousekeepingWidget(data.housekeeping ?? {}, currency, size),
     schedule: (size) => renderScheduleWidget(data.schedule, data.users ?? [], size),
     waste: (size) => renderWasteWidget(data.waste, size),
     pantry: (size) => renderPantryWidget(data.pantryExpiring, size),
-    family: () => renderFamilyWidget(data.users ?? [], data, { manageHref: familyManage }),
-    meals: () => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes, data.users),
+    family: (size) => renderFamilyWidget(data.users ?? [], data, { manageHref: familyManage, size }),
+    meals: (size) => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes, data.users, size),
     notes: (size) => renderPinnedNotes(data.pinnedNotes ?? [], size, data.notesTotal),
-    shopping: () => renderShoppingTile(data),
+    shopping: (size) => renderShoppingTile(data, size),
     // Hier ankommen heisst eingerichtet (`isWidgetModuleEnabled`); fehlt das
     // Wetter trotzdem, sagt die Kachel es, statt zu verschwinden.
-    weather: () => (weather ? renderWeatherWidget(weather) : renderWeatherUnavailable()),
-    clock: () => renderClockWidget(),
-    quicklinks: () => renderQuickLinks(data.quicklinks ?? []),
+    weather: (size) => (weather ? renderWeatherWidget(weather, size) : renderWeatherUnavailable(size)),
+    clock: (size) => renderClockWidget({ size }),
+    quicklinks: (size) => renderQuickLinks(data.quicklinks ?? [], size),
     // Die Kachelreihe braucht als einziges Widget zu wissen, wer sonst noch
     // dasteht - sie ist die einzige, die fremde Zahlen zeigt. Gerechnet aus
     // DERSELBEN Bedingung, nach der die Kacheln gleich gefiltert werden, damit
@@ -7011,9 +7291,9 @@ function dashboardTileRenderers(cfg, data, weather, currency, { visibleMealTypes
     // Dazu, welche Zahl das Heute-Blatt schon nennt (offene Freigaben): die
     // Kein-Echo-Regel gilt auch zwischen Blatt und Kachel. Ein ausgeblendetes
     // Blatt nennt nichts.
-    metrics: () => renderMetricTiles(data, currency, new Set(
+    metrics: (size) => renderMetricTiles(data, currency, new Set(
       cfg.filter((w) => w.visible && w.id !== 'metrics' && isWidgetModuleEnabled(w.id)).map((w) => w.id),
-    ), glanceHidden ? new Set() : todaySheetSpeaks(data, cfg)),
+    ), glanceHidden ? new Set() : todaySheetSpeaks(data, cfg), size),
   };
 }
 
@@ -7042,7 +7322,7 @@ function renderWidgetBody(w, renderers) {
  *  und das DOM-Attribut schaltete natives Ziehen ein, das ihm die Geste nimmt. */
 function renderWidgetWrapper(w, html, { editing = false, index = 0, total = 1 } = {}) {
   return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
-                   data-widget-id="${esc(w.id)}"${calendarListRows(w)}>
+                   data-widget-id="${esc(w.id)}"${tileSpanWrapperAttrs(html)}>
         ${editing ? renderWidgetCustomizeControls(w, index, total) : ''}
         ${html}
       </div>`;
@@ -7056,8 +7336,10 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     .map((w, index, arr) => {
       const html = renderWidgetBody(w, widgetById);
       if (!html) return '';
-      // Was wirklich im Raster steht - die Vorhersage des Skeletts (rememberGridHint).
+      // Was wirklich im Raster steht - die Vorhersage des Skeletts (rememberGridHint),
+      // samt der Hoehe aus den Daten (U1 b).
       drawn?.push(w);
+      drawnSpanRows.set(w.id, tileSpanOf(html)?.rows ?? 0);
       // Und was die naechste Geste nicht neu zeichnen muss (patchCustomize).
       bodies?.set(w.id, html);
       return renderWidgetWrapper(w, html, { editing, index, total: arr.length });
@@ -7104,12 +7386,13 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
  * Abmelden verworfen werden muss - die Begruendung steht dort. */
 
 function renderDashboardSkeleton(user = null, { head = null } = {}) {
-  // Mit den Listenzeilen (#2087): eine hohe Kalenderkachel mit acht oder
-  // zwoelf Terminen belegt schon im Skelett ihre drei oder vier Zeilen.
+  // Mit den Hoehen aus den Daten (U1 b): jede Kachel steht schon im Skelett so
+  // hoch, wie sie beim letzten Zeichnen war - auch die Kalenderliste mit acht
+  // oder zwoelf Terminen (#2087).
   const defaults = buildDefaultWidgetConfig().filter((w) => w.visible && isWidgetModuleEnabled(w.id));
   const hint = layoutHintTiles(defaults.map((w) => w.size));
   const tiles = hint.sizes
-    .map((size, i) => `<div class="widget-wrapper ${widgetSizeClass(size)}"${listRowsAttr(hint.listRows[i])}>${skeletonWidget(3)}</div>`)
+    .map((size, i) => `<div class="widget-wrapper ${widgetSizeClass(size)}"${hint.spans[i] ? ` style="--tile-rows: ${hint.spans[i]}"` : ''}>${skeletonWidget(3)}</div>`)
     .join('');
   return `
     ${renderMastheadSkeleton(user, head)}
@@ -7213,7 +7496,7 @@ function widgetErrorSeal(id) {
 
 function renderWidgetError(id) {
   const title = esc(widgetLabel(id));
-  return `<div class="widget widget--error" role="alert">
+  return `<div class="widget widget--error" role="alert"${emptySpanAttrs('1x1')}>
     ${widgetHeader(id, title, null, null, null, widgetErrorSeal(id))}
     ${widgetEmptyHtml(t('dashboard.widgetError'), { label: t('common.retry'), icon: 'refresh-cw', attrs: { 'data-widget-retry': id } }, id)}
   </div>`;
@@ -7230,17 +7513,17 @@ function renderWidgetError(id) {
  * Feld fehlt) gelten die Felder, die auch das Heute-Blatt und die Wand lesen.
  * Die Kachel ist der EINZIGE Leser von `shoppingTile`.
  */
-function renderShoppingTile(data) {
+function renderShoppingTile(data, size = '2x1') {
   const tile = data?.shoppingTile;
   if (tile && Array.isArray(tile.lists)) {
-    return renderShoppingLists(tile.lists, tile.openCount, tile.listCount);
+    return renderShoppingLists(tile.lists, tile.openCount, tile.listCount, size);
   }
-  return renderShoppingLists(data?.shoppingLists ?? [], data?.shoppingOpenCount, data?.shoppingOpenLists);
+  return renderShoppingLists(data?.shoppingLists ?? [], data?.shoppingOpenCount, data?.shoppingOpenLists, size);
 }
 
-function renderShoppingLists(lists, openTotal = null, listTotalCount = null) {
+function renderShoppingLists(lists, openTotal = null, listTotalCount = null, size = '2x1') {
   if (!lists.length) {
-    return `<div class="widget widget--shopping">
+    return `<div class="widget widget--shopping"${emptySpanAttrs(size)}>
       ${widgetHeader('shopping', t('nav.shopping'), 0, '/shopping')}
       ${widgetEmptyHtml(t('dashboard.noShoppingLists'), emptyRouteAction('/shopping', t('common.add')), 'shopping')}
     </div>`;
@@ -7304,7 +7587,18 @@ function renderShoppingLists(lists, openTotal = null, listTotalCount = null) {
     `;
   }).join('');
 
-  return `<div class="widget widget--shopping">
+  /* Je Liste eine zusammengesetzte Zeile (U11): Name und Zahl, Balken, die
+   * Artikel in je einer Zeile, ggf. "+N weitere" bzw. "nichts offen". */
+  const listPx = (list) => {
+    const n = list.items.length;
+    return TILE_PARTS.shoppingList + n * TILE_PARTS.shoppingItem + Math.max(0, n - 1) * TILE_PARTS.shoppingItemGap
+      + (list.open_count - n > 0 ? TILE_PARTS.shoppingMore : 0) + (list.open_count === 0 ? TILE_PARTS.shoppingNothing : 0);
+  };
+  const listsPx = lists.reduce((sum, list, i) => sum + listPx(list) + (i ? 1 : 0), 0);
+  const span = tileSpanAttrs(() => ({
+    body: TILE_GEOMETRY.rowsPad + listsPx + (moreLists > 0 ? TILE_GEOMETRY.more : 0),
+  }), size);
+  return `<div class="widget widget--shopping"${span}>
     ${widgetHeader('shopping', t('nav.shopping'), totalOpen, '/shopping')}
     <div class="widget__body widget__body--rows">${widgetRows(listsHtml)}${listMoreLine('dashboard.shoppingMoreLists', moreLists)}</div>
   </div>`;
@@ -7568,8 +7862,10 @@ function weatherRefreshButton() {
       </button>`;
 }
 
-function renderWeatherWidget(weather) {
+function renderWeatherWidget(weather, size = '2x1') {
   if (!weather) return '';
+  // Jetzt-Block mit oder ohne Vorhersage daneben/darunter - eine Hoehe je Groesse.
+  const span = tileSpanAttrs((s) => ({ body: TILE_PARTS.weather[nearestPreset(s)] ?? TILE_PARTS.weather['2x1'] }), size);
 
   const { city, current, forecast, units } = weather;
 
@@ -7605,7 +7901,7 @@ function renderWeatherWidget(weather) {
   }).join('');
 
   return `
-    <div class="widget widget--weather weather-widget" id="weather-widget"${weatherToneAttr(current.icon)}${weatherMotionAttr(current.icon)}>
+    <div class="widget widget--weather weather-widget" id="weather-widget"${span}${weatherToneAttr(current.icon)}${weatherMotionAttr(current.icon)}>
       ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard', { action: weatherRefreshButton() })}
       <div class="weather-widget__inner">
         <div class="weather-widget__main">
@@ -7631,9 +7927,9 @@ function renderWeatherWidget(weather) {
 // und nicht beheben muss, und er soll nicht bei jedem Aufbau vorgelesen werden.
 // Der Aktualisieren-Knopf bleibt - er ist der Weg zurueck, und
 // `wireWeatherRefresh` tauscht die Kachel bei Erfolg aus.
-function renderWeatherUnavailable() {
+function renderWeatherUnavailable(size = '2x1') {
   return `
-    <div class="widget widget--weather weather-widget weather-widget--unavailable" id="weather-widget">
+    <div class="widget widget--weather weather-widget weather-widget--unavailable" id="weather-widget"${emptySpanAttrs(size)}>
       ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard', { action: weatherRefreshButton() })}
       ${widgetEmptyHtml(t('dashboard.weatherUnavailable'))}
     </div>`;
@@ -7671,7 +7967,7 @@ function clockWidgetParts(now = new Date()) {
  *   Ihre IDs bleiben dieselben - der Minutentakt (`updateClockWidget`) findet
  *   sie so in beiden Zustaenden, statt ein zweites Mal geschrieben zu werden.
  */
-function renderClockWidget({ wall = false } = {}) {
+function renderClockWidget({ wall = false, size = '2x1' } = {}) {
   const { time, date, machineTime } = clockWidgetParts();
   const cls = wall ? 'clock-widget clock-widget--wall' : 'widget widget--clock clock-widget';
   // SPERRZONE FUER MELDUNGEN, NUR AN DER WAND (#1917): dort steht der Stapel
@@ -7691,8 +7987,10 @@ function renderClockWidget({ wall = false } = {}) {
   if (wall) {
     return `<div class="${cls}" id="clock-widget">${body}</div>`;
   }
+  // Die Ziffern wachsen mit der Hoehe der Groesse (dashboard.css, --clock-time-max).
+  const span = tileSpanAttrs((s) => ({ body: TILE_PARTS.clock[nearestPreset(s)] ?? TILE_PARTS.clock['2x1'] }), size);
   return `
-    <div class="${cls}" id="clock-widget">
+    <div class="${cls}" id="clock-widget"${span}>
       ${widgetHeader('clock', t('dashboard.clock'), null, null, null, 'dashboard')}
       <div class="widget__body clock-widget__body">${body}</div>
     </div>`;
@@ -8914,13 +9212,20 @@ function gridSpans(el) {
   return { cols: span(cs.gridColumnStart, cs.gridColumnEnd), rows: span(cs.gridRowStart, cs.gridRowEnd) };
 }
 
+/* Die Spuren einer Groesse: die Breite aus dem Stylesheet (Klasse kurz
+ * tauschen, lesen, zurueck), die Hoehe aus den Daten der Kachel
+ * (`data-span-sizes`, U1 b) - plus der Abstand, den der Rahmen traegt
+ * (`--tile-gap-rows`, steckt in der gelesenen Spanne). */
 function spansForSize(el, size) {
   const current = [...el.classList].find((c) => c.startsWith('widget-size--'));
   const probe = widgetSizeClass(size);
-  if (!current || current === probe) return gridSpans(el);
+  const own = Number(el.dataset?.spanRows);
+  const content = spanRowsForSize(el, size);
+  const withContent = (spans) => (content && own ? { ...spans, rows: spans.rows - own + content } : spans);
+  if (!current || current === probe) return withContent(gridSpans(el));
   el.classList.replace(current, probe);
   try {
-    return gridSpans(el);
+    return withContent(gridSpans(el));
   } finally {
     el.classList.replace(probe, current);
   }
@@ -8935,12 +9240,13 @@ function gridColumnCount(grid) {
  * Groesse an jeder Kachel aus (spansForSize: Klasse tauschen, lesen, zurueck) -
  * bei 22 Kacheln 66 Proben, und jede legte das Raster zur Auslegung frei: nach
  * jeder Anpassen-Geste ein zweites volles Layout (gemessen 4x CPU ~25 ms).
- * Was eine Probe misst, haengt nur an der Groessenklasse, der Listenstufe
- * (`data-list-rows`) und den Spuren des Rasters - darum gilt sie je Spurbild,
- * und nach der ersten Runde misst eine Geste nichts mehr nach. */
+ * Was eine Probe misst, haengt nur an der Groessenklasse, den Spuren, die die
+ * Kachel in jeder Groesse belegt (`data-span-sizes`, U1 b), und den Spuren des
+ * Rasters - darum gilt sie je Spurbild, und nach der ersten Runde misst eine
+ * Geste nichts mehr nach. */
 const tileSpanMemo = new Map();
 function memoSpans(el, size, tracks) {
-  const key = `${tracks}|${size}|${el.getAttribute('data-list-rows') ?? ''}`;
+  const key = `${tracks}|${size}|${el.dataset?.spanRows ?? ''}|${el.dataset?.spanSizes ?? ''}`;
   let spans = tileSpanMemo.get(key);
   if (!spans) {
     spans = spansForSize(el, size);
@@ -8962,19 +9268,35 @@ function gridHoleSuggestion(grid) {
     (item) => WIDGET_SIZE_PRESETS.map((p) => ({ size: p.value, ...memoSpans(item.el, p.value, tracks) })));
 }
 
+/* WAS BREITE IN INHALT UMSETZT (DW-P2-6, U1 b): das Wetter zeigt in der
+ * Breite mehr Tage (4 ab 640px Kachelbreite, 5 ab 860px), in derselben Hoehe.
+ * Jede andere Kachel zeigte breiter nur dasselbe groesser. */
+const FILL_WIDE_WIDGETS = new Set(['weather']);
+
 /**
- * DAS RASTER HAT IM NORMALMODUS KEINE LOECHER (Re-Critique 2026-09-27, A7
- * P2-12 / R10 L9). Die Kachel vor einer freien Zelle waechst in den Rest ihrer
- * Zeile (`rowFillSpans`, utils/dashboard-widgets.js) - als Darstellung, nicht
- * als gespeicherte Groesse: `data-row-fill` plus `--widget-fill-span`
- * (dashboard.css). Im Anpassen-Modus waechst nichts; dort zeigt das Raster die
- * gewaehlten Groessen, und der Loch-Hinweis (`gridHoleSuggestion`) schlaegt die
- * dauerhafte Korrektur vor.
+ * DAS RASTER HAT KEIN LOCH - UND KEINE KACHEL HOEHE OHNE INHALT (R10 L9,
+ * R21 D5, neu gefasst mit U1 b). Nach der dichten Packung sind die Kacheln so
+ * hoch wie ihre Daten (`--tile-rows`); was dann noch frei ist:
+ *   - rechts neben dem Wetter waechst das Wetter hinein (`rowFillSpans`,
+ *     nur `wide`) und zeigt dort mehr Tage;
+ *   - ein Loch, unter dem noch eine Kachel steht, fuellt die Kachel darueber
+ *     (`columnFillSpans`) - ein Spaltenende ist kein Loch und bleibt frei.
+ * Beides ist Darstellung (`data-row-fill`/`data-col-fill`), gespeichert bleibt
+ * die gewaehlte Groesse.
  *
- * Gemessen wird mit abgenommenem Wachstum - die Spans kommen aus den
- * Groessenklassen, nicht aus der letzten Runde dieser Funktion.
+ * DER ANPASSEN-MODUS ZEIGT DASSELBE RASTER (DW-P2-9, WYSIWYG): er fuellte nicht,
+ * und der Lueckenhinweis schlug dann eine Korrektur fuer eine Luecke vor, die
+ * ausserhalb nie stand. Jetzt fuellt er wie der Normalmodus; die Hoehe, die
+ * eine Kachel nur zum Fuellen bekommt, steht dort als Geist
+ * (`--tile-ghost-rows`, dashboard.css) - man sieht, was Inhalt ist und was
+ * Platz.
+ *
+ * Gemessen wird mit abgenommenem Wachstum - die Spans kommen aus Groessenklasse
+ * und Daten, nicht aus der letzten Runde dieser Funktion.
  */
-function applyRowFill(grid, { editing = false } = {}) {
+const seenGridColumns = new WeakMap();
+
+function applyRowFill(grid, { editing = false, columns: knownColumns = null } = {}) {
   // Nur, was im Raster steht: ein verborgenes Kind belegt keine Zelle.
   const tiles = [...grid.children].filter((el) => getComputedStyle(el).display !== 'none');
   /* ERST LESEN, DANN SCHREIBEN (DW-P2-4). Die Kacheln sind Container
@@ -8983,58 +9305,80 @@ function applyRowFill(grid, { editing = false } = {}) {
    * Flaeche noch einmal - gemessen 8 ms bei 4x CPU, mitten im Seitenwechsel.
    * Ein frisch gezeichnetes Raster traegt noch keine Fuellung: dort wird
    * alles vorab gelesen. Nur ein Raster, das schon gefuellt war (neue
-   * Spaltenzahl), muss erst zuruecksetzen, damit die Spannen die gewaehlten
-   * sind und nicht die gefuellten. */
+   * Spaltenzahl, eine Geste), muss erst zuruecksetzen, damit die Spannen die
+   * gewaehlten sind und nicht die gefuellten. */
   const filled = tiles.some((el) => 'rowFill' in el.dataset || 'colFill' in el.dataset);
   const read = () => {
-    const columns = editing ? 0 : gridColumnCount(grid);
+    const columns = knownColumns ?? gridColumnCount(grid);
+    seenGridColumns.set(grid, columns);
     if (columns < 2) return { columns, items: [] };
     return {
       columns,
-      items: tiles.map((el, index) => ({
-        id: el.dataset.widgetId || `#${index}`,
-        el,
-        ...gridSpans(el),
-        grow: getComputedStyle(el).alignSelf !== 'start',
-      })),
+      items: tiles.map((el, index) => {
+        const spans = gridSpans(el);
+        return {
+          id: el.dataset.widgetId || `#${index}`,
+          el,
+          ...spans,
+          wide: FILL_WIDE_WIDGETS.has(el.dataset.widgetId) && spans.cols >= 2,
+          // Die Kennzahlreihe waechst nicht (so hoch wie ihre Kacheln, `align-self: start`).
+          grow: !el.querySelector(':scope > .metric-tiles'),
+        };
+      }),
     };
   };
   const early = filled ? null : read();
   for (const el of grid.children) {
+    if ('colLock' in el.dataset) {
+      delete el.dataset.colLock;
+      el.style.removeProperty('--tile-col');
+      el.style.removeProperty('--tile-span-cols');
+    }
     if ('rowFill' in el.dataset) {
       delete el.dataset.rowFill;
       el.style.removeProperty('--widget-fill-span');
+      el.style.removeProperty('--tile-ghost-cols');
+      delete el.dataset.ghostInline;
     }
     if ('colFill' in el.dataset) {
       delete el.dataset.colFill;
       el.style.removeProperty('--widget-fill-rows');
+      el.style.removeProperty('--tile-ghost-rows');
+      delete el.dataset.ghostBlock;
     }
   }
-  if (editing) return;
-  const { columns, items } = early ?? read();
+  const { columns, items: read0 } = early ?? read();
   if (columns < 2) return;
-  const grown = rowFillSpans(items, columns);
-  for (const item of items) {
-    const span = grown.get(item.id);
-    if (!span) continue;
-    item.el.dataset.rowFill = '';
-    item.el.style.setProperty('--widget-fill-span', String(span));
-  }
-  /* UND WAS VON LINKS NIEMAND ERREICHT, FUELLT DIE KACHEL DARUEBER (R21, D5):
-   * `columnFillSpans`, utils/dashboard-widgets.js. Eine Kachel, die so hoch ist
-   * wie ihr Inhalt (`align-self: start`, die Kennzahlreihe), waechst nicht -
-   * gestreckt stuende die Leere nur in ihr. */
-  const widened = items.map((item) => ({
-    ...item,
-    cols: grown.get(item.id) ?? item.cols,
-  }));
-  const taller = columnFillSpans(widened, columns);
-  for (const item of widened) {
-    const rows = taller.get(item.id);
-    if (!rows) continue;
-    item.el.dataset.colFill = '';
-    item.el.style.setProperty('--widget-fill-rows', String(rows));
-  }
+  // Packen und Fuellen: eine reine Rechnung (fillGridSpans, utils/dashboard-widgets.js).
+  const items = read0;
+  const spans = fillGridSpans(items, columns);
+  // Die Spalte breiter Kacheln steht fest: gleich frueh, weniger Loch (packGrid).
+  spans.forEach((item, i) => {
+    if (item.col === undefined) return;
+    items[i].el.dataset.colLock = '';
+    items[i].el.style.setProperty('--tile-col', String(item.col + 1));
+    items[i].el.style.setProperty('--tile-span-cols', String(Math.min(items[i].cols, columns)));
+  });
+  spans.forEach((item, i) => {
+    const own = items[i];
+    if (item.cols !== own.cols) {
+      item.el.dataset.rowFill = '';
+      item.el.style.setProperty('--widget-fill-span', String(item.cols));
+      // Nur die Breite aus Schritt 3 ist Platz ohne Inhalt - das Wetter zeigt darin Tage.
+      if (editing && !own.wide) {
+        item.el.dataset.ghostInline = '';
+        item.el.style.setProperty('--tile-ghost-cols', `${item.cols - own.cols} / ${item.cols}`);
+      }
+    }
+    if (item.rows !== own.rows) {
+      item.el.dataset.colFill = '';
+      item.el.style.setProperty('--widget-fill-rows', String(item.rows));
+      if (editing) {
+        item.el.dataset.ghostBlock = '';
+        item.el.style.setProperty('--tile-ghost-rows', String(item.rows - own.rows));
+      }
+    }
+  });
 }
 
 function renderGridHint(suggestion) {
@@ -9311,7 +9655,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     savedGlanceVisible = glanceVisible;
     followsDefault = prefsRes.data?.dashboard_follows_default !== false;
     // Das Skelett des NAECHSTEN Aufrufs lernt hier seine Kachelform.
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
     screensaverEnabled = Boolean(prefsRes.data?.screensaver_enabled);
     currency     = prefsRes.data?.currency ?? 'EUR';
     visibleMealTypes = normalizeVisibleMealTypes(prefsRes.data?.visible_meal_types);
@@ -9458,7 +9802,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Ab jetzt liegt ein eigener Stand vor - die Vorgabe des Haushalts erreicht
     // mich erst wieder, wenn ich ihn loesche.
     followsDefault = false;
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
     isCustomizing = false;
     // Wird die Zyklus-Kachel gerade erst eingeblendet, ihren owner-only Slice
     // nachladen — sonst zeigte sie fälschlich den Empty-State bis zum Reload.
@@ -9488,7 +9832,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
             await api.put('/preferences', { dashboard_widgets: widgetConfig, dashboard_today_glance: glanceVisible });
             savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
             savedGlanceVisible = glanceVisible;
-            rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+            rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
             if (wasteOptionsBeforeUndo !== JSON.stringify(widgetConfig.find((w) => w.id === 'waste')?.options ?? null)) data.waste = undefined;
             if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) await ensureWasteSlice();
             await reloadAfterSave(() => reloadIfQueryChanged(queryBeforeUndo));
@@ -9598,7 +9942,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
     savedGlanceVisible = glanceVisible;
     followsDefault = true;
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
     isCustomizing = false;
     if (widgetConfig.some((w) => w.id === 'cycle' && w.visible)) await ensureCycleSlice();
     if (widgetConfig.some((w) => w.id === 'schedule' && w.visible)) await ensureScheduleSlice();
@@ -9625,7 +9969,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
         savedGlanceVisible = glanceVisible;
         followsDefault = false;
-        rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+        rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
         if (wasteOptionsBeforeUndo !== JSON.stringify(widgetConfig.find((w) => w.id === 'waste')?.options ?? null)) data.waste = undefined;
         if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) await ensureWasteSlice();
         await reloadAfterSave(() => reloadIfQueryChanged(queryBeforeUndo));
@@ -9669,7 +10013,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     }
     savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
     savedGlanceVisible = glanceVisible;
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
     isCustomizing = false;
     // Wie beim Speichern: haben sich mit den Optionen die Parameter der Abfrage
     // geaendert, steht noch die alte Antwort da. Ohne den Abruf zeigte die
@@ -9714,13 +10058,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // auch auf der Stufe ihrer Reihe nicht passt, tritt eine Stufe zurueck
     // (DW-P2-7). Der ResizeObserver darin misst bei jeder Breitenaenderung neu.
     fitMetricLeads(grid);
-    if (isCustomizing || typeof ResizeObserver !== 'function') return;
+    if (typeof ResizeObserver !== 'function') return;
     let shape = `${gridColumnCount(grid)}:${grid.childElementCount}`;
     rowFillObserver = new ResizeObserver(() => {
       const next = `${gridColumnCount(grid)}:${grid.childElementCount}`;
       if (next === shape) return;
       shape = next;
-      applyRowFill(grid);
+      applyRowFill(grid, { editing: isCustomizing });
     });
     rowFillObserver.observe(grid);
   }
@@ -9864,10 +10208,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
         if (redraw) {
           old.classList.remove(...[...old.classList].filter((name) => name.startsWith('widget-size--')));
           old.classList.add(widgetSizeClass(w.size));
-          const rows = calendarListRowsOf(w);
-          if (rows == null) old.removeAttribute('data-list-rows');
-          else old.setAttribute('data-list-rows', String(rows));
           if (body !== drawnBodies.get(w.id)) {
+            // Der Koerper bringt seine Hoehe mit (U1 b): andere Groesse, andere Zeilenzahl.
+            setTileSpan(old, body);
             for (const child of [...old.children]) if (!child.matches('[data-widget-controls]')) child.remove();
             old.append(...elementsFromHtml(body));
             fresh.push(old);
@@ -9924,6 +10267,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
 
     for (const el of fresh) createPendingIcons(el);
     wireFreshTiles(shell, fresh.filter((el) => el.matches('.widget-wrapper')));
+    // DASSELBE RASTER WIE AUSSERHALB (DW-P2-9, WYSIWYG): neu gefuellt nach den
+    // Spannen, die die Geste gesetzt hat - ohne Neuaufbau, und ohne Auslegung:
+    // die Spaltenzahl ist die der letzten (sie aendert keine Geste).
+    applyRowFill(grid, { editing: true, columns: seenGridColumns.get(grid) });
     // Ab hier wird gelesen, alles an EINER Auslegung des neuen Stands, und erst
     // danach geschrieben. Jede Animation und jeder Fokuswechsel vor einer
     // Lesung verlangte eine neue Stilrechnung der ganzen Flaeche (gemessen
@@ -10314,7 +10661,15 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // selbst patchen, patchCustomize): beim Betreten und Verlassen wachsen und
     // schwinden die Bearbeiten-Leisten aller Kacheln, da waere jede Bewegung
     // nur Unruhe.
-    const tileRectsBefore = isCustomizing && renderedCustomizing === true ? captureTileRects(shell) : null;
+    /* UND EIN STILLER ABGLEICH GLEITET (U1 b): seit die Kachel so hoch ist wie
+     * ihre Daten, aendert ein Erledigen, ein neuer Termin oder ein neuer
+     * Wetterbericht ihre Spanne - und alles darunter rueckte von einem Bild
+     * aufs naechste. Jetzt gleiten die Kacheln von ihrer alten Lage an die
+     * neue (FLIP, `--ease-out`, unter reduzierter Bewegung blenden sie). Nicht
+     * aus dem Skelett und nicht beim ersten Bild einer Rueckkehr (dort steht
+     * noch keine Kachel). */
+    const quietRebuild = !isCustomizing && !modeChanged && !shell.querySelector('.widget-skeleton');
+    const tileRectsBefore = (isCustomizing && renderedCustomizing === true) || quietRebuild ? captureTileRects(shell) : null;
     // BETRETEN UND VERLASSEN: das Raster gleitet ALS GANZES an seine neue Lage
     // (R16, Bewegung). Der Gruss bricht um, die Ablage schiebt sich davor - das
     // Raster sprang beim Betreten um mehrere hundert Pixel (gemessen 486 ->
@@ -10460,9 +10815,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
       ...todayFallback,
     ]);
     focusAfterRebuild = null;
-    playTileFlip(shell, tileRectsBefore);
-    playGridShift(shell, gridTopBefore);
+    // Erst die Lage zurueck, dann gleiten: sonst stuende der Scroll-Versatz der
+    // Verankerung mit in der Bewegung.
     if (scroller && scroller.scrollTop !== keptScroll) scroller.scrollTop = keptScroll;
+    if (tileRectsBefore?.size) playTileFlip(shell, tileRectsBefore);
+    playGridShift(shell, gridTopBefore);
   }
 
   rebuildDashboard(widgetConfig);
@@ -10816,7 +11173,7 @@ export const __test = {
   usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
   getOverviewMemo: () => _overviewMemo,
   setOverviewMemo: (memo) => { _overviewMemo = memo; },
-  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, measureTileFlip, startTileFlip, playGridShift, arrangeChildren, placeBefore, focusTarget, nearestScrollDelta, tileDrawKey, dashboardTileRenderers, dashboardTileListed, renderWidgetBody, renderWidgetWrapper, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, NEW_SHEETS, wireNewMenu, initFab, rowsArriving, shownRowKeys, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit, renderWidgetError, renderWidgetCustomizeControls, renderWidgetTileMenu, syncCustomizeControls, wireLinks, renderFastingWidget, renderNutritionWidget, renderWasteWidget, renderQuickLinks, renderShoppingLists };
+  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarTileModel, tileSpanOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, measureTileFlip, startTileFlip, playGridShift, arrangeChildren, placeBefore, focusTarget, nearestScrollDelta, tileDrawKey, dashboardTileRenderers, dashboardTileListed, renderWidgetBody, renderWidgetWrapper, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, NEW_SHEETS, wireNewMenu, initFab, rowsArriving, shownRowKeys, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit, renderWidgetError, renderWidgetCustomizeControls, renderWidgetTileMenu, syncCustomizeControls, wireLinks, renderFastingWidget, renderNutritionWidget, renderWasteWidget, renderQuickLinks, renderShoppingLists };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -

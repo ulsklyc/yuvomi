@@ -1024,3 +1024,49 @@ to a commit SHA instead of a ref, so that an update needs a new approval, and a 
 reviewer besides the maintainer. Only then is a list pinned to reviewed SHAs worth discussing.
 A community-run list linked from MODULES.md is not undoing this decision; a list in this
 repository or in the app, curated or not, is.
+
+---
+
+## 16. A tile on the overview is as tall as its data
+
+**From tablet width up, every tile on the overview takes the height of what it shows: the rows
+its data gives, at most as many as its chosen size allows, plus its header and padding; an empty
+tile is one line. The grid packs densely in fine tracks, and only a real hole - empty space with a
+tile below it - is closed by a neighbour; the end of a column is not a hole** (DW-P1-3, critique of
+the overview widgets 2026-10-26, decided by Ulas on 2026-10-26 as option b, written down
+2026-10-27; this revises R10 L9 and R21 D5).
+
+The grid had been closed against holes twice before: R10 L9 let a tile grow into the rest of its
+row, R21 D5 into the cell below it ("no hole - right, then down"). Both stretched a tile to the size
+of its grid cells, and a grid row was as tall as its tallest tile. Measured with every tile shown,
+19 % of the card area at 1440px and 27 % at 1920px was blank card below the last line of content -
+the empty waste tile 629 of 759px, the shift plan 608 of 759px. Four ways were weighed: (a) let the
+browser pack masonry-style with `grid-lanes` - no major browser ships it, and the fallback brings
+the holes of R21 D5 back; (b) take each tile's height from its data before drawing; (c) measure
+each tile after drawing and set its span in JavaScript - exact, but a layout read after every
+build, against the work on return speed; (d) leave it. (b) was chosen: the height comes from the
+same source as the content, the same in every browser, and the skeleton and the layout hint know
+it before the data arrives.
+
+### Where the rule lives
+
+- `contentSpanRows` and `TILE_GEOMETRY` in `public/utils/dashboard-widgets.js`: rows times row
+  height plus header and padding, in tracks of `--dashboard-row-unit` (4px). Each renderer in
+  `public/pages/dashboard.js` describes its content as a function of size (`tileSpanAttrs`,
+  `TILE_PARTS` for tiles that are not lists) and writes `data-span-rows`; `dashboard.css` turns
+  `--tile-rows` into the span. A row in a tile has one fixed height from tablet width up, so its
+  title stays on one line there.
+- `fillGridSpans`: dense packing with one deviation (a wide tile that fits in two places equally
+  early takes the one with the smaller hole above it, `packGrid`, and keeps that column), then the
+  weather grows into free width, a hole is filled from above, and what is still a hole from the
+  left. Customize shows the same grid, the filled space as a dashed slot.
+- `npm run test:dashboard` ("U1 b") holds the equivalence with the data rows, the measurements
+  against `dashboard.css`, no hole in the demo household at two, three and four columns, and that
+  filling never moves a tile.
+
+### What counts as undoing it
+
+A tile that gets height its content does not have in the normal grid - stretching rows to their
+tallest tile, a fixed height per size, filling the end of a column. A tile whose height is measured
+after drawing instead of taken from its data. And a tile on the overview that does not report its
+height.

@@ -284,6 +284,18 @@ test('Groessen: die Kachel entscheidet, wie viel davon steht', () => {
   const tall = parent('1x2');
   assert.equal((tall.match(/class="list-row rewards-member"/g) || []).length, 3);
   assert.match(tall, /class="rewards-goal__label"/);
+
+  // U1 b (DW-P1-3): die Kachel ist so hoch wie das, was in ihrer Groesse steht -
+  // und sagt fuer jede Groesse dieselbe Hoehe, die sie in dieser Groesse meldet
+  // (der Lueckenhinweis probiert Groessen, ohne neu zu zeichnen).
+  const spuren = (html) => Number(/data-span-rows="(\d+)"/.exec(html)?.[1]);
+  const jeGroesse = (html) => Object.fromEntries((/data-span-sizes="([^"]*)"/.exec(html)?.[1] ?? '').split(',').map((e) => e.split(':')).map(([k, v]) => [k, Number(v)]));
+  assert.ok(spuren(kid('1x2')) > spuren(kid('1x1')), 'hoch steht der Verlauf - die Kachel ist hoeher');
+  assert.ok(spuren(parent('1x2')) > spuren(parent('1x1')), 'hoch drei Mitglieder mit Satz, flach zwei ohne');
+  for (const view of [kid, parent]) {
+    const angesagt = jeGroesse(view('1x1'));
+    for (const size of ['1x1', '2x1', '1x2', '2x2']) assert.equal(angesagt[size], spuren(view(size)), `${size}: angesagt = gemeldet`);
+  }
 });
 
 test('Leerzustand: ein Kind bekommt keinen Knopf, den es nicht benutzen darf', () => {

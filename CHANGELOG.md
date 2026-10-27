@@ -72,6 +72,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema tests check that every field exists in the stack and that no field locks a setting.
 
 ### Changed
+- **Every tile on the overview is as tall as what it shows.** From tablet width up, a tile used to
+  take the height of its neighbours in the same row, so a list with two entries stood as tall as one
+  with five and the rest was blank card - with every tile shown, a fifth to a quarter of the card area
+  was empty. Now each tile reports its height from its own data: the rows it shows (at most as many
+  as its size allows, so the size you pick is the limit), the header and the padding, and an empty
+  tile is a single line. Tiles pack below one another without gaps; where a gap would still open up,
+  a neighbour closes it, and in Customize that extra space shows as a dashed slot, so you see which
+  height is content and which is space. Customize now shows exactly the grid you get afterwards: the
+  bar floats over the tile's header instead of pushing the tile down. A tile changes its height
+  smoothly when an entry is added or done, and the weather tile alone grows into free width, where
+  it shows more days. A 1920px screen now has three wider columns instead of four narrow ones, so
+  appointment details are no longer cut off. Titles in the tiles' rows stay on one line from tablet
+  width up; the full title is one tap away.
 - **Every list on the overview reads the same, and a phone shows more of it.** Tasks, appointments,
   birthdays, countdowns, expiring food, shifts, waste pickups, family, rewards and shopping lists
   now share one row: a mark at the front of the same size (a face, a symbol or a dot), the title in

@@ -34,8 +34,8 @@
  * bei 1440 um 8px. Jetzt polstert sie wie jeder Modulkopf mit
  * `--page-inline-pad` (tokens.css) und steht damit auf derselben
  * Inhaltsspalte (`--content-max-width`): 252 / 252 / 430 bei 1280 / 1440 /
- * 1920, rechts bis zur Kopfkante der Module. Vier Kachelspalten bleiben bei
- * 1920 rund 305px breit - so breit wie bei 1440. */
+ * 1920, rechts bis zur Kopfkante der Module. Bei 1920 stehen darin drei
+ * Kachelspalten zu rund 413px (Spaltenminimum 330px, DW-P2-12). */
 @media (min-width: 1024px) {
   .dashboard {
     padding: var(--space-6) var(--page-inline-pad);
@@ -147,6 +147,14 @@
   @media (min-width: 768px) {
     .dashboard__grid:not(.dashboard__grid--editing) > .widget-wrapper:nth-child(2) {
       content-visibility: visible;
+    }
+
+    /* MIT SPALTEN KENNT DAS RASTER DIE HOEHE SCHON (U1 b): sie kommt aus den
+     * Daten (`--tile-rows`), nicht aus dem letzten Bild. Ohne `auto` - eine
+     * Kachel, die nach einem stillen Abgleich kuerzer ist, braechte sonst ihre
+     * alte Hoehe als Platzhalter mit und streckte die Spuren ihrer Nachbarn. */
+    .dashboard__grid:not(.dashboard__grid--editing) > .widget-wrapper:nth-child(n+2) {
+      contain-intrinsic-size: auto none calc(var(--tile-rows, var(--tile-size-rows)) * var(--dashboard-row-unit));
     }
   }
 
@@ -290,26 +298,12 @@
   color: var(--color-text-primary);
 }
 
-/* EINE RASTERZEILE HOCH, NICHT 21PX DARUNTER (DW-P2-7, G1-P3-2). Ab 1024px
- * ist jede Rasterzeile mindestens `--dashboard-row-min` hoch. Die Reihe
- * (111px) stand oben in ihrer 132px-Zeile, und bis zur naechsten Kachel
- * waren es 41 statt 20px. Ein Zeilenminimum nur fuer diese Zelle gibt es im
- * Raster nicht - also fuellt die Reihe die Zeile, die sie ohnehin belegt,
- * und waechst nie darueber hinaus (`align-self: start` am Wrapper bleibt). */
-@media (min-width: 1024px) {
-  /* Die REIHE haelt das Minimum: im Subgrid kommt die Hoehe der Kachel aus
-   * den Spuren der Reihe, und deren Fuss-Spur (`1fr`) nimmt den Rest auf.
-   * Selektor wie `min-height: 0` oben, damit die Kaskade nicht raet. */
-  .widget-wrapper > .metric-tiles {
-    min-block-size: var(--dashboard-row-min);
-  }
-
-  @supports not (grid-template-rows: subgrid) {
-    .metric-tiles > .metric-card {
-      min-block-size: var(--dashboard-row-min);
-    }
-  }
-}
+/* DIE KENNZAHLREIHE IST SO HOCH WIE IHRE KACHELN (DW-P2-7, U1 b). Hier stand
+ * ein Zeilenminimum (`--dashboard-row-min`, 132px), damit die Reihe genau eine
+ * Rasterzeile fuellte statt 21px darunter zu enden. Seit die Kacheln so hoch
+ * sind wie ihr Inhalt (`contentSpanRows`, utils/dashboard-widgets.js), gibt es
+ * keine Rasterzeile mehr, an der sie sich messen muesste - die Reihe meldet
+ * ihre Kachelzeilen wie jede Liste ihre Zeilen. */
 
 @media (min-width: 768px) {
   .dashboard__grid {
@@ -337,21 +331,20 @@
     /* Auto-fill-Bento (Critique P0 „tote Spalte"): die Spaltenzahl folgt der
      * TATSÄCHLICHEN Grid-Breite (sidebar-bewusst) statt einer starren 3/4-Stufe.
      * So springt das Raster nicht bei genau 3 Spalten in eine halb-leere rechte
-     * Spalte, sondern atmet mit der Fensterbreite (3–6 Spalten). `dense` + die
-     * Zeilen-Spans der hohen Widgets füllen Restlücken; verbleibender Weißraum
-     * wandert ans ruhige Grid-Ende statt in die Mitte. */
+     * Spalte, sondern atmet mit der Fensterbreite. */
     /* 280px, NICHT 240px: bei 240 legte ein 1440er-Fenster vier 270px-Spalten
      * an, und in denen kuerzte die Ellipse reihenweise echte Inhalte weg -
      * gemessen „Familienmitg…", „Tante Claire Bec…", „Leo John…". Eine Spalte,
      * in der Namen nicht ganz stehen, ist keine Spalte, sondern eine Kachel mit
      * Platznot; drei ruhige Spalten tragen dieselben fuenf Karten besser als
-     * vier gedraengte. Die auto-fill-Mechanik bleibt unangetastet: ab ~1700px
-     * kommt die vierte Spalte von selbst zurueck, dann mit Platz fuer Text. */
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
-    /* Das Zeilenminimum als Wert: die Kennzahlreihe misst sich daran
-     * (`.metric-tiles > .metric-card`, DW-P2-7). */
-    --dashboard-row-min: 132px;
-    grid-auto-rows: minmax(var(--dashboard-row-min), auto);
+     * vier gedraengte.
+     *
+     * 330px, NICHT 280px (DW-P2-12, H5): die vierte Spalte kam bei 1920px
+     * zurueck - mit 305px schmaler als die drei bei 1440px (372px), und die
+     * Metazeilen kuerzten wieder ("17:00 Fussballtraining - Leo · 1 Aufg…").
+     * Bei der Kappe der Inhaltsspalte (1280px) passen vier Spalten zu 330px
+     * nicht mehr; es bleiben drei zu rund 413px. */
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
     --dashboard-grid-gap: var(--space-5);
   }
 
@@ -376,71 +369,99 @@
   .widget-size--4x4 {
     grid-column: span 3;
   }
+}
 
-  .widget-size--1x1,
-  .widget-size--2x1,
-  .widget-size--3x1,
-  .widget-size--4x1 {
-    grid-row: span 1;
+/* DIE HOEHE KOMMT AUS DEN DATEN (DW-P1-3, U1 b, Entscheidung Ulas 2026-10-26;
+ * revidiert R10 L9 und R21 D5, docs/DECISIONS.md).
+ *
+ * Bis hierher belegte eine Kachel so viele 132px-Zeilen, wie ihre Groesse
+ * sagte, und jede Zeile war so hoch wie ihre hoechste Kachel - der Rest wurde
+ * "Atem" in der Karte. Gemessen mit allen Kacheln: 1440px 19 %, 1920px 27 %
+ * der Kachelflaeche leer, die leere Entsorgung 629 von 759px.
+ *
+ * Jetzt rechnet das Raster in feinen Spuren (`--dashboard-row-unit`, 4px), und
+ * jede Kachel belegt so viele, wie ihr Inhalt hoch ist: `--tile-rows` setzt
+ * die Kachel selbst aus ihren Daten (`contentSpanRows`, utils/
+ * dashboard-widgets.js; `data-span-rows` am Rahmen). Die gewaehlte Groesse ist
+ * die Obergrenze (so viele Zeilen zeigt die Liste hoechstens) und die Breite.
+ * Dicht gepackt wie bisher: jede Kachel nimmt ihren fruehesten freien Platz,
+ * und weil die Spuren fein sind, setzt sie sich unter die kuerzeste Spalte -
+ * ohne Luecke und ohne Streckung.
+ *
+ * DIE LUECKE ZWISCHEN ZWEI KACHELN TRAEGT DER RAHMEN, NICHT DAS RASTER: eine
+ * Zeilenluecke zwischen 4px-Spuren stuende hunderte Male zwischen EINER
+ * Kachel. Der Rahmen haelt sie als Aussenabstand unten und belegt dafuer
+ * `--tile-gap-rows` Spuren mehr (16px = 4, ab 1024px 20px = 5); das Raster
+ * nimmt den letzten Abstand mit einem negativen Rand zurueck.
+ *
+ * `minmax(Spur, auto)`: steht ein Inhalt doch hoeher als gerechnet (eine
+ * groessere Grundschrift im Browser), waechst die Spur mit, statt dass die
+ * Kachel in ihre Nachbarin ragt.
+ *
+ * Ohne Angabe der Kachel (Skelett ohne Hinweis) gilt die Hoehe ihrer Groesse
+ * wie vorher: 132px je Zeile plus Luecke (`--tile-size-rows`). */
+@media (min-width: 768px) {
+  .dashboard__grid {
+    --dashboard-row-unit: var(--space-1);
+    --tile-gap-rows: 4;
+    row-gap: 0;
+    grid-auto-rows: minmax(var(--dashboard-row-unit), auto);
+    margin-block-end: calc(var(--dashboard-grid-gap) * -1);
   }
 
-  .widget-size--1x2,
-  .widget-size--2x2,
-  .widget-size--3x2,
-  .widget-size--4x2 {
-    grid-row: span 2;
+  .dashboard__grid > .widget-wrapper {
+    --tile-size-rows: 33;
+    margin-block-end: var(--dashboard-grid-gap);
+    grid-row-end: span calc(var(--tile-rows, var(--tile-size-rows)) + var(--tile-gap-rows));
   }
 
-  .widget-size--1x3,
-  .widget-size--2x3,
-  .widget-size--3x3 {
-    grid-row: span 3;
+  .dashboard__grid > :is(.widget-size--1x2, .widget-size--2x2, .widget-size--3x2, .widget-size--4x2) {
+    --tile-size-rows: 71;
   }
 
-  .widget-size--1x4,
-  .widget-size--2x4,
-  .widget-size--3x4,
-  .widget-size--4x4 {
-    grid-row: span 4;
+  .dashboard__grid > :is(.widget-size--1x3, .widget-size--2x3, .widget-size--3x3, .widget-size--4x3) {
+    --tile-size-rows: 109;
   }
 
-  .widget-size--4x3 {
-    grid-row: span 3;
-  }
-
-  /* DIE STUFE DER KALENDERLISTE IST IHRE HOEHE (#2087). Acht Termine belegen
-   * drei Rasterzeilen, zwoelf vier - die Liste waechst um eigene Zeilen statt
-   * die Zeile ihrer Nachbarn zu strecken. Nur an den hohen Klassen: 1x1 zeigt
-   * drei Zeilen, und dort darf die Stufe keine Spanne setzen. Das Attribut
-   * setzt `calendarListRows()` (dashboard.js); gespeichert bleibt die Groesse. */
-  .widget-size--1x2[data-list-rows="8"],
-  .widget-size--2x2[data-list-rows="8"] {
-    grid-row: span 3;
-  }
-
-  .widget-size--1x2[data-list-rows="12"],
-  .widget-size--2x2[data-list-rows="12"] {
-    grid-row: span 4;
+  .dashboard__grid > :is(.widget-size--1x4, .widget-size--2x4, .widget-size--3x4, .widget-size--4x4) {
+    --tile-size-rows: 147;
   }
 }
 
-/* DIE KACHEL VOR EINER FREIEN ZELLE WAECHST IN DEN ZEILENREST (Re-Critique
- * 2026-09-27, A7 P2-12 / R10 L9). Welche und wie weit, rechnet
- * `applyRowFill()` (dashboard.js) nach der Packung aus und setzt es als
- * Darstellung, nicht als Groesse: gespeichert bleibt, was der Nutzer gewaehlt
- * hat. Gemessen 1440x900: rechts neben Kennzahlen und Notizen blieb je eine
- * 367px-Spalte leer. Nur ab zwei Spalten - einspaltig gibt es keinen Rest. */
+@media (min-width: 1024px) {
+  .dashboard__grid {
+    --tile-gap-rows: 5;
+  }
+}
+
+/* WAS DANACH NOCH FREI IST, IST EIN ECHTES LOCH - UND NUR DAS WIRD GEFUELLT
+ * (R10 L9, R21 D5, neu gefasst mit U1 b). `applyRowFill()` (dashboard.js)
+ * rechnet es nach der Packung aus und setzt es als Darstellung, nicht als
+ * Groesse: gespeichert bleibt, was der Nutzer gewaehlt hat.
+ *
+ * Nach rechts waechst nur, was Breite in Inhalt umsetzt (das Wetter zeigt mehr
+ * Tage, `rowFillSpans`); nach unten nur in ein Loch, unter dem noch eine Kachel
+ * steht (`columnFillSpans`) - ein Spaltenende ist kein Loch. Nur ab zwei
+ * Spalten - einspaltig gibt es keinen Rest. */
 @media (min-width: 768px) {
   .dashboard__grid > [data-row-fill] {
     grid-column: span var(--widget-fill-span);
   }
 
-  /* DIE KACHEL UEBER EINER FREIEN ZELLE WAECHST NACH UNTEN (R21, D5), wo von
-   * links niemand hinkommt: `columnFillSpans()` (utils/dashboard-widgets.js),
-   * gesetzt von `applyRowFill()`. Gemessen 1440px mit eingeklappter
-   * Seitenleiste: 305x185px leer unter einer 1x1-Kachel neben zwei hohen. */
   .dashboard__grid > [data-col-fill] {
     grid-row: span var(--widget-fill-rows);
+  }
+
+  /* GLEICH FRUEH, WENIGER LOCH (`packGrid`): passt eine breite Kachel an zwei
+   * Stellen gleich frueh, nimmt sie die mit dem kleineren Loch darueber - CSS
+   * `dense` naehme immer die linke. Die Spalte setzt `applyRowFill`, die Zeile
+   * sucht das Raster wie jede andere selbst. */
+  .dashboard__grid > [data-col-lock] {
+    grid-column: var(--tile-col) / span var(--tile-span-cols);
+  }
+
+  .dashboard__grid > [data-col-lock][data-row-fill] {
+    grid-column-end: span var(--widget-fill-span);
   }
 }
 
@@ -737,6 +758,100 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* MIT SPALTEN IST DIE ZEILE EIN TAKT (U1 b). Die Kachel ist so hoch, wie ihre
+ * Zeilen es sagen (`contentSpanRows`: Zahl der Zeilen mal Zeilenhoehe) - dafuer
+ * muss die Zeile eine Hoehe HABEN, nicht nur eine Mindesthoehe: ein Name, der
+ * in einer 330px-Spalte in die zweite Zeile bricht, machte sie 71 statt 52px
+ * hoch, und die Rechnung ging um die Differenz daneben. Der Name steht darum
+ * in EINER Zeile wie die Metazeile darunter - wie in einem Apple-Widget; die
+ * Zeile oeffnet ihr Objekt, dort steht er ganz. Am Telefon bleibt alles, wie
+ * es ist: dort steht jede Kachel in ihrer eigenen Hoehe untereinander.
+ * Ausgenommen sind die zusammengesetzten Zeilen (Belohnungen mit Balken, die
+ * Einkaufsliste mit Artikeln) - die rechnet ihre Kachel selbst. */
+@media (min-width: 768px) {
+  .widget__rows > .list-row:not(.rewards-member, .shopping-widget-list) {
+    block-size: calc(var(--target-lg) + var(--space-1h));
+    min-height: 0;
+  }
+
+  .widget__rows > .list-row:not(.shopping-widget-list) .list-row__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Dieselbe Regel fuer die Kacheln, die keine Zeilen sind: was ihre Hoehe
+   * bestimmt, haengt an den Daten und an der GROESSE, nicht an der Breite, in
+   * der die Spalte gerade steht (330 bis gut 500px schmal, 680 bis 1030px
+   * breit). Sonst rechnete `contentSpanRows` je Fenster anders. */
+
+  /* Belohnungen: der Satz zum Ziel in einer Zeile (die Zeile oeffnet die
+   * Seite, dort steht er ganz). */
+  .rewards-member .rewards-goal__label:not(.rewards-goal__label--compact) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Notizen: schmal eine Spalte, breit drei - nach der Groesse, nicht nach
+   * der Breite (die Container-Stufen oben gelten weiter am Telefon). Die
+   * Vorschau steht in genau zwei Zeilen: eine kurze Notiz reserviert sie,
+   * eine Liste in Markdown wird nach ihnen abgeschnitten. */
+  .dashboard__grid > .widget-wrapper .notes-grid-widget {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard__grid > :is(.widget-size--2x1, .widget-size--2x2, .widget-size--2x3, .widget-size--2x4,
+    .widget-size--3x1, .widget-size--3x2, .widget-size--3x3, .widget-size--3x4,
+    .widget-size--4x1, .widget-size--4x2, .widget-size--4x3, .widget-size--4x4) .notes-grid-widget {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dashboard__grid .note-item__content {
+    block-size: 2lh;
+  }
+
+  /* Mahlzeiten: breit hat der Gerichtname in seinem Slot eine Zeile Platz,
+   * schmal (zwei Slots in 330px) zwei - immer genau so viele. */
+  .dashboard__grid .meal-slot__title {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+  }
+
+  .dashboard__grid > :is(.widget-size--1x1, .widget-size--1x2, .widget-size--1x3, .widget-size--1x4) .meal-slot__title {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    block-size: 2lh;
+  }
+
+  /* Schnellzugriffe: drei Kacheln je Reihe schmal, sechs breit. */
+  .dashboard__grid .quick-link-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dashboard__grid > :is(.widget-size--2x1, .widget-size--2x2, .widget-size--2x3, .widget-size--2x4,
+    .widget-size--3x1, .widget-size--3x2, .widget-size--3x3, .widget-size--3x4,
+    .widget-size--4x1, .widget-size--4x2, .widget-size--4x3, .widget-size--4x4) .quick-link-row {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .dashboard__grid .quick-link-tile {
+    inline-size: auto;
+  }
+
+  /* Fasten schmal: die Knoepfe (und der Uhr-Schalter eines laufenden
+   * Fastens) untereinander statt je nach Breite mal neben-, mal untereinander. */
+  .dashboard__grid > :is(.widget-size--1x1, .widget-size--1x2, .widget-size--1x3, .widget-size--1x4) :is(.fasting-widget__actions, .fasting-clock-switch) {
+    flex-direction: column;
+    align-items: start;
+  }
+
+  .dashboard__grid > :is(.widget-size--1x1, .widget-size--1x2, .widget-size--1x3, .widget-size--1x4) .fasting-clock-switch {
+    align-items: stretch;
+  }
 }
 
 /* Die Fussnote ("+N weitere") und die Faltzeile der beendeten Termine stehen
@@ -4508,6 +4623,118 @@ button.today-cockpit__more--link {
   background: var(--color-surface-elevated);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
+}
+
+/* ANPASSEN ZEIGT DAS RASTER, DAS GLEICH STEHT (DW-P2-9, WYSIWYG; U1 b).
+ *
+ * Die Leiste stand im Fluss ueber der Kachel (#569) und machte jede Kachel um
+ * ihre Hoehe groesser - das Raster im Anpassen-Modus war ein anderes als das
+ * danach, und der Lueckenhinweis sprach von Luecken, die ausserhalb nie
+ * standen. Jetzt hat der Rahmen genau die Flaeche, die seine Daten ihm geben
+ * (`contain: size`, die Spuren kommen aus `--tile-rows` wie im Normalmodus),
+ * die Kachel steht darin wie ausserhalb, und die Leiste schwebt oben ueber
+ * ihrem Kopf (#569 bleibt geloest: sie bricht um, ohne etwas zu verschieben).
+ * Am Telefon ist Anpassen eine Liste ohne Inhalt (unten) - dort gilt das
+ * nicht. */
+@media (min-width: 768px) {
+  /* Die Kante des Rasters liegt AUSSERHALB (outline), nicht als Polster: das
+   * Polster machte jede Spalte im Anpassen-Modus 6px schmaler als danach. */
+  .dashboard__grid--editing {
+    padding: 0;
+    border: none;
+    outline: var(--space-px) dashed color-mix(in srgb, var(--module-accent) var(--tint-hint), var(--color-border));
+    outline-offset: var(--space-2);
+  }
+
+  .dashboard__grid--editing > .widget-wrapper--editing {
+    contain: size;
+    padding: 0;
+    /* Auch die Kennzahlreihe (`align-self: start`): ohne Inhaltshoehe
+     * (`contain: size`) stuende sie sonst 0px hoch. */
+    align-self: stretch;
+  }
+
+  .dashboard__grid--editing > .widget-wrapper > :is(.widget, .metric-tiles) {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* DIE LEISTE LIEGT UEBER DER KACHEL, NICHT VOR IHR. Sie traegt den Namen
+   * (der Kopf darunter ist verdeckt) und schwebt auf ihrer eigenen Flaeche:
+   * schmal in zwei Zeilen (Name und Knoepfe, darunter die Groessen), breit in
+   * einer. */
+  .dashboard__grid--editing > .widget-wrapper--editing > .widget-edit-controls {
+    position: absolute;
+    inset-block-start: var(--space-1h);
+    inset-inline: var(--space-1h);
+    /* Ueber dem Kopf der Kachel (der steht selbst auf Ebene 2). */
+    z-index: 3;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name actions"
+      "size size";
+    align-items: center;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+  }
+
+  .dashboard__grid--editing .widget-edit-controls__caption {
+    display: block;
+    grid-area: name;
+    min-width: 0;
+    padding-inline-start: var(--space-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+  }
+
+  .dashboard__grid--editing .widget-edit-controls__size {
+    grid-area: size;
+    justify-self: start;
+  }
+
+  .dashboard__grid--editing .widget-edit-controls__actions {
+    grid-area: actions;
+  }
+
+  @container dashboard-widget (min-width: 640px) {
+    .dashboard__grid--editing > .widget-wrapper--editing > .widget-edit-controls {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-areas: "name size actions";
+    }
+  }
+
+  /* DER GEIST: was eine Kachel nur bekommt, um ein Loch zu schliessen
+   * (`applyRowFill`, `--tile-ghost-rows`/`--tile-ghost-cols`), steht hier als
+   * leerer Schlitz - dieselbe gestrichelte Form wie der Platz beim Ziehen
+   * (`.sortable-ghost`, layout.css). So sieht man, welche Hoehe Inhalt ist und
+   * welche Platz. */
+  .dashboard__grid--editing > .widget-wrapper:is([data-ghost-block], [data-ghost-inline])::after {
+    content: '';
+    position: absolute;
+    inset-block-end: var(--space-1h);
+    inset-inline-end: var(--space-1h);
+    z-index: 1;
+    border-radius: var(--radius-sm);
+    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), var(--color-surface));
+    outline: var(--space-px) dashed var(--module-accent, var(--color-accent));
+    outline-offset: calc(var(--space-px) * -1);
+    pointer-events: none;
+  }
+
+  .dashboard__grid--editing > .widget-wrapper[data-ghost-block]::after {
+    inset-inline-start: var(--space-1h);
+    block-size: calc(var(--tile-ghost-rows) * var(--dashboard-row-unit) - var(--space-1h));
+  }
+
+  .dashboard__grid--editing > .widget-wrapper[data-ghost-inline]::after {
+    inset-block-start: var(--space-1h);
+    inline-size: calc((100% - var(--space-3)) * var(--tile-ghost-cols));
+  }
 }
 
 .widget-edit-controls {

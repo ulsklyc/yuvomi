@@ -3163,12 +3163,15 @@ test('dashboardQuery uebersetzt Optionen in Parameter, die die Route versteht (#
 });
 
 // --------------------------------------------------------
-// Das dichte Raster, nachgerechnet (Critique 2026-09-23)
+// Das dichte Raster, nachgerechnet (Critique 2026-09-23; neu gefasst mit
+// U1 b, DW-P1-3, Entscheidung Ulas 2026-10-26)
 //
 // `packGrid` rechnet `grid-auto-flow: row dense` fuer Kacheln mit reinen Spans
-// nach; der Loch-Hinweis im Bearbeiten-Modus schlaegt darauf eine Groesse vor.
-// Ob der Browser genauso packt, misst test:dashboard-surface-browser am
-// gerenderten Raster - hier steht die Rechnung selbst.
+// nach - seit U1 b in feinen Spuren (4px), mit EINER Abweichung: passt eine
+// breite Kachel an zwei Stellen gleich frueh, nimmt sie die mit dem kleineren
+// Loch darueber (CSS bekommt dafuer ihre Spalte fest, `--tile-col`). Ob der
+// Browser genauso packt, misst test:dashboard-surface-browser am gerenderten
+// Raster - hier steht die Rechnung selbst.
 // --------------------------------------------------------
 
 const kachel = (id, cols, rows, size = `${cols}x${rows}`) => ({ id, cols, rows, size });
@@ -3189,53 +3192,65 @@ test('packGrid: eine hohe Kachel belegt beide Zeilen, eine zu breite wird an der
   assert(cells[2].every((v) => v === 'weather'), `weather: ${JSON.stringify(cells)}`);
   assert(cells[0][1] === null && cells[1][1] === null && cells[3].every((v) => v === 'notes'),
     `notes passt nicht neben family und landet unten: ${JSON.stringify(cells)}`);
-  assert(widgets.gridHoleCount(cells) === 2);
+  assert(widgets.gridHoleCount(cells) === 2, 'neben family, ueber weather: ein Loch aus zwei Zellen');
 });
 
-test('suggestGridHoleFill: schlaegt die billigste Aenderung am Nachbarn des Lochs vor', () => {
-  // Drei Breitkacheln in drei Spalten: rechts bleibt je eine Zelle frei.
-  // Billigste Loesung ist dieselbe Flaeche in anderer Form, und zwar an der
-  // Kachel links neben dem ersten Loch.
-  const items = [kachel('calendar', 2, 1), kachel('tasks', 2, 1), kachel('notes', 2, 1)];
-  const presets = (item) => [['1x1', 1, 1], ['2x1', 2, 1], ['1x2', 1, 2], ['2x2', 2, 2]]
-    .map(([size, cols, rows]) => ({ size, cols, rows, id: item.id }));
-  const vorschlag = widgets.suggestGridHoleFill(items, 3, presets);
-  nodeAssert.deepEqual(vorschlag, { id: 'calendar', size: '1x2' });
-  const danach = widgets.packGrid(items.map((it) => (it.id === 'calendar' ? { ...it, cols: 1, rows: 2 } : it)), 3);
-  assert(widgets.gridHoleCount(danach) === 0, 'der Vorschlag schliesst das Loch nicht');
+/* U1 b: GLEICH FRUEH, WENIGER LOCH. Der Demo-Haushalt bei 1440px (drei
+ * Spalten): `dense` setzte die Kennzahlen links unter die Familie, und weil
+ * das Wetter rechts davon frueher endete, fuellte die Familie 195px Leere.
+ * Gleich frueh steht die Reihe auch rechts - dort ohne Loch. */
+test('U1 b: packGrid - eine breite Kachel nimmt unter gleich fruehen Stellen die mit dem kleineren Loch', () => {
+  const items = [kachel('family', 1, 100), kachel('birthdays', 1, 98), kachel('weather', 2, 50), kachel('metrics', 2, 35)];
+  const cells = widgets.packGrid(items, 3);
+  const at = (id) => { for (let r = 0; r < cells.length; r += 1) { const c = cells[r].indexOf(id); if (c >= 0) return [r, c]; } return null; };
+  nodeAssert.deepEqual(at('weather'), [98, 1], 'das Wetter steht so frueh wie moeglich (unter den Geburtstagen)');
+  nodeAssert.deepEqual(at('metrics'), [148, 1], 'die Kennzahlen gleich frueh rechts - links stuende ein Loch unter der Familie');
+  // Mit fester Spalte rechnet packGrid wie CSS mit `grid-column-start`.
+  const locked = widgets.packGrid(items.map((it) => (it.id === 'metrics' ? { ...it, col: 0 } : it)), 3);
+  nodeAssert.equal(locked[148][0], 'metrics', 'eine feste Spalte gilt');
+  nodeAssert.deepEqual([...widgets.wideTileColumns(items, 3)], [['weather', 1], ['metrics', 1]]);
 });
 
-test('suggestGridHoleFill: waechst lieber, als Inhalt wegzunehmen', () => {
-  // Der Demo-Haushalt bei 1440px, in seiner gespeicherten Rangfolge: unter
-  // „Belohnungen" (1x1, dicht nach vorn gerueckt) bleibt ein Loch neben den
-  // Kennzahlen (2x1). Kennzahlen als 1x1 schloesse es auch - und naehme einer
-  // Kachel die Haelfte. Belohnungen als 1x2 waechst in das Loch hinein.
+/* EIN LOCH IST EIN LOCH, WENN DARUNTER NOCH ETWAS STEHT (U1 b). Seit die
+ * Kacheln so hoch sind wie ihr Inhalt, enden die Spalten verschieden tief;
+ * das Ende einer Spalte ist kein Loch. */
+test('U1 b: gridHoleCount zaehlt Zellen, unter denen noch eine Kachel steht - kein Spaltenende', () => {
+  const ragged = widgets.packGrid([kachel('a', 1, 10), kachel('b', 1, 4)], 2);
+  nodeAssert.equal(widgets.gridHoleCount(ragged), 0, 'b endet frueher als a: ein Spaltenende');
+  const enclosed = widgets.packGrid([kachel('a', 1, 10), kachel('b', 1, 4), kachel('c', 2, 3)], 2);
+  nodeAssert.equal(widgets.gridHoleCount(enclosed), 6, 'unter b und ueber c: sechs Zellen Loch');
+});
+
+const presets4 = (item) => [['1x1', 1, 1], ['2x1', 2, 1], ['1x2', 1, 2], ['2x2', 2, 2]]
+  .map(([size, cols, rows]) => ({ size, cols, rows: item.base * rows, id: item.id }));
+
+test('suggestGridHoleFill: schlaegt die Groesse vor, nach der kein Loch mehr gefuellt werden muss', () => {
+  // Zwei Spalten: links die Familie (60 Spuren), rechts die Notizen (30), darunter
+  // das Wetter ueber beide - unter den Notizen bleiben 30 Spuren Loch. Hoch (1x2)
+  // sind die Notizen so hoch wie die Familie.
   const items = [
-    kachel('family', 1, 2), kachel('budget', 1, 2), kachel('birthdays', 1, 2),
-    kachel('weather', 2, 1), kachel('metrics', 2, 1), kachel('rewards', 1, 1), kachel('notes', 2, 1),
+    { ...kachel('family', 1, 60, '1x2'), base: 30 },
+    { ...kachel('notes', 1, 30, '1x1'), base: 30 },
+    { ...kachel('weather', 2, 40, '2x1'), base: 40 },
   ];
-  const presets = (item) => [['1x1', 1, 1], ['2x1', 2, 1], ['1x2', 1, 2], ['2x2', 2, 2]]
-    .map(([size, cols, rows]) => ({ size, cols, rows, id: item.id }));
-  assert(widgets.gridHoleCount(widgets.packGrid(items, 3)) === 1, 'Reichweite: das Ausgangsraster hat genau ein Loch');
-  nodeAssert.deepEqual(widgets.suggestGridHoleFill(items, 3, presets), { id: 'rewards', size: '1x2' });
+  nodeAssert.ok(widgets.gridHoleCount(widgets.packGrid(items, 2)) > 0, 'Vorbedingung: ein Loch');
+  nodeAssert.deepEqual(widgets.suggestGridHoleFill(items, 2, presets4), { id: 'notes', size: '1x2' });
 });
 
 test('suggestGridHoleFill: ohne Loch und ohne Ausweg schweigt er', () => {
-  const presets = (item) => [{ size: item.size, cols: item.cols, rows: item.rows }];
-  assert(widgets.suggestGridHoleFill([kachel('a', 1, 1), kachel('b', 1, 1)], 2, presets) === null,
+  const own = (item) => [{ size: item.size, cols: item.cols, rows: item.rows }];
+  assert(widgets.suggestGridHoleFill([kachel('a', 1, 1), kachel('b', 1, 1)], 2, own) === null,
     'eine volle Zeile hat kein Loch');
-  // Nur die eigene Groesse im Angebot: es gibt nichts vorzuschlagen.
-  assert(widgets.suggestGridHoleFill([kachel('a', 2, 1), kachel('b', 2, 1), kachel('c', 1, 1)], 3, presets) === null,
+  assert(widgets.suggestGridHoleFill([kachel('a', 1, 60), kachel('b', 1, 30), kachel('c', 2, 40)], 2, own) === null,
     'ohne Kandidaten darf kein Vorschlag entstehen');
 });
 
 // --------------------------------------------------------
-// Normalmodus ohne Loecher (Re-Critique 2026-09-27, A7 P2-12 / R10 L9)
-//
-// Gemessen bei 1440x900 im Demo-Haushalt: neben den Kennzahlen (367x110) und
-// neben den Notizen (367x201) blieb je eine Spalte leer, und den Loch-Hinweis
-// gibt es nur im Anpassen-Modus. `rowFillSpans` sagt, welche Kachel in den
-// Rest ihrer Zeile waechst; applyRowFill() setzt es als Darstellung.
+// Normalmodus ohne Loecher (Re-Critique 2026-09-27, A7 P2-12 / R10 L9; R21 D5;
+// neu gefasst mit U1 b): nach rechts waechst nur, was Breite in Inhalt
+// umsetzt (das Wetter), nach unten nur in ein echtes Loch, und was dann noch
+// Loch ist, nimmt die Kachel links daneben. `fillGridSpans` ist die eine
+// Rechnung, applyRowFill() setzt sie als Darstellung.
 // --------------------------------------------------------
 
 /** Die Positionen einer Packung: Id -> [Zeile, Spalte] der ersten Zelle. */
@@ -3245,29 +3260,107 @@ function positions(cells) {
   return pos;
 }
 
-const DEMO_RASTER = [
-  kachel('family', 1, 2), kachel('budget', 1, 2), kachel('birthdays', 1, 2),
-  kachel('weather', 2, 1), kachel('metrics', 2, 1), kachel('rewards', 1, 1), kachel('notes', 2, 1),
-];
+/** Gemessene Spuren (Inhalt + 5 Spuren Abstand) im Demo-Haushalt, 2026-10-27. */
+const span = ([id, cols, rows]) => ({ id, cols, rows: rows + 5, wide: id === 'weather', grow: id !== 'metrics' });
+const DEMO_SEED = [['family', 1, 95], ['birthdays', 1, 93], ['weather', 2, 45], ['metrics', 2, 30], ['rewards', 1, 62], ['notes', 2, 51]].map(span);
+const DEMO_KIND = [['rewards', 1, 54], ['family', 1, 95], ['birthdays', 1, 93], ['weather', 2, 45], ['notes', 2, 51]].map(span);
+const DEMO_ALLE = [['tasks', 1, 93], ['calendar', 1, 86], ['meals', 2, 58], ['shopping', 2, 76], ['pantry', 1, 59],
+  ['birthdays', 1, 93], ['budget', 1, 94], ['rewards', 1, 74], ['health', 2, 44], ['cycle', 2, 45], ['fasting', 2, 75],
+  ['nutrition', 2, 57], ['housekeeping', 1, 52], ['schedule', 1, 46], ['waste', 1, 46], ['family', 1, 95],
+  ['notes', 1, 153], ['weather', 2, 45], ['clock', 2, 42], ['quicklinks', 2, 42]].map(span);
 
-test('rowFillSpans: im Demo-Raster wachsen Kennzahlen und Notizen in ihren Zeilenrest', () => {
+test('U1 b: rowFillSpans - nach rechts waechst nur, was Breite in Inhalt umsetzt', () => {
   nodeAssert.equal(typeof widgets.rowFillSpans, 'function', 'rowFillSpans fehlt in utils/dashboard-widgets.js');
-  const grown = widgets.rowFillSpans(DEMO_RASTER, 3);
-  nodeAssert.deepEqual([...grown], [['metrics', 3], ['notes', 3]]);
-  // Einspaltig gibt es keinen Rest, und ein volles Raster laesst alles stehen.
-  nodeAssert.equal(widgets.rowFillSpans(DEMO_RASTER, 1).size, 0);
-  nodeAssert.equal(widgets.rowFillSpans([kachel('a', 1, 1), kachel('b', 1, 1)], 2).size, 0);
+  // Notizen (2 Spalten) neben einem freien Rest: ohne `wide` waechst nichts.
+  const items = [kachel('notes', 2, 20), kachel('weather', 2, 30)];
+  nodeAssert.deepEqual([...widgets.rowFillSpans(items, 3)], [], 'Breite ohne Inhalt ist Leere quer (DW-P2-6)');
+  nodeAssert.deepEqual([...widgets.rowFillSpans(items.map((it) => ({ ...it, wide: it.id === 'weather' })), 3)], [['weather', 3]],
+    'das Wetter zeigt in der Breite mehr Tage');
+  nodeAssert.equal(widgets.rowFillSpans(items, 1).size, 0, 'einspaltig gibt es keinen Rest');
 });
 
-test('rowFillSpans: eine hohe Kachel waechst nur, wo BEIDE ihrer Zeilen frei sind', () => {
-  // family 1x2 links, rechts daneben oben notes 1x1, unten nichts: die Zelle
-  // unten rechts ist frei, aber die obere nicht - family darf nicht wachsen,
-  // die einzeilige Kachel daneben schon nicht, weil ihre Zeile voll ist.
-  const grown = widgets.rowFillSpans([kachel('family', 1, 2), kachel('notes', 1, 1)], 2);
-  nodeAssert.deepEqual([...grown], []);
-  // Zwei hohe Kacheln in drei Spalten: die zweite waechst in die dritte Spalte.
-  nodeAssert.deepEqual([...widgets.rowFillSpans([kachel('a', 1, 2), kachel('b', 1, 2)], 3)], [['b', 2]]);
+test('U1 b: rowFillSpans holes - schmal nur in ein echtes Loch, breit auch in den Rest der Zeile', () => {
+  // 1024px im Demo-Haushalt: Belohnungen (schmal) unten links, rechts daneben
+  // frei, darunter die Notizen ueber beide Spalten - ein Loch.
+  const loch = [kachel('rewards', 1, 62), kachel('notes', 2, 51)];
+  nodeAssert.deepEqual([...widgets.rowFillSpans(loch, 2, { holes: true })], [['rewards', 2]]);
+  // Steht darunter nichts, ist es ein Spaltenende: die schmale Kachel bleibt schmal.
+  nodeAssert.deepEqual([...widgets.rowFillSpans([kachel('a', 1, 10), kachel('b', 1, 4)], 3, { holes: true })], []);
+  // Drei breite Kacheln in drei Spalten liessen eine ganze Spalte leer.
+  nodeAssert.deepEqual([...widgets.rowFillSpans([kachel('a', 2, 10), kachel('b', 2, 10), kachel('c', 2, 10)], 3, { holes: true })],
+    [['a', 3], ['b', 3], ['c', 3]]);
 });
+
+test('U1 b: columnFillSpans fuellt nur ein echtes Loch, kein Spaltenende', () => {
+  nodeAssert.equal(typeof widgets.columnFillSpans, 'function', 'columnFillSpans fehlt in utils/dashboard-widgets.js');
+  // a ist hoeher als b, darunter c ueber beide: b waechst bis an c.
+  nodeAssert.deepEqual([...widgets.columnFillSpans([kachel('a', 1, 10), kachel('b', 1, 4), kachel('c', 2, 3)], 2)], [['b', 10]]);
+  // Ohne c ist es das Ende der Spalte: keine Hoehe ohne Inhalt.
+  nodeAssert.deepEqual([...widgets.columnFillSpans([kachel('a', 1, 10), kachel('b', 1, 4)], 2)], []);
+  // Eine Kachel, die so hoch ist wie ihr Inhalt (die Kennzahlreihe), waechst nicht.
+  nodeAssert.deepEqual([...widgets.columnFillSpans([kachel('a', 1, 10), { ...kachel('b', 1, 4), grow: false }, kachel('c', 2, 3)], 2)], []);
+});
+
+test('U1 b: fillGridSpans - kein Loch im Demo-Haushalt (Erwachsene, Kind, alle Kacheln) bei 2, 3 und 4 Spalten', () => {
+  nodeAssert.equal(typeof widgets.fillGridSpans, 'function', 'fillGridSpans fehlt in utils/dashboard-widgets.js');
+  for (const [name, items] of [['Seed', DEMO_SEED], ['Kind', DEMO_KIND], ['alle', DEMO_ALLE]]) {
+    for (const cols of [2, 3, 4]) {
+      const filled = widgets.fillGridSpans(items, cols);
+      const before = widgets.packGrid(items, cols);
+      const after = widgets.packGrid(filled, cols);
+      nodeAssert.equal(widgets.gridHoleCount(after), 0, `${name}, ${cols} Spalten: Loch`);
+      nodeAssert.deepEqual(positions(after), positions(before), `${name}, ${cols} Spalten: keine Kachel wechselt den Platz`);
+      nodeAssert.ok(after.length <= before.length, `${name}, ${cols} Spalten: das Raster wird nicht hoeher`);
+    }
+  }
+});
+
+test('U1 b: fillGridSpans - das Wachsen wirft die Packung nie um (Aequivalenz, 500 zufaellige Raster)', () => {
+  // Gewachsen wird nur in Zellen, die nach der VOLLEN Packung leer sind - die
+  // Neupackung mit den gefuellten Spannen laesst jede Kachel an ihrer Stelle.
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let trial = 0; trial < 500; trial += 1) {
+    const cols = 2 + Math.floor(rnd() * 3);
+    const items = Array.from({ length: 3 + Math.floor(rnd() * 15) }, (_, i) => ({
+      id: `t${i}`, cols: rnd() < 0.35 ? 2 : 1, rows: 25 + Math.floor(rnd() * 120), wide: rnd() < 0.1,
+    }));
+    const before = widgets.packGrid(items, cols);
+    const after = widgets.packGrid(widgets.fillGridSpans(items, cols), cols);
+    nodeAssert.deepEqual(positions(after), positions(before), `Positionen verschoben (Versuch ${trial})`);
+    nodeAssert.ok(after.length <= before.length, `das Raster wird hoeher (Versuch ${trial})`);
+  }
+});
+
+/* Ein Raster aus Attrappen fuer applyRowFill: Spannen wie getComputedStyle sie
+ * liest (Inhalt + 5 Spuren Abstand), Schreibzugriffe protokolliert. */
+function stubGrid(spans, { columns = 3, log = null } = {}) {
+  const tile = (id) => {
+    const props = new Map();
+    const dataset = new Proxy({ widgetId: id }, {
+      set(target, key, value) { log?.push('write'); target[key] = value; return true; },
+      deleteProperty(target, key) { log?.push('write'); delete target[key]; return true; },
+    });
+    return {
+      dataset,
+      querySelector: (sel) => (id === 'metrics' && sel.includes('metric-tiles') ? {} : null),
+      style: { setProperty: (k, v) => { log?.push('write'); props.set(k, v); }, removeProperty: (k) => props.delete(k), props },
+    };
+  };
+  const tiles = Object.keys(spans).map(tile);
+  const grid = { children: tiles };
+  const style = (el) => {
+    log?.push('read');
+    if (el === grid) return { gridTemplateColumns: Array(columns).fill('300px').join(' ') };
+    const [cols, rows] = spans[el.dataset.widgetId];
+    const filled = 'rowFill' in el.dataset ? Number(el.style.props.get('--widget-fill-span')) : cols;
+    return { display: 'flex', gridColumnStart: 'auto', gridColumnEnd: `span ${filled}`, gridRowStart: 'auto', gridRowEnd: `span ${rows}` };
+  };
+  return { grid, tiles, style };
+}
+const GRID_SEED = Object.fromEntries(DEMO_SEED.map((it) => [it.id, [it.cols, it.rows]]));
+const filledOf = (tiles) => tiles.filter((t) => 'rowFill' in t.dataset || 'colFill' in t.dataset || 'colLock' in t.dataset)
+  .map((t) => [t.dataset.widgetId, t.style.props.get('--widget-fill-span') ?? null, t.style.props.get('--widget-fill-rows') ?? null, t.style.props.get('--tile-col') ?? null]);
 
 /* DW-P2-4: ERST LESEN, DANN SCHREIBEN. Die Kacheln sind Container; ein
  * `getComputedStyle` nach dem ersten gesetzten Fuell-Attribut verlangte Stil
@@ -3276,39 +3369,218 @@ test('rowFillSpans: eine hohe Kachel waechst nur, wo BEIDE ihrer Zeilen frei sin
  * gefuelltes setzt erst zurueck und kommt zum selben Ergebnis. */
 test('DW-P2-4: applyRowFill liest alles, bevor es schreibt - und ein gefuelltes Raster fuellt gleich', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
-  const SPANS = { family: [1, 2], budget: [1, 2], birthdays: [1, 2], weather: [2, 1], metrics: [2, 1], rewards: [1, 1], notes: [2, 1] };
   const log = [];
-  const tile = (id) => {
-    const props = new Map();
-    const dataset = new Proxy({ widgetId: id }, {
-      set(target, key, value) { log.push('write'); target[key] = value; return true; },
-      deleteProperty(target, key) { log.push('write'); delete target[key]; return true; },
-    });
-    return { dataset, style: { setProperty: (k, v) => { log.push('write'); props.set(k, v); }, removeProperty: (k) => props.delete(k), props } };
-  };
-  const tiles = Object.keys(SPANS).map(tile);
-  const grid = { children: tiles };
+  const { grid, tiles, style } = stubGrid(GRID_SEED, { log });
   const vorher = globalThis.getComputedStyle;
-  globalThis.getComputedStyle = (el) => {
-    log.push('read');
-    if (el === grid) return { gridTemplateColumns: '366px 366px 366px' };
-    const [cols, rows] = SPANS[el.dataset.widgetId];
-    const filled = 'rowFill' in el.dataset ? Number(el.style.props.get('--widget-fill-span')) : cols;
-    return { display: 'flex', alignSelf: el.dataset.widgetId === 'metrics' ? 'start' : 'stretch', gridColumnStart: 'auto', gridColumnEnd: `span ${filled}`, gridRowStart: 'auto', gridRowEnd: `span ${rows}` };
-  };
-  const filledOf = () => tiles.filter((t) => 'rowFill' in t.dataset || 'colFill' in t.dataset)
-    .map((t) => [t.dataset.widgetId, t.style.props.get('--widget-fill-span') ?? null, t.style.props.get('--widget-fill-rows') ?? null]);
+  globalThis.getComputedStyle = style;
   try {
     __test.applyRowFill(grid);
     const firstWrite = log.indexOf('write');
     nodeAssert.ok(firstWrite > 0, 'Vorbedingung: es wird gefuellt');
     nodeAssert.equal(log.slice(firstWrite).filter((e) => e === 'read').length, 0, 'kein Lesen nach dem ersten Schreiben');
-    const once = filledOf();
+    const once = filledOf(tiles);
     // Neue Spaltenzahl (ResizeObserver): dasselbe Raster noch einmal.
     __test.applyRowFill(grid);
-    nodeAssert.deepEqual(filledOf(), once, 'ein schon gefuelltes Raster liest die gewaehlten Spannen, nicht die gefuellten');
+    nodeAssert.deepEqual(filledOf(tiles), once, 'ein schon gefuelltes Raster liest die gewaehlten Spannen, nicht die gefuellten');
   } finally {
     globalThis.getComputedStyle = vorher;
+  }
+});
+
+/* U1 b / DW-P2-9: DER ANPASSEN-MODUS ZEIGT DASSELBE RASTER. Vorher nahm er alles
+ * Wachstum zurueck - das Raster dort war ein anderes als danach. Jetzt fuellt
+ * er wie der Normalmodus und markiert die Hoehe, die nur Platz ist, als Geist. */
+test('U1 b: applyRowFill fuellt im Normal- und im Anpassen-Modus gleich - dort steht die Fuellung als Geist', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  nodeAssert.equal(typeof __test.applyRowFill, 'function', 'applyRowFill fehlt im __test-Export');
+  const { grid, tiles, style } = stubGrid(GRID_SEED);
+  const vorher = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = style;
+  try {
+    __test.applyRowFill(grid);
+    const normal = filledOf(tiles);
+    // Der Demo-Haushalt, drei Spalten: die Breiten stehen rechts (gleich frueh,
+    // weniger Loch), unter "Belohnungen" fuellt die Kachel das Loch ueber dem Wetter.
+    nodeAssert.deepEqual(normal.find(([id]) => id === 'weather')?.[3], '2', 'das Wetter steht in Spalte 2');
+    nodeAssert.ok(normal.some(([id, , rows]) => id === 'rewards' && Number(rows) > GRID_SEED.rewards[1]), 'Belohnungen schliesst das Loch');
+    nodeAssert.equal(tiles.filter((t) => 'ghostBlock' in t.dataset).length, 0, 'ausserhalb des Anpassens kein Geist');
+    __test.applyRowFill(grid, { editing: true });
+    nodeAssert.deepEqual(filledOf(tiles), normal, 'im Anpassen-Modus dasselbe Raster');
+    const ghost = tiles.find((t) => 'ghostBlock' in t.dataset);
+    nodeAssert.equal(ghost?.dataset.widgetId, 'rewards');
+    nodeAssert.equal(Number(ghost.style.props.get('--tile-ghost-rows')), Number(normal.find(([id]) => id === 'rewards')[2]) - GRID_SEED.rewards[1]);
+  } finally {
+    globalThis.getComputedStyle = vorher;
+  }
+});
+
+test('das Fuellen ist verdrahtet: CSS liest Spannen und Spalte, der Aufbau ruft es direkt nach dem Zeichnen, eine Geste ohne Auslegung', () => {
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const regel = (sel) => [...eachRule(css)].find((r) => r.selector.trim() === sel);
+  for (const [sel, body] of [
+    ['.dashboard__grid > [data-row-fill]', /grid-column:\s*span var\(--widget-fill-span\)/],
+    ['.dashboard__grid > [data-col-fill]', /grid-row:\s*span var\(--widget-fill-rows\)/],
+    ['.dashboard__grid > [data-col-lock]', /grid-column:\s*var\(--tile-col\) \/ span var\(--tile-span-cols\)/],
+    ['.dashboard__grid > [data-col-lock][data-row-fill]', /grid-column-end:\s*span var\(--widget-fill-span\)/],
+  ]) {
+    const r = regel(sel);
+    nodeAssert.ok(r, `keine Regel fuer ${sel} in dashboard.css`);
+    nodeAssert.match(r.body, body, sel);
+    nodeAssert.ok(r.at.some((a) => /min-width:\s*768px/.test(a)), `${sel}: nur ab zwei Spalten`);
+  }
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  // Seit DW-P2-4 direkt nach dem Zeichnen: dort ist das Layout noch sauber,
+  // und die Packung liest, bevor eine Verdrahtung schreibt.
+  nodeAssert.match(src, /\}, \{ animate: fromSkeleton \}\);\s*(?:\/\/[^\n]*\n\s*)*wireRowFill\(\);/, 'rebuildDashboard ruft wireRowFill() direkt nach dem Zeichnen');
+  nodeAssert.equal(src.match(/\bwireRowFill\(\);/g)?.length, 1, 'genau ein Aufruf je Aufbau');
+  nodeAssert.match(src, /applyRowFill\(grid, \{ editing: isCustomizing \}\)/, 'wireRowFill fuellt im Anpassen-Modus wie ausserhalb');
+  // Eine Geste fuellt neu, mit der Spaltenzahl der letzten Auslegung (kein Layout-Lesen).
+  nodeAssert.match(src, /applyRowFill\(grid, \{ editing: true, columns: seenGridColumns\.get\(grid\) \}\)/, 'patchCustomize fuellt ohne Neuaufbau');
+});
+
+// --------------------------------------------------------
+// U1 b (DW-P1-3): die Hoehe kommt aus den Daten. Eine Liste zeigt so viele
+// Zeilen, wie die Daten hergeben und die Groesse erlaubt, und ist genau so
+// hoch: `contentSpanRows` rechnet daraus die Rasterspuren.
+// --------------------------------------------------------
+
+test('U1 b: contentSpanRows - Zeilen aus den Daten, die Groesse ist die Obergrenze, leer ist eine Zeile', () => {
+  nodeAssert.equal(typeof widgets.contentSpanRows, 'function', 'contentSpanRows fehlt in utils/dashboard-widgets.js');
+  const g = widgets.TILE_GEOMETRY;
+  const spurenFuer = (px) => Math.ceil(px / g.unit - 1e-6);
+  // Aequivalenz gegen die Datenzeilen: fuer jede Zahl an Eintraegen, jede
+  // Obergrenze und jeden Rest dieselbe Rechnung wie Zeile fuer Zeile gezaehlt.
+  for (const cap of [3, 5, 8, 12]) {
+    for (let items = 0; items <= 14; items += 1) {
+      for (const extraTotal of [0, 4]) {
+        const total = items + extraTotal;
+        const r = widgets.contentSpanRows({ items, total, cap });
+        const shown = Math.min(items, cap);
+        let px = g.frame + g.head;
+        if (!shown) px += g.empty;
+        else {
+          px += g.rowsPad;
+          for (let i = 0; i < shown; i += 1) px += g.row;
+          if (total > shown) px += g.more;
+        }
+        nodeAssert.equal(r.shown, shown, `cap ${cap}, ${items} Eintraege: gezeigt`);
+        nodeAssert.equal(r.rest, total - shown, `cap ${cap}, ${items}/${total}: Rest`);
+        nodeAssert.equal(r.rows, spurenFuer(px), `cap ${cap}, ${items}/${total}: Spuren`);
+      }
+    }
+  }
+  // Leer ist genau eine Zeile, in jeder Groesse.
+  const leer = widgets.contentSpanRows({ items: 0, cap: 5 });
+  nodeAssert.equal(leer.rows, widgets.contentSpanRows({ items: 0, cap: 3 }).rows);
+  nodeAssert.ok(leer.rows * g.unit < g.frame + g.head + g.rowsPad + 2 * g.row, 'eine leere Kachel ist nicht hoeher als eine mit einer Zeile');
+  // Die Obergrenze haelt: mehr Daten machen die Kachel nicht hoeher.
+  nodeAssert.equal(widgets.contentSpanRows({ items: 9, cap: 5 }).rows, widgets.contentSpanRows({ items: 50, cap: 5 }).rows);
+  // Ohne "+N weitere" (more: false), eigene Zeilenhoehe, feste Teile, eigener Aufbau, ohne Karte.
+  nodeAssert.equal(widgets.contentSpanRows({ items: 7, cap: 5, more: false }).rows, spurenFuer(g.frame + g.head + g.rowsPad + 5 * g.row));
+  nodeAssert.equal(widgets.contentSpanRows({ items: 2, row: 77, extra: 64 }).rows, spurenFuer(g.frame + g.head + g.rowsPad + 2 * 77 + 64));
+  nodeAssert.equal(widgets.contentSpanRows({ body: 125 }).rows, spurenFuer(g.frame + g.head + 125));
+  nodeAssert.equal(widgets.contentSpanRows({ body: 119, bare: true }).rows, spurenFuer(119));
+});
+
+/* Dieselben Masse wie das Stylesheet - sonst rechnete die Kachel eine andere
+ * Hoehe, als der Browser zeichnet, und die Spuren waechsen nach. */
+test('U1 b: TILE_GEOMETRY sind die Masse aus dashboard.css und tokens.css', () => {
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const tok = (name) => Number(new RegExp(`--${name}:\\s*([\\d.]+)px`).exec(tokens)?.[1]);
+  const rules = [...eachRule(css)];
+  const g = widgets.TILE_GEOMETRY;
+  const grid = rules.find((r) => r.selector.trim() === '.dashboard__grid' && /--dashboard-row-unit/.test(r.body));
+  nodeAssert.ok(grid, 'das Raster hat eine Spur (--dashboard-row-unit)');
+  nodeAssert.match(grid.body, /--dashboard-row-unit:\s*var\(--space-1\)/);
+  nodeAssert.equal(g.unit, tok('space-1'), 'eine Spur ist --space-1');
+  nodeAssert.match(grid.body, /grid-auto-rows:\s*minmax\(var\(--dashboard-row-unit\),\s*auto\)/, 'eine Spur waechst mit, statt Inhalt ragen zu lassen');
+  nodeAssert.match(grid.body, /row-gap:\s*0/);
+  nodeAssert.equal(Number(/--tile-gap-rows:\s*(\d+)/.exec(grid.body)?.[1]) * g.unit, tok('space-4'), 'ab 768px: 16px Abstand');
+  const wide = rules.find((r) => r.selector.trim() === '.dashboard__grid' && /--tile-gap-rows:\s*5/.test(r.body));
+  nodeAssert.ok(wide?.at.some((a) => /min-width:\s*1024px/.test(a)) && 5 * g.unit === tok('space-5'), 'ab 1024px: 20px Abstand');
+  const wrapper = rules.find((r) => r.selector.trim() === '.dashboard__grid > .widget-wrapper' && /grid-row-end/.test(r.body));
+  nodeAssert.match(wrapper?.body ?? '', /grid-row-end:\s*span calc\(var\(--tile-rows, var\(--tile-size-rows\)\) \+ var\(--tile-gap-rows\)\)/);
+  nodeAssert.match(wrapper.body, /margin-block-end:\s*var\(--dashboard-grid-gap\)/, 'den Abstand traegt der Rahmen');
+  const row = rules.find((r) => r.selector.includes('.widget__rows > .list-row:not(') && /block-size/.test(r.body));
+  nodeAssert.match(row?.body ?? '', /block-size:\s*calc\(var\(--target-lg\) \+ var\(--space-1h\)\)/);
+  nodeAssert.equal(g.row, tok('target-lg') + tok('space-1h'), 'Zeilenhoehe');
+  const body = rules.find((r) => r.selector.trim() === '.dashboard .widget > .widget__body--rows');
+  nodeAssert.match(body?.body ?? '', /padding-block:\s*var\(--space-2\) var\(--space-3\)/);
+  nodeAssert.equal(g.rowsPad, tok('space-2') + tok('space-3'), 'Polster der Zeilenkachel');
+});
+
+/* Die Spanne jeder Listenkachel ist die ihrer gezeichneten Zeilen - gezaehlt
+ * im Markup, nicht behauptet. */
+test('U1 b: jede Listenkachel meldet die Spuren ihrer gezeichneten Zeilen (data-span-rows)', async () => {
+  const dash = await import('../public/pages/dashboard.js');
+  const { __test } = dash;
+  const g = widgets.TILE_GEOMETRY;
+  const zeilen = (html) => (html.match(/class="list-row /g) ?? []).length;
+  const fuss = (html) => /class="(widget-list-more|countdown-more|pantry-widget-more|waste-widget-more)"/.test(html);
+  const spuren = (html) => Number(/data-span-rows="(\d+)"/.exec(html)?.[1]);
+  const erwartet = (html) => {
+    const n = zeilen(html);
+    const px = n ? g.frame + g.head + g.rowsPad + n * g.row + (fuss(html) ? g.more : 0) : g.frame + g.head + g.empty;
+    return Math.ceil(px / g.unit - 1e-6);
+  };
+  const tasks = (n) => Array.from({ length: n }, (_, i) => ({ id: i + 1, title: `T${i}`, priority: 'none', status: 'open', assigned_users: [] }));
+  const birthdays = (n) => Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `B${i}`, days_until: i + 1, next_birthday: '2027-01-01' }));
+  for (const size of ['1x1', '1x2', '2x2']) {
+    for (const n of [0, 1, 3, 5, 7]) {
+      for (const html of [
+        __test.renderUrgentTasks(tasks(n), n + 2, size),
+        dash.renderUpcomingBirthdays(birthdays(n), size, n),
+        __test.renderPantryWidget({ items: birthdays(n).map((b) => ({ ...b, days_left: 2 })), total: n }, size),
+      ]) {
+        nodeAssert.equal(spuren(html), erwartet(html), `${size}, ${n} Eintraege: ${html.slice(0, 60)}`);
+      }
+    }
+  }
+});
+
+test('U1 b: jede Kachel meldet ihre Hoehe - fuer jede Groesse, damit der Hinweis Groessen probieren kann', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const cfg = widgets.WIDGET_IDS.map((id, i) => ({ id, visible: true, order: i, size: widgets.defaultWidgetSize(id) }));
+  const html = __test.renderDashboardLayout(cfg, {
+    urgentTasks: [], upcomingEvents: [], todayMeals: [], shoppingLists: [], pantryExpiring: { items: [] }, birthdays: [],
+    countdowns: [{ id: 1, title: 'x', date: '2027-01-01', days_until: 30, source: 'task' }], budget: {}, rewards: {}, health: {},
+    fasting: { active: null }, nutrition: { target: null }, housekeeping: {}, schedule: { entries: [], hasTypes: false },
+    waste: { items: [] }, users: [{ id: 1, display_name: 'A' }, { id: 2, display_name: 'B' }], pinnedNotes: [], quicklinks: [],
+  }, null, 'EUR');
+  const wrappers = [...html.matchAll(/<div class="widget-wrapper [^"]*"\s+data-widget-id="([^"]+)"([^>]*)>/g)];
+  nodeAssert.ok(wrappers.length > 10, `Vorbedingung: Kacheln gezeichnet (${wrappers.length})`);
+  for (const [, id, attrs] of wrappers) {
+    nodeAssert.match(attrs, /data-span-rows="\d+"/, `${id} meldet keine Hoehe`);
+    nodeAssert.match(attrs, /style="--tile-rows: \d+"/, `${id}: der Rahmen setzt --tile-rows`);
+    for (const p of widgets.WIDGET_SIZE_PRESETS) nodeAssert.match(attrs, new RegExp(`data-span-sizes="[^"]*${p.value}:\\d+`), `${id}: Hoehe als ${p.value}`);
+  }
+});
+
+/* Die Hoehe, die eine Kachel fuer eine ANDERE Groesse ansagt (`data-span-sizes`,
+ * fuer den Lueckenhinweis), ist die, die sie in dieser Groesse meldet. */
+test('U1 b: data-span-sizes sagt je Groesse dieselbe Hoehe, die die Kachel dort meldet', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  global.window ??= { yuvomi: null };
+  const items = (n, f) => Array.from({ length: n }, (_, i) => f(i));
+  const data = {
+    urgentTasks: items(7, (i) => ({ id: i + 1, title: `T${i}`, priority: 'none', status: 'open', assigned_users: [] })), openTaskCount: 9,
+    birthdays: items(8, (i) => ({ id: i + 1, name: `B${i}`, days_until: i + 1, next_birthday: '2027-01-01' })), birthdayTotal: 8,
+    pinnedNotes: items(6, (i) => ({ id: i + 1, title: i % 2 ? `N${i}` : '', content: 'x', categories: [] })), notesTotal: 8,
+    budget: { entryCount: 4, income: 3000, expenses: 1200, balance: 1800, topExpenses: items(3, (i) => ({ category: `c${i}`, amount: 100 })) },
+    users: items(3, (i) => ({ id: i + 1, display_name: `U${i}` })),
+    todayMeals: [], shoppingLists: [{ id: 1, name: 'Wochenmarkt', open_count: 9, total_count: 12, items: items(6, (i) => ({ name: `A${i}` })) }],
+    pantryExpiring: { items: items(4, (i) => ({ name: `P${i}`, days_left: i })), total: 6 },
+  };
+  const ids = ['tasks', 'birthdays', 'notes', 'budget', 'family', 'meals', 'shopping', 'pantry', 'clock'];
+  const cfg = ids.map((id, i) => ({ id, visible: true, order: i, size: '1x1' }));
+  const spuren = (html) => Number(/data-span-rows="(\d+)"/.exec(html)?.[1]);
+  for (const id of ids) {
+    const render = (size) => __test.dashboardTileRenderers(cfg, data, null, 'EUR')[id](size, {});
+    const angesagt = Object.fromEntries((/data-span-sizes="([^"]*)"/.exec(render('1x1'))?.[1] ?? '').split(',').map((e) => e.split(':')).map(([k, v]) => [k, Number(v)]));
+    for (const size of ['1x1', '2x1', '1x2', '2x2']) {
+      nodeAssert.equal(angesagt[size], spuren(render(size)), `${id}: ${size} angesagt = gemeldet`);
+    }
   }
 });
 
@@ -3342,77 +3614,6 @@ test('DW-P2-4: die gemeldete Hoehe einer Kachel steht beim naechsten Aufbau als 
   }
 });
 
-test('rowFillSpans: das Wachstum wirft die Packung nicht um (Aequivalenz)', () => {
-  // Gewachsen wird nur in Zellen, die nach der VOLLEN Packung leer sind - die
-  // Neupackung mit den breiteren Spans muss jede Kachel an ihrer Stelle lassen
-  // und die gewachsenen Zeilen voll machen. Geprueft an mehreren Rastern,
-  // nicht nur am Demo-Haushalt.
-  const raster = [
-    [DEMO_RASTER, 3],
-    [DEMO_RASTER, 4],
-    [DEMO_RASTER, 2],
-    [[kachel('a', 2, 1), kachel('b', 1, 2), kachel('c', 1, 1), kachel('d', 2, 2), kachel('e', 1, 1)], 3],
-    [[kachel('a', 1, 1), kachel('b', 3, 1), kachel('c', 1, 2), kachel('d', 1, 1)], 4],
-  ];
-  for (const [items, cols] of raster) {
-    const before = widgets.packGrid(items, cols);
-    const grown = widgets.rowFillSpans(items, cols);
-    const widened = items.map((it) => (grown.has(it.id) ? { ...it, cols: grown.get(it.id) } : it));
-    const after = widgets.packGrid(widened, cols);
-    nodeAssert.deepEqual(positions(after), positions(before), `Positionen verschoben (${cols} Spalten)`);
-    nodeAssert.ok(after.length <= before.length, 'das Raster wird nicht hoeher');
-    for (const [id] of grown) {
-      const [r] = positions(after)[id];
-      nodeAssert.ok(after[r].every(Boolean), `die Zeile von ${id} ist nach dem Wachsen voll (${cols} Spalten)`);
-    }
-  }
-});
-
-test('applyRowFill: waechst im Normalmodus, im Anpassen-Modus nimmt es alles zurueck', async () => {
-  const { __test } = await import('../public/pages/dashboard.js');
-  nodeAssert.equal(typeof __test.applyRowFill, 'function', 'applyRowFill fehlt im __test-Export');
-  const SPANS = { family: [1, 2], budget: [1, 2], birthdays: [1, 2], weather: [2, 1], metrics: [2, 1], rewards: [1, 1], notes: [2, 1] };
-  const tile = (id) => {
-    const props = new Map();
-    return {
-      dataset: { widgetId: id },
-      style: { setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k), props },
-    };
-  };
-  const tiles = Object.keys(SPANS).map(tile);
-  const grid = { children: tiles };
-  const vorher = globalThis.getComputedStyle;
-  globalThis.getComputedStyle = (el) => {
-    if (el === grid) return { gridTemplateColumns: '366px 366px 366px' };
-    const [cols, rows] = SPANS[el.dataset.widgetId];
-    return { display: 'flex', gridColumnStart: 'auto', gridColumnEnd: `span ${cols}`, gridRowStart: 'auto', gridRowEnd: `span ${rows}` };
-  };
-  try {
-    __test.applyRowFill(grid);
-    const gewachsen = tiles.filter((t) => 'rowFill' in t.dataset).map((t) => [t.dataset.widgetId, t.style.props.get('--widget-fill-span')]);
-    nodeAssert.deepEqual(gewachsen, [['metrics', '3'], ['notes', '3']]);
-    __test.applyRowFill(grid, { editing: true });
-    nodeAssert.equal(tiles.filter((t) => 'rowFill' in t.dataset || t.style.props.size).length, 0,
-      'im Anpassen-Modus zeigt das Raster die gewaehlten Groessen');
-  } finally {
-    globalThis.getComputedStyle = vorher;
-  }
-});
-
-test('das Wachstum ist verdrahtet: CSS liest den Span, der Aufbau ruft es direkt nach dem Zeichnen', () => {
-  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
-  const regel = [...eachRule(css)].find((r) => r.selector.trim() === '.dashboard__grid > [data-row-fill]');
-  nodeAssert.ok(regel, 'keine Regel fuer [data-row-fill] in dashboard.css');
-  nodeAssert.match(regel.body, /grid-column:\s*span var\(--widget-fill-span\)/);
-  nodeAssert.ok(regel.at.some((a) => /min-width:\s*768px/.test(a)), 'nur ab zwei Spalten');
-  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
-  // Seit DW-P2-4 direkt nach dem Zeichnen: dort ist das Layout noch sauber,
-  // und die Packung liest, bevor eine Verdrahtung schreibt.
-  nodeAssert.match(src, /\}, \{ animate: fromSkeleton \}\);\s*(?:\/\/[^\n]*\n\s*)*wireRowFill\(\);/, 'rebuildDashboard ruft wireRowFill() direkt nach dem Zeichnen');
-  nodeAssert.equal(src.match(/\bwireRowFill\(\);/g)?.length, 1, 'genau ein Aufruf je Aufbau');
-  nodeAssert.match(src, /applyRowFill\(grid, \{ editing: isCustomizing \}\)/, 'wireRowFill nimmt das Wachstum im Anpassen-Modus zurueck');
-});
-
 // --------------------------------------------------------
 // R21 (Critique 2026-10-21, D5): die Uebersicht als Briefing.
 // Geld-Kacheln ab Werk aus, das Raster ohne Loch bei drei und vier Spalten,
@@ -3427,85 +3628,6 @@ test('R21 D5: der Saldo steht ab Werk nirgends - Budget-Widget aus, keine Saldo-
   // Keine Migration: ein gespeichertes Layout mit eingeblendetem Budget bleibt so.
   const saved = widgets.normalizeDashboardConfig([{ id: 'budget', visible: true, order: 0, size: '1x2' }]);
   nodeAssert.equal(saved.find((w) => w.id === 'budget').visible, true, 'gespeichert bleibt gespeichert');
-});
-
-/** Leere Zellen VOR der letzten Zeile nach Wachsen nach rechts und nach unten. */
-function holesAfterFill(items, columns) {
-  const wide = widgets.rowFillSpans(items, columns);
-  const widened = items.map((it) => ({ ...it, cols: wide.get(it.id) ?? it.cols }));
-  const tall = widgets.columnFillSpans(widened, columns);
-  const filled = widened.map((it) => ({ ...it, rows: tall.get(it.id) ?? it.rows }));
-  return { cells: widgets.packGrid(filled, columns), before: widgets.packGrid(items, columns), filled };
-}
-
-test('R21 D5: columnFillSpans schliesst das Loch unter einer 1x1-Kachel neben zwei hohen', () => {
-  nodeAssert.equal(typeof widgets.columnFillSpans, 'function', 'columnFillSpans fehlt in utils/dashboard-widgets.js');
-  // Der gemessene Fall (1440px, Seitenleiste eingeklappt, vier Spalten): drei
-  // hohe Kacheln und daneben Belohnungen 1x1 - darunter blieben 305x185px leer.
-  const demo = [kachel('family', 1, 2), kachel('budget', 1, 2), kachel('birthdays', 1, 2),
-    kachel('weather', 2, 1), kachel('metrics', 2, 1), kachel('rewards', 1, 1), kachel('notes', 2, 1)];
-  nodeAssert.ok(widgets.gridHoleCount(widgets.packGrid(demo, 4)) > 0, 'Vorbedingung: ohne Fuellung ein Loch');
-  for (const cols of [2, 3, 4]) {
-    const { cells, before } = holesAfterFill(demo, cols);
-    nodeAssert.equal(widgets.gridHoleCount(cells), 0, `kein Loch bei ${cols} Spalten`);
-    nodeAssert.deepEqual(positions(cells), positions(before), `keine Kachel wechselt den Platz (${cols} Spalten)`);
-    nodeAssert.ok(cells.length <= before.length, 'das Raster wird nicht hoeher');
-  }
-  // Das Kinderkonto (R20: Belohnungen zuerst) bei drei Spalten: 1x1 vorn links.
-  const kind = [kachel('rewards', 1, 1), kachel('family', 1, 2), kachel('birthdays', 1, 2),
-    kachel('weather', 2, 1), kachel('metrics', 2, 1), kachel('notes', 2, 1)];
-  nodeAssert.equal(widgets.gridHoleCount(holesAfterFill(kind, 3).cells), 0, 'auch das Kinderkonto ohne Loch');
-  // Eine Kachel, die so hoch ist wie ihr Inhalt, waechst nicht.
-  const stiff = widgets.columnFillSpans([kachel('a', 1, 2), kachel('b', 1, 1, '1x1')].map((it) => (it.id === 'b' ? { ...it, grow: false } : it)), 2);
-  nodeAssert.equal(stiff.size, 0);
-});
-
-test('R21 D5: die Standardgroessen sind bei drei und vier Spalten lueckenlos', () => {
-  const sichtbar = widgets.DEFAULT_WIDGET_CONFIG.filter((w) => w.visible);
-  const span = (size) => size.split('x').map(Number);
-  // Mit und ohne Countdown (der erscheint erst, wenn jemand etwas markiert).
-  for (const withCountdown of [false, true]) {
-    const items = sichtbar.filter((w) => withCountdown || w.id !== 'countdown')
-      .map((w) => kachel(w.id, ...span(w.size)))
-      // Die Kennzahlreihe ist so hoch wie ihr Inhalt (align-self: start).
-      .map((it) => (it.id === 'metrics' ? { ...it, grow: false } : it));
-    for (const cols of [3, 4]) {
-      nodeAssert.equal(widgets.gridHoleCount(holesAfterFill(items, cols).cells), 0,
-        `Loch bei ${cols} Spalten (${withCountdown ? 'mit' : 'ohne'} Countdown): ${items.map((i) => i.id).join(',')}`);
-    }
-  }
-});
-
-test('R21 D5: applyRowFill setzt das Wachsen nach unten als Darstellung, und CSS liest es', async () => {
-  const { __test } = await import('../public/pages/dashboard.js');
-  const SPANS = { family: [1, 2], budget: [1, 2], birthdays: [1, 2], rewards: [1, 1], weather: [2, 1], metrics: [2, 1], notes: [2, 1] };
-  const tile = (id) => {
-    const props = new Map();
-    return { dataset: { widgetId: id }, style: { setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k), props } };
-  };
-  const tiles = Object.keys(SPANS).map(tile);
-  const grid = { children: tiles };
-  const vorher = globalThis.getComputedStyle;
-  globalThis.getComputedStyle = (el) => {
-    if (el === grid) return { gridTemplateColumns: '305px 305px 305px 305px' };
-    const [cols, rows] = SPANS[el.dataset.widgetId];
-    return { display: 'flex', alignSelf: el.dataset.widgetId === 'metrics' ? 'start' : 'stretch',
-      gridColumnStart: 'auto', gridColumnEnd: `span ${cols}`, gridRowStart: 'auto', gridRowEnd: `span ${rows}` };
-  };
-  try {
-    __test.applyRowFill(grid);
-    const tiefer = tiles.filter((t) => 'colFill' in t.dataset).map((t) => [t.dataset.widgetId, t.style.props.get('--widget-fill-rows')]);
-    nodeAssert.deepEqual(tiefer, [['rewards', '2']], 'Belohnungen fuellt die Zelle unter sich');
-    __test.applyRowFill(grid, { editing: true });
-    nodeAssert.equal(tiles.filter((t) => 'colFill' in t.dataset || t.style.props.size).length, 0,
-      'im Anpassen-Modus zeigt das Raster die gewaehlten Groessen');
-  } finally {
-    globalThis.getComputedStyle = vorher;
-  }
-  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
-  const regel = [...eachRule(css)].find((r) => r.selector.trim() === '.dashboard__grid > [data-col-fill]');
-  nodeAssert.ok(regel, 'keine Regel fuer [data-col-fill] in dashboard.css');
-  nodeAssert.match(regel.body, /grid-row:\s*span var\(--widget-fill-rows\)/);
 });
 
 test('R21 D5: auf dem Telefon zeigt das Blatt so viele Zeilen, wie in den ersten Schirm passen', async () => {
@@ -3911,11 +4033,20 @@ test('DW-P2-7: die Kennzahlreihe ist aus dem Material der Widgets und ein metric
   // Gleicher Rhythmus: Luecke und Zeilenminimum kommen aus dem Raster.
   assert(has('.metric-tiles', 'gap', /^var\(--dashboard-grid-gap\)$/) && has('.dashboard__grid', 'gap', /^var\(--dashboard-grid-gap\)$/),
     'die Kacheln stehen mit der Rasterluecke nebeneinander, nicht mit eigenen 10px');
-  const wide = (a) => a.some((x) => /min-width:\s*1024px/.test(x));
-  assert(has('.dashboard__grid', 'grid-auto-rows', /^minmax\(var\(--dashboard-row-min\),\s*auto\)$/, wide),
-    'das Zeilenminimum des Rasters ist ein Wert (--dashboard-row-min), an dem sich die Reihe misst');
-  assert(has('.widget-wrapper > .metric-tiles', 'min-block-size', /^var\(--dashboard-row-min\)$/, wide),
-    'ab 1024px fuellt die Reihe genau ihre Rasterzeile - sonst liegen 41 statt 20px bis zur naechsten Kachel');
+  // Seit U1 b gibt es kein Zeilenminimum mehr, an dem sich die Reihe messen
+  // muesste: sie meldet ihre Kachelzeilen wie jede Liste ihre Zeilen
+  // (`contentSpanRows`, bare) - vier je Reihe breit, zwei schmal.
+  assert(!rules.some((r) => /--dashboard-row-min/.test(r.body)), 'das Zeilenminimum der 132px-Rasterzeilen ist mit U1 b gegangen');
+  const { __test } = await import('../public/pages/dashboard.js');
+  global.window ??= { yuvomi: null };
+  const reihe = (size) => Number(/class="metric-tiles"[^>]*data-span-rows="(\d+)"/.exec(__test.renderMetricTiles({
+    budget: { entryCount: 3, balance: 120, income: 200 },
+    birthdays: [{ days_until: 3, name: 'Anna', kind: 'birthday' }],
+    pinnedNotes: [{ id: 1, pinned: 1 }], pinnedNotesCount: 1,
+  }, 'EUR', new Set(), new Set(), size))?.[1]);
+  // Zwei Kacheln: eine Reihe, schmal wie breit - genau eine Kachelhoehe (119px).
+  assert(reihe('2x1') === Math.ceil(119 / widgets.TILE_GEOMETRY.unit) && reihe('1x1') === reihe('2x1'),
+    `die Kennzahlreihe meldet die Hoehe einer Kachelreihe (${reihe('2x1')} / ${reihe('1x1')})`);
 
   // Was auch auf der Stufe nicht passt, verkleinert fitMetricLeads - auch die Kachel.
   const saved = Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver');

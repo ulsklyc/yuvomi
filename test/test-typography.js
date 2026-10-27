@@ -974,10 +974,20 @@ test('R19: die Titelregel - Zeilentitel hoechstens zwei Zeilen, kein Modul weich
   // Kein Modulblatt setzt am Zeilentitel eine eigene Fassung: einzeilig,
   // eine andere Zeilenzahl oder eine Anzeige, die die Kappung aufhebt.
   const TITLE_RE = /\.(?:list-row__name|task-card__title|contact-item__name|subscription-card__name|rw-standing__name|birthday-item__name|budget-entry__title)$|\.agenda-event__title(?:\s*>\s*span)?$/;
+  // EINE benannte Ausnahme (U1 b, DW-P1-3, 2026-10-27): die Zeilen der
+  // Listen-Kacheln der Uebersicht stehen ab 768px in EINER Zeile. Die Kachel
+  // ist dort so hoch wie ihre Zeilen (`contentSpanRows`), und das geht nur,
+  // wenn eine Zeile eine Hoehe HAT - ein Name, der in einer 330px-Spalte
+  // umbricht, machte sie 71 statt 54px hoch. Die Kachel ist eine Vorschau
+  // (wie ein Apple-Widget); die Zeile oeffnet ihr Objekt, dort gilt die Regel.
+  const widgetRowsWide = (name, rule) => name === 'dashboard.css'
+    && /^\.widget__rows > \.list-row:not\(/.test(rule.selector.trim())
+    && rule.at.some((a) => /min-width:\s*768px/.test(a));
   const funde = [];
   for (const name of cssFiles.filter((n) => n !== 'typography.css')) {
     for (const rule of eachRule(readFileSync(new URL(name, STYLES_DIR), 'utf8'))) {
       if (!sels(rule).some((sel) => TITLE_RE.test(sel))) continue;
+      if (widgetRowsWide(name, rule)) continue;
       if (/white-space:\s*nowrap/.test(rule.body)) funde.push(`${name}: ${rule.selector.trim()} nowrap`);
       const clamp = rule.body.match(/line-clamp:\s*(\d+)/);
       if (clamp && clamp[1] !== '2') funde.push(`${name}: ${rule.selector.trim()} line-clamp ${clamp[1]}`);

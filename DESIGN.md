@@ -1214,7 +1214,9 @@ das Verhaeltnis haelt.
   Buchungen 45, Rezepte 64px) - mit "je Zeile" ab der ersten sprang die Liste beim Aufbau
   (Kontakte CLS 0,098 -> 0). Die Kacheln der Uebersicht ab der zweiten Reihe ebenso (DW-P2-4);
   ihr Platzhalter ist die Hoehe aus dem letzten Bild (`--tile-block-size`), weil jeder Neuaufbau
-  neue Knoten zeichnet und `auto` sich nur den Knoten merkt. Immer unter `@supports` mit
+  neue Knoten zeichnet und `auto` sich nur den Knoten merkt - ab 768px die Hoehe aus ihren Daten
+  (`--tile-rows` mal Spur, U1 b), ohne `auto`, damit eine kuerzer gewordene Kachel keine alte Hoehe
+  mitbringt. Immer unter `@supports` mit
   `contain-intrinsic-size: auto none auto <gemessene Hoehe>` (sonst springt der Bildlaufbalken),
   und `overflow-clip-margin` fuer Schatten und Fokusring des Traegers, die die
   Paint-Containment an der Gruppenkante sonst abschnitte. Nicht dort, wo Spalten oder Masonry
@@ -2676,30 +2678,50 @@ SEITENWECHSEL am Netz, zeichnet `showPageUnreachable()` denselben Ton in den Inh
 selbst neu; der Absturzbildschirm bleibt Fehlern im Code der Seite. Das Offline-Banner steht am
 Desktop rechts der schwebenden Seitenleiste (`--sidebar-width` + `--sidebar-float-gap`).
 
-**Die Fusszeilen-Regel (v2.6.0). Ueberschuessige Hoehe wird Atem, nicht Loch.** Eine Karte
-mit Fusszeile streckt ihren Koerper (`flex: 1`) und verankert die Fusszeile unten
-(`margin-block-start: auto`), damit der Ueberschuss ZWISCHEN Inhalt und Abschluss faellt
-statt hinter den Abschluss.
+**Die Fusszeilen-Regel (v2.6.0, neu gefasst mit U1 b). Eine Fusszeile schliesst an, sie wird nicht
+verankert.** Seit eine Kachel so hoch ist wie ihr Inhalt (Raster-Regel darunter), gibt es keinen
+Ueberschuss mehr, den der Anker (`margin-block-start: auto` am Fuss, Koerper `flex: 1`) zwischen
+Inhalt und Abschluss legen muesste: der Fuss steht unter der letzten Zeile. Der Anker bleibt fuer
+den einen Fall, in dem eine Kachel doch Hoehe bekommt - wenn sie ein echtes Loch im Raster
+schliesst: dann faellt die Leere zwischen Inhalt und Abschluss statt hinter den Abschluss, und die
+Belohnungen (eigene Sicht) zeigen darin ihre juengsten Punkte (`rewards-recent--fill`). Vorher
+war der Anker die Regel: die Zeilenhoehen richteten sich nach den 1x1-Kacheln, und "Familie" stand
+mit 319px Inhalt in 489px Karte.
 
-Der Anlass ist eine Eigenheit jedes Rasters: die Zeilenhoehen richten sich nach den
-1x1-Kacheln, eine 1x2-Karte bekommt also die Summe zweier Zeilen plus Gap. Gemessen waren
-das 489px Karte gegen 319px Inhalt bei „Familie" und 294px bei „Budget" - und weil jeder
-Koerper oben klebte, sass der Rest als toter Block unter dem letzten Element. Mit dem Anker
-liest die Karte als bewusst gesetzter Rahmen aus Kopf, Inhalt und Fuss. Die Regel gilt fuer
-JEDE Karte mit Fusszeile, nicht nur fuer die zwei, die heute zu kurz sind.
+**Die Kachel der Uebersicht ist so hoch wie ihre Daten** (U1 b, DW-P1-3, Ulas 2026-10-26;
+`docs/DECISIONS.md` Nr. 16 - revidiert R10 L9 und R21 D5). Ab 768px rechnet das Raster in feinen
+Spuren (`--dashboard-row-unit`, 4px); jede Kachel belegt so viele, wie ihr Inhalt hoch ist: so
+viele Zeilen, wie die Daten hergeben und ihre Groesse erlaubt (die gewaehlte Groesse ist die
+OBERGRENZE, `listRowCap`, beim Kalender die Stufe), mal der Zeilenhoehe, dazu Kopf und Polster;
+leer genau eine Zeile (`.card-empty-row`). Der Renderer sagt es aus seinen Daten, bevor das Raster
+ausgelegt wird (`contentSpanRows`, `data-span-rows`, `--tile-rows`) - keine Messung, in jedem
+Browser dasselbe Raster, und Skelett und Layout-Hinweis kennen dieselbe Spanne. Damit das stimmt,
+hat eine Zeile ab 768px eine HOEHE (54px, Name und Metazeile je einzeilig; benannte Ausnahme der
+Titelregel R19) und die Kacheln ohne Zeilen eine Hoehe je Groesse und Datenlage (`TILE_PARTS`):
+Notizen schmal eine, breit drei Spalten mit genau zwei Vorschauzeilen, Schnellzugriffe drei bzw.
+sechs je Reihe, das Fasten schmal mit untereinander stehenden Knoepfen. Den Abstand zwischen zwei
+Kacheln traegt der Rahmen (Aussenabstand unten, `--tile-gap-rows` Spuren). Vorher belegte eine
+Kachel so viele 132px-Zeilen, wie ihre Groesse sagte, und eine Zeile war so hoch wie ihre hoechste
+Kachel: gemessen mit allen Kacheln 19 % (1440px) bzw. 27 % (1920px) der Kachelflaeche leer.
 
-Sie loest das Loch nicht allein: dazu gehoert, dass eine Listen-Kachel ihre Zeilenzahl aus
-ihrer HOEHE nimmt statt aus einer Konstante, die fuer eine und fuer zwei Rasterzeilen
-dieselbe war. Ueber das Standard-Board gemessen bleiben 3px Leerraum pro Karte.
+**Das Raster hat im Normalmodus kein Loch - und keine Kachel Hoehe ohne Inhalt.** Gepackt wird
+dicht wie bisher (`packGrid`), mit EINER Abweichung: passt eine breite Kachel an zwei Stellen gleich
+frueh, nimmt sie die mit dem kleineren Loch darueber und behaelt diese Spalte (`--tile-col`). Was
+danach frei ist (`fillGridSpans`): rechts neben dem Wetter waechst das Wetter hinein und zeigt mehr
+Tage - keine andere Kachel wird breiter, nur weil Platz ist (DW-P2-6); ein Loch, unter dem noch eine
+Kachel steht, fuellt die Kachel darueber; was dann noch Loch ist, die Kachel links daneben. Das Ende
+einer Spalte ist kein Loch: Spalten enden verschieden tief. Alles ist Darstellung
+(`data-row-fill`/`data-col-fill`), gespeichert bleibt die gewaehlte Groesse. Gemessen nachher (Seed,
+Kind, alle Kacheln; 768-1920px): 0 Loecher, Hoehe ohne Inhalt 1-9 % statt 9-29 % der Kachelflaeche
+(`test:dashboard`, "U1 b").
 
-**Das Raster der Uebersicht hat im Normalmodus kein Loch - rechts, dann unten** (R10 L9, R21 D5).
-Nach der dichten Packung waechst jede Kachel erst nach rechts in den Rest ihrer Zeile
-(`rowFillSpans`), dann nach unten in freie Zellen, die von links niemand erreicht
-(`columnFillSpans`): eine 1x1-Kachel neben zwei hohen liess darunter 305x185px leer (1440px,
-vier Spalten) bzw. 319x201px (Kinderkonto, drei Spalten). Beides ist Darstellung
-(`data-row-fill`/`data-col-fill`), gespeichert bleibt die gewaehlte Groesse; im Anpassen-Modus
-waechst nichts. Die Kennzahlreihe (`align-self: start`) waechst nicht nach unten. Gemessen nachher:
-0 Loecher bei 2, 3 und 4 Spalten, Erwachsene und Kind (`test:dashboard`, „R21 D5").
+**Anpassen zeigt das Raster, das danach steht** (DW-P2-9). Der Rahmen hat im Anpassen-Modus genau
+die Flaeche seiner Daten (`contain: size`), die Leiste schwebt mit dem Namen der Kachel ueber deren
+Kopf, die Kante des Rasters liegt ausserhalb (outline statt Polster). Was eine Kachel nur zum Fuellen
+bekommt, steht dort als gestrichelter Schlitz (Geist, dieselbe Form wie der Platz beim Ziehen).
+Gemessen: Kachelrahmen im Anpassen-Modus = Normalmodus +-1px. Eine Geste packt und fuellt neu, ohne
+die Seite neu zu bauen; ein stiller Abgleich, der die Spanne einer Kachel aendert, laesst die Kacheln
+gleiten (FLIP, `--ease-out`; unter reduzierter Bewegung blenden sie).
 
 **Und eine Fusszeile ist eine Auskunft, kein Griff.** Die Tagesbilanz des Haushalts schliesst
 ihre Karte als hairline-getrennte Zeile ab, exakt wie der Fuss der Budgetkarte - ein
@@ -4458,8 +4480,8 @@ Stufe unter dem 17px-Widget-Titel, weil die Kachel ein halbes Widget ist), der W
 semibold wie jede Kennzahl. Die Reihe ist der Container `metric-grid` (Wertstufen 28/22/20 nach ihrer Breite),
 `fitMetricLeads()` verkleinert, was auf der Stufe nicht passt, und per Subgrid teilen die
 Kacheln Kopf-, Wert- und Fusszeile - ein umbrechender Modulname verschiebt keinen Wert mehr.
-Ab 1024px fuellt die Reihe genau eine Rasterzeile (`--dashboard-row-min`), der Abstand zur
-naechsten Kachel ist die Rasterluecke (vorher 41 statt 20px). Das Caption-Label der
+Seit U1 b meldet die Reihe ihre Hoehe wie jede Kachel (vier Kacheln je Reihe breit, zwei schmal),
+der Abstand zur naechsten Kachel ist die Rasterluecke (vorher 41 statt 20px). Das Caption-Label der
 Kennzahl-Regel unten gilt fuer die Kennzahl einer Flaeche; hier nennt das Label den Absender.
 
 **Hier stand `module-seal--vivid`, und die Klasse gibt es nicht mehr.** In Etappe 2 war sie
