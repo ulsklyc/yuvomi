@@ -207,6 +207,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "value_num kann nicht geleert werden." and two German 403 sentences; every `error` there is English
   now, with the same status codes. The OpenAPI description of `PUT /health/caregivers/{subjectId}`
   now names `account_deactivated`, which it already sent.
+- **Calendar subscriptions, the Apple connection and event targets refuse in English** (#1695).
+  `/api/v1/calendar` still answered "Abonnement nicht gefunden.", "name: Pflichtfeld, max. 100
+  Zeichen.", "from/to müssen YYYY-MM-DD sein", "target_caldav_account_id: ungültige Konto-ID." and
+  "Interner Fehler" for subscriptions, the Apple connection, reading a range, the holiday feed and
+  the sync target of an event; every `error` there is English now, with the same status codes.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the

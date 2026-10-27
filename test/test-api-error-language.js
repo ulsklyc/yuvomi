@@ -42,6 +42,10 @@
  *        Bein 1 nicht liest (`limitedStr(..., 'Telefon')`, `date(..., 'Geburtstag')`).
  *        Ebenso fuer die Gesundheit (health/*.js, 32 Stellen in acht Dateien):
  *        Bein 1 nennt jede Datei, Bein 2 nennt alle 20 gefuehrten Absagen deutsch.
+ *        Ebenso fuer die Kalender-Abos, die Apple-Anbindung, den Feed, das Lesen
+ *        und die Kalenderziele (calendar/{apple,feed,helpers,read,subscriptions}.js,
+ *        46 Stellen): Bein 2 nennt 26 der 28 gefuehrten Absagen deutsch; "url:
+ *        Pflichtfeld." sah die Regel erst mit diesem Wort.
  *
  * Ausführen: npm run test:api-error-language
  */
@@ -65,11 +69,6 @@ const ROUTES = new URL('../server/routes/', import.meta.url);
 // meals.js und recipes.js stiegen mit den Kontakt-Feldnamen der Regel (Notizen,
 // Geburtstag ...): dieselben Stellen, jetzt gesehen, keine neuen.
 const GERMAN_LEFT = new Map([
-  ['calendar/apple.js', 6],
-  ['calendar/feed.js', 5],
-  ['calendar/helpers.js', 9],
-  ['calendar/read.js', 4],
-  ['calendar/subscriptions.js', 22],
   ['meals.js', 37],
   ['pantry.js', 5],
   ['push.js', 3],
@@ -113,6 +112,7 @@ test('die Regel erkennt die alten Saetze der uebrigen Module und laesst englisch
     'calendar_default_target: maximal 300 Zeichen',
     'Unbekannte Nutzer-ID.',
     'target_google_calendar_id: zu lang.',
+    'url: Pflichtfeld.',
     'Telefon is too long.',
     'Geburtstag must be a valid date.',
   ]) assert.ok(germanIn(old), `nicht erkannt: ${old}`);
@@ -684,5 +684,69 @@ test('keine Absage der Gesundheit traegt deutschen Wortlaut', async () => {
     assertRefusedInEnglish(seen);
   } finally {
     hServer.close();
+  }
+});
+
+test('keine Absage der Kalender-Abos, Apple-Anbindung und Kalenderziele traegt deutschen Wortlaut', async () => {
+  const { default: calendarRouter } = await import('../server/routes/calendar.js');
+  const who = { userId: ADMIN, role: 'admin' };
+  const calApp = express();
+  calApp.use(express.json());
+  calApp.use((req, _res, next) => {
+    req.authUserId = who.userId;
+    req.authRole = who.role;
+    req.session = { userId: who.userId, role: who.role };
+    next();
+  });
+  calApp.use('/calendar', calendarRouter);
+  const calServer = calApp.listen(0, '127.0.0.1');
+  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}`)));
+  try {
+    const seen = [];
+    const run = async (label, method, route, body, as = { userId: ADMIN, role: 'admin' }) => {
+      Object.assign(who, as);
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${calUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      seen.push({ label, status: res.status, error: json?.error ?? null });
+    };
+    const member = { userId: MEMBER, role: 'member' };
+    const sub = db.prepare("INSERT INTO ics_subscriptions (name, url, created_by) VALUES ('Abo', 'https://ics.example/a.ics', ?)").run(ADMIN).lastInsertRowid;
+    const event = { title: 'T', start_datetime: '2026-11-01T10:00', end_datetime: '2026-11-01T11:00' };
+
+    await run('read-range', 'GET', '/calendar?from=x&to=y');
+    await run('apple-url', 'POST', '/calendar/apple/connect', { url: 'nope', username: 'u', password: 'p' });
+    await run('apple-user', 'POST', '/calendar/apple/connect', { url: 'https://caldav.example/', password: 'p' });
+    await run('apple-password', 'POST', '/calendar/apple/connect', { url: 'https://caldav.example/', username: 'u' });
+    await run('sub-name', 'POST', '/calendar/subscriptions', { url: 'https://ics.example/b.ics', color: '#112233' });
+    await run('sub-url', 'POST', '/calendar/subscriptions', { name: 'B', color: '#112233' });
+    await run('sub-scheme', 'POST', '/calendar/subscriptions', { name: 'B', url: 'ftp://ics.example/b.ics', color: '#112233' });
+    await run('sub-color', 'POST', '/calendar/subscriptions', { name: 'B', url: 'https://ics.example/b.ics', color: 'red' });
+    await run('sub-patch-id', 'PATCH', '/calendar/subscriptions/x', { name: 'X' });
+    await run('sub-patch-name', 'PATCH', `/calendar/subscriptions/${sub}`, { name: '' });
+    await run('sub-patch-color', 'PATCH', `/calendar/subscriptions/${sub}`, { color: 'red' });
+    await run('sub-patch-gone', 'PATCH', '/calendar/subscriptions/987654', { name: 'X' });
+    await run('sub-patch-foreign', 'PATCH', `/calendar/subscriptions/${sub}`, { name: 'X' }, member);
+    await run('sub-delete-id', 'DELETE', '/calendar/subscriptions/x');
+    await run('sub-delete-gone', 'DELETE', '/calendar/subscriptions/987654');
+    await run('sub-delete-foreign', 'DELETE', `/calendar/subscriptions/${sub}`, undefined, member);
+    await run('sub-sync-id', 'POST', '/calendar/subscriptions/x/sync');
+    await run('sub-sync-gone', 'POST', '/calendar/subscriptions/987654/sync');
+    await run('sub-sync-foreign', 'POST', `/calendar/subscriptions/${sub}/sync`, undefined, member);
+    await run('target-caldav-id', 'POST', '/calendar', { ...event, target_caldav_account_id: 'x' });
+    await run('target-caldav-url', 'POST', '/calendar', { ...event, target_caldav_account_id: 1 });
+    await run('target-caldav-long', 'POST', '/calendar', { ...event, target_caldav_account_id: 1, target_caldav_calendar_url: 'x'.repeat(3000) });
+    await run('target-outlook-id', 'POST', '/calendar', { ...event, target_outlook_account_id: 'x' });
+    await run('target-outlook-cal', 'POST', '/calendar', { ...event, target_outlook_account_id: 1 });
+    await run('target-outlook-long', 'POST', '/calendar', { ...event, target_outlook_account_id: 1, target_outlook_calendar_id: 'x'.repeat(3000) });
+    await run('target-google-long', 'POST', '/calendar', { ...event, target_google_calendar_id: 'x'.repeat(3000) });
+    await run('target-caldav-offered', 'POST', '/calendar', { ...event, target_caldav_account_id: 987654, target_caldav_calendar_url: 'https://dav.example/cal/' });
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    calServer.close();
   }
 });

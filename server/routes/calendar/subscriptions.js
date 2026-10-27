@@ -37,7 +37,7 @@ router.get('/subscriptions', (req, res) => {
     res.json({ data });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -45,15 +45,15 @@ router.post('/subscriptions', async (req, res) => {
   try {
     const { name, url, color: colorVal, shared } = req.body;
     if (!name || typeof name !== 'string' || name.trim().length === 0 || name.length > 100)
-      return res.status(400).json({ error: 'name: Pflichtfeld, max. 100 Zeichen.', code: 400 });
+      return res.status(400).json({ error: 'name is required and may be at most 100 characters long.', code: 400 });
     if (!url || typeof url !== 'string')
-      return res.status(400).json({ error: 'url: Pflichtfeld.', code: 400 });
+      return res.status(400).json({ error: 'url is required.', code: 400 });
     const allowPrivate = icsSubscription.isPrivateNetworkAllowed();
     const allowedProtocols = allowPrivate ? ['https:', 'http:'] : ['https:'];
     try { const u = new URL(url.replace(/^webcal:\/\//i, 'https://')); if (!allowedProtocols.includes(u.protocol)) throw new Error(); }
-    catch { return res.status(400).json({ error: allowPrivate ? 'url: Nur http://, https:// und webcal:// sind erlaubt.' : 'url: Nur https:// und webcal:// sind erlaubt.', code: 400 }); }
+    catch { return res.status(400).json({ error: allowPrivate ? 'Only http://, https:// and webcal:// URLs are allowed.' : 'Only https:// and webcal:// URLs are allowed.', code: 400 }); }
     if (!colorVal || !ICS_COLOR_RE.test(colorVal))
-      return res.status(400).json({ error: 'color: Pflichtfeld, muss #RRGGBB sein.', code: 400 });
+      return res.status(400).json({ error: 'color is required and must be #RRGGBB.', code: 400 });
     // Die Standard-Zuweisung schon beim Anlegen: create() synchronisiert
     // unmittelbar, und bisher ließ sie sich erst danach im Bearbeiten-Dialog
     // setzen - die erste, oft größte Ladung Termine kam also grundsätzlich ohne
@@ -73,26 +73,26 @@ router.post('/subscriptions', async (req, res) => {
     res.status(201).json({ data: sub, syncError: syncError || null });
   } catch (err) {
     log.error('', err);
-    if (err.message?.includes('Nur https')) return res.status(400).json({ error: err.message, code: 400 });
+    if (err.message?.startsWith('Only ')) return res.status(400).json({ error: err.message, code: 400 });
     if (err.message?.includes('private IP')) return res.status(400).json({ error: err.message, code: 400 });
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
 router.patch('/subscriptions/:id', (req, res) => {
   try {
     const subId   = parseInt(req.params.id, 10);
-    if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     const isAdmin = isAdminUser(req);
     const fields  = {};
     if (req.body.name  !== undefined) {
       if (typeof req.body.name !== 'string' || req.body.name.trim().length === 0 || req.body.name.length > 100)
-        return res.status(400).json({ error: 'name: max. 100 Zeichen, darf nicht leer sein.', code: 400 });
+        return res.status(400).json({ error: 'name must not be empty and may be at most 100 characters long.', code: 400 });
       fields.name = req.body.name.trim();
     }
     if (req.body.color !== undefined) {
       if (!ICS_COLOR_RE.test(req.body.color))
-        return res.status(400).json({ error: 'color: muss #RRGGBB sein.', code: 400 });
+        return res.status(400).json({ error: 'color must be #RRGGBB.', code: 400 });
       fields.color = req.body.color;
     }
     if (req.body.shared !== undefined) fields.shared = req.body.shared;
@@ -104,48 +104,48 @@ router.patch('/subscriptions/:id', (req, res) => {
     if (assignees.present) fields.default_assignee_user_ids = assignees.ids;
 
     const updated = icsSubscription.update(getUserId(req), subId, fields, isAdmin);
-    if (!updated) return res.status(404).json({ error: 'Abonnement nicht gefunden.', code: 404 });
+    if (!updated) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
     res.json({ data: updated });
   } catch (err) {
     // icsSubscription wirft 'Not authorized.' (englisch) — ohne diese Angleichung
     // schlägt der Vergleich fehl und ein Nicht-Owner erhielte 500 statt 403.
-    if (err.message === 'Not authorized.') return res.status(403).json({ error: 'Nicht autorisiert.', code: 403 });
+    if (err.message === 'Not authorized.') return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
 router.delete('/subscriptions/:id', (req, res) => {
   try {
     const subId   = parseInt(req.params.id, 10);
-    if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     const isAdmin = isAdminUser(req);
     const ok      = icsSubscription.remove(getUserId(req), subId, isAdmin);
-    if (!ok) return res.status(404).json({ error: 'Abonnement nicht gefunden.', code: 404 });
+    if (!ok) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
     res.status(204).end();
   } catch (err) {
     // icsSubscription wirft 'Not authorized.' (englisch) — Angleichung wie oben,
     // sonst 500 statt 403 für Nicht-Owner.
-    if (err.message === 'Not authorized.') return res.status(403).json({ error: 'Nicht autorisiert.', code: 403 });
+    if (err.message === 'Not authorized.') return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
 router.post('/subscriptions/:id/sync', async (req, res) => {
   try {
     const subId   = parseInt(req.params.id, 10);
-    if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     const isAdmin = isAdminUser(req);
     const sub     = db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId);
-    if (!sub) return res.status(404).json({ error: 'Abonnement nicht gefunden.', code: 404 });
+    if (!sub) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
     if (!isAdmin && sub.created_by !== getUserId(req))
-      return res.status(403).json({ error: 'Nicht autorisiert.', code: 403 });
+      return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
     await icsSubscription.sync(subId);
     res.json({ data: icsSubscription.getOne(subId) });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -189,7 +189,7 @@ router.post('/import', async (req, res) => {
       return res.status(400).json({ error: err.message, code: 400 });
     }
     log.error('POST /import:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 

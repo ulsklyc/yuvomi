@@ -22,7 +22,7 @@ router.get('/feed', (req, res) => {
     res.json({ data: { token, url: feedUrl(req, token), showAssignees, includeBirthdays } });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -46,7 +46,7 @@ router.put('/feed', (req, res) => {
     res.json({ data });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -57,7 +57,7 @@ router.post('/feed/regenerate', (req, res) => {
     res.json({ data: { token, url: feedUrl(req, token) } });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -68,7 +68,7 @@ router.delete('/feed', (req, res) => {
     res.json({ data: { token: null } });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -86,7 +86,7 @@ router.get('/holidays', (req, res) => {
     res.json({ data });
   } catch (err) {
     log.error('GET /holidays', err);
-    res.status(500).json({ error: 'Interner Fehler.', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
