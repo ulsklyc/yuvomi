@@ -136,3 +136,56 @@ test('Kontoseite: ohne Kurs steht die Summe je Waehrung, keine Gesamtzahl', () =
   assert.doesNotMatch(html, /<div class="metric-card__value">/, 'keine erfundene Gesamtzahl');
   assert.match(html, /class="metric-card__note">/);
 });
+
+// --------------------------------------------------------------------------
+// Die gefilterte Uebersicht (#2302, Stufe c)
+// --------------------------------------------------------------------------
+
+const SUMMARY = { income: 1000, expenses: -400, balance: 600, transfers: 50, transfers_in: 20, byCategory: [] };
+
+test('Filter: ohne Kontofilter bleibt die Budget-Waehrung, mit Filter gilt die des Kontos', () => {
+  withState({ accountFilterId: null }, () => assert.equal(budgetUi.viewCurrency(), 'EUR'));
+  withState({ accountFilterId: 2 }, () => assert.equal(budgetUi.viewCurrency(), 'JPY'));
+  withState({ accountFilterId: 1 }, () => assert.equal(budgetUi.viewCurrency(), 'EUR', 'Konto ohne eigene Waehrung'));
+});
+
+test('Filter: Bilanz-Kurzzeile und Umbuchungskarte stehen zusammen in der Kontowaehrung', () => {
+  const glance = withState({ accountFilterId: 3 }, () => budgetUi.balanceGlanceHtml(SUMMARY, { expensesOnly: false, forecast: false, balanceTone: '' }));
+  for (const n of [600, 1000, 400]) {
+    assert.ok(glance.includes(formatMoney(n, 'USD').replace('-', '')) || glance.includes(formatMoney(n, 'USD')), `${n} in USD`);
+  }
+  assert.ok(!glance.includes(currencySymbol('EUR')), 'kein Euro-Zeichen im Kontofilter');
+  const transfers = withState({ accountFilterId: 3 }, () => budgetUi.transferSummaryHtml(SUMMARY));
+  assert.ok(transfers.includes(currencySymbol('USD')), 'Eingang und Ausgang in USD');
+  assert.ok(!transfers.includes(currencySymbol('EUR')));
+});
+
+test('Filter: das Kategoriediagramm folgt der Kontowaehrung', () => {
+  const rows = [{ category: 'food', income: 0, expenses: -400, total: -400 }];
+  const filtered = withState({ accountFilterId: 2 }, () => budgetUi.renderCategoryBars(rows));
+  assert.ok(filtered.includes(currencySymbol('JPY')), 'Yen im Diagramm des Yen-Kontos');
+  assert.ok(!filtered.includes(currencySymbol('EUR')));
+  const plain = withState({ accountFilterId: null }, () => budgetUi.renderCategoryBars(rows));
+  assert.ok(plain.includes(currencySymbol('EUR')), 'ungefiltert in der Budget-Waehrung');
+});
+
+test('Liste: eine Buchung steht in der Waehrung ihres Kontos', () => {
+  const rows = withState({ accountFilterId: null, month: '2026-06', members: [] }, () => budgetUi.entryRows([
+    { id: 1, title: 'Ramen', amount: -1200, category: 'food', subcategory: '', date: '2026-06-03', account_id: 2, responsible_users: [], attachments: [] },
+    { id: 2, title: 'Brot', amount: -3, category: 'food', subcategory: '', date: '2026-06-03', account_id: 1, responsible_users: [], attachments: [] },
+  ]));
+  assert.ok(rows.includes(currencySymbol('JPY')), 'die Yen-Buchung in Yen');
+  assert.ok(rows.includes(currencySymbol('EUR')), 'die Giro-Buchung in Euro');
+});
+
+test('Filter: jede Karte der Bilanz rechnet in der Waehrung der Uebersicht', async () => {
+  // Die Bilanzkarten stehen im Rumpf von renderBody, der ein ganzes DOM
+  // braucht; gemessen wird deshalb der Quelltext: jeder Betrag der Summary
+  // (`s.`) und des Ausstehenden geht mit `viewCurrency()` durch.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/budget.js', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('function renderBody()'), src.indexOf('function categoryFilterLabel()'));
+  const calls = [...body.matchAll(/amountByRole\((s\.\w+|pendingTotal)[^)]*\)/g)].map((m) => m[0]);
+  assert.ok(calls.length >= 5, `Bilanzbetraege gefunden: ${calls.length}`);
+  for (const call of calls) assert.match(call, /currency: viewCurrency\(\)/, call);
+});

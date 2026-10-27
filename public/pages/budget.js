@@ -250,6 +250,14 @@ function accountCurrency(id) {
   return (state.accounts ?? []).find((a) => a.id === id)?.currency || state.currency;
 }
 
+// DIE WAEHRUNG DER UEBERSICHT (#2302). Auf ein Konto gefiltert stehen Karten,
+// Diagramm und Summen in dessen Waehrung - es sind seine Buchungen, und sie
+// stehen dort so wie auf dem Kontoauszug. Ungefiltert bleibt die
+// Budget-Waehrung; alle Karten wechseln zusammen, nie eine allein.
+function viewCurrency() {
+  return state.accountFilterId != null ? accountCurrency(state.accountFilterId) : state.currency;
+}
+
 // --------------------------------------------------------
 // State
 // --------------------------------------------------------
@@ -492,11 +500,11 @@ function transferSummaryHtml(s) {
   const out = Number(s?.transfers) || 0;
   const filtered = state.accountFilterId && s?.transfers_in !== undefined;
   if (!filtered) {
-    return out > 0 ? `<div class="metric-card budget-transfer-summary"><div class="metric-card__label">${t('budget.summaryTransfers')}</div><div class="metric-card__value">${amountByRole(out, 'total').text}</div></div>` : '';
+    return out > 0 ? `<div class="metric-card budget-transfer-summary"><div class="metric-card__label">${t('budget.summaryTransfers')}</div><div class="metric-card__value">${amountByRole(out, 'total', { currency: viewCurrency() }).text}</div></div>` : '';
   }
   const incoming = Number(s.transfers_in) || 0;
   if (!(incoming > 0) && !(out > 0)) return '';
-  const flow = (key, n) => `<div class="budget-transfer-summary__flow"><dt class="budget-transfer-summary__flow-label">${t(key)}</dt><dd class="budget-transfer-summary__flow-value">${amountByRole(n, 'flow').text}</dd></div>`;
+  const flow = (key, n) => `<div class="budget-transfer-summary__flow"><dt class="budget-transfer-summary__flow-label">${t(key)}</dt><dd class="budget-transfer-summary__flow-value">${amountByRole(n, 'flow', { currency: viewCurrency() }).text}</dd></div>`;
   return `<div class="metric-card budget-transfer-summary budget-transfer-summary--split">
       <div class="metric-card__label" id="budget-transfer-summary-label">${t('budget.summaryTransfers')}</div>
       <dl class="budget-transfer-summary__flows" aria-labelledby="budget-transfer-summary-label">${flow('budget.summaryTransfersIn', incoming)}${flow('budget.summaryTransfersOut', -out)}</dl>
@@ -738,7 +746,7 @@ function ledgerStatusText() {
   const sum = entries.reduce((total, entry) => (
     total + (entry.is_pending ? 0 : Number(entry.amount) || 0)
   ), 0);
-  return t('budget.ledgerFilterSummary', { count: entries.length, sum: formatAmount(sum) });
+  return t('budget.ledgerFilterSummary', { count: entries.length, sum: formatAmount(sum, viewCurrency()) });
 }
 
 function findEntry(id) {
@@ -1429,7 +1437,7 @@ function renderBody() {
          <i data-lucide="clock" class="icon-sm" aria-hidden="true"></i>
          <span>${esc(t('budget.pendingSummary', {
            count: s.pending.count,
-           amount: amountByRole(pendingTotal, 'flow').text,
+           amount: amountByRole(pendingTotal, 'flow', { currency: viewCurrency() }).text,
          }))}</span>
        </p>`
     : '';
@@ -1445,7 +1453,7 @@ function renderBody() {
   const incomeCard = `
       <div class="metric-card metric-card--income">
         <div class="metric-card__label">${t('budget.income')}</div>
-        <div class="metric-card__value">${amountByRole(s.income, 'total').text}</div>
+        <div class="metric-card__value">${amountByRole(s.income, 'total', { currency: viewCurrency() }).text}</div>
         ${p ? renderTrend(s.income, p.income, prevLabel) : ''}
       </div>`;
   // Ausgaben-Trend im Betragsraum (Math.abs), wie die Zahl auf der Karte:
@@ -1454,16 +1462,16 @@ function renderBody() {
   const expensesCard = `
       <div class="metric-card metric-card--expenses">
         <div class="metric-card__label">${t('budget.expenses')}</div>
-        <div class="metric-card__value">${amountByRole(s.expenses, 'total').text}</div>
+        <div class="metric-card__value">${amountByRole(s.expenses, 'total', { currency: viewCurrency() }).text}</div>
         ${p ? renderTrend(Math.abs(s.expenses), Math.abs(p.expenses), prevLabel) : ''}
       </div>`;
   // Rolle `balance`: hier trägt die Zahl selbst die Richtung.
   // DER SALDO FUEHRT (Critique R18): eine Display-Stufe in der Seitenleiste,
   // Einnahmen und Ausgaben eine Stufe leiser (panel.css `.metric-card--lead`).
   const balanceCard = `
-      <div class="metric-card budget-balance-card ${balanceTone} ${leadCardClass(amountByRole(s.balance, 'balance').text)}">
+      <div class="metric-card budget-balance-card ${balanceTone} ${leadCardClass(amountByRole(s.balance, 'balance', { currency: viewCurrency() }).text)}">
         <div class="metric-card__label">${t('budget.balance')}</div>
-        <div class="metric-card__value">${amountByRole(s.balance, 'balance').text}</div>
+        <div class="metric-card__value">${amountByRole(s.balance, 'balance', { currency: viewCurrency() }).text}</div>
         ${p && !balanceNeutral ? renderTrend(s.balance, p.balance, prevLabel) : ''}
       </div>`;
 
@@ -1864,8 +1872,8 @@ function blockTotal(rows) {
  * Vorzeichen, denn dort IST es die Auskunft (hinein oder hinaus). */
 function blockAmountText(amount, kind) {
   return kind === 'transfers'
-    ? amountByRole(amount, 'flow').text
-    : amountByRole(amount, 'total').text;
+    ? amountByRole(amount, 'flow', { currency: viewCurrency() }).text
+    : amountByRole(amount, 'total', { currency: viewCurrency() }).text;
 }
 
 /* Wie in der Statistik: der Anteil steht nur bei Ausgaben, leise hinter dem Betrag. */
@@ -1929,7 +1937,7 @@ function chartIncomeLine(blocks) {
   return `
           <p class="budget-chart-head__income">
             <span>${esc(t('budget.income'))}</span>
-            <span class="budget-chart-head__income-amount">${amountByRole(blockTotal(blocks.income), 'flow').text}</span>
+            <span class="budget-chart-head__income-amount">${amountByRole(blockTotal(blocks.income), 'flow', { currency: viewCurrency() }).text}</span>
           </p>`;
 }
 
@@ -1982,12 +1990,12 @@ function balanceGlanceHtml(s, { expensesOnly, forecast, balanceTone }) {
     : balanceTone === 'metric-card--balance-positive' ? 'positive'
       : balanceTone === 'metric-card--balance-negative' ? 'negative' : 'neutral';
   const lead = expensesOnly
-    ? { label: t('budget.expenses'), value: amountByRole(s.expenses, 'total').text, tone: 'neutral' }
-    : { label: t(forecast ? 'budget.summaryTitleForecast' : 'budget.balance'), value: amountByRole(s.balance, 'balance').text, tone };
+    ? { label: t('budget.expenses'), value: amountByRole(s.expenses, 'total', { currency: viewCurrency() }).text, tone: 'neutral' }
+    : { label: t(forecast ? 'budget.summaryTitleForecast' : 'budget.balance'), value: amountByRole(s.balance, 'balance', { currency: viewCurrency() }).text, tone };
   const flows = expensesOnly ? '' : `
         <span class="budget-glance__flows">
-          <span class="budget-glance__flow">${esc(t('budget.income'))} <span class="budget-glance__amount">${amountByRole(s.income, 'total').text}</span></span>
-          <span class="budget-glance__flow">${esc(t('budget.expenses'))} <span class="budget-glance__amount">${amountByRole(s.expenses, 'total').text}</span></span>
+          <span class="budget-glance__flow">${esc(t('budget.income'))} <span class="budget-glance__amount">${amountByRole(s.income, 'total', { currency: viewCurrency() }).text}</span></span>
+          <span class="budget-glance__flow">${esc(t('budget.expenses'))} <span class="budget-glance__amount">${amountByRole(s.expenses, 'total', { currency: viewCurrency() }).text}</span></span>
         </span>`;
   const count = s.byCategory?.length ?? 0;
   return `
@@ -2251,7 +2259,7 @@ function subcategoryRows(category, entries) {
                 style="--bar-scale:${scale}"${parentTexture ? ` data-texture="${parentTexture}"` : ''}></span>
         </span>
         <span class="budget-bar-row__amount">
-          ${amountByRole(row.amount, 'flow').text}${kind === 'expenses' && row.amount !== 0 ? shareHtml(row.amount, categoryTotal) : ''}
+          ${amountByRole(row.amount, 'flow', { currency: viewCurrency() }).text}${kind === 'expenses' && row.amount !== 0 ? shareHtml(row.amount, categoryTotal) : ''}
         </span>
       </button>`;
   }).join('');
@@ -2274,7 +2282,7 @@ function renderSubcategoryBreakdowns() {
                 aria-labelledby="${esc(titleId)}">
           <h3 class="budget-chart-block__title" id="${esc(titleId)}">
             <span>${esc(categoryLabel(category))}</span>
-            <span class="budget-chart-block__total">${amountByRole(total, 'total').text}</span>
+            <span class="budget-chart-block__total">${amountByRole(total, 'total', { currency: viewCurrency() }).text}</span>
           </h3>
           <div class="budget-chart-block__rows">
             ${rows}
@@ -2702,7 +2710,7 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
     // Rolle `flow`: eine einzelne Kontobewegung trägt immer ein Vorzeichen, und
     // das Vorzeichen kommt aus dem Zahlformat (signDisplay), nicht aus einem
     // vorangestellten '+' - sonst steht es in RTL-Locales auf der falschen Seite.
-    const amountText = amountByRole(e.amount, 'flow').text;
+    const amountText = amountByRole(e.amount, 'flow', { currency: accountCurrency(e.account_id) }).text;
     /* DER MONAT STEHT ÜBER DER LISTE, NICHT IN JEDER ZEILE.
      *
      * Die Liste ist per Konstruktion EIN Monat - loadMonth() holt
@@ -6366,6 +6374,8 @@ export const __test = {
   entryFormErrors,
   // #2302: der Betrag im Buchungsdialog folgt der Waehrung des Kontos.
   bindEntryAccountCurrency,
+  // #2302: im Kontofilter steht die Uebersicht in der Waehrung des Kontos.
+  viewCurrency, transferSummaryHtml, entryRows,
   monthNavHtml,
   // #1775: das Datum eines neuen Eintrags folgt dem gezeigten Zeitraum.
   newEntryDefaultDate,

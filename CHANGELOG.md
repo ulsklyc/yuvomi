@@ -259,6 +259,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accounts in several currencies is converted with the cached exchange rates and marked as an
   approximation (≈, with the date of the rates); without a rate it shows the total per currency
   instead of adding dollars and euros.
+- **Filtered to one account, the budget overview is in that account's currency** (#2302). The
+  balance, income, expenses, transfers, pending amount and category chart of an account in
+  dollars still showed euros, so the numbers next to the statement were not the statement's. All
+  of them now switch together to the account's currency while the filter is set, and each entry
+  in the list shows its own account's currency. Without a filter the overview stays in the
+  household currency as before.
 - **Settings - Wall tablets names the pairing address before a code exists** (#2294). A tablet
   pairs at your instance's `/pair` address, not through the sign-in page, but the page only said
   so next to a freshly generated code. It now shows the two steps and the full address up front,

@@ -3982,7 +3982,7 @@ test('Rot steht im Budget nur an einer Warnung, nie an der Ausgabe selbst', () =
   assert.ok(trend, 'Trend-Diagramm nicht gefunden');
   assert.doesNotMatch(trend[0], /--color-danger/, 'die Ausgabenlinie ist kein Alarm');
   // Die Richtung bleibt lesbar ohne Farbe: das Vorzeichen kommt aus dem Zahlformat.
-  assert.match(budget, /amountByRole\(e\.amount, 'flow'\)/);
+  assert.match(budget, /amountByRole\(e\.amount, 'flow', \{ currency: accountCurrency\(e\.account_id\) \}\)/, 'Rolle flow, in der Waehrung des Kontos (#2302)');
 });
 
 // --------------------------------------------------------
