@@ -3050,10 +3050,6 @@
   min-inline-size: 8rem;
 }
 
-.caldav-reminder-assignees[hidden] {
-  display: none;
-}
-
 /* Der Hinweis "nur lesbar" (#1840) steht unter Name UND Modulwahl, ueber die
    volle Breite. */
 .caldav-reminder-note {
