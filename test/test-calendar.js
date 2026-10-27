@@ -7235,7 +7235,8 @@ test('#1462: am Desktop wird der Status zum Zeichen, wenn die Zeile sonst nicht 
   const box = (width, extra = {}) => ({ getBoundingClientRect: () => ({ width }), classList: { contains: () => false }, ...extra });
   const make = (inner) => {
     const classes = new Set();
-    const status = box(200);
+    // Wie im Browser: in der Zeichen-Form misst der Status 40 statt 200px.
+    const status = { getBoundingClientRect: () => ({ width: classes.has('page-toolbar--status-icon') ? 40 : 200 }), classList: { contains: () => false } };
     const kids = [box(36), box(120), box(340), box(160), status];
     const barEl = { classList: { contains: (c) => c === 'page-toolbar__bar' }, getBoundingClientRect: () => ({ width: 600 }) };
     return {
