@@ -229,14 +229,14 @@ test('refreshUrlSource and createUrlSource: a failed fetch names its class in th
 test('buildAutoMappingDecisions: every label remembered (mapped or ignored) and no blocking diagnostic -> a decision per label', () => {
   const preview = {
     labels: [
-      { normalized_label: 'bio', remembered_type_id: 5, remembered_ignored: false },
-      { normalized_label: 'restmuell', remembered_type_id: null, remembered_ignored: true },
+      { normalized_label: 'bio', remembered_type_ids: [5], remembered_ignored: false },
+      { normalized_label: 'restmuell', remembered_type_ids: [], remembered_ignored: true },
     ],
     diagnostics: [{ severity: 'info', code: 'cancelled_excluded' }],
   };
   const decisions = __test.buildAutoMappingDecisions(preview);
   assert.deepEqual(decisions, [
-    { normalized_label: 'bio', type_id: 5 },
+    { normalized_label: 'bio', type_ids: [5] },
     { normalized_label: 'restmuell', ignored: true },
   ]);
 });
@@ -244,8 +244,8 @@ test('buildAutoMappingDecisions: every label remembered (mapped or ignored) and 
 test('buildAutoMappingDecisions: one label with neither a remembered type nor remembered_ignored -> null (cannot auto-decide)', () => {
   const preview = {
     labels: [
-      { normalized_label: 'bio', remembered_type_id: 5, remembered_ignored: false },
-      { normalized_label: 'neu', remembered_type_id: null, remembered_ignored: false },
+      { normalized_label: 'bio', remembered_type_ids: [5], remembered_ignored: false },
+      { normalized_label: 'neu', remembered_type_ids: [], remembered_ignored: false },
     ],
     diagnostics: [],
   };
@@ -254,7 +254,7 @@ test('buildAutoMappingDecisions: one label with neither a remembered type nor re
 
 test('buildAutoMappingDecisions: an unresolved blocking diagnostic blocks auto-commit even when every label is mapped', () => {
   const preview = {
-    labels: [{ normalized_label: 'bio', remembered_type_id: 5, remembered_ignored: false }],
+    labels: [{ normalized_label: 'bio', remembered_type_ids: [5], remembered_ignored: false }],
     diagnostics: [{ severity: 'blocking', code: 'unbounded_recurrence' }],
   };
   assert.equal(__test.buildAutoMappingDecisions(preview), null);
@@ -683,6 +683,13 @@ async function createAndCommit(url, name, mappingDecisions) {
   return created.source.id;
 }
 
+/** Remembers a label decision the way a source's mapping sheet does, so a refresh may auto-commit. */
+function rememberMapping(sourceId, originalLabel, typeId) {
+  const mappingId = get().prepare('INSERT INTO waste_source_mappings (source_id, original_label, normalized_label) VALUES (?, ?, ?)')
+    .run(sourceId, originalLabel, originalLabel.toLowerCase()).lastInsertRowid;
+  get().prepare('INSERT INTO waste_source_mapping_types (mapping_id, type_id) VALUES (?, ?)').run(mappingId, typeId);
+}
+
 function pickupRows(sourceId) {
   return get().prepare('SELECT id, type_id, date_key, original_summary FROM waste_imported_pickups WHERE source_id = ? ORDER BY id').all(sourceId);
 }
@@ -706,8 +713,7 @@ test('#1795 refresh: a row of ANOTHER type on the same day is no partner - it is
     const huisvuilRow = before.find((r) => r.type_id === huisvuil.id);
     // "Gft" is a label this source has no decision for yet - remember one, the
     // way the mapping sheet of a source does, so the refresh may auto-commit.
-    get().prepare('INSERT INTO waste_source_mappings (source_id, original_label, normalized_label, type_id, ignored) VALUES (?, ?, ?, ?, 0)')
-      .run(sourceId, 'Gft', 'gft', gft.id);
+    rememberMapping(sourceId, 'Gft', gft.id);
 
     const refreshed = await refreshUrlSource(get(), sourceId);
     assert.equal(refreshed.outcome, 'committed');
@@ -753,8 +759,7 @@ test('#1795 refresh: two labels on one type and day are paired by their wording,
     );
     assert.deepEqual(pickupRows(sourceId).map((r) => [r.id, r.original_summary]), before.map((r) => [r.id, r.original_summary]));
 
-    get().prepare('INSERT INTO waste_source_mappings (source_id, original_label, normalized_label, type_id, ignored) VALUES (?, ?, ?, ?, 0)')
-      .run(sourceId, 'Rest 6w', 'rest 6w', rest.id);
+    rememberMapping(sourceId, 'Rest 6w', rest.id);
     const renamed = await refreshUrlSource(get(), sourceId);
     assert.equal(renamed.outcome, 'committed');
     assert.deepEqual(
@@ -979,7 +984,8 @@ async function emptyFeedHousehold() {
     },
   });
   assert.equal(committed.status, 200, JSON.stringify(committed.body));
-  const typeIds = d.prepare('SELECT DISTINCT type_id FROM waste_source_mappings WHERE source_id = ?').all(id).map((r) => r.type_id);
+  const typeIds = d.prepare(`SELECT DISTINCT mt.type_id FROM waste_source_mapping_types mt
+    JOIN waste_source_mappings m ON m.id = mt.mapping_id WHERE m.source_id = ?`).all(id).map((r) => r.type_id);
   for (const typeId of typeIds) {
     const set = await apiCall('PUT', `/waste/reminder-settings/${typeId}`, { body: { enabled: true, offset_days: 1, delivery_time: '18:00' } });
     assert.equal(set.status, 200, JSON.stringify(set.body));

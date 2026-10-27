@@ -219,7 +219,7 @@ function pickupDateKey(dtstart, timeZone) {
  * @param {string} [opts.timeZone] IANA zone the pickup DAY is decided in (see pickupDateKey).
  *   Defaults to UTC so this stays a pure function; waste-store.js passes the household zone.
  * @param {object[]} [opts.existingTypes] `{id, name}` rows, for mapping suggestions
- * @param {Map<string,{type_id:number|null, ignored:boolean, original_label:string}>} [opts.existingMappings] normalized_label -> remembered decision (re-import)
+ * @param {Map<string,{type_ids:number[], ignored:boolean, original_label:string}>} [opts.existingMappings] normalized_label -> remembered decision (re-import)
  * @returns {object} preview - `diagnostics` entries with `severity: 'blocking'` carry an
  *   `event_key`; the caller (waste-store.js#commitImport) decides whether an
  *   explicit `skipEventKeys` list covers every blocking key before allowing a commit.
@@ -376,7 +376,11 @@ export function buildImportPreview(icsText, {
     return {
       ...g,
       suggested_type_id: typesByLowerName.get(g.normalized_label) ?? null,
-      remembered_type_id: remembered?.type_id ?? null,
+      // Every type the label was mapped to on the last commit (#2273);
+      // remembered_type_id is the lowest of them, kept for API callers from
+      // before a label could carry more than one.
+      remembered_type_ids: remembered?.type_ids ?? [],
+      remembered_type_id: remembered?.type_ids?.[0] ?? null,
       remembered_ignored: remembered?.ignored ?? false,
     };
   }).sort((a, b) => a.normalized_label.localeCompare(b.normalized_label));

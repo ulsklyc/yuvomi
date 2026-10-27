@@ -272,13 +272,14 @@ test('suggested_type_id matches an existing type by case-insensitive name', () =
   assert.equal(preview.labels[0].suggested_type_id, 42);
 });
 
-test('existingMappings prefill remembered_type_id / remembered_ignored for a re-import preview', () => {
+test('existingMappings prefill remembered_type_ids / remembered_ignored for a re-import preview', () => {
   const ics = vcalendar(['BEGIN:VEVENT\r\nUID:r1@x\r\nSUMMARY:Restmüll\r\nDTSTART;VALUE=DATE:20260701\r\nEND:VEVENT']);
   const preview = buildImportPreview(ics, {
     today: TODAY,
-    existingMappings: new Map([['restmüll', { type_id: 7, ignored: false, original_label: 'Restmüll' }]]),
+    existingMappings: new Map([['restmüll', { type_ids: [7, 9], ignored: false, original_label: 'Restmüll' }]]),
   });
-  assert.equal(preview.labels[0].remembered_type_id, 7);
+  assert.deepEqual(preview.labels[0].remembered_type_ids, [7, 9]);
+  assert.equal(preview.labels[0].remembered_type_id, 7, 'the single field of API callers from before #2273 names the lowest');
   assert.equal(preview.labels[0].remembered_ignored, false);
 });
 
