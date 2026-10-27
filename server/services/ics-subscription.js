@@ -437,9 +437,16 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
   // Mit Personen: der Termin derselben Person mit derselben UID, in jedem
   // lokalen Kalender. Die aelteste Zeile, falls ein frueherer Lauf ohne Personen
   // ihn in zwei Kalender gelegt hat.
+  //
+  // NUR EIN FRUEHERER IMPORT, NIE EIN GESPIEGELTER TERMIN (Review zu #1940):
+  // ein aus CalDAV, iCloud oder Google eingelesener Termin traegt dieselbe Art
+  // UID in `external_calendar_id`, gehoert dem Konto, das den Sync betreibt, und
+  // hat keine `subscription_id` - ohne `external_source = 'local'` haette der
+  // Import an ihm Zuweisung, Erinnerungen und Anhangrechte geaendert.
   const existingAnyCalendar = db.get().prepare(`
     SELECT e.id, e.assigned_to FROM calendar_events e
-    WHERE e.created_by = ? AND e.subscription_id IS NULL AND e.external_calendar_id = ?
+    WHERE e.created_by = ? AND e.subscription_id IS NULL AND e.external_source = 'local'
+      AND e.external_calendar_id = ?
     ORDER BY e.id LIMIT 1
   `);
   const assigneesOf = db.get().prepare('SELECT user_id FROM event_assignments WHERE event_id = ? ORDER BY user_id');

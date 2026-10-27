@@ -492,7 +492,7 @@ function bindCalendarImport(container, calendars = []) {
       if (assigned > 0) {
         // Schon vorhandene Termine haben Personen dazubekommen (#1940): das ist
         // der Zweck des zweiten Laufs und steht im Satz, nicht "alles doppelt".
-        showToast(t('settings.calendarImport.successWithAssigned', { count: imported, skipped, assigned }), 'success');
+        showToast(t('settings.calendarImport.successWithAssigned', { imported, skipped, assigned }), 'success');
       } else if (imported === 0 && skipped > 0) {
         showToast(t('settings.calendarImport.allDuplicates'), 'default');
       } else if (skipped > 0) {

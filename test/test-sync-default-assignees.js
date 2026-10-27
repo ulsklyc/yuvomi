@@ -331,6 +331,15 @@ describe('Import mit Personen (#1940)', () => {
     assert.equal(byUid('x').length, 1);
   });
 
+  it('a synced event with the same UID is no earlier import and stays untouched (review)', async () => {
+    const cal = calendar(CAL_TOGETHER, 'Zusammen', []);
+    const mirrored = Number(db.prepare(`INSERT INTO calendar_events (title, start_datetime, created_by, external_source,
+      external_calendar_id, calendar_ref_id) VALUES ('m', '2026-05-01T09:00', ?, 'caldav', 'shared-uid', ?) RETURNING id`).get(OWNER, cal).id);
+    const r = await ics.importToLocal(OWNER, { ics: feed('shared-uid'), assigneeIds: [ANNA] });
+    assert.deepEqual([r.imported, r.assigned], [1, 0], 'imported as a local event of its own');
+    assert.deepEqual(assignmentsOf(mirrored), [], 'the mirrored event keeps its assignment');
+  });
+
   it('without a person, the run is what it was: the same rows and numbers', async () => {
     await ics.importToLocal(OWNER, { ics: feed('a') });
     const r = await ics.importToLocal(OWNER, { ics: feed('a', 'b') });
