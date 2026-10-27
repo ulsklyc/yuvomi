@@ -1165,17 +1165,25 @@ export function previewMappingProfileImport(d, sourceId, profile) {
     typesByLowerName.get(key).push(type);
   }
 
+  // Own types already claimed by an earlier entry of the same pattern: a
+  // label mapped to two same-named types exports two entries with one name,
+  // and each must resolve to ANOTHER of the two, or a round trip of the
+  // label's own profile would fold them into one (#2273).
+  const claimedByPattern = new Map();
   const resolved = profile.mappings.map((entry) => {
     const pattern = sameLabelNormalization(entry.pattern);
     const mappingRow = existingMappingsByLabel.get(pattern) ?? null;
     const candidates = typesByLowerName.get(entry.type_name.trim().toLowerCase()) ?? [];
+    if (!claimedByPattern.has(pattern)) claimedByPattern.set(pattern, new Set());
+    const claimed = claimedByPattern.get(pattern);
     // A name collision resolves to one of the mapping's OWN current types
     // when one of them is among the candidates (the idempotent, "keep
     // pointing at what it already points at" reading) rather than guessing
     // between look-alikes.
     const type = candidates.length <= 1
       ? (candidates[0] ?? null)
-      : (candidates.find((c) => mappingRow?.type_ids.includes(c.id)) ?? null);
+      : (candidates.find((c) => mappingRow?.type_ids.includes(c.id) && !claimed.has(c.id)) ?? null);
+    if (type) claimed.add(type.id);
     let status = null;
     if (!mappingRow) status = 'unmatched_pattern';
     else if (!candidates.length) status = 'unmatched_type';

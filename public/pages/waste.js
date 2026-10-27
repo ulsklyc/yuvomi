@@ -1731,12 +1731,21 @@ function labelTypeChipsHtml({ labelId, typeIds, createNew = null }) {
         <button type="button" class="filter-chip${on ? ' filter-chip--active' : ''}" ${attrs} aria-pressed="${on ? 'true' : 'false'}">`
     + `<i data-lucide="${esc(icon)}"${color ? ` style="color:${esc(color)}"` : ''} aria-hidden="true"></i><span>${esc(text)}</span></button>`;
   const none = !chosen.size && !createNew;
+  // Die Wahl steht zusaetzlich in einem versteckten Feld (wie bei den
+  // Wochentagen): nur Felder sieht der Verwerfen-Schutz des Dialogs, und ohne
+  // es ginge eine Aenderung nur an den Chips beim Schliessen still verloren.
   return `
       <div class="waste-label-types" role="group" aria-labelledby="${esc(labelId)}" data-role="label-types">
         ${types.map((t2) => chip(`data-type-chip="${t2.id}"`, chosen.has(t2.id), t2.icon || 'trash-2', t2.color, t2.name)).join('')}
         ${createNew === null ? '' : chip('data-new-type-chip', !!createNew, 'plus', null, t('waste.importCreateNewType'))}
+        <input type="hidden" name="${esc(labelId)}-types" data-role="label-types-value" value="${esc(labelTypesValue([...chosen], createNew))}">
       </div>
       <p class="waste-label-types__ignored" data-role="label-ignored"${none ? '' : ' hidden'}>${esc(t('waste.importLabelIgnoredHint'))}</p>`;
+}
+
+/** Pure: the hidden field's value for one row's choice - what the dialog's discard guard compares. */
+function labelTypesValue(typeIds, createNew) {
+  return [...[...typeIds].sort((a, b) => a - b), ...(createNew ? ['new'] : [])].join(',');
 }
 
 /** Reads one row's chips back: the pressed types and whether "new type" is on. */
@@ -1761,6 +1770,7 @@ function toggleLabelTypeChip(event, rowSelector) {
   chip.setAttribute('aria-pressed', on ? 'true' : 'false');
   chip.classList.toggle('filter-chip--active', on);
   syncLabelRow(row);
+  row.querySelector('[data-role="label-types-value"]')?.dispatchEvent(new Event('input', { bubbles: true }));
   if (on && chip.hasAttribute('data-new-type-chip')) row.querySelector('[data-role="label-new-type-name"]')?.focus();
   return row;
 }
@@ -1771,6 +1781,8 @@ function syncLabelRow(row) {
   if (ignored) ignored.hidden = typeIds.length > 0 || createNew;
   const name = row.querySelector('[data-role="label-new-type-name"]');
   if (name) name.hidden = !createNew;
+  const value = row.querySelector('[data-role="label-types-value"]');
+  if (value) value.value = labelTypesValue(typeIds, createNew);
 }
 
 function importLabelRowHtml(label, index) {
@@ -2882,7 +2894,7 @@ export const __test = {
   findScheduleOrigin, parseDeepLinkParams, deepLinkSelectors, recurrenceSummary, originBadges,
   defaultLabelSelection, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
   // #2273: die Abfallarten eines Labels als Chips.
-  labelTypeChipsHtml, mappingTypesChanged, importLabelRowHtml, sourceMappingRowHtml,
+  labelTypeChipsHtml, labelTypesValue, mappingTypesChanged, importLabelRowHtml, sourceMappingRowHtml,
   splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,
   // Die drei Zeilenbauer und die Palette: seit der Vereinheitlichung der
   // Zeilengrammatik (Audit UX 2026-09-12) tragen sie Bedingungen, die man

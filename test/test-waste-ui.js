@@ -308,6 +308,16 @@ test('#2273 a label row offers every type as a chip of the canon, pressed as rem
   assert.match(sheet, /data-type-chip="3" aria-pressed="true"/, 'an archived type stays visible while it is chosen');
   assert.doesNotMatch(sheet, /data-new-type-chip/, 'a source\'s mapping sheet creates no type');
   assert.match(sheet, /aria-labelledby="wsrc-mapping-9"/);
+  // The discard guard of a dialog only sees fields: the choice also stands in a hidden one.
+  assert.match(sheet, /<input type="hidden" name="wsrc-mapping-9-types" data-role="label-types-value" value="1,3">/);
+  assert.match(html, /name="wiz-label-0-types" data-role="label-types-value" value="1,2"/);
+});
+
+test('#2273 labelTypesValue: the hidden field changes with every chip, including "new type"', () => {
+  assert.equal(__test.labelTypesValue([3, 1], false), '1,3');
+  assert.equal(__test.labelTypesValue([], true), 'new');
+  assert.equal(__test.labelTypesValue([2], true), '2,new');
+  assert.equal(__test.labelTypesValue([], false), '');
 });
 
 test('#2273 mappingTypesChanged compares the type set, not its order', () => {

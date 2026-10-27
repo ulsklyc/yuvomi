@@ -1434,3 +1434,17 @@ test('#2273 a mapping profile carries every type of a label, and applying it set
   const again = await call('POST', `/waste/sources/${target.id}/mapping-profile/import/preview`, { body: { profile: exported } });
   assert.deepEqual(again.body.data.entries.map((e) => e.status), ['unchanged', 'unchanged']);
 });
+
+test('#2273 a label mapped to two same-named types keeps both through a round trip of its own profile', async () => {
+  const name = `Tonne-${randomUUID()}`;
+  const first = await createType({ name });
+  const second = await createType({ name });
+  const { source } = await commitSharedDay([first.id, second.id]);
+  const exported = (await call('GET', `/waste/sources/${source.id}/mapping-profile/export`)).body.data;
+  assert.equal(exported.mappings.length, 2);
+
+  const preview = await call('POST', `/waste/sources/${source.id}/mapping-profile/import/preview`, { body: { profile: exported } });
+  assert.deepEqual(preview.body.data.entries.map((e) => e.status), ['unchanged', 'unchanged']);
+  assert.deepEqual(preview.body.data.entries.map((e) => e.resolved_type_id).sort((a, b) => a - b), [first.id, second.id].sort((a, b) => a - b),
+    'each entry resolves to ANOTHER of the two own types, never both to the first');
+});
