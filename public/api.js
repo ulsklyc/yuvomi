@@ -168,7 +168,8 @@ async function apiFetch(path, options = {}, _retried = false) {
     // Aufgabe, gespiegeltes Rezept, CSRF): der Satz zum Grund statt des
     // englischen vom Server. Manche Seiten zeigen `err.data.error` statt
     // `err.message` (Gesundheit, deren Einstellungen) - deshalb traegt beides
-    // die Uebersetzung. Die Liste steht bei friendlyError, das denselben Satz zeigt.
+    // die Uebersetzung. Die Liste steht in public/utils/friendly-error.js, wo
+    // unhandledErrorSentence denselben Satz zeigt.
     const refusalKey = response.status === 403 ? REFUSAL_MESSAGES.get(data?.reason) : undefined;
     if (refusalKey) {
       const text = t(refusalKey);

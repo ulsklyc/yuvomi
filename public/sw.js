@@ -122,14 +122,28 @@ const API_SNAPSHOTS = {
 // weil er fuer jede Sitzung gilt, auch die ohne Abzug (Display, Split-Gast).
 const SESSION_EXPIRY_KEY = `${self.location.origin}/api/v1/__offline/session-expires-at`;
 
-async function rememberSessionExpiry(cache, body) {
+// GENERATION DES API-CACHES (#2293, Sicherheitsbefund). Jedes Loeschen zaehlt
+// hoch. Ein Schreibpfad merkt sich die Generation VOR seinem fetch() und
+// schreibt nur, wenn sie unmittelbar vor `cache.put` noch dieselbe ist: eine
+// Antwort, die noch unter Person A unterwegs war, als abgemeldet wurde, landet
+// sonst im frischen Cache von Person B - mit Bs gueltigem Sitzungsablauf daneben.
+let _cacheGeneration = 0;
+
+function deleteApiCache() {
+  _cacheGeneration += 1;
+  return caches.delete(API_CACHE);
+}
+
+async function rememberSessionExpiry(cache, body, generation) {
+  if (generation !== _cacheGeneration) return false;
   const expiresAt = sessionExpiryOf(body);
   // Kein Ablauf vom Server: keine Grenze, also kein gespeicherter Stand -
   // der ganze API-Cache geht, nicht nur der Marker (fail-closed).
   if (expiresAt === null || expiresAt <= Date.now()) {
-    await caches.delete(API_CACHE);
+    await deleteApiCache();
     return false;
   }
+  if (generation !== _cacheGeneration) return false;
   await cache.put(SESSION_EXPIRY_KEY, new Response(JSON.stringify({ expiresAt }), {
     status: 200,
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
@@ -160,7 +174,7 @@ async function hasValidSessionExpiry() {
  */
 async function dropApiCacheIfSessionExpired() {
   if (await hasValidSessionExpiry()) return false;
-  await caches.delete(API_CACHE).catch(() => false);
+  await deleteApiCache().catch(() => false);
   return true;
 }
 
@@ -707,14 +721,17 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) {
     const snapshotReducer = request.method === 'GET' ? apiSnapshotReducer(url.pathname) : null;
     if (request.method === 'GET' && (snapshotReducer || isCacheableApiGet(url.pathname))) {
+      // Die Generation des API-Caches beim EINGANG des Abrufs (#2293): bis die
+      // Strategie unten laeuft, kann schon abgemeldet worden sein.
+      const generation = _cacheGeneration;
       event.respondWith(
         (_bypassInitDone ? Promise.resolve() : _bypassInit).then(() => {
           // Im Bypass-Fenster (nach SW-Update) API-Requests nicht anfassen:
           // frisch ans Netz, weder aus Cache bedienen noch hineinschreiben.
           if (Date.now() < bypassCacheUntil) return fetch(request);
           return snapshotReducer
-            ? networkFirstSnapshot(request, snapshotReducer)
-            : networkFirstApi(request, event);
+            ? networkFirstSnapshot(request, snapshotReducer, generation)
+            : networkFirstApi(request, event, generation);
         })
       );
     }
@@ -939,18 +956,18 @@ function avatarPathsIn(value, found = new Set()) {
  * @param {string} baseUrl Adresse der Liste, gegen die die Pfade aufgeloest werden
  * @param {string} text Rumpf der Liste
  */
-async function precacheAvatars(baseUrl, text) {
+async function precacheAvatars(baseUrl, text, generation) {
   let body;
   try { body = JSON.parse(text); } catch { return; }
   const paths = [...avatarPathsIn(body)];
-  if (!paths.length || !(await ensureSessionExpiry())) return;
+  if (!paths.length || !(await ensureSessionExpiry(generation))) return;
   const cache = await caches.open(API_CACHE);
   await Promise.all(paths.map(async (path) => {
     const url = new URL(path, baseUrl).href;
     if (await cache.match(url)) return;
     try {
       const res = await fetch(url, { credentials: 'same-origin' });
-      if (res.ok && res.type === 'basic') await cache.put(url, res);
+      if (res.ok && res.type === 'basic' && generation === _cacheGeneration) await cache.put(url, res);
     } catch {
       // Offline oder abgewiesen: beim naechsten Laden der Liste wieder.
     }
@@ -963,18 +980,20 @@ async function precacheAvatars(baseUrl, text) {
 // Netzfehler → Cache-Fallback, sonst 503-JSON {error:'offline'}; nach dem
 //          Sitzungsablauf (#2293) kein Fallback, der API-Cache geht weg.
 // --------------------------------------------------------
-async function networkFirstApi(request, event) {
+async function networkFirstApi(request, event, generation = _cacheGeneration) {
   try {
     const response = await fetch(request);
     // Nur erfolgreiche, gleichoriginäre (basic) Antworten cachen - und nur
     // neben einem gueltigen Sitzungsablauf (#2293): ohne ihn entstuende ein
     // Eintrag, den der Offline-Pfad ohnehin nie mehr ausliefert.
-    if (response.ok && response.type === 'basic' && await ensureSessionExpiry()) {
-      const cache   = await caches.open(API_CACHE);
+    if (response.ok && response.type === 'basic' && await ensureSessionExpiry(generation)) {
       const cloned  = response.clone();
       const headers = new Headers(cloned.headers);
       headers.set('x-cached-at', String(Date.now()));
       const body = await cloned.blob();
+      // Unmittelbar vor dem Schreiben: noch dieselbe Generation?
+      if (generation !== _cacheGeneration) return response;
+      const cache = await caches.open(API_CACHE);
       await cache.put(request, new Response(body, {
         status: cloned.status,
         statusText: cloned.statusText,
@@ -986,7 +1005,7 @@ async function networkFirstApi(request, event) {
       // schon: `waitUntil` haelt den Worker am Leben, bis die Bilder im Cache
       // liegen - sonst darf der Browser ihn nach der Antwort beenden.
       if (!AVATAR_PATH_RE.test(new URL(request.url).pathname)) {
-        const prefetch = response.clone().text().then((text) => precacheAvatars(request.url, text)).catch(() => {});
+        const prefetch = response.clone().text().then((text) => precacheAvatars(request.url, text, generation)).catch(() => {});
         if (event && typeof event.waitUntil === 'function') event.waitUntil(prefetch);
       }
     }
@@ -1051,7 +1070,7 @@ function isMutableAppResource(pathname) {
 // Netzfehler → Abzug, sonst 503-JSON {error:'offline'} wie networkFirstApi;
 //          nach dem Sitzungsablauf keins von beiden (dropApiCacheIfSessionExpired).
 // --------------------------------------------------------
-async function networkFirstSnapshot(request, reduce) {
+async function networkFirstSnapshot(request, reduce, generation = _cacheGeneration) {
   let response;
   try {
     response = await fetch(request);
@@ -1059,26 +1078,31 @@ async function networkFirstSnapshot(request, reduce) {
     if (await dropApiCacheIfSessionExpired()) return offlineResponse();
     return (await cachedApiResponse(request)) || offlineResponse();
   }
-  await storeSnapshot(request, response, reduce);
+  await storeSnapshot(request, response, reduce, generation);
   return response;
 }
 
-/** Legt den Abzug einer Netzantwort ab (oder raeumt ihn weg). Wirft nie. */
-async function storeSnapshot(request, response, reduce) {
+/**
+ * Legt den Abzug einer Netzantwort ab (oder raeumt ihn weg). Wirft nie.
+ * `generation` ist die des API-Caches vor dem fetch(); hat er sich seitdem
+ * geaendert, wird nichts geschrieben.
+ */
+async function storeSnapshot(request, response, reduce, generation) {
   try {
+    if (generation !== _cacheGeneration) return;
     if (response.ok && response.type === 'basic') {
       const body = await response.clone().json();
       // `/auth/me` schreibt den Ablauf; jeder andere Abzug nur neben einem gueltigen.
       const allowed = reduce === reduceSessionSnapshot
-        ? await rememberSessionExpiry(await caches.open(API_CACHE), body)
-        : await ensureSessionExpiry();
+        ? await rememberSessionExpiry(await caches.open(API_CACHE), body, generation)
+        : await ensureSessionExpiry(generation);
       const snapshot = allowed ? reduce(body) : null;
-      if (snapshot) {
+      if (snapshot && generation === _cacheGeneration) {
         await (await caches.open(API_CACHE)).put(request, new Response(JSON.stringify(snapshot), {
           status: 200,
           headers: { 'Content-Type': 'application/json; charset=utf-8', 'x-cached-at': String(Date.now()) },
         }));
-      } else if (await caches.has(API_CACHE)) {
+      } else if (!snapshot && await caches.has(API_CACHE)) {
         await (await caches.open(API_CACHE)).delete(request);
       }
     } else if (response.status === 401 && await caches.has(API_CACHE)) {
@@ -1096,18 +1120,24 @@ async function storeSnapshot(request, response, reduce) {
  * beim fail-closed.
  */
 let _sessionProbe = null;
-async function ensureSessionExpiry() {
-  if (await hasValidSessionExpiry()) return true;
+async function ensureSessionExpiry(generation) {
+  // Eine Antwort aus einer frueheren Generation fragt gar nicht erst nach:
+  // die neue Sitzung gehoert jemand anderem.
+  if (generation !== _cacheGeneration) return false;
+  if (await hasValidSessionExpiry()) return generation === _cacheGeneration;
   if (!_sessionProbe) {
+    // Die Probe merkt sich IHRE Generation: wird waehrenddessen geleert,
+    // schreibt sie keinen Ablauf in den Cache der naechsten Sitzung.
+    const probeGeneration = _cacheGeneration;
     _sessionProbe = (async () => {
       try {
         const request = new Request(`${self.location.origin}/api/v1/auth/me`, { credentials: 'same-origin' });
-        await storeSnapshot(request, await fetch(request), reduceSessionSnapshot);
+        await storeSnapshot(request, await fetch(request), reduceSessionSnapshot, probeGeneration);
       } catch { /* offline oder abgewiesen: kein Ablauf, also nichts ablegen */ }
     })().finally(() => { _sessionProbe = null; });
   }
   await _sessionProbe;
-  return hasValidSessionExpiry();
+  return generation === _cacheGeneration && hasValidSessionExpiry();
 }
 
 // Prüft, ob ein API-Pfad (inkl. /api/v1-Prefix) zur Read-only-Offline-Whitelist
@@ -1152,7 +1182,7 @@ self.addEventListener('message', (event) => {
     // aelteren Aufrufer) bekommt wie bisher nichts zurueck.
     const port = event.ports && event.ports[0];
     event.waitUntil(
-      caches.delete(API_CACHE)
+      deleteApiCache()
         .catch(() => false)
         .then(() => { if (port) port.postMessage({ ok: true }); }),
     );

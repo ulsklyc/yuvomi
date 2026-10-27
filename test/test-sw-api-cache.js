@@ -815,3 +815,37 @@ test('eine Liste ohne vorheriges /auth/me (nach Update oder Anmeldung) holt den 
   const session = await dispatchFetch(sw, new MockRequest(apiUrl('/auth/me'), { method: 'GET' })).result;
   assert.equal(session.status, 200, 'und mit ihr der Sitzungsabzug');
 });
+
+// Sicherheitsbefund (#2293): eine Antwort, die noch unter Person A unterwegs
+// war, als abgemeldet wurde, darf nicht in den frischen Cache von Person B.
+test('eine Antwort aus der Zeit vor CLEAR_API_CACHE landet nicht im Cache der naechsten Sitzung', async () => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const sw = loadSw({ withSession: true, fetchImpl: () => pending });
+  const inFlight = dispatchFetch(sw, new MockRequest(apiUrl('/shopping'), { method: 'GET' }));
+
+  await dispatchMessage(sw, { type: 'CLEAR_API_CACHE' });
+  // B meldet sich an: ab jetzt antwortet /auth/me mit einer anderen, gueltigen Sitzung.
+  sw.setFetch(async (req) => {
+    if (req.url.endsWith('/auth/me')) return meResponse({ ...ME_BODY, user: { ...ME_BODY.user, id: 8, username: 'ben' } });
+    return new MockResponse(JSON.stringify({ data: [] }), { status: 200 });
+  });
+  release(new MockResponse(JSON.stringify({ data: [{ id: 1, name: 'Annas Liste' }] }), { status: 200 }));
+  await inFlight.result;
+  await Promise.all(inFlight.waited);
+
+  const name = await apiCacheName(sw);
+  const entries = name ? [...(await sw.caches.open(name)).store.keys()] : [];
+  assert.deepEqual(entries, [], 'kein Eintrag im API-Cache');
+});
+
+test('auch ein Abzug aus der Zeit vor CLEAR_API_CACHE wird verworfen', async () => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const sw = loadSw({ withSession: true, fetchImpl: () => pending });
+  const inFlight = dispatchFetch(sw, new MockRequest(apiUrl('/auth/me'), { method: 'GET' }));
+  await dispatchMessage(sw, { type: 'CLEAR_API_CACHE' });
+  release(meResponse());
+  await inFlight.result;
+  assert.equal(await apiCacheName(sw), undefined);
+});
