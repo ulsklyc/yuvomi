@@ -217,6 +217,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "sync_target: erwartet ...", "Maximal 2 Verschachtelungsebenen erlaubt.", "endpoint ist
   erforderlich." or "Ungültiger Icon-Code."; every `error` there is English now and names the request
   field (`quantity`, `notes`, `category`, `name`), with the same status codes and reasons.
+- **The meal plan, pantry and recipes APIs refuse in English** (#1695, #2267). They still answered
+  "Mahlzeit nicht gefunden", "Mindestens eine Mahlzeit ist erforderlich.", "Menge darf nicht negativ
+  sein.", "Lagerort nicht gefunden." and sentences with German field names ("Titel is required.",
+  "Mahlzeit-Typ must be one of: ..."); every `error` there is English now and names the request field
+  (`title`, `meal_type`, `quantity` ...), with the same status codes and reasons. The meal plan and
+  the pantry no longer show the server's sentence in a toast but their own, in your language. The
+  OpenAPI description now lists `recipe_mirrored` and `cross_module_access` at the recipe, meal and
+  pantry routes that already sent them.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the

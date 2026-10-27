@@ -1564,7 +1564,7 @@ async function addRecipeToSlot(recipe, date, mealType, { replaceMeals = [] } = {
     }
     renderWeekGrid();
   } catch (err) {
-    window.yuvomi?.showToast(window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
   }
 }
 
@@ -1657,7 +1657,7 @@ async function runRandomize(panel) {
     window.yuvomi?.showToast(t('meals.randomizeSuccess', { count: plan.assignments.length }), 'success');
   } catch (err) {
     runBtn.disabled = false;
-    window.yuvomi?.showToast(window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
   }
 }
 
@@ -1873,7 +1873,7 @@ async function moveMeal(mealId, targetDate, targetType, { rerender = renderWeekG
       meal.meal_type = moves.confirmed.meal_type;
     }
     rerender();
-    window.yuvomi?.showToast(window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
   } finally {
     moves.pending -= 1;
     if (moves.pending === 0) _mealMoves.delete(mealId);
@@ -2210,7 +2210,7 @@ function openMealModal(opts) {
 
           window.yuvomi?.showToast(t('recipes.created'), 'success');
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+          window.yuvomi?.showToast(errorSentence(err), 'danger');
         } finally {
           saveAsRecipeBtn.disabled = false;
         }
@@ -2285,7 +2285,7 @@ function openMealModal(opts) {
             window.yuvomi?.showToast(t('kitchen.transferAllPresent'), 'info');
           }
         } catch (err) {
-          window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+          window.yuvomi?.showToast(errorSentence(err), 'danger');
           btn.disabled = false;
         }
       });
@@ -2941,7 +2941,7 @@ async function deleteMeal(mealId, { scope } = {}) {
           'success',
         );
       } catch (err) {
-        window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+        window.yuvomi?.showToast(errorSentence(err), 'danger');
       }
       return;
     }
@@ -2961,7 +2961,7 @@ async function deleteMeal(mealId, { scope } = {}) {
     },
     restore: (err) => {
       if (itemEl) itemEl.style.display = '';
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) window.yuvomi?.showToast(errorSentence(err), 'danger');
     },
   });
 }
@@ -3015,7 +3015,7 @@ async function transferMeal(mealId, btn) {
       window.yuvomi?.showToast(t('kitchen.transferAllPresent'), 'info');
     }
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
   } finally {
     // Die Kachel wird nach einem Erfolg neu gezeichnet; der Knopf hier ist dann
     // schon ersetzt. Das Zurücksetzen gilt dem Fehlerfall und dem Nichts-zu-tun-Fall.

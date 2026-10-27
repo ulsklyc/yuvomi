@@ -49,6 +49,8 @@
  *        Ebenso fuer Einkauf, Aufgaben, Push und Wetter (shopping.js 19 mit
  *        "Menge" in der Regel, tasks.js 4, push.js 3, weather.js 2): Bein 2
  *        nennt alle 29 gefuehrten Absagen deutsch.
+ *        Ebenso fuer Essensplan, Vorrat und Rezepte (meals.js 34, pantry.js 5,
+ *        recipes.js 2): Bein 2 nennt 30 der 38 gefuehrten Absagen deutsch.
  *
  * Ausführen: npm run test:api-error-language
  */
@@ -69,13 +71,7 @@ const ROUTES = new URL('../server/routes/', import.meta.url);
  * Deutsche Stellen je Routen-Datei, Stand 26.10.2026. NUR SENKEN: wer ein
  * Modul umstellt, streicht seine Zeile - der Test verlangt es.
  */
-// meals.js und recipes.js stiegen mit den Kontakt-Feldnamen der Regel (Notizen,
-// Geburtstag ...): dieselben Stellen, jetzt gesehen, keine neuen. pantry.js
-// ebenso mit "Menge".
 const GERMAN_LEFT = new Map([
-  ['meals.js', 37],
-  ['pantry.js', 6],
-  ['recipes.js', 4],
 ]);
 
 function routeFiles(dir = ROUTES, prefix = '') {
@@ -828,5 +824,84 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
     assertRefusedInEnglish(seen);
   } finally {
     gServer.close();
+  }
+});
+
+test('keine Absage von Essensplan, Vorrat und Rezepten traegt deutschen Wortlaut', async () => {
+  const { default: mealsRouter } = await import('../server/routes/meals.js');
+  const { default: pantryRouter } = await import('../server/routes/pantry.js');
+  const { default: recipesRouter } = await import('../server/routes/recipes.js');
+  const kApp = express();
+  kApp.use(express.json({ limit: '10mb' }));
+  kApp.use((req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  });
+  kApp.use('/meals', mealsRouter);
+  kApp.use('/pantry', pantryRouter);
+  kApp.use('/recipes', recipesRouter);
+  const kServer = kApp.listen(0, '127.0.0.1');
+  const kUrl = await new Promise((r) => kServer.on('listening', () => r(`http://127.0.0.1:${kServer.address().port}`)));
+  try {
+    const seen = [];
+    const call = async (method, route, body) => {
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${kUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      return { status: res.status, body: json };
+    };
+    const run = async (label, method, route, body) => {
+      const r = await call(method, route, body);
+      seen.push({ label, status: r.status, error: r.body?.error ?? null });
+    };
+    const series = await call('POST', '/meals', { date: '2026-11-02', meal_type: 'dinner', title: 'Suppe', repeat_weekly: true });
+    assert.equal(series.status, 201, 'Vorbedingung: die Serie wird angelegt');
+    const mealId = series.body.data.id;
+    const longText = 'x'.repeat(20000);
+
+    await run('meal-date', 'POST', '/meals', { meal_type: 'dinner', title: 'A' });
+    await run('meal-type', 'POST', '/meals', { date: '2026-11-02', meal_type: 'nope', title: 'A' });
+    await run('meal-title', 'POST', '/meals', { date: '2026-11-02', meal_type: 'dinner' });
+    await run('meal-notes', 'POST', '/meals', { date: '2026-11-02', meal_type: 'dinner', title: 'A', notes: longText });
+    await run('meal-until', 'POST', '/meals', { date: '2026-11-02', meal_type: 'dinner', title: 'A', repeat_weekly: true, repeat_until: 'x' });
+    await run('plan-skip', 'POST', '/meals/apply-plan', { assignments: [], skip_occupied: 'x' });
+    await run('plan-both', 'POST', '/meals/apply-plan', { assignments: [], skip_occupied: true, replace_existing: true });
+    await run('plan-empty', 'POST', '/meals/apply-plan', { assignments: [] });
+    await run('plan-entry', 'POST', '/meals/apply-plan', { assignments: [{ date: '2026-11-02', meal_type: 'nope' }] });
+    await run('put-gone', 'PUT', '/meals/987654', { title: 'X' });
+    await run('put-type', 'PUT', `/meals/${mealId}`, { meal_type: 'nope' });
+    await run('put-until', 'PUT', `/meals/${mealId}?scope=series`, { repeat_until: '2026-10-01' });
+    await run('put-until-shape', 'PUT', `/meals/${mealId}?scope=series`, { repeat_until: 'x' });
+    await run('delete-gone', 'DELETE', '/meals/987654');
+    await run('ingredient-meal', 'POST', '/meals/987654/ingredients', { name: 'Salz' });
+    await run('ingredient-name', 'POST', `/meals/${mealId}/ingredients`, {});
+    await run('ingredient-gone', 'PATCH', '/meals/ingredients/987654', { name: 'X' });
+    await run('ingredient-delete-gone', 'DELETE', '/meals/ingredients/987654');
+    await run('to-list-meal', 'POST', '/meals/987654/to-shopping-list', { listId: 1 });
+    await run('to-list-id', 'POST', `/meals/${mealId}/to-shopping-list`, {});
+    await run('to-list-gone', 'POST', `/meals/${mealId}/to-shopping-list`, { listId: 987654 });
+    await run('week-list-id', 'POST', '/meals/week-to-shopping-list', { week: '2026-11-02' });
+    await run('week-date', 'POST', '/meals/week-to-shopping-list', { listId: 1, week: 'x' });
+    await run('week-list-gone', 'POST', '/meals/week-to-shopping-list', { listId: 987654, week: '2026-11-02' });
+    await run('pantry-quantity', 'POST', '/pantry', { name: 'Reis', quantity: -1 });
+    await run('pantry-location', 'POST', '/pantry', { name: 'Reis', location_id: 987654 });
+    await run('pantry-category', 'POST', '/pantry', { name: 'Reis', category: 'nope' });
+    await run('pantry-expires', 'POST', '/pantry', { name: 'Reis', expires_on: 'x' });
+    await run('pantry-min', 'POST', '/pantry', { name: 'Reis', min_quantity: -1 });
+    await run('pantry-notes', 'POST', '/pantry', { name: 'Reis', notes: longText });
+    await run('pantry-item-id', 'PUT', '/pantry/x', { name: 'Reis' });
+    await run('location-name', 'POST', '/pantry/locations', {});
+    await run('location-id', 'PUT', '/pantry/locations/x', { name: 'X' });
+    await run('recipe-title', 'POST', '/recipes', {});
+    await run('recipe-notes', 'POST', '/recipes', { title: 'A', notes: longText });
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    kServer.close();
   }
 });

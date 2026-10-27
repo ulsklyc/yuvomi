@@ -22155,8 +22155,6 @@ const SERVER_TEXT_OWNERS = new Set([
 // in module.json fehlt) in einen uebersetzten Satz - eine Angabe zum Modul fuer
 // den, der es installiert, kein Satz an seiner Stelle (#1909).
 const SERVER_TEXT_OPEN = new Map([
-  ['pages/meals.js', 5],
-  ['pages/pantry.js', 6],
   ['settings/module-install-errors.js', 1],
 ]);
 
@@ -22220,7 +22218,7 @@ test('keine Seite zeigt den Text des Servers ohne Zuordnung, die offenen stehen 
     'pages/inventory.js', 'pages/notes.js', 'pages/contacts.js', 'pages/birthdays.js', 'pages/tasks.js',
     'components/task-detail.js', 'components/modal.js', 'pages/schedule.js',
     'components/quick-links-manager.js', 'settings/pages/modules-kitchen.js', 'pages/calendar.js',
-    'settings/pages/admin-immich.js', 'pages/dashboard.js']) {
+    'settings/pages/admin-immich.js', 'pages/dashboard.js', 'pages/meals.js', 'pages/pantry.js']) {
     assert.equal(SERVER_TEXT_OPEN.has(name), false, `${name} steht auf 0 und gehoert nicht in die Liste`);
   }
 });
@@ -22279,6 +22277,10 @@ const ERROR_MESSAGE_CLEAN = [
   'settings/pages/personal-tasks.js',
   'settings/pages/personal-weather.js',
   'utils/household-zone-hint.js',
+  // Die Kuechen-Scheibe von #1695: Essensplan und Vorrat zeigen nie mehr den
+  // Satz des Servers, der dort jetzt Englisch spricht.
+  'pages/meals.js',
+  'pages/pantry.js',
 ];
 
 test('der Leser fuer err.message sieht beide Schreibweisen und keinen Kommentar (#1909)', () => {
@@ -22451,9 +22453,7 @@ function countFriendlyErrorCalls(source) {
 }
 
 // Datei -> Zahl der Aufrufe von friendlyError. Nur senken.
-const FRIENDLY_ERROR_CALLERS = new Map([
-  ['pages/meals.js', 3],
-]);
+const FRIENDLY_ERROR_CALLERS = new Map([]);
 
 test('der Zaehler fuer friendlyError sieht beide Wege und keine eigene Funktion (#1909)', () => {
   const imported = "import { friendlyError } from '/utils/friendly-error.js';\n";

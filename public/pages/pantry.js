@@ -1692,7 +1692,7 @@ function adjustQuantity(item, direction, row) {
       if (!rowNow) return;
       if (current) refreshRowQuantity(rowNow, withIntent(current));
       if (renderFilters().wasReset) renderList();
-      window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(err), 'danger');
     }
   }, QUANTITY_DEBOUNCE_MS_OVERRIDE ?? QUANTITY_DEBOUNCE_MS);
 
@@ -1825,7 +1825,7 @@ async function sendToShopping(items, btn, entries = null) {
   try {
     lists = await ensureLists();
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
     return;
   }
 
@@ -1866,7 +1866,7 @@ async function sendToShopping(items, btn, entries = null) {
     // bedeuten das Gegenteil voneinander (Critique 2026-07-30).
     announceTransfer({ message, addedIds });
   } catch (err) {
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -2066,7 +2066,7 @@ async function saveItem(panel, mode, item) {
     window.yuvomi?.showToast(mode === 'create' ? t('pantry.created') : t('pantry.updated'), 'success');
   } catch (err) {
     saveBtn.disabled = false;
-    window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(errorSentence(err), 'danger');
   }
 }
 
@@ -2109,7 +2109,7 @@ async function removeItem(item) {
         rowEl_.style.overflow = '';
         expandIn(rowEl_);
       }
-      if (err) window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
+      if (err) window.yuvomi?.showToast(errorSentence(err), 'danger');
     },
   });
 }
@@ -2191,7 +2191,7 @@ async function openLocationManager() {
       // ankommt, ist immer ein Fehler DIESER Auffrischung - und der erklaert als
       // einziger, warum die Seite den alten Stand behaelt.
       console.error('[Pantry] Auffrischen nach Ort-Aenderung fehlgeschlagen:', err);
-      window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(err), 'danger');
     }
   };
 

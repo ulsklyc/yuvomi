@@ -85,7 +85,7 @@ test('GET /: leere Sammlung → leeres Array', async () => {
 test('POST /: fehlender Titel → 400', async () => {
   const r = await call('POST', '/', { title: '  ' });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Titel/);
+  assert.match(r.body.error, /^title /);
 });
 
 test('POST /: legt Rezept an; created_by, 201, meal_types-Default = alle vier', async () => {
@@ -772,7 +772,7 @@ test('POST /: ohne Body → 400 mit der Titel-Meldung, nicht 500 (#2197)', async
   const before = db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n;
   const r = await call('POST', '/');
   assert.equal(r.status, 400, JSON.stringify(r.body));
-  assert.match(r.body.error, /Titel/);
+  assert.match(r.body.error, /title is required/);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n, before);
 });
 
@@ -781,7 +781,7 @@ test('PUT /:id: ohne Body → 400, das Rezept bleibt unveraendert (#2197)', asyn
   const id = created.body.data.id;
   const r = await call('PUT', `/${id}`);
   assert.equal(r.status, 400, JSON.stringify(r.body));
-  assert.match(r.body.error, /Titel/);
+  assert.match(r.body.error, /title is required/);
   assert.deepEqual(ingredientRows(id).map((x) => x.name), ['Bleibt']);
 });
 
@@ -843,7 +843,7 @@ test('MCP call_api_operation post_recipes: Felder neben payload → klare Meldun
       callTool(ctx, 'call_api_operation', { operation_key: 'post_recipes' }),
       (err) => {
         assert.doesNotMatch(err.message, /Internal error/);
-        assert.match(err.message, /Titel/);
+        assert.match(err.message, /title is required/);
         return true;
       },
     );
