@@ -143,13 +143,11 @@ router.get('/summary', (req, res) => {
     // fuer den es `pending` gibt. Gerechnet beim Lesen
     // (services/subscription-budget-projection.js), mit demselben Filter wie
     // die Buchungen: was der Betrachter nicht sieht, zaehlt er auch nicht.
-    // Mit Kontofilter keine: eine erwartete Abo-Zahlung haengt an keinem Konto,
-    // und die Liste laesst sie aus demselben Grund weg.
-    const expected = accountFiltered
-      ? { count: 0, income: 0, expenses: 0, omitted: false }
-      : expectedSubscriptionTotals(db.get(), {
-        from, to, filter: expectedSubscriptionFilter(req),
-      });
+    // Mit Kontofilter nur die des Kontos: seit #1277 bucht ein Abo seine
+    // Folgezahlungen auf sein Konto, und die Liste zeigt sie aus demselben Grund.
+    const expected = expectedSubscriptionTotals(db.get(), {
+      from, to, filter: expectedSubscriptionFilter(req), accountId: accountFiltered ? accountId : null,
+    });
 
     res.json({
       data: {
@@ -374,17 +372,18 @@ router.get('/', (req, res) => {
     // einzigen Monat. Gerechnet beim Lesen, nichts wird angelegt - Regeln und
     // Begruendung in services/subscription-budget-projection.js.
     //
-    // NUR IN DER MONATSLISTE: der Darlehens-Drilldown fragt nach Raten, und ein
-    // Kontofilter nach dem, was ueber ein Konto lief - eine erwartete
-    // Abo-Zahlung haengt an keinem. Wer sie sieht, entscheidet
+    // NUR IN DER MONATSLISTE: der Darlehens-Drilldown fragt nach Raten. Ein
+    // Kontofilter bekommt die Zahlungen der Abos, die auf dieses Konto buchen
+    // (#1277). Wer sie sieht, entscheidet
     // expectedSubscriptionFilter() - ausgelassen, nie maskiert; der
     // Kategoriefilter trifft sie deshalb unter ihrer echten Kategorie.
     const accountFiltered = Number.isInteger(parseInt(req.query.account_id, 10))
       && parseInt(req.query.account_id, 10) > 0;
     let expectedOmitted = false;
-    if (!loanId && !accountFiltered) {
+    if (!loanId) {
       const expected = expectedSubscriptionEntries(db.get(), {
         from, to, filter: expectedSubscriptionFilter(req),
+        accountId: accountFiltered ? parseInt(req.query.account_id, 10) : null,
       });
       expectedOmitted = expected.omitted;
       const rows = expected.entries

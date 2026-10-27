@@ -48,6 +48,7 @@ db.exec(`
     name TEXT NOT NULL,
     color TEXT
   );
+  CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
 `);
 db.exec(MIGRATIONS_SQL[85]);  // calendar_event_exceptions
 db.exec(MIGRATIONS_SQL[174]); // generated birthday/name-day joins

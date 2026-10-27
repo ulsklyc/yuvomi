@@ -1195,7 +1195,6 @@
         "pickOne": "Pilih acara",
         "pickOneHint": "Waktu, tempat, dan pengingat muncul di sini.",
         "syncTargetAssigneeAmbiguous": "Beberapa kalender memiliki orang ini sebagai penugasan default. Pilih sendiri tujuannya.",
-        "syncTargetSeveralAssignees": "Beberapa orang ditugaskan, jadi penugasan tidak memilih kalender. Yang digunakan sebagai gantinya: {{target}}.",
         "filtersSources": "Kalender",
         "filterUnassigned": "Belum ditugaskan",
         "dateSpanSpoken": "{{from}} sampai {{to}}",
@@ -1236,7 +1235,8 @@
         "errorSelectedCalendarGone": "Kalender yang dipilih sudah tidak ada.",
         "errorSeriesNoOccurrence": "Dengan pengulangan ini tidak akan ada satu acara pun sejak tanggal mulai.",
         "localCalendarUploadsHint": "Acara di kalender ini diunggah ke iCloud melalui Apple Calendar.",
-        "overlapOpenSchedule": "Buka jadwal shift"
+        "overlapOpenSchedule": "Buka jadwal shift",
+        "syncTargetNoCalendarForPeople": "Tidak ada kalender yang penerima tugas default-nya tepat orang-orang ini, jadi penugasan tidak memilih kalender. Yang dipakai: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategori",
@@ -2441,7 +2441,10 @@
             "errorNoCalendarName": "Masukkan nama untuk kalender baru.",
             "dropzoneTitle": "Seret berkas ICS ke sini atau pilih satu",
             "dropzoneTitleTouch": "Ketuk untuk memilih file ICS",
-            "dropzoneHint": "Hanya berkas .ics"
+            "dropzoneHint": "Hanya berkas .ics",
+            "assigneesLabel": "Tugaskan ke",
+            "assigneesHint": "Acara baru mendapat orang-orang ini. Acara yang sudah diimpor dengan ID yang sama mendapat tambahan mereka - meski penugasannya dihapus manual.",
+            "successWithAssigned": "Diimpor: {{imported}}, sudah ada: {{skipped}}, di antaranya kini ditugaskan: {{assigned}}."
         },
         "memberPhoneLabel": "Nomor telepon (opsional)",
         "memberEmailLabel": "Email (opsional)",
@@ -3072,10 +3075,7 @@
         "notificationChannelDeleteConfirmDetail": "Lewat saluran ini tidak ada notifikasi yang keluar lagi, termasuk yang mendesak. Alamat dan kredensial harus dimasukkan ulang sepenuhnya untuk saluran baru.",
         "apiTokensMcpHint": "Token ini juga berfungsi sebagai token Bearer untuk endpoint MCP di /mcp (mis. di Claude Desktop, untuk membuat tugas, item belanja, dan acara dengan AI).",
         "sync": {
-            "defaultAssignee": "Penerima tugas default",
             "defaultAssigneeNone": "Tidak ada",
-            "defaultAssigneeHint": "Acara yang baru disinkronkan otomatis ditugaskan ke orang ini.",
-            "defaultAssigneeRoutingHint": "Penerima tugas default: acara dari sebuah kalender mendapat orang yang dipilih di sana, dan acara baru yang hanya ditugaskan ke orang itu dibuat di kalender tersebut. Berlaku untuk kalender Google dan CalDAV, bukan Apple atau Outlook.",
             "backfillTitle": "Lengkapi penugasan",
             "backfillDescription": "Penerima tugas default hanya berlaku untuk janji temu yang diimpor setelah diatur. Di sini Anda dapat menerapkannya sekali ke janji temu yang sudah diimpor dari semua akun.",
             "backfillAction": "Terapkan ke janji temu yang ada",
@@ -3095,7 +3095,10 @@
             "backfillMovedNext": "Tampilkan berikutnya",
             "backfillMovedAll": "Pilih semua",
             "backfillMovedChange": "Dari {{from}} ke {{to}}",
-            "backfillDescriptionMore": "Janji temu tanpa penerima tugas langsung mendapatkannya. Janji temu yang masih membawa penerima tugas default kalender lain ditampilkan satu per satu untuk Anda pilih. Penugasan lain tidak berubah."
+            "backfillDescriptionMore": "Janji temu tanpa penerima tugas langsung mendapatkannya. Janji temu yang masih membawa penerima tugas default kalender lain ditampilkan satu per satu untuk Anda pilih. Penugasan lain tidak berubah.",
+            "defaultAssignees": "Penerima tugas default",
+            "defaultAssigneesHint": "Acara yang baru disinkronkan otomatis ditugaskan ke orang-orang ini. Orang pertama menentukan warnanya.",
+            "defaultAssigneesRoutingHint": "Penerima tugas default: acara dari sebuah kalender mendapat orang yang dipilih di sana, dan acara baru yang ditugaskan tepat ke orang-orang ini dibuat di kalender itu. Ini berlaku untuk kalender Google dan CalDAV, bukan Apple atau Outlook."
         },
         "calendarAssignMeLabel": "Tugaskan acara baru ke saya",
         "calendarDefaultRemindersLabel": "Pengingat bawaan",
@@ -3424,7 +3427,10 @@
         "caldavCalendarReadOnlyWaiting": "Hanya baca: {{count}} acara yang menunggu diunggah ke sini tidak akan sampai",
         "reminderListReadOnly": "Hanya baca: entri baru tidak dapat disimpan di sini",
         "reminderListReadOnlyWaiting_one": "Hanya baca: {{count}} entri yang menunggu diunggah ke sini tidak akan sampai",
-        "reminderListReadOnlyWaiting": "Hanya baca: {{count}} entri yang menunggu diunggah ke sini tidak akan sampai"
+        "reminderListReadOnlyWaiting": "Hanya baca: {{count}} entri yang menunggu diunggah ke sini tidak akan sampai",
+        "reminderListAssigneesTasksOnly": "Orang hanya bisa diatur untuk daftar yang masuk ke Tugas.",
+        "syncAssigneeNotMember": "Hanya anggota rumah tangga yang bisa dipilih di sini.",
+        "syncAssigneeUnknown": "Orang ini sudah tidak ada. Muat ulang halaman."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",
@@ -4367,6 +4373,7 @@
             "missedBook": "Bukukan yang terlewat mulai {{date}}",
             "missedDetail": "{{count}} tanggal terlewat sejak {{date}}.",
             "missedDetail_one": "{{count}} tanggal terlewat sejak {{date}}.",
+            "failing": "Pembukuan gagal - dicoba lagi setiap jam",
             "pastQuestion": "Tanggalnya sudah lewat",
             "pastSkip": "Mulai dari {{date}}",
             "pastDetail": "{{count}} tanggal seharusnya sudah jatuh tempo sejak {{date}}.",
@@ -4804,7 +4811,14 @@
         "detailAmountLabel": "Jumlah",
         "detailNextPaymentLabel": "Pembayaran berikutnya",
         "renewedNamed": "\"{{name}}\" dibayar - pembayaran berikutnya {{date}}.",
-        "completedNamed": "\"{{name}}\" dibayar dan selesai."
+        "completedNamed": "\"{{name}}\" dibayar dan selesai.",
+        "accountHint": "Setiap pembayaran langganan ini dicatat ke akun ini. Ubah satu pembayaran di anggaran.",
+        "accountArchivedHint": "Akun ini diarsipkan. Langganan dicatat tanpa akun sampai kamu memilih akun lain.",
+        "accountArchivedOption": "{{name}} (diarsipkan)",
+        "accountArchivedMeta": "{{name}} diarsipkan - dicatat tanpa akun",
+        "visibilityHint_private": "Hanya kamu yang melihat langganan ini dan pembayarannya.",
+        "visibilityHint_shared": "Semua orang di rumah tangga melihat langganan ini dan pembayarannya.",
+        "errorAccountGone": "Akun yang dipilih sudah tidak ada."
     },
     "health": {
         "fasting": {

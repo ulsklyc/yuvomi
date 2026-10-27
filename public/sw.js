@@ -409,6 +409,7 @@ const PAGE_MODULES = [
   '/settings/region-presets.js',
   '/settings/weather-location.js',
   '/settings/family-users.js',
+  '/settings/assignee-menu.js',
   '/settings/module-install-errors.js',
   '/settings/pages/personal-account.js',
   '/settings/pages/personal-schedule.js',

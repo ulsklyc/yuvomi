@@ -1177,7 +1177,6 @@
         "pickOne": "Bir etkinlik seçin",
         "pickOneHint": "Saat, yer ve hatırlatıcılar burada görünür.",
         "syncTargetAssigneeAmbiguous": "Birden fazla takvimde bu kişi varsayılan atama olarak ayarlı. Hedefi kendin seç.",
-        "syncTargetSeveralAssignees": "Birden fazla kişi atanmış, bu yüzden atama bir takvim seçmez. Bunun yerine kullanılan: {{target}}.",
         "filtersSources": "Takvimler",
         "filterUnassigned": "Atanmamış",
         "dateSpanSpoken": "{{from}} ile {{to}} arası",
@@ -1218,7 +1217,8 @@
         "errorSelectedCalendarGone": "Seçilen takvim artık yok.",
         "errorSeriesNoOccurrence": "Bu tekrarla başlangıç tarihinden itibaren hiç etkinlik olmazdı.",
         "localCalendarUploadsHint": "Bu takvimdeki etkinlikler Apple Calendar üzerinden iCloud’a yüklenir.",
-        "overlapOpenSchedule": "Vardiya planını aç"
+        "overlapOpenSchedule": "Vardiya planını aç",
+        "syncTargetNoCalendarForPeople": "Hiçbir takvimin varsayılan ataması tam olarak bu kişiler değil, bu yüzden atama bir takvim seçmez. Bunun yerine: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategoriler",
@@ -2285,7 +2285,10 @@
             "errorNoCalendarName": "Yeni takvim için bir ad gir.",
             "dropzoneTitle": "Bir ICS dosyasını buraya sürükleyin veya seçin",
             "dropzoneTitleTouch": "ICS dosyası seçmek için dokunun",
-            "dropzoneHint": "Yalnızca .ics dosyaları"
+            "dropzoneHint": "Yalnızca .ics dosyaları",
+            "assigneesLabel": "Ata",
+            "assigneesHint": "Yeni etkinlikler bu kişileri alır. Aynı kimlikle daha önce içe aktarılmış bir etkinliğe de eklenirler - ataması elle kaldırılmış olsa bile.",
+            "successWithAssigned": "İçe aktarılan: {{imported}}, zaten vardı: {{skipped}}, bunlardan şimdi atanan: {{assigned}}."
         },
         "memberPhoneLabel": "Telefon numarası (isteğe bağlı)",
         "memberEmailLabel": "E-posta (isteğe bağlı)",
@@ -3054,10 +3057,7 @@
         "notificationChannelDeleteConfirmDetail": "Bu kanaldan artık hiçbir bildirim gitmez, acil olanlar da dahil. Adres ve erişim bilgileri yeni bir kanal için baştan girilmelidir.",
         "apiTokensMcpHint": "Bu belirteçler /mcp adresindeki MCP uç noktası için Bearer belirteci olarak da çalışır (örn. Claude Desktop'ta yapay zekâ ile görev, alışveriş öğesi ve etkinlik oluşturmak için).",
         "sync": {
-            "defaultAssignee": "Varsayılan atama",
             "defaultAssigneeNone": "Yok",
-            "defaultAssigneeHint": "Yeni eşitlenen etkinlikler otomatik olarak bu kişiye atanır.",
-            "defaultAssigneeRoutingHint": "Varsayılan atama: bir takvimdeki etkinlikler orada seçilen kişiye atanır ve yalnızca o kişiye atanan yeni bir etkinlik o takvimde oluşturulur. Google ve CalDAV takvimleri için geçerlidir, Apple veya Outlook için değil.",
             "backfillTitle": "Atamaları tamamla",
             "backfillDescription": "Varsayılan atama yalnızca ayarlandıktan sonra içe aktarılan randevulara uygulanır. Burada bunu tüm hesaplardan zaten içe aktarılmış randevulara bir kez uygulayabilirsiniz.",
             "backfillAction": "Mevcut randevulara uygula",
@@ -3077,7 +3077,10 @@
             "backfillMovedNext": "Sonrakileri göster",
             "backfillMovedAll": "Tümünü seç",
             "backfillMovedChange": "{{from}} yerine {{to}}",
-            "backfillDescriptionMore": "Atanmamış randevular onu doğrudan alır. Hâlâ başka bir takvimin varsayılan atamasını taşıyan randevular seçmeniz için tek tek listelenir. Diğer tüm atamalar değişmez."
+            "backfillDescriptionMore": "Atanmamış randevular onu doğrudan alır. Hâlâ başka bir takvimin varsayılan atamasını taşıyan randevular seçmeniz için tek tek listelenir. Diğer tüm atamalar değişmez.",
+            "defaultAssignees": "Varsayılan atama",
+            "defaultAssigneesHint": "Yeni eşitlenen etkinlikler otomatik olarak bu kişilere atanır. İlk kişi rengi belirler.",
+            "defaultAssigneesRoutingHint": "Varsayılan atama: bir takvimdeki etkinlikler orada seçilen kişileri alır ve tam olarak bu kişilere atanan yeni bir etkinlik o takvimde oluşturulur. Bu, Google ve CalDAV takvimleri için geçerlidir; Apple veya Outlook için değil."
         },
         "calendarAssignMeLabel": "Yeni etkinlikleri bana ata",
         "calendarDefaultRemindersLabel": "Varsayılan hatırlatıcılar",
@@ -3406,7 +3409,10 @@
         "caldavCalendarReadOnlyWaiting": "Salt okunur: buraya yüklenmeyi bekleyen {{count}} etkinlik ulaşmayacak",
         "reminderListReadOnly": "Salt okunur: buraya yeni kayıt eklenemez",
         "reminderListReadOnlyWaiting_one": "Salt okunur: buraya yüklenmeyi bekleyen {{count}} kayıt ulaşmayacak",
-        "reminderListReadOnlyWaiting": "Salt okunur: buraya yüklenmeyi bekleyen {{count}} kayıt ulaşmayacak"
+        "reminderListReadOnlyWaiting": "Salt okunur: buraya yüklenmeyi bekleyen {{count}} kayıt ulaşmayacak",
+        "reminderListAssigneesTasksOnly": "Kişiler yalnızca Görevler’e giden listeler için ayarlanabilir.",
+        "syncAssigneeNotMember": "Burada yalnızca hane üyeleri seçilebilir.",
+        "syncAssigneeUnknown": "Bu kişi artık yok. Sayfayı yeniden yükleyin."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",
@@ -4367,6 +4373,7 @@
             "missedBook": "{{date}} tarihinden itibaren kaçanları kaydet",
             "missedDetail": "{{date}} tarihinden beri {{count}} tarih kaçırıldı.",
             "missedDetail_one": "{{date}} tarihinden beri {{count}} tarih kaçırıldı.",
+            "failing": "Kayıt başarısız - her saat yeniden deneniyor",
             "pastQuestion": "Tarih geçmişte",
             "pastSkip": "{{date}} tarihinden başla",
             "pastDetail": "{{date}} tarihinden beri {{count}} tarihin vadesi gelmiş olurdu.",
@@ -4804,7 +4811,14 @@
         "detailAmountLabel": "Tutar",
         "detailNextPaymentLabel": "Sonraki ödeme",
         "renewedNamed": "\"{{name}}\" ödendi - sonraki ödeme {{date}}.",
-        "completedNamed": "\"{{name}}\" ödendi ve tamamlandı."
+        "completedNamed": "\"{{name}}\" ödendi ve tamamlandı.",
+        "accountHint": "Bu aboneliğin her ödemesi bu hesaba işlenir. Tek bir ödemeyi bütçede değiştirebilirsin.",
+        "accountArchivedHint": "Bu hesap arşivlendi. Başka bir hesap seçene kadar abonelik hesapsız işlenir.",
+        "accountArchivedOption": "{{name}} (arşivlendi)",
+        "accountArchivedMeta": "{{name}} arşivlendi - hesapsız işlenir",
+        "visibilityHint_private": "Bu aboneliği ve ödemelerini yalnızca sen görürsün.",
+        "visibilityHint_shared": "Ev halkındaki herkes bu aboneliği ve ödemelerini görür.",
+        "errorAccountGone": "Seçilen hesap artık mevcut değil."
     },
     "health": {
         "fasting": {

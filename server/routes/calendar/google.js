@@ -10,7 +10,9 @@ import express from 'express';
 import * as db from '../../db.js';
 import * as googleCalendar from '../../services/google-calendar.js';
 import { requireAdmin } from '../../auth.js';
-import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
+import {
+  assigneeFields, readDefaultAssignees, validateAssigneeIds, writeDefaultAssignees,
+} from '../../services/default-assignees.js';
 import {
   applyDefaultAssigneesToExisting,
   backfillCandidatesToken,
@@ -211,8 +213,14 @@ function knownCalendarName(source, externalId) {
  * aktualisiert beim Anlegen nur Name und Farbe (ON CONFLICT DO UPDATE), die
  * Zuweisung bleibt also stehen.
  *
- * Body: { source: 'google'|'apple'|'caldav', external_id: string, default_assignee_user_id: number|null }
- * Response: { data: { source, external_id, default_assignee_user_id } }
+ * MEHRERE PERSONEN (#1897): `default_assignee_user_ids` ersetzt die Menge des
+ * Kalenders (Join-Tabelle, Migration 265), die erste ist die primaere. Die
+ * Altform `default_assignee_user_id` (eine Person oder null) bleibt gueltig und
+ * setzt die Menge auf diese eine Person. Die Antwort traegt beides.
+ *
+ * Body: { source: 'google'|'apple'|'caldav', external_id: string,
+ *         default_assignee_user_ids?: number[], default_assignee_user_id?: number|null }
+ * Response: { data: { source, external_id, default_assignee_user_ids, default_assignee_user_id } }
  */
 router.patch('/external-calendars', requireAdmin, (req, res) => {
   try {
@@ -223,38 +231,30 @@ router.patch('/external-calendars', requireAdmin, (req, res) => {
     if (typeof external_id !== 'string' || external_id.trim().length === 0) {
       return res.status(400).json({ error: 'external_id is missing or invalid.', code: 400 });
     }
-    const raw = req.body.default_assignee_user_id;
-    const assignee = (raw === null || raw === undefined || raw === '') ? null : Number(raw);
-    if (assignee !== null && !Number.isInteger(assignee)) {
-      return res.status(400).json({ error: 'default_assignee_user_id must be a number or null.', code: 400 });
-    }
-    if (assignee !== null && !db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(assignee)) {
-      return res.status(400).json({ error: 'Unknown user ID.', code: 400 });
-    }
-    // Neu nur Haushaltsmitglieder (#1207); die gespeicherte Zuweisung bleibt gueltig.
-    if (assignee !== null) {
-      const stored = db.get().prepare('SELECT default_assignee_user_id AS a FROM external_calendars WHERE source = ? AND external_id = ?').get(source, external_id)?.a;
-      const strangers = newNonMembers([assignee], { stored: stored == null ? [] : [stored] });
-      if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
-    }
+    const d = db.get();
+    const row = d.prepare('SELECT id FROM external_calendars WHERE source = ? AND external_id = ?').get(source, external_id);
+    // Neu nur Haushaltsmitglieder (#1207); wer schon an dem Kalender steht, bleibt gueltig.
+    const stored = row ? readDefaultAssignees(d, 'calendar', row.id) : [];
+    const checked = validateAssigneeIds(d, req.body, { stored });
+    if (checked.error) return res.status(400).json({ error: checked.error, code: 400, reason: checked.reason });
+    // Ein Body ohne eines der Felder leert die Menge, wie frueher ein fehlendes Feld.
+    const ids = checked.present ? checked.ids : [];
 
-    const result = db.get().prepare(
-      'UPDATE external_calendars SET default_assignee_user_id = ? WHERE source = ? AND external_id = ?'
-    ).run(assignee, source, external_id);
-
-    if (result.changes === 0) {
+    let calendarId = row?.id;
+    if (!calendarId) {
       const name = knownCalendarName(source, external_id);
       if (!name) {
         return res.status(404).json({ error: 'This calendar has not been synced yet.', code: 404 });
       }
       // Farbe bleibt offen: Sie gehört dem Provider, und der nächste Sync trägt
       // sie zusammen mit dem endgültigen Namen nach.
-      db.get().prepare(`
-        INSERT INTO external_calendars (source, external_id, name, color, default_assignee_user_id)
-        VALUES (?, ?, ?, NULL, ?)
-      `).run(source, external_id, name, assignee);
+      calendarId = Number(d.prepare(`
+        INSERT INTO external_calendars (source, external_id, name, color)
+        VALUES (?, ?, ?, NULL)
+      `).run(source, external_id, name).lastInsertRowid);
     }
-    res.json({ data: { source, external_id, default_assignee_user_id: assignee } });
+    writeDefaultAssignees(d, 'calendar', calendarId, ids);
+    res.json({ data: { source, external_id, ...assigneeFields(readDefaultAssignees(d, 'calendar', calendarId)) } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -279,16 +279,23 @@ function movedPreviewFields(d, viewerId, after = null) {
   const { total, before } = countMovedCandidates(d, { viewerId, after });
   const more = before + rows.length < total && rows.length > 0;
   return {
+    // Mengen (#1897): `from_user_ids`/`to_user_ids` mit ihren Namen. Die
+    // Einzelfelder tragen fuer Aufrufer der Altform die primaere Person und
+    // alle Namen in einem Text.
     moved: rows.map((m) => ({
       event_id: m.eventId,
       title: m.title,
       start_datetime: m.startDatetime,
       all_day: m.allDay,
       calendar_name: m.calendarName,
-      from_user_id: m.fromUserId,
-      from_name: m.fromName,
-      to_user_id: m.userId,
-      to_name: m.toName,
+      from_user_ids: m.fromUserIds,
+      from_names: m.fromNames,
+      to_user_ids: m.userIds,
+      to_names: m.toNames,
+      from_user_id: m.fromUserIds[0] ?? null,
+      from_name: m.fromNames.join(', '),
+      to_user_id: m.userIds[0] ?? null,
+      to_name: m.toNames.join(', '),
     })),
     moved_total: total,
     moved_offset: before,
@@ -296,11 +303,20 @@ function movedPreviewFields(d, viewerId, after = null) {
   };
 }
 
+/** Eine Menge aus einem Umzugseintrag: die Liste oder die Altform (eine Id). */
+function moveIds(list, single) {
+  const raw = list !== undefined ? list : (single !== undefined ? [single] : null);
+  if (!Array.isArray(raw) || !raw.length || raw.length > 100) return null;
+  if (!raw.every((v) => Number.isInteger(v) && v > 0)) return null;
+  return [...new Set(raw)];
+}
+
 /**
- * `moves` aus dem Body: eine Liste { event_id, from_user_id, to_user_id }, je
- * Termin hoechstens einmal und hoechstens movedCandidatesLimit.max Eintraege -
- * so viele, wie die Vorschau zeigt. Fehlt sie, ist nichts abgehakt.
- * @returns {{ eventId: number, fromUserId: number, userId: number }[] | { error: string }}
+ * `moves` aus dem Body: eine Liste { event_id, from_user_ids, to_user_ids }
+ * (oder, Altform, { event_id, from_user_id, to_user_id }), je Termin
+ * hoechstens einmal und hoechstens movedCandidatesLimit.max Eintraege - so
+ * viele, wie die Vorschau zeigt. Fehlt sie, ist nichts abgehakt.
+ * @returns {{ eventId: number, fromUserIds: number[], userIds: number[] }[] | { error: string }}
  */
 function parseMoves(raw) {
   if (raw === undefined || raw === null) return [];
@@ -312,11 +328,13 @@ function parseMoves(raw) {
   const moves = [];
   for (const item of raw) {
     if (!item || typeof item !== 'object') return invalid;
-    const { event_id: eventId, from_user_id: fromUserId, to_user_id: userId } = item;
-    if (![eventId, fromUserId, userId].every((v) => Number.isInteger(v) && v > 0)) return invalid;
+    const { event_id: eventId } = item;
+    const fromUserIds = moveIds(item.from_user_ids, item.from_user_id);
+    const userIds = moveIds(item.to_user_ids, item.to_user_id);
+    if (!Number.isInteger(eventId) || eventId < 1 || !fromUserIds || !userIds) return invalid;
     if (seen.has(eventId)) return invalid;
     seen.add(eventId);
-    moves.push({ eventId, fromUserId, userId });
+    moves.push({ eventId, fromUserIds, userIds });
   }
   return moves;
 }
@@ -385,7 +403,7 @@ router.get('/external-calendars/default-assignee-backfill', requireAdmin, (req, 
  * geschrieben.
  * Ohne `moves` wird kein Termin umgestellt.
  * Body: { expected_count: number, expected_token?: string,
- *         moves?: { event_id, from_user_id, to_user_id }[] }
+ *         moves?: { event_id, from_user_ids, to_user_ids }[] } (Altform: from_user_id, to_user_id)
  * Response: { data: { assigned } } | 409 { data: { count, token, moved, moved_total, moved_offset, moved_next } }
  */
 router.post('/external-calendars/default-assignee-backfill', requireAdmin, async (req, res) => {

@@ -1175,7 +1175,6 @@
         "pickOne": "Escolha um evento",
         "pickOneHint": "O horário, o local e os lembretes aparecem aqui.",
         "syncTargetAssigneeAmbiguous": "Vários calendários têm esta pessoa como atribuição padrão. Escolha o destino manualmente.",
-        "syncTargetSeveralAssignees": "Várias pessoas estão atribuídas, por isso a atribuição não escolhe nenhum calendário. Usado em vez disso: {{target}}.",
         "filtersSources": "Calendários",
         "filterUnassigned": "Não atribuídos",
         "dateSpanSpoken": "de {{from}} a {{to}}",
@@ -1218,7 +1217,8 @@
         "errorSelectedCalendarGone": "O calendário escolhido não existe mais.",
         "errorSeriesNoOccurrence": "Com esta repetição não haveria nenhum evento a partir da data de início.",
         "localCalendarUploadsHint": "Os eventos deste calendário são enviados para o iCloud pelo Apple Calendar.",
-        "overlapOpenSchedule": "Abrir turnos"
+        "overlapOpenSchedule": "Abrir turnos",
+        "syncTargetNoCalendarForPeople": "Nenhum calendário tem exatamente estas pessoas como atribuição padrão, então a atribuição não escolhe nenhum. Usado em vez disso: {{target}}."
     },
     "noteCategories": {
         "categories": "Categorias",
@@ -2285,7 +2285,10 @@
             "errorNoCalendarName": "Introduz um nome para o novo calendário.",
             "dropzoneTitle": "Arraste um arquivo ICS para cá ou escolha um",
             "dropzoneTitleTouch": "Toque para escolher um arquivo ICS",
-            "dropzoneHint": "Somente arquivos .ics"
+            "dropzoneHint": "Somente arquivos .ics",
+            "assigneesLabel": "Atribuir a",
+            "assigneesHint": "Novos eventos recebem estas pessoas. Um evento já importado com o mesmo ID as recebe a mais - mesmo que a atribuição tenha sido removida à mão.",
+            "successWithAssigned": "Importados: {{imported}}, já existiam: {{skipped}}, deles agora atribuídos: {{assigned}}."
         },
         "memberPhoneLabel": "Telefone (opcional)",
         "memberEmailLabel": "E-mail (opcional)",
@@ -3053,10 +3056,7 @@
         "notificationChannelDeleteConfirmDetail": "Nenhuma notificação sai mais por este canal, nem mesmo as urgentes. O endereço e as credenciais terão que ser inseridos novamente para outro canal.",
         "apiTokensMcpHint": "Estes tokens também funcionam como tokens Bearer para o endpoint MCP em /mcp (por ex. no Claude Desktop, para criar tarefas, itens de compras e eventos através de IA).",
         "sync": {
-            "defaultAssignee": "Atribuição padrão",
             "defaultAssigneeNone": "Nenhum",
-            "defaultAssigneeHint": "Os eventos recém-sincronizados são atribuídos automaticamente a esta pessoa.",
-            "defaultAssigneeRoutingHint": "Atribuição padrão: os eventos de um calendário recebem a pessoa escolhida nele, e um novo evento atribuído apenas a essa pessoa é criado nesse calendário. Vale para calendários Google e CalDAV, não para Apple nem Outlook.",
             "backfillTitle": "Completar atribuições",
             "backfillDescription": "A atribuição padrão só vale para eventos importados depois de configurada. Aqui você pode aplicá-la uma vez aos eventos já importados de todas as contas.",
             "backfillAction": "Aplicar aos eventos existentes",
@@ -3076,7 +3076,10 @@
             "backfillMovedNext": "Próximo evento",
             "backfillMovedPartial": "Os eventos {{first}} a {{last}} de {{total}} foram movidos.",
             "backfillMovedTitle": "Revisar eventos movidos",
-            "backfillDescriptionMore": "Eventos que já estão atribuídos a alguém não mudam."
+            "backfillDescriptionMore": "Eventos que já estão atribuídos a alguém não mudam.",
+            "defaultAssignees": "Atribuição padrão",
+            "defaultAssigneesHint": "Eventos recém-sincronizados são atribuídos automaticamente a estas pessoas. A primeira define a cor.",
+            "defaultAssigneesRoutingHint": "Atribuição padrão: eventos de um calendário recebem as pessoas escolhidas nele, e um novo evento atribuído exatamente a essas pessoas é criado nesse calendário. Vale para calendários Google e CalDAV, não para Apple ou Outlook."
         },
         "calendarAssignMeLabel": "Atribuir novos eventos a mim",
         "calendarDefaultRemindersLabel": "Lembretes padrão",
@@ -3406,7 +3409,10 @@
         "caldavCalendarReadOnlyWaiting": "Somente leitura: {{count}} eventos aguardando envio para cá não vão chegar",
         "reminderListReadOnly": "Somente leitura: não é possível salvar novas entradas aqui",
         "reminderListReadOnlyWaiting_one": "Somente leitura: {{count}} entrada aguardando envio para cá não vai chegar",
-        "reminderListReadOnlyWaiting": "Somente leitura: {{count}} entradas aguardando envio para cá não vão chegar"
+        "reminderListReadOnlyWaiting": "Somente leitura: {{count}} entradas aguardando envio para cá não vão chegar",
+        "reminderListAssigneesTasksOnly": "Pessoas só podem ser definidas para listas que vão para Tarefas.",
+        "syncAssigneeNotMember": "Aqui só podem ser escolhidos membros da casa.",
+        "syncAssigneeUnknown": "Esta pessoa não existe mais. Recarregue a página."
     },
     "login": {
         "tagline": "Bem-vindo de volta. Sua casa em um só lugar.",
@@ -4367,6 +4373,7 @@
             "missedBook": "Lançar as datas perdidas desde {{date}}",
             "missedDetail": "{{count}} datas foram perdidas desde {{date}}.",
             "missedDetail_one": "{{count}} data foi perdida desde {{date}}.",
+            "failing": "Falha no lançamento - nova tentativa a cada hora",
             "pastQuestion": "A data está no passado",
             "pastSkip": "Começar em {{date}}",
             "pastDetail": "{{count}} datas teriam vencido desde {{date}}.",
@@ -4804,7 +4811,14 @@
         "detailAmountLabel": "Valor",
         "detailNextPaymentLabel": "Próximo pagamento",
         "renewedNamed": "\"{{name}}\" pago - próximo pagamento em {{date}}.",
-        "completedNamed": "\"{{name}}\" pago e concluído."
+        "completedNamed": "\"{{name}}\" pago e concluído.",
+        "accountHint": "Cada pagamento desta assinatura é lançado nesta conta. Altere um pagamento específico no orçamento.",
+        "accountArchivedHint": "Esta conta está arquivada. A assinatura é lançada sem conta até você escolher outra.",
+        "accountArchivedOption": "{{name}} (arquivada)",
+        "accountArchivedMeta": "{{name}} arquivada - lançada sem conta",
+        "visibilityHint_private": "Só você vê esta assinatura e seus pagamentos.",
+        "visibilityHint_shared": "Toda a casa vê esta assinatura e seus pagamentos.",
+        "errorAccountGone": "A conta selecionada não existe mais."
     },
     "health": {
         "fasting": {

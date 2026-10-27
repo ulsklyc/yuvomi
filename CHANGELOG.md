@@ -8,6 +8,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A synced calendar can bring its events in for several people** (#1897). The default
+  assignee of a Google or CalDAV calendar and of a calendar subscription is now a set: a shared
+  "Together" calendar assigns its events to both of you, your own calendars stay with one person
+  each. The field in each calendar row opens a menu with one switch per member; the first person
+  chosen gives an event its colour. The other rules follow the set: an event moved between two
+  calendars takes the new calendar's people while its assignment is still exactly the old
+  calendar's, "Apply to existing appointments" fills in all of them, and a new event assigned to
+  exactly the people of one calendar is created there. Existing single assignments carry over
+  (migration 265). API clients send `default_assignee_user_ids`; the single
+  `default_assignee_user_id` is still accepted and returned.
+- **A reminder list mapped to Tasks can assign its new tasks** (#1221). Next to the list in the
+  reminder sync settings, choose who gets the tasks the sync brings in from it. Only new tasks get
+  them; an assignment you change or clear later stays.
+- **A calendar import can assign its events** (#1940). Choose people in the import form: every
+  new event of the run is assigned to them, and an event you imported before - the same
+  appointment in a second family member's link - is not created again but gets them added. So two
+  children's feeds leave a shared dentist appointment as one event with both, and running an
+  earlier import again with a person assigns what it brought in. Without a person the import works
+  as before.
+- **A recurring shared expense that keeps failing says so on its row** (#1746). When the hourly
+  run cannot book a series for an unexpected reason, the series keeps running and is retried
+  every hour, as before - so a fault on our side never stops a household's rent - but its row,
+  read view and edit dialog now say "Booking failed - retrying every hour" instead of the error
+  living only in the server log. A booking, an edit or a pause for a known reason clears it. API
+  clients see `failed_at` on each recurring expense (migration 263).
+- **A subscription books to an account, and can be shared or private** (#1277, #1701). The
+  subscription dialog has an Account field once the budget has accounts: every payment the
+  subscription books goes to it, the next one as soon as you save. A payment already booked is an
+  ordinary entry - change its account in the budget for a month someone else paid, and a later
+  edit of the subscription leaves it alone. When the chosen account is archived, the subscription
+  books without an account and says so quietly on its row and under the field; restoring the
+  account books to it again, and deleting it clears the choice. In the personal budget mode the
+  dialog also has Visibility, as on a budget entry: a new subscription starts shared, a private one
+  and its payments are seen only by you. For API clients `account_id` is new on
+  `/api/v1/budget/subscriptions`, with `account_name` and `account_archived` in the answer;
+  `/meta` adds `budget_mode` and `accounts`, and an unknown account answers `400` with reason
+  `subscriptions_account_not_found` (migration 264).
 - **A recurring shared expense with a start date in the past asks before booking the gap**
   (#1748). Creating one, or moving its next date, to a day before today used to book one missed
   date per hour until it had caught up. The dialog now asks, as resuming does: start from the next
@@ -161,6 +198,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cancellation by the occurrence's original start, and the next CalDAV or iCloud sync corrects one
   stored the old way. Google Calendar and cancellations a provider no longer sends follow
   separately.
+- **"New - Task" on the Overview opens the new-task form again.** The "+ New" button on a computer
+  and the quick-action button on a phone switched to Tasks and stopped there, because they still
+  looked for the add button under the name it had before the add buttons were unified. Event, Note
+  and Shopping were not affected.
+- **Finishing, editing or deleting from a sheet over the Overview leaves the Overview where it
+  was.** Completing a task, changing or deleting an event, or starting or ending a fast in a sheet
+  opened from the Overview rebuilt the whole page: the loading placeholders flashed, the page shrank
+  to the height of the screen and a computer scrolled back to the top. The Overview now updates in
+  place - the row that goes away closes, the scroll position and the focus stay - and the
+  half-hourly weather update only redraws it when the forecast changed.
 - **A long reminder list name no longer squeezes the module picker in the sync settings** (#2284).
   The picker keeps the width of its value; next to a long name on a phone it moves below the name,
   and a long name wraps instead of running past the row.

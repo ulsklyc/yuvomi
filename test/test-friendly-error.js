@@ -326,6 +326,10 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909); die echte
     // Antwort misst test:screensaver.
     '../server/routes/screensaver.js',
+    // Personen einer Sync-Quelle oder eines Imports (#1897, #1221, #1940): die
+    // eine Pruefung steht im Dienst, die Erinnerungsliste in ihrer Route; die
+    // echte Antwort misst test:sync-default-assignees.
+    '../server/services/default-assignees.js', '../server/routes/calendar/caldav.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
@@ -360,6 +364,7 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'meals_selected_recipe_not_found',
     'subscriptions_subscription_not_found', 'subscriptions_category_not_found', 'subscriptions_payment_method_not_found',
     'subscriptions_selected_category_not_found', 'subscriptions_selected_payment_method_not_found',
+    'subscriptions_account_not_found',
     'inventory_item_not_found', 'inventory_tracked_date_not_found', 'inventory_selected_location_not_found',
     'inventory_booking_not_found', 'notes_note_not_found', 'notes_selected_category_not_found',
     'contacts_contact_not_found', 'birthdays_birthday_not_found', 'birthdays_selected_contact_not_found',

@@ -75,6 +75,7 @@ describe('CalDAV Multi-Account Sync', () => {
         color       TEXT,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
 
       CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -436,6 +437,7 @@ describe('CalDAV sync yields to the event loop (#519)', () => {
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
@@ -612,6 +614,7 @@ describe('CalDAV: RECURRENCE-ID-Overrides killen die Serie nicht (#549)', () => 
         source TEXT NOT NULL, external_id TEXT NOT NULL, name TEXT, color TEXT,
         default_assignee_user_id INTEGER, UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
@@ -818,6 +821,7 @@ describe('CalDAV: No-op-Syncs bleiben im Standard-Log-Level still', () => {
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
@@ -1077,6 +1081,7 @@ describe('CalDAV: eine Bearbeitung friert die Farbe nicht mehr ein (#899)', () =
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
@@ -1283,6 +1288,7 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
@@ -2239,6 +2245,7 @@ describe('CalDAV: eine Aufgabenliste bleibt kein Terminziel (#617)', () => {
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
@@ -2419,6 +2426,7 @@ describe('CalDAV: die Kalenderauswahl überlebt das Aktualisieren (#732)', () =>
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
 
       INSERT INTO caldav_accounts (name, caldav_url, username, password)
         VALUES ('Mailbox', 'https://dav.example/', 'u', 'p');
@@ -2528,6 +2536,7 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
         default_assignee_user_id INTEGER,
         UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
@@ -2756,6 +2765,7 @@ describe('CalDAV: neue Kalender sind opt-in (#732)', () => {
         source TEXT NOT NULL, external_id TEXT NOT NULL, name TEXT, color TEXT,
         default_assignee_user_id INTEGER, UNIQUE(source, external_id)
       );
+      CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
       CREATE TABLE calendar_events (
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,

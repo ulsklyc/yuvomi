@@ -598,7 +598,8 @@ test('#1821 Fokus: der Neuaufbau der Seite ruft Erfassen und Wiederfokus, um das
   const fn = src.slice(src.indexOf('  function rebuildDashboard(cfg) {'));
   const body = fn.slice(0, fn.indexOf('\n  }\n')).split('\n').filter((line) => !/^\s*(\/\/|\/?\*)/.test(line)).join('\n');
   const capture = body.indexOf('const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);');
-  const paint = body.indexOf('setHtml(shell, `\n      <section class="dashboard-masthead');
+  // Das Markup kommt seit DW-P1-2 aus dashboardShellHtml(cfg).
+  const paint = body.indexOf('setHtml(shell, html);');
   // R19: mobil steht der Anpassen-Einstieg im Menue (`.dashboard-tools-btn`) -
   // der Knopf ist dort nicht gerendert, das Menue ist der Rueckweg.
   // R20 (D, Wand-Modus): nach dem Verlassen der Wand steht danach der
@@ -927,7 +928,8 @@ test('FLIP haengt am Neuaufbau: vorher messen, nach dem setHtml abspielen - nur 
   const body = src.match(/function rebuildDashboard\(cfg\) \{[\s\S]*?\n {2}\}\n/)?.[0];
   assert.ok(body, 'rebuildDashboard() nicht gefunden - die Signatur greift nicht mehr');
   const capture = body.search(/const tileRectsBefore = isCustomizing && renderedCustomizing === true \? captureTileRects\(shell\) : null;/);
-  const rebuild = body.search(/setHtml\(shell, `\s*<section class="dashboard-masthead/);
+  // Das Markup kommt seit DW-P1-2 aus dashboardShellHtml(cfg).
+  const rebuild = body.search(/setHtml\(shell, html\);/);
   const play = body.search(/playTileFlip\(shell, tileRectsBefore\)/);
   assert.ok(capture > -1 && rebuild > -1 && play > -1, 'Messen, Neuaufbau und Abspielen stehen alle drei im Neuaufbau');
   assert.ok(capture < rebuild && rebuild < play, 'erst messen, dann neu bauen, dann abspielen');
@@ -963,7 +965,8 @@ test('Anpassen-Modus betreten/verlassen: das Raster gleitet als Ganzes, ohne Fed
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   const body = src.match(/function rebuildDashboard\(cfg\) \{[\s\S]*?\n {2}\}\n/)?.[0] ?? '';
   const capture = body.search(/const gridTopBefore = modeChanged\s*\?/);
-  const rebuild = body.search(/setHtml\(shell, `\s*<section class="dashboard-masthead/);
+  // Das Markup kommt seit DW-P1-2 aus dashboardShellHtml(cfg).
+  const rebuild = body.search(/setHtml\(shell, html\);/);
   const play = body.search(/playGridShift\(shell, gridTopBefore\)/);
   assert.ok(capture > -1 && capture < rebuild && rebuild < play, 'nur beim Moduswechsel: vorher messen, neu bauen, gleiten');
 });
@@ -1601,7 +1604,9 @@ test('R21 Rueckweg: die Nachfrage vergleicht den Inhalt, nicht die Reihenfolge d
   assert.match(render, /= memo\s*\? \[memo\.data, memo\.weatherRes, \{ data: memo\.prefs \}, memo\.data\.pendingReminders\]\s*: await Promise\.all\(/,
     'der gemerkte Stand wird nicht ohne Anfrage gezeichnet');
   assert.match(render, /if \(memo\) refreshDashboardData\(\{ onlyIfChanged: true \}\);/, 'nach dem Zeichnen aus dem Stand fragt die Seite nicht nach');
-  assert.match(render, /if \(!unchanged\) rebuildDashboard\(widgetConfig\);/, 'eine gleiche Antwort baut die Flaeche trotzdem neu');
+  // Seit DW-P1-2 klappen gehende Zeilen vorher aus (closeLeavingRows) - gebaut
+  // wird weiterhin nur bei geaenderter Antwort.
+  assert.match(render, /if \(unchanged\) return;\n[\s\S]{0,700}?rebuildDashboard\(widgetConfig\);/, 'eine gleiche Antwort baut die Flaeche trotzdem neu');
 });
 
 // Review zu R21 (PR #2142): der gemerkte Stand traegt die eigenen Slices
@@ -1655,4 +1660,114 @@ test('R22: der Rundgang zeigt in Schritt 2 Module und verspricht das Wischen nur
   assert.doesNotMatch(de, /Wische Listeneinträge/);
   const en = JSON.parse(readFileSync(new URL('../public/locales/en.json', import.meta.url), 'utf8')).onboarding.step3Body;
   assert.match(en, /In Tasks, Shopping and Pantry/);
+});
+
+// "+ NEU > AUFGABE" OEFFNET DAS ANLEGEN-BLATT (DW-P1-1, Critique 2026-10-26).
+// Pille und Speed-Dial wechseln ins Modul und klicken dort dessen Anlegen-Knopf.
+// Die Aufgaben-Seite heisst ihn seit #1483 `fab-new-task`, die Uebersicht suchte
+// weiter `#btn-new-task` - der Tipp landete in der Liste, und nichts ging auf.
+// Gemessen wird die Map aus dem geladenen Modul gegen das Markup der Zielseite
+// (welche Datei, sagt die Routentabelle des Routers) und die Verdrahtung beider
+// Wege mit dem echten `findPageFab()`.
+function stubEl(extra = {}) {
+  const listeners = [];
+  return {
+    dataset: {}, listeners, tabIndex: 0, hidden: false,
+    classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+    setAttribute() {}, getAttribute: () => null, focus() {},
+    addEventListener(type, fn, opts) { listeners.push({ type, fn, opts }); },
+    querySelector: () => null, querySelectorAll: () => [], closest: () => null,
+    ...extra,
+  };
+}
+
+async function withNewTargets(fn) {
+  const { setPermissions, clearPermissions } = await import('../public/permissions.js');
+  const prevWindow = globalThis.window;
+  const prevDocument = globalThis.document;
+  const visited = [];
+  const clicked = [];
+  // Jeder Knopf, den die Zielseite tatsaechlich traegt, ist per Id auffindbar -
+  // eine andere Id liefert wie im Browser `null`.
+  const pageIds = new Set();
+  const byId = (id) => (pageIds.has(id) ? { click: () => clicked.push(id) } : null);
+  globalThis.document = {
+    getElementById: byId,
+    // Auch der Selektor-Weg sieht nur Knoepfe, die es gibt - so misst die Probe
+    // das Ziel, nicht die Art der Suche.
+    querySelector: (sel) => (sel.startsWith('#') ? byId(sel.slice(1)) : null),
+    addEventListener() {},
+  };
+  globalThis.window = {
+    yuvomi: { navigate: async (route) => { visited.push(route); }, isModuleDisabled: () => false },
+    matchMedia: () => ({ matches: false }),
+  };
+  setPermissions({ admin: true, modules: {}, widgets: {}, capabilities: {} });
+  try {
+    return await fn({ visited, clicked, pageIds });
+  } finally {
+    clearPermissions();
+    globalThis.window = prevWindow;
+    globalThis.document = prevDocument;
+  }
+}
+
+test('DW-P1-1: jedes "+ Neu"-Ziel nennt eine Id, die seine Zielseite traegt', async () => {
+  const { readFileSync } = await import('node:fs');
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  const targets = __test.FAB_NEW_BTN;
+  assert.ok(targets && typeof targets === 'object', 'FAB_NEW_BTN ist nicht erreichbar');
+  await withNewTargets(async () => {
+    const offered = __test.FAB_ACTIONS().map((a) => a.route);
+    assert.deepEqual(offered.slice().sort(), Object.keys(targets).sort(),
+      'Speed-Dial und Pille bieten genau die Ziele an, fuer die die Map einen Knopf kennt');
+  });
+  for (const [route, id] of Object.entries(targets)) {
+    assert.match(id, /^[a-z][\w-]*$/, `${route}: "${id}" ist eine Id fuer findPageFab(), kein Selektor`);
+    const page = new RegExp(`\\{ path: '${route}',\\s*page: '([^']+)'`).exec(router)?.[1];
+    assert.ok(page, `${route}: keine Seite in der Routentabelle`);
+    const src = readFileSync(new URL(`../public${page}`, import.meta.url), 'utf8');
+    assert.ok(src.includes(`id="${id}"`), `${route}: ${page} traegt keinen Knopf mit id="${id}" - "+ Neu" oeffnet dort nichts`);
+  }
+});
+
+test('DW-P1-1: Pille und Speed-Dial klicken nach dem Wechsel den Knopf der Zielseite', async () => {
+  const targets = __test.FAB_NEW_BTN;
+  assert.ok(targets, 'FAB_NEW_BTN ist nicht erreichbar');
+  // Die Zielseiten tragen die Knoepfe, die ihr Markup traegt (vorige Probe).
+  const real = ['fab-new-task', 'fab-new-event', 'fab-new-item', 'fab-new-note'];
+  await withNewTargets(async ({ visited, clicked, pageIds }) => {
+    real.forEach((id) => pageIds.add(id));
+    // Pille (Desktop): Klick auf einen Menuepunkt im Seiten-Container.
+    const container = stubEl();
+    __test.wireNewMenu(container, new AbortController().signal);
+    const onClick = container.listeners.find((l) => l.type === 'click' && !l.opts?.capture)?.fn;
+    assert.ok(onClick, 'wireNewMenu haengt keinen Klick an den Container');
+    for (const route of Object.keys(targets)) {
+      const item = stubEl({ dataset: { newRoute: route } });
+      await onClick({ target: { closest: (sel) => (sel === '[data-new-route]' ? item : null) } });
+    }
+    assert.deepEqual(visited, Object.keys(targets));
+    assert.deepEqual(clicked, real, 'Pille: jedes Ziel oeffnet sein Anlegen-Blatt');
+
+    // Speed-Dial (Telefon): der Knopf lebt in der Shell-Layer, findPageFab findet ihn.
+    visited.length = 0;
+    clicked.length = 0;
+    const items = Object.keys(targets).map((route) => stubEl({ dataset: { route } }));
+    const fabActions = stubEl({ querySelectorAll: (sel) => (sel === '[data-route]' ? items : []) });
+    const group = stubEl({ querySelector: (sel) => (sel === '#fab-actions' ? fabActions : null) });
+    const fabMain = stubEl({ closest: (sel) => (sel === '.page-fab-group' ? group : null) });
+    const getById = globalThis.document.getElementById;
+    globalThis.document.getElementById = (id) => (id === 'fab-main' ? fabMain : getById(id));
+    __test.initFab(new AbortController().signal);
+    for (const el of items) {
+      const go = el.listeners.find((l) => l.type === 'click')?.fn;
+      assert.ok(go, `Speed-Dial: ${el.dataset.route} ist nicht verdrahtet`);
+      await go();
+      // `go` wartet auf den Wechsel und klickt dann - einen Takt Luft fuer den Klick.
+      await new Promise((r) => setImmediate(r));
+    }
+    assert.deepEqual(visited, Object.keys(targets));
+    assert.deepEqual(clicked, real, 'Speed-Dial: jedes Ziel oeffnet sein Anlegen-Blatt');
+  });
 });

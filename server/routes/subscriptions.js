@@ -23,6 +23,7 @@ import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { findLogoOptions } from '../services/subscription-logo.js';
 import { normalizeObjectVisibility, budgetVisibilityWhere, budgetDetailsVisibleWhere, canEditEntry, resolveBudgetMode } from '../services/budget-visibility.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
+import { budgetFilter, listAccounts, validateAccountRef } from './budget/helpers.js';
 
 const log = createLogger('Subscriptions');
 const router = express.Router();
@@ -77,6 +78,27 @@ function selectedMetaGone(categoryId, paymentMethodId) {
   return null;
 }
 
+/**
+ * Das gewaehlte Konto (#1277): `{ value }` (null = ohne Konto) oder die
+ * Absage. Dieselbe Pruefung wie an einer Buchung (validateAccountRef): eine
+ * Kontohuelle ist fuer wen sie nichts traegt "nicht gefunden". Ein PUT ohne
+ * `account_id` laesst die Vorgabe stehen, ein unveraendertes wird nicht neu
+ * geprueft - das Konto kann inzwischen archiviert sein, und dann bucht das
+ * Abo ohne Konto, statt das Speichern abzulehnen.
+ */
+function accountChoice(req, current = null) {
+  if (req.body.account_id === undefined) return { value: current?.account_id ?? null };
+  if (current && req.body.account_id !== null && req.body.account_id !== ''
+      && Number(req.body.account_id) === current.account_id) return { value: current.account_id };
+  const ref = validateAccountRef(req.body.account_id, budgetFilter(req, 'e', { scoped: false }));
+  // Nur "gibt es nicht" erreicht der Dialog; eine ungueltige id nur die API.
+  if (ref.error === 'Account not found.') {
+    return { problem: { error: ref.error, code: 400, reason: 'subscriptions_account_not_found' } };
+  }
+  if (ref.error) return { problem: { error: ref.error, code: 400 } };
+  return { value: ref.value };
+}
+
 function actorId(req) {
   return req.authUserId || req.session.userId;
 }
@@ -112,16 +134,34 @@ function syncReminder(subscription) {
   );
 }
 
+/**
+ * DAS KONTO AM ABO (#1277), mitgelesen: Name und ob es archiviert ist. Eine
+ * Huelle (archived = 2, budget/helpers.js) zaehlt als archiviert - eine
+ * Vorgabe zeigt nie auf sie, denn das Loeschen eines Kontos leert jede.
+ */
+const ACCOUNT_COLUMNS = 'a.name AS account_name, a.archived AS account_archived';
+
+/**
+ * Das Konto, auf das die Buchung des Abos geht: die Vorgabe, solange ihr Konto
+ * aktiv ist. Ist es archiviert, bucht das Abo OHNE Konto (Entscheidung zu
+ * #1277) und sagt es am Abo (`account_archived`) - auf ein archiviertes Konto
+ * soll nichts Neues mehr laufen, und eine Absage braeche jede Zahlung ab.
+ */
+function bookingAccountId(row) {
+  return row.account_id != null && !row.account_archived ? row.account_id : null;
+}
+
 function loadSubscription(id) {
   return db.get().prepare(`
     SELECT s.*, c.name AS category_name, c.color AS category_color,
            c.label_key AS category_label_key, c.budget_subcategory_key,
            p.name AS payment_method_name, p.label_key AS payment_method_label_key,
-           u.display_name AS creator_name
+           u.display_name AS creator_name, ${ACCOUNT_COLUMNS}
     FROM budget_subscriptions s
     LEFT JOIN subscription_categories c ON c.id = s.category_id
     LEFT JOIN subscription_payment_methods p ON p.id = s.payment_method_id
     LEFT JOIN users u ON u.id = s.created_by
+    LEFT JOIN budget_accounts a ON a.id = s.account_id
     WHERE s.id = ?
   `).get(id);
 }
@@ -166,6 +206,7 @@ function decorate(row) {
     ...row,
     enabled: Boolean(row.enabled),
     reminder_enabled: Boolean(row.reminder_enabled),
+    account_archived: row.account_id != null && Boolean(row.account_archived),
     status: subscriptionStatus(row),
     occurrences_remaining: occurrencesRemaining(row),
   };
@@ -267,29 +308,31 @@ function bookingAmount(row, budgetCur, fetched) {
 /**
  * Schreibt die verknuepfte Buchung aus `row`, legt sie an, wenn es sie nicht
  * (mehr) gibt, und verknuepft sie. Eigentuemer + Sichtbarkeit kommen aus der
- * Zeile (#476/#505): ein privates Abo hat eine private Buchung.
+ * Zeile (#476/#505): ein privates Abo hat eine private Buchung. Das Konto auch
+ * (#1277, bookingAccountId); es ist von der Sichtbarkeit unabhaengig wie bei
+ * jeder Buchung - Konten tragen keine.
  */
 function writeLinkedBooking(row, budgetCur, amount) {
   const database = db.get();
   const values = [
     subscriptionBudgetTitle(row, budgetCur), -amount, row.budget_subcategory_key || '', row.next_payment_date,
-    row.owner_id ?? row.created_by, row.visibility || 'shared',
+    row.owner_id ?? row.created_by, row.visibility || 'shared', bookingAccountId(row),
   ];
   if (row.budget_entry_id) {
     const updated = database.prepare(`
       UPDATE budget_entries
       SET title = ?, amount = ?, category = 'subscriptions', subcategory = ?, date = ?,
-          owner_id = ?, visibility = ?
+          owner_id = ?, visibility = ?, account_id = ?
       WHERE id = ?
     `).run(...values, row.budget_entry_id);
     if (updated.changes) return row.budget_entry_id;
   }
-  const [title, signed, subcategory, date, ownerId, visibility] = values;
+  const [title, signed, subcategory, date, ownerId, visibility, accountId] = values;
   const entryId = database.prepare(`
     INSERT INTO budget_entries
-      (title, amount, category, subcategory, date, is_recurring, created_by, owner_id, visibility)
-    VALUES (?, ?, 'subscriptions', ?, ?, 0, ?, ?, ?)
-  `).run(title, signed, subcategory, date, row.created_by, ownerId, visibility).lastInsertRowid;
+      (title, amount, category, subcategory, date, is_recurring, created_by, owner_id, visibility, account_id)
+    VALUES (?, ?, 'subscriptions', ?, ?, 0, ?, ?, ?, ?)
+  `).run(title, signed, subcategory, date, row.created_by, ownerId, visibility, accountId).lastInsertRowid;
   database.prepare('UPDATE budget_subscriptions SET budget_entry_id = ? WHERE id = ?').run(entryId, row.id);
   return entryId;
 }
@@ -324,6 +367,13 @@ const applyBooking = (id, fetched) => db.get().transaction(() => {
     if (row.budget_entry_id && row.visibility === 'private') {
       db.get().prepare("UPDATE budget_entries SET visibility = 'private' WHERE id = ? AND visibility <> 'private'")
         .run(row.budget_entry_id);
+    }
+    // Das Konto haengt an keinem Kurs (#1277): es geht SOFORT auf die Buchung.
+    // Sonst gaebe ein Verlaengern waehrend des Kursabrufs die Buchung mit dem
+    // alten Konto ab, und sie bliebe dort, waehrend die naechste das neue traegt.
+    if (row.budget_entry_id) {
+      db.get().prepare('UPDATE budget_entries SET account_id = ? WHERE id = ? AND account_id IS NOT ?')
+        .run(bookingAccountId(row), row.budget_entry_id, bookingAccountId(row));
     }
     return { needs: { currency: row.currency, budgetCurrency: budgetCur } };
   }
@@ -486,11 +536,7 @@ async function subscriptionsWithConversions(rows, baseCurrency, refresh = false)
       const nativeMonthly = monthlyEquivalent(row.amount, row.billing_cycle, row.cycle_interval);
       const baseMonthly = convertAmount(nativeMonthly, row.currency, baseCurrency, ratesResult.rates);
       return {
-        ...row,
-        enabled: Boolean(row.enabled),
-        reminder_enabled: Boolean(row.reminder_enabled),
-        status: subscriptionStatus(row),
-        occurrences_remaining: occurrencesRemaining(row),
+        ...decorate(row),
         monthly_native: Number(nativeMonthly.toFixed(2)),
         monthly_base: baseMonthly === null ? null : Number(baseMonthly.toFixed(2)),
         base_currency: baseCurrency,
@@ -503,7 +549,7 @@ async function subscriptionsWithConversions(rows, baseCurrency, refresh = false)
   };
 }
 
-router.get('/meta', (_req, res) => {
+router.get('/meta', (req, res) => {
   try {
     const categories = db.get().prepare(`
       SELECT c.*, (SELECT COUNT(*) FROM budget_subscriptions s WHERE s.category_id = c.id) AS usage_count
@@ -515,7 +561,15 @@ router.get('/meta', (_req, res) => {
       FROM subscription_payment_methods p
       ORDER BY p.sort_order, p.name COLLATE NOCASE
     `).all();
-    res.json({ data: { categories, payment_methods: paymentMethods, billing_cycles: BILLING_CYCLES } });
+    // Fuer den Abo-Dialog (#1277, #1701): die Konten zur Wahl (archivierte mit
+    // Kennzeichen, eine Huelle nur fuer wen sie etwas traegt - listAccounts)
+    // und der Budget-Modus, der entscheidet, ob es eine Sichtbarkeit gibt.
+    const accounts = listAccounts(true, budgetFilter(req, 'e', { scoped: false }))
+      .map((a) => ({ id: a.id, name: a.name, archived: Boolean(a.archived) }));
+    res.json({ data: {
+      categories, payment_methods: paymentMethods, billing_cycles: BILLING_CYCLES,
+      budget_mode: budgetMode(), accounts,
+    } });
   } catch (err) {
     log.error('GET /meta error:', err);
     res.status(500).json({ error: 'Subscription metadata could not be loaded.', code: 500 });
@@ -799,11 +853,12 @@ router.get('/', refuseWhileRestoring, async (req, res) => {
       SELECT s.*, c.name AS category_name, c.color AS category_color,
              c.label_key AS category_label_key, c.budget_subcategory_key,
              p.name AS payment_method_name, p.label_key AS payment_method_label_key,
-             u.display_name AS creator_name
+             u.display_name AS creator_name, ${ACCOUNT_COLUMNS}
       FROM budget_subscriptions s
       LEFT JOIN subscription_categories c ON c.id = s.category_id
       LEFT JOIN subscription_payment_methods p ON p.id = s.payment_method_id
       LEFT JOIN users u ON u.id = s.created_by
+      LEFT JOIN budget_accounts a ON a.id = s.account_id
       ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''}
       ORDER BY s.next_payment_date, s.name COLLATE NOCASE
     `).all(...params);
@@ -869,6 +924,8 @@ router.post('/', async (req, res) => {
     if (endErrors.length) return res.status(400).json(problemBody(endErrors));
     const metaGone = selectedMetaGone(req.body.category_id, req.body.payment_method_id);
     if (metaGone) return res.status(400).json(metaGone);
+    const account = accountChoice(req);
+    if (account.problem) return res.status(400).json(account.problem);
     const me = actorId(req);
     const visibility = normalizeObjectVisibility(
       req.body.visibility,
@@ -879,8 +936,8 @@ router.post('/', async (req, res) => {
         (name, description, amount, currency, billing_cycle, cycle_interval, next_payment_date,
          category_id, payment_method_id, reminder_days, reminder_enabled, enabled, website_url, logo_data,
          brand_color, notes, account_username, created_by, owner_id, visibility,
-         end_type, end_date, occurrence_count)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         end_type, end_date, occurrence_count, account_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       req.body.name.trim(), req.body.description?.trim() || null, Number(req.body.amount), validated.currency,
       req.body.billing_cycle, validated.cycleInterval, req.body.next_payment_date,
@@ -889,7 +946,7 @@ router.post('/', async (req, res) => {
       req.body.enabled === false ? 0 : 1, req.body.website_url?.trim() || null, req.body.logo_data || null,
       req.body.brand_color || null, req.body.notes?.trim() || null,
       req.body.account_username?.trim() || null, me, me, visibility,
-      endType, endDate, occurrenceCount,
+      endType, endDate, occurrenceCount, account.value,
     );
     const row = await syncBudgetExpense(Number(result.lastInsertRowid));
     syncReminder(row);
@@ -934,12 +991,14 @@ router.put('/:id', async (req, res) => {
     if (endErrors.length) return res.status(400).json(problemBody(endErrors));
     const metaGone = selectedMetaGone(value('category_id', current.category_id), value('payment_method_id', current.payment_method_id));
     if (metaGone) return res.status(400).json(metaGone);
+    const account = accountChoice(req, current);
+    if (account.problem) return res.status(400).json(account.problem);
     db.get().prepare(`
       UPDATE budget_subscriptions SET
         name = ?, description = ?, amount = ?, currency = ?, billing_cycle = ?, cycle_interval = ?,
         next_payment_date = ?, category_id = ?, payment_method_id = ?, reminder_days = ?, reminder_enabled = ?, enabled = ?,
         website_url = ?, logo_data = ?, brand_color = ?, notes = ?, account_username = ?, visibility = ?,
-        end_type = ?, end_date = ?, occurrence_count = ?, completed_at = ?
+        end_type = ?, end_date = ?, occurrence_count = ?, completed_at = ?, account_id = ?
       WHERE id = ?
     `).run(
       value('name', current.name)?.trim(), value('description', current.description)?.trim() || null,
@@ -952,7 +1011,7 @@ router.put('/:id', async (req, res) => {
       value('website_url', current.website_url)?.trim() || null, value('logo_data', current.logo_data) || null,
       value('brand_color', current.brand_color) || null, value('notes', current.notes)?.trim() || null,
       value('account_username', current.account_username)?.trim() || null, nextVisibility,
-      endType, endDate, occurrenceCount, completedAt, id,
+      endType, endDate, occurrenceCount, completedAt, account.value, id,
     );
     const row = await syncBudgetExpense(id);
     syncReminder(row);

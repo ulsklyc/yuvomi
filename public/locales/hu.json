@@ -1177,7 +1177,6 @@
         "pickOne": "Válassz egy eseményt",
         "pickOneHint": "Az időpont, a helyszín és az emlékeztetők itt jelennek meg.",
         "syncTargetAssigneeAmbiguous": "Több naptárnak is ez a személy az alapértelmezett hozzárendelése. Válaszd ki magad a célt.",
-        "syncTargetSeveralAssignees": "Több személy van hozzárendelve, ezért a hozzárendelés nem választ naptárat. Helyette ez érvényes: {{target}}.",
         "filtersSources": "Naptárak",
         "filterUnassigned": "Senkihez sincs rendelve",
         "dateSpanSpoken": "{{from}} és {{to}} között",
@@ -1218,7 +1217,8 @@
         "errorSelectedCalendarGone": "A kiválasztott naptár már nem létezik.",
         "errorSeriesNoOccurrence": "Ezzel az ismétléssel a kezdő dátumtól egyetlen esemény sem lenne.",
         "localCalendarUploadsHint": "Az ebben a naptárban lévő események az Apple Calendaron keresztül feltöltődnek az iCloudba.",
-        "overlapOpenSchedule": "Műszakbeosztás megnyitása"
+        "overlapOpenSchedule": "Műszakbeosztás megnyitása",
+        "syncTargetNoCalendarForPeople": "Egyik naptár alapértelmezett hozzárendelése sem pontosan ezek a személyek, ezért a hozzárendelés nem választ naptárt. Helyette: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategóriák",
@@ -2396,7 +2396,10 @@
             "errorNoCalendarName": "Adj meg egy nevet az új naptárhoz.",
             "dropzoneTitle": "Húzz ide egy ICS-fájlt, vagy válassz egyet",
             "dropzoneTitleTouch": "Koppintson egy ICS-fájl kiválasztásához",
-            "dropzoneHint": "Csak .ics fájlok"
+            "dropzoneHint": "Csak .ics fájlok",
+            "assigneesLabel": "Hozzárendelés",
+            "assigneesHint": "Az új események ezeket a személyeket kapják. Egy azonos azonosítóval már importált esemény pluszban kapja őket - akkor is, ha a hozzárendelését kézzel eltávolították.",
+            "successWithAssigned": "Importálva: {{imported}}, már létezett: {{skipped}}, ebből most hozzárendelve: {{assigned}}."
         },
         "birthdayFeedTitle": "Születésnaptár exportálása",
         "birthdayFeedDescription": "Minden mentett születésnap és névnap évente ismétlődő egész napos eseményként, emlékeztető nélkül is. Bármely ICS-t támogató naptáralkalmazásban használható.",
@@ -3054,10 +3057,7 @@
         "notificationChannelDeleteConfirmDetail": "Ezen a csatornán mostantól semmilyen értesítés nem megy ki, még sürgős sem. A címet és a belépési adatokat új csatornához teljesen újra meg kell adni.",
         "apiTokensMcpHint": "Ezek a tokenek Bearer tokenként is működnek a /mcp címen elérhető MCP-végponthoz (pl. a Claude Desktopban, feladatok, bevásárlólista-tételek és események MI-vel történő létrehozásához).",
         "sync": {
-            "defaultAssignee": "Alapértelmezett hozzárendelés",
             "defaultAssigneeNone": "Nincs",
-            "defaultAssigneeHint": "Az újonnan szinkronizált események automatikusan ehhez a személyhez lesznek rendelve.",
-            "defaultAssigneeRoutingHint": "Alapértelmezett hozzárendelés: egy naptár eseményei az ott kiválasztott személyhez kerülnek, és a csak neki kiosztott új esemény abban a naptárban jön létre. Google- és CalDAV-naptárakra vonatkozik, Apple-re és Outlookra nem.",
             "backfillTitle": "Hozzárendelések pótlása",
             "backfillDescription": "Az alapértelmezett hozzárendelés csak a beállítása után behozott időpontokra vonatkozik. Itt egyszer alkalmazhatja az összes fiókból már behozott időpontokra.",
             "backfillAction": "Alkalmazás a meglévő időpontokra",
@@ -3077,7 +3077,10 @@
             "backfillMovedNext": "Következők",
             "backfillMovedAll": "Összes kijelölése",
             "backfillMovedChange": "{{from}} helyett {{to}}",
-            "backfillDescriptionMore": "A hozzárendelés nélküli időpontok közvetlenül megkapják. Azok az időpontok, amelyek még egy másik naptár alapértelmezett hozzárendelését viselik, egyenként jelennek meg választásra. Minden más hozzárendelés változatlan marad."
+            "backfillDescriptionMore": "A hozzárendelés nélküli időpontok közvetlenül megkapják. Azok az időpontok, amelyek még egy másik naptár alapértelmezett hozzárendelését viselik, egyenként jelennek meg választásra. Minden más hozzárendelés változatlan marad.",
+            "defaultAssignees": "Alapértelmezett hozzárendelés",
+            "defaultAssigneesHint": "Az újonnan szinkronizált események automatikusan ezekhez a személyekhez kerülnek. Az első határozza meg a színt.",
+            "defaultAssigneesRoutingHint": "Alapértelmezett hozzárendelés: egy naptár eseményei az ott választott személyeket kapják, és egy pontosan ezekhez a személyekhez rendelt új esemény ebben a naptárban jön létre. Google és CalDAV naptárakra érvényes, Apple-re és Outlookra nem."
         },
         "calendarAssignMeLabel": "Új események hozzám rendelése",
         "calendarDefaultRemindersLabel": "Alapértelmezett emlékeztetők",
@@ -3406,7 +3409,10 @@
         "caldavCalendarReadOnlyWaiting": "Csak olvasható: {{count}} ide feltöltésre váró esemény nem érkezik meg",
         "reminderListReadOnly": "Csak olvasható: ide nem menthetők új bejegyzések",
         "reminderListReadOnlyWaiting_one": "Csak olvasható: {{count}} ide feltöltésre váró bejegyzés nem érkezik meg",
-        "reminderListReadOnlyWaiting": "Csak olvasható: {{count}} ide feltöltésre váró bejegyzés nem érkezik meg"
+        "reminderListReadOnlyWaiting": "Csak olvasható: {{count}} ide feltöltésre váró bejegyzés nem érkezik meg",
+        "reminderListAssigneesTasksOnly": "Személyek csak a Feladatokba kerülő listákhoz állíthatók be.",
+        "syncAssigneeNotMember": "Itt csak a háztartás tagjai választhatók.",
+        "syncAssigneeUnknown": "Ez a személy már nem létezik. Töltsd újra az oldalt."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",
@@ -4367,6 +4373,7 @@
             "missedBook": "Utólagos könyvelés ettől: {{date}}",
             "missedDetail": "{{date}} óta {{count}} időpont maradt ki.",
             "missedDetail_one": "{{date}} óta {{count}} időpont maradt ki.",
+            "failing": "A könyvelés sikertelen - óránként újrapróbálja",
             "pastQuestion": "A dátum a múltban van",
             "pastSkip": "Kezdés ettől: {{date}}",
             "pastDetail": "{{date}} óta {{count}} időpont lett volna esedékes.",
@@ -4804,7 +4811,14 @@
         "detailAmountLabel": "Összeg",
         "detailNextPaymentLabel": "Következő fizetés",
         "renewedNamed": "„{{name}}” kifizetve - következő fizetés: {{date}}.",
-        "completedNamed": "„{{name}}” kifizetve és lezárva."
+        "completedNamed": "„{{name}}” kifizetve és lezárva.",
+        "accountHint": "Az előfizetés minden fizetése erre a számlára kerül. Egy-egy fizetést a költségvetésben módosíthatsz.",
+        "accountArchivedHint": "Ez a számla archivált. Az előfizetés számla nélkül könyvel, amíg másikat nem választasz.",
+        "accountArchivedOption": "{{name}} (archivált)",
+        "accountArchivedMeta": "{{name}} archivált - számla nélkül könyvel",
+        "visibilityHint_private": "Ezt az előfizetést és a fizetéseit csak te látod.",
+        "visibilityHint_shared": "A háztartás minden tagja látja ezt az előfizetést és a fizetéseit.",
+        "errorAccountGone": "A kiválasztott számla már nem létezik."
     },
     "health": {
         "fasting": {

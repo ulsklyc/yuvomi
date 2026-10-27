@@ -1252,7 +1252,6 @@
         "pickOne": "Vyberte událost",
         "pickOneHint": "Čas, místo a připomenutí se zobrazí zde.",
         "syncTargetAssigneeAmbiguous": "Tuto osobu má jako výchozí přiřazení více kalendářů. Vyber cíl sám.",
-        "syncTargetSeveralAssignees": "Je přiřazeno více osob, proto přiřazení nevybírá žádný kalendář. Místo toho platí: {{target}}.",
         "filtersSources": "Kalendáře",
         "filterUnassigned": "Nepřiřazeno",
         "dateSpanSpoken": "od {{from}} do {{to}}",
@@ -1295,7 +1294,8 @@
         "errorSelectedCalendarGone": "Vybraný kalendář už neexistuje.",
         "errorSeriesNoOccurrence": "S tímto opakováním by od data zahájení nebyl žádný termín.",
         "localCalendarUploadsHint": "Události v tomto kalendáři se nahrávají do iCloudu přes Apple Calendar.",
-        "overlapOpenSchedule": "Otevřít rozpis směn"
+        "overlapOpenSchedule": "Otevřít rozpis směn",
+        "syncTargetNoCalendarForPeople": "Žádný kalendář nemá jako výchozí přiřazení přesně tyto osoby, proto přiřazení žádný nevybere. Místo toho platí: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategorie",
@@ -2512,7 +2512,10 @@
             "errorNoCalendarName": "Zadej název nového kalendáře.",
             "dropzoneTitle": "Přetáhněte sem soubor ICS nebo ho vyberte",
             "dropzoneTitleTouch": "Klepnutím vyberte soubor ICS",
-            "dropzoneHint": "Jen soubory .ics"
+            "dropzoneHint": "Jen soubory .ics",
+            "assigneesLabel": "Přiřadit",
+            "assigneesHint": "Nové události dostanou tyto osoby. Již importované události se stejným ID je dostanou navíc - i když bylo jejich přiřazení ručně odebráno.",
+            "successWithAssigned": "Naimportováno: {{imported}}, již existovalo: {{skipped}}, z toho nyní přiřazeno: {{assigned}}."
         },
         "memberPhoneLabel": "Telefonní číslo (volitelné)",
         "memberEmailLabel": "E-mail (volitelné)",
@@ -3152,10 +3155,7 @@
         "notificationChannelDeleteConfirmDetail": "Tímto kanálem už neodejde žádné upozornění, ani naléhavé. Adresu i přihlašovací údaje bude nutné pro nový kanál zadat celé znovu.",
         "apiTokensMcpHint": "Tyto tokeny fungují také jako Bearer tokeny pro koncový bod MCP na /mcp (např. v Claude Desktop pro vytváření úkolů, položek nákupu a událostí pomocí AI).",
         "sync": {
-            "defaultAssignee": "Výchozí přiřazení",
             "defaultAssigneeNone": "Žádné",
-            "defaultAssigneeHint": "Nově synchronizované události se automaticky přiřadí této osobě.",
-            "defaultAssigneeRoutingHint": "Výchozí přiřazení: události z kalendáře dostanou osobu zvolenou u něj a nová událost přiřazená jen této osobě se vytvoří v tomto kalendáři. Platí pro kalendáře Google a CalDAV, ne pro Apple ani Outlook.",
             "backfillTitle": "Doplnit přiřazení",
             "backfillDescription": "Výchozí přiřazení platí jen pro události přenesené po jeho nastavení. Zde ho můžete jednorázově použít na události už přenesené ze všech účtů.",
             "backfillAction": "Použít na stávající události",
@@ -3178,7 +3178,10 @@
             "backfillMovedNext": "Zobrazit další",
             "backfillMovedAll": "Vybrat vše",
             "backfillMovedChange": "Z {{from}} na {{to}}",
-            "backfillDescriptionMore": "Nepřiřazené události ho dostanou přímo. Události, které stále nesou výchozí přiřazení jiného kalendáře, se zobrazí jednotlivě k výběru. Jakékoli jiné přiřazení zůstane beze změny."
+            "backfillDescriptionMore": "Nepřiřazené události ho dostanou přímo. Události, které stále nesou výchozí přiřazení jiného kalendáře, se zobrazí jednotlivě k výběru. Jakékoli jiné přiřazení zůstane beze změny.",
+            "defaultAssignees": "Výchozí přiřazení",
+            "defaultAssigneesHint": "Nově synchronizované události se automaticky přiřadí těmto osobám. První určuje barvu.",
+            "defaultAssigneesRoutingHint": "Výchozí přiřazení: události z kalendáře dostanou osoby zvolené u něj a nová událost přiřazená přesně těmto osobám se vytvoří v tomto kalendáři. Platí pro kalendáře Google a CalDAV, ne pro Apple ani Outlook."
         },
         "calendarAssignMeLabel": "Přiřazovat nové události mně",
         "calendarDefaultRemindersLabel": "Výchozí připomenutí",
@@ -3516,7 +3519,10 @@
         "caldavCalendarReadOnlyWaiting_few": "Jen pro čtení: {{count}} události čekající na nahrání sem nedorazí",
         "caldavCalendarReadOnlyWaiting_many": "Jen pro čtení: {{count}} události čekající na nahrání sem nedorazí",
         "reminderListReadOnlyWaiting_few": "Jen pro čtení: {{count}} položky čekající na nahrání sem nedorazí",
-        "reminderListReadOnlyWaiting_many": "Jen pro čtení: {{count}} položky čekající na nahrání sem nedorazí"
+        "reminderListReadOnlyWaiting_many": "Jen pro čtení: {{count}} položky čekající na nahrání sem nedorazí",
+        "reminderListAssigneesTasksOnly": "Osoby lze nastavit jen u seznamů, které jdou do Úkolů.",
+        "syncAssigneeNotMember": "Zde lze vybrat pouze členy domácnosti.",
+        "syncAssigneeUnknown": "Tato osoba již neexistuje. Načtěte stránku znovu."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",
@@ -3990,6 +3996,7 @@
             "missedDetail": "Od {{date}} bylo zmeškáno {{count}} termínů.",
             "missedDetail_one": "Od {{date}} byl zmeškán {{count}} termín.",
             "missedDetail_few": "Od {{date}} byly zmeškány {{count}} termíny.",
+            "failing": "Zaúčtování selhalo - opakuje se každou hodinu",
             "pastQuestion": "Datum je v minulosti",
             "pastSkip": "Začít od {{date}}",
             "pastDetail": "Od {{date}} by bylo splatných {{count}} termínů.",
@@ -4936,7 +4943,14 @@
         "detailAmountLabel": "Částka",
         "detailNextPaymentLabel": "Další platba",
         "renewedNamed": "„{{name}}“ zaplaceno - další platba {{date}}.",
-        "completedNamed": "„{{name}}“ zaplaceno a ukončeno."
+        "completedNamed": "„{{name}}“ zaplaceno a ukončeno.",
+        "accountHint": "Každá platba tohoto předplatného se zaúčtuje na tento účet. Jednotlivou platbu změníš v rozpočtu.",
+        "accountArchivedHint": "Tento účet je archivovaný. Předplatné se účtuje bez účtu, dokud nevybereš jiný.",
+        "accountArchivedOption": "{{name}} (archivováno)",
+        "accountArchivedMeta": "{{name}} archivováno - účtuje se bez účtu",
+        "visibilityHint_private": "Toto předplatné a jeho platby vidíš jen ty.",
+        "visibilityHint_shared": "Celá domácnost vidí toto předplatné a jeho platby.",
+        "errorAccountGone": "Vybraný účet už neexistuje."
     },
     "health": {
         "fasting": {

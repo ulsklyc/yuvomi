@@ -203,6 +203,7 @@ export const CASE_MESSAGES = new Map([
   // der Dialog bleibt offen und bietet die aktuellen an.
   ['subscriptions_selected_category_not_found', 'subscriptions.errorSelectedCategoryGone'],
   ['subscriptions_selected_payment_method_not_found', 'subscriptions.errorSelectedPaymentMethodGone'],
+  ['subscriptions_account_not_found', 'subscriptions.errorAccountGone'],
   ['subscriptions_category_exists', 'subscriptions.errorCategoryExists'],
   ['subscriptions_payment_method_exists', 'subscriptions.errorPaymentMethodExists'],
   // Eingaben, die der Abo-Dialog durchlaesst und erst der Server prueft.
@@ -375,6 +376,13 @@ export const CASE_MESSAGES = new Map([
   // dieser Satz ist derselbe wie dort.
   ['calendar_series_no_occurrence', 'calendar.errorSeriesNoOccurrence'],
   ['calendar_series_ends_before_start', 'calendar.recurrenceEndBeforeStart'],
+  // Personen einer Sync-Quelle oder eines Imports (#1897, #1221, #1940): die
+  // Auswahl bietet nur Mitglieder an, beide Saetze erreicht nur ein veralteter
+  // Stand (Person entfernt, Konto geloescht). Die Einkaufsliste nennt, warum
+  // sie keine Personen traegt.
+  ['calendar_assignee_not_member', 'settings.syncAssigneeNotMember'],
+  ['calendar_assignee_unknown', 'settings.syncAssigneeUnknown'],
+  ['reminder_list_assignee_not_tasks', 'settings.reminderListAssigneesTasksOnly'],
   // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909). Die drei
   // Eingaben, die der Server beim Speichern abweist, und was der
   // Verbindungstest von Immich zurueckbekommt: ein abgelehnter API-Schluessel
@@ -498,6 +506,7 @@ export const GONE_REASONS = new Set([
   'subscriptions_payment_method_not_found',
   'subscriptions_selected_category_not_found',
   'subscriptions_selected_payment_method_not_found',
+  'subscriptions_account_not_found',
   'inventory_item_not_found',
   'inventory_tracked_date_not_found',
   'inventory_selected_location_not_found',

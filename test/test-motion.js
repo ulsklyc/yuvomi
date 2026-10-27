@@ -2884,7 +2884,10 @@ test('R19: die Uebersicht blendet vom Skelett zum Inhalt ueber swapContent', () 
   assert.match(src, /const fromSkeleton = Boolean\(shell\.querySelector\('\.widget-skeleton'\)\)\s*&& !document\.documentElement\.classList\.contains\('page-swapping'\);/);
   // Seit R21 (D5) misst der Rueckruf nach dem Zeichnen noch das Heute-Blatt
   // (measurePhoneProgram) - im selben Rueckruf, also unter derselben Blende.
-  assert.match(src, /swapContent\(shell, \(\) => \{\s*setHtml\(shell, `[\s\S]*?`\);[\s\S]{0,800}?\}, \{ animate: fromSkeleton \}\);/);
+  // Seit DW-P1-2 kommt das Markup aus dashboardShellHtml() (der stille Abgleich
+  // liest daraus voraus, welche Zeilen gehen) - gezeichnet wird es hier.
+  assert.match(src, /const html = dashboardShellHtml\(cfg\);/);
+  assert.match(src, /swapContent\(shell, \(\) => \{\s*setHtml\(shell, html\);[\s\S]{0,800}?\}, \{ animate: fromSkeleton \}\);/);
 });
 
 /* 12. GERICHTETER WECHSEL EINER REGION (R19, Critique 2026-10-16): der

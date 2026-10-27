@@ -1648,6 +1648,9 @@ const RECURRING_SELECT = `
  *   fortsetzen darf - die Regel der Ausgaben (`mayChangeGroupRecord`). Vom
  *   Server, damit die Oberflaeche sie nicht nachbaut; das Modulrecht fragt sie
  *   selbst.
+ * - `failed_at` (Spalte, #1746): seit wann der Lauf sie unerwartet nicht
+ *   buchen kann, oder null. Sie bleibt dabei unpausiert und wird stuendlich
+ *   neu versucht; die Zeile sagt das.
  * - `missed_count` / `resume_date`: nur an einer pausierten Serie. Wie viele
  *   Termine ein Fortsetzen ohne `missed: "book"` ueberspringt und auf welchem
  *   Termin es landet - dieselbe Rechnung, die die Pause-Route faehrt.
@@ -1838,6 +1841,10 @@ router.post('/groups/:id/recurring', (req, res) => {
  * nicht - ein faelliger Termin, den niemand angefasst hat, rueckt nicht still
  * weiter.
  *
+ * Ein unerwarteter Fehlschlag des Laufs (`failed_at`, #1746) wird geleert:
+ * wer die Serie bearbeitet hat, hat sie gesehen, und der naechste Lauf misst
+ * neu. Scheitert sie wieder, steht er wieder da.
+ *
  * `paused_at` bleibt: wer eine automatisch pausierte Serie repariert, setzt sie
  * danach selbst fort und entscheidet dabei ueber die versaeumten Termine.
  *
@@ -1892,7 +1899,7 @@ router.put('/recurring/:id', (req, res) => {
       db.get().prepare(`
         UPDATE recurring_expenses
         SET title = ?, description = ?, amount_minor = ?, currency = ?, payer_id = ?, category = ?,
-            split_method = ?, split_snapshot = ?, frequency = ?, next_run_date = ?, anchor_day = ?
+            split_method = ?, split_snapshot = ?, frequency = ?, next_run_date = ?, anchor_day = ?, failed_at = NULL
         WHERE id = ?
       `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, category, parsed.method, JSON.stringify(snapshot), frequency, nextRunDate, anchorDay, existing.id);
       activity(existing.group_id, userId(req), 'recurring_edited', 'recurring_expense', existing.id, expenseSnapshot(parsed.title, parsed.amountMinor, parsed.currency));

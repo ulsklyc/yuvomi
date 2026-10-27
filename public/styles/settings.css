@@ -3035,11 +3035,19 @@
   overflow-wrap: anywhere;
 }
 
-.caldav-reminder-module {
+.caldav-reminder-module,
+.caldav-reminder-assignees {
   /* `.form-input` setzt die volle Breite; als Ausgangsmass zaehlt hier der Wert. */
   inline-size: auto;
   flex: 1 0 auto;
   max-inline-size: 100%;
+}
+
+/* Die Personen (#1221) brauchen keinen Platz, solange niemand gewaehlt ist,
+ * und kuerzen lange Namenslisten, statt die Zeile zu sprengen. */
+.caldav-reminder-assignees {
+  flex-basis: 0;
+  min-inline-size: 8rem;
 }
 
 /* Der Hinweis "nur lesbar" (#1840) steht unter Name UND Modulwahl, ueber die
@@ -3148,6 +3156,70 @@
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
 }
+
+/* MEHRERE PERSONEN (#1897): das Feld ist ein Knopf, der ein Menue oeffnet
+ * (settings/assignee-menu.js) - in der Kalender- und Listenzeile wie im
+ * Formular. Er traegt die Namen in der Reihenfolge der Wahl und kuerzt am
+ * Ende, wie das Auswahlfeld vorher; der Pfeil sagt "hier geht etwas auf" wie
+ * dessen Pfeil. */
+.assignee-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: start;
+}
+
+.assignee-menu__trigger.form-input {
+  justify-content: space-between;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.assignee-menu__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assignee-menu__glyph,
+.assignee-menu__chevron {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+/* IN DER FORMULARZEILE spricht der Knopf den Dialekt der randlosen Auswahl
+ * daneben (layout.css, "In der Zeile: die randlose Auswahl"): keine Kante,
+ * der Wert in Sekundaerfarbe am Zeilenende, das Zeichen an der Zeilenkante.
+ * Das Etikett der Zeile sagt, wovon der Wert spricht - das Personen-Zeichen
+ * entfaellt dort. */
+.form-row__control .assignee-menu__trigger.form-input {
+  inline-size: auto;
+  max-inline-size: 100%;
+  min-height: var(--target-md);
+  padding-inline: var(--space-2) 0;
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+}
+
+.form-row__control .assignee-menu__trigger.form-input .assignee-menu__glyph {
+  display: none;
+}
+
+.form-row__control .assignee-menu__trigger.form-input .assignee-menu__chevron {
+  inline-size: var(--icon-md);
+  block-size: var(--icon-md);
+}
+
+.assignee-menu__trigger:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 
 .caldav-account-actions {
   display: flex;

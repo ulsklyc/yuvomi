@@ -27,7 +27,7 @@ import { dateTimeText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { captureModalContext, closeModal, confirmModal, openModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { settingRowHtml, settingSwitchRowHtml, toggleRowHtml, fileDropzoneHtml, wireFileDropzone } from '/settings/components.js';
-import { loadFamilyUsers } from '/settings/family-users.js';
+import { assigneeIdsOf, buildAssigneeMenu } from '/settings/assignee-menu.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import { rowActionEl } from '/utils/row-action.js';
 import { loadErrorSentence } from '/utils/friendly-error.js';
@@ -73,12 +73,9 @@ function renderPage(container) {
                 control: '<input class="settings-color-button" type="color" id="ics-color" value="#6366f1" />',
               })}
               ${settingRowHtml({
-                label: t('settings.sync.defaultAssignee'), labelFor: 'ics-assignee',
-                description: t('settings.sync.defaultAssigneeHint'), descriptionId: 'ics-assignee-hint',
-                control: `<select class="form-input" id="ics-assignee" aria-describedby="ics-assignee-hint">
-                  <option value="">${t('settings.sync.defaultAssigneeNone')}</option>
-                  <option value="" disabled data-loading>${t('common.loading')}</option>
-                </select>`,
+                label: t('settings.sync.defaultAssignees'), labelFor: 'ics-assignee',
+                description: t('settings.sync.defaultAssigneesHint'), descriptionId: 'ics-assignee-hint',
+                control: '<span data-assignee-slot="ics-assignee"></span>',
               })}
               ${settingSwitchRowHtml({
                 label: t('settings.ics.form.shared'),
@@ -121,6 +118,11 @@ function renderPage(container) {
             ${settingRowHtml({
               label: t('settings.calendarImport.colorLabel'), labelFor: 'cal-import-color',
               control: '<input class="settings-color-button" type="color" id="cal-import-color" value="#007AFF" />',
+            })}
+            ${settingRowHtml({
+              label: t('settings.calendarImport.assigneesLabel'), labelFor: 'cal-import-assignees',
+              description: t('settings.calendarImport.assigneesHint'), descriptionId: 'cal-import-assignees-hint',
+              control: '<span data-assignee-slot="cal-import-assignees"></span>',
             })}
             ${settingRowHtml({
               label: t('settings.calendarImport.targetCalendarLabel'), labelFor: 'cal-import-calendar',
@@ -288,12 +290,9 @@ function openIcsEditModal(container, sub, subs, user) {
             attrs: { id: 'ics-edit-shared' },
           }),
           formRowHtml({
-            label: t('settings.sync.defaultAssignee'), labelFor: 'ics-edit-assignee',
-            description: t('settings.sync.defaultAssigneeHint'), descriptionId: 'ics-edit-assignee-hint',
-            control: `<select class="form-input" id="ics-edit-assignee" aria-describedby="ics-edit-assignee-hint">
-              <option value="">${t('settings.sync.defaultAssigneeNone')}</option>
-              <option value="" disabled data-loading>${t('common.loading')}</option>
-            </select>`,
+            label: t('settings.sync.defaultAssignees'), labelFor: 'ics-edit-assignee',
+            description: t('settings.sync.defaultAssigneesHint'), descriptionId: 'ics-edit-assignee-hint',
+            control: '<span data-assignee-slot="ics-edit-assignee"></span>',
           }),
         ])}
         <div id="ics-edit-error" class="form-error" role="alert" hidden></div>
@@ -304,20 +303,9 @@ function openIcsEditModal(container, sub, subs, user) {
       </form>
     `,
     onSave(panel) {
-      // Assignee-Optionen async nachladen — Modal öffnet sofort (kein Fetch-Block).
-      const assigneeSel = panel.querySelector('#ics-edit-assignee');
-      if (assigneeSel) {
-        loadFamilyUsers(sub.default_assignee_user_id).then((users) => {
-          assigneeSel.querySelector('option[data-loading]')?.remove();
-          for (const u of users) {
-            const opt = document.createElement('option');
-            opt.value = String(u.id);
-            opt.textContent = u.display_name;
-            if (Number(sub.default_assignee_user_id) === u.id) opt.selected = true;
-            assigneeSel.appendChild(opt);
-          }
-        });
-      }
+      // Die Personen laden im Knopf nach - der Dialog oeffnet sofort.
+      const storedAssignees = storedAssigneeIds(sub);
+      mountAssigneeField(panel.querySelector('#ics-edit-form'), 'ics-edit-assignee', storedAssignees);
       panel.querySelector('#ics-edit-cancel')?.addEventListener('click', () => closeModal());
       panel.querySelector('#ics-edit-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -328,7 +316,7 @@ function openIcsEditModal(container, sub, subs, user) {
         const name = panel.querySelector('#ics-edit-name').value.trim();
         const color = panel.querySelector('#ics-edit-color').value;
         const shared = panel.querySelector('#ics-edit-shared').checked ? 1 : 0;
-        const assignee = assigneePatch(panel.querySelector('#ics-edit-assignee'), sub.default_assignee_user_id);
+        const assignee = assigneePatch(panel.querySelector('#ics-edit-assignee'), storedAssignees);
         errEl.hidden = true;
         // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der
         // Anfrage aufgegangen ist (#1997).
@@ -359,24 +347,10 @@ function bindIcsEvents(container, subs, user) {
   const submitBtn = container.querySelector('#ics-submit-btn');
   const errorEl = container.querySelector('#ics-add-error');
 
-  // Die Zuweisungsliste erst beim Aufklappen holen und nur einmal: Das Formular
-  // steht dauerhaft im DOM, ein Nachladen bei jedem Öffnen wäre derselbe Abruf
-  // ohne neues Ergebnis.
-  const assigneeSel = container.querySelector('#ics-assignee');
-  let assigneesLoaded = false;
-  const fillAssignees = () => {
-    if (assigneesLoaded || !assigneeSel) return;
-    assigneesLoaded = true;
-    loadFamilyUsers().then((users) => {
-      assigneeSel.querySelector('option[data-loading]')?.remove();
-      for (const u of users) {
-        const opt = document.createElement('option');
-        opt.value = String(u.id);
-        opt.textContent = u.display_name;
-        assigneeSel.appendChild(opt);
-      }
-    }).catch(() => { assigneesLoaded = false; });
-  };
+  // Das Feld der Personen entsteht beim Aufklappen, jedes Mal leer: das
+  // Formular steht dauerhaft im DOM, und `reset()` kennt den Knopf nicht. Die
+  // Mitgliederliste haelt family-users.js ohnehin einmal je Seitenaufruf.
+  const fillAssignees = () => mountAssigneeField(addForm, 'ics-assignee', []);
 
   addBtn?.addEventListener('click', () => {
     formWrapper.hidden = false;
@@ -399,13 +373,12 @@ function bindIcsEvents(container, subs, user) {
     const name = container.querySelector('#ics-name').value.trim();
     const color = container.querySelector('#ics-color').value;
     const shared = container.querySelector('#ics-shared').checked ? 1 : 0;
-    const assigneeVal = assigneeSel?.value || '';
-    const default_assignee_user_id = assigneeVal ? Number(assigneeVal) : null;
+    const default_assignee_user_ids = assigneeIdsOf(container.querySelector('#ics-assignee'));
 
     submitBtn.disabled = true;
     try {
       const res = await api.post('/calendar/subscriptions', {
-        url, name, color, shared, default_assignee_user_id,
+        url, name, color, shared, default_assignee_user_ids,
       });
       subs.push(res.data);
       renderIcsList(container, subs, user);
@@ -461,6 +434,9 @@ function bindCalendarImport(container, calendars = []) {
   const submitBtn = container.querySelector('#cal-import-submit');
   const importedCalendars = [...calendars];
   const dropzone = wireFileDropzone(container, 'cal-import-file');
+  // Personen fuer diesen Lauf (#1940): gespeichert wird nichts, nach dem
+  // Import steht das Feld wieder leer.
+  mountAssigneeField(form, 'cal-import-assignees', []);
 
   const syncNewCalendarVisibility = () => {
     if (newCalendarGroup) newCalendarGroup.hidden = calendarSelect?.value !== '__new';
@@ -484,6 +460,8 @@ function bindCalendarImport(container, calendars = []) {
     let createdCalendarId = null;
     try {
       const payload = { color: colorInput.value };
+      const people = assigneeIdsOf(container.querySelector('#cal-import-assignees'));
+      if (people.length) payload.assignee_user_ids = people;
       if (file) payload.ics = await file.text();
       else payload.url = url;
       if (calendarSelect?.value === '__new') {
@@ -504,13 +482,18 @@ function bindCalendarImport(container, calendars = []) {
       if (createdCalendarId != null) {
         importedCalendars.push({ id: createdCalendarId, name: newCalendarNameInput?.value.trim() });
       }
-      const { imported = 0, skipped = 0 } = res.data || {};
+      const { imported = 0, skipped = 0, assigned = 0 } = res.data || {};
       form.reset();
       dropzone.reset();
+      mountAssigneeField(form, 'cal-import-assignees', []);
       populateCalendarImportTarget(container, importedCalendars);
       syncNewCalendarVisibility();
 
-      if (imported === 0 && skipped > 0) {
+      if (assigned > 0) {
+        // Schon vorhandene Termine haben Personen dazubekommen (#1940): das ist
+        // der Zweck des zweiten Laufs und steht im Satz, nicht "alles doppelt".
+        showToast(t('settings.calendarImport.successWithAssigned', { imported, skipped, assigned }), 'success');
+      } else if (imported === 0 && skipped > 0) {
         showToast(t('settings.calendarImport.allDuplicates'), 'default');
       } else if (skipped > 0) {
         showToast(t('settings.calendarImport.successWithSkipped', { count: imported, skipped }), 'success');
@@ -540,21 +523,43 @@ function bindCalendarImport(container, calendars = []) {
 // Entry point
 // --------------------------------------------------------------------------
 
-/**
- * Der Zustaendigen-Wert fuer PATCH /calendar/subscriptions/:id. Die Optionen
- * laden asynchron nach (loadFamilyUsers). Steht eine gespeicherte Zuweisung
- * nicht darunter - die Liste laedt noch, oder das Laden ist fehlgeschlagen -,
- * bleibt das Feld weg, und der Server laesst den gespeicherten Wert stehen.
- * Sonst truege jedes Speichern von Name oder Farbe still "niemand" ein (#1207).
- */
-function assigneePatch(select, stored) {
-  const offered = [...(select.options ?? [])].some((option) => option.value === String(stored));
-  if (stored != null && !offered) return {};
-  const value = select.value;
-  return { default_assignee_user_id: value ? Number(value) : null };
+/** Die gespeicherten Standard-Personen eines Abos (#1897), auch aus der Altform. */
+function storedAssigneeIds(sub) {
+  if (Array.isArray(sub?.default_assignee_user_ids)) return sub.default_assignee_user_ids.map(Number);
+  return sub?.default_assignee_user_id != null ? [Number(sub.default_assignee_user_id)] : [];
 }
 
-export const __test = { assigneePatch, openIcsEditModal };
+/**
+ * Setzt den Personen-Knopf (assignee-menu.js) an die Stelle seines Platzhalters
+ * im Formular. Ein zweiter Aufruf ersetzt den ersten - samt seinem Menue.
+ * @param {HTMLElement|null} form  Wirt des Menues (ausserhalb eines Labels)
+ * @param {string} id              id des Knopfs, dieselbe wie `labelFor`
+ * @param {number[]} currentIds
+ */
+function mountAssigneeField(form, id, currentIds) {
+  const slot = form?.querySelector(`[data-assignee-slot="${id}"]`);
+  if (!slot) return;
+  const old = slot.querySelector('.assignee-menu__trigger');
+  if (old) document.getElementById(old.getAttribute('popovertarget'))?.remove();
+  const trigger = buildAssigneeMenu({ currentIds, host: form, id, triggerClass: 'form-input' });
+  trigger.setAttribute('aria-describedby', `${id}-hint`);
+  slot.replaceChildren(trigger);
+}
+
+/**
+ * Der Zustaendigen-Wert fuer PATCH /calendar/subscriptions/:id. Hat niemand
+ * die Personen angefasst, bleibt das Feld weg, und der Server laesst die
+ * gespeicherten stehen - so traegt ein Speichern von Name oder Farbe nichts
+ * ein, was der Knopf (noch) nicht kennt (#1207). Sonst die Menge in der
+ * Reihenfolge der Wahl (#1897).
+ */
+function assigneePatch(trigger, stored) {
+  const ids = assigneeIdsOf(trigger);
+  const same = ids.length === stored.length && ids.every((id, i) => id === Number(stored[i]));
+  return same ? {} : { default_assignee_user_ids: ids };
+}
+
+export const __test = { assigneePatch, openIcsEditModal, storedAssigneeIds };
 
 export async function render(container, { user } = {}) {
   renderPage(container);

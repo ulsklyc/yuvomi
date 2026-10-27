@@ -9,6 +9,8 @@ import * as caldavSync from '../../services/caldav-sync.js';
 import * as caldavReminders from '../../services/caldav-reminders-sync.js';
 import { requireAdmin } from '../../auth.js';
 import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
+import * as db from '../../db.js';
+import { readDefaultAssignees, validateAssigneeIds } from '../../services/default-assignees.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -170,18 +172,38 @@ router.get('/caldav/accounts/:id/reminder-lists', requireAdmin, refuseWhileResto
   }
 });
 
+// `defaultAssigneeUserIds` (#1221): die Personen, die eine neu eingelesene
+// Aufgabe aus dieser Liste bekommt. Nur Haushaltsmitglieder, nur fuer eine
+// Liste, die auf Aufgaben zeigt.
 router.patch('/caldav/accounts/:id/reminder-lists', requireAdmin, (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const { listUrl, enabled, targetModule } = req.body;
+    const touchesAssignees = req.body.defaultAssigneeUserIds !== undefined || req.body.defaultAssigneeUserId !== undefined;
 
-    if (!listUrl || (enabled === undefined && targetModule === undefined)) {
+    if (!listUrl || (enabled === undefined && targetModule === undefined && !touchesAssignees)) {
       return res.status(400).json({ error: 'Missing listUrl or update fields.', code: 400 });
     }
 
-    const result = caldavReminders.updateReminderSelection(accountId, listUrl, { enabled, targetModule });
+    let defaultAssigneeUserIds;
+    if (touchesAssignees) {
+      const sel = db.get().prepare('SELECT id FROM caldav_reminder_selection WHERE account_id = ? AND list_url = ?')
+        .get(accountId, listUrl);
+      const checked = validateAssigneeIds(db.get(), req.body, {
+        listField: 'defaultAssigneeUserIds',
+        singleField: 'defaultAssigneeUserId',
+        stored: sel ? readDefaultAssignees(db.get(), 'reminderList', sel.id) : [],
+      });
+      if (checked.error) return res.status(400).json({ error: checked.error, code: 400, reason: checked.reason });
+      defaultAssigneeUserIds = checked.ids;
+    }
+
+    const result = caldavReminders.updateReminderSelection(accountId, listUrl, { enabled, targetModule, defaultAssigneeUserIds });
     res.json({ data: result });
   } catch (err) {
+    if (err instanceof caldavReminders.ReminderListAssigneeError) {
+      return res.status(400).json({ error: err.message, code: 400, reason: 'reminder_list_assignee_not_tasks' });
+    }
     log.error('CalDAV reminder selection update failed:', err);
     res.status(500).json({ error: err.message || 'Failed to update reminder selection.', code: 500 });
   }

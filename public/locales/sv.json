@@ -1177,7 +1177,6 @@
         "pickOne": "Välj en händelse",
         "pickOneHint": "Tid, plats och påminnelser visas här.",
         "syncTargetAssigneeAmbiguous": "Flera kalendrar har den här personen som standardtilldelning. Välj målet själv.",
-        "syncTargetSeveralAssignees": "Flera personer är tilldelade, så tilldelningen väljer ingen kalender. I stället gäller: {{target}}.",
         "filtersSources": "Kalendrar",
         "filterUnassigned": "Ej tilldelade",
         "dateSpanSpoken": "{{from}} till {{to}}",
@@ -1218,7 +1217,8 @@
         "errorSelectedCalendarGone": "Den valda kalendern finns inte längre.",
         "errorSeriesNoOccurrence": "Med den här upprepningen skulle det inte finnas en enda händelse från startdatumet.",
         "localCalendarUploadsHint": "Händelser i den här kalendern laddas upp till iCloud via Apple Calendar.",
-        "overlapOpenSchedule": "Öppna skiftschema"
+        "overlapOpenSchedule": "Öppna skiftschema",
+        "syncTargetNoCalendarForPeople": "Ingen kalender har exakt dessa personer som standardtilldelning, så tilldelningen väljer ingen. Används i stället: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategorier",
@@ -2285,7 +2285,10 @@
             "errorNoCalendarName": "Ange ett namn för den nya kalendern.",
             "dropzoneTitle": "Dra en ICS-fil hit eller välj en",
             "dropzoneTitleTouch": "Tryck för att välja en ICS-fil",
-            "dropzoneHint": "Endast .ics-filer"
+            "dropzoneHint": "Endast .ics-filer",
+            "assigneesLabel": "Tilldela",
+            "assigneesHint": "Nya händelser får dessa personer. En händelse som redan importerats med samma ID får dem dessutom - även om tilldelningen tagits bort för hand.",
+            "successWithAssigned": "Importerade: {{imported}}, fanns redan: {{skipped}}, av dem nu tilldelade: {{assigned}}."
         },
         "memberPhoneLabel": "Telefonnummer (valfritt)",
         "memberEmailLabel": "E-post (valfritt)",
@@ -3054,10 +3057,7 @@
         "notificationChannelDeleteConfirmDetail": "Via den här kanalen går inga aviseringar ut längre, inte ens brådskande. Adress och inloggningsuppgifter måste anges på nytt för en ny kanal.",
         "apiTokensMcpHint": "Dessa token fungerar även som Bearer-token för MCP-slutpunkten på /mcp (t.ex. i Claude Desktop, för att skapa uppgifter, inköpsartiklar och händelser med AI).",
         "sync": {
-            "defaultAssignee": "Standardtilldelning",
             "defaultAssigneeNone": "Ingen",
-            "defaultAssigneeHint": "Nyligen synkroniserade händelser tilldelas automatiskt den här personen.",
-            "defaultAssigneeRoutingHint": "Standardtilldelning: händelser från en kalender får personen som valts där, och en ny händelse som bara är tilldelad den personen skapas i den kalendern. Gäller Google- och CalDAV-kalendrar, inte Apple eller Outlook.",
             "backfillTitle": "Fyll i tilldelningar",
             "backfillDescription": "En standardtilldelning gäller bara möten som hämtats efter att den ställts in. Här kan du tillämpa den en gång på möten som redan hämtats från alla konton.",
             "backfillAction": "Tillämpa på befintliga möten",
@@ -3077,7 +3077,10 @@
             "backfillMovedNext": "Visa nästa",
             "backfillMovedAll": "Markera alla",
             "backfillMovedChange": "Från {{from}} till {{to}}",
-            "backfillDescriptionMore": "Möten utan tilldelning får den direkt. Möten som fortfarande har en annan kalenders standardtilldelning visas ett och ett så att du kan välja. All annan tilldelning lämnas orörd."
+            "backfillDescriptionMore": "Möten utan tilldelning får den direkt. Möten som fortfarande har en annan kalenders standardtilldelning visas ett och ett så att du kan välja. All annan tilldelning lämnas orörd.",
+            "defaultAssignees": "Standardtilldelning",
+            "defaultAssigneesHint": "Nyligen synkade händelser tilldelas automatiskt dessa personer. Den första bestämmer färgen.",
+            "defaultAssigneesRoutingHint": "Standardtilldelning: händelser från en kalender får personerna som valts där, och en ny händelse som tilldelats exakt dessa personer skapas i den kalendern. Det gäller Google- och CalDAV-kalendrar, inte Apple eller Outlook."
         },
         "calendarAssignMeLabel": "Tilldela nya händelser till mig",
         "calendarDefaultRemindersLabel": "Standardpåminnelser",
@@ -3406,7 +3409,10 @@
         "caldavCalendarReadOnlyWaiting": "Skrivskyddad: {{count}} händelser som väntar på uppladdning hit kommer inte fram",
         "reminderListReadOnly": "Skrivskyddad: nya poster kan inte sparas här",
         "reminderListReadOnlyWaiting_one": "Skrivskyddad: {{count}} post som väntar på uppladdning hit kommer inte fram",
-        "reminderListReadOnlyWaiting": "Skrivskyddad: {{count}} poster som väntar på uppladdning hit kommer inte fram"
+        "reminderListReadOnlyWaiting": "Skrivskyddad: {{count}} poster som väntar på uppladdning hit kommer inte fram",
+        "reminderListAssigneesTasksOnly": "Personer kan bara anges för listor som går till Uppgifter.",
+        "syncAssigneeNotMember": "Bara medlemmar i hushållet kan väljas här.",
+        "syncAssigneeUnknown": "Den här personen finns inte längre. Ladda om sidan."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",
@@ -4367,6 +4373,7 @@
             "missedBook": "Bokför missade datum från {{date}}",
             "missedDetail": "{{count}} datum har missats sedan {{date}}.",
             "missedDetail_one": "{{count}} datum har missats sedan {{date}}.",
+            "failing": "Bokföringen misslyckades - försöker igen varje timme",
             "pastQuestion": "Datumet ligger i det förflutna",
             "pastSkip": "Börja från {{date}}",
             "pastDetail": "{{count}} datum skulle ha förfallit sedan {{date}}.",
@@ -4804,7 +4811,14 @@
         "detailAmountLabel": "Belopp",
         "detailNextPaymentLabel": "Nästa betalning",
         "renewedNamed": "”{{name}}” betald - nästa betalning {{date}}.",
-        "completedNamed": "”{{name}}” betald och avslutad."
+        "completedNamed": "”{{name}}” betald och avslutad.",
+        "accountHint": "Varje betalning för den här prenumerationen bokförs på det här kontot. En enskild betalning ändrar du i budgeten.",
+        "accountArchivedHint": "Det här kontot är arkiverat. Prenumerationen bokförs utan konto tills du väljer ett annat.",
+        "accountArchivedOption": "{{name}} (arkiverat)",
+        "accountArchivedMeta": "{{name}} arkiverat - bokförs utan konto",
+        "visibilityHint_private": "Bara du ser den här prenumerationen och dess betalningar.",
+        "visibilityHint_shared": "Alla i hushållet ser den här prenumerationen och dess betalningar.",
+        "errorAccountGone": "Det valda kontot finns inte längre."
     },
     "health": {
         "fasting": {

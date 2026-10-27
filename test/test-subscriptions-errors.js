@@ -276,6 +276,7 @@ test('Server: verlaengert jemand, waehrend eine Aenderung den Kurs holt, steht d
 const SERVER_REASONS = [
   'subscriptions_subscription_not_found', 'subscriptions_subscription_completed', 'subscriptions_category_not_found', 'subscriptions_payment_method_not_found',
   'subscriptions_selected_category_not_found', 'subscriptions_selected_payment_method_not_found',
+  'subscriptions_account_not_found',
   'subscriptions_category_exists', 'subscriptions_payment_method_exists',
   'subscriptions_end_before_next_payment', 'subscriptions_occurrence_count_too_low', 'subscriptions_logo_content_mismatch',
   'subscriptions_no_logo_found',

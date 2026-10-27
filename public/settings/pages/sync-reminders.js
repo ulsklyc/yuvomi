@@ -8,7 +8,9 @@ import {
   createStatusSummary,
 } from '/settings/components.js';
 import { withBusy } from '/utils/ux.js';
+import { errorSentence } from '/utils/friendly-error.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { buildAssigneeMenu } from '/settings/assignee-menu.js';
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -72,6 +74,31 @@ function renderPage(container) {
   `);
 }
 
+/**
+ * Die Standard-Personen einer Liste (#1221): wer eine neu eingelesene Aufgabe
+ * aus ihr bekommt. Derselbe Knopf wie in der Kalenderzeile (assignee-menu.js),
+ * jeder Haken speichert sofort. Nur fuer eine Liste, die auf Aufgaben zeigt -
+ * ein Einkaufseintrag hat keine Person; der Knopf geht mit der Modulwahl.
+ */
+function buildListAssigneeMenu(account, list, host) {
+  const trigger = buildAssigneeMenu({
+    currentIds: list.defaultAssigneeUserIds ?? [],
+    host,
+    triggerClass: 'form-input caldav-reminder-assignees',
+    save: async (ids) => {
+      await api.patch(`/calendar/caldav/accounts/${account.id}/reminder-lists`, {
+        listUrl: list.listUrl,
+        defaultAssigneeUserIds: ids,
+      });
+      list.defaultAssigneeUserIds = ids;
+    },
+    onSaved: () => showToast(t('settings.reminderMapUpdated'), 'success'),
+    onError: (err) => showToast(errorSentence(err), 'danger'),
+  });
+  trigger.hidden = list.targetModule !== 'tasks';
+  return trigger;
+}
+
 function buildTargetSelect(account, list) {
   const select = document.createElement('select');
   select.className = 'form-input caldav-reminder-module';
@@ -97,6 +124,7 @@ function buildTargetSelect(account, list) {
         targetModule: select.value,
       });
       list.targetModule = select.value;
+      select.dispatchEvent(new CustomEvent('reminder-module-changed', { bubbles: true }));
       showToast(t('settings.reminderMapUpdated'), 'success');
     } catch (err) {
       select.value = previous ?? 'tasks';
@@ -153,7 +181,11 @@ function buildReminderRow(account, list) {
     label: list.listName,
     control: toggle,
   });
-  wrapper.append(row, select);
+  const assignees = buildListAssigneeMenu(account, list, wrapper);
+  wrapper.addEventListener('reminder-module-changed', () => {
+    assignees.hidden = list.targetModule !== 'tasks';
+  });
+  wrapper.append(row, select, assignees);
   if (readOnlyNote) {
     const note = document.createElement('p');
     note.className = 'caldav-calendar-source caldav-reminder-note';
