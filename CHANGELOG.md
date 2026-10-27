@@ -202,6 +202,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and reasons. The OpenAPI description now lists `category_exists`, `category_in_use`,
   `category_last`, `contact_email_protected` and `family_member_contact` at the contact routes, and
   `contacts_contact_not_found` at the vCard download, where they already sent them.
+- **The health API refuses in English** (#1695, #2267). `/api/v1/health` still answered "Ungültige
+  ID.", "Ungültige Person.", "Person nicht gefunden.", "caregiver_ids muss eine Liste sein.",
+  "value_num kann nicht geleert werden." and two German 403 sentences; every `error` there is English
+  now, with the same status codes. The OpenAPI description of `PUT /health/caregivers/{subjectId}`
+  now names `account_deactivated`, which it already sent.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the

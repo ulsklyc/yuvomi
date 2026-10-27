@@ -91,7 +91,6 @@ const UNDOCUMENTED_REASONS = new Map([
   ['DELETE /api/v1/budget/categories/{key}/subcategories/{subKey}', ['subcategory_in_use', 'subcategory_last']],
   ['PUT /api/v1/budget/categories/{key}/subcategories/{subKey}', ['subcategory_exists']],
   ['GET /api/v1/displays/people', ['display_only']],
-  ['PUT /api/v1/health/caregivers/{subjectId}', ['account_deactivated']],
   ['POST /api/v1/housekeeping/supply-requests', ['cross_module_access']],
   ['POST /api/v1/meals/week-to-shopping-list', ['cross_module_access']],
   ['POST /api/v1/meals/{id}/to-shopping-list', ['cross_module_access']],

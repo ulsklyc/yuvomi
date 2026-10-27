@@ -40,6 +40,8 @@
  *        Ebenso fuer die Kontakte (contacts.js): `contacts.js: 13 (erlaubt 0)`,
  *        und Bein 2 nennt 12 deutsche Absagen - elf davon Feldnamen, die
  *        Bein 1 nicht liest (`limitedStr(..., 'Telefon')`, `date(..., 'Geburtstag')`).
+ *        Ebenso fuer die Gesundheit (health/*.js, 32 Stellen in acht Dateien):
+ *        Bein 1 nennt jede Datei, Bein 2 nennt alle 20 gefuehrten Absagen deutsch.
  *
  * Ausführen: npm run test:api-error-language
  */
@@ -68,14 +70,6 @@ const GERMAN_LEFT = new Map([
   ['calendar/helpers.js', 9],
   ['calendar/read.js', 4],
   ['calendar/subscriptions.js', 22],
-  ['health/activities.js', 2],
-  ['health/caregivers.js', 4],
-  ['health/cycle.js', 3],
-  ['health/helpers.js', 2],
-  ['health/labs.js', 6],
-  ['health/medications.js', 12],
-  ['health/nutrition.js', 1],
-  ['health/vitals.js', 2],
   ['meals.js', 37],
   ['pantry.js', 5],
   ['push.js', 3],
@@ -631,5 +625,64 @@ test('keine Absage der Kontakte traegt deutschen Wortlaut', async () => {
     assertRefusedInEnglish(seen);
   } finally {
     cServer.close();
+  }
+});
+
+test('keine Absage der Gesundheit traegt deutschen Wortlaut', async () => {
+  const { default: healthRouter } = await import('../server/routes/health.js');
+  const who = { userId: ADMIN, role: 'admin' };
+  const hApp = express();
+  hApp.use(express.json());
+  hApp.use((req, _res, next) => {
+    req.authUserId = who.userId;
+    req.authRole = who.role;
+    req.session = { userId: who.userId, role: who.role };
+    next();
+  });
+  hApp.use('/health', healthRouter);
+  const hServer = hApp.listen(0, '127.0.0.1');
+  const hUrl = await new Promise((r) => hServer.on('listening', () => r(`http://127.0.0.1:${hServer.address().port}`)));
+  try {
+    const seen = [];
+    const call = async (method, route, body, as = { userId: ADMIN, role: 'admin' }) => {
+      Object.assign(who, as);
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${hUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      return { status: res.status, body: json };
+    };
+    const run = async (label, method, route, body, as) => {
+      const r = await call(method, route, body, as);
+      seen.push({ label, status: r.status, error: r.body?.error ?? null });
+    };
+    const member = { userId: MEMBER, role: 'member' };
+    const report = await call('POST', '/health/labs', {
+      report_date: '2026-10-01', results: [{ analyte: 'HbA1c', value_num: 5.4 }],
+    });
+    assert.equal(report.status, 201, 'Vorbedingung: der Laborbefund wird angelegt');
+    const resultId = db.prepare('SELECT id FROM health_lab_results WHERE report_id = ?').get(report.body.data.id).id;
+
+    for (const route of ['/health/activities/x', '/health/vitals/x', '/health/medications/x', '/health/labs/x',
+      '/health/results/x', '/health/schedules/x', '/health/logs/x', '/health/cycle/periods/x', '/health/cycle/logs/x']) {
+      await run(`delete-id ${route}`, 'DELETE', route);
+    }
+    await run('labs-get-id', 'GET', '/health/labs/x');
+    await run('labs-results-id', 'POST', '/health/labs/x/results', { analyte: 'A', value_num: 1 });
+    await run('med-logs-id', 'GET', '/health/medications/x/logs');
+    await run('result-clear', 'PATCH', `/health/results/${resultId}`, { value_num: null });
+    await run('owner-invalid', 'POST', '/health/labs', { report_date: '2026-10-01', user_id: 'x' });
+    await run('owner-foreign', 'POST', '/health/labs', { report_date: '2026-10-01', user_id: ADMIN }, member);
+    await run('target-foreign', 'GET', `/health/nutrition/targets?user_id=${ADMIN}`, undefined, member);
+    await run('caregivers-subject', 'PUT', '/health/caregivers/x', { caregiver_ids: [] });
+    await run('caregivers-gone', 'PUT', '/health/caregivers/987654', { caregiver_ids: [] });
+    await run('caregivers-shape', 'PUT', `/health/caregivers/${MEMBER}`, { caregiver_ids: 'x' });
+    await run('caregivers-unknown', 'PUT', `/health/caregivers/${MEMBER}`, { caregiver_ids: [987654] });
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    hServer.close();
   }
 });

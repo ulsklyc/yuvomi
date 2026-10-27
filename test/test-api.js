@@ -1149,8 +1149,8 @@ test('die drei Absagen aus #1640 haben ihren Satz, und jeder Satz steht in jeder
 // Saetze ohne Grund: sie sagen nur, DASS die Berechtigung fehlt.
 const PLAIN_REFUSALS = new Set([
   'Admin access required.', 'Not authorized.', 'Permission denied.', 'Forbidden.', 'Not allowed.',
-  'Nicht autorisiert.', 'Keine Berechtigung', 'Keine Berechtigung fuer dieses Ziel.',
-  'Keine Berechtigung, für diese Person einzutragen.',
+  'Nicht autorisiert.', 'Keine Berechtigung', 'You cannot view this target.',
+  'You cannot record entries for this person.',
   'You cannot modify this entry.', 'You cannot modify this loan.', 'You cannot modify this subscription.',
   'You cannot change a receipt you may not see.', 'Household category management is not allowed.',
   // Nur mit API-Token erreichbar, nie aus der App.

@@ -60,14 +60,14 @@ router.get('/caregivers', requireAdmin, (req, res) => {
 router.put('/caregivers/:subjectId', requireAdmin, (req, res) => {
   try {
     const subjectId = parseInt(req.params.subjectId, 10);
-    if (!subjectId) return res.status(400).json({ error: 'Ungültige Person.', code: 400 });
+    if (!subjectId) return res.status(400).json({ error: 'Invalid user_id.', code: 400 });
 
     const subject = db.get().prepare('SELECT id FROM users WHERE id = ?').get(subjectId);
-    if (!subject) return res.status(404).json({ error: 'Person nicht gefunden.', code: 404 });
+    if (!subject) return res.status(404).json({ error: 'User not found.', code: 404 });
 
     const raw = req.body?.caregiver_ids;
     if (!Array.isArray(raw)) {
-      return res.status(400).json({ error: 'caregiver_ids muss eine Liste sein.', code: 400 });
+      return res.status(400).json({ error: 'caregiver_ids must be an array.', code: 400 });
     }
 
     // Doppelte Einträge und die Person selbst fallen still heraus: beides wäre
@@ -82,7 +82,7 @@ router.put('/caregivers/:subjectId', requireAdmin, (req, res) => {
         `SELECT id FROM users WHERE id IN (${placeholders})`
       ).all(...ids);
       if (found.length !== ids.length) {
-        return res.status(400).json({ error: 'Unbekannte Person in caregiver_ids.', code: 400 });
+        return res.status(400).json({ error: 'caregiver_ids contains an unknown user.', code: 400 });
       }
       // Ein ehemaliges Konto betreut niemanden NEU (#1381). Das Deaktivieren
       // nimmt ihm seine Betreuungen; ohne diese Zeile liesse sich die naechste
