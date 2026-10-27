@@ -122,6 +122,15 @@ const API_SNAPSHOTS = {
 // weil er fuer jede Sitzung gilt, auch die ohne Abzug (Display, Split-Gast).
 const SESSION_EXPIRY_KEY = `${self.location.origin}/api/v1/__offline/session-expires-at`;
 
+// WANDDISPLAY: DIE FRIST GLEITET (Folge von #2293). Ein Display hat keine
+// Anmeldesitzung; der Server nennt ihm jetzt + 72 Stunden - in `/auth/me` als
+// `sessionExpiresAt` und an JEDER Antwort in dieser Kopfzeile
+// (server/services/display-accounts.js, DISPLAY_OFFLINE_GRACE_MS). Eine Liste,
+// die mit ihr ankommt, rueckt den Marker vor, sonst liefe die Frist ab dem
+// letzten `/auth/me` statt ab dem letzten Kontakt. Familiensitzungen bekommen
+// die Kopfzeile nie; fuer sie bleibt es beim Ablauf aus `/auth/me`.
+const OFFLINE_EXPIRES_HEADER = 'x-offline-expires-at';
+
 // GENERATION DES API-CACHES (#2293, Sicherheitsbefund). Jedes Loeschen zaehlt
 // hoch. Ein Schreibpfad merkt sich die Generation VOR seinem fetch() und
 // schreibt nur, wenn sie unmittelbar vor `cache.put` noch dieselbe ist: eine
@@ -149,6 +158,21 @@ async function rememberSessionExpiry(cache, body, generation) {
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
   }));
   return true;
+}
+
+/**
+ * Rueckt den Marker auf die Frist aus der Kopfzeile einer Netzantwort vor.
+ * Nur neben einem schon gueltigen Marker (der Aufrufer hat
+ * `ensureSessionExpiry` bestanden) und nur mit einer Zahl in der Zukunft:
+ * fehlt die Kopfzeile oder taugt sie nicht, bleibt der Marker, wie er ist.
+ */
+async function extendSessionExpiry(response, generation) {
+  const raw = response.headers.get(OFFLINE_EXPIRES_HEADER);
+  if (raw === null || !/^\d+$/.test(raw)) return;
+  const expiresAt = Number(raw);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return;
+  if (generation !== _cacheGeneration) return;
+  await rememberSessionExpiry(await caches.open(API_CACHE), { sessionExpiresAt: expiresAt }, generation);
 }
 
 /** Steht im API-Cache ein lesbarer, noch nicht abgelaufener Sitzungsablauf? */
@@ -987,6 +1011,7 @@ async function networkFirstApi(request, event, generation = _cacheGeneration) {
     // neben einem gueltigen Sitzungsablauf (#2293): ohne ihn entstuende ein
     // Eintrag, den der Offline-Pfad ohnehin nie mehr ausliefert.
     if (response.ok && response.type === 'basic' && await ensureSessionExpiry(generation)) {
+      await extendSessionExpiry(response, generation);
       const cloned  = response.clone();
       const headers = new Headers(cloned.headers);
       headers.set('x-cached-at', String(Date.now()));
@@ -1096,6 +1121,7 @@ async function storeSnapshot(request, response, reduce, generation) {
       const allowed = reduce === reduceSessionSnapshot
         ? await rememberSessionExpiry(await caches.open(API_CACHE), body, generation)
         : await ensureSessionExpiry(generation);
+      if (allowed && reduce !== reduceSessionSnapshot) await extendSessionExpiry(response, generation);
       const snapshot = allowed ? reduce(body) : null;
       if (snapshot && generation === _cacheGeneration) {
         await (await caches.open(API_CACHE)).put(request, new Response(JSON.stringify(snapshot), {

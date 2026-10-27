@@ -15,8 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answers again, the session is checked and the page refreshes; an expired session goes to the
   sign-in as before, and once the session has expired the saved state is not shown and is deleted.
   A remote sign-out reaches the device when it is back online. Split guests keep their old
-  behaviour; a wall display no longer keeps data for offline use, because it has no session that
-  could end it. Signing out now always deletes the saved data on the device, also when the app
+  behaviour; a wall display has no session and gets its own limit (see Changed). Signing out now always deletes the saved data on the device, also when the app
   was not yet controlled by its service worker. After this update, a device shows its saved state
   again once it has been online with the app.
 - **One entry of a waste calendar can fill several bins** (#2273). Some cities name two bins in
@@ -148,6 +147,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   batches.
 
 ### Changed
+- **A wall display keeps its saved lists for 72 hours after its last contact with your server.**
+  Until now a display kept the lists it had loaded for as long as it stayed open without a
+  connection, with no end. Saved data on a device now ends with its session, and a display has
+  none, so your server now gives it a sliding limit: every answer it receives moves the limit to
+  72 hours from now. A display that loses the connection over a weekend still shows its calendar
+  and tasks; one that has been offline longer shows the unreachable state and deletes the saved
+  lists. A display you remove or block in the settings deletes them as soon as it is online again.
+  A display that is restarted without a connection still opens on the unreachable state, as
+  before.
 - **The calendar head names the period, not the module** (#1797, #1462). On a computer
   "October 2026" (in the agenda its span) is now the title of the head, the year in grey, the
   arrows right in front of it and "Today" behind it; the arrows no longer stand 300px apart, and

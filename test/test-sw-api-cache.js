@@ -108,7 +108,7 @@ class MockCacheStorage {
 }
 
 /** Lädt sw.js in eine frische Sandbox und liefert Handles für Listener + Caches. */
-function loadSw({ fetchImpl, withSession = false } = {}) {
+function loadSw({ fetchImpl, withSession = false, clock = null } = {}) {
   const cacheStorage = new MockCacheStorage();
   const ctl = { fetchImpl: fetchImpl || (async () => new MockResponse('{}', { status: 200 })) };
   const listeners = {};
@@ -123,7 +123,8 @@ function loadSw({ fetchImpl, withSession = false } = {}) {
     self, caches: cacheStorage,
     fetch: (...a) => ctl.fetchImpl(...a),
     Request: MockRequest, Response: MockResponse, Headers: MockHeaders,
-    URL, Date, Promise, JSON, Number, String, Object, Array, Math, Map, Set,
+    // Eine stellbare Uhr fuer Fristen von Tagen (`clock.now`); ohne sie die echte.
+    URL, Date: clock ? class extends Date { static now() { return clock.now; } } : Date, Promise, JSON, Number, String, Object, Array, Math, Map, Set,
     parseInt, console, Symbol, setTimeout, clearTimeout,
   };
   sandbox.globalThis = sandbox;
@@ -848,4 +849,144 @@ test('auch ein Abzug aus der Zeit vor CLEAR_API_CACHE wird verworfen', async () 
   release(meResponse());
   await inFlight.result;
   assert.equal(await apiCacheName(sw), undefined);
+});
+
+// --------------------------------------------------------
+// Wanddisplay: gleitende Offline-Frist (Folge von #2293)
+// --------------------------------------------------------
+// Ein Display hat keine Anmeldesitzung. Der Server nennt ihm deshalb als
+// Ablauf jetzt + 72 Stunden - in `/auth/me` und als Kopfzeile an jeder
+// Antwort -, und die Frist rueckt mit jedem Kontakt vor. Einen Sitzungsabzug
+// bekommt es weiterhin nicht, nur die Listen.
+const HOUR = 60 * 60 * 1000;
+const DISPLAY_GRACE = 72 * HOUR;
+const OFFLINE_HEADER = 'x-offline-expires-at';
+
+function displayServer(clock) {
+  return async (req) => {
+    const until = String(clock.now + DISPLAY_GRACE);
+    if (req.url.endsWith('/auth/me')) {
+      const res = meResponse({ ...ME_BODY, user: { ...ME_BODY.user, access_scope: 'display' }, sessionExpiresAt: clock.now + DISPLAY_GRACE });
+      res.headers.set(OFFLINE_HEADER, until);
+      return res;
+    }
+    return new MockResponse(JSON.stringify({ data: [{ id: 1, title: 'Muell raus' }] }), {
+      status: 200, headers: { 'Content-Type': 'application/json', [OFFLINE_HEADER]: until },
+    });
+  };
+}
+
+const down = async () => { throw new TypeError('Failed to fetch'); };
+const get = (sw, path) => dispatchFetch(sw, new MockRequest(apiUrl(path), { method: 'GET' })).result;
+
+test('Display: online abgerufen, offline kommen die Listen aus dem Cache', async () => {
+  const clock = { now: Date.now() };
+  const sw = loadSw({ clock, fetchImpl: displayServer(clock) });
+  await get(sw, '/auth/me');
+  await get(sw, '/tasks');
+
+  sw.setFetch(down);
+  clock.now += 71 * HOUR;
+  const list = await get(sw, '/tasks');
+  assert.equal(list.status, 200, 'die Aufgaben sind offline da');
+  assert.deepEqual((await list.json()).data, [{ id: 1, title: 'Muell raus' }]);
+  const me = await get(sw, '/auth/me');
+  assert.equal(me.status, 503, 'aber kein Sitzungsabzug fuer ein Display');
+});
+
+test('Display: nach mehr als 72 Stunden ohne Serverkontakt sind die Listen weg', async () => {
+  const clock = { now: Date.now() };
+  const sw = loadSw({ clock, fetchImpl: displayServer(clock) });
+  await get(sw, '/auth/me');
+  await get(sw, '/tasks');
+
+  sw.setFetch(down);
+  clock.now += DISPLAY_GRACE + 1;
+  const list = await get(sw, '/tasks');
+  assert.equal(list.status, 503);
+  assert.equal(await apiCacheName(sw), undefined, 'der API-Cache ist geloescht');
+});
+
+test('Display: jeder neue Serverkontakt verlaengert die Frist, auch ohne /auth/me', async () => {
+  const clock = { now: Date.now() };
+  const sw = loadSw({ clock, fetchImpl: displayServer(clock) });
+  await get(sw, '/auth/me');
+  await get(sw, '/tasks');
+
+  // 60 Stunden spaeter fragt die Uebersicht ihre Liste neu - nur die Liste.
+  clock.now += 60 * HOUR;
+  await get(sw, '/tasks');
+
+  sw.setFetch(down);
+  clock.now += 70 * HOUR; // 130 h nach /auth/me, 70 h nach dem letzten Kontakt
+  const list = await get(sw, '/tasks');
+  assert.equal(list.status, 200, 'die Frist laeuft ab dem letzten Kontakt');
+
+  clock.now += 3 * HOUR; // 73 h nach dem letzten Kontakt
+  assert.equal((await get(sw, '/tasks')).status, 503);
+});
+
+test('Display: eine Frist in der Vergangenheit oder ohne Zahl verlaengert nichts', async () => {
+  const clock = { now: Date.now() };
+  const sw = loadSw({ clock, fetchImpl: displayServer(clock) });
+  await get(sw, '/auth/me');
+  await get(sw, '/tasks');
+  for (const bad of ['morgen', String(clock.now - 1)]) {
+    sw.setFetch(async () => new MockResponse(JSON.stringify({ data: [] }), { status: 200, headers: { [OFFLINE_HEADER]: bad } }));
+    await get(sw, '/tasks');
+  }
+  sw.setFetch(down);
+  clock.now += DISPLAY_GRACE + 1;
+  assert.equal((await get(sw, '/tasks')).status, 503, 'die alte Frist gilt weiter');
+});
+
+test('Display: ein gesperrtes Token (401) loescht den Cache', async () => {
+  const clock = { now: Date.now() };
+  const sw = loadSw({ clock, fetchImpl: displayServer(clock) });
+  await get(sw, '/auth/me');
+  await get(sw, '/tasks');
+  sw.setFetch(down);
+  assert.equal((await get(sw, '/tasks')).status, 200, 'vorher offline lesbar');
+
+  // Online wieder: das Token ist widerrufen. Die 401 geht an die Seite, die
+  // raeumt per `auth:expired` den API-Cache (public/api.js -> clearApiCache).
+  sw.setFetch(async () => new MockResponse(JSON.stringify({ error: 'Not authenticated.' }), { status: 401 }));
+  const denied = await get(sw, '/tasks');
+  assert.equal(denied.status, 401);
+  await dispatchMessage(sw, { type: 'CLEAR_API_CACHE' });
+
+  sw.setFetch(down);
+  assert.equal((await get(sw, '/tasks')).status, 503);
+  assert.equal(await apiCacheName(sw), undefined);
+});
+
+test('Familiensitzung: eine Liste ohne Display-Frist laesst den Sitzungsablauf, wie er ist', async () => {
+  const clock = { now: Date.now() };
+  const sw = loadSw({
+    clock,
+    fetchImpl: async (req) => (req.url.endsWith('/auth/me')
+      ? meResponse({ ...ME_BODY, sessionExpiresAt: clock.now + 24 * HOUR })
+      : new MockResponse(JSON.stringify({ data: [] }), { status: 200 })),
+  });
+  await get(sw, '/auth/me');
+  clock.now += 20 * HOUR;
+  await get(sw, '/shopping');
+  sw.setFetch(down);
+  clock.now += 5 * HOUR;
+  assert.equal((await get(sw, '/shopping')).status, 503, 'endet mit dem Sitzungsablauf');
+});
+
+test('Display: auch /preferences rueckt die Frist vor', async () => {
+  const clock = { now: Date.now() };
+  const sw = loadSw({ clock, fetchImpl: displayServer(clock) });
+  await get(sw, '/auth/me');
+  await get(sw, '/tasks');
+  clock.now += 60 * HOUR;
+  sw.setFetch(async () => new MockResponse(JSON.stringify({ data: { module_order: ['tasks'] } }), {
+    status: 200, headers: { [OFFLINE_HEADER]: String(clock.now + DISPLAY_GRACE) },
+  }));
+  await get(sw, '/preferences');
+  sw.setFetch(down);
+  clock.now += 70 * HOUR;
+  assert.equal((await get(sw, '/tasks')).status, 200);
 });

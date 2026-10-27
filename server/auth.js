@@ -26,7 +26,8 @@ import {
 import { RemovalRefused, removeUser } from './services/user-removal.js';
 import {
   DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayCookieIdentity, displayCookieOptions,
-  displayMayRead, displayTokenFromRequest, isDisplayAccount, markDisplayCookieRefreshed,
+  displayMayRead, displayOfflineExpiresAt, displayTokenFromRequest, isDisplayAccount,
+  markDisplayCookieRefreshed, OFFLINE_EXPIRES_HEADER,
 } from './services/display-accounts.js';
 import { birthDateInput, deleteBirthdayArtifacts, placeholderBirthDate, syncBirthdayArtifacts, validateYearUnknown } from './services/birthdays.js';
 import { syncFastingRemindersForUser } from './services/fasting-reminders.js';
@@ -1036,6 +1037,12 @@ function requireAuth(req, res, next) {
       req.authScopes = [...DISPLAY_SCOPES];
       req.displayDeviceId = device.deviceId;
       req.displayShowsScreensaver = device.showScreensaver === true;
+      // DIE OFFLINE-FRIST RUECKT MIT JEDEM KONTAKT VOR (Folge von #2293). Der
+      // Service Worker legt sie neben die gecachten Listen; `/auth/me` nennt
+      // denselben Wert als `sessionExpiresAt`. Begruendung und Dauer bei
+      // `DISPLAY_OFFLINE_GRACE_MS`.
+      req.displayOfflineExpiresAt = displayOfflineExpiresAt();
+      res.set(OFFLINE_EXPIRES_HEADER, String(req.displayOfflineExpiresAt));
       // DAS COOKIE WIRD NACHDATIERT, ABER NICHT BEI JEDEM ZUGRIFF. Browser
       // kappen die Lebensdauer persistenter Cookies (Chromium: 400 Tage), eine
       // einmal geschriebene Jahreszahl haelt also nicht, was sie sagt - ein
@@ -2746,6 +2753,21 @@ router.post('/setup', loginLimiter, async (req, res) => {
 });
 
 /**
+ * Der Ablauf, bis zu dem der Service Worker den Offline-Stand dieses Geraets
+ * halten darf: fuer eine Anmeldesitzung der Ablauf ihres Cookies, fuer ein
+ * Display seine gleitende Frist, sonst keiner (`null`, fail-closed).
+ */
+function sessionExpiresAtFor(req) {
+  if (req.authMethod === 'display') {
+    return Number.isFinite(req.displayOfflineExpiresAt) ? req.displayOfflineExpiresAt : null;
+  }
+  if (req.authMethod === 'session' && req.session.cookie?.expires instanceof Date) {
+    return req.session.cookie.expires.getTime();
+  }
+  return null;
+}
+
+/**
  * GET /api/v1/auth/me
  * Response: { user: { id, username, display_name, avatar_color, role } }
  */
@@ -2822,12 +2844,12 @@ router.get('/me', requireAuth, (req, res) => {
       // Browser fuer sein Session-Cookie zuletzt bekommen hat (bei der Anmeldung
       // oder von refreshSessionCookieIfDue). Der Service Worker haelt den
       // Offline-Abzug samt Listen nicht laenger (#2293, public/sw.js); ohne
-      // diesen Wert legt er keinen an. Nur fuer eine Anmeldesitzung: ein
-      // Wanddisplay laeuft auf seinem eigenen Cookie, und das `req.session`
-      // daneben ist eine leere Huelle, deren Ablauf nichts bedeutet.
-      sessionExpiresAt: req.authMethod === 'session' && req.session.cookie?.expires instanceof Date
-        ? req.session.cookie.expires.getTime()
-        : null,
+      // diesen Wert legt er keinen an. Ein Wanddisplay laeuft auf seinem
+      // eigenen Cookie, und das `req.session` daneben ist eine leere Huelle:
+      // es bekommt stattdessen seine gleitende Offline-Frist, jetzt + 72 h
+      // (`DISPLAY_OFFLINE_GRACE_MS`, gesetzt in `requireAuth`). Einen
+      // Sitzungsabzug legt der Worker fuer ein Display trotzdem nicht an.
+      sessionExpiresAt: sessionExpiresAtFor(req),
     });
   } catch (err) {
     log.error('/me error:', err);
