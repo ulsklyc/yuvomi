@@ -3556,22 +3556,34 @@ applied as before. To empty a source, delete it.
 | created_at | TEXT | ISO 8601 |
 | updated_at | TEXT | ISO 8601 |
 
-### Waste Source Mappings (migration v200, #1063)
+### Waste Source Mappings (migration v200, #1063; rebuilt v267, #2273)
 One row per distinct label (an ICS `CATEGORIES` tag, or `SUMMARY` when a feed carries no categories)
-seen for a source. Exactly one of (`type_id` set) / (`ignored`=1) is valid - a label is always either
-mapped or explicitly excluded, never left ambiguous. Rows persist across re-imports (`UNIQUE` on
-`source_id`+`normalized_label`), so a reviewed decision is remembered and only resurfaced for review,
-not re-asked, unless the label itself is new.
+seen for a source. A label maps to any number of waste types (Waste Source Mapping Types below): an
+entry that names two bins ("Leerung Bio-Tonne, Blaue Tonne") maps to both, and each of its entries
+becomes one imported pickup per type. A label with no type is explicitly excluded (`ignored` in the
+API) - a commit still needs a decision for every label, never an ambiguous one. Rows persist across
+re-imports (`UNIQUE` on `source_id`+`normalized_label`), so a reviewed decision is remembered and only
+resurfaced for review, not re-asked, unless the label itself is new.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
 | source_id | INTEGER | FK → Waste Sources (CASCADE delete) |
 | original_label | TEXT | NOT NULL - as it appeared in the source |
 | normalized_label | TEXT | NOT NULL - trimmed/collapsed/lowercased. UNIQUE with source_id |
-| type_id | INTEGER | FK → Waste Types, nullable - exactly one of type_id/ignored |
-| ignored | INTEGER | NOT NULL DEFAULT 0 |
 | created_at | TEXT | ISO 8601 |
 | updated_at | TEXT | ISO 8601 |
+
+Before v267 the row carried `type_id` and `ignored` itself; v267 moved every mapped label's type into
+the table below and dropped both columns, so "ignored" now means exactly "no type row". The API still
+returns `type_id` (the lowest of `type_ids`) for callers from before.
+
+### Waste Source Mapping Types (migration v267, #2273)
+The types of one label. Composite primary key (`mapping_id`, `type_id`).
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| mapping_id | INTEGER | FK → Waste Source Mappings (CASCADE delete) |
+| type_id | INTEGER | FK → Waste Types (no cascade) |
 
 ### Waste Imported Pickups (migration v201, #1063)
 One row per concrete pickup fact accepted by a committed import. `identity_key` is the stable
@@ -3590,7 +3602,7 @@ source never touches another source's or manual data.
 |--------|------|-----------|
 | source_id | INTEGER | FK → Waste Sources (CASCADE delete) |
 | type_id | INTEGER | FK → Waste Types (no cascade - deletion refused while imported pickups exist) |
-| identity_key | TEXT | NOT NULL. UNIQUE with source_id |
+| identity_key | TEXT | NOT NULL. UNIQUE with source_id and type_id (v267: one entry, one pickup per type of its label) |
 | external_uid | TEXT | nullable - the source event's own ICS UID, for display/diagnostics only |
 | original_summary | TEXT | nullable - the source event's own SUMMARY text |
 | date_key | TEXT | YYYY-MM-DD, NOT NULL |
@@ -3688,8 +3700,10 @@ types (by name) - never inventing a mapping row or type that doesn't already exi
 profile just reports everything unmatched - and returns a `profile_digest`; `POST .../import/commit`
 re-runs the preview server-side and requires that digest to match (409 on mismatch, the same guard
 shape as the ICS import's own `preview_digest`), then applies every `applicable` entry
-transactionally. No new table: this reuses `waste_source_mappings` as-is and, like
-`updateMapping()`, never retroactively rewrites already-committed imported pickups.
+transactionally. No new table: this reuses the source's own mappings and, like
+`updateMapping()`, never retroactively rewrites already-committed imported pickups. A label with
+several types exports one entry per type under the same pattern (#2273); applying a profile sets a
+label to exactly the types its entries resolve to.
 
 ### Waste in global search (migration v206, #1063 Phase 10)
 Only the `waste_types` catalog is indexed into the shared `search_index` FTS5 table (entity

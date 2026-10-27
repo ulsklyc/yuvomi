@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **One entry of a waste calendar can fill several bins** (#2273). Some cities name two bins in
+  one entry when they share a day - Dresden writes "Leerung Bio-Tonne, Blaue Tonne". In the import
+  and in a source's mappings, each label now shows your waste types as chips: pick every bin the
+  entry names, and each gets its own pickup on that day, with its own colour and reminder. No chip
+  picked means the label is not imported. Existing mappings carry over (migration 267). API
+  clients send and read `type_ids`; the single `type_id` is still accepted and returned.
 - **A synced calendar can bring its events in for several people** (#1897). The default
   assignee of a Google or CalDAV calendar and of a calendar subscription is now a set: a shared
   "Together" calendar assigns its events to both of you, your own calendars stay with one person
