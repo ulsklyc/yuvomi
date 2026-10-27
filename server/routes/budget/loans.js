@@ -13,7 +13,7 @@ import { translate, resolveHouseholdLocale } from '../../utils/i18n.js';
 import { todayKey } from '../../utils/timezone.js';
 import {
   budgetFilter, mayEdit, getBudgetMode, loanSummaryRow, loadLoan, refreshLoanStatus, cents,
-  budgetCurrency, toBudgetAmount, CURRENCY_RE, validateAccountRef, addMonths,
+  budgetCurrency, toBudgetAmount, loanEntryRate, CURRENCY_RE, validateAccountRef, addMonths,
   LOAN_DIRECTIONS, bookingFor, refusal, refusals, refuse, dueDateInMonth,
 } from './helpers.js';
 
@@ -620,7 +620,12 @@ router.post('/loans/:id/payments', (req, res) => {
     // Budget kennt aber nur eine Währung - der gekoppelte Eintrag wird deshalb mit
     // dem festen Kurs umgerechnet. Der Kurs wird nur hier, zum Buchungszeitpunkt,
     // angewandt: eine spätere Kursänderung lässt gebuchte Raten unberührt.
-    const budgetAmount = toBudgetAmount(paymentAmount, loan);
+    // Seit #2302 in der Waehrung des Kontos, auf das die Rate bucht.
+    const entryRate = loanEntryRate(loan, loanRow.account_id ?? null);
+    if (entryRate == null) {
+      return refuse(res, [refusal('loan_payment_rate_unavailable', 'No exchange rate is known for the account currency.')], 409);
+    }
+    const budgetAmount = cents(paymentAmount * entryRate);
     const foreign = loan.is_foreign_currency ? ` (${loan.currency})` : '';
     // Der Titel wird in der Datensprache des Haushalts gespeichert, wie schon bei
     // Geburtstagsterminen (#524/#631/#632). Grund ist derselbe: die Zeile in

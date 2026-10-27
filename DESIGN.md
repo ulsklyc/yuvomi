@@ -1347,7 +1347,10 @@ das Verhaeltnis haelt.
   kennt, als gedaempfte Feder (`@supports` in tokens.css): gleicher Gipfel (1,095), gleiche Dauer,
   aber in Ruhe ab 57 % statt 91 % der Zeit (Blatt-Einfahrt gemessen: Ueberschwinger 117 -> 67ms
   sichtbar, Gipfel bei +100 statt +162ms; Guard `test:motion` "Glasfeder D1"); die Sidebar-Pille bekommt die sanftere
-  Feder `--ease-sidebar-glide`, damit sie nicht ueber das Ziel-Item hinausschiesst.
+  Feder `--ease-sidebar-glide`, damit sie nicht ueber das Ziel-Item hinausschiesst - seit #1802 ebenso als
+  `linear()`-Feder (Daempfung 0,78, Gipfel 1,018 wie die Bezier, in Ruhe ab 59 statt 76 %). Die Blattfeder
+  `--ease-sheet` ist mit `linear()` kritisch gedaempft (kein Ueberschwinger, monoton), ohne bleibt sie
+  `--ease-glass`.
   Hoehenwechsel (Zeile oder Gruppe klappt ein/auf, `collapseOut`/`expandIn` in `utils/ux.js`,
   samt Gruppenwinkel) laufen auf der symmetrischen `--ease-in-out` cubic-bezier(0.42,0,0.58,1):
   `--ease-out` nahm dort 80 % der Hoehe in 60ms, die Nachbarn sprangen hinterher. **Ausklappen
@@ -1394,11 +1397,17 @@ das Verhaeltnis haelt.
   rutschte an die Polsterkante, die Titelkante sprang von Aufgabe zu Aufgabe um 12px (25 gegen
   13px). Guard: `test:mobile-chrome`.
 - **Blatt von unten - ein Paar:** Dialog-Sheet, Mehr-Blatt und die mobile Suche fahren aus
-  `--sheet-in` (`--duration-xl` + `--ease-glass`) und `--sheet-out` (`--duration-md` +
-  `--ease-out`), mit dem kurzen Hub `--sheet-lift` (24px) und einer Blende. Vorher drei
-  Bewegungen fuer dieselbe Geste (Dialog 24px/Feder/300ms, Mehr-Blatt Vollhub 250ms, Suche
-  Vollhub). Der Vollhub ist entfallen, weil die Feder ihn nicht traegt: ueber die volle Hoehe
-  wirft sie das Blatt sichtbar ueber seine Ruhelage. Geschlossen sind Mehr-Blatt und Suche
+  `--sheet-in` (`--duration-xl` + `--ease-sheet`) und `--sheet-out` (`--duration-md` +
+  `--ease-out`). Vorher drei Bewegungen fuer dieselbe Geste (Dialog 24px/Feder/300ms, Mehr-Blatt
+  Vollhub 250ms, Suche Vollhub). **Seit #1802 steigt das Blatt ueber seine volle Hoehe** (`sheet-rise`,
+  `--sheet-rise` = eigene Hoehe plus Randabstand) ohne Blende, auf der kritisch gedaempften Blattfeder -
+  nur wo der Browser `linear()` kennt und ohne reduzierte Bewegung. Ohne `linear()` bleibt es beim kurzen
+  Hub `--sheet-lift` (24px) mit Blende auf der Back-Out-Bezier, die ueber die volle Hoehe sichtbar
+  ueberschwingen wuerde. Der Tipp-/Esc-Ausgang bleibt der kurze Hub mit Blende (Entscheidung 05.10.).
+  **Der Grund des Dialogs ist ein eigener Knoten** (`.modal-overlay__scrim`, #1801), nicht der Dialog
+  und nicht `::backdrop`: seine Deckkraft folgt beim Ziehen dem Finger (`--sheet-pull`), die Tafel
+  bleibt voll. Der Dialog selbst blendet nie - eine Deckkraft unter 1 am Vorfahren nahme dem Blur des
+  Grunds die Seite (Backdrop Root). Geschlossen sind Mehr-Blatt und Suche
   durchsichtig, nehmen keinen Zeiger und sind `inert`.
 - **Das Anlegen-Blatt in zwei Frames (R21 S8):** die FAB-Blaetter der Module oeffnen gestuft
   (`openModal({ staged: true })`): im Tipp stehen Dialog, Abdunklung und Kopf, die Tafel ist
@@ -2217,7 +2226,14 @@ hakt der Zeilen-Tipp ab; sonst oeffnet er. Loeschen = Wisch mobil + ein fester O
   (bis R18 ein Papierkorb in der Zeile), Dialogfuss (immer).
 - **Vorrat:** Koerper oeffnet. Loeschen: Wisch zum Zeilenende (Touch; Stepper und Warenkorb
   sind Ausnahmezone, `wirePantrySwipe()`), Dialogfuss (immer), jeweils mit Rueckgaengig. Der
-  Chevron am Zeilenende entfaellt hier - dort steht der "+"-Knopf.
+  Chevron am Zeilenende entfaellt hier - dort steht der "+"-Knopf. Ein Produkt mit mehreren
+  Chargen (#1448) ist eine Produktzeile, die nur auf- und zuklappt (Knopf mit `aria-expanded`,
+  Winkel `.list-group__chevron` am Zeilenende, wie die Sammelzeile der Uebersicht); ihre
+  Chargen darunter sind die gewohnten Zeilen mit Koerper, Stepper, Warenkorb und Wisch. Ein
+  Produkt ohne Charge hat keinen Dialog, also keinen Dialogfuss: es loescht per Wisch (Touch) und
+  ueber den Eintrag "Loeschen" im Mehr-Knopf der Zeile (fester Ort), mit Rueckgaengig wie eine
+  Charge. Die Chipzeile des Vorrats traegt bewusst ZWEI Dimensionen (Status und Lagerort) als
+  Chips mit Einfachauswahl, auf Wunsch des Maintainers in #2085: benannte Ausnahme von D2.
 - **Mahlzeiten:** die Karte oeffnet den Dialog, Loeschen steht im Dialogfuss - in jeder
   Breite. Die Karte traegt seit R18 keinen Papierkorb mehr (benannte Ausnahme der
   Zeilenaktionen im Kanon oben).
@@ -3327,6 +3343,34 @@ rechnet ab, was das Siegel belegt (`calc(100% - var(--seal-head-lead))`) - mit `
 der Titel sich unter sein eigenes Siegel geschoben und die Lead-Zone waere um eine Zeile
 gewachsen. Gemessen ueber alle zehn Koepfe: Kopfhoehe und Lead-Zone sind mit und ohne Siegel
 identisch, es kostet also keine Zeile.
+
+**Variante: Zeitraum als Titel (#1797, Ulas 2026-10-26).** Wo der Titel eines Kopfs ein
+navigierbarer Zeitraum ist, ist ab 1024px der ZEITRAUM der sichtbare Titel - „Oktober 2026" im
+Inline-Schnitt der Titelrolle (22px fett), das Jahr in der Sekundaerfarbe, wie Apples Kalender
+ihn setzt; in einem Datum („21.10.2026") bleibt das Jahr Teil des Datums. Das `<h1>` mit dem
+Modulnamen bleibt die Seitenueberschrift und ist nur noch fuer Hilfstechnik da: per Clip
+versteckt, nie per `display`/`visibility`. Das Siegel bleibt der Absender und steht vor dem
+Zeitraum. Die Pfeile stehen direkt am Titel - VOR ihm, damit sie bei wechselnder Textbreite
+stillstehen -, „Heute" folgt als Kapsel. Was hinter dem Titel steht, steht ebenfalls still: das
+Modul misst je Ansicht, Sprache und Jahr die laengste Fassung (zwoelf Monate, sieben Wochentage)
+und gibt sie dem Titel als Mindestbreite (`--period-title-min`). Kennklasse
+`page-toolbar--period-as-title` (layout.css, Rolle in typography.css); unter 1024px gilt der
+Kopf der kompakten Klasse unveraendert (Large Title mit Modulnamen). Traeger: Kalender. Agenda-
+und Schichtplan-Koepfe koennen sie spaeter nehmen. Guard: `test:calendar` "#1797", Messung
+Sonde 19 in `test:document-guards`.
+
+**Der Status-Slot der Titelzeile (#1462).** Eine Meldung ueber die Daten der Seite (im
+Kalender: Schichtplaene ueberlappen) steht als `.page-toolbar__status` in der Titelzeile, nie
+als eigene Kopfzeile: unter 1024px ein Zeichen in Zielgroesse, dessen Name der volle Satz ist;
+ein Tipp oeffnet ihn mit dem Weg ins Quellmodul (Blatt, ab 768px Popover am Zeichen,
+`openDetailView`). Ab 1024px steht der kurze Text daneben - solange er die eine Zeile nicht
+kostet: passt sie nur ohne ihn oder braeche ohne ihn die Titelzeile, steht auch dort nur das
+Zeichen (`page-toolbar--status-icon`, gemessen in `syncToolbarFit`; de 1280 mit Ueberlappung
+69px). Das versteckte `<h1>` der Variante steht als 1px-Element IN der Titelzeile, nicht
+absolut - absolut stand es in einem Kopf mit eigener Bar-Zeile zwischen den Zeilen und zaehlte
+fuer Sonde 19 als zweite Titelzeile (uk 1280). Den Slot gibt es nur, solange es
+etwas zu melden gibt. Gemessen 390px: Kalenderkopf mit Ueberlappung 117px wie ohne (vorher eine
+Zeile mehr), eingeklappt 65px; dort kuerzt das Zeitraum-Label wie neben einem aktiven Filter.
 
 **Die Kuechen-Leiste fuehrt ihren Absender selbst.** Nach der Leisten-Regel IST sie die
 Kopf-Navigation; ihr Siegel steht am Desktop vor dem Titel "Kueche". Mobil weichen Titel und
@@ -4660,7 +4704,7 @@ Rundgang - Bestandshaushalte sehen sie nach einem Update nie - und ihr Stand lie
 
 Der **Fehlerbildschirm einer Seite** (router.js `renderError`) nennt die Seite mit ihrem Namen
 aus der Navigation ("Die Seite „Kontakte" lässt sich gerade nicht öffnen"), haengt an die
-Ursache aus `friendlyError` den Satz, dass der Rest weiterlaeuft, und bietet neben "Neu laden"
+Ursache aus `unhandledErrorSentence` den Satz, dass der Rest weiterlaeuft, und bietet neben "Neu laden"
 "Zur Übersicht" (nicht auf der Uebersicht selbst). Ohne Shell bleibt der allgemeine Titel. Er
 ist Region-Fokusziel ohne Rahmen (`.page-crash`, wie `.page-unreachable`).
 

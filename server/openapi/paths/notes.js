@@ -64,14 +64,21 @@ export function notesPaths() {
 
 // #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
 // englischen `error` - je Operation der Satz, der sie nennt.
-const NOTE_GONE = '`notes_note_not_found` (404, the note does not exist - deleted)';
+const NOTE_GONE = '`notes_note_not_found` (404, the note does not exist - deleted, or another member\'s private note)';
+const NOTE_LOCKED = '`note_locked` (403, the note is locked; only its creator and administrators can change it, ticking a checklist line included)';
 const CATEGORY_GONE = '`notes_selected_category_not_found` (400 or 409, a category in `category_ids` does not exist or is not available to you)';
 const NOT_OWNER = '`not_owner` (403, without the module\'s `*_edit_others` capability only notes you created; ticking a checklist line stays open can be changed or deleted - R23)';
 const CASE_REASONS = {
   '/api/v1/notes': { post: CATEGORY_GONE },
-  '/api/v1/notes/{id}': { put: `${NOTE_GONE}, ${CATEGORY_GONE}, ${NOT_OWNER} (a body with only \`category_ids\` stays open)`, delete: `${NOTE_GONE}, ${NOT_OWNER}` },
-  '/api/v1/notes/{id}/pin': { patch: `${NOTE_GONE}, ${NOT_OWNER}` },
-  '/api/v1/notes/{id}/check': { patch: NOTE_GONE },
+  '/api/v1/notes/{id}': { put: `${NOTE_GONE}, ${CATEGORY_GONE}, ${NOTE_LOCKED}, ${NOT_OWNER} (a body with only \`category_ids\` stays open; changing \`visibility\` is the creator's, changing \`locked\` the creator's and administrators')`, delete: `${NOTE_GONE}, ${NOTE_LOCKED}, ${NOT_OWNER}` },
+  '/api/v1/notes/{id}/pin': { patch: `${NOTE_GONE}, ${NOTE_LOCKED}, ${NOT_OWNER}` },
+  // Die 409 des Haken-Setzens nennt, warum die Zeile nicht mehr passt (#2267).
+  '/api/v1/notes/{id}/check': {
+    patch: `${NOTE_GONE}, ${NOTE_LOCKED}, `
+      + '`stale` (409, the line no longer reads as `expect` - the note was edited meanwhile), '
+      + '`out_of_range` (409, the note has no line with this number), '
+      + '`not_a_checklist_line` (409, the line is not a checklist item)',
+  },
   '/api/v1/notes/categories': { post: '`category_exists` (409, a category with this name already exists)' },
   '/api/v1/notes/categories/{id}': { put: '`category_exists` (409, a category with this name already exists)' },
 };

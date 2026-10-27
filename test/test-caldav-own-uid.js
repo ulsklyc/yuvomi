@@ -842,7 +842,7 @@ for (const [label, way] of Object.entries(WAYS)) {
     const SYNC_COLUMNS = [
       'external_source', 'external_uid', 'external_calendar_id', 'external_account_id', 'external_object_url',
       'calendar_ref_id', 'outbound_dirty', 'outbound_attempts', 'target_caldav_account_id', 'target_caldav_list_url',
-      'color_modified', 'caldav_account_id',
+      'color_modified', 'caldav_account_id', 'seen_on_server',
     ];
     for (const column of SYNC_COLUMNS) { delete before[column]; delete after[column]; }
     assert.deepEqual(after, before, 'der Inhalt vom Server hat lokale Felder überschrieben');
@@ -3098,6 +3098,19 @@ function assertMirroredWithLeftover(way, { id, uid, url, other }) {
   assert.deepEqual(names(other).sort(), ['neighbour2.ics', `${uid}.ics`].sort());
 }
 
+/**
+ * Ein Abruf sieht die Zeile am neuen Platz (#1839): erst dann ist ihr Fehlen
+ * dort ein Löschen durch eine andere App. Der Rest am alten Platz bleibt
+ * dabei liegen, das Entfernen ist abgelehnt.
+ */
+async function seenAtNewPlace(way, placed) {
+  dav.refuse({ method: 'DELETE', status: 403 });
+  await way.sync();
+  dav.allowAll();
+  assert.equal(helpers(way).row(placed.id).seen_on_server, 1, 'der Fall ist nicht nachgestellt: kein Abruf hat die Zeile gesehen');
+  assertMirroredWithLeftover(way, placed);
+}
+
 const LEFTOVER_CASES = {
   Termin: {
     way: WAYS.Termin,
@@ -3160,6 +3173,7 @@ for (const [label, { way, arrange }] of Object.entries(LEFTOVER_CASES)) {
     reset();
     const placed = await arrange();
     assertMirroredWithLeftover(way, placed);
+    await seenAtNewPlace(way, placed);
     await deletedByAnotherApp(placed.other, `${placed.uid}.ics`);
 
     await way.sync();
@@ -3175,6 +3189,7 @@ for (const [label, { way, arrange }] of Object.entries(LEFTOVER_CASES)) {
     reset();
     const placed = await arrange();
     assertMirroredWithLeftover(way, placed);
+    await seenAtNewPlace(way, placed);
     await deletedByAnotherApp(placed.other, `${placed.uid}.ics`);
     dav.refuse({ method: 'DELETE', status: 403 });
 

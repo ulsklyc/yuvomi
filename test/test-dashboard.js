@@ -2026,6 +2026,7 @@ cdb.exec(`
     source TEXT NOT NULL DEFAULT 'google', external_id TEXT,
     name TEXT NOT NULL, color TEXT
   );
+  CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
   -- color gehoert dazu: sie ist die GEERBTE Farbe eines Abos und wird seit #891
   -- als cal_color mitgelesen, weil ein Abo-Termin keinen external_calendars-
   -- Eintrag hat. Fehlt sie hier, misst dieses verkuerzte Schema an der echten
@@ -3444,7 +3445,9 @@ test('R21 D5: auf dem Telefon zeigt das Blatt so viele Zeilen, wie in den ersten
     'auf einem sehr kleinen Schirm bleiben die zwei Zeilen als Untergrenze');
   // Verdrahtet: gemessen wird im selben Task wie das Zeichnen, vor dem Bild.
   const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
-  nodeAssert.match(src, /setHtml\(shell, `[\s\S]{0,900}`\);\s*\/\/[^\n]*\n[^\n]*\n\s*const fitted = measurePhoneProgram\(shell\);/,
+  // Das Markup kommt seit DW-P1-2 aus dashboardShellHtml() - der stille Abgleich
+  // liest daraus voraus, welche Zeilen gehen.
+  nodeAssert.match(src, /setHtml\(shell, html\);\s*\/\/[^\n]*\n[^\n]*\n\s*const fitted = measurePhoneProgram\(shell\);/,
     'rebuildDashboard misst direkt nach dem Zeichnen');
   nodeAssert.match(src, /renderTodayCockpit\(data, cfg, isCustomizing, \{ cap: fitted \}\)/, 'und zeichnet nur das Blatt neu');
   nodeAssert.match(src, /cap = onPhoneStage\(\) \? phoneProgramCap\(\) : PROGRAM_ROW_CAP/, 'der naechste Aufbau rechnet mit dem gemessenen Wert');
@@ -4401,6 +4404,228 @@ test('Wand-Modus: render() reicht screensaver_enabled bis zum Knopf, der Klick r
     await clicks[0]({ detail: 1 });
     nodeAssert.ok(asked.includes('/screensaver/photos'), 'Reichweite: auch dieser Klick lief durch preview()');
     nodeAssert.equal(toasts.length, 1, 'true: der Schoner laeuft, kein Toast');
+  } finally {
+    controller.abort();
+    for (const handle of timeouts) clearTimeout(handle);
+    for (const handle of intervals) clearInterval(handle);
+    for (const name of names) {
+      if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
+      else delete globalThis[name];
+    }
+  }
+});
+
+// --------------------------------------------------------
+// DW-P1-2: Eine Aktion im Blatt laesst die Uebersicht stehen
+// --------------------------------------------------------
+// Erledigen, Bearbeiten, Loeschen, Fasten aus einem Blatt ueber der Uebersicht
+// riefen `rerender` = das volle render(): Skelett ueber dem Inhalt, die Seite
+// schrumpfte auf Bildschirmhoehe, der Scroll fiel auf 0 (gemessen 400 -> 0,
+// 120-250 ms Skelett), und die erledigte Zeile war ohne Ausklappen weg.
+//
+// Hier laeuft die echte Seite gegen eine Attrappe des Containers. Geklickt
+// wird die Aufgabenzeile aus dem Markup, das render() geschrieben hat; das
+// Aufgabenmodul ist ein Stub, der das `onChanged` des Blatts in die Hand gibt.
+// Gezaehlt wird, was danach passiert: kein Schreiben in den Container (das
+// waere render()), kein Skelett, ein neuer Stand in der Flaeche, und die
+// gehende Zeile ist vorher per collapseRow geschlossen.
+register(`data:text/javascript,${encodeURIComponent(`
+  export async function resolve(spec, ctx, next) {
+    if (spec === '/pages/tasks.js') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const openTaskById = (id, opts) => globalThis.__openTaskById?.(id, opts);') };
+    return next(spec, ctx);
+  }`)}`);
+const beforeQuietRefresh = pendingTests.slice();
+test('DW-P1-2 + DW-P3-13: onChanged eines Blatts gleicht still ab - kein render(), kein Skelett, die gehende Zeile schliesst; der Wetter-Takt baut nur bei neuer Antwort', async () => {
+  await Promise.allSettled(beforeQuietRefresh);
+  const names = ['window', 'document', 'localStorage', 'location', 'history', 'MutationObserver', 'setTimeout', 'setInterval', 'CSS', 'ResizeObserver', '__apiStub', '__openTaskById', '__motionStub'];
+  const saved = Object.fromEntries(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const realSetTimeout = globalThis.setTimeout;
+  const realSetInterval = globalThis.setInterval;
+  const timeouts = [];
+  const intervals = [];
+  const ticks = [];
+  const log = [];
+
+  const makeNode = (attrs = new Map()) => {
+    const listeners = new Map();
+    return {
+      dataset: {},
+      style: {},
+      hidden: false,
+      classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+      listeners,
+      addEventListener(type, fn) { listeners.set(type, [...(listeners.get(type) ?? []), fn]); },
+      removeEventListener() {},
+      setAttribute(name, value) { attrs.set(name, String(value)); },
+      getAttribute: (name) => attrs.get(name) ?? null,
+      removeAttribute(name) { attrs.delete(name); },
+      hasAttribute: (name) => attrs.has(name),
+      toggleAttribute() {},
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      closest: () => null,
+      append() {},
+      appendChild() {},
+      prepend() {},
+      before() {},
+      remove() {},
+      contains: () => false,
+      focus() {},
+      getClientRects: () => [{}],
+      getBoundingClientRect: () => ({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }),
+    };
+  };
+
+  // Die Flaeche kennt genau das, was die Seite hineingeschrieben hat. Eine
+  // Aufgabenzeile gibt es fuer jedes `data-task-id` darin - als derselbe
+  // Knoten, bis die Flaeche neu geschrieben wird.
+  let shellHtml = '';
+  let rows = new Map();
+  const shell = makeNode();
+  const taskRows = () => [...shellHtml.matchAll(/class="task-item" data-task-id="(\d+)"/g)].map(([, id]) => {
+    if (!rows.has(id)) {
+      const row = makeNode(new Map([['data-task-id', id]]));
+      row.dataset.taskId = id;
+      row.closest = (selector) => {
+        if (selector.includes('data-widget-id')) return { dataset: { widgetId: 'tasks' } };
+        if (selector === '#dashboard-shell') return shell;
+        return row;
+      };
+      rows.set(id, row);
+    }
+    return rows.get(id);
+  });
+  Object.assign(shell, {
+    replaceChildren() { shellHtml = ''; rows = new Map(); },
+    insertAdjacentHTML(_position, html) {
+      shellHtml += html;
+      log.push(['shell', /widget-skeleton/.test(html) ? 'skeleton' : 'content']);
+    },
+    querySelectorAll: (selector) => (/data-task-id/.test(selector) ? taskRows() : []),
+  });
+  const container = Object.assign(makeNode(), {
+    replaceChildren() { log.push(['container']); shellHtml = ''; rows = new Map(); },
+    insertAdjacentHTML(_position, html) { shellHtml += html; },
+    querySelector: (selector) => (selector === '#dashboard-shell' ? shell : null),
+    querySelectorAll: (selector) => (/task-item\[data-task-id\]/.test(selector) ? taskRows() : []),
+  });
+  // Ein traeges Dokument fuer den Blick voraus (rowsLeaving): es kennt eine
+  // Aufgabe, wenn das Markup ihre Zeile traegt.
+  const inertDoc = () => {
+    let html = '';
+    return {
+      body: { insertAdjacentHTML(_position, markup) { html += markup; } },
+      querySelector: (selector) => {
+        const id = /\[data-task-id="(\d+)"\]/.exec(selector)?.[1];
+        return id && html.includes(`data-task-id="${id}"`) ? {} : null;
+      },
+    };
+  };
+
+  let tasks = [5, 6];
+  let countdowns = [];
+  let weather = { provider: 'open-meteo', city: 'Dortmund', units: 'metric', current: { temp: 21, icon: 'sun', desc: 'wmo.0' }, forecast: [] };
+  const asked = [];
+  const globals = {
+    window: Object.assign(makeNode(), {
+      yuvomi: { showToast() {}, isModuleDisabled: () => false, replacePageFab() {} },
+      requestAnimationFrame: () => 0,
+      cancelAnimationFrame() {},
+      innerWidth: 1440,
+      innerHeight: 900,
+      matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+    }),
+    document: Object.assign(makeNode(), {
+      documentElement: makeNode(),
+      body: makeNode(),
+      hidden: false,
+      activeElement: null,
+      createElement: () => makeNode(),
+      getElementById: () => null,
+      implementation: { createHTMLDocument: () => inertDoc() },
+    }),
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    location: { pathname: '/', search: '', hash: '', href: 'http://overview.test/' },
+    history: { state: null, pushState() {}, replaceState() {}, back() {}, go() {} },
+    MutationObserver: class { observe() {} disconnect() {} },
+    ResizeObserver: class { observe() {} unobserve() {} disconnect() {} },
+    setTimeout: (...args) => { const handle = realSetTimeout(...args); timeouts.push(handle); return handle; },
+    setInterval: (...args) => { const handle = realSetInterval(...args); intervals.push(handle); ticks.push(args); return handle; },
+    CSS: { escape: (value) => String(value), supports: () => false },
+    __apiStub: {
+      get: async (path) => {
+        asked.push(path);
+        // Nur die Aufgabenkachel: sie traegt die Zeilen, um die es geht.
+        // Dazu der Countdown: seine Kachel steht nur, wenn es einen gibt
+        // (setCountdownAvailability) - der Abgleich muss das neu lesen.
+        if (path === '/preferences') return { data: { dashboard_widgets: [{ id: 'tasks', visible: true, order: 0, size: '1x2' }, { id: 'countdown', visible: true, order: 1, size: '1x1' }] } };
+        if (path.startsWith('/dashboard')) {
+          return { urgentTasks: tasks.map((id) => ({ id, title: `Aufgabe ${id}`, status: 'open', priority: 'high', due_date: null })), openTaskCount: tasks.length, upcomingEvents: [], users: [], countdowns };
+        }
+        if (path.startsWith('/weather')) return { data: weather };
+        return { data: null };
+      },
+    },
+    __openTaskById: async (id, opts) => { log.push(['open', String(id)]); opened = opts; },
+    __motionStub: (name, host) => { if (name === 'collapseRow') log.push(['collapseRow', host?.dataset?.taskId ?? null]); },
+  };
+  let opened = null;
+  for (const [name, value] of Object.entries(globals)) {
+    Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  }
+  const settle = async () => { for (let i = 0; i < 30; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
+  const controller = new AbortController();
+  try {
+    const { render } = await import('../public/pages/dashboard.js');
+    await render(container, { user: { id: 1, role: 'admin', display_name: 'Anna' }, signal: controller.signal });
+    await settle();
+    nodeAssert.match(shellHtml, /data-task-id="5"/, 'Reichweite: die Aufgabenkachel steht mit Aufgabe 5');
+    nodeAssert.doesNotMatch(shellHtml, /data-widget-id="countdown"/, 'Reichweite: ohne Countdown keine Countdown-Kachel');
+
+    const row = taskRows().find((el) => el.dataset.taskId === '5');
+    const clicks = row?.listeners.get('click') ?? [];
+    nodeAssert.equal(clicks.length, 1, 'die Zeile oeffnet ihr Blatt per Klick');
+    await clicks[0]();
+    await settle();
+    nodeAssert.equal(typeof opened?.onChanged, 'function', 'Reichweite: das Blatt bekommt ein onChanged');
+
+    // Aufgabe 5 ist im Blatt erledigt: der Server nennt sie nicht mehr. Und
+    // Aufgabe 6 hat im Blatt einen Countdown bekommen (Review zu #2314).
+    tasks = [6];
+    countdowns = [{ id: 6, source: 'task', title: 'Aufgabe 6', date: '2026-12-24', days_until: 59 }];
+    log.length = 0;
+    asked.length = 0;
+    await opened.onChanged();
+    await settle();
+
+    nodeAssert.ok(asked.some((path) => path.startsWith('/dashboard')), 'Reichweite: der Abgleich hat die Uebersicht neu gefragt');
+    nodeAssert.deepEqual(log.filter(([kind]) => kind === 'container'), [],
+      'kein Schreiben in den Container - das waere das volle render() mit Skelett');
+    nodeAssert.deepEqual(log.filter(([, what]) => what === 'skeleton'), [], 'kein Skelett nach einer Blatt-Aktion');
+    nodeAssert.doesNotMatch(shellHtml, /data-task-id="5"/, 'die Flaeche zeigt den neuen Stand: Aufgabe 5 ist weg');
+    nodeAssert.match(shellHtml, /data-task-id="6"/, 'und Aufgabe 6 steht noch');
+    const collapsed = log.findIndex(([kind, id]) => kind === 'collapseRow' && id === '5');
+    const redrawn = log.findIndex(([kind, what]) => kind === 'shell' && what === 'content');
+    nodeAssert.ok(collapsed >= 0, 'die gehende Zeile schliesst per collapseRow');
+    nodeAssert.ok(collapsed < redrawn, 'und zwar bevor die Flaeche ohne sie neu entsteht');
+    nodeAssert.ok(!log.some(([kind, id]) => kind === 'collapseRow' && id === '6'), 'die bleibende Zeile schliesst nicht');
+    nodeAssert.match(shellHtml, /data-widget-id="countdown"/,
+      'ein im Blatt angelegter Countdown bringt seine Kachel mit - die Verfuegbarkeit kommt aus dem neuen Stand');
+
+    // DW-P3-13: der 30-Minuten-Takt des Wetters. Dieselbe Antwort baut nichts
+    // neu; eine neue genau einmal (Reichweite: der Takt zeichnet ueberhaupt).
+    const weatherTick = ticks.find(([, ms]) => ms === 30 * 60 * 1000)?.[0];
+    nodeAssert.equal(typeof weatherTick, 'function', 'Reichweite: der Wetter-Takt ist eingerichtet');
+    log.length = 0;
+    await weatherTick();
+    await settle();
+    nodeAssert.deepEqual(log.filter(([kind]) => kind === 'shell' || kind === 'container'), [],
+      'gleiche Wetter-Antwort: kein Neuaufbau');
+    weather = { ...weather, current: { ...weather.current, temp: 12 } };
+    await weatherTick();
+    await settle();
+    nodeAssert.equal(log.filter(([kind, what]) => kind === 'shell' && what === 'content').length, 1,
+      'neue Wetter-Antwort: die Flaeche zeichnet sie');
   } finally {
     controller.abort();
     for (const handle of timeouts) clearTimeout(handle);

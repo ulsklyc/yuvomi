@@ -57,7 +57,7 @@ router.get('/labs/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const report = reportForRead(id, viewer);
     if (!report) return res.status(404).json({ error: 'Lab report not found.', code: 404, reason: 'health_lab_report_not_found' });
@@ -151,7 +151,7 @@ router.patch('/labs/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const existing = reportWritable(id, viewer);
     if (!existing) return res.status(404).json({ error: 'Lab report not found.', code: 404, reason: 'health_lab_report_not_found' });
@@ -181,7 +181,7 @@ router.delete('/labs/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const existing = reportWritable(id, viewer);
     if (!existing) return res.status(404).json({ error: 'Lab report not found.', code: 404, reason: 'health_lab_report_not_found' });
@@ -199,7 +199,7 @@ router.post('/labs/:id/results', (req, res) => {
   try {
     const viewer = viewerId(req);
     const reportId = parseInt(req.params.id, 10);
-    if (!reportId) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!reportId) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     if (!reportWritable(reportId, viewer)) return res.status(404).json({ error: 'Lab report not found.', code: 404, reason: 'health_lab_report_not_found' });
 
     const { row, error } = validateResult(req.body || {});
@@ -234,7 +234,7 @@ router.patch('/results/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const existing = writableChild(`
       SELECT res.* FROM health_lab_results res
@@ -245,7 +245,7 @@ router.patch('/results/:id', (req, res) => {
 
     const b = req.body || {};
     if ((b.value_num === null || b.value_num === '') && existing.value_num !== null) {
-      return badRequest(res, ['value_num kann nicht geleert werden.']);
+      return badRequest(res, ['value_num cannot be cleared.']);
     }
     const pick = (key) => (b[key] !== undefined ? b[key] : existing[key]);
     const { row, error } = validateResult({
@@ -278,7 +278,7 @@ router.delete('/results/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const existing = writableChild(`
       SELECT res.id FROM health_lab_results res

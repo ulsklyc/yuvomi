@@ -1416,7 +1416,6 @@
         "pickOne": "اختر موعدًا",
         "pickOneHint": "يظهر الوقت والمكان والتذكيرات هنا.",
         "syncTargetAssigneeAmbiguous": "لدى عدة تقويمات هذا الشخص كإسناد افتراضي. اختر الوجهة بنفسك.",
-        "syncTargetSeveralAssignees": "تم إسناد عدة أشخاص، لذلك لا يختار الإسناد أي تقويم. المستخدَم بدلًا من ذلك: {{target}}.",
         "filtersSources": "التقويمات",
         "filterUnassigned": "غير مُسندة",
         "dateSpanSpoken": "من {{from}} إلى {{to}}",
@@ -1462,7 +1461,10 @@
         "errorDeleteFeedAdminOnly": "يتم تصدير هذا التقويم. يمكن للمسؤول فقط حذفه.",
         "errorEventGone": "هذا الموعد لم يعد موجودًا.",
         "errorSelectedCalendarGone": "التقويم المختار لم يعد موجودًا.",
-        "errorSeriesNoOccurrence": "مع هذا التكرار لن يكون هناك أي موعد ابتداءً من تاريخ البداية."
+        "errorSeriesNoOccurrence": "مع هذا التكرار لن يكون هناك أي موعد ابتداءً من تاريخ البداية.",
+        "localCalendarUploadsHint": "تُرفع أحداث هذا التقويم إلى iCloud عبر Apple Calendar.",
+        "overlapOpenSchedule": "فتح جدول المناوبات",
+        "syncTargetNoCalendarForPeople": "لا يوجد تقويم إسناده الافتراضي هؤلاء الأشخاص تمامًا، لذلك لا يختار الإسناد تقويمًا. المستخدم بدلًا من ذلك: {{target}}."
     },
     "noteCategories": {
         "categories": "الفئات",
@@ -1536,7 +1538,11 @@
         "checklistDone": "منجز",
         "checklistOpen": "مفتوح",
         "errorNoteGone": "هذه الملاحظة لم تعد موجودة.",
-        "errorSelectedCategoryGone": "إحدى الفئات المحددة لم تعد موجودة."
+        "errorSelectedCategoryGone": "إحدى الفئات المحددة لم تعد موجودة.",
+        "lockedToggle": "قفل التحرير",
+        "lockedBadge": "مقفلة",
+        "lockedHint": "لا يمكن لأحد غيرك وغير المسؤولين تغيير هذه الملاحظة أو تثبيتها أو حذفها - بما في ذلك تحديد عناصر قائمة التحقق. يمكن للجميع الآخرين قراءتها.",
+        "errorLocked": "هذه الملاحظة مقفلة. لا يمكن تغييرها إلا من قبل الشخص الذي أنشأها والمسؤولين."
     },
     "markdown": {
         "bold": "عريض (Ctrl+B)",
@@ -2021,6 +2027,8 @@
         "planSavingsDeleteConfirm": "حذف هدف الادخار؟",
         "accountsTab": "الحسابات",
         "netWorth": "صافي الثروة",
+        "netWorthApproxNote": "محوّل بأسعار صرف بتاريخ {{date}}",
+        "netWorthPerCurrencyNote": "بلا سعر صرف - المجموع لكل عملة",
         "addAccount": "إضافة حساب",
         "accountsEmptyTitle": "لا توجد حسابات بعد",
         "accountsEmptyDescription": "أضف حسابات مثل الجاري أو التوفير لتتبع أرصدتك.",
@@ -2117,6 +2125,7 @@
         "saveFailed": "تعذّر الحفظ. يرجى التحقق من البيانات.",
         "loanAlreadyPaid": "هذا القرض مدفوع بالكامل بالفعل.",
         "loanInstallmentAlreadyPaid": "هذا القسط مدفوع بالفعل.",
+        "loanPaymentRateUnavailable": "لا يوجد سعر صرف معروف لعملة الحساب. اختر حسابًا آخر للقرض أو بلا حساب.",
         "amountExceedsLoanRemaining": "المبلغ أكبر من المتبقي من القرض",
         "responsibleNotMember": "لا يمكن أن يكون المسؤول إلا من أفراد المنزل.",
         "seriesStartTooEarly": "لا يمكن أن يقع يوم البدء في شهر يسبق أول دفعة في السلسلة",
@@ -2558,7 +2567,10 @@
             "errorNoCalendarName": "أدخل اسمًا للتقويم الجديد.",
             "dropzoneTitle": "اسحب ملف ICS إلى هنا أو اختر ملفًا",
             "dropzoneTitleTouch": "اضغط لاختيار ملف ICS",
-            "dropzoneHint": "ملفات .ics فقط"
+            "dropzoneHint": "ملفات .ics فقط",
+            "assigneesLabel": "إسناد إلى",
+            "assigneesHint": "تحصل الأحداث الجديدة على هؤلاء الأشخاص. ويُضافون إلى الحدث المستورد سابقًا بالمعرّف نفسه - حتى لو أُزيل إسناده يدويًا.",
+            "successWithAssigned": "تم الاستيراد: {{imported}}، موجودة بالفعل: {{skipped}}، أُسند منها الآن: {{assigned}}."
         },
         "memberPhoneLabel": "رقم الهاتف (اختياري)",
         "memberEmailLabel": "البريد الإلكتروني (اختياري)",
@@ -3357,10 +3369,7 @@
         "notificationChannelDeleteConfirmDetail": "لن يخرج عبر هذه القناة أي إشعار بعد الآن، ولا حتى العاجل منها. ويجب إدخال العنوان وبيانات الدخول من جديد كليًا لأي قناة أخرى.",
         "apiTokensMcpHint": "تعمل هذه الرموز أيضًا كرموز Bearer لنقطة نهاية MCP على /mcp (على سبيل المثال في Claude Desktop، لإنشاء المهام وعناصر التسوق والمواعيد باستخدام الذكاء الاصطناعي).",
         "sync": {
-            "defaultAssignee": "الإسناد الافتراضي",
             "defaultAssigneeNone": "بلا",
-            "defaultAssigneeHint": "تُسنَد الأحداث المُزامَنة حديثًا تلقائيًا إلى هذا الشخص.",
-            "defaultAssigneeRoutingHint": "الإسناد الافتراضي: تحصل مواعيد التقويم على الشخص المختار له، والموعد الجديد المُسند إلى هذا الشخص وحده يُنشأ في ذلك التقويم. ينطبق ذلك على تقويمات Google وCalDAV، وليس على Apple أو Outlook.",
             "backfillTitle": "استكمال الإسناد",
             "backfillDescription": "لا يسري الإسناد الافتراضي إلا على المواعيد المستوردة بعد تعيينه. يمكنك هنا تطبيقه مرة واحدة على المواعيد المستوردة بالفعل من جميع الحسابات.",
             "backfillAction": "تطبيق على المواعيد الموجودة",
@@ -3389,7 +3398,10 @@
             "backfillMovedNext": "عرض التالي",
             "backfillMovedAll": "تحديد الكل",
             "backfillMovedChange": "من {{from}} إلى {{to}}",
-            "backfillDescriptionMore": "تحصل المواعيد غير المسندة عليه مباشرة. أما المواعيد التي لا تزال تحمل الإسناد الافتراضي لتقويم آخر فتُعرض واحدًا واحدًا لتختار منها. أي إسناد آخر يبقى دون تغيير."
+            "backfillDescriptionMore": "تحصل المواعيد غير المسندة عليه مباشرة. أما المواعيد التي لا تزال تحمل الإسناد الافتراضي لتقويم آخر فتُعرض واحدًا واحدًا لتختار منها. أي إسناد آخر يبقى دون تغيير.",
+            "defaultAssignees": "الإسناد الافتراضي",
+            "defaultAssigneesHint": "تُسند الأحداث المتزامنة حديثًا تلقائيًا إلى هؤلاء الأشخاص. أولهم يحدد اللون.",
+            "defaultAssigneesRoutingHint": "الإسناد الافتراضي: تحصل الأحداث من التقويم على الأشخاص المختارين هناك، ويُنشأ الحدث الجديد المسند إلى هؤلاء الأشخاص تمامًا في ذلك التقويم. ينطبق هذا على تقويمات Google وCalDAV، وليس على Apple أو Outlook."
         },
         "calendarAssignMeLabel": "إسناد الأحداث الجديدة إليّ",
         "calendarDefaultRemindersLabel": "التذكيرات الافتراضية",
@@ -3614,6 +3626,8 @@
         "displayDeleteConfirm": "حذف «{{name}}»؟",
         "displayPairingCodeLabel": "رمز الاقتران",
         "displayPairingCodeHint": "صالح لمدة 15 دقيقة ويُستخدم مرة واحدة فقط. افتح /pair على الجهاز اللوحي وأدخله هناك. لا يظهر إلا الآن.",
+        "displayPairStepCode": "أضف هنا جهازًا لوحيًا جداريًا وأنشئ رمز اقتران.",
+        "displayPairStepOpen": "افتح هذا العنوان على الجهاز اللوحي وأدخل الرمز هناك:",
         "displayDeviceUnnamed": "جهاز بلا اسم",
         "displayDeviceLastSeen": "آخر ظهور: {{when}}",
         "displayDeviceNeverSeen": "لم يتصل قط",
@@ -3727,7 +3741,22 @@
         "permChildRoleHint": "تحصل حسابات الأطفال الجديدة عند إنشائها أيضًا على أذونات بدء خاصة: {{list}}. بعد ذلك تظهر لدى العضو نفسه.",
         "activeModulesHintMore": "لإخفاء وحدة من تنقلك أنت فقط، اذهب إلى الوحدات ← التنقل.",
         "permIntroMore": "يمكن أن يختلف الأعضاء الأفراد عن الإعداد الافتراضي للدور. بدون أي إعداد، يتمتع كل دور بوصول كامل؛ والمشرفون دائمًا.",
-        "preferenceSaveFailed": "تعذّر حفظ الإعداد."
+        "preferenceSaveFailed": "تعذّر حفظ الإعداد.",
+        "caldavCalendarReadOnly": "للقراءة فقط: لا يمكن حفظ أحداث جديدة هنا",
+        "caldavCalendarReadOnlyWaiting_one": "للقراءة فقط: لن يصل حدث واحد ({{count}}) بانتظار الرفع إلى هنا",
+        "caldavCalendarReadOnlyWaiting": "للقراءة فقط: لن يصل {{count}} حدث بانتظار الرفع إلى هنا",
+        "reminderListReadOnly": "للقراءة فقط: لا يمكن حفظ إدخالات جديدة هنا",
+        "reminderListReadOnlyWaiting_one": "للقراءة فقط: لن يصل إدخال واحد ({{count}}) بانتظار الرفع إلى هنا",
+        "reminderListReadOnlyWaiting": "للقراءة فقط: لن يصل {{count}} إدخال بانتظار الرفع إلى هنا",
+        "caldavCalendarReadOnlyWaiting_two": "للقراءة فقط: لن يصل حدثان ({{count}}) بانتظار الرفع إلى هنا",
+        "caldavCalendarReadOnlyWaiting_few": "للقراءة فقط: لن تصل {{count}} أحداث بانتظار الرفع إلى هنا",
+        "caldavCalendarReadOnlyWaiting_many": "للقراءة فقط: لن يصل {{count}} حدثًا بانتظار الرفع إلى هنا",
+        "reminderListReadOnlyWaiting_two": "للقراءة فقط: لن يصل إدخالان ({{count}}) بانتظار الرفع إلى هنا",
+        "reminderListReadOnlyWaiting_few": "للقراءة فقط: لن تصل {{count}} إدخالات بانتظار الرفع إلى هنا",
+        "reminderListReadOnlyWaiting_many": "للقراءة فقط: لن يصل {{count}} إدخالًا بانتظار الرفع إلى هنا",
+        "reminderListAssigneesTasksOnly": "يمكن تحديد الأشخاص فقط للقوائم التي تذهب إلى المهام.",
+        "syncAssigneeNotMember": "يمكن اختيار أفراد المنزل فقط هنا.",
+        "syncAssigneeUnknown": "هذا الشخص لم يعد موجودًا. أعد تحميل الصفحة."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",
@@ -4069,7 +4098,8 @@
         "banner": "غير متصل - تتم إعادة الاتصال…",
         "staleData": "غير متصل - آخر تحديث: {{time}}",
         "pageTitle": "أنت غير متصل",
-        "pageDescription": "تحتاج هذه الصفحة إلى اتصال. ستُحمَّل تلقائيًا فور عودة جهازك إلى الاتصال."
+        "pageDescription": "تحتاج هذه الصفحة إلى اتصال. ستُحمَّل تلقائيًا فور عودة جهازك إلى الاتصال.",
+        "snapshot": "لا يوجد اتصال بالخادم - بيانات محفوظة، للقراءة فقط"
     },
     "emptyHint": {
         "recipes": "تنتقل الوصفة مباشرة إلى خطة الوجبات أو إلى قائمة المشتريات.",
@@ -4727,6 +4757,14 @@
             "missedDetail_few": "فاتت {{count}} مواعيد منذ {{date}}.",
             "missedDetail_two": "فات موعدان ({{count}}) منذ {{date}}.",
             "missedDetail_many": "فات {{count}} موعدًا منذ {{date}}.",
+            "failing": "فشل التسجيل - تتم إعادة المحاولة كل ساعة",
+            "pastQuestion": "التاريخ في الماضي",
+            "pastSkip": "البدء من {{date}}",
+            "pastDetail": "كان سيستحق {{count}} موعد منذ {{date}}.",
+            "pastDetail_one": "كان سيستحق موعد واحد ({{count}}) منذ {{date}}.",
+            "pastDetail_few": "كانت ستستحق {{count}} مواعيد منذ {{date}}.",
+            "pastDetail_two": "كان سيستحق موعدان ({{count}}) منذ {{date}}.",
+            "pastDetail_many": "كان سيستحق {{count}} موعدًا منذ {{date}}.",
             "deleteConfirm": "حذف هذا المصروف المتكرر؟",
             "deleteConfirmDetail": "لن تُنشأ مصاريف جديدة. المصاريف المسجلة سابقًا تبقى كما هي.",
             "show": "عرض",
@@ -4819,7 +4857,14 @@
         "debtOwesYou": "{{name}} مدين لك",
         "debtOwes": "{{from}} مدين لـ {{to}}",
         "balanced": "متسوّى",
-        "balancedInGroup": "{{group}}: متسوّى"
+        "balancedInGroup": "{{group}}: متسوّى",
+        "totalsByMember": "المدفوع لكل شخص",
+        "totalsByMemberHint": "ما دفعه كل شخص، وتحته حصته الخاصة",
+        "ownShare": "الحصة الخاصة: {{amount}}",
+        "paidLabel": "المدفوع",
+        "totalsByCategory": "حسب الفئة",
+        "categoryFilter": "تصفية النفقات حسب الفئة",
+        "noExpensesInCategory": "لا توجد نفقات في هذه الفئة."
     },
     "wmo": {
         "0": "سماء صافية",
@@ -5174,7 +5219,14 @@
         "detailAmountLabel": "المبلغ",
         "detailNextPaymentLabel": "الدفعة التالية",
         "renewedNamed": "تم دفع «{{name}}» - الدفعة التالية في {{date}}.",
-        "completedNamed": "تم دفع «{{name}}» وإنهاؤه."
+        "completedNamed": "تم دفع «{{name}}» وإنهاؤه.",
+        "accountHint": "تُقيَّد كل دفعة من هذا الاشتراك على هذا الحساب. غيّر دفعة واحدة من الميزانية.",
+        "accountArchivedHint": "هذا الحساب مؤرشف. يُقيِّد الاشتراك دون حساب حتى تختار حسابًا آخر.",
+        "accountArchivedOption": "{{name}} (مؤرشف)",
+        "accountArchivedMeta": "{{name}} مؤرشف - يُقيَّد دون حساب",
+        "visibilityHint_private": "أنت وحدك ترى هذا الاشتراك ودفعاته.",
+        "visibilityHint_shared": "يرى جميع أفراد الأسرة هذا الاشتراك ودفعاته.",
+        "errorAccountGone": "لم يعد الحساب المحدد موجودًا."
     },
     "health": {
         "fasting": {
@@ -5349,6 +5401,7 @@
             "saveError": "تعذّر حفظ القياس.",
             "invalidValue": "يرجى إدخال قيم صحيحة.",
             "range": {
+                "day": "يوم",
                 "week": "أسبوع",
                 "month": "شهر",
                 "year": "سنة"
@@ -5388,6 +5441,7 @@
                 "family": "العائلة"
             },
             "sparse": "قياسات قليلة جدًا لعرض اتجاه.",
+            "bandValue": "{{mean}}، من {{low}} إلى {{high}}",
             "recentMeasurements": "آخر القياسات",
             "deleteMeasurement": "حذف القياس {{value}} ({{date}})",
             "measurementDeleted": "تم حذف القياس",
@@ -6309,8 +6363,9 @@
         "importDiagnosticDuplicateInstance_two": "تم دمج {{count}} من حالات الاستحواذ المكررة (نفس الهوية) في حالة واحدة.",
         "importDiagnosticDuplicateInstance_many": "تم دمج {{count}} من حالات الاستحواذ المكررة (نفس الهوية) في حالة واحدة.",
         "importUnresolvedBlockingError": "يرجى حل جميع الملاحظات المانعة أولاً، أو تخطي الأحداث المتأثرة صراحةً.",
-        "importIgnoreLabel": "تجاهل",
         "importCreateNewType": "إنشاء نوع نفايات جديد",
+        "importLabelsHint": "إذا ذكر إدخال واحد عدة حاويات، فاختر جميعها - لكل منها موعد جمع خاص بها.",
+        "importLabelIgnoredHint": "لم يتم اختيار نوع نفايات - لن يتم استيراده.",
         "importNewTypeNameRequiredError": "يرجى إدخال اسم للنوع الجديد من النفايات.",
         "importDefaultSourceName": "ملف مستورد",
         "importCommittedToast": "تم تطبيق الاستيراد: تمت إضافة {{added}}، وتغيير {{changed}}، وإزالة {{removed}}.",
@@ -6629,6 +6684,19 @@
         "badgeLow": "شبه منتهٍ",
         "badgeOut": "نفد",
         "bestBefore": "الصلاحية {{date}}",
+        "noBestBefore": "بدون تاريخ صلاحية",
+        "errorProductHasStock": "هذا المنتج متوفر مرة أخرى ولم يُحذف.",
+        "productTotal": "{{quantity}} إجمالًا",
+        "productPlaces": "{{count}} مكان",
+        "productPlaces_one": "مكان واحد",
+        "productPlaces_two": "مكانان",
+        "productPlaces_few": "{{count}} أماكن",
+        "productPlaces_many": "{{count}} مكانًا",
+        "productBatches": "{{count}} دفعة",
+        "productBatches_one": "دفعة واحدة",
+        "productBatches_two": "دفعتان",
+        "productBatches_few": "{{count}} دفعات",
+        "productBatches_many": "{{count}} دفعةً",
         "increase": "زيادة الكمية",
         "decrease": "إنقاص الكمية",
         "toShoppingAll": "الكل إلى قائمة التسوق",

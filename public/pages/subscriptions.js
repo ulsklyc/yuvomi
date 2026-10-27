@@ -1141,6 +1141,11 @@ function renderCard(subscription) {
             <span class="subscription-card__meta-extra">${esc(rowPaymentMethodLabel(subscription))}</span>
             ${completed ? '' : `<span class="subscription-card__meta-extra"><i data-lucide="${subscription.reminder_enabled === false ? 'bell-off' : 'bell'}" aria-hidden="true"></i>${subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>`}
             ${endInfo ? `<span><i data-lucide="${endInfo.icon}" aria-hidden="true"></i>${esc(endInfo.text)}</span>` : ''}
+            ${/* RUHIG, ABER AUCH AM TELEFON (Entscheidung zu #1277): das Konto
+                 ist archiviert, das Abo bucht ohne Konto. Eine Metaangabe wie
+                 die anderen, kein Warnton - nichts ist kaputt, es fehlt nur
+                 die Zuordnung, bis jemand ein anderes Konto waehlt. */ ''}
+            ${subscription.account_archived && !completed ? `<span class="subscription-card__meta-account"><i data-lucide="archive" aria-hidden="true"></i>${esc(t('subscriptions.accountArchivedMeta', { name: subscription.account_name || '' }))}</span>` : ''}
           </span>
         </span>
         <span class="subscription-card__cost">
@@ -1444,6 +1449,11 @@ function subscriptionReadSections(subscription) {
     { icon: 'tags', label: t('subscriptions.categoryLabel'), value: subscription.category_id ? rowCategoryLabel(subscription) : '' },
     { icon: 'wallet-cards', label: t('subscriptions.paymentMethodLabel'),
       value: subscription.payment_method_id ? rowPaymentMethodLabel(subscription) : '' },
+    { icon: 'wallet', label: t('budget.accountLabel'),
+      value: subscription.account_id == null ? ''
+        : (subscription.account_archived
+          ? t('subscriptions.accountArchivedMeta', { name: subscription.account_name || '' })
+          : subscription.account_name || '') },
     { icon: 'at-sign', label: t('subscriptions.accountUsernameLabel'), value: subscription.account_username || '' },
     { icon: 'sticky-note', label: t('subscriptions.notesLabel'), value: subscription.notes || '', multiline: true },
   ];
@@ -1516,6 +1526,84 @@ async function offerCurrentMeta(panel, id, reason, owner) {
   panel.querySelector(`#${id}-search`)?.focus();
 }
 
+/**
+ * DAS KONTO DES ABOS (#1277): die Vorgabe fuer jede Buchung, die es bucht.
+ * Zur Wahl stehen die aktiven Konten; ein archiviertes nur, wenn es das
+ * gewaehlte ist - dann bucht das Abo ohne Konto (Entscheidung zu #1277), und
+ * der Hinweis darunter sagt es. Ohne Konten gibt es das Feld nicht, wie im
+ * Buchungsdialog.
+ */
+function accountFieldHtml(subscription) {
+  const accounts = state.meta.accounts ?? [];
+  if (!accounts.length) return '';
+  const current = subscription?.account_id ?? null;
+  const options = accounts
+    .filter((account) => !account.archived || account.id === current)
+    .map((account) => `<option value="${account.id}"${account.id === current ? ' selected' : ''}${account.archived ? ' data-archived="true"' : ''}>${esc(account.archived
+      ? t('subscriptions.accountArchivedOption', { name: account.name })
+      : account.name)}</option>`)
+    .join('');
+  const archived = accounts.some((account) => account.id === current && account.archived);
+  return `
+        <div class="form-group" data-subscription-account-field>
+          <label class="form-label" for="subscription-account-id">${t('budget.accountLabel')}</label>
+          <select class="form-input" id="subscription-account-id"
+                  aria-describedby="subscription-account-id-hint subscription-account-id-archived">
+            <option value=""${current === null ? ' selected' : ''}>${t('budget.noAccount')}</option>${options}
+          </select>
+          <p class="form-hint" id="subscription-account-id-hint">${t('subscriptions.accountHint')}</p>
+          <p class="form-hint" id="subscription-account-id-archived"${archived ? '' : ' hidden'}>${t('subscriptions.accountArchivedHint')}</p>
+        </div>`;
+}
+
+/** Der Archiv-Hinweis folgt der Wahl: er steht, solange ein archiviertes gewaehlt ist. */
+function wireAccountField(panel) {
+  const select = panel.querySelector('#subscription-account-id');
+  if (!select) return;
+  select.addEventListener('change', () => {
+    const hint = panel.querySelector('#subscription-account-id-archived');
+    if (hint) hint.hidden = select.selectedOptions?.[0]?.dataset.archived !== 'true';
+  });
+}
+
+/**
+ * DIE SICHTBARKEIT DES ABOS (#1701): dieselbe Wahl unter derselben Bedingung
+ * wie im Buchungsdialog (budget.js) - nur im persoenlichen Budget-Modus, im
+ * geteilten sieht ohnehin jeder alles. Ein neues Abo steht auf "geteilt" wie
+ * eine neue Buchung; die Buchungen des Abos folgen seiner Stufe.
+ */
+function visibilityFieldHtml(subscription) {
+  if (state.meta.budget_mode !== 'personal') return '';
+  const level = subscription?.visibility === 'private' ? 'private' : 'shared';
+  return `
+        <div class="form-group">
+          <label class="form-label" for="subscription-visibility">${t('budget.visibilityLabel')}</label>
+          <select class="form-input" id="subscription-visibility" aria-describedby="subscription-visibility-hint">
+            ${['private', 'shared'].map((option) => `<option value="${option}"${option === level ? ' selected' : ''}>${t(`budget.visibility_${option}`)}</option>`).join('')}
+          </select>
+          <p class="form-hint" id="subscription-visibility-hint">${t(`subscriptions.visibilityHint_${level}`)}</p>
+        </div>`;
+}
+
+/**
+ * Das gewaehlte Konto gibt es nicht mehr (#1277): wie bei Kategorie und
+ * Zahlungsart bleibt der Dialog offen, die Seite laedt neu, und die Wahl kommt
+ * aus dem frischen Stand, auf "Kein Konto".
+ */
+async function offerCurrentAccounts(panel, owner) {
+  const goneId = Number(panel.querySelector('#subscription-account-id')?.value) || null;
+  if (!isCurrentOwner(owner)) return;
+  await reload(undefined, { owner, quiet: true });
+  if (!isCurrentOwner(owner)) return;
+  const field = panel.querySelector('[data-subscription-account-field]');
+  if (!field) return;
+  state.meta.accounts = (state.meta.accounts ?? []).filter((account) => account.id !== goneId);
+  field.insertAdjacentHTML('afterend', accountFieldHtml(null));
+  field.remove();
+  wireAccountField(panel);
+  panel.querySelector('#subscription-account-id')?.focus();
+}
+
 export function openSubscriptionModal(subscription = null) {
   // Der Riegel steht VOR jeder Vorbereitung: der Anlegeweg entfaellt ganz, ein
   // bestehendes Abo geht als Leseansicht auf (P1-Muster wie openNoteModal).
@@ -1542,11 +1630,13 @@ export function openSubscriptionModal(subscription = null) {
     || (!!subscription.brand_color && subscription.brand_color !== '#0F766E')
     || !!subscription.notes
     || subscription.enabled === false
+    || (state.meta.budget_mode === 'personal' && subscription.visibility === 'private')
   );
 
   const advancedFieldsHtml = `
       <section class="subscription-form__section">
         <h3 class="subscription-form__title">${t('subscriptions.organizationDetails')}</h3>
+        ${visibilityFieldHtml(subscription)}
         <div class="subscription-form__organization-grid">
           ${metaComboboxMarkup('subscription-category', subscription?.category_id || '')}
           ${metaComboboxMarkup('subscription-method', subscription?.payment_method_id || '')}
@@ -1631,6 +1721,7 @@ export function openSubscriptionModal(subscription = null) {
             <input class="form-input" id="subscription-interval" type="number" min="1" max="365" step="1" value="${subscription?.cycle_interval || 1}">
           </div>
         </div>
+        ${accountFieldHtml(subscription)}
       </section>
 
       <section class="subscription-form__section">
@@ -1709,6 +1800,11 @@ export function openSubscriptionModal(subscription = null) {
       wireCombobox(panel, 'subscription-cycle');
       wireCombobox(panel, 'subscription-category');
       wireCombobox(panel, 'subscription-method');
+      wireAccountField(panel);
+      const visibility = panel.querySelector('#subscription-visibility');
+      visibility?.addEventListener('change', () => {
+        panel.querySelector('#subscription-visibility-hint').textContent = t(`subscriptions.visibilityHint_${visibility.value}`);
+      });
       const reminderEnabled = panel.querySelector('#subscription-reminder-enabled');
       reminderEnabled.addEventListener('change', () => {
         panel.querySelector('#subscription-reminder').disabled = !reminderEnabled.checked;
@@ -1878,6 +1974,13 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
       end_date: endDate,
       occurrence_count: occurrenceCount,
     };
+    // Konto und Sichtbarkeit nur, wenn der Dialog sie zeigt (#1277, #1701):
+    // ohne Kontofeld bleibt das Konto des Abos stehen, im geteilten Modus
+    // entscheidet der Server die Sichtbarkeit.
+    const accountSelect = panel.querySelector('#subscription-account-id');
+    if (accountSelect) payload.account_id = Number(accountSelect.value) || null;
+    const visibilitySelect = state.meta.budget_mode === 'personal' ? panel.querySelector('#subscription-visibility') : null;
+    if (visibilitySelect) payload.visibility = visibilitySelect.value === 'private' ? 'private' : 'shared';
     if (existing) await api.put(`/budget/subscriptions/${existing.id}`, payload);
     else await api.post('/budget/subscriptions', payload);
     // Nur DIESEN Dialog: einen inzwischen geoeffneten anderen laesst die
@@ -1890,6 +1993,11 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
     if (goneSelect) {
       window.yuvomi?.showToast(errorText(err), 'danger');
       await offerCurrentMeta(panel, goneSelect, err.data.reason, owner);
+      return;
+    }
+    if (err?.data?.reason === 'subscriptions_account_not_found') {
+      window.yuvomi?.showToast(errorText(err), 'danger');
+      await offerCurrentAccounts(panel, owner);
       return;
     }
     reportError(err, { owner, dialog });

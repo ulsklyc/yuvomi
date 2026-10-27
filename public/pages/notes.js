@@ -38,6 +38,8 @@ import {
 import { NOTE_CATEGORY_NAME_MAX_LENGTH } from '/utils/note-category-name.js';
 import { canChangeRecord, isNavModuleReadOnly } from '/permissions.js';
 import { errorSentence, isAlreadyDeleted } from '/utils/friendly-error.js';
+import { mayChangeNoteLock, mayChangeNoteVisibility, noteLockedFor } from '/utils/note-access.js';
+import { hidesPrivacyControls } from '/utils/household.js';
 
 // --------------------------------------------------------
 // Konstanten
@@ -115,7 +117,21 @@ function readOnly() {
  */
 function mayChange(note) {
   if (readOnly() || !note) return false;
+  if (noteLockedFor(note, viewer())) return false;
   return canChangeRecord('notes', Number(note.created_by) === Number(state.user?.id));
+}
+
+/** Wer hier fragt - fuer die Regeln aus utils/note-access.js (#1514, #1602). */
+function viewer() {
+  return { userId: state.user?.id ?? null, isAdmin: state.user?.role === 'admin' };
+}
+
+/**
+ * Darf ich in DIESER Notiz abhaken? Allen offen, die schreiben duerfen - ausser
+ * die Notiz ist gesperrt (#1602): die Sperre gilt ganz, auch fuer die Haken.
+ */
+function mayCheck(note) {
+  return !readOnly() && Boolean(note) && !noteLockedFor(note, viewer());
 }
 
 function noteById(id) {
@@ -168,7 +184,9 @@ function pinMarkup(note) {
 // ein `span role="img"`, dessen Beschriftung den Zustand nennt. Die
 // dekorative Form waere hier zu wenig - sie ist `aria-hidden` und nimmt einem
 // Nur-lesen-Nutzer genau die Auskunft, die die Zeile traegt.
-const CHECKLIST_OPTS = () => (readOnly()
+// Seit #1602 fragt das die Notiz: in einer gesperrten fremden sind die
+// Kaestchen ebenso Zeichen wie bei Nur-lesen.
+const CHECKLIST_OPTS = (note = null) => (!(note ? mayCheck(note) : !readOnly())
   ? { checklist: { stateLabels: { checked: t('notes.checklistDone'), unchecked: t('notes.checklistOpen') } } }
   : { checklist: { interactive: true, toggleLabel: t('notes.checklistToggle') } });
 
@@ -208,7 +226,7 @@ async function toggleCheck(noteId, box) {
   // Render oder aus den Devtools findet ihn trotzdem.
   if (readOnly()) return;
   const note = state.notes.find((n) => n.id === noteId);
-  if (!note) return;
+  if (!note || !mayCheck(note)) return;
 
   const line    = parseInt(box.dataset.mdLine, 10);
   const checked = box.dataset.mdChecked !== '1';
@@ -244,9 +262,10 @@ async function toggleCheck(noteId, box) {
 
 /**
  * "GIBT ES NICHT MEHR" (#1909): ein anderes Haushaltsmitglied hat die Notiz
- * geloescht. Sie faellt aus dem Stand, ohne die Pinnwand neu zu holen - und
- * zwar nur bei genau diesem Grund. Notizen haben keine Sichtbarkeit, die 404
- * heisst nur "geloescht". Gibt true zurueck, wenn sie gefallen ist.
+ * geloescht - oder, seit #1514, auf "Nur ich" gestellt. Fuer diese Person ist
+ * beides dasselbe: es gibt sie nicht mehr. Sie faellt aus dem Stand, ohne die
+ * Pinnwand neu zu holen - und zwar nur bei genau diesem Grund. Gibt true
+ * zurueck, wenn sie gefallen ist.
  */
 function dropGoneNote(err, noteId) {
   if (!isAlreadyDeleted(err, 'notes_note_not_found')) return false;
@@ -708,7 +727,7 @@ function renderNoteCard(note, { headingLevel = 2 } = {}) {
           * Die Optik traegt allein die Klasse (typography.css, notes.css);
           * `reset.css` nimmt den UA-Rand, die Groesse setzt die Rolle. */ ''}
       ${note.title ? `<h${headingLevel === 3 ? 3 : 2} class="note-card__title">${esc(note.title)}</h${headingLevel === 3 ? 3 : 2}>` : ''}
-      <div class="note-card__content">${renderMarkdownLight(note.content, CHECKLIST_OPTS())}</div>
+      <div class="note-card__content">${renderMarkdownLight(note.content, CHECKLIST_OPTS(note))}</div>
       ${(note.categories || []).length ? `<div class="note-card__categories" role="group" aria-label="${t('noteCategories.categories')}">
         ${note.categories.map(renderCategoryBadge).join('')}
       </div>` : ''}
@@ -721,6 +740,7 @@ function renderNoteCard(note, { headingLevel = 2 } = {}) {
               : ''}
           </span>
           <span>${esc(note.creator_name || '')}</span>
+          ${renderAccessMarks(note)}
         </div>
         <div class="note-card__actions">
           ${/* LOESCHEN IM MEHR-KNOPF (R18, D6, Critique 2026-10-16): der
@@ -736,6 +756,68 @@ function renderNoteCard(note, { headingLevel = 2 } = {}) {
       </div>
     </div>
   `;
+}
+
+/**
+ * Die zwei leisen Zeichen neben dem Namen (#1514, #1602): Schloss fuer
+ * gesperrt - dasselbe Zeichen wie an der gesperrten Aufgabe -, durchgestrichenes
+ * Auge fuer "Nur ich". Das zweite sieht nur die Autorin; fuer alle anderen gibt
+ * es die Notiz nicht. `role="img"`, damit die Beschriftung gilt.
+ */
+function renderAccessMarks(note) {
+  const mark = (icon, label) => `<span class="note-card__mark" role="img" aria-label="${esc(label)}" title="${esc(label)}">
+            <i data-lucide="${icon}" aria-hidden="true"></i>
+          </span>`;
+  return [
+    note.visibility === 'private' ? mark('eye-off', t('common.visibility.private')) : '',
+    note.locked ? mark('lock', t('notes.lockedBadge')) : '',
+  ].join('');
+}
+
+/**
+ * Sichtbarkeit und Sperre im Editor (#1514, #1602) - neben Farbe und Nadel,
+ * wie bei den Aufgaben nebeneinander: beide beantworten, wer hier was darf.
+ *
+ * GEZEIGT WIRD NUR, WAS DIESE PERSON STELLEN DARF: die Sichtbarkeit die
+ * Autorin, die Sperre Autorin und Admins. Ein Feld, das fehlt, geht auch nicht
+ * in den Rumpf - der Server laesst den Bestand stehen.
+ *
+ * Im Ein-Personen-Haushalt VERBORGEN, NICHT ENTFERNT (dieselbe Regel wie bei
+ * den Aufgaben): der Absende-Pfad liest die Knoten, und ein fehlender schriebe
+ * den gespeicherten Wert nicht mit.
+ */
+function renderAccessFields(note) {
+  const v = viewer();
+  const showVisibility = !note || mayChangeNoteVisibility(note, v);
+  const showLock = !note || mayChangeNoteLock(note, v);
+  if (!showVisibility && !showLock) return '';
+  const hidden = hidesPrivacyControls('notes') ? ' hidden' : '';
+  const visibility = note?.visibility === 'private' ? 'private' : 'all';
+  return `${showVisibility ? `
+      <div class="form-group"${hidden}>
+        <label class="form-label" for="note-visibility">${t('common.visibility.label')}</label>
+        <select class="form-input" id="note-visibility" aria-describedby="note-visibility-hint">
+          <option value="all"${visibility === 'all' ? ' selected' : ''}>${t('common.visibility.all')}</option>
+          <option value="private"${visibility === 'private' ? ' selected' : ''}>${t('common.visibility.private')}</option>
+        </select>
+        <p class="form-hint" id="note-visibility-hint">${t('common.visibility.hint')}</p>
+      </div>` : ''}${showLock ? `
+      <div class="form-group"${hidden}>
+        ${formSwitchRowHtml({
+          label: t('notes.lockedToggle'), checked: Boolean(note?.locked),
+          hint: t('notes.lockedHint'), hintId: 'note-locked-hint', attrs: { id: 'note-locked' },
+        })}
+      </div>` : ''}`;
+}
+
+/** Was die Felder oben in den Rumpf geben - nur die, die es gibt. */
+function readAccessFields(panel) {
+  const out = {};
+  const visibility = panel.querySelector('#note-visibility');
+  if (visibility) out.visibility = visibility.value === 'private' ? 'private' : 'all';
+  const locked = panel.querySelector('#note-locked');
+  if (locked) out.locked = locked.checked ? 1 : 0;
+  return out;
 }
 
 // --------------------------------------------------------
@@ -763,9 +845,9 @@ function renderCategoryBadge(category) {
   </span>`;
 }
 
-function renderNoteReadHtml(content, { live = false, categories = [] } = {}) {
+function renderNoteReadHtml(content, { live = false, categories = [], note = null } = {}) {
   const body = (content || '').trim()
-    ? renderMarkdownLight(content, live ? CHECKLIST_OPTS() : {})
+    ? renderMarkdownLight(content, live ? CHECKLIST_OPTS(note) : {})
     : `<p class="note-read__empty">${t('notes.readEmpty')}</p>`;
   return `${categories.length ? `<div class="note-read__categories" role="group" aria-label="${t('noteCategories.categories')}">
     ${categories.map(renderCategoryBadge).join('')}
@@ -900,7 +982,7 @@ function openNoteReadModal(note) {
     <div class="note-modal" data-view="read" data-note-id="${note.id}" style="--note-color:${esc(note.color)};">
       <div class="note-read-view" data-pane="read" tabindex="-1">
         ${foreign}
-        ${renderNoteReadHtml(note.content, { live: true, categories: note.categories || [] })}
+        ${renderNoteReadHtml(note.content, { live: true, categories: note.categories || [], note })}
       </div>
     </div>`,
     onSave(panel) {
@@ -946,7 +1028,7 @@ function openNoteModal({ mode, note = null }) {
 
       <div class="note-read-view" id="note-pane-read" data-pane="read" role="tabpanel"
            aria-labelledby="note-tab-read" tabindex="-1"${initialView === 'read' ? '' : ' hidden'}>
-        ${isEdit ? renderNoteReadHtml(note.content, { live: true, categories: note.categories || [] }) : ''}
+        ${isEdit ? renderNoteReadHtml(note.content, { live: true, categories: note.categories || [], note }) : ''}
       </div>
 
       <div class="note-edit-view" id="note-pane-edit" data-pane="edit" role="tabpanel"
@@ -987,8 +1069,10 @@ function openNoteModal({ mode, note = null }) {
       </div>
       <div class="form-group">
         ${formSwitchRowHtml({ label: t('notes.pinnedLabel'), checked: Boolean(isEdit && note.pinned), attrs: { id: 'note-pinned' } })}
-      </div>`,
-      { open: isEdit && (!!note.pinned || (!!note.color && note.color !== NOTE_COLORS[0])) })}
+      </div>
+      ${renderAccessFields(isEdit ? note : null)}`,
+      { open: isEdit && (!!note.pinned || (!!note.color && note.color !== NOTE_COLORS[0])
+        || note.visibility === 'private' || !!note.locked) })}
       </div>
 
       <div class="modal-panel__footer modal-panel__footer--plain note-modal__footer">
@@ -1105,6 +1189,7 @@ function openNoteModal({ mode, note = null }) {
           // anders als die der Notiz auf dem Server (#704).
           readPane.insertAdjacentHTML('beforeend', renderNoteReadHtml(viewContent.value, {
             live: isEdit && viewContent.value === note.content,
+            note,
             categories: [...panel.querySelectorAll('input[name="note-category"]:checked')]
               .map((input) => state.categories.find((category) => Number(category.id) === Number(input.value)))
               .filter(Boolean),
@@ -1482,10 +1567,10 @@ function openNoteModal({ mode, note = null }) {
 
         try {
           if (mode === 'create') {
-            const res = await api.post('/notes', { title, content: cnt, color, pinned, category_ids });
+            const res = await api.post('/notes', { title, content: cnt, color, pinned, category_ids, ...readAccessFields(panel) });
             state.notes.unshift(res.data);
           } else {
-            const res = await api.put(`/notes/${note.id}`, { title, content: cnt, color, pinned, category_ids });
+            const res = await api.put(`/notes/${note.id}`, { title, content: cnt, color, pinned, category_ids, ...readAccessFields(panel) });
             const idx = state.notes.findIndex((n) => n.id === note.id);
             if (idx !== -1) state.notes[idx] = res.data;
             state.notes.sort((a, b) => b.pinned - a.pinned);
@@ -1671,5 +1756,7 @@ export const __test = {
   openNoteFromQuery,
   // #1909: Anpinnen und Loeschen einer Notiz, die es nicht mehr gibt.
   togglePin, deleteNote,
+  // #1514, #1602: Sichtbarkeit und Sperre - Felder im Editor, Zeichen an der Karte.
+  renderAccessFields, renderAccessMarks,
   setContainerForTest(container) { _container = container; },
 };

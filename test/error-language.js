@@ -27,7 +27,8 @@ export const GERMAN = new RegExp(
   + 'Interner|Fehler|Erlaubt|erwartet|Mahlzeit|Zeitzone|Sprache|Wochenstart|Anbieter|Einheit|'
   + 'Authentifizierung|Abrufen|Notiz|Kontakt|Inhalt|Termin|Kalender|Abonnement|Kilometerstand|'
   + 'Ländercode|Regionscode|Gruppencode|Erinnerungen|maximal|enthält|beim|bei|der|das|'
-  + 'Unbekannte|Unbekannter|Nutzer|Aufgaben|zu|nur'
+  + 'Unbekannte|Unbekannter|Nutzer|Aufgaben|zu|nur|'
+  + 'Vorname|Nachname|Zweitname|Namenszusatz|Namenssuffix|Telefon|Adresse|Notizen|Geburtstag|Pflichtfeld|Menge'
   + ')\\b',
   'i',
 );

@@ -403,7 +403,7 @@ test('der gedockte Dialog zeigt mit einem Hauch, dass die Liste daneben gerade n
   const { readFileSync } = await import('node:fs');
   const { eachRule } = await import('./css-rules.js');
   const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
-  const rule = [...eachRule(css)].find((r) => r.selector.trim() === 'dialog.modal-overlay.modal-overlay--docked::backdrop');
+  const rule = [...eachRule(css)].find((r) => r.selector.trim() === '.modal-overlay--docked > .modal-overlay__scrim');
   assert.ok(rule, 'der Grund des gedockten Dialogs hat eine eigene Regel');
   assert.doesNotMatch(rule.body, /background-color:\s*transparent/, 'kein unsichtbarer Grund');
   assert.match(rule.body, /background-color:\s*color-mix\(in srgb, var\(--color-overlay-light\)/, 'der Hauch kommt aus dem Overlay-Token');

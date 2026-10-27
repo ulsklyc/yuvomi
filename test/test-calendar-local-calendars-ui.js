@@ -411,3 +411,84 @@ test('the three event delete paths: gone is done, any other failure says the app
     if (previous.undoStub === undefined) delete globalThis.__undoStub; else globalThis.__undoStub = previous.undoStub;
   }
 });
+
+// #1927: die Hilfezeile unter der Kalenderwahl nennt den iCloud-Upload, sobald
+// der gewaehlte Kalender hochlaedt - ohne Rueckfrage beim Speichern und ohne
+// Zeile, solange keiner hochlaedt.
+test('the event form names the iCloud upload under the calendar picker while the chosen calendar uploads', () => {
+  const before = calendar.localCalendarState.localCalendars;
+  const fakeSelect = () => {
+    const attrs = {};
+    return { value: '', setAttribute(name, value) { attrs[name] = value; }, removeAttribute(name) { delete attrs[name]; }, attrs };
+  };
+  try {
+    for (const uploads of [true, false, undefined]) {
+      calendar.localCalendarState.localCalendars = [
+        { id: 1, name: 'Yuvomi', is_default: true, uploads_to_icloud: uploads },
+        { id: 2, name: 'School', is_default: false, uploads_to_icloud: false },
+      ];
+      const html = calendar.buildEventModalContent({ mode: 'create', date: '2035-05-01' });
+      assert.match(html, /id="event-local-calendar-upload-hint" hidden>calendar\.localCalendarUploadsHint</,
+        'the line is part of the picker and starts hidden');
+
+      const select = fakeSelect();
+      const hint = { id: 'event-local-calendar-upload-hint', hidden: true };
+      const panel = { querySelector: (sel) => (sel === '#event-local-calendar' ? select
+        : sel === '#event-local-calendar-upload-hint' ? hint : null) };
+
+      select.value = '1';
+      calendar.syncLocalCalendarUploadHint(panel);
+      assert.equal(hint.hidden, uploads !== true, `default calendar, uploads: ${uploads}`);
+      assert.equal(select.attrs['aria-describedby'], uploads === true ? hint.id : undefined);
+
+      select.value = '2';
+      calendar.syncLocalCalendarUploadHint(panel);
+      assert.equal(hint.hidden, true, 'a calendar that stays local shows no line');
+      assert.equal(select.attrs['aria-describedby'], undefined);
+    }
+  } finally { calendar.localCalendarState.localCalendars = before; }
+});
+
+// #1927, Folge: auch ohne Kalenderwahl (ein einziger lokaler Kalender) nennt
+// das Formular den iCloud-Upload - ruhig unter dem Zeitblock, derselbe Satz.
+// Waehlt der Termin ein Google- oder CalDAV-Ziel, landet er nicht im lokalen
+// Kalender, und die Zeile geht.
+test('with a single local calendar the event form names the iCloud upload under the time block', () => {
+  const before = calendar.localCalendarState.localCalendars;
+  const fakeEl = (value = '') => {
+    const attrs = {};
+    return { value, hidden: true, id: '', setAttribute(n, v) { attrs[n] = v; }, removeAttribute(n) { delete attrs[n]; }, attrs };
+  };
+  try {
+    for (const uploads of [true, false]) {
+      calendar.localCalendarState.localCalendars = [{ id: 1, name: 'Yuvomi', is_default: true, uploads_to_icloud: uploads }];
+      const html = calendar.buildEventModalContent({ mode: 'create', date: '2035-05-01' });
+      assert.doesNotMatch(html, /id="event-local-calendar"/, 'no picker with one calendar');
+      const hintAt = html.indexOf('id="event-local-calendar-upload-hint"');
+      assert.ok(hintAt > html.indexOf('id="allday-fields"'), 'the line sits under the time block');
+      assert.match(html, /id="event-local-calendar-upload-hint" hidden>calendar\.localCalendarUploadsHint</);
+
+      const hint = { ...fakeEl(), id: 'event-local-calendar-upload-hint' };
+      const syncTarget = fakeEl('');
+      const panel = { querySelector: (sel) => (sel === '#event-local-calendar-upload-hint' ? hint
+        : sel === '#event-sync-target' ? syncTarget : null) };
+      calendar.syncLocalCalendarUploadHint(panel);
+      assert.equal(hint.hidden, !uploads, `uploads: ${uploads}`);
+
+      syncTarget.value = 'caldav:4|https://dav.example.org/cal/family/';
+      calendar.syncLocalCalendarUploadHint(panel);
+      assert.equal(hint.hidden, true, 'an event with a CalDAV target does not go to iCloud');
+      syncTarget.value = 'google:family@group.calendar.google.com';
+      calendar.syncLocalCalendarUploadHint(panel);
+      assert.equal(hint.hidden, true, 'nor one with a Google target');
+    }
+
+    // Ein schon zu einem anderen Anbieter gespiegelter Termin bekommt die Zeile nicht.
+    calendar.localCalendarState.localCalendars = [{ id: 1, name: 'Yuvomi', is_default: true, uploads_to_icloud: true }];
+    const mirrored = calendar.buildEventModalContent({ mode: 'edit', event: {
+      id: 3, title: 'Termin', start_datetime: '2035-05-01T10:00', end_datetime: '2035-05-01T11:00',
+      external_source: 'apple', assigned_users: [],
+    } });
+    assert.doesNotMatch(mirrored, /id="event-local-calendar-upload-hint"/);
+  } finally { calendar.localCalendarState.localCalendars = before; }
+});

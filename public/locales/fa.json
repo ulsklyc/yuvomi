@@ -1206,7 +1206,6 @@
         "pickOne": "یک رویداد انتخاب کنید",
         "pickOneHint": "زمان، مکان و یادآوری‌ها اینجا نمایش داده می‌شوند.",
         "syncTargetAssigneeAmbiguous": "چند تقویم این فرد را به‌عنوان واگذاری پیش‌فرض دارند. مقصد را خودت انتخاب کن.",
-        "syncTargetSeveralAssignees": "چند نفر واگذار شده‌اند، پس واگذاری هیچ تقویمی را انتخاب نمی‌کند. به‌جای آن استفاده می‌شود: {{target}}.",
         "filtersSources": "تقویم‌ها",
         "filterUnassigned": "واگذارنشده",
         "dateSpanSpoken": "{{from}} تا {{to}}",
@@ -1245,7 +1244,10 @@
         "errorDeleteFeedAdminOnly": "این تقویم در حال خروجی گرفتن است. فقط مدیر می‌تواند آن را حذف کند.",
         "errorEventGone": "این رویداد دیگر وجود ندارد.",
         "errorSelectedCalendarGone": "تقویم انتخاب‌شده دیگر وجود ندارد.",
-        "errorSeriesNoOccurrence": "با این تکرار از تاریخ شروع به بعد هیچ رویدادی وجود نخواهد داشت."
+        "errorSeriesNoOccurrence": "با این تکرار از تاریخ شروع به بعد هیچ رویدادی وجود نخواهد داشت.",
+        "localCalendarUploadsHint": "رویدادهای این تقویم از طریق Apple Calendar در iCloud بارگذاری می‌شوند.",
+        "overlapOpenSchedule": "باز کردن برنامه شیفت",
+        "syncTargetNoCalendarForPeople": "هیچ تقویمی دقیقاً این افراد را به‌عنوان واگذاری پیش‌فرض ندارد، پس واگذاری تقویمی انتخاب نمی‌کند. به‌جای آن: {{target}}."
     },
     "noteCategories": {
         "categories": "دسته‌بندی‌ها",
@@ -1316,7 +1318,11 @@
         "checklistDone": "انجام‌شده",
         "checklistOpen": "باز",
         "errorNoteGone": "این یادداشت دیگر وجود ندارد.",
-        "errorSelectedCategoryGone": "یکی از دسته‌های انتخاب‌شده دیگر وجود ندارد."
+        "errorSelectedCategoryGone": "یکی از دسته‌های انتخاب‌شده دیگر وجود ندارد.",
+        "lockedToggle": "قفل کردن ویرایش",
+        "lockedBadge": "قفل‌شده",
+        "lockedHint": "فقط شما و مدیران می‌توانید این یادداشت را تغییر دهید، سنجاق کنید یا حذف کنید - از جمله تیک زدن موارد فهرست آن. بقیه همچنان می‌توانند آن را بخوانند.",
+        "errorLocked": "این یادداشت قفل است. فقط کسی که آن را ایجاد کرده و مدیران می‌توانند آن را تغییر دهند."
     },
     "markdown": {
         "bold": "توپر (Ctrl+B)",
@@ -1789,6 +1795,8 @@
         "planSavingsDeleteConfirm": "هدف پس‌انداز حذف شود؟",
         "accountsTab": "حساب‌ها",
         "netWorth": "ارزش خالص",
+        "netWorthApproxNote": "تبدیل‌شده با نرخ‌های {{date}}",
+        "netWorthPerCurrencyNote": "بدون نرخ تبدیل - جمع برای هر ارز",
         "addAccount": "افزودن حساب",
         "accountsEmptyTitle": "هنوز حسابی نیست",
         "accountsEmptyDescription": "حساب‌هایی مانند جاری یا پس‌انداز اضافه کنید تا موجودی‌ها را دنبال کنید.",
@@ -1882,6 +1890,7 @@
         "saveFailed": "ذخیره نشد. لطفاً اطلاعات را بررسی کنید.",
         "loanAlreadyPaid": "این وام پیش‌تر به‌طور کامل پرداخت شده است.",
         "loanInstallmentAlreadyPaid": "این قسط پیش‌تر پرداخت شده است.",
+        "loanPaymentRateUnavailable": "نرخ تبدیلی برای ارز این حساب شناخته نشده است. برای وام حساب دیگری انتخاب کنید یا هیچ حسابی.",
         "amountExceedsLoanRemaining": "مبلغ از باقی‌ماندهٔ وام بیشتر است",
         "responsibleNotMember": "فقط اعضای خانوار می‌توانند مسئول باشند.",
         "seriesStartTooEarly": "روز شروع نمی‌تواند در ماهی پیش از نخستین مدخل مجموعه باشد",
@@ -2446,7 +2455,10 @@
             "errorNoCalendarName": "برای تقویم جدید یک نام وارد کنید.",
             "dropzoneTitle": "یک فایل ICS را اینجا بکشید یا انتخاب کنید",
             "dropzoneTitleTouch": "برای انتخاب فایل ICS ضربه بزنید",
-            "dropzoneHint": "فقط فایل‌های .ics"
+            "dropzoneHint": "فقط فایل‌های .ics",
+            "assigneesLabel": "واگذاری به",
+            "assigneesHint": "رویدادهای تازه این افراد را می‌گیرند. رویدادی که قبلاً با همان شناسه درون‌ریزی شده آن‌ها را اضافه می‌گیرد - حتی اگر واگذاری‌اش دستی برداشته شده باشد.",
+            "successWithAssigned": "درون‌ریزی‌شده: {{imported}}، از قبل موجود: {{skipped}}، از آن‌ها اکنون واگذارشده: {{assigned}}."
         },
         "memberPhoneLabel": "شماره تلفن (اختیاری)",
         "memberEmailLabel": "ایمیل (اختیاری)",
@@ -3077,10 +3089,7 @@
         "notificationChannelDeleteConfirmDetail": "از این پس هیچ اعلانی از این کانال ارسال نمی‌شود، حتی موارد فوری. برای کانال جدید باید نشانی و اطلاعات ورود از نو وارد شوند.",
         "apiTokensMcpHint": "این توکن‌ها به عنوان توکن Bearer برای نقطه پایانی MCP در /mcp نیز کار می‌کنند (مثلاً در Claude Desktop، برای ایجاد کارها، اقلام خرید و رویدادها با هوش مصنوعی).",
         "sync": {
-            "defaultAssignee": "واگذاری پیش‌فرض",
             "defaultAssigneeNone": "هیچ‌کدام",
-            "defaultAssigneeHint": "رویدادهای تازه همگام‌سازی‌شده به‌طور خودکار به این شخص واگذار می‌شوند.",
-            "defaultAssigneeRoutingHint": "واگذاری پیش‌فرض: رویدادهای یک تقویم به فردی که آنجا انتخاب شده واگذار می‌شوند، و رویداد تازه‌ای که فقط به همان فرد واگذار شده در همان تقویم ساخته می‌شود. این برای تقویم‌های Google و CalDAV است، نه Apple یا Outlook.",
             "backfillTitle": "تکمیل واگذاری‌ها",
             "backfillDescription": "واگذاری پیش‌فرض فقط برای قرارهایی اعمال می‌شود که پس از تنظیم آن وارد شده‌اند. اینجا می‌توانید آن را یک بار روی قرارهایی که از همهٔ حساب‌ها وارد شده‌اند اعمال کنید.",
             "backfillAction": "اعمال روی قرارهای موجود",
@@ -3100,7 +3109,10 @@
             "backfillMovedNext": "نمایش بعدی",
             "backfillMovedAll": "انتخاب همه",
             "backfillMovedChange": "از {{from}} به {{to}}",
-            "backfillDescriptionMore": "قرارهای بدون واگذاری آن را مستقیم می‌گیرند. قرارهایی که هنوز واگذاری پیش‌فرض تقویم دیگری را دارند، یکی‌یکی برای انتخاب نمایش داده می‌شوند. هر واگذاری دیگری بدون تغییر می‌ماند."
+            "backfillDescriptionMore": "قرارهای بدون واگذاری آن را مستقیم می‌گیرند. قرارهایی که هنوز واگذاری پیش‌فرض تقویم دیگری را دارند، یکی‌یکی برای انتخاب نمایش داده می‌شوند. هر واگذاری دیگری بدون تغییر می‌ماند.",
+            "defaultAssignees": "واگذاری پیش‌فرض",
+            "defaultAssigneesHint": "رویدادهای تازه همگام‌شده به‌طور خودکار به این افراد واگذار می‌شوند. نفر اول رنگ را تعیین می‌کند.",
+            "defaultAssigneesRoutingHint": "واگذاری پیش‌فرض: رویدادهای یک تقویم افراد انتخاب‌شده در آن را می‌گیرند، و رویداد تازه‌ای که دقیقاً به همین افراد واگذار شده در همان تقویم ساخته می‌شود. این برای تقویم‌های Google و CalDAV است، نه Apple یا Outlook."
         },
         "calendarAssignMeLabel": "اختصاص رویدادهای جدید به من",
         "calendarDefaultRemindersLabel": "یادآوری‌های پیش‌فرض",
@@ -3319,6 +3331,8 @@
         "displayDeleteConfirm": "«{{name}}» حذف شود؟",
         "displayPairingCodeLabel": "کد جفت‌سازی",
         "displayPairingCodeHint": "۱۵ دقیقه اعتبار دارد و دقیقاً یک بار کار می‌کند. روی تبلت نشانی /pair را باز کنید و آن را همان‌جا وارد کنید. فقط همین حالا نمایش داده می‌شود.",
+        "displayPairStepCode": "اینجا یک تبلت دیواری بیفزایید و کد جفت‌سازی بسازید.",
+        "displayPairStepOpen": "روی تبلت این نشانی را باز کنید و کد را همان‌جا وارد کنید:",
         "displayDeviceUnnamed": "دستگاه بدون نام",
         "displayDeviceLastSeen": "آخرین بار دیده شده: {{when}}",
         "displayDeviceNeverSeen": "هرگز متصل نشده",
@@ -3423,7 +3437,16 @@
         "permChildRoleHint": "حساب‌های جدید کودک هنگام ساخت، دسترسی‌های آغازین خودشان را هم می‌گیرند: {{list}}. پس از آن نزد همان عضو نمایش داده می‌شوند.",
         "activeModulesHintMore": "برای پنهان کردن فقط برای خودت به ماژول‌ها ← ناوبری برو.",
         "permIntroMore": "هر عضو می‌تواند با پیش‌فرض نقش متفاوت باشد. بدون تنظیم، هر نقش دسترسی کامل دارد؛ مدیران همیشه.",
-        "preferenceSaveFailed": "تنظیم ذخیره نشد."
+        "preferenceSaveFailed": "تنظیم ذخیره نشد.",
+        "caldavCalendarReadOnly": "فقط خواندنی: نمی‌توان رویداد تازه‌ای را اینجا ذخیره کرد",
+        "caldavCalendarReadOnlyWaiting_one": "فقط خواندنی: {{count}} رویداد در انتظار بارگذاری به اینجا نمی‌رسد",
+        "caldavCalendarReadOnlyWaiting": "فقط خواندنی: {{count}} رویداد در انتظار بارگذاری به اینجا نمی‌رسند",
+        "reminderListReadOnly": "فقط خواندنی: نمی‌توان مورد تازه‌ای را اینجا ذخیره کرد",
+        "reminderListReadOnlyWaiting_one": "فقط خواندنی: {{count}} مورد در انتظار بارگذاری به اینجا نمی‌رسد",
+        "reminderListReadOnlyWaiting": "فقط خواندنی: {{count}} مورد در انتظار بارگذاری به اینجا نمی‌رسند",
+        "reminderListAssigneesTasksOnly": "افراد را فقط برای فهرست‌هایی می‌توان تعیین کرد که به کارها می‌روند.",
+        "syncAssigneeNotMember": "اینجا فقط اعضای خانوار را می‌توان انتخاب کرد.",
+        "syncAssigneeUnknown": "این فرد دیگر وجود ندارد. صفحه را دوباره بارگیری کنید."
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",
@@ -3738,7 +3761,8 @@
         "banner": "آفلاین - در حال بازیابی اتصال…",
         "staleData": "آفلاین - وضعیت: {{time}}",
         "pageTitle": "آفلاین هستید",
-        "pageDescription": "این صفحه به اتصال نیاز دارد. به‌محض آنلاین شدن دوباره دستگاه، خودش بارگیری می‌شود."
+        "pageDescription": "این صفحه به اتصال نیاز دارد. به‌محض آنلاین شدن دوباره دستگاه، خودش بارگیری می‌شود.",
+        "snapshot": "اتصال به سرور برقرار نیست - داده‌های ذخیره‌شده، فقط خواندنی"
     },
     "emptyHint": {
         "tasks": "برای ساخت اولین کار خود روی + بزنید. یک کارت را برای انجام‌شدن به چپ و برای مشاهده به راست بکشید.",
@@ -4366,6 +4390,11 @@
             "missedBook": "ثبت موعدهای گذشته از {{date}}",
             "missedDetail": "از {{date}} تاکنون {{count}} موعد از دست رفته است.",
             "missedDetail_one": "از {{date}} تاکنون {{count}} موعد از دست رفته است.",
+            "failing": "ثبت ناموفق بود - هر ساعت دوباره تلاش می‌شود",
+            "pastQuestion": "تاریخ در گذشته است",
+            "pastSkip": "شروع از {{date}}",
+            "pastDetail": "از {{date}} تاکنون {{count}} موعد سررسید می‌شد.",
+            "pastDetail_one": "از {{date}} تاکنون {{count}} موعد سررسید می‌شد.",
             "deleteConfirm": "این هزینه تکرارشونده حذف شود؟",
             "deleteConfirmDetail": "هزینه جدیدی ایجاد نمی‌شود. هزینه‌های ثبت‌شده باقی می‌مانند.",
             "show": "نمایش",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}} به شما بدهکار است",
         "debtOwes": "{{from}} به {{to}} بدهکار است",
         "balanced": "تسویه‌شده",
-        "balancedInGroup": "{{group}}: تسویه‌شده"
+        "balancedInGroup": "{{group}}: تسویه‌شده",
+        "totalsByMember": "پرداختی هر نفر",
+        "totalsByMemberHint": "مبلغ پرداخت‌شده، و زیر آن سهم خود فرد",
+        "ownShare": "سهم خود: {{amount}}",
+        "paidLabel": "پرداخت‌شده",
+        "totalsByCategory": "بر اساس دسته",
+        "categoryFilter": "فیلتر هزینه‌ها بر اساس دسته",
+        "noExpensesInCategory": "هیچ هزینه‌ای در این دسته نیست."
     },
     "wmo": {
         "0": "آسمان صاف",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "مبلغ",
         "detailNextPaymentLabel": "پرداخت بعدی",
         "renewedNamed": "«{{name}}» پرداخت شد - پرداخت بعدی در {{date}}.",
-        "completedNamed": "«{{name}}» پرداخت و پایان یافت."
+        "completedNamed": "«{{name}}» پرداخت و پایان یافت.",
+        "accountHint": "هر پرداخت این اشتراک در این حساب ثبت می‌شود. یک پرداخت تکی را در بودجه تغییر دهید.",
+        "accountArchivedHint": "این حساب بایگانی شده است. اشتراک تا زمانی که حساب دیگری انتخاب کنید بدون حساب ثبت می‌شود.",
+        "accountArchivedOption": "{{name}} (بایگانی‌شده)",
+        "accountArchivedMeta": "{{name}} بایگانی‌شده - بدون حساب ثبت می‌شود",
+        "visibilityHint_private": "فقط شما این اشتراک و پرداخت‌های آن را می‌بینید.",
+        "visibilityHint_shared": "همه اعضای خانوار این اشتراک و پرداخت‌های آن را می‌بینند.",
+        "errorAccountGone": "حساب انتخاب‌شده دیگر وجود ندارد."
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "اندازه‌گیری ذخیره نشد.",
             "invalidValue": "لطفاً مقادیر معتبری وارد کنید.",
             "range": {
+                "day": "روز",
                 "week": "هفته",
                 "month": "ماه",
                 "year": "سال"
@@ -5003,6 +5047,7 @@
                 "family": "خانواده"
             },
             "sparse": "اندازه‌گیری‌ها برای نمایش روند بسیار کم است.",
+            "bandValue": "{{mean}}، از {{low}} تا {{high}}",
             "recentMeasurements": "آخرین اندازه‌گیری‌ها",
             "deleteMeasurement": "حذف اندازه‌گیری {{value}} ({{date}})",
             "measurementDeleted": "اندازه‌گیری حذف شد",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "{{count}} مورد تکراری از زمان‌های جمع‌آوری (با شناسه یکسان) در یک مورد ادغام شد.",
         "importDiagnosticOther": "یکی از رویدادهای تقویم با قالب مورد انتظار مطابقت ندارد.",
         "importUnresolvedBlockingError": "ابتدا همه هشدارهای مسدودکننده را برطرف کنید، یا رویدادهای مربوطه را به‌صراحت رد کنید.",
-        "importIgnoreLabel": "نادیده گرفتن",
         "importCreateNewType": "ایجاد نوع جدید زباله",
+        "importLabelsHint": "اگر یک مورد چند سطل را نام می‌برد، همه را انتخاب کنید - هر کدام زمان جمع‌آوری خود را می‌گیرد.",
+        "importLabelIgnoredHint": "هیچ نوع زباله‌ای انتخاب نشده - وارد نمی‌شود.",
         "importNewTypeNameRequiredError": "لطفاً نامی برای نوع جدید زباله وارد کنید.",
         "importDefaultSourceName": "فایل واردشده",
         "importCommittedToast": "درون‌ریزی اعمال شد: {{added}} افزوده، {{changed}} تغییر یافته، {{removed}} حذف‌شده.",
@@ -6198,6 +6244,13 @@
         "badgeLow": "تقریباً تمام",
         "badgeOut": "تمام شده",
         "bestBefore": "انقضا {{date}}",
+        "noBestBefore": "بدون تاریخ انقضا",
+        "errorProductHasStock": "این محصول دوباره موجود است و حذف نشد.",
+        "productTotal": "در مجموع {{quantity}}",
+        "productPlaces": "{{count}} مکان",
+        "productPlaces_one": "{{count}} مکان",
+        "productBatches": "{{count}} دسته",
+        "productBatches_one": "{{count}} دسته",
         "increase": "افزایش مقدار",
         "decrease": "کاهش مقدار",
         "toShoppingAll": "همه به فهرست خرید",

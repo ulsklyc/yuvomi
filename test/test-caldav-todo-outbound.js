@@ -477,7 +477,7 @@ test('Eine lokale Aufgabe hinterlässt keinen Tombstone', () => {
 // mehr löschen - der Tombstone scheiterte, das lokale DELETE kam nie dazu, und
 // die entfernte Kopie blieb ohnehin unerreichbar stehen.
 
-test('Das Löschen eines Kontos entkoppelt seine gespiegelten Zeilen', () => {
+test('Das Löschen eines Kontos gibt seine gespiegelten Zeilen frei (#1885, #1906)', () => {
   const accountId = reset();
   const task = insertTask({ accountId });
   const item = insertShoppingItem({ accountId, uid: 'todo-2@test' });
@@ -490,10 +490,11 @@ test('Das Löschen eines Kontos entkoppelt seine gespiegelten Zeilen', () => {
     ['Einkaufsposten', db.prepare('SELECT * FROM shopping_items WHERE id = ?').get(item.id)],
   ]) {
     assert.ok(row, `${label}: Nutzerdaten bleiben, nur die Verbindung geht`);
-    assert.strictEqual(row.external_source, 'local', `${label}: gehört ab jetzt Yuvomi allein`);
+    // Wie bei Terminen: die Zeile bleibt Spiegel ihrer UID, und das nächste
+    // Konto, das die UID liefert, übernimmt sie statt einer zweiten Zeile.
+    assert.strictEqual(row.external_source, 'caldav', `${label}: bleibt Spiegel ihrer UID`);
     assert.strictEqual(row.external_account_id, null, `${label}: keine tote Kontokennung`);
-    assert.strictEqual(row.external_uid, null, `${label}: die UID bedeutet nichts mehr`);
-    assert.strictEqual(row.external_object_url, null);
+    assert.ok(row.external_uid, `${label}: die UID bleibt, damit ein anderes Konto sie übernimmt`);
     assert.strictEqual(row.outbound_dirty, 0, `${label}: es gibt niemanden mehr, der das empfinge`);
     assert.strictEqual(row.outbound_attempts, 0);
   }

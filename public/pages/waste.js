@@ -1631,12 +1631,18 @@ function openPickupModal(pickup = null) {
 // ICS import wizard and source management (#1063 Phase 3)
 // -------------------------------------------------------------------------
 
-/** Pure: a sensible starting decision for a label - remembered beats suggested beats "create a new type". */
-function defaultLabelDecision(label) {
-  if (label.remembered_ignored) return '';
-  if (label.remembered_type_id) return String(label.remembered_type_id);
-  if (label.suggested_type_id) return String(label.suggested_type_id);
-  return '__new__';
+/**
+ * Pure: a sensible starting selection for a label - remembered beats suggested
+ * beats "create a new type". A label can name several bins (#2273), so the
+ * selection is a set of types plus, at most, one new type; nothing selected
+ * means the label is ignored.
+ * @returns {{ typeIds: number[], createNew: boolean }}
+ */
+function defaultLabelSelection(label) {
+  if (label.remembered_ignored) return { typeIds: [], createNew: false };
+  if (label.remembered_type_ids?.length) return { typeIds: [...label.remembered_type_ids], createNew: false };
+  if (label.suggested_type_id) return { typeIds: [label.suggested_type_id], createNew: false };
+  return { typeIds: [], createNew: true };
 }
 
 /** Pure: blocking diagnostics not yet covered by an explicit skip. */
@@ -1646,22 +1652,28 @@ function unresolvedBlockingDiagnostics(diagnostics, skippedEventKeys) {
 }
 
 /**
- * Pure: builds the commit body's `mappings` array from each label row's chosen
- * decision (`'' | '__new__' | '<type id>'`). Returns `{ error, label }` instead
- * of throwing, so the DOM-facing caller can show a field-level message.
+ * Pure: builds the commit body's `mappings` array from each label row's
+ * selection (`{ typeIds, createNew, newTypeName }`). No type and no new type
+ * is "ignored"; otherwise every chosen type and the new one together (#2273).
+ * Returns `{ error, label }` instead of throwing, so the DOM-facing caller can
+ * show a field-level message.
  */
 function buildMappingDecisions(rows) {
   const mappings = [];
   for (const row of rows) {
-    if (row.decision === '__new__') {
+    const typeIds = [...new Set(row.typeIds ?? [])];
+    if (!typeIds.length && !row.createNew) {
+      mappings.push({ normalized_label: row.normalized_label, ignored: true });
+      continue;
+    }
+    const decision = { normalized_label: row.normalized_label };
+    if (typeIds.length) decision.type_ids = typeIds;
+    if (row.createNew) {
       const name = (row.newTypeName || '').trim();
       if (!name) return { error: 'missing_new_type_name', label: row.normalized_label };
-      mappings.push({ normalized_label: row.normalized_label, new_type: { name } });
-    } else if (row.decision === '') {
-      mappings.push({ normalized_label: row.normalized_label, ignored: true });
-    } else {
-      mappings.push({ normalized_label: row.normalized_label, type_id: Number(row.decision) });
+      decision.new_type = { name };
     }
+    mappings.push(decision);
   }
   return { mappings };
 }
@@ -1699,28 +1711,90 @@ function importDiagnosticRowHtml(diag) {
   return `<p class="waste-import-diagnostic waste-import-diagnostic--info">${esc(importDiagnosticText(diag))}</p>`;
 }
 
-/** The options of one label's decision: ignore, every type, create a new one. `decision` is `'' | '__new__' | '<type id>'`. */
-function importDecisionOptionsHtml(decision) {
-  const typeOptions = state.types.filter((t2) => !t2.archived || decision === String(t2.id))
-    .map((t2) => `<option value="${t2.id}"${decision === String(t2.id) ? ' selected' : ''}>${esc(t2.name)}</option>`).join('');
-  return `<option value=""${decision === '' ? ' selected' : ''}>${esc(t('waste.importIgnoreLabel'))}</option>
-        ${typeOptions}
-        <option value="__new__"${decision === '__new__' ? ' selected' : ''}>${esc(t('waste.importCreateNewType'))}</option>`;
+/**
+ * EIN EINTRAG, MEHRERE TONNEN (#2273): die Abfallarten eines Labels als Chips
+ * des Kanons (`.filter-chip`, `aria-pressed`) in einer benannten Gruppe, wie
+ * die Wochentage im Termin-Dialog. Dresden nennt Bio- und Blaue Tonne in einem
+ * Eintrag; beide Chips an heisst ein Termin je Art. Kein Chip an heisst: das
+ * Label wird nicht uebernommen - das sagt die Zeile darunter, statt dass
+ * "Ignorieren" wie eine weitere Abfallart zwischen den Arten steht.
+ *
+ * Eine archivierte Art steht nur da, wenn sie schon gewaehlt ist, damit eine
+ * inzwischen archivierte Zuordnung als gewaehlt erscheint, statt still
+ * wegzufallen. `createNew` ist `null`, wo es keinen "Neue Abfallart"-Chip gibt
+ * (die Zuordnungen einer Quelle legen keine Art an).
+ */
+function labelTypeChipsHtml({ labelId, typeIds, createNew = null }) {
+  const chosen = new Set(typeIds);
+  const types = state.types.filter((t2) => !t2.archived || chosen.has(t2.id));
+  const chip = (attrs, on, icon, color, text) => `
+        <button type="button" class="filter-chip${on ? ' filter-chip--active' : ''}" ${attrs} aria-pressed="${on ? 'true' : 'false'}">`
+    + `<i data-lucide="${esc(icon)}"${color ? ` style="color:${esc(color)}"` : ''} aria-hidden="true"></i><span>${esc(text)}</span></button>`;
+  const none = !chosen.size && !createNew;
+  // Die Wahl steht zusaetzlich in einem versteckten Feld (wie bei den
+  // Wochentagen): nur Felder sieht der Verwerfen-Schutz des Dialogs, und ohne
+  // es ginge eine Aenderung nur an den Chips beim Schliessen still verloren.
+  return `
+      <div class="waste-label-types" role="group" aria-labelledby="${esc(labelId)}" data-role="label-types">
+        ${types.map((t2) => chip(`data-type-chip="${t2.id}"`, chosen.has(t2.id), t2.icon || 'trash-2', t2.color, t2.name)).join('')}
+        ${createNew === null ? '' : chip('data-new-type-chip', !!createNew, 'plus', null, t('waste.importCreateNewType'))}
+        <input type="hidden" name="${esc(labelId)}-types" data-role="label-types-value" value="${esc(labelTypesValue([...chosen], createNew))}">
+      </div>
+      <p class="waste-label-types__ignored" data-role="label-ignored"${none ? '' : ' hidden'}>${esc(t('waste.importLabelIgnoredHint'))}</p>`;
 }
 
-function importLabelRowHtml(label) {
-  const decision = defaultLabelDecision(label);
-  // Include an archived type only when it's the remembered/suggested decision
-  // itself, so a since-archived mapping still renders as a real selected
-  // option instead of silently falling back to "ignore" in the live DOM.
+/** Pure: the hidden field's value for one row's choice - what the dialog's discard guard compares. */
+function labelTypesValue(typeIds, createNew) {
+  return [...[...typeIds].sort((a, b) => a - b), ...(createNew ? ['new'] : [])].join(',');
+}
+
+/** Reads one row's chips back: the pressed types and whether "new type" is on. */
+function labelTypeSelection(row) {
+  return {
+    typeIds: [...row.querySelectorAll('[data-type-chip][aria-pressed="true"]')].map((el) => Number(el.dataset.typeChip)),
+    createNew: row.querySelector('[data-new-type-chip]')?.getAttribute('aria-pressed') === 'true',
+  };
+}
+
+/**
+ * Schaltet einen Chip und haelt die Zeile nach: der Satz "wird nicht
+ * uebernommen", sobald nichts mehr gewaehlt ist, und das Namensfeld der neuen
+ * Art, solange ihr Chip an ist. Gibt die Zeile zurueck, oder null, wenn der
+ * Klick keinen Chip traf.
+ */
+function toggleLabelTypeChip(event, rowSelector) {
+  const chip = event.target.closest('[data-type-chip], [data-new-type-chip]');
+  const row = chip?.closest(rowSelector);
+  if (!row) return null;
+  const on = chip.getAttribute('aria-pressed') !== 'true';
+  chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+  chip.classList.toggle('filter-chip--active', on);
+  syncLabelRow(row);
+  row.querySelector('[data-role="label-types-value"]')?.dispatchEvent(new Event('input', { bubbles: true }));
+  if (on && chip.hasAttribute('data-new-type-chip')) row.querySelector('[data-role="label-new-type-name"]')?.focus();
+  return row;
+}
+
+function syncLabelRow(row) {
+  const { typeIds, createNew } = labelTypeSelection(row);
+  const ignored = row.querySelector('[data-role="label-ignored"]');
+  if (ignored) ignored.hidden = typeIds.length > 0 || createNew;
+  const name = row.querySelector('[data-role="label-new-type-name"]');
+  if (name) name.hidden = !createNew;
+  const value = row.querySelector('[data-role="label-types-value"]');
+  if (value) value.value = labelTypesValue(typeIds, createNew);
+}
+
+function importLabelRowHtml(label, index) {
+  const { typeIds, createNew } = defaultLabelSelection(label);
+  const labelId = `wiz-label-${index}`;
   return `
     <div class="waste-import-label-row" data-label="${esc(label.normalized_label)}">
-      <span class="waste-import-label-row__name">${esc(label.original_label)} <span class="waste-import-label-row__count">(${label.count})</span></span>
-      <select class="form-input" data-role="label-decision-type">
-        ${importDecisionOptionsHtml(decision)}
-      </select>
+      <span class="waste-import-label-row__name" id="${labelId}">${esc(label.original_label)} <span class="waste-import-label-row__count">(${label.count})</span></span>
+      ${labelTypeChipsHtml({ labelId, typeIds, createNew })}
       <input type="text" class="form-input waste-import-new-type-name" data-role="label-new-type-name"
-        placeholder="${esc(t('waste.typeNameLabel'))}" value="${esc(label.original_label)}"${decision === '__new__' ? '' : ' hidden'}>
+        aria-label="${esc(t('waste.typeNameLabel'))}"
+        placeholder="${esc(t('waste.typeNameLabel'))}" value="${esc(label.original_label)}"${createNew ? '' : ' hidden'}>
     </div>`;
 }
 
@@ -1729,7 +1803,8 @@ function importPreviewStepHtml(preview) {
     <p class="waste-import-summary">${esc(t('waste.importSummary', { events: preview.counts.events, candidates: preview.counts.candidates }))}</p>
     ${preview.diagnostics.length ? `<div class="waste-import-diagnostics">${preview.diagnostics.map(importDiagnosticRowHtml).join('')}</div>` : ''}
     ${preview.labels.length
-    ? `<div class="waste-import-labels">${preview.labels.map(importLabelRowHtml).join('')}</div>`
+    ? `<p class="waste-import-labels-hint">${esc(t('waste.importLabelsHint'))}</p>
+      <div class="waste-import-labels">${preview.labels.map(importLabelRowHtml).join('')}</div>`
     : `<p>${esc(t('waste.importNoLabels'))}</p>`}`;
 }
 
@@ -1746,24 +1821,27 @@ function importErrorText(err) {
 /**
  * The import commit failed only because a label was mapped to a type somebody
  * deleted in the meantime: the assistant stays, every decision stays, and the
- * selects are rebuilt from the fresh types. A row whose type is gone falls
- * back to "create a new type" - the same default the assistant gives a label
- * it knows no type for - and gets the focus.
+ * chips are rebuilt from the fresh types. A row that loses its last type to
+ * the deletion falls back to "create a new type" - the same default the
+ * assistant gives a label it knows no type for - and its first chip gets the
+ * focus.
  */
 async function refreshImportTypeChoices(panel) {
   await reloadAndRender();
   let first = null;
   for (const row of panel.querySelectorAll('.waste-import-label-row')) {
-    const select = row.querySelector('[data-role="label-decision-type"]');
-    const chosen = select.value;
-    const isType = chosen !== '' && chosen !== '__new__';
-    const stillThere = isType && state.types.some((t2) => String(t2.id) === chosen);
-    const decision = isType && !stillThere ? '__new__' : chosen;
-    select.replaceChildren();
-    select.insertAdjacentHTML('beforeend', importDecisionOptionsHtml(decision));
-    row.querySelector('[data-role="label-new-type-name"]').hidden = decision !== '__new__';
-    if (isType && !stillThere && !first) first = select;
+    const { typeIds, createNew } = labelTypeSelection(row);
+    const kept = typeIds.filter((id) => state.types.some((t2) => t2.id === id));
+    const lostAll = typeIds.length > 0 && kept.length === 0;
+    const group = row.querySelector('[data-role="label-types"]');
+    const labelId = group.getAttribute('aria-labelledby');
+    group.nextElementSibling?.remove();
+    group.insertAdjacentHTML('afterend', labelTypeChipsHtml({ labelId, typeIds: kept, createNew: createNew || lostAll }));
+    group.remove();
+    syncLabelRow(row);
+    if (kept.length < typeIds.length && !first) first = row.querySelector('[data-role="label-types"] .filter-chip');
   }
+  if (window.lucide) window.lucide.createIcons({ el: panel });
   first?.focus();
 }
 
@@ -1809,12 +1887,7 @@ function openImportWizard(source = null) {
 
       panel.querySelector('#wiz-cancel').addEventListener('click', () => closeModal());
 
-      panel.addEventListener('change', (e) => {
-        const select = e.target.closest('[data-role="label-decision-type"]');
-        if (!select) return;
-        const row = select.closest('.waste-import-label-row');
-        row.querySelector('[data-role="label-new-type-name"]').hidden = select.value !== '__new__';
-      });
+      panel.addEventListener('click', (e) => { toggleLabelTypeChip(e, '.waste-import-label-row'); });
 
       panel.querySelector('#wiz-preview').addEventListener('click', async () => {
         errorEl.hidden = true;
@@ -1864,7 +1937,7 @@ function openImportWizard(source = null) {
 
         const rows = [...panel.querySelectorAll('.waste-import-label-row')].map((row) => ({
           normalized_label: row.dataset.label,
-          decision: row.querySelector('[data-role="label-decision-type"]').value,
+          ...labelTypeSelection(row),
           newTypeName: row.querySelector('[data-role="label-new-type-name"]').value,
         }));
         const built = buildMappingDecisions(rows);
@@ -1902,16 +1975,19 @@ function openImportWizard(source = null) {
 }
 
 function sourceMappingRowHtml(mapping) {
-  const typeOptions = state.types.filter((t2) => !t2.archived || t2.id === mapping.type_id)
-    .map((t2) => `<option value="${t2.id}"${t2.id === mapping.type_id ? ' selected' : ''}>${esc(t2.name)}</option>`).join('');
+  const labelId = `wsrc-mapping-${mapping.id}`;
   return `
     <div class="waste-source-mapping-row" data-mapping-id="${mapping.id}">
-      <span class="waste-source-mapping-row__label">${esc(mapping.original_label)}</span>
-      <select class="form-input" data-role="mapping-type">
-        <option value=""${mapping.ignored ? ' selected' : ''}>${esc(t('waste.importIgnoreLabel'))}</option>
-        ${typeOptions}
-      </select>
+      <span class="waste-source-mapping-row__label" id="${labelId}">${esc(mapping.original_label)}</span>
+      ${labelTypeChipsHtml({ labelId, typeIds: mapping.type_ids ?? [] })}
     </div>`;
+}
+
+/** Pure: whether a row's chosen types differ from the mapping as the server has it. */
+function mappingTypesChanged(mapping, typeIds) {
+  const before = [...(mapping.type_ids ?? [])].sort((a, b) => a - b);
+  const after = [...typeIds].sort((a, b) => a - b);
+  return before.length !== after.length || before.some((id, i) => id !== after[i]);
 }
 
 // -------------------------------------------------------------------------
@@ -2071,6 +2147,7 @@ function openSourceModal(source) {
     size: 'md',
     onSave(panel) {
       panel.querySelector('#wsrc-cancel').addEventListener('click', () => closeModal());
+      panel.addEventListener('click', (e) => { toggleLabelTypeChip(e, '.waste-source-mapping-row'); });
 
       panel.querySelector('#wsrc-mapping-profile-export').addEventListener('click', () => exportMappingProfileFile(source));
       panel.querySelector('#wsrc-mapping-profile-import').addEventListener('click', () => openMappingProfileImportModal(source));
@@ -2106,11 +2183,9 @@ function openSourceModal(source) {
             const mappingId = Number(row.dataset.mappingId);
             failedMappingId = mappingId;
             const mapping = source.mappings.find((m) => m.id === mappingId);
-            const value = row.querySelector('[data-role="mapping-type"]').value;
-            const ignored = value === '';
-            const typeId = ignored ? null : Number(value);
-            if (!!mapping.ignored === ignored && mapping.type_id === typeId) continue;
-            await api.put(`/waste/sources/${source.id}/mappings/${mappingId}`, { type_id: typeId, ignored });
+            const { typeIds } = labelTypeSelection(row);
+            if (!mappingTypesChanged(mapping, typeIds)) continue;
+            await api.put(`/waste/sources/${source.id}/mappings/${mappingId}`, typeIds.length ? { type_ids: typeIds } : { ignored: true });
           }
           closeModal({ force: true, context: modalContext });
           await reloadAfterSave(() => reloadAndRender());
@@ -2131,7 +2206,8 @@ function openSourceModal(source) {
  * der Name im Feld bleibt. Die Zeilen werden aus der frisch gelesenen Quelle neu
  * gebaut - was vor der gescheiterten Zeile schon gespeichert wurde, steht damit
  * als gespeichert da, und die gescheiterte zeigt wieder ihren Stand am Server
- * statt still auf "Ignorieren" zu fallen. Der Fokus steht auf ihrer Auswahl.
+ * statt still auf "nicht uebernommen" zu fallen. Die Gruppe ihrer Abfallarten
+ * ist als ungueltig markiert, der Fokus steht auf ihrem ersten Chip.
  *
  * @returns {Promise<boolean>} true: behandelt
  */
@@ -2153,9 +2229,9 @@ async function keepSourceDialogForMissingType(err, panel, source, mappingId) {
   const host = panel.querySelector('#wsrc-mappings');
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', fresh.mappings.map(sourceMappingRowHtml).join(''));
-  const select = host.querySelector(`[data-mapping-id="${mappingId}"] [data-role="mapping-type"]`);
-  select?.setAttribute('aria-invalid', 'true');
-  select?.focus();
+  if (window.lucide) window.lucide.createIcons({ el: host });
+  host.querySelector(`[data-mapping-id="${mappingId}"] [data-role="label-types"]`)?.setAttribute('aria-invalid', 'true');
+  host.querySelector(`[data-mapping-id="${mappingId}"] [data-role="label-types"] .filter-chip`)?.focus();
   return true;
 }
 
@@ -2816,7 +2892,9 @@ export const __test = {
   // R17/E6: die Wochentage des Termin-Dialogs als Chips.
   weekdayPickerHtml, weekdayPickerValue, intervalStepperHtml, wireIntervalStepper,
   findScheduleOrigin, parseDeepLinkParams, deepLinkSelectors, recurrenceSummary, originBadges,
-  defaultLabelDecision, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
+  defaultLabelSelection, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
+  // #2273: die Abfallarten eines Labels als Chips.
+  labelTypeChipsHtml, labelTypesValue, mappingTypesChanged, importLabelRowHtml, sourceMappingRowHtml,
   splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,
   // Die drei Zeilenbauer und die Palette: seit der Vereinheitlichung der
   // Zeilengrammatik (Audit UX 2026-09-12) tragen sie Bedingungen, die man

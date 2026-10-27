@@ -1206,7 +1206,6 @@
         "pickOne": "Pilih acara",
         "pickOneHint": "Waktu, tempat, dan pengingat muncul di sini.",
         "syncTargetAssigneeAmbiguous": "Beberapa kalender memiliki orang ini sebagai penugasan default. Pilih sendiri tujuannya.",
-        "syncTargetSeveralAssignees": "Beberapa orang ditugaskan, jadi penugasan tidak memilih kalender. Yang digunakan sebagai gantinya: {{target}}.",
         "filtersSources": "Kalender",
         "filterUnassigned": "Belum ditugaskan",
         "dateSpanSpoken": "{{from}} sampai {{to}}",
@@ -1245,7 +1244,10 @@
         "errorDeleteFeedAdminOnly": "Kalender ini sedang diekspor. Hanya admin yang dapat menghapusnya.",
         "errorEventGone": "Acara ini sudah tidak ada.",
         "errorSelectedCalendarGone": "Kalender yang dipilih sudah tidak ada.",
-        "errorSeriesNoOccurrence": "Dengan pengulangan ini tidak akan ada satu acara pun sejak tanggal mulai."
+        "errorSeriesNoOccurrence": "Dengan pengulangan ini tidak akan ada satu acara pun sejak tanggal mulai.",
+        "localCalendarUploadsHint": "Acara di kalender ini diunggah ke iCloud melalui Apple Calendar.",
+        "overlapOpenSchedule": "Buka jadwal shift",
+        "syncTargetNoCalendarForPeople": "Tidak ada kalender yang penerima tugas default-nya tepat orang-orang ini, jadi penugasan tidak memilih kalender. Yang dipakai: {{target}}."
     },
     "noteCategories": {
         "categories": "Kategori",
@@ -1316,7 +1318,11 @@
         "checklistDone": "Selesai",
         "checklistOpen": "Terbuka",
         "errorNoteGone": "Catatan ini sudah tidak ada.",
-        "errorSelectedCategoryGone": "Salah satu kategori yang dipilih sudah tidak ada."
+        "errorSelectedCategoryGone": "Salah satu kategori yang dipilih sudah tidak ada.",
+        "lockedToggle": "Kunci penyuntingan",
+        "lockedBadge": "Terkunci",
+        "lockedHint": "Hanya kamu dan administrator yang dapat mengubah, menyematkan, atau menghapus catatan ini - termasuk mencentang item daftarnya. Yang lain tetap dapat membacanya.",
+        "errorLocked": "Catatan ini terkunci. Hanya orang yang membuatnya dan administrator yang dapat mengubahnya."
     },
     "markdown": {
         "bold": "Tebal (Ctrl+B)",
@@ -1789,6 +1795,8 @@
         "planSavingsDeleteConfirm": "Hapus target tabungan?",
         "accountsTab": "Akun",
         "netWorth": "Kekayaan bersih",
+        "netWorthApproxNote": "Dikonversi dengan kurs per {{date}}",
+        "netWorthPerCurrencyNote": "Tanpa kurs - total per mata uang",
         "addAccount": "Tambah akun",
         "accountsEmptyTitle": "Belum ada akun",
         "accountsEmptyDescription": "Tambahkan akun seperti giro atau tabungan untuk melacak saldo Anda.",
@@ -1882,6 +1890,7 @@
         "saveFailed": "Tidak dapat disimpan. Periksa kembali data yang diisi.",
         "loanAlreadyPaid": "Pinjaman ini sudah lunas.",
         "loanInstallmentAlreadyPaid": "Cicilan ini sudah dibayar.",
+        "loanPaymentRateUnavailable": "Kurs untuk mata uang akun ini tidak diketahui. Pilih akun lain pada pinjaman, atau tanpa akun.",
         "amountExceedsLoanRemaining": "Jumlahnya lebih besar daripada sisa pinjaman",
         "responsibleNotMember": "Hanya anggota rumah tangga yang dapat menjadi penanggung jawab.",
         "seriesStartTooEarly": "Hari mulai tidak boleh berada di bulan sebelum entri pertama seri",
@@ -2446,7 +2455,10 @@
             "errorNoCalendarName": "Masukkan nama untuk kalender baru.",
             "dropzoneTitle": "Seret berkas ICS ke sini atau pilih satu",
             "dropzoneTitleTouch": "Ketuk untuk memilih file ICS",
-            "dropzoneHint": "Hanya berkas .ics"
+            "dropzoneHint": "Hanya berkas .ics",
+            "assigneesLabel": "Tugaskan ke",
+            "assigneesHint": "Acara baru mendapat orang-orang ini. Acara yang sudah diimpor dengan ID yang sama mendapat tambahan mereka - meski penugasannya dihapus manual.",
+            "successWithAssigned": "Diimpor: {{imported}}, sudah ada: {{skipped}}, di antaranya kini ditugaskan: {{assigned}}."
         },
         "memberPhoneLabel": "Nomor telepon (opsional)",
         "memberEmailLabel": "Email (opsional)",
@@ -3077,10 +3089,7 @@
         "notificationChannelDeleteConfirmDetail": "Lewat saluran ini tidak ada notifikasi yang keluar lagi, termasuk yang mendesak. Alamat dan kredensial harus dimasukkan ulang sepenuhnya untuk saluran baru.",
         "apiTokensMcpHint": "Token ini juga berfungsi sebagai token Bearer untuk endpoint MCP di /mcp (mis. di Claude Desktop, untuk membuat tugas, item belanja, dan acara dengan AI).",
         "sync": {
-            "defaultAssignee": "Penerima tugas default",
             "defaultAssigneeNone": "Tidak ada",
-            "defaultAssigneeHint": "Acara yang baru disinkronkan otomatis ditugaskan ke orang ini.",
-            "defaultAssigneeRoutingHint": "Penerima tugas default: acara dari sebuah kalender mendapat orang yang dipilih di sana, dan acara baru yang hanya ditugaskan ke orang itu dibuat di kalender tersebut. Berlaku untuk kalender Google dan CalDAV, bukan Apple atau Outlook.",
             "backfillTitle": "Lengkapi penugasan",
             "backfillDescription": "Penerima tugas default hanya berlaku untuk janji temu yang diimpor setelah diatur. Di sini Anda dapat menerapkannya sekali ke janji temu yang sudah diimpor dari semua akun.",
             "backfillAction": "Terapkan ke janji temu yang ada",
@@ -3100,7 +3109,10 @@
             "backfillMovedNext": "Tampilkan berikutnya",
             "backfillMovedAll": "Pilih semua",
             "backfillMovedChange": "Dari {{from}} ke {{to}}",
-            "backfillDescriptionMore": "Janji temu tanpa penerima tugas langsung mendapatkannya. Janji temu yang masih membawa penerima tugas default kalender lain ditampilkan satu per satu untuk Anda pilih. Penugasan lain tidak berubah."
+            "backfillDescriptionMore": "Janji temu tanpa penerima tugas langsung mendapatkannya. Janji temu yang masih membawa penerima tugas default kalender lain ditampilkan satu per satu untuk Anda pilih. Penugasan lain tidak berubah.",
+            "defaultAssignees": "Penerima tugas default",
+            "defaultAssigneesHint": "Acara yang baru disinkronkan otomatis ditugaskan ke orang-orang ini. Orang pertama menentukan warnanya.",
+            "defaultAssigneesRoutingHint": "Penerima tugas default: acara dari sebuah kalender mendapat orang yang dipilih di sana, dan acara baru yang ditugaskan tepat ke orang-orang ini dibuat di kalender itu. Ini berlaku untuk kalender Google dan CalDAV, bukan Apple atau Outlook."
         },
         "calendarAssignMeLabel": "Tugaskan acara baru ke saya",
         "calendarDefaultRemindersLabel": "Pengingat bawaan",
@@ -3319,6 +3331,8 @@
         "displayDeleteConfirm": "Hapus “{{name}}”?",
         "displayPairingCodeLabel": "Kode pemasangan",
         "displayPairingCodeHint": "Berlaku 15 menit dan hanya sekali pakai. Buka /pair di tablet lalu ketikkan di sana. Kode ini hanya ditampilkan sekarang.",
+        "displayPairStepCode": "Tambahkan tablet dinding di sini dan buat kode pemasangan.",
+        "displayPairStepOpen": "Di tablet, buka alamat ini lalu ketikkan kodenya di sana:",
         "displayDeviceUnnamed": "Perangkat tanpa nama",
         "displayDeviceLastSeen": "Terakhir terlihat: {{when}}",
         "displayDeviceNeverSeen": "Belum pernah terhubung",
@@ -3423,7 +3437,16 @@
         "permChildRoleHint": "Akun anak baru juga mendapat izin awal sendiri saat dibuat: {{list}}. Setelah itu, izin tersebut tercantum pada anggota itu.",
         "activeModulesHintMore": "Untuk menyembunyikan hanya bagi dirimu, buka Modul → Navigasi.",
         "permIntroMore": "Anggota individu dapat berbeda dari default peran. Tanpa pengaturan, setiap peran memiliki akses penuh; administrator selalu.",
-        "preferenceSaveFailed": "Pengaturan tidak dapat disimpan."
+        "preferenceSaveFailed": "Pengaturan tidak dapat disimpan.",
+        "caldavCalendarReadOnly": "Hanya baca: acara baru tidak dapat disimpan di sini",
+        "caldavCalendarReadOnlyWaiting_one": "Hanya baca: {{count}} acara yang menunggu diunggah ke sini tidak akan sampai",
+        "caldavCalendarReadOnlyWaiting": "Hanya baca: {{count}} acara yang menunggu diunggah ke sini tidak akan sampai",
+        "reminderListReadOnly": "Hanya baca: entri baru tidak dapat disimpan di sini",
+        "reminderListReadOnlyWaiting_one": "Hanya baca: {{count}} entri yang menunggu diunggah ke sini tidak akan sampai",
+        "reminderListReadOnlyWaiting": "Hanya baca: {{count}} entri yang menunggu diunggah ke sini tidak akan sampai",
+        "reminderListAssigneesTasksOnly": "Orang hanya bisa diatur untuk daftar yang masuk ke Tugas.",
+        "syncAssigneeNotMember": "Hanya anggota rumah tangga yang bisa dipilih di sini.",
+        "syncAssigneeUnknown": "Orang ini sudah tidak ada. Muat ulang halaman."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",
@@ -3738,7 +3761,8 @@
         "banner": "Offline - memulihkan koneksi…",
         "staleData": "Offline - per: {{time}}",
         "pageTitle": "Kamu sedang offline",
-        "pageDescription": "Halaman ini memerlukan koneksi. Begitu perangkatmu online lagi, halaman dimuat dengan sendirinya."
+        "pageDescription": "Halaman ini memerlukan koneksi. Begitu perangkatmu online lagi, halaman dimuat dengan sendirinya.",
+        "snapshot": "Tidak ada koneksi ke server - data tersimpan, hanya baca"
     },
     "emptyHint": {
         "tasks": "Ketuk + untuk membuat tugas pertama Anda. Geser kartu ke kiri untuk menyelesaikan, ke kanan untuk melihat.",
@@ -4366,6 +4390,11 @@
             "missedBook": "Bukukan yang terlewat mulai {{date}}",
             "missedDetail": "{{count}} tanggal terlewat sejak {{date}}.",
             "missedDetail_one": "{{count}} tanggal terlewat sejak {{date}}.",
+            "failing": "Pembukuan gagal - dicoba lagi setiap jam",
+            "pastQuestion": "Tanggalnya sudah lewat",
+            "pastSkip": "Mulai dari {{date}}",
+            "pastDetail": "{{count}} tanggal seharusnya sudah jatuh tempo sejak {{date}}.",
+            "pastDetail_one": "{{count}} tanggal seharusnya sudah jatuh tempo sejak {{date}}.",
             "deleteConfirm": "Hapus pengeluaran berulang ini?",
             "deleteConfirmDetail": "Tidak ada pengeluaran baru yang dibuat. Pengeluaran yang sudah dibukukan tetap ada.",
             "show": "Tampilkan",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}} berutang kepada Anda",
         "debtOwes": "{{from}} berutang kepada {{to}}",
         "balanced": "Lunas",
-        "balancedInGroup": "{{group}}: Lunas"
+        "balancedInGroup": "{{group}}: Lunas",
+        "totalsByMember": "Dibayar per orang",
+        "totalsByMemberHint": "Yang ditalangi, dengan bagian sendiri di bawahnya",
+        "ownShare": "Bagian sendiri: {{amount}}",
+        "paidLabel": "Dibayar",
+        "totalsByCategory": "Menurut kategori",
+        "categoryFilter": "Saring pengeluaran menurut kategori",
+        "noExpensesInCategory": "Tidak ada pengeluaran dalam kategori ini."
     },
     "wmo": {
         "0": "Langit cerah",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "Jumlah",
         "detailNextPaymentLabel": "Pembayaran berikutnya",
         "renewedNamed": "\"{{name}}\" dibayar - pembayaran berikutnya {{date}}.",
-        "completedNamed": "\"{{name}}\" dibayar dan selesai."
+        "completedNamed": "\"{{name}}\" dibayar dan selesai.",
+        "accountHint": "Setiap pembayaran langganan ini dicatat ke akun ini. Ubah satu pembayaran di anggaran.",
+        "accountArchivedHint": "Akun ini diarsipkan. Langganan dicatat tanpa akun sampai kamu memilih akun lain.",
+        "accountArchivedOption": "{{name}} (diarsipkan)",
+        "accountArchivedMeta": "{{name}} diarsipkan - dicatat tanpa akun",
+        "visibilityHint_private": "Hanya kamu yang melihat langganan ini dan pembayarannya.",
+        "visibilityHint_shared": "Semua orang di rumah tangga melihat langganan ini dan pembayarannya.",
+        "errorAccountGone": "Akun yang dipilih sudah tidak ada."
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "Pengukuran tidak dapat disimpan.",
             "invalidValue": "Harap masukkan nilai yang valid.",
             "range": {
+                "day": "Hari",
                 "week": "Minggu",
                 "month": "Bulan",
                 "year": "Tahun"
@@ -5003,6 +5047,7 @@
                 "family": "Keluarga"
             },
             "sparse": "Terlalu sedikit pengukuran untuk menampilkan tren.",
+            "bandValue": "{{mean}}, dari {{low}} hingga {{high}}",
             "recentMeasurements": "Pengukuran terakhir",
             "deleteMeasurement": "Hapus pengukuran {{value}} dari {{date}}",
             "measurementDeleted": "Pengukuran dihapus",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "{{count}} kejadian penjemputan duplikat (identitas sama) digabung menjadi satu.",
         "importDiagnosticOther": "Satu entri kalender tidak sesuai dengan format yang diharapkan.",
         "importUnresolvedBlockingError": "Selesaikan dahulu setiap peringatan yang memblokir, atau lewati acara yang terpengaruh secara eksplisit.",
-        "importIgnoreLabel": "Abaikan",
         "importCreateNewType": "Buat jenis sampah baru",
+        "importLabelsHint": "Jika satu entri menyebut beberapa tempat sampah, pilih semuanya - masing-masing mendapat jadwal pengambilannya sendiri.",
+        "importLabelIgnoredHint": "Tidak ada jenis sampah dipilih - tidak akan diimpor.",
         "importNewTypeNameRequiredError": "Masukkan nama untuk jenis sampah baru.",
         "importDefaultSourceName": "File yang diimpor",
         "importCommittedToast": "Impor diterapkan: {{added}} ditambahkan, {{changed}} diubah, {{removed}} dihapus.",
@@ -6198,6 +6244,13 @@
         "badgeLow": "Hampir habis",
         "badgeOut": "Habis",
         "bestBefore": "Kedaluwarsa {{date}}",
+        "noBestBefore": "Tanpa tanggal kedaluwarsa",
+        "errorProductHasStock": "Produk ini tersedia lagi dan tidak dihapus.",
+        "productTotal": "{{quantity}} seluruhnya",
+        "productPlaces": "{{count}} tempat",
+        "productPlaces_one": "{{count}} tempat",
+        "productBatches": "{{count}} kelompok",
+        "productBatches_one": "{{count}} kelompok",
         "increase": "Tambah jumlah",
         "decrease": "Kurangi jumlah",
         "toShoppingAll": "Semua ke daftar belanja",

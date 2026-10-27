@@ -33,7 +33,7 @@ import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
          monthPeriodKeys, defaultDateInPeriod,
         todayKey} from '/utils/date.js';
-import { formatMoney, formatSignedAmount, sharePercent, roundToCurrency, currencySymbol, parseAmountInput } from '/utils/money.js';
+import { formatMoney, formatSignedAmount, sharePercent, roundToCurrency, currencySymbol, parseAmountInput, setFallbackCurrency } from '/utils/money.js';
 import { amountInputAttrs, setAmountCurrency, amountFieldError } from '/utils/amount-field.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass, leadStep, fitMetricLeads } from '/utils/metric-card.js';
@@ -243,6 +243,21 @@ function accountName(id) {
   return state.accounts.find((a) => a.id === id)?.name || '';
 }
 
+// Die Waehrung eines Kontos (#2302): jeder Betrag auf ihm steht in ihr - Saldo,
+// Startsaldo, Buchungen. Ohne Konto oder ohne eigene gilt die Budget-Waehrung.
+function accountCurrency(id) {
+  if (id == null) return state.currency;
+  return (state.accounts ?? []).find((a) => a.id === id)?.currency || state.currency;
+}
+
+// DIE WAEHRUNG DER UEBERSICHT (#2302). Auf ein Konto gefiltert stehen Karten,
+// Diagramm und Summen in dessen Waehrung - es sind seine Buchungen, und sie
+// stehen dort so wie auf dem Kontoauszug. Ungefiltert bleibt die
+// Budget-Waehrung; alle Karten wechseln zusammen, nie eine allein.
+function viewCurrency() {
+  return state.accountFilterId != null ? accountCurrency(state.accountFilterId) : state.currency;
+}
+
 // --------------------------------------------------------
 // State
 // --------------------------------------------------------
@@ -258,6 +273,9 @@ let state = {
   loans:       { loans: [], summary: { active_count: 0, remaining_amount: 0, remaining_installments: 0 } },
   accounts:    [],
   netWorth:    0,
+  // Naeherung und Teilsummen des Nettovermoegens bei Konten in mehreren
+  // Waehrungen (#2302, netWorthSummary in server/routes/budget/helpers.js).
+  netWorthInfo: { approx: false, ratesAt: null, byCurrency: [] },
   accountFilterId: null,      // aktiver Konto-Filter für die Transaktionsliste (Drilldown)
   accountsShowArchived: false,
   categoryFilter: null,       // active category filter
@@ -482,11 +500,11 @@ function transferSummaryHtml(s) {
   const out = Number(s?.transfers) || 0;
   const filtered = state.accountFilterId && s?.transfers_in !== undefined;
   if (!filtered) {
-    return out > 0 ? `<div class="metric-card budget-transfer-summary"><div class="metric-card__label">${t('budget.summaryTransfers')}</div><div class="metric-card__value">${amountByRole(out, 'total').text}</div></div>` : '';
+    return out > 0 ? `<div class="metric-card budget-transfer-summary"><div class="metric-card__label">${t('budget.summaryTransfers')}</div><div class="metric-card__value">${amountByRole(out, 'total', { currency: viewCurrency() }).text}</div></div>` : '';
   }
   const incoming = Number(s.transfers_in) || 0;
   if (!(incoming > 0) && !(out > 0)) return '';
-  const flow = (key, n) => `<div class="budget-transfer-summary__flow"><dt class="budget-transfer-summary__flow-label">${t(key)}</dt><dd class="budget-transfer-summary__flow-value">${amountByRole(n, 'flow').text}</dd></div>`;
+  const flow = (key, n) => `<div class="budget-transfer-summary__flow"><dt class="budget-transfer-summary__flow-label">${t(key)}</dt><dd class="budget-transfer-summary__flow-value">${amountByRole(n, 'flow', { currency: viewCurrency() }).text}</dd></div>`;
   return `<div class="metric-card budget-transfer-summary budget-transfer-summary--split">
       <div class="metric-card__label" id="budget-transfer-summary-label">${t('budget.summaryTransfers')}</div>
       <dl class="budget-transfer-summary__flows" aria-labelledby="budget-transfer-summary-label">${flow('budget.summaryTransfersIn', incoming)}${flow('budget.summaryTransfersOut', -out)}</dl>
@@ -728,7 +746,7 @@ function ledgerStatusText() {
   const sum = entries.reduce((total, entry) => (
     total + (entry.is_pending ? 0 : Number(entry.amount) || 0)
   ), 0);
-  return t('budget.ledgerFilterSummary', { count: entries.length, sum: formatAmount(sum) });
+  return t('budget.ledgerFilterSummary', { count: entries.length, sum: formatAmount(sum, viewCurrency()) });
 }
 
 function findEntry(id) {
@@ -769,7 +787,12 @@ async function loadAccounts() {
     // serverseitig; die Kachel-Liste filtert clientseitig.
     const res = await api.get('/budget/accounts?include_archived=1');
     state.accounts = (res.data?.accounts ?? []).filter((entry) => !pendingAccountDeletes.has(entry.id));
-    state.netWorth = res.data?.net_worth ?? 0;
+    state.netWorth = res.data?.net_worth ?? (res.data?.net_worth_by_currency ? null : 0);
+    state.netWorthInfo = {
+      approx: Boolean(res.data?.net_worth_approx),
+      ratesAt: res.data?.net_worth_rates_at ?? null,
+      byCurrency: res.data?.net_worth_by_currency ?? [],
+    };
   } catch (err) {
     console.error('[Budget] loadAccounts Fehler:', err);
   }
@@ -930,6 +953,7 @@ export async function render(container, { user }) {
         loadBudgetMeta(),
       ]);
       state.currency = prefsRes.data?.currency ?? 'EUR';
+      setFallbackCurrency(state.currency);
       state.budgetMode = prefsRes.data?.budget_mode === 'personal' ? 'personal' : 'shared';
       state.members = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data?.users ?? []);
     } catch (_) { /* Fallback auf EUR */ }
@@ -1413,7 +1437,7 @@ function renderBody() {
          <i data-lucide="clock" class="icon-sm" aria-hidden="true"></i>
          <span>${esc(t('budget.pendingSummary', {
            count: s.pending.count,
-           amount: amountByRole(pendingTotal, 'flow').text,
+           amount: amountByRole(pendingTotal, 'flow', { currency: viewCurrency() }).text,
          }))}</span>
        </p>`
     : '';
@@ -1429,7 +1453,7 @@ function renderBody() {
   const incomeCard = `
       <div class="metric-card metric-card--income">
         <div class="metric-card__label">${t('budget.income')}</div>
-        <div class="metric-card__value">${amountByRole(s.income, 'total').text}</div>
+        <div class="metric-card__value">${amountByRole(s.income, 'total', { currency: viewCurrency() }).text}</div>
         ${p ? renderTrend(s.income, p.income, prevLabel) : ''}
       </div>`;
   // Ausgaben-Trend im Betragsraum (Math.abs), wie die Zahl auf der Karte:
@@ -1438,16 +1462,16 @@ function renderBody() {
   const expensesCard = `
       <div class="metric-card metric-card--expenses">
         <div class="metric-card__label">${t('budget.expenses')}</div>
-        <div class="metric-card__value">${amountByRole(s.expenses, 'total').text}</div>
+        <div class="metric-card__value">${amountByRole(s.expenses, 'total', { currency: viewCurrency() }).text}</div>
         ${p ? renderTrend(Math.abs(s.expenses), Math.abs(p.expenses), prevLabel) : ''}
       </div>`;
   // Rolle `balance`: hier trägt die Zahl selbst die Richtung.
   // DER SALDO FUEHRT (Critique R18): eine Display-Stufe in der Seitenleiste,
   // Einnahmen und Ausgaben eine Stufe leiser (panel.css `.metric-card--lead`).
   const balanceCard = `
-      <div class="metric-card budget-balance-card ${balanceTone} ${leadCardClass(amountByRole(s.balance, 'balance').text)}">
+      <div class="metric-card budget-balance-card ${balanceTone} ${leadCardClass(amountByRole(s.balance, 'balance', { currency: viewCurrency() }).text)}">
         <div class="metric-card__label">${t('budget.balance')}</div>
-        <div class="metric-card__value">${amountByRole(s.balance, 'balance').text}</div>
+        <div class="metric-card__value">${amountByRole(s.balance, 'balance', { currency: viewCurrency() }).text}</div>
         ${p && !balanceNeutral ? renderTrend(s.balance, p.balance, prevLabel) : ''}
       </div>`;
 
@@ -1848,8 +1872,8 @@ function blockTotal(rows) {
  * Vorzeichen, denn dort IST es die Auskunft (hinein oder hinaus). */
 function blockAmountText(amount, kind) {
   return kind === 'transfers'
-    ? amountByRole(amount, 'flow').text
-    : amountByRole(amount, 'total').text;
+    ? amountByRole(amount, 'flow', { currency: viewCurrency() }).text
+    : amountByRole(amount, 'total', { currency: viewCurrency() }).text;
 }
 
 /* Wie in der Statistik: der Anteil steht nur bei Ausgaben, leise hinter dem Betrag. */
@@ -1913,7 +1937,7 @@ function chartIncomeLine(blocks) {
   return `
           <p class="budget-chart-head__income">
             <span>${esc(t('budget.income'))}</span>
-            <span class="budget-chart-head__income-amount">${amountByRole(blockTotal(blocks.income), 'flow').text}</span>
+            <span class="budget-chart-head__income-amount">${amountByRole(blockTotal(blocks.income), 'flow', { currency: viewCurrency() }).text}</span>
           </p>`;
 }
 
@@ -1966,12 +1990,12 @@ function balanceGlanceHtml(s, { expensesOnly, forecast, balanceTone }) {
     : balanceTone === 'metric-card--balance-positive' ? 'positive'
       : balanceTone === 'metric-card--balance-negative' ? 'negative' : 'neutral';
   const lead = expensesOnly
-    ? { label: t('budget.expenses'), value: amountByRole(s.expenses, 'total').text, tone: 'neutral' }
-    : { label: t(forecast ? 'budget.summaryTitleForecast' : 'budget.balance'), value: amountByRole(s.balance, 'balance').text, tone };
+    ? { label: t('budget.expenses'), value: amountByRole(s.expenses, 'total', { currency: viewCurrency() }).text, tone: 'neutral' }
+    : { label: t(forecast ? 'budget.summaryTitleForecast' : 'budget.balance'), value: amountByRole(s.balance, 'balance', { currency: viewCurrency() }).text, tone };
   const flows = expensesOnly ? '' : `
         <span class="budget-glance__flows">
-          <span class="budget-glance__flow">${esc(t('budget.income'))} <span class="budget-glance__amount">${amountByRole(s.income, 'total').text}</span></span>
-          <span class="budget-glance__flow">${esc(t('budget.expenses'))} <span class="budget-glance__amount">${amountByRole(s.expenses, 'total').text}</span></span>
+          <span class="budget-glance__flow">${esc(t('budget.income'))} <span class="budget-glance__amount">${amountByRole(s.income, 'total', { currency: viewCurrency() }).text}</span></span>
+          <span class="budget-glance__flow">${esc(t('budget.expenses'))} <span class="budget-glance__amount">${amountByRole(s.expenses, 'total', { currency: viewCurrency() }).text}</span></span>
         </span>`;
   const count = s.byCategory?.length ?? 0;
   return `
@@ -2235,7 +2259,7 @@ function subcategoryRows(category, entries) {
                 style="--bar-scale:${scale}"${parentTexture ? ` data-texture="${parentTexture}"` : ''}></span>
         </span>
         <span class="budget-bar-row__amount">
-          ${amountByRole(row.amount, 'flow').text}${kind === 'expenses' && row.amount !== 0 ? shareHtml(row.amount, categoryTotal) : ''}
+          ${amountByRole(row.amount, 'flow', { currency: viewCurrency() }).text}${kind === 'expenses' && row.amount !== 0 ? shareHtml(row.amount, categoryTotal) : ''}
         </span>
       </button>`;
   }).join('');
@@ -2258,7 +2282,7 @@ function renderSubcategoryBreakdowns() {
                 aria-labelledby="${esc(titleId)}">
           <h3 class="budget-chart-block__title" id="${esc(titleId)}">
             <span>${esc(categoryLabel(category))}</span>
-            <span class="budget-chart-block__total">${amountByRole(total, 'total').text}</span>
+            <span class="budget-chart-block__total">${amountByRole(total, 'total', { currency: viewCurrency() }).text}</span>
           </h3>
           <div class="budget-chart-block__rows">
             ${rows}
@@ -2686,7 +2710,7 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
     // Rolle `flow`: eine einzelne Kontobewegung trägt immer ein Vorzeichen, und
     // das Vorzeichen kommt aus dem Zahlformat (signDisplay), nicht aus einem
     // vorangestellten '+' - sonst steht es in RTL-Locales auf der falschen Seite.
-    const amountText = amountByRole(e.amount, 'flow').text;
+    const amountText = amountByRole(e.amount, 'flow', { currency: accountCurrency(e.account_id) }).text;
     /* DER MONAT STEHT ÜBER DER LISTE, NICHT IN JEDER ZEILE.
      *
      * Die Liste ist per Konstruktion EIN Monat - loadMonth() holt
@@ -2875,10 +2899,25 @@ function renderAccountsPage() {
   // Rolle `balance`: das Vorzeichen steckt in der Zahl. Nebenbei behebt die
   // Rollenlogik, dass ein Nettovermögen von exakt 0 vorher als Erfolg grün
   // erschien - null Vermögen ist keine gute Nachricht, sondern gar keine.
-  const netWorth = amountByRole(state.netWorth, 'balance', { block: 'metric-card' });
+  const netWorth = amountByRole(state.netWorth ?? 0, 'balance', { block: 'metric-card' });
   // EIN STAND IST KEINE NACHRICHT (R18, budget.css `.budget-account__balance`):
   // das Nettovermoegen steht in Textfarbe, nur ein Minus traegt Rot.
   const netWorthTone = Number(state.netWorth) < 0 ? 'negative' : 'neutral';
+  // KONTEN IN MEHREREN WAEHRUNGEN (#2302). Mit Kursen ist die Summe eine
+  // Naeherung in der Budget-Waehrung: "≈" vor der Zahl, das Kursdatum
+  // darunter. Fehlt ein Kurs, steht die Summe je Waehrung da - eine
+  // Rohsumme aus Dollar und Euro waere eine falsche Zahl.
+  const parts = state.netWorth == null ? state.netWorthInfo.byCurrency : [];
+  const approx = state.netWorth != null && state.netWorthInfo.approx;
+  const netWorthText = parts.length
+    ? parts.map((p) => formatAmount(p.amount, p.currency)).join(' · ')
+    : `${approx ? '≈ ' : ''}${netWorth.text}`;
+  const netWorthNote = parts.length
+    ? t('budget.netWorthPerCurrencyNote')
+    : (approx && state.netWorthInfo.ratesAt ? t('budget.netWorthApproxNote', { date: dateText(state.netWorthInfo.ratesAt, { year: true }) }) : '');
+  const netWorthValue = parts.length
+    ? `<dl class="budget-transfer-summary__flows budget-net-worth__parts">${parts.map((p) => `<div class="budget-transfer-summary__flow"><dt class="budget-transfer-summary__flow-label">${esc(p.currency)}</dt><dd class="budget-transfer-summary__flow-value">${esc(formatAmount(p.amount, p.currency))}</dd></div>`).join('')}</dl>`
+    : `<div class="metric-card__value">${esc(netWorthText)}</div>`;
 
   const archiveToggle = hasArchived ? `
       <button class="budget-accounts__toggle" id="budget-toggle-archived" type="button" aria-pressed="${state.accountsShowArchived}">
@@ -2908,8 +2947,9 @@ function renderAccountsPage() {
        * also ohne Aufklapper (metric-glance.js) - die Karte bleibt dort aus. */ ''}
     ${metricGlanceHtml({
       label: t('budget.netWorth'),
-      value: netWorth.text,
+      value: netWorthText,
       tone: netWorthTone,
+      flows: netWorthNote ? [{ label: netWorthNote }] : [],
       lead: true,
     })}
     `;
@@ -2922,9 +2962,10 @@ function renderAccountsPage() {
   // steht sie ueber den Konten, mobil vertritt sie die Kurzzeile.
   const rail = `
     <div class="metric-grid metric-grid--rail budget-glance-details">
-      <div class="metric-card metric-card--${netWorthTone} ${leadCardClass(netWorth.text)}">
+      <div class="metric-card metric-card--${netWorthTone} ${leadCardClass(netWorthText)}">
         <div class="metric-card__label">${t('budget.netWorth')}</div>
-        <div class="metric-card__value">${netWorth.text}</div>
+        ${netWorthValue}
+        ${netWorthNote ? `<div class="metric-card__note">${esc(netWorthNote)}</div>` : ''}
       </div>
     </div>`;
 
@@ -2959,7 +3000,7 @@ function renderAccountsPage() {
     const creditMeta = a.type === 'credit' && (a.credit_bank || a.available_limit != null)
       ? `<span class="budget-account__meta">${[
           a.credit_bank ? esc(a.credit_bank) : '',
-          a.available_limit != null ? `${t('budget.availableLimitShort')} ${formatAmount(a.available_limit)}` : '',
+          a.available_limit != null ? `${t('budget.availableLimitShort')} ${formatAmount(a.available_limit, accountCurrency(a.id))}` : '',
         ].filter(Boolean).join(' · ')}</span>`
       : '';
     return `
@@ -2976,12 +3017,12 @@ function renderAccountsPage() {
                   unter 640px); dort ist `.budget-account__starting` ausgeblendet,
                   hier `__type-start` daneben - genau eine Fassung ist sichtbar
                   und im Barrierebaum. */ ''}
-            <span class="budget-account__type">${esc(accountTypeLabel(a.type))}<span class="budget-account__type-start"> · ${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance)}</span></span></span>
+            <span class="budget-account__type">${esc(accountTypeLabel(a.type))}<span class="budget-account__type-start"> · ${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance, accountCurrency(a.id))}</span></span></span>
             ${creditMeta}
           </span>
           <span class="budget-account__figures">
-            <span class="budget-account__balance ${balClass}">${formatAmount(a.current_balance)}</span>
-            <span class="budget-account__starting">${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance)}</span></span>
+            <span class="budget-account__balance ${balClass}">${formatAmount(a.current_balance, accountCurrency(a.id))}</span>
+            <span class="budget-account__starting">${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance, accountCurrency(a.id))}</span></span>
           </span>
           <span class="sr-only">, ${esc(t('budget.showAccountTransactions'))}</span>
         </button>
@@ -4071,7 +4112,8 @@ function renderLoanCard(loan) {
 function renderTrend(current, prev, prevLabel) {
   // Auf die Waehrung gerundet (Critique R19, roundToCurrency): die feste
   // Schwelle 0,005 kannte nur Waehrungen mit zwei Nachkommastellen.
-  const delta = roundToCurrency(current - prev, state.currency);
+  // Der Vergleich steht in derselben Waehrung wie die Karte darueber (#2302).
+  const delta = roundToCurrency(current - prev, viewCurrency());
   if (delta === 0) {
     return trendMarkup({
       delta: 0, text: esc(t('budget.trendNeutral', { month: prevLabel })), icon: false,
@@ -4080,7 +4122,7 @@ function renderTrend(current, prev, prevLabel) {
   // Rolle `flow`: eine Veränderung gegenüber dem Vormonat trägt immer ein
   // Vorzeichen, aus demselben Zahlformat wie die Buchungen selbst. Den Pfeil
   // setzt utils/metric-card.js; ohne `betterWhen` bleibt die Farbe neutral.
-  const deltaText = amountByRole(delta, 'flow').text;
+  const deltaText = amountByRole(delta, 'flow', { currency: viewCurrency() }).text;
   return trendMarkup({
     delta,
     text: esc(t('budget.trendDelta', { amount: deltaText, month: prevLabel })),
@@ -4312,6 +4354,9 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
   // rundet nie; einen Bestandswert neben dem Raster laesst das Speichern
   // unangetastet durch (amountFieldError mit `original`).
   const absAmount  = isEdit ? String(Math.abs(editAmount)) : '';
+  // Der Betrag steht in der Waehrung des gewaehlten Kontos (#2302); die
+  // Einheit am Feld wechselt mit der Kontowahl (bindEntryAccountCurrency).
+  const entryCurrency = accountCurrency(isEdit ? entry.account_id : null);
   const curInterval = isEdit && entry.recurrence_interval ? entry.recurrence_interval : 'monthly';
   // „Alle N" (#636). Bestandsserien tragen 1, solange niemand etwas anderes wählt.
   const curCount = Math.min(MAX_INTERVAL_COUNT, Math.max(1, Number(isEdit && entry.recurrence_interval_count) || 1));
@@ -4383,9 +4428,9 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
            war die einzige Zahl des Moduls ohne Waehrung. Sie steht als Suffix
            im Feld, in Sekundaerfarbe; die Ziffern tragen das Gewicht. */ ''}
       <div class="budget-amount-field">
-        <input class="form-input budget-amount-input" id="bm-amount"${amountInputAttrs(state.currency, absAmount)}
+        <input class="form-input budget-amount-input" id="bm-amount"${amountInputAttrs(entryCurrency, absAmount)}
                aria-describedby="bm-amount-unit" required>
-        <span class="budget-amount-field__unit" id="bm-amount-unit">${esc(currencySymbol(state.currency))}</span>
+        <span class="budget-amount-field__unit" id="bm-amount-unit">${esc(currencySymbol(entryCurrency))}</span>
       </div>
     </div>
 
@@ -4539,7 +4584,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
           title: entry.title,
           amount: Math.abs(entry.amount),
           date: entry.date,
-          currency: state.currency,
+          currency: accountCurrency(entry.account_id),
           participantIds: (entry.responsible_users ?? []).map((u) => u.id),
         });
         await closeModal({ force: true });
@@ -4682,6 +4727,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         }),
       });
       panel.querySelector('#bm-category').addEventListener('change', () => updateSubcategoryOptions());
+      bindEntryAccountCurrency(panel);
       panel.querySelector('#bm-recurring').addEventListener('change', (e) => {
         panel.querySelector('#bm-recurrence-options').hidden = !e.target.checked;
       });
@@ -4952,6 +4998,28 @@ function requestNameInPanel(panel, { title, label, placeholder }) {
 // Kursfeld erscheint nur bei einer von der Budget-Währung abweichenden Wahl -
 // solange beide gleich sind, gibt es nichts umzurechnen. Die Option-Liste füllt
 // wireLoanCurrencyFields() nach dem Einfügen (geteilte CURRENCY_CODES).
+/** Die Waehrung des im Buchungsdialog gewaehlten Kontos (#2302). */
+function entryDialogCurrency(panel) {
+  const value = panel.querySelector('#bm-account')?.value;
+  return accountCurrency(value ? Number(value) : null);
+}
+
+/**
+ * Die Einheit am Betragsfeld folgt der Kontowahl (#2302) - wie die Umbuchung
+ * dem Quellkonto folgt. Platzhalter und Stellenzahl gehen mit; den Wert
+ * prueft das Speichern.
+ */
+function bindEntryAccountCurrency(panel) {
+  const select = panel.querySelector('#bm-account');
+  if (!select) return;
+  select.addEventListener('change', () => {
+    const currency = entryDialogCurrency(panel);
+    const unit = panel.querySelector('#bm-amount-unit');
+    if (unit) unit.textContent = currencySymbol(currency);
+    setAmountCurrency(panel.querySelector('#bm-amount'), currency);
+  });
+}
+
 /**
  * Die Feldfehler des Buchungsdialogs, ALLE zugleich, als `[feld, meldung]`
  * fuer reportFieldErrors (Critique R19). Ein Betrag, der fehlt, und einer, der
@@ -4967,7 +5035,7 @@ export function entryFormErrors(panel, { title, category, subcategory, date, ori
     !title && [panel.querySelector('#bm-title'), t('common.titleRequired')],
     // Der Grund kommt aus dem TEXT des Feldes (D1): gruppiert, keine Zahl,
     // nicht positiv oder zu viele Stellen - nie ein stilles Fehllesen.
-    amountFieldError(panel.querySelector('#bm-amount'), state.currency, { required: true, original }),
+    amountFieldError(panel.querySelector('#bm-amount'), entryDialogCurrency(panel), { required: true, original }),
     !category && [panel.querySelector('#bm-category'), t('budget.categoryRequired')],
     Boolean(category) && !subcategory && subcategoryChoice(category).required
       && [panel.querySelector('#bm-subcategory'), t('budget.subcategoryRequired')],
@@ -5545,6 +5613,7 @@ const BUDGET_REFUSALS = new Map([
   ['account_type_invalid', ['#am-type', BUDGET_SAVE_FAILED]],
   ['account_has_transfers', [null, 'budget.accountHasTransfers']],
   ['account_color_invalid', [null, BUDGET_SAVE_FAILED]],
+  ['account_currency_invalid', [null, 'budget.loanCurrencyInvalid']],
   // Kategorie aus dem Buchungsdialog (categories.js) - die Saetze der Verwaltung.
   ['category_name_invalid', [null, 'common.nameRequired']],
   ['subcategory_name_invalid', [null, 'common.nameRequired']],
@@ -5558,6 +5627,7 @@ const BUDGET_REFUSALS = new Map([
   ['loan_payment_amount_exceeds', [null, 'budget.amountExceedsLoanRemaining']],
   ['loan_payment_date_invalid', [null, 'calendar.invalidDate']],
   ['loan_payment_installment_invalid', [null, BUDGET_FAILED]],
+  ['loan_payment_rate_unavailable', ['#bm-amount', 'budget.loanPaymentRateUnavailable']],
 ]);
 
 /**
@@ -6303,6 +6373,10 @@ async function deleteEntrySeries(id) {
 // statt Quelltext-Regex.
 export const __test = {
   entryFormErrors,
+  // #2302: der Betrag im Buchungsdialog folgt der Waehrung des Kontos.
+  bindEntryAccountCurrency,
+  // #2302: im Kontofilter steht die Uebersicht in der Waehrung des Kontos.
+  viewCurrency, transferSummaryHtml, entryRows, renderTrend,
   monthNavHtml,
   // #1775: das Datum eines neuen Eintrags folgt dem gezeigten Zeitraum.
   newEntryDefaultDate,

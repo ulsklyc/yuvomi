@@ -92,6 +92,29 @@ export const DISPLAY_COOKIE_MAX_AGE = 365 * 24 * 60 * 60 * 1000;
 export const DISPLAY_COOKIE_REFRESH_AFTER_MS = 12 * 60 * 60 * 1000;
 
 /**
+ * Wie lange ein Display ohne Serverkontakt seine Listen offline zeigt.
+ *
+ * Der Service Worker haelt Listen nur neben einem gueltigen Ablauf (#2293,
+ * public/sw.js, fail-closed). Eine Anmeldesitzung bringt ihn mit, ein Display
+ * hat keine: sein `req.session` ist eine leere Huelle. Ohne eigene Grenze sah
+ * ein Tablett an der Wand offline gar nichts mehr. Deshalb nennt der Server ihm
+ * jetzt + 72 Stunden, und die Frist GLEITET: jede Antwort an das Display traegt
+ * sie neu (`OFFLINE_EXPIRES_HEADER`), `/auth/me` als `sessionExpiresAt`. Drei
+ * Tage tragen ein Wochenende mit gestoertem WLAN; ein widerrufenes Token zeigt
+ * spaetestens so lange nach seinem letzten Kontakt noch den alten Stand, online
+ * raeumt die 401 sofort.
+ */
+export const DISPLAY_OFFLINE_GRACE_MS = 72 * 60 * 60 * 1000;
+
+/** Kopfzeile, mit der jede Antwort an ein Display die vorgerueckte Frist nennt. */
+export const OFFLINE_EXPIRES_HEADER = 'X-Offline-Expires-At';
+
+/** Bis wann ein Display, das jetzt Kontakt hat, offline lesen darf (ms seit Epoche). */
+export function displayOfflineExpiresAt(now = Date.now()) {
+  return now + DISPLAY_OFFLINE_GRACE_MS;
+}
+
+/**
  * Ist seit der letzten Auffrischung genug Zeit vergangen? `null` heisst "noch
  * nie" und ist sofort faellig - richtig fuer jedes Geraet, das vor Migration
  * 216 gekoppelt wurde.

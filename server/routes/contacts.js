@@ -65,11 +65,11 @@ function limitedStr(val, label, max, { reason }, required = false) {
 /** Längen-Validierung der Namensteile (gleiche Grenze wie der Anzeigename). */
 function namePartChecks(parts) {
   return [
-    limitedStr(parts.firstName,  'Vorname',      MAX_TITLE, { reason: 'contacts_name_too_long' }),
-    limitedStr(parts.lastName,   'Nachname',     MAX_TITLE, { reason: 'contacts_name_too_long' }),
-    limitedStr(parts.middleName, 'Zweitname',    MAX_TITLE, { reason: 'contacts_name_too_long' }),
-    limitedStr(parts.namePrefix, 'Namenszusatz', MAX_SHORT, { reason: 'contacts_name_too_long' }),
-    limitedStr(parts.nameSuffix, 'Namenssuffix', MAX_SHORT, { reason: 'contacts_name_too_long' }),
+    limitedStr(parts.firstName,  'firstName',    MAX_TITLE, { reason: 'contacts_name_too_long' }),
+    limitedStr(parts.lastName,   'lastName',     MAX_TITLE, { reason: 'contacts_name_too_long' }),
+    limitedStr(parts.middleName, 'middleName',   MAX_TITLE, { reason: 'contacts_name_too_long' }),
+    limitedStr(parts.namePrefix, 'namePrefix',   MAX_SHORT, { reason: 'contacts_name_too_long' }),
+    limitedStr(parts.nameSuffix, 'nameSuffix',   MAX_SHORT, { reason: 'contacts_name_too_long' }),
   ];
 }
 
@@ -336,14 +336,14 @@ router.get('/categories', (_req, res) => {
     res.json({ data: loadContactCategories() });
   } catch (err) {
     log.error('GET /categories error:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
 // POST /api/v1/contacts/categories  Body: { name } → { data: ContactCategory }
 router.post('/categories', (req, res) => {
   try {
-    const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
+    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
     const conflict = db.get().prepare(`
@@ -364,7 +364,7 @@ router.post('/categories', (req, res) => {
     res.status(201).json({ data: cat });
   } catch (err) {
     log.error('POST /categories error:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -377,7 +377,7 @@ router.patch('/categories/reorder', (req, res) => {
     res.json({ data: loadContactCategories() });
   } catch (err) {
     log.error('PATCH /categories/reorder error:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -400,7 +400,7 @@ router.put('/categories/:key', (req, res) => {
       return res.json({ data: db.get().prepare('SELECT key, name, label_key, icon, sort_order, color FROM contact_categories WHERE key = ?').get(cat.key) });
     }
 
-    const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
+    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
     const conflict = db.get().prepare(`
@@ -414,7 +414,7 @@ router.put('/categories/:key', (req, res) => {
     res.json({ data: updated });
   } catch (err) {
     log.error('PUT /categories/:key error:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -435,7 +435,7 @@ router.delete('/categories/:key', (req, res) => {
     res.status(204).end();
   } catch (err) {
     log.error('DELETE /categories/:key error:', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -566,7 +566,7 @@ router.get('/', (req, res) => {
     res.json({ data: contacts });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -580,18 +580,18 @@ router.post('/', (req, res) => {
   try {
     // Strukturierte Namensteile haben Vorrang vor einem mitgesendeten `name` (#535).
     const nameParts = readNameParts(req.body);
-    const vName    = limitedStr(nameParts.displayName ?? req.body.name, 'Name', MAX_TITLE, { reason: 'contacts_name_too_long' }, true);
-    const vCat     = oneOf(req.body.category || FALLBACK_CATEGORY, validContactCategoryKeys(), 'Category');
-    const vPhone   = limitedStr(req.body.phone,   'Telefon', CONTACT_PHONE_MAX_LENGTH, { reason: 'contacts_phone_too_long' });
-    const vEmail   = limitedStr(req.body.email,   'E-Mail',  MAX_TITLE, { reason: 'contacts_email_too_long' });
-    const vAddress = limitedStr(req.body.address, 'Adresse', MAX_TEXT,  { reason: 'contacts_address_too_long' });
-    const vNotes   = limitedStr(req.body.notes,   'Notizen', MAX_TEXT,  { reason: 'contacts_notes_too_long' });
+    const vName    = limitedStr(nameParts.displayName ?? req.body.name, 'name', MAX_TITLE, { reason: 'contacts_name_too_long' }, true);
+    const vCat     = oneOf(req.body.category || FALLBACK_CATEGORY, validContactCategoryKeys(), 'category');
+    const vPhone   = limitedStr(req.body.phone,   'phone',   CONTACT_PHONE_MAX_LENGTH, { reason: 'contacts_phone_too_long' });
+    const vEmail   = limitedStr(req.body.email,   'email',   MAX_TITLE, { reason: 'contacts_email_too_long' });
+    const vAddress = limitedStr(req.body.address, 'address', MAX_TEXT,  { reason: 'contacts_address_too_long' });
+    const vNotes   = limitedStr(req.body.notes,   'notes',   MAX_TEXT,  { reason: 'contacts_notes_too_long' });
     // Geburtstag (ISO YYYY-MM-DD, optional) - u. a. aus vCard-BDAY beim Import.
     // Speist den bestehenden #518-Geburtstags-Import (GET /birthdays/import/candidates).
     // Ohne Jahr (#2095): `birthday_year_unknown` setzt das Jahr auf den
     // Platzhalter, die Anzeige laesst es weg.
     const vYearUnknown = validateYearUnknown(req.body.birthday_year_unknown, 'birthday_year_unknown');
-    const vBirthday = birthdayCheck(date(birthDateInput(req.body.birthday, vYearUnknown.value === true), 'Geburtstag', false));
+    const vBirthday = birthdayCheck(date(birthDateInput(req.body.birthday, vYearUnknown.value === true), 'birthday', false));
     const checks   = [vName, vCat, vPhone, vEmail, vAddress, vNotes, vYearUnknown, vBirthday,
                       ...namePartChecks(nameParts.parts)];
     const errors   = collectErrors(checks);
@@ -696,7 +696,7 @@ router.post('/', (req, res) => {
     });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -719,13 +719,13 @@ router.put('/:id', (req, res) => {
 
     const checks = [];
     if (nameParts.provided)              checks.push(...namePartChecks(nameParts.parts));
-    if (req.body.name     !== undefined) checks.push(limitedStr(req.body.name, 'Name', MAX_TITLE, { reason: 'contacts_name_too_long' }));
-    const vCat = req.body.category !== undefined ? oneOf(req.body.category, validContactCategoryKeys(), 'Category') : null;
+    if (req.body.name     !== undefined) checks.push(limitedStr(req.body.name, 'name', MAX_TITLE, { reason: 'contacts_name_too_long' }));
+    const vCat = req.body.category !== undefined ? oneOf(req.body.category, validContactCategoryKeys(), 'category') : null;
     if (vCat) checks.push(vCat);
-    if (req.body.phone    !== undefined) checks.push(limitedStr(req.body.phone,   'Telefon', CONTACT_PHONE_MAX_LENGTH, { reason: 'contacts_phone_too_long' }));
-    if (req.body.email    !== undefined) checks.push(limitedStr(req.body.email,   'E-Mail',  MAX_TITLE, { reason: 'contacts_email_too_long' }));
-    if (req.body.address  !== undefined) checks.push(limitedStr(req.body.address, 'Adresse', MAX_TEXT,  { reason: 'contacts_address_too_long' }));
-    if (req.body.notes    !== undefined) checks.push(limitedStr(req.body.notes,   'Notizen', MAX_TEXT,  { reason: 'contacts_notes_too_long' }));
+    if (req.body.phone    !== undefined) checks.push(limitedStr(req.body.phone,   'phone',   CONTACT_PHONE_MAX_LENGTH, { reason: 'contacts_phone_too_long' }));
+    if (req.body.email    !== undefined) checks.push(limitedStr(req.body.email,   'email',   MAX_TITLE, { reason: 'contacts_email_too_long' }));
+    if (req.body.address  !== undefined) checks.push(limitedStr(req.body.address, 'address', MAX_TEXT,  { reason: 'contacts_address_too_long' }));
+    if (req.body.notes    !== undefined) checks.push(limitedStr(req.body.notes,   'notes',   MAX_TEXT,  { reason: 'contacts_notes_too_long' }));
     // Fehlt `birthday_year_unknown`, bleibt die gespeicherte Marke (#2095); wer
     // sie abnimmt, schickt das Jahr mit, sonst wuerde der Platzhalter 2000 zum
     // echten Geburtsjahr.
@@ -734,7 +734,7 @@ router.put('/:id', (req, res) => {
     const yearUnknown = vYearUnknown.value ?? contact.birthday_year_unknown === 1;
     let birthday = contact.birthday;
     if (req.body.birthday !== undefined) {
-      const vBirthday = birthdayCheck(date(birthDateInput(req.body.birthday, yearUnknown), 'Geburtstag', false));
+      const vBirthday = birthdayCheck(date(birthDateInput(req.body.birthday, yearUnknown), 'birthday', false));
       checks.push(vBirthday);
       birthday = vBirthday.value;
     } else if (yearUnknown && contact.birthday_year_unknown !== 1 && contact.birthday) {
@@ -910,7 +910,7 @@ router.put('/:id', (req, res) => {
     });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -926,7 +926,7 @@ router.delete('/:id', (req, res) => {
     if (!contact) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
     
     if (contact.family_user_id) {
-      return res.status(403).json({ error: 'Familienmitglieder können nicht aus der Kontaktliste gelöscht werden.', code: 403, reason: 'family_member_contact' });
+      return res.status(403).json({ error: 'A household member cannot be deleted from the contact list.', code: 403, reason: 'family_member_contact' });
     }
 
     const result = db.get().prepare('DELETE FROM contacts WHERE id = ?').run(id);
@@ -935,7 +935,7 @@ router.delete('/:id', (req, res) => {
     res.status(204).end();
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -954,7 +954,7 @@ router.get('/meta', (_req, res) => {
     res.json({ data: { categories: loadContactCategories(), categoryColors: CONTACT_CATEGORY_COLORS } });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -980,7 +980,7 @@ router.get('/:id', (req, res) => {
     });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -1031,7 +1031,7 @@ router.get('/:id/vcard', (req, res) => {
     res.send(vcf);
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 

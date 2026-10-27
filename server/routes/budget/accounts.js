@@ -7,8 +7,10 @@ import express from 'express';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { str, oneOf, num, color as validateColor, MAX_SHORT } from '../../middleware/validate.js';
+import { resyncSubscriptionBookings } from '../subscriptions.js';
+import { CURRENCY_CODES } from '../../../public/utils/currency-codes.js';
 import {
-  budgetFilter, listAccounts, accountGoneFor, ACCOUNT_SHELL, ACCOUNT_TYPE_KEYS, nextAccountSortOrder, cents, refusal, refusals, refuse,
+  budgetFilter, listAccounts, netWorthSummary, accountGoneFor, ACCOUNT_SHELL, ACCOUNT_TYPE_KEYS, nextAccountSortOrder, cents, refusal, refusals, refuse,
 } from './helpers.js';
 
 const log = createLogger('Budget');
@@ -18,16 +20,14 @@ const router = express.Router();
  * GET /api/v1/budget/accounts
  * Listet Konten mit Startsaldo und laufendem Saldo; zusätzlich das Gesamt-Nettovermögen.
  * Query: ?include_archived=1  (default: nur aktive Konten)
- * Response: { data: { accounts: [], net_worth } }
+ * Response: { data: { accounts: [], net_worth, net_worth_approx?, net_worth_rates_at?, net_worth_by_currency? } }
+ * (netWorthSummary in helpers.js, #2302)
  */
 router.get('/accounts', (req, res) => {
   try {
     const includeArchived = req.query.include_archived === '1' || req.query.include_archived === 'true';
     const accounts = listAccounts(includeArchived, budgetFilter(req, 'e', { scoped: false }));
-    const netWorth = cents(accounts
-      .filter((a) => !a.archived)
-      .reduce((sum, a) => sum + a.current_balance, 0));
-    res.json({ data: { accounts, net_worth: netWorth } });
+    res.json({ data: { accounts, ...netWorthSummary(accounts) } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Internal error', code: 500 });
@@ -63,7 +63,8 @@ router.post('/accounts', (req, res) => {
       return refuse(res, [refusal('account_credit_limit_invalid', 'Credit limit must not be negative.')]);
     }
 
-    const currency = req.body.currency ? str(req.body.currency, 'Currency', { max: 8 }).value : null;
+    const currency = accountCurrencyInput(req.body.currency);
+    if (currency === undefined) return refuse(res, [CURRENCY_REFUSAL()]);
     const color    = vColor.value;
 
     const result = db.get().prepare(`
@@ -85,12 +86,33 @@ router.post('/accounts', (req, res) => {
 });
 
 /**
+ * Die Waehrung eines Kontos: ein Code aus CURRENCY_CODES, leer heisst
+ * Budget-Waehrung (null), undefined heisst ungueltig. Bis #2302 stand hier ein
+ * freier Text bis 8 Zeichen; ein Code wie "XYZ1" brachte `Intl.NumberFormat`
+ * im Browser zum Werfen, und die Budget-Seite renderte fuer den ganzen
+ * Haushalt nicht mehr. Ein unveraendert mitgeschickter Bestandswert bleibt
+ * stehen - ein Bearbeiten des Namens scheitert nicht an ihm.
+ */
+function accountCurrencyInput(value, current = null) {
+  if (value === null || value === '' || value === undefined) return null;
+  if (current != null && value === current) return current;
+  const code = String(value).trim().toUpperCase();
+  return CURRENCY_CODES.includes(code) ? code : undefined;
+}
+const CURRENCY_REFUSAL = () => refusal('account_currency_invalid', 'Currency must be a supported ISO 4217 code.');
+
+/** Die Abos mit diesem Konto als Vorgabe - ihre wartende Buchung folgt ihm. */
+function subscriptionsOn(accountId) {
+  return db.get().prepare('SELECT id FROM budget_subscriptions WHERE account_id = ?').all(accountId).map((r) => r.id);
+}
+
+/**
  * PUT /api/v1/budget/accounts/:id
  * Konto aktualisieren (Name, Typ, Startsaldo, Währung, Farbe, Archiv-Status,
  * bei Kreditkarten zusätzlich Bank und Kreditlimit).
  * Response: { data: Account }
  */
-router.put('/accounts/:id', (req, res) => {
+router.put('/accounts/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const existing = db.get().prepare('SELECT * FROM budget_accounts WHERE id = ?').get(id);
@@ -109,8 +131,9 @@ router.put('/accounts/:id', (req, res) => {
     if (errors.length) return refuse(res, errors);
 
     const currency = req.body.currency !== undefined
-      ? (req.body.currency ? str(req.body.currency, 'Currency', { max: 8 }).value : null)
+      ? accountCurrencyInput(req.body.currency, existing.currency)
       : existing.currency;
+    if (currency === undefined) return refuse(res, [CURRENCY_REFUSAL()]);
     const color = req.body.color !== undefined
       ? validateColor(req.body.color, 'Color', { allowTokens: true }).value
       : existing.color;
@@ -149,6 +172,21 @@ router.put('/accounts/:id', (req, res) => {
       req.body.starting_balance !== undefined ? cents(req.body.starting_balance) : null,
       currency, color, archived, creditBank, creditLimit, id
     );
+    // ABOS MIT DIESEM KONTO (#1277): die Buchung ihrer naechsten Zahlung
+    // folgt dem Abo, und ein Abo auf einem archivierten Konto bucht ohne Konto
+    // (bookingAccountId in routes/subscriptions.js). Archivieren nimmt ihr das
+    // Konto, Zurueckholen gibt es ihr wieder; bezahlte Buchungen sind nicht
+    // mehr verknuepft und bleiben, wie sie sind.
+    if (Boolean(archived) !== Boolean(existing.archived)) {
+      db.get().prepare(`UPDATE budget_entries SET account_id = ?
+        WHERE id IN (SELECT budget_entry_id FROM budget_subscriptions
+                     WHERE account_id = ? AND budget_entry_id IS NOT NULL)`)
+        .run(archived ? null : id, id);
+    }
+    // Mit dem Konto wechselt die Waehrung ihrer Buchung (#2302).
+    if (Boolean(archived) !== Boolean(existing.archived) || currency !== existing.currency) {
+      await resyncSubscriptionBookings(subscriptionsOn(id));
+    }
 
     const account = listAccounts(true, budgetFilter(req, 'e', { scoped: false })).find((a) => a.id === id);
     res.json({ data: account });
@@ -166,7 +204,7 @@ router.put('/accounts/:id', (req, res) => {
  * (ACCOUNT_SHELL, helpers.js) - die Antwort ist dieselbe 204.
  * Response: 204 No Content
  */
-router.delete('/accounts/:id', (req, res) => {
+router.delete('/accounts/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const filter = budgetFilter(req, 'e', { scoped: false });
@@ -180,6 +218,7 @@ router.delete('/accounts/:id', (req, res) => {
       return refuse(res, [refusal('account_has_transfers', 'This account has linked transfers. Archive it instead.')], 409);
     }
 
+    const affected = subscriptionsOn(id);
     const tx = db.get().transaction(() => {
       // Zuordnung explizit leeren (unabhängig vom FK-Pragma), Einträge bleiben
       // bestehen - aber nur die, die der Aufrufer sieht: ueber fremde private
@@ -192,6 +231,14 @@ router.delete('/accounts/:id', (req, res) => {
       // Dasselbe für das Standardkonto eines Darlehens (#638) - künftige Raten
       // landen dann wieder ohne Kontobezug statt auf einer toten ID.
       db.get().prepare('UPDATE budget_loans SET account_id = NULL WHERE account_id = ?').run(id);
+      // Ebenso die Vorgabe eines Abos (#1277) samt der Buchung seiner naechsten
+      // Zahlung, die ihr folgt - ueber alle Abos, wie beim Darlehen: eine
+      // Vorgabe ist keine gebuchte Tatsache, und die wartende Buchung haette
+      // sonst allein eine Huelle stehen lassen.
+      db.get().prepare(`UPDATE budget_entries SET account_id = NULL
+        WHERE account_id = ? AND id IN (SELECT budget_entry_id FROM budget_subscriptions WHERE account_id = ?)`)
+        .run(id, id);
+      db.get().prepare('UPDATE budget_subscriptions SET account_id = NULL WHERE account_id = ?').run(id);
       const rest = db.get().prepare('SELECT 1 FROM budget_entries WHERE account_id = ? LIMIT 1').get(id);
       if (rest) {
         db.get().prepare('UPDATE budget_accounts SET archived = ? WHERE id = ?').run(ACCOUNT_SHELL, id);
@@ -200,6 +247,7 @@ router.delete('/accounts/:id', (req, res) => {
       }
     });
     tx();
+    await resyncSubscriptionBookings(affected);
 
     res.status(204).end();
   } catch (err) {

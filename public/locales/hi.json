@@ -1188,7 +1188,6 @@
         "pickOne": "कोई कार्यक्रम चुनें",
         "pickOneHint": "समय, स्थान और रिमाइंडर यहाँ दिखेंगे।",
         "syncTargetAssigneeAmbiguous": "कई कैलेंडर में यह व्यक्ति डिफ़ॉल्ट असाइनमेंट है। लक्ष्य स्वयं चुनें।",
-        "syncTargetSeveralAssignees": "कई लोग असाइन हैं, इसलिए असाइनमेंट कोई कैलेंडर नहीं चुनता। इसके बजाय लागू: {{target}}।",
         "filtersSources": "कैलेंडर",
         "filterUnassigned": "किसी को नहीं सौंपे गए",
         "dateSpanSpoken": "{{from}} से {{to}} तक",
@@ -1227,7 +1226,10 @@
         "errorDeleteFeedAdminOnly": "यह कैलेंडर निर्यात हो रहा है। केवल एक व्यवस्थापक इसे हटा सकता है।",
         "errorEventGone": "यह घटना अब मौजूद नहीं है।",
         "errorSelectedCalendarGone": "चुना गया कैलेंडर अब मौजूद नहीं है।",
-        "errorSeriesNoOccurrence": "इस दोहराव से शुरुआती तारीख से एक भी घटना नहीं बनेगी।"
+        "errorSeriesNoOccurrence": "इस दोहराव से शुरुआती तारीख से एक भी घटना नहीं बनेगी।",
+        "localCalendarUploadsHint": "इस कैलेंडर के इवेंट Apple Calendar के ज़रिए iCloud पर अपलोड होते हैं।",
+        "overlapOpenSchedule": "शिफ़्ट शेड्यूल खोलें",
+        "syncTargetNoCalendarForPeople": "किसी कैलेंडर का डिफ़ॉल्ट असाइनमेंट ठीक ये लोग नहीं हैं, इसलिए असाइनमेंट कोई कैलेंडर नहीं चुनता। इसके बजाय: {{target}}।"
     },
     "noteCategories": {
         "categories": "श्रेणियाँ",
@@ -1298,7 +1300,11 @@
         "checklistDone": "पूर्ण",
         "checklistOpen": "खुला",
         "errorNoteGone": "यह नोट अब मौजूद नहीं है।",
-        "errorSelectedCategoryGone": "चुनी गई एक श्रेणी अब मौजूद नहीं है।"
+        "errorSelectedCategoryGone": "चुनी गई एक श्रेणी अब मौजूद नहीं है।",
+        "lockedToggle": "संपादन लॉक करें",
+        "lockedBadge": "लॉक किया गया",
+        "lockedHint": "केवल आप और व्यवस्थापक इस नोट को बदल, पिन या हटा सकते हैं - इसकी चेकलिस्ट के आइटम पर निशान लगाना भी। बाकी सभी इसे पढ़ सकते हैं।",
+        "errorLocked": "यह नोट लॉक है। इसे केवल वह व्यक्ति जिसने इसे बनाया और व्यवस्थापक बदल सकते हैं।"
     },
     "markdown": {
         "bold": "बोल्ड (Ctrl+B)",
@@ -1771,6 +1777,8 @@
         "planSavingsDeleteConfirm": "बचत लक्ष्य हटाएँ?",
         "accountsTab": "खाते",
         "netWorth": "निवल संपत्ति",
+        "netWorthApproxNote": "{{date}} की दरों पर परिवर्तित",
+        "netWorthPerCurrencyNote": "विनिमय दर नहीं - हर मुद्रा का अलग योग",
         "addAccount": "खाता जोड़ें",
         "accountsEmptyTitle": "अभी कोई खाता नहीं",
         "accountsEmptyDescription": "शेष राशि ट्रैक करने के लिए चालू या बचत जैसे खाते जोड़ें।",
@@ -1864,6 +1872,7 @@
         "saveFailed": "इसे सहेजा नहीं जा सका। कृपया विवरण जाँचें।",
         "loanAlreadyPaid": "यह उधार पहले ही पूरा चुकाया जा चुका है।",
         "loanInstallmentAlreadyPaid": "यह किस्त पहले ही चुकाई जा चुकी है।",
+        "loanPaymentRateUnavailable": "खाते की मुद्रा के लिए कोई विनिमय दर ज्ञात नहीं है। ऋण पर कोई दूसरा खाता चुनें, या कोई नहीं।",
         "amountExceedsLoanRemaining": "राशि उधार की बाकी रकम से अधिक है",
         "responsibleNotMember": "केवल परिवार के सदस्य ही जिम्मेदार हो सकते हैं।",
         "seriesStartTooEarly": "आरंभ का दिन श्रृंखला की पहली प्रविष्टि से पहले के महीने में नहीं हो सकता",
@@ -2290,7 +2299,10 @@
             "errorNoCalendarName": "नए कैलेंडर के लिए नाम दर्ज करें.",
             "dropzoneTitle": "ICS फ़ाइल यहाँ खींचें या चुनें",
             "dropzoneTitleTouch": "ICS फ़ाइल चुनने के लिए टैप करें",
-            "dropzoneHint": "केवल .ics फ़ाइलें"
+            "dropzoneHint": "केवल .ics फ़ाइलें",
+            "assigneesLabel": "असाइन करें",
+            "assigneesHint": "नए ईवेंट को ये लोग मिलते हैं। उसी ID से पहले आयात किए गए ईवेंट में ये जोड़े जाते हैं - भले ही उसका असाइनमेंट हाथ से हटाया गया हो।",
+            "successWithAssigned": "आयात किए गए: {{imported}}, पहले से मौजूद: {{skipped}}, इनमें से अब असाइन: {{assigned}}।"
         },
         "memberPhoneLabel": "फ़ोन नंबर (वैकल्पिक)",
         "memberEmailLabel": "ईमेल (वैकल्पिक)",
@@ -3059,10 +3071,7 @@
         "notificationChannelDeleteConfirmDetail": "इस माध्यम से अब कोई सूचना नहीं जाएगी, तत्काल वाली भी नहीं। नए माध्यम के लिए पता और लॉगिन विवरण पूरी तरह दोबारा डालने होंगे।",
         "apiTokensMcpHint": "ये टोकन /mcp पर MCP एंडपॉइंट के लिए Bearer टोकन के रूप में भी काम करते हैं (उदा. Claude Desktop में, AI के ज़रिए कार्य, खरीदारी की वस्तुएँ और इवेंट बनाने के लिए)।",
         "sync": {
-            "defaultAssignee": "डिफ़ॉल्ट असाइनमेंट",
             "defaultAssigneeNone": "कोई नहीं",
-            "defaultAssigneeHint": "नई सिंक की गई घटनाएँ स्वचालित रूप से इस व्यक्ति को सौंपी जाती हैं।",
-            "defaultAssigneeRoutingHint": "डिफ़ॉल्ट असाइनमेंट: किसी कैलेंडर के इवेंट वहाँ चुने गए व्यक्ति को सौंपे जाते हैं, और केवल उसी व्यक्ति को सौंपा गया नया इवेंट उसी कैलेंडर में बनाया जाता है। यह Google और CalDAV कैलेंडर पर लागू होता है, Apple या Outlook पर नहीं।",
             "backfillTitle": "असाइनमेंट भरें",
             "backfillDescription": "डिफ़ॉल्ट असाइनमेंट केवल उन अपॉइंटमेंट पर लागू होता है जो इसे सेट करने के बाद आयात हुए हैं। यहाँ आप इसे सभी खातों से पहले ही आयात हुए अपॉइंटमेंट पर एक बार लागू कर सकते हैं।",
             "backfillAction": "मौजूदा अपॉइंटमेंट पर लागू करें",
@@ -3082,7 +3091,10 @@
             "backfillMovedNext": "अगले दिखाएँ",
             "backfillMovedAll": "सभी चुनें",
             "backfillMovedChange": "{{from}} से {{to}}",
-            "backfillDescriptionMore": "बिना असाइनमेंट वाले अपॉइंटमेंट को यह सीधे मिलता है। जिन अपॉइंटमेंट पर अब भी किसी दूसरे कैलेंडर का डिफ़ॉल्ट असाइनमेंट है, वे चुनने के लिए एक-एक करके दिखाए जाते हैं। कोई भी दूसरा असाइनमेंट नहीं बदलता।"
+            "backfillDescriptionMore": "बिना असाइनमेंट वाले अपॉइंटमेंट को यह सीधे मिलता है। जिन अपॉइंटमेंट पर अब भी किसी दूसरे कैलेंडर का डिफ़ॉल्ट असाइनमेंट है, वे चुनने के लिए एक-एक करके दिखाए जाते हैं। कोई भी दूसरा असाइनमेंट नहीं बदलता।",
+            "defaultAssignees": "डिफ़ॉल्ट असाइनमेंट",
+            "defaultAssigneesHint": "नए सिंक हुए ईवेंट अपने-आप इन लोगों को असाइन होते हैं। पहला व्यक्ति रंग तय करता है।",
+            "defaultAssigneesRoutingHint": "डिफ़ॉल्ट असाइनमेंट: किसी कैलेंडर के ईवेंट को वहाँ चुने गए लोग मिलते हैं, और ठीक इन्हीं लोगों को असाइन किया गया नया ईवेंट उसी कैलेंडर में बनता है। यह Google और CalDAV कैलेंडर पर लागू है, Apple या Outlook पर नहीं।"
         },
         "calendarAssignMeLabel": "नए इवेंट मुझे असाइन करें",
         "calendarDefaultRemindersLabel": "डिफ़ॉल्ट रिमाइंडर",
@@ -3301,6 +3313,8 @@
         "displayDeleteConfirm": "“{{name}}” हटाएँ?",
         "displayPairingCodeLabel": "जोड़ने का कोड",
         "displayPairingCodeHint": "15 मिनट तक वैध और ठीक एक बार ही चलता है। टैबलेट पर /pair खोलें और वहाँ यह कोड डालें। यह केवल अभी दिखाया जाता है।",
+        "displayPairStepCode": "यहाँ एक दीवार टैबलेट जोड़ें और जोड़ने का कोड बनाएँ।",
+        "displayPairStepOpen": "टैबलेट पर यह पता खोलें और वहाँ कोड डालें:",
         "displayDeviceUnnamed": "बिना नाम का डिवाइस",
         "displayDeviceLastSeen": "आखिरी बार देखा गया: {{when}}",
         "displayDeviceNeverSeen": "कभी कनेक्ट नहीं हुआ",
@@ -3405,7 +3419,16 @@
         "permChildRoleHint": "नए बच्चों के खातों को बनते समय अपनी शुरुआती अनुमतियाँ भी मिलती हैं: {{list}}। इसके बाद वे उसी सदस्य के पास दिखती हैं।",
         "activeModulesHintMore": "केवल अपने लिए छिपाने के लिए मॉड्यूल → नेविगेशन पर जाएँ।",
         "permIntroMore": "अलग-अलग सदस्य भूमिका के डिफ़ॉल्ट से भिन्न हो सकते हैं। कुछ भी सेट न होने पर, हर भूमिका को पूर्ण पहुँच होती है; व्यवस्थापकों को हमेशा।",
-        "preferenceSaveFailed": "सेटिंग सहेजी नहीं जा सकी।"
+        "preferenceSaveFailed": "सेटिंग सहेजी नहीं जा सकी।",
+        "caldavCalendarReadOnly": "केवल पढ़ने के लिए: यहाँ नए इवेंट सहेजे नहीं जा सकते",
+        "caldavCalendarReadOnlyWaiting_one": "केवल पढ़ने के लिए: यहाँ अपलोड की प्रतीक्षा कर रहा {{count}} इवेंट नहीं पहुँचेगा",
+        "caldavCalendarReadOnlyWaiting": "केवल पढ़ने के लिए: यहाँ अपलोड की प्रतीक्षा कर रहे {{count}} इवेंट नहीं पहुँचेंगे",
+        "reminderListReadOnly": "केवल पढ़ने के लिए: यहाँ नई प्रविष्टियाँ सहेजी नहीं जा सकतीं",
+        "reminderListReadOnlyWaiting_one": "केवल पढ़ने के लिए: यहाँ अपलोड की प्रतीक्षा कर रही {{count}} प्रविष्टि नहीं पहुँचेगी",
+        "reminderListReadOnlyWaiting": "केवल पढ़ने के लिए: यहाँ अपलोड की प्रतीक्षा कर रही {{count}} प्रविष्टियाँ नहीं पहुँचेंगी",
+        "reminderListAssigneesTasksOnly": "लोग केवल उन सूचियों के लिए तय किए जा सकते हैं जो कार्यों में जाती हैं।",
+        "syncAssigneeNotMember": "यहाँ केवल परिवार के सदस्य चुने जा सकते हैं।",
+        "syncAssigneeUnknown": "यह व्यक्ति अब मौजूद नहीं है। पेज फिर से लोड करें।"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",
@@ -3738,7 +3761,8 @@
         "banner": "ऑफ़लाइन - फिर से कनेक्ट किया जा रहा है…",
         "staleData": "ऑफ़लाइन - अंतिम अपडेट: {{time}}",
         "pageTitle": "आप ऑफ़लाइन हैं",
-        "pageDescription": "इस पेज को कनेक्शन चाहिए। जैसे ही आपका डिवाइस फिर से ऑनलाइन होगा, यह अपने आप लोड हो जाएगा।"
+        "pageDescription": "इस पेज को कनेक्शन चाहिए। जैसे ही आपका डिवाइस फिर से ऑनलाइन होगा, यह अपने आप लोड हो जाएगा।",
+        "snapshot": "सर्वर से कोई कनेक्शन नहीं - सहेजा गया डेटा, केवल पढ़ने के लिए"
     },
     "emptyHint": {
         "recipes": "एक रेसिपी सीधे भोजन योजना या खरीद सूची में जाती है.",
@@ -4366,6 +4390,11 @@
             "missedBook": "{{date}} से छूटी तारीखें दर्ज करें",
             "missedDetail": "{{date}} से {{count}} तारीखें छूट गई हैं।",
             "missedDetail_one": "{{date}} से {{count}} तारीख छूट गई है।",
+            "failing": "दर्ज करना विफल रहा - हर घंटे फिर से कोशिश की जा रही है",
+            "pastQuestion": "तारीख बीत चुकी है",
+            "pastSkip": "{{date}} से शुरू करें",
+            "pastDetail": "{{date}} से {{count}} तारीखें देय हो चुकी होतीं।",
+            "pastDetail_one": "{{date}} से {{count}} तारीख देय हो चुकी होती।",
             "deleteConfirm": "इस दोहराए खर्च को हटाएं?",
             "deleteConfirmDetail": "नए खर्च नहीं बनेंगे। पहले से दर्ज खर्च बने रहेंगे।",
             "show": "दिखाएं",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}} से आपको मिलना है",
         "debtOwes": "{{from}} को {{to}} को देना है",
         "balanced": "हिसाब बराबर",
-        "balancedInGroup": "{{group}}: हिसाब बराबर"
+        "balancedInGroup": "{{group}}: हिसाब बराबर",
+        "totalsByMember": "हर व्यक्ति ने कितना चुकाया",
+        "totalsByMemberHint": "चुकाई गई राशि, नीचे अपना हिस्सा",
+        "ownShare": "अपना हिस्सा: {{amount}}",
+        "paidLabel": "चुकाया",
+        "totalsByCategory": "श्रेणी के अनुसार",
+        "categoryFilter": "खर्चों को श्रेणी के अनुसार फ़िल्टर करें",
+        "noExpensesInCategory": "इस श्रेणी में कोई खर्च नहीं है।"
     },
     "wmo": {
         "0": "साफ आकाश",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "राशि",
         "detailNextPaymentLabel": "अगला भुगतान",
         "renewedNamed": "\"{{name}}\" का भुगतान हुआ - अगला भुगतान {{date}} को।",
-        "completedNamed": "\"{{name}}\" का भुगतान हुआ और समाप्त।"
+        "completedNamed": "\"{{name}}\" का भुगतान हुआ और समाप्त।",
+        "accountHint": "इस सदस्यता का हर भुगतान इसी खाते में दर्ज होता है। किसी एक भुगतान को बजट में बदलें।",
+        "accountArchivedHint": "यह खाता संग्रहीत है। जब तक आप कोई दूसरा खाता नहीं चुनते, सदस्यता बिना खाते के दर्ज होती है।",
+        "accountArchivedOption": "{{name}} (संग्रहीत)",
+        "accountArchivedMeta": "{{name}} संग्रहीत - बिना खाते के दर्ज",
+        "visibilityHint_private": "यह सदस्यता और इसके भुगतान केवल आप देखते हैं।",
+        "visibilityHint_shared": "परिवार के सभी लोग यह सदस्यता और इसके भुगतान देखते हैं।",
+        "errorAccountGone": "चुना गया खाता अब मौजूद नहीं है।"
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "मापन सहेजा नहीं जा सका।",
             "invalidValue": "कृपया मान्य मान दर्ज करें।",
             "range": {
+                "day": "दिन",
                 "week": "सप्ताह",
                 "month": "माह",
                 "year": "वर्ष"
@@ -5003,6 +5047,7 @@
                 "family": "परिवार"
             },
             "sparse": "रुझान दिखाने के लिए बहुत कम माप।",
+            "bandValue": "{{mean}}, {{low}} से {{high}} तक",
             "recentMeasurements": "हाल की मापें",
             "deleteMeasurement": "{{date}} का माप {{value}} हटाएँ",
             "measurementDeleted": "माप हटाई गई",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "{{count}} डुप्लिकेट पिकअप घटना (समान पहचान) एक में विलय कर दी गई।",
         "importDiagnosticOther": "एक कैलेंडर प्रविष्टि अपेक्षित प्रारूप से मेल नहीं खाती।",
         "importUnresolvedBlockingError": "कृपया पहले हर अवरोधक चेतावनी हल करें, या प्रभावित इवेंट को स्पष्ट रूप से छोड़ें।",
-        "importIgnoreLabel": "अनदेखा करें",
         "importCreateNewType": "नया कचरा प्रकार बनाएं",
+        "importLabelsHint": "अगर किसी प्रविष्टि में कई डिब्बे हैं, तो सभी चुनें - हर एक का अपना संग्रह होगा।",
+        "importLabelIgnoredHint": "कोई कचरा प्रकार नहीं चुना गया - इसे आयात नहीं किया जाएगा।",
         "importNewTypeNameRequiredError": "कृपया नए कचरा प्रकार के लिए एक नाम दर्ज करें।",
         "importDefaultSourceName": "आयातित फ़ाइल",
         "importCommittedToast": "आयात लागू हुआ: {{added}} जोड़े गए, {{changed}} बदले गए, {{removed}} हटाए गए।",
@@ -6198,6 +6244,13 @@
         "badgeLow": "लगभग समाप्त",
         "badgeOut": "समाप्त",
         "bestBefore": "उपयोग तिथि {{date}}",
+        "noBestBefore": "बिना उपयोग तिथि",
+        "errorProductHasStock": "यह उत्पाद फिर से स्टॉक में है और हटाया नहीं गया।",
+        "productTotal": "कुल {{quantity}}",
+        "productPlaces": "{{count}} जगहें",
+        "productPlaces_one": "{{count}} जगह",
+        "productBatches": "{{count}} खेपें",
+        "productBatches_one": "{{count}} खेप",
         "increase": "मात्रा बढ़ाएँ",
         "decrease": "मात्रा घटाएँ",
         "toShoppingAll": "सब कुछ खरीदारी सूची में",

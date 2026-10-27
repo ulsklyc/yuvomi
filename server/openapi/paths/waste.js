@@ -227,7 +227,7 @@ export function wastePaths() {
       post: op({
         summary: 'Commit a fresh ICS import as a new source',
         tag: 'Waste',
-        description: 'Re-parses the ICS text (never trusts a client-supplied candidate list) and atomically creates the source, its label mappings, and its imported pickups. Every distinct label reported by a preview of this same file must have exactly one mapping decision: an existing type_id, a new_type to create inline, or ignored. '
+        description: 'Re-parses the ICS text (never trusts a client-supplied candidate list) and atomically creates the source, its label mappings, and its imported pickups. Every distinct label reported by a preview of this same file must have exactly one mapping decision: one or more types (existing type_ids and/or a new_type to create inline - an entry naming several bins becomes one pickup per type), or ignored. '
           + 'A decision that names a type deleted in the meantime is refused with 400 and `reason: "waste_selected_type_not_found"`. 400 with a machine-readable `reason` next to `error` when the calendar hits a limit: `waste_import_empty_file`, `waste_import_no_events` (text without a single calendar entry is never a calendar, #1938; a calendar whose entries all fall outside the import window still previews), `waste_import_file_too_large` (`params.limit_mb`), `waste_import_event_cap_exceeded`, `waste_import_instance_cap_exceeded`, `waste_import_label_cap_exceeded` (each `params.limit`). '
           + 'Refusals only an API caller triggers (no name, a label without a decision, an unacknowledged blocking diagnostic) carry no `reason`.',
         stateChanging: true,
@@ -298,7 +298,7 @@ export function wastePaths() {
     },
     '/api/v1/waste/sources/{id}/mappings/{mappingId}': {
       put: op({
-        summary: 'Edit one label\'s mapping decision without a re-import',
+        summary: 'Edit one label\'s mapping decision (its type set, or ignored) without a re-import',
         tag: 'Waste',
         description: 'Changes only the mapping row. Already-committed imported pickups for this label keep their existing type_id until the next re-import commit applies the changed mapping to the data. A type_id that names a type deleted in the meantime is refused with 400 and `reason: "waste_selected_type_not_found"`.',
         params: [idParam('id', 'Source ID'), idParam('mappingId', 'Mapping ID')],
@@ -311,7 +311,7 @@ export function wastePaths() {
       post: op({
         summary: 'Preview a re-import of an existing source (stateless)',
         tag: 'Waste',
-        description: 'Same as /import/preview, but prefills each label\'s remembered_type_id/remembered_ignored from this source\'s existing mappings and returns expected_version for the commit\'s concurrency check. A URL source is fetched server-side; a fetch that fails answers 502 with the class of the failure as `reason` '
+        description: 'Same as /import/preview, but prefills each label\'s remembered_type_ids/remembered_ignored from this source\'s existing mappings and returns expected_version for the commit\'s concurrency check. A URL source is fetched server-side; a fetch that fails answers 502 with the class of the failure as `reason` '
           + '(`waste_source_fetch_http_status` with `params.status`, `waste_source_fetch_too_large` with `params.limit_mb`, `waste_source_fetch_blocked`, `waste_source_fetch_unreachable`, `waste_source_fetch_no_events` for an answer without a single calendar entry, '
           + 'or the reason of the URL validation). The import limits answer 400 as on POST /waste/import/preview; a FILE without a single calendar entry is one of them (`waste_import_no_events`).',
         params: [idParam()],

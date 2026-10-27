@@ -12,34 +12,60 @@ import { visibilityWhere } from './visibility.js';
 const FOLLOW_ASSIGNMENT = Object.freeze({ grantAssigneesOnly: true });
 import { sqlIsOwnEventUidOfRow } from '../utils/own-uid.js';
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
+import { readDefaultAssignees, readAllDefaultAssignees } from './default-assignees.js';
 
 // --------------------------------------------------------
-// Standard-Zuweisung für synchronisierte Termine (#459).
+// Standard-Zuweisung für synchronisierte Termine (#459, #1897).
 //
-// Wenn ein Sync-Ziel (external_calendars-Zeile oder ics_subscriptions-Zeile) eine
-// `default_assignee_user_id` gesetzt hat, wird sie neu importierten Terminen dieses
-// Ziels zugewiesen. Bewusst nur für NEUE Termine (nicht rückwirkend), damit eine
-// manuell entfernte Zuweisung beim nächsten Sync nicht wiederkehrt.
+// Ein Sync-Ziel (external_calendars-Zeile oder ics_subscriptions-Zeile) traegt
+// eine MENGE Standard-Personen (Migration 265, default-assignees.js). Sie
+// werden neu importierten Terminen dieses Ziels zugewiesen. Bewusst nur für
+// NEUE Termine (nicht rückwirkend), damit eine manuell entfernte Zuweisung
+// beim nächsten Sync nicht wiederkehrt.
 // --------------------------------------------------------
+
+/** Eine Person, eine Liste oder nichts - als Liste ohne Doppelte. */
+function asIdList(userIds) {
+  if (userIds == null) return [];
+  const list = Array.isArray(userIds) ? userIds : [userIds];
+  return [...new Set(list.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+}
+
+/** Nur Personen, die es (noch) gibt, in der gegebenen Reihenfolge. */
+function existingUsers(d, userIds) {
+  const exists = d.prepare('SELECT 1 FROM users WHERE id = ?');
+  return asIdList(userIds).filter((id) => exists.get(id));
+}
 
 /**
- * Weist einem frisch angelegten Termin die Standard-Person zu.
- * No-op, wenn keine Person konfiguriert ist oder sie nicht (mehr) existiert.
+ * Die Standard-Personen eines Kalenders (external_calendars.id).
+ * @param {object} d
+ * @param {number|null} calRefId
+ * @returns {number[]}
+ */
+export function calendarDefaultAssignees(d, calRefId) {
+  return readDefaultAssignees(d, 'calendar', calRefId);
+}
+
+/**
+ * Weist einem frisch angelegten Termin die Standard-Personen zu.
+ * No-op, wenn keine Person konfiguriert ist oder keine (mehr) existiert. Die
+ * erste Person wird die primaere (`assigned_to`), wenn die Spalte noch leer ist.
  *
  * @param {object} d       better-sqlite3 Datenbank-Handle
  * @param {number} eventId ID des neu eingefügten Termins
- * @param {number|null} userId  Standard-zugewiesene User-ID des Sync-Ziels
+ * @param {number|number[]|null} userIds  Standard-Personen des Sync-Ziels
  */
-export function assignDefaultToEvent(d, eventId, userId) {
-  if (!eventId || !userId) return;
+export function assignDefaultToEvent(d, eventId, userIds) {
+  if (!eventId) return;
   // Verwaiste Referenz (Nutzer gelöscht) still ignorieren.
-  const exists = d.prepare('SELECT 1 FROM users WHERE id = ?').get(userId);
-  if (!exists) return;
+  const ids = existingUsers(d, userIds);
+  if (!ids.length) return;
 
   d.prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ? AND assigned_to IS NULL')
-    .run(userId, eventId);
-  d.prepare('INSERT OR IGNORE INTO event_assignments (event_id, user_id) VALUES (?, ?)')
-    .run(eventId, userId);
+    .run(ids[0], eventId);
+  const insert = d.prepare('INSERT OR IGNORE INTO event_assignments (event_id, user_id) VALUES (?, ?)');
+  for (const userId of ids) insert.run(eventId, userId);
 }
 
 /**
@@ -62,11 +88,11 @@ export function assignDefaultToEvent(d, eventId, userId) {
  * @param {object} d               Datenbank-Handle
  * @param {number} eventId         die neu angelegte Ausnahme
  * @param {number|null} masterId   Zeile der Serie, falls bekannt
- * @param {number|null} defaultUserId  Standard-Person des Kalenders
+ * @param {number|number[]|null} defaultUserIds  Standard-Personen des Kalenders
  */
-export function assignNewOverride(d, eventId, masterId, defaultUserId) {
+export function assignNewOverride(d, eventId, masterId, defaultUserIds) {
   if (eventId && masterId && copyMasterAssignment(d, eventId, masterId)) return;
-  assignDefaultToEvent(d, eventId, defaultUserId);
+  assignDefaultToEvent(d, eventId, defaultUserIds);
 }
 
 function copyMasterAssignment(d, eventId, masterId) {
@@ -166,30 +192,61 @@ const NOT_PUSHED_OUTBOUND = `
 `;
 
 // --------------------------------------------------------
-// UNANGETASTET: die Zuweisung ist GENAU eine Person `who` - eine Menge mit einem
-// Element in `event_assignments`, und `assigned_to` leer oder dieselbe (so sah
-// eine Zeile aus, deren Spalte beim Import schon belegt war; assignDefaultToEvent
-// schreibt sie nur, wenn sie NULL ist). Dazu nicht hinausgepusht.
+// DIE MENGE EINES KALENDERS (#1897): die Standard-Personen aus
+// external_calendar_assignees (Migration 265), nur Konten, die es gibt.
+// `cal` ist ein SQL-Ausdruck fuer external_calendars.id, `tag` haelt die
+// Aliase der Unterabfragen auseinander, wo ein Fragment zweimal steht.
+// --------------------------------------------------------
+
+const CALENDAR_SET = (cal, tag) => `
+  SELECT ${tag}.user_id FROM external_calendar_assignees ${tag}
+  JOIN users ${tag}u ON ${tag}u.id = ${tag}.user_id
+  WHERE ${tag}.calendar_id = ${cal}
+`;
+
+const HAS_CALENDAR_SET = (cal, tag) => `EXISTS (${CALENDAR_SET(cal, tag)})`;
+
+// Zwei Kalender nennen dieselbe Menge.
+const SAME_CALENDAR_SET = (a, b, tag) => `
+  NOT EXISTS (SELECT 1 FROM (${CALENDAR_SET(a, `${tag}a`)}) ${tag}x
+    WHERE ${tag}x.user_id NOT IN (${CALENDAR_SET(b, `${tag}b`)}))
+  AND NOT EXISTS (SELECT 1 FROM (${CALENDAR_SET(b, `${tag}c`)}) ${tag}y
+    WHERE ${tag}y.user_id NOT IN (${CALENDAR_SET(a, `${tag}d`)}))
+`;
+
+// --------------------------------------------------------
+// UNANGETASTET: die Zuweisung ist GENAU die Menge des Kalenders `cal` - jede
+// Person der Menge steht in `event_assignments`, keine andere, und
+// `assigned_to` ist leer oder eine von ihnen (so sah eine Zeile aus, deren
+// Spalte beim Import schon belegt war; assignDefaultToEvent schreibt sie nur,
+// wenn sie NULL ist). Dazu nicht hinausgepusht. Mit einer Person ist das die
+// Regel von #1270: GENAU diese eine.
 //
 // EINE Regel fuer ZWEI Stellen: der Umzug zur Laufzeit (#1270,
 // reassignDefaultOnCalendarMove) und das Nachholen alter Umzuege (#1307,
-// MOVED_DEFAULT_EVENTS). `who` ist ein SQL-Ausdruck - ein Parameter bei der
-// einen, eine Spalte bei der anderen - und steht dreimal im Fragment. Der
-// Alias `e` wie bei NOT_PUSHED_OUTBOUND.
+// MOVED_DEFAULT_EVENTS). `cal` ist ein SQL-Ausdruck - ein Parameter bei der
+// einen, eine Spalte bei der anderen. Der Alias `e` wie bei NOT_PUSHED_OUTBOUND.
 // --------------------------------------------------------
 
-const UNTOUCHED_DEFAULT_ASSIGNMENT = (who) => `
+const ASSIGNMENT_IS_CALENDAR_SET = (cal) => `
+  (e.assigned_to IS NULL OR e.assigned_to IN (${CALENDAR_SET(cal, 'uq')}))
+    AND EXISTS (SELECT 1 FROM event_assignments ua WHERE ua.event_id = e.id)
+    AND NOT EXISTS (SELECT 1 FROM event_assignments ub WHERE ub.event_id = e.id
+      AND ub.user_id NOT IN (${CALENDAR_SET(cal, 'ur')}))
+    AND NOT EXISTS (SELECT 1 FROM (${CALENDAR_SET(cal, 'us')}) uc
+      WHERE NOT EXISTS (SELECT 1 FROM event_assignments ud WHERE ud.event_id = e.id AND ud.user_id = uc.user_id))
+`;
+
+const UNTOUCHED_DEFAULT_ASSIGNMENT = (cal) => `
   ${NOT_PUSHED_OUTBOUND}
-    AND (e.assigned_to IS NULL OR e.assigned_to = ${who})
-    AND EXISTS (SELECT 1 FROM event_assignments ua WHERE ua.event_id = e.id AND ua.user_id = ${who})
-    AND NOT EXISTS (SELECT 1 FROM event_assignments ub WHERE ub.event_id = e.id AND ub.user_id <> ${who})
+    AND ${ASSIGNMENT_IS_CALENDAR_SET(cal)}
 `;
 
 const UNASSIGNED_MAPPED_EVENTS = `
   FROM calendar_events e
   JOIN external_calendars ec ON ec.id = e.calendar_ref_id
-  JOIN users u ON u.id = ec.default_assignee_user_id
   WHERE e.external_source = ec.source
+    AND ${HAS_CALENDAR_SET('ec.id', 'bk')}
     AND ${NOT_PUSHED_OUTBOUND}
     AND e.assigned_to IS NULL
     AND NOT EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id)
@@ -239,20 +296,23 @@ const UNASSIGNED_MAPPED_EVENTS = `
 // es sie selbst, war schon eine Hand daran, und es bleibt, wie es ist.
 // --------------------------------------------------------
 
+// Mit Mengen (#1897): der Termin traegt genau die Menge eines anderen
+// Kalenders A und nicht die seines Kalenders B. Ein Termin aus "Zusammen"
+// (Anna und Ben), der nach "Ben" gezogen ist, steht also als "Anna, Ben ->
+// Ben" in der Liste.
 const MOVED_DEFAULT_EVENTS = `
   FROM calendar_events e
   JOIN external_calendars ec ON ec.id = e.calendar_ref_id
-  JOIN users u ON u.id = ec.default_assignee_user_id
-  JOIN event_assignments cur ON cur.event_id = e.id
   WHERE e.external_source = ec.source
     AND e.user_modified = 0
-    AND cur.user_id <> ec.default_assignee_user_id
-    AND ${UNTOUCHED_DEFAULT_ASSIGNMENT('cur.user_id')}
+    AND ${HAS_CALENDAR_SET('ec.id', 'mb')}
+    AND NOT (${ASSIGNMENT_IS_CALENDAR_SET('ec.id')})
+    AND ${NOT_PUSHED_OUTBOUND}
     AND EXISTS (
       SELECT 1 FROM external_calendars eca
       WHERE eca.source = ec.source
         AND eca.id <> ec.id
-        AND eca.default_assignee_user_id = cur.user_id
+        AND ${ASSIGNMENT_IS_CALENDAR_SET('eca.id')}
         AND (ec.source <> 'caldav' OR EXISTS (
           SELECT 1 FROM caldav_calendar_selection sa
           JOIN caldav_calendar_selection sb ON sb.account_id = sa.account_id
@@ -273,14 +333,59 @@ const MOVED_DEFAULT_EVENTS = `
  * @param {number} toUserId
  * @param {string} nowKey remindAtCompareKey(jetzt)
  */
-function moveDefaultAssignment(d, eventId, toUserId, nowKey) {
-  d.prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ?').run(toUserId, eventId);
-  setEventAssignments(d, eventId, [toUserId], FOLLOW_ASSIGNMENT);
-  d.prepare(`
+function moveDefaultAssignment(d, eventId, toUserIds, nowKey) {
+  d.prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ?').run(toUserIds[0], eventId);
+  setEventAssignments(d, eventId, toUserIds, FOLLOW_ASSIGNMENT);
+  settlePastInheritedReminders(d, eventId, toUserIds, nowKey);
+}
+
+/**
+ * Geerbte Erinnerungen der Personen, deren Zeit vorbei ist, gelten als
+ * verworfen: der Scheduler verschickte sonst jede sofort (#1154).
+ * @param {object} d
+ * @param {number} eventId
+ * @param {number[]} userIds
+ * @param {string} nowKey remindAtCompareKey(jetzt)
+ */
+export function settlePastInheritedReminders(d, eventId, userIds, nowKey) {
+  const settle = d.prepare(`
     UPDATE reminders SET dismissed = 1
     WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
       AND assigned_from IS NOT NULL AND ${remindAtUtcSql('remind_at')} <= ?
-  `).run(eventId, toUserId, nowKey);
+  `);
+  for (const userId of userIds) settle.run(eventId, userId, nowKey);
+}
+
+/** Zwei Mengen von Personen sind gleich, unabhaengig von der Reihenfolge. */
+function sameIds(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  const set = new Set(a.map(Number));
+  return b.every((id) => set.has(Number(id)));
+}
+
+/**
+ * Liest die Personen an einem Termin, primaere zuerst, dann nach Id. Einmal
+ * vorbereitet und je Termin gerufen - die Pruefung der Umzuege laeuft ueber
+ * bis zu 5000 Eintraege (#1440).
+ * @returns {(eventId: number) => number[]}
+ */
+function eventAssigneesReader(d) {
+  const stmt = d.prepare(`
+    SELECT a.user_id FROM event_assignments a
+    JOIN calendar_events e ON e.id = a.event_id
+    WHERE a.event_id = ?
+    ORDER BY CASE WHEN a.user_id = e.assigned_to THEN 0 ELSE 1 END, a.user_id
+  `);
+  return (eventId) => stmt.all(eventId).map((r) => Number(r.user_id));
+}
+
+/** Dasselbe fuer die Menge eines Kalenders. @returns {(calendarId: number) => number[]} */
+function calendarSetReader(d) {
+  const stmt = d.prepare(`
+    SELECT a.user_id FROM external_calendar_assignees a JOIN users u ON u.id = a.user_id
+    WHERE a.calendar_id = ? ORDER BY a.position, a.user_id
+  `);
+  return (calendarId) => stmt.all(calendarId).map((r) => Number(r.user_id));
 }
 
 /**
@@ -293,18 +398,19 @@ export const backfillBatch = { size: 50 };
 
 /**
  * Die Kandidaten des Nachtragens, wie sie JETZT sind: Termin ohne Zuweisung und
- * die Person seines Kalenders (#1154). Die Route vergleicht sie mit der
- * bestätigten Menge und reicht genau diese Liste an
+ * die Personen seines Kalenders (#1154, #1897). Die Route vergleicht sie mit
+ * der bestätigten Menge und reicht genau diese Liste an
  * applyDefaultAssigneesToExisting() weiter. Umgezogene Termine (#1307) stehen
  * NICHT darin, siehe listMovedCandidates().
  *
  * @param {object} d better-sqlite3 Datenbank-Handle
- * @returns {{ eventId: number, userId: number }[]}
+ * @returns {{ eventId: number, userIds: number[] }[]}
  */
 export function listBackfillCandidates(d) {
+  const sets = readAllDefaultAssignees(d, 'calendar');
   return d.prepare(
-    `SELECT e.id AS eventId, ec.default_assignee_user_id AS userId ${UNASSIGNED_MAPPED_EVENTS} ORDER BY e.id`
-  ).all();
+    `SELECT e.id AS eventId, ec.id AS calendarId ${UNASSIGNED_MAPPED_EVENTS} ORDER BY e.id`
+  ).all().map(({ eventId, calendarId }) => ({ eventId, userIds: sets.get(Number(calendarId)) ?? [] }));
 }
 
 /**
@@ -375,11 +481,27 @@ export function countMovedCandidates(d, { viewerId, after = null }) {
 }
 
 const MOVED_COLUMNS = `
-  e.id AS eventId, ec.default_assignee_user_id AS userId, cur.user_id AS fromUserId,
+  e.id AS eventId, ec.id AS calendarId,
   e.title AS title, e.start_datetime AS startDatetime, e.all_day AS allDay,
-  ec.name AS calendarName, u.display_name AS toName,
-  (SELECT fu.display_name FROM users fu WHERE fu.id = cur.user_id) AS fromName
+  ec.name AS calendarName
 `;
+
+/**
+ * Eine Zeile der Umzugsliste mit beiden Mengen: `fromUserIds` steht am Termin,
+ * `userIds` ist die Menge seines Kalenders. Die Namen in derselben Reihenfolge.
+ */
+function withMoveSets(d, rows) {
+  if (!rows.length) return rows;
+  const sets = readAllDefaultAssignees(d, 'calendar');
+  const eventAssignees = eventAssigneesReader(d);
+  const nameOf = d.prepare('SELECT display_name FROM users WHERE id = ?');
+  const names = (ids) => ids.map((id) => nameOf.get(id)?.display_name ?? '');
+  return rows.map(({ calendarId, ...row }) => {
+    const userIds = sets.get(Number(calendarId)) ?? [];
+    const fromUserIds = eventAssignees(row.eventId);
+    return { ...row, userIds, fromUserIds, toNames: names(userIds), fromNames: names(fromUserIds) };
+  });
+}
 
 /**
  * Die vor #1306 umgezogenen Termine (#1307), wie sie JETZT sind - eine Seite der
@@ -391,19 +513,19 @@ const MOVED_COLUMNS = `
  * @param {{ viewerId: number, limit: number,
  *   after?: { afterId: number, afterStart: string } | null }} options
  *   nur fuer `viewerId` sichtbare Termine, hoechstens `limit`, nach dem Zeiger
- * @returns {{ eventId: number, userId: number, fromUserId: number, title: string,
- *   startDatetime: string, allDay: number, calendarName: string, fromName: string,
- *   toName: string }[]} nach Beginn sortiert, bei gleichem Beginn nach ID
+ * @returns {{ eventId: number, userIds: number[], fromUserIds: number[], title: string,
+ *   startDatetime: string, allDay: number, calendarName: string, fromNames: string[],
+ *   toNames: string[] }[]} nach Beginn sortiert, bei gleichem Beginn nach ID
  */
 export function listMovedCandidates(d, { viewerId, limit, after = null }) {
-  return d.prepare(`
+  return withMoveSets(d, d.prepare(`
     SELECT ${MOVED_COLUMNS}
     ${MOVED_DEFAULT_EVENTS}
       AND ${MOVED_VISIBLE_TO_VIEWER}
       ${after ? `AND ${AFTER_CURSOR}` : ''}
     ORDER BY e.start_datetime, e.id
     LIMIT @limit
-  `).all({ viewerId, limit, ...(after ?? {}) });
+  `).all({ viewerId, limit, ...(after ?? {}) }));
 }
 
 /**
@@ -421,22 +543,26 @@ export function listMovedCandidates(d, { viewerId, limit, after = null }) {
  * Zeile ab.
  *
  * @param {object} d better-sqlite3 Datenbank-Handle
- * @param {{ eventId: number, userId: number, fromUserId: number }[]} moves
+ * @param {{ eventId: number, userIds: number[], fromUserIds: number[] }[]} moves
  * @param {{ viewerId: number, batchSize?: number }} options
  * @returns {Promise<boolean>}
  */
 export async function movesStillOffered(d, moves, { viewerId, batchSize = backfillBatch.size }) {
   const current = d.prepare(`
-    SELECT ec.default_assignee_user_id AS userId, cur.user_id AS fromUserId
+    SELECT ec.id AS calendarId
     ${MOVED_DEFAULT_EVENTS}
       AND e.id = @eventId
       AND ${MOVED_VISIBLE_TO_VIEWER}
   `);
+  const eventAssignees = eventAssigneesReader(d);
+  const calendarSet = calendarSetReader(d);
   for (let start = 0; start < moves.length; start += batchSize) {
     if (start > 0) await new Promise((resolve) => setImmediate(resolve));
-    for (const { eventId, userId, fromUserId } of moves.slice(start, start + batchSize)) {
+    for (const { eventId, userIds, fromUserIds } of moves.slice(start, start + batchSize)) {
       const row = current.get({ eventId, viewerId });
-      if (!row || row.fromUserId !== fromUserId || row.userId !== userId) return false;
+      if (!row) return false;
+      if (!sameIds(calendarSet(row.calendarId), userIds)) return false;
+      if (!sameIds(eventAssignees(eventId), fromUserIds)) return false;
     }
   }
   return true;
@@ -453,12 +579,15 @@ export async function movesStillOffered(d, moves, { viewerId, batchSize = backfi
  * Rückfrage gezählt hat. Die Liste kommt nach Termin-ID sortiert, der
  * Fingerabdruck ist also für dieselbe Menge immer derselbe.
  *
- * @param {{ eventId: number, userId: number }[]} candidates
+ * Mit einer Person je Kalender ist der Text derselbe wie vor #1897 - ein
+ * Token aus einer Zaehlung vor dem Update bestaetigt also noch dieselbe Menge.
+ *
+ * @param {{ eventId: number, userIds: number[] }[]} candidates
  * @returns {string} SHA-256, hex
  */
 export function backfillCandidatesToken(candidates) {
   const hash = createHash('sha256');
-  for (const { eventId, userId } of candidates) hash.update(`${eventId}:${userId};`);
+  for (const { eventId, userIds } of candidates) hash.update(`${eventId}:${userIds.join(',')};`);
   return hash.digest('hex');
 }
 
@@ -494,11 +623,11 @@ export function backfillCandidatesToken(candidates) {
  * Erinnerungen hat, nimmt den teuren Weg gar nicht erst.
  *
  * @param {object} d better-sqlite3 Datenbank-Handle
- * @param {{ eventId: number, userId: number, fromUserId?: number }[]} [candidates]
+ * @param {{ eventId: number, userIds: number[], fromUserIds?: number[] }[]} [candidates]
  *   bestätigte Liste; Standard: die aktuelle des Nachtragens. Ein Eintrag mit
- *   `fromUserId` ist ein einzeln abgehakter umgezogener Termin (#1307): er wird
- *   nur umgestellt, wenn er beim Schreiben noch genau von dieser Person auf
- *   diese Person ginge.
+ *   `fromUserIds` ist ein einzeln abgehakter umgezogener Termin (#1307): er wird
+ *   nur umgestellt, wenn er beim Schreiben noch genau von diesen Personen auf
+ *   diese Personen ginge.
  * @param {{ batchSize?: number, now?: Date, viewerId?: number|null }} [options]
  * @returns {Promise<number>} Anzahl der zugewiesenen Termine
  */
@@ -510,7 +639,7 @@ export async function applyDefaultAssigneesToExisting(
   // Derselbe Vergleich wie beim Zustellen (#1364): `remind_at` als Zeitpunkt.
   const nowKey = remindAtCompareKey(now);
   const stillEligible = d.prepare(`
-    SELECT ec.default_assignee_user_id AS userId,
+    SELECT ec.id AS calendarId,
            e.created_by AS authorId, e.attachment_document_id AS documentId
     ${UNASSIGNED_MAPPED_EVENTS}
       AND e.id = ?
@@ -526,42 +655,44 @@ export async function applyDefaultAssigneesToExisting(
     WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
       AND ${remindAtUtcSql('remind_at')} > ?
   `);
-  const settlePastInherited = d.prepare(`
-    UPDATE reminders SET dismissed = 1
-    WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
-      AND assigned_from IS NOT NULL AND ${remindAtUtcSql('remind_at')} <= ?
-  `);
-
   // Mit `viewerId` (die Route) gilt beim Schreiben auch die Sichtbarkeit wie in
   // der Vorschau; ohne sie nur die Regel.
   const stillMoved = d.prepare(`
-    SELECT ec.default_assignee_user_id AS userId, cur.user_id AS fromUserId
+    SELECT ec.id AS calendarId
     ${MOVED_DEFAULT_EVENTS}
       AND e.id = @eventId
       ${viewerId == null ? '' : `AND ${MOVED_VISIBLE_TO_VIEWER}`}
   `);
+
+  const eventAssignees = eventAssigneesReader(d);
+  const calendarSet = calendarSetReader(d);
 
   let assigned = 0;
   for (let start = 0; start < candidates.length; start += batchSize) {
     const batch = candidates.slice(start, start + batchSize);
     assigned += d.transaction(() => {
       let written = 0;
-      for (const { eventId, userId, fromUserId } of batch) {
-        if (fromUserId != null) {
+      for (const { eventId, userIds, fromUserIds } of batch) {
+        if (fromUserIds != null) {
           const moved = stillMoved.get(viewerId == null ? { eventId } : { eventId, viewerId });
-          if (!moved || moved.userId !== userId || moved.fromUserId !== fromUserId) continue;
-          moveDefaultAssignment(d, eventId, userId, nowKey);
+          if (!moved) continue;
+          const current = calendarSet(moved.calendarId);
+          if (!sameIds(current, userIds) || !sameIds(eventAssignees(eventId), fromUserIds)) continue;
+          moveDefaultAssignment(d, eventId, current, nowKey);
           written += 1;
           continue;
         }
         const row = stillEligible.get(eventId);
-        if (!row || row.userId !== userId) continue;
-        setPrimary.run(userId, eventId);
+        if (!row) continue;
+        // Die Reihenfolge wie im Kalender: die erste Person wird die primaere.
+        const current = calendarSet(row.calendarId);
+        if (!current.length || !sameIds(current, userIds)) continue;
+        setPrimary.run(current[0], eventId);
         if (row.documentId || (row.authorId !== null && hasFutureTemplate.get(eventId, row.authorId, nowKey))) {
-          setEventAssignments(d, eventId, [userId], FOLLOW_ASSIGNMENT);
-          settlePastInherited.run(eventId, userId, nowKey);
+          setEventAssignments(d, eventId, current, FOLLOW_ASSIGNMENT);
+          settlePastInheritedReminders(d, eventId, current, nowKey);
         } else {
-          addAssignment.run(eventId, userId);
+          for (const userId of current) addAssignment.run(eventId, userId);
         }
         written += 1;
       }
@@ -641,8 +772,8 @@ export async function applyDefaultAssigneesToExisting(
  * @param {object} move
  * @param {number|null} move.fromCalRefId external_calendars.id VOR dem Umzug
  * @param {number|null} move.toCalRefId   external_calendars.id NACH dem Umzug
- * @param {number|null} move.toDefaultUserId Standard-Person des neuen Kalenders
- *        (die Aufrufer loesen sie einmal je Kalender auf, nicht je Termin)
+ * @param {number[]|number|null} move.toDefaultUserIds Standard-Personen des neuen
+ *        Kalenders (die Aufrufer loesen sie einmal je Kalender auf, nicht je Termin)
  * @param {Date} [move.now] Bezugszeitpunkt fuer "vergangen"; ersetzbar fuer
  *        Tests, wie bei `applyDefaultAssigneesToExisting()`
  * @returns {boolean} true, wenn die Zuweisung umgestellt wurde
@@ -650,31 +781,28 @@ export async function applyDefaultAssigneesToExisting(
 export function reassignDefaultOnCalendarMove(
   d,
   eventId,
-  { fromCalRefId = null, toCalRefId = null, toDefaultUserId = null, now = new Date() } = {},
+  { fromCalRefId = null, toCalRefId = null, toDefaultUserIds = null, now = new Date() } = {},
 ) {
   if (!eventId || fromCalRefId == null || toCalRefId == null) return false;
   if (Number(fromCalRefId) === Number(toCalRefId)) return false;
-  if (!toDefaultUserId) return false;
-
-  const fromDefault = d.prepare(
-    'SELECT default_assignee_user_id FROM external_calendars WHERE id = ?'
-  ).get(fromCalRefId)?.default_assignee_user_id ?? null;
-  if (!fromDefault) return false;
-  if (Number(fromDefault) === Number(toDefaultUserId)) return false;
-
-  // GENAU die unangetastete Standard-Person von A, und nicht hinausgepusht: an
-  // einem hinausgepushten Termin war schon eine Hand, auch wenn er dieselbe
-  // Person nennt wie der Kalender, in dem er liegt. Dieselbe Regel wie beim
-  // Nachholen alter Umzuege (#1307).
-  const untouched = d.prepare(
-    `SELECT 1 FROM calendar_events e WHERE e.id = @eventId AND ${UNTOUCHED_DEFAULT_ASSIGNMENT('@fromUser')}`
-  ).get({ eventId, fromUser: Number(fromDefault) });
-  if (!untouched) return false;
-
   // Verwaiste Referenz (Nutzer gelöscht) still ignorieren, wie in
   // assignDefaultToEvent.
-  if (!d.prepare('SELECT 1 FROM users WHERE id = ?').get(toDefaultUserId)) return false;
+  const toIds = existingUsers(d, toDefaultUserIds);
+  if (!toIds.length) return false;
 
-  moveDefaultAssignment(d, eventId, toDefaultUserId, remindAtCompareKey(now));
+  const fromIds = calendarDefaultAssignees(d, fromCalRefId);
+  if (!fromIds.length) return false;
+  if (sameIds(fromIds, toIds)) return false;
+
+  // GENAU die unangetastete Menge von A, und nicht hinausgepusht: an einem
+  // hinausgepushten Termin war schon eine Hand, auch wenn er dieselben
+  // Personen nennt wie der Kalender, in dem er liegt. Dieselbe Regel wie beim
+  // Nachholen alter Umzuege (#1307).
+  const untouched = d.prepare(
+    `SELECT 1 FROM calendar_events e WHERE e.id = @eventId AND ${UNTOUCHED_DEFAULT_ASSIGNMENT('@fromCal')}`
+  ).get({ eventId, fromCal: Number(fromCalRefId) });
+  if (!untouched) return false;
+
+  moveDefaultAssignment(d, eventId, toIds, remindAtCompareKey(now));
   return true;
 }

@@ -47,6 +47,7 @@
  * mit `created_by`, die offenen Einladungen und die offenen Kopplungscodes des
  * Kontos.
  */
+import { dropDefaultAssignee } from './default-assignees.js';
 import { deleteBirthdayArtifacts } from './birthdays.js';
 import { closeFormerMoney } from './reward-money.js';
 
@@ -125,6 +126,12 @@ export const PRIVATE_USER_COLUMNS = new Set([
   // Buchung bleibt loeschbar, der Plan geht per CASCADE mit. Die BUCHUNGEN
   // (`reward_ledger`) sind die Spur und bleiben es.
   'reward_allowances.user_id',
+  // Standard-Personen einer Sync-Quelle (#1897, #1221): eine Einstellung an
+  // Kalender, Abo oder Erinnerungsliste, die auf das Konto zeigt, keine Daten
+  // des Haushalts. Wie die alte Spalte, die beim Entfernen auf NULL ging.
+  'external_calendar_assignees.user_id',
+  'ics_subscription_assignees.user_id',
+  'caldav_reminder_assignees.user_id',
   // Dasselbe gilt fuer die Kontozeile: ein eroeffnetes, nie benutztes Konto.
   'reward_money_accounts.user_id',
   'note_categories.owner_user_id',
@@ -233,7 +240,11 @@ function endSessions(database, userId) {
 
 /** Verweise ohne Fremdschluessel, die auf ein Konto zeigen, das keines mehr ist. */
 function clearDefaultAssignee(database, userId) {
-  // Standard-Zuweisungen von Sync-Zielen (kein FK auf diesen Spalten, #459).
+  // Standard-Personen von Sync-Quellen (#459, #1897). Die Join-Tabellen haben
+  // einen Fremdschluessel, beim Deaktivieren bleibt die users-Zeile aber
+  // stehen. Die alte Spalte liest seit Migration 265 niemand mehr; sie geht
+  // trotzdem auf NULL, damit keine Zeile mehr auf das Konto zeigt.
+  dropDefaultAssignee(database, userId);
   database.prepare('UPDATE ics_subscriptions SET default_assignee_user_id = NULL WHERE default_assignee_user_id = ?').run(userId);
   database.prepare('UPDATE external_calendars SET default_assignee_user_id = NULL WHERE default_assignee_user_id = ?').run(userId);
 }

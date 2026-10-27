@@ -177,7 +177,7 @@ describe('CalDAV-Ziel an Events (Issue #241)', () => {
 
       assert.deepStrictEqual(
         data.caldav,
-        [{ accountId, accountName: 'mailbox', calendarUrl: calUrl, calendarName: 'Familie', defaultAssigneeUserId: null }],
+        [{ accountId, accountName: 'mailbox', calendarUrl: calUrl, calendarName: 'Familie', defaultAssigneeUserIds: [], defaultAssigneeUserId: null }],
         'Nicht-Admins müssen die aktivierten CalDAV-Ziele sehen'
       );
       // Ohne Google-Verbindung bleibt die Gruppe leer statt die Antwort zu kippen.
@@ -188,15 +188,17 @@ describe('CalDAV-Ziel an Events (Issue #241)', () => {
       // Das Formular liest sie rückwärts: ein neuer Termin für diese Person
       // bekommt diesen Kalender als Ziel. Sie hängt an der Kalender-URL.
       const d = db.get();
-      d.prepare(
-        `INSERT INTO external_calendars (source, external_id, name, color, default_assignee_user_id)
-         VALUES ('caldav', ?, 'Familie', '#4A90E2', ?)`
-      ).run(calUrl, userId);
+      const ref = d.prepare(
+        `INSERT INTO external_calendars (source, external_id, name, color)
+         VALUES ('caldav', ?, 'Familie', '#4A90E2')`
+      ).run(calUrl).lastInsertRowid;
+      d.prepare('INSERT INTO external_calendar_assignees (calendar_id, user_id) VALUES (?, ?)').run(ref, userId);
       try {
         const res = await fetch(`${baseUrl}/calendar/sync-targets`);
         const { data } = await res.json();
         assert.strictEqual(data.caldav[0].defaultAssigneeUserId, userId,
           'ohne das Feld kann das Formular den Kalender der Person nicht finden');
+        assert.deepStrictEqual(data.caldav[0].defaultAssigneeUserIds, [userId], 'die Menge (#1897)');
       } finally {
         d.prepare(`DELETE FROM external_calendars WHERE source = 'caldav' AND external_id = ?`).run(calUrl);
       }

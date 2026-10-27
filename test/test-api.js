@@ -776,7 +776,7 @@ const EXPLAINED_REFUSALS = [
   ['routes/calendar/sync-targets.js', 'Write access to the calendar is required.', 'cross_module_access'],
   // Der Satz steht in der Fehlerklasse; die Antwort baut `sendDocumentLinkRefusal`.
   ['services/document-links.js', 'err.message, code: 403', 'cross_module_access'],
-  ['routes/contacts.js', 'Familienmitglieder können nicht aus der Kontaktliste gelöscht werden.', 'family_member_contact'],
+  ['routes/contacts.js', 'A household member cannot be deleted from the contact list.', 'family_member_contact'],
   ['routes/contacts.js', 'can change the email addresses of a household member.', 'contact_email_protected'],
   ['routes/documents.js', 'Not authorized to delete every document in this folder.', 'FOLDER_DOCUMENTS_NOT_MANAGEABLE'],
 ];
@@ -877,6 +877,12 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/calendar/crud.js: error.code', { sites: 1, at403: [['not_authorized', 'services/calendar-occurrence-overrides.js']],
     why: 'sendCalendarOccurrenceError: 403 nur bei not_authorized, sonst 400/404/409' }],
   ['routes/calendar/crud.js: eligibility.reason', { sites: 1, at403: [], why: 'feste 400' }],
+  // Personen einer Sync-Quelle (#1897, #1221, #1940): validateAssigneeIds
+  // (services/default-assignees.js) liefert den Grund, die Routen senden ihn an
+  // einer festen 400.
+  ['routes/calendar/google.js: checked.reason', { sites: 1, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
+  ['routes/calendar/caldav.js: checked.reason', { sites: 1, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
+  ['routes/calendar/subscriptions.js: assignees.reason', { sites: 3, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
   ['services/calendar-occurrence-overrides.js: eligible ? null : \'ineligible_series\'', { sites: 1, at403: [],
     why: 'keine Antwort; wird zu error.code und reist mit 400' }],
   ['routes/tasks.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],
@@ -1143,8 +1149,8 @@ test('die drei Absagen aus #1640 haben ihren Satz, und jeder Satz steht in jeder
 // Saetze ohne Grund: sie sagen nur, DASS die Berechtigung fehlt.
 const PLAIN_REFUSALS = new Set([
   'Admin access required.', 'Not authorized.', 'Permission denied.', 'Forbidden.', 'Not allowed.',
-  'Nicht autorisiert.', 'Keine Berechtigung', 'Keine Berechtigung fuer dieses Ziel.',
-  'Keine Berechtigung, für diese Person einzutragen.',
+  'Nicht autorisiert.', 'Keine Berechtigung', 'You cannot view this target.',
+  'You cannot record entries for this person.',
   'You cannot modify this entry.', 'You cannot modify this loan.', 'You cannot modify this subscription.',
   'You cannot change a receipt you may not see.', 'Household category management is not allowed.',
   // Nur mit API-Token erreichbar, nie aus der App.

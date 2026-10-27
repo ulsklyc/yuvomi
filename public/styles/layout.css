@@ -1978,6 +1978,38 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
   transition: transform var(--sheet-in), opacity var(--sheet-fade-in);
 }
 
+/* MEHR-BLATT UND SUCHE STEIGEN WIE DAS DIALOG-BLATT (#1802, glass.css
+ * `sheet-rise`): mit der kritisch gedaempften Blattfeder den vollen Weg vom
+ * unteren Rand, ohne Blende. Die Einfahrt ist eine Animation, nicht die
+ * Transition: deren Startpunkt ist der geschlossene Zustand, und der bleibt
+ * der kurze Hub mit Blende - der Ausgang aendert sich nicht (Entscheidung
+ * 05.10.). Die offene Regel fuehrt deshalb weder `transform` noch `opacity`
+ * in ihrer Transition: eine laufende Transition schlaegt in der Kaskade jede
+ * Animation, der kurze Hub laege ueber dem Aufstieg. Die Deckkraft steht so
+ * sofort auf 1 - das Blatt liegt in diesem Frame noch unter dem Rand. Das Mehr-Blatt hoert ueber der Leiste
+ * auf: sein Weg ist die eigene Hoehe plus die Leiste.
+ * Ohne `linear()` und unter reduzierter Bewegung bleibt es bei den Regeln
+ * oben (Hub + Blende bzw. nur die Blende). */
+@supports (transition-timing-function: linear(0, 1)) {
+  @media (prefers-reduced-motion: no-preference) {
+    @media (max-width: 767px) {
+      .more-sheet {
+        --sheet-rise: calc(100% + var(--nav-bottom-height));
+      }
+
+      .more-sheet[aria-hidden="false"] {
+        animation: sheet-rise var(--sheet-in);
+        transition: translate var(--duration-lg) var(--ease-out);
+      }
+
+      .search-overlay--visible {
+        animation: sheet-rise var(--sheet-in);
+        transition: none;
+      }
+    }
+  }
+}
+
 /* Gruppiert Kopf + Treffer + Schließen. Auf Mobile transparent und
  * bildschirmfüllend (das Overlay trägt die Tönung), Bezugsrahmen für den
  * absolut positionierten Schließen-Button. */
@@ -3116,6 +3148,117 @@ html.fab-steady .page-fab {
    * 431px breit, 72px hinaus). Das Clipping von `main.app-content` macht den
    * Bruch unsichtbar, nicht harmlos. */
   min-width: 0;
+}
+
+/* DER STATUS-SLOT DER TITELZEILE (#1462, Ulas 2026-10-26). Eine Meldung ueber
+ * die Daten der Seite (im Kalender: Schichtplaene ueberlappen) steht als
+ * Zeichen in der Titelzeile, nicht als eigene Kopfzeile: unter 1024px nur das
+ * Zeichen in Zielgroesse, sein Name ist der volle Satz und ein Tipp oeffnet
+ * ihn (Blatt oder Popover); ab 1024px mit kurzem Text daneben. Der Slot steht
+ * nur, solange es etwas zu melden gibt - ohne Meldung nimmt er keine Breite.
+ * Er oeffnet nie eine eigene Zeile (keine Reihenfolge, keine volle Basis;
+ * Guard test:calendar "#1462"). */
+.page-toolbar__status {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+/* Am Slot gebunden: die Knopfhaut (`.btn--ghost`) setzt ihre eigene Tinte. */
+.page-toolbar__status > .page-toolbar__status-btn {
+  gap: var(--space-1);
+  color: var(--color-warning);
+}
+
+/* Messfuehler der Titelbreite (calendar.js `syncPeriodTitleWidth`): dieselbe
+ * Schrift wie der Titel, ausser Fluss und unsichtbar. */
+.page-toolbar__period-probe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  inline-size: auto;
+  min-inline-size: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 1023px) {
+  /* Was das Zeichen der Titelzeile wegnimmt - fuer Koepfe, die ihre
+   * Titelbasis selbst rechnen (Kalender am Tablet). */
+  .page-toolbar:has(> .page-toolbar__status) {
+    --page-status-lead: calc(var(--target-base) + var(--page-toolbar-gap));
+  }
+
+  .page-toolbar__status > .page-toolbar__status-btn {
+    inline-size: var(--target-base);
+    min-inline-size: var(--target-base);
+    block-size: var(--target-base);
+    padding: 0;
+    justify-content: center;
+  }
+
+  .page-toolbar__status-text {
+    display: none;
+  }
+}
+
+/* VARIANTE „ZEITRAUM ALS TITEL" (#1797, Ulas 2026-10-26; DESIGN.md Modulkopf).
+ * Wo der Titel eines Kopfs ein navigierbarer Zeitraum ist, ist ab 1024px der
+ * ZEITRAUM der sichtbare Titel („Oktober 2026", Titelrolle 22px fett, das Jahr
+ * in der Sekundaerfarbe - typography.css), wie in Apples Kalender. Das <h1>
+ * bleibt die Seitenueberschrift und nennt das Modul der Hilfstechnik: per Clip
+ * versteckt, nie per display/visibility (dann fiele es aus dem Baum). Das
+ * Siegel bleibt der Absender und steht vor dem Zeitraum. Die Pfeile stehen
+ * direkt am Titel - VOR ihm, damit sie bei wechselnder Textbreite stillstehen;
+ * „Heute" folgt als Kapsel. Die Mindestbreite des Titels (`--period-title-min`)
+ * misst das Modul je Ansicht, damit auch alles dahinter stillsteht. Unter
+ * 1024px gilt der Kopf der kompakten Klasse unveraendert (Large Title). */
+@media (min-width: 1024px) {
+  /* Im Fluss, nicht absolut (Sonde 19, uk bei 1280): absolut stand das <h1>
+   * in einem Kopf mit eigener Bar-Zeile mittig zwischen beiden Zeilen und
+   * zaehlte als zweite Zeile der Titelzeile. Als 1px-Element steht es in ihr;
+   * die negative Marge gibt die Luecke dahinter zurueck. */
+  .page-toolbar--period-as-title:not(.page-toolbar--in-group) > .page-toolbar__title {
+    flex: 0 0 1px;
+    width: 1px;
+    height: 1px;
+    margin-inline-end: calc(-1 * var(--page-toolbar-gap) - 1px);
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* DER STATUS ALS ZEICHEN, WENN SEIN WORT DIE ZEILE KOSTET (Sonde 19).
+   * Das Modul misst (calendar.js `syncToolbarFit`): passt die eine Zeile nur
+   * ohne das Wort, oder bricht ohne es die Titelzeile, steht nur das Zeichen
+   * in Zielgroesse - der Name bleibt der volle Satz, ein Klick oeffnet ihn. */
+  .page-toolbar--status-icon > .page-toolbar__status > .page-toolbar__status-btn {
+    inline-size: var(--target-base);
+    min-inline-size: var(--target-base);
+    padding: 0;
+    justify-content: center;
+  }
+
+  .page-toolbar--status-icon > .page-toolbar__status .page-toolbar__status-text {
+    display: none;
+  }
+
+  .page-toolbar--period-as-title .page-toolbar__center .period-stepper__value {
+    order: 1;
+    min-inline-size: var(--period-title-min, auto);
+    text-align: start;
+  }
+
+  .page-toolbar--period-as-title .page-toolbar__center .period-stepper__reset {
+    order: 2;
+  }
+}
+
+@media (min-width: 1024px) and (hover: hover) {
+  .page-toolbar--status-icon > .page-toolbar__status > .page-toolbar__status-btn {
+    inline-size: var(--target-md);
+    min-inline-size: var(--target-md);
+  }
 }
 
 /* AB 1024px GIBT DIE SUCHE NACH, NICHT DIE AKTIONEN (R23, D13; Critique G0
@@ -6828,14 +6971,21 @@ a.popover-menu__item {
  * Grund, `max-width/height` fuer :modal) wird zurueckgenommen, die Polster
  * oben (Safe-Areas) gelten weiter.
  *
- * DIE ABDUNKLUNG LIEGT AUF `::backdrop`, solange der Dialog in der Top-Layer
- * steht - die Werte sind dieselben wie am Overlay (die Regeln oben, glass.css
- * und die Rueckfaelle fuer reduzierte Transparenz fuehren `::backdrop` in
- * ihrer Liste). Im Ausgang verlaesst der Dialog die Top-Layer sofort
- * (modal.js, _leaveTopLayer: die Seite ist dann schon wieder bedienbar), und
- * ohne Top-Layer gibt es kein `::backdrop` - dann traegt der Knoten die
- * Abdunklung wieder selbst und blendet sie aus. Beide Zustaende zeigen
- * dieselbe Flaeche, der Wechsel liegt im selben Frame.
+ * DIE ABDUNKLUNG IST EIN EIGENER KNOTEN UNTER DER TAFEL (#1801, Entscheidung
+ * 26.10.): `.modal-overlay__scrim`, das erste Kind des Dialogs. Bis dahin lag
+ * sie auf `::backdrop` (in der Top-Layer) bzw. auf dem Knoten selbst (im
+ * Ausgang) - und weil der Knoten auch der Elternteil der Tafel ist, haette
+ * seine Deckkraft die Tafel mitgenommen: beim Ziehen des Blatts blieb der
+ * Grund deshalb voll. Der eigene Knoten folgt dem Finger per `--sheet-pull`
+ * (utils/sheet-drag.js) wie der Backdrop des Mehr-Blatts, die Tafel bleibt
+ * unberuehrt. Er traegt dieselbe Flaeche in jedem Zustand - in der Top-Layer,
+ * im Ausgang ausserhalb und in einem Browser ohne showModal() (Safari vor
+ * 15.4, die Mindestversion ist 14.1).
+ *
+ * DER DIALOG SELBST BLENDET NIE (`animation: none`, auch im Ausgang). Eine
+ * Deckkraft unter 1 an einem Vorfahren macht ihn zur Backdrop Root, und der
+ * Blur des Grunds saehe die Seite dahinter nicht mehr. Ein- und Ausblenden
+ * liegen am Grund, die Tafel hat ihre eigene Bewegung.
  *
  * Die selbstgebauten `.modal-overlay`-Divs (Hilfe, Kalender-Symbolwahl)
  * behalten ihre Flaeche: die Regeln hier gelten nur dem `<dialog>`. */
@@ -6847,34 +6997,54 @@ dialog.modal-overlay {
   margin: 0;
   border: 0;
   color: inherit;
+  background-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  animation: none;
   /* Ein Wisch ueber das Blatt kettet nicht an die Seite darunter. */
   overscroll-behavior: contain;
 }
 
-/* Nur in der Top-Layer (`[open]` setzt erst showModal()): ohne sie - im
- * Ausgang, oder in einem Browser ohne showModal() (Safari vor 15.4, die
- * Mindestversion ist 14.1) - traegt der Knoten die Abdunklung wie bisher. */
-dialog.modal-overlay[open] {
-  background-color: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
 /* Geschlossen (`[open]` fehlt) blendet das UA-Blatt den Dialog aus; im
- * Ausgang soll er noch zu sehen sein. */
+ * Ausgang soll er noch zu sehen sein. Blenden tut der Grund, nicht er. */
 dialog.modal-overlay.modal-overlay--closing {
   display: flex;
+  animation: none;
 }
 
+/* `::backdrop` traegt nichts (die UA-Toenung kaeme sonst unter den Grund). Ein
+ * Scroll ueber ihm bleibt dort (overflow macht ihn zum Scroll-Container, erst
+ * dann greift overscroll-behavior). */
 dialog.modal-overlay::backdrop {
+  background-color: transparent;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* Der Grund: ueber die ganze Flaeche des Dialogs (auch sein Polster), unter
+ * der Tafel (frueher im Baum, beide positioniert). Er nimmt keinen Zeiger - ein
+ * Tipp daneben trifft weiter den Dialog und schliesst ihn wie bisher.
+ * Die Einblendung fuellt NICHT: eine gehaltene Animation schluege die
+ * Deckkraft aus dem Zug. */
+.modal-overlay__scrim {
+  position: absolute;
+  inset: 0;
   background-color: color-mix(in srgb, var(--color-accent) var(--tint-wash), var(--color-overlay-glass));
   backdrop-filter: var(--blur-xs) saturate(120%);
   -webkit-backdrop-filter: var(--blur-xs) saturate(120%);
-  animation: modal-overlay-in var(--duration-md) var(--ease-out) forwards;
-  /* Ein Scroll ueber dem Grund bleibt dort (overflow macht ihn zum
-   * Scroll-Container, erst dann greift overscroll-behavior). */
-  overflow: hidden;
-  overscroll-behavior: contain;
+  opacity: calc(1 - var(--sheet-pull, 0));
+  pointer-events: none;
+  animation: modal-overlay-in var(--duration-md) var(--ease-out);
+}
+
+/* Im Ausgang blendet der Grund von dort aus, wo der Zug ihn liess (Keyframes
+ * ohne Start). Mobil so lang wie das Blatt (`--duration-md`, unten). */
+.modal-overlay--closing > .modal-overlay__scrim {
+  animation: modal-scrim-out var(--duration-sm) var(--ease-out) forwards;
+}
+
+@keyframes modal-scrim-out {
+  to { opacity: 0; }
 }
 
 /* DAS FORMULAR IN DER DETAILSPALTE (Critique R19). Ab der Split-Schwelle legt
@@ -6898,7 +7068,7 @@ dialog.modal-overlay.modal-overlay--docked {
  * an, sah aber voll bedienbar aus, und der erste Klick auf eine Zeile schloss
  * nur das Formular. Der Hauch ist die halbe leichte Abdunklung, ohne Blur: die
  * Spalte bleibt der Ort, an dem man bearbeitet. */
-dialog.modal-overlay.modal-overlay--docked::backdrop {
+.modal-overlay--docked > .modal-overlay__scrim {
   background-color: color-mix(in srgb, var(--color-overlay-light) var(--tint-hint), transparent);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -7930,7 +8100,8 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
     animation: sheet-out var(--sheet-out) forwards;
   }
 
-  .modal-overlay.modal-overlay--closing {
+  .modal-overlay.modal-overlay--closing,
+  .modal-overlay--closing > .modal-overlay__scrim {
     animation-duration: var(--duration-md);
   }
 }
@@ -7958,7 +8129,8 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
     animation: none;
   }
   .modal-panel.modal-panel--closing,
-  .modal-overlay.modal-overlay--closing {
+  .modal-overlay.modal-overlay--closing,
+  .modal-overlay--closing > .modal-overlay__scrim {
     animation: none;
   }
 
@@ -10866,9 +11038,9 @@ button.btn--loading:is(:enabled, :disabled) {
 
   /* Ohne Blur braucht der Modal-Backdrop wieder volle Deckkraft, damit das
    * dahinterliegende Modul nicht unscharf-frei durchscheint. Dasselbe fuer
-   * den Grund des nativen Dialogs (D7). */
+   * den Grund des nativen Dialogs (`.modal-overlay__scrim`, #1801). */
   .modal-overlay,
-  dialog.modal-overlay::backdrop,
+  .modal-overlay__scrim,
   dialog.dialog-surface::backdrop {
     background-color: var(--color-overlay);
     backdrop-filter: none;

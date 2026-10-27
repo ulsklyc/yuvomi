@@ -11383,6 +11383,295 @@ const MIGRATIONS = [
       END;
     `,
   },
+  {
+    version: 261,
+    description: 'CalDAV: remember whether a calendar or list takes new entries (#1840)',
+    up: `
+      -- DARF HIER GESCHRIEBEN WERDEN (#1840). Die Auflistung liest je
+      -- Collection current-user-privilege-set (RFC 3744); die Ziel-Auswahl der
+      -- Formulare bietet nur an, was neue Eintraege annimmt. 1 = ja, 0 = nein,
+      -- NULL = der Server sagt es nicht (oder die Liste ist von vor dem
+      -- Update): gilt als beschreibbar, wie bisher.
+      ALTER TABLE caldav_calendar_selection ADD COLUMN writable INTEGER;
+      ALTER TABLE caldav_reminder_selection ADD COLUMN writable INTEGER;
+    `,
+  },
+  {
+    version: 262,
+    description: 'notes: a visibility of their own and a lock on a single note (#1514, #1602)',
+    up: `
+      -- SICHTBARKEIT (#1514): 'all' (der Haushalt) oder 'private' (nur wer sie
+      -- angelegt hat), dieselben Woerter wie Aufgaben und Termine (DECISIONS 5).
+      -- Default 'all': jede bestehende Notiz bleibt, wer sie bisher sah.
+      ALTER TABLE notes ADD COLUMN visibility TEXT NOT NULL DEFAULT 'all'
+        CHECK (visibility IN ('all', 'private'));
+      -- SPERRE (#1602): 1 = nur Ersteller:in und Admins aendern die Notiz,
+      -- auch ihre Checklisten-Haken. Default 0, also wie bisher.
+      ALTER TABLE notes ADD COLUMN locked INTEGER NOT NULL DEFAULT 0
+        CHECK (locked IN (0, 1));
+    `,
+  },
+  {
+    version: 263,
+    description: 'split expenses: a recurring expense remembers when it started failing (#1746)',
+    up: `
+      -- Der erste unerwartete Fehlschlag des Buchungslaufs (#1746), ISO-Zeitpunkt
+      -- in UTC, oder NULL. Ein unerwarteter Fehler (ein Bug, die Umgebung)
+      -- pausiert eine Serie bewusst nicht, damit kein Fehler auf unserer Seite
+      -- still die Miete eines Haushalts anhaelt; stattdessen steht er hier und
+      -- die Zeile zeigt ihn. Der Lauf setzt ihn beim ersten Fehlschlag und laesst
+      -- ihn bei weiteren stehen; eine Buchung, ein Bearbeiten und eine Pause aus
+      -- bekanntem Grund leeren ihn (server/services/split-expenses-scheduler.js,
+      -- PUT /split-expenses/recurring/:id). Bestandsserien starten ohne.
+      -- Ein kuenftiger Rebuild von recurring_expenses muss die Spalte mitnehmen.
+      ALTER TABLE recurring_expenses ADD COLUMN failed_at TEXT;
+    `,
+  },
+  {
+    version: 264,
+    description: 'subscriptions: an account as the default for every payment it books (#1277)',
+    up: `
+      -- KONTO AM ABO (#1277): die Vorgabe fuer jede Buchung, die das Abo
+      -- schreibt. NULL = ohne Konto, wie bisher jede Abo-Buchung. Dieselbe
+      -- Referenz wie budget_entries.account_id und budget_loans.account_id;
+      -- die DELETE-Route eines Kontos leert sie zusaetzlich ausdruecklich.
+      ALTER TABLE budget_subscriptions ADD COLUMN account_id INTEGER
+        REFERENCES budget_accounts(id) ON DELETE SET NULL;
+    `,
+  },
+  {
+    version: 265,
+    description: 'sync: several default assignees per calendar, subscription and reminder list (#1897, #1221)',
+    up: `
+      -- MEHRERE STANDARD-PERSONEN JE QUELLE (#1897): ein gemeinsamer Kalender
+      -- ("Zusammen") bringt seine Termine fuer beide Personen herein. Bisher trug
+      -- jede Quelle genau eine Person in default_assignee_user_id (Migration 79).
+      -- Je Elterntabelle eine Join-Tabelle, damit beide Seiten einen echten
+      -- Fremdschluessel haben: verschwindet der Kalender, das Abo, die
+      -- Erinnerungsliste oder das Konto, gehen die Zeilen mit.
+      --
+      -- position: die Reihenfolge der Wahl. Die erste Person ist die primaere
+      -- Zuweisung eines neuen Termins (calendar_events.assigned_to), und deren
+      -- Farbe traegt ein Termin ohne eigene (#891).
+      --
+      -- Die alte Spalte bleibt stehen (Migrationen wachsen nur am Ende, und
+      -- Bestandsinstallationen tragen sie), wird ab hier aber nicht mehr gelesen;
+      -- nur das Entfernen eines Kontos leert sie noch. Ein kuenftiger Umbau einer der drei Elterntabellen mit
+      -- DROP TABLE muss mit foreignKeysOff laufen, sonst raeumt CASCADE diese
+      -- Zeilen ab.
+      CREATE TABLE external_calendar_assignees (
+        calendar_id INTEGER NOT NULL REFERENCES external_calendars(id) ON DELETE CASCADE,
+        user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        position    INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (calendar_id, user_id)
+      );
+      CREATE INDEX idx_external_calendar_assignees_user ON external_calendar_assignees(user_id);
+
+      CREATE TABLE ics_subscription_assignees (
+        subscription_id INTEGER NOT NULL REFERENCES ics_subscriptions(id) ON DELETE CASCADE,
+        user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        position        INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (subscription_id, user_id)
+      );
+      CREATE INDEX idx_ics_subscription_assignees_user ON ics_subscription_assignees(user_id);
+
+      -- Erinnerungslisten (#1221): nur fuer Listen, die auf Aufgaben zeigen; die
+      -- Route lehnt eine Einkaufsliste ab, der Sync liest sie dort nicht.
+      CREATE TABLE caldav_reminder_assignees (
+        selection_id INTEGER NOT NULL REFERENCES caldav_reminder_selection(id) ON DELETE CASCADE,
+        user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        position     INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (selection_id, user_id)
+      );
+      CREATE INDEX idx_caldav_reminder_assignees_user ON caldav_reminder_assignees(user_id);
+
+      -- Die bestehende Einzelperson kommt als einzige Zeile mit. Eine verwaiste
+      -- Referenz (Konto geloescht, die Spalte hatte keinen Fremdschluessel)
+      -- faellt am JOIN heraus - der Sync hat sie ohnehin uebergangen.
+      INSERT INTO external_calendar_assignees (calendar_id, user_id, position)
+        SELECT ec.id, ec.default_assignee_user_id, 0
+          FROM external_calendars ec JOIN users u ON u.id = ec.default_assignee_user_id;
+      INSERT INTO ics_subscription_assignees (subscription_id, user_id, position)
+        SELECT s.id, s.default_assignee_user_id, 0
+          FROM ics_subscriptions s JOIN users u ON u.id = s.default_assignee_user_id;
+    `,
+  },
+  {
+    version: 266,
+    description: 'sync: a mirrored row is marked once a sync run has seen its object (#1839)',
+    up: `
+      -- GESEHEN, NICHT HOCHGELADEN (#1839, Entscheidung 9.10.): eine Zeile gilt
+      -- erst als Spiegel, wenn ein Abruf ihr Objekt auf dem Server gefunden hat.
+      -- "Der PUT hat geantwortet" ist kein Beleg: vor #1837 stempelte ein
+      -- abgelehnter Upload die Zeile zum Spiegel eines Objekts, das es nie gab,
+      -- und der naechste Prune loeschte sie als "anderswo entfernt".
+      --
+      -- 1 setzt nur der Abruf (der Prune, fuer jede Zeile, deren UID er
+      -- gesehen hat), nie der Upload. Der Prune loescht nur gesehene Zeilen;
+      -- eine nie gesehene, hier angelegte faellt auf lokal zurueck und geht
+      -- erneut hinauf. Bestandszeilen starten mit 0: der erste Lauf nach dem
+      -- Update loescht nichts, was er nicht gesehen hat.
+      ALTER TABLE calendar_events ADD COLUMN seen_on_server INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE tasks           ADD COLUMN seen_on_server INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE shopping_items  ADD COLUMN seen_on_server INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
+  {
+    version: 267,
+    description: 'waste: one import label can map to several types (#2273)',
+    up: `
+      -- EIN LABEL, MEHRERE TYPEN (#2273): Dresden nennt zwei Tonnen in einem
+      -- Eintrag ("Leerung Bio-Tonne, Blaue Tonne"). Bisher trug eine Zuordnung
+      -- genau eine type_id (Migration 200) und ein Eintrag wurde genau ein
+      -- Termin (Migration 201). Ab hier haengen die Typen eines Labels in
+      -- waste_source_mapping_types, und ein Eintrag wird ein Termin je Typ -
+      -- Farbe, Uebersicht und Erinnerung bleiben je Tonne.
+      --
+      -- waste_source_mappings wird ohne type_id und ohne ignored neu gebaut:
+      -- "ignoriert" ist jetzt genau "keine Typ-Zeile", eine einzige Wahrheit
+      -- statt zweier Spalten, die sich widersprechen koennten. Keine Tabelle
+      -- verweist auf diese beiden, das DROP raeumt also nichts per CASCADE ab;
+      -- die neue Kindtabelle entsteht erst nach dem Umbau. Ein kuenftiger
+      -- Umbau von waste_source_mappings mit DROP TABLE muss mit foreignKeysOff
+      -- laufen, sonst nimmt CASCADE die Typ-Zeilen mit.
+      CREATE TABLE waste_source_mappings_new (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_id         INTEGER NOT NULL REFERENCES waste_sources(id) ON DELETE CASCADE,
+        original_label    TEXT    NOT NULL,
+        normalized_label  TEXT    NOT NULL,
+        created_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        UNIQUE (source_id, normalized_label)
+      );
+      INSERT INTO waste_source_mappings_new (id, source_id, original_label, normalized_label, created_at, updated_at)
+        SELECT id, source_id, original_label, normalized_label, created_at, updated_at FROM waste_source_mappings;
+
+      -- type_id ohne CASCADE, wie ueberall in Waste: ein Typ, auf den eine
+      -- Zuordnung zeigt, verschwindet nicht still (invariant #5).
+      CREATE TABLE waste_source_mapping_types (
+        mapping_id INTEGER NOT NULL REFERENCES waste_source_mappings_new(id) ON DELETE CASCADE,
+        type_id    INTEGER NOT NULL REFERENCES waste_types(id),
+        PRIMARY KEY (mapping_id, type_id)
+      );
+      INSERT INTO waste_source_mapping_types (mapping_id, type_id)
+        SELECT m.id, m.type_id FROM waste_source_mappings m JOIN waste_types t ON t.id = m.type_id
+        WHERE m.ignored = 0;
+
+      DROP TABLE waste_source_mappings;
+      ALTER TABLE waste_source_mappings_new RENAME TO waste_source_mappings;
+      CREATE TRIGGER trg_waste_source_mappings_updated_at AFTER UPDATE ON waste_source_mappings FOR EACH ROW BEGIN
+        UPDATE waste_source_mappings SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+      CREATE INDEX idx_waste_source_mappings_source ON waste_source_mappings(source_id);
+      CREATE INDEX idx_waste_source_mapping_types_type ON waste_source_mapping_types(type_id);
+
+      -- Ein Eintrag (identity_key) traegt jetzt einen Termin je Typ: die
+      -- Eindeutigkeit wandert von (source_id, identity_key) auf
+      -- (source_id, identity_key, type_id). SQLite aendert keine
+      -- Tabellen-Constraint, daher Umbau; ids bleiben erhalten.
+      CREATE TABLE waste_imported_pickups_new (
+        id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_id          INTEGER NOT NULL REFERENCES waste_sources(id) ON DELETE CASCADE,
+        type_id            INTEGER NOT NULL REFERENCES waste_types(id),
+        identity_key       TEXT    NOT NULL,
+        external_uid       TEXT,
+        original_summary   TEXT,
+        date_key           TEXT    NOT NULL,
+        tz_note            TEXT,
+        created_at         TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at         TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        UNIQUE (source_id, identity_key, type_id)
+      );
+      INSERT INTO waste_imported_pickups_new
+        (id, source_id, type_id, identity_key, external_uid, original_summary, date_key, tz_note, created_at, updated_at)
+        SELECT id, source_id, type_id, identity_key, external_uid, original_summary, date_key, tz_note, created_at, updated_at
+        FROM waste_imported_pickups;
+      DROP TABLE waste_imported_pickups;
+      ALTER TABLE waste_imported_pickups_new RENAME TO waste_imported_pickups;
+      CREATE TRIGGER trg_waste_imported_pickups_updated_at AFTER UPDATE ON waste_imported_pickups FOR EACH ROW BEGIN
+        UPDATE waste_imported_pickups SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+      CREATE INDEX idx_waste_imported_pickups_source ON waste_imported_pickups(source_id);
+      CREATE INDEX idx_waste_imported_pickups_type_date ON waste_imported_pickups(type_id, date_key);
+      CREATE INDEX idx_waste_imported_pickups_source_date ON waste_imported_pickups(source_id, date_key);
+    `,
+  },
+  {
+    version: 268,
+    description: 'CalDAV: one task or shopping row per UID across accounts, and a deleted account releases its rows (#1906, #1885)',
+    // EINE ZEILE JE UID (#1906, Entscheidung 27.10., wie #1879 fuer Termine).
+    // Fuehrten zwei Konten dieselbe Erinnerungsliste, legte jedes seine eigene
+    // Zeile an: dieselbe Aufgabe stand zweimal da. Die Dubletten werden hier
+    // zusammengefuehrt; die AELTERE Zeile (kleinste id) bleibt und behaelt ihr
+    // Konto. Von der juengeren gehen Kommentare, Dokumente und Zuweisungen auf
+    // die aeltere ueber (Doppeltes wird uebersprungen), ebenso ihre
+    // Unteraufgaben, die Folgeaufgaben einer Serie und die Verweise aus der
+    // Haushaltshilfe. Ihre Erledigungen fallen: sie sind fast immer der Spiegel
+    // derselben Erledigung, und doppelt zaehlten Verlauf und Punkte zweimal.
+    // Unteraufgaben haengen VOR dem Loeschen um, sonst naehme CASCADE sie mit;
+    // ihre eigene UID-Gruppe fuehrt sie danach zusammen.
+    //
+    // KONTO WEG, ZEILE BLEIBT (#1885, Entscheidung 27.10.). Wie bei Terminen
+    // (v238, ON DELETE SET NULL): eine Zeile eines geloeschten Kontos verliert
+    // ihr Konto, bleibt Spiegel, und das naechste Konto, das die UID liefert,
+    // uebernimmt sie. Ein Trigger statt eines Fremdschluessels: der haette die
+    // drei grossen Tabellen samt Suchindex und Triggern neu gebaut. Er raeumt
+    // auch die Upload-Ziele (Aufgaben, Termine), die bisher von Hand fielen.
+    up(db) {
+      const groups = (table) => db.prepare(`
+        SELECT external_uid AS uid, MIN(id) AS keep FROM ${table}
+         WHERE external_source = 'caldav' AND external_uid IS NOT NULL
+         GROUP BY external_uid HAVING COUNT(*) > 1
+      `).all();
+      const youngerOf = (table, uid, keep) => db.prepare(`
+        SELECT id FROM ${table} WHERE external_source = 'caldav' AND external_uid = ? AND id <> ?
+      `).all(uid, keep).map((r) => r.id);
+
+      for (const { uid, keep } of groups('tasks')) {
+        for (const drop of youngerOf('tasks', uid, keep)) {
+          db.prepare('UPDATE tasks SET parent_task_id = ? WHERE parent_task_id = ?').run(keep, drop);
+          db.prepare('UPDATE tasks SET recurrence_origin_id = ? WHERE recurrence_origin_id = ?').run(keep, drop);
+          db.prepare('UPDATE task_comments SET task_id = ? WHERE task_id = ?').run(keep, drop);
+          db.prepare('UPDATE OR IGNORE task_documents SET task_id = ? WHERE task_id = ?').run(keep, drop);
+          db.prepare('UPDATE OR IGNORE task_assignments SET task_id = ? WHERE task_id = ?').run(keep, drop);
+          db.prepare('UPDATE housekeeping_work_sessions SET payment_task_id = ? WHERE payment_task_id = ?').run(keep, drop);
+          db.prepare("DELETE FROM caldav_upload_attempts WHERE kind = 'task' AND row_id = ?").run(drop);
+          db.prepare('DELETE FROM tasks WHERE id = ?').run(drop);
+        }
+      }
+      for (const { uid, keep } of groups('shopping_items')) {
+        for (const drop of youngerOf('shopping_items', uid, keep)) {
+          db.prepare('UPDATE housekeeping_supply_requests SET shopping_item_id = ? WHERE shopping_item_id = ?').run(keep, drop);
+          db.prepare("DELETE FROM caldav_upload_attempts WHERE kind = 'item' AND row_id = ?").run(drop);
+          db.prepare('DELETE FROM shopping_items WHERE id = ?').run(drop);
+        }
+      }
+
+      // Bestand, der schon heute auf ein geloeschtes Konto zeigt (gedriftete DB).
+      db.exec(`
+        UPDATE tasks SET external_account_id = NULL
+         WHERE external_account_id IS NOT NULL AND external_account_id NOT IN (SELECT id FROM caldav_accounts);
+        UPDATE shopping_items SET external_account_id = NULL
+         WHERE external_account_id IS NOT NULL AND external_account_id NOT IN (SELECT id FROM caldav_accounts);
+
+        CREATE TRIGGER trg_caldav_accounts_release_rows
+          AFTER DELETE ON caldav_accounts FOR EACH ROW
+          BEGIN
+            UPDATE tasks
+               SET external_account_id = NULL, outbound_dirty = 0, outbound_attempts = 0
+             WHERE external_account_id = OLD.id;
+            UPDATE tasks
+               SET target_caldav_account_id = NULL, target_caldav_list_url = NULL
+             WHERE target_caldav_account_id = OLD.id;
+            UPDATE shopping_items
+               SET external_account_id = NULL, outbound_dirty = 0, outbound_attempts = 0,
+                   outbound_move = 0, outbound_move_attempts = 0, outbound_move_since = NULL, outbound_move_by = NULL
+             WHERE external_account_id = OLD.id;
+            UPDATE calendar_events
+               SET target_caldav_account_id = NULL, target_caldav_calendar_url = NULL
+             WHERE target_caldav_account_id = OLD.id;
+          END;
+      `);
+    },
+  },
 ];
 
 /**
@@ -11749,6 +12038,12 @@ const CRITICAL_COLUMNS = [
   { table: 'contacts', column: 'birthday_year_unknown',
     type: 'INTEGER NOT NULL DEFAULT 0 CHECK(birthday_year_unknown IN (0, 1))',
     backfill: backfillContactBirthdayYearUnknown },
+  // #1839: v266 traegt "gesehen" nach; ohne die Spalten scheitert jeder Prune
+  // von CalDAV und iCloud (er liest und schreibt sie) und jede Buchung eines
+  // Uploads. Kein Nachtrag: 0 ist der Stand, mit dem die Migration beginnt.
+  { table: 'calendar_events', column: 'seen_on_server', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'tasks', column: 'seen_on_server', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'shopping_items', column: 'seen_on_server', type: 'INTEGER NOT NULL DEFAULT 0' },
 ];
 
 /**

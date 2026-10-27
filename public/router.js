@@ -22,7 +22,7 @@ import { showToast, endFeedbackToasts } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
 import { createNavigate, prefetchPathOf, focusMainAfterNavigation, unlessAborted, isCurrentAddress } from '/utils/router-navigate.js';
 import { pageMountTarget } from '/utils/page-mount.js';
-import { friendlyError, unhandledErrorSentence } from '/utils/friendly-error.js';
+import { unhandledErrorSentence } from '/utils/friendly-error.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
 import { dismissFilterPopovers } from '/utils/filter-sheet.js';
 import { watchToastPlacement } from '/utils/toast-placement.js';
@@ -51,6 +51,7 @@ import { hasLeaveGuard, mayLeave } from '/utils/leave-guard.js';
 import { createUpdateFlow, isUserBusy } from '/utils/app-update.js';
 import { createStartHandoff } from '/utils/start-handoff.js';
 import { showSessionUnreachable, showPageUnreachable, isUnreachableFailure } from '/utils/session-unreachable.js';
+import { createOfflineSession } from '/utils/offline-session.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
@@ -836,12 +837,38 @@ const startHandoff = createStartHandoff({
  * Namen sind der Vertrag (NAVIGATE_DEPS): fehlt einer, wirft createNavigate()
  * schon beim Laden.
  */
+// Kaltstart ohne Verbindung aus dem Abzug der letzten Sitzung (#2293,
+// utils/offline-session.js): der Hinweisstreifen sagt es, und sobald der
+// Server antwortet, startet die Sitzung wie jede andere und die Seite holt
+// ihren frischen Stand. Eine 401 dabei meldet api.js als `auth:expired`.
+const offlineSession = createOfflineSession({
+  window,
+  document,
+  verify: () => auth.me(),
+  onChange: () => refreshOfflineBanner(),
+  onVerified: async (result) => {
+    routerState.currentUser = result.user;
+    routerState._preferencesLoaded = false;
+    await syncPreferencesOnce();
+    if (!routerState.currentUser) return;
+    startThirdPartyModulePolling();
+    if (!['split_guest', 'display'].includes(routerState.currentUser.access_scope)) {
+      loadReminderStyles();
+      initReminders();
+      initPushAndReport();
+    }
+    rebuildNavigation();
+    refreshCurrentRoute();
+  },
+});
+
 const navigate = createNavigate(routerState, {
   ROUTES, allRoutes, unknownPathDetour, publicPathDetour, detourPaths, canAccessNavModule,
   location, history, window, document,
   hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
   auth: startHandoff.auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush: initPushAndReport,
   armScreensaver, forgetSessionState,
+  holdOfflineSession: () => offlineSession.start(),
   // Nur ein 401 fuehrt zur Anmeldung; jeder andere Fehler der Sitzungspruefung
   // zeichnet diesen Zustand in #app und versucht selbst erneut (Critique R19).
   showSessionUnreachable: (err, retry) => showSessionUnreachable(document.getElementById('app'), err, retry),
@@ -3506,20 +3533,29 @@ function loadReminderStyles() {
   document.head.appendChild(link);
 }
 
-function initOfflineBanner() {
+/**
+ * Der Streifen steht, solange das Geraet offline ist ODER die App aus dem
+ * Abzug der letzten Sitzung gestartet ist (#2293). Im zweiten Fall meldet
+ * `navigator.onLine` oft "online" (Mobilnetz da, Heimserver nicht erreichbar),
+ * und der Streifen sagt dann, was wirklich gilt: gespeicherter Stand.
+ */
+function refreshOfflineBanner() {
   const banner = document.getElementById('offline-banner');
   if (!banner) return;
   const i18nSpan = banner.querySelector('[data-i18n]');
-  function update() {
-    banner.hidden = navigator.onLine;
-    if (i18nSpan) i18nSpan.textContent = t('offline.banner');
-    document.documentElement.style.setProperty(
-      '--offline-banner-height', navigator.onLine ? '0px' : `${banner.offsetHeight || 40}px`
-    );
-  }
-  window.addEventListener('online', update);
-  window.addEventListener('offline', update);
-  update();
+  const fromSnapshot = offlineSession.isActive();
+  const show = !navigator.onLine || fromSnapshot;
+  banner.hidden = !show;
+  if (i18nSpan) i18nSpan.textContent = t(fromSnapshot ? 'offline.snapshot' : 'offline.banner');
+  document.documentElement.style.setProperty(
+    '--offline-banner-height', show ? `${banner.offsetHeight || 40}px` : '0px'
+  );
+}
+
+function initOfflineBanner() {
+  window.addEventListener('online', refreshOfflineBanner);
+  window.addEventListener('offline', refreshOfflineBanner);
+  refreshOfflineBanner();
 }
 
 /**
@@ -5167,8 +5203,7 @@ function errorDetails(err) {
 
 // Die Zuordnung Fehler -> Satz lebt in utils/friendly-error.js (#1640), damit
 // sie ohne Browser pruefbar ist. Fehlerbildschirm und Rejection sagen
-// unhandledErrorSentence, nie den Text des Servers (#1909);
-// window.yuvomi.friendlyError unten reicht den Uebergang nur weiter.
+// unhandledErrorSentence, nie den Text des Servers (#1909).
 
 // --------------------------------------------------------
 // Globale Fehler-Handler (Error Boundary)
@@ -5287,6 +5322,8 @@ window.addEventListener('popstate', (e) => {
  * Fenster, in dem eine abgeschaltete Route wieder erreichbar waere. */
 function forgetSessionState() {
   routerState.currentUser = null;
+  // Eine ungepruefte Sitzung aus dem Abzug (#2293) endet mit.
+  offlineSession.stop();
   routerState._preferencesLoaded = false;
   forgetZonePrefs();
   _hiddenModules = new Set();
@@ -5672,7 +5709,6 @@ window.yuvomi = {
   // Seitenleiste, Mehr-Blatt und Cmd-K.
   openSearch: () => _openSearch?.(),
   showToast,
-  friendlyError,
   setThemeColor,
   setDisabledModules,
   setHiddenModules,

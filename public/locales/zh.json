@@ -1188,7 +1188,6 @@
         "pickOne": "选择一个日程",
         "pickOneHint": "时间、地点和提醒会显示在这里。",
         "syncTargetAssigneeAmbiguous": "多个日历将此人设为默认分配对象。请自行选择目标。",
-        "syncTargetSeveralAssignees": "已分配多人，因此不会根据分配选择日历。改为使用：{{target}}",
         "filtersSources": "日历",
         "filterUnassigned": "未分配",
         "dateSpanSpoken": "{{from}}至{{to}}",
@@ -1227,7 +1226,10 @@
         "errorDeleteFeedAdminOnly": "此日历正在导出。只有管理员可以删除它。",
         "errorEventGone": "此日程已不存在。",
         "errorSelectedCalendarGone": "所选的日历已不存在。",
-        "errorSeriesNoOccurrence": "按此重复设置，从开始日期起不会有任何日程。"
+        "errorSeriesNoOccurrence": "按此重复设置，从开始日期起不会有任何日程。",
+        "localCalendarUploadsHint": "此日历中的日程会通过 Apple Calendar 上传到 iCloud。",
+        "overlapOpenSchedule": "打开排班",
+        "syncTargetNoCalendarForPeople": "没有日历的默认分配恰好是这些人，因此分配不会选择日历。改用：{{target}}。"
     },
     "noteCategories": {
         "categories": "分类",
@@ -1298,7 +1300,11 @@
         "checklistDone": "已完成",
         "checklistOpen": "待处理",
         "errorNoteGone": "这条便签已不存在。",
-        "errorSelectedCategoryGone": "所选的一个类别已不存在。"
+        "errorSelectedCategoryGone": "所选的一个类别已不存在。",
+        "lockedToggle": "锁定编辑",
+        "lockedBadge": "已锁定",
+        "lockedHint": "只有你和管理员可以更改、置顶或删除这条笔记，包括勾选清单项目。其他人仍可阅读。",
+        "errorLocked": "这条笔记已锁定。只有创建者和管理员可以更改。"
     },
     "markdown": {
         "bold": "加粗 (Ctrl+B)",
@@ -1771,6 +1777,8 @@
         "planSavingsDeleteConfirm": "删除储蓄目标？",
         "accountsTab": "账户",
         "netWorth": "净资产",
+        "netWorthApproxNote": "按 {{date}} 汇率换算",
+        "netWorthPerCurrencyNote": "无汇率 - 按币种分别合计",
         "addAccount": "添加账户",
         "accountsEmptyTitle": "还没有账户",
         "accountsEmptyDescription": "添加活期或储蓄等账户来跟踪你的余额。",
@@ -1864,6 +1872,7 @@
         "saveFailed": "未能保存。请检查填写的内容。",
         "loanAlreadyPaid": "这笔借款已全部还清。",
         "loanInstallmentAlreadyPaid": "这一期已支付。",
+        "loanPaymentRateUnavailable": "该账户币种没有已知汇率。请为贷款选择其他账户，或不选账户。",
         "amountExceedsLoanRemaining": "金额超过借款的剩余金额",
         "responsibleNotMember": "只有家庭成员才能担任负责人。",
         "seriesStartTooEarly": "开始日不能早于系列第一条条目所在的月份",
@@ -2290,7 +2299,10 @@
             "allDuplicates": "没有新活动——全部已存在。",
             "dropzoneTitle": "将 ICS 文件拖到此处或选择文件",
             "dropzoneTitleTouch": "点按以选择 ICS 文件",
-            "dropzoneHint": "仅限 .ics 文件"
+            "dropzoneHint": "仅限 .ics 文件",
+            "assigneesLabel": "分配给",
+            "assigneesHint": "新活动会分配给这些人。以相同 ID 已导入的活动会额外加上他们，即使其分配曾被手动移除。",
+            "successWithAssigned": "已导入：{{imported}}，已存在：{{skipped}}，其中现已分配：{{assigned}}。"
         },
         "memberPhoneLabel": "电话号码（可选）",
         "memberEmailLabel": "电子邮件（可选）",
@@ -3059,10 +3071,7 @@
         "notificationChannelDeleteConfirmDetail": "今后不会再有任何通知通过该渠道发出，紧急通知也不例外。新建渠道需要重新完整填写地址和登录凭据。",
         "apiTokensMcpHint": "这些令牌也可用作 /mcp 上 MCP 端点的 Bearer 令牌（例如在 Claude Desktop 中，通过 AI 创建任务、购物项和日程）。",
         "sync": {
-            "defaultAssignee": "默认分配",
             "defaultAssigneeNone": "无",
-            "defaultAssigneeHint": "新同步的日程会自动分配给此人。",
-            "defaultAssigneeRoutingHint": "默认分配: 日历中的事件会分配给在此选择的人，仅分配给此人的新事件会创建在该日历中。适用于 Google 和 CalDAV 日历，不适用于 Apple 或 Outlook。",
             "backfillTitle": "补充分配",
             "backfillDescription": "默认分配只适用于设置之后导入的日程。你可以在这里将其一次性应用到所有账户中已导入的日程。",
             "backfillAction": "应用到现有日程",
@@ -3082,7 +3091,10 @@
             "backfillMovedNext": "显示下一批",
             "backfillMovedAll": "全选",
             "backfillMovedChange": "从 {{from}} 改为 {{to}}",
-            "backfillDescriptionMore": "未分配的日程会直接获得默认分配。仍带有其他日历默认分配的日程会逐条列出，供你选择。其他任何分配保持不变。"
+            "backfillDescriptionMore": "未分配的日程会直接获得默认分配。仍带有其他日历默认分配的日程会逐条列出，供你选择。其他任何分配保持不变。",
+            "defaultAssignees": "默认分配",
+            "defaultAssigneesHint": "新同步的活动会自动分配给这些人。第一位决定颜色。",
+            "defaultAssigneesRoutingHint": "默认分配：日历中的活动会分配给在那里选择的人，而恰好分配给这些人的新活动会创建在该日历中。适用于 Google 和 CalDAV 日历，不适用于 Apple 或 Outlook。"
         },
         "calendarAssignMeLabel": "将新事件分配给我",
         "calendarDefaultRemindersLabel": "默认提醒",
@@ -3301,6 +3313,8 @@
         "displayDeleteConfirm": "删除「{{name}}」？",
         "displayPairingCodeLabel": "配对码",
         "displayPairingCodeHint": "有效期 15 分钟，且仅能使用一次。在平板上打开 /pair 并在那里输入。它只在此刻显示。",
+        "displayPairStepCode": "在这里添加壁挂平板并生成配对码。",
+        "displayPairStepOpen": "在平板上打开这个地址，并在那里输入配对码：",
         "displayDeviceUnnamed": "未命名设备",
         "displayDeviceLastSeen": "最后连接：{{when}}",
         "displayDeviceNeverSeen": "从未连接过",
@@ -3405,7 +3419,16 @@
         "permChildRoleHint": "新的儿童账户在创建时还会获得自己的初始权限：{{list}}。之后会显示在该成员处。",
         "activeModulesHintMore": "只想在自己这里隐藏，请前往「模块 → 导航」。",
         "permIntroMore": "各个成员可以不同于角色的默认设置。若不设置，每个角色都拥有完全访问权限；管理员始终如此。",
-        "preferenceSaveFailed": "无法保存设置。"
+        "preferenceSaveFailed": "无法保存设置。",
+        "caldavCalendarReadOnly": "只读：无法在此保存新日程",
+        "caldavCalendarReadOnlyWaiting_one": "只读：等待上传到这里的 {{count}} 个日程不会送达",
+        "caldavCalendarReadOnlyWaiting": "只读：等待上传到这里的 {{count}} 个日程不会送达",
+        "reminderListReadOnly": "只读：无法在此保存新条目",
+        "reminderListReadOnlyWaiting_one": "只读：等待上传到这里的 {{count}} 个条目不会送达",
+        "reminderListReadOnlyWaiting": "只读：等待上传到这里的 {{count}} 个条目不会送达",
+        "reminderListAssigneesTasksOnly": "只有进入任务的清单才能设置人员。",
+        "syncAssigneeNotMember": "这里只能选择家庭成员。",
+        "syncAssigneeUnknown": "此人已不存在。请重新加载页面。"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",
@@ -3738,7 +3761,8 @@
         "banner": "离线 - 正在重新连接…",
         "staleData": "离线 - 数据截至：{{time}}",
         "pageTitle": "你已离线",
-        "pageDescription": "此页面需要网络连接。设备恢复在线后会自动加载。"
+        "pageDescription": "此页面需要网络连接。设备恢复在线后会自动加载。",
+        "snapshot": "无法连接到服务器 - 已保存的数据，只读"
     },
     "emptyHint": {
         "recipes": "食谱可以直接进入用餐计划或购物清单。",
@@ -4366,6 +4390,11 @@
             "missedBook": "补记自 {{date}} 起的日期",
             "missedDetail": "自 {{date}} 起已错过 {{count}} 个日期。",
             "missedDetail_one": "自 {{date}} 起已错过 {{count}} 个日期。",
+            "failing": "记账失败 - 每小时重试一次",
+            "pastQuestion": "日期已过",
+            "pastSkip": "从 {{date}} 开始",
+            "pastDetail": "自 {{date}} 起本应有 {{count}} 个到期日期。",
+            "pastDetail_one": "自 {{date}} 起本应有 {{count}} 个到期日期。",
             "deleteConfirm": "删除此定期支出？",
             "deleteConfirmDetail": "不会再创建新的支出。已入账的支出会保留。",
             "show": "显示",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}} 欠你",
         "debtOwes": "{{from}} 欠 {{to}}",
         "balanced": "已结清",
-        "balancedInGroup": "{{group}}：已结清"
+        "balancedInGroup": "{{group}}：已结清",
+        "totalsByMember": "每人已付",
+        "totalsByMemberHint": "各自垫付的金额，下方为自己的份额",
+        "ownShare": "自己的份额：{{amount}}",
+        "paidLabel": "已付",
+        "totalsByCategory": "按类别",
+        "categoryFilter": "按类别筛选支出",
+        "noExpensesInCategory": "此类别没有支出。"
     },
     "wmo": {
         "0": "晴天",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "金额",
         "detailNextPaymentLabel": "下次付款",
         "renewedNamed": "“{{name}}”已付款 - 下次付款日 {{date}}。",
-        "completedNamed": "“{{name}}”已付款并结束。"
+        "completedNamed": "“{{name}}”已付款并结束。",
+        "accountHint": "此订阅的每笔付款都记入这个账户。单笔付款可在预算中修改。",
+        "accountArchivedHint": "这个账户已归档。在你选择其他账户之前，订阅将不带账户记账。",
+        "accountArchivedOption": "{{name}}（已归档）",
+        "accountArchivedMeta": "{{name}} 已归档 - 不带账户记账",
+        "visibilityHint_private": "只有你能看到这个订阅及其付款。",
+        "visibilityHint_shared": "家庭中的每个人都能看到这个订阅及其付款。",
+        "errorAccountGone": "所选账户已不存在。"
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "无法保存测量值。",
             "invalidValue": "请输入有效的数值。",
             "range": {
+                "day": "日",
                 "week": "周",
                 "month": "月",
                 "year": "年"
@@ -5003,6 +5047,7 @@
                 "family": "家庭"
             },
             "sparse": "测量数据太少，无法显示趋势。",
+            "bandValue": "{{mean}}，{{low}} 至 {{high}}",
             "recentMeasurements": "最近的测量",
             "deleteMeasurement": "删除测量 {{value}}（{{date}}）",
             "measurementDeleted": "测量已删除",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "已将 {{count}} 个重复的收运实例（相同标识）合并为一个。",
         "importDiagnosticOther": "有一个日历条目不符合预期格式。",
         "importUnresolvedBlockingError": "请先解决所有阻断性提示，或明确跳过受影响的事件。",
-        "importIgnoreLabel": "忽略",
         "importCreateNewType": "创建新的垃圾类型",
+        "importLabelsHint": "如果一个条目列出多个垃圾桶，请全部选择 - 每个都会有自己的收运。",
+        "importLabelIgnoredHint": "未选择垃圾类型 - 不会导入。",
         "importNewTypeNameRequiredError": "请输入新垃圾类型的名称。",
         "importDefaultSourceName": "已导入的文件",
         "importCommittedToast": "导入已应用：新增 {{added}} 项，变更 {{changed}} 项，移除 {{removed}} 项。",
@@ -6198,6 +6244,13 @@
         "badgeLow": "即将用完",
         "badgeOut": "已用完",
         "bestBefore": "保质期 {{date}}",
+        "noBestBefore": "无保质期",
+        "errorProductHasStock": "该商品又有库存了，未被删除。",
+        "productTotal": "共 {{quantity}}",
+        "productPlaces": "{{count}} 处",
+        "productPlaces_one": "{{count}} 处",
+        "productBatches": "{{count}} 批",
+        "productBatches_one": "{{count}} 批",
         "increase": "增加数量",
         "decrease": "减少数量",
         "toShoppingAll": "全部加入购物清单",

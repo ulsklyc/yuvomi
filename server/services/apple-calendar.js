@@ -18,7 +18,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('Apple');
 
 import * as db from '../db.js';
-import { assignNewOverride, reassignDefaultOnCalendarMove } from './sync-assignment.js';
+import { assignNewOverride, calendarDefaultAssignees, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { pruneDeletedEvents, countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
 import { readSyncOutcome, withSyncOutcome } from './sync-outcome.js';
 import { runSerialized } from '../utils/sync-lock.js';
@@ -31,12 +31,13 @@ import { rruleLine } from './recurrence.js';
 import { eventDateTimeFields, rruleForDtstart } from '../utils/ics-datetime.js';
 import { vtimezoneFor } from '../utils/vtimezone.js';
 import { householdTimeZone } from '../utils/timezone.js';
-import { createCalDAVClient, createUploadGate } from '../utils/caldav-client.js';
+import { createCalDAVClient, createUploadGate, supportsComponent, acceptsNewEntries } from '../utils/caldav-client.js';
 import { nearestIcalColorName } from '../utils/ical-color.js';
 import { normalizeCalColor, calendarDisplayName } from '../utils/calendar-meta.js';
 import { authoredAfterInbound, outboundEvent, outboundRecurrenceRule } from './outbound-dtstart.js';
 import { icsReading, icsSnapshot, isEcho } from './outbound-echo.js';
 import { followInboundStartChange } from './calendar-occurrence-overrides.js';
+import { storeImportedExceptions } from './imported-occurrence-key.js';
 
 const APPLE_COLOR = '#FC3C44';
 
@@ -60,6 +61,15 @@ function collectLocalOutboundEvents(database, id = null) {
       )
       AND (? IS NULL OR e.id = ?)
   `).all(id, id);
+}
+
+/**
+ * Der Kalender, in den lokale Termine hinaufgehen (#1840): der erste der
+ * Auflistung, der Termine führt (`VEVENT`) und neue annimmt. Ohne Angabe der
+ * Rechte zählt ein Kalender als beschreibbar, wie vorher. null: keiner.
+ */
+function icloudUploadTarget(calendars) {
+  return (calendars || []).find((cal) => supportsComponent(cal, 'VEVENT') && acceptsNewEntries(cal)) ?? null;
 }
 
 // --------------------------------------------------------
@@ -367,9 +377,14 @@ async function runSync({ makeClient } = {}) {
 
   // Alle Kalender synchen (inklusive Geburtstags-Kalender)
   const syncCalendars = calendars;
+  // Hinauf geht es in den ersten Kalender der Auflistung, der Termine führt
+  // und neue annimmt (#1840) - nicht blind in den ersten: ein nur lesbar
+  // geteilter oder eine Erinnerungsliste wiese jeden Upload ab. Sagt der
+  // Server nichts zu den Rechten, zählt der Kalender als beschreibbar.
+  const defaultCal = icloudUploadTarget(syncCalendars);
   // Will diese lokale Zeile weiter hinauf (#1882)? Gefragt wird NICHT, in
-  // welchen Kalender: hinauf geht es in den ersten der Auflistung, und die
-  // sagt keine Reihenfolge zu. Steht beim nächsten Lauf ein anderer vorn, ist
+  // welchen Kalender: hinauf geht es in den ersten beschreibbaren der
+  // Auflistung, und die sagt keine Reihenfolge zu. Steht beim nächsten Lauf ein anderer vorn, ist
   // das Objekt im früheren ersten erst dann ein Rest, wenn der Termin woanders
   // angekommen ist - vorher wäre sein Löschen der einzige Stand auf dem Server.
   const stillWantsUpload = (row) => collectLocalOutboundEvents(db.get(), row.id).length > 0;
@@ -403,10 +418,8 @@ async function runSync({ makeClient } = {}) {
     const calColor = normalizeCalColor(cal.calendarColor) || APPLE_COLOR;
     const calName  = calendarDisplayName(cal.displayName, 'Apple Calendar');
     const calRefId = upsertExternalCalendar('apple', cal.url, calName, calColor);
-    // Standard-Zuweisung dieses Kalenders (#459) einmal auflösen, nicht pro Event.
-    const calDefaultAssignee = db.get()
-      .prepare('SELECT default_assignee_user_id FROM external_calendars WHERE id = ?')
-      .get(calRefId)?.default_assignee_user_id ?? null;
+    // Standard-Personen dieses Kalenders (#459, #1897) einmal auflösen, nicht pro Event.
+    const calDefaultAssignees = calendarDefaultAssignees(db.get(), calRefId);
 
     // --------------------------------------------------------
     // Inbound: iCloud → lokal
@@ -433,11 +446,11 @@ async function runSync({ makeClient } = {}) {
           calendarUids.add(ev.uid);
           // Der eigene Upload, dessen Antwort verloren ging: übernommen wird
           // nur ein Termin, den der Upload unten in GENAU diesen Kalender
-          // schicken würde (den ersten) - die UID kommt vom Server und weist
+          // schicken würde (`defaultCal`) - die UID kommt vom Server und weist
           // nichts aus.
           const adoptOwn = () => !!obj.url && outbound.adoptOwnEventUpload({
             source: 'apple', uid: ev.uid, objectUrl: obj.url, calRefId, calendarUrl: cal.url,
-            isWaitingHere: (eventId) => cal.url === syncCalendars[0].url
+            isWaitingHere: (eventId) => cal.url === defaultCal?.url
               && collectLocalOutboundEvents(db.get()).some((e) => e.id === eventId),
           });
 
@@ -537,7 +550,7 @@ async function runSync({ makeClient } = {}) {
             reassignDefaultOnCalendarMove(db.get(), eventId, {
               fromCalRefId: existing.calendar_ref_id,
               toCalRefId: calRefId,
-              toDefaultUserId: calDefaultAssignee,
+              toDefaultUserIds: calDefaultAssignees,
             });
           } else {
             const inserted = db.get().prepare(`
@@ -560,16 +573,15 @@ async function runSync({ makeClient } = {}) {
                   WHERE external_calendar_id = ? AND external_source = 'apple' ORDER BY id LIMIT 1
                 `).get(ev.seriesUid)?.id ?? null
               : null;
-            assignNewOverride(db.get(), eventId, seriesId, calDefaultAssignee);
+            assignNewOverride(db.get(), eventId, seriesId, calDefaultAssignees);
           }
 
           // EXDATE + ersetzte Override-Termine als Instanz-Ausnahmen ablegen,
           // damit die Expansion diese Vorkommen überspringt (#489/#549). Additiv.
+          // Schluessel in Format A, die alte Zeile desselben Rohwerts heilt
+          // (#2000, #2034 Schritt 5).
           if (ev.rrule && Array.isArray(ev.exdates) && ev.exdates.length) {
-            const insEx = db.get().prepare(
-              'INSERT OR IGNORE INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)'
-            );
-            for (const exDate of ev.exdates) insEx.run(eventId, exDate);
+            storeImportedExceptions(db.get(), eventId, ev);
           }
         } catch (err) {
           log.error(`Upsert error for UID ${ev.uid}:`, err.message);
@@ -603,18 +615,20 @@ async function runSync({ makeClient } = {}) {
   // zum Objekt für Bestandstermine erst aus dessen Abruf bekannt wird; der
   // Inbound überspringt dafür alles, was hier noch aussteht.
   // --------------------------------------------------------
+  // Ein Stoppsignal für jede schreibende Phase (#1863, #2135): Aufräumen,
+  // Löschen, Ändern und Uploads. Nach der ersten kontoweiten Absage geht in
+  // diesem Lauf nichts mehr an das Konto.
+  const stop = outbound.createRefusalStop();
   try {
     // Die Reste nie bestätigter Uploads entfernen (#1882).
     await outbound.releaseLeftoverUploads(client, {
-      source: 'apple', wantsUploadHere: stillWantsUpload, calendarUrls: ownCalendarUrls,
+      source: 'apple', wantsUploadHere: stillWantsUpload, calendarUrls: ownCalendarUrls, stop,
     });
     // iCloud kennt keine Auswahl, also keinen abgewählten Kalender. Was es
     // gibt, ist der Kalender, den die Auflistung nicht mehr nennt: sein
     // Auftrag hat sein Ziel erreicht (#1884). Die Auflistung ist oben als
     // nicht leer befunden.
     outbound.dropDeletionsOfMissingCalendars('apple', { listedUrls: calendars.map((cal) => cal.url) });
-    // Ein Stoppsignal für Löschen und Ändern (#1863).
-    const stop = outbound.createRefusalStop();
     const removed = await processPendingDeletions(client, 'apple', objectIndex, ownCalendarUrls, { stop });
     if (removed) log.info(`${removed} pending deletion(s) applied in iCloud.`);
     const pushed = await processPendingUpdates(client, 'apple', objectIndex, calendarsByUrl, { stop });
@@ -624,10 +638,13 @@ async function runSync({ makeClient } = {}) {
   }
 
   // --------------------------------------------------------
-  // Outbound: lokal → iCloud (erster verfügbarer Kalender)
+  // Outbound: lokal → iCloud (erster beschreibbarer Kalender, `defaultCal`)
   // --------------------------------------------------------
-  const defaultCal = syncCalendars[0];
   const localEvents = collectLocalOutboundEvents(db.get());
+  if (!defaultCal && localEvents.length) {
+    log.warn(`No calendar in this iCloud account accepts new events; `
+      + `${localEvents.length} local event(s) stay local.`);
+  }
 
   // Einmal je Lauf: die Zone, an der naive Zeiten haengen (#938).
   const householdZone = householdTimeZone(db.get());
@@ -635,7 +652,7 @@ async function runSync({ makeClient } = {}) {
   // Lehnt der Kalender ab (nur lesbar, Konto voll), träfe jeder weitere Termin
   // dieses Laufs dieselbe Absage: nach der ersten ist Schluss, und es gibt EINE
   // Zeile mit der Anzahl statt einer je Termin.
-  const uploadGate = createUploadGate();
+  const uploadGate = createUploadGate(stop);
   for (const listed of localEvents) {
     if (!defaultCal || uploadGate.isClosed(defaultCal.url)) continue;
     // Frisch lesen (#1862): die Liste stammt von vor der Schleife, und jeder
@@ -690,4 +707,4 @@ export { sync, flushOutbound, getStatus, saveCredentials, clearCredentials,
 // Nur fuer Tests: der ICS-Builder ist der einzige Weg, auf dem ein rein lokaler
 // Termin zum Anbieter kommt, und der Sync-Pfad drumherum ist zu gross, um ihn
 // dafuer nachzustellen.
-export const __test = { buildICS, collectLocalOutboundEvents };
+export const __test = { buildICS, collectLocalOutboundEvents, icloudUploadTarget };

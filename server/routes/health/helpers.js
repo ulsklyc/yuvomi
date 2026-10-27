@@ -197,12 +197,12 @@ export function resolveOwner(req, viewer) {
   if (raw === undefined || raw === null || raw === '') return { ownerId: viewer };
 
   const ownerId = parseInt(raw, 10);
-  if (!ownerId) return { error: 'Ungültige Person.', status: 400 };
+  if (!ownerId) return { error: 'Invalid user_id.', status: 400 };
   if (!canWriteFor(viewer, ownerId)) {
     // Bewusst 403 und nicht 404: dass es die Person gibt, weiß der Aufrufer aus
     // der Mitgliederliste ohnehin - verschleiert würde hier nichts, nur die
     // Ursache unklar gemacht.
-    return { error: 'Keine Berechtigung, für diese Person einzutragen.', status: 403 };
+    return { error: 'You cannot record entries for this person.', status: 403 };
   }
   return { ownerId };
 }

@@ -1575,6 +1575,12 @@ const MIGRATIONS_SQL = {
       SELECT 'saving', key, 'Savings', 5 FROM budget_categories
       WHERE key = 'financial_other';
   `,
+  262: `
+    ALTER TABLE notes ADD COLUMN visibility TEXT NOT NULL DEFAULT 'all'
+      CHECK (visibility IN ('all', 'private'));
+    ALTER TABLE notes ADD COLUMN locked INTEGER NOT NULL DEFAULT 0
+      CHECK (locked IN (0, 1));
+  `,
 };
 
 export { MIGRATIONS_SQL };

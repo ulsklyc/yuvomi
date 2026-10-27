@@ -556,6 +556,19 @@
   color: var(--color-text-secondary);
 }
 
+/* Gesperrt / Nur ich (#1514, #1602): Zeichen, keine Knoepfe - im Ton des
+ * Namens daneben, damit sie nachlesen statt rufen. */
+.note-card__mark {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-secondary);
+}
+
+.note-card__mark svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
 /* DIE SCHEIBE IST DER PUNKT IN SEINER GRÖSSTEN FORM - ALSO VOLLTON.
  *
  * Hier stand das gemessene 16-%-Rezept mit Primärtext darauf, und die

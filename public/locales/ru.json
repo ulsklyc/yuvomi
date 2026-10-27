@@ -1340,7 +1340,6 @@
         "pickOne": "Выберите событие",
         "pickOneHint": "Здесь появятся время, место и напоминания.",
         "syncTargetAssigneeAmbiguous": "У нескольких календарей этот человек назначен по умолчанию. Выбери цель сам.",
-        "syncTargetSeveralAssignees": "Назначено несколько человек, поэтому назначение не выбирает календарь. Вместо этого используется: {{target}}.",
         "filtersSources": "Календари",
         "filterUnassigned": "Не назначенные",
         "dateSpanSpoken": "с {{from}} по {{to}}",
@@ -1383,7 +1382,10 @@
         "errorDeleteFeedAdminOnly": "Этот календарь экспортируется. Удалить его может только администратор.",
         "errorEventGone": "Этого события больше нет.",
         "errorSelectedCalendarGone": "Выбранного календаря больше нет.",
-        "errorSeriesNoOccurrence": "При таком повторе с даты начала не было бы ни одного события."
+        "errorSeriesNoOccurrence": "При таком повторе с даты начала не было бы ни одного события.",
+        "localCalendarUploadsHint": "События этого календаря загружаются в iCloud через Apple Calendar.",
+        "overlapOpenSchedule": "Открыть график смен",
+        "syncTargetNoCalendarForPeople": "Ни у одного календаря назначение по умолчанию не совпадает ровно с этими людьми, поэтому назначение не выбирает календарь. Вместо этого: {{target}}."
     },
     "noteCategories": {
         "categories": "Категории",
@@ -1456,7 +1458,11 @@
         "checklistDone": "Выполнено",
         "checklistOpen": "Открыто",
         "errorNoteGone": "Этой заметки больше нет.",
-        "errorSelectedCategoryGone": "Одной из выбранных категорий больше нет."
+        "errorSelectedCategoryGone": "Одной из выбранных категорий больше нет.",
+        "lockedToggle": "Заблокировать изменение",
+        "lockedBadge": "Заблокирована",
+        "lockedHint": "Только вы и администраторы можете изменять, закреплять или удалять эту заметку - в том числе отмечать пункты её списка. Остальные по-прежнему могут её читать.",
+        "errorLocked": "Эта заметка заблокирована. Изменить её могут только тот, кто её создал, и администраторы."
     },
     "markdown": {
         "bold": "Жирный (Ctrl+B)",
@@ -1937,6 +1943,8 @@
         "planSavingsDeleteConfirm": "Удалить цель накоплений?",
         "accountsTab": "Счета",
         "netWorth": "Чистые активы",
+        "netWorthApproxNote": "Пересчитано по курсам на {{date}}",
+        "netWorthPerCurrencyNote": "Без курса - сумма по каждой валюте",
         "addAccount": "Добавить счёт",
         "accountsEmptyTitle": "Счетов пока нет",
         "accountsEmptyDescription": "Добавьте счета, например текущий или сберегательный, чтобы отслеживать балансы.",
@@ -2032,6 +2040,7 @@
         "saveFailed": "Не удалось сохранить. Проверьте введённые данные.",
         "loanAlreadyPaid": "Этот займ уже полностью оплачен.",
         "loanInstallmentAlreadyPaid": "Этот платёж уже оплачен.",
+        "loanPaymentRateUnavailable": "Курс для валюты счёта неизвестен. Выберите для займа другой счёт или уберите счёт.",
         "amountExceedsLoanRemaining": "Сумма больше остатка по займу",
         "responsibleNotMember": "Ответственными могут быть только члены домохозяйства.",
         "seriesStartTooEarly": "День начала не может приходиться на месяц до первой записи серии",
@@ -2468,7 +2477,10 @@
             "errorNoCalendarName": "Введите название нового календаря.",
             "dropzoneTitle": "Перетащите ICS-файл сюда или выберите его",
             "dropzoneTitleTouch": "Нажмите, чтобы выбрать ICS-файл",
-            "dropzoneHint": "Только файлы .ics"
+            "dropzoneHint": "Только файлы .ics",
+            "assigneesLabel": "Назначить",
+            "assigneesHint": "Новые события получают этих людей. Уже импортированное событие с тем же ID получает их дополнительно - даже если назначение было снято вручную.",
+            "successWithAssigned": "Импортировано: {{imported}}, уже было: {{skipped}}, из них сейчас назначено: {{assigned}}."
         },
         "memberPhoneLabel": "Номер телефона (необязательно)",
         "memberEmailLabel": "Электронная почта (необязательно)",
@@ -3257,10 +3269,7 @@
         "notificationChannelDeleteConfirmDetail": "Через этот канал больше не уйдёт ни одно уведомление, даже срочное. Адрес и учётные данные для нового канала придётся вводить заново.",
         "apiTokensMcpHint": "Эти токены также работают как токены Bearer для конечной точки MCP по адресу /mcp (например, в Claude Desktop для создания задач, покупок и событий с помощью ИИ).",
         "sync": {
-            "defaultAssignee": "Назначение по умолчанию",
             "defaultAssigneeNone": "Нет",
-            "defaultAssigneeHint": "Новые синхронизированные события автоматически назначаются этому человеку.",
-            "defaultAssigneeRoutingHint": "Назначение по умолчанию: события из календаря получают выбранного там человека, а новое событие, назначенное только ему, создаётся в этом календаре. Это касается календарей Google и CalDAV, но не Apple или Outlook.",
             "backfillTitle": "Дополнить назначения",
             "backfillDescription": "Назначение по умолчанию действует только для встреч, загруженных после его установки. Здесь его можно один раз применить к уже загруженным встречам из всех аккаунтов.",
             "backfillAction": "Применить к существующим встречам",
@@ -3286,7 +3295,10 @@
             "backfillMovedNext": "Показать следующие",
             "backfillMovedAll": "Выбрать все",
             "backfillMovedChange": "С {{from}} на {{to}}",
-            "backfillDescriptionMore": "Встречи без назначения получают его сразу. Встречи, у которых всё ещё стоит назначение по умолчанию другого календаря, показаны по одной для выбора. Любое другое назначение не меняется."
+            "backfillDescriptionMore": "Встречи без назначения получают его сразу. Встречи, у которых всё ещё стоит назначение по умолчанию другого календаря, показаны по одной для выбора. Любое другое назначение не меняется.",
+            "defaultAssignees": "Назначение по умолчанию",
+            "defaultAssigneesHint": "Новые синхронизированные события автоматически назначаются этим людям. Первый определяет цвет.",
+            "defaultAssigneesRoutingHint": "Назначение по умолчанию: события из календаря получают выбранных там людей, а новое событие, назначенное ровно этим людям, создаётся в этом календаре. Действует для календарей Google и CalDAV, но не для Apple и Outlook."
         },
         "calendarAssignMeLabel": "Назначать новые события мне",
         "calendarDefaultRemindersLabel": "Напоминания по умолчанию",
@@ -3509,6 +3521,8 @@
         "displayDeleteConfirm": "Удалить «{{name}}»?",
         "displayPairingCodeLabel": "Код подключения",
         "displayPairingCodeHint": "Действует 15 минут и срабатывает ровно один раз. Откройте на планшете /pair и введите его там. Он показывается только сейчас.",
+        "displayPairStepCode": "Добавьте здесь настенный планшет и создайте код подключения.",
+        "displayPairStepOpen": "Откройте на планшете этот адрес и введите там код:",
         "displayDeviceUnnamed": "Устройство без названия",
         "displayDeviceLastSeen": "Последний раз в сети: {{when}}",
         "displayDeviceNeverSeen": "Ни разу не подключалось",
@@ -3619,7 +3633,20 @@
         "permChildRoleHint": "Новые детские аккаунты при создании также получают собственные стартовые права: {{list}}. Потом они указаны у этого участника.",
         "activeModulesHintMore": "Чтобы скрыть модуль только у себя, откройте Модули → Навигация.",
         "permIntroMore": "Отдельные участники могут отличаться от значения по умолчанию для роли. Без настроек каждая роль имеет полный доступ; администраторы - всегда.",
-        "preferenceSaveFailed": "Не удалось сохранить настройку."
+        "preferenceSaveFailed": "Не удалось сохранить настройку.",
+        "caldavCalendarReadOnly": "Только чтение: сюда нельзя сохранить новые события",
+        "caldavCalendarReadOnlyWaiting_one": "Только чтение: {{count}} событие, ожидающее загрузки сюда, не дойдёт",
+        "caldavCalendarReadOnlyWaiting": "Только чтение: {{count}} событий, ожидающих загрузки сюда, не дойдут",
+        "reminderListReadOnly": "Только чтение: сюда нельзя сохранить новые записи",
+        "reminderListReadOnlyWaiting_one": "Только чтение: {{count}} запись, ожидающая загрузки сюда, не дойдёт",
+        "reminderListReadOnlyWaiting": "Только чтение: {{count}} записей, ожидающих загрузки сюда, не дойдут",
+        "caldavCalendarReadOnlyWaiting_few": "Только чтение: {{count}} события, ожидающих загрузки сюда, не дойдут",
+        "caldavCalendarReadOnlyWaiting_many": "Только чтение: {{count}} событий, ожидающих загрузки сюда, не дойдут",
+        "reminderListReadOnlyWaiting_few": "Только чтение: {{count}} записи, ожидающих загрузки сюда, не дойдут",
+        "reminderListReadOnlyWaiting_many": "Только чтение: {{count}} записей, ожидающих загрузки сюда, не дойдут",
+        "reminderListAssigneesTasksOnly": "Людей можно задать только для списков, которые идут в Задачи.",
+        "syncAssigneeNotMember": "Здесь можно выбрать только членов семьи.",
+        "syncAssigneeUnknown": "Этого человека больше нет. Перезагрузите страницу."
     },
     "login": {
         "tagline": "С возвращением. Ваш дом - в одном месте.",
@@ -3958,7 +3985,8 @@
         "banner": "Офлайн - переподключение…",
         "staleData": "Офлайн - по состоянию на: {{time}}",
         "pageTitle": "Ты офлайн",
-        "pageDescription": "Этой странице нужно подключение. Как только устройство снова будет онлайн, она загрузится сама."
+        "pageDescription": "Этой странице нужно подключение. Как только устройство снова будет онлайн, она загрузится сама.",
+        "snapshot": "Нет соединения с сервером - сохранённые данные, только чтение"
     },
     "emptyHint": {
         "recipes": "Рецепт попадает прямо в план питания или в список покупок.",
@@ -4606,6 +4634,13 @@
             "missedDetail_one": "С {{date}} пропущена {{count}} дата.",
             "missedDetail_few": "С {{date}} пропущено {{count}} даты.",
             "missedDetail_many": "С {{date}} пропущено {{count}} дат.",
+            "failing": "Не удалось провести - повтор каждый час",
+            "pastQuestion": "Дата в прошлом",
+            "pastSkip": "Начать с {{date}}",
+            "pastDetail": "С {{date}} наступило бы {{count}} даты.",
+            "pastDetail_one": "С {{date}} наступила бы {{count}} дата.",
+            "pastDetail_few": "С {{date}} наступило бы {{count}} даты.",
+            "pastDetail_many": "С {{date}} наступило бы {{count}} дат.",
             "deleteConfirm": "Удалить этот повторяющийся расход?",
             "deleteConfirmDetail": "Новые расходы создаваться не будут. Уже проведенные расходы сохранятся.",
             "show": "Показать",
@@ -4696,7 +4731,14 @@
         "debtOwesYou": "Долг вам: {{name}}",
         "debtOwes": "{{from}} должен {{to}}",
         "balanced": "Расчёты закрыты",
-        "balancedInGroup": "{{group}}: Расчёты закрыты"
+        "balancedInGroup": "{{group}}: Расчёты закрыты",
+        "totalsByMember": "Оплачено каждым",
+        "totalsByMemberHint": "Сколько внёс каждый, ниже его собственная доля",
+        "ownShare": "Собственная доля: {{amount}}",
+        "paidLabel": "Оплачено",
+        "totalsByCategory": "По категориям",
+        "categoryFilter": "Фильтровать расходы по категории",
+        "noExpensesInCategory": "В этой категории нет расходов."
     },
     "wmo": {
         "0": "Ясное небо",
@@ -5046,7 +5088,14 @@
         "detailAmountLabel": "Сумма",
         "detailNextPaymentLabel": "Следующий платеж",
         "renewedNamed": "«{{name}}» оплачено - следующий платёж {{date}}.",
-        "completedNamed": "«{{name}}» оплачено и завершено."
+        "completedNamed": "«{{name}}» оплачено и завершено.",
+        "accountHint": "Каждый платёж по этой подписке записывается на этот счёт. Отдельный платёж можно изменить в бюджете.",
+        "accountArchivedHint": "Этот счёт в архиве. Подписка записывается без счёта, пока вы не выберете другой.",
+        "accountArchivedOption": "{{name}} (в архиве)",
+        "accountArchivedMeta": "{{name}} в архиве - записывается без счёта",
+        "visibilityHint_private": "Эту подписку и её платежи видите только вы.",
+        "visibilityHint_shared": "Все в семье видят эту подписку и её платежи.",
+        "errorAccountGone": "Выбранного счёта больше нет."
     },
     "health": {
         "fasting": {
@@ -5220,6 +5269,7 @@
             "saveError": "Не удалось сохранить измерение.",
             "invalidValue": "Введите корректные значения.",
             "range": {
+                "day": "День",
                 "week": "Неделя",
                 "month": "Месяц",
                 "year": "Год"
@@ -5259,6 +5309,7 @@
                 "family": "Семья"
             },
             "sparse": "Слишком мало измерений для отображения тренда.",
+            "bandValue": "{{mean}}, от {{low}} до {{high}}",
             "recentMeasurements": "Последние измерения",
             "deleteMeasurement": "Удалить измерение {{value}} от {{date}}",
             "measurementDeleted": "Измерение удалено",
@@ -6169,8 +6220,9 @@
         "importDiagnosticDuplicateInstance_few": "Объединено дублирующихся вывозов (с одинаковым идентификатором): {{count}}.",
         "importDiagnosticDuplicateInstance_many": "Объединено дублирующихся вывозов (с одинаковым идентификатором): {{count}}.",
         "importUnresolvedBlockingError": "Сначала устраните все блокирующие предупреждения или явно пропустите затронутые события.",
-        "importIgnoreLabel": "Игнорировать",
         "importCreateNewType": "Создать новый вид отходов",
+        "importLabelsHint": "Если в записи указано несколько контейнеров, выберите все - у каждого будет свой вывоз.",
+        "importLabelIgnoredHint": "Вид отходов не выбран - запись не будет импортирована.",
         "importNewTypeNameRequiredError": "Введите название для нового вида отходов.",
         "importDefaultSourceName": "Импортированный файл",
         "importCommittedToast": "Импорт применён: добавлено {{added}}, изменено {{changed}}, удалено {{removed}}.",
@@ -6485,6 +6537,17 @@
         "badgeLow": "Почти закончилось",
         "badgeOut": "Закончилось",
         "bestBefore": "Годен до {{date}}",
+        "noBestBefore": "Без срока годности",
+        "errorProductHasStock": "Этот продукт снова есть в запасах и не был удалён.",
+        "productTotal": "всего {{quantity}}",
+        "productPlaces": "{{count}} места",
+        "productPlaces_one": "{{count}} место",
+        "productPlaces_few": "{{count}} места",
+        "productPlaces_many": "{{count}} мест",
+        "productBatches": "{{count}} партии",
+        "productBatches_one": "{{count}} партия",
+        "productBatches_few": "{{count}} партии",
+        "productBatches_many": "{{count}} партий",
         "increase": "Увеличить количество",
         "decrease": "Уменьшить количество",
         "toShoppingAll": "Всё в список покупок",

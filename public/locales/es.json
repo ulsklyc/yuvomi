@@ -1188,7 +1188,6 @@
         "pickOne": "Elige un evento",
         "pickOneHint": "La hora, el lugar y los recordatorios aparecen aquí.",
         "syncTargetAssigneeAmbiguous": "Varios calendarios tienen a esta persona como asignación predeterminada. Elige tú el destino.",
-        "syncTargetSeveralAssignees": "Hay varias personas asignadas, así que la asignación no elige ningún calendario. Se usa en su lugar: {{target}}.",
         "filtersSources": "Calendarios",
         "filterUnassigned": "Sin asignar",
         "dateSpanSpoken": "del {{from}} al {{to}}",
@@ -1227,7 +1226,10 @@
         "errorDeleteFeedAdminOnly": "Este calendario se está exportando. Solo un administrador puede eliminarlo.",
         "errorEventGone": "Este evento ya no existe.",
         "errorSelectedCalendarGone": "El calendario elegido ya no existe.",
-        "errorSeriesNoOccurrence": "Con esta repetición no habría ningún evento a partir de la fecha de inicio."
+        "errorSeriesNoOccurrence": "Con esta repetición no habría ningún evento a partir de la fecha de inicio.",
+        "localCalendarUploadsHint": "Los eventos de este calendario se suben a iCloud a través de Apple Calendar.",
+        "overlapOpenSchedule": "Abrir turnos",
+        "syncTargetNoCalendarForPeople": "Ningún calendario tiene exactamente a estas personas como asignación predeterminada, así que la asignación no elige ninguno. Se usa en su lugar: {{target}}."
     },
     "noteCategories": {
         "categories": "Categorías",
@@ -1298,7 +1300,11 @@
         "checklistDone": "Completado",
         "checklistOpen": "Abierto",
         "errorNoteGone": "Esta nota ya no existe.",
-        "errorSelectedCategoryGone": "Una categoría seleccionada ya no existe."
+        "errorSelectedCategoryGone": "Una categoría seleccionada ya no existe.",
+        "lockedToggle": "Bloquear la edición",
+        "lockedBadge": "Bloqueada",
+        "lockedHint": "Solo tú y los administradores podéis cambiar, fijar o eliminar esta nota, incluido marcar los elementos de su lista. Los demás pueden seguir leyéndola.",
+        "errorLocked": "Esta nota está bloqueada. Solo la persona que la creó y los administradores pueden cambiarla."
     },
     "markdown": {
         "bold": "Negrita (Ctrl+B)",
@@ -1771,6 +1777,8 @@
         "planSavingsDeleteConfirm": "¿Eliminar el objetivo de ahorro?",
         "accountsTab": "Cuentas",
         "netWorth": "Patrimonio neto",
+        "netWorthApproxNote": "Convertido con tipos de cambio del {{date}}",
+        "netWorthPerCurrencyNote": "Sin tipo de cambio - total por moneda",
         "addAccount": "Añadir cuenta",
         "accountsEmptyTitle": "Aún no hay cuentas",
         "accountsEmptyDescription": "Añade cuentas como corriente o de ahorro para controlar tus saldos.",
@@ -1864,6 +1872,7 @@
         "saveFailed": "No se pudo guardar. Revisa los datos.",
         "loanAlreadyPaid": "Este préstamo ya está pagado por completo.",
         "loanInstallmentAlreadyPaid": "Esta cuota ya está pagada.",
+        "loanPaymentRateUnavailable": "No se conoce ningún tipo de cambio para la moneda de la cuenta. Elige otra cuenta en el préstamo o ninguna.",
         "amountExceedsLoanRemaining": "El importe es mayor que lo que queda del préstamo",
         "responsibleNotMember": "Solo los miembros del hogar pueden ser responsables.",
         "seriesStartTooEarly": "El día de inicio no puede estar en un mes anterior al primer apunte de la serie",
@@ -2290,7 +2299,10 @@
             "errorNoCalendarName": "Introduce un nombre para el calendario nuevo.",
             "dropzoneTitle": "Arrastra aquí un archivo ICS o elige uno",
             "dropzoneTitleTouch": "Toca para elegir un archivo ICS",
-            "dropzoneHint": "Solo archivos .ics"
+            "dropzoneHint": "Solo archivos .ics",
+            "assigneesLabel": "Asignar a",
+            "assigneesHint": "Los eventos nuevos reciben a estas personas. Un evento ya importado con el mismo ID las recibe además - aunque su asignación se haya quitado a mano.",
+            "successWithAssigned": "Importados: {{imported}}, ya existían: {{skipped}}, de ellos ahora asignados: {{assigned}}."
         },
         "memberPhoneLabel": "Número de teléfono (opcional)",
         "memberEmailLabel": "Correo electrónico (opcional)",
@@ -3059,10 +3071,7 @@
         "notificationChannelDeleteConfirmDetail": "Por este canal ya no saldrá ninguna notificación, tampoco las urgentes. La dirección y las credenciales habrá que introducirlas de nuevo para otro canal.",
         "apiTokensMcpHint": "Estos tokens también funcionan como tokens Bearer para el endpoint MCP en /mcp (p. ej. en Claude Desktop, para crear tareas, artículos de la compra y eventos mediante IA).",
         "sync": {
-            "defaultAssignee": "Asignación predeterminada",
             "defaultAssigneeNone": "Ninguno",
-            "defaultAssigneeHint": "Los eventos recién sincronizados se asignan automáticamente a esta persona.",
-            "defaultAssigneeRoutingHint": "Asignación predeterminada: los eventos de un calendario reciben a la persona elegida allí, y un evento nuevo asignado solo a esa persona se crea en ese calendario. Se aplica a calendarios de Google y CalDAV, no a Apple ni Outlook.",
             "backfillTitle": "Completar asignaciones",
             "backfillDescription": "La asignación predeterminada solo se aplica a las citas importadas después de configurarla. Aquí puedes aplicarla una vez a las citas ya importadas de todas las cuentas.",
             "backfillAction": "Aplicar a las citas existentes",
@@ -3082,7 +3091,10 @@
             "backfillMovedNext": "Mostrar siguientes",
             "backfillMovedAll": "Seleccionar todas",
             "backfillMovedChange": "De {{from}} a {{to}}",
-            "backfillDescriptionMore": "Las citas sin asignar la reciben directamente. Las citas que aún llevan la asignación predeterminada de otro calendario aparecen una a una para que elijas. Cualquier otra asignación no cambia."
+            "backfillDescriptionMore": "Las citas sin asignar la reciben directamente. Las citas que aún llevan la asignación predeterminada de otro calendario aparecen una a una para que elijas. Cualquier otra asignación no cambia.",
+            "defaultAssignees": "Asignación predeterminada",
+            "defaultAssigneesHint": "Los eventos sincronizados nuevos se asignan automáticamente a estas personas. La primera define el color.",
+            "defaultAssigneesRoutingHint": "Asignación predeterminada: los eventos de un calendario reciben las personas elegidas allí, y un evento nuevo asignado exactamente a esas personas se crea en ese calendario. Se aplica a calendarios de Google y CalDAV, no a Apple ni Outlook."
         },
         "calendarAssignMeLabel": "Asignarme los nuevos eventos",
         "calendarDefaultRemindersLabel": "Recordatorios predeterminados",
@@ -3301,6 +3313,8 @@
         "displayDeleteConfirm": "¿Eliminar «{{name}}»?",
         "displayPairingCodeLabel": "Código de vinculación",
         "displayPairingCodeHint": "Válido 15 minutos y se puede usar una sola vez. Abre /pair en la tableta e introdúcelo allí. Solo se muestra ahora.",
+        "displayPairStepCode": "Añade aquí una tableta de pared y genera un código de vinculación.",
+        "displayPairStepOpen": "En la tableta, abre esta dirección e introduce allí el código:",
         "displayDeviceUnnamed": "Dispositivo sin nombre",
         "displayDeviceLastSeen": "Visto por última vez: {{when}}",
         "displayDeviceNeverSeen": "Nunca se ha conectado",
@@ -3405,7 +3419,16 @@
         "permChildRoleHint": "Las cuentas infantiles nuevas reciben además, al crearse, sus propios permisos iniciales: {{list}}. Después aparecen en el miembro correspondiente.",
         "activeModulesHintMore": "Para ocultar un módulo solo para ti, ve a Módulos → Navegación.",
         "permIntroMore": "Cada miembro puede diferir del valor predeterminado del rol. Sin ninguna configuración, cada rol tiene acceso completo; los administradores siempre.",
-        "preferenceSaveFailed": "No se ha podido guardar el ajuste."
+        "preferenceSaveFailed": "No se ha podido guardar el ajuste.",
+        "caldavCalendarReadOnly": "Solo lectura: aquí no se pueden guardar eventos nuevos",
+        "caldavCalendarReadOnlyWaiting_one": "Solo lectura: {{count}} evento pendiente de subir aquí no llegará",
+        "caldavCalendarReadOnlyWaiting": "Solo lectura: {{count}} eventos pendientes de subir aquí no llegarán",
+        "reminderListReadOnly": "Solo lectura: aquí no se pueden guardar entradas nuevas",
+        "reminderListReadOnlyWaiting_one": "Solo lectura: {{count}} entrada pendiente de subir aquí no llegará",
+        "reminderListReadOnlyWaiting": "Solo lectura: {{count}} entradas pendientes de subir aquí no llegarán",
+        "reminderListAssigneesTasksOnly": "Las personas solo se pueden fijar para listas que van a Tareas.",
+        "syncAssigneeNotMember": "Aquí solo se pueden elegir miembros del hogar.",
+        "syncAssigneeUnknown": "Esta persona ya no existe. Recarga la página."
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",
@@ -3738,7 +3761,8 @@
         "banner": "Sin conexión - reconectando…",
         "staleData": "Sin conexión: datos del {{time}}",
         "pageTitle": "Estás sin conexión",
-        "pageDescription": "Esta página necesita conexión. En cuanto tu dispositivo vuelva a estar en línea, se cargará sola."
+        "pageDescription": "Esta página necesita conexión. En cuanto tu dispositivo vuelva a estar en línea, se cargará sola.",
+        "snapshot": "Sin conexión con el servidor - datos guardados, solo lectura"
     },
     "emptyHint": {
         "recipes": "Una receta pasa directamente al plan de comidas o a la lista de la compra.",
@@ -4366,6 +4390,11 @@
             "missedBook": "Registrar desde el {{date}}",
             "missedDetail": "Desde el {{date}} se han pasado {{count}} fechas.",
             "missedDetail_one": "Desde el {{date}} se ha pasado {{count}} fecha.",
+            "failing": "Error al registrar - se reintenta cada hora",
+            "pastQuestion": "La fecha está en el pasado",
+            "pastSkip": "Empezar el {{date}}",
+            "pastDetail": "Desde el {{date}} habrían vencido {{count}} fechas.",
+            "pastDetail_one": "Desde el {{date}} habría vencido {{count}} fecha.",
             "deleteConfirm": "¿Eliminar este gasto recurrente?",
             "deleteConfirmDetail": "No se crearán más gastos. Los gastos ya registrados se conservan.",
             "show": "Mostrar",
@@ -4452,7 +4481,14 @@
         "debtOwesYou": "{{name}} te debe",
         "debtOwes": "{{from}} debe a {{to}}",
         "balanced": "Saldado",
-        "balancedInGroup": "{{group}}: Saldado"
+        "balancedInGroup": "{{group}}: Saldado",
+        "totalsByMember": "Pagado por persona",
+        "totalsByMemberHint": "Lo adelantado, con la parte propia debajo",
+        "ownShare": "Parte propia: {{amount}}",
+        "paidLabel": "Pagado",
+        "totalsByCategory": "Por categoría",
+        "categoryFilter": "Filtrar gastos por categoría",
+        "noExpensesInCategory": "No hay gastos en esta categoría."
     },
     "wmo": {
         "0": "Cielo despejado",
@@ -4792,7 +4828,14 @@
         "detailAmountLabel": "Importe",
         "detailNextPaymentLabel": "Próximo pago",
         "renewedNamed": "«{{name}}» pagado - próximo pago el {{date}}.",
-        "completedNamed": "«{{name}}» pagado y finalizado."
+        "completedNamed": "«{{name}}» pagado y finalizado.",
+        "accountHint": "Cada pago de esta suscripción se registra en esta cuenta. Un pago concreto se cambia en el presupuesto.",
+        "accountArchivedHint": "Esta cuenta está archivada. La suscripción se registra sin cuenta hasta que elijas otra.",
+        "accountArchivedOption": "{{name}} (archivada)",
+        "accountArchivedMeta": "{{name}} archivada - se registra sin cuenta",
+        "visibilityHint_private": "Solo tú ves esta suscripción y sus pagos.",
+        "visibilityHint_shared": "Todo el hogar ve esta suscripción y sus pagos.",
+        "errorAccountGone": "La cuenta seleccionada ya no existe."
     },
     "health": {
         "fasting": {
@@ -4964,6 +5007,7 @@
             "saveError": "No se pudo guardar la medición.",
             "invalidValue": "Introduce valores válidos.",
             "range": {
+                "day": "Día",
                 "week": "Semana",
                 "month": "Mes",
                 "year": "Año"
@@ -5003,6 +5047,7 @@
                 "family": "Familia"
             },
             "sparse": "Muy pocas mediciones para mostrar una tendencia.",
+            "bandValue": "{{mean}}, de {{low}} a {{high}}",
             "recentMeasurements": "Últimas mediciones",
             "deleteMeasurement": "Eliminar medición {{value}} del {{date}}",
             "measurementDeleted": "Medición eliminada",
@@ -5891,8 +5936,9 @@
         "importDiagnosticDuplicateInstance_one": "{{count}} instancia de recogida duplicada (misma identidad) se combinó en una.",
         "importDiagnosticOther": "Una entrada del calendario no tiene el formato esperado.",
         "importUnresolvedBlockingError": "Resuelve primero todos los avisos bloqueantes, u omite explícitamente los eventos afectados.",
-        "importIgnoreLabel": "Ignorar",
         "importCreateNewType": "Crear un nuevo tipo de residuo",
+        "importLabelsHint": "Si una entrada nombra varios contenedores, elígelos todos: cada uno tendrá su propia recogida.",
+        "importLabelIgnoredHint": "Ningún tipo de residuo seleccionado: no se importará.",
         "importNewTypeNameRequiredError": "Introduce un nombre para el nuevo tipo de residuo.",
         "importDefaultSourceName": "Archivo importado",
         "importCommittedToast": "Importación aplicada: {{added}} añadidas, {{changed}} modificadas, {{removed}} eliminadas.",
@@ -6198,6 +6244,13 @@
         "badgeLow": "Casi agotado",
         "badgeOut": "Agotado",
         "bestBefore": "Cad. {{date}}",
+        "noBestBefore": "Sin fecha de caducidad",
+        "errorProductHasStock": "Este producto vuelve a estar en existencias y no se ha eliminado.",
+        "productTotal": "{{quantity}} en total",
+        "productPlaces": "{{count}} lugares",
+        "productPlaces_one": "{{count}} lugar",
+        "productBatches": "{{count}} lotes",
+        "productBatches_one": "{{count}} lote",
         "increase": "Aumentar cantidad",
         "decrease": "Reducir cantidad",
         "toShoppingAll": "Todo a la lista de la compra",

@@ -40,6 +40,23 @@ export function visibilityWhere(alias, assignTable, assignCol, bind = '?') {
 }
 
 /**
+ * WHERE-Fragment fuer die Sichtbarkeit einer NOTIZ (#1514): `all` oder die
+ * eigene. Dieselbe Regel wie `visibilityWhere()`, ohne den Zuweisungs-Zweig -
+ * Notizen haben keine Zugewiesenen. Kein Admin-Zweig (DECISIONS 1).
+ *
+ * EINE STELLE FUER JEDEN LESEWEG: Liste, Aenderungswege per Kennung, Suche und
+ * die Notizkachel der Uebersicht haengen dieses Fragment an.
+ *
+ * @param {string} alias  Tabellen-Alias der Notizen (z. B. 'n')
+ * @param {string} bind   Platzhalter der betrachtenden User-ID: '?' (EIN
+ *                        positionaler Bind) oder benannt wie '@me'
+ * @returns {string} SQL-Fragment (ohne fuehrendes AND)
+ */
+export function noteVisibleWhere(alias, bind = '?') {
+  return `(${alias}.visibility = 'all' OR ${alias}.created_by = ${bind})`;
+}
+
+/**
  * WHERE-Fragment fuer die ZWEITE Regel, die ein Termin traegt: ein Termin aus
  * einem ICS-Abo ist nur da, wenn das Abo geteilt ist oder der betrachtenden
  * Person gehoert. Die Zeilen-Sichtbarkeit oben deckt das nicht - ein

@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 /**
  * Gilt fuer alle vier schreibenden Wege unten, deshalb einmal statt viermal:
@@ -27,7 +27,7 @@ const REMIND_AT_INPUT = ' `remind_at` is stored as UTC without a zone suffix, al
   + 'read as the instant they name and fire on time.';
 
 export function remindersPaths() {
-  return {
+  return withCaseReasons('reminders', CASE_REASONS, {
     '/api/v1/reminders/pending': {
       get: op({
         summary: 'List pending reminders',
@@ -55,5 +55,19 @@ export function remindersPaths() {
     '/api/v1/reminders/{id}': {
       delete: op({ summary: 'Delete reminder', tag: 'Reminders', params: [idParam()], stateChanging: true, description: '`pantry_item` is rejected with 400 - the notification run recreates the row every pass. Dismiss it instead.' + EVENT_FANOUT }),
     },
-  };
+  });
 }
+
+// #2267: eine Erinnerung gehoert zum Modul ihres Eintrags (Aufgabe, Termin,
+// Abo ...). Wer dieses Modul nicht lesen bzw. schreiben darf - als Mitglied
+// per Rechteentzug oder als Token ohne den Scope -, bekommt die Absage.
+const ORIGIN_READ = '`module_access_denied` (403, the caller may not read the module the reminder\'s entity belongs to - '
+  + 'for an API token a `<module>:read` or `<module>:write` scope of that module, e.g. `tasks:read` for `entity_type=task`)';
+const ORIGIN_WRITE = '`module_access_denied` (403, the caller may not write to the module the reminder\'s entity belongs to - '
+  + 'for an API token the `<module>:write` scope of that module, e.g. `calendar:write` for `entity_type=event`)';
+const CASE_REASONS = {
+  '/api/v1/reminders/all': { get: ORIGIN_READ },
+  '/api/v1/reminders': { get: ORIGIN_READ, post: ORIGIN_WRITE, put: ORIGIN_WRITE, delete: ORIGIN_WRITE },
+  '/api/v1/reminders/{id}/dismiss': { patch: ORIGIN_WRITE },
+  '/api/v1/reminders/{id}': { delete: ORIGIN_WRITE },
+};

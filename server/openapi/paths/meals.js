@@ -192,8 +192,11 @@ export function mealsPaths() {
 // #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem
 // englischen `error` - je Operation der Satz, der sie nennt.
 const SELECTED_RECIPE_GONE = '`meals_selected_recipe_not_found` (400, the chosen `recipe_id` does not exist)';
+const SHOPPING_WRITE_REQUIRED = '`cross_module_access` (403, the caller has no write access to the shopping module - for API tokens a `shopping:write` scope)';
 const CASE_REASONS = {
   '/api/v1/meals': { post: SELECTED_RECIPE_GONE },
   '/api/v1/meals/{id}': { put: SELECTED_RECIPE_GONE },
   '/api/v1/meals/apply-plan': { post: SELECTED_RECIPE_GONE },
+  '/api/v1/meals/{id}/to-shopping-list': { post: SHOPPING_WRITE_REQUIRED },
+  '/api/v1/meals/week-to-shopping-list': { post: SHOPPING_WRITE_REQUIRED },
 };

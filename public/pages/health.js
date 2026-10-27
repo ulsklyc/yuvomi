@@ -397,10 +397,13 @@ const CYCLE_TREND_CHART = Object.freeze({ ...CHART, H: 260 });
 const chartRatioAttr = ({ W, H }) => (H === CHART.H ? '' : ` style="aspect-ratio: ${W} / ${H}"`);
 
 const RANGE_LABELS = {
+  day: 'health.vitals.range.day',
   week: 'health.vitals.range.week',
   month: 'health.vitals.range.month',
   year: 'health.vitals.range.year',
 };
+// Der Tag steht vorn (#1699): vom Einzelnen zum Ueberblick, wie in Apple Health.
+const VITAL_RANGES = Object.keys(RANGE_LABELS);
 
 // Kanal-Farben (Trend-Chart). Nur Tokens — keine Wertung, rein zur Unterscheidung.
 const CHANNEL_COLORS = ['var(--module-health)', 'var(--color-info)', 'var(--color-warning)'];
@@ -1406,7 +1409,7 @@ function renderVitalsShell() {
     ${readOnlyBannerMarkup(vitals.members, vitals.personId, canEditFor(vitals.personId, vitals.meId), vitals.meId)}
     <div class="health-vitals__toolbar">
       <div class="health-vitals__ranges" role="tablist" aria-label="${esc(t('health.vitals.chartTitle'))}">
-        ${['week', 'month', 'year'].map((r) => `
+        ${VITAL_RANGES.map((r) => `
           <button type="button" class="health-vitals__range${r === vitals.range ? ' is-active' : ''}"
             data-range="${r}" role="tab" aria-selected="${r === vitals.range}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
       </div>
@@ -1608,6 +1611,9 @@ async function switchPerson() {
  * Messart oeffnen. Ist gar nichts gemessen, steht statt der Kacheln EINE
  * ruhige Zeile mit der Erfassen-Aktion, und Zeitraum und Diagramm entfallen
  * (`.health-vitals--empty`, health.css). */
+/** Zeitraum der Kacheln: der gewaehlte, am Tag die Woche (eine Linie braucht mehr als einen Bucket). */
+const cardRange = () => (vitals.range === 'day' ? 'week' : vitals.range);
+
 function renderCards() {
   const host = vitals.root.querySelector('#health-vitals-cards');
   if (!host) return;
@@ -1617,7 +1623,8 @@ function renderCards() {
   const measured = [];
   const all = VITAL_METRICS.map((metric) => ({
     metric,
-    series: computeVitalSeries(vitals.rows, { type: metric.type, range: vitals.range, anchor: vitals.anchor }),
+    // Die Trendlinie der Kachel braucht einen Verlauf; am Tag zeigt sie die Woche.
+    series: computeVitalSeries(vitals.rows, { type: metric.type, range: cardRange(), anchor: vitals.anchor }),
   }));
   for (const entry of all) (entry.series.latest ? measured : empty).push(entry.metric);
   // Die gewaehlte Messart ist eine gemessene - sonst zeigte das Diagramm
@@ -1863,7 +1870,7 @@ function renderDetail() {
         <div class="health-chart-section__title">${esc(t(metric.labelKey))}</div>
         <div class="health-vitals__stepper">
           <button class="btn btn--icon" data-step="-1" aria-label="${esc(t('health.vitals.prevPeriod'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-          <span class="health-vitals__period">${esc(dateRangeText(series.from, series.to))}</span>
+          <span class="health-vitals__period">${esc(vitalPeriodText(series))}</span>
           <button class="btn btn--icon" data-step="1" aria-label="${esc(t('health.vitals.nextPeriod'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
         </div>
       </div>
@@ -2024,9 +2031,20 @@ function recentMeasurementsMarkup(metric) {
           // Hier stand eine Eigenbau-Zeile mit einem Stift als einzigem Ziel;
           // jetzt ist die ganze Zeile der Knopf (`.list-row__main--interactive`
           // streckt sich ueber sie), sein Name ist ihr Inhalt: Tag und Wert.
+          // UHRZEIT UND NOTIZ (#1699): beide waren mit jeder Messung gespeichert,
+          // die Liste zeigte nur den Tag. Drei Zuckerwerte eines Tages standen
+          // als drei gleiche Daten untereinander.
+          const time = readingTime(r);
+          const note = String(r.note ?? '').trim();
           const cells = `
-            <span class="health-recent__date">${esc(dateText(r.measured_at))}</span>
-            <span class="health-recent__value">${esc(valueText(r))}${vitalUnitText(metric, r) ? ` <small>${esc(vitalUnitText(metric, r))}</small>` : ''}</span>`;
+            <span class="health-recent__when">
+              <span class="health-recent__date">${esc(dateText(r.measured_at))}</span>
+              ${time ? `<span class="health-recent__time">${esc(time)}</span>` : ''}
+            </span>
+            <span class="health-recent__body">
+              <span class="health-recent__value">${esc(valueText(r))}${vitalUnitText(metric, r) ? ` <small>${esc(vitalUnitText(metric, r))}</small>` : ''}</span>
+              ${note ? `<span class="health-recent__note">${esc(note)}</span>` : ''}
+            </span>`;
           return `
           <li class="list-row health-recent__row">
             ${own ? `<button type="button" class="list-row__main list-row__main--interactive health-recent__open" data-vital-edit="${esc(r.id)}">${cells}</button>`
@@ -2110,13 +2128,13 @@ function vitalSheetMarkup(metric) {
   }
   return `
     <div class="health-vitals__ranges health-vital-sheet__ranges" role="tablist" aria-label="${esc(t('health.vitals.chartTitle'))}">
-      ${['week', 'month', 'year'].map((r) => `
+      ${VITAL_RANGES.map((r) => `
         <button type="button" class="health-vitals__range${r === vitals.range ? ' is-active' : ''}"
           data-sheet-range="${r}" role="tab" aria-selected="${r === vitals.range}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
     </div>
     <div class="health-vitals__stepper health-vital-sheet__stepper">
       <button type="button" class="btn btn--icon" data-sheet-step="-1" aria-label="${esc(t('health.vitals.prevPeriod'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-      <span class="health-vitals__period">${esc(dateRangeText(series.from, series.to))}</span>
+      <span class="health-vitals__period">${esc(vitalPeriodText(series))}</span>
       <button type="button" class="btn btn--icon" data-sheet-step="1" aria-label="${esc(t('health.vitals.nextPeriod'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
     </div>
     <div class="health-vital-sheet__chart">
@@ -2168,6 +2186,12 @@ function renderVitalSheet(host) {
     }));
 }
 
+/** Der Zeitraum ueber dem Diagramm; ein Tag mit Wochentag (#1699). */
+function vitalPeriodText(series) {
+  if (series.gran === 'hour') return dateText(series.from, { weekday: true });
+  return dateRangeText(series.from, series.to);
+}
+
 function stepAnchor(dir) {
   vitals.anchor = stepVitalAnchor(vitals.range, vitals.anchor, dir);
 }
@@ -2193,8 +2217,38 @@ function axisUnitText(metric, series, axis) {
   return series.latest?.unit || metric.units?.[0] || '';
 }
 
+/** Uhrzeit einer Messung (Wanduhr aus `measured_at`, ohne Zone). */
+function readingTime(reading) {
+  const hhmm = /T(\d{2}:\d{2})/.exec(String(reading?.measured_at ?? ''))?.[1];
+  return hhmm ? formatTime(hhmm) : '';
+}
+
+/** Wie eine einzelne Messung im Diagramm heisst: am Tag die Uhrzeit, sonst Tag und Uhrzeit. */
+function readingLabel(series, reading) {
+  const time = readingTime(reading);
+  if (series.gran === 'hour') return time;
+  return time ? `${dateText(reading.date)} ${time}` : dateText(reading.date);
+}
+
+/** Der Wert eines Buckets: das Mittel, bei mehreren verschiedenen Werten mit seiner Spanne. */
+function bucketValueText(metric, point, key) {
+  const lo = point.min?.[key];
+  const hi = point.max?.[key];
+  const mean = fmtChannelValue(metric, point[key]);
+  if (lo === null || lo === undefined || hi === null || hi === undefined || !(hi > lo)) return mean;
+  return t('health.vitals.bandValue', { mean, low: fmtChannelValue(metric, lo), high: fmtChannelValue(metric, hi) });
+}
+
 function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
   const pts = series.points;
+  const readingsAll = series.readings ?? [];
+  // DIE TAGESANSICHT (#1699): eine Stundenachse, jede Messung an ihrer Uhrzeit.
+  const hourly = series.gran === 'hour';
+  /* DER BLUTDRUCK IST EIN BALKEN JE MESSUNG (#1798): von diastolisch bis
+   * systolisch, statt zweier Kurven, die wie unabhaengige Reihen lasen. Im
+   * Jahr steht je Monat ein Balken zwischen den Mittelwerten - eine Messung
+   * je Balken waeren dort hunderte Striche. */
+  const bars = metric.format === 'pair' && axis.channels.includes(0) && axis.channels.includes(1);
 
   // Aktive Kanäle: die dieser Achse, die im Zeitraum mindestens einen Wert tragen.
   const channels = axis.channels
@@ -2205,19 +2259,30 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
   if (!channels.length) {
     return primary ? emptyHintHTML(t('health.vitals.noData'), { className: 'health-chart-empty' }) : '';
   }
+  const hasValue = (r) => channels.some(({ key }) => r[key] !== null && r[key] !== undefined);
 
-  // Buckets mit mindestens einem Messwert. Weniger als zwei ergeben keine Kurve —
-  // dann ein ehrlicher Low-Data-Hinweis statt eines einzelnen Punkts im Leerraum.
-  const dataIdx = pts
-    .map((p, i) => ({ p, i }))
-    .filter(({ p }) => channels.some(({ key }) => p[key] !== null))
-    .map(({ i }) => i);
-  if (dataIdx.length < 2) {
+  // Was gezeichnet wird: Messungen (Tag, Blutdruck-Balken) oder Buckets.
+  const marks = hourly || (bars && series.gran !== 'month')
+    ? readingsAll.filter(hasValue)
+    : pts.map((p, i) => ({ ...p, index: i, bucket: true })).filter(hasValue);
+
+  // Weniger als zwei Buckets ergeben keine Kurve - dann ein ehrlicher
+  // Low-Data-Hinweis statt eines einzelnen Punkts im Leerraum. Am Tag ist die
+  // eine Messung genau die Auskunft, und zwei Blutdruck-Balken eines Tages
+  // stehen fuer sich.
+  const enough = hourly ? marks.length >= 1
+    : bars ? marks.length >= 2
+      : pts.filter(hasValue).length >= 2;
+  if (!enough) {
     return primary ? emptyHintHTML(t('health.vitals.sparse'), { className: 'health-chart-empty' }) : '';
   }
 
   const unit = axisUnitText(metric, series, axis);
-  const allValues = channels.flatMap(({ key }) => pts.map((p) => p[key]).filter((v) => v !== null));
+  // Die Achse traegt auch die Raender der Tagesbaender - sonst schnitte sie
+  // die 190 ab, die das Band gerade zeigen soll.
+  const allValues = channels.flatMap(({ key }) => (marks[0]?.bucket
+    ? marks.flatMap((p) => [p[key], p.min?.[key], p.max?.[key]])
+    : marks.map((r) => r[key]))).filter((v) => v !== null && v !== undefined);
   let min;
   let max;
   let steps = 4;
@@ -2244,66 +2309,147 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
    * Wert geklemmt: Messungen vom 09.09. und 20.09. standen an den Plotkanten,
    * waehrend der Kopf "01.09.2026 - 30.09.2026" sagte - die Kurve behauptete
    * einen Monat, den sie nicht zeigte. Die Buckets sind luekenlos (jeder Tag,
-   * jeder Monat), ihr Index IST die Zeit; also spannt die Achse alle. */
-  const x = (i) => left + (pts.length <= 1 ? 0 : (i * (right - left)) / (pts.length - 1));
+   * jeder Monat), ihr Index IST die Zeit; also spannt die Achse alle. Am Tag
+   * ist die Achse 00:00 bis 24:00. */
+  const xBucket = (i) => left + (pts.length <= 1 ? 0 : (i * (right - left)) / (pts.length - 1));
+  const xOf = hourly
+    ? (r) => left + (Math.min(1440, Math.max(0, r.minutes)) / 1440) * (right - left)
+    : (r) => xBucket(r.index);
   const y = (v) => bottom - ((v - min) / (max - min)) * (bottom - top);
+  const labelOf = (m) => (m.bucket ? vitalPointLabel(series, m) : readingLabel(series, m));
 
-  // Flächenfüllung nur bei Einzelkanal-Metriken (Gewicht, Glukose …). Bei
-  // Systole und Diastole würde ein Füllband die Linien verschlucken, und der
-  // Puls hat eine eigene Linienfarbe - die Fläche steht im Modulton.
   let area = '';
-  if (channels.length === 1 && metric.channels.length === 1) {
-    const key = channels[0].key;
-    const vp = pts.map((p, i) => ({ p, i })).filter(({ p }) => p[key] !== null);
-    if (vp.length >= 2) {
-      const spine = vp.map(({ p, i }) => `${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`).join(' ');
-      const x0 = x(vp[0].i).toFixed(1);
-      const x1 = x(vp[vp.length - 1].i).toFixed(1);
-      area = `<polygon class="health-chart__area" points="${x0},${bottom.toFixed(1)} ${spine} ${x1},${bottom.toFixed(1)}" />`;
-    }
-  }
-
-  /* DIE REIHEN SIND DIREKT BESCHRIFTET (R21, D6), nicht nur ueber die Farbe
-   * und eine Legende darunter: der Name steht ueber dem letzten Punkt seiner
-   * Kurve, in ihrer Farbe. Nur bei Messarten mit mehreren Kanaelen - eine
-   * einzelne Kurve nennt schon die Ueberschrift. */
+  let seriesSvg = '';
   const labelled = metric.channels.length > 1;
-  const seriesSvg = channels.map(({ key, idx }) => {
-    const color = CHANNEL_COLORS[idx % CHANNEL_COLORS.length];
-    const chName = metric.channelLabelKeys?.[idx] ? t(metric.channelLabelKeys[idx]) : t(metric.labelKey);
-    const linePts = [];
-    const dots = [];
+
+  if (bars) {
+    /* Mehrere Messungen eines Tages stehen NEBENEINANDER um ihren Tag, in der
+     * Reihenfolge der Uhrzeit - nicht uebereinander, wo die zweite die erste
+     * verdeckte. Der Abstand bleibt innerhalb des Tages. */
+    const color = CHANNEL_COLORS[0];
+    const [sysKey, diaKey] = [metric.channels[0], metric.channels[1]];
+    const step = pts.length > 1 ? (right - left) / (pts.length - 1) : right - left;
+    const perBucket = new Map();
+    for (const m of marks) perBucket.set(m.index, (perBucket.get(m.index) ?? 0) + 1);
+    const seen = new Map();
     let last = null;
-    pts.forEach((p, i) => {
-      if (p[key] === null) return;
-      const px = x(i).toFixed(1);
-      const py = y(p[key]).toFixed(1);
-      linePts.push(`${px},${py}`);
-      last = { px, py };
-      dots.push(`<circle cx="${px}" cy="${py}" r="3.5" fill="${color}"><title>${esc(`${chName} · ${vitalPointLabel(series, p)}: ${fmtChannelValue(metric, p[key])}`)}</title></circle>`);
+    const drawn = [];
+    const pieces = marks.map((m) => {
+      let px = xOf(m);
+      const n = hourly ? 1 : perBucket.get(m.index);
+      const gap = Math.min(12, step / (n + 1));
+      if (!hourly) {
+        const k = seen.get(m.index) ?? 0;
+        seen.set(m.index, k + 1);
+        // Die Gruppe rueckt an den Plotkanten als Ganzes nach innen; einzeln
+        // geklemmt lagen die Balken des letzten Tages uebereinander.
+        const half = ((n - 1) / 2) * gap;
+        const center = Math.min(right - half, Math.max(left + half, px));
+        px = center + (k - (n - 1) / 2) * gap;
+      }
+      const sys = m[sysKey];
+      const dia = m[diaKey];
+      const title = `${t(metric.labelKey)} · ${labelOf(m)}: ${sys !== null && dia !== null ? vitalValueText(metric, m) : fmtChannelValue(metric, sys ?? dia)}${unit ? ` ${unit}` : ''}`;
+      const x1 = px.toFixed(1);
+      if (sys === null || dia === null) {
+        // Ein Wert ohne Paar faellt auf einen Punkt zurueck.
+        return `<circle class="health-chart__bp-point" cx="${x1}" cy="${y(sys ?? dia).toFixed(1)}" r="3.5" fill="${color}"><title>${esc(title)}</title></circle>`;
+      }
+      last = { x: x1, top: y(Math.max(sys, dia)).toFixed(1), bottom: y(Math.min(sys, dia)).toFixed(1) };
+      drawn.push({ index: m.index, x: px, top: y(Math.max(sys, dia)), bottom: y(Math.min(sys, dia)) });
+      // Stehen mehrere Balken an einem Tag, werden sie schmaler statt sich zu beruehren.
+      const width = n > 1 ? Math.max(2, Math.min(6, gap / 2)) : 6;
+      return `<line class="health-chart__bp" x1="${x1}" x2="${x1}" y1="${last.top}" y2="${last.bottom}" stroke="${color}" stroke-width="${width.toFixed(1)}"><title>${esc(title)}</title></line>`;
     });
-    const label = labelled && last
-      ? `<text x="${last.px}" y="${last.py}" dy="-0.8em" class="chart__axis health-chart__series-label" text-anchor="end" fill="${color}">${esc(chName)}</text>`
+    const chName = (idx) => t(metric.channelLabelKeys[idx]);
+    // Die Namen stehen am letzten Tag mit Balken, links von seiner Gruppe.
+    if (last && !hourly) {
+      const group = drawn.filter((b) => b.index === drawn[drawn.length - 1].index);
+      last = {
+        x: Math.min(...group.map((b) => b.x)).toFixed(1),
+        top: Math.min(...group.map((b) => b.top)).toFixed(1),
+        bottom: Math.max(...group.map((b) => b.bottom)).toFixed(1),
+      };
+    }
+    const labels = last
+      // Links neben den Enden des letzten Balkens, auf ihrer Hoehe: ueber oder
+      // unter ihm stiessen sie an Gitter und Plotkante.
+      ? `<text x="${last.x}" y="${last.top}" dx="-0.7em" dy="0.35em" class="chart__axis health-chart__series-label" text-anchor="end" fill="${color}">${esc(chName(0))}</text>
+         <text x="${last.x}" y="${last.bottom}" dx="-0.7em" dy="0.35em" class="chart__axis health-chart__series-label" text-anchor="end" fill="${color}">${esc(chName(1))}</text>`
       : '';
-    return `
-      <polyline fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"
-        stroke-linecap="round" points="${linePts.join(' ')}" />
+    seriesSvg = pieces.join('') + labels;
+  } else {
+    // Flächenfüllung nur bei Einzelkanal-Metriken (Gewicht, Glukose …) und
+    // nicht am Tag: dort sind es einzelne Messungen, keine Verlaufsflaeche.
+    if (!hourly && channels.length === 1 && metric.channels.length === 1) {
+      const key = channels[0].key;
+      const vp = marks.filter((m) => m[key] !== null);
+      if (vp.length >= 2) {
+        const spine = vp.map((m) => `${xOf(m).toFixed(1)},${y(m[key]).toFixed(1)}`).join(' ');
+        const x0 = xOf(vp[0]).toFixed(1);
+        const x1 = xOf(vp[vp.length - 1]).toFixed(1);
+        area = `<polygon class="health-chart__area" points="${x0},${bottom.toFixed(1)} ${spine} ${x1},${bottom.toFixed(1)}" />`;
+      }
+    }
+
+    /* DIE REIHEN SIND DIREKT BESCHRIFTET (R21, D6), nicht nur ueber die Farbe
+     * und eine Legende darunter: der Name steht ueber dem letzten Punkt seiner
+     * Kurve, in ihrer Farbe. Nur bei Messarten mit mehreren Kanaelen - eine
+     * einzelne Kurve nennt schon die Ueberschrift. */
+    seriesSvg = channels.map(({ key, idx }) => {
+      const color = CHANNEL_COLORS[idx % CHANNEL_COLORS.length];
+      const chName = metric.channelLabelKeys?.[idx] ? t(metric.channelLabelKeys[idx]) : t(metric.labelKey);
+      const linePts = [];
+      const dots = [];
+      const bands = [];
+      let last = null;
+      marks.forEach((m) => {
+        if (m[key] === null || m[key] === undefined) return;
+        const px = xOf(m).toFixed(1);
+        const py = y(m[key]).toFixed(1);
+        linePts.push(`${px},${py}`);
+        last = { px, py };
+        /* DAS TAGESBAND (#1699): vom kleinsten zum groessten Wert des Buckets,
+         * das Mittel als Punkt darauf. Bei einer einzigen Messung faellt es
+         * auf den Punkt zusammen und entfaellt - das Diagramm sieht dann aus
+         * wie vorher. */
+        const lo = m.bucket ? m.min?.[key] : null;
+        const hi = m.bucket ? m.max?.[key] : null;
+        if (lo !== null && lo !== undefined && hi > lo) {
+          bands.push(`<line class="health-chart__range" x1="${px}" x2="${px}" y1="${y(hi).toFixed(1)}" y2="${y(lo).toFixed(1)}" stroke="${color}" />`);
+        }
+        const valueText = m.bucket ? bucketValueText(metric, m, key) : fmtChannelValue(metric, m[key]);
+        dots.push(`<circle cx="${px}" cy="${py}" r="3.5" fill="${color}"><title>${esc(`${chName} · ${labelOf(m)}: ${valueText}`)}</title></circle>`);
+      });
+      const label = labelled && last
+        ? `<text x="${last.px}" y="${last.py}" dy="-0.8em" class="chart__axis health-chart__series-label" text-anchor="end" fill="${color}">${esc(chName)}</text>`
+        : '';
+      const line = linePts.length >= 2
+        ? `<polyline fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"
+        stroke-linecap="round" points="${linePts.join(' ')}" />`
+        : '';
+      return `
+      ${bands.join('')}
+      ${line}
       ${dots.join('')}
       ${label}`;
-  }).join('');
+    }).join('');
+  }
 
   const grid = chartGridFor(min, max, metric, geo, steps, unit);
 
-  // Screenreader-Datentabelle: nur Buckets mit mindestens einem Wert.
+  // Screenreader-Datentabelle: dieselben Marken wie im Bild - je Messung oder
+  // je Bucket mit Wert, ein Bucket mit seiner Spanne.
   const chLabel = (idx) => (metric.channelLabelKeys?.[idx] ? t(metric.channelLabelKeys[idx]) : t(metric.labelKey));
   const tableHeaders = [t('health.vitals.field.measuredAt'), ...channels.map(({ idx }) => chLabel(idx))];
-  const dataPoints = pts.filter((p) => channels.some(({ key }) => p[key] !== null));
-  const tableRows = dataPoints
-    .map((p) => [vitalPointLabel(series, p), ...channels.map(({ key }) => fmtChannelValue(metric, p[key]))]);
+  const tableRows = marks.map((m) => [labelOf(m), ...channels.map(({ key }) => (m.bucket ? bucketValueText(metric, m, key) : fmtChannelValue(metric, m[key])))]);
   const caption = primary ? t(metric.labelKey) : channels.map(({ idx }) => chLabel(idx)).join(', ');
   const table = tableRows.length ? chartTableMarkup(caption, tableHeaders, tableRows) : '';
-  // Die Marken benennen den Zeitraum (Anfang, Mitte, Ende) an ihrer Stelle.
-  const xLabels = chartXLabelsMarkup(pts.map((p) => vitalPointLabel(series, p)), geo);
+  // Die Marken benennen den Zeitraum (Anfang, Mitte, Ende) an ihrer Stelle;
+  // am Tag sind es Mitternacht, Mittag, Mitternacht.
+  const xLabels = hourly
+    ? chartXLabelsMarkup([formatTime('00:00'), formatTime('12:00'), formatTime('00:00')], geo)
+    : chartXLabelsMarkup(pts.map((p) => vitalPointLabel(series, p)), geo);
   // `.chart` haelt das 3:1 der geteilten Geometrie (panel.css); eine hoehere
   // Flaeche nennt ihr eigenes Verhaeltnis.
   const ratio = H === CHART.H ? '' : ` style="aspect-ratio: ${W} / ${H}"`;

@@ -36,7 +36,8 @@ global.document = {
 const { __test } = await import('../public/pages/waste.js');
 const {
   findScheduleOrigin, parseDeepLinkParams, deepLinkSelectors, recurrenceSummary, originBadges,
-  defaultLabelDecision, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
+  defaultLabelSelection, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
+  labelTypeChipsHtml, mappingTypesChanged, importLabelRowHtml, sourceMappingRowHtml,
   splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,
   typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, WASTE_TYPE_COLORS,
   activeSwatchColor, resolveSwatchColors,
@@ -238,11 +239,12 @@ test('originBadges: a moved AND coalesced occurrence shows both badges', () => {
 // Import wizard pure helpers (#1063 Phase 3)
 // -------------------------------------------------------------------------
 
-test('defaultLabelDecision: remembered_ignored beats remembered_type_id beats suggested_type_id beats "create new"', () => {
-  assert.equal(defaultLabelDecision({ remembered_ignored: true, remembered_type_id: 5, suggested_type_id: 9 }), '');
-  assert.equal(defaultLabelDecision({ remembered_ignored: false, remembered_type_id: 5, suggested_type_id: 9 }), '5');
-  assert.equal(defaultLabelDecision({ remembered_ignored: false, remembered_type_id: null, suggested_type_id: 9 }), '9');
-  assert.equal(defaultLabelDecision({ remembered_ignored: false, remembered_type_id: null, suggested_type_id: null }), '__new__');
+test('defaultLabelSelection: remembered_ignored beats remembered types beats suggested_type_id beats "create new"', () => {
+  assert.deepEqual(defaultLabelSelection({ remembered_ignored: true, remembered_type_ids: [5], suggested_type_id: 9 }), { typeIds: [], createNew: false });
+  assert.deepEqual(defaultLabelSelection({ remembered_ignored: false, remembered_type_ids: [5, 7], suggested_type_id: 9 }), { typeIds: [5, 7], createNew: false },
+    'every remembered type of a label that names two bins (#2273)');
+  assert.deepEqual(defaultLabelSelection({ remembered_ignored: false, remembered_type_ids: [], suggested_type_id: 9 }), { typeIds: [9], createNew: false });
+  assert.deepEqual(defaultLabelSelection({ remembered_ignored: false, remembered_type_ids: [], suggested_type_id: null }), { typeIds: [], createNew: true });
 });
 
 test('unresolvedBlockingDiagnostics: only blocking diagnostics count, and an explicit skip resolves one', () => {
@@ -256,26 +258,73 @@ test('unresolvedBlockingDiagnostics: only blocking diagnostics count, and an exp
   assert.equal(unresolvedBlockingDiagnostics(diagnostics, ['uid:a', 'uid:b']).length, 0);
 });
 
-test('buildMappingDecisions: builds type_id / new_type / ignored entries from each row\'s decision', () => {
+test('buildMappingDecisions: several types, a new type, both together, or nothing (= ignored) from each row (#2273)', () => {
   const rows = [
-    { normalized_label: 'restmüll', decision: '5', newTypeName: '' },
-    { normalized_label: 'papier', decision: '__new__', newTypeName: 'Papier' },
-    { normalized_label: 'sperrmüll', decision: '', newTypeName: '' },
+    { normalized_label: 'restmüll', typeIds: [5], createNew: false, newTypeName: '' },
+    { normalized_label: 'bio, blaue tonne', typeIds: [5, 7, 7], createNew: false, newTypeName: '' },
+    { normalized_label: 'papier', typeIds: [], createNew: true, newTypeName: 'Papier' },
+    { normalized_label: 'bio, gelb', typeIds: [5], createNew: true, newTypeName: 'Gelb' },
+    { normalized_label: 'sperrmüll', typeIds: [], createNew: false, newTypeName: '' },
   ];
   const { mappings, error } = buildMappingDecisions(rows);
   assert.equal(error, undefined);
   assert.deepEqual(mappings, [
-    { normalized_label: 'restmüll', type_id: 5 },
+    { normalized_label: 'restmüll', type_ids: [5] },
+    { normalized_label: 'bio, blaue tonne', type_ids: [5, 7] },
     { normalized_label: 'papier', new_type: { name: 'Papier' } },
+    { normalized_label: 'bio, gelb', type_ids: [5], new_type: { name: 'Gelb' } },
     { normalized_label: 'sperrmüll', ignored: true },
   ]);
 });
 
 test('buildMappingDecisions: a "create new" decision without a name reports an error instead of committing a blank type', () => {
-  const rows = [{ normalized_label: 'papier', decision: '__new__', newTypeName: '  ' }];
+  const rows = [{ normalized_label: 'papier', typeIds: [], createNew: true, newTypeName: '  ' }];
   const result = buildMappingDecisions(rows);
   assert.equal(result.error, 'missing_new_type_name');
   assert.equal(result.label, 'papier');
+});
+
+test('#2273 a label row offers every type as a chip of the canon, pressed as remembered, in a group named by the label', () => {
+  __test.setStateForTest({ types: [
+    { id: 1, name: 'Bio', icon: 'leaf', color: '#2E7D32', archived: false },
+    { id: 2, name: 'Papier', icon: 'newspaper', color: '#1565C0', archived: false },
+    { id: 3, name: 'Alt', icon: 'trash-2', color: '#666666', archived: true },
+  ] });
+  const html = importLabelRowHtml({ normalized_label: 'bio, blaue tonne', original_label: 'Bio, Blaue Tonne', count: 3, remembered_type_ids: [1, 2] }, 0);
+  assert.match(html, /role="group" aria-labelledby="wiz-label-0"/);
+  assert.match(html, /id="wiz-label-0"/);
+  assert.match(html, /class="filter-chip filter-chip--active" data-type-chip="1" aria-pressed="true"/);
+  assert.match(html, /class="filter-chip filter-chip--active" data-type-chip="2" aria-pressed="true"/);
+  assert.doesNotMatch(html, /data-type-chip="3"/, 'an archived type that is not chosen is no offer');
+  assert.match(html, /data-new-type-chip aria-pressed="false"/);
+  assert.match(html, /data-role="label-ignored" hidden/, 'chosen types: no "not imported" line');
+  assert.match(html, /data-role="label-new-type-name"[^>]*hidden/);
+
+  const ignored = importLabelRowHtml({ normalized_label: 'info', original_label: 'Info', count: 1, remembered_ignored: true, remembered_type_ids: [] }, 1);
+  assert.doesNotMatch(ignored, /aria-pressed="true"/);
+  assert.match(ignored, /data-role="label-ignored">/, 'nothing chosen: the line says the label is not imported');
+
+  const sheet = sourceMappingRowHtml({ id: 9, original_label: 'Bio, Blaue Tonne', type_ids: [1, 3] });
+  assert.match(sheet, /data-type-chip="3" aria-pressed="true"/, 'an archived type stays visible while it is chosen');
+  assert.doesNotMatch(sheet, /data-new-type-chip/, 'a source\'s mapping sheet creates no type');
+  assert.match(sheet, /aria-labelledby="wsrc-mapping-9"/);
+  // The discard guard of a dialog only sees fields: the choice also stands in a hidden one.
+  assert.match(sheet, /<input type="hidden" name="wsrc-mapping-9-types" data-role="label-types-value" value="1,3">/);
+  assert.match(html, /name="wiz-label-0-types" data-role="label-types-value" value="1,2"/);
+});
+
+test('#2273 labelTypesValue: the hidden field changes with every chip, including "new type"', () => {
+  assert.equal(__test.labelTypesValue([3, 1], false), '1,3');
+  assert.equal(__test.labelTypesValue([], true), 'new');
+  assert.equal(__test.labelTypesValue([2], true), '2,new');
+  assert.equal(__test.labelTypesValue([], false), '');
+});
+
+test('#2273 mappingTypesChanged compares the type set, not its order', () => {
+  assert.equal(mappingTypesChanged({ type_ids: [1, 2] }, [2, 1]), false);
+  assert.equal(mappingTypesChanged({ type_ids: [1] }, [1, 2]), true);
+  assert.equal(mappingTypesChanged({ type_ids: [] }, []), false);
+  assert.equal(mappingTypesChanged({ type_ids: [1] }, []), true);
 });
 
 test('sourceHealthBadgeInfo: an error takes priority over needs_refresh, and a healthy source shows nothing', () => {

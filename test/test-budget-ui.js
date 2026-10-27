@@ -1271,7 +1271,7 @@ test('gespeicherte Beträge werden beim Öffnen nicht gerundet', () => {
 // in den Stellen der Waehrung, nur mit Nullen aufgefuellt (test:money-utils).
 test('Betragsfelder zeigen den Bestand in den Stellen der Waehrung (200,00 statt 200)', () => {
   const felder = [
-    ['budget.js', budget, 'bm-amount', /amountInputAttrs\(state\.currency, absAmount\)/],
+    ['budget.js', budget, 'bm-amount', /amountInputAttrs\(entryCurrency, absAmount\)/], // #2302: Waehrung des Kontos
     ['budget.js', budget, 'cb-amount', /amountInputAttrs\(currency, absAmount\)/],
     ['budget.js', budget, 'lm-amount', /amountInputAttrs\(loanCurrency, loan \? loan\.total_amount : ''\)/],
     ['budget-plans.js', plans, 'plan-amount', /amountInputAttrs\(view\.ctx\.currency, value\)/],
@@ -2686,8 +2686,8 @@ test('eingebettete Split-Ausgaben gliedern Gruppe und Karten eine Stufe tiefer',
     'die Karten stehen eingebettet unter dem Gruppennamen, also <h4>');
   assert.match(src, /<\$\{GroupTag\} class="split-group-name">/,
     'der Gruppenname muss über GroupTag gerendert werden');
-  assert.equal((src.match(/<\$\{SectionTag\} class="split-section-title u-section-title">/g) ?? []).length, 4,
-    'Salden, letzte Ausgaben, wiederkehrende Ausgaben (#1647) und Verlauf müssen über SectionTag gerendert werden');
+  assert.equal((src.match(/<\$\{SectionTag\} class="split-section-title u-section-title">/g) ?? []).length, 6,
+    'Salden, die Summen je Person und je Kategorie (#1888, #1941), letzte Ausgaben, wiederkehrende Ausgaben (#1647) und Verlauf müssen über SectionTag gerendert werden');
   // Fest geschriebene Ueberschriften nur im Kopf von render(), und dort je
   // Zweig genau passend: eingebettet die sr-only-<h2>, eigenstaendig die <h1>.
   const outsideHead = src.replace(/const head = embedded[\s\S]*?<\/header>`;/, '');
@@ -3234,7 +3234,7 @@ test('Buchungsdialog: Betrag zuerst und gross, Seltenes hinter „Weitere Angabe
   assert.ok(pos('id="bm-amount"') < pos('id="bm-title"'), 'der Betrag steht vor dem Titel - und bekommt als erstes Feld den Erstfokus');
   assert.ok(pos('id="bm-title"') < pos('id="bm-category"'));
   assert.ok(pos('id="bm-category"') < pos('id="bm-date"'));
-  assert.match(modal, /class="form-input budget-amount-input" id="bm-amount"\$\{amountInputAttrs\(state\.currency, absAmount\)\}/, 'der Betrag ist der D1-Baustein');
+  assert.match(modal, /class="form-input budget-amount-input" id="bm-amount"\$\{amountInputAttrs\(entryCurrency, absAmount\)\}/, 'der Betrag ist der D1-Baustein');
   const adv = pos('${advancedSection(`');
   for (const rare of ['id="bm-visibility"', 'responsiblePickerHtml(', "budgetToggleHtml('bm-recurring'", 'renderDocumentAttachField(']) {
     assert.ok(pos(rare) > adv, `${rare} gehoert hinter „Weitere Angaben"`);
@@ -3982,7 +3982,7 @@ test('Rot steht im Budget nur an einer Warnung, nie an der Ausgabe selbst', () =
   assert.ok(trend, 'Trend-Diagramm nicht gefunden');
   assert.doesNotMatch(trend[0], /--color-danger/, 'die Ausgabenlinie ist kein Alarm');
   // Die Richtung bleibt lesbar ohne Farbe: das Vorzeichen kommt aus dem Zahlformat.
-  assert.match(budget, /amountByRole\(e\.amount, 'flow'\)/);
+  assert.match(budget, /amountByRole\(e\.amount, 'flow', \{ currency: accountCurrency\(e\.account_id\) \}\)/, 'Rolle flow, in der Waehrung des Kontos (#2302)');
 });
 
 // --------------------------------------------------------
@@ -7627,7 +7627,7 @@ test('R22 D9: Konto, Abo und Ausgabe der Aufteilung beginnen mit derselben Lead-
   assert.match(read('../public/pages/budget.js'), /class="budget-account__icon budget-tile"/);
   assert.match(read('../public/pages/subscriptions.js'), /class="subscription-card__brand budget-tile"/);
   const split = read('../public/pages/split-expenses.js');
-  assert.equal((split.match(/class="split-expense__icon budget-tile"\$\{categoryTone\(/g) ?? []).length, 2, 'Ausgabe und Serie tragen den Ton ihrer Kategorie');
+  assert.equal((split.match(/class="split-expense__icon budget-tile"\$\{categoryTone\(/g) ?? []).length, 3, 'Ausgabe, Serie und Summe je Kategorie (#1941) tragen den Ton ihrer Kategorie');
   assert.equal((split.match(/class="split-group__avatar budget-tile"/g) ?? []).length, 2);
 });
 

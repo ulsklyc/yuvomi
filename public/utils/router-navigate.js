@@ -44,7 +44,7 @@ export const NAVIGATE_DEPS = Object.freeze([
   'hasLeaveGuard', 'mayLeave', 'whenHistorySettled', 'consumeOverlayMarker',
   // Sitzung
   'auth', 'syncPreferencesOnce', 'startThirdPartyModulePolling', 'loadReminderStyles', 'initReminders', 'initPush',
-  'armScreensaver', 'showSessionUnreachable', 'forgetSessionState',
+  'armScreensaver', 'showSessionUnreachable', 'forgetSessionState', 'holdOfflineSession',
   // Seite
   'rememberScrollPosition', 'scrollPositionFor', 'renderPage', 'adoptPageFab', 'updateNav', 'topLevelSection',
   'syncWallMode', 'applyModuleAccentForRoute', 'updateThemeColorForRoute', 'updateBranding',
@@ -206,7 +206,7 @@ export function createNavigate(state, deps) {
     location, history, window, document,
     hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
     auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
-    armScreensaver, showSessionUnreachable, forgetSessionState,
+    armScreensaver, showSessionUnreachable, forgetSessionState, holdOfflineSession,
     rememberScrollPosition, scrollPositionFor, renderPage, adoptPageFab, updateNav, topLevelSection,
     syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
     focusMainContentAfterNavigation, showToast, t,
@@ -350,6 +350,12 @@ export function createNavigate(state, deps) {
       if (typeof userOrPushState === 'object' && userOrPushState !== null) {
         state.currentUser = userOrPushState;
         state._setupRequired = false;
+        // EINMAL DIE SITZUNG ABFRAGEN, BEVOR DIE SEITE LAEDT (#2293). Nur die
+        // Antwort von `/auth/me` traegt den Sitzungsablauf, neben dem der
+        // Service Worker Listen ablegt (sw.js); ohne sie bliebe nach einer
+        // Anmeldung die ganze Sitzung ohne Offline-Stand. Ein Fehler hier
+        // haelt die Anmeldung nicht auf.
+        await auth.me().catch(() => null);
         // Ab hier gibt es jemanden, dessen Bildschirmschoner es sein kann
         // (#1919). VOR dem await: laeuft die Sitzung dabei ab, entschaerft
         // `auth:expired` ihn wieder. Fuer jedes Konto, auch Gast und Display.
@@ -456,13 +462,22 @@ export function createNavigate(state, deps) {
           // antwortet ihm mit seinem Konto.
           armScreensaver();
           await syncPreferencesOnce();
-          startThirdPartyModulePolling();
-          // currentUser kann während des await oben auf null gesetzt worden sein
-          // (auth:expired bei 401 von /preferences), daher Guard gegen null.
-          if (state.currentUser && !['split_guest', 'display'].includes(state.currentUser.access_scope)) {
-            loadReminderStyles();
-            initReminders();
-            initPush();
+          // KALTSTART OHNE VERBINDUNG (#2293). Der Service Worker antwortete mit
+          // dem Abzug der letzten Sitzung (sw.js API_SNAPSHOTS): die Seite zeigt
+          // den gespeicherten Stand, aber NIEMAND hat die Sitzung geprueft. Der
+          // Router sagt das an und prueft nach, sobald der Server antwortet;
+          // Erinnerungen, Push und Modulabfrage starten erst dann.
+          if (result?.offlineSnapshot === true) {
+            if (state.currentUser) holdOfflineSession();
+          } else {
+            startThirdPartyModulePolling();
+            // currentUser kann während des await oben auf null gesetzt worden sein
+            // (auth:expired bei 401 von /preferences), daher Guard gegen null.
+            if (state.currentUser && !['split_guest', 'display'].includes(state.currentUser.access_scope)) {
+              loadReminderStyles();
+              initReminders();
+              initPush();
+            }
           }
         } catch (err) {
           state.currentPath = null; // Reset damit navigate('/login') nicht geblockt wird

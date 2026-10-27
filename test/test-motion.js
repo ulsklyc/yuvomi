@@ -18,7 +18,8 @@
  *  3. KEINE FEDER UND KEIN VERSATZ AUF DEM SEITENINHALT. Der Rueckfall des
  *     Seitenwechsels ist eine reine Blende; glass.css hatte ihm die Glas-Feder
  *     gegeben (Inhalt schwang 2px ueber).
- *  4. DIE SHEET-EINFAHRT HEBT 24px, NICHT 40 %.
+ *  4. DIE SHEET-EINFAHRT AUF DER GLASFEDER HEBT 24px, NICHT 40 %. Den vollen
+ *     Weg faehrt nur die kritisch gedaempfte Blattfeder (#1802).
  *  5. swapPage (utils/view-transition.js): Tausch im Callback, Kopf benannt
  *     und danach wieder frei, ohne API ein direkter Tausch.
  *  6. DIE KUECHEN-LEISTE STEHT IM NEUEN BILD. Der Browser nimmt das neue Bild
@@ -286,7 +287,8 @@ test('eine Kurvenfamilie: die Shorthands und das Sheet-Paar bestehen aus Tokens'
     assert.match(byName.get(name) ?? '', /^var\(--duration-[\w-]+\) var\(--ease-out\)$/, `${name}: Dauer-Token + --ease-out, kein Keyword und kein Literal`);
   }
   assert.match(byName.get('--transition-glass') ?? '', /^var\(--duration-[\w-]+\) var\(--ease-glass\)$/);
-  assert.match(byName.get('--sheet-in') ?? '', /^var\(--duration-[\w-]+\) var\(--ease-glass\)$/, 'der Eintritt des Blatts federt');
+  // Die Blattfeder (#1802): ohne linear() die Glasfeder, mit ihr kritisch gedaempft.
+  assert.match(byName.get('--sheet-in') ?? '', /^var\(--duration-[\w-]+\) var\(--ease-sheet\)$/, 'der Eintritt des Blatts federt');
   assert.match(byName.get('--sheet-out') ?? '', /^var\(--duration-[\w-]+\) var\(--ease-out\)$/, 'der Austritt hat keinen Ueberschwinger');
   const ms = (name) => parseFloat(css('tokens.css').match(new RegExp(`${name}:\\s*(\\d+)ms`))?.[1] ?? 'NaN');
   const dur = (name) => ms(byName.get(name).match(/var\((--duration-[\w-]+)\)/)[1]);
@@ -400,7 +402,11 @@ test('der Seiteninhalt blendet nur - keine Feder, kein Versatz', () => {
   assert.deepEqual(failures, []);
 });
 
-test('die Sheet-Einfahrt hebt hoechstens 24px', () => {
+// BENANNTE ENTSCHEIDUNG (#1802): der kurze Hub gilt der Einfahrt auf der
+// Back-Out-Feder (`glass-sheet-in`, der Rueckfall ohne linear()). Den vollen
+// Weg faehrt nur `sheet-rise` auf der kritisch gedaempften Blattfeder - der
+// Guard "Federn #1802: das Blatt steigt ..." unten haelt diese Seite.
+test('die Sheet-Einfahrt auf der Glasfeder hebt hoechstens 24px - der Vollhub nur ohne Ueberschwinger', () => {
   const names = [...keyframeNames()].filter((n) => /sheet-in$/.test(n));
   assert.ok(names.includes('glass-sheet-in'), 'Vorbedingung: die Glas-Einfahrt ist gefunden');
   for (const name of names) {
@@ -2878,7 +2884,10 @@ test('R19: die Uebersicht blendet vom Skelett zum Inhalt ueber swapContent', () 
   assert.match(src, /const fromSkeleton = Boolean\(shell\.querySelector\('\.widget-skeleton'\)\)\s*&& !document\.documentElement\.classList\.contains\('page-swapping'\);/);
   // Seit R21 (D5) misst der Rueckruf nach dem Zeichnen noch das Heute-Blatt
   // (measurePhoneProgram) - im selben Rueckruf, also unter derselben Blende.
-  assert.match(src, /swapContent\(shell, \(\) => \{\s*setHtml\(shell, `[\s\S]*?`\);[\s\S]{0,800}?\}, \{ animate: fromSkeleton \}\);/);
+  // Seit DW-P1-2 kommt das Markup aus dashboardShellHtml() (der stille Abgleich
+  // liest daraus voraus, welche Zeilen gehen) - gezeichnet wird es hier.
+  assert.match(src, /const html = dashboardShellHtml\(cfg\);/);
+  assert.match(src, /swapContent\(shell, \(\) => \{\s*setHtml\(shell, html\);[\s\S]{0,800}?\}, \{ animate: fromSkeleton \}\);/);
 });
 
 /* 12. GERICHTETER WECHSEL EINER REGION (R19, Critique 2026-10-16): der
@@ -3185,4 +3194,134 @@ test('R23: Lade-Schimmer und Wisch-Hinweis lesen ihre Zeiten aus Tokens', () => 
   for (const name of ['--shimmer-period', '--hint-nudge', '--hint-delay']) {
     assert.match(css('tokens.css'), new RegExp(`${name}:\\s*\\d*\\.?\\d+m?s;`), `${name} fehlt in tokens.css`);
   }
+});
+
+// --------------------------------------------------------
+// #1801: die Abdunklung des Dialog-Blatts folgt dem Zug
+// --------------------------------------------------------
+
+/**
+ * DER GRUND IST EIN EIGENER KNOTEN UNTER DER TAFEL (#1801, Entscheidung Ulas
+ * 26.10.). Das Overlay war Abdunklung UND Elternknoten der Tafel - seine
+ * Deckkraft naehme die Tafel mit, deshalb blieb der Grund beim Ziehen voll.
+ * Jetzt traegt `.modal-overlay__scrim` (erstes Kind des Dialogs, vor der Tafel)
+ * Toenung und Blur, und seine Deckkraft folgt per `--sheet-pull` dem Finger
+ * wie der Backdrop des Mehr-Blatts.
+ */
+test('Dialog-Blatt #1801: der Grund ist ein eigener Knoten unter der Tafel, seine Deckkraft folgt dem Zug', () => {
+  const modal = stripComments(publicSource('components/modal.js'));
+  assert.match(modal, /<dialog class="modal-overlay"[^>]*>\s*<div class="modal-overlay__scrim" aria-hidden="true"><\/div>\s*<div class="modal-panel/,
+    'der Grund steht als erstes Kind VOR der Tafel - kein Pseudo-Element, nicht ihr Elternknoten');
+  const wire = modal.slice(modal.indexOf('function _wireSheetSwipe('), modal.indexOf('function _awaitOverlayRemoval('));
+  assert.match(wire, /dim: \(\) => [\s\S]{0,80}\.modal-overlay__scrim/, 'das Dialog-Blatt reicht seinen Grund an die Geste durch');
+
+  const scrim = ruleBodies('layout.css', '.modal-overlay__scrim').join(';');
+  assert.match(scrim, /opacity:\s*calc\(1 - var\(--sheet-pull, 0\)\)/, 'nur opacity folgt dem Zug - wie am Mehr-Blatt');
+  assert.match(scrim, /pointer-events:\s*none/, 'ein Tipp daneben trifft weiter den Dialog (schliesst wie bisher)');
+  assert.match(scrim, /backdrop-filter:\s*var\(--blur-xs\)/, 'der Grund traegt den Blur, nicht der Dialog');
+  // Eine gefuellte Einblendung schluege die Deckkraft aus dem Zug.
+  const enter = scrim.match(/animation:\s*([^;]+)/)?.[1] ?? '';
+  assert.match(enter, /^modal-overlay-in\b/, 'der Grund blendet ein');
+  assert.doesNotMatch(enter, /forwards|both/, 'ohne fill - sonst haelt die Einblendung opacity bei 1 fest');
+  // Der Ausgang beginnt, wo der Zug den Grund liess: Keyframes ohne Start.
+  const out = ruleBodies('layout.css', '.modal-overlay--closing > .modal-overlay__scrim').join(';');
+  assert.match(out, /animation:\s*modal-scrim-out\b/);
+  assert.doesNotMatch(keyframesBody('modal-scrim-out'), /from|0%/, 'kein Startwert - der Grund springt beim Loslassen nicht auf voll');
+
+  // Der Dialog selbst blendet nie: Deckkraft unter 1 an einem Vorfahren macht
+  // ihn zur Backdrop Root, und der Blur des Grunds saehe die Seite nicht mehr.
+  for (const sel of ['dialog.modal-overlay', 'dialog.modal-overlay.modal-overlay--closing']) {
+    assert.match(ruleBodies('layout.css', sel).join(';'), /animation:\s*none/, `${sel}: keine Blende am Elternknoten des Grunds`);
+  }
+  const reduced = stripComments(publicSource('components/modal.js'));
+  const fade = reduced.slice(reduced.indexOf('function _fade('), reduced.indexOf('function _onCancel('));
+  assert.match(fade, /\.modal-overlay__scrim/, 'unter reduzierter Bewegung blenden Grund und Tafel, nicht der Dialog');
+  assert.match(fade, /\.modal-panel/);
+  assert.doesNotMatch(fade, /overlay\.animate\(/, 'kein _fade auf dem ganzen Dialog');
+  // ::backdrop traegt nichts mehr - sonst laege die Abdunklung doppelt.
+  const backdrop = ruleBodies('layout.css', 'dialog.modal-overlay::backdrop').join(';');
+  assert.match(backdrop, /background-color:\s*transparent/);
+});
+
+// --------------------------------------------------------
+// #1802: Federn per linear(), das Blatt steigt ueber seine volle Hoehe
+// --------------------------------------------------------
+
+const easeStops = (value) => value.split(',').map((s) => s.trim().split(/\s+/)).map(([v, at]) => ({ v: parseFloat(v), at: at == null ? null : parseFloat(at) }));
+
+test('Federn #1802: die Blattfeder ist kritisch gedaempft - linear() nur als @supports-Verfeinerung, sonst die Glasfeder von heute', () => {
+  const rules = [...eachRule(css('tokens.css'))];
+  const base = rules.find((r) => !r.at.length && /--ease-sheet:/.test(r.body))?.body ?? '';
+  assert.match(base, /--ease-sheet:\s*var\(--ease-glass\);/, 'ohne linear() bleibt die Kurve von heute');
+  assert.match(base, /--sheet-in:\s*var\(--duration-xl\) var\(--ease-sheet\);/, 'die Einfahrt liest die Blattfeder');
+  const spring = rules.filter((r) => r.at.some((a) => /@supports \(transition-timing-function: linear\(0, 1\)\)/.test(a)) && /--ease-sheet:/.test(r.body));
+  assert.equal(spring.length, 1, 'die Blattfeder steht genau einmal im @supports-Rahmen');
+  const stops = easeStops(spring[0].body.match(/--ease-sheet:\s*linear\(([^)]*)\)/)?.[1] ?? '');
+  assert.equal(stops[0].v, 0);
+  assert.equal(stops.at(-1).v, 1);
+  // Kritisch gedaempft: kein Ueberschwinger - die volle Hoehe flogt nicht ueber die Ruhelage.
+  assert.ok(stops.every((s) => s.v <= 1), 'die Blattfeder schwingt ueber 1 - ueber die volle Hoehe waere das sichtbar');
+  assert.ok(stops.every((s, i) => i === 0 || s.v >= stops[i - 1].v), 'monoton: das Blatt kehrt nie um');
+  // Und sie kommt an: ab 75 % innerhalb von 1 % (die Reststrecke eines 740px-Blatts unter 8px).
+  assert.ok(stops.filter((s) => s.at >= 75).every((s) => s.v >= 0.99), 'die Feder haengt am Ende');
+});
+
+test('Federn #1802: die Sidebar-Pille gleitet auf einer linear()-Feder mit dem Gipfel ihrer Bezier', () => {
+  const rules = [...eachRule(css('tokens.css'))];
+  const base = rules.find((r) => !r.at.length && /--ease-sidebar-glide:/.test(r.body))?.body ?? '';
+  assert.match(base, /--ease-sidebar-glide:\s*cubic-bezier\(0\.28, 1\.25, 0\.36, 1\);/, 'der Rueckfall bleibt die Bezier');
+  const spring = rules.filter((r) => r.at.some((a) => /@supports \(transition-timing-function: linear\(0, 1\)\)/.test(a)) && /--ease-sidebar-glide:/.test(r.body));
+  assert.equal(spring.length, 1, 'die Feder der Pille steht nicht im @supports-Rahmen');
+  assert.ok(rules.every((r) => !/--ease-[\w-]+:\s*linear\(/.test(r.body) || r.at.some((a) => /@supports/.test(a))),
+    'eine linear()-Kurve ohne @supports macht in alten Browsern jede Transition ungueltig');
+  const stops = easeStops(spring[0].body.match(/--ease-sidebar-glide:\s*linear\(([^)]*)\)/)?.[1] ?? '');
+  assert.equal(stops[0].v, 0);
+  assert.equal(stops.at(-1).v, 1);
+  const peak = Math.max(...stops.map((s) => s.v));
+  assert.ok(Math.abs(peak - 1.0204) <= 0.01, `Gipfel ${peak} - die Pille schoesse anders weit als ihre Bezier`);
+  assert.ok(stops.filter((s) => s.at >= 60).every((s) => Math.abs(s.v - 1) <= 0.01), 'die Pille steht nach 60 % nicht');
+});
+
+test('Federn #1802: das Blatt steigt ueber seine volle Hoehe ohne Blende - nur mit linear(), nur ohne reduzierte Bewegung', () => {
+  // Die Keyframes: der volle Weg aus `--sheet-rise`, keine Deckkraft.
+  const rise = keyframesBody('sheet-rise') ?? '';
+  assert.match(rise, /from\s*\{\s*transform:\s*translateY\(var\(--sheet-rise\)\);?\s*\}/, 'Start unter dem unteren Rand');
+  assert.doesNotMatch(rise, /opacity/, 'das Blatt blendet nicht - es steigt');
+  assert.match(css('tokens.css'), /--sheet-rise:\s*calc\(100% \+ [^;]+\);/, 'die volle Hoehe plus der Abstand zum Rand');
+
+  const users = [];
+  for (const file of allSheets) {
+    for (const rule of eachRule(css(file))) {
+      if (/(?:^|[;\s])animation\s*:\s*sheet-rise\b/.test(rule.body)) users.push({ file, ...rule });
+    }
+  }
+  const sels = users.flatMap((u) => u.selector.split(',').map((sel) => sel.replace(/\s+/g, ' ').trim()));
+  for (const want of ['.modal-panel:not(.modal-panel--closing)', 'dialog.dialog-surface:not(.dialog-surface--closing)', '.more-sheet[aria-hidden="false"]', '.search-overlay--visible']) {
+    assert.ok(sels.includes(want), `${want}: steigt nicht ueber die volle Hoehe`);
+  }
+  for (const u of users) {
+    const at = u.at.join(' ');
+    assert.match(at, /@supports \(transition-timing-function: linear\(0, 1\)\)/, `${u.selector}: ohne linear() bekaeme ein alter Browser den Vollhub auf der Back-Out-Bezier`);
+    assert.match(at, /prefers-reduced-motion: no-preference/, `${u.selector}: unter reduzierter Bewegung kein Weg`);
+    assert.match(at, /max-width: 767px/, `${u.selector}: nur das Blatt am Telefon`);
+    assert.match(u.body, /sheet-rise var\(--sheet-in\)/, `${u.selector}: aus dem Token-Paar`);
+    // Die Transition-Blaetter: keine Blende in der Einfahrt.
+    const transition = u.body.match(/(?:^|;)\s*transition\s*:\s*([^;]+)/)?.[1];
+    if (transition) assert.doesNotMatch(transition, /(?:^|,)\s*opacity\b/, `${u.selector}: die Einfahrt blendet`);
+  }
+  // Der Rueckfall ist die Einfahrt von heute: 24px Hub (siehe oben), die
+  // Glasfeder, die Blende - und der Ausgang bleibt der kurze Hub.
+  assert.match(keyframesBody('glass-sheet-in'), /translateY\(24px\)/);
+  assert.match(keyframesBody('sheet-out'), /translateY\(var\(--sheet-lift\)\)/);
+});
+
+test('easingToken reicht eine linear()-Kurve unveraendert durch', async () => {
+  const restore = motionEnv();
+  const value = 'linear(0, 0.4 13.75%, 0.91 40.25%, 1)';
+  const prev = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = () => ({ getPropertyValue: (name) => (name === '--ease-sheet' ? ` ${value} ` : '') });
+  try {
+    const { easingToken } = await import('../public/utils/ux.js');
+    assert.equal(easingToken('--ease-sheet', 'ease-out'), value);
+  } finally { globalThis.getComputedStyle = prev; restore(); }
 });
