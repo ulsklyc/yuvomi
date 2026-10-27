@@ -530,6 +530,8 @@ function applyTaskRelations(seen) {
   const update = db.get().prepare('UPDATE tasks SET parent_task_id = ? WHERE id = ? AND parent_task_id IS NOT ?');
   const changed = new Set();
   for (const [uid, entry] of seen) {
+    // Eine Aufgabe eines anderen Kontos (#1906) ist hier nur Elternteil.
+    if (entry.foreign) continue;
     const rootUid = parentUidOf.has(uid) ? rootOf(uid) : null;
     const parentId = rootUid ? idByUid.get(rootUid) ?? null : null;
     // Auch der NULL-Fall muss geschrieben werden: wer auf dem Server aus der
@@ -962,8 +964,17 @@ async function runSync({ createClient: makeClient } = {}) {
                   defaultAssignees: listAssignees.get(sel.id),
                 });
                 // Die Aufgabe gehört einem anderen Konto (#1906): dessen
-                // Abruf verdrahtet ihre Hierarchie.
-                if (taskId == null) { totalItems++; continue; }
+                // Abruf verdrahtet IHRE Hierarchie. Als Elternteil eigener
+                // Kinder bleibt sie auffindbar (Review), geändert wird sie
+                // hier nicht (`foreign`).
+                if (taskId == null) {
+                  const owned = db.get().prepare(
+                    "SELECT id FROM tasks WHERE external_uid = ? AND external_source = 'caldav' ORDER BY id LIMIT 1"
+                  ).get(todo.uid);
+                  if (owned) taskRelations.set(todo.uid, { taskId: owned.id, parentUid: null, childUids: todo.childUids || [], foreign: true });
+                  totalItems++;
+                  continue;
+                }
                 taskRelations.set(todo.uid, {
                   taskId,
                   parentUid: todo.parentUid || null,

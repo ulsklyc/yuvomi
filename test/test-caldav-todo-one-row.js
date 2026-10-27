@@ -178,6 +178,28 @@ test('Trigger: ein Konto, das auf anderem Weg verschwindet, gibt Zeilen und Uplo
   assert.deepEqual([row(target).target_caldav_account_id, row(target).target_caldav_list_url], [null, null]);
 });
 
+test('Elternteil gehört dem ersten Konto, das Kind nur dem zweiten: das Kind hängt trotzdem am Elternteil (#1906, Review)', async () => {
+  reset();
+  const a = account('Anna');
+  const b = account('Ben');
+  const listA = dav.addCollection('todo-a', { name: 'A', components: ['VTODO'] });
+  const listB = dav.addCollection('todo-b', { name: 'B', components: ['VTODO'] });
+  dav.putObject(listA, 'n.ics', vtodo('na@test', 'Nachbar'));
+  dav.putObject(listA, 'parent.ics', vtodo('parent@test', 'Elternteil'));
+  dav.putObject(listB, 'parent.ics', vtodo('parent@test', 'Elternteil'));
+  dav.putObject(listB, 'child.ics', vtodo('child@test', 'Kind').replace('SUMMARY:Kind', 'SUMMARY:Kind\r\nRELATED-TO;RELTYPE=PARENT:parent@test'));
+  selectTasks(a, listA);
+  selectTasks(b, listB);
+
+  await remindersSync.sync();
+  const [parent] = tasksWith('parent@test');
+  const [child] = tasksWith('child@test');
+  assert.equal(parent.external_account_id, a);
+  assert.equal(child.external_account_id, b);
+  assert.equal(child.parent_task_id, parent.id, 'das Kind hängt nicht am Elternteil des anderen Kontos');
+  assert.equal(parent.parent_task_id, null);
+});
+
 // ── Migration v268 gegen eine Bestands-DB mit Dubletten ─────────────────────────
 
 function applyMigration(d, migration) {
