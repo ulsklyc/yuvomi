@@ -350,6 +350,12 @@ export function createNavigate(state, deps) {
       if (typeof userOrPushState === 'object' && userOrPushState !== null) {
         state.currentUser = userOrPushState;
         state._setupRequired = false;
+        // EINMAL DIE SITZUNG ABFRAGEN, BEVOR DIE SEITE LAEDT (#2293). Nur die
+        // Antwort von `/auth/me` traegt den Sitzungsablauf, neben dem der
+        // Service Worker Listen ablegt (sw.js); ohne sie bliebe nach einer
+        // Anmeldung die ganze Sitzung ohne Offline-Stand. Ein Fehler hier
+        // haelt die Anmeldung nicht auf.
+        await auth.me().catch(() => null);
         // Ab hier gibt es jemanden, dessen Bildschirmschoner es sein kann
         // (#1919). VOR dem await: laeuft die Sitzung dabei ab, entschaerft
         // `auth:expired` ihn wieder. Fuer jedes Konto, auch Gast und Display.

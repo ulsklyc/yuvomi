@@ -509,7 +509,9 @@ test('/preferences kommt offline als Abzug mit Modulen, Reihenfolge und Zone', a
     data: {
       disabled_modules: ['budget'], hidden_modules: [], module_order: ['shopping', 'tasks'], mobile_nav_order: ['shopping'],
       timezone: 'Europe/Berlin', date_format: 'dd.mm.yyyy', time_format: '24h',
-      weather_location: 'Musterstadt', dashboard_widgets: ['weather'],
+      weather_location: 'Musterstadt',
+      dashboard_widgets: [{ id: 'tasks', visible: true, filter: 'mine' }], dashboard_follows_default: false,
+      dashboard_today_glance: { show: true },
     },
   };
   const env = loadSw({ withSession: true, fetchImpl: async () => new MockResponse(JSON.stringify(prefs), { status: 200 }) });
@@ -523,6 +525,11 @@ test('/preferences kommt offline als Abzug mit Modulen, Reihenfolge und Zone', a
   assert.deepEqual(body.data.module_order, ['shopping', 'tasks']);
   assert.equal(body.data.timezone, 'Europe/Berlin');
   assert.equal('weather_location' in body.data, false, 'nur die Felder der Shell');
+  // Die Uebersicht baut aus ihnen ihre Abfrage: ohne sie fragte sie offline
+  // die Standardansicht an, die nie im Cache lag (Codex-Befund).
+  assert.deepEqual(body.data.dashboard_widgets, [{ id: 'tasks', visible: true, filter: 'mine' }]);
+  assert.equal(body.data.dashboard_follows_default, false);
+  assert.deepEqual(body.data.dashboard_today_glance, { show: true });
 });
 
 test('CLEAR_API_CACHE nimmt den Sitzungsabzug mit', async () => {
@@ -757,4 +764,22 @@ test('ohne gueltigen Marker legt der Worker keine Liste ab', async () => {
   const name = await apiCacheName(env);
   const stored = name ? await (await env.caches.open(name)).match(apiUrl('/shopping')) : undefined;
   assert.equal(stored, undefined);
+});
+
+// Nach dem Anmelden fragt navigate() die Sitzung einmal ab (Codex-Befund):
+// nur `/auth/me` legt den Sitzungsablauf an, und ohne ihn cacht der Worker in
+// dieser ganzen Sitzung keine Liste.
+test('nach dem Anmelden fragt navigate() /auth/me, bevor die Seite laedt', async () => {
+  let harness = null;
+  const seenBeforeRender = [];
+  harness = createNavigateHarness({
+    me: async () => {
+      seenBeforeRender.push(harness.log.renderStarted.length === 0);
+      return { user: { id: 7, access_scope: 'family' } };
+    },
+  });
+  await harness.navigate('/tasks', { id: 7, access_scope: 'family' });
+  assert.equal(harness.log.authCalls, 1, 'eine Abfrage der Sitzung nach dem Anmelden');
+  assert.deepEqual(seenBeforeRender, [true], 'vor der Seite, damit ihre Listen in den Cache duerfen');
+  assert.deepEqual(harness.log.rendered, ['/tasks']);
 });

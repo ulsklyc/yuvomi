@@ -53,7 +53,8 @@ const API_CACHE_EXCLUDE = ['/shopping/versions'];
 //                 CSRF-Token und keine Kopfzeile der Antwort (kein Set-Cookie).
 //                 Nur fuer normale Sitzungen: Wanddisplay und Split-Gast
 //                 behalten ihr Verhalten, ihr Abzug wird geloescht.
-//   /preferences  Modulreihenfolge, abgeschaltete Module, Zone und Formate.
+//   /preferences  Modulreihenfolge, abgeschaltete Module, Zone, Formate und
+//                 die Anordnung der Uebersicht.
 // Der Abzug traegt `offlineSnapshot: true`. Er wird nur bei einem Netzfehler
 // ausgeliefert (Network-First), und der Router liest daran, dass die Sitzung
 // NICHT geprueft ist. Eine 401 loescht ihn.
@@ -74,6 +75,10 @@ const SESSION_SNAPSHOT_FIELDS = ['permissions', 'householdSize', 'initialsRoster
 const PREFERENCES_SNAPSHOT_FIELDS = [
   'disabled_modules', 'hidden_modules', 'module_order', 'mobile_nav_order',
   'timezone', 'date_format', 'time_format', 'region', 'currency', 'app_name',
+  // Die Uebersicht baut aus ihnen ihre Abfrage; ohne sie fragte sie offline
+  // die Standardansicht an, die nie im Cache lag.
+  'dashboard_widgets', 'dashboard_widgets_default', 'dashboard_follows_default',
+  'dashboard_today_glance', 'dashboard_today_glance_default',
 ];
 
 function pickFields(source, fields) {
