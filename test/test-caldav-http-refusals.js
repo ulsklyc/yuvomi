@@ -2271,6 +2271,22 @@ test('Gesehen: ein nie gesehener Termin mit wartendem Umzug geht in den Kalender
   assert.equal(dav.getObject(cal.url, `${uid}.ics`), null, 'der Termin ging in den alten Kalender');
 });
 
+test('Gesehen: eine nie gesehene Aufgabe mit UID nach dem alten Muster bleibt Spiegel - ein Upload ginge unter neuer UID hinauf (#1839, Review)', async () => {
+  reset();
+  const list = taskList();
+  const id = localTask(list, 'Alt');
+  const uid = `yuvomi-task-${id}@yuvomi.local`;
+  db.prepare(`
+    UPDATE tasks SET external_source = 'caldav', external_uid = ?, external_account_id = ?, external_object_url = ?,
+                     target_caldav_account_id = NULL, target_caldav_list_url = NULL
+     WHERE id = ?
+  `).run(uid, accountId, `${list}${uid}.ics`, id);
+
+  await remindersSync.sync();
+  assert.equal(task(id)?.external_uid, uid, 'die Aufgabe mit alter UID wurde geloescht oder zurueckgesetzt');
+  assert.equal(dav.seen('PUT').length, 0, 'ein Upload unter neuer UID ging hinaus');
+});
+
 // ── CardDAV-Verbindungstest: die Absage erreicht den Nutzer ─────────────────────
 
 test('CardDAV-Konto anlegen: eine Absage des Servers kommt als Meldung an, nicht als "Internal error"', async () => {

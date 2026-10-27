@@ -16,9 +16,12 @@ const log = createLogger('CalendarPrune');
 
 /**
  * Hat DIESE Installation das Objekt mit dieser UID für genau diese Zeile
- * angelegt (#1839)? Beide Muster zählen: das alte ohne Kennung (vor #1837)
- * und das neue mit der Kennung dieser Installation. Eine fremde Kennung ist
- * nicht "hier angelegt" - eine andere Yuvomi-Installation am selben Konto.
+ * angelegt, so dass ein erneuter Upload es wieder unter DERSELBEN UID ablegt
+ * (#1839)? Nur das neue Muster mit der Kennung dieser Installation: der Upload
+ * vergibt heute nur dieses (`ownUid`). Eine Zeile mit der UID nach dem alten
+ * Muster ginge unter einer neuen hinauf - lag ihr Objekt doch noch oben, gäbe
+ * es zwei; sie bleibt deshalb stehen wie eine fremde (Review). Eine fremde
+ * Kennung ist eine andere Yuvomi-Installation am selben Konto.
  *
  * @param {object} database
  * @param {string} uid
@@ -28,7 +31,7 @@ const log = createLogger('CalendarPrune');
 export function createdHere(database, uid, kind, rowId) {
   const parsed = parseOwnUid(uid);
   if (!parsed || parsed.kind !== kind || parsed.id !== Number(rowId)) return false;
-  return parsed.installation === null || parsed.installation === installationId(database);
+  return parsed.installation !== null && parsed.installation === installationId(database);
 }
 
 /**

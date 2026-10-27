@@ -670,7 +670,16 @@ export function pruneRemoved(database, table, accountId, seenUids, keepUids = []
  */
 function todoBackToLocal(database, table, row, accountId) {
   const objectUrl = database.prepare(`SELECT external_object_url FROM ${table} WHERE id = ?`).get(row.id)?.external_object_url;
-  const listUrl = collectionUrlOf(objectUrl || '') || null;
+  const derived = collectionUrlOf(objectUrl || '') || null;
+  // Das Ziel in der Schreibweise der Auswahl (Review): die Uploads suchen die
+  // Liste mit genau dieser URL, und eine Liste ohne Schlussstrich fände sich
+  // unter der abgeleiteten sonst nicht - die Aufgabe bliebe für immer lokal.
+  const trim = (url) => String(url || '').replace(/\/+$/, '');
+  const listUrl = derived && table === 'tasks'
+    ? database.prepare(
+      "SELECT list_url FROM caldav_reminder_selection WHERE account_id = ? AND target_module = 'tasks'"
+    ).all(accountId).map((r) => r.list_url).find((url) => trim(url) === trim(derived)) ?? derived
+    : derived;
   const target = table === 'tasks'
     ? `target_caldav_account_id = ${listUrl ? '?' : 'NULL'}, target_caldav_list_url = ${listUrl ? '?' : 'NULL'},`
     : 'outbound_move = 0, outbound_move_attempts = 0, outbound_move_since = NULL, outbound_move_by = NULL,';
