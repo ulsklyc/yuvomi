@@ -3189,9 +3189,34 @@
   white-space: nowrap;
 }
 
+.assignee-menu__glyph,
 .assignee-menu__chevron {
   flex-shrink: 0;
   color: var(--color-text-secondary);
+}
+
+/* IN DER FORMULARZEILE spricht der Knopf den Dialekt der randlosen Auswahl
+ * daneben (layout.css, "In der Zeile: die randlose Auswahl"): keine Kante,
+ * der Wert in Sekundaerfarbe am Zeilenende, das Zeichen an der Zeilenkante.
+ * Das Etikett der Zeile sagt, wovon der Wert spricht - das Personen-Zeichen
+ * entfaellt dort. */
+.form-row__control .assignee-menu__trigger.form-input {
+  inline-size: auto;
+  max-inline-size: 100%;
+  min-height: var(--target-md);
+  padding-inline: var(--space-2) 0;
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+}
+
+.form-row__control .assignee-menu__trigger.form-input .assignee-menu__glyph {
+  display: none;
+}
+
+.form-row__control .assignee-menu__trigger.form-input .assignee-menu__chevron {
+  inline-size: var(--icon-md);
+  block-size: var(--icon-md);
 }
 
 .assignee-menu__trigger:disabled {

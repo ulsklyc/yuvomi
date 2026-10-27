@@ -371,6 +371,7 @@ function buildCalendarAssigneeMenu({ source, externalId, currentIds, host }) {
 // --------------------------------------------------------------------------
 
 let calendarListSeq = 0;
+let calendarNameSeq = 0;
 
 function buildCalendarList(account, calendars) {
   const list = document.createElement('div');
@@ -405,6 +406,10 @@ function buildCalendarList(account, calendars) {
     }
 
     label.append(checkbox, color, name);
+    // Der Haken heisst wie der Kalender. Als Label-Text trug sein Name sonst
+    // auch den Personen-Knopf mit, der in derselben Zeile steht (#1897).
+    name.id = `caldav-calendar-name-${++calendarNameSeq}`;
+    checkbox.setAttribute('aria-labelledby', name.id);
     // VOR DEM HAKEN, NICHT NACH DEM SYNC: Das Feld stand früher erst da, wenn
     // der Kalender aktiv UND einmal synchronisiert war - also frühestens, als
     // der erste Schwung Termine bereits ohne Zuweisung hereingekommen war, bei
@@ -1255,6 +1260,8 @@ function buildGoogleCalendarPicker(googleCall) {
         name.textContent = cal.summary || cal.id;
 
         item.append(checkbox, dot, name);
+        name.id = `google-calendar-name-${++calendarNameSeq}`;
+        checkbox.setAttribute('aria-labelledby', name.id);
         // Wie bei CalDAV vor dem Haken setzbar (#730) - hier zählt es doppelt:
         // Das Aktivieren startet den Sync unmittelbar (PATCH /google/calendars),
         // eine Zuweisung danach käme für die erste Ladung immer zu spät.

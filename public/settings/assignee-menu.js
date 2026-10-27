@@ -28,6 +28,7 @@
 import { t } from '/i18n.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
+import { sharedSurname } from '/components/user-multi-select.js';
 
 let menuSeq = 0;
 
@@ -93,7 +94,11 @@ export function buildAssigneeMenu({
   currentIds, save = async () => {}, host, onError, onSaved, id: triggerId, triggerClass = 'caldav-calendar-assignee',
 }) {
   let ids = (currentIds ?? []).map(Number).filter((id) => Number.isInteger(id) && id > 0);
+  // Kurz im Knopf, voll im zugaenglichen Namen: tragen alle denselben
+  // Nachnamen, steht im Knopf nur der Vorname - wie in den Chips der
+  // Personenauswahl (R19, sharedSurname).
   const names = new Map();
+  const fullNames = new Map();
   const id = `assignee-menu-${++menuSeq}`;
 
   const trigger = document.createElement('button');
@@ -106,7 +111,13 @@ export function buildAssigneeMenu({
   const text = document.createElement('span');
   text.className = 'assignee-menu__text';
   text.textContent = t('common.loading');
-  trigger.append(text, icon('chevron-down', 'assignee-menu__chevron', 'icon-sm'));
+  // Das Personen-Zeichen vorn sagt, wovon "Keine" spricht - in der Zeile einer
+  // Erinnerungsliste steht der Knopf neben der Modulwahl, nicht unter einem Etikett.
+  trigger.append(
+    icon('users', 'assignee-menu__glyph', 'icon-sm'),
+    text,
+    icon('chevron-down', 'assignee-menu__chevron', 'icon-sm'),
+  );
   trigger.disabled = true;
   trigger.dataset.assigneeIds = ids.join(',');
 
@@ -121,10 +132,9 @@ export function buildAssigneeMenu({
 
   // Der Knopf sagt, wer gilt; sein zugaenglicher Name nennt dazu die Frage.
   const render = () => {
-    const summary = assigneeSummary(ids, names);
     trigger.dataset.assigneeIds = ids.join(',');
-    text.textContent = summary;
-    trigger.title = `${t('settings.sync.defaultAssignees')}: ${summary}`;
+    text.textContent = assigneeSummary(ids, names);
+    trigger.title = `${t('settings.sync.defaultAssignees')}: ${assigneeSummary(ids, fullNames)}`;
     trigger.setAttribute('aria-label', trigger.title);
     for (const item of panel.querySelectorAll('[data-user-id]')) {
       const on = ids.includes(Number(item.dataset.userId));
@@ -137,8 +147,11 @@ export function buildAssigneeMenu({
   ['click', 'mousedown'].forEach((ev) => trigger.addEventListener(ev, (e) => e.stopPropagation()));
 
   loadFamilyUsers(...ids).then((users) => {
+    const surname = sharedSurname(users);
     for (const user of users) {
-      names.set(Number(user.id), user.display_name);
+      const full = String(user.display_name ?? '').trim();
+      fullNames.set(Number(user.id), full);
+      names.set(Number(user.id), surname && full.endsWith(` ${surname}`) ? full.slice(0, -(surname.length + 1)) : full);
       const item = document.createElement('button');
       item.type = 'button';
       item.className = 'popover-menu__item';
@@ -155,13 +168,18 @@ export function buildAssigneeMenu({
     render();
   });
 
+  let saving = false;
   panel.addEventListener('click', async (event) => {
     const item = event.target?.closest?.('[data-user-id]');
-    if (!item) return;
+    if (!item || saving) return;
     const before = ids;
     ids = toggleAssignee(ids, Number(item.dataset.userId));
     render();
-    trigger.disabled = true;
+    // NICHT `disabled`: das Menue schliesst und gibt den Fokus an den Knopf
+    // zurueck - ein abgeschalteter Knopf nimmt ihn nicht, und die Tastatur
+    // stuende danach am Seitenanfang. Ein zweiter Haken wartet stattdessen.
+    saving = true;
+    trigger.setAttribute('aria-busy', 'true');
     try {
       await save(ids);
       onSaved?.();
@@ -170,7 +188,8 @@ export function buildAssigneeMenu({
       render();
       onError?.(err);
     } finally {
-      trigger.disabled = false;
+      saving = false;
+      trigger.removeAttribute('aria-busy');
     }
   });
 
