@@ -156,6 +156,7 @@ const CASE_REASONS = {
   '/api/v1/inventory/items/{id}/dates/{dateId}/complete': {
     post: `${ITEM_GONE}, \`inventory_tracked_date_not_found\` (404, the item no longer has this tracked date), ${NOT_OWNER}`,
   },
-  '/api/v1/inventory/items/{id}/service-log': { post: NOT_OWNER },
-  '/api/v1/inventory/items/{id}/service-log/{logId}': { put: NOT_OWNER, delete: NOT_OWNER },
+  '/api/v1/inventory/items/{id}/history': { get: ITEM_GONE },
+  '/api/v1/inventory/items/{id}/service-log': { get: ITEM_GONE, post: `${ITEM_GONE}, ${NOT_OWNER}` },
+  '/api/v1/inventory/items/{id}/service-log/{logId}': { put: `${ITEM_GONE}, ${NOT_OWNER}`, delete: `${ITEM_GONE}, ${NOT_OWNER}` },
 };

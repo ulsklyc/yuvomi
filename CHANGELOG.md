@@ -187,6 +187,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The quick links API refuses in English** (#1695). `/api/v1/quick-links` still answered
   "Schnellzugriff nicht gefunden", "Keine Berechtigung", "ids muss ein Array sein" and "Interner
   Fehler"; every `error` there is English now, with the same status codes and reasons.
+- **The inventory API refuses in English and names its reason in the API description** (#1695,
+  #2267). `/api/v1/inventory/items` and its tracked dates, service log and booking links still
+  answered in German or with German field names ("Kilometerstand darf nicht negativ sein.",
+  "Kategorie must be one of: ...", "Maximal 10 Fristen je Gegenstand."); every `error` there is
+  English now and names the request field (`odometer`, `category`, `interval_months` ...), with the
+  same status codes. The OpenAPI description now lists `inventory_item_not_found` (404) at the
+  history and service log routes, where they already sent it.
 - **A new API token now starts with an expiry and a module limit.** Until now a token created with
   only a name never expired and could do everything the selected person may do. The form now offers
   30 days, 90 days (preselected), 1 year, a custom date or no expiration, and shows the end date; the

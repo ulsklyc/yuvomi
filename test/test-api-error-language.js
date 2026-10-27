@@ -33,6 +33,10 @@
  *        Bein 2 nennt jede der 13 gefuehrten Absagen deutsch.
  *        Ebenso fuer die Schnellzugriffe (quick-links.js): `quick-links.js: 10
  *        (erlaubt 0)`, und Bein 2 nennt die fuenf deutschen Absagen.
+ *        Ebenso fuer das Inventar (inventory/items.js 9, item-dates.js 5,
+ *        service-log.js 6): Bein 2 nennt 20 deutsche Absagen, darunter
+ *        Feldnamen, die Bein 1 nicht liest (`idParam(..., 'Buchung-ID')`,
+ *        `date(..., 'Datum')`, ein Satz aus einem `return` im Helfer).
  *
  * Ausführen: npm run test:api-error-language
  */
@@ -68,9 +72,6 @@ const GERMAN_LEFT = new Map([
   ['health/medications.js', 12],
   ['health/nutrition.js', 1],
   ['health/vitals.js', 2],
-  ['inventory/item-dates.js', 5],
-  ['inventory/items.js', 9],
-  ['inventory/service-log.js', 6],
   ['meals.js', 34],
   ['pantry.js', 5],
   ['push.js', 3],
@@ -494,5 +495,81 @@ test('keine Absage der Schnellzugriffe traegt deutschen Wortlaut', async () => {
     assertRefusedInEnglish(seen);
   } finally {
     qlServer.close();
+  }
+});
+
+test('keine Absage des Inventars traegt deutschen Wortlaut', async () => {
+  const { default: inventoryRouter } = await import('../server/routes/inventory/index.js');
+  const invApp = express();
+  invApp.use(express.json({ limit: '10mb' }));
+  invApp.use((req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  });
+  invApp.use('/inventory', inventoryRouter);
+  const invServer = invApp.listen(0, '127.0.0.1');
+  const invUrl = await new Promise((r) => invServer.on('listening', () => r(`http://127.0.0.1:${invServer.address().port}`)));
+  try {
+    const seen = [];
+    const call = async (method, route, body) => {
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${invUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      return { status: res.status, body: json };
+    };
+    const run = async (label, method, route, body) => {
+      const r = await call(method, route, body);
+      seen.push({ label, status: r.status, error: r.body?.error ?? null });
+    };
+    const car = await call('POST', '/inventory/items', {
+      name: 'Auto', category: 'vehicles', odometer: 50000, odometer_unit: 'km', odometer_on: '2026-09-01',
+    });
+    assert.equal(car.status, 201, 'Vorbedingung: das Fahrzeug wird angelegt');
+    const id = car.body.data.id;
+    const item = (extra) => ({ name: 'Ding', ...extra });
+    const date = (extra) => ({ name: 'Ding', tracked_dates: [{ label: 'TÜV', date: '2027-01-01', ...extra }] });
+
+    await run('name', 'POST', '/inventory/items', {});
+    await run('category', 'POST', '/inventory/items', item({ category: 'nope' }));
+    await run('location', 'POST', '/inventory/items', item({ location_id: 'abc' }));
+    await run('purchase-date', 'POST', '/inventory/items', item({ purchase_date: 'nope' }));
+    await run('price', 'POST', '/inventory/items', item({ purchase_price: -1 }));
+    await run('price-type', 'POST', '/inventory/items', item({ purchase_price: 'abc' }));
+    await run('warranty', 'POST', '/inventory/items', item({ warranty_months: 601 }));
+    await run('odometer', 'POST', '/inventory/items', item({ category: 'vehicles', odometer: -5 }));
+    await run('odometer-unit', 'POST', '/inventory/items', item({ category: 'vehicles', odometer: 5, odometer_unit: 'nope' }));
+    await run('odometer-on', 'POST', '/inventory/items', item({ category: 'vehicles', odometer: 5, odometer_on: 'nope' }));
+    await run('condition', 'POST', '/inventory/items', item({ condition: 'nope' }));
+    await run('status', 'POST', '/inventory/items', item({ status: 'nope' }));
+    await run('entry-id', 'POST', '/inventory/items', item({ entry_id: 'abc' }));
+    await run('date-label', 'POST', '/inventory/items', date({ label: '' }));
+    await run('date-date', 'POST', '/inventory/items', date({ date: 'nope' }));
+    await run('date-offset', 'POST', '/inventory/items', date({ reminder_offset_days: 400 }));
+    await run('date-interval', 'POST', '/inventory/items', date({ interval_months: 0 }));
+    await run('date-distance', 'POST', '/inventory/items', date({ interval_distance: -1 }));
+    await run('dates-many', 'POST', '/inventory/items', {
+      name: 'Ding', tracked_dates: Array.from({ length: 11 }, (_, i) => ({ label: `F${i}`, date: '2027-01-01' })),
+    });
+    await run('item-id', 'GET', '/inventory/items/abc');
+    await run('link-entry', 'POST', `/inventory/items/${id}/entries`, { entry_id: 'abc' });
+    await run('link-role', 'POST', `/inventory/items/${id}/entries`, { entry_id: 1, role: 'nope' });
+    await run('link-share', 'POST', `/inventory/items/${id}/entries`, { entry_id: 1, amount_share: -1 });
+    await run('unlink-entry', 'DELETE', `/inventory/items/${id}/entries/abc`);
+    await run('complete-date', 'POST', `/inventory/items/${id}/dates/abc/complete`, {});
+    await run('log-label', 'POST', `/inventory/items/${id}/service-log`, { performed_on: '2026-10-01' });
+    await run('log-date', 'POST', `/inventory/items/${id}/service-log`, { label: 'Ölwechsel' });
+    await run('log-odometer', 'POST', `/inventory/items/${id}/service-log`, { label: 'Ölwechsel', performed_on: '2026-10-01', odometer: -1 });
+    await run('log-regression', 'POST', `/inventory/items/${id}/service-log`, { label: 'Ölwechsel', performed_on: '2026-10-01', odometer: 40000 });
+    await run('log-id', 'PUT', `/inventory/items/${id}/service-log/abc`, { label: 'X', performed_on: '2026-10-01' });
+    await run('entry-items-id', 'GET', '/inventory/entries/abc/items');
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    invServer.close();
   }
 });
