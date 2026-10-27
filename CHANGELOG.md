@@ -202,6 +202,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   would have stayed on Yuvomi only, because the server refuses it. An item already on such a list
   keeps it. API clients see `accepts_new_items` on each list, and a move to a list without it is
   refused with 400.
+- **A synced entry is removed only after a sync has seen it on the server** (#1839). Before
+  #1837 an upload the server refused still marked the entry as synced, and the next sync took the
+  missing object for "deleted elsewhere" and removed the entry here; a few such entries can still
+  be in a database. Now an event, task or shopping item counts as synced to CalDAV or iCloud only
+  once a sync has found it there. One that was created in Yuvomi and never found becomes local
+  again and is uploaded once more instead of being deleted; an entry a sync has seen and someone
+  then deleted elsewhere goes as before. Existing entries start as not seen, so the first sync
+  after the update deletes nothing it has not seen (migration 266).
 - **An occurrence cancelled in a subscribed or synced calendar stays cancelled after a clock
   change** (#2000). For a series with its own time zone, an occurrence the provider cancelled or
   moved could stay visible once its UTC day and its local day fell apart: a New York series at

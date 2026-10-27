@@ -720,7 +720,9 @@ export function adoptOwnUpload(module, uid, accountId, objectUrl, { listUrl, tar
            target_caldav_account_id = NULL,
            target_caldav_list_url   = NULL,` : ''}
            outbound_dirty      = 1,
-           outbound_attempts   = 0
+           outbound_attempts   = 0,
+           -- Der Abruf hat das Objekt gerade gefunden (#1839).
+           seen_on_server      = 1
      WHERE id = ? AND external_source = 'local'
   `).run(uid, accountId, objectUrl, rowId).changes > 0;
   if (adopted) {
@@ -1094,7 +1096,9 @@ function bookTodoUpload(module, sent, { uid, objectUrl, accountId, collectionUrl
            target_caldav_account_id = NULL,
            target_caldav_list_url   = NULL,` : ''}
            outbound_dirty      = ?,
-           outbound_attempts   = 0
+           outbound_attempts   = 0,
+           -- Ein Upload belegt nichts (#1839): gesehen setzt nur der Abruf.
+           seen_on_server      = 0
      WHERE id = ? AND external_source = 'local'
   `).run(uid, accountId, objectUrl, adopted || edited ? 1 : 0, sent.id).changes > 0;
   if (!mirrored) return 'unchanged';

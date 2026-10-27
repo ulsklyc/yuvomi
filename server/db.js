@@ -11496,6 +11496,26 @@ const MIGRATIONS = [
           FROM ics_subscriptions s JOIN users u ON u.id = s.default_assignee_user_id;
     `,
   },
+  {
+    version: 266,
+    description: 'sync: a mirrored row is marked once a sync run has seen its object (#1839)',
+    up: `
+      -- GESEHEN, NICHT HOCHGELADEN (#1839, Entscheidung 9.10.): eine Zeile gilt
+      -- erst als Spiegel, wenn ein Abruf ihr Objekt auf dem Server gefunden hat.
+      -- "Der PUT hat geantwortet" ist kein Beleg: vor #1837 stempelte ein
+      -- abgelehnter Upload die Zeile zum Spiegel eines Objekts, das es nie gab,
+      -- und der naechste Prune loeschte sie als "anderswo entfernt".
+      --
+      -- 1 setzt nur der Abruf (der Prune, fuer jede Zeile, deren UID er
+      -- gesehen hat), nie der Upload. Der Prune loescht nur gesehene Zeilen;
+      -- eine nie gesehene, hier angelegte faellt auf lokal zurueck und geht
+      -- erneut hinauf. Bestandszeilen starten mit 0: der erste Lauf nach dem
+      -- Update loescht nichts, was er nicht gesehen hat.
+      ALTER TABLE calendar_events ADD COLUMN seen_on_server INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE tasks           ADD COLUMN seen_on_server INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE shopping_items  ADD COLUMN seen_on_server INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];
 
 /**
@@ -11862,6 +11882,12 @@ const CRITICAL_COLUMNS = [
   { table: 'contacts', column: 'birthday_year_unknown',
     type: 'INTEGER NOT NULL DEFAULT 0 CHECK(birthday_year_unknown IN (0, 1))',
     backfill: backfillContactBirthdayYearUnknown },
+  // #1839: v266 traegt "gesehen" nach; ohne die Spalten scheitert jeder Prune
+  // von CalDAV und iCloud (er liest und schreibt sie) und jede Buchung eines
+  // Uploads. Kein Nachtrag: 0 ist der Stand, mit dem die Migration beginnt.
+  { table: 'calendar_events', column: 'seen_on_server', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'tasks', column: 'seen_on_server', type: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'shopping_items', column: 'seen_on_server', type: 'INTEGER NOT NULL DEFAULT 0' },
 ];
 
 /**

@@ -2085,6 +2085,162 @@ for (const status of [429, 503]) {
   });
 }
 
+// ── Gespiegelt heisst gesehen (#1839) ───────────────────────────────────────────
+//
+// Vor #1837 stempelte ein abgelehnter Upload die Zeile zum Spiegel eines
+// Objekts, das es nie gab, und der naechste Prune loeschte sie als "anderswo
+// entfernt". Entschieden am 9.10.: eine Zeile gilt erst als Spiegel, wenn ein
+// Abruf ihr Objekt gesehen hat. Nachgestellt wird die Zeile, wie die alte
+// Buchung sie hinterliess (Spiegel ohne Objekt, nie gesehen), und die Zeile,
+// die ein Abruf gesehen hat und die danach anderswo geloescht wurde.
+
+const seenOf = (table, id) => db.prepare(`SELECT seen_on_server FROM ${table} WHERE id = ?`).get(id).seen_on_server;
+
+/** Eine Aufgabe, die die alte Buchung zum Spiegel gestempelt hat: kein Objekt oben. */
+function phantomTask(listUrl, title = 'Phantom') {
+  const id = localTask(listUrl, title);
+  const uid = todoOutbound.todoUidFor('tasks', id);
+  db.prepare(`
+    UPDATE tasks SET external_source = 'caldav', external_uid = ?, external_account_id = ?, external_object_url = ?,
+                     target_caldav_account_id = NULL, target_caldav_list_url = NULL
+     WHERE id = ?
+  `).run(uid, accountId, `${listUrl}${uid}.ics`, id);
+  return { id, uid };
+}
+
+test('Gesehen: eine nie gesehene, hier angelegte Aufgabe ohne Objekt wird nicht geloescht, sondern hochgeladen (#1839)', async () => {
+  reset();
+  const list = taskList();
+  const { id, uid } = phantomTask(list);
+
+  await remindersSync.sync();
+  assert.ok(task(id), 'die Aufgabe wurde als "anderswo geloescht" entfernt');
+  assert.equal(task(id).external_source, 'caldav', 'die Aufgabe ging nicht wieder hinauf');
+  assert.equal(task(id).external_uid, uid, 'dieselbe UID wie zuvor');
+  assert.ok(dav.getObject(list, `${uid}.ics`), 'das Objekt liegt nicht auf dem Server');
+  assert.equal(seenOf('tasks', id), 0, 'der Upload selbst belegt nichts');
+
+  // Der naechste Abruf findet es: ab jetzt gesehen.
+  await remindersSync.sync();
+  assert.equal(seenOf('tasks', id), 1);
+});
+
+test('Gesehen: eine Aufgabe, deren Objekt ein Abruf gesehen hat, faellt, wenn es anderswo geloescht wird (#1839)', async () => {
+  reset();
+  const list = taskList();
+  const { id, url } = mirroredTask(list, 'todo-seen@test', 'Gesehen');
+
+  await remindersSync.sync();
+  assert.equal(seenOf('tasks', id), 1, 'der Abruf hat die Aufgabe nicht als gesehen markiert');
+  dav.removeObject(list, 'todo-seen@test.ics');
+  assert.ok(url);
+  await remindersSync.sync();
+  assert.equal(task(id), undefined, 'eine anderswo geloeschte Aufgabe blieb stehen');
+});
+
+test('Gesehen: der erste Lauf nach dem Update loescht nichts, was er nicht gesehen hat (#1839)', async () => {
+  reset();
+  const list = taskList();
+  // Eine fremde Aufgabe aus der Zeit vor der Spalte, deren Objekt fehlt.
+  const id = Number(db.prepare(`
+    INSERT INTO tasks (title, created_by, external_uid, external_source, external_account_id, external_object_url)
+    VALUES ('Fremd', 1, 'foreign@test', 'caldav', ?, ?)
+  `).run(accountId, `${list}foreign@test.ics`).lastInsertRowid);
+  const phantom = phantomTask(list);
+
+  await remindersSync.sync();
+  assert.equal(task(id)?.external_source, 'caldav', 'eine nie gesehene fremde Aufgabe wurde geloescht');
+  assert.ok(task(phantom.id), 'eine nie gesehene eigene Aufgabe wurde geloescht');
+});
+
+test('Gesehen: ein nie gesehener, hier angelegter Einkaufsartikel ohne Objekt geht wieder hinauf (#1839)', async () => {
+  reset();
+  const { url, listId } = shoppingList();
+  const id = Number(db.prepare('INSERT INTO shopping_items (list_id, name) VALUES (?, ?)').run(listId, 'Phantom').lastInsertRowid);
+  const uid = todoOutbound.todoUidFor('shopping', id);
+  db.prepare(`
+    UPDATE shopping_items SET external_source = 'caldav', external_uid = ?, external_account_id = ?, external_object_url = ?
+     WHERE id = ?
+  `).run(uid, accountId, `${url}${uid}.ics`, id);
+
+  await remindersSync.sync();
+  const now = db.prepare('SELECT * FROM shopping_items WHERE id = ?').get(id);
+  assert.ok(now, 'der Artikel wurde als "anderswo geloescht" entfernt');
+  assert.equal(now.external_source, 'caldav');
+  assert.equal(now.list_id, listId);
+  assert.ok(dav.getObject(url, `${uid}.ics`), 'das Objekt liegt nicht auf dem Server');
+});
+
+/** Ein Termin, den die alte Buchung zum Spiegel gestempelt hat: kein Objekt oben. */
+function phantomEvent(cal) {
+  const id = localEvent(cal.url, 'Phantom');
+  const uid = eventUidFor(id);
+  db.prepare(`
+    UPDATE calendar_events SET external_source = 'caldav', external_calendar_id = ?, calendar_ref_id = ?,
+                               external_object_url = ?, caldav_account_id = ?
+     WHERE id = ?
+  `).run(uid, cal.refId, `${cal.url}${uid}.ics`, accountId, id);
+  return { id, uid };
+}
+
+test('Gesehen: ein nie gesehener, hier angelegter Termin ohne Objekt wird nicht geloescht, sondern hochgeladen (#1839)', async () => {
+  reset();
+  const cal = calendar();
+  const { id, uid } = phantomEvent(cal);
+
+  await caldavSync.sync();
+  assert.ok(event(id), 'der Termin wurde als "anderswo geloescht" entfernt');
+  assert.equal(event(id).external_source, 'caldav', 'der Termin ging nicht wieder hinauf');
+  assert.equal(event(id).external_calendar_id, uid);
+  assert.ok(dav.getObject(cal.url, `${uid}.ics`), 'das Objekt liegt nicht auf dem Server');
+
+  await caldavSync.sync();
+  assert.equal(seenOf('calendar_events', id), 1);
+});
+
+test('Gesehen: ein gesehener Termin faellt, wenn er anderswo geloescht wird; ein nie gesehener fremder bleibt (#1839)', async () => {
+  reset();
+  const cal = calendar();
+  const seen = mirroredEvent(cal, 'evt-seen@test', 'Gesehen');
+  const foreign = mirroredEvent(cal, 'evt-foreign@test', 'Fremd');
+  dav.removeObject(cal.url, 'evt-foreign@test.ics');
+
+  await caldavSync.sync();
+  assert.equal(seenOf('calendar_events', seen.id), 1);
+  assert.ok(event(foreign.id), 'ein nie gesehener fremder Termin wurde geloescht');
+
+  dav.removeObject(cal.url, 'evt-seen@test.ics');
+  await caldavSync.sync();
+  assert.equal(event(seen.id), undefined, 'ein anderswo geloeschter Termin blieb stehen');
+});
+
+test('Gesehen: iCloud - ein nie gesehener, hier angelegter Termin ohne Objekt geht wieder hinauf (#1839)', async () => {
+  reset();
+  const url = dav.addCollection('icloud', { name: 'iCloud' });
+  dav.putObject(url, 'neighbour.ics', vevent('apple-neighbour@test', 'Nachbar'));
+  appleCalendar.saveCredentials(dav.url, 'u', 'p');
+  try {
+    await appleCalendar.sync();
+    const refId = db.prepare("SELECT id FROM external_calendars WHERE source = 'apple' AND external_id = ?").get(url).id;
+    const id = Number(db.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, created_by, external_source)
+      VALUES ('Phantom', '2035-03-10T09:00', '2035-03-10T10:00', 0, 1, 'local')
+    `).run().lastInsertRowid);
+    const uid = eventUidFor(id);
+    db.prepare(`
+      UPDATE calendar_events SET external_source = 'apple', external_calendar_id = ?, calendar_ref_id = ?, external_object_url = ?
+       WHERE id = ?
+    `).run(uid, refId, `${url}${uid}.ics`, id);
+
+    await appleCalendar.sync();
+    assert.ok(event(id), 'der Termin wurde als "anderswo geloescht" entfernt');
+    assert.equal(event(id).external_source, 'apple', 'der Termin ging nicht wieder hinauf');
+    assert.ok(dav.getObject(url, `${uid}.ics`), 'das Objekt liegt nicht in iCloud');
+  } finally {
+    appleCalendar.clearCredentials();
+  }
+});
+
 // ── CardDAV-Verbindungstest: die Absage erreicht den Nutzer ─────────────────────
 
 test('CardDAV-Konto anlegen: eine Absage des Servers kommt als Meldung an, nicht als "Internal error"', async () => {

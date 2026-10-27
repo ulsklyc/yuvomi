@@ -13,7 +13,8 @@ const log = createLogger('CalDAV-Reminders');
 
 import * as db from '../db.js';
 import { parseVTODO } from './ics-parser.js';
-import { createCalDAVClient, supportsComponent, writableColumn, writableFromColumn } from '../utils/caldav-client.js';
+import { createCalDAVClient, supportsComponent, writableColumn, writableFromColumn, collectionUrlOf } from '../utils/caldav-client.js';
+import { createdHere } from './calendar-prune.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { setItemTags, setTags } from '../utils/task-tags.js';
 import { syncTaskCompletion, recordCompletion, revokeCompletion } from './task-completions.js';
@@ -607,14 +608,61 @@ export function pruneRemoved(database, table, accountId, seenUids) {
     return 0;
   }
 
-  const placeholders = uids.map(() => '?').join(',');
-  const result = database.prepare(
-    `DELETE FROM ${table}
-     WHERE external_source = 'caldav' AND external_account_id = ?
-       AND external_uid NOT IN (${placeholders})`
-  ).run(accountId, ...uids);
+  const seen = new Set(uids);
+  const rows = database.prepare(
+    `SELECT id, external_uid, seen_on_server FROM ${table}
+     WHERE external_source = 'caldav' AND external_account_id = ?`
+  ).all(accountId);
 
-  return result.changes;
+  // Gesehen (#1839): was dieser Abruf liefert, ist ab jetzt belegt gespiegelt.
+  const markSeen = database.prepare(`UPDATE ${table} SET seen_on_server = 1 WHERE id = ?`);
+  for (const row of rows) {
+    if (!row.seen_on_server && seen.has(row.external_uid)) markSeen.run(row.id);
+  }
+
+  // NUR WAS GESEHEN WURDE, FÄLLT (#1839), wie beim Termin (`pruneDeletedEvents`):
+  // eine nie gesehene, hier angelegte Zeile geht zurück auf lokal und erneut
+  // hinauf, eine fremde bleibt stehen.
+  const kind = table === 'tasks' ? 'task' : 'item';
+  const del = database.prepare(`DELETE FROM ${table} WHERE id = ?`);
+  let removed = 0;
+  let restored = 0;
+  for (const row of rows) {
+    if (seen.has(row.external_uid)) continue;
+    if (row.seen_on_server) {
+      removed += Number(del.run(row.id).changes);
+    } else if (createdHere(database, row.external_uid, kind, row.id)) {
+      restored += todoBackToLocal(database, table, row, accountId);
+    }
+  }
+  if (restored) {
+    log.warn(`Account ${accountId}: ${restored} ${table} row(s) created here were never seen on the server; they are local again and are uploaded once more.`);
+  }
+  return removed;
+}
+
+/**
+ * Macht eine nie gesehene, hier angelegte Aufgabe oder einen Einkaufsartikel
+ * wieder lokal (#1839). Die Aufgabe bekommt ihr Ziel zurück - Konto und die
+ * Liste, in der ihr Objekt liegen sollte -, der Artikel braucht keines: die
+ * Zuordnung seiner Liste ist das Ziel. Der nächste Upload trägt dieselbe UID;
+ * liegt das Objekt doch oben, übernimmt er es (412).
+ * @returns {number} 1, wenn die Zeile zurückgesetzt wurde
+ */
+function todoBackToLocal(database, table, row, accountId) {
+  const objectUrl = database.prepare(`SELECT external_object_url FROM ${table} WHERE id = ?`).get(row.id)?.external_object_url;
+  const listUrl = collectionUrlOf(objectUrl || '') || null;
+  const target = table === 'tasks'
+    ? `target_caldav_account_id = ${listUrl ? '?' : 'NULL'}, target_caldav_list_url = ${listUrl ? '?' : 'NULL'},`
+    : 'outbound_move = 0, outbound_move_attempts = 0, outbound_move_since = NULL, outbound_move_by = NULL,';
+  const args = table === 'tasks' && listUrl ? [accountId, listUrl] : [];
+  return Number(database.prepare(`
+    UPDATE ${table}
+       SET external_source = 'local', external_uid = NULL, external_account_id = NULL,
+           external_object_url = NULL, ${target}
+           outbound_dirty = 0, outbound_attempts = 0, seen_on_server = 0
+     WHERE id = ? AND external_source = 'caldav'
+  `).run(...args, row.id).changes);
 }
 
 // --------------------------------------------------------

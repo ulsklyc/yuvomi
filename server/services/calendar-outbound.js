@@ -1160,6 +1160,8 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
     UPDATE calendar_events
     SET external_source = ?, external_calendar_id = ?, local_calendar_id = NULL,
         external_object_url = ?, calendar_ref_id = ?,${forCaldav ? '\n        caldav_account_id = ?,' : ''}
+        -- Ein Upload belegt nichts (#1839): gesehen setzt nur der Abruf.
+        seen_on_server = 0,
         color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END,
         outbound_dirty = CASE WHEN ? = 1 THEN 1 ELSE outbound_dirty END,
         outbound_move_to = COALESCE(?, outbound_move_to),
