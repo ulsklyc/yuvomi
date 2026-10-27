@@ -328,3 +328,18 @@ test('Nettovermoegen: ohne Kurs keine Gesamtzahl, sondern die Summe je Waehrung'
   assert.equal(r.body.data.net_worth, null, 'eine Rohsumme 210 waere falsch');
   assert.deepEqual(r.body.data.net_worth_by_currency, [{ currency: 'EUR', amount: 100 }, { currency: 'USD', amount: 110 }]);
 });
+
+test('Nettovermoegen: eine Teilsumme behaelt die Stellen ihrer Waehrung', async () => {
+  // KWD fuehrt drei Stellen; es steht nicht in CURRENCY_CODES, also ein
+  // Bestandskonto aus der Zeit davor, mit einer Buchung von 1,234 KWD.
+  await account('Giro', null);
+  const kwd = db.prepare(`INSERT INTO budget_accounts (name, type, starting_balance, currency, sort_order, created_by)
+                          VALUES ('Kuwait', 'checking', 0, 'KWD', 99, ?)`).run(ADA).lastInsertRowid;
+  db.prepare(`INSERT INTO budget_entries (title, amount, category, date, created_by, account_id)
+              VALUES ('Zins', 1.234, 'other_income', '2026-10-01', ?, ?)`).run(ADA, kwd);
+  db.prepare(`INSERT INTO subscription_exchange_rates (base_currency, quote_currency, rate, fetched_at)
+              VALUES ('EUR', 'KWD', 3, '2026-10-27T00:00:00Z')`).run();
+  const r = await call('GET', '/accounts');
+  assert.deepEqual(r.body.data.net_worth_by_currency.find((p) => p.currency === 'KWD'), { currency: 'KWD', amount: 1.234 });
+  assert.equal(r.body.data.net_worth, 3.7, '1,234 KWD zu 3 sind 3,70 EUR, nicht 3,69');
+});

@@ -928,7 +928,13 @@ export function netWorthSummary(accounts) {
     const currency = a.currency || base;
     totals.set(currency, (totals.get(currency) ?? 0) + Number(a.current_balance || 0));
   }
-  const byCurrency = [...totals].map(([currency, amount]) => ({ currency, amount: cents(amount) }))
+  // Jede Teilsumme in den Stellen IHRER Waehrung (KWD drei, JPY keine) -
+  // gerundet wird erst die umgerechnete Summe (Codex zu #2335).
+  const inDigits = (amount, currency) => {
+    const f = 10 ** accountFractionDigits(currency);
+    return Math.round(amount * f) / f;
+  };
+  const byCurrency = [...totals].map(([currency, amount]) => ({ currency, amount: inDigits(amount, currency) }))
     .sort((x, y) => (x.currency === base ? -1 : y.currency === base ? 1 : x.currency.localeCompare(y.currency)));
   if (byCurrency.every((p) => p.currency === base)) return { net_worth: byCurrency[0]?.amount ?? 0 };
   let sum = 0;

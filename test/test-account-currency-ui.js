@@ -73,13 +73,13 @@ function fakePanel(accountValue, amountValue = '') {
 
 test('Dialog: eine Buchung auf dem JPY-Konto zeigt Yen-Einheit und Yen-Platzhalter', () => {
   const html = dialog({ id: 7, title: 'Ramen', amount: -1200, category: 'food', subcategory: '', date: '2026-06-03', account_id: 2 });
-  assert.match(html, new RegExp(`id="bm-amount-unit">${currencySymbol('JPY').replace(/[$¥]/g, '\\$&')}<`), 'die Einheit des Kontos, nicht €');
-  assert.match(html, new RegExp(`placeholder="${amountPlaceholder('JPY')}"`));
+  assert.ok(html.includes(`id="bm-amount-unit">${currencySymbol('JPY')}<`), 'die Einheit des Kontos, nicht €');
+  assert.ok(html.includes(`placeholder="${amountPlaceholder('JPY')}"`));
 });
 
 test('Dialog: ohne Konto bleibt die Budget-Waehrung', () => {
   const html = dialog(null);
-  assert.match(html, new RegExp(`id="bm-amount-unit">${currencySymbol('EUR')}<`));
+  assert.ok(html.includes(`id="bm-amount-unit">${currencySymbol('EUR')}<`));
 });
 
 test('Dialog: die Kontowahl stellt Einheit und Platzhalter um', () => {
