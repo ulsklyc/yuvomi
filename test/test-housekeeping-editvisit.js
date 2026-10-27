@@ -17,9 +17,7 @@
  *
  *        Die Saetze kommen aus der echten Zuordnung (`utils/friendly-error.js`,
  *        `loadErrorSentence`, #1909); `t()` des Loaders gibt den Schluessel
- *        zurueck. `window.yuvomi.friendlyError` traegt einen Stellvertreter,
- *        der den Text des Servers zurueckgaebe: fragt die Seite ihn wieder,
- *        steht dieser Text im Toast und die Erwartungen unten fallen.
+ *        zurueck.
  *
  *        Der Erfolgsfall verzweigt seit #1170 nach `visit.can_edit` zwischen
  *        Bearbeiten- und Berichtsmodal (#1135: wer einen abgerechneten Besuch
@@ -37,7 +35,6 @@ globalThis.window = globalThis.window ?? {};
 const toastCalls = [];
 globalThis.window.yuvomi = {
   showToast: (...args) => toastCalls.push(args),
-  friendlyError: (err) => err?.data?.error ?? err?.message ?? 'friendlyError',
 };
 // friendly-error.js liest `navigator.onLine`; ohne Wert hielte es jeden Fehler fuer "offline".
 Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
@@ -228,7 +225,7 @@ test('openVisitFromDeepLink: 429 (Rate-Limit) bietet ein Retry an, das dieselbe 
   assert.equal(replaceStateCalls.length, 1);
   assert.equal(toastCalls.length, 1);
   const [message, type, duration, action] = toastCalls[0];
-  assert.equal(message, 'common.errorRateLimited', 'keine rohe Servermeldung, kein friendlyError-Fallback');
+  assert.equal(message, 'common.errorRateLimited', 'keine rohe Servermeldung');
   assert.equal(type, 'danger');
   assert.equal(duration, 6000);
   assert.equal(typeof action?.onClick, 'function', '429 ist voruebergehend und muss ein Retry anbieten');

@@ -383,7 +383,7 @@ test('Verschieben: scheitern zwei Zuege derselben Karte, steht sie am letzten BE
   const { calls, put } = gatedPut();
   globalThis.__apiStub = { put };
   const prevYuvomi = globalThis.window.yuvomi;
-  globalThis.window.yuvomi = { ...prevYuvomi, showToast: () => {}, friendlyError: () => 'x' };
+  globalThis.window.yuvomi = { ...prevYuvomi, showToast: () => {} };
   try {
     const first = meals.moveMeal(5, '2026-10-06', 'lunch', { rerender: () => {} });
     const second = meals.moveMeal(5, '2026-10-07', 'dinner', { rerender: () => {} });
@@ -410,7 +410,7 @@ test('Verschieben: gelingt der erste Zug und scheitert der zweite, bleibt das Zi
   const { calls, put } = gatedPut();
   globalThis.__apiStub = { put };
   const prevYuvomi = globalThis.window.yuvomi;
-  globalThis.window.yuvomi = { ...prevYuvomi, showToast: () => {}, friendlyError: () => 'x' };
+  globalThis.window.yuvomi = { ...prevYuvomi, showToast: () => {} };
   try {
     const first = meals.moveMeal(5, '2026-10-06', 'lunch', { rerender: () => {} });
     const second = meals.moveMeal(5, '2026-10-07', 'dinner', { rerender: () => {} });

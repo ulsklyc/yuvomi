@@ -4704,7 +4704,7 @@ Rundgang - Bestandshaushalte sehen sie nach einem Update nie - und ihr Stand lie
 
 Der **Fehlerbildschirm einer Seite** (router.js `renderError`) nennt die Seite mit ihrem Namen
 aus der Navigation ("Die Seite „Kontakte" lässt sich gerade nicht öffnen"), haengt an die
-Ursache aus `friendlyError` den Satz, dass der Rest weiterlaeuft, und bietet neben "Neu laden"
+Ursache aus `unhandledErrorSentence` den Satz, dass der Rest weiterlaeuft, und bietet neben "Neu laden"
 "Zur Übersicht" (nicht auf der Uebersicht selbst). Ohne Shell bleibt der allgemeine Titel. Er
 ist Region-Fokusziel ohne Rahmen (`.page-crash`, wie `.page-unreachable`).
 

@@ -410,9 +410,7 @@ test('Neuer Kontakt ist nicht als „Arzt" vorbelegt: aktive Filterkategorie, so
 // weil nur er das abgewiesene Feld nannte. Jetzt nennt der Server den Fall
 // (`reason`, `params.limit`, server/routes/contacts.js), und der Satz der App
 // nennt Feld und Grenze. Gemessen wird am echten Aufrufer mit der echten
-// Zuordnung (utils/friendly-error.js); `window.yuvomi.friendlyError` traegt
-// hier einen Stellvertreter, der den Servertext zurueckgaebe - fragt die Seite
-// ihn noch, steht der im Toast.
+// Zuordnung (utils/friendly-error.js).
 // -------------------------------------------------------------------------
 test('Import-Toast: schlaegt alles fehl, nennt er das Feld als Satz der App, nie den Servertext (#1909)', async () => {
   // Wie der Fehler aus api.js kommt: `message` und `data.error` tragen den Text des Servers.
@@ -420,12 +418,11 @@ test('Import-Toast: schlaegt alles fehl, nennt er das Feld als Satz der App, nie
     name: 'ApiError', status, data: { error, code: status, ...extra },
   });
   const yuvomi = globalThis.window.yuvomi;
-  const saved = { showToast: yuvomi.showToast, friendlyError: yuvomi.friendlyError };
+  const saved = { showToast: yuvomi.showToast };
   const savedNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
   const toasts = [];
   yuvomi.showToast = (message, type, duration, action) => toasts.push({ message, type, duration, action });
-  yuvomi.friendlyError = (err) => err?.data?.error ?? 'friendlyError';
   const failed = (lastError) => {
     toasts.length = 0;
     contacts.showImportResult({ imported: 0, withBirthday: 0, failedList: [{ name: '' }], lastName: null, lastError });

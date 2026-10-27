@@ -22,7 +22,7 @@ import { showToast, endFeedbackToasts } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
 import { createNavigate, prefetchPathOf, focusMainAfterNavigation, unlessAborted, isCurrentAddress } from '/utils/router-navigate.js';
 import { pageMountTarget } from '/utils/page-mount.js';
-import { friendlyError, unhandledErrorSentence } from '/utils/friendly-error.js';
+import { unhandledErrorSentence } from '/utils/friendly-error.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
 import { dismissFilterPopovers } from '/utils/filter-sheet.js';
 import { watchToastPlacement } from '/utils/toast-placement.js';
@@ -5167,8 +5167,7 @@ function errorDetails(err) {
 
 // Die Zuordnung Fehler -> Satz lebt in utils/friendly-error.js (#1640), damit
 // sie ohne Browser pruefbar ist. Fehlerbildschirm und Rejection sagen
-// unhandledErrorSentence, nie den Text des Servers (#1909);
-// window.yuvomi.friendlyError unten reicht den Uebergang nur weiter.
+// unhandledErrorSentence, nie den Text des Servers (#1909).
 
 // --------------------------------------------------------
 // Globale Fehler-Handler (Error Boundary)
@@ -5672,7 +5671,6 @@ window.yuvomi = {
   // Seitenleiste, Mehr-Blatt und Cmd-K.
   openSearch: () => _openSearch?.(),
   showToast,
-  friendlyError,
   setThemeColor,
   setDisabledModules,
   setHiddenModules,
