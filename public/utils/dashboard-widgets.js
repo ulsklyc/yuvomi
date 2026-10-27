@@ -752,6 +752,33 @@ export function contentSpanRows(content = {}, geometry = {}) {
   return { shown, rest, px, rows: Math.max(1, Math.ceil(px / g.unit - 1e-6)) };
 }
 
+/* HOEHE WIRD INHALT (U14, Entscheidung Ulas 2026-10-27). Eine Kachel bekommt
+ * beim Fuellen (`fillGridSpans`) manchmal mehr Hoehe, als ihre Daten melden -
+ * sie schliesst ein Loch oder ein Spaltenende. Hat sie dafuer weitere Zeilen
+ * geladen (der Server liefert den Vorrat fuer die groesste Fassung, die
+ * Groesse zeigt weniger), stehen sie im gewonnenen Platz; ohne Mehrdaten
+ * bleibt er leer. Vorbild war die Fuell-Liste der Belohnungen (R22 S10), die
+ * das nur fuer sich und nur per CSS konnte.
+ *
+ * KEINE RUECKKOPPLUNG: die Spanne kommt weiter aus den Daten in der gewaehlten
+ * Groesse (`contentSpanRows`), die Packung rechnet nur damit. Die Zusatzzeilen
+ * fuellen danach, was die Packung zugeteilt hat, und fragen nie zurueck - kein
+ * zweiter Packlauf, kein Layout-Lesen. Wie viele es sind, rechnet der Renderer
+ * mit derselben Geometrie vorab aus: `steps[k - 1]` = Spuren der Kachel mit k
+ * Zusatzzeilen (dann auch mit kleinerem oder ohne "+N weitere").
+ *
+ * @param {number[]} steps aufsteigend, Spuren mit 1, 2, ... Zusatzzeilen
+ * @param {number} allotted die Spuren, die die Packung der Kachel zuteilt (ohne Abstand)
+ * @returns {number} wie viele Zusatzzeilen hineinpassen
+ */
+export function fillRowCount(steps, allotted) {
+  const room = Number(allotted);
+  if (!Array.isArray(steps) || !Number.isFinite(room)) return 0;
+  let k = 0;
+  while (k < steps.length && Number(steps[k]) > 0 && Number(steps[k]) <= room) k += 1;
+  return k;
+}
+
 export function sameWidgetConfig(a, b) {
   if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
   return a.every((w, i) => w.id === b[i].id && w.visible === b[i].visible

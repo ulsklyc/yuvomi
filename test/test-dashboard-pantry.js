@@ -379,7 +379,8 @@ function slice(items, total = items.length) {
   };
 }
 
-const zeilen = (html) => (html.match(/class="list-row pantry-widget-row"/g) || []).length;
+// Was ohne Streckung steht: Zusatzzeilen (U14, `data-fill-row`) zeigt erst applyRowFill.
+const zeilen = (html) => (html.match(/<div class="list-row pantry-widget-row"[^>]*>/g) || []).filter((tag) => !tag.includes('data-fill-row')).length;
 
 test('Renderer: ein Ladefehler (null) wirft, damit die geteilte Fehlerkachel greift', () => {
   // Mit der eigenen Meldung - ein TypeError aus einem fehlenden Renderer wäre

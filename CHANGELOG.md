@@ -85,6 +85,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   weather tile is the first to grow into free width, where it shows more days. A 1920px screen now
   has three wider columns instead of four narrow ones, so appointment details are no longer cut off.
   Titles in the tiles' rows stay on one line from tablet width up; the full title is one tap away.
+- **A tile stretched to close a gap shows more of its list.** When a list tile on the overview gets
+  extra height to close a gap beside taller neighbours, it fills it with entries it already has
+  but did not show at its size - more tasks, appointments, birthdays, countdowns, expiring food,
+  shifts, waste pickups, notes, rewards or expense categories, whole rows only - and "+N more"
+  counts down, or goes once everything is shown. Without more entries the space stays as it was;
+  the tiles keep their places, and phones are unchanged. The overview now loads the eight nearest
+  birthdays and the five largest expense categories, so a stretched tall tile has rows to show. The
+  recent points in a child's small rewards tile come the same way and sit above "1 request
+  awaiting approval", as in the tall tile.
 - **Every list on the overview reads the same, and a phone shows more of it.** Tasks, appointments,
   birthdays, countdowns, expiring food, shifts, waste pickups, family, rewards and shopping lists
   now share one row: a mark at the front of the same size (a face, a symbol or a dot), the title in

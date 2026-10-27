@@ -2683,8 +2683,9 @@ verankert.** Seit eine Kachel so hoch ist wie ihr Inhalt (Raster-Regel darunter)
 Ueberschuss mehr, den der Anker (`margin-block-start: auto` am Fuss, Koerper `flex: 1`) zwischen
 Inhalt und Abschluss legen muesste: der Fuss steht unter der letzten Zeile. Der Anker bleibt fuer
 den einen Fall, in dem eine Kachel doch Hoehe bekommt - wenn sie ein echtes Loch im Raster
-schliesst: dann faellt die Leere zwischen Inhalt und Abschluss statt hinter den Abschluss, und die
-Belohnungen (eigene Sicht) zeigen darin ihre juengsten Punkte (`rewards-recent--fill`). Vorher
+schliesst: dann fuellt eine Liste den Platz mit weiteren geladenen Zeilen (U14, "Hoehe wird
+Inhalt" unten), und nur was danach bleibt, faellt zwischen Inhalt und Abschluss statt hinter den
+Abschluss. Vorher
 war der Anker die Regel: die Zeilenhoehen richteten sich nach den 1x1-Kacheln, und "Familie" stand
 mit 319px Inhalt in 489px Karte.
 
@@ -2720,6 +2721,25 @@ und Notizen folgten, und Spalte 1 stand im Demo-Haushalt bei 1440px unter der Fa
 im Kinderkonto 588px; die alte Loch-Zaehlung sah das Spaltenende nicht. Gemessen nachher (Seed,
 Kind, alle Kacheln; 768-1920px, hell und dunkel): 0 Loecher, kein Spaltenende ueber 8px, das
 Wetter bei drei Spalten ueber die ganze Breite (`test:dashboard`, "U1 b", "F9").
+
+**Hoehe wird Inhalt** (U14, Ulas 2026-10-27; `docs/DECISIONS.md` Nr. 16). Bekommt eine
+Listenkachel beim Fuellen mehr Hoehe, als ihre Daten melden, zeigt sie darin weitere Zeilen, die
+sie schon geladen hat (der Server liefert den Vorrat fuer die groesste Fassung, die Groesse zeigt
+weniger) - ganze Zeilen oder keine, und "+N weitere" zaehlt herunter oder geht, wenn alles steht.
+Ohne Mehrdaten bleibt der Platz leer. Eine Mechanik fuer alle Listen: der Renderer traegt die
+Zeilen mit (`data-fill-row`, versteckt) und rechnet mit derselben Geometrie, wie viele Spuren er
+mit 1, 2 ... Zusatzzeilen braeuchte (`data-fill-steps`, `contentSpanRows`); `applyRowFill` zeigt
+nach der Packung so viele, wie in die zugeteilte Hoehe passen (`fillRowCount`). Keine
+Rueckkopplung: die Spanne bleibt die der gewaehlten Groesse, die Packung sieht die Zusatzzeilen
+nie, und gelesen wird kein Layout. Sie stehen im ersten Bild schon da (keine Einlaufbewegung);
+nach einem stillen Abgleich zieht eine nachrueckende Zeile ein wie jede neue (`expandIn`). Im
+Anpassen-Modus ist der Geist nur noch der Rest unter der letzten Zusatzzeile. Am Telefon wird
+nicht gestreckt, also auch nichts mitgetragen. Ohne Mehrdaten: Familie (sie zeigt in jeder
+Groesse bis zu sechs Mitglieder; ein siebtes ist nicht angeschlossen, weil die geteilte Terminzeile
+an den gezeigten Personen haengt), Einkauf (eigene Form, U11), Kennzahlen, Wetter, Uhr, Gesundheit, Zyklus,
+Fasten, Naehrwerte, Haushaltshilfe, Schnellzugriffe, Mahlzeiten. Gemessen 1440px, alle Kacheln:
+Budget hoch 79 -> 29px leer (zwei Kategorien mehr); Aufgaben 1x1 neben zwei hohen Kacheln 109 ->
+1px ("+9 weitere" -> "+7 weitere").
 
 **Anpassen zeigt das Raster, das danach steht** (DW-P2-9). Der Rahmen hat im Anpassen-Modus genau
 die Flaeche seiner Daten (`contain: size`), die Leiste schwebt mit dem Namen der Kachel ueber deren
@@ -3094,10 +3114,10 @@ geschrieben nur, wo noch nichts steht (`test:child-start-permissions`, "R21 D6")
   Haarlinie laeuft ueber beide; bei ungerader Zahl spannt die letzte Zeile unter beiden
   (`.today-cockpit-card--span`). Die Einkaufszeile schliesst das SICHTBARE Programm und steht vor
   „+N weitere heute". Im Kindkonto steht die eigene Belohnungskachel oben (die Anfrage folgt dem
-  Ziel statt `margin-block-start: auto`). Was die Reihe der 1x1-Kachel ueber ihren Inhalt hinaus
-  gibt, fuellt der Verlauf (bis drei Zeilen) in einer Flaeche ohne eigene Hoehe: ganze Zeilen
-  oder keine (umbrechende Spalte, `.rewards-recent--fill`), in einer Reihe kurzer Kacheln bleibt
-  sie 0px (R22 S10; 1440: 206px Inhalt in 427px Kachel, jetzt drei Zeilen). Guards:
+  Ziel statt `margin-block-start: auto`). Was die Packung der 1x1-Kachel ueber ihren Inhalt hinaus
+  gibt, fuellt der Verlauf (bis drei Zeilen), ganze Zeilen oder keine - seit U14 ueber die eine
+  Mechanik aller Listen (Zusatzzeilen, siehe "Hoehe wird Inhalt"), nicht mehr ueber eine eigene
+  umbrechende Spalte (R22 S10; 1440: 206px Inhalt in 427px Kachel, jetzt drei Zeilen). Guards:
   `test:dashboard-today` ("R22 D16"), `test:dashboard-rewards` ("Groessen").
 - **Anpassen: Optionen am Chip (R22, D16):** ein ausgeblendetes Widget mit Optionen ist ein
   geteilter Knopf - links einblenden (ein Tipp), rechts am selben Pill der Pfeil ins Menue

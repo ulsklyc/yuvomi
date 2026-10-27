@@ -727,6 +727,19 @@
   list-style: none;
 }
 
+/* HOEHE WIRD INHALT (U14). Eine Liste bringt die Zeilen mit, die sie geladen,
+ * aber in ihrer Groesse nicht gezeigt hat (`data-fill-row`); sie stehen erst,
+ * wenn die Packung der Kachel die Hoehe dafuer zuteilt (`applyRowFill` setzt
+ * `data-fill-on`). Ohne Bewegung: sie stehen im ersten Bild schon da, wo sie
+ * hingehoeren - ein Ankommen ist es nur nach einem stillen Abgleich, und das
+ * zeigt `expandIn` wie jede neue Zeile. "+N weitere" zaehlt herunter und geht,
+ * wenn alles steht (`data-fill-gone`). */
+.dashboard .widget [data-fill-row]:not([data-fill-on]),
+.dashboard .widget [data-fill-group]:not([data-fill-on]),
+.dashboard .widget [data-fill-more][data-fill-gone] {
+  display: none;
+}
+
 .widget__rows > .list-row {
   min-height: calc(var(--target-lg) + var(--space-1));
   padding: var(--space-1) var(--space-4);
@@ -5271,46 +5284,11 @@ button.today-cockpit__more--link {
   margin-block-start: 0;
 }
 
-/* DER VERLAUF FUELLT DEN UEBERSCHUSS, GANZE ZEILEN ODER KEINE (R22 S10).
- * In der 1x1-Kachel hat die Liste keine eigene Hoehe (`flex-basis: 0`): sie
- * bekommt nur, was die Reihe der Kachel ueber ihren Inhalt hinaus gibt. Damit
- * keine Zeile angeschnitten steht, laeuft die Liste als umbrechende Spalte -
- * was nicht ganz passt, bricht in eine zweite Spalte rechts ausserhalb der
- * Flaeche und ist weg. Das leere `::before` haelt die erste Spalte, damit auch
- * die erste Zeile (mit der Ueberschrift) weicht, wenn sie nicht ganz passt.
- * Ohne Ueberschuss (eine Reihe kurzer Kacheln) ist die Liste 0px hoch. */
-.dashboard .rewards-widget--self > .rewards-recent--fill {
-  flex: 1 1 0;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  /* Der Spaltenabstand der Kachel (`.rewards-widget`, gap) zaehlte sonst auch
-   * fuer die leere Liste: die Kachel wuchs um 12px. Die Ueberschrift der
-   * ersten Zeile traegt den Abstand selbst. */
-  margin-block-start: calc(-1 * var(--space-3));
-}
-
-.rewards-recent--fill::before {
-  content: '';
-  inline-size: 100%;
-  block-size: 0;
-}
-
-.rewards-recent--fill > .rewards-recent__row {
-  inline-size: 100%;
-}
-
-.rewards-recent--fill > .rewards-recent__row:first-child::before {
-  content: attr(data-recent-title);
-  grid-column: 1 / -1;
-  padding-block-start: var(--space-5);
-  color: var(--color-text-secondary);
-  font-size: var(--type-caption);
-  font-weight: var(--font-weight-medium);
-}
+/* DER VERLAUF FUELLT DEN UEBERSCHUSS (R22 S10) - seit U14 ueber die eine
+ * Mechanik aller Listen: die 1x1-Kachel bringt ihre juengsten Punkte als
+ * Zusatzzeilen mit (`data-fill-row`, Block samt Ueberschrift `data-fill-group`),
+ * und sie stehen, sobald die Packung der Kachel die Hoehe dafuer zuteilt -
+ * ganze Zeilen oder keine, ohne eigene Flex-Fuell-Liste. */
 
 .dashboard .widget__empty {
   padding: var(--space-4);

@@ -1129,7 +1129,8 @@ test('Notiz-Widget: die Zeilenzahl kommt aus der Kachelgroesse, nicht aus einer 
   const notes = ['A', 'B', 'C', 'D', 'E'].map((titel, i) => ({
     id: i + 1, title: `Notiz ${titel}`, content: titel, pinned: 1,
   }));
-  const zeilen = (html) => (html.match(/class="note-item"/g) || []).length;
+  // Was ohne Streckung steht: Zusatzzeilen (U14, `data-fill-row`) zeigt erst applyRowFill.
+  const zeilen = (html) => (html.match(/<div class="note-item"[^>]*>/g) || []).filter((tag) => !tag.includes('data-fill-row')).length;
 
   // Die Standardgroesse der Kachel ist 1x2, also hoch: dort passen fuenf.
   // Genau hier stand der Fehler - die Kachel hatte den Platz und bekam drei.
@@ -3618,7 +3619,9 @@ test('U1 b: jede Listenkachel meldet die Spuren ihrer gezeichneten Zeilen (data-
   const dash = await import('../public/pages/dashboard.js');
   const { __test } = dash;
   const g = widgets.TILE_GEOMETRY;
-  const zeilen = (html) => (html.match(/class="list-row /g) ?? []).length;
+  // Gezaehlt wird, was ohne Streckung steht - Zusatzzeilen (U14) traegt die
+  // Kachel mit, sie zaehlen erst, wenn applyRowFill sie zeigt.
+  const zeilen = (html) => (html.match(/<[a-z]+ class="list-row [^>]*>/g) ?? []).filter((tag) => !/data-fill-row/.test(tag)).length;
   const fuss = (html) => /class="(widget-list-more|countdown-more|pantry-widget-more|waste-widget-more)"/.test(html);
   const spuren = (html) => Number(/data-span-rows="(\d+)"/.exec(html)?.[1]);
   const erwartet = (html) => {
@@ -3639,6 +3642,179 @@ test('U1 b: jede Listenkachel meldet die Spuren ihrer gezeichneten Zeilen (data-
       }
     }
   }
+});
+
+/* U14 (Entscheidung Ulas 2026-10-27): HOEHE WIRD INHALT. Bekommt eine
+ * Listenkachel beim Fuellen mehr Hoehe, als ihre Daten melden, zeigt sie darin
+ * weitere geladene Zeilen - und "+N weitere" zaehlt herunter. Die Spanne bleibt
+ * die ohne Zusatzzeilen (keine Rueckkopplung in die Packung). */
+test('U14: fillRowCount - so viele Zusatzzeilen, wie ganz in die zugeteilten Spuren passen', () => {
+  nodeAssert.equal(typeof widgets.fillRowCount, 'function', 'fillRowCount fehlt in utils/dashboard-widgets.js');
+  nodeAssert.equal(widgets.fillRowCount([60, 74, 81], 59), 0, 'nicht gestreckt: keine');
+  nodeAssert.equal(widgets.fillRowCount([60, 74, 81], 60), 1);
+  nodeAssert.equal(widgets.fillRowCount([60, 74, 81], 80), 2, 'eine angeschnittene Zeile steht nicht');
+  nodeAssert.equal(widgets.fillRowCount([60, 74, 81], 400), 3, 'nie mehr, als geladen ist');
+  nodeAssert.equal(widgets.fillRowCount([], 400), 0, 'ohne Mehrdaten bleibt der Platz leer');
+});
+
+/** Die Zusatzzeilen einer Kachel: Spuren je Stufe und die markierten Zeilen. */
+function fillOf(html) {
+  const steps = (/data-fill-steps="([0-9,]*)"/.exec(html)?.[1] ?? '').split(',').filter(Boolean).map(Number);
+  const rows = (html.match(/<[a-z]+ class="(?:list-row|note-item|budget-widget__top-row|rewards-recent__row)[ "][^>]*>/g) ?? []).filter((tag) => /data-fill-row/.test(tag)).length;
+  return { steps, rows, base: Number(/data-span-rows="(\d+)"/.exec(html)?.[1]) };
+}
+
+test('U14: jede Listenkachel traegt ihre geladenen Zeilen mit - und rechnet ihre Spuren mit derselben Geometrie', async () => {
+  const dash = await import('../public/pages/dashboard.js');
+  const { __test } = dash;
+  const g = widgets.TILE_GEOMETRY;
+  const spurenFuer = (px) => Math.ceil(px / g.unit - 1e-6);
+  const many = (n, f) => Array.from({ length: n }, (_, i) => f(i));
+  const tasks = many(5, (i) => ({ id: i + 1, title: `T${i}`, priority: 'none', status: 'open', assigned_users: [] }));
+  const birthdays = many(8, (i) => ({ id: i + 1, name: `B${i}`, days_until: i + 1, next_birthday: '2027-01-01' }));
+  // Aufgaben 1x1: drei stehen, zwei sind geladen und warten, 12 offen insgesamt.
+  const t11 = __test.renderUrgentTasks(tasks, 12, '1x1');
+  const f = fillOf(t11);
+  nodeAssert.equal(f.rows, 2, 'Aufgaben 1x1: die zwei geladenen, nicht gezeigten Zeilen stehen im Markup');
+  const rowsPx = (n, rest) => g.frame + g.head + g.rowsPad + n * g.row + (rest > 0 ? g.more : 0);
+  nodeAssert.deepEqual(f.steps, [spurenFuer(rowsPx(4, 8)), spurenFuer(rowsPx(5, 7))], 'Spuren mit 1 und 2 Zusatzzeilen');
+  nodeAssert.equal(f.base, spurenFuer(rowsPx(3, 9)), 'die Spanne bleibt die ohne Zusatzzeilen');
+  nodeAssert.match(t11, /data-fill-more data-more-rest="9" data-more-key="dashboard\.tasksMore"/, '"+N weitere" kennt seinen Rest');
+  // Hoch zeigt die Aufgabenkachel alle fuenf geladenen: nichts wartet.
+  nodeAssert.deepEqual(fillOf(__test.renderUrgentTasks(tasks, 12, '1x2')).steps, [], '1x2: ohne Mehrdaten keine Stufe');
+  // Geburtstage 1x2: der Server liefert acht (U14), die Kachel zeigt fuenf.
+  const b12 = fillOf(dash.renderUpcomingBirthdays(birthdays, '1x2', 8));
+  nodeAssert.equal(b12.rows, 3);
+  nodeAssert.deepEqual(b12.steps, [6, 7, 8].map((n) => spurenFuer(rowsPx(n, 8 - n))), 'die letzte Stufe ohne "+N weitere"');
+  // Jede Listenkachel macht mit (eine Mechanik, keine Einzelloesung).
+  const pantry = __test.renderPantryWidget({ items: many(5, (i) => ({ name: `P${i}`, days_left: i })), total: 9 }, '1x1');
+  nodeAssert.equal(fillOf(pantry).rows, 2, 'Vorrat');
+  const waste = __test.renderWasteWidget({ items: many(5, (i) => ({ type: { id: i + 1, name: `W${i}`, sort_order: i }, next: null })) }, '1x1');
+  nodeAssert.equal(fillOf(waste).rows, 2, 'Entsorgung');
+  const schedule = __test.renderScheduleWidget({ hasTypes: true, entries: many(5, (i) => ({ user_id: i + 1, shift_type: null })) }, many(5, (i) => ({ id: i + 1, display_name: `U${i}` })), '1x1');
+  nodeAssert.equal(fillOf(schedule).rows, 2, 'Schichtplan');
+  const notes = __test.renderPinnedNotes(many(5, (i) => ({ id: i + 1, title: `N${i}`, content: 'x', categories: [] })), '1x1', 8);
+  nodeAssert.equal(fillOf(notes).rows, 2, 'Notizen');
+  const kids = many(4, (i) => ({ id: 20 + i, display_name: `K${i}`, balance: 5 }));
+  const rewards = __test.renderRewardsWidget({ view: 'approver', me: 1, standings: kids, catalog: [], pending: 0 }, '1x1');
+  nodeAssert.equal(fillOf(rewards).rows, 2, 'Belohnungen (Familie)');
+  const recent = many(3, (n) => ({ delta: n + 1, reason: `R${n}`, type: 'earn', created_at: '2026-09-01T08:00:00Z' }));
+  const self = __test.renderRewardsWidget({ view: 'self', me: 7, standings: [{ id: 7, display_name: 'Emma', balance: 4 }], catalog: [], recent }, '1x1');
+  nodeAssert.equal(fillOf(self).rows, 3, 'Belohnungen (eigene Sicht): die juengsten Punkte');
+  nodeAssert.match(self, /class="rewards-self__recent" data-fill-group/, 'mit der ersten Zeile kommt die Ueberschrift');
+  const budget = __test.renderBudgetWidget({ entryCount: 4, income: 3000, expenses: 1200, balance: 1800,
+    topExpenses: many(5, (i) => ({ category: `c${i}`, amount: 100 - i })) }, 'EUR', '1x2');
+  nodeAssert.equal(fillOf(budget).rows, 2, 'Budget hoch: zwei Kategorien mehr');
+  const now = new Date();
+  const soon = (h) => new Date(now.getTime() + h * 3600e3).toISOString();
+  const events = many(5, (i) => ({ id: i + 1, title: `E${i}`, start_datetime: soon(i + 2), end_datetime: soon(i + 3) }));
+  const cal = __test.renderCalendarWidget({ upcomingEvents: events }, '1x1', {});
+  nodeAssert.equal(fillOf(cal).rows, 2, 'Kalender 1x1: die Kommenden, die die Stufe geladen hat');
+  nodeAssert.match(cal, /data-fill-more data-more-rest="2"/, '"Weitere im Kalender" geht, wenn alle Geladenen stehen');
+  // Am Telefon wird nicht gestreckt - dort traegt keine Kachel Zusatzzeilen.
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { configurable: true, writable: true, value: { ...(globalThis.window ?? {}), matchMedia: () => ({ matches: true }) } });
+  try {
+    nodeAssert.equal(fillOf(__test.renderUrgentTasks(tasks, 12, '1x1')).rows, 0, 'Telefon: keine Zusatzzeile');
+  } finally {
+    if (saved) Object.defineProperty(globalThis, 'window', saved);
+    else delete globalThis.window;
+  }
+});
+
+test('U14: jede Stufe ist die Hoehe der Kachel mit genau so vielen Zeilen (Aequivalenz gegen das Markup)', async () => {
+  const dash = await import('../public/pages/dashboard.js');
+  const g = widgets.TILE_GEOMETRY;
+  const birthdays = (n) => Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `B${i}`, days_until: i + 1, next_birthday: '2027-01-01' }));
+  let stufen = 0;
+  for (const size of ['1x1', '1x2']) {
+    for (const n of [0, 2, 4, 6, 8]) {
+      for (const total of [n, n + 3]) {
+        const html = dash.renderUpcomingBirthdays(birthdays(n), size, total);
+        const { steps, rows, base } = fillOf(html);
+        nodeAssert.equal(steps.length, rows, `${size}, ${n}/${total}: eine Stufe je Zusatzzeile`);
+        const shown = (html.match(/<[a-z]+ class="list-row [^>]*>/g) ?? []).length - rows;
+        steps.forEach((spuren, i) => {
+          const k = i + 1;
+          const px = g.frame + g.head + g.rowsPad + (shown + k) * g.row + (total - shown - k > 0 ? g.more : 0);
+          nodeAssert.equal(spuren, Math.ceil(px / g.unit - 1e-6), `${size}, ${n}/${total}: Stufe ${k}`);
+          nodeAssert.ok(spuren > (i ? steps[i - 1] : base), 'jede Stufe ist hoeher als die vorige');
+        });
+        stufen += steps.length;
+      }
+    }
+  }
+  nodeAssert.ok(stufen >= 10, `Vorbedingung: Kacheln mit Zusatzzeilen geprueft (${stufen} Stufen)`);
+});
+
+/** Eine Kachel-Attrappe mit Zusatzzeilen fuer applyRowFill. */
+function fillTile(tile, { steps, rows = steps.length, rest = rows + 2, key = 'dashboard.tasksMore', spanRows }) {
+  const attrs = (bag) => ({ toggleAttribute: (name, on) => { if (on) bag.add(name); else bag.delete(name); }, has: (name) => bag.has(name) });
+  const zeilen = Array.from({ length: rows }, () => attrs(new Set()));
+  const more = { ...attrs(new Set()), dataset: { moreRest: String(rest), moreKey: key }, textContent: `+${rest}` };
+  tile.dataset.fillSteps = steps.join(',');
+  tile.dataset.spanRows = String(spanRows);
+  tile.querySelectorAll = (sel) => (sel === '[data-fill-row]' ? zeilen : sel === '[data-fill-more]' ? [more] : []);
+  return { zeilen, more, shown: () => zeilen.filter((z) => z.has('data-fill-on')).length };
+}
+
+test('U14: applyRowFill zeigt im gestreckten Platz weitere Zeilen - und die Packung bleibt, wie sie ohne sie war', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const vorher = globalThis.getComputedStyle;
+  try {
+    // Ohne Zusatzzeilen: das Raster des Demo-Haushalts (Belohnungen schliessen
+    // ueber dem Wetter ein Loch, drei Spalten).
+    const plain = stubGrid(GRID_SEED);
+    globalThis.getComputedStyle = plain.style;
+    __test.applyRowFill(plain.grid);
+    const ohne = filledOf(plain.tiles);
+    const zugeteilt = Number(ohne.find(([id]) => id === 'rewards')[2]) - 5;
+    // Dieselben Spannen, die Belohnungen haben drei Zusatzzeilen: zwei passen.
+    const own = GRID_SEED.rewards[1] - 5;
+    const stub = stubGrid(GRID_SEED);
+    globalThis.getComputedStyle = stub.style;
+    const rewards = stub.tiles.find((t) => t.dataset.widgetId === 'rewards');
+    const steps = [own + 14, zugeteilt - 1, zugeteilt + 13];
+    const fill = fillTile(rewards, { steps, rest: 5, spanRows: own });
+    __test.applyRowFill(stub.grid);
+    nodeAssert.deepEqual(filledOf(stub.tiles), ohne, 'die Zusatzzeilen veraendern die Packung nicht');
+    nodeAssert.equal(fill.shown(), 2, 'so viele, wie ganz in die zugeteilte Hoehe passen');
+    nodeAssert.equal(rewards.dataset.fillShown, '2');
+    nodeAssert.equal(fill.more.textContent, 'dashboard.tasksMore{"count":3}', '"+N weitere" zaehlt herunter');
+    nodeAssert.ok(!fill.more.has('data-fill-gone'));
+    // Im Anpassen-Modus steht als Geist nur noch der Rest.
+    __test.applyRowFill(stub.grid, { editing: true });
+    nodeAssert.deepEqual(filledOf(stub.tiles), ohne, 'Anpassen = Normal');
+    nodeAssert.equal(Number(rewards.style.props.get('--tile-ghost-rows')), zugeteilt - steps[1], 'der Geist ist der Platz unter der letzten Zusatzzeile');
+    // Passt alles, geht "+N weitere".
+    const all = stubGrid(GRID_SEED);
+    globalThis.getComputedStyle = all.style;
+    const r2 = all.tiles.find((t) => t.dataset.widgetId === 'rewards');
+    const fill2 = fillTile(r2, { steps: [own + 14, own + 27], rest: 2, spanRows: own });
+    __test.applyRowFill(all.grid);
+    nodeAssert.equal(fill2.shown(), 2);
+    nodeAssert.ok(fill2.more.has('data-fill-gone'), 'alles steht: keine Fusszeile mehr');
+    // Eine Kachel, die nicht gestreckt ist, zeigt keine Zusatzzeile.
+    const fam = all.tiles.find((t) => t.dataset.widgetId === 'family');
+    const fill3 = fillTile(fam, { steps: [GRID_SEED.family[1] - 5 + 14], spanRows: GRID_SEED.family[1] - 5 });
+    __test.applyRowFill(all.grid);
+    nodeAssert.equal(fill3.shown(), 0, 'ohne zugeteilte Hoehe keine Zusatzzeile');
+  } finally {
+    globalThis.getComputedStyle = vorher;
+  }
+});
+
+test('U14: die Zusatzzeilen fragen nie zurueck - kein Layout-Lesen, keine eigene Spanne, versteckt bis applyRowFill sie zeigt', () => {
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  const body = /function showFillRows\(el, k\) \{([\s\S]*?)\n\}/.exec(src)?.[1] ?? '';
+  nodeAssert.ok(body, 'showFillRows fehlt');
+  nodeAssert.doesNotMatch(body, /getComputedStyle|getBoundingClientRect|offset(Height|Width|Top)|client(Height|Width)|scrollHeight/, 'kein Layout-Lesen');
+  nodeAssert.doesNotMatch(body, /--tile-rows|spanRows\s*=|fillGridSpans|packGrid/, 'keine Rueckkopplung in die Spanne');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.includes('[data-fill-row]:not([data-fill-on])'));
+  nodeAssert.match(rule?.body ?? '', /display:\s*none/, 'eine Zusatzzeile steht erst, wenn applyRowFill sie zeigt');
+  nodeAssert.ok(rule.selector.includes('[data-fill-more][data-fill-gone]'), '"+N weitere" geht, wenn alles steht');
+  nodeAssert.doesNotMatch(css, /rewards-recent--fill/, 'die Belohnungen fuellen ueber dieselbe Mechanik, nicht mehr mit eigener Liste');
 });
 
 test('U1 b: jede Kachel meldet ihre Hoehe - fuer jede Groesse, damit der Hinweis Groessen probieren kann', async () => {
@@ -3970,7 +4146,8 @@ test('Schedule-Widget: die Zeilenzahl kommt aus der Kachelgroesse, nicht aus der
     hasTypes: true,
     entries: users.map((u) => ({ user_id: u.id, shift_type: type })),
   };
-  const zeilen = (html) => (html.match(/class="list-row schedule-widget-row"/g) || []).length;
+  // Was ohne Streckung steht: Zusatzzeilen (U14, `data-fill-row`) zeigt erst applyRowFill.
+  const zeilen = (html) => (html.match(/<div class="list-row schedule-widget-row"[^>]*>/g) || []).filter((tag) => !tag.includes('data-fill-row')).length;
 
   // Die hohe Kachel (1x2, ihr eigener Standard) zeigt fuenf von sechs Zeilen -
   // genau hier stand der Fehler: ohne Deckel waeren es alle sechs gewesen.
@@ -4025,13 +4202,15 @@ test('renderScheduleWidget() zaehlt Personen, nicht Schicht-Eintraege, und begre
     { user_id: 3, source: 'override', shift_type: shiftType },
   ];
 
+  // Gezaehlt wird, was ohne Streckung steht (U14: Zusatzzeilen zeigt erst applyRowFill).
+  const zeilen = (html) => (html.match(/<div class="list-row schedule-widget-row"[^>]*>/g) || []).filter((tag) => !tag.includes('data-fill-row')).length;
   const wide = __test.renderScheduleWidget({ entries, hasTypes: true }, users, '1x2');
   nodeAssert.match(wide, /widget__badge">3</, 'drei verschiedene Personen sind im Dienst, nicht vier Zeilen');
-  nodeAssert.equal((wide.match(/schedule-widget-row"/g) || []).length, 4, 'auf 1x2 (Deckel 5) passen alle vier Zeilen');
+  nodeAssert.equal(zeilen(wide), 4, 'auf 1x2 (Deckel 5) passen alle vier Zeilen');
 
   const narrow = __test.renderScheduleWidget({ entries, hasTypes: true }, users, '1x1');
   nodeAssert.match(narrow, /widget__badge">3</, 'die Kopfzahl bleibt der wahre Bestand, unabhaengig von der Kachelgroesse');
-  nodeAssert.equal((narrow.match(/schedule-widget-row"/g) || []).length, 3, 'auf 1x1 (Deckel 3) werden nur drei der vier Zeilen gezeigt');
+  nodeAssert.equal(zeilen(narrow), 3, 'auf 1x1 (Deckel 3) werden nur drei der vier Zeilen gezeigt');
 });
 
 test('Kennzahlreihe fuehrt mit den Modulen, die sonst kein Widget zeigen', async () => {
@@ -5462,6 +5641,55 @@ test('DW p7: eine Terminzeile reicht das Signal der Uebersicht an openEventById 
   const calls = [...src.matchAll(/wireLinks\((?:sheet|container), refreshAfterSheet, \{[^}]*\}\)/g)].map((m) => m[0]);
   nodeAssert.equal(calls.length, 2, `Reichweite: zwei Aufrufe in render() (${calls.length})`);
   for (const call of calls) nodeAssert.match(call, /\bsignal\b/, `${call}: ohne Signal leiht das Blatt kein calendar.css`);
+});
+
+/* U14: eine gestreckte Kachel zeigt weitere geladene Zeilen - dafuer liefert
+ * der Server den Vorrat ueber die hohe Fassung hinaus, wo das billig ist:
+ * Geburtstage acht (die Liste ist sortiert im Speicher), die groessten
+ * Ausgabenkategorien fuenf (dieselbe Gruppierung). */
+// Erst nach allen anderen: die Tests teilen eine Datenbank und laufen
+// nebeneinander, zehn Geburtstage mehr verschoeben deren Zaehlungen.
+const othersFirst = pendingTests.slice();
+test('U14: der Server liefert Geburtstage und Ausgabenkategorien ueber die hohe Kachel hinaus', async () => {
+  await Promise.allSettled(othersFirst);
+  const { get } = await import('../server/db.js');
+  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const routeDb = get();
+  const cleanup = () => {
+    routeDb.prepare("DELETE FROM reminders WHERE created_by IN (SELECT id FROM users WHERE username LIKE 'dashboard-u14-%')").run();
+    routeDb.prepare("DELETE FROM calendar_events WHERE created_by IN (SELECT id FROM users WHERE username LIKE 'dashboard-u14-%')").run();
+    routeDb.prepare("DELETE FROM birthdays WHERE created_by IN (SELECT id FROM users WHERE username LIKE 'dashboard-u14-%')").run();
+    routeDb.prepare("DELETE FROM budget_entries WHERE created_by IN (SELECT id FROM users WHERE username LIKE 'dashboard-u14-%')").run();
+    routeDb.prepare("DELETE FROM users WHERE username LIKE 'dashboard-u14-%'").run();
+  };
+  cleanup();
+  const owner = routeDb.prepare(`
+    INSERT INTO users (username, display_name, password_hash, avatar_color, role)
+    VALUES ('dashboard-u14-owner', 'Owner', 'x', '#007AFF', 'admin')
+  `).run().lastInsertRowid;
+  for (let i = 0; i < 10; i += 1) {
+    routeDb.prepare('INSERT INTO birthdays (name, birth_date, created_by) VALUES (?, ?, ?)')
+      .run(`U14 Anlass ${i}`, `2000-${String(1 + (i % 12)).padStart(2, '0')}-1${i % 9}`, owner);
+  }
+  const month = today.slice(0, 7);
+  ['housing', 'food', 'transport', 'health', 'leisure', 'education'].forEach((category, i) => {
+    routeDb.prepare(`INSERT INTO budget_entries (title, amount, category, subcategory, date, created_by)
+      VALUES (?, ?, ?, '', ?, ?)`).run(`U14 ${category}`, -(600 - i * 50), category, `${month}-0${1 + i}`, owner);
+  });
+  const app = express();
+  app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
+  app.use('/', dashboardRouter);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  try {
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    nodeAssert.equal(body.birthdays.length, 8, 'acht Geburtstage: fuenf fuer die hohe Kachel, drei fuer den gestreckten Platz');
+    nodeAssert.ok(body.birthdayTotal >= 10, 'die Gesamtzahl bleibt die ganze');
+    nodeAssert.equal(body.budget.topExpenses.length, 5, 'fuenf Kategorien: drei fuer die hohe Kachel, zwei fuer den gestreckten Platz');
+  } finally {
+    server.close();
+    cleanup();
+  }
 });
 
 await Promise.all(pendingTests);

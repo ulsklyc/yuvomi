@@ -368,7 +368,11 @@ function tileEvents(count, { ended = 0 } = {}) {
   }
   return list;
 }
-const rowTitles = (html) => [...html.matchAll(/event-item__title">([^<]*)</g)].map((m) => m[1]);
+// Was ohne Streckung steht: Zusatzzeilen (U14, `data-fill-row`) zeigt erst
+// applyRowFill, wenn die Packung der Kachel die Hoehe dafuer zuteilt.
+const rowTitles = (html) => html.split('<div class="list-row event-item').slice(1)
+  .filter((row) => !/^[^>]*data-fill-row/.test(row))
+  .map((row) => /event-item__title">([^<]*)</.exec(row)?.[1]).filter((title) => title !== undefined);
 const aheadRows = (html) => rowTitles(html).filter((title) => title.startsWith('Kommt'));
 
 /** Den Dialog oeffnen, ohne DOM: der Stub faengt Inhalt und Speichern-Handler. */
@@ -441,7 +445,7 @@ for (const [limit, expected] of [[undefined, 5], [5, 5], [8, 8], [12, 12], [7, 5
 /* #2087: die Kachel folgt ihrer Groesse wie jede Liste (`listRowCap`). Vorher
  * zeigte eine 1x1-Kachel ihre Stufe - acht oder zwoelf Zeilen in einer
  * Rasterzeile, die die Nachbarn mitstreckte. */
-const aheadMore = (html) => /widget-list-more">dashboard\.eventsMoreAhead</.test(html);
+const aheadMore = (html) => /widget-list-more"[^>]*>dashboard\.eventsMoreAhead</.test(html);
 
 test('Kachel: 1x1 zeigt drei wie jede Liste, hoch die Stufe, 2x1 bleibt der Wochenstreifen (#2087)', inBrowser(THU_14_BERLIN, 'Europe/Berlin', () => {
   const data = { upcomingEvents: tileEvents(14), weekEvents: [] };
@@ -522,7 +526,7 @@ test('Kachel: 1x1 voll und mit beendeten von heute traegt nur eine Zusatzzeile (
     const html = dash.renderCalendarWidget({ upcomingEvents: tileEvents(5, { ended }) }, '1x1', {});
     assert.equal(rowTitles(html).length, 3, `${ended} beendet: drei Terminzeilen`);
     assert.equal(auxLines(html), 1, `${ended} beendet: eine Zusatzzeile wie jede 1x1-Liste`);
-    const foot = /<p class="widget-list-more">([^<]*)<\/p>/.exec(html)?.[1] ?? '';
+    const foot = /<p class="widget-list-more"[^>]*>([^<]*)<\/p>/.exec(html)?.[1] ?? '';
     assert.match(foot, new RegExp(`eventsEndedMore\\{&quot;count&quot;:${ended}\\}`), 'die Fusszeile nennt die frueheren');
     assert.match(foot, /eventsMoreAhead/, 'und dass weitere kommen');
   }

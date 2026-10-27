@@ -43,7 +43,7 @@ import { findSettingsLeaf } from '/settings/registry.js';
 import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
   COCKPIT_COVERED_WIDGETS,
-  nearestPreset, sameWidgetConfig, suggestGridHoleFill, fillGridSpans, contentSpanRows, TILE_GEOMETRY,
+  nearestPreset, sameWidgetConfig, suggestGridHoleFill, fillGridSpans, contentSpanRows, fillRowCount, TILE_GEOMETRY,
   dashboardQuery, dashboardQueryFiltersCounts, dashboardRequest, normalizeShoppingListSelection,
   normalizeCalendarSelection,
   fetchPendingReminders, childDefaultWidgetConfig,
@@ -1581,8 +1581,10 @@ function widgetRows(rows, { tag = 'div', className = '' } = {}) {
  * der Server liefert die fuenf dringendsten fuer die hohe Fassung, eine
  * 1x1-Kachel zeigt davon drei. Ohne Groesse ist es die Vorgabe der Kachel. */
 function renderUrgentTasks(allTasks, openTotal = null, size = '1x2') {
-  const tasks = allTasks.slice(0, listRowCap(size));
-  const span = tileSpanAttrs((s) => ({ items: allTasks.length, total: listTotal(openTotal, allTasks.length), cap: listRowCap(s) }), size);
+  const cap = listRowCap(size);
+  const fill = fillRows(allTasks.length, cap);
+  const tasks = allTasks.slice(0, cap + fill);
+  const span = tileSpanAttrs((s, k = 0) => ({ items: allTasks.length, total: listTotal(openTotal, allTasks.length), cap: listRowCap(s) + k }), size, fill);
   if (!tasks.length) {
     return `<div class="widget widget--tasks"${span}>
       ${widgetHeader('tasks', t('nav.tasks'), 0, '/tasks')}
@@ -1590,7 +1592,7 @@ function renderUrgentTasks(allTasks, openTotal = null, size = '1x2') {
     </div>`;
   }
 
-  const items = tasks.map((t) => {
+  const items = tasks.map((t, index) => {
     const due = formatDueDate(t.due_date, t.due_time);
     // Begonnen traegt dasselbe Zeichen wie in der Aufgabenliste (#1251), keine
     // eigene Bauart, und es steht in der Fuehrung der Zeile: dort, wo sonst der
@@ -1604,7 +1606,7 @@ function renderUrgentTasks(allTasks, openTotal = null, size = '1x2') {
         ? `<span class="task-item__priority task-item__priority--${t.priority}" title="${esc(PRIORITY_LABELS()[t.priority] ?? t.priority)}"></span>`
         : '';
     return `
-      <div class="list-row task-item" data-task-id="${t.id}" data-task-title="${esc(t.title)}" role="button" tabindex="0">
+      <div class="list-row task-item" data-task-id="${t.id}" data-task-title="${esc(t.title)}" role="button" tabindex="0"${fillRowAttr(index, cap)}>
         <span class="list-row__lead task-item__lead" aria-hidden="true">${lead}</span>
         <span class="sr-only">${PRIORITY_LABELS()[t.priority] ?? t.priority}</span>
         ${started ? `<span class="sr-only">${esc(TASK_STATUS_IN_PROGRESS())}</span>` : ''}
@@ -1622,7 +1624,7 @@ function renderUrgentTasks(allTasks, openTotal = null, size = '1x2') {
   const total = listTotal(openTotal, allTasks.length);
   return `<div class="widget widget--tasks"${span}>
     ${widgetHeader('tasks', t('nav.tasks'), total, '/tasks')}
-    <div class="widget__body widget__body--rows">${widgetRows(items)}${listMoreLine('dashboard.tasksMore', total - tasks.length)}</div>
+    <div class="widget__body widget__body--rows">${widgetRows(items)}${listMoreLine('dashboard.tasksMore', total - Math.min(tasks.length, cap), fill)}</div>
   </div>`;
 }
 
@@ -1656,7 +1658,7 @@ const ENDED_EVENTS_SHOWN = 2;
  * Anpassen-Modus steht bis zum Speichern die alte Antwort da, und wer von
  * zwoelf auf fuenf zurueckstellt, soll fuenf sehen und nicht zwoelf bis zum
  * naechsten Abruf. */
-function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT_DEFAULT, rows = clampEventLimit(limit), span = '' } = {}) {
+function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT_DEFAULT, rows = clampEventLimit(limit), span = '', fill = 0 } = {}) {
   const todayKey = zonedDateKey(now);
   const nowStamp = householdNowStamp(now);
   const endedToday = allEvents.filter((e) => overviewEventSpan(e, todayKey).day === todayKey && eventHasEnded(e, nowStamp));
@@ -1665,7 +1667,11 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
   const endedRoom = Math.min(ENDED_EVENTS_SHOWN, rows - ahead.length);
   const ended = endedRoom > 0 ? endedToday.slice(-endedRoom) : [];
   const folded = endedToday.length - ended.length;
-  const events = [...ended, ...ahead];
+  // Zusatzzeilen (U14): die naechsten Kommenden, hinter der Liste. Die
+  // Beendeten bleiben, wie die Groesse sie gewaehlt hat.
+  const extraAhead = aheadAll.slice(ahead.length, ahead.length + Math.max(0, fill));
+  const events = [...ended, ...ahead, ...extraAhead];
+  const firstExtra = ended.length + ahead.length;
   if (!events.length) {
     return `<div class="widget widget--calendar"${span}>
       ${widgetHeader('calendar', t('nav.calendar'), 0, '/calendar')}
@@ -1676,7 +1682,7 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
   // Der Tagesvergleich ueber KEYS, nicht ueber `toDateString()`: das las die
   // Browser-Zone und machte „heute" zu einer Frage an das Geraet (#851).
   const today = todayKey;
-  const items = events.map((e) => {
+  const items = events.map((e, index) => {
     const span = overviewEventSpan(e, today);
     const dayKey = span.day;
     const isToday = dayKey === today;
@@ -1695,7 +1701,7 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
     const rest = [timeStr, e.location ? fmtLocation(e.location) : '', e.cal_name || ''].filter(Boolean).map((part) => esc(part));
     const whenClass = isToday && !isEnded ? ' event-item__when--today' : '';
     return `
-      <div class="list-row event-item${isEnded ? ' event-item--ended' : ''}" data-route="${esc(calendarEventRoute(e))}" role="button" tabindex="0">
+      <div class="list-row event-item${isEnded ? ' event-item--ended' : ''}" data-route="${esc(calendarEventRoute(e))}" role="button" tabindex="0"${fillRowAttr(index, firstExtra)}>
         <!-- Dieselbe Regel wie im Kalender, aus derselben Datei. Hier stand
              e.color || e.cal_color - dieselbe Frage ohne den Zweig fuer die
              zugewiesene Person, was seit #891 zwei verschiedene Antworten
@@ -1728,8 +1734,10 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
   // weniger zeigt, als geladen ist (#2087): „+2 weitere" hiesse „fuenf geladen,
   // drei gezeigt" und laege bei dreissig kommenden Terminen. Sie steht an der
   // Stelle und in der Form des „+N weitere" der anderen Listen.
+  // Stehen alle Zusatzzeilen, ist nichts Kommendes mehr verborgen: die Zeile
+  // geht, oder sie behaelt die Faltzeile (`data-more-done`).
   const more = moreAhead
-    ? `<p class="widget-list-more">${esc([earlierText, t('dashboard.eventsMoreAhead')].filter(Boolean).join(' · '))}</p>`
+    ? `<p class="widget-list-more"${fillMoreAttrs(extraAhead.length, extraAhead.length, '', earlierText)}>${esc([earlierText, t('dashboard.eventsMoreAhead')].filter(Boolean).join(' · '))}</p>`
     : '';
   return `<div class="widget widget--calendar"${span}>
     ${widgetHeader('calendar', t('nav.calendar'), null, '/calendar')}
@@ -1798,10 +1806,12 @@ function renderWeekStrip(weekEvents, span = '') {
  *  Die Stufe aus den Optionen (#1680) gilt nur der hohen Liste - die Woche
  *  zeigt sieben Tage, keine Zeilen, und 1x1 die Zeilen seiner Groesse. */
 function renderCalendarWidget(data, size, options = {}) {
-  const span = tileSpanAttrs(calendarTileModel(data, options), size ?? '1x2');
+  const model = calendarTileModel(data, options);
+  const fill = model.fillFor(size ?? '1x2');
+  const span = tileSpanAttrs(model, size ?? '1x2', fill);
   return nearestPreset(size ?? '1x2') === '2x1'
     ? renderWeekStrip(data?.weekEvents, span)
-    : renderUpcomingEvents(data?.upcomingEvents ?? [], { limit: options?.limit, rows: calendarRowCap(size, options?.limit), span });
+    : renderUpcomingEvents(data?.upcomingEvents ?? [], { limit: options?.limit, rows: calendarRowCap(size, options?.limit), span, fill });
 }
 
 /* Die Hoehe der Kalenderkachel in jeder Groesse (U1 b) - dieselbe Rechnung wie
@@ -1817,7 +1827,7 @@ function calendarTileModel(data, options = {}, now = new Date()) {
   const endedToday = allEvents.filter((e) => overviewEventSpan(e, todayKey).day === todayKey && eventHasEnded(e, nowStamp));
   const aheadAll = allEvents.length - endedToday.length;
   let week = null;
-  return (s) => {
+  const model = (s, k = 0) => {
     if (nearestPreset(s) === '2x1') {
       week ??= (() => {
         const strip = buildWeekStrip((Array.isArray(data?.weekEvents) ? data.weekEvents : []).map(localizeBirthdayEvent), householdToday());
@@ -1830,9 +1840,24 @@ function calendarTileModel(data, options = {}, now = new Date()) {
     const aheadN = Math.min(aheadAll, cap);
     const endedN = Math.min(endedToday.length, Math.max(0, Math.min(ENDED_EVENTS_SHOWN, cap - aheadN)));
     const moreAhead = cap < clampEventLimit(limit) && aheadAll > aheadN;
-    const aux = moreAhead ? TILE_GEOMETRY.more : endedToday.length > endedN ? TILE_PARTS.earlier : 0;
-    return { items: aheadN + endedN, extra: aux };
+    // Mit k Zusatzzeilen (U14) stehen k Kommende mehr da; sind es alle, geht
+    // "Weitere Termine", und die Faltzeile bleibt unten in seiner Form.
+    const extra = moreAhead ? Math.min(Math.max(0, k), aheadAll - aheadN) : 0;
+    const folded = endedToday.length > endedN;
+    const aux = moreAhead && aheadN + extra < aheadAll ? TILE_GEOMETRY.more
+      : moreAhead && extra && folded ? TILE_GEOMETRY.more
+        : moreAhead && extra ? 0
+          : moreAhead ? TILE_GEOMETRY.more : folded ? TILE_PARTS.earlier : 0;
+    return { items: aheadN + endedN + extra, extra: aux };
   };
+  // Wie viele Kommende die Groesse geladen, aber nicht gezeigt hat - ohne
+  // "Weitere Termine" keine (die Liste zeigt dann schon alles).
+  model.fillFor = (s) => {
+    if (nearestPreset(s) === '2x1' || onPhoneStage()) return 0;
+    const cap = calendarRowCap(s, limit);
+    return cap < clampEventLimit(limit) ? Math.max(0, aheadAll - Math.min(aheadAll, cap)) : 0;
+  };
+  return model;
 }
 
 /**
@@ -2012,29 +2037,61 @@ function emptySpanAttrs(size) {
   return tileSpanAttrs(() => ({ items: 0 }), size ?? '1x1');
 }
 
-function tileSpanAttrs(model, size) {
+/* `fill` (U14): so viele Zeilen hat die Kachel ueber das hinaus geladen, was
+ * ihre Groesse zeigt. `model(size, k)` beschreibt sie dann mit k Zusatzzeilen,
+ * und `data-fill-steps` sagt fuer k = 1 ... fill die Spuren, die sie dafuer
+ * braeuchte (`fillRowCount`, applyRowFill). Die Spanne selbst bleibt die ohne
+ * Zusatzzeilen - die Packung sieht sie nie. */
+function tileSpanAttrs(model, size, fill = 0) {
   // Am Telefon steht jede Kachel in ihrer eigenen Hoehe untereinander (eine
   // Spalte, kein Raster aus Spuren): dort wird nichts gerechnet. Ein Wechsel
   // zur breiten Buehne baut die Uebersicht neu (createPhoneProgramFit).
   if (onPhoneStage()) return '';
-  const rowsAt = (s) => contentSpanRows(model(s) ?? {}).rows;
+  const rowsAt = (s, k = 0) => contentSpanRows(model(s, k) ?? {}).rows;
   const sizes = [...new Set([...SPAN_SIZES, size].filter(Boolean))];
-  return ` data-span-rows="${rowsAt(size)}" data-span-sizes="${sizes.map((s) => `${s}:${rowsAt(s)}`).join(',')}"`;
+  const steps = Array.from({ length: Math.max(0, fill | 0) }, (_, i) => rowsAt(size, i + 1));
+  return ` data-span-rows="${rowsAt(size)}" data-span-sizes="${sizes.map((s) => `${s}:${rowsAt(s)}`).join(',')}"`
+    + (steps.length ? ` data-fill-steps="${steps.join(',')}"` : '');
 }
 
 /** Die Spanne aus dem Markup eines Renderers (erstes `data-span-rows`). */
 function tileSpanOf(html) {
   const rows = /\sdata-span-rows="(\d+)"/.exec(String(html ?? ''))?.[1];
   const sizes = /\sdata-span-sizes="([0-9x:,]*)"/.exec(String(html ?? ''))?.[1];
-  return rows ? { rows: Number(rows), sizes: sizes ?? '' } : null;
+  const steps = /\sdata-fill-steps="([0-9,]*)"/.exec(String(html ?? ''))?.[1];
+  return rows ? { rows: Number(rows), sizes: sizes ?? '', steps: steps ?? '' } : null;
 }
 
 /** Die Attribute des Rahmens: Spanne und, als Wert fuer dashboard.css, `--tile-rows`. */
 function tileSpanWrapperAttrs(html) {
   const span = tileSpanOf(html);
   return span
-    ? ` data-span-rows="${span.rows}" data-span-sizes="${esc(span.sizes)}" style="--tile-rows: ${span.rows}"`
+    ? ` data-span-rows="${span.rows}" data-span-sizes="${esc(span.sizes)}"${span.steps ? ` data-fill-steps="${esc(span.steps)}"` : ''} style="--tile-rows: ${span.rows}"`
     : '';
+}
+
+/* DIE ZUSATZZEILEN (U14): wie viele Zeilen eine Liste ueber ihre Groesse hinaus
+ * mitbringt - die geladenen, die sie nicht zeigt, hoechstens sechs (die
+ * groesste gemessene Streckung, Familie bei zwei Spalten 359px, traegt keine
+ * sieben Zeilen; Entsorgung und Schichtplan liefern ungedeckelt). Am Telefon
+ * keine: dort wird nicht gestreckt. */
+const FILL_ROWS_MAX = 6;
+function fillRows(loaded, shown) {
+  return onPhoneStage() ? 0 : Math.min(FILL_ROWS_MAX, Math.max(0, (Number(loaded) || 0) - (Number(shown) || 0)));
+}
+
+/** Markiert die i-te Zeile einer Liste als Zusatzzeile, wenn sie hinter `cap` steht. */
+function fillRowAttr(index, cap) {
+  return index >= cap ? ' data-fill-row' : '';
+}
+
+/* "+N weitere" kennt seine Zusatzzeilen: applyRowFill zaehlt herunter
+ * (`data-more-key`, `data-more-rest`) und nimmt die Zeile weg, wenn alles
+ * steht - oder setzt dann `data-more-done` (der Kalender behaelt seine
+ * Faltzeile). */
+function fillMoreAttrs(fill, rest, key = '', done = '') {
+  if (!(fill > 0)) return '';
+  return ` data-fill-more data-more-rest="${rest}"${key ? ` data-more-key="${esc(key)}"` : ''}${done ? ` data-more-done="${esc(done)}"` : ''}`;
 }
 
 /* Die zuletzt gezeichnete Spanne je Kachel - fuer den Layout-Hinweis, der dem
@@ -2048,6 +2105,10 @@ function drawnSpanOf(w) {
 function setTileSpan(el, html) {
   const span = tileSpanOf(html);
   if (el.dataset?.widgetId) drawnSpanRows.set(el.dataset.widgetId, span?.rows ?? 0);
+  // Der neue Koerper zeigt noch keine Zusatzzeile (U14); applyRowFill setzt sie.
+  delete el.dataset.fillShown;
+  if (!span?.steps) delete el.dataset.fillSteps;
+  else el.dataset.fillSteps = span.steps;
   if (!span) {
     el.removeAttribute('data-span-rows');
     el.removeAttribute('data-span-sizes');
@@ -2090,8 +2151,8 @@ function listTotal(total, loaded) {
   return Number.isFinite(n) ? Math.max(n, loaded) : loaded;
 }
 
-function listMoreLine(key, rest) {
-  return rest > 0 ? `<p class="widget-list-more">${esc(t(key, { count: rest }))}</p>` : '';
+function listMoreLine(key, rest, fill = 0) {
+  return rest > 0 ? `<p class="widget-list-more"${fillMoreAttrs(fill, rest, key)}>${esc(t(key, { count: rest }))}</p>` : '';
 }
 
 /* DATUM UND ABSTAND IN EINER ZEILE (#1454). Das Datum folgt der Stufung der
@@ -2110,8 +2171,10 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
   // was davon erscheint, entscheidet die Kachel. Die Badge zaehlte hier die
   // gezeigten Zeilen und sagte damit „5" bei acht anstehenden Anlaessen - jetzt
   // nennt sie `birthdayTotal`, und der Rest steht als Fusszeile da (listTotal).
-  const birthdays = allBirthdays.slice(0, listRowCap(size));
-  const span = tileSpanAttrs((s) => ({ items: allBirthdays.length, total: listTotal(total, allBirthdays.length), cap: listRowCap(s) }), size);
+  const cap = listRowCap(size);
+  const fill = fillRows(allBirthdays.length, cap);
+  const birthdays = allBirthdays.slice(0, cap + fill);
+  const span = tileSpanAttrs((s, k = 0) => ({ items: allBirthdays.length, total: listTotal(total, allBirthdays.length), cap: listRowCap(s) + k }), size, fill);
   if (!birthdays.length) {
     return `<div class="widget widget--birthdays"${span}>
       ${widgetHeader('birthdays', t('nav.birthdays'), 0, '/birthdays')}
@@ -2119,7 +2182,7 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
     </div>`;
   }
 
-  const items = birthdays.map((b) => {
+  const items = birthdays.map((b, index) => {
     // "in 9 Tagen" wie im Geburtstagsmodul (R23, D11), nicht "9 Tage".
     const daysLabel = daysFromTodayText(b.days_until);
     // Familien-Geburtstage tragen die Identitaetsfarbe des Mitglieds - dieselbe
@@ -2137,7 +2200,7 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
         ? t('birthdays.turnsAge', { age: b.next_age })
         : '';
     return `
-      <div class="list-row birthday-widget-item" data-route="${esc(b.id != null ? `/birthdays?open=${encodeURIComponent(String(b.id))}` : '/birthdays')}" role="button" tabindex="0">
+      <div class="list-row birthday-widget-item" data-route="${esc(b.id != null ? `/birthdays?open=${encodeURIComponent(String(b.id))}` : '/birthdays')}" role="button" tabindex="0"${fillRowAttr(index, cap)}>
         <div class="list-row__lead birthday-widget-item__avatar"${avatarStyle}>
           ${b.photo_data ? `<img src="${esc(b.photo_data)}" alt="" loading="lazy">` : `<span>${esc(initials(b.name))}</span>`}
         </div>
@@ -2153,7 +2216,7 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
   const gesamt = listTotal(total, allBirthdays.length);
   return `<div class="widget widget--birthdays"${span}>
     ${widgetHeader('birthdays', t('nav.birthdays'), gesamt, '/birthdays')}
-    <div class="widget__body widget__body--rows">${widgetRows(items)}${listMoreLine('dashboard.birthdaysMore', gesamt - birthdays.length)}</div>
+    <div class="widget__body widget__body--rows">${widgetRows(items)}${listMoreLine('dashboard.birthdaysMore', gesamt - Math.min(birthdays.length, cap), fill)}</div>
   </div>`;
 }
 
@@ -2174,13 +2237,15 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
  * Kachel nimmt die Liste, wie sie kommt (siehe services/countdowns.js). */
 function renderCountdowns(allItems, size, total = null) {
   const shown = visibleCountdowns(allItems);
-  const items = shown.slice(0, listRowCap(size));
+  const cap = listRowCap(size);
+  const fill = fillRows(shown.length, cap);
+  const items = shown.slice(0, cap + fill);
   // Kein Leerzustand: ohne Countdown ist die Kachel nicht leer, sondern nicht
   // vorhanden (isWidgetModuleEnabled). Diese Zeile ist der Notausgang für den
   // Fall, dass die Verfügbarkeit und die Daten auseinanderlaufen.
   if (!items.length) return '';
 
-  const rows = items.map((c) => {
+  const rows = items.map((c, index) => {
     const phrase = countdownPhrase(c.days_until);
     const label = phrase.count === undefined ? t(phrase.key) : t(phrase.key, { count: phrase.count });
     // Sagt der Zaehler rechts schon „Heute"/„Morgen", traegt die Zeile kein
@@ -2210,7 +2275,7 @@ function renderCountdowns(allItems, size, total = null) {
       ? ` data-task-id="${esc(String(c.id))}" data-task-title="${esc(c.title)}"`
       : ` data-route="/calendar?open=${encodeURIComponent(String(c.id))}&date=${encodeURIComponent(c.date)}"`;
     return `
-      <div class="list-row countdown-item" role="button" tabindex="0"${anchor}${accent}>
+      <div class="list-row countdown-item" role="button" tabindex="0"${anchor}${accent}${fillRowAttr(index, cap)}>
         <span class="list-row__lead countdown-item__icon" aria-hidden="true">
           <i data-lucide="${esc(c.icon || 'calendar')}"></i>
         </span>
@@ -2244,12 +2309,12 @@ function renderCountdowns(allItems, size, total = null) {
    * ist. Fehlt sie (älterer Server, Fehlerpfad), fällt sie auf die geladene
    * Länge zurück - dann stimmt sie wenigstens für den Kachelschnitt. */
   const gesamt = Number.isFinite(Number(total)) ? Number(total) : shown.length;
-  const rest = Math.max(0, gesamt - items.length);
+  const rest = Math.max(0, gesamt - Math.min(items.length, cap));
   const more = rest > 0
-    ? `<p class="countdown-more">${esc(t('dashboard.countdownMore', { count: rest }))}</p>`
+    ? `<p class="countdown-more"${fillMoreAttrs(fill, rest, 'dashboard.countdownMore')}>${esc(t('dashboard.countdownMore', { count: rest }))}</p>`
     : '';
 
-  const span = tileSpanAttrs((s) => ({ items: shown.length, total: gesamt, cap: listRowCap(s) }), size);
+  const span = tileSpanAttrs((s, k = 0) => ({ items: shown.length, total: gesamt, cap: listRowCap(s) + k }), size, fill);
   return `<div class="widget widget--countdown"${span}>
     ${widgetHeader('countdown', t('dashboard.countdownTitle'), gesamt, null, null, 'dashboard')}
     <div class="widget__body widget__body--rows">${widgetRows(rows)}${more}</div>
@@ -2318,13 +2383,15 @@ function renderPinnedNotes(allNotes, size, total = null) {
    * Notizen angepinnt hatte, sah drei davon und keinen Hinweis auf die
    * uebrigen (#928). Dieselbe Korrektur haben die Geburtstage schon bekommen;
    * die Notizen wurden dabei uebersehen. */
-  const notes = allNotes.slice(0, listRowCap(size));
+  const cap = listRowCap(size);
+  const fill = fillRows(allNotes.length, cap);
+  const notes = allNotes.slice(0, cap + fill);
   /* Notizkarten in Reihen (U1 b): schmal eine Spalte, breit drei (dashboard.css
    * "MIT SPALTEN"), jede Reihe so hoch wie ihre hoechste Karte - Titel und
    * Kategorien sind Daten, die Vorschau steht in genau zwei Zeilen. */
   const notesTotal = listTotal(total, allNotes.length);
-  const span = tileSpanAttrs((s) => {
-    const shown = allNotes.slice(0, listRowCap(s));
+  const span = tileSpanAttrs((s, k = 0) => {
+    const shown = allNotes.slice(0, listRowCap(s) + k);
     if (!shown.length) return { items: 0 };
     const cols = tileColumns(s) >= 2 ? 3 : 1;
     const card = (n) => TILE_PARTS.noteCard + (n.title ? TILE_PARTS.noteTitle : 0) + TILE_PARTS.noteContent
@@ -2334,7 +2401,7 @@ function renderPinnedNotes(allNotes, size, total = null) {
       body += Math.max(...shown.slice(i, i + cols).map(card)) + (i ? TILE_PARTS.notesGap : 0);
     }
     return { body: body + (notesTotal > shown.length ? TILE_PARTS.notesMore : 0) };
-  }, size);
+  }, size, fill);
   if (!notes.length) {
     return `<div class="widget widget--notes"${span}>
       ${widgetHeader('notes', t('nav.notes'), 0, '/notes')}
@@ -2359,9 +2426,9 @@ function renderPinnedNotes(allNotes, size, total = null) {
   // damit das ganze color-mix ungueltig macht. Uebrig blieb der nackte
   // Traegergrund: drei graubeige Kaesten, die wie deaktiviert aussahen. Ohne die
   // Deklaration greift der Fallback im Stylesheet (der Notizen-Ton).
-  const items = notes.map((n) => `
+  const items = notes.map((n, index) => `
     <div class="note-item" data-route="${esc(`/notes?open=${encodeURIComponent(String(n.id))}`)}"
-         ${n.color ? `style="--note-color:${esc(n.color)};"` : ''}>
+         ${n.color ? `style="--note-color:${esc(n.color)};"` : ''}${fillRowAttr(index, cap)}>
       <div class="note-item__body" role="link" tabindex="0">
       ${n.title ? `<div class="note-item__title">${esc(n.title)}</div>` : ''}
       <div class="note-item__content">${renderMarkdownLight(excerpt(n.content))}</div>
@@ -2384,7 +2451,7 @@ function renderPinnedNotes(allNotes, size, total = null) {
   return `<div class="widget widget--notes"${span}>
     ${widgetHeader('notes', t('nav.notes'), gesamt, '/notes')}
     <div class="notes-grid-widget">${items}</div>
-    ${listMoreLine('dashboard.notesMore', gesamt - notes.length)}
+    ${listMoreLine('dashboard.notesMore', gesamt - Math.min(notes.length, cap), fill)}
   </div>`;
 }
 
@@ -2802,11 +2869,22 @@ function renderBudgetSavings(budget, balance, income, savingsRate) {
  * DREI groessten Ausgabenkategorien statt einer - dieselbe Frage („wohin ging
  * das Geld?"), vollstaendiger beantwortet, und genau die Hoehe, die fehlte.
  * Die flache Kachel behaelt ihre eine Zeile; mehr trueg sie nicht. */
-function renderBudgetTopExpenses(budget, currency, size) {
+const BUDGET_TOP_TALL = 3;
+
+/* Die Zusatzzeilen der hohen Budget-Kachel (U14): weitere Kategorien, soweit
+ * geladen (der Server liefert fuenf). Die flache Kachel nennt eine Kategorie in
+ * einer Satzzeile - eine Liste wuerde sie erst durch Streckung, das ist kein
+ * Mehr an Zeilen, sondern eine andere Form. */
+function budgetTopFill(topCount, size) {
+  return listRowCap(size) === LIST_ROWS_TALL ? fillRows(topCount, BUDGET_TOP_TALL) : 0;
+}
+
+function renderBudgetTopExpenses(budget, currency, size, fill = 0) {
+  const cap = listRowCap(size) === LIST_ROWS_TALL ? BUDGET_TOP_TALL : 1;
   const rows = (Array.isArray(budget?.topExpenses) && budget.topExpenses.length
     ? budget.topExpenses
     : budget?.topExpenseCategory ? [{ category: budget.topExpenseCategory, amount: budget.topExpenseAmount }] : [])
-    .slice(0, listRowCap(size) === LIST_ROWS_TALL ? 3 : 1);
+    .slice(0, cap + (cap > 1 ? fill : 0));
   if (!rows.length) return '';
   if (rows.length === 1) {
     return `<div class="budget-widget__footer">${t('dashboard.topExpense')}: <strong>${esc(budgetCategoryLabel(rows[0].category))}</strong> · ${formatCurrency(rows[0].amount, currency)}</div>`;
@@ -2815,8 +2893,8 @@ function renderBudgetTopExpenses(budget, currency, size) {
     <div class="budget-widget__footer budget-widget__top">
       <p class="budget-widget__top-title">${esc(t('dashboard.topExpenses'))}</p>
       <ul class="budget-widget__top-list">
-        ${rows.map((row) => `
-        <li class="budget-widget__top-row">
+        ${rows.map((row, index) => `
+        <li class="budget-widget__top-row"${fillRowAttr(index, cap)}>
           <span>${esc(budgetCategoryLabel(row.category))}</span>
           <strong>${formatCurrency(row.amount, currency)}</strong>
         </li>`).join('')}
@@ -2841,13 +2919,14 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
   const hasData = (budget?.entryCount || 0) > 0;
   const topCount = (Array.isArray(budget?.topExpenses) && budget.topExpenses.length
     ? budget.topExpenses.length : budget?.topExpenseCategory ? 1 : 0);
-  const span = tileSpanAttrs((s) => {
+  const fill = hasData ? budgetTopFill(topCount, size) : 0;
+  const span = tileSpanAttrs((s, k = 0) => {
     if (!hasData) return { items: 0 };
-    const n = Math.min(topCount, listRowCap(s) === LIST_ROWS_TALL ? 3 : 1);
+    const n = Math.min(topCount, listRowCap(s) === LIST_ROWS_TALL ? BUDGET_TOP_TALL + k : 1);
     const savings = budget?.savingsGoal > 0 ? TILE_PARTS.budgetGoal : income > 0 ? TILE_PARTS.budgetSavings : TILE_PARTS.budgetSavingsBare;
     const top = n === 0 ? 0 : n === 1 ? TILE_PARTS.budgetTopOne : TILE_PARTS.budgetTopList + n * TILE_PARTS.budgetTopRow - 4;
     return { body: TILE_PARTS.budgetPad + TILE_PARTS.budgetHeadline + savings + TILE_PARTS.budgetFlow + top };
-  }, size);
+  }, size, fill);
 
   if (!hasData) {
     return `<div class="widget widget--budget"${span}>
@@ -2874,7 +2953,7 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
           <strong>${formatCurrency(expenses, currency)}</strong>
         </span>
       </div>
-      ${renderBudgetTopExpenses(budget, currency, size)}
+      ${renderBudgetTopExpenses(budget, currency, size, fill)}
     </div>
   </div>`;
 }
@@ -3368,18 +3447,35 @@ function earnedWhenLabel(value) {
   return dateText(value);
 }
 
-function renderRewardsSelf(me, rewards, spans) {
-  // Die kleine Kachel traegt nur den Weg zum Ziel: mit einer Verlaufszeile
-  // und dem Anfrage-Chip stand sie bei 275px gegen 183px der Nachbarn
-  // (gemessen 1440px). Breit steht der Verlauf daneben, hoch darunter.
-  const recentCap = spans.rows >= 2 ? 3 : spans.cols >= 2 ? 2 : 0;
-  const recent = (Array.isArray(rewards.recent) ? rewards.recent : []).slice(0, recentCap);
+/* Wie viele juengste Punkte die eigene Sicht in ihrer Groesse zeigt: die kleine
+ * Kachel traegt nur den Weg zum Ziel - mit einer Verlaufszeile und dem
+ * Anfrage-Chip stand sie bei 275px gegen 183px der Nachbarn (gemessen 1440px).
+ * Breit steht der Verlauf daneben, hoch darunter. */
+function rewardsRecentCap(spans) {
+  return spans.rows >= 2 ? 3 : spans.cols >= 2 ? 2 : 0;
+}
+
+/* Die Zusatzzeilen der Belohnungskachel (U14): die juengsten Punkte, die die
+ * eigene Sicht geladen, aber in ihrer Groesse nicht zeigt, bzw. die Mitglieder
+ * hinter dem Deckel der Familiensicht. */
+function rewardsFillRows(r, own, members, spans) {
+  if (!members.length) return 0;
+  if (own && members.length === 1) return fillRows((Array.isArray(r.recent) ? r.recent : []).length, rewardsRecentCap(spans));
+  return fillRows(members.length, spans.rows >= 2 ? REWARD_MEMBERS_TALL : REWARD_MEMBERS_SHORT);
+}
+
+function renderRewardsSelf(me, rewards, spans, fill = 0) {
+  // HOEHE WIRD INHALT (U14, vorher R22 S10 als eigene CSS-Fuell-Liste): was
+  // die Packung der Kachel an Hoehe zuteilt, fuellen weitere juengste Punkte -
+  // in der kleinen Kachel samt Ueberschrift, die dann mit der ersten Zeile kommt.
+  const recentCap = rewardsRecentCap(spans);
+  const recent = (Array.isArray(rewards.recent) ? rewards.recent : []).slice(0, recentCap + fill);
   const recentHTML = recent.length ? `
-      <div class="rewards-self__recent">
+      <div class="rewards-self__recent"${recentCap === 0 ? ' data-fill-group' : ''}>
         <p class="rewards-self__recent-title" aria-hidden="true">${esc(t('dashboard.rewardsRecent'))}</p>
         <ul class="rewards-recent" aria-label="${esc(t('dashboard.rewardsRecent'))}">
-          ${recent.map((row) => `
-            <li class="rewards-recent__row">
+          ${recent.map((row, index) => `
+            <li class="rewards-recent__row"${fillRowAttr(index, recentCap)}>
               <span class="rewards-recent__delta">+${esc(formatPoints(row.delta))}</span>
               <span class="rewards-recent__reason">${esc(row.reason || t(`rewards.ledgerType.${row.type}`))}</span>
               <span class="rewards-recent__when">${esc(earnedWhenLabel(row.created_at))}</span>
@@ -3389,24 +3485,6 @@ function renderRewardsSelf(me, rewards, spans) {
   // Praemien- und Geld-Anfragen (#1734) zusammen: der Server fuehrt sie
   // getrennt, die Kachel sagt, wie viele warten.
   const pending = (Number(rewards.pending) || 0) + (Number(rewards.moneyPending) || 0);
-  // DIE KLEINE KACHEL FUELLT NUR, WAS IHR DIE REIHE SCHENKT (R22 S10, aus S9).
-  // 1x1 neben Familie und Geburtstagen streckt die Reihe sie auf deren Hoehe,
-  // und unter Ziel und Anfrage stand leere Flaeche. Der Verlauf steht deshalb
-  // auch hier - aber in einer Flaeche ohne eigene Hoehe (dashboard.css,
-  // `.rewards-recent--fill`): er nimmt nur den Ueberschuss, ganze Zeilen oder
-  // keine. In einer Reihe kurzer Kacheln bleibt die Kachel so kurz wie bisher.
-  const fill = recentCap === 0
-    ? (Array.isArray(rewards.recent) ? rewards.recent : []).slice(0, 3)
-    : [];
-  const fillHTML = fill.length ? `
-      <ul class="rewards-recent rewards-recent--fill" aria-label="${esc(t('dashboard.rewardsRecent'))}">
-        ${fill.map((row, i) => `
-          <li class="rewards-recent__row"${i === 0 ? ` data-recent-title="${esc(t('dashboard.rewardsRecent'))}"` : ''}>
-            <span class="rewards-recent__delta">+${esc(formatPoints(row.delta))}</span>
-            <span class="rewards-recent__reason">${esc(row.reason || t(`rewards.ledgerType.${row.type}`))}</span>
-            <span class="rewards-recent__when">${esc(earnedWhenLabel(row.created_at))}</span>
-          </li>`).join('')}
-      </ul>` : '';
   return `
     <div class="widget__body rewards-widget rewards-widget--self">
       <div class="rewards-self">
@@ -3417,20 +3495,19 @@ function renderRewardsSelf(me, rewards, spans) {
         ${recentHTML}
       </div>
       ${pending > 0 ? rewardsFooterHTML(t('dashboard.rewardsOwnPending', { count: pending })) : ''}
-      ${fillHTML}
     </div>`;
 }
 
-function renderRewardsFamily(members, rewards, spans) {
+function renderRewardsFamily(members, rewards, spans, fill = 0) {
   // In der Haushaltsreihenfolge (#1644), nicht nach Punkten: eine Reihenfolge
   // nach Stand WAERE die Rangliste, nur ohne Ziffern. Der Server liefert die
   // Liste schon so; sortiert wird hier trotzdem, weil die Zusage dieser Kachel
   // ("nie nach Stand") nicht an der Abfrage einer anderen Datei haengen soll.
   const sorted = sortMembers(members);
   const cap = spans.rows >= 2 ? REWARD_MEMBERS_TALL : REWARD_MEMBERS_SHORT;
-  const shown = sorted.slice(0, cap);
-  const rows = shown.map((m) => `
-      <li class="list-row rewards-member">
+  const shown = sorted.slice(0, cap + fill);
+  const rows = shown.map((m, index) => `
+      <li class="list-row rewards-member"${fillRowAttr(index, cap)}>
         ${rewardAvatarHTML(m)}
         <span class="list-row__main rewards-member__body">
           <span class="list-row__name rewards-member__name">${esc(m.display_name)}</span>
@@ -3438,12 +3515,12 @@ function renderRewardsFamily(members, rewards, spans) {
         </span>
         <span class="list-row__end rewards-member__points">${esc(t('dashboard.metricPoints', { count: Number(m.balance) || 0 }))}</span>
       </li>`).join('');
-  const more = sorted.length - shown.length;
+  const more = sorted.length - Math.min(shown.length, cap);
   const pending = rewards.view === 'approver' ? (Number(rewards.pending) || 0) + (Number(rewards.moneyPending) || 0) : 0;
   return `
     <div class="widget__body widget__body--rows rewards-widget">
       ${widgetRows(rows, { tag: 'ul', className: 'rewards-widget__members' })}
-      ${more > 0 ? `<p class="rewards-widget__more">${esc(t('dashboard.shoppingMore', { count: more }))}</p>` : ''}
+      ${more > 0 ? `<p class="rewards-widget__more"${fillMoreAttrs(fill, more, 'dashboard.shoppingMore')}>${esc(t('dashboard.shoppingMore', { count: more }))}</p>` : ''}
       ${pending > 0 ? rewardsFooterHTML(t('dashboard.rewardsPending', { count: pending })) : ''}
     </div>`;
 }
@@ -3455,7 +3532,8 @@ function renderRewardsWidget(rewards, size) {
   // Das Kind sieht NUR sich, auch wenn eine Antwort mehr mitbraechte.
   const members = r.view === 'self' ? (own ? [own] : []) : standings;
   const header = widgetHeader('rewards', t('nav.rewards'), null, '/rewards');
-  const span = tileSpanAttrs((sz) => rewardsTileModel(r, own, members, sizeSpans(sz)), size);
+  const fill = rewardsFillRows(r, own, members, sizeSpans(size));
+  const span = tileSpanAttrs((sz, k = 0) => rewardsTileModel(r, own, members, sizeSpans(sz), k), size, fill);
 
   if (!members.length) {
     // Praemien anlegen ist Elternsache: einem Kind einen Knopf zu zeigen, der
@@ -3474,8 +3552,8 @@ function renderRewardsWidget(rewards, size) {
   // Ein-Personen-Haushalt. Eine Uebersicht "je Kind" mit genau einer Zeile,
   // die man selbst ist, waere die Eltern-Sicht ohne Kinder.
   const body = own && members.length === 1
-    ? renderRewardsSelf(own, r, spans)
-    : renderRewardsFamily(members, r, spans);
+    ? renderRewardsSelf(own, r, spans, fill)
+    : renderRewardsFamily(members, r, spans, fill);
   return `<div class="widget widget--rewards"${span}>
     ${header}
     ${body}
@@ -3485,23 +3563,21 @@ function renderRewardsWidget(rewards, size) {
 /* Die Hoehe der Belohnungskachel aus denselben Zahlen wie ihre zwei Fassungen
  * (U1 b): die eigene (Stand, Ziel, juengste Punkte, offene Freigaben) oder die
  * der Familie (eine Zeile mit Balken je Mitglied, flach in 1x1). */
-function rewardsTileModel(r, own, members, spans) {
+function rewardsTileModel(r, own, members, spans, k = 0) {
   if (!members.length) return { items: 0 };
   const pendingAll = (Number(r.pending) || 0) + (Number(r.moneyPending) || 0);
   const recentAll = Array.isArray(r.recent) ? r.recent : [];
   if (own && members.length === 1) {
-    const recentCap = spans.rows >= 2 ? 3 : spans.cols >= 2 ? 2 : 0;
-    const recent = recentAll.slice(0, recentCap).length;
-    // Die Fuell-Liste (`rewards-recent--fill`) ist ohne Ueberschuss 0px hoch:
-    // sie zeigt die juengsten Punkte nur in Hoehe, die die Kachel zum Fuellen
-    // eines Lochs bekommt - und macht sie so zu Inhalt statt Leere.
+    // Mit k Zusatzzeilen (U14) k juengste Punkte mehr - in der kleinen
+    // Kachel kommt mit der ersten auch die Ueberschrift.
+    const recent = recentAll.slice(0, rewardsRecentCap(spans) + Math.max(0, k)).length;
     return {
       body: TILE_PARTS.rewardsSelfPad + TILE_PARTS.rewardsSelfGoal
         + (recent ? TILE_PARTS.rewardsGap + TILE_PARTS.rewardsRecentTitle + recent * TILE_PARTS.rewardsRecentRow : 0)
         + (pendingAll > 0 ? TILE_PARTS.rewardsGap + TILE_PARTS.rewardsFooter : 0),
     };
   }
-  const cap = spans.rows >= 2 ? REWARD_MEMBERS_TALL : REWARD_MEMBERS_SHORT;
+  const cap = (spans.rows >= 2 ? REWARD_MEMBERS_TALL : REWARD_MEMBERS_SHORT) + Math.max(0, k);
   const shown = Math.min(members.length, cap);
   const pending = r.view === 'approver' ? pendingAll : 0;
   const more = members.length > shown;
@@ -3826,7 +3902,9 @@ function renderScheduleWidget(schedule, users, size) {
   const entries = schedule?.entries ?? [];
   const hasTypes = Boolean(schedule?.hasTypes);
   // Kein "+N weitere": die Kachel nennt die Zahl der Schichten im Kopf.
-  const span = tileSpanAttrs((s) => ({ items: hasTypes ? entries.length : 0, cap: listRowCap(s), more: false }), size);
+  const cap = listRowCap(size);
+  const fill = hasTypes ? fillRows(entries.length, cap) : 0;
+  const span = tileSpanAttrs((s, k = 0) => ({ items: hasTypes ? entries.length : 0, cap: listRowCap(s) + k, more: false }), size, fill);
 
   if (!hasTypes) {
     return `<div class="widget widget--schedule"${span}>
@@ -3864,7 +3942,7 @@ function renderScheduleWidget(schedule, users, size) {
   // bestehender Plan von Hauspersonal traegt so einen Namen. Ohne Verzeichnis
   // bleibt es bei data.users.
   const directory = schedule?.people?.length ? schedule.people : users;
-  const rows = sorted.slice(0, listRowCap(size)).map((entry) => {
+  const rows = sorted.slice(0, cap + fill).map((entry, index) => {
     const user = directory.find((item) => Number(item.id) === Number(entry.user_id));
     const type = entry.shift_type;
     const accent = user?.avatar_color || AVATAR_FALLBACK_COLOR;
@@ -3883,7 +3961,7 @@ function renderScheduleWidget(schedule, users, size) {
     const icon = type?.icon ? `<i data-lucide="${esc(type.icon)}" class="schedule-widget-row__icon" aria-hidden="true"></i>` : '';
     const badge = entry.source === 'extra' ? `<i data-lucide="layers" class="schedule-widget-row__extra-badge" aria-label="${esc(t('schedule.extraBadgeLabel'))}"></i>` : '';
     return `
-      <div class="list-row schedule-widget-row" data-route="/schedule/patterns" role="button" tabindex="0">
+      <div class="list-row schedule-widget-row" data-route="/schedule/patterns" role="button" tabindex="0"${fillRowAttr(index, cap)}>
         <span class="list-row__lead schedule-widget-row__avatar" style="background:${esc(accent)};color:${getReadableTextColor(accent)}">${avatarInner}</span>
         <span class="list-row__main">
           <span class="list-row__name schedule-widget-row__name">${esc(user?.display_name ?? '')}</span>
@@ -3935,7 +4013,9 @@ function renderPantryWidget(pantry, size) {
   const title = t('dashboard.pantryExpiringTitle');
   const items = Array.isArray(pantry.items) ? pantry.items : [];
   const pantryTotal = Number.isFinite(Number(pantry.total)) ? Number(pantry.total) : items.length;
-  const span = tileSpanAttrs((s) => ({ items: items.length, total: pantryTotal, cap: listRowCap(s) }), size);
+  const cap = listRowCap(size);
+  const fill = fillRows(items.length, cap);
+  const span = tileSpanAttrs((s, k = 0) => ({ items: items.length, total: pantryTotal, cap: listRowCap(s) + k }), size, fill);
 
   if (!items.length) {
     return `<div class="widget widget--pantry"${span}>
@@ -3944,8 +4024,8 @@ function renderPantryWidget(pantry, size) {
     </div>`;
   }
 
-  const shown = items.slice(0, listRowCap(size));
-  const rows = shown.map((item) => {
+  const shown = items.slice(0, cap + fill);
+  const rows = shown.map((item, index) => {
     const days = Number(item.days_left);
     const tone = pantryExpiryTone(days);
     const phrase = pantryExpiryPhrase(days);
@@ -3955,7 +4035,7 @@ function renderPantryWidget(pantry, size) {
       .filter(Boolean).join(' · ');
     const filter = tone === 'expired' ? 'expired' : 'soon';
     return `
-      <div class="list-row pantry-widget-row" data-route="/pantry?filter=${filter}" role="button" tabindex="0">
+      <div class="list-row pantry-widget-row" data-route="/pantry?filter=${filter}" role="button" tabindex="0"${fillRowAttr(index, cap)}>
         <span class="list-row__lead pantry-widget-row__icon" aria-hidden="true"><i data-lucide="${esc(icon)}"></i></span>
         <div class="list-row__main pantry-widget-row__body">
           <div class="list-row__name pantry-widget-row__name">${esc(item.name)}</div>
@@ -3969,9 +4049,9 @@ function renderPantryWidget(pantry, size) {
   // und eine Fussnote aus der geladenen Laenge verschwiege genau diesen Schnitt
   // (dieselbe Lehre wie beim Countdown, #647).
   const total = Number.isFinite(Number(pantry.total)) ? Number(pantry.total) : items.length;
-  const rest = Math.max(0, total - shown.length);
+  const rest = Math.max(0, total - Math.min(shown.length, cap));
   const more = rest > 0
-    ? `<p class="pantry-widget-more">${esc(t('dashboard.pantryExpiringMore', { count: rest }))}</p>`
+    ? `<p class="pantry-widget-more"${fillMoreAttrs(fill, rest, 'dashboard.pantryExpiringMore')}>${esc(t('dashboard.pantryExpiringMore', { count: rest }))}</p>`
     : '';
 
   return `<div class="widget widget--pantry"${span}>
@@ -3995,7 +4075,9 @@ function renderPantryWidget(pantry, size) {
 function renderWasteWidget(waste, size) {
   if (waste === null) throw new Error('waste widget slice failed to load');
   const items = waste?.items ?? [];
-  const span = tileSpanAttrs((s) => ({ items: items.length, cap: listRowCap(s), extra: waste?.needsRefresh ? TILE_PARTS.wasteWarning : 0 }), size);
+  const cap = listRowCap(size);
+  const fill = fillRows(items.length, cap);
+  const span = tileSpanAttrs((s, k = 0) => ({ items: items.length, cap: listRowCap(s) + k, extra: waste?.needsRefresh ? TILE_PARTS.wasteWarning : 0 }), size, fill);
 
   if (!items.length) {
     return `<div class="widget widget--waste"${span}>
@@ -4018,8 +4100,8 @@ function renderWasteWidget(waste, size) {
   const earliestDate = sorted.find((e) => e.next)?.next.date_key ?? null;
   const upcomingCount = items.filter((e) => e.next).length;
 
-  const capped = sorted.slice(0, listRowCap(size));
-  const rows = capped.map((entry) => {
+  const capped = sorted.slice(0, cap + fill);
+  const rows = capped.map((entry, index) => {
     const type = entry.type;
     const next = entry.next;
     const accent = type.color || 'var(--color-border)';
@@ -4027,7 +4109,7 @@ function renderWasteWidget(waste, size) {
 
     if (!next) {
       return `
-        <div class="list-row waste-widget-row" data-route="${esc(`/waste?type=${encodeURIComponent(String(type.id))}`)}" role="button" tabindex="0">
+        <div class="list-row waste-widget-row" data-route="${esc(`/waste?type=${encodeURIComponent(String(type.id))}`)}" role="button" tabindex="0"${fillRowAttr(index, cap)}>
           <span class="list-row__lead" aria-hidden="true"><span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span></span>
           <span class="list-row__main"><span class="list-row__name waste-widget-row__name">${icon}${esc(type.name)}</span></span>
           <span class="list-row__end waste-widget-row__date waste-widget-row__date--none">${esc(t('waste.noUpcomingPickup'))}</span>
@@ -4049,16 +4131,16 @@ function renderWasteWidget(waste, size) {
     const emphasize = next.date_key === earliestDate ? ' waste-widget-row__date--next' : '';
 
     return `
-      <div class="list-row waste-widget-row" data-route="${esc(`/waste${next.deep_link}`)}" role="button" tabindex="0">
+      <div class="list-row waste-widget-row" data-route="${esc(`/waste${next.deep_link}`)}" role="button" tabindex="0"${fillRowAttr(index, cap)}>
         <span class="list-row__lead" aria-hidden="true"><span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span></span>
         <span class="list-row__main"><span class="list-row__name waste-widget-row__name">${icon}${esc(type.name)}${moved}${coalesced}</span></span>
         <span class="list-row__end waste-widget-row__date${emphasize}">${esc(relativeDateLabel(next.date_key))}</span>
       </div>`;
   }).join('');
 
-  const rest = Math.max(0, sorted.length - capped.length);
+  const rest = Math.max(0, sorted.length - Math.min(capped.length, cap));
   const more = rest > 0
-    ? `<p class="waste-widget-more">${esc(t('dashboard.wasteMore', { count: rest }))}</p>`
+    ? `<p class="waste-widget-more"${fillMoreAttrs(fill, rest, 'dashboard.wasteMore')}>${esc(t('dashboard.wasteMore', { count: rest }))}</p>`
     : '';
   // Quelle-braucht-Auffrischung (invariant #6) ist ein Source-, kein
   // Occurrence-Feld - eigener Fetch auf /waste/sources in ensureWasteSlice(),
@@ -9349,7 +9431,11 @@ function applyRowFill(grid, { editing = false, columns: knownColumns = null } = 
     }
   }
   const { columns, items: read0 } = early ?? read();
-  if (columns < 2) return;
+  if (columns < 2) {
+    // Einspaltig wird nichts gestreckt, also steht auch keine Zusatzzeile (U14).
+    for (const el of grid.children) if (el.dataset?.fillShown) showFillRows(el, 0);
+    return;
+  }
   // Packen und Fuellen: eine reine Rechnung (fillGridSpans, utils/dashboard-widgets.js).
   const items = read0;
   const spans = fillGridSpans(items, columns);
@@ -9369,15 +9455,41 @@ function applyRowFill(grid, { editing = false, columns: knownColumns = null } = 
       // Kein Geist fuer Breite (F9): der Inhalt laeuft ueber die ganze Breite,
       // ein Schlitz am Rand laege ueber ihm.
     }
+    // HOEHE WIRD INHALT (U14): was die Packung einer Liste an Hoehe zuteilt,
+    // fuellen ihre geladenen Zeilen, soweit sie ganz hineinpassen. Gelesen
+    // wird nur, was der Renderer ausgerechnet hat (`data-fill-steps`).
+    const base = Number(item.el.dataset?.spanRows) || 0;
+    const steps = String(item.el.dataset?.fillSteps ?? '').split(',').map(Number).filter((n) => n > 0);
+    const extra = steps.length && base ? fillRowCount(steps, base + item.rows - own.rows) : 0;
+    if (steps.length || item.el.dataset?.fillShown) showFillRows(item.el, extra);
     if (item.rows !== own.rows) {
       item.el.dataset.colFill = '';
       item.el.style.setProperty('--widget-fill-rows', String(item.rows));
-      if (editing) {
+      // Im Anpassen-Modus steht als Geist nur, was danach noch Platz ist.
+      const ghost = item.rows - own.rows - (extra ? steps[extra - 1] - base : 0);
+      if (editing && ghost > 0) {
         item.el.dataset.ghostBlock = '';
-        item.el.style.setProperty('--tile-ghost-rows', String(item.rows - own.rows));
+        item.el.style.setProperty('--tile-ghost-rows', String(ghost));
       }
     }
   });
+}
+
+/* Zeigt die ersten `k` Zusatzzeilen einer Kachel (U14) und zaehlt "+N weitere"
+ * herunter. Schreibt nur, was sich aendert; liest kein Layout. */
+function showFillRows(el, k) {
+  if ((Number(el.dataset.fillShown) || 0) === k) return;
+  if (k) el.dataset.fillShown = String(k);
+  else delete el.dataset.fillShown;
+  el.querySelectorAll('[data-fill-row]').forEach((row, i) => row.toggleAttribute('data-fill-on', i < k));
+  el.querySelectorAll('[data-fill-group]').forEach((group) => group.toggleAttribute('data-fill-on', k > 0));
+  for (const more of el.querySelectorAll('[data-fill-more]')) {
+    more.dataset.moreBase ??= more.textContent;
+    const rest = (Number(more.dataset.moreRest) || 0) - k;
+    const done = rest <= 0 ? more.dataset.moreDone ?? '' : '';
+    more.toggleAttribute('data-fill-gone', rest <= 0 && !done);
+    more.textContent = done || (rest > 0 && more.dataset.moreKey ? t(more.dataset.moreKey, { count: rest }) : more.dataset.moreBase);
+  }
 }
 
 function renderGridHint(suggestion) {

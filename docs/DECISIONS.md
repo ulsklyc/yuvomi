@@ -1068,7 +1068,20 @@ it before the data arrives.
   and column 1 stood empty for 536px beside three tiles in the demo household at 1440px (588px for
   a child). The hole count reported zero. `gridHoleCount` now counts a column end beyond one tile
   gap.
-- `npm run test:dashboard` ("U1 b", "F9") holds the equivalence with the data rows, the measurements
+- Height becomes content (U14, decided by Ulas on 2026-10-27, option b of the open question after
+  the first build): a list tile that gets more height while filling shows further rows it already
+  loaded (the server sends the supply for the tallest size, the size shows fewer), whole rows only,
+  and "+N more" counts down or goes. Without more data the space stays empty. The renderer carries
+  those rows hidden (`data-fill-row`) and says how many tracks it would need with one, two ... more
+  (`data-fill-steps`, same `contentSpanRows`); `applyRowFill` shows as many as fit after packing
+  (`fillRowCount`). The span stays the one of the chosen size, so the extra rows never feed back into
+  the packing, and nothing is measured. Weighed against it: (a) accept the empty space, (c) let a
+  later narrow tile move ahead of a wide one - fewer gaps, but the order would no longer be the
+  ranking. The overview loads eight birthdays and five expense categories for this, both already
+  sorted or grouped in one query. Tasks and expiring food keep their limit because the Today sheet
+  reads the same list or constant, notes because their preview has a contract test; countdowns keep
+  theirs for now (no measured stretch needed it).
+- `npm run test:dashboard` ("U1 b", "F9", "U14") holds the equivalence with the data rows, the measurements
   against `dashboard.css`, no hole and no empty column end in the demo household at two, three and
   four columns, fewer than 5 % of 3000 random grids with a hole, and that filling never moves a
   tile.
@@ -1079,4 +1092,6 @@ A tile that gets height its content does not have in the normal grid when no hol
 stretching rows to their tallest tile, a fixed height per size, filling a column end that stops
 within one tile gap of the others. A column left empty beside full ones. A tile whose height is measured
 after drawing instead of taken from its data. And a tile on the overview that does not report its
-height.
+height. Extra rows that change a tile's span, trigger a second packing pass or are fitted by
+measuring, a tile with loaded rows that leaves its filled height blank, and a second fill
+mechanism beside the one all lists share.

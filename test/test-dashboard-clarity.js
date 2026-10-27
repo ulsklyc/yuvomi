@@ -103,7 +103,8 @@ function onPhone(fn) {
     globalThis.window = prev;
   }
 }
-const taskRows = (html) => (html.match(/class="list-row task-item"/g) ?? []).length;
+// Was ohne Streckung steht: Zusatzzeilen (U14, `data-fill-row`) zeigt erst applyRowFill.
+const taskRows = (html) => (html.match(/<div class="list-row task-item"[^>]*>/g) ?? []).filter((tag) => !tag.includes('data-fill-row')).length;
 
 test('Aufgaben: die Kachel folgt ihrer Groesse wie jede Liste (#2087)', () => {
   const tasks = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, title: `Aufgabe ${i}`, priority: 'none', status: 'open' }));
