@@ -563,7 +563,7 @@
 
 .housekeeping-create__hint {
   margin: 0 0 var(--space-2);
-  font-size: var(--text-xs);
+  font-size: var(--type-caption);
   color: var(--color-text-secondary);
 }
 
