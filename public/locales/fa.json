@@ -2919,7 +2919,6 @@
         "permInherit": "ارث‌بری",
         "permInheritedHint": "ارث‌بری‌شده: {{value}}",
         "permModuleLockedHint": "ماژول قفل است",
-        "permSave": "ذخیره",
         "permSaved": "دسترسی‌های {{name}} ذخیره شد.",
         "permResetSubject": "بازنشانی به پیش‌فرض",
         "permResetConfirm": "همهٔ دسترسی‌های {{name}} به پیش‌فرض (دسترسی کامل) بازنشانی شود؟",
@@ -2933,9 +2932,6 @@
         "permLoadError": "مجوزها بارگذاری نشد.",
         "permNoMembers": "هنوز عضوی وجود ندارد.",
         "permReadOnlyBanner": "شما به این ماژول دسترسی فقط‌خواندنی دارید - تغییر ممکن نیست.",
-        "permDiscardConfirm": "تغییرات ذخیره‌نشده نادیده گرفته شود؟",
-        "permDiscard": "نادیده گرفتن",
-        "permUnsaved": "تغییرات ذخیره‌نشده",
         "leaveDiscardDetail": "تغییراتی که در این صفحه داده‌اید هنوز ذخیره نشده‌اند و اگر اکنون خارج شوید از بین می‌روند.",
         "permSummaryFull": "دسترسی کامل به همهٔ ماژول‌ها و ابزارک‌ها.",
         "permDeviationsLead": "استثناها:",
@@ -3466,7 +3462,8 @@
         "reminderListReadOnlyWaiting": "فقط خواندنی: {{count}} مورد در انتظار بارگذاری به اینجا نمی‌رسند",
         "reminderListAssigneesTasksOnly": "افراد را فقط برای فهرست‌هایی می‌توان تعیین کرد که به کارها می‌روند.",
         "syncAssigneeNotMember": "اینجا فقط اعضای خانوار را می‌توان انتخاب کرد.",
-        "syncAssigneeUnknown": "این فرد دیگر وجود ندارد. صفحه را دوباره بارگیری کنید."
+        "syncAssigneeUnknown": "این فرد دیگر وجود ندارد. صفحه را دوباره بارگیری کنید.",
+        "permDetails": "ویجت‌ها و مجوزهای بیشتر"
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",

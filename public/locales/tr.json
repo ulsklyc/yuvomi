@@ -2901,7 +2901,6 @@
         "permInherit": "Devral",
         "permInheritedHint": "Devralındı: {{value}}",
         "permModuleLockedHint": "Modül kilitli",
-        "permSave": "Kaydet",
         "permSaved": "{{name}} izinleri kaydedildi.",
         "permResetSubject": "Varsayılana sıfırla",
         "permResetConfirm": "{{name}} için tüm izinler varsayılana (tam erişim) sıfırlansın mı?",
@@ -2915,9 +2914,6 @@
         "permLoadError": "İzinler yüklenemedi.",
         "permNoMembers": "Henüz üye yok.",
         "permReadOnlyBanner": "Bu modüle salt okunur erişiminiz var - değişiklik yapılamaz.",
-        "permDiscardConfirm": "Kaydedilmemiş değişiklikler atılsın mı?",
-        "permDiscard": "At",
-        "permUnsaved": "Kaydedilmemiş değişiklikler",
         "leaveDiscardDetail": "Bu sayfada yaptığınız değişiklikler henüz kaydedilmedi ve şimdi ayrılırsanız kaybolacak.",
         "permSummaryFull": "Tüm modüllere ve widget'lara tam erişim.",
         "permDeviationsLead": "İstisnalar:",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "Salt okunur: buraya yüklenmeyi bekleyen {{count}} kayıt ulaşmayacak",
         "reminderListAssigneesTasksOnly": "Kişiler yalnızca Görevler’e giden listeler için ayarlanabilir.",
         "syncAssigneeNotMember": "Burada yalnızca hane üyeleri seçilebilir.",
-        "syncAssigneeUnknown": "Bu kişi artık yok. Sayfayı yeniden yükleyin."
+        "syncAssigneeUnknown": "Bu kişi artık yok. Sayfayı yeniden yükleyin.",
+        "permDetails": "Widget'lar ve diğer izinler"
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

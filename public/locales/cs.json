@@ -3005,7 +3005,6 @@
         "permInherit": "Zdědit",
         "permInheritedHint": "Zděděno: {{value}}",
         "permModuleLockedHint": "Modul uzamčen",
-        "permSave": "Uložit",
         "permSaved": "Oprávnění pro {{name}} uložena.",
         "permResetSubject": "Obnovit výchozí",
         "permResetConfirm": "Obnovit všechna oprávnění pro {{name}} na výchozí (plný přístup)?",
@@ -3019,9 +3018,6 @@
         "permLoadError": "Oprávnění se nepodařilo načíst.",
         "permNoMembers": "Zatím žádní členové.",
         "permReadOnlyBanner": "K tomuto modulu máte přístup jen ke čtení - změny nejsou možné.",
-        "permDiscardConfirm": "Zahodit neuložené změny?",
-        "permDiscard": "Zahodit",
-        "permUnsaved": "Neuložené změny",
         "leaveDiscardDetail": "Změny, které jste na této stránce provedli, ještě nejsou uložené a když ji teď opustíte, ztratí se.",
         "permSummaryFull": "Plný přístup ke všem modulům a widgetům.",
         "permDeviationsLead": "Výjimky:",
@@ -3566,7 +3562,8 @@
         "reminderListReadOnlyWaiting_many": "Jen pro čtení: {{count}} položky čekající na nahrání sem nedorazí",
         "reminderListAssigneesTasksOnly": "Osoby lze nastavit jen u seznamů, které jdou do Úkolů.",
         "syncAssigneeNotMember": "Zde lze vybrat pouze členy domácnosti.",
-        "syncAssigneeUnknown": "Tato osoba již neexistuje. Načtěte stránku znovu."
+        "syncAssigneeUnknown": "Tato osoba již neexistuje. Načtěte stránku znovu.",
+        "permDetails": "Widgety a další oprávnění"
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

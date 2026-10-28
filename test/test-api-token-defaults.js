@@ -20,7 +20,7 @@ import { installMiniDom, MiniElement } from './mini-dom.js';
 
 installMiniDom();
 
-const { __test, resolveTokenExpiry, validityExpiresAt, TOKEN_VALIDITY_DEFAULT } = await import('../public/settings/pages/admin-api.js');
+const { __test, resolveTokenExpiry, validityExpiresAt, TOKEN_VALIDITY_DEFAULT, scopesFromLevels } = await import('../public/settings/pages/admin-api.js');
 
 const NOW = Date.parse('2026-10-25T12:00:00Z');
 /** Dieselbe Uhrzeit `days` Kalendertage spaeter, in der Zone des Laufs. */
@@ -59,6 +59,20 @@ test('die Modulgrenze ist eingeschaltet und die Rechtetabelle sichtbar', () => {
   const html = renderedForm();
   assert.match(tagWithId(html, 'api-token-scope-limit'), /\bchecked\b/);
   assert.doesNotMatch(tagWithId(html, 'api-token-scope-grid'), /\bhidden\b/);
+});
+
+// R24 (E11, Critique G6-Einst-P3-1): je Modul EINE Optionszeile mit der Stufe
+// als Auswahl, wie Name/Person/Gueltigkeit darueber - statt einer grauen
+// Tabelle mit 2 x 15 nativen 13px-Kaestchen. Die Grenze bleibt eingeschaltet
+// (bewusste Vorgabe, Test darueber). Schreiben schliesst Lesen ein.
+test('R24 E11: je Modul eine Optionszeile "Kein Zugriff / Lesen / Schreiben", keine Kaestchen', () => {
+  const html = renderedForm();
+  const rows = [...html.matchAll(/<select class="form-input" id="api-token-scope-([\w-]+)" data-scope-module="([\w:-]+)">/g)].map((m) => m[2]);
+  assert.deepEqual(rows, ['tasks', 'shopping'], 'eine Zeile je Modul');
+  assert.doesNotMatch(html, /type="checkbox"[^>]*data-scope=/, 'keine Lesen/Schreiben-Kaestchen mehr');
+  assert.doesNotMatch(html, /api-token-scopes__head|api-token-scopes__cell/, 'keine Tabelle');
+  assert.match(html, /<option value="none">settings\.permAccessNone<\/option><option value="read">settings\.apiTokenScopeRead<\/option><option value="write">settings\.apiTokenScopeWrite<\/option>/);
+  assert.deepEqual(scopesFromLevels([['tasks', 'write'], ['shopping', 'none'], ['notes', 'read']]), ['tasks:read', 'tasks:write', 'notes:read']);
 });
 
 test('jede Vorgabe ergibt ein Ablaufdatum, nur "Kein Ablauf" ergibt keins', () => {

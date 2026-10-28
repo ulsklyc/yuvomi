@@ -212,6 +212,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which names what it holds - as in the medication and preventive care dialogs. Editing an existing entry
   no longer brings up the keyboard on phones. Without any entry and without a daily goal, Nutrition shows
   one empty state instead of the goal hint above it.
+- **Roles and permissions are one line per module.** Each module shows its access as a value on the
+  right ("Full ⌄"); widgets and extra permissions open under "Widgets and more permissions" in the same
+  form. A change is saved right away with Undo in the message - there is no Save button any more and
+  nothing to discard. The page is about half as long. API tokens choose their module limits the same
+  way ("No access / Read / Write" per module) instead of a table of tick boxes.
 - **Contact categories fit.** When the category chips no longer fit next to the list (on the desktop
   beside an open contact, on phones from the third chip) or there are more than four, a "Filter" button
   takes their place and shows the categories in a sheet - the same filter as elsewhere. The import

@@ -3205,7 +3205,6 @@
         "permInherit": "توريث",
         "permInheritedHint": "موروث: {{value}}",
         "permModuleLockedHint": "الوحدة مقفلة",
-        "permSave": "حفظ",
         "permSaved": "تم حفظ أذونات {{name}}.",
         "permResetSubject": "إعادة التعيين إلى الافتراضي",
         "permResetConfirm": "إعادة تعيين جميع أذونات {{name}} إلى الافتراضي (وصول كامل)؟",
@@ -3219,9 +3218,6 @@
         "permLoadError": "تعذر تحميل الصلاحيات.",
         "permNoMembers": "لا يوجد أعضاء بعد.",
         "permReadOnlyBanner": "لديك وصول للقراءة فقط إلى هذه الوحدة - لا يمكن إجراء تغييرات.",
-        "permDiscardConfirm": "تجاهل التغييرات غير المحفوظة؟",
-        "permDiscard": "تجاهل",
-        "permUnsaved": "تغييرات غير محفوظة",
         "leaveDiscardDetail": "لم تُحفظ التغييرات التي أجريتها في هذه الصفحة بعد، وستضيع إذا غادرتها الآن.",
         "permSummaryFull": "وصول كامل إلى جميع الوحدات والأدوات.",
         "permDeviationsLead": "الاستثناءات:",
@@ -3788,7 +3784,8 @@
         "reminderListReadOnlyWaiting_many": "للقراءة فقط: لن يصل {{count}} إدخالًا بانتظار الرفع إلى هنا",
         "reminderListAssigneesTasksOnly": "يمكن تحديد الأشخاص فقط للقوائم التي تذهب إلى المهام.",
         "syncAssigneeNotMember": "يمكن اختيار أفراد المنزل فقط هنا.",
-        "syncAssigneeUnknown": "هذا الشخص لم يعد موجودًا. أعد تحميل الصفحة."
+        "syncAssigneeUnknown": "هذا الشخص لم يعد موجودًا. أعد تحميل الصفحة.",
+        "permDetails": "الأدوات والصلاحيات الإضافية"
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",

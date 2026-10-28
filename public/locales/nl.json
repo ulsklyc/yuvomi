@@ -2901,7 +2901,6 @@
         "permInherit": "Overnemen",
         "permInheritedHint": "Overgenomen: {{value}}",
         "permModuleLockedHint": "Module vergrendeld",
-        "permSave": "Opslaan",
         "permSaved": "Rechten voor {{name}} opgeslagen.",
         "permResetSubject": "Terug naar standaard",
         "permResetConfirm": "Alle rechten voor {{name}} terugzetten naar de standaard (volledige toegang)?",
@@ -2915,9 +2914,6 @@
         "permLoadError": "De rechten konden niet worden geladen.",
         "permNoMembers": "Nog geen leden.",
         "permReadOnlyBanner": "Je hebt alleen-lezentoegang tot deze module - wijzigen is niet mogelijk.",
-        "permDiscardConfirm": "Niet-opgeslagen wijzigingen negeren?",
-        "permDiscard": "Negeren",
-        "permUnsaved": "Niet-opgeslagen wijzigingen",
         "leaveDiscardDetail": "De wijzigingen op deze pagina zijn nog niet opgeslagen en gaan verloren als je nu weggaat.",
         "permSummaryFull": "Volledige toegang tot alle modules en widgets.",
         "permDeviationsLead": "Uitzonderingen:",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "Alleen-lezen: {{count}} items die hierheen moeten worden geüpload, komen niet aan",
         "reminderListAssigneesTasksOnly": "Personen kunnen alleen worden ingesteld voor lijsten die naar Taken gaan.",
         "syncAssigneeNotMember": "Hier kunnen alleen leden van het huishouden worden gekozen.",
-        "syncAssigneeUnknown": "Deze persoon bestaat niet meer. Laad de pagina opnieuw."
+        "syncAssigneeUnknown": "Deze persoon bestaat niet meer. Laad de pagina opnieuw.",
+        "permDetails": "Widgets en meer rechten"
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

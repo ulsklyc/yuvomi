@@ -2901,7 +2901,6 @@
         "permInherit": "繼承",
         "permInheritedHint": "繼承：{{value}}",
         "permModuleLockedHint": "模組已鎖定",
-        "permSave": "儲存",
         "permSaved": "已儲存 {{name}} 的權限。",
         "permResetSubject": "重置為預設",
         "permResetConfirm": "將 {{name}} 的所有權限重置為預設（完全存取）嗎？",
@@ -2915,9 +2914,6 @@
         "permLoadError": "無法載入權限。",
         "permNoMembers": "還沒有成員。",
         "permReadOnlyBanner": "您對此模組只有唯讀存取權限——無法進行更改。",
-        "permDiscardConfirm": "放棄未儲存的更改嗎？",
-        "permDiscard": "放棄",
-        "permUnsaved": "未儲存的更改",
         "leaveDiscardDetail": "你在此頁面所做的更改尚未儲存，現在離開將會遺失。",
         "permSummaryFull": "對所有模組和小元件的完全存取。",
         "permDeviationsLead": "例外：",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "唯讀：等待上傳到這裡的 {{count}} 個項目不會送達",
         "reminderListAssigneesTasksOnly": "只有進入任務的清單才能設定人員。",
         "syncAssigneeNotMember": "這裡只能選擇家庭成員。",
-        "syncAssigneeUnknown": "此人已不存在。請重新載入頁面。"
+        "syncAssigneeUnknown": "此人已不存在。請重新載入頁面。",
+        "permDetails": "小工具與其他權限"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

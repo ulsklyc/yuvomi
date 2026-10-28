@@ -12150,32 +12150,21 @@ test('jedes Settings-Blatt importiert die geteilten Helfer, die es aufruft', () 
 // und `title` erscheint auf Touch nie (Critique 2026-07-27).
 test('Rechtevergabe ist auf dem Telefon beschriftet und mit dem Finger bedienbar', () => {
   const source = read('../public/settings/pages/admin-permissions.js');
-  // Der Klartext muss im Markup stehen, nicht nur in title/aria-label.
-  assert.match(source, /<span class="perm-seg__label">\$\{esc\(o\.label\)\}<\/span>/);
-  // aria-label bleibt der spezifischere Name ("Kalender: Kein Zugriff") und
-  // enthaelt den sichtbaren Text - sonst bricht WCAG 2.5.3 (Label in Name).
-  assert.match(source, /aria-label="\$\{esc\(label \|\| group\)\}: \$\{esc\(o\.label\)\}"/);
+  // R24 (E11): die Stufe ist der WERT der Zeile - eine randlose Auswahl rechts
+  // in der Optionszeile der Einstellungen (settingRowHtml). Das Wort steht in
+  // jeder Breite, denn der Wert IST das Wort; der zugaengliche Name ist das
+  // verknuepfte Etikett (labelFor) und das aria-label nennt die Zeile.
+  assert.match(source, /<select class="form-input perm-select" id="\$\{esc\(domId\(group\)\)\}" data-group="\$\{esc\(group\)\}"\s*aria-label="\$\{esc\(label\)\}"/);
+  assert.match(source, /settingRowHtml\(\{\s*label: moduleLabel\(mod\.key\),\s*labelFor: domId\(group\)/, 'das Etikett gehoert zur Auswahl');
+  assert.doesNotMatch(source, /perm-seg/, 'keine Segmente mehr');
 
   const css = read('../public/styles/settings.css');
-  // Die Grenze ist NICHT der Mobile-Breakpoint: iPad Portrait ist 768px, dort
-  // galt die kompakte Icon-Variante wieder (gemessen bei 820px: 59 Segmente
-  // à 34x30px). `pointer: coarse` deckt das Tablet im Querformat.
-  const touchQuery = '@media (max-width: 1023px), (pointer: coarse)';
-  assert.ok(css.includes(touchQuery), 'Touch endet nicht bei 767px');
-  // Seit R14 ist der Modus-Umschalter der Kanon `.segmented` (Touch-Mass aus
-  // --target-base in panel.css); hier bleiben die Chips der Subjekt-Auswahl.
-  const mobile = css.slice(css.indexOf(touchQuery, css.indexOf('.perm-mode {')));
-  assert.ok(mobile.includes('.perm-seg__label'), 'Der Touch-Block muss das Label sichtbar schalten');
-  assert.match(mobile, /\.perm-chip \{ min-height: var\(--target-base\); \}/);
-  assert.match(mobile, /\.perm-seg__opt \{[^}]*min-height: var\(--target-base\);/s);
-  // Gestapelt statt segmentiert: vier Stufen mit Wort passen bei 390px nicht
-  // neben den Modulnamen.
-  assert.match(mobile, /\.perm-row \{[^}]*flex-direction: column;/s);
-  assert.match(mobile, /\.perm-seg \{[^}]*grid-template-columns: repeat\(var\(--seg-count, 3\), 1fr\);/s);
-
-  // Seit R21 traegt das Segment sein Wort auch am Zeiger (neben dem Icon) -
-  // die kompakte Icon-Fassung mit Legende ist gegangen (test:permissions).
-  assert.doesNotMatch(css, /\.perm-seg__label \{ display: none; \}/);
+  // Die Chips der Subjekt-Auswahl bleiben am Finger ein volles Ziel.
+  assert.ok(css.includes('@media (max-width: 1023px), (pointer: coarse)'), 'Touch endet nicht bei 767px');
+  assert.match(css, /\.perm-chip \{ min-height: var\(--target-base\); \}/);
+  // Die Zeile ist ein Fingerziel hoch: dieselbe Regel wie jede Einstellungszeile.
+  assert.match(css, /\.settings-group > \.settings-setting-row \{[^}]*min-height: var\(--target-lg\);/s);
+  assert.doesNotMatch(css, /\.perm-seg\b/, 'die Segment-Regeln sind weg');
 });
 
 // "Automatische Backups" mit Titel, Hinweis und leerem Inhalt liest sich als

@@ -2938,7 +2938,6 @@
         "permInherit": "Arv",
         "permInheritedHint": "Arvet: {{value}}",
         "permModuleLockedHint": "Modul låst",
-        "permSave": "Lagre",
         "permSaved": "Tillatelser for {{name}} er lagret.",
         "permResetSubject": "Tilbakestill til standard",
         "permResetConfirm": "Tilbakestill alle tillatelser for {{name}} til standard (full tilgang)?",
@@ -2952,9 +2951,6 @@
         "permLoadError": "Tillatelsene kunne ikke lastes inn.",
         "permNoMembers": "Ingen medlemmer ennå.",
         "permReadOnlyBanner": "Du har kun lesetilgang til denne modulen - endringer er ikke mulige.",
-        "permDiscardConfirm": "Forkast ulagrede endringer?",
-        "permDiscard": "Forkast",
-        "permUnsaved": "Ulagrede endringer",
         "leaveDiscardDetail": "Endringene på denne siden er ikke lagret ennå og vil gå tapt hvis du forlater nå.",
         "permSummaryFull": "Full tilgang til alle moduler og widgets.",
         "permDeviationsLead": "Avvik:",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "Skrivebeskyttet: {{count}} oppføringer som venter på opplasting hit, kommer ikke frem",
         "reminderListAssigneesTasksOnly": "Personer kan bare settes for lister som går til Oppgaver.",
         "syncAssigneeNotMember": "Bare medlemmer av husstanden kan velges her.",
-        "syncAssigneeUnknown": "Denne personen finnes ikke lenger. Last inn siden på nytt."
+        "syncAssigneeUnknown": "Denne personen finnes ikke lenger. Last inn siden på nytt.",
+        "permDetails": "Widgeter og flere rettigheter"
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",

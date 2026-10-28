@@ -2253,55 +2253,11 @@
   color: var(--color-text-primary);
 }
 
+/* Die Rechte-Grenze ist eine zweite Zeilengruppe derselben Form (R24, E11):
+ * je Modul eine Optionszeile mit der Stufe rechts. Vorher eine graue Tabelle
+ * mit Lesen/Schreiben-Kaestchen. */
 .api-token-scopes {
   margin-top: var(--space-3);
-  /* Inset-Well statt Kasten in der Karte (tokens.css). */
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--color-fill-well);
-  overflow: hidden;
-}
-
-.api-token-scopes__head,
-.api-token-scopes__row {
-  display: grid;
-  grid-template-columns: 1fr 4.5rem 4.5rem;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-}
-
-.api-token-scopes__head {
-  background: var(--color-surface-2);
-  color: var(--color-text-secondary);
-  font-weight: var(--font-weight-medium);
-}
-
-.api-token-scopes__head span:not(:first-child) {
-  text-align: center;
-  justify-self: center;
-}
-
-.api-token-scopes__row:not(:last-child) {
-  border-bottom: var(--space-px) solid var(--color-border-subtle);
-}
-
-.api-token-scopes__name {
-  color: var(--color-text-primary);
-}
-
-/* Die Zelle ist das Ziel, nicht die 14px-Checkbox (Zielgroessen-Regel in
- * tokens.css): sie fuellt ihre Spalte und haelt --target-base in der Hoehe.
- * Der negative margin-block greift in das Polster der Zeile, damit die Zeile
- * nicht um die Trefferflaeche waechst. */
-.api-token-scopes__cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  justify-self: stretch;
-  min-height: var(--target-base);
-  margin-block: calc(var(--space-2) * -1);
-  cursor: pointer;
 }
 
 /* --------------------------------------------------------
@@ -3719,253 +3675,98 @@
 
 .perm-summary__dot { width: 7px; height: 7px; border-radius: var(--radius-full); flex-shrink: 0; }
 
-/* Liste: Modul-Gruppen, jede mit eingerückten Widgets darunter. */
-.perm-list {
-  /* Inset-Well statt Kasten in der Karte (tokens.css). */
-  border: none;
-  border-radius: var(--radius-md);
-  background: var(--color-fill-well);
-  overflow: hidden;
-}
+/* EINE ZEILENGRUPPE (R24, E11; Critique G6-Familie-P2-2). Die Matrix war ein
+ * eingelassener Kasten mit Dreier-Segmenten je Modul, Zweier-Segmenten je
+ * Widget und einer dritten Segmentform je Zusatzrecht - 4166px am Laptop. Jetzt
+ * traegt sie die Form jeder Einstellungsgruppe (`row-carrier settings-group`):
+ * je Modul eine Optionszeile mit der Stufe als Wert rechts, Widgets und
+ * Zusatzrechte in derselben Form in der aufgeklappten Zeile, eingerueckt. */
+/* Gruppe, Widgets und Zusatzrechte tragen `.settings-group` (die Zeilen sind
+ * ihre direkten Kinder und nehmen so die Zeilenform der Einstellungen); ihren
+ * Abstand nach unten setzt nur die aeussere Gruppe. */
+.perm-list .settings-group { margin-bottom: 0; }
 
-.perm-modgroup + .perm-modgroup { border-top: var(--space-px) solid var(--color-border); }
+.perm-modgroup + .perm-modgroup { border-top: var(--space-px) solid var(--color-border-subtle); }
 
 /* DIE MATRIX RECHNET NUR, WAS IN SICHT IST (R23 S11; wie die Agenda,
- * calendar.css). 16 Modulgruppen, rund 1100 Knoten und 3600px am Laptop
- * (mobil 5000px): das Oeffnen des Blatts hielt das Bild 146-180 ms (4x CPU),
- * davon 72 ms erzwungenes Layout, als die Kapsel des Umschalters oben ihre
- * Lage las - fuer Gruppen, die erst nach Bildlauf kommen. Ab der zweiten
- * Gruppe ueberspringt der Browser, was ausser Sicht steht; `auto` merkt sich
- * danach die echte Hoehe. Der Fokusring einer Zeile darf ueber die
- * Gruppenkante (overflow-clip-margin). */
+ * calendar.css). Ab der zweiten Gruppe ueberspringt der Browser, was ausser
+ * Sicht steht; `auto` merkt sich danach die echte Hoehe. Eingeklappt ist eine
+ * Gruppe seit R24 nur noch ihre Zeile. Der Fokusring einer Zeile darf ueber
+ * die Gruppenkante (overflow-clip-margin). */
 @supports (content-visibility: auto) and (contain-intrinsic-size: auto none auto 1px) {
   .perm-modgroup + .perm-modgroup {
     content-visibility: auto;
-    contain-intrinsic-size: auto none auto 220px;
+    contain-intrinsic-size: auto none auto var(--target-lg);
     overflow-clip-margin: var(--space-2);
   }
 }
 
-.perm-modgroup__widgets {
-  padding-inline-start: var(--space-8);
-  padding-bottom: var(--space-1);
+.perm-modgroup__more {
+  padding-inline-start: var(--space-4);
+  padding-block-end: var(--space-2);
 }
 
-.perm-modgroup__widgets .perm-row--widget { border-top: var(--space-px) solid var(--color-border-subtle); }
-
-.perm-modgroup__capabilities {
-  margin-block: 0 var(--space-3);
-  margin-inline: var(--space-8) var(--space-3);
-  border-block: var(--space-px) solid var(--color-border-subtle);
-}
-
-.perm-modgroup__capabilities-title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: var(--space-px) solid var(--color-border-subtle);
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-}
-
-.perm-modgroup__capabilities-title svg { width: var(--icon-md); height: var(--icon-md); }
-.perm-row--capability { padding: var(--space-3); }
-
-.perm-modgroup--general .perm-modgroup__general-title {
-  padding: var(--space-3) var(--space-4) 0;
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-}
-
-.perm-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-4);
-  padding: var(--space-3) var(--space-4);
-}
-
-/* MIT WORT SIND DIE STUFEN BREITER (R21): vier Stufen im Mitglieds-Modus
- * ("Erben" dazu) brauchen bei 1280 rund 500px. Der Name behaelt mindestens
- * 12rem; reicht die Zeile nicht, rueckt das Segment in eine eigene Zeile,
- * rechtsbuendig wie in der einzeiligen Form - statt den Namen auf einen
- * Buchstaben je Zeile zu quetschen. */
-.perm-row > .perm-row__label {
-  flex: 1 1 12rem;
-}
-
-.perm-row > .perm-seg {
-  margin-inline-start: auto;
-}
-
-.perm-row.is-locked { opacity: 0.5; }
-
-.perm-row__label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  color: var(--color-text-primary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-}
-
-.perm-row__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-}
-
-/* Widget-Zeilen leiser als Module (kleineres Icon, sekundäre Farbe). */
-.perm-row--widget { padding-top: var(--space-2); padding-bottom: var(--space-2); }
-.perm-row--widget .perm-row__label { color: var(--color-text-secondary); }
-.perm-row__wicon { width: var(--icon-md); height: var(--icon-md); color: var(--color-text-tertiary); }
-
-/* Der Name bricht um statt abzuschneiden (R21): neben Stufen mit Wort blieb
- * "Gemeinsame Notizkategorien verwalten" bei 1280 sonst als "Gemeinsame Not..." */
-.perm-row__name {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  hyphens: auto;
-  hyphenate-limit-chars: 6 4 4;
-  -webkit-hyphenate-limit-before: 4;
-  -webkit-hyphenate-limit-after: 4;
-}
-
-.perm-row__hint {
-  color: var(--color-text-tertiary);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-medium);
-  white-space: nowrap;
-}
-
-.perm-row__hint--warn { color: var(--color-warning); }
-
-/* Icon-Segment mit gleitender Aktiv-Pille. Optionen gleich breit; die Pille
-   (thumb) wandert per translateX zur aktiven Position. */
-/* GLEICH BREITE STUFEN, JEDE MIT WORT (Critique R21, a5 P3). Mit dem Wort neben
- * dem Icon sind die Stufen verschieden lang ("Kein Zugriff" / "Voll"); der
- * gleitende Daumen rechnet aber mit gleichen Spalten ((100% - 4px) / Anzahl).
- * Das Raster gibt jeder Spalte die Breite der laengsten. */
-.perm-seg {
-  position: relative;
-  display: inline-grid;
-  grid-template-columns: repeat(var(--seg-count, 3), 1fr);
-  flex-shrink: 0;
-  padding: var(--space-0h);
-  background: var(--color-surface-raised);
-  border: var(--space-px) solid var(--color-border-subtle);
-  border-radius: var(--radius-full);
-}
-
-.perm-seg[data-disabled="true"] { opacity: 0.55; }
-
-.perm-seg__thumb {
-  position: absolute;
-  top: 2px;
-  bottom: 2px;
-  left: 2px;
-  width: calc((100% - 4px) / var(--seg-count, 3));
-  border-radius: var(--radius-full);
-  /* Der gleitende Daumen IST das aktive Segment. Er trug bis zur Re-Critique
-   * 2026-09-28 die Segment-Sprache der Shell (erhabene Surface-Pille, Modulton
-   * in der Tinte) - und war damit praktisch unsichtbar: gemessen weiss auf
-   * rgb(251,251,253) = 1,03:1, in Dark sogar DUNKLER als das Segment, und der
-   * Modulton der Einstellungen ist neutral, also trug auch die Tinte nichts
-   * (1,2:1 gegen das inaktive Glyph). Die Matrix ist die Aufgabe mit den
-   * groessten sozialen Folgen (was darf das Kind) und steht am Zeiger nur als
-   * Icon - die Label-Verlust-Regel verlangt getoente Flaeche PLUS gefuelltes
-   * Glyph (layout.css, Filled Variant), beides im App-Akzent.
-   *
-   * Die KANTE traegt den Kontrast: eine Toenung allein erreicht die 3:1 gegen
-   * das Segment nie (24 %: 1,41 hell / 1,28 dunkel), der Akzent als Kante
-   * 5,86 hell / 4,61 dunkel (nachgerechnet in test-permission-sheet-ui.js). Als
-   * inset-Schatten, damit sie den Daumen nicht vergroessert. Nie die Kante
-   * allein - Flaeche und Glyph sagen den Zustand mit. */
-  background: color-mix(in srgb, var(--color-accent) var(--tint-surface), var(--color-surface));
-  box-shadow: inset 0 0 0 1.5px var(--color-accent);
-  transform: translateX(calc(var(--seg-index, 0) * 100%));
-  transition: transform var(--duration-lg) var(--ease-out);
-  pointer-events: none;
-}
-
-/* Am Zeiger stehen Icon und Wort nebeneinander (R21); das Ziel bleibt
- * mindestens `--target-base` hoch und breit - Segmente stehen aneinander, die
- * Spacing-Ausnahme aus WCAG 2.5.8 greift fuer sie nicht. */
-.perm-seg__opt {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  min-width: var(--target-base);
-  min-height: var(--target-base);
-  padding-inline: var(--space-3);
-  border: none;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.perm-seg__opt:disabled { cursor: not-allowed; }
-/* Die Fläche liefert der gleitende Daumen; das Glyph darauf trägt die Tinte -
- * dieselbe Mischung wie jedes andere aktive Segment, aber im APP-Akzent statt
- * im Modulton: der der Einstellungen ist neutral und hob das aktive Glyph nur
- * 1,2:1 vom inaktiven ab (Re-Critique 2026-09-28, A7 P1-1). */
-.perm-seg__opt.is-active {
-  color: color-mix(in srgb, var(--color-accent) var(--tint-ink), var(--color-text-primary));
-}
-
-/* Das Wort der Stufe, in jeder Breite (R21) - am Zeiger in einer Zeile neben
- * dem Icon, am Finger darunter (Media-Query unten). */
-.perm-seg__label {
-  font-size: var(--type-caption);
-  font-weight: var(--font-weight-medium);
-  white-space: nowrap;
-}
-
-.perm-seg__opt:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
-}
-
-.perm-actions {
-  position: sticky;
-  /* Ueber der Tab-Kapsel, nicht unter ihr: seit der Inhalt bis zur
-   * Unterkante laeuft, klebte `bottom: 0` hinter dem Glas (Kopfregel mobil,
-   * 2026-09-26). `--nav-tail` ist 0, wo keine Leiste steht. */
-  bottom: var(--nav-tail);
-  z-index: var(--z-sticky, 10);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  /* Umbruch statt Quetschen - Begruendung an `.modal-panel__footer`
-   * (layout.css, #872). Die Schmalregel weiter unten setzt ihn nicht mehr,
-   * sie gibt der Statuszeile dort nur noch ihre eigene Zeile. */
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-5);
-  padding: var(--space-3) 0;
-  background: var(--color-bg);
+.perm-modgroup__more .perm-row,
+.perm-modgroup--general .perm-row {
   border-top: var(--space-px) solid var(--color-border-subtle);
 }
 
-.perm-actions__status {
+/* Die Ueberschriften in der Gruppe sind Gruppierungslabels (12/600,
+ * Satzschreibung), keine Abschnittstitel. */
+.perm-modgroup__capabilities-title,
+.perm-modgroup--general .perm-modgroup__general-title {
+  margin: 0;
+  padding: var(--space-3) 0 var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.perm-modgroup--general .perm-modgroup__general-title { padding-inline: var(--space-4); }
+
+/* Gesperrtes Widget (Modul ohne Zugriff): die Zeile bleibt lesbar, der Wert
+ * tritt zurueck - die Beschreibung sagt, warum. */
+.perm-row.is-locked .settings-setting-row__control { opacity: 0.55; }
+
+/* „Widgets und weitere Rechte ⌄" unter dem Modulnamen: ein Textknopf in
+ * Akzenttinte, das Ziel so hoch wie eine Zeile (Trefferflaeche per ::before,
+ * tokens.css), das Zeichen dreht beim Aufklappen. */
+.perm-row__more {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  margin-right: auto;
-  color: var(--color-warning);
+  margin-block-start: var(--space-0h);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
   font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.perm-row__more::before {
+  content: "";
+  position: absolute;
+  inset: calc((var(--target-base) - 1lh) / -2) calc(-1 * var(--space-2));
+}
+
+.perm-row__more svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  transition: transform var(--transition-fast);
+}
+
+.perm-row__more[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+/* Kein Speichern-Fuss mehr (R24, E11): jede Wahl wirkt sofort. Es bleibt
+ * „Auf Standard zuruecksetzen" am Ende der Liste. */
+.perm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: var(--space-4);
 }
 
 .perm-adminnote {
@@ -3982,97 +3783,15 @@
 
 .perm-adminnote p { margin: 0; font-size: var(--text-sm); }
 
-/* Rechtevergabe war die schlechteste Touch-Fläche in Settings - bei der Aufgabe
-   mit den größten sozialen Folgen (Critique 2026-07-27): 32px-Chips,
-   32px-Modusumschalter und 34x30px-Segmente, deren Klartext nur im `title`
-   stand. Gestapelt statt segmentiert: der Name bekommt seine eigene Zeile, die
-   Stufen darunter die volle Breite - mit Wort, nicht nur mit Symbol.
-
-   Die Grenze ist bewusst nicht der Mobile-Breakpoint: iPad Portrait ist
-   768px, dort galt die kompakte Icon-Variante wieder (gemessen bei 820px: 59
-   Segmente à 34x30px, Label `display: none`). Touch endet nicht bei 767px.
-   `pointer: coarse` deckt zusätzlich das Tablet im Querformat, wo der
-   Viewport breiter als Desktop ist, der Finger aber derselbe bleibt. */
+/* Die Chips der Rollen und Mitglieder sind am Finger ein volles Ziel (Critique
+   2026-07-27: 32px). `pointer: coarse` deckt das Tablet im Querformat. */
 @media (max-width: 1023px), (pointer: coarse) {
-  .perm-modgroup__widgets { padding-inline-start: var(--space-4); }
-  .perm-modgroup__capabilities { margin-inline-start: var(--space-4); }
-
   .perm-chip { min-height: var(--target-base); }
-
-  .perm-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-2);
-  }
-
-  /* DIE BASIS DES NAMENS IST IN DER SPALTE EINE HOEHE (R23, D5). `flex: 1 1
-   * 12rem` oben gilt der Zeile; in der Spalte wurde daraus 12rem HOEHE je
-   * Name, und das Blatt maß mobil 12143px. In der Spalte nimmt der Name nur,
-   * was er braucht. */
-  .perm-row > .perm-row__label {
-    flex: none;
-  }
-
-  /* Der Name darf jetzt umbrechen: er teilt die Zeile mit nichts mehr. */
-  .perm-row__name {
-    white-space: normal;
-    overflow: visible;
-  }
-
-  .perm-seg {
-    display: grid;
-    grid-template-columns: repeat(var(--seg-count, 3), 1fr);
-    width: 100%;
-  }
-
-  /* Icon über Wort: nebeneinander passen vier Stufen ("Erben" kommt im
-     Mitglieds-Modus dazu) bei 390px nicht in eine Zeile. */
-  /* Hier traegt das Segment sein Label wieder - es ist kein Icon-Ziel mehr und
-   * gibt die quadratische Mindestbreite an die Rasterspalte ab. */
-  .perm-seg__opt {
-    display: grid;
-    place-items: center;
-    grid-auto-flow: row;
-    align-content: center;
-    gap: var(--space-0h);
-    min-width: 0;
-    min-height: var(--target-base);
-    padding: var(--space-1) var(--space-0h);
-  }
-
-  .perm-seg__label {
-    display: block;
-    font-size: var(--text-xs);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.15;
-    text-align: center;
-    white-space: normal;
-  }
-
-  /* Zwei Buttons plus Statuszeile passen bei 390px nicht nebeneinander. Die
-     ERLAUBNIS zum Umbruch steht seit #872 in der Basisregel und gilt in jeder
-     Breite; hier bleibt nur der GRUND: die Statuszeile nimmt sich eine eigene
-     Zeile, statt sich zwischen die Knoepfe zu draengen. */
-  .perm-actions__status {
-    flex-basis: 100%;
-    margin-right: 0;
-  }
-
-  /* Klebend nur, solange etwas ungespeichert ist (Re-Critique 2026-09-28,
-   * A7 P2-5): vorher 73px dauerhaft ueber der 76px-Kapsel, auch mit gesperrtem
-   * „Speichern", und im ersten Bild lag er auf dem Rollen-Hinweis. Ohne
-   * Aenderung steht der Fuss am Ende der Liste - „Zuruecksetzen" bleibt dort
-   * erreichbar. `is-dirty` setzt updateSaveState(), derselbe Weg, der
-   * „Speichern" freigibt. */
-  .perm-actions:not(.is-dirty) {
-    position: static;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .perm-chip,
-  .perm-seg__opt,
-  .perm-seg__thumb { transition: none; }
+  .perm-row__more svg { transition: none; }
 }
 
 /* --------------------------------------------------------

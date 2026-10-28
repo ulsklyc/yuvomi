@@ -186,14 +186,37 @@ function scopeModuleLabel(key) {
   return label === i18nKey ? key : label;
 }
 
+/**
+ * JE MODUL EINE OPTIONSZEILE (R24, E11; Critique G6-Einst-P3-1). Hier stand eine
+ * graue Tabelle mit 30 nativen 13px-Kaestchen (Lesen | Schreiben), Treffer ueber
+ * die Zelle - der Formular-Dialekt mitten in einem Einstellungsblatt. Jetzt
+ * dieselbe Zeile wie Name, Person und Gueltigkeit darueber: Modul links, die
+ * Stufe als Auswahl rechts ("Kein Zugriff ⌄"), wie die Rechte-Matrix. Schreiben
+ * schliesst Lesen ein - die Stufe sagt es, statt ein zweites Kaestchen zu
+ * sperren.
+ */
+export const SCOPE_LEVELS = ['none', 'read', 'write'];
+
 function renderScopeRows(scopeKeys) {
-  return scopeKeys.map((key) => `
-    <div class="api-token-scopes__row">
-      <span class="api-token-scopes__name">${esc(scopeModuleLabel(key))}</span>
-      <label class="api-token-scopes__cell"><input type="checkbox" data-scope="${key}:read" aria-label="${esc(scopeModuleLabel(key))} ${t('settings.apiTokenScopeRead')}" /></label>
-      <label class="api-token-scopes__cell"><input type="checkbox" data-scope="${key}:write" aria-label="${esc(scopeModuleLabel(key))} ${t('settings.apiTokenScopeWrite')}" /></label>
-    </div>
-  `).join('');
+  const options = [
+    ['none', t('settings.permAccessNone')],
+    ['read', t('settings.apiTokenScopeRead')],
+    ['write', t('settings.apiTokenScopeWrite')],
+  ].map(([value, label]) => `<option value="${value}">${esc(label)}</option>`).join('');
+  return scopeKeys.map((key) => settingRowHtml({
+    label: scopeModuleLabel(key),
+    labelFor: `api-token-scope-${key.replace(/[^a-z0-9_-]/gi, '-')}`,
+    control: `<select class="form-input" id="api-token-scope-${esc(key.replace(/[^a-z0-9_-]/gi, '-'))}" data-scope-module="${esc(key)}">${options}</select>`,
+  })).join('');
+}
+
+/** Die gewaehlten Stufen als Scopes der API: Schreiben schliesst Lesen ein. */
+export function scopesFromLevels(entries) {
+  return entries.flatMap(([key, level]) => {
+    if (level === 'write') return [`${key}:read`, `${key}:write`];
+    if (level === 'read') return [`${key}:read`];
+    return [];
+  });
 }
 
 function renderPage(container, scopeKeys = CORE_SCOPE_MODULE_KEYS) {
@@ -249,12 +272,7 @@ function renderPage(container, scopeKeys = CORE_SCOPE_MODULE_KEYS) {
               attrs: { id: 'api-token-scope-limit' },
             })}
           </div>
-          <div id="api-token-scope-grid" class="api-token-scopes">
-            <div class="api-token-scopes__head">
-              <span>${t('settings.apiTokenScopeModule')}</span>
-              <span>${t('settings.apiTokenScopeRead')}</span>
-              <span>${t('settings.apiTokenScopeWrite')}</span>
-            </div>
+          <div id="api-token-scope-grid" class="row-carrier settings-group api-token-scopes" role="group" aria-label="${esc(t('settings.apiTokenScopeModule'))}">
             ${renderScopeRows(scopeKeys)}
           </div>
           <div id="api-token-created" class="settings-token-output" hidden>
@@ -330,14 +348,6 @@ function bindEvents(container, initialTokens, users, currentUserId) {
     scopeLimit.addEventListener('change', () => {
       scopeGrid.hidden = !scopeLimit.checked;
     });
-    // Schreibrecht schließt Leserecht ein: read spiegeln + sperren, solange write aktiv ist.
-    scopeGrid.addEventListener('change', (event) => {
-      const box = event.target;
-      if (!box.dataset.scope || !box.dataset.scope.endsWith(':write')) return;
-      const readBox = scopeGrid.querySelector(`[data-scope="${box.dataset.scope.replace(':write', ':read')}"]`);
-      if (!readBox) return;
-      if (box.checked) { readBox.checked = true; readBox.disabled = true; } else { readBox.disabled = false; }
-    });
   }
 
   form.addEventListener('submit', async (event) => {
@@ -361,8 +371,8 @@ function bindEvents(container, initialTokens, users, currentUserId) {
     // scopes: nur senden, wenn „auf Module beschränken" aktiv ist. Sonst voller Zugriff.
     const payload = { name, expires_at, subject_user_id: Number(subject.value) };
     if (scopeLimit && scopeLimit.checked) {
-      const scopes = [...scopeGrid.querySelectorAll('input[data-scope]:checked')]
-        .map((box) => box.dataset.scope);
+      const scopes = scopesFromLevels([...scopeGrid.querySelectorAll('select[data-scope-module]')]
+        .map((select) => [select.dataset.scopeModule, select.value]));
       if (!scopes.length) {
         showError(errorEl, t('settings.apiTokenScopeRequired'));
         return;
@@ -379,10 +389,7 @@ function bindEvents(container, initialTokens, users, currentUserId) {
       form.reset();
       expiresPicker.value = '';
       syncValidity();
-      if (scopeGrid) {
-        scopeGrid.hidden = !scopeLimit.checked;
-        scopeGrid.querySelectorAll('input[data-scope]').forEach((box) => { box.disabled = false; });
-      }
+      if (scopeGrid) scopeGrid.hidden = !scopeLimit.checked;
       // The raw token is shown exactly once, only from the creation response.
       outputValue.value = res.token;
       output.hidden = false;

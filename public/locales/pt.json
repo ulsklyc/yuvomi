@@ -2901,7 +2901,6 @@
         "permInherit": "Herdar",
         "permInheritedHint": "Herdado: {{value}}",
         "permModuleLockedHint": "Módulo bloqueado",
-        "permSave": "Guardar",
         "permSaved": "Permissões de {{name}} guardadas.",
         "permResetSubject": "Repor predefinição",
         "permResetConfirm": "Repor todas as permissões de {{name}} para a predefinição (acesso completo)?",
@@ -2915,9 +2914,6 @@
         "permLoadError": "Não foi possível carregar as permissões.",
         "permNoMembers": "Ainda não há membros.",
         "permReadOnlyBanner": "Tem acesso apenas de leitura a este módulo - não é possível fazer alterações.",
-        "permDiscardConfirm": "Descartar as alterações não guardadas?",
-        "permDiscard": "Descartar",
-        "permUnsaved": "Alterações não guardadas",
         "leaveDiscardDetail": "As alterações feitas nesta página ainda não foram guardadas e perdem-se se sair agora.",
         "permSummaryFull": "Acesso completo a todos os módulos e widgets.",
         "permDeviationsLead": "Exceções:",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "Só de leitura: {{count}} entradas à espera de envio para aqui não vão chegar",
         "reminderListAssigneesTasksOnly": "As pessoas só podem ser definidas para listas que vão para Tarefas.",
         "syncAssigneeNotMember": "Aqui só podem ser escolhidos membros do agregado.",
-        "syncAssigneeUnknown": "Esta pessoa já não existe. Recarregue a página."
+        "syncAssigneeUnknown": "Esta pessoa já não existe. Recarregue a página.",
+        "permDetails": "Widgets e mais permissões"
     },
     "login": {
         "tagline": "Bem-vindo de volta. A tua casa num só lugar.",

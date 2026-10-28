@@ -2956,7 +2956,6 @@
         "permInherit": "Erben",
         "permInheritedHint": "Geerbt: {{value}}",
         "permModuleLockedHint": "Modul gesperrt",
-        "permSave": "Speichern",
         "permSaved": "Rechte für {{name}} gespeichert.",
         "permResetSubject": "Auf Standard zurücksetzen",
         "permResetConfirm": "Alle Rechte für {{name}} auf Standard (Vollzugriff) zurücksetzen?",
@@ -2970,9 +2969,6 @@
         "permLoadError": "Die Rechte konnten nicht geladen werden.",
         "permNoMembers": "Keine Mitglieder vorhanden.",
         "permReadOnlyBanner": "Du hast nur Lesezugriff auf dieses Modul - Änderungen sind nicht möglich.",
-        "permDiscardConfirm": "Ungespeicherte Änderungen verwerfen?",
-        "permDiscard": "Verwerfen",
-        "permUnsaved": "Ungespeicherte Änderungen",
         "leaveDiscardDetail": "Was du auf diesem Blatt geändert hast, ist noch nicht gespeichert und geht verloren, wenn du es jetzt verlässt.",
         "permSummaryFull": "Voller Zugriff auf alle Module und Widgets.",
         "permDeviationsLead": "Abweichungen:",
@@ -3466,7 +3462,8 @@
         "reminderListReadOnlyWaiting": "Nur lesbar: {{count}} Einträge, die hierher hochgeladen werden sollen, kommen nicht an",
         "reminderListAssigneesTasksOnly": "Personen gibt es nur für Listen, die in Aufgaben landen.",
         "syncAssigneeNotMember": "Nur Haushaltsmitglieder können hier gewählt werden.",
-        "syncAssigneeUnknown": "Diese Person gibt es nicht mehr. Lade die Seite neu."
+        "syncAssigneeUnknown": "Diese Person gibt es nicht mehr. Lade die Seite neu.",
+        "permDetails": "Widgets und weitere Rechte"
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",

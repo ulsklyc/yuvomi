@@ -2901,7 +2901,6 @@
         "permInherit": "Kế thừa",
         "permInheritedHint": "Kế thừa: {{value}}",
         "permModuleLockedHint": "Mô-đun bị khóa",
-        "permSave": "Lưu",
         "permSaved": "Đã lưu quyền cho {{name}}.",
         "permResetSubject": "Đặt lại về mặc định",
         "permResetConfirm": "Đặt lại tất cả quyền cho {{name}} về mặc định (toàn quyền truy cập)?",
@@ -2915,9 +2914,6 @@
         "permLoadError": "Không thể tải quyền.",
         "permNoMembers": "Chưa có thành viên.",
         "permReadOnlyBanner": "Bạn có quyền chỉ đọc với mô-đun này - không thể thay đổi.",
-        "permDiscardConfirm": "Bỏ các thay đổi chưa lưu?",
-        "permDiscard": "Bỏ",
-        "permUnsaved": "Thay đổi chưa lưu",
         "leaveDiscardDetail": "Các thay đổi bạn đã thực hiện trên trang này chưa được lưu và sẽ mất nếu bạn rời đi bây giờ.",
         "permSummaryFull": "Toàn quyền truy cập tất cả mô-đun và widget.",
         "permDeviationsLead": "Ngoại lệ:",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "Chỉ đọc: {{count}} mục đang chờ tải lên đây sẽ không đến nơi",
         "reminderListAssigneesTasksOnly": "Chỉ đặt được người cho danh sách đi vào Công việc.",
         "syncAssigneeNotMember": "Ở đây chỉ chọn được thành viên trong gia đình.",
-        "syncAssigneeUnknown": "Người này không còn tồn tại. Hãy tải lại trang."
+        "syncAssigneeUnknown": "Người này không còn tồn tại. Hãy tải lại trang.",
+        "permDetails": "Tiện ích và quyền khác"
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

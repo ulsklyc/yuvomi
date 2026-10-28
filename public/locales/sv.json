@@ -2901,7 +2901,6 @@
         "permInherit": "Ärv",
         "permInheritedHint": "Ärvt: {{value}}",
         "permModuleLockedHint": "Modul låst",
-        "permSave": "Spara",
         "permSaved": "Behörigheter för {{name}} sparade.",
         "permResetSubject": "Återställ till standard",
         "permResetConfirm": "Återställa alla behörigheter för {{name}} till standard (full åtkomst)?",
@@ -2915,9 +2914,6 @@
         "permLoadError": "Behörigheterna kunde inte läsas in.",
         "permNoMembers": "Inga medlemmar än.",
         "permReadOnlyBanner": "Du har skrivskyddad åtkomst till denna modul - ändringar är inte möjliga.",
-        "permDiscardConfirm": "Kasta osparade ändringar?",
-        "permDiscard": "Kasta",
-        "permUnsaved": "Osparade ändringar",
         "leaveDiscardDetail": "Ändringarna du har gjort på den här sidan är inte sparade än och går förlorade om du lämnar nu.",
         "permSummaryFull": "Full åtkomst till alla moduler och widgetar.",
         "permDeviationsLead": "Undantag:",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "Skrivskyddad: {{count}} poster som väntar på uppladdning hit kommer inte fram",
         "reminderListAssigneesTasksOnly": "Personer kan bara anges för listor som går till Uppgifter.",
         "syncAssigneeNotMember": "Bara medlemmar i hushållet kan väljas här.",
-        "syncAssigneeUnknown": "Den här personen finns inte längre. Ladda om sidan."
+        "syncAssigneeUnknown": "Den här personen finns inte längre. Ladda om sidan.",
+        "permDetails": "Widgetar och fler behörigheter"
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

@@ -2919,7 +2919,6 @@
         "permInherit": "상속",
         "permInheritedHint": "상속됨: {{value}}",
         "permModuleLockedHint": "모듈 잠김",
-        "permSave": "저장",
         "permSaved": "{{name}}의 권한을 저장했습니다.",
         "permResetSubject": "기본값으로 재설정",
         "permResetConfirm": "{{name}}의 모든 권한을 기본값(전체 접근)으로 재설정할까요?",
@@ -2933,9 +2932,6 @@
         "permLoadError": "권한을 불러오지 못했습니다.",
         "permNoMembers": "아직 구성원이 없습니다.",
         "permReadOnlyBanner": "이 모듈에 대한 읽기 전용 접근 권한이 있습니다. 변경할 수 없습니다.",
-        "permDiscardConfirm": "저장하지 않은 변경 사항을 버릴까요?",
-        "permDiscard": "버리기",
-        "permUnsaved": "저장하지 않은 변경 사항",
         "leaveDiscardDetail": "이 페이지에서 변경한 내용이 아직 저장되지 않았습니다. 지금 나가면 사라집니다.",
         "permSummaryFull": "모든 모듈과 위젯에 대한 전체 접근.",
         "permDeviationsLead": "예외:",
@@ -3466,7 +3462,8 @@
         "reminderListReadOnlyWaiting": "읽기 전용: 여기로 업로드를 기다리는 항목 {{count}}개는 도착하지 않습니다",
         "reminderListAssigneesTasksOnly": "사람은 할 일로 가는 목록에만 정할 수 있습니다.",
         "syncAssigneeNotMember": "여기서는 가구 구성원만 고를 수 있습니다.",
-        "syncAssigneeUnknown": "이 사람은 더 이상 없습니다. 페이지를 새로 고치세요."
+        "syncAssigneeUnknown": "이 사람은 더 이상 없습니다. 페이지를 새로 고치세요.",
+        "permDetails": "위젯 및 기타 권한"
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",

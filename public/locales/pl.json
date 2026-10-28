@@ -3121,7 +3121,6 @@
         "permInherit": "Dziedzicz",
         "permInheritedHint": "Odziedziczone: {{value}}",
         "permModuleLockedHint": "Moduł zablokowany",
-        "permSave": "Zapisz",
         "permSaved": "Uprawnienia dla {{name}} zapisane.",
         "permResetSubject": "Przywróć domyślne",
         "permResetConfirm": "Przywrócić wszystkie uprawnienia dla {{name}} do domyślnych (pełny dostęp)?",
@@ -3135,9 +3134,6 @@
         "permLoadError": "Nie udało się wczytać uprawnień.",
         "permNoMembers": "Brak członków.",
         "permReadOnlyBanner": "Masz dostęp tylko do odczytu do tego modułu - zmiany nie są możliwe.",
-        "permDiscardConfirm": "Odrzucić niezapisane zmiany?",
-        "permDiscard": "Odrzuć",
-        "permUnsaved": "Niezapisane zmiany",
         "leaveDiscardDetail": "Zmiany wprowadzone na tej stronie nie zostały jeszcze zapisane i przepadną, jeśli teraz ją opuścisz.",
         "permSummaryFull": "Pełny dostęp do wszystkich modułów i widżetów.",
         "permDeviationsLead": "Wyjątki:",
@@ -3692,7 +3688,8 @@
         "reminderListReadOnlyWaiting_many": "Tylko do odczytu: {{count}} wpisów czekających na przesłanie tutaj nie dotrze",
         "reminderListAssigneesTasksOnly": "Osoby można ustawić tylko dla list trafiających do Zadań.",
         "syncAssigneeNotMember": "Tutaj można wybrać tylko członków gospodarstwa domowego.",
-        "syncAssigneeUnknown": "Ta osoba już nie istnieje. Odśwież stronę."
+        "syncAssigneeUnknown": "Ta osoba już nie istnieje. Odśwież stronę.",
+        "permDetails": "Widżety i dodatkowe uprawnienia"
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

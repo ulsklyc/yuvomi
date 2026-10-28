@@ -2163,9 +2163,9 @@ const PENDING = {
     'public/pages/notes.js': 1, 'public/pages/schedule.js': 1,
   },
   'advanced-hint': {},
+  // Die Rechte-Matrix hat seit R24 S11 (E11) keinen Speichern-Knopf mehr.
   'primary-disabled': {
     'public/pages/schedule.js': 1,
-    'public/settings/pages/admin-permissions.js': 1,
   },
   'people-checkbox': {},
 };

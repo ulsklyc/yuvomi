@@ -2901,7 +2901,6 @@
         "permInherit": "Eredita",
         "permInheritedHint": "Ereditato: {{value}}",
         "permModuleLockedHint": "Modulo bloccato",
-        "permSave": "Salva",
         "permSaved": "Autorizzazioni di {{name}} salvate.",
         "permResetSubject": "Ripristina predefinito",
         "permResetConfirm": "Ripristinare tutte le autorizzazioni di {{name}} al valore predefinito (accesso completo)?",
@@ -2915,9 +2914,6 @@
         "permLoadError": "Impossibile caricare i permessi.",
         "permNoMembers": "Ancora nessun membro.",
         "permReadOnlyBanner": "Hai accesso in sola lettura a questo modulo: non è possibile apportare modifiche.",
-        "permDiscardConfirm": "Scartare le modifiche non salvate?",
-        "permDiscard": "Scarta",
-        "permUnsaved": "Modifiche non salvate",
         "leaveDiscardDetail": "Le modifiche apportate in questa pagina non sono ancora state salvate e andranno perse se esci ora.",
         "permSummaryFull": "Accesso completo a tutti i moduli e widget.",
         "permDeviationsLead": "Eccezioni:",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "Sola lettura: {{count}} voci in attesa di caricamento qui non arriveranno",
         "reminderListAssigneesTasksOnly": "Le persone si impostano solo per liste che finiscono nelle Attività.",
         "syncAssigneeNotMember": "Qui si possono scegliere solo membri della famiglia.",
-        "syncAssigneeUnknown": "Questa persona non esiste più. Ricarica la pagina."
+        "syncAssigneeUnknown": "Questa persona non esiste più. Ricarica la pagina.",
+        "permDetails": "Widget e altri permessi"
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",

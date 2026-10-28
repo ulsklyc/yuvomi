@@ -280,7 +280,8 @@ test('die Rechtematrix zerlegt dataset.group nicht mehr selbst (#1009)', () => {
   );
   assert.match(
     src,
-    /parsePermissionGroup\s*\(\s*opt\.dataset\.group\s*\)/,
+    // R24 (E11): die Stufe ist eine Auswahl je Zeile (`select`), vorher ein Segment (`opt`).
+    /parsePermissionGroup\s*\(\s*select\.dataset\.group\s*\)/,
     'und ihn auf dataset.group anwenden',
   );
 

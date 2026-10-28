@@ -2956,7 +2956,6 @@
         "permInherit": "Manahin",
         "permInheritedHint": "Minana: {{value}}",
         "permModuleLockedHint": "Naka-lock ang modyul",
-        "permSave": "I-save",
         "permSaved": "Na-save ang mga pahintulot para sa {{name}}.",
         "permResetSubject": "I-reset sa default",
         "permResetConfirm": "I-reset ang lahat ng pahintulot para sa {{name}} sa default (buong access)?",
@@ -2970,9 +2969,6 @@
         "permLoadError": "Hindi ma-load ang mga pahintulot.",
         "permNoMembers": "Wala pang miyembro.",
         "permReadOnlyBanner": "Babasahin lamang ang iyong access sa modyul na ito - hindi posible ang mga pagbabago.",
-        "permDiscardConfirm": "Itapon ang mga hindi naka-save na pagbabago?",
-        "permDiscard": "Itapon",
-        "permUnsaved": "Mga hindi naka-save na pagbabago",
         "leaveDiscardDetail": "Hindi pa naka-save ang mga binago mo sa pahinang ito at mawawala ang mga ito kapag umalis ka ngayon.",
         "permSummaryFull": "Buong access sa lahat ng modyul at widget.",
         "permDeviationsLead": "Mga pagkakaiba:",
@@ -3466,7 +3462,8 @@
         "reminderListReadOnlyWaiting": "Read-only: hindi darating ang {{count}} entry na naghihintay ma-upload dito",
         "reminderListAssigneesTasksOnly": "Maitatakda lang ang mga tao para sa mga listahang napupunta sa Mga Gawain.",
         "syncAssigneeNotMember": "Mga miyembro lang ng sambahayan ang mapipili rito.",
-        "syncAssigneeUnknown": "Wala na ang taong ito. I-reload ang pahina."
+        "syncAssigneeUnknown": "Wala na ang taong ito. I-reload ang pahina.",
+        "permDetails": "Mga widget at iba pang pahintulot"
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

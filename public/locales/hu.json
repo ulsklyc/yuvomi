@@ -2901,7 +2901,6 @@
         "permInherit": "Öröklés",
         "permInheritedHint": "Örökölt: {{value}}",
         "permModuleLockedHint": "Modul zárolva",
-        "permSave": "Mentés",
         "permSaved": "{{name}} jogosultságai mentve.",
         "permResetSubject": "Alapértelmezés visszaállítása",
         "permResetConfirm": "Visszaállítod {{name}} összes jogosultságát az alapértelmezésre (teljes hozzáférés)?",
@@ -2915,9 +2914,6 @@
         "permLoadError": "A jogosultságok betöltése sikertelen.",
         "permNoMembers": "Még nincsenek tagok.",
         "permReadOnlyBanner": "Csak olvasási hozzáférésed van ehhez a modulhoz - módosítás nem lehetséges.",
-        "permDiscardConfirm": "Elveted a nem mentett módosításokat?",
-        "permDiscard": "Elvetés",
-        "permUnsaved": "Nem mentett módosítások",
         "leaveDiscardDetail": "Az ezen az oldalon végzett módosítások még nincsenek mentve, és elvesznek, ha most kilép.",
         "permSummaryFull": "Teljes hozzáférés az összes modulhoz és widgethez.",
         "permDeviationsLead": "Kivételek:",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "Csak olvasható: {{count}} ide feltöltésre váró bejegyzés nem érkezik meg",
         "reminderListAssigneesTasksOnly": "Személyek csak a Feladatokba kerülő listákhoz állíthatók be.",
         "syncAssigneeNotMember": "Itt csak a háztartás tagjai választhatók.",
-        "syncAssigneeUnknown": "Ez a személy már nem létezik. Töltsd újra az oldalt."
+        "syncAssigneeUnknown": "Ez a személy már nem létezik. Töltsd újra az oldalt.",
+        "permDetails": "Widgetek és további jogok"
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

@@ -3103,7 +3103,6 @@
         "permInherit": "Успадкувати",
         "permInheritedHint": "Успадковано: {{value}}",
         "permModuleLockedHint": "Модуль заблоковано",
-        "permSave": "Зберегти",
         "permSaved": "Права для {{name}} збережено.",
         "permResetSubject": "Скинути до типових",
         "permResetConfirm": "Скинути всі права для {{name}} до типових (повний доступ)?",
@@ -3117,9 +3116,6 @@
         "permLoadError": "Не вдалося завантажити права доступу.",
         "permNoMembers": "Ще немає учасників.",
         "permReadOnlyBanner": "У вас доступ лише для читання до цього модуля - зміни неможливі.",
-        "permDiscardConfirm": "Відхилити незбережені зміни?",
-        "permDiscard": "Відхилити",
-        "permUnsaved": "Незбережені зміни",
         "leaveDiscardDetail": "Зміни на цій сторінці ще не збережено, і їх буде втрачено, якщо ви підете зараз.",
         "permSummaryFull": "Повний доступ до всіх модулів і віджетів.",
         "permDeviationsLead": "Винятки:",
@@ -3674,7 +3670,8 @@
         "reminderListReadOnlyWaiting_many": "Лише читання: {{count}} записів, що чекають на завантаження сюди, не дійдуть",
         "reminderListAssigneesTasksOnly": "Людей можна задати лише для списків, що йдуть у Завдання.",
         "syncAssigneeNotMember": "Тут можна вибрати лише членів родини.",
-        "syncAssigneeUnknown": "Цієї людини більше немає. Перезавантажте сторінку."
+        "syncAssigneeUnknown": "Цієї людини більше немає. Перезавантажте сторінку.",
+        "permDetails": "Віджети та інші права"
     },
     "login": {
         "tagline": "З поверненням. Ваш дім - в одному місці.",

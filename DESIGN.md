@@ -2492,12 +2492,15 @@ nirgends gibt, `.perm-seg__opt` stand als Icon-Segment auf 34x30, und allein
 `.documents-dms-link-btn` machte es richtig. Alle messen `--target-base`
 (auf Touch `--target-lg`).
 
-Die Rechte-Matrix hat das Label seit R21 in JEDER Breite: am Zeiger Icon und Wort
-nebeneinander, am Finger untereinander, gleich breite Stufen fuer den gleitenden Daumen.
-Die Legende ueber der Matrix, die am Zeiger die Icons erklaerte, entfiel - wer bei jedem
-Schalter nachschlagen muss, was ein durchgestrichenes Auge heisst, setzt Rechte fuer Kinder
-nach Gefuehl. Reicht die Zeile nicht (Mitglieds-Modus mit "Erben"), rueckt das Segment
-unter den Namen (`test:permissions`).
+Die Rechte-Matrix traegt seit R24 (E11) keine Segmente mehr: je Modul EINE Optionszeile der
+Einstellungen (`settingRowHtml`) mit der Stufe als randloser Auswahl rechts („Voll ⌄",
+Mitglied zusaetzlich „Erben" und „Geerbt: …" als Sekundaerzeile), Widgets und Zusatzrechte
+in derselben Form in der aufgeklappten Zeile („Widgets und weitere Rechte ⌄"). Eine Wahl
+wirkt sofort und meldet sich mit Rueckgaengig; Speichern-Knopf, Entwurf und
+Verwerfen-Rueckfrage entfallen, „Auf Standard zuruecksetzen" bleibt mit Rueckfrage. Der
+API-Zugriff waehlt seine Modulgrenze in derselben Zeilenform („Kein Zugriff / Lesen /
+Schreiben"), nicht mehr in einer Kaestchen-Tabelle (`test:permissions`,
+`test:api-token-defaults`). Vorher (R21): Icon + Wort je Segment, 4166/4989px.
 
 **Der erste der vier ist seit 2026-08-28 GESCHICHTE, und sein Ende ist die staerkere Lesart
 derselben Regel.** `.cal-toolbar__mine-btn` und die vier Ebenen-Chips daneben sind aus dem

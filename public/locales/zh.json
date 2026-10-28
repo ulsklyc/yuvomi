@@ -2901,7 +2901,6 @@
         "permInherit": "继承",
         "permInheritedHint": "继承：{{value}}",
         "permModuleLockedHint": "模块已锁定",
-        "permSave": "保存",
         "permSaved": "已保存 {{name}} 的权限。",
         "permResetSubject": "重置为默认",
         "permResetConfirm": "将 {{name}} 的所有权限重置为默认（完全访问）吗？",
@@ -2915,9 +2914,6 @@
         "permLoadError": "无法加载权限。",
         "permNoMembers": "还没有成员。",
         "permReadOnlyBanner": "您对此模块只有只读访问权限——无法进行更改。",
-        "permDiscardConfirm": "放弃未保存的更改吗？",
-        "permDiscard": "放弃",
-        "permUnsaved": "未保存的更改",
         "leaveDiscardDetail": "你在此页面所做的更改尚未保存，现在离开将会丢失。",
         "permSummaryFull": "对所有模块和小组件的完全访问。",
         "permDeviationsLead": "例外：",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "只读：等待上传到这里的 {{count}} 个条目不会送达",
         "reminderListAssigneesTasksOnly": "只有进入任务的清单才能设置人员。",
         "syncAssigneeNotMember": "这里只能选择家庭成员。",
-        "syncAssigneeUnknown": "此人已不存在。请重新加载页面。"
+        "syncAssigneeUnknown": "此人已不存在。请重新加载页面。",
+        "permDetails": "小组件和其他权限"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",

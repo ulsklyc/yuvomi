@@ -1178,10 +1178,11 @@ test('Einstellungen: ein Blatt ohne Formular (Rechte-Matrix) meldet seinen Entwu
     assert.equal(leave.hasLeaveGuard(), false, 'gespeichert: abgemeldet');
     abmelden();
   });
+  // R24 (E11): die Rechte-Matrix speichert jede Wahl sofort und hat keinen
+  // Entwurf mehr - sie meldet nichts an, und es gibt nichts zu verlieren.
   const src = await readFile(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
-  assert.match(src, /trackLeafEdits\(container, \(\) => state\.dirty\)/, 'die Matrix meldet ihren Entwurf an');
-  const update = src.slice(src.indexOf('function updateSaveState('), src.indexOf('\n}\n', src.indexOf('function updateSaveState(')));
-  assert.match(update, /syncLeafEdits\(\)/, 'jede Aenderung des Entwurfs gleicht die Anmeldung ab');
+  assert.doesNotMatch(src, /trackLeafEdits|state\.dirty/, 'kein Entwurf, keine Anmeldung');
+  assert.match(src, /matrix\?\.addEventListener\('change'/, 'die Wahl wirkt beim Aendern');
 });
 
 test('Feiertage: die Ebenen-Schalter speichern sofort, ein Fehler legt zurueck (R15 A7 P1-1)', async () => {

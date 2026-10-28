@@ -2919,7 +2919,6 @@
         "permInherit": "Warisi",
         "permInheritedHint": "Diwarisi: {{value}}",
         "permModuleLockedHint": "Modul terkunci",
-        "permSave": "Simpan",
         "permSaved": "Izin untuk {{name}} disimpan.",
         "permResetSubject": "Setel ulang ke default",
         "permResetConfirm": "Setel ulang semua izin untuk {{name}} ke default (akses penuh)?",
@@ -2933,9 +2932,6 @@
         "permLoadError": "Izin tidak dapat dimuat.",
         "permNoMembers": "Belum ada anggota.",
         "permReadOnlyBanner": "Anda memiliki akses hanya-baca ke modul ini - perubahan tidak dapat dilakukan.",
-        "permDiscardConfirm": "Buang perubahan yang belum disimpan?",
-        "permDiscard": "Buang",
-        "permUnsaved": "Perubahan belum disimpan",
         "leaveDiscardDetail": "Perubahan yang Anda buat di halaman ini belum disimpan dan akan hilang jika Anda keluar sekarang.",
         "permSummaryFull": "Akses penuh ke semua modul dan widget.",
         "permDeviationsLead": "Pengecualian:",
@@ -3466,7 +3462,8 @@
         "reminderListReadOnlyWaiting": "Hanya baca: {{count}} entri yang menunggu diunggah ke sini tidak akan sampai",
         "reminderListAssigneesTasksOnly": "Orang hanya bisa diatur untuk daftar yang masuk ke Tugas.",
         "syncAssigneeNotMember": "Hanya anggota rumah tangga yang bisa dipilih di sini.",
-        "syncAssigneeUnknown": "Orang ini sudah tidak ada. Muat ulang halaman."
+        "syncAssigneeUnknown": "Orang ini sudah tidak ada. Muat ulang halaman.",
+        "permDetails": "Widget dan izin lainnya"
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

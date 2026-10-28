@@ -2901,7 +2901,6 @@
         "permInherit": "इनहेरिट",
         "permInheritedHint": "इनहेरिट किया गया: {{value}}",
         "permModuleLockedHint": "मॉड्यूल लॉक है",
-        "permSave": "सहेजें",
         "permSaved": "{{name}} की अनुमतियाँ सहेजी गईं।",
         "permResetSubject": "डिफ़ॉल्ट पर रीसेट करें",
         "permResetConfirm": "{{name}} की सभी अनुमतियाँ डिफ़ॉल्ट (पूर्ण पहुँच) पर रीसेट करें?",
@@ -2915,9 +2914,6 @@
         "permLoadError": "अनुमतियाँ लोड नहीं हो सकीं।",
         "permNoMembers": "अभी तक कोई सदस्य नहीं।",
         "permReadOnlyBanner": "आपके पास इस मॉड्यूल तक केवल-पढ़ने की पहुँच है - बदलाव संभव नहीं हैं।",
-        "permDiscardConfirm": "बिना सहेजे बदलाव छोड़ें?",
-        "permDiscard": "छोड़ें",
-        "permUnsaved": "बिना सहेजे बदलाव",
         "leaveDiscardDetail": "इस पेज पर किए गए आपके बदलाव अभी सहेजे नहीं गए हैं और अभी छोड़ने पर खो जाएंगे।",
         "permSummaryFull": "सभी मॉड्यूल और विजेट तक पूर्ण पहुँच।",
         "permDeviationsLead": "अपवाद:",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "केवल पढ़ने के लिए: यहाँ अपलोड की प्रतीक्षा कर रही {{count}} प्रविष्टियाँ नहीं पहुँचेंगी",
         "reminderListAssigneesTasksOnly": "लोग केवल उन सूचियों के लिए तय किए जा सकते हैं जो कार्यों में जाती हैं।",
         "syncAssigneeNotMember": "यहाँ केवल परिवार के सदस्य चुने जा सकते हैं।",
-        "syncAssigneeUnknown": "यह व्यक्ति अब मौजूद नहीं है। पेज फिर से लोड करें।"
+        "syncAssigneeUnknown": "यह व्यक्ति अब मौजूद नहीं है। पेज फिर से लोड करें।",
+        "permDetails": "विजेट और अन्य अनुमतियाँ"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",

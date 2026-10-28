@@ -2901,7 +2901,6 @@
         "permInherit": "継承",
         "permInheritedHint": "継承: {{value}}",
         "permModuleLockedHint": "モジュールはロック中",
-        "permSave": "保存",
         "permSaved": "{{name}} の権限を保存しました。",
         "permResetSubject": "既定値にリセット",
         "permResetConfirm": "{{name}} のすべての権限を既定値（フルアクセス）にリセットしますか？",
@@ -2915,9 +2914,6 @@
         "permLoadError": "権限を読み込めませんでした。",
         "permNoMembers": "メンバーはまだいません。",
         "permReadOnlyBanner": "このモジュールには読み取り専用でアクセスしています。変更はできません。",
-        "permDiscardConfirm": "保存していない変更を破棄しますか？",
-        "permDiscard": "破棄",
-        "permUnsaved": "保存していない変更",
         "leaveDiscardDetail": "このページで行った変更はまだ保存されていません。今このページを離れると失われます。",
         "permSummaryFull": "すべてのモジュールとウィジェットにフルアクセス。",
         "permDeviationsLead": "例外:",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "読み取り専用：ここへのアップロードを待っている項目 {{count}} 件は届きません",
         "reminderListAssigneesTasksOnly": "人を設定できるのはタスクに入るリストだけです。",
         "syncAssigneeNotMember": "ここで選べるのは世帯のメンバーだけです。",
-        "syncAssigneeUnknown": "この人はもう存在しません。ページを再読み込みしてください。"
+        "syncAssigneeUnknown": "この人はもう存在しません。ページを再読み込みしてください。",
+        "permDetails": "ウィジェットとその他の権限"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

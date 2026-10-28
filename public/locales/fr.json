@@ -2901,7 +2901,6 @@
         "permInherit": "Hériter",
         "permInheritedHint": "Hérité : {{value}}",
         "permModuleLockedHint": "Module verrouillé",
-        "permSave": "Enregistrer",
         "permSaved": "Autorisations de {{name}} enregistrées.",
         "permResetSubject": "Réinitialiser par défaut",
         "permResetConfirm": "Réinitialiser toutes les autorisations de {{name}} à la valeur par défaut (accès complet) ?",
@@ -2915,9 +2914,6 @@
         "permLoadError": "Impossible de charger les droits.",
         "permNoMembers": "Aucun membre pour l'instant.",
         "permReadOnlyBanner": "Vous avez un accès en lecture seule à ce module - aucune modification n'est possible.",
-        "permDiscardConfirm": "Abandonner les modifications non enregistrées ?",
-        "permDiscard": "Abandonner",
-        "permUnsaved": "Modifications non enregistrées",
         "leaveDiscardDetail": "Les modifications apportées sur cette page ne sont pas encore enregistrées et seront perdues si vous la quittez maintenant.",
         "permSummaryFull": "Accès complet à tous les modules et widgets.",
         "permDeviationsLead": "Exceptions :",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "Lecture seule : {{count}} entrées en attente d’envoi ici n’arriveront pas",
         "reminderListAssigneesTasksOnly": "Les personnes ne se définissent que pour les listes qui vont dans les Tâches.",
         "syncAssigneeNotMember": "Seuls les membres du foyer peuvent être choisis ici.",
-        "syncAssigneeUnknown": "Cette personne n’existe plus. Rechargez la page."
+        "syncAssigneeUnknown": "Cette personne n’existe plus. Rechargez la page.",
+        "permDetails": "Widgets et autres droits"
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

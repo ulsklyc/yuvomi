@@ -2938,7 +2938,6 @@
         "permInherit": "Inherit",
         "permInheritedHint": "Inherited: {{value}}",
         "permModuleLockedHint": "Module locked",
-        "permSave": "Save",
         "permSaved": "Permissions for {{name}} saved.",
         "permResetSubject": "Reset to default",
         "permResetConfirm": "Reset all permissions for {{name}} to the default (full access)?",
@@ -2952,9 +2951,6 @@
         "permLoadError": "The permissions could not be loaded.",
         "permNoMembers": "No members yet.",
         "permReadOnlyBanner": "You have read-only access to this module - changes aren't possible.",
-        "permDiscardConfirm": "Discard unsaved changes?",
-        "permDiscard": "Discard",
-        "permUnsaved": "Unsaved changes",
         "leaveDiscardDetail": "The changes you made on this page have not been saved yet and will be lost if you leave now.",
         "permSummaryFull": "Full access to all modules and widgets.",
         "permDeviationsLead": "Deviations:",
@@ -3448,7 +3444,8 @@
         "reminderListReadOnlyWaiting": "Read-only: {{count}} entries waiting to upload here will not arrive",
         "reminderListAssigneesTasksOnly": "People can only be set for lists that go to Tasks.",
         "syncAssigneeNotMember": "Only household members can be chosen here.",
-        "syncAssigneeUnknown": "This person no longer exists. Reload the page."
+        "syncAssigneeUnknown": "This person no longer exists. Reload the page.",
+        "permDetails": "Widgets and more permissions"
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",

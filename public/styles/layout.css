@@ -2528,8 +2528,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 .filter-chip--active svg,
 .contact-filter-chip--active svg,
 .group-toggle__btn--active svg,
-.segmented__item.is-active svg,
-.perm-seg__opt.is-active svg {
+.segmented__item.is-active svg {
   /* 30 % statt 16 %: auf Tab-Bar-Größe (20px) las die schwächere Füllung
    * weiter als Outline (Finish-Verdict Fundament-Phase, Fix 8). */
   fill: color-mix(in srgb, currentColor 30%, transparent);
