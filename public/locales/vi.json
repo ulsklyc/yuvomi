@@ -4044,7 +4044,6 @@
         "selectedFilesLabel": "Đã chọn {{count}} tệp",
         "fileTooLargeNamed": "“{{name}}” quá lớn.",
         "uploadProgress": "Đang tải lên {{current}} trên {{total}}…",
-        "storageSettingsLink": "Cài đặt lưu trữ",
         "dmsSearchLabel": "Từ khóa tìm kiếm",
         "dmsSearching": "Đang tìm…",
         "dmsSearchError": "Hiện không kết nối được tới DMS.",
@@ -4129,7 +4128,8 @@
         "viewerPrevNamed": "Tài liệu trước: {{name}}",
         "viewerNextNamed": "Tài liệu tiếp theo: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" đang trống",
-        "viewerImageFallbackHint": "Không thể hiển thị hình ảnh này. Hãy tải xuống để mở."
+        "viewerImageFallbackHint": "Không thể hiển thị hình ảnh này. Hãy tải xuống để mở.",
+        "moreDetailsHint": "Mô tả và trạng thái"
     },
     "housekeeping": {
         "title": "Dọn dẹp",
@@ -6455,7 +6455,8 @@
         "openAction": "Mở {{name}}",
         "limitReached": "Tối đa {{count}} tài liệu.",
         "limitReached_one": "Tối đa {{count}} tài liệu.",
-        "lockedPrivate": "Có tệp đính kèm (riêng tư)"
+        "lockedPrivate": "Có tệp đính kèm (riêng tư)",
+        "pickNone": "Chọn ít nhất một tài liệu."
     },
     "join": {
         "title": "Thiết lập tài khoản",

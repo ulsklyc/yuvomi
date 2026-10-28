@@ -50,6 +50,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Mark as renewed" and Edit. In the form the currency is chosen inside the amount field, the next
   payment sits with the billing details, and the logo tile itself picks the image. The row no longer
   lists the payment method and the standard "3 days before" reminder in every line.
+- **Uploading a document is quieter.** The upload dialog no longer puts the cursor in the name field
+  (the file comes first and names itself), the explanations under name, category and folder sit behind
+  "Learn more", and the storage location is a plain sentence instead of a link out of the half-filled
+  form. People who may see a restricted document are picked with name chips. In the document viewer,
+  Open, Edit, Share and Download carry their words (on phones Download keeps its word and the others
+  show as icons), and "Add" in the receipt picker can always be pressed and says when nothing is chosen.
 - **One balance sentence.** When a group has a single open debt that involves you, the figure at the
   top says it with the name ("You owe Alex Johnson 24.14 €") and the balances list no longer repeats it.
 - **Tapping a meal shows it first.** The meal card opens a read view (date, meal, cook, ingredients,

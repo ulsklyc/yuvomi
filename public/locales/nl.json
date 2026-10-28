@@ -4044,7 +4044,6 @@
         "selectedFilesLabel": "{{count}} bestanden geselecteerd",
         "fileTooLargeNamed": "‘{{name}}’ is te groot.",
         "uploadProgress": "{{current}} van {{total}} uploaden…",
-        "storageSettingsLink": "Opslaginstellingen",
         "dmsSearchLabel": "Zoekterm",
         "dmsSearching": "Bezig met zoeken…",
         "dmsSearchError": "Het DMS is momenteel niet bereikbaar.",
@@ -4129,7 +4128,8 @@
         "viewerPrevNamed": "Vorig document: {{name}}",
         "viewerNextNamed": "Volgend document: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" is leeg",
-        "viewerImageFallbackHint": "Deze afbeelding kon niet worden weergegeven. Download hem om hem te openen."
+        "viewerImageFallbackHint": "Deze afbeelding kon niet worden weergegeven. Download hem om hem te openen.",
+        "moreDetailsHint": "Beschrijving en status"
     },
     "housekeeping": {
         "title": "Huishouden",
@@ -6455,7 +6455,8 @@
         "openAction": "{{name}} openen",
         "limitReached": "Maximaal {{count}} documenten.",
         "limitReached_one": "Maximaal {{count}} document.",
-        "lockedPrivate": "Bijlage aanwezig (privé)"
+        "lockedPrivate": "Bijlage aanwezig (privé)",
+        "pickNone": "Kies minstens één document."
     },
     "join": {
         "title": "Account instellen",

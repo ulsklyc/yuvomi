@@ -4226,7 +4226,6 @@
         "selectedFilesLabel": "Вибрано файлів: {{count}}",
         "fileTooLargeNamed": "«{{name}}» завеликий.",
         "uploadProgress": "Завантаження {{current}} із {{total}}…",
-        "storageSettingsLink": "Налаштування сховища",
         "dmsSearchLabel": "Пошуковий запит",
         "dmsSearching": "Пошук…",
         "dmsSearchError": "DMS зараз недоступна.",
@@ -4317,7 +4316,8 @@
         "viewerPrevNamed": "Попередній документ: {{name}}",
         "viewerNextNamed": "Наступний документ: {{name}}",
         "emptyFolderTitle": "Тека «{{name}}» порожня",
-        "viewerImageFallbackHint": "Не вдалося показати це зображення. Завантажте його, щоб відкрити."
+        "viewerImageFallbackHint": "Не вдалося показати це зображення. Завантажте його, щоб відкрити.",
+        "moreDetailsHint": "Опис і статус"
     },
     "shortcuts": {
         "goKitchen": "Кухня",
@@ -6787,7 +6787,8 @@
         "limitReached_one": "Не більше ніж {{count}} документ.",
         "limitReached_few": "Не більше ніж {{count}} документи.",
         "limitReached_many": "Не більше ніж {{count}} документів.",
-        "lockedPrivate": "Є вкладення (приватне)"
+        "lockedPrivate": "Є вкладення (приватне)",
+        "pickNone": "Обери щонайменше один документ."
     },
     "join": {
         "title": "Налаштування облікового запису",

@@ -3982,7 +3982,6 @@
         "selectedFilesLabel": "{{count}} dosya seçildi",
         "fileTooLargeNamed": "“{{name}}” çok büyük.",
         "uploadProgress": "{{total}} belgeden {{current}}. yükleniyor…",
-        "storageSettingsLink": "Depolama ayarları",
         "dmsSearchLabel": "Arama terimi",
         "dmsSearching": "Aranıyor…",
         "dmsSearchError": "DMS şu anda erişilebilir değil.",
@@ -4067,7 +4066,8 @@
         "viewerPrevNamed": "Önceki belge: {{name}}",
         "viewerNextNamed": "Sonraki belge: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" boş",
-        "viewerImageFallbackHint": "Bu görsel görüntülenemedi. Açmak için indirin."
+        "viewerImageFallbackHint": "Bu görsel görüntülenemedi. Açmak için indirin.",
+        "moreDetailsHint": "Açıklama ve durum"
     },
     "shortcuts": {
         "goKitchen": "Mutfak",
@@ -6455,7 +6455,8 @@
         "openAction": "{{name}} ögesini aç",
         "limitReached": "En fazla {{count}} belge.",
         "limitReached_one": "En fazla {{count}} belge.",
-        "lockedPrivate": "Ek mevcut (özel)"
+        "lockedPrivate": "Ek mevcut (özel)",
+        "pickNone": "En az bir belge seç."
     },
     "join": {
         "title": "Hesabını oluştur",

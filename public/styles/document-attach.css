@@ -208,6 +208,11 @@ a.doc-attach__chip-name:focus-visible {
   gap: var(--space-1);
 }
 
+/* Der Grund, wenn "Uebernehmen" ohne Wahl getippt wurde (R24, D4). */
+.doc-attach-picker__reason {
+  margin: 0;
+}
+
 .doc-attach-picker__status {
   margin: auto;
   color: var(--color-text-tertiary);

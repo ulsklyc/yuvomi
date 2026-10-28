@@ -4044,7 +4044,6 @@
         "selectedFilesLabel": "파일 {{count}}개 선택됨",
         "fileTooLargeNamed": "“{{name}}”이(가) 너무 큽니다.",
         "uploadProgress": "{{total}}개 중 {{current}}개 업로드 중…",
-        "storageSettingsLink": "저장소 설정",
         "dmsSearchLabel": "검색어",
         "dmsSearching": "검색 중…",
         "dmsSearchError": "지금은 DMS에 연결할 수 없습니다.",
@@ -4129,7 +4128,8 @@
         "viewerPrevNamed": "이전 문서: {{name}}",
         "viewerNextNamed": "다음 문서: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" 폴더가 비어 있습니다",
-        "viewerImageFallbackHint": "이 이미지를 표시할 수 없습니다. 다운로드하여 여세요."
+        "viewerImageFallbackHint": "이 이미지를 표시할 수 없습니다. 다운로드하여 여세요.",
+        "moreDetailsHint": "설명 및 상태"
     },
     "userMultiSelect": {
         "nobody": "없음",
@@ -6455,7 +6455,8 @@
         "openAction": "{{name}} 열기",
         "limitReached": "문서는 최대 {{count}}개입니다.",
         "limitReached_one": "문서는 최대 {{count}}개입니다.",
-        "lockedPrivate": "첨부 파일 있음(비공개)"
+        "lockedPrivate": "첨부 파일 있음(비공개)",
+        "pickNone": "문서를 하나 이상 선택하세요."
     },
     "join": {
         "title": "계정 설정",

@@ -5494,7 +5494,8 @@ test('R22 D13: lange Erklaerungen vor dem ersten Feld - Kern vorn, der Rest hint
     const sentences = de.settings[key].split(/(?<=[.!?])\s+/).length;
     assert.ok(sentences <= 2, `${key}: ${sentences} Saetze vor dem ersten Feld`);
   }
-  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  // Seit R24 ein geteilter Baustein (utils/hint-fold.js), die Regeln in layout.css.
+  const css = await readFile(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
   const summary = [...eachRule(css)].find((r) => r.selector.trim() === '.settings-hint-fold__summary');
   assert.ok(summary, 'der Ausloeser hat eine Regel');
   assert.match(summary.body, /min-block-size:\s*var\(--target-base\)/, 'Zielgroesse der Geraetewelt');

@@ -3982,7 +3982,6 @@
         "selectedFilesLabel": "{{count}} arquivos selecionados",
         "fileTooLargeNamed": "«{{name}}» é grande demais.",
         "uploadProgress": "Carregando {{current}} de {{total}}…",
-        "storageSettingsLink": "Configurações de armazenamento",
         "dmsSearchLabel": "Termo de pesquisa",
         "dmsSearching": "Pesquisando…",
         "dmsSearchError": "O DMS está indisponível de momento.",
@@ -4067,7 +4066,8 @@
         "viewerPrevNamed": "Documento anterior: {{name}}",
         "viewerNextNamed": "Próximo documento: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" está vazia",
-        "viewerImageFallbackHint": "Não foi possível mostrar esta imagem. Baixe-a para abri-la."
+        "viewerImageFallbackHint": "Não foi possível mostrar esta imagem. Baixe-a para abri-la.",
+        "moreDetailsHint": "Descrição e status"
     },
     "shortcuts": {
         "goKitchen": "Cozinha",
@@ -5836,7 +5836,8 @@
         "openAction": "Abrir {{name}}",
         "limitReached": "No máximo {{count}} documentos.",
         "limitReached_one": "No máximo {{count}} documento.",
-        "lockedPrivate": "Este documento é privado e não pode ser anexado."
+        "lockedPrivate": "Este documento é privado e não pode ser anexado.",
+        "pickNone": "Escolha pelo menos um documento."
     },
     "iconPicker": {
         "title": "Escolher ícone",

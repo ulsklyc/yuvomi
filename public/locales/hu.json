@@ -4044,7 +4044,6 @@
         "selectedFilesLabel": "{{count}} fájl kijelölve",
         "fileTooLargeNamed": "A(z) „{{name}}” túl nagy.",
         "uploadProgress": "Feltöltés: {{current}} / {{total}}…",
-        "storageSettingsLink": "Tárolási beállítások",
         "dmsSearchLabel": "Keresőkifejezés",
         "dmsSearching": "Keresés…",
         "dmsSearchError": "A DMS jelenleg nem érhető el.",
@@ -4129,7 +4128,8 @@
         "viewerPrevNamed": "Előző dokumentum: {{name}}",
         "viewerNextNamed": "Következő dokumentum: {{name}}",
         "emptyFolderTitle": "A(z) „{{name}}” mappa üres",
-        "viewerImageFallbackHint": "Ezt a képet nem sikerült megjeleníteni. Töltse le a megnyitáshoz."
+        "viewerImageFallbackHint": "Ezt a képet nem sikerült megjeleníteni. Töltse le a megnyitáshoz.",
+        "moreDetailsHint": "Leírás és állapot"
     },
     "housekeeping": {
         "title": "Háztartás",
@@ -6455,7 +6455,8 @@
         "openAction": "{{name}} megnyitása",
         "limitReached": "Legfeljebb {{count}} dokumentum.",
         "limitReached_one": "Legfeljebb {{count}} dokumentum.",
-        "lockedPrivate": "Van melléklet (privát)"
+        "lockedPrivate": "Van melléklet (privát)",
+        "pickNone": "Válassz legalább egy dokumentumot."
     },
     "join": {
         "title": "Fiók beállítása",

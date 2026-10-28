@@ -480,10 +480,6 @@
   .documents-context-menu__item {
     min-height: var(--target-lg);
   }
-
-  .document-member-option {
-    min-height: var(--target-base);
-  }
 }
 
 /* Natives Popover für Ordner- & Dokument-Aktionen: rendert im Top-Layer, daher
@@ -1362,20 +1358,13 @@
   background-color: var(--color-surface);
 }
 
+/* Die Personen als Chips wie renderUserMultiSelect (`.user-ms__option`,
+ * user-multi-select.css) - eine umbrechende Reihe (Critique R24, D4). */
 .document-member-picker__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-2);
-}
-
-.document-member-option {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--target-sm);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
 }
 
 /* Bis Tablet: Ordner-Browser als horizontale Chip-Leiste statt fixer Seitenspalte,
@@ -2425,14 +2414,6 @@
   flex-wrap: wrap;
 }
 
-/* Deep-Link in die (admin-only) Speicher-Einstellungen — bisher war das Ziel von
- * der Dokumente-Seite aus überhaupt nicht verlinkt. */
-.document-storage-target__link {
-  color: var(--module-accent);
-  font-size: var(--text-xs);
-  text-decoration: underline;
-}
-
 /* Fehlerzeile der DMS-Suche: eigener Zustand mit Retry, klar getrennt von
  * „keine Treffer" (das ist eine Antwort, kein Fehler). */
 .dms-results__error {
@@ -2575,6 +2556,20 @@
 
   .document-viewer__pager + .document-viewer__actions {
     margin-inline-start: auto;
+  }
+
+  /* Schmal behaelt nur der Primaerknopf sein Wort ("Herunterladen"); Oeffnen,
+   * Bearbeiten und Teilen stehen als Zeichen in Knopfgroesse - ihr Name steht
+   * im aria-label (Critique R24 G4-Dokumente-P3-3). Mit Wort liefen vier
+   * Knoepfe bei 390px aus der Zeile. */
+  .document-viewer__action:not(.btn--primary) {
+    inline-size: var(--target-base);
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  .document-viewer__action:not(.btn--primary) > span {
+    display: none;
   }
 
   .document-viewer__meta {

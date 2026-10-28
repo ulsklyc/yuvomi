@@ -3982,7 +3982,6 @@
         "selectedFilesLabel": "{{count}} फ़ाइलें चुनी गईं",
         "fileTooLargeNamed": "«{{name}}» बहुत बड़ी है।",
         "uploadProgress": "{{total}} में से {{current}} अपलोड हो रहा है…",
-        "storageSettingsLink": "भंडारण सेटिंग्स",
         "dmsSearchLabel": "खोज शब्द",
         "dmsSearching": "खोजा जा रहा है…",
         "dmsSearchError": "DMS इस समय उपलब्ध नहीं है।",
@@ -4067,7 +4066,8 @@
         "viewerPrevNamed": "पिछला दस्तावेज़: {{name}}",
         "viewerNextNamed": "अगला दस्तावेज़: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" खाली है",
-        "viewerImageFallbackHint": "यह छवि प्रदर्शित नहीं की जा सकी। इसे खोलने के लिए डाउनलोड करें।"
+        "viewerImageFallbackHint": "यह छवि प्रदर्शित नहीं की जा सकी। इसे खोलने के लिए डाउनलोड करें।",
+        "moreDetailsHint": "विवरण और स्थिति"
     },
     "shortcuts": {
         "goKitchen": "रसोई",
@@ -6455,7 +6455,8 @@
         "openAction": "{{name}} खोलें",
         "limitReached": "अधिकतम {{count}} दस्तावेज़।",
         "limitReached_one": "अधिकतम {{count}} दस्तावेज़।",
-        "lockedPrivate": "अटैचमेंट मौजूद है (निजी)"
+        "lockedPrivate": "अटैचमेंट मौजूद है (निजी)",
+        "pickNone": "कम से कम एक दस्तावेज़ चुनें।"
     },
     "join": {
         "title": "अपना खाता सेट करें",

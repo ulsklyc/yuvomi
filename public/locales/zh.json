@@ -3982,7 +3982,6 @@
         "selectedFilesLabel": "已选择 {{count}} 个文件",
         "fileTooLargeNamed": "“{{name}}”太大了。",
         "uploadProgress": "正在上传第 {{current}} / {{total}} 个…",
-        "storageSettingsLink": "存储设置",
         "dmsSearchLabel": "搜索词",
         "dmsSearching": "正在搜索…",
         "dmsSearchError": "当前无法连接 DMS。",
@@ -4067,7 +4066,8 @@
         "viewerPrevNamed": "上一个文档：{{name}}",
         "viewerNextNamed": "下一个文档：{{name}}",
         "emptyFolderTitle": "“{{name}}”是空的",
-        "viewerImageFallbackHint": "无法显示此图片。请下载后打开。"
+        "viewerImageFallbackHint": "无法显示此图片。请下载后打开。",
+        "moreDetailsHint": "说明和状态"
     },
     "shortcuts": {
         "goKitchen": "厨房",
@@ -6455,7 +6455,8 @@
         "openAction": "打开 {{name}}",
         "limitReached": "最多 {{count}} 份文档。",
         "limitReached_one": "最多 {{count}} 份文档。",
-        "lockedPrivate": "有附件（私密）"
+        "lockedPrivate": "有附件（私密）",
+        "pickNone": "请至少选择一份文件。"
     },
     "join": {
         "title": "设置你的账户",

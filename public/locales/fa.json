@@ -4044,7 +4044,6 @@
         "selectedFilesLabel": "{{count}} فایل انتخاب شد",
         "fileTooLargeNamed": "«{{name}}» بیش از حد بزرگ است.",
         "uploadProgress": "بارگذاری {{current}} از {{total}}…",
-        "storageSettingsLink": "تنظیمات ذخیره‌سازی",
         "dmsSearchLabel": "عبارت جست‌وجو",
         "dmsSearching": "در حال جست‌وجو…",
         "dmsSearchError": "در حال حاضر DMS در دسترس نیست.",
@@ -4129,7 +4128,8 @@
         "viewerPrevNamed": "سند قبلی: {{name}}",
         "viewerNextNamed": "سند بعدی: {{name}}",
         "emptyFolderTitle": "«{{name}}» خالی است",
-        "viewerImageFallbackHint": "نمایش این تصویر ممکن نشد. برای باز کردن، آن را دانلود کنید."
+        "viewerImageFallbackHint": "نمایش این تصویر ممکن نشد. برای باز کردن، آن را دانلود کنید.",
+        "moreDetailsHint": "توضیحات و وضعیت"
     },
     "userMultiSelect": {
         "nobody": "هیچ‌کس",
@@ -6455,7 +6455,8 @@
         "openAction": "باز کردن {{name}}",
         "limitReached": "حداکثر {{count}} سند.",
         "limitReached_one": "حداکثر {{count}} سند.",
-        "lockedPrivate": "پیوست موجود است (خصوصی)"
+        "lockedPrivate": "پیوست موجود است (خصوصی)",
+        "pickNone": "دست‌کم یک سند را انتخاب کن."
     },
     "join": {
         "title": "راه‌اندازی حساب",

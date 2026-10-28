@@ -4044,7 +4044,6 @@
         "selectedFilesLabel": "{{count}} Dateien ausgewählt",
         "fileTooLargeNamed": "„{{name}}“ ist zu groß.",
         "uploadProgress": "Lade {{current}} von {{total}} …",
-        "storageSettingsLink": "Speicher-Einstellungen",
         "dmsSearchLabel": "Suchbegriff",
         "dmsSearching": "Suche läuft …",
         "dmsSearchError": "Das DMS ist gerade nicht erreichbar.",
@@ -4129,7 +4128,8 @@
         "viewerPrevNamed": "Vorheriges Dokument: {{name}}",
         "viewerNextNamed": "Nächstes Dokument: {{name}}",
         "emptyFolderTitle": "„{{name}}“ ist leer",
-        "viewerImageFallbackHint": "Dieses Bild konnte nicht angezeigt werden. Lade es herunter, um es zu öffnen."
+        "viewerImageFallbackHint": "Dieses Bild konnte nicht angezeigt werden. Lade es herunter, um es zu öffnen.",
+        "moreDetailsHint": "Beschreibung und Status"
     },
     "userMultiSelect": {
         "nobody": "Niemand",
@@ -6455,7 +6455,8 @@
         "openAction": "{{name}} öffnen",
         "limitReached": "Höchstens {{count}} Dokumente möglich.",
         "limitReached_one": "Höchstens {{count}} Dokument möglich.",
-        "lockedPrivate": "Anhang vorhanden (privat)"
+        "lockedPrivate": "Anhang vorhanden (privat)",
+        "pickNone": "Wähle mindestens ein Dokument."
     },
     "join": {
         "title": "Konto einrichten",

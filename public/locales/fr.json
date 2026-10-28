@@ -3982,7 +3982,6 @@
         "selectedFilesLabel": "{{count}} fichiers sélectionnés",
         "fileTooLargeNamed": "« {{name}} » est trop volumineux.",
         "uploadProgress": "Téléversement {{current}} sur {{total}}…",
-        "storageSettingsLink": "Paramètres de stockage",
         "dmsSearchLabel": "Terme de recherche",
         "dmsSearching": "Recherche en cours…",
         "dmsSearchError": "La GED est actuellement injoignable.",
@@ -4067,7 +4066,8 @@
         "viewerPrevNamed": "Document précédent : {{name}}",
         "viewerNextNamed": "Document suivant : {{name}}",
         "emptyFolderTitle": "« {{name}} » est vide",
-        "viewerImageFallbackHint": "Cette image n'a pas pu être affichée. Téléchargez-la pour l'ouvrir."
+        "viewerImageFallbackHint": "Cette image n'a pas pu être affichée. Téléchargez-la pour l'ouvrir.",
+        "moreDetailsHint": "Description et statut"
     },
     "shortcuts": {
         "goKitchen": "Cuisine",
@@ -6455,7 +6455,8 @@
         "openAction": "Ouvrir {{name}}",
         "limitReached": "{{count}} documents au maximum.",
         "limitReached_one": "{{count}} document au maximum.",
-        "lockedPrivate": "Pièce jointe présente (privée)"
+        "lockedPrivate": "Pièce jointe présente (privée)",
+        "pickNone": "Choisis au moins un document."
     },
     "join": {
         "title": "Configurer votre compte",

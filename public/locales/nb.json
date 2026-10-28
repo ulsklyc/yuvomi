@@ -4044,7 +4044,6 @@
         "selectedFilesLabel": "{{count}} filer valgt",
         "fileTooLargeNamed": "«{{name}}» er for stor.",
         "uploadProgress": "Laster opp {{current}} av {{total}}…",
-        "storageSettingsLink": "Lagringsinnstillinger",
         "dmsSearchLabel": "Søkeord",
         "dmsSearching": "Leter…",
         "dmsSearchError": "DMS-systemet er for øyeblikket utilgjengelig.",
@@ -4129,7 +4128,8 @@
         "viewerPrevNamed": "Forrige dokument: {{name}}",
         "viewerNextNamed": "Neste dokument: {{name}}",
         "emptyFolderTitle": "«{{name}}» er tom",
-        "viewerImageFallbackHint": "Dette bildet kunne ikke vises. Last det ned for å åpne det."
+        "viewerImageFallbackHint": "Dette bildet kunne ikke vises. Last det ned for å åpne det.",
+        "moreDetailsHint": "Beskrivelse og status"
     },
     "housekeeping": {
         "title": "Husarbeid",
@@ -6455,7 +6455,8 @@
         "openAction": "Åpne {{name}}",
         "limitReached": "Minst {{count}} dokumenter.",
         "limitReached_one": "Minst {{count}} dokument.",
-        "lockedPrivate": "Vedlegg til stede (privat)"
+        "lockedPrivate": "Vedlegg til stede (privat)",
+        "pickNone": "Velg minst ett dokument."
     },
     "join": {
         "title": "Opprett konto",

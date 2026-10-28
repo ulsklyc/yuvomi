@@ -4288,7 +4288,6 @@
         "selectedFilesLabel": "Wybrane pliki: {{count}}",
         "fileTooLargeNamed": "„{{name}}” jest za duży.",
         "uploadProgress": "Przesyłanie {{current}} z {{total}}…",
-        "storageSettingsLink": "Ustawienia magazynu",
         "dmsSearchLabel": "Szukana fraza",
         "dmsSearching": "Wyszukiwanie…",
         "dmsSearchError": "System DMS jest obecnie nieosiągalny.",
@@ -4379,7 +4378,8 @@
         "viewerPrevNamed": "Poprzedni dokument: {{name}}",
         "viewerNextNamed": "Następny dokument: {{name}}",
         "emptyFolderTitle": "Folder „{{name}}” jest pusty",
-        "viewerImageFallbackHint": "Nie udało się wyświetlić tego obrazu. Pobierz go, aby go otworzyć."
+        "viewerImageFallbackHint": "Nie udało się wyświetlić tego obrazu. Pobierz go, aby go otworzyć.",
+        "moreDetailsHint": "Opis i status"
     },
     "userMultiSelect": {
         "nobody": "Nikt",
@@ -6787,7 +6787,8 @@
         "limitReached_one": "Maksymalnie dokumentów: {{count}}.",
         "limitReached_few": "Maksymalnie dokumentów: {{count}}.",
         "limitReached_many": "Maksymalnie dokumentów: {{count}}.",
-        "lockedPrivate": "Załącznik istnieje (prywatny)"
+        "lockedPrivate": "Załącznik istnieje (prywatny)",
+        "pickNone": "Wybierz co najmniej jeden dokument."
     },
     "join": {
         "title": "Skonfiguruj konto",

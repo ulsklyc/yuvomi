@@ -367,6 +367,7 @@ const APP_SHELL = [
   '/utils/content-swap.js',
   '/utils/color-picker.js',
   '/utils/interval-sentence.js',
+  '/utils/hint-fold.js',
   '/utils/media-picker.js',
   '/utils/filter-sheet.js',
   '/utils/folder-upload.js',

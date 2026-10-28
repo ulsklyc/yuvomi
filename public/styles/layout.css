@@ -12321,3 +12321,57 @@ p.field-hint--warn svg {
 .select-circle--on .select-circle__check {
   display: block;
 }
+
+/* ERKLAERUNG: KERN VORN, DER REST AUFKLAPPBAR (R22, D13; utils/hint-fold.js
+ * hintFoldHtml). Der Ausloeser ist ein Textknopf in Akzenttinte auf der
+ * Hinweisstufe, der Pfeil zeigt die Richtung (natives `<details>`, Marker
+ * aus). Die Trefferflaeche haelt die Zielgroesse ihrer Geraetewelt
+ * (--target-base liefert 40 am Zeiger, 48 am Finger), ohne die Zeile
+ * optisch aufzublaehen. */
+.settings-hint-fold {
+  margin-block-end: var(--space-3);
+}
+
+.settings-hint-fold__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-block-size: var(--target-base);
+  color: var(--color-accent);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings-hint-fold__summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-hint-fold__summary:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+.settings-hint-fold__icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: 0 0 auto;
+  transition: transform var(--transition-fast);
+}
+
+.settings-hint-fold__more[open] .settings-hint-fold__icon {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-hint-fold__icon {
+    transition: none;
+  }
+}
+
+.settings-hint-fold__body {
+  display: grid;
+  gap: var(--space-2);
+}

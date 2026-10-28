@@ -3982,7 +3982,6 @@
         "selectedFilesLabel": "已選擇 {{count}} 個檔案",
         "fileTooLargeNamed": "「{{name}}」太大了。",
         "uploadProgress": "正在上傳第 {{current}} / {{total}} 個…",
-        "storageSettingsLink": "儲存設定",
         "dmsSearchLabel": "搜尋詞",
         "dmsSearching": "正在搜尋…",
         "dmsSearchError": "當前無法連線 DMS。",
@@ -4067,7 +4066,8 @@
         "viewerPrevNamed": "上一個文件：{{name}}",
         "viewerNextNamed": "下一個文件：{{name}}",
         "emptyFolderTitle": "「{{name}}」是空的",
-        "viewerImageFallbackHint": "無法顯示此圖片。請下載後開啟。"
+        "viewerImageFallbackHint": "無法顯示此圖片。請下載後開啟。",
+        "moreDetailsHint": "說明與狀態"
     },
     "shortcuts": {
         "goKitchen": "廚房",
@@ -6455,7 +6455,8 @@
         "openAction": "開啟 {{name}}",
         "limitReached": "最多 {{count}} 份文件。",
         "limitReached_one": "最多 {{count}} 份文件。",
-        "lockedPrivate": "有附件（私密）"
+        "lockedPrivate": "有附件（私密）",
+        "pickNone": "請至少選擇一份文件。"
     },
     "join": {
         "title": "設定你的帳戶",

@@ -3982,7 +3982,6 @@
         "selectedFilesLabel": "{{count}} 件のファイルを選択中",
         "fileTooLargeNamed": "「{{name}}」は大きすぎます。",
         "uploadProgress": "{{total}} 件中 {{current}} 件をアップロード中…",
-        "storageSettingsLink": "ストレージ設定",
         "dmsSearchLabel": "検索語",
         "dmsSearching": "検索中…",
         "dmsSearchError": "現在 DMS に接続できません。",
@@ -4067,7 +4066,8 @@
         "viewerPrevNamed": "前のドキュメント: {{name}}",
         "viewerNextNamed": "次のドキュメント: {{name}}",
         "emptyFolderTitle": "「{{name}}」は空です",
-        "viewerImageFallbackHint": "この画像を表示できませんでした。ダウンロードして開いてください。"
+        "viewerImageFallbackHint": "この画像を表示できませんでした。ダウンロードして開いてください。",
+        "moreDetailsHint": "説明とステータス"
     },
     "shortcuts": {
         "goKitchen": "キッチン",
@@ -6455,7 +6455,8 @@
         "openAction": "{{name}} を開く",
         "limitReached": "書類は最大 {{count}} 件までです。",
         "limitReached_one": "書類は最大 {{count}} 件までです。",
-        "lockedPrivate": "添付ファイルあり（非公開）"
+        "lockedPrivate": "添付ファイルあり（非公開）",
+        "pickNone": "少なくとも1つの書類を選んでください。"
     },
     "join": {
         "title": "アカウントの設定",

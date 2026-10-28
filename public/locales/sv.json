@@ -3982,7 +3982,6 @@
         "selectedFilesLabel": "{{count}} filer valda",
         "fileTooLargeNamed": "”{{name}}” är för stor.",
         "uploadProgress": "Laddar upp {{current}} av {{total}}…",
-        "storageSettingsLink": "Lagringsinställningar",
         "dmsSearchLabel": "Sökord",
         "dmsSearching": "Söker…",
         "dmsSearchError": "DMS:et går inte att nå just nu.",
@@ -4067,7 +4066,8 @@
         "viewerPrevNamed": "Föregående dokument: {{name}}",
         "viewerNextNamed": "Nästa dokument: {{name}}",
         "emptyFolderTitle": "”{{name}}” är tom",
-        "viewerImageFallbackHint": "Det gick inte att visa denna bild. Ladda ner den för att öppna den."
+        "viewerImageFallbackHint": "Det gick inte att visa denna bild. Ladda ner den för att öppna den.",
+        "moreDetailsHint": "Beskrivning och status"
     },
     "shortcuts": {
         "goKitchen": "Kök",
@@ -6455,7 +6455,8 @@
         "openAction": "Öppna {{name}}",
         "limitReached": "Högst {{count}} dokument.",
         "limitReached_one": "Högst {{count}} dokument.",
-        "lockedPrivate": "Bilaga finns (privat)"
+        "lockedPrivate": "Bilaga finns (privat)",
+        "pickNone": "Välj minst ett dokument."
     },
     "join": {
         "title": "Skapa ditt konto",

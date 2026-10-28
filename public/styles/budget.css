@@ -174,10 +174,6 @@
   margin-inline-start: var(--space-2);
 }
 
-.budget-nav__range[hidden] {
-  display: none;
-}
-
 .budget-nav__range-trigger {
   gap: var(--space-1);
 }

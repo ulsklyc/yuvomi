@@ -416,9 +416,10 @@ test('documents: a stored grant for a non-member stays on offer and checked', as
   // ein Kaestchen, das fehlt, entzieht beim Speichern den Zugriff.
   await loadDocumentPeople();
   const html = documents.memberOptions([CLARA.id]);
-  const boxes = [...html.matchAll(/<input type="checkbox" value="(\d+)"\s*(checked)?/g)].map((m) => [Number(m[1]), Boolean(m[2])]);
+  // Seit R24 (D4 people-checkbox) Chips wie renderUserMultiSelect.
+  const boxes = [...html.matchAll(/<input type="checkbox" class="user-ms__checkbox" value="(\d+)" data-ms-input="document-members"\s*(checked)?/g)].map((m) => [Number(m[1]), Boolean(m[2])]);
   assert.deepEqual(boxes, [[ANNA.id, false], [CLARA.id, true]]);
-  assert.match(html, /<span>Clara<\/span>/, 'the grant is shown by name');
+  assert.match(html, /<span class="user-ms__name">Clara<\/span>/, 'the grant is shown by name');
 });
 
 test('budget: the responsible filter chip names a stored non-member responsible', () => {

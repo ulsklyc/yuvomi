@@ -4044,7 +4044,6 @@
         "selectedFilesLabel": "{{count}} files selected",
         "fileTooLargeNamed": "“{{name}}” is too large.",
         "uploadProgress": "Uploading {{current}} of {{total}}…",
-        "storageSettingsLink": "Storage settings",
         "dmsSearchLabel": "Search term",
         "dmsSearching": "Searching…",
         "dmsSearchError": "The DMS is currently unreachable.",
@@ -4129,7 +4128,8 @@
         "viewerPrevNamed": "Previous document: {{name}}",
         "viewerNextNamed": "Next document: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" is empty",
-        "viewerImageFallbackHint": "This image could not be displayed. Download it to open it."
+        "viewerImageFallbackHint": "This image could not be displayed. Download it to open it.",
+        "moreDetailsHint": "Description and status"
     },
     "housekeeping": {
         "title": "Housekeeping",
@@ -6455,7 +6455,8 @@
         "openAction": "Open {{name}}",
         "limitReached": "At most {{count}} documents.",
         "limitReached_one": "At most {{count}} document.",
-        "lockedPrivate": "Attachment present (private)"
+        "lockedPrivate": "Attachment present (private)",
+        "pickNone": "Choose at least one document."
     },
     "join": {
         "title": "Set up your account",

@@ -3982,7 +3982,6 @@
         "selectedFilesLabel": "{{count}} file selezionati",
         "fileTooLargeNamed": "«{{name}}» è troppo grande.",
         "uploadProgress": "Caricamento {{current}} di {{total}}…",
-        "storageSettingsLink": "Impostazioni di archiviazione",
         "dmsSearchLabel": "Termine di ricerca",
         "dmsSearching": "Ricerca in corso…",
         "dmsSearchError": "Il DMS non è al momento raggiungibile.",
@@ -4067,7 +4066,8 @@
         "viewerPrevNamed": "Documento precedente: {{name}}",
         "viewerNextNamed": "Documento successivo: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" è vuota",
-        "viewerImageFallbackHint": "Impossibile visualizzare questa immagine. Scaricala per aprirla."
+        "viewerImageFallbackHint": "Impossibile visualizzare questa immagine. Scaricala per aprirla.",
+        "moreDetailsHint": "Descrizione e stato"
     },
     "shortcuts": {
         "goKitchen": "Cucina",
@@ -6455,7 +6455,8 @@
         "openAction": "Apri {{name}}",
         "limitReached": "Al massimo {{count}} documenti.",
         "limitReached_one": "Al massimo {{count}} documento.",
-        "lockedPrivate": "Allegato presente (privato)"
+        "lockedPrivate": "Allegato presente (privato)",
+        "pickNone": "Scegli almeno un documento."
     },
     "join": {
         "title": "Configura il tuo account",

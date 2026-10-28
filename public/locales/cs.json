@@ -4318,7 +4318,6 @@
         "selectedFilesLabel": "Vybrané soubory: {{count}}",
         "fileTooLargeNamed": "„{{name}}“ je příliš velký.",
         "uploadProgress": "Nahrávání {{current}} z {{total}}…",
-        "storageSettingsLink": "Nastavení úložiště",
         "dmsSearchLabel": "Hledaný výraz",
         "dmsSearching": "Hledání…",
         "dmsSearchError": "DMS je momentálně nedostupný.",
@@ -4406,7 +4405,8 @@
         "viewerPrevNamed": "Předchozí dokument: {{name}}",
         "viewerNextNamed": "Další dokument: {{name}}",
         "emptyFolderTitle": "„{{name}}“ je prázdná",
-        "viewerImageFallbackHint": "Tento obrázek se nepodařilo zobrazit. Stáhněte si jej a otevřete."
+        "viewerImageFallbackHint": "Tento obrázek se nepodařilo zobrazit. Stáhněte si jej a otevřete.",
+        "moreDetailsHint": "Popis a stav"
     },
     "reminders": {
         "sectionTitle": "Připomínka",
@@ -6631,7 +6631,8 @@
         "limitReached": "Nejvýše dokumentů: {{count}}.",
         "limitReached_one": "Nejvýše dokumentů: {{count}}.",
         "limitReached_few": "Nejvýše dokumentů: {{count}}.",
-        "lockedPrivate": "Příloha existuje (soukromá)"
+        "lockedPrivate": "Příloha existuje (soukromá)",
+        "pickNone": "Vyber alespoň jeden dokument."
     },
     "join": {
         "title": "Nastavení účtu",

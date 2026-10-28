@@ -3982,7 +3982,6 @@
         "selectedFilesLabel": "{{count}} αρχεία επιλέχθηκαν",
         "fileTooLargeNamed": "Το «{{name}}» είναι πολύ μεγάλο.",
         "uploadProgress": "Μεταφόρτωση {{current}} από {{total}}…",
-        "storageSettingsLink": "Ρυθμίσεις αποθήκευσης",
         "dmsSearchLabel": "Όρος αναζήτησης",
         "dmsSearching": "Αναζήτηση…",
         "dmsSearchError": "Το DMS δεν είναι προσβάσιμο αυτήν τη στιγμή.",
@@ -4067,7 +4066,8 @@
         "viewerPrevNamed": "Προηγούμενο έγγραφο: {{name}}",
         "viewerNextNamed": "Επόμενο έγγραφο: {{name}}",
         "emptyFolderTitle": "Το «{{name}}» είναι κενό",
-        "viewerImageFallbackHint": "Δεν ήταν δυνατή η προβολή αυτής της εικόνας. Κατεβάστε την για να την ανοίξετε."
+        "viewerImageFallbackHint": "Δεν ήταν δυνατή η προβολή αυτής της εικόνας. Κατεβάστε την για να την ανοίξετε.",
+        "moreDetailsHint": "Περιγραφή και κατάσταση"
     },
     "shortcuts": {
         "goKitchen": "Κουζίνα",
@@ -6455,7 +6455,8 @@
         "openAction": "Άνοιγμα {{name}}",
         "limitReached": "Το πολύ {{count}} έγγραφα.",
         "limitReached_one": "Το πολύ {{count}} έγγραφο.",
-        "lockedPrivate": "Υπάρχει συνημμένο (ιδιωτικό)"
+        "lockedPrivate": "Υπάρχει συνημμένο (ιδιωτικό)",
+        "pickNone": "Επίλεξε τουλάχιστον ένα έγγραφο."
     },
     "join": {
         "title": "Ρύθμιση λογαριασμού",

@@ -2044,15 +2044,9 @@ const PENDING = {
   // Darlehenstilgungen und Aufgaben sind umgestellt; der Essensplan traegt
   // keinen Papierkorb mehr. Ab hier ist jede neue Zone mit mehr als zwei
   // sichtbaren Zeilenaktionen und jede Textkapsel in einer Zeile rot.
-  'row-action-count': {
-    // BENANNTE AUSNAHME, keine Altlast: die Leiste im KOPF DES
-    // DOKUMENTBETRACHTERS (In neuem Tab, Bearbeiten, Teilen, Herunterladen).
-    // Sie ist die Werkzeugleiste eines geoeffneten Dokuments, keine Zeile
-    // einer Liste - ihre Knoepfe leiht sie sich nur von `.row-action`. Die
-    // Regel "zwei sichtbar" gilt der Wiederholung je Zeile; diese Leiste
-    // steht einmal.
-    'public/pages/documents.js': 1,
-  },
+  // Leer seit R24 S10: die Leiste des Dokumentbetrachters traegt Knoepfe mit
+  // Wort (G4-Dokumente-P3-3), keine geliehenen `.row-action` mehr.
+  'row-action-count': {},
   'row-text-capsule': {},
   // --- R21 (Critique 2026-10-21), D10 Zeilen-Endzone, nur nach UNTEN. ---
   // Leer seit #2152: die Verwalter (Abo-Kategorien und Zahlungsarten, Familie)
@@ -2162,19 +2156,19 @@ const PENDING = {
   // Gesundheit/Kontakte/Familie; Schnellzugriffe und Einstellungen S6.
   'edit-autofocus': {
     'public/components/quick-links-manager.js': 1, 'public/pages/birthdays.js': 1,
-    'public/pages/calendar.js': 1, 'public/pages/documents.js': 1, 'public/pages/health.js': 7,
+    'public/pages/calendar.js': 1, 'public/pages/health.js': 7,
     'public/pages/notes.js': 1, 'public/pages/schedule.js': 1,
     'public/settings/pages/modules-health.js': 1, 'public/settings/pages/sync-contacts.js': 1,
   },
   'advanced-hint': {
-    'public/pages/contacts.js': 1, 'public/pages/documents.js': 1, 'public/pages/health.js': 2,
+    'public/pages/contacts.js': 1, 'public/pages/health.js': 2,
   },
   'primary-disabled': {
-    'public/components/document-attach.js': 1, 'public/pages/birthdays.js': 1, 'public/pages/contacts.js': 1,
-    'public/pages/documents.js': 1, 'public/pages/schedule.js': 1,
+    'public/pages/birthdays.js': 1, 'public/pages/contacts.js': 1,
+    'public/pages/schedule.js': 1,
     'public/settings/pages/admin-permissions.js': 1,
   },
-  'people-checkbox': { 'public/pages/documents.js': 1 },
+  'people-checkbox': {},
 };
 
 const HEAD_SEARCH = headSearchClasses(JS);

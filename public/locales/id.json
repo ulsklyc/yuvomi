@@ -4044,7 +4044,6 @@
         "selectedFilesLabel": "{{count}} berkas dipilih",
         "fileTooLargeNamed": "“{{name}}” terlalu besar.",
         "uploadProgress": "Mengunggah {{current}} dari {{total}}…",
-        "storageSettingsLink": "Pengaturan penyimpanan",
         "dmsSearchLabel": "Kata kunci",
         "dmsSearching": "Mencari…",
         "dmsSearchError": "DMS sedang tidak dapat dijangkau.",
@@ -4129,7 +4128,8 @@
         "viewerPrevNamed": "Dokumen sebelumnya: {{name}}",
         "viewerNextNamed": "Dokumen berikutnya: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" kosong",
-        "viewerImageFallbackHint": "Gambar ini tidak dapat ditampilkan. Unduh untuk membukanya."
+        "viewerImageFallbackHint": "Gambar ini tidak dapat ditampilkan. Unduh untuk membukanya.",
+        "moreDetailsHint": "Deskripsi dan status"
     },
     "userMultiSelect": {
         "nobody": "Tidak ada",
@@ -6455,7 +6455,8 @@
         "openAction": "Buka {{name}}",
         "limitReached": "Maksimal {{count}} dokumen.",
         "limitReached_one": "Maksimal {{count}} dokumen.",
-        "lockedPrivate": "Ada lampiran (pribadi)"
+        "lockedPrivate": "Ada lampiran (pribadi)",
+        "pickNone": "Pilih setidaknya satu dokumen."
     },
     "join": {
         "title": "Siapkan akun Anda",

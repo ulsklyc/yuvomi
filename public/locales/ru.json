@@ -4226,7 +4226,6 @@
         "selectedFilesLabel": "Выбрано файлов: {{count}}",
         "fileTooLargeNamed": "«{{name}}» слишком большой.",
         "uploadProgress": "Загрузка {{current}} из {{total}}…",
-        "storageSettingsLink": "Настройки хранилища",
         "dmsSearchLabel": "Поисковый запрос",
         "dmsSearching": "Поиск…",
         "dmsSearchError": "DMS сейчас недоступна.",
@@ -4317,7 +4316,8 @@
         "viewerPrevNamed": "Предыдущий документ: {{name}}",
         "viewerNextNamed": "Следующий документ: {{name}}",
         "emptyFolderTitle": "Папка «{{name}}» пуста",
-        "viewerImageFallbackHint": "Не удалось показать это изображение. Скачайте его, чтобы открыть."
+        "viewerImageFallbackHint": "Не удалось показать это изображение. Скачайте его, чтобы открыть.",
+        "moreDetailsHint": "Описание и статус"
     },
     "shortcuts": {
         "goKitchen": "Кухня",
@@ -6787,7 +6787,8 @@
         "limitReached_one": "Не более {{count}} документа.",
         "limitReached_few": "Не более {{count}} документов.",
         "limitReached_many": "Не более {{count}} документов.",
-        "lockedPrivate": "Есть вложение (личное)"
+        "lockedPrivate": "Есть вложение (личное)",
+        "pickNone": "Выбери хотя бы один документ."
     },
     "join": {
         "title": "Настройка учётной записи",
