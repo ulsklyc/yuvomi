@@ -99,7 +99,7 @@ test('fasting acceptance: desktop and mobile journal controls preserve data and 
       await page.waitForFunction(() => (() => { const el = document.querySelector('.modal-panel [data-fasting-preset="15"]'); return el?.getAttribute('aria-checked') === 'true' && !el.disabled; })());
       assert.equal((await call('get', '/health/fasting/state')).data.settings.default_goal_minutes, 900);
       assert.equal(await page.$eval('.modal-panel [data-fasting-preset="15"]', (el) => el === document.activeElement), true);
-      assert.equal(await page.$eval('[data-fasting-preferences-status]', (el) => el.textContent), 'Uloženo');
+      assert.equal(await page.$eval('.modal-panel [data-fasting-preferences-status]', (el) => el.textContent), 'Uloženo');
       await clickFasting(page, '.modal-panel [data-fasting-preset="custom"]');
       assert.equal(await page.$eval('.modal-panel [data-fasting-custom]', (el) => el.hidden), false);
       assert.equal(await page.$eval('.modal-panel [data-fasting-preset="custom"]', (el) => el.getAttribute('aria-checked')), 'true');
