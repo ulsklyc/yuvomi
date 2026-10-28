@@ -561,7 +561,10 @@
   flex: 0 0 auto;
 }
 
-.health-vitals__toolbar {
+/* DIE ZEITRAUM-ZEILE EINES BEREICHS (R24, G5 P2-6): Segment links, EIN
+ * Stepper rechts - Vitalwerte und Aktivitaet tragen dieselbe Zeile. */
+.health-vitals__toolbar,
+.health-period-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -569,36 +572,8 @@
   flex-wrap: wrap;
 }
 
-.health-vitals__ranges {
-  display: inline-flex;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border-radius: var(--radius-full);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-}
-
-.health-vitals__range {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(var(--target-base) - var(--space-2));
-  padding: var(--space-1) var(--space-3);
-  border: none;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-/* Aktiv = erhabene Surface-Pille, Ton in der Tinte (tokens.css, Abschnitt 6c). */
-.health-vitals__range.is-active {
-  background: var(--seg-active-bg);
-  box-shadow: var(--seg-active-shadow);
-  color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
-}
-
+/* Das Segment ist das Kanon-Segment (.segmented, panel.css) seit R24 (G5 P2-6):
+ * vorher eine eigene Kapsel mit Ring, 36px statt 40. */
 
 /* Karten-Grid je Metrik. Mindestbreite 160px: die schmalste Karte muss den
  * längsten Metrik-Namen („Sauerstoffsättigung") einzeilig tragen können,
@@ -616,6 +591,37 @@
   /* Hoehe der Trendzeile im Rueckfall ohne Subgrid (panel.css `.metric-rows`):
    * die der Trendlinie (`.metric-card__spark`). */
   --metric-spark-row: 22px;
+}
+
+/* KEIN LOCH IM RASTER (R24, Critique G5 P3-3; Muster `.cycle-stats`). Neun
+ * Kacheln in vier Spalten liessen neben der letzten drei leere Zellen. Die
+ * letzte Kachel nimmt die freien Spuren ihrer Zeile. Die Schwellen sind die
+ * des Rasters selbst: auto-fill mit 160px Mindestbreite und --space-3 (12px)
+ * Abstand ergibt n Spalten ab 172n - 12px Reihenbreite. */
+@container metric-grid (min-width: 332px) and (max-width: 503.98px) {
+  .health-vitals__cards > :last-child:nth-child(2n+1) { grid-column: span 2; }
+}
+@container metric-grid (min-width: 504px) and (max-width: 675.98px) {
+  .health-vitals__cards > :last-child:nth-child(3n+1) { grid-column: span 3; }
+  .health-vitals__cards > :last-child:nth-child(3n+2) { grid-column: span 2; }
+}
+@container metric-grid (min-width: 676px) and (max-width: 847.98px) {
+  .health-vitals__cards > :last-child:nth-child(4n+1) { grid-column: span 4; }
+  .health-vitals__cards > :last-child:nth-child(4n+2) { grid-column: span 3; }
+  .health-vitals__cards > :last-child:nth-child(4n+3) { grid-column: span 2; }
+}
+@container metric-grid (min-width: 848px) and (max-width: 1019.98px) {
+  .health-vitals__cards > :last-child:nth-child(5n+1) { grid-column: span 5; }
+  .health-vitals__cards > :last-child:nth-child(5n+2) { grid-column: span 4; }
+  .health-vitals__cards > :last-child:nth-child(5n+3) { grid-column: span 3; }
+  .health-vitals__cards > :last-child:nth-child(5n+4) { grid-column: span 2; }
+}
+@container metric-grid (min-width: 1020px) and (max-width: 1191.98px) {
+  .health-vitals__cards > :last-child:nth-child(6n+1) { grid-column: span 6; }
+  .health-vitals__cards > :last-child:nth-child(6n+2) { grid-column: span 5; }
+  .health-vitals__cards > :last-child:nth-child(6n+3) { grid-column: span 4; }
+  .health-vitals__cards > :last-child:nth-child(6n+4) { grid-column: span 3; }
+  .health-vitals__cards > :last-child:nth-child(6n+5) { grid-column: span 2; }
 }
 
 /* Die Kachel selbst ist seit Block 2 die geteilte Kennzahlkarte:
@@ -746,8 +752,10 @@
   flex: 1 1 0;
 }
 
-.health-vital-sheet__stepper {
+.health-vitals__stepper.health-vital-sheet__stepper {
+  display: flex;
   justify-content: space-between;
+  margin-inline-start: 0;
 }
 
 .health-vital-sheet__chart .health-chart-empty {
@@ -794,16 +802,26 @@
   color: var(--color-text-secondary);
 }
 
-.health-vitals__stepper {
+/* DER STEPPER DER ZEITRAUM-ZEILE (R24, G5 P2-6): der geteilte Baustein
+ * (utils/period-stepper.js) am Ende der Zeile, der Wert wie im Budget und den
+ * Berichten der Haushaltshilfe (16/600, primaer) mit fester Breite, damit kein
+ * Pfeil wandert (DESIGN „Zeitraum blaettern"). Vorher 14px sekundaer. */
+.health-vitals__stepper,
+.health-activity__stepper {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  margin-inline-start: auto;
 }
 
-.health-vitals__period {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  min-width: 0;
+.health-vitals__period,
+.health-activity__period {
+  min-inline-size: 8.5rem;
+  text-align: center;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  white-space: nowrap;
 }
 
 .health-chart {
@@ -1846,31 +1864,14 @@ button.health-med-card:hover {
   gap: var(--space-4);
 }
 
-.health-activity__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.health-activity__stepper {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.health-activity__period {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  min-width: 0;
-}
 
 
 /* Summen-Karten */
 .health-activity__summary {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  /* auto-fit (R24, G5 P3-3): vier Kennzahlen fuellen die Zeile - mit
+   * auto-fill standen rechts daneben 170px leere Spuren (1440). */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--space-3);
 }
 
@@ -2412,6 +2413,8 @@ button.health-med-card:hover {
    * `.metric-card` baut, deklariert `container: metric-grid / inline-size` -
    * `.metric-grid` selbst tut nichts anderes. */
   container: metric-grid / inline-size;
+  /* Dieselbe Trendzeile wie die Kacheln des Bereichs (R24, G5 P2-6). */
+  --metric-spark-row: 22px;
 }
 
 /* TELEFON: ZWEI KERNWERTE (R16). Neun Kacheln waren 575px auf einer Seite,

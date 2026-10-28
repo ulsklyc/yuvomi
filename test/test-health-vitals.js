@@ -374,7 +374,7 @@ test('M3: das Blatt traegt Zeitraum, Stepper, ein hohes Diagramm und die Messlis
     assert.equal(blatt.headerAction?.label, 'health.vitals.addShort', 'Erfassen steht im Kopf des Blatts');
 
     const html = health.vitalSheetMarkup(vitalMetric('weight'));
-    assert.match(html, /class="health-vitals__ranges health-vital-sheet__ranges" role="tablist"/);
+    assert.match(html, /class="segmented health-vitals__ranges health-vital-sheet__ranges" role="tablist"/, 'das Kanon-Segment (R24 G5 P2-6)');
     assert.deepEqual([...html.matchAll(/data-sheet-range="(\w+)"/g)].map((m) => m[1]), ['day', 'week', 'month', 'year'],
       'der Zeitraum-Umschalter steht IM Blatt');
     assert.match(html, /data-sheet-step="-1"[\s\S]*data-sheet-step="1"/);

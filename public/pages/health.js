@@ -73,6 +73,7 @@ import { emptyStateHTML, emptyHintHTML, mountLoadError, cardEmptyRowHtml } from 
 import { errorSentence, isGone } from '/utils/friendly-error.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 import { NUTRIENTS, MEAL_TYPES, nutrientProgress } from '/utils/health-nutrition.js';
+import { periodStepperHtml } from '/utils/period-stepper.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { HEALTH_PERSON_EVENT, healthPersonIsOther, pickHealthPerson, readHealthPerson, writeHealthPerson } from '/utils/health-person.js';
 
@@ -1548,6 +1549,18 @@ async function loadVitals() {
   vitals.rows = withoutPendingDeletes('vitals', res.data || [], load);
 }
 
+/** Der eine Zeitraum-Stepper der Vitalwerte (R24 G5 P2-6): blaettert Kacheln und Diagramm. */
+function vitalStepperMarkup() {
+  const series = computeVitalSeries(vitals.rows, { type: vitals.selectedType || VITAL_METRICS[0].type, range: vitals.range, anchor: vitals.anchor });
+  // Markup und Reihenfolge aus dem EINEN Baustein (utils/period-stepper.js).
+  return `
+      <div class="health-vitals__stepper">${periodStepperHtml({
+        prev: { label: t('health.vitals.prevPeriod'), attrs: { 'data-step': '-1' } },
+        value: { className: 'health-vitals__period', text: vitalPeriodText(series) },
+        next: { label: t('health.vitals.nextPeriod'), attrs: { 'data-step': '1' } },
+      })}</div>`;
+}
+
 function renderVitalsShell() {
   if (!vitals.root?.isConnected) return;
   vitals.root.replaceChildren();
@@ -1561,12 +1574,18 @@ function renderVitalsShell() {
     ${personSwitcherMarkup(vitals.members, vitals.personId, vitals.meId,
       { menuId: 'health-person-menu-vitals', label: t('health.vitals.personsLabel') })}
     ${readOnlyBannerMarkup(vitals.members, vitals.personId, canEditFor(vitals.personId, vitals.meId), vitals.meId)}
-    <div class="health-vitals__toolbar">
-      <div class="health-vitals__ranges" role="tablist" aria-label="${esc(t('health.vitals.chartTitle'))}">
+    ${/* EINE ZEITRAUM-ZEILE (R24, Critique G5 P2-6): das Segment stand als
+         eigene Kapsel mit Ring ueber den Kacheln, der Stepper im Kopf des
+         Diagramms darunter - zwei Orte fuer eine Frage. Jetzt das Kanon-Segment
+         (.segmented, gleitende Kapsel) und EIN Stepper in derselben Zeile ueber
+         Kacheln und Diagramm, wie die Woche der Aktivitaet. */ ''}
+    <div class="health-vitals__toolbar health-period-row">
+      <div class="segmented health-vitals__ranges" role="tablist" aria-label="${esc(t('health.vitals.chartTitle'))}">
         ${VITAL_RANGES.map((r) => `
-          <button type="button" class="health-vitals__range${r === vitals.range ? ' is-active' : ''}"
-            data-range="${r}" role="tab" aria-selected="${r === vitals.range}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
+          <button type="button" class="segmented__item health-vitals__range${r === vitals.range ? ' is-active' : ''}"
+            data-range="${r}" data-tab-id="${r}" role="tab" aria-selected="${r === vitals.range}" tabindex="${r === vitals.range ? '0' : '-1'}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
       </div>
+      ${vitalStepperMarkup()}
     </div>
     <div class="health-vitals__cards metric-rows" id="health-vitals-cards"></div>
     <div class="health-vitals__more" id="health-vitals-more"></div>
@@ -1733,10 +1752,18 @@ function wireVitals() {
   installPopoverMenus(vitals.root);
   wirePersonSwitcher(vitals, switchPerson);
 
-  vitals.root.querySelectorAll('.health-vitals__range').forEach((btn) =>
+  vitals.root.querySelectorAll('.health-vitals__toolbar .health-vitals__range').forEach((btn) =>
     btn.addEventListener('click', () => {
       vitals.range = btn.dataset.range;
       renderVitalsShell();
+    }));
+  // Der Neuaufbau ersetzt den Knopf: der Fokus kommt an denselben Pfeil zurueck.
+  vitals.root.querySelectorAll('.health-vitals__toolbar [data-step]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const dir = btn.dataset.step;
+      stepAnchor(Number(dir));
+      renderVitalsShell();
+      vitals.root.querySelector(`.health-vitals__toolbar [data-step="${dir}"]`)?.focus();
     }));
 
 }
@@ -2006,6 +2033,39 @@ function deltaMarkup(delta, metric) {
 // Detail: Trend-Chart der ausgewählten Metrik
 // --------------------------------------------------------
 
+/**
+ * DAS DIAGRAMM HAT EINE HOEHE, NICHT EIN SEITENVERHAELTNIS (R24, Critique G5
+ * P3-2). Die Flaeche 600x200 wuchs mit der Spalte: bei 1440 stand der
+ * Blutdruck mit Puls 2 x 270px hoch fuer drei Messungen. Ab der Grundbreite
+ * haelt das Diagramm CHART.H in Pixeln: die Breite bleibt 600 Einheiten (an
+ * ihr haengt der Schriftmassstab `--chart-scale`, panel.css), die Hoehe in
+ * Einheiten schrumpft im selben Verhaeltnis - es wird breiter, nicht hoeher.
+ * `chartRatioAttr` traegt das neue Verhaeltnis ans SVG. Schmaler als die
+ * Grundbreite skaliert es wie bisher.
+ */
+function vitalDetailGeometry(host) {
+  const pad = 2 * 16; // .health-chart-section polstert mit --space-4 je Seite
+  const width = Math.round((host?.getBoundingClientRect?.().width ?? 0) - pad);
+  if (!(width > CHART.W)) return CHART;
+  return Object.freeze({ ...CHART, H: Math.max(100, Math.round((CHART.W * CHART.H) / width)) });
+}
+
+/* Die Breite steht oft erst fest, wenn der Bereich sichtbar wird (das Panel
+ * wird verborgen gebaut) - und sie aendert sich mit dem Fenster. Ein
+ * Beobachter je Wirt zeichnet das Diagramm neu, sobald seine Geometrie nicht
+ * mehr passt; die Einzeichnung laeuft dabei nicht noch einmal (drawChartOnce). */
+const _vitalDetailObservers = new WeakMap();
+function watchVitalDetailWidth(host, drawnH) {
+  host.dataset.chartH = String(drawnH);
+  if (typeof ResizeObserver !== 'function' || _vitalDetailObservers.has(host)) return;
+  const observer = new ResizeObserver(() => {
+    if (!host.isConnected) { observer.disconnect(); _vitalDetailObservers.delete(host); return; }
+    if (String(vitalDetailGeometry(host).H) !== host.dataset.chartH && vitals.root?.contains(host)) renderDetail();
+  });
+  observer.observe(host);
+  _vitalDetailObservers.set(host, observer);
+}
+
 function renderDetail() {
   const host = vitals.root.querySelector('#health-vitals-detail');
   if (!host) return;
@@ -2017,19 +2077,16 @@ function renderDetail() {
     type: metric.type, range: vitals.range, anchor: vitals.anchor,
   });
 
+  const geo = vitalDetailGeometry(host);
+  watchVitalDetailWidth(host, geo.H);
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', `
     <div class="health-chart-section">
       <div class="health-chart-section__head">
         <div class="health-chart-section__title">${esc(t(metric.labelKey))}</div>
-        <div class="health-vitals__stepper">
-          <button class="btn btn--icon" data-step="-1" aria-label="${esc(t('health.vitals.prevPeriod'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-          <span class="health-vitals__period">${esc(vitalPeriodText(series))}</span>
-          <button class="btn btn--icon" data-step="1" aria-label="${esc(t('health.vitals.nextPeriod'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-        </div>
       </div>
       ${series.hasData
-    ? chartMarkup(metric, series)
+    ? chartMarkup(metric, series, geo)
     : emptyHintHTML(t('health.vitals.noData'), { className: 'health-chart-empty' })}
     </div>
     ${recentMeasurementsMarkup(metric)}`);
@@ -2040,12 +2097,6 @@ function renderDetail() {
   // wartet nicht noch einmal 300ms (drawChartOnce, utils/ux.js). Raster und
   // Achse stehen; der Beschnitt haengt an der Gruppe aus Flaeche und Kurven.
   drawChartOnce(`health-vitals-${metric.type}`, { lines: host.querySelector('.health-chart__lines') });
-
-  host.querySelectorAll('[data-step]').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      stepAnchor(Number(btn.dataset.step));
-      renderVitalsShell();
-    }));
 
   // Der Riegel vor dem einen schreibenden Weg dieser Ansicht (#1265): der
   // Zeitraum-Stepper darueber liest, das Bearbeiten darunter nicht.
@@ -2281,16 +2332,16 @@ function vitalSheetMarkup(metric) {
     return emptyHintHTML(t('health.vitals.noValue'), { className: 'health-chart-empty' });
   }
   return `
-    <div class="health-vitals__ranges health-vital-sheet__ranges" role="tablist" aria-label="${esc(t('health.vitals.chartTitle'))}">
+    <div class="segmented health-vitals__ranges health-vital-sheet__ranges" role="tablist" aria-label="${esc(t('health.vitals.chartTitle'))}">
       ${VITAL_RANGES.map((r) => `
-        <button type="button" class="health-vitals__range${r === vitals.range ? ' is-active' : ''}"
-          data-sheet-range="${r}" role="tab" aria-selected="${r === vitals.range}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
+        <button type="button" class="segmented__item health-vitals__range${r === vitals.range ? ' is-active' : ''}"
+          data-sheet-range="${r}" data-tab-id="${r}" role="tab" aria-selected="${r === vitals.range}" tabindex="${r === vitals.range ? '0' : '-1'}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
     </div>
-    <div class="health-vitals__stepper health-vital-sheet__stepper">
-      <button type="button" class="btn btn--icon" data-sheet-step="-1" aria-label="${esc(t('health.vitals.prevPeriod'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-      <span class="health-vitals__period">${esc(vitalPeriodText(series))}</span>
-      <button type="button" class="btn btn--icon" data-sheet-step="1" aria-label="${esc(t('health.vitals.nextPeriod'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-    </div>
+    <div class="health-vitals__stepper health-vital-sheet__stepper">${periodStepperHtml({
+      prev: { label: t('health.vitals.prevPeriod'), attrs: { 'data-sheet-step': '-1' } },
+      value: { className: 'health-vitals__period', text: vitalPeriodText(series) },
+      next: { label: t('health.vitals.nextPeriod'), attrs: { 'data-sheet-step': '1' } },
+    })}</div>
     <div class="health-vital-sheet__chart">
       ${series.hasData
     ? chartMarkup(metric, series, VITAL_SHEET_CHART)
@@ -2550,8 +2601,11 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
      * und eine Legende darunter: der Name steht ueber dem letzten Punkt seiner
      * Kurve, in ihrer Farbe. Nur bei Messarten mit mehreren Kanaelen - eine
      * einzelne Kurve nennt schon die Ueberschrift. */
-    seriesSvg = channels.map(({ key, idx }) => {
-      const color = CHANNEL_COLORS[idx % CHANNEL_COLORS.length];
+    seriesSvg = channels.map(({ key, idx }, pos) => {
+      // Die Farbe zaehlt je ACHSE (R24, G5 P3-2): der Puls steht seit R21 auf
+      // eigener Achse und trug als dritter Kanal Amber - eine fremde Farbe fuer
+      // eine einzelne Kurve. Allein auf seiner Achse traegt er den Modulton.
+      const color = CHANNEL_COLORS[pos % CHANNEL_COLORS.length];
       const chName = metric.channelLabelKeys?.[idx] ? t(metric.channelLabelKeys[idx]) : t(metric.labelKey);
       const linePts = [];
       const dots = [];
@@ -5621,12 +5675,12 @@ function renderActivityShell() {
     ${personSwitcherMarkup(activity.members, activity.personId, activity.meId,
       { menuId: 'health-person-menu-activity', label: t('health.activity.personsLabel') })}
     ${readOnlyBannerMarkup(activity.members, activity.personId, canEditFor(activity.personId, activity.meId), activity.meId)}
-    <div class="health-activity__toolbar">
-      <div class="health-activity__stepper">
-        <button class="btn btn--icon" data-step="-1" aria-label="${esc(t('health.activity.prevWeek'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-        <span class="health-activity__period">${esc(dateRangeText(summary.from, summary.to))}</span>
-        <button class="btn btn--icon" data-step="1" aria-label="${esc(t('health.activity.nextWeek'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-      </div>
+    <div class="health-activity__toolbar health-period-row">
+      <div class="health-activity__stepper">${periodStepperHtml({
+        prev: { label: t('health.activity.prevWeek'), attrs: { 'data-step': '-1' } },
+        value: { className: 'health-activity__period', text: dateRangeText(summary.from, summary.to) },
+        next: { label: t('health.activity.nextWeek'), attrs: { 'data-step': '1' } },
+      })}</div>
     </div>
     ${totals.count === 0 ? '' : `<div class="health-activity__summary">${activityStatsMarkup(totals)}</div>`}
     ${/* EINE LEERE WOCHE IST EINE KARTE OHNE INHALT (R22, D12): die ruhige
@@ -7714,6 +7768,9 @@ function overviewVitalCardMarkup(metric, series, { extra = false } = {}) {
 
   // --inset: die Kachel liegt IN der Übersichtskarte (Kasten-in-Kasten,
   // Muster vorher .health-overview__card .health-metric-card).
+  // EINE KACHEL (R24, Critique G5 P2-6): dieselbe Bauform wie im Bereich -
+  // Kopf, Wert, Trendlinie, Meta. Die Uebersicht trug sie ohne Trendlinie,
+  // als zweite Kachelsorte neben der des Bereichs.
   return `
     <button type="button" class="metric-card metric-card--select metric-card--inset${extra ? ' health-overview__vital--extra' : ''}" data-vital-nav="${esc(metric.type)}">
       <span class="metric-card__head">
@@ -7721,6 +7778,7 @@ function overviewVitalCardMarkup(metric, series, { extra = false } = {}) {
         <span class="metric-card__label">${esc(label)}</span>
       </span>
       <span class="metric-card__body">${valueHtml}</span>
+      ${latest ? sparklineMarkup(series.points, 'value_num', metric) : ''}
       ${metaHtml}
     </button>`;
 }

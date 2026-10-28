@@ -1079,3 +1079,42 @@ test('R24 G5 P2-5: das Fastenziel steht vor dem Start, Nachtragen an EINER Stell
   assert.match(page, /\$\{fastingMoreMenuHtml\(\{ backfill: !sections\.empty \}\)\}/, 'ohne Verlauf kein Nachtragen im „..."');
   assert.match(page, /\.\.\.\(backfill \? \[\{ action: 'fasting-backfill'/, 'mit Verlauf steht es dort');
 });
+
+// R24 (Critique G5 P2-6, P3-2, P3-3): vorher 1440 - Zeitraum als eigene
+// Kapsel mit Ring (36px) ueber den Kacheln, der Stepper im Diagrammkopf;
+// Blutdruck + Puls 2 x 270px fuer drei Messungen, Puls in Amber; neun Kacheln
+// in vier Spalten mit drei leeren Zellen, Aktivitaet 170px leer neben vier
+// Kennzahlen; Uebersicht-Kacheln ohne Trendlinie. Nachher: Segment + EIN
+// Stepper (utils/period-stepper.js) in einer Zeile, Diagramme 2 x 200px.
+test('R24 G5 P2-6/P3-2/P3-3: eine Zeitraum-Zeile, eine Kachel, Diagramm mit fester Hoehe, kein Loch', async () => {
+  const shell = HEALTH_JS.slice(HEALTH_JS.indexOf('function renderVitalsShell('), HEALTH_JS.indexOf('function wirePersonSwitcher('));
+  assert.match(shell, /<div class="health-vitals__toolbar health-period-row">\s*<div class="segmented health-vitals__ranges"/, 'das Kanon-Segment in der Zeitraum-Zeile');
+  assert.match(shell, /\$\{vitalStepperMarkup\(\)\}\s*<\/div>/, 'der Stepper in derselben Zeile');
+  assert.match(HEALTH_JS.slice(HEALTH_JS.indexOf('function vitalStepperMarkup('), HEALTH_JS.indexOf('function renderVitalsShell(')), /periodStepperHtml\(\{/, 'der eine Baustein');
+  const detail = HEALTH_JS.slice(HEALTH_JS.indexOf('function renderDetail()'), HEALTH_JS.indexOf('const pendingDeletes'));
+  assert.doesNotMatch(detail, /data-step=/, 'kein zweiter Stepper im Diagrammkopf');
+  assert.match(detail, /chartMarkup\(metric, series, geo\)/, 'das Diagramm nimmt die Geometrie der Spalte');
+  const activityShell = HEALTH_JS.slice(HEALTH_JS.indexOf('function renderActivityShell('), HEALTH_JS.indexOf('function activityStatsMarkup('));
+  assert.match(activityShell, /health-activity__toolbar health-period-row">\s*<div class="health-activity__stepper">\$\{periodStepperHtml\(/, 'die Aktivitaet traegt dieselbe Zeile');
+  // Geometrie: ab der Grundbreite bleibt die Hoehe in Pixeln (CHART.H), die Breite in Einheiten.
+  const geoFn = HEALTH_JS.slice(HEALTH_JS.indexOf('function vitalDetailGeometry('), HEALTH_JS.indexOf('const _vitalDetailObservers'));
+  const { CHART } = await import('../public/utils/chart.js');
+  // eslint-disable-next-line no-new-func
+  const geometry = new Function('CHART', `${geoFn}; return vitalDetailGeometry;`)(CHART);
+  const at = (width) => geometry({ getBoundingClientRect: () => ({ width }) });
+  assert.equal(at(500), CHART, 'schmal wie bisher');
+  const wide = at(842); // 1440: 810px Diagramm
+  assert.equal(wide.W, CHART.W, 'die Breite in Einheiten bleibt - an ihr haengt der Schriftmassstab');
+  assert.equal(Math.round((810 * wide.H) / wide.W), CHART.H, '810px breit, 200px hoch');
+  // Der Puls auf eigener Achse traegt den Modulton, nicht Amber.
+  assert.match(HEALTH_JS, /seriesSvg = channels\.map\(\(\{ key, idx \}, pos\) => \{[\s\S]{0,400}CHANNEL_COLORS\[pos % CHANNEL_COLORS\.length\]/);
+  // Eine Kachel: auch die Uebersicht traegt die Trendlinie.
+  const ov = HEALTH_JS.slice(HEALTH_JS.indexOf('function overviewVitalCardMarkup('), HEALTH_JS.indexOf('function overviewUpcomingMarkup('));
+  assert.match(ov, /sparklineMarkup\(series\.points, 'value_num', metric\)/);
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(read('public/styles/health.css'))];
+  assert.ok(rules.some((r) => r.at.some((a) => /container metric-grid \(min-width: 676px\)/.test(a)) && /:last-child:nth-child\(4n\+1\)/.test(r.selector) && /span 4/.test(r.body)),
+    'vier Spalten, eine Kachel allein: sie nimmt die Zeile');
+  assert.ok(rules.some((r) => r.selector.trim() === '.health-activity__summary' && /repeat\(auto-fit,/.test(r.body)), 'vier Kennzahlen fuellen die Zeile');
+  assert.ok(!rules.some((r) => /\.health-vitals__range\.is-active/.test(r.selector)), 'keine eigene Segment-Pille mehr');
+});

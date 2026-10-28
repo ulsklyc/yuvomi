@@ -17455,8 +17455,10 @@ test('das aktive Segment ist ueberall dieselbe Pille', () => {
   // Eine Zusicherung ueber eine leere Liste ist keine: findet der Scanner die
   // Pille nirgends, ist der Guard blind und nicht die App sauber. Seit R24 (E3)
   // tragen Reiter und Listen-Kapseln die getoente Kapsel statt des Daumens
-  // (test:kitchen-tabs "R24 E3"), es bleiben die Segmente: 7 -> 5.
-  assert.ok(seen >= 5, `Nur ${seen} Pillen-Regeln gefunden - liest der Scanner die Segment-Zustaende noch?`);
+  // (test:kitchen-tabs "R24 E3"), es bleiben die Segmente: 7 -> 5. R24 S11
+  // (G5 P2-6): der Zeitraum der Vitalwerte ist das Kanon-Segment, seine eigene
+  // Pillen-Regel ist weg: 5 -> 4.
+  assert.ok(seen >= 4, `Nur ${seen} Pillen-Regeln gefunden - liest der Scanner die Segment-Zustaende noch?`);
 
   assert.deepEqual(incomplete.sort(), [],
     'Diese Segment-Zustaende nehmen die Pille nur halb. Alle drei Zeilen gehoeren '

@@ -212,6 +212,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which names what it holds - as in the medication and preventive care dialogs. Editing an existing entry
   no longer brings up the keyboard on phones. Without any entry and without a daily goal, Nutrition shows
   one empty state instead of the goal hint above it.
+- **Health vitals have one time line.** Day, week, month or year is the same switch as elsewhere in the
+  app, and the period arrows sit in the same line instead of above the chart - activity uses the same
+  line for its week. The vitals chart keeps its height on wide screens (two charts of 200 px instead of
+  270 px for blood pressure and pulse), the pulse is drawn in the Health colour on its own axis, the last
+  tile no longer leaves empty cells next to it, and the overview's tiles show the same trend line as the
+  vitals area.
 - **Pick your fasting goal before you start.** When no fast is running, the fasting card shows the goal
   (none, 12:12 up to 23:1, custom) right above the buttons, so "Start fasting" runs with the goal you
   see instead of "No goal" from a setting two steps away. Adding a past fast has one place: the empty
