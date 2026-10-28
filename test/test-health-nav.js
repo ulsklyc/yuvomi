@@ -941,8 +941,9 @@ test('R24 G5 P2-2: der Detailkopf steht ohne eigene Karte auf der Hoehe der List
   const fn = HEALTH_JS.slice(HEALTH_JS.indexOf('function syncDetailHead()'), HEALTH_JS.indexOf('function markAreaEntering('));
   assert.match(fn, /area\.id === HEALTH_OVERVIEW_ID/, 'die Uebersicht kennt ihren Fall');
   assert.match(fn, /_detailHead\.hidden = overviewHead/, 'und blendet den Kopf aus');
-  assert.ok(rules.some((r) => /\.split-view__detail-head\[hidden\]/.test(r.selector) && /display:\s*none/.test(r.body)),
-    '`hidden` gewinnt gegen das display:flex der Kopfregel');
+  // `hidden` setzt sich gegen das display:flex der Kopfregel durch: die globale
+  // Regel in reset.css (`[hidden] { display: none !important }`, test:hidden-cascade).
+  assert.match(read('public/styles/reset.css'), /\[hidden\][^{]*\{[^}]*display:\s*none\s*!important/);
 });
 
 test('R24 E10: auch die Bedarfsdosis nimmt man am Ring, mit dem Namen des Medikaments', async () => {

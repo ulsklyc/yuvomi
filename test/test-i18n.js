@@ -269,7 +269,8 @@ test('jeder statisch geschriebene t()-Schlüssel steht auch in der Referenz-Loca
  * gehoert dazu. Was der Vergleich NICHT sieht: zwei verschiedene Woerter mit
  * derselben Bedeutung (ru "Отмена" | "Отменить") - das bleibt Lesearbeit.
  */
-const DISCARD_LABELS = ['modal.discardChanges', 'settings.permDiscard'];
+// settings.permDiscard ist mit dem Entwurf der Rechte-Matrix entfallen (R24 E11).
+const DISCARD_LABELS = ['modal.discardChanges'];
 
 test('ein Verwerfen-Knopf heisst in keiner Sprache wie der Abbrechen-Knopf daneben', () => {
   const fold = (value, locale) => String(value ?? '').trim().toLocaleLowerCase(locale);

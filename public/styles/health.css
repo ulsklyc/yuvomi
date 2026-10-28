@@ -436,9 +436,6 @@
     border-block-end: 0;
   }
 
-  .health-split > .split-view__detail .split-view__detail-head[hidden] {
-    display: none;
-  }
 
   .health-areas__overview {
     display: block;
