@@ -1175,8 +1175,8 @@ const insertMember = db.prepare(`
   INSERT INTO expense_group_members (group_id, user_id, role, invited_by) VALUES (?, ?, ?, ?)
 `);
 const insertExpenseRow = db.prepare(`
-  INSERT INTO expenses (group_id, title, description, amount_minor, currency, converted_amount_minor, converted_currency, payer_id, category, split_method, expense_date, created_by)
-  VALUES (@group, @title, @description, @amount, 'EUR', @amount, 'EUR', @payer, @category, 'equal', @date, @created_by)
+  INSERT INTO expenses (group_id, title, description, amount_minor, currency, converted_amount_minor, converted_currency, payer_id, category, budget_category, split_method, expense_date, created_by)
+  VALUES (@group, @title, @description, @amount, 'EUR', @amount, 'EUR', @payer, @category, @budget, 'equal', @date, @created_by)
 `);
 const insertSplit = db.prepare('INSERT INTO expense_splits (expense_id, user_id, amount_minor, currency) VALUES (?, ?, ?, ?)');
 const insertLedger = db.prepare(`
@@ -1188,7 +1188,14 @@ const insertActivity = db.prepare(`
   VALUES (?, ?, ?, ?, ?, ?)
 `);
 
-function addExpense(groupId, payerId, memberIds, title, description, euros, category, date) {
+// Die Aufteilung fuehrt Budget-Kategorien (R24, E12, Migration 271): dieselbe
+// Zuordnung wie die Migration, wo die alte Kategorie keinen Schluessel hat,
+// nennt der Aufruf ihn selbst.
+const SPLIT_TO_BUDGET = {
+  groceries: 'food', rent: 'housing', utilities: 'housing', home: 'housing', school: 'education',
+  travel: 'leisure', subscriptions: 'leisure', shopping: 'shopping_clothing', health: 'personal_health',
+};
+function addExpense(groupId, payerId, memberIds, title, description, euros, category, date, budget = SPLIT_TO_BUDGET[category] ?? null) {
   const amount = Math.round(euros * 100);
   const n = memberIds.length;
   const base = Math.floor(amount / n);
@@ -1199,7 +1206,7 @@ function addExpense(groupId, payerId, memberIds, title, description, euros, cate
     return { uid, amount_minor: s };
   });
   const expId = insertExpenseRow.run({
-    group: groupId, title, description, amount, payer: payerId, category, date, created_by: payerId,
+    group: groupId, title, description, amount, payer: payerId, category, budget, date, created_by: payerId,
   }).lastInsertRowid;
   for (const s of shares) insertSplit.run(expId, s.uid, s.amount_minor, 'EUR');
   // Ledger: payer +full, each member -their share
@@ -1224,7 +1231,7 @@ const groceriesExpenseId =
   addExpense(houseGroup, alexId,  [alexId, lindaId], L('Weekly groceries',  'Wocheneinkauf'),        L('Big shop at REWE',      'Großeinkauf bei REWE'),      142.30, 'groceries',     thisMonthDate(4));
 addExpense(houseGroup, lindaId, [alexId, lindaId], L('Electricity bill',  'Stromrechnung'),        L('Monthly direct debit',  'Monatlicher Abschlag'),       78.00, 'utilities',     thisMonthDate(15));
 const dinnerExpenseId =
-  addExpense(houseGroup, alexId,  [alexId, lindaId], L('Date-night dinner', 'Abendessen zu zweit'),  L('Italian on the corner', 'Italiener um die Ecke'),      87.50, 'general',       thisMonthDate(9));
+  addExpense(houseGroup, alexId,  [alexId, lindaId], L('Date-night dinner', 'Abendessen zu zweit'),  L('Italian on the corner', 'Italiener um die Ecke'),      87.50, 'general',       thisMonthDate(9), 'food');
 addExpense(houseGroup, lindaId, [alexId, lindaId], L("Emma's new shoes",  'Neue Schuhe für Emma'), L('Back-to-school',        'Für den Schulstart'),         38.50, 'shopping',      thisMonthDate(16));
 addExpense(houseGroup, alexId,  [alexId, lindaId], L('Streaming bundle',  'Streaming-Paket'),      L('Netflix + Spotify',     'Netflix und Spotify'),        34.98, 'subscriptions', thisMonthDate(10));
 
@@ -1238,7 +1245,7 @@ insertMember.run(tripGroup, lindaId, 'admin', alexId);
 insertActivity.run(tripGroup, alexId, 'group_created', 'group', tripGroup, JSON.stringify({ name: tripGroupName }));
 addExpense(tripGroup, alexId,  [alexId, lindaId], L('Flights (×4)',      'Flüge (×4)'),          L('Dortmund → Naples',   'Dortmund → Neapel'),        648.00, 'travel',  thisMonthDate(2));
 addExpense(tripGroup, lindaId, [alexId, lindaId], L('Apartment deposit', 'Anzahlung Ferienwohnung'), L('Sorrento - 7 nights', 'Sorrent - 7 Nächte'),   400.00, 'travel',  thisMonthDate(6));
-addExpense(tripGroup, alexId,  [alexId, lindaId], L('Travel insurance',  'Reiseversicherung'),   L('Family annual policy','Jahrespolice für die Familie'), 96.00, 'general', thisMonthDate(8));
+addExpense(tripGroup, alexId,  [alexId, lindaId], L('Travel insurance',  'Reiseversicherung'),   L('Family annual policy','Jahrespolice für die Familie'), 96.00, 'general', thisMonthDate(8), 'financial_other');
 
 // Beleg + Kommentar an einer geteilten Ausgabe: beides gab es im Seed nie, und
 // beide Ansichten (Beleg-Chip, Kommentarfaden) blieben dadurch unsichtbar.
@@ -1256,9 +1263,9 @@ insertExpenseComment.run(dinnerExpenseId, alexId,  L('Agreed. Next time we book 
 
 // Wiederkehrende geteilte Ausgabe: der Mietanteil läuft monatlich weiter.
 db.prepare(`
-  INSERT INTO recurring_expenses (group_id, title, description, amount_minor, currency, payer_id, category,
+  INSERT INTO recurring_expenses (group_id, title, description, amount_minor, currency, payer_id, category, budget_category,
                                   split_method, split_snapshot, frequency, next_run_date, anchor_day, created_by)
-  VALUES (?, ?, ?, ?, 'EUR', ?, 'rent', 'equal', ?, 'monthly', ?, 1, ?)
+  VALUES (?, ?, ?, ?, 'EUR', ?, 'rent', 'housing', 'equal', ?, 'monthly', ?, 1, ?)
 `).run(
   houseGroup, L('Rent share', 'Mietanteil'), L('Split 50/50 each month', 'Jeden Monat hälftig geteilt'),
   145000, alexId,

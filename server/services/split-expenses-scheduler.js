@@ -76,8 +76,8 @@ function generateRecurringExpense(database, recurring) {
   const expenseId = database.prepare(`
     INSERT INTO expenses
       (group_id, title, description, amount_minor, currency, converted_amount_minor, converted_currency,
-       payer_id, category, split_method, expense_date, recurring_rule_id, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       payer_id, category, budget_category, split_method, expense_date, recurring_rule_id, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     recurring.group_id,
     recurring.title,
@@ -88,6 +88,9 @@ function generateRecurringExpense(database, recurring) {
     recurring.currency,
     recurring.payer_id,
     recurring.category,
+    // Die Budget-Kategorie der Serie (R24, E12, Migration 271) geht an jede
+    // gebuchte Ausgabe mit.
+    recurring.budget_category ?? null,
     recurring.split_method,
     recurring.next_run_date,
     recurring.id,

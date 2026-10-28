@@ -3980,7 +3980,8 @@ Immutable expense records — amounts stored in integer minor currency units (e.
 | exchange_rate_den | INTEGER | NOT NULL DEFAULT 1 |
 | exchange_snapshot | TEXT | JSON, nullable — the rate source as it stood at booking time, so a later rate change never rewrites a recorded expense |
 | payer_id | INTEGER | FK → Users (RESTRICT on delete), NOT NULL |
-| category | TEXT | NOT NULL DEFAULT 'general' |
+| category | TEXT | NOT NULL DEFAULT 'general' - the older split-expense list of twelve; kept for the `/api/v1` surface, the app no longer reads it |
+| budget_category | TEXT | nullable - a key of `budget_categories` (type `expense`), NULL = no category (migration 271, R24 E12). The app shows and filters by it with the budget's dot and name; the migration carried existing rows over where a budget key fits (groceries → food, rent/utilities/home → housing, school → education, travel/subscriptions → leisure, shopping → shopping_clothing, health → personal_health) |
 | split_method | TEXT | 'equal', 'exact', 'percentage', 'shares' (default 'equal') |
 | status | TEXT | 'active' (default) or 'deleted' |
 | expense_date | TEXT | DATE, NOT NULL |
@@ -4091,7 +4092,8 @@ Template for automatically generated expenses on a fixed schedule.
 | amount_minor | INTEGER | NOT NULL CHECK(> 0) |
 | currency | TEXT | NOT NULL |
 | payer_id | INTEGER | FK → Users (RESTRICT on delete), NOT NULL |
-| category | TEXT | NOT NULL DEFAULT 'general' |
+| category | TEXT | NOT NULL DEFAULT 'general' (older list, see Expenses) |
+| budget_category | TEXT | nullable - budget category of the series, copied into every booked expense (migration 271) |
 | split_method | TEXT | NOT NULL DEFAULT 'equal' |
 | split_snapshot | TEXT | NOT NULL (JSON) |
 | frequency | TEXT | 'weekly', 'monthly', 'yearly' |

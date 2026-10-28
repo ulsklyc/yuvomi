@@ -41,6 +41,27 @@ const GROUP_ROLES = ['owner', 'admin', 'guest'];
 const SPLIT_METHODS = ['equal', 'exact', 'percentage', 'shares'];
 const CATEGORIES = ['groceries', 'rent', 'utilities', 'baby', 'pets', 'school', 'travel', 'shopping', 'subscriptions', 'health', 'home', 'general'];
 const FREQUENCIES = ['weekly', 'monthly', 'yearly'];
+
+/**
+ * DIE KATEGORIE EINER AUSGABE IST EINE BUDGET-KATEGORIE (R24, E12, Migration
+ * 271). `budget_category` ist ein Schluessel aus budget_categories (Typ
+ * Ausgabe) oder NULL ("ohne Kategorie"). Die alte Liste CATEGORIES bleibt nur
+ * fuer das Feld `category` der /api/v1-Oberflaeche (zugesagt), die App liest
+ * es nicht mehr.
+ *
+ * `undefined` heisst "nicht genannt" und gibt `keep` zurueck (ein PUT, das nur
+ * den Betrag korrigiert, laesst die Kategorie stehen - dieselbe Regel wie
+ * #1941 fuer `category`); `null` oder '' leert sie. Ein unbekannter Schluessel
+ * ist ein Fehler am Feld, kein stilles "ohne Kategorie".
+ */
+function parseBudgetCategory(value, keep = null) {
+  if (value === undefined) return keep;
+  if (value === null || value === '') return null;
+  const key = String(value);
+  const known = db.get().prepare("SELECT 1 FROM budget_categories WHERE key = ? AND type = 'expense'").get(key);
+  if (!known) throw new Refusal(400, 'Unknown budget category.', 'unknown_budget_category');
+  return key;
+}
 const FAMILY_ROLES = ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'];
 
 function userId(req) {
@@ -1082,6 +1103,12 @@ router.get('/groups/:id/expenses', (req, res) => {
       : '';
     const search = String(req.query.q || '').trim();
     const category = CATEGORIES.includes(req.query.category) ? req.query.category : null;
+    // Der Filter der App (R24, E12): ein Budget-Schluessel oder "none" fuer
+    // Ausgaben ohne Kategorie. Ein unbekannter Schluessel filtert nicht still
+    // auf nichts, er wird ignoriert wie ein unbekanntes `category`.
+    const rawBudget = typeof req.query.budget_category === 'string' ? req.query.budget_category : '';
+    const budgetCategory = rawBudget === 'none' ? 'none'
+      : (rawBudget && db.get().prepare('SELECT 1 FROM budget_categories WHERE key = ?').get(rawBudget) ? rawBudget : null);
     const recurringOnly = req.query.recurring === '1';
     const rows = db.get().prepare(`
       SELECT e.*, u.display_name AS payer_name
@@ -1090,11 +1117,12 @@ router.get('/groups/:id/expenses', (req, res) => {
       WHERE e.group_id = @groupId AND e.status = 'active'
         AND (@search = '' OR e.title LIKE '%' || @search || '%' OR e.description LIKE '%' || @search || '%')
         AND (@category IS NULL OR e.category = @category)
+        AND (@budgetCategory IS NULL OR (@budgetCategory = 'none' AND e.budget_category IS NULL) OR e.budget_category = @budgetCategory)
         AND (@recurringOnly = 0 OR e.recurring_rule_id IS NOT NULL)
         ${keyset}
       ORDER BY e.expense_date DESC, e.created_at DESC, e.id DESC
       LIMIT @fetch OFFSET @offset
-    `).all({ groupId, search, category, recurringOnly: recurringOnly ? 1 : 0, fetch: limit + 1, offset, ...(cursor || {}) });
+    `).all({ groupId, search, category, budgetCategory, recurringOnly: recurringOnly ? 1 : 0, fetch: limit + 1, offset, ...(cursor || {}) });
     // `created_at` ist sekundengenau: Ausgaben derselben Sekunde (eine Serie,
     // die nachholt) haetten ohne `id` keine feste Reihenfolge, und Offset-Seiten
     // koennten eine doppeln oder auslassen (#2108). Eine Zeile mehr gelesen
@@ -1121,6 +1149,7 @@ router.post('/groups/:id/expenses', (req, res) => {
     const archived = archivedRefusal(groupId);
     if (archived) return sendRefusal(res, archived);
     const parsed = parseExpenseBody(req.body, group.default_currency);
+    const budgetCategory = parseBudgetCategory(req.body.budget_category);
     const payerId = Number(req.body.payer_id || userId(req));
     const participants = Array.isArray(req.body.participants) ? req.body.participants : [payerId];
     const refusal = membershipRefusal(db.get(), groupId, payerId, participants);
@@ -1135,9 +1164,9 @@ router.post('/groups/:id/expenses', (req, res) => {
     const createdId = db.transaction(() => {
       const result = db.get().prepare(`
         INSERT INTO expenses
-          (group_id, title, description, amount_minor, currency, converted_amount_minor, converted_currency, exchange_snapshot, payer_id, category, split_method, expense_date, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, parsed.method, parsed.expenseDate, userId(req));
+          (group_id, title, description, amount_minor, currency, converted_amount_minor, converted_currency, exchange_snapshot, payer_id, category, budget_category, split_method, expense_date, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, budgetCategory, parsed.method, parsed.expenseDate, userId(req));
       const expense = db.get().prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid);
       replaceExpenseSplits(db.get(), expense, splits);
       // Belege (#583): nur sichtbare Dokumente, sonst liesse sich über geratene
@@ -1174,6 +1203,7 @@ router.put('/expenses/:id', (req, res) => {
     // sie nicht nennt (oder `null` schickt), laesst sie stehen. Sonst setzte
     // jedes PUT, das nur den Betrag korrigiert, sie still auf `general`.
     if (req.body.category === undefined || req.body.category === null) parsed.category = existing.category;
+    const budgetCategory = parseBudgetCategory(req.body.budget_category, existing.budget_category ?? null);
     const payerId = Number(req.body.payer_id || existing.payer_id);
     const participants = Array.isArray(req.body.participants) ? req.body.participants : db.get().prepare('SELECT user_id FROM expense_splits WHERE expense_id = ?').all(existing.id).map((r) => r.user_id);
     const refusal = membershipRefusal(db.get(), existing.group_id, payerId, participants);
@@ -1183,9 +1213,9 @@ router.put('/expenses/:id', (req, res) => {
       db.get().prepare(`
         UPDATE expenses
         SET title = ?, description = ?, amount_minor = ?, currency = ?, converted_amount_minor = ?, converted_currency = ?,
-            exchange_snapshot = ?, payer_id = ?, category = ?, split_method = ?, expense_date = ?
+            exchange_snapshot = ?, payer_id = ?, category = ?, budget_category = ?, split_method = ?, expense_date = ?
         WHERE id = ?
-      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, parsed.method, parsed.expenseDate, existing.id);
+      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, parsed.convertedAmountMinor, parsed.convertedCurrency, JSON.stringify(req.body.exchange_snapshot || null), payerId, parsed.category, budgetCategory, parsed.method, parsed.expenseDate, existing.id);
       const expense = db.get().prepare('SELECT * FROM expenses WHERE id = ?').get(existing.id);
       replaceExpenseSplits(db.get(), expense, splits);
       // Belege nur anfassen, wenn das Feld mitkommt - ein PUT, das nur den
@@ -1348,6 +1378,21 @@ function groupCategoryTotals(groupId) {
   `).all(groupId).map((row) => ({ ...row, total: minorToDecimal(row.total_minor, row.currency) }));
 }
 
+/**
+ * Dieselbe Rechnung nach der Budget-Kategorie (R24, E12): die Zeilen, die die
+ * App zeigt. `budget_category` NULL ist "ohne Kategorie" und steht als eigene
+ * Zeile. `category_totals` bleibt fuer die /api/v1-Oberflaeche.
+ */
+function groupBudgetCategoryTotals(groupId) {
+  return db.get().prepare(`
+    SELECT e.budget_category, e.converted_currency AS currency, SUM(e.converted_amount_minor) AS total_minor
+    FROM expenses e
+    WHERE e.group_id = ? AND e.status = 'active'
+    GROUP BY e.converted_currency, e.budget_category
+    ORDER BY currency ASC, total_minor DESC, e.budget_category ASC
+  `).all(groupId).map((row) => ({ ...row, total: minorToDecimal(row.total_minor, row.currency) }));
+}
+
 router.get('/groups/:id/balances', (req, res) => {
   try {
     const groupId = Number(req.params.id);
@@ -1361,6 +1406,7 @@ router.get('/groups/:id/balances', (req, res) => {
         simplified_debts: simplifyDebts(rows),
         member_totals: groupMemberTotals(groupId),
         category_totals: groupCategoryTotals(groupId),
+        budget_category_totals: groupBudgetCategoryTotals(groupId),
       },
     });
   } catch (err) {
@@ -1793,9 +1839,9 @@ router.post('/groups/:id/recurring', (req, res) => {
     const nextRunDate = startingRunDate(parsed.expenseDate, frequency, anchorDay, missed);
     const result = db.get().prepare(`
       INSERT INTO recurring_expenses
-        (group_id, title, description, amount_minor, currency, payer_id, category, split_method, split_snapshot, frequency, next_run_date, anchor_day, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, parsed.category, parsed.method, JSON.stringify(snapshot), frequency, nextRunDate, anchorDay, userId(req));
+        (group_id, title, description, amount_minor, currency, payer_id, category, budget_category, split_method, split_snapshot, frequency, next_run_date, anchor_day, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(groupId, parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, parsed.category, parseBudgetCategory(req.body.budget_category), parsed.method, JSON.stringify(snapshot), frequency, nextRunDate, anchorDay, userId(req));
     activity(groupId, userId(req), 'recurring_created', 'recurring_expense', result.lastInsertRowid, { title: parsed.title, frequency });
     res.status(201).json({ data: recurringResponse(result.lastInsertRowid, req) });
   } catch (err) {
@@ -1883,6 +1929,7 @@ router.put('/recurring/:id', (req, res) => {
       // Die Kategorie laeuft nicht durch die Rueckfall-Regel des Parsers
       // ("unbekannt = general"), wenn der Aufruf sie gar nicht nennt.
       const category = given('category') && sent.category !== null ? (CATEGORIES.includes(sent.category) ? sent.category : 'general') : existing.category;
+      const budgetCategory = parseBudgetCategory(sent.budget_category, existing.budget_category ?? null);
       const dateMoved = parsed.expenseDate !== existing.next_run_date;
       if (dateMoved) {
         const lastBooked = db.get().prepare('SELECT MAX(expense_date) AS date FROM expenses WHERE recurring_rule_id = ?').get(existing.id)?.date || null;
@@ -1898,10 +1945,10 @@ router.put('/recurring/:id', (req, res) => {
       const nextRunDate = dateMoved ? startingRunDate(parsed.expenseDate, frequency, anchorDay, missed) : parsed.expenseDate;
       db.get().prepare(`
         UPDATE recurring_expenses
-        SET title = ?, description = ?, amount_minor = ?, currency = ?, payer_id = ?, category = ?,
+        SET title = ?, description = ?, amount_minor = ?, currency = ?, payer_id = ?, category = ?, budget_category = ?,
             split_method = ?, split_snapshot = ?, frequency = ?, next_run_date = ?, anchor_day = ?, failed_at = NULL
         WHERE id = ?
-      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, category, parsed.method, JSON.stringify(snapshot), frequency, nextRunDate, anchorDay, existing.id);
+      `).run(parsed.title, parsed.description, parsed.amountMinor, parsed.currency, payerId, category, budgetCategory, parsed.method, JSON.stringify(snapshot), frequency, nextRunDate, anchorDay, existing.id);
       activity(existing.group_id, userId(req), 'recurring_edited', 'recurring_expense', existing.id, expenseSnapshot(parsed.title, parsed.amountMinor, parsed.currency));
     });
     res.json({ data: recurringResponse(id, req) });
