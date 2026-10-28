@@ -25,7 +25,7 @@ async function open(withBirthday = [], withoutBirthday = []) {
   window.yuvomi.showToast = (...args) => toasts.push(args);
   const controls = new Map([
     ['#bd-import-submit', control()], ['#bd-import-cancel', control()],
-    ['#bd-import-status', control()],
+    ['#bd-import-status', control()], ['[data-import-reason]', control()],
   ]);
   let html;
   let boxes;
@@ -51,7 +51,7 @@ async function open(withBirthday = [], withoutBirthday = []) {
   return {
     html, boxes, toasts, toggle: controls.get('#bd-import-toggle'),
     submit: controls.get('#bd-import-submit'), status: controls.get('#bd-import-status'),
-    cancel: controls.get('#bd-import-cancel'),
+    cancel: controls.get('#bd-import-cancel'), reason: controls.get('[data-import-reason]'),
   };
 }
 
@@ -61,14 +61,18 @@ test.afterEach(() => {
 });
 
 test('bulk and individual selection keep the action label, count and announcement in sync', async () => {
-  const { boxes, toggle, submit, status } = await open([
+  const { boxes, toggle, submit, status, reason } = await open([
     candidate(1), candidate(2), candidate(3, { already_imported: true }),
   ], [{ id: 4, name: 'No birthday' }]);
   assert.deepEqual(boxes.map((b) => b.value), ['1', '2']);
   assert.ok(boxes.every((b) => !b.checked));
   assert.equal(toggle.textContent, 'contacts.importSelectAll');
-  assert.equal(submit.disabled, true);
+  // R24 (D4): der Primaerknopf ist nie gesperrt - ohne Wahl sagt er beim Tippen, was fehlt.
+  assert.equal(submit.disabled, false);
   assert.equal(status.textContent, '', 'opening the dialog stays silent');
+  await submit.fire('click');
+  assert.equal(reason.textContent, 'birthdays.importNothingSelected', 'die Meldung steht am Dialog');
+  assert.equal(reason.hidden, false);
 
   toggle.fire('click');
   assert.ok(boxes.every((b) => b.checked));
@@ -85,7 +89,7 @@ test('bulk and individual selection keep the action label, count and announcemen
   assert.ok(boxes.every((b) => b.checked), 'a partial selection selects all');
   toggle.fire('click');
   assert.ok(boxes.every((b) => !b.checked));
-  assert.equal(submit.disabled, true);
+  assert.equal(submit.disabled, false);
   assert.equal(toggle.textContent, 'contacts.importSelectAll');
   assert.match(status.textContent, /"count":0/);
   for (const box of boxes) {
@@ -105,7 +109,7 @@ test('no bulk action appears when there are no eligible contacts', async () => {
     const dialog = await open(rows, [{ id: 2, name: 'No birthday' }]);
     assert.equal(dialog.toggle, undefined);
     assert.equal(dialog.boxes.length, 0);
-    assert.equal(dialog.submit.disabled, true);
+    assert.equal(dialog.submit.disabled, false, 'R24 D4: nie gesperrt, sagt beim Tippen, was fehlt');
   }
 });
 

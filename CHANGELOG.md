@@ -212,6 +212,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which names what it holds - as in the medication and preventive care dialogs. Editing an existing entry
   no longer brings up the keyboard on phones. Without any entry and without a daily goal, Nutrition shows
   one empty state instead of the goal hint above it.
+- **Contact categories fit.** When the category chips no longer fit next to the list (on the desktop
+  beside an open contact, on phones from the third chip) or there are more than four, a "Filter" button
+  takes their place and shows the categories in a sheet - the same filter as elsewhere. The import
+  dialogs for contacts and birthdays no longer grey out "Import" before you choose; they say "Please
+  select at least one contact." at the dialog instead. "More details" in the contact form names what it
+  holds, and editing a birthday, quick link or address book account no longer brings up the keyboard on
+  phones.
 - **Health vitals have one time line.** Day, week, month or year is the same switch as elsewhere in the
   app, and the period arrows sit in the same line instead of above the chart - activity uses the same
   line for its week. The vitals chart keeps its height on wide screens (two charts of 200 px instead of

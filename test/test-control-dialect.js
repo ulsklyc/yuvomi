@@ -2154,17 +2154,16 @@ const PENDING = {
   // S7 Zeit (Kalender, Schichtplan, Geburtstage), S8 (Aufgaben, Belohnungen,
   // Haushaltshilfe, Entsorgung), S9 Kueche, S10 Geld & Ablage, S11
   // Gesundheit/Kontakte/Familie; Schnellzugriffe und Einstellungen S6.
+  // R24 S11: Gesundheit, Kontakte, Geburtstage, Schnellzugriffe und die
+  // Einstellungsblaetter der Gesundheit und der Adressbuch-Synchronisation
+  // sind umgestellt. Es bleiben Kalender, Notizen, Schichtplan (S7/S10 haben
+  // sie nicht angefasst - Uebergabe im handoff-11).
   'edit-autofocus': {
-    'public/components/quick-links-manager.js': 1, 'public/pages/birthdays.js': 1,
     'public/pages/calendar.js': 1,
     'public/pages/notes.js': 1, 'public/pages/schedule.js': 1,
-    'public/settings/pages/sync-contacts.js': 1,
   },
-  'advanced-hint': {
-    'public/pages/contacts.js': 1,
-  },
+  'advanced-hint': {},
   'primary-disabled': {
-    'public/pages/birthdays.js': 1, 'public/pages/contacts.js': 1,
     'public/pages/schedule.js': 1,
     'public/settings/pages/admin-permissions.js': 1,
   },

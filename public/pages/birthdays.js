@@ -1,5 +1,5 @@
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, advancedSection, reportFieldErrors, captureModalContext, captureOpenContext, isModalContextCurrent, swapFieldsKeepingDirtyBase, isOwnModalOpen, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, advancedSection, reportFieldErrors, captureModalContext, captureOpenContext, isModalContextCurrent, swapFieldsKeepingDirtyBase, isOwnModalOpen, refocusAfterRender, dialogInitialFocus } from '/components/modal.js';
 import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
 import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
@@ -1077,6 +1077,8 @@ function openBirthdayModal({ mode, birthday = null }) {
   openSharedModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('birthdays.editTitle') : t('birthdays.newTitle'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4).
+    initialFocus: dialogInitialFocus(isEdit),
     content: `
       <div class="birthday-modal">
         <div class="birthday-modal__identity">
@@ -1421,9 +1423,10 @@ async function openImportModal() {
           </div>` : ''}
         ${listHtml}
         ${withoutHtml}
+        <p class="form-hint form-hint--danger bd-import__reason" data-import-reason role="status" hidden></p>
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--secondary" type="button" id="bd-import-cancel">${t('common.cancel')}</button>
-          <button class="btn btn--primary" type="button" id="bd-import-submit" disabled>${t('birthdays.importSubmit', { count: 0 })}</button>
+          <button class="btn btn--primary" type="button" id="bd-import-submit">${t('birthdays.importSubmit', { count: 0 })}</button>
         </div>
       </div>
     `,
@@ -1431,6 +1434,7 @@ async function openImportModal() {
       const submitBtn = panel.querySelector('#bd-import-submit');
       const toggleBtn = panel.querySelector('#bd-import-toggle');
       const status = panel.querySelector('#bd-import-status');
+      const reasonEl = panel.querySelector('[data-import-reason]');
       const selectable = [...panel.querySelectorAll('.bd-import__list input:not(:disabled)')];
       let submitting = false;
       // A retry continues the same import, including batches already saved.
@@ -1442,7 +1446,11 @@ async function openImportModal() {
       const refresh = (announce = false) => {
         const n = selectedIds().length;
         submitBtn.textContent = t('birthdays.importSubmit', { count: n });
-        submitBtn.disabled = submitting || n === 0;
+        // Gesperrt nur, solange die Anfrage laeuft; ohne Wahl sagt der Knopf
+        // beim Tippen, was fehlt (R24, D4 - kein grauer Primaerknopf).
+        if (submitting) submitBtn.disabled = true;
+        else submitBtn.disabled = false;
+        if (n > 0 && reasonEl) reasonEl.hidden = true;
         if (toggleBtn) {
           toggleBtn.textContent = n === selectable.length
             ? t('contacts.importDeselectAll')
@@ -1494,7 +1502,10 @@ async function openImportModal() {
         if (submitting) return;
         const ids = selectedIds();
         if (ids.length === 0) {
-          window.yuvomi?.showToast(t('birthdays.importNothingSelected'), 'warning');
+          // Am Dialog, nicht als Toast: die Meldung steht dort, wo gewaehlt wird.
+          reasonEl.textContent = t('birthdays.importNothingSelected');
+          reasonEl.hidden = false;
+          selectable[0]?.focus();
           return;
         }
         // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der

@@ -153,10 +153,13 @@ test('Kontakte: "+ Telefonnummer hinzufuegen" ist eine leise Zeilenaktion an der
 test('Dialogregel Erstfokus: dialogInitialFocus - Anlegen das erste Feld, Bearbeiten "edit" (Loader-Stub gleich)', async () => {
   const src = read('components/modal.js');
   const body = src.slice(src.indexOf('export function dialogInitialFocus('), src.indexOf('\n}\n', src.indexOf('export function dialogInitialFocus(')));
-  assert.match(body, /return isEdit \? 'edit' : 'first-field';/);
+  // R24 S11: ein Dialog, dessen erstes Pflichtfeld eine Auswahl ist, nennt sie (Selektor).
+  assert.match(body, /export function dialogInitialFocus\(isEdit, required = 'first-field'\) \{\s*return isEdit \? 'edit' : required;/);
   const { dialogInitialFocus } = await import('/components/modal.js');
   assert.equal(dialogInitialFocus(true), 'edit');
   assert.equal(dialogInitialFocus(false), 'first-field');
+  assert.equal(dialogInitialFocus(false, '#activity-type'), '#activity-type');
+  assert.equal(dialogInitialFocus(true, '#activity-type'), 'edit', 'Bearbeiten bleibt am Finger der Titel');
 });
 
 // --------------------------------------------------------------------------

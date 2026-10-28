@@ -24,7 +24,7 @@ import { rowActionHtml } from '/utils/row-action.js';
 import { USER_COLOR_DEFAULT } from '/utils/color.js';
 import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
 import { prefersInkText } from '/utils/contrast.js';
-import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmOverModal, reportFieldError, btnError, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmOverModal, reportFieldError, btnError, refocusAfterRender, dialogInitialFocus } from '/components/modal.js';
 import { normalizeQuickLinkUrl, quickLinkHost } from '/utils/quick-link-url.js';
 import { iconElement } from '/utils/lucide-icons.js';
 import { sortableSet, restoreOrder } from '/utils/sortable.js';
@@ -246,6 +246,8 @@ function openQuickLinkForm(link, onDone) {
 
   openModal({
     title: isEdit ? t('quickLinks.editTitle') : t('quickLinks.addTitle'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'sm',
     content: formHtml(state, isEdit),
     onSave(panel) {
