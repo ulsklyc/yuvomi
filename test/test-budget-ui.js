@@ -150,8 +150,8 @@ test('Zeitraum-Kopf: zurueck, Wert, vor - dahinter „Aktuell", per .is-current+
   const ids = [...budgetUi.monthNavHtml().matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     ids,
-    ['budget-prev', 'budget-label', 'budget-next', 'budget-today', 'budget-period-note'],
-    'erwartet zurueck, Wert, vor, Reset (und den Kontexttext-Slot)'
+    ['budget-prev', 'budget-label', 'budget-next', 'budget-today', 'budget-range-slot', 'budget-range-trigger', 'budget-range-value', 'budget-range-menu', 'budget-period-note'],
+    'erwartet zurueck, Wert, vor, Reset, die Wahl des Bereichs (R24) und den Kontexttext-Slot'
   );
 
   // (b) Sichtbarkeit: im aktuellen Monat bzw. auf dem heutigen Berichts-Anker
@@ -338,7 +338,10 @@ test('das Modul führt genau eine Zeitachse', () => {
   assert.doesNotMatch(stats, /data-step=/, 'budget-stats.js baut wieder einen zweiten Stepper');
   assert.doesNotMatch(stats, /budget-stats__period/, 'der Zeitraum gehört in den geteilten Kopf');
   assert.match(stats, /view\.anchor = ctx\.anchor/, 'der Anker muss vom Modul kommen');
-  assert.match(stats, /view\.ctx\.onRangeChange\(id\)/, 'die Auflösung muss ans Modul zurückgemeldet werden');
+  // Seit R24 (G4-Budget-P2-5) waehlt der Kopf auch die Aufloesung - das Panel
+  // traegt kein zweites Bedienelement fuer die Zeit mehr.
+  assert.doesNotMatch(stats, /budget-stats__ranges|role="tablist"/, 'kein Segment Woche/Monat/Jahr im Panel');
+  assert.match(budget, /range: state\.range,/, 'die Aufloesung kommt vom Modul');
 });
 
 test('EIN Anlege-Knopf: der FAB traegt Sichtbarkeit, Aktion und Nomen des Tabs (Kanon D3)', () => {
@@ -509,13 +512,17 @@ test('das Touch-Maß der Umschalter kommt aus dem Token, nicht aus der Leiste', 
   assert.match(item[1], /min-height:\s*var\(--target-base\)/);
 });
 
-test('Auflösungs-Umschalter der Berichte trägt echtes Tab-ARIA', () => {
-  const bar = stats.match(/class="[^"]*budget-stats__ranges"[\s\S]*?<\/div>/);
-  assert.ok(bar, 'Auflösungs-Leiste nicht gefunden');
-  assert.match(bar[0], /role="tablist"/);
-  assert.match(bar[0], /aria-label=/);
-  assert.match(stats, /role="tab"[\s\S]{0,140}aria-selected="\$\{on\}"/);
-  assert.match(stats, /tabindex="\$\{on \? '0' : '-1'\}"/);
+test('R24 G4-Budget-P2-5: der Bereich der Statistik ist eine Wahl am Zeitraum im Kopf, ein Menue mit Haken', () => {
+  const nav = budgetUi.monthNavHtml();
+  const label = nav.indexOf('id="budget-label"');
+  const trigger = nav.indexOf('id="budget-range-trigger"');
+  assert.ok(label > 0 && trigger > label, 'die Wahl steht hinter dem Wert des Steppers');
+  assert.match(nav, /<span class="budget-nav__range" id="budget-range-slot" hidden>/, 'verborgen, bis ein Reiter Bereiche hat');
+  assert.match(nav, /popovertarget="budget-range-menu" aria-haspopup="menu" aria-expanded="false"/);
+  assert.equal((nav.match(/role="menuitemradio"/g) ?? []).length, 3, 'Woche, Monat, Jahr');
+  assert.match(nav, /aria-checked="true" class="popover-menu__item" data-stats-range="month"/, 'der Bereich des Moduls ist angehakt');
+  assert.match(budget, /const rangeSlot = _container\.querySelector\('#budget-range-slot'\);\n\s*if \(rangeSlot\) rangeSlot\.hidden = !caps\.range;/, 'nur auf dem Reiter mit Bereichen sichtbar');
+  assert.match(budget, /'reports':\s+\{ month: true,\s+range: true/);
 });
 
 test('Einfachauswahl-Leisten melden ihren Zustand über aria-checked', () => {
@@ -6987,6 +6994,17 @@ test('Statistik: eine Differenz, die nur ein Rundungsrest ist, zeigt keinen Pfei
   assert.match(html, /metric-card__trend--neutral/, 'die Null-Differenz traegt eine Valenz');
   assert.match(html, /data-lucide="minus"/);
   assert.doesNotMatch(html, /trending-up|trending-down/);
+});
+
+test('R24 G4-Budget-P3-5: unter "Ausgaben" und "Einnahmen" stehen Betraege ohne Vorzeichen, nur die Veraenderung traegt eins', async () => {
+  const html = await renderCatBarsWith({
+    byCategory: [{ category: 'food', expenses: -1200, income: 0 }, { category: 'salary', expenses: 0, income: 3000 }],
+    prevByCategory: [{ category: 'food', expenses: -1000, income: 0 }],
+  });
+  assert.match(html, /budget-bar-row__amount">1200 €/, 'die Ausgabe ohne Minus, wie in der Uebersicht');
+  assert.match(html, /budget-chart-block__total">1200 €</, 'die Summe des Blocks ebenso');
+  assert.match(html, /budget-bar-row__amount">3000 €/, 'die Einnahme ohne Plus');
+  assert.doesNotMatch(html, /budget-(?:bar-row__amount|chart-block__total)">[-+\u2212]/, 'kein Vorzeichen an Betrag oder Summe');
 });
 
 test('Statistik: das Ziel steht als Text, und seine Marke klemmt nicht an der Kante (Critique R19)', async () => {

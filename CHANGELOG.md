@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   An account row no longer repeats its starting balance (it is shown when you open the account), the
   loan filter starts at the edge of the list, and a loan card says its next and last payment in one
   line.
+- **Statistics have one place for time.** Week, month or year is chosen right next to the period in
+  the header ("October 2026 · Month ⌄"; on phones as the first line of the statistics) instead of a
+  second switch below it, and amounts under "Expenses" and "Income" no longer carry a minus or plus -
+  only the change against the previous period does.
 - **A subscription shows itself before it edits.** Tapping a subscription opens a read view with
   "Mark as renewed" and Edit. In the form the currency is chosen inside the amount field, the next
   payment sits with the billing details, and the logo tile itself picks the image. The row no longer

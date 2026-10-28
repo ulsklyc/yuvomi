@@ -845,8 +845,60 @@ function monthNavHtml() {
     next: { id: 'budget-next', label: t('budget.nextMonth'), keys: keys.next },
     reset: { id: 'budget-today', className: 'budget-nav__today', label: t('budget.currentMonth') },
   })}
+          ${statsRangeHtml()}
           <span class="budget-nav__note" id="budget-period-note" hidden></span>
   `;
+}
+
+const STATS_RANGES = ['week', 'month', 'year'];
+const STATS_RANGE_LABELS = { week: 'budget.statsRangeWeek', month: 'budget.statsRangeMonth', year: 'budget.statsRangeYear' };
+
+/**
+ * DER BEREICH DER STATISTIK IST EINE WAHL AM ZEITRAUM (Critique R24
+ * G4-Budget-P2-5). Die Statistik hatte zwei Zeitsteuerungen: den Stepper
+ * "Oktober 2026" im Kopf UND darunter ein Segment Woche/Monat/Jahr. Jetzt
+ * steht der Bereich direkt am Wert des Steppers ("Oktober 2026 | Monat ⌄"),
+ * als Menue mit Haken wie die Sortierungen des Moduls; das Segment im Reiter
+ * entfaellt. Nur auf dem Reiter mit Bereichen (TAB_CAPS.range) sichtbar.
+ * Am Telefon teilen sich Titel und Stepper die Kopfzeile ohne Platz fuer die
+ * Wahl ("B..." neben "Okt. 2026 ⌄" gemessen): dort hat dasselbe Menue einen
+ * zweiten Ausloeser als erste Zeile der Statistik (budget-stats.js), je
+ * Breite steht genau einer - dasselbe Muster wie das Gruppenmenue der
+ * Aufteilung (popover-menu.js richtet sich am sichtbaren aus).
+ */
+function statsRangeHtml() {
+  const range = state.range ?? 'month';
+  return `
+          <span class="budget-nav__range" id="budget-range-slot" hidden>
+            <button type="button" class="btn btn--secondary btn--sm budget-nav__range-trigger popover-menu__trigger" id="budget-range-trigger"
+                    popovertarget="budget-range-menu" aria-haspopup="menu" aria-expanded="false"
+                    aria-label="${esc(t('budget.statsRangeLabel'))}: ${esc(t(STATS_RANGE_LABELS[range]))}">
+              <span class="budget-range-value" id="budget-range-value">${esc(t(STATS_RANGE_LABELS[range]))}</span>
+              <i data-lucide="chevron-down" class="icon-sm" aria-hidden="true"></i>
+            </button>
+            <div class="popover-menu budget-range-menu" id="budget-range-menu" popover role="menu" aria-label="${esc(t('budget.statsRangeLabel'))}">
+              ${STATS_RANGES.map((id) => menuRadioHtml({ on: range === id, attr: 'data-stats-range', value: id, label: t(STATS_RANGE_LABELS[id]) })).join('')}
+            </div>
+          </span>`;
+}
+
+/** Bereich und Menue nach einem Wechsel nachziehen, ohne den Kopf neu zu bauen. */
+function syncStatsRange() {
+  const trigger = _container?.querySelector('#budget-range-trigger');
+  if (!trigger) return;
+  const label = t(STATS_RANGE_LABELS[state.range] ?? STATS_RANGE_LABELS.month);
+  // Beide Ausloeser desselben Menues (Kopf und, am Telefon, die Zeile ueber
+  // der Statistik) nennen denselben Bereich.
+  for (const el of _container.querySelectorAll?.('.budget-nav__range-trigger') ?? [trigger]) {
+    const value = el.querySelector?.('.budget-range-value');
+    if (value) value.textContent = label;
+    el.setAttribute?.('aria-label', `${t('budget.statsRangeLabel')}: ${label}`);
+  }
+  for (const item of _container.querySelectorAll?.('[data-stats-range]') ?? []) {
+    const on = item.dataset.statsRange === state.range;
+    item.setAttribute('aria-checked', String(on));
+    item.querySelector('.popover-menu__item-check')?.classList.toggle('popover-menu__item-check--hidden', !on);
+  }
 }
 
 /**
@@ -1120,7 +1172,29 @@ async function changeTab(id, { direction = 0 } = {}) {
   }
 }
 
+/**
+ * Woche/Monat/Jahr der Statistik wechseln (Menue am Zeitraum, statsRangeHtml):
+ * die Aufloesung gehoert dem Modul und ueberlebt den Reiterwechsel; der Inhalt
+ * wechselt mit einer Blende ohne Richtung, Kopf und Menue ziehen nach.
+ */
+function changeStatsRange(range) {
+  if (!STATS_RANGES.includes(range)) return;
+  state.range = range;
+  syncStatsRange();
+  if (state.activeTab === 'reports') swapContent(bodyEl(), renderBody);
+}
+
 function wireNav() {
+  // Bereich der Statistik am Zeitraum (Critique R24 G4-Budget-P2-5).
+  _container.querySelector('#budget-range-menu')?.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-stats-range]');
+    if (!item) return;
+    e.currentTarget.hidePopover?.();
+    changeStatsRange(item.dataset.statsRange);
+    // Der Fokus geht an den Ausloeser, der in dieser Breite steht.
+    [..._container.querySelectorAll('.budget-nav__range-trigger')]
+      .find((el) => el.getClientRects().length > 0)?.focus();
+  });
   // EIN Stepper für alle Tabs mit Zeitbezug. Welche Achse er bewegt, sagt der
   // Tab: Budget und Plan rechnen in Monaten, die Berichte in ihrer gewählten
   // Auflösung. Vorher trugen die Berichte einen zweiten Stepper im Panel.
@@ -1317,12 +1391,6 @@ function renderBody() {
       // bei `read` gibt es die Handlung nicht. Das Panel reicht den Zeitraum
       // mit, den es zeigt - der Dialog datiert den Eintrag dort hinein.
       onAddEntry: readOnly() ? null : (period) => openBudgetModal({ mode: 'create', period }),
-      onRangeChange: (r) => {
-        state.range = r;
-        // Woche/Monat/Jahr wechselt die Aufloesung: Blende ohne Richtung.
-        swapContent(body, renderBody);
-        refocusSegmented('.budget-stats__ranges');
-      },
       // Die Wochengrenzen kennt der Server; das Kopf-Label holt sie sich von dort
       // nach, statt die Wochenlogik ein zweites Mal im Client zu führen. Die
       // rohen Grenzen (reportRangeFrom/To) braucht reportShowsToday() für die
@@ -1782,6 +1850,9 @@ function updateTabs() {
     note.hidden = !caps.note;
     if (caps.note) note.textContent = t(caps.note);
   }
+  const rangeSlot = _container.querySelector('#budget-range-slot');
+  if (rangeSlot) rangeSlot.hidden = !caps.range;
+  syncStatsRange();
 
   syncAddAction();
 }

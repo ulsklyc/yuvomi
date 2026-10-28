@@ -164,6 +164,46 @@
   align-items: center;
 }
 
+/* DER BEREICH DER STATISTIK AM WERT DES STEPPERS (Critique R24
+ * G4-Budget-P2-5; budget.js statsRangeHtml): "Oktober 2026 | Monat ⌄" - die
+ * Wahl steht unmittelbar hinter dem Zeitraum, den sie aufloest, als ruhiger
+ * Knopf in Kopfhoehe. */
+.budget-nav__range {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: var(--space-2);
+}
+
+.budget-nav__range[hidden] {
+  display: none;
+}
+
+.budget-nav__range-trigger {
+  gap: var(--space-1);
+}
+
+/* Je Breite EIN Ausloeser: ab 640px im Kopf, darunter als erste Zeile der
+ * Statistik (die Kopfzeile traegt dort Titel und Stepper). */
+.budget-stats__resolution {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .budget-nav__range {
+    margin-inline-start: 0;
+  }
+
+  .budget-nav__range-trigger:not(.budget-stats__resolution-trigger) {
+    display: none;
+  }
+
+  .budget-stats__resolution {
+    display: flex;
+    justify-content: flex-end;
+    margin-block-end: var(--space-2);
+  }
+}
+
 /* MOBIL TEILEN SICH TITEL UND ZEITRAUM EINE ZEILE (R16, layout.css
  * `.page-toolbar--period-inline`). Hier steht nur, was das Label und die Notiz
  * dafuer hergeben:
@@ -2735,7 +2775,6 @@ button.budget-entry__title {
 /* .budget-stats__range* und __stepper/__period sind entfallen: die Auflösung
  * läuft über .segmented (aus genau dieser Leiste extrahiert), der
  * Zeitraum über den geteilten Kopf-Stepper des Moduls. */
-.budget-stats__controls { display:flex; flex-wrap:wrap; gap:var(--space-3); align-items:center; margin-bottom:var(--space-4); }
 .budget-stats__trend { width:100%; height:auto; display:block; }
 
 /* Oben haelt der Traeger eine Zeile frei: dort steht "Heute" ueber der
