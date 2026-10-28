@@ -1085,3 +1085,50 @@ test('R24 P3-3: Taschengeld bietet keine Elternrolle als Konto an, Mitglieder oh
     s.money = vorher;
   }
 });
+
+// R24 S8-F1 (Ulas 28.10.): der Verlauf ist ein Ort. Zurueck fuehrt auf
+// "Punkte", Neuladen und Link landen im Verlauf - wie die Bereiche der
+// Gesundheit (`/health/*`). Der Router laedt fuer beide Adressen dieselbe
+// Seite und wechselt per Soft-Navigation (update()).
+test('R24 S8-F1: der Verlauf hat die Adresse /rewards/history, der Router fuehrt sie als Teil der Belohnungen', () => {
+  const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(router, /\{ path: '\/rewards\/history',\s*page: '\/pages\/rewards\.js',\s*requiresAuth: true,\s*module: 'rewards'/,
+    'eigene Route, dieselbe Seite, dasselbe Modul (Rechte- und Modul-Gates gelten wie fuer /rewards)');
+  assert.match(router, /function topLevelSection\(path\) \{[\s\S]*?path === '\/rewards\/history'[\s\S]*?return '\/rewards'/,
+    'ein aktives Nav-Ziel: der Verlauf markiert "Belohnungen"');
+  const rewards = readFileSync(new URL('../public/pages/rewards.js', import.meta.url), 'utf8');
+  assert.match(rewards, /export async function update\(/, 'die Seite tauscht per Soft-Navigation');
+  assert.match(rewards, /if \(isHistoryPath\(location\.pathname\)\) state\.tab = LEDGER;/,
+    'Neuladen und Direktaufruf beginnen im Verlauf');
+  assert.ok(rewardsPage.isHistoryPath('/rewards/history'));
+  assert.equal(rewardsPage.isHistoryPath('/rewards'), false);
+});
+
+test('R24 S8-F1: hinein ueber die Adresse, zurueck ueber den Verlaufseintrag - ein Direktaufruf geht auf /rewards', () => {
+  const s = rewardsPage.state;
+  const vorher = s.tab;
+  const savedWin = globalThis.window;
+  const savedHistory = globalThis.history;
+  const calls = [];
+  globalThis.window = { ...(savedWin ?? {}), yuvomi: { navigate: (p) => calls.push(['navigate', p]) } };
+  globalThis.history = { back: () => calls.push(['back']) };
+  try {
+    s.tab = 'overview';
+    rewardsPage.openLedgerRoute();
+    assert.deepEqual(calls.at(-1), ['navigate', '/rewards/history'], '"Verlauf ›" schreibt einen Verlaufseintrag');
+    s.tab = 'ledger';
+    rewardsPage.closeLedgerRoute();
+    assert.deepEqual(calls.at(-1), ['back'], '"‹ Punkte" nach dem Hineingehen ist Browser-Zurueck: kein zweiter Eintrag');
+    // Direkt aufgerufen (Neuladen, Link): es gibt keinen Eintrag "Punkte" davor.
+    rewardsPage.closeLedgerRoute();
+    assert.deepEqual(calls.at(-1), ['navigate', '/rewards'], 'ohne Vorgaenger fuehrt der Rueckweg auf die Adresse der Seite');
+    const n = calls.length;
+    s.tab = 'catalog';
+    rewardsPage.closeLedgerRoute();
+    assert.equal(calls.length, n, 'ausserhalb des Verlaufs tut der Rueckweg nichts');
+  } finally {
+    s.tab = vorher;
+    globalThis.window = savedWin;
+    globalThis.history = savedHistory;
+  }
+});

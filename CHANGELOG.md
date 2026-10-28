@@ -111,7 +111,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them right away.
 - **Rewards has two tabs: Points and Rewards.** The history is one level below Points: "History ›"
   opens it with the person filter, "‹ Points" (or the Points tab) goes back. Before, Points showed the
-  history at its side and History showed the points at its side - the same two blocks on two tabs.
+  history at its side and History showed the points at its side - the same two blocks on two tabs. The
+  history has its own address (`/rewards/history`): the browser's or the phone's Back returns to Points,
+  and reloading or opening a link lands in the history.
 - **A bonus is a credit or a deduction.** The bonus dialog has a Credit | Deduction switch and a plain
   number, and its button says "Credit" or "Deduct" instead of "Save"; before, you typed a minus sign
   to take points away. Redeeming with too few points is no longer a greyed-out button - it says why.

@@ -1806,7 +1806,9 @@ angedockte Primaerknopf sprang mit (Belohnungen 271/431px). Seitdem gilt:
   nur, was es als Daten und Baustein schon gibt: Belohnungen/Uebersicht die letzten Buchungen
   (der Abschnittstitel fuehrt in den Verlauf - seit R24 E8 kein Reiter mehr, sondern eine Ebene
   unter "Punkte" mit Rueckweg "‹ Punkte", ohne Seitenspalte: die Punktestaende dort spiegelten
-  nur die Uebersicht),
+  nur die Uebersicht; seit S12 mit eigener Adresse `/rewards/history` wie die Bereiche der
+  Gesundheit - Browser-Zurueck fuehrt auf "Punkte", Neuladen und Link landen im Verlauf, der
+  Wechsel ist eine Soft-Navigation ueber `update()`),
   Entsorgung Abfallarten und Quellen neben den Abholungen, Haushaltshilfe/Haushaltshilfen
   das Protokoll der gewaehlten Person. **Kennzahlen sind keine Zweitansicht (R24, E2):**
   Haushaltshilfe/Berichte fuehrt seine Zahlen als EINE Kurzzeile oben in der Bahn (offene

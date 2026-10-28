@@ -142,6 +142,9 @@ const ROUTES = [
   { path: '/housekeeping', page: '/pages/housekeeping.js', requiresAuth: true, module: 'housekeeping', titleKey: 'nav.housekeeping' },
   { path: '/waste', page: '/pages/waste.js', requiresAuth: true, module: 'waste', titleKey: 'nav.waste' },
   { path: '/rewards',  page: '/pages/rewards.js',    requiresAuth: true, module: 'rewards',   titleKey: 'nav.rewards' },
+  // Der Verlauf der Belohnungen ist ein Ort (R24 S8-F1): eigene Adresse, dieselbe
+  // Seite, dasselbe Modul - Zurueck, Neuladen und Link landen im Verlauf.
+  { path: '/rewards/history', page: '/pages/rewards.js', requiresAuth: true, module: 'rewards', titleKey: 'nav.rewards' },
 ];
 
 // Settings ist eine Sektion mit einer Wurzel und je einer exakten Route pro
@@ -685,6 +688,8 @@ function topLevelSection(path) {
   // startsWith('/schedule') traefe auch einen hypothetischen kuenftigen Pfad
   // wie '/schedules...', der zu keinem echten Schedule-Tab gehoert.
   if (typeof path === 'string' && (path === '/schedule' || path.startsWith('/schedule/'))) return '/schedule';
+  // Der Verlauf der Belohnungen (R24 S8-F1) markiert "Belohnungen".
+  if (path === '/rewards/history') return '/rewards';
   return path ?? '/';
 }
 

@@ -45,6 +45,41 @@ import { errorSentence, isAlreadyDeleted, isGone } from '/utils/friendly-error.j
 const TABS = ['overview', 'catalog'];
 const LEDGER = 'ledger';
 
+/* DER VERLAUF IST EIN ORT (Critique R24 S8-F1, Ulas 28.10.). Bis dahin war er
+ * nur ein Zustand der Seite: Browser- und Android-Zurueck verliessen das
+ * Modul, Neuladen und ein Link landeten auf "Punkte". Jetzt hat er wie die
+ * Bereiche der Gesundheit eine Adresse; der Router laedt dieselbe Seite, und
+ * der Wechsel zwischen beiden Adressen ist eine Soft-Navigation ueber
+ * `update()`. Die Route steht in router.js (ROUTES), der Abschnitt der
+ * Navigation bleibt `/rewards` (topLevelSection). */
+export const REWARDS_HISTORY_PATH = '/rewards/history';
+const REWARDS_PATH = '/rewards';
+
+/** Kam der Verlauf aus "Punkte" (dann ist Zurueck der Weg hinaus, wie in der Gesundheit)? */
+let _pushedFromPoints = false;
+
+function isHistoryPath(path) {
+  return path === REWARDS_HISTORY_PATH;
+}
+
+/** In den Verlauf ueber seine Adresse - der Router ruft update(). */
+function openLedgerRoute() {
+  if (state.tab === LEDGER) return;
+  _pushedFromPoints = true;
+  window.yuvomi?.navigate(REWARDS_HISTORY_PATH);
+}
+
+/** Zurueck auf "Punkte": der Verlaufseintrag davor, sonst die Adresse der Seite. */
+function closeLedgerRoute() {
+  if (state.tab !== LEDGER) return;
+  if (_pushedFromPoints) {
+    _pushedFromPoints = false;
+    history.back();
+  } else {
+    window.yuvomi?.navigate(REWARDS_PATH);
+  }
+}
+
 let state = {
   tab: 'overview',
   user: null,
@@ -373,15 +408,22 @@ function renderShell(container) {
       <div class="rewards-content" id="rewards-content"></div>
     </div>`);
 
-  wireTablist(container.querySelector('.rewards-tabs'), {
+  _tabs = wireTablist(container.querySelector('.rewards-tabs'), {
     activeId: state.tab === LEDGER ? 'overview' : state.tab,
-    onChange: (id, { direction = 0 } = {}) => { state.tab = id; renderCurrentTab(container, { direction }); },
+    onChange: (id, { direction = 0 } = {}) => {
+      // Aus dem Verlauf in die Praemien: die Adresse folgt dem Reiter, ohne
+      // einen Schritt zu schreiben (Zurueck fuehrt nicht in den Verlauf).
+      if (state.tab === LEDGER && isHistoryPath(location.pathname)) {
+        _pushedFromPoints = false;
+        history.replaceState({ ...(history.state ?? {}), path: REWARDS_PATH }, '', REWARDS_PATH);
+      }
+      state.tab = id;
+      renderCurrentTab(container, { direction });
+    },
   });
   // Im Verlauf steht "Punkte" schon als aktiver Reiter - ein Tipp darauf ist
   // fuer die Leiste kein Wechsel. Er fuehrt zurueck wie "‹ Punkte".
-  container.querySelector('.rewards-tabs [data-tab-id="overview"]')?.addEventListener('click', () => {
-    if (state.tab === LEDGER) leaveLedger(container);
-  });
+  container.querySelector('.rewards-tabs [data-tab-id="overview"]')?.addEventListener('click', closeLedgerRoute);
   // Geteilte gleitende Kapsel (Re-Critique 2026-09-27, D8); `key`, weil die
   // Seite den Kopf bei jedem Aufruf neu baut.
   attachSegmentIndicator(container.querySelector('.rewards-tabs'), { key: 'rewards-tabs' });
@@ -418,9 +460,12 @@ function content() {
  * `renderSeq` verwirft eine Antwort, die ein spaeterer Wechsel ueberholt hat. */
 /** In den Verlauf (E8): vorwaerts, der Reiter "Punkte" bleibt aktiv. */
 function enterLedger(container) {
-  if (state.tab === LEDGER) return;
+  if (state.tab === LEDGER) return Promise.resolve();
   state.tab = LEDGER;
-  renderCurrentTab(container, { direction: 1, drill: true });
+  // "Punkte" bleibt im Verlauf der aktive Reiter - auch wenn der Verlauf
+  // ueber seine Adresse aus den Praemien kommt (Link, Zurueck/Vor).
+  _tabs?.sync('overview');
+  return renderCurrentTab(container, { direction: 1, drill: true });
 }
 
 /** Zurueck auf "Punkte"; der Fokus geht an den Weg, der hineingefuehrt hat. */
@@ -430,6 +475,10 @@ async function leaveLedger(container) {
   await renderCurrentTab(container, { direction: -1, drill: true });
   content()?.querySelector('.rw-section__more')?.focus({ preventScroll: true });
 }
+
+/** Der Traeger der gerenderten Seite und seine Reiter - fuer update(). */
+let _container = null;
+let _tabs = null;
 
 let renderSeq = 0;
 /** Traeger, die schon einmal Inhalt gezeigt haben (ueberlebt keinen Seitenneubau). */
@@ -798,9 +847,7 @@ function renderOverview(el) {
 
 function wireOverview(el) {
   installPopoverMenus(el);
-  el.querySelector('.rw-section__more')?.addEventListener('click', () => {
-    enterLedger(document.querySelector('.rewards-page')?.parentElement || document.body);
-  });
+  el.querySelector('.rw-section__more')?.addEventListener('click', openLedgerRoute);
   el.querySelector('[data-action="manage-participants"]')?.addEventListener('click', openParticipantsModal);
   el.querySelectorAll('.rw-redeem-open').forEach((btn) => {
     btn.addEventListener('click', () => openRedeemModal(Number(btn.dataset.member)));
@@ -1009,9 +1056,7 @@ function renderLedger(el) {
       </section>`,
       })}
     </div>`);
-  el.querySelector('[data-rw-back]')?.addEventListener('click', () => {
-    leaveLedger(document.querySelector('.rewards-page')?.parentElement || document.body);
-  });
+  el.querySelector('[data-rw-back]')?.addEventListener('click', closeLedgerRoute);
 
   el.querySelectorAll('[data-filter="ledger-member"]').forEach((chip) => chip.addEventListener('click', async () => {
     const val = chip.dataset.value;
@@ -2201,11 +2246,36 @@ export const __test = {
   openParticipantsModal, openMemberDetail, openMoneyDetail,
   // R24 (E8, G2-Belohnungen-P3-1/P3-3): Bonus als Gutschrift/Abzug, Taschengeld fuer Kinder, zwei Reiter.
   openBonusModal, moneyCandidates, TABS, tabButton,
+  // R24 S8-F1: der Verlauf als Adresse.
+  openLedgerRoute, closeLedgerRoute, isHistoryPath,
 };
 
 export async function render(container, { user } = {}) {
   state.user = user || null;
-  if (!TABS.includes(state.tab)) state.tab = 'overview';
+  // Die Adresse entscheidet: `/rewards/history` (Neuladen, Link, Zurueck in
+  // einen Verlaufseintrag) oeffnet den Verlauf, `/rewards` einen Reiter.
+  _pushedFromPoints = false;
+  if (isHistoryPath(location.pathname)) state.tab = LEDGER;
+  else if (!TABS.includes(state.tab)) state.tab = 'overview';
+  _container = container;
   renderShell(container);
   await renderCurrentTab(container);
+}
+
+/**
+ * Soft-Navigation zwischen `/rewards` und `/rewards/history` (Router,
+ * utils/router-navigate.js). Hinein und hinaus ist der Ebenenwechsel von E8
+ * (swapRegion); ein Neuaufbau entfaellt.
+ * @returns {Promise<boolean>} false, wenn die Seite nicht steht - dann rendert der Router neu
+ */
+export async function update({ path, user } = {}) {
+  if (!_container?.isConnected || !content()) return false;
+  if (user) state.user = user;
+  if (isHistoryPath(path)) {
+    await enterLedger(_container);
+  } else {
+    _pushedFromPoints = false;
+    await leaveLedger(_container);
+  }
+  return true;
 }
