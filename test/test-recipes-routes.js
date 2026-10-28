@@ -860,3 +860,96 @@ test('MCP call_api_operation post_recipes: Felder neben payload → klare Meldun
     else process.env.MCP_INTERNAL_BASE_URL = previous;
   }
 });
+
+// --------------------------------------------------------------------------
+// Portionen (R24, E12): Migration 270, Routen, umgerechnete Uebergabe
+// --------------------------------------------------------------------------
+test('Migration 270: eine frische Datenbank traegt recipes.servings, NULL als Standard, CHECK 1-99', () => {
+  const col = db.prepare('PRAGMA table_info(recipes)').all().find((c) => c.name === 'servings');
+  assert.ok(col, 'Spalte servings vorhanden');
+  assert.equal(col.dflt_value, null);
+  assert.equal(col.notnull, 0);
+  const id = db.prepare("INSERT INTO recipes (title, created_by) VALUES ('Frisch', ?)").run(OWNER).lastInsertRowid;
+  assert.equal(db.prepare('SELECT servings FROM recipes WHERE id = ?').get(id).servings, null);
+  assert.throws(() => db.prepare('UPDATE recipes SET servings = 0 WHERE id = ?').run(id), /CHECK/);
+  assert.throws(() => db.prepare('UPDATE recipes SET servings = 100 WHERE id = ?').run(id), /CHECK/);
+});
+
+test('Migration 270: eine Bestandsdatenbank mit altem Schema behaelt ihre Rezepte, servings faellt auf NULL', async () => {
+  const { default: Database } = await import('better-sqlite3-multiple-ciphers');
+  const old = new Database(':memory:');
+  // Das Schema der Rezepte vor 270 (Migration 13 + meal_types + Bild).
+  old.exec(`
+    CREATE TABLE recipes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, notes TEXT, recipe_url TEXT,
+      created_by INTEGER NOT NULL, meal_types TEXT NOT NULL DEFAULT 'breakfast,lunch,dinner,snack',
+      image_data TEXT, created_at TEXT, updated_at TEXT
+    );
+    CREATE TABLE recipe_ingredients (id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER NOT NULL, name TEXT NOT NULL, quantity TEXT, category TEXT);
+    INSERT INTO recipes (title, notes, created_by, meal_types) VALUES ('Alt-Curry', 'scharf', 1, 'dinner');
+    INSERT INTO recipe_ingredients (recipe_id, name, quantity, category) VALUES (1, 'Reis', '300 g', 'Sonstiges');
+  `);
+  const migration = dbmod.MIGRATIONS.find((m) => m.version === 270);
+  assert.ok(migration, 'Migration 270 vorhanden');
+  migration.up(old);
+  migration.up(old); // ein zweiter Lauf (gedriftete Datenbank) scheitert nicht
+  assert.deepEqual(
+    { ...old.prepare('SELECT title, notes, meal_types, servings FROM recipes WHERE id = 1').get() },
+    { title: 'Alt-Curry', notes: 'scharf', meal_types: 'dinner', servings: null },
+  );
+  assert.equal(old.prepare('SELECT quantity FROM recipe_ingredients WHERE recipe_id = 1').get().quantity, '300 g');
+  old.prepare('UPDATE recipes SET servings = 4 WHERE id = 1').run();
+  assert.equal(old.prepare('SELECT servings FROM recipes WHERE id = 1').get().servings, 4);
+  old.close();
+});
+
+test('POST/PUT /: servings wird gespeichert, ein Teil-Update laesst es stehen, null loescht es', async () => {
+  const created = await call('POST', '/', { title: 'Portionen-Rezept', servings: 4, ingredients: [{ name: 'Mehl', quantity: '200 g' }] });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.data.servings, 4);
+  const id = created.body.data.id;
+  const kept = await call('PUT', `/${id}`, { title: 'Portionen-Rezept', ingredients: [{ name: 'Mehl', quantity: '200 g' }] });
+  assert.equal(kept.status, 200);
+  assert.equal(db.prepare('SELECT servings FROM recipes WHERE id = ?').get(id).servings, 4);
+  await call('PUT', `/${id}`, { title: 'Portionen-Rezept', servings: 6 });
+  assert.equal(db.prepare('SELECT servings FROM recipes WHERE id = ?').get(id).servings, 6);
+  await call('PUT', `/${id}`, { title: 'Portionen-Rezept', servings: null });
+  assert.equal(db.prepare('SELECT servings FROM recipes WHERE id = ?').get(id).servings, null);
+  const list = await call('GET', '/');
+  assert.ok(list.body.data.some((r) => r.id === id && r.servings === null));
+});
+
+test('POST/PUT /: servings ausserhalb 1-99 oder keine ganze Zahl -> 400, nichts geschrieben', async () => {
+  for (const servings of [0, 100, 2.5, 'vier', -1]) {
+    const r = await call('POST', '/', { title: `Falsch ${servings}`, servings });
+    assert.equal(r.status, 400, `servings ${servings}`);
+    assert.match(r.body.error, /Servings/);
+  }
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM recipes WHERE title LIKE 'Falsch %'").get().n, 0);
+});
+
+test('POST /:id/to-shopping-list: quantities ersetzt die Mengen fuer diese Uebergabe, Namen bleiben', async () => {
+  const listId = newList('Portionen-Liste');
+  const created = await call('POST', '/', {
+    title: 'Skaliert', servings: 2,
+    ingredients: [{ name: 'Nudeln', quantity: '250 g', category: 'Backen' }, { name: 'Salz' }],
+  });
+  const id = created.body.data.id;
+  const r = await call('POST', `/${id}/to-shopping-list`, { listId, quantities: ['500 g', null] });
+  assert.equal(r.status, 200);
+  const items = shoppingItems(listId);
+  assert.deepEqual(items.map((i) => [i.name, i.quantity, i.category]), [['Nudeln', '500 g', 'Backen'], ['Salz', null, 'Sonstiges']]);
+  // Das Rezept selbst bleibt unveraendert.
+  assert.deepEqual(ingredientRows(id).map((x) => x.quantity), ['250 g', null]);
+});
+
+test('POST /:id/to-shopping-list: quantities in falscher Laenge oder Form -> 400, nichts uebernommen', async () => {
+  const listId = newList('Portionen-Falsch');
+  const created = await call('POST', '/', { title: 'Skaliert-Falsch', ingredients: [{ name: 'Mehl', quantity: '1 kg' }] });
+  const id = created.body.data.id;
+  for (const quantities of [['1 kg', '2 kg'], [], 'x', [42]]) {
+    const r = await call('POST', `/${id}/to-shopping-list`, { listId, quantities });
+    assert.equal(r.status, 400, JSON.stringify(quantities));
+  }
+  assert.equal(shoppingItems(listId).length, 0);
+});

@@ -210,6 +210,21 @@ function validateIngredients(val) {
   return { value: val.filter((ing) => ing && typeof ing === 'object'), error: null };
 }
 
+/* PORTIONEN (R24, E12): fuer wie viele Portionen die Mengen gelten.
+ *
+ * `undefined` heisst "nicht mitgeschickt" und laesst den gespeicherten Wert
+ * stehen (Teil-Update, wie Bild und meal_types); `null` oder '' loescht ihn.
+ * Sonst eine ganze Zahl von 1 bis 99 - dieselbe Grenze haelt der CHECK der
+ * Spalte (Migration 270).
+ */
+function validateServings(val) {
+  if (val === undefined) return { value: undefined, error: null };
+  if (val === null || val === '') return { value: null, error: null };
+  const n = Number(val);
+  if (!Number.isInteger(n) || n < 1 || n > 99) return { value: null, error: 'Servings must be a whole number from 1 to 99.' };
+  return { value: n, error: null };
+}
+
 router.post('/', (req, res) => {
   try {
     const body = bodyOf(req);
@@ -222,15 +237,16 @@ router.post('/', (req, res) => {
     const mealTypes = normalizeRecipeMealTypes(body.meal_types);
 
     const vImage = validateRecipeImage(body.image_data);
-    const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage, vIngredients]);
+    const vServings = validateServings(body.servings);
+    const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage, vIngredients, vServings]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const recipeId = db.transaction(() => {
       const result = db.get().prepare(`
-        INSERT INTO recipes (title, notes, recipe_url, meal_types, image_data, created_by)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO recipes (title, notes, recipe_url, meal_types, image_data, servings, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(vTitle.value, vNotes.value, vRecipeUrl.value, mealTypes.join(','),
-        vImage.value ?? null, req.authUserId || req.session.userId);
+        vImage.value ?? null, vServings.value ?? null, req.authUserId || req.session.userId);
 
       const rid = Number(result.lastInsertRowid);
       const insertIng = db.get().prepare(`
@@ -290,7 +306,8 @@ router.put('/:id', (req, res) => {
       body.meal_types === undefined ? existing.meal_types : body.meal_types
     );
     const vImage = validateRecipeImage(body.image_data);
-    const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage, vIngredients]);
+    const vServings = validateServings(body.servings);
+    const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage, vIngredients, vServings]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     db.transaction(() => {
@@ -301,10 +318,12 @@ router.put('/:id', (req, res) => {
       db.get().prepare(`
         UPDATE recipes
         SET title = ?, notes = ?, recipe_url = ?, meal_types = ?,
-            image_data = CASE WHEN ? = 1 THEN ? ELSE image_data END
+            image_data = CASE WHEN ? = 1 THEN ? ELSE image_data END,
+            servings = CASE WHEN ? = 1 THEN ? ELSE servings END
         WHERE id = ?
       `).run(vTitle.value, vNotes.value, vRecipeUrl.value, mealTypes.join(','),
-        vImage.value === undefined ? 0 : 1, vImage.value ?? null, id);
+        vImage.value === undefined ? 0 : 1, vImage.value ?? null,
+        vServings.value === undefined ? 0 : 1, vServings.value ?? null, id);
 
       db.get().prepare('DELETE FROM recipe_ingredients WHERE recipe_id = ?').run(id);
 
@@ -565,6 +584,21 @@ router.post('/:id/to-shopping-list', (req, res) => {
       'SELECT name, quantity, category FROM recipe_ingredients WHERE recipe_id = ? ORDER BY id ASC',
     ).all(id);
     if (!ingredients.length) return res.json({ data: { transferred: 0, skipped: 0, added_ids: [] } });
+
+    // UMGERECHNETE MENGEN (R24, E12). Wer das Rezept fuer mehr oder weniger
+    // Portionen ansieht, uebernimmt auch diese Mengen. Gerechnet wird im
+    // Browser (scaleQuantityText, utils/scale-quantity.js - dieselbe Rechnung
+    // wie im Mahlzeit-Dialog); hierher kommt nur der Text je Zutat, in der
+    // Reihenfolge der Zutaten. Namen und Kategorien bleiben die des Rezepts:
+    // die Liste ersetzt die Menge, sie legt keine Zutat an.
+    const { quantities } = bodyOf(req);
+    if (quantities !== undefined) {
+      if (!Array.isArray(quantities) || quantities.length !== ingredients.length
+        || quantities.some((q) => q !== null && (typeof q !== 'string' || q.length > MAX_SHORT))) {
+        return res.status(400).json({ error: 'Quantities must be one text per ingredient.', code: 400 });
+      }
+      quantities.forEach((q, i) => { ingredients[i].quantity = q?.trim() || null; });
+    }
 
     // Die Regel ist die der ganzen Kueche (services/kitchen-handover.js, R23 D2):
     // dieser Weg hatte sie als einziger schon, die drei anderen nicht.
