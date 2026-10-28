@@ -344,6 +344,9 @@ test('the balance keeps its mobile slot, the transfer card is conditional, and t
     }
     await page.$eval('#budget-expenses-only', el => el.click());
     await page.$eval(`${transferRow} .budget-entry__title`, el => el.click());
+    // R24 E1: der Tipp zeigt die Buchung zuerst; Bearbeiten fuehrt in den Editor.
+    await page.waitForSelector('#budget-read-edit');
+    await page.$eval('#budget-read-edit', el => el.click());
     await page.waitForSelector('#bt-delete');
     await page.$eval('#bt-delete', el => el.click());
     await page.waitForFunction(text => document.body.textContent.includes(text), {}, tr('budget.transferDeleteSeriesConfirm'));

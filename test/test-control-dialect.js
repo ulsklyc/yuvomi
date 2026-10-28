@@ -2155,14 +2155,14 @@ const PENDING = {
   // Verhaltensschicht `wireTablist`: S10 (Budget-Konto) zieht sie auf
   // colorPickerHtml({ options, custom: false }) - der Baustein nimmt
   // Token-Ausdruecke als `paint`; der Kategorie-Verwalter folgt mit.
-  'swatch-dialect': { 'public/pages/budget.js': 1, 'public/components/category-manager.js': 1 },
+  'swatch-dialect': {},
   // --- Critique R24 S3: Dialogregeln (DESIGN.md D4). Gebaut sind Regel und
   // Helfer, angewendet wird je Modul in S7-S11; die Listen sinken dort.
   // S7 Zeit (Kalender, Schichtplan, Geburtstage), S8 (Aufgaben, Belohnungen,
   // Haushaltshilfe, Entsorgung), S9 Kueche, S10 Geld & Ablage, S11
   // Gesundheit/Kontakte/Familie; Schnellzugriffe und Einstellungen S6.
   'edit-autofocus': {
-    'public/components/quick-links-manager.js': 1, 'public/pages/birthdays.js': 1, 'public/pages/budget.js': 2,
+    'public/components/quick-links-manager.js': 1, 'public/pages/birthdays.js': 1,
     'public/pages/calendar.js': 1, 'public/pages/documents.js': 1, 'public/pages/health.js': 7,
     'public/pages/notes.js': 1, 'public/pages/schedule.js': 1,
     'public/pages/subscriptions.js': 1,

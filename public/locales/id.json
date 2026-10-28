@@ -1936,7 +1936,11 @@
         "ledgerAccountsAll": "Semua akun",
         "showAccountTransactions": "Tampilkan transaksi",
         "summaryTransfersIn": "Masuk",
-        "summaryTransfersOut": "Keluar"
+        "summaryTransfersOut": "Keluar",
+        "transferDefaultTitle": "Transfer {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Kategori dan pengulangan",
+        "loanMoreDetailsHint": "Judul, akun, mata uang, dan catatan",
+        "entryMoreDetailsHint": "Pengulangan, penanggung jawab, dan struk"
     },
     "settings": {
         "healthCycleEnableLabel": "Sediakan siklus untuk rumah tangga",

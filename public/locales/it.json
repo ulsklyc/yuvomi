@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "Tutti i conti",
         "showAccountTransactions": "Mostra i movimenti",
         "summaryTransfersIn": "In entrata",
-        "summaryTransfersOut": "In uscita"
+        "summaryTransfersOut": "In uscita",
+        "transferDefaultTitle": "Giroconto {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Categoria e ripetizione",
+        "loanMoreDetailsHint": "Titolo, conto, valuta e note",
+        "entryMoreDetailsHint": "Ripetizione, responsabili e ricevute"
     },
     "settings": {
         "healthCycleEnableLabel": "Offri il ciclo alla famiglia",

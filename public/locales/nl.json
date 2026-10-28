@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "Alle rekeningen",
         "showAccountTransactions": "Boekingen tonen",
         "summaryTransfersIn": "Inkomend",
-        "summaryTransfersOut": "Uitgaand"
+        "summaryTransfersOut": "Uitgaand",
+        "transferDefaultTitle": "Overboeking {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Categorie en herhaling",
+        "loanMoreDetailsHint": "Titel, rekening, valuta en notities",
+        "entryMoreDetailsHint": "Herhaling, verantwoordelijken en bonnen"
     },
     "settings": {
         "healthCycleEnableLabel": "Cyclus aanbieden in het huishouden",

@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "所有帳戶",
         "showAccountTransactions": "檢視交易",
         "summaryTransfersIn": "轉入",
-        "summaryTransfersOut": "轉出"
+        "summaryTransfersOut": "轉出",
+        "transferDefaultTitle": "轉帳 {{from}} → {{to}}",
+        "transferMoreDetailsHint": "類別與重複",
+        "loanMoreDetailsHint": "標題、帳戶、貨幣與備註",
+        "entryMoreDetailsHint": "重複、負責人與收據"
     },
     "settings": {
         "healthCycleEnableLabel": "在家庭中提供週期",

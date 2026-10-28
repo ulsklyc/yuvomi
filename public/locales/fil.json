@@ -1936,7 +1936,11 @@
         "ledgerAccountsAll": "Lahat ng account",
         "showAccountTransactions": "Ipakita ang mga transaksyon",
         "summaryTransfersIn": "Papasok",
-        "summaryTransfersOut": "Palabas"
+        "summaryTransfersOut": "Palabas",
+        "transferDefaultTitle": "Paglipat {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Kategorya at pag-ulit",
+        "loanMoreDetailsHint": "Pamagat, account, pera at mga tala",
+        "entryMoreDetailsHint": "Pag-ulit, mga responsable at resibo"
     },
     "settings": {
         "healthCycleEnableLabel": "Ialok ang cycle sa sambahayan",

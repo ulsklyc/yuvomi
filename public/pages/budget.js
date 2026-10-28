@@ -12,9 +12,10 @@ import { MAX_INTERVAL_COUNT } from '/utils/budget-recurrence.js';
 import { SAVINGS_CHART_CATEGORY, budgetChartCategory } from '/utils/budget-chart-category.js';
 import { openModal as openSharedModal, closeModal, captureModalContext, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
-import { openDetailView } from '/components/detail-view.js';
+import { openDetailView, closeDetailView, withPrimaryEdit } from '/components/detail-view.js';
 import { stagger, vibrate, scheduleUndoableDelete, growBars, isImeComposing } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
+import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
 import { dateText, dateRangeText } from '/utils/date-format.js';
@@ -34,7 +35,7 @@ import { toLocalDateKey, parseLocalDateKey, addLocalDays,
          monthPeriodKeys, defaultDateInPeriod,
         todayKey} from '/utils/date.js';
 import { formatMoney, formatSignedAmount, sharePercent, roundToCurrency, currencySymbol, parseAmountInput, setFallbackCurrency } from '/utils/money.js';
-import { amountInputAttrs, setAmountCurrency, amountFieldError } from '/utils/amount-field.js';
+import { amountInputAttrs, setAmountCurrency, amountFieldError, amountFieldHtml, setAmountUnit } from '/utils/amount-field.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { trendMarkup, leadCardClass, leadStep, fitMetricLeads } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
@@ -377,10 +378,6 @@ const TAB_CAPS = {
   // widersprechen. Der Slot haelt seine Hoehe (budget.css, .budget-nav__month).
   'split-expenses': { month: false, add: 'splitExpenses.addExpense', label: 'newLabel.splitExpenses' },
 };
-
-// Sentinel für „keine eigene Farbe" im Kontofarb-Wähler: der echte Wert ist der
-// leere String, den eine Auswahl-Leiste nicht als Auswahl unterscheiden kann.
-const DEFAULT_COLOR_ID = 'default';
 
 /** Reiter aus `?tab=` - nur einer, den es gibt (TAB_CAPS ist die Liste). */
 function tabFromQuery(search) {
@@ -1708,12 +1705,13 @@ function renderBody() {
       return;
     }
 
-    // Der Zeilen-Klick fragt NICHT selbst: openBudgetModal verzweigt bei
-    // `read` in die Leseansicht, und die ist der Leseweg dieser Zeile.
+    // DER TIPP OEFFNET DAS LESEBLATT (R24, E1; Critique G4-Budget-P2-4).
+    // Mit Schreibrecht steht Bearbeiten als der eine Primaerknopf darin; bei
+    // `read` dieselbe Ansicht ohne Fuss (openEntryReadView).
     const item = e.target.closest('.budget-entry[data-id]');
     if (item && !action) {
       const entry = findEntry(parseInt(item.dataset.id, 10));
-      if (entry) openBudgetModal({ mode: 'edit', entry });
+      if (entry) openEntryReadView(entry, { editable: !readOnly() && !entry.details_hidden });
     }
   });
 
@@ -2825,9 +2823,11 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
     const rowInteraction = masked ? ''
       : fromSubscription ? `data-open-subscription="${Number(e.subscription_id)}"`
         : `data-id="${e.id}"`;
+    // Seit R24 (E1) oeffnet der Tipp auch mit Schreibrecht das Leseblatt -
+    // der Name verspricht deshalb in keinem Fall mehr "bearbeiten".
     const titleAction = fromSubscription
       ? `${esc(t('budget.expectedSubscriptionOpen'))}: `
-      : (ro ? '' : `${esc(t('budget.editEntry'))}: `);
+      : '';
     const titleCell = masked
       ? `<div class="list-row__name budget-entry__title">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}${transferMark}</div>`
       : `<button class="list-row__name budget-entry__title" type="button"
@@ -3092,18 +3092,16 @@ function openAccountModal(account = null) {
 
   const currentColor = isEdit ? (account.color || '') : '';
   const activeType = isEdit ? account.type : 'checking';
-  // Einfachauswahl wie die Filterleisten des Moduls: role="radiogroup" und die
-  // geteilte Verhaltensschicht statt role="group" mit eigenem Klick-Handler.
-  // Die Standardfarbe hat den leeren Wert und trägt deshalb den Sentinel als
-  // data-tab-id - wireTablist erkennt einen leeren String nicht als Auswahl.
-  const swatch = (value, styleColor, label) => {
-    const on = currentColor === value;
-    return `<button type="button" role="radio" class="budget-color-swatch${on ? ' is-active' : ''}"
-             data-tab-id="${esc(value || DEFAULT_COLOR_ID)}" style="--swatch:${esc(styleColor)}"
-             aria-label="${esc(label)}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}"></button>`;
-  };
-  const colorSwatches = swatch('', 'var(--module-accent)', t('budget.accountColorDefault'))
-    + ACCOUNT_COLORS.map((c) => swatch(c.value, c.value, t(c.nameKey))).join('');
+  // EIN FARBWAEHLER (Critique R24, E6; Uebergabe S3): die Kontofarben sind
+  // kuratierte Token-Toene (sie sind zugleich die Serienfarben der Diagramme)
+  // und gehen deshalb OHNE "Eigene" durch denselben Baustein wie jede andere
+  // Farbreihe der App - vorher eine eigene Swatch-Reihe mit eigener Klasse
+  // (`.budget-color-swatch`) und wireTablist. Die Standardfarbe ist der leere
+  // Wert und malt den Modulton.
+  const colorOptions = [
+    { value: '', paint: 'var(--module-accent)', label: t('budget.accountColorDefault') },
+    ...ACCOUNT_COLORS.map((c) => ({ value: c.value, label: t(c.nameKey) })),
+  ];
 
   const content = `
     <div class="form-group">
@@ -3117,7 +3115,7 @@ function openAccountModal(account = null) {
     </div>
     <div class="form-group">
       <label class="form-label" for="am-balance">${t('budget.startingBalanceLabel')}</label>
-      <input class="form-input" id="am-balance"${amountInputAttrs(accountCurrency, isEdit ? account.starting_balance : '')}>
+      ${amountFieldHtml({ id: 'am-balance', currency: accountCurrency, value: isEdit ? account.starting_balance : '', required: false })}
       <p class="form-hint">${t('budget.startingBalanceHint')}</p>
     </div>
     <div id="am-credit-fields" ${activeType === 'credit' ? '' : 'hidden'}>
@@ -3131,13 +3129,13 @@ function openAccountModal(account = null) {
         <!-- Platzhalter aus der Kontowährung: bei JPY ist ein Hundertstel keine
              Einheit, die es gibt. Ein Rahmen ist nie negativ, 0 ist erlaubt, und
              leer heisst "kein Rahmen gepflegt". -->
-        <input class="form-input" id="am-credit-limit"${amountInputAttrs(accountCurrency, isEdit ? (account.credit_limit ?? '') : '')}>
+        ${amountFieldHtml({ id: 'am-credit-limit', currency: accountCurrency, value: isEdit ? (account.credit_limit ?? '') : '', required: false })}
         <p class="form-hint">${t('budget.creditLimitHint')}</p>
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">${t('budget.accountColorLabel')}</label>
-      <div class="budget-color-picker" id="am-color" role="radiogroup" aria-label="${t('budget.accountColorLabel')}">${colorSwatches}</div>
+      <span class="form-label" id="am-color-label">${t('budget.accountColorLabel')}</span>
+      ${colorPickerHtml({ id: 'am-color', value: currentColor, labelledBy: 'am-color-label', options: colorOptions, custom: false })}
     </div>
 
     <div class="modal-panel__footer modal-panel__footer--plain">
@@ -3160,16 +3158,11 @@ function openAccountModal(account = null) {
   openSharedModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('budget.editAccount') : t('budget.newAccount'),
+    initialFocus: isEdit ? 'edit' : 'first-field',
     content,
     size: 'sm',
     onSave(panel) {
-      let selectedColor = currentColor;
-      wireTablist(panel.querySelector('#am-color'), {
-        activeId: currentColor || DEFAULT_COLOR_ID,
-        activeClass: 'is-active',
-        mode: 'select',
-        onChange: (id) => { selectedColor = id === DEFAULT_COLOR_ID ? '' : id; },
-      });
+      wireColorPicker(panel);
 
       panel.querySelector('#am-cancel').addEventListener('click', closeModal);
 
@@ -3254,7 +3247,7 @@ function openAccountModal(account = null) {
         saveBtn.disabled = true;
         saveBtn.textContent = '…';
         try {
-          const body = { name, type, starting_balance: startingBalance, color: selectedColor || null };
+          const body = { name, type, starting_balance: startingBalance, color: panel.querySelector('#am-color').value || null };
           // Ein Typwechsel weg von der Kreditkarte räumt die Felder mit ab, sonst
           // blieben Bank und Limit unsichtbar am Konto hängen.
           body.credit_bank  = type === 'credit' ? (panel.querySelector('#am-credit-bank').value.trim() || null) : null;
@@ -4285,19 +4278,30 @@ function entryReadSections(entry) {
 }
 
 /**
- * Die Buchung bei `budget: read`: eine Leseansicht, sonst nichts (#1265 P7).
+ * Die Buchung als LESEBLATT (R24, E1; Critique G4-Budget-P2-4).
  *
- * Die Bauart aus P1: der Einstieg in den Editor verzweigt bei `read` in eine
- * Leseansicht (`openNoteModal` -> `openNoteReadModal` in notes.js), gezeichnet
- * mit der geteilten Leseansicht, die P1 fuer die Kontakte bei `read` auf
- * reines Lesen zurueckschneidet - kein `edit`, keine `actions`. Damit gibt es
- * weder „Bearbeiten" im Kopf noch eine Fusszeile, und keinen gesperrten Knopf.
+ * Bei `budget: read` (#1265 P7) die reine Leseansicht ohne `actions` - weder
+ * „Bearbeiten" noch eine Fusszeile, kein gesperrter Knopf. Seit R24 oeffnet
+ * auch der Zeilen-Tipp mit Schreibrecht zuerst dieses Blatt: wer eine Buchung
+ * antippt, will sie meist ansehen (Betrag, Kategorie, Konto, Beleg, Serie);
+ * Bearbeiten ist darin der EINE Primaerknopf (withPrimaryEdit), dieselbe
+ * Antwort wie Inventar, Notiz, Termin und Mahlzeit.
  */
-function openEntryReadView(entry) {
+function openEntryReadView(entry, { editable = false } = {}) {
+  const actions = editable ? withPrimaryEdit([], {
+    id: 'budget-read-edit',
+    label: t('common.edit'),
+    onClick: async ({ close } = {}) => {
+      await (close ?? closeDetailView)({ force: true });
+      openBudgetModal({ mode: 'edit', entry });
+    },
+  }) : [];
   return openDetailView({
-    title: entry.title,
+    title: entry.details_hidden ? t('budget.maskedEntryTitle') : entry.title,
+    key: `budget-entry:${entry.id}`,
     size: 'sm',
     sections: entryReadSections(entry),
+    actions,
   });
 }
 
@@ -4526,6 +4530,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
           icon: 'receipt',
         })}`,
         {
+          hint: t('budget.entryMoreDetailsHint'),
           // Beim Bearbeiten offen, sobald eine der Angaben gesetzt ist - ein
           // gesetzter Wert hinter einem geschlossenen Riegel waere unsichtbar.
           open: isEdit && (entry.is_recurring
@@ -4593,7 +4598,19 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         renderBody();
       });
 
+      // DER DIALOG SPRINGT BEIM TYPWECHSEL NICHT (Critique R24
+      // G4-Budget-P2-1): Ausgabe -> Umbuchung liess ihn um 220px wachsen, die
+      // Oberkante sprang von y134 auf y24. Die Hoehe, die er einmal hatte,
+      // bleibt sein Mindestmass; ein kuerzerer Typ laesst unten Luft statt
+      // die Felder unter dem Finger zu verschieben.
+      const holdHeight = () => {
+        const sheet = panel.closest?.('.modal-panel') ?? panel;
+        const height = sheet.getBoundingClientRect?.().height ?? 0;
+        const held = parseFloat(sheet.style?.minBlockSize) || 0;
+        if (height > held && sheet.style) sheet.style.minBlockSize = `${Math.round(height)}px`;
+      };
       const setType = (type) => {
+        if (type !== currentType) holdHeight();
         currentType = type;
         // Den Zustand der Leiste (is-active, aria-checked, tabindex) malt
         // wireTablist - hier nur, was am Typ haengt.
@@ -5097,8 +5114,8 @@ function wireLoanCurrencyFields(panel) {
     // Kreditsumme und Darlehensbetrag stehen in der gewählten Währung, nicht in
     // der Budget-Währung: ohne das Nachziehen zeigte ein auf JPY gestelltes
     // Darlehen weiter "0,00" und liesse Hundertstel Yen zu.
-    setAmountCurrency(panel.querySelector('#lm-amount'), select.value);
-    setAmountCurrency(panel.querySelector('#lm-principal'), select.value);
+    setAmountUnit(panel.querySelector('#lm-amount'), select.value);
+    setAmountUnit(panel.querySelector('#lm-principal'), select.value);
 
     const foreign = select.value !== state.currency;
     rateGroup.hidden = !foreign;
@@ -5125,6 +5142,7 @@ function wireLoanCurrencyFields(panel) {
 function loanIdentityFieldsHtml(loan) {
   const borrowed = isBorrowedLoan(loan);
   return `
+    <div class="form-grid-2">
     <div class="form-group">
       <label class="form-label" for="lm-direction">${t('budget.loanDirectionLabel')}</label>
       <select class="form-input" id="lm-direction">
@@ -5140,12 +5158,17 @@ function loanIdentityFieldsHtml(loan) {
              placeholder="${t(borrowed ? 'budget.loanLenderPlaceholder' : 'budget.loanBorrowerPlaceholder')}"
              value="${esc(loan?.borrower ?? '')}" required>
     </div>
+    </div>`;
+}
+
+/** Titel des Darlehens - selten gesetzt, er steht hinter "Weitere Angaben" (R24). */
+function loanTitleFieldHtml(loan) {
+  return `
     <div class="form-group">
       <label class="form-label" for="lm-title">${t('budget.loanTitleLabel')}</label>
       <input type="text" class="form-input" id="lm-title" maxlength="200"
              placeholder="${t('budget.loanTitlePlaceholder')}" value="${esc(loan?.title ?? '')}">
-    </div>
-    ${loanAccountFieldHtml(loan)}`;
+    </div>`;
 }
 
 // Konto für die Raten (#638): Bis dahin hatte der Raten-Eintrag nie eine
@@ -5203,7 +5226,7 @@ function loanInterestFieldsHtml(loan) {
     <div id="lm-interest-fields" ${mode === 'none' ? 'hidden' : ''}>
       <div class="form-group">
         <label class="form-label" for="lm-principal">${t('budget.loanPrincipalLabel')}${REQUIRED_MARK}</label>
-        <input class="form-input" id="lm-principal"${amountInputAttrs(currency, it?.principal ?? '')} required>
+        ${amountFieldHtml({ id: 'lm-principal', currency, value: it?.principal ?? '' })}
       </div>
       <div class="form-grid-2">
         <div class="form-group">
@@ -5410,13 +5433,20 @@ function wireLoanPaidInstallmentsField(panel) {
 function loanFormFieldsHtml(loan, { startMonth }) {
   const isEdit = Boolean(loan);
   const loanCurrency = loan?.currency || state.currency;
+  /* DAS DARLEHEN IM GELDGERUEST (Critique R24 G4-Budget-P1-1): zwoelf Felder
+   * standen offen untereinander, 850px. Jetzt zuerst, was das Darlehen
+   * ausmacht - Richtung und Gegenueber, Zinsart, Betrag (Zeichen der Waehrung
+   * im Feld) und Raten, Start und Faelligkeit -, dahinter "Weitere Angaben"
+   * mit Titel, Konto, Waehrung und Notizen. Offen, sobald eines davon einen
+   * Wert traegt (auch eine fremde Waehrung). */
+  const foreign = loanCurrency !== state.currency;
+  const more = Boolean(loan?.title || loan?.notes || loan?.account_id) || foreign;
   return `
     ${loanIdentityFieldsHtml(loan)}
-    ${loanCurrencyFieldsHtml(loan)}
     <div class="form-grid-2" id="lm-manual-fields">
       <div class="form-group">
         <label class="form-label" for="lm-amount">${t('budget.loanAmountLabel')}${REQUIRED_MARK}</label>
-        <input class="form-input" id="lm-amount"${amountInputAttrs(loanCurrency, loan ? loan.total_amount : '')} required>
+        ${amountFieldHtml({ id: 'lm-amount', currency: loanCurrency, value: loan ? loan.total_amount : '' })}
       </div>
       <div class="form-group">
         <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}${REQUIRED_MARK}</label>
@@ -5425,6 +5455,7 @@ function loanFormFieldsHtml(loan, { startMonth }) {
       </div>
     </div>
     ${loanInterestFieldsHtml(loan)}
+    <div class="form-grid-2">
     <div class="form-group">
       <label class="form-label" for="lm-start">${t('budget.loanStartMonthLabel')}${REQUIRED_MARK}</label>
       <input type="month" class="form-input" id="lm-start" value="${esc(loan?.start_month ?? startMonth)}" required>
@@ -5437,6 +5468,7 @@ function loanFormFieldsHtml(loan, { startMonth }) {
              inputmode="numeric" value="${loan?.due_day ?? ''}" aria-describedby="lm-due-day-hint">
       <p class="form-hint budget-loan-hint" id="lm-due-day-hint">${t('budget.loanDueDayHint')}</p>
     </div>
+    </div>
     ${isEdit ? '' : `
     <div class="form-group">
       <label class="form-label" for="lm-paid">${t('budget.loanPaidInstallmentsLabel')}</label>
@@ -5444,10 +5476,14 @@ function loanFormFieldsHtml(loan, { startMonth }) {
              inputmode="numeric" value="0">
       <p class="form-hint budget-loan-hint">${t('budget.loanPaidInstallmentsHint')}</p>
     </div>`}
+    ${advancedSection(`
+    ${loanTitleFieldHtml(loan)}
+    ${loanAccountFieldHtml(loan)}
+    ${loanCurrencyFieldsHtml(loan)}
     <div class="form-group">
       <label class="form-label" for="lm-notes">${t('budget.loanNotesLabel')}</label>
       <textarea class="form-input" id="lm-notes" rows="3" maxlength="1000">${esc(loan?.notes ?? '')}</textarea>
-    </div>`;
+    </div>`, { hint: t('budget.loanMoreDetailsHint'), open: more })}`;
 }
 
 /** Verhalten zu loanFormFieldsHtml() - ebenfalls die eine Stelle für beide Dialoge. */
@@ -5887,6 +5923,7 @@ function openLoanModal(loan = null) {
   openSharedModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('budget.editLoan') : t('budget.newLoan'),
+    initialFocus: isEdit ? 'edit' : 'first-field',
     content,
     // 520 statt 400 (R17, E6): achtzehn Felder, darunter Zweierreihen - im
     // 400er-Blatt (innen 366) fielen die Paare einspaltig und der Dialog
@@ -6373,6 +6410,8 @@ async function deleteEntrySeries(id) {
 // statt Quelltext-Regex.
 export const __test = {
   entryFormErrors,
+  // R24 E1: der Tipp auf eine Buchung oeffnet das Leseblatt (test-budget-readonly-ui.js).
+  openEntryReadView,
   // #2302: der Betrag im Buchungsdialog folgt der Waehrung des Kontos.
   bindEntryAccountCurrency,
   // #2302: im Kontofilter steht die Uebersicht in der Waehrung des Kontos.

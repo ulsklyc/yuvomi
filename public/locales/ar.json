@@ -2183,7 +2183,11 @@
         "ledgerAccountsAll": "كل الحسابات",
         "showAccountTransactions": "عرض الحركات",
         "summaryTransfersIn": "وارد",
-        "summaryTransfersOut": "صادر"
+        "summaryTransfersOut": "صادر",
+        "transferDefaultTitle": "تحويل {{from}} ← {{to}}",
+        "transferMoreDetailsHint": "الفئة والتكرار",
+        "loanMoreDetailsHint": "العنوان والحساب والعملة والملاحظات",
+        "entryMoreDetailsHint": "التكرار والمسؤولون والإيصالات"
     },
     "settings": {
         "healthCycleEnableLabel": "إتاحة الدورة للأسرة",

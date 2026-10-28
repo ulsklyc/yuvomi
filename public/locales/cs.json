@@ -2009,7 +2009,11 @@
         "ledgerAccountsAll": "Všechny účty",
         "showAccountTransactions": "Zobrazit pohyby účtu",
         "summaryTransfersIn": "Příchozí",
-        "summaryTransfersOut": "Odchozí"
+        "summaryTransfersOut": "Odchozí",
+        "transferDefaultTitle": "Převod {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Kategorie a opakování",
+        "loanMoreDetailsHint": "Název, účet, měna a poznámky",
+        "entryMoreDetailsHint": "Opakování, odpovědní a účtenky"
     },
     "settings": {
         "healthCycleEnableLabel": "Nabídnout cyklus v domácnosti",

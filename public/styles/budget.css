@@ -1021,34 +1021,6 @@
 .budget-account-chip:hover { background: color-mix(in srgb, var(--module-accent) var(--tint-raised), transparent); }
 .budget-account-chip:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: var(--focus-ring-offset); }
 
-/* Farbwahl im Konto-Modal */
-.budget-color-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.budget-color-swatch {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-full);
-  background: var(--swatch);
-  border: 2px solid var(--color-border);
-  cursor: pointer;
-  transition: transform var(--transition-fast), border-color var(--transition-fast);
-}
-
-.budget-color-swatch:hover { transform: scale(1.1); }
-/* AUSNAHME vom Fokusring-Token: die Swatch IST eine beliebige Farbe, auch der
- * Modulakzent selbst. Ein Ring im Akzent wäre auf genau der Swatch unsichtbar,
- * die gerade gewählt werden soll - deshalb der Textkontrast, der gegen jeden
- * Untergrund steht. */
-.budget-color-swatch:focus-visible { --focus-ring-color: var(--color-text-primary); outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: var(--focus-ring-offset); }
-.budget-color-swatch.is-active {
-  border-color: var(--color-text-primary);
-  box-shadow: 0 0 0 2px var(--color-surface-elevated), 0 0 0 4px var(--swatch);
-}
-
 /* --------------------------------------------------------
  * Kompaktstufen der geteilten Kennzahl-Bauteile
  *
@@ -2737,6 +2709,60 @@ button.budget-entry__title {
 .budget-amount-field__unit--choice:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset-inset);
+}
+
+/* VON -> AUF IN EINER ZEILE (Critique R24 G4-Budget-P2-1): die zwei Konten
+ * einer Umbuchung nebeneinander, der Pfeil auf der Hoehe der Felder. Unter
+ * 20rem Dialogbreite stehen sie untereinander, der Pfeil dreht nach unten. */
+.budget-transfer-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+/* Label und Feld jeder Seite liegen im Raster der Zeile (subgrid): der Pfeil
+ * steht in der Feldzeile mittig, wie hoch das Feld je Zeiger auch ist. */
+.budget-transfer-route > .form-group {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  row-gap: var(--space-1);
+  margin-bottom: 0;
+  min-inline-size: 0;
+}
+
+.budget-transfer-route__arrow {
+  grid-row: 2;
+  grid-column: 2;
+  align-self: center;
+  inline-size: var(--icon-md);
+  block-size: var(--icon-md);
+  color: var(--color-text-secondary);
+}
+
+[dir="rtl"] .budget-transfer-route__arrow {
+  transform: scaleX(-1);
+}
+
+@container modal-body (max-width: 20rem) {
+  .budget-transfer-route {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+  }
+
+  .budget-transfer-route > .form-group {
+    grid-row: auto;
+    grid-template-rows: none;
+  }
+
+  .budget-transfer-route__arrow {
+    grid-row: auto;
+    grid-column: auto;
+    justify-self: center;
+    transform: rotate(90deg);
+  }
 }
 
 /* Datum und Konto in einer Zeile (budget.js openBudgetModal). Zwei Spalten,

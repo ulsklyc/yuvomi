@@ -1936,7 +1936,11 @@
         "ledgerAccountsAll": "همه حساب‌ها",
         "showAccountTransactions": "نمایش تراکنش‌ها",
         "summaryTransfersIn": "ورودی",
-        "summaryTransfersOut": "خروجی"
+        "summaryTransfersOut": "خروجی",
+        "transferDefaultTitle": "انتقال {{from}} ← {{to}}",
+        "transferMoreDetailsHint": "دسته و تکرار",
+        "loanMoreDetailsHint": "عنوان، حساب، ارز و یادداشت‌ها",
+        "entryMoreDetailsHint": "تکرار، مسئولان و رسیدها"
     },
     "settings": {
         "healthCycleEnableLabel": "ارائهٔ چرخه در خانوار",

@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "Tất cả tài khoản",
         "showAccountTransactions": "Xem giao dịch",
         "summaryTransfersIn": "Chuyển đến",
-        "summaryTransfersOut": "Chuyển đi"
+        "summaryTransfersOut": "Chuyển đi",
+        "transferDefaultTitle": "Chuyển khoản {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Danh mục và lặp lại",
+        "loanMoreDetailsHint": "Tiêu đề, tài khoản, tiền tệ và ghi chú",
+        "entryMoreDetailsHint": "Lặp lại, người phụ trách và biên lai"
     },
     "settings": {
         "healthCycleEnableLabel": "Cung cấp chu kỳ cho gia đình",

@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "Alle kontoer",
         "showAccountTransactions": "Vis transaksjoner",
         "summaryTransfersIn": "Inngående",
-        "summaryTransfersOut": "Utgående"
+        "summaryTransfersOut": "Utgående",
+        "transferDefaultTitle": "Overføring {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Kategori og gjentakelse",
+        "loanMoreDetailsHint": "Tittel, konto, valuta og notater",
+        "entryMoreDetailsHint": "Gjentakelse, ansvarlige og kvitteringer"
     },
     "settings": {
         "healthCycleEnableLabel": "Tilby syklusen i husstanden",

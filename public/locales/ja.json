@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "すべての口座",
         "showAccountTransactions": "記録を表示",
         "summaryTransfersIn": "入金",
-        "summaryTransfersOut": "出金"
+        "summaryTransfersOut": "出金",
+        "transferDefaultTitle": "振替 {{from}} → {{to}}",
+        "transferMoreDetailsHint": "カテゴリと繰り返し",
+        "loanMoreDetailsHint": "タイトル、口座、通貨、メモ",
+        "entryMoreDetailsHint": "繰り返し、担当者、領収書"
     },
     "settings": {
         "healthCycleEnableLabel": "世帯で周期を利用できるようにする",

@@ -1936,7 +1936,11 @@
         "ledgerAccountsAll": "Alle Konten",
         "showAccountTransactions": "Buchungen anzeigen",
         "summaryTransfersIn": "Eingang",
-        "summaryTransfersOut": "Ausgang"
+        "summaryTransfersOut": "Ausgang",
+        "transferDefaultTitle": "Umbuchung {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Kategorie und Wiederholung",
+        "loanMoreDetailsHint": "Titel, Konto, Währung und Notizen",
+        "entryMoreDetailsHint": "Wiederholung, Zuständige und Belege"
     },
     "settings": {
         "healthCycleEnableLabel": "Zyklus im Haushalt anbieten",

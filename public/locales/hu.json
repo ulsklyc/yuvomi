@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "Minden számla",
         "showAccountTransactions": "Tételek megjelenítése",
         "summaryTransfersIn": "Bejövő",
-        "summaryTransfersOut": "Kimenő"
+        "summaryTransfersOut": "Kimenő",
+        "transferDefaultTitle": "Átvezetés {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Kategória és ismétlés",
+        "loanMoreDetailsHint": "Cím, számla, pénznem és jegyzetek",
+        "entryMoreDetailsHint": "Ismétlés, felelősök és nyugták"
     },
     "settings": {
         "healthCycleEnableLabel": "Ciklus felajánlása a háztartásban",

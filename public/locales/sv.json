@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "Alla konton",
         "showAccountTransactions": "Visa transaktioner",
         "summaryTransfersIn": "Inkommande",
-        "summaryTransfersOut": "Utgående"
+        "summaryTransfersOut": "Utgående",
+        "transferDefaultTitle": "Överföring {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Kategori och upprepning",
+        "loanMoreDetailsHint": "Titel, konto, valuta och anteckningar",
+        "entryMoreDetailsHint": "Upprepning, ansvariga och kvitton"
     },
     "settings": {
         "healthCycleEnableLabel": "Erbjud cykeln i hushållet",

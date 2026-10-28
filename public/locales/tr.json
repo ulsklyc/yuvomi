@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "Tüm hesaplar",
         "showAccountTransactions": "Hareketleri göster",
         "summaryTransfersIn": "Gelen",
-        "summaryTransfersOut": "Giden"
+        "summaryTransfersOut": "Giden",
+        "transferDefaultTitle": "Transfer {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Kategori ve tekrar",
+        "loanMoreDetailsHint": "Başlık, hesap, para birimi ve notlar",
+        "entryMoreDetailsHint": "Tekrar, sorumlular ve fişler"
     },
     "settings": {
         "healthCycleEnableLabel": "Döngüyü evde sun",

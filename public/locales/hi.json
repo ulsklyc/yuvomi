@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "सभी खाते",
         "showAccountTransactions": "लेन-देन दिखाएं",
         "summaryTransfersIn": "आने वाले",
-        "summaryTransfersOut": "जाने वाले"
+        "summaryTransfersOut": "जाने वाले",
+        "transferDefaultTitle": "स्थानांतरण {{from}} → {{to}}",
+        "transferMoreDetailsHint": "श्रेणी और दोहराव",
+        "loanMoreDetailsHint": "शीर्षक, खाता, मुद्रा और नोट्स",
+        "entryMoreDetailsHint": "दोहराव, ज़िम्मेदार और रसीदें"
     },
     "settings": {
         "healthCycleEnableLabel": "घर में चक्र उपलब्ध कराएँ",

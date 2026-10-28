@@ -2094,7 +2094,11 @@
         "ledgerAccountsAll": "Все счета",
         "showAccountTransactions": "Показать операции по счёту",
         "summaryTransfersIn": "Входящие",
-        "summaryTransfersOut": "Исходящие"
+        "summaryTransfersOut": "Исходящие",
+        "transferDefaultTitle": "Перевод {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Категория и повтор",
+        "loanMoreDetailsHint": "Название, счёт, валюта и заметки",
+        "entryMoreDetailsHint": "Повтор, ответственные и чеки"
     },
     "settings": {
         "healthCycleEnableLabel": "Предлагать цикл в семье",

@@ -2988,6 +2988,10 @@ function _describesOnFocus(input) {
 }
 
 function _focusField(input) {
+  // Ein Feld hinter einem geschlossenen "Weitere Angaben" (advancedSection)
+  // ist nicht fokussierbar und unsichtbar: der Fehler klappt seinen Abschnitt
+  // auf, statt ins Leere zu zeigen (R24, Umbuchung/Darlehen).
+  for (let d = input?.closest?.('details:not([open])'); d; d = d.parentElement?.closest?.('details:not([open])')) d.open = true;
   // Custom Elements (z. B. yuvomi-datepicker) sind selbst nicht fokussierbar:
   // stattdessen ihren inneren Formular-Knoten fokussieren.
   const isNative = typeof input.matches === 'function' && input.matches('input, select, textarea, button');

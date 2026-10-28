@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "所有账户",
         "showAccountTransactions": "查看交易",
         "summaryTransfersIn": "转入",
-        "summaryTransfersOut": "转出"
+        "summaryTransfersOut": "转出",
+        "transferDefaultTitle": "转账 {{from}} → {{to}}",
+        "transferMoreDetailsHint": "类别与重复",
+        "loanMoreDetailsHint": "标题、账户、货币和备注",
+        "entryMoreDetailsHint": "重复、负责人和收据"
     },
     "settings": {
         "healthCycleEnableLabel": "在家庭中提供周期",

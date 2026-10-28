@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "Tous les comptes",
         "showAccountTransactions": "Voir les écritures",
         "summaryTransfersIn": "Entrants",
-        "summaryTransfersOut": "Sortants"
+        "summaryTransfersOut": "Sortants",
+        "transferDefaultTitle": "Virement {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Catégorie et répétition",
+        "loanMoreDetailsHint": "Titre, compte, devise et notes",
+        "entryMoreDetailsHint": "Répétition, responsables et justificatifs"
     },
     "settings": {
         "healthCycleEnableLabel": "Proposer le cycle au foyer",

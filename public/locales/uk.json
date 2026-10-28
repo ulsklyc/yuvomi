@@ -2094,7 +2094,11 @@
         "ledgerAccountsAll": "Усі рахунки",
         "showAccountTransactions": "Показати операції рахунку",
         "summaryTransfersIn": "Вхідні",
-        "summaryTransfersOut": "Вихідні"
+        "summaryTransfersOut": "Вихідні",
+        "transferDefaultTitle": "Переказ {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Категорія та повторення",
+        "loanMoreDetailsHint": "Назва, рахунок, валюта та нотатки",
+        "entryMoreDetailsHint": "Повторення, відповідальні та чеки"
     },
     "settings": {
         "healthCycleEnableLabel": "Пропонувати цикл у родині",

@@ -2112,7 +2112,11 @@
         "ledgerAccountsAll": "Wszystkie konta",
         "showAccountTransactions": "Pokaż operacje konta",
         "summaryTransfersIn": "Przychodzące",
-        "summaryTransfersOut": "Wychodzące"
+        "summaryTransfersOut": "Wychodzące",
+        "transferDefaultTitle": "Przelew {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Kategoria i powtarzanie",
+        "loanMoreDetailsHint": "Tytuł, konto, waluta i notatki",
+        "entryMoreDetailsHint": "Powtarzanie, odpowiedzialni i paragony"
     },
     "settings": {
         "healthCycleEnableLabel": "Udostępnij cykl w gospodarstwie",

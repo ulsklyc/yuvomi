@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   row, people are picked with the same name chips as elsewhere, and notes and receipts sit under "More
   details". "Add" can always be pressed and says what is missing (nobody selected, shares that do not
   add up) at the field instead of staying grey.
+- **A booking shows itself before it edits.** Tapping a transaction opens a read view (amount, date,
+  category, account, receipts, repeat) with Edit as the one main button, instead of the edit form.
+- **Transfers, loans and accounts use the same money form.** A transfer's amount shows its currency
+  in the field, "From" and "To" sit side by side, the title may stay empty (it is then named after both
+  accounts) and category and repeat sit under "More details" - switching the entry type no longer makes
+  the dialog jump. A loan asks for direction, person, amount and instalments first and keeps title,
+  account, currency and notes under "More details". The starting balance and credit limit of an account
+  show their currency, and account and category colours use the same colour row as the rest of the app.
 - **One balance sentence.** When a group has a single open debt that involves you, the figure at the
   top says it with the name ("You owe Alex Johnson 24.14 €") and the balances list no longer repeats it.
 - **Tapping a meal shows it first.** The meal card opens a read view (date, meal, cook, ingredients,

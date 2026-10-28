@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "Todas as contas",
         "showAccountTransactions": "Ver lançamentos",
         "summaryTransfersIn": "Recebidas",
-        "summaryTransfersOut": "Enviadas"
+        "summaryTransfersOut": "Enviadas",
+        "transferDefaultTitle": "Transferência {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Categoria e repetição",
+        "loanMoreDetailsHint": "Título, conta, moeda e notas",
+        "entryMoreDetailsHint": "Repetição, responsáveis e recibos"
     },
     "settings": {
         "healthCycleEnableLabel": "Disponibilizar o ciclo no agregado",

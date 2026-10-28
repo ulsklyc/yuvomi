@@ -1936,7 +1936,11 @@
         "ledgerAccountsAll": "모든 계좌",
         "showAccountTransactions": "거래 내역 보기",
         "summaryTransfersIn": "입금",
-        "summaryTransfersOut": "출금"
+        "summaryTransfersOut": "출금",
+        "transferDefaultTitle": "이체 {{from}} → {{to}}",
+        "transferMoreDetailsHint": "카테고리와 반복",
+        "loanMoreDetailsHint": "제목, 계좌, 통화 및 메모",
+        "entryMoreDetailsHint": "반복, 담당자 및 영수증"
     },
     "settings": {
         "healthCycleEnableLabel": "가구에 주기 제공",

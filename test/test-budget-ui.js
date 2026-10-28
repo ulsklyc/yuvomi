@@ -1274,7 +1274,6 @@ test('Betragsfelder zeigen den Bestand in den Stellen der Waehrung (200,00 statt
   const felder = [
     ['budget.js', budget, 'bm-amount', /amountInputAttrs\(entryCurrency, absAmount\)/], // #2302: Waehrung des Kontos
     ['budget.js', budget, 'cb-amount', /amountInputAttrs\(currency, absAmount\)/],
-    ['budget.js', budget, 'lm-amount', /amountInputAttrs\(loanCurrency, loan \? loan\.total_amount : ''\)/],
     ['budget-plans.js', plans, 'plan-amount', /amountInputAttrs\(view\.ctx\.currency, value\)/],
     ['subscriptions.js', subscriptions, 'subscription-amount', /amountInputAttrs\(formCurrency, subscription\?\.amount \?\? ''\)/],
   ];
@@ -1283,6 +1282,12 @@ test('Betragsfelder zeigen den Bestand in den Stellen der Waehrung (200,00 statt
     assert.ok(field, `${file}: #${id} nicht gefunden`);
     assert.match(field[0], value, `${file}: #${id} zeigt den Bestand nicht ueber den Baustein`);
   }
+  // Seit R24 (G4-Budget-P1-1) bauen Darlehen und Umbuchung den Betrag ueber
+  // amountFieldHtml - derselbe Baustein mit dem Zeichen der Waehrung im Feld,
+  // der Bestand laeuft dort durch amountInputAttrs.
+  assert.match(withoutComments(budget), /amountFieldHtml\(\{ id: 'lm-amount', currency: loanCurrency, value: loan \? loan\.total_amount : '' \}\)/);
+  assert.match(withoutComments(transferDialog), /amountFieldHtml\(\{ id: 'bt-amount', currency: sourceCurrency, value: transfer \? Math\.abs\(transfer\.amount\) : '' \}\)/);
+  assert.match(read('../public/utils/amount-field.js'), /id="\$\{esc\(id\)\}"[^>]*\$\{amountInputAttrs\(currency, value\)\}/);
   const raten = [...withoutComments(housekeeping).matchAll(/<input name="(daily_rate|hourly_rate|extras)"[^>]*>/g)];
   assert.ok(raten.length >= 4, `Raten der Haushaltshilfe nicht gefunden (${raten.length})`);
   for (const [field, name] of raten) assert.match(field, /\$\{amountInputAttrs\(state\.currency, /, `housekeeping.js: ${name} ohne amountInputAttrs`);
@@ -1307,7 +1312,7 @@ test('wählbare Währungen ziehen das Betragsfeld nach', () => {
   for (const [file, src] of [['budget.js', budget], ['subscriptions.js', subscriptions], ['budget-transfer-dialog.js', transferDialog], ['split-expenses.js', splitExpenses]]) {
     assert.match(
       withoutComments(src),
-      /setAmountCurrency\(|amountPlaceholder\(/,
+      /setAmountCurrency\(|setAmountUnit\(|amountPlaceholder\(/,
       `${file}: Währungswechsel im Formular ohne Nachziehen des Betragsfeldes`,
     );
   }
@@ -4923,7 +4928,9 @@ test('#1668: jeder Grund der Budget-Routen ist eingeordnet, jedes Feld gibt es, 
   for (const [reason, [fields]] of budgetUi.BUDGET_REFUSALS) {
     for (const selector of (fields ?? '').split(',').map((part) => part.trim()).filter(Boolean)) {
       assert.match(selector, /^#(bm|am|cb|bt)-[a-z-]+$/, `${reason}: ${selector}`);
-      assert.ok(((selector.startsWith('#bt-') ? transferDialog : budget) + recurrenceMarkup).includes(`id="${selector.slice(1)}"`), `${reason}: das Feld ${selector} steht in keinem Dialog`);
+      const markup = (selector.startsWith('#bt-') ? transferDialog : budget) + recurrenceMarkup;
+      // Ein Betragsfeld aus dem Baustein (amountFieldHtml) nennt seine id als Option.
+      assert.ok(markup.includes(`id="${selector.slice(1)}"`) || markup.includes(`id: '${selector.slice(1)}'`), `${reason}: das Feld ${selector} steht in keinem Dialog`);
     }
   }
 
@@ -6107,7 +6114,7 @@ test('transfer category changes replace subcategory options and deletion delegat
   const elements = {
     '#bt-category': category, '#bt-subcategory': select, '#bt-subcategory-group': {},
     '#bt-recurring': element('recurring'), '#bt-delete': element('delete'),
-    '#bt-from': element('from'), '#bt-amount': element('amount'),
+    '#bt-from': element('from'), '#bt-to': element('to'), '#bt-title': element('title'), '#bt-amount': element('amount'),
     '#bt-interval': element('interval', 'monthly'), '#bt-interval-count': element('interval-count', '1'), '#bt-interval-unit': {},
   };
   const previousClose = globalThis.__closeModal;
@@ -7746,7 +7753,7 @@ test('F4.4: der Buchungstyp ist nie schmaler als sein Wort, im schmalen Dialog g
 
 // R23 (D8, Rest aus S1): die Umbuchung meldet ALLE Fehler auf einmal, wie der
 // Buchungsdialog - vorher einen je Klick, und wer drei Felder vergass, klickte dreimal.
-test('Umbuchung: ein leerer Dialog meldet Kategorie, Titel, Betrag und Konten zugleich (reportFieldErrors)', async () => {
+test('Umbuchung: ein leerer Dialog meldet Kategorie, Betrag und Konten zugleich (reportFieldErrors); der Titel darf leer bleiben (R24)', async () => {
   const { wireTransferForm } = await import('../public/components/budget-transfer-dialog.js');
   const element = (value = '') => ({ value, checked: false, dataset: {}, addEventListener() {}, setAttribute() {}, removeAttribute() {} });
   const select = element();
@@ -7768,7 +7775,7 @@ test('Umbuchung: ein leerer Dialog meldet Kategorie, Titel, Betrag und Konten zu
       accounts: [], currency: 'EUR', subcategories: {}, readOnly: () => false, onSaved() {}, onError() {}, onDelete: async () => {},
     });
     await save(elements['#bt-save']);
-    assert.deepEqual(reported, ['#bt-category', '#bt-title', '#bt-amount', '#bt-to']);
+    assert.deepEqual(reported, ['#bt-category', '#bt-amount', '#bt-to']);
   } finally {
     if (previous === undefined) delete globalThis.__reportFieldError; else globalThis.__reportFieldError = previous;
   }
@@ -7818,4 +7825,66 @@ test('R24: die Plan-Pille nennt das Kategoriebudget, nicht das Modul', async () 
     const loc = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
     assert.notEqual(loc.newLabel.budgetPlan.toLowerCase(), loc.budget.title.toLowerCase(), `${file}: die Pille wiederholt den Modulnamen`);
   }
+});
+
+// Critique R24 G4-Budget-P2-1: die Umbuchung im Geldgeruest.
+test('R24: die Umbuchung - Betrag mit Waehrungszeichen, Von -> Auf in einer Zeile, Seltenes hinter "Weitere Angaben", Titel darf leer bleiben', async () => {
+  const { transferFieldsHtml, wireTransferForm } = await import('../public/components/budget-transfer-dialog.js');
+  const accounts = [{ id: 1, name: 'Giro', currency: 'EUR' }, { id: 2, name: 'Spar', currency: 'EUR' }];
+  const aufrufe = [];
+  globalThis.__advancedSection = (inner, options) => { aufrufe.push({ inner, options }); return `<details>${inner}</details>`; };
+  let html;
+  try {
+    html = transferFieldsHtml({ accounts, categories: [{ key: 'financial_other', name: 'F' }], month: '2026-10', currency: 'EUR', budgetMode: 'shared' });
+  } finally { delete globalThis.__advancedSection; }
+  assert.match(html, /<div class="budget-amount-field">\s*<input class="form-input budget-amount-input" id="bt-amount"/, 'derselbe Betragsbaustein wie die Buchung');
+  assert.match(html, /<span class="budget-amount-field__unit" id="bt-amount-unit">/, 'mit dem Zeichen der Waehrung im Feld');
+  assert.match(html, /<div class="budget-transfer-route">[\s\S]*id="bt-from"[\s\S]*budget-transfer-route__arrow[\s\S]*id="bt-to"/, 'Von -> Auf in einer Zeile');
+  assert.doesNotMatch(html, /for="bt-title">budget\.titleLabel<span class="required-marker"/, 'der Titel traegt keinen Stern mehr');
+  assert.equal(aufrufe.length, 1);
+  assert.match(aufrufe[0].inner, /id="bt-category"[\s\S]*id="bt-recurring"/, 'Kategorie und Wiederholung hinter "Weitere Angaben"');
+  assert.equal(aufrufe[0].options.hint, 'budget.transferMoreDetailsHint');
+  assert.equal(aufrufe[0].options.open, false);
+
+  // Speichern ohne Titel: die Umbuchung heisst nach ihren Konten.
+  const element = (value = '') => ({ value, checked: false, dataset: {}, placeholder: '', addEventListener() {}, setAttribute() {}, removeAttribute() {}, parentElement: null });
+  const select = element('');
+  select.replaceChildren = () => {};
+  select.insertAdjacentHTML = () => {};
+  const elements = {
+    '#bt-category': element('financial_other'), '#bt-subcategory': select, '#bt-subcategory-group': {},
+    '#bt-title': element(''), '#bt-amount': element('25'), '#bt-date': element('2026-10-24'),
+    '#bt-from': element('1'), '#bt-to': element('2'),
+    '#bt-recurring': element(), '#bt-confirm': element(), '#bt-save': element(),
+    '#bt-interval': element('monthly'), '#bt-interval-count': element('1'), '#bt-interval-unit': {},
+  };
+  const gesendet = [];
+  globalThis.__apiStub = { post: async (pfad, body) => { gesendet.push({ pfad, body }); return { data: {} }; } };
+  const vorherClose = globalThis.__closeModal;
+  globalThis.__closeModal = () => {};
+  try {
+    const save = wireTransferForm({ querySelector: (sel) => elements[sel] ?? null }, {
+      accounts, currency: 'EUR', subcategories: {}, readOnly: () => false, onSaved() {}, onError(err) { throw err; }, onDelete: async () => {},
+    });
+    assert.equal(elements['#bt-title'].placeholder, 'budget.transferDefaultTitle{"from":"Giro","to":"Spar"}', 'der Platzhalter nennt den Titel, den sie bekommt');
+    await save(elements['#bt-save']);
+  } finally {
+    delete globalThis.__apiStub;
+    if (vorherClose === undefined) delete globalThis.__closeModal; else globalThis.__closeModal = vorherClose;
+  }
+  assert.equal(gesendet.length, 1);
+  assert.equal(gesendet[0].body.title, 'budget.transferDefaultTitle{"from":"Giro","to":"Spar"}');
+});
+
+test('R24: der Typwechsel im Buchungsdialog haelt die Hoehe (kein Oberkantensprung), das Darlehen legt Titel, Konto, Waehrung, Notizen hinter "Weitere Angaben"', () => {
+  const src = withoutComments(budget);
+  assert.match(src, /const setType = \(type\) => \{\n\s*if \(type !== currentType\) holdHeight\(\);/);
+  assert.match(src, /sheet\.style\.minBlockSize = `\$\{Math\.round\(height\)\}px`/);
+  const loan = src.slice(src.indexOf('function loanFormFieldsHtml('), src.indexOf('function wireLoanFormFields('));
+  const more = loan.slice(loan.indexOf('${advancedSection(`'));
+  for (const teil of ['loanTitleFieldHtml(loan)', 'loanAccountFieldHtml(loan)', 'loanCurrencyFieldsHtml(loan)', 'id="lm-notes"']) {
+    assert.ok(more.includes(teil), `${teil} steht hinter "Weitere Angaben"`);
+  }
+  assert.match(more, /hint: t\('budget\.loanMoreDetailsHint'\), open: more/);
+  assert.ok(loan.indexOf('loanIdentityFieldsHtml(loan)') < loan.indexOf('id="lm-manual-fields"'), 'Richtung und Person zuerst');
 });

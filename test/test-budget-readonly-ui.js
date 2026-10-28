@@ -163,7 +163,10 @@ test('Buchungszeile mit Schreibrecht: Bearbeiten und Verbuchen stehen da, Loesch
     // R14 P8: EINE Zeilenbedienung - Loeschen steht im Blatt (#bm-delete).
     assert.doesNotMatch(html, /data-action="delete"/);
     assert.match(html, /id="budget-manage-categories"/);
-    assert.match(html, /aria-label="budget\.editEntry: Stromabschlag, /);
+    // Seit R24 (E1) oeffnet der Tipp das Leseblatt - der Name nennt die
+    // Buchung, nicht "bearbeiten".
+    assert.match(html, /aria-label="Stromabschlag, /);
+    assert.doesNotMatch(html, /aria-label="budget\.editEntry/);
   });
 });
 
@@ -965,9 +968,9 @@ test('der delegierte Listen-Handler fragt VOR der ersten Aktion, und der Zeilen-
   const riegel = handler.indexOf('if (action && readOnly() && !READ_SAFE_ACTIONS.has(action.dataset.action)) return;');
   const ersteAktion = handler.indexOf('[data-action="confirm"]');
   assert.ok(riegel > 0 && ersteAktion > 0 && riegel < ersteAktion, 'der Riegel steht hinter dem Verbuchen');
-  // Der Zeilen-Klick geht an openBudgetModal - und DER verzweigt bei `read`
-  // in die Leseansicht (Test unten), wie openNoteModal in P1.
-  assert.match(handler, /if \(item && !action\) \{\n[^\n]*\n\s*if \(entry\) openBudgetModal\(\{ mode: 'edit', entry \}\);/);
+  // Der Zeilen-Klick oeffnet seit R24 (E1) das Leseblatt; Bearbeiten steht
+  // darin nur mit Schreibrecht und nie fuer eine maskierte Buchung.
+  assert.match(handler, /if \(item && !action\) \{\n[^\n]*\n\s*if \(entry\) openEntryReadView\(entry, \{ editable: !readOnly\(\) && !entry\.details_hidden \}\);/);
 });
 
 test('Kopfknopf und FAB: der Anlege-Handler fragt selbst, obwohl CSS beide ausblendet', () => {
@@ -1132,6 +1135,25 @@ const belegDocx = {
   document_id: 6, name: 'Vertrag.docx',
   mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 };
+
+test('R24 E1: mit Schreibrecht traegt das Leseblatt der Buchung EINEN Primaerknopf Bearbeiten, der den Editor oeffnet', async () => {
+  const eintrag = buchung({ attachments: [beleg] });
+  const lesend = withAccess({ budget: 'write' }, () => detailOptionen(() => budget.openEntryReadView(eintrag, { editable: true })));
+  assert.equal(lesend.title, 'Stromabschlag');
+  assert.deepEqual(lesend.actions.map((a) => [a.id, a.variant]), [['budget-read-edit', 'primary']]);
+  assert.ok(lesend.sections.some((s) => s.label === 'budget.amountLabel'), 'das Blatt zeigt den Betrag');
+  let editor = null;
+  await withAccess({ budget: 'write' }, async () => {
+    const vorher = globalThis.__openModal;
+    globalThis.__openModal = (opts) => { editor = opts; };
+    try { await lesend.actions[0].onClick({ close: async () => {} }); } finally {
+      if (vorher === undefined) delete globalThis.__openModal; else globalThis.__openModal = vorher;
+    }
+  });
+  assert.equal(editor?.title, 'budget.editEntry', 'Bearbeiten fuehrt in den Editor der Buchung');
+  // Ohne `editable` (Leserecht, maskierte Buchung) bleibt es ein Blatt ohne Fuss.
+  keineHandlung(detailOptionen(() => budget.openEntryReadView(eintrag)), 'Buchung ohne Schreibweg');
+});
 
 test('Buchung bei `budget: read`: der Einstieg oeffnet die Leseansicht, nicht den Editor', () => {
   const eintrag = buchung({ attachments: [beleg] });

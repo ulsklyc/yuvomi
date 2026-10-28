@@ -1918,7 +1918,11 @@
         "ledgerAccountsAll": "Όλοι οι λογαριασμοί",
         "showAccountTransactions": "Εμφάνιση κινήσεων",
         "summaryTransfersIn": "Εισερχόμενες",
-        "summaryTransfersOut": "Εξερχόμενες"
+        "summaryTransfersOut": "Εξερχόμενες",
+        "transferDefaultTitle": "Μεταφορά {{from}} → {{to}}",
+        "transferMoreDetailsHint": "Κατηγορία και επανάληψη",
+        "loanMoreDetailsHint": "Τίτλος, λογαριασμός, νόμισμα και σημειώσεις",
+        "entryMoreDetailsHint": "Επανάληψη, υπεύθυνοι και αποδείξεις"
     },
     "settings": {
         "healthCycleEnableLabel": "Διάθεση του κύκλου στο νοικοκυριό",

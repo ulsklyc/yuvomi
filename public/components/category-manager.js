@@ -52,7 +52,7 @@ import { api } from '/api.js';
 import { t, getLocale } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { makeSortable, isDragActive } from '/utils/sortable.js';
-import { wireTablist } from '/utils/tablist.js';
+import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
 import { rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
@@ -63,9 +63,6 @@ import { holdUntilStyled, warmStyle } from '/utils/component-style.js';
 // Der Tag-Verwalter (tag-manager.js) traegt dieselben Klassen.
 const CATEGORY_MANAGER_STYLE = '/styles/category-manager.css';
 warmStyle(CATEGORY_MANAGER_STYLE);
-
-/** Platzhalter-Id fuer den Eintrag ohne Ton: eine leere `data-tab-id` waere kein Knopf. */
-const NO_COLOR_ID = '__none__';
 
 /**
  * Die Beschriftungen der Palette, in der Reihenfolge der Toene, die der Server
@@ -673,25 +670,18 @@ class CategoryManagerElement extends HTMLElement {
    */
   _colorStripHtml(cat) {
     if (!this._colors.length) return '';
-    // `data-tab-id` statt eines eigenen Attributs: den Streifen bedient
-    // `wireTablist(mode: 'select')`, und der liefert Pfeiltasten,
-    // Roving-Tabindex und aria-checked - das vorgeschriebene Muster fuer eine
-    // radiogroup. Eine handgeschriebene Tastaturschleife waere hier die zweite
-    // Fassung derselben zwanzig Zeilen (der Kalender hat eine aeltere).
-    const swatch = (value, labelKey) => {
-      const on = (cat.color ?? '') === value;
-      return `<button type="button" role="radio" aria-checked="${on}"
-        class="cat-color-swatch${on ? ' cat-color-swatch--active' : ''}${value ? ' vivid-mark' : ''}"
-        data-tab-id="${esc(value || NO_COLOR_ID)}"
-        tabindex="${on ? '0' : '-1'}"
-        aria-label="${esc(t(labelKey))}" title="${esc(t(labelKey))}"
-        ${value ? `style="--seal-accent:${esc(value)}"` : ''}></button>`;
-    };
+    // EIN FARBWAEHLER (Critique R24, E6; Uebergabe S3): die Kategorietoene
+    // sind kuratierte Token-Werte und gehen OHNE "Eigene" durch denselben
+    // Baustein wie jede Farbreihe der App (utils/color-picker.js) - vorher
+    // eine eigene Swatch-Klasse mit wireTablist. "Keine Farbe" ist der leere
+    // Wert und steht vorn als ruhige Mulde.
+    const options = [
+      { value: '', paint: 'var(--color-fill-well)', label: t('category.colorNone'), title: t('category.colorNone') },
+      ...this._colors.map((c, i) => ({ value: c, label: t(COLOR_LABEL_KEYS[i] ?? 'category.colorPick'), title: t(COLOR_LABEL_KEYS[i] ?? 'category.colorPick') })),
+    ];
     return `
-      <div class="cat-row__colors" role="radiogroup"
-           aria-label="${esc(t('category.colorPick'))}" hidden>
-        ${swatch('', 'category.colorNone')}
-        ${this._colors.map((c, i) => swatch(c, COLOR_LABEL_KEYS[i] ?? 'category.colorPick')).join('')}
+      <div class="cat-row__colors" hidden>
+        ${colorPickerHtml({ value: cat.color ?? '', label: t('category.colorPick'), options, custom: false, inputClass: 'cat-row__color-value' })}
       </div>`;
   }
 
@@ -866,13 +856,9 @@ class CategoryManagerElement extends HTMLElement {
     // Listener fuer eine Palette, die meistens niemand oeffnet.
     if (open && !strip.dataset.wired) {
       strip.dataset.wired = '1';
-      const cat = this._cats.find((c) => this._keyOf(c) === row.dataset.key);
-      wireTablist(strip, {
-        activeId: cat?.color || NO_COLOR_ID,
-        activeClass: 'cat-color-swatch--active',
-        mode: 'select',
-        onChange: (id) => this._setColor(row.dataset.key, id === NO_COLOR_ID ? '' : id),
-      });
+      wireColorPicker(strip);
+      strip.querySelector('.cat-row__color-value')
+        ?.addEventListener('change', (e) => this._setColor(row.dataset.key, e.target.value));
     }
     // Nur eine Palette gleichzeitig: zwei offene Streifen in einer kurzen
     // Liste lesen sich als Mehrfachauswahl.
@@ -880,7 +866,7 @@ class CategoryManagerElement extends HTMLElement {
     for (const other of this.querySelectorAll('.cat-row__mark')) other.setAttribute('aria-expanded', 'false');
     strip.hidden = !open;
     btn.setAttribute('aria-expanded', String(open));
-    if (open) strip.querySelector('[aria-checked="true"], .cat-color-swatch')?.focus();
+    if (open) strip.querySelector('.color-swatch[aria-checked="true"], .color-swatch')?.focus();
   }
 
   async _setColor(key, color) {
