@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "匯率不可用",
         "refreshRates": "重新整理匯率",
         "monthlyCost": "每月費用",
-        "activeCount": "{{count}} 個啟用",
-        "monthlyBudget": "每月預算",
         "overBudget": "超出預算",
         "remainingBudget": "剩餘預算",
         "budgetUsed": "預算已使用",
         "yearlyProjection": "年度預測",
-        "yearlyProjectionNote": "月費 × 12",
         "byCategory": "按類別",
         "byPaymentMethod": "按付款方式",
         "noAnalytics": "暫無支出資料。",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "其他",
         "enabledHint": "啟用的訂閱會計入預算支出。",
         "currencyRequired": "請選擇貨幣。",
-        "noBudgetLimit": "無預算限制",
-        "unlimited": "無限制",
-        "setBudgetHint": "設定每月預算以追蹤限額。",
         "renewalForecast": "續訂預測",
         "logoSearchTitle": "選擇標誌",
         "logoSearchLabel": "網站或服務名稱",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} 已歸檔 - 不帶帳戶記帳",
         "visibilityHint_private": "只有你能看到這個訂閱及其付款。",
         "visibilityHint_shared": "家庭中的每個人都能看到這個訂閱及其付款。",
-        "errorAccountGone": "所選帳戶已不存在。"
+        "errorAccountGone": "所選帳戶已不存在。",
+        "moreDetailsHint": "類別、付款方式、顏色與備註"
     },
     "health": {
         "fasting": {

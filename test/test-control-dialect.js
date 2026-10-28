@@ -2151,10 +2151,9 @@ const PENDING = {
   // "Kalender verwalten" ist seit S7 eine Zeilenliste mit Bearbeiten-Blatt
   // (colorPickerHtml) - kein natives Farbfeld mehr ausserhalb des Bausteins.
   'native-color': {},
-  // Kuratierte TOKEN-Toene (Kontofarben, Kategorietoene) mit eigener
-  // Verhaltensschicht `wireTablist`: S10 (Budget-Konto) zieht sie auf
+  // Kuratierte TOKEN-Toene (Kontofarben, Kategorietoene) gehen seit S10 durch
   // colorPickerHtml({ options, custom: false }) - der Baustein nimmt
-  // Token-Ausdruecke als `paint`; der Kategorie-Verwalter folgt mit.
+  // Token-Ausdruecke als `paint`.
   'swatch-dialect': {},
   // --- Critique R24 S3: Dialogregeln (DESIGN.md D4). Gebaut sind Regel und
   // Helfer, angewendet wird je Modul in S7-S11; die Listen sinken dort.
@@ -2165,12 +2164,10 @@ const PENDING = {
     'public/components/quick-links-manager.js': 1, 'public/pages/birthdays.js': 1,
     'public/pages/calendar.js': 1, 'public/pages/documents.js': 1, 'public/pages/health.js': 7,
     'public/pages/notes.js': 1, 'public/pages/schedule.js': 1,
-    'public/pages/subscriptions.js': 1,
     'public/settings/pages/modules-health.js': 1, 'public/settings/pages/sync-contacts.js': 1,
   },
   'advanced-hint': {
     'public/pages/contacts.js': 1, 'public/pages/documents.js': 1, 'public/pages/health.js': 2,
-    'public/pages/subscriptions.js': 1,
   },
   'primary-disabled': {
     'public/components/document-attach.js': 1, 'public/pages/birthdays.js': 1, 'public/pages/contacts.js': 1,

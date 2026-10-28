@@ -1919,7 +1919,7 @@
         "showAccountTransactions": "Hareketleri göster",
         "summaryTransfersIn": "Gelen",
         "summaryTransfersOut": "Giden",
-        "transferDefaultTitle": "Transfer {{from}} → {{to}}",
+        "transferDefaultTitle": "Virman {{from}} → {{to}}",
         "transferMoreDetailsHint": "Kategori ve tekrar",
         "loanMoreDetailsHint": "Başlık, hesap, para birimi ve notlar",
         "entryMoreDetailsHint": "Tekrar, sorumlular ve fişler"
@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "Döviz kurları kullanılamıyor",
         "refreshRates": "Kurları yenile",
         "monthlyCost": "Aylık maliyet",
-        "activeCount": "{{count}} aktif",
-        "monthlyBudget": "Aylık bütçe",
         "overBudget": "Bütçe aşıldı",
         "remainingBudget": "Kalan bütçe",
         "budgetUsed": "bütçe kullanıldı",
         "yearlyProjection": "Yıllık tahmin",
-        "yearlyProjectionNote": "12 × aylık maliyet",
         "byCategory": "Kategoriye göre",
         "byPaymentMethod": "Ödeme yöntemine göre",
         "noAnalytics": "Henüz harcama verisi yok.",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "Diğer",
         "enabledHint": "Aktif abonelikler bütçe giderlerine dahil edilir.",
         "currencyRequired": "Bir para birimi seçin.",
-        "noBudgetLimit": "Bütçe sınırı yok",
-        "unlimited": "Sınırsız",
-        "setBudgetHint": "Bir sınırı takip etmek için aylık bütçe belirleyin.",
         "renewalForecast": "Yenileme tahmini",
         "logoSearchTitle": "Logo seç",
         "logoSearchLabel": "Web sitesi veya hizmet adı",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} arşivlendi - hesapsız işlenir",
         "visibilityHint_private": "Bu aboneliği ve ödemelerini yalnızca sen görürsün.",
         "visibilityHint_shared": "Ev halkındaki herkes bu aboneliği ve ödemelerini görür.",
-        "errorAccountGone": "Seçilen hesap artık mevcut değil."
+        "errorAccountGone": "Seçilen hesap artık mevcut değil.",
+        "moreDetailsHint": "Kategori, ödeme yöntemi, renk ve notlar"
     },
     "health": {
         "fasting": {

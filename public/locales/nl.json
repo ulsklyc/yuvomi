@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "Wisselkoersen niet beschikbaar",
         "refreshRates": "Koersen vernieuwen",
         "monthlyCost": "Maandelijkse kosten",
-        "activeCount": "{{count}} actief",
-        "monthlyBudget": "Maandbudget",
         "overBudget": "Boven budget",
         "remainingBudget": "Resterend budget",
         "budgetUsed": "budget gebruikt",
         "yearlyProjection": "Jaarprognose",
-        "yearlyProjectionNote": "12 × maandelijkse kosten",
         "byCategory": "Per categorie",
         "byPaymentMethod": "Per betaalmethode",
         "noAnalytics": "Nog geen uitgavendata.",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "Overig",
         "enabledHint": "Actieve abonnementen worden opgenomen in budgetuitgaven.",
         "currencyRequired": "Selecteer een valuta.",
-        "noBudgetLimit": "Geen budgetlimiet",
-        "unlimited": "Onbeperkt",
-        "setBudgetHint": "Stel een maandbudget in om een limiet bij te houden.",
         "renewalForecast": "Vernieuwingsprognose",
         "logoSearchTitle": "Logo kiezen",
         "logoSearchLabel": "Website of servicenaam",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} gearchiveerd - boekt zonder rekening",
         "visibilityHint_private": "Alleen jij ziet dit abonnement en de betalingen ervan.",
         "visibilityHint_shared": "Iedereen in het huishouden ziet dit abonnement en de betalingen ervan.",
-        "errorAccountGone": "De gekozen rekening bestaat niet meer."
+        "errorAccountGone": "De gekozen rekening bestaat niet meer.",
+        "moreDetailsHint": "Categorie, betaalmethode, kleur en notities"
     },
     "health": {
         "fasting": {

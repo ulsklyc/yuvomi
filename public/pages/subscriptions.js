@@ -23,18 +23,19 @@ import { CURRENCY_CODES } from '/utils/currency-codes.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import { formatMoney, parseAmountInput } from '/utils/money.js';
-import { amountInputAttrs, setAmountCurrency, amountFieldError } from '/utils/amount-field.js';
+import { amountFieldHtml, amountInputAttrs, setAmountCurrency, amountFieldError } from '/utils/amount-field.js';
+import { mediaPickerBadgeHtml } from '/utils/media-picker.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { isNavModuleReadOnly } from '/permissions.js';
-import { openDetailView } from '/components/detail-view.js';
+import { openDetailView, closeDetailView, withPrimaryEdit } from '/components/detail-view.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { sortableSet, restoreOrder } from '/utils/sortable.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
-import { metricGlanceHtml, wireMetricGlance, metricGlanceSkeletonHtml, metricCardsSkeletonHtml } from '/utils/metric-glance.js';
+import { metricGlanceHtml, metricGlanceSkeletonHtml } from '/utils/metric-glance.js';
 import { toggleRowHtml, formSwitchRowHtml } from '/settings/components.js';
-import { leadCardClass, fitMetricLeads } from '/utils/metric-card.js';
+import { fitMetricLeads } from '/utils/metric-card.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { colorPickerHtml, familyColorOptions, setColorPickerValue, wireColorPicker } from '/utils/color-picker.js';
@@ -42,9 +43,6 @@ import { intervalSentenceHtml, UNIT_SENTENCE_KEYS } from '/utils/interval-senten
 
 const SUBSCRIPTION_COLOR_DEFAULT = '#0F766E';
 
-// Auslastung, ab der ein Budget „knapp" ist - dieselbe Zahl wie im Plan
-// (budget-plans.js `toneForRatio`), damit beide Tabs dieselbe Grenze ziehen.
-const PLAN_NEAR_RATIO = 0.85;
 
 let state = {
   subscriptions: [],
@@ -58,7 +56,6 @@ let state = {
   status: 'all',
   sort: 'due',
   user: null,
-  summaryExpanded: false, // mobil: Kennzahl-Karten unter der Glance-Zeile aufgeklappt (R14 P1)
 };
 let container = null;
 /** Handle des geteilten Suchfelds (wirePageSearch) - Zuruecksetzen leert es mit. */
@@ -399,8 +396,7 @@ export async function render(target, { user } = {}) {
            Liste, waehrend "Transaktionen" und "Kategorie-Budgets" nebenan
            ueber ihrem Traeger stehen. Jetzt h2.u-section-title mit den
            Werkzeugen rechts, darunter der Zeilentraeger (.row-carrier). -->
-      <div class="subscriptions-summary" id="subscriptions-summary">${/* Der Kennzahl-Slot steht ab dem ersten Bild in seiner Form (R22, D4). */ ''}${metricGlanceSkeletonHtml({ lead: true })}
-        <section class="metric-grid metric-grid--led budget-glance-details" aria-hidden="true">${metricCardsSkeletonHtml(3)}</section>
+      <div class="subscriptions-summary" id="subscriptions-summary">${/* Der Kennzahl-Slot steht ab dem ersten Bild in seiner Form (R22, D4). */ ''}${metricGlanceSkeletonHtml({ lead: true, controls: false, flows: 2, everywhere: true })}
       </div>
       <section class="subscriptions-list-section" aria-labelledby="subscriptions-list-title">
         <div class="subscriptions-section-head section-toolbar">
@@ -804,13 +800,9 @@ function renderSummary() {
   const budget = Number(summary.monthly_budget || 0);
   const used = Number(summary.monthly_total || 0);
   const hasBudget = budget > 0;
-  // Balkenbreite ist bei 100% gecappt, das Label nennt die echte Auslastung (121% statt „100%").
+  // Die echte Auslastung (121 % statt "100 %") nennt der Satz unter der Zeile.
   const realPercentage = hasBudget ? Math.round((used / budget) * 100) : 0;
-  const percentage = Math.min(100, realPercentage);
   const isOverBudget = hasBudget && summary.remaining_budget < 0;
-  // Dieselbe Schwelle wie der Plan (budget-plans.js `toneForRatio`): ab 85 %
-  // Auslastung der Warnton, darueber hinaus die Tatsache.
-  const isNearBudget = hasBudget && !isOverBudget && used / budget > PLAN_NEAR_RATIO;
   // Geteilte Kennzahl-Zeile und -Karte des Budget-Moduls (budget.css). Die
   // frühere eigene .subscriptions-summary-card war die zweite von fünf
   // Bauarten im selben Modul (Critique 2026-07-30, P0).
@@ -835,53 +827,27 @@ function renderSummary() {
   // Unbegrenzt". Wo kein Budget gesetzt ist, gibt es keine Zahl dafuer; den
   // Zustand nennt die Karte daneben. Drei Karten sind die Grundform der Reihe
   // (panel.css) - seit R19 auch MIT Budget: es steht in der Kostenkarte.
+  /* EINE KENNZAHL, EINE ZEILE, IN JEDER BREITE (R24, E2; Critique
+   * G4-Budget-P2-3). Bis R24 standen rechts drei Karten - Monatskosten mit
+   * Balken, "Ueber Budget 23,60 €" (die zweite Fassung des roten Balkens) und
+   * die Jahresprognose -, mobil dieselben hinter einem Aufklapper. Jetzt die
+   * Kurzzeile oben in der Bahn: die Monatskosten fuehren, daneben der
+   * Budgetstand (ueber dem Budget im Danger-Ton) und das Jahr. Die Zahl der
+   * Abos steht am Kopf der Liste, die sie zaehlt. Der Weg zur Handlung bei
+   * einer Ueberschreitung ("Teuerste zuerst") bleibt, unter der Zeile. */
   const budgetFlow = hasBudget
     ? { label: t(isOverBudget ? 'subscriptions.overBudget' : 'subscriptions.remainingBudget'),
       amount: money(Math.abs(summary.remaining_budget)), tone: isOverBudget ? 'negative' : '' }
     : null;
   return `
     ${metricGlanceHtml({
-    id: 'subscriptions-glance-more',
-    controls: 'subscriptions-summary-details',
-    expanded: state.summaryExpanded,
     label: t('subscriptions.monthlyCost'),
     value: money(used),
     lead: true,
-    flows: [{ label: t('subscriptions.activeCount', { count: summary.active_count }) }, budgetFlow],
+    everywhere: true,
+    flows: [budgetFlow, { label: t('subscriptions.yearlyProjection'), amount: money(used * 12) }],
   })}
-    <section class="metric-grid metric-grid--led budget-glance-details${state.summaryExpanded ? ' is-expanded' : ''}" id="subscriptions-summary-details">
-      ${/* KOSTEN UND BUDGET IN EINER KARTE (R19, Critique 2026-10-16). Zwei
-         Karten sagten "113,60 €" und "90,00 €" nebeneinander, den Vergleich
-         musste man selbst ziehen. Jetzt "113,60 € von 90,00 €" mit dem Balken
-         darunter - dieselbe Form wie das Ziel im Plan (budget.planTargetOf);
-         die Reihe hat damit immer drei Karten. */ ''}
-      <article class="metric-card ${leadCardClass(money(used))}">
-        <div class="metric-card__label">${t('subscriptions.monthlyCost')}</div>
-        <div class="metric-card__value">${money(used)}</div>
-        ${hasBudget ? `<div class="metric-card__progress${isOverBudget ? ' metric-card__progress--over' : isNearBudget ? ' metric-card__progress--near' : ''}"
-             role="progressbar" aria-label="${esc(t('subscriptions.monthlyBudget'))}"
-             aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}" aria-valuetext="${esc(percentText(realPercentage))}">
-          <span style="--fill:${percentage / 100}"></span>
-        </div>` : ''}
-        ${/* "VON X" IN DER NOTIZ (R23, D12): neben dem Wert machte es die
-           Kennzahl laenger, als ihre Stufe traegt, und zwang sie kleiner. */ ''}
-        <div class="metric-card__note">${hasBudget ? `${esc(t('budget.planTargetOf', { amount: money(budget) }))} · ` : ''}${t('subscriptions.activeCount', { count: summary.active_count })}</div>
-      </article>
-      ${/* DIE WARNUNG STEHT EINMAL (R21 S7, Critique a4 "Warnung doppelt"): der
-         Balken der Kostenkarte daneben steht ueber 100 % schon im Danger-Ton
-         (wie der Plan). Diese Karte nennt die Tatsache in Worten samt Symbol
-         und den Weg zur Handlung - ohne zweite rote Flaeche und Zahl. */ ''}
-      <article class="metric-card">
-        <div class="metric-card__label">${isOverBudget ? '<i data-lucide="triangle-alert" class="icon-sm" aria-hidden="true"></i>' : ''}${hasBudget ? (isOverBudget ? t('subscriptions.overBudget') : t('subscriptions.remainingBudget')) : t('subscriptions.noBudgetLimit')}</div>
-        <div class="metric-card__value">${hasBudget ? money(Math.abs(summary.remaining_budget)) : t('subscriptions.unlimited')}</div>
-        <div class="metric-card__note">${hasBudget ? `${esc(percentText(realPercentage))} ${t('subscriptions.budgetUsed')}` : (readOnly() ? '' : t('subscriptions.setBudgetHint'))}${isOverBudget ? ` <button type="button" class="subscriptions-over-budget-action" id="subscriptions-over-budget-action">${t('subscriptions.overBudgetAction')}</button>` : ''}</div>
-      </article>
-      <article class="metric-card">
-        <div class="metric-card__label">${t('subscriptions.yearlyProjection')}</div>
-        <div class="metric-card__value">${money(used * 12)}</div>
-        <div class="metric-card__note">${t('subscriptions.yearlyProjectionNote')}</div>
-      </article>
-    </section>
+    ${isOverBudget ? `<p class="subscriptions-over-budget">${esc(percentText(realPercentage))} ${t('subscriptions.budgetUsed')} <button type="button" class="subscriptions-over-budget-action" id="subscriptions-over-budget-action">${t('subscriptions.overBudgetAction')}</button></p>` : ''}
   `;
 }
 
@@ -1069,6 +1035,14 @@ function endInfoLabel(subscription) {
 // WCAG 1.3.1/4.1.2) und `contacts.js`. Aus demselben Grund tragen Name und
 // Beschreibung `<span>` statt `<h3>`/`<p>`: Content-Model eines `<button>` ist
 // Phrasing Content. Was der Knopf TUT, kommt als sr-only Zusatz ans Ende.
+/** Der Standard der Erinnerung (Dialog und Route: 3 Tage vorher). */
+const DEFAULT_REMINDER_DAYS = 3;
+
+/** Weicht die Erinnerung dieses Abos vom Standard ab (aus oder andere Frist)? */
+function reminderDiffers(subscription) {
+  return subscription.reminder_enabled === false || Number(subscription.reminder_days ?? DEFAULT_REMINDER_DAYS) !== DEFAULT_REMINDER_DAYS;
+}
+
 function renderCard(subscription) {
   const brandColor = subscription.brand_color || subscription.category_color || SUBSCRIPTION_COLOR_DEFAULT;
   const status = statusMeta(subscription);
@@ -1124,7 +1098,7 @@ function renderCard(subscription) {
     <article class="subscription-card ${status.cardClass}"
              data-id="${subscription.id}" style="--subscription-color:${esc(brandColor)}">
       <button type="button" class="subscription-card__main list-row__main--interactive"
-              data-action="${ro ? 'view' : 'edit'}">
+              data-action="view">
         <span class="subscription-card__brand budget-tile">
           ${subscription.logo_data
             ? `<img src="${esc(subscription.logo_data)}" alt="">`
@@ -1145,8 +1119,12 @@ function renderCard(subscription) {
             <span class="subscription-card__meta-desc">${esc(subscription.description || rowCategoryLabel(subscription))}</span>
             ${completed ? '' : `<span class="subscription-card__due${overdue ? ' subscription-card__due--overdue' : ''}"><i data-lucide="${overdue ? 'triangle-alert' : 'calendar-clock'}" aria-hidden="true"></i><span>${esc(dateText(subscription.next_payment_date))} ·</span> <span>${dueLabel(subscription)}</span></span>`}
             <span class="subscription-card__meta-cycle">${cycleLabel(subscription)}</span>
-            <span class="subscription-card__meta-extra">${esc(rowPaymentMethodLabel(subscription))}</span>
-            ${completed ? '' : `<span class="subscription-card__meta-extra"><i data-lucide="${subscription.reminder_enabled === false ? 'bell-off' : 'bell'}" aria-hidden="true"></i>${subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>`}
+            ${/* DIE METAZEILE SAGT, WAS DIESES ABO UNTERSCHEIDET (Critique R24
+                 G4-Budget-P3-2): Zahlart und "3 Tage vorher" standen in JEDER
+                 Zeile - fuenf Angaben, zwei davon ueberall gleich. Die Zahlart
+                 steht im Leseblatt; die Erinnerung nur, wo sie vom Standard
+                 (3 Tage) abweicht oder aus ist. */ ''}
+            ${completed || !reminderDiffers(subscription) ? '' : `<span class="subscription-card__meta-extra"><i data-lucide="${subscription.reminder_enabled === false ? 'bell-off' : 'bell'}" aria-hidden="true"></i>${subscription.reminder_enabled === false ? t('subscriptions.noReminder') : t('subscriptions.reminderMeta', { count: subscription.reminder_days })}</span>`}
             ${endInfo ? `<span><i data-lucide="${endInfo.icon}" aria-hidden="true"></i>${esc(endInfo.text)}</span>` : ''}
             ${/* RUHIG, ABER AUCH AM TELEFON (Entscheidung zu #1277): das Konto
                  ist archiviert, das Abo bucht ohne Konto. Eine Metaangabe wie
@@ -1160,7 +1138,6 @@ function renderCard(subscription) {
           ${converted ? `<span>${converted}</span>` : ''}
           <span class="subscription-card__cost-cycle">${cycleLabel(subscription)}</span>
         </span>
-        ${ro ? '' : `<span class="sr-only">${t('common.edit')}</span>`}
       </button>
       ${/* DIE ENDZONE WIE IN JEDEM BUDGET-REITER (R22, D9 nach R21-D10):
            [eine Handlung][Mehr-Knopf]. Bis dahin stand am Zeiger nur der
@@ -1258,7 +1235,6 @@ function renderEmpty() {
 }
 
 function bindContent() {
-  wireMetricGlance(container, 'subscriptions-glance-more', (on) => { state.summaryExpanded = on; });
   container.querySelector('#subscriptions-refresh-rates')?.addEventListener('click', () => reload({ refreshRates: true }));
   container.querySelector('#subscriptions-empty-add')?.addEventListener('click', () => openSubscriptionModal());
   container.querySelector('#subscriptions-empty-reset')?.addEventListener('click', resetFilters);
@@ -1279,7 +1255,7 @@ function bindContent() {
     // eine klickbare Zeile). Ein blosser Tap-Handler auf dem `<article>` haette
     // den Bearbeiten-Knopf entfernt, ohne einen Tastaturweg an seine Stelle zu
     // setzen - das waere kein Aufraeumen, sondern ein Regress.
-    if (action.dataset.action === 'view') openSubscriptionReadView(subscription);
+    if (action.dataset.action === 'view') openSubscriptionReadView(subscription, { editable: !readOnly() });
     if (action.dataset.action === 'edit') openSubscriptionModal(subscription);
     if (action.dataset.action === 'renew') await renewSubscription(subscription);
     if (action.dataset.action === 'delete') await deleteSubscription(subscription);
@@ -1467,16 +1443,39 @@ function subscriptionReadSections(subscription) {
 }
 
 /**
- * Das Abo bei `budget: read`: eine Leseansicht, sonst nichts. Dieselbe Bauart
- * wie die Buchung in budget.js (P1-Muster: der Einstieg in den Editor verzweigt,
- * die geteilte Leseansicht ohne `edit` und ohne `actions`).
+ * DAS ABO ALS LESEBLATT (R24, E1; Critique G4-Budget-P2-4). Bis R24 oeffnete
+ * der Tipp auf die Zeile das Formular, den Namen fokussiert - am Telefon mit
+ * der Tastatur ueber dem halben Blatt. Jetzt zuerst das Blatt mit Betrag,
+ * Turnus, naechster Zahlung, Zahlart und Konto; Bearbeiten ist der EINE
+ * Primaerknopf (withPrimaryEdit), "Verlaengert" steht sekundaer davor, solange
+ * das Abo eine naechste Zahlung hat. Bei `budget: read` (P1-Muster) dasselbe
+ * Blatt ohne Fuss.
  */
-function openSubscriptionReadView(subscription) {
+function openSubscriptionReadView(subscription, { editable = false } = {}) {
+  const leave = (next) => async ({ close } = {}) => {
+    await (close ?? closeDetailView)({ force: true });
+    await next();
+  };
+  const actions = editable ? withPrimaryEdit([
+    !isCompleted(subscription) && {
+      id: 'subscription-read-renew',
+      label: t('subscriptions.markRenewed'),
+      icon: 'calendar-check',
+      variant: 'secondary',
+      onClick: leave(() => renewSubscription(subscription)),
+    },
+  ], {
+    id: 'subscription-read-edit',
+    label: t('common.edit'),
+    onClick: leave(() => openSubscriptionModal(subscription)),
+  }) : [];
   return openDetailView({
     title: subscription.name,
+    key: `subscription:${subscription.id}`,
     accentColor: subscription.brand_color || subscription.category_color || 'var(--module-budget)',
     size: 'sm',
     sections: subscriptionReadSections(subscription),
+    actions,
   });
 }
 
@@ -1672,17 +1671,25 @@ export function openSubscriptionModal(subscription = null) {
   const content = `
     <form id="subscription-form" class="subscription-form" novalidate>
       <section class="subscription-form__section subscription-form__identity">
+        ${/* DAS LOGO IST EIN BEDIENELEMENT (Critique R24 G4-Budget-P3-3,
+             Baustein `.media-picker`): die Kachel IST die Dateiwahl, das
+             Abzeichen an ihrer Ecke sagt es - "Logo hochladen" als zweite
+             Beschriftung darunter ist weg. "Logo finden" bleibt eine eigene
+             Handlung (Suche im Netz), als ruhiger Knopf darunter. */ ''}
         <div class="subscription-logo-tools">
-          <label class="subscription-logo-picker" for="subscription-logo" title="${t('subscriptions.logoLabel')}">
-            <span id="subscription-logo-preview">
-              ${initialLogo
-                ? `<img src="${esc(initialLogo)}" alt="">`
-                : `<strong>${esc(initialName.slice(0, 2).toUpperCase() || '+')}</strong>`}
-            </span>
-            <small><i data-lucide="upload" aria-hidden="true"></i>${t('subscriptions.logoLabel')}</small>
-            <input id="subscription-logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
-          </label>
-          <button class="btn btn--secondary subscription-find-logo-btn" type="button" id="subscription-find-logo">
+          <span class="media-picker">
+            <button type="button" class="subscription-logo-picker" id="subscription-logo-button" aria-label="${esc(t('subscriptions.logoLabel'))}">
+              <span id="subscription-logo-preview">
+                ${initialLogo
+                  ? `<img src="${esc(initialLogo)}" alt="">`
+                  : `<strong>${esc(initialName.slice(0, 2).toUpperCase() || '+')}</strong>`}
+              </span>
+            </button>
+            ${mediaPickerBadgeHtml()}
+          </span>
+          <input class="sr-only" id="subscription-logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                 aria-label="${esc(t('subscriptions.logoLabel'))}" tabindex="-1">
+          <button class="btn btn--secondary btn--sm subscription-find-logo-btn" type="button" id="subscription-find-logo">
             <i data-lucide="scan-search" aria-hidden="true"></i>${t('subscriptions.findLogo')}
           </button>
         </div>
@@ -1701,18 +1708,14 @@ export function openSubscriptionModal(subscription = null) {
       <section class="subscription-form__section">
         <h3 class="subscription-form__title">${t('subscriptions.billingDetails')}</h3>
         <div class="subscription-form__billing-grid">
+          ${/* DIE WAEHRUNG STEHT IM BETRAG (R22 D9, Critique R24
+               G4-Budget-P1-1): bis R24 eine eigene Such-Combobox mit Lupe
+               ("EUR · Euro") neben dem Betrag. Jetzt die Wahl als Code im
+               Suffix des Felds, derselbe Baustein wie Ausgabe und Serie. */ ''}
           <div class="form-group">
             <label class="form-label" for="subscription-amount">${t('subscriptions.amountLabel')}${REQUIRED_MARK}</label>
-            <input class="form-input" id="subscription-amount"${amountInputAttrs(formCurrency, subscription?.amount ?? '')} required>
+            ${amountFieldHtml({ id: 'subscription-amount', currency: formCurrency, value: subscription?.amount ?? '', currencies: CURRENCY_CODES, currencyId: 'subscription-currency', currencyName: 'currency' })}
           </div>
-          ${comboboxMarkup({
-            id: 'subscription-currency',
-            label: t('subscriptions.currencyLabel'),
-            required: true,
-            items: currencyItems(),
-            value: subscription?.currency || state.settings.base_currency,
-            placeholder: t('subscriptions.currencySearchPlaceholder'),
-          })}
           ${/* DER ZYKLUS IST EIN SATZ (Critique R24 G4-Budget-P3-3): "Alle [1] [Monat]"
                statt "Abrechnungszyklus" als Suchfeld und daneben "Alle" ueber einer
                nackten 1 (utils/interval-sentence.js). Die Woerter der Wahl folgen der
@@ -1726,6 +1729,15 @@ export function openSubscriptionModal(subscription = null) {
               countHtml: `<input class="form-input" id="subscription-interval" type="number" min="1" max="365" step="1" inputmode="numeric" value="${esc(String(subscription?.cycle_interval || 1))}" aria-labelledby="subscription-cycle-label">`,
             })}
           </div>
+          ${/* DIE NAECHSTE ZAHLUNG GEHOERT ZUR ABRECHNUNG (Critique R24
+               G4-Budget-P3-3): sie hing unter dem Erinnerungs-Schalter, weit
+               weg von Betrag und Turnus, aus denen sie folgt. */ ''}
+          <div class="form-group subscription-form__next">
+            <label class="form-label" for="subscription-next-date">${t('subscriptions.nextPaymentLabel')}${REQUIRED_MARK}</label>
+            <yuvomi-datepicker id="subscription-next-date" type="date" required
+                   value="${esc(subscription?.next_payment_date || todayKey())}"></yuvomi-datepicker>
+            ${isCompleted(subscription) ? `<p class="form-hint" id="subscription-next-date-hint">${t('subscriptions.nextPaymentCompletedHint')}</p>` : ''}
+          </div>
         </div>
         ${accountFieldHtml(subscription)}
       </section>
@@ -1737,17 +1749,9 @@ export function openSubscriptionModal(subscription = null) {
           checked: subscription?.reminder_enabled !== false,
           attrs: { id: 'subscription-reminder-enabled' },
         })}
-        <div class="form-grid-2">
-          <div class="form-group">
-            <label class="form-label" for="subscription-next-date">${t('subscriptions.nextPaymentLabel')}${REQUIRED_MARK}</label>
-            <yuvomi-datepicker id="subscription-next-date" type="date" required
-                   value="${esc(subscription?.next_payment_date || todayKey())}"></yuvomi-datepicker>
-            ${isCompleted(subscription) ? `<p class="form-hint" id="subscription-next-date-hint">${t('subscriptions.nextPaymentCompletedHint')}</p>` : ''}
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="subscription-reminder">${t('subscriptions.reminderDaysLabel')}</label>
-            <input class="form-input" id="subscription-reminder" type="number" min="0" max="365" step="1" value="${subscription?.reminder_days ?? 3}"${subscription?.reminder_enabled === false ? ' disabled' : ''}>
-          </div>
+        <div class="form-group">
+          <label class="form-label" for="subscription-reminder">${t('subscriptions.reminderDaysLabel')}</label>
+          <input class="form-input" id="subscription-reminder" type="number" min="0" max="365" step="1" value="${subscription?.reminder_days ?? DEFAULT_REMINDER_DAYS}"${subscription?.reminder_enabled === false ? ' disabled' : ''}>
         </div>
         <div class="form-group">
           <label class="form-label" for="subscription-end-type">${t('subscriptions.endLabel')}</label>
@@ -1770,7 +1774,7 @@ export function openSubscriptionModal(subscription = null) {
         </div>
       </section>
 
-      ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
+      ${advancedSection(advancedFieldsHtml, { open: advancedOpen, hint: t('subscriptions.moreDetailsHint') })}
       <div class="modal-panel__footer subscriptions-modal-footer">
         ${edit ? `<button type="button" class="btn btn--danger-outline" id="subscription-delete"
                 aria-label="${esc(t('common.deleteNamed', { name: subscription.name }))}">
@@ -1784,6 +1788,7 @@ export function openSubscriptionModal(subscription = null) {
   openModal({
     staged: !edit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: edit ? t('subscriptions.editTitle') : t('subscriptions.addTitle'),
+    initialFocus: edit ? 'edit' : 'first-field',
     content,
     size: 'lg',
     onSave(panel) {
@@ -1798,7 +1803,9 @@ export function openSubscriptionModal(subscription = null) {
           logoPreview.insertAdjacentHTML('afterbegin', `<strong>${esc(panel.querySelector('#subscription-name').value.slice(0, 2).toUpperCase() || '+')}</strong>`);
         }
       };
-      wireCombobox(panel, 'subscription-currency');
+      // Die Kachel oeffnet die Dateiwahl (media-picker): das Feld selbst ist
+      // versteckt und nicht im Tab-Lauf.
+      panel.querySelector('#subscription-logo-button').addEventListener('click', () => panel.querySelector('#subscription-logo').click());
       // Ein Abo darf 0 kosten (Gratis-Tarif, Server prüft amount >= 0): das
       // Speichern prueft deshalb mit `sign: 'nonNegative'`.
       panel.querySelector('#subscription-currency').addEventListener('change', (event) => {
@@ -1894,9 +1901,9 @@ async function saveSubscription(panel, existing, searchedLogoData = null) {
     fieldErrors.push([dateInput, t('subscriptions.invalidDate')]);
   }
   if (!currencyInput.value) {
-    // Die Meldung klebt am sichtbaren Suchfeld der Combobox, nicht am
-    // versteckten Wert-Input.
-    fieldErrors.push([panel.querySelector('#subscription-currency-search'), t('subscriptions.currencyRequired')]);
+    // Seit R24 eine Wahl im Suffix des Betrags - leer kann sie nur ein
+    // Nachbau sein; die Meldung steht dann an ihr.
+    fieldErrors.push([currencyInput, t('subscriptions.currencyRequired')]);
   }
   // Ende-Bedingung (#594): nur das aktive Zusatzfeld liefert einen Wert.
   const endType = panel.querySelector('#subscription-end-type').value;
@@ -2671,6 +2678,8 @@ export const __test = {
   readOnly, READ_SAFE_ACTIONS, renderCard, renderEmpty, renderSummary, state, toolsMenuHtml, activeFilters,
   renderBreakdown, renderAreaChart,
   subscriptionReadSections, openSubscriptionModal, saveSubscription,
+  // R24 E1: der Tipp auf ein Abo oeffnet das Leseblatt (test-budget-readonly-ui.js).
+  openSubscriptionReadView,
   // #1909: die Fehlerwege der Seite (test:subscriptions-errors).
   reload, renewSubscription, deleteSubscription, openSettingsModal, openMetadataModal, openLogoPickerModal,
   // #2152: die Zeilen des Verwalten-Dialogs (test:manager-endzone).

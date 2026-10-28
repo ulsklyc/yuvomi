@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "Valutakurser utilgjengelige",
         "refreshRates": "Oppdater kurser",
         "monthlyCost": "Månedspris",
-        "activeCount": "{{count}} aktive",
-        "monthlyBudget": "Månedsbudsjett",
         "overBudget": "Over budsjett",
         "remainingBudget": "Gjenværende budsjett",
         "budgetUsed": "budsjett brukt",
         "yearlyProjection": "Årlig prognose",
-        "yearlyProjectionNote": "12 × månedspris",
         "byCategory": "Etter kategori",
         "byPaymentMethod": "Etter betalingsmetode",
         "noAnalytics": "Ingen utgiftsdata ennå.",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "Annet",
         "enabledHint": "Aktive abonnementer er inkludert i budsjettutgifter.",
         "currencyRequired": "Velg en valuta.",
-        "noBudgetLimit": "Ingen budsjettgrense",
-        "unlimited": "Ubegrenset",
-        "setBudgetHint": "Sett et månedlig budsjett for å spore en grense.",
         "renewalForecast": "Fornyelsesprognose",
         "logoSearchTitle": "Velg logo",
         "logoSearchLabel": "Nettsted eller tjenestenavn",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} arkivert - bokføres uten konto",
         "visibilityHint_private": "Bare du ser dette abonnementet og betalingene.",
         "visibilityHint_shared": "Alle i husholdningen ser dette abonnementet og betalingene.",
-        "errorAccountGone": "Den valgte kontoen finnes ikke lenger."
+        "errorAccountGone": "Den valgte kontoen finnes ikke lenger.",
+        "moreDetailsHint": "Kategori, betalingsmåte, farge og notater"
     },
     "health": {
         "fasting": {

@@ -4829,13 +4829,10 @@
         "ratesUnavailable": "Směnné kurzy nejsou k dispozici",
         "refreshRates": "Aktualizovat kurzy",
         "monthlyCost": "Měsíční náklady",
-        "activeCount": "{{count}} aktivních",
-        "monthlyBudget": "Měsíční rozpočet",
         "overBudget": "Nad rozpočet",
         "remainingBudget": "Zbývající rozpočet",
         "budgetUsed": "rozpočtu využito",
         "yearlyProjection": "Roční projekce",
-        "yearlyProjectionNote": "12 × měsíční náklady",
         "byCategory": "Podle kategorie",
         "byPaymentMethod": "Podle platební metody",
         "noAnalytics": "Zatím žádná data o výdajích.",
@@ -4924,9 +4921,6 @@
         "paymentMethodOther": "Ostatní",
         "enabledHint": "Aktivní předplatná jsou zahrnuta do rozpočtových výdajů.",
         "currencyRequired": "Vyberte měnu.",
-        "noBudgetLimit": "Bez rozpočtového limitu",
-        "unlimited": "Neomezeně",
-        "setBudgetHint": "Nastavte měsíční rozpočet pro sledování limitu.",
         "renewalForecast": "Prognóza obnovení",
         "logoSearchTitle": "Vybrat logo",
         "logoSearchLabel": "Web nebo název služby",
@@ -4988,7 +4982,8 @@
         "accountArchivedMeta": "{{name}} archivováno - účtuje se bez účtu",
         "visibilityHint_private": "Toto předplatné a jeho platby vidíš jen ty.",
         "visibilityHint_shared": "Celá domácnost vidí toto předplatné a jeho platby.",
-        "errorAccountGone": "Vybraný účet už neexistuje."
+        "errorAccountGone": "Vybraný účet už neexistuje.",
+        "moreDetailsHint": "Kategorie, způsob platby, barva a poznámky"
     },
     "health": {
         "fasting": {

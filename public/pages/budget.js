@@ -37,7 +37,7 @@ import { toLocalDateKey, parseLocalDateKey, addLocalDays,
 import { formatMoney, formatSignedAmount, sharePercent, roundToCurrency, currencySymbol, parseAmountInput, setFallbackCurrency } from '/utils/money.js';
 import { amountInputAttrs, setAmountCurrency, amountFieldError, amountFieldHtml, setAmountUnit } from '/utils/amount-field.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
-import { trendMarkup, leadCardClass, leadStep, fitMetricLeads } from '/utils/metric-card.js';
+import { trendMarkup, leadCardClass, fitMetricLeads } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
 import { LEDGER_SORTS, DEFAULT_LEDGER_SORT, normalizeLedgerSort, sortLedger } from '/utils/ledger-order.js';
@@ -296,7 +296,6 @@ let state = {
   categoriesExpanded: false,  // Kategorie-Diagramm einspaltig ganz aufgeklappt (sonst Top 3)
   plannedExpandedMonth: null, // Monat, in dem "Geplant" ganz aufgeklappt ist (sonst die naechsten 3); gilt nur fuer DIESEN Monat
   balanceExpanded: false,     // mobil: Bilanz-Karten unter der Kopfzeile aufgeklappt (balanceGlanceHtml)
-  loansExpanded: false,       // mobil: Darlehens-Karten unter der Glance-Zeile aufgeklappt (metricGlanceHtml)
   loanPaymentsExpanded: false, // Raten: alle statt der letzten sechs (renderLoanTransactions)
   meta:        { expenseCategories: [], incomeCategories: [], subcategories: {} },
   metaError:   null,
@@ -2670,8 +2669,13 @@ function togglePlanned(button) {
  */
 function statementCreditLimitHtml() {
   const account = (state.accounts ?? []).find((a) => a.id === state.accountFilterId);
-  if (!account || account.type !== 'credit' || account.credit_limit == null) return '';
-  return `<div class="budget-list-header__filter">${esc(t('budget.creditLimitLabel'))} ${esc(formatAmount(account.credit_limit, account.currency || state.currency))}</div>`;
+  if (!account) return '';
+  const currency = account.currency || state.currency;
+  // Der Startsaldo stand bis R24 in jeder Kontozeile; im Auszug des Kontos
+  // gehoert er an den Anfang (Critique G4-Budget-P3-1).
+  const start = `<div class="budget-list-header__filter">${esc(t('budget.startingBalanceShort'))} ${esc(formatAmount(account.starting_balance ?? 0, currency))}</div>`;
+  if (account.type !== 'credit' || account.credit_limit == null) return start;
+  return `${start}<div class="budget-list-header__filter">${esc(t('budget.creditLimitLabel'))} ${esc(formatAmount(account.credit_limit, currency))}</div>`;
 }
 
 /** Die Buchungszeilen selbst - einmal gebaut, von Liste und Gruppen benutzt. */
@@ -2915,9 +2919,6 @@ function renderAccountsPage() {
   const netWorthNote = parts.length
     ? t('budget.netWorthPerCurrencyNote')
     : (approx && state.netWorthInfo.ratesAt ? t('budget.netWorthApproxNote', { date: dateText(state.netWorthInfo.ratesAt, { year: true }) }) : '');
-  const netWorthValue = parts.length
-    ? `<dl class="budget-transfer-summary__flows budget-net-worth__parts">${parts.map((p) => `<div class="budget-transfer-summary__flow"><dt class="budget-transfer-summary__flow-label">${esc(p.currency)}</dt><dd class="budget-transfer-summary__flow-value">${esc(formatAmount(p.amount, p.currency))}</dd></div>`).join('')}</dl>`
-    : `<div class="metric-card__value">${esc(netWorthText)}</div>`;
 
   const archiveToggle = hasArchived ? `
       <button class="budget-accounts__toggle" id="budget-toggle-archived" type="button" aria-pressed="${state.accountsShowArchived}">
@@ -2942,39 +2943,29 @@ function renderAccountsPage() {
       ${title}
       <div class="panel-head__actions">${archiveToggle}</div>
     </div>` : title}
-    ${/* Mobil die Kurzzeile wie in jedem Reiter mit Kennzahlen (R16): hier stand
-       * unter 640px als einzige Stelle des Moduls noch die Karte. EINE Zahl,
-       * also ohne Aufklapper (metric-glance.js) - die Karte bleibt dort aus. */ ''}
-    ${metricGlanceHtml({
-      label: t('budget.netWorth'),
-      value: netWorthText,
-      tone: netWorthTone,
-      flows: netWorthNote ? [{ label: netWorthNote }] : [],
-      lead: true,
-    })}
     `;
-  // DAS NETTOVERMOEGEN IST EINE LEISTENKARTE NEBEN DEN KONTEN (Critique R17,
-  // E14). Bis dahin trug die eine Kennzahl eine ganze Zeile ueber dem Raster:
-  // EINE Karte ueber 981px (1280) bzw. 1124px (1440), davon rund 800px leer.
-  // Ab 960px Modulflaeche steht sie in der Seitenleiste der Budget-Bahn wie
-  // die Kennzahlen der Uebersicht und der Darlehen (`.metric-grid--rail`),
-  // die Konten daneben auf dem Lesemass. Im Markup bleibt sie VORN: schmaler
-  // steht sie ueber den Konten, mobil vertritt sie die Kurzzeile.
-  const rail = `
-    <div class="metric-grid metric-grid--rail budget-glance-details">
-      <div class="metric-card metric-card--${netWorthTone} ${leadCardClass(netWorthText)}">
-        <div class="metric-card__label">${t('budget.netWorth')}</div>
-        ${netWorthValue}
-        ${netWorthNote ? `<div class="metric-card__note">${esc(netWorthNote)}</div>` : ''}
-      </div>
-    </div>`;
+  // DAS NETTOVERMOEGEN IST EINE KARTE OBEN, IN JEDER BREITE (R24, E2; Critique
+  // G4-Budget-P2-3). Seit R17 (E14) stand es als einsame Leistenkarte neben
+  // den Konten, darunter 680px leer; die Kurzzeile darueber trug mobil
+  // dieselbe Zahl. Jetzt ist es EINE Aussage: die Kurzzeile ueber den Konten
+  // (`metricGlanceHtml({ everywhere })`), am Desktop wie am Telefon, die Konten
+  // darunter auf dem Lesemass, keine Seitenspalte. Bei Konten in mehreren
+  // Waehrungen ohne Kurs steht die Summe je Waehrung in der Zeile.
+  const glance = metricGlanceHtml({
+    label: t('budget.netWorth'),
+    value: netWorthText,
+    tone: netWorthTone,
+    flows: netWorthNote ? [{ label: netWorthNote }] : [],
+    lead: true,
+    everywhere: true,
+  });
 
   if (!all.length) {
     return `
       <div class="budget-tab-panel page-scrollport budget-tab-panel--accounts" data-scroll-port="budget">
         ${header}
         <div class="budget-accounts">
-        ${rail}
+        ${glance}
         ${emptyStateHTML({
     icon: 'wallet',
     title: t('budget.accountsEmptyTitle'),
@@ -3013,16 +3004,16 @@ function renderAccountsPage() {
           <span class="budget-account__icon budget-tile"><i data-lucide="${icon}" class="icon-md" aria-hidden="true"></i></span>
           <span class="budget-account__body">
             <span class="budget-account__name"><span class="budget-account__name-text">${esc(a.name)}</span>${archivedBadge}</span>
-            ${/* Am Telefon steht der Start in der Zeile der Kontoart (budget.css,
-                  unter 640px); dort ist `.budget-account__starting` ausgeblendet,
-                  hier `__type-start` daneben - genau eine Fassung ist sichtbar
-                  und im Barrierebaum. */ ''}
-            <span class="budget-account__type">${esc(accountTypeLabel(a.type))}<span class="budget-account__type-start"> · ${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance, accountCurrency(a.id))}</span></span></span>
+            ${/* DER STARTSALDO STEHT NICHT IN DER ZEILE (Critique R24
+                  G4-Budget-P3-1): "Start: 2.480,00 €" in jeder Zeile war
+                  Rauschen neben dem Stand, und mobil brachen die Namen daneben.
+                  Er steht im Kontoauszug (Kopf der gefilterten Liste) und im
+                  Konto-Dialog. */ ''}
+            <span class="budget-account__type">${esc(accountTypeLabel(a.type))}</span>
             ${creditMeta}
           </span>
           <span class="budget-account__figures">
             <span class="budget-account__balance ${balClass}">${formatAmount(a.current_balance, accountCurrency(a.id))}</span>
-            <span class="budget-account__starting">${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance, accountCurrency(a.id))}</span></span>
           </span>
           <span class="sr-only">, ${esc(t('budget.showAccountTransactions'))}</span>
         </button>
@@ -3041,7 +3032,7 @@ function renderAccountsPage() {
     <div class="budget-tab-panel page-scrollport budget-tab-panel--accounts" data-scroll-port="budget">
       ${header}
       <div class="budget-accounts">
-        ${rail}
+        ${glance}
         <div class="budget-accounts__list">${cards}</div>
       </div>
     </div>`;
@@ -3316,56 +3307,52 @@ function renderLoansDashboard() {
 
   const cards = loanSummaryCards(summary);
   const [leadCard, ...restCards] = cards;
+  /* EINE KENNZAHL OBEN, KEIN TURM (R24, E2; Critique G4-Budget-P2-3). Bis R24
+   * standen rechts vier Karten (Restschuld, Steht dir zu, Bezahlt,
+   * Zurueckerhalten) neben den Darlehen, mobil dieselben hinter einem
+   * Aufklapper. Jetzt EINE Zeile in jeder Breite: die Restschuld fuehrt, zwei
+   * Nebenwerte stehen daneben; was die Karten einzeln sagen (gezahlt, offen
+   * je Darlehen), steht an jeder Karte.
+   *
+   * DER KOPF BEGINNT AN DER KANTE DER LISTE (Critique G4-Budget-P2-5): das
+   * Segment Aktiv/Bezahlt/Alle stand rechtsbuendig ohne Titel, links 470px
+   * leer. Jetzt steht es vorn wie ein Abschnittskopf (`section-toolbar`), die
+   * Werkzeuge am Ende; ein sichtbarer Titel "Darlehen" wiederholte nur den
+   * Reiter (test:typography), er bleibt fuer die Gliederung unsichtbar. */
   return `
     <section class="budget-loans">
       ${metricGlanceHtml({
-    id: 'budget-loans-more',
-    controls: 'budget-loans-details',
-    expanded: state.loansExpanded,
     label: leadCard.label,
     value: leadCard.value,
     lead: true,
+    everywhere: true,
     flows: restCards.map((card) => ({ label: card.label, amount: card.value })),
   })}
-      <div class="panel-head budget-loans__header">
-        <div>
-          <!-- Unsichtbar wie bei den Konten: sichtbar wiederholte der Titel nur den Tab. -->
-          <h2 class="panel-head__title sr-only">${t('budget.loansTitle')}</h2>
-          <!-- Die Summenzeile („2 aktiv · 175.444,93 € offen") ist entfallen:
-               sie wiederholte die Karte RESTSCHULD direkt darunter (R14 P1). -->
-          ${state.loanFilterId ? `<div class="budget-list-header__filter">${esc(activeLoanLabel())}</div>` : ''}
-          ${loanSortNoteHtml()}
+      <div class="budget-loans__header section-toolbar">
+        <!-- Unsichtbar wie bei den Konten: sichtbar wiederholte der Titel nur
+             den Reiter "Darlehen" (test:typography). -->
+        <h2 class="sr-only" tabindex="-1">${t('budget.loansTitle')}</h2>
+        <!-- Einfachauswahl, keine Sicht: role="radiogroup" statt des früheren
+             role="group", damit der Zustand angesagt wird UND die geteilte
+             Verhaltensschicht Pfeiltasten liefert (Critique 2026-07-30, P1). -->
+        <div class="segmented budget-loans__filters" role="radiogroup" aria-label="${t('budget.loanStatusFilterLabel')}">
+          ${[['active', 'budget.loanStatusActive'], ['paid', 'budget.loanStatusPaid'], ['all', 'budget.loanStatusAll']]
+            .map(([id, key]) => {
+              const on = state.loanStatusFilter === id;
+              return `<button class="segmented__item${on ? ' is-active' : ''}"
+                  type="button" role="radio" data-tab-id="${id}" aria-checked="${on}"
+                  tabindex="${on ? '0' : '-1'}">${t(key)}</button>`;
+            }).join('')}
         </div>
+        ${state.loanFilterId ? `<span class="budget-list-header__filter">${esc(activeLoanLabel())}</span>` : ''}
+        ${loanSortNoteHtml()}
         <div class="panel-head__actions">
           ${state.loanFilterId ? `
           <button class="btn btn--secondary btn--sm" type="button" id="budget-clear-loan-filter">
             <i data-lucide="x" aria-hidden="true"></i>${t('budget.clearLoanFilter')}
           </button>` : ''}
-          <!-- Einfachauswahl, keine Sicht: role="radiogroup" statt des früheren
-               role="group", damit der Zustand angesagt wird UND die geteilte
-               Verhaltensschicht Pfeiltasten liefert (Critique 2026-07-30, P1). -->
-          <div class="segmented budget-loans__filters" role="radiogroup" aria-label="${t('budget.loanStatusFilterLabel')}">
-            ${[['active', 'budget.loanStatusActive'], ['paid', 'budget.loanStatusPaid'], ['all', 'budget.loanStatusAll']]
-              .map(([id, key]) => {
-                const on = state.loanStatusFilter === id;
-                return `<button class="segmented__item${on ? ' is-active' : ''}"
-                    type="button" role="radio" data-tab-id="${id}" aria-checked="${on}"
-                    tabindex="${on ? '0' : '-1'}">${t(key)}</button>`;
-              }).join('')}
-          </div>
           ${loanToolsMenuHtml()}
         </div>
-      </div>
-      <!-- Geteilte Kennzahl-Zeile statt der früheren eigenen budget-loans__stats
-           (fünfte Kartenbauart des Moduls, Critique 2026-07-30, P0). Rolle
-           total: die Richtung steht im Label, nicht im Vorzeichen.
-           Mobil wartet sie hinter EINER Zeile (metricGlanceHtml, R14 P1). -->
-      <div class="metric-grid metric-grid--led${cards.length === 4 ? ' metric-grid--quad' : ''}${leadStep(cards[0]?.value) ? ' metric-grid--long-lead' : ''} budget-glance-details${state.loansExpanded ? ' is-expanded' : ''}" id="budget-loans-details">
-        ${cards.map((card, i) => `
-        <div class="metric-card${i === 0 ? ` ${leadCardClass(card.value)}` : ''}">
-          <div class="metric-card__label">${card.label}</div>
-          <div class="metric-card__value">${card.value}</div>
-        </div>`).join('')}
       </div>
       ${summary.has_foreign_currency ? `<p class="form-hint budget-loan-hint">${t('budget.loanSummaryConverted', {
         currency: esc(summary.currency || state.currency),
@@ -3706,7 +3693,6 @@ function wireLoanCards(root, open = openLoanReport) {
 
 function wireLoansPage() {
   _container.querySelector('[data-action="toggle-loan-payments"]')?.addEventListener('click', (e) => toggleLoanPayments(e.currentTarget));
-  wireMetricGlance(_container, 'budget-loans-more', (on) => { state.loansExpanded = on; });
   _container.querySelector('#budget-empty-loan')?.addEventListener('click', () => openBudgetModal({ mode: 'create', initialType: 'loan' }));
   _container.querySelector('#budget-clear-loan-filter')?.addEventListener('click', () => {
     state.loanFilterId = null;
@@ -4043,12 +4029,12 @@ function renderLoanCard(loan) {
         <span data-bar-key="loan:${loan.id}" style="--bar-scale:${paidPct / 100}"></span>
       </div>
       <div class="budget-loan-card__footer">
+        ${/* EINE DATUMSZEILE (Critique R24 G4-Budget-P3-7): "Naechste" und
+            * "Ende voraussichtlich" standen als zwei Zeilen neben der
+            * Endzone. Jetzt ein Satz; der Monat der letzten Rate (#1706)
+            * faellt weg, wenn ihn der Server nicht kennt. */ ''}
         <div class="budget-loan-card__dates">
-          <span>${t('budget.loanNextDue', { month: nextDue })}</span>
-          ${/* Der Monat der letzten Rate (#1706), vom Server aus derselben
-              * Restlaufzeit gerechnet, die auch der Bericht zeigt. Fehlt er
-              * (getilgt, oder die Rate deckt den Zins nicht), faellt die Zeile weg. */ ''}
-          ${loan.projected_end_month ? `<span class="budget-loan-card__end">${t('budget.loanProjectedEnd', { month: formatMonthLabel(loan.projected_end_month) })}</span>` : ''}
+          <span>${t('budget.loanNextDue', { month: nextDue })}${loan.projected_end_month ? `<span class="budget-loan-card__end"> · ${t('budget.loanProjectedEnd', { month: formatMonthLabel(loan.projected_end_month) })}</span>` : ''}</span>
         </div>
         ${/* Bei `budget: read` gehen alle drei: Bearbeiten, Loeschen und das
             * Buchen einer Rate schreiben. Faelligkeit, Fortschritt und der
@@ -4065,7 +4051,7 @@ function renderLoanCard(loan) {
           ${/* Sekundaer, nicht primaer (Critique 2026-09-25): drei Darlehen
               * zeigten drei violette Primaerknoepfe nebeneinander, und keiner
               * war der Weg der Seite. Der steht im Kopf („+ Darlehen"). */ ''}
-          <button class="btn btn--secondary" data-action="loan-pay" data-id="${loan.id}" ${payDisabled}>
+          <button class="btn btn--secondary btn--sm" data-action="loan-pay" data-id="${loan.id}" ${payDisabled}>
             ${t(isBorrowedLoan(loan) ? 'budget.loanBookInstallment' : 'budget.loanReceiveRepayment')}
           </button>
         </div>`}

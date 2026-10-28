@@ -4954,13 +4954,10 @@
         "ratesUnavailable": "Kursy wymiany niedostępne",
         "refreshRates": "Odśwież kursy",
         "monthlyCost": "Koszt miesięczny",
-        "activeCount": "{{count}} aktywnych",
-        "monthlyBudget": "Budżet miesięczny",
         "overBudget": "Ponad budżet",
         "remainingBudget": "Pozostały budżet",
         "budgetUsed": "budżetu wykorzystano",
         "yearlyProjection": "Prognoza roczna",
-        "yearlyProjectionNote": "12 × koszt miesięczny",
         "byCategory": "Według kategorii",
         "byPaymentMethod": "Według metody płatności",
         "noAnalytics": "Brak jeszcze danych o wydatkach.",
@@ -5050,9 +5047,6 @@
         "paymentMethodOther": "Inne",
         "enabledHint": "Aktywne subskrypcje są uwzględniane w wydatkach budżetu.",
         "currencyRequired": "Wybierz walutę.",
-        "noBudgetLimit": "Brak limitu budżetu",
-        "unlimited": "Bez limitu",
-        "setBudgetHint": "Ustaw miesięczny budżet, aby śledzić limit.",
         "renewalForecast": "Prognoza odnowień",
         "logoSearchTitle": "Wybierz logo",
         "logoSearchLabel": "Witryna lub nazwa usługi",
@@ -5116,7 +5110,8 @@
         "accountArchivedMeta": "{{name}} zarchiwizowane - księguje bez konta",
         "visibilityHint_private": "Tylko Ty widzisz tę subskrypcję i jej płatności.",
         "visibilityHint_shared": "Całe gospodarstwo widzi tę subskrypcję i jej płatności.",
-        "errorAccountGone": "Wybrane konto już nie istnieje."
+        "errorAccountGone": "Wybrane konto już nie istnieje.",
+        "moreDetailsHint": "Kategoria, metoda płatności, kolor i notatki"
     },
     "health": {
         "fasting": {

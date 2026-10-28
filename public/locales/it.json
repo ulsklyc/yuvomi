@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "Tassi di cambio non disponibili",
         "refreshRates": "Aggiorna tassi",
         "monthlyCost": "Costo mensile",
-        "activeCount": "{{count}} attivi",
-        "monthlyBudget": "Budget mensile",
         "overBudget": "Fuori budget",
         "remainingBudget": "Budget rimanente",
         "budgetUsed": "budget utilizzato",
         "yearlyProjection": "Proiezione annuale",
-        "yearlyProjectionNote": "12 × costo mensile",
         "byCategory": "Per categoria",
         "byPaymentMethod": "Per metodo di pagamento",
         "noAnalytics": "Nessun dato di spesa ancora.",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "Altro",
         "enabledHint": "Gli abbonamenti attivi sono inclusi nelle spese del budget.",
         "currencyRequired": "Seleziona una valuta.",
-        "noBudgetLimit": "Nessun limite di budget",
-        "unlimited": "Illimitato",
-        "setBudgetHint": "Imposta un budget mensile per monitorare un limite.",
         "renewalForecast": "Previsione rinnovi",
         "logoSearchTitle": "Scegli logo",
         "logoSearchLabel": "Sito web o nome del servizio",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} archiviato - registrato senza conto",
         "visibilityHint_private": "Solo tu vedi questo abbonamento e i suoi pagamenti.",
         "visibilityHint_shared": "Tutta la famiglia vede questo abbonamento e i suoi pagamenti.",
-        "errorAccountGone": "Il conto selezionato non esiste più."
+        "errorAccountGone": "Il conto selezionato non esiste più.",
+        "moreDetailsHint": "Categoria, metodo di pagamento, colore e note"
     },
     "health": {
         "fasting": {

@@ -15,6 +15,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 global.HTMLElement = class HTMLElement {};
 global.customElements = { define() {}, get() { return undefined; } };
@@ -106,11 +107,18 @@ test('Dialog: die Stellen werden nach der Waehrung des gewaehlten Kontos gepruef
   });
 });
 
-test('Kontoseite: Saldo, Startsaldo und Rahmen stehen in der Kontowaehrung', () => {
+test('Kontoseite: Saldo und Rahmen stehen in der Kontowaehrung; der Startsaldo steht im Auszug, nicht in der Zeile (R24)', () => {
   const html = withState({ netWorth: 0, netWorthInfo: { approx: false, ratesAt: null, byCurrency: [] } },
     () => budgetUi.renderAccountsPage());
   assert.ok(html.includes(formatMoney(5000, 'JPY')), 'Saldo des Yen-Kontos in Yen');
-  assert.ok(html.includes(formatMoney(1000, 'JPY')), 'Startsaldo in Yen');
+  assert.ok(!html.includes(formatMoney(1000, 'JPY')), 'kein Startsaldo in der Zeile (Critique G4-Budget-P3-1)');
+  assert.doesNotMatch(html, /budget\.startingBalanceShort/);
+  // R24 E2: das Nettovermoegen ist EINE Kurzzeile oben in jeder Breite, keine Leistenkarte.
+  assert.match(html, /class="row-carrier budget-glance budget-glance--lead budget-glance--everywhere"/);
+  assert.doesNotMatch(html, /metric-grid--rail/);
+  assert.ok(html.indexOf('budget-glance--everywhere') < html.indexOf('budget-accounts__list'), 'die Zahl steht ueber den Konten');
+  const src = readFileSync(new URL('../public/pages/budget.js', import.meta.url), 'utf8');
+  assert.match(src, /const start = `<div class="budget-list-header__filter">\$\{esc\(t\('budget\.startingBalanceShort'\)\)\}/, 'der Startsaldo steht im Kopf des Kontoauszugs');
   assert.ok(html.includes(formatMoney(460, 'USD')), 'verfuegbarer Rahmen in Dollar');
   assert.ok(html.includes(formatMoney(100, 'EUR')), 'das Konto ohne eigene Waehrung in der Budget-Waehrung');
   assert.ok(!html.includes(formatMoney(5000, 'EUR')), 'kein Yen-Betrag mit Euro-Zeichen');
@@ -120,8 +128,8 @@ test('Kontoseite: das Nettovermoegen ueber Kurse ist als Naeherung gekennzeichne
   const html = withState({
     netWorth: 145.5, netWorthInfo: { approx: true, ratesAt: '2026-10-27T08:00:00Z', byCurrency: [] },
   }, () => budgetUi.renderAccountsPage());
-  assert.match(html, /<div class="metric-card__value">≈ /, 'die Karte traegt das ≈');
-  assert.match(html, /class="metric-card__note">[^<]+</, 'darunter der Hinweis mit dem Kursdatum');
+  assert.match(html, /class="budget-glance__value[^"]*">≈ /, 'die Kurzzeile traegt das ≈');
+  assert.match(html, /class="budget-glance__flow">[^<]+</, 'daneben der Hinweis mit dem Kursdatum');
   assert.match(html, /budget\.netWorthApproxNote|27\.10\.2026/);
 });
 
@@ -130,11 +138,9 @@ test('Kontoseite: ohne Kurs steht die Summe je Waehrung, keine Gesamtzahl', () =
     netWorth: null,
     netWorthInfo: { approx: false, ratesAt: null, byCurrency: [{ currency: 'EUR', amount: 100 }, { currency: 'USD', amount: -40 }] },
   }, () => budgetUi.renderAccountsPage());
-  assert.match(html, /<dl class="[^"]*budget-net-worth__parts/);
-  assert.ok(html.includes(`<dt class="budget-transfer-summary__flow-label">USD</dt>`));
-  assert.ok(html.includes(formatMoney(-40, 'USD')));
-  assert.doesNotMatch(html, /<div class="metric-card__value">/, 'keine erfundene Gesamtzahl');
-  assert.match(html, /class="metric-card__note">/);
+  assert.ok(html.includes(`${formatMoney(100, 'EUR')} · ${formatMoney(-40, 'USD')}`), 'die Summe je Waehrung in der Kurzzeile');
+  assert.doesNotMatch(html, /class="metric-card/, 'keine Karte, keine erfundene Gesamtzahl');
+  assert.match(html, /budget\.netWorthPerCurrencyNote/);
 });
 
 // --------------------------------------------------------------------------

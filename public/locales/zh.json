@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "汇率不可用",
         "refreshRates": "刷新汇率",
         "monthlyCost": "每月费用",
-        "activeCount": "{{count}} 个启用",
-        "monthlyBudget": "每月预算",
         "overBudget": "超出预算",
         "remainingBudget": "剩余预算",
         "budgetUsed": "预算已使用",
         "yearlyProjection": "年度预测",
-        "yearlyProjectionNote": "月费 × 12",
         "byCategory": "按类别",
         "byPaymentMethod": "按付款方式",
         "noAnalytics": "暂无支出数据。",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "其他",
         "enabledHint": "启用的订阅会计入预算支出。",
         "currencyRequired": "请选择货币。",
-        "noBudgetLimit": "无预算限制",
-        "unlimited": "无限制",
-        "setBudgetHint": "设置每月预算以跟踪限额。",
         "renewalForecast": "续订预测",
         "logoSearchTitle": "选择标志",
         "logoSearchLabel": "网站或服务名称",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} 已归档 - 不带账户记账",
         "visibilityHint_private": "只有你能看到这个订阅及其付款。",
         "visibilityHint_shared": "家庭中的每个人都能看到这个订阅及其付款。",
-        "errorAccountGone": "所选账户已不存在。"
+        "errorAccountGone": "所选账户已不存在。",
+        "moreDetailsHint": "类别、付款方式、颜色和备注"
     },
     "health": {
         "fasting": {

@@ -4954,13 +4954,10 @@
         "ratesUnavailable": "Курси валют недоступні",
         "refreshRates": "Оновити курси",
         "monthlyCost": "Щомісячна вартість",
-        "activeCount": "{{count}} активних",
-        "monthlyBudget": "Місячний бюджет",
         "overBudget": "Понад бюджет",
         "remainingBudget": "Залишок бюджету",
         "budgetUsed": "бюджету використано",
         "yearlyProjection": "Річний прогноз",
-        "yearlyProjectionNote": "12 × щомісячні витрати",
         "byCategory": "За категоріями",
         "byPaymentMethod": "За способами оплати",
         "noAnalytics": "Поки немає даних про витрати.",
@@ -5050,9 +5047,6 @@
         "paymentMethodOther": "Інше",
         "enabledHint": "Активні підписки включаються до бюджетних витрат.",
         "currencyRequired": "Виберіть валюту.",
-        "noBudgetLimit": "Без обмеження бюджету",
-        "unlimited": "Без обмежень",
-        "setBudgetHint": "Установіть місячний бюджет, щоб відстежувати ліміт.",
         "renewalForecast": "Прогноз поновлень",
         "logoSearchTitle": "Вибрати логотип",
         "logoSearchLabel": "Сайт або назва сервісу",
@@ -5116,7 +5110,8 @@
         "accountArchivedMeta": "{{name}} в архіві - записується без рахунку",
         "visibilityHint_private": "Цю підписку та її платежі бачите тільки ви.",
         "visibilityHint_shared": "Усі вдома бачать цю підписку та її платежі.",
-        "errorAccountGone": "Вибраного рахунку більше немає."
+        "errorAccountGone": "Вибраного рахунку більше немає.",
+        "moreDetailsHint": "Категорія, спосіб оплати, колір і нотатки"
     },
     "health": {
         "fasting": {

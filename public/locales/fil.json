@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "Hindi available ang palitan ng pera",
         "refreshRates": "I-refresh ang palitan",
         "monthlyCost": "Buwanang gastos",
-        "activeCount": "{{count}} ang aktibo",
-        "monthlyBudget": "Buwanang badyet",
         "overBudget": "Lampas sa badyet",
         "remainingBudget": "Natitirang badyet",
         "budgetUsed": "ng badyet ang nagamit",
         "yearlyProjection": "Taunang proyeksyon",
-        "yearlyProjectionNote": "12 × buwanang gastos",
         "byCategory": "Ayon sa kategorya",
         "byPaymentMethod": "Ayon sa paraan ng pagbabayad",
         "noAnalytics": "Wala pang datos ng paggastos.",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "Iba pa",
         "enabledHint": "Kasama ang mga aktibong subscription sa mga gastos sa Badyet.",
         "currencyRequired": "Pumili ng pera.",
-        "noBudgetLimit": "Walang limitasyon sa badyet",
-        "unlimited": "Walang hangganan",
-        "setBudgetHint": "Magtakda ng buwanang badyet para subaybayan ang limitasyon.",
         "renewalForecast": "Hula sa pag-renew",
         "logoSearchTitle": "Pumili ng logo",
         "logoSearchLabel": "Website o pangalan ng serbisyo",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} naka-archive - itinatala nang walang account",
         "visibilityHint_private": "Ikaw lang ang nakakakita ng subscription na ito at ng mga bayad nito.",
         "visibilityHint_shared": "Nakikita ng lahat sa sambahayan ang subscription na ito at ang mga bayad nito.",
-        "errorAccountGone": "Wala na ang napiling account."
+        "errorAccountGone": "Wala na ang napiling account.",
+        "moreDetailsHint": "Kategorya, paraan ng pagbabayad, kulay at mga tala"
     },
     "health": {
         "fasting": {

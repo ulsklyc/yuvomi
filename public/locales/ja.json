@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "為替レートを利用できません",
         "refreshRates": "レートを更新",
         "monthlyCost": "月額費用",
-        "activeCount": "{{count}} 件が有効",
-        "monthlyBudget": "月間予算",
         "overBudget": "予算超過",
         "remainingBudget": "残り予算",
         "budgetUsed": "予算を使用済み",
         "yearlyProjection": "年間予測",
-        "yearlyProjectionNote": "月額 × 12",
         "byCategory": "カテゴリ別",
         "byPaymentMethod": "支払い方法別",
         "noAnalytics": "支出データはまだありません。",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "その他",
         "enabledHint": "有効なサブスクリプションは予算支出に含まれます。",
         "currencyRequired": "通貨を選択してください。",
-        "noBudgetLimit": "予算上限なし",
-        "unlimited": "無制限",
-        "setBudgetHint": "上限を追跡するには月間予算を設定してください。",
         "renewalForecast": "更新予測",
         "logoSearchTitle": "ロゴを選択",
         "logoSearchLabel": "Webサイトまたはサービス名",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} はアーカイブ済み - 口座なしで記録",
         "visibilityHint_private": "このサブスクリプションとその支払いはあなただけが見られます。",
         "visibilityHint_shared": "世帯の全員がこのサブスクリプションとその支払いを見られます。",
-        "errorAccountGone": "選択した口座はもう存在しません。"
+        "errorAccountGone": "選択した口座はもう存在しません。",
+        "moreDetailsHint": "カテゴリ、支払い方法、色、メモ"
     },
     "health": {
         "fasting": {

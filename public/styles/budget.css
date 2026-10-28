@@ -610,48 +610,15 @@
 /* .budget-networth ist entfallen: das Nettovermögen ist jetzt eine
  * .metric-card wie jede andere Kennzahl im Modul. */
 
-/* DAS NETTOVERMOEGEN STEHT IN DER SEITENLEISTE (Critique R17, E14).
- *
- * R16 liess die eine Kennzahl die ganze Zeile tragen (vorher eine 232px-Kachel
- * neben 764px Leere). Das fuellte die Zeile, aber nicht mit Inhalt: EINE Karte
- * ueber 981px (1280) bzw. 1124px (1440), der Wert links, rechts davon nichts.
- * Ab 960px Modulflaeche stehen die Konten deshalb auf dem Lesemass und das
- * Nettovermoegen daneben in der Leiste - dieselbe Zweispalte und dieselben
- * Spaltenmasse wie Uebersicht, Plan und Darlehen, damit die rechte Kante beim
- * Reiterwechsel nicht springt. Die Karte selbst ist `.metric-grid--rail`
- * (panel.css: eine Karte je Zeile, Title 1). Im Markup steht sie vorn; unter
- * der Schwelle steht sie ueber den Konten, mobil vertritt sie die Kurzzeile. */
-@container budget-page (min-width: 960px) {
-  .budget-accounts {
-    display: grid;
-    grid-template-columns:
-      minmax(0, var(--page-measure, var(--layout-reading)))
-      clamp(
-        var(--budget-rail-min),
-        calc(100% - var(--page-measure, var(--layout-reading)) - var(--budget-column-gap)),
-        var(--budget-rail-max)
-      );
-    column-gap: var(--budget-column-gap);
-    align-items: start;
-  }
-
-  .budget-accounts > .metric-grid {
-    grid-column: 2;
-    grid-row: 1;
-    padding-block-start: 0;
-  }
-
-  /* Konten oder ihr Leerzustand: die Hauptspalte. */
-  .budget-accounts > :not(.metric-grid) {
-    grid-column: 1;
-    grid-row: 1;
-  }
-}
-
-/* Unter der Schwelle traegt die Kennzahl die Zeile bis zur Kante der Konten
- * darunter (die Kennzahl-Zeile endete sonst am Lesemass, 67px davor). */
-.budget-accounts > .metric-grid {
-  max-width: none;
+/* DAS NETTOVERMOEGEN STEHT OBEN, IN JEDER BREITE (R24, E2; bis dahin seit
+ * R17 E14 eine Leistenkarte neben den Konten). Kurzzeile und Konten bilden
+ * EINE Spalte auf dem Lesemass der Budget-Bahn, ohne Seitenspalte; den
+ * Abstand zwischen Zahl und Liste traegt die Spalte. */
+.budget-accounts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-inline-size: var(--page-measure, var(--layout-reading));
 }
 
 /* EIN TRAEGER, FLACHE ZEILEN (Zeilenlisten-Regel, Sonde 7). Die Konten sind
@@ -692,8 +659,7 @@
   background: var(--color-surface-receded);
 }
 
-.budget-account--archived .budget-account__type,
-.budget-account--archived .budget-account__starting {
+.budget-account--archived .budget-account__type {
   color: var(--color-text-receded);
 }
 
@@ -837,9 +803,8 @@
  * 2026-09-28 P1-2, #1774). Mit `flex: 0 1 auto; min-width: 0` lief sie bei
  * 390px unter den `nowrap`-Betrag, und der lief nach links in den Namen
  * ("Gemeinsames Gi.8.544,47 €"). Ohne `min-width: 0` bleibt der automatische
- * Mindestwert der Spalte die Breite des Betrags: sie schrumpft nur um die
- * umbrechbare Startzeile (`.budget-account__starting`), nie in den Saldo
- * hinein. Der Name bekommt so die Breite, die er braucht, bevor er mitten im
+ * Mindestwert der Spalte die Breite des Betrags: sie schrumpft nie in den
+ * Saldo hinein (die Startzeile darunter ist seit R24 aus der Zeile). Der Name bekommt so die Breite, die er braucht, bevor er mitten im
  * Wort umbricht ("Housekeepin" und "g cash"); gekuerzt wird erst danach, und zwar
  * der Name (`.budget-account__name-text` ellipsiert). */
 .budget-account__figures {
@@ -879,29 +844,10 @@
  * Dasselbe gilt fuer das Nettovermoegen (budget.js `renderAccountsPage`). */
 .budget-account__balance--negative { color: var(--color-danger); }
 
-.budget-account__starting {
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-  /* Umbrechbar: die Startzeile ist das, was die Saldo-Spalte hergibt. */
-  white-space: normal;
-  text-align: end;
-}
-
-/* DER STARTSALDO BLEIBT BEI SEINEM BETRAG (Critique 2026-10-16). Bei 390px
- * gab die Saldo-Spalte genau so viel her, dass „Start:" in einer Zeile und
- * „2.480,00 €" in der naechsten stand - vier von sechs Konten. Unter 640px
- * zieht die Startzeile deshalb in die Textspalte, unter Name und Kontoart:
- * dort ist sie eine Angabe ueber das Konto wie die Art, und rechts steht der
- * Saldo allein. `display: contents` loest die Saldo-Spalte auf, ihre zwei
- * Kinder nehmen je eine Zelle des Rasters. Der Betrag bricht nie
- * (`__starting-amount`); bei 320px darf das Etikett zur Not vor ihm umbrechen. */
-/* EINE ZEILE FUER ART UND START (Re-Critique 2026-10-17, A4). Name, Art und
- * Start standen untereinander in der 123px-Spalte neben dem Saldo: drei bis
- * vier Zeilen, 110px je Konto. Jetzt: Name und Saldo in der ersten Zeile, Art
- * und Start als EIN Satz darunter ueber die volle Breite bis unter den Saldo
- * ("Girokonto · Start: 2.480,00 €") - der Start steht dafuer im Markup ein
- * zweites Mal (`__type-start`), sichtbar ist je Breite genau eine Fassung.
- * Der Betrag bricht nie; bei 320px darf der Satz vor ihm umbrechen. */
+/* EINE ZEILE FUER DEN NAMEN, EINE FUER DIE ART (Re-Critique 2026-10-17, A4;
+ * seit R24 ohne Startsaldo, Critique G4-Budget-P3-1): unter 640px stehen Name
+ * und Saldo in der ersten Zeile, die Kontoart darunter ueber die volle Breite
+ * bis unter den Saldo. */
 @media (max-width: 639px) {
   .budget-account__main {
     display: grid;
@@ -937,10 +883,6 @@
   .budget-account__meta {
     grid-column: 2 / 4;
   }
-
-  .budget-account__starting {
-    display: none;
-  }
 }
 
 /* Bei 320px blieben dem Namen neben dem Saldo 53px ("Gemei-nsa..."): dort
@@ -957,16 +899,6 @@
     grid-row: 2;
     justify-self: start;
   }
-}
-
-@media (min-width: 640px) {
-  .budget-account__type-start {
-    display: none;
-  }
-}
-
-.budget-account__starting-amount {
-  white-space: nowrap;
 }
 
 /* Der Chevron ist entfallen (Redesign Runde 6, Phase 1) - dieselbe Bauart wie
@@ -1613,52 +1545,32 @@ button.budget-bar-row:focus-visible {
  * einzige der sieben Tabs komplett als Karte ein. Seit die Kennzahlen echte
  * .metric-card sind, wären das Karten in einer Karte - und der Tab
  * setzte sich beim Wechsel als anderer Ort ab (Critique 2026-07-30, P0). */
+/* DARLEHEN AUF DEM LESEMASS, DIE KENNZAHL OBEN (R24, E2; bis dahin seit R16
+ * die vier Kennzahlen als Turm in der Seitenleiste). Kurzzeile, Kopf,
+ * Darlehen und Transaktionen bilden EINE Spalte. */
 .budget-loans {
-  margin-bottom: var(--space-3);
+  display: flex;
+  flex-direction: column;
   flex-shrink: 0;
+  gap: var(--space-3);
+  max-inline-size: var(--page-measure, var(--layout-reading));
+  margin-bottom: var(--space-3);
 }
 
-/* DARLEHEN AUF DER BAHN DER UEBERSICHT (Critique R16, 2026-10-05). Vier
- * Bloecke, vier Kanten: Filterzeile bis zur Bahn, Kennzahlen am Lesemass,
- * Karten bis zur Bahn, Transaktionen am Lesemass. Ab 960px Container dieselbe
- * Zweispalte wie Uebersicht, Statistik und Plan: links Filter, Darlehen und
- * Transaktionen auf dem Lesemass, rechts die drei Kennzahlen als
- * Zusammenfassung in der Seitenleiste. Das Markup bleibt in seiner Reihenfolge
- * (mobil unveraendert). Die Kennzahlen spannen alle Zeilen; die letzte Zeile
- * ist flexibel, damit eine kurze linke Spalte nicht auseinandergezogen wird,
- * wenn die Seitenleiste hoeher ist als sie. */
-@container budget-page (min-width: 960px) {
-  .budget-loans {
-    display: grid;
-    grid-template-columns:
-      minmax(0, var(--page-measure, var(--layout-reading)))
-      clamp(
-        var(--budget-rail-min),
-        calc(100% - var(--page-measure, var(--layout-reading)) - var(--budget-column-gap)),
-        var(--budget-rail-max)
-      );
-    grid-template-rows: repeat(5, auto) minmax(0, 1fr);
-    column-gap: var(--budget-column-gap);
-    align-items: start;
-  }
+/* Der Kopf der Liste wie ein Abschnittskopf (`.section-toolbar`): der
+ * Statusfilter vorn an der Kante der Liste, die Werkzeuge am Ende. */
+.budget-loans__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
 
-  .budget-loans > * {
-    grid-column: 1;
-  }
-
-  .budget-loans > .metric-grid {
-    --summary-cards: 1;
-    --metric-value-size: var(--text-3xl);
-    grid-column: 2;
-    grid-row: 1 / -1;
-    grid-auto-rows: auto;
-    padding-block: 0;
-  }
-
-  /* Die Restschuld fuehrt die Spalte (panel.css `.metric-card--lead`). */
-  .budget-loans > .metric-grid--led {
-    --metric-rail: ;
-  }
+.budget-loans__header .panel-head__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: auto;
 }
 
 /* .budget-loans__header trägt jetzt .panel-head (geteilte Panel-
@@ -1999,7 +1911,6 @@ button.budget-bar-row:focus-visible {
 }
 
 @media (max-width: 639px) {
-  .budget-loans__header,
   .budget-loan-card__footer {
     align-items: stretch;
     flex-direction: column;
@@ -3474,8 +3385,6 @@ button.budget-entry__title {
  * im Markup direkt einen Betrag rendert, muss hier (oder an einer eigenen
  * tabular-Regel) gedeckt sein. */
 .budget-account__balance,
-.budget-account__starting,
-.budget-account__starting-amount,
 .budget-account__meta,
 .budget-account__figures,
 .budget-loan-card__amounts span,

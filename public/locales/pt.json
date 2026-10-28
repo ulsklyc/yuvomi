@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "Taxas de câmbio indisponíveis",
         "refreshRates": "Atualizar taxas",
         "monthlyCost": "Custo mensal",
-        "activeCount": "{{count}} ativas",
-        "monthlyBudget": "Orçamento mensal",
         "overBudget": "Acima do orçamento",
         "remainingBudget": "Orçamento restante",
         "budgetUsed": "do orçamento usado",
         "yearlyProjection": "Projeção anual",
-        "yearlyProjectionNote": "12 × custo mensal",
         "byCategory": "Por categoria",
         "byPaymentMethod": "Por método de pagamento",
         "noAnalytics": "Ainda não há dados de gastos.",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "Outros",
         "enabledHint": "Assinaturas ativas são incluídas nas despesas do orçamento.",
         "currencyRequired": "Selecione uma moeda.",
-        "noBudgetLimit": "Sem limite de orçamento",
-        "unlimited": "Ilimitado",
-        "setBudgetHint": "Defina um orçamento mensal para acompanhar um limite.",
         "renewalForecast": "Previsão de renovações",
         "logoSearchTitle": "Escolher logótipo",
         "logoSearchLabel": "Site ou nome do serviço",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} arquivada - lançada sem conta",
         "visibilityHint_private": "Só tu vês esta assinatura e os seus pagamentos.",
         "visibilityHint_shared": "Todo o agregado vê esta assinatura e os seus pagamentos.",
-        "errorAccountGone": "A conta escolhida já não existe."
+        "errorAccountGone": "A conta escolhida já não existe.",
+        "moreDetailsHint": "Categoria, método de pagamento, cor e notas"
     },
     "health": {
         "fasting": {

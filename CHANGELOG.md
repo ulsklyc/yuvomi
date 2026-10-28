@@ -35,6 +35,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the dialog jump. A loan asks for direction, person, amount and instalments first and keeps title,
   account, currency and notes under "More details". The starting balance and credit limit of an account
   show their currency, and account and category colours use the same colour row as the rest of the app.
+- **Accounts, loans and subscriptions lead with one line of figures.** Instead of a column of cards
+  next to the list, each tab shows its main figure at the top in every width - net worth, remaining
+  debt, monthly subscription cost - with at most two companions beside it ("Over budget 23.60 € ·
+  Yearly forecast 1,363.20 €"). The subscription side column keeps only the forecast and breakdowns.
+  An account row no longer repeats its starting balance (it is shown when you open the account), the
+  loan filter starts at the edge of the list, and a loan card says its next and last payment in one
+  line.
+- **A subscription shows itself before it edits.** Tapping a subscription opens a read view with
+  "Mark as renewed" and Edit. In the form the currency is chosen inside the amount field, the next
+  payment sits with the billing details, and the logo tile itself picks the image. The row no longer
+  lists the payment method and the standard "3 days before" reminder in every line.
 - **One balance sentence.** When a group has a single open debt that involves you, the figure at the
   top says it with the name ("You owe Alex Johnson 24.14 €") and the balances list no longer repeats it.
 - **Tapping a meal shows it first.** The meal card opens a read view (date, meal, cook, ingredients,

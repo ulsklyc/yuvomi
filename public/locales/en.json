@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "Exchange rates unavailable",
         "refreshRates": "Refresh rates",
         "monthlyCost": "Monthly cost",
-        "activeCount": "{{count}} active",
-        "monthlyBudget": "Monthly budget",
         "overBudget": "Over budget",
         "remainingBudget": "Remaining budget",
         "budgetUsed": "budget used",
         "yearlyProjection": "Yearly projection",
-        "yearlyProjectionNote": "12 × monthly cost",
         "byCategory": "By category",
         "byPaymentMethod": "By payment method",
         "noAnalytics": "No spending data yet.",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "Other",
         "enabledHint": "Active subscriptions are included in Budget expenses.",
         "currencyRequired": "Select a currency.",
-        "noBudgetLimit": "No budget limit",
-        "unlimited": "Unlimited",
-        "setBudgetHint": "Set a monthly budget to track a limit.",
         "renewalForecast": "Renewal forecast",
         "logoSearchTitle": "Choose logo",
         "logoSearchLabel": "Website or service name",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} archived - books without an account",
         "visibilityHint_private": "Only you see this subscription and its payments.",
         "visibilityHint_shared": "Everyone in the household sees this subscription and its payments.",
-        "errorAccountGone": "The selected account no longer exists."
+        "errorAccountGone": "The selected account no longer exists.",
+        "moreDetailsHint": "Category, payment method, colour and notes"
     },
     "health": {
         "fasting": {

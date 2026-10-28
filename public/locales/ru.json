@@ -4954,13 +4954,10 @@
         "ratesUnavailable": "Курсы валют недоступны",
         "refreshRates": "Обновить курсы",
         "monthlyCost": "Расходы в месяц",
-        "activeCount": "{{count}} активных",
-        "monthlyBudget": "Месячный бюджет",
         "overBudget": "Превышен бюджет",
         "remainingBudget": "Остаток бюджета",
         "budgetUsed": "бюджета использовано",
         "yearlyProjection": "Годовой прогноз",
-        "yearlyProjectionNote": "12 × ежемесячные расходы",
         "byCategory": "По категориям",
         "byPaymentMethod": "По способам оплаты",
         "noAnalytics": "Пока нет данных о расходах.",
@@ -5050,9 +5047,6 @@
         "paymentMethodOther": "Другое",
         "enabledHint": "Активные подписки включаются в расходы бюджета.",
         "currencyRequired": "Выберите валюту.",
-        "noBudgetLimit": "Без ограничения бюджета",
-        "unlimited": "Без ограничений",
-        "setBudgetHint": "Установите месячный бюджет, чтобы отслеживать лимит.",
         "renewalForecast": "Прогноз продлений",
         "logoSearchTitle": "Выбрать логотип",
         "logoSearchLabel": "Сайт или название сервиса",
@@ -5116,7 +5110,8 @@
         "accountArchivedMeta": "{{name}} в архиве - записывается без счёта",
         "visibilityHint_private": "Эту подписку и её платежи видите только вы.",
         "visibilityHint_shared": "Все в семье видят эту подписку и её платежи.",
-        "errorAccountGone": "Выбранного счёта больше нет."
+        "errorAccountGone": "Выбранного счёта больше нет.",
+        "moreDetailsHint": "Категория, способ оплаты, цвет и заметки"
     },
     "health": {
         "fasting": {

@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "환율 사용 불가",
         "refreshRates": "환율 새로고침",
         "monthlyCost": "월 비용",
-        "activeCount": "{{count}}개 활성",
-        "monthlyBudget": "월 예산",
         "overBudget": "예산 초과",
         "remainingBudget": "남은 예산",
         "budgetUsed": "예산 사용됨",
         "yearlyProjection": "연간 예상",
-        "yearlyProjectionNote": "월 비용 × 12",
         "byCategory": "카테고리별",
         "byPaymentMethod": "결제 수단별",
         "noAnalytics": "아직 지출 데이터 없음.",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "기타",
         "enabledHint": "활성 구독은 예산 지출에 반영됩니다.",
         "currencyRequired": "통화를 선택하세요.",
-        "noBudgetLimit": "예산 한도 없음",
-        "unlimited": "무제한",
-        "setBudgetHint": "한도를 추적하려면 월 예산을 설정하세요.",
         "renewalForecast": "갱신 예상",
         "logoSearchTitle": "로고 선택",
         "logoSearchLabel": "웹사이트 또는 서비스 이름",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} 보관됨 - 계좌 없이 기록",
         "visibilityHint_private": "이 구독과 결제 내역은 나만 볼 수 있습니다.",
         "visibilityHint_shared": "가구의 모든 구성원이 이 구독과 결제 내역을 볼 수 있습니다.",
-        "errorAccountGone": "선택한 계좌가 더 이상 존재하지 않습니다."
+        "errorAccountGone": "선택한 계좌가 더 이상 존재하지 않습니다.",
+        "moreDetailsHint": "카테고리, 결제 수단, 색상 및 메모"
     },
     "health": {
         "fasting": {

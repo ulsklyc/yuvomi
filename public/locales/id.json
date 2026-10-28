@@ -1937,7 +1937,7 @@
         "showAccountTransactions": "Tampilkan transaksi",
         "summaryTransfersIn": "Masuk",
         "summaryTransfersOut": "Keluar",
-        "transferDefaultTitle": "Transfer {{from}} → {{to}}",
+        "transferDefaultTitle": "Pemindahan dana {{from}} → {{to}}",
         "transferMoreDetailsHint": "Kategori dan pengulangan",
         "loanMoreDetailsHint": "Judul, akun, mata uang, dan catatan",
         "entryMoreDetailsHint": "Pengulangan, penanggung jawab, dan struk"
@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "Kurs tidak tersedia",
         "refreshRates": "Perbarui kurs",
         "monthlyCost": "Biaya bulanan",
-        "activeCount": "{{count}} aktif",
-        "monthlyBudget": "Anggaran bulanan",
         "overBudget": "Melebihi anggaran",
         "remainingBudget": "Sisa anggaran",
         "budgetUsed": "anggaran terpakai",
         "yearlyProjection": "Proyeksi tahunan",
-        "yearlyProjectionNote": "12 × biaya bulanan",
         "byCategory": "Menurut kategori",
         "byPaymentMethod": "Menurut metode pembayaran",
         "noAnalytics": "Belum ada data pengeluaran.",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "Lainnya",
         "enabledHint": "Langganan aktif diperhitungkan dalam pengeluaran anggaran.",
         "currencyRequired": "Pilih mata uang.",
-        "noBudgetLimit": "Tanpa batas anggaran",
-        "unlimited": "Tak terbatas",
-        "setBudgetHint": "Tetapkan anggaran bulanan untuk melacak batasnya.",
         "renewalForecast": "Prakiraan perpanjangan",
         "logoSearchTitle": "Pilih logo",
         "logoSearchLabel": "Situs web atau nama layanan",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} diarsipkan - dicatat tanpa akun",
         "visibilityHint_private": "Hanya kamu yang melihat langganan ini dan pembayarannya.",
         "visibilityHint_shared": "Semua orang di rumah tangga melihat langganan ini dan pembayarannya.",
-        "errorAccountGone": "Akun yang dipilih sudah tidak ada."
+        "errorAccountGone": "Akun yang dipilih sudah tidak ada.",
+        "moreDetailsHint": "Kategori, metode pembayaran, warna, dan catatan"
     },
     "health": {
         "fasting": {

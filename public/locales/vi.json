@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "Không có tỷ giá hối đoái",
         "refreshRates": "Làm mới tỷ giá",
         "monthlyCost": "Chi phí hàng tháng",
-        "activeCount": "{{count}} đang hoạt động",
-        "monthlyBudget": "Ngân sách tháng",
         "overBudget": "Vượt ngân sách",
         "remainingBudget": "Ngân sách còn lại",
         "budgetUsed": "ngân sách đã dùng",
         "yearlyProjection": "Dự báo hằng năm",
-        "yearlyProjectionNote": "12 × chi phí hằng tháng",
         "byCategory": "Theo danh mục",
         "byPaymentMethod": "Theo phương thức thanh toán",
         "noAnalytics": "Chưa có dữ liệu chi tiêu.",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "Khác",
         "enabledHint": "Đăng ký đang hoạt động được tính vào chi phí ngân sách.",
         "currencyRequired": "Chọn tiền tệ.",
-        "noBudgetLimit": "Không giới hạn ngân sách",
-        "unlimited": "Không giới hạn",
-        "setBudgetHint": "Đặt ngân sách hàng tháng để theo dõi giới hạn.",
         "renewalForecast": "Dự báo gia hạn",
         "logoSearchTitle": "Chọn logo",
         "logoSearchLabel": "Trang web hoặc tên dịch vụ",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} đã lưu trữ - ghi không có tài khoản",
         "visibilityHint_private": "Chỉ bạn thấy đăng ký này và các khoản thanh toán của nó.",
         "visibilityHint_shared": "Mọi người trong hộ gia đình đều thấy đăng ký này và các khoản thanh toán của nó.",
-        "errorAccountGone": "Tài khoản đã chọn không còn tồn tại."
+        "errorAccountGone": "Tài khoản đã chọn không còn tồn tại.",
+        "moreDetailsHint": "Danh mục, phương thức thanh toán, màu và ghi chú"
     },
     "health": {
         "fasting": {

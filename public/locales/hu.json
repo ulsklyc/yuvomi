@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "Árfolyamok nem elérhetők",
         "refreshRates": "Árfolyamok frissítése",
         "monthlyCost": "Havi költség",
-        "activeCount": "{{count}} aktív",
-        "monthlyBudget": "Havi költségvetés",
         "overBudget": "Költségvetés túllépve",
         "remainingBudget": "Hátralévő költségvetés",
         "budgetUsed": "Felhasznált költségvetés",
         "yearlyProjection": "Éves előrejelzés",
-        "yearlyProjectionNote": "12 × havi költség",
         "byCategory": "Kategória szerint",
         "byPaymentMethod": "Fizetési mód szerint",
         "noAnalytics": "Még nincs költési adat.",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "Egyéb",
         "enabledHint": "Az aktív előfizetések beleértve a költségvetés kiadásait.",
         "currencyRequired": "Válasszon pénznemet.",
-        "noBudgetLimit": "Nincs költségvetési korlát",
-        "unlimited": "Korlátlan",
-        "setBudgetHint": "Állítson be havi költségvetést a korlát nyomon követéséhez.",
         "renewalForecast": "Megújítási előrejelzés",
         "logoSearchTitle": "Logo kiválasztása",
         "logoSearchLabel": "Weboldal vagy szolgáltatás neve",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} archivált - számla nélkül könyvel",
         "visibilityHint_private": "Ezt az előfizetést és a fizetéseit csak te látod.",
         "visibilityHint_shared": "A háztartás minden tagja látja ezt az előfizetést és a fizetéseit.",
-        "errorAccountGone": "A kiválasztott számla már nem létezik."
+        "errorAccountGone": "A kiválasztott számla már nem létezik.",
+        "moreDetailsHint": "Kategória, fizetési mód, szín és jegyzetek"
     },
     "health": {
         "fasting": {

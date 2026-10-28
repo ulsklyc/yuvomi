@@ -4692,13 +4692,10 @@
         "ratesUnavailable": "نرخ‌های ارز در دسترس نیست",
         "refreshRates": "به‌روزرسانی نرخ‌ها",
         "monthlyCost": "هزینه ماهانه",
-        "activeCount": "{{count}} فعال",
-        "monthlyBudget": "بودجه ماهانه",
         "overBudget": "بیش از بودجه",
         "remainingBudget": "بودجه باقی‌مانده",
         "budgetUsed": "از بودجه استفاده‌شده",
         "yearlyProjection": "پیش‌بینی سالانه",
-        "yearlyProjectionNote": "12 × هزینهٔ ماهانه",
         "byCategory": "بر اساس دسته",
         "byPaymentMethod": "بر اساس روش پرداخت",
         "noAnalytics": "هنوز داده هزینه‌ای نیست.",
@@ -4786,9 +4783,6 @@
         "paymentMethodOther": "متفرقه",
         "enabledHint": "اشتراک‌های فعال در هزینه‌های بودجه در نظر گرفته می‌شوند.",
         "currencyRequired": "یک واحد پول انتخاب کنید.",
-        "noBudgetLimit": "بدون سقف بودجه",
-        "unlimited": "نامحدود",
-        "setBudgetHint": "برای پیگیری سقف، یک بودجه ماهانه تعیین کنید.",
         "renewalForecast": "پیش‌بینی تمدید",
         "logoSearchTitle": "انتخاب لوگو",
         "logoSearchLabel": "وب‌سایت یا نام سرویس",
@@ -4848,7 +4842,8 @@
         "accountArchivedMeta": "{{name}} بایگانی‌شده - بدون حساب ثبت می‌شود",
         "visibilityHint_private": "فقط شما این اشتراک و پرداخت‌های آن را می‌بینید.",
         "visibilityHint_shared": "همه اعضای خانوار این اشتراک و پرداخت‌های آن را می‌بینند.",
-        "errorAccountGone": "حساب انتخاب‌شده دیگر وجود ندارد."
+        "errorAccountGone": "حساب انتخاب‌شده دیگر وجود ندارد.",
+        "moreDetailsHint": "دسته، روش پرداخت، رنگ و یادداشت‌ها"
     },
     "health": {
         "fasting": {

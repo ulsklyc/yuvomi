@@ -21200,7 +21200,9 @@ test('R16: eine Kennzahlkarte je Zeile traegt Title 1 - die Seitenspalte sagt es
       assert.match(rule.body, /--metric-value-size:\s*var\(--text-3xl\)/, `${file}: ${rule.selector.trim()}`);
     }
   }
-  assert.ok(spalten >= 4, `Uebersicht, Darlehen, .page-columns__rail und .metric-grid--rail (gefunden: ${spalten})`);
+  // Seit R24 (E2) stehen die Kennzahlen von Darlehen, Abos und Konten als EINE
+  // Kurzzeile oben in der Bahn - keine Seitenspalte mehr dort.
+  assert.ok(spalten >= 3, `Uebersicht, .page-columns__rail und .metric-grid--rail (gefunden: ${spalten})`);
   // Kein Modul unterbietet den Grad lokal.
   for (const file of ['budget.css', 'subscriptions.css', 'split-expenses.css']) {
     const lokal = rulesOf(read(`../public/styles/${file}`))
@@ -21211,16 +21213,21 @@ test('R16: eine Kennzahlkarte je Zeile traegt Title 1 - die Seitenspalte sagt es
   assert.doesNotMatch(read('../public/styles/budget.css'), /\.budget-overview__aside \.metric-grid[^{]*\{[^}]*--summary-cards:\s*2/);
 });
 
-test('R16: Konten zeigt mobil die Kurzzeile wie jeder Budget-Reiter mit Kennzahlen', () => {
+test('R16/R24 E2: Konten, Darlehen und Abos fuehren EINE Kurzzeile in jeder Breite, keine Kennzahlkarte daneben', () => {
   const glance = read('../public/utils/metric-glance.js');
   assert.match(glance, /if \(!controls\) \{[\s\S]*?budget-glance__row budget-glance__row--static/,
     'ohne Aufklapp-Ziel ist die Zeile ein Zeichen, kein Knopf');
-  const accounts = read('../public/pages/budget.js').match(/const header = `[\s\S]*?<\/div>`;/)?.[0] ?? '';
-  assert.match(accounts, /metricGlanceHtml\(\{\s*label: t\('budget\.netWorth'\)/, 'Konten fuehrt die Kurzzeile');
-  assert.doesNotMatch(accounts, /controls:/, 'eine Zahl hat nichts aufzuklappen');
-  // Seit R17 (E14) ist die Karte die Leistenkarte neben den Konten - `budget-glance-details`
-  // haelt sie unter 640px weiter aus.
-  assert.match(accounts, /<div class="metric-grid metric-grid--rail budget-glance-details">/, 'die Karte bleibt unter 640px aus');
+  const budget = read('../public/pages/budget.js');
+  const accounts = budget.slice(budget.indexOf('function renderAccountsPage('), budget.indexOf('function wireAccountsPage('));
+  assert.match(accounts, /metricGlanceHtml\(\{\s*label: t\('budget\.netWorth'\)[\s\S]*?everywhere: true,/, 'Konten fuehrt die Kurzzeile in jeder Breite');
+  assert.doesNotMatch(accounts, /controls:|metric-grid/, 'eine Zahl, keine Karte, nichts aufzuklappen');
+  const loans = budget.slice(budget.indexOf('function renderLoansDashboard('), budget.indexOf('function filteredLoans('));
+  assert.match(loans, /metricGlanceHtml\(\{[\s\S]*?everywhere: true,/);
+  assert.doesNotMatch(loans, /controls:|class="metric-grid/, 'Darlehen ohne Kennzahlturm');
+  const subs = read('../public/pages/subscriptions.js');
+  const summary = subs.slice(subs.indexOf('function renderSummary('), subs.indexOf('function showMostExpensive('));
+  assert.match(summary, /metricGlanceHtml\(\{[\s\S]*?everywhere: true,/);
+  assert.doesNotMatch(summary, /controls:|class="metric-grid|metric-card/, 'Abos ohne Kennzahlturm');
 });
 
 test('R16: im Budget steht jeder Abschnittstitel auf der Buehne, die Zeilen liegen im Traeger', () => {
@@ -21339,7 +21346,9 @@ test('R16: der Pflichtstern ist ein Element (`REQUIRED_MARK`), nie Teil eines Lo
   for (const key of ['nameLabel', 'amountLabel', 'nextPaymentLabel']) {
     mit('subscriptions.js', new RegExp(`t\\('subscriptions\\.${key}'\\)\\}\\$\\{REQUIRED_MARK\\}`));
   }
-  mit('subscriptions.js', /label: t\('subscriptions\.currencyLabel'\),\s*required: true,/);
+  // Seit R24 ist die Waehrung die Wahl im Suffix des Betrags (amountFieldHtml)
+  // - eine Wahl ohne leere Option, also ohne eigenen Stern.
+  mit('subscriptions.js', /amountFieldHtml\(\{ id: 'subscription-amount', currency: formCurrency, value: subscription\?\.amount \?\? '', currencies: CURRENCY_CODES/);
 });
 
 /* R16 Schritt 2b (Critique 2026-10-05, "Kontakte: Links rgb(206,42,99) neben

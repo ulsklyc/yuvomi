@@ -475,7 +475,9 @@ const abo = (over = {}) => ({
 test('Abo-Karte mit `budget: read`: der Koerper oeffnet die Leseansicht, Verlaengern, Loeschen und Wischflaechen gehen', () => {
   withAccess({ budget: 'write' }, () => {
     const html = abos.renderCard(abo());
-    assert.match(html, /<button type="button" class="subscription-card__main list-row__main--interactive"\s+data-action="edit">/);
+    // R24 (E1): auch mit Schreibrecht oeffnet der Koerper das Leseblatt;
+    // Bearbeiten ist dort der Primaerknopf.
+    assert.match(html, /<button type="button" class="subscription-card__main list-row__main--interactive"\s+data-action="view">/);
     assert.match(html, /data-action="renew"/);
     // R14 P8: kein sichtbarer Papierkorb an der Zeile. Seit R22 (D9, Endzone
     // R21-D10) steht Loeschen als Eintrag im Mehr-Knopf, wie bei Konten und
@@ -486,7 +488,6 @@ test('Abo-Karte mit `budget: read`: der Koerper oeffnet die Leseansicht, Verlaen
     assert.match(html, /class="popover-menu__item popover-menu__item--danger"\s+data-action="delete"/);
     assert.ok(html.indexOf('row-action--more') > html.indexOf('data-action="renew"'), 'Endzone: [Verlaengern][Mehr]');
     assert.match(html, /swipe-reveal--done/);
-    assert.match(html, /common\.edit/);
     // Der Wisch-Chevron faellt neben dem Mehr-Knopf (layout.css `:has(.row-action--more)`), die Geste bleibt.
     assert.doesNotMatch(html, /swipe-row--static/, 'die Geste bleibt');
   });
@@ -504,7 +505,8 @@ test('Abo-Karte mit `budget: read`: der Koerper oeffnet die Leseansicht, Verlaen
     assert.doesNotMatch(html, /subscription-status/);
     assert.match(abos.renderCard(abo({ enabled: false, status: 'paused' })), /class="subscription-status [^"]*">\s*subscriptions\.disabled/);
     assert.match(html, /subscriptions\.cycle\.monthly/);
-    assert.match(html, /subscriptions\.reminderMeta/);
+    // Die Standard-Erinnerung steht seit R24 (G4-Budget-P3-2) im Leseblatt, nicht in jeder Zeile.
+    assert.doesNotMatch(html, /subscriptions\.reminderMeta/);
     assert.match(html, /12[.,]99/);
   });
 });
@@ -525,44 +527,25 @@ test('Abos ohne Eintrag mit `budget: read`: kein Anlegen-CTA; der Filter-Ausweg 
   } finally { Object.assign(abos.state, vorher); }
 });
 
-test('Abo-Kennzahlen ohne Monatsbudget: bei `budget: read` keine Aufforderung, eines festzulegen', () => {
-  const vorher = abos.state.summary;
-  abos.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 0, remaining_budget: 0, base_currency: 'EUR' };
-  try {
-    withAccess({ budget: 'write' }, () => assert.match(abos.renderSummary(), /subscriptions\.setBudgetHint/));
-    withAccess({ budget: 'read' }, () => {
-      const html = abos.renderSummary();
-      assert.doesNotMatch(html, /subscriptions\.setBudgetHint/);
-      assert.match(html, /subscriptions\.unlimited/, 'der Zustand „kein Limit" bleibt');
-    });
-  } finally { abos.state.summary = vorher; }
-});
-
-test('Abo-Budget spricht wie der Plan: ab 85 % Warnton, ueberschritten Danger (Critique 2026-09-25)', () => {
+test('R24 E2: die Abo-Kennzahl ist bei jedem Recht dieselbe Zeile; ueber dem Budget EINMAL rot, der Weg zur Liste ist Lesen', () => {
   const vorher = abos.state.summary;
   const summe = (used) => ({ active_count: 3, monthly_total: used, monthly_budget: 100, remaining_budget: 100 - used, base_currency: 'EUR' });
   try {
-    abos.state.summary = summe(123.6);
-    const over = abos.renderSummary();
-    // R21 S7 (Critique a4 "Warnung doppelt", D8): die Ueberschreitung steht
-    // EINMAL rot - am Balken der Kostenkarte, wie im Plan; die Karte daneben
-    // nennt sie in Worten, ohne zweite rote Flaeche.
-    assert.doesNotMatch(over, /metric-card--over/, 'keine zweite rote Karte neben dem roten Balken');
-    assert.match(over, /triangle-alert[\s\S]{0,120}subscriptions\.overBudget/, 'das Label nennt die Tatsache samt Symbol');
-    assert.doesNotMatch(over, /metric-card--warning/);
-    assert.match(over, /metric-card__progress metric-card__progress--over/);
-    assert.match(over, /id="subscriptions-over-budget-action"/, 'der Handlungsweg bleibt');
-    abos.state.summary = summe(90);
-    const near = abos.renderSummary();
-    assert.match(near, /metric-card__progress--near/, 'ab 85 % der Warnton, wie im Plan');
-    assert.doesNotMatch(near, /metric-card--over|progress--over/);
-    abos.state.summary = summe(50);
-    assert.doesNotMatch(abos.renderSummary(), /progress--(near|over)|metric-card--over/);
+    for (const modus of ['write', 'read']) {
+      withAccess({ budget: modus }, () => {
+        abos.state.summary = summe(123.6);
+        const over = abos.renderSummary();
+        assert.equal((over.match(/budget-glance__flow--negative/g) ?? []).length, 1, `${modus}: die Ueberschreitung steht EINMAL rot`);
+        assert.doesNotMatch(over, /metric-card|role="progressbar"/, `${modus}: kein Balken, keine zweite Karte`);
+        assert.match(over, /id="subscriptions-over-budget-action"/, `${modus}: der Handlungsweg ist Lesen und bleibt`);
+        abos.state.summary = summe(50);
+        const under = abos.renderSummary();
+        assert.doesNotMatch(under, /budget-glance__flow--negative|subscriptions-over-budget-action/);
+        abos.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 0, remaining_budget: 0, base_currency: 'EUR' };
+        assert.doesNotMatch(abos.renderSummary(), /subscriptions\.setBudgetHint|remainingBudget/, `${modus}: ohne Budget keine Aufforderung und kein Stand`);
+      });
+    }
   } finally { abos.state.summary = vorher; }
-  const panel = readFileSync(new URL('../public/styles/panel.css', import.meta.url), 'utf8');
-  const rule = (sel) => [...eachRule(panel)].find((r) => r.selector.trim() === sel)?.body ?? '';
-  assert.match(rule('.metric-card__progress--over > span'), /--color-danger/);
-  assert.match(rule('.metric-card__progress--near > span'), /--color-warning/);
   const plansCss = readFileSync(new URL('../public/styles/budget.css', import.meta.url), 'utf8');
   assert.match(plansCss, /\.budget-plan-row--tone-over \{ --plan-tone-color: var\(--color-danger\);/, 'der Plan ist die Referenz');
 });
@@ -1271,7 +1254,7 @@ test('Abo: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlu
     end_type: 'on_date', end_date: '2026-12-31', brand_color: '#E50914',
   });
   const werte = {
-    'subscriptions.detailAmountLabel': [[/id="subscription-amount"[^>]*value="12,99"/, /id="subscription-currency" type="hidden" value="EUR"/],
+    'subscriptions.detailAmountLabel': [[/id="subscription-amount"[^>]*value="12,99"/, /id="subscription-currency"[^>]*>[\s\S]*?<option value="EUR" selected>EUR</],
       /^12,99\s€ · subscriptions\.monthlyEquivalent\{"amount":"12,99\s€"\}$/],
     'subscriptions.filterLabelStatus': [[/role="switch" id="subscription-enabled"[^>]*checked/], /^subscriptions\.active$/],
     'subscriptions.descriptionLabel': [[/id="subscription-description"[^>]*value="Premium"/], /^Premium$/],
@@ -1722,6 +1705,28 @@ test('Plan: kein zweites „+ Budget festlegen" im Koerper - der Budget-FAB ruft
   }
 });
 
+test('R24 E1: mit Schreibrecht traegt das Abo-Leseblatt Bearbeiten als Primaerknopf, "Verlaengert" davor - abgeschlossen ohne', () => {
+  const offen = withAccess({ budget: 'write' }, () => detailOptionen(() => abos.openSubscriptionReadView(abo(), { editable: true })));
+  assert.deepEqual(offen.actions.map((a) => [a.id, a.variant]), [['subscription-read-renew', 'secondary'], ['subscription-read-edit', 'primary']]);
+  const fertig = withAccess({ budget: 'write' }, () => detailOptionen(() => abos.openSubscriptionReadView(abo({ status: 'completed' }), { editable: true })));
+  assert.deepEqual(fertig.actions.map((a) => a.id), ['subscription-read-edit'], 'ein abgeschlossenes Abo hat keine naechste Zahlung');
+  keineHandlung(detailOptionen(() => abos.openSubscriptionReadView(abo())), 'Abo ohne Schreibweg');
+});
+
+test('R24 G4-Budget-P3-3: im Abo-Dialog ist das Logo EIN Bedienelement, die naechste Zahlung steht bei der Abrechnung', () => {
+  const editor = withAccess({ budget: 'write' }, () => modalOptionen(() => abos.openSubscriptionModal(abo())));
+  const html = editor.content;
+  assert.equal(editor.initialFocus, 'edit', 'Bearbeiten holt am Finger keine Tastatur');
+  assert.match(html, /<span class="media-picker">\s*<button type="button" class="subscription-logo-picker" id="subscription-logo-button"/, 'die Kachel IST die Dateiwahl');
+  assert.match(html, /media-picker__badge/);
+  assert.doesNotMatch(html, /<small>[\s\S]*?subscriptions\.logoLabel/, 'keine zweite Beschriftung "Logo hochladen" unter der Kachel');
+  assert.match(html, /id="subscription-find-logo"/, '"Logo finden" bleibt eine eigene Handlung');
+  const billing = html.slice(html.indexOf('subscription-form__billing-grid'), html.indexOf('subscriptions.renewalDetails'));
+  assert.match(billing, /id="subscription-next-date"/, 'die naechste Zahlung gehoert zur Abrechnung');
+  assert.match(billing, /class="budget-amount-field budget-amount-field--choice"[\s\S]*id="subscription-currency"/, 'die Waehrung ist die Wahl im Suffix des Betrags');
+  assert.doesNotMatch(html, /subscription-currency-search/, 'keine Such-Combobox mehr fuer die Waehrung');
+});
+
 test('Abo: the payment reminder switch defaults on and displays a saved off choice', () => {
   for (const reminderEnabled of [undefined, true, false]) {
     const subscription = abo({ reminder_enabled: reminderEnabled });
@@ -1736,10 +1741,12 @@ test('Abo: the payment reminder switch defaults on and displays a saved off choi
     assert.equal(detail['subscriptions.reminderDaysLabel'], reminderEnabled === false
       ? 'subscriptions.noReminder' : 'subscriptions.reminderMeta{"count":3}');
     const card = withAccess({ budget: 'read' }, () => abos.renderCard(subscription));
-    assert.equal(card.includes('subscriptions.reminderMeta'), reminderEnabled !== false);
+    // Seit R24 (G4-Budget-P3-2) steht in der Zeile nur eine Erinnerung, die
+    // vom Standard abweicht - die ausgeschaltete; die Standardfrist nicht.
+    assert.equal(card.includes('subscriptions.reminderMeta'), false);
     assert.equal(card.includes('subscriptions.noReminder'), reminderEnabled === false);
     const reminderIcon = reminderEnabled === false ? 'bell-off' : 'bell';
-    assert.ok(card.includes(`data-lucide="${reminderIcon}"`));
+    if (reminderEnabled === false) assert.ok(card.includes(`data-lucide="${reminderIcon}"`));
     const reminderRow = abos.subscriptionReadSections(subscription)
       .find(row => row.label === 'subscriptions.reminderDaysLabel');
     assert.equal(reminderRow.icon, reminderIcon);

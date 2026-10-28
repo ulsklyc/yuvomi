@@ -5086,13 +5086,10 @@
         "ratesUnavailable": "أسعار الصرف غير متاحة",
         "refreshRates": "تحديث الأسعار",
         "monthlyCost": "التكلفة الشهرية",
-        "activeCount": "{{count}} نشطة",
-        "monthlyBudget": "الميزانية الشهرية",
         "overBudget": "تجاوز الميزانية",
         "remainingBudget": "الميزانية المتبقية",
         "budgetUsed": "من الميزانية مستخدم",
         "yearlyProjection": "التوقع السنوي",
-        "yearlyProjectionNote": "12 × التكلفة الشهرية",
         "byCategory": "حسب الفئة",
         "byPaymentMethod": "حسب طريقة الدفع",
         "noAnalytics": "لا توجد بيانات إنفاق بعد.",
@@ -5183,9 +5180,6 @@
         "paymentMethodOther": "أخرى",
         "enabledHint": "يتم تضمين الاشتراكات النشطة في مصروفات الميزانية.",
         "currencyRequired": "اختر عملة.",
-        "noBudgetLimit": "لا يوجد حد للميزانية",
-        "unlimited": "غير محدود",
-        "setBudgetHint": "حدد ميزانية شهرية لتتبع الحد.",
         "renewalForecast": "توقعات التجديد",
         "logoSearchTitle": "اختيار شعار",
         "logoSearchLabel": "الموقع أو اسم الخدمة",
@@ -5251,7 +5245,8 @@
         "accountArchivedMeta": "{{name}} مؤرشف - يُقيَّد دون حساب",
         "visibilityHint_private": "أنت وحدك ترى هذا الاشتراك ودفعاته.",
         "visibilityHint_shared": "يرى جميع أفراد الأسرة هذا الاشتراك ودفعاته.",
-        "errorAccountGone": "لم يعد الحساب المحدد موجودًا."
+        "errorAccountGone": "لم يعد الحساب المحدد موجودًا.",
+        "moreDetailsHint": "الفئة وطريقة الدفع واللون والملاحظات"
     },
     "health": {
         "fasting": {
