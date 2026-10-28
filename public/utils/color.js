@@ -7,6 +7,20 @@
 export const AVATAR_FALLBACK_COLOR = '#8E8E93';
 
 /**
+ * Eine freie Nutzerfarbe, wie sie in ein style-Attribut darf: nur #RRGGBB,
+ * sonst der Ersatz. `esc()` haelt das Attribut zu, aber nicht die Deklaration -
+ * `red;position:fixed` waere sonst eine zweite Regel im fremden Element. Der
+ * Server nimmt nur HEX an; das hier haelt auch Altwerte aus der Anzeige.
+ *
+ * @param {unknown} value
+ * @param {string} [fallback]
+ * @returns {string}
+ */
+export function safeHexColor(value, fallback = AVATAR_FALLBACK_COLOR) {
+  return typeof value === 'string' && /^#[0-9A-Fa-f]{6}$/.test(value) ? value : fallback;
+}
+
+/**
  * Die Farben, die ein Objekt ohne Bild bekommt - Mitglieder seit jeher, und
  * seit #469 auch die Kacheln der Schnellzugriffe.
  *

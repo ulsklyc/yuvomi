@@ -1,7 +1,7 @@
 import { t } from '/i18n.js';
 import { moduleIconHTML } from '/nav-icons.js';
 import { esc } from '/utils/html.js';
-import { getReadableTextColor } from '/utils/color.js';
+import { getReadableTextColor, safeHexColor } from '/utils/color.js';
 import { formRowHtml } from '/utils/form-row.js';
 import { errorSentence } from '/utils/friendly-error.js';
 
@@ -132,9 +132,10 @@ export function toggleRowHtml({
   // hat keine garantierte Tinte - dieselbe Rechnung macht der Avatar-Stack
   // (components/user-multi-select.js), und zwei Antworten auf dieselbe Frage
   // waeren genau die Spaltung, die #891 an drei Stellen aufgeraeumt hat.
-  const swatchHtml = swatchColor
+  const swatchHex = swatchColor ? safeHexColor(swatchColor) : null;
+  const swatchHtml = swatchHex
     ? `<span class="toggle-row__swatch" aria-hidden="true"`
-      + ` style="--swatch-color:${esc(String(swatchColor))};color:${getReadableTextColor(String(swatchColor))}">`
+      + ` style="--swatch-color:${swatchHex};color:${getReadableTextColor(swatchHex)}">`
       + `${esc(String(swatchLabel ?? ''))}</span>`
     : '';
   const labelClass = labelVisible ? '' : ' class="sr-only"';

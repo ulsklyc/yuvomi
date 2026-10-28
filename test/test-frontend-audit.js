@@ -10337,14 +10337,16 @@ test('user-selected avatar colors derive readable text ink', () => {
     dashboard,
     /color:\$\{getReadableTextColor\(u\.avatar_color \|\| AVATAR_FALLBACK_COLOR\)\}/,
   );
-  assert.match(multiSelect, /import \{ getReadableTextColor, AVATAR_FALLBACK_COLOR \} from '\/utils\/color\.js'/);
+  // Flaeche und Tinte aus DERSELBEN geprueften Farbe: nur #RRGGBB darf ins
+  // style-Attribut, sonst der Ersatz (`safeHexColor`, test:avatar-color).
+  assert.match(multiSelect, /import \{ getReadableTextColor, safeHexColor \} from '\/utils\/color\.js'/);
   assert.match(
     multiSelect,
-    /color:\$\{getReadableTextColor\(u\.color \?\? AVATAR_FALLBACK_COLOR\)\}/,
+    /background-color:\$\{safeHexColor\(u\.color\)\};color:\$\{getReadableTextColor\(safeHexColor\(u\.color\)\)\}/,
   );
   assert.match(
     multiSelect,
-    /color:\$\{getReadableTextColor\(u\.avatar_color \?\? AVATAR_FALLBACK_COLOR\)\}/,
+    /background-color:\$\{safeHexColor\(u\.avatar_color\)\};color:\$\{getReadableTextColor\(safeHexColor\(u\.avatar_color\)\)\}/,
   );
 });
 

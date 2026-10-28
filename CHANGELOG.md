@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **A member colour can only be a colour.** Your profile, member management and the
+  housekeeper form accepted any text as a member colour, and that text ended up in the
+  styles other household members see, so an account could lay its own styling over their
+  screens. Only `#RRGGBB` is accepted now, the app shows nothing else, and a stored value
+  that is not a colour falls back to the default blue on update.
+
 ### Fixed
 - **The read and write boxes of a new API token are easy to hit.** Each box only answered on its
   own 14 px square; now the whole cell of its column does, as tall as any other control.

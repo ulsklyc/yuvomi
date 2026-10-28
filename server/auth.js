@@ -15,7 +15,7 @@ import { refuseWhileRestoring } from './middleware/restore-gate.js';
 import { restoreInProgressError } from './utils/restore-messages.js';
 import { runExternalJob } from './utils/restore-state.js';
 import { SESSION_MAX_AGE_MS, sessionCookieRefreshDue } from './utils/session-lifetime.js';
-import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TITLE } from './middleware/validate.js';
+import { collectErrors, color as validateColor, date as validateDate, str, MAX_SHORT, MAX_TITLE } from './middleware/validate.js';
 import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
 import { GravatarError, fetchGravatar, gravatarEnabled, gravatarHost } from './services/gravatar.js';
@@ -3527,6 +3527,8 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
     if (!FAMILY_ROLES.includes(family_role)) {
       return res.status(400).json({ error: 'Invalid family role.', code: 400 });
     }
+    const colorError = validateColor(avatar_color, 'avatar_color').error;
+    if (colorError) return res.status(400).json({ error: colorError, code: 400 });
 
     const normalizedAvatarData = normalizeAvatarData(avatar_data);
     if (normalizedAvatarData?.error) {
@@ -3637,6 +3639,8 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     if (!FAMILY_ROLES.includes(familyRole)) {
       return res.status(400).json({ error: 'Invalid family role.', code: 400 });
     }
+    const colorError = validateColor(avatarColor, 'avatar_color').error;
+    if (colorError) return res.status(400).json({ error: colorError, code: 400 });
     if (avatarData?.error) {
       return res.status(400).json({ error: avatarData.error, code: 400 });
     }
@@ -3770,6 +3774,10 @@ router.patch('/me/profile', requireAuth, csrfMiddleware, (req, res) => {
     if (displayName.length > 128) {
       return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
     }
+    // Die Farbe steht bei allen Mitgliedern in einem style-Attribut: nur #RRGGBB,
+    // sonst setzt sich ein Konto eine CSS-Deklaration in fremde Ansichten.
+    const colorError = validateColor(avatarColor, 'avatar_color').error;
+    if (colorError) return res.status(400).json({ error: colorError, code: 400 });
     if (avatarData?.error) {
       return res.status(400).json({ error: avatarData.error, code: 400 });
     }

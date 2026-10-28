@@ -6,7 +6,7 @@
 
 import { esc } from '/utils/html.js';
 import { t } from '/i18n.js';
-import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
+import { getReadableTextColor, safeHexColor } from '/utils/color.js';
 import { initials, compactInitials } from '/utils/initials.js';
 
 // Der Rand von `.avatar-stack__item` (user-multi-select.css). Er steht hier
@@ -56,7 +56,7 @@ export function renderAvatarStack(users, { size = 28, maxVisible = 3, minFont = 
       ? `<img src="${esc(u.avatar_data)}" alt="${esc(u.display_name ?? '')}" loading="lazy">`
       : (showText ? esc(text) : '');
     return `<span class="avatar-stack__item"
-      style="width:${size}px;height:${size}px;font-size:${fs}px;background-color:${esc(u.color ?? AVATAR_FALLBACK_COLOR)};color:${getReadableTextColor(u.color ?? AVATAR_FALLBACK_COLOR)}"
+      style="width:${size}px;height:${size}px;font-size:${fs}px;background-color:${safeHexColor(u.color)};color:${getReadableTextColor(safeHexColor(u.color))}"
       title="${esc(u.display_name ?? '')}">
       ${inner}
     </span>`;
@@ -120,7 +120,7 @@ export function renderUserMultiSelect(allUsers, selectedIds, inputName, labelKey
       <label class="user-ms__option">
         <input type="checkbox" class="user-ms__checkbox" value="${u.id}" ${checked}
                data-ms-input="${esc(inputName)}">
-        <span class="user-ms__avatar" style="background-color:${esc(u.avatar_color ?? AVATAR_FALLBACK_COLOR)};color:${getReadableTextColor(u.avatar_color ?? AVATAR_FALLBACK_COLOR)}">
+        <span class="user-ms__avatar" style="background-color:${safeHexColor(u.avatar_color)};color:${getReadableTextColor(safeHexColor(u.avatar_color))}">
           ${inner}
         </span>
         <span class="user-ms__name">${userChipName(u.display_name, surname)}</span>

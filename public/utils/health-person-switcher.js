@@ -9,7 +9,7 @@
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
-import { getReadableTextColor } from '/utils/color.js';
+import { getReadableTextColor, safeHexColor } from '/utils/color.js';
 
 // Geteilter Personen-Umschalter: EIN Knopf mit der aktiven Person statt einer
 // Dauer-Pillenzeile (Critique 2026-08-31: 6 Ansichts-Tabs + 4 Personen-Pillen
@@ -25,13 +25,14 @@ export function personSwitcherMarkup(members, activeId, meId, { menuId, label })
   const nameOf = (m) => (m.id === meId
     ? `${m.display_name} · ${t('health.vitals.you')}`
     : m.display_name);
+  const colorOf = (m) => safeHexColor(m.avatar_color, null);
   const dotOf = (m) => `<span class="health-person-chip__dot" aria-hidden="true"
-          style="background:${esc(m.avatar_color) || 'var(--module-health)'}"></span>`;
+          style="background:${colorOf(m) || 'var(--module-health)'}"></span>`;
   // Am Knopf traegt der Punkt die Initialen: im Seitenkopf des Telefons waechst
   // er zum Gesicht (health.css, R23). Ohne Farbe bleibt die Schrift die des
   // Moduls auf seiner Toenung.
   const faceOf = (m) => `<span class="health-person-chip__dot" aria-hidden="true"
-          style="background:${esc(m.avatar_color) || 'var(--module-health)'}${m.avatar_color ? `;color:${getReadableTextColor(m.avatar_color)}` : ''}"><span class="health-person-chip__initials">${esc(initials(m.display_name, '?'))}</span></span>`;
+          style="background:${colorOf(m) || 'var(--module-health)'}${colorOf(m) ? `;color:${getReadableTextColor(colorOf(m))}` : ''}"><span class="health-person-chip__initials">${esc(initials(m.display_name, '?'))}</span></span>`;
   const active = list.find((m) => m.id === activeId) ?? list[0];
   return `
     <div class="health-person-switcher">
