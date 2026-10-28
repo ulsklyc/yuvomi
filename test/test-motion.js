@@ -1641,7 +1641,7 @@ test('Inhaltswechsel: Reiter, Zeitraeume und Bereiche tauschen ueber swapContent
     ['housekeeping', /swapPeriod\(content, towards, \(\) => renderReports\(content\)\)/, 'Berichtsmonat'],
     ['budget', /swapContent\(_container\.querySelector\('#budget-body'\), renderBody, \{ direction \}\)/, 'Reiterwechsel'],
     ['budget', /swapPeriod\(bodyEl\(\), dir,/, 'Monat/Berichtszeitraum'],
-    ['budget', /swapContent\(body, renderBody\)/, 'Aufloesung der Statistik'],
+    ['budget', /swapContent\((?:body|bodyEl\(\)), renderBody\)/, 'Aufloesung der Statistik (seit R24 am Zeitraum, changeStatsRange)'],
     ['calendar', /swapPeriod\(_container\?\.querySelector\('#cal-body'\), dir, renderView\)/, 'Blaettern per Pfeil und Kuerzel'],
     ['calendar', /swapPeriod\(_container\?\.querySelector\('#cal-body'\), towardsToday, renderView\)/, 'Heute'],
     ['meals', /swapPeriod\(_container\?\.querySelector\('#week-grid'\) \?\? null, step, renderWeekGrid\)/, 'Woche'],

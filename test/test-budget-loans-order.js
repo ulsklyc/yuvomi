@@ -450,8 +450,11 @@ function summenSeite(loans, byDirection) {
   });
   try {
     const html = withAccess({ budget: 'write' }, () => budget.renderLoansPage());
-    const karten = [...html.matchAll(/<div class="metric-card__label">([^<]+)<\/div>\s*<div class="metric-card__value">([^<]+)<\/div>/g)]
-      .map((m) => [m[1], m[2].replace(/\s/g, ' ')]);
+    // Seit R24 (E2) EINE Kennzahlzeile statt der Kartenspalte: die Leitzahl
+    // und hoechstens zwei Nebenwerte (metricGlanceHtml), in Lesereihenfolge.
+    const lead = html.match(/<span class="budget-glance__label">([^<]+)<\/span>\s*<span class="budget-glance__value[^"]*">([^<]+)<\/span>/);
+    const flows = [...html.matchAll(/<span class="budget-glance__flow[^"]*">([^<]+?) <span class="budget-glance__amount">([^<]+)<\/span>/g)];
+    const karten = [lead, ...flows].filter(Boolean).map((m) => [m[1], m[2].replace(/\s/g, ' ')]);
     return { html, karten };
   } finally { Object.assign(budget.state, vorher); }
 }
@@ -466,8 +469,13 @@ test('Darlehenssumme: Verliehenes steht als Anspruch neben der Restschuld, nicht
     },
   );
   const labels = karten.map(([l]) => l);
-  assert.deepEqual(labels, ['budget.loanRemainingPrincipal', 'budget.loanOwedToYou', 'budget.loanPaidAmount', 'budget.loanReceivedAmount']);
+  // Die Zeile traegt hoechstens zwei Nebenwerte: "zurueckerhalten" steht mit
+  // beiden Richtungen an der Karte des verliehenen Darlehens (offen von
+  // gesamt, Fortschritt), nicht oben.
+  assert.deepEqual(labels, ['budget.loanRemainingPrincipal', 'budget.loanOwedToYou', 'budget.loanPaidAmount']);
   assert.match(karten[0][1], /174\.644,93/, 'die Restschuld ist nur das Aufgenommene');
+  assert.match(html, /budget-glance--everywhere/, 'die Zeile steht in jeder Breite');
+  assert.doesNotMatch(html, /class="metric-card/, 'keine Kartenspalte neben den Darlehen');
   assert.match(karten[1][1], /800,00/);
   assert.doesNotMatch(html.replace(/<!--[\s\S]*?-->/g, ''), /175\.444,93/, 'die Summe ueber beide Richtungen steht nirgends');
   assert.doesNotMatch(labels.join(), /loanRemainingInstallments/, 'eine Ratenzahl ueber beide Richtungen mischte wieder');
