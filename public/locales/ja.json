@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "推移",
-                "analyte": "項目",
                 "tooFew": "推移を表示するには少なくとも2件の検査結果が必要です。",
-                "unit": "単位: {{unit}}"
+                "unit": "単位: {{unit}}",
+                "showFor": "{{name}}の推移を表示"
             },
             "field": {
                 "reportDate": "検査日",

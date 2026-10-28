@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "추이",
-                "analyte": "분석물질",
                 "tooFew": "추이를 표시하려면 최소 두 개의 소견이 필요합니다.",
-                "unit": "단위: {{unit}}"
+                "unit": "단위: {{unit}}",
+                "showFor": "{{name}} 추이 보기"
             },
             "field": {
                 "reportDate": "소견 날짜",

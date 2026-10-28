@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Verlauf",
-                "analyte": "Analyt",
                 "tooFew": "Mindestens zwei Befunde nötig, um einen Verlauf zu zeigen.",
-                "unit": "Einheit: {{unit}}"
+                "unit": "Einheit: {{unit}}",
+                "showFor": "Verlauf von {{name}} zeigen"
             },
             "field": {
                 "reportDate": "Befunddatum",

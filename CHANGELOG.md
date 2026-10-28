@@ -218,6 +218,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   270 px for blood pressure and pulse), the pulse is drawn in the Health colour on its own axis, the last
   tile no longer leaves empty cells next to it, and the overview's tiles show the same trend line as the
   vitals area.
+- **Lab results pick their trend by name.** Tap an analyte in a report to see its trend below, instead
+  of choosing it from a list under the table. A low or high value carries its arrow and word right at
+  the value, so the mostly empty "Assessment" column is gone, and "Edit" is a regular small button. The
+  cycle view no longer shows the next period twice - the ring says when; a tile only appears for the
+  range around menopause.
 - **Pick your fasting goal before you start.** When no fast is running, the fasting card shows the goal
   (none, 12:12 up to 23:1, custom) right above the buttons, so "Start fasting" runs with the goal you
   see instead of "No goal" from a setting two steps away. Adding a past fast has one place: the empty

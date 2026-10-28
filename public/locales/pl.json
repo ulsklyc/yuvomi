@@ -5540,9 +5540,9 @@
             },
             "trend": {
                 "title": "Przebieg",
-                "analyte": "Analit",
                 "tooFew": "Do pokazania przebiegu potrzebne są co najmniej dwa wyniki.",
-                "unit": "Jednostka: {{unit}}"
+                "unit": "Jednostka: {{unit}}",
+                "showFor": "Pokaż przebieg: {{name}}"
             },
             "field": {
                 "reportDate": "Data wyniku",

@@ -1118,3 +1118,22 @@ test('R24 G5 P2-6/P3-2/P3-3: eine Zeitraum-Zeile, eine Kachel, Diagramm mit fest
   assert.ok(rules.some((r) => r.selector.trim() === '.health-activity__summary' && /repeat\(auto-fit,/.test(r.body)), 'vier Kennzahlen fuellen die Zeile');
   assert.ok(!rules.some((r) => /\.health-vitals__range\.is-active/.test(r.selector)), 'keine eigene Segment-Pille mehr');
 });
+
+// R24 (Critique G5 P3-4, P3-5). Zyklus vorher: Ring „Nächste Periode: in 22
+// Tagen" + Kachel „Nächste Periode 19.11." nebeneinander. Labor vorher: Verlauf
+// ueber ein natives <select>, Spalte „Bewertung" leer bis auf eine Zeile,
+// „Bearbeiten" als Geisterknopf. Nachher (1440 + 390): Tipp auf „Ferritin" ->
+// „Verlauf · Ferritin", Fokus bleibt am Namen, aria-pressed.
+test('R24 G5 P3-4/P3-5: ein Wert fuer die naechste Periode, der Analyt waehlt seinen Verlauf', () => {
+  const stats = HEALTH_JS.slice(HEALTH_JS.indexOf('function cycleStatsMarkup('), HEALTH_JS.indexOf('function cycleStatsSourceText('));
+  assert.match(stats, /if \(perimenopauseRange\) \{\s*tiles\.push\(cycleStatCardMarkup\(\{\s*icon: 'calendar-heart'/, 'die Kachel nur noch fuer die Spanne');
+  const detail = HEALTH_JS.slice(HEALTH_JS.indexOf('function labDetailMarkup('), HEALTH_JS.indexOf('function referenceLabel('));
+  assert.doesNotMatch(detail, /health\.labs\.col\.flag|health-lab-table__flag/, 'keine Spalte Bewertung mehr');
+  assert.match(detail, /<td class="health-lab-table__value">\$\{esc\(fmtNum\(r\.value_num\)\)\}\$\{unit\}\$\{flag \? ` \$\{flag\}` : ''\}<\/td>/, 'die Bewertung steht am Wert');
+  assert.match(detail, /<th scope="row" class="health-lab-table__analyte">\$\{labTrendButtonMarkup\(r\)\}<\/th>/, 'der Analyt ist Zeilenkopf und Knopf');
+  assert.match(detail, /<span class="health-lab-rows__analyte">\$\{labTrendButtonMarkup\(r\)\}<\/span>/, 'auch in den Zeilen am Telefon');
+  assert.match(detail, /class="btn btn--secondary btn--sm" data-action="lab-edit"/, 'Bearbeiten als Abschnittsaktion, kein Geisterknopf');
+  const trend = HEALTH_JS.slice(HEALTH_JS.indexOf('function labTrendMarkup('), HEALTH_JS.indexOf('function labTrendChart('));
+  assert.doesNotMatch(trend, /<select/, 'kein natives Auswahlfeld mehr');
+  assert.match(HEALTH_JS, /querySelectorAll\('\[data-lab-trend\]'\)\.forEach\(\(btn\) => btn\.addEventListener\('click'/);
+});

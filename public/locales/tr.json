@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Seyir",
-                "analyte": "Parametre",
                 "tooFew": "Seyir göstermek için en az iki sonuç gerekir.",
-                "unit": "Birim: {{unit}}"
+                "unit": "Birim: {{unit}}",
+                "showFor": "{{name}} seyrini göster"
             },
             "field": {
                 "reportDate": "Sonuç tarihi",

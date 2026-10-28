@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Diễn biến",
-                "analyte": "Chỉ số",
                 "tooFew": "Cần ít nhất hai kết quả để hiển thị diễn biến.",
-                "unit": "Đơn vị: {{unit}}"
+                "unit": "Đơn vị: {{unit}}",
+                "showFor": "Xem diễn biến của {{name}}"
             },
             "field": {
                 "reportDate": "Ngày kết quả",

@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Trend",
-                "analyte": "Analytt",
                 "tooFew": "Det kreves minst to rapporter for å vise en trend.",
-                "unit": "Enhet: {{unit}}"
+                "unit": "Enhet: {{unit}}",
+                "showFor": "Vis utvikling for {{name}}"
             },
             "field": {
                 "reportDate": "Rapporteringsdato",

@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Takbo",
-                "analyte": "Analyte",
                 "tooFew": "Kailangan ng kahit dalawang ulat para magpakita ng takbo.",
-                "unit": "Yunit: {{unit}}"
+                "unit": "Yunit: {{unit}}",
+                "showFor": "Ipakita ang takbo ng {{name}}"
             },
             "field": {
                 "reportDate": "Petsa ng ulat",

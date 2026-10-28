@@ -4929,7 +4929,6 @@ function labDetailMarkup() {
               <th scope="col">${esc(t('health.labs.col.analyte'))}</th>
               <th scope="col">${esc(t('health.labs.col.value'))}</th>
               <th scope="col">${esc(t('health.labs.col.reference'))}</th>
-              <th scope="col">${esc(t('health.labs.col.flag'))}</th>
             </tr>
           </thead>
           <tbody>${results.map(resultRowMarkup).join('')}</tbody>
@@ -4945,10 +4944,10 @@ function labDetailMarkup() {
           <span class="health-lab-detail__date">${esc(dateLabel)}</span>
           ${report.lab_name ? `<span class="health-lab-detail__lab">${esc(report.lab_name)}</span>` : ''}
         </div>
+        ${/* Die Abschnittsaktion ist EINE btn--secondary btn--sm (D5, #2042),
+             kein Geisterknopf in der Karte (R24, Critique G5 P3-5). */ ''}
         ${own ? `
-          <button type="button" class="btn btn--ghost btn--sm" data-action="lab-edit" data-report-id="${esc(report.id)}">
-            <i data-lucide="pencil" aria-hidden="true"></i>${esc(t('health.labs.edit'))}
-          </button>` : ''}
+          <button type="button" class="btn btn--secondary btn--sm" data-action="lab-edit" data-report-id="${esc(report.id)}">${esc(t('health.labs.edit'))}</button>` : ''}
       </div>
       ${report.note ? `<div class="health-lab-detail__note">${esc(report.note)}</div>` : ''}
       ${table}
@@ -4956,15 +4955,26 @@ function labDetailMarkup() {
     </div>`;
 }
 
+/* DER ANALYT IST DER WEG ZU SEINEM VERLAUF (R24, Critique G5 P3-5). Der
+ * Verlauf waehlte seinen Analyten ueber ein natives <select> unter der
+ * Tabelle, und die Spalte „Bewertung" stand leer bis auf eine Zeile. Jetzt
+ * waehlt der Tipp auf den Namen den Verlauf darunter (aria-pressed), und die
+ * Bewertung steht als Zeichen an ihrem Wert - Pfeil und Wort, wie mobil. */
+function labTrendButtonMarkup(r) {
+  const selected = r.analyte === currentTrendAnalyte();
+  return `<button type="button" class="health-lab-analyte" data-lab-trend="${esc(r.analyte)}" aria-pressed="${selected}"
+    aria-controls="health-lab-trend" aria-label="${esc(t('health.labs.trend.showFor', { name: r.analyte }))}">${esc(r.analyte)}</button>`;
+}
+
 function resultRowMarkup(r) {
   const unit = r.unit ? ` ${esc(r.unit)}` : '';
   const refText = referenceLabel(r.ref_low, r.ref_high);
+  const flag = flagIndicatorMarkup(r.flag);
   return `
     <tr>
-      <td class="health-lab-table__analyte">${esc(r.analyte)}</td>
-      <td class="health-lab-table__value">${esc(fmtNum(r.value_num))}${unit}</td>
+      <th scope="row" class="health-lab-table__analyte">${labTrendButtonMarkup(r)}</th>
+      <td class="health-lab-table__value">${esc(fmtNum(r.value_num))}${unit}${flag ? ` ${flag}` : ''}</td>
       <td class="health-lab-table__ref">${esc(refText)}</td>
-      <td class="health-lab-table__flag">${flagIndicatorMarkup(r.flag)}</td>
     </tr>`;
 }
 
@@ -4988,7 +4998,7 @@ function resultListMarkup(results) {
     const flag = r.flag && LAB_FLAGS.includes(r.flag) ? flagIndicatorMarkup(r.flag) : '';
     return `
       <li class="health-lab-rows__row${abnormal(r) ? ` health-lab-rows__row--${esc(r.flag)}` : ''}">
-        <span class="health-lab-rows__analyte">${esc(r.analyte)}</span>
+        <span class="health-lab-rows__analyte">${labTrendButtonMarkup(r)}</span>
         <span class="health-lab-rows__value">${esc(fmtNum(r.value_num))}${unit}</span>
         ${ref || flag ? `<span class="health-lab-rows__meta">${ref}${flag}</span>` : ''}
       </li>`;
@@ -5022,27 +5032,26 @@ function flagIndicatorMarkup(flag) {
 // Trend eines wiederkehrenden Analyten (native SVG-Kurve)
 // --------------------------------------------------------
 
+/** Der Analyt, dessen Verlauf gerade steht: gewaehlt, sonst der Vorschlag. */
+function currentTrendAnalyte() {
+  const names = analyteNames(labs.reports);
+  return names.includes(labs.trendAnalyte) ? labs.trendAnalyte : defaultTrendAnalyte(labs.reports);
+}
+
 function labTrendMarkup() {
   const names = analyteNames(labs.reports);
   if (names.length === 0) return '';
-  const selected = names.includes(labs.trendAnalyte) ? labs.trendAnalyte : defaultTrendAnalyte(labs.reports);
+  const selected = currentTrendAnalyte();
   const points = analyteTrend(labs.reports, selected);
-
-  const options = names.map((n) =>
-    `<option value="${esc(n)}"${n === selected ? ' selected' : ''}>${esc(n)}</option>`).join('');
 
   const body = points.length >= 2
     ? labTrendChart(points, selected)
     : emptyHintHTML(t('health.labs.trend.tooFew'));
 
   return `
-    <div class="health-lab-trend">
+    <div class="health-lab-trend" id="health-lab-trend">
       <div class="health-lab-trend__head">
-        <span class="health-lab-trend__title">${esc(t('health.labs.trend.title'))}</span>
-        <label class="health-lab-trend__select">
-          <span class="sr-only">${esc(t('health.labs.trend.analyte'))}</span>
-          <select class="form-input" id="health-lab-trend-analyte">${options}</select>
-        </label>
+        <span class="health-lab-trend__title">${esc(t('health.labs.trend.title'))} · ${esc(selected)}</span>
       </div>
       ${body}
     </div>`;
@@ -5183,15 +5192,21 @@ function wireLabs() {
     });
   }
 
-  labs.root.querySelector('#health-lab-trend-analyte')?.addEventListener('change', (e) => {
-    labs.trendAnalyte = e.target.value;
+  // Lesend (auch ohne Schreibrecht): der Tipp auf den Analyten waehlt den
+  // Verlauf. Der Fokus bleibt an demselben Namen (der Neuaufbau ersetzt ihn).
+  labs.root.querySelectorAll('[data-lab-trend]').forEach((btn) => btn.addEventListener('click', () => {
+    const name = btn.dataset.labTrend;
+    const inList = Boolean(btn.closest('.health-lab-rows'));
+    labs.trendAnalyte = name;
     const host = labs.root.querySelector('#health-labs-detail');
     if (!host) return;
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', labDetailMarkup());
     if (window.lucide) window.lucide.createIcons({ el: host });
     wireLabsDetail();
-  });
+    const scope = host.querySelector(inList ? '.health-lab-rows' : '.health-lab-table');
+    [...(scope?.querySelectorAll('[data-lab-trend]') ?? [])].find((b) => b.dataset.labTrend === name)?.focus();
+  }));
 }
 
 // Verdrahtet nur die Detail-internen Steuerelemente neu (nach Trend-Wechsel).
@@ -5204,15 +5219,21 @@ function wireLabsDetail() {
       if (report) openLabModal(report);
     });
   }
-  labs.root.querySelector('#health-lab-trend-analyte')?.addEventListener('change', (e) => {
-    labs.trendAnalyte = e.target.value;
+  // Lesend (auch ohne Schreibrecht): der Tipp auf den Analyten waehlt den
+  // Verlauf. Der Fokus bleibt an demselben Namen (der Neuaufbau ersetzt ihn).
+  labs.root.querySelectorAll('[data-lab-trend]').forEach((btn) => btn.addEventListener('click', () => {
+    const name = btn.dataset.labTrend;
+    const inList = Boolean(btn.closest('.health-lab-rows'));
+    labs.trendAnalyte = name;
     const host = labs.root.querySelector('#health-labs-detail');
     if (!host) return;
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', labDetailMarkup());
     if (window.lucide) window.lucide.createIcons({ el: host });
     wireLabsDetail();
-  });
+    const scope = host.querySelector(inList ? '.health-lab-rows' : '.health-lab-table');
+    [...(scope?.querySelectorAll('[data-lab-trend]') ?? [])].find((b) => b.dataset.labTrend === name)?.focus();
+  }));
 }
 
 // --------------------------------------------------------
@@ -8578,17 +8599,20 @@ function cycleStatsMarkup(prediction) {
   // Ring-Mittelpunkt (cycleCountdownText()) bleibt bewusst bei EINER Zahl
   // (nextStart/daysUntilNext), weil ein Countdown auf eine Spanne dort keinen
   // sinnvollen einzelnen Text ergäbe.
+  //
+  // EIN WERT, EINE STELLE (R24, Critique G5 P3-4): der Ring sagte „Nächste
+  // Periode: in 22 Tagen", die Kachel daneben „Nächste Periode 19.11." - zwei
+  // Antworten auf dieselbe Frage nebeneinander. Die Kachel steht nur noch,
+  // wenn sie etwas sagt, das der Ring nicht kann: die Spanne der Perimenopause.
   const perimenopauseRange = (prediction.perimenopause && prediction.nextStartRange) ? prediction.nextStartRange : null;
-  tiles.push(cycleStatCardMarkup({
-    icon: 'calendar-heart',
-    labelKey: 'health.cycle.status.nextPeriod',
-    value: perimenopauseRange
-      ? dateRangeText(perimenopauseRange.min, perimenopauseRange.max)
-      : dateText(prediction.nextStart),
-    sub: perimenopauseRange
-      ? t('health.cycle.status.nextPeriodRangeSub', { date: dateText(prediction.nextStart) })
-      : '',
-  }));
+  if (perimenopauseRange) {
+    tiles.push(cycleStatCardMarkup({
+      icon: 'calendar-heart',
+      labelKey: 'health.cycle.status.nextPeriod',
+      value: dateRangeText(perimenopauseRange.min, perimenopauseRange.max),
+      sub: t('health.cycle.status.nextPeriodRangeSub', { date: dateText(prediction.nextStart) }),
+    }));
+  }
 
   if (prediction.trackFertility) {
     // Bestätigt (Phase 3, Temperaturanstieg) vs. vorhergesagt (Kalendermethode) -

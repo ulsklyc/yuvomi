@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Förlopp",
-                "analyte": "Analyt",
                 "tooFew": "Minst två provsvar krävs för att visa ett förlopp.",
-                "unit": "Enhet: {{unit}}"
+                "unit": "Enhet: {{unit}}",
+                "showFor": "Visa förlopp för {{name}}"
             },
             "field": {
                 "reportDate": "Provsvarsdatum",

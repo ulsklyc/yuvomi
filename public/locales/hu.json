@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Alakulás",
-                "analyte": "Paraméter",
                 "tooFew": "Legalább két lelet szükséges az alakulás megjelenítéséhez.",
-                "unit": "Mértékegység: {{unit}}"
+                "unit": "Mértékegység: {{unit}}",
+                "showFor": "{{name}} alakulásának megjelenítése"
             },
             "field": {
                 "reportDate": "Lelet dátuma",

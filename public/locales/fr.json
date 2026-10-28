@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Évolution",
-                "analyte": "Analyte",
                 "tooFew": "Au moins deux comptes rendus sont nécessaires pour afficher une évolution.",
-                "unit": "Unité : {{unit}}"
+                "unit": "Unité : {{unit}}",
+                "showFor": "Afficher l'évolution de {{name}}"
             },
             "field": {
                 "reportDate": "Date du compte rendu",

@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Tren",
-                "analyte": "Analit",
                 "tooFew": "Diperlukan setidaknya dua hasil untuk menampilkan tren.",
-                "unit": "Satuan: {{unit}}"
+                "unit": "Satuan: {{unit}}",
+                "showFor": "Tampilkan tren {{name}}"
             },
             "field": {
                 "reportDate": "Tanggal hasil",

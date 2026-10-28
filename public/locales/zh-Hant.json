@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "趨勢",
-                "analyte": "指標",
                 "tooFew": "至少需要兩份報告才能顯示趨勢。",
-                "unit": "單位：{{unit}}"
+                "unit": "單位：{{unit}}",
+                "showFor": "顯示 {{name}} 的趨勢"
             },
             "field": {
                 "reportDate": "報告日期",

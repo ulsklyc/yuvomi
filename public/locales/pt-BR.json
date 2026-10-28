@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Evolução",
-                "analyte": "Parâmetro",
                 "tooFew": "São necessários pelo menos dois relatórios para mostrar uma evolução.",
-                "unit": "Unidade: {{unit}}"
+                "unit": "Unidade: {{unit}}",
+                "showFor": "Mostrar evolução de {{name}}"
             },
             "field": {
                 "reportDate": "Data do relatório",

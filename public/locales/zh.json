@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "趋势",
-                "analyte": "指标",
                 "tooFew": "至少需要两份报告才能显示趋势。",
-                "unit": "单位：{{unit}}"
+                "unit": "单位：{{unit}}",
+                "showFor": "显示 {{name}} 的趋势"
             },
             "field": {
                 "reportDate": "报告日期",

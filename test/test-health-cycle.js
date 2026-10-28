@@ -2272,7 +2272,8 @@ test('R21 S7: Legende am Ring, Luft fuer die Tagesmarke, ein Traeger fuer den Be
   const rules = [...eachRule(css)];
   const ring = rules.find((r) => r.selector.trim() === '.cycle-ring' && r.at.some((a) => /min-width:\s*640px/.test(a)));
   assert.match(ring?.body ?? '', /margin-inline:\s*var\(--space-4\)/, 'neben den Kennzahlen hat der Ring Rand fuer die Tagesmarke');
+  // R24 (G5 P2-2) nimmt dem Bereichskopf die Karte wieder ab: er steht ohne
+  // eigene Flaeche in der Buehne (test:health-nav "R24 G5 P2-2").
   const head = rules.find((r) => r.selector.trim() === '.health-split > .split-view__detail .split-view__detail-head');
-  assert.match(head?.body ?? '', /border-radius:\s*var\(--radius-lg\)/, 'der Bereichskopf ist eine Karte');
-  assert.match(head.body, /box-shadow:\s*var\(--shadow-sm\)/);
+  assert.match(head?.body ?? '', /background-color:\s*transparent/, 'der Bereichskopf hat keine eigene Flaeche');
 });

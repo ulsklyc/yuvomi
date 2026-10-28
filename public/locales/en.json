@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Trend",
-                "analyte": "Analyte",
                 "tooFew": "At least two reports are needed to show a trend.",
-                "unit": "Unit: {{unit}}"
+                "unit": "Unit: {{unit}}",
+                "showFor": "Show trend for {{name}}"
             },
             "field": {
                 "reportDate": "Report date",

@@ -5409,9 +5409,9 @@
             },
             "trend": {
                 "title": "Průběh",
-                "analyte": "Analyt",
                 "tooFew": "K zobrazení průběhu jsou potřeba alespoň dva nálezy.",
-                "unit": "Jednotka: {{unit}}"
+                "unit": "Jednotka: {{unit}}",
+                "showFor": "Zobrazit vývoj: {{name}}"
             },
             "field": {
                 "reportDate": "Datum nálezu",

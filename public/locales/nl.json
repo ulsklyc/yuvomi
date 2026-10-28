@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Verloop",
-                "analyte": "Analyt",
                 "tooFew": "Er zijn minstens twee uitslagen nodig om een verloop te tonen.",
-                "unit": "Eenheid: {{unit}}"
+                "unit": "Eenheid: {{unit}}",
+                "showFor": "Verloop van {{name}} tonen"
             },
             "field": {
                 "reportDate": "Uitslagdatum",

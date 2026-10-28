@@ -5266,9 +5266,9 @@
             },
             "trend": {
                 "title": "Andamento",
-                "analyte": "Analita",
                 "tooFew": "Sono necessari almeno due referti per mostrare un andamento.",
-                "unit": "Unità: {{unit}}"
+                "unit": "Unità: {{unit}}",
+                "showFor": "Mostra andamento di {{name}}"
             },
             "field": {
                 "reportDate": "Data del referto",
