@@ -271,7 +271,6 @@
 }
 
 .health-priority-skeleton__card--due   { min-block-size: 14.5rem; }
-.health-priority-skeleton__card--quick { min-block-size: 11rem; }
 
 .health-priority > .health-overview__card {
   margin-bottom: 0;
@@ -420,33 +419,25 @@
     border-radius: 0;
   }
 
-  /* DER KOPF DES BEREICHS HAT EINEN TRAEGER (R21 S7, D9). Die Spalte traegt
-   * hier keine Karte (siehe oben), und ihr klebender Kopf stand als weisser
-   * eckiger Balken ueber der Buehne, ohne Rundung, Schatten oder Flaeche
-   * darunter - als einziges Element der Seite. Er wird die Karte, die er
-   * ohnehin schon ist: Radius und leiser Schatten wie die Bereichskarten
-   * darunter, ohne Trennlinie (die Kante ist der Schatten), und Luft zum
-   * ersten Bereich. */
+  /* DER KOPF DES BEREICHS STEHT IN DER BUEHNE, OHNE EIGENE FLAECHE (R24,
+   * Critique G5 P2-2). Seit R21 (D9) war er eine weisse 64px-Karte, die mit
+   * Grundstreifen klebte (R22 D12) - der einzige Detailkopf der App als
+   * eigener Kasten, 40px ueber dem Inhalt, und auf der Uebersicht stand
+   * „Übersicht" doppelt. Jetzt: Siegel und Name in der Rolle Detailtitel
+   * (22/600, typography.css) direkt ueber dem Bereich, auf der Hoehe der
+   * Liste, ohne Karte, ohne Kleben - die Bereichskarten darunter tragen die
+   * Flaechen. Die Uebersicht zeigt keinen Kopf (health.js syncDetailHead). */
   .health-split > .split-view__detail .split-view__detail-head {
-    border-radius: var(--radius-lg);
-    border-block-end-color: transparent;
-    margin-block-end: var(--space-3);
-    /* DER KOPF FLUCHTET MIT DER LISTE UND KLEBT MIT ABSTAND (R22, D12;
-     * Critique a5 P2). Er stand bei y=69 direkt unter dem Modulkopf, die
-     * Bereichsliste daneben bei 85, und beim Scrollen liefen Kacheln durch
-     * den Spalt darueber und unter seinen runden Ecken durch. Jetzt beginnt
-     * er auf der Hoehe der Liste und klebt dort (`top` = Abstand), und ein
-     * Grundstreifen im Seitengrund liegt hinter ihm: ein Ring von --space-2
-     * deckt die Ecken, derselbe nach oben versetzt den Spalt bis zur Kante
-     * der Spalte. Zuerst der eigene Schatten, damit er ueber dem Streifen
-     * liegt. Der Ring bleibt unter der Luft zum Inhalt (--space-3), in Ruhe
-     * verdeckt er nichts. */
+    position: static;
+    min-height: 0;
+    padding: 0;
     margin-block-start: var(--space-4);
-    top: var(--space-4);
-    box-shadow:
-      var(--shadow-sm),
-      0 0 0 var(--space-2) var(--color-bg),
-      0 calc(-1 * var(--space-4)) 0 var(--space-2) var(--color-bg);
+    background-color: transparent;
+    border-block-end: 0;
+  }
+
+  .health-split > .split-view__detail .split-view__detail-head[hidden] {
+    display: none;
   }
 
   .health-areas__overview {
@@ -2482,13 +2473,6 @@ button.health-med-card:hover {
 .health-overview__export-hint {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
-}
-
-/* Schnell-Erfassung */
-.health-overview__quick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
 }
 
 /* Export */

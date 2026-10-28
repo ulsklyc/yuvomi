@@ -4974,12 +4974,11 @@
                 "notStarted": "Nog niets geregistreerd"
             },
             "vitals": {
-                "title": "Laatste vitale waarden"
+                "title": "Laatste vitale waarden",
+                "recentTitle": "Laatst gemeten"
             },
             "quick": {
                 "title": "Snel vastleggen",
-                "vital": "Vitale waarde",
-                "activity": "Activiteit",
                 "meds": "Inname"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Preventie & vaccinaties",
             "emptyTitle": "Nog geen preventie-items",
             "emptyDesc": "Vaccinaties en controles verschijnen hier zodra ze zijn vastgelegd.",
-            "add": "Item toevoegen",
-            "edit": "Item bewerken",
+            "add": "Preventie toevoegen",
+            "edit": "Preventie bewerken",
             "saved": "Item opgeslagen.",
             "saveError": "Item kon niet worden opgeslagen.",
             "deleted": "Item verwijderd.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Vastleggen",
         "healthCycle": "Dag",
         "healthMeds": "Medicijn",
-        "healthPrevention": "Controle",
+        "healthPrevention": "Preventie",
         "healthLabs": "Uitslag",
         "healthActivity": "Training",
         "healthNutrition": "Maaltijd",

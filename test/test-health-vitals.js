@@ -1029,13 +1029,13 @@ async function inUebersicht(fn, rows, { access = 'write' } = {}) {
   }
 }
 
-test('R21 D6: ohne Messung keine grauen Wells, sondern eine ruhige Zeile mit Erfassen', async () => {
+test('R21 D6 + R24 E9: ohne Messung keine grauen Wells, sondern eine ruhige Zeile - erfasst wird am FAB', async () => {
   await inUebersicht(() => {
     const html = health.overviewVitalsMarkup();
     assert.doesNotMatch(html, /metric-card__value--empty|metric-card/, 'keine Kachel ohne Wert');
     assert.match(html, /card-empty-row/, 'die geteilte ruhige Zeile (utils/empty-state.js)');
     assert.match(html, /health\.vitals\.emptyTitle/);
-    assert.match(html, /data-action="ov-add-vital"/, 'mit Schreibrecht der Weg zum Erfassen');
+    assert.doesNotMatch(html, /data-action="ov-add-vital"/, 'R24 E9: kein zweiter Erfassen-Weg neben dem FAB-Menue');
   }, []);
   await inUebersicht(() => {
     assert.doesNotMatch(health.overviewVitalsMarkup(), /data-action="ov-add-vital"/, 'ohne Schreibrecht nur die Zeile');

@@ -4974,12 +4974,11 @@
                 "notStarted": "Ingenting logget ennå"
             },
             "vitals": {
-                "title": "Siste vitale tegn"
+                "title": "Siste vitale tegn",
+                "recentTitle": "Sist målt"
             },
             "quick": {
                 "title": "Raskt tillegg",
-                "vital": "Vitalt tegn",
-                "activity": "Aktivitet",
                 "meds": "Dose"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Forebyggende behandling og vaksiner",
             "emptyTitle": "Ingen forebyggende behandlinger ennå",
             "emptyDesc": "Vaksiner og kontroller vises her når de er loggført.",
-            "add": "Legg til oppføring",
-            "edit": "Rediger oppføring",
+            "add": "Legg til forebygging",
+            "edit": "Rediger forebygging",
             "saved": "Oppføring lagret.",
             "saveError": "Oppføring kunne ikke lagres.",
             "deleted": "Oppføring slettet.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Registrer",
         "healthCycle": "Dag",
         "healthMeds": "Medisinering",
-        "healthPrevention": "Undersøkelse",
+        "healthPrevention": "Forebygging",
         "healthLabs": "Rapport",
         "healthActivity": "Treningsøkt",
         "healthNutrition": "Måltid",

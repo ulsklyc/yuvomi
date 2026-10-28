@@ -4974,12 +4974,11 @@
                 "notStarted": "Belum ada yang dicatat"
             },
             "vitals": {
-                "title": "Tanda vital terakhir"
+                "title": "Tanda vital terakhir",
+                "recentTitle": "Terakhir diukur"
             },
             "quick": {
                 "title": "Catat cepat",
-                "vital": "Tanda vital",
-                "activity": "Aktivitas",
                 "meds": "Dosis"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Pencegahan & vaksinasi",
             "emptyTitle": "Belum ada catatan pencegahan",
             "emptyDesc": "Vaksinasi dan pemeriksaan akan muncul di sini setelah dicatat.",
-            "add": "Tambah catatan",
-            "edit": "Edit catatan",
+            "add": "Tambah pencegahan",
+            "edit": "Edit pencegahan",
             "saved": "Catatan disimpan.",
             "saveError": "Catatan tidak dapat disimpan.",
             "deleted": "Catatan dihapus.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Catat",
         "healthCycle": "Hari",
         "healthMeds": "Obat",
-        "healthPrevention": "Pemeriksaan",
+        "healthPrevention": "Pencegahan",
         "healthLabs": "Hasil",
         "healthActivity": "Latihan",
         "healthNutrition": "Makanan",

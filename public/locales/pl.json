@@ -5244,12 +5244,11 @@
                 "notStarted": "Nic jeszcze nie zarejestrowano"
             },
             "vitals": {
-                "title": "Ostatnie parametry życiowe"
+                "title": "Ostatnie parametry życiowe",
+                "recentTitle": "Ostatnie pomiary"
             },
             "quick": {
                 "title": "Szybki zapis",
-                "vital": "Parametr życiowy",
-                "activity": "Aktywność",
                 "meds": "Dawka"
             },
             "reminders": {
@@ -5463,8 +5462,8 @@
             "title": "Profilaktyka i szczepienia",
             "emptyTitle": "Brak wpisów profilaktycznych",
             "emptyDesc": "Szczepienia i badania pojawią się tutaj po zapisaniu.",
-            "add": "Dodaj wpis",
-            "edit": "Edytuj wpis",
+            "add": "Dodaj profilaktykę",
+            "edit": "Edytuj profilaktykę",
             "saved": "Wpis zapisany.",
             "saveError": "Nie udało się zapisać wpisu.",
             "deleted": "Wpis usunięty.",
@@ -6839,7 +6838,7 @@
         "healthOverview": "Zapisz",
         "healthCycle": "Dzień",
         "healthMeds": "Lek",
-        "healthPrevention": "Badanie",
+        "healthPrevention": "Profilaktyka",
         "healthLabs": "Wynik",
         "healthActivity": "Trening",
         "healthNutrition": "Posiłek",

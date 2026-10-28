@@ -4974,12 +4974,11 @@
                 "notStarted": "Wala pang naitala"
             },
             "vitals": {
-                "title": "Pinakabagong palatandaan"
+                "title": "Pinakabagong palatandaan",
+                "recentTitle": "Huling nasukat"
             },
             "quick": {
                 "title": "Mabilisang pagdagdag",
-                "vital": "Palatandaan",
-                "activity": "Aktibidad",
                 "meds": "Dosis"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Pag-iwas at bakuna",
             "emptyTitle": "Wala pang mga tala ng pag-iwas",
             "emptyDesc": "Lalabas dito ang mga bakuna at check-up kapag naitala na.",
-            "add": "Magdagdag ng tala",
-            "edit": "I-edit ang tala",
+            "add": "Magdagdag ng pag-iwas",
+            "edit": "I-edit ang pag-iwas",
             "saved": "Na-save ang tala.",
             "saveError": "Hindi ma-save ang tala.",
             "deleted": "Nabura ang tala.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Itala",
         "healthCycle": "Araw",
         "healthMeds": "Gamot",
-        "healthPrevention": "Pagsusuri",
+        "healthPrevention": "Pag-iwas",
         "healthLabs": "Ulat",
         "healthActivity": "Ehersisyo",
         "healthNutrition": "Pagkain",

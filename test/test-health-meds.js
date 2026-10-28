@@ -584,7 +584,8 @@ test('R16: mobil bleiben zwei Vitalkennzahlen, der Titel fuehrt zu allen', async
     try {
       const phone = healthHelpers.overviewGridMarkup({ phone: true });
       const at = (needle) => { const i = phone.indexOf(needle); assert.ok(i > 0, `${needle} fehlt`); return i; };
-      assert.ok(at('health.overview.vitals.title') < at('health-overview__more-toggle'), 'die Vitalwerte stehen vor der Zeile');
+      // R24 (G5 P2-7): am Telefon heisst die Karte „Zuletzt gemessen" - sie zeigt zwei Werte.
+      assert.ok(at('health.overview.vitals.recentTitle') < at('health-overview__more-toggle'), 'die Vitalwerte stehen vor der Zeile');
       assert.ok(at('health-overview__more-toggle') < at('health.overview.adherence.title</h3>'), 'die Einnahmetreue liegt dahinter');
       assert.match(phone, /health-overview__more-toggle"\s+aria-expanded="false" aria-controls="health-overview-more"/);
       assert.match(phone, /id="health-overview-more" hidden>/, 'eingeklappt beim ersten Blick');

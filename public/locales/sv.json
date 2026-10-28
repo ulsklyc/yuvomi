@@ -4974,12 +4974,11 @@
                 "notStarted": "Inget loggat ännu"
             },
             "vitals": {
-                "title": "Senaste vitalvärden"
+                "title": "Senaste vitalvärden",
+                "recentTitle": "Senast uppmätt"
             },
             "quick": {
                 "title": "Snabbregistrering",
-                "vital": "Vitalvärde",
-                "activity": "Aktivitet",
                 "meds": "Dos"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Förebyggande vård & vaccinationer",
             "emptyTitle": "Inga förebyggande poster ännu",
             "emptyDesc": "Vaccinationer och kontroller visas här när de loggats.",
-            "add": "Lägg till post",
-            "edit": "Redigera post",
+            "add": "Lägg till förebyggande vård",
+            "edit": "Redigera förebyggande vård",
             "saved": "Posten sparad.",
             "saveError": "Posten kunde inte sparas.",
             "deleted": "Posten borttagen.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Registrera",
         "healthCycle": "Dag",
         "healthMeds": "Medicin",
-        "healthPrevention": "Undersökning",
+        "healthPrevention": "Förebyggande vård",
         "healthLabs": "Labbrapport",
         "healthActivity": "Träningspass",
         "healthNutrition": "Måltid",

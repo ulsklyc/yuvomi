@@ -3731,17 +3731,15 @@ test('Vorsorge-Zeile: Bearbeiten weg, Datum und Charge bleiben', () => {
 // Uebersicht
 // -------------------------------------------------------------------------
 
-test('Schnellerfassung der Uebersicht faellt bei `health: read` ganz weg', () => {
+test('Das Erfassen-Menue der Uebersicht faellt bei `health: read` ganz weg (R24 E9, vorher „Schnell erfassen")', () => {
   mitView('overview', { meId: 1, personId: 1, __reset: {} }, () => {
     withAccess({ health: 'write' }, () => {
-      const html = health.quickCaptureMarkup();
-      assert.match(html, /data-action="ov-add-vital"/);
-      assert.match(html, /data-action="ov-add-activity"/);
-      assert.match(html, /data-action="ov-go-meds"/);
+      const actions = health.overviewCaptureItems().map((item) => item.action);
+      assert.ok(actions.includes('ov-add-vital') && actions.includes('ov-add-activity') && actions.includes('ov-go-meds'), actions.join(','));
     });
     withAccess({ health: 'read' }, () => {
-      assert.equal(health.quickCaptureMarkup(), '',
-        'drei Knoepfe, die nur anlegen - es bleibt nichts zu zeigen');
+      assert.deepEqual(health.overviewCaptureItems(), [],
+        'Wege, die nur anlegen - es bleibt nichts anzubieten, der FAB geht');
     });
   });
 });
@@ -3921,8 +3919,10 @@ test('READ_SAFE_ACTIONS ist eine Positivliste und enthaelt nur lesende Aktionen'
   // R16: dazu der dritte Tabwechsel (Kartentitel "Letzte Vitalwerte") und der
   // CSV-Export im Kopf - ein Download, der schon als Karte ohne Schreibrecht
   // offenstand (dort als blosse Links, deshalb ohne `data-action`).
-  assert.deepEqual(erlaubt, ['cancel', 'health-export', 'ov-go-cycle', 'ov-go-meds', 'ov-go-vitals'],
-    'Dialog schliessen, drei Tabwechsel und der Export-Dialog - alles andere dieser Seite schreibt');
+  // R24 (E9): `ov-go-meds` stand in der Karte „Schnell erfassen" - die ist weg,
+  // das Erfassen-Menue am FAB gibt es nur mit Schreibrecht.
+  assert.deepEqual(erlaubt, ['cancel', 'health-export', 'ov-go-cycle', 'ov-go-vitals'],
+    'Dialog schliessen, zwei Bereichswechsel und der Export-Dialog - alles andere dieser Seite schreibt');
 
   // Und die Gegenprobe gegen den Quelltext: JEDE andere `data-action` der Seite
   // ist damit gesperrt. Kaeme morgen eine dazu, waere sie es auch - das ist der

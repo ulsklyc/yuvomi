@@ -4974,12 +4974,11 @@
                 "notStarted": "Noch nichts protokolliert"
             },
             "vitals": {
-                "title": "Letzte Vitalwerte"
+                "title": "Letzte Vitalwerte",
+                "recentTitle": "Zuletzt gemessen"
             },
             "quick": {
                 "title": "Schnell erfassen",
-                "vital": "Vitalwert",
-                "activity": "Aktivität",
                 "meds": "Einnahme"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Vorsorge & Impfungen",
             "emptyTitle": "Noch keine Vorsorge-Einträge",
             "emptyDesc": "Impfungen und Vorsorgeuntersuchungen erscheinen hier, sobald sie protokolliert sind.",
-            "add": "Eintrag hinzufügen",
-            "edit": "Eintrag bearbeiten",
+            "add": "Vorsorge hinzufügen",
+            "edit": "Vorsorge bearbeiten",
             "saved": "Eintrag gespeichert.",
             "saveError": "Eintrag konnte nicht gespeichert werden.",
             "deleted": "Eintrag gelöscht.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Erfassen",
         "healthCycle": "Tag",
         "healthMeds": "Medikament",
-        "healthPrevention": "Untersuchung",
+        "healthPrevention": "Vorsorge",
         "healthLabs": "Befund",
         "healthActivity": "Training",
         "healthNutrition": "Mahlzeit",

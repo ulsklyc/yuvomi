@@ -4974,12 +4974,11 @@
                 "notStarted": "هنوز چیزی ثبت نشده است"
             },
             "vitals": {
-                "title": "آخرین علائم حیاتی"
+                "title": "آخرین علائم حیاتی",
+                "recentTitle": "آخرین اندازه‌گیری"
             },
             "quick": {
                 "title": "ثبت سریع",
-                "vital": "علامت حیاتی",
-                "activity": "فعالیت",
                 "meds": "دوز"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "پیشگیری و واکسیناسیون",
             "emptyTitle": "هنوز رکورد پیشگیری وجود ندارد",
             "emptyDesc": "واکسن‌ها و معاینات پس از ثبت در اینجا نمایش داده می‌شوند.",
-            "add": "افزودن رکورد",
-            "edit": "ویرایش رکورد",
+            "add": "افزودن پیشگیری",
+            "edit": "ویرایش پیشگیری",
             "saved": "رکورد ذخیره شد.",
             "saveError": "ذخیره رکورد ممکن نشد.",
             "deleted": "رکورد حذف شد.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "ثبت",
         "healthCycle": "روز",
         "healthMeds": "دارو",
-        "healthPrevention": "معاینه",
+        "healthPrevention": "پیشگیری",
         "healthLabs": "نتیجه",
         "healthActivity": "تمرین",
         "healthNutrition": "وعده غذایی",

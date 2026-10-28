@@ -4974,12 +4974,11 @@
                 "notStarted": "まだ記録がありません"
             },
             "vitals": {
-                "title": "最新のバイタル"
+                "title": "最新のバイタル",
+                "recentTitle": "最近の測定"
             },
             "quick": {
                 "title": "クイック記録",
-                "vital": "バイタル",
-                "activity": "アクティビティ",
                 "meds": "服薬"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "予防接種・健診管理",
             "emptyTitle": "まだ予防に関する記録がありません",
             "emptyDesc": "記録すると、予防接種や健診がここに表示されます。",
-            "add": "記録を追加",
-            "edit": "記録を編集",
+            "add": "予防を追加",
+            "edit": "予防を編集",
             "saved": "記録を保存しました。",
             "saveError": "記録を保存できませんでした。",
             "deleted": "記録を削除しました。",
@@ -6507,7 +6506,7 @@
         "healthOverview": "記録",
         "healthCycle": "記録",
         "healthMeds": "薬",
-        "healthPrevention": "検診",
+        "healthPrevention": "予防",
         "healthLabs": "検査結果",
         "healthActivity": "トレーニング",
         "healthNutrition": "食事",

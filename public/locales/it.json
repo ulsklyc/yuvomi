@@ -4974,12 +4974,11 @@
                 "notStarted": "Ancora nessun dato registrato"
             },
             "vitals": {
-                "title": "Ultimi parametri vitali"
+                "title": "Ultimi parametri vitali",
+                "recentTitle": "Ultime misurazioni"
             },
             "quick": {
                 "title": "Registrazione rapida",
-                "vital": "Parametro vitale",
-                "activity": "Attività",
                 "meds": "Assunzione"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Prevenzione e vaccinazioni",
             "emptyTitle": "Nessuna voce di prevenzione",
             "emptyDesc": "Vaccinazioni e controlli appariranno qui una volta registrati.",
-            "add": "Aggiungi voce",
-            "edit": "Modifica voce",
+            "add": "Aggiungi prevenzione",
+            "edit": "Modifica prevenzione",
             "saved": "Voce salvata.",
             "saveError": "Impossibile salvare la voce.",
             "deleted": "Voce eliminata.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Registra",
         "healthCycle": "Giorno",
         "healthMeds": "Farmaco",
-        "healthPrevention": "Controllo",
+        "healthPrevention": "Prevenzione",
         "healthLabs": "Referto",
         "healthActivity": "Allenamento",
         "healthNutrition": "Pasto",

@@ -4974,12 +4974,11 @@
                 "notStarted": "Chưa ghi nhận gì"
             },
             "vitals": {
-                "title": "Chỉ số sinh tồn gần nhất"
+                "title": "Chỉ số sinh tồn gần nhất",
+                "recentTitle": "Đo gần nhất"
             },
             "quick": {
                 "title": "Ghi nhanh",
-                "vital": "Chỉ số sinh tồn",
-                "activity": "Hoạt động",
                 "meds": "Liều"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Phòng ngừa & tiêm chủng",
             "emptyTitle": "Chưa có mục phòng ngừa nào",
             "emptyDesc": "Tiêm chủng và kiểm tra sẽ hiện ở đây sau khi được ghi lại.",
-            "add": "Thêm mục",
-            "edit": "Sửa mục",
+            "add": "Thêm phòng ngừa",
+            "edit": "Sửa phòng ngừa",
             "saved": "Đã lưu mục.",
             "saveError": "Không thể lưu mục.",
             "deleted": "Đã xóa mục.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Ghi",
         "healthCycle": "Ngày",
         "healthMeds": "Thuốc",
-        "healthPrevention": "Khám",
+        "healthPrevention": "Phòng ngừa",
         "healthLabs": "Kết quả",
         "healthActivity": "Buổi tập",
         "healthNutrition": "Bữa ăn",

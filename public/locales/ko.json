@@ -4974,12 +4974,11 @@
                 "notStarted": "아직 기록된 내용이 없습니다"
             },
             "vitals": {
-                "title": "최근 생체 신호"
+                "title": "최근 생체 신호",
+                "recentTitle": "최근 측정"
             },
             "quick": {
                 "title": "빠른 기록",
-                "vital": "생체 신호",
-                "activity": "활동",
                 "meds": "복용"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "예방접종 및 건강검진",
             "emptyTitle": "아직 예방 기록이 없습니다",
             "emptyDesc": "예방접종과 검진을 기록하면 여기에 표시됩니다.",
-            "add": "기록 추가",
-            "edit": "기록 편집",
+            "add": "예방 추가",
+            "edit": "예방 편집",
             "saved": "기록이 저장되었습니다.",
             "saveError": "기록을 저장할 수 없습니다.",
             "deleted": "기록이 삭제되었습니다.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "기록",
         "healthCycle": "기록",
         "healthMeds": "약",
-        "healthPrevention": "검진",
+        "healthPrevention": "예방",
         "healthLabs": "소견",
         "healthActivity": "운동",
         "healthNutrition": "식사",

@@ -1967,17 +1967,23 @@ starten" und startet (nur bei mir, nur ohne laufendes Fasten - `mountFasting` me
 und Einstellungen (vorher Startknopf + Zahnrad in der Aktionszeile, Nachtragen als Geisterknopf
 am Verlauf); laeuft ein Fasten, traegt der Ring „Fasten beenden" und der FAB faellt weg. Die
 Zyklus-Legende des Kalenders nennt nur, was der Monat zeigt (R23, distill). Der Bereichsname steht hoechstens zweimal (Liste und
-Detailkopf); die Kopf-Pille nennt das OBJEKT, nie den Bereich (de „+ Untersuchung" statt
-„+ Vorsorge", R22 S10; `test:health-nav` "R14 P6" an der Referenz-Locale). **Einnehmen ist Abhaken (R24, E10):** geplante wie Bedarfsdosis
+Detailkopf); die Kopf-Pille nennt das OBJEKT, nie den Bereich (R22 S10; `test:health-nav` "R14 P6"
+an der Referenz-Locale). Ausnahme seit R24 (S5-F2): die Vorsorge traegt EIN Nomen fuer
+Untersuchung und Impfung - Pille „+ Vorsorge", Dialog „Vorsorge hinzufuegen"; verboten bleibt
+der Bereichstitel „Vorsorge & Impfungen". **Einnehmen ist Abhaken (R24, E10):** geplante wie Bedarfsdosis
 tragen den Abhak-Ring vor der Zeile (`.health-dose__check` + `.check-ring`, Name "<Medikament>
 einnehmen"), eingenommen ist er voll (`--static --done`), Ueberspringen steht im Mehr-Knopf; der
 gefuellte Kapselknopf "Einnehmen" (2-3 Primaere je Ansicht neben dem FAB) ist entfallen. Mit Ring
 bleibt die geplante Dosis bei jeder Breite EINE Zeile (`test:health-meds` "R24 E10"). Der Detailkopf am Desktop beginnt auf der Hoehe
-der Bereichsliste und klebt dort (`top` = Abstand) auf einem Grundstreifen im Seitengrund
-(Ring `--space-2` um die Ecken, nach oben versetzt bis zur Spaltenkante). Das Erfassen-Formular
+der Bereichsliste und steht seit R24 (G5 P2-2) OHNE eigene Flaeche in der Buehne: Siegel +
+Name in der Rolle Detailtitel, nicht klebend, keine Karte (vorher weisse 64px-Karte mit
+Grundstreifen, R21/R22); die Uebersicht traegt keinen Kopf (sie ist die Wurzel, die Liste
+markiert sie). Auf der Telefon-Uebersicht stehen „Heute faellig" und „Bei Bedarf" vor der
+Bereichsliste (health-hoist.js); erfasst wird nur ueber den FAB, eine Karte „Schnell erfassen"
+gibt es nicht mehr (E9). Das Erfassen-Formular
 steht in EINEM `.form-rows`-Traeger (die Wertefelder als Glied darin). Die Bereichsliste fuehrt
 ihre Glyphen ohne Kachel in Modultinte (Muster Apple Health "Durchsuchen") - bewusst anders als
-die getoenten Kacheln der Seitenleiste, die Module nennen. Guards: `test:health-nav` ("R22 D12"),
+die getoenten Kacheln der Seitenleiste, die Module nennen. Guards: `test:health-nav` ("R24 G5 P2-2", "R24 G5 P2-7"),
 `test:health-cycle`, `test:control-dialect` (Dialogfuesse ohne Inline-Stil).
 
 Guard: PAGE-017 bis PAGE-019 in `test/test-frontend-audit.js` - jede Seite steht genau einmal in

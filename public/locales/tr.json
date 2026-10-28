@@ -4974,12 +4974,11 @@
                 "notStarted": "Henüz kayıt yok"
             },
             "vitals": {
-                "title": "Son yaşamsal değerler"
+                "title": "Son yaşamsal değerler",
+                "recentTitle": "Son ölçümler"
             },
             "quick": {
                 "title": "Hızlı kayıt",
-                "vital": "Yaşamsal değer",
-                "activity": "Aktivite",
                 "meds": "Doz"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Önleyici bakım ve aşılar",
             "emptyTitle": "Henüz önleyici bakım kaydı yok",
             "emptyDesc": "Aşılar ve kontroller kaydedildiğinde burada görünür.",
-            "add": "Kayıt ekle",
-            "edit": "Kaydı düzenle",
+            "add": "Önleyici bakım ekle",
+            "edit": "Önleyici bakımı düzenle",
             "saved": "Kayıt kaydedildi.",
             "saveError": "Kayıt kaydedilemedi.",
             "deleted": "Kayıt silindi.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Kaydet",
         "healthCycle": "Gün",
         "healthMeds": "İlaç",
-        "healthPrevention": "Muayene",
+        "healthPrevention": "Önleyici bakım",
         "healthLabs": "Sonuç",
         "healthActivity": "Antrenman",
         "healthNutrition": "Öğün",

@@ -4974,12 +4974,11 @@
                 "notStarted": "Nada registrado ainda"
             },
             "vitals": {
-                "title": "Últimos sinais vitais"
+                "title": "Últimos sinais vitais",
+                "recentTitle": "Últimas medições"
             },
             "quick": {
                 "title": "Registo rápido",
-                "vital": "Sinal vital",
-                "activity": "Atividade",
                 "meds": "Toma"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Prevenção e vacinas",
             "emptyTitle": "Ainda sem registos de prevenção",
             "emptyDesc": "Vacinas e check-ups aparecem aqui depois de registados.",
-            "add": "Adicionar registo",
-            "edit": "Editar registo",
+            "add": "Adicionar prevenção",
+            "edit": "Editar prevenção",
             "saved": "Registo guardado.",
             "saveError": "Não foi possível guardar o registo.",
             "deleted": "Registo eliminado.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Registar",
         "healthCycle": "Dia",
         "healthMeds": "Medicamento",
-        "healthPrevention": "Exame",
+        "healthPrevention": "Prevenção",
         "healthLabs": "Relatório",
         "healthActivity": "Treino",
         "healthNutrition": "Refeição",

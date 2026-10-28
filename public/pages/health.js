@@ -282,10 +282,12 @@ function cycleCanEdit() {
  * Knopf aus einem aelteren Render oder aus den Devtools findet denselben
  * Riegel. Muster wie `READ_SAFE_ACTIONS` in waste.js/schedule.js/tasks.js.
  *
- * `cancel` schliesst nur einen Dialog; `ov-go-meds`/`ov-go-cycle` wechseln nur
- * den Tab. Alles andere schreibt.
+ * `cancel` schliesst nur einen Dialog; `ov-go-cycle`/`ov-go-vitals` wechseln nur
+ * den Bereich. Alles andere schreibt. `ov-go-meds` stand bis R24 in der Karte
+ * „Schnell erfassen"; im Erfassen-Menue am FAB (E9) gibt es ihn nur mit
+ * Schreibrecht, das Menue prueft selbst (onCaptureMenuClick).
  */
-const READ_SAFE_ACTIONS = new Set(['cancel', 'ov-go-meds', 'ov-go-cycle', 'ov-go-vitals', 'health-export']);
+const READ_SAFE_ACTIONS = new Set(['cancel', 'ov-go-cycle', 'ov-go-vitals', 'health-export']);
 
 /**
  * Die schreibenden Bedienhaken OHNE `data-action`.
@@ -895,6 +897,12 @@ function syncDetailHead() {
   if (!_detailHead) return;
   const area = HEALTH_AREAS({ cycleEnabled, fastingEnabled }).find((a) => a.id === _activeArea);
   if (!area) return;
+  // DIE UEBERSICHT TRAEGT KEINEN KOPF (R24, Critique G5 P2-2): „Übersicht"
+  // stand links markiert, rechts noch einmal als Kopf und darueber der
+  // Seitentitel „Gesundheit". Ein Bereich nennt sich - die Uebersicht ist die
+  // Wurzel und beginnt mit ihrem Inhalt.
+  const overviewHead = area.id === HEALTH_OVERVIEW_ID;
+  if (_detailHead.hidden !== overviewHead) _detailHead.hidden = overviewHead;
   const title = _detailHead.querySelector('[data-health-detail-title]');
   if (title && title.textContent !== t(area.labelKey)) title.textContent = t(area.labelKey);
   const seal = _detailHead.querySelector('[data-health-detail-seal]');
@@ -958,10 +966,6 @@ function prioritySkeletonMarkup() {
               <div class="skeleton-card health-priority-skeleton__card health-priority-skeleton__card--due">
                 <div class="skeleton skeleton-line skeleton-line--title"></div>
                 <div class="skeleton skeleton-line skeleton-line--medium"></div>
-                <div class="skeleton skeleton-line skeleton-line--full"></div>
-              </div>
-              <div class="skeleton-card health-priority-skeleton__card health-priority-skeleton__card--quick">
-                <div class="skeleton skeleton-line skeleton-line--title"></div>
                 <div class="skeleton skeleton-line skeleton-line--full"></div>
               </div>
             </div>`;
@@ -7267,11 +7271,16 @@ function renderOverviewShell() {
  */
 function overviewGridMarkup({ phone = isPhone() } = {}) {
   const due = overviewCard('calendar-check', 'health.overview.dueToday.title', overviewDueMarkup(), 'due');
-  const quick = canEditFor(overview.personId, overview.meId)
-    ? overviewCard('plus-circle', 'health.overview.quick.title', quickCaptureMarkup(), 'quick') : '';
-  const vitalsCard = overviewCard('activity', 'health.overview.vitals.title', overviewVitalsMarkup(), 'vitals', { action: 'ov-go-vitals' });
-  const prn = prnMeds('overview').length
-    ? { title: t('health.meds.prn.title'), html: overviewCard('pill', 'health.meds.prn.title', prnListMarkup('overview')) } : null;
+  /* "SCHNELL ERFASSEN" IST WEG (R24, E9; Critique G5 P1-1). Die Karte bot
+   * Messwert, Training und Einnahme - dieselben Wege wie das Menue am FAB
+   * „+ Erfassen", zwei Anlegewege auf einer Seite. Erfasst wird ueber den FAB. */
+  /* AM TELEFON NENNT DIE KARTE, WAS SIE ZEIGT (R24, Critique G5 P2-7): dort
+   * stehen nur die zwei zuletzt gemessenen Werte, „Letzte Vitalwerte"
+   * versprach alle neun. */
+  const vitalsCard = overviewCard('activity', phone ? 'health.overview.vitals.recentTitle' : 'health.overview.vitals.title',
+    overviewVitalsMarkup(), 'vitals', { action: 'ov-go-vitals' });
+  const prnHtml = prnMeds('overview').length
+    ? overviewCard('pill', 'health.meds.prn.title', prnListMarkup('overview'), 'prn') : '';
   const adherence = { title: t('health.overview.adherence.title'), html: overviewCard('trending-up', 'health.overview.adherence.title', overviewAdherenceMarkup()) };
   const cycleHtml = overviewCycleTileMarkup();
   const cycleTile = cycleHtml ? { title: t('health.cycle.status.nextPeriod'), html: cycleHtml } : null;
@@ -7282,30 +7291,30 @@ function overviewGridMarkup({ phone = isPhone() } = {}) {
     return `
     <div class="health-overview__grid">
       ${due}
-      ${prn?.html ?? ''}
+      ${prnHtml}
       ${adherence.html}
       ${vitalsCard}
       ${cycleTile?.html ?? ''}
-      ${quick}
       ${reminders.html}
     </div>`;
   }
 
   // Titel und Markup zusammen: die Zeile nennt, was hinter ihr liegt.
-  const rest = [prn, adherence, cycleTile, reminders].filter(Boolean);
+  const rest = [adherence, cycleTile, reminders].filter(Boolean);
 
-  /* TELEFON: KERNWERTE ZUERST, DER REST HINTER EINER ZEILE (R16). Die Wurzel
-   * des Moduls IST dort die Uebersicht - "Heute faellig" und "Schnell
-   * erfassen" stehen vor der Bereichsliste (health-hoist.js), alles andere
-   * hing als 1627px lange Kartenfolge darunter. Jetzt folgen der Bereichsliste
-   * die Vitalwerte (zwei Kennzahlen, der Titel fuehrt zu allen) und EINE
-   * Zeile, die den Rest aufklappt und nennt, was sie haelt. Die Reihenfolge im
-   * Baum ist die im Bild, damit der Fokus dem Auge folgt. */
+  /* TELEFON: WAS HEUTE ANSTEHT ZUERST, DER REST HINTER EINER ZEILE (R16, R24).
+   * Die Wurzel des Moduls IST dort die Uebersicht - „Heute faellig" und
+   * „Bei Bedarf" ziehen vor die Bereichsliste (health-hoist.js), beides ist,
+   * was man heute einnimmt (R24, Critique G5 P2-7: „Bei Bedarf" lag mit
+   * seinem Ring in der Falte). Der Bereichsliste folgen die zwei zuletzt
+   * gemessenen Werte (der Titel fuehrt zu allen) und EINE Zeile, die den Rest
+   * aufklappt und nennt, was sie haelt. Die Reihenfolge im Baum ist die im
+   * Bild, damit der Fokus dem Auge folgt. */
   const open = overview.moreExpanded;
   return `
     <div class="health-overview__grid">
       ${due}
-      ${quick}
+      ${prnHtml}
       ${vitalsCard}
       <div class="row-divided health-vitals__more-list health-overview__more-list">
         <button type="button" class="health-vitals__more-row health-overview__more-toggle"
@@ -7583,12 +7592,11 @@ function overviewVitalsMarkup() {
   return `<div class="health-overview__vitals-grid metric-rows">${cards}</div>`;
 }
 
-/** Die ruhige Zeile, wenn noch nichts gemessen ist - mit dem Weg zum Erfassen. */
+/** Die ruhige Zeile, wenn noch nichts gemessen ist. */
 function overviewVitalsEmptyMarkup() {
-  const action = canEditFor(overview.personId, overview.meId)
-    ? { id: 'ov-add-vital', label: t('health.vitals.addShort') }
-    : null;
-  return cardEmptyRowHtml(t('health.vitals.emptyTitle'), { action });
+  // Ohne eigene Erfassen-Aktion (R24, E9): sie stand als zweiter Weg neben
+  // dem FAB-Menue „+ Erfassen", das den Messwert ebenso anbietet.
+  return cardEmptyRowHtml(t('health.vitals.emptyTitle'));
 }
 
 /**
@@ -7704,24 +7712,6 @@ function overviewUpcomingMarkup() {
   return `<ul class="health-overview__reminders-list">${rows}</ul>`;
 }
 
-// --- Schnell-Erfassung (nur eigene Person) ---
-
-function quickCaptureMarkup() {
-  if (!canEditFor(overview.personId, overview.meId)) return '';
-  return `
-    <div class="health-overview__quick">
-      <button type="button" class="btn btn--secondary" data-action="ov-add-vital">
-        <i data-lucide="heart-pulse" class="icon-md" aria-hidden="true"></i>${esc(t('health.overview.quick.vital'))}
-      </button>
-      <button type="button" class="btn btn--secondary" data-action="ov-add-activity">
-        <i data-lucide="dumbbell" class="icon-md" aria-hidden="true"></i>${esc(t('health.overview.quick.activity'))}
-      </button>
-      <button type="button" class="btn btn--secondary" data-action="ov-go-meds">
-        <i data-lucide="pill" class="icon-md" aria-hidden="true"></i>${esc(t('health.overview.quick.meds'))}
-      </button>
-    </div>`;
-}
-
 // --- CSV-Export je Bereich (Server-Route, Muster wie Budget-Stats-Export) ---
 
 function overviewExportHref(area) {
@@ -7795,16 +7785,6 @@ function wireOverview() {
       window.yuvomi?.navigate('/health/vitals');
     }));
 
-  if (!readOnly()) {
-    // Zwei Wege zum selben Dialog: "Schnell erfassen" und die ruhige Zeile der
-    // Vitalwerte, solange noch nichts gemessen ist (R21, D6).
-    overview.root.querySelectorAll('[data-action="ov-add-vital"]').forEach((btn) =>
-      btn.addEventListener('click', () => openVitalModal({ onSaved: () => reloadOverview() })));
-    overview.root.querySelector('[data-action="ov-add-activity"]')
-      ?.addEventListener('click', () => openActivityModal(null, { onSaved: () => reloadOverview() }));
-  }
-  overview.root.querySelector('[data-action="ov-go-meds"]')
-    ?.addEventListener('click', () => window.yuvomi?.navigate('/health/meds'));
   overview.root.querySelector('[data-action="ov-go-cycle"]')
     ?.addEventListener('click', () => window.yuvomi?.navigate('/health/cycle'));
   overview.root.querySelector('[data-action="ov-go-vitals"]')
@@ -10638,7 +10618,8 @@ export const __test = {
   overviewVitalCardMarkup,
   // R21 D6: der Satz oben.
   overviewBriefMarkup,
-  quickCaptureMarkup,
+  // R24 E9: das Erfassen-Menue am FAB (vorher die Karte „Schnell erfassen").
+  overviewCaptureItems,
   cycleBubbleMarkup,
   cyclePregnancyMarkup,
   cycleTodayActionsMarkup,

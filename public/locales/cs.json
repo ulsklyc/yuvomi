@@ -5115,12 +5115,11 @@
                 "notStarted": "Zatím nic nezaznamenáno"
             },
             "vitals": {
-                "title": "Poslední vitální hodnoty"
+                "title": "Poslední vitální hodnoty",
+                "recentTitle": "Naposledy změřeno"
             },
             "quick": {
                 "title": "Rychlé zadání",
-                "vital": "Vitální hodnota",
-                "activity": "Aktivita",
                 "meds": "Dávka"
             },
             "reminders": {
@@ -5334,8 +5333,8 @@
             "title": "Prevence a očkování",
             "emptyTitle": "Zatím žádné preventivní záznamy",
             "emptyDesc": "Očkování a prohlídky se zde zobrazí po zaznamenání.",
-            "add": "Přidat záznam",
-            "edit": "Upravit záznam",
+            "add": "Přidat prevenci",
+            "edit": "Upravit prevenci",
             "saved": "Záznam uložen.",
             "saveError": "Záznam se nepodařilo uložit.",
             "deleted": "Záznam smazán.",
@@ -6683,7 +6682,7 @@
         "healthOverview": "Zadat",
         "healthCycle": "Den",
         "healthMeds": "Lék",
-        "healthPrevention": "Prohlídka",
+        "healthPrevention": "Prevence",
         "healthLabs": "Nález",
         "healthActivity": "Trénink",
         "healthNutrition": "Jídlo",

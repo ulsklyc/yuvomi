@@ -4974,12 +4974,11 @@
                 "notStarted": "Aún no hay registros"
             },
             "vitals": {
-                "title": "Últimas constantes"
+                "title": "Últimas constantes",
+                "recentTitle": "Última medición"
             },
             "quick": {
                 "title": "Registro rápido",
-                "vital": "Constante",
-                "activity": "Actividad",
                 "meds": "Toma"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Prevención y vacunas",
             "emptyTitle": "Aún no hay registros de prevención",
             "emptyDesc": "Las vacunas y revisiones aparecerán aquí una vez registradas.",
-            "add": "Añadir registro",
-            "edit": "Editar registro",
+            "add": "Añadir prevención",
+            "edit": "Editar prevención",
             "saved": "Registro guardado.",
             "saveError": "No se pudo guardar el registro.",
             "deleted": "Registro eliminado.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Registrar",
         "healthCycle": "Día",
         "healthMeds": "Medicamento",
-        "healthPrevention": "Revisión",
+        "healthPrevention": "Prevención",
         "healthLabs": "Informe",
         "healthActivity": "Entrenamiento",
         "healthNutrition": "Comida",

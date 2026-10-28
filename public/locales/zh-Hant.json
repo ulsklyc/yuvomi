@@ -4974,12 +4974,11 @@
                 "notStarted": "尚無記錄"
             },
             "vitals": {
-                "title": "最新生命體徵"
+                "title": "最新生命體徵",
+                "recentTitle": "最近量測"
             },
             "quick": {
                 "title": "快速記錄",
-                "vital": "生命體徵",
-                "activity": "活動",
                 "meds": "服藥"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "預防保健與疫苗接種",
             "emptyTitle": "尚無預防保健記錄",
             "emptyDesc": "疫苗接種和健康檢查記錄後將顯示在此處。",
-            "add": "新增記錄",
-            "edit": "編輯記錄",
+            "add": "新增預防保健",
+            "edit": "編輯預防保健",
             "saved": "記錄已儲存。",
             "saveError": "記錄儲存失敗。",
             "deleted": "記錄已刪除。",
@@ -6507,7 +6506,7 @@
         "healthOverview": "記錄",
         "healthCycle": "記錄",
         "healthMeds": "藥物",
-        "healthPrevention": "健康檢查",
+        "healthPrevention": "預防保健",
         "healthLabs": "報告",
         "healthActivity": "訓練",
         "healthNutrition": "餐食",

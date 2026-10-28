@@ -4974,12 +4974,11 @@
                 "notStarted": "尚无记录"
             },
             "vitals": {
-                "title": "最新生命体征"
+                "title": "最新生命体征",
+                "recentTitle": "最近测量"
             },
             "quick": {
                 "title": "快速记录",
-                "vital": "生命体征",
-                "activity": "活动",
                 "meds": "服药"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "预防保健与疫苗接种",
             "emptyTitle": "尚无预防保健记录",
             "emptyDesc": "疫苗接种和体检记录后将显示在此处。",
-            "add": "添加记录",
-            "edit": "编辑记录",
+            "add": "添加预防保健",
+            "edit": "编辑预防保健",
             "saved": "记录已保存。",
             "saveError": "记录保存失败。",
             "deleted": "记录已删除。",
@@ -6507,7 +6506,7 @@
         "healthOverview": "记录",
         "healthCycle": "记录",
         "healthMeds": "药物",
-        "healthPrevention": "体检",
+        "healthPrevention": "预防保健",
         "healthLabs": "报告",
         "healthActivity": "训练",
         "healthNutrition": "餐食",

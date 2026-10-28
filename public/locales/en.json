@@ -4974,12 +4974,11 @@
                 "notStarted": "Nothing logged yet"
             },
             "vitals": {
-                "title": "Latest vitals"
+                "title": "Latest vitals",
+                "recentTitle": "Last measured"
             },
             "quick": {
                 "title": "Quick add",
-                "vital": "Vital",
-                "activity": "Activity",
                 "meds": "Dose"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Preventive care & vaccinations",
             "emptyTitle": "No preventive care entries yet",
             "emptyDesc": "Vaccinations and check-ups appear here once logged.",
-            "add": "Add entry",
-            "edit": "Edit entry",
+            "add": "Add preventive care",
+            "edit": "Edit preventive care",
             "saved": "Entry saved.",
             "saveError": "Entry could not be saved.",
             "deleted": "Entry deleted.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Record",
         "healthCycle": "Day",
         "healthMeds": "Medication",
-        "healthPrevention": "Checkup",
+        "healthPrevention": "Preventive care",
         "healthLabs": "Report",
         "healthActivity": "Workout",
         "healthNutrition": "Meal",

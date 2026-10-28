@@ -4974,12 +4974,11 @@
                 "notStarted": "Rien enregistré pour l’instant"
             },
             "vitals": {
-                "title": "Dernières constantes"
+                "title": "Dernières constantes",
+                "recentTitle": "Dernières mesures"
             },
             "quick": {
                 "title": "Saisie rapide",
-                "vital": "Constante",
-                "activity": "Activité",
                 "meds": "Prise"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Prévention et vaccinations",
             "emptyTitle": "Aucune entrée de prévention pour le moment",
             "emptyDesc": "Les vaccins et bilans apparaîtront ici une fois enregistrés.",
-            "add": "Ajouter une entrée",
-            "edit": "Modifier l'entrée",
+            "add": "Ajouter une prévention",
+            "edit": "Modifier la prévention",
             "saved": "Entrée enregistrée.",
             "saveError": "Impossible d'enregistrer l'entrée.",
             "deleted": "Entrée supprimée.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Enregistrer",
         "healthCycle": "Jour",
         "healthMeds": "Médicament",
-        "healthPrevention": "Examen",
+        "healthPrevention": "Prévention",
         "healthLabs": "Compte rendu",
         "healthActivity": "Séance",
         "healthNutrition": "Repas",

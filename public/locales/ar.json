@@ -5380,12 +5380,11 @@
                 "notStarted": "لم يُسجَّل شيء بعد"
             },
             "vitals": {
-                "title": "أحدث المؤشرات الحيوية"
+                "title": "أحدث المؤشرات الحيوية",
+                "recentTitle": "آخر القياسات"
             },
             "quick": {
                 "title": "تسجيل سريع",
-                "vital": "مؤشر حيوي",
-                "activity": "النشاط",
                 "meds": "جرعة"
             },
             "reminders": {
@@ -5599,8 +5598,8 @@
             "title": "الوقاية واللقاحات",
             "emptyTitle": "لا توجد سجلات وقاية بعد",
             "emptyDesc": "ستظهر اللقاحات والفحوصات هنا بعد تسجيلها.",
-            "add": "إضافة سجل",
-            "edit": "تعديل السجل",
+            "add": "إضافة رعاية وقائية",
+            "edit": "تعديل الرعاية الوقائية",
             "saved": "تم حفظ السجل.",
             "saveError": "تعذر حفظ السجل.",
             "deleted": "تم حذف السجل.",
@@ -7006,7 +7005,7 @@
         "healthOverview": "تسجيل",
         "healthCycle": "يوم",
         "healthMeds": "دواء",
-        "healthPrevention": "فحص وقائي",
+        "healthPrevention": "الرعاية الوقائية",
         "healthLabs": "تقرير",
         "healthActivity": "تمرين",
         "healthNutrition": "وجبة",

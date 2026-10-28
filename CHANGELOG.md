@@ -202,7 +202,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (measurement, workout, dose, cycle), and the cycle area's "+ Day" logs today. Before, both views had
   no button and phones showed an empty spot at the end of the tab bar. "Period started" in the cycle's
   today card is now a quiet button next to it, and the workout dialog says "Log workout" like its button.
-  On the desktop the person picker no longer shifts sideways when you switch areas.
+  On the desktop the person picker no longer shifts sideways when you switch areas. The overview's
+  "Quick capture" card is gone - the menu at "+ Record" offers the same - and preventive care is called
+  "Preventive care" on its button and in its dialog ("Add preventive care") instead of "Checkup" and
+  "Add entry".
+- **The Health overview starts with today.** On phones "As needed" now stands right below "Due today",
+  before the list of areas, instead of behind "Show all values"; the card with the two latest
+  measurements is called "Last measured". On the desktop an area's name stands above it without a card
+  of its own, and the overview no longer repeats "Overview" next to the list. In the person menu "Me"
+  comes first.
 - **The active tab looks the same in light and dark.** Budget, Rewards, Household help, Shift plan,
   Kitchen and the shopping lists mark the current tab with a soft capsule in the module's colour. In light
   mode it was a white capsule with a grey ring that looked like a button.

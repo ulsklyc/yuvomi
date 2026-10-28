@@ -4974,12 +4974,11 @@
                 "notStarted": "Még nincs semmi rögzítve"
             },
             "vitals": {
-                "title": "Legutóbbi vitális értékek"
+                "title": "Legutóbbi vitális értékek",
+                "recentTitle": "Legutóbb mért"
             },
             "quick": {
                 "title": "Gyors rögzítés",
-                "vital": "Vitális érték",
-                "activity": "Tevékenység",
                 "meds": "Bevétel"
             },
             "reminders": {
@@ -5193,8 +5192,8 @@
             "title": "Megelőzés és védőoltások",
             "emptyTitle": "Még nincs megelőzési bejegyzés",
             "emptyDesc": "A védőoltások és szűrővizsgálatok itt jelennek meg, ha rögzítve vannak.",
-            "add": "Bejegyzés hozzáadása",
-            "edit": "Bejegyzés szerkesztése",
+            "add": "Megelőzés hozzáadása",
+            "edit": "Megelőzés szerkesztése",
             "saved": "Bejegyzés mentve.",
             "saveError": "A bejegyzést nem sikerült menteni.",
             "deleted": "Bejegyzés törölve.",
@@ -6507,7 +6506,7 @@
         "healthOverview": "Rögzítés",
         "healthCycle": "Nap",
         "healthMeds": "Gyógyszer",
-        "healthPrevention": "Szűrés",
+        "healthPrevention": "Megelőzés",
         "healthLabs": "Lelet",
         "healthActivity": "Edzés",
         "healthNutrition": "Étkezés",
