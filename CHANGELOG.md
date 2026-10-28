@@ -56,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   form. People who may see a restricted document are picked with name chips. In the document viewer,
   Open, Edit, Share and Download carry their words (on phones Download keeps its word and the others
   show as icons), and "Add" in the receipt picker can always be pressed and says when nothing is chosen.
+- **The inventory leads with one line.** Items and total value stand as one line at the top in every
+  width instead of three tiles, and "Needs attention 1" is a filter chip that shows exactly the items
+  with an upcoming deadline - it only appears when there is one.
 - **One balance sentence.** When a group has a single open debt that involves you, the figure at the
   top says it with the name ("You owe Alex Johnson 24.14 €") and the balances list no longer repeats it.
 - **Tapping a meal shows it first.** The meal card opens a read view (date, meal, cook, ingredients,

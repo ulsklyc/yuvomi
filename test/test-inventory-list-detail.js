@@ -290,17 +290,14 @@ test('die geteilte Leseansicht zeichnet Gruppen mit Titel und laesst leere ganz 
   }
 });
 
-test('in der Spalte: Kennzahlen als Karten zu zweit, nicht als Tabelle und nicht als drei 136px-Kacheln (A8 P1-2, R23 D12)', async () => {
+test('R24 E2 (vorher A8 P1-2, R23 D12): keine Kennzahlkarten mehr - die Kurzzeile und der Fristen-Chip auf dem Lesemass', async () => {
   const { eachRule } = await import('./css-rules.js');
   const css = readFileSync(new URL('../public/styles/inventory.css', import.meta.url), 'utf8');
-  const inSplit = [...eachRule(css)].filter((r) => r.at.some((a) => /module-surface/.test(a)));
-  const body = (sel) => inSplit.filter((r) => r.selector.trim() === sel).map((r) => r.body).join(';');
-  assert.match(body('.inventory-list .metric-grid'), /--summary-cards:\s*2/, 'zwei Karten je Zeile - keine 136px-Kacheln');
-  assert.match(body('.inventory-list .metric-grid > .metric-card:last-child:nth-child(odd)'), /grid-column:\s*1\s*\/\s*-1/, 'die dritte Karte nimmt die volle Zeile');
-  // Die Karte bleibt eine Kennzahlkarte: keine Zeilen-Umbauten, kein eigener Wertgrad.
-  const all = [...eachRule(css)].map((r) => `${r.selector} {${r.body}}`).join('\n');
-  assert.doesNotMatch(all, /\.inventory-list \.metric-grid > \.metric-card \{[^}]*flex-direction:\s*row/, 'keine Tabellenzeile');
-  assert.doesNotMatch(all, /\.inventory-list \.metric-grid \.metric-card__value \{[^}]*font-size/, 'kein eigener Wertgrad');
+  const all = [...eachRule(css)];
+  assert.ok(!all.some((r) => /\.inventory-list \.metric-grid/.test(r.selector)), 'keine Kartenreihe mehr im Inventar');
+  const measure = all.find((r) => r.at.length === 0 && r.selector.includes('.inventory-list > .budget-glance'));
+  assert.match(measure?.body ?? '', /max-width:\s*var\(--page-measure, var\(--layout-reading\)\)/, 'auf dem Lesemass der Gruppen');
+  assert.ok(measure.selector.includes('.inventory-list > .inventory-attention'), 'der Chip ebenso');
 });
 
 // Review R11: der Kilometerstand-Trend rechnet X nach dem Datum. Zwei
@@ -567,8 +564,12 @@ test('R22: der Gegenstand heisst beim Bearbeiten so wie beim Anlegen, null Frist
   const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
   assert.equal(de.inventory.editItem, 'Gegenstand bearbeiten');
   const metrics = src.slice(src.indexOf('function renderMetrics('), src.indexOf('function groupItemsByCategory('));
-  assert.match(metrics, /\$\{attentionEmpty \? `<div class="metric-card metric-card--empty">/, 'ohne Frist eine ruhige Kennzahl');
-  assert.match(metrics, /: `<button type="button" class="metric-card metric-card--select/, 'mit Frist der Schalter');
+  // Seit R24 (E2, G4-Inventar-P3-1) EINE Kurzzeile in jeder Breite und die
+  // Fristen als Filterchip - ohne Frist (und ohne aktiven Filter) gar keiner.
+  assert.match(metrics, /const attention = needsAttention > 0 \|\| state\.filterAttention/, 'null Fristen sind kein Knopf');
+  assert.match(metrics, /<button type="button" class="filter-chip filter-chip--sm\$\{state\.filterAttention \? ' filter-chip--active' : ''\}"\s+data-action="toggle-attention-filter" aria-pressed="\$\{state\.filterAttention\}">/, 'mit Frist ein Filterchip');
+  assert.match(metrics, /metricGlanceHtml\(\{[\s\S]*?everywhere: true,/, 'die Kurzzeile in jeder Breite');
+  assert.doesNotMatch(metrics, /metric-grid|metric-card/, 'keine Kacheln mehr');
 });
 
 // Critique R22 (aus S1): die globale Suche fuehrt mit `/inventory?open=<id>`
