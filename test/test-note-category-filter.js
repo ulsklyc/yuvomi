@@ -402,7 +402,11 @@ test('notes UI keeps the approved category filter and editor contracts', () => {
   assert.match(source, /role="combobox"/);
   assert.match(source, /role="listbox"/);
   assert.match(source, /data-category-remove/);
-  assert.match(source, /note-category-scope-help/);
+  // R24 (G4-Notizen-P3-1): die Wahl des Kategorietyps traegt ihr Label, die
+  // Erklaerung steht hinter "Mehr dazu" statt hinter einem Info-Tooltip.
+  assert.match(source, /<label class="form-label" for="note-category-new-scope">\$\{esc\(t\('noteCategories\.scopeLabel'\)\)\}<\/label>/);
+  assert.match(source, /hintFoldHtml\(\{ moreHtml: `<p class="form-hint">\$\{esc\(t\('noteCategories\.scopeHelp'\)\)\}/);
+  assert.doesNotMatch(source, /note-category-scope-help|wireCategoryScopeHelp/);
   assert.match(source, /findCategorySuggestions/);
   assert.match(source, /findExactCategory/);
   assert.match(source, /function assignableCategories\(\)[\s\S]*?return state\.categories;/,
@@ -531,12 +535,12 @@ test('pointer selection keeps combobox focus until the delegated click selects t
 test('category scope select fills the available creation row space', () => {
   const css = readFileSync(new URL('../public/styles/notes.css', import.meta.url), 'utf8');
   const scopeRule = css.match(/\.note-category-editor__scope\s*\{([^}]*)\}/)?.[1] || '';
-  const selectRule = css.match(/\.note-category-editor__scope \.form-input\s*\{([^}]*)\}/)?.[1] || '';
   assert.match(scopeRule, /flex:\s*1 1 0/);
   assert.match(scopeRule, /min-width:\s*0/);
-  assert.match(selectRule, /flex:\s*1/);
-  assert.match(selectRule, /min-width:\s*0/);
-  assert.match(selectRule, /width:\s*100%/);
+  // Seit R24 steht das Label ueber der Wahl: eine Spalte, in der die Wahl
+  // ohne eigene Regel die volle Breite nimmt (align-items: stretch).
+  assert.match(scopeRule, /flex-direction:\s*column/);
+  assert.doesNotMatch(scopeRule, /align-items/);
 });
 
 test('compact dashboard note widgets hide category badges', () => {
@@ -595,4 +599,14 @@ test('R20: die Filterreihe haelt ihren Platz, bis die Daten da sind', () => {
     'nach dem Laden entscheidet renderFilters, und die Reihe spricht wieder');
   const css = readFileSync(new URL('../public/styles/notes.css', import.meta.url), 'utf8');
   assert.match(css, /\.notes-filters__skeleton \{[^}]*block-size: var\(--target-md\)/);
+});
+
+test('R24 (G4-Notizen-P3-1): Lesen | Bearbeiten als Text, das Textfeld ohne Ziehgriff', () => {
+  const source = readFileSync(new URL('../public/pages/notes.js', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../public/styles/notes.css', import.meta.url), 'utf8');
+  const tabs = source.match(/<div class="note-mode-switch"[\s\S]*?<\/div>/)?.[0] || '';
+  assert.match(tabs, /notes\.modeRead[\s\S]*notes\.modeEdit/, 'beide Reiter gefunden');
+  assert.doesNotMatch(tabs, /data-lucide/, 'kein Zeichen vor dem Wort');
+  const editor = [...eachRule(css)].find((rule) => rule.selector === '.note-editor__text' && !rule.at.length)?.body || '';
+  assert.match(editor, /resize:\s*none/);
 });

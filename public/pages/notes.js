@@ -7,7 +7,10 @@
 import { api } from '/api.js';
 import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
 import { openModal as openSharedModal, closeModal, btnError, advancedSection, reportFieldError, captureModalContext, decorateFooterDelete } from '/components/modal.js';
-import { wireCategoryScopeHelp } from '/components/category-manager.js';
+// Der Kategorie-Verwalter (`<yuvomi-category-manager>`, unten) registriert
+// sich beim Import.
+import '/components/category-manager.js';
+import { hintFoldHtml } from '/utils/hint-fold.js';
 import { stagger, vibrate, scheduleUndoableDelete, wireScrollFade, acknowledgeCheck, isImeComposing } from '/utils/ux.js';
 import { redrawList } from '/utils/list-motion.js';
 import { t } from '/i18n.js';
@@ -24,6 +27,7 @@ import { lendPageStyle } from '/utils/component-style.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { emptyStateHTML, searchEmptyHTML } from '/utils/empty-state.js';
 import { AVATAR_FALLBACK_COLOR } from '/utils/color.js';
+import { personChipsHtml } from '/utils/filter-sheet.js';
 import {
   noteMatchesCategories,
   occupiedNoteCategoryIds,
@@ -478,31 +482,30 @@ function renderFilters() {
   row.removeAttribute('aria-hidden');
   delete row.dataset.pending;
   const focused = row.contains(document.activeElement) ? document.activeElement : null;
-  const focusKey = ['creator', 'categoryId', 'clearCategories'].find((key) => focused && Object.hasOwn(focused.dataset, key));
+  const focusKey = ['value', 'categoryId', 'clearCategories'].find((key) => focused && Object.hasOwn(focused.dataset, key));
   const focusValue = focusKey ? focused.dataset[focusKey] : null;
   const scrollLeft = row.scrollLeft;
   row.replaceChildren();
   if (row.hidden) return;
 
-  const makeChip = (label, value) => {
-    const active = state.filterCreator === value;
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = `filter-chip filter-chip--sm${active ? ' filter-chip--active' : ''}`;
-    chip.dataset.creator = value;
-    chip.setAttribute('aria-pressed', String(active));
-    chip.textContent = label;
-    return chip;
-  };
-
+  /* DIE PERSONEN WIE UEBERALL (Critique R24 G4-Notizen-P3-2): der Baustein
+   * der Personenzeile (`personChipsHtml`, S3) - Scheibe in der Farbe der
+   * Person mit Initialen, der Vorname, solange alle denselben Nachnamen
+   * tragen. Hier standen Namen-Chips ohne Scheibe, die vierte Form derselben
+   * Zeile. Der Wert ist der Name, nach dem `visibleNotes()` filtert. */
   if (creators.length >= 2) {
-    const group = document.createElement('div');
-    group.className = 'notes-filter-group';
-    group.setAttribute('role', 'group');
-    group.setAttribute('aria-label', t('notes.filterCreatorLabel'));
-    group.appendChild(makeChip(t('common.all'), ''));
-    creators.forEach((n) => group.appendChild(makeChip(n.creator_name, n.creator_name)));
-    row.appendChild(group);
+    row.insertAdjacentHTML('beforeend', personChipsHtml({
+      filter: 'creator',
+      label: t('notes.filterCreatorLabel'),
+      people: creators.map((n) => ({
+        id: n.creator_name,
+        display_name: n.creator_name,
+        avatar_color: n.creator_color || AVATAR_FALLBACK_COLOR,
+      })),
+      isActive: (person) => state.filterCreator === person.id,
+      all: { label: t('common.all'), active: !state.filterCreator },
+      className: 'notes-filter-group',
+    }));
   }
 
   if (filterCategories.length) {
@@ -530,10 +533,10 @@ function renderFilters() {
     row.appendChild(group);
   }
 
-  row.querySelectorAll('[data-creator]').forEach((chip) => {
+  row.querySelectorAll('[data-filter="creator"]').forEach((chip) => {
     chip.addEventListener('click', () => {
       // Erneuter Klick auf den aktiven Chip hebt den Filter auf.
-      state.filterCreator = state.filterCreator === chip.dataset.creator ? '' : chip.dataset.creator;
+      state.filterCreator = state.filterCreator === chip.dataset.value ? '' : chip.dataset.value;
       renderNotesAndFilters();
     });
   });
@@ -896,16 +899,17 @@ function renderSelectedCategories(selectedIds) {
 
 function renderCategoryScopeControl() {
   if (!state.canManageHousehold) return '';
-  return `<div class="note-category-editor__scope">
-    <select class="form-input" id="note-category-new-scope" aria-label="${esc(t('noteCategories.scopeLabel'))}"
-            aria-describedby="note-category-scope-help">
+  /* DIE WAHL TRAEGT IHR LABEL (Critique R24 G4-Notizen-P3-1): "Persoenlich"
+   * stand als Auswahl ohne sichtbaren Namen, die Erklaerung hinter einem
+   * Info-Zeichen als Tooltip. Jetzt "Kategorietyp" als Label ueber der Wahl,
+   * die Erklaerung hinter "Mehr dazu" wie jede Hilfe eines Formulars. */
+  return `<div class="form-field note-category-editor__scope">
+    <label class="form-label" for="note-category-new-scope">${esc(t('noteCategories.scopeLabel'))}</label>
+    <select class="form-input" id="note-category-new-scope">
       <option value="personal">${t('noteCategories.personal')}</option>
       <option value="household">${t('noteCategories.household')}</option>
     </select>
-    <button type="button" class="category-scope-help" aria-expanded="false" aria-label="${esc(t('noteCategories.scopeHelp'))}">
-      <i data-lucide="info" aria-hidden="true"></i>
-      <span class="category-scope-help__tooltip u-meta" id="note-category-scope-help" role="tooltip">${esc(t('noteCategories.scopeHelp'))}</span>
-    </button>
+    ${hintFoldHtml({ moreHtml: `<p class="form-hint">${esc(t('noteCategories.scopeHelp'))}</p>` })}
   </div>`;
 }
 
@@ -1053,17 +1057,18 @@ function openNoteModal({ mode, note = null }) {
 
   const content = `
     <div class="note-modal" data-view="${initialView}"${isEdit ? ` data-note-id="${note.id}"` : ''} style="--note-color:${esc(selColor)};">
+      ${/* LESEN | BEARBEITEN ALS TEXT (Critique R24 G4-Notizen-P3-1, D3):
+           Reiter tragen ihr Wort, kein Zeichen davor - das Buch und der Stift
+           wiederholten nur, was das Wort sagt. */ ''}
       <div class="note-mode-switch" role="tablist" aria-label="${t('notes.modeSwitchLabel')}">
         <button type="button" id="note-tab-read" class="sub-tab${initialView === 'read' ? ' sub-tab--active' : ''}"
                 role="tab" aria-selected="${initialView === 'read' ? 'true' : 'false'}"
                 aria-controls="note-pane-read" tabindex="${initialView === 'read' ? '0' : '-1'}" data-view="read">
-          <i data-lucide="book-open" class="sub-tab__icon" aria-hidden="true"></i>
           <span class="sub-tab__label">${t('notes.modeRead')}</span>
         </button>
         <button type="button" id="note-tab-edit" class="sub-tab${initialView === 'edit' ? ' sub-tab--active' : ''}"
                 role="tab" aria-selected="${initialView === 'edit' ? 'true' : 'false'}"
                 aria-controls="note-pane-edit" tabindex="${initialView === 'edit' ? '0' : '-1'}" data-view="edit">
-          <i data-lucide="pencil" class="sub-tab__icon" aria-hidden="true"></i>
           <span class="sub-tab__label">${t('notes.modeEdit')}</span>
         </button>
       </div>
@@ -1136,7 +1141,6 @@ function openNoteModal({ mode, note = null }) {
       editorClosed = true;
     },
     onSave(panel) {
-      wireCategoryScopeHelp(panel);
       // Reader/Editor-Umschalter (#507): beide Panes bleiben im DOM, damit
       // Dirty-Check und Feld-Verdrahtung intakt bleiben und der Toggle nichts
       // verwirft. Die Leseansicht wird bei jedem Wechsel aus den Live-Feldern

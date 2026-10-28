@@ -747,4 +747,9 @@ test('R24: Aufgaben-Verlauf, Filterblatt, Belohnungen und Kalender bauen ihre Pe
   assert.doesNotMatch(tasksSrc, /group-toggle history-people|history-people__mark|data-history-user/, 'kein Umschalter-Dialekt mehr im Verlauf');
   assert.match(read('pages/rewards.js'), /personChipsHtml\(\{\s*filter: 'ledger-member'/, 'Belohnungen');
   assert.match(read('pages/calendar.js'), /personChipsHtml\(\{\s*filter: 'person'/, 'Kalender');
+  // S10 (G4-Notizen-P3-2): der Verfasserfilter der Notizen war die vierte
+  // Form - Namen-Chips ohne Scheibe, von Hand gebaut.
+  const notesSrc = read('pages/notes.js');
+  assert.match(notesSrc, /personChipsHtml\(\{\s*filter: 'creator'[\s\S]{0,400}className: 'notes-filter-group'/, 'Notizen');
+  assert.doesNotMatch(notesSrc, /dataset\.creator|\[data-creator\]/, 'kein handgebauter Namen-Chip mehr');
 });

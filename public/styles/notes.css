@@ -507,18 +507,18 @@
 .note-category-picker__option svg { width: var(--icon-md); height: var(--icon-md); color: var(--color-text-secondary); }
 .note-category-picker__scope { color: var(--color-text-tertiary); font-size: var(--text-xs); }
 
+/* Die Wahl des Kategorietyps ist ein Feld mit Label, die Erklaerung hinter
+ * "Mehr dazu" (R24, G4-Notizen-P3-1). */
 .note-category-editor__scope {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   flex: 1 1 0;
   min-width: 0;
   gap: var(--space-1);
 }
 
-.note-category-editor__scope .form-input {
-  flex: 1;
-  min-width: 0;
-  width: 100%;
+.note-category-editor__scope .settings-hint-fold {
+  margin-block-end: 0;
 }
 
 .note-category-editor__create {
@@ -537,7 +537,6 @@
   }
   .note-category-editor__create { align-items: stretch; }
   .note-category-editor__scope { flex: 1 1 100%; }
-  .note-category-editor__scope .form-input { flex: 1; }
   .note-category-editor__create > .btn { width: 100%; }
 }
 
@@ -736,7 +735,10 @@
   min-height: max(18.75rem, 38vh);
   min-height: max(18.75rem, 38dvh);
   field-sizing: content;
-  resize: vertical;
+  /* Kein Ziehgriff (Critique R24 G4-Notizen-P3-1): das Feld waechst mit dem
+   * Text (field-sizing) und traegt die Hoehe der Flaeche - der native Griff
+   * war ein Bedienelement ohne Aufgabe in der Ecke der Arbeitsflaeche. */
+  resize: none;
   line-height: var(--line-height-relaxed);
 }
 

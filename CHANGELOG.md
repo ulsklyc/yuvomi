@@ -59,6 +59,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The inventory leads with one line.** Items and total value stand as one line at the top in every
   width instead of three tiles, and "Needs attention 1" is a filter chip that shows exactly the items
   with an upcoming deadline - it only appears when there is one.
+- **Notes filter by person with faces.** The "Created by" chips above the notes show each person's
+  colour and initials with the first name, like the person filters in the calendar and tasks. In the
+  note editor, Read and Edit are plain words, the category type has a visible label with its
+  explanation under "Learn more" instead of an info tooltip, and the text field no longer shows a
+  resize handle.
 - **One balance sentence.** When a group has a single open debt that involves you, the figure at the
   top says it with the name ("You owe Alex Johnson 24.14 €") and the balances list no longer repeats it.
 - **Tapping a meal shows it first.** The meal card opens a read view (date, meal, cook, ingredients,
