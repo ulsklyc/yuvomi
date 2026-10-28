@@ -471,6 +471,16 @@ function applyInitialFocus(container, initialFocus) {
 function resolveInitialFocus(container, initialFocus) {
   if (initialFocus === 'none') return null;
   if (initialFocus && typeof initialFocus.focus === 'function') return initialFocus;
+  // EIN SELEKTOR NENNT DAS PFLICHTFELD, DAS DIE REGEL NICHT FINDET (R24,
+  // Critique G5 P2-4). `firstEntryField` sucht zuerst ein Tippfeld - steht
+  // vor dem ersten Tippfeld eine Pflicht-AUSWAHL (Aktivitaet: „Art *" vor dem
+  // Zeitpunkt), landete der Fokus im Datum und die Tastatur fuhr hoch. Ein
+  // Dialog, dessen Pflichtfeld eine Auswahl ist, nennt sie; fehlt sie, gilt
+  // die Regel.
+  if (typeof initialFocus === 'string' && /^[#.[]/.test(initialFocus)) {
+    const named = container.querySelector?.(initialFocus);
+    if (named && !named.closest?.('[hidden], [inert]')) return named;
+  }
   if (initialFocus === 'edit' && typeof matchMedia === 'function' && matchMedia('(hover: none)').matches) {
     const heading = container.querySelector?.('.modal-panel__title');
     if (heading) {
@@ -2004,7 +2014,8 @@ export function armPointerDeadTime(root, { now = () => performance.now(), durati
  * @param {Function} [opts.onClose]  - Callback, wird aufgerufen wenn das Modal geschlossen wird
  * @param {Function} [opts.onDelete] - Falls vorhanden, wird ein Löschen-Button eingebaut
  * @param {string}   [opts.size='md'] - 'sm' (400px) | 'md' (520px) | 'lg' (680px) | 'xl' (min(960px, 95vw)); Breiten siehe layout.css .modal-panel--*
- * @param {'first-field'|'edit'|'none'|HTMLElement} [opts.initialFocus='first-field'] - siehe applyInitialFocus;
+ * @param {'first-field'|'edit'|'none'|HTMLElement|string} [opts.initialFocus='first-field'] - siehe applyInitialFocus
+ *   (ein Selektor ab `#`, `.` oder `[` nennt das Pflichtfeld, resolveInitialFocus);
  *   `'edit'` fuer das Bearbeiten eines bestehenden Eintrags (resolveInitialFocus)
  * @param {{label: string, id?: string, onClick?: Function}} [opts.headerAction] - Textbutton rechts im Kopf, links vom Schließen-X
  * @param {boolean} [opts.dirtyGuard=true] - `false` für Ansichtsblätter, deren
@@ -3307,10 +3318,12 @@ export function btnError(btn) {
  * "edit-autofocus" (jeder Dialog mit Bearbeiten-Titel setzt initialFocus).
  *
  * @param {boolean} isEdit
- * @returns {'edit'|'first-field'}
+ * @param {string} [required] - Selektor des ersten Pflichtfelds, wenn es eine
+ *   Auswahl ist (die Regel sucht Tippfelder zuerst, resolveInitialFocus)
+ * @returns {string}
  */
-export function dialogInitialFocus(isEdit) {
-  return isEdit ? 'edit' : 'first-field';
+export function dialogInitialFocus(isEdit, required = 'first-field') {
+  return isEdit ? 'edit' : required;
 }
 
 // --------------------------------------------------------

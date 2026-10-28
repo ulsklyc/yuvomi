@@ -1728,7 +1728,7 @@ button.health-med-card:hover {
   color: var(--color-text-primary);
 }
 
-.health-lab-trend__select .input {
+.health-lab-trend__select .form-input {
   min-width: 140px;
 }
 

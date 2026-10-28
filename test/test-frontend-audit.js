@@ -19191,7 +19191,8 @@ test('Gesundheit: die letzten Vitalwerte ueberspannen die Spalten der Uebersicht
   // je Zeile.
   const health = read('../public/pages/health.js');
   // Seit R16 ist ihr Titel zugleich der Weg zu allen Werten (fuenfter Parameter).
-  assert.match(health, /overviewCard\('activity', 'health\.overview\.vitals\.title', overviewVitalsMarkup\(\), 'vitals', \{ action: 'ov-go-vitals' \}\)/,
+  // R24 (G5 P2-7): am Telefon heisst sie „Zuletzt gemessen" - Teilname und Weg bleiben.
+  assert.match(health, /overviewCard\('activity', phone \? 'health\.overview\.vitals\.recentTitle' : 'health\.overview\.vitals\.title',\s*overviewVitalsMarkup\(\), 'vitals', \{ action: 'ov-go-vitals' \}\)/,
     'die Vitalwerte-Karte traegt ihren Teilnamen - an ihm haengt die Spannweite');
   const css = read('../public/styles/health.css');
   const span = [...eachRule(css)].find(({ selector, at }) => selector.trim() === '.health-overview__card--vitals' && !at.length);
@@ -21633,12 +21634,11 @@ test('R17 E6: die Zwei-Felder-Zeile steht einmal in layout.css, kein Modulblatt 
 // die uebrigen Dateien stehen als Arbeitsvorrat in ALIAS_PENDING, und die
 // Liste darf nur schrumpfen.
 const ALIAS_PENDING = new Set([
-  '../public/pages/health.js', '../public/pages/tasks.js', '../public/pages/documents.js',
+  '../public/pages/tasks.js', '../public/pages/documents.js',
   '../public/pages/rewards.js', '../public/pages/calendar.js', '../public/pages/setup.js',
   '../public/pages/join.js', '../public/pages/login.js', '../public/pages/reset-password.js',
   '../public/pages/forgot-password.js', '../public/components/user-multi-select.js',
   '../public/components/tag-manager.js',
-  '../public/settings/pages/modules-health.js',
 ]);
 
 test('R17 E6: Dialog-Markup traegt `.form-label`/`.form-input`, nicht die Alias-Klassen', () => {

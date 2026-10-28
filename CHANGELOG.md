@@ -206,6 +206,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Quick capture" card is gone - the menu at "+ Record" offers the same - and preventive care is called
   "Preventive care" on its button and in its dialog ("Add preventive care") instead of "Checkup" and
   "Add entry".
+- **Health dialogs ask for the important thing first.** Logging a workout puts you on "Type" instead of
+  the date, and preventive care marks its name as required when no type is chosen. Recording nutrition
+  shows name, time, meal and energy; fat, carbohydrates, protein and the rest sit under "More details",
+  which names what it holds - as in the medication and preventive care dialogs. Editing an existing entry
+  no longer brings up the keyboard on phones. Without any entry and without a daily goal, Nutrition shows
+  one empty state instead of the goal hint above it.
 - **The Health overview starts with today.** On phones "As needed" now stands right below "Due today",
   before the list of areas, instead of behind "Show all values"; the card with the two latest
   measurements is called "Last measured". On the desktop an area's name stands above it without a card

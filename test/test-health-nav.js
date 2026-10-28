@@ -1038,3 +1038,27 @@ test('R24 G5 P3-1: im Personenmenue steht „Ich" zuerst', async () => {
   assert.deepEqual(order, ['1', '3', '2'], 'ich zuerst, die anderen in ihrer Reihenfolge');
   assert.match(html, /aria-label="Person: Emma"/, 'der Knopf nennt weiter die gewaehlte Person');
 });
+
+// R24 (Critique G5 P2-4, P3-6): Dialoge der Gesundheit nach D4. Gemessen
+// vorher: Aktivitaet Fokus im Datum (Art * davor), Vorsorge-Name ohne Stern,
+// Naehrwerte 850px mit neun Zahlfeldern; leere Naehrwerte mit zwei
+// Leerzustaenden (Ziel-Hinweis + Bereichs-Leerzustand). Nachher (1440):
+// Aktivitaet Fokus „Art *", Vorsorge „Name *" required, Naehrwerte 526px.
+test('R24 G5 P2-4/P3-6: Pflichtfeld zuerst, Seltenes gefaltet und benannt, ein Leerzustand', () => {
+  const prev = HEALTH_JS.slice(HEALTH_JS.indexOf('function openPreventionModal('), HEALTH_JS.indexOf('function collectPreventionBody('));
+  assert.match(prev, /for="prevention-name">\$\{esc\(t\('health\.prevention\.field\.name'\)\)\}\$\{REQUIRED_MARK\}/, 'der Name traegt den Stern');
+  assert.match(prev, /nameInput\.required = !typeSelect\.value/, 'Pflicht, solange keine Art gewaehlt ist');
+  assert.match(prev, /advancedSection\(advancedFieldsHtml, \{[\s\S]{0,80}hint:/, 'Weitere Angaben nennt Intervall & Co.');
+  const meds = HEALTH_JS.slice(HEALTH_JS.indexOf('function openMedModal('), HEALTH_JS.indexOf('function collectMedBody('));
+  assert.match(meds, /hint: \[t\('health\.meds\.field\.stockQty'\)/, 'auch das Medikament nennt, was dahinter liegt');
+  const nut = HEALTH_JS.slice(HEALTH_JS.indexOf('function openNutritionModal('), HEALTH_JS.indexOf('function collectNutritionBody('));
+  assert.match(nut, /nutrientFieldsMarkup\('nutrition-entry', row, \{ keys: \[NUTRIENTS\[0\]\.key\] \}\)/, 'sichtbar nur die Energie');
+  assert.match(nut, /advancedSection\(`\s*\$\{nutrientFieldsMarkup\('nutrition-entry', row, \{ keys: NUTRIENTS\.slice\(1\)/, 'die Makros hinter Weitere Angaben');
+  for (const area of ['vitals', 'meds', 'labs', 'prevention', 'nutrition']) {
+    const fn = HEALTH_JS.slice(HEALTH_JS.indexOf(`title: isEdit ? t('health.${area}.edit')`), HEALTH_JS.indexOf(`title: isEdit ? t('health.${area}.edit')`) + 300);
+    assert.match(fn, /initialFocus: dialogInitialFocus\(isEdit\)/, `${area}: Anlegen erstes Pflichtfeld, Bearbeiten am Finger der Titel`);
+  }
+  const shell = HEALTH_JS.slice(HEALTH_JS.indexOf('function renderNutritionShell('), HEALTH_JS.indexOf('function nutritionTodaySectionMarkup('));
+  assert.match(shell, /\$\{entries\.length \|\| nutrition\.summary\?\.target \? nutritionTodaySectionMarkup\(own\) : ''\}/,
+    'ohne Eintrag und ohne Ziel nur der Leerzustand des Bereichs');
+});

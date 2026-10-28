@@ -178,7 +178,7 @@ const STUBS = {
   `,
   '/components/modal.js': `
     // Dialogregel Erstfokus (Critique R24 S3): wie das Original, rein.
-    export const dialogInitialFocus = (isEdit) => (isEdit ? 'edit' : 'first-field');
+    export const dialogInitialFocus = (isEdit, required = 'first-field') => (isEdit ? 'edit' : required);
     export const openModal = (...args) => globalThis.__openModal?.(...args);
     // Die letzte Eingabe (Taste oder Zeiger); wer den Tastaturweg meint, setzt
     // globalThis.__lastInputKeyboard = true.

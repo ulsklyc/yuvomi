@@ -23,7 +23,7 @@ import { zonedDateKey } from '/utils/timezone.js';
 import { DATE_STATUS_ALERT_DAYS } from '/utils/date-status.js';
 import { nowFields, nowDateTimeValue } from '/utils/timezone.js';
 import { trendMarkup } from '/utils/metric-card.js';
-import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, constraintErrors, advancedSection, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, constraintErrors, advancedSection, refocusAfterRender, dialogInitialFocus } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { formRowsHtml, formRowHtml, formCompositeHtml } from '/utils/form-row.js';
@@ -2775,6 +2775,8 @@ function openVitalModal(opts = {}) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.vitals.edit') : t('health.vitals.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'md',
     // Aus dem mobilen Detailblatt geoeffnet, fuehrt das Schliessen dorthin
     // zurueck (openVitalSheet) - auf jedem Weg: Speichern, Abbrechen, Loeschen.
@@ -4050,8 +4052,8 @@ function openMedLogModal(logId) {
       <form id="medlog-form" class="form-stack" novalidate>
         <p class="form-hint">${esc(entry.medName)}</p>
         <div class="form-field">
-          <label class="label" for="medlog-status">${esc(t('health.meds.log.statusLabel'))}</label>
-          <select class="input" id="medlog-status">
+          <label class="form-label" for="medlog-status">${esc(t('health.meds.log.statusLabel'))}</label>
+          <select class="form-input" id="medlog-status">
             <option value="taken"${entry.status === 'taken' ? ' selected' : ''}>${esc(t('health.meds.status.taken'))}</option>
             <option value="skipped"${entry.status === 'skipped' ? ' selected' : ''}>${esc(t('health.meds.status.skipped'))}</option>
             <option value="pending"${entry.status === 'pending' ? ' selected' : ''}>${esc(t('health.meds.log.statusPending'))}</option>
@@ -4059,11 +4061,11 @@ function openMedLogModal(logId) {
         </div>
         <div class="modal-grid modal-grid--2" id="medlog-when">
           <div class="form-field">
-            <label class="label" for="medlog-date">${esc(t('health.meds.log.dateLabel'))}</label>
+            <label class="form-label" for="medlog-date">${esc(t('health.meds.log.dateLabel'))}</label>
             <yuvomi-datepicker id="medlog-date" type="date" value="${esc(dateValue)}"></yuvomi-datepicker>
           </div>
           <div class="form-field">
-            <label class="label" for="medlog-time">${esc(t('health.meds.log.timeLabel'))}</label>
+            <label class="form-label" for="medlog-time">${esc(t('health.meds.log.timeLabel'))}</label>
             <yuvomi-datepicker id="medlog-time" type="time" value="${esc(timeValue)}"></yuvomi-datepicker>
           </div>
         </div>
@@ -4375,23 +4377,25 @@ function openMedModal(med) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.meds.edit') : t('health.meds.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'md',
     content: `
       <form id="med-form" class="form-stack" novalidate>
         <div class="form-field">
-          <label class="label" for="med-name">${esc(t('health.meds.field.name'))}${REQUIRED_MARK}</label>
-          <input class="input" id="med-name" type="text" maxlength="200" required value="${esc(val(med?.name))}">
+          <label class="form-label" for="med-name">${esc(t('health.meds.field.name'))}${REQUIRED_MARK}</label>
+          <input class="form-input" id="med-name" type="text" maxlength="200" required value="${esc(val(med?.name))}">
         </div>
         ${/* Paare teilen sich die Zeile auch im 390er-Blatt (.form-pair,
              layout.css): Dosis/Form und Uhrzeit/Dosis sind kurze Werte. */ ''}
         <div class="form-pair">
           <div class="form-field">
-            <label class="label" for="med-dosage">${esc(t('health.meds.field.dosageText'))}</label>
-            <input class="input" id="med-dosage" type="text" maxlength="100" value="${esc(val(med?.dosage_text))}">
+            <label class="form-label" for="med-dosage">${esc(t('health.meds.field.dosageText'))}</label>
+            <input class="form-input" id="med-dosage" type="text" maxlength="100" value="${esc(val(med?.dosage_text))}">
           </div>
           <div class="form-field">
-            <label class="label" for="med-form-field">${esc(t('health.meds.field.form'))}</label>
-            <input class="input" id="med-form-field" type="text" maxlength="30" value="${esc(val(med?.form))}">
+            <label class="form-label" for="med-form-field">${esc(t('health.meds.field.form'))}</label>
+            <input class="form-input" id="med-form-field" type="text" maxlength="30" value="${esc(val(med?.form))}">
           </div>
         </div>
         ${formRowsHtml([
@@ -4403,33 +4407,33 @@ function openMedModal(med) {
              Auskunft darueber, wann die naechste Dosis ansteht. -->
         <div class="modal-grid modal-grid--2" id="med-prn-fields">
           <div class="form-field">
-            <label class="label" for="med-interval">${esc(t('health.meds.field.minInterval'))}</label>
+            <label class="form-label" for="med-interval">${esc(t('health.meds.field.minInterval'))}</label>
             <!-- Die Grenzen sind die der Route: groesser als 0 (ein Abstand von
                  0 waere ein Countdown, der immer abgelaufen ist) und hoechstens
                  28 Tage. Nicht enger, sonst liesse sich ein ueber die API
                  gesetzter Viertelstundenabstand hier nicht mehr speichern -
                  auch dann nicht, wenn nur der Name geaendert wird. Leer bleiben
                  darf das Feld weiterhin: das ist „kein Abstand hinterlegt". -->
-            <input class="input" id="med-interval" type="number" inputmode="decimal" step="any" min="0.01" max="672"
+            <input class="form-input" id="med-interval" type="number" inputmode="decimal" step="any" min="0.01" max="672"
                    value="${esc(val(med?.min_interval_hours))}">
             <p class="form-hint">${esc(t('health.meds.field.minIntervalHint'))}</p>
           </div>
           <div class="form-field">
-            <label class="label" for="med-prn-dose">${esc(t('health.meds.field.prnDose'))}</label>
-            <input class="input" id="med-prn-dose" type="number" inputmode="decimal" step="any" min="0"
+            <label class="form-label" for="med-prn-dose">${esc(t('health.meds.field.prnDose'))}</label>
+            <input class="form-input" id="med-prn-dose" type="number" inputmode="decimal" step="any" min="0"
                    value="${esc(val(med?.prn_dose_qty))}">
             <p class="form-hint">${esc(t('health.meds.field.prnDoseHint'))}</p>
           </div>
         </div>
 
         <div class="health-sched">
-          <span class="label">${esc(t('health.meds.schedule.title'))}</span>
+          <span class="form-label">${esc(t('health.meds.schedule.title'))}</span>
           <div id="med-sched-editor"></div>
         </div>
 
         <div class="form-field">
-          <label class="label" for="med-visibility">${esc(t('health.meds.field.visibility'))}</label>
-          <select class="input" id="med-visibility">
+          <label class="form-label" for="med-visibility">${esc(t('health.meds.field.visibility'))}</label>
+          <select class="form-input" id="med-visibility">
             <option value="private" ${(med?.visibility || defaultVisibility('meds')) === 'family' ? '' : 'selected'}>${esc(t('health.meds.visibility.private'))}</option>
             <option value="family" ${(med?.visibility || defaultVisibility('meds')) === 'family' ? 'selected' : ''}>${esc(t('health.meds.visibility.family'))}</option>
           </select>
@@ -4438,22 +4442,26 @@ function openMedModal(med) {
         ${advancedSection(`
         <div class="modal-grid modal-grid--3">
           <div class="form-field">
-            <label class="label" for="med-stock">${esc(t('health.meds.field.stockQty'))}</label>
-            <input class="input" id="med-stock" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.stock_qty))}">
+            <label class="form-label" for="med-stock">${esc(t('health.meds.field.stockQty'))}</label>
+            <input class="form-input" id="med-stock" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.stock_qty))}">
           </div>
           <div class="form-field">
-            <label class="label" for="med-stock-unit">${esc(t('health.meds.field.stockUnit'))}</label>
-            <input class="input" id="med-stock-unit" type="text" maxlength="30" value="${esc(val(med?.stock_unit))}">
+            <label class="form-label" for="med-stock-unit">${esc(t('health.meds.field.stockUnit'))}</label>
+            <input class="form-input" id="med-stock-unit" type="text" maxlength="30" value="${esc(val(med?.stock_unit))}">
           </div>
           <div class="form-field">
-            <label class="label" for="med-refill">${esc(t('health.meds.field.refillThreshold'))}</label>
-            <input class="input" id="med-refill" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.refill_threshold))}">
+            <label class="form-label" for="med-refill">${esc(t('health.meds.field.refillThreshold'))}</label>
+            <input class="form-input" id="med-refill" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.refill_threshold))}">
           </div>
         </div>
         <div class="form-field">
-          <label class="label" for="med-note">${esc(t('health.meds.field.note'))}</label>
-          <textarea class="input" id="med-note" rows="2" maxlength="5000">${esc(val(med?.note))}</textarea>
-        </div>`, { open: moreOpen })}
+          <label class="form-label" for="med-note">${esc(t('health.meds.field.note'))}</label>
+          <textarea class="form-input" id="med-note" rows="2" maxlength="5000">${esc(val(med?.note))}</textarea>
+        </div>`, {
+          open: moreOpen,
+          // Was dahinter liegt, nennt die Zeile (R24 D4, Inventar-Muster) - aus den Feldnamen, wie im Zyklus-Tag.
+          hint: [t('health.meds.field.stockQty'), t('health.meds.field.refillThreshold'), t('health.meds.field.note')].join(', '),
+        })}
 
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="med-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
@@ -4582,16 +4590,16 @@ function renderSchedEditor(panel, med, draft = null) {
     <div class="health-sched-add">
       <div class="form-pair">
         <div class="form-field">
-          <label class="label" for="sched-time">${esc(t('health.meds.schedule.time'))}</label>
+          <label class="form-label" for="sched-time">${esc(t('health.meds.schedule.time'))}</label>
           <yuvomi-datepicker id="sched-time" type="time" value="08:00"></yuvomi-datepicker>
         </div>
         <div class="form-field">
-          <label class="label" for="sched-dose">${esc(t('health.meds.schedule.dose'))}</label>
-          <input class="input" id="sched-dose" type="number" inputmode="decimal" step="any" min="0">
+          <label class="form-label" for="sched-dose">${esc(t('health.meds.schedule.dose'))}</label>
+          <input class="form-input" id="sched-dose" type="number" inputmode="decimal" step="any" min="0">
         </div>
       </div>
       <div class="form-field">
-        <span class="label">${esc(t('health.meds.schedule.days'))}</span>
+        <span class="form-label">${esc(t('health.meds.schedule.days'))}</span>
         <div class="health-weekday-toggle" id="sched-days">
           ${WEEKDAY_KEYS.map((k, i) => `
             <button type="button" class="health-weekday is-active" data-day="${i}" aria-pressed="true">${esc(t(WEEKDAY_LABEL_KEYS[i]))}</button>`).join('')}
@@ -4979,7 +4987,7 @@ function labTrendMarkup() {
         <span class="health-lab-trend__title">${esc(t('health.labs.trend.title'))}</span>
         <label class="health-lab-trend__select">
           <span class="sr-only">${esc(t('health.labs.trend.analyte'))}</span>
-          <select class="input" id="health-lab-trend-analyte">${options}</select>
+          <select class="form-input" id="health-lab-trend-analyte">${options}</select>
         </label>
       </div>
       ${body}
@@ -5168,33 +5176,35 @@ function openLabModal(report) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.labs.edit') : t('health.labs.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'md',
     content: `
       <form id="lab-form" class="form-stack" novalidate>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="lab-date">${esc(t('health.labs.field.reportDate'))}</label>
+            <label class="form-label" for="lab-date">${esc(t('health.labs.field.reportDate'))}</label>
             <yuvomi-datepicker id="lab-date" type="date" value="${esc(dateValue)}"></yuvomi-datepicker>
           </div>
           <div class="form-field">
-            <label class="label" for="lab-name">${esc(t('health.labs.field.labName'))}</label>
-            <input class="input" id="lab-name" type="text" maxlength="200" value="${esc(val(report?.lab_name))}">
+            <label class="form-label" for="lab-name">${esc(t('health.labs.field.labName'))}</label>
+            <input class="form-input" id="lab-name" type="text" maxlength="200" value="${esc(val(report?.lab_name))}">
           </div>
         </div>
         <div class="form-field">
-          <label class="label" for="lab-visibility">${esc(t('health.labs.field.visibility'))}</label>
-          <select class="input" id="lab-visibility">
+          <label class="form-label" for="lab-visibility">${esc(t('health.labs.field.visibility'))}</label>
+          <select class="form-input" id="lab-visibility">
             <option value="private" ${(report?.visibility || defaultVisibility('labs')) === 'family' ? '' : 'selected'}>${esc(t('health.labs.visibility.private'))}</option>
             <option value="family" ${(report?.visibility || defaultVisibility('labs')) === 'family' ? 'selected' : ''}>${esc(t('health.labs.visibility.family'))}</option>
           </select>
         </div>
         <div class="form-field">
-          <label class="label" for="lab-note">${esc(t('health.labs.field.note'))}</label>
-          <textarea class="input" id="lab-note" rows="2" maxlength="5000">${esc(val(report?.note))}</textarea>
+          <label class="form-label" for="lab-note">${esc(t('health.labs.field.note'))}</label>
+          <textarea class="form-input" id="lab-note" rows="2" maxlength="5000">${esc(val(report?.note))}</textarea>
         </div>
 
         <div class="health-results">
-          <span class="label">${esc(t('health.labs.results.title'))}</span>
+          <span class="form-label">${esc(t('health.labs.results.title'))}</span>
           <div id="lab-results-editor"></div>
         </div>
 
@@ -5325,26 +5335,26 @@ function resultFormMarkup(editing = null) {
     <div class="health-results-add"${editing ? ` data-editing="${esc(editing.id)}"` : ''}>
       <div class="modal-grid modal-grid--2">
         <div class="form-field">
-          <label class="label" for="res-analyte">${esc(t('health.labs.results.analyte'))}</label>
-          <input class="input" id="res-analyte" type="text" maxlength="120"${val(editing?.analyte)}>
+          <label class="form-label" for="res-analyte">${esc(t('health.labs.results.analyte'))}</label>
+          <input class="form-input" id="res-analyte" type="text" maxlength="120"${val(editing?.analyte)}>
         </div>
         <div class="form-field">
-          <label class="label" for="res-value">${esc(t('health.labs.results.value'))}</label>
-          <input class="input" id="res-value" type="number" inputmode="decimal" step="any"${val(editing?.value_num)}>
+          <label class="form-label" for="res-value">${esc(t('health.labs.results.value'))}</label>
+          <input class="form-input" id="res-value" type="number" inputmode="decimal" step="any"${val(editing?.value_num)}>
         </div>
       </div>
       <div class="modal-grid modal-grid--3">
         <div class="form-field">
-          <label class="label" for="res-unit">${esc(t('health.labs.results.unit'))}</label>
-          <input class="input" id="res-unit" type="text" maxlength="30"${val(editing?.unit)}>
+          <label class="form-label" for="res-unit">${esc(t('health.labs.results.unit'))}</label>
+          <input class="form-input" id="res-unit" type="text" maxlength="30"${val(editing?.unit)}>
         </div>
         <div class="form-field">
-          <label class="label" for="res-ref-low">${esc(t('health.labs.results.refLow'))}</label>
-          <input class="input" id="res-ref-low" type="number" inputmode="decimal" step="any"${val(editing?.ref_low)}>
+          <label class="form-label" for="res-ref-low">${esc(t('health.labs.results.refLow'))}</label>
+          <input class="form-input" id="res-ref-low" type="number" inputmode="decimal" step="any"${val(editing?.ref_low)}>
         </div>
         <div class="form-field">
-          <label class="label" for="res-ref-high">${esc(t('health.labs.results.refHigh'))}</label>
-          <input class="input" id="res-ref-high" type="number" inputmode="decimal" step="any"${val(editing?.ref_high)}>
+          <label class="form-label" for="res-ref-high">${esc(t('health.labs.results.refHigh'))}</label>
+          <input class="form-input" id="res-ref-high" type="number" inputmode="decimal" step="any"${val(editing?.ref_high)}>
         </div>
       </div>
       <div class="health-results-preview" id="res-flag-preview" aria-live="polite"></div>
@@ -5877,6 +5887,8 @@ function openActivityModal(row, opts = {}) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.activity.edit') : t('health.activity.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit, '#activity-type'),
     size: 'md',
     content: `
       <form id="activity-form" class="form-stack" novalidate>
@@ -5936,8 +5948,8 @@ function openActivityModal(row, opts = {}) {
           }),
         ])}
         <div class="form-field">
-          <label class="label" for="activity-note">${esc(t('health.activity.field.note'))}</label>
-          <textarea class="input" id="activity-note" rows="2" maxlength="2000">${esc(val(row?.note))}</textarea>
+          <label class="form-label" for="activity-note">${esc(t('health.activity.field.note'))}</label>
+          <textarea class="form-input" id="activity-note" rows="2" maxlength="2000">${esc(val(row?.note))}</textarea>
         </div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="activity-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
@@ -6344,71 +6356,79 @@ function openPreventionModal(row) {
   const advancedFieldsHtml = `
     <div class="modal-grid modal-grid--2">
       <div class="form-field">
-        <label class="label" for="prevention-interval">${esc(t('health.prevention.field.intervalMonths'))}</label>
+        <label class="form-label" for="prevention-interval">${esc(t('health.prevention.field.intervalMonths'))}</label>
         <div class="health-prevention-interval-row">
-          <input class="input health-prevention-interval-row__value" id="prevention-interval" type="number" inputmode="numeric" min="1" step="1" value="${esc(val(interval.value))}">
-          <select class="input health-prevention-interval-row__unit" id="prevention-interval-unit" aria-label="${esc(t('common.unit'))}">${preventionIntervalUnitOptions(interval.unit)}</select>
+          <input class="form-input health-prevention-interval-row__value" id="prevention-interval" type="number" inputmode="numeric" min="1" step="1" value="${esc(val(interval.value))}">
+          <select class="form-input health-prevention-interval-row__unit" id="prevention-interval-unit" aria-label="${esc(t('common.unit'))}">${preventionIntervalUnitOptions(interval.unit)}</select>
         </div>
       </div>
       <div class="form-field">
-        <label class="label" for="prevention-next-due">${esc(t('health.prevention.field.nextDueOn'))}</label>
+        <label class="form-label" for="prevention-next-due">${esc(t('health.prevention.field.nextDueOn'))}</label>
         <yuvomi-datepicker id="prevention-next-due" type="date" value="${esc(val(row?.next_due_on))}"></yuvomi-datepicker>
       </div>
     </div>
     <div class="form-field">
-      <label class="label" for="prevention-offset">${esc(t('health.prevention.field.reminderOffsetDays'))}</label>
-      <input class="input" id="prevention-offset" type="number" inputmode="numeric" min="0" max="365" step="1"
+      <label class="form-label" for="prevention-offset">${esc(t('health.prevention.field.reminderOffsetDays'))}</label>
+      <input class="form-input" id="prevention-offset" type="number" inputmode="numeric" min="0" max="365" step="1"
              value="${esc(val(row?.reminder_offset_days))}" placeholder="30">
     </div>`;
 
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.prevention.edit') : t('health.prevention.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'md',
     content: `
       <form id="prevention-form" class="form-stack" novalidate>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="prevention-type">${esc(t('health.prevention.field.type'))}</label>
-            <select class="input" id="prevention-type">${preventionTypeSelectMarkup(row?.type_id ?? null)}</select>
+            <label class="form-label" for="prevention-type">${esc(t('health.prevention.field.type'))}</label>
+            <select class="form-input" id="prevention-type">${preventionTypeSelectMarkup(row?.type_id ?? null)}</select>
           </div>
+          ${/* OHNE ART IST DER NAME PFLICHT - UND SAGT ES (R24, Critique G5 P2-4):
+               das Feld trug keinen Stern, war aber das einzige, das den Eintrag
+               benennt. `required` folgt der Sichtbarkeit (syncName, gleich beim Oeffnen). */ ''}
           <div class="form-field" id="prevention-name-field" ${row?.type_id ? 'hidden' : ''}>
-            <label class="label" for="prevention-name">${esc(t('health.prevention.field.name'))}</label>
-            <input class="input" id="prevention-name" type="text" maxlength="200" value="${esc(val(row?.name))}">
+            <label class="form-label" for="prevention-name">${esc(t('health.prevention.field.name'))}${REQUIRED_MARK}</label>
+            <input class="form-input" id="prevention-name" type="text" maxlength="200" required value="${esc(val(row?.name))}">
           </div>
         </div>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="prevention-given-on">${esc(t('health.prevention.field.givenOn'))}</label>
+            <label class="form-label" for="prevention-given-on">${esc(t('health.prevention.field.givenOn'))}</label>
             <yuvomi-datepicker id="prevention-given-on" type="date" value="${esc(row?.given_on || todayKey())}"></yuvomi-datepicker>
           </div>
           <div class="form-field">
-            <label class="label" for="prevention-dose">${esc(t('health.prevention.field.doseNumber'))}</label>
-            <input class="input" id="prevention-dose" type="number" inputmode="numeric" min="1" step="1" value="${esc(val(row?.dose_number))}">
+            <label class="form-label" for="prevention-dose">${esc(t('health.prevention.field.doseNumber'))}</label>
+            <input class="form-input" id="prevention-dose" type="number" inputmode="numeric" min="1" step="1" value="${esc(val(row?.dose_number))}">
           </div>
         </div>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="prevention-provider">${esc(t('health.prevention.field.provider'))}</label>
-            <input class="input" id="prevention-provider" type="text" maxlength="100" value="${esc(val(row?.provider))}">
+            <label class="form-label" for="prevention-provider">${esc(t('health.prevention.field.provider'))}</label>
+            <input class="form-input" id="prevention-provider" type="text" maxlength="100" value="${esc(val(row?.provider))}">
           </div>
           <div class="form-field">
-            <label class="label" for="prevention-batch">${esc(t('health.prevention.field.batch'))}</label>
-            <input class="input" id="prevention-batch" type="text" maxlength="100" value="${esc(val(row?.batch))}">
+            <label class="form-label" for="prevention-batch">${esc(t('health.prevention.field.batch'))}</label>
+            <input class="form-input" id="prevention-batch" type="text" maxlength="100" value="${esc(val(row?.batch))}">
           </div>
         </div>
         <div class="form-field">
-          <label class="label" for="prevention-note">${esc(t('health.prevention.field.note'))}</label>
-          <textarea class="input" id="prevention-note" rows="2" maxlength="5000">${esc(val(row?.note))}</textarea>
+          <label class="form-label" for="prevention-note">${esc(t('health.prevention.field.note'))}</label>
+          <textarea class="form-input" id="prevention-note" rows="2" maxlength="5000">${esc(val(row?.note))}</textarea>
         </div>
         <div class="form-field">
-          <label class="label" for="prevention-visibility">${esc(t('health.prevention.field.visibility'))}</label>
-          <select class="input" id="prevention-visibility">
+          <label class="form-label" for="prevention-visibility">${esc(t('health.prevention.field.visibility'))}</label>
+          <select class="form-input" id="prevention-visibility">
             <option value="private" ${(row?.visibility || defaultVisibility('prevention')) === 'family' ? '' : 'selected'}>${esc(t('health.prevention.visibility.private'))}</option>
             <option value="family" ${(row?.visibility || defaultVisibility('prevention')) === 'family' ? 'selected' : ''}>${esc(t('health.prevention.visibility.family'))}</option>
           </select>
         </div>
-        ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
+        ${advancedSection(advancedFieldsHtml, {
+          open: advancedOpen,
+          hint: [t('health.prevention.field.intervalMonths'), t('health.prevention.field.nextDueOn'), t('health.prevention.field.reminderOffsetDays')].join(', '),
+        })}
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="prevention-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
@@ -6418,7 +6438,9 @@ function openPreventionModal(row) {
     onSave(panel) {
       const typeSelect = panel.querySelector('#prevention-type');
       const nameField = panel.querySelector('#prevention-name-field');
-      const syncName = () => { nameField.hidden = !!typeSelect.value; };
+      const nameInput = panel.querySelector('#prevention-name');
+      const syncName = () => { nameField.hidden = !!typeSelect.value; nameInput.required = !typeSelect.value; };
+      syncName();
       typeSelect.addEventListener('change', syncName);
 
       panel.querySelector('[data-action="cancel"]')?.addEventListener('click', () => closeModal({ force: true }));
@@ -6656,7 +6678,12 @@ function renderNutritionShell() {
     ${personSwitcherMarkup(nutrition.members, nutrition.personId, nutrition.meId,
       { menuId: 'health-person-menu-nutrition', label: t('health.nutrition.personsLabel') })}
     ${readOnlyBannerMarkup(nutrition.members, nutrition.personId, own, nutrition.meId)}
-    ${nutritionTodaySectionMarkup(own)}
+    ${/* EIN LEERZUSTAND JE BEREICH (R22 D12; R24 Critique G5 P3-6): ohne einen
+         Eintrag und ohne Ziel standen „Noch kein Tagesziel gesetzt." + „Ziel
+         setzen" UND darunter der Leerzustand - zwei Leerzustaende uebereinander.
+         Der Ziel-Abschnitt kommt mit dem ersten Eintrag (oder steht, sobald
+         ein Ziel gesetzt ist). */ ''}
+    ${entries.length || nutrition.summary?.target ? nutritionTodaySectionMarkup(own) : ''}
     ${entries.length
       ? `<h3 class="health-nutrition__entries-title u-section-title">${esc(t('health.nutrition.entriesTitle'))}</h3>
       <ul class="health-nutrition-row-list">${entries.map((row) => nutritionRowMarkup(row, own)).join('')}</ul>`
@@ -6810,9 +6837,10 @@ function nutritionMealSelectMarkup(current) {
  * Als Zeilen (Re-Kritik 2026-10-17): Naehrstoff links, Zahl mit Einheit rechts,
  * wie Puls und Gewicht in der Messung - statt eines Zweierrasters gestapelter
  * Felder mit der Einheit in Klammern im Etikett. */
-function nutrientFieldsMarkup(prefix, source) {
+function nutrientFieldsMarkup(prefix, source, { keys = null } = {}) {
   const val = (v) => (v === null || v === undefined ? '' : String(v));
-  return formRowsHtml(NUTRIENTS.map((n) => formRowHtml({
+  const list = keys ? NUTRIENTS.filter((n) => keys.includes(n.key)) : NUTRIENTS;
+  return formRowsHtml(list.map((n) => formRowHtml({
     label: t(n.labelKey),
     labelFor: `${prefix}-${n.key}`,
     field: true,
@@ -6908,6 +6936,8 @@ function openNutritionModal(row) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.nutrition.edit') : t('health.nutrition.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'md',
     content: `
       <form id="nutrition-form" class="form-stack" novalidate>
@@ -6931,11 +6961,22 @@ function openNutritionModal(row) {
             control: `<select class="form-input" id="nutrition-meal-type">${nutritionMealSelectMarkup(row?.meal_type ?? null)}</select>`,
           }),
         ])}
-        ${nutrientFieldsMarkup('nutrition-entry', row)}
-        <div class="form-field">
-          <label class="label" for="nutrition-note">${esc(t('health.nutrition.field.note'))}</label>
-          <textarea class="input" id="nutrition-note" rows="2" maxlength="5000">${esc(val(row?.note))}</textarea>
-        </div>
+        ${/* BEZEICHNUNG UND ENERGIE SICHTBAR, DIE MAKROS DAHINTER (R24, Critique
+             G5 P2-4). Der Dialog war 850px hoch mit neun Zahlfeldern auf einmal,
+             waehrend Medikament und Vorsorge ihr Seltenes falten. Die Energie
+             ist die eine Zahl, die fast jeder eintraegt; Fett, Kohlenhydrate,
+             Eiweiss & Co. stehen hinter „Weitere Angaben" und nennen sich dort
+             (Inventar-Muster). Mit einem Wert beim Bearbeiten ist die Falte offen. */ ''}
+        ${nutrientFieldsMarkup('nutrition-entry', row, { keys: [NUTRIENTS[0].key] })}
+        ${advancedSection(`
+          ${nutrientFieldsMarkup('nutrition-entry', row, { keys: NUTRIENTS.slice(1).map((n) => n.key) })}
+          <div class="form-field">
+            <label class="form-label" for="nutrition-note">${esc(t('health.nutrition.field.note'))}</label>
+            <textarea class="form-input" id="nutrition-note" rows="2" maxlength="5000">${esc(val(row?.note))}</textarea>
+          </div>`, {
+          open: Boolean(row) && (NUTRIENTS.slice(1).some((n) => row[n.key] != null) || Boolean(row.note)),
+          hint: ['fat', 'carbs', 'protein'].map((k) => t(`health.nutrition.nutrient.${k}`)).concat(t('health.nutrition.field.note')).join(', '),
+        })}
         <!-- DIE GETEILTEN BESCHRIFTUNGEN, nicht eigene. docs/DECISIONS.md
              Abschnitt 5 zaehlt fuenf deutsche Formulierungen fuer denselben
              Zustand auf und nennt die gemeinsamen Labels als das, was fehlt:
@@ -7738,11 +7779,11 @@ function overviewExportMarkup() {
     <div class="health-overview__export">
       <div class="health-overview__export-range">
         <div class="form-field">
-          <label class="label" for="ov-export-from">${esc(t('health.export.rangeFrom'))}</label>
+          <label class="form-label" for="ov-export-from">${esc(t('health.export.rangeFrom'))}</label>
           <yuvomi-datepicker id="ov-export-from" type="date" value="${esc(from || '')}"></yuvomi-datepicker>
         </div>
         <div class="form-field">
-          <label class="label" for="ov-export-to">${esc(t('health.export.rangeTo'))}</label>
+          <label class="form-label" for="ov-export-to">${esc(t('health.export.rangeTo'))}</label>
           <yuvomi-datepicker id="ov-export-to" type="date" value="${esc(to || '')}"></yuvomi-datepicker>
         </div>
       </div>
@@ -9797,30 +9838,32 @@ function openPeriodModal(period) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.cycle.period.edit') : t('health.cycle.period.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'sm',
     content: `
       <form id="cycle-period-form" class="form-stack" novalidate>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="cycle-start">${esc(t('health.cycle.field.startDate'))}</label>
+            <label class="form-label" for="cycle-start">${esc(t('health.cycle.field.startDate'))}</label>
             <yuvomi-datepicker id="cycle-start" type="date" value="${esc(startVal)}"></yuvomi-datepicker>
           </div>
           <div class="form-field">
-            <label class="label" for="cycle-end">${esc(t('health.cycle.field.endDate'))}</label>
+            <label class="form-label" for="cycle-end">${esc(t('health.cycle.field.endDate'))}</label>
             <yuvomi-datepicker id="cycle-end" type="date" value="${esc(endVal)}"></yuvomi-datepicker>
           </div>
         </div>
         <p class="cycle-hint cycle-hint--warning" data-role="period-warning" hidden></p>
         <div class="form-field">
-          <label class="label" for="cycle-visibility">${esc(t('health.cycle.field.visibility'))}</label>
-          <select class="input" id="cycle-visibility">
+          <label class="form-label" for="cycle-visibility">${esc(t('health.cycle.field.visibility'))}</label>
+          <select class="form-input" id="cycle-visibility">
             <option value="private" ${cycleVisibilityFor(period) === 'family' ? '' : 'selected'}>${esc(t('health.cycle.visibility.private'))}</option>
             <option value="family" ${cycleVisibilityFor(period) === 'family' ? 'selected' : ''}>${esc(t('health.cycle.visibility.family'))}</option>
           </select>
         </div>
         <div class="form-field">
-          <label class="label" for="cycle-note">${esc(t('health.cycle.field.note'))}</label>
-          <textarea class="input" id="cycle-note" rows="2" maxlength="2000">${esc(period?.note || '')}</textarea>
+          <label class="form-label" for="cycle-note">${esc(t('health.cycle.field.note'))}</label>
+          <textarea class="form-input" id="cycle-note" rows="2" maxlength="2000">${esc(period?.note || '')}</textarea>
         </div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="cycle-delete-period"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
@@ -9914,12 +9957,12 @@ function openCycleImportModal() {
       <form id="cycle-import-form" class="form-stack" novalidate>
         <p class="cycle-hint">${esc(t('health.cycle.import.explainer'))}</p>
         <div class="form-field">
-          <label class="label" for="cycle-import-file">${esc(t('health.cycle.import.fileLabel'))}</label>
-          <input class="input" id="cycle-import-file" type="file" accept=".csv,text/csv">
+          <label class="form-label" for="cycle-import-file">${esc(t('health.cycle.import.fileLabel'))}</label>
+          <input class="form-input" id="cycle-import-file" type="file" accept=".csv,text/csv">
         </div>
         <div class="form-field">
-          <label class="label" for="cycle-import-paste">${esc(t('health.cycle.import.pasteLabel'))}</label>
-          <textarea class="input" id="cycle-import-paste" rows="6" placeholder="start_date,end_date"></textarea>
+          <label class="form-label" for="cycle-import-paste">${esc(t('health.cycle.import.pasteLabel'))}</label>
+          <textarea class="form-input" id="cycle-import-paste" rows="6" placeholder="start_date,end_date"></textarea>
         </div>
         <div id="cycle-import-errors" class="form-error cycle-import-errors" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -10112,12 +10155,12 @@ function openDayLogModal(dateKey) {
   const moreFieldsHtml = `
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="cycle-bbt">${esc(t('health.cycle.bbt.label'))}</label>
-            <input class="input" id="cycle-bbt" type="number" inputmode="decimal" step="0.01" placeholder="${esc(t('health.cycle.bbt.placeholder'))}" value="${esc(bbtValue)}">
+            <label class="form-label" for="cycle-bbt">${esc(t('health.cycle.bbt.label'))}</label>
+            <input class="form-input" id="cycle-bbt" type="number" inputmode="decimal" step="0.01" placeholder="${esc(t('health.cycle.bbt.placeholder'))}" value="${esc(bbtValue)}">
           </div>
           <div class="form-field">
-            <label class="label" for="cycle-bbt-unit">${esc(t('health.cycle.bbt.unitLabel'))}</label>
-            <select class="input" id="cycle-bbt-unit">
+            <label class="form-label" for="cycle-bbt-unit">${esc(t('health.cycle.bbt.unitLabel'))}</label>
+            <select class="form-input" id="cycle-bbt-unit">
               <option value="c" ${bbtUnit === 'c' ? 'selected' : ''}>${esc(t('health.cycle.bbt.celsius'))}</option>
               <option value="f" ${bbtUnit === 'f' ? 'selected' : ''}>${esc(t('health.cycle.bbt.fahrenheit'))}</option>
             </select>
@@ -10125,25 +10168,25 @@ function openDayLogModal(dateKey) {
         </div>
         <p class="cycle-hint">${esc(t('health.cycle.bbt.hint'))}</p>
         <div class="form-field">
-          <span class="label">${esc(t('health.cycle.mucus.label'))}</span>
+          <span class="form-label">${esc(t('health.cycle.mucus.label'))}</span>
           <div class="health-choices" data-group="mucus" role="group" aria-label="${esc(t('health.cycle.mucus.label'))}">${mucusButtons}</div>
           <p class="cycle-hint">${esc(t('health.cycle.mucus.hint'))}</p>
         </div>
         <div class="form-field">
-          <span class="label">${esc(t('health.cycle.test.label'))}</span>
+          <span class="form-label">${esc(t('health.cycle.test.label'))}</span>
           <div class="modal-grid modal-grid--2">
             <div>
-              <span class="label">${esc(t('health.cycle.test.lhLabel'))}</span>
+              <span class="form-label">${esc(t('health.cycle.test.lhLabel'))}</span>
               <div class="health-choices" data-group="lh-test" role="group" aria-label="${esc(t('health.cycle.test.lhLabel'))}">${lhButtons}</div>
             </div>
             <div>
-              <span class="label">${esc(t('health.cycle.test.pregnancyLabel'))}</span>
+              <span class="form-label">${esc(t('health.cycle.test.pregnancyLabel'))}</span>
               <div class="health-choices" data-group="pregnancy-test" role="group" aria-label="${esc(t('health.cycle.test.pregnancyLabel'))}">${pregButtons}</div>
             </div>
           </div>
         </div>
         <div class="form-field">
-          <span class="label cycle-intimacy-label"><i data-lucide="lock" class="icon-sm" aria-hidden="true"></i>${esc(t('health.cycle.intimacy.label'))}</span>
+          <span class="form-label cycle-intimacy-label"><i data-lucide="lock" class="icon-sm" aria-hidden="true"></i>${esc(t('health.cycle.intimacy.label'))}</span>
           <div class="health-choices" data-group="intimacy" role="group" aria-label="${esc(t('health.cycle.intimacy.label'))}">${intimacyButtons}</div>
           <p class="cycle-hint">${esc(t('health.cycle.intimacy.hint'))}</p>
         </div>
@@ -10165,11 +10208,11 @@ function openDayLogModal(dateKey) {
     content: `
       <form id="cycle-log-form" class="form-stack" novalidate>
         <div class="form-field">
-          <span class="label">${esc(t('health.cycle.flow.label'))}</span>
+          <span class="form-label">${esc(t('health.cycle.flow.label'))}</span>
           <div class="health-choices" data-group="flow" role="group" aria-label="${esc(t('health.cycle.flow.label'))}">${flowButtons}</div>
         </div>
         <div class="form-field">
-          <span class="label">${esc(t('health.cycle.symptom.label'))}</span>
+          <span class="form-label">${esc(t('health.cycle.symptom.label'))}</span>
           <div class="health-choices health-choices--wrap" data-group="symptoms">${symptomButtons}</div>
           <div class="cycle-quick-links">
             <button type="button" class="btn btn--ghost btn--sm" data-action="cycle-log-painkiller">${esc(t('health.cycle.quickLink.painkiller'))}</button>
@@ -10177,19 +10220,19 @@ function openDayLogModal(dateKey) {
           </div>
         </div>
         <div class="form-field">
-          <span class="label">${esc(t('health.cycle.feelings.label'))}</span>
+          <span class="form-label">${esc(t('health.cycle.feelings.label'))}</span>
           <div class="health-choices health-choices--wrap" data-group="feelings">${feelingsButtons}</div>
         </div>
         <div class="form-field">
-          <label class="label" for="cycle-log-visibility">${esc(t('health.cycle.field.visibility'))}</label>
-          <select class="input" id="cycle-log-visibility">
+          <label class="form-label" for="cycle-log-visibility">${esc(t('health.cycle.field.visibility'))}</label>
+          <select class="form-input" id="cycle-log-visibility">
             <option value="private" ${cycleVisibilityFor(existing) === 'family' ? '' : 'selected'}>${esc(t('health.cycle.visibility.private'))}</option>
             <option value="family" ${cycleVisibilityFor(existing) === 'family' ? 'selected' : ''}>${esc(t('health.cycle.visibility.family'))}</option>
           </select>
         </div>
         <div class="form-field">
-          <label class="label" for="cycle-log-note">${esc(t('health.cycle.field.note'))}</label>
-          <textarea class="input" id="cycle-log-note" rows="2" maxlength="2000">${esc(existing?.note || '')}</textarea>
+          <label class="form-label" for="cycle-log-note">${esc(t('health.cycle.field.note'))}</label>
+          <textarea class="form-input" id="cycle-log-note" rows="2" maxlength="2000">${esc(existing?.note || '')}</textarea>
         </div>
         ${advancedSection(moreFieldsHtml, { hint: moreHint, open: moreOpen })}
         <div class="modal-panel__footer modal-panel__footer--plain">

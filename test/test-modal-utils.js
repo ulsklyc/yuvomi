@@ -1636,6 +1636,30 @@ test('Erstfokus "edit": am Finger der Titel (ohne Ring), am Zeiger das erste Fel
   assert.match(budget, /initialFocus: isEdit \? 'edit' : 'first-field'/, 'die Buchung ebenso - kein Eigenbau mehr');
 });
 
+/* R24 (Critique G5 P2-4): „Art *" der Aktivitaet ist eine Pflicht-AUSWAHL;
+ * die Regel sucht Tippfelder zuerst, der Fokus landete im Datum und mobil fuhr
+ * die Tastatur hoch. Ein Selektor nennt das Pflichtfeld; verborgen oder
+ * fehlend gilt wieder die Regel. */
+test('Erstfokus per Selektor: die genannte Pflicht-Auswahl, sonst die Regel (R24 G5 P2-4)', () => {
+  for (const [fall, auswahlDa, verborgen] of [['genannt', true, false], ['verborgen', true, true], ['fehlt', false, false]]) {
+    const lage = erstfokusLage();
+    try {
+      const auswahl = lage.knoten('activity-type', true);
+      auswahl.closest = (sel) => (sel === '[hidden], [inert]' && verborgen ? {} : null);
+      const container = { ...lage.container, querySelector: (sel) => (sel === '#activity-type' ? (auswahlDa ? auswahl : null) : lage.feld) };
+      global.document.activeElement = lage.knoten('fab-draussen', false);
+      modalTest.applyInitialFocus(container, '#activity-type');
+      lage.ausloesen();
+      const soll = auswahlDa && !verborgen ? auswahl : lage.feld;
+      assert.equal(global.document.activeElement, soll, `${fall}: ${soll.id}`);
+    } finally {
+      lage.aufraeumen();
+    }
+  }
+  const health = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(health, /initialFocus: dialogInitialFocus\(isEdit, '#activity-type'\)/, 'die Aktivitaet nennt ihre Art');
+});
+
 /* Review zu #1193: der Datepicker oeffnet sein Popover unter document.body und
  * fokussiert synchron hinein - AUSSERHALB des Modal-Containers. Eine Wache, die
  * nur im Modal nachsieht, riss den Fokus aus dem offenen Kalender. */

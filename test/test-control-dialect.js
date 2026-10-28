@@ -2156,12 +2156,12 @@ const PENDING = {
   // Gesundheit/Kontakte/Familie; Schnellzugriffe und Einstellungen S6.
   'edit-autofocus': {
     'public/components/quick-links-manager.js': 1, 'public/pages/birthdays.js': 1,
-    'public/pages/calendar.js': 1, 'public/pages/health.js': 7,
+    'public/pages/calendar.js': 1,
     'public/pages/notes.js': 1, 'public/pages/schedule.js': 1,
-    'public/settings/pages/modules-health.js': 1, 'public/settings/pages/sync-contacts.js': 1,
+    'public/settings/pages/sync-contacts.js': 1,
   },
   'advanced-hint': {
-    'public/pages/contacts.js': 1, 'public/pages/health.js': 2,
+    'public/pages/contacts.js': 1,
   },
   'primary-disabled': {
     'public/pages/birthdays.js': 1, 'public/pages/contacts.js': 1,
