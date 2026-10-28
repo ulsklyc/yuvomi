@@ -2175,7 +2175,7 @@ sind Dokumente (ein Werkzeugmenue), Kalender (Filterblatt, Dialogfuss) und der B
 | Abschnitt als Auszug eines Reiters | der Abschnittstitel IST der Weg: Knopf im `h2.u-section-title` mit Pfeil | `.section-title-link` (layout.css) | "Alle anzeigen"-Knopf daneben, Nachbau je Modul |
 | Ueberschrift ueber Inhalt | **Gruppentitel IN einer Liste** = `.list-group__title` (12px Versalien), Wort plus Zaehlstand, OHNE Zeichen (R23 D10: Einkauf, Vorrat, Inventar trugen das Kategorie-/Ort-Icon; es bleibt im Kategorie-Verwalter und in den Auswahlen; Guard `test:control-dialect` "D10: kein Gruppentitel ..."). **Abschnittstitel einer Flaeche** = `h2.u-section-title` (20px semibold) AUF DER BUEHNE, ueber der Karte oder dem Traeger, Werkzeuge rechts daneben; ohne Icon. Wiederholt er den Namen des offenen Reiters, steht er nur in der Gliederung (`.sr-only`) | list-row.css, typography.css | Titel in der Karte, `div` ohne Ueberschriftenrolle, Icon vor dem Titel |
 | Betrag in Zeile oder Karte | semibold, `tabular-nums`, in der Zeile 16 wie ihr Name (seit R24: Konto vorher 18, Planwert 14 - dessen Limit steht als Ziel eine Stufe leiser, 13 sekundaer; ein nacktes `<strong>` ist Browser-Fett und bekommt das Gewicht der Regel); Diagrammbalken folgen ihrem Label (13/15), im selben Gewicht; Ton nur mit Aussage (Zuwachs gruen, Schuld rot, **null neutral**). Die Kennzahl (`.metric-card__value`, Title 1) ist ebenfalls semibold und hebt sich durch ihre Groesse ab (seit 2026-10-26) | `--font-weight-semibold`; `test:budget-ui` | 600 / 700 / 900 je Reiter, Gewicht als Literal oder mit `!important`, "0,00 €" in Erfolgsgruen |
-| Zeitraum blaettern | EINE Reihenfolge im Markup (= Tab-Folge): Pfeil zurueck, Wert, Pfeil vor, DAHINTER der Reset ("Heute"/"Aktuell" - ein Reset, kein Schritt). Die Pfeile nennen ihr OBJEKT ("Vorherige Woche", "Naechster Monat"), der Wert haelt eine feste Breite, damit kein Pfeil wandert. Kalender, Wochenplan, Budget, Berichte der Haushaltshilfe und seit R16 der Schichtplan (dort im Koerper: "Schichtplan" + Stepper passen mobil nicht in eine Kopfzeile). Gleiches gilt seit R17 fuer die Berichte der Haushaltshilfe: "Haushaltshilfe" (ca. 236px) + Stepper (192px) > 358px, und als eigene Kopfzeile schob der Zeitraum die Reiterleiste um 52px nach unten - er steht unter 1024px als Zeile UNTER den Reitern, zwischen Kopf und Inhalt (`#housekeeping-period`); ab 1024px haengt `placeReportPeriod()` denselben Knoten als Center-Slot in die Titelzeile (E16: dort sprang nie etwas, und unter den Reitern scrollte der Monat weg) | `periodStepperHtml()` + `syncPeriodReset()` (utils/period-stepper.js) in Kalender, Essensplan, Budget, Haushaltshilfe/Berichte und Schichtplan/Vergleich; Module behalten ids und Klassen, die Shell haengt an `period-stepper__*`. Der Reset zeigt sich nur neben dem laufenden Zeitraum (`.is-current` + `inert`, Fokus vorher zum Zurueck-Pfeil). **Seit R21 blaettern Links/Rechts, solange der Fokus auf dem Stepper steht** (Pfeil, Wert oder Reset; RTL gespiegelt, `aria-keyshortcuts` an den Pfeilen): `wirePeriodArrowKeys()` am Traeger der Pfeile, nie am Seitencontainer - im Kalender gelten die Pfeile seitenweit (router.js). Derselbe Griff blaettert im Dokumentbetrachter durch die sichtbare Liste (Vor/Zurueck-Paar vorn in der Leiste; seit R22 ein eigenes Kind der Meta-Zeile, am Listenrand der fehlende Pfeil gedimmt statt einer Luecke, mobil in der Zeile des Kategorie-Knopfs). **Steht statt des Steppers eine Notiz (Budget: Konten, Abos, Darlehen), haelt ihr Slot die Breite des Steppers** (R22: mobil 2 x `--target-base` + 96px, Tablet + 144px; vorher wuchs er in die freie Zeile, Layout-Shift beim Reiterwechsel 0,0005 / 0,012 -> 0) **und beginnt am Desktop, wo der Monat beginnt** (`text-align: start`; `test:budget-ui` "Kopfnotiz"). **Die Pfeile stehen neutral (R19)**, kein Modul faerbt sie um (der Essensplan trug sie im Akzent; Guard `test:frontend-audit`). Im Essensplan bleibt der Stepper in der Zeile UNTER der Kuechen-Leiste - die Leiste ist der gemeinsame Kopf von vier Reitern. **Mobil in der Titelzeile (`--period-inline`, Budget) liegt der Reset durchsichtig UEBER dem Wert:** Tipp aufs Monatslabel springt zurueck, der Wert steht im Modulton, solange man daneben steht; Name und Tab-Stopp bleiben | `< Heute > Wert`, Pfeile namens "Zurueck"/"Weiter", Reihenfolge per CSS-`order` |
+| Zeitraum blaettern | EINE Reihenfolge im Markup (= Tab-Folge): Pfeil zurueck, Wert, Pfeil vor, DAHINTER der Reset ("Heute"/"Aktuell" - ein Reset, kein Schritt). Die Pfeile nennen ihr OBJEKT ("Vorherige Woche", "Naechster Monat"), der Wert haelt eine feste Breite, damit kein Pfeil wandert. Kalender, Wochenplan, Budget, Berichte der Haushaltshilfe und seit R16 der Schichtplan (seit R24 S7b im Kopf wie im Budget, ab 768px in der Titelzeile; mobil passen "Schichtplan" + Stepper nicht in eine Zeile, dort steht er als letzte Kopfzeile unter den Reitern). Gleiches gilt seit R17 fuer die Berichte der Haushaltshilfe: "Haushaltshilfe" (ca. 236px) + Stepper (192px) > 358px, und als eigene Kopfzeile schob der Zeitraum die Reiterleiste um 52px nach unten - er steht unter 1024px als Zeile UNTER den Reitern, zwischen Kopf und Inhalt (`#housekeeping-period`); ab 1024px haengt `placeReportPeriod()` denselben Knoten als Center-Slot in die Titelzeile (E16: dort sprang nie etwas, und unter den Reitern scrollte der Monat weg) | `periodStepperHtml()` + `syncPeriodReset()` (utils/period-stepper.js) in Kalender, Essensplan, Budget, Haushaltshilfe/Berichte und Schichtplan/Vergleich; Module behalten ids und Klassen, die Shell haengt an `period-stepper__*`. Der Reset zeigt sich nur neben dem laufenden Zeitraum (`.is-current` + `inert`, Fokus vorher zum Zurueck-Pfeil). **Seit R21 blaettern Links/Rechts, solange der Fokus auf dem Stepper steht** (Pfeil, Wert oder Reset; RTL gespiegelt, `aria-keyshortcuts` an den Pfeilen): `wirePeriodArrowKeys()` am Traeger der Pfeile, nie am Seitencontainer - im Kalender gelten die Pfeile seitenweit (router.js). Derselbe Griff blaettert im Dokumentbetrachter durch die sichtbare Liste (Vor/Zurueck-Paar vorn in der Leiste; seit R22 ein eigenes Kind der Meta-Zeile, am Listenrand der fehlende Pfeil gedimmt statt einer Luecke, mobil in der Zeile des Kategorie-Knopfs). **Steht statt des Steppers eine Notiz (Budget: Konten, Abos, Darlehen), haelt ihr Slot die Breite des Steppers** (R22: mobil 2 x `--target-base` + 96px, Tablet + 144px; vorher wuchs er in die freie Zeile, Layout-Shift beim Reiterwechsel 0,0005 / 0,012 -> 0) **und beginnt am Desktop, wo der Monat beginnt** (`text-align: start`; `test:budget-ui` "Kopfnotiz"). **Die Pfeile stehen neutral (R19)**, kein Modul faerbt sie um (der Essensplan trug sie im Akzent; Guard `test:frontend-audit`). Im Essensplan bleibt der Stepper in der Zeile UNTER der Kuechen-Leiste - die Leiste ist der gemeinsame Kopf von vier Reitern. **Mobil in der Titelzeile (`--period-inline`, Budget) liegt der Reset durchsichtig UEBER dem Wert:** Tipp aufs Monatslabel springt zurueck, der Wert steht im Modulton, solange man daneben steht; Name und Tab-Stopp bleiben | `< Heute > Wert`, Pfeile namens "Zurueck"/"Weiter", Reihenfolge per CSS-`order` |
 | Kennzahl einer Flaeche | EINE Karte, EIN Wert-Grad: am Desktop `.metric-grid` mit Title 1 (28px) - auch in einer Seitenspalte, die EINE Karte je Zeile stapelt (die Spalte sagt es der Zeile mit `--summary-cards: 1` + `--metric-value-size`); mobil die Kurzzeile, bei einer einzigen Zahl ohne Aufklapper (`metricGlanceHtml()` ohne `controls`). Seit R18 FUEHRT je Geld-Reiter eine Zahl: `lead: true` in der Kurzzeile, `.metric-card--lead` in der Reihe `.metric-grid--led` (Large Title 34 in der Seitenspalte, sonst Title 1, kleiner nur bei Ueberlauf - R23 D12; die uebrigen sind Nebenzahlen in Headline 17, seit R24 an jedem Ort). **Eine Saldo-Aussage (R22, D9):** die Aufteilung nennt die Richtung, die nicht null ist ("Du schuldest", "Du bekommst" oder "Ausgeglichen"), EINE Karte - beide nur bei zwei Waehrungen in beide Richtungen. Eine Seitenspalte beginnt an der Werkzeuglinie der Liste und stapelt Karten in Inhaltshoehe (`grid-auto-rows: auto`, `padding-block: 0`; Abos wie Darlehen). Eine Darlehenskarte fuehrt mit ihrer Zahl, "Restschuld" steht leise in der Bezugszeile, kein Versal-Eyebrow. **E2 (R24): Kennzahlen wandern als EINE Karte oben in die Bahn**, nicht als Turm in die Seitenspalte - die Kurzzeile in jeder Breite (`metricGlanceHtml({ everywhere: true })`, `.budget-glance--everywhere`, statisch ohne Aufklapper; den Abstand zur Liste traegt die Spalte). Gebaut: Haushaltshilfe/Berichte; Haushaltshilfe/Arbeiten ohne Kennzahlen; Konten und Vorrat folgen (S9/S10) | `.metric-grid`, `.metric-grid--rail`, `.budget-glance*` (panel.css), utils/metric-glance.js, utils/metric-card.js | 20px in der Seitenleiste neben 28px in der Zeile, Zweier-Reihe mit 144px-Karten, Karte statt Kurzzeile unter 640px |
 | Reiter-Skelett im Budget (R16) | Kennzahlen (s. o.), dann je Abschnitt `.u-section-title` AUF DER BUEHNE mit den Werkzeugen rechts (`.section-toolbar`), darunter der Zeilentraeger (`.row-carrier`). Karten nur, wo ein OBJEKT eine Karte ist (Darlehen, Gruppe, Konto). Statistik: Verlauf und Anteilsring teilen Zeile 1, die Balken nehmen darunter die Bahn; mobil steht der Ring als Kopf der Kategorieliste | budget.js, subscriptions.js, split-expenses.js, budget-stats.js | Titel in der Karte (`.subscriptions-list-section`, `.split-card`), Kartentitel 17px als Abschnittstitel, Ring in einer Leiste, die unter ihm leer bleibt |
 | Pflichtfeld | der Stern ist EIN Element hinter dem Label: `${REQUIRED_MARK}` (`.required-marker`, aus dem Baum genommen); die Pflicht sagt das Feld (`required`) - IMMER, auch wo kein Stern steht. Stern an jedem Pflichtfeld; ein Formular aus EINEM Feld (2FA-Code, Display koppeln) und die Anmeldeseiten tragen keinen, dort ist die Pflicht offensichtlich. Zeilen-Bausteine tragen ihn per `labelExtra` (2026-10-18, Guard in `test:frontend-audit`, seit R23 auch fuer `yuvomi-datepicker required`); `formField()` des Schichtplans setzt ihn selbst, wo das Feld `required` traegt. Neben dem Stern steht kein "(optional)" am Kannfeld - zwei Markierungen fuer dieselbe Frage. **Der Fehler steht am Feld, alle auf einmal** (`reportFieldErrors`), nie als Sammel-Toast. **Erstfokus** = erstes Pflichtfeld zum Tippen, sonst erstes Tippfeld, erst dann Auswahl/Schalter (nicht Logo, nicht Typ-Auswahl; Felder in `[hidden]`-Gruppen zaehlen nicht; `firstEntryField`, components/modal.js). Ohne Feld (Dokument-Betrachter, Leseansicht) nimmt nach einem Zeigertipp der Dialogtitel den Fokus (`tabindex=-1`, ohne Ring), nach Tastatur das X mit Ring - die Eingabeart merkt modal.js vor `showModal()` (R23, Critique G4: umrandetes X nach Tipp) | utils/html.js | " *" im Locale-Text, handgebauter Span je Seite |
@@ -3894,7 +3894,8 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
   seit R22 (D6) EINE Werkzeugzeile: Zeitraum (der Reset liegt mobil auf dem Wert), Woche/Tag
   und die Personen als ein Knopf mit den Gesichtern der Gewaehlten (`renderAvatarStack`), der
   das Personenblatt des Kalenders oeffnet (`openFilterSheet`) - bis R21 Ansicht und Chipreihe
-  in Zeile 1, der Stepper in Zeile 2. Auswertung: Person und Zeitraum nebeneinander ohne
+  in Zeile 1, der Stepper in Zeile 2. Seit R24 S7b steht diese Zeile IM KOPF (Center-Slot
+  `.schedule-nav`, siehe "EIN Wochenraster"). Auswertung: Person und Zeitraum nebeneinander ohne
   Kartenflaeche, die Aktionen darunter (257 -> 104px). Feld-Labels, die dabei weichen,
   bleiben im Baum (geclippt), nie `display: none`.
 - **EIN Wochenraster: Schichtplan auf dem Raster des Kalenders (R22, D6; Critique a3 P2).**
@@ -3904,18 +3905,27 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
   auch in Woche/Tag, gemessen am Raster, der Schichttitel klebt an der sichtbaren Blockkante) kommen aus EINEM
   Baustein: `utils/time-grid.js` + `styles/time-grid.css` (per `@import` in calendar.css und
   schedule.css, `PAGE_STYLE_IMPORTS` im Router). Die verdichtete Stundenskala des Schichtplans
-  (nur belegte Stunden) ist entfallen. Die Uebersicht scrollt mit der SEITE: der Kopf dockt wie
-  in jedem Modul auf seine 65px-Leiste, Werkzeugzeile und Tageskoepfe kleben darunter
-  (`.schedule-overview__dock`, Klebekante = Unterkante des angedockten Kopfs,
-  `syncOverviewDock()`); waagerecht rollt nur das Raster, die Kopfzeile folgt. Je Tag eine
+  (nur belegte Stunden) ist entfallen. **Seit R24 S7b (S7-F1) dieselbe BAUART wie die
+  Kalender-Woche:** die Seite ist gedeckelt, jeder Reiter scrollt in seinem eigenen Port
+  (`.schedule-content.page-scrollport`, das Raster in `#schedule-week-scroll` wie `#week-scroll`),
+  die Tageskoepfe stehen ueber dem Port, und der Kopf klappt beim Scrollen per Klasse ein
+  (Architektur "innere Liste", `--period`). Zeitraum, Woche/Tag und Personen stehen im
+  Center-Slot des Kopfs (`.schedule-nav`, `--period-inline`): ab 768px in der Titelzeile wie
+  im Budget, am Telefon als letzte Kopfzeile UNTER den Reitern - neben dem Large Title blieben
+  dem Namen 125 von 184px („Schicht..."), und ueber den Reitern sprangen diese beim Wechsel auf
+  einen Reiter ohne Werkzeuge um eine Zeile; auf den anderen Reitern ist der Slot leer und
+  oeffnet keine Zeile. Gemessen 390px: Kopf 169 offen / 117 eingeklappt (vorher 117 + 56
+  Werkzeugzeile, angedockt 65 + 56), 820px 129 / 73, Desktop 117 ohne die 56px-Zeile darunter
+  (Raster ab y 186 statt 242). Bis R24 (R22 D6) scrollte die SEITE: der Kopf dockte mit
+  negativem `top`, Werkzeugzeile und Tageskoepfe klebten darunter (`.schedule-overview__dock`).
+  Waagerecht rollt derselbe Port, die Kopfzeile folgt (`wireOverviewScroll`). Je Tag eine
   Spur je Person (Mindestbreite `--schedule-lane-min`), Kopf der Spur ohne den geteilten
   Nachnamen; Eintraege ohne Uhrzeit stehen in der Ganztagszone unter dem Tageskopf. Gemessen
   390px: Raster ab y 315 -> 198, Inhalt 53 -> 77 %. Guard `test:schedule` (R22 D6),
   `test:calendar`. **Der Titel einer Schicht steht an der SICHTBAREN Oberkante ihres Blocks**
-  wie im Kalender, aber gerechnet statt `sticky` (der waagerechte Scroller ist in beiden Achsen
-  Scroll-Container): `pinOverviewTitles()` setzt `--title-shift` bis an die Klebekante, nie
-  tiefer, als der Block Platz hat (R22-F; Titel y -24 -> 200 bei Kante 198, mobil;
-  `test:schedule` "R22-F"). **Eine Blocksprache mit dem Kalender** (R23): der Block auf der
+  wie im Kalender: `position: sticky` im Port, die Zeit eine Zeile darunter (seit R24 S7b; bis
+  dahin gerechnet - `pinOverviewTitles()`, `--title-shift` -, weil der waagerechte Scroller
+  senkrecht nie rollte; R22-F, `test:schedule` "R22-F"). **Eine Blocksprache mit dem Kalender** (R23): der Block auf der
   Achse traegt das Rezept von `.week-event` - Vollton-Kante `--cal-event-edge` in der
   Schichtfarbe, Tinte 35 %, Titel halbfett; den Punkt tragen nur Eintraege ohne Stunde
   (Ganztagszone, Feiertag), wie die Schicht-Chips des Kalenders. **Tage rasten an der Achse
@@ -3924,18 +3934,16 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
   halb unter der Achse). Neben der Seitenleiste ebenso **ganze Tage**: so viele, wie das
   Mindestmass (7rem je Spur) erlaubt, gemessen am Abschnitt (`container-type`, `cqi`) - bei
   1024px sechs Tage zu 113px statt sieben zu 112px mit einem 4px-Streifen des ersten neben der
-  Achse (R23 S11b). **Nur der Nutzer dockt den Kopf an** (R24, Critique G1-Schichtplan-P2-1):
-  beim Ausrichten auf die laufende Stunde haelt der Kopf seine volle Hoehe
-  (`.schedule-toolbar--held`, klebt bei 0 statt bei -Lead; `holdHeadForAlign`), die erste
-  Geste im Port (Rad, Finger, Taste) gibt ihn frei, und er gleitet per FLIP an seine angedockte
-  Lage - vorher stand er nach dem Oeffnen schon angedockt, mobil mit „Planu..." neben dem
-  angedockten Titel. **Ein Reiterwechsel haelt den Kopf**: der neue Reiter beginnt unter
-  der angedockten Leiste, die Uebersicht wieder auf der laufenden Stunde; `update()` meldet
-  `'own-scroll'`, und der Router setzt den Stand bei der Soft-Navigation nicht noch einmal auf 0
-  (vorher zwei Spruenge 0,035/0,038 beim Wechsel, und die Rueckkehr stand auf 00:00). Traegt
-  ein Reiter die Hoehe nicht (Planung mobil), bekommt er seit R23 S10 genau den fehlenden
-  Nachlauf (`--schedule-tail` an `.schedule-body`, gemessen an der Lead-Zone) - der Kopf bleibt
-  angedockt (vorher klappte er auf und zog die Reiter 35px weg, 0,029 + 0,032).
+  Achse (R23 S11b). **Die Ausrichtung auf jetzt ist EIN Weg mit dem Kalender**
+  (`scrollGridToNow`, utils/time-grid.js, R24 S7b): morgens ab 07:00 bzw. ab dem ersten
+  frueheren Block, die laufende Stunde ganz im Bild - ohne die Flaeche hinter der Tab-Leiste
+  (`scroll-padding-block-end` des Ports; im Kalender stand 18 Uhr mobil bis dahin hinter dem
+  Glas). Sie rollt nur den Port, der Kopf bleibt offen; eingeklappt wird er nur von einem
+  Nutzer-Scroll (Critique G1-Schichtplan-P2-1 - in S7 noch per gehaltenem Kopf geloest). **Ein
+  Reiterwechsel** beginnt im neuen Port oben, die Uebersicht wieder auf der laufenden Stunde,
+  derselbe Reiter neu gezeichnet behaelt seinen Stand in beiden Achsen; `update()` meldet
+  `'own-scroll'`. Den Nachlauf fuer kurze Reiter (`--schedule-tail`, R23 S10) braucht es nicht
+  mehr: der Kopf liegt ausserhalb jedes Ports.
   **Der FAB nennt den Plan** (R23 D14): „+ Schichtplan" in Planung UND Uebersicht (derselbe
   Dialog; vorher „Eintrag" und auf der Uebersicht kein Anlegeweg), nur die Auswertung bleibt
   ohne. Freie Tage sind dort kein Balken unter den Schichtarten, sondern stehen in der Notiz der
@@ -3957,8 +3965,9 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
 - **Kacheln werden mobil kompakte Karten.** Praemien: 358x218 -> rund 130px (Zeichen und Text
   nebeneinander, Preis und Aktion darunter). Ein Abschnittstitel, der den Reiter wiederholt,
   steht mobil nur im Baum.
-**Variante: die Reiter sind die Titelzeile (R19, Critique 2026-10-16 P2).** Schichtplan,
-Belohnungen und Haushaltshilfe trugen unter 1024px den Large Title ueber ihrer Reiterleiste:
+**Variante: die Reiter sind die Titelzeile (R19, Critique 2026-10-16 P2).** Belohnungen und
+Haushaltshilfe (bis R24 S7b auch der Schichtplan; der traegt seitdem den Zeitraum-Kopf des
+Budgets) trugen unter 1024px den Large Title ueber ihrer Reiterleiste:
 121/121/129px bei 390px, 118-130px bei 834px. `page-toolbar--tabs-title` stellt die Leiste in
 die Titelzeile, wie iOS ein Segment als Titel der Navigationsleiste fuehrt - zwischen 768 und
 1023px: Large Title und Reiter nebeneinander (Titel gibt nach, Leiste scrollt mit Fade),
@@ -4197,7 +4206,8 @@ Die MECHANIK richtet sich nach der Scrollport-Architektur des Moduls, die Regel 
   Hoehe der Zeilen ueber der letzten). Seine Hoehe aendert sich NIE - ein Klassen-Umschalter
   wuerde hier ein Element im Fluss verkuerzen, den Scroll-Offset verschieben und den Kopf um
   seine eigene Schwelle pendeln lassen.
-- **Eine innere Liste scrollt** (Budget, Kalender, Notizen, Kontakte): der Modul-Root ist
+- **Eine innere Liste scrollt** (Budget, Kalender, Notizen, Kontakte, seit R24 S7b der
+  Schichtplan): der Modul-Root ist
   `overflow: hidden`, der Kopf liegt ausserhalb und bewegt sich nie. Dort klappt die
   Titelzeile wirklich ein - gefahrlos, weil der Hoehenwechsel nur den inneren Port
   verlaengert, ohne dessen Offset anzufassen.

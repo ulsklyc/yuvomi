@@ -86,6 +86,59 @@ export function alignedHourScroll({ hour, hourHeight, max, visible, morning = MO
   return Math.floor(capped / hourHeight + 1e-6) * hourHeight;
 }
 
+/** Die Bloecke, deren fruehester den Morgen setzt (Kalender: Termine und Schichtbaender). */
+export const GRID_BLOCKS = '.week-event, .day-event, .schedule-time-block';
+
+/**
+ * DER MORGEN BEGINNT MIT DEM ERSTEN BLOCK (R22 D6 fuer den Schichtplan, R24
+ * Critique G1 P1-1 fuer den Kalender). Gemessen wird am Raster: die Oberkante
+ * des fruehesten Blocks. Was um 00:00 beginnt, zaehlt nicht - das ist die
+ * Fortsetzung von gestern, nicht der Morgen.
+ * @returns {number|undefined} Stunde oder undefined (dann MORNING_HOUR)
+ */
+export function earliestBlockHour(body, bodyTop, hourHeight, blocks = GRID_BLOCKS) {
+  if (!(hourHeight > 0)) return undefined;
+  let first = Infinity;
+  for (const el of body.querySelectorAll?.(blocks) ?? []) {
+    const offset = el.getBoundingClientRect().top - bodyTop;
+    if (offset >= 1 && offset < first) first = offset;
+  }
+  return Number.isFinite(first) ? Math.floor(first / hourHeight + 1e-6) : undefined;
+}
+
+/**
+ * DAS RASTER STEHT AUF JETZT - EIN WEG FUER BEIDE WOCHENRASTER (R24 S7b).
+ * Kalender (Woche, Tag) und Schichtplan-Uebersicht scrollen ihr Raster in
+ * einem eigenen Port (`#week-scroll`, `.schedule-overview__scroll`), der Kopf
+ * des Moduls und die Tageskoepfe stehen darueber. Bis R24 rechnete der
+ * Schichtplan das selbst, gegen die Seite und ihre klebende Werkzeugzeile;
+ * seit beide dieselbe Bauart haben, rechnet hier EINE Funktion: das Raster
+ * (`body`) beginnt oben im Port, die Hoehe einer Stunde wird an ihm gemessen.
+ *
+ * Unten zieht der Nachlauf der Shell ab (`scroll-padding-block-end` der Rolle
+ * `.page-scrollport`, mobil die schwebende Tab-Leiste): sonst stand die
+ * laufende Stunde "ganz im Bild" hinter dem Glas.
+ * @param {Element|null} scroll  der Port
+ * @param {Element|null} body    das 24-Stunden-Raster, oben im Port
+ * @param {{ hour: number, blocks?: string }} opts  `hour` = Stunde des Haushalts
+ */
+export function scrollGridToNow(scroll, body, { hour, blocks = GRID_BLOCKS }) {
+  if (!scroll || !body) return;
+  const bodyRect = body.getBoundingClientRect();
+  const hourHeight = bodyRect.height / 24;
+  let covered = 0;
+  try {
+    covered = parseFloat(getComputedStyle(scroll).scrollPaddingBlockEnd) || 0;
+  } catch { /* ohne Stilauskunft (Tests): nichts verdeckt */ }
+  scroll.scrollTop = alignedHourScroll({
+    hour,
+    hourHeight,
+    max: scroll.scrollHeight - scroll.clientHeight,
+    visible: scroll.clientHeight - covered,
+    morning: earliestBlockHour(body, bodyRect.top, hourHeight, blocks),
+  });
+}
+
 function attrsHtml(attrs = {}) {
   return Object.entries(attrs)
     .filter(([, value]) => value !== undefined && value !== null && value !== false)

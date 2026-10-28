@@ -19,7 +19,7 @@ import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-st
 import { swapRegion } from '/utils/content-swap.js';
 import { initials } from '/utils/initials.js';
 import { shiftTypeLabel } from '/utils/shift-label.js';
-import { hourOffset, alignedHourScroll, hourGutterLabel, compactHourLabel, timeGridDayHeadHtml, timeGridHoursHtml, timeGridHourLinesHtml, timeGridNowLineHtml } from '/utils/time-grid.js';
+import { hourOffset, alignedHourScroll, scrollGridToNow, hourGutterLabel, compactHourLabel, timeGridDayHeadHtml, timeGridHoursHtml, timeGridHourLinesHtml, timeGridNowLineHtml } from '/utils/time-grid.js';
 import { shiftEndDateKey, isEndBeforeStart, weekStartIndex, weekdayOrder,
          monthPeriodKeys, startOfLocalWeekKey, addLocalDays, defaultDateInPeriod,
          isWeekendKey } from '/utils/date.js';
@@ -5271,41 +5271,13 @@ function wireTimeGridCreate(surface, {
 }
 
 /**
- * Setzt einen Zeitraster-Scroller auf die aktuelle Stunde, gemessen an der
- * Gesamthoehe des 24-Stunden-Koerpers statt an einer zweiten Stundenzahl in JS.
+ * Setzt einen Zeitraster-Scroller auf die aktuelle Stunde (Woche, Tag) - der
+ * geteilte Weg aus utils/time-grid.js (scrollGridToNow), derselbe wie in der
+ * Schichtplan-Uebersicht (R24 S7b). Der Morgen beginnt mit dem fruehesten
+ * Termin oder Schichtband (R24 Critique G1 P1-1), die Uhr ist die des Haushalts.
  */
 function scrollToHour(scroll, body) {
-  if (!scroll || !body) return;
-  const bodyRect = body.getBoundingClientRect();
-  const hourHeight = bodyRect.height / 24;
-  scroll.scrollTop = alignedHourScroll({
-    hour: nowFields().hour,
-    hourHeight,
-    max: scroll.scrollHeight - scroll.clientHeight,
-    visible: scroll.clientHeight,
-    morning: earliestBlockHour(body, bodyRect.top, hourHeight),
-  });
-}
-
-/**
- * DER MORGEN BEGINNT MIT DEM ERSTEN BLOCK (R22 D6 fuer den Kalender, R24
- * Critique G1 P1-1). Der Schichtplan uebergab `morning` schon (schedule.js,
- * alignOverviewToNow), der Kalender nicht: seit die Schichten als Bloecke im
- * Raster stehen (R23 D14), begann die Woche um 07:00 und jede Fruehschicht
- * 06:00 stand mit ihrem Titel 56px ueber dem Bild - sichtbar waren namenlose
- * Saeulen. Gemessen wird am Raster: die Oberkante des fruehesten Termins oder
- * Schichtblocks. Was um 00:00 beginnt, zaehlt nicht - das ist die Fortsetzung
- * von gestern, nicht der Morgen (dieselbe Regel wie im Schichtplan).
- * @returns {number|undefined} Stunde oder undefined (dann MORNING_HOUR)
- */
-function earliestBlockHour(body, bodyTop, hourHeight) {
-  if (!(hourHeight > 0)) return undefined;
-  let first = Infinity;
-  for (const el of body.querySelectorAll?.('.week-event, .day-event, .schedule-time-block') ?? []) {
-    const offset = el.getBoundingClientRect().top - bodyTop;
-    if (offset >= 1 && offset < first) first = offset;
-  }
-  return Number.isFinite(first) ? Math.floor(first / hourHeight + 1e-6) : undefined;
+  scrollGridToNow(scroll, body, { hour: nowFields().hour });
 }
 
 // MORNING_HOUR, EARLY_HOUR und alignedHourScroll() stehen im geteilten

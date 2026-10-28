@@ -1406,9 +1406,19 @@ test('R22 D6: die Uebersicht baut Kopf, Achse und Jetzt-Linie aus dem geteilten 
     assert.match(html, /data-action="overview-open-day"/, 'der Tageskopf fuehrt in den Tag, wie im Kalender');
     assert.match(html, /style="--schedule-days:7;--schedule-lanes:2"/, 'Kopf und Raster teilen ein Spaltenmass');
     assert.match(html, /schedule-overview__lane-name">Ada<span class="sr-only"> Lovelace<\/span>/, 'der geteilte Nachname steht nicht in jeder Spur');
-    assert.equal((html.match(/class="schedule-overview__toolbar section-toolbar"/g) || []).length, 1, 'EINE Werkzeugzeile');
-    assert.match(html, /data-action="overview-people"[^>]*aria-label="schedule\.overviewPeopleCount/, 'die Personenwahl ist ein Knopf, ihre Zahl im Namen');
-    assert.doesNotMatch(html, /user-ms|data-ms-input/, 'keine Chipreihe mehr ueber der Woche');
+    // R24 S7b: die Werkzeuge stehen im Kopf (renderOverviewNav), nicht im Inhalt.
+    assert.doesNotMatch(html, /schedule-overview__dock|schedule-overview__stepper|data-action="overview-people"/, 'der Inhalt traegt keine Werkzeugzeile mehr');
+    assert.match(html, /<div class="schedule-overview__scroll page-scrollport" data-scroll-port="schedule-overview" id="schedule-week-scroll">/, 'das Raster rollt in seinem eigenen Port, wie #week-scroll');
+    let nav = '';
+    const slot = { replaceChildren() { nav = ''; }, insertAdjacentHTML(_, h) { nav += h; }, querySelector: () => null };
+    __test.setRootForTest({ querySelector: (sel) => (sel === '.schedule-nav' ? slot : null) });
+    const priorWindow = globalThis.window;
+    globalThis.window ??= {};
+    try { __test.renderOverviewNav(); } finally { __test.setRootForTest(null); globalThis.window = priorWindow; }
+    assert.equal((nav.match(/class="schedule-overview__stepper"/g) || []).length, 1, 'EIN Zeitraum im Kopf');
+    assert.equal((nav.match(/data-action="overview-view-mode"/g) || []).length, 2, 'Woche/Tag im Kopf');
+    assert.match(nav, /data-action="overview-people"[^>]*aria-label="schedule\.overviewPeopleCount/, 'die Personenwahl ist ein Knopf, ihre Zahl im Namen');
+    assert.doesNotMatch(nav, /user-ms|data-ms-input/, 'keine Chipreihe mehr ueber der Woche');
   } finally {
     globalThis.__sharedSurname = priorSurname;
     Object.assign(st, before);
@@ -1424,7 +1434,7 @@ test('R22 D6: die Uebersicht baut Kopf, Achse und Jetzt-Linie aus dem geteilten 
   }
 });
 
-test('R22 D6: die Seite steht beim Oeffnen auf der laufenden Stunde, der Morgen beginnt mit der ersten Schicht', async () => {
+test('R22 D6: das Raster steht beim Oeffnen auf der laufenden Stunde, der Morgen beginnt mit der ersten Schicht', async () => {
   const { alignedHourScroll } = await import('../public/utils/time-grid.js');
   const h = 56;
   assert.equal(alignedHourScroll({ hour: 15, hourHeight: h, max: 24 * h, visible: 13 * h }), 7 * h, 'Kalender-Regel: morgens ab 07:00');
@@ -1433,60 +1443,65 @@ test('R22 D6: die Seite steht beim Oeffnen auf der laufenden Stunde, der Morgen 
   assert.equal(alignedHourScroll({ hour: 22, hourHeight: h, max: 24 * h, visible: 10 * h, morning: 6 }), 13 * h, 'abends steht die laufende Stunde unten im Bild');
   const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   const align = src.slice(src.indexOf('function alignOverviewToNow()'), src.indexOf('function openOverviewPeople()'));
-  assert.match(align, /alignedHourScroll\(\{ hour: nowFields\(\)\.hour,/, 'gerechnet mit der Uhr des Haushalts');
+  // R24 S7b: DERSELBE Weg wie die Kalender-Woche, im eigenen Port.
+  assert.match(align, /scrollGridToNow\(port, grid, \{ hour: nowFields\(\)\.hour,/, 'geteilter Weg, gerechnet mit der Uhr des Haushalts');
+  const calendar = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  assert.match(calendar, /scrollGridToNow\(scroll, body, \{ hour: nowFields\(\)\.hour \}\)/, 'der Kalender geht denselben Weg');
+  assert.doesNotMatch(calendar, /function earliestBlockHour\(/, 'keine zweite Morgenregel im Kalender');
   // R22-Sichtpruefung, im Browser gemessen (390x844): heute lag rechts
-  // ausserhalb (scrollLeft 0, x 560), die laufende Stunde hinter der Tab-Leiste.
+  // ausserhalb (scrollLeft 0, x 560).
   assert.match(align, /\.schedule-overview__day\[data-date="\$\{todayKey\(\)\}"\]/, 'waagerecht auf heute');
-  assert.match(align, /scroller\.scrollLeft = /, 'das Raster rollt auf heute');
-  assert.match(align, /scrollPaddingBottom/, 'die Tab-Leiste zaehlt nicht als sichtbar');
+  assert.match(align, /port\.scrollLeft = /, 'das Raster rollt auf heute');
   assert.match(src, /if \(view === 'overview'\) \{\n    if \(step === null\) overviewAlignPending = true;/, 'beim Oeffnen, nicht beim Blaettern');
 });
 
-// R22-F (F1 Punkt 2): nach dem Ladebildlauf beginnt eine laufende Schicht ueber
-// dem Bild, ihr Titel stand hinter der klebenden Werkzeugzeile (gemessen mobil
-// Titel y -24 bei Klebekante 198, Desktop 78 bei 244). `position: sticky`
-// haftete am waagerechten Scroller - der Versatz kommt aus der Seite.
-test('R22-F: der Titel einer Schicht steht unter der Klebekante und bleibt in seinem Block', async () => {
-  const { __test } = await import('../public/pages/schedule.js');
-  const { pinnedTitleShift } = __test;
-  assert.equal(pinnedTitleShift({ top: 300, height: 400, edge: 198, content: 30, inset: 2 }), 0, 'beginnt der Block unter der Kante, bleibt der Titel oben');
-  assert.equal(pinnedTitleShift({ top: -26, height: 446, edge: 198, content: 30, inset: 2 }), 224, 'beginnt er darueber, rueckt der Titel bis an die Kante');
-  assert.equal(pinnedTitleShift({ top: -226, height: 446, edge: 198, content: 30, inset: 2 }), 414, 'nie tiefer als der Block Platz hat');
-  assert.equal(pinnedTitleShift({ top: -500, height: 400, edge: 198, content: 30, inset: 2 }), 0, 'ein Block ganz ueber der Kante bleibt unberuehrt');
-
-  // Am Aufrufer: die Bloecke des Rasters bekommen ihren Versatz als Stil.
-  const style = () => {
-    const props = new Map();
-    return { props, getPropertyValue: (k) => props.get(k) ?? '', setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k) };
+// R24 S7b: die Tab-Leiste unten zaehlt nicht als sichtbar - der geteilte Weg
+// zieht den Nachlauf der Shell (`scroll-padding-block-end`) ab, im Kalender
+// wie im Schichtplan. Und ein Block, der um 00:00 beginnt (Fortsetzung von
+// gestern), setzt den Morgen nicht.
+test('R24 S7b: scrollGridToNow rechnet ohne die verdeckte Tab-Leiste, der Morgen ab dem ersten Block', async () => {
+  const { scrollGridToNow } = await import('../public/utils/time-grid.js');
+  const HOUR = 56;
+  const prevGcs = globalThis.getComputedStyle;
+  const run = ({ hour, covered, blocks = [] }) => {
+    globalThis.getComputedStyle = () => ({ scrollPaddingBlockEnd: `${covered}px` });
+    const port = { scrollTop: 0, scrollHeight: 24 * HOUR + 80, clientHeight: 10 * HOUR + 80 };
+    const body = {
+      getBoundingClientRect: () => ({ top: 0, height: 24 * HOUR }),
+      querySelectorAll: () => blocks.map((b) => ({ getBoundingClientRect: () => ({ top: b * HOUR }) })),
+    };
+    scrollGridToNow(port, body, { hour, blocks: '.b' });
+    return port.scrollTop / HOUR;
   };
-  const block = (top, height) => {
-    const title = { offsetTop: 2, offsetHeight: 16 };
-    const time = { offsetTop: 18, offsetHeight: 12 };
-    return { style: style(), getBoundingClientRect: () => ({ top, height, bottom: top + height }), querySelector: () => title, lastElementChild: time };
-  };
-  const running = block(-26, 446);
-  const later = block(400, 100);
-  const dock = { getBoundingClientRect: () => ({ bottom: 198 }) };
-  const section = {
-    querySelector: (sel) => (sel === '.schedule-overview__dock' ? dock : null),
-    querySelectorAll: (sel) => (sel === '.schedule-overview__lane > .schedule-overview__block' ? [running, later] : []),
-  };
-  __test.setRootForTest({ querySelector: (sel) => (sel === '.schedule-overview' ? section : null) });
   try {
-    __test.pinOverviewTitles();
+    assert.equal(run({ hour: 18, covered: 0 }), 8, 'ohne Abzug stuende 18 Uhr hinter der Leiste: 08-19');
+    assert.equal(run({ hour: 18, covered: 80 }), 9, 'mit Abzug steht 18 Uhr ganz im Bild: 09-19');
+    assert.equal(run({ hour: 10, covered: 80, blocks: [0, 6] }), 6, 'die Fruehschicht 06:00 setzt den Morgen, die Fortsetzung 00:00 nicht');
   } finally {
-    __test.setRootForTest(null);
+    globalThis.getComputedStyle = prevGcs;
   }
-  assert.equal(running.style.getPropertyValue('--title-shift'), '224px', 'die laufende Schicht nennt sich unter der Kante');
-  assert.equal(later.style.getPropertyValue('--title-shift'), '', 'eine spaetere Schicht bleibt, wie sie ist');
+});
 
-  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  const render = src.slice(src.indexOf('function renderPage()'), src.indexOf('function renderPage()') + 9000);
-  assert.match(render, /wireOverviewTitlePins\(\);\n    pinOverviewTitles\(\);/, 'renderPage haengt den Hoerer an und rechnet sofort');
+// R22-F (F1 Punkt 2): nach dem Ladebildlauf beginnt eine laufende Schicht ueber
+// dem Bild. Bis R24 S7b rechnete die Seite den Versatz des Titels selbst
+// (pinOverviewTitles), weil `position: sticky` am waagerechten Scroller
+// haftete, der senkrecht nie rollte. Seit EIN Port beide Achsen rollt, klebt
+// der Titel wie im Kalender an der sichtbaren Oberkante - die Zeit darunter.
+test('R22-F: der Titel einer Schicht klebt an der sichtbaren Oberkante seines Blocks', async () => {
   const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
   const { eachRule } = await import('./css-rules.js');
-  const rule = [...eachRule(css)].find((r) => r.selector === '.schedule-overview__lane > .schedule-overview__block > *');
-  assert.match(rule?.body ?? '', /transform:\s*translateY\(var\(--title-shift, 0px\)\)/, 'Titel und Zeit ruecken um den Versatz');
+  const rules = [...eachRule(css)];
+  const title = rules.find((r) => r.selector === '.schedule-overview__lane > .schedule-overview__block > .schedule-overview__block-title');
+  assert.match(title?.body ?? '', /position:\s*sticky/);
+  assert.match(title?.body ?? '', /(^|[;\s])top:\s*0/, 'der Titel an der Oberkante des Ports');
+  const time = rules.find((r) => r.selector === '.schedule-overview__lane > .schedule-overview__block > .schedule-overview__block-time');
+  assert.match(time?.body ?? '', /position:\s*sticky/);
+  assert.match(time?.body ?? '', /top:\s*calc\(var\(--text-xs\) \* 1\.3\)/, 'die Zeit eine Zeile darunter');
+  assert.ok(!rules.some((r) => /--title-shift/.test(r.body)), 'kein gerechneter Versatz mehr');
+  const port = rules.find((r) => r.selector === '.schedule-overview__scroll');
+  assert.match(port?.body ?? '', /(^|[;\s])overflow:\s*auto/, 'EIN Port rollt beide Achsen - sonst haftete der Titel am falschen');
+  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /pinOverviewTitles|wireOverviewTitlePins|pinnedTitleShift/, 'keine Rechnung in der Seite');
 });
 
 test('normalizeOverviewSelection() drops ids no longer eligible, without throwing', async () => {
@@ -1771,20 +1786,20 @@ test('setShiftIconButtonIcon replaces the previous icon even after lucide has co
 // Rebuilding .schedule-body on every renderPage() call can destroy whatever
 // currently holds focus (e.g. the Statistics tab's own persistent form
 // controls, which trigger a render on every change) - losing focus resets it
-// to <body>, and the browser scrolls #main-content (the app's real
-// scrollport, see router.js) back to the top. renderPage() must snapshot and
-// restore that scrollTop around its own DOM mutation, or every click/change
-// on the Statistics tab visibly jumps the page to the top.
-test('renderPage() preserves the #main-content scroll position across its own DOM rebuild', () => {
+// to <body>, and the browser scrolls the tab's port back to the top. Since
+// R24 S7b every tab scrolls in its OWN port (`.page-scrollport` inside
+// .schedule-body), so renderPage() snapshots that port's position before the
+// rebuild and writes it onto the new port after it - for the same tab only.
+test('renderPage() preserves the tab port scroll position across its own DOM rebuild', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   const body = schedulePage.slice(schedulePage.indexOf('function renderPage()'), schedulePage.indexOf('function updateScheduleFab()'));
-  assert.match(body, /const scrollPort = document\.getElementById\('main-content'\);/);
-  // R23: the SAME tab keeps its position; a new tab starts at the top (below a docked bar).
-  assert.match(body, /const scrollTop = sameView \? \(scrollPort\?\.scrollTop \?\? 0\) : lead;/, 'must capture the scroll position before body.replaceChildren() runs');
-  assert.match(body, /if \(scrollPort\) scrollPort\.scrollTop = scrollTop;/, 'must restore the scroll position after the DOM rebuild completes');
-  const saveIndex = body.indexOf('const scrollTop = scrollPort');
+  assert.match(body, /const oldPort = root\?\.querySelector\('\.schedule-body \.page-scrollport'\);/);
+  assert.match(body, /const keep = sameView && oldPort \? \{ top: oldPort\.scrollTop, left: oldPort\.scrollLeft \} : null;/, 'the same tab keeps its position, a new tab starts at the top');
+  assert.match(body, /port\.scrollTop = keep\.top;/, 'must restore the scroll position after the DOM rebuild completes');
+  assert.doesNotMatch(body, /getElementById\('main-content'\)/, 'the page itself no longer scrolls');
+  const saveIndex = body.indexOf('const keep = ');
   const rebuildIndex = body.indexOf('body.replaceChildren()');
-  const restoreIndex = body.indexOf('scrollPort.scrollTop = scrollTop;');
+  const restoreIndex = body.indexOf('port.scrollTop = keep.top;');
   assert.ok(saveIndex < rebuildIndex && rebuildIndex < restoreIndex, 'save must happen before the rebuild and restore must happen after it, not interleaved');
 });
 
@@ -2331,15 +2346,27 @@ test('R17/E1: without anything to compare the start tab leads to the first actio
     const empty = __test.renderOverview();
     assert.match(empty, /data-action="go-to-shift-types"/, 'empty household: ONE way, to the tab where the FAB adds a shift type');
     assert.equal((empty.match(/empty-state__cta/g) || []).length, 1, 'one action instead of four equal pills (D5)');
-    assert.doesNotMatch(empty, /schedule-overview__toolbar|data-action="overview-week"/, 'no person picker and no week stepper above nothing');
+    assert.doesNotMatch(empty, /schedule-overview__stepper|data-action="overview-week"/, 'no person picker and no week stepper above nothing');
 
     st.types = [{ id: 1, name: 'Frueh', color: '#0891b2', start_time: '06:00', end_time: '14:00', fields: [] }];
     const noPlan = __test.renderOverview();
     assert.match(noPlan, /data-action="open-create"[^>]*data-view="patterns"|data-view="patterns"[^>]*data-action="open-create"/, 'shift types but no plan: the button adds a plan');
-    assert.doesNotMatch(noPlan, /schedule-overview__toolbar/);
-
-    st.patterns = [{ id: 2, user_id: 1, name: 'Plan', anchor_date: '2026-10-05', cycle_length: 7, is_active: 1, days: [] }];
-    assert.match(__test.renderOverview(), /schedule-overview__toolbar/, 'with a plan the comparison itself stands');
+    assert.doesNotMatch(noPlan, /schedule-overview__stepper/);
+    // R24 S7b: Zeitraum, Woche/Tag und Personen stehen im Kopf - und nur dort,
+    // wo es etwas zu vergleichen gibt.
+    let nav = '';
+    const slot = { replaceChildren() { nav = ''; }, insertAdjacentHTML(_, h) { nav += h; }, querySelector: () => null };
+    __test.setRootForTest({ querySelector: (sel) => (sel === '.schedule-nav' ? slot : null) });
+    try {
+      __test.renderOverviewNav();
+      assert.equal(nav, '', 'no stepper in the head while there is nothing to compare');
+      st.patterns = [{ id: 2, user_id: 1, name: 'Plan', anchor_date: '2026-10-05', cycle_length: 7, is_active: 1, days: [] }];
+      __test.renderOverviewNav();
+      assert.match(nav, /class="schedule-overview__stepper"/, 'with a plan the comparison tools stand in the head');
+    } finally {
+      __test.setRootForTest(null);
+    }
+    assert.doesNotMatch(__test.renderOverview(), /schedule-overview--start/, 'with a plan the comparison itself stands');
   } finally {
     Object.assign(st, before);
   }
@@ -2632,21 +2659,31 @@ test('Shift types quick-start: plain buttons replace the misused `.segmented` co
   assert.match(shiftsPanel, /visibleQuickstartTemplates\(\)\.map\(\(\[template, key\]\)/);
 });
 
-test('Compare/Overview tab: Werkzeugzeile und Tageskoepfe kleben unter dem angedockten Kopf; Woche/Tag bleibt ein Segment', async () => {
+// R24 S7b (Entscheidung S7-F1): die Bauart der Kalender-Woche. Die Seite ist
+// gedeckelt, die Werkzeuge stehen im Kopf, das Raster rollt in einem eigenen
+// Port; die klebende Inhaltszeile `.schedule-overview__dock` und ihre
+// Klebekante aus dem angedockten Kopf entfallen.
+test('Compare/Overview tab: Werkzeuge im Kopf, Tageskoepfe ueber dem eigenen Port; Woche/Tag bleibt ein Segment', async () => {
   const { eachRule } = await import('./css-rules.js');
   const scheduleCss = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
-  const dock = [...eachRule(scheduleCss)].find((r) => r.selector.trim() === '.schedule-overview__dock' && !r.at.length);
-  assert.match(dock?.body ?? '', /position:\s*sticky;/);
-  assert.match(dock.body, /top:\s*var\(--schedule-dock-top, 0px\);/, 'die Klebekante ist die Unterkante des angedockten Kopfs');
-  assert.match(dock.body, /background-color:\s*var\(--color-bg\);/, 'must not scroll transparently over passing hour lines/entries');
-  const joint = [...eachRule(scheduleCss)].find((r) => r.selector.trim() === '.schedule-content > .schedule-overview');
+  const all = [...eachRule(scheduleCss)];
+  assert.ok(!all.some((r) => /schedule-overview__dock|--schedule-dock-top|schedule-toolbar--held/.test(r.selector + r.body)), 'keine klebende Inhaltszeile, keine Klebekante, kein gehaltener Kopf');
+  const page = all.find((r) => r.selector.trim() === '.schedule-page' && !r.at.length);
+  assert.match(page?.body ?? '', /overflow:\s*hidden/, 'die Seite ist gedeckelt wie Kalender und Budget - der Kopf klappt per Klasse ein');
+  assert.match(page.body, /block-size:\s*100%/);
+  const port = all.find((r) => r.selector.trim() === '.schedule-content.page-scrollport' && !r.at.length);
+  assert.match(port?.body ?? '', /overflow-y:\s*auto/, 'jeder andere Reiter scrollt in seinem eigenen Port');
+  const head = all.find((r) => r.selector.trim() === '.schedule-overview__head' && !r.at.length);
+  assert.match(head?.body ?? '', /flex:\s*0 0 auto/, 'die Tageskoepfe stehen ueber dem Port, wie im Kalender');
+  const joint = all.find((r) => r.selector.trim() === '.schedule-content > .schedule-overview');
   assert.match(joint?.body ?? '', /gap:\s*0/, 'Kopfzeile und Raster stossen aneinander, ohne den Abstand der Reiter-Abschnitte');
 
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /<header class="page-toolbar page-toolbar--wrap page-toolbar--period page-toolbar--period-inline schedule-toolbar">\s*<h1 class="page-toolbar__title">[^\n]*\n\s*<div class="page-toolbar__center schedule-nav"><\/div>/, 'der Zeitraum steht im Center-Slot des Kopfs, wie im Budget');
   assert.match(schedulePage, /data-action="overview-view-mode" data-mode="week"/, 'the week/day density toggle is legitimate mutually-exclusive state and must remain a segmented control');
   assert.match(schedulePage, /class="segmented schedule-overview__mode"[^>]*>\s*\n\s*<button type="button" class="segmented__item\$\{overview\.viewMode === 'week'/);
-  const sync = schedulePage.slice(schedulePage.indexOf('function syncOverviewDock()'), schedulePage.indexOf('function wireOverviewScroll('));
-  assert.match(sync, /head\.offsetHeight \+ top/, 'Hoehe plus negatives top: die sichtbare Leiste des angedockten Kopfs');
+  assert.doesNotMatch(schedulePage, /syncOverviewDock|holdHeadForAlign|releaseHeadHold|getElementById\('main-content'\)/, 'keine Andock-Logik gegen den Seitenport');
+  assert.match(schedulePage, /wirePeriodArrowKeys\(root\.querySelector\('\.schedule-nav'\)\)/, 'Pfeiltasten am Slot, der den Neuaufbau ueberlebt');
 });
 
 test('Shift types grid: the section head and the empty state span both desktop columns, so the first card starts in column 1', async () => {
@@ -2834,7 +2871,7 @@ test('Uebersicht: Tage rasten an der Achse ein, am Telefon ganze Tage; ein Reite
   // Der Reiterwechsel setzt seinen Stand selbst, der Router nicht noch einmal.
   assert.match(js, /return 'own-scroll';/, 'update() meldet den eigenen Stand');
   assert.match(router, /if \(main && !\(handled === 'own-scroll' && pushState\)\) main\.scrollTop = scrollTarget;/, 'der Router laesst ihn stehen, Zurueck stellt weiter her');
-  assert.match(js, /const scrollTop = sameView \? \(scrollPort\?\.scrollTop \?\? 0\) : lead;/, 'ein neuer Reiter beginnt oben, unter einer angedockten Leiste');
+  assert.match(js, /const keep = sameView && oldPort \? \{ top: oldPort\.scrollTop, left: oldPort\.scrollLeft \} : null;/, 'ein neuer Reiter beginnt oben in seinem Port');
 });
 
 // R23 S11b (Rest aus S9): bei 1024px war der Weg (108px) kuerzer als ein Tag
@@ -2853,21 +2890,19 @@ test('Uebersicht neben der Seitenleiste: ganze Tage, gemessen am Abschnitt', asy
   assert.match(wide.body, /--schedule-columns:[^;]*calc\(var\(--schedule-day-room\) \/ var\(--schedule-day-fit\)\)/, 'die ganzen Tage teilen sich die Breite');
 });
 
-// R23 S10 (Rest aus S9): die Planung ist mobil kuerzer als Port + Lead-Zone -
-// der Browser kappte den Stand, der Kopf klappte beim Wechsel auf (0,029/0,032).
-test('ein kurzer Reiter bekommt unter angedocktem Kopf genau den fehlenden Nachlauf', async () => {
+// R23 S10 (Rest aus S9): die Planung war mobil kuerzer als Port + Lead-Zone -
+// der Browser kappte den Stand, der Kopf klappte beim Wechsel auf; R23 gab dem
+// Reiter einen gemessenen Nachlauf (`--schedule-tail`). Seit R24 S7b liegt der
+// Kopf ausserhalb jedes Ports: ein kurzer Reiter kappt keinen Stand, der ihn
+// betraefe, und der Nachlauf entfaellt mitsamt seiner Messung.
+test('R24 S7b: ein kurzer Reiter braucht keinen Nachlauf - der Kopf liegt ausserhalb des Ports', async () => {
   const { eachRule } = await import('./css-rules.js');
   const js = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
-  const body = js.slice(js.indexOf('function renderPage()'), js.indexOf('function updateScheduleFab()'));
-  assert.match(body, /if \(!sameView\) body\.style\.removeProperty\('--schedule-tail'\);/, 'ein neuer Reiter misst ohne alten Nachlauf');
-  assert.match(body, /const deficit = lead - \(scrollPort\.scrollHeight - scrollPort\.clientHeight\);/, 'gemessen an der Lead-Zone, nicht an einer Zahl');
-  assert.match(body, /body\.style\.setProperty\('--schedule-tail', `\$\{tail\}px`\);/);
-  const tailAt = body.indexOf("setProperty('--schedule-tail'");
-  const restoreAt = body.indexOf('scrollPort.scrollTop = scrollTop;');
-  assert.ok(tailAt > 0 && tailAt < restoreAt, 'der Nachlauf steht, bevor der Stand gesetzt wird');
-  const rule = [...eachRule(css)].find((r) => r.selector.trim() === '.schedule-body' && !r.at.length);
-  assert.match(rule?.body ?? '', /padding-block-end:\s*var\(--schedule-tail, 0\)/, 'ohne Mangel kein Nachlauf');
+  assert.doesNotMatch(js, /--schedule-tail/, 'kein gemessener Nachlauf');
+  assert.ok(![...eachRule(css)].some((r) => /--schedule-tail/.test(r.body)), 'keine Regel liest ihn');
+  const body = [...eachRule(css)].find((r) => r.selector.trim() === '.schedule-body' && !r.at.length);
+  assert.match(body?.body ?? '', /min-block-size:\s*0/, 'der Inhalt nimmt den Rest unter dem Kopf und scrollt darin');
 });
 
 test('das Gueltigkeitsfenster eines Musters steht hinter "Weitere Einstellungen", offen sobald gesetzt (W2/A2)', async () => {
@@ -3110,13 +3145,18 @@ test('R16/R22: Uebersicht mobil EINE Werkzeugzeile, Auswertung zwei Bedienzeilen
   const stepper = src.match(/<div class="schedule-overview__stepper"[\s\S]*?<\/div>/)[0];
   assert.doesNotMatch(stepper, /calendar\.back|calendar\.forward/, 'die Pfeile nennen ihr Objekt (Woche/Tag), nicht nur die Richtung');
   assert.match(stepper, /calendar\.prevWeek[\s\S]*calendar\.nextWeek/);
-  assert.doesNotMatch(body(phone, '.schedule-overview__toolbar'), /grid-template-areas/, 'keine zweite Bedienzeile mehr');
   assert.match(body(phone, '.schedule-overview__stepper > .period-stepper__reset'), /position:\s*absolute/, 'Heute liegt auf dem Wert');
   assert.match(body(phone, '.schedule-overview__stepper > .period-stepper__reset'), /color:\s*transparent/);
-  const order = all.map((r, i) => [r, i]).filter(([r]) => r.selector === '.schedule-overview__toolbar');
-  const baseAt = order.find(([r]) => r.at.length === 0)?.[1];
-  const phoneAt = order.find(([r]) => r.at.some((a) => /max-width:\s*767px/.test(a)))?.[1];
-  assert.ok(baseAt >= 0 && phoneAt > baseAt, 'die mobile Werkzeugzeile steht hinter ihrer Basisregel');
+  // R24 S7b: die Zeile ist der Center-Slot des Kopfs. Am Telefon steht sie
+  // als eigene, letzte Zeile UNTER den Reitern (volle Basis, Reihenfolge hinter
+  // der Bar), damit die Reiter auf jedem Reiter an derselben Stelle stehen;
+  // die Selektorform schlaegt die 0,4,0-Regeln von `--wrap` in layout.css.
+  const row = phone.find((r) => r.selector === '.page-toolbar.schedule-toolbar:not(.page-toolbar--in-group):has(> .page-toolbar__title) > .page-toolbar__center.schedule-nav');
+  assert.ok(row, 'die mobile Werkzeugzeile hat ihre Regel');
+  assert.match(row.body, /order:\s*5/, 'hinter der Reiterleiste');
+  assert.match(row.body, /flex:\s*1 1 100%/, 'eine ganze Zeile');
+  const empty = all.find((r) => r.selector === '.schedule-nav:empty');
+  assert.match(empty?.body ?? '', /display:\s*none/, 'auf den anderen Reitern oeffnet der leere Slot keine Zeile');
 
   const narrow = at(/max-width:\s*639px/);
   assert.match(body(narrow, '.schedule-stat-filters'), /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
@@ -3403,7 +3443,7 @@ test('R19: ein Ladefehler (429) bleibt in der Seite - Ladefehler mit Wiederholen
     // Die Mini-DOM kennt keine Selektoren (test/mini-dom.js) - gemessen wird
     // das ausgegebene Markup, der Mount-Ort im Quelltext.
     const out = container.outerHTML;
-    assert.match(out, /class="page-toolbar page-toolbar--tabs-title schedule-toolbar"[\s\S]*class="schedule-body"/,
+    assert.match(out, /class="page-toolbar page-toolbar--wrap page-toolbar--period page-toolbar--period-inline schedule-toolbar"[\s\S]*class="schedule-body"/,
       'der Kopf mit Titel und Reitern steht ueber dem Inhalt');
     assert.equal((out.match(/role="tab"/g) ?? []).length, 4, 'alle vier Reiter');
     const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
@@ -3727,22 +3767,20 @@ test('R24 G1-Schichtplan-P3-2: Ausnahme und Zusatzschicht tragen die Schicht als
 // Oeffnen zur laufenden Stunde, und der Kopf stand damit schon angedockt
 // („Planu..."). Beim Ausrichten haelt er seine volle Hoehe; erst die Geste des
 // Nutzers gibt ihn frei.
-test('R24 G1-Schichtplan-P2-1: beim Ausrichten bleibt der Kopf offen, die Geste gibt ihn frei', async () => {
+// R24 G1-Schichtplan-P2-1, seit S7b ohne Halten: beim Laden stand der Kopf
+// schon angedockt, weil die SEITE zur laufenden Stunde rollte. S7 hielt ihn
+// dafuer offen, bis eine Geste ihn freigab (holdHeadForAlign). Mit eigenem
+// Port rollt beim Ausrichten nur das Raster - der Kopf liegt ausserhalb, und
+// die Shell klappt ihn nur bei einem Nutzer-Scroll ein.
+test('R24 G1-Schichtplan-P2-1: das Ausrichten rollt nur den Port, der Kopf bleibt offen', async () => {
   const js = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  const align = js.slice(js.indexOf('function alignOverviewToNow()'), js.indexOf('function alignOverviewToNow()') + 1400);
-  const hold = align.indexOf('holdHeadForAlign(port)');
-  assert.ok(hold > 0 && hold < align.indexOf('const stuck'), 'gehalten wird VOR der Rechnung der Klebekante');
-  assert.ok(align.indexOf('syncOverviewDock()') > hold && align.indexOf('syncOverviewDock()') < align.indexOf('const stuck'), 'die Klebekante folgt dem gehaltenen Kopf');
-  const holdFn = js.slice(js.indexOf('function holdHeadForAlign('), js.indexOf('function releaseHeadHold('));
-  assert.match(holdFn, /\['wheel', 'touchmove', 'keydown'\]/, 'nur eine Geste im Port gibt frei');
-  const releaseFn = js.slice(js.indexOf('function releaseHeadHold('), js.indexOf('function openOverviewPeople('));
-  assert.match(releaseFn, /flipSnapshotElements[\s\S]*classList\.remove\('schedule-toolbar--held'\)[\s\S]*flipPlayElements/, 'der Kopf gleitet per FLIP an seine angedockte Lage');
+  const align = js.slice(js.indexOf('function alignOverviewToNow()'), js.indexOf('function openOverviewPeople()'));
+  assert.match(align, /const port = section\?\.querySelector\('\.schedule-overview__scroll'\);/, 'gerollt wird der Port des Rasters');
+  assert.doesNotMatch(align, /main-content|schedule-toolbar|is-docked/, 'kein Griff an Seitenport oder Kopf');
   const { eachRule } = await import('./css-rules.js');
-  const held = [...eachRule(readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8'))]
-    .find((r) => r.selector.trim() === '.schedule-toolbar.page-toolbar--stacked.schedule-toolbar--held');
-  assert.ok(held && /top:\s*0/.test(held.body) && held.at.some((a) => /max-width:\s*1023px/.test(a)), 'gehalten klebt der scrollende Kopf bei 0');
-  const label = [...eachRule(readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8'))]
-    .find((r) => r.at.length === 0 && r.selector.trim() === '.schedule-overview__week-label');
+  const css = [...eachRule(readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8'))];
+  assert.ok(!css.some((r) => /schedule-toolbar--held/.test(r.selector)), 'kein gehaltener Kopf mehr');
+  const label = css.find((r) => r.at.length === 0 && r.selector.trim() === '.schedule-overview__week-label');
   assert.match(label?.body ?? '', /font-size:\s*var\(--text-base\)/, 'der Zeitraum 16 wie im Budget (G1-Schichtplan-P3-3)');
   assert.match(label.body, /font-weight:\s*var\(--font-weight-semibold\)/);
 });

@@ -57,9 +57,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from a distance.
 - **A new birthday says what happens to it next to the date.** The note that every birthday goes to the
   calendar and reminders now sits under the date field instead of above the buttons.
-- **The shift plan opens with its full header.** The overview still scrolls to the current hour, but
-  the title and tabs stay in view until you scroll yourself; before, the header was already folded and
-  the tabs were cut off on phones.
+- **The shift plan's overview works like the calendar's week.** The week, the Week/Day switch and the
+  people button sit in the page header, next to the title on tablets and computers and under the tabs on
+  phones, instead of in a strip above the grid. The grid scrolls on its own under the day headings, and
+  the header folds away while you scroll it, like in the calendar and the budget; on a computer the grid
+  starts 56px higher. It still opens on the current hour, now with the full header in view, and that
+  hour is no longer hidden behind the tab bar on phones - in the calendar's week and day view neither.
+  A running shift keeps its name at the top of the grid while you scroll.
 - **"Today" in the shift plan is in the overview grid.** The row of today's shifts above every tab is
   gone; the overview shows today in its grid, and shift types, planning and statistics start right with
   their content.

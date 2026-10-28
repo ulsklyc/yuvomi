@@ -16,13 +16,12 @@ import { emptyStateHTML, loadErrorHTML, mountLoadError } from '/utils/empty-stat
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { wireScrollFade } from '/utils/ux.js';
-import { flipSnapshotElements, flipPlayElements } from '/utils/flip.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { toggleRowHtml, formSwitchRowHtml } from '/settings/components.js';
 import { renderAvatarStack, sharedSurname } from '/components/user-multi-select.js';
 import { openFilterSheet, filterChipsHtml } from '/utils/filter-sheet.js';
-import { hourOffset, alignedHourScroll, timeGridDayHeadHtml, timeGridHoursHtml, timeGridHourLinesHtml, timeGridNowLineHtml } from '/utils/time-grid.js';
+import { hourOffset, scrollGridToNow, timeGridDayHeadHtml, timeGridHoursHtml, timeGridHourLinesHtml, timeGridNowLineHtml } from '/utils/time-grid.js';
 import { nowFields } from '/utils/timezone.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { USER_COLOR_DEFAULT } from '/utils/color.js';
@@ -1874,25 +1873,29 @@ function overviewHolidaysOnDay(dateKey) {
 // las dieselbe Woche in einer zweiten Grammatik. Jetzt kommen Tageskopf
 // („MO 19", Heute-Kreis), Stundenachse (24 Stunden, `--cal-hour-height`),
 // Stundenlinien und Jetzt-Linie aus dem geteilten Zeitraster
-// (utils/time-grid.js, styles/time-grid.css), und die Seite steht beim Oeffnen
-// auf der laufenden Stunde (alignedHourScroll, dieselbe Regel wie die Woche
-// des Kalenders). Die verdichtete Skala ist entfallen: auf der vollen Achse
+// (utils/time-grid.js, styles/time-grid.css), und das Raster steht beim Oeffnen
+// auf der laufenden Stunde (scrollGridToNow, derselbe Weg wie die Woche des
+// Kalenders). Die verdichtete Skala ist entfallen: auf der vollen Achse
 // ist eine 45-Minuten-Stunde 42px hoch, lesbar wie vorher, und die leeren
 // Stunden scrollen, statt zu verschwinden.
 //
-// DIE WERKZEUGE STEHEN IN EINER ZEILE: Zeitraum, Woche/Tag und die Personen.
+// DIE WERKZEUGE STEHEN IM KOPF: Zeitraum, Woche/Tag und die Personen.
 // Die Personen waren eine Chipreihe ueber der Woche (mobil eine eigene
 // Zeile); jetzt ist es ein Knopf mit den Gesichtern der Gewaehlten, der das
 // Personenblatt des Kalenders oeffnet (utils/filter-sheet.js) - dieselbe
 // Chip-Grammatik, derselbe Ort (Popover am Desktop, Blatt am Telefon).
 //
-// DIE SEITE SCROLLT, NICHT EIN KASTEN DARIN: die Woche stand in einem 70vh
-// hohen Kasten, und der Kopf der Seite dockte nie an - mobil begann das Raster
-// bei y=315 (53 % Inhalt). Jetzt scrollt die Seite durch die Stunden, der
-// Kopf dockt wie in jedem Modul auf seine Leiste, und Werkzeugzeile und
-// Tageskoepfe kleben darunter (`.schedule-overview__dock`, Klebekante aus
-// syncOverviewDock()). Waagerecht (viele Personen, schmale Tage) rollt nur das
-// Raster; die Kopfzeile folgt ihm (wireOverviewScroll()).
+// DIE BAUART DER KALENDER-WOCHE (R24 S7b, Entscheidung S7-F1; nimmt R22 D6
+// "die Seite scrollt" fuer den Schichtplan zurueck). R22 hatte die Woche aus
+// einem 70vh hohen Kasten geholt, weil der Kopf darueber nie andockte; dafuer
+// scrollte die Seite, und Werkzeugzeile samt Tageskoepfen klebten unter einem
+// Kopf, der mit negativem `top` andockte - die Ausrichtung auf jetzt dockte
+// ihn beim Laden schon an (R24 G1-Schichtplan-P2-1). Jetzt ist die Seite
+// gedeckelt wie Kalender und Budget: die Werkzeuge stehen im Kopf, das Raster
+// rollt in einem eigenen Port (`#schedule-week-scroll`, wie `#week-scroll`),
+// und der Kopf klappt beim Scrollen per Klasse ein - das Andock-Problem von
+// D6 loest die einklappende Kopfzeile. Waagerecht (viele Personen, schmale
+// Tage) rollt derselbe Port; die Kopfzeile folgt ihm (wireOverviewScroll()).
 const OVERVIEW_DAY_KEYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 function overviewPerson(userId) {
@@ -1980,8 +1983,9 @@ function overviewToolbarHtml(weekDays) {
   // Haushaltshilfe. Markup und Reset-Regel aus dem EINEN Baustein
   // (utils/period-stepper.js); "Heute" steht nur, wenn der heutige Tag NICHT
   // zu sehen ist. Die Reihenfolge steht im MARKUP (= Tab-Folge).
-  return `<div class="schedule-overview__toolbar section-toolbar">
-    <div class="schedule-overview__stepper" role="group" aria-label="${esc(weekLabel)}">${periodStepperHtml({
+  // Drei Kinder des Center-Slots im Kopf (renderPage): Zeitraum, Woche/Tag,
+  // Personen. Bis R24 S7b eine klebende Inhaltszeile (`.schedule-overview__dock`).
+  return `<div class="schedule-overview__stepper" role="group" aria-label="${esc(weekLabel)}">${periodStepperHtml({
       prev: { label: t(overview.viewMode === 'day' ? 'calendar.prevDay' : 'calendar.prevWeek'), keys: periodArrowKeys().prev, attrs: { 'data-action': 'overview-week', 'data-direction': 'prev' } },
       value: { className: `schedule-overview__week-label${showsToday ? '' : ' period-stepper__value--away'}`, text: weekLabel, live: true },
       next: { label: t(overview.viewMode === 'day' ? 'calendar.nextDay' : 'calendar.nextWeek'), keys: periodArrowKeys().next, attrs: { 'data-action': 'overview-week', 'data-direction': 'next' } },
@@ -1989,8 +1993,7 @@ function overviewToolbarHtml(weekDays) {
     })}
     </div>
     ${viewToggle}
-    ${overviewPeopleButtonHtml()}
-  </div>`;
+    ${overviewPeopleButtonHtml()}`;
 }
 
 function renderOverview() {
@@ -2004,16 +2007,15 @@ function renderOverview() {
   // Der Vergleich ist eine Leseansicht ohne FAB: ohne Schichtart fuehrt EIN
   // Weg dorthin, wo sie entsteht - derselbe Leerzustand wie in der Planung.
   if (planningNeedsShiftTypes()) return `<section class="schedule-overview schedule-overview--start">${emptyPlanningNeedsTypesState()}</section>`;
-  if (!state.patterns.length && !state.overrides.length && !state.extras.length && !overview.loading && !overview.error && !overview.entries.length) {
+  if (overviewIsStart()) {
     return `<section class="schedule-overview schedule-overview--start">${emptyPatternState()}</section>`;
   }
   const weekDays = overviewVisibleDays();
-  const toolbar = overviewToolbarHtml(weekDays);
   if (overview.error) {
-    return `<section class="schedule-overview"><div class="schedule-overview__dock">${toolbar}</div>${loadErrorHTML({ title: t('common.errorGeneric'), error: overview.error, attrs: { 'data-action': 'retry-overview' } })}</section>`;
+    return `<section class="schedule-overview">${loadErrorHTML({ title: t('common.errorGeneric'), error: overview.error, attrs: { 'data-action': 'retry-overview' } })}</section>`;
   }
   if (!overview.selectedIds.length) {
-    return `<section class="schedule-overview"><div class="schedule-overview__dock">${toolbar}</div>${emptyStateHTML({ title: t('schedule.overviewEmptyTitle'), description: t('schedule.overviewEmptyDescription') })}</section>`;
+    return `<section class="schedule-overview">${emptyStateHTML({ title: t('schedule.overviewEmptyTitle'), description: t('schedule.overviewEmptyDescription') })}</section>`;
   }
 
   // LADEN ZEIGT DAS RASTER, NICHT EINE LISTE (D4): Kopf, Achse und Spuren
@@ -2050,35 +2052,45 @@ function renderOverview() {
     </div>`).join('');
 
   const status = overview.loading ? `<span class="sr-only" role="status" aria-live="polite">${esc(t('common.loading'))}</span>` : '';
-  return `<section class="schedule-overview" style="${cols}"${overview.loading ? ' aria-busy="true"' : ''}>${status}
-    <div class="schedule-overview__dock">
-      ${toolbar}
-      <div class="schedule-overview__head"><div class="schedule-overview__head-row"><div class="schedule-overview__corner" aria-hidden="true"></div>${heads}</div></div>
-    </div>
-    <div class="schedule-overview__scroll"><div class="schedule-overview__grid">
+  // DIE BAUART DER KALENDER-WOCHE (R24 S7b, S7-F1): Tageskoepfe ueber einem
+  // eigenen Port (`#schedule-week-scroll`, wie `#week-scroll`), der durch die
+  // Stunden rollt - der Kopf des Moduls steht darueber und klappt per Klasse
+  // ein. Waagerecht rollt derselbe Port, die Kopfzeile folgt ihm
+  // (wireOverviewScroll()).
+  return `<section class="schedule-overview schedule-overview--grid" style="${cols}"${overview.loading ? ' aria-busy="true"' : ''}>${status}
+    <div class="schedule-overview__head"><div class="schedule-overview__head-row"><div class="schedule-overview__corner" aria-hidden="true"></div>${heads}</div></div>
+    <div class="schedule-overview__scroll page-scrollport" data-scroll-port="schedule-overview" id="schedule-week-scroll"><div class="schedule-overview__grid">
       <div class="week-view__times schedule-overview__times" aria-hidden="true">${timeGridHoursHtml()}</div>
       ${days}
     </div></div>
   </section>`;
 }
 
-/**
- * Die Klebekante der Werkzeugzeile: die Unterkante des angedockten Kopfs.
- * In der scrollenden Architektur klebt der Kopf mit negativem `top` (seine
- * Lead-Zone wandert aus dem Bild, layout.css), seine Hoehe aendert sich dabei
- * nie - die angedockte Leiste ist also Hoehe plus `top`. Ein Kopf, der nicht
- * klebt, laesst die Zeile bei 0 kleben.
- */
-function syncOverviewDock() {
-  const section = root?.querySelector('.schedule-overview');
-  const head = root?.querySelector('.schedule-toolbar');
-  if (!section || !head) return;
-  const cs = getComputedStyle(head);
-  const top = cs.position === 'sticky' ? (parseFloat(cs.top) || 0) : -head.offsetHeight;
-  section.style.setProperty('--schedule-dock-top', `${Math.max(0, Math.round(head.offsetHeight + top))}px`);
+/** Ohne Plan, Ausnahme und Zusatzschicht ist die Uebersicht ihr Startzustand (R17/E1). */
+function overviewIsStart() {
+  return !state.patterns.length && !state.overrides.length && !state.extras.length && !overview.loading && !overview.error && !overview.entries.length;
 }
 
-/** Kopfzeile und Raster rollen waagerecht gemeinsam, gleich wo der Finger liegt. */
+/** Der Center-Slot des Kopfs: auf der Uebersicht ihre Werkzeuge, sonst leer. */
+function renderOverviewNav() {
+  const slot = root?.querySelector('.schedule-nav');
+  if (!slot) return;
+  const shows = activeView === 'overview' && !planningNeedsShiftTypes() && !overviewIsStart();
+  slot.replaceChildren();
+  if (!shows) return;
+  slot.insertAdjacentHTML('beforeend', overviewToolbarHtml(overviewVisibleDays()));
+  window.lucide?.createIcons({ el: slot });
+  // Woche/Tag entsteht mit jedem Neuaufbau neu: der Schluessel laesst die
+  // neue Kapsel von der Stelle der alten gleiten.
+  const mode = slot.querySelector('.schedule-overview__mode');
+  if (mode) attachSegmentIndicator(mode, { key: 'schedule-overview-mode' });
+}
+
+/**
+ * Kopfzeile und Raster rollen waagerecht gemeinsam, gleich wo der Finger liegt.
+ * Die Tageskoepfe stehen ueber dem Port (wie im Kalender), der Port rollt in
+ * beiden Achsen; die Kopfzeile folgt ihm ohne eigene Leiste.
+ */
 function wireOverviewScroll(body) {
   const grid = body.querySelector('.schedule-overview__scroll');
   const head = body.querySelector('.schedule-overview__head');
@@ -2095,161 +2107,39 @@ function wireOverviewScroll(body) {
 }
 
 /**
- * DER TITEL EINER SCHICHT BLEIBT IM BILD (R22-F, F1 Punkt 2). Seit die Seite
- * beim Oeffnen auf die laufende Stunde rollt (D6), beginnt eine laufende
- * Schicht meist UEBER dem Bild: gemessen mobil 06:00-14:00 um 10 Uhr - eine
- * 210px hohe Flaeche ohne ein Zeichen, Name und Zeit standen hinter der
- * klebenden Werkzeugzeile. Im Kalender haelt `position: sticky` den Titel an
- * der sichtbaren Oberkante (calendar.css, `.week-event__title`); hier geht
- * das nicht: senkrecht rollt die SEITE, waagerecht das Raster
- * (`.schedule-overview__scroll`), und ein Element mit `overflow-x: auto` ist
- * in beiden Achsen ein Scroll-Container - der klebende Titel haftete an ihm,
- * der senkrecht nie rollt. Deshalb rechnet die Seite den Versatz selbst: so
- * weit, dass der Titel unter der Klebekante steht, und nie tiefer, als der
- * Block Platz hat (Titel, Zeit und das Polster oben bleiben innerhalb).
- * @param {{ top: number, height: number, edge: number, content: number, inset?: number }} m
- *        top/height: der Block im Fenster; edge: Unterkante des Klebebereichs;
- *        content: Unterkante von Titel und Zeit im Block; inset: Polster oben.
- * @returns {number} Versatz in px, 0 wenn der Block nicht unter der Kante beginnt
- */
-function pinnedTitleShift({ top, height, edge, content, inset = 0 }) {
-  if (!(top < edge) || !(top + height > edge)) return 0;
-  const room = Math.max(0, height - content - inset);
-  return Math.round(Math.min(edge - top, room));
-}
-
-let overviewPinFrame = 0;
-let overviewPinPort = null;
-
-/** Ein Lesedurchgang ueber alle Bloecke, dann ein Schreibdurchgang. */
-function pinOverviewTitles() {
-  overviewPinFrame = 0;
-  const section = root?.querySelector('.schedule-overview');
-  const dock = section?.querySelector('.schedule-overview__dock');
-  if (!dock) return;
-  const edge = dock.getBoundingClientRect().bottom;
-  const shifts = [...section.querySelectorAll('.schedule-overview__lane > .schedule-overview__block')].map((block) => {
-    const rect = block.getBoundingClientRect();
-    const title = block.querySelector('.schedule-overview__block-title');
-    const last = block.lastElementChild;
-    const inset = title?.offsetTop ?? 0;
-    const content = last ? last.offsetTop + last.offsetHeight : 0;
-    return [block, pinnedTitleShift({ top: rect.top, height: rect.height, edge, content, inset })];
-  });
-  for (const [block, shift] of shifts) {
-    const value = shift ? `${shift}px` : '';
-    if (block.style.getPropertyValue('--title-shift') === value) continue;
-    if (value) block.style.setProperty('--title-shift', value);
-    else block.style.removeProperty('--title-shift');
-  }
-}
-
-/** Einmal je Scrollport; nach einem Seitenwechsel haengt sich der Hoerer selbst ab. */
-function wireOverviewTitlePins() {
-  const port = document.getElementById('main-content');
-  if (!port || overviewPinPort === port) return;
-  overviewPinPort = port;
-  const onScroll = () => {
-    if (!root?.isConnected || !root.querySelector('.schedule-overview__dock')) {
-      if (!root?.isConnected) {
-        port.removeEventListener('scroll', onScroll);
-        if (overviewPinPort === port) overviewPinPort = null;
-      }
-      return;
-    }
-    if (!overviewPinFrame) overviewPinFrame = requestAnimationFrame(pinOverviewTitles);
-  };
-  port.addEventListener('scroll', onScroll, { passive: true });
-}
-
-/**
- * Die Seite auf die laufende Stunde stellen - dieselbe Regel wie die Woche des
- * Kalenders (alignedHourScroll): morgens ab 07:00, sonst so, dass die laufende
- * Stunde ganz unter der klebenden Werkzeugzeile steht. Gemessen am Raster,
- * nicht aus einer zweiten Stundenzahl.
+ * Den Port auf die laufende Stunde stellen - DERSELBE Weg wie die Woche des
+ * Kalenders (utils/time-grid.js, scrollGridToNow): morgens ab 07:00 oder ab
+ * der ersten Schicht, sonst so, dass die laufende Stunde ganz im Bild steht;
+ * die Tab-Leiste unten zaehlt nicht als sichtbar. Gemessen am Raster, nicht
+ * aus einer zweiten Stundenzahl.
+ *
+ * Bis R24 S7b scrollte hier die SEITE (R22 D6): die Klebekante war die
+ * Unterkante des angedockten Kopfs plus Werkzeugzeile, der Kopf musste beim
+ * Ausrichten gehalten werden, damit er nicht sofort andockte, und der Titel
+ * einer laufenden Schicht wurde per Rechnung unter die Kante gerueckt. Im
+ * eigenen Port steht der Kopf darueber, und das alles entfaellt.
  */
 function alignOverviewToNow() {
-  const port = document.getElementById('main-content');
   const section = root?.querySelector('.schedule-overview');
-  const grid = section?.querySelector('.schedule-overview__grid');
-  const dock = section?.querySelector('.schedule-overview__dock');
+  const port = section?.querySelector('.schedule-overview__scroll');
+  const grid = port?.querySelector('.schedule-overview__grid');
   const axis = grid?.querySelector('.schedule-overview__times');
-  if (!port || !grid || !dock || !axis) return;
-  // Der Kopf bleibt beim Ausrichten offen (holdHeadForAlign) - die Klebekante
-  // ist dann seine volle Unterkante, und die wird hier gleich mitgerechnet.
-  holdHeadForAlign(port);
-  syncOverviewDock();
-  const hourHeight = axis.getBoundingClientRect().height / 24;
-  const stuck = (parseFloat(section.style.getPropertyValue('--schedule-dock-top')) || 0) + dock.offsetHeight;
-  // Unten zieht die Tab-Leiste ab (mobil 80px, als scroll-padding des Ports):
-  // sonst stand die laufende Stunde "ganz im Bild" hinter ihr.
-  const visible = port.clientHeight - stuck - (parseFloat(getComputedStyle(port).scrollPaddingBottom) || 0);
-  // Der Morgen beginnt mit der ersten Schicht, wenn sie frueher liegt als
-  // 07:00 (eine Fortsetzung von gestern zaehlt nicht - sie beginnt um 00:00).
-  const starts = [...section.querySelectorAll('.schedule-overview__block[data-start]')].map((el) => Number(el.dataset.start));
-  const morning = starts.length ? Math.floor(Math.min(...starts) / 60) : undefined;
-  const offset = alignedHourScroll({ hour: nowFields().hour, hourHeight, max: 24 * hourHeight - visible, visible, morning });
-  const gridTop = grid.getBoundingClientRect().top - port.getBoundingClientRect().top + port.scrollTop;
-  port.scrollTop = Math.max(0, Math.round(gridTop + offset - stuck));
+  if (!port || !grid || !axis) return;
+  // Ein Fortsetzungsblock (Nachtschicht von gestern) beginnt um 00:00 und
+  // zaehlt nicht als Morgen - dieselbe Regel wie im Kalender.
+  scrollGridToNow(port, grid, { hour: nowFields().hour, blocks: '.schedule-overview__lane > .schedule-overview__block' });
   // Und waagerecht auf heute (R22-Sichtpruefung): mobil passen keine sieben
   // Tage ins Bild, die Woche stand auf Montag und heute lag rechts ausserhalb.
-  // Heute steht gleich hinter der klebenden Stundenachse; Kopfzeile und Raster
-  // rollen gemeinsam (wireOverviewScroll), der Kopf wird hier gleich mitgesetzt.
-  const scroller = section.querySelector('.schedule-overview__scroll');
+  // Heute steht gleich hinter der klebenden Stundenachse; die Kopfzeile wird
+  // hier gleich mitgesetzt (wireOverviewScroll).
   const head = section.querySelector('.schedule-overview__head');
   const todayColumn = grid.querySelector(`.schedule-overview__day[data-date="${todayKey()}"]`);
-  if (scroller && todayColumn && scroller.scrollWidth > scroller.clientWidth) {
-    const left = todayColumn.getBoundingClientRect().left - scroller.getBoundingClientRect().left
-      + scroller.scrollLeft - axis.getBoundingClientRect().width;
-    scroller.scrollLeft = Math.max(0, Math.round(left));
-    if (head) head.scrollLeft = scroller.scrollLeft;
+  if (todayColumn && port.scrollWidth > port.clientWidth) {
+    const left = todayColumn.getBoundingClientRect().left - port.getBoundingClientRect().left
+      + port.scrollLeft - axis.getBoundingClientRect().width;
+    port.scrollLeft = Math.max(0, Math.round(left));
+    if (head) head.scrollLeft = port.scrollLeft;
   }
-}
-
-/**
- * NUR DER NUTZER DOCKT DEN KOPF AN (R24, Critique G1-Schichtplan-P2-1).
- * Die Uebersicht rollt die SEITE beim Oeffnen zur laufenden Stunde
- * (alignOverviewToNow). Im scrollenden Kopf (layout.css, negatives `top` =
- * Lead-Zone) hiess das: der Large Title wanderte sofort aus dem Bild, der
- * Kopf stand angedockt, und mobil teilten sich angedockter Titel und Reiter
- * eine Zeile („Planu..."). Der Zustand blieb beim Reiterwechsel, erst die
- * Auswertung zeigte den vollen Kopf - der Kopf sprang je Reiter.
- *
- * Jetzt haelt der Kopf beim Ausrichten seine volle Hoehe (`--held`: klebt bei
- * 0 statt bei -Lead). Die erste Geste des Nutzers im Port (Rad, Finger,
- * Taste) gibt ihn frei: er gleitet per transform an seine angedockte Lage,
- * und von da an dockt er wie in jedem Modul. Ein Reiterwechsel ohne Geste
- * findet ihn offen und beginnt oben.
- */
-let headHoldRelease = null;
-
-function holdHeadForAlign(port) {
-  const head = root?.querySelector('.schedule-toolbar');
-  if (!head || !port) return;
-  head.classList.add('schedule-toolbar--held');
-  if (headHoldRelease) return;
-  const release = (e) => {
-    if (e?.type === 'keydown' && !['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(e.key)) return;
-    if (e?.target?.closest?.('.schedule-toolbar')) return;
-    releaseHeadHold();
-  };
-  for (const type of ['wheel', 'touchmove', 'keydown']) port.addEventListener(type, release, { passive: true });
-  headHoldRelease = () => {
-    for (const type of ['wheel', 'touchmove', 'keydown']) port.removeEventListener(type, release);
-    headHoldRelease = null;
-  };
-}
-
-function releaseHeadHold() {
-  headHoldRelease?.();
-  const head = root?.querySelector('.schedule-toolbar');
-  if (!head?.classList.contains('schedule-toolbar--held')) return;
-  // FLIP (utils/flip.js): nur `transform`, Tokens fuer Dauer und Kurve,
-  // unter reduzierter Bewegung steht der Wechsel.
-  const before = flipSnapshotElements([head, root.querySelector('.schedule-overview__dock')].filter(Boolean));
-  head.classList.remove('schedule-toolbar--held');
-  syncOverviewDock();
-  flipPlayElements(before);
 }
 
 function openOverviewPeople() {
@@ -2332,8 +2222,15 @@ function scheduleHeadHtml(current = activeView) {
     ['patterns', t('schedule.planning')],
     ['statistics', t('schedule.statistics')],
   ];
-  return `<header class="page-toolbar page-toolbar--tabs-title schedule-toolbar">
+  // DER KOPF DER KALENDER-BAUART (R24 S7b, Entscheidung S7-F1): Zeitraum,
+  // Woche/Tag und Personen der Uebersicht stehen im Center-Slot des Kopfs
+  // (renderOverviewNav), in jeder Breite - wie im Kalender und im Budget,
+  // nicht als klebende Inhaltszeile. Die Seite ist gedeckelt (schedule.css),
+  // jeder Reiter scrollt in seinem eigenen Port, und der Kopf klappt beim
+  // Scrollen per Klasse ein (`--period`, die Kopf-Mechanik der Shell in utils/ux.js).
+  return `<header class="page-toolbar page-toolbar--wrap page-toolbar--period page-toolbar--period-inline schedule-toolbar">
       <h1 class="page-toolbar__title">${esc(t('schedule.title'))}</h1>
+      <div class="page-toolbar__center schedule-nav"></div>
       <div class="page-toolbar__actions"></div>
       <div class="sub-tabs-bar schedule-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('schedule.title'))}">
         ${tabs.map(([id, label]) => `<button class="sub-tab${id === current ? ' sub-tab--active' : ''}" id="schedule-tab-${id}" type="button" role="tab" data-tab-id="${id}" aria-controls="schedule-body" aria-selected="${id === current ? 'true' : 'false'}" tabindex="${id === current ? '0' : '-1'}">${esc(label)}</button>`).join('')}
@@ -2370,11 +2267,9 @@ function renderShell() {
   // wie die Gesundheit auf derselben `.sub-tabs-bar` (Kanon, Runde 7 D8). Die
   // Leiste wird hier EINMAL gebaut; die Kapsel folgt sync()/Klick selbst.
   attachSegmentIndicator(root.querySelector('.schedule-tabs'));
-  // Die Klebekante der Uebersicht folgt dem Kopf: seiner Hoehe (Fenster,
-  // Sprache) und seiner Lead-Zone, die die Shell (router.js) als Stil setzt.
-  const head = root.querySelector('.schedule-toolbar');
-  if (head && typeof ResizeObserver === 'function') new ResizeObserver(() => syncOverviewDock()).observe(head);
-  if (head && typeof MutationObserver === 'function') new MutationObserver(() => syncOverviewDock()).observe(head, { attributes: true, attributeFilter: ['style', 'class'] });
+  // Links/Rechts blaettern am Stepper im Kopf (utils/period-stepper.js,
+  // Critique R21) - einmal am Slot, der den Neuaufbau des Steppers ueberlebt.
+  wirePeriodArrowKeys(root.querySelector('.schedule-nav'));
   root.addEventListener('submit', submitForm);
   // Die Mehr-Knoepfe der Listenzeilen (editDeleteMenu) - idempotent.
   installPopoverMenus(root);
@@ -2428,34 +2323,19 @@ function updateCycleDayHeadersFor(target) {
 }
 
 function renderPage() {
-  // Rebuilding .schedule-body below can destroy whatever currently holds
-  // focus (e.g. the weekly-hours input right after the user typed into it) -
-  // losing focus resets it to <body>, and the browser scrolls the page's
-  // real scrollport (#main-content, see router.js) back to the top to show
-  // it. Statistics is the one tab with persistent on-page form controls that
-  // trigger a render while focused, so it's the one tab where this was
-  // visible; restoring the scroll position afterward papers over it for
-  // every tab uniformly rather than special-casing statistics.
-  const scrollPort = document.getElementById('main-content');
-  // EIN NEUER REITER BEGINNT OBEN (R23, Critique G1 P2). Hier wurde auch beim
-  // Reiterwechsel der Stand der Uebersicht zurueckgeschrieben (mobil 732px):
-  // der kuerzere Reiter kappte ihn, der Kopf klappte auf und gleich wieder zu
-  // (zwei Spruenge, 0,035 und 0,038). Neu gezeichnet wird derselbe Reiter mit
-  // seinem Stand (Statistik-Fokus, unten); ein anderer beginnt bei 0 - die
-  // Uebersicht stellt sich danach selbst auf die laufende Stunde.
-  //
-  // UND DER ANGEDOCKTE KOPF BLEIBT ANGEDOCKT. Oben heisst dann: unter der
-  // Leiste, nicht unter dem Large Title - der Stand ist genau die Lead-Zone
-  // des Kopfs (sein negatives `top`, utils/ux.js). Sonst klappte jeder Wechsel
-  // aus der Uebersicht den Kopf auf und zog die Reiter unter dem Finger um
-  // 35px weg. Traegt der neue Reiter die Hoehe nicht, kappt der Browser den
-  // Stand, und der Kopf klappt auf - die Reserve-Regel der Shell.
+  // JEDER REITER SCROLLT IN SEINEM EIGENEN PORT (R24 S7b, Bauart der
+  // Kalender-Woche): die Seite ist gedeckelt, `.schedule-content` bzw. das
+  // Raster der Uebersicht tragen die Rolle `.page-scrollport`. Ein Neubau
+  // ersetzt den Port, und der Fokus faellt dabei auf <body> - derselbe Reiter
+  // neu gezeichnet (Statistik-Felder, Blaettern, Personenwahl) behaelt deshalb
+  // seinen Stand, senkrecht und waagerecht. Ein ANDERER Reiter beginnt oben
+  // (R23, Critique G1 P2); die Uebersicht stellt sich danach selbst auf die
+  // laufende Stunde. Der Kopf klappt dabei nicht um: ein Reiterwechsel ist
+  // keine Geste (die Kopf-Mechanik der Shell urteilt nur ueber Nutzer-Scrolls).
   const sameView = renderedView === activeView;
   renderedView = activeView;
-  const headBar = root?.querySelector('.schedule-toolbar');
-  const docked = Boolean(headBar?.classList.contains('is-docked'));
-  const lead = docked ? Math.max(0, -parseFloat(getComputedStyle(headBar).top) || 0) : 0;
-  const scrollTop = sameView ? (scrollPort?.scrollTop ?? 0) : lead;
+  const oldPort = root?.querySelector('.schedule-body .page-scrollport');
+  const keep = sameView && oldPort ? { top: oldPort.scrollTop, left: oldPort.scrollLeft } : null;
   // Repaint statt Neubau: wireTablist() haelt Klasse/aria-selected/tabindex der
   // schon bestehenden Knoepfe selbst nach (sync() loest dabei bewusst KEIN
   // erneutes onChange aus - activeView aendert sich hier ueber Wege, die die
@@ -2512,54 +2392,37 @@ function renderPage() {
         : renderStatistics();
   const body = root.querySelector('.schedule-body');
   body.replaceChildren();
-  body.insertAdjacentHTML('beforeend', `<div class="schedule-content">${panel}</div>`);
+  // Das Raster der Uebersicht bringt seinen Port selbst mit (renderOverview);
+  // jeder andere Inhalt - auch Leer-, Start- und Fehlerzustand der
+  // Uebersicht - scrollt im Inhaltsport.
+  const grid = activeView === 'overview' && panel.includes('schedule-overview--grid');
+  body.insertAdjacentHTML('beforeend', grid
+    ? `<div class="schedule-content schedule-content--grid">${panel}</div>`
+    : `<div class="schedule-content page-scrollport" data-scroll-port="schedule">${panel}</div>`);
+  renderOverviewNav();
   renderTodayCard();
   updateScheduleFab();
   window.lucide?.createIcons({ el: body });
-  if (activeView === 'overview') {
+  if (grid) {
     wireScrollFade(body.querySelector('.schedule-overview__scroll'));
     wireOverviewScroll(body);
-    syncOverviewDock();
-    // Links/Rechts blaettern am Stepper (utils/period-stepper.js, Critique R21).
-    wirePeriodArrowKeys(body.querySelector('.schedule-overview__stepper'));
   }
-  // Statistik-Zeitraum und Woche/Tag entstehen mit jedem renderPage() neu:
-  // der Schluessel laesst die neue Kapsel von der Stelle der alten gleiten.
+  // Der Statistik-Zeitraum entsteht mit jedem renderPage() neu: der Schluessel
+  // laesst die neue Kapsel von der Stelle der alten gleiten.
   const statRange = body.querySelector('.schedule-stat-range__choices');
   if (statRange) attachSegmentIndicator(statRange, { key: 'schedule-stat-range' });
-  const overviewMode = body.querySelector('[data-action="overview-view-mode"]')?.parentElement;
-  if (overviewMode) attachSegmentIndicator(overviewMode, { key: 'schedule-overview-mode' });
-  // EIN KURZER REITER TRAEGT DEN ANGEDOCKTEN KOPF (R23 S10, Rest aus S9).
-  // Die Planung ist mobil kuerzer als Port + Lead-Zone: der Browser kappte den
-  // Stand, der Kopf klappte auf und zog die Reiter um 35px unter dem Finger
-  // weg (zwei Spruenge 0,029/0,032). Ein Reiterwechsel ist keine Geste - er
-  // haelt den Kopf so, wie der Nutzer ihn verlassen hat. Fehlt dem neuen
-  // Reiter die Hoehe, bekommt er sie als Nachlauf am Ende (`--schedule-tail`),
-  // genau so viel wie fehlt; derselbe Reiter neu gezeichnet behaelt ihn.
-  if (!sameView) body.style.removeProperty('--schedule-tail');
-  if (scrollPort && !sameView && lead > 0) {
-    // scrollHeight steht nie unter clientHeight: ist der Reiter kuerzer als
-    // der Port, verschwindet der erste Nachlauf in der Luecke bis zur Kante -
-    // jedes weitere Messen legt den Rest nach (hoechstens vier Layouts, kein
-    // Raten an der Shell).
-    let tail = 0;
-    for (let i = 0; i < 4; i++) {
-      const deficit = lead - (scrollPort.scrollHeight - scrollPort.clientHeight);
-      if (deficit <= 0) break;
-      tail += Math.ceil(deficit);
-      body.style.setProperty('--schedule-tail', `${tail}px`);
-    }
+  const port = body.querySelector('.page-scrollport');
+  if (port && keep) {
+    port.scrollTop = keep.top;
+    port.scrollLeft = keep.left;
+    const head = body.querySelector('.schedule-overview__head');
+    if (head) head.scrollLeft = port.scrollLeft;
   }
-  if (scrollPort) scrollPort.scrollTop = scrollTop;
-  // Beim Oeffnen der Uebersicht (und bei "Heute") steht die Seite auf der
+  // Beim Oeffnen der Uebersicht (und bei "Heute") steht das Raster auf der
   // laufenden Stunde; Blaettern und Personenwahl behalten den Scrollstand.
-  if (activeView === 'overview' && overviewAlignPending && root.querySelector('.schedule-overview__grid')) {
+  if (grid && overviewAlignPending) {
     alignOverviewToNow();
     if (!overview.loading) overviewAlignPending = false;
-  }
-  if (activeView === 'overview' && root.querySelector('.schedule-overview__grid')) {
-    wireOverviewTitlePins();
-    pinOverviewTitles();
   }
 }
 
@@ -3580,9 +3443,14 @@ async function action(event) {
       // Der Stepper entsteht mit dem Neuaufbau neu: wer per Tastatur blaettert
       // (Pfeile oder Enter), behaelt den Fokus auf demselben Pfeil, statt auf
       // <body> zu fallen (Critique R21, Persona Alex).
-      const keepFocus = document.activeElement === button && button.dataset.direction !== 'today';
+      // Gefragt wird der FOKUSSIERTE Teil, nicht der ausgeloeste: die
+      // Pfeiltasten (wirePeriodArrowKeys) loesen den anderen Pfeil aus, waehrend
+      // der Fokus bleibt, wo er war - mit dem Ausloeser verglichen fiel er nach
+      // Links auf "weiter" auf <body> (gemessen R24 S7b).
+      const focused = document.activeElement?.closest?.('[data-action="overview-week"]');
+      const keepFocus = focused && focused.dataset.direction !== 'today' ? focused.dataset.direction : null;
       await activateView('overview', { step: towards });
-      if (keepFocus) root?.querySelector(`[data-action="overview-week"][data-direction="${button.dataset.direction}"]`)?.focus();
+      if (keepFocus) root?.querySelector(`[data-action="overview-week"][data-direction="${keepFocus}"]`)?.focus();
       return;
     }
     if (button.dataset.action === 'overview-people') {
@@ -3597,9 +3465,13 @@ async function action(event) {
       return;
     }
     if (button.dataset.action === 'overview-view-mode') {
+      // Das Segment entsteht im Kopf neu: der Fokus geht auf den neuen Knopf,
+      // statt auf <body> zu fallen (R24 S7b).
+      const hadFocus = document.activeElement === button;
       overview = { ...overview, viewMode: button.dataset.mode };
       saveOverviewViewMode(overview.viewMode);
       renderPage();
+      if (hadFocus) root?.querySelector(`[data-action="overview-view-mode"][data-mode="${overview.viewMode}"]`)?.focus();
       return;
     }
     if (button.dataset.action === 'edit-shift-type') {
@@ -3876,9 +3748,9 @@ export async function update({ path } = {}) {
   }
   if (nextView !== activeView) {
     await activateView(nextView);
-    // Den Stand des neuen Reiters hat renderPage() gesetzt (oben bzw. unter
-    // der angedockten Leiste, die Uebersicht auf der laufenden Stunde) - der
-    // Router setzt ihn nicht noch einmal auf 0 (utils/router-navigate.js).
+    // Den Stand des neuen Reiters hat renderPage() in dessen eigenem Port
+    // gesetzt (oben, die Uebersicht auf der laufenden Stunde) - der Router
+    // fasst den Seitenport nicht noch einmal an (utils/router-navigate.js).
     return 'own-scroll';
   }
   return true;
@@ -3888,4 +3760,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { shiftTypeGroups, shiftTypeListHtml, PRESET_TEMPLATES, presetShortCode, presetAlreadyThere, NUMERIC_PRESET_CODES, setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, saveCustomField, saveShiftTypeEdit, savePatternEdit, setRootForTest: (element) => { root = element; scheduleTablist = null; }, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, setOverviewForTest: (next) => { overview = { ...overview, ...next }; }, isOvernightEntry, overviewEntryBlock, alignOverviewToNow, syncOverviewDock, pinnedTitleShift, pinOverviewTitles, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { shiftTypeGroups, shiftTypeListHtml, PRESET_TEMPLATES, presetShortCode, presetAlreadyThere, NUMERIC_PRESET_CODES, setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, saveCustomField, saveShiftTypeEdit, savePatternEdit, setRootForTest: (element) => { root = element; scheduleTablist = null; }, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, setOverviewForTest: (next) => { overview = { ...overview, ...next }; }, isOvernightEntry, overviewEntryBlock, alignOverviewToNow, renderOverviewNav, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

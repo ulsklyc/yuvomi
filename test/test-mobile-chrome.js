@@ -704,7 +704,10 @@ test('R20 + R23: der Gesundheits-Bereichskopf ist einzeilig, die Person rechts w
 // noch ihre Reiter - kein Kopf nannte den Ort, die Kapsel sagte "Mehr". Unter
 // 768px steht wieder der Kopf aller Module: Siegel und Name, die Reiter als
 // Bar-Zeile darunter (wie Budget), mit demselben Einklappen beim Scrollen.
-const TABS_TITLE_MODULES = ['pages/housekeeping.js', 'pages/rewards.js', 'pages/schedule.js'];
+// R24 S7b (S7-F1): der Schichtplan traegt seitdem den Zeitraum-Kopf des
+// Budgets (`--period-inline`, Reiter als eigene Zeile) - er hat einen Zeitraum
+// im Kopf, die Titelzeile gehoert ihm, nicht den Reitern.
+const TABS_TITLE_MODULES = ['pages/housekeeping.js', 'pages/rewards.js'];
 test('R19/R21: Reiter in der Titelzeile ab 768px, darunter nennt der Kopf den Ort', () => {
   for (const f of TABS_TITLE_MODULES) {
     assert.match(read(`../public/${f}`), /<header class="page-toolbar [^"]*\bpage-toolbar--tabs-title\b/, `${f}: der Kopf traegt die Variante`);

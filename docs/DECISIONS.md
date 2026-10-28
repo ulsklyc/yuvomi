@@ -1095,3 +1095,49 @@ after drawing instead of taken from its data. And a tile on the overview that do
 height. Extra rows that change a tile's span, trigger a second packing pass or are fitted by
 measuring, a tile with loaded rows that leaves its filled height blank, and a second fill
 mechanism beside the one all lists share.
+
+## 17. The two week grids share one build: own port, head that folds
+
+**The week of the calendar and the overview of the shift schedule are one time grid and are
+built the same way: the page is capped, the grid scrolls in its own port under the day heads,
+the period stepper and the view switch stand in the module head, and the head folds by class
+while the grid scrolls. Neither module lets the page itself scroll through the hours** (R24
+S7-F1, decided by Ulas on 2026-10-28; this takes back R22 D6 "the page scrolls, not a box in
+it" for the shift schedule).
+
+R22 D6 put the shift overview on the calendar's grid (#2034 thread, critique a3 "two week
+grids") and took it out of a 70vh box, because the head above that box never docked and the
+grid began at y 315 on a phone. The answer then was to let the page scroll: the head docked by a
+negative `top`, and a sticky content row carried the stepper, the view switch, the people and the
+day heads underneath it. Two rounds later the same question came back from the other side
+(critique G1-Schichtplan-P2-1/P3-3, R24): aligning to the current hour scrolled the page, so the
+head was docked before anyone touched it, the period stood in a content row while calendar and
+budget carry it in the head, and the title of a running shift had to be pushed below the sticky
+edge by script because `position: sticky` stuck to the horizontal scroller. Three options were
+weighed: (a) keep the content row - no rebuild, but a second place for the period; (b) the
+stepper in the head only from 1024px - the calendar's head on desktop, but two layouts of the same
+tools; (c) the calendar's build in every width. (c) was chosen: one head pattern for both week
+grids, and the problem D6 solved - a head that never moved - is solved by the head that folds.
+
+### Where the rule lives
+
+- `public/pages/schedule.js`: the head carries `page-toolbar--period page-toolbar--period-inline`
+  and an empty center slot `.schedule-nav` that `renderOverviewNav()` fills on the overview;
+  `renderOverview()` puts the grid in `#schedule-week-scroll` (`.page-scrollport`), every other
+  tab scrolls in `.schedule-content.page-scrollport`. `public/styles/schedule.css` caps
+  `.schedule-page` (`overflow: hidden`), so the shell's collapsing head runs in its "inner list"
+  architecture (`public/utils/ux.js`). On a phone the tools are the last head row, under the tabs:
+  next to the large title the name kept 125 of 184px, and above the tabs they would have moved the
+  tabs on every switch to a tab without tools.
+- `scrollGridToNow()` in `public/utils/time-grid.js` aligns both grids to the current hour, from
+  the earliest block in the morning, without counting the area behind the tab bar; the calendar's
+  week and day and the shift overview call it.
+- `npm run test:schedule` ("Compare/Overview tab", "R22 D6", "R22-F", "R24 S7b") and
+  `npm run test:calendar` ("R24 G1 P1-1").
+
+### What counts as undoing it
+
+The page scrolling through the hours of either grid again; a period stepper or view switch of a
+week grid placed in a sticky content row instead of the head; a second alignment rule beside
+`scrollGridToNow`; a shift title pinned by script instead of `position: sticky` in the port; a
+head that is docked or folded by the alignment rather than by the user's scroll.
