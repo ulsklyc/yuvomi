@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "„{{item}}” visszakerült ide: „{{back}}”. A szerver nem fogadta el itt: „{{target}}”.",
             "waited": "„{{item}}” nem került át ide: „{{target}}”. A(z) „{{back}}” szinkronizálása több mint egy hete ki van kapcsolva. A tétel újra megjelenik itt: „{{back}}”, amint bekapcsolod a listát."
-        }
+        },
+        "moreDetailsHint": "Ár, bolt, hivatkozás, jegyzet",
+        "toPantryAllToPlaceholder": "Válassz helyet …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} hozzávaló",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "Mentett recept",
         "savedRecipePlaceholder": "Recept kiválasztása",
         "saveAsRecipe": "Mentés receptként",
-        "recipeScaleLabel": "Hozzávalók arányosítása",
         "deletedToast": "Étkezés törölve.",
         "recurrenceLabel": "Ismétlés hetente",
         "recurrenceWeekly": "Hetente",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "{{title}} receptjének megnyitása",
         "viewRecipeNamed": "{{title}} receptjének megtekintése",
         "recipeIngredientsLabel": "Hozzávalók a receptből",
-        "recipeIngredientsEdit": "Módosítás"
+        "recipeIngredientsEdit": "Módosítás",
+        "moreDetailsHint": "Recept, jegyzetek, hivatkozás"
     },
     "calendar": {
         "searchOpen": "Események keresése",
@@ -3725,9 +3727,9 @@
         "imageHint": "Receptenként egy kép. Megjelenik az étkezési tervben és az áttekintő csempén.",
         "imageTooLarge": "A kép kicsinyítés után is túl nagy.",
         "ingredientMatchNone": "Nincs hozzárendelve",
-        "ingredientMatchOpen": "{{count}} hozzávaló hozzárendelése a készlethez",
-        "ingredientMatchOpen_one": "{{count}} hozzávaló hozzárendelése a készlethez",
-        "ingredientMatchBulkTitle": "Hozzávalók hozzárendelése a készlethez",
+        "ingredientMatchOpen": "{{count}} hozzávaló összekapcsolása a készlettel",
+        "ingredientMatchOpen_one": "{{count}} hozzávaló összekapcsolása a készlettel",
+        "ingredientMatchBulkTitle": "Hozzávalók összekapcsolása a készlettel",
         "ingredientMatchBulkHint": "Minden hozzávalóhoz válaszd ki a készlet azon sorát, amelyre vonatkozik. A Yuvomi semmit sem találgat - csak az számít, amit itt megerősítesz.",
         "ingredientMatchAction": "{{name}} hozzárendelése egy készletsorhoz",
         "ingredientMatchTitle": "{{name}} hozzárendelése",
@@ -3736,7 +3738,17 @@
         "ingredientMatchEmpty": "A készlet még üres.",
         "ingredientMatchSaved": "Hozzárendelés mentve.",
         "ingredientMatchCleared": "Hozzárendelés megszüntetve.",
-        "ingredientMatchLoadError": "A készletet nem sikerült betölteni."
+        "ingredientMatchLoadError": "A készletet nem sikerült betölteni.",
+        "servingsLabel": "Adag",
+        "servingsMultipleLabel": "Mennyiség",
+        "servingsFewer": "Kevesebb adag",
+        "servingsMore": "Több adag",
+        "servingsLess": "Mennyiség csökkentése",
+        "servingsMoreMultiple": "Mennyiség növelése",
+        "servingsHint": "Hány adagra szólnak a mennyiségek. Hagyd üresen, ha nem tudod.",
+        "servingsInvalid": "Egész szám 1 és 99 között.",
+        "moreDetailsHint": "Jegyzetek, kép, hivatkozás",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Gépelj, hogy egy területre ugorj vagy létrehozz valamit. 2 karaktertől a bejegyzéseidet is megtalálod, akár szórészlettel is.",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Lejárt",
         "filterSoon": "Hamarosan lejár",
         "filterLow": "Majdnem elfogyott",
-        "watchLabel": "Figyelmet igényel",
-        "watchEmpty": "Semmi sem jár le, és semmi sem fogy ki.",
         "badgeExpiredYesterday": "Tegnap lejárt",
         "badgeExpiredDays": "{{count}} napja lejárt",
         "badgeExpiresToday": "Ma jár le",
@@ -6290,7 +6300,8 @@
             "bag": "tasak",
             "bag_one": "tasak",
             "bag_other": "tasak"
-        }
+        },
+        "moreDetailsHint": "Minimális készlet, jegyzetek"
     },
     "inventory": {
         "title": "Leltár",

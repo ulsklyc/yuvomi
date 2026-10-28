@@ -158,3 +158,54 @@ test('Dialogregel Erstfokus: dialogInitialFocus - Anlegen das erste Feld, Bearbe
   assert.equal(dialogInitialFocus(true), 'edit');
   assert.equal(dialogInitialFocus(false), 'first-field');
 });
+
+// --------------------------------------------------------------------------
+// Portionen-Stepper (R24, E12 - Critique G3-Rezepte-P2-1)
+// --------------------------------------------------------------------------
+// Ein Baustein fuer Rezept (Leseblatt, Detailspalte) und Mahlzeit-Dialog. Er
+// ersetzt das Faktorfeld "Zutaten skalieren" (Schritt 0,1), das nur mit
+// gewaehltem Rezept wirkte und sonst still blieb.
+const stepper = await import('../public/utils/servings-stepper.js');
+const scale = await import('../public/utils/scale-quantity.js');
+
+test('Portionen: der Faktor ist Wahl durch gespeicherte Portionen, ohne Portionen die Wahl selbst', () => {
+  assert.equal(scale.servingsFactor(4, 8), 2);
+  assert.equal(scale.servingsFactor(4, 2), 0.5);
+  assert.equal(scale.servingsFactor(null, 1.5), 1.5, 'ohne gespeicherte Zahl in Vielfachen');
+  assert.equal(scale.servingsFactor(4, 0), 1, 'kein Faktor 0');
+  const out = scale.scaledIngredients([{ name: 'Mehl', quantity: '200 g' }, { name: 'Salz', quantity: 'eine Prise' }, { name: 'Ei', quantity: null }], 2);
+  assert.deepEqual(out.map((i) => i.quantity), ['400 g', 'eine Prise', null], 'Zahl umgerechnet, Text unveraendert, leer bleibt leer');
+});
+
+test('Portionen: der Stepper nennt Portionen oder Menge, steht im Wert und sperrt an der Grenze', () => {
+  const mit = stepper.servingsStepperHtml({ id: 'p', base: 4, value: 1 });
+  assert.match(mit, /role="group"\s+aria-labelledby="p-label" data-servings-stepper/);
+  assert.match(mit, /<span class="servings-stepper__label" id="p-label">recipes\.servingsLabel<\/span>/);
+  assert.match(mit, /<output class="servings-stepper__value" aria-live="polite">1<\/output>/, 'der Wert steht zwischen den Knoepfen');
+  assert.match(mit, /data-servings-step="-1"\s+aria-label="recipes\.servingsFewer" disabled/, 'an der Untergrenze ist Minus gesperrt');
+  assert.doesNotMatch(mit, /data-servings-step="1"[^>]*disabled/);
+  const ohne = stepper.servingsStepperHtml({ id: 'q', base: null });
+  assert.match(ohne, /recipes\.servingsMultipleLabel/, 'ohne Portionen heisst er Menge');
+  assert.match(ohne, /recipes\.servingsTimes\{&quot;value&quot;:&quot;1&quot;\}/, 'und zeigt den Faktor (escaped)');
+  assert.match(ohne, /aria-label="recipes\.servingsLess"/);
+});
+
+test('Portionen: Rezept-Leseblatt und Mahlzeit-Dialog tragen den Stepper, das Faktorfeld ist weg', () => {
+  const recipes = read('pages/recipes.js');
+  const meals = read('pages/meals.js');
+  assert.match(recipes, /headExtraHtml: servingsStepperHtml\(\{/, 'der Stepper steht im Kopf der Zutaten');
+  assert.match(recipes, /scaleQuantityText\(ing\.quantity \?\? '', factor\)/, 'die Mengen werden mit der Wahl gezeigt');
+  assert.match(recipes, /body\.quantities = scaledIngredients\(recipe\.ingredients, factor\)/, 'die Einkaufsliste bekommt die umgerechneten Mengen');
+  assert.match(recipes, /mealPayloadFromRecipe\(source, date, mealType\)/, 'das Einplanen ebenso');
+  assert.match(recipes, /id="recipe-servings"[^>]*min="1" max="99"/, 'das Formular fragt die Portionen');
+  assert.match(meals, /servingsStepperHtml\(\{\s*id: 'modal-servings'/);
+  assert.doesNotMatch(meals, /modal-recipe-scale|recipeScaleLabel/, 'kein Faktorfeld mehr');
+  assert.doesNotMatch(meals, /style="display:flex;align-items:flex-end;"/, 'kein Formfeld mit Inline-Stil');
+  for (const file of readdirSync(new URL('../public/locales/', import.meta.url))) {
+    const { recipes: r, meals: m } = JSON.parse(readFileSync(new URL(`../public/locales/${file}`, import.meta.url), 'utf8'));
+    for (const key of ['servingsLabel', 'servingsMultipleLabel', 'servingsTimes', 'servingsFewer', 'servingsMore', 'servingsLess', 'servingsMoreMultiple', 'servingsHint', 'servingsInvalid']) {
+      assert.ok(r?.[key], `${file}: recipes.${key}`);
+    }
+    assert.equal(m?.recipeScaleLabel, undefined, `${file}: meals.recipeScaleLabel ist tot`);
+  }
+});

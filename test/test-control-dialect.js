@@ -2164,19 +2164,18 @@ const PENDING = {
   'edit-autofocus': {
     'public/components/quick-links-manager.js': 1, 'public/pages/birthdays.js': 1, 'public/pages/budget.js': 2,
     'public/pages/calendar.js': 1, 'public/pages/documents.js': 1, 'public/pages/health.js': 7,
-    'public/pages/notes.js': 1, 'public/pages/pantry.js': 1,
-    'public/pages/recipes.js': 1, 'public/pages/schedule.js': 1,
+    'public/pages/notes.js': 1, 'public/pages/schedule.js': 1,
     'public/pages/split-expenses.js': 3, 'public/pages/subscriptions.js': 1,
     'public/settings/pages/modules-health.js': 1, 'public/settings/pages/sync-contacts.js': 1,
   },
   'advanced-hint': {
-    'public/pages/contacts.js': 1, 'public/pages/documents.js': 1, 'public/pages/health.js': 2, 'public/pages/meals.js': 1,
-    'public/pages/pantry.js': 1, 'public/pages/recipes.js': 1, 'public/pages/subscriptions.js': 1,
+    'public/pages/contacts.js': 1, 'public/pages/documents.js': 1, 'public/pages/health.js': 2,
+    'public/pages/subscriptions.js': 1,
   },
   'primary-disabled': {
     'public/components/document-attach.js': 1, 'public/pages/birthdays.js': 1, 'public/pages/contacts.js': 1,
     'public/pages/documents.js': 1, 'public/pages/schedule.js': 1,
-    'public/pages/shopping.js': 1, 'public/pages/split-expenses.js': 2, 'public/settings/pages/admin-permissions.js': 1,
+    'public/pages/split-expenses.js': 2, 'public/settings/pages/admin-permissions.js': 1,
   },
   'people-checkbox': { 'public/pages/documents.js': 1, 'public/pages/split-expenses.js': 2 },
 };
@@ -2737,7 +2736,11 @@ test('R23 D13: Wochenplan - Rezepte als Leiste unter dem Plan, unter 72rem der T
   const layout = rules.find((r) => r.selector.trim() === '.meals-layout' && /container:\s*meals-board/.test(r.body));
   assert.ok(layout, '.meals-layout misst sich nicht als Flaeche');
   assert.match(layout.body, /grid-template-columns:\s*minmax\(0, 1fr\)/, 'keine Spalte rechts mehr');
-  assert.match(layout.body, /grid-template-rows:\s*minmax\(0, 1fr\) auto/, 'die Leiste hat ihre eigene Zeile');
+  // R24 (Critique G3-Mahlzeiten-P2-1): die Leiste FOLGT dem Plan, statt mit
+  // `1fr` an den Fensterboden gedrueckt zu werden (145px leeres Band bei 1440).
+  assert.match(layout.body, /grid-template-rows:\s*minmax\(0, max-content\) auto/, 'die Leiste hat ihre eigene Zeile, direkt unter dem Plan');
+  assert.match(layout.body, /align-content:\s*start/, 'beide Zeilen stehen oben zusammen');
+  assert.doesNotMatch(layout.body, /minmax\(0, 1fr\) auto/, 'die Woche dehnt sich nicht auf die Resthoehe');
   const narrow = rules.filter((r) => r.at.some((a) => /meals-board \(width < 72rem\)/.test(a)));
   const grid = narrow.find((r) => r.selector.trim() === '.week-grid');
   assert.ok(grid && /repeat\(7, minmax\(128px, 1fr\)\)/.test(grid.body), 'sieben Tage mit mindestens 128px');
@@ -2919,4 +2922,47 @@ test('R24 G0-Shell-P3-3: EIN Etikett (`.tag`) fuer Aufgaben-Tags, Einkaufs-Etike
   for (const [css, sel] of [['tasks.css', '.task-tag'], ['list-row.css', '.list-row__tag'], ['health.css', '.health-med-badge']]) {
     assert.deepEqual(ruleOf(cssOf(css), sel), [], `${sel}: keine eigene Pillenregel neben .tag`);
   }
+});
+
+// --------------------------------------------------------------------------
+// R24 S9 Kueche (Critique 2026-10-26, G3): Plan, Karte, Rezepte, Einkauf
+// --------------------------------------------------------------------------
+test('R24 S9: die Rezeptkachel nennt ihre Zutaten, die Leiste beginnt in niedrigen Fenstern eingeklappt', () => {
+  const meals = readPub('pages/meals.js');
+  assert.match(meals, /title\.className = 'recipe-sidebar__title u-section-title'/, 'der Leistentitel ist ein Abschnittstitel (20/600)');
+  assert.match(meals, /meta\.className = 'recipe-sidebar__card-meta';\s*meta\.textContent = t\('meals\.ingredientCount', \{ count \}\)/, 'die Kachel nennt die Zutatenzahl');
+  assert.match(meals, /className: 'recipe-sidebar__thumb'/, 'und traegt ein Bild, wo es eins gibt');
+  assert.match(meals, /let hidden = window\.matchMedia\?\.\('\(max-height: 799px\)'\)\?\.matches \?\? false;/, 'unter 800px Hoehe startet die Leiste eingeklappt');
+});
+
+test('R24 S9: Karte am Board - Titel bis drei Zeilen, beide Zeichen in einem Ton, Tageskopf "Mi 28.10." mit ruhigem Plus', () => {
+  const rules = rulesOf('styles/meals.css');
+  const board = rules.find((r) => r.selector.trim() === '.meal-card__title-text' && r.at.some((a) => /min-width: 1024px/.test(a)) && /line-clamp/.test(r.body));
+  assert.match(board?.body ?? '', /-webkit-line-clamp:\s*3/, 'am Board drei Zeilen statt zwei');
+  const ton = rules.find((r) => r.selector.includes('.meal-card__action-btn--shopping') && r.selector.includes('.meal-card__action-btn--recipe') && !r.at.length);
+  assert.match(ton?.body ?? '', /color:\s*var\(--color-text-secondary\)/, 'Muetze und Wagen ruhen im selben Ton');
+  assert.ok(!rules.some((r) => r.selector.trim() === '.meal-card__action-btn--shopping' && /color:\s*var\(--module-accent\)/.test(r.body)),
+    'der Wagen traegt den Modulton nur unter dem Zeiger');
+  const add = rules.find((r) => r.selector.trim() === '.day-header > .day-add');
+  assert.match(add?.body ?? '', /margin-inline-start:\s*auto/, 'das Plus steht am Ende, Tag und Datum zusammen vorn');
+  assert.match(add?.body ?? '', /color:\s*var\(--color-text-secondary\)/, 'und ruhig, nicht orange');
+  assert.ok(!rules.some((r) => r.selector.trim() === '.day-header__date' && /margin-inline-start:\s*auto/.test(r.body)), 'das Datum rueckt nicht mehr an den Rand');
+});
+
+test('R24 S9: "Diese Woche geplant" steht nur, wenn nicht alle Rezepte geplant sind', () => {
+  const recipes = readPub('pages/recipes.js');
+  assert.match(recipes, /const allPlanned = listedRecipes\(\)\.every\(\(r\) => state\.plannedRecipeIds\.has\(r\.id\)\);/);
+  assert.match(recipes, /if \(state\.plannedRecipeIds\.has\(recipe\.id\) && !allPlanned\)/);
+});
+
+test('R24 S9: der Artikel-Dialog des Einkaufs faltet Preis, Laden, Link, Notiz und holt keine Tastatur', () => {
+  const shopping = readPub('pages/shopping.js');
+  const start = shopping.indexOf('function openItemDetails(');
+  const body = shopping.slice(start, shopping.indexOf('\nfunction ', start + 10));
+  assert.match(body, /initialFocus: 'edit'/, 'Bearbeiten holt am Finger keine Tastatur');
+  assert.match(body, /advancedSection\(itemMoreDetailsHtml\(item, linkPreview\), \{[\s\S]*?hint: t\('shopping\.moreDetailsHint'\)/, '"Weitere Angaben" nennt, was dahinter liegt');
+  assert.match(body, /open: item\.price_cents != null \|\| item\.store_id != null \|\| !!item\.url \|\| !!item\.notes/, 'offen, sobald eines einen Wert traegt');
+  assert.match(body, /class="form-pair form-pair--wide"/, 'die Kategorie steht am Telefon nicht in der halben Zeile');
+  assert.match(shopping, /<option value="\$\{PICK_PLACE\}" disabled selected>\$\{esc\(t\('shopping\.toPantryAllToPlaceholder'\)\)\}<\/option>/,
+    '"Alle nach" steht auf einem Platzhalter, bis jemand waehlt');
 });

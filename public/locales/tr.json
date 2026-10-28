@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "„{{item}}” yeniden „{{back}}” listesinde: sunucu onu „{{target}}” listesinde kabul etmedi.",
             "waited": "„{{item}}”, „{{target}}” listesine taşınmadı: „{{back}}” listesinin eşitlemesi bir haftadan uzun süredir kapalı. Liste açıldığında ürün „{{back}}” listesinde yeniden görünecek."
-        }
+        },
+        "moreDetailsHint": "Fiyat, mağaza, bağlantı, not",
+        "toPantryAllToPlaceholder": "Bir yer seç …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} malzeme",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "Kayıtlı tarif",
         "savedRecipePlaceholder": "Tarif seç",
         "saveAsRecipe": "Tarif olarak kaydet",
-        "recipeScaleLabel": "Malzemeleri ölçekle",
         "deletedToast": "Öğün silindi.",
         "recurrenceLabel": "Haftalık tekrarla",
         "recurrenceWeekly": "Haftalık",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "{{title}} tarifini aç",
         "viewRecipeNamed": "{{title}} tarifini görüntüle",
         "recipeIngredientsLabel": "Tariften malzemeler",
-        "recipeIngredientsEdit": "Düzenle"
+        "recipeIngredientsEdit": "Düzenle",
+        "moreDetailsHint": "Tarif, notlar, bağlantı"
     },
     "calendar": {
         "searchOpen": "Etkinlik ara",
@@ -3608,9 +3610,9 @@
         "imageHint": "Tarif başına bir görsel. Yemek planında ve genel bakış kutusunda görünür.",
         "imageTooLarge": "Görsel küçültüldükten sonra hâlâ çok büyük.",
         "ingredientMatchNone": "Eşleştirilmedi",
-        "ingredientMatchOpen": "{{count}} malzemeyi kilerle eşleştir",
-        "ingredientMatchOpen_one": "{{count}} malzemeyi kilerle eşleştir",
-        "ingredientMatchBulkTitle": "Malzemeleri kilerle eşleştir",
+        "ingredientMatchOpen": "{{count}} malzemeyi kilerle bağla",
+        "ingredientMatchOpen_one": "{{count}} malzemeyi kilerle bağla",
+        "ingredientMatchBulkTitle": "Malzemeleri kilerle bağla",
         "ingredientMatchBulkHint": "Her malzeme için karşılığı olan kiler satırını seç. Yuvomi hiçbir şey tahmin etmez - yalnızca burada onayladığın geçerlidir.",
         "ingredientMatchAction": "{{name}} malzemesini bir kiler satırıyla eşleştir",
         "ingredientMatchTitle": "{{name}} eşleştir",
@@ -3619,7 +3621,17 @@
         "ingredientMatchEmpty": "Kiler henüz boş.",
         "ingredientMatchSaved": "Eşleştirme kaydedildi.",
         "ingredientMatchCleared": "Eşleştirme kaldırıldı.",
-        "ingredientMatchLoadError": "Kiler yüklenemedi."
+        "ingredientMatchLoadError": "Kiler yüklenemedi.",
+        "servingsLabel": "Porsiyon",
+        "servingsMultipleLabel": "Miktar",
+        "servingsFewer": "Daha az porsiyon",
+        "servingsMore": "Daha fazla porsiyon",
+        "servingsLess": "Miktarı azalt",
+        "servingsMoreMultiple": "Miktarı artır",
+        "servingsHint": "Miktarların kaç porsiyon için olduğu. Bilmiyorsan boş bırak.",
+        "servingsInvalid": "1 ile 99 arasında bir tam sayı.",
+        "moreDetailsHint": "Notlar, görsel, bağlantı",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Bir bölüme gitmek ya da yeni bir şey oluşturmak için yaz. 2 karakterden itibaren kayıtlarını da bulursun, kelimenin bir kısmıyla bile.",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Süresi dolmuş",
         "filterSoon": "Yakında doluyor",
         "filterLow": "Neredeyse bitti",
-        "watchLabel": "Dikkat gerektiriyor",
-        "watchEmpty": "Süresi dolan ya da azalan bir şey yok.",
         "badgeExpiredYesterday": "Dün doldu",
         "badgeExpiredDays": "{{count}} gün önce doldu",
         "badgeExpiresToday": "Bugün doluyor",
@@ -6290,7 +6300,8 @@
             "bag": "poşet",
             "bag_one": "poşet",
             "bag_other": "poşet"
-        }
+        },
+        "moreDetailsHint": "Asgari stok, notlar"
     },
     "inventory": {
         "title": "Envanter",

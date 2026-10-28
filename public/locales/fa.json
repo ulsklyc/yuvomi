@@ -837,7 +837,9 @@
         "moveReturned": {
             "refused": "«{{item}}» به «{{back}}» برگشت: سرور آن را در «{{target}}» نپذیرفت.",
             "waited": "«{{item}}» به «{{target}}» منتقل نشد: همگام‌سازی «{{back}}» بیش از یک هفته است که خاموش است. مورد به محض روشن شدن این فهرست دوباره در «{{back}}» نمایش داده می‌شود."
-        }
+        },
+        "moreDetailsHint": "قیمت، فروشگاه، پیوند، یادداشت",
+        "toPantryAllToPlaceholder": "یک مکان انتخاب کنید …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} مادهٔ لازم",
@@ -909,7 +911,6 @@
         "savedRecipeLabel": "دستور غذای ذخیره‌شده",
         "savedRecipePlaceholder": "انتخاب دستور غذا",
         "saveAsRecipe": "ذخیره به عنوان دستور غذا",
-        "recipeScaleLabel": "مقیاس‌بندی مواد",
         "deletedToast": "وعده حذف شد.",
         "recurrenceLabel": "تکرار هفتگی",
         "recurrenceWeekly": "هفتگی",
@@ -935,7 +936,8 @@
         "openRecipeNamed": "باز کردن دستور غذای {{title}}",
         "viewRecipeNamed": "مشاهده دستور غذای {{title}}",
         "recipeIngredientsLabel": "مواد از دستور پخت",
-        "recipeIngredientsEdit": "تنظیم"
+        "recipeIngredientsEdit": "تنظیم",
+        "moreDetailsHint": "دستور پخت، یادداشت، پیوند"
     },
     "calendar": {
         "searchOpen": "جستجوی رویدادها",
@@ -3743,9 +3745,9 @@
         "imageHint": "یک تصویر برای هر دستور پخت. در برنامه غذایی و کاشی نمای کلی دیده می‌شود.",
         "imageTooLarge": "تصویر پس از کوچک‌سازی هنوز بزرگ است.",
         "ingredientMatchNone": "اختصاص‌نیافته",
-        "ingredientMatchOpen": "اختصاص {{count}} ماده به انبار",
-        "ingredientMatchOpen_one": "اختصاص {{count}} ماده به انبار",
-        "ingredientMatchBulkTitle": "اختصاص مواد به انبار",
+        "ingredientMatchOpen": "پیوند دادن {{count}} ماده به انبار",
+        "ingredientMatchOpen_one": "پیوند دادن {{count}} ماده به انبار",
+        "ingredientMatchBulkTitle": "پیوند دادن مواد به انبار",
         "ingredientMatchBulkHint": "برای هر ماده ردیفی از انبار را انتخاب کن که به آن اشاره دارد. یوومی چیزی را حدس نمی‌زند - فقط آنچه اینجا تأیید کنی معتبر است.",
         "ingredientMatchAction": "اختصاص {{name}} به یک ردیف انبار",
         "ingredientMatchTitle": "اختصاص {{name}}",
@@ -3754,7 +3756,17 @@
         "ingredientMatchEmpty": "انبار هنوز خالی است.",
         "ingredientMatchSaved": "اختصاص ذخیره شد.",
         "ingredientMatchCleared": "اختصاص برداشته شد.",
-        "ingredientMatchLoadError": "انبار بارگذاری نشد."
+        "ingredientMatchLoadError": "انبار بارگذاری نشد.",
+        "servingsLabel": "تعداد پرس",
+        "servingsMultipleLabel": "مقدار",
+        "servingsFewer": "پرس کمتر",
+        "servingsMore": "پرس بیشتر",
+        "servingsLess": "کاهش مقدار",
+        "servingsMoreMultiple": "افزایش مقدار",
+        "servingsHint": "مقدارها برای چند پرس است. اگر نمی‌دانید خالی بگذارید.",
+        "servingsInvalid": "عددی صحیح از 1 تا 99.",
+        "moreDetailsHint": "یادداشت، تصویر، پیوند",
+        "servingsTimes": "× {{value}}"
     },
     "onboarding": {
         "step1Title": "به {{name}} خوش آمدید",
@@ -6237,8 +6249,6 @@
         "filterExpired": "منقضی‌شده",
         "filterSoon": "به‌زودی منقضی می‌شود",
         "filterLow": "تقریباً تمام",
-        "watchLabel": "نیازمند توجه",
-        "watchEmpty": "چیزی در حال انقضا یا تمام شدن نیست.",
         "badgeExpiredYesterday": "دیروز منقضی شد",
         "badgeExpiredDays": "{{count}} روز پیش منقضی شد",
         "badgeExpiresToday": "امروز منقضی می‌شود",
@@ -6290,7 +6300,8 @@
             "bag": "کیسه",
             "bag_one": "کیسه",
             "bag_other": "کیسه"
-        }
+        },
+        "moreDetailsHint": "حداقل موجودی، یادداشت"
     },
     "inventory": {
         "title": "اموال",

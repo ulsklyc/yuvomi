@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "«{{item}}» er tilbake på «{{back}}»: serveren godtok den ikke i «{{target}}».",
             "waited": "«{{item}}» ble ikke flyttet til «{{target}}»: synkroniseringen av «{{back}}» har vært slått av i over en uke. Varen dukker opp igjen på «{{back}}» når listen slås på."
-        }
+        },
+        "moreDetailsHint": "Pris, butikk, lenke, notat",
+        "toPantryAllToPlaceholder": "Velg et sted …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediens",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "Lagret oppskrift",
         "savedRecipePlaceholder": "Velg oppskrift",
         "saveAsRecipe": "Lagre som oppskrift",
-        "recipeScaleLabel": "Skaler ingredienser",
         "deletedToast": "Måltid slettet.",
         "recurrenceLabel": "Gjenta ukentlig",
         "recurrenceWeekly": "Ukentlig",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "Åpne oppskrift for {{title}}",
         "viewRecipeNamed": "Vis oppskrift for {{title}}",
         "recipeIngredientsLabel": "Ingredienser fra oppskriften",
-        "recipeIngredientsEdit": "Tilpass"
+        "recipeIngredientsEdit": "Tilpass",
+        "moreDetailsHint": "Oppskrift, notater, lenke"
     },
     "calendar": {
         "searchOpen": "Søk etter hendelser",
@@ -3736,7 +3738,17 @@
         "ingredientMatchEmpty": "Skapet ditt er fortsatt tomt.",
         "ingredientMatchSaved": "Kobling lagret.",
         "ingredientMatchCleared": "Kobling fjernet.",
-        "ingredientMatchLoadError": "Skapet kunne ikke lastes."
+        "ingredientMatchLoadError": "Skapet kunne ikke lastes.",
+        "servingsLabel": "Porsjoner",
+        "servingsMultipleLabel": "Mengde",
+        "servingsFewer": "Færre porsjoner",
+        "servingsMore": "Flere porsjoner",
+        "servingsLess": "Reduser mengden",
+        "servingsMoreMultiple": "Øk mengden",
+        "servingsHint": "Hvor mange porsjoner mengdene gjelder for. La stå tomt hvis du ikke vet.",
+        "servingsInvalid": "Et heltall fra 1 til 99.",
+        "moreDetailsHint": "Notater, bilde, lenke",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Skriv minst 2 tegn for å søke i alle områder, inkludert deler av ord.",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Utløpt",
         "filterSoon": "Utløper snart",
         "filterLow": "Lave beholdninger",
-        "watchLabel": "Trenger oppmerksomhet",
-        "watchEmpty": "Ingenting utløper eller har lave beholdninger.",
         "badgeExpiredYesterday": "Utløp i går",
         "badgeExpiredDays": "Utløp for {{count}} dager siden",
         "badgeExpiresToday": "Utløper i dag",
@@ -6290,7 +6300,8 @@
             "bag": "pose",
             "bag_one": "pose",
             "bag_other": "poser"
-        }
+        },
+        "moreDetailsHint": "Minimumsbeholdning, notater"
     },
     "inventory": {
         "title": "Inventar",

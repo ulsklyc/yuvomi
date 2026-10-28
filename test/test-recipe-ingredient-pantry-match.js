@@ -605,7 +605,7 @@ test('die Oberflaeche nennt den unzugeordneten Zustand unbekannt, nicht fehlend'
   const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
   const text = de.recipes?.ingredientMatchNone;
   assert.equal(typeof text, 'string', 'recipes.ingredientMatchNone fehlt in public/locales/de.json');
-  assert.match(text, /nicht zugeordnet|unbekannt/i, `"${text}" benennt den Zustand nicht als unbekannt`);
+  assert.match(text, /nicht zugeordnet|nicht verknüpft|unbekannt/i, `"${text}" benennt den Zustand nicht als unbekannt`);
   assert.doesNotMatch(text, /fehlt|fehlend|nicht vorhanden|nicht da/i,
     `"${text}" liest sich wie eine Auskunft ueber den Bestand - Stufe 1 gibt keine`);
 

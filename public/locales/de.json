@@ -837,7 +837,9 @@
         "moveReturned": {
             "refused": "„{{item}}“ steht wieder auf „{{back}}“: Der Server hat den Artikel in „{{target}}“ nicht angenommen.",
             "waited": "„{{item}}“ wurde nicht nach „{{target}}“ verschoben: Der Abgleich von „{{back}}“ ist seit über einer Woche aus. Der Artikel erscheint wieder auf „{{back}}“, sobald die Liste eingeschaltet wird."
-        }
+        },
+        "moreDetailsHint": "Preis, Laden, Link, Notiz",
+        "toPantryAllToPlaceholder": "Ort wählen …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} Zutat",
@@ -909,7 +911,6 @@
         "savedRecipeLabel": "Gespeichertes Rezept",
         "savedRecipePlaceholder": "Rezept auswählen",
         "saveAsRecipe": "Als Rezept speichern",
-        "recipeScaleLabel": "Zutaten skalieren",
         "deletedToast": "Mahlzeit gelöscht.",
         "recurrenceLabel": "Wöchentlich wiederholen",
         "recurrenceWeekly": "Wöchentlich",
@@ -935,7 +936,8 @@
         "openRecipeNamed": "Rezept zu {{title}} öffnen",
         "viewRecipeNamed": "Rezept zu {{title}} ansehen",
         "recipeIngredientsLabel": "Zutaten aus dem Rezept",
-        "recipeIngredientsEdit": "Anpassen"
+        "recipeIngredientsEdit": "Anpassen",
+        "moreDetailsHint": "Rezept, Notizen, Link"
     },
     "calendar": {
         "searchOpen": "Termine suchen",
@@ -3742,19 +3744,29 @@
         "imageRemove": "Bild entfernen",
         "imageHint": "Ein Bild je Rezept. Es erscheint im Essensplan und auf der Übersichtskachel.",
         "imageTooLarge": "Das Bild ist nach dem Verkleinern noch zu groß.",
-        "ingredientMatchNone": "Nicht zugeordnet",
-        "ingredientMatchOpen": "{{count}} Zutaten dem Vorrat zuordnen",
-        "ingredientMatchOpen_one": "{{count}} Zutat dem Vorrat zuordnen",
-        "ingredientMatchBulkTitle": "Zutaten dem Vorrat zuordnen",
-        "ingredientMatchBulkHint": "Wähle für jede Zutat die Zeile aus deinem Vorrat, die sie meint. Yuvomi rät nichts - es gilt nur, was du hier bestätigst.",
-        "ingredientMatchAction": "{{name}} einer Vorratszeile zuordnen",
-        "ingredientMatchTitle": "{{name}} zuordnen",
-        "ingredientMatchLabel": "Zeile im Vorrat",
-        "ingredientMatchHint": "Wähle die Zeile aus deinem Vorrat, die diese Zutat meint. Yuvomi rät nichts - es gilt nur, was du hier bestätigst.",
+        "ingredientMatchNone": "Nicht verknüpft",
+        "ingredientMatchOpen": "{{count}} Zutaten mit dem Vorrat verknüpfen",
+        "ingredientMatchOpen_one": "{{count}} Zutat mit dem Vorrat verknüpfen",
+        "ingredientMatchBulkTitle": "Zutaten mit dem Vorrat verknüpfen",
+        "ingredientMatchBulkHint": "Wähle für jede Zutat aus deinem Vorrat, was sie meint. Yuvomi rät nichts - es gilt nur, was du hier bestätigst.",
+        "ingredientMatchAction": "{{name}} mit dem Vorrat verknüpfen",
+        "ingredientMatchTitle": "{{name}} verknüpfen",
+        "ingredientMatchLabel": "Im Vorrat",
+        "ingredientMatchHint": "Wähle aus deinem Vorrat, was diese Zutat meint. Yuvomi rät nichts - es gilt nur, was du hier bestätigst.",
         "ingredientMatchEmpty": "Dein Vorrat ist noch leer.",
-        "ingredientMatchSaved": "Zuordnung gespeichert.",
-        "ingredientMatchCleared": "Zuordnung aufgehoben.",
-        "ingredientMatchLoadError": "Der Vorrat konnte nicht geladen werden."
+        "ingredientMatchSaved": "Verknüpfung gespeichert.",
+        "ingredientMatchCleared": "Verknüpfung gelöst.",
+        "ingredientMatchLoadError": "Der Vorrat konnte nicht geladen werden.",
+        "servingsLabel": "Portionen",
+        "servingsMultipleLabel": "Menge",
+        "servingsFewer": "Weniger Portionen",
+        "servingsMore": "Mehr Portionen",
+        "servingsLess": "Menge verringern",
+        "servingsMoreMultiple": "Menge erhöhen",
+        "servingsHint": "Für so viele Portionen gelten die Mengen. Leer lassen, wenn unbekannt.",
+        "servingsInvalid": "Eine ganze Zahl von 1 bis 99.",
+        "moreDetailsHint": "Notizen, Bild, Link",
+        "servingsTimes": "× {{value}}"
     },
     "onboarding": {
         "step1Title": "Willkommen bei {{name}}",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Abgelaufen",
         "filterSoon": "Läuft bald ab",
         "filterLow": "Fast leer",
-        "watchLabel": "Braucht Aufmerksamkeit",
-        "watchEmpty": "Nichts läuft ab, nichts wird knapp.",
         "badgeExpiredYesterday": "Gestern abgelaufen",
         "badgeExpiredDays": "Vor {{count}} Tagen abgelaufen",
         "badgeExpiresToday": "Läuft heute ab",
@@ -6290,7 +6300,8 @@
             "bag": "Beutel",
             "bag_one": "Beutel",
             "bag_other": "Beutel"
-        }
+        },
+        "moreDetailsHint": "Mindestbestand, Notizen"
     },
     "inventory": {
         "title": "Inventar",

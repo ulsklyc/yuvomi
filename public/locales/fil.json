@@ -837,7 +837,9 @@
         "moveReturned": {
             "refused": "Bumalik ang \"{{item}}\" sa \"{{back}}\": hindi ito tinanggap ng server sa \"{{target}}\".",
             "waited": "Hindi nailipat ang \"{{item}}\" sa \"{{target}}\": mahigit isang linggo nang naka-off ang pag-sync ng \"{{back}}\". Lalabas ulit ang item sa \"{{back}}\" kapag binuksan ang listahang iyon."
-        }
+        },
+        "moreDetailsHint": "Presyo, tindahan, link, tala",
+        "toPantryAllToPlaceholder": "Pumili ng lugar …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} sangkap",
@@ -909,7 +911,6 @@
         "savedRecipeLabel": "Naka-save na resipe",
         "savedRecipePlaceholder": "Pumili ng resipe",
         "saveAsRecipe": "I-save bilang resipe",
-        "recipeScaleLabel": "I-scale ang mga sangkap",
         "deletedToast": "Natanggal na ang pagkain.",
         "recurrenceLabel": "Ulitin lingguhan",
         "recurrenceWeekly": "Lingguhan",
@@ -935,7 +936,8 @@
         "openRecipeNamed": "Buksan ang resipe ng {{title}}",
         "viewRecipeNamed": "Tingnan ang resipe ng {{title}}",
         "recipeIngredientsLabel": "Mga sangkap mula sa recipe",
-        "recipeIngredientsEdit": "I-adjust"
+        "recipeIngredientsEdit": "I-adjust",
+        "moreDetailsHint": "Recipe, mga tala, link"
     },
     "calendar": {
         "searchOpen": "Maghanap ng kaganapan",
@@ -3743,9 +3745,9 @@
         "imageHint": "Isang larawan bawat resipe. Lumalabas ito sa tagaplano ng pagkain at sa overview tile.",
         "imageTooLarge": "Masyado pa ring malaki ang larawan pagkatapos paliitin.",
         "ingredientMatchNone": "Hindi pa naitutugma",
-        "ingredientMatchOpen": "Itugma ang {{count}} sangkap sa paminggalan",
-        "ingredientMatchOpen_one": "Itugma ang {{count}} sangkap sa paminggalan",
-        "ingredientMatchBulkTitle": "Itugma ang mga sangkap sa paminggalan",
+        "ingredientMatchOpen": "Iugnay ang {{count}} sangkap sa paminggalan",
+        "ingredientMatchOpen_one": "Iugnay ang {{count}} sangkap sa paminggalan",
+        "ingredientMatchBulkTitle": "Iugnay ang mga sangkap sa paminggalan",
         "ingredientMatchBulkHint": "Para sa bawat sangkap, piliin ang linya sa paminggalan na tinutukoy nito. Walang hinuhulaan ang Yuvomi - ang kinukumpirma mo lang dito ang binibilang.",
         "ingredientMatchAction": "Itugma ang {{name}} sa isang linya sa paminggalan",
         "ingredientMatchTitle": "Itugma ang {{name}}",
@@ -3754,7 +3756,17 @@
         "ingredientMatchEmpty": "Wala pa ring laman ang iyong paminggalan.",
         "ingredientMatchSaved": "Na-save ang pagtutugma.",
         "ingredientMatchCleared": "Inalis ang pagtutugma.",
-        "ingredientMatchLoadError": "Hindi ma-load ang paminggalan."
+        "ingredientMatchLoadError": "Hindi ma-load ang paminggalan.",
+        "servingsLabel": "Mga serving",
+        "servingsMultipleLabel": "Dami",
+        "servingsFewer": "Mas kaunting serving",
+        "servingsMore": "Mas maraming serving",
+        "servingsLess": "Bawasan ang dami",
+        "servingsMoreMultiple": "Dagdagan ang dami",
+        "servingsHint": "Ilang serving ang saklaw ng mga dami. Iwanang blangko kung hindi alam.",
+        "servingsInvalid": "Buong numero mula 1 hanggang 99.",
+        "moreDetailsHint": "Mga tala, larawan, link",
+        "servingsTimes": "× {{value}}"
     },
     "onboarding": {
         "step1Title": "Maligayang pagdating sa {{name}}",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Nag-expire",
         "filterSoon": "Malapit nang mag-expire",
         "filterLow": "Nauubos na",
-        "watchLabel": "Kailangang bantayan",
-        "watchEmpty": "Walang mag-e-expire o paubos na.",
         "badgeExpiredYesterday": "Nag-expire kahapon",
         "badgeExpiredDays": "Nag-expire {{count}} araw na ang nakalipas",
         "badgeExpiresToday": "Nag-e-expire ngayon",
@@ -6290,7 +6300,8 @@
             "bag": "supot",
             "bag_one": "supot",
             "bag_other": "supot"
-        }
+        },
+        "moreDetailsHint": "Pinakamababang stock, mga tala"
     },
     "inventory": {
         "title": "Imbentaryo",

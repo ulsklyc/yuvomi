@@ -501,6 +501,10 @@
 .kanban-card__meta,
 .due-date,
 .priority-badge,
+/* Kueche (R24): die Metazeile des Vorrats (Menge, Status, MHD, Ort) und die
+   Zutatenzahl der Rezeptkachel unter dem Essensplan */
+.pantry-row__meta,
+.recipe-sidebar__card-meta,
 /* Kalender, Kontakte, Geburtstage */
 .agenda-event__meta,
 .contact-item__meta,

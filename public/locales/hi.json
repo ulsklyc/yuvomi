@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "“{{item}}” वापस “{{back}}” में है: सर्वर ने इसे “{{target}}” में स्वीकार नहीं किया।",
             "waited": "“{{item}}” को “{{target}}” में नहीं ले जाया गया: “{{back}}” का सिंक एक हफ़्ते से ज़्यादा समय से बंद है। सूची चालू होते ही आइटम फिर से “{{back}}” में दिखेगा।"
-        }
+        },
+        "moreDetailsHint": "कीमत, दुकान, लिंक, नोट",
+        "toPantryAllToPlaceholder": "जगह चुनें …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} सामग्री",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "सहेजी गई रेसिपी",
         "savedRecipePlaceholder": "रेसिपी चुनें",
         "saveAsRecipe": "रेसिपी के रूप में सहेजें",
-        "recipeScaleLabel": "सामग्री की मात्रा बदलें",
         "deletedToast": "भोजन हटाया गया।",
         "recurrenceLabel": "हर सप्ताह दोहराएं",
         "recurrenceWeekly": "साप्ताहिक",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "{{title}} की रेसिपी खोलें",
         "viewRecipeNamed": "{{title}} की रेसिपी देखें",
         "recipeIngredientsLabel": "रेसिपी की सामग्री",
-        "recipeIngredientsEdit": "बदलें"
+        "recipeIngredientsEdit": "बदलें",
+        "moreDetailsHint": "रेसिपी, नोट, लिंक"
     },
     "calendar": {
         "searchOpen": "इवेंट खोजें",
@@ -3619,7 +3621,17 @@
         "ingredientMatchEmpty": "भंडार अभी खाली है।",
         "ingredientMatchSaved": "संबंध सहेजा गया।",
         "ingredientMatchCleared": "संबंध हटाया गया।",
-        "ingredientMatchLoadError": "भंडार लोड नहीं हो सका।"
+        "ingredientMatchLoadError": "भंडार लोड नहीं हो सका।",
+        "servingsLabel": "सर्विंग",
+        "servingsMultipleLabel": "मात्रा",
+        "servingsFewer": "कम सर्विंग",
+        "servingsMore": "अधिक सर्विंग",
+        "servingsLess": "मात्रा घटाएँ",
+        "servingsMoreMultiple": "मात्रा बढ़ाएँ",
+        "servingsHint": "मात्राएँ कितनी सर्विंग के लिए हैं। पता न हो तो खाली छोड़ें।",
+        "servingsInvalid": "1 से 99 तक की पूर्ण संख्या।",
+        "moreDetailsHint": "नोट, चित्र, लिंक",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "किसी हिस्से पर जाने या कुछ नया बनाने के लिए लिखें। 2 अक्षरों से आपकी प्रविष्टियाँ भी मिलती हैं, शब्द के हिस्से से भी।",
@@ -6237,8 +6249,6 @@
         "filterExpired": "समय-सीमा समाप्त",
         "filterSoon": "जल्द समाप्त",
         "filterLow": "लगभग समाप्त",
-        "watchLabel": "ध्यान देने योग्य",
-        "watchEmpty": "कुछ भी समाप्त या खत्म होने वाला नहीं है।",
         "badgeExpiredYesterday": "कल समाप्त हुई",
         "badgeExpiredDays": "{{count}} दिन पहले समाप्त हुई",
         "badgeExpiresToday": "आज समाप्त होती है",
@@ -6290,7 +6300,8 @@
             "bag": "थैली",
             "bag_one": "थैली",
             "bag_other": "थैलियाँ"
-        }
+        },
+        "moreDetailsHint": "न्यूनतम स्टॉक, नोट"
     },
     "inventory": {
         "title": "इन्वेंटरी",

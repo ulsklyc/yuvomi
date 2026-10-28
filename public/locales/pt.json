@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "«{{item}}» voltou para «{{back}}»: o servidor não o aceitou em «{{target}}».",
             "waited": "«{{item}}» não foi movido para «{{target}}»: a sincronização de «{{back}}» está desativada há mais de uma semana. O artigo volta a aparecer em «{{back}}» assim que essa lista for ativada."
-        }
+        },
+        "moreDetailsHint": "Preço, loja, ligação, nota",
+        "toPantryAllToPlaceholder": "Escolha um local …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediente",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "Receita salva",
         "savedRecipePlaceholder": "Selecionar receita",
         "saveAsRecipe": "Salvar como receita",
-        "recipeScaleLabel": "Ajustar ingredientes",
         "deletedToast": "Refeição excluída.",
         "recurrenceLabel": "Repetir semanalmente",
         "recurrenceWeekly": "Semanalmente",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "Abrir a receita de {{title}}",
         "viewRecipeNamed": "Ver a receita de {{title}}",
         "recipeIngredientsLabel": "Ingredientes da receita",
-        "recipeIngredientsEdit": "Ajustar"
+        "recipeIngredientsEdit": "Ajustar",
+        "moreDetailsHint": "Receita, notas, ligação"
     },
     "calendar": {
         "searchOpen": "Pesquisar eventos",
@@ -3608,9 +3610,9 @@
         "imageHint": "Uma imagem por receita. Aparece no plano de refeições e no mosaico de visão geral.",
         "imageTooLarge": "A imagem continua demasiado grande depois de reduzida.",
         "ingredientMatchNone": "Sem correspondência",
-        "ingredientMatchOpen": "Associar {{count}} ingredientes à despensa",
-        "ingredientMatchOpen_one": "Associar {{count}} ingrediente à despensa",
-        "ingredientMatchBulkTitle": "Associar ingredientes à despensa",
+        "ingredientMatchOpen": "Ligar {{count}} ingredientes à despensa",
+        "ingredientMatchOpen_one": "Ligar {{count}} ingrediente à despensa",
+        "ingredientMatchBulkTitle": "Ligar ingredientes à despensa",
         "ingredientMatchBulkHint": "Escolhe, para cada ingrediente, a linha da tua despensa a que se refere. O Yuvomi não adivinha nada - só vale o que confirmares aqui.",
         "ingredientMatchAction": "Associar {{name}} a uma linha da despensa",
         "ingredientMatchTitle": "Associar {{name}}",
@@ -3619,7 +3621,17 @@
         "ingredientMatchEmpty": "A despensa ainda está vazia.",
         "ingredientMatchSaved": "Associação guardada.",
         "ingredientMatchCleared": "Associação removida.",
-        "ingredientMatchLoadError": "Não foi possível carregar a despensa."
+        "ingredientMatchLoadError": "Não foi possível carregar a despensa.",
+        "servingsLabel": "Porções",
+        "servingsMultipleLabel": "Quantidade",
+        "servingsFewer": "Menos porções",
+        "servingsMore": "Mais porções",
+        "servingsLess": "Diminuir quantidade",
+        "servingsMoreMultiple": "Aumentar quantidade",
+        "servingsHint": "Para quantas porções valem as quantidades. Deixe vazio se não souber.",
+        "servingsInvalid": "Um número inteiro de 1 a 99.",
+        "moreDetailsHint": "Notas, imagem, ligação",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Digita para ir a uma área ou criar algo. A partir de 2 caracteres também encontras os teus registos, até por partes de palavras.",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Expirado",
         "filterSoon": "A expirar em breve",
         "filterLow": "Quase esgotado",
-        "watchLabel": "Requer atenção",
-        "watchEmpty": "Nada está a expirar nem a acabar.",
         "badgeExpiredYesterday": "Expirou ontem",
         "badgeExpiredDays": "Expirou há {{count}} dias",
         "badgeExpiresToday": "Expira hoje",
@@ -6290,7 +6300,8 @@
             "bag": "saco",
             "bag_one": "saco",
             "bag_other": "sacos"
-        }
+        },
+        "moreDetailsHint": "Stock mínimo, notas"
     },
     "inventory": {
         "title": "Inventário",

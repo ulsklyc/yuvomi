@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "”{{item}}” är tillbaka på ”{{back}}”: servern tog inte emot den i ”{{target}}”.",
             "waited": "”{{item}}” flyttades inte till ”{{target}}”: synkroniseringen av ”{{back}}” har varit avstängd i över en vecka. Varan dyker upp på ”{{back}}” igen när listan slås på."
-        }
+        },
+        "moreDetailsHint": "Pris, butik, länk, anteckning",
+        "toPantryAllToPlaceholder": "Välj en plats …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediens",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "Sparat recept",
         "savedRecipePlaceholder": "Välj recept",
         "saveAsRecipe": "Spara som recept",
-        "recipeScaleLabel": "Skala ingredienser",
         "deletedToast": "Måltid borttagen.",
         "recurrenceLabel": "Upprepa varje vecka",
         "recurrenceWeekly": "Varje vecka",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "Öppna receptet för {{title}}",
         "viewRecipeNamed": "Visa receptet för {{title}}",
         "recipeIngredientsLabel": "Ingredienser från receptet",
-        "recipeIngredientsEdit": "Anpassa"
+        "recipeIngredientsEdit": "Anpassa",
+        "moreDetailsHint": "Recept, anteckningar, länk"
     },
     "calendar": {
         "searchOpen": "Sök händelser",
@@ -3619,7 +3621,17 @@
         "ingredientMatchEmpty": "Skafferiet är fortfarande tomt.",
         "ingredientMatchSaved": "Kopplingen sparades.",
         "ingredientMatchCleared": "Kopplingen togs bort.",
-        "ingredientMatchLoadError": "Skafferiet kunde inte läsas in."
+        "ingredientMatchLoadError": "Skafferiet kunde inte läsas in.",
+        "servingsLabel": "Portioner",
+        "servingsMultipleLabel": "Mängd",
+        "servingsFewer": "Färre portioner",
+        "servingsMore": "Fler portioner",
+        "servingsLess": "Minska mängden",
+        "servingsMoreMultiple": "Öka mängden",
+        "servingsHint": "Hur många portioner mängderna gäller för. Lämna tomt om du inte vet.",
+        "servingsInvalid": "Ett heltal från 1 till 99.",
+        "moreDetailsHint": "Anteckningar, bild, länk",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Skriv för att gå till en del eller skapa något. Från 2 tecken hittar du även dina poster, också på delar av ord.",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Utgången",
         "filterSoon": "Går snart ut",
         "filterLow": "Nästan slut",
-        "watchLabel": "Kräver uppmärksamhet",
-        "watchEmpty": "Inget går ut eller håller på att ta slut.",
         "badgeExpiredYesterday": "Gick ut i går",
         "badgeExpiredDays": "Gick ut för {{count}} dagar sedan",
         "badgeExpiresToday": "Går ut i dag",
@@ -6290,7 +6300,8 @@
             "bag": "påse",
             "bag_one": "påse",
             "bag_other": "påsar"
-        }
+        },
+        "moreDetailsHint": "Minsta lager, anteckningar"
     },
     "inventory": {
         "title": "Inventarier",

@@ -977,7 +977,9 @@
         "moveReturned": {
             "refused": "„{{item}}” wrócił na listę „{{back}}”: serwer nie przyjął go na liście „{{target}}”.",
             "waited": "„{{item}}” nie został przeniesiony na listę „{{target}}”: synchronizacja listy „{{back}}” jest wyłączona od ponad tygodnia. Produkt pojawi się znowu na liście „{{back}}”, gdy ją włączysz."
-        }
+        },
+        "moreDetailsHint": "Cena, sklep, link, notatka",
+        "toPantryAllToPlaceholder": "Wybierz miejsce …"
     },
     "meals": {
         "randomizeSuccess_few": "Zaplanowano {{count}} posiłki.",
@@ -1059,7 +1061,6 @@
         "savedRecipeLabel": "Zapisany przepis",
         "savedRecipePlaceholder": "Wybierz przepis",
         "saveAsRecipe": "Zapisz jako przepis",
-        "recipeScaleLabel": "Skaluj składniki",
         "deletedToast": "Posiłek usunięty.",
         "recurrenceLabel": "Powtarzaj co tydzień",
         "recurrenceWeekly": "Co tydzień",
@@ -1085,7 +1086,8 @@
         "openRecipeNamed": "Otwórz przepis na {{title}}",
         "viewRecipeNamed": "Zobacz przepis na {{title}}",
         "recipeIngredientsLabel": "Składniki z przepisu",
-        "recipeIngredientsEdit": "Dostosuj"
+        "recipeIngredientsEdit": "Dostosuj",
+        "moreDetailsHint": "Przepis, notatki, link"
     },
     "calendar": {
         "searchOpen": "Szukaj wydarzeń",
@@ -3973,11 +3975,11 @@
         "imageHint": "Jeden obraz na przepis. Pojawia się w planie posiłków i na kafelku przeglądu.",
         "imageTooLarge": "Obraz jest nadal za duży po zmniejszeniu.",
         "ingredientMatchNone": "Nieprzypisane",
-        "ingredientMatchOpen": "Przypisz {{count}} składnika do spiżarni",
-        "ingredientMatchOpen_one": "Przypisz {{count}} składnik do spiżarni",
-        "ingredientMatchOpen_few": "Przypisz {{count}} składniki do spiżarni",
-        "ingredientMatchOpen_many": "Przypisz {{count}} składników do spiżarni",
-        "ingredientMatchBulkTitle": "Przypisz składniki do spiżarni",
+        "ingredientMatchOpen": "Połącz {{count}} składnika ze spiżarnią",
+        "ingredientMatchOpen_one": "Połącz {{count}} składnik ze spiżarnią",
+        "ingredientMatchOpen_few": "Połącz {{count}} składniki ze spiżarnią",
+        "ingredientMatchOpen_many": "Połącz {{count}} składników ze spiżarnią",
+        "ingredientMatchBulkTitle": "Połącz składniki ze spiżarnią",
         "ingredientMatchBulkHint": "Dla każdego składnika wybierz pozycję w spiżarni, którą oznacza. Yuvomi niczego nie zgaduje - liczy się tylko to, co tutaj potwierdzisz.",
         "ingredientMatchAction": "Przypisz {{name}} do pozycji w spiżarni",
         "ingredientMatchTitle": "Przypisz {{name}}",
@@ -3986,7 +3988,17 @@
         "ingredientMatchEmpty": "Spiżarnia jest jeszcze pusta.",
         "ingredientMatchSaved": "Przypisanie zapisane.",
         "ingredientMatchCleared": "Przypisanie usunięte.",
-        "ingredientMatchLoadError": "Nie udało się wczytać spiżarni."
+        "ingredientMatchLoadError": "Nie udało się wczytać spiżarni.",
+        "servingsLabel": "Porcje",
+        "servingsMultipleLabel": "Ilość",
+        "servingsFewer": "Mniej porcji",
+        "servingsMore": "Więcej porcji",
+        "servingsLess": "Zmniejsz ilość",
+        "servingsMoreMultiple": "Zwiększ ilość",
+        "servingsHint": "Na ile porcji są podane ilości. Zostaw puste, jeśli nie wiesz.",
+        "servingsInvalid": "Liczba całkowita od 1 do 99.",
+        "moreDetailsHint": "Notatki, obraz, link",
+        "servingsTimes": "× {{value}}"
     },
     "onboarding": {
         "step1Title": "Witaj w {{name}}",
@@ -6536,8 +6548,6 @@
         "filterExpired": "Przeterminowane",
         "filterSoon": "Wkrótce przeterminowane",
         "filterLow": "Prawie wyczerpane",
-        "watchLabel": "Wymaga uwagi",
-        "watchEmpty": "Nic nie traci ważności ani się nie kończy.",
         "badgeExpiredYesterday": "Przeterminowane wczoraj",
         "badgeExpiredDays": "Przeterminowane {{count}} dni temu",
         "badgeExpiredDays_many": "Przeterminowane {{count}} dni temu",
@@ -6610,7 +6620,8 @@
             "bag_few": "torebki",
             "bag_many": "torebek",
             "bag_other": "torebki"
-        }
+        },
+        "moreDetailsHint": "Minimalny zapas, notatki"
     },
     "inventory": {
         "title": "Inwentarz",

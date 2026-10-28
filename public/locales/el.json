@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "Το «{{item}}» επέστρεψε στη λίστα «{{back}}»: ο διακομιστής δεν το δέχτηκε στη λίστα «{{target}}».",
             "waited": "Το «{{item}}» δεν μεταφέρθηκε στη λίστα «{{target}}»: ο συγχρονισμός της λίστας «{{back}}» είναι απενεργοποιημένος πάνω από μία εβδομάδα. Το είδος θα εμφανιστεί ξανά στη λίστα «{{back}}» μόλις την ενεργοποιήσετε."
-        }
+        },
+        "moreDetailsHint": "Τιμή, κατάστημα, σύνδεσμος, σημείωση",
+        "toPantryAllToPlaceholder": "Επιλέξτε θέση …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} υλικό",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "Αποθηκευμένη συνταγή",
         "savedRecipePlaceholder": "Επιλογή συνταγής",
         "saveAsRecipe": "Αποθήκευση ως συνταγή",
-        "recipeScaleLabel": "Κλιμάκωση υλικών",
         "deletedToast": "Το γεύμα διαγράφηκε.",
         "recurrenceLabel": "Επανάληψη κάθε εβδομάδα",
         "recurrenceWeekly": "Εβδομαδιαία",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "Άνοιγμα συνταγής για «{{title}}»",
         "viewRecipeNamed": "Προβολή συνταγής για «{{title}}»",
         "recipeIngredientsLabel": "Υλικά από τη συνταγή",
-        "recipeIngredientsEdit": "Προσαρμογή"
+        "recipeIngredientsEdit": "Προσαρμογή",
+        "moreDetailsHint": "Συνταγή, σημειώσεις, σύνδεσμος"
     },
     "calendar": {
         "searchOpen": "Αναζήτηση εκδηλώσεων",
@@ -3608,9 +3610,9 @@
         "imageHint": "Μία εικόνα ανά συνταγή. Εμφανίζεται στο πρόγραμμα γευμάτων και στο πλακίδιο επισκόπησης.",
         "imageTooLarge": "Η εικόνα παραμένει πολύ μεγάλη μετά τη σμίκρυνση.",
         "ingredientMatchNone": "Χωρίς αντιστοίχιση",
-        "ingredientMatchOpen": "Αντιστοίχιση {{count}} συστατικών στο απόθεμα",
-        "ingredientMatchOpen_one": "Αντιστοίχιση {{count}} συστατικού στο απόθεμα",
-        "ingredientMatchBulkTitle": "Αντιστοίχιση συστατικών στο απόθεμα",
+        "ingredientMatchOpen": "Σύνδεση {{count}} συστατικών με το απόθεμα",
+        "ingredientMatchOpen_one": "Σύνδεση {{count}} συστατικού με το απόθεμα",
+        "ingredientMatchBulkTitle": "Σύνδεση συστατικών με το απόθεμα",
         "ingredientMatchBulkHint": "Για κάθε συστατικό διάλεξε τη γραμμή του αποθέματος που εννοεί. Το Yuvomi δεν μαντεύει τίποτα - μετράει μόνο ό,τι επιβεβαιώνεις εδώ.",
         "ingredientMatchAction": "Αντιστοίχιση του {{name}} σε γραμμή του αποθέματος",
         "ingredientMatchTitle": "Αντιστοίχιση {{name}}",
@@ -3619,7 +3621,17 @@
         "ingredientMatchEmpty": "Το απόθεμα είναι ακόμη άδειο.",
         "ingredientMatchSaved": "Η αντιστοίχιση αποθηκεύτηκε.",
         "ingredientMatchCleared": "Η αντιστοίχιση καταργήθηκε.",
-        "ingredientMatchLoadError": "Δεν ήταν δυνατή η φόρτωση του αποθέματος."
+        "ingredientMatchLoadError": "Δεν ήταν δυνατή η φόρτωση του αποθέματος.",
+        "servingsLabel": "Μερίδες",
+        "servingsMultipleLabel": "Ποσότητα",
+        "servingsFewer": "Λιγότερες μερίδες",
+        "servingsMore": "Περισσότερες μερίδες",
+        "servingsLess": "Μείωση ποσότητας",
+        "servingsMoreMultiple": "Αύξηση ποσότητας",
+        "servingsHint": "Για πόσες μερίδες ισχύουν οι ποσότητες. Αφήστε κενό αν δεν το ξέρετε.",
+        "servingsInvalid": "Ακέραιος αριθμός από 1 έως 99.",
+        "moreDetailsHint": "Σημειώσεις, εικόνα, σύνδεσμος",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Πληκτρολόγησε για να μεταβείς σε μια ενότητα ή να δημιουργήσεις κάτι. Από 2 χαρακτήρες βρίσκεις και τις καταχωρίσεις σου, ακόμη και με μέρος λέξης.",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Ληγμένα",
         "filterSoon": "Λήγουν σύντομα",
         "filterLow": "Σχεδόν εξαντλημένα",
-        "watchLabel": "Χρειάζεται προσοχή",
-        "watchEmpty": "Τίποτα δεν λήγει ούτε τελειώνει.",
         "badgeExpiredYesterday": "Έληξε χθες",
         "badgeExpiredDays": "Έληξε πριν από {{count}} ημέρες",
         "badgeExpiresToday": "Λήγει σήμερα",
@@ -6290,7 +6300,8 @@
             "bag": "σακούλα",
             "bag_one": "σακούλα",
             "bag_other": "σακούλες"
-        }
+        },
+        "moreDetailsHint": "Ελάχιστο απόθεμα, σημειώσεις"
     },
     "inventory": {
         "title": "Απογραφή",

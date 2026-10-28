@@ -9595,6 +9595,94 @@ textarea::placeholder {
   grid-area: remove;
 }
 
+/* EINE ZEILE, SOBALD DIE LISTE SIE TRAEGT (R24, Critique G3-Rezepte-P3-2).
+ * Am Desktop (Rezept bearbeiten in der Detailspalte, Liste 642px) stand jede
+ * Zutat zweizeilig - 96px je Zutat, und von sechs Zutaten war im 540px-Blatt
+ * eine sichtbar. Ab 34rem Listenbreite steht sie wie im Uebernahme-Dialog des
+ * Einkaufs in einer Zeile: Name | Menge | Kategorie | Entfernen. Die
+ * Reihenfolge bleibt die des Markups (Tab-Folge = Lesefolge). Gefragt wird die
+ * Breite der LISTE, nicht des Viewports: dasselbe Blatt ist am Telefon schmal. */
+.ingredient-list,
+.recipe-ingredient-list {
+  container: ingredient-rows / inline-size;
+}
+
+@container ingredient-rows (min-width: 34rem) {
+  .ingredient-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 6.5rem) minmax(0, 10rem) auto;
+    grid-template-areas: "name qty cat remove";
+  }
+}
+
+/* --------------------------------------------------------
+ * Portionen-Stepper (R24, E12; Markup: utils/servings-stepper.js)
+ * Global, weil er im Rezept (Seite, Leseblatt) UND im Mahlzeit-Dialog steht -
+ * Dialoge rendern im geteilten Overlay. Die Knoepfe tragen die ruhige Haut des
+ * Vorrat-Steppers (keine Kante, Flaeche erst im Hover), der Wert steht
+ * dazwischen in gleich breiten Ziffern: hier ist er die Antwort („fuer wie
+ * viele?"), nicht eine Angabe der Metazeile.
+ * -------------------------------------------------------- */
+.servings-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  --servings-step-btn: var(--target-md);
+}
+
+.servings-stepper__label {
+  margin-inline-end: var(--space-1);
+  font-size: var(--type-secondary);
+  color: var(--color-text-secondary);
+}
+
+.servings-stepper__value {
+  min-width: 3.5ch;
+  text-align: center;
+  font-size: var(--type-body);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+}
+
+.servings-stepper__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--servings-step-btn);
+  height: var(--servings-step-btn);
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+/* Unter dem Zeiger; am Finger bliebe der Hover nach dem Tipp kleben. */
+@media (hover: hover) {
+  .servings-stepper__btn:hover:not(:disabled) {
+    background-color: var(--color-surface-hover);
+    color: var(--color-text-primary);
+  }
+}
+
+.servings-stepper__btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.servings-stepper__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (hover: none) {
+  .servings-stepper {
+    --servings-step-btn: var(--target-base);
+  }
+}
+
 .meal-type-badge {
   display: inline-flex;
   align-items: center;

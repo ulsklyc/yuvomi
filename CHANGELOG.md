@@ -7,7 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Recipes know their servings.** A recipe can say how many servings its amounts are for, and its
+  ingredients get a "Servings − 4 +" stepper that recalculates every amount as you step. Planning the
+  recipe or putting it on the shopping list takes the servings you chose. In the meal dialog the same
+  stepper replaces the "Scale ingredients" number field once a recipe fills the list. A recipe without
+  servings steps in multiples ("Amount × 1.5") instead of inventing a number.
+
 ### Changed
+- **Tapping a meal shows it first.** The meal card opens a read view (date, meal, cook, ingredients,
+  recipe, notes) with Edit as the one main button and "Add to shopping list" next to it, instead of
+  the full edit form. On a computer it opens next to the card. In the form, a meal's ingredients are
+  always a short list with "Adjust", no longer a fold in some meals and a list in others.
+- **The meal plan keeps its recipes close.** The recipe strip follows the week instead of sitting at
+  the bottom of the window with an empty band above it, starts folded on low screens, and its tiles
+  show the number of ingredients (and the picture where there is one). Meal names on the week board
+  use up to three lines before they are shortened, the two card icons share one quiet colour, and on
+  phones a day reads "Wed 28.10." with the plus at the end.
+- **The pantry says everything in one line, in the same order.** "2 days left" and "Running low" now
+  follow the quantity under the name ("1 l · 3 days left · Running low"), instead of floating next to
+  the name. On phones the best-before date moves to its own line instead of disappearing, and the side
+  column that listed the same expiring items again is gone - the filter chips carry the counts. A tap on
+  + or − briefly highlights the quantity it changed.
+- **Recipes are calmer.** "Planned this week" only appears when not every recipe is planned, editing a
+  recipe shows each ingredient in one row on wider screens, and "Match 6 ingredients to the pantry" now
+  reads "Link 6 ingredients to your pantry".
+- **Shopping item details are shorter.** Price, store, link and note sit under "More details" (open
+  when one of them is filled in), the category has the full width on phones, and opening an item no
+  longer brings up the keyboard. The quick-add row is as tall as the rest of the header and sends with
+  an "Add" button instead of a bare return arrow. "Add from meal plan" can always be pressed and says
+  at its preview line when the range has nothing to add. "To pantry" starts with "Choose a place …"
+  instead of pretending every item goes to the first place.
 - **Waste collection is calmer.** Today's pickup carries a "Put out today" label instead of the same grey
   "Today" as every other date. Types without a schedule share one card ("No schedule: Recycling, Organic,
   Glass") with a single "Add schedule" button instead of one card each repeating "No schedule yet", and

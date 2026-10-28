@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "「{{item}}」は「{{back}}」に戻りました。サーバーが「{{target}}」への追加を受け付けませんでした。",
             "waited": "「{{item}}」は「{{target}}」に移動されませんでした。「{{back}}」の同期が1週間以上オフになっています。リストをオンにすると、「{{back}}」に再び表示されます。"
-        }
+        },
+        "moreDetailsHint": "価格・店舗・リンク・メモ",
+        "toPantryAllToPlaceholder": "場所を選択 …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} 品の材料",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "保存済みのレシピ",
         "savedRecipePlaceholder": "レシピを選択",
         "saveAsRecipe": "レシピとして保存",
-        "recipeScaleLabel": "材料の分量を調整",
         "deletedToast": "食事を削除しました。",
         "recurrenceLabel": "毎週繰り返す",
         "recurrenceWeekly": "毎週",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "{{title}}のレシピを開く",
         "viewRecipeNamed": "{{title}}のレシピを表示",
         "recipeIngredientsLabel": "レシピの材料",
-        "recipeIngredientsEdit": "調整"
+        "recipeIngredientsEdit": "調整",
+        "moreDetailsHint": "レシピ・メモ・リンク"
     },
     "calendar": {
         "searchOpen": "予定を検索",
@@ -3608,9 +3610,9 @@
         "imageHint": "レシピごとに1枚。食事計画と概要タイルに表示されます。",
         "imageTooLarge": "縮小してもまだ大きすぎます。",
         "ingredientMatchNone": "未対応づけ",
-        "ingredientMatchOpen": "{{count}} 件の材料を在庫に対応づける",
-        "ingredientMatchOpen_one": "{{count}} 件の材料を在庫に対応づける",
-        "ingredientMatchBulkTitle": "材料を在庫に対応づける",
+        "ingredientMatchOpen": "{{count}} 件の材料を在庫に結び付ける",
+        "ingredientMatchOpen_one": "{{count}} 件の材料を在庫に結び付ける",
+        "ingredientMatchBulkTitle": "材料を在庫に結び付ける",
         "ingredientMatchBulkHint": "材料ごとに、それが指す在庫の行を選んでください。Yuvomi は何も推測しません - ここで確認したものだけが有効です。",
         "ingredientMatchAction": "{{name}} を在庫の行に対応づける",
         "ingredientMatchTitle": "{{name}} の対応づけ",
@@ -3619,7 +3621,17 @@
         "ingredientMatchEmpty": "在庫はまだ空です。",
         "ingredientMatchSaved": "対応づけを保存しました。",
         "ingredientMatchCleared": "対応づけを解除しました。",
-        "ingredientMatchLoadError": "在庫を読み込めませんでした。"
+        "ingredientMatchLoadError": "在庫を読み込めませんでした。",
+        "servingsLabel": "人数",
+        "servingsMultipleLabel": "分量",
+        "servingsFewer": "人数を減らす",
+        "servingsMore": "人数を増やす",
+        "servingsLess": "分量を減らす",
+        "servingsMoreMultiple": "分量を増やす",
+        "servingsHint": "分量が何人分か。分からなければ空欄のままにします。",
+        "servingsInvalid": "1から99までの整数。",
+        "moreDetailsHint": "メモ・画像・リンク",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "入力すると項目へ移動したり、新しく作成したりできます。2文字以上で登録内容も検索でき、単語の一部でも見つかります。",
@@ -6237,8 +6249,6 @@
         "filterExpired": "期限切れ",
         "filterSoon": "まもなく期限",
         "filterLow": "残りわずか",
-        "watchLabel": "要確認",
-        "watchEmpty": "期限間近や残りわずかの品はありません。",
         "badgeExpiredYesterday": "昨日期限切れ",
         "badgeExpiredDays": "{{count}}日前に期限切れ",
         "badgeExpiresToday": "今日が期限",
@@ -6290,7 +6300,8 @@
             "bag": "袋",
             "bag_one": "袋",
             "bag_other": "袋"
-        }
+        },
+        "moreDetailsHint": "最低在庫・メモ"
     },
     "inventory": {
         "title": "持ち物",

@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "«{{item}}» è tornato in «{{back}}»: il server non l’ha accettato in «{{target}}».",
             "waited": "«{{item}}» non è stato spostato in «{{target}}»: la sincronizzazione di «{{back}}» è disattivata da oltre una settimana. L’articolo ricomparirà in «{{back}}» non appena riattivi quella lista."
-        }
+        },
+        "moreDetailsHint": "Prezzo, negozio, link, nota",
+        "toPantryAllToPlaceholder": "Scegli un posto …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediente",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "Ricetta salvata",
         "savedRecipePlaceholder": "Seleziona ricetta",
         "saveAsRecipe": "Salva come ricetta",
-        "recipeScaleLabel": "Scala ingredienti",
         "deletedToast": "Pasto eliminato.",
         "recurrenceLabel": "Ripeti ogni settimana",
         "recurrenceWeekly": "Settimanale",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "Apri la ricetta di {{title}}",
         "viewRecipeNamed": "Vedi la ricetta di {{title}}",
         "recipeIngredientsLabel": "Ingredienti dalla ricetta",
-        "recipeIngredientsEdit": "Modifica"
+        "recipeIngredientsEdit": "Modifica",
+        "moreDetailsHint": "Ricetta, note, link"
     },
     "calendar": {
         "searchOpen": "Cerca eventi",
@@ -3608,9 +3610,9 @@
         "imageHint": "Un'immagine per ricetta. Appare nel piano pasti e nel riquadro panoramica.",
         "imageTooLarge": "L'immagine è ancora troppo grande dopo il ridimensionamento.",
         "ingredientMatchNone": "Non associato",
-        "ingredientMatchOpen": "Associa {{count}} ingredienti alla dispensa",
-        "ingredientMatchOpen_one": "Associa {{count}} ingrediente alla dispensa",
-        "ingredientMatchBulkTitle": "Associa gli ingredienti alla dispensa",
+        "ingredientMatchOpen": "Collega {{count}} ingredienti alla dispensa",
+        "ingredientMatchOpen_one": "Collega {{count}} ingrediente alla dispensa",
+        "ingredientMatchBulkTitle": "Collega gli ingredienti alla dispensa",
         "ingredientMatchBulkHint": "Per ogni ingrediente scegli la riga della dispensa a cui si riferisce. Yuvomi non indovina nulla - vale solo ciò che confermi qui.",
         "ingredientMatchAction": "Associa {{name}} a una riga della dispensa",
         "ingredientMatchTitle": "Associa {{name}}",
@@ -3619,7 +3621,17 @@
         "ingredientMatchEmpty": "La dispensa è ancora vuota.",
         "ingredientMatchSaved": "Associazione salvata.",
         "ingredientMatchCleared": "Associazione rimossa.",
-        "ingredientMatchLoadError": "Non è stato possibile caricare la dispensa."
+        "ingredientMatchLoadError": "Non è stato possibile caricare la dispensa.",
+        "servingsLabel": "Porzioni",
+        "servingsMultipleLabel": "Quantità",
+        "servingsFewer": "Meno porzioni",
+        "servingsMore": "Più porzioni",
+        "servingsLess": "Riduci quantità",
+        "servingsMoreMultiple": "Aumenta quantità",
+        "servingsHint": "Per quante porzioni valgono le quantità. Lascia vuoto se non lo sai.",
+        "servingsInvalid": "Un numero intero da 1 a 99.",
+        "moreDetailsHint": "Note, immagine, link",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Digita per andare a una sezione o creare qualcosa. Da 2 caratteri trovi anche le tue voci, pure per parti di parola.",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Scaduto",
         "filterSoon": "In scadenza",
         "filterLow": "Quasi esaurito",
-        "watchLabel": "Richiede attenzione",
-        "watchEmpty": "Niente scade o sta per finire.",
         "badgeExpiredYesterday": "Scaduto ieri",
         "badgeExpiredDays": "Scaduto {{count}} giorni fa",
         "badgeExpiresToday": "Scade oggi",
@@ -6290,7 +6300,8 @@
             "bag": "sacchetto",
             "bag_one": "sacchetto",
             "bag_other": "sacchetti"
-        }
+        },
+        "moreDetailsHint": "Scorta minima, note"
     },
     "inventory": {
         "title": "Inventario",

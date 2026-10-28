@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "\"{{item}}\" is back on \"{{back}}\": the server did not accept it in \"{{target}}\".",
             "waited": "\"{{item}}\" was not moved to \"{{target}}\": syncing for \"{{back}}\" has been off for over a week. The item will show up on \"{{back}}\" again once that list is switched on."
-        }
+        },
+        "moreDetailsHint": "Price, store, link, note",
+        "toPantryAllToPlaceholder": "Choose a place …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingredient",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "Saved recipe",
         "savedRecipePlaceholder": "Select recipe",
         "saveAsRecipe": "Save as recipe",
-        "recipeScaleLabel": "Scale ingredients",
         "deletedToast": "Meal deleted.",
         "recurrenceLabel": "Repeat weekly",
         "recurrenceWeekly": "Weekly",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "Open recipe for {{title}}",
         "viewRecipeNamed": "View recipe for {{title}}",
         "recipeIngredientsLabel": "Ingredients from the recipe",
-        "recipeIngredientsEdit": "Adjust"
+        "recipeIngredientsEdit": "Adjust",
+        "moreDetailsHint": "Recipe, notes, link"
     },
     "calendar": {
         "searchOpen": "Search events",
@@ -3724,19 +3726,29 @@
         "imageRemove": "Remove image",
         "imageHint": "One image per recipe. It shows in the meal planner and on the overview tile.",
         "imageTooLarge": "The image is still too large after resizing.",
-        "ingredientMatchNone": "Not matched",
-        "ingredientMatchOpen": "Match {{count}} ingredients to the pantry",
-        "ingredientMatchOpen_one": "Match {{count}} ingredient to the pantry",
-        "ingredientMatchBulkTitle": "Match ingredients to the pantry",
-        "ingredientMatchBulkHint": "For each ingredient, pick the pantry row it means. Yuvomi guesses nothing - only what you confirm here counts.",
-        "ingredientMatchAction": "Match {{name}} to a pantry row",
-        "ingredientMatchTitle": "Match {{name}}",
-        "ingredientMatchLabel": "Row in your pantry",
-        "ingredientMatchHint": "Pick the row in your pantry that this ingredient means. Yuvomi guesses nothing - only what you confirm here counts.",
+        "ingredientMatchNone": "Not linked",
+        "ingredientMatchOpen": "Link {{count}} ingredients to your pantry",
+        "ingredientMatchOpen_one": "Link {{count}} ingredient to your pantry",
+        "ingredientMatchBulkTitle": "Link ingredients to your pantry",
+        "ingredientMatchBulkHint": "For each ingredient, pick what in your pantry it means. Yuvomi guesses nothing - only what you confirm here counts.",
+        "ingredientMatchAction": "Link {{name}} to your pantry",
+        "ingredientMatchTitle": "Link {{name}}",
+        "ingredientMatchLabel": "In your pantry",
+        "ingredientMatchHint": "Pick what in your pantry this ingredient means. Yuvomi guesses nothing - only what you confirm here counts.",
         "ingredientMatchEmpty": "Your pantry is still empty.",
-        "ingredientMatchSaved": "Match saved.",
-        "ingredientMatchCleared": "Match removed.",
-        "ingredientMatchLoadError": "The pantry could not be loaded."
+        "ingredientMatchSaved": "Link saved.",
+        "ingredientMatchCleared": "Link removed.",
+        "ingredientMatchLoadError": "The pantry could not be loaded.",
+        "servingsLabel": "Servings",
+        "servingsMultipleLabel": "Amount",
+        "servingsFewer": "Fewer servings",
+        "servingsMore": "More servings",
+        "servingsLess": "Decrease amount",
+        "servingsMoreMultiple": "Increase amount",
+        "servingsHint": "How many servings the amounts are for. Leave empty if unknown.",
+        "servingsInvalid": "A whole number from 1 to 99.",
+        "moreDetailsHint": "Notes, image, link",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Type to jump to an area or create something. From 2 characters you also find your entries, even by parts of words.",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Expired",
         "filterSoon": "Expiring soon",
         "filterLow": "Running low",
-        "watchLabel": "Needs attention",
-        "watchEmpty": "Nothing is expiring or running low.",
         "badgeExpiredYesterday": "Expired yesterday",
         "badgeExpiredDays": "Expired {{count}} days ago",
         "badgeExpiresToday": "Expires today",
@@ -6290,7 +6300,8 @@
             "bag": "bag",
             "bag_one": "bag",
             "bag_other": "bags"
-        }
+        },
+        "moreDetailsHint": "Minimum stock, notes"
     },
     "inventory": {
         "title": "Inventory",

@@ -892,7 +892,9 @@
         "moveReturned": {
             "refused": "Položka „{{item}}“ je zpět v seznamu „{{back}}“: server ji v seznamu „{{target}}“ nepřijal.",
             "waited": "Položka „{{item}}“ nebyla přesunuta do seznamu „{{target}}“: synchronizace seznamu „{{back}}“ je přes týden vypnutá. Položka se v seznamu „{{back}}“ znovu objeví, jakmile ho zapnete."
-        }
+        },
+        "moreDetailsHint": "Cena, obchod, odkaz, poznámka",
+        "toPantryAllToPlaceholder": "Vyberte místo …"
     },
     "meals": {
         "randomizeSuccess_few": "Naplánována {{count}} jídla.",
@@ -969,7 +971,6 @@
         "savedRecipeLabel": "Uložený recept",
         "savedRecipePlaceholder": "Vybrat recept",
         "saveAsRecipe": "Uložit jako recept",
-        "recipeScaleLabel": "Upravit množství ingrediencí",
         "deletedToast": "Jídlo odstraněno.",
         "recurrenceLabel": "Opakovat každý týden",
         "recurrenceWeekly": "Týdně",
@@ -995,7 +996,8 @@
         "openRecipeNamed": "Otevřít recept: {{title}}",
         "viewRecipeNamed": "Zobrazit recept: {{title}}",
         "recipeIngredientsLabel": "Suroviny z receptu",
-        "recipeIngredientsEdit": "Upravit"
+        "recipeIngredientsEdit": "Upravit",
+        "moreDetailsHint": "Recept, poznámky, odkaz"
     },
     "calendar": {
         "searchOpen": "Hledat události",
@@ -4626,11 +4628,11 @@
         "imageHint": "Jeden obrázek na recept. Zobrazí se v jídelním plánu a na dlaždici přehledu.",
         "imageTooLarge": "Obrázek je i po zmenšení příliš velký.",
         "ingredientMatchNone": "Nepřiřazeno",
-        "ingredientMatchOpen": "Přiřadit {{count}} ingrediencí ke spíži",
-        "ingredientMatchOpen_one": "Přiřadit {{count}} ingredienci ke spíži",
-        "ingredientMatchOpen_few": "Přiřadit {{count}} ingredience ke spíži",
-        "ingredientMatchOpen_many": "Přiřadit {{count}} ingredience ke spíži",
-        "ingredientMatchBulkTitle": "Přiřadit ingredience ke spíži",
+        "ingredientMatchOpen": "Propojit {{count}} ingrediencí se spíží",
+        "ingredientMatchOpen_one": "Propojit {{count}} ingredienci se spíží",
+        "ingredientMatchOpen_few": "Propojit {{count}} ingredience se spíží",
+        "ingredientMatchOpen_many": "Propojit {{count}} ingredience se spíží",
+        "ingredientMatchBulkTitle": "Propojit ingredience se spíží",
         "ingredientMatchBulkHint": "U každé ingredience vyber položku ve spíži, kterou znamená. Yuvomi nic nehádá - platí jen to, co tady potvrdíš.",
         "ingredientMatchAction": "Přiřadit {{name}} k položce ve spíži",
         "ingredientMatchTitle": "Přiřadit {{name}}",
@@ -4639,7 +4641,17 @@
         "ingredientMatchEmpty": "Spíž je zatím prázdná.",
         "ingredientMatchSaved": "Přiřazení uloženo.",
         "ingredientMatchCleared": "Přiřazení zrušeno.",
-        "ingredientMatchLoadError": "Spíž se nepodařilo načíst."
+        "ingredientMatchLoadError": "Spíž se nepodařilo načíst.",
+        "servingsLabel": "Porce",
+        "servingsMultipleLabel": "Množství",
+        "servingsFewer": "Méně porcí",
+        "servingsMore": "Více porcí",
+        "servingsLess": "Snížit množství",
+        "servingsMoreMultiple": "Zvýšit množství",
+        "servingsHint": "Pro kolik porcí platí množství. Nechte prázdné, pokud nevíte.",
+        "servingsInvalid": "Celé číslo od 1 do 99.",
+        "moreDetailsHint": "Poznámky, obrázek, odkaz",
+        "servingsTimes": "× {{value}}"
     },
     "wmo": {
         "0": "Jasno",
@@ -6394,8 +6406,6 @@
         "filterExpired": "Prošlé",
         "filterSoon": "Brzy prošlé",
         "filterLow": "Téměř došlo",
-        "watchLabel": "Vyžaduje pozornost",
-        "watchEmpty": "Nic brzy neprojde ani nedochází.",
         "badgeExpiredYesterday": "Prošlo včera",
         "badgeExpiredDays": "Prošlo před {{count}} dny",
         "badgeExpiresToday": "Prochází dnes",
@@ -6460,7 +6470,8 @@
             "bag_few": "sáčky",
             "bag_many": "sáčku",
             "bag_other": "sáčků"
-        }
+        },
+        "moreDetailsHint": "Minimální zásoba, poznámky"
     },
     "inventory": {
         "title": "Inventář",

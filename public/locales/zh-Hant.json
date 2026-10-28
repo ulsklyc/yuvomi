@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "「{{item}}」已回到「{{back}}」：伺服器不接受將它放入「{{target}}」。",
             "waited": "「{{item}}」未移到「{{target}}」：「{{back}}」的同步已關閉超過一週。開啟該清單後，項目會重新出現在「{{back}}」。"
-        }
+        },
+        "moreDetailsHint": "價格、商店、連結、備註",
+        "toPantryAllToPlaceholder": "選擇位置 …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} 種食材",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "已儲存的食譜",
         "savedRecipePlaceholder": "選擇食譜",
         "saveAsRecipe": "儲存為食譜",
-        "recipeScaleLabel": "調整食材用量",
         "deletedToast": "已刪除該餐。",
         "recurrenceLabel": "每週重複",
         "recurrenceWeekly": "每週",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "開啟{{title}}的食譜",
         "viewRecipeNamed": "檢視{{title}}的食譜",
         "recipeIngredientsLabel": "食譜中的食材",
-        "recipeIngredientsEdit": "調整"
+        "recipeIngredientsEdit": "調整",
+        "moreDetailsHint": "食譜、備註、連結"
     },
     "calendar": {
         "searchOpen": "搜尋日程",
@@ -3619,7 +3621,17 @@
         "ingredientMatchEmpty": "庫存還是空的。",
         "ingredientMatchSaved": "已儲存關聯。",
         "ingredientMatchCleared": "已取消關聯。",
-        "ingredientMatchLoadError": "無法載入庫存。"
+        "ingredientMatchLoadError": "無法載入庫存。",
+        "servingsLabel": "份數",
+        "servingsMultipleLabel": "份量",
+        "servingsFewer": "減少份數",
+        "servingsMore": "增加份數",
+        "servingsLess": "減少份量",
+        "servingsMoreMultiple": "增加份量",
+        "servingsHint": "這些用量是幾人份。不確定就留空。",
+        "servingsInvalid": "1 到 99 之間的整數。",
+        "moreDetailsHint": "備註、圖片、連結",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "輸入文字即可前往某個模組或新建內容。輸入至少 2 個字元時也能搜尋你的條目，只輸入部分字詞也找得到。",
@@ -6237,8 +6249,6 @@
         "filterExpired": "已過期",
         "filterSoon": "即將過期",
         "filterLow": "即將用完",
-        "watchLabel": "需要留意",
-        "watchEmpty": "沒有即將過期或快用完的物品。",
         "badgeExpiredYesterday": "昨天過期",
         "badgeExpiredDays": "{{count}} 天前過期",
         "badgeExpiresToday": "今天到期",
@@ -6290,7 +6300,8 @@
             "bag": "袋",
             "bag_one": "袋",
             "bag_other": "袋"
-        }
+        },
+        "moreDetailsHint": "最低庫存、備註"
     },
     "inventory": {
         "title": "物品",

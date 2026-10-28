@@ -1029,7 +1029,9 @@
         "moveReturned": {
             "refused": "عاد «{{item}}» إلى «{{back}}»: لم يقبله الخادم في «{{target}}».",
             "waited": "لم يُنقل «{{item}}» إلى «{{target}}»: مزامنة «{{back}}» متوقفة منذ أكثر من أسبوع. سيظهر العنصر في «{{back}}» مجددًا بمجرد تشغيل القائمة."
-        }
+        },
+        "moreDetailsHint": "السعر، المتجر، الرابط، ملاحظة",
+        "toPantryAllToPlaceholder": "اختر مكانًا …"
     },
     "meals": {
         "randomizeSuccess_few": "تم تخطيط {{count}} وجبات.",
@@ -1116,7 +1118,6 @@
         "savedRecipeLabel": "وصفة محفوظة",
         "savedRecipePlaceholder": "اختر وصفة",
         "saveAsRecipe": "الحفظ كوصفة",
-        "recipeScaleLabel": "تعديل مقادير المكونات",
         "deletedToast": "تم حذف الوجبة.",
         "recurrenceLabel": "كرر أسبوعياً",
         "recurrenceWeekly": "أسبوعيًا",
@@ -1142,7 +1143,8 @@
         "openRecipeNamed": "فتح وصفة {{title}}",
         "viewRecipeNamed": "عرض وصفة {{title}}",
         "recipeIngredientsLabel": "مكونات من الوصفة",
-        "recipeIngredientsEdit": "تعديل"
+        "recipeIngredientsEdit": "تعديل",
+        "moreDetailsHint": "وصفة، ملاحظات، رابط"
     },
     "calendar": {
         "searchOpen": "البحث عن المواعيد",
@@ -3968,7 +3970,17 @@
         "ingredientMatchEmpty": "المؤن فارغة حتى الآن.",
         "ingredientMatchSaved": "تم حفظ الربط.",
         "ingredientMatchCleared": "تم إلغاء الربط.",
-        "ingredientMatchLoadError": "تعذّر تحميل المؤن."
+        "ingredientMatchLoadError": "تعذّر تحميل المؤن.",
+        "servingsLabel": "الحصص",
+        "servingsMultipleLabel": "الكمية",
+        "servingsFewer": "حصص أقل",
+        "servingsMore": "حصص أكثر",
+        "servingsLess": "تقليل الكمية",
+        "servingsMoreMultiple": "زيادة الكمية",
+        "servingsHint": "عدد الحصص التي تكفيها الكميات. اتركه فارغًا إن لم يكن معروفًا.",
+        "servingsInvalid": "رقم صحيح من 1 إلى 99.",
+        "moreDetailsHint": "ملاحظات، صورة، رابط",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "اكتب للانتقال إلى قسم أو لإنشاء شيء جديد. من حرفين تجد أيضًا إدخالاتك، حتى بأجزاء الكلمات.",
@@ -6685,8 +6697,6 @@
         "filterExpired": "منتهي الصلاحية",
         "filterSoon": "ينتهي قريبًا",
         "filterLow": "شبه منتهٍ",
-        "watchLabel": "يحتاج إلى انتباه",
-        "watchEmpty": "لا شيء ينتهي أو يقارب النفاد.",
         "badgeExpiredYesterday": "انتهت صلاحيته أمس",
         "badgeExpiredDays": "انتهت صلاحيته قبل {{count}} أيام",
         "badgeExpiredDays_two": "انتهت صلاحيته قبل يومين",
@@ -6771,7 +6781,8 @@
             "bag_few": "أكياس",
             "bag_many": "كيس",
             "bag_other": "كيس"
-        }
+        },
+        "moreDetailsHint": "الحد الأدنى للمخزون، ملاحظات"
     },
     "inventory": {
         "title": "المقتنيات",

@@ -837,7 +837,9 @@
         "moveReturned": {
             "refused": "\"{{item}}\" kembali ke \"{{back}}\": server tidak menerimanya di \"{{target}}\".",
             "waited": "\"{{item}}\" tidak dipindahkan ke \"{{target}}\": sinkronisasi \"{{back}}\" sudah lebih dari seminggu nonaktif. Item akan muncul lagi di \"{{back}}\" setelah daftar itu diaktifkan."
-        }
+        },
+        "moreDetailsHint": "Harga, toko, tautan, catatan",
+        "toPantryAllToPlaceholder": "Pilih tempat …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} bahan",
@@ -909,7 +911,6 @@
         "savedRecipeLabel": "Resep tersimpan",
         "savedRecipePlaceholder": "Pilih resep",
         "saveAsRecipe": "Simpan sebagai resep",
-        "recipeScaleLabel": "Skala bahan",
         "deletedToast": "Makanan dihapus.",
         "recurrenceLabel": "Ulangi mingguan",
         "recurrenceWeekly": "Mingguan",
@@ -935,7 +936,8 @@
         "openRecipeNamed": "Buka resep {{title}}",
         "viewRecipeNamed": "Lihat resep {{title}}",
         "recipeIngredientsLabel": "Bahan dari resep",
-        "recipeIngredientsEdit": "Sesuaikan"
+        "recipeIngredientsEdit": "Sesuaikan",
+        "moreDetailsHint": "Resep, catatan, tautan"
     },
     "calendar": {
         "searchOpen": "Cari acara",
@@ -3743,9 +3745,9 @@
         "imageHint": "Satu gambar per resep. Tampil di rencana makan dan di kartu ringkasan.",
         "imageTooLarge": "Gambar masih terlalu besar setelah diperkecil.",
         "ingredientMatchNone": "Belum dicocokkan",
-        "ingredientMatchOpen": "Cocokkan {{count}} bahan dengan persediaan",
-        "ingredientMatchOpen_one": "Cocokkan {{count}} bahan dengan persediaan",
-        "ingredientMatchBulkTitle": "Cocokkan bahan dengan persediaan",
+        "ingredientMatchOpen": "Tautkan {{count}} bahan ke persediaan",
+        "ingredientMatchOpen_one": "Tautkan {{count}} bahan ke persediaan",
+        "ingredientMatchBulkTitle": "Tautkan bahan ke persediaan",
         "ingredientMatchBulkHint": "Untuk setiap bahan, pilih baris persediaan yang dimaksud. Yuvomi tidak menebak apa pun - hanya yang kamu konfirmasi di sini yang berlaku.",
         "ingredientMatchAction": "Cocokkan {{name}} dengan baris persediaan",
         "ingredientMatchTitle": "Cocokkan {{name}}",
@@ -3754,7 +3756,17 @@
         "ingredientMatchEmpty": "Persediaan masih kosong.",
         "ingredientMatchSaved": "Pencocokan disimpan.",
         "ingredientMatchCleared": "Pencocokan dihapus.",
-        "ingredientMatchLoadError": "Persediaan tidak dapat dimuat."
+        "ingredientMatchLoadError": "Persediaan tidak dapat dimuat.",
+        "servingsLabel": "Porsi",
+        "servingsMultipleLabel": "Jumlah",
+        "servingsFewer": "Lebih sedikit porsi",
+        "servingsMore": "Lebih banyak porsi",
+        "servingsLess": "Kurangi jumlah",
+        "servingsMoreMultiple": "Tambah jumlah",
+        "servingsHint": "Untuk berapa porsi jumlah bahan ini. Biarkan kosong jika tidak tahu.",
+        "servingsInvalid": "Bilangan bulat dari 1 sampai 99.",
+        "moreDetailsHint": "Catatan, gambar, tautan",
+        "servingsTimes": "× {{value}}"
     },
     "onboarding": {
         "step1Title": "Selamat datang di {{name}}",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Kedaluwarsa",
         "filterSoon": "Segera kedaluwarsa",
         "filterLow": "Hampir habis",
-        "watchLabel": "Perlu perhatian",
-        "watchEmpty": "Tidak ada yang kedaluwarsa atau hampir habis.",
         "badgeExpiredYesterday": "Kedaluwarsa kemarin",
         "badgeExpiredDays": "Kedaluwarsa {{count}} hari lalu",
         "badgeExpiresToday": "Kedaluwarsa hari ini",
@@ -6290,7 +6300,8 @@
             "bag": "kantong",
             "bag_one": "kantong",
             "bag_other": "kantong"
-        }
+        },
+        "moreDetailsHint": "Stok minimum, catatan"
     },
     "inventory": {
         "title": "Inventaris",

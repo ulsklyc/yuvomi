@@ -105,11 +105,18 @@ const schreibend = (liste) => liste.filter((eintrag) => !eintrag.startsWith('GET
 async function modalMitschnitt(fn) {
   const geoeffnet = [];
   const zuvor = globalThis.__openModal;
+  const zuvorDetail = globalThis.__openDetailView;
   globalThis.__openModal = (opts) => { geoeffnet.push(opts); };
+  // Die Mahlzeit liest sich seit R24 (E1) im Leseblatt (openDetailView); sein
+  // Inhalt steht im ersten Abschnitt, sein Fuss in `actions`.
+  globalThis.__openDetailView = (opts) => {
+    geoeffnet.push({ ...opts, content: opts.sections?.map((sec) => sec.node?.innerHTML ?? '').join('') ?? '' });
+  };
   try {
     await fn();
   } finally {
     globalThis.__openModal = zuvor;
+    globalThis.__openDetailView = zuvorDetail;
   }
   return geoeffnet;
 }
@@ -241,14 +248,40 @@ test('Essensplan bei `read`: die Karte oeffnet die Leseansicht und traegt keine 
   assert.doesNotMatch(voll, /delete-meal/, 'die Karte traegt auch mit Schreibrecht keinen Papierkorb');
   // `add-meal` steht seit D5 (Critique 2026-10-16) nur noch in LEEREN Zellen -
   // dort prueft ihn „ein leerer Platz ist nur Zustand" unten im Gegenfall.
-  for (const erwartet of ['edit-meal', 'transfer-meal']) {
+  // R24 (E1): auch mit Schreibrecht oeffnet der Tipp das Leseblatt - Bearbeiten
+  // steht dort als Primaerknopf (siehe "das Leseblatt der Karte" unten).
+  for (const erwartet of ['meal-details', 'transfer-meal']) {
     assert.match(voll, new RegExp(`data-action="${erwartet}"`), `Gegenfall: ${erwartet} steht mit Schreibrecht da`);
   }
+  assert.doesNotMatch(voll, /data-action="edit-meal"/, 'die Karte oeffnet nicht mehr das Formular');
   assert.match(voll, /meal-card__drag/, 'Gegenfall: der Ziehgriff');
   // R22 S9 (Critique a2): die Zeichen der Karte nennen sich unter dem Zeiger.
   assert.match(voll, /data-action="transfer-meal"[^>]*title="common\.toShoppingList"/, 'der Wagen sagt, was er tut');
   assert.match(html, /data-action="open-recipe"[\s\S]{0,300}?title="meals\.openRecipe"/, 'das Rezept-Zeichen ebenso');
-  assert.doesNotMatch(voll, /common\.showDetails|meal-details/);
+  assert.doesNotMatch(voll, /common\.showDetails/, 'der Leser-Zusatz steht nur bei `read`');
+});
+
+// R24 E1 (Critique G3-Mahlzeiten-P2-2): der Tipp auf die Karte oeffnet mit
+// Schreibrecht das Leseblatt - EIN Primaerknopf "Bearbeiten", davor
+// "Auf die Einkaufsliste" sekundaer, solange offene Zutaten da sind.
+test('R24 E1: das Leseblatt der Karte traegt Bearbeiten als Primaer und den Transfer sekundaer', async () => {
+  const offen = (modules, weg) => withAccess(modules, () => mitPlan({}, () => modalMitschnitt(weg)));
+  const [blatt, ...mehr] = await offen(SCHREIBEN, () => meals.onGridClick(klick('meal-details', { mealId: '11' })));
+  assert.ok(blatt && !mehr.length, 'genau ein Blatt');
+  assert.match(blatt.content, /data-view="read"/, 'es ist die Leseansicht, nicht der Editor');
+  assert.doesNotMatch(blatt.content, /modal-save|<input|<select/, 'kein Formular');
+  const actions = blatt.actions ?? [];
+  const primaer = actions.filter((a) => a.variant === 'primary');
+  assert.equal(primaer.length, 1, 'genau EIN Primaerknopf');
+  assert.equal(primaer[0].id, 'meal-read-edit', 'und der ist Bearbeiten');
+  assert.equal(actions.at(-1), primaer[0], 'am Ende des Fusses');
+  const transfer = actions.find((a) => a.id === 'meal-read-transfer');
+  assert.ok(transfer, 'der Transfer steht im Fuss');
+  assert.equal(transfer.variant, 'secondary');
+  assert.equal(transfer.label, 'common.toShoppingList');
+  // Bei `read` dasselbe Blatt ohne Fuss.
+  const [lesend] = await offen(LESEN, () => meals.onGridClick(klick('meal-details', { mealId: '11' })));
+  assert.deepEqual(lesend.actions, []);
 });
 
 test('Essensplan bei `read`: der Transfer in den Einkauf bleibt auch mit Einkaufsrecht weg', async () => {

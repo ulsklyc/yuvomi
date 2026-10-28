@@ -959,7 +959,9 @@
         "moveReturned": {
             "refused": "«{{item}}» знову у списку «{{back}}»: сервер не прийняв його у списку «{{target}}».",
             "waited": "«{{item}}» не переміщено до списку «{{target}}»: синхронізація списку «{{back}}» вимкнена понад тиждень. Товар знову з’явиться у списку «{{back}}», щойно ви його увімкнете."
-        }
+        },
+        "moreDetailsHint": "Ціна, магазин, посилання, нотатка",
+        "toPantryAllToPlaceholder": "Виберіть місце …"
     },
     "meals": {
         "randomizeSuccess_few": "Заплановано {{count}} прийоми їжі.",
@@ -1041,7 +1043,6 @@
         "savedRecipeLabel": "Збережений рецепт",
         "savedRecipePlaceholder": "Виберіть рецепт",
         "saveAsRecipe": "Зберегти як рецепт",
-        "recipeScaleLabel": "Кількість інгредієнтів",
         "deletedToast": "Прийом їжі видалено.",
         "recurrenceLabel": "Повторювати щотижня",
         "recurrenceWeekly": "Щотижня",
@@ -1067,7 +1068,8 @@
         "openRecipeNamed": "Відкрити рецепт {{title}}",
         "viewRecipeNamed": "Переглянути рецепт {{title}}",
         "recipeIngredientsLabel": "Інгредієнти з рецепта",
-        "recipeIngredientsEdit": "Змінити"
+        "recipeIngredientsEdit": "Змінити",
+        "moreDetailsHint": "Рецепт, нотатки, посилання"
     },
     "calendar": {
         "searchOpen": "Пошук подій",
@@ -3879,11 +3881,11 @@
         "imageHint": "Одне зображення на рецепт. Воно з'являється в плані харчування та на плитці огляду.",
         "imageTooLarge": "Зображення все ще завелике після зменшення.",
         "ingredientMatchNone": "Не зіставлено",
-        "ingredientMatchOpen": "Зіставити {{count}} інгредієнта із запасами",
-        "ingredientMatchOpen_one": "Зіставити {{count}} інгредієнт із запасами",
-        "ingredientMatchOpen_few": "Зіставити {{count}} інгредієнти із запасами",
-        "ingredientMatchOpen_many": "Зіставити {{count}} інгредієнтів із запасами",
-        "ingredientMatchBulkTitle": "Зіставити інгредієнти із запасами",
+        "ingredientMatchOpen": "Пов'язати {{count}} інгредієнта із запасами",
+        "ingredientMatchOpen_one": "Пов'язати {{count}} інгредієнт із запасами",
+        "ingredientMatchOpen_few": "Пов'язати {{count}} інгредієнти із запасами",
+        "ingredientMatchOpen_many": "Пов'язати {{count}} інгредієнтів із запасами",
+        "ingredientMatchBulkTitle": "Пов'язати інгредієнти із запасами",
         "ingredientMatchBulkHint": "Для кожного інгредієнта вибери рядок запасів, який він означає. Yuvomi нічого не вгадує - діє лише те, що ти підтвердиш тут.",
         "ingredientMatchAction": "Зіставити «{{name}}» із рядком запасів",
         "ingredientMatchTitle": "Зіставити «{{name}}»",
@@ -3892,7 +3894,17 @@
         "ingredientMatchEmpty": "Запаси поки що порожні.",
         "ingredientMatchSaved": "Зіставлення збережено.",
         "ingredientMatchCleared": "Зіставлення знято.",
-        "ingredientMatchLoadError": "Не вдалося завантажити запаси."
+        "ingredientMatchLoadError": "Не вдалося завантажити запаси.",
+        "servingsLabel": "Порції",
+        "servingsMultipleLabel": "Кількість",
+        "servingsFewer": "Менше порцій",
+        "servingsMore": "Більше порцій",
+        "servingsLess": "Зменшити кількість",
+        "servingsMoreMultiple": "Збільшити кількість",
+        "servingsHint": "На скільки порцій розраховано кількості. Залиште порожнім, якщо не знаєте.",
+        "servingsInvalid": "Ціле число від 1 до 99.",
+        "moreDetailsHint": "Нотатки, зображення, посилання",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Друкуйте, щоб перейти до розділу або щось створити. Від 2 символів знаходяться й ваші записи, навіть за частиною слова.",
@@ -6536,8 +6548,6 @@
         "filterExpired": "Прострочено",
         "filterSoon": "Скоро спливає",
         "filterLow": "Майже закінчилося",
-        "watchLabel": "Потребує уваги",
-        "watchEmpty": "Нічого не спливає і не закінчується.",
         "badgeExpiredYesterday": "Прострочено вчора",
         "badgeExpiredDays": "Прострочено {{count}} днів тому",
         "badgeExpiredDays_many": "Прострочено {{count}} днів тому",
@@ -6610,7 +6620,8 @@
             "bag_few": "пакети",
             "bag_many": "пакетів",
             "bag_other": "пакета"
-        }
+        },
+        "moreDetailsHint": "Мінімальний запас, нотатки"
     },
     "inventory": {
         "title": "Інвентар",

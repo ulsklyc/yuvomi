@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "“{{item}}”已回到“{{back}}”：服务器不接受将它放入“{{target}}”。",
             "waited": "“{{item}}”未移到“{{target}}”：“{{back}}”的同步已关闭超过一周。开启该清单后，项目会重新出现在“{{back}}”。"
-        }
+        },
+        "moreDetailsHint": "价格、商店、链接、备注",
+        "toPantryAllToPlaceholder": "选择位置 …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} 种食材",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "已保存的食谱",
         "savedRecipePlaceholder": "选择食谱",
         "saveAsRecipe": "保存为食谱",
-        "recipeScaleLabel": "调整食材用量",
         "deletedToast": "已删除该餐。",
         "recurrenceLabel": "每周重复",
         "recurrenceWeekly": "每周",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "打开{{title}}的食谱",
         "viewRecipeNamed": "查看{{title}}的食谱",
         "recipeIngredientsLabel": "食谱中的食材",
-        "recipeIngredientsEdit": "调整"
+        "recipeIngredientsEdit": "调整",
+        "moreDetailsHint": "食谱、备注、链接"
     },
     "calendar": {
         "searchOpen": "搜索日程",
@@ -3619,7 +3621,17 @@
         "ingredientMatchEmpty": "库存还是空的。",
         "ingredientMatchSaved": "已保存关联。",
         "ingredientMatchCleared": "已取消关联。",
-        "ingredientMatchLoadError": "无法加载库存。"
+        "ingredientMatchLoadError": "无法加载库存。",
+        "servingsLabel": "份数",
+        "servingsMultipleLabel": "份量",
+        "servingsFewer": "减少份数",
+        "servingsMore": "增加份数",
+        "servingsLess": "减少份量",
+        "servingsMoreMultiple": "增加份量",
+        "servingsHint": "这些用量是几人份。不确定就留空。",
+        "servingsInvalid": "1 到 99 之间的整数。",
+        "moreDetailsHint": "备注、图片、链接",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "输入即可跳转到某个模块或新建内容。输入 2 个字符起还能搜索你的条目，词的一部分也能找到。",
@@ -6237,8 +6249,6 @@
         "filterExpired": "已过期",
         "filterSoon": "即将过期",
         "filterLow": "即将用完",
-        "watchLabel": "需要留意",
-        "watchEmpty": "没有即将过期或快用完的物品。",
         "badgeExpiredYesterday": "昨天过期",
         "badgeExpiredDays": "{{count}} 天前过期",
         "badgeExpiresToday": "今天到期",
@@ -6290,7 +6300,8 @@
             "bag": "袋",
             "bag_one": "袋",
             "bag_other": "袋"
-        }
+        },
+        "moreDetailsHint": "最低库存、备注"
     },
     "inventory": {
         "title": "物品",

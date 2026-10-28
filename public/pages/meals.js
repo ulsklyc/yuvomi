@@ -27,8 +27,10 @@ import { pageToolsMenuHtml, installPopoverMenus, syncPopoverMenuItem } from '/ut
 import { zonedWeekday, nowFields } from '/utils/timezone.js';
 import { mealTypeList, primeMealTypeNames, MEAL_TYPE_KEYS } from '/utils/meal-types.js';
 import { recipeThumbHtml, wireRecipeThumbs } from '/utils/recipe-thumb.js';
-import { toDecimalString, breaksOffAtSeparator, toStoredNumber } from '/utils/money.js';
+import { scaleQuantityText } from '/utils/scale-quantity.js';
+import { servingsStepperHtml, wireServingsSteppers } from '/utils/servings-stepper.js';
 import { mayWritePath } from '/utils/module-access.js';
+import { openDetailView, closeDetailView, withPrimaryEdit } from '/components/detail-view.js';
 import { readRowHtml, readRowHintHtml } from '/utils/read-row.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { withChosenPeople } from '/utils/people-picker.js';
@@ -855,7 +857,13 @@ function wireRailToggle() {
   // SEIT R23 (D13) STEHT DIE LEISTE UNTER DEM PLAN und nimmt der Woche keine
   // Breite mehr - die Messung oben hat nichts mehr zu entscheiden: offen,
   // solange niemand sie bewusst geschlossen hat.
-  let hidden = false;
+  //
+  // NIEDRIGE FENSTER (R24, G3-Mahlzeiten-P2-1): unter 800px Hoehe nahm die
+  // Leiste der Woche so viel, dass sie zum eigenen 2D-Scroller wurde und die
+  // Snack-Reihe unter der Leiste lag (1024x768). Dort beginnt sie
+  // eingeklappt; das Werkzeugmenue blendet sie ein, und eine bewusste Wahl
+  // gilt weiter vor dem Vorgabewert.
+  let hidden = window.matchMedia?.('(max-height: 799px)')?.matches ?? false;
   let gespeichert = null;
   try { gespeichert = localStorage.getItem(RAIL_STORAGE_KEY); } catch { /* ignore */ }
   if (gespeichert) hidden = gespeichert === 'hidden';
@@ -1075,7 +1083,9 @@ function renderRecipeSidebar() {
   sidebar.replaceChildren();
 
   const title = document.createElement('h2');
-  title.className = 'recipe-sidebar__title';
+  // Abschnittstitel der Flaeche (20/600, typography.css) - die Leiste ist ein
+  // Abschnitt unter dem Plan, kein eigener Seitenkopf (R24, G3-Mahlzeiten-P2-1).
+  title.className = 'recipe-sidebar__title u-section-title';
   title.textContent = t('nav.recipes');
   sidebar.appendChild(title);
 
@@ -1132,10 +1142,34 @@ function renderRecipeSidebar() {
     open.setAttribute('aria-label', t('meals.planRecipeNamed', { name: recipe.title }));
     card.appendChild(open);
 
+    // BILD UND ZUTATENZAHL (R24, G3-Mahlzeiten-P2-1): die Kachel war nur ein
+    // Name - was man einplant, liest man am Bild, und wie viel man dafuer
+    // einkauft, an der Zahl. Ein Bild nur, wo es eins gibt (die Regel der
+    // Rezeptzeile, rowShowsThumb in recipes.js): eine Kachel ohne Bild bleibt
+    // eine Textkachel, kein Platzhalterblock.
+    if (recipe.has_own_image || (recipe.source !== 'native' && recipe.provider_has_image)) {
+      open.insertAdjacentHTML('beforeend', recipeThumbHtml({
+        recipeId: recipe.id,
+        hasImage: recipe.provider_has_image,
+        hasOwnImage: recipe.has_own_image,
+        imageVersion: recipe.provider_updated_at,
+        className: 'recipe-sidebar__thumb',
+      }));
+    }
+    const text = document.createElement('span');
+    text.className = 'recipe-sidebar__card-text';
     const titleEl = document.createElement('span');
     titleEl.className = 'recipe-sidebar__card-title';
     titleEl.textContent = recipe.title;
-    open.appendChild(titleEl);
+    text.appendChild(titleEl);
+    const count = recipe.ingredients?.length ?? 0;
+    if (count) {
+      const meta = document.createElement('span');
+      meta.className = 'recipe-sidebar__card-meta';
+      meta.textContent = t('meals.ingredientCount', { count });
+      text.appendChild(meta);
+    }
+    open.appendChild(text);
 
     if (recipe.source !== 'native') {
       const sourceBadgeEl = document.createElement('span');
@@ -1178,6 +1212,7 @@ function renderRecipeSidebar() {
   });
 
   sidebar.appendChild(list);
+  wireRecipeThumbs(list);
   // Die Leiste scrollt quer (R23, D13): der Anriss sagt, dass rechts weitere
   // Rezepte liegen.
   wireScrollFade(list);
@@ -1247,8 +1282,7 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
     const ingDoneLabel = ownCount > 0 && ingDone === ownCount ? ' ✓' : '';
     // Und nur, wenn der Server den Transfer annaehme: Pfad-Guard (`meals`) UND
     // Einkaufs-Recht (#1290). Ohne eines davon endete der Knopf im 403.
-    const canTransfer  = (recipeCount > 0 || (ownCount > 0 && ingDone < ownCount))
-      && mayTransferMealToShopping(meal.id);
+    const canTransfer  = mealCanTransfer(meal);
     // WER KOCHT, STEHT IN DER META-ZEILE, NICHT IM TITEL (#1679). Der Titel ist
     // an jeder Breite der knappste Platz der Karte - 148px am Board, eine
     // Zeile neben Griff und Aktionen am Telefon - und jedes Zeichen dort kostet
@@ -1285,7 +1319,7 @@ function renderSlot(date, type, mealsForDay, dayCol, typeRow) {
     return `
       <div class="meal-card" data-meal-id="${meal.id}">
         <button type="button" class="meal-card__open${(meal.recipe_has_own_image || meal.recipe_has_image) ? ' meal-card__open--with-thumb' : ''}"
-           data-action="${ro ? 'meal-details' : 'edit-meal'}"
+           data-action="meal-details"
            data-meal-id="${meal.id}">
           ${(meal.recipe_has_own_image || meal.recipe_has_image) ? recipeThumbHtml({
             recipeId: meal.recipe_id,
@@ -1444,7 +1478,7 @@ async function onGridClick(e) {
 
   if (action === 'meal-details') {
     const meal = state.meals.find((m) => m.id === parseInt(btn.dataset.mealId, 10));
-    if (meal) openMealReadModal(meal);
+    if (meal) openMealReadModal(meal, btn);
     return;
   }
 
@@ -1885,122 +1919,6 @@ async function moveMeal(mealId, targetDate, targetType, { rerender = renderWeekG
 // --------------------------------------------------------
 
 /**
- * Eine skalierte Zutatenmenge, in der Schreibweise der eingestellten Region.
- *
- * Die Menge ist Freitext („250 g", „1 1/2 Tassen", „eine Prise"), also wird nur
- * die fuehrende Zahl angefasst und der Rest der Zeile unveraendert angehaengt.
- * Erkannt werden gemischte Brueche, einfache Brueche und Dezimalzahlen; alles
- * andere bleibt, wie es dasteht.
- *
- * LESEN UND SCHREIBEN haengen beide an der Region, und das ist der Kern. Vorher
- * las die Funktion mit einem eigenen `replace(',', '.')` und schrieb mit einem
- * `useComma`, das sie sich aus der Eingabe abgeschaut hatte. Beides war still
- * falsch: unter en-US gruppiert das Komma Tausender, „1,000 g" wurde also zur
- * Basis 1 und danach mit dem Faktor multipliziert - eine Zutat, die um den
- * Faktor tausend zu klein im Rezept stand. Unter fa oder ar-EG traf die Regex
- * gar nicht erst (`\d` ist ASCII), die Zeile blieb ungeskaliert zwischen
- * skalierten Geschwistern stehen. Und das abgeschaute `useComma` konnte den
- * Trenner nur wiederholen, den die gespeicherte Zutat zufaellig trug - eine aus
- * Mealie gespiegelte „1.5" blieb in einer deutschen Oberflaeche „1.5".
- *
- * Die Umschrift ist dieselbe wie bei Preis und Einkaufsmenge
- * (`toDecimalString`), die Ausgabe geht durch `toStoredNumber`. Damit
- * liest die Funktion ihre eigene Ausgabe wieder ein, was sie muss: der
- * gerenderte Wert landet in einer Zutatenzeile, wird gespeichert und beim
- * naechsten Anwenden des Rezepts erneut skaliert. Deshalb auch ohne
- * Gruppierung - ein gruppierter Wert kaeme nicht wieder herein.
- *
- * Eine gruppierte Eingabe wird abgewiesen und die Zeile bleibt UNVERAENDERT
- * stehen. Das ist bewusst ein anderer Ausgang als beim Einkauf, wo ein nicht
- * verstandener Wert auf „1 Stueck" faellt: dort ist die Menge ein Vorschlag in
- * einem korrigierbaren Feld, hier ist sie der Text der Zutat selbst, und der
- * Originaltext ist die einzige Antwort, die nichts erfindet.
- */
-function scaleQuantityText(quantity, factor) {
-  if (!quantity || factor === 1) return quantity;
-
-  // Erst umschreiben, dann lesen: sonst sieht die ASCII-Regex unter fa/ar-EG
-  // ueberhaupt keine Ziffer, und zwar auch nicht in einem Bruch wie „1 1/2".
-  // `freeText`, weil nur die fuehrende Zahl gerechnet wird: eine Gruppierung im
-  // Rest („2 Dosen à 1.000 ml") darf die Zeile nicht ungeskaliert stehen lassen.
-  const original = String(quantity).trim();
-  const text = toDecimalString(original, { freeText: true });
-  if (!text) return quantity;
-
-  // Der Rest der Zeile kommt aus dem ORIGINAL, nicht aus der umgeschriebenen
-  // Fassung: umgeschrieben wird nur, was auch gerechnet wird. Sonst verloere ein
-  // zweiter Zahlenteil im Text seine Ziffern - unter fa wurde „۲ x ۵۰۰ g" zu
-  // „۴ x 500 g", also zu einer Zeile in zwei Schriften. Der Offset stimmt, weil
-  // toDecimalString positionstreu ist (ein Zeichen hinein, ein Zeichen hinaus);
-  // die Zusicherung steht dort im Kopf und haengt an einem Guard.
-  // In CODEPOINTS, nicht in UTF-16-Einheiten: die Ziffern von 40 der 77 Systeme
-  // liegen ausserhalb der BMP und belegen zwei Einheiten, ihr ASCII-Ergebnis nur
-  // eine. Mit `.length` verrutschte der Schnitt genau dort und schnitt mitten in
-  // ein Zeichen - gemessen ergab „𞥒 x 500 g" ein „4\uDD52 x 500 g" mit einer
-  // halben Ersatzzeichen-Paarung, und dieser kaputte Text wurde in die
-  // Zutatenzeile geschrieben.
-  const zeichen = [...original];
-  const restOf = (match, tailGroup) => zeichen.slice([...match[0]].length - [...match[tailGroup]].length).join('');
-
-  // Der Abbruch-im-Trenner gilt fuer ALLE drei Formen, nicht nur fuer die
-  // Dezimalzahl unten. Bricht ein Nenner in einem Trenner ab, ist der Bruch nicht
-  // gelesen, sondern abgeschnitten: aus „1/2,5 cup" wurde 1/2, mal Faktor, und der
-  // Rest „,5 cup" dahinter - also „1,5 cup", eine plausible und falsche Menge.
-  // Dann lieber gar nichts anfassen, wie bei „eine Prise".
-  const mixed = text.match(/^(\d+)\s+(\d+)\/(\d+)(.*)$/);
-  if (mixed) {
-    if (breaksOffAtSeparator(mixed[4])) return quantity;
-    const whole = Number(mixed[1]);
-    const num = Number(mixed[2]);
-    const den = Number(mixed[3]);
-    if (den > 0) return `${formatScaledQuantity((whole + (num / den)) * factor)}${restOf(mixed, 4)}`;
-  }
-
-  const frac = text.match(/^(\d+)\/(\d+)(.*)$/);
-  if (frac) {
-    if (breaksOffAtSeparator(frac[3])) return quantity;
-    const num = Number(frac[1]);
-    const den = Number(frac[2]);
-    if (den > 0) return `${formatScaledQuantity((num / den) * factor)}${restOf(frac, 3)}`;
-  }
-
-  const dec = text.match(/^(\d+(?:\.\d+)?)(.*)$/);
-  if (dec) {
-    // Bricht die Zahl mitten in einem Trennzeichen ab, ist sie nicht gelesen,
-    // sondern abgeschnitten. Unter fa ist das ASCII-Komma kein Dezimaltrenner:
-    // aus „1,5 kg" waere sonst die Basis 1 geworden und die Ausgabe „۲,5 kg",
-    // also eine halbierte Zutat in einer Schreibweise, die es nicht gibt.
-    // Ueber dieselbe geteilte Pruefung wie im Einkauf: sie kennt die Trennzeichen
-    // der waehlbaren Regionen. „Irgendein Zeichen zwischen zwei Ziffern" war zu
-    // breit und liess „2x500 g" ungeskaliert stehen - ein `x` trennt nichts.
-    const abgeschnitten = breaksOffAtSeparator(dec[2]);
-    const base = Number(dec[1]);
-    if (!abgeschnitten && Number.isFinite(base)) {
-      return `${formatScaledQuantity(base * factor)}${restOf(dec, 2)}`;
-    }
-  }
-
-  // „eine Prise", „nach Geschmack": nichts zu rechnen, also nichts anfassen.
-  return quantity;
-}
-
-/**
- * Die skalierte Zahl als Text: hoechstens zwei Nachkommastellen, Ziffern in
- * ASCII, Trenner aus der Region soweit serverlesbar, ohne Gruppierung.
- *
- * Warum die Ziffern NICHT der Region folgen, obwohl der Trenner es tut: dieser
- * Text wird in die Zutatenzeile geschrieben und gespeichert, und beim Uebertrag
- * in die Einkaufsliste liest ihn `parseQuantity` in
- * server/services/shopping-import.js mit einer ASCII-Regex wieder ein. Eine in
- * nativen Ziffern geschriebene Menge („۲۰۰۰ g") kaeme dort nicht an - die Zutat
- * liesse sich nicht mehr mit anderen zusammenzaehlen. Begruendung und der Weg zu
- * einem saubereren Endzustand stehen bei `toStoredNumber` in utils/money.js.
- */
-function formatScaledQuantity(value) {
-  return toStoredNumber(value);
-}
-
-/**
  * Die Mahlzeit bei `meals: read`: Leseansicht, sonst nichts (Regel 9, Bauart
  * `itemReadHtml()` in pantry.js und shopping.js). Alles, was der
  * Bearbeiten-Dialog zeigt - Datum, Mahlzeit, Zutaten samt Menge und Kategorie,
@@ -2052,15 +1970,56 @@ function mealReadHtml(meal) {
     </div>`;
 }
 
-function openMealReadModal(meal) {
-  openSharedModal({
-    title: meal.title,
-    size: 'md',
-    content: mealReadHtml(meal),
-    onSave(panel) {
-      if (window.lucide) window.lucide.createIcons({ el: panel });
+/**
+ * DER TIPP AUF DIE KARTE OEFFNET DAS LESEBLATT (R24, E1; Critique
+ * G3-Mahlzeiten-P2-2). Bis R24 ging das Bearbeiten-Formular auf - 13 Felder,
+ * „Weitere Angaben" offen, 850px hoch -, obwohl die Frage am Kuechentisch „was
+ * gibt es, was brauche ich" ist. Jetzt dieselbe Leseansicht wie Termin, Rezept,
+ * Inventar (openDetailView): am Desktop als Popover an der Karte, am Telefon
+ * als Blatt. Im Fuss EIN Primaerknopf „Bearbeiten" (withPrimaryEdit), davor
+ * „Auf die Einkaufsliste" sekundaer, wenn die Mahlzeit noch offene Zutaten hat
+ * und beide Rechte stehen. Bei `meals: read` dieselbe Ansicht ohne Fuss
+ * (Regel 9). Loeschen bleibt im Formular (benannte Ausnahme der Karte).
+ */
+function openMealReadModal(meal, anchor = null) {
+  const body = document.createElement('div');
+  body.insertAdjacentHTML('beforeend', mealReadHtml(meal));
+  const ro = readOnly();
+  const leave = (next) => async ({ close } = {}) => {
+    await (close ?? closeDetailView)({ force: true });
+    next();
+  };
+  const actions = ro ? [] : withPrimaryEdit([
+    mealCanTransfer(meal) && {
+      id: 'meal-read-transfer',
+      label: t('common.toShoppingList'),
+      icon: 'shopping-cart',
+      variant: 'secondary',
+      onClick: leave(() => transferMeal(meal.id, null)),
     },
+  ], {
+    id: 'meal-read-edit',
+    label: t('common.edit'),
+    onClick: leave(() => openMealModal({ mode: 'edit', meal, date: meal.date, mealType: meal.meal_type })),
   });
+  openDetailView({
+    title: meal.title,
+    key: `meal:${meal.id}`,
+    anchor,
+    sections: [{ node: body }],
+    actions,
+  });
+}
+
+/**
+ * Hat die Mahlzeit Zutaten, die noch nicht auf einer Liste stehen, und darf
+ * dieses Konto sie dorthin schicken? Dieselbe Regel wie der Wagen der Karte.
+ */
+function mealCanTransfer(meal) {
+  const ownCount = meal.ingredients?.length ?? 0;
+  const ingDone = meal.ingredients?.filter((i) => i.on_shopping_list).length ?? 0;
+  const recipeCount = ownCount === 0 ? (meal.recipe_ingredient_count ?? 0) : 0;
+  return (recipeCount > 0 || (ownCount > 0 && ingDone < ownCount)) && mayTransferMealToShopping(meal.id);
 }
 
 function openMealModal(opts) {
@@ -2101,28 +2060,13 @@ function openMealModal(opts) {
       const ingList   = panel.querySelector('#ingredient-list');
       const addIngBtn = panel.querySelector('#add-ingredient-btn');
       const recipeSelect = panel.querySelector('#modal-recipe-id');
-      const recipeScaleInput = panel.querySelector('#modal-recipe-scale');
+      const servingsSlot = panel.querySelector('#modal-servings-slot');
       const saveAsRecipeBtn = panel.querySelector('#modal-save-as-recipe');
       let currentAppliedRecipe = null;
 
-      const applyRecipe = (recipeId) => {
-        const id = Number(recipeId);
-        const factor = Math.max(Number(recipeScaleInput?.value || 1), 0.1);
-        if (!id) {
-          currentAppliedRecipe = null;
-          return;
-        }
-        const recipe = state.recipes.find((r) => r.id === id);
-        if (!recipe) return;
-
-        currentAppliedRecipe = recipe;
-        // Ein anderes Rezept fuellt die Zeilen selbst - die Leseliste weicht.
-        recipeIngredientsToRows(panel);
-
-        panel.querySelector('#modal-title').value = recipe.title || '';
-        panel.querySelector('#modal-notes').value = recipe.notes || '';
-        panel.querySelector('#modal-recipe-url').value = recipe.recipe_url || '';
-
+      // Die Zeilen aus dem angewandten Rezept, umgerechnet mit dem Faktor des
+      // Portionen-Steppers (R24, E12; vorher ein Zahlenfeld mit Schritt 0,1).
+      const fillRowsFromRecipe = (recipe, factor) => {
         ingList.replaceChildren();
         ingList.insertAdjacentHTML('beforeend', (recipe.ingredients || [])
           .map((ing) => ingredientRowHTML({
@@ -2132,16 +2076,57 @@ function openMealModal(opts) {
             categories: mealCategories(),
           }))
           .join(''));
-
         if (window.lucide) lucide.createIcons({ el: ingList });
       };
 
-      recipeSelect?.addEventListener('change', () => {
-        if (recipeScaleInput) recipeScaleInput.value = '1';
-        applyRecipe(recipeSelect.value);
-      });
+      // Der Stepper steht nur, solange ein Rezept die Zeilen gefuellt hat -
+      // sonst gaebe es nichts umzurechnen, und ein Feld ohne Wirkung waere
+      // genau das, was das Faktorfeld war.
+      const showServings = (recipe) => {
+        if (!servingsSlot) return;
+        servingsSlot.replaceChildren();
+        servingsSlot.hidden = !recipe;
+        if (!recipe) return;
+        servingsSlot.insertAdjacentHTML('beforeend', servingsStepperHtml({
+          id: 'modal-servings',
+          base: recipe.servings ?? null,
+        }));
+        if (window.lucide) lucide.createIcons({ el: servingsSlot });
+      };
+      if (servingsSlot) {
+        wireServingsSteppers(servingsSlot, (_stepper, _value, factor) => {
+          if (currentAppliedRecipe) fillRowsFromRecipe(currentAppliedRecipe, factor);
+        });
+      }
+
+      const applyRecipe = (recipeId) => {
+        const id = Number(recipeId);
+        if (!id) {
+          currentAppliedRecipe = null;
+          showServings(null);
+          return;
+        }
+        const recipe = state.recipes.find((r) => r.id === id);
+        if (!recipe) return;
+
+        currentAppliedRecipe = recipe;
+        showServings(recipe);
+        // Ein anderes Rezept fuellt die Zeilen selbst - die Leseliste weicht.
+        recipeIngredientsToRows(panel);
+
+        panel.querySelector('#modal-title').value = recipe.title || '';
+        panel.querySelector('#modal-notes').value = recipe.notes || '';
+        panel.querySelector('#modal-recipe-url').value = recipe.recipe_url || '';
+
+        fillRowsFromRecipe(recipe, 1);
+      };
+
+      recipeSelect?.addEventListener('change', () => applyRecipe(recipeSelect.value));
       panel.querySelector('#meal-recipe-ingredients-edit')?.addEventListener('click', () => {
-        recipeIngredientsToRows(panel, recipeIngredientsOf(meal));
+        // Aus dem Rezept: dessen Zutaten werden eigene Zeilen. Mit eigenen
+        // Zutaten stehen die Zeilen schon im Markup und werden nur sichtbar.
+        const fromRecipe = recipeIngredientsOf(meal);
+        recipeIngredientsToRows(panel, fromRecipe.length ? fromRecipe : null);
         panel.querySelector('#ingredient-list .ingredient-row input')?.focus();
       });
 
@@ -2149,33 +2134,12 @@ function openMealModal(opts) {
       // Rezepttreffer geht denselben Weg wie die Rezeptauswahl darunter.
       const chooseRecipe = (id) => {
         if (recipeSelect) recipeSelect.value = String(id);
-        if (recipeScaleInput) recipeScaleInput.value = '1';
         applyRecipe(id);
       };
       wireMealTitleCombobox(panel, { onRecipe: chooseRecipe });
       // Aus der Rezept-Spalte geoeffnet: das Rezept ist schon gewaehlt, also
       // stehen Titel, Zutaten und Notizen gleich da.
       if (opts.recipeId) chooseRecipe(opts.recipeId);
-
-      recipeScaleInput?.addEventListener('input', () => {
-        const currentRecipeId = Number(recipeSelect?.value || 0);
-        if (!currentRecipeId || !currentAppliedRecipe) return;
-
-        const factor = Number(recipeScaleInput.value || 1);
-        if (!Number.isFinite(factor) || factor <= 0) return;
-
-        ingList.replaceChildren();
-        ingList.insertAdjacentHTML('beforeend', (currentAppliedRecipe.ingredients || [])
-          .map((ing) => ingredientRowHTML({
-            name: ing.name,
-            quantity: scaleQuantityText(ing.quantity ?? '', Math.max(factor, 0.1)),
-            category: ing.category ?? DEFAULT_CATEGORY_NAME,
-            categories: mealCategories(),
-          }))
-          .join(''));
-
-        if (window.lucide) lucide.createIcons({ el: ingList });
-      });
 
       saveAsRecipeBtn?.addEventListener('click', async () => {
         // Die Rechte koennen sich aendern, waehrend der Dialog offen steht.
@@ -2305,7 +2269,6 @@ function openMealModal(opts) {
         showCookForScope(panel, meal);
       });
 
-      wireIngredientCount(panel);
       wireCookPicker(panel);
       if (membersMissing) {
         refreshCookPicker(panel, isEdit ? meal : null)
@@ -2446,24 +2409,6 @@ async function refreshCookPicker(panel, meal) {
 }
 
 /** Beschriftung des Zutaten-Aufklappers: "Zutaten · 6" (wie "Geplant · n" im Budget). */
-function ingredientsFoldLabel(count) {
-  return `${t('meals.ingredientsLabel')} · ${count}`;
-}
-
-/**
- * Haelt den Zaehler am Zutaten-Aufklapper nach, wenn Zeilen dazukommen oder
- * gehen (Hinzufuegen, Entfernen, ein Rezept ersetzt die Liste). Ohne
- * Aufklapper (Anlegen, keine Zutaten) passiert nichts.
- */
-function wireIngredientCount(panel) {
-  const label = panel.querySelector?.('#modal-ingredients-fold .form-advanced__summary > span');
-  const list = panel.querySelector?.('#ingredient-list');
-  if (!label || !list || typeof MutationObserver !== 'function') return;
-  new MutationObserver(() => {
-    label.textContent = ingredientsFoldLabel(list.querySelectorAll('.ingredient-row').length);
-  }).observe(list, { childList: true });
-}
-
 /* Die Mahlzeitart als Radiogruppe aus Chips (buildModalContent): Klick und
  * Pfeiltasten waehlen, das versteckte `#modal-type` haelt den Wert. Roving
  * tabindex wie beim Segment: EIN Tab-Halt, die Pfeile wandern. */
@@ -2629,14 +2574,14 @@ function buildModalContent({ mode, date, mealType, meal, recipeId = null }) {
       <select class="form-input" id="modal-recipe-id">${recipeOptions}</select>
     </div>
 
-    <div class="modal-grid modal-grid--2">
-      <div class="form-group">
-        <label class="form-label" for="modal-recipe-scale">${t('meals.recipeScaleLabel')}</label>
-        <input type="number" class="form-input" id="modal-recipe-scale" min="0.1" step="0.1" value="1">
-      </div>
-      <div class="form-group" style="display:flex;align-items:flex-end;">
-        <button class="btn btn--secondary" id="modal-save-as-recipe" type="button">${t('meals.saveAsRecipe')}</button>
-      </div>
+    ${/* PORTIONEN STATT FAKTOR (R24, E12): hier stand ein Zahlenfeld
+        * „Zutaten skalieren" (Schritt 0,1), das nur mit gewaehltem Rezept wirkte
+        * und sonst still blieb. Der Stepper erscheint, sobald ein Rezept die
+        * Zeilen fuellt, und rechnet sie in dessen Portionen um - derselbe
+        * Baustein wie im Rezept (utils/servings-stepper.js). */ ''}
+    <div class="form-group meal-servings" id="modal-servings-slot" hidden></div>
+    <div class="form-group">
+      <button class="btn btn--secondary btn--sm meal-save-as-recipe" id="modal-save-as-recipe" type="button">${t('meals.saveAsRecipe')}</button>
     </div>
 
     <div class="form-group">
@@ -2691,42 +2636,39 @@ function buildModalContent({ mode, date, mealType, meal, recipeId = null }) {
   // den Fokus. Vorher fuehrte ohne Slot (FAB, Kurzbefehl) das Datum - der
   // Dialog fokussierte "Datum", das Pflichtfeld stand an dritter Stelle.
   // Darunter Mahlzeitart (Chips) und Tag.
-  // ZUTATEN BEIM BEARBEITEN EINGEKLAPPT, MIT ZAEHLER (R17 Schritt 5). Eine
-  // Zutatenzeile misst mobil 104px; mit sechs Zutaten lag alles Weitere zwei
-  // Bildschirme tiefer. Wer eine bestehende Mahlzeit oeffnet, aendert meist
-  // Tag, Koch oder Umfang - die Zutaten stehen hinter dem geteilten Aufklapper,
-  // der ihre Zahl nennt (wireIngredientCount haelt sie nach). Beim Anlegen und
-  // ohne Zutaten bleibt der Abschnitt offen wie bisher: dort IST er die Arbeit.
-  const ingCount = isEdit ? (meal.ingredients?.length ?? 0) : 0;
+  // EINE FORM FUER DIE ZUTATEN EINER BESTEHENDEN MAHLZEIT (R24, Critique
+  // G3-Mahlzeiten-P3-3). Bis R24 standen sie in zwei Formen: aus dem Rezept als
+  // Leseliste mit „Anpassen", mit eigenen Zutaten als Aufklapper „Zutaten · 6"
+  // (R17 Schritt 5, damals gegen 104px je Zeile). Jetzt immer als Leseliste
+  // mit der Menge vorn und „Anpassen", das die bearbeitbaren Zeilen zeigt -
+  // die Liste haelt den Dialog so kurz wie der Aufklapper und zeigt dabei,
+  // WAS die Mahlzeit braucht. Beim Anlegen und ohne Zutaten bleiben die
+  // Zeilen offen: dort IST die Eingabe die Arbeit.
   const ingFieldsHtml = `
       <div class="ingredient-list" id="ingredient-list">${ingRows}</div>
       <button class="btn btn--secondary add-ingredient-btn" id="add-ingredient-btn" type="button">
         <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
         ${t('meals.addIngredient')}
       </button>`;
-  // DIE ZUTATEN DES REZEPTS STEHEN DA (R23, D13; Critique G3 "Mahlzeit-Dialog
-  // zeigt Rezeptzutaten nicht"). Eine Mahlzeit aus einem Rezept hat keine
-  // eigenen Zutaten, bis sie zum ersten Mal auf eine Liste geht - es gelten
-  // die des Rezepts (services/kitchen-handover.js, mealPlanSource). Der Dialog
-  // zeigte dort ein leeres Feld "Zutaten" und behauptete damit, die Mahlzeit
-  // brauche nichts. Jetzt stehen sie als Liste zum Lesen; "Anpassen" macht sie
-  // zu eigenen Zeilen dieser Mahlzeit (recipeIngredientsToRows).
+  // DIE ZUTATEN DES REZEPTS STEHEN DA (R23, D13): eine Mahlzeit aus einem
+  // Rezept hat keine eigenen Zutaten, bis sie zum ersten Mal auf eine Liste
+  // geht - es gelten die des Rezepts (services/kitchen-handover.js,
+  // mealPlanSource). „Anpassen" macht sie zu eigenen Zeilen dieser Mahlzeit
+  // (recipeIngredientsToRows).
   const recipeIngs = recipeIngredientsOf(isEdit ? meal : null);
-  const ingredientsHtml = recipeIngs.length
+  const ownIngs = isEdit ? (meal.ingredients ?? []) : [];
+  const readIngs = recipeIngs.length ? recipeIngs : ownIngs;
+  const ingredientsHtml = readIngs.length
     ? `
     <div class="form-group meal-recipe-ingredients" id="meal-recipe-ingredients">
       <div class="meal-recipe-ingredients__head">
-        <span class="form-label" id="meal-recipe-ingredients-label">${t('meals.recipeIngredientsLabel')}</span>
+        <span class="form-label" id="meal-recipe-ingredients-label">${recipeIngs.length ? t('meals.recipeIngredientsLabel') : t('meals.ingredientsLabel')}</span>
         <button type="button" class="btn btn--ghost btn--sm" id="meal-recipe-ingredients-edit">${t('meals.recipeIngredientsEdit')}</button>
       </div>
       <ul class="meal-recipe-ingredients__list" aria-labelledby="meal-recipe-ingredients-label">
-        ${recipeIngs.map((ing) => `<li>${ing.quantity ? `<span class="meal-recipe-ingredients__qty">${esc(ing.quantity)}</span> ` : ''}${esc(ing.name)}</li>`).join('')}
+        ${readIngs.map((ing) => `<li>${ing.quantity ? `<span class="meal-recipe-ingredients__qty">${esc(ing.quantity)}</span> ` : ''}${esc(ing.name)}</li>`).join('')}
       </ul>
       <div id="meal-own-ingredients" hidden>${ingFieldsHtml}</div>
-    </div>`
-    : ingCount > 0
-    ? `<div class="meal-ingredients-fold" id="modal-ingredients-fold">
-      ${advancedSection(ingFieldsHtml, { label: ingredientsFoldLabel(ingCount) })}
     </div>`
     : `
     <div class="form-group">
@@ -2740,7 +2682,7 @@ function buildModalContent({ mode, date, mealType, meal, recipeId = null }) {
 
     ${ingredientsHtml}
 
-    ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
+    ${advancedSection(advancedFieldsHtml, { open: advancedOpen, hint: t('meals.moreDetailsHint') })}
 
     ${canTransfer ? `
     <div class="shopping-transfer">

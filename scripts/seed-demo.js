@@ -554,7 +554,7 @@ for (const [title, description, start, end, all_day, location, color, icon, rrul
 // ── Recipes ──────────────────────────────────────────────────────────────────
 
 console.log('Inserting recipes…');
-const insertRecipe = db.prepare('INSERT INTO recipes (title, notes, recipe_url, created_by) VALUES (?, ?, ?, ?)');
+const insertRecipe = db.prepare('INSERT INTO recipes (title, notes, recipe_url, servings, created_by) VALUES (?, ?, ?, ?, ?)');
 const insertRecipeIng = db.prepare('INSERT INTO recipe_ingredients (recipe_id, name, quantity, category) VALUES (?, ?, ?, ?)');
 const recipes = [
   [L('Spaghetti Bolognese', 'Spaghetti Bolognese'), L('Family favourite - simmer the sauce for at least 45 minutes for the best flavour.', 'Familienklassiker - die Soße mindestens 45 Minuten ziehen lassen.'), 'https://www.bbcgoodfood.com/recipes/best-spaghetti-bolognese-recipe', [
@@ -582,9 +582,13 @@ const recipes = [
     [L('Blueberries', 'Blaubeeren'), '125 g', CAT.produce], [L('Maple syrup', 'Ahornsirup'), L('1 bottle', '1 Flasche'), CAT.other],
   ]],
 ];
+// Portionen je Rezept in derselben Reihenfolge (R24, E12). Das Ofenhaehnchen
+// bleibt ohne Angabe: so zeigt die Demo beide Formen des Steppers - Portionen
+// und, ohne gespeicherte Zahl, Vielfache des Rezepts.
+const RECIPE_SERVINGS = [4, 4, 2, 4, null, 4];
 const recipeIdByTitle = {};
-for (const [title, notes, url, ings] of recipes) {
-  const rid = insertRecipe.run(title, notes, url, alexId).lastInsertRowid;
+for (const [i, [title, notes, url, ings]] of recipes.entries()) {
+  const rid = insertRecipe.run(title, notes, url, RECIPE_SERVINGS[i] ?? null, alexId).lastInsertRowid;
   recipeIdByTitle[title] = rid;
   for (const [name, qty, cat] of ings) insertRecipeIng.run(rid, name, qty, cat);
 }

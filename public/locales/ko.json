@@ -837,7 +837,9 @@
         "moveReturned": {
             "refused": "“{{item}}” 항목이 “{{back}}” 목록으로 돌아갔습니다. 서버가 “{{target}}” 목록에서 받아들이지 않았습니다.",
             "waited": "“{{item}}” 항목이 “{{target}}” 목록으로 옮겨지지 않았습니다. “{{back}}” 목록의 동기화가 일주일 넘게 꺼져 있습니다. 목록을 켜면 “{{back}}”에 다시 나타납니다."
-        }
+        },
+        "moreDetailsHint": "가격, 매장, 링크, 메모",
+        "toPantryAllToPlaceholder": "장소 선택 …"
     },
     "meals": {
         "ingredientCount_one": "재료 {{count}}개",
@@ -909,7 +911,6 @@
         "savedRecipeLabel": "저장된 레시피",
         "savedRecipePlaceholder": "레시피 선택",
         "saveAsRecipe": "레시피로 저장",
-        "recipeScaleLabel": "재료 비율 조절",
         "deletedToast": "식사가 삭제되었습니다.",
         "recurrenceLabel": "매주 반복",
         "recurrenceWeekly": "매주",
@@ -935,7 +936,8 @@
         "openRecipeNamed": "{{title}} 레시피 열기",
         "viewRecipeNamed": "{{title}} 레시피 보기",
         "recipeIngredientsLabel": "레시피 재료",
-        "recipeIngredientsEdit": "조정"
+        "recipeIngredientsEdit": "조정",
+        "moreDetailsHint": "레시피, 메모, 링크"
     },
     "calendar": {
         "searchOpen": "일정 검색",
@@ -3754,7 +3756,17 @@
         "ingredientMatchEmpty": "재고가 아직 비어 있습니다.",
         "ingredientMatchSaved": "연결을 저장했습니다.",
         "ingredientMatchCleared": "연결을 해제했습니다.",
-        "ingredientMatchLoadError": "재고를 불러오지 못했습니다."
+        "ingredientMatchLoadError": "재고를 불러오지 못했습니다.",
+        "servingsLabel": "인분",
+        "servingsMultipleLabel": "분량",
+        "servingsFewer": "인분 줄이기",
+        "servingsMore": "인분 늘리기",
+        "servingsLess": "분량 줄이기",
+        "servingsMoreMultiple": "분량 늘리기",
+        "servingsHint": "재료 양이 몇 인분 기준인지 적습니다. 모르면 비워 두세요.",
+        "servingsInvalid": "1부터 99까지의 정수입니다.",
+        "moreDetailsHint": "메모, 이미지, 링크",
+        "servingsTimes": "× {{value}}"
     },
     "onboarding": {
         "step1Title": "{{name}}에 오신 것을 환영합니다",
@@ -6237,8 +6249,6 @@
         "filterExpired": "기한 만료",
         "filterSoon": "곧 만료",
         "filterLow": "거의 소진",
-        "watchLabel": "확인 필요",
-        "watchEmpty": "기한이 임박하거나 부족한 품목이 없습니다.",
         "badgeExpiredYesterday": "어제 만료됨",
         "badgeExpiredDays": "{{count}}일 전 만료됨",
         "badgeExpiresToday": "오늘 만료",
@@ -6290,7 +6300,8 @@
             "bag": "봉지",
             "bag_one": "봉지",
             "bag_other": "봉지"
-        }
+        },
+        "moreDetailsHint": "최소 재고, 메모"
     },
     "inventory": {
         "title": "소지품",

@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "„{{item}}” staat weer op „{{back}}”: de server heeft het niet geaccepteerd in „{{target}}”.",
             "waited": "„{{item}}” is niet verplaatst naar „{{target}}”: de synchronisatie van „{{back}}” staat al meer dan een week uit. Het artikel verschijnt weer op „{{back}}” zodra die lijst wordt ingeschakeld."
-        }
+        },
+        "moreDetailsHint": "Prijs, winkel, link, notitie",
+        "toPantryAllToPlaceholder": "Kies een plek …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediënt",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "Opgeslagen recept",
         "savedRecipePlaceholder": "Recept selecteren",
         "saveAsRecipe": "Opslaan als recept",
-        "recipeScaleLabel": "Ingrediënten schalen",
         "deletedToast": "Maaltijd verwijderd.",
         "recurrenceLabel": "Wekelijks herhalen",
         "recurrenceWeekly": "Wekelijks",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "Recept voor {{title}} openen",
         "viewRecipeNamed": "Recept voor {{title}} bekijken",
         "recipeIngredientsLabel": "Ingrediënten uit het recept",
-        "recipeIngredientsEdit": "Aanpassen"
+        "recipeIngredientsEdit": "Aanpassen",
+        "moreDetailsHint": "Recept, notities, link"
     },
     "calendar": {
         "searchOpen": "Afspraken zoeken",
@@ -3736,7 +3738,17 @@
         "ingredientMatchEmpty": "De voorraad is nog leeg.",
         "ingredientMatchSaved": "Koppeling opgeslagen.",
         "ingredientMatchCleared": "Koppeling verwijderd.",
-        "ingredientMatchLoadError": "De voorraad kon niet worden geladen."
+        "ingredientMatchLoadError": "De voorraad kon niet worden geladen.",
+        "servingsLabel": "Porties",
+        "servingsMultipleLabel": "Hoeveelheid",
+        "servingsFewer": "Minder porties",
+        "servingsMore": "Meer porties",
+        "servingsLess": "Hoeveelheid verlagen",
+        "servingsMoreMultiple": "Hoeveelheid verhogen",
+        "servingsHint": "Voor hoeveel porties de hoeveelheden gelden. Laat leeg als je het niet weet.",
+        "servingsInvalid": "Een geheel getal van 1 tot 99.",
+        "moreDetailsHint": "Notities, afbeelding, link",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Typ om naar een onderdeel te gaan of iets aan te maken. Vanaf 2 tekens vind je ook je items, zelfs op delen van woorden.",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Verlopen",
         "filterSoon": "Bijna over datum",
         "filterLow": "Bijna op",
-        "watchLabel": "Vraagt aandacht",
-        "watchEmpty": "Niets verloopt of raakt op.",
         "badgeExpiredYesterday": "Gisteren verlopen",
         "badgeExpiredDays": "{{count}} dagen geleden verlopen",
         "badgeExpiresToday": "Verloopt vandaag",
@@ -6290,7 +6300,8 @@
             "bag": "zak",
             "bag_one": "zak",
             "bag_other": "zakken"
-        }
+        },
+        "moreDetailsHint": "Minimumvoorraad, notities"
     },
     "inventory": {
         "title": "Inventaris",

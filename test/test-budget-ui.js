@@ -1178,12 +1178,13 @@ test('keine Seite schreibt einen Dezimaltrenner von Hand um', () => {
   assert.match(menge[0], /toDecimalString\(/,
     'die Mengenangabe muss durch dieselbe Umschrift laufen wie der Preis');
 
-  // Dasselbe fuer das Skalieren einer Zutatenmenge (pages/meals.js): es LIEST eine
+  // Dasselbe fuer das Skalieren einer Zutatenmenge (utils/scale-quantity.js, bis
+  // R24 in pages/meals.js - seitdem rechnen Rezept und Mahlzeit damit): es LIEST eine
   // Zahl und SCHREIBT sie wieder, und beide Richtungen haengen an der Region. Die
   // Ausgabe schaute sich den Trenner vorher aus der Eingabe ab (`useComma`) - eine
   // aus Mealie gespiegelte "1.5" blieb damit auch in einer deutschen Oberflaeche
   // eine "1.5". Verhalten in test-meals.js.
-  const rezept = withoutComments(read('../public/pages/meals.js'));
+  const rezept = withoutComments(read('../public/utils/scale-quantity.js'));
   const skalieren = rezept.match(/function scaleQuantityText[\s\S]*?\n\}/);
   assert.ok(skalieren, 'scaleQuantityText nicht gefunden');
   assert.match(skalieren[0], /toDecimalString\(/,

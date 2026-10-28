@@ -959,7 +959,9 @@
         "moveReturned": {
             "refused": "«{{item}}» снова в списке «{{back}}»: сервер не принял его в списке «{{target}}».",
             "waited": "«{{item}}» не перемещён в список «{{target}}»: синхронизация списка «{{back}}» выключена больше недели. Товар снова появится в списке «{{back}}», как только вы его включите."
-        }
+        },
+        "moreDetailsHint": "Цена, магазин, ссылка, заметка",
+        "toPantryAllToPlaceholder": "Выберите место …"
     },
     "meals": {
         "randomizeSuccess_few": "Запланировано {{count}} приёма пищи.",
@@ -1041,7 +1043,6 @@
         "savedRecipeLabel": "Сохранённый рецепт",
         "savedRecipePlaceholder": "Выберите рецепт",
         "saveAsRecipe": "Сохранить как рецепт",
-        "recipeScaleLabel": "Пересчитать ингредиенты",
         "deletedToast": "Приём пищи удалён.",
         "recurrenceLabel": "Повторять каждую неделю",
         "recurrenceWeekly": "Еженедельно",
@@ -1067,7 +1068,8 @@
         "openRecipeNamed": "Открыть рецепт {{title}}",
         "viewRecipeNamed": "Посмотреть рецепт {{title}}",
         "recipeIngredientsLabel": "Ингредиенты из рецепта",
-        "recipeIngredientsEdit": "Изменить"
+        "recipeIngredientsEdit": "Изменить",
+        "moreDetailsHint": "Рецепт, заметки, ссылка"
     },
     "calendar": {
         "searchOpen": "Поиск событий",
@@ -3838,11 +3840,11 @@
         "imageHint": "Одно изображение на рецепт. Оно появляется в плане питания и на плитке обзора.",
         "imageTooLarge": "Изображение всё ещё слишком велико после уменьшения.",
         "ingredientMatchNone": "Не сопоставлено",
-        "ingredientMatchOpen": "Сопоставить {{count}} ингредиента с запасами",
-        "ingredientMatchOpen_one": "Сопоставить {{count}} ингредиент с запасами",
-        "ingredientMatchOpen_few": "Сопоставить {{count}} ингредиента с запасами",
-        "ingredientMatchOpen_many": "Сопоставить {{count}} ингредиентов с запасами",
-        "ingredientMatchBulkTitle": "Сопоставить ингредиенты с запасами",
+        "ingredientMatchOpen": "Связать {{count}} ингредиента с запасами",
+        "ingredientMatchOpen_one": "Связать {{count}} ингредиент с запасами",
+        "ingredientMatchOpen_few": "Связать {{count}} ингредиента с запасами",
+        "ingredientMatchOpen_many": "Связать {{count}} ингредиентов с запасами",
+        "ingredientMatchBulkTitle": "Связать ингредиенты с запасами",
         "ingredientMatchBulkHint": "Для каждого ингредиента выбери строку запасов, которую он означает. Yuvomi ничего не угадывает - действует только то, что ты подтвердишь здесь.",
         "ingredientMatchAction": "Сопоставить «{{name}}» со строкой запасов",
         "ingredientMatchTitle": "Сопоставить «{{name}}»",
@@ -3851,7 +3853,17 @@
         "ingredientMatchEmpty": "Запасы пока пусты.",
         "ingredientMatchSaved": "Сопоставление сохранено.",
         "ingredientMatchCleared": "Сопоставление снято.",
-        "ingredientMatchLoadError": "Не удалось загрузить запасы."
+        "ingredientMatchLoadError": "Не удалось загрузить запасы.",
+        "servingsLabel": "Порции",
+        "servingsMultipleLabel": "Количество",
+        "servingsFewer": "Меньше порций",
+        "servingsMore": "Больше порций",
+        "servingsLess": "Уменьшить количество",
+        "servingsMoreMultiple": "Увеличить количество",
+        "servingsHint": "На сколько порций рассчитаны количества. Оставьте пустым, если не знаете.",
+        "servingsInvalid": "Целое число от 1 до 99.",
+        "moreDetailsHint": "Заметки, изображение, ссылка",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Печатайте, чтобы перейти в раздел или что-то создать. С 2 символов находятся и ваши записи, даже по части слова.",
@@ -6536,8 +6548,6 @@
         "filterExpired": "Просрочено",
         "filterSoon": "Скоро истекает",
         "filterLow": "Почти закончилось",
-        "watchLabel": "Требует внимания",
-        "watchEmpty": "Ничего не истекает и не заканчивается.",
         "badgeExpiredYesterday": "Просрочено вчера",
         "badgeExpiredDays": "Просрочено {{count}} дней назад",
         "badgeExpiredDays_many": "Просрочено {{count}} дней назад",
@@ -6610,7 +6620,8 @@
             "bag_few": "пакета",
             "bag_many": "пакетов",
             "bag_other": "пакета"
-        }
+        },
+        "moreDetailsHint": "Минимальный запас, заметки"
     },
     "inventory": {
         "title": "Инвентарь",

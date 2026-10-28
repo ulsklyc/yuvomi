@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "“{{item}}” đã trở lại “{{back}}”: máy chủ không chấp nhận mục này trong “{{target}}”.",
             "waited": "“{{item}}” chưa được chuyển sang “{{target}}”: đồng bộ của “{{back}}” đã tắt hơn một tuần. Mục này sẽ xuất hiện lại trong “{{back}}” khi danh sách đó được bật."
-        }
+        },
+        "moreDetailsHint": "Giá, cửa hàng, liên kết, ghi chú",
+        "toPantryAllToPlaceholder": "Chọn nơi …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} nguyên liệu",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "Công thức đã lưu",
         "savedRecipePlaceholder": "Chọn công thức",
         "saveAsRecipe": "Lưu thành công thức",
-        "recipeScaleLabel": "Cân đối nguyên liệu",
         "deletedToast": "Đã xóa bữa ăn.",
         "recurrenceLabel": "Lặp lại hằng tuần",
         "recurrenceWeekly": "Hằng tuần",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "Mở công thức {{title}}",
         "viewRecipeNamed": "Xem công thức {{title}}",
         "recipeIngredientsLabel": "Nguyên liệu từ công thức",
-        "recipeIngredientsEdit": "Điều chỉnh"
+        "recipeIngredientsEdit": "Điều chỉnh",
+        "moreDetailsHint": "Công thức, ghi chú, liên kết"
     },
     "calendar": {
         "searchOpen": "Tìm sự kiện",
@@ -3725,9 +3727,9 @@
         "imageHint": "Một hình cho mỗi công thức. Hình hiện trong kế hoạch bữa ăn và trên ô tổng quan.",
         "imageTooLarge": "Hình vẫn quá lớn sau khi thu nhỏ.",
         "ingredientMatchNone": "Chưa gán",
-        "ingredientMatchOpen": "Gán {{count}} nguyên liệu với kho dự trữ",
-        "ingredientMatchOpen_one": "Gán {{count}} nguyên liệu với kho dự trữ",
-        "ingredientMatchBulkTitle": "Gán nguyên liệu với kho dự trữ",
+        "ingredientMatchOpen": "Liên kết {{count}} nguyên liệu với kho dự trữ",
+        "ingredientMatchOpen_one": "Liên kết {{count}} nguyên liệu với kho dự trữ",
+        "ingredientMatchBulkTitle": "Liên kết nguyên liệu với kho dự trữ",
         "ingredientMatchBulkHint": "Với mỗi nguyên liệu, chọn dòng trong kho dự trữ mà nó muốn nói đến. Yuvomi không đoán gì cả - chỉ những gì bạn xác nhận ở đây mới có hiệu lực.",
         "ingredientMatchAction": "Gán {{name}} với một dòng trong kho dự trữ",
         "ingredientMatchTitle": "Gán {{name}}",
@@ -3736,7 +3738,17 @@
         "ingredientMatchEmpty": "Kho dự trữ vẫn còn trống.",
         "ingredientMatchSaved": "Đã lưu liên kết.",
         "ingredientMatchCleared": "Đã bỏ liên kết.",
-        "ingredientMatchLoadError": "Không tải được kho dự trữ."
+        "ingredientMatchLoadError": "Không tải được kho dự trữ.",
+        "servingsLabel": "Khẩu phần",
+        "servingsMultipleLabel": "Lượng",
+        "servingsFewer": "Ít khẩu phần hơn",
+        "servingsMore": "Nhiều khẩu phần hơn",
+        "servingsLess": "Giảm lượng",
+        "servingsMoreMultiple": "Tăng lượng",
+        "servingsHint": "Lượng nguyên liệu dành cho bao nhiêu khẩu phần. Để trống nếu không biết.",
+        "servingsInvalid": "Một số nguyên từ 1 đến 99.",
+        "moreDetailsHint": "Ghi chú, hình ảnh, liên kết",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Nhập để chuyển đến một mục hoặc tạo mới. Từ 2 ký tự, bạn cũng tìm được các mục của mình, kể cả bằng một phần của từ.",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Hết hạn",
         "filterSoon": "Sắp hết hạn",
         "filterLow": "Sắp hết",
-        "watchLabel": "Cần chú ý",
-        "watchEmpty": "Không có gì sắp hết hạn hay sắp hết.",
         "badgeExpiredYesterday": "Hết hạn hôm qua",
         "badgeExpiredDays": "Hết hạn {{count}} ngày trước",
         "badgeExpiresToday": "Hết hạn hôm nay",
@@ -6290,7 +6300,8 @@
             "bag": "túi",
             "bag_one": "túi",
             "bag_other": "túi"
-        }
+        },
+        "moreDetailsHint": "Tồn kho tối thiểu, ghi chú"
     },
     "inventory": {
         "title": "Tài sản",

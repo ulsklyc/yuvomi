@@ -819,7 +819,9 @@
         "moveReturned": {
             "refused": "«{{item}}» ha vuelto a «{{back}}»: el servidor no lo aceptó en «{{target}}».",
             "waited": "«{{item}}» no se ha movido a «{{target}}»: la sincronización de «{{back}}» lleva más de una semana desactivada. El artículo volverá a aparecer en «{{back}}» en cuanto actives esa lista."
-        }
+        },
+        "moreDetailsHint": "Precio, tienda, enlace, nota",
+        "toPantryAllToPlaceholder": "Elige un lugar …"
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediente",
@@ -891,7 +893,6 @@
         "savedRecipeLabel": "Receta guardada",
         "savedRecipePlaceholder": "Seleccionar receta",
         "saveAsRecipe": "Guardar como receta",
-        "recipeScaleLabel": "Escalar ingredientes",
         "deletedToast": "Comida eliminada.",
         "recurrenceLabel": "Repetir semanalmente",
         "recurrenceWeekly": "Semanal",
@@ -917,7 +918,8 @@
         "openRecipeNamed": "Abrir la receta de {{title}}",
         "viewRecipeNamed": "Ver la receta de {{title}}",
         "recipeIngredientsLabel": "Ingredientes de la receta",
-        "recipeIngredientsEdit": "Ajustar"
+        "recipeIngredientsEdit": "Ajustar",
+        "moreDetailsHint": "Receta, notas, enlace"
     },
     "calendar": {
         "searchOpen": "Buscar eventos",
@@ -3608,9 +3610,9 @@
         "imageHint": "Una imagen por receta. Aparece en el plan de comidas y en el mosaico de resumen.",
         "imageTooLarge": "La imagen sigue siendo demasiado grande tras reducirla.",
         "ingredientMatchNone": "Sin asignar",
-        "ingredientMatchOpen": "Asignar {{count}} ingredientes a la despensa",
-        "ingredientMatchOpen_one": "Asignar {{count}} ingrediente a la despensa",
-        "ingredientMatchBulkTitle": "Asignar ingredientes a la despensa",
+        "ingredientMatchOpen": "Vincular {{count}} ingredientes con la despensa",
+        "ingredientMatchOpen_one": "Vincular {{count}} ingrediente con la despensa",
+        "ingredientMatchBulkTitle": "Vincular ingredientes con la despensa",
         "ingredientMatchBulkHint": "Elige para cada ingrediente la línea de tu despensa a la que se refiere. Yuvomi no adivina nada - solo cuenta lo que confirmes aquí.",
         "ingredientMatchAction": "Asignar {{name}} a una línea de la despensa",
         "ingredientMatchTitle": "Asignar {{name}}",
@@ -3619,7 +3621,17 @@
         "ingredientMatchEmpty": "La despensa aún está vacía.",
         "ingredientMatchSaved": "Asignación guardada.",
         "ingredientMatchCleared": "Asignación eliminada.",
-        "ingredientMatchLoadError": "No se pudo cargar la despensa."
+        "ingredientMatchLoadError": "No se pudo cargar la despensa.",
+        "servingsLabel": "Raciones",
+        "servingsMultipleLabel": "Cantidad",
+        "servingsFewer": "Menos raciones",
+        "servingsMore": "Más raciones",
+        "servingsLess": "Reducir cantidad",
+        "servingsMoreMultiple": "Aumentar cantidad",
+        "servingsHint": "Para cuántas raciones son las cantidades. Déjalo vacío si no lo sabes.",
+        "servingsInvalid": "Un número entero del 1 al 99.",
+        "moreDetailsHint": "Notas, imagen, enlace",
+        "servingsTimes": "× {{value}}"
     },
     "search": {
         "emptyHint": "Escribe para ir a una sección o crear algo. Desde 2 caracteres también encuentras tus entradas, incluso por partes de palabras.",
@@ -6237,8 +6249,6 @@
         "filterExpired": "Caducado",
         "filterSoon": "Caduca pronto",
         "filterLow": "Casi agotado",
-        "watchLabel": "Requiere atención",
-        "watchEmpty": "Nada caduca ni se está agotando.",
         "badgeExpiredYesterday": "Caducó ayer",
         "badgeExpiredDays": "Caducó hace {{count}} días",
         "badgeExpiresToday": "Caduca hoy",
@@ -6290,7 +6300,8 @@
             "bag": "bolsa",
             "bag_one": "bolsa",
             "bag_other": "bolsas"
-        }
+        },
+        "moreDetailsHint": "Existencias mínimas, notas"
     },
     "inventory": {
         "title": "Inventario",

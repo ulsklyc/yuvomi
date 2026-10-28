@@ -383,6 +383,17 @@
   color: var(--color-text-primary);
 }
 
+/* Ueberschrift und Portionen-Stepper in einer Zeile (R24, E12): der Stepper
+ * gehoert zu den Zutaten, die er umrechnet, und steht an ihrem Kopf rechts.
+ * Wird es eng (Telefon, langes Wort), rueckt er unter die Ueberschrift. */
+.recipe-detail__section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
 /* ZUTATEN IN PRIMAERTEXT: sie sind der Inhalt des Rezepts, nicht seine
  * Fussnote. Grau standen sie gleichrangig mit den Notizen und leiser als die
  * Zuordnungs-Knoepfe daneben (Re-Critique 2026-09-27, A4). */
@@ -565,6 +576,12 @@ button.recipe-detail__ingredient-match:hover {
 /* Die Zeilen-Aktions-Buttons (Bearbeiten/Duplizieren/Löschen) nutzen die
  * geteilte .row-action-Grammatik aus layout.css in der geteilten
  * .list-row__actions. Kein eigenes Reveal-Layout mehr. */
+
+/* Portionen sind eine Zahl mit ein, zwei Ziffern - das Feld so breit wie ein
+ * Mengenfeld der Zutatenzeile, nicht wie der Name daneben (R24, E12). */
+.recipe-servings-field > .form-input {
+  max-inline-size: 6.5rem;
+}
 
 .recipe-ingredient-list {
   display: grid;
