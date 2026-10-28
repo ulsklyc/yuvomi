@@ -667,6 +667,10 @@ async function assertCalendarSaveGateEditor(page) {
   });
 }
 
+const CALENDAR_SAVE_ERROR_DE = JSON.parse(
+  readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'),
+).calendar.saveError;
+
 test('calendar save gates retain unsaved fields after orphan confirmation, server failure and canceled retry', async () => {
   const page = await openPage(harness, { device: 'desktop', locale: 'de' });
   try {
@@ -697,15 +701,19 @@ test('calendar save gates retain unsaved fields after orphan confirmation, serve
     await page.waitForSelector('#confirm-modal-ok');
     assert.equal(attempts.length, 1, 'the real server must reject the rule that orphans its linked child');
     await clickPastDeadTime(page, '#confirm-modal-ok');
-    await page.waitForFunction(() => [...document.querySelectorAll('[role="alert"], .toast')]
-      .some((element) => element.textContent.includes('Save gate test server failure')));
+    // Seit #2251 sagt der Toast den Satz der App, nie den Text des Servers.
+    await page.waitForFunction((sentence) => [...document.querySelectorAll('[role="alert"], .toast')]
+      .some((element) => element.textContent.includes(sentence)), {}, CALENDAR_SAVE_ERROR_DE);
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('[role="alert"], .toast')]
+      .some((element) => element.textContent.includes('Save gate test server failure'))), false,
+    'the server text must not reach the toast (#2251)');
     await assertCalendarSaveGateEditor(page);
     assert.equal(attempts.length, 2);
     assert.equal(attempts[1].confirmed_orphan_count, 1);
     assert.equal(attempts[1].title, 'Calendar save gate unsaved');
 
-    await page.waitForFunction(() => ![...document.querySelectorAll('.toast')]
-      .some((element) => element.textContent.includes('Save gate test server failure')));
+    await page.waitForFunction((sentence) => ![...document.querySelectorAll('.toast')]
+      .some((element) => element.textContent.includes(sentence)), {}, CALENDAR_SAVE_ERROR_DE);
     await page.click('#modal-save');
     await page.waitForSelector('[data-scope="series"]');
     await clickPastDeadTime(page, '[data-scope="series"]');
@@ -1240,6 +1248,11 @@ const SHAPE_EXEMPT = new Map([
   // ganz auf `.segmented__item` lief - seine eigene Regel ist entfallen.
   ['ydp__trigger', 'Griff: Feld-Oeffner des Datepickers, traegt Feldkante'],
   ['more-sheet__search', 'Griff: Suchfeld des More-Sheets, traegt Feldkante'],
+  // Die Personenwahl (settings/assignee-menu.js) ist seit #2316 ein Knopf, der
+  // ein Menue oeffnet, wo vorher ein <select> stand. Sie traegt .form-input und
+  // damit die Feldkante des Auswahlfelds, das sie ersetzt - dieselbe Lage wie
+  // der Datepicker-Griff. Eine Kapsel waere ein Knopf zwischen Feldern.
+  ['assignee-menu__trigger', 'Griff: Feld-Oeffner der Personenwahl, ersetzt das Auswahlfeld, traegt Feldkante'],
   // Das Kanon-Segment (panel.css, DESIGN.md: konzentrisch eingesetzte
   // .segmented__item im radius-md-Traeger). Es stand bis 2026-09-25 auf keiner
   // gemessenen Route im Bild; seit der Dokumente-Critique traegt der Status

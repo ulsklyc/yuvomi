@@ -2368,8 +2368,7 @@
   font-weight: var(--font-weight-medium);
 }
 
-.api-token-scopes__head span:not(:first-child),
-.api-token-scopes__cell {
+.api-token-scopes__head span:not(:first-child) {
   text-align: center;
   justify-self: center;
 }
@@ -2382,9 +2381,17 @@
   color: var(--color-text-primary);
 }
 
+/* Die Zelle ist das Ziel, nicht die 14px-Checkbox (Zielgroessen-Regel in
+ * tokens.css): sie fuellt ihre Spalte und haelt --target-base in der Hoehe.
+ * Der negative margin-block greift in das Polster der Zeile, damit die Zeile
+ * nicht um die Trefferflaeche waechst. */
 .api-token-scopes__cell {
   display: flex;
+  align-items: center;
   justify-content: center;
+  justify-self: stretch;
+  min-height: var(--target-base);
+  margin-block: calc(var(--space-2) * -1);
   cursor: pointer;
 }
 
