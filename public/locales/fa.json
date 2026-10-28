@@ -790,6 +790,7 @@
         "reorderHandleHint": "برای مرتب‌سازی بکشید یا از کلیدهای جهت‌نما استفاده کنید",
         "reorderPosition": "جایگاه {{index}} از {{total}}",
         "priceLabel": "قیمت",
+        "lastPurchased": "آخرین خرید",
         "storeLabel": "فروشگاه",
         "storePlaceholder": "انتخاب کنید یا بنویسید",
         "manageStores": "مدیریت فروشگاه‌ها",

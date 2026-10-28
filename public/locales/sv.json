@@ -772,6 +772,7 @@
         "reorderHandleHint": "Dra eller använd piltangenterna för att sortera",
         "reorderPosition": "Position {{index}} av {{total}}",
         "priceLabel": "Pris",
+        "lastPurchased": "Senast köpt",
         "storeLabel": "Butik",
         "storePlaceholder": "Välj eller skriv",
         "manageStores": "Hantera butiker",

@@ -432,6 +432,40 @@ router.get('/suggestions', (req, res) => {
 // drei). Deshalb eine winzige CRUD-Flaeche statt eines Textfelds.
 // --------------------------------------------------------
 
+// --------------------------------------------------------
+// Kaufhistorie-Helfer (#1003)
+// --------------------------------------------------------
+
+/**
+ * Registriert oder aktualisiert einen Einkauf in der Historie (#1003).
+ *
+ * Ein Einkauf ist eine Tatsache: bezahlt in Cent, an einem Laden (optional),
+ * an einem Tag. shopping_item_id haelt die Verbindung zum offenen Artikel
+ * auf der Liste; wird der Artikel spaeter geloescht ("Remove checked"),
+ * setzt SQLite die Spalte ueber ON DELETE SET NULL auf NULL und der Eintrag
+ * bleibt dauerhaft in der Historie stehen.
+ */
+function recordShoppingPurchase(database, item) {
+  if (!item || item.price_cents == null || !item.name?.trim()) return;
+
+  const conn = database || db.get();
+  conn.prepare(`
+    INSERT INTO shopping_purchases (item_name, price_cents, store_id, shopping_item_id)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(shopping_item_id) WHERE shopping_item_id IS NOT NULL
+    DO UPDATE SET
+      item_name = excluded.item_name,
+      price_cents = excluded.price_cents,
+      store_id = excluded.store_id
+  `).run(item.name.trim(), item.price_cents, item.store_id ?? null, item.id);
+}
+
+function removeShoppingPurchase(database, itemId) {
+  if (!itemId) return;
+  const conn = database || db.get();
+  conn.prepare('DELETE FROM shopping_purchases WHERE shopping_item_id = ?').run(itemId);
+}
+
 // GET /api/v1/shopping/stores  -> { data: Store[] }
 router.get('/stores', (_req, res) => {
   try {
@@ -508,6 +542,36 @@ router.delete('/stores/:id', (req, res) => {
     res.status(204).end();
   } catch (err) {
     log.error('DELETE /stores/:id error:', err);
+    res.status(500).json({ error: 'Internal error', code: 500 });
+  }
+});
+
+// GET /api/v1/shopping/price-history?name=...
+//
+// Liefert die Kaufhistorie fuer einen Artikelnamen (#1003),
+// unbeeinflusst von Gross-/Kleinschreibung (COLLATE NOCASE).
+// Response: { data: Purchase[] }
+router.get('/price-history', (req, res) => {
+  try {
+    const rawName = String(req.query.name ?? '').trim();
+    if (!rawName) {
+      return res.json({ data: [] });
+    }
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+
+    const purchases = db.get().prepare(`
+      SELECT p.id, p.item_name, p.price_cents, p.store_id, p.purchased_at,
+             s.name AS store_name
+      FROM shopping_purchases p
+      LEFT JOIN shopping_stores s ON s.id = p.store_id
+      WHERE p.item_name = ? COLLATE NOCASE
+      ORDER BY p.purchased_at DESC, p.id DESC
+      LIMIT ?
+    `).all(rawName, limit);
+
+    res.json({ data: purchases });
+  } catch (err) {
+    log.error('GET /price-history error:', err);
     res.status(500).json({ error: 'Internal error', code: 500 });
   }
 });
@@ -661,6 +725,20 @@ router.patch('/items/:itemId', (req, res) => {
             ), 0) + 1 WHERE id = ?
           `).run(targetListId, category, item.id, item.id);
         }
+
+        // KAUFHISTORIE (#1003): ein abgehakter Artikel mit Preis traegt sich
+        // in die Historie ein. Ein entfernter Haken nimmt den noch unvollendeten
+        // Einkauf wieder zurueck, und ein geaenderter Preis aktualisiert ihn.
+        if (is_checked && priceCents !== null) {
+          recordShoppingPurchase(db.get(), {
+            id: req.params.itemId,
+            name,
+            price_cents: priceCents,
+            store_id: storeId,
+          });
+        } else if (!is_checked || priceCents === null) {
+          removeShoppingPurchase(db.get(), req.params.itemId);
+        }
       })();
     });
 
@@ -790,6 +868,11 @@ router.delete('/items/:itemId', (req, res) => {
     const queued = queueTodoDeletions('shopping', mirroredItems('id = ?', req.params.itemId));
 
     const { list_change } = withListChange(item.list_id, () => {
+      // Ein einzeln geloeschter Artikel (z.B. per Wischgeste oder "Loeschen"
+      // im Detailblatt) gilt als verworfen/nicht gekauft - sein provisorischer
+      // Kauf wird entfernt (#1003). Dauerhaft in der Historie bleiben nur
+      // Artikel, die ueber "Erledigte loeschen" (checked) aufgeraumt werden.
+      removeShoppingPurchase(db.get(), item.id);
       db.get().prepare('DELETE FROM shopping_items WHERE id = ?').run(item.id);
     });
     res.json({ ok: true, list_change });
@@ -1446,9 +1529,22 @@ router.delete('/:listId/items/checked', (req, res) => {
 
     const queued = queueTodoDeletions('shopping', mirroredItems(scope.where, ...scope.params));
 
-    const { result, list_change } = withListChange(req.params.listId, () => db.get().prepare(`
-      DELETE FROM shopping_items WHERE ${scope.where}
-    `).run(...scope.params));
+    const { result, list_change } = withListChange(req.params.listId, () => {
+      // Bevor die Zeilen geloescht werden (#1003): alle noch nicht erfassten
+      // abgehakten Artikel mit Preis in die Historie eintragen.
+      const pricedItems = db.get().prepare(`
+        SELECT id, name, price_cents, store_id
+        FROM shopping_items
+        WHERE ${scope.where} AND price_cents IS NOT NULL
+      `).all(...scope.params);
+      for (const pItem of pricedItems) {
+        recordShoppingPurchase(db.get(), pItem);
+      }
+
+      return db.get().prepare(`
+        DELETE FROM shopping_items WHERE ${scope.where}
+      `).run(...scope.params);
+    });
     res.json({ deleted: result.changes, list_change });
 
     if (queued) pushToCalDAV('Löschung');

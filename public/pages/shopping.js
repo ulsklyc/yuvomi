@@ -2805,6 +2805,7 @@ function itemReadHtml(item) {
         ${readRowHtml({ icon: 'tag', label: t('shopping.categoryLabel'), value: item.category ? categoryLabel(item.category) : '' })}
         ${readRowHtml({ icon: 'receipt', label: t('shopping.priceLabel'), value: priceReadText(item.price_cents) })}
         ${readRowHtml({ icon: 'store', label: t('shopping.storeLabel'), value: storeName(item) })}
+        <div id="item-details-read-last-purchased"></div>
         ${readRowHtml({ icon: 'link', label: t('shopping.urlLabel'), valueHtml: link })}
         ${readRowHtml({ icon: 'align-left', label: t('shopping.notesLabel'), value: item.notes || '', multiline: true })}
       </div>
@@ -2818,6 +2819,17 @@ function openItemReadModal(item) {
     content: itemReadHtml(item),
     onSave(panel) {
       window.lucide?.createIcons({ el: panel });
+      const target = panel.querySelector('#item-details-read-last-purchased');
+      if (target) {
+        api.get(`/shopping/price-history?name=${encodeURIComponent(item.name)}&limit=1`).then((res) => {
+          const last = res.data?.[0];
+          if (!last) return;
+          const text = `${priceReadText(last.price_cents)}${last.store_name ? ` · ${last.store_name}` : ''}`;
+          target.insertAdjacentHTML('beforebegin', readRowHtml({ icon: 'history', label: t('shopping.lastPurchased'), value: text }));
+          target.remove();
+          window.lucide?.createIcons({ el: panel });
+        }).catch(() => {});
+      }
     },
   });
 }
@@ -2825,6 +2837,7 @@ function openItemReadModal(item) {
 function openItemDetails(itemId, container) {
   const item = state.items.find((i) => i.id === itemId);
   if (!item) return;
+
   // Der Riegel steht VOR jeder Vorbereitung: bei `read` geht die Leseansicht auf.
   if (readOnly()) {
     openItemReadModal(item);
@@ -2925,6 +2938,7 @@ function openItemDetails(itemId, container) {
             </datalist>
           </div>
         </div>
+        <div id="item-details-last-purchased" class="form-hint item-details__last-purchased" hidden></div>
         <div class="form-group">
           <label class="form-label" for="item-details-url">${t('shopping.urlLabel')}</label>
           <input class="form-input" type="url" id="item-details-url" inputmode="url"
@@ -2953,6 +2967,22 @@ function openItemDetails(itemId, container) {
       // `context`: das Nachladen nach "gibt es nicht mehr" schliesst genau
       // diesen Dialog, nicht einen, der inzwischen offen ist (#1997).
       _itemDialog = { id: item.id, panel, context: captureModalContext() };
+      const hint = panel.querySelector('#item-details-last-purchased');
+      if (hint) {
+        api.get(`/shopping/price-history?name=${encodeURIComponent(item.name)}&limit=1`).then((res) => {
+          const last = res.data?.[0];
+          if (!last) return;
+          const icon = document.createElement('i');
+          icon.setAttribute('data-lucide', 'history');
+          icon.className = 'icon-sm';
+          icon.setAttribute('aria-hidden', 'true');
+          const span = document.createElement('span');
+          span.textContent = `${t('shopping.lastPurchased')}: ${priceReadText(last.price_cents)}${last.store_name ? ` · ${last.store_name}` : ''}`;
+          hint.replaceChildren(icon, span);
+          hint.hidden = false;
+          window.lucide?.createIcons({ el: hint });
+        }).catch(() => {});
+      }
       const form    = panel.querySelector('#item-details-form');
       const nameEl  = panel.querySelector('#item-details-name');
       const qtyEl   = panel.querySelector('#item-details-qty');

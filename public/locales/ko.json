@@ -790,6 +790,7 @@
         "reorderHandleHint": "끌거나 화살표 키로 순서를 변경하세요",
         "reorderPosition": "{{total}}개 중 {{index}}번째",
         "priceLabel": "가격",
+        "lastPurchased": "마지막 구매",
         "storeLabel": "상점",
         "storePlaceholder": "선택하거나 입력",
         "manageStores": "상점 관리",

@@ -772,6 +772,7 @@
         "reorderHandleHint": "拖動或使用方向鍵排序",
         "reorderPosition": "第 {{index}} 項，共 {{total}} 項",
         "priceLabel": "價格",
+        "lastPurchased": "上次購買",
         "storeLabel": "商店",
         "storePlaceholder": "選擇或輸入",
         "manageStores": "管理商店",

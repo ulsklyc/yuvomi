@@ -25,6 +25,13 @@ export function shoppingPaths() {
     '/api/v1/shopping/categories/reorder': {
       patch: op({ summary: 'Reorder shopping categories', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
     },
+    '/api/v1/shopping/price-history': {
+      get: op({
+        summary: 'Get purchase price history for an item',
+        description: 'Returns recorded purchase history facts (item_name, price_cents, store_name, purchased_at) matching item name case-insensitively, ordered by purchased_at DESC.',
+        tag: 'Shopping',
+      }),
+    },
     '/api/v1/shopping/suggestions': {
       get: op({
         summary: 'Get shopping suggestions',

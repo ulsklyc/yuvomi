@@ -772,6 +772,7 @@
         "reorderHandleHint": "Faites glisser ou utilisez les flèches pour réorganiser",
         "reorderPosition": "Position {{index}} sur {{total}}",
         "priceLabel": "Prix",
+        "lastPurchased": "Dernier achat",
         "storeLabel": "Magasin",
         "storePlaceholder": "Choisir ou saisir",
         "manageStores": "Gérer les magasins",

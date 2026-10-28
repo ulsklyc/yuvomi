@@ -772,6 +772,7 @@
         "reorderHandleHint": "Kéo hoặc dùng phím mũi tên để sắp xếp",
         "reorderPosition": "Vị trí {{index}} trên {{total}}",
         "priceLabel": "Giá",
+        "lastPurchased": "Đã mua lần cuối",
         "storeLabel": "Cửa hàng",
         "storePlaceholder": "Chọn hoặc nhập",
         "manageStores": "Quản lý cửa hàng",

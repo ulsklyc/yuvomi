@@ -790,6 +790,7 @@
         "reorderHandleHint": "Ziehen oder mit den Pfeiltasten sortieren",
         "reorderPosition": "Position {{index}} von {{total}}",
         "priceLabel": "Preis",
+        "lastPurchased": "Zuletzt gekauft",
         "storeLabel": "Laden",
         "storePlaceholder": "Wählen oder tippen",
         "manageStores": "Läden verwalten",

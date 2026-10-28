@@ -790,6 +790,7 @@
         "reorderHandleHint": "I-drag o gamitin ang arrow keys para mag-ayos",
         "reorderPosition": "Posisyon {{index}} ng {{total}}",
         "priceLabel": "Presyo",
+        "lastPurchased": "Huling binili",
         "storeLabel": "Tindahan",
         "storePlaceholder": "Pumili o mag-type",
         "manageStores": "Pamahalaan ang mga tindahan",

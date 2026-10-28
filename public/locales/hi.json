@@ -772,6 +772,7 @@
         "reorderHandleHint": "क्रम बदलने के लिए खींचें या तीर कुंजियों का उपयोग करें",
         "reorderPosition": "{{total}} में से स्थान {{index}}",
         "priceLabel": "मूल्य",
+        "lastPurchased": "अंतिम खरीद",
         "storeLabel": "दुकान",
         "storePlaceholder": "चुनें या लिखें",
         "manageStores": "दुकानें प्रबंधित करें",

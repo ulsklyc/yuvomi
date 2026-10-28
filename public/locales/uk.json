@@ -904,6 +904,7 @@
         "reorderHandleHint": "Перетягніть або скористайтеся стрілками для сортування",
         "reorderPosition": "Позиція {{index}} з {{total}}",
         "priceLabel": "Ціна",
+        "lastPurchased": "Остання покупка",
         "storeLabel": "Магазин",
         "storePlaceholder": "Оберіть або введіть",
         "manageStores": "Керування магазинами",

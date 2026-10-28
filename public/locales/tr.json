@@ -772,6 +772,7 @@
         "reorderHandleHint": "Sıralamak için sürükleyin veya ok tuşlarını kullanın",
         "reorderPosition": "{{total}} öğeden {{index}}. sırada",
         "priceLabel": "Fiyat",
+        "lastPurchased": "Son satın alma",
         "storeLabel": "Mağaza",
         "storePlaceholder": "Seçin veya yazın",
         "manageStores": "Mağazaları yönet",

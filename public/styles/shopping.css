@@ -1124,6 +1124,14 @@
 
 .item-details__link:hover { text-decoration: underline; }
 
+.item-details__last-purchased {
+  margin-top: calc(-1 * var(--space-2));
+  margin-bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1h);
+}
+
 /* --------------------------------------------------------
  * Swipe-Wrapper - Shopping-spezifische Styles
  * -------------------------------------------------------- */
