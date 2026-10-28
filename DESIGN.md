@@ -1730,9 +1730,10 @@ Fenster, mit Anriss an beiden Kanten. Ab 1440 traegt die Typspalte wieder.
 
 **Der Kopf behaelt seine Form** (R23, D13). Ab 1024px schrumpfen die Aktionen nicht
 (`.page-toolbar__actions { flex-shrink: 0 }`), die Suche gibt nach - bei 1024 ragte "+ Aufgabe"
-24px ueber seinen Slot. Ein Werkzeug, das in einer Ansicht nichts kann, wird abgeschaltet statt
-entfernt (Filter im Aufgaben-Verlauf), und der angedockte FAB tritt im Auswahlmodus unsichtbar ab
-(`visibility`), statt Segment und Menue um seine Breite zu schieben. Ein Ansichtswechsel laesst die
+24px ueber seinen Slot. Ein Werkzeug, das in einer Ansicht nichts kann, haelt seinen Platz und
+tritt unsichtbar ab (`visibility`; Filter im Aufgaben-Verlauf, `.is-vacant` - seit R24 nicht mehr
+ausgegraut: ein sichtbar totes Werkzeug sagte nicht, warum), genau wie der angedockte FAB im
+Auswahlmodus - nichts schiebt Segment und Menue um seine Breite. Ein Ansichtswechsel laesst die
 alte Ansicht stehen, bis die neue geladen ist, und tauscht Kopfmass und Koerper im selben Bild
 (Aufgaben: kein gedimmtes Zwischenbild mehr).
 
