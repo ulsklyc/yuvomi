@@ -5398,7 +5398,12 @@ test('U2: "+ Neu" oeffnet das Anlegen-Blatt ueber der Uebersicht - kein navigate
   const settle = async () => { for (let i = 0; i < 30; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
   const controller = new AbortController();
   try {
-    const { render } = await import('../public/pages/dashboard.js');
+    const { render, __test } = await import('../public/pages/dashboard.js');
+    // Ohne gemerkten Stand: der Test davor hinterlaesst einen frischen (R21,
+    // _overviewMemo), und mit ihm zeichnete der Aufbau zuerst dessen Zeilen und
+    // holte die eigenen erst in der stillen Nachfrage - auf einem langsamen
+    // Runner nach `settle()` (CI #2349, Node 22).
+    __test.setOverviewMemo(null);
     await render(container, { user, signal: controller.signal });
     await settle();
     nodeAssert.match(shellHtml, /data-task-id="5"/, 'Reichweite: die Aufgabenkachel steht');
