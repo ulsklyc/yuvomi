@@ -757,15 +757,14 @@ test('Vorrat bei `read`: ein stehen gebliebener Stepper-Knoten schickt keinen PA
   }
 });
 
-test('Vorrat bei `read`: Liste und Nebenpanel oeffnen die Leseansicht, nie den Editor', async () => {
+test('Vorrat bei `read`: die Liste oeffnet die Leseansicht, nie den Editor', async () => {
   const offen = (modules, ueber) => withAccess(modules, () => {
     vorratZustand([reichlich()]);
     return modalMitschnitt(ueber);
   });
-  const panelKlick = { target: { closest: (sel) => (sel === '[data-watch-id]' ? { dataset: { watchId: '7' } } : null) } };
+  // Das Nebenpanel „Im Blick" gibt es seit R24 (E2) nicht mehr.
   const wege = {
     'Zeile (Leseknoten)': () => pantry.onListClick(listenKlick('details', 7)),
-    'Nebenpanel': () => pantry.onWatchClick(panelKlick),
     'openItemModal direkt': () => pantry.openItemModal('edit', pantry.state.items[0]),
   };
   try {

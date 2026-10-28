@@ -34,7 +34,7 @@ import { errorSentence } from '/utils/friendly-error.js';
 // Alias, weil dieses Modul selbst eine `emptyStateEl()`-Funktion hat, die den
 // Renderer mit den Vorrats-Texten füllt.
 import { emptyStateEl as emptyStateComponentEl, mountLoadError, searchEmptyEl } from '/utils/empty-state.js';
-import { scheduleUndoableDelete, vibrate, wireScrollFade, collapseOut, expandIn, toggleRegion } from '/utils/ux.js';
+import { scheduleUndoableDelete, vibrate, wireScrollFade, collapseOut, expandIn, toggleRegion, durationToken, easingToken } from '/utils/ux.js';
 import { redrawList } from '/utils/list-motion.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { todayKey } from '/utils/date.js';
@@ -524,20 +524,15 @@ export async function render(container) {
   fab.dataset.dockLabel = t('newLabel.pantry');
   fab.insertAdjacentHTML('beforeend', '<i data-lucide="plus" aria-hidden="true"></i>');
 
-  // DAS NEBENPANEL „IM BLICK" (Re-Critique 2026-09-27, A4 P1 / R10 L4): am
-  // Desktop steht neben der Liste fest, was bald ablaeuft oder knapp wird -
-  // dieselben drei Fragen wie die Filterchips, nur ohne dass man sie stellen
-  // muss. Unter der Schwelle blendet es CSS aus; dort tragen die Chips die
-  // Frage. Liste und Panel teilen einen Koerper, weil ein Container sich
-  // selbst nicht umstellen kann (die Abfrage steht an `.pantry-page`).
+  // KEINE SEITENSPALTE (R24, E2). Hier stand ab 60rem das Nebenpanel „Im
+  // Blick" mit dem, was bald ablaeuft - dieselben Artikel wie der Chip
+  // „Laeuft bald ab" mit seinem Zaehler und wie das Etikett an der Zeile, also
+  // dreimal dieselbe Aussage (Critique 2026-10-26, G3-Vorrat-P2-1). Die
+  // Chipreihe mit ihren Zaehlern IST die Kennzahl der Flaeche; die Liste steht
+  // auf dem Lesemass wie in jeder Breite.
   const body = document.createElement('div');
   body.className = 'pantry-body';
-  const watch = document.createElement('aside');
-  watch.className = 'pantry-watch';
-  watch.id = 'pantry-watch';
-  watch.setAttribute('aria-label', t('pantry.watchLabel'));
-  watch.hidden = true;
-  body.append(list, watch);
+  body.append(list);
 
   page.append(title, live, toolbar, body, fab);
   container.replaceChildren(page);
@@ -576,7 +571,6 @@ export async function render(container) {
   list.addEventListener('click', onListClick);
   // The row menu of a product without batches (its delete) is a popover menu.
   installPopoverMenus(list);
-  watch.addEventListener('click', onWatchClick);
 
   try {
     await loadPantry();
@@ -774,7 +768,7 @@ function renderBulkBar() {
  * Darf dieses Konto in den Vorrat schreiben? Regel 1 in utils/module-access.js.
  * Als Funktion, damit jedes Neuzeichnen neu fragt.
  *
- * WAS BEI `read` BLEIBT: Suche, Filterchips, das Nebenpanel, die Zeile mit
+ * WAS BEI `read` BLEIBT: Suche, Filterchips, die Zeile mit
  * Menge, MHD und Badges als ZEICHEN - und der Tipp auf sie, der dann die
  * Leseansicht oeffnet (Regel 9). WAS GEHT: der Stepper, der Bearbeiten-Dialog
  * samt Loeschen, das Anlegen (FAB und Leerzustand), die Lagerort-Verwaltung und
@@ -824,7 +818,6 @@ function drawList(list) {
   list.replaceChildren(...(chipRow ? [chipRow] : []));
   if (chipRow && chipScroll) chipRow.scrollLeft = chipScroll;
   renderBulkBar();
-  renderWatch();
 
   // A product outlives its last batch (#1448): with products left, the page is
   // not empty, it shows them as out of stock.
@@ -889,105 +882,6 @@ function drawList(list) {
 
   wirePantrySwipe(list);
   if (window.lucide) window.lucide.createIcons({ el: list });
-}
-
-// --------------------------------------------------------
-// Nebenpanel „Im Blick" (Desktop)
-// --------------------------------------------------------
-
-// NUR ZEITKRITISCHES (Re-Critique 2026-09-28, P7 / A4 P2-6). Hier stand auch
-// "Fast leer": dieselbe Aussage stand damit dreimal da (Zeilen-Badge, Chip mit
-// Zaehler, Panel), 14 von 21 Artikeln rechts ein zweites Mal, und "Fast leer
-// 10" uebertoente die Fristen. Das Panel beantwortet jetzt nur, was nicht
-// warten kann; "Fast leer" bleibt Chip plus Warenkorb an der Zeile.
-const WATCH_SECTIONS = [
-  { key: 'expired', label: 'pantry.filterExpired', tone: 'danger' },
-  { key: 'soon', label: 'pantry.filterSoon', tone: 'warning' },
-];
-
-/**
- * Die drei Abschnitte des Panels, mit genau der Zuordnung der Filterchips
- * (`matchesPantryFilter`) - ein Artikel steht im Panel, wenn und weil ihn der
- * gleichnamige Chip traefe. Unabhaengig von Suche und aktivem Filter: das
- * Panel beantwortet „was braucht Aufmerksamkeit", nicht „was zeigt die Liste".
- * Sortiert wie die flache Filterliste: Ablauf nach Datum, Bestand nach Menge.
- */
-function pantryWatchGroups(items, today) {
-  return WATCH_SECTIONS.map((section) => {
-    const rows = items.filter((item) => matchesPantryFilter(item, section.key, today));
-    rows.sort((a, b) => String(a.expires_on).localeCompare(String(b.expires_on)));
-    return { ...section, items: rows };
-  }).filter((section) => section.items.length);
-}
-
-function watchRowEl(item, section) {
-  const li = document.createElement('li');
-  li.className = 'list-row pantry-watch__row';
-  const main = document.createElement('button');
-  main.type = 'button';
-  main.className = 'list-row__main list-row__main--interactive';
-  main.dataset.watchId = String(item.id);
-  const name = document.createElement('span');
-  name.className = 'list-row__name';
-  name.textContent = item.name;
-  const meta = document.createElement('span');
-  meta.className = 'list-row__meta';
-  // Der Satz der Zeile („Laeuft morgen ab"), in der Tinte seiner Dringlichkeit.
-  const expiry = expiryBadge(item);
-  const lead = document.createElement('span');
-  lead.className = `pantry-watch__due pantry-watch__due--${expiry ? expiry.tone : section.tone}`;
-  lead.textContent = expiry ? expiry.text : quantityText(item);
-  meta.appendChild(lead);
-  if (item.location_name) meta.append(` · ${locationLabel(item.location_name)}`);
-  main.append(name, meta);
-  li.appendChild(main);
-  return li;
-}
-
-/** Zeichnet das Panel neu; ohne Artikel bleibt es verborgen. */
-function renderWatch() {
-  const watch = _container?.querySelector('#pantry-watch');
-  if (!watch) return;
-  watch.replaceChildren();
-  if (!state.items.length) {
-    watch.hidden = true;
-    return;
-  }
-  watch.hidden = false;
-  const groups = pantryWatchGroups(state.items.map(withIntent), state.todayKey);
-  if (!groups.length) {
-    const calm = document.createElement('p');
-    calm.className = 'pantry-watch__empty';
-    calm.textContent = t('pantry.watchEmpty');
-    watch.appendChild(calm);
-    return;
-  }
-  for (const section of groups) {
-    const el = document.createElement('section');
-    el.className = 'list-group pantry-watch__group';
-    const heading = document.createElement('h2');
-    heading.className = 'list-group__title';
-    const label = document.createElement('span');
-    label.textContent = t(section.label);
-    const count = document.createElement('span');
-    count.className = 'list-group__count';
-    count.textContent = String(section.items.length);
-    heading.append(label, count);
-    const rows = document.createElement('ul');
-    rows.className = 'row-carrier';
-    for (const item of section.items) rows.appendChild(watchRowEl(item, section));
-    el.append(heading, rows);
-    watch.appendChild(el);
-  }
-  if (window.lucide) window.lucide.createIcons({ el: watch });
-}
-
-/** Eine Panelzeile oeffnet denselben Dialog wie ihre Zeile in der Liste. */
-function onWatchClick(e) {
-  const btn = e.target.closest('[data-watch-id]');
-  if (!btn) return;
-  const item = state.items.find((i) => i.id === Number(btn.dataset.watchId));
-  if (item) openItemModal('edit', item);
 }
 
 /**
@@ -1070,6 +964,61 @@ function batchTitle(item, opts) {
 }
 
 /** Eine Vorratszeile (eine Charge). */
+/**
+ * MHD, Ort und Summe als EIN Knoten (`.pantry-row__where`), der Mittelpunkt
+ * davor als eigener: rueckt die Haelfte auf einer schmalen Zeile in eine eigene
+ * Zeile, blendet CSS ihn aus (`.pantry-row__lead-sep`), statt dass die Zeile
+ * mit „· MHD" beginnt. Jeder Teil traegt sein „ · " vorn im Text; beim ersten
+ * wandert es in den eigenen Knoten.
+ */
+function whereEl(parts) {
+  const where = document.createElement('span');
+  where.className = 'pantry-row__where';
+  const [first] = parts;
+  const carrier = first.querySelector?.('[aria-hidden="true"]') ?? first;
+  if (carrier.textContent.startsWith(' · ')) {
+    carrier.textContent = carrier.textContent.slice(3);
+    const sep = document.createElement('span');
+    sep.className = 'pantry-row__lead-sep';
+    sep.setAttribute('aria-hidden', 'true');
+    sep.textContent = ' · ';
+    where.append(sep, ...parts);
+  } else {
+    where.append(...parts);
+  }
+  return where;
+}
+
+/**
+ * Der Schein an der Menge nach einem Stepper-Schritt (R24, G3-Vorrat-P3-1) -
+ * im Handler per Web Animations ausgeloest, nie ueber eine Zustandsklasse: ein
+ * Neuzeichnen spielte sie sonst an unberuehrten Zeilen (test:motion R18).
+ * Unter reduzierter Bewegung und im verborgenen Tab nichts.
+ */
+function acknowledgeQuantity(el) {
+  if (!el || typeof el.animate !== 'function') return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+  const tint = getComputedStyle(el).getPropertyValue('--pantry-step-tint').trim();
+  if (!tint) return;
+  el.animate([{ backgroundColor: tint }, { backgroundColor: 'transparent' }], {
+    duration: durationToken('--duration-2xl', 400),
+    easing: easingToken('--ease-in-out', 'ease-in-out'),
+  });
+}
+
+/** Die Status-Etiketten einer Zeile als EIN Knoten (Metazeile, R24). */
+function badgesEl(badges) {
+  const wrap = document.createElement('span');
+  wrap.className = 'pantry-row__badges';
+  for (const badge of badges) {
+    const el = document.createElement('span');
+    el.className = `pantry-badge pantry-badge--${badge.tone}`;
+    el.textContent = badge.text;
+    wrap.appendChild(el);
+  }
+  return wrap;
+}
+
 function rowEl(item, opts = rowOptions(item)) {
   const status = pantryItemStatus(item, state.todayKey);
   const place = placeText(item);
@@ -1125,9 +1074,12 @@ function rowEl(item, opts = rowOptions(item)) {
   // eigenen Namen, damit die Positivliste im Handler ihn durchlaesst.
   main.dataset.action = ro ? 'details' : 'edit';
 
-  // Name und Status in EINER Zeile: das Badge qualifiziert den Artikel, es ist
-  // keine eigene Information. Auf einer eigenen Zeile wuchs jede betroffene
-  // Zeile um ~25px, während rechts neben dem Namen Platz frei blieb.
+  // DER NAME STEHT ALLEIN IN SEINER ZEILE, der Status in der Metazeile (R24,
+  // Critique 2026-10-26 G3-Vorrat-P2-1). Bis R24 stand das Etikett neben dem
+  // Namen und sprang mit dessen Laenge: am Desktop frei schwebend (x761 „Fast
+  // leer" neben x791 „Noch 2 Tage"), am Telefon mal oben neben dem Namen,
+  // mal in einer eigenen Zeile darunter. Jetzt immer an derselben Stelle:
+  // nach der Menge, die er einordnet.
   const headline = document.createElement('span');
   headline.className = 'pantry-row__headline';
 
@@ -1144,24 +1096,6 @@ function rowEl(item, opts = rowOptions(item)) {
     name.textContent = item.name;
   }
   headline.appendChild(name);
-
-  // DIE BADGES SIND EIN PAAR, ALSO EIN KNOTEN (Critique 2026-08-13).
-  // Ohne ihn entscheidet die Restbreite, WIE VIELE von ihnen umbrechen: gemessen
-  // stand „Vollmilch" mit „Läuft heute ab" in Zeile zwei und „Fast leer" in
-  // Zeile drei, also 109,5px gegen 86,3px derselben Liste mit zwei Badges
-  // nebeneinander. Was zusammen gelesen wird, bricht zusammen um.
-  const badges = [expiryBadge(item), stockBadge(item)].filter(Boolean);
-  if (badges.length) {
-    const wrap = document.createElement('span');
-    wrap.className = 'pantry-row__badges';
-    for (const badge of badges) {
-      const el = document.createElement('span');
-      el.className = `pantry-badge pantry-badge--${badge.tone}`;
-      el.textContent = badge.text;
-      wrap.appendChild(el);
-    }
-    headline.appendChild(wrap);
-  }
   main.appendChild(headline);
 
   // Meta-Zeile trägt nur, was hier orientiert. Die Kategorie steht bewusst NICHT
@@ -1192,11 +1126,22 @@ function rowEl(item, opts = rowOptions(item)) {
   // beantwortet, und die Zeile ellipsiert am Ende. Hinten stünde sie genau
   // dort, wo bei langem Ortsnamen gekappt wird.
   const meta = document.createElement('span');
-  meta.className = 'list-row__meta';
+  meta.className = 'list-row__meta pantry-row__meta';
   const quantity = document.createElement('span');
   quantity.className = 'pantry-row__quantity';
   quantity.textContent = quantityText(item);
   meta.appendChild(quantity);
+
+  // DER STATUS FOLGT DER MENGE (R24): „1 Stück · Fast leer". Die beiden
+  // Etiketten bleiben EIN Knoten (Critique 2026-08-13: was zusammen gelesen
+  // wird, steht zusammen), den Mittelpunkt davor setzt CSS.
+  const badges = [expiryBadge(item), stockBadge(item)].filter(Boolean);
+  if (badges.length) meta.appendChild(badgesEl(badges));
+
+  // MHD, Ort und Summe bilden die zweite Haelfte der Metazeile. Als EIN Knoten,
+  // damit sie auf einer schmalen Zeile mit Status gemeinsam in eine eigene
+  // Zeile ruecken (pantry.css) - weggelassen wird das MHD dort nicht mehr.
+  const whereParts = [];
 
   /* MHD und Lagerort sind EIGENE Knoten, keine zusammengefügte Zeichenkette.
    *
@@ -1225,12 +1170,12 @@ function rowEl(item, opts = rowOptions(item)) {
     spoken.className = 'sr-only';
     spoken.textContent = `, ${t('pantry.bestBefore', { date: dateText(item.expires_on) })}`;
     date.append(shown, spoken);
-    meta.appendChild(date);
+    whereParts.push(date);
   } else if (item.expires_on && !opts.batch) {
     const expiry = document.createElement('span');
     expiry.className = 'pantry-row__expiry';
     expiry.textContent = ` · ${t('pantry.bestBefore', { date: dateText(item.expires_on) })}`;
-    meta.appendChild(expiry);
+    whereParts.push(expiry);
   }
   // Seit die Seite nach Produkten statt nach Lagerort gliedert (#1448), traegt
   // jede Zeile ihren Ort selbst - wie vorher nur im gefilterten Modus. Unter
@@ -1239,7 +1184,7 @@ function rowEl(item, opts = rowOptions(item)) {
     const placeEl = document.createElement('span');
     placeEl.className = 'pantry-row__place';
     placeEl.textContent = ` · ${place}`;
-    meta.appendChild(placeEl);
+    whereParts.push(placeEl);
   }
   // In the flat filter list a batch of a product with several batches says the
   // product's total: "1 l" alone does not tell that 3 more are in the cellar.
@@ -1247,8 +1192,9 @@ function rowEl(item, opts = rowOptions(item)) {
     const total = document.createElement('span');
     total.className = 'pantry-row__total';
     total.textContent = ` · ${productTotalText(opts.total, item.unit)}`;
-    meta.appendChild(total);
+    whereParts.push(total);
   }
+  if (whereParts.length) meta.appendChild(whereEl(whereParts));
   main.appendChild(meta);
 
   // Was der Button tut - nur für Screenreader, am Ende des Namens. Bei `read`
@@ -1400,8 +1346,9 @@ function productEl(product) {
 
   const text = document.createElement('span');
   text.className = 'pantry-product__text';
-  // Name and the most urgent expiry in one line, like a batch row: collapsed,
-  // the product row is the only place that can say a batch has expired.
+  // The most urgent expiry stands after the total, like a batch row's status
+  // after its quantity: collapsed, the product row is the only place that can
+  // say a batch has expired.
   const headline = document.createElement('span');
   headline.className = 'pantry-row__headline';
   const name = document.createElement('span');
@@ -1410,16 +1357,17 @@ function productEl(product) {
   const badges = document.createElement('span');
   badges.className = 'pantry-row__badges pantry-product__badges';
   fillProductBadge(badges, product.batches);
-  headline.append(name, badges);
+  headline.append(name);
+  // Wie die Charge (R24): der Status folgt der Summe in der Metazeile.
   const meta = document.createElement('span');
-  meta.className = 'list-row__meta';
+  meta.className = 'list-row__meta pantry-row__meta';
   const totalEl = document.createElement('span');
   totalEl.className = 'pantry-product__total';
   totalEl.textContent = productTotalText(total, product.unit);
   const where = document.createElement('span');
   where.className = 'pantry-product__where';
   where.textContent = productWhereText(product.batches);
-  meta.append(totalEl, where);
+  meta.append(totalEl, badges, where);
   text.append(headline, meta);
 
   toggle.append(text);
@@ -1482,13 +1430,13 @@ function emptyProductEl(product) {
   badge.className = 'pantry-badge pantry-badge--danger';
   badge.textContent = t('pantry.badgeOut');
   badges.appendChild(badge);
-  headline.append(name, badges);
+  headline.append(name);
   const meta = document.createElement('span');
-  meta.className = 'list-row__meta';
+  meta.className = 'list-row__meta pantry-row__meta';
   const quantity = document.createElement('span');
   quantity.className = 'pantry-row__quantity';
   quantity.textContent = quantityText({ quantity: 0, unit: product.unit });
-  meta.appendChild(quantity);
+  meta.append(quantity, badges);
   main.append(headline, meta);
   row.appendChild(main);
 
@@ -1713,7 +1661,7 @@ function adjustQuantity(item, direction, row) {
   });
 
   vibrate(8);
-  refreshRowQuantity(row, withIntent(item));
+  refreshRowQuantity(row, withIntent(item), { stepped: true });
   if (renderFilters().wasReset) renderList();
   bindQuantityFlush();
 }
@@ -1761,7 +1709,7 @@ function liveRow(id, fallback) {
   return fallback?.isConnected ? fallback : null;
 }
 
-function refreshRowQuantity(row, item) {
+function refreshRowQuantity(row, item, { stepped = false } = {}) {
   const value = row.querySelector('.pantry-row__quantity');
   if (value) value.textContent = quantityText(item);
   announce(`${item.name}: ${quantityText(item)}`);
@@ -1788,11 +1736,13 @@ function refreshRowQuantity(row, item) {
   row.querySelector('.pantry-row__main')?.replaceWith(fresh.querySelector('.pantry-row__main'));
   row.querySelector('.pantry-row__cart-slot')?.replaceWith(fresh.querySelector('.pantry-row__cart-slot'));
   refreshProductTotals(item);
+  // DER SCHRITT QUITTIERT SICH AN DER MENGE (R24, G3-Vorrat-P3-1). Der Wert
+  // steht seit 2026-08-12 bewusst in der Metazeile statt zwischen den Knoepfen
+  // (eine Zeile weniger je Artikel); damit man nach „+" nicht sucht, WO sich
+  // etwas geaendert hat, leuchtet die Menge kurz im Modulton auf.
+  if (stepped) acknowledgeQuantity(row.querySelector('.pantry-row__quantity'));
 
   if (window.lucide) window.lucide.createIcons({ el: row });
-  // Das Panel spricht von denselben Mengen: ein Schritt, der einen Artikel
-  // unter den Mindestbestand bringt, gehoert sofort unter „Fast leer".
-  renderWatch();
 }
 
 // --------------------------------------------------------
@@ -1913,7 +1863,7 @@ function openItemReadModal(item) {
 function openItemModal(mode, item = null) {
   const isEdit = mode === 'edit';
   // Der Riegel steht VOR jeder Vorbereitung, und er steht HIER, weil Liste,
-  // Nebenpanel, FAB und Leerzustand alle diesen Weg nehmen: bei `read` geht
+  // FAB und Leerzustand alle diesen Weg nehmen: bei `read` geht
   // fuer einen Artikel die Leseansicht auf, und Anlegen gibt es nicht. Den FAB
   // blendet CSS aus (html[data-module-readonly]) - ausgeblendet ist nicht
   // unerreichbar.
@@ -1925,8 +1875,8 @@ function openItemModal(mode, item = null) {
   // eines Stepper-Schritts, dessen PATCH noch im Entprell-Fenster steht. Aus
   // dem nackten Serverstand gefuellt stuende dort die alte Menge, und wer dann
   // ein anderes Feld speichert, schriebe sie per PUT zurueck - der Schritt
-  // waere still verloren. Hier statt beim Aufrufer, weil Liste und Nebenpanel
-  // denselben Weg nehmen.
+  // waere still verloren. Hier statt beim Aufrufer, damit jeder Weg in den
+  // Dialog es mitnimmt.
   if (isEdit) item = withIntent(item);
   const locations = state.locations;
   const categories = state.categories;
@@ -1946,6 +1896,8 @@ function openItemModal(mode, item = null) {
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('common.editItem') : t('pantry.addItem'),
     size: 'md',
+    // Die Zeile antippen holt am Finger keine Tastatur (R23 D13, R24 S9).
+    initialFocus: isEdit ? 'edit' : 'first-field',
     content: `
       <div class="form-group">
         <label class="form-label" for="pantry-name">${esc(t('common.nameLabel'))}${REQUIRED_MARK}</label>
@@ -1989,7 +1941,7 @@ function openItemModal(mode, item = null) {
           <textarea id="pantry-notes" class="form-input" rows="3"
                     placeholder="${esc(t('pantry.notesPlaceholder'))}"></textarea>
         </div>`,
-      { open: isEdit && (item.min_quantity != null || !!item.notes) })}
+      { open: isEdit && (item.min_quantity != null || !!item.notes), hint: t('pantry.moreDetailsHint') })}
       <div class="modal-panel__footer modal-panel__footer--plain">
         ${isEdit ? `<button type="button" class="btn btn--danger-outline pantry-form__delete" id="pantry-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
         <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
@@ -2269,12 +2221,8 @@ export const __test = {
   placeChips,
   noResultsEl,
   refreshRowQuantity,
-  // R10 L4: das Nebenpanel ordnet wie die Filterchips (test-pantry-ux.js).
-  pantryWatchGroups,
-  renderWatch,
-  // Beide Wege in den Bearbeiten-Dialog (test-pantry-ux.js).
+  // Der Weg in den Bearbeiten-Dialog (test-pantry-ux.js).
   onListClick,
-  onWatchClick,
   // R16 2b: der Lösch-Wisch der Vorratszeile (test-pantry-ux.js).
   wirePantrySwipe,
   removeItem,

@@ -34,6 +34,7 @@ function makeNode() {
     getAttribute(name) { return attrs.has(name) ? attrs.get(name) : null; },
     appendChild(child) { node.children.push(child); return child; },
     append(...kids) { node.children.push(...kids); },
+    prepend(...kids) { node.children.unshift(...kids); },
     replaceChildren() { node.children = []; },
     replaceWith() {},
     insertAdjacentHTML(_where, html) { node.html += html; },
@@ -458,113 +459,61 @@ test('renderList() laesst die Chipreihe als erstes Kind des Ports stehen', () =>
 });
 
 // --------------------------------------------------------
-// Nebenpanel „Braucht Aufmerksamkeit" (Re-Critique 2026-09-27, A4 P1 / R10 L4)
+// R24 E2: keine Seitenspalte, der Status steht in der Metazeile
 // --------------------------------------------------------
 
-// Am Desktop standen die Lagerort-Gruppen auf 252-972, rechts 436px leer. Das
-// Panel fuellt die Flaeche mit den drei Fragen der Filterchips - und muss
-// dieselbe Zuordnung sprechen, sonst stuende ein Artikel im Panel unter
-// „Fast leer", den der gleichnamige Chip nicht findet.
-const WATCH_TODAY = '2026-09-27';
-const watchItems = () => [
-  rice(5, { id: 1, name: 'Reis' }),                                                  // ruhig
-  rice(1, { id: 2, name: 'Milch', expires_on: '2026-09-25', location_name: 'fridge' }), // abgelaufen
-  rice(1, { id: 3, name: 'Joghurt', expires_on: '2026-09-29' }),                       // bald
-  rice(1, { id: 4, name: 'Eier', expires_on: '2026-09-28' }),                          // bald, frueher
-  rice(1, { id: 5, name: 'Mehl', min_quantity: 2 }),                                   // fast leer
-  rice(0, { id: 6, name: 'Zucker' }),                                                  // leer
-];
-
-// NUR ZEITKRITISCHES (Re-Critique 2026-09-28, P7 / A4 P2-6): "Fast leer"
-// stand dreifach da - Zeilen-Badge, Chip mit Zaehler und hier; 14 von 21
-// Artikeln standen rechts ein zweites Mal. Die Frist ist die Frage, die nicht
-// warten kann; "Fast leer" bleibt Chip und Warenkorb an der Zeile.
-test('das Panel ordnet wie die Filterchips, aber nur, was eine Frist hat: abgelaufen, bald', async () => {
-  resetPantry();
-  assert.equal(typeof __test.pantryWatchGroups, 'function', 'pantryWatchGroups fehlt im __test-Export');
-  const { matchesPantryFilter } = await import('../public/utils/pantry-status.js');
-  const groups = __test.pantryWatchGroups(watchItems(), WATCH_TODAY);
-  assert.deepEqual(groups.map((g) => [g.key, g.items.map((i) => i.name)]), [
-    ['expired', ['Milch']],
-    ['soon', ['Eier', 'Joghurt']],
-  ]);
-  for (const g of groups) {
-    const chip = watchItems().filter((i) => matchesPantryFilter(i, g.key, WATCH_TODAY)).map((i) => i.id).sort();
-    assert.deepEqual(g.items.map((i) => i.id).sort(), chip, `${g.key}: Panel und Chip meinen dieselben Artikel`);
-  }
-  assert.deepEqual(__test.pantryWatchGroups([rice(5)], WATCH_TODAY), [], 'nichts faellig heisst keine Abschnitte');
-});
-
-test('renderList zeichnet das Panel mit - unabhaengig von Suche und aktivem Filter', () => {
-  resetPantry();
-  const list = makeNode();
-  list.replaceChildren = (...kids) => { list.children = [...kids]; };
-  const watch = makeNode();
-  watch.hidden = true;
-  __test.setContainerForTest({
-    querySelector: (sel) => (sel === '#pantry-list' ? list : sel === '#pantry-watch' ? watch : null),
-  });
-  __test.state.todayKey = WATCH_TODAY;
-  __test.state.items = watchItems();
-  __test.state.filter = 'low';
-  __test.state.query = 'mehl';
-  const zuvor = global.document.createTextNode;
-  global.document.createTextNode = () => makeNode();
-  try {
-    __test.renderList();
-  } finally {
-    global.document.createTextNode = zuvor;
-  }
-  assert.equal(watch.hidden, false, 'mit Artikeln steht das Panel');
-  assert.equal(watch.children.length, 2, 'zwei Abschnitte (abgelaufen, bald), obwohl die Liste nur „Mehl" unter „Fast leer" zeigt');
-  // Ohne jeden Artikel: kein Panel (der Leerzustand der Liste spricht).
-  __test.state.items = [];
-  __test.renderWatch();
-  assert.equal(watch.hidden, true);
-  // Artikel, aber nichts faellig: ein ruhiger Satz statt eines leeren Kastens.
-  __test.state.items = [rice(5)];
-  __test.renderWatch();
-  assert.equal(watch.hidden, false);
-  assert.equal(watch.children.length, 1);
-  assert.equal(watch.children[0].textContent, 'pantry.watchEmpty');
-});
-
-test('das Panel steht nur ab 60rem Vorratsflaeche, die Liste auf dem Lesemass, das Panel nimmt den Rest', async () => {
+// Critique 2026-10-26 (G3-Vorrat-P2-1): "Laeuft bald ab" stand dreifach da -
+// Chip mit Zaehler, Nebenpanel mit denselben Artikeln, Etikett an der Zeile.
+// E2 (Ulas 28.10.): Kennzahlen nicht als Spalte; die Chips tragen die Zahl.
+test('R24 E2: der Vorrat hat keine Seitenspalte mehr - weder Markup noch Regel', async () => {
   const { eachRule } = await import('./css-rules.js');
   const css = readFileSync(new URL('../public/styles/pantry.css', import.meta.url), 'utf8');
   const rules = [...eachRule(css)];
-  assert.ok(rules.some((r) => r.selector.trim() === '.pantry-page' && /container:\s*pantry-surface\s*\/\s*inline-size/.test(r.body)),
-    'die Seite ist der Container - die Abfrage misst die Vorratsflaeche, nicht den Viewport');
-  const base = rules.find((r) => r.selector.trim() === '.pantry-watch' && !r.at.length);
-  assert.match(base?.body ?? '', /display:\s*none/, 'unter der Schwelle tragen die Chips die Frage');
-  const wide = (sel) => rules.find((r) => r.selector.trim() === sel && r.at.includes('@container pantry-surface (min-width: 60rem)'));
-  assert.match(wide('.pantry-watch:not([hidden])')?.body ?? '', /display:\s*grid/);
-  assert.match(wide('.pantry-watch:not([hidden])')?.body ?? '', /overflow-y:\s*auto/, 'ein langes Panel scrollt fuer sich');
-  assert.match(wide('.pantry-body')?.body ?? '', /flex-direction:\s*row/);
-  assert.match(wide('.pantry-body > .pantry-list')?.body ?? '', /--page-measure:\s*100%/,
-    'die Gruppen kappen auf die Spalte, ueber dieselbe Variable wie ueberall');
-  // Critique R19: das Seitenpolster stand IN der 20rem-Basis des Panels - bei
-  // 1920 blieben 110px Inhalt. Es gehoert einmal an den Koerper; die Liste
-  // steht auf dem Lesemass, das Panel nimmt den Rest (Geometrie von .page-columns).
-  assert.match(wide('.pantry-body')?.body ?? '', /padding-inline:\s*var\(--page-inline-pad\)/,
-    'der Koerper zieht Liste und Panel auf die Inhaltsspalte');
-  assert.doesNotMatch(wide('.pantry-watch:not([hidden])')?.body ?? '', /padding-inline/,
-    'das Panel polstert nicht selbst - sonst frisst das Seitenpolster seine Breite');
-  assert.match(wide('.pantry-body > .pantry-list')?.body ?? '', /flex:\s*0 1 var\(--layout-reading\)/,
-    'die Liste steht auf dem Lesemass statt sich bis zum Panel zu strecken');
-  assert.match(wide('.pantry-body > .pantry-list')?.body ?? '', /padding-inline:\s*0\b/);
-  assert.match(wide('.pantry-watch:not([hidden])')?.body ?? '', /min-width:\s*var\(--layout-rail-min\)/,
-    'das Panel wird nie schmaler als eine Seitenspalte');
+  assert.ok(!rules.some((r) => /pantry-watch/.test(r.selector)), 'keine Regel fuer ein Nebenpanel');
+  assert.ok(!rules.some((r) => r.at.some?.((at) => /pantry-surface/.test(at)) || /pantry-surface/.test(String(r.at))),
+    'keine Container-Abfrage, die Liste und Spalte nebeneinander stellt');
   const src = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8');
-  assert.match(src, /body\.append\(list, watch\)/, 'Liste und Panel teilen den Koerper');
-  assert.match(src, /watch\.addEventListener\('click', onWatchClick\)/, 'eine Panelzeile oeffnet ihren Artikel');
+  assert.doesNotMatch(src, /pantry-watch|renderWatch|onWatchClick/, 'kein Panel im Code');
+  assert.match(src, /body\.append\(list\)/, 'der Koerper traegt nur die Liste');
+});
+
+// Am Telefon stand der Status mal neben, mal unter dem Namen, am Desktop frei
+// schwebend - jetzt immer nach der Menge in der Metazeile.
+test('R24: der Status steht in der Metazeile nach der Menge, nicht neben dem Namen', () => {
+  resetPantry();
+  __test.state.todayKey = '2026-09-27';
+  const item = rice(1, { id: 7, name: 'Vollmilch', expires_on: '2026-09-29', min_quantity: 2, location_name: 'fridge' });
+  const wrap = __test.rowEl(item, { batch: false, total: null });
+  const li = byClass(wrap, 'pantry-row')[0] ?? wrap;
+  const headline = byClass(li, 'pantry-row__headline')[0];
+  assert.equal(byClass(headline, 'pantry-badge').length, 0, 'kein Etikett neben dem Namen');
+  const meta = byClass(li, 'pantry-row__meta')[0];
+  const kids = meta.children.map((c) => c.className);
+  assert.equal(kids[0], 'pantry-row__quantity', 'die Menge fuehrt');
+  assert.equal(kids[1], 'pantry-row__badges', 'der Status folgt ihr');
+  assert.equal(kids[2], 'pantry-row__where', 'MHD und Ort danach, als ein Knoten');
+  assert.deepEqual(byClass(meta, 'pantry-badge').map(textOf), ['pantry.badgeExpiresDays{"count":2}', 'pantry.badgeLow']);
+  const where = meta.children[2];
+  assert.equal(where.children[0].className, 'pantry-row__lead-sep', 'der Trenner vor dem MHD ist ein eigener Knoten');
+  assert.ok(!where.children[1].textContent.startsWith(' · '), 'das MHD beginnt nicht mit dem Trenner');
+});
+
+test('R24: am Telefon rueckt bei einem Status die zweite Haelfte in eine eigene Zeile, das MHD bleibt', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/pantry.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const narrow = (sel) => rules.find((r) => r.selector.trim() === sel && String(r.at).includes('list-rows (max-width: 26rem)'));
+  assert.match(narrow('.pantry-row__meta:has(.pantry-badge) > .pantry-row__where')?.body ?? '', /display:\s*block/);
+  assert.match(narrow('.pantry-row__meta:has(.pantry-badge) > .pantry-row__where > .pantry-row__lead-sep')?.body ?? '', /display:\s*none/);
+  assert.ok(!rules.some((r) => /pantry-row__expiry/.test(r.selector) && /display:\s*none/.test(r.body)),
+    'das MHD wird nirgends mehr weggelassen');
 });
 
 // Codex P2 zu R10 L4: das Panel zeichnete aus `withIntent`, der Klick holte den
 // Artikel aber aus dem nackten Serverstand. Stepper-Schritt, Zeile im Panel
 // oeffnen, anderes Feld speichern - und der PUT schrieb die alte Menge zurueck.
 // Gemessen am Feld, das der Dialog wirklich fuellt, fuer BEIDE Einstiege.
-test('der Bearbeiten-Dialog zeigt die Menge eines noch entprellten Schritts - aus Panel und Liste', () => {
+test('der Bearbeiten-Dialog zeigt die Menge eines noch entprellten Schritts', () => {
   resetPantry();
   __test.state.items = [rice(1, { id: 2, name: 'Milch' })];
   __test.intents.set(2, { quantity: 4, seq: 1, timer: null, flush: () => {} });
@@ -583,21 +532,16 @@ test('der Bearbeiten-Dialog zeigt die Menge eines noch entprellten Schritts - au
   const opened = [];
   globalThis.__openModal = (opts) => { opened.push(opts); };
   try {
-    const watchBtn = { dataset: { watchId: '2' } };
-    __test.onWatchClick({ target: { closest: (sel) => (sel === '[data-watch-id]' ? watchBtn : null) } });
-    assert.equal(opened.length, 1, 'die Panelzeile oeffnet den Dialog');
-    assert.equal(fieldsOf(opened[0])['#pantry-quantity'].value, '4', 'Panel: die Menge der Absicht, nicht der Serverstand 1');
-
     const row = { dataset: { id: '2' } };
     const editBtn = { dataset: { action: 'edit' }, closest: (sel) => (sel === '.pantry-row[data-id]' ? row : null) };
     __test.onListClick({ target: { closest: (sel) => (sel === '[data-action]' ? editBtn : null) } });
-    assert.equal(opened.length, 2, 'die Listenzeile oeffnet den Dialog');
-    assert.equal(fieldsOf(opened[1])['#pantry-quantity'].value, '4', 'Liste: dieselbe Menge wie die Zeile');
+    assert.equal(opened.length, 1, 'die Listenzeile oeffnet den Dialog');
+    assert.equal(fieldsOf(opened[0])['#pantry-quantity'].value, '4', 'die Menge der Absicht, nicht der Serverstand 1');
 
     // Gegenprobe ohne Absicht: der Serverstand.
     __test.intents.clear();
-    __test.onWatchClick({ target: { closest: (sel) => (sel === '[data-watch-id]' ? watchBtn : null) } });
-    assert.equal(fieldsOf(opened[2])['#pantry-quantity'].value, '1');
+    __test.onListClick({ target: { closest: (sel) => (sel === '[data-action]' ? editBtn : null) } });
+    assert.equal(fieldsOf(opened[1])['#pantry-quantity'].value, '1');
   } finally {
     delete globalThis.__openModal;
     resetPantry();

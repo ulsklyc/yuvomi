@@ -75,90 +75,15 @@
   padding-top: var(--space-4);
 }
 
-/* LISTE PLUS NEBENPANEL „IM BLICK" (Re-Critique 2026-09-27, A4 P1 / R10 L4).
- *
- * Gemessen bei 1440x900: die Lagerort-Gruppen standen auf dem Lesemass
- * 252-972, rechts 436px leere Buehne, waehrend Essensplan und Rezepte bis
- * 1408 reichen - beim Tabwechsel sprang der Inhalt. Ab 60rem Vorratsflaeche
- * (1280er mit Seitenleiste: 1060px) steht rechts ein festes Panel mit dem, was
- * bald ablaeuft oder knapp wird; die Liste steht auf dem Lesemass, das Panel
- * nimmt den Rest und endet an der Kante der Kuechen-Leiste (R19, unten).
- *
- * FEST, NICHT STICKY: das Panel ist ein eigener Block neben dem Scrollport,
- * kein Kind von ihm - es steht bei jedem Scrollstand der Liste, und ist es
- * laenger als der Platz, scrollt es fuer sich.
- *
- * Der Container ist die Seite, umgestellt wird ihr Koerper: eine
- * Container-Abfrage kann ihren eigenen Container nicht umbauen. */
-.pantry-page {
-  container: pantry-surface / inline-size;
-}
-
+/* KEINE SEITENSPALTE (R24, E2). Ab 60rem stand hier das Nebenpanel „Im
+ * Blick" neben der Liste - dieselben Artikel wie Chip und Zeilen-Etikett.
+ * Die Liste steht jetzt in jeder Breite auf dem Lesemass der Seite
+ * (`page-measure--narrow`), der Koerper ist nur noch ihr Rahmen. */
 .pantry-body {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.pantry-watch {
-  display: none;
-}
-
-@container pantry-surface (min-width: 60rem) {
-  /* DAS POLSTER GEHOERT DEM KOERPER, NICHT DER SPALTE (Critique R19, P1).
-   * Bis R19 trug die Liste links und das Panel rechts je ein
-   * `--page-inline-pad`. Bei 1920 sind das 210px - im Panel INNERHALB seiner
-   * 20rem-Basis: es blieben 110px Inhalt, und "Griechi-scher Joghurt" brach
-   * mitten im Wort. Daneben streckte sich die Liste auf 1146px, bei 1440 stand
-   * der Stepper 600px vom Namen. Jetzt zieht der Koerper beides EINMAL auf die
-   * Inhaltsspalte, und darin gilt dieselbe Geometrie wie `.page-columns`
-   * (layout.css): die Liste auf dem Lesemass, das Panel nimmt den Rest bis zur
-   * Kopfkante und wird nie schmaler als eine Telefonbreite.
-   * Gemessen 1280 / 1440 / 1920: Liste 612 / 720 / 720px, Panel 360 / 412 /
-   * 536px, rechte Kante = Kopfkante. */
-  .pantry-body {
-    flex-direction: row;
-    gap: var(--space-6);
-    padding-inline: var(--page-inline-pad);
-  }
-
-  .pantry-body > .pantry-list {
-    flex: 0 1 var(--layout-reading);
-    min-width: 0;
-    padding-inline: 0;
-    --page-measure: 100%;
-  }
-
-  .pantry-watch:not([hidden]) {
-    display: grid;
-    align-content: start;
-    gap: var(--space-5);
-    flex: 1 1 var(--layout-rail-min);
-    min-width: var(--layout-rail-min);
-    min-height: 0;
-    overflow-y: auto;
-    padding-top: var(--space-4);
-    padding-bottom: var(--space-6);
-  }
-}
-
-/* Der Satz des Ablaufs in der Tinte seiner Dringlichkeit - dieselbe Sprache
- * wie `.due-date--overdue/--today` in den Aufgaben: Farbe am Wort, keine
- * Flaeche an der Zeile. */
-.pantry-watch__due--danger {
-  color: var(--color-danger);
-  font-weight: var(--font-weight-semibold);
-}
-
-.pantry-watch__due--warning {
-  color: var(--color-warning);
-  font-weight: var(--font-weight-semibold);
-}
-
-.pantry-watch__empty {
-  margin: 0;
-  color: var(--color-text-secondary);
 }
 
 /* KEINE reservierte FAB-Gasse mehr. Sie stand hier und in shopping.css als
@@ -250,33 +175,15 @@
   min-width: 0;
 }
 
-/* Die Statusmarken wandern gemeinsam. Ohne diesen Träger entschied die
- * Restbreite, wie viele von ihnen umbrechen - gemessen bei 390x844 stand
- * „Vollmilch" mit „Läuft heute ab" in Zeile zwei und „Fast leer" in Zeile
- * drei, also 109,5px gegen 86,3px derselben Liste mit zwei Marken nebeneinander.
- *
- * `flex-shrink: 0` ist die Bedingung dafür: schrumpfte das Paar, bliebe es in
- * der Namenszeile stehen und presste sich dort zusammen, statt geschlossen
- * darunter zu rutschen. Ein eigener Umbruch steht ihm nicht zu - genau den
- * nimmt der Träger ihm ab. */
+/* DER STATUS STEHT IN DER METAZEILE, NACH DER MENGE (R24, Critique
+ * 2026-10-26 G3-Vorrat-P2-1). Bis R24 stand das Paar als Flex-Traeger neben dem
+ * Namen und sprang mit dessen Laenge - am Desktop frei schwebend, am Telefon mal
+ * neben, mal unter dem Namen. In der Metazeile ist es Text wie die Menge davor:
+ * inline, mit dem Mittelpunkt der Zeile als Trenner. Jede Marke nimmt ihren
+ * Mittelpunkt mit (`nowrap` samt ::before), sodass keine Zeile mit „·" beginnt. */
 .pantry-row__badges {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1) var(--space-2);
-  flex-shrink: 0;
-  /* ...ausser das Paar ist allein schon breiter als die Textspalte (#1448):
-   * eine Charge unter ihrem Produkt hat 16px weniger, und bei 375px lief
-   * "Gestern abgelaufen · Fast leer" ueber den Warenkorb. Gedeckelt auf die
-   * Spaltenbreite bricht es dann in sich um, statt hinauszuragen. */
-  flex-wrap: wrap;
-  max-width: 100%;
-  /* Der Mittelpunkt haengt im Zwischenraum VOR der zweiten Marke (unten). Bricht
-   * das Paar um, steht er links vor der Kante des Traegers und wird hier
-   * abgeschnitten, statt die zweite Zeile mit "· Fast leer" zu beginnen. */
-  column-gap: calc(var(--space-4) + 0.3em);
-  overflow: hidden;
+  display: inline;
 }
-
 /* Name und Metazeile kommen aus .list-row__name / .list-row__meta. Die
  * Regel „umbrechen statt abschneiden" ist dort verallgemeinert: sie galt zuerst
  * für das MHD im Vorrat, gilt jetzt genauso für den Artikelnamen im Einkauf, der
@@ -284,60 +191,24 @@
 
 /* ── DIE MELDUNG TRAEGT IHREN TON IN DER SCHRIFT, NICHT UNTER IHR ──
  *
- * Hier stand die Hauskonvention „Akzent-Text auf akzent-getoentem Grund", und
- * sie war fuer MODUL-Toene gedacht: der rohe Modulton scheitert als Schrift am
- * Kontrast. Die semantischen Toene tun das nicht - gemessen auf der
- * Kartenflaeche traegt Danger 5,38:1 (light) / 5,20:1 (dark) und Warning
- * 4,96:1 / 7,13:1, beides AA fuer Kleintext. Die Toenung war hier also nie
- * noetig, und sie kostete: „Noch 2 Tage" (Warning) und „Fast leer" (Warning)
- * sahen aus wie derselbe Zustand, und „Vor 6 Tagen abgelaufen" (Danger) hob
- * sich davon kaum ab - zwei Achsen und drei Stufen in zwei fast gleichen
- * Feldern.
- *
- * Zweiter Zweig der Skalen-Regel: die Rangmarke der Aufgaben-Prioritaet traegt
- * ihren Ton im Punkt und laesst die Schrift neutral, weil sie GESCANNT wird.
- * Eine Meldung wird GELESEN - ihr Ton gehoert auf die Zeichen, die man liest.
- * Ohne Fuellung faellt ausserdem die Polsterung weg, und die schmalste
- * Namensspalte (128px bei 393px Fenster) bekommt sie zurueck. */
+ * Semantische Toene tragen als Schrift auf der Kartenflaeche (Danger 5,38:1 /
+ * 5,20:1, Warning 4,96:1 / 7,13:1 - AA fuer Kleintext); eine Toenung darunter
+ * machte „Noch 2 Tage" und „Fast leer" ununterscheidbar. Eine Meldung wird
+ * GELESEN - ihr Ton gehoert auf die Zeichen. Seit R24 steht sie in der
+ * Metazeile und nimmt deren Groesse an; das Gewicht hebt sie von MHD und Ort ab. */
 .pantry-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
-  line-height: 1.6;
-  /* KEIN white-space: nowrap.
-   *
-   * „Vor 6 Tagen abgelaufen" ist 149px breit, die Namensspalte bei 393px nur
-   * 128px. Mit nowrap konnte das Badge auch auf eigener Zeile nicht passen und
-   * ragte 21px über die Zeile hinaus, sichtbar abgeschnitten (gemessen, in
-   * beiden Themes). Ein zweizeiliges Badge auf einem schmalen Telefon kostet
-   * Höhe, ein abgeschnittenes kostet die Aussage - und genau diese Aussage ist
-   * der Grund, warum man eine Vorratsliste öffnet. Deutsch ist hier die längste
-   * Locale, andere brauchen den Umbruch seltener. */
-  max-width: 100%;
+  white-space: nowrap;
+}
+
+.pantry-badge::before {
+  content: ' · ';
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-secondary);
 }
 
 .pantry-badge--danger  { color: var(--color-danger); }
 .pantry-badge--warning { color: var(--color-warning); }
-
-/* ZWEI MELDUNGEN SIND ZWEI, AUCH WENN SIE DENSELBEN TON HABEN. Ohne Fuellung
- * fehlt den Kapseln die Kante, an der man sie trennt - und „Vor 2 Tagen
- * abgelaufen" plus „Leer" tragen beide Danger, standen also als ein Satz da.
- * Der Mittelpunkt ist dieselbe Trennung, die die Metazeile der Zeile darunter
- * seit jeher fuehrt, und er kommt ueber den `+`-Kombinator: er gehoert zum
- * ZWISCHENRAUM, nicht zum Badge (Zeilenlisten-Regel). */
-.pantry-badge + .pantry-badge {
-  position: relative;
-}
-
-.pantry-badge + .pantry-badge::before {
-  content: '·';
-  position: absolute;
-  inset-inline-start: calc(-1 * (var(--space-2) + 0.3em));
-  width: 0.3em;
-  text-align: center;
-  color: var(--color-text-tertiary);
-}
 
 /* Die Bedien-Gruppe kommt aus .list-row__actions.
  *
@@ -453,6 +324,14 @@
   white-space: nowrap;
 }
 
+/* Ein Schritt am Stepper quittiert sich an der Menge (R24): ein kurzer Schein
+ * im Modulton, den pantry.js (acknowledgeQuantity) per Web Animations spielt.
+ * Hier steht nur die Farbe; der Radius gibt dem Schein seine Form. */
+.pantry-row__quantity {
+  --pantry-step-tint: color-mix(in srgb, var(--module-accent) var(--tint-raised), transparent);
+  border-radius: var(--radius-sm);
+}
+
 /* EINE Metazeile, und sie bricht nicht um.
  *
  * `.list-row__meta` darf umbrechen (`overflow-wrap: break-word`), weil dort im
@@ -465,32 +344,28 @@
   text-overflow: ellipsis;
 }
 
-/* WEGLASSEN STATT ABSCHNEIDEN - dritte Anwendung derselben Hausregel (das
- * Etikett der Aufgabenzeile, das Konto der Buchungszeile, die Notiz der
- * Geburtstagszeile machen es genauso).
- *
- * Der Anlass ist hier genau messbar: eine Zeile MIT Warenkorb hat 168px
- * Textspalte statt 220px, und „1 Flasche · MHD 23.12.2027" braucht 182px. Mit
- * Ellipse stand da „MHD 23.12…." - ein halbes Datum ist keine Angabe, sondern
- * sieht aus wie ein Fehler, und es ist dieselbe Trunkierung, gegen die das MHD
- * hier schon einmal nach vorn gewichen ist.
- *
- * `:has()` fragt nach dem Warenkorb, nicht nach einer Zeilenklasse: es sind
- * genau die leeren und fast leeren Artikel, die ihn tragen, und genau bei denen
- * steht die dringendere Aussage schon als Badge in der Kopfzeile. Wer das MHD
- * dieser Zeile braucht, öffnet sie - oder filtert auf „Läuft bald ab", wo kein
- * Warenkorb steht.
- *
- * 26rem: die Trägerbreiten sind gemessen 358px (390er-Telefon) und 720px (ab
- * 768px). Der Schnitt liegt dazwischen, und auf dem breiten Träger stehen
- * beide Angaben in jeder Zeile.
- *
- * NUR MIT STEPPER (#1682): die 168px gelten fuer eine Zeile, in der Warenkorb
- * UND Stepper stehen. Bei `pantry: read` gibt es keinen Stepper, die Bedienzone
- * ist nur der Warenkorb, und die Textspalte hat den Platz wieder - dort bleibt
- * das Datum stehen. */
+/* 26rem: die Traegerbreiten sind gemessen 358px (390er-Telefon) und 720px (ab
+ * 768px); der Schnitt liegt dazwischen. Bis R24 liess die Regel hier das MHD
+ * weg („weglassen statt abschneiden") - jetzt bekommt es eine eigene Zeile. */
 @container list-rows (max-width: 26rem) {
-  .pantry-row:has(.pantry-row__cart):has(.pantry-stepper) .pantry-row__expiry {
+  /* MIT STATUS RUECKT DIE ZWEITE HAELFTE IN EINE EIGENE ZEILE (R24). Bis R24
+   * fiel das MHD hier weg (Zeilen mit Warenkorb, 168px Textspalte): Butter und
+   * Mehl verloren am Telefon ihr Datum, das der Desktop zeigte. Jetzt steht
+   * „1 Stück · Fast leer" oben und „MHD 11.11. · Kühlschrank" darunter - die
+   * Zeile waechst nur dort, wo ein Status steht, und das sind die Zeilen,
+   * derentwegen man die Liste oeffnet. */
+  .pantry-row__meta:has(.pantry-badge) {
+    white-space: normal;
+  }
+
+  .pantry-row__meta:has(.pantry-badge) > .pantry-row__where {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pantry-row__meta:has(.pantry-badge) > .pantry-row__where > .pantry-row__lead-sep {
     display: none;
   }
 }
