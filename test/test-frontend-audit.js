@@ -6211,11 +6211,15 @@ test('die Bedienzone der Vorratszeile traegt keinen Text', () => {
     'das MHD braucht einen eigenen Knoten, sonst kann es nur abgeschnitten statt weggelassen werden');
   assert.match(pantryJs, /expiry\.textContent = ` · \$\{t\('pantry\.bestBefore'/,
     'das Trennzeichen gehoert IN den Knoten - sonst bleibt beim Weglassen ein einsames Mittelpunkt-Zeichen stehen');
+  // R24 (Critique G3-Vorrat-P2-1): das MHD faellt nicht mehr weg - auf der
+  // schmalen Zeile mit Status rueckt es mit dem Ort in eine eigene Zeile
+  // (test-pantry-ux.js "R24: am Telefon rueckt ..."), an der Traegerbreite.
   assert.match(
     pantryCss,
-    /@container list-rows \(max-width:[^)]+\)\s*\{\s*\.pantry-row:has\(\.pantry-row__cart\):has\(\.pantry-stepper\) \.pantry-row__expiry\s*\{\s*display:\s*none/,
-    'das MHD faellt auf der schmalen Zeile MIT Warenkorb UND Stepper weg - an der Traegerbreite, nicht am Viewport; ohne Stepper (Lesezeile) ist Platz (#1682)',
+    /@container list-rows \(max-width:[^)]+\)\s*\{[^}]*\.pantry-row__meta:has\(\.pantry-badge\)\s*\{\s*white-space:\s*normal/,
+    'die schmale Zeile mit Status bricht die Metazeile um, statt das MHD wegzulassen',
   );
+  assert.doesNotMatch(pantryCss, /\.pantry-row__expiry\s*\{\s*display:\s*none/, 'das MHD wird nirgends weggelassen');
 
   // Eine Variable, zwei Zeigerklassen: die Knopfgroesse wechselt mit der
   // Zeigerfaehigkeit und wird nicht doppelt gepflegt.
@@ -6466,12 +6470,13 @@ test('die beiden Küchen-Editoren sind derselbe Dialog', () => {
   // Die Modul-CSS dürfen die Geometrie nicht zurückholen.
   assert.doesNotMatch(read('../public/styles/shopping.css'), /\.pantry-transfer__clear/, 'kein Modul-Eigenbau fuer den Schalter');
 
-  // „Übernehmen" darf bei 0 Treffern nicht klickbar sein. Die Schwesteraktion
-  // („Plan zufällig füllen") macht das seit dem Audit korrekt.
-  assert.match(shopping, /id="shopping-import-submit" disabled/,
-    'der Import-Knopf muss deaktiviert starten');
-  assert.match(shopping, /submitBtn\.disabled = !added/,
-    'die Vorschau muss ihn freischalten, sobald der Zeitraum Zutaten enthält, die noch nicht auf der Liste stehen (R23, D2)');
+  // R24 (Dialogregel primary-disabled, test:control-dialect): „Übernehmen" ist
+  // immer bedienbar; die Vorschau sagt, was passiert, und ein leerer Zeitraum
+  // meldet sich beim Absenden an derselben Zeile statt als grauer Knopf.
+  assert.doesNotMatch(shopping, /id="shopping-import-submit" disabled/, 'der Import-Knopf startet bedienbar');
+  assert.doesNotMatch(shopping, /submitBtn\.disabled/, 'und wird nie gesperrt');
+  assert.match(shopping, /if \(previewEl\) previewEl\.textContent = t\('shopping\.importMealsEmpty'\)/,
+    'ein leerer Zeitraum sagt es an der Vorschauzeile');
 });
 
 /**
@@ -7275,7 +7280,7 @@ test('phase 3 mobile Shopping quick-add separates name, quantity, category, and 
   // als Regel - hier nur die Zusage dieses Tests: drei Spuren, der Knopf am Ende.
   assert.match(
     shoppingCss,
-    /\.quick-add__form\s*\{[\s\S]*display:\s*grid[\s\S]*grid-template-columns:\s*minmax\(0,\s*\d+fr\)\s*minmax\(0,\s*\d+fr\)\s*var\(--target-base\)/
+    /\.quick-add__form\s*\{[\s\S]*display:\s*grid[\s\S]*grid-template-columns:\s*minmax\(0,\s*\d+fr\)\s*minmax\(0,\s*\d+fr\)\s*auto/
   );
   assert.match(shoppingCss, /\.quick-add__input-wrap\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1/);
   assert.match(shoppingCss, /\.quick-add__qty\s*\{[\s\S]*position:\s*static[\s\S]*min-height:\s*var\(--target-base\)/);
@@ -7344,7 +7349,9 @@ test('#1372 quick-add fields stretch with their row, and no translated field get
 
   for (const { at, value } of templates) {
     const list = tracks(value);
-    assert.equal(list.at(-1), 'var(--target-base)', `${at}: die letzte Spur ist der Knopf`);
+    // R24 (G3-Einkauf-P3-1): der Absender ist ein Knopf mit Wort - seine Spur
+    // ist so breit wie das Wort (`auto`), nicht ein 44px-Kreis.
+    assert.equal(list.at(-1), 'auto', `${at}: die letzte Spur ist der Knopf`);
     const fields = list.slice(0, -1);
     for (const track of fields) {
       assert.match(track, FLEX_TRACK,
@@ -7372,7 +7379,6 @@ test('phase 6 touched UI files continue using design tokens for target sizes', (
   const layout = read('../public/styles/layout.css');
   const targetRules = [
     ['../public/styles/tasks.css', tasks, '.task-status-btn'],
-    ['../public/styles/shopping.css', shopping, '.quick-add__btn'],
     ['../public/styles/shopping.css', shopping, '.item-check'],
     ['../public/styles/notes.css', notes, '.note-card__pin'],
     ['../public/styles/notes.css', notes, '.note-card__more'],
@@ -7390,7 +7396,6 @@ test('phase 6 touched UI files continue using design tokens for target sizes', (
 
   for (const property of ['width', 'height']) {
     assertRuleUsesToken(tasks, '.task-status-btn', property, '--target-base', '../public/styles/tasks.css');
-    assertRuleUsesToken(shopping, '.quick-add__btn', property, '--target-base', '../public/styles/shopping.css');
     assertRuleUsesToken(shopping, '.item-check', property, '--target-base', '../public/styles/shopping.css');
     assertRuleUsesToken(notes, '.note-card__pin', property, '--target-base', '../public/styles/notes.css');
     assertRuleUsesToken(notes, '.note-card__more', property, '--target-base', '../public/styles/notes.css');

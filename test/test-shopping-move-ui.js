@@ -128,7 +128,9 @@ async function speichere(values, antwort, { listen = null, vorDerAntwort = null 
 
 /** Der Dialog, in seine Formularzeilen zerlegt: das Paar Menge+Kategorie und was darauf folgt. */
 function zeilen(content) {
-  const [, erstesPaar, zweitesPaar] = content.split('<div class="form-pair">');
+  // Das erste Paar traegt seit R24 `--wide` (die Kategorie steht am Telefon
+  // nicht mehr in der halben Zeile).
+  const [, erstesPaar, zweitesPaar] = content.split(/<div class="form-pair(?: form-pair--wide)?">/);
   return { mengeKategorie: erstesPaar, preisLaden: zweitesPaar };
 }
 

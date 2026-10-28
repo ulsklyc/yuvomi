@@ -408,7 +408,7 @@
  * braucht, kennt keine Zahl in diesem Blatt. Fest ist nur der Knopf. */
 .quick-add__form {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) var(--target-base);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
   gap: var(--space-2);
   align-items: stretch;
 }
@@ -490,7 +490,7 @@
      * DIE KATEGORIE BEHAELT IHR WORT (R22 S9, Critique a2): in der ersten der
      * zwei Spalten (1280) blieben ihr 116px, „Sonstig..." - die Untergrenze
      * 8.5rem traegt „Sonstiges" samt Chevron, das Namensfeld gibt dafuer nach. */
-    grid-template-columns: minmax(0, 5fr) minmax(0, 2fr) minmax(8.5rem, 3fr) var(--target-base);
+    grid-template-columns: minmax(0, 5fr) minmax(0, 2fr) minmax(8.5rem, 3fr) auto;
   }
 
   .quick-add__input-wrap {
@@ -502,29 +502,28 @@
   .quick-add__cat   { font-size: var(--text-base); }
 }
 
-.quick-add__btn {
-  width: var(--target-base);
-  height: var(--target-base);
-  border-radius: var(--radius-full);
-  /* EIN PLUS, UND ES GEHOERT DER PILLE (Re-Critique 2026-09-28, A4 P2-4).
-   * Hier stand ein gefuellter Kreis in der Stimme mit "+" - am Zeiger direkt
-   * unter der angedockten Kopf-Pille "+ Artikel", die dasselbe tut (sie
-   * fokussiert dieses Feld). Zwei violette Plus fuer eine Absicht. Der
-   * Absender ist jetzt die ruhige Return-Glyphe wie in Erinnerungen: wer
-   * tippt, drueckt Enter; der Knopf bleibt fuer Maus und Touch da. */
-  background-color: transparent;
-  color: var(--color-text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background-color var(--transition-fast);
-  min-height: var(--target-lg);
+/* AM ZEIGER IN DER HOEHE DER SHELL (R24, Critique G3-Einkauf-P3-1): drei
+ * gefuellte 50px-Kapseln (44 Mindesthoehe plus Polster) standen unter einem
+ * Kopf, dessen Felder und Knoepfe 40px messen. Die Fingergroesse bleibt dem
+ * Touch-Fall, wo das Feld per FAB aufgeht. */
+@media (hover: hover) {
+  .quick-add__input,
+  .quick-add__qty,
+  .quick-add__cat {
+    min-height: var(--target-md);
+    padding-block: var(--space-2);
+  }
 }
 
-.quick-add__btn:hover { background-color: var(--color-surface-2); color: var(--color-text-primary); }
+/* DER ABSENDER IST EIN RUHIGER KNOPF MIT WORT (R24, Critique G3-Einkauf-P3-1).
+ * Bis R24 eine nackte Return-Glyphe im 44px-Kreis (Re-Critique 2026-09-28: das
+ * „+" gehoert der Kopf-Pille). Jetzt `btn--secondary btn--sm` mit „Hinzufuegen":
+ * kein zweites Plus, keine zweite gefuellte Stimme, und das Ziel nennt seine
+ * Handlung. Groesse und Haut kommen vom Knopf-Baustein. */
+.quick-add__btn {
+  align-self: center;
+  white-space: nowrap;
+}
 
 /* Autocomplete-Dropdown */
 .autocomplete-dropdown {
@@ -1105,13 +1104,10 @@
 }
 
 /* Klickbare Link-Vorschau im Detail-Drawer. */
-/* Die Listen-Zeile im Bearbeiten-Dialog (#1700) steht zwischen Feldgruppen,
- * die ihren Abstand selbst mitbringen (`.form-group`, --space-4 darunter). Der
- * Traeger der Formularzeile hat keinen - ohne diesen stiesse "Preis" direkt
- * an sie an. */
-.item-details-form .form-rows {
-  margin-block-end: var(--space-4);
-}
+/* Den Takt des Bearbeiten-Dialogs setzt `.form-stack` (layout.css, EIN
+ * FELDTAKT IM DIALOG): seit R24 steht dort neben Feldern, Paar und Listenzeile
+ * auch "Weitere Angaben", und mit Margen je Feld klebte dessen Kante an der
+ * Kategorie (0px gemessen). Die Marge der Listenzeile (#1700) ist damit weg. */
 
 .item-details__link-wrap:not(:empty) {
   margin-top: var(--space-2);

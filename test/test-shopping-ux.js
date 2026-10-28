@@ -2352,19 +2352,24 @@ test('Einkauf: kein Wisch-Chevron an der Zeile, keine Reserve dafuer', async () 
 });
 
 // Re-Critique 2026-09-28 (P7 / A4 P2-4): am Zeiger standen zwei violette "+"
-// fuer dieselbe Absicht - die angedockte Kopf-Pille "+ Artikel" und der
-// Absender des Schnellfelds. Das "+" bleibt der Pille; der Absender ist die
-// ruhige Return-Glyphe wie in Erinnerungen (tippen, Enter).
-test('Einkauf: EIN Plus - der Absender des Schnellfelds ist eine ruhige Return-Glyphe', async () => {
+// fuer dieselbe Absicht - das "+" bleibt der Pille. R24 (Critique
+// G3-Einkauf-P3-1): der Absender war danach eine nackte Return-Glyphe, die nur
+// versteht, wer Enter schon kennt; jetzt ein ruhiger Knopf mit Wort.
+test('Einkauf: EIN Plus - der Absender des Schnellfelds ist ein ruhiger Knopf mit Wort', async () => {
   const src = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
-  const btn = /<button class="quick-add__btn"[^>]*>\s*<i data-lucide="([^"]+)"/.exec(src);
+  const btn = /<button class="([^"]*quick-add__btn[^"]*)" type="submit">([^<]*)<\/button>/.exec(src);
   assert.ok(btn, 'der Absender bleibt ein echter Submit-Knopf');
-  assert.equal(btn[1], 'corner-down-left', 'kein zweites Plus neben der Kopf-Pille');
+  assert.match(btn[1], /\bbtn--secondary\b/, 'sekundaer, keine zweite gefuellte Stimme');
+  assert.match(btn[1], /\bbtn--sm\b/, 'in der kleinen Knopfgroesse der Zeile');
+  assert.match(btn[2], /t\('common\.add'\)/, 'mit dem Wort "Hinzufuegen"');
+  assert.doesNotMatch(btn[0], /data-lucide="(?:plus|corner-down-left)"/, 'kein Plus und keine nackte Glyphe');
   const { eachRule } = await import('./css-rules.js');
-  const rule = [...eachRule(readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8'))]
-    .find((r) => r.selector.trim() === '.quick-add__btn' && !r.at.length);
-  assert.doesNotMatch(rule?.body ?? '', /background-color:\s*var\(--color-accent\)/, 'keine zweite gefuellte Stimme');
-  assert.match(rule?.body ?? '', /color:\s*var\(--color-text-(?:secondary|tertiary)\)/);
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8'))];
+  const rule = rules.find((r) => r.selector.trim() === '.quick-add__btn' && !r.at.length);
+  assert.doesNotMatch(rule?.body ?? '', /background|border-radius|width|height/, 'Haut und Groesse kommen vom Knopf-Baustein');
+  // Am Zeiger stehen die Felder in der Hoehe der Shell (40px), nicht 50.
+  const zeiger = rules.find((r) => /\.quick-add__input/.test(r.selector) && r.at.some((at) => /hover:\s*hover/.test(at)));
+  assert.match(zeiger?.body ?? '', /min-height:\s*var\(--target-md\)/);
 });
 
 // Re-Critique 2026-09-28 (P11 / A4 P2-8): eine neu gezeichnete Einkaufsliste
