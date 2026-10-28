@@ -57,9 +57,9 @@ function tile(extraClass, [value, unit], { label = 'Blutdruck', spark = false } 
 
 /* GEMISCHTE KACHELN, wie die Seite sie hat: mit und ohne Trendlinie, ein- und
  * zweizeiliges Label. Acht gleiche Kacheln sind von selbst gleich hoch und
- * sagen nichts ueber die geteilten Zeilen aus `.metric-rows`. Die Uebersicht
- * fuehrt keine Trendlinien (`overviewVitalCardMarkup()`), die Vitalwerte-Seite
- * schon (`cardMarkup()`). */
+ * sagen nichts ueber die geteilten Zeilen aus `.metric-rows`. Seit R24 (G5
+ * P2-6) fuehren beide Kachelbauer die Trendlinie (`overviewVitalCardMarkup()`,
+ * `cardMarkup()`). */
 const mixed = (extraClass, { sparks }) => VALUES.map((v, i) => tile(extraClass, v, {
   label: i % 4 === 1 ? LONG_LABEL : 'Blutdruck',
   spark: sparks && i % 2 === 0,
@@ -69,7 +69,7 @@ const PAGE = `<!doctype html><html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 ${SHEETS.map((name) => `<link rel="stylesheet" href="${pathToFileURL(join(ROOT, 'public/styles', `${name}.css`)).href}">`).join('\n')}
 </head><body>
-<div id="host-overview"><div class="health-overview__vitals-grid metric-rows">${mixed(' metric-card--inset', { sparks: false })}</div></div>
+<div id="host-overview"><div class="health-overview__vitals-grid metric-rows">${mixed(' metric-card--inset', { sparks: true })}</div></div>
 <div id="host-vitals"><div class="health-vitals__cards metric-rows">${mixed('', { sparks: true })}</div></div>
 <div id="host-cycle" style="padding: 0 16px"><div class="cycle-hero">
   <div class="cycle-ring"></div>
@@ -165,9 +165,10 @@ test('die Sonde misst das Markup, das health.js schreibt', () => {
   assert.ok(source.includes('class="health-vitals__cards metric-rows"'), 'das Raster der Vitalwerte-Seite heisst anders');
   assert.ok(source.includes('class="health-overview__vitals-grid metric-rows"'), 'das Raster der Uebersicht heisst anders');
   assert.ok(source.includes('metric-card metric-card--select metric-card--inset'), 'die Kachel der Uebersicht ist nicht mehr --inset');
-  // Die Trendlinie steht zwischen Wert und Meta, nur auf der Vitalwerte-Seite.
+  // Die Trendlinie steht zwischen Wert und Meta - seit R24 (G5 P2-6, EINE
+  // Kachel) auch in der Uebersicht.
   assert.ok(source.includes('<svg class="metric-card__spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">'), 'die Trendlinie ist anders gebaut');
-  assert.equal(source.split("${latest ? sparklineMarkup(series.points, 'value_num', metric) : ''}").length - 1, 1, 'genau ein Kachelbauer fuehrt die Trendlinie');
+  assert.equal(source.split("${latest ? sparklineMarkup(series.points, 'value_num', metric) : ''}").length - 1, 2, 'beide Kachelbauer fuehren die Trendlinie');
 });
 
 test('die Sonde erkennt einen Umbruch: eine zu schmale Kachel faellt auf', async () => {

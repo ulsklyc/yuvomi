@@ -595,30 +595,40 @@
  * letzte Kachel nimmt die freien Spuren ihrer Zeile. Die Schwellen sind die
  * des Rasters selbst: auto-fill mit 160px Mindestbreite und --space-3 (12px)
  * Abstand ergibt n Spalten ab 172n - 12px Reihenbreite. */
-@container metric-grid (min-width: 332px) and (max-width: 503.98px) {
-  .health-vitals__cards > :last-child:nth-child(2n+1) { grid-column: span 2; }
+/* Unter 640px Fenster haelt eine eigene Regel das Raster bei hoechstens zwei
+ * Spalten (`max-width: 639px` weiter unten, Mindestspur 150px): dort zaehlt
+ * nur die Zweierregel, ab 312px Reihenbreite. */
+@media (max-width: 639px) {
+  @container metric-grid (min-width: 312px) {
+    .health-vitals__cards > :last-child:nth-child(2n+1) { grid-column: span 2; }
+  }
 }
-@container metric-grid (min-width: 504px) and (max-width: 675.98px) {
-  .health-vitals__cards > :last-child:nth-child(3n+1) { grid-column: span 3; }
-  .health-vitals__cards > :last-child:nth-child(3n+2) { grid-column: span 2; }
-}
-@container metric-grid (min-width: 676px) and (max-width: 847.98px) {
-  .health-vitals__cards > :last-child:nth-child(4n+1) { grid-column: span 4; }
-  .health-vitals__cards > :last-child:nth-child(4n+2) { grid-column: span 3; }
-  .health-vitals__cards > :last-child:nth-child(4n+3) { grid-column: span 2; }
-}
-@container metric-grid (min-width: 848px) and (max-width: 1019.98px) {
-  .health-vitals__cards > :last-child:nth-child(5n+1) { grid-column: span 5; }
-  .health-vitals__cards > :last-child:nth-child(5n+2) { grid-column: span 4; }
-  .health-vitals__cards > :last-child:nth-child(5n+3) { grid-column: span 3; }
-  .health-vitals__cards > :last-child:nth-child(5n+4) { grid-column: span 2; }
-}
-@container metric-grid (min-width: 1020px) and (max-width: 1191.98px) {
-  .health-vitals__cards > :last-child:nth-child(6n+1) { grid-column: span 6; }
-  .health-vitals__cards > :last-child:nth-child(6n+2) { grid-column: span 5; }
-  .health-vitals__cards > :last-child:nth-child(6n+3) { grid-column: span 4; }
-  .health-vitals__cards > :last-child:nth-child(6n+4) { grid-column: span 3; }
-  .health-vitals__cards > :last-child:nth-child(6n+5) { grid-column: span 2; }
+@media (min-width: 640px) {
+  @container metric-grid (min-width: 332px) and (max-width: 503.98px) {
+    .health-vitals__cards > :last-child:nth-child(2n+1) { grid-column: span 2; }
+  }
+  @container metric-grid (min-width: 504px) and (max-width: 675.98px) {
+    .health-vitals__cards > :last-child:nth-child(3n+1) { grid-column: span 3; }
+    .health-vitals__cards > :last-child:nth-child(3n+2) { grid-column: span 2; }
+  }
+  @container metric-grid (min-width: 676px) and (max-width: 847.98px) {
+    .health-vitals__cards > :last-child:nth-child(4n+1) { grid-column: span 4; }
+    .health-vitals__cards > :last-child:nth-child(4n+2) { grid-column: span 3; }
+    .health-vitals__cards > :last-child:nth-child(4n+3) { grid-column: span 2; }
+  }
+  @container metric-grid (min-width: 848px) and (max-width: 1019.98px) {
+    .health-vitals__cards > :last-child:nth-child(5n+1) { grid-column: span 5; }
+    .health-vitals__cards > :last-child:nth-child(5n+2) { grid-column: span 4; }
+    .health-vitals__cards > :last-child:nth-child(5n+3) { grid-column: span 3; }
+    .health-vitals__cards > :last-child:nth-child(5n+4) { grid-column: span 2; }
+  }
+  @container metric-grid (min-width: 1020px) and (max-width: 1191.98px) {
+    .health-vitals__cards > :last-child:nth-child(6n+1) { grid-column: span 6; }
+    .health-vitals__cards > :last-child:nth-child(6n+2) { grid-column: span 5; }
+    .health-vitals__cards > :last-child:nth-child(6n+3) { grid-column: span 4; }
+    .health-vitals__cards > :last-child:nth-child(6n+4) { grid-column: span 3; }
+    .health-vitals__cards > :last-child:nth-child(6n+5) { grid-column: span 2; }
+  }
 }
 
 /* Die Kachel selbst ist seit Block 2 die geteilte Kennzahlkarte:
