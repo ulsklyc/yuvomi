@@ -4387,20 +4387,6 @@
             "shopping": "خرید",
             "general": "عمومی"
         },
-        "category": {
-            "groceries": "مواد غذایی",
-            "rent": "اجاره",
-            "utilities": "قبض‌ها",
-            "baby": "نوزاد",
-            "pets": "حیوانات خانگی",
-            "school": "مدرسه",
-            "travel": "سفر",
-            "shopping": "خرید",
-            "subscriptions": "اشتراک‌ها",
-            "health": "سلامت",
-            "home": "خانه",
-            "general": "عمومی"
-        },
         "recurring": {
             "empty": "هزینه تکرارشونده‌ای وجود ندارد.",
             "add": "افزودن هزینه تکرارشونده",
@@ -4516,7 +4502,10 @@
         "paidLabel": "پرداخت‌شده",
         "totalsByCategory": "بر اساس دسته",
         "categoryFilter": "فیلتر هزینه‌ها بر اساس دسته",
-        "noExpensesInCategory": "هیچ هزینه‌ای در این دسته نیست."
+        "noExpensesInCategory": "هیچ هزینه‌ای در این دسته نیست.",
+        "noCategory": "بدون دسته",
+        "participantsRequired": "دست‌کم یک نفر را انتخاب کن.",
+        "moreDetailsHint": "یادداشت‌ها و رسیدها"
     },
     "wmo": {
         "0": "آسمان صاف",

@@ -21,7 +21,7 @@
  */
 import { t, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { amountPlaceholder, amountToInput, amountExample, amountInputProblem, smallestUnitLabel } from '/utils/money.js';
+import { amountPlaceholder, amountToInput, amountExample, amountInputProblem, smallestUnitLabel, currencySymbol } from '/utils/money.js';
 
 /**
  * Die Attribute eines Betragsfeldes, ohne `id`, `class` und `required` - die
@@ -34,6 +34,60 @@ import { amountPlaceholder, amountToInput, amountExample, amountInputProblem, sm
 export function amountInputAttrs(currency, value = '') {
   return ` type="text" inputmode="decimal" autocomplete="off" spellcheck="false"`
     + ` placeholder="${esc(amountPlaceholder(currency))}" value="${esc(amountToInput(value ?? '', currency))}"`;
+}
+
+/**
+ * DAS FELD MIT SEINER WAEHRUNG (R22 D9, Critique R24 G4-Budget-P1-1): Betrag
+ * gross mit Ziffern gleicher Breite, die Waehrung als Suffix IM Feld. Bis R24
+ * hatte nur die Buchung diese Form; Umbuchung, Ausgabe, Darlehen und Abo
+ * fuehrten die Waehrung als eigenes Feld daneben (Select "EUR", Such-Combobox)
+ * oder gar nicht. Jetzt EIN Markup fuer jedes Geldgeruest.
+ *
+ * Ohne `currencies` ist das Suffix das Zeichen der Waehrung (`€`), ohne
+ * Zeiger. Mit `currencies` ist es die WAHL der Waehrung - ein `<select>` mit den
+ * Codes am selben Ort (`.budget-amount-field__unit--choice`); der Dialog zieht
+ * beim Wechsel `setAmountCurrency` nach wie bisher am eigenen Feld.
+ *
+ * @param {object} opts
+ * @param {string} opts.id          id des Textfelds
+ * @param {string} opts.currency    ISO-Code
+ * @param {number|string|null} [opts.value]
+ * @param {string} [opts.name]      name des Textfelds (Formulare mit FormData)
+ * @param {boolean} [opts.required=true]
+ * @param {string[]|null} [opts.currencies]  Codes der Wahl, oder null
+ * @param {string} [opts.currencyName='currency']  name der Wahl
+ * @param {string} [opts.currencyId]  id der Wahl
+ * @param {string} [opts.describedBy]  weitere ids fuer aria-describedby
+ * @returns {string}
+ */
+export function amountFieldHtml({
+  id, currency, value = '', name = '', required = true,
+  currencies = null, currencyName = 'currency', currencyId = '', describedBy = '',
+}) {
+  const choice = Array.isArray(currencies) && currencies.length > 0;
+  const unitId = choice ? (currencyId || `${id}-currency`) : `${id}-unit`;
+  const list = choice && !currencies.includes(currency) ? [currency, ...currencies] : currencies;
+  const unit = choice
+    ? `<select class="budget-amount-field__unit budget-amount-field__unit--choice" id="${esc(unitId)}" name="${esc(currencyName)}"
+        aria-label="${esc(t('splitExpenses.currency'))}">${list.map((code) =>
+        `<option value="${esc(code)}"${code === currency ? ' selected' : ''}>${esc(code)}</option>`).join('')}</select>`
+    : `<span class="budget-amount-field__unit" id="${esc(unitId)}">${esc(currencySymbol(currency))}</span>`;
+  const described = [choice ? '' : unitId, describedBy].filter(Boolean).join(' ');
+  return `<div class="budget-amount-field${choice ? ' budget-amount-field--choice' : ''}">
+        <input class="form-input budget-amount-input" id="${esc(id)}"${name ? ` name="${esc(name)}"` : ''}${amountInputAttrs(currency, value)}
+               ${described ? `aria-describedby="${esc(described)}"` : ''}${required ? ' required' : ''}>
+        ${unit}
+      </div>`;
+}
+
+/**
+ * Das Zeichen im Suffix eines Feldes ohne Wahl auf eine andere Waehrung
+ * stellen (Konto gewechselt). Ein Feld MIT Wahl zeigt den Code selbst.
+ */
+export function setAmountUnit(input, currency) {
+  const unit = input?.parentElement?.querySelector('span.budget-amount-field__unit');
+  if (unit) unit.textContent = currencySymbol(currency);
+  setAmountCurrency(input, currency);
 }
 
 /**

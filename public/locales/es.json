@@ -4387,20 +4387,6 @@
             "shopping": "Compras",
             "general": "General"
         },
-        "category": {
-            "groceries": "Supermercado",
-            "rent": "Alquiler",
-            "utilities": "Servicios",
-            "baby": "Bebé",
-            "pets": "Mascotas",
-            "school": "Escuela",
-            "travel": "Viaje",
-            "shopping": "Compras",
-            "subscriptions": "Suscripciones",
-            "health": "Salud",
-            "home": "Casa",
-            "general": "General"
-        },
         "recurring": {
             "empty": "No hay gastos recurrentes.",
             "add": "Añadir gasto recurrente",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Pagado",
         "totalsByCategory": "Por categoría",
         "categoryFilter": "Filtrar gastos por categoría",
-        "noExpensesInCategory": "No hay gastos en esta categoría."
+        "noExpensesInCategory": "No hay gastos en esta categoría.",
+        "noCategory": "Sin categoría",
+        "participantsRequired": "Elige al menos una persona.",
+        "moreDetailsHint": "Notas y recibos"
     },
     "wmo": {
         "0": "Cielo despejado",

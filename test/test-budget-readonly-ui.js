@@ -804,7 +804,9 @@ test('Regel 6: `renderExpenses` traegt nicht mehr den Namen des Modulrechts', ()
   // `data-expense-id` ins Bearbeiten. Seit #2108 ist er benannt
   // (`onExpenseListClick`, dort steht auch "Mehr laden"); drawMain haengt ihn an.
   assert.match(fn(SPLIT_CODE, 'drawMain'), /querySelector\('#split-expense-list'\)\?\.addEventListener\('click', onExpenseListClick\)/);
-  assert.match(fn(SPLIT_CODE, 'onExpenseListClick'), /if \(btn\.dataset\.expenseView\) openExpenseReadView\(expense\);\n\s*else openExpenseModal\(expense\);/);
+  // Seit R24 (E1) oeffnet JEDE Zeile das Leseblatt; Bearbeiten steht dort als
+  // Primaerknopf - nur mit Schreibrecht und ausserhalb des Archivs.
+  assert.match(fn(SPLIT_CODE, 'onExpenseListClick'), /openExpenseReadView\(expense, \{ editable: !btn\.dataset\.expenseView && !readOnly\(\) && !isArchivedView\(\) \}\)/);
 });
 
 test('Keine Gruppe mit `budget: read`: der Titel bleibt, „Erstelle eine Gruppe" geht', () => {
@@ -1286,7 +1288,7 @@ test('Abo: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlu
 
 const ausgabe = {
   id: 40, title: 'Ferienwohnung', amount: 600, currency: 'EUR', payer_id: 1, payer_name: 'Alex',
-  expense_date: '2026-08-02', split_method: 'exact', category: 'travel', description: 'Anzahlung', attachments: [beleg],
+  expense_date: '2026-08-02', split_method: 'exact', category: 'travel', budget_category: 'urlaub_x', description: 'Anzahlung', attachments: [beleg],
   splits: [
     { user_id: 1, display_name: 'Alex', amount: 400, currency: 'EUR' },
     { user_id: 3, display_name: 'Emma', amount: 200, currency: 'EUR' },
@@ -1296,7 +1298,8 @@ const ausgabe = {
 test('Ausgabe: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlung', () => {
   const vorher = { ...split.state };
   Object.assign(split.state, {
-    activeGroupId: 2, groups: [{ id: 2, default_currency: 'EUR' }], meta: { currencies: ['EUR', 'USD'], categories: ['groceries', 'travel', 'general'] },
+    activeGroupId: 2, groups: [{ id: 2, default_currency: 'EUR' }], meta: { currencies: ['EUR', 'USD'] },
+    budgetCategories: [{ key: 'essen_x', name: 'Essen' }, { key: 'urlaub_x', name: 'Urlaub' }],
     groupMembers: [{ id: 1, display_name: 'Alex' }, { id: 3, display_name: 'Emma' }],
   });
   const werte = {
@@ -1306,8 +1309,9 @@ test('Ausgabe: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Ha
     'splitExpenses.paidBy': [[/<option value="1" selected>Alex</], /^Alex$/],
     'splitExpenses.date': [[/name="expense_date"[^>]*value="2026-08-02"/], /^2026-08-02$/],
     'splitExpenses.splitMethod': [[/<option value="exact" selected>/], /^splitExpenses\.splitExact$/],
-    // Die Kategorie (#1941): im Dialog gewaehlt, in der Leseansicht benannt.
-    'splitExpenses.categoryLabel': [[/<option value="travel" selected>/], /^splitExpenses\.category\.travel$/],
+    // Die Kategorie (#1941, seit R24 E12 eine Budget-Kategorie): im Dialog
+    // gewaehlt, in der Leseansicht benannt.
+    'splitExpenses.categoryLabel': [[/<option value="urlaub_x" selected>/], /^Urlaub$/],
     'splitExpenses.participants': [[/name="split_value_1"[^>]*value="400,00"/, /name="split_value_3"[^>]*value="200,00"/],
       /^Alex: 400,00\s€\nEmma: 200,00\s€$/],
     'splitExpenses.notes': [[/Anzahlung<\/textarea>/], /^Anzahlung$/],
@@ -1605,7 +1609,7 @@ test('Gruppenkopf bei `budget: read`: Waehrung, Standardaufteilung und Mitgliede
     'splitExpenses.currency': [[/<option value="EUR" selected>EUR</], /^EUR$/],
     'splitExpenses.defaultSplit': [[/<option value="percentage" selected>/, /name="default_value_1"[^>]*value="60"/, /name="default_value_3"[^>]*value="40"/],
       /^splitExpenses\.splitPercentage - Alex 60\u00a0%, Emma 40\u00a0%$/],
-    'splitExpenses.members': [[/value="user:1" checked[\s\S]*Alex/, /value="user:3" checked[\s\S]*Emma · splitExpenses\.roleGuest/],
+    'splitExpenses.members': [[/value="user:1"[^>]* checked[\s\S]*Alex/, /value="user:3"[^>]* checked[\s\S]*Emma · splitExpenses\.roleGuest/],
       /^Alex, Emma \(splitExpenses\.roleGuest\)$/],
   };
   jederWert(werte, editor.content, gruppenZeile(gruppenKopf(gruppe(), mitglieder, 'read')), 'Gruppe');

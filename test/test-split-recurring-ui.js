@@ -45,7 +45,7 @@ test.after(() => { miniDomAbraeumen(); mock.timers.reset(); });
 
 const serie = (id, extra = {}) => ({
   id, group_id: 2, title: `Serie ${id}`, description: '', amount_minor: 90000, amount: '900.00', currency: 'EUR',
-  payer_id: 1, payer_name: 'Alex', category: 'rent', split_method: 'equal', frequency: 'monthly',
+  payer_id: 1, payer_name: 'Alex', category: 'rent', budget_category: 'housing', split_method: 'equal', frequency: 'monthly',
   next_run_date: '2026-11-01', anchor_day: 1, paused_at: null, created_by: 1,
   participants: [1, 3], splits: [], blocked_reason: null, can_edit: true, missed_count: 0, resume_date: null,
   ...extra,
@@ -570,7 +570,7 @@ function knoten(extra = {}) {
  * JETZT. `haken[id].checked = false` hakt eine Person ab.
  */
 function formular(werte, { method = 'equal', teilnehmer = { 1: '', 3: '' }, abgehakt = [] } = {}) {
-  const namen = ['title', 'amount', 'currency', 'payer_id', 'frequency', 'next_run_date', 'category', 'description'];
+  const namen = ['title', 'amount', 'currency', 'payer_id', 'frequency', 'next_run_date', 'budget_category', 'description'];
   const felder = {
     '[name="split_method"]': knoten({ value: method }),
     '#split-method-hint': knoten(),
@@ -769,11 +769,11 @@ test('Der Server weist einen schon gebuchten Termin ab: der Satz steht am Datums
 test('Speichern einer neuen Serie sendet POST mit allen Feldern der Route; ein unbrauchbarer Betrag sendet nichts', async () => {
   await buehne({}, async (spur) => {
     const { panel, setze } = offenerDialog(spur, null);
-    setze('title', 'Strom'); setze('amount', '30'); setze('frequency', 'weekly'); setze('next_run_date', '2026-11-05'); setze('category', 'utilities');
+    setze('title', 'Strom'); setze('amount', '30'); setze('frequency', 'weekly'); setze('next_run_date', '2026-11-05'); setze('budget_category', 'housing');
     await panel.feuere('submit');
     assert.deepEqual(spur.gesendet, [['POST', '/split-expenses/groups/2/recurring', {
       title: 'Strom', amount: '30', currency: 'EUR', payer_id: '1', frequency: 'weekly', next_run_date: '2026-11-05',
-      split_method: 'equal', category: 'utilities', description: '', participants: [1, 3], splits: [],
+      split_method: 'equal', budget_category: 'housing', description: '', participants: [1, 3], splits: [],
     }]]);
   });
   await buehne({}, async (spur) => {

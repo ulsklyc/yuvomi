@@ -4387,20 +4387,6 @@
             "shopping": "Alışveriş",
             "general": "Genel"
         },
-        "category": {
-            "groceries": "Market",
-            "rent": "Kira",
-            "utilities": "Faturalar",
-            "baby": "Bebek",
-            "pets": "Evcil hayvan",
-            "school": "Okul",
-            "travel": "Seyahat",
-            "shopping": "Alışveriş",
-            "subscriptions": "Abonelikler",
-            "health": "Sağlık",
-            "home": "Ev",
-            "general": "Genel"
-        },
         "recurring": {
             "empty": "Tekrarlanan gider yok.",
             "add": "Tekrarlanan gider ekle",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Ödenen",
         "totalsByCategory": "Kategoriye göre",
         "categoryFilter": "Harcamaları kategoriye göre filtrele",
-        "noExpensesInCategory": "Bu kategoride harcama yok."
+        "noExpensesInCategory": "Bu kategoride harcama yok.",
+        "noCategory": "Kategorisiz",
+        "participantsRequired": "En az bir kişi seç.",
+        "moreDetailsHint": "Notlar ve fişler"
     },
     "wmo": {
         "0": "Açık",

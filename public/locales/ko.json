@@ -4387,20 +4387,6 @@
             "shopping": "장보기",
             "general": "일반"
         },
-        "category": {
-            "groceries": "식료품",
-            "rent": "임대료",
-            "utilities": "공과금",
-            "baby": "아기",
-            "pets": "반려동물",
-            "school": "학교",
-            "travel": "여행",
-            "shopping": "장보기",
-            "subscriptions": "구독",
-            "health": "건강",
-            "home": "집",
-            "general": "일반"
-        },
         "recurring": {
             "empty": "반복 지출 없음.",
             "add": "반복 지출 추가",
@@ -4516,7 +4502,10 @@
         "paidLabel": "결제액",
         "totalsByCategory": "카테고리별",
         "categoryFilter": "카테고리로 지출 필터링",
-        "noExpensesInCategory": "이 카테고리에는 지출이 없습니다."
+        "noExpensesInCategory": "이 카테고리에는 지출이 없습니다.",
+        "noCategory": "카테고리 없음",
+        "participantsRequired": "한 명 이상 선택하세요.",
+        "moreDetailsHint": "메모와 영수증"
     },
     "wmo": {
         "0": "맑음",

@@ -4387,20 +4387,6 @@
             "shopping": "购物",
             "general": "通用"
         },
-        "category": {
-            "groceries": "食品杂货",
-            "rent": "租金",
-            "utilities": "水电杂费",
-            "baby": "婴儿",
-            "pets": "宠物",
-            "school": "学校",
-            "travel": "旅行",
-            "shopping": "购物",
-            "subscriptions": "订阅",
-            "health": "健康",
-            "home": "家居",
-            "general": "通用"
-        },
         "recurring": {
             "empty": "没有定期支出。",
             "add": "添加定期支出",
@@ -4516,7 +4502,10 @@
         "paidLabel": "已付",
         "totalsByCategory": "按类别",
         "categoryFilter": "按类别筛选支出",
-        "noExpensesInCategory": "此类别没有支出。"
+        "noExpensesInCategory": "此类别没有支出。",
+        "noCategory": "无类别",
+        "participantsRequired": "请至少选择一人。",
+        "moreDetailsHint": "备注与收据"
     },
     "wmo": {
         "0": "晴天",

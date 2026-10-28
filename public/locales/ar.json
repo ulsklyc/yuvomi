@@ -4763,20 +4763,6 @@
             "shopping": "تسوق",
             "general": "عام"
         },
-        "category": {
-            "groceries": "بقالة",
-            "rent": "إيجار",
-            "utilities": "مرافق",
-            "baby": "طفل",
-            "pets": "حيوانات أليفة",
-            "school": "مدرسة",
-            "travel": "سفر",
-            "shopping": "تسوق",
-            "subscriptions": "اشتراكات",
-            "health": "صحة",
-            "home": "منزل",
-            "general": "عام"
-        },
         "recurring": {
             "empty": "لا توجد مصاريف متكررة.",
             "add": "إضافة مصروف متكرر",
@@ -4904,7 +4890,10 @@
         "paidLabel": "المدفوع",
         "totalsByCategory": "حسب الفئة",
         "categoryFilter": "تصفية النفقات حسب الفئة",
-        "noExpensesInCategory": "لا توجد نفقات في هذه الفئة."
+        "noExpensesInCategory": "لا توجد نفقات في هذه الفئة.",
+        "noCategory": "بدون فئة",
+        "participantsRequired": "اختر شخصًا واحدًا على الأقل.",
+        "moreDetailsHint": "ملاحظات وإيصالات"
     },
     "wmo": {
         "0": "سماء صافية",

@@ -4637,20 +4637,6 @@
             "shopping": "Zakupy",
             "general": "Ogólny"
         },
-        "category": {
-            "groceries": "Artykuły spożywcze",
-            "rent": "Czynsz",
-            "utilities": "Media",
-            "baby": "Dziecko",
-            "pets": "Zwierzęta",
-            "school": "Szkoła",
-            "travel": "Podróż",
-            "shopping": "Zakupy",
-            "subscriptions": "Subskrypcje",
-            "health": "Zdrowie",
-            "home": "Dom",
-            "general": "Ogólne"
-        },
         "recurring": {
             "empty": "Brak cyklicznych wydatków.",
             "add": "Dodaj cykliczny wydatek",
@@ -4774,7 +4760,10 @@
         "paidLabel": "Zapłacono",
         "totalsByCategory": "Według kategorii",
         "categoryFilter": "Filtruj wydatki według kategorii",
-        "noExpensesInCategory": "Brak wydatków w tej kategorii."
+        "noExpensesInCategory": "Brak wydatków w tej kategorii.",
+        "noCategory": "Bez kategorii",
+        "participantsRequired": "Wybierz co najmniej jedną osobę.",
+        "moreDetailsHint": "Notatki i paragony"
     },
     "wmo": {
         "0": "Bezchmurnie",

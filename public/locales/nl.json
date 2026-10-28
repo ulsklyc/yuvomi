@@ -4387,20 +4387,6 @@
             "shopping": "Boodschappen",
             "general": "Algemeen"
         },
-        "category": {
-            "groceries": "Boodschappen",
-            "rent": "Huur",
-            "utilities": "Nutsvoorzieningen",
-            "baby": "Baby",
-            "pets": "Huisdieren",
-            "school": "School",
-            "travel": "Reizen",
-            "shopping": "Winkelen",
-            "subscriptions": "Abonnementen",
-            "health": "Gezondheid",
-            "home": "Thuis",
-            "general": "Algemeen"
-        },
         "recurring": {
             "empty": "Geen terugkerende uitgaven.",
             "add": "Terugkerende uitgave toevoegen",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Betaald",
         "totalsByCategory": "Per categorie",
         "categoryFilter": "Uitgaven filteren op categorie",
-        "noExpensesInCategory": "Geen uitgaven in deze categorie."
+        "noExpensesInCategory": "Geen uitgaven in deze categorie.",
+        "noCategory": "Zonder categorie",
+        "participantsRequired": "Kies minstens één persoon.",
+        "moreDetailsHint": "Notities en bonnen"
     },
     "wmo": {
         "0": "Heldere lucht",

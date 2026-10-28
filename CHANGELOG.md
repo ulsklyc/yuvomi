@@ -13,8 +13,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recipe or putting it on the shopping list takes the servings you chose. In the meal dialog the same
   stepper replaces the "Scale ingredients" number field once a recipe fills the list. A recipe without
   servings steps in multiples ("Amount × 1.5") instead of inventing a number.
+- **Shared expenses use your budget categories.** An expense in a split group now picks from the same
+  categories as the budget, shown with the same coloured dot, instead of a separate list of twelve with
+  icons. Existing expenses keep their meaning where a budget category fits (groceries become Food, rent
+  Housing, travel Leisure and so on); the rest show "No category". The category filter above the
+  expenses is a filter button like elsewhere in the budget. Over the API, `budget_category` sits next
+  to the older `category`, which stays as it was.
 
 ### Changed
+- **A shared expense shows itself before it edits.** Tapping an expense opens a read view with Edit as
+  the one main button instead of the form with the keyboard up. The expense and recurring-expense forms
+  start with the amount, with the currency chosen right inside the amount field; date and payer share a
+  row, people are picked with the same name chips as elsewhere, and notes and receipts sit under "More
+  details". "Add" can always be pressed and says what is missing (nobody selected, shares that do not
+  add up) at the field instead of staying grey.
+- **One balance sentence.** When a group has a single open debt that involves you, the figure at the
+  top says it with the name ("You owe Alex Johnson 24.14 €") and the balances list no longer repeats it.
 - **Tapping a meal shows it first.** The meal card opens a read view (date, meal, cook, ingredients,
   recipe, notes) with Edit as the one main button and "Add to shopping list" next to it, instead of
   the full edit form. On a computer it opens next to the card. In the form, a meal's ingredients are

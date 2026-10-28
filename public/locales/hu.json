@@ -4387,20 +4387,6 @@
             "shopping": "Bevásárlás",
             "general": "Általános"
         },
-        "category": {
-            "groceries": "Élelmiszer",
-            "rent": "Bérleti díj",
-            "utilities": "Közüzemi számlák",
-            "baby": "Baba",
-            "pets": "Háziállatok",
-            "school": "Iskola",
-            "travel": "Utazás",
-            "shopping": "Bevásárlás",
-            "subscriptions": "Előfizetések",
-            "health": "Egészség",
-            "home": "Otthon",
-            "general": "Általános"
-        },
         "recurring": {
             "empty": "Nincs ismétlődő költség.",
             "add": "Ismétlődő költség hozzáadása",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Fizetve",
         "totalsByCategory": "Kategória szerint",
         "categoryFilter": "Kiadások szűrése kategória szerint",
-        "noExpensesInCategory": "Ebben a kategóriában nincs kiadás."
+        "noExpensesInCategory": "Ebben a kategóriában nincs kiadás.",
+        "noCategory": "Kategória nélkül",
+        "participantsRequired": "Válassz legalább egy személyt.",
+        "moreDetailsHint": "Jegyzetek és nyugták"
     },
     "wmo": {
         "0": "Tiszta égbolt",

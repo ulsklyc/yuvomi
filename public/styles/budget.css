@@ -2695,6 +2695,50 @@ button.budget-entry__title {
   pointer-events: none;
 }
 
+/* DIE WAEHRUNG ALS WAHL IM SUFFIX (Critique R24 G4-Budget-P1-1,
+ * amountFieldHtml): wo eine Ausgabe oder ein Abo die Waehrung waehlt, steht
+ * die Wahl am selben Ort wie das Zeichen der Buchung - als ruhiger Code mit
+ * eigenem Pfeil, nimmt Zeiger und Fokus, Hoehe des Felds. Das Feld haelt ihr
+ * den Platz frei (Code + Pfeil). */
+.budget-amount-field--choice > .budget-amount-input {
+  padding-inline-end: calc(var(--space-3) + 7ch);
+}
+
+.budget-amount-field__unit--choice {
+  inset-block: var(--space-1);
+  inset-inline-end: var(--space-1);
+  min-height: 0;
+  padding-inline: var(--space-2) var(--space-6);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background-color: transparent;
+  background-image: var(--field-chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--space-2) center;
+  background-size: var(--icon-sm) var(--icon-sm);
+  font-family: inherit;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+  cursor: pointer;
+  appearance: none;
+}
+
+[dir="rtl"] .budget-amount-field__unit--choice {
+  background-position: left var(--space-2) center;
+}
+
+.budget-amount-field__unit--choice:hover {
+  background-color: var(--color-fill-well);
+}
+
+.budget-amount-field__unit--choice:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
 /* Datum und Konto in einer Zeile (budget.js openBudgetModal). Zwei Spalten,
  * solange jede ihre ~150px hat; die Gruppen tragen ihren Abstand nicht selbst
  * (der Zeilenabstand gehoert dem Dialog). */

@@ -4387,20 +4387,6 @@
             "shopping": "Shopping",
             "general": "Allmänt"
         },
-        "category": {
-            "groceries": "Matvaror",
-            "rent": "Hyra",
-            "utilities": "Verktyg",
-            "baby": "Baby",
-            "pets": "Husdjur",
-            "school": "Skola",
-            "travel": "Resa",
-            "shopping": "Shopping",
-            "subscriptions": "Prenumerationer",
-            "health": "Hälsa",
-            "home": "Hem",
-            "general": "Allmänt"
-        },
         "recurring": {
             "empty": "Inga återkommande utgifter.",
             "add": "Lägg till återkommande utgift",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Betalt",
         "totalsByCategory": "Per kategori",
         "categoryFilter": "Filtrera utgifter efter kategori",
-        "noExpensesInCategory": "Inga utgifter i den här kategorin."
+        "noExpensesInCategory": "Inga utgifter i den här kategorin.",
+        "noCategory": "Utan kategori",
+        "participantsRequired": "Välj minst en person.",
+        "moreDetailsHint": "Anteckningar och kvitton"
     },
     "wmo": {
         "0": "Klart",

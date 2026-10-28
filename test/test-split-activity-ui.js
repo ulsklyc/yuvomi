@@ -464,7 +464,7 @@ test('Ausgaben (#2108): Gruppenwechsel und Kategoriewechsel beginnen bei Seite 1
     assert.equal(split.state.expenses.length, 31);
     split.state.category = 'travel';
     await split.loadGroupData();
-    assert.equal(b.ausgabenGets().at(-1), '/split-expenses/groups/2/expenses?limit=30&category=travel', 'ein neuer Filter fragt neu, ohne die alte Tiefe');
+    assert.equal(b.ausgabenGets().at(-1), '/split-expenses/groups/2/expenses?limit=30&budget_category=travel', 'ein neuer Filter fragt neu, ohne die alte Tiefe');
   } finally { b.abbauen(); }
 });
 

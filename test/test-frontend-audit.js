@@ -21662,10 +21662,16 @@ test('R17 E6: die Dialoge der Aufteilung tragen Label, Stern und Betrag des Budg
     assert.equal(star, required, `Stern genau am Pflichtfeld: ${field.slice(0, 90)}`);
   }
   const amounts = fields.filter((field) => /name="amount"/.test(tagOf(field)));
-  assert.equal(amounts.length, 3, 'Ausgabe, Serie und Zahlung haben je ein Betragsfeld');
+  // Seit R24 (G4-Budget-P1-1) bauen Ausgabe und Serie den Betrag ueber den
+  // Baustein amountFieldHtml (Waehrung als Wahl im Suffix); die Zahlung bleibt
+  // ein Feld im Label.
+  const bausteine = src.match(/amountFieldHtml\(\{ id: 'split-[\w-]+', name: 'amount'/g) ?? [];
+  assert.equal(amounts.length + bausteine.length, 3, 'Ausgabe, Serie und Zahlung haben je ein Betragsfeld');
+  assert.equal(bausteine.length, 2, 'Ausgabe und Serie nehmen den Baustein');
   for (const field of amounts) {
     assert.match(tagOf(field), /class="form-input budget-amount-input"/, 'der Betrag ist 48px/20/600 wie im Budget-Eintrag');
   }
+  assert.match(read('../public/utils/amount-field.js'), /<input class="form-input budget-amount-input"/, 'der Baustein ist dasselbe Feld');
   assert.match(read('../public/styles/budget.css'), /\.budget-amount-input\s*\{[^}]*font-size:\s*var\(--text-xl\)/);
 });
 

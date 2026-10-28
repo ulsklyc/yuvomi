@@ -4387,20 +4387,6 @@
             "shopping": "Belanja",
             "general": "Umum"
         },
-        "category": {
-            "groceries": "Bahan makanan",
-            "rent": "Sewa",
-            "utilities": "Utilitas",
-            "baby": "Bayi",
-            "pets": "Hewan peliharaan",
-            "school": "Sekolah",
-            "travel": "Perjalanan",
-            "shopping": "Belanja",
-            "subscriptions": "Langganan",
-            "health": "Kesehatan",
-            "home": "Rumah",
-            "general": "Umum"
-        },
         "recurring": {
             "empty": "Tidak ada pengeluaran berulang.",
             "add": "Tambah pengeluaran berulang",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Dibayar",
         "totalsByCategory": "Menurut kategori",
         "categoryFilter": "Saring pengeluaran menurut kategori",
-        "noExpensesInCategory": "Tidak ada pengeluaran dalam kategori ini."
+        "noExpensesInCategory": "Tidak ada pengeluaran dalam kategori ini.",
+        "noCategory": "Tanpa kategori",
+        "participantsRequired": "Pilih setidaknya satu orang.",
+        "moreDetailsHint": "Catatan dan struk"
     },
     "wmo": {
         "0": "Langit cerah",

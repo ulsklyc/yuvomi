@@ -4387,20 +4387,6 @@
             "shopping": "Pamimili",
             "general": "Pangkalahatan"
         },
-        "category": {
-            "groceries": "Pagkain at grocery",
-            "rent": "Upa",
-            "utilities": "Mga utility",
-            "baby": "Sanggol",
-            "pets": "Alagang hayop",
-            "school": "Paaralan",
-            "travel": "Biyahe",
-            "shopping": "Pamimili",
-            "subscriptions": "Mga subscription",
-            "health": "Kalusugan",
-            "home": "Bahay",
-            "general": "Pangkalahatan"
-        },
         "recurring": {
             "empty": "Walang paulit-ulit na gastos.",
             "add": "Magdagdag ng paulit-ulit na gastos",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Binayaran",
         "totalsByCategory": "Ayon sa kategorya",
         "categoryFilter": "I-filter ang mga gastos ayon sa kategorya",
-        "noExpensesInCategory": "Walang gastos sa kategoryang ito."
+        "noExpensesInCategory": "Walang gastos sa kategoryang ito.",
+        "noCategory": "Walang kategorya",
+        "participantsRequired": "Pumili ng kahit isang tao.",
+        "moreDetailsHint": "Mga tala at resibo"
     },
     "wmo": {
         "0": "Maaliwalas na langit",

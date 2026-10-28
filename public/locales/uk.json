@@ -4637,20 +4637,6 @@
             "shopping": "Покупки",
             "general": "Загальне"
         },
-        "category": {
-            "groceries": "Продукти",
-            "rent": "Оренда",
-            "utilities": "Комунальні",
-            "baby": "Дитина",
-            "pets": "Домашні тварини",
-            "school": "Школа",
-            "travel": "Подорож",
-            "shopping": "Покупки",
-            "subscriptions": "Підписки",
-            "health": "Здоров’я",
-            "home": "Дім",
-            "general": "Загальне"
-        },
         "recurring": {
             "empty": "Немає повторюваних витрат.",
             "add": "Додати повторювану витрату",
@@ -4774,7 +4760,10 @@
         "paidLabel": "Сплачено",
         "totalsByCategory": "За категоріями",
         "categoryFilter": "Фільтрувати витрати за категорією",
-        "noExpensesInCategory": "У цій категорії немає витрат."
+        "noExpensesInCategory": "У цій категорії немає витрат.",
+        "noCategory": "Без категорії",
+        "participantsRequired": "Обери щонайменше одну людину.",
+        "moreDetailsHint": "Нотатки та чеки"
     },
     "wmo": {
         "0": "Ясне небо",

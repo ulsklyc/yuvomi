@@ -4387,20 +4387,6 @@
             "shopping": "Spesa",
             "general": "Generale"
         },
-        "category": {
-            "groceries": "Alimentari",
-            "rent": "Affitto",
-            "utilities": "Utenze",
-            "baby": "Bambino",
-            "pets": "Animali",
-            "school": "Scuola",
-            "travel": "Viaggio",
-            "shopping": "Shopping",
-            "subscriptions": "Abbonamenti",
-            "health": "Salute",
-            "home": "Casa",
-            "general": "Generale"
-        },
         "recurring": {
             "empty": "Nessuna spesa ricorrente.",
             "add": "Aggiungi spesa ricorrente",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Pagato",
         "totalsByCategory": "Per categoria",
         "categoryFilter": "Filtra le spese per categoria",
-        "noExpensesInCategory": "Nessuna spesa in questa categoria."
+        "noExpensesInCategory": "Nessuna spesa in questa categoria.",
+        "noCategory": "Senza categoria",
+        "participantsRequired": "Scegli almeno una persona.",
+        "moreDetailsHint": "Note e ricevute"
     },
     "wmo": {
         "0": "Cielo sereno",

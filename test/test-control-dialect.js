@@ -2165,7 +2165,7 @@ const PENDING = {
     'public/components/quick-links-manager.js': 1, 'public/pages/birthdays.js': 1, 'public/pages/budget.js': 2,
     'public/pages/calendar.js': 1, 'public/pages/documents.js': 1, 'public/pages/health.js': 7,
     'public/pages/notes.js': 1, 'public/pages/schedule.js': 1,
-    'public/pages/split-expenses.js': 3, 'public/pages/subscriptions.js': 1,
+    'public/pages/subscriptions.js': 1,
     'public/settings/pages/modules-health.js': 1, 'public/settings/pages/sync-contacts.js': 1,
   },
   'advanced-hint': {
@@ -2175,9 +2175,9 @@ const PENDING = {
   'primary-disabled': {
     'public/components/document-attach.js': 1, 'public/pages/birthdays.js': 1, 'public/pages/contacts.js': 1,
     'public/pages/documents.js': 1, 'public/pages/schedule.js': 1,
-    'public/pages/split-expenses.js': 2, 'public/settings/pages/admin-permissions.js': 1,
+    'public/settings/pages/admin-permissions.js': 1,
   },
-  'people-checkbox': { 'public/pages/documents.js': 1, 'public/pages/split-expenses.js': 2 },
+  'people-checkbox': { 'public/pages/documents.js': 1 },
 };
 
 const HEAD_SEARCH = headSearchClasses(JS);

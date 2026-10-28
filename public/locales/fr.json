@@ -4387,20 +4387,6 @@
             "shopping": "Courses",
             "general": "Général"
         },
-        "category": {
-            "groceries": "Courses",
-            "rent": "Loyer",
-            "utilities": "Charges",
-            "baby": "Bébé",
-            "pets": "Animaux",
-            "school": "École",
-            "travel": "Voyage",
-            "shopping": "Achats",
-            "subscriptions": "Abonnements",
-            "health": "Santé",
-            "home": "Maison",
-            "general": "Général"
-        },
         "recurring": {
             "empty": "Aucune dépense récurrente.",
             "add": "Ajouter une dépense récurrente",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Payé",
         "totalsByCategory": "Par catégorie",
         "categoryFilter": "Filtrer les dépenses par catégorie",
-        "noExpensesInCategory": "Aucune dépense dans cette catégorie."
+        "noExpensesInCategory": "Aucune dépense dans cette catégorie.",
+        "noCategory": "Sans catégorie",
+        "participantsRequired": "Choisis au moins une personne.",
+        "moreDetailsHint": "Notes et justificatifs"
     },
     "wmo": {
         "0": "Ciel dégagé",

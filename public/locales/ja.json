@@ -4387,20 +4387,6 @@
             "shopping": "買い物",
             "general": "一般"
         },
-        "category": {
-            "groceries": "食料品",
-            "rent": "家賃",
-            "utilities": "公共料金",
-            "baby": "ベビー",
-            "pets": "ペット",
-            "school": "学校",
-            "travel": "旅行",
-            "shopping": "買い物",
-            "subscriptions": "サブスク",
-            "health": "健康",
-            "home": "家",
-            "general": "一般"
-        },
         "recurring": {
             "empty": "定期費用はありません。",
             "add": "定期費用を追加",
@@ -4516,7 +4502,10 @@
         "paidLabel": "支払額",
         "totalsByCategory": "カテゴリ別",
         "categoryFilter": "カテゴリで支出を絞り込む",
-        "noExpensesInCategory": "このカテゴリの支出はありません。"
+        "noExpensesInCategory": "このカテゴリの支出はありません。",
+        "noCategory": "カテゴリなし",
+        "participantsRequired": "少なくとも1人を選んでください。",
+        "moreDetailsHint": "メモと領収書"
     },
     "wmo": {
         "0": "快晴",

@@ -4387,20 +4387,6 @@
             "shopping": "購物",
             "general": "通用"
         },
-        "category": {
-            "groceries": "食品雜貨",
-            "rent": "租金",
-            "utilities": "水電雜費",
-            "baby": "嬰兒",
-            "pets": "寵物",
-            "school": "學校",
-            "travel": "旅行",
-            "shopping": "購物",
-            "subscriptions": "訂閱",
-            "health": "健康",
-            "home": "家居",
-            "general": "通用"
-        },
         "recurring": {
             "empty": "沒有定期支出。",
             "add": "新增定期支出",
@@ -4516,7 +4502,10 @@
         "paidLabel": "已付",
         "totalsByCategory": "依類別",
         "categoryFilter": "依類別篩選支出",
-        "noExpensesInCategory": "此類別沒有支出。"
+        "noExpensesInCategory": "此類別沒有支出。",
+        "noCategory": "無類別",
+        "participantsRequired": "請至少選擇一人。",
+        "moreDetailsHint": "備註與收據"
     },
     "wmo": {
         "0": "晴天",

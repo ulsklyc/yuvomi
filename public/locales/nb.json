@@ -4387,20 +4387,6 @@
             "shopping": "Shopping",
             "general": "Generelt"
         },
-        "category": {
-            "groceries": "Dagligvarer",
-            "rent": "Leie",
-            "utilities": "Verktøy",
-            "baby": "Baby",
-            "pets": "Kjæledyr",
-            "school": "Skole",
-            "travel": "Reise",
-            "shopping": "Shopping",
-            "subscriptions": "Abonnementer",
-            "health": "Helse",
-            "home": "Hjem",
-            "general": "Generelt"
-        },
         "recurring": {
             "empty": "Ingen gjentakende utgifter.",
             "add": "Legg til gjentakende utgift",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Betalt",
         "totalsByCategory": "Etter kategori",
         "categoryFilter": "Filtrer utgifter etter kategori",
-        "noExpensesInCategory": "Ingen utgifter i denne kategorien."
+        "noExpensesInCategory": "Ingen utgifter i denne kategorien.",
+        "noCategory": "Uten kategori",
+        "participantsRequired": "Velg minst én person.",
+        "moreDetailsHint": "Notater og kvitteringer"
     },
     "wmo": {
         "0": "Skyfri",

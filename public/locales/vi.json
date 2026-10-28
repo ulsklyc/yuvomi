@@ -4387,20 +4387,6 @@
             "shopping": "Mua sắm",
             "general": "Chung"
         },
-        "category": {
-            "groceries": "Tạp hóa",
-            "rent": "Thuê nhà",
-            "utilities": "Tiện ích",
-            "baby": "Em bé",
-            "pets": "Thú cưng",
-            "school": "Trường học",
-            "travel": "Du lịch",
-            "shopping": "Mua sắm",
-            "subscriptions": "Đăng ký dịch vụ",
-            "health": "Sức khỏe",
-            "home": "Nhà",
-            "general": "Chung"
-        },
         "recurring": {
             "empty": "Không có chi phí định kỳ.",
             "add": "Thêm chi phí định kỳ",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Đã trả",
         "totalsByCategory": "Theo danh mục",
         "categoryFilter": "Lọc chi tiêu theo danh mục",
-        "noExpensesInCategory": "Không có chi tiêu nào trong danh mục này."
+        "noExpensesInCategory": "Không có chi tiêu nào trong danh mục này.",
+        "noCategory": "Không có danh mục",
+        "participantsRequired": "Chọn ít nhất một người.",
+        "moreDetailsHint": "Ghi chú và biên lai"
     },
     "wmo": {
         "0": "Trời quang",

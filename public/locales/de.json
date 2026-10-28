@@ -4387,20 +4387,6 @@
             "shopping": "Einkaufen",
             "general": "Allgemein"
         },
-        "category": {
-            "groceries": "Lebensmittel",
-            "rent": "Miete",
-            "utilities": "Nebenkosten",
-            "baby": "Baby",
-            "pets": "Haustiere",
-            "school": "Schule",
-            "travel": "Reise",
-            "shopping": "Einkaufen",
-            "subscriptions": "Abos",
-            "health": "Gesundheit",
-            "home": "Zuhause",
-            "general": "Allgemein"
-        },
         "recurring": {
             "empty": "Keine wiederkehrenden Ausgaben.",
             "add": "Wiederkehrende Ausgabe hinzufügen",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Bezahlt",
         "totalsByCategory": "Nach Kategorie",
         "categoryFilter": "Ausgaben nach Kategorie filtern",
-        "noExpensesInCategory": "Keine Ausgaben in dieser Kategorie."
+        "noExpensesInCategory": "Keine Ausgaben in dieser Kategorie.",
+        "noCategory": "Ohne Kategorie",
+        "participantsRequired": "Wähle mindestens eine Person.",
+        "moreDetailsHint": "Notizen und Belege"
     },
     "wmo": {
         "0": "Klarer Himmel",

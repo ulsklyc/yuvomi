@@ -4006,20 +4006,6 @@
             "shopping": "Nakupování",
             "general": "Obecné"
         },
-        "category": {
-            "groceries": "Potraviny",
-            "rent": "Nájem",
-            "utilities": "Poplatky",
-            "baby": "Dítě",
-            "pets": "Domácí zvířata",
-            "school": "Škola",
-            "travel": "Cestování",
-            "shopping": "Nakupování",
-            "subscriptions": "Předplatné",
-            "health": "Zdraví",
-            "home": "Domov",
-            "general": "Obecné"
-        },
         "recurring": {
             "empty": "Žádné opakující se výdaje.",
             "add": "Přidat opakující se výdaj",
@@ -4139,7 +4125,10 @@
         "paidLabel": "Zaplaceno",
         "totalsByCategory": "Podle kategorie",
         "categoryFilter": "Filtrovat výdaje podle kategorie",
-        "noExpensesInCategory": "V této kategorii nejsou žádné výdaje."
+        "noExpensesInCategory": "V této kategorii nejsou žádné výdaje.",
+        "noCategory": "Bez kategorie",
+        "participantsRequired": "Vyber alespoň jednu osobu.",
+        "moreDetailsHint": "Poznámky a účtenky"
     },
     "documents": {
         "title": "Dokumenty",

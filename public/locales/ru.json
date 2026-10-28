@@ -4637,20 +4637,6 @@
             "shopping": "Покупки",
             "general": "Общее"
         },
-        "category": {
-            "groceries": "Продукты",
-            "rent": "Аренда",
-            "utilities": "Коммунальные услуги",
-            "baby": "Ребенок",
-            "pets": "Питомцы",
-            "school": "Школа",
-            "travel": "Поездка",
-            "shopping": "Покупки",
-            "subscriptions": "Подписки",
-            "health": "Здоровье",
-            "home": "Дом",
-            "general": "Общее"
-        },
         "recurring": {
             "empty": "Нет повторяющихся расходов.",
             "add": "Добавить повторяющийся расход",
@@ -4774,7 +4760,10 @@
         "paidLabel": "Оплачено",
         "totalsByCategory": "По категориям",
         "categoryFilter": "Фильтровать расходы по категории",
-        "noExpensesInCategory": "В этой категории нет расходов."
+        "noExpensesInCategory": "В этой категории нет расходов.",
+        "noCategory": "Без категории",
+        "participantsRequired": "Выбери хотя бы одного человека.",
+        "moreDetailsHint": "Заметки и чеки"
     },
     "wmo": {
         "0": "Ясное небо",

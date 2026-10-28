@@ -4387,20 +4387,6 @@
             "shopping": "खरीदारी",
             "general": "सामान्य"
         },
-        "category": {
-            "groceries": "किराना",
-            "rent": "किराया",
-            "utilities": "उपयोगिताएं",
-            "baby": "शिशु",
-            "pets": "पालतू जानवर",
-            "school": "स्कूल",
-            "travel": "यात्रा",
-            "shopping": "खरीदारी",
-            "subscriptions": "सदस्यताएं",
-            "health": "स्वास्थ्य",
-            "home": "घर",
-            "general": "सामान्य"
-        },
         "recurring": {
             "empty": "कोई दोहराया खर्च नहीं।",
             "add": "दोहराया खर्च जोड़ें",
@@ -4516,7 +4502,10 @@
         "paidLabel": "चुकाया",
         "totalsByCategory": "श्रेणी के अनुसार",
         "categoryFilter": "खर्चों को श्रेणी के अनुसार फ़िल्टर करें",
-        "noExpensesInCategory": "इस श्रेणी में कोई खर्च नहीं है।"
+        "noExpensesInCategory": "इस श्रेणी में कोई खर्च नहीं है।",
+        "noCategory": "बिना श्रेणी",
+        "participantsRequired": "कम से कम एक व्यक्ति चुनें।",
+        "moreDetailsHint": "नोट्स और रसीदें"
     },
     "wmo": {
         "0": "साफ आकाश",

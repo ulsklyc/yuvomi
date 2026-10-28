@@ -4387,20 +4387,6 @@
             "shopping": "Shopping",
             "general": "General"
         },
-        "category": {
-            "groceries": "Groceries",
-            "rent": "Rent",
-            "utilities": "Utilities",
-            "baby": "Baby",
-            "pets": "Pets",
-            "school": "School",
-            "travel": "Travel",
-            "shopping": "Shopping",
-            "subscriptions": "Subscriptions",
-            "health": "Health",
-            "home": "Home",
-            "general": "General"
-        },
         "recurring": {
             "empty": "No recurring expenses.",
             "add": "Add recurring expense",
@@ -4516,7 +4502,10 @@
         "paidLabel": "Paid",
         "totalsByCategory": "By category",
         "categoryFilter": "Filter expenses by category",
-        "noExpensesInCategory": "No expenses in this category."
+        "noExpensesInCategory": "No expenses in this category.",
+        "noCategory": "No category",
+        "participantsRequired": "Choose at least one person.",
+        "moreDetailsHint": "Notes and receipts"
     },
     "wmo": {
         "0": "Clear sky",
