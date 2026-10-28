@@ -1062,3 +1062,20 @@ test('R24 G5 P2-4/P3-6: Pflichtfeld zuerst, Seltenes gefaltet und benannt, ein L
   assert.match(shell, /\$\{entries\.length \|\| nutrition\.summary\?\.target \? nutritionTodaySectionMarkup\(own\) : ''\}/,
     'ohne Eintrag und ohne Ziel nur der Leerzustand des Bereichs');
 });
+
+// R24 (Critique G5 P2-5): das Fastenziel stand nur im Einstellungsblatt hinter
+// „...", gestartet lief man „Ohne Ziel"; Nachtragen stand im „..." UND im
+// Leerzustand. Gemessen nachher (1440): Ziel-Leiste in der Bereit-Karte,
+// Wahl 16:8 gespeichert, Fokus bleibt auf „16:8"; ohne Verlauf nur der Leerzustand.
+// Escape schliesst das „..." (gemessen, erledigt vorab 71b012bc8).
+test('R24 G5 P2-5: das Fastenziel steht vor dem Start, Nachtragen an EINER Stelle', () => {
+  const page = read('public/pages/health-fasting.js');
+  const controls = read('public/components/fasting-controls.js');
+  assert.match(page, /\$\{writable && !active \? `<div class="fasting-hero__goal" data-fasting-goal-host>\$\{fastingGoalHtml\(state\.settings \|\| \{\}, \{ compact: true \}\)\}/,
+    'ohne laufendes Fasten traegt die Karte die Ziel-Leiste');
+  assert.match(page, /wireFastingPreferences\(goalHost,/, 'dieselbe Verdrahtung wie im Blatt: speichert sofort');
+  assert.match(controls, /export function fastingPreferencesHtml[\s\S]{0,200}\$\{fastingGoalHtml\(settings\)\}/, 'das Blatt baut dieselbe Leiste');
+  // EIN Weg je Datenlage: leer der Leerzustand (R22 D12), mit Verlauf das „..." (R23 D14).
+  assert.match(page, /\$\{fastingMoreMenuHtml\(\{ backfill: !sections\.empty \}\)\}/, 'ohne Verlauf kein Nachtragen im „..."');
+  assert.match(page, /\.\.\.\(backfill \? \[\{ action: 'fasting-backfill'/, 'mit Verlauf steht es dort');
+});

@@ -212,6 +212,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which names what it holds - as in the medication and preventive care dialogs. Editing an existing entry
   no longer brings up the keyboard on phones. Without any entry and without a daily goal, Nutrition shows
   one empty state instead of the goal hint above it.
+- **Pick your fasting goal before you start.** When no fast is running, the fasting card shows the goal
+  (none, 12:12 up to 23:1, custom) right above the buttons, so "Start fasting" runs with the goal you
+  see instead of "No goal" from a setting two steps away. Adding a past fast has one place: the empty
+  state while there is no history, the card's "..." menu once there is.
 - **The Health overview starts with today.** On phones "As needed" now stands right below "Due today",
   before the list of areas, instead of behind "Show all values"; the card with the two latest
   measurements is called "Last measured". On the desktop an area's name stands above it without a card

@@ -14,7 +14,7 @@ import { moduleAccess } from '/permissions.js';
 import { scheduleUndoableDelete } from '/utils/ux.js';
 import { fastingEducationMarkup } from '/components/fasting-dial.js';
 import { renderFastingStats } from '/components/health-fasting-insights.js';
-import { fastingPreferencesHtml, wireFastingPreferences, startFasting, finishFasting, openFastingCreator, openFastingEditor, startFastingClock, fastingClockSwitchHtml, fastingStamp, fastingError, requireFastingWrite } from '/components/fasting-controls.js';
+import { fastingPreferencesHtml, fastingGoalHtml, wireFastingPreferences, startFasting, finishFasting, openFastingCreator, openFastingEditor, startFastingClock, fastingClockSwitchHtml, fastingStamp, fastingError, requireFastingWrite } from '/components/fasting-controls.js';
 
 const panels = new WeakMap();
 // Undo timers outlive page roots. Suppression follows the signed-in owner.
@@ -226,12 +226,15 @@ async function refresh(view, { refreshStats = false } = {}) {
  * Zahnrad als dritter Knopf in der Aktionszeile (Critique G5 P3) und das
  * Nachtragen als Geisterknopf ueber dem Verlauf.
  */
-function fastingMoreMenuHtml() {
+function fastingMoreMenuHtml({ backfill = true } = {}) {
+  // EIN WEG ZUM NACHTRAGEN JE DATENLAGE (R24, Critique G5 P2-5; R22 D12):
+  // ohne Verlauf traegt ihn der Leerzustand direkt unter der Karte - das „..."
+  // bot denselben Eintrag ein zweites Mal. Mit Verlauf steht er hier (R23 D14).
   return popoverMenuHtml({
     id: 'fasting-more-menu',
     label: t('common.moreActionsNamed', { name: t('health.fasting.title') }),
     items: [
-      { action: 'fasting-backfill', label: t('health.fasting.backfill'), icon: 'history', attrs: { 'data-fasting-backfill': '' } },
+      ...(backfill ? [{ action: 'fasting-backfill', label: t('health.fasting.backfill'), icon: 'history', attrs: { 'data-fasting-backfill': '' } }] : []),
       { action: 'fasting-settings', label: t('nav.settings'), icon: 'settings', attrs: { 'data-fasting-settings': '' } },
     ],
   });
@@ -255,7 +258,13 @@ function renderBody(view, stats, statsError = false) {
     <div class="fasting-dial fasting-dial--segmented" data-fasting-progress><div data-fasting-segments></div><div class="fasting-dial__content"><div class="fasting-hero__timer" data-fasting-timer>00:00:00</div><span class="fasting-dial__days" data-fasting-days></span></div></div>
     <p class="sr-only" role="status" aria-live="polite" data-fasting-announcement></p>
     ${active ? `<p class="fasting-hero__remaining" data-fasting-remaining></p><p class="fasting-hero__meta">${esc(t('health.fasting.startedAt', { date: fastingStamp(active.start_at, active.start_tzid) }))}</p>${active.goal_minutes ? `<p class="fasting-hero__meta" data-fasting-target>${esc(t('health.fasting.targetAt', { date: fastingStamp(new Date(Date.parse(active.start_at) + active.goal_minutes * 60000).toISOString(), active.start_tzid) }))}</p>` : ''}` : ''}
-    ${writable ? `<div class="fasting-hero__actions">${active ? `<button class="btn btn--primary" type="button" data-fasting-action>${esc(t('health.fasting.finish'))}</button>` : ''}<button class="btn btn--secondary" type="button" ${active ? 'data-fasting-edit-start' : 'data-fasting-earlier'}>${esc(t(active ? 'health.fasting.editStart' : 'health.fasting.earlier'))}</button>${fastingMoreMenuHtml()}</div>` : `<p class="form-hint">${esc(t('health.fasting.readOnly'))}</p>`}
+    ${/* DAS ZIEL STEHT VOR DEM START (R24, Critique G5 P2-5): es lag nur im
+         Einstellungsblatt hinter „...", gestartet lief man „Ohne Ziel" mit
+         leerem Ring. Ohne laufendes Fasten traegt die Bereit-Karte die
+         Ziel-Leiste; die Wahl gilt sofort fuer den naechsten Start (der FAB
+         „Fasten starten" nimmt sie, R23 D14). */ ''}
+    ${writable && !active ? `<div class="fasting-hero__goal" data-fasting-goal-host>${fastingGoalHtml(state.settings || {}, { compact: true })}<p class="form-hint" role="status" data-fasting-preferences-status></p></div>` : ''}
+    ${writable ? `<div class="fasting-hero__actions">${active ? `<button class="btn btn--primary" type="button" data-fasting-action>${esc(t('health.fasting.finish'))}</button>` : ''}<button class="btn btn--secondary" type="button" ${active ? 'data-fasting-edit-start' : 'data-fasting-earlier'}>${esc(t(active ? 'health.fasting.editStart' : 'health.fasting.earlier'))}</button>${fastingMoreMenuHtml({ backfill: !sections.empty })}</div>` : `<p class="form-hint">${esc(t('health.fasting.readOnly'))}</p>`}
     <p class="form-hint" role="alert" data-fasting-error></p>
     ${state.settings?.zone_mode === 'educational' ? fastingEducationMarkup() : ''}
   </section>
@@ -279,6 +288,15 @@ function renderBody(view, stats, statsError = false) {
   const reloadStats = () => refresh(view, { refreshStats: true });
   if (writable) {
     root.querySelector('[data-fasting-settings]')?.addEventListener('click', () => openFastingSettings(view, reload));
+    const goalHost = root.querySelector('[data-fasting-goal-host]');
+    if (goalHost) {
+      // Dieselbe Verdrahtung wie im Blatt: jede Wahl speichert sofort, danach
+      // zeichnet die Karte neu und der Fokus kehrt an die Wahl zurueck.
+      wireFastingPreferences(goalHost, state.settings || {}, async () => {
+        await reload();
+        return root.querySelector('[data-fasting-goal-host]');
+      }, () => view.state?.active ?? null);
+    }
     const toggleFasting = async (button) => {
       if (button) button.disabled = true;
       try {

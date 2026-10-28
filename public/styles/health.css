@@ -4104,6 +4104,12 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .fasting-hero__remaining { font-weight: var(--font-weight-semibold); }
 .fasting-hero__meta { margin-block: var(--space-2) var(--space-4); color: var(--color-text-secondary); }
 .fasting-hero__actions { display: flex; justify-content: center; gap: var(--space-2); flex-wrap: wrap; }
+/* Die Ziel-Leiste vor dem Start (R24, Critique G5 P2-5): Feldetikett ueber dem
+ * Segment, mittig wie die Karte; laeuft ein Fasten, steht sie nicht da. */
+.fasting-hero__goal { display: grid; justify-items: center; gap: var(--space-1); max-inline-size: 100%; margin-block-end: var(--space-4); }
+.fasting-goal--compact { display: grid; justify-items: center; max-inline-size: 100%; }
+.fasting-goal--compact .fasting-presets { margin-block: var(--space-2) 0; }
+.fasting-goal--compact .fasting-custom { justify-self: stretch; text-align: start; }
 /* Vor dem ersten Fasten (health-fasting.js `idle`): kein leerer Ring, keine
  * Umschaltung der Uhr - Satz und Knoepfe, darunter gleich der Leerzustand
  * des Verlaufs (Critique 2026-10-16). */

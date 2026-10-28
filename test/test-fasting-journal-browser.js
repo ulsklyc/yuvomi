@@ -260,14 +260,14 @@ test('journal earlier start, active edit, recorded target, end undo and manual h
     assert.equal(Date.parse(edited.start_at) - Date.parse(active.start_at), 300000);
     assert.equal(edited.end_at, null);
     await openFastingSettings(page);
-    await page.click('[data-fasting-preset="16"]');
-    await page.waitForFunction(() => (() => { const el = document.querySelector('[data-fasting-preset="16"]'); return el?.getAttribute('aria-checked') === 'true' && !el.disabled; })());
+    await page.click('.modal-panel [data-fasting-preset="16"]');
+    await page.waitForFunction(() => (() => { const el = document.querySelector('.modal-panel [data-fasting-preset="16"]'); return el?.getAttribute('aria-checked') === 'true' && !el.disabled; })());
     await page.waitForSelector('[data-fasting-target]');
     const target16 = await page.$eval('[data-fasting-target]', (el) => el.textContent);
-    await page.click('[data-fasting-preset="20"]');
+    await page.click('.modal-panel [data-fasting-preset="20"]');
     await page.waitForFunction((value) => document.querySelector('[data-fasting-target]')?.textContent !== value, {}, target16);
     assert.equal((await call(page, 'get', '/health/fasting/state')).data.active.start_at, edited.start_at);
-    await page.click('[data-fasting-preset="none"]');
+    await page.click('.modal-panel [data-fasting-preset="none"]');
     await page.waitForFunction(() => !document.querySelector('[data-fasting-target]'));
     await closeFastingSettings(page);
     await page.click('[data-fasting-action]');
@@ -281,11 +281,11 @@ test('journal earlier start, active edit, recorded target, end undo and manual h
     active = (await call(page, 'get', '/health/fasting/state')).data.active;
     assert.equal(active.id, edited.id);
     // Nachtragen sitzt seit R22 (D12) im Leerzustand und seit R23 (D14) im "..."
-    // des Rings, nicht im FAB. Hier der Leerzustand; der Weg ueber das "..."
-    // steht in der Probe zur Server-Uhr.
+    // des Rings, nicht im FAB - seit R24 (G5 P2-5) EIN Weg je Datenlage: ohne
+    // Verlauf nur der Leerzustand, mit Verlauf das "..." (Probe zur Server-Uhr).
     const emptyBackfill = '[data-fasting-body] .empty-state [data-fasting-backfill]';
     assert.ok(await page.$(emptyBackfill));
-    assert.ok(await page.$('#fasting-more-menu [data-fasting-backfill]'));
+    assert.equal(await page.$('#fasting-more-menu [data-fasting-backfill]'), null, 'ohne Verlauf kein zweites Nachtragen im "..."');
     assert.equal(await page.$('[data-fasting-from]'), null, 'ohne abgeschlossenes Fasten kein Filter');
     await page.click(emptyBackfill);
     await page.waitForSelector('#fast-start'); await settle(page);
@@ -323,10 +323,10 @@ test('completed-entry default uses server time while the phone clock stays ahead
           static now() { return RealDate.now() + offset; }
         };
       }, offsetMinutes * 60 * 1000);
-      // Nachtragen ueber das "..." des Rings (R23 D14).
-      await page.click('[popovertarget="fasting-more-menu"]');
-      await page.waitForSelector('#fasting-more-menu:popover-open [data-fasting-backfill]');
-      await page.click('#fasting-more-menu [data-fasting-backfill]');
+      // Nachtragen: ohne Verlauf ueber den Leerzustand (R24 G5 P2-5; mit
+      // Verlauf steht derselbe Eintrag im "..." des Rings, R23 D14).
+      await page.waitForSelector('[data-fasting-body] .empty-state [data-fasting-backfill]');
+      await page.click('[data-fasting-body] .empty-state [data-fasting-backfill]');
       await page.waitForSelector('[data-fasting-edit-form]');
       await page.$eval('[data-fasting-edit-form]', (form) => form.requestSubmit());
       await settle(page);
