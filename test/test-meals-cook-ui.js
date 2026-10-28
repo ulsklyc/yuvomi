@@ -306,7 +306,14 @@ test('Wandtablett, "Wer heute dran ist": der Koch der heutigen Mahlzeit zaehlt m
     const zuvor = globalThis.window.yuvomi;
     globalThis.window.yuvomi = null;
     try {
-      const html = dashboard.renderWallSurface({ todayMeals, urgentTasks, wallTasks, users: [ANNA_WAND, BEN_WAND] }, null, {});
+      // DIE UHR STEHT AM NACHMITTAG (R24 S7b): seit die Wand ihre Zeilen aus
+      // der Zeitleiste nimmt (R24 S7, 08fe2de19), zaehlt jede Mahlzeit, die
+      // heute noch kommt - morgens drei, ab dem Abendessen keine. Der Test lief
+      // mit der Wanduhr und war nur zwischen Mittag und Abendessen gruen. Um
+      // 15:00 steht genau das Abendessen noch aus: eine Sache.
+      const afternoon = new Date();
+      afternoon.setHours(15, 0, 0, 0);
+      const html = dashboard.renderWallSurface({ todayMeals, urgentTasks, wallTasks, users: [ANNA_WAND, BEN_WAND] }, null, { now: afternoon });
       return abschnitt(html, 'class="wall__who"', '</section>');
     } finally {
       globalThis.window.yuvomi = zuvor;
