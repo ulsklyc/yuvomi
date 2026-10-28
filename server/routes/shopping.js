@@ -1341,10 +1341,11 @@ router.post('/:listId/import-meal-plan', (req, res) => {
 // --------------------------------------------------------
 // POST /api/v1/shopping/:listId/import-pantry
 // Setzt Vorratsartikel auf die Einkaufsliste (leer oder unter Mindestbestand).
-// Body: { items: [{ pantry_item_id, quantity? } | { pantry_product_id }] }
+// Body: { items: [{ pantry_item_id, quantity? } | { pantry_product_id, quantity? }] }
 //
-// `pantry_product_id` hands over a household product without batches (#1448):
-// its name and category, no quantity, like an empty batch without a minimum.
+// `pantry_product_id` hands over a household product (#1448): its name and
+// category, and the shortfall to its minimum over all its batches as the
+// quantity (step 3), or none, like an empty batch without a minimum.
 //
 // Die Mengen-Angabe kommt als fertiger Anzeigetext vom Client: shopping_items.quantity
 // ist Freitext, und die Einheiten des Vorrats ('pcs', 'can', …) sind erst über t()
@@ -1401,9 +1402,7 @@ router.post('/:listId/import-pantry', (req, res) => {
           ? findPantryProduct.get(Number(entry.pantry_product_id))
           : findPantryItem.get(Number(entry?.pantry_item_id));
         if (!pantryItem) { missing += 1; continue; }
-        // A product without batches has no stock to measure a shortfall
-        // against: it goes over without a quantity.
-        const vQty = byProduct ? { value: null } : str(entry.quantity, 'quantity', { max: MAX_SHORT, required: false });
+        const vQty = str(entry.quantity, 'quantity', { max: MAX_SHORT, required: false });
         const category = validNames.includes(pantryItem.category) ? pantryItem.category : defaultCat;
         rows.push({ name: pantryItem.name, quantity: vQty.value, category });
       }

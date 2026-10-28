@@ -1,5 +1,5 @@
 /**
- * Test: A household product above the stock batch (#1448, part 1)
+ * Test: A household product above the stock batch (#1448, parts 1 and 3)
  * Purpose: Migration 253 groups the existing batches into products by their
  *          own wording (trimmed, whitespace collapsed, case-insensitive, Unicode
  *          case included) and unit, with its own frozen grouping; the start of
@@ -8,6 +8,12 @@
  *          every write path (create, full edit, partial PATCH, import from
  *          Shopping, demo seed) leaves no batch without a product; a renamed
  *          batch moves to another product and the old one stays.
+ *          Part 3: migration 269 gives every product the highest minimum of
+ *          its batches (frozen SQL), the adoption at start does the same for
+ *          a product it creates, and the kitchen count reads low and out over
+ *          the product, counting a product that needs attention once, and a
+ *          product without batches only when it has a minimum (#2118); a
+ *          rename into a new product keeps the minimum (#2118).
  *
  *          The migration runs through the real runner on a database migrated
  *          to v249, as an existing installation runs the update. The routes are
@@ -30,6 +36,7 @@ import { tempDir } from './tmp-dir.js';
 const dbmod = await import('../server/db.js');
 const { default: pantryRouter } = await import('../server/routes/pantry.js');
 const { default: shoppingRouter } = await import('../server/routes/shopping.js');
+const { default: kitchenRouter } = await import('../server/routes/kitchen.js');
 const { productKey, assignPantryProduct } = await import('../server/services/pantry-products.js');
 const db = dbmod.get();
 
@@ -53,6 +60,7 @@ app.use((req, _res, next) => {
 });
 app.use('/pantry', pantryRouter);
 app.use('/shopping', shoppingRouter);
+app.use('/kitchen', kitchenRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -117,7 +125,7 @@ function insertLegacyRows(database) {
 /** Batch id -> what its product says, for comparing two databases. */
 function productOfEveryBatch(database) {
   return database.prepare(`
-    SELECT pi.id AS batch, pp.name, pp.name_key, pp.unit, pp.category, pp.created_by, pp.created_at, pp.updated_at
+    SELECT pi.id AS batch, pp.name, pp.name_key, pp.unit, pp.category, pp.min_quantity, pp.created_by, pp.created_at, pp.updated_at
     FROM pantry_items pi LEFT JOIN pantry_products pp ON pp.id = pi.product_id
     ORDER BY pi.id
   `).all();
@@ -196,9 +204,11 @@ test('migration 253 leaves updated_at of every batch alone and puts the trigger 
   assert.notEqual(legacy.prepare('SELECT updated_at FROM pantry_items WHERE id = 1').get().updated_at, '2026-01-05T08:00:00Z');
 });
 
-test('pantry_products: unique per key and unit as stored, product_id cascades, the product keeps no minimum yet', () => {
+test('pantry_products: unique per key and unit as stored, product_id cascades, the minimum is the last column (v269)', () => {
   const columns = db.prepare('PRAGMA table_info(pantry_products)').all().map((c) => c.name);
-  assert.deepEqual(columns, ['id', 'name', 'name_key', 'unit', 'category', 'created_by', 'created_at', 'updated_at']);
+  assert.deepEqual(columns, ['id', 'name', 'name_key', 'unit', 'category', 'created_by', 'created_at', 'updated_at', 'min_quantity']);
+  assert.ok(db.prepare('PRAGMA table_info(pantry_items)').all().some((c) => c.name === 'min_quantity'),
+    'the batch column stays: no destructive change, the previous version still finds it');
 
   const fk = db.prepare('PRAGMA foreign_key_list(pantry_items)').all().find((f) => f.from === 'product_id');
   assert.equal(fk.table, 'pantry_products');
@@ -226,14 +236,23 @@ test('pantry_products: unique per key and unit as stored, product_id cascades, t
 // the stored name_key values follow the old rule and the writers would stop
 // finding their products, which needs a migration of its own.
 test('the frozen grouping of migration 253 and the live grouping agree today', () => {
+  // Two batches of milk with different minimums, one oil with one (#1448, step 3).
+  const withMinimums = (database) => {
+    insertLegacyRows(database);
+    // With the trigger resting, so updated_at stays what LEGACY_ROWS says.
+    const trigger = database.prepare("SELECT sql FROM sqlite_master WHERE name = 'trg_pantry_items_updated_at'").get().sql;
+    database.exec('DROP TRIGGER trg_pantry_items_updated_at');
+    database.exec('UPDATE pantry_items SET min_quantity = 2 WHERE id = 1; UPDATE pantry_items SET min_quantity = 4 WHERE id = 2; UPDATE pantry_items SET min_quantity = 1 WHERE id = 5');
+    database.exec(trigger);
+  };
   const migrated = databaseAt(252);
-  insertLegacyRows(migrated);
+  withMinimums(migrated);
   dbmod.migrate(migrated, dbmod.MIGRATIONS);
 
   // The same rows, written by an older version on an already migrated
   // database: product_id stays NULL, the start adopts them (live grouping).
   const newer = databaseAt(Infinity);
-  insertLegacyRows(newer);
+  withMinimums(newer);
   assert.equal(nullProducts(newer), LEGACY_ROWS.length);
 
   dbmod.adoptOrphanPantryBatches(newer);
@@ -244,6 +263,10 @@ test('the frozen grouping of migration 253 and the live grouping agree today', (
   assert.deepEqual(batchIdsByProduct(newer), batchIdsByProduct(migrated));
   const count = (database) => database.prepare('SELECT COUNT(*) AS c FROM pantry_products').get().c;
   assert.equal(count(newer), count(migrated));
+  const minOf = (database, batch) => database.prepare('SELECT pp.min_quantity AS m FROM pantry_items pi JOIN pantry_products pp ON pp.id = pi.product_id WHERE pi.id = ?').get(batch).m;
+  assert.equal(minOf(migrated, 1), 4, 'the highest minimum of the milk batches');
+  assert.equal(minOf(migrated, 4), 1);
+  assert.equal(minOf(migrated, 3), null);
 
   // The frozen key and the runtime key agree on every stored name.
   for (const batch of migrated.prepare('SELECT pi.name, pp.name_key FROM pantry_items pi JOIN pantry_products pp ON pp.id = pi.product_id').all()) {
@@ -568,4 +591,222 @@ test('the demo seed gives every batch its product and wipes the products with th
   assert.equal(second.products, first.products, 'a second seed does not pile up products');
   assert.equal(second.orphans, 0);
   assert.equal(second.empty, 0, 'every seeded product has a batch');
+});
+
+// --------------------------------------------------------------------------
+// Migration 269: the minimum moves to the product (#1448, step 3)
+// --------------------------------------------------------------------------
+
+/**
+ * The migration of step 3, found by what it does, not by its number: from
+ * #2118 on, whoever is merged first takes the next free number, so the number
+ * may change on a rebase. The titles name today's.
+ */
+const MINIMUM_MIGRATION = dbmod.MIGRATIONS.find((m) => typeof m.up === 'string'
+  && m.up.includes('ALTER TABLE pantry_products ADD COLUMN min_quantity REAL'));
+
+test('migration 269 is found by what it does, exactly once, after the products of step 1', () => {
+  assert.ok(MINIMUM_MIGRATION, 'the migration that adds pantry_products.min_quantity');
+  assert.equal(dbmod.MIGRATIONS.filter((m) => typeof m.up === 'string'
+    && m.up.includes('ALTER TABLE pantry_products ADD COLUMN min_quantity')).length, 1);
+  assert.ok(MINIMUM_MIGRATION.version > 253, 'after migration 253, which creates pantry_products');
+});
+
+/** A database just before migration 269, with products and batches written as step 1 left them. */
+function databaseWithMinimums() {
+  const database = databaseAt(MINIMUM_MIGRATION.version - 1);
+  const product = database.prepare(`
+    INSERT INTO pantry_products (id, name, name_key, unit, created_at, updated_at)
+    VALUES (?, ?, ?, ?, '2026-01-01T08:00:00Z', '2026-01-02T08:00:00Z')
+  `);
+  product.run(1, 'Milch', 'milch', 'l');         // batches with 2, 5 and none: 5
+  product.run(2, 'Reis', 'reis', 'kg');          // batches without a minimum: NULL
+  product.run(3, 'Zahnpasta', 'zahnpasta', 'pcs'); // no batch at all: NULL
+  product.run(4, 'Salz', 'salz', 'pcs');         // one batch with 0: 0, not NULL
+  const batch = database.prepare('INSERT INTO pantry_items (name, unit, quantity, min_quantity, product_id, updated_at) VALUES (?, ?, 1, ?, ?, ?)');
+  batch.run('Milch', 'l', 2, 1, '2026-01-03T08:00:00Z');
+  batch.run('Milch', 'l', 5, 1, '2026-01-03T08:00:00Z');
+  batch.run('Milch', 'l', null, 1, '2026-01-03T08:00:00Z');
+  batch.run('Reis', 'kg', null, 2, '2026-01-03T08:00:00Z');
+  batch.run('Salz', 'pcs', 0, 4, '2026-01-03T08:00:00Z');
+  return database;
+}
+
+test('migration 269 gives every product the highest minimum of its batches, NULL without one', () => {
+  const database = databaseWithMinimums();
+  dbmod.migrate(database, dbmod.MIGRATIONS);
+  const mins = Object.fromEntries(database.prepare('SELECT id, min_quantity FROM pantry_products ORDER BY id').all().map((r) => [r.id, r.min_quantity]));
+  assert.deepEqual(mins, { 1: 5, 2: null, 3: null, 4: 0 },
+    'milk 2/5/none -> 5 (warns early rather than late); rice without minimums and the product without batches stay NULL; 0 stays 0');
+  // The batch column stays as it was (no destructive change).
+  assert.deepEqual(database.prepare("SELECT min_quantity AS m FROM pantry_items WHERE name = 'Milch' ORDER BY id").all().map((r) => r.m), [2, 5, null]);
+});
+
+test('migration 269 leaves updated_at of every product alone and puts the trigger back', () => {
+  const database = databaseWithMinimums();
+  dbmod.migrate(database, dbmod.MIGRATIONS);
+  assert.deepEqual(database.prepare('SELECT DISTINCT updated_at FROM pantry_products').all().map((r) => r.updated_at), ['2026-01-02T08:00:00Z']);
+  assert.deepEqual(database.prepare('SELECT DISTINCT updated_at FROM pantry_items').all().map((r) => r.updated_at), ['2026-01-03T08:00:00Z']);
+  const triggers = database.prepare(`SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'pantry_products'`).all();
+  assert.deepEqual(triggers.map((t) => t.name), ['trg_pantry_products_updated_at']);
+  database.prepare('UPDATE pantry_products SET min_quantity = 7 WHERE id = 1').run();
+  assert.notEqual(database.prepare('SELECT updated_at FROM pantry_products WHERE id = 1').get().updated_at, '2026-01-02T08:00:00Z',
+    'an edit after the migration stamps again');
+});
+
+test('migration 269 is frozen SQL: no runtime code, nothing imported', () => {
+  const entry = MINIMUM_MIGRATION;
+  assert.equal(typeof entry.up, 'string', 'plain SQL');
+  assert.equal(entry.afterUp, undefined, 'no JS step');
+  assert.match(entry.up, /ALTER TABLE pantry_products ADD COLUMN min_quantity REAL;/);
+  assert.match(entry.up, /SELECT MAX\(pi\.min_quantity\) FROM pantry_items pi WHERE pi\.product_id = pantry_products\.id/);
+  assert.doesNotMatch(entry.up, /DROP TABLE|DROP COLUMN/, 'the batch column stays');
+});
+
+test('adoption at start: a product it creates takes the highest minimum of its batches, a joined one keeps its own', () => {
+  const database = databaseAt(Infinity);
+  const milk = database.prepare(`INSERT INTO pantry_items (name, unit, created_by) VALUES ('Milch', 'l', 1)`).run().lastInsertRowid;
+  const milkProduct = assignPantryProduct(database, milk, { userId: 1 });
+  database.prepare('UPDATE pantry_products SET min_quantity = 1 WHERE id = ?').run(milkProduct);
+  // An older version writes the minimum on the batch and knows no product.
+  database.prepare(`
+    INSERT INTO pantry_items (id, name, unit, min_quantity, created_by) VALUES
+      (200, 'milch', 'l', 9, 1),
+      (201, 'Brot', 'pcs', 2, 1),
+      (202, 'brot', 'pcs', 3, 1),
+      (203, 'Tee', 'pkg', NULL, 1)
+  `).run();
+
+  dbmod.adoptOrphanPantryBatches(database);
+  const minOf = (batch) => database.prepare('SELECT pp.min_quantity AS m FROM pantry_items pi JOIN pantry_products pp ON pp.id = pi.product_id WHERE pi.id = ?').get(batch).m;
+  assert.equal(minOf(200), 1, 'an existing product is joined as it is, its minimum included');
+  assert.equal(minOf(201), 3, 'a new product: the highest of its batches');
+  assert.equal(minOf(203), null);
+});
+
+// --------------------------------------------------------------------------
+// The kitchen count over products (#1448, step 3)
+// --------------------------------------------------------------------------
+
+const TODAY = '2026-10-20';
+async function kitchen() {
+  const r = await call('GET', `/kitchen/summary?today=${TODAY}`);
+  assert.equal(r.status, 200);
+  return r.body.data.pantry;
+}
+function resetStock() {
+  db.prepare('DELETE FROM pantry_items').run();
+  db.prepare('DELETE FROM pantry_products').run();
+}
+const post = (body) => call('POST', '/pantry', body).then((r) => r.body.data);
+
+test('kitchen: low and out are read over the product total, not per batch', async () => {
+  resetStock();
+  // Toothpaste: 1 in the bathroom, 8 in the attic, minimum 3: the household has 9.
+  await post({ name: 'Zahnpasta', quantity: 1, min_quantity: 3 });
+  await post({ name: 'Zahnpasta', quantity: 8 });
+  assert.deepEqual(await kitchen(), { attention: 0, expired: 0, low: 0, out: 0 }, 'not low: 9 > 3');
+
+  // Milk 1 l + 1 l + 2 l against a minimum of 5: the product is low, once.
+  await post({ name: 'Milch', unit: 'l', quantity: 1, min_quantity: 5 });
+  await post({ name: 'Milch', unit: 'l', quantity: 1 });
+  const big = await post({ name: 'Milch', unit: 'l', quantity: 2 });
+  assert.deepEqual(await kitchen(), { attention: 1, expired: 0, low: 1, out: 0 });
+
+  // The boundary: total = minimum is low (as pantryStockStatus says).
+  await call('PATCH', `/pantry/${big.id}`, { quantity: 3 });
+  assert.equal((await kitchen()).low, 1, '5 <= 5 is low');
+  await call('PATCH', `/pantry/${big.id}`, { quantity: 3.01 });
+  assert.equal((await kitchen()).low, 0, '5.01 is not');
+
+  // Out: every batch at 0, and a product whose last batch is gone.
+  resetStock();
+  const a = await post({ name: 'Mehl', unit: 'kg', quantity: 0, min_quantity: 1 });
+  await post({ name: 'Mehl', unit: 'kg', quantity: 0 });
+  const soap = await post({ name: 'Seife', quantity: 1, min_quantity: 2 });
+  await call('DELETE', `/pantry/${soap.id}`);
+  const salt = await post({ name: 'Salz', quantity: 1 });
+  await call('DELETE', `/pantry/${salt.id}`);
+  assert.deepEqual(await kitchen(), { attention: 2, expired: 0, low: 0, out: 2 },
+    'flour (two empty batches) is one product out; soap without batches and with a minimum is out; '
+    + 'salt without batches and without a minimum is not (#2118, point 3)');
+  // A minimum of 0 is no minimum here (hasPantryMinimum); a batch at 0 is out without one.
+  db.prepare("UPDATE pantry_products SET min_quantity = 0 WHERE name = 'Salz'").run();
+  assert.equal((await kitchen()).out, 2, 'salt with a minimum of 0 still is not');
+  db.prepare("UPDATE pantry_products SET min_quantity = 1 WHERE name = 'Salz'").run();
+  assert.deepEqual(await kitchen(), { attention: 3, expired: 0, low: 0, out: 3 }, 'with a minimum of 1 it is');
+  const pepper = await post({ name: 'Pfeffer', quantity: 0 });
+  assert.equal((await kitchen()).out, 4, 'a batch at 0 is out with or without a minimum');
+  assert.ok(a && pepper);
+});
+
+test('kitchen: a product that is low and has an expired batch is ONE item needing attention, not two', async () => {
+  resetStock();
+  // Milk: low over its total (4 <= 5) and one batch expired yesterday.
+  await post({ name: 'Milch', unit: 'l', quantity: 1, min_quantity: 5, expires_on: '2026-10-19' });
+  await post({ name: 'Milch', unit: 'l', quantity: 1 });
+  await post({ name: 'Milch', unit: 'l', quantity: 2 });
+  const one = await kitchen();
+  assert.deepEqual(one, { attention: 1, expired: 1, low: 1, out: 0 },
+    'expired counts the batch, low the product, attention the product once');
+
+  // Passata: two expired batches of one product, plenty in stock: one item.
+  await post({ name: 'Passata', unit: 'can', quantity: 3, expires_on: '2026-10-01' });
+  await post({ name: 'Passata', unit: 'can', quantity: 3, expires_on: '2026-10-10' });
+  assert.deepEqual(await kitchen(), { attention: 2, expired: 3, low: 1, out: 0 },
+    'two expired batches of one product are one item needing attention; expired still names three batches');
+
+  // An expired batch of a product that is not low, and an empty product with a
+  // minimum: each one. An empty product without a minimum is nothing (#2118).
+  await post({ name: 'Joghurt', unit: 'jar', quantity: 2, expires_on: '2026-10-18' });
+  const soap = await post({ name: 'Seife', quantity: 1, min_quantity: 1 });
+  await call('DELETE', `/pantry/${soap.id}`);
+  const salt = await post({ name: 'Salz', quantity: 1 });
+  await call('DELETE', `/pantry/${salt.id}`);
+  assert.deepEqual(await kitchen(), { attention: 4, expired: 4, low: 1, out: 1 });
+
+  // Counter-proof: soon is not attention, and a fresh batch of milk lifts it out of low.
+  await post({ name: 'Brot', quantity: 1, expires_on: '2026-10-22' });
+  await post({ name: 'Milch', unit: 'l', quantity: 2 });
+  assert.deepEqual(await kitchen(), { attention: 4, expired: 4, low: 0, out: 1 },
+    'milk is no longer low but still has its expired batch: still one item');
+});
+
+test('#2118: "Milch", 3 l, minimum 2, renamed to "Vollmilch" in a PUT without the field keeps its minimum', async () => {
+  resetStock();
+  const milk = await post({ name: 'Milch', unit: 'l', quantity: 3, min_quantity: 2 });
+  assert.deepEqual(await kitchen(), { attention: 0, expired: 0, low: 0, out: 0 });
+
+  const r = await call('PUT', `/pantry/${milk.id}`, { name: 'Vollmilch', unit: 'l', quantity: 3 });
+  assert.equal(r.status, 200);
+  const products = db.prepare(`
+    SELECT p.id, p.name, p.min_quantity AS min, COUNT(pi.id) AS batches
+    FROM pantry_products p LEFT JOIN pantry_items pi ON pi.product_id = p.id
+    GROUP BY p.id ORDER BY p.id
+  `).all();
+  assert.deepEqual(products.map(({ name, min, batches }) => ({ name, min, batches })), [
+    { name: 'Milch', min: 2, batches: 0 },
+    { name: 'Vollmilch', min: 2, batches: 1 },
+  ], 'Vollmilch, created by the move, takes over the minimum of Milch');
+  assert.equal(r.body.data.min_quantity, 2);
+
+  // Vollmilch (3 l against 2) is fine. Milch is left with 0 batches and its
+  // minimum, so it says "you have 0" and counts as out until it is deleted.
+  assert.deepEqual(await kitchen(), { attention: 1, expired: 0, low: 0, out: 1 });
+  assert.equal((await call('DELETE', `/pantry/products/${products[0].id}`)).status, 204);
+  assert.deepEqual(await kitchen(), { attention: 0, expired: 0, low: 0, out: 0 }, 'deleted: nothing left to count');
+
+  // Into an EXISTING product: that product keeps its own minimum.
+  const oat = await post({ name: 'Hafermilch', unit: 'l', quantity: 2, min_quantity: 5 });
+  await call('PUT', `/pantry/${milk.id}`, { name: 'Hafermilch', unit: 'l', quantity: 3 });
+  assert.equal(db.prepare('SELECT min_quantity AS m FROM pantry_products WHERE id = ?').get(oat.product_id).m, 5);
+  assert.equal(db.prepare('SELECT min_quantity AS m FROM pantry_products WHERE id = ?').get(products[1].id).m, 2,
+    'Vollmilch, left behind, keeps its 2');
+});
+
+test('kitchen: a batch without a product (an older version wrote it) counts for itself', async () => {
+  resetStock();
+  db.prepare(`INSERT INTO pantry_items (name, quantity, min_quantity, expires_on) VALUES ('Alt', 1, 2, '2026-01-01')`).run();
+  assert.deepEqual(await kitchen(), { attention: 1, expired: 1, low: 1, out: 0 });
+  resetStock();
 });

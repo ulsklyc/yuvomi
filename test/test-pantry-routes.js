@@ -218,7 +218,10 @@ test('PUT /pantry/:id: ersetzt alle Felder; weggelassene werden geleert', async 
   assert.equal(r.status, 200);
   assert.equal(r.body.data.name, 'Neu');
   assert.equal(r.body.data.notes, null);
-  assert.equal(r.body.data.min_quantity, null);
+  // The minimum is the product's since #1448 step 3: a replace without the
+  // field no longer clears it (CHANGELOG, Deprecated), and the product "Neu, l"
+  // that this move creates takes over the minimum of "Alt, kg" (#2118, point 2).
+  assert.equal(r.body.data.min_quantity, 2);
   assert.equal(r.body.data.expires_on, null);
 });
 
@@ -555,21 +558,26 @@ test('GET /pantry: products names every household product with its batch count, 
   assert.ok(r.body.data.every((i) => i.product_id === milk.id), 'both batches point at the product listed');
 });
 
-test('import-pantry: a product without batches goes over by pantry_product_id, with its name and category and no quantity', async () => {
+test('import-pantry: a product goes over by pantry_product_id, with its name, category and the shortfall sent', async () => {
   const list = await call('POST', '/shopping', { name: 'Drogerie' });
   const listId = list.body.data.id;
   const tooth = db.prepare("SELECT id FROM pantry_products WHERE name = 'Zahnpasta'").get();
   const r = await call('POST', `/shopping/${listId}/import-pantry`, {
-    // A quantity sent along is not taken: there is no stock to measure it against.
-    items: [{ pantry_product_id: tooth.id, quantity: '3' }, { pantry_product_id: 999999 }],
+    // The shortfall to the product's minimum, as display text (#1448, step 3).
+    items: [{ pantry_product_id: tooth.id, quantity: '3 pcs' }, { pantry_product_id: 999999 }],
   });
   assert.equal(r.status, 200);
   assert.equal(r.body.data.added, 1);
   assert.equal(r.body.data.skipped, 1, 'an unknown product is skipped like an unknown batch');
   const row = db.prepare('SELECT id, name, quantity, category FROM shopping_items WHERE list_id = ?').get(listId);
   assert.deepEqual({ name: row.name, quantity: row.quantity, category: row.category },
-    { name: 'Zahnpasta', quantity: null, category: 'Drogerie' });
+    { name: 'Zahnpasta', quantity: '3 pcs', category: 'Drogerie' });
   assert.deepEqual(r.body.data.added_ids, [row.id]);
+
+  // Without a quantity (a product without a minimum) it goes over without one.
+  const plain = await call('POST', '/shopping', { name: 'Drogerie 2' });
+  await call('POST', `/shopping/${plain.body.data.id}/import-pantry`, { items: [{ pantry_product_id: tooth.id }] });
+  assert.equal(db.prepare('SELECT quantity FROM shopping_items WHERE list_id = ?').get(plain.body.data.id).quantity, null);
 
   // Same name unchecked on the list: skipped, as for a batch.
   const again = await call('POST', `/shopping/${listId}/import-pantry`, { items: [{ pantry_product_id: tooth.id }] });
@@ -671,4 +679,124 @@ test('DELETE /pantry/products/:id: behind the pantry write permission, like the 
   } finally {
     gatedServer.close();
   }
+});
+
+// --------------------------------------------------------------------------
+// The minimum on the product (#1448, step 3)
+// --------------------------------------------------------------------------
+const productMin = (itemId) => db.prepare(
+  'SELECT pp.min_quantity AS m FROM pantry_items pi JOIN pantry_products pp ON pp.id = pi.product_id WHERE pi.id = ?',
+).get(itemId).m;
+const batchColumn = (itemId) => db.prepare('SELECT min_quantity AS m FROM pantry_items WHERE id = ?').get(itemId).m;
+
+test('GET /pantry: products carry their minimum and total; every batch returns the minimum of its product', async () => {
+  db.prepare('DELETE FROM pantry_items').run();
+  db.prepare('DELETE FROM pantry_products').run();
+  const a = await call('POST', '/pantry', { name: 'Milch', quantity: 1, unit: 'l', min_quantity: 5 });
+  const b = await call('POST', '/pantry', { name: 'Milch', quantity: 1, unit: 'l' });
+  const c = await call('POST', '/pantry', { name: 'Milch', quantity: 2.25, unit: 'l' });
+  const soap = await call('POST', '/pantry', { name: 'Seife', quantity: 1, min_quantity: 2 });
+  await call('DELETE', `/pantry/${soap.body.data.id}`);
+
+  const r = await call('GET', '/pantry');
+  const milk = r.body.products.find((p) => p.name === 'Milch');
+  assert.deepEqual({ min: milk.min_quantity, total: milk.total_quantity, batches: milk.batch_count }, { min: 5, total: 4.25, batches: 3 });
+  const empty = r.body.products.find((p) => p.name === 'Seife');
+  assert.deepEqual({ min: empty.min_quantity, total: empty.total_quantity }, { min: 2, total: 0 }, 'a product outlives its batches with its minimum');
+  for (const item of r.body.data) assert.equal(item.min_quantity, 5, `batch ${item.id} returns the minimum of its product`);
+  assert.equal(batchColumn(b.body.data.id), null, 'the batch column is not what is read');
+  assert.equal(b.body.data.min_quantity, 5, 'POST answers with the mirrored value too');
+
+  const one = await call('PATCH', `/pantry/${c.body.data.id}`, { quantity: 2 });
+  assert.equal(one.body.data.min_quantity, 5, 'PATCH answers with the mirrored value');
+  assert.equal(a.body.data.min_quantity, 5);
+});
+
+test('write-through: min_quantity on a batch sets the minimum of its product, for every batch of it', async () => {
+  db.prepare('DELETE FROM pantry_items').run();
+  db.prepare('DELETE FROM pantry_products').run();
+  const a = (await call('POST', '/pantry', { name: 'Reis', quantity: 1, unit: 'kg', min_quantity: 2 })).body.data;
+  const b = (await call('POST', '/pantry', { name: 'Reis', quantity: 1, unit: 'kg' })).body.data;
+  assert.equal(productMin(a.id), 2);
+
+  // A create without a number leaves the minimum of the product alone: null, '' or missing.
+  await call('POST', '/pantry', { name: 'reis', quantity: 1, unit: 'kg', min_quantity: null });
+  await call('POST', '/pantry', { name: 'Reis', quantity: 1, unit: 'kg', min_quantity: '' });
+  assert.equal(productMin(a.id), 2, 'a new batch does not clear the minimum of its product');
+  // ... a number sets it.
+  await call('POST', '/pantry', { name: 'Reis', quantity: 1, unit: 'kg', min_quantity: 3 });
+  assert.equal(productMin(a.id), 3);
+
+  // PATCH with the field on one batch: the product, so the other batch reads it too.
+  await call('PATCH', `/pantry/${b.id}`, { min_quantity: 4 });
+  assert.equal(productMin(a.id), 4);
+  assert.equal((await call('GET', '/pantry')).body.data.find((i) => i.id === a.id).min_quantity, 4);
+  assert.equal(batchColumn(b.id), 4, 'the batch column is still written, for the way back');
+
+  // PUT without the field (an older client, the dialog without a change) leaves it.
+  await call('PUT', `/pantry/${a.id}`, { name: 'Reis', quantity: 1, unit: 'kg' });
+  assert.equal(productMin(a.id), 4, 'a full update without min_quantity does not clear the minimum');
+  // PUT with null clears it, for all batches.
+  await call('PUT', `/pantry/${a.id}`, { name: 'Reis', quantity: 1, unit: 'kg', min_quantity: null });
+  assert.equal(productMin(a.id), null);
+  // A negative one is refused and changes nothing; PATCH with '' clears.
+  await call('PATCH', `/pantry/${b.id}`, { min_quantity: 1 });
+  const bad = await call('PATCH', `/pantry/${b.id}`, { min_quantity: -1 });
+  assert.equal(bad.status, 400);
+  assert.equal(productMin(a.id), 1);
+  await call('PATCH', `/pantry/${b.id}`, { min_quantity: '' });
+  assert.equal(productMin(a.id), null);
+  // The stepper (quantity only) never touches it.
+  await call('PATCH', `/pantry/${b.id}`, { min_quantity: 2 });
+  await call('PATCH', `/pantry/${b.id}`, { quantity: 7 });
+  assert.equal(productMin(a.id), 2);
+});
+
+test('write-through after a rename: the minimum goes to the product the batch moved to, the old one keeps its own', async () => {
+  db.prepare('DELETE FROM pantry_items').run();
+  db.prepare('DELETE FROM pantry_products').run();
+  const milk = (await call('POST', '/pantry', { name: 'Milch', quantity: 1, unit: 'l', min_quantity: 2 })).body.data;
+  const oat = (await call('POST', '/pantry', { name: 'Hafermilch', quantity: 1, unit: 'l', min_quantity: 3 })).body.data;
+  const extra = (await call('POST', '/pantry', { name: 'Milch', quantity: 1, unit: 'l' })).body.data;
+
+  // Renamed without the field: it joins oat milk, and both minimums stay.
+  await call('PUT', `/pantry/${extra.id}`, { name: 'Hafermilch', quantity: 1, unit: 'l' });
+  assert.equal(productMin(extra.id), 3, 'oat milk keeps its minimum');
+  assert.equal(productMin(milk.id), 2, 'milk keeps its minimum');
+  // Renamed with the field: it sets the minimum of the product it joins.
+  await call('PUT', `/pantry/${extra.id}`, { name: 'Milch', quantity: 1, unit: 'l', min_quantity: 6 });
+  assert.equal(productMin(milk.id), 6);
+  assert.equal(productMin(oat.id), 3);
+});
+
+test('#2118: a product created by a move takes over the minimum of the product the batch came from', async () => {
+  db.prepare('DELETE FROM pantry_items').run();
+  db.prepare('DELETE FROM pantry_products').run();
+  const productOf = (id) => db.prepare('SELECT product_id FROM pantry_items WHERE id = ?').get(id).product_id;
+  const milk = (await call('POST', '/pantry', { name: 'Milch', quantity: 3, unit: 'l', min_quantity: 2 })).body.data;
+  const from = milk.product_id;
+
+  // PUT without the field (the dialog sends it only when changed): the new
+  // product "Vollmilch" takes over 2; the product left behind keeps its own.
+  const put = await call('PUT', `/pantry/${milk.id}`, { name: 'Vollmilch', quantity: 3, unit: 'l' });
+  assert.equal(put.status, 200);
+  assert.notEqual(productOf(milk.id), from, 'the batch moved to a new product');
+  assert.equal(productMin(milk.id), 2, 'Vollmilch has the minimum of Milch');
+  assert.equal(put.body.data.min_quantity, 2, 'and the API mirror says so');
+  assert.equal(db.prepare('SELECT min_quantity AS m FROM pantry_products WHERE id = ?').get(from).m, 2,
+    'Milch keeps its own (0 batches): it can be deleted (#2085)');
+
+  // PATCH of the unit moves it again, into a product created by that move: 2 again.
+  await call('PATCH', `/pantry/${milk.id}`, { unit: 'ml' });
+  assert.equal(productMin(milk.id), 2);
+
+  // A move that names the field: the field wins, in the same transaction.
+  await call('PUT', `/pantry/${milk.id}`, { name: 'Bio-Vollmilch', quantity: 3, unit: 'ml', min_quantity: 4 });
+  assert.equal(productMin(milk.id), 4);
+  await call('PATCH', `/pantry/${milk.id}`, { name: 'Landmilch', min_quantity: null });
+  assert.equal(productMin(milk.id), null, 'null clears, also on a move');
+
+  // A product without a minimum hands on none.
+  await call('PATCH', `/pantry/${milk.id}`, { name: 'Heumilch' });
+  assert.equal(productMin(milk.id), null);
 });
