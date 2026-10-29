@@ -622,3 +622,24 @@ test('ein unberührter Schalter mit Compose-Ausdruck bleibt ungesendet', () => {
   assert.ok(calls.length >= 2 && calls.every(c => /untouched/.test(c)),
     'install.html gibt omitUnchanged den Feldstand nach der Vorbelegung nicht mit');
 });
+
+test('übernommene Koordinaten mit Compose-Ausdruck blockieren wea-next nicht', () => {
+  // WEATHER_LAT=${LAT:-52.52}: ein type=number-Feld verwirft den Ausdruck beim
+  // Zuweisen zu '', die Pflichtprüfung lief VOR der untouched-Ausnahme und hielt
+  // den unveränderten Rerun fest. Unverändert geht der Bestand zurück.
+  const wea = handler('wea-next');
+  const keep = wea.indexOf("untouched('wea-lat', 'wea-lon')");
+  const required = wea.indexOf("t('weather.errCoords')");
+  assert.ok(keep !== -1 && keep < required, 'die Pflichtprüfung läuft vor der untouched-Ausnahme');
+  assert.match(wea, /rerunValues\.WEATHER_LAT/, 'unveränderte Koordinaten kommen nicht aus dem Bestand');
+});
+
+test('der Erweitert-Pfad öffnet erst nach dem Preflight', () => {
+  // Kam die Antwort spät, überschrieb applyRerunPrefill() schon getippte Werte
+  // und hielt sie als unverändert fest - die Eingabe ging still verloren.
+  const start = html.slice(html.indexOf('async function startFlow('));
+  const body = start.slice(0, start.indexOf('\n}\n'));
+  const wait = body.indexOf('await preflightDone');
+  const branch = body.indexOf("if (m === 'simple')");
+  assert.ok(wait !== -1 && wait < branch, 'startFlow wartet nur im Einfach-Pfad auf den Preflight');
+});

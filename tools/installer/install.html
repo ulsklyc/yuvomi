@@ -3804,8 +3804,12 @@ async function startFlow(m) {
   // waehlt, ist sofort dort. Die haengende Einfach-Wahl ist dann ueberholt und
   // darf ihn nicht per showStep(1) zurueckwerfen.
   const request = ++flowRequest;
+  // Auch der Erweitert-Pfad wartet: applyRerunPrefill() setzt seine Felder
+  // erst mit der Antwort, und eine vorher getippte Eingabe ging sonst still
+  // verloren - überschrieben und als "unverändert" festgehalten.
+  await preflightDone;
+  if (request !== flowRequest) return;
   if (m === 'simple') {
-    await preflightDone;
     // Die Einfach-Defaults unten brauchen die Heimnetz-Adresse.
     await lanDone;
     if (request !== flowRequest) return;
@@ -4150,13 +4154,16 @@ $('wea-enable').addEventListener('change', function() {
 $('wea-next').addEventListener('click', () => {
   clearInvalid();
   if ($('wea-enable').checked) {
-    const lat = $('wea-lat').value.trim();
-    const lon = $('wea-lon').value.trim();
-    if (!lat || !lon) { fail('wea-err', t('weather.errCoords'), !lat ? 'wea-lat' : 'wea-lon'); return; }
     // Übernommene Koordinaten gehen unverändert zurück (untouched), auch nicht
     // durch parseFloat normalisiert: aus 41.880 würde sonst 41.88, ein
-    // gesendeter, anderer Wert.
+    // gesendeter, anderer Wert. Und sie kommen aus dem Bestand, nicht aus dem
+    // Feld: ein type=number-Feld verwirft einen Compose-Ausdruck wie
+    // ${LAT:-52.52} beim Zuweisen zu '' - die Pflichtprüfung darunter hielt den
+    // unveränderten Rerun sonst fest.
     const keepCoords = untouched('wea-lat', 'wea-lon');
+    const lat = keepCoords ? (rerunValues.WEATHER_LAT || '') : $('wea-lat').value.trim();
+    const lon = keepCoords ? (rerunValues.WEATHER_LON || '') : $('wea-lon').value.trim();
+    if (!keepCoords && (!lat || !lon)) { fail('wea-err', t('weather.errCoords'), !lat ? 'wea-lat' : 'wea-lon'); return; }
     const latN = parseFloat(lat), lonN = parseFloat(lon);
     if (!keepCoords && (isNaN(latN) || latN < -90 || latN > 90))   { fail('wea-err', t('weather.errLat'), 'wea-lat'); return; }
     if (!keepCoords && (isNaN(lonN) || lonN < -180 || lonN > 180)) { fail('wea-err', t('weather.errLon'), 'wea-lon'); return; }
