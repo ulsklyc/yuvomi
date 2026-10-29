@@ -19,7 +19,7 @@
     "copyRedirect": "Redirect-URI kopiëren",
     "opt": "(optioneel)",
     "copyFailed": "Kopiëren lukte niet - de waarde is geselecteerd, kopieer hem handmatig.",
-    "errorDetail": "Details: {{detail}}",
+    "errorDetail": "Melding: {{detail}}",
     "stepSkipped": "(overgeslagen)"
   },
   "config": {
