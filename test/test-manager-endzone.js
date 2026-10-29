@@ -654,7 +654,10 @@ function navRowsOf(html) {
 function navEndzone(row) {
   const at = row.indexOf('settings-module-row__end');
   if (at === -1) return [];
-  return endzone(row.slice(at).replace(/class="settings-module-hide"/g, 'class="row-action settings-module-hide"'));
+  // Die eine Handlung ist seit R24 der Schalter "In meiner Navigation"
+  // (`input role="switch"` in der geteilten Schalterzeile) - er zaehlt als
+  // Handlung, wie vorher der Ausblenden-Knopf.
+  return endzone(row.slice(at).replace(/<input type="checkbox" role="switch"/g, '<button class="row-action settings-module-hide"'));
 }
 
 test('Navigation: Zeile endet [Ausblenden][Mehr][Griff], kein sichtbares Auf/Ab-Paar mehr (#2180)', () => {
@@ -673,7 +676,9 @@ test('Navigation: Zeile endet [Ausblenden][Mehr][Griff], kein sichtbares Auf/Ab-
     const zone = navEndzone(row);
     assertD10(zone, { sortable: true }, `Navigationszeile ${i + 1}`);
     assert.deepEqual(zone, ['action', 'more', 'handle']);
-    assert.match(row, /class="settings-module-hide"/, 'die eine Handlung ist Ausblenden');
+    assert.match(row, /<label class="toggle-row toggle-row--switch settings-module-hide">[\s\S]*?<input type="checkbox" role="switch" data-module-hide="\w+"/,
+      'die eine Handlung ist der Schalter "In meiner Navigation" (R24)');
+    assert.doesNotMatch(row, /eye-off|aria-pressed/, 'kein durchgestrichenes Auge, kein Umschaltknopf mehr');
     const items = menuItems(row);
     assert.deepEqual(items.map((x) => x.action), ['module-move-up', 'module-move-down']);
     assert.equal(items[0].disabled, i === 0, 'Nach oben in der ersten Zeile gesperrt');

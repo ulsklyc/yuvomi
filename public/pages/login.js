@@ -263,8 +263,11 @@ export async function render(container) {
       // Sperre; alles andere (Status 0 = offline, 5xx = Serverfehler) ist ein
       // Verbindungsproblem – der Nutzer darf nicht fälschlich an sich zweifeln.
       let message;
+      // Ohne Zuruecksetzen per Mail (kein SMTP, Critique R24 G6-Zugang-P3-1)
+      // stand nach falschen Zugangsdaten kein Weg da: der Satz sagt, wer hilft.
+      const resetOffered = form.querySelector('.auth-form__forgot')?.hidden === false;
       if (err.status === 429) message = t('login.tooManyAttempts');
-      else if (err.status === 401) message = t('login.invalidCredentials');
+      else if (err.status === 401) message = t(resetOffered ? 'login.invalidCredentials' : 'login.invalidCredentialsAskAdmin');
       // Eine Absage ist kein Verbindungsproblem: wer „Verbindung fehlgeschlagen"
       // liest, versucht es weiter, statt sich an seine Verwaltung zu wenden.
       else if (err.status === 403) message = t('login.accountCannotSignIn');

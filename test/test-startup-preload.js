@@ -340,3 +340,68 @@ test('die Sprachdateien kommen mit dem Start und gleichzeitig', () => {
   assert.ok(init.indexOf('loadLocale(currentLocale)') < init.indexOf('await loadLocale(DEFAULT_LOCALE)'),
     'die eigene Sprache wird erst nach der Rueckfallsprache angefragt - eine Rundreise mehr fuer jede Sprache ausser Deutsch');
 });
+
+/*
+ * U2 (DW p5b): "+ Neu" legt Termin und Notiz ueber der Uebersicht an. Ihre
+ * Formulare tragen Regeln aus calendar.css bzw. notes.css, und der Router
+ * laedt nur das Blatt der Seite, die steht. Geliehen wird das Blatt so lange,
+ * wie die Uebersicht steht - am Ende von <head> wie im Modul, und mit ihrem
+ * Signal wieder weg, sonst laege es fuer den Rest der Sitzung auf jeder Seite.
+ */
+test('lendPageStyle: am Ende von <head>, einmal je Blatt, geht mit dem Signal der Seite', async () => {
+  const doc = fakeDocument();
+  globalThis.document = doc;
+  try {
+    const { lendPageStyle } = await import(`../public/utils/component-style.js?t=${Date.now()}-lend`);
+    const page = new AbortController();
+    const a = lendPageStyle('/styles/calendar.css', page.signal);
+    const b = lendPageStyle('/styles/calendar.css', page.signal);
+    assert.equal(a, b, 'zweimal geoeffnet, einmal geladen');
+    const links = doc.children.filter((c) => c.href === '/styles/calendar.css');
+    assert.equal(links.length, 1);
+    assert.equal(doc.children.at(-1), links[0], 'hinter typography.css und dem Seitenblatt - wie auf der Kalenderseite');
+    links[0].fire('load');
+    await a;
+    page.abort();
+    assert.equal(links[0].isConnected, false, 'die Uebersicht ist weg, ihr geliehenes Blatt auch');
+
+    // Steht das Blatt schon (die Seite des Moduls selbst), wird nichts geliehen.
+    const own = doc.createElement('link');
+    own.rel = 'stylesheet';
+    own.href = '/styles/notes.css';
+    own.sheet = {};
+    doc.children.push(own);
+    await lendPageStyle('/styles/notes.css', new AbortController().signal);
+    assert.equal(doc.children.filter((c) => c.href === '/styles/notes.css').length, 1);
+
+    // Ein gescheitertes Blatt (Netz kurz weg) geht wieder raus, wie bei
+    // ensureStyle: sonst haelt der tote Link jedes weitere Oeffnen auf dem
+    // alten Versprechen fest, und das Formular bleibt bis zum Seitenwechsel
+    // ohne seine Regeln (Codex-Review #2344).
+    const stay = new AbortController();
+    const failed = lendPageStyle('/styles/calendar.css', stay.signal);
+    const broken = doc.children.find((c) => c.href === '/styles/calendar.css');
+    broken.fire('error');
+    await failed;
+    assert.equal(broken.isConnected, false, 'der kaputte Link bleibt im Dokument');
+    const retry = lendPageStyle('/styles/calendar.css', stay.signal);
+    assert.notEqual(retry, failed, 'das naechste Oeffnen bekommt das alte, schon aufgeloeste Versprechen');
+    const fresh = doc.children.filter((c) => c.href === '/styles/calendar.css');
+    assert.equal(fresh.length, 1, 'genau ein neuer Versuch');
+    assert.notEqual(fresh[0], broken);
+    fresh[0].fire('load');
+    await retry;
+  } finally {
+    delete globalThis.document;
+  }
+});
+
+test('lendPageStyle: Termin und Notiz leihen ihr Seitenblatt, bevor ihr Formular ueber einer fremden Seite aufgeht', () => {
+  for (const [file, fn, href] of [['pages/calendar.js', 'openNewEvent', '/styles/calendar.css'], ['pages/notes.js', 'openNewNote', '/styles/notes.css']]) {
+    const src = read(file);
+    const at = src.indexOf(`export async function ${fn}(`);
+    assert.ok(at >= 0, `${file} exportiert ${fn} nicht`);
+    const body = src.slice(at, src.indexOf('\n}\n', at));
+    assert.ok(body.includes(`lendPageStyle('${href}', signal)`), `${fn} leiht ${href} nicht - das Formular stuende ueber der Uebersicht ohne seine Regeln`);
+  }
+});

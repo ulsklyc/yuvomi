@@ -1,7 +1,7 @@
 import { t } from '/i18n.js';
 import { moduleIconHTML } from '/nav-icons.js';
 import { esc } from '/utils/html.js';
-import { getReadableTextColor } from '/utils/color.js';
+import { getReadableTextColor, safeHexColor } from '/utils/color.js';
 import { formRowHtml } from '/utils/form-row.js';
 import { errorSentence } from '/utils/friendly-error.js';
 
@@ -56,24 +56,9 @@ export function createDisclosure({
   return section;
 }
 
-/**
- * DIE ERKLAERUNG VOR DEM ERSTEN FELD IST EIN BIS ZWEI SAETZE (R22, D13).
- * Wandtabletts und API-Zugriff begannen mit sieben bis neun Zeilen Fussnote,
- * bevor das erste Feld kam. Der Kern steht als Hinweis da, der Rest hinter
- * "Mehr dazu" - ein natives `<details>` (Tastatur und Ansage ohne Skript),
- * der Pfeil zeigt die Richtung. `moreHtml` ist fertiges, escaptes Markup
- * (Absaetze, auch leere Halter, die der Aufrufer spaeter fuellt).
- */
-export function hintFoldHtml({ lead, moreHtml, className = '' }) {
-  return `
-    <div class="settings-hint-fold${className ? ` ${esc(className)}` : ''}">
-      <p class="form-hint">${esc(lead)}</p>
-      <details class="settings-hint-fold__more">
-        <summary class="settings-hint-fold__summary">${esc(t('settings.hintMore'))}<i data-lucide="chevron-down" class="settings-hint-fold__icon" aria-hidden="true"></i></summary>
-        <div class="settings-hint-fold__body">${moreHtml}</div>
-      </details>
-    </div>`;
-}
+// Die Erklaerung mit "Mehr dazu" ist seit R24 ein geteilter Baustein
+// (utils/hint-fold.js); die Einstellungen importieren ihn weiter von hier.
+export { hintFoldHtml } from '/utils/hint-fold.js';
 
 // Ein Schalter, eine Form. Vorher erfand jedes Blatt seine eigene: `toggle-row`,
 // `settings-toggle`, der iOS-Switch aus `toggle`/`toggle__track` und nackte
@@ -132,9 +117,10 @@ export function toggleRowHtml({
   // hat keine garantierte Tinte - dieselbe Rechnung macht der Avatar-Stack
   // (components/user-multi-select.js), und zwei Antworten auf dieselbe Frage
   // waeren genau die Spaltung, die #891 an drei Stellen aufgeraeumt hat.
-  const swatchHtml = swatchColor
+  const swatchHex = swatchColor ? safeHexColor(swatchColor) : null;
+  const swatchHtml = swatchHex
     ? `<span class="toggle-row__swatch" aria-hidden="true"`
-      + ` style="--swatch-color:${esc(String(swatchColor))};color:${getReadableTextColor(String(swatchColor))}">`
+      + ` style="--swatch-color:${swatchHex};color:${getReadableTextColor(swatchHex)}">`
       + `${esc(String(swatchLabel ?? ''))}</span>`
     : '';
   const labelClass = labelVisible ? '' : ' class="sr-only"';

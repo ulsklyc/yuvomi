@@ -6,7 +6,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
-import { pushService as defaultPushService } from '../services/push.js';
+import { checkPushEndpoint, pushService as defaultPushService } from '../services/push.js';
 
 const log = createLogger('PushRoutes');
 
@@ -28,7 +28,13 @@ export function buildRouter({ pushService = defaultPushService, database } = {})
       const userId = req.authUserId || req.session.userId;
       const { endpoint, keys } = req.body || {};
       if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
-        return res.status(400).json({ error: 'endpoint und keys (p256dh, auth) sind erforderlich.', code: 400 });
+        return res.status(400).json({ error: 'endpoint and keys (p256dh, auth) are required.', code: 400 });
+      }
+      // Ein Endpoint ist ein Ziel, an das der Server spaeter selbst sendet:
+      // nur oeffentliche https-Adressen, wie sie jeder Push-Dienst vergibt.
+      // Der Versand prueft erneut (Bestandszeilen, DNS beim Verbindungsaufbau).
+      if (!checkPushEndpoint(endpoint).ok) {
+        return res.status(400).json({ error: 'endpoint must be a public https address.', code: 400 });
       }
       const ua = req.get('user-agent') || null;
       getDb().prepare(`
@@ -54,7 +60,7 @@ export function buildRouter({ pushService = defaultPushService, database } = {})
       const userId = req.authUserId || req.session.userId;
       const { endpoint } = req.body || {};
       if (!endpoint) {
-        return res.status(400).json({ error: 'endpoint ist erforderlich.', code: 400 });
+        return res.status(400).json({ error: 'endpoint is required.', code: 400 });
       }
       getDb().prepare('DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?').run(endpoint, userId);
       res.status(204).end();
@@ -69,7 +75,7 @@ export function buildRouter({ pushService = defaultPushService, database } = {})
       const userId = req.authUserId || req.session.userId;
       const { endpoint, active } = req.body || {};
       if (typeof endpoint !== 'string' || typeof active !== 'boolean') {
-        return res.status(400).json({ error: 'endpoint (string) und active (boolean) sind erforderlich.', code: 400 });
+        return res.status(400).json({ error: 'endpoint (string) and active (boolean) are required.', code: 400 });
       }
       // active=true: Pause setzen (jetzt); active=false: Pause loeschen.
       // Der Zeitstempel laeuft nach WALL_PAUSE_MAX_AGE_HOURS ab - eine Erneuerung

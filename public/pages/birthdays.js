@@ -1,10 +1,11 @@
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, advancedSection, reportFieldErrors, captureModalContext, captureOpenContext, isModalContextCurrent, swapFieldsKeepingDirtyBase, isOwnModalOpen, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, advancedSection, reportFieldErrors, captureModalContext, captureOpenContext, isModalContextCurrent, swapFieldsKeepingDirtyBase, isOwnModalOpen, refocusAfterRender, dialogInitialFocus } from '/components/modal.js';
 import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
 import { stagger, scheduleUndoableDelete } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { t, formatMonthYear, parseDateInput, isDateInputValid, getLocale, formatUnit } from '/i18n.js';
 import { dateText, daysFromTodayText } from '/utils/date-format.js';
+import { mediaPickerBadgeHtml } from '/utils/media-picker.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { rowMenuHtml } from '/utils/row-action.js';
@@ -1076,23 +1077,26 @@ function openBirthdayModal({ mode, birthday = null }) {
   openSharedModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('birthdays.editTitle') : t('birthdays.newTitle'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4).
+    initialFocus: dialogInitialFocus(isEdit),
     content: `
       <div class="birthday-modal">
         <div class="birthday-modal__identity">
+          ${/* EIN BEDIENELEMENT FUER DAS BILD (Critique R24 G1-Geburtstage-P3-1,
+               Baustein `.media-picker` in layout.css): die Scheibe IST die Wahl,
+               das Stift-Abzeichen sagt es; der zweite Knopf mit demselben Stift
+               daneben ist weg. "Bild entfernen" steht nur mit Bild darunter, als
+               Text - eine andere Handlung, kein zweiter Weg zur selben. */ ''}
           <div class="birthday-modal__photo-wrap">
-            <button type="button" class="birthday-avatar-editor" id="birthday-preview" aria-label="${t('birthdays.photoLabel')}">
-              ${birthdayPreviewHtml(birthday?.name || '', photoData)}
-            </button>
+            <span class="media-picker">
+              <button type="button" class="birthday-avatar-editor" id="birthday-preview" aria-label="${t('birthdays.photoLabel')}">
+                ${birthdayPreviewHtml(birthday?.name || '', photoData)}
+              </button>
+              ${mediaPickerBadgeHtml()}
+            </span>
             <input class="sr-only" id="bd-photo" type="file" accept="image/png,image/jpeg,image/webp"
                    aria-label="${t('birthdays.photoLabel')}" tabindex="-1">
-            <div class="birthday-modal__photo-actions">
-              <button type="button" class="birthday-modal__photo-action" id="bd-photo-edit" aria-label="${t('birthdays.photoLabel')}" title="${t('birthdays.photoLabel')}">
-                <i data-lucide="pencil" aria-hidden="true"></i>
-              </button>
-              <button type="button" class="birthday-modal__photo-action birthday-modal__photo-action--danger" id="bd-remove-photo" aria-label="${t('birthdays.removePhoto')}" title="${t('birthdays.removePhoto')}"${photoData ? '' : ' hidden'}>
-                <i data-lucide="trash-2" aria-hidden="true"></i>
-              </button>
-            </div>
+            <button type="button" class="btn btn--ghost btn--sm media-picker__remove" id="bd-remove-photo"${photoData ? '' : ' hidden'}>${t('birthdays.removePhoto')}</button>
           </div>
           <div class="birthday-modal__fields">
             <div class="form-group">
@@ -1106,6 +1110,11 @@ function openBirthdayModal({ mode, birthday = null }) {
               yearUnknown: birthday?.year_unknown,
               max: today,
               required: true,
+              // DER HINWEIS STEHT IM KOPF, BEIM DATUM (R24, Critique
+              // G1-Geburtstage-P3-1): was mit dem Datum geschieht (Kalender,
+              // Erinnerung), sagt der Hinweis des Felds, wo es eingegeben wird -
+              // nicht mehr unter dem Aufklapper ueber dem Fuss.
+              hint: t('birthdays.calendarHint'),
             })}
           </div>
         </div>
@@ -1119,7 +1128,6 @@ function openBirthdayModal({ mode, birthday = null }) {
           ${renderBirthdayReminderSection(birthday)}`,
           { open: isEdit && (!!birthday?.contact_id || !!birthday?.name_day || !!birthday?.notes || reminderOpensAdvanced(birthday)),
             hint: birthdayAdvancedTopics(mayLinkContacts(birthday)) })}
-        <div class="birthday-modal__hint">${t('birthdays.calendarHint')}</div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="bd-delete">
             <i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}
@@ -1136,7 +1144,6 @@ function openBirthdayModal({ mode, birthday = null }) {
       const nameInput = panel.querySelector('#bd-name');
       const preview = panel.querySelector('#birthday-preview');
       const fileInput = panel.querySelector('#bd-photo');
-      const photoEdit = panel.querySelector('#bd-photo-edit');
       // Den Entfernen-Knopf gibt es nur mit Bild: ein roter Muelleimer fuer
       // ein Bild, das es nicht gibt, war eine Handlung ohne Gegenstand.
       const removePhoto = panel.querySelector('#bd-remove-photo');
@@ -1148,7 +1155,6 @@ function openBirthdayModal({ mode, birthday = null }) {
       };
       nameInput.addEventListener('input', renderPreview);
       preview.addEventListener('click', () => fileInput?.click());
-      photoEdit?.addEventListener('click', () => fileInput?.click());
       fileInput?.addEventListener('change', async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -1417,9 +1423,10 @@ async function openImportModal() {
           </div>` : ''}
         ${listHtml}
         ${withoutHtml}
+        <p class="form-hint form-hint--danger bd-import__reason" data-import-reason role="status" hidden></p>
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--secondary" type="button" id="bd-import-cancel">${t('common.cancel')}</button>
-          <button class="btn btn--primary" type="button" id="bd-import-submit" disabled>${t('birthdays.importSubmit', { count: 0 })}</button>
+          <button class="btn btn--primary" type="button" id="bd-import-submit">${t('birthdays.importSubmit', { count: 0 })}</button>
         </div>
       </div>
     `,
@@ -1427,6 +1434,7 @@ async function openImportModal() {
       const submitBtn = panel.querySelector('#bd-import-submit');
       const toggleBtn = panel.querySelector('#bd-import-toggle');
       const status = panel.querySelector('#bd-import-status');
+      const reasonEl = panel.querySelector('[data-import-reason]');
       const selectable = [...panel.querySelectorAll('.bd-import__list input:not(:disabled)')];
       let submitting = false;
       // A retry continues the same import, including batches already saved.
@@ -1438,7 +1446,11 @@ async function openImportModal() {
       const refresh = (announce = false) => {
         const n = selectedIds().length;
         submitBtn.textContent = t('birthdays.importSubmit', { count: n });
-        submitBtn.disabled = submitting || n === 0;
+        // Gesperrt nur, solange die Anfrage laeuft; ohne Wahl sagt der Knopf
+        // beim Tippen, was fehlt (R24, D4 - kein grauer Primaerknopf).
+        if (submitting) submitBtn.disabled = true;
+        else submitBtn.disabled = false;
+        if (n > 0 && reasonEl) reasonEl.hidden = true;
         if (toggleBtn) {
           toggleBtn.textContent = n === selectable.length
             ? t('contacts.importDeselectAll')
@@ -1490,7 +1502,10 @@ async function openImportModal() {
         if (submitting) return;
         const ids = selectedIds();
         if (ids.length === 0) {
-          window.yuvomi?.showToast(t('birthdays.importNothingSelected'), 'warning');
+          // Am Dialog, nicht als Toast: die Meldung steht dort, wo gewaehlt wird.
+          reasonEl.textContent = t('birthdays.importNothingSelected');
+          reasonEl.hidden = false;
+          selectable[0]?.focus();
           return;
         }
         // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der
@@ -1679,7 +1694,7 @@ function renderBirthdayPane(id, body) {
     actions: ro ? [] : [{
       id: 'birthday-detail-delete',
       label: t('common.delete'),
-      variant: 'danger-ghost',
+      variant: 'danger-outline',
       icon: 'trash-2',
       align: 'start',
       onClick: () => deleteBirthday(birthday.id),
@@ -1733,7 +1748,7 @@ function openBirthdaySheet(birthday) {
     actions: [{
       id: 'birthday-detail-delete',
       label: t('common.delete'),
-      variant: 'danger-ghost',
+      variant: 'danger-outline',
       icon: 'trash-2',
       align: 'start',
       onClick: async ({ close }) => {

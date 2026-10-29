@@ -258,7 +258,7 @@ export function mountEmptyState(target, opts) {
  *      Stellen "Bitte pruefe die Verbindung", auch bei einer Bremse (429) oder
  *      einem Serverfehler -, und darunter stand ein roher Chip "HTTP 429".
  *      Jetzt kommt der Satz aus dem Fehler (`loadErrorSentence`, dieselbe
- *      Zuordnung wie friendlyError, aber nie der Servertext). Die
+ *      Zuordnung wie unhandledErrorSentence). Die
  *      `description` des Aufrufers ist nur noch der Rueckfall fuer eine
  *      Ursache ohne eigenen Satz. Der Statuscode wandert in die aufklappbaren
  *      Details - fuer den Selbsthoster da, fuer alle anderen kein Raetsel.
@@ -453,6 +453,58 @@ export function mountSearchEmpty(target, opts) {
  */
 export function emptyHintHTML(text, opts) {
   return emptyHintEl(text, opts).outerHTML;
+}
+
+/**
+ * DIE RUHIGE ZEILE EINES LEEREN ABSCHNITTS IN EINER KARTE (R22, D12) - ein
+ * Satz und, wo es etwas zu erfassen gibt, EINE Aktion am Zeilenende.
+ *
+ * Sie lebte bis DW (p7) als `cardEmptyRowHtml` in health.js, waehrend die
+ * Kacheln der Uebersicht dieselbe Aussage in drei Formen trugen: Glyphe, Satz
+ * und ein Akzent-Textknopf, der je nach Breite rechts in der Zeile stand oder
+ * UNTER den Satz umbrach (Entsorgung und Schnellzugriffe am Telefon, die
+ * Entsorgung auch bei 1440 und 1920). Eine Karte ist eine Karte, ob sie im
+ * Gesundheitsbereich steht oder im Raster der Uebersicht - also EINE Zeile.
+ *
+ * DIE AKTION BRICHT NIE UM. Der Satz nimmt den Platz, der bleibt, und bricht
+ * selbst in eine zweite Zeile; der Knopf behaelt seine Breite am Ende
+ * (`.card-empty-row`, layout.css). Sekundaer, nie gefuellt: der eine gefuellte
+ * Knopf eines Schirms ist sein Anlegen (FAB bzw. Kopf-Pille).
+ *
+ * Reine Zeichenkette ohne DOM - die Uebersicht zeichnet ihre Kacheln auch in
+ * Modultests unter Node.
+ *
+ * @param {string} text  Aufgeloester Satz (wird escaped).
+ * @param {object} [opts]
+ * @param {{ label: string, id?: string, icon?: string, attrs?: Record<string, string> }|null} [opts.action]
+ *        `id` wird zu `data-action` (Gesundheit verdrahtet so); `attrs` setzt
+ *        weitere Attribute (die Uebersicht: `data-route`, `data-widget-retry`).
+ *        `icon` ist ein Lucide-Name, Standard `plus` (Erfassen).
+ * @param {string} [opts.className]  Zusaetzliche Klassen am Traeger.
+ * @param {string} [opts.id]  Id des Satzes - die Aktion verweist per
+ *        `aria-describedby` darauf. Wo die Aktion nur das Verb traegt
+ *        ("Hinzufuegen"), nennt der Satz daneben das Objekt; ohne Verweis
+ *        hoerte, wer die Knoepfe einer Seite durchgeht, nur das Verb.
+ * @returns {string}
+ */
+export function cardEmptyRowHtml(text, { action = null, className = '', id = '' } = {}) {
+  const attrs = action
+    ? [
+      action.id ? ` data-action="${esc(action.id)}"` : '',
+      id ? ` aria-describedby="${esc(id)}"` : '',
+      ...Object.entries(action.attrs ?? {}).map(([name, value]) => ` ${esc(name)}="${esc(String(value))}"`),
+    ].join('')
+    : '';
+  const button = action
+    ? `<button type="button" class="btn btn--secondary btn--sm card-empty-row__action"${attrs}>
+        <i data-lucide="${esc(action.icon ?? 'plus')}" aria-hidden="true"></i>${esc(action.label)}
+      </button>`
+    : '';
+  return `
+    <div class="card-empty-row${className ? ` ${esc(className)}` : ''}">
+      <span class="card-empty-row__text"${id ? ` id="${esc(id)}"` : ''}>${esc(text)}</span>
+      ${button}
+    </div>`;
 }
 
 /**

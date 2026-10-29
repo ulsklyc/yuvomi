@@ -501,3 +501,29 @@ test('Kueche D1: die Auswahl wechselt erst mit dem Inhalt - nicht beim Tipp, und
   assert.doesNotMatch(reuse, /placeIndicator\(\{ glide: true \}\)/, 'im Tausch gleitet die Kapsel noch - sie stuende erst nach dem Inhalt am Ziel');
   assert.match(subTabs, /if \(isNav && !markOnNavigate\) \{\s*onChange\(tabId\);\s*return;\s*\}/, 'renderSubTabs ehrt markOnNavigate nicht');
 });
+
+// R24 E3 (Ulas 2026-10-28): der aktive Reiter ist in beiden Themes EINE
+// getoente Kapsel im Modulton, ohne Ring - hell war er die weisse
+// Segment-Pille mit grauem Ring auf dem Seitengrund und las sich als
+// Umrandungs-Knopf, dunkel eine graue Platte. Das Segment (Ansichtswahl)
+// behaelt Daumen und Kante; Reiter und Segment bleiben unterscheidbar.
+test('R24 E3: der aktive Reiter ist eine getoente Kapsel ohne Ring, das Segment behaelt den Daumen', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readSrc('../public/styles/sub-tabs.css'))].filter((r) => !r.at.length);
+  const tint = /background-color:\s*color-mix\(in srgb,\s*var\(--active-module-accent, var\(--color-accent\)\) var\(--tint-state\),\s*transparent\)/;
+  for (const selector of ['.sub-tab--active', '.has-seg-indicator:has(> .sub-tab) > .seg-indicator']) {
+    const rule = rules.find((r) => r.selector === selector);
+    assert.ok(rule, `${selector} steht in sub-tabs.css`);
+    assert.match(rule.body, tint, `${selector}: Flaeche = Modulton auf --tint-state`);
+    assert.match(rule.body, /box-shadow:\s*none/, `${selector}: kein Ring, kein Schatten`);
+    assert.doesNotMatch(rule.body, /--seg-active-(?:bg|shadow)/, `${selector}: nicht der Segment-Daumen`);
+  }
+  // Die Listen-Kapseln des Einkaufs sind Reiter (welche Liste) direkt unter
+  // der Kuechen-Leiste: dieselbe Flaeche, sonst zwei Zustandsbilder uebereinander.
+  const list = [...eachRule(readSrc('../public/styles/shopping.css'))].find((r) => !r.at.length && r.selector === '.list-tab--active');
+  assert.match(list.body, /background-color:\s*color-mix\(in srgb,\s*var\(--module-accent, var\(--color-accent\)\) var\(--tint-state\),\s*transparent\)/);
+  assert.match(list.body, /box-shadow:\s*none/, 'Listen-Kapsel ohne Ring');
+  const base = rules.find((r) => r.selector === '.seg-indicator');
+  assert.match(base.body, /background-color:\s*var\(--seg-active-bg\)/, 'das Segment behaelt den Daumen');
+  assert.match(base.body, /box-shadow:\s*var\(--seg-active-shadow\)/, 'und seine 3:1-Kante');
+});

@@ -341,13 +341,14 @@ try {
   // ------------------------------------------------------------------
   // DELETE /:id - Familienmitglied-Schutz (403), Erfolg (204), 404
   // ------------------------------------------------------------------
-  await asyncTest('DELETE /:id eines Familienmitglied-Kontakts → 403', async () => {
+  await asyncTest('DELETE /:id eines Familienmitglied-Kontakts → 403 mit Grund', async () => {
     const famContactId = database.prepare(
       "INSERT INTO contacts (name, category, family_user_id) VALUES ('Fam Kontakt', 'misc', ?)"
     ).run(famUserId).lastInsertRowid;
     const { status, body } = await jsend(`${base}/${famContactId}`, 'DELETE');
     assert(status === 403, `Status ${status}`);
-    assert(/Familienmitglieder/.test(body.error), 'Fehlermeldung nennt Familienmitglieder');
+    assert(body.reason === 'family_member_contact', 'die Absage nennt ihren Grund');
+    assert(/household member/.test(body.error), 'Fehlermeldung nennt das Haushaltsmitglied');
     // Kontakt bleibt bestehen.
     assert(database.prepare('SELECT 1 FROM contacts WHERE id = ?').get(famContactId), 'Familien-Kontakt nicht gelöscht');
   });

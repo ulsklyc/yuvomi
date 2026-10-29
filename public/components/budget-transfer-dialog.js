@@ -2,11 +2,11 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { openModal, closeModal, reportFieldErrors, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent } from '/components/modal.js';
+import { openModal, closeModal, reportFieldErrors, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, advancedSection } from '/components/modal.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
 import { todayKey, monthPeriodKeys, defaultDateInPeriod } from '/utils/date.js';
 import { parseAmountInput, amountToInput } from '/utils/money.js';
-import { amountInputAttrs, setAmountCurrency, amountFieldError } from '/utils/amount-field.js';
+import { amountFieldHtml, setAmountUnit, amountFieldError } from '/utils/amount-field.js';
 import { budgetToggleHtml, budgetIntervalFieldsHtml, wireBudgetIntervalFields } from '/components/budget-recurrence-fields.js';
 
 export function transferFieldsHtml({ transfer = null, accounts, categories, month, currency, budgetMode }) {
@@ -20,32 +20,64 @@ export function transferFieldsHtml({ transfer = null, accounts, categories, mont
   const recurring = Boolean(transfer?.is_recurring || transfer?.recurrence_parent_id);
   const schedule = transfer?.series ?? transfer;
   const sourceCurrency = accounts.find(a => a.id === transfer?.from_account_id)?.currency || currency;
+  /* DIE UMBUCHUNG IM GELDGERUEST (Critique R24 G4-Budget-P2-1, D9). Bis R24
+   * wuchs der Dialog beim Wechsel Ausgabe -> Umbuchung von 632 auf 852px, der
+   * Betrag hatte kein Waehrungszeichen, der Titel einen Stern ohne Pflicht, Von
+   * und Auf standen untereinander und die Kategorie "Sparen" war Pflicht im
+   * Blick. Jetzt: der Betrag mit dem Zeichen des Quellkontos (amountFieldHtml),
+   * Von -> Auf in EINER Zeile, der Titel darf leer bleiben (er heisst dann
+   * "Umbuchung Von -> Auf", der Platzhalter zeigt es), und was selten
+   * geaendert wird - Kategorie, Sichtbarkeit, Wiederholung - liegt hinter
+   * "Weitere Angaben" und nennt sich dort; offen, sobald die Umbuchung eine
+   * Serie ist. */
+  const fromName = accounts.find(a => a.id === transfer?.from_account_id)?.name;
+  const toName = accounts.find(a => a.id === transfer?.to_account_id)?.name;
   return `
-    ${field('bt-amount', 'budget.amountLabel', `<input class="form-input budget-amount-input" id="bt-amount"${amountInputAttrs(sourceCurrency, transfer ? Math.abs(transfer.amount) : '')} required>`)}
-    ${field('bt-title', 'budget.titleLabel', `<input class="form-input" id="bt-title" value="${esc(transfer?.title ?? '')}">`)}
-    ${field('bt-from', 'budget.transferFromAccount', `<select class="form-input" id="bt-from" required>${options(transfer?.from_account_id, 'budget.transferFromAccount')}</select>`)}
-    ${field('bt-to', 'budget.transferToAccount', `<select class="form-input" id="bt-to" required>${options(transfer?.to_account_id, 'budget.transferToAccount')}</select>`)}
+    <div class="form-group">
+      <label class="form-label" for="bt-amount">${t('budget.amountLabel')}${REQUIRED_MARK}</label>
+      ${amountFieldHtml({ id: 'bt-amount', currency: sourceCurrency, value: transfer ? Math.abs(transfer.amount) : '' })}
+    </div>
+    <div class="budget-transfer-route">
+      ${field('bt-from', 'budget.transferFromAccount', `<select class="form-input" id="bt-from" required>${options(transfer?.from_account_id, 'budget.transferFromAccount')}</select>`)}
+      <i data-lucide="arrow-right" class="budget-transfer-route__arrow" aria-hidden="true"></i>
+      ${field('bt-to', 'budget.transferToAccount', `<select class="form-input" id="bt-to" required>${options(transfer?.to_account_id, 'budget.transferToAccount')}</select>`)}
+    </div>
+    <div class="form-group"><label class="form-label" for="bt-title">${t('budget.titleLabel')}</label><input class="form-input" id="bt-title" value="${esc(transfer?.title ?? '')}" placeholder="${esc(transferTitle(fromName, toName))}"></div>
+    ${field('bt-date', 'budget.dateLabel', `<yuvomi-datepicker id="bt-date" type="date" value="${date}"></yuvomi-datepicker>`)}
+    ${recurring ? field('bt-scope', 'budget.recurringSeriesScope', `<select class="form-input" id="bt-scope"><option value="this">${t('budget.recurringThisOnly')}</option><option value="series">${t('budget.recurringEditSeries')}</option></select>`) : ''}
+    ${advancedSection(`
     ${field('bt-category', 'budget.categoryLabel', `<select class="form-input" id="bt-category">${categoryOptions}</select>`)}
     <div class="form-group" id="bt-subcategory-group" hidden><label class="form-label" for="bt-subcategory">${t('budget.subcategoryLabel')}</label><select class="form-input" id="bt-subcategory"></select></div>
-    ${field('bt-date', 'budget.dateLabel', `<yuvomi-datepicker id="bt-date" type="date" value="${date}"></yuvomi-datepicker>`)}
     ${budgetMode === 'personal' ? field('bt-visibility', 'budget.visibilityLabel', `<select class="form-input" id="bt-visibility">${['private', 'shared', 'shared_amount'].map(v => `<option value="${v}"${v === (transfer?.visibility ?? 'private') ? ' selected' : ''}>${t(`budget.visibility_${v}`)}</option>`).join('')}</select>`) : ''}
-    ${recurring ? field('bt-scope', 'budget.recurringSeriesScope', `<select class="form-input" id="bt-scope"><option value="this">${t('budget.recurringThisOnly')}</option><option value="series">${t('budget.recurringEditSeries')}</option></select>`) : ''}
     <div class="form-group">${budgetToggleHtml('bt-recurring', 'budget.recurringLabel', { checked: recurring, disabled: Boolean(transfer) })}</div>
     <div class="form-group" id="bt-recurrence"${recurring ? '' : ' hidden'}>
       ${budgetIntervalFieldsHtml('bt', schedule?.recurrence_interval ?? 'monthly', schedule?.recurrence_interval_count ?? 1)}
       <div class="form-group">${budgetToggleHtml('bt-confirm', 'budget.confirmFirstLabel', { checked: Boolean(schedule?.recurrence_confirm) })}</div>
-    </div>
+    </div>`, { hint: t('budget.transferMoreDetailsHint'), open: recurring })}
 `;
+}
+
+/** Der Titel einer Umbuchung ohne eigenen: "Umbuchung Girokonto -> Sparkonto". */
+function transferTitle(from, to) {
+  return from && to ? t('budget.transferDefaultTitle', { from, to }) : t('budget.typeTransfer');
 }
 
 export function wireTransferForm(panel, { transfer = null, accounts = [], currency, subcategories = {}, readOnly, onSaved, onDelete, onError }) {
   const syncAmountCurrency = () => {
     const sourceId = Number(panel.querySelector('#bt-from').value);
     const sourceCurrency = accounts.find(a => a.id === sourceId)?.currency || currency;
-    setAmountCurrency(panel.querySelector('#bt-amount'), sourceCurrency);
+    setAmountUnit(panel.querySelector('#bt-amount'), sourceCurrency);
   };
-  panel.querySelector('#bt-from').addEventListener('change', syncAmountCurrency);
+  // Der Platzhalter des Titels nennt den Titel, den eine Umbuchung ohne
+  // eigenen bekommt - er folgt den beiden Konten.
+  const syncTitlePlaceholder = () => {
+    const name = (id) => accounts.find(a => a.id === Number(panel.querySelector(id).value))?.name;
+    panel.querySelector('#bt-title').placeholder = transferTitle(name('#bt-from'), name('#bt-to'));
+  };
+  panel.querySelector('#bt-from').addEventListener('change', () => { syncAmountCurrency(); syncTitlePlaceholder(); });
+  panel.querySelector('#bt-to').addEventListener('change', syncTitlePlaceholder);
   syncAmountCurrency();
+  syncTitlePlaceholder();
   wireBudgetIntervalFields(panel, 'bt');
   const syncSubcategory = (selected = '') => {
     const subs = subcategories[panel.querySelector('#bt-category').value] ?? [];
@@ -102,11 +134,13 @@ export function wireTransferForm(panel, { transfer = null, accounts = [], curren
     if (reportFieldErrors([
       !body.category && [panel.querySelector('#bt-category'), t('budget.categoryRequired')],
       panel.querySelector('#bt-subcategory').required && !body.subcategory && [panel.querySelector('#bt-subcategory'), t('budget.subcategoryRequired')],
-      !body.title && [panel.querySelector('#bt-title'), t('common.titleRequired')],
       amountFieldError(panel.querySelector('#bt-amount'), sourceCurrency, { required: true, original }),
       (!body.from_account_id || !body.to_account_id || body.from_account_id === body.to_account_id)
         && [panel.querySelector('#bt-to'), t('budget.transferChooseAccounts')],
     ])) return;
+    // Ohne eigenen Titel heisst die Umbuchung nach ihren Konten (der Platzhalter
+    // hat es gezeigt).
+    if (!body.title) body.title = transferTitle(accounts.find(a => a.id === body.from_account_id)?.name, accounts.find(a => a.id === body.to_account_id)?.name);
     if (panel.querySelector('#bt-visibility')) body.visibility = value('visibility');
     const suffix = panel.querySelector('#bt-scope')?.value === 'series' ? '/series' : '';
     if (!transfer || suffix) Object.assign(body, { is_recurring: panel.querySelector('#bt-recurring').checked,

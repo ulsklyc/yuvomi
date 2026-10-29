@@ -48,11 +48,14 @@ import '../server/utils/require-supported-runtime.js';
 // verschluesselt hat (#2114). Bereits gesetzte Variablen gewinnen.
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
-import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { computeLoanSchedule } from '../server/services/loan-amortization.js';
 import { buildDemoPdf } from './seed-demo-pdf.js';
 import { assignPantryProduct } from '../server/services/pantry-products.js';
 import { applyChildStartPermissions } from '../server/permissions.js';
+import { recordCompletion } from '../server/services/task-completions.js';
 
 const args = process.argv.slice(2);
 const dbIdx = args.indexOf('--db');
@@ -475,6 +478,16 @@ for (const [title, description, category, priority, status, start_date, due_date
   for (const u of assignees) insertTaskAssign.run(id, u);
   for (const tag of tags) insertTaskTag.run(id, tag, tagKey(tag));
 }
+// DER VERLAUF IST NICHT LEER (R24, Critique G2 P3-3). Die erledigten
+// Seed-Aufgaben standen ohne Eintrag in task_completions da, und die Ansicht
+// "Verlauf" der Aufgaben zeigte in jeder Demo ihren Leerzustand. Eingetragen
+// wie beim Abhaken (recordCompletion), zum Faelligkeitstag; die Kinder-Aufgaben
+// bekommen ihren Eintrag unten mit der Punkte-Gutschrift.
+for (const [title, days, hour, min, who] of [
+  [L('Call insurance about claim', 'Versicherung wegen Schaden anrufen'), -3, 10, 15, alexId],
+  [L('Grocery run', 'Wocheneinkauf erledigen'), -1, 18, 20, lindaId],
+]) recordCompletion(db, taskIdByTitle[title], who, null, { completedAt: isoFromNow(days, hour, min) });
+
 // Point values on the children's chores (drives the Rewards module)
 const setTaskPoints = db.prepare('UPDATE tasks SET points = ? WHERE id = ?');
 [
@@ -541,7 +554,7 @@ for (const [title, description, start, end, all_day, location, color, icon, rrul
 // ── Recipes ──────────────────────────────────────────────────────────────────
 
 console.log('Inserting recipes…');
-const insertRecipe = db.prepare('INSERT INTO recipes (title, notes, recipe_url, created_by) VALUES (?, ?, ?, ?)');
+const insertRecipe = db.prepare('INSERT INTO recipes (title, notes, recipe_url, servings, created_by) VALUES (?, ?, ?, ?, ?)');
 const insertRecipeIng = db.prepare('INSERT INTO recipe_ingredients (recipe_id, name, quantity, category) VALUES (?, ?, ?, ?)');
 const recipes = [
   [L('Spaghetti Bolognese', 'Spaghetti Bolognese'), L('Family favourite - simmer the sauce for at least 45 minutes for the best flavour.', 'Familienklassiker - die Soße mindestens 45 Minuten ziehen lassen.'), 'https://www.bbcgoodfood.com/recipes/best-spaghetti-bolognese-recipe', [
@@ -558,7 +571,7 @@ const recipes = [
   ]],
   [L('Grilled Salmon & Roasted Veg', 'Lachs mit Ofengemüse'), L('Lemon butter sauce ties it all together. Ready in 30 minutes.', 'Die Zitronenbutter hält alles zusammen. In 30 Minuten fertig.'), null, [
     [L('Salmon fillets', 'Lachsfilets'), '4', CAT.meat], [L('Courgette', 'Zucchini'), '2', CAT.produce], [L('Bell peppers', 'Paprika'), '2', CAT.produce],
-    [L('Lemon', 'Zitrone'), '1', CAT.produce], [L('Butter', 'Butter'), '50 g', CAT.dairy],
+    [L('Lemon juice', 'Zitronensaft'), L('2 tbsp', '2 EL'), CAT.produce], [L('Butter', 'Butter'), '50 g', CAT.dairy],
   ]],
   [L('Sunday Roast Chicken', 'Hähnchen aus dem Ofen'), L('Rest the chicken for 15 minutes before carving.', 'Das Hähnchen vor dem Tranchieren 15 Minuten ruhen lassen.'), null, [
     [L('Whole chicken', 'Ganzes Hähnchen'), '1,5 kg', CAT.meat], [L('Potatoes', 'Kartoffeln'), '1 kg', CAT.produce], [L('Carrots', 'Möhren'), '500 g', CAT.produce],
@@ -569,9 +582,13 @@ const recipes = [
     [L('Blueberries', 'Blaubeeren'), '125 g', CAT.produce], [L('Maple syrup', 'Ahornsirup'), L('1 bottle', '1 Flasche'), CAT.other],
   ]],
 ];
+// Portionen je Rezept in derselben Reihenfolge (R24, E12). Das Ofenhaehnchen
+// bleibt ohne Angabe: so zeigt die Demo beide Formen des Steppers - Portionen
+// und, ohne gespeicherte Zahl, Vielfache des Rezepts.
+const RECIPE_SERVINGS = [4, 4, 2, 4, null, 4];
 const recipeIdByTitle = {};
-for (const [title, notes, url, ings] of recipes) {
-  const rid = insertRecipe.run(title, notes, url, alexId).lastInsertRowid;
+for (const [i, [title, notes, url, ings]] of recipes.entries()) {
+  const rid = insertRecipe.run(title, notes, url, RECIPE_SERVINGS[i] ?? null, alexId).lastInsertRowid;
   recipeIdByTitle[title] = rid;
   for (const [name, qty, cat] of ings) insertRecipeIng.run(rid, name, qty, cat);
 }
@@ -1008,12 +1025,13 @@ for (const [slug, name] of [
   folderId[slug] = insertFolder.run(name, alexId).lastInsertRowid;
   folderName[slug] = name;
 }
-// Build a base64 payload of a given byte size so file sizes look realistic.
-function payload(bytes) {
-  const text = 'OIKOS DEMO DOCUMENT - placeholder content. '.repeat(Math.ceil(bytes / 44)).slice(0, bytes);
-  const buf = Buffer.from(text, 'utf8');
-  return { base64: buf.toString('base64'), size: buf.length };
-}
+// DIE BILDBELEGE SIND ECHTE JPEGS (R24, Critique G4 P2-1). Hier lag Klartext
+// mit MIME-Typ image/jpeg, und jede Vorschau und jeder Screenshot zeigte ein
+// kaputtes Bild. Die Dateien zeichnet scripts/generate-seed-images.mjs (ohne
+// Schrift, also in jeder Seed-Sprache richtig); eingecheckt, damit der Seed
+// ohne die Entwicklungsabhaengigkeit `sharp` auskommt.
+const SEED_IMAGES = join(dirname(fileURLToPath(import.meta.url)), 'seed-images');
+const seedImage = (original) => readFileSync(join(SEED_IMAGES, original));
 const insertDoc = db.prepare(`
   INSERT INTO family_documents (name, description, category, status, visibility, folder_id, original_name, mime_type, file_size, content_data, created_by)
   VALUES (@name, @description, @category, 'active', @visibility, @folder, @original, @mime, @size, @content, @created_by)
@@ -1042,7 +1060,7 @@ for (const [name, description, category, visibility, folder, original, mime, siz
   // PDFs sind echte PDFs (#1511): die Vorschau der App und der PDF-Viewer des
   // Browsers öffnen sie, statt einen Fehler zu zeigen. Als Buffer gebunden
   // landet der Inhalt als BLOB in der Spalte - das Format, in dem die App seit
-  // Migration 67 selbst schreibt. Die Bilder bleiben ein Text-Platzhalter.
+  // Migration 67 selbst schreibt. Die Bilder sind echte JPEGs (seedImage).
   // `size` ist in beiden Fällen die angezeigte, realistische Grösse, nicht die
   // der abgelegten Bytes.
   const content = mime === 'application/pdf'
@@ -1059,7 +1077,7 @@ for (const [name, description, category, visibility, folder, original, mime, siz
       footer: L('Yuvomi demo document - sample content, not a real record.',
         'Yuvomi-Demodokument - Beispielinhalt, keine echte Unterlage.'),
     })
-    : payload(Math.min(size, 4096)).base64; // store a small placeholder, report a realistic size
+    : seedImage(original);
   documentIdByName[name] = insertDoc.run({
     name, description, category, visibility, folder: folderId[folder],
     original, mime, size, content, created_by,
@@ -1157,8 +1175,8 @@ const insertMember = db.prepare(`
   INSERT INTO expense_group_members (group_id, user_id, role, invited_by) VALUES (?, ?, ?, ?)
 `);
 const insertExpenseRow = db.prepare(`
-  INSERT INTO expenses (group_id, title, description, amount_minor, currency, converted_amount_minor, converted_currency, payer_id, category, split_method, expense_date, created_by)
-  VALUES (@group, @title, @description, @amount, 'EUR', @amount, 'EUR', @payer, @category, 'equal', @date, @created_by)
+  INSERT INTO expenses (group_id, title, description, amount_minor, currency, converted_amount_minor, converted_currency, payer_id, category, budget_category, split_method, expense_date, created_by)
+  VALUES (@group, @title, @description, @amount, 'EUR', @amount, 'EUR', @payer, @category, @budget, 'equal', @date, @created_by)
 `);
 const insertSplit = db.prepare('INSERT INTO expense_splits (expense_id, user_id, amount_minor, currency) VALUES (?, ?, ?, ?)');
 const insertLedger = db.prepare(`
@@ -1170,7 +1188,14 @@ const insertActivity = db.prepare(`
   VALUES (?, ?, ?, ?, ?, ?)
 `);
 
-function addExpense(groupId, payerId, memberIds, title, description, euros, category, date) {
+// Die Aufteilung fuehrt Budget-Kategorien (R24, E12, Migration 271): dieselbe
+// Zuordnung wie die Migration, wo die alte Kategorie keinen Schluessel hat,
+// nennt der Aufruf ihn selbst.
+const SPLIT_TO_BUDGET = {
+  groceries: 'food', rent: 'housing', utilities: 'housing', home: 'housing', school: 'education',
+  travel: 'leisure', subscriptions: 'leisure', shopping: 'shopping_clothing', health: 'personal_health',
+};
+function addExpense(groupId, payerId, memberIds, title, description, euros, category, date, budget = SPLIT_TO_BUDGET[category] ?? null) {
   const amount = Math.round(euros * 100);
   const n = memberIds.length;
   const base = Math.floor(amount / n);
@@ -1181,7 +1206,7 @@ function addExpense(groupId, payerId, memberIds, title, description, euros, cate
     return { uid, amount_minor: s };
   });
   const expId = insertExpenseRow.run({
-    group: groupId, title, description, amount, payer: payerId, category, date, created_by: payerId,
+    group: groupId, title, description, amount, payer: payerId, category, budget, date, created_by: payerId,
   }).lastInsertRowid;
   for (const s of shares) insertSplit.run(expId, s.uid, s.amount_minor, 'EUR');
   // Ledger: payer +full, each member -their share
@@ -1206,7 +1231,7 @@ const groceriesExpenseId =
   addExpense(houseGroup, alexId,  [alexId, lindaId], L('Weekly groceries',  'Wocheneinkauf'),        L('Big shop at REWE',      'Großeinkauf bei REWE'),      142.30, 'groceries',     thisMonthDate(4));
 addExpense(houseGroup, lindaId, [alexId, lindaId], L('Electricity bill',  'Stromrechnung'),        L('Monthly direct debit',  'Monatlicher Abschlag'),       78.00, 'utilities',     thisMonthDate(15));
 const dinnerExpenseId =
-  addExpense(houseGroup, alexId,  [alexId, lindaId], L('Date-night dinner', 'Abendessen zu zweit'),  L('Italian on the corner', 'Italiener um die Ecke'),      87.50, 'general',       thisMonthDate(9));
+  addExpense(houseGroup, alexId,  [alexId, lindaId], L('Date-night dinner', 'Abendessen zu zweit'),  L('Italian on the corner', 'Italiener um die Ecke'),      87.50, 'general',       thisMonthDate(9), 'food');
 addExpense(houseGroup, lindaId, [alexId, lindaId], L("Emma's new shoes",  'Neue Schuhe für Emma'), L('Back-to-school',        'Für den Schulstart'),         38.50, 'shopping',      thisMonthDate(16));
 addExpense(houseGroup, alexId,  [alexId, lindaId], L('Streaming bundle',  'Streaming-Paket'),      L('Netflix + Spotify',     'Netflix und Spotify'),        34.98, 'subscriptions', thisMonthDate(10));
 
@@ -1220,7 +1245,7 @@ insertMember.run(tripGroup, lindaId, 'admin', alexId);
 insertActivity.run(tripGroup, alexId, 'group_created', 'group', tripGroup, JSON.stringify({ name: tripGroupName }));
 addExpense(tripGroup, alexId,  [alexId, lindaId], L('Flights (×4)',      'Flüge (×4)'),          L('Dortmund → Naples',   'Dortmund → Neapel'),        648.00, 'travel',  thisMonthDate(2));
 addExpense(tripGroup, lindaId, [alexId, lindaId], L('Apartment deposit', 'Anzahlung Ferienwohnung'), L('Sorrento - 7 nights', 'Sorrent - 7 Nächte'),   400.00, 'travel',  thisMonthDate(6));
-addExpense(tripGroup, alexId,  [alexId, lindaId], L('Travel insurance',  'Reiseversicherung'),   L('Family annual policy','Jahrespolice für die Familie'), 96.00, 'general', thisMonthDate(8));
+addExpense(tripGroup, alexId,  [alexId, lindaId], L('Travel insurance',  'Reiseversicherung'),   L('Family annual policy','Jahrespolice für die Familie'), 96.00, 'general', thisMonthDate(8), 'financial_other');
 
 // Beleg + Kommentar an einer geteilten Ausgabe: beides gab es im Seed nie, und
 // beide Ansichten (Beleg-Chip, Kommentarfaden) blieben dadurch unsichtbar.
@@ -1238,9 +1263,9 @@ insertExpenseComment.run(dinnerExpenseId, alexId,  L('Agreed. Next time we book 
 
 // Wiederkehrende geteilte Ausgabe: der Mietanteil läuft monatlich weiter.
 db.prepare(`
-  INSERT INTO recurring_expenses (group_id, title, description, amount_minor, currency, payer_id, category,
+  INSERT INTO recurring_expenses (group_id, title, description, amount_minor, currency, payer_id, category, budget_category,
                                   split_method, split_snapshot, frequency, next_run_date, anchor_day, created_by)
-  VALUES (?, ?, ?, ?, 'EUR', ?, 'rent', 'equal', ?, 'monthly', ?, 1, ?)
+  VALUES (?, ?, ?, ?, 'EUR', ?, 'rent', 'housing', 'equal', ?, 'monthly', ?, 1, ?)
 `).run(
   houseGroup, L('Rent share', 'Mietanteil'), L('Split 50/50 each month', 'Jeden Monat hälftig geteilt'),
   145000, alexId,
@@ -1464,23 +1489,42 @@ const REWARD_GAMING    = L('Video game hour', 'Eine Stunde zocken');
 ].forEach((r, i) => insertRewardItem.run(r[0], r[1], r[2], r[3], i, alexId));
 
 const insertRewardLedger = db.prepare(`
-  INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, redemption_id, created_by, created_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, redemption_id, created_by, created_at, series_id)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
+// JEDE GUTSCHRIFT HAT IHRE AUFGABE (R24, Critique G2 P3-2). Die earn-Zeilen
+// standen ohne task_id da; der Server zeigt den Grund einer solchen Zeile nur
+// der Person, der sie gehoert (routes/rewards.js, LEDGER_TASK_VISIBLE_SQL), und
+// Eltern lasen sechsmal "Aufgabe erledigt". Jetzt bucht der Seed, was die App
+// beim Abhaken bucht (awardForCompletion): eine erledigte Aufgabe des Kindes
+// mit Punkten, ihr Verlaufseintrag (task_completions) und die Gutschrift mit
+// Titel, task_id und Serie - zur selben Zeit.
+const insertDoneChore = db.prepare(`
+  INSERT INTO tasks (title, category, priority, status, due_date, assigned_to, created_by, points)
+  VALUES (?, 'household', 'none', 'done', ?, ?, ?, ?)
+`);
+function earnForChore(userId, title, points, days, hour = 18, min = 0, { taskId = null } = {}) {
+  if (!taskId) {
+    taskId = insertDoneChore.run(title, daysFromNow(days), userId, lindaId, points).lastInsertRowid;
+    insertTaskAssign.run(taskId, userId);
+  }
+  const at = isoFromNow(days, hour, min);
+  recordCompletion(db, taskId, userId, null, { completedAt: at });
+  insertRewardLedger.run(userId, points, 'earn', title, taskId, null, userId, at, taskId);
+}
 // Emma earns points, then redeems an ice cream trip
-[
-  [10, 'earn',  L('Tidied her bedroom',      'Zimmer aufgeräumt'),          -9],
-  [15, 'earn',  L('Helped with the dishes',  'Beim Abwasch geholfen'),      -7],
-  [20, 'bonus', L('Great school week 🎉',    'Tolle Schulwoche 🎉'),        -5],
-  [10, 'earn',  L('Fed the cat all week',    'Die ganze Woche Katze gefüttert'), -2],
-].forEach(([delta, type, reason, d]) => insertRewardLedger.run(emmaId, delta, type, reason, null, null, alexId, isoFromNow(d, 18, 0)));
+earnForChore(emmaId, L('Tidy the desk', 'Schreibtisch aufräumen'), 10, -9);
+earnForChore(emmaId, L('Help with the dishes', 'Beim Abwasch helfen'), 15, -7, 19, 30);
+insertRewardLedger.run(emmaId, 20, 'bonus', L('Great school week 🎉', 'Tolle Schulwoche 🎉'), null, null, alexId, isoFromNow(-5, 18, 0), null);
+earnForChore(emmaId, L('Feed the cat', 'Katze füttern'), 10, -2, 7, 45);
 // Leo earns points (has a pending redemption, not yet deducted)
-[
-  [15, 'earn',  L('Practised piano',          'Klavier geübt'),             -8],
-  [10, 'earn',  L('Watered the plants',       'Pflanzen gegossen'),         -6],
-  [20, 'bonus', L('Kept his room tidy all week','Zimmer die ganze Woche ordentlich'), -4],
-  [15, 'earn',  L('Homework done on time',    'Hausaufgaben pünktlich erledigt'), -1],
-].forEach(([delta, type, reason, d]) => insertRewardLedger.run(leoId, delta, type, reason, null, null, alexId, isoFromNow(d, 18, 0)));
+earnForChore(leoId, L('Practise piano', 'Klavier üben'), 15, -8, 17, 15);
+earnForChore(leoId, L('Take out the bins', 'Mülltonnen rausstellen'), 10, -6, 19, 0);
+// Die schon erledigte Seed-Aufgabe "Pflanzen gießen" (5 Punkte, vorgestern)
+// bucht wie jede andere - vorher stand sie erledigt da, ohne Gutschrift.
+earnForChore(leoId, L('Water the plants', 'Pflanzen gießen'), 5, -2, 17, 40, { taskId: taskIdByTitle[L('Water the plants', 'Pflanzen gießen')] });
+insertRewardLedger.run(leoId, 20, 'bonus', L('Kept his room tidy all week', 'Zimmer die ganze Woche ordentlich'), null, null, alexId, isoFromNow(-4, 18, 0), null);
+earnForChore(leoId, L('Homework done on time', 'Hausaufgaben pünktlich erledigt'), 15, -1, 16, 30);
 
 const insertRedemption = db.prepare(`
   INSERT INTO reward_redemptions (user_id, catalog_id, reward_name, reward_icon, cost, status, note, requested_by, decided_by, decided_at, created_at)
@@ -1490,7 +1534,7 @@ const insertRedemption = db.prepare(`
 const emmaRedemptionId = insertRedemption.run(
   emmaId, 2, REWARD_ICE_CREAM, '🍦', 25, 'fulfilled', null, emmaId, alexId, isoFromNow(-3, 19, 0), isoFromNow(-3, 16, 0)
 ).lastInsertRowid;
-insertRewardLedger.run(emmaId, -25, 'redeem', REWARD_ICE_CREAM, null, emmaRedemptionId, alexId, isoFromNow(-3, 19, 0));
+insertRewardLedger.run(emmaId, -25, 'redeem', REWARD_ICE_CREAM, null, emmaRedemptionId, alexId, isoFromNow(-3, 19, 0), null);
 // Leo: pending request awaiting a parent's approval (no ledger entry yet)
 insertRedemption.run(leoId, 4, REWARD_GAMING, '🎮', 40, 'pending',
   L('Please? Finished all my homework!', 'Bitte? Ich habe alle Hausaufgaben fertig!'),

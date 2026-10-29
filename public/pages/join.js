@@ -6,7 +6,7 @@
 import { auth } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, flagField, hideAuthError } from '/utils/auth-ui.js';
+import { authHeroHtml, authErrorHtml, wirePasswordToggle, passwordRuleHtml, hideAuthError, showAuthError, getStoredAppName } from '/utils/auth-ui.js';
 
 // Dieselbe Regel wie im Server (POST /auth/invites/accept). Sie hier zu spiegeln
 // erspart dem Nutzer ein 400, das sich sonst nicht von einem toten Token
@@ -133,6 +133,13 @@ export async function render(container) {
   }
   if (!preview?.valid) { dead(); return; }
   btn.disabled = false;
+  // DIE EINLADUNG NENNT, WER EINLAEDT (Critique R24, G6-Zugang-P3-1): "Du
+  // wurdest zu Yuvomi eingeladen" sagte weder wer noch wohin - und trug den
+  // Produktnamen auch dort, wo ein Haushalt seinen eigenen Namen gesetzt hat.
+  // Jetzt Person und Name der App, wie ihn die Marke darueber zeigt.
+  if (preview.invited_by) {
+    intro.textContent = t('join.introNamed', { name: preview.invited_by, app: getStoredAppName() });
+  }
 
   // Was die Einladung vorgibt, steht fest: der Server nimmt ohnehin ihre Werte.
   // Das Feld wird deshalb schreibgeschützt UND sichtbar als vorgegeben markiert -
@@ -170,15 +177,17 @@ export async function render(container) {
     const password = form.password.value;
     const confirm = form.confirm.value;
 
-    // Jede Pruefung markiert das Feld, das sie meint (utils/auth-ui.js, flagField).
-    if (!username) { flagField(usernameEl, errorEl); fail(t('join.usernameRequired')); return; }
-    if (!USERNAME_PATTERN.test(username)) { flagField(usernameEl, errorEl); fail(t('join.usernameInvalid')); return; }
-    if (displayName.length > MAX_DISPLAY_NAME) { flagField(displayNameEl, errorEl); fail(t('join.displayNameTooLong')); return; }
+    // DIE MELDUNG STEHT AM FELD, DER FOKUS AUCH (Critique R24 G6-Zugang-P2-1):
+    // wie Anmeldung und Einrichtung (showAuthError). Bis R24 stand sie im
+    // Kasten ueber dem Formular, der Fokus auf dem Kasten, das Feld blieb grau.
+    if (!username) { showAuthError(errorEl, t('join.usernameRequired'), usernameEl); return; }
+    if (!USERNAME_PATTERN.test(username)) { showAuthError(errorEl, t('join.usernameInvalid'), usernameEl); return; }
+    if (displayName.length > MAX_DISPLAY_NAME) { showAuthError(errorEl, t('join.displayNameTooLong'), displayNameEl); return; }
     if (passwordRequired) {
       // Wie der Server (normalizePassword): auf macOS/Firefox kommen Umlaute als
       // NFD an und zählen roh doppelt, nach NFC bleibt weniger übrig (#608).
-      if (password.normalize('NFC').length < 8) { flagField(form.password, errorEl); fail(t('join.tooShort')); return; }
-      if (password !== confirm) { flagField(form.confirm, errorEl); fail(t('join.mismatch')); return; }
+      if (password.normalize('NFC').length < 8) { showAuthError(errorEl, t('join.tooShort'), form.password); return; }
+      if (password !== confirm) { showAuthError(errorEl, t('join.mismatch'), form.confirm); return; }
     }
 
     btn.disabled = true;
@@ -193,8 +202,7 @@ export async function render(container) {
       setTimeout(() => window.yuvomi.navigate('/login'), 1500);
     } catch (err) {
       if (err?.status === 409) {
-        flagField(usernameEl, errorEl);
-        fail(t('join.usernameTaken'));
+        showAuthError(errorEl, t('join.usernameTaken'), usernameEl);
         btn.disabled = false;
         return;
       }

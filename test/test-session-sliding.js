@@ -328,3 +328,23 @@ test('keine ausgeschriebene Lebensdauer neben der Konstante', () => {
   }
   assert.deepEqual(abweichungen, [], 'jede maxAge-Zuweisung nennt SESSION_MAX_AGE_MS');
 });
+
+// Der Offline-Abzug der Sitzung (#2293, public/sw.js) endet, wo die Sitzung
+// endet: `/auth/me` nennt den Ablauf, den der Browser fuer sein Session-Cookie
+// zuletzt bekommen hat - nicht eine Zahl, die der Service Worker sich ausdenkt.
+test('/auth/me nennt den Ablauf des Session-Cookies (sessionExpiresAt)', async () => {
+  const loginRes = await login(0);
+  const cookie = cookieHeader(loginRes.headers.get('set-cookie'));
+  // Der Ablauf, den der Browser zuletzt bekommen hat: von der Anmeldung, dann
+  // von jeder Antwort, die das Cookie neu ausstellt. Ob die Auffrischung bei
+  // 13h kommt, misst der Test weiter oben - hier zaehlt nur, dass `/auth/me`
+  // denselben Wert nennt wie das Cookie.
+  let browserExpiry = expiryOf(setCookieLines(loginRes, 'yuvomi.sid')[0], T0);
+  for (const at of [1 * HOUR, 13 * HOUR]) {
+    const res = await me(cookie, at);
+    const [line] = setCookieLines(res, 'yuvomi.sid');
+    if (line) browserExpiry = expiryOf(line, T0 + at);
+    const body = await res.json();
+    assert.equal(body.sessionExpiresAt, browserExpiry, `bei T0+${at / HOUR}h: der Ablauf des Cookies im Browser`);
+  }
+});

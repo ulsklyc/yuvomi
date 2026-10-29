@@ -111,6 +111,11 @@ class FakeEl {
 
   querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; }
 
+  contains(node) {
+    for (let n = node; n; n = n.parent) if (n === this) return true;
+    return false;
+  }
+
   addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }
   removeEventListener(type, fn) {
     this.listeners[type] = (this.listeners[type] ?? []).filter((f) => f !== fn);
@@ -220,8 +225,9 @@ function openForm(event, { syncTargets = null, attachment = false } = {}) {
   add('input', 'modal-countdown', { type: 'checkbox' });
 
   // Farbwahl: der Erben-Swatch und eine eigene Farbe, als role="radio" mit
-  // aria-checked wie im Dialog.
-  const picker = add('div', 'event-color-picker');
+  // aria-checked wie im Dialog - seit R24 E6 im geteilten Farbwaehler
+  // (utils/color-picker.js), der am Traeger `[data-color-picker]` horcht.
+  const picker = add('div', 'event-color-picker', { attrs: { 'data-color-picker': '' } });
   for (const color of ['', '#FF9500']) {
     const swatch = add('button', null, { classes: ['color-swatch'], attrs: { role: 'radio', 'aria-checked': 'false' } }, picker);
     swatch.dataset.color = color;

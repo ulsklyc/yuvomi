@@ -23,7 +23,7 @@ import { zonedDateKey } from '/utils/timezone.js';
 import { DATE_STATUS_ALERT_DAYS } from '/utils/date-status.js';
 import { nowFields, nowDateTimeValue } from '/utils/timezone.js';
 import { trendMarkup } from '/utils/metric-card.js';
-import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, constraintErrors, advancedSection, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, reportFieldError, reportFieldErrors, constraintErrors, advancedSection, refocusAfterRender, dialogInitialFocus } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { rowActionHtml, rowMenuHtml } from '/utils/row-action.js';
 import { formRowsHtml, formRowHtml, formCompositeHtml } from '/utils/form-row.js';
@@ -69,10 +69,11 @@ import { hoistPlan, applyHoistPlan } from '/utils/health-hoist.js';
 import { renderSkeletonList, renderSkeletonChart } from '/utils/skeleton.js';
 import { formatFastingDuration } from '/utils/health-fasting.js';
 import { canUseFasting, isNavModuleReadOnly } from '/permissions.js';
-import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
+import { emptyStateHTML, emptyHintHTML, mountLoadError, cardEmptyRowHtml } from '/utils/empty-state.js';
 import { errorSentence, isGone } from '/utils/friendly-error.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 import { NUTRIENTS, MEAL_TYPES, nutrientProgress } from '/utils/health-nutrition.js';
+import { periodStepperHtml } from '/utils/period-stepper.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { HEALTH_PERSON_EVENT, healthPersonIsOther, pickHealthPerson, readHealthPerson, writeHealthPerson } from '/utils/health-person.js';
 
@@ -117,8 +118,9 @@ function mountAreaLoadError(area, name, onRetry) {
  *     `.empty-state`-Komposition (utils/empty-state.js).
  *   KARTE (ein Abschnitt in einem Bereich mit Inhalt): `cardEmptyRowHtml` -
  *     die ruhige Zeile mit dem Satz und, wo es etwas zu erfassen gibt, der
- *     Erfassen-Aktion (`.health-overview__empty-row`, seit R21 D6 der
- *     Vitalwerte-Karte der Uebersicht).
+ *     Erfassen-Aktion (seit R21 D6 der Vitalwerte-Karte der Uebersicht; seit
+ *     DW p7 geteilt in utils/empty-state.js, `.card-empty-row` - die Kacheln
+ *     der Uebersicht sprechen dieselbe Zeile).
  *
  * Die Aktion ist ein Knopf mit `data-action`; der Bereich verdrahtet ihn nach
  * dem Einhaengen (emptyStateHTML ist eine Zeichenkette).
@@ -137,18 +139,6 @@ function areaEmptyHtml(route, { action = null, className = '' } = {}) {
   });
 }
 
-function cardEmptyRowHtml(text, { action = null, className = '' } = {}) {
-  const button = action
-    ? `<button type="button" class="btn btn--secondary btn--sm" data-action="${esc(action.id)}">
-        <i data-lucide="plus" aria-hidden="true"></i>${esc(action.label)}
-      </button>`
-    : '';
-  return `
-    <div class="health-overview__empty-row${className ? ` ${esc(className)}` : ''}">
-      <span class="health-overview__empty-text">${esc(text)}</span>
-      ${button}
-    </div>`;
-}
 
 // Sichtbarkeit des Zyklus-Tabs. Zwei Schalter greifen ineinander: der Haushalt
 // erlaubt ihn (Settings → Module → Gesundheit, Admin), und jede Person kann ihn
@@ -161,7 +151,10 @@ let fastingEnabled = false;
 
 async function loadHealthPrefs() {
   try {
-    const res = await api.get('/preferences');
+    // Ist die Gesundheit die erste Seite, hat der Start `/preferences` schon
+    // angefragt (utils/start-handoff.js): diese Antwort statt eines zweiten
+    // Abrufs (Critique R24 G5-Gesundheit-P3-8, doppelt je Einstieg).
+    const res = await (window.yuvomi?.takeStartPreferences?.() ?? api.get('/preferences'));
     cycleEnabled = res?.data?.health_cycle_effective !== false;
     fastingEnabled = canUseFasting();
   } catch {
@@ -293,10 +286,12 @@ function cycleCanEdit() {
  * Knopf aus einem aelteren Render oder aus den Devtools findet denselben
  * Riegel. Muster wie `READ_SAFE_ACTIONS` in waste.js/schedule.js/tasks.js.
  *
- * `cancel` schliesst nur einen Dialog; `ov-go-meds`/`ov-go-cycle` wechseln nur
- * den Tab. Alles andere schreibt.
+ * `cancel` schliesst nur einen Dialog; `ov-go-cycle`/`ov-go-vitals` wechseln nur
+ * den Bereich. Alles andere schreibt. `ov-go-meds` stand bis R24 in der Karte
+ * „Schnell erfassen"; im Erfassen-Menue am FAB (E9) gibt es ihn nur mit
+ * Schreibrecht, das Menue prueft selbst (onCaptureMenuClick).
  */
-const READ_SAFE_ACTIONS = new Set(['cancel', 'ov-go-meds', 'ov-go-cycle', 'ov-go-vitals', 'health-export']);
+const READ_SAFE_ACTIONS = new Set(['cancel', 'ov-go-cycle', 'ov-go-vitals', 'health-export']);
 
 /**
  * Die schreibenden Bedienhaken OHNE `data-action`.
@@ -571,7 +566,11 @@ function panelMarkup(panel, activeRoute) {
 }
 
 // Routen-basierter Kontext-FAB: die Primäraktion folgt der aktiven Health-Route.
-// Auf der Übersicht (keine Erstellen-Aktion) ausgeblendet.
+// SEIT R24 IN JEDER ANSICHT (E9, Ulas 2026-10-28): auf der Uebersicht
+// „+ Erfassen" mit einem Auswahlmenue (Messwert, Training, Einnahme, Zyklus),
+// im Zyklus „+ Tag" (Tag protokollieren). Vorher stand dort kein Knopf, und
+// die Kapsel trug mobil einen leeren Platz unten rechts - genau dort, wo Casey
+// sucht (Critique G5 P1-1, G0 P2-2).
 let _fab = null;
 // Was der FAB im Fasten kann - pages/health-fasting.js meldet es nach jedem
 // Zeichnen (mountFasting onIntent), bis dahin ausgeblendet.
@@ -589,10 +588,16 @@ function updateHealthFab(activeRoute) {
     case '/health/cycle':
       // EIN VERB JE AKTION (R22, D12; Critique a5 P2): "+ Periode" im Kopf
       // stand neben "Periode gestartet" in der Heute-Karte - zwei Knoepfe fuer
-      // dieselbe Frage. Die Hauptaktion traegt der Inhalt (Heute-Karte, im
-      // Leerzustand "Periode nachtragen"), das Nachtragen steht am Verlauf
-      // (cycleHistoryMarkup). Kein FAB, keine Kopf-Pille.
-      setPageFabAction(_fab, { hidden: true, dockLabel: t('newLabel.healthCycle') }); break;
+      // dieselbe Frage. Seit R24 (E9) traegt der FAB die ANDERE Handlung: den
+      // Tag protokollieren (Blutung, Symptome, Notiz) - „+ Tag". „Periode
+      // gestartet" bleibt der eine Tipp in der Heute-Karte (dort sekundaer,
+      // der Primaer ist der FAB), das Nachtragen steht am Verlauf.
+      setPageFabAction(_fab, {
+        hidden: !cycleCanEdit(),
+        label: t('health.cycle.today.logDay'),
+        dockLabel: t('newLabel.healthCycle'),
+        onClick: () => openDayLogModal(todayKey()),
+      }); break;
     case '/health/meds':
       setPageFabAction(_fab, { hidden: !canEditFor(meds.personId, meds.meId), label: t('health.meds.add'), dockLabel: t('newLabel.healthMeds'), onClick: () => openMedModal(null) }); break;
     case '/health/prevention':
@@ -617,13 +622,154 @@ function updateHealthFab(activeRoute) {
         dockLabel: t('health.fasting.start'),
         onClick: () => void fastingIntent.start?.(),
       }); break;
+    case HEALTH_OVERVIEW_ROUTE: {
+      // DIE UEBERSICHT ERFASST UEBER EIN MENUE (R24, E9). Ein Knopf, vier
+      // Wege - wie „+ Neu" der App-Uebersicht. Das Menue haengt per
+      // `popovertarget` am FAB: die Popover-API oeffnet und schliesst, gibt den
+      // Fokus zurueck, und das geteilte Menue (popover-menu.js) rechnet die
+      // Lage am Knopf - unten rechts kippt es nach oben, angedockt nach unten.
+      const items = overviewCaptureItems();
+      setPageFabAction(_fab, {
+        hidden: !items.length,
+        label: t('health.overview.quick.title'),
+        dockLabel: t('newLabel.healthOverview'),
+        onClick: null,
+      });
+      syncCaptureMenu(items);
+      break;
+    }
     default:
       // Das Nomen bleibt stehen: der Router dockt den Knopf am Desktop nur beim
-      // Seitenaufbau an und nur mit `data-dock-label`. Wer auf der Uebersicht
-      // (ohne Erstellen-Aktion) einsteigt und es hier loeschte, behielte den
+      // Seitenaufbau an und nur mit `data-dock-label`. Wer in einem Bereich
+      // ohne eigene Aktion einsteigt und es hier loeschte, behielte den
       // schwebenden Knopf fuer den ganzen Besuch.
       setPageFabAction(_fab, { hidden: true, dockLabel: _fab.dataset?.dockLabel || t('newLabel.healthVitals') });
   }
+  if (activeRoute !== HEALTH_OVERVIEW_ROUTE) syncCaptureMenu(null);
+  fitHealthFabSlot();
+}
+
+const HEALTH_OVERVIEW_ROUTE = '/health';
+const CAPTURE_MENU_ID = 'health-capture-menu';
+
+/**
+ * Die Wege des Erfassen-Menues auf der Uebersicht - nur, was die gewaehlte
+ * Person hier anlegen darf. Messwert und Training oeffnen ihren Dialog direkt
+ * (wie bisher „Schnell erfassen"), Einnahme und Zyklus fuehren in ihren
+ * Bereich, wo die Heute-Karte bzw. die Dosis-Zeile den einen Tipp tragen.
+ */
+function overviewCaptureItems() {
+  if (readOnly() || !canEditFor(overview.personId, overview.meId)) return [];
+  const own = overview.personId == null || overview.personId === overview.meId;
+  return [
+    { action: 'ov-add-vital', icon: 'heart-pulse', label: t('newLabel.healthVitals') },
+    { action: 'ov-add-activity', icon: 'dumbbell', label: t('newLabel.healthActivity') },
+    { action: 'ov-go-meds', icon: 'pill', label: t('health.overview.quick.meds') },
+    ...(cycleEnabled && own ? [{ action: 'ov-go-cycle', icon: 'droplet', label: t('health.tabs.cycle') }] : []),
+  ];
+}
+
+/** Das Menue am FAB anlegen, auffrischen oder (ausserhalb der Uebersicht) abbauen. */
+function syncCaptureMenu(items) {
+  if (!_fab) return;
+  let panel = document.getElementById(CAPTURE_MENU_ID);
+  if (!items?.length) {
+    _fab.removeAttribute('popovertarget');
+    _fab.removeAttribute('aria-haspopup');
+    _fab.removeAttribute('aria-expanded');
+    if (panel?.matches?.(':popover-open')) panel.hidePopover();
+    return;
+  }
+  const host = _container?.querySelector('.health-page');
+  if (!host) return;
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'popover-menu health-capture-menu';
+    panel.id = CAPTURE_MENU_ID;
+    panel.setAttribute('popover', '');
+    panel.setAttribute('role', 'menu');
+    // Das Menue ist seine eigene Wurzel: unter der Uebersicht haengt schon
+    // ein installPopoverMenus(), ein zweites darueber liefe jede Taste doppelt.
+    installPopoverMenus(panel);
+    panel.addEventListener('click', onCaptureMenuClick);
+    // Am Telefon steht der FAB IN der Kapsel: das Menue kippt nach oben und
+    // laege mit seiner Unterkante auf dem Glas. Es endet ueber der Kapsel, im
+    // Abstand, den auch Toasts und Mehr-Blatt zu ihr halten (8px).
+    panel.addEventListener('toggle', (event) => {
+      if (event.newState !== 'open') return;
+      const capsule = document.querySelector('.nav-bottom');
+      const top = capsule?.getClientRects().length ? capsule.getBoundingClientRect().top : null;
+      const box = panel.getBoundingClientRect();
+      if (top != null && box.bottom > top - 8 && box.top < top) {
+        panel.style.top = `${Math.max(8, Math.round(top - 8 - box.height))}px`;
+      }
+    });
+    host.appendChild(panel);
+  }
+  panel.setAttribute('aria-label', t('health.overview.quick.title'));
+  panel.replaceChildren();
+  panel.insertAdjacentHTML('beforeend', items.map((item) => `
+    <button type="button" role="menuitem" class="popover-menu__item" data-action="${esc(item.action)}">
+      <i data-lucide="${esc(item.icon)}" class="icon-md" aria-hidden="true"></i>
+      <span>${esc(item.label)}</span>
+    </button>`).join(''));
+  if (window.lucide) window.lucide.createIcons({ el: panel });
+  _fab.setAttribute('popovertarget', CAPTURE_MENU_ID);
+  _fab.setAttribute('aria-haspopup', 'menu');
+  if (!_fab.hasAttribute('aria-expanded')) _fab.setAttribute('aria-expanded', 'false');
+}
+
+function onCaptureMenuClick(event) {
+  const action = event.target.closest?.('[data-action]')?.dataset.action;
+  if (!action || readOnly()) return;
+  if (action === 'ov-add-vital') openVitalModal({ onSaved: () => reloadOverview() });
+  else if (action === 'ov-add-activity') openActivityModal(null, { onSaved: () => reloadOverview() });
+  else if (action === 'ov-go-meds') window.yuvomi?.navigate('/health/meds');
+  else if (action === 'ov-go-cycle') window.yuvomi?.navigate('/health/cycle');
+}
+
+/**
+ * DER FAB-PLATZ STEHT (R24, Critique G5 P2-3). Angedockt traegt der Knopf je
+ * Bereich ein anderes Nomen („Messwert", „Befund", „Fasten starten"), und die
+ * Personenwahl links daneben sprang bei jedem Bereichswechsel seitlich (1440:
+ * x 1008-1167). Der Platz bekommt die Breite seines laengsten Nomens - einmal
+ * gemessen am angedockten Knopf selbst, im selben Frame zurueckgesetzt.
+ */
+let _fabSlotKey = '';
+function fitHealthFabSlot() {
+  const label = _fab?.querySelector('.toolbar-new-btn__label');
+  const toolbar = _fab?.closest('.health-toolbar');
+  if (!label || !toolbar) return;
+  const words = [
+    'newLabel.healthOverview', 'newLabel.healthVitals', 'newLabel.healthCycle', 'newLabel.healthMeds',
+    'newLabel.healthPrevention', 'newLabel.healthLabs', 'newLabel.healthActivity', 'newLabel.healthNutrition',
+    'health.fasting.start',
+  ].map((key) => t(key));
+  const key = words.join('|');
+  if (key === _fabSlotKey && toolbar.style.getPropertyValue('--health-fab-slot')) return;
+  // Gemessen wird der Knopf, wie er steht (Schrift, Polster, Zeichen) - mit
+  // jedem Nomen einmal, ohne die Mindestbreite und sichtbar; zurueckgesetzt,
+  // bevor der Browser zeichnet. Die Breite gilt nur angedockt (health.css).
+  const shown = label.textContent;
+  const display = _fab.style.display;
+  const wasHidden = _fab.hidden;
+  _fab.hidden = false;
+  _fab.style.display = '';
+  toolbar.style.removeProperty('--health-fab-slot');
+  let widest = 0;
+  // Gemessen wird der ganze Aktions-Slot: dort steht vor dem Knopf das
+  // Werkzeug des Kopfs (Export), und dessen Breite gehoert mit zum Platz.
+  const slot = _fab.closest('.page-toolbar__actions') ?? _fab;
+  for (const word of words) {
+    label.textContent = word;
+    widest = Math.max(widest, slot.getBoundingClientRect().width);
+  }
+  label.textContent = shown;
+  _fab.style.display = display;
+  _fab.hidden = wasHidden;
+  if (!widest) return;
+  _fabSlotKey = key;
+  toolbar.style.setProperty('--health-fab-slot', `${Math.ceil(widest)}px`);
 }
 
 // FAB nach Panel-Mount / Personenwechsel neu bewerten (personId steht dann fest).
@@ -686,7 +832,7 @@ function areasNavMarkup() {
   // Seite, auf der die Liste steht, die Übersicht - eine Zeile zu ihr wäre
   // ein Link auf sich selbst.
   return `
-    <nav class="health-areas" aria-label="${esc(t('nav.health'))}">
+    <nav class="health-areas" aria-label="${esc(t('nav.health'))}"${_statusRevealPending ? ' data-health-status-pending' : ''}>
       <ul class="row-divided health-areas__group health-areas__overview" role="list">${areaRowMarkup(overviewArea)}</ul>
       <h2 class="health-areas__title u-section-title" id="health-areas-title">${esc(t('health.overview.areasTitle'))}</h2>
       <ul class="row-divided health-areas__group health-areas__list" role="list" aria-labelledby="health-areas-title">${rest.map(areaRowMarkup).join('')}</ul>
@@ -755,6 +901,12 @@ function syncDetailHead() {
   if (!_detailHead) return;
   const area = HEALTH_AREAS({ cycleEnabled, fastingEnabled }).find((a) => a.id === _activeArea);
   if (!area) return;
+  // DIE UEBERSICHT TRAEGT KEINEN KOPF (R24, Critique G5 P2-2): „Übersicht"
+  // stand links markiert, rechts noch einmal als Kopf und darueber der
+  // Seitentitel „Gesundheit". Ein Bereich nennt sich - die Uebersicht ist die
+  // Wurzel und beginnt mit ihrem Inhalt.
+  const overviewHead = area.id === HEALTH_OVERVIEW_ID;
+  if (_detailHead.hidden !== overviewHead) _detailHead.hidden = overviewHead;
   const title = _detailHead.querySelector('[data-health-detail-title]');
   if (title && title.textContent !== t(area.labelKey)) title.textContent = t(area.labelKey);
   const seal = _detailHead.querySelector('[data-health-detail-seal]');
@@ -818,10 +970,6 @@ function prioritySkeletonMarkup() {
               <div class="skeleton-card health-priority-skeleton__card health-priority-skeleton__card--due">
                 <div class="skeleton skeleton-line skeleton-line--title"></div>
                 <div class="skeleton skeleton-line skeleton-line--medium"></div>
-                <div class="skeleton skeleton-line skeleton-line--full"></div>
-              </div>
-              <div class="skeleton-card health-priority-skeleton__card health-priority-skeleton__card--quick">
-                <div class="skeleton skeleton-line skeleton-line--title"></div>
                 <div class="skeleton skeleton-line skeleton-line--full"></div>
               </div>
             </div>`;
@@ -1036,6 +1184,39 @@ let _statusGen = 0;
 // wer mobil direkt in einen Bereich springt, sieht sie nicht.
 let _statusesRequested = false;
 
+/* DIE LISTE ERSCHEINT MIT IHREN STATUS (R24 S13, S12-F3). Ein Name allein
+ * steht mittig in seiner Zeile (R18, #1770), und mit dem Status, der nach ihm
+ * ankommt, rueckte er um eine halbe Zeile hoch - Eintritt am Desktop: Shift
+ * 0,0015-0,0024 an fuenf Namen. Dieselbe Antwort wie R22 D4 fuer die Heute-
+ * Region: die Liste haelt ihren Platz unsichtbar (`data-health-status-pending`,
+ * health.css), bis die ERSTE Runde der Status steht - die eigenen Abrufe und,
+ * wo sie drei davon liefert, die Uebersicht -, und erscheint dann einmal an
+ * ihrem Ort. Spaetere Runden (Personenwahl, Speichern) zeigen die Liste
+ * schon; dort ist es eine Antwort auf eine Handlung. */
+let _statusRevealPending = false;
+// Die erste Runde laeuft: { loading, overview } - wartet sie noch auf ihre
+// Abrufe, und braucht sie dafuer die Uebersicht?
+let _statusReveal = null;
+/** So lange haelt die Liste hoechstens ihre Marke: ein haengender Abruf
+ * verbirgt die Navigation nicht. */
+const STATUS_WAIT_MS = 800;
+// Die Frist der ersten Runde. Sie gilt, bis die Liste wirklich erscheint: auch
+// wenn die eigenen Abrufe fertig sind, kann die Uebersicht noch fehlen.
+let _statusRevealTimer = 0;
+
+function revealAreaStatuses() {
+  clearTimeout(_statusRevealTimer);
+  _statusRevealPending = false;
+  _statusReveal = null;
+  _container?.querySelector('.health-areas')?.removeAttribute('data-health-status-pending');
+}
+
+function maybeRevealAreaStatuses() {
+  if (!_statusReveal || _statusReveal.loading) return;
+  if (_statusReveal.overview && !overview.loaded && !overview.error) return;
+  revealAreaStatuses();
+}
+
 function setAreaStatus(id, text) {
   const el = _container?.querySelector(`[data-health-area-status="${CSS.escape(id)}"]`);
   if (el && el.textContent !== text) el.textContent = text;
@@ -1074,16 +1255,27 @@ function refreshAllAreaStatuses() {
   // sagten sie "Blutdruck 120/80" ueber die falsche - sie bleiben dann leer.
   if (healthPersonIsOther(healthUser?.id)) {
     for (const area of HEALTH_AREAS({ cycleEnabled, fastingEnabled })) setAreaStatus(area.id, '');
+    revealAreaStatuses();
     return;
   }
   // Steht die Uebersicht (oder laedt sie gerade fuer die eigene Person),
   // liefert sie ihre drei Zeilen selbst (renderOverviewShell).
   const overviewProvides = applyOverviewStatuses()
     || (_activeArea === HEALTH_OVERVIEW_ID && !overview.loaded);
+  const loads = [];
   for (const area of HEALTH_AREAS({ cycleEnabled, fastingEnabled })) {
     if (overviewProvides && OVERVIEW_DERIVED.has(area.id)) continue;
-    refreshAreaStatus(area.id);
+    loads.push(refreshAreaStatus(area.id));
   }
+  if (!_statusRevealPending || _statusReveal) return;
+  const round = { loading: true, overview: overviewProvides };
+  _statusReveal = round;
+  _statusRevealTimer = setTimeout(revealAreaStatuses, STATUS_WAIT_MS);
+  Promise.allSettled(loads).then(() => {
+    if (_statusReveal !== round) return;
+    round.loading = false;
+    maybeRevealAreaStatuses();
+  });
 }
 
 function wireAreasNav(signal) {
@@ -1122,6 +1314,8 @@ export async function render(container, ctx = {}) {
   _pushedFromOverview = false;
   _statusesRequested = false;
   _statusGen += 1;
+  _statusRevealPending = true;
+  _statusReveal = null;
   healthUser = ctx.user ?? healthUser;
   vitals.meId = ctx.user?.id ?? vitals.meId;
   vitals.root = null;
@@ -1239,6 +1433,16 @@ export async function render(container, ctx = {}) {
 
   _fab = createPageFab({ id: 'health-fab', dockLabel: t('newLabel.healthVitals') });
   page.appendChild(_fab);
+  // Der Router dockt den Knopf erst NACH dem Aufbau an (adoptPageFab). Der
+  // Platz wird im selben Zug gemessen - der Beobachter laeuft vor dem Malen,
+  // sonst stuende er erst nach dem Laden der Daten, und die Personenwahl
+  // spraenge doch noch einmal (R24, G5 P2-3).
+  const actionsSlot = container.querySelector('.health-toolbar > .page-toolbar__actions');
+  if (actionsSlot && typeof MutationObserver === 'function') {
+    const slotWatch = new MutationObserver(() => fitHealthFabSlot());
+    slotWatch.observe(actionsSlot, { childList: true });
+    ctx.signal?.addEventListener('abort', () => slotWatch.disconnect(), { once: true });
+  }
 
   if (window.lucide) window.lucide.createIcons({ el: container });
 
@@ -1394,6 +1598,18 @@ async function loadVitals() {
   vitals.rows = withoutPendingDeletes('vitals', res.data || [], load);
 }
 
+/** Der eine Zeitraum-Stepper der Vitalwerte (R24 G5 P2-6): blaettert Kacheln und Diagramm. */
+function vitalStepperMarkup() {
+  const series = computeVitalSeries(vitals.rows, { type: vitals.selectedType || VITAL_METRICS[0].type, range: vitals.range, anchor: vitals.anchor });
+  // Markup und Reihenfolge aus dem EINEN Baustein (utils/period-stepper.js).
+  return `
+      <div class="health-vitals__stepper">${periodStepperHtml({
+        prev: { label: t('health.vitals.prevPeriod'), attrs: { 'data-step': '-1' } },
+        value: { className: 'health-vitals__period', text: vitalPeriodText(series) },
+        next: { label: t('health.vitals.nextPeriod'), attrs: { 'data-step': '1' } },
+      })}</div>`;
+}
+
 function renderVitalsShell() {
   if (!vitals.root?.isConnected) return;
   vitals.root.replaceChildren();
@@ -1407,12 +1623,18 @@ function renderVitalsShell() {
     ${personSwitcherMarkup(vitals.members, vitals.personId, vitals.meId,
       { menuId: 'health-person-menu-vitals', label: t('health.vitals.personsLabel') })}
     ${readOnlyBannerMarkup(vitals.members, vitals.personId, canEditFor(vitals.personId, vitals.meId), vitals.meId)}
-    <div class="health-vitals__toolbar">
-      <div class="health-vitals__ranges" role="tablist" aria-label="${esc(t('health.vitals.chartTitle'))}">
+    ${/* EINE ZEITRAUM-ZEILE (R24, Critique G5 P2-6): das Segment stand als
+         eigene Kapsel mit Ring ueber den Kacheln, der Stepper im Kopf des
+         Diagramms darunter - zwei Orte fuer eine Frage. Jetzt das Kanon-Segment
+         (.segmented, gleitende Kapsel) und EIN Stepper in derselben Zeile ueber
+         Kacheln und Diagramm, wie die Woche der Aktivitaet. */ ''}
+    <div class="health-vitals__toolbar health-period-row">
+      <div class="segmented health-vitals__ranges" role="tablist" aria-label="${esc(t('health.vitals.chartTitle'))}">
         ${VITAL_RANGES.map((r) => `
-          <button type="button" class="health-vitals__range${r === vitals.range ? ' is-active' : ''}"
-            data-range="${r}" role="tab" aria-selected="${r === vitals.range}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
+          <button type="button" class="segmented__item health-vitals__range${r === vitals.range ? ' is-active' : ''}"
+            data-range="${r}" data-tab-id="${r}" role="tab" aria-selected="${r === vitals.range}" tabindex="${r === vitals.range ? '0' : '-1'}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
       </div>
+      ${vitalStepperMarkup()}
     </div>
     <div class="health-vitals__cards metric-rows" id="health-vitals-cards"></div>
     <div class="health-vitals__more" id="health-vitals-more"></div>
@@ -1579,10 +1801,18 @@ function wireVitals() {
   installPopoverMenus(vitals.root);
   wirePersonSwitcher(vitals, switchPerson);
 
-  vitals.root.querySelectorAll('.health-vitals__range').forEach((btn) =>
+  vitals.root.querySelectorAll('.health-vitals__toolbar .health-vitals__range').forEach((btn) =>
     btn.addEventListener('click', () => {
       vitals.range = btn.dataset.range;
       renderVitalsShell();
+    }));
+  // Der Neuaufbau ersetzt den Knopf: der Fokus kommt an denselben Pfeil zurueck.
+  vitals.root.querySelectorAll('.health-vitals__toolbar [data-step]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const dir = btn.dataset.step;
+      stepAnchor(Number(dir));
+      renderVitalsShell();
+      vitals.root.querySelector(`.health-vitals__toolbar [data-step="${dir}"]`)?.focus();
     }));
 
 }
@@ -1852,6 +2082,39 @@ function deltaMarkup(delta, metric) {
 // Detail: Trend-Chart der ausgewählten Metrik
 // --------------------------------------------------------
 
+/**
+ * DAS DIAGRAMM HAT EINE HOEHE, NICHT EIN SEITENVERHAELTNIS (R24, Critique G5
+ * P3-2). Die Flaeche 600x200 wuchs mit der Spalte: bei 1440 stand der
+ * Blutdruck mit Puls 2 x 270px hoch fuer drei Messungen. Ab der Grundbreite
+ * haelt das Diagramm CHART.H in Pixeln: die Breite bleibt 600 Einheiten (an
+ * ihr haengt der Schriftmassstab `--chart-scale`, panel.css), die Hoehe in
+ * Einheiten schrumpft im selben Verhaeltnis - es wird breiter, nicht hoeher.
+ * `chartRatioAttr` traegt das neue Verhaeltnis ans SVG. Schmaler als die
+ * Grundbreite skaliert es wie bisher.
+ */
+function vitalDetailGeometry(host) {
+  const pad = 2 * 16; // .health-chart-section polstert mit --space-4 je Seite
+  const width = Math.round((host?.getBoundingClientRect?.().width ?? 0) - pad);
+  if (!(width > CHART.W)) return CHART;
+  return Object.freeze({ ...CHART, H: Math.max(100, Math.round((CHART.W * CHART.H) / width)) });
+}
+
+/* Die Breite steht oft erst fest, wenn der Bereich sichtbar wird (das Panel
+ * wird verborgen gebaut) - und sie aendert sich mit dem Fenster. Ein
+ * Beobachter je Wirt zeichnet das Diagramm neu, sobald seine Geometrie nicht
+ * mehr passt; die Einzeichnung laeuft dabei nicht noch einmal (drawChartOnce). */
+const _vitalDetailObservers = new WeakMap();
+function watchVitalDetailWidth(host, drawnH) {
+  host.dataset.chartH = String(drawnH);
+  if (typeof ResizeObserver !== 'function' || _vitalDetailObservers.has(host)) return;
+  const observer = new ResizeObserver(() => {
+    if (!host.isConnected) { observer.disconnect(); _vitalDetailObservers.delete(host); return; }
+    if (String(vitalDetailGeometry(host).H) !== host.dataset.chartH && vitals.root?.contains(host)) renderDetail();
+  });
+  observer.observe(host);
+  _vitalDetailObservers.set(host, observer);
+}
+
 function renderDetail() {
   const host = vitals.root.querySelector('#health-vitals-detail');
   if (!host) return;
@@ -1863,19 +2126,16 @@ function renderDetail() {
     type: metric.type, range: vitals.range, anchor: vitals.anchor,
   });
 
+  const geo = vitalDetailGeometry(host);
+  watchVitalDetailWidth(host, geo.H);
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', `
     <div class="health-chart-section">
       <div class="health-chart-section__head">
         <div class="health-chart-section__title">${esc(t(metric.labelKey))}</div>
-        <div class="health-vitals__stepper">
-          <button class="btn btn--icon" data-step="-1" aria-label="${esc(t('health.vitals.prevPeriod'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-          <span class="health-vitals__period">${esc(vitalPeriodText(series))}</span>
-          <button class="btn btn--icon" data-step="1" aria-label="${esc(t('health.vitals.nextPeriod'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-        </div>
       </div>
       ${series.hasData
-    ? chartMarkup(metric, series)
+    ? chartMarkup(metric, series, geo)
     : emptyHintHTML(t('health.vitals.noData'), { className: 'health-chart-empty' })}
     </div>
     ${recentMeasurementsMarkup(metric)}`);
@@ -1886,12 +2146,6 @@ function renderDetail() {
   // wartet nicht noch einmal 300ms (drawChartOnce, utils/ux.js). Raster und
   // Achse stehen; der Beschnitt haengt an der Gruppe aus Flaeche und Kurven.
   drawChartOnce(`health-vitals-${metric.type}`, { lines: host.querySelector('.health-chart__lines') });
-
-  host.querySelectorAll('[data-step]').forEach((btn) =>
-    btn.addEventListener('click', () => {
-      stepAnchor(Number(btn.dataset.step));
-      renderVitalsShell();
-    }));
 
   // Der Riegel vor dem einen schreibenden Weg dieser Ansicht (#1265): der
   // Zeitraum-Stepper darueber liest, das Bearbeiten darunter nicht.
@@ -2127,16 +2381,16 @@ function vitalSheetMarkup(metric) {
     return emptyHintHTML(t('health.vitals.noValue'), { className: 'health-chart-empty' });
   }
   return `
-    <div class="health-vitals__ranges health-vital-sheet__ranges" role="tablist" aria-label="${esc(t('health.vitals.chartTitle'))}">
+    <div class="segmented health-vitals__ranges health-vital-sheet__ranges" role="tablist" aria-label="${esc(t('health.vitals.chartTitle'))}">
       ${VITAL_RANGES.map((r) => `
-        <button type="button" class="health-vitals__range${r === vitals.range ? ' is-active' : ''}"
-          data-sheet-range="${r}" role="tab" aria-selected="${r === vitals.range}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
+        <button type="button" class="segmented__item health-vitals__range${r === vitals.range ? ' is-active' : ''}"
+          data-sheet-range="${r}" data-tab-id="${r}" role="tab" aria-selected="${r === vitals.range}" tabindex="${r === vitals.range ? '0' : '-1'}">${esc(t(RANGE_LABELS[r]))}</button>`).join('')}
     </div>
-    <div class="health-vitals__stepper health-vital-sheet__stepper">
-      <button type="button" class="btn btn--icon" data-sheet-step="-1" aria-label="${esc(t('health.vitals.prevPeriod'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-      <span class="health-vitals__period">${esc(vitalPeriodText(series))}</span>
-      <button type="button" class="btn btn--icon" data-sheet-step="1" aria-label="${esc(t('health.vitals.nextPeriod'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-    </div>
+    <div class="health-vitals__stepper health-vital-sheet__stepper">${periodStepperHtml({
+      prev: { label: t('health.vitals.prevPeriod'), attrs: { 'data-sheet-step': '-1' } },
+      value: { className: 'health-vitals__period', text: vitalPeriodText(series) },
+      next: { label: t('health.vitals.nextPeriod'), attrs: { 'data-sheet-step': '1' } },
+    })}</div>
     <div class="health-vital-sheet__chart">
       ${series.hasData
     ? chartMarkup(metric, series, VITAL_SHEET_CHART)
@@ -2396,8 +2650,11 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
      * und eine Legende darunter: der Name steht ueber dem letzten Punkt seiner
      * Kurve, in ihrer Farbe. Nur bei Messarten mit mehreren Kanaelen - eine
      * einzelne Kurve nennt schon die Ueberschrift. */
-    seriesSvg = channels.map(({ key, idx }) => {
-      const color = CHANNEL_COLORS[idx % CHANNEL_COLORS.length];
+    seriesSvg = channels.map(({ key, idx }, pos) => {
+      // Die Farbe zaehlt je ACHSE (R24, G5 P3-2): der Puls steht seit R21 auf
+      // eigener Achse und trug als dritter Kanal Amber - eine fremde Farbe fuer
+      // eine einzelne Kurve. Allein auf seiner Achse traegt er den Modulton.
+      const color = CHANNEL_COLORS[pos % CHANNEL_COLORS.length];
       const chName = metric.channelLabelKeys?.[idx] ? t(metric.channelLabelKeys[idx]) : t(metric.labelKey);
       const linePts = [];
       const dots = [];
@@ -2621,6 +2878,8 @@ function openVitalModal(opts = {}) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.vitals.edit') : t('health.vitals.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'md',
     // Aus dem mobilen Detailblatt geoeffnet, fuehrt das Schliessen dorthin
     // zurueck (openVitalSheet) - auf jedem Weg: Speichern, Abbrechen, Loeschen.
@@ -3343,7 +3602,7 @@ function dueTodayMarkup() {
   const due = computeDueDoses(allSchedules(), { from: today, to: today });
   if (!due.length) {
     // Ein Abschnitt in einem Bereich mit Inhalt: die ruhige Zeile (R22, D12).
-    return cardEmptyRowHtml(t('health.meds.dueToday.empty'), { className: 'health-overview__empty-row--surface' });
+    return cardEmptyRowHtml(t('health.meds.dueToday.empty'), { className: 'card-empty-row--surface' });
   }
   const rows = due.map((dose) => {
     const med = meds.list.find((m) => m.id === dose.medicationId);
@@ -3371,23 +3630,18 @@ const OVERVIEW_DOSE_HOOKS = { take: 'data-ov-dose-take', skip: 'data-ov-dose-ski
 
 function doseActionsMarkup(dose, log, name, own, hooks = DOSE_HOOKS) {
   const status = log?.status;
-  if (status === 'taken') {
-    return `<span class="health-dose__status health-dose__status--taken"><i data-lucide="check" aria-hidden="true"></i>${esc(t('health.meds.status.taken'))}</span>`;
-  }
+  // Eingenommen sagt der volle Ring vorn (doseCheckMarkup), kein Wort am Ende.
+  if (status === 'taken') return '';
   if (status === 'skipped') {
     return `<span class="health-dose__status health-dose__status--skipped"><i data-lucide="x" aria-hidden="true"></i>${esc(t('health.meds.status.skipped'))}</span>`;
   }
   if (!own) {
     return `<span class="health-dose__status">${esc(t('health.meds.status.pending'))}</span>`;
   }
-  const data = `data-med-id="${esc(dose.medicationId)}" data-schedule-id="${esc(dose.scheduleId ?? '')}" data-scheduled-at="${esc(dose.scheduledAt)}" data-log-id="${esc(log?.id ?? '')}" data-dose="${esc(dose.dose_qty ?? '')}"`;
-  // EINNEHMEN SICHTBAR, UEBERSPRINGEN IM MEHR-KNOPF (R21, D10 Zeilen-Endzone:
-  // hoechstens EINE sichtbare Primaeraktion, dahinter der Mehr-Knopf). Bis
-  // dahin standen beide als Knopf mit Wort in der Zeile - die einzige Liste der
-  // App mit zwei gleichrangigen Handlungen je Zeile. Der Eintrag traegt dieselben
-  // Haken und Daten wie der Knopf vorher; wireMeds()/wireOverview() finden ihn
-  // ueber denselben Selektor. Das `aria-label` traegt den ganzen Satz weiter,
-  // wenn der sichtbare Text nach der Containerbreite faellt (health.css).
+  // UEBERSPRINGEN IM MEHR-KNOPF (R21, D10 Zeilen-Endzone). Einnehmen ist seit
+  // R24 (E10) der Ring VOR der Zeile (doseCheckMarkup); die Endzone traegt nur
+  // noch den Mehr-Knopf. Der Eintrag traegt dieselben Haken und Daten wie der
+  // Knopf vorher; wireMeds()/wireOverview() finden ihn ueber denselben Selektor.
   const skipAttrs = {
     [hooks.skip]: true,
     'data-med-id': dose.medicationId,
@@ -3399,7 +3653,6 @@ function doseActionsMarkup(dose, log, name, own, hooks = DOSE_HOOKS) {
   const menuId = `${hooks === OVERVIEW_DOSE_HOOKS ? 'ov' : 'meds'}-dose-menu-${dose.medicationId}-${String(dose.scheduledAt).replace(/[^\w-]/g, '')}`;
   return `
       <div class="health-dose__actions">
-        <button type="button" class="btn btn--sm btn--primary health-dose__take" ${hooks.take} ${data} aria-label="${esc(t('health.meds.takeNamed', { name }))}"><i data-lucide="pill" class="icon-md health-dose__take-icon" aria-hidden="true"></i><span class="health-dose__take-label">${esc(t('health.meds.take'))}</span></button>
         ${rowMenuHtml({
           id: menuId,
           label: t('common.moreActionsNamed', { name }),
@@ -3409,13 +3662,42 @@ function doseActionsMarkup(dose, log, name, own, hooks = DOSE_HOOKS) {
       </div>`;
 }
 
+/**
+ * EINNEHMEN IST ABHAKEN (R24, E10; Critique G5-Gesundheit-P2-1). Bis dahin
+ * stand "Einnehmen" als gefuellter Primaerknopf in jeder faelligen Zeile -
+ * zwei bis drei Primaere je Ansicht neben dem FAB. Einnehmen hat ein
+ * feststehendes Ergebnis wie das Erledigen einer Aufgabe, und dafuer gibt es
+ * EIN Zeichen (R23 D7): den Ring vor der Zeile (`.check-ring`, list-row.css).
+ * Tipp = eingenommen, der Toast nennt das Medikament und nimmt zurueck
+ * (acknowledgeDose). Eingenommen ist der Ring voll; ohne Recht oder nach dem
+ * Ueberspringen steht er als Zeichen (`--static`), nicht als Knopf.
+ */
+function doseCheckMarkup(dose, log, name, own, hooks = DOSE_HOOKS) {
+  const status = log?.status;
+  const tick = '<i data-lucide="check" class="check-ring__check" aria-hidden="true"></i>';
+  if (status === 'taken') {
+    return `<span class="health-dose__check check-ring check-ring--static check-ring--done" role="img" aria-label="${esc(t('health.meds.status.taken'))}">${tick}</span>`;
+  }
+  if (status === 'skipped' || !own) {
+    return `<span class="health-dose__check check-ring check-ring--static" aria-hidden="true">${tick}</span>`;
+  }
+  const data = `data-med-id="${esc(dose.medicationId)}" data-schedule-id="${esc(dose.scheduleId ?? '')}" data-scheduled-at="${esc(dose.scheduledAt)}" data-log-id="${esc(log?.id ?? '')}" data-dose="${esc(dose.dose_qty ?? '')}"`;
+  return `<button type="button" class="health-dose__check check-ring" ${hooks.take} ${data} aria-label="${esc(t('health.meds.takeNamed', { name }))}">${tick}</button>`;
+}
+
+/** Der Ring quittiert den Tipp sofort; scheitert die Buchung, wird er wieder leer. */
+function markDoseCheck(btn, on) {
+  if (btn?.classList?.contains('check-ring')) btn.classList.toggle('check-ring--done', on);
+}
+
 function dueRowMarkup(dose, med, log) {
   const name = med ? med.name : '';
   const own = canEditFor(meds.personId, meds.meId);
   const doseText = dose.dose_qty != null ? ` · ${t('health.meds.doseQty', { count: fmtNum(dose.dose_qty) })}` : '';
 
   return `
-    <li class="list-row health-dose">
+    <li class="list-row health-dose health-dose--check">
+      ${doseCheckMarkup(dose, log, name, own)}
       <span class="health-dose__time">${esc(dose.time)}</span>
       <span class="list-row__name health-dose__name">${esc(name)}${esc(doseText)}</span>
       ${doseActionsMarkup(dose, log, name, own)}
@@ -3518,25 +3800,22 @@ function prnRowMarkup(med, scope, own) {
     ? t('health.meds.doseQty', { count: fmtNum(med.prn_dose_qty) })
     : med.dosage_text || '';
 
-  // EIN VERB, IMMER MIT WORT (R22, D12; Critique a5 P2): die Bedarfsdosis
-  // hiess "Jetzt nehmen", die geplante "Einnehmen", und unter 21rem blieb von
-  // ihr nur ein Icon-Kreis (Uebersicht am Laptop). Jetzt derselbe Knopf wie
-  // bei der geplanten Dosis: Tablette und "Einnehmen", schmal gibt er zuerst
-  // die Tablette ab, nie das Wort (health.css).
+  // DERSELBE RING WIE BEI DER GEPLANTEN DOSIS (R24, E10): vorher ein
+  // Kapselknopf "Einnehmen" - gefuellt, solange die Dosis erlaubt war, ghost
+  // waehrend des Mindestabstands. Der Ring bleibt nach dem Tipp leer: eine
+  // Bedarfsdosis ist nie "fertig", die Statuszeile sagt, wann die naechste
+  // erlaubt ist. Wartend fragt der Tipp nach (handlePrnDose).
   const action = own
-    ? `<button type="button" class="btn btn--sm ${state.allowed ? 'btn--primary' : 'btn--ghost'} health-prn__take"
+    ? `<button type="button" class="health-dose__check check-ring"
                data-prn-take data-prn-scope="${esc(scope)}" data-med-id="${esc(med.id)}"
-               aria-label="${esc(t('health.meds.takeNamed', { name: med.name }))}">
-         <i data-lucide="pill" class="icon-md health-dose__take-icon" aria-hidden="true"></i>
-         <span class="health-prn__take-label">${esc(t('health.meds.take'))}</span>
-       </button>`
+               aria-label="${esc(t('health.meds.takeNamed', { name: med.name }))}"><i data-lucide="check" class="check-ring__check" aria-hidden="true"></i></button>`
     : '';
 
   return `
-    <li class="list-row health-dose health-prn${state.allowed ? '' : ' is-waiting'}">
+    <li class="list-row health-dose health-prn${own ? ' health-dose--check' : ''}${state.allowed ? '' : ' is-waiting'}">
+      ${action}
       <span class="list-row__name health-dose__name">${esc(med.name)}${doseText ? ` · ${esc(doseText)}` : ''}</span>
       ${prnStatusMarkup(state)}
-      ${action}
     </li>`;
 }
 
@@ -3647,6 +3926,7 @@ async function handlePrnDose(btn) {
   }
 
   setDoseBusy(medId, true);
+  markDoseCheck(btn, true);
   const dose = med.prn_dose_qty != null ? Number(med.prn_dose_qty) : null;
   let booked = null;
   try {
@@ -3670,6 +3950,7 @@ async function handlePrnDose(btn) {
   } catch (err) {
     console.error('[Health] prn dose error:', err);
     setDoseBusy(medId, false);
+    markDoseCheck(btn, false);
     reportError(err, 'health.meds.doseError', reloadMedViews, { fromDialog: false });
     return;
   }
@@ -3874,8 +4155,8 @@ function openMedLogModal(logId) {
       <form id="medlog-form" class="form-stack" novalidate>
         <p class="form-hint">${esc(entry.medName)}</p>
         <div class="form-field">
-          <label class="label" for="medlog-status">${esc(t('health.meds.log.statusLabel'))}</label>
-          <select class="input" id="medlog-status">
+          <label class="form-label" for="medlog-status">${esc(t('health.meds.log.statusLabel'))}</label>
+          <select class="form-input" id="medlog-status">
             <option value="taken"${entry.status === 'taken' ? ' selected' : ''}>${esc(t('health.meds.status.taken'))}</option>
             <option value="skipped"${entry.status === 'skipped' ? ' selected' : ''}>${esc(t('health.meds.status.skipped'))}</option>
             <option value="pending"${entry.status === 'pending' ? ' selected' : ''}>${esc(t('health.meds.log.statusPending'))}</option>
@@ -3883,11 +4164,11 @@ function openMedLogModal(logId) {
         </div>
         <div class="modal-grid modal-grid--2" id="medlog-when">
           <div class="form-field">
-            <label class="label" for="medlog-date">${esc(t('health.meds.log.dateLabel'))}</label>
+            <label class="form-label" for="medlog-date">${esc(t('health.meds.log.dateLabel'))}</label>
             <yuvomi-datepicker id="medlog-date" type="date" value="${esc(dateValue)}"></yuvomi-datepicker>
           </div>
           <div class="form-field">
-            <label class="label" for="medlog-time">${esc(t('health.meds.log.timeLabel'))}</label>
+            <label class="form-label" for="medlog-time">${esc(t('health.meds.log.timeLabel'))}</label>
             <yuvomi-datepicker id="medlog-time" type="time" value="${esc(timeValue)}"></yuvomi-datepicker>
           </div>
         </div>
@@ -3971,8 +4252,8 @@ function medCardMarkup(med) {
   const own = canEditFor(meds.personId, meds.meId);
 
   const badges = [];
-  if (!med.active) badges.push(`<span class="health-med-badge health-med-badge--muted">${esc(t('health.meds.badge.inactive'))}</span>`);
-  if (med.prn) badges.push(`<span class="health-med-badge">${esc(t('health.meds.badge.prn'))}</span>`);
+  if (!med.active) badges.push(`<span class="tag health-med-badge--muted">${esc(t('health.meds.badge.inactive'))}</span>`);
+  if (med.prn) badges.push(`<span class="tag">${esc(t('health.meds.badge.prn'))}</span>`);
 
   let stockHtml = '';
   if (rf.level !== 'none') {
@@ -4156,6 +4437,7 @@ async function handleDose(btn, action) {
   const dose = btn.dataset.dose !== '' ? Number(btn.dataset.dose) : null;
 
   setDoseBusy(medId, true);
+  if (action === 'take') markDoseCheck(btn, true);
   try {
     const booked = await sendScheduledDose({ medId, logId, scheduleId, scheduledAt, dose, action });
 
@@ -4167,6 +4449,7 @@ async function handleDose(btn, action) {
   } catch (err) {
     console.error('[Health] dose error:', err);
     setDoseBusy(medId, false);
+    markDoseCheck(btn, false);
     reportError(err, 'health.meds.doseError', reloadMedViews, { fromDialog: false });
   }
 }
@@ -4197,23 +4480,25 @@ function openMedModal(med) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.meds.edit') : t('health.meds.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'md',
     content: `
       <form id="med-form" class="form-stack" novalidate>
         <div class="form-field">
-          <label class="label" for="med-name">${esc(t('health.meds.field.name'))}${REQUIRED_MARK}</label>
-          <input class="input" id="med-name" type="text" maxlength="200" required value="${esc(val(med?.name))}">
+          <label class="form-label" for="med-name">${esc(t('health.meds.field.name'))}${REQUIRED_MARK}</label>
+          <input class="form-input" id="med-name" type="text" maxlength="200" required value="${esc(val(med?.name))}">
         </div>
         ${/* Paare teilen sich die Zeile auch im 390er-Blatt (.form-pair,
              layout.css): Dosis/Form und Uhrzeit/Dosis sind kurze Werte. */ ''}
         <div class="form-pair">
           <div class="form-field">
-            <label class="label" for="med-dosage">${esc(t('health.meds.field.dosageText'))}</label>
-            <input class="input" id="med-dosage" type="text" maxlength="100" value="${esc(val(med?.dosage_text))}">
+            <label class="form-label" for="med-dosage">${esc(t('health.meds.field.dosageText'))}</label>
+            <input class="form-input" id="med-dosage" type="text" maxlength="100" value="${esc(val(med?.dosage_text))}">
           </div>
           <div class="form-field">
-            <label class="label" for="med-form-field">${esc(t('health.meds.field.form'))}</label>
-            <input class="input" id="med-form-field" type="text" maxlength="30" value="${esc(val(med?.form))}">
+            <label class="form-label" for="med-form-field">${esc(t('health.meds.field.form'))}</label>
+            <input class="form-input" id="med-form-field" type="text" maxlength="30" value="${esc(val(med?.form))}">
           </div>
         </div>
         ${formRowsHtml([
@@ -4225,33 +4510,33 @@ function openMedModal(med) {
              Auskunft darueber, wann die naechste Dosis ansteht. -->
         <div class="modal-grid modal-grid--2" id="med-prn-fields">
           <div class="form-field">
-            <label class="label" for="med-interval">${esc(t('health.meds.field.minInterval'))}</label>
+            <label class="form-label" for="med-interval">${esc(t('health.meds.field.minInterval'))}</label>
             <!-- Die Grenzen sind die der Route: groesser als 0 (ein Abstand von
                  0 waere ein Countdown, der immer abgelaufen ist) und hoechstens
                  28 Tage. Nicht enger, sonst liesse sich ein ueber die API
                  gesetzter Viertelstundenabstand hier nicht mehr speichern -
                  auch dann nicht, wenn nur der Name geaendert wird. Leer bleiben
                  darf das Feld weiterhin: das ist „kein Abstand hinterlegt". -->
-            <input class="input" id="med-interval" type="number" inputmode="decimal" step="any" min="0.01" max="672"
+            <input class="form-input" id="med-interval" type="number" inputmode="decimal" step="any" min="0.01" max="672"
                    value="${esc(val(med?.min_interval_hours))}">
             <p class="form-hint">${esc(t('health.meds.field.minIntervalHint'))}</p>
           </div>
           <div class="form-field">
-            <label class="label" for="med-prn-dose">${esc(t('health.meds.field.prnDose'))}</label>
-            <input class="input" id="med-prn-dose" type="number" inputmode="decimal" step="any" min="0"
+            <label class="form-label" for="med-prn-dose">${esc(t('health.meds.field.prnDose'))}</label>
+            <input class="form-input" id="med-prn-dose" type="number" inputmode="decimal" step="any" min="0"
                    value="${esc(val(med?.prn_dose_qty))}">
             <p class="form-hint">${esc(t('health.meds.field.prnDoseHint'))}</p>
           </div>
         </div>
 
         <div class="health-sched">
-          <span class="label">${esc(t('health.meds.schedule.title'))}</span>
+          <span class="form-label">${esc(t('health.meds.schedule.title'))}</span>
           <div id="med-sched-editor"></div>
         </div>
 
         <div class="form-field">
-          <label class="label" for="med-visibility">${esc(t('health.meds.field.visibility'))}</label>
-          <select class="input" id="med-visibility">
+          <label class="form-label" for="med-visibility">${esc(t('health.meds.field.visibility'))}</label>
+          <select class="form-input" id="med-visibility">
             <option value="private" ${(med?.visibility || defaultVisibility('meds')) === 'family' ? '' : 'selected'}>${esc(t('health.meds.visibility.private'))}</option>
             <option value="family" ${(med?.visibility || defaultVisibility('meds')) === 'family' ? 'selected' : ''}>${esc(t('health.meds.visibility.family'))}</option>
           </select>
@@ -4260,22 +4545,26 @@ function openMedModal(med) {
         ${advancedSection(`
         <div class="modal-grid modal-grid--3">
           <div class="form-field">
-            <label class="label" for="med-stock">${esc(t('health.meds.field.stockQty'))}</label>
-            <input class="input" id="med-stock" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.stock_qty))}">
+            <label class="form-label" for="med-stock">${esc(t('health.meds.field.stockQty'))}</label>
+            <input class="form-input" id="med-stock" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.stock_qty))}">
           </div>
           <div class="form-field">
-            <label class="label" for="med-stock-unit">${esc(t('health.meds.field.stockUnit'))}</label>
-            <input class="input" id="med-stock-unit" type="text" maxlength="30" value="${esc(val(med?.stock_unit))}">
+            <label class="form-label" for="med-stock-unit">${esc(t('health.meds.field.stockUnit'))}</label>
+            <input class="form-input" id="med-stock-unit" type="text" maxlength="30" value="${esc(val(med?.stock_unit))}">
           </div>
           <div class="form-field">
-            <label class="label" for="med-refill">${esc(t('health.meds.field.refillThreshold'))}</label>
-            <input class="input" id="med-refill" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.refill_threshold))}">
+            <label class="form-label" for="med-refill">${esc(t('health.meds.field.refillThreshold'))}</label>
+            <input class="form-input" id="med-refill" type="number" inputmode="decimal" step="any" min="0" value="${esc(val(med?.refill_threshold))}">
           </div>
         </div>
         <div class="form-field">
-          <label class="label" for="med-note">${esc(t('health.meds.field.note'))}</label>
-          <textarea class="input" id="med-note" rows="2" maxlength="5000">${esc(val(med?.note))}</textarea>
-        </div>`, { open: moreOpen })}
+          <label class="form-label" for="med-note">${esc(t('health.meds.field.note'))}</label>
+          <textarea class="form-input" id="med-note" rows="2" maxlength="5000">${esc(val(med?.note))}</textarea>
+        </div>`, {
+          open: moreOpen,
+          // Was dahinter liegt, nennt die Zeile (R24 D4, Inventar-Muster) - aus den Feldnamen, wie im Zyklus-Tag.
+          hint: [t('health.meds.field.stockQty'), t('health.meds.field.refillThreshold'), t('health.meds.field.note')].join(', '),
+        })}
 
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="med-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
@@ -4404,16 +4693,16 @@ function renderSchedEditor(panel, med, draft = null) {
     <div class="health-sched-add">
       <div class="form-pair">
         <div class="form-field">
-          <label class="label" for="sched-time">${esc(t('health.meds.schedule.time'))}</label>
+          <label class="form-label" for="sched-time">${esc(t('health.meds.schedule.time'))}</label>
           <yuvomi-datepicker id="sched-time" type="time" value="08:00"></yuvomi-datepicker>
         </div>
         <div class="form-field">
-          <label class="label" for="sched-dose">${esc(t('health.meds.schedule.dose'))}</label>
-          <input class="input" id="sched-dose" type="number" inputmode="decimal" step="any" min="0">
+          <label class="form-label" for="sched-dose">${esc(t('health.meds.schedule.dose'))}</label>
+          <input class="form-input" id="sched-dose" type="number" inputmode="decimal" step="any" min="0">
         </div>
       </div>
       <div class="form-field">
-        <span class="label">${esc(t('health.meds.schedule.days'))}</span>
+        <span class="form-label">${esc(t('health.meds.schedule.days'))}</span>
         <div class="health-weekday-toggle" id="sched-days">
           ${WEEKDAY_KEYS.map((k, i) => `
             <button type="button" class="health-weekday is-active" data-day="${i}" aria-pressed="true">${esc(t(WEEKDAY_LABEL_KEYS[i]))}</button>`).join('')}
@@ -4689,7 +4978,6 @@ function labDetailMarkup() {
               <th scope="col">${esc(t('health.labs.col.analyte'))}</th>
               <th scope="col">${esc(t('health.labs.col.value'))}</th>
               <th scope="col">${esc(t('health.labs.col.reference'))}</th>
-              <th scope="col">${esc(t('health.labs.col.flag'))}</th>
             </tr>
           </thead>
           <tbody>${results.map(resultRowMarkup).join('')}</tbody>
@@ -4705,10 +4993,10 @@ function labDetailMarkup() {
           <span class="health-lab-detail__date">${esc(dateLabel)}</span>
           ${report.lab_name ? `<span class="health-lab-detail__lab">${esc(report.lab_name)}</span>` : ''}
         </div>
+        ${/* Die Abschnittsaktion ist EINE btn--secondary btn--sm (D5, #2042),
+             kein Geisterknopf in der Karte (R24, Critique G5 P3-5). */ ''}
         ${own ? `
-          <button type="button" class="btn btn--ghost btn--sm" data-action="lab-edit" data-report-id="${esc(report.id)}">
-            <i data-lucide="pencil" aria-hidden="true"></i>${esc(t('health.labs.edit'))}
-          </button>` : ''}
+          <button type="button" class="btn btn--secondary btn--sm" data-action="lab-edit" data-report-id="${esc(report.id)}">${esc(t('health.labs.edit'))}</button>` : ''}
       </div>
       ${report.note ? `<div class="health-lab-detail__note">${esc(report.note)}</div>` : ''}
       ${table}
@@ -4716,15 +5004,26 @@ function labDetailMarkup() {
     </div>`;
 }
 
+/* DER ANALYT IST DER WEG ZU SEINEM VERLAUF (R24, Critique G5 P3-5). Der
+ * Verlauf waehlte seinen Analyten ueber ein natives <select> unter der
+ * Tabelle, und die Spalte „Bewertung" stand leer bis auf eine Zeile. Jetzt
+ * waehlt der Tipp auf den Namen den Verlauf darunter (aria-pressed), und die
+ * Bewertung steht als Zeichen an ihrem Wert - Pfeil und Wort, wie mobil. */
+function labTrendButtonMarkup(r) {
+  const selected = r.analyte === currentTrendAnalyte();
+  return `<button type="button" class="health-lab-analyte" data-lab-trend="${esc(r.analyte)}" aria-pressed="${selected}"
+    aria-controls="health-lab-trend" aria-label="${esc(t('health.labs.trend.showFor', { name: r.analyte }))}">${esc(r.analyte)}</button>`;
+}
+
 function resultRowMarkup(r) {
   const unit = r.unit ? ` ${esc(r.unit)}` : '';
   const refText = referenceLabel(r.ref_low, r.ref_high);
+  const flag = flagIndicatorMarkup(r.flag);
   return `
     <tr>
-      <td class="health-lab-table__analyte">${esc(r.analyte)}</td>
-      <td class="health-lab-table__value">${esc(fmtNum(r.value_num))}${unit}</td>
+      <th scope="row" class="health-lab-table__analyte">${labTrendButtonMarkup(r)}</th>
+      <td class="health-lab-table__value">${esc(fmtNum(r.value_num))}${unit}${flag ? ` ${flag}` : ''}</td>
       <td class="health-lab-table__ref">${esc(refText)}</td>
-      <td class="health-lab-table__flag">${flagIndicatorMarkup(r.flag)}</td>
     </tr>`;
 }
 
@@ -4748,7 +5047,7 @@ function resultListMarkup(results) {
     const flag = r.flag && LAB_FLAGS.includes(r.flag) ? flagIndicatorMarkup(r.flag) : '';
     return `
       <li class="health-lab-rows__row${abnormal(r) ? ` health-lab-rows__row--${esc(r.flag)}` : ''}">
-        <span class="health-lab-rows__analyte">${esc(r.analyte)}</span>
+        <span class="health-lab-rows__analyte">${labTrendButtonMarkup(r)}</span>
         <span class="health-lab-rows__value">${esc(fmtNum(r.value_num))}${unit}</span>
         ${ref || flag ? `<span class="health-lab-rows__meta">${ref}${flag}</span>` : ''}
       </li>`;
@@ -4782,27 +5081,26 @@ function flagIndicatorMarkup(flag) {
 // Trend eines wiederkehrenden Analyten (native SVG-Kurve)
 // --------------------------------------------------------
 
+/** Der Analyt, dessen Verlauf gerade steht: gewaehlt, sonst der Vorschlag. */
+function currentTrendAnalyte() {
+  const names = analyteNames(labs.reports);
+  return names.includes(labs.trendAnalyte) ? labs.trendAnalyte : defaultTrendAnalyte(labs.reports);
+}
+
 function labTrendMarkup() {
   const names = analyteNames(labs.reports);
   if (names.length === 0) return '';
-  const selected = names.includes(labs.trendAnalyte) ? labs.trendAnalyte : defaultTrendAnalyte(labs.reports);
+  const selected = currentTrendAnalyte();
   const points = analyteTrend(labs.reports, selected);
-
-  const options = names.map((n) =>
-    `<option value="${esc(n)}"${n === selected ? ' selected' : ''}>${esc(n)}</option>`).join('');
 
   const body = points.length >= 2
     ? labTrendChart(points, selected)
     : emptyHintHTML(t('health.labs.trend.tooFew'));
 
   return `
-    <div class="health-lab-trend">
+    <div class="health-lab-trend" id="health-lab-trend">
       <div class="health-lab-trend__head">
-        <span class="health-lab-trend__title">${esc(t('health.labs.trend.title'))}</span>
-        <label class="health-lab-trend__select">
-          <span class="sr-only">${esc(t('health.labs.trend.analyte'))}</span>
-          <select class="input" id="health-lab-trend-analyte">${options}</select>
-        </label>
+        <span class="health-lab-trend__title">${esc(t('health.labs.trend.title'))} · ${esc(selected)}</span>
       </div>
       ${body}
     </div>`;
@@ -4943,15 +5241,21 @@ function wireLabs() {
     });
   }
 
-  labs.root.querySelector('#health-lab-trend-analyte')?.addEventListener('change', (e) => {
-    labs.trendAnalyte = e.target.value;
+  // Lesend (auch ohne Schreibrecht): der Tipp auf den Analyten waehlt den
+  // Verlauf. Der Fokus bleibt an demselben Namen (der Neuaufbau ersetzt ihn).
+  labs.root.querySelectorAll('[data-lab-trend]').forEach((btn) => btn.addEventListener('click', () => {
+    const name = btn.dataset.labTrend;
+    const inList = Boolean(btn.closest('.health-lab-rows'));
+    labs.trendAnalyte = name;
     const host = labs.root.querySelector('#health-labs-detail');
     if (!host) return;
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', labDetailMarkup());
     if (window.lucide) window.lucide.createIcons({ el: host });
     wireLabsDetail();
-  });
+    const scope = host.querySelector(inList ? '.health-lab-rows' : '.health-lab-table');
+    [...(scope?.querySelectorAll('[data-lab-trend]') ?? [])].find((b) => b.dataset.labTrend === name)?.focus();
+  }));
 }
 
 // Verdrahtet nur die Detail-internen Steuerelemente neu (nach Trend-Wechsel).
@@ -4964,15 +5268,21 @@ function wireLabsDetail() {
       if (report) openLabModal(report);
     });
   }
-  labs.root.querySelector('#health-lab-trend-analyte')?.addEventListener('change', (e) => {
-    labs.trendAnalyte = e.target.value;
+  // Lesend (auch ohne Schreibrecht): der Tipp auf den Analyten waehlt den
+  // Verlauf. Der Fokus bleibt an demselben Namen (der Neuaufbau ersetzt ihn).
+  labs.root.querySelectorAll('[data-lab-trend]').forEach((btn) => btn.addEventListener('click', () => {
+    const name = btn.dataset.labTrend;
+    const inList = Boolean(btn.closest('.health-lab-rows'));
+    labs.trendAnalyte = name;
     const host = labs.root.querySelector('#health-labs-detail');
     if (!host) return;
     host.replaceChildren();
     host.insertAdjacentHTML('beforeend', labDetailMarkup());
     if (window.lucide) window.lucide.createIcons({ el: host });
     wireLabsDetail();
-  });
+    const scope = host.querySelector(inList ? '.health-lab-rows' : '.health-lab-table');
+    [...(scope?.querySelectorAll('[data-lab-trend]') ?? [])].find((b) => b.dataset.labTrend === name)?.focus();
+  }));
 }
 
 // --------------------------------------------------------
@@ -4990,33 +5300,35 @@ function openLabModal(report) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.labs.edit') : t('health.labs.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'md',
     content: `
       <form id="lab-form" class="form-stack" novalidate>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="lab-date">${esc(t('health.labs.field.reportDate'))}</label>
+            <label class="form-label" for="lab-date">${esc(t('health.labs.field.reportDate'))}</label>
             <yuvomi-datepicker id="lab-date" type="date" value="${esc(dateValue)}"></yuvomi-datepicker>
           </div>
           <div class="form-field">
-            <label class="label" for="lab-name">${esc(t('health.labs.field.labName'))}</label>
-            <input class="input" id="lab-name" type="text" maxlength="200" value="${esc(val(report?.lab_name))}">
+            <label class="form-label" for="lab-name">${esc(t('health.labs.field.labName'))}</label>
+            <input class="form-input" id="lab-name" type="text" maxlength="200" value="${esc(val(report?.lab_name))}">
           </div>
         </div>
         <div class="form-field">
-          <label class="label" for="lab-visibility">${esc(t('health.labs.field.visibility'))}</label>
-          <select class="input" id="lab-visibility">
+          <label class="form-label" for="lab-visibility">${esc(t('health.labs.field.visibility'))}</label>
+          <select class="form-input" id="lab-visibility">
             <option value="private" ${(report?.visibility || defaultVisibility('labs')) === 'family' ? '' : 'selected'}>${esc(t('health.labs.visibility.private'))}</option>
             <option value="family" ${(report?.visibility || defaultVisibility('labs')) === 'family' ? 'selected' : ''}>${esc(t('health.labs.visibility.family'))}</option>
           </select>
         </div>
         <div class="form-field">
-          <label class="label" for="lab-note">${esc(t('health.labs.field.note'))}</label>
-          <textarea class="input" id="lab-note" rows="2" maxlength="5000">${esc(val(report?.note))}</textarea>
+          <label class="form-label" for="lab-note">${esc(t('health.labs.field.note'))}</label>
+          <textarea class="form-input" id="lab-note" rows="2" maxlength="5000">${esc(val(report?.note))}</textarea>
         </div>
 
         <div class="health-results">
-          <span class="label">${esc(t('health.labs.results.title'))}</span>
+          <span class="form-label">${esc(t('health.labs.results.title'))}</span>
           <div id="lab-results-editor"></div>
         </div>
 
@@ -5147,26 +5459,26 @@ function resultFormMarkup(editing = null) {
     <div class="health-results-add"${editing ? ` data-editing="${esc(editing.id)}"` : ''}>
       <div class="modal-grid modal-grid--2">
         <div class="form-field">
-          <label class="label" for="res-analyte">${esc(t('health.labs.results.analyte'))}</label>
-          <input class="input" id="res-analyte" type="text" maxlength="120"${val(editing?.analyte)}>
+          <label class="form-label" for="res-analyte">${esc(t('health.labs.results.analyte'))}</label>
+          <input class="form-input" id="res-analyte" type="text" maxlength="120"${val(editing?.analyte)}>
         </div>
         <div class="form-field">
-          <label class="label" for="res-value">${esc(t('health.labs.results.value'))}</label>
-          <input class="input" id="res-value" type="number" inputmode="decimal" step="any"${val(editing?.value_num)}>
+          <label class="form-label" for="res-value">${esc(t('health.labs.results.value'))}</label>
+          <input class="form-input" id="res-value" type="number" inputmode="decimal" step="any"${val(editing?.value_num)}>
         </div>
       </div>
       <div class="modal-grid modal-grid--3">
         <div class="form-field">
-          <label class="label" for="res-unit">${esc(t('health.labs.results.unit'))}</label>
-          <input class="input" id="res-unit" type="text" maxlength="30"${val(editing?.unit)}>
+          <label class="form-label" for="res-unit">${esc(t('health.labs.results.unit'))}</label>
+          <input class="form-input" id="res-unit" type="text" maxlength="30"${val(editing?.unit)}>
         </div>
         <div class="form-field">
-          <label class="label" for="res-ref-low">${esc(t('health.labs.results.refLow'))}</label>
-          <input class="input" id="res-ref-low" type="number" inputmode="decimal" step="any"${val(editing?.ref_low)}>
+          <label class="form-label" for="res-ref-low">${esc(t('health.labs.results.refLow'))}</label>
+          <input class="form-input" id="res-ref-low" type="number" inputmode="decimal" step="any"${val(editing?.ref_low)}>
         </div>
         <div class="form-field">
-          <label class="label" for="res-ref-high">${esc(t('health.labs.results.refHigh'))}</label>
-          <input class="input" id="res-ref-high" type="number" inputmode="decimal" step="any"${val(editing?.ref_high)}>
+          <label class="form-label" for="res-ref-high">${esc(t('health.labs.results.refHigh'))}</label>
+          <input class="form-input" id="res-ref-high" type="number" inputmode="decimal" step="any"${val(editing?.ref_high)}>
         </div>
       </div>
       <div class="health-results-preview" id="res-flag-preview" aria-live="polite"></div>
@@ -5433,18 +5745,18 @@ function renderActivityShell() {
     ${personSwitcherMarkup(activity.members, activity.personId, activity.meId,
       { menuId: 'health-person-menu-activity', label: t('health.activity.personsLabel') })}
     ${readOnlyBannerMarkup(activity.members, activity.personId, canEditFor(activity.personId, activity.meId), activity.meId)}
-    <div class="health-activity__toolbar">
-      <div class="health-activity__stepper">
-        <button class="btn btn--icon" data-step="-1" aria-label="${esc(t('health.activity.prevWeek'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
-        <span class="health-activity__period">${esc(dateRangeText(summary.from, summary.to))}</span>
-        <button class="btn btn--icon" data-step="1" aria-label="${esc(t('health.activity.nextWeek'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
-      </div>
+    <div class="health-activity__toolbar health-period-row">
+      <div class="health-activity__stepper">${periodStepperHtml({
+        prev: { label: t('health.activity.prevWeek'), attrs: { 'data-step': '-1' } },
+        value: { className: 'health-activity__period', text: dateRangeText(summary.from, summary.to) },
+        next: { label: t('health.activity.nextWeek'), attrs: { 'data-step': '1' } },
+      })}</div>
     </div>
     ${totals.count === 0 ? '' : `<div class="health-activity__summary">${activityStatsMarkup(totals)}</div>`}
     ${/* EINE LEERE WOCHE IST EINE KARTE OHNE INHALT (R22, D12): die ruhige
          Zeile mit der Erfassen-Aktion statt eines grauen Satzes im Diagramm. */ ''}
     ${totals.count === 0
-      ? cardEmptyRowHtml(t('health.activity.noData'), { action: canAdd ? { id: 'activity-add', label: t('health.activity.addShort') } : null, className: 'health-overview__empty-row--surface' })
+      ? cardEmptyRowHtml(t('health.activity.noData'), { action: canAdd ? { id: 'activity-add', label: t('health.activity.addShort') } : null, className: 'card-empty-row--surface' })
       : `<div class="health-activity__chart">${activityChartMarkup(summary)}</div>`}
     ${totals.count === 0 ? '' : `<div class="health-activity__log">${activityLogMarkup(weekRows)}</div>`}
   `);
@@ -5699,6 +6011,8 @@ function openActivityModal(row, opts = {}) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.activity.edit') : t('health.activity.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit, '#activity-type'),
     size: 'md',
     content: `
       <form id="activity-form" class="form-stack" novalidate>
@@ -5758,8 +6072,8 @@ function openActivityModal(row, opts = {}) {
           }),
         ])}
         <div class="form-field">
-          <label class="label" for="activity-note">${esc(t('health.activity.field.note'))}</label>
-          <textarea class="input" id="activity-note" rows="2" maxlength="2000">${esc(val(row?.note))}</textarea>
+          <label class="form-label" for="activity-note">${esc(t('health.activity.field.note'))}</label>
+          <textarea class="form-input" id="activity-note" rows="2" maxlength="2000">${esc(val(row?.note))}</textarea>
         </div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="activity-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
@@ -6166,71 +6480,79 @@ function openPreventionModal(row) {
   const advancedFieldsHtml = `
     <div class="modal-grid modal-grid--2">
       <div class="form-field">
-        <label class="label" for="prevention-interval">${esc(t('health.prevention.field.intervalMonths'))}</label>
+        <label class="form-label" for="prevention-interval">${esc(t('health.prevention.field.intervalMonths'))}</label>
         <div class="health-prevention-interval-row">
-          <input class="input health-prevention-interval-row__value" id="prevention-interval" type="number" inputmode="numeric" min="1" step="1" value="${esc(val(interval.value))}">
-          <select class="input health-prevention-interval-row__unit" id="prevention-interval-unit" aria-label="${esc(t('common.unit'))}">${preventionIntervalUnitOptions(interval.unit)}</select>
+          <input class="form-input health-prevention-interval-row__value" id="prevention-interval" type="number" inputmode="numeric" min="1" step="1" value="${esc(val(interval.value))}">
+          <select class="form-input health-prevention-interval-row__unit" id="prevention-interval-unit" aria-label="${esc(t('common.unit'))}">${preventionIntervalUnitOptions(interval.unit)}</select>
         </div>
       </div>
       <div class="form-field">
-        <label class="label" for="prevention-next-due">${esc(t('health.prevention.field.nextDueOn'))}</label>
+        <label class="form-label" for="prevention-next-due">${esc(t('health.prevention.field.nextDueOn'))}</label>
         <yuvomi-datepicker id="prevention-next-due" type="date" value="${esc(val(row?.next_due_on))}"></yuvomi-datepicker>
       </div>
     </div>
     <div class="form-field">
-      <label class="label" for="prevention-offset">${esc(t('health.prevention.field.reminderOffsetDays'))}</label>
-      <input class="input" id="prevention-offset" type="number" inputmode="numeric" min="0" max="365" step="1"
+      <label class="form-label" for="prevention-offset">${esc(t('health.prevention.field.reminderOffsetDays'))}</label>
+      <input class="form-input" id="prevention-offset" type="number" inputmode="numeric" min="0" max="365" step="1"
              value="${esc(val(row?.reminder_offset_days))}" placeholder="30">
     </div>`;
 
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.prevention.edit') : t('health.prevention.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'md',
     content: `
       <form id="prevention-form" class="form-stack" novalidate>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="prevention-type">${esc(t('health.prevention.field.type'))}</label>
-            <select class="input" id="prevention-type">${preventionTypeSelectMarkup(row?.type_id ?? null)}</select>
+            <label class="form-label" for="prevention-type">${esc(t('health.prevention.field.type'))}</label>
+            <select class="form-input" id="prevention-type">${preventionTypeSelectMarkup(row?.type_id ?? null)}</select>
           </div>
+          ${/* OHNE ART IST DER NAME PFLICHT - UND SAGT ES (R24, Critique G5 P2-4):
+               das Feld trug keinen Stern, war aber das einzige, das den Eintrag
+               benennt. `required` folgt der Sichtbarkeit (syncName, gleich beim Oeffnen). */ ''}
           <div class="form-field" id="prevention-name-field" ${row?.type_id ? 'hidden' : ''}>
-            <label class="label" for="prevention-name">${esc(t('health.prevention.field.name'))}</label>
-            <input class="input" id="prevention-name" type="text" maxlength="200" value="${esc(val(row?.name))}">
+            <label class="form-label" for="prevention-name">${esc(t('health.prevention.field.name'))}${REQUIRED_MARK}</label>
+            <input class="form-input" id="prevention-name" type="text" maxlength="200" required value="${esc(val(row?.name))}">
           </div>
         </div>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="prevention-given-on">${esc(t('health.prevention.field.givenOn'))}</label>
+            <label class="form-label" for="prevention-given-on">${esc(t('health.prevention.field.givenOn'))}</label>
             <yuvomi-datepicker id="prevention-given-on" type="date" value="${esc(row?.given_on || todayKey())}"></yuvomi-datepicker>
           </div>
           <div class="form-field">
-            <label class="label" for="prevention-dose">${esc(t('health.prevention.field.doseNumber'))}</label>
-            <input class="input" id="prevention-dose" type="number" inputmode="numeric" min="1" step="1" value="${esc(val(row?.dose_number))}">
+            <label class="form-label" for="prevention-dose">${esc(t('health.prevention.field.doseNumber'))}</label>
+            <input class="form-input" id="prevention-dose" type="number" inputmode="numeric" min="1" step="1" value="${esc(val(row?.dose_number))}">
           </div>
         </div>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="prevention-provider">${esc(t('health.prevention.field.provider'))}</label>
-            <input class="input" id="prevention-provider" type="text" maxlength="100" value="${esc(val(row?.provider))}">
+            <label class="form-label" for="prevention-provider">${esc(t('health.prevention.field.provider'))}</label>
+            <input class="form-input" id="prevention-provider" type="text" maxlength="100" value="${esc(val(row?.provider))}">
           </div>
           <div class="form-field">
-            <label class="label" for="prevention-batch">${esc(t('health.prevention.field.batch'))}</label>
-            <input class="input" id="prevention-batch" type="text" maxlength="100" value="${esc(val(row?.batch))}">
+            <label class="form-label" for="prevention-batch">${esc(t('health.prevention.field.batch'))}</label>
+            <input class="form-input" id="prevention-batch" type="text" maxlength="100" value="${esc(val(row?.batch))}">
           </div>
         </div>
         <div class="form-field">
-          <label class="label" for="prevention-note">${esc(t('health.prevention.field.note'))}</label>
-          <textarea class="input" id="prevention-note" rows="2" maxlength="5000">${esc(val(row?.note))}</textarea>
+          <label class="form-label" for="prevention-note">${esc(t('health.prevention.field.note'))}</label>
+          <textarea class="form-input" id="prevention-note" rows="2" maxlength="5000">${esc(val(row?.note))}</textarea>
         </div>
         <div class="form-field">
-          <label class="label" for="prevention-visibility">${esc(t('health.prevention.field.visibility'))}</label>
-          <select class="input" id="prevention-visibility">
+          <label class="form-label" for="prevention-visibility">${esc(t('health.prevention.field.visibility'))}</label>
+          <select class="form-input" id="prevention-visibility">
             <option value="private" ${(row?.visibility || defaultVisibility('prevention')) === 'family' ? '' : 'selected'}>${esc(t('health.prevention.visibility.private'))}</option>
             <option value="family" ${(row?.visibility || defaultVisibility('prevention')) === 'family' ? 'selected' : ''}>${esc(t('health.prevention.visibility.family'))}</option>
           </select>
         </div>
-        ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
+        ${advancedSection(advancedFieldsHtml, {
+          open: advancedOpen,
+          hint: [t('health.prevention.field.intervalMonths'), t('health.prevention.field.nextDueOn'), t('health.prevention.field.reminderOffsetDays')].join(', '),
+        })}
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="prevention-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
           <button type="button" class="btn btn--secondary" data-action="cancel">${esc(t('common.cancel'))}</button>
@@ -6240,7 +6562,9 @@ function openPreventionModal(row) {
     onSave(panel) {
       const typeSelect = panel.querySelector('#prevention-type');
       const nameField = panel.querySelector('#prevention-name-field');
-      const syncName = () => { nameField.hidden = !!typeSelect.value; };
+      const nameInput = panel.querySelector('#prevention-name');
+      const syncName = () => { nameField.hidden = !!typeSelect.value; nameInput.required = !typeSelect.value; };
+      syncName();
       typeSelect.addEventListener('change', syncName);
 
       panel.querySelector('[data-action="cancel"]')?.addEventListener('click', () => closeModal({ force: true }));
@@ -6478,7 +6802,12 @@ function renderNutritionShell() {
     ${personSwitcherMarkup(nutrition.members, nutrition.personId, nutrition.meId,
       { menuId: 'health-person-menu-nutrition', label: t('health.nutrition.personsLabel') })}
     ${readOnlyBannerMarkup(nutrition.members, nutrition.personId, own, nutrition.meId)}
-    ${nutritionTodaySectionMarkup(own)}
+    ${/* EIN LEERZUSTAND JE BEREICH (R22 D12; R24 Critique G5 P3-6): ohne einen
+         Eintrag und ohne Ziel standen „Noch kein Tagesziel gesetzt." + „Ziel
+         setzen" UND darunter der Leerzustand - zwei Leerzustaende uebereinander.
+         Der Ziel-Abschnitt kommt mit dem ersten Eintrag (oder steht, sobald
+         ein Ziel gesetzt ist). */ ''}
+    ${entries.length || nutrition.summary?.target ? nutritionTodaySectionMarkup(own) : ''}
     ${entries.length
       ? `<h3 class="health-nutrition__entries-title u-section-title">${esc(t('health.nutrition.entriesTitle'))}</h3>
       <ul class="health-nutrition-row-list">${entries.map((row) => nutritionRowMarkup(row, own)).join('')}</ul>`
@@ -6632,9 +6961,10 @@ function nutritionMealSelectMarkup(current) {
  * Als Zeilen (Re-Kritik 2026-10-17): Naehrstoff links, Zahl mit Einheit rechts,
  * wie Puls und Gewicht in der Messung - statt eines Zweierrasters gestapelter
  * Felder mit der Einheit in Klammern im Etikett. */
-function nutrientFieldsMarkup(prefix, source) {
+function nutrientFieldsMarkup(prefix, source, { keys = null } = {}) {
   const val = (v) => (v === null || v === undefined ? '' : String(v));
-  return formRowsHtml(NUTRIENTS.map((n) => formRowHtml({
+  const list = keys ? NUTRIENTS.filter((n) => keys.includes(n.key)) : NUTRIENTS;
+  return formRowsHtml(list.map((n) => formRowHtml({
     label: t(n.labelKey),
     labelFor: `${prefix}-${n.key}`,
     field: true,
@@ -6730,6 +7060,8 @@ function openNutritionModal(row) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.nutrition.edit') : t('health.nutrition.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'md',
     content: `
       <form id="nutrition-form" class="form-stack" novalidate>
@@ -6753,11 +7085,22 @@ function openNutritionModal(row) {
             control: `<select class="form-input" id="nutrition-meal-type">${nutritionMealSelectMarkup(row?.meal_type ?? null)}</select>`,
           }),
         ])}
-        ${nutrientFieldsMarkup('nutrition-entry', row)}
-        <div class="form-field">
-          <label class="label" for="nutrition-note">${esc(t('health.nutrition.field.note'))}</label>
-          <textarea class="input" id="nutrition-note" rows="2" maxlength="5000">${esc(val(row?.note))}</textarea>
-        </div>
+        ${/* BEZEICHNUNG UND ENERGIE SICHTBAR, DIE MAKROS DAHINTER (R24, Critique
+             G5 P2-4). Der Dialog war 850px hoch mit neun Zahlfeldern auf einmal,
+             waehrend Medikament und Vorsorge ihr Seltenes falten. Die Energie
+             ist die eine Zahl, die fast jeder eintraegt; Fett, Kohlenhydrate,
+             Eiweiss & Co. stehen hinter „Weitere Angaben" und nennen sich dort
+             (Inventar-Muster). Mit einem Wert beim Bearbeiten ist die Falte offen. */ ''}
+        ${nutrientFieldsMarkup('nutrition-entry', row, { keys: [NUTRIENTS[0].key] })}
+        ${advancedSection(`
+          ${nutrientFieldsMarkup('nutrition-entry', row, { keys: NUTRIENTS.slice(1).map((n) => n.key) })}
+          <div class="form-field">
+            <label class="form-label" for="nutrition-note">${esc(t('health.nutrition.field.note'))}</label>
+            <textarea class="form-input" id="nutrition-note" rows="2" maxlength="5000">${esc(val(row?.note))}</textarea>
+          </div>`, {
+          open: Boolean(row) && (NUTRIENTS.slice(1).some((n) => row[n.key] != null) || Boolean(row.note)),
+          hint: ['fat', 'carbs', 'protein'].map((k) => t(`health.nutrition.nutrient.${k}`)).concat(t('health.nutrition.field.note')).join(', '),
+        })}
         <!-- DIE GETEILTEN BESCHRIFTUNGEN, nicht eigene. docs/DECISIONS.md
              Abschnitt 5 zaehlt fuenf deutsche Formulierungen fuer denselben
              Zustand auf und nennt die gemeinsamen Labels als das, was fehlt:
@@ -7063,6 +7406,7 @@ function renderOverviewShell() {
     // Es kommt nichts mehr, das vor die Liste zieht - das Skelett geht.
     _priorityPending = false;
     syncPriorityRegion();
+    maybeRevealAreaStatuses();
     return;
   }
 
@@ -7077,7 +7421,10 @@ function renderOverviewShell() {
   if (window.lucide) window.lucide.createIcons({ el: overview.root });
   wireOverview();
   applyOverviewStatuses();
+  maybeRevealAreaStatuses();
   syncHoists();
+  // Das Erfassen-Menue am FAB kennt jetzt Person und Recht (R24, E9).
+  refreshHealthFab();
 }
 
 /**
@@ -7091,11 +7438,16 @@ function renderOverviewShell() {
  */
 function overviewGridMarkup({ phone = isPhone() } = {}) {
   const due = overviewCard('calendar-check', 'health.overview.dueToday.title', overviewDueMarkup(), 'due');
-  const quick = canEditFor(overview.personId, overview.meId)
-    ? overviewCard('plus-circle', 'health.overview.quick.title', quickCaptureMarkup(), 'quick') : '';
-  const vitalsCard = overviewCard('activity', 'health.overview.vitals.title', overviewVitalsMarkup(), 'vitals', { action: 'ov-go-vitals' });
-  const prn = prnMeds('overview').length
-    ? { title: t('health.meds.prn.title'), html: overviewCard('pill', 'health.meds.prn.title', prnListMarkup('overview')) } : null;
+  /* "SCHNELL ERFASSEN" IST WEG (R24, E9; Critique G5 P1-1). Die Karte bot
+   * Messwert, Training und Einnahme - dieselben Wege wie das Menue am FAB
+   * „+ Erfassen", zwei Anlegewege auf einer Seite. Erfasst wird ueber den FAB. */
+  /* AM TELEFON NENNT DIE KARTE, WAS SIE ZEIGT (R24, Critique G5 P2-7): dort
+   * stehen nur die zwei zuletzt gemessenen Werte, „Letzte Vitalwerte"
+   * versprach alle neun. */
+  const vitalsCard = overviewCard('activity', phone ? 'health.overview.vitals.recentTitle' : 'health.overview.vitals.title',
+    overviewVitalsMarkup(), 'vitals', { action: 'ov-go-vitals' });
+  const prnHtml = prnMeds('overview').length
+    ? overviewCard('pill', 'health.meds.prn.title', prnListMarkup('overview'), 'prn') : '';
   const adherence = { title: t('health.overview.adherence.title'), html: overviewCard('trending-up', 'health.overview.adherence.title', overviewAdherenceMarkup()) };
   const cycleHtml = overviewCycleTileMarkup();
   const cycleTile = cycleHtml ? { title: t('health.cycle.status.nextPeriod'), html: cycleHtml } : null;
@@ -7106,30 +7458,30 @@ function overviewGridMarkup({ phone = isPhone() } = {}) {
     return `
     <div class="health-overview__grid">
       ${due}
-      ${prn?.html ?? ''}
+      ${prnHtml}
       ${adherence.html}
       ${vitalsCard}
       ${cycleTile?.html ?? ''}
-      ${quick}
       ${reminders.html}
     </div>`;
   }
 
   // Titel und Markup zusammen: die Zeile nennt, was hinter ihr liegt.
-  const rest = [prn, adherence, cycleTile, reminders].filter(Boolean);
+  const rest = [adherence, cycleTile, reminders].filter(Boolean);
 
-  /* TELEFON: KERNWERTE ZUERST, DER REST HINTER EINER ZEILE (R16). Die Wurzel
-   * des Moduls IST dort die Uebersicht - "Heute faellig" und "Schnell
-   * erfassen" stehen vor der Bereichsliste (health-hoist.js), alles andere
-   * hing als 1627px lange Kartenfolge darunter. Jetzt folgen der Bereichsliste
-   * die Vitalwerte (zwei Kennzahlen, der Titel fuehrt zu allen) und EINE
-   * Zeile, die den Rest aufklappt und nennt, was sie haelt. Die Reihenfolge im
-   * Baum ist die im Bild, damit der Fokus dem Auge folgt. */
+  /* TELEFON: WAS HEUTE ANSTEHT ZUERST, DER REST HINTER EINER ZEILE (R16, R24).
+   * Die Wurzel des Moduls IST dort die Uebersicht - „Heute faellig" und
+   * „Bei Bedarf" ziehen vor die Bereichsliste (health-hoist.js), beides ist,
+   * was man heute einnimmt (R24, Critique G5 P2-7: „Bei Bedarf" lag mit
+   * seinem Ring in der Falte). Der Bereichsliste folgen die zwei zuletzt
+   * gemessenen Werte (der Titel fuehrt zu allen) und EINE Zeile, die den Rest
+   * aufklappt und nennt, was sie haelt. Die Reihenfolge im Baum ist die im
+   * Bild, damit der Fokus dem Auge folgt. */
   const open = overview.moreExpanded;
   return `
     <div class="health-overview__grid">
       ${due}
-      ${quick}
+      ${prnHtml}
       ${vitalsCard}
       <div class="row-divided health-vitals__more-list health-overview__more-list">
         <button type="button" class="health-vitals__more-row health-overview__more-toggle"
@@ -7289,7 +7641,8 @@ function overviewDueRowMarkup(dose, med, log, own) {
   // hier fehlten einmal Klasse und Label-Span, und der Fix von dort erreichte
   // diese Zeile nicht (Critique 2026-08-13).
   return `
-    <li class="list-row health-dose">
+    <li class="list-row health-dose health-dose--check">
+      ${doseCheckMarkup(dose, log, name, own, OVERVIEW_DOSE_HOOKS)}
       <span class="health-dose__time">${esc(dose.time)}</span>
       <span class="list-row__name health-dose__name">${esc(name)}${esc(doseText)}</span>
       ${doseActionsMarkup(dose, log, name, own, OVERVIEW_DOSE_HOOKS)}
@@ -7306,6 +7659,7 @@ async function handleOverviewDose(btn, action) {
   const dose = btn.dataset.dose !== '' ? Number(btn.dataset.dose) : null;
 
   setDoseBusy(medId, true);
+  if (action === 'take') markDoseCheck(btn, true);
   try {
     const booked = await sendScheduledDose({ medId, logId, scheduleId, scheduledAt, dose, action });
 
@@ -7315,6 +7669,7 @@ async function handleOverviewDose(btn, action) {
   } catch (err) {
     console.error('[Health] overview dose error:', err);
     setDoseBusy(medId, false);
+    markDoseCheck(btn, false);
     reportError(err, 'health.meds.doseError', reloadMedViews, { fromDialog: false });
   }
 }
@@ -7404,18 +7759,11 @@ function overviewVitalsMarkup() {
   return `<div class="health-overview__vitals-grid metric-rows">${cards}</div>`;
 }
 
-/** Die ruhige Zeile, wenn noch nichts gemessen ist - mit dem Weg zum Erfassen. */
+/** Die ruhige Zeile, wenn noch nichts gemessen ist. */
 function overviewVitalsEmptyMarkup() {
-  const action = canEditFor(overview.personId, overview.meId)
-    ? `<button type="button" class="btn btn--secondary btn--sm" data-action="ov-add-vital">
-        <i data-lucide="plus" aria-hidden="true"></i>${esc(t('health.vitals.addShort'))}
-      </button>`
-    : '';
-  return `
-    <div class="health-overview__empty-row">
-      <span class="health-overview__empty-text">${esc(t('health.vitals.emptyTitle'))}</span>
-      ${action}
-    </div>`;
+  // Ohne eigene Erfassen-Aktion (R24, E9): sie stand als zweiter Weg neben
+  // dem FAB-Menue „+ Erfassen", das den Messwert ebenso anbietet.
+  return cardEmptyRowHtml(t('health.vitals.emptyTitle'));
 }
 
 /**
@@ -7492,6 +7840,9 @@ function overviewVitalCardMarkup(metric, series, { extra = false } = {}) {
 
   // --inset: die Kachel liegt IN der Übersichtskarte (Kasten-in-Kasten,
   // Muster vorher .health-overview__card .health-metric-card).
+  // EINE KACHEL (R24, Critique G5 P2-6): dieselbe Bauform wie im Bereich -
+  // Kopf, Wert, Trendlinie, Meta. Die Uebersicht trug sie ohne Trendlinie,
+  // als zweite Kachelsorte neben der des Bereichs.
   return `
     <button type="button" class="metric-card metric-card--select metric-card--inset${extra ? ' health-overview__vital--extra' : ''}" data-vital-nav="${esc(metric.type)}">
       <span class="metric-card__head">
@@ -7499,6 +7850,7 @@ function overviewVitalCardMarkup(metric, series, { extra = false } = {}) {
         <span class="metric-card__label">${esc(label)}</span>
       </span>
       <span class="metric-card__body">${valueHtml}</span>
+      ${latest ? sparklineMarkup(series.points, 'value_num', metric) : ''}
       ${metaHtml}
     </button>`;
 }
@@ -7531,24 +7883,6 @@ function overviewUpcomingMarkup() {
   return `<ul class="health-overview__reminders-list">${rows}</ul>`;
 }
 
-// --- Schnell-Erfassung (nur eigene Person) ---
-
-function quickCaptureMarkup() {
-  if (!canEditFor(overview.personId, overview.meId)) return '';
-  return `
-    <div class="health-overview__quick">
-      <button type="button" class="btn btn--secondary" data-action="ov-add-vital">
-        <i data-lucide="heart-pulse" class="icon-md" aria-hidden="true"></i>${esc(t('health.overview.quick.vital'))}
-      </button>
-      <button type="button" class="btn btn--secondary" data-action="ov-add-activity">
-        <i data-lucide="dumbbell" class="icon-md" aria-hidden="true"></i>${esc(t('health.overview.quick.activity'))}
-      </button>
-      <button type="button" class="btn btn--secondary" data-action="ov-go-meds">
-        <i data-lucide="pill" class="icon-md" aria-hidden="true"></i>${esc(t('health.overview.quick.meds'))}
-      </button>
-    </div>`;
-}
-
 // --- CSV-Export je Bereich (Server-Route, Muster wie Budget-Stats-Export) ---
 
 function overviewExportHref(area) {
@@ -7575,11 +7909,11 @@ function overviewExportMarkup() {
     <div class="health-overview__export">
       <div class="health-overview__export-range">
         <div class="form-field">
-          <label class="label" for="ov-export-from">${esc(t('health.export.rangeFrom'))}</label>
+          <label class="form-label" for="ov-export-from">${esc(t('health.export.rangeFrom'))}</label>
           <yuvomi-datepicker id="ov-export-from" type="date" value="${esc(from || '')}"></yuvomi-datepicker>
         </div>
         <div class="form-field">
-          <label class="label" for="ov-export-to">${esc(t('health.export.rangeTo'))}</label>
+          <label class="form-label" for="ov-export-to">${esc(t('health.export.rangeTo'))}</label>
           <yuvomi-datepicker id="ov-export-to" type="date" value="${esc(to || '')}"></yuvomi-datepicker>
         </div>
       </div>
@@ -7622,16 +7956,6 @@ function wireOverview() {
       window.yuvomi?.navigate('/health/vitals');
     }));
 
-  if (!readOnly()) {
-    // Zwei Wege zum selben Dialog: "Schnell erfassen" und die ruhige Zeile der
-    // Vitalwerte, solange noch nichts gemessen ist (R21, D6).
-    overview.root.querySelectorAll('[data-action="ov-add-vital"]').forEach((btn) =>
-      btn.addEventListener('click', () => openVitalModal({ onSaved: () => reloadOverview() })));
-    overview.root.querySelector('[data-action="ov-add-activity"]')
-      ?.addEventListener('click', () => openActivityModal(null, { onSaved: () => reloadOverview() }));
-  }
-  overview.root.querySelector('[data-action="ov-go-meds"]')
-    ?.addEventListener('click', () => window.yuvomi?.navigate('/health/meds'));
   overview.root.querySelector('[data-action="ov-go-cycle"]')
     ?.addEventListener('click', () => window.yuvomi?.navigate('/health/cycle'));
   overview.root.querySelector('[data-action="ov-go-vitals"]')
@@ -7906,9 +8230,10 @@ function renderCycleShell() {
     title: t('health.cycle.emptyTitle'),
     description: t('health.cycle.emptyDesc'),
     // DER LEERZUSTAND TRAEGT DIE AKTION (R22, D12): Glyphe, Titel, Satz,
-    // Aktion - wie jeder leere Bereich. Seit der FAB hier fehlt, ist sie der
-    // einzige Anlege-Weg und kein zweiter: hier steht kein FAB (Kanon D5).
-    action: darf ? { label: t('health.cycle.add'), icon: 'plus', attrs: { 'data-action': 'cycle-add-period' } } : undefined,
+    // Aktion - wie jeder leere Bereich. Seit R24 (E9) steht hier auch der FAB
+    // („+ Tag"); das Nachtragen ist die andere Handlung und steht deshalb
+    // sekundaer daneben - nie zwei Primaere in einer Ansicht (R23 D14).
+    action: darf ? { label: t('health.cycle.add'), icon: 'plus', tone: 'secondary', attrs: { 'data-action': 'cycle-add-period' } } : undefined,
   })}`);
     if (window.lucide) window.lucide.createIcons({ el: cycle.root });
     wireCycle();
@@ -8325,17 +8650,20 @@ function cycleStatsMarkup(prediction) {
   // Ring-Mittelpunkt (cycleCountdownText()) bleibt bewusst bei EINER Zahl
   // (nextStart/daysUntilNext), weil ein Countdown auf eine Spanne dort keinen
   // sinnvollen einzelnen Text ergäbe.
+  //
+  // EIN WERT, EINE STELLE (R24, Critique G5 P3-4): der Ring sagte „Nächste
+  // Periode: in 22 Tagen", die Kachel daneben „Nächste Periode 19.11." - zwei
+  // Antworten auf dieselbe Frage nebeneinander. Die Kachel steht nur noch,
+  // wenn sie etwas sagt, das der Ring nicht kann: die Spanne der Perimenopause.
   const perimenopauseRange = (prediction.perimenopause && prediction.nextStartRange) ? prediction.nextStartRange : null;
-  tiles.push(cycleStatCardMarkup({
-    icon: 'calendar-heart',
-    labelKey: 'health.cycle.status.nextPeriod',
-    value: perimenopauseRange
-      ? dateRangeText(perimenopauseRange.min, perimenopauseRange.max)
-      : dateText(prediction.nextStart),
-    sub: perimenopauseRange
-      ? t('health.cycle.status.nextPeriodRangeSub', { date: dateText(prediction.nextStart) })
-      : '',
-  }));
+  if (perimenopauseRange) {
+    tiles.push(cycleStatCardMarkup({
+      icon: 'calendar-heart',
+      labelKey: 'health.cycle.status.nextPeriod',
+      value: dateRangeText(perimenopauseRange.min, perimenopauseRange.max),
+      sub: t('health.cycle.status.nextPeriodRangeSub', { date: dateText(prediction.nextStart) }),
+    }));
+  }
 
   if (prediction.trackFertility) {
     // Bestätigt (Phase 3, Temperaturanstieg) vs. vorhergesagt (Kalendermethode) -
@@ -8460,18 +8788,20 @@ function watchCycleTodayPlace() {
 function cycleTodayActionsMarkup(pregnant = false) {
   const open = cycleOpenPeriod();
   // Im Schwangerschafts-Modus keine „Periode starten/beenden"-Aktion anbieten —
-  // nur das Tages-Protokoll bleibt (z. B. für Schmierblutungen/Symptome).
-  const primary = pregnant
-    ? ''
-    : (open
-      ? `<button class="btn btn--secondary" data-action="cycle-end-period"><i data-lucide="check" aria-hidden="true"></i>${esc(t('health.cycle.today.endPeriod'))}</button>`
-      : `<button class="btn btn--primary" data-action="cycle-start-period"><i data-lucide="droplet" aria-hidden="true"></i>${esc(t('health.cycle.today.startPeriod'))}</button>`);
+  // nur das Tages-Protokoll bleibt (z. B. für Schmierblutungen/Symptome), und
+  // das traegt seit R24 der FAB („+ Tag"). Die Karte faellt dann weg.
+  if (pregnant) return '';
+  // EIN PRIMAER JE ANSICHT (R24, E9): der FAB ist der Primaer des Bereichs,
+  // „Periode gestartet" steht hier sekundaer wie sein Gegenstueck „beendet".
+  // „Tag protokollieren" stand als dritter Knopf daneben - das ist jetzt der FAB.
+  const action = open
+    ? `<button class="btn btn--secondary" data-action="cycle-end-period"><i data-lucide="check" aria-hidden="true"></i>${esc(t('health.cycle.today.endPeriod'))}</button>`
+    : `<button class="btn btn--secondary" data-action="cycle-start-period"><i data-lucide="droplet" aria-hidden="true"></i>${esc(t('health.cycle.today.startPeriod'))}</button>`;
   return `
     <div class="cycle-today">
       <span class="cycle-today__label">${esc(t('health.cycle.today.title'))}</span>
       <div class="cycle-today__actions">
-        ${primary}
-        <button class="btn btn--ghost" data-action="cycle-log-today"><i data-lucide="pencil-line" aria-hidden="true"></i>${esc(t('health.cycle.today.logDay'))}</button>
+        ${action}
       </div>
     </div>`;
 }
@@ -8479,10 +8809,12 @@ function cycleTodayActionsMarkup(pregnant = false) {
 async function cycleStartPeriodToday() {
   if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const today = todayKey();
+  // Die Quittung kommt nach der Anfrage - nie im naechsten Modul (R24).
+  const scope = window.yuvomi?.feedbackScope?.() ?? null;
   try {
     await api.post('/health/cycle/periods', { start_date: today });
     cycle.anchor = today;
-    window.yuvomi?.showToast(t('health.cycle.today.startedToast'), 'success');
+    window.yuvomi?.showToast(t('health.cycle.today.startedToast'), 'success', 3000, null, { scope });
     await reloadAfterSave(() => reloadCycle());
   } catch (err) {
     console.error('[Health] cycle start error:', err);
@@ -8494,9 +8826,10 @@ async function cycleEndPeriodToday() {
   if (readOnly()) return;  // #1265, dritte Linie: auch ein Aufruf ohne Knopf endet hier
   const open = cycleOpenPeriod();
   if (!open) { window.yuvomi?.showToast(t('health.cycle.today.noOpenPeriod'), 'info'); return; }
+  const scope = window.yuvomi?.feedbackScope?.() ?? null;
   try {
     await api.patch(`/health/cycle/periods/${open.id}`, { end_date: todayKey() });
-    window.yuvomi?.showToast(t('health.cycle.today.endedToast'), 'success');
+    window.yuvomi?.showToast(t('health.cycle.today.endedToast'), 'success', 3000, null, { scope });
     await reloadAfterSave(() => reloadCycle());
   } catch (err) {
     console.error('[Health] cycle end error:', err);
@@ -9582,7 +9915,6 @@ function wireCycle() {
     btn.addEventListener('click', () => openPeriodModal(null)));
   cycle.root.querySelector('[data-action="cycle-start-period"]')?.addEventListener('click', () => cycleStartPeriodToday());
   cycle.root.querySelector('[data-action="cycle-end-period"]')?.addEventListener('click', () => cycleEndPeriodToday());
-  cycle.root.querySelector('[data-action="cycle-log-today"]')?.addEventListener('click', () => openDayLogModal(todayKey()));
   cycle.root.querySelector('[data-action="cycle-settings"]')?.addEventListener('click', () => openCycleSettingsModal());
   cycle.root.querySelector('[data-action="cycle-import"]')?.addEventListener('click', () => openCycleImportModal());
   cycle.root.querySelector('[data-cycle-feed-link]')?.addEventListener('click', (event) => {
@@ -9639,30 +9971,32 @@ function openPeriodModal(period) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('health.cycle.period.edit') : t('health.cycle.period.add'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4, G5 P2-4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'sm',
     content: `
       <form id="cycle-period-form" class="form-stack" novalidate>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="cycle-start">${esc(t('health.cycle.field.startDate'))}</label>
+            <label class="form-label" for="cycle-start">${esc(t('health.cycle.field.startDate'))}</label>
             <yuvomi-datepicker id="cycle-start" type="date" value="${esc(startVal)}"></yuvomi-datepicker>
           </div>
           <div class="form-field">
-            <label class="label" for="cycle-end">${esc(t('health.cycle.field.endDate'))}</label>
+            <label class="form-label" for="cycle-end">${esc(t('health.cycle.field.endDate'))}</label>
             <yuvomi-datepicker id="cycle-end" type="date" value="${esc(endVal)}"></yuvomi-datepicker>
           </div>
         </div>
         <p class="cycle-hint cycle-hint--warning" data-role="period-warning" hidden></p>
         <div class="form-field">
-          <label class="label" for="cycle-visibility">${esc(t('health.cycle.field.visibility'))}</label>
-          <select class="input" id="cycle-visibility">
+          <label class="form-label" for="cycle-visibility">${esc(t('health.cycle.field.visibility'))}</label>
+          <select class="form-input" id="cycle-visibility">
             <option value="private" ${cycleVisibilityFor(period) === 'family' ? '' : 'selected'}>${esc(t('health.cycle.visibility.private'))}</option>
             <option value="family" ${cycleVisibilityFor(period) === 'family' ? 'selected' : ''}>${esc(t('health.cycle.visibility.family'))}</option>
           </select>
         </div>
         <div class="form-field">
-          <label class="label" for="cycle-note">${esc(t('health.cycle.field.note'))}</label>
-          <textarea class="input" id="cycle-note" rows="2" maxlength="2000">${esc(period?.note || '')}</textarea>
+          <label class="form-label" for="cycle-note">${esc(t('health.cycle.field.note'))}</label>
+          <textarea class="form-input" id="cycle-note" rows="2" maxlength="2000">${esc(period?.note || '')}</textarea>
         </div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button type="button" class="btn btn--danger-outline" data-action="cycle-delete-period"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
@@ -9756,12 +10090,12 @@ function openCycleImportModal() {
       <form id="cycle-import-form" class="form-stack" novalidate>
         <p class="cycle-hint">${esc(t('health.cycle.import.explainer'))}</p>
         <div class="form-field">
-          <label class="label" for="cycle-import-file">${esc(t('health.cycle.import.fileLabel'))}</label>
-          <input class="input" id="cycle-import-file" type="file" accept=".csv,text/csv">
+          <label class="form-label" for="cycle-import-file">${esc(t('health.cycle.import.fileLabel'))}</label>
+          <input class="form-input" id="cycle-import-file" type="file" accept=".csv,text/csv">
         </div>
         <div class="form-field">
-          <label class="label" for="cycle-import-paste">${esc(t('health.cycle.import.pasteLabel'))}</label>
-          <textarea class="input" id="cycle-import-paste" rows="6" placeholder="start_date,end_date"></textarea>
+          <label class="form-label" for="cycle-import-paste">${esc(t('health.cycle.import.pasteLabel'))}</label>
+          <textarea class="form-input" id="cycle-import-paste" rows="6" placeholder="start_date,end_date"></textarea>
         </div>
         <div id="cycle-import-errors" class="form-error cycle-import-errors" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -9954,12 +10288,12 @@ function openDayLogModal(dateKey) {
   const moreFieldsHtml = `
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="cycle-bbt">${esc(t('health.cycle.bbt.label'))}</label>
-            <input class="input" id="cycle-bbt" type="number" inputmode="decimal" step="0.01" placeholder="${esc(t('health.cycle.bbt.placeholder'))}" value="${esc(bbtValue)}">
+            <label class="form-label" for="cycle-bbt">${esc(t('health.cycle.bbt.label'))}</label>
+            <input class="form-input" id="cycle-bbt" type="number" inputmode="decimal" step="0.01" placeholder="${esc(t('health.cycle.bbt.placeholder'))}" value="${esc(bbtValue)}">
           </div>
           <div class="form-field">
-            <label class="label" for="cycle-bbt-unit">${esc(t('health.cycle.bbt.unitLabel'))}</label>
-            <select class="input" id="cycle-bbt-unit">
+            <label class="form-label" for="cycle-bbt-unit">${esc(t('health.cycle.bbt.unitLabel'))}</label>
+            <select class="form-input" id="cycle-bbt-unit">
               <option value="c" ${bbtUnit === 'c' ? 'selected' : ''}>${esc(t('health.cycle.bbt.celsius'))}</option>
               <option value="f" ${bbtUnit === 'f' ? 'selected' : ''}>${esc(t('health.cycle.bbt.fahrenheit'))}</option>
             </select>
@@ -9967,25 +10301,25 @@ function openDayLogModal(dateKey) {
         </div>
         <p class="cycle-hint">${esc(t('health.cycle.bbt.hint'))}</p>
         <div class="form-field">
-          <span class="label">${esc(t('health.cycle.mucus.label'))}</span>
+          <span class="form-label">${esc(t('health.cycle.mucus.label'))}</span>
           <div class="health-choices" data-group="mucus" role="group" aria-label="${esc(t('health.cycle.mucus.label'))}">${mucusButtons}</div>
           <p class="cycle-hint">${esc(t('health.cycle.mucus.hint'))}</p>
         </div>
         <div class="form-field">
-          <span class="label">${esc(t('health.cycle.test.label'))}</span>
+          <span class="form-label">${esc(t('health.cycle.test.label'))}</span>
           <div class="modal-grid modal-grid--2">
             <div>
-              <span class="label">${esc(t('health.cycle.test.lhLabel'))}</span>
+              <span class="form-label">${esc(t('health.cycle.test.lhLabel'))}</span>
               <div class="health-choices" data-group="lh-test" role="group" aria-label="${esc(t('health.cycle.test.lhLabel'))}">${lhButtons}</div>
             </div>
             <div>
-              <span class="label">${esc(t('health.cycle.test.pregnancyLabel'))}</span>
+              <span class="form-label">${esc(t('health.cycle.test.pregnancyLabel'))}</span>
               <div class="health-choices" data-group="pregnancy-test" role="group" aria-label="${esc(t('health.cycle.test.pregnancyLabel'))}">${pregButtons}</div>
             </div>
           </div>
         </div>
         <div class="form-field">
-          <span class="label cycle-intimacy-label"><i data-lucide="lock" class="icon-sm" aria-hidden="true"></i>${esc(t('health.cycle.intimacy.label'))}</span>
+          <span class="form-label cycle-intimacy-label"><i data-lucide="lock" class="icon-sm" aria-hidden="true"></i>${esc(t('health.cycle.intimacy.label'))}</span>
           <div class="health-choices" data-group="intimacy" role="group" aria-label="${esc(t('health.cycle.intimacy.label'))}">${intimacyButtons}</div>
           <p class="cycle-hint">${esc(t('health.cycle.intimacy.hint'))}</p>
         </div>
@@ -10007,11 +10341,11 @@ function openDayLogModal(dateKey) {
     content: `
       <form id="cycle-log-form" class="form-stack" novalidate>
         <div class="form-field">
-          <span class="label">${esc(t('health.cycle.flow.label'))}</span>
+          <span class="form-label">${esc(t('health.cycle.flow.label'))}</span>
           <div class="health-choices" data-group="flow" role="group" aria-label="${esc(t('health.cycle.flow.label'))}">${flowButtons}</div>
         </div>
         <div class="form-field">
-          <span class="label">${esc(t('health.cycle.symptom.label'))}</span>
+          <span class="form-label">${esc(t('health.cycle.symptom.label'))}</span>
           <div class="health-choices health-choices--wrap" data-group="symptoms">${symptomButtons}</div>
           <div class="cycle-quick-links">
             <button type="button" class="btn btn--ghost btn--sm" data-action="cycle-log-painkiller">${esc(t('health.cycle.quickLink.painkiller'))}</button>
@@ -10019,19 +10353,19 @@ function openDayLogModal(dateKey) {
           </div>
         </div>
         <div class="form-field">
-          <span class="label">${esc(t('health.cycle.feelings.label'))}</span>
+          <span class="form-label">${esc(t('health.cycle.feelings.label'))}</span>
           <div class="health-choices health-choices--wrap" data-group="feelings">${feelingsButtons}</div>
         </div>
         <div class="form-field">
-          <label class="label" for="cycle-log-visibility">${esc(t('health.cycle.field.visibility'))}</label>
-          <select class="input" id="cycle-log-visibility">
+          <label class="form-label" for="cycle-log-visibility">${esc(t('health.cycle.field.visibility'))}</label>
+          <select class="form-input" id="cycle-log-visibility">
             <option value="private" ${cycleVisibilityFor(existing) === 'family' ? '' : 'selected'}>${esc(t('health.cycle.visibility.private'))}</option>
             <option value="family" ${cycleVisibilityFor(existing) === 'family' ? 'selected' : ''}>${esc(t('health.cycle.visibility.family'))}</option>
           </select>
         </div>
         <div class="form-field">
-          <label class="label" for="cycle-log-note">${esc(t('health.cycle.field.note'))}</label>
-          <textarea class="input" id="cycle-log-note" rows="2" maxlength="2000">${esc(existing?.note || '')}</textarea>
+          <label class="form-label" for="cycle-log-note">${esc(t('health.cycle.field.note'))}</label>
+          <textarea class="form-input" id="cycle-log-note" rows="2" maxlength="2000">${esc(existing?.note || '')}</textarea>
         </div>
         ${advancedSection(moreFieldsHtml, { hint: moreHint, open: moreOpen })}
         <div class="modal-panel__footer modal-panel__footer--plain">
@@ -10460,7 +10794,8 @@ export const __test = {
   overviewVitalCardMarkup,
   // R21 D6: der Satz oben.
   overviewBriefMarkup,
-  quickCaptureMarkup,
+  // R24 E9: das Erfassen-Menue am FAB (vorher die Karte „Schnell erfassen").
+  overviewCaptureItems,
   cycleBubbleMarkup,
   cyclePregnancyMarkup,
   cycleTodayActionsMarkup,

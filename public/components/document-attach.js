@@ -455,9 +455,10 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
         <div class="doc-attach-picker__list" data-picker-list>
           <p class="doc-attach-picker__status">${esc(t('common.loading'))}</p>
         </div>
+        <p class="form-hint form-hint--danger doc-attach-picker__reason" data-picker-reason role="status" hidden></p>
         <div class="doc-attach-picker__footer" data-dialog-actions>
           <button class="btn btn--secondary" type="button" data-picker-close>${esc(t('common.cancel'))}</button>
-          <button class="btn btn--primary" type="button" data-picker-confirm disabled>
+          <button class="btn btn--primary" type="button" data-picker-confirm>
             ${esc(t('documentAttach.confirmSelection'))}
           </button>
         </div>
@@ -467,6 +468,7 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
     const listEl = overlay.querySelector('[data-picker-list]');
     const searchEl = overlay.querySelector('#doc-attach-picker-search');
     const confirmEl = overlay.querySelector('[data-picker-confirm]');
+    const reasonEl = overlay.querySelector('[data-picker-reason]');
     // Der Auslöser bekommt den Fokus zurück - das Overlay liegt über einem
     // offenen Modal, sonst fiele der Fokus auf <body>.
     const opener = document.activeElement;
@@ -528,7 +530,7 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
         }
       }
       if (box.checked) selected.add(id); else selected.delete(id);
-      confirmEl.disabled = selected.size === 0;
+      if (selected.size) reasonEl.hidden = true;
     });
 
     wirePageSearch(overlay, { id: 'doc-attach-picker-search', delay: 0, onQuery: renderList });
@@ -536,6 +538,14 @@ function openDocumentPicker(panel, { excludeIds = new Set(), single = false } = 
       button.addEventListener('click', () => close([]));
     });
     confirmEl.addEventListener('click', () => {
+      // DER PRIMAERKNOPF IST NIE GESPERRT (Critique R24, D4): ohne Wahl sagt
+      // er, was fehlt, und bleibt im Bild - vorher stand er grau da.
+      if (!selected.size) {
+        reasonEl.textContent = t('documentAttach.pickNone');
+        reasonEl.hidden = false;
+        listEl.querySelector('input[type="checkbox"]')?.focus();
+        return;
+      }
       close(documents.filter((doc) => selected.has(doc.id)));
     });
     overlay.addEventListener('mousedown', (event) => {

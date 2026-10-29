@@ -668,8 +668,13 @@
   .contact-mv-row { transition: none; }
 }
 
+/* "+ Telefonnummer hinzufuegen" ist eine leise Zeilenaktion an der Kante der
+ * Felder, kein Knopf ueber die volle Breite (Critique R24 G5-Kontakte-P3-3):
+ * mittig und 486px breit las er sich wie die Hauptaktion des Dialogs. */
 .contact-mv-add {
+  align-self: flex-start;
   margin-top: var(--space-2);
+  margin-inline-start: calc(-1 * var(--space-2));
 }
 
 /* SCHMAL STEHT DAS LABEL UNTER DEM WERT (R21 S7, Critique a3). In der

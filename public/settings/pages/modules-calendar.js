@@ -4,6 +4,7 @@ import { dateTimeText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { weekStartIndex, weekdayOrder } from '/utils/date.js';
 import { bindInstantSwitch, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
+import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
@@ -152,9 +153,9 @@ function renderPage(container, preferences) {
               attrs: { id: 'holiday-show-public', 'data-instant-save': true },
             })}
             ${settingRowHtml({
-              label: t('settings.holidayPublicColor'), labelFor: 'holiday-public-color',
+              label: t('settings.holidayPublicColor'), labelId: 'holiday-public-color-label', stacked: true,
               attrs: { id: 'holiday-public-color-group', hidden: !preferences.holiday_show_public },
-              control: `<input class="settings-color-button" type="color" id="holiday-public-color" value="${esc(preferences.holiday_public_color)}">`,
+              control: colorPickerHtml({ id: 'holiday-public-color', value: preferences.holiday_public_color, labelledBy: 'holiday-public-color-label' }),
             })}
             ${settingSwitchRowHtml({
               label: t('settings.holidaySchoolLabel'),
@@ -163,9 +164,9 @@ function renderPage(container, preferences) {
               extra: `<p class="form-hint" id="holiday-school-unavailable-hint" hidden>${t('settings.holidaySchoolUnavailable')}</p>`,
             })}
             ${settingRowHtml({
-              label: t('settings.holidaySchoolColor'), labelFor: 'holiday-school-color',
+              label: t('settings.holidaySchoolColor'), labelId: 'holiday-school-color-label', stacked: true,
               attrs: { id: 'holiday-school-color-group', hidden: !preferences.holiday_show_school },
-              control: `<input class="settings-color-button" type="color" id="holiday-school-color" value="${esc(preferences.holiday_school_color)}">`,
+              control: colorPickerHtml({ id: 'holiday-school-color', value: preferences.holiday_school_color, labelledBy: 'holiday-school-color-label' }),
             })}
           </div>
           <div id="holidays-form-error" class="form-error" role="alert" hidden></div>
@@ -642,6 +643,7 @@ async function bindEvents(container, preferences) {
   });
 
   const form = container.querySelector('#holidays-form');
+  wireColorPicker(form);
   const countrySelect = container.querySelector('#holiday-country');
   const subdivisionSelect = container.querySelector('#holiday-subdivision');
   const groupSelect = container.querySelector('#holiday-group');

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#F5F3ED" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)">
   <meta name="color-scheme" content="light dark">
-  <title>Keine Verbindung - Yuvomi</title>
+  <title>Verbindung unterbrochen - Yuvomi</title>
   <!-- Dieselbe Theme-Entscheidung wie in der App: der gespeicherte Wunsch
        (`yuvomi-theme`) schlaegt die Systemeinstellung und setzt `data-theme` auf
        <html>. Das Skript ist dasselbe, das index.html im Kopf laedt, und es
@@ -30,6 +30,14 @@
      * damit aus wie eine fremde Seite - ausgerechnet in dem Moment, in dem ein
      * Nutzer wissen will, ob er noch in seiner App ist.
      *
+     * DIE BUEHNE DER ZUGANGSSEITEN (Critique R24, G6-Rand-P3-1). Bis R24 eine
+     * eigene Karte (Radius 12 mit Haarlinie, graues wifi-off, "Keine
+     * Verbindung") - der zweite Offline-Zustand der App neben `page-unreachable`
+     * ("Verbindung unterbrochen"). Jetzt dieselbe Form wie /join und
+     * /reset-password (styles/auth.css): Marken-Lichtfeld auf dem Grund, eine
+     * Glastafel mit Lichtkante, darin die Bildmarke als Absender, der Titel
+     * der App fuer diesen Zustand und EIN Knopf.
+     *
      * Wer hier etwas aendert, aendert es in tokens.css mit (und umgekehrt).
      * Die Werte stehen als Literale, weil es keine zweite Quelle gibt, die
      * dieses Dokument erreichen koennte. */
@@ -39,21 +47,34 @@
       /* Farben - Light (tokens.css :root) */
       --color-bg:             #F5F3ED;  /* --neutral-100 */
       --color-surface:        #FFFFFF;
-      --color-border:         #E4E0D7;  /* --neutral-200 */
       --color-text:           #1D1B17;  /* --neutral-900 */
       --color-text-secondary: #63615B;  /* --neutral-600, 6.19:1 auf weiss */
       --color-accent:         #6C3AED;
       --color-ink-on-vivid:   #FFFFFF;
 
-      /* Form */
-      --radius: 12px;                   /* --radius-md */
+      /* Die Bildmarke kippt nicht mit dem Theme (utils/brand-mark.js). */
+      --brand-mark-from:      #8B5CF6;
+      --brand-mark-to:        #6C3AED;
+      --brand-mark-ink:       #FFFFFF;
 
-      /* Typografie - die SEMANTISCHEN Rollen der App, nicht drei Groessenstufen.
-       * Title 1 fuer den Zustand, Subheadline fuer die Erklaerung, Body fuer die
-       * Aktion: 28/15/17px, Verhaeltnis 1.87:1 (Audit 2026-08-08, P3-4). */
-      --type-title:     1.75rem;    /* 28px - Title 1  (= --text-3xl) */
-      --type-body:      1.0625rem;  /* 17px - Body     (= --type-body) */
-      --type-secondary: 0.9375rem;  /* 15px - Subheadline */
+      /* Lichtfeld und Glastafel (tokens.css --brand-field, --glass-*). */
+      --brand-field-opacity:  0.20;
+      --glass-bg-elevated:    rgba(251, 250, 247, 0.86);
+      --glass-border:         rgba(255, 255, 255, 0.65);
+      --glass-inset-elevated: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      --glass-shadow-lg:      0 10px 44px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.45);
+      --shadow-md:            0 2px 10px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+
+      /* Form */
+      --radius-xl: 26px;                /* schwebende Flaeche */
+
+      /* Typografie - die Rollen der Kartenseiten (auth.css): Absender 20/600
+       * (--type-section-title), Titel 22/700 (--type-toolbar-title), Satz 15
+       * (Subheadline), Knopf 17 (Body). */
+      --type-sender:    1.25rem;    /* 20px */
+      --type-title:     1.375rem;   /* 22px */
+      --type-body:      1.0625rem;  /* 17px */
+      --type-secondary: 0.9375rem;  /* 15px */
       --line-height-tight: 1.21;
       --line-height-base:  1.47;
       --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
@@ -68,7 +89,6 @@
         color-scheme: dark;
         --color-bg:             #191816;
         --color-surface:        #2B2825;
-        --color-border:         #47423B;
         --color-text:           #F5F3ED;
         --color-text-secondary: #B4AEA5;
         /* Spiegelt --_color-accent aus tokens.css. Hier traegt der Wert nur
@@ -77,71 +97,149 @@
          * nennt, gilt fuer diese Datei nicht - sie hat keine. */
         --color-accent:         #A78BFA;
         --color-ink-on-vivid:   #191816;
+        --brand-field-opacity:  0.26;
+        --glass-bg-elevated:    rgba(45, 42, 39, 0.88);
+        --glass-border:         rgba(255, 255, 255, 0.12);
+        --glass-shadow-lg:      0 10px 44px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.05);
+        --shadow-md:            0 4px 14px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(255, 255, 255, 0.06);
       }
     }
     :root[data-theme="dark"] {
       color-scheme: dark;
       --color-bg:             #191816;
       --color-surface:        #2B2825;
-      --color-border:         #47423B;
       --color-text:           #F5F3ED;
       --color-text-secondary: #B4AEA5;
       --color-accent:         #A78BFA;
       --color-ink-on-vivid:   #191816;
+      --brand-field-opacity:  0.26;
+      --glass-bg-elevated:    rgba(45, 42, 39, 0.88);
+      --glass-border:         rgba(255, 255, 255, 0.12);
+      --glass-shadow-lg:      0 10px 44px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      --shadow-md:            0 4px 14px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    /* Wer Transparenz oder mehr Kontrast verlangt, bekommt die opake Tafel
+     * ohne Feld - dieselbe Weiche wie tokens.css. */
+    @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+      :root {
+        --brand-field-opacity: 0;
+        --glass-bg-elevated:   var(--color-surface);
+      }
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      height: 100%;
-      background: var(--color-bg);
+      min-height: 100%;
+      background-color: var(--color-bg);
       color: var(--color-text);
       font-family: var(--font-sans);
     }
+    /* Das Marken-Lichtfeld (tokens.css --brand-field): drei stehende, weiche
+     * Kreise in den Farben der Bildmarke um die Mitte. Gespiegelt mit sechs
+     * statt elf Stuetzstellen - dieselbe Kurve, kuerzer notiert. */
     body {
+      min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
+      padding: 16px;
+      background-image:
+        radial-gradient(circle 24rem at calc(50% - 13rem) calc(50% - 12rem),
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 100%), transparent) 0%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 90%), transparent) 20%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 65%), transparent) 40%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 35%), transparent) 60%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 10%), transparent) 80%,
+          transparent 100%),
+        radial-gradient(circle 22rem at calc(50% + 15rem) calc(50% - 1rem),
+          color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 100%), transparent) 0%,
+          color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 90%), transparent) 20%,
+          color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 65%), transparent) 40%,
+          color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 35%), transparent) 60%,
+          color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 10%), transparent) 80%,
+          transparent 100%),
+        radial-gradient(circle 23rem at calc(50% - 1rem) calc(50% + 17rem),
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 80%), transparent) 0%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 72%), transparent) 20%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 52%), transparent) 40%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 28%), transparent) 60%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 8%), transparent) 80%,
+          transparent 100%);
+      background-repeat: no-repeat;
+      background-attachment: fixed;
     }
-    .card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      padding: 40px 32px;
-      max-width: 360px;
-      width: 100%;
+
+    /* Die Glastafel (auth.css `.auth-page`): 380px Formularbreite plus Polster,
+     * `margin: auto` stellt sie in die Mitte und klemmt nicht, wenn das
+     * Fenster niedriger ist als sie. Der opake Rueckfall steht ausserhalb von
+     * @supports (Fallback-Regel in DESIGN.md). */
+    .stage {
+      margin: auto;
+      inline-size: min(100%, 412px);
+      padding: 32px 16px 16px;
       text-align: center;
+      background-color: var(--color-surface);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--glass-inset-elevated), var(--glass-shadow-lg);
     }
-    .icon {
-      width: 64px;
-      height: 64px;
-      margin: 0 auto 24px;
-      color: var(--color-text-secondary);
+    @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+      .stage {
+        background-color: var(--glass-bg-elevated);
+        backdrop-filter: blur(32px) saturate(200%);
+        -webkit-backdrop-filter: blur(32px) saturate(200%);
+      }
     }
+
+    /* Der Absender: Bildmarke und Name, eine Stufe leiser als auf /login -
+     * wie auf /join (`.auth-hero--compact`). */
+    .sender {
+      margin-bottom: 24px;
+    }
+    .mark {
+      display: block;
+      inline-size: 48px;
+      block-size: 48px;
+      margin: 0 auto 8px;
+      border-radius: 22.5%;
+      box-shadow: var(--shadow-md);
+    }
+    .mark__from { stop-color: var(--brand-mark-from); }
+    .mark__to   { stop-color: var(--brand-mark-to); }
+    .mark__circles { fill: var(--brand-mark-ink); fill-opacity: 0.82; }
+    .sender__name {
+      font-size: var(--type-sender);
+      font-weight: 600;
+      line-height: var(--line-height-tight);
+      color: var(--color-text);
+      margin: 0;
+    }
+
+    /* Titel wie `.auth-card__title`: Title 2, fett, Label-Farbe. */
     h1 {
       font-size: var(--type-title);
       line-height: var(--line-height-tight);
-      font-weight: 600;
+      font-weight: 700;
       margin-bottom: 8px;
-      /* 28px auf einer 296px breiten Textspalte: „Keine Verbindung" passt in
-       * einer Zeile, laengere Uebersetzungen brechen sauber statt zu ueberlaufen. */
       text-wrap: balance;
     }
     p {
       font-size: var(--type-secondary);
       color: var(--color-text-secondary);
       line-height: var(--line-height-base);
-      margin-bottom: 28px;
+      margin-bottom: 24px;
+      text-wrap: pretty;
     }
-    /* Die Kapsel - EINE Buttonform, app-weit (DESIGN.md, Guard Sonde 3).
-     * Vorher trug der Knopf --radius-md und war damit die einzige Stelle der
-     * App mit einer eigenen Buttonform. */
+    /* Die Kapsel - EINE Buttonform, app-weit (DESIGN.md, Guard Sonde 3), so
+     * breit wie die Tafel wie `.auth-form__submit`. */
     .retry {
-      display: inline-flex;
+      display: flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
+      inline-size: 100%;
       /* 44px Mindesthoehe: die Seite erscheint fast immer auf dem Telefon, und
-       * der Knopf ist ihr einziges Ziel. 10px Polsterung ergaben 39px. */
+       * der Knopf ist ihr einziges Ziel. */
       min-height: 44px;
       padding: 10px 24px;
       background: var(--color-accent);
@@ -166,21 +264,33 @@
   </style>
 </head>
 <body>
-  <!-- `main` statt `div`: die Karte IST der Inhalt dieser Seite. offline.html
+  <!-- `main` statt `div`: die Tafel IST der Inhalt dieser Seite. offline.html
        war die einzige der sechs anonymen Seiten ohne Landmarke - ohne sie
        findet ein Screenreader keinen Einstieg und muss von oben durchlaufen
        (Audit 2026-08-08, P3-4). -->
-  <main class="card">
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-      <line x1="1" y1="1" x2="23" y2="23"/>
-      <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
-      <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
-      <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
-      <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
-      <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
-      <line x1="12" y1="20" x2="12.01" y2="20"/>
-    </svg>
-    <h1>Keine Verbindung</h1>
+  <main class="stage">
+    <div class="sender">
+      <!-- Die Bildmarke (utils/brand-mark.js, docs/logo.svg): Verlauf, Radius
+           36 auf 160, drei Kreise. Dekorativ - der Name steht daneben. -->
+      <svg class="mark" viewBox="0 0 160 160" fill="none" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="offline-mark" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse">
+            <stop class="mark__from" offset="0%"/>
+            <stop class="mark__to" offset="100%"/>
+          </linearGradient>
+        </defs>
+        <rect width="160" height="160" rx="36" fill="url(#offline-mark)"/>
+        <g class="mark__circles">
+          <circle cx="64" cy="72" r="27"/>
+          <circle cx="100" cy="78" r="25"/>
+          <circle cx="80" cy="106" r="24"/>
+        </g>
+      </svg>
+      <p class="sender__name">Yuvomi</p>
+    </div>
+    <!-- Derselbe Titel wie der Zustand in der App (`page-unreachable`,
+         common.sessionUnreachableTitle): ein Zustand, ein Wort dafuer. -->
+    <h1>Verbindung unterbrochen</h1>
     <!-- R23 S10 (clarify): Yuvomi laeuft zu Hause, nicht im Internet - der Satz
          nennt beide Ursachen, die es sein koennen (wie login.networkError). -->
     <p>Yuvomi ist gerade nicht erreichbar. Prüfe, ob dein Gerät im Netz ist und der Server läuft, und versuche es erneut.</p>

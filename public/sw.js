@@ -13,13 +13,15 @@
  *        bei SW-Update geleert
  *   API: Network-First für eine Read-only-GET-Whitelist (Kalender, Tasks, …)
  *        → offline letzter Stand sichtbar; Mutationen/Auth immer direkt ans Netz.
+ *        Ausnahme: reduzierte Abzuege von /auth/me und /preferences fuer den
+ *        Kaltstart ohne Verbindung (API_SNAPSHOTS, #2293).
  *        Cache wird bei Logout/Session-Ende geleert (CLEAR_API_CACHE-Message).
  *
  * Nach SW-Update: alle Requests gehen einmalig cache-bypassed ans Netz
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const APP_RELEASE        = '2.81.0';
+const APP_RELEASE        = '2.82.0';
 const APP_BUILD_REVISION = '__YUVOMI_BUILD_REVISION__';
 const CACHE_RELEASE      = `${APP_RELEASE}-${APP_BUILD_REVISION}`;
 const SHELL_CACHE        = `yuvomi-shell-${CACHE_RELEASE}`;
@@ -40,6 +42,210 @@ const ALL_CACHES    = [SHELL_CACHE, PAGES_CACHE, LOCALES_CACHE, ASSETS_CACHE];
 const API_CACHE_WHITELIST = ['/calendar', '/tasks', '/shopping', '/contacts', '/dashboard', '/people'];
 // Pfade UNTER einem Whitelist-Prefix, die trotzdem nie gecacht werden.
 const API_CACHE_EXCLUDE = ['/shopping/versions'];
+
+// KALTSTART OHNE VERBINDUNG (#2293). Ohne Sitzung zeigt der Router keine
+// Seite, und `/auth/me` stand nie im Cache: eine geschlossene App, offline
+// geoeffnet, landete deshalb beim "Server nicht erreichbar" statt auf den
+// gespeicherten Listen. Zwei Antworten liegen deshalb als ABZUG im API-Cache,
+// genau gleich lang wie die Listen (ein Loeschpfad: Abmelden, Sitzungsende,
+// Update) und nur mit dem, was die Shell zum Zeichnen braucht:
+//   /auth/me      Konto ohne Kontaktdaten, Rechte, Haushalt - NIE das
+//                 CSRF-Token und keine Kopfzeile der Antwort (kein Set-Cookie).
+//                 Fuer normale Sitzungen; ein Wanddisplay bekommt einen
+//                 eigenen, noch engeren Abzug (DISPLAY_SNAPSHOT_*), ein
+//                 Split-Gast keinen, ein vorhandener wird geloescht.
+//   /preferences  Modulreihenfolge, abgeschaltete Module, Zone, Formate und
+//                 die Anordnung der Uebersicht.
+// Der Abzug traegt `offlineSnapshot: true`. Er wird nur bei einem Netzfehler
+// ausgeliefert (Network-First), und der Router liest daran, dass die Sitzung
+// NICHT geprueft ist. Eine 401 loescht ihn.
+//
+// DER ABZUG ENDET MIT DER SITZUNG. `/auth/me` nennt `sessionExpiresAt`, den
+// Ablauf des Session-Cookies (server/auth.js); der Worker legt ihn neben die
+// Antworten (SESSION_EXPIRY_KEY). Ist er vorbei, liefert ein Netzfehler weder
+// den Abzug noch die Listen, und der API-Cache wird geloescht - ein Geraet mit
+// abgelaufener oder widerrufener Sitzung zeigt den Haushalt nicht beliebig
+// lange. Ohne Ablauf vom Server gibt es keinen Abzug.
+const SESSION_SNAPSHOT_SCOPES = ['family', 'display'];
+const SESSION_SNAPSHOT_USER_FIELDS = [
+  'id', 'username', 'display_name', 'avatar_color', 'avatar_data', 'role', 'family_role',
+  'access_scope', 'onboarding_version', 'changelog_seen_version', 'changelog_seen_latest',
+  'sort_order', 'is_household_member',
+];
+const SESSION_SNAPSHOT_FIELDS = ['permissions', 'householdSize', 'initialsRoster', 'othersCanRead'];
+const PREFERENCES_SNAPSHOT_FIELDS = [
+  'disabled_modules', 'hidden_modules', 'module_order', 'mobile_nav_order',
+  'timezone', 'date_format', 'time_format', 'region', 'currency', 'app_name',
+  // Die Uebersicht baut aus ihnen ihre Abfrage; ohne sie fragte sie offline
+  // die Standardansicht an, die nie im Cache lag.
+  'dashboard_widgets', 'dashboard_widgets_default', 'dashboard_follows_default',
+  'dashboard_today_glance', 'dashboard_today_glance_default',
+];
+
+function pickFields(source, fields) {
+  const out = {};
+  for (const field of fields) {
+    if (Object.prototype.hasOwnProperty.call(source, field)) out[field] = source[field];
+  }
+  return out;
+}
+
+function sessionExpiryOf(body) {
+  const value = body && body.sessionExpiresAt;
+  return Number.isFinite(value) ? value : null;
+}
+
+// WANDDISPLAY: EIN EIGENER ABZUG FUER DEN KALTSTART (Folge von #2342). Ohne ihn
+// startete ein Tablett, das ohne Netz neu hochfaehrt, bei "Server nicht
+// erreichbar", obwohl seine Listen im Cache lagen. Die Allowlist ist am Code
+// gemessen, nicht geraten: die Shell liest Name, Farbe und Bild fuer die
+// Kontozeile (router.js `syncSidebarAccount`), der Router `id`, `role` und
+// `access_scope`, `permissions` steuern Leiste und Kacheln, `householdSize`
+// die Avatar-Marken. Das Bild bleibt weg (die Kontozeile faellt auf die
+// Initialen zurueck), ebenso der Anmeldename, `initialsRoster` (die Namen des
+// Haushalts) und `othersCanRead` (nur fuer Formulare, ein Display hat keine).
+// Zone, Formate und App-Name kommen aus dem `/preferences`-Abzug. Die Frist ist
+// dieselbe gleitende wie fuer die Listen (72 h, server/services/display-accounts.js).
+const DISPLAY_SNAPSHOT_USER_FIELDS = ['id', 'display_name', 'avatar_color', 'role', 'access_scope'];
+const DISPLAY_SNAPSHOT_FIELDS = ['permissions', 'householdSize'];
+
+const SNAPSHOT_ALLOWLISTS = {
+  family: [SESSION_SNAPSHOT_USER_FIELDS, SESSION_SNAPSHOT_FIELDS],
+  display: [DISPLAY_SNAPSHOT_USER_FIELDS, DISPLAY_SNAPSHOT_FIELDS],
+};
+
+function reduceSessionSnapshot(body) {
+  const user = body && typeof body.user === 'object' ? body.user : null;
+  if (!user || !SESSION_SNAPSHOT_SCOPES.includes(user.access_scope)) return null;
+  const expiresAt = sessionExpiryOf(body);
+  if (expiresAt === null || expiresAt <= Date.now()) return null;
+  const [userFields, fields] = SNAPSHOT_ALLOWLISTS[user.access_scope];
+  return {
+    user: pickFields(user, userFields),
+    ...pickFields(body, fields),
+    expiresAt,
+    offlineSnapshot: true,
+  };
+}
+
+function reducePreferencesSnapshot(body) {
+  const data = body && typeof body.data === 'object' && body.data ? body.data : null;
+  if (!data) return null;
+  return { data: pickFields(data, PREFERENCES_SNAPSHOT_FIELDS), offlineSnapshot: true };
+}
+
+const API_SNAPSHOTS = {
+  '/auth/me': reduceSessionSnapshot,
+  '/preferences': reducePreferencesSnapshot,
+};
+
+// Ablauf der Sitzung, deren Antworten im API-Cache liegen. Eigener Eintrag,
+// weil er fuer jede Sitzung gilt, auch die ohne Abzug (Display, Split-Gast).
+const SESSION_EXPIRY_KEY = `${self.location.origin}/api/v1/__offline/session-expires-at`;
+
+// WANDDISPLAY: DIE FRIST GLEITET (Folge von #2293). Ein Display hat keine
+// Anmeldesitzung; der Server nennt ihm jetzt + 72 Stunden - in `/auth/me` als
+// `sessionExpiresAt` und an JEDER Antwort in dieser Kopfzeile
+// (server/services/display-accounts.js, DISPLAY_OFFLINE_GRACE_MS). Eine Liste,
+// die mit ihr ankommt, rueckt den Marker vor, sonst liefe die Frist ab dem
+// letzten `/auth/me` statt ab dem letzten Kontakt. Familiensitzungen bekommen
+// die Kopfzeile nie; fuer sie bleibt es beim Ablauf aus `/auth/me`.
+const OFFLINE_EXPIRES_HEADER = 'x-offline-expires-at';
+
+// GENERATION DES API-CACHES (#2293, Sicherheitsbefund). Jedes Loeschen zaehlt
+// hoch. Ein Schreibpfad merkt sich die Generation VOR seinem fetch() und
+// schreibt nur, wenn sie unmittelbar vor `cache.put` noch dieselbe ist: eine
+// Antwort, die noch unter Person A unterwegs war, als abgemeldet wurde, landet
+// sonst im frischen Cache von Person B - mit Bs gueltigem Sitzungsablauf daneben.
+let _cacheGeneration = 0;
+
+function deleteApiCache() {
+  _cacheGeneration += 1;
+  return caches.delete(API_CACHE);
+}
+
+async function rememberSessionExpiry(cache, body, generation) {
+  if (generation !== _cacheGeneration) return false;
+  const expiresAt = sessionExpiryOf(body);
+  // Kein Ablauf vom Server: keine Grenze, also kein gespeicherter Stand -
+  // der ganze API-Cache geht, nicht nur der Marker (fail-closed).
+  if (expiresAt === null || expiresAt <= Date.now()) {
+    await deleteApiCache();
+    return false;
+  }
+  if (generation !== _cacheGeneration) return false;
+  await cache.put(SESSION_EXPIRY_KEY, new Response(JSON.stringify({ expiresAt }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  }));
+  return true;
+}
+
+/**
+ * Rueckt den Marker auf die Frist aus der Kopfzeile einer Netzantwort vor.
+ * Nur neben einem schon gueltigen Marker (der Aufrufer hat
+ * `ensureSessionExpiry` bestanden) und nur mit einer Zahl in der Zukunft:
+ * fehlt die Kopfzeile oder taugt sie nicht, bleibt der Marker, wie er ist.
+ */
+async function extendSessionExpiry(response, generation) {
+  const raw = response.headers.get(OFFLINE_EXPIRES_HEADER);
+  if (raw === null || !/^\d+$/.test(raw)) return;
+  const expiresAt = Number(raw);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return;
+  if (generation !== _cacheGeneration) return;
+  await rememberSessionExpiry(await caches.open(API_CACHE), { sessionExpiresAt: expiresAt }, generation);
+}
+
+/** Steht im API-Cache ein lesbarer, noch nicht abgelaufener Sitzungsablauf? */
+async function hasValidSessionExpiry() {
+  try {
+    if (!(await caches.has(API_CACHE))) return false;
+    const marker = await (await caches.open(API_CACHE)).match(SESSION_EXPIRY_KEY);
+    if (!marker) return false;
+    const { expiresAt } = await marker.json();
+    return Number.isFinite(expiresAt) && expiresAt > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * FAIL-CLOSED: der API-Cache wird nur ausgeliefert, solange ein lesbarer
+ * Sitzungsablauf in ihm steht und noch nicht erreicht ist. Fehlt der Marker
+ * (Listen von vor diesem Update), ist er unlesbar, ungueltig oder vorbei, ist
+ * der Cache jetzt geloescht, und der Aufrufer liefert nichts aus ihm. Folge
+ * fuer Bestandsgeraete: einmal kein Offline-Stand bis zum naechsten Abruf mit
+ * Verbindung.
+ */
+async function dropApiCacheIfSessionExpired() {
+  if (await hasValidSessionExpiry()) return false;
+  await deleteApiCache().catch(() => false);
+  return true;
+}
+
+/** Der gespeicherte Stand zu einem Abruf - ohne den Cache dafuer neu anzulegen. */
+async function cachedApiResponse(request) {
+  try {
+    if (!(await caches.has(API_CACHE))) return null;
+    return (await (await caches.open(API_CACHE)).match(request)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function offlineResponse() {
+  return new Response(JSON.stringify({ error: 'offline' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
+}
+
+/** Der Abzug-Reduzierer zu einem API-Pfad (exakter Pfad, keine Unterpfade), sonst null. */
+function apiSnapshotReducer(pathname) {
+  if (!pathname.startsWith('/api/v1/')) return null;
+  const rest = pathname.slice('/api/v1'.length);
+  return Object.prototype.hasOwnProperty.call(API_SNAPSHOTS, rest) ? API_SNAPSHOTS[rest] : null;
+}
 
 // App-Shell: sofort benötigt für ersten Render
 const APP_SHELL = [
@@ -159,6 +365,10 @@ const APP_SHELL = [
   '/utils/list-motion.js',
   '/utils/component-style.js',
   '/utils/content-swap.js',
+  '/utils/color-picker.js',
+  '/utils/interval-sentence.js',
+  '/utils/hint-fold.js',
+  '/utils/media-picker.js',
   '/utils/filter-sheet.js',
   '/utils/folder-upload.js',
   '/utils/folder-tree.js',
@@ -216,6 +426,7 @@ const APP_SHELL = [
   '/utils/note-category-name.js',
   '/utils/note-category-overflow.js',
   '/utils/note-category-picker.js',
+  '/utils/offline-session.js',
   '/utils/overlay-history.js',
   '/utils/overlay-host.js',
   '/utils/dialog-surface.js',
@@ -246,8 +457,10 @@ const APP_SHELL = [
   '/utils/roving-toolbar.js',
   '/utils/row-action.js',
   '/utils/row-fill.js',
+  '/utils/scale-quantity.js',
   '/utils/schedule-tabs.js',
   '/utils/schedule-reminder-offset.js',
+  '/utils/servings-stepper.js',
   '/utils/screensaver-idle.js',
   '/utils/scroll-restore.js',
   '/utils/seal-pair.js',
@@ -269,11 +482,13 @@ const APP_SHELL = [
   '/utils/reload-after-save.js',
   '/utils/background-inert.js',
   '/utils/today-sheet.js',
+  '/utils/today-timeline.js',
   '/utils/shift-label.js',
   '/utils/time-grid.js',
   '/utils/unknown-route.js',
   '/utils/page-mount.js',
   '/utils/ux.js',
+  '/utils/sidebar-glide.js',
   '/utils/vcard.js',
   '/utils/view-transition.js',
   '/utils/version.js',
@@ -409,6 +624,7 @@ const PAGE_MODULES = [
   '/settings/region-presets.js',
   '/settings/weather-location.js',
   '/settings/family-users.js',
+  '/settings/assignee-menu.js',
   '/settings/module-install-errors.js',
   '/settings/pages/personal-account.js',
   '/settings/pages/personal-schedule.js',
@@ -556,13 +772,19 @@ self.addEventListener('fetch', (event) => {
   // API-Requests: nur GET-Whitelist read-only offline-cachen. Alles andere
   // (Mutationen, /auth/*, Nicht-Whitelist) unangetastet ans Netz durchreichen.
   if (url.pathname.startsWith('/api/')) {
-    if (request.method === 'GET' && isCacheableApiGet(url.pathname)) {
+    const snapshotReducer = request.method === 'GET' ? apiSnapshotReducer(url.pathname) : null;
+    if (request.method === 'GET' && (snapshotReducer || isCacheableApiGet(url.pathname))) {
+      // Die Generation des API-Caches beim EINGANG des Abrufs (#2293): bis die
+      // Strategie unten laeuft, kann schon abgemeldet worden sein.
+      const generation = _cacheGeneration;
       event.respondWith(
         (_bypassInitDone ? Promise.resolve() : _bypassInit).then(() => {
           // Im Bypass-Fenster (nach SW-Update) API-Requests nicht anfassen:
           // frisch ans Netz, weder aus Cache bedienen noch hineinschreiben.
           if (Date.now() < bypassCacheUntil) return fetch(request);
-          return networkFirstApi(request, event);
+          return snapshotReducer
+            ? networkFirstSnapshot(request, snapshotReducer, generation)
+            : networkFirstApi(request, event, generation);
         })
       );
     }
@@ -787,18 +1009,18 @@ function avatarPathsIn(value, found = new Set()) {
  * @param {string} baseUrl Adresse der Liste, gegen die die Pfade aufgeloest werden
  * @param {string} text Rumpf der Liste
  */
-async function precacheAvatars(baseUrl, text) {
+async function precacheAvatars(baseUrl, text, generation) {
   let body;
   try { body = JSON.parse(text); } catch { return; }
   const paths = [...avatarPathsIn(body)];
-  if (!paths.length) return;
+  if (!paths.length || !(await ensureSessionExpiry(generation))) return;
   const cache = await caches.open(API_CACHE);
   await Promise.all(paths.map(async (path) => {
     const url = new URL(path, baseUrl).href;
     if (await cache.match(url)) return;
     try {
       const res = await fetch(url, { credentials: 'same-origin' });
-      if (res.ok && res.type === 'basic') await cache.put(url, res);
+      if (res.ok && res.type === 'basic' && generation === _cacheGeneration) await cache.put(url, res);
     } catch {
       // Offline oder abgewiesen: beim naechsten Laden der Liste wieder.
     }
@@ -808,18 +1030,24 @@ async function precacheAvatars(baseUrl, text) {
 // --------------------------------------------------------
 // Strategie: Network-First für GET-API (Read-only-Offline)
 // Erfolg → Antwort klonen, x-cached-at-Header ergänzen, in API_CACHE legen.
-// Netzfehler → Cache-Fallback, sonst 503-JSON {error:'offline'}.
+// Netzfehler → Cache-Fallback, sonst 503-JSON {error:'offline'}; nach dem
+//          Sitzungsablauf (#2293) kein Fallback, der API-Cache geht weg.
 // --------------------------------------------------------
-async function networkFirstApi(request, event) {
+async function networkFirstApi(request, event, generation = _cacheGeneration) {
   try {
     const response = await fetch(request);
-    // Nur erfolgreiche, gleichoriginäre (basic) Antworten cachen.
-    if (response.ok && response.type === 'basic') {
-      const cache   = await caches.open(API_CACHE);
+    // Nur erfolgreiche, gleichoriginäre (basic) Antworten cachen - und nur
+    // neben einem gueltigen Sitzungsablauf (#2293): ohne ihn entstuende ein
+    // Eintrag, den der Offline-Pfad ohnehin nie mehr ausliefert.
+    if (response.ok && response.type === 'basic' && await ensureSessionExpiry(generation)) {
+      await extendSessionExpiry(response, generation);
       const cloned  = response.clone();
       const headers = new Headers(cloned.headers);
       headers.set('x-cached-at', String(Date.now()));
       const body = await cloned.blob();
+      // Unmittelbar vor dem Schreiben: noch dieselbe Generation?
+      if (generation !== _cacheGeneration) return response;
+      const cache = await caches.open(API_CACHE);
       await cache.put(request, new Response(body, {
         status: cloned.status,
         statusText: cloned.statusText,
@@ -831,19 +1059,14 @@ async function networkFirstApi(request, event) {
       // schon: `waitUntil` haelt den Worker am Leben, bis die Bilder im Cache
       // liegen - sonst darf der Browser ihn nach der Antwort beenden.
       if (!AVATAR_PATH_RE.test(new URL(request.url).pathname)) {
-        const prefetch = response.clone().text().then((text) => precacheAvatars(request.url, text)).catch(() => {});
+        const prefetch = response.clone().text().then((text) => precacheAvatars(request.url, text, generation)).catch(() => {});
         if (event && typeof event.waitUntil === 'function') event.waitUntil(prefetch);
       }
     }
     return response;
   } catch {
-    const cache  = await caches.open(API_CACHE);
-    const cached = await cache.match(request);
-    if (cached) return cached;
-    return new Response(JSON.stringify({ error: 'offline' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    });
+    if (await dropApiCacheIfSessionExpired()) return offlineResponse();
+    return (await cachedApiResponse(request)) || offlineResponse();
   }
 }
 
@@ -894,6 +1117,84 @@ function isMutableAppResource(pathname) {
     || /\.(css|js|json|html)$/i.test(pathname);
 }
 
+// --------------------------------------------------------
+// Strategie: Network-First fuer die Abzuege (#2293, API_SNAPSHOTS oben)
+// Erfolg → nur der reduzierte Abzug in API_CACHE, die Netzantwort unveraendert
+//          an die Seite. Kein Abzug (Display, Split-Gast) oder 401 → Eintrag weg.
+// Netzfehler → Abzug, sonst 503-JSON {error:'offline'} wie networkFirstApi;
+//          nach dem Sitzungsablauf keins von beiden (dropApiCacheIfSessionExpired).
+// --------------------------------------------------------
+async function networkFirstSnapshot(request, reduce, generation = _cacheGeneration) {
+  let response;
+  try {
+    response = await fetch(request);
+  } catch {
+    if (await dropApiCacheIfSessionExpired()) return offlineResponse();
+    return (await cachedApiResponse(request)) || offlineResponse();
+  }
+  await storeSnapshot(request, response, reduce, generation);
+  return response;
+}
+
+/**
+ * Legt den Abzug einer Netzantwort ab (oder raeumt ihn weg). Wirft nie.
+ * `generation` ist die des API-Caches vor dem fetch(); hat er sich seitdem
+ * geaendert, wird nichts geschrieben.
+ */
+async function storeSnapshot(request, response, reduce, generation) {
+  try {
+    if (generation !== _cacheGeneration) return;
+    if (response.ok && response.type === 'basic') {
+      const body = await response.clone().json();
+      // `/auth/me` schreibt den Ablauf; jeder andere Abzug nur neben einem gueltigen.
+      const allowed = reduce === reduceSessionSnapshot
+        ? await rememberSessionExpiry(await caches.open(API_CACHE), body, generation)
+        : await ensureSessionExpiry(generation);
+      if (allowed && reduce !== reduceSessionSnapshot) await extendSessionExpiry(response, generation);
+      const snapshot = allowed ? reduce(body) : null;
+      if (snapshot && generation === _cacheGeneration) {
+        await (await caches.open(API_CACHE)).put(request, new Response(JSON.stringify(snapshot), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json; charset=utf-8', 'x-cached-at': String(Date.now()) },
+        }));
+      } else if (!snapshot && await caches.has(API_CACHE)) {
+        await (await caches.open(API_CACHE)).delete(request);
+      }
+    } else if (response.status === 401 && await caches.has(API_CACHE)) {
+      await (await caches.open(API_CACHE)).delete(request);
+    }
+  } catch { /* Speicher voll oder kein JSON: die Antwort geht trotzdem raus */ }
+}
+
+/**
+ * DER WORKER HOLT DEN SITZUNGSABLAUF SELBST, wenn er fehlt (Codex, #2293).
+ * Ohne ihn legt er keine Liste ab - und die Seite fragt `/auth/me` nicht
+ * zuverlaessig vorher: nach einem Update geht die Startabfrage im
+ * Bypass-Fenster am Cache vorbei, beim Start kann `/preferences` vor
+ * `/auth/me` ankommen. Eine Abfrage zur Zeit; schlaegt sie fehl, bleibt es
+ * beim fail-closed.
+ */
+let _sessionProbe = null;
+async function ensureSessionExpiry(generation) {
+  // Eine Antwort aus einer frueheren Generation fragt gar nicht erst nach:
+  // die neue Sitzung gehoert jemand anderem.
+  if (generation !== _cacheGeneration) return false;
+  if (await hasValidSessionExpiry()) return generation === _cacheGeneration;
+  if (!_sessionProbe) {
+    // Die Probe merkt sich IHRE Generation: wird waehrenddessen geleert,
+    // schreibt sie keinen Ablauf in den Cache der naechsten Sitzung.
+    const probeGeneration = _cacheGeneration;
+    _sessionProbe = (async () => {
+      try {
+        const request = new Request(`${self.location.origin}/api/v1/auth/me`, { credentials: 'same-origin' });
+        await storeSnapshot(request, await fetch(request), reduceSessionSnapshot, probeGeneration);
+      } catch { /* offline oder abgewiesen: kein Ablauf, also nichts ablegen */ }
+    })().finally(() => { _sessionProbe = null; });
+  }
+  await _sessionProbe;
+  return generation === _cacheGeneration && hasValidSessionExpiry();
+}
+
 // Prüft, ob ein API-Pfad (inkl. /api/v1-Prefix) zur Read-only-Offline-Whitelist
 // gehört. Query-Strings sind nicht Teil von pathname → reiner Pfad-Prefix-Match.
 function isCacheableApiGet(pathname) {
@@ -936,7 +1237,7 @@ self.addEventListener('message', (event) => {
     // aelteren Aufrufer) bekommt wie bisher nichts zurueck.
     const port = event.ports && event.ports[0];
     event.waitUntil(
-      caches.delete(API_CACHE)
+      deleteApiCache()
         .catch(() => false)
         .then(() => { if (port) port.postMessage({ ok: true }); }),
     );

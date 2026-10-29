@@ -150,8 +150,8 @@ test('Zeitraum-Kopf: zurueck, Wert, vor - dahinter „Aktuell", per .is-current+
   const ids = [...budgetUi.monthNavHtml().matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     ids,
-    ['budget-prev', 'budget-label', 'budget-next', 'budget-today', 'budget-period-note'],
-    'erwartet zurueck, Wert, vor, Reset (und den Kontexttext-Slot)'
+    ['budget-prev', 'budget-label', 'budget-next', 'budget-today', 'budget-range-slot', 'budget-range-trigger', 'budget-range-value', 'budget-range-menu', 'budget-period-note'],
+    'erwartet zurueck, Wert, vor, Reset, die Wahl des Bereichs (R24) und den Kontexttext-Slot'
   );
 
   // (b) Sichtbarkeit: im aktuellen Monat bzw. auf dem heutigen Berichts-Anker
@@ -338,7 +338,10 @@ test('das Modul führt genau eine Zeitachse', () => {
   assert.doesNotMatch(stats, /data-step=/, 'budget-stats.js baut wieder einen zweiten Stepper');
   assert.doesNotMatch(stats, /budget-stats__period/, 'der Zeitraum gehört in den geteilten Kopf');
   assert.match(stats, /view\.anchor = ctx\.anchor/, 'der Anker muss vom Modul kommen');
-  assert.match(stats, /view\.ctx\.onRangeChange\(id\)/, 'die Auflösung muss ans Modul zurückgemeldet werden');
+  // Seit R24 (G4-Budget-P2-5) waehlt der Kopf auch die Aufloesung - das Panel
+  // traegt kein zweites Bedienelement fuer die Zeit mehr.
+  assert.doesNotMatch(stats, /budget-stats__ranges|role="tablist"/, 'kein Segment Woche/Monat/Jahr im Panel');
+  assert.match(budget, /range: state\.range,/, 'die Aufloesung kommt vom Modul');
 });
 
 test('EIN Anlege-Knopf: der FAB traegt Sichtbarkeit, Aktion und Nomen des Tabs (Kanon D3)', () => {
@@ -509,13 +512,17 @@ test('das Touch-Maß der Umschalter kommt aus dem Token, nicht aus der Leiste', 
   assert.match(item[1], /min-height:\s*var\(--target-base\)/);
 });
 
-test('Auflösungs-Umschalter der Berichte trägt echtes Tab-ARIA', () => {
-  const bar = stats.match(/class="[^"]*budget-stats__ranges"[\s\S]*?<\/div>/);
-  assert.ok(bar, 'Auflösungs-Leiste nicht gefunden');
-  assert.match(bar[0], /role="tablist"/);
-  assert.match(bar[0], /aria-label=/);
-  assert.match(stats, /role="tab"[\s\S]{0,140}aria-selected="\$\{on\}"/);
-  assert.match(stats, /tabindex="\$\{on \? '0' : '-1'\}"/);
+test('R24 G4-Budget-P2-5: der Bereich der Statistik ist eine Wahl am Zeitraum im Kopf, ein Menue mit Haken', () => {
+  const nav = budgetUi.monthNavHtml();
+  const label = nav.indexOf('id="budget-label"');
+  const trigger = nav.indexOf('id="budget-range-trigger"');
+  assert.ok(label > 0 && trigger > label, 'die Wahl steht hinter dem Wert des Steppers');
+  assert.match(nav, /<span class="budget-nav__range" id="budget-range-slot" hidden>/, 'verborgen, bis ein Reiter Bereiche hat');
+  assert.match(nav, /popovertarget="budget-range-menu" aria-haspopup="menu" aria-expanded="false"/);
+  assert.equal((nav.match(/role="menuitemradio"/g) ?? []).length, 3, 'Woche, Monat, Jahr');
+  assert.match(nav, /aria-checked="true" class="popover-menu__item" data-stats-range="month"/, 'der Bereich des Moduls ist angehakt');
+  assert.match(budget, /const rangeSlot = _container\.querySelector\('#budget-range-slot'\);\n\s*if \(rangeSlot\) rangeSlot\.hidden = !caps\.range;/, 'nur auf dem Reiter mit Bereichen sichtbar');
+  assert.match(budget, /'reports':\s+\{ month: true,\s+range: true/);
 });
 
 test('Einfachauswahl-Leisten melden ihren Zustand über aria-checked', () => {
@@ -1178,12 +1185,13 @@ test('keine Seite schreibt einen Dezimaltrenner von Hand um', () => {
   assert.match(menge[0], /toDecimalString\(/,
     'die Mengenangabe muss durch dieselbe Umschrift laufen wie der Preis');
 
-  // Dasselbe fuer das Skalieren einer Zutatenmenge (pages/meals.js): es LIEST eine
+  // Dasselbe fuer das Skalieren einer Zutatenmenge (utils/scale-quantity.js, bis
+  // R24 in pages/meals.js - seitdem rechnen Rezept und Mahlzeit damit): es LIEST eine
   // Zahl und SCHREIBT sie wieder, und beide Richtungen haengen an der Region. Die
   // Ausgabe schaute sich den Trenner vorher aus der Eingabe ab (`useComma`) - eine
   // aus Mealie gespiegelte "1.5" blieb damit auch in einer deutschen Oberflaeche
   // eine "1.5". Verhalten in test-meals.js.
-  const rezept = withoutComments(read('../public/pages/meals.js'));
+  const rezept = withoutComments(read('../public/utils/scale-quantity.js'));
   const skalieren = rezept.match(/function scaleQuantityText[\s\S]*?\n\}/);
   assert.ok(skalieren, 'scaleQuantityText nicht gefunden');
   assert.match(skalieren[0], /toDecimalString\(/,
@@ -1271,17 +1279,22 @@ test('gespeicherte Beträge werden beim Öffnen nicht gerundet', () => {
 // in den Stellen der Waehrung, nur mit Nullen aufgefuellt (test:money-utils).
 test('Betragsfelder zeigen den Bestand in den Stellen der Waehrung (200,00 statt 200)', () => {
   const felder = [
-    ['budget.js', budget, 'bm-amount', /amountInputAttrs\(state\.currency, absAmount\)/],
+    ['budget.js', budget, 'bm-amount', /amountInputAttrs\(entryCurrency, absAmount\)/], // #2302: Waehrung des Kontos
     ['budget.js', budget, 'cb-amount', /amountInputAttrs\(currency, absAmount\)/],
-    ['budget.js', budget, 'lm-amount', /amountInputAttrs\(loanCurrency, loan \? loan\.total_amount : ''\)/],
     ['budget-plans.js', plans, 'plan-amount', /amountInputAttrs\(view\.ctx\.currency, value\)/],
-    ['subscriptions.js', subscriptions, 'subscription-amount', /amountInputAttrs\(formCurrency, subscription\?\.amount \?\? ''\)/],
   ];
   for (const [file, src, id, value] of felder) {
     const field = withoutComments(src).match(new RegExp(`<input[^>]*id="${id}"[^>]*>`));
     assert.ok(field, `${file}: #${id} nicht gefunden`);
     assert.match(field[0], value, `${file}: #${id} zeigt den Bestand nicht ueber den Baustein`);
   }
+  // Seit R24 (G4-Budget-P1-1) bauen Darlehen und Umbuchung den Betrag ueber
+  // amountFieldHtml - derselbe Baustein mit dem Zeichen der Waehrung im Feld,
+  // der Bestand laeuft dort durch amountInputAttrs.
+  assert.match(withoutComments(budget), /amountFieldHtml\(\{ id: 'lm-amount', currency: loanCurrency, value: loan \? loan\.total_amount : '' \}\)/);
+  assert.match(withoutComments(subscriptions), /amountFieldHtml\(\{ id: 'subscription-amount', currency: formCurrency, value: subscription\?\.amount \?\? ''/);
+  assert.match(withoutComments(transferDialog), /amountFieldHtml\(\{ id: 'bt-amount', currency: sourceCurrency, value: transfer \? Math\.abs\(transfer\.amount\) : '' \}\)/);
+  assert.match(read('../public/utils/amount-field.js'), /id="\$\{esc\(id\)\}"[^>]*\$\{amountInputAttrs\(currency, value\)\}/);
   const raten = [...withoutComments(housekeeping).matchAll(/<input name="(daily_rate|hourly_rate|extras)"[^>]*>/g)];
   assert.ok(raten.length >= 4, `Raten der Haushaltshilfe nicht gefunden (${raten.length})`);
   for (const [field, name] of raten) assert.match(field, /\$\{amountInputAttrs\(state\.currency, /, `housekeeping.js: ${name} ohne amountInputAttrs`);
@@ -1306,7 +1319,7 @@ test('wählbare Währungen ziehen das Betragsfeld nach', () => {
   for (const [file, src] of [['budget.js', budget], ['subscriptions.js', subscriptions], ['budget-transfer-dialog.js', transferDialog], ['split-expenses.js', splitExpenses]]) {
     assert.match(
       withoutComments(src),
-      /setAmountCurrency\(|amountPlaceholder\(/,
+      /setAmountCurrency\(|setAmountUnit\(|amountPlaceholder\(/,
       `${file}: Währungswechsel im Formular ohne Nachziehen des Betragsfeldes`,
     );
   }
@@ -1589,27 +1602,14 @@ test('Kopf und alle Reiter enden an der Bahn: Kopfmass, Plan, Darlehen und Konte
   assert.match(rule('#budget-plan-body > .budget-plan-savings', wide)?.body ?? '', /grid-column:\s*2/);
   assert.match(rule('#budget-plan-body > .budget-plan__section', wide)?.body ?? '', /grid-column:\s*1/);
 
-  // Darlehen: Filter, Karten und Transaktionen links, Kennzahlen rechts.
-  const loans = rule('.budget-loans', wide);
-  assert.match(loans?.body ?? '', columns, 'die Darlehen stehen auf derselben Zweispalte');
-  assert.match(loans?.body ?? '', /grid-template-rows:[^;]*minmax\(0,\s*1fr\)/,
-    'die letzte Zeile ist flexibel - eine hoehere Seitenleiste zieht die linke Spalte nicht auseinander');
-  const loanMetrics = rule('.budget-loans > .metric-grid', wide);
-  assert.match(loanMetrics?.body ?? '', /grid-column:\s*2/);
-  assert.match(loanMetrics?.body ?? '', /--summary-cards:\s*1/, 'in der Seitenleiste stehen die Kennzahlen untereinander');
-
-  // Konten (R17, E14): das Nettovermoegen steht als Leistenkarte NEBEN den
-  // Konten - dieselbe Zweispalte wie Uebersicht, Plan und Darlehen. Bis dahin
-  // trug EINE Karte die ganze Zeile (981px bei 1280, 1124px bei 1440).
-  const accounts = rule('.budget-accounts', wide);
-  assert.match(accounts?.body ?? '', columns, 'die Konten stehen auf derselben Zweispalte');
-  const net = rule('.budget-accounts > .metric-grid', wide);
-  assert.match(net?.body ?? '', /grid-column:\s*2/, 'das Nettovermoegen steht in der Seitenleiste');
-  assert.match(net?.body ?? '', /grid-row:\s*1/, 'neben den Konten, nicht darueber');
-  assert.match(rule('.budget-accounts > :not(.metric-grid)', wide)?.body ?? '', /grid-column:\s*1;[\s\S]*grid-row:\s*1/,
-    'Konten (oder ihr Leerzustand) nehmen die Hauptspalte');
-  assert.equal(rule('#budget-body .budget-tab-panel--accounts > .metric-grid', flat), undefined,
-    'die Regel „eine Karte traegt die Zeile" ist abgeloest');
+  // Darlehen und Konten (R24, E2): EINE Spalte auf dem Lesemass, die Kennzahl
+  // als Kurzzeile oben - keine Seitenspalte mehr, keine Zweispalten-Regel.
+  for (const sel of ['.budget-loans', '.budget-accounts']) {
+    assert.equal(rule(sel, wide), undefined, `${sel}: keine Zweispalte ab 960px mehr`);
+    assert.match(rule(sel, flat)?.body ?? '', /max-inline-size:\s*var\(--page-measure, var\(--layout-reading\)\)/, `${sel}: auf dem Lesemass`);
+  }
+  assert.equal(rule('.budget-loans > .metric-grid', wide), undefined);
+  assert.equal(rule('.budget-accounts > .metric-grid', wide), undefined);
   // EIN Traeger, flache Zeilen (Sonde 7): die Liste traegt Flaeche und Radius,
   // das Konto keine; getrennt wird ueber `> * + *`, nie ueber `gap`.
   const list = rule('.budget-accounts__list', flat);
@@ -1623,21 +1623,21 @@ test('Kopf und alle Reiter enden an der Bahn: Kopfmass, Plan, Darlehen und Konte
     'keine Fensterabfrage mehr an der Kontenliste - zwei 325px-Karten brachen die Namen mitten im Wort');
 });
 
-test('E14: das Nettovermoegen ist eine Leistenkarte im Konten-Raster, im Markup vor den Konten', () => {
+test('R24 E2 (vorher E14): das Nettovermoegen ist EINE Kurzzeile ueber den Konten, keine Leistenkarte', () => {
   const zuvor = { accounts: budgetUi.state.accounts, netWorth: budgetUi.state.netWorth, show: budgetUi.state.accountsShowArchived };
   try {
     budgetUi.state.accounts = [{ id: 1, name: 'Giro', type: 'checking', current_balance: 100, starting_balance: 0, archived: 0 }];
     budgetUi.state.netWorth = 100;
     const html = budgetUi.renderAccountsPage();
     const wrap = html.indexOf('<div class="budget-accounts">');
-    const rail = html.indexOf('class="metric-grid metric-grid--rail budget-glance-details"');
+    const glance = html.indexOf('budget-glance--everywhere');
     const list = html.indexOf('<div class="budget-accounts__list">');
-    assert.ok(wrap > 0 && rail > wrap && list > rail, 'Huelle > Leistenkarte > Kontenliste (schmal steht die Kennzahl ueber den Konten)');
-    assert.equal(html.match(/class="metric-card /g)?.length, 1, 'EINE Karte, EIN Wert');
-    // Auch der Leerzustand steht in der Zweispalte (Quelltext: emptyStateHTML braucht ein DOM).
+    assert.ok(wrap > 0 && glance > wrap && list > glance, 'Huelle > Kurzzeile > Kontenliste');
+    assert.equal(html.match(/class="budget-glance__value /g)?.length, 1, 'EINE Zahl');
+    assert.doesNotMatch(html, /class="metric-card|metric-grid--rail/, 'keine Leistenkarte mehr');
     const fn = budget.slice(budget.indexOf('function renderAccountsPage()'), budget.indexOf('function wireAccountsPage()'));
     assert.equal(fn.match(/<div class="budget-accounts">/g)?.length, 2, 'beide Zweige (leer und gefuellt) fuehren die Huelle');
-    assert.equal(fn.match(/\$\{rail\}/g)?.length, 2, 'und beide die Leistenkarte');
+    assert.equal(fn.match(/\$\{glance\}/g)?.length, 2, 'und beide die Kurzzeile');
   } finally {
     Object.assign(budgetUi.state, { accounts: zuvor.accounts, netWorth: zuvor.netWorth, accountsShowArchived: zuvor.show });
   }
@@ -1827,14 +1827,14 @@ test('Filterzustand überlebt den Modulwechsel nicht', () => {
   // die Liste der Filter kommt aus dem Zustand selbst: ein neuer Filter, den
   // der Reset nicht kennt, faellt hier auf.
   const dirty = {
-    accountFilterId: 7, responsibleFilterId: 3, responsibleFilterCachedName: 'Clara',
+    accountFilterId: 7, accountFilterFrom: 'accounts', responsibleFilterId: 3, responsibleFilterCachedName: 'Clara',
     loanFilterId: 9, loanStatusFilter: 'paid', accountsShowArchived: true, categoryFilter: 'housing',
     subcategoryFilter: { category: 'housing', key: 'rent_mortgage' }
   };
   const target = { ...dirty, activeTab: 'loans', month: '2026-03', groupByResponsible: true };
   budgetUi.resetSessionFilters(target);
   assert.deepEqual(target, {
-    accountFilterId: null, responsibleFilterId: null, responsibleFilterCachedName: '',
+    accountFilterId: null, accountFilterFrom: null, responsibleFilterId: null, responsibleFilterCachedName: '',
     loanFilterId: null, loanStatusFilter: 'active', accountsShowArchived: false,
     categoryFilter: null, subcategoryFilter: null,
     // Bleibt bewusst: der Reiter, der Monat (render setzt ihn selbst) und die
@@ -3055,7 +3055,7 @@ test('Betraege im Budget-Modul stehen in tabular-nums (benannt und aus dem Marku
     || classesOf(selector).some((cls) => tabular.some((tab) => classesOf(lastCompound(tab)).includes(cls)));
 
   const named = [
-    '.budget-account__balance', '.budget-account__starting', '.subscriptions-chart-row > strong',
+    '.budget-account__balance', '.subscriptions-chart-row > strong',
     '.subscription-card__cost', '.subscriptions-chart__figure strong', '.split-expense__amount',
     '.split-debt strong', '.budget-loan-card__amounts span', '.budget-loans__summary',
     '.budget-stats__readout', '.budget-stats__legend-item', '.metric-card__trend',
@@ -3234,7 +3234,7 @@ test('Buchungsdialog: Betrag zuerst und gross, Seltenes hinter „Weitere Angabe
   assert.ok(pos('id="bm-amount"') < pos('id="bm-title"'), 'der Betrag steht vor dem Titel - und bekommt als erstes Feld den Erstfokus');
   assert.ok(pos('id="bm-title"') < pos('id="bm-category"'));
   assert.ok(pos('id="bm-category"') < pos('id="bm-date"'));
-  assert.match(modal, /class="form-input budget-amount-input" id="bm-amount"\$\{amountInputAttrs\(state\.currency, absAmount\)\}/, 'der Betrag ist der D1-Baustein');
+  assert.match(modal, /class="form-input budget-amount-input" id="bm-amount"\$\{amountInputAttrs\(entryCurrency, absAmount\)\}/, 'der Betrag ist der D1-Baustein');
   const adv = pos('${advancedSection(`');
   for (const rare of ['id="bm-visibility"', 'responsiblePickerHtml(', "budgetToggleHtml('bm-recurring'", 'renderDocumentAttachField(']) {
     assert.ok(pos(rare) > adv, `${rare} gehoert hinter „Weitere Angaben"`);
@@ -3434,7 +3434,12 @@ test('Abo-Zeile: ein abgeschlossenes Abo zeigt keine naechste Zahlung', async ()
   const liveCard = abos.renderCard(active);
   assert.match(liveCard, /data-action="renew"/, 'laufend: der Bezahlt-Knopf bleibt');
   assert.match(liveCard, /swipe-reveal--done/, 'laufend: das Bezahlt-Panel bleibt');
-  assert.match(liveCard, /subscriptions\.reminderMeta/, 'laufend: der Erinnerungs-Chip bleibt');
+  // Seit R24 (G4-Budget-P3-2) steht die Erinnerung nur in der Zeile, wenn sie
+  // vom Standard (3 Tage) abweicht; das Leseblatt nennt sie immer.
+  assert.equal(active.reminder_days ?? 3, 3);
+  assert.doesNotMatch(liveCard, /subscriptions\.reminderMeta/, 'laufend mit Standard-Erinnerung: kein Chip in jeder Zeile');
+  assert.match(abos.renderCard({ ...active, reminder_days: 7 }), /subscriptions\.reminderMeta/, 'eine abweichende Frist steht in der Zeile');
+  assert.match(abos.renderCard({ ...active, reminder_enabled: false }), /subscriptions\.noReminder/, 'eine ausgeschaltete ebenso');
   assert.notEqual(reminderRow(active).value, '', 'laufend: die Leseansicht nennt die Erinnerung');
   assert.match(liveCard, /subscription-card__due/, 'laufend: die Faelligkeit bleibt');
   // 2099 ist weiter als ein Monat: die grobe Stufe statt "in N Tagen" (R23 S11).
@@ -3982,7 +3987,7 @@ test('Rot steht im Budget nur an einer Warnung, nie an der Ausgabe selbst', () =
   assert.ok(trend, 'Trend-Diagramm nicht gefunden');
   assert.doesNotMatch(trend[0], /--color-danger/, 'die Ausgabenlinie ist kein Alarm');
   // Die Richtung bleibt lesbar ohne Farbe: das Vorzeichen kommt aus dem Zahlformat.
-  assert.match(budget, /amountByRole\(e\.amount, 'flow'\)/);
+  assert.match(budget, /amountByRole\(e\.amount, 'flow', \{ currency: accountCurrency\(e\.account_id\) \}\)/, 'Rolle flow, in der Waehrung des Kontos (#2302)');
 });
 
 // --------------------------------------------------------
@@ -4066,8 +4071,6 @@ test('Kontosaldo gibt nach, aber nie unter seinen Betrag - der Name ellipsiert (
   }
   const balance = [...eachRule(budgetCss)].find(({ selector, at }) => selector.trim() === '.budget-account__balance' && !at.length);
   assert.match(balance?.body ?? '', /white-space:\s*nowrap/, 'der Betrag bleibt unzerbrechlich - er ist der Mindestwert der Spalte');
-  const starting = [...eachRule(budgetCss)].find(({ selector, at }) => selector.trim() === '.budget-account__starting' && !at.length);
-  assert.match(starting?.body ?? '', /white-space:\s*normal/, 'die Startzeile ist das, was die Saldo-Spalte hergibt, und muss umbrechen duerfen');
   const nameText = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-account__name-text');
   assert.match(nameText.body, /text-overflow:\s*ellipsis/);
   const body = [...eachRule(budgetCss)].find(({ selector }) => selector.trim() === '.budget-account__body');
@@ -4114,7 +4117,7 @@ function glanceVorDetails(html, id, controls) {
   return html.slice(details);
 }
 
-test('Abos, Darlehen, Aufteilung mobil: EINE Glance-Zeile, die Karten klappen auf (R14 P1)', () => {
+test('Abos, Darlehen, Aufteilung: EINE Glance-Zeile (R14 P1); Abos und Darlehen seit R24 E2 in jeder Breite, ohne Karten', () => {
   const vorher = { loans: budgetUi.state.loans, filter: budgetUi.state.loanStatusFilter };
   try {
     budgetUi.state.loans = {
@@ -4123,8 +4126,8 @@ test('Abos, Darlehen, Aufteilung mobil: EINE Glance-Zeile, die Karten klappen au
     };
     budgetUi.state.loanStatusFilter = 'paid'; // keine sichtbare Karte - hier zaehlt nur der Kopf
     const html = budgetUi.renderLoansPage();
-    const rest = glanceVorDetails(html, 'budget-loans-more', 'budget-loans-details');
-    assert.match(rest, /class="metric-grid/, 'Darlehen: die drei Karten stehen im aufklappbaren Bereich');
+    assert.match(html, /class="row-carrier budget-glance budget-glance--lead budget-glance--everywhere"/, 'Darlehen: die Kurzzeile in jeder Breite');
+    assert.doesNotMatch(html, /class="metric-grid|budget-loans-more|aria-controls/, 'Darlehen: keine Karten, nichts aufzuklappen');
     assert.doesNotMatch(html, /budget\.loansSummary|budget-loans__summary/, 'die Summenzeile wiederholte RESTSCHULD und entfaellt');
     assert.match(html, /budget-glance__label">budget\.loanRemainingPrincipal</, 'Leitwert ist die Restschuld');
   } finally {
@@ -4136,8 +4139,8 @@ test('Abos, Darlehen, Aufteilung mobil: EINE Glance-Zeile, die Karten klappen au
   abosGlance.state.summary = { active_count: 2, monthly_total: 40, monthly_budget: 100, remaining_budget: 60, base_currency: 'EUR' };
   let abos;
   try { abos = abosGlance.renderSummary(); } finally { abosGlance.state.summary = abosVorher; }
-  const abosRest = glanceVorDetails(abos, 'subscriptions-glance-more', 'subscriptions-summary-details');
-  assert.match(abosRest, /class="metric-grid metric-grid--led budget-glance-details/, 'Abos: die Karten im aufklappbaren Bereich');
+  assert.match(abos, /class="row-carrier budget-glance budget-glance--lead budget-glance--everywhere"/, 'Abos: die Kurzzeile in jeder Breite');
+  assert.doesNotMatch(abos, /class="metric-grid|metric-card|aria-controls/, 'Abos: keine Karten, nichts aufzuklappen');
   assert.match(abos, /budget-glance__label">subscriptions\.monthlyCost</, 'Leitwert sind die Monatskosten');
 
   const summary = { html: '' };
@@ -4178,34 +4181,38 @@ test('Abos, Darlehen, Aufteilung mobil: EINE Glance-Zeile, die Karten klappen au
  * kein Budget gesetzt ist, gibt es keine Zahl dafuer; es bleibt die eine Karte,
  * die den Zustand nennt. Drei Karten sind die Grundform der Reihe (panel.css,
  * `--summary-cards` Standard 3), `--quad` gilt nur fuer vier. */
-test('Abo-Kennzahlen ohne Monatsbudget: keine Karte „Monatsbudget 0", drei Karten in der Dreier-Reihe', () => {
+test('R24 E2: die Abo-Kennzahl ist EINE Zeile - Monatskosten, Budgetstand (nur mit Budget) und Jahr; ueber dem Budget der Weg zur Liste', () => {
   const vorher = abosGlance.state.summary;
-  const karten = (html) => (html.match(/<article class="metric-card/g) ?? []).length;
   try {
     abosGlance.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 0, remaining_budget: 0, base_currency: 'EUR' };
     const ohne = abosGlance.renderSummary();
-    assert.doesNotMatch(ohne, /metric-card__label">subscriptions\.monthlyBudget</, 'die Karte „Monatsbudget" entfaellt');
-    assert.doesNotMatch(ohne, /role="progressbar"/, 'ohne Budget gibt es nichts, was ein Balken messen koennte');
-    assert.match(ohne, /subscriptions\.noBudgetLimit/, 'der Zustand bleibt benannt');
-    assert.match(ohne, /subscriptions\.unlimited/);
-    assert.equal(karten(ohne), 3);
-    assert.doesNotMatch(ohne, /metric-grid--quad/, 'drei Karten in einer Vierer-Reihe liessen eine Leerzelle');
-    assert.match(ohne, /class="metric-grid metric-grid--led budget-glance-details/, 'der aufklappbare Bereich bleibt derselbe');
+    assert.doesNotMatch(ohne, /subscriptions\.remainingBudget|subscriptions\.overBudget/, 'ohne Budget kein Budgetstand und keine "0"');
+    assert.match(ohne, /budget-glance__flow">subscriptions\.yearlyProjection <span class="budget-glance__amount">/, 'die Jahresprognose steht daneben');
+    assert.doesNotMatch(ohne, /role="progressbar"|metric-card/);
 
-    // R19 (Critique 2026-10-16, "113,60 € von 90 €"): mit Budget steht es IN
-    // der Kostenkarte - Wert, "von"-Ziel und Balken -, keine eigene Karte.
-    // R23 (D12): das "von X" steht in der NOTIZ, nicht neben dem Wert - die
-    // Kennzahl behaelt ihre feste Stufe.
     abosGlance.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 50, remaining_budget: 37.01, base_currency: 'EUR' };
     const mit = abosGlance.renderSummary();
-    assert.doesNotMatch(mit, /metric-card__label">subscriptions\.monthlyBudget</, 'keine eigene Budget-Karte mehr');
-    assert.match(mit, /metric-card__label">subscriptions\.monthlyCost<\/div>\s*<div class="metric-card__value">[^<]*<\/div>/, 'der Wert steht allein');
-    assert.doesNotMatch(mit, /metric-card__of/, 'kein Ziel neben dem Wert');
-    assert.match(mit, /<div class="metric-card__note">budget\.planTargetOf\{[^}]*\} · subscriptions\.activeCount/, 'Kosten "von" Budget in der Notiz derselben Karte');
-    assert.match(mit, /role="progressbar" aria-label="subscriptions\.monthlyBudget"/, 'der Balken misst weiter das Budget');
-    assert.equal(karten(mit), 3);
-    assert.doesNotMatch(mit, /metric-grid--quad/);
+    assert.match(mit, /budget-glance__flow">subscriptions\.remainingBudget <span class="budget-glance__amount">/, 'mit Budget: was bleibt');
+    assert.doesNotMatch(mit, /subscriptions-over-budget-action/, 'unter dem Budget kein Weg noetig');
+
+    abosGlance.state.summary = { active_count: 8, monthly_total: 113.6, monthly_budget: 90, remaining_budget: -23.6, base_currency: 'EUR' };
+    const ueber = abosGlance.renderSummary();
+    assert.match(ueber, /budget-glance__flow budget-glance__flow--negative">subscriptions\.overBudget/, 'die Ueberschreitung im Danger-Ton, EINMAL');
+    // R24 S13 (S12-F3): die Fussnote stand UNTER der Kurzzeile - das Skelett
+    // (82px) kannte sie nicht, die echte Zeile wuchs auf 111px und schob den
+    // Listenkopf (Shift 0,0233 mobil, 0,0068 Desktop beim Reiterwechsel). Sie
+    // steht jetzt vor den Zeilen der Liste, die sie sortiert: der Kennzahl-Slot
+    // ist so hoch wie sein Skelett, und die Fussnote kommt im selben Bild wie
+    // die Zeilen, die das Skelett der Liste ersetzen.
+    assert.doesNotMatch(ueber, /subscriptions-over-budget/, 'die Kennzahl-Zeile traegt keine Fussnote - sonst waechst sie ueber ihr Skelett');
+    assert.match(abosGlance.renderOverBudgetNote(), /<p class="subscriptions-over-budget">[^<]*subscriptions\.budgetUsed <button type="button" class="subscriptions-over-budget-action" id="subscriptions-over-budget-action">/, 'der Weg "Teuerste zuerst" bleibt');
+    abosGlance.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 50, remaining_budget: 37.01, base_currency: 'EUR' };
+    assert.equal(abosGlance.renderOverBudgetNote(), '', 'unter dem Budget keine Fussnote');
   } finally { abosGlance.state.summary = vorher; }
+  const src = withoutCommentsKeepingLines(readFileSync(new URL('../public/pages/subscriptions.js', import.meta.url), 'utf8'));
+  const draw = src.slice(src.indexOf('function drawContent('), src.indexOf('function renderSummary('));
+  assert.match(draw, /setHtml\(content, `\s*\$\{renderOverBudgetNote\(\)\}\s*<div class="subscriptions-list row-carrier"/,
+    'die Fussnote steht im Inhalt der Liste vor den Zeilen und kommt mit ihnen im selben Bild');
 });
 
 /* DER KOPF SPRINGT NICHT (Re-Critique 2026-09-28, A5 P2-9). Mobil 162 <-> 135px
@@ -4922,7 +4929,9 @@ test('#1668: jeder Grund der Budget-Routen ist eingeordnet, jedes Feld gibt es, 
   for (const [reason, [fields]] of budgetUi.BUDGET_REFUSALS) {
     for (const selector of (fields ?? '').split(',').map((part) => part.trim()).filter(Boolean)) {
       assert.match(selector, /^#(bm|am|cb|bt)-[a-z-]+$/, `${reason}: ${selector}`);
-      assert.ok(((selector.startsWith('#bt-') ? transferDialog : budget) + recurrenceMarkup).includes(`id="${selector.slice(1)}"`), `${reason}: das Feld ${selector} steht in keinem Dialog`);
+      const markup = (selector.startsWith('#bt-') ? transferDialog : budget) + recurrenceMarkup;
+      // Ein Betragsfeld aus dem Baustein (amountFieldHtml) nennt seine id als Option.
+      assert.ok(markup.includes(`id="${selector.slice(1)}"`) || markup.includes(`id: '${selector.slice(1)}'`), `${reason}: das Feld ${selector} steht in keinem Dialog`);
     }
   }
 
@@ -5830,6 +5839,9 @@ test('R17/E5: "Ausgleichen" steht in der Salden-Zeile; schmal tritt der Gruppenk
   assert.doesNotMatch(kopf, /split-settle/, 'im Gruppenkopf steht "Ausgleichen" nicht mehr');
   assert.match(main, /const balanceActions = canAct \? `\s*<div class="split-section-actions">\s*<button class="btn btn--secondary btn--sm" id="split-settle">[\s\S]*?\$\{groupToolsTriggerHtml\(\)\}/,
     'die Salden-Zeile traegt "Ausgleichen" und den schmalen Ausloeser des Werkzeugmenues');
+  // Seit R24 faellt der Abschnitt, wenn die eine eigene Schuld als Kennzahl
+  // steht (foldedDebt, S10-F6) - "Ausgleichen" bleibt als Zeile ohne Titel.
+  assert.match(main, /\$\{foldedDebt\(\) \? \(balanceActions \? `[\s\S]*?split-section--folded[\s\S]*?\$\{balanceActions\}/);
   assert.match(main, /<span>\$\{t\('splitExpenses\.simplified'\)\}<\/span>\s*<\/div>\$\{balanceActions\}/);
   assert.match(main, /const canAct = !ro && !archived;/, 'nur wer handeln darf, in einer aktiven Gruppe');
   assert.match(main, /class="split-group-header\$\{toolsOnly \? ' split-group-header--tools-only' : ''\}"/);
@@ -6105,7 +6117,7 @@ test('transfer category changes replace subcategory options and deletion delegat
   const elements = {
     '#bt-category': category, '#bt-subcategory': select, '#bt-subcategory-group': {},
     '#bt-recurring': element('recurring'), '#bt-delete': element('delete'),
-    '#bt-from': element('from'), '#bt-amount': element('amount'),
+    '#bt-from': element('from'), '#bt-to': element('to'), '#bt-title': element('title'), '#bt-amount': element('amount'),
     '#bt-interval': element('interval', 'monthly'), '#bt-interval-count': element('interval-count', '1'), '#bt-interval-unit': {},
   };
   const previousClose = globalThis.__closeModal;
@@ -6181,15 +6193,9 @@ test('R18: je Geld-Reiter fuehrt EINE Zahl, mobil in der Kurzzeile und in der Ke
       summary: { active_count: 2, remaining_principal: 175444.93, has_interest: true, remaining_installments: 12, paid_amount: 500 },
     };
     const loans = budgetUi.renderLoansPage();
-    assert.match(loans, /budget-glance--lead">/, 'Darlehen: die Restschuld fuehrt die Kurzzeile');
-    assert.match(loans, /class="metric-grid metric-grid--led[^"]*\bmetric-grid--long-lead budget-glance-details[^"]*" id="budget-loans-details">\s*<div class="metric-card metric-card--lead">\s*<div class="metric-card__label">budget\.loanRemainingPrincipal/);
-    // R22 S10 (aus S7): am Tablet lief „174.644,93 €" aus der Viererkarte. Die
-    // Reihe mit langer Leitzahl bricht unter ~928px Zeile in zwei mal zwei.
-    const quadRule = [...eachRule(budgetCss)].find((r) => r.at.some((a) => /@container\s+budget-page\s*\(max-width:\s*927px\)/.test(a))
-      && r.selector.trim() === '.metric-grid--quad.metric-grid--long-lead');
-    assert.match(quadRule?.body ?? '', /--summary-cards:\s*2/, 'lange Leitzahl: zwei mal zwei unter 928px');
-    budgetUi.state.loans = { loans: [{ id: 1, status: 'active' }], summary: { active_count: 1, remaining_principal: 900, paid_amount: 100 } };
-    assert.doesNotMatch(budgetUi.renderLoansPage(), /metric-grid--long-lead/, 'eine kurze Leitzahl behaelt die Viererzeile');
+    assert.match(loans, /budget-glance--lead budget-glance--everywhere">/, 'Darlehen: die Restschuld fuehrt die Kurzzeile, in jeder Breite (R24 E2)');
+    assert.match(loans, /budget-glance__label">budget\.loanRemainingPrincipal</);
+    assert.doesNotMatch(loans, /metric-card/, 'keine Karten mehr daneben');
   } finally {
     budgetUi.state.loans = vorher.loans;
   }
@@ -6197,9 +6203,8 @@ test('R18: je Geld-Reiter fuehrt EINE Zahl, mobil in der Kurzzeile und in der Ke
   try {
     abosGlance.state.summary = { active_count: 2, monthly_total: 40, monthly_budget: 100, remaining_budget: 60, base_currency: 'EUR' };
     const abos = abosGlance.renderSummary();
-    assert.match(abos, /budget-glance--lead">/, 'Abos: die Monatskosten fuehren die Kurzzeile');
-    assert.match(abos, /<article class="metric-card metric-card--lead">\s*<div class="metric-card__label">subscriptions\.monthlyCost/);
-    assert.equal((abos.match(/metric-card--lead\b/g) ?? []).length, 1);
+    assert.match(abos, /budget-glance--lead budget-glance--everywhere">/, 'Abos: die Monatskosten fuehren die Kurzzeile, in jeder Breite (R24 E2)');
+    assert.doesNotMatch(abos, /metric-card/, 'keine Karten mehr daneben');
   } finally {
     abosGlance.state.summary = abosVorher;
   }
@@ -6219,10 +6224,14 @@ test('R18: je Geld-Reiter fuehrt EINE Zahl, mobil in der Kurzzeile und in der Ke
   assert.doesNotMatch(panelText, /\d+(?:\.\d+)?(?:vw|cqi)\s*,\s*var\(--text-[345]xl\)/, 'keine Viewport-/Container-Leiter fuer die Leitzahl');
   assert.match(rule('.budget-glance__value').body, /white-space:\s*nowrap/, 'ein Betrag ueber zwei Zeilen ist keine Kennzahl');
   assert.match(rule('.budget-glance--lead .budget-glance__flows').body, /flex:\s*1 0 100%/, 'die Nebenwerte bekommen ihre eigene Zeile');
-  // In der Reihe treten die anderen zurueck - in jeder Stufe der Leiter.
+  // In der Reihe treten die anderen zurueck: R24 (G4-Budget-P2-2) als EINE
+  // feste Nebenzahl in Headline 17 - vorher 22/20/18 je nach Ort.
   const quiet = rules.filter((r) => r.selector.trim() === '.metric-grid--led > .metric-card:not(.metric-card--lead) > .metric-card__value');
-  assert.equal(quiet.length, 3, 'Grundregel plus die zwei Container-Stufen');
+  assert.equal(quiet.length, 1, 'EINE Regel, keine Container-Stufen fuer die Nebenzahl');
+  assert.equal(quiet[0].at.length, 0);
+  assert.equal(size('.metric-grid--led > .metric-card:not(.metric-card--lead) > .metric-card__value'), 'var(--type-card-title)', 'Nebenzahl = Headline 17');
   assert.match(quiet[0].body, /font-weight:\s*var\(--font-weight-semibold\)/);
+  assert.equal(size('.budget-glance__value'), 'var(--type-card-title)', 'der Wert der Kurzzeile ohne Leitzahl ist dieselbe Nebenzahl');
   // In der Seitenspalte steigt die Leitzahl auf Large Title: die Spalte sagt es
   // mit dem leeren `--metric-rail`, EINE Regel in panel.css setzt ihn vor die
   // Stufe. Ohne ihn ist `--_metric-lead` ungueltig und Title 1 greift.
@@ -6238,11 +6247,14 @@ test('R18: je Geld-Reiter fuehrt EINE Zahl, mobil in der Kurzzeile und in der Ke
   const railOn = /--metric-rail:\s*;/;
   assert.match(rule('.metric-grid--rail').body + panelCss.match(/\.metric-grid--rail \{[^}]*--metric-rail[^}]*\}/)?.[0], railOn);
   const subsCss = read('../public/styles/subscriptions.css');
-  for (const sel of ['.budget-overview__aside .metric-grid--led', '.budget-loans > .metric-grid--led', '.budget-page .subscriptions-summary > .metric-grid--led']) {
+  // Seit R24 (E2) traegt nur noch die Uebersicht eine Kennzahl-Spalte;
+  // Darlehen und Abos fuehren die Kurzzeile oben in der Bahn.
+  for (const sel of ['.budget-overview__aside .metric-grid--led']) {
     const r = [...eachRule(budgetCss + subsCss)].find((x) => x.selector.trim() === sel);
     assert(r && railOn.test(r.body), `${sel}: die Spalte meldet sich als Spalte`);
-    assert.match(r.body, /--metric-quiet-size:\s*var\(--text-2xl\)/, `${sel}: die anderen stehen in Title 2`);
+    assert.doesNotMatch(r.body, /--metric-quiet-size/, `${sel}: kein eigener Grad fuer die Nebenzahl (R24)`);
   }
+  assert.doesNotMatch(withoutComments(panelText + budgetCss + subsCss), /--metric-quiet-size/, 'die Stellschraube fuer einen zweiten Nebenzahl-Grad ist entfallen');
 });
 
 test('R23 D12: die Leitzahl wird nur kleiner, wenn sie nicht passt (fitMetricLeads)', async () => {
@@ -6400,12 +6412,11 @@ test('R18 Konten: Staende in Textfarbe, nur das Minus ist rot - auch das Nettove
     budgetUi.state.netWorth = 25064.21;
     const plus = budgetUi.renderAccountsPage();
     assert.match(plus, /budget-glance__value budget-glance__value--neutral">/, 'Kurzzeile: Textfarbe');
-    assert.match(plus, /class="metric-card metric-card--neutral metric-card--lead/, 'Karte: Textfarbe');
+    assert.doesNotMatch(plus, /class="metric-card/, 'seit R24 (E2) keine Karte daneben');
     assert.doesNotMatch(plus, /metric-card--positive|budget-glance__value--positive/);
     budgetUi.state.netWorth = -12;
     const minus = budgetUi.renderAccountsPage();
     assert.match(minus, /budget-glance__value budget-glance__value--negative">/);
-    assert.match(minus, /class="metric-card metric-card--negative metric-card--lead/);
   } finally {
     Object.assign(budgetUi.state, zuvor);
   }
@@ -6874,25 +6885,16 @@ test('Critique 2026-10-16: Kurzzeile einzeilig bis aufgeklappt, Startsaldo beim 
   const lead = panel.find((r) => r.selector.trim() === '.budget-glance--fold.budget-glance--lead .budget-glance__lead');
   assert.match(lead?.body ?? '', /flex-direction:\s*row/, 'Etikett und Saldo in EINER Zeile');
 
-  // Konten: der Betrag des Startsaldos bricht nie, mobil zieht die Zeile in die Textspalte.
+  // Konten: seit R24 (G4-Budget-P3-1) kein Startsaldo mehr in der Zeile - er
+  // steht im Kopf des Kontoauszugs. Mobil loest sich die Saldo-Spalte auf.
   const budgetJs = read('../public/pages/budget.js');
-  assert.match(budgetJs, /<span class="budget-account__starting">\$\{t\('budget\.startingBalanceShort'\)\} <span class="budget-account__starting-amount">/);
+  assert.doesNotMatch(budgetJs, /budget-account__starting|budget-account__type-start/, 'kein Startsaldo in der Kontozeile');
   const css = [...eachRule(budgetCss)];
-  assert.match(css.find((r) => r.selector.trim() === '.budget-account__starting-amount')?.body ?? '', /white-space:\s*nowrap/);
+  assert.ok(!css.some((r) => /budget-account__starting|budget-account__type-start/.test(r.selector)), 'und keine Regel mehr dafuer');
   const phone = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
   assert.ok(css.some((r) => phone(r) && r.selector.split(',').map((x) => x.trim()).includes('.budget-account__figures') && /display:\s*contents/.test(r.body)),
     'mobil loest sich die Saldo-Spalte auf');
-  // Re-Critique 2026-10-17 (A4): Name, Art und Start standen untereinander in
-  // der schmalen Textspalte - 110px je Konto bei 390. Mobil stehen Art und
-  // Start jetzt als EIN Satz unter Name und Saldo, ueber die volle Breite.
-  // Genau eine Fassung des Starts ist je Breite sichtbar (und damit im
-  // Barrierebaum): rechts ab 640px, in der Art-Zeile darunter.
-  assert.match(budgetJs, /<span class="budget-account__type">\$\{esc\(accountTypeLabel\(a\.type\)\)\}<span class="budget-account__type-start"> · \$\{t\('budget\.startingBalanceShort'\)\} <span class="budget-account__starting-amount">/,
-    'mobil steht der Start in der Zeile der Kontoart');
-  assert.ok(css.some((r) => phone(r) && r.selector.trim() === '.budget-account__starting' && /display:\s*none/.test(r.body)),
-    'mobil faellt die rechte Startzeile weg');
-  assert.ok(css.some((r) => r.at.some((a) => /min-width:\s*640px/.test(a)) && r.selector.trim() === '.budget-account__type-start' && /display:\s*none/.test(r.body)),
-    'ab 640px faellt der Start in der Art-Zeile weg');
+  assert.match(budgetJs, /<span class="budget-account__type">\$\{esc\(accountTypeLabel\(a\.type\)\)\}<\/span>/, 'die Art-Zeile nennt nur die Art');
   assert.ok(css.some((r) => phone(r) && /\.budget-account__type\b/.test(r.selector) && /grid-column:\s*2 \/ 4/.test(r.body)),
     'die Art-Zeile laeuft bis unter den Saldo');
   assert.ok(css.some((r) => phone(r) && r.selector.trim() === '.budget-account__balance' && /grid-row:\s*1;/.test(r.body)),
@@ -7007,6 +7009,17 @@ test('Statistik: eine Differenz, die nur ein Rundungsrest ist, zeigt keinen Pfei
   assert.match(html, /metric-card__trend--neutral/, 'die Null-Differenz traegt eine Valenz');
   assert.match(html, /data-lucide="minus"/);
   assert.doesNotMatch(html, /trending-up|trending-down/);
+});
+
+test('R24 G4-Budget-P3-5: unter "Ausgaben" und "Einnahmen" stehen Betraege ohne Vorzeichen, nur die Veraenderung traegt eins', async () => {
+  const html = await renderCatBarsWith({
+    byCategory: [{ category: 'food', expenses: -1200, income: 0 }, { category: 'salary', expenses: 0, income: 3000 }],
+    prevByCategory: [{ category: 'food', expenses: -1000, income: 0 }],
+  });
+  assert.match(html, /budget-bar-row__amount">1200 €/, 'die Ausgabe ohne Minus, wie in der Uebersicht');
+  assert.match(html, /budget-chart-block__total">1200 €</, 'die Summe des Blocks ebenso');
+  assert.match(html, /budget-bar-row__amount">3000 €/, 'die Einnahme ohne Plus');
+  assert.doesNotMatch(html, /budget-(?:bar-row__amount|chart-block__total)">[-+\u2212]/, 'kein Vorzeichen an Betrag oder Summe');
 });
 
 test('Statistik: das Ziel steht als Text, und seine Marke klemmt nicht an der Kante (Critique R19)', async () => {
@@ -7428,7 +7441,7 @@ test('R21 S7: der Plan beginnt mit den Kategorien, die Sparziel-Aufforderung ste
 // (Name x 308 -> Betrag x 1312 = 1000px Blickweg). Ab 960px Budget-Flaeche
 // dieselbe Zweispalte wie Uebersicht und Plan: Liste auf dem Lesemass (720),
 // rechts die Kennzahlleiste mit einer Karte je Zeile und die Diagramme.
-test('R21 S7: die Abos stehen in der Bahn - Liste links, Kennzahlleiste rechts', () => {
+test('R21 S7 / R24 E2: die Abos stehen in der Bahn - Kurzzeile und Liste links, Diagramme rechts', () => {
   const css = read('../public/styles/subscriptions.css');
   const lane = [...eachRule(css)].filter((r) => r.at.some((a) => /@container budget-page \(min-width: 960px\)/.test(a)));
   const page = lane.find((r) => r.selector.trim() === '.budget-page .subscriptions-page');
@@ -7437,11 +7450,13 @@ test('R21 S7: die Abos stehen in der Bahn - Liste links, Kennzahlleiste rechts',
   assert.match(page.body, /var\(--budget-rail-max\)/, 'rechts die Seitenspalte des Budgets');
   const list = lane.find((r) => r.selector.trim() === '.budget-page .subscriptions-list-section');
   assert.match(list?.body ?? '', /grid-column:\s*1/);
+  assert.match(list.body, /grid-row:\s*2/, 'die Liste unter der Kurzzeile');
   const summary = lane.find((r) => r.selector.trim() === '.budget-page .subscriptions-summary');
-  assert.match(summary?.body ?? '', /grid-column:\s*2/);
-  const cards = lane.find((r) => r.selector.trim() === '.budget-page .subscriptions-summary > .metric-grid');
-  assert.match(cards?.body ?? '', /--summary-cards:\s*1/, 'eine Karte je Zeile');
-  assert.match(cards.body, /--metric-value-size:\s*var\(--text-3xl\)/, 'mit dem Wertgrad der Seitenspalte');
+  assert.match(summary?.body ?? '', /grid-column:\s*1/, 'die Kennzahl steht oben in der Bahn, nicht in der Seitenspalte');
+  assert.match(summary.body, /grid-row:\s*1/);
+  const analytics = lane.find((r) => r.selector.trim() === '.budget-page #subscriptions-analytics');
+  assert.match(analytics?.body ?? '', /grid-column:\s*2/, 'die Seitenspalte traegt die Zweitansichten');
+  assert.equal(lane.find((r) => r.selector.trim() === '.budget-page .subscriptions-summary > .metric-grid'), undefined, 'kein Kennzahlturm mehr');
 });
 
 // R21 S7 (D9 "Aufteilen: Gruppenwahl zuerst, Kennzahl im Gruppenkopf, Hover !=
@@ -7536,8 +7551,9 @@ test('R22 D4: Abos und Aufteilung tragen den Kennzahl-Slot ab dem ersten Bild in
   assert.equal((metricCardsSkeletonHtml(2, { note: false, tag: 'div' }).match(/<div class="metric-card"/g) ?? []).length, 2);
 
   const subs = withoutCommentsKeepingLines(read('../public/pages/subscriptions.js'));
-  assert.match(subs, /<div class="subscriptions-summary" id="subscriptions-summary">\$\{[^}]*\}\$\{metricGlanceSkeletonHtml\(\{ lead: true \}\)\}\s*<section class="metric-grid metric-grid--led budget-glance-details" aria-hidden="true">\$\{metricCardsSkeletonHtml\(3\)\}<\/section>/,
-    'Abos: der Kennzahl-Slot steht leer, bis die Daten kommen');
+  assert.match(subs, /<div class="subscriptions-summary" id="subscriptions-summary">\$\{[^}]*\}\$\{metricGlanceSkeletonHtml\(\{ lead: true, controls: false, flows: 2, everywhere: true \}\)\}\s*<\/div>/,
+    'Abos: der Kennzahl-Slot steht leer, bis die Daten kommen - seit R24 E2 als statische Zeile in jeder Breite');
+  assert.match(metricGlanceSkeletonHtml({ lead: true, controls: false, everywhere: true }), /budget-glance--everywhere/, 'das Skelett steht in derselben Breite wie die Zeile');
   const split = withoutCommentsKeepingLines(read('../public/pages/split-expenses.js'));
   assert.match(split, /<div id="split-glance">\$\{[^}]*\}\$\{metricGlanceSkeletonHtml\(\)\}<\/div>/, 'Aufteilung: die Kurzzeile steht leer, bis die Daten kommen');
   // EINE Karte seit R22 (D9: eine Saldo-Aussage).
@@ -7627,7 +7643,10 @@ test('R22 D9: Konto, Abo und Ausgabe der Aufteilung beginnen mit derselben Lead-
   assert.match(read('../public/pages/budget.js'), /class="budget-account__icon budget-tile"/);
   assert.match(read('../public/pages/subscriptions.js'), /class="subscription-card__brand budget-tile"/);
   const split = read('../public/pages/split-expenses.js');
-  assert.equal((split.match(/class="split-expense__icon budget-tile"\$\{categoryTone\(/g) ?? []).length, 3, 'Ausgabe, Serie und Summe je Kategorie (#1941) tragen den Ton ihrer Kategorie');
+  // Seit R24 (E12) tragen Ausgabe, Serie und Summe je Kategorie den PUNKT der
+  // Budget-Kategorie wie das Journal, keine Icon-Mulde mehr.
+  assert.doesNotMatch(split, /split-expense__icon/);
+  assert.equal((split.match(/\$\{categoryDotHtml\(/g) ?? []).length, 3, 'Ausgabe, Serie und Summe je Kategorie tragen den Punkt ihrer Budget-Kategorie');
   assert.equal((split.match(/class="split-group__avatar budget-tile"/g) ?? []).length, 2);
 });
 
@@ -7674,15 +7693,6 @@ test('R22 D9: die Darlehenskarte fuehrt mit der Zahl, "Restschuld" steht in der 
 // der Werkzeuglinie der Liste (padding-block der Kennzahl-Zeile) und streckte
 // ihre Karten per 1fr auf gleiche Hoehe. Gemessen 1280: Karten y 141 -> 129,
 // Hoehen 110/110/110 -> 110/85/85 - wie die Spalte der Darlehen.
-test('R22 D9: die Abo-Spalte beginnt an der Werkzeuglinie, ihre Karten sind so hoch wie ihr Inhalt', () => {
-  const css = read('../public/styles/subscriptions.css');
-  const rail = [...eachRule(css)].find((r) => r.selector.trim() === '.budget-page .subscriptions-summary > .metric-grid'
-    && r.at.some((a) => /min-width:\s*960px/.test(a)));
-  assert.ok(rail, 'die Spaltenregel der Abos fehlt');
-  assert.match(rail.body, /grid-auto-rows:\s*auto/);
-  assert.match(rail.body, /padding-block:\s*0/);
-});
-
 // Critique R22 (D9, a4 Klein): der Betrag stand ohne Waehrung im Feld, und das
 // Konto lag am Telefon unter dem Fuss (390x844: Feld y 798, Fuss 758) -
 // nachher Datum und Konto in einer Zeile, Feld y 718 im ersten Bild.
@@ -7736,7 +7746,7 @@ test('F4.4: der Buchungstyp ist nie schmaler als sein Wort, im schmalen Dialog g
 
 // R23 (D8, Rest aus S1): die Umbuchung meldet ALLE Fehler auf einmal, wie der
 // Buchungsdialog - vorher einen je Klick, und wer drei Felder vergass, klickte dreimal.
-test('Umbuchung: ein leerer Dialog meldet Kategorie, Titel, Betrag und Konten zugleich (reportFieldErrors)', async () => {
+test('Umbuchung: ein leerer Dialog meldet Kategorie, Betrag und Konten zugleich (reportFieldErrors); der Titel darf leer bleiben (R24)', async () => {
   const { wireTransferForm } = await import('../public/components/budget-transfer-dialog.js');
   const element = (value = '') => ({ value, checked: false, dataset: {}, addEventListener() {}, setAttribute() {}, removeAttribute() {} });
   const select = element();
@@ -7758,7 +7768,7 @@ test('Umbuchung: ein leerer Dialog meldet Kategorie, Titel, Betrag und Konten zu
       accounts: [], currency: 'EUR', subcategories: {}, readOnly: () => false, onSaved() {}, onError() {}, onDelete: async () => {},
     });
     await save(elements['#bt-save']);
-    assert.deepEqual(reported, ['#bt-category', '#bt-title', '#bt-amount', '#bt-to']);
+    assert.deepEqual(reported, ['#bt-category', '#bt-amount', '#bt-to']);
   } finally {
     if (previous === undefined) delete globalThis.__reportFieldError; else globalThis.__reportFieldError = previous;
   }
@@ -7792,4 +7802,82 @@ test('R23: die Abo-Faelligkeit nennt ueber einen Monat Wochen, Monate oder Jahre
   assert.equal(due(400), daysFromTodayText(400), 'mehr als ein Jahr: Jahre');
   assert.match(due(0), /subscriptions\.dueToday/);
   assert.match(due(-3), /subscriptions\.overdueDays/);
+});
+
+// R24 (Critique G4-Budget-P3-4): die Plan-Pille nannte das Modul („+ Budget"
+// im Modul Budget), nicht das Objekt. Jetzt „+ Kategoriebudget", und die
+// Ansage sagt dasselbe Nomen - in jeder Sprache ist die Pille nicht der
+// Modulname.
+test('R24: die Plan-Pille nennt das Kategoriebudget, nicht das Modul', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const de = JSON.parse(readFileSync(new URL('de.json', dir), 'utf8'));
+  assert.equal(de.newLabel.budgetPlan, 'Kategoriebudget');
+  assert.equal(de.budget.planAddBudget, 'Kategoriebudget festlegen');
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const loc = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
+    assert.notEqual(loc.newLabel.budgetPlan.toLowerCase(), loc.budget.title.toLowerCase(), `${file}: die Pille wiederholt den Modulnamen`);
+  }
+});
+
+// Critique R24 G4-Budget-P2-1: die Umbuchung im Geldgeruest.
+test('R24: die Umbuchung - Betrag mit Waehrungszeichen, Von -> Auf in einer Zeile, Seltenes hinter "Weitere Angaben", Titel darf leer bleiben', async () => {
+  const { transferFieldsHtml, wireTransferForm } = await import('../public/components/budget-transfer-dialog.js');
+  const accounts = [{ id: 1, name: 'Giro', currency: 'EUR' }, { id: 2, name: 'Spar', currency: 'EUR' }];
+  const aufrufe = [];
+  globalThis.__advancedSection = (inner, options) => { aufrufe.push({ inner, options }); return `<details>${inner}</details>`; };
+  let html;
+  try {
+    html = transferFieldsHtml({ accounts, categories: [{ key: 'financial_other', name: 'F' }], month: '2026-10', currency: 'EUR', budgetMode: 'shared' });
+  } finally { delete globalThis.__advancedSection; }
+  assert.match(html, /<div class="budget-amount-field">\s*<input class="form-input budget-amount-input" id="bt-amount"/, 'derselbe Betragsbaustein wie die Buchung');
+  assert.match(html, /<span class="budget-amount-field__unit" id="bt-amount-unit">/, 'mit dem Zeichen der Waehrung im Feld');
+  assert.match(html, /<div class="budget-transfer-route">[\s\S]*id="bt-from"[\s\S]*budget-transfer-route__arrow[\s\S]*id="bt-to"/, 'Von -> Auf in einer Zeile');
+  assert.doesNotMatch(html, /for="bt-title">budget\.titleLabel<span class="required-marker"/, 'der Titel traegt keinen Stern mehr');
+  assert.equal(aufrufe.length, 1);
+  assert.match(aufrufe[0].inner, /id="bt-category"[\s\S]*id="bt-recurring"/, 'Kategorie und Wiederholung hinter "Weitere Angaben"');
+  assert.equal(aufrufe[0].options.hint, 'budget.transferMoreDetailsHint');
+  assert.equal(aufrufe[0].options.open, false);
+
+  // Speichern ohne Titel: die Umbuchung heisst nach ihren Konten.
+  const element = (value = '') => ({ value, checked: false, dataset: {}, placeholder: '', addEventListener() {}, setAttribute() {}, removeAttribute() {}, parentElement: null });
+  const select = element('');
+  select.replaceChildren = () => {};
+  select.insertAdjacentHTML = () => {};
+  const elements = {
+    '#bt-category': element('financial_other'), '#bt-subcategory': select, '#bt-subcategory-group': {},
+    '#bt-title': element(''), '#bt-amount': element('25'), '#bt-date': element('2026-10-24'),
+    '#bt-from': element('1'), '#bt-to': element('2'),
+    '#bt-recurring': element(), '#bt-confirm': element(), '#bt-save': element(),
+    '#bt-interval': element('monthly'), '#bt-interval-count': element('1'), '#bt-interval-unit': {},
+  };
+  const gesendet = [];
+  globalThis.__apiStub = { post: async (pfad, body) => { gesendet.push({ pfad, body }); return { data: {} }; } };
+  const vorherClose = globalThis.__closeModal;
+  globalThis.__closeModal = () => {};
+  try {
+    const save = wireTransferForm({ querySelector: (sel) => elements[sel] ?? null }, {
+      accounts, currency: 'EUR', subcategories: {}, readOnly: () => false, onSaved() {}, onError(err) { throw err; }, onDelete: async () => {},
+    });
+    assert.equal(elements['#bt-title'].placeholder, 'budget.transferDefaultTitle{"from":"Giro","to":"Spar"}', 'der Platzhalter nennt den Titel, den sie bekommt');
+    await save(elements['#bt-save']);
+  } finally {
+    delete globalThis.__apiStub;
+    if (vorherClose === undefined) delete globalThis.__closeModal; else globalThis.__closeModal = vorherClose;
+  }
+  assert.equal(gesendet.length, 1);
+  assert.equal(gesendet[0].body.title, 'budget.transferDefaultTitle{"from":"Giro","to":"Spar"}');
+});
+
+test('R24: der Typwechsel im Buchungsdialog haelt die Hoehe (kein Oberkantensprung), das Darlehen legt Titel, Konto, Waehrung, Notizen hinter "Weitere Angaben"', () => {
+  const src = withoutComments(budget);
+  assert.match(src, /const setType = \(type\) => \{\n\s*if \(type !== currentType\) holdHeight\(\);/);
+  assert.match(src, /sheet\.style\.minBlockSize = `\$\{Math\.round\(height\)\}px`/);
+  const loan = src.slice(src.indexOf('function loanFormFieldsHtml('), src.indexOf('function wireLoanFormFields('));
+  const more = loan.slice(loan.indexOf('${advancedSection(`'));
+  for (const teil of ['loanTitleFieldHtml(loan)', 'loanAccountFieldHtml(loan)', 'loanCurrencyFieldsHtml(loan)', 'id="lm-notes"']) {
+    assert.ok(more.includes(teil), `${teil} steht hinter "Weitere Angaben"`);
+  }
+  assert.match(more, /hint: t\('budget\.loanMoreDetailsHint'\), open: more/);
+  assert.ok(loan.indexOf('loanIdentityFieldsHtml(loan)') < loan.indexOf('id="lm-manual-fields"'), 'Richtung und Person zuerst');
 });

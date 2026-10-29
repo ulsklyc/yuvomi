@@ -373,6 +373,32 @@ html.page-swapping .fab-layer .page-fab {
   animation-timing-function: var(--ease-out);
 }
 
+/* SEITENLEISTE EIN-/AUSKLAPPEN (utils/sidebar-glide.js, R24 S12): die Kanten
+ * von Tafel und Inhalt gleiten, die Bilder darin werden nicht gestaucht -
+ * links verankert, in ihrer Groesse, von der gleitenden Kante beschnitten.
+ * Die Tafel behaelt dabei ihre Rundung. Unter reduzierter Bewegung startet
+ * das Skript keine Transition (der Wechsel steht). */
+::view-transition-group(sidebar-panel),
+::view-transition-group(sidebar-content) {
+  animation-duration: var(--duration-xl);
+  animation-timing-function: var(--ease-out);
+  overflow: clip;
+}
+
+::view-transition-group(sidebar-panel) {
+  border-radius: var(--radius-glass-card);
+}
+
+::view-transition-old(sidebar-panel),
+::view-transition-new(sidebar-panel),
+::view-transition-old(sidebar-content),
+::view-transition-new(sidebar-content) {
+  inline-size: auto;
+  block-size: 100%;
+  object-fit: none;
+  object-position: left top;
+}
+
 ::view-transition-group(page-toolbar),
 ::view-transition-group(nav-sidebar),
 ::view-transition-group(nav-bottom),
@@ -2528,8 +2554,7 @@ html:has(.list-bulkbar) yuvomi-install-prompt {
 .filter-chip--active svg,
 .contact-filter-chip--active svg,
 .group-toggle__btn--active svg,
-.segmented__item.is-active svg,
-.perm-seg__opt.is-active svg {
+.segmented__item.is-active svg {
   /* 30 % statt 16 %: auf Tab-Bar-Größe (20px) las die schwächere Füllung
    * weiter als Outline (Finish-Verdict Fundament-Phase, Fix 8). */
   fill: color-mix(in srgb, currentColor 30%, transparent);
@@ -3148,6 +3173,117 @@ html.fab-steady .page-fab {
    * 431px breit, 72px hinaus). Das Clipping von `main.app-content` macht den
    * Bruch unsichtbar, nicht harmlos. */
   min-width: 0;
+}
+
+/* DER STATUS-SLOT DER TITELZEILE (#1462, Ulas 2026-10-26). Eine Meldung ueber
+ * die Daten der Seite (im Kalender: Schichtplaene ueberlappen) steht als
+ * Zeichen in der Titelzeile, nicht als eigene Kopfzeile: unter 1024px nur das
+ * Zeichen in Zielgroesse, sein Name ist der volle Satz und ein Tipp oeffnet
+ * ihn (Blatt oder Popover); ab 1024px mit kurzem Text daneben. Der Slot steht
+ * nur, solange es etwas zu melden gibt - ohne Meldung nimmt er keine Breite.
+ * Er oeffnet nie eine eigene Zeile (keine Reihenfolge, keine volle Basis;
+ * Guard test:calendar "#1462"). */
+.page-toolbar__status {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+/* Am Slot gebunden: die Knopfhaut (`.btn--ghost`) setzt ihre eigene Tinte. */
+.page-toolbar__status > .page-toolbar__status-btn {
+  gap: var(--space-1);
+  color: var(--color-warning);
+}
+
+/* Messfuehler der Titelbreite (calendar.js `syncPeriodTitleWidth`): dieselbe
+ * Schrift wie der Titel, ausser Fluss und unsichtbar. */
+.page-toolbar__period-probe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  inline-size: auto;
+  min-inline-size: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 1023px) {
+  /* Was das Zeichen der Titelzeile wegnimmt - fuer Koepfe, die ihre
+   * Titelbasis selbst rechnen (Kalender am Tablet). */
+  .page-toolbar:has(> .page-toolbar__status) {
+    --page-status-lead: calc(var(--target-base) + var(--page-toolbar-gap));
+  }
+
+  .page-toolbar__status > .page-toolbar__status-btn {
+    inline-size: var(--target-base);
+    min-inline-size: var(--target-base);
+    block-size: var(--target-base);
+    padding: 0;
+    justify-content: center;
+  }
+
+  .page-toolbar__status-text {
+    display: none;
+  }
+}
+
+/* VARIANTE „ZEITRAUM ALS TITEL" (#1797, Ulas 2026-10-26; DESIGN.md Modulkopf).
+ * Wo der Titel eines Kopfs ein navigierbarer Zeitraum ist, ist ab 1024px der
+ * ZEITRAUM der sichtbare Titel („Oktober 2026", Titelrolle 22px fett, das Jahr
+ * in der Sekundaerfarbe - typography.css), wie in Apples Kalender. Das <h1>
+ * bleibt die Seitenueberschrift und nennt das Modul der Hilfstechnik: per Clip
+ * versteckt, nie per display/visibility (dann fiele es aus dem Baum). Das
+ * Siegel bleibt der Absender und steht vor dem Zeitraum. Die Pfeile stehen
+ * direkt am Titel - VOR ihm, damit sie bei wechselnder Textbreite stillstehen;
+ * „Heute" folgt als Kapsel. Die Mindestbreite des Titels (`--period-title-min`)
+ * misst das Modul je Ansicht, damit auch alles dahinter stillsteht. Unter
+ * 1024px gilt der Kopf der kompakten Klasse unveraendert (Large Title). */
+@media (min-width: 1024px) {
+  /* Im Fluss, nicht absolut (Sonde 19, uk bei 1280): absolut stand das <h1>
+   * in einem Kopf mit eigener Bar-Zeile mittig zwischen beiden Zeilen und
+   * zaehlte als zweite Zeile der Titelzeile. Als 1px-Element steht es in ihr;
+   * die negative Marge gibt die Luecke dahinter zurueck. */
+  .page-toolbar--period-as-title:not(.page-toolbar--in-group) > .page-toolbar__title {
+    flex: 0 0 1px;
+    width: 1px;
+    height: 1px;
+    margin-inline-end: calc(-1 * var(--page-toolbar-gap) - 1px);
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* DER STATUS ALS ZEICHEN, WENN SEIN WORT DIE ZEILE KOSTET (Sonde 19).
+   * Das Modul misst (calendar.js `syncToolbarFit`): passt die eine Zeile nur
+   * ohne das Wort, oder bricht ohne es die Titelzeile, steht nur das Zeichen
+   * in Zielgroesse - der Name bleibt der volle Satz, ein Klick oeffnet ihn. */
+  .page-toolbar--status-icon > .page-toolbar__status > .page-toolbar__status-btn {
+    inline-size: var(--target-base);
+    min-inline-size: var(--target-base);
+    padding: 0;
+    justify-content: center;
+  }
+
+  .page-toolbar--status-icon > .page-toolbar__status .page-toolbar__status-text {
+    display: none;
+  }
+
+  .page-toolbar--period-as-title .page-toolbar__center .period-stepper__value {
+    order: 1;
+    min-inline-size: var(--period-title-min, auto);
+    text-align: start;
+  }
+
+  .page-toolbar--period-as-title .page-toolbar__center .period-stepper__reset {
+    order: 2;
+  }
+}
+
+@media (min-width: 1024px) and (hover: hover) {
+  .page-toolbar--status-icon > .page-toolbar__status > .page-toolbar__status-btn {
+    inline-size: var(--target-md);
+    min-inline-size: var(--target-md);
+  }
 }
 
 /* AB 1024px GIBT DIE SUCHE NACH, NICHT DIE AKTIONEN (R23, D13; Critique G0
@@ -4016,8 +4152,7 @@ html.fab-steady .page-fab {
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
-  font-size: var(--text-lg);
-  font-weight: var(--font-weight-semibold);
+  /* Groesse und Gewicht: Rolle Detailtitel (typography.css, R24). */
   color: var(--color-text-primary);
   overflow-wrap: anywhere;
 }
@@ -4787,9 +4922,18 @@ html.fab-steady .page-fab {
  * uebereinander: Zeitraum und Tab-Leiste bringen ihre Luft in 48px-
  * Trefferflaechen mit, der Large Title in seiner Zeilenhoehe. Selektorform der
  * Large-Title-Regel oben plus die Modifier-Klasse - mit blossem
- * `.page-toolbar--period` verlor der Wert still gegen 0,3,0. */
+ * `.page-toolbar--period` verlor der Wert still gegen 0,3,0.
+ *
+ * DIESELBE LUFT FUER JEDE BAR-ZEILE (R24, Critique G0 P2-3). Die Regel galt
+ * nur den Zeitraum-Koepfen; die Reiter-Koepfe (Belohnungen, Haushaltshilfe,
+ * Schichtplan) bekamen den vollen Zeilenabstand der Large-Title-Regel - ihre
+ * Reiter standen bei 390px auf y64 statt y60, der Kopf mass 121 statt 117px,
+ * und beim Wechsel Budget -> Belohnungen sprang die Leiste um 4px. Die
+ * Begruendung oben gilt fuer die Reiter genauso (48px-Ziele bringen ihre Luft
+ * mit), also gilt die Regel jedem Kopf mit Bar-Zeile: EINE Kopfhoehe mobil. */
 @media (max-width: 767px) {
-  .page-toolbar.page-toolbar--period:not(.page-toolbar--in-group):has(> .page-toolbar__title) {
+  .page-toolbar.page-toolbar--period:not(.page-toolbar--in-group):has(> .page-toolbar__title),
+  .page-toolbar:not(.page-toolbar--in-group):has(> .page-toolbar__title):has(> .page-toolbar__bar) {
     row-gap: var(--space-1);
   }
 }
@@ -6101,9 +6245,10 @@ a.popover-menu__item {
     min-height: 0;
     padding-bottom: 0;
     margin-left: var(--sidebar-width);
-    /* Begleitet den Sidebar-Collapse (siehe .nav-sidebar width): der Inhalt rückt
-     * nach - bewusste Layout-Transition, reduced-motion schaltet sie ab. */
-    transition: margin-left var(--transition-slow);
+    /* KEINE TRANSITION AM RAND (Critique R24 G0-Shell-P3-7): 400 ms
+     * `margin-left` legten den ganzen Inhalt in jedem Frame neu aus (gemessen
+     * 17 Breiten je Umschalten, Layout-Shift 0,20). Der Rand springt in EINEM
+     * Layout, der Inhalt gleitet per transform (utils/sidebar-glide.js). */
   }
 
   .nav-bottom {
@@ -6542,6 +6687,21 @@ a.popover-menu__item {
   /* ── Sidebar eingeklappt (icon-only) ── */
   html.sidebar-collapsed {
     --sidebar-width: 56px;
+  }
+
+  /* DER UMSCHALTER GLEITET OHNE LAYOUT JE FRAME (utils/sidebar-glide.js,
+   * Critique R24 G0-Shell-P3-7). Waehrend des Wechsels traegt eine View
+   * Transition die Bewegung: Tafel und Inhalt bekommen je einen Namen, ihre
+   * Breite springt (keine Transition - sonst zeichnete das neue Bild die
+   * Breite Frame fuer Frame nach). Das Hover-Ausklappen behaelt seine eigene
+   * Breiten-Transition. */
+  html.sidebar-gliding .nav-sidebar {
+    view-transition-name: sidebar-panel;
+    transition: none;
+  }
+
+  html.sidebar-gliding #main-content {
+    view-transition-name: sidebar-content;
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-sidebar__brand-text {
@@ -7286,6 +7446,244 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
 
 .form-pair--wide {
   --form-pair-min: 11rem;
+}
+
+/* DAS AUGE IM PASSWORTFELD (wirePasswordToggle, utils/auth-ui.js). Bis
+   Critique R24 (G6-Einst-P3-4) stand die Regel in auth.css und galt nur vor
+   der Anmeldung; Sicherung und Dokumentablage bauten ein eigenes Auge AUSSER-
+   HALB des Felds (13px-Glyphe). Jetzt global, fuer `.input` und `.form-input`. */
+.input-password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.input-password-wrapper :is(.input, .form-input) {
+  flex: 1;
+  min-width: 0;
+  /* logisch statt physisch, damit der Toggle-Platz in RTL auf der richtigen
+   * Seite reserviert wird (ar/fa) */
+  padding-inline-end: calc(var(--target-lg) + var(--space-1));
+}
+
+.password-toggle {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Komfortable Daumen-Trefferfläche (≥44 px) statt der bisherigen 40 px */
+  width: var(--target-lg);
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  /* logische Ecken: rundet in RTL automatisch die richtige Seite */
+  border-start-start-radius: 0;
+  border-start-end-radius: var(--radius-md);
+  border-end-end-radius: var(--radius-md);
+  border-end-start-radius: 0;
+  transition: color var(--transition-fast);
+}
+
+.password-toggle:hover {
+  color: var(--color-text-primary);
+}
+
+.password-toggle:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+/* EIN INTERVALL IST EIN SATZ (Critique R24; utils/interval-sentence.js):
+ * "Alle [2] Wochen" - das Feld steht im Satz, nicht unter einem Etikett "Alle".
+ * Bricht er um, dann zwischen den Woertern, nie im Feld. */
+.interval-sentence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.interval-sentence__word {
+  color: var(--color-text-primary);
+  /* Satz, kein Etikett: auch in Formularen, deren Feldtitel halbfett sind. */
+  font-weight: var(--font-weight-regular);
+}
+
+/* Drei Ziffern breit - ein Abstand von 365 Tagen ist das Laengste. */
+.interval-sentence > input[type="number"] {
+  flex: 0 0 auto;
+  inline-size: var(--space-16);
+  text-align: center;
+}
+
+.interval-sentence > select {
+  flex: 0 1 auto;
+  inline-size: auto;
+  min-inline-size: 0;
+}
+
+/* EIN BEDIENELEMENT FUER EIN BILD (Critique R24; utils/media-picker.js): das
+ * Vorschaubild ist der Knopf, das Abzeichen an seiner Ecke sagt "aenderbar".
+ * Das Abzeichen sitzt NEBEN dem Knopf im Traeger, nicht in ihm: der Knopf
+ * schneidet sein Bild rund (`overflow: hidden`) und schnitte das Abzeichen mit. */
+.media-picker {
+  position: relative;
+  display: inline-flex;
+}
+
+.media-picker__badge {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  display: grid;
+  place-items: center;
+  inline-size: calc(var(--space-6) + var(--space-1));
+  block-size: calc(var(--space-6) + var(--space-1));
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+.media-picker__badge svg {
+  inline-size: var(--icon-md);
+  block-size: var(--icon-md);
+}
+
+.media-picker__remove {
+  color: var(--color-danger);
+}
+
+/* EIN FARBWAEHLER (Critique R24, E6; utils/color-picker.js). Eine Reihe
+ * benannter Toene als radiogroup, dahinter "Eigene" fuer den Systemwaehler.
+ * Stand bis R24 als `.color-swatch` in calendar.css und in vier Abschriften
+ * (waste, notes, budget, Schnellzugriffe) - eine geteilte Form, deren CSS in
+ * einem Modul wohnt, ist nur dort eine Form.
+ * Die Trefferflaeche ist die Zielgroesse (`--target-base`: 44 am Zeiger,
+ * 48 am Finger); `::before` holt sie um den kleineren Swatch herum, ohne die
+ * Palette aufzublasen. Kein `overflow` am Swatch: er schnitte das `::before` ab.
+ *
+ * SWATCH + ABSTAND = TREFFERFLAECHE (R24 S15). Hier stand ein fester
+ * Ueberstand von 10px bei 12px/8px Abstand: je zwei Nachbarflaechen
+ * ueberlappten, und weil die spaetere oben liegt, traf ein Tipp knapp neben
+ * einem Swatch den naechsten. Wirklich treffbar blieben 40x36 (gemessen,
+ * elementFromPoint). Jetzt ist der Abstand fest (16px) und der Swatch die
+ * Zielgroesse minus Abstand: 28px am Zeiger (wie bisher), 32px am Finger.
+ * Die Flaechen stossen aneinander, Zentrumsabstand = Zielgroesse in beiden
+ * Achsen, keine Ueberlappung - fuer Reihe, Umbruch und "Eigene". */
+.color-picker {
+  --swatch-hit: var(--target-base);
+  --swatch-gap: var(--space-4);
+  --swatch-size: calc(var(--swatch-hit) - var(--swatch-gap));
+  display: flex;
+  align-items: flex-end;
+  gap: var(--swatch-gap);
+}
+
+/* Bricht die Reihe um, bleibt "Eigene" am Ende der letzten Zeile stehen,
+   statt allein in eine eigene zu fallen. */
+.color-picker__swatches {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  gap: var(--swatch-gap);
+}
+
+.color-picker__custom {
+  flex: 0 0 auto;
+}
+
+.color-swatch {
+  position: relative;
+  inline-size: var(--swatch-size, calc(var(--space-6) + var(--space-1)));
+  block-size: var(--swatch-size, calc(var(--space-6) + var(--space-1)));
+  padding: 0;
+  border-radius: var(--radius-full);
+  border: var(--space-0h) solid transparent;
+  background: var(--swatch, transparent);
+  background-clip: padding-box;
+  /* Eine ruhige Innenkante in beiden Themes: im Dark lief ein Swatch ohne
+     Kante in den Kartengrund (Re-Critique 2026-09-28, P9). */
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+/* `inset` misst von der Innenkante des Rings aus (Polsterkasten des
+ * Absolut-Bezugs), nicht von der Aussenkante - daher der Ring abgezogen.
+ * Ohne ihn fehlten 4px: die alte 48er Flaeche war in Wahrheit 44. */
+.color-swatch::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--swatch-size) - var(--swatch-hit)) / 2 - var(--space-0h));
+  border-radius: var(--radius-full);
+}
+
+@media (hover: hover) {
+  .color-swatch:hover { transform: scale(1.1); }
+}
+
+/* Der Ring nimmt die Textfarbe, nicht den Akzent: er muss gegen JEDE
+   Fuellung bestehen, auch gegen den Akzent selbst. Ebenso der Fokusring. */
+.color-swatch.color-swatch--active {
+  border-color: var(--color-text-primary);
+  box-shadow: inset 0 0 0 2px var(--color-surface-raised);
+}
+
+.color-swatch:focus-visible {
+  --focus-ring-color: var(--color-text-primary);
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* "Eigene": ein runder Knopf im Well mit Plus, darueber unsichtbar der
+   Systemwaehler (das Feld selbst traegt Namen und Fokus). Die gewaehlte
+   eigene Farbe steht als Swatch davor, nicht im Knopf - der Knopf heisst
+   immer dasselbe. */
+.color-picker__custom {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  inline-size: var(--swatch-size);
+  block-size: var(--swatch-size);
+  border-radius: var(--radius-full);
+  background: var(--color-fill-well);
+  color: var(--color-text-secondary);
+}
+
+.color-picker__custom svg {
+  inline-size: var(--icon-md);
+  block-size: var(--icon-md);
+  pointer-events: none;
+}
+
+.color-picker .color-picker__native {
+  /* Doppelte Klasse: Modulregeln wie `.housekeeping-field input` (0,1,1)
+     haetten das Feld sonst wieder sichtbar und breit gemacht. */
+  position: absolute;
+  inset: calc((var(--swatch-size) - var(--swatch-hit)) / 2);
+  inline-size: var(--swatch-hit);
+  min-inline-size: 0;
+  block-size: var(--swatch-hit);
+  min-block-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.color-picker__custom:has(.color-picker__native:focus-visible) {
+  outline: var(--focus-ring-width) solid var(--color-text-primary);
+  outline-offset: var(--focus-ring-offset);
 }
 
 /* Gleich hohe Karten/Boxen in Modal-Grids */
@@ -8177,23 +8575,12 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   color: var(--color-text-primary);
 }
 
-/* Zerstörende Aktion mit tertiärem Gewicht: roter Text, aber ohne Rahmen/Füllung,
-   damit „Löschen" im Event-Popover hinter „Bearbeiten" zurücktritt statt gleich
-   gewichtet daneben zu stehen (Critique-Minor). */
-.btn--danger-ghost {
-  background-color: transparent;
-  color: var(--color-danger);
-}
-
-.btn--danger-ghost:hover {
-  background-color: var(--color-surface-2);
-  color: var(--color-danger-hover);
-}
-
-/* AUSNAHME wie .btn--danger-outline: Gefahrenfarbe statt Modul-Akzent. */
-.btn--danger-ghost:focus-visible {
-  --focus-ring-color: var(--color-danger);
-}
+/* EINE LOESCHEN-FORM (R24, G0-Shell-P3-1). Hier stand `.btn--danger-ghost`,
+ * roter Text ohne Kante, fuer Loeschen in Leseblatt, Detailspalte und
+ * Termin-Popover - neben `.btn--danger-outline` in jedem Dialogfuss. Dieselbe
+ * Handlung sah je nach Ort zwei Gewichte; Loeschen ist jetzt ueberall der
+ * umrandete Knopf mit Wort am Anfangsrand, er tritt hinter den gefuellten
+ * Primaerknopf am Ende zurueck (Guard test:control-dialect "R24 Loeschen"). */
 
 /* Eingerasteter Zustand eines Umschalt-Buttons (z. B. Mehrfachauswahl in
    Aufgaben). Trägt `aria-pressed="true"`; ohne diese Regel war der aktive
@@ -8388,6 +8775,16 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
     min-width: var(--target-md);
   }
 
+  /* DER KLEINE ICON-KNOPF IST AM ZEIGER SO GROSS WIE DER KLEINE TEXTKNOPF
+   * (R24, G0-Shell-P3-2). `btn--icon btn--sm` steht als Werkzeug im Kopf
+   * eines Abschnitts (Punktestaende, Ausgleich): freistehend, also
+   * `--target-md` am Zeiger wie `.btn--sm` daneben - er mass 44 neben 40er
+   * Kapseln. Am Finger bleibt `--target-base`. */
+  .btn--icon.btn--sm {
+    min-height: var(--target-md);
+    min-width: var(--target-md);
+  }
+
   /* `height` dazu: Polster plus Zeilenhoehe ergaben 43px ueber der Untergrenze. */
   .page-toolbar .page-search__input,
   .section-toolbar .page-search__input {
@@ -8398,7 +8795,8 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   /* Dieselbe Regel im Dialogfuss (R17, E6): ein Icon-Knopf (Archivieren neben
    * Loeschen, Entsorgung und Konto) stand mit 44px neben Abbrechen und
    * Speichern mit 40 und streckte seinen Nachbarn mit. */
-  .modal-panel__footer .btn--icon {
+  .modal-panel__footer .btn--icon,
+  .detail-view__footer .btn--icon {
     min-height: var(--target-md);
     min-width: var(--target-md);
   }
@@ -8744,7 +9142,7 @@ textarea::placeholder {
 :is(.modal-panel__body, .form-advanced__body, .form-stack, .form-pair, .modal-grid,
     .rrule-row, .reminder-fields, .reminder-section,
     .subscription-form__identity-fields, .subscription-form__billing-grid,
-    .shopping-import-meals-form, .settings-name-color-row) > .form-group,
+    .shopping-import-meals-form) > .form-group,
 :is(.modal-panel__body, .form-advanced__body, .form-stack, .birthday-modal__identity) > * > .form-group:last-child {
   margin-bottom: 0;
 }
@@ -9252,6 +9650,94 @@ textarea::placeholder {
   grid-area: remove;
 }
 
+/* EINE ZEILE, SOBALD DIE LISTE SIE TRAEGT (R24, Critique G3-Rezepte-P3-2).
+ * Am Desktop (Rezept bearbeiten in der Detailspalte, Liste 642px) stand jede
+ * Zutat zweizeilig - 96px je Zutat, und von sechs Zutaten war im 540px-Blatt
+ * eine sichtbar. Ab 34rem Listenbreite steht sie wie im Uebernahme-Dialog des
+ * Einkaufs in einer Zeile: Name | Menge | Kategorie | Entfernen. Die
+ * Reihenfolge bleibt die des Markups (Tab-Folge = Lesefolge). Gefragt wird die
+ * Breite der LISTE, nicht des Viewports: dasselbe Blatt ist am Telefon schmal. */
+.ingredient-list,
+.recipe-ingredient-list {
+  container: ingredient-rows / inline-size;
+}
+
+@container ingredient-rows (min-width: 34rem) {
+  .ingredient-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 6.5rem) minmax(0, 10rem) auto;
+    grid-template-areas: "name qty cat remove";
+  }
+}
+
+/* --------------------------------------------------------
+ * Portionen-Stepper (R24, E12; Markup: utils/servings-stepper.js)
+ * Global, weil er im Rezept (Seite, Leseblatt) UND im Mahlzeit-Dialog steht -
+ * Dialoge rendern im geteilten Overlay. Die Knoepfe tragen die ruhige Haut des
+ * Vorrat-Steppers (keine Kante, Flaeche erst im Hover), der Wert steht
+ * dazwischen in gleich breiten Ziffern: hier ist er die Antwort („fuer wie
+ * viele?"), nicht eine Angabe der Metazeile.
+ * -------------------------------------------------------- */
+.servings-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  --servings-step-btn: var(--target-md);
+}
+
+.servings-stepper__label {
+  margin-inline-end: var(--space-1);
+  font-size: var(--type-secondary);
+  color: var(--color-text-secondary);
+}
+
+.servings-stepper__value {
+  min-width: 3.5ch;
+  text-align: center;
+  font-size: var(--type-body);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+}
+
+.servings-stepper__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--servings-step-btn);
+  height: var(--servings-step-btn);
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+/* Unter dem Zeiger; am Finger bliebe der Hover nach dem Tipp kleben. */
+@media (hover: hover) {
+  .servings-stepper__btn:hover:not(:disabled) {
+    background-color: var(--color-surface-hover);
+    color: var(--color-text-primary);
+  }
+}
+
+.servings-stepper__btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.servings-stepper__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (hover: none) {
+  .servings-stepper {
+    --servings-step-btn: var(--target-base);
+  }
+}
+
 .meal-type-badge {
   display: inline-flex;
   align-items: center;
@@ -9705,6 +10191,47 @@ textarea::placeholder {
   font-size: var(--type-caption);
 }
 
+/* EINE RUHIGE ZEILE STATT LEERER KACHELN (R21 D6, R22 D12, DW p7):
+ * `cardEmptyRowHtml` (utils/empty-state.js). Ein leerer Abschnitt in einer
+ * Karte ist ein Satz und hoechstens eine Aktion - die Gesundheit und die
+ * Kacheln der Uebersicht sprechen dieselbe Zeile.
+ *
+ * DIE AKTION STEHT IMMER AM ZEILENENDE. Hier stand `flex-wrap: wrap`, und auf
+ * der Uebersicht brach "Abfallart anlegen" am Telefon und bei 1440 unter den
+ * Satz (gemessen: Entsorgung 104-108px statt einer Zeile). Jetzt gibt der
+ * SATZ nach: er schrumpft und bricht in sich um, der Knopf behaelt seine
+ * Breite. */
+.card-empty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-block-size: var(--target-base);
+}
+
+.card-empty-row__text {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  font-size: var(--type-secondary);
+  color: var(--color-text-secondary);
+  text-wrap: pretty;
+}
+
+.card-empty-row__action {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* DIESELBE ZEILE AUF EIGENER FLAECHE (R22, D12): wo sie nicht in einer
+ * Karte steht ("Heute faellig" im Medikamentenbereich, eine leere Woche der
+ * Aktivitaet), traegt sie die Flaeche einer Karte selbst. */
+.card-empty-row--surface {
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
 /* --------------------------------------------------------
  * Responsive Grid (Utility)
  * -------------------------------------------------------- */
@@ -10129,6 +10656,19 @@ html:has(.search-overlay--visible) .bulk-pill-layer {
   transition: opacity var(--transition-fast), transform var(--duration-2xs) var(--ease-out);
 }
 
+/* DIE KAPSEL DER PILLE HAT DIE ZIELGROESSE DES KLEINEN KNOPFS (R24,
+ * G2-Aufgaben-P2-3, G3-Einkauf-P3-2): `--target-md` hoch, 14px wie `.btn--sm`.
+ * Sie mass 28px in 12px - am Zeiger unter jedem anderen Knopf der App, am
+ * Finger nur ueber den unsichtbaren Saum (unten) treffbar. Die Ruecknahme im
+ * Toast bleibt die Fussnote einer Meldung, die von selbst geht. */
+.list-bulkbar__action {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-md);
+  padding-block: 0;
+  font-size: var(--text-sm);
+}
+
 /* DIE MARKE AN DER KAPSEL steht standardmäßig nicht da: solange das Subjekt
  * links die Zahl trägt, wäre sie deren Echo. Sie tritt erst ein, wo das Subjekt
  * wegfällt (siehe die Container-Regel bei .list-bulkbar__subject).
@@ -10303,7 +10843,10 @@ html:has(.search-overlay--visible) .bulk-pill-layer {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
+  /* Die Kapseln messen `--target-md` (R24, unten); die Pille gibt ihnen dafuer
+   * ihr senkrechtes Polster ab und bleibt bei `--bulk-pill-height` - abzueglich
+   * der 1px-Glaskante (glass.css), die sonst 2px dazugab. */
+  padding: calc((var(--bulk-pill-height) - var(--target-md)) / 2 - var(--space-px)) var(--space-3);
   /* Die Zusicherung hinter --bulk-pill-safe-zone (tokens.css): der Nachlauf am
    * Scroll-Ende rechnet mit diesem Wert, also muss die Pille ihn halten. */
   min-height: var(--bulk-pill-height);
@@ -11832,4 +12375,58 @@ p.field-hint--warn svg {
 
 .select-circle--on .select-circle__check {
   display: block;
+}
+
+/* ERKLAERUNG: KERN VORN, DER REST AUFKLAPPBAR (R22, D13; utils/hint-fold.js
+ * hintFoldHtml). Der Ausloeser ist ein Textknopf in Akzenttinte auf der
+ * Hinweisstufe, der Pfeil zeigt die Richtung (natives `<details>`, Marker
+ * aus). Die Trefferflaeche haelt die Zielgroesse ihrer Geraetewelt
+ * (--target-base liefert 40 am Zeiger, 48 am Finger), ohne die Zeile
+ * optisch aufzublaehen. */
+.settings-hint-fold {
+  margin-block-end: var(--space-3);
+}
+
+.settings-hint-fold__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-block-size: var(--target-base);
+  color: var(--color-accent);
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings-hint-fold__summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-hint-fold__summary:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+.settings-hint-fold__icon {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: 0 0 auto;
+  transition: transform var(--transition-fast);
+}
+
+.settings-hint-fold__more[open] .settings-hint-fold__icon {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-hint-fold__icon {
+    transition: none;
+  }
+}
+
+.settings-hint-fold__body {
+  display: grid;
+  gap: var(--space-2);
 }

@@ -154,10 +154,22 @@
  *
  * Diese Leiste liest `--active-module-accent` statt `--module-accent`: sie
  * sitzt in der Shell, nicht auf dem Page-Root, und kennt den Modulton nur
- * über das, was der Router aufs Dokument setzt. */
+ * über das, was der Router aufs Dokument setzt.
+ *
+ * EIN REITER IST KEIN SEGMENT (R24, E3, Ulas 2026-10-28). Die Fläche des
+ * aktiven Reiters war die Surface-Pille des Segments: hell eine weiße Kapsel
+ * mit grauem 1px-Ring auf dem Seitengrund - sie las sich als Umrandungs-Knopf
+ * -, dunkel eine graue Platte. Ein Reiter steht aber auf keiner Bahn (kein
+ * Well), der Ring hatte keinen Träger, dessen Kante er zeichnen müsste. Jetzt
+ * ist er in beiden Themes EINE getönte Kapsel im Modulton (`--tint-state`,
+ * Zustand auf ungetönter Fläche), ohne Ring und Schatten; die Tinte bleibt.
+ * Das Segment (Ansichtswahl) behält den Daumen mit Kante - so bleiben Reiter
+ * (welcher Bereich) und Segment (welche Ansicht) unterscheidbar. Die Grenze
+ * des Zustands trägt hier nicht die Fläche allein: Tinte im Modulton und
+ * Semibold sagen ihn mit (WCAG 1.4.1). */
 .sub-tab--active {
-  background-color: var(--seg-active-bg);
-  box-shadow: var(--seg-active-shadow);
+  background-color: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) var(--tint-state), transparent);
+  box-shadow: none;
   color: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
   font-weight: var(--font-weight-semibold);
 }
@@ -206,6 +218,16 @@
 
 .has-seg-indicator [data-seg-active][data-seg-active] {
   background-color: transparent;
+  box-shadow: none;
+}
+
+/* Die gleitende Kapsel einer REITER-Leiste nimmt die Fläche des aktiven
+ * Reiters an (R24, E3, siehe `.sub-tab--active`): getönt im Modulton, ohne
+ * Ring. Erkannt an ihren Einträgen, nicht an einer Namensliste - jede Leiste
+ * aus `.sub-tab` ist eine Reiter-Leiste (Budget, Belohnungen, Haushaltshilfe,
+ * Schichtplan, Küche, Gesundheit). */
+.has-seg-indicator:has(> .sub-tab) > .seg-indicator {
+  background-color: color-mix(in srgb, var(--active-module-accent, var(--color-accent)) var(--tint-state), transparent);
   box-shadow: none;
 }
 

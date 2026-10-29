@@ -162,6 +162,9 @@ function* domButtons(src) {
 const isHeadTools = (cls) => /\bpopover-menu__trigger\b/.test(cls) && /-tools\b|tools-btn\b/.test(cls);
 const isPhotoOverlay = (cls) => /photo-action|avatar-action/.test(cls);
 const isFooterDelete = (cls) => /\bbtn--danger(?![\w-])/.test(cls) && /\bbtn--icon\b/.test(cls);
+// Das Mehr-Menue im Fuss eines Leseblatts (R24, detailFooterEl `more: true`):
+// eine Blatt-Aktion wie das Kopf-Werkzeug, keine Zeilenaktion.
+const isFooterMore = (cls) => /\bdetail-view__more-btn\b/.test(cls) && /\bpopover-menu__trigger\b/.test(cls);
 
 /**
  * Punkt 1: ein Bedienelement, das Bearbeiten/Loeschen/Mehr an einer ZEILE
@@ -186,7 +189,7 @@ export function scanRowAction(src) {
     // Aktionen in einem 148px-Slot, 48px-Knoepfe passen dort nicht; die
     // Trefferflaeche spannt ein ::before auf 40px.
     if (/\bmeal-card__action-btn\b/.test(cls)) return;
-    if (isHeadTools(cls) || isPhotoOverlay(cls) || isFooterDelete(cls)) return;
+    if (isHeadTools(cls) || isPhotoOverlay(cls) || isFooterDelete(cls) || isFooterMore(cls)) return;
     found.push({ line: lineOf(src, index), what: `${cls || '(ohne Klasse)'} [${icon}${action ? ` ${action}` : ''}]` });
   };
   for (const c of templateControls(src)) judge(c);
@@ -981,6 +984,127 @@ export function scanNativeDate(src, file = '') {
   return found;
 }
 
+/**
+ * EIN FARBWAEHLER (Critique R24, E6): ein natives Farbfeld gibt es nur noch
+ * als "Eigene" im Baustein utils/color-picker.js - sonst stand es als
+ * violetter Balken (Schichtplan, Haushaltshilfe, Abos) oder als runder Knopf
+ * (Konto, Kalender-Import) neben fuenf Swatch-Reihen.
+ */
+export function scanNativeColor(src, file = '') {
+  if (file === 'public/utils/color-picker.js') return [];
+  const found = [];
+  const re = /<input\b[^>]*\btype=(["'])color\1[^>]*>|\.type\s*=\s*(["'])color\2|setAttribute\(\s*(["'])type\3\s*,\s*(["'])color\4\s*\)/g;
+  let m;
+  while ((m = re.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    found.push({ line: lineOf(src, m.index), what: m[0].slice(0, 80) });
+  }
+  return found;
+}
+
+/**
+ * Eine Swatch-Reihe mit eigener Klasse (`.waste-color-swatch`,
+ * `.note-color-swatch`, `.budget-color-swatch` ...) statt `.color-swatch` aus
+ * colorPickerHtml(): jede Abschrift hatte eigene Geometrie, eigene Tasten und
+ * eigenen Ring. Gezaehlt wird jede Klasse auf `-swatch`, die als Radio waehlt.
+ */
+export function scanSwatchDialect(src, file = '') {
+  if (file === 'public/utils/color-picker.js') return [];
+  const found = [];
+  const re = /<(?:div|button|span)\b[^>]*>/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const tag = m[0];
+    if (!/role=(["'])radio\1/.test(tag)) continue;
+    const hit = /class="([^"]*)"|class='([^']*)'/.exec(tag);
+    const cls = (hit?.[1] ?? hit?.[2] ?? '').replace(/\$\{[^}]*\}/g, ' ');
+    const own = cls.split(/\s+/).find((c) => /-swatch$/.test(c) && c !== 'color-swatch');
+    if (!own || inComment(src, m.index)) continue;
+    found.push({ line: lineOf(src, m.index), what: own });
+  }
+  return found;
+}
+
+/**
+ * DIALOGREGELN (Critique R24 S3; DESIGN.md D4 "Formulare"). Drei Regeln, die
+ * in jedem Moduldialog gelten, die Anwendung je Modul in S7-S11 - die
+ * Ausnahmelisten unten sinken mit jedem Modul:
+ *
+ * edit-autofocus: ein Dialog, der auch BEARBEITET (Titel nach isEdit/edit/
+ * mode), oeffnet mit `initialFocus: 'edit'` - am Finger nimmt dann der Titel
+ * den Fokus, keine Tastatur ueber dem halben Blatt (R23 D13, modal.js).
+ */
+export function scanEditAutofocus(src) {
+  const found = [];
+  const re = /\bopen(?:Shared)?Modal\(\{/g;
+  let m;
+  while ((m = re.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const args = callArgs(src, m.index + m[0].length - 2);
+    const title = /\btitle:\s*([^,\n]+)/.exec(args)?.[1] ?? '';
+    const editable = /\b(?:isEdit|edit|editing|existing)\s*\?|mode\s*===\s*'edit'\s*\?|\.id\s*\?/.test(title);
+    if (!editable || /\binitialFocus\s*:/.test(args)) continue;
+    found.push({ line: lineOf(src, m.index), what: title.trim().slice(0, 70) });
+  }
+  return found;
+}
+
+/**
+ * advanced-hint: "Weitere Angaben" nennt, was dahinter liegt ("Weitere
+ * Angaben - Kontakt, Notizen und Erinnerung", Inventar-Muster). Ohne Hinweis
+ * findet ein Feld dort nur, wer schon weiss, dass es existiert.
+ */
+export function scanAdvancedHint(src, file = '') {
+  if (file === 'public/components/modal.js') return [];
+  const found = [];
+  const re = /\badvancedSection\(/g;
+  let m;
+  while ((m = re.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    const before = src.slice(Math.max(0, m.index - 30), m.index);
+    if (/import\s*\{[^}]*$|,\s*$/.test(before) && !/\$\{\s*$/.test(before)) continue;
+    const args = callArgs(src, m.index + m[0].length - 1);
+    if (/\b(?:hint|label)\s*:/.test(args)) continue;
+    found.push({ line: lineOf(src, m.index), what: 'advancedSection ohne hint' });
+  }
+  return found;
+}
+
+/**
+ * primary-disabled: der Primaerknopf eines Dialogs ist immer bedienbar, die
+ * Pruefung meldet sich beim Absenden am Feld (`reportFieldErrors`). Ein bis
+ * zur Gueltigkeit gesperrter Knopf sagt nicht, WAS fehlt (Aufteilung bis R24).
+ */
+export function scanPrimaryDisabled(src) {
+  const found = [];
+  const re = /\b(?:save|submit|primary|confirm)\w*\.disabled\s*=(?!\s*(?:true|false)\b)\s*[^;\n]+/gi;
+  let m;
+  while ((m = re.exec(src))) {
+    if (inComment(src, m.index)) continue;
+    found.push({ line: lineOf(src, m.index), what: m[0].slice(0, 80) });
+  }
+  return found;
+}
+
+/**
+ * people-checkbox: Personen waehlt man mit `renderUserMultiSelect` (Scheibe,
+ * Name, eine Trefferflaeche je Person) - nicht mit nativen 13px-Kaestchen in
+ * einem rohen `<fieldset>` (Aufteilung-Teilnehmende bis R24).
+ */
+export function scanPeopleCheckbox(src, file = '') {
+  if (file === 'public/components/user-multi-select.js') return [];
+  const found = [];
+  const re = /<input\b[^>]*\btype="checkbox"[^>]*>/g;
+  let m;
+  while ((m = re.exec(src))) {
+    const tag = m[0];
+    if (/role="switch"|user-ms__checkbox/.test(tag) || inComment(src, m.index)) continue;
+    if (!/(?:particip|member|person|people|assignee|user)/i.test(tag)) continue;
+    found.push({ line: lineOf(src, m.index), what: tag.slice(0, 80) });
+  }
+  return found;
+}
+
 /** Ende des Elements, dessen Tag bei `openIdx` beginnt (balancierte div-Tiefe); ohne Schluss +800. */
 function elementEnd(src, openIdx) {
   const re = /<div\b|<\/div>/g;
@@ -1530,6 +1654,57 @@ test('Scanner: native-date faengt das native Datumsfeld (Template und DOM) und l
   assert.deepEqual(scanNativeDate(bad, 'public/components/datepicker.js'), [], 'der Baustein selbst zaehlt nicht');
 });
 
+test('Scanner: native-color faengt das native Farbfeld (Template und DOM) und laesst den Baustein durch', () => {
+  const bad = `
+    <input class="form-input form-input--color" name="color" type="color" value="\${esc(c)}">
+    <input class="settings-color-button" type='color' id="x">
+    field.type = 'color';
+    input.setAttribute("type", "color");`;
+  assert.equal(scanNativeColor(bad, 'public/pages/x.js').length, 4);
+  const good = `
+    \${colorPickerHtml({ name: 'color', value, labelledBy: 'l' })}
+    // <input type="color"> stand hier bis R24
+    <input type="text" class="form-input">`;
+  assert.deepEqual(scanNativeColor(good, 'public/pages/x.js'), []);
+  assert.deepEqual(scanNativeColor(bad, 'public/utils/color-picker.js'), [], 'der Baustein selbst zaehlt nicht');
+});
+
+test('Scanner: swatch-dialect faengt die eigene Swatch-Klasse als Radio und laesst .color-swatch und Schmuck durch', () => {
+  const bad = `
+    <div class="note-color-swatch \${on ? 'note-color-swatch--active' : ''}" data-color="x"
+         role="radio" tabindex="0"></div>
+    <button type="button" role="radio" class="budget-color-swatch is-active" style="--swatch:x"></button>`;
+  assert.deepEqual(scanSwatchDialect(bad, 'public/pages/x.js').map((h) => h.what), ['note-color-swatch', 'budget-color-swatch']);
+  const good = `
+    <button type="button" class="color-swatch color-swatch--active" role="radio" aria-checked="true"></button>
+    <span class="filter-chip__swatch" aria-hidden="true"></span>
+    <span class="cal-calendar-row__swatch" style="background-color:x" aria-hidden="true"></span>`;
+  assert.deepEqual(scanSwatchDialect(good, 'public/pages/x.js'), []);
+});
+
+test('Scanner: Dialogregeln - edit-autofocus, advanced-hint, primary-disabled, people-checkbox fangen ihr Muster und lassen den Kanon durch', () => {
+  const edit = `openModal({ title: isEdit ? t('a.edit') : t('a.new'), content });
+    openSharedModal({ title: t('a.only'), content });
+    openModal({ title: isEdit ? t('b.edit') : t('b.new'), initialFocus: isEdit ? 'edit' : 'first-field', content });`;
+  assert.deepEqual(scanEditAutofocus(edit).map((h) => h.line), [1], 'nur der bearbeitende Dialog ohne initialFocus');
+  const adv = `import { advancedSection } from '/components/modal.js';
+    \${advancedSection(fieldsHtml, { open })}
+    \${advancedSection(fieldsHtml, { hint: t('x.topics'), open })}
+    \${advancedSection(list, { label: t('x.fold') })}`;
+  assert.deepEqual(scanAdvancedHint(adv, 'public/pages/x.js').map((h) => h.line), [2]);
+  const prim = `saveBtn.disabled = true;
+    saveBtn.disabled = false;
+    save.disabled = !valid;
+    submitBtn.disabled = n === 0;
+    other.disabled = !ok;`;
+  assert.deepEqual(scanPrimaryDisabled(prim).map((h) => h.line), [3, 4], 'Laden-Sperre ja, Gueltigkeits-Sperre nein');
+  const ppl = `<input type="checkbox" name="participants" value="\${id}">
+    <input type="checkbox" class="user-ms__checkbox" value="\${u.id}">
+    <input type="checkbox" role="switch" id="member-active">
+    <input type="checkbox" name="done">`;
+  assert.deepEqual(scanPeopleCheckbox(ppl, 'public/pages/x.js').map((h) => h.line), [1]);
+});
+
 test('Scanner: section-action faengt btn--ghost und btn--secondary ohne --sm im Abschnittskopf und laesst Kanon durch', () => {
   const bad = `
     <div class="split-section-actions">
@@ -1869,15 +2044,9 @@ const PENDING = {
   // Darlehenstilgungen und Aufgaben sind umgestellt; der Essensplan traegt
   // keinen Papierkorb mehr. Ab hier ist jede neue Zone mit mehr als zwei
   // sichtbaren Zeilenaktionen und jede Textkapsel in einer Zeile rot.
-  'row-action-count': {
-    // BENANNTE AUSNAHME, keine Altlast: die Leiste im KOPF DES
-    // DOKUMENTBETRACHTERS (In neuem Tab, Bearbeiten, Teilen, Herunterladen).
-    // Sie ist die Werkzeugleiste eines geoeffneten Dokuments, keine Zeile
-    // einer Liste - ihre Knoepfe leiht sie sich nur von `.row-action`. Die
-    // Regel "zwei sichtbar" gilt der Wiederholung je Zeile; diese Leiste
-    // steht einmal.
-    'public/pages/documents.js': 1,
-  },
+  // Leer seit R24 S10: die Leiste des Dokumentbetrachters traegt Knoepfe mit
+  // Wort (G4-Dokumente-P3-3), keine geliehenen `.row-action` mehr.
+  'row-action-count': {},
   'row-text-capsule': {},
   // --- R21 (Critique 2026-10-21), D10 Zeilen-Endzone, nur nach UNTEN. ---
   // Leer seit #2152: die Verwalter (Abo-Kategorien und Zahlungsarten, Familie)
@@ -1972,6 +2141,29 @@ const PENDING = {
   // --- Issue #2119 (2026-10-25): Haken mit Gegenstueck - leer ab Beginn. ---
   'action-hook': {},
   'cta-hook': {},
+  // --- Critique R24 S3 (2026-10-28), E6: EIN Farbwaehler. ---
+  // "Kalender verwalten" ist seit S7 eine Zeilenliste mit Bearbeiten-Blatt
+  // (colorPickerHtml) - kein natives Farbfeld mehr ausserhalb des Bausteins.
+  'native-color': {},
+  // Kuratierte TOKEN-Toene (Kontofarben, Kategorietoene) gehen seit S10 durch
+  // colorPickerHtml({ options, custom: false }) - der Baustein nimmt
+  // Token-Ausdruecke als `paint`.
+  'swatch-dialect': {},
+  // --- Critique R24 S3: Dialogregeln (DESIGN.md D4). Gebaut sind Regel und
+  // Helfer, angewendet wird je Modul in S7-S11; die Listen sinken dort.
+  // S7 Zeit (Kalender, Schichtplan, Geburtstage), S8 (Aufgaben, Belohnungen,
+  // Haushaltshilfe, Entsorgung), S9 Kueche, S10 Geld & Ablage, S11
+  // Gesundheit/Kontakte/Familie; Schnellzugriffe und Einstellungen S6.
+  // R24 S11: Gesundheit, Kontakte, Geburtstage, Schnellzugriffe und die
+  // Einstellungsblaetter der Gesundheit und der Adressbuch-Synchronisation
+  // sind umgestellt. R24 S12: Termin, Notiz und eigenes Schichtplan-Feld
+  // ebenso - die Liste ist leer.
+  'edit-autofocus': {},
+  'advanced-hint': {},
+  // Die Rechte-Matrix hat seit R24 S11 (E11) keinen Speichern-Knopf mehr; der
+  // Schichtplan meldet "Extra ohne Schichttyp" seit R24 S12 beim Absenden.
+  'primary-disabled': {},
+  'people-checkbox': {},
 };
 
 const HEAD_SEARCH = headSearchClasses(JS);
@@ -2005,6 +2197,12 @@ const RULES = {
   'section-action': { files: JS, scan: (s) => scanSectionAction(s), canon: 'genau EINE `btn--secondary btn--sm` (Icon + Wort) im Abschnittskopf; Nebenaktionen hinter `popover-menu__trigger` mit `<modul>-section-tools` (DESIGN.md D5)' },
   'section-toolbar-create': { files: JS, scan: (s) => scanSectionToolbarCreate(s), canon: 'Erstell-Aktion im Abschnittskopf hinter `popover-menu__trigger`, kein nackter `btn--icon` mit Plus-Icon (DESIGN.md D5)' },
   'action-hook': { files: JS, scan: (s, f) => scanActionHook(s, importedSources(s, f, JS_BY_FILE)), canon: 'jedes `[data-action="x"]` im Listener hat ein `x` im Markup derselben Datei oder eines importierten Moduls (#2119)' },
+  'native-color': { files: JS, scan: (s, f) => scanNativeColor(s, f), canon: '`colorPickerHtml()` + `wireColorPicker()` (utils/color-picker.js) - Familientoene, "Eigene" dahinter (E6)' },
+  'edit-autofocus': { files: JS, scan: (s) => scanEditAutofocus(s), canon: '`initialFocus: \'edit\'` an jedem Dialog, der auch bearbeitet (components/modal.js, R23 D13)' },
+  'advanced-hint': { files: JS, scan: (s, f) => scanAdvancedHint(s, f), canon: '`advancedSection(html, { hint })` - "Weitere Angaben" nennt, was dahinter liegt (Inventar-Muster)' },
+  'primary-disabled': { files: JS, scan: (s) => scanPrimaryDisabled(s), canon: 'Primaerknopf immer aktiv, Pruefung beim Absenden (`reportFieldErrors(constraintErrors(form))`)' },
+  'people-checkbox': { files: JS, scan: (s, f) => scanPeopleCheckbox(s, f), canon: '`renderUserMultiSelect()` (components/user-multi-select.js) statt nativer Kaestchen je Person' },
+  'swatch-dialect': { files: JS, scan: (s, f) => scanSwatchDialect(s, f), canon: '`.color-swatch` aus `colorPickerHtml()` (utils/color-picker.js), keine eigene Swatch-Klasse je Modul' },
   'cta-hook': { files: JS, scan: (s) => scanCtaHook(s), canon: 'eine Leerzustand-Aktion ohne `onClick` traegt einen Haken (`attrs: { \'data-action\' }`, `id`, Klasse), den die Datei bindet (#2210)' },
 };
 
@@ -2196,13 +2394,25 @@ test('R22 D12: die Dialog-Fuesse der Gesundheit und ihres Einstellungsblatts tra
   assert.deepEqual(offenders, []);
 });
 
-test('R22 D20: der Notiz-Lesedialog wechselt das Gewicht von Loeschen mit der Ansicht (Detail-Fuss-Kanon)', () => {
-  // Leseansicht wie das Leseblatt der Kontakte (danger-ghost), Editor wie
-  // jeder Dialogfuss (danger-outline) - derselbe Knopf, syncFooter() schaltet.
+test('R24 Loeschen: EINE Form app-weit - `btn--danger-outline` mit Wort, kein `danger-ghost` mehr (G0-Shell-P3-1)', () => {
+  // Bis R24 stand Loeschen in Leseblatt, Detailspalte, Popover und
+  // Notiz-Lesedialog als `danger-ghost` (roter Text ohne Kante), im
+  // Dialogfuss als `danger-outline`: dieselbe Handlung in zwei Gewichten.
+  const offenders = [];
+  for (const { file, src } of JS) {
+    src.split('\n').forEach((line, i) => {
+      if (/danger-ghost/.test(line) && !/^\s*(?:\/\/|\*)/.test(line)) offenders.push(`${file}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(offenders, []);
+  const css = readdirSync(new URL('../public/styles/', import.meta.url)).filter((f) => f.endsWith('.css'))
+    .flatMap((f) => [...eachRule(readFileSync(new URL(`../public/styles/${f}`, import.meta.url), 'utf8'))].map((r) => r.selector));
+  assert.ok(!css.some((sel) => /\.btn--danger-ghost\b/.test(sel)), 'keine Regel fuer `.btn--danger-ghost`');
+  // Der Notiz-Lesedialog schaltet das Gewicht nicht mehr um.
   const notes = JS.find(({ file }) => file.endsWith('pages/notes.js')).src;
   const sync = notes.slice(notes.indexOf('function syncFooter(view)'), notes.indexOf('function animatePane('));
-  assert.match(sync, /classList\.toggle\('btn--danger-ghost', view === 'read'\)/);
-  assert.match(sync, /classList\.toggle\('btn--danger-outline', view !== 'read'\)/);
+  assert.doesNotMatch(sync, /classList\.toggle\('btn--danger/);
+  assert.match(notes, /<button type="button" class="btn btn--danger-outline" id="note-modal-delete">/);
 });
 
 test('Auswahlkreis: EIN Baustein in der Shell (layout.css), jede Mehrfachauswahl nutzt ihn (R8 H14)', () => {
@@ -2450,10 +2660,16 @@ test('R23 D13: Kanban-Wechsel ohne Zwischenbild - alte Ansicht bleibt, Kopf und 
   assert.match(set, /if \(!swap\(\)\) return;\s*renderTaskList\(container\)/, 'Liste und Brett zeichnen direkt nach dem Tausch');
 });
 
-test('R23 D13: der Kopf der Aufgaben behaelt seine Form - Filter abgeschaltet statt weg, angedockter FAB unsichtbar statt weg', () => {
+test('R23 D13 / R24: der Kopf der Aufgaben behaelt seine Form - der Filter haelt im Verlauf nur seinen Platz, angedockter FAB unsichtbar statt weg', () => {
   const chrome = fnBody(readPub('pages/tasks.js'), 'function syncViewChrome(', '\n}\n');
   assert.doesNotMatch(chrome, /filterBtn\.hidden\s*=\s*isHistory/, 'der Filterknopf verschwand im Verlauf und schob Segment und Menue');
-  assert.match(chrome, /filterBtn\.disabled\s*=\s*isHistory/);
+  // R24 (G2-Aufgaben-P3-3): nicht mehr ausgegraut (ein totes Werkzeug ohne
+  // Grund), sondern unsichtbar mit gehaltenem Platz.
+  assert.doesNotMatch(chrome, /filterBtn\.disabled\s*=\s*isHistory/, 'ausgegraut stand ein Werkzeug da, das nichts tut');
+  assert.match(chrome, /filterBtn\.classList\.toggle\('is-vacant',\s*isHistory\)/);
+  const vacant = rulesOf('styles/tasks.css').find((r) => r.selector.trim() === '.tasks-toolbar .is-vacant');
+  assert.ok(vacant, 'Regel fuer den gehaltenen Platz fehlt');
+  assert.match(vacant.body, /visibility:\s*hidden/, 'visibility haelt den Platz und nimmt Zeiger, Tab-Folge und Baum');
   const docked = rulesOf('styles/layout.css').find((r) => r.selector.includes('.is-selecting) .page-fab.page-fab--docked'));
   assert.ok(docked, 'Regel fuer den angedockten FAB im Auswahlmodus fehlt');
   assert.ok(docked.at.some((a) => /min-width:\s*1024px/.test(a)), 'nur dort, wo er angedockt ist');
@@ -2506,7 +2722,11 @@ test('R23 D13: Wochenplan - Rezepte als Leiste unter dem Plan, unter 72rem der T
   const layout = rules.find((r) => r.selector.trim() === '.meals-layout' && /container:\s*meals-board/.test(r.body));
   assert.ok(layout, '.meals-layout misst sich nicht als Flaeche');
   assert.match(layout.body, /grid-template-columns:\s*minmax\(0, 1fr\)/, 'keine Spalte rechts mehr');
-  assert.match(layout.body, /grid-template-rows:\s*minmax\(0, 1fr\) auto/, 'die Leiste hat ihre eigene Zeile');
+  // R24 (Critique G3-Mahlzeiten-P2-1): die Leiste FOLGT dem Plan, statt mit
+  // `1fr` an den Fensterboden gedrueckt zu werden (145px leeres Band bei 1440).
+  assert.match(layout.body, /grid-template-rows:\s*minmax\(0, max-content\) auto/, 'die Leiste hat ihre eigene Zeile, direkt unter dem Plan');
+  assert.match(layout.body, /align-content:\s*start/, 'beide Zeilen stehen oben zusammen');
+  assert.doesNotMatch(layout.body, /minmax\(0, 1fr\) auto/, 'die Woche dehnt sich nicht auf die Resthoehe');
   const narrow = rules.filter((r) => r.at.some((a) => /meals-board \(width < 72rem\)/.test(a)));
   const grid = narrow.find((r) => r.selector.trim() === '.week-grid');
   assert.ok(grid && /repeat\(7, minmax\(128px, 1fr\)\)/.test(grid.body), 'sieben Tage mit mindestens 128px');
@@ -2515,6 +2735,25 @@ test('R23 D13: Wochenplan - Rezepte als Leiste unter dem Plan, unter 72rem der T
   const meals = readPub('pages/meals.js');
   assert.doesNotMatch(fnBody(meals, 'function wireRailToggle(', '\n}\n'), /grid\.scrollWidth > grid\.clientWidth/,
     'die Leiste klappt nicht mehr von selbst ein - sie nimmt der Woche keine Breite');
+});
+
+test('R24 S13-F1: das Wochenraster ist so hoch wie sein Inhalt (1024x768 ohne Hochscrollen)', () => {
+  // Gemessen vorher bei 1024x768: Woche 684px in 611px Port, die Snack-Reihe
+  // unter der Falz. Hoehen, die nicht aus dem Inhalt kamen: 72px Slot,
+  // Aktionsleiste ohne Knopf (Abstand + Polster), 20px Typzeile, 16er-Polster
+  // in der 128px-Spalte, 32px Seitenpolster unter dem eigenen Scrollport.
+  const rules = rulesOf('styles/meals.css');
+  const board = rules.filter((r) => r.at.length === 1 && /min-width:\s*1024px/.test(r.at[0]));
+  const narrow = rules.filter((r) => r.at.some((a) => /meals-board \(width < 72rem\)/.test(a)));
+  const one = (list, sel) => list.filter((r) => r.selector.trim() === sel).map((r) => r.body).join('\n');
+  assert.match(one(board, '.week-grid .meal-slot'), /min-height:\s*var\(--target-lg\)/, 'am Board traegt der Slot nur die Hoehe seines Plus');
+  assert.match(one(board, '.week-grid .meal-card__open'), /padding:\s*var\(--space-3\) var\(--space-3\) 0/);
+  assert.match(one(board, '.week-grid .meal-card__actions'), /padding:\s*0 var\(--space-3\) var\(--space-3\)/);
+  assert.match(one(board, '.week-grid .meal-card__actions:not(:has(*))'), /margin-top:\s*0/, 'eine Leiste ohne Knopf haelt keinen Abstand');
+  assert.match(one(board, '.meals-layout--rail-hidden'), /padding-block-end:\s*var\(--space-4\)/);
+  assert.doesNotMatch(one(narrow, '.week-gutter-label'), /min-block-size/, 'die Typzeile ist so hoch wie ihr Wort');
+  assert.match(one(narrow, '.week-grid .meal-slot'), /margin-block-start:\s*var\(--space-5\)/);
+  assert.match(one(narrow, '.week-grid .day-header'), /padding-block-start:\s*var\(--space-2\)/);
 });
 
 test('R23 D13: Mahlzeit aus einem Rezept zeigt dessen Zutaten zum Lesen, "Anpassen" macht eigene Zeilen daraus', () => {
@@ -2595,4 +2834,140 @@ test('R23 D14: ein Leerzustand neben dem FAB hat keine zweite Primaeraktion', ()
   const empty = docs.slice(docs.indexOf('function emptyStateFor()'), docs.indexOf('function renderEmptyState('));
   assert.doesNotMatch(empty, /variant: 'primary'/, 'Dokumente: kein Primaerknopf im Leerzustand');
   assert.match(empty, /t\('documents\.emptyFolderTitle', \{ name: folder\.name \}\)/, 'ein leerer Ordner ist ein Ort, kein Filter ohne Treffer');
+});
+
+// ---------------------------------------------------------------------------
+// R24 S6: Knoepfe, Zeilen, Auswahl (Critique 2026-10-26)
+// ---------------------------------------------------------------------------
+const cssOf = (name) => CSS.find(({ file }) => file === `public/styles/${name}`).src;
+const jsOf = (name) => JS.find(({ file }) => file === name).src;
+const ruleOf = (css, selector, at = null) => [...eachRule(css)]
+  .filter((r) => r.selector.replace(/\/\*[\s\S]*?\*\//g, '').trim() === selector && (at === null || r.at.some((a) => at.test(a))));
+
+test('R24 G0-Shell-P3-2: am Zeiger misst jedes Kopf- und Abschnittswerkzeug 40px, nicht 44 oder 48', () => {
+  const pointer = /min-width:\s*1024px\)\s*and\s*\(hover:\s*hover/;
+  // Der kleine Icon-Knopf (Abschnittskopf Punktestaende/Ausgleich) wie `.btn--sm`.
+  const small = ruleOf(cssOf('layout.css'), '.btn--icon.btn--sm', pointer);
+  assert.equal(small.length, 1, '`.btn--icon.btn--sm` hat am Zeiger eine eigene Hoehe');
+  assert.match(small[0].body, /min-height:\s*var\(--target-md\)/);
+  assert.match(small[0].body, /min-width:\s*var\(--target-md\)/);
+  // Die Personenwahl im Gesundheitskopf.
+  const person = ruleOf(cssOf('health.css'), '.health-toolbar__person .health-person-switcher__trigger', pointer);
+  assert.equal(person.length, 1, 'Personenwahl im Kopf: eigene Zeiger-Hoehe');
+  assert.match(person[0].body, /min-height:\s*var\(--target-md\)/);
+  // "Auschecken" der Haushaltshilfe nimmt die Hoehe von `.btn`, keine eigene.
+  const check = ruleOf(cssOf('housekeeping.css'), '.housekeeping-check-small');
+  assert.ok(check.length && check.every((r) => !/min-height/.test(r.body)), 'kein fester --target-lg am Auschecken-Knopf');
+  // Personen vergleichen im Schichtplan: kein Polster ueber der Untergrenze.
+  const people = ruleOf(cssOf('schedule.css'), '.schedule-overview__people', /hover:\s*hover/);
+  assert.match(people[0]?.body ?? '', /padding-block:\s*0/);
+});
+
+test('R24 G2-Aufgaben-P2-3 / G3-Einkauf-P3-2: die Kapseln der Sammel-Pille messen --target-md, die Pille bleibt', () => {
+  const layout = cssOf('layout.css');
+  const action = ruleOf(layout, '.list-bulkbar__action');
+  assert.equal(action.length, 1);
+  assert.match(action[0].body, /min-height:\s*var\(--target-md\)/);
+  assert.match(action[0].body, /font-size:\s*var\(--text-sm\)/);
+  const pill = ruleOf(layout, '.list-bulkbar')[0];
+  assert.match(pill.body, /min-height:\s*var\(--bulk-pill-height\)/, 'die Pille haelt die Sicherheitszone');
+  assert.match(pill.body, /padding:\s*calc\(\(var\(--bulk-pill-height\) - var\(--target-md\)\) \/ 2 - var\(--space-px\)\)/,
+    'das senkrechte Polster ist der Rest bis zur Pillenhoehe (abzueglich der Glaskante)');
+});
+
+test('R24 G2-Belohnungen-P2-1: eine Anfrage traegt EINE sichtbare Handlung, nie gefuellt; Ablehnen steht im Mehr', () => {
+  const src = jsOf('public/pages/rewards.js');
+  const fn = src.slice(src.indexOf('const rows = state.redemptions.map('), src.indexOf('DER KOPF STEHT AUF DEM GRUND'));
+  assert.match(fn, /<button class="btn btn--secondary btn--sm" type="button" data-decide="fulfill"/);
+  assert.doesNotMatch(fn, /btn--primary/, 'kein Primaerknopf in der Zeile - der Primaer ist der FAB');
+  assert.match(fn, /rowMenuHtml\(\{[\s\S]*?attrs: \{ 'data-decide': 'reject'/, 'Ablehnen ist ein Eintrag im Zeilenmenue');
+  assert.doesNotMatch(fn, /<button class="btn btn--ghost btn--sm" type="button" data-decide="reject"/);
+});
+
+test('R24 G2-Entsorgung-P3-1: eine Vorlage ist ein kleiner Sekundaerknopf, ihre Farbe eine Variable', () => {
+  const src = jsOf('public/pages/waste.js');
+  const fn = src.slice(src.indexOf('function presetButtonHtml('), src.indexOf('function remainingPresetsHtml('));
+  assert.match(fn, /class="btn btn--secondary btn--sm waste-onboarding__preset"/);
+  assert.match(fn, /style="--waste-type-color:\$\{esc\(preset\.color\)\}"/);
+  assert.doesNotMatch(src, /filter-chip waste-onboarding__preset/, 'keine Filter-Optik fuer eine Anlegen-Handlung');
+  assert.doesNotMatch(fn, /style="color:/, 'keine Farbe als Inline-Stil am Zeichen');
+  assert.match(ruleOf(cssOf('waste.css'), '.waste-onboarding__preset svg')[0]?.body ?? '', /color:\s*var\(--waste-type-color/);
+});
+
+test('R24 G5-Kontakte-P3-2 / G3-Rezepte-P3-3: Seltenes steht im Mehr-Menue des Fusses, mit Wort', () => {
+  const view = jsOf('public/components/detail-view.js');
+  assert.match(view, /function footerMoreMenuEl\(actions, close\)/);
+  assert.match(view, /if \(action\.more && folds\)/, 'nur falten, wenn daneben noch etwas steht');
+  assert.match(jsOf('public/pages/contacts.js'), /id: 'contact-detail-export',[\s\S]{0,200}more: true/);
+  assert.match(jsOf('public/pages/recipes.js'), /id: 'recipe-detail-duplicate'[^}]*more: true/);
+});
+
+test('R24 G0-Inv-5 / G4-Notizen-P3-2: die Notizkarte hat den Kartenradius, ihr Checklisten-Ring 20px', () => {
+  const notes = cssOf('notes.css');
+  assert.match(ruleOf(notes, '.note-card')[0].body, /border-radius:\s*var\(--radius-lg\)/);
+  const ring = [...eachRule(notes)].find((r) => /\.note-card \.note-md-box/.test(r.selector));
+  assert.match(ring?.body ?? '', /font-size:\s*var\(--space-5\)/, 'der Ring misst 20px (Haken in em waechst mit)');
+});
+
+test('R24 G0-Shell-P3-3: EIN Etikett (`.tag`) fuer Aufgaben-Tags, Einkaufs-Etiketten, Notiz-Kategorien und Medikamenten-Abzeichen', () => {
+  const tag = ruleOf(cssOf('list-row.css'), '.tag');
+  assert.equal(tag.length, 1);
+  assert.match(tag[0].body, /background:\s*var\(--color-fill-well\)/);
+  assert.match(tag[0].body, /color:\s*var\(--color-text-secondary\)/);
+  assert.match(tag[0].body, /border-radius:\s*var\(--radius-full\)/);
+  const uses = [
+    ['public/pages/tasks.js', /class="tag task-tag task-tag--filter"/],
+    ['public/pages/shopping.js', /class="tag list-row__tag"/],
+    ['public/pages/notes.js', /class="tag note-category-badge/],
+    ['public/pages/dashboard.js', /class="tag note-item__category"/],
+    ['public/pages/health.js', /<span class="tag">/],
+  ];
+  for (const [file, re] of uses) assert.match(jsOf(file), re, file);
+  // Die Module tragen keine eigene Pillenform mehr.
+  for (const [css, sel] of [['tasks.css', '.task-tag'], ['list-row.css', '.list-row__tag'], ['health.css', '.health-med-badge']]) {
+    assert.deepEqual(ruleOf(cssOf(css), sel), [], `${sel}: keine eigene Pillenregel neben .tag`);
+  }
+});
+
+// --------------------------------------------------------------------------
+// R24 S9 Kueche (Critique 2026-10-26, G3): Plan, Karte, Rezepte, Einkauf
+// --------------------------------------------------------------------------
+test('R24 S9: die Rezeptkachel nennt ihre Zutaten, die Leiste beginnt in niedrigen Fenstern eingeklappt', () => {
+  const meals = readPub('pages/meals.js');
+  assert.match(meals, /title\.className = 'recipe-sidebar__title u-section-title'/, 'der Leistentitel ist ein Abschnittstitel (20/600)');
+  assert.match(meals, /meta\.className = 'recipe-sidebar__card-meta';\s*meta\.textContent = t\('meals\.ingredientCount', \{ count \}\)/, 'die Kachel nennt die Zutatenzahl');
+  assert.match(meals, /className: 'recipe-sidebar__thumb'/, 'und traegt ein Bild, wo es eins gibt');
+  assert.match(meals, /let hidden = window\.matchMedia\?\.\('\(max-height: 799px\)'\)\?\.matches \?\? false;/, 'unter 800px Hoehe startet die Leiste eingeklappt');
+});
+
+test('R24 S9: Karte am Board - Titel bis drei Zeilen, beide Zeichen in einem Ton, Tageskopf "Mi 28.10." mit ruhigem Plus', () => {
+  const rules = rulesOf('styles/meals.css');
+  const board = rules.find((r) => r.selector.trim() === '.meal-card__title-text' && r.at.some((a) => /min-width: 1024px/.test(a)) && /line-clamp/.test(r.body));
+  assert.match(board?.body ?? '', /-webkit-line-clamp:\s*3/, 'am Board drei Zeilen statt zwei');
+  const ton = rules.find((r) => r.selector.includes('.meal-card__action-btn--shopping') && r.selector.includes('.meal-card__action-btn--recipe') && !r.at.length);
+  assert.match(ton?.body ?? '', /color:\s*var\(--color-text-secondary\)/, 'Muetze und Wagen ruhen im selben Ton');
+  assert.ok(!rules.some((r) => r.selector.trim() === '.meal-card__action-btn--shopping' && /color:\s*var\(--module-accent\)/.test(r.body)),
+    'der Wagen traegt den Modulton nur unter dem Zeiger');
+  const add = rules.find((r) => r.selector.trim() === '.day-header > .day-add');
+  assert.match(add?.body ?? '', /margin-inline-start:\s*auto/, 'das Plus steht am Ende, Tag und Datum zusammen vorn');
+  assert.match(add?.body ?? '', /color:\s*var\(--color-text-secondary\)/, 'und ruhig, nicht orange');
+  assert.ok(!rules.some((r) => r.selector.trim() === '.day-header__date' && /margin-inline-start:\s*auto/.test(r.body)), 'das Datum rueckt nicht mehr an den Rand');
+});
+
+test('R24 S9: "Diese Woche geplant" steht nur, wenn nicht alle Rezepte geplant sind', () => {
+  const recipes = readPub('pages/recipes.js');
+  assert.match(recipes, /const allPlanned = listedRecipes\(\)\.every\(\(r\) => state\.plannedRecipeIds\.has\(r\.id\)\);/);
+  assert.match(recipes, /if \(state\.plannedRecipeIds\.has\(recipe\.id\) && !allPlanned\)/);
+});
+
+test('R24 S9: der Artikel-Dialog des Einkaufs faltet Preis, Laden, Link, Notiz und holt keine Tastatur', () => {
+  const shopping = readPub('pages/shopping.js');
+  const start = shopping.indexOf('function openItemDetails(');
+  const body = shopping.slice(start, shopping.indexOf('\nfunction ', start + 10));
+  assert.match(body, /initialFocus: 'edit'/, 'Bearbeiten holt am Finger keine Tastatur');
+  assert.match(body, /advancedSection\(itemMoreDetailsHtml\(item, linkPreview\), \{[\s\S]*?hint: t\('shopping\.moreDetailsHint'\)/, '"Weitere Angaben" nennt, was dahinter liegt');
+  assert.match(body, /open: item\.price_cents != null \|\| item\.store_id != null \|\| !!item\.url \|\| !!item\.notes/, 'offen, sobald eines einen Wert traegt');
+  assert.match(body, /class="form-pair form-pair--wide"/, 'die Kategorie steht am Telefon nicht in der halben Zeile');
+  assert.match(shopping, /<option value="\$\{PICK_PLACE\}" disabled selected>\$\{esc\(t\('shopping\.toPantryAllToPlaceholder'\)\)\}<\/option>/,
+    '"Alle nach" steht auf einem Platzhalter, bis jemand waehlt');
 });

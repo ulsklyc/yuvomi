@@ -71,13 +71,13 @@ function seedWeeklySchedule(typeId, overrides = {}) {
 // Fresh schema
 // -------------------------------------------------------------------------
 
-test('fresh schema: all nine Waste tables exist as ordinary tables (backup-compatible, invariant #11)', () => {
+test('fresh schema: all ten Waste tables exist as ordinary tables (backup-compatible, invariant #11)', () => {
   const rows = get().prepare(
     `SELECT name, type FROM sqlite_master WHERE type = 'table' AND name LIKE 'waste_%' ORDER BY name`
   ).all();
   assert.deepEqual(rows.map((r) => r.name), [
     'waste_imported_pickups', 'waste_one_off_pickups', 'waste_reminder_entries', 'waste_reminder_settings',
-    'waste_schedule_overrides', 'waste_schedules', 'waste_source_mappings', 'waste_sources', 'waste_types',
+    'waste_schedule_overrides', 'waste_schedules', 'waste_source_mapping_types', 'waste_source_mappings', 'waste_sources', 'waste_types',
   ]);
   assert.ok(rows.every((r) => r.type === 'table'), 'no virtual tables or views - plain rows the SQLite backup already covers');
 });
@@ -91,7 +91,7 @@ test('fresh schema: the ten expected indexes exist', () => {
     'idx_waste_imported_pickups_type_date',
     'idx_waste_one_off_pickups_type_date', 'idx_waste_reminder_entries_user',
     'idx_waste_schedule_overrides_schedule',
-    'idx_waste_schedules_type_active', 'idx_waste_source_mappings_source',
+    'idx_waste_schedules_type_active', 'idx_waste_source_mapping_types_type', 'idx_waste_source_mappings_source',
     'idx_waste_sources_due', 'idx_waste_sources_name', 'idx_waste_types_sort',
   ]);
 });
@@ -377,34 +377,29 @@ test('trg_waste_sources_updated_at / trg_waste_source_mappings_updated_at / trg_
   assert.ok(pAfter >= pBefore);
 });
 
-test('constraint: waste_source_mappings requires exactly one of (type_id set) / (ignored=1)', () => {
+test('constraint: a label carries each type once, and only types that exist (#2273)', () => {
   const source = commitFixture().source;
+  const mapping = get().prepare('SELECT * FROM waste_source_mappings WHERE source_id = ?').get(source.id);
+  const typeId = get().prepare('SELECT type_id FROM waste_source_mapping_types WHERE mapping_id = ?').get(mapping.id).type_id;
   assert.throws(() => {
-    get().prepare(`
-      INSERT INTO waste_source_mappings (source_id, original_label, normalized_label, type_id, ignored)
-      VALUES (?, 'Both', 'both', ?, 1)
-    `).run(source.id, seedType().id);
-  }, /CHECK/, 'type_id set AND ignored=1 must be rejected');
+    get().prepare('INSERT INTO waste_source_mapping_types (mapping_id, type_id) VALUES (?, ?)').run(mapping.id, typeId);
+  }, /UNIQUE|PRIMARY KEY/, 'the same type twice on one label must be rejected');
   assert.throws(() => {
-    get().prepare(`
-      INSERT INTO waste_source_mappings (source_id, original_label, normalized_label, type_id, ignored)
-      VALUES (?, 'Neither', 'neither', NULL, 0)
-    `).run(source.id);
-  }, /CHECK/, 'neither type_id nor ignored must be rejected');
+    get().prepare('INSERT INTO waste_source_mapping_types (mapping_id, type_id) VALUES (?, 999999)').run(mapping.id);
+  }, /FOREIGN KEY/, 'a type that does not exist must be rejected');
 });
 
 test('constraint: a mapping is unique per (source_id, normalized_label)', () => {
   const source = commitFixture().source;
-  const type = seedType();
   assert.throws(() => {
     get().prepare(`
-      INSERT INTO waste_source_mappings (source_id, original_label, normalized_label, type_id, ignored)
-      VALUES (?, 'Restmüll', 'restmüll', ?, 0)
-    `).run(source.id, type.id);
+      INSERT INTO waste_source_mappings (source_id, original_label, normalized_label)
+      VALUES (?, 'Restmüll', 'restmüll')
+    `).run(source.id);
   }, /UNIQUE/);
 });
 
-test('constraint: an imported pickup is unique per (source_id, identity_key)', () => {
+test('constraint: an imported pickup is unique per (source_id, identity_key, type_id)', () => {
   const source = commitFixture().source;
   const pickup = get().prepare('SELECT * FROM waste_imported_pickups WHERE source_id = ?').get(source.id);
   assert.throws(() => {
@@ -423,6 +418,8 @@ test('cascade: deleting a source cascades its mappings and imported pickups, but
   store.deleteSource(get(), source.id);
 
   assert.equal(get().prepare('SELECT COUNT(*) AS n FROM waste_source_mappings WHERE source_id = ?').get(source.id).n, 0);
+  assert.equal(get().prepare('SELECT COUNT(*) AS n FROM waste_source_mapping_types WHERE type_id = ?').get(typeId).n, 0,
+    'a label\'s types go with the label');
   assert.equal(get().prepare('SELECT COUNT(*) AS n FROM waste_imported_pickups WHERE source_id = ?').get(source.id).n, 0);
   assert.ok(store.getType(get(), typeId), 'the type itself must survive its source being deleted');
 });
@@ -551,4 +548,39 @@ test('previewImport + commitImport: getOccurrences surfaces an import origin wit
   assert.ok(occ, 'an occurrence carrying this test\'s own import origin must be present');
   const origin = occ.origins.find((o) => o.kind === 'import' && o.source_id === source.id);
   assert.equal(origin.source_name, source.name);
+});
+
+// -------------------------------------------------------------------------
+// #2273: one label, several types. The migration moves every existing
+// decision into waste_source_mapping_types - a mapped label keeps its one
+// type, an ignored label keeps no type - and keeps every imported pickup.
+// -------------------------------------------------------------------------
+
+test('#2273 upgrade: existing label decisions and imported pickups survive the move to several types per label', () => {
+  const MULTI = 267;
+  const before = buildMigratedDatabase(MIGRATIONS.filter((m) => m.version < MULTI));
+  const typeId = before.prepare("INSERT INTO waste_types (name, color) VALUES ('Bio', '#2E7D32')").run().lastInsertRowid;
+  const sourceId = before.prepare("INSERT INTO waste_sources (kind, name, content_hash) VALUES ('file', 'Stadt', 'h')").run().lastInsertRowid;
+  const mapped = before.prepare(`INSERT INTO waste_source_mappings (source_id, original_label, normalized_label, type_id, ignored)
+    VALUES (?, 'Bio-Tonne', 'bio-tonne', ?, 0)`).run(sourceId, typeId).lastInsertRowid;
+  const ignored = before.prepare(`INSERT INTO waste_source_mappings (source_id, original_label, normalized_label, type_id, ignored)
+    VALUES (?, 'Info', 'info', NULL, 1)`).run(sourceId).lastInsertRowid;
+  const pickupId = before.prepare(`INSERT INTO waste_imported_pickups (source_id, type_id, identity_key, date_key)
+    VALUES (?, ?, 'uid-1', '2027-03-05')`).run(sourceId, typeId).lastInsertRowid;
+
+  for (const migration of MIGRATIONS.filter((m) => m.version >= MULTI)) applyMigration(before, migration);
+
+  assert.deepEqual(before.prepare('SELECT mapping_id, type_id FROM waste_source_mapping_types ORDER BY mapping_id').all(),
+    [{ mapping_id: Number(mapped), type_id: Number(typeId) }], 'the mapped label keeps its type, the ignored one has none');
+  assert.deepEqual(before.prepare('SELECT id FROM waste_source_mappings ORDER BY id').all().map((r) => r.id), [Number(mapped), Number(ignored)]);
+  const pickup = before.prepare('SELECT id, type_id, identity_key FROM waste_imported_pickups').get();
+  assert.deepEqual(pickup, { id: Number(pickupId), type_id: Number(typeId), identity_key: 'uid-1' });
+  // The same entry may now carry a second type on the same day.
+  const other = before.prepare("INSERT INTO waste_types (name, color) VALUES ('Papier', '#1565C0')").run().lastInsertRowid;
+  before.prepare(`INSERT INTO waste_imported_pickups (source_id, type_id, identity_key, date_key) VALUES (?, ?, 'uid-1', '2027-03-05')`)
+    .run(sourceId, other);
+  assert.throws(() => before.prepare(`INSERT INTO waste_imported_pickups (source_id, type_id, identity_key, date_key) VALUES (?, ?, 'uid-1', '2027-03-05')`)
+    .run(sourceId, other), /UNIQUE/);
+  assert.deepEqual(before.pragma('foreign_key_check'), []);
+  before.close();
 });

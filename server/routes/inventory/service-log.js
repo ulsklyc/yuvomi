@@ -65,24 +65,24 @@ function odometerRegressionError(item, odometer, performedOn) {
   if (odometer == null || item?.odometer == null || item.odometer_on == null) return null;
   if (performedOn == null || performedOn < item.odometer_on) return null;
   if (odometer < item.odometer) {
-    return `Kilometerstand darf nicht unter den zuletzt erfassten Stand (${item.odometer}) fallen.`;
+    return `odometer must not fall below the last recorded reading (${item.odometer}).`;
   }
   return null;
 }
 
 function validateServiceLogInput(body, item) {
   const results = [];
-  const vLabel = str(body?.label, 'Bezeichnung', { max: 100 });
+  const vLabel = str(body?.label, 'label', { max: 100 });
   results.push(vLabel);
-  const vPerformedOn = date(body?.performed_on, 'Datum', true);
+  const vPerformedOn = date(body?.performed_on, 'performed_on', true);
   results.push(vPerformedOn);
 
   let odometer = null;
   if (body?.odometer !== undefined && body.odometer !== null && body.odometer !== '') {
-    const vOdometer = num(body.odometer, 'Kilometerstand');
+    const vOdometer = num(body.odometer, 'odometer');
     results.push(vOdometer);
     if (vOdometer.value !== null && (!Number.isInteger(vOdometer.value) || vOdometer.value < 0)) {
-      results.push({ error: 'Kilometerstand darf nicht negativ sein.' });
+      results.push({ error: 'odometer must be a whole number of at least 0.' });
     } else if (vOdometer.value !== null) {
       odometer = vOdometer.value;
     }
@@ -90,9 +90,9 @@ function validateServiceLogInput(body, item) {
   const regressionError = odometerRegressionError(item, odometer, vPerformedOn.value);
   if (regressionError) results.push({ error: regressionError });
 
-  const vVendor = str(body?.vendor, 'Haendler', { max: MAX_SHORT, required: false });
+  const vVendor = str(body?.vendor, 'vendor', { max: MAX_SHORT, required: false });
   results.push(vVendor);
-  const vNote = str(body?.note, 'Notiz', { max: MAX_TEXT, required: false });
+  const vNote = str(body?.note, 'note', { max: MAX_TEXT, required: false });
   results.push(vNote);
 
   return {
@@ -111,15 +111,15 @@ function validateServiceLogInput(body, item) {
  */
 function validateCompletionInput(body, item) {
   const results = [];
-  const vPerformedOn = date(body?.performed_on, 'Datum', true);
+  const vPerformedOn = date(body?.performed_on, 'performed_on', true);
   results.push(vPerformedOn);
 
   let odometer = null;
   if (body?.odometer !== undefined && body.odometer !== null && body.odometer !== '') {
-    const vOdometer = num(body.odometer, 'Kilometerstand');
+    const vOdometer = num(body.odometer, 'odometer');
     results.push(vOdometer);
     if (vOdometer.value !== null && (!Number.isInteger(vOdometer.value) || vOdometer.value < 0)) {
-      results.push({ error: 'Kilometerstand darf nicht negativ sein.' });
+      results.push({ error: 'odometer must be a whole number of at least 0.' });
     } else if (vOdometer.value !== null) {
       odometer = vOdometer.value;
     }
@@ -127,9 +127,9 @@ function validateCompletionInput(body, item) {
   const regressionError = odometerRegressionError(item, odometer, vPerformedOn.value);
   if (regressionError) results.push({ error: regressionError });
 
-  const vVendor = str(body?.vendor, 'Haendler', { max: MAX_SHORT, required: false });
+  const vVendor = str(body?.vendor, 'vendor', { max: MAX_SHORT, required: false });
   results.push(vVendor);
-  const vNote = str(body?.note, 'Notiz', { max: MAX_TEXT, required: false });
+  const vNote = str(body?.note, 'note', { max: MAX_TEXT, required: false });
   results.push(vNote);
 
   return {

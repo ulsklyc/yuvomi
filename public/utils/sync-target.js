@@ -123,25 +123,32 @@ export function buildSyncTargetOptions(targets, labels, current = '') {
   return options;
 }
 
+/** Die Standard-Personen eines Ziels: die Menge, sonst (aeltere Antwort) die eine Person. */
+function defaultSetOf(cal) {
+  if (Array.isArray(cal?.defaultAssigneeUserIds)) {
+    return cal.defaultAssigneeUserIds.map(Number).filter((id) => Number.isInteger(id) && id > 0);
+  }
+  const one = Number(cal?.defaultAssigneeUserId);
+  return Number.isInteger(one) && one > 0 ? [one] : [];
+}
+
 /**
- * Das Ziel, das ein neuer Termin ueber seine Zuweisung bekommt (#1060).
+ * Das Ziel, das ein neuer Termin ueber seine Zuweisung bekommt (#1060, #1897).
  *
- * Die Standard-Zuweisung eines Kalenders (#459) wird hier rueckwaerts gelesen:
- * ist der Termin GENAU EINER Person zugewiesen und nennt GENAU EIN Kalender sie
- * als Standard, ist das sein Ziel.
+ * Die Standard-Personen eines Kalenders (#459) werden hier rueckwaerts gelesen:
+ * sind dem Termin GENAU die Personen zugewiesen, die EIN Kalender als Standard
+ * nennt, ist das sein Ziel. Ein Termin fuer Anna und Ben geht so in den
+ * gemeinsamen Kalender "Zusammen", einer fuer Anna allein in Annas Kalender.
  *
- * - Mehrere Zugewiesene: kein Ziel. "Beide -> gemeinsamer Kalender" waere eine
- *   zweite Regel ohne Daten dahinter. Nennt ein Kalender wenigstens EINE von
- *   ihnen, traegt die Antwort `severalAssignees` (#1332): allein zugewiesen
- *   haette diese Person ihren Kalender bekommen, und der Dialog sagt, warum das
- *   jetzt ausbleibt, statt den Termin still im eigenen Standard des Autors
- *   landen zu lassen. Nennt keiner eine von ihnen, gibt es nichts zu erklaeren:
- *   wie bei einer einzelnen Person ohne Kalender gilt still der Standard - sonst
- *   stuende der Hinweis in jedem Haushalt ohne Standard-Zuweisung an jedem
- *   Termin mit zwei Personen.
- * - Mehrere Kalender nennen dieselbe Person: kein Ziel, aber `ambiguous`. Den
+ * - Keine Zuweisung: kein Ziel, still der Standard.
+ * - Mehrere Kalender nennen dieselbe Menge: kein Ziel, aber `ambiguous`. Den
  *   ersten zu nehmen hiesse raten, und ein Termin im falschen Kalender faellt
  *   erst auf, wenn ihn jemand dort vermisst.
+ * - Mehrere Zugewiesene und kein Kalender mit genau dieser Menge: kein Ziel.
+ *   Nennt ein Kalender wenigstens EINE von ihnen, traegt die Antwort
+ *   `severalAssignees` (#1332), und der Dialog sagt, warum das Ziel ausbleibt,
+ *   statt den Termin still im eigenen Standard des Autors landen zu lassen.
+ *   Nennt keiner eine von ihnen, gibt es nichts zu erklaeren.
  * - Nur Google und CalDAV: Apple kennt kein Zielformat, Outlook keine
  *   Standard-Zuweisung.
  *
@@ -150,25 +157,19 @@ export function buildSyncTargetOptions(targets, labels, current = '') {
  * @returns {{value: string|null, ambiguous: boolean, severalAssignees: boolean}}
  */
 export function assigneeSyncTarget(targets, assigneeIds) {
-  // Die Kalender, die eine Person als Standard nennen. Keine gueltige Id ist
-  // niemand - und muss es bleiben: Number(null) ist 0, eine 0 traefe sonst
-  // jeden Kalender OHNE Standard-Zuweisung.
-  const kalenderVon = (id) => {
-    if (!Number.isInteger(id) || id < 1) return [];
-    return [
-      ...(targets?.google ?? [])
-        .filter((cal) => Number(cal.defaultAssigneeUserId) === id)
-        .map((cal) => googleTargetValue(cal.id)),
-      ...(targets?.caldav ?? [])
-        .filter((cal) => Number(cal.defaultAssigneeUserId) === id)
-        .map((cal) => caldavTargetValue(cal.accountId, cal.calendarUrl)),
-    ];
-  };
-  const ids = [...new Set((assigneeIds ?? []).map(Number))];
-  if (ids.length > 1) {
-    return { value: null, ambiguous: false, severalAssignees: ids.some((id) => kalenderVon(id).length > 0) };
-  }
-  const treffer = ids.length === 1 ? kalenderVon(ids[0]) : [];
+  // Keine gueltige Id ist niemand - und muss es bleiben: Number(null) ist 0.
+  const ids = [...new Set((assigneeIds ?? []).map(Number))].filter((id) => Number.isInteger(id) && id > 0);
+  if (!ids.length) return { value: null, ambiguous: false, severalAssignees: false };
+  const calendars = [
+    ...(targets?.google ?? []).map((cal) => ({ set: defaultSetOf(cal), value: googleTargetValue(cal.id) })),
+    ...(targets?.caldav ?? []).map((cal) => ({ set: defaultSetOf(cal), value: caldavTargetValue(cal.accountId, cal.calendarUrl) })),
+  ];
+  const wanted = new Set(ids);
+  const treffer = calendars
+    .filter(({ set }) => set.length === wanted.size && set.every((id) => wanted.has(id)))
+    .map(({ value }) => value);
   if (treffer.length === 1) return { value: treffer[0], ambiguous: false, severalAssignees: false };
-  return { value: null, ambiguous: treffer.length > 1, severalAssignees: false };
+  if (treffer.length > 1) return { value: null, ambiguous: true, severalAssignees: false };
+  const severalAssignees = ids.length > 1 && calendars.some(({ set }) => set.some((id) => wanted.has(id)));
+  return { value: null, ambiguous: false, severalAssignees };
 }

@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
-import { bindDisclosure, createRetryState, thirdPartyStatusLabel } from '/settings/components.js';
+import { bindDisclosure, createRetryState, thirdPartyStatusLabel, settingRowHtml, toggleRowHtml } from '/settings/components.js';
 import {
   BUILT_IN_MODULES,
   DEFAULT_MODULE_ACCENT,
@@ -206,24 +206,35 @@ function endZoneHtml(row, position, hideHtml = '') {
  * eingebauten Slugs; ein Knopf, dessen Wert der Server verwirft, wäre eine
  * Zusage, die niemand einhält.
  */
+/* EIN SCHALTER "IN MEINER NAVIGATION" STATT DES DURCHGESTRICHENEN AUGES
+ * (R24, Critique G6-Einst-P3-2, D8 Boolean = Schalter). Der Knopf oben war ein
+ * Umschalter mit fester Glyphe `eye-off`, gedrueckt = ausgeblendet: eine
+ * doppelte Verneinung, die man erst lernen musste, und die einzige Zeile der
+ * Einstellungen, deren Zustand nicht als Schalter stand. Jetzt die geteilte
+ * Schalterbahn (`toggleRowHtml`, `role="switch"`) in der positiven Lesart:
+ * an = steht in meiner Navigation. Die Gruende oben gelten weiter: der Name
+ * ist stabil und nennt sein Modul, ein gesperrter Schalter verweist auf den
+ * Status-Chip seiner Zeile, Drittanbieter-Module tragen ihn nicht.
+ */
 function hideToggleHtml(row, { hasStatusChip = true } = {}) {
   const label = row.groupLabelKey
     ? t(row.groupLabelKey)
-    : t('settings.modulesHideForMe', { module: row.label });
+    : t('settings.modulesInMyNavigation', { module: row.label });
   // Nur verweisen, wo es auch etwas zu lesen gibt: die Kuechen-Kinder tragen
   // keinen Status-Chip, ein `aria-describedby` auf eine Id, die es nicht gibt,
-  // sagt der Hilfstechnik NICHTS - genau der Zustand, den dieser Verweis
-  // beheben sollte (Review zu PR #790).
-  const describedBy = (!row.enabled && hasStatusChip)
-    ? ` aria-describedby="module-status-${esc(row.id)}"`
-    : '';
-  return `
-    <button type="button" class="settings-module-hide" data-module-hide="${esc(row.id)}"
-            aria-pressed="${row.hidden ? 'true' : 'false'}" ${row.enabled ? '' : 'disabled'}
-            aria-label="${esc(label)}" title="${esc(label)}"${describedBy}>
-      <i data-lucide="eye-off" aria-hidden="true"></i>
-    </button>
-  `;
+  // sagt der Hilfstechnik NICHTS (Review zu PR #790).
+  return toggleRowHtml({
+    control: 'switch',
+    label,
+    checked: !row.hidden,
+    disabled: !row.enabled,
+    className: 'settings-module-hide',
+    labelVisible: false,
+    attrs: {
+      'data-module-hide': row.id,
+      'aria-describedby': (!row.enabled && hasStatusChip) ? `module-status-${row.id}` : null,
+    },
+  });
 }
 
 /* EIN STATUSKANAL JE ZEILE (Critique 2026-08-16, P0).
@@ -243,9 +254,9 @@ function statusChipHtml(row) {
   if (!row.enabled) {
     return `<span class="settings-module-status settings-module-status--disabled" id="module-status-${esc(row.id)}">${esc(t('settings.thirdPartyModulesStatusDisabled'))}</span>`;
   }
-  if (row.hidden) {
-    return `<span class="settings-module-status settings-module-status--hidden">${esc(t('settings.modulesHiddenForMe'))}</span>`;
-  }
+  // "Fuer mich ausgeblendet" steht seit R24 nicht mehr als Wort neben dem
+  // Namen: der Schalter "In meiner Navigation" sagt denselben Zustand am Ende
+  // der Zeile (ein Statuskanal je Zeile), und die Zeile toent sich.
   return '';
 }
 
@@ -260,7 +271,7 @@ function builtInRowHtml(row, position) {
       </div>
       <div class="settings-module-row__body">
         <div class="settings-module-row__title">
-          <strong>${esc(row.label)}</strong>
+          <strong class="settings-module-row__name">${esc(row.label)}</strong>
           ${row.locked ? `<span class="settings-module-origin">${esc(t('settings.modulesBuiltInBadge'))}</span>` : ''}
           ${statusChipHtml(row)}
         </div>
@@ -295,7 +306,7 @@ function kitchenRowHtml(row, position) {
       </div>
       <div class="settings-module-row__body">
         <div class="settings-module-row__title">
-          <strong>${esc(row.label)}</strong>
+          <strong class="settings-module-row__name">${esc(row.label)}</strong>
           ${statusChipHtml(row)}
         </div>
         <button type="button" class="settings-disclosure__trigger settings-module-kitchen__trigger" aria-expanded="false" data-kitchen-expand>
@@ -313,7 +324,7 @@ function kitchenRowHtml(row, position) {
             </div>`).join('')}
         </div>
       </div>
-      ${endZoneHtml(row, position, hideToggleHtml({ ...row, id: 'kitchen', groupLabelKey: 'settings.modulesHideKitchenForMe' }))}
+      ${endZoneHtml(row, position, hideToggleHtml({ ...row, id: 'kitchen', groupLabelKey: 'settings.modulesKitchenInMyNavigation' }))}
     </div>
   `;
 }
@@ -332,7 +343,7 @@ function thirdPartyRowHtml(row, position) {
       </div>
       <div class="settings-module-row__body">
         <div class="settings-module-row__title">
-          <strong>${esc(row.label)}</strong>
+          <strong class="settings-module-row__name">${esc(row.label)}</strong>
           <span class="settings-module-origin">${esc(t('settings.modulesExternalBadge'))}</span>
           ${showStatus ? `<span class="settings-module-status ${statusClass}">${esc(row.status)}</span>` : ''}
         </div>
@@ -370,24 +381,30 @@ function mobileCandidateRows(rows) {
   ));
 }
 
+/* DIE DREI PLAETZE SIND EINE KARTE MIT DREI OPTIONSZEILEN (R24, Critique
+ * G6-Einst-P3-2). Vorher stand jeder Platz als eigene Karte mit vollbreitem
+ * Auswahlfeld darunter - mobil drei Kaesten untereinander (rund 450px) fuer
+ * drei Werte. Jetzt die Zeile der Einstellungen (`settingRowHtml`): „Position
+ * 1" links, die randlose Auswahl mit dem Wert rechts, wie Sprache oder Region. */
 function mobileSlotHtml(rows, selectedIds, index) {
   const selectedId = selectedIds[index] ?? '';
   const selectedElsewhere = new Set(selectedIds.filter((_, slot) => slot !== index));
   const label = t('settings.mobileNavigationSlotLabel', { position: index + 1 });
+  const id = `mobile-nav-slot-${index + 1}`;
 
-  return `
-    <label class="settings-mobile-nav-slot">
-      <span class="settings-mobile-nav-slot__label">${esc(label)}</span>
-      <select class="form-input" data-mobile-nav-slot aria-label="${esc(label)}"${selectedId ? '' : ' disabled'}>
+  return settingRowHtml({
+    label,
+    labelFor: id,
+    className: 'settings-mobile-nav-slot',
+    control: `<select class="form-input" id="${id}" data-mobile-nav-slot${selectedId ? '' : ' disabled'}>
         ${selectedId ? '' : `<option value="" selected>${esc(t('settings.mobileNavigationEmptyOption'))}</option>`}
         ${rows.map((row) => `
           <option value="${esc(row.orderId)}"${row.orderId === selectedId ? ' selected' : ''}${selectedElsewhere.has(row.orderId) ? ' disabled' : ''}>
             ${esc(row.label)}
           </option>
         `).join('')}
-      </select>
-    </label>
-  `;
+      </select>`,
+  });
 }
 
 function desktopGroupHtml(section, rows) {
@@ -420,7 +437,7 @@ function renderPage(container, rows, mobileOrder) {
       <section class="settings-navigation-panel">
         <h2 class="settings-navigation-panel__title">${t('settings.mobileNavigationTitle')}</h2>
         <p class="form-hint">${t('settings.mobileNavigationHint')}</p>
-        <div class="settings-mobile-nav-slots">
+        <div class="row-carrier settings-group settings-mobile-nav-slots">
           ${[0, 1, 2].map((index) => mobileSlotHtml(mobileRows, mobileOrder, index)).join('')}
         </div>
       </section>
@@ -460,10 +477,11 @@ function collectVisibleGlobalOrder(list) {
  * Nötig ist die Auflösung ohnehin nicht: die vier Kind-Knöpfe stehen immer im
  * DOM - das Feld ist nur `hidden` - und der Gruppenklick legt sie selbst um.
  */
-function collectHiddenModuleIds(buttons) {
+function collectHiddenModuleIds(switches) {
   const ids = new Set();
-  for (const btn of buttons) {
-    if (btn.getAttribute('aria-pressed') !== 'true') continue;
+  for (const btn of switches) {
+    // Der Schalter sagt "steht in meiner Navigation" (R24): aus = ausgeblendet.
+    if (btn.checked) continue;
     const id = btn.dataset.moduleHide;
     if (!id || id === 'kitchen') continue;
     ids.add(id);
@@ -726,10 +744,14 @@ function bindModuleListEvents(container, user, rows, unrenderedOrderIds = []) {
    * Vollrender bleibt genau dort, wo er hingehört: im Fehlerfall, wo der
    * Serverstand die Wahrheit ist und der Fokus das kleinere Problem.
    */
-  list.addEventListener('click', async (event) => {
+  // Der Schalter (R24) meldet `change`, nicht `click`: ein Klick auf seine
+  // Bahn laeuft ueber das umschliessende Label und loeste sonst zweimal aus.
+  list.addEventListener('change', async (event) => {
     const btn = event.target.closest('[data-module-hide]');
-    if (!btn || btn.disabled || busy) return;
-    const wasHidden = btn.getAttribute('aria-pressed') === 'true';
+    if (!btn || btn.disabled) return;
+    // Schon umgelegt: der Zustand vor dem Tipp ist das Gegenteil von jetzt.
+    const wasHidden = btn.checked;
+    if (busy) { btn.checked = !btn.checked; return; }
     const previousMobile = readMobileSlotValues(container);
 
     applyHiddenState(btn, !wasHidden);
@@ -869,7 +891,7 @@ function markRowHidden(rows, id, hidden) {
  * und die Gruppe rechnet ihren Zustand aus ihren Kindern - nicht aus dem Klick.
  */
 function applyHiddenState(btn, hidden) {
-  btn.setAttribute('aria-pressed', String(hidden));
+  btn.checked = !hidden;
   const childRow = btn.closest('.settings-module-kitchen__child-row');
   if (childRow) {
     childRow.classList.toggle('settings-module-kitchen__child-row--hidden', hidden);
@@ -880,14 +902,6 @@ function applyHiddenState(btn, hidden) {
   if (!row) return;
   const disabled = row.classList.contains('settings-module-row--disabled');
   row.classList.toggle('settings-module-row--hidden', hidden && !disabled);
-  const title = row.querySelector('.settings-module-row__title');
-  const chip = title?.querySelector('.settings-module-status--hidden');
-  if (hidden && title && !chip && !disabled) {
-    title.insertAdjacentHTML('beforeend',
-      `<span class="settings-module-status settings-module-status--hidden">${esc(t('settings.modulesHiddenForMe'))}</span>`);
-  } else if (!hidden && chip) {
-    chip.remove();
-  }
 }
 
 /**
@@ -918,7 +932,7 @@ function syncKitchenGroupState(list, rows) {
   const kitchen = rows?.find((row) => row.id === 'kitchen');
   if (!groupBtn || !kitchen) return;
   const hidden = kitchenGroupHidden(kitchen.children);
-  if (groupBtn.getAttribute('aria-pressed') === String(hidden)) return;
+  if (groupBtn.checked === !hidden) return;
   applyHiddenState(groupBtn, hidden);
 }
 

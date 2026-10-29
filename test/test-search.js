@@ -49,6 +49,8 @@ db.exec(MIGRATIONS_SQL[197]);
 // Migration 206: FTS triggers + backfill for waste_types.
 db.exec(MIGRATIONS_SQL[206]);
 db.exec(MIGRATIONS_SQL[262]); // notes.visibility - die Notizsuche fragt sie seit #1514
+db.exec(MIGRATIONS_SQL[174]); // birthdays.name_day_calendar_event_id - Geburtstagsfelder der Termin-Treffer
+db.exec(MIGRATIONS_SQL[254]); // birthdays.year_unknown
 
 console.log('\n[Search-Test] FTS5-Volltextsuche\n');
 
@@ -287,6 +289,36 @@ test('"heute" der globalen Suche ist der Tag der Haushaltszone (#1607)', () => {
   const utc = mitUhr(jetzt, 'UTC', () => runSearch(db, 'Qzxbirthday', uid).events[0]);
   assert(la.start_datetime.slice(0, 10) === '2026-10-14', `Los Angeles: ${la.start_datetime}`);
   assert(utc.start_datetime.slice(0, 10) === '2027-10-14', `UTC: ${utc.start_datetime}`);
+});
+
+test('R24 G0 P1-1: ein Geburtstagstermin traegt birthday_name, damit der Client ihn uebersetzt', () => {
+  const bday = db.prepare(`INSERT INTO calendar_events (title, start_datetime, all_day, recurrence_rule, created_by)
+    VALUES ('Birthday: Qzxemma', '2015-03-08', 1, 'FREQ=YEARLY', ?)`).run(uid).lastInsertRowid;
+  const nday = db.prepare(`INSERT INTO calendar_events (title, start_datetime, all_day, recurrence_rule, created_by)
+    VALUES ('Name day: Qzxemma', '2015-07-22', 1, 'FREQ=YEARLY', ?)`).run(uid).lastInsertRowid;
+  const plain = db.prepare(`INSERT INTO calendar_events (title, start_datetime, all_day, created_by)
+    VALUES ('Qzxemma Schulfest', '2026-11-02', 1, ?)`).run(uid).lastInsertRowid;
+  const person = db.prepare(`INSERT INTO birthdays (name, birth_date, calendar_event_id, name_day_calendar_event_id, created_by)
+    VALUES ('Qzxemma', '2015-03-08', ?, ?, ?)`).run(bday, nday, uid).lastInsertRowid;
+  try {
+    const hits = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => runSearch(db, 'Qzxemma', uid).events);
+    const byId = new Map(hits.map((h) => [h.id, h]));
+    assert(byId.size === 3, `drei Treffer erwartet, bekommen ${hits.length}`);
+    const b = byId.get(Number(bday));
+    assert(b.birthday_name === 'Qzxemma' && b.birthday_event_kind === 'birthday' && b.birthday_date === '2015-03-08',
+      `Geburtstag: ${JSON.stringify(b)}`);
+    const n = byId.get(Number(nday));
+    assert(n.birthday_name === 'Qzxemma' && n.birthday_event_kind === 'name_day' && n.birthday_date === null,
+      `Namenstag: ${JSON.stringify(n)}`);
+    assert(!('birthday_name' in byId.get(Number(plain))), 'ein gewoehnlicher Termin behaelt seine Form');
+    // Unbekanntes Geburtsjahr: kein erfundenes Datum, wie serializeEvent().
+    db.prepare('UPDATE birthdays SET year_unknown = 1 WHERE id = ?').run(person);
+    const again = mitUhr('2026-10-02T10:00:00Z', 'UTC', () => runSearch(db, 'Qzxemma', uid).events);
+    assert(again.find((h) => h.id === Number(bday)).birthday_date === null, 'Jahr unbekannt -> kein Datum');
+  } finally {
+    db.prepare('DELETE FROM birthdays WHERE id = ?').run(person);
+    db.prepare('DELETE FROM calendar_events WHERE id IN (?, ?, ?)').run(bday, nday, plain);
+  }
 });
 
 test('globale Suche und Kalendersuche fragen dasselbe Fenster ab (#1607)', () => {

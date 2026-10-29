@@ -61,6 +61,9 @@ const THIS_YEAR = `${YEAR}-06-15`;
 const NEXT_YEAR = `${YEAR + 1}-01-03`;
 const answer = (next) => ({ data: { id: 7, status: 'done', archived_at: null, next_due_date: next } });
 const SERIES = `tasks.seriesDoneToast${JSON.stringify({ date: `kurz:${THIS_YEAR}` })}`;
+// R24 (Uebergabe S2): mit bekanntem Titel nennt der Satz die Aufgabe -
+// "„Blumen giessen“ erledigt - naechstes Mal am ...", R22 D6 "‹Objekt› ‹Verb›".
+const SERIES_NAMED = (title) => `tasks.seriesDoneNamed${JSON.stringify({ title, date: `kurz:${THIS_YEAR}` })}`;
 const SERIES_BY = (name) => `tasks.seriesDoneByToast${JSON.stringify({ name, date: `kurz:${THIS_YEAR}` })}`;
 
 test.beforeEach(() => {
@@ -96,6 +99,15 @@ test('seriesDoneText: nennt das Datum ueber die Formatierer der App, mit Jahr nu
   );
 });
 
+test('seriesDoneText: mit Titel nennt der Satz die Aufgabe (R24, Toast-Form ‹Objekt› ‹Verb›)', () => {
+  assert.equal(seriesDoneText(answer(THIS_YEAR), { title: 'Blumen giessen' }), SERIES_NAMED('Blumen giessen'));
+  assert.equal(seriesDoneText(answer(THIS_YEAR)), SERIES, 'ohne Titel bleibt der bisherige Satz');
+  assert.equal(seriesDoneText(answer(null), { title: 'Blumen giessen' }), null);
+  const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  assert.match(de.tasks.seriesDoneNamed ?? '', /\{\{title\}\}[\s\S]*\{\{date\}\}/);
+  assert.doesNotMatch(de.tasks.seriesDoneNamed ?? '', /[–—]/);
+});
+
 test('seriesDoneText: mit benannter Person EIN Text, der beides sagt', () => {
   assert.equal(seriesDoneText(answer(THIS_YEAR), { name: 'Mia' }), SERIES_BY('Mia'));
   assert.equal(seriesDoneText(answer(null), { name: 'Mia' }), null);
@@ -129,7 +141,7 @@ async function finishInDetail(response, action = 'task-detail-finish', status = 
 test('Detailansicht: Erledigen einer Serie sagt, wann es weitergeht', async () => {
   const task = await finishInDetail(answer(THIS_YEAR));
   assert.equal(task.status, 'done');
-  assert.deepEqual(toasts.map((x) => x.message), [SERIES]);
+  assert.deepEqual(toasts.map((x) => x.message), [SERIES_NAMED('Blumen giessen')]);
   assert.notEqual(toasts[0].type, 'danger');
 });
 
@@ -212,12 +224,36 @@ test('Liste: Haken und Wisch reichen die ANTWORT ihres Schreibvorgangs an die Qu
   const src = readFileSync(new URL('../public/pages/tasks.js', import.meta.url), 'utf8');
   // Je Aufrufstelle: im Abschnitt davor steht der Schreibvorgang, dessen
   // Antwort in `response` landet - und genau die geht in die Quittung.
-  const sites = [...src.matchAll(/(?<!function )acknowledgeStatusToggle\(container, \w+, nextStatus, response(?:, before)?\)/g)];
+  // Seit R24 (G0-Shell-P1-2) die LAUFENDE Anfrage: die Quittung steht im Tipp,
+  // die Serie traegt ihren Satz nach, sobald die Antwort da ist (Test unten).
+  const sites = [...src.matchAll(/(?<!function )acknowledgeStatusToggle\(container, \w+, nextStatus, pending, before\)/g)];
   assert.equal(sites.length, 2, 'Haken und Wisch rufen beide die geteilte Quittung');
   for (const site of sites) {
     const before = src.slice(Math.max(0, site.index - 600), site.index);
-    assert.match(before, /const response = await toggleTaskStatus\(\w+, \w+\);/,
-      'die Quittung bekommt die Antwort von toggleTaskStatus');
+    assert.match(before, /const pending = toggleTaskStatus\(\w+, \w+\);/,
+      'die Quittung bekommt die Anfrage von toggleTaskStatus');
+  }
+});
+
+test('Liste, Haken im Tipp: die Quittung steht sofort und traegt das naechste Mal der Serie nach', async () => {
+  tasks.state.tasks = [{ id: 7, title: 'Muell rausbringen', is_recurring: 1 }];
+  const updates = [];
+  globalThis.__offerUndoUpdate = (text) => updates.push(text);
+  try {
+    let resolve;
+    const pending = new Promise((r) => { resolve = r; });
+    tasks.acknowledgeStatusToggle(null, 7, 'done', pending);
+    assert.deepEqual(toasts.map((x) => x.message), [`tasks.checkedDoneNamed${JSON.stringify({ title: 'Muell rausbringen' })}`],
+      'vor der Antwort: der Satz mit dem Titel, sofort');
+    assert.equal(typeof toasts[0].onUndo, 'function', 'Rueckgaengig steht schon da');
+    resolve(answer(THIS_YEAR));
+    await pending;
+    await new Promise((r) => setImmediate(r));
+    assert.deepEqual(updates, [SERIES_NAMED('Muell rausbringen')], 'die Antwort traegt das naechste Mal in DENSELBEN Toast nach');
+    assert.equal(toasts.length, 1, 'kein zweiter Toast');
+  } finally {
+    tasks.state.tasks = [];
+    delete globalThis.__offerUndoUpdate;
   }
 });
 
@@ -255,9 +291,9 @@ test('Brett: der Spaltenwechsel nach „Erledigt" sagt es bei einer Serie, sonst
   const container = { querySelector: () => null, querySelectorAll: () => [] };
   tasks.state.viewMode = 'kanban';
   try {
-    await tasks.runColumnMove({ id: 7, status: 'open', archived_at: null }, 'done', container);
+    await tasks.runColumnMove({ id: 7, title: 'Blumen giessen', status: 'open', archived_at: null }, 'done', container);
     assert.deepEqual(sent, [['/tasks/7/status', { status: 'done' }]]);
-    assert.deepEqual(toasts.map((x) => x.message), [SERIES]);
+    assert.deepEqual(toasts.map((x) => x.message), [SERIES_NAMED('Blumen giessen')]);
 
     toasts.length = 0;
     response = answer(null);
@@ -331,7 +367,7 @@ test('Formular: wer eine Serie ueber das Status-Feld erledigt, liest, wann es we
   assert.equal(put[1], '/tasks/7');
   assert.equal(put[2].status, 'done');
   // EIN Toast, nicht „gespeichert" und darueber noch der Serienhinweis.
-  assert.deepEqual(toasts.map((x) => [x.message, x.type]), [[SERIES, 'success']]);
+  assert.deepEqual(toasts.map((x) => [x.message, x.type]), [[SERIES_NAMED('Blumen giessen'), 'success']]);
 });
 
 test('Formular: ohne naechstes Mal bleibt es beim schlichten „gespeichert"', async () => {

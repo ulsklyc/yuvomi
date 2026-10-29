@@ -15,9 +15,11 @@
  * Navigation ohne await (siehe hasLeaveGuard im Router). Die Rueckfrage ist
  * dieselbe wie die des Dialogs und des Anpassen-Modus (danger, "Verwerfen").
  *
- * ZWEI ARTEN VON OFFENEM STAND: Formulare mit eigenem Absenden (automatisch
- * erkannt) und Blaetter ohne Formular, die ihren Stand selbst kennen - die
- * Rechte-Matrix mit ihrem Speichern-Knopf (`trackLeafEdits`).
+ * OFFEN IST NUR EIN FORMULAR MIT EIGENEM ABSENDEN (automatisch erkannt). Bis
+ * R24 kannte der Guard eine zweite Art - Blaetter ohne Formular, die ihren
+ * Stand selbst anmelden (`trackLeafEdits`, fuer die Rechte-Matrix mit ihrem
+ * Speichern-Knopf). Seit E11 speichert die Matrix jede Zeile sofort und hat
+ * keinen Entwurf mehr; ohne Nutzer ist der Weg entfallen (R24 S12).
  */
 
 import { t } from '/i18n.js';
@@ -27,9 +29,6 @@ import { setLeaveGuard } from '/utils/leave-guard.js';
 // Formular-Referenzen statt eines Flags: so bleibt erkennbar, ob der offene
 // Stand ueberhaupt noch im Dokument haengt.
 const dirtyForms = new Set();
-// Blaetter ohne Formular: Knoten -> "ist etwas offen?". Der Knoten sagt, ob
-// die Quelle noch im Dokument steht; faellt er heraus, faellt sie mit.
-const dirtySources = new Map();
 // Das zuletzt abgeschickte Formular, dessen Speichern noch aussteht - siehe
 // "ERST NACH DEM ERFOLG" in watchLeafForms.
 let pendingForm = null;
@@ -66,20 +65,14 @@ function hasOpenEdits() {
   for (const form of dirtyForms) {
     if (!form.isConnected) dirtyForms.delete(form);
   }
-  let sourceOpen = false;
-  for (const [node, isDirty] of dirtySources) {
-    if (!node.isConnected) dirtySources.delete(node);
-    else if (isDirty()) sourceOpen = true;
-  }
-  return dirtyForms.size > 0 || sourceOpen;
+  return dirtyForms.size > 0;
 }
 
 /**
  * Haelt die Anmeldung beim Router im Takt mit dem offenen Stand: angemeldet,
- * solange etwas offen ist, sonst abgemeldet. Blaetter mit eigener Quelle rufen
- * das nach jeder Aenderung ihres Stands (siehe trackLeafEdits).
+ * solange etwas offen ist, sonst abgemeldet.
  */
-export function syncLeafEdits() {
+function syncLeafEdits() {
   if (hasOpenEdits()) {
     if (!releaseLeaveGuard) {
       releaseLeaveGuard = setLeaveGuard(async () => {
@@ -95,21 +88,6 @@ export function syncLeafEdits() {
     releaseLeaveGuard();
     releaseLeaveGuard = null;
   }
-}
-
-/**
- * Ein Blatt ohne Formular meldet seinen offenen Stand selbst an (Rechte-Matrix).
- * @param {Node} node          Knoten des Blatts; faellt er aus dem Dokument, endet die Quelle
- * @param {() => boolean} isDirty
- * @returns {() => void} Abmeldung
- */
-export function trackLeafEdits(node, isDirty) {
-  dirtySources.set(node, isDirty);
-  syncLeafEdits();
-  return () => {
-    if (dirtySources.get(node) === isDirty) dirtySources.delete(node);
-    syncLeafEdits();
-  };
 }
 
 function onBeforeUnload(event) {
@@ -138,9 +116,7 @@ function onWriteSucceeded() {
  * die Listener verschwinden also mit ihm.
  */
 export function watchLeafForms(container) {
-  // Neues Blatt: offene Formulare des alten sind weg. Quellen NICHT leeren -
-  // das Blatt hat seine eben beim Rendern angemeldet; abgehaengte faellt
-  // hasOpenEdits() ueber isConnected heraus.
+  // Neues Blatt: offene Formulare des alten sind weg.
   dirtyForms.clear();
   pendingForm = null;
   syncLeafEdits();
@@ -194,7 +170,6 @@ export function watchLeafForms(container) {
 
 export function clearLeafEdits() {
   dirtyForms.clear();
-  dirtySources.clear();
   pendingForm = null;
   syncLeafEdits();
 }
@@ -211,8 +186,7 @@ export async function confirmLeafExit() {
     // "Verwerfen" wirft Eingaben unwiderruflich weg, rot benennt das.
     danger: true,
     confirmLabel: t('modal.discardChanges'),
-    // Eigener Folgentext: "in diesem Formular" stimmte fuer die Rechte-Matrix
-    // nicht, und ein roter Dialog nennt seine Folgen ausgeschrieben.
+    // Eigener Folgentext: ein roter Dialog nennt seine Folgen ausgeschrieben.
     detail: t('settings.leaveDiscardDetail'),
   });
   if (confirmed) clearLeafEdits();

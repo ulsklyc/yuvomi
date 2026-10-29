@@ -84,9 +84,12 @@ export function leadCardClass() {
   return 'metric-card--lead';
 }
 
-// Die Leitzahlen, die fitMetricLeads misst: die fuehrende Karte und die
-// Kurzzeile mit Leitzahl (utils/metric-glance.js).
-const LEAD_VALUES = '.metric-card--lead > .metric-card__value, .budget-glance--lead .budget-glance__value';
+// Die Werte, die fitMetricLeads misst: die fuehrende Karte, die Kurzzeile mit
+// Leitzahl (utils/metric-glance.js) und die Kennzahlkachel der Uebersicht
+// (`.metric-card--tile`, DW-P2-7) - mobil fuellt sie sich per `auto-fit`, ab
+// 768px steht sie in der Spaltenzahl ihres Hoehenmodells (U15); die Breite der
+// Reihe sagt in beiden Faellen nichts ueber die Breite der Kachel.
+const LEAD_VALUES = '.metric-card--lead > .metric-card__value, .budget-glance--lead .budget-glance__value, .metric-card--tile > .metric-card__value';
 const FIT_STEPS = 2;
 let fitObserver = null;
 
@@ -119,11 +122,21 @@ export function fitMetricLeads(root) {
   }
 }
 
+/* UEBERLAUF HEISST AUCH: UEBER DIE EIGENE BOX (U15, Review p11). Gemessen
+ * wurde nur der Traeger - eine Zahl, die in sein Polster lief, fiel dort nicht
+ * auf: "10 im Monat" stand in der 176px-Kachel der Uebersicht 3px vor der
+ * Kante, in 158px "-196,14 €" 10px. Darum zaehlt die Box der Zahl mit (1px
+ * Rundung Spiel; eine Box ohne Breite, etwa inline, wird nicht gefragt). */
+function overflows(box, value) {
+  return box.scrollWidth > box.clientWidth
+    || (value.clientWidth > 0 && value.scrollWidth > value.clientWidth + 1);
+}
+
 function fitLead(box) {
   const value = box.querySelector(LEAD_VALUES);
   if (!value || box.clientWidth === 0) return;
   value.removeAttribute('data-fit');
-  for (let step = 1; step <= FIT_STEPS && box.scrollWidth > box.clientWidth; step += 1) {
+  for (let step = 1; step <= FIT_STEPS && overflows(box, value); step += 1) {
     value.setAttribute('data-fit', String(step));
   }
 }

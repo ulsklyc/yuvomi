@@ -224,9 +224,11 @@ for (const device of ['mobile', 'desktop']) {
 
     // Labor: ein sechsstelliger Wert.
     await gotoRoute(page, '/health/labs');
-    await page.waitForSelector('#health-lab-trend-analyte', { timeout: 15000 });
+    // Seit R24 (G5 P3-5) waehlt der Tipp auf den Analyten den Verlauf - Tabelle
+    // am Desktop, Zeilen am Telefon; geklickt wird der sichtbare.
+    await page.waitForSelector('[data-lab-trend="q1722 Thrombozyten"]', { timeout: 15000 });
     await settle(page);
-    await page.select('#health-lab-trend-analyte', 'q1722 Thrombozyten');
+    await page.evaluate(() => [...document.querySelectorAll('[data-lab-trend="q1722 Thrombozyten"]')].find((b) => b.getClientRects().length)?.click());
     await page.waitForFunction(() => /\d{3}\.\d{3}/.test(document.querySelector('.health-lab-trend svg.chart .chart__axis--y')?.textContent ?? ''), { timeout: 5000 });
     await waitFitted(page, '.health-lab-trend');
     const [labs] = await axisGeometry(page, '.health-lab-trend');

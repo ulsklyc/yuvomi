@@ -1000,7 +1000,12 @@
    * hat es dieselben Ausschalter: in prefers-reduced-transparency und
    * prefers-contrast stehen beide auf 0. Ein Wert in der Komponente hätte
    * diese Kopplung nicht mitgebracht. */
-  --weather-glow-opacity: 1;
+  /* Die Staerke des Lichthauchs je Buehne. Auf der Kohle-Buehne (unten) die
+   * Haelfte: die aufgehellten Lagen (Schiefer #A8BBCC) standen dort in voller
+   * Staerke als grauer Fleck neben der Wolke, nicht als Licht (DW-P3-8). Die
+   * Ausschalter der Gattung setzen weiter `--weather-glow-opacity` auf 0. */
+  --weather-glow-strength: 1;
+  --weather-glow-opacity: var(--weather-glow-strength);
 
   /* --------------------------------------------------------
    * 6. Farben - Prioritäten
@@ -1475,10 +1480,10 @@
    *    (Zentrumsabstand 31,5), Aufgaben-Tagfilter (29,3), Sidebar-Umschalter
    *    (31,5). Wer eine Ausnahme braucht, braucht in Wahrheit Abstand.
    *
-   *    GEMESSEN WIRD DIE TREFFERFLÄCHE, NICHT DIE BOX. .weather-widget__refresh
-   *    ist 34x34 groß und dehnt seine Fläche per ::before auf --target-base
-   *    aus; eine Box-Messung meldet ihn als Verstoß, obwohl der Finger 44px
-   *    findet. Das ist zugleich das Rezept für „kompakt aussehen, voll
+   *    GEMESSEN WIRD DIE TREFFERFLÄCHE, NICHT DIE BOX. Der „Alle"-Link im
+   *    Widget-Kopf (.widget__link) ist 32px hoch und dehnt seine Fläche per
+   *    ::before auf 48px aus; eine Box-Messung meldet ihn als Verstoß, obwohl
+   *    der Finger 48px findet (ebenso der Wetter-Knopf: 40px am Zeiger, 44px Fläche). Das ist zugleich das Rezept für „kompakt aussehen, voll
    *    treffen".
    *
    *    Geprüft auf Ebene 4 (Dokument, Puppeteer: `Sonde 4` in
@@ -1773,6 +1778,10 @@
    * Das Reveal-Panel stellt Icon und Etikett in genau diesen Streifen: was
    * beim Ausloesen aufgedeckt ist, ist dann auch vollstaendig zu lesen. */
   --swipe-threshold: 80px;
+  /* Der Fastenring als Begleiter eines Satzes (Uebersicht, DW-P3-5): die
+   * Viewbox des Rings (components/fasting-dial.js) in Pixeln - groesser
+   * fuehrt er, kleiner wird der Ring zur Glyphe. */
+  --fasting-widget-dial: 120px;
   --fab-size: 52px;
   --fab-gap: var(--space-6);
   /* Mitte der Nav-Kapsel: safe-area + Bar-Polster + halbe Resthoehe. Die
@@ -2641,6 +2650,7 @@
     --_weather-rain:   #7FC4F0;
     --_weather-snow:   #5EDDE8;
     --_weather-storm:  #D8A6F5;
+    --weather-glow-strength: 0.5;
     --_weather-band-icy:  #67E8F9;
     --_weather-band-cold: #7FB8FF;
     --_weather-band-mild: #5EEAD4;
@@ -2888,6 +2898,7 @@
     --_weather-rain:   #7FC4F0;
     --_weather-snow:   #5EDDE8;
     --_weather-storm:  #D8A6F5;
+    --weather-glow-strength: 0.5;
     --_weather-band-icy:  #67E8F9;
     --_weather-band-cold: #7FB8FF;
     --_weather-band-mild: #5EEAD4;

@@ -110,14 +110,14 @@ export function caldavTarget(body) {
   }
   const accountId = typeof rawId === 'number' ? rawId : parseInt(rawId, 10);
   if (!Number.isInteger(accountId) || accountId < 1) {
-    return { value: null, error: 'target_caldav_account_id: ungültige Konto-ID.' };
+    return { value: null, error: 'target_caldav_account_id is not a valid account id.' };
   }
   const calendarUrl = typeof rawUrl === 'string' ? rawUrl.trim() : '';
   if (!calendarUrl) {
-    return { value: null, error: 'target_caldav_calendar_url: fehlt für CalDAV-Ziel.' };
+    return { value: null, error: 'target_caldav_calendar_url is required for a CalDAV target.' };
   }
   if (calendarUrl.length > 2048) {
-    return { value: null, error: 'target_caldav_calendar_url: zu lang.' };
+    return { value: null, error: 'target_caldav_calendar_url is too long.' };
   }
   return { value: { accountId, calendarUrl }, error: null };
 }
@@ -159,14 +159,14 @@ export function caldavTargetOffered(database, target, event = null) {
     return ok;
   }
   if (event?.external_source === 'caldav' && event.caldav_account_id !== target.accountId) {
-    return { value: null, error: 'target_caldav_account_id: ein gespiegelter Termin wechselt den Kalender nur innerhalb seines Kontos.' };
+    return { value: null, error: 'target_caldav_account_id: a synced event can only move to a calendar of its own account.' };
   }
   const offered = database.prepare(`
     SELECT writable FROM caldav_calendar_selection
     WHERE account_id = ? AND calendar_url = ? AND enabled = 1
   `).get(target.accountId, target.calendarUrl);
   if (!offered) {
-    return { value: null, error: 'target_caldav_calendar_url: kein eingeschalteter Kalender dieses Kontos.' };
+    return { value: null, error: 'target_caldav_calendar_url is not an enabled calendar of this account.' };
   }
   // Ein nur lesbarer Kalender wird nicht angeboten (#1840) und auch nicht
   // angenommen: jeder Upload dorthin wäre abgewiesen worden.
@@ -186,14 +186,14 @@ export function outlookTarget(body) {
   }
   const accountId = typeof rawId === 'number' ? rawId : parseInt(rawId, 10);
   if (!Number.isInteger(accountId) || accountId < 1) {
-    return { value: null, error: 'target_outlook_account_id: ungültige Konto-ID.' };
+    return { value: null, error: 'target_outlook_account_id is not a valid account id.' };
   }
   const calendarId = typeof rawCal === 'string' ? rawCal.trim() : '';
   if (!calendarId) {
-    return { value: null, error: 'target_outlook_calendar_id: fehlt für Outlook-Ziel.' };
+    return { value: null, error: 'target_outlook_calendar_id is required for an Outlook target.' };
   }
   if (calendarId.length > 2048) {
-    return { value: null, error: 'target_outlook_calendar_id: zu lang.' };
+    return { value: null, error: 'target_outlook_calendar_id is too long.' };
   }
   return { value: { accountId, calendarId }, error: null };
 }
@@ -208,7 +208,7 @@ export function googleTarget(body) {
   const id = typeof raw === 'string' ? raw.trim() : '';
   if (!id) return { value: null, error: null };
   if (id.length > 2048) {
-    return { value: null, error: 'target_google_calendar_id: zu lang.' };
+    return { value: null, error: 'target_google_calendar_id is too long.' };
   }
   return { value: id, error: null };
 }

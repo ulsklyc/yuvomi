@@ -379,7 +379,8 @@ function slice(items, total = items.length) {
   };
 }
 
-const zeilen = (html) => (html.match(/class="pantry-widget-row"/g) || []).length;
+// Was ohne Streckung steht: Zusatzzeilen (U14, `data-fill-row`) zeigt erst applyRowFill.
+const zeilen = (html) => (html.match(/<div class="list-row pantry-widget-row"[^>]*>/g) || []).filter((tag) => !tag.includes('data-fill-row')).length;
 
 test('Renderer: ein Ladefehler (null) wirft, damit die geteilte Fehlerkachel greift', () => {
   // Mit der eigenen Meldung - ein TypeError aus einem fehlenden Renderer wäre
@@ -428,8 +429,8 @@ test('Renderer: Resttage in Worten aus den Vorrats-Texten', () => {
 
 test('Renderer: Zeilen führen in den passend gefilterten Vorrat, der Kopf in den ganzen', () => {
   const html = renderPantryWidget(slice([row(1, -1), row(2, 2)]), '1x2');
-  assert.match(html, /class="pantry-widget-row" data-route="\/pantry\?filter=expired"/);
-  assert.match(html, /class="pantry-widget-row" data-route="\/pantry\?filter=soon"/);
+  assert.match(html, /class="list-row pantry-widget-row" data-route="\/pantry\?filter=expired"/);
+  assert.match(html, /class="list-row pantry-widget-row" data-route="\/pantry\?filter=soon"/);
   assert.match(html, /class="widget__link"/);
   assert.match(html, /data-route="\/pantry" class="widget__link"|href="\/pantry" data-route="\/pantry"/,
     'der Kopf-Link führt auf /pantry - mit Query liefe das Siegel auf den Slug „pantry?filter=…"');

@@ -149,7 +149,9 @@ export function housekeepingPaths() {
 const WORKER_GONE = '`housekeeping_worker_not_found` (404, the housekeeper was deleted)';
 const VISIT_GONE = '`housekeeping_visit_not_found` (404, the visit was deleted)';
 const TASK_GONE = '`housekeeping_task_not_found` (404, the task was deleted)';
+const SHOPPING_WRITE_REQUIRED = '`cross_module_access` (403, a supply request writes to the shopping list and needs write access to it - for API tokens a `shopping:write` scope)';
 const CASE_REASONS = {
+  '/api/v1/housekeeping/supply-requests': { post: SHOPPING_WRITE_REQUIRED },
   '/api/v1/housekeeping/worker': {
     post: `${WORKER_GONE}, \`housekeeping_username_invalid\` (400, the username breaks the naming rule), `
       + '`housekeeping_username_taken` (409, another account uses the username)',

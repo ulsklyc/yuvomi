@@ -28,15 +28,23 @@ import * as outlookCalendar from '../../services/outlook-calendar.js';
 const log = createLogger('Calendar');
 const router = express.Router();
 
+/** Die eine Standard-Person eines Kalenders, sonst null (Altform, #1897). */
+function soleAssignee(ids) {
+  return Array.isArray(ids) && ids.length === 1 ? ids[0] : null;
+}
+
 /**
  * Google-Ziele: nur aktivierte und beschreibbare Kalender - dieselbe Auswahl,
  * die das Frontend bisher clientseitig aus /google/calendars gefiltert hat.
  * Ohne Verbindung wird gar nicht erst gegen die Google-API gerufen.
  *
- * `defaultAssigneeUserId` ist die Standard-Zuweisung des Kalenders (#459). Das
- * Formular liest sie RUECKWAERTS (#1060): ein neuer Termin, der genau dieser
- * Person zugewiesen ist, bekommt diesen Kalender als Ziel.
- * @returns {Promise<Array<{id: string, summary: string, defaultAssigneeUserId: number|null}>>}
+ * `defaultAssigneeUserIds` sind die Standard-Personen des Kalenders (#459,
+ * #1897). Das Formular liest sie RUECKWAERTS (#1060): ein neuer Termin, der
+ * genau diesen Personen zugewiesen ist, bekommt diesen Kalender als Ziel.
+ * `defaultAssigneeUserId` traegt fuer Aufrufer der Altform die Person nur, wenn
+ * es genau eine ist: ein aelterer Client liest es als "der Kalender genau dieser
+ * Person", und ein gemeinsamer Kalender ist das fuer keine von beiden.
+ * @returns {Promise<Array<{id: string, summary: string, defaultAssigneeUserIds: number[], defaultAssigneeUserId: number|null}>>}
  */
 async function listGoogleTargets() {
   if (!googleCalendar.getStatus().connected) return [];
@@ -46,7 +54,8 @@ async function listGoogleTargets() {
     .map((cal) => ({
       id: cal.id,
       summary: cal.summary || cal.id,
-      defaultAssigneeUserId: cal.default_assignee_user_id ?? null,
+      defaultAssigneeUserIds: cal.default_assignee_user_ids ?? [],
+      defaultAssigneeUserId: soleAssignee(cal.default_assignee_user_ids),
     }));
 }
 
@@ -56,8 +65,8 @@ async function listGoogleTargets() {
  *
  * Die Standard-Zuweisung haengt an der Kalender-URL, nicht am Konto
  * (`external_calendars.external_id`). Fuehren zwei Konten dieselbe URL, tragen
- * beide Ziele dieselbe Person - das Formular waehlt dann keines von selbst.
- * @returns {Promise<Array<{accountId: number, accountName: string, calendarUrl: string, calendarName: string, defaultAssigneeUserId: number|null}>>}
+ * beide Ziele dieselben Personen - das Formular waehlt dann keines von selbst.
+ * @returns {Promise<Array<{accountId: number, accountName: string, calendarUrl: string, calendarName: string, defaultAssigneeUserIds: number[], defaultAssigneeUserId: number|null}>>}
  */
 async function listCaldavTargets() {
   const targets = [];
@@ -73,7 +82,8 @@ async function listCaldavTargets() {
           accountName: account.name,
           calendarUrl: cal.calendarUrl,
           calendarName: cal.calendarName || cal.calendarUrl,
-          defaultAssigneeUserId: cal.default_assignee_user_id ?? null,
+          defaultAssigneeUserIds: cal.default_assignee_user_ids ?? [],
+          defaultAssigneeUserId: soleAssignee(cal.default_assignee_user_ids),
         });
       }
     } catch (err) {
@@ -108,8 +118,8 @@ function listOutlookTargets() {
 /**
  * GET /api/v1/calendar/sync-targets
  * Fuer alle angemeldeten Nutzer. Response:
- * { data: { google: [{ id, summary, defaultAssigneeUserId }],
- *           caldav: [{ accountId, accountName, calendarUrl, calendarName, defaultAssigneeUserId }],
+ * { data: { google: [{ id, summary, defaultAssigneeUserIds, defaultAssigneeUserId }],
+ *           caldav: [{ accountId, accountName, calendarUrl, calendarName, defaultAssigneeUserIds, defaultAssigneeUserId }],
  *           outlook: [{ accountId, accountName, calendarId, calendarName }] } }
  *
  * Jede Quelle faellt einzeln auf eine leere Liste zurueck: ein abgelaufenes

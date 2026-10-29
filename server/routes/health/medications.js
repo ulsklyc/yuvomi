@@ -293,7 +293,7 @@ router.patch('/medications/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const existing = medicationWritable(id, viewer);
     if (!existing) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
@@ -331,7 +331,7 @@ router.delete('/medications/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const existing = medicationWritable(id, viewer);
     if (!existing) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
@@ -351,7 +351,7 @@ router.get('/medications/:id/schedules', (req, res) => {
   try {
     const viewer = viewerId(req);
     const medId = parseInt(req.params.id, 10);
-    if (!medId) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!medId) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     if (!medicationForRead(medId, viewer)) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
 
     const rows = db.get().prepare(
@@ -369,7 +369,7 @@ router.post('/medications/:id/schedules', (req, res) => {
   try {
     const viewer = viewerId(req);
     const medId = parseInt(req.params.id, 10);
-    if (!medId) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!medId) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     if (!medicationWritable(medId, viewer)) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
 
     const sched = parseSchedule(req.body || {});
@@ -389,7 +389,7 @@ router.patch('/schedules/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const existing = writableChild(`
       SELECT s.* FROM medication_schedules s
@@ -432,7 +432,7 @@ router.delete('/schedules/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const existing = writableChild(`
       SELECT s.id FROM medication_schedules s
@@ -456,7 +456,7 @@ router.get('/medications/:id/logs', (req, res) => {
   try {
     const viewer = viewerId(req);
     const medId = parseInt(req.params.id, 10);
-    if (!medId) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!medId) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     if (!medicationForRead(medId, viewer)) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
 
     // Gefiltert wird ueber denselben Ausdruck, nach dem auch sortiert wird.
@@ -491,7 +491,7 @@ router.post('/medications/:id/logs', (req, res) => {
   try {
     const viewer = viewerId(req);
     const medId = parseInt(req.params.id, 10);
-    if (!medId) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!medId) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     if (!medicationWritable(medId, viewer)) return res.status(404).json({ error: 'Medication not found.', code: 404, reason: 'health_medication_not_found' });
 
     const b = req.body || {};
@@ -574,7 +574,7 @@ router.post('/medications/:id/logs', (req, res) => {
 function updateLogStatus(req, res, newStatus) {
   const viewer = viewerId(req);
   const id = parseInt(req.params.id, 10);
-  if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+  if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
   const logRow = ownLogRow(id, viewer);
   if (!logRow) return res.status(404).json({ error: 'Dose entry not found.', code: 404, reason: 'health_dose_not_found' });
@@ -635,7 +635,7 @@ router.patch('/logs/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const logRow = ownLogRow(id, viewer);
     if (!logRow) return res.status(404).json({ error: 'Dose entry not found.', code: 404, reason: 'health_dose_not_found' });
@@ -694,7 +694,7 @@ router.delete('/logs/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const logRow = ownLogRow(id, viewer);
     if (!logRow) return res.status(404).json({ error: 'Dose entry not found.', code: 404, reason: 'health_dose_not_found' });
@@ -733,7 +733,7 @@ router.post('/logs/:id/undo', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     const logRow = ownLogRow(id, viewer);
     if (!logRow) return res.status(404).json({ error: 'Dose entry not found.', code: 404, reason: 'health_dose_not_found' });
     const credit = v.num(req.body?.stock_credit, 'stock_credit');

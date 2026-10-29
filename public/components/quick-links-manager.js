@@ -21,9 +21,10 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { rowActionHtml } from '/utils/row-action.js';
-import { AVATAR_COLORS } from '/utils/color.js';
+import { USER_COLOR_DEFAULT } from '/utils/color.js';
+import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
 import { prefersInkText } from '/utils/contrast.js';
-import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmOverModal, reportFieldError, btnError, refocusAfterRender } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmOverModal, reportFieldError, btnError, refocusAfterRender, dialogInitialFocus } from '/components/modal.js';
 import { normalizeQuickLinkUrl, quickLinkHost } from '/utils/quick-link-url.js';
 import { iconElement } from '/utils/lucide-icons.js';
 import { sortableSet, restoreOrder } from '/utils/sortable.js';
@@ -62,11 +63,16 @@ const URL_ERROR_KEYS = {
 };
 
 /**
- * Die Farben, aus denen eine Kachel ohne Bild ihren Grund bekommt. Es sind die
- * Farben, aus denen auch ein Mitglied ohne Foto seine bekommt (utils/color.js):
- * eine Kachel neben einem Mitgliedsbild soll aus derselben Palette sprechen.
+ * Die Farbe einer Kachel ohne Bild waehlt der geteilte Farbwaehler
+ * (utils/color-picker.js, Critique R24 E6): dieselben Familientoene, aus
+ * denen auch ein Mitglied seine Farbe waehlt - eine Kachel neben einem
+ * Mitgliedsbild spricht aus derselben Palette. Bis R24 hiessen die sechs
+ * Swatches hier nach ihrem Hex-Wert ("Farbe #007AFF").
+ *
+ * Der Rueckfall fuer eine Kachel ohne gespeicherte Farbe bleibt das Blau der
+ * alten Palette: Bestandskacheln aendern ihr Gesicht nicht.
  */
-const TILE_COLORS = AVATAR_COLORS;
+const TILE_FALLBACK_COLOR = '#007AFF';
 
 function monogram(name) {
   // Der erste BUCHSTABE, nicht das erste Zeichen: ein Name wie "🎬 Jellyfin"
@@ -164,13 +170,6 @@ async function deleteUnlessGone(path) {
 // --------------------------------------------------------
 
 function formHtml(state, isEdit) {
-  const swatches = TILE_COLORS.map((c) => `
-    <button type="button" class="quick-link-swatch ${state.color === c ? 'quick-link-swatch--active' : ''}"
-            data-color="${esc(c)}" style="--swatch:${esc(c)}"
-            role="radio" aria-checked="${state.color === c ? 'true' : 'false'}"
-            tabindex="${state.color === c ? '0' : '-1'}"
-            aria-label="${esc(t('quickLinks.colorOption', { color: c }))}"></button>`).join('');
-
   return `
     <div class="quick-link-form">
       <div class="quick-link-form__face">
@@ -208,7 +207,7 @@ function formHtml(state, isEdit) {
 
       <div class="form-group">
         <span class="form-label" id="quick-link-color-label">${esc(t('quickLinks.colorLabel'))}</span>
-        <div class="quick-link-swatches" role="radiogroup" aria-labelledby="quick-link-color-label">${swatches}</div>
+        ${colorPickerHtml({ id: 'quick-link-color', value: state.color, labelledBy: 'quick-link-color-label' })}
       </div>
 
       <div class="form-group">
@@ -241,12 +240,14 @@ function openQuickLinkForm(link, onDone) {
     url: link?.url ?? '',
     iconData: link?.icon_data ?? null,
     iconName: link?.icon_name ?? null,
-    color: link?.color ?? TILE_COLORS[0],
+    color: link?.color ?? USER_COLOR_DEFAULT,
     visibility: VISIBILITY_VALUES.includes(link?.visibility) ? link.visibility : 'all',
   };
 
   openModal({
     title: isEdit ? t('quickLinks.editTitle') : t('quickLinks.addTitle'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'sm',
     content: formHtml(state, isEdit),
     onSave(panel) {
@@ -319,35 +320,11 @@ function openQuickLinkForm(link, onDone) {
         repaintFace();
       });
 
-      // Farbwahl mit Roving Tabindex - dasselbe Muster wie die Notizfarben.
-      const swatches = [...panel.querySelectorAll('.quick-link-swatch')];
-      const selectSwatch = (target) => {
-        swatches.forEach((s) => {
-          const active = s === target;
-          s.classList.toggle('quick-link-swatch--active', active);
-          s.setAttribute('aria-checked', active ? 'true' : 'false');
-          s.setAttribute('tabindex', active ? '0' : '-1');
-        });
-        state.color = target.dataset.color;
+      // Die Farbe ist der geteilte Waehler; die Kachel oben malt jede Wahl mit.
+      wireColorPicker(panel);
+      panel.querySelector('#quick-link-color')?.addEventListener('change', (e) => {
+        state.color = e.target.value;
         repaintFace();
-      };
-      swatches.forEach((sw) => {
-        sw.addEventListener('click', () => { selectSwatch(sw); sw.focus(); });
-        sw.addEventListener('keydown', (e) => {
-          const idx = swatches.indexOf(sw);
-          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-            e.preventDefault();
-            const next = swatches[(idx + 1) % swatches.length];
-            selectSwatch(next); next.focus();
-          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-            e.preventDefault();
-            const prev = swatches[(idx - 1 + swatches.length) % swatches.length];
-            selectSwatch(prev); prev.focus();
-          } else if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            selectSwatch(sw);
-          }
-        });
       });
 
       panel.querySelector('#quick-link-cancel').addEventListener('click', () => closeModal());
@@ -475,7 +452,7 @@ function listRowHtml(s, canEdit, index = 1, total = 1) {
   const host = quickLinkHost(s.url);
   return `
     <li class="quick-link-manage-row" data-id="${s.id}" data-name="${esc(s.name)}">
-      <span class="quick-link-face${faceInk(s.color || TILE_COLORS[0])}" style="--quick-link-color:${esc(s.color || TILE_COLORS[0])}" data-face></span>
+      <span class="quick-link-face${faceInk(s.color || TILE_FALLBACK_COLOR)}" style="--quick-link-color:${esc(s.color || TILE_FALLBACK_COLOR)}" data-face></span>
       <span class="quick-link-manage-row__body">
         <span class="quick-link-manage-row__name">${esc(s.name)}</span>
         <span class="quick-link-manage-row__host">${esc(host)}</span>

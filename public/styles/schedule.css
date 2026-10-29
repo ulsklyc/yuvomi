@@ -4,42 +4,40 @@
 
 .schedule-page {
   --module-accent: var(--module-schedule);
-  display: grid;
-  /* Without an explicit column, the implicit track sizes to `auto`
-   * (max-content): a child that refuses to shrink - the tab row's
-   * `flex-wrap: nowrap` rail with a long locale's labels - then grows this
-   * whole grid past the viewport instead of overflowing on its own. Every
-   * other bleed module avoids this by never being display:grid at the root;
-   * Schedule needs the grid for its stat sections, so the column itself has
-   * to allow shrinking below its content's natural width. */
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
+  /* DIE BAUART DER KALENDER-WOCHE (R24 S7b, Entscheidung S7-F1). Die Seite
+   * ist gedeckelt wie Kalender und Budget: Kopf, Warnung und Reiterinhalt
+   * stehen untereinander, und gescrollt wird nur im Port des Reiters
+   * (`.schedule-content.page-scrollport`, in der Uebersicht ihr Raster
+   * `#schedule-week-scroll`). Der Kopf liegt damit ausserhalb jedes Ports und
+   * klappt per Klasse ein (utils/ux.js, Architektur 2) - bis R24
+   * scrollte die Seite selbst (R22 D6), und der Kopf dockte mit negativem
+   * `top` an. */
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
   min-inline-size: 0;
-  padding-bottom: var(--space-8);
+  overflow: hidden;
 }
 
 /* Content column (#577 contract): the toolbar and tab rail are full-bleed
  * shared components that pad themselves; the body below carries the same
- * --page-inline-pad via margin so its cards keep their own internal padding
- * instead of stretching edge-to-edge. */
-.schedule-today,
-.schedule-content {
-  margin-inline: var(--page-inline-pad);
-}
-
-/* Container context lives on the margined box, not the full-bleed page root,
- * so the responsive grids below react to the width they actually render at. */
+ * --page-inline-pad. Seit der Inhalt sein eigener Port ist (R24 S7b), steht
+ * der Abstand als Polster IM Port: als Rand stuende die Bildlaufleiste
+ * mitten in der Seite, und Fokusringe am Rand wuerden abgeschnitten.
+ *
+ * Container context lives on the content box, so the responsive grids below
+ * react to the width they actually render at (Polster zaehlt nicht mit). */
 .schedule-content {
   container: schedule-page / inline-size;
+  padding-inline: var(--page-inline-pad);
 }
 
 .schedule-body {
-  display: grid;
-  gap: var(--space-4);
-  min-width: 0;
-  /* Nachlauf fuer einen kurzen Reiter unter angedocktem Kopf (renderPage,
-   * R23 S10): nur so hoch, wie dem Port zur Lead-Zone fehlt, sonst 0. */
-  padding-block-end: var(--schedule-tail, 0);
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-block-size: 0;
+  min-inline-size: 0;
 }
 
 .schedule-content,
@@ -49,79 +47,39 @@
   min-width: 0;
 }
 
-/* "HEUTE" IST EINE ZEILE (Entscheidung R17, E1). Bis R17 eine Karte mit
- * Abschnittstitel und Listenzeilen: 132px (mobil) bis 148px ueber JEDEM Reiter,
- * bevor dessen Inhalt begann - mobil lag die erste Datenzeile der Planung bei
- * y=304. Jetzt das Wort und dahinter eine Marke je Eintrag, eine
- * Trefferflaeche hoch; mehr Eintraege, als die Zeile fasst, rollen seitwaerts
- * (der Anschnitt kommt aus wireScrollFade()). */
-.schedule-today {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
-.schedule-today__label {
-  flex: 0 0 auto;
-  margin: 0;
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-secondary);
-}
-
-.schedule-today__entries {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+/* Der Port eines Reiters: der Abstand zum Kopf steht oben im Port (bis R24
+ * die Luecke des Seitenrasters), das Ende traegt der Nachlauf der Shell
+ * (`.page-scrollport`, layout.css). */
+.schedule-content.page-scrollport {
   flex: 1 1 auto;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+  min-block-size: 0;
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding-block-start: var(--space-4);
+  --scrollport-pad: var(--space-8);
 }
 
-.schedule-today__entry {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--target-base);
-  padding-inline: var(--space-3);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-full);
-  background: var(--color-surface);
-  white-space: nowrap;
+/* Das Raster der Uebersicht bringt seinen Port mit; der Inhalt ist hier nur
+ * die Flaeche, in der Tageskoepfe und Port untereinander stehen. */
+.schedule-content--grid {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-block-size: 0;
 }
 
-.schedule-today__name {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
-}
-
-.schedule-today__meta,
-.schedule-today__empty {
-  color: var(--color-text-secondary);
-}
-
-/* Der leere Tag haelt dieselbe Zeilenhoehe wie einer mit Marke, damit der
- * Inhalt darunter nicht um eine halbe Zeile ruckt, sobald der erste Eintrag
- * dazukommt. */
-.schedule-today__empty {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--target-base);
+/* Ohne Warnung ist der Slot leer und nimmt keine Zeile (sonst stuende eine
+ * zweite Luecke zwischen Kopf und Reiterinhalt). */
+.schedule-today-slot:empty {
+  display: none;
 }
 
 .schedule-today-slot > .schedule-warnings {
   margin: var(--space-2) var(--page-inline-pad) 0;
 }
 
-.schedule-toolbar {
-  margin-bottom: calc(var(--space-4) * -1);
-}
-
-/* EINE TITELZEILE, EINE HOEHE (wie die Haushaltshilfe). "Vergleich" und
+/* EINE TITELZEILE, EINE HOEHE (wie die Haushaltshilfe). "Uebersicht" und
  * "Auswertung" tragen keinen Kopf-Knopf; ohne diese Regel war der Kopf dort
  * 13px niedriger (104 statt 117px bei 1280) und die Reiterleiste sprang beim
  * Wechsel - seit R17 beim ersten Wechsel WEG vom Startreiter. Nur mit
@@ -170,18 +128,6 @@
  * `:has()`-Unterstuetzung die ganze Liste (F4.2). */
 .schedule-form > .form-field:has(input[name="name"]) {
   grid-column: 1 / -1;
-}
-
-/* Ein fester Balken statt `width: 100%`: dieselbe Regel stretchte den nativen
- * Farbwaehler ueber die volle Breite seiner Rasterzelle - auf dem Desktop eine
- * hohe Flaeche neben dem Kurzcode-Feld, unterhalb des Mobil-Breakpoints (wo
- * .schedule-form auf eine Spalte faellt) ein Balken ueber die volle
- * Formularbreite. Feste Breite, statt an der Breite der umgebenden Zelle zu
- * haengen - 64px, ein eigener Wert fuer dieses Feld statt der 44-52px der
- * anderen Farbwaehler (subscriptions.css), die eine andere Feldgroesse haben. */
-.schedule-color-field .form-input--color {
-  width: 64px;
-  flex: 0 0 auto;
 }
 
 /* Bare <fieldset> carries a browser-default border/padding/min-width this
@@ -384,9 +330,17 @@
   gap: var(--space-2);
 }
 
-/* Unter der Liste, leise (R20): Etikett und Ghost-Knoepfe auf einer Linie. */
+/* Unter der Liste, leise (R20). Seit R24 (Critique G1-Schichtplan-P3-2) sagt
+ * das Etikett, was die Knoepfe tun („Typische Schichtarten anlegen:"), und
+ * steht als eigene Zeile ueber ihnen - neben ihnen brach mobil der erste Knopf
+ * in die Etikettzeile und die anderen darunter, mit 56px Luecke. */
 .schedule-quickstart-actions--more {
   align-items: center;
+}
+
+.schedule-quickstart-actions__label {
+  flex-basis: 100%;
+  color: var(--color-text-secondary);
 }
 
 /* Zwei Gruppen in der Schichtarten-Liste (R20): mit Uhrzeit, ganztaegig. Den
@@ -394,7 +348,7 @@
  * als seine zwei Spalten nebeneinander. */
 .schedule-type-group__title {
   margin: 0 0 var(--space-2);
-  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
 }
 
 .schedule-icon-picker {
@@ -405,15 +359,11 @@
 }
 
 @media (max-width: 639px) {
-  .schedule-page {
-    gap: var(--space-3);
-    /* Die Kapselzone traegt der Shell-Nachlauf (--nav-tail, layout.css);
-     * hier steht nur das eigene Ende der Seite. */
-    padding-bottom: var(--space-6);
-  }
-
-  .schedule-toolbar {
-    margin-bottom: calc(var(--space-3) * -1);
+  /* Die Kapselzone traegt der Shell-Nachlauf (--nav-tail, layout.css); hier
+   * stehen nur der eigene Abstand zum Kopf und das eigene Ende des Ports. */
+  .schedule-content.page-scrollport {
+    padding-block-start: var(--space-3);
+    --scrollport-pad: var(--space-6);
   }
 
   .schedule-create > .schedule-form {
@@ -786,26 +736,32 @@
   gap: 0;
 }
 
-/* DIE WERKZEUGZEILE UND DIE TAGESKOEPFE KLEBEN UNTER DEM KOPF. Die Seite
- * scrollt durch die Stunden (der Kopf dockt dabei wie in jedem Modul auf
- * seine Leiste), und Zeitraum, Ansicht, Personen und die Tage bleiben stehen
- * - die Rolle, die im Kalender der feste Kopf ueber dem Wochenport spielt.
- * Die Klebekante ist die Unterkante des angedockten Kopfs
- * (--schedule-dock-top, syncOverviewDock() in schedule.js). */
-.schedule-overview__dock {
-  position: sticky;
-  top: var(--schedule-dock-top, 0px);
-  z-index: var(--z-sticky);
-  background-color: var(--color-bg);
-  min-width: 0;
+/* DAS RASTER FUELLT DEN REITER (R24 S7b, Bauart der Kalender-Woche): die
+ * Tageskoepfe oben, darunter der Port, der den Rest nimmt und durch die
+ * Stunden rollt. */
+.schedule-overview--grid {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-block-size: 0;
 }
 
-.schedule-overview__toolbar {
+/* DIE WERKZEUGE DER UEBERSICHT STEHEN IM KOPF (R24 S7b, S7-F1): Zeitraum,
+ * Woche/Tag und Personen im Center-Slot (`.schedule-nav`, renderOverviewNav),
+ * in jeder Breite - wie Kalender und Budget. Ab 768px in der Titelzeile
+ * neben dem Namen, am Telefon als eigene Zeile UNTER den Reitern: neben dem
+ * Large Title blieben dem Namen 125 von 184px („Schicht..."), und ueber den
+ * Reitern sprangen diese beim Wechsel auf einen Reiter ohne Werkzeuge um eine
+ * Zeile. Auf den anderen Reitern ist der Slot leer. */
+.schedule-nav {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
-  padding-block: var(--space-2);
+}
+
+.schedule-nav:empty {
+  display: none;
 }
 
 .schedule-overview__stepper {
@@ -817,12 +773,14 @@
 }
 
 /* Der Wert steht ZWISCHEN den Pfeilen (Zeitraum-Kopf, DESIGN.md) und haelt
- * eine Mindestbreite, damit der rechte Pfeil beim Blaettern nicht wandert. */
+ * eine Mindestbreite, damit der rechte Pfeil beim Blaettern nicht wandert.
+ * Groesse und Gewicht des Zeitraums im Kopf wie im Budget (16/600, R24
+ * Critique G1-Schichtplan-P3-3). */
 .schedule-overview__week-label {
   min-inline-size: 8rem;
   text-align: center;
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   white-space: nowrap;
 }
@@ -848,28 +806,34 @@
 /* EINE HOEHE JE ZEILE (D8): das Segment misst aussen wie seine Nachbarn,
  * dieselbe Rechnung wie im Seitenkopf (panel.css) - am Finger
  * --target-base, am Zeiger --target-md. */
-.schedule-overview__toolbar .segmented {
+.schedule-nav .segmented {
   padding: var(--space-px);
 }
 
-.schedule-overview__toolbar .segmented__item {
+.schedule-nav .segmented__item {
   min-height: calc(var(--target-base) - 4 * var(--space-px));
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .schedule-overview__toolbar .segmented__item {
+  .schedule-nav .segmented__item {
     min-height: calc(var(--target-md) - 4 * var(--space-px));
   }
 
+  /* `padding-block: 0` (R24, G0-Shell-P3-2): Polster plus Gesichterstapel
+   * ergaben 42px ueber der Untergrenze - neben dem 40er Segment derselben
+   * Zeile. */
   .schedule-overview__people {
     min-height: var(--target-md);
     min-width: var(--target-md);
+    padding-block: 0;
   }
 }
 
-/* Kopfzeile und Raster teilen EIN Spaltenmass. Die Kopfzeile rollt
- * waagerecht mit dem Raster (wireOverviewScroll()), ohne eigene Leiste. */
+/* Kopfzeile und Raster teilen EIN Spaltenmass. Die Kopfzeile steht ueber dem
+ * Port und rollt waagerecht mit ihm (wireOverviewScroll()), ohne eigene
+ * Leiste. */
 .schedule-overview__head {
+  flex: 0 0 auto;
   overflow-x: auto;
   scrollbar-width: none;
   border-block-end: 1px solid var(--color-border);
@@ -973,17 +937,22 @@
   white-space: nowrap;
 }
 
-/* Waagerecht rollt nur das Raster; senkrecht rollt die Seite.
+/* DER PORT DES RASTERS (R24 S7b, wie `#week-scroll` im Kalender): er rollt
+ * senkrecht durch die Stunden und waagerecht durch die Tage; die Stundenachse
+ * klebt links, die Tageskoepfe stehen darueber.
  *
  * DER TAG RASTET AN DER STUNDENACHSE EIN (R23, Critique G1 P2). Am Telefon
  * passten 2,8 Tage ins Bild, und das Rollen hielt, wo der Finger losliess:
  * der erste sichtbare Tag stand halb unter der klebenden Achse ("Frühschicht"
  * ohne ihren Anfang), auch beim Oeffnen auf heute (der Weg war am Ende). Jetzt
- * rastet jeder Tag mit seiner Startkante an der Achse ein, und am Telefon ist
- * ein Tag genau so breit, dass ganze Tage ins Bild passen (unten). */
+ * rastet jeder Tag mit seiner Startkante an der Achse ein (nur waagerecht),
+ * und am Telefon ist ein Tag genau so breit, dass ganze Tage ins Bild passen
+ * (unten). */
 .schedule-overview__scroll {
-  overflow-x: auto;
-  overflow-y: hidden;
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
   scroll-snap-type: x mandatory;
   scroll-padding-inline-start: var(--cal-gutter-width);
 }
@@ -1132,12 +1101,19 @@
 }
 
 /* Der Titel bleibt an der SICHTBAREN Oberkante seines Blocks, wie im Kalender
- * (`.week-event__title`): beginnt die Schicht ueber der Klebekante, ruecken
- * Titel und Zeit um `--title-shift` nach unten, innerhalb des Blocks. Den
- * Versatz rechnet pinOverviewTitles() (schedule.js) - `position: sticky`
- * haftete hier am waagerechten Scroller, der senkrecht nie rollt. */
-.schedule-overview__lane > .schedule-overview__block > * {
-  transform: translateY(var(--title-shift, 0px));
+ * (`.week-event__title`): beginnt die Schicht ueber dem Bild, klebt er oben im
+ * Port. Bis R24 S7b rechnete die Seite den Versatz (pinOverviewTitles) -
+ * `position: sticky` haftete am waagerechten Scroller, der senkrecht nie
+ * rollte. Seit EIN Port beide Achsen rollt, haftet er dort, wo er soll. Die
+ * Zeit folgt eine Zeile tiefer, beide bleiben in ihrem Block. */
+.schedule-overview__lane > .schedule-overview__block > .schedule-overview__block-title {
+  position: sticky;
+  top: 0;
+}
+
+.schedule-overview__lane > .schedule-overview__block > .schedule-overview__block-time {
+  position: sticky;
+  top: calc(var(--text-xs) * 1.3);
 }
 
 @media print {
@@ -1151,7 +1127,6 @@
    * Einstellungsblatt (settings/pages/personal-schedule.js), das settings.css
    * laedt - hier gibt es sie nicht mehr zu verstecken. */
   .schedule-tabs,
-  .schedule-today,
   .schedule-stat-filters,
   .schedule-stat-filters .form-field,
   .schedule-stat-filter-actions {
@@ -1258,18 +1233,37 @@
   text-align: end;
 }
 
-/* MOBIL: EINE WERKZEUGZEILE (R22, D6; vorher R16 zwei Zeilen). Zeitraum,
- * Woche/Tag und die Personen teilen eine Zeile; der Wert nimmt den Rest und
- * kuerzt. "Heute" liegt wie im Kalender und im Budget AUF dem Wert:
- * durchsichtig zwischen den Pfeilen, ein Tipp aufs Label springt zurueck; der
- * Wert steht im Modulton, solange man neben dem laufenden Zeitraum steht.
- * Name und Tab-Stopp des Knopfs bleiben. */
+/* Ab 768px steht die Zeile in der Titelzeile (`--period-inline`, layout.css);
+ * dessen Center-Regel nimmt den Abstand zwischen Pfeilen und Wert (`gap: 0`),
+ * hier stehen aber drei Werkzeuge nebeneinander. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .page-toolbar.page-toolbar--period-inline.page-toolbar--wrap:not(.page-toolbar--in-group) > .page-toolbar__center.schedule-nav {
+    gap: var(--space-2);
+  }
+}
+
+/* MOBIL: EINE WERKZEUGZEILE UNTER DEN REITERN (R22 D6, seit R24 S7b im
+ * Kopf). Zeitraum, Woche/Tag und die Personen teilen eine Zeile; der Wert
+ * nimmt den Rest und kuerzt. Die Zeile ist die letzte des Kopfs: die Reiter
+ * stehen auf jedem Reiter an derselben Stelle, und eingeklappt geht nur der
+ * Large Title (layout.css, `--period ... is-collapsed`). Die Selektorform ist
+ * die der Regeln, die sie zuruecknimmt (layout.css, `--wrap` und
+ * `--period-inline`), sonst verloere sie still gegen 0,4,0.
+ *
+ * "Heute" liegt wie im Kalender und im Budget AUF dem Wert: durchsichtig
+ * zwischen den Pfeilen, ein Tipp aufs Label springt zurueck; der Wert steht
+ * im Modulton, solange man neben dem laufenden Zeitraum steht. Name und
+ * Tab-Stopp des Knopfs bleiben. */
 @media (max-width: 767px) {
-  .schedule-overview__toolbar {
+  .page-toolbar.schedule-toolbar:not(.page-toolbar--in-group):has(> .page-toolbar__title) > .page-toolbar__center.schedule-nav {
+    order: 5;
+    flex: 1 1 100%;
+    min-width: 0;
+    margin-inline: 0;
     gap: var(--space-1);
   }
 
-  .schedule-overview__toolbar .segmented__item {
+  .schedule-nav .segmented__item {
     padding-inline: var(--space-2);
   }
 
@@ -1280,11 +1274,15 @@
     contain: inline-size;
   }
 
+  /* Mobil teilt sich der Zeitraum die Zeile mit Woche/Tag und der
+   * Personenwahl: in 16px kuerzte „26.10. - 01.11." auf „26.10. - 01...". Er
+   * bleibt hier in der Footnote-Groesse, halbfett wie breit. */
   .schedule-overview__stepper > .schedule-overview__week-label {
     flex: 1 1 0;
     min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-size: var(--text-sm);
   }
 
   .schedule-overview__stepper > .period-stepper__reset.is-current {

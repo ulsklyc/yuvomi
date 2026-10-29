@@ -11,7 +11,7 @@ import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
+import { metricGlanceHtml } from '/utils/metric-glance.js';
 import {
   openModal as openSharedModal,
   closeModal as closeSharedModal,
@@ -451,54 +451,34 @@ function updateAttentionBadge() {
     'warning');
 }
 
-// Mobil ist die Kennzahl-Zeile EINE Kurzzeile (utils/metric-glance.js), die
-// die Karten aufklappt (R16): drei Kacheln standen als 136px vor der ersten
-// Kategorie, eine davon fuer „0". Der Merker haelt den Zustand ueber den
-// Neuaufbau der Liste.
-let _metricsExpanded = false;
-
+/* DIE KENNZAHL IST EINE KURZZEILE IN JEDER BREITE (R24, E2; Critique
+ * G4-Inventar-P3-1). Am Desktop standen zwei plus eine Kachel (150px vor der
+ * ersten Zeile), und "Braucht Aufmerksamkeit 1" war eine Kachel, kein Weg zu
+ * dem einen Gegenstand. Jetzt die Zeile oben (Gegenstaende, Wert) und
+ * darunter - nur wenn es Fristen gibt oder der Filter steht - ein Filterchip
+ * "Braucht Aufmerksamkeit 1", derselbe Baustein wie "Laeuft bald ab" in den
+ * Dokumenten: ein Tipp zeigt genau diese Gegenstaende. */
 function renderMetrics() {
   const { count, totalValue, needsAttention } = computeMetrics(state.items);
-  // Ein aktiver Filter bleibt sichtbar: seine Kachel ist der Schalter, also
-  // steht die Zeile dann aufgeklappt.
-  const expanded = _metricsExpanded || state.filterAttention;
-  const attentionEmpty = needsAttention === 0 && !state.filterAttention;
+  const attention = needsAttention > 0 || state.filterAttention
+    ? `<div class="page-chip-row inventory-attention" role="group" aria-label="${esc(t('inventory.metricAttentionLabel'))}">
+        <button type="button" class="filter-chip filter-chip--sm${state.filterAttention ? ' filter-chip--active' : ''}"
+                data-action="toggle-attention-filter" aria-pressed="${state.filterAttention}">
+          <i data-lucide="calendar-clock" class="icon-md" aria-hidden="true"></i>${esc(t('inventory.metricAttentionLabel'))}<span class="filter-chip__count">${needsAttention}</span>
+        </button>
+      </div>`
+    : '';
   return `
     ${metricGlanceHtml({
-    id: 'inventory-glance-more',
-    controls: 'inventory-metrics',
-    expanded,
     label: t('inventory.metricItemsLabel'),
     value: String(count),
+    everywhere: true,
     flows: [
       // Ohne Preisrecht (R23) gibt es keinen Wert - die Antwort traegt keine Preise.
       canSeeInventoryPrices() ? { label: t('inventory.metricValueLabel'), amount: formatMoney(totalValue, _householdCurrency) } : null,
-      // Eine leere Kennzahl entfaellt in der Kurzzeile.
-      needsAttention > 0 ? { label: t('inventory.metricAttentionLabel'), amount: String(needsAttention) } : null,
     ],
   })}
-    <div class="metric-grid budget-glance-details${expanded ? ' is-expanded' : ''}" id="inventory-metrics">
-      <div class="metric-card">
-        <div class="metric-card__label">${esc(t('inventory.metricItemsLabel'))}</div>
-        <div class="metric-card__value">${count}</div>
-      </div>
-      ${canSeeInventoryPrices() ? `<div class="metric-card">
-        <div class="metric-card__label">${esc(t('inventory.metricValueLabel'))}</div>
-        <div class="metric-card__value">${esc(formatMoney(totalValue, _householdCurrency))}</div>
-      </div>` : ''}
-      ${/* NULL IST KEIN WEG (R22, a4 Klein): "Braucht Aufmerksamkeit 0" stand
-           in Akzenttinte als Knopf da und versprach einen Filter, der eine
-           leere Liste zeigt. Ohne Frist und ohne aktiven Filter ist die Zeile
-           eine ruhige Kennzahl; mit Fristen (oder eingeschaltet) der Schalter. */ ''}
-      ${attentionEmpty ? `<div class="metric-card metric-card--empty">
-        <div class="metric-card__label">${esc(t('inventory.metricAttentionLabel'))}</div>
-        <div class="metric-card__value">${needsAttention}</div>
-      </div>` : `<button type="button" class="metric-card metric-card--select${state.filterAttention ? ' is-active' : ''}"
-              data-action="toggle-attention-filter" aria-pressed="${state.filterAttention}">
-        <div class="metric-card__label">${esc(t('inventory.metricAttentionLabel'))}</div>
-        <div class="metric-card__value">${needsAttention}</div>
-      </button>`}
-    </div>`;
+    ${attention}`;
 }
 
 /**
@@ -789,7 +769,6 @@ function renderListBody() {
 
   list.replaceChildren();
   list.insertAdjacentHTML('beforeend', renderMetrics());
-  wireMetricGlance(list, 'inventory-glance-more', (expanded) => { _metricsExpanded = expanded; });
   list.querySelector('[data-action="toggle-attention-filter"]')?.addEventListener('click', () => {
     state.filterAttention = !state.filterAttention;
     renderList();
@@ -1365,7 +1344,7 @@ async function openItemDetail(item, { pane = null, signal = null } = {}) {
     actions: ro ? [] : [{
       id: 'inventory-detail-delete',
       label: t('common.delete'),
-      variant: 'danger-ghost',
+      variant: 'danger-outline',
       icon: 'trash-2',
       align: 'start',
       onClick: async ({ close }) => {
@@ -2055,7 +2034,7 @@ function buildItemForm({ mode, item = null }) {
           || item.odometer != null || categoryTracksOdometer(item.category)),
       })}
       <div class="modal-panel__footer modal-panel__footer--plain">
-        ${isEdit ? `<button type="button" class="btn btn--danger-ghost" id="inv-delete">${esc(t('common.delete'))}</button>` : ''}
+        ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="inv-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
         <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
         <button type="button" class="btn btn--primary" id="inv-save">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
       </div>`;

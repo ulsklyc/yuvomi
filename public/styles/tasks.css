@@ -80,6 +80,18 @@
   padding-bottom: 0;
 }
 
+/* DAS BRETT IN DER HOEHENKETTE (R24 S13, Critique G2-Aufgaben-P2-1). Traegt
+ * die Modulflaeche die Spaltenform, bleibt das Brett in ihr (tasks.js,
+ * syncSplitHeight): ohne Detailspalte ist `.split-view` die Flex-Spalte der
+ * Shell, und die Liste fuellt sie und scrollt selbst - wie in der Liste, nur
+ * ueber die volle Breite. So wechselt beim Umschalten nicht der Scrollport,
+ * und Liste -> Kanban ist ein Schnitt ohne Shift (vorher 0,0538). */
+.tasks-page--split:not(.app-page--list-detail) .split-view__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 /* Das Bodenpolster wandert mit dem Scrollen in die Liste - als Summand der
  * Scrollport-Rolle, die tasks.js dort in der Spaltenform setzt; den Nachlauf
  * der Shell legt `.page-scrollport` darauf (layout.css). */
@@ -257,10 +269,28 @@
   }
 }
 
+/* ZEICHEN ODER WORT, NIE BEIDES (R24, Critique G0 P2-1). Ab 1440 stand das
+ * Segment als Zeichen + Wort - eine dritte Form neben dem Text-Segment des
+ * Kalenders und dem Zeichen-Segment der Dokumente. Wo das Wort Platz hat,
+ * steht es allein wie im Kalender; darunter bleibt das Zeichen. */
+@media (min-width: 1440px) {
+  .tasks-view-toggle .segmented__item > [data-lucide],
+  .tasks-view-toggle .segmented__item > svg {
+    display: none;
+  }
+}
+
 @media (max-width: 767px) {
   .tasks-view-toggle {
     display: none;
   }
+}
+
+/* Der Filterknopf im Verlauf: Platz gehalten, Knopf weg (tasks.js
+ * `syncViewChrome`, Critique R24 G2-Aufgaben-P3-3). `visibility` nimmt ihn aus
+ * Zeiger, Tab-Folge und Baum, ohne dass Segment und Primaerknopf rutschen. */
+.tasks-toolbar .is-vacant {
+  visibility: hidden;
 }
 
 @media (min-width: 768px) {
@@ -706,35 +736,16 @@
    als die Prioritäts-Badges: Tags ordnen, sie warnen nicht.
    -------------------------------------------------------- */
 
-.task-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-0h) var(--space-2);
-  border: var(--space-px) solid var(--color-border-subtle);
-  border-radius: var(--radius-full);
-  background: var(--color-surface-2);
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-  line-height: 1.4;
-  /* Ein sehr langer Fremd-Tag darf die Zeile nicht sprengen. */
-  max-width: 14rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Auf den Karten ist das Chip ein Button (Klick filtert). Die Button-Herkunft
- * abräumen, damit es wie ein Etikett aussieht und nicht wie eine Schaltfläche -
- * es ordnet, es ruft nicht zur Handlung auf. */
+/* Die Form ist das geteilte Etikett (`.tag`, list-row.css, R24). Auf den
+ * Karten ist es ein Button (Klick filtert): es sieht aus wie ein Etikett und
+ * nicht wie eine Schaltflaeche - es ordnet, es ruft nicht zur Handlung auf. */
 .task-tag--filter {
   cursor: pointer;
-  font-family: inherit;
-  transition: border-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .task-tag--filter:hover {
-  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) var(--tint-state), var(--color-fill-well));
   color: var(--color-text-primary);
 }
 
@@ -748,12 +759,10 @@
  * Bedeutung, daher die abweichende Hover-Farbe. */
 .task-tag--editable {
   cursor: pointer;
-  font-family: inherit;
-  transition: border-color var(--transition-fast), color var(--transition-fast);
+  transition: color var(--transition-fast);
 }
 
 .task-tag--editable:hover {
-  border-color: var(--color-danger);
   color: var(--color-danger);
 }
 
@@ -909,7 +918,14 @@
   gap: var(--space-1);
   flex-wrap: nowrap;
   min-width: 0;
-  overflow: hidden;
+  /* NUR WAAGERECHT GESCHNITTEN (R24): der Schnitt haelt eine zu lange Zeile
+   * von der Endzone fern (Etiketten tragen ihre Ellipse selbst). Senkrecht
+   * bleibt sie offen, damit die 44er-Trefferflaeche des Teilaufgaben-Stands
+   * (`.subtask-toggle::before`) ueber die Textzeile hinausreicht - `hidden`
+   * schnitt sie auf 25px. `clip` macht dabei keinen Scrollport, und neben
+   * `clip` bleibt `visible` auf der anderen Achse sichtbar. */
+  overflow-x: clip;
+  overflow-y: visible;
   /* DIE ZEILE TRAEGT IHRE HOEHE, NICHT DER GROESSTE CHIP DARIN.
    *
    * Bis 2026-08-18 war das Prioritaets-Etikett mit seiner Fuellung, seiner
@@ -1292,6 +1308,17 @@
   color: var(--color-text-secondary);
 }
 
+/* Dieselbe Rangmarke als WERT in der Leseansicht (task-detail.js
+ * `priorityNode`, Critique R24 G2-Aufgaben-P2-2): Groesse und Farbe erbt sie
+ * vom Wert (`.detail-row__value`, Body 17, primaer) wie "Offen" und
+ * "Haushalt" daneben - das Etikett der Metazeile stand dort zwei Stufen
+ * kleiner. */
+.detail-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 /* `.priority-dot` STAND HIER und ist nach list-row.css gezogen: dieselbe
  * Rangmarke steht seit dieser Etappe auch am Aufgaben-Chip des Kalenders, und
  * ein Page-CSS je Seite heisst, dass tasks.css dort gar nicht geladen ist. Eine
@@ -1332,47 +1359,70 @@
   flex-shrink: 0;
 }
 
-/* Subtask-Fortschrittsbalken */
-/* <button>: klappt die Unteraufgaben auf. Als Div war die Liste (display:none)
- * per Tastatur unerreichbar — es gab keinen anderen Öffner. */
-.subtask-progress {
-  padding: 0 var(--space-3) var(--space-2);
-  display: flex;
+/* Stand der Teilaufgaben in der Metazeile (tasks.js `subtaskToggleHtml`,
+ * Critique R24 G2-Aufgaben-P3-2). Bis R24 ein 26px hoher Balken-Knopf ueber
+ * die ganze Zeile. Jetzt sieht er aus wie die Faelligkeit neben ihm (Groesse
+ * und Farbe der Metazeile, typography.css) und klappt die Liste auf; der
+ * Chevron dreht mit. Die Trefferflaeche waechst senkrecht auf 44 (`::before`),
+ * die Metazeile schneidet dafuer nur waagerecht (`overflow-x: clip`, unten). */
+.subtask-toggle {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  text-align: start;
+  gap: var(--space-0h);
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
 }
 
-.subtask-progress__bar-wrap {
-  flex: 1;
-  height: 4px;
-  background-color: var(--color-border);
-  border-radius: var(--radius-full);
-  overflow: hidden;
+.subtask-toggle::before {
+  content: '';
+  position: absolute;
+  inset-block: calc(50% - var(--target-base) / 2);
+  inset-inline: calc(-1 * var(--space-1));
 }
 
-.subtask-progress__bar-fill {
-  height: 100%;
-  background-color: var(--color-success);
-  border-radius: var(--radius-full);
-  transform-origin: left;
-  transform: scaleX(var(--progress-scale, 0));
-  transition: transform var(--transition-slow);
+.subtask-toggle__chevron {
+  transition: transform var(--transition-fast);
 }
 
-.subtask-progress__text {
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-  white-space: nowrap;
+.subtask-toggle[aria-expanded="true"] .subtask-toggle__chevron {
+  transform: rotate(180deg);
+}
+
+.subtask-toggle:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+@media (hover: hover) {
+  .subtask-toggle:hover {
+    color: var(--color-text-primary);
+  }
 }
 
 /* Subtask-Liste (eingeklappt/ausgeklappt) */
+/* EINGERUECKT UNTER DEN TITEL (Critique R24, G2-Aufgaben-P3-2): die Ringe der
+ * Teilaufgaben standen links VOR dem Elternring (4px weiter aussen) - die
+ * Liste las sich als Geschwister, nicht als Teil. Jetzt fluchtet der Ring mit
+ * dem Titel der Aufgabe: Polster + Statusring + Abstand der Zeile
+ * (`--task-title-inset`, mobil enger, s. 639er-Regel). */
 .subtask-list {
+  --task-title-inset: calc(var(--space-4) + var(--target-base) + var(--space-3));
   border-top: 1px solid var(--color-border-subtle);
-  padding: var(--space-2) var(--space-3);
+  padding-block: var(--space-1) var(--space-2);
+  padding-inline: var(--task-title-inset) var(--space-3);
   display: none;
+}
+
+@media (max-width: 639px) {
+  .subtask-list {
+    --task-title-inset: calc(var(--space-3) + var(--space-5) + var(--space-3) + var(--space-2));
+  }
 }
 
 .subtask-list--visible { display: block; }
@@ -1472,33 +1522,36 @@
   color: var(--color-text-primary);
 }
 
+/* EINE RUHIGE ZEILE MIT PLUS (Critique R24, G2-Aufgaben-P3-2) statt der
+ * einzigen gestrichelten Kapsel der App: das Plus steht, wo bei den
+ * Teilaufgaben darueber der Ring steht, der Text fluchtet mit ihren Titeln.
+ * Dieselbe Form wie im Detail (`.detail-subtask--add`, detail-view.css). */
 .subtask-item__add {
-  width: 100%;
-  padding: var(--space-2);
-  padding-inline: var(--space-3);
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  background: none;
-  border: 1.5px dashed var(--color-border);
-  /* Kapsel wie sein Gegenstueck `.detail-subtask--add` (detail-view.css):
-   * EINE Buttonform, auch fuer die gestrichelte Einladung. */
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  text-align: left;
-  margin-top: var(--space-2);
-  min-height: var(--target-lg);
-  /* Plus-Glyph und Text in einer Zeile - das "+" stand bis zur Critique
-   * 2026-09-26 im Locale-Text, und neben dem Icon der Detailansicht stand es
-   * doppelt ("+ + Teilaufgabe hinzufuegen"). */
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  transition: border-color var(--transition-fast), color var(--transition-fast);
+  width: 100%;
+  min-height: var(--target-base);
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  text-align: start;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.subtask-item__add > svg {
+  box-sizing: content-box;
+  flex-shrink: 0;
+  width: var(--icon-md);
+  height: var(--icon-md);
+  padding-inline: calc((var(--space-5) - var(--icon-md)) / 2);
 }
 
 .subtask-item__add:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--module-accent, var(--color-accent));
 }
 
 /* --------------------------------------------------------
@@ -1533,6 +1586,13 @@
 @media (min-width: 1024px) {
   .kanban-board {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /* DIE LEERE ABLAGE IST NUR IHR KOPF BREIT (Critique R24, G2-Aufgaben-P3-1;
+   * tasks.js `kanbanBoardHtml`). Drei arbeitende Spalten teilen sich den Rest,
+   * die Ablage bleibt Ablegeziel ("Hierher ziehen" erscheint beim Ziehen). */
+  .kanban-board:has(> .kanban-col--vacant) {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) max-content;
   }
 }
 
@@ -1733,15 +1793,23 @@
   margin-top: var(--space-2);
 }
 
+/* DAS VERB STEHT IM KNOPF (Critique R24, G2-Aufgaben-P3-4): "Starten",
+ * "Erledigen", "Wieder oeffnen" - vorher ein 24px-Kreis mit wechselndem
+ * Zeichen und dem Verb nur im Tooltip. Die Kapsel bleibt so niedrig wie
+ * vorher (24px), die Trefferflaeche waechst per ::before auf 44. */
 .kanban-card__status-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
+  gap: var(--space-1);
   height: 24px;
-  padding: 0;
+  padding: 0 var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -1752,7 +1820,7 @@
 }
 
 /* KOMPAKT AUSSEHEN, VOLL TREFFEN (Rezept aus tokens.css, Musterfall
- * `.weather-widget__refresh`): der Kreis bleibt 24px, weil er in der
+ * `.widget__link`): der Kreis bleibt 24px, weil er in der
  * Kartenfusszeile neben dem Avatarstapel steht, aber die Trefferflaeche
  * dehnt sich per ::before auf --target-base (44px Zeiger, 48px Finger). Bis
  * zur Critique 2026-09-26 war die 24px-Box die ganze Flaeche - die kleinste
@@ -1763,7 +1831,8 @@
 .kanban-card__status-btn::before {
   content: '';
   position: absolute;
-  inset: calc((100% - var(--target-base)) / 2);
+  inset-block: calc((100% - var(--target-base)) / 2);
+  inset-inline: calc(-1 * var(--space-1));
   border-radius: var(--radius-full);
 }
 
@@ -1774,8 +1843,9 @@
 }
 
 .kanban-card__status-btn svg {
-  width: 12px;
-  height: 12px;
+  flex-shrink: 0;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
   pointer-events: none;
 }
 
@@ -1821,31 +1891,54 @@
     margin-block-end: var(--space-1);
   }
 
-  /* Der Punkt zeichnet 8px, getroffen wird die volle Zielgroesse. */
-  .kanban-pager__dot {
-    display: grid;
-    place-items: center;
-    width: var(--target-base);
-    height: var(--space-6);
-    padding: 0;
+  /* TEXT-REITER STATT PUNKTE (Critique R24, G2-Aufgaben-P3-4): jeder nennt
+   * seine Spalte und ihre Zahl. Form der Reiter-Kapsel (E3, sub-tabs.css):
+   * Text sekundaer, der aktuelle getoent im Modulton, ohne Ring. Passt die
+   * Zeile nicht (lange Sprachen), scrollt sie waagerecht. */
+  .kanban-pager {
+    justify-content: flex-start;
+    gap: var(--space-1);
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-block-end: var(--space-2);
+  }
+
+  .kanban-pager::-webkit-scrollbar {
+    display: none;
+  }
+
+  .kanban-pager__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1h);
+    flex-shrink: 0;
+    min-height: var(--target-md);
+    padding: 0 var(--space-3);
     border: none;
-    background: none;
-    cursor: pointer;
-  }
-
-  .kanban-pager__dot::before {
-    content: '';
-    width: var(--space-2);
-    height: var(--space-2);
     border-radius: var(--radius-full);
-    background-color: var(--color-text-tertiary);
-    opacity: 0.45;
-    transition: opacity var(--transition-fast), background-color var(--transition-fast);
+    background: none;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
   }
 
-  .kanban-pager__dot[aria-current='true']::before {
-    background-color: var(--color-text-primary);
-    opacity: 1;
+  .kanban-pager__count {
+    color: var(--color-text-tertiary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kanban-pager__tab[aria-current='true'] {
+    background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), transparent);
+    color: var(--color-text-primary);
+  }
+
+  .kanban-pager__tab:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset-inset);
   }
 
   .kanban-card {
@@ -1902,6 +1995,15 @@
   .kanban-card__status-btn {
     grid-column: 3;
     grid-row: 1 / span 2;
+    /* Mobil ist die Karte eine Zeile: das Verb kostete dem Titel 90px
+     * ("Schreibtisch aufrae..."). Dort bleibt der Kreis mit Zeichen, das Verb
+     * sagt der Name (`aria-label`) - die Spalte darueber nennt den Stand. */
+    width: 24px;
+    padding: 0;
+  }
+
+  .kanban-card__status-verb {
+    display: none;
   }
 }
 
@@ -2204,9 +2306,78 @@
   width: 100%;
 }
 
-.task-comment__input {
+/* EIN FELD, DAS MIT DEM TEXT WAECHST (Critique R24, G2-Aufgaben-P2-2): kein
+ * Ziehgriff mehr (`resize: vertical` war ein Werkzeug fuer den Browser, nicht
+ * fuer den Kommentar), sondern eine Zeile, die beim Tippen hoeher wird und ab
+ * vier Zeilenhoehen in sich scrollt. Wo `field-sizing` fehlt (Firefox, Safari
+ * vor 26), bleibt es einzeilig und scrollt - kein Verlust, nur kein Wachsen. */
+textarea.task-comment__input {
   width: 100%;
-  resize: vertical;
+  resize: none;
+  field-sizing: content;
+  min-height: var(--target-lg);
+  max-height: calc(var(--target-lg) * 4);
+}
+
+/* Leer ist das Feld EINE Zeile, auch wenn der Hinweis laenger ist als das
+ * Telefon breit (390: "Kommentar schreiben, @ erwaehnt jemanden" brach um und
+ * zog das leere Feld auf zwei Zeilen). Der Hinweis endet dann mit Ellipse;
+ * sobald getippt wird, waechst das Feld mit dem Text. */
+textarea.task-comment__input:placeholder-shown {
+  field-sizing: fixed;
+  height: var(--target-lg);
+  overflow: hidden;
+}
+
+textarea.task-comment__input::placeholder {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Der Senden-Pfeil steht IM Feld an der Endkante (die Bauart des Auges im
+ * Passwortfeld, layout.css `.password-toggle`): das Feld reserviert ihm den
+ * Platz, er sitzt unten, damit er beim Wachsen an der letzten Zeile bleibt. */
+.task-comments__field > .task-comment__input {
+  /* block: als inline-block liess die Textarea unter sich die Unterlaenge
+   * der Zeile stehen, und der Pfeil sass 7px unter ihrer Kante. */
+  display: block;
+  padding-inline-end: calc(var(--target-lg) + var(--space-1));
+}
+
+.task-comments__send {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-end: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--target-lg);
+  height: var(--target-lg);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-accent);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.task-comments__send > svg {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+}
+
+/* Leer ist der Pfeil ruhig: er wird erst zur Einladung, wenn es etwas zu
+ * senden gibt. Bedienbar bleibt er - ein leerer Kommentar geht ohnehin nicht
+ * ab (der Submit-Handler kehrt zurueck). */
+.task-comments__field:has(> .task-comment__input:placeholder-shown) > .task-comments__send {
+  color: var(--color-text-tertiary);
+}
+
+.task-comments__send:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
 }
 
 .task-comment__edit-actions {
@@ -2338,40 +2509,12 @@
 
 /* Die Personenauswahl steht ueber der Liste und traegt deren Lesemass - sonst
  * liefe sie bis an die Traegerkante, waehrend die Zeilen darunter bei 720px
- * enden. */
+ * enden. Sie ist die EINE Personenzeile (`personChipsHtml`, Critique R24) auf
+ * `.page-chip-row`: die bringt das Scrollen bei Ueberlauf und den Schutz der
+ * Chips gegen das Schrumpfen (#1068) schon mit. */
 .history-people {
   max-width: var(--page-measure, var(--content-max-width-narrow));
   margin-bottom: var(--space-3);
-  overflow-x: auto;
-}
-
-/* WER IN EINER SCROLLENDEN REIHE STEHT, MUSS SICH SELBST GEGEN DAS SCHRUMPFEN
- * WEHREN - UND ZWAR ALS DIREKTES KIND (#1068).
- *
- * `overflow-x: auto` an der Reihe greift erst, wenn die Flex-Items nicht mehr
- * nachgeben. Solange sie duerfen, schrumpfen sie ZUERST und die Reihe scrollt
- * gar nicht: gemessen bei 375px mit neun Mitgliedern fiel der schmalste Chip auf
- * 40px - unter die Zielgroesse, die dieser Chip als Traeger des Label-Verlusts
- * gerade zusichern soll. Mit der Regel bleiben alle neun bei 48px und die Reihe
- * scrollt. Dasselbe Muster traegt die geteilte Chipreihe im Scrollport
- * (layout.css, `.page-chip-row > * { flex-shrink: 0 }`).
- *
- * Das Flex-Item ist der KNOPF. `.history-people__mark` liegt eine Ebene tiefer
- * und ist fuer die Reihe unsichtbar - eine Regel dort haette diesen Schutz nie
- * geleistet, so plausibel sie sich auch liest. */
-.history-people .group-toggle__btn {
-  flex-shrink: 0;
-}
-
-/* Die Marke, die bleibt, wenn das Label faellt.
- *
- * Ihr eigenes `flex-shrink: 0` gilt IM KNOPF, nicht in der Reihe: der Knopf ist
- * selbst eine Flexbox, und ein langes Label neben der Scheibe wuerde sie sonst
- * zusammendruecken. Die Groesse bringt der Avatar inline mit
- * (`renderAvatarStack`), hier steht nur, dass sie ihm bleibt. */
-.history-people__mark {
-  display: inline-flex;
-  flex-shrink: 0;
 }
 
 /* „Mehr anzeigen" schliesst die Liste ab, mittig unter ihr. */

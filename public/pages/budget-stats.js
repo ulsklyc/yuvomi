@@ -6,8 +6,6 @@ import { CATEGORY_SERIES_COLORS, CATEGORY_OTHER_COLOR, categoryColorIndex, categ
 import { api } from '/api.js';
 import { t, getLocale } from '/i18n.js';
 import { dateRangeText, dateText } from '/utils/date-format.js';
-import { wireTablist } from '/utils/tablist.js';
-import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { renderSkeletonChart } from '/utils/skeleton.js';
 import { growBars, drawChartOnce } from '/utils/ux.js';
 import { mountEmptyState, mountLoadError } from '/utils/empty-state.js';
@@ -21,11 +19,8 @@ import { trendMarkup } from '/utils/metric-card.js';
 // Modul, die nie synchron waren (Critique 2026-07-30, P1).
 const view = { range: 'month', anchor: null, data: null, prev: null, error: false, ctx: null, root: null };
 
-const RANGE_LABELS = {
-  week: 'budget.statsRangeWeek',
-  month: 'budget.statsRangeMonth',
-  year: 'budget.statsRangeYear',
-};
+const RANGE_LABEL_KEYS = { week: 'budget.statsRangeWeek', month: 'budget.statsRangeMonth', year: 'budget.statsRangeYear' };
+
 
 export async function renderStats(panel, ctx) {
   view.ctx = ctx;
@@ -115,21 +110,20 @@ function renderShell() {
          eigener Modus je Reiter hiesse, auch den Kopf je Reiter umzuschalten -
          das ist Welle C in docs/PAGE-COMPOSITION.md, keine Nebenwirkung. -->
     <div class="budget-stats app-page app-page--reading page-measure--narrow" data-composition="reading">
-      <!-- Nur noch die Auflösung: der Zeitraum selbst wird über den geteilten
-           Kopf-Stepper des Moduls gewählt. Optik aus dem geteilten
-           .segmented-Baustein. -->
-      <div class="budget-stats__controls">
-        <div class="segmented budget-stats__ranges" role="tablist" aria-label="${t('budget.statsRangeLabel')}">
-          ${['week', 'month', 'year'].map((r) => {
-            const on = r === view.range;
-            return `
-            <button type="button" role="tab" class="segmented__item${on ? ' is-active' : ''}"
-              data-tab-id="${r}" aria-selected="${on}" tabindex="${on ? '0' : '-1'}"
-              aria-controls="budget-stats-body">${t(RANGE_LABELS[r])}</button>`;
-          }).join('')}
-        </div>
+      <!-- Zeitraum UND Aufloesung stehen seit R24 (Critique G4-Budget-P2-5)
+           im geteilten Kopf: der Bereich ist eine Wahl am Wert des Steppers
+           (budget.js statsRangeHtml), kein Segment hier. Am Telefon ist die
+           Kopfzeile voll; dort oeffnet dieser zweite Ausloeser dasselbe Menue
+           (je Breite steht genau einer, budget.css). -->
+      <div class="budget-stats__resolution">
+        <button type="button" class="btn btn--secondary btn--sm budget-nav__range-trigger budget-stats__resolution-trigger popover-menu__trigger"
+                popovertarget="budget-range-menu" aria-haspopup="menu" aria-expanded="false"
+                aria-label="${t('budget.statsRangeLabel')}: ${t(RANGE_LABEL_KEYS[view.range] ?? RANGE_LABEL_KEYS.month)}">
+          <span class="budget-range-value">${t(RANGE_LABEL_KEYS[view.range] ?? RANGE_LABEL_KEYS.month)}</span>
+          <i data-lucide="chevron-down" class="icon-sm" aria-hidden="true"></i>
+        </button>
       </div>
-      <div id="budget-stats-body" role="tabpanel" tabindex="0"></div>
+      <div id="budget-stats-body" tabindex="-1"></div>
     </div>
   `);
   if (window.lucide) lucide.createIcons({ el: view.root });
@@ -137,20 +131,7 @@ function renderShell() {
 }
 
 function wire() {
-  // Geteilte Tablist-Grammatik (Klick + Pfeiltasten/Home/End + Roving-Tabindex)
-  // wie die Budget-Haupttabs — vorher trug der Container role="tablist", ohne
-  // dass ein Kind role="tab" hatte, und Pfeiltasten taten nichts.
-  //
-  // Die Auflösung meldet das Modul zurück (onRangeChange), damit sie den
-  // Tabwechsel überlebt und der Kopf-Stepper in derselben Schrittweite läuft.
-  wireTablist(view.root.querySelector('.budget-stats__ranges'), {
-    activeId: view.range,
-    activeClass: 'is-active',
-    onChange: (id) => view.ctx.onRangeChange(id),
-  });
-  // Gleitende Auswahl-Kapsel wie jede Segmentleiste (Kanon, Runde 7 D8); das
-  // Panel wird mit dem Berichte-Tab neu gebaut, der Schluessel haelt die Lage.
-  attachSegmentIndicator(view.root.querySelector('.budget-stats__ranges'), { key: 'budget-stats-range' });
+  // Nichts mehr zu verdrahten: die Aufloesung waehlt der Kopf (budget.js).
 }
 
 function renderBodyContent(body) {
@@ -278,6 +259,11 @@ function previousPeriodLabel(prev) {
  * aus utils/budget-category-colors.js, dieselbe Zuordnung wie Uebersicht und
  * Plan (groesste Ausgabe zuerst, jenseits der Palette die Sammelscheibe). */
 
+/* DIE RICHTUNG STEHT IM BLOCK, NICHT IM VORZEICHEN (Critique R24
+ * G4-Budget-P3-5, R23 "Minus doppelt"): unter "Ausgaben" stand "-1.620,99 €",
+ * dieselbe Kategorie in der Uebersicht "1.620,99 €". Betraege und Summe eines
+ * Blocks stehen ohne Vorzeichen wie in der Uebersicht; nur die Veraenderung
+ * gegenueber dem Vorzeitraum traegt eins - sie IST eine Richtung. */
 function renderCatBars() {
   const host = view.root.querySelector('#budget-stats-cat');
   if (!host) return;
@@ -356,7 +342,7 @@ function renderCatBars() {
             <div class="budget-bar-row__fill budget-bar-row__fill--${kind}" style="--bar-scale:${scale.toFixed(4)}"${texture ? ` data-texture="${texture}"` : ''} data-bar-key="${kind}:${view.ctx.esc(String(r.category))}"></div>
             ${targetMarker}
           </div>
-          <div class="budget-bar-row__amount">${view.ctx.esc(signed(r.amount))}${share}</div>
+          <div class="budget-bar-row__amount">${view.ctx.esc(fmtAmount(Math.abs(r.amount)))}${share}</div>
           ${deltaHtml || targetText ? `<div class="budget-bar-row__delta">${targetText}${deltaHtml}</div>` : ''}
         </div>`;
     }).join('');
@@ -364,7 +350,7 @@ function renderCatBars() {
       <section class="budget-chart-block budget-chart-block--${kind}" aria-labelledby="${titleId}">
         <h3 class="budget-chart-block__title" id="${titleId}">
           <span>${t(labelKey)}</span>
-          <span class="budget-chart-block__total">${view.ctx.esc(signed(total))}</span>
+          <span class="budget-chart-block__total">${view.ctx.esc(fmtAmount(Math.abs(total)))}</span>
         </h3>
         <div class="budget-chart-block__rows">${body}</div>
       </section>`;

@@ -17,7 +17,7 @@
 import { api } from '/api.js';
 import { clearApiCache } from '/sw-register.js';
 import { t } from '/i18n.js';
-import { esc, REQUIRED_MARK } from '/utils/html.js';
+import { esc } from '/utils/html.js';
 import { authHeroHtml, flagField, showAuthError } from '/utils/auth-ui.js';
 import { errorSentence } from '/utils/friendly-error.js';
 
@@ -42,7 +42,7 @@ export async function render(container) {
         <p class="auth-card__intro">${esc(t('pairDisplay.intro'))}</p>
         <form id="pair-form" class="auth-form" autocomplete="off" novalidate>
           <div class="form-group">
-            <label class="form-label" for="pair-code">${esc(t('pairDisplay.codeLabel'))}${REQUIRED_MARK}</label>
+            <label class="form-label" for="pair-code">${esc(t('pairDisplay.codeLabel'))}</label>
             <input class="form-input" type="text" id="pair-code" required
                    autocapitalize="characters" autocorrect="off" spellcheck="false"
                    inputmode="text" maxlength="14" />

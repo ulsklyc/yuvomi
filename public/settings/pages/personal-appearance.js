@@ -258,12 +258,14 @@ function localeOptions() {
  * 2026-10-21, Entscheidung Ulas): mobil hat die geschlossene Auswahl rund
  * 180 px, und "Automatisch (Englisch)" endete dort als "Automatisch (Engl…" -
  * abgeschnitten genau an der Stelle, die sagt, was gilt. Die Zeile sagt jetzt
- * "Automatisch", die Hinweiszeile beginnt mit "Gerade Englisch.".
+ * "Automatisch", die Hinweiszeile beginnt mit "Zurzeit: Englisch." (bis R24
+ * "Gerade Englisch." - G6-Einst-P3-6: neben deutscher Oberflaeche las sich
+ * das wie "sogar Englisch"; jetzt dieselbe Form wie in jeder anderen Sprache).
  *
  * Ohne `current` bleibt der Hinweis, wie er ist: eine ausdrücklich gewählte
  * Sprache oder Zone steht schon vollständig in der Auswahl. Seit #2151 gilt
  * dasselbe fuer Region und Sprache in Kurzform: "VAE" in der Auswahl,
- * "Gerade Vereinigte Arabische Emirate." vorn im Hinweis.
+ * "Zurzeit: Vereinigte Arabische Emirate." vorn im Hinweis.
  */
 export function hintWithCurrent(hint, current) {
   return current ? t('settings.hintWithCurrent', { value: current, hint }) : hint;
@@ -725,7 +727,7 @@ export async function refreshDataLanguageOptions(container) {
   const preferences = await getPreferences();
   select.replaceChildren();
   select.insertAdjacentHTML('beforeend', dataLanguageOptions(preferences.language || null));
-  // Die Hinweiszeile traegt das Automatik-Ergebnis ("Gerade Englisch.") - sie
+  // Die Hinweiszeile traegt das Automatik-Ergebnis ("Zurzeit: Englisch.") - sie
   // geht mit, auch wenn sich nur die Ableitung geaendert hat (Regionswechsel).
   setHint(container, 'data-language-hint', dataLanguageHintText(preferences.language || null, preferences.language_auto));
 }

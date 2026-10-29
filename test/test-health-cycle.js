@@ -2189,13 +2189,16 @@ test('Zyklus: "Periode nachtragen" steht am Verlauf und im Leerzustand, die Heut
   assert.equal(de.period.add, de.add, 'Knopf und Dialogtitel sagen dasselbe');
   assert.notEqual(de.add, de.today.startPeriod, 'und etwas anderes als die Heute-Aktion');
   const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
-  // R22 D12: kein FAB, keine Kopf-Pille - "+ Periode" stand neben "Periode gestartet".
+  // R22 D12: kein „+ Periode" im Kopf - es stand neben "Periode gestartet".
+  // Seit R24 (E9) traegt der FAB den Tag („+ Tag"), nie das Nachtragen.
   const fab = src.slice(src.indexOf("case '/health/cycle':"), src.indexOf("case '/health/meds':"));
-  assert.match(fab, /setPageFabAction\(_fab, \{ hidden: true, dockLabel: t\('newLabel\.healthCycle'\) \}\)/);
+  assert.match(fab, /dockLabel: t\('newLabel\.healthCycle'\)/);
+  assert.match(fab, /openDayLogModal\(todayKey\(\)\)/);
   assert.doesNotMatch(fab, /openPeriodModal/);
   const hist = src.slice(src.indexOf('function cycleHistoryMarkup('), src.indexOf('function cycleDiscoveryMarkup('));
   assert.match(hist, /data-action="cycle-add-period"><i data-lucide="plus" aria-hidden="true"><\/i>\$\{esc\(t\('health\.cycle\.add'\)\)\}/, 'das Nachtragen steht am Verlauf');
-  assert.match(src, /action: darf \? \{ label: t\('health\.cycle\.add'\), icon: 'plus', attrs: \{ 'data-action': 'cycle-add-period' \} \} : undefined/, 'und im leeren Bereich');
+  // Seit R24 (E9) steht im leeren Bereich auch der FAB: das Nachtragen ist sekundaer.
+  assert.match(src, /action: darf \? \{ label: t\('health\.cycle\.add'\), icon: 'plus', tone: 'secondary', attrs: \{ 'data-action': 'cycle-add-period' \} \} : undefined/, 'und im leeren Bereich');
   assert.match(src, /querySelectorAll\('\[data-action="cycle-add-period"\]'\)\.forEach\(\(btn\) =>\s*btn\.addEventListener\('click', \(\) => openPeriodModal\(null\)\)\)/);
 });
 
@@ -2269,7 +2272,8 @@ test('R21 S7: Legende am Ring, Luft fuer die Tagesmarke, ein Traeger fuer den Be
   const rules = [...eachRule(css)];
   const ring = rules.find((r) => r.selector.trim() === '.cycle-ring' && r.at.some((a) => /min-width:\s*640px/.test(a)));
   assert.match(ring?.body ?? '', /margin-inline:\s*var\(--space-4\)/, 'neben den Kennzahlen hat der Ring Rand fuer die Tagesmarke');
+  // R24 (G5 P2-2) nimmt dem Bereichskopf die Karte wieder ab: er steht ohne
+  // eigene Flaeche in der Buehne (test:health-nav "R24 G5 P2-2").
   const head = rules.find((r) => r.selector.trim() === '.health-split > .split-view__detail .split-view__detail-head');
-  assert.match(head?.body ?? '', /border-radius:\s*var\(--radius-lg\)/, 'der Bereichskopf ist eine Karte');
-  assert.match(head.body, /box-shadow:\s*var\(--shadow-sm\)/);
+  assert.match(head?.body ?? '', /background-color:\s*transparent/, 'der Bereichskopf hat keine eigene Flaeche');
 });

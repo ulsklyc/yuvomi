@@ -2263,6 +2263,207 @@ test('#1941: PUT ohne `category` laesst die Kategorie stehen, eine unbekannte fa
   assert.equal((await call('DELETE', `/expenses/${id}`, { actor: OWNER_A })).status, 200);
 });
 
+// --------------------------------------------------------------------------
+// Budget-Kategorien in der Aufteilung (R24, E12): Migration 271 + Routen
+// --------------------------------------------------------------------------
+test('Migration 271: eine frische Datenbank traegt budget_category an Ausgaben und Serien, NULL als Standard', () => {
+  for (const table of ['expenses', 'recurring_expenses']) {
+    const col = db.prepare(`PRAGMA table_info(${table})`).all().find((c) => c.name === 'budget_category');
+    assert.ok(col, `${table}.budget_category vorhanden`);
+    assert.equal(col.notnull, 0);
+    assert.equal(col.dflt_value, null);
+  }
+});
+
+test('Migration 271: eine Bestandsdatenbank mit altem Schema behaelt ihre Ausgaben, die Kategorie wird uebertragen', async () => {
+  const { default: Database } = await import('better-sqlite3-multiple-ciphers');
+  const old = new Database(':memory:');
+  // Das Schema vor 271: Ausgaben und Serien mit der eigenen Kategorie-Liste,
+  // dazu die Budget-Kategorien aus Migration 16 (eine davon hat der Haushalt
+  // geloescht: 'education').
+  old.exec(`
+    CREATE TABLE budget_categories (key TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0);
+    INSERT INTO budget_categories (key, name, type) VALUES
+      ('housing', 'Housing / Home', 'expense'), ('food', 'Food', 'expense'), ('leisure', 'Leisure', 'expense'),
+      ('shopping_clothing', 'Shopping', 'expense'), ('personal_health', 'Health', 'expense');
+    CREATE TABLE expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER NOT NULL, title TEXT NOT NULL, amount_minor INTEGER NOT NULL,
+      currency TEXT NOT NULL, payer_id INTEGER NOT NULL, category TEXT NOT NULL DEFAULT 'general'
+    );
+    CREATE TABLE recurring_expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER NOT NULL, title TEXT NOT NULL, amount_minor INTEGER NOT NULL,
+      currency TEXT NOT NULL, payer_id INTEGER NOT NULL, category TEXT NOT NULL DEFAULT 'general'
+    );
+    INSERT INTO expenses (group_id, title, amount_minor, currency, payer_id, category) VALUES
+      (1, 'REWE', 3000, 'EUR', 1, 'groceries'), (1, 'Miete', 90000, 'EUR', 1, 'rent'), (1, 'Futter', 2000, 'EUR', 1, 'pets'),
+      (1, 'Hefte', 500, 'EUR', 1, 'school'), (1, 'Sonstwas', 100, 'EUR', 1, 'general');
+    INSERT INTO recurring_expenses (group_id, title, amount_minor, currency, payer_id, category) VALUES (1, 'Strom', 7800, 'EUR', 1, 'utilities');
+  `);
+  const migration = dbmod.MIGRATIONS.find((m) => m.version === 271);
+  assert.ok(migration, 'Migration 271 vorhanden');
+  migration.up(old);
+  assert.deepEqual(
+    old.prepare('SELECT title, amount_minor, category, budget_category FROM expenses ORDER BY id').all().map((r) => ({ ...r })),
+    [
+      { title: 'REWE', amount_minor: 3000, category: 'groceries', budget_category: 'food' },
+      { title: 'Miete', amount_minor: 90000, category: 'rent', budget_category: 'housing' },
+      { title: 'Futter', amount_minor: 2000, category: 'pets', budget_category: null },
+      { title: 'Hefte', amount_minor: 500, category: 'school', budget_category: null },
+      { title: 'Sonstwas', amount_minor: 100, category: 'general', budget_category: null },
+    ],
+    'alte Kategorie bleibt, die Budget-Kategorie nur, wo der Schluessel existiert',
+  );
+  assert.equal(old.prepare('SELECT budget_category FROM recurring_expenses').get().budget_category, 'housing');
+  // Ein zweiter Lauf (gedriftete Datenbank) scheitert nicht und ueberschreibt keine spaetere Wahl.
+  old.prepare("UPDATE expenses SET budget_category = 'leisure' WHERE title = 'REWE'").run();
+  migration.up(old);
+  assert.equal(old.prepare("SELECT budget_category FROM expenses WHERE title = 'REWE'").get().budget_category, 'leisure');
+  old.close();
+});
+
+test('POST/PUT /expenses: budget_category wird gespeichert, ein PUT ohne sie laesst sie stehen, null leert sie, unbekannt -> 400', async () => {
+  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Budget-Kategorien', type: 'general', default_currency: 'EUR' } });
+  const gid = g.body.data.id;
+  const base = { title: 'Bäcker', amount: '6.00', currency: 'EUR', split_method: 'equal', payer_id: OWNER, participants: [OWNER] };
+  const created = await call('POST', `/groups/${gid}/expenses`, { actor: OWNER_A, body: { ...base, budget_category: 'food' } });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  assert.equal(created.body.data.budget_category, 'food');
+  const id = created.body.data.id;
+  const kept = await call('PUT', `/expenses/${id}`, { actor: OWNER_A, body: { ...base, amount: '7.00' } });
+  assert.equal(kept.status, 200);
+  assert.equal(kept.body.data.budget_category, 'food', 'nicht genannt heisst: bleibt');
+  const moved = await call('PUT', `/expenses/${id}`, { actor: OWNER_A, body: { ...base, budget_category: 'leisure' } });
+  assert.equal(moved.body.data.budget_category, 'leisure');
+  const cleared = await call('PUT', `/expenses/${id}`, { actor: OWNER_A, body: { ...base, budget_category: null } });
+  assert.equal(cleared.body.data.budget_category, null);
+  const income = await call('PUT', `/expenses/${id}`, { actor: OWNER_A, body: { ...base, budget_category: 'Erwerbseinkommen' } });
+  assert.equal(income.status, 400, 'eine Einnahme-Kategorie ist keine Ausgabe-Kategorie');
+  const unknown = await call('POST', `/groups/${gid}/expenses`, { actor: OWNER_A, body: { ...base, title: 'Falsch', budget_category: 'casino' } });
+  assert.equal(unknown.status, 400);
+  assert.match(unknown.body.error, /budget category/i);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM expenses WHERE group_id = ? AND title = 'Falsch'").get(gid).n, 0);
+  assert.equal(db.prepare('SELECT budget_category FROM expenses WHERE id = ?').get(id).budget_category, null, 'die abgelehnten Aufrufe schrieben nichts');
+});
+
+test('GET /expenses?budget_category und /balances: Filter nach Budget-Kategorie, "none" fuer ohne, Summen je Budget-Kategorie', async () => {
+  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Budget-Filter', type: 'general', default_currency: 'EUR' } });
+  const gid = g.body.data.id;
+  const add = (title, amount, budget_category) => call('POST', `/groups/${gid}/expenses`, {
+    actor: OWNER_A, body: { title, amount, currency: 'EUR', split_method: 'equal', payer_id: OWNER, participants: [OWNER], budget_category },
+  });
+  await add('Brot', '4.00', 'food');
+  await add('Kaese', '6.00', 'food');
+  await add('Kino', '20.00', 'leisure');
+  await add('Ohne', '1.00', null);
+  const food = await call('GET', `/groups/${gid}/expenses?budget_category=food`, { actor: OWNER_A });
+  assert.deepEqual(food.body.data.map((e) => e.title).sort(), ['Brot', 'Kaese']);
+  const none = await call('GET', `/groups/${gid}/expenses?budget_category=none`, { actor: OWNER_A });
+  assert.deepEqual(none.body.data.map((e) => e.title), ['Ohne']);
+  const unknown = await call('GET', `/groups/${gid}/expenses?budget_category=casino`, { actor: OWNER_A });
+  assert.equal(unknown.body.data.length, 4, 'ein unbekannter Schluessel filtert nicht still auf nichts');
+  const balances = await call('GET', `/groups/${gid}/balances`, { actor: OWNER_A });
+  assert.deepEqual(
+    balances.body.data.budget_category_totals.map((r) => [r.budget_category, r.total]),
+    [['leisure', '20.00'], ['food', '10.00'], [null, '1.00']],
+  );
+  assert.ok(Array.isArray(balances.body.data.category_totals), 'die alte Summe bleibt fuer die API');
+});
+
+test('Serie: budget_category wird gespeichert, ein PUT ohne sie laesst sie stehen, der Lauf bucht sie an die Ausgabe', async () => {
+  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Budget-Serie', type: 'general', default_currency: 'EUR' } });
+  const gid = g.body.data.id;
+  const created = await call('POST', `/groups/${gid}/recurring`, {
+    actor: OWNER_A,
+    body: { title: 'Miete', amount: '900.00', currency: 'EUR', frequency: 'monthly', next_run_date: '2099-01-05', payer_id: OWNER, participants: [OWNER], split_method: 'equal', budget_category: 'housing' },
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const id = created.body.data.id;
+  assert.equal(db.prepare('SELECT budget_category FROM recurring_expenses WHERE id = ?').get(id).budget_category, 'housing');
+  const kept = await call('PUT', `/recurring/${id}`, { actor: OWNER_A, body: { amount: '950.00' } });
+  assert.equal(kept.status, 200, JSON.stringify(kept.body));
+  assert.equal(db.prepare('SELECT budget_category FROM recurring_expenses WHERE id = ?').get(id).budget_category, 'housing');
+  const { generateRecurringExpense } = await import('../server/services/split-expenses-scheduler.js');
+  const rule = db.prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id);
+  db.transaction(() => generateRecurringExpense(db, rule))();
+  assert.equal(db.prepare('SELECT budget_category FROM expenses WHERE recurring_rule_id = ?').get(id).budget_category, 'housing');
+});
+
+// ── Codex an #2364 (P2): eine Kategorie, die nur Aufteilungs-Ausgaben tragen ──
+//
+// Die Loeschsperre zaehlte nur Buchungen (`budget_entries`). Eine Kategorie,
+// die nur eine Ausgabe der Aufteilung trug, liess sich loeschen - und danach
+// lehnte jedes Speichern der Ausgabe mit 400 ab, weil der Editor die alte
+// Kategorie mitschickt.
+test('eine Budget-Kategorie, die nur Aufteilungs-Ausgaben oder Serien tragen, ist in Benutzung und laesst sich nicht loeschen', async () => {
+  const { categoryInUseCount } = await import('../server/routes/budget/helpers.js');
+  const { default: catRouter } = await import('../server/routes/budget/categories.js');
+  const insertCategory = db.prepare("INSERT INTO budget_categories (key, name, type, sort_order) VALUES (?, ?, 'expense', 900)");
+  insertCategory.run('split_only_expense', 'Nur Aufteilung');
+  insertCategory.run('split_only_series', 'Nur Serie');
+  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Loeschsperre', type: 'general', default_currency: 'EUR' } });
+  const gid = g.body.data.id;
+  const expense = await call('POST', `/groups/${gid}/expenses`, {
+    actor: OWNER_A,
+    body: { title: 'Kino', amount: '12.00', currency: 'EUR', split_method: 'equal', payer_id: OWNER, participants: [OWNER], budget_category: 'split_only_expense' },
+  });
+  assert.equal(expense.status, 201, JSON.stringify(expense.body));
+  const series = await call('POST', `/groups/${gid}/recurring`, {
+    actor: OWNER_A,
+    body: { title: 'Abo', amount: '9.00', currency: 'EUR', frequency: 'monthly', next_run_date: '2099-01-01', payer_id: OWNER, participants: [OWNER], budget_category: 'split_only_series' },
+  });
+  assert.equal(series.status, 201, JSON.stringify(series.body));
+  assert.equal(categoryInUseCount(db, 'split_only_expense'), 1, 'die Ausgabe zaehlt');
+  assert.equal(categoryInUseCount(db, 'split_only_series'), 1, 'die Serie zaehlt');
+
+  const budgetApp = express();
+  budgetApp.use(express.json());
+  budgetApp.use((req, _res, next) => { req.authUserId = OWNER; req.authRole = 'member'; req.session = { userId: OWNER, role: 'member' }; next(); });
+  budgetApp.use('/', catRouter);
+  const budgetServer = budgetApp.listen(0, '127.0.0.1');
+  await new Promise((r) => budgetServer.on('listening', r));
+  try {
+    for (const key of ['split_only_expense', 'split_only_series']) {
+      const res = await fetch(`http://127.0.0.1:${budgetServer.address().port}/categories/${key}`, { method: 'DELETE' });
+      assert.equal(res.status, 409, `${key} ist in Benutzung`);
+      assert.equal((await res.json()).reason, 'category_in_use');
+      assert.ok(db.prepare('SELECT 1 FROM budget_categories WHERE key = ?').get(key), `${key} steht noch`);
+    }
+  } finally {
+    await new Promise((r) => budgetServer.close(r));
+  }
+});
+
+// Altbestand: geloescht vor der Sperre, oder per Migration 271 gemappt und
+// spaeter geloescht. Der Editor schickt den Schluessel unveraendert mit - das
+// darf das Speichern nicht brechen; eine NEUE Wahl bleibt streng.
+test('ein unveraenderter, inzwischen geloeschter Kategorie-Schluessel bricht das Speichern einer Ausgabe oder Serie nicht', async () => {
+  db.prepare("INSERT INTO budget_categories (key, name, type, sort_order) VALUES ('split_gone', 'Weg', 'expense', 901)").run();
+  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Altbestand', type: 'general', default_currency: 'EUR' } });
+  const gid = g.body.data.id;
+  const base = { title: 'Bus', amount: '3.00', currency: 'EUR', split_method: 'equal', payer_id: OWNER, participants: [OWNER] };
+  const expense = await call('POST', `/groups/${gid}/expenses`, { actor: OWNER_A, body: { ...base, budget_category: 'split_gone' } });
+  assert.equal(expense.status, 201, JSON.stringify(expense.body));
+  const seriesBase = { title: 'Abo', amount: '9.00', currency: 'EUR', frequency: 'monthly', next_run_date: '2099-01-01', payer_id: OWNER, participants: [OWNER] };
+  const series = await call('POST', `/groups/${gid}/recurring`, { actor: OWNER_A, body: { ...seriesBase, budget_category: 'split_gone' } });
+  assert.equal(series.status, 201, JSON.stringify(series.body));
+  // Wie vor der Sperre (oder nach Migration 271): die Kategorie ist weg, die Ausgaben tragen sie noch.
+  db.prepare("DELETE FROM budget_categories WHERE key = 'split_gone'").run();
+
+  const edited = await call('PUT', `/expenses/${expense.body.data.id}`, { actor: OWNER_A, body: { ...base, amount: '4.00', budget_category: 'split_gone' } });
+  assert.equal(edited.status, 200, JSON.stringify(edited.body));
+  assert.equal(edited.body.data.budget_category, 'split_gone', 'der Schluessel bleibt, wie er war');
+  const editedSeries = await call('PUT', `/recurring/${series.body.data.id}`, { actor: OWNER_A, body: { ...seriesBase, amount: '10.00', budget_category: 'split_gone' } });
+  assert.equal(editedSeries.status, 200, JSON.stringify(editedSeries.body));
+
+  const fresh = await call('POST', `/groups/${gid}/expenses`, { actor: OWNER_A, body: { ...base, title: 'Neu', budget_category: 'split_gone' } });
+  assert.equal(fresh.status, 400, 'eine neue Ausgabe nimmt keinen unbekannten Schluessel');
+  const freshSeries = await call('POST', `/groups/${gid}/recurring`, { actor: OWNER_A, body: { ...seriesBase, title: 'Neu', budget_category: 'split_gone' } });
+  assert.equal(freshSeries.status, 400, 'eine neue Serie auch nicht');
+  const other = await call('POST', `/groups/${gid}/expenses`, { actor: OWNER_A, body: { ...base, title: 'Zweite', budget_category: 'food' } });
+  const moved = await call('PUT', `/expenses/${other.body.data.id}`, { actor: OWNER_A, body: { ...base, budget_category: 'split_gone' } });
+  assert.equal(moved.status, 400, 'den geloeschten Schluessel neu waehlen bleibt verboten');
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

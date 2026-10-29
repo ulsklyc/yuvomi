@@ -33,17 +33,17 @@ import { locationLabel } from '/utils/pantry-locations.js';
 import { pantryQuantityLabel } from '/utils/pantry-units.js';
 import { findPageFab } from '/utils/fab.js';
 import { setLeaveGuard } from '/utils/leave-guard.js';
-import { openModal, closeModal, confirmModal, refocusAfterRender } from '/components/modal.js';
-import { renderAvatarStack } from '/components/user-multi-select.js';
+import { openModal, closeModal, confirmModal, refocusAfterRender, lastInputWasKeyboard } from '/components/modal.js';
+import { renderAvatarStack, sharedSurname } from '/components/user-multi-select.js';
 import { isSoloHousehold } from '/utils/household.js';
-import { toggleRegion, durationToken, easingToken } from '/utils/ux.js';
-import { swapContent } from '/utils/content-swap.js';
+import { toggleRegion, durationToken, easingToken, expandIn } from '/utils/ux.js';
+import { swapContent, SWAP_FROM_OPACITY } from '/utils/content-swap.js';
 import { brandMarkSvg } from '/utils/brand-mark.js';
 import { findSettingsLeaf } from '/settings/registry.js';
 import {
   WIDGET_SIZE_PRESETS, WIDGET_SIZE_OPTIONS,
   COCKPIT_COVERED_WIDGETS,
-  nearestPreset, sameWidgetConfig, suggestGridHoleFill, rowFillSpans, columnFillSpans,
+  nearestPreset, sameWidgetConfig, suggestGridHoleFill, fillGridSpans, contentSpanRows, fillRowCount, TILE_GEOMETRY,
   dashboardQuery, dashboardQueryFiltersCounts, dashboardRequest, normalizeShoppingListSelection,
   normalizeCalendarSelection,
   fetchPendingReminders, childDefaultWidgetConfig,
@@ -61,13 +61,15 @@ import { whoMark } from '/utils/seal-pair.js';
 import { MODULE_ICON, moduleIconHTML } from '/nav-icons.js';
 import { enterWallMode, exitWallMode, isWallActive, syncWallMode } from '/utils/wall-mode.js';
 import { mountZonePrompt } from '/utils/household-zone-hint.js';
-import { mountFirstSteps, startFirstSteps } from '/utils/first-steps.js';
+import { firstStepsActive, mountFirstSteps, startFirstSteps } from '/utils/first-steps.js';
 import { renderWallTimer, wireWallTimer } from '/components/wall-timer.js';
-import { rememberLayoutHint, layoutHintTiles, layoutHintQuery } from '/utils/dashboard-layout-hint.js';
-import { emptyHintHTML } from '/utils/empty-state.js';
+import { rememberLayoutHint, layoutHintTiles, layoutHintQuery, rememberHeadHint, headHint } from '/utils/dashboard-layout-hint.js';
+import { emptyHintHTML, cardEmptyRowHtml } from '/utils/empty-state.js';
 import { quickLinkHost } from '/utils/quick-link-url.js';
 import { hasIcon } from '/utils/lucide-icons.js';
 import { prefersInkText } from '/utils/contrast.js';
+import { fitMetricLeads } from '/utils/metric-card.js';
+import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { attachOverlay, pushOverlay, dropOverlay, isOverlayOpen } from '/utils/overlay-history.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { mealTypeList, primeMealTypeNames } from '/utils/meal-types.js';
@@ -77,6 +79,8 @@ import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { nextRewardGoal } from '/utils/reward-goal.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { shiftTypeLabel } from '/utils/shift-label.js';
+import { layoutTodayTimeline, timelineScale, timelineHourCovered } from '/utils/today-timeline.js';
+import { hourGutterLabel } from '/utils/time-grid.js';
 
 // Hält den AbortController des aktuellen FAB-Listeners - wird bei jedem render() erneuert.
 let _fabController = null;
@@ -438,6 +442,52 @@ function isShownOnScreen(el) {
 
 /** Abstand des Lichtrings um das gezeigte Bedienelement, in px. */
 const ONBOARDING_SPOT_PAD = 6;
+/** Abstand der Karte zum Lichtring und zum Fensterrand, in px. */
+const ONBOARDING_CARD_GAP = 16;
+
+/**
+ * DIE KARTE STEHT AM ERKLAERTEN ELEMENT (Critique R24, G6-Rundgang-P3-1). Sie
+ * stand mittig, auch wenn der Schritt die Seitenleiste erklaerte - 306 px
+ * daneben am Desktop, mobil oben, waehrend der Ring unten um die Leiste lag.
+ * Jetzt an der Seite des Rings, die Platz hat: ueber oder unter einem breiten
+ * oder quadratischen Ziel (Leiste, Plus-Knopf), neben einem hohen
+ * (Seitenleiste); quer dazu an der Mitte des Ziels ausgerichtet, im Fenster
+ * gehalten. Passt sie nirgends daneben, bleibt sie in der Mitte (null).
+ *
+ * Rein: Rechteck des Rings, Groesse der Karte, Fenster -> linke obere Ecke.
+ *
+ * @param {{ left: number, top: number, right: number, bottom: number }} spot
+ * @param {{ width: number, height: number }} card
+ * @param {{ width: number, height: number }} view
+ * @param {number} [gap]
+ * @returns {{ x: number, y: number, side: string } | null}
+ */
+function onboardingCardPlacement(spot, card, view, gap = ONBOARDING_CARD_GAP) {
+  const spotW = spot.right - spot.left;
+  const spotH = spot.bottom - spot.top;
+  const clamp = (value, max) => Math.round(Math.max(gap, Math.min(value, max - gap)));
+  const room = {
+    above: spot.top - gap * 2 >= card.height,
+    below: view.height - spot.bottom - gap * 2 >= card.height,
+    right: view.width - spot.right - gap * 2 >= card.width,
+    left: spot.left - gap * 2 >= card.width,
+  };
+  const order = spotH > spotW ? ['right', 'left', 'below', 'above'] : ['above', 'below', 'right', 'left'];
+  const side = order.find((name) => room[name]);
+  if (!side) return null;
+  if (side === 'above' || side === 'below') {
+    return {
+      side,
+      x: clamp(spot.left + spotW / 2 - card.width / 2, view.width - card.width),
+      y: Math.round(side === 'above' ? spot.top - gap - card.height : spot.bottom + gap),
+    };
+  }
+  return {
+    side,
+    x: Math.round(side === 'right' ? spot.right + gap : spot.left - gap - card.width),
+    y: clamp(spot.top + spotH / 2 - card.height / 2, view.height - card.height),
+  };
+}
 
 function showOnboarding(appContainer, onDone) {
   const steps = getOnboardingSteps();
@@ -511,7 +561,7 @@ function showOnboarding(appContainer, onDone) {
     const target = steps[current].target?.();
     const shown = isShownOnScreen(target);
     overlay.classList.toggle('onboarding-overlay--spot', shown);
-    if (!shown) return;
+    if (!shown) { placeCard(null); return; }
     const r = target.getBoundingClientRect();
     const radius = parseFloat(getComputedStyle(target).borderTopLeftRadius) || 0;
     const pad = ONBOARDING_SPOT_PAD;
@@ -520,6 +570,37 @@ function showOnboarding(appContainer, onDone) {
     spot.style.setProperty('--spot-w', `${Math.round(r.width + pad * 2)}px`);
     spot.style.setProperty('--spot-h', `${Math.round(r.height + pad * 2)}px`);
     spot.style.setProperty('--spot-r', `${Math.round(Math.min(radius + pad, (r.height + pad * 2) / 2))}px`);
+    placeCard({ left: r.left - pad, top: r.top - pad, right: r.right + pad, bottom: r.bottom + pad });
+  }
+
+  /* Die Karte an den Ring (onboardingCardPlacement). Der Ortswechsel gleitet
+   * wie der Ring (FLIP ueber transform, --duration-lg), unter reduzierter
+   * Bewegung springt er. Ohne Ziel steht sie wieder, wie das Overlay sie
+   * stellt (Mitte, mobil oben). */
+  function placeCard(spotRect) {
+    const before = card.getBoundingClientRect();
+    const place = spotRect && onboardingCardPlacement(
+      spotRect,
+      { width: card.offsetWidth, height: card.offsetHeight },
+      { width: window.innerWidth, height: window.innerHeight },
+    );
+    overlay.classList.toggle('onboarding-overlay--anchored', Boolean(place));
+    if (place) {
+      card.style.setProperty('--card-x', `${place.x}px`);
+      card.style.setProperty('--card-y', `${place.y}px`);
+    } else {
+      card.style.removeProperty('--card-x');
+      card.style.removeProperty('--card-y');
+    }
+    const after = card.getBoundingClientRect();
+    const dx = before.left - after.left;
+    const dy = before.top - after.top;
+    if ((Math.abs(dx) < 1 && Math.abs(dy) < 1) || !card.animate || !before.width) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    card.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], {
+      duration: parseFloat(getComputedStyle(card).getPropertyValue('--onboarding-move-ms')) || 400,
+      easing: getComputedStyle(card).getPropertyValue('--onboarding-move-ease').trim() || 'ease-out',
+    });
   }
   const onResize = () => placeSpotlight();
   window.addEventListener('resize', onResize);
@@ -559,6 +640,8 @@ function showOnboarding(appContainer, onDone) {
     const title = document.createElement('h2');
     title.className = 'onboarding-title';
     title.id = ONBOARDING_TITLE_ID;
+    // Fokusziel nach einem Tipp (focusStep), nicht in der Tab-Folge.
+    title.tabIndex = -1;
     title.textContent = step.title;
 
     const body = document.createElement('p');
@@ -600,7 +683,7 @@ function showOnboarding(appContainer, onDone) {
       // gegangen) - synchron nach dem Tausch, die Blende sperrt nichts.
       let next = null;
       swapContent(stepEl, () => { next = fillStep(); }, { direction: 1 });
-      next?.focus();
+      focusStep(next);
     });
 
     // EIN SCHRITT ZURUECK (R23 S10, Critique G6 P3 "Tour ohne Zurueck"): wer
@@ -615,7 +698,7 @@ function showOnboarding(appContainer, onDone) {
       current--;
       let next = null;
       swapContent(stepEl, () => { next = fillStep(); }, { direction: -1 });
-      next?.focus();
+      focusStep(next);
     });
 
     if (current > 0) actions.appendChild(backBtn);
@@ -631,6 +714,19 @@ function showOnboarding(appContainer, onDone) {
     if (window.lucide) window.lucide.createIcons({ el: stepEl });
     placeSpotlight();
     return nextBtn;
+  }
+
+  /* KEIN RING AM FINGER (Critique R24, G6-Rundgang-P3-1). Der Fokus ging nach
+   * jedem Schritt programmatisch an "Weiter", und der Knopf trug danach seinen
+   * Fokusring auch nach einem Tipp (gemessen 390, touch: `:focus-visible` in
+   * allen drei Schritten). Wie im Dialog (components/modal.js, Erstfokus):
+   * nach Tastatur der Hauptknopf mit Ring, nach Zeiger oder auf einem
+   * Touchgeraet ohne Eingabe der Titel des Schritts (`tabindex=-1`, ohne
+   * Ring) - der Fokus bleibt in der Karte, und Tab fuehrt zu den Knoepfen. */
+  function focusStep(button) {
+    const touch = window.matchMedia?.('(hover: none) and (pointer: coarse)').matches === true;
+    if (lastInputWasKeyboard() && !touch) { button?.focus(); return; }
+    stepEl.querySelector('.onboarding-title')?.focus({ preventScroll: true });
   }
 
   let finished = false;
@@ -668,7 +764,7 @@ function showOnboarding(appContainer, onDone) {
   // Die Seite hinter dem Rundgang ist gesperrt, solange er laeuft
   // (utils/background-inert.js); finish() gibt sie vor dem Fokus frei.
   const releaseBackground = inertOutside(overlay);
-  setTimeout(() => stepEl.querySelector('.btn--primary')?.focus(), 50);
+  setTimeout(() => focusStep(stepEl.querySelector('.btn--primary')), 50);
   // Die Zurueck-Geste beendet die Einfuehrung, statt hinter ihr zu navigieren
   // (#871). `finish()` ist der EINE Weg hinaus und merkt sich das auch.
   attachOverlay(overlay, finish);
@@ -1147,7 +1243,7 @@ function formatPoints(value) {
  * weil kein Kopf ihn je fragte. Notizen trug hier weiter `pin`, waehrend die
  * Leiste daneben `sticky-note` zeichnete. Wer die Id uebergibt, kann diese
  * Abweichung gar nicht mehr schreiben. */
-function widgetHeader(widgetId, title, count, linkHref, linkLabel, sealSlug = null) {
+function widgetHeader(widgetId, title, count, linkHref, linkLabel, sealSlug = null, { action = '' } = {}) {
   const icon = widgetIcon(widgetId);
   // Ein eigenes Link-Label spricht auch im aria-Label mit eigener Stimme:
   // „Alle: Familienmitglieder" für einen „Verwalten"-Link wäre eine Lüge.
@@ -1217,19 +1313,30 @@ function widgetHeader(widgetId, title, count, linkHref, linkLabel, sealSlug = nu
         ${badge}
       </h3>
       ${countText}
-      ${link}
+      ${link}${action}
     </div>
   `;
 }
 
-// Dezente Aktivierungs-Affordance für Empty-States: verlinkt in den Modul-Flow,
-// damit ein Erststart-Nutzer nicht in einer beschreibenden Sackgasse landet.
-// Nutzt dasselbe [data-route]-System wie widget__link (wireLinks verkabelt es).
-function emptyStateCta(route, label) {
-  return `<button type="button" class="widget__empty-cta" data-route="${route}">
-    <i data-lucide="plus" aria-hidden="true"></i>
-    <span>${label}</span>
-  </button>`;
+/* DER LEERZUSTAND EINER KACHEL IST DIE RUHIGE ZEILE DER APP (DW-P2-11; R22
+ * D12, `cardEmptyRowHtml` aus utils/empty-state.js). Bis hierher trug jede
+ * leere Kachel eine Glyphe mit 60 % Deckkraft, einen Satz in Caption und einen
+ * Akzent-Textknopf, der bei knapper Breite UNTER den Satz brach - Entsorgung
+ * und Schnellzugriffe am Telefon, die Entsorgung auch bei 1440 und 1920. Das
+ * Siegel im Kopf nennt die Kachel schon; die Zeile sagt nur noch, was fehlt,
+ * und bietet am Ende den einen Weg dahin. `.widget__empty` bleibt die Klasse
+ * des Traegers (Polster der Kachel, Sonden der Browser-Suiten). */
+function widgetEmptyHtml(text, action = null, widgetId = '') {
+  return cardEmptyRowHtml(text, { action, className: 'widget__empty', id: action && widgetId ? `widget-empty-${widgetId}` : '' });
+}
+
+// Die Aktion einer leeren Kachel fuehrt in den Modul-Flow - dasselbe
+// [data-route]-System wie widget__link (wireLinks verkabelt es). Ihr Wort ist
+// das VERB ("Hinzufuegen"), wo der Satz das Objekt schon nennt ("Noch keine
+// Abfallarten"): "Ersten Schnellzugriff anlegen" nahm am Telefon 240px und liess
+// dem Satz 80. Den Bezug fuer den Screenreader stellt `aria-describedby` her.
+function emptyRouteAction(route, label) {
+  return { label, attrs: { 'data-route': route } };
 }
 
 function buildTodayHighlights(data) {
@@ -1368,6 +1475,48 @@ function taskForOthersOnly(task, viewer) {
   return people.length > 0 && !people.some((person) => person?.id === viewer.id);
 }
 
+/**
+ * Die Zeile eines Termins im Heute-Blatt - in der Liste und als aufgeklappte
+ * Zeile unter der Zeitleiste (renderTodayTimeline), damit beide dieselbe
+ * Anatomie tragen.
+ */
+function todayEventRow(event, span) {
+  // Der Platz im Tag nach der Wanduhr des HAUSHALTS: hier stand
+  // `getHours()` eines Date, also die Zone des Geraets (#1457). Was schon
+  // vor heute begann, steht oben bei den ganztaegigen.
+  const time = !span.allDay && !span.carried ? zonedTimeKey(event.start_datetime) : '';
+  return {
+    kind: 'event',
+    objectId: event.id,
+    sortKey: time || '00:01',
+    timeLabel: overviewEventTime(event, span),
+    title: event.title,
+    // Die Herkunft statt des Wortes „Termin" (#1698): der Name des
+    // Kalenders, im Heute-Blatt wie an der Wand. „Frueh" ist erst mit
+    // „Niklas Arbeitskalender" darunter eine Auskunft. Ein Termin, der nur
+    // in Yuvomi lebt, hat keinen Kalendernamen - er behaelt das Wort.
+    sub: eventCalendarName(event) || t('dashboard.todayEvent'),
+    // Das ENDE bleibt der Wand vorbehalten (entschieden in #1698): es reist
+    // neben `timeLabel` mit, und nur `renderWallRow` schreibt es dahinter.
+    // Das Blatt nennt weiter den Beginn allein.
+    wallTimeEnd: wallEventEnd(event, span),
+    icon: 'calendar',
+    tone: 'event',
+    route: calendarEventRoute(event),
+    who: event.assigned_users?.[0] ?? null,
+    // ALLE Zugewiesenen, nicht nur das eine Gesicht der Zeile (#1828): die
+    // Wand zaehlt den Termin bei jeder Person (rowPeopleIds).
+    people: event.assigned_users ?? [],
+    // Das am Termin gewaehlte Icon (#1829). `icon` bleibt das Zeichen des
+    // Moduls; wer das eigene zeigt, fragt hasEventIcon().
+    eventIcon: event.icon ?? null,
+    // Beitrags-Vertrag (utils/today-sheet.js): ein Termin ist ein Rahmen
+    // des Tages, kein Auftrag - er haelt die Coda nicht auf.
+    priority: 40,
+    open: false,
+  };
+}
+
 function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, includeMeals = true, now = new Date(), viewer = dashboardViewer } = {}) {
   const highlights = buildTodayHighlights(data);
   const todayKey = zonedDateKey(now);
@@ -1382,40 +1531,7 @@ function buildTodayProgram(data, { includeTasks = true, includeCalendar = true, 
       // Das Blatt verspricht, was heute NOCH ansteht (#1449): ein beendeter
       // Termin verlaesst es. Die Termin-Kachel behaelt ihn zurueckgetreten.
       if (eventHasEnded(event, nowStamp)) continue;
-      // Der Platz im Tag nach der Wanduhr des HAUSHALTS: hier stand
-      // `getHours()` eines Date, also die Zone des Geraets (#1457). Was schon
-      // vor heute begann, steht oben bei den ganztaegigen.
-      const time = !span.allDay && !span.carried ? zonedTimeKey(event.start_datetime) : '';
-      rows.push({
-        kind: 'event',
-        objectId: event.id,
-        sortKey: time || '00:01',
-        timeLabel: overviewEventTime(event, span),
-        title: event.title,
-        // Die Herkunft statt des Wortes „Termin" (#1698): der Name des
-        // Kalenders, im Heute-Blatt wie an der Wand. „Frueh" ist erst mit
-        // „Niklas Arbeitskalender" darunter eine Auskunft. Ein Termin, der nur
-        // in Yuvomi lebt, hat keinen Kalendernamen - er behaelt das Wort.
-        sub: eventCalendarName(event) || t('dashboard.todayEvent'),
-        // Das ENDE bleibt der Wand vorbehalten (entschieden in #1698): es reist
-        // neben `timeLabel` mit, und nur `renderWallRow` schreibt es dahinter.
-        // Das Blatt nennt weiter den Beginn allein.
-        wallTimeEnd: wallEventEnd(event, span),
-        icon: 'calendar',
-        tone: 'event',
-        route: calendarEventRoute(event),
-        who: event.assigned_users?.[0] ?? null,
-        // ALLE Zugewiesenen, nicht nur das eine Gesicht der Zeile (#1828): die
-        // Wand zaehlt den Termin bei jeder Person (rowPeopleIds).
-        people: event.assigned_users ?? [],
-        // Das am Termin gewaehlte Icon (#1829). `icon` bleibt das Zeichen des
-        // Moduls; wer das eigene zeigt, fragt hasEventIcon().
-        eventIcon: event.icon ?? null,
-        // Beitrags-Vertrag (utils/today-sheet.js): ein Termin ist ein Rahmen
-        // des Tages, kein Auftrag - er haelt die Coda nicht auf.
-        priority: 40,
-        open: false,
-      });
+      rows.push(todayEventRow(event, span));
     }
   }
 
@@ -1539,40 +1655,56 @@ function skeletonWidget(lines = 3) {
 
 const TASK_STATUS_IN_PROGRESS = () => t('tasks.statusInProgress');
 
+/* EIN ZEILENGERUEST FUER ALLE LISTEN-KACHELN (Critique DW, DW-P1-4). Die
+ * Kachel ist der EINE Traeger ihrer Zeilen (Zeilenlisten-Regel, Fall "Liste IN
+ * einer Karte"): die Folge traegt nur `.row-divided`, jede Zeile ist die
+ * geteilte `.list-row` mit Fuehrung (`.list-row__lead`, 32px: Avatar, Siegel
+ * oder Glyphe), Textspalte (`.list-row__name` 16/500 + `.list-row__meta` 13)
+ * und hoechstens einer Endzone (`.list-row__end`). Vorher standen neun
+ * Zeilen-Dialekte in einem Raster (Titel 15/600 bis 17/600, Fuehrung 5 bis
+ * 40px, drei Trennerformen). Was die Liste kommentiert ("+N weitere"), steht
+ * ausserhalb - eine Fussnote ist kein Eintrag. */
+function widgetRows(rows, { tag = 'div', className = '' } = {}) {
+  return `<${tag} class="widget__rows row-divided${className ? ` ${className}` : ''}">${rows}</${tag}>`;
+}
+
+
 /* Die Zeilen folgen der Groesse wie bei jeder Liste (`listRowCap`, #2087):
  * der Server liefert die fuenf dringendsten fuer die hohe Fassung, eine
  * 1x1-Kachel zeigt davon drei. Ohne Groesse ist es die Vorgabe der Kachel. */
 function renderUrgentTasks(allTasks, openTotal = null, size = '1x2') {
-  const tasks = allTasks.slice(0, listRowCap(size));
+  const cap = listRowCap(size);
+  const fill = fillRows(allTasks.length, cap);
+  const tasks = allTasks.slice(0, cap + fill);
+  const span = tileSpanAttrs((s, k = 0) => ({ items: allTasks.length, total: listTotal(openTotal, allTasks.length), cap: listRowCap(s) + k }), size, fill);
   if (!tasks.length) {
-    return `<div class="widget widget--tasks">
+    return `<div class="widget widget--tasks"${span}>
       ${widgetHeader('tasks', t('nav.tasks'), 0, '/tasks')}
-      <div class="widget__empty">
-        <i data-lucide="check-circle" class="empty-state__icon" style="color:var(--color-success)" aria-hidden="true"></i>
-        <div>${t('dashboard.allDone')}</div>
-      </div>
+      ${widgetEmptyHtml(t('dashboard.allDone'))}
     </div>`;
   }
 
-  const items = tasks.map((t) => {
+  const items = tasks.map((t, index) => {
     const due = formatDueDate(t.due_date, t.due_time);
     // Begonnen traegt dasselbe Zeichen wie in der Aufgabenliste (#1251), keine
-    // eigene Bauart. Nur dort: eine offene Zeile bekommt keinen leeren Ring, sonst
-    // haette jede Zeile ein viertes Zeichen. Das Wort steht als sr-only daneben,
-    // weil die Zeile role="button" ist und ihre Kinder damit keine eigene Rolle
-    // mehr tragen - ein role="img" am Ring waere dort verloren.
-    const started = t.status === 'in_progress'
-      ? `<span class="task-status-btn task-status-btn--in_progress task-status-btn--static" aria-hidden="true"></span>
-        <span class="sr-only">${esc(TASK_STATUS_IN_PROGRESS())}</span>`
-      : '';
+    // eigene Bauart, und es steht in der Fuehrung der Zeile: dort, wo sonst der
+    // Prioritaetspunkt steht (DW-P1-4 - EIN Zeichen je Fuehrung). Das Wort steht
+    // als sr-only daneben, weil die Zeile role="button" ist und ihre Kinder damit
+    // keine eigene Rolle mehr tragen - ein role="img" am Ring waere dort verloren.
+    const started = t.status === 'in_progress';
+    const lead = started
+      ? '<span class="task-status-btn task-status-btn--in_progress task-status-btn--static" aria-hidden="true"></span>'
+      : t.priority !== 'none'
+        ? `<span class="task-item__priority task-item__priority--${t.priority}" title="${esc(PRIORITY_LABELS()[t.priority] ?? t.priority)}"></span>`
+        : '';
     return `
-      <div class="task-item" data-task-id="${t.id}" data-task-title="${esc(t.title)}" role="button" tabindex="0">
-        ${t.priority !== 'none' ? `<div class="task-item__priority task-item__priority--${t.priority}" title="${esc(PRIORITY_LABELS()[t.priority] ?? t.priority)}" aria-hidden="true"></div>` : ''}
+      <div class="list-row task-item" data-task-id="${t.id}" data-task-title="${esc(t.title)}" role="button" tabindex="0"${fillRowAttr(index, cap)}>
+        <span class="list-row__lead task-item__lead" aria-hidden="true">${lead}</span>
         <span class="sr-only">${PRIORITY_LABELS()[t.priority] ?? t.priority}</span>
-        ${started}
-        <div class="task-item__content">
-          <div class="task-item__title">${esc(t.title)}</div>
-          ${due ? `<div class="task-item__meta ${due.overdue ? 'task-item__meta--overdue' : ''} ${due.soon ? 'task-item__meta--soon' : ''}">${due.text}</div>` : ''}
+        ${started ? `<span class="sr-only">${esc(TASK_STATUS_IN_PROGRESS())}</span>` : ''}
+        <div class="list-row__main task-item__content">
+          <div class="list-row__name task-item__title">${esc(t.title)}</div>
+          ${due ? `<div class="list-row__meta task-item__meta${due.overdue ? ' task-item__meta--overdue' : ''}${due.soon ? ' task-item__meta--soon' : ''}">${due.text}</div>` : ''}
         </div>
         ${renderAvatarStack(t.assigned_users ?? [], { size: 28 })}
       </div>
@@ -1582,9 +1714,9 @@ function renderUrgentTasks(allTasks, openTotal = null, size = '1x2') {
   // `urgentTasks` sind die fuenf dringendsten, `openTaskCount` alle offenen
   // (siehe listTotal); die Fusszeile nennt, was nicht in DIESER Groesse steht.
   const total = listTotal(openTotal, allTasks.length);
-  return `<div class="widget widget--tasks">
+  return `<div class="widget widget--tasks"${span}>
     ${widgetHeader('tasks', t('nav.tasks'), total, '/tasks')}
-    <div class="widget__body">${items}${listMoreLine('dashboard.tasksMore', total - tasks.length)}</div>
+    <div class="widget__body widget__body--rows">${widgetRows(items)}${listMoreLine('dashboard.tasksMore', total - Math.min(tasks.length, cap), fill)}</div>
   </div>`;
 }
 
@@ -1618,7 +1750,7 @@ const ENDED_EVENTS_SHOWN = 2;
  * Anpassen-Modus steht bis zum Speichern die alte Antwort da, und wer von
  * zwoelf auf fuenf zurueckstellt, soll fuenf sehen und nicht zwoelf bis zum
  * naechsten Abruf. */
-function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT_DEFAULT, rows = clampEventLimit(limit) } = {}) {
+function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT_DEFAULT, rows = clampEventLimit(limit), span = '', fill = 0 } = {}) {
   const todayKey = zonedDateKey(now);
   const nowStamp = householdNowStamp(now);
   const endedToday = allEvents.filter((e) => overviewEventSpan(e, todayKey).day === todayKey && eventHasEnded(e, nowStamp));
@@ -1627,21 +1759,22 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
   const endedRoom = Math.min(ENDED_EVENTS_SHOWN, rows - ahead.length);
   const ended = endedRoom > 0 ? endedToday.slice(-endedRoom) : [];
   const folded = endedToday.length - ended.length;
-  const events = [...ended, ...ahead];
+  // Zusatzzeilen (U14): die naechsten Kommenden, hinter der Liste. Die
+  // Beendeten bleiben, wie die Groesse sie gewaehlt hat.
+  const extraAhead = aheadAll.slice(ahead.length, ahead.length + Math.max(0, fill));
+  const events = [...ended, ...ahead, ...extraAhead];
+  const firstExtra = ended.length + ahead.length;
   if (!events.length) {
-    return `<div class="widget widget--calendar">
+    return `<div class="widget widget--calendar"${span}>
       ${widgetHeader('calendar', t('nav.calendar'), 0, '/calendar')}
-      <div class="widget__empty">
-        <i data-lucide="calendar-check" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.noEvents')}</div>
-      </div>
+      ${widgetEmptyHtml(t('dashboard.noEvents'))}
     </div>`;
   }
 
   // Der Tagesvergleich ueber KEYS, nicht ueber `toDateString()`: das las die
   // Browser-Zone und machte „heute" zu einer Frage an das Geraet (#851).
   const today = todayKey;
-  const items = events.map((e) => {
+  const items = events.map((e, index) => {
     const span = overviewEventSpan(e, today);
     const dayKey = span.day;
     const isToday = dayKey === today;
@@ -1651,24 +1784,24 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
     const timeStr = span.until || span.allDay
       ? overviewEventTime(e, span)
       : `${formatTime(e.start_datetime)}${_suffix ? ' ' + _suffix : ''}`.trim();
-    const badge = isEnded
-      ? `<span class="event-time-badge">${esc(t('dashboard.eventEnded'))}</span>`
-      : `<span class="event-time-badge ${isToday ? 'event-time-badge--today' : ''}">${isToday ? t('common.today') : relativeDateLabel(dayKey)}</span>`;
+    // EINE METAZEILE: "Heute · 17:00 · Sportplatz West" (DW-P2-10). Das Etikett
+    // stand als Pille vor der Zeit und brach am Telefon in eine eigene Zeile
+    // (Termin dreizeilig); der Kalendername stand immer allein darunter. Jetzt
+    // ist der Tag das erste Wort der Zeile, der Zustand haengt weiter nicht an
+    // der Farbe allein ("Vorbei" statt "Heute").
+    const when = isEnded ? t('dashboard.eventEnded') : isToday ? t('common.today') : relativeDateLabel(dayKey);
+    const rest = [timeStr, e.location ? fmtLocation(e.location) : '', e.cal_name || ''].filter(Boolean).map((part) => esc(part));
+    const whenClass = isToday && !isEnded ? ' event-item__when--today' : '';
     return `
-      <div class="event-item${isEnded ? ' event-item--ended' : ''}" data-route="${esc(calendarEventRoute(e))}" role="button" tabindex="0">
+      <div class="list-row event-item${isEnded ? ' event-item--ended' : ''}" data-route="${esc(calendarEventRoute(e))}" role="button" tabindex="0"${fillRowAttr(index, firstExtra)}>
         <!-- Dieselbe Regel wie im Kalender, aus derselben Datei. Hier stand
              e.color || e.cal_color - dieselbe Frage ohne den Zweig fuer die
              zugewiesene Person, was seit #891 zwei verschiedene Antworten
              gegeben haette. -->
-        <div class="event-item__bar" style="background-color:${esc(resolveEventColor(e))}"></div>
-        <div class="event-item__content">
-          <div class="event-item__title">${esc(e.title)}</div>
-          <div class="event-item__time">
-            ${badge}
-            ${timeStr}
-            ${e.location ? ` · ${esc(fmtLocation(e.location))}` : ''}
-            ${e.cal_name ? `<span class="event-item__cal">${esc(e.cal_name)}</span>` : ''}
-          </div>
+        <span class="list-row__lead event-item__lead" aria-hidden="true"><span class="event-item__bar" style="background-color:${esc(resolveEventColor(e))}"></span></span>
+        <div class="list-row__main event-item__content">
+          <div class="list-row__name event-item__title">${esc(e.title)}</div>
+          <div class="list-row__meta event-item__time"><span class="event-item__when${whenClass}">${esc(when)}</span>${rest.map((part) => ` · ${part}`).join('')}</div>
         </div>
         ${renderAvatarStack(e.assigned_users ?? [], { size: 28 })}
       </div>
@@ -1693,12 +1826,14 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
   // weniger zeigt, als geladen ist (#2087): „+2 weitere" hiesse „fuenf geladen,
   // drei gezeigt" und laege bei dreissig kommenden Terminen. Sie steht an der
   // Stelle und in der Form des „+N weitere" der anderen Listen.
+  // Stehen alle Zusatzzeilen, ist nichts Kommendes mehr verborgen: die Zeile
+  // geht, oder sie behaelt die Faltzeile (`data-more-done`).
   const more = moreAhead
-    ? `<p class="widget-list-more">${esc([earlierText, t('dashboard.eventsMoreAhead')].filter(Boolean).join(' · '))}</p>`
+    ? `<p class="widget-list-more"${fillMoreAttrs(extraAhead.length, extraAhead.length, '', earlierText)}>${esc([earlierText, t('dashboard.eventsMoreAhead')].filter(Boolean).join(' · '))}</p>`
     : '';
-  return `<div class="widget widget--calendar">
+  return `<div class="widget widget--calendar"${span}>
     ${widgetHeader('calendar', t('nav.calendar'), null, '/calendar')}
-    <div class="widget__body">${earlier}${items}${more}</div>
+    <div class="widget__body widget__body--rows">${earlier}${widgetRows(items)}${more}</div>
   </div>`;
 }
 
@@ -1719,7 +1854,7 @@ function renderUpcomingEvents(allEvents, { now = new Date(), limit = EVENT_LIMIT
 const WEEKDAY_SHORT_KEYS = ['dayShortSunday', 'dayShortMonday', 'dayShortTuesday', 'dayShortWednesday', 'dayShortThursday', 'dayShortFriday', 'dayShortSaturday'];
 const WEEKDAY_LONG_KEYS = ['dayLongSunday', 'dayLongMonday', 'dayLongTuesday', 'dayLongWednesday', 'dayLongThursday', 'dayLongFriday', 'dayLongSaturday'];
 
-function renderWeekStrip(weekEvents) {
+function renderWeekStrip(weekEvents, span = '') {
   // Geburtstage tragen serverseitig einen sprachneutralen Titel (#524) - hier
   // und nicht im Ladepfad uebersetzt, weil der Titel nur im Tagesnamen steht.
   const events = (Array.isArray(weekEvents) ? weekEvents : []).map(localizeBirthdayEvent);
@@ -1750,7 +1885,7 @@ function renderWeekStrip(weekEvents) {
   const empty = strip.days.every((day) => day.count === 0)
     ? `<p class="week-strip__empty">${t('dashboard.weekStripEmpty')}</p>`
     : '';
-  return `<div class="widget widget--calendar widget--week">
+  return `<div class="widget widget--calendar widget--week"${span}>
     ${widgetHeader('calendar', t('dashboard.weekStripTitle'), null, '/calendar')}
     <div class="widget__body">
       <div class="week-strip">${days}${bands}</div>
@@ -1763,9 +1898,58 @@ function renderWeekStrip(weekEvents) {
  *  Die Stufe aus den Optionen (#1680) gilt nur der hohen Liste - die Woche
  *  zeigt sieben Tage, keine Zeilen, und 1x1 die Zeilen seiner Groesse. */
 function renderCalendarWidget(data, size, options = {}) {
+  const model = calendarTileModel(data, options);
+  const fill = model.fillFor(size ?? '1x2');
+  const span = tileSpanAttrs(model, size ?? '1x2', fill);
   return nearestPreset(size ?? '1x2') === '2x1'
-    ? renderWeekStrip(data?.weekEvents)
-    : renderUpcomingEvents(data?.upcomingEvents ?? [], { limit: options?.limit, rows: calendarRowCap(size, options?.limit) });
+    ? renderWeekStrip(data?.weekEvents, span)
+    : renderUpcomingEvents(data?.upcomingEvents ?? [], { limit: options?.limit, rows: calendarRowCap(size, options?.limit), span, fill });
+}
+
+/* Die Hoehe der Kalenderkachel in jeder Groesse (U1 b) - dieselbe Rechnung wie
+ * renderUpcomingEvents: wie viele Kommende, wie viele Beendete, und ob unter
+ * der Liste "+N weitere" oder ueber ihr die Faltzeile steht (beide eine
+ * Footnote-Zeile). 2x1 ist der Wochenstreifen: Kopfzeile, eine Spur je
+ * Mehrtagesband, die Punktzeile und ggf. der Satz "keine Termine". */
+function calendarTileModel(data, options = {}, now = new Date()) {
+  const limit = options?.limit;
+  const allEvents = data?.upcomingEvents ?? [];
+  const todayKey = zonedDateKey(now);
+  const nowStamp = householdNowStamp(now);
+  const endedToday = allEvents.filter((e) => overviewEventSpan(e, todayKey).day === todayKey && eventHasEnded(e, nowStamp));
+  const aheadAll = allEvents.length - endedToday.length;
+  let week = null;
+  const model = (s, k = 0) => {
+    if (nearestPreset(s) === '2x1') {
+      week ??= (() => {
+        const strip = buildWeekStrip((Array.isArray(data?.weekEvents) ? data.weekEvents : []).map(localizeBirthdayEvent), householdToday());
+        const empty = strip.days.every((day) => day.count === 0);
+        return { body: TILE_PARTS.weekBase + strip.laneCount * TILE_PARTS.weekLane + (empty ? TILE_PARTS.weekEmpty : 0) };
+      })();
+      return week;
+    }
+    const cap = calendarRowCap(s, limit);
+    const aheadN = Math.min(aheadAll, cap);
+    const endedN = Math.min(endedToday.length, Math.max(0, Math.min(ENDED_EVENTS_SHOWN, cap - aheadN)));
+    const moreAhead = cap < clampEventLimit(limit) && aheadAll > aheadN;
+    // Mit k Zusatzzeilen (U14) stehen k Kommende mehr da; sind es alle, geht
+    // "Weitere Termine", und die Faltzeile bleibt unten in seiner Form.
+    const extra = moreAhead ? Math.min(Math.max(0, k), aheadAll - aheadN) : 0;
+    const folded = endedToday.length > endedN;
+    const aux = moreAhead && aheadN + extra < aheadAll ? TILE_GEOMETRY.more
+      : moreAhead && extra && folded ? TILE_GEOMETRY.more
+        : moreAhead && extra ? 0
+          : moreAhead ? TILE_GEOMETRY.more : folded ? TILE_PARTS.earlier : 0;
+    return { items: aheadN + endedN + extra, extra: aux };
+  };
+  // Wie viele Kommende die Groesse geladen, aber nicht gezeigt hat - ohne
+  // "Weitere Termine" keine (die Liste zeigt dann schon alles).
+  model.fillFor = (s) => {
+    if (nearestPreset(s) === '2x1' || onPhoneStage()) return 0;
+    const cap = calendarRowCap(s, limit);
+    return cap < clampEventLimit(limit) ? Math.max(0, aheadAll - Math.min(aheadAll, cap)) : 0;
+  };
+  return model;
 }
 
 /**
@@ -1789,11 +1973,12 @@ function renderCalendarWidget(data, size, options = {}) {
  * Zeile mit ihrer hoechsten Kachel waechst (`grid-auto-rows: minmax(132px,
  * auto)`), stand bei den Nachbarn „+N weitere" ueber leerem Raum. Jetzt:
  *   - 1x1 zeigt drei Zeilen, auch Kalender und Aufgaben, plus Fusszeile.
- *   - Hoch zeigt fuenf; beim Kalender die Stufe aus seinen Optionen, und die
- *     Stufe bestimmt, wie viele Rasterzeilen die Kachel belegt (5/8/12 ->
- *     2/3/4, `calendarListRows` + dashboard.css). Eine laengere Liste ist eine
- *     hoehere Kachel, nicht eine hoehere Zeile der Nachbarn. Darstellung,
- *     keine gespeicherte Groesse.
+ *   - Hoch zeigt fuenf; beim Kalender die Stufe aus seinen Optionen. Eine
+ *     laengere Liste ist eine hoehere Kachel, nicht eine hoehere Zeile der
+ *     Nachbarn. Seit U1 b (DW-P1-3) ist das die Regel fuer JEDE Liste: die
+ *     Zahl hier ist die Obergrenze, die Hoehe kommt aus den gezeigten Zeilen
+ *     (`tileSpanAttrs` -> `contentSpanRows`). Darstellung, keine gespeicherte
+ *     Groesse.
  *   - Beendete Termine zaehlen innerhalb der Zeilen, nach dem Kommenden
  *     (`ENDED_EVENTS_SHOWN`).
  *   - Die Wand hat ihren eigenen Deckel (`WALL_ROW_CAP`) und liest weder
@@ -1839,28 +2024,199 @@ function calendarRowCap(size, limit) {
   return isTallSize(size ?? '1x2') ? clampEventLimit(limit) : listRowCap(size);
 }
 
-/* Wie viele Rasterzeilen eine hohe Kalenderliste belegt, sagt dashboard.css
- * (`[data-list-rows]` an den hohen Groessenklassen, ab 1024px). Das Attribut
- * traegt nur die Stufe, nicht die Spanne - die Groessenklasse entscheidet, ob
- * es greift. So liest `spansForSize` beim Probieren einer anderen Groesse
- * auch die richtige Spanne: an 1x1 passt keine Regel. Die Vorgabe fuenf ist
- * die normale hohe Kachel und braucht kein Attribut. */
-function calendarListRowsOf(w) {
-  if (w?.id !== 'calendar') return null;
-  const limit = clampEventLimit(w.options?.limit);
-  return limit === EVENT_LIMIT_DEFAULT ? null : limit;
+/* DIE KACHEL SAGT AUS IHREN DATEN, WIE HOCH SIE IST (DW-P1-3, U1 b).
+ *
+ * Jeder Renderer beschreibt seinen Inhalt als Funktion der Groesse
+ * (`model(size)` -> `contentSpanRows`, utils/dashboard-widgets.js): so viele
+ * Zeilen, wie die Daten hergeben und die Groesse erlaubt, oder die Hoehe seines
+ * festen Aufbaus. Daraus wird die Zahl der Rasterspuren, die er belegt -
+ * `data-span-rows` an seiner Wurzel, beim Zeichnen ausgerechnet, bevor das
+ * Raster ausgelegt wird. Fuer die anderen drei Groessen steht die Zahl gleich
+ * daneben (`data-span-sizes`): der Lueckenhinweis probiert Groessen aus und
+ * muss wissen, wie hoch die Kachel in jeder waere, ohne sie neu zu zeichnen.
+ *
+ * Der Rahmen (`renderWidgetWrapper`) hebt beides an sich und setzt
+ * `--tile-rows`; dashboard.css macht daraus die Spanne. Die Stufe der
+ * Kalenderliste (#2087, 5/8/12 Termine) war bis hierher ein eigenes Attribut
+ * mit eigenen Spannen - jetzt ist sie, was sie immer war: die Obergrenze einer
+ * Liste, deren Hoehe aus ihren Zeilen kommt. */
+const SPAN_SIZES = WIDGET_SIZE_PRESETS.map((p) => p.value);
+
+/* FESTE TEILE EINZELNER KACHELN in px, ab 768px (dashboard.css; gemessen
+ * 2026-10-27 bei 768, 1024, 1440 und 1920px, Grundschrift 16px). Was eine
+ * Liste aus Zeilen ist, rechnet TILE_GEOMETRY; hier steht, was eine Kachel
+ * ausser Zeilen traegt. Aendert sich eine dieser Regeln, aendert sich hier die
+ * Zahl - `test:dashboard` haelt die Liste vollstaendig. */
+const TILE_PARTS = Object.freeze({
+  // Kalender 2x1, der Wochenstreifen: Kopf- und Punktzeile, je Band eine Spur.
+  weekBase: 100.4,
+  weekLane: 10,
+  weekEmpty: 27,
+  // Die Faltzeile "N frueher" ueber der Terminliste (Footnote + 4px).
+  earlier: 23,
+  wasteWarning: 40,
+  // Koerper (unter dem Kopf) der Kacheln mit eigenem Aufbau, je Groesse.
+  weather: { '1x1': 102, '1x2': 234, '2x1': 125, '2x2': 142 },
+  clock: { '1x1': 109, '1x2': 133, '2x1': 111, '2x2': 135 },
+  // Koerper- plus Innenpolster der Kacheln Gesundheit, Zyklus, Haushaltshilfe.
+  statusPad: 60,
+  healthProgress: 26.5,
+  statusLine: 35.5,
+  statusChip: 46,
+  healthNone: 23.5,
+  cycleRing: 60,
+  cycleInfo: 44.6,
+  cycleDate: 21.1,
+  housekeepingStatus: 44.6,
+  // Fasten: Ring neben Satz und Knoepfen; schmal stehen die Knoepfe untereinander.
+  fasting: { wide: 148, narrow: 166.2 },
+  fastingActive: { wide: 243.9, narrow: 335.9 },
+  nutritionPad: 60,
+  nutritionRow: 22,
+  nutritionGap: 8,
+  nutritionCount: 31.1,
+  budgetPad: 32,
+  budgetHeadline: 68,
+  budgetSavings: 53,
+  budgetSavingsBare: 37,
+  budgetGoal: 52,
+  budgetFlow: 48.2,
+  budgetTopOne: 34,
+  budgetTopList: 46.2,
+  budgetTopRow: 25,
+  mealsPad: 28,
+  mealSlot: 69.2,
+  mealSlotTwoLines: 91.2,
+  mealGap: 8,
+  familyPad: 24,
+  familyMore: 27.1,
+  familyFooter: 28.7,
+  rewardsMember: 77.4,
+  rewardsMemberCompact: 54.5,
+  rewardsGap: 12,
+  rewardsFooter: 52,
+  rewardsMore: 19.1,
+  rewardsSelfPad: 28,
+  rewardsSelfGoal: 67.5,
+  rewardsRecentTitle: 30,
+  rewardsRecentRow: 28,
+  notesPad: 28,
+  notesGap: 12,
+  noteCard: 24,
+  noteTitle: 24.1,
+  noteContent: 41.5,
+  noteCategories: 26,
+  notesMore: 31.1,
+  shoppingList: 58,
+  shoppingItem: 19.5,
+  shoppingItemGap: 4,
+  shoppingMore: 31.1,
+  shoppingNothing: 23.5,
+  metricCard: 119,
+  metricGap: 20,
+  quickLinksPad: 12,
+  quickLinkTile: 100.3,
+  quickLinkGap: 8,
+});
+
+/** Die Spalten, die eine Groesse ab 768px belegt: 1 oder 2 (3x/4x auch 2+). */
+function tileColumns(size) {
+  return Number(String(size ?? '1x1').split('x')[0]) >= 2 ? 2 : 1;
 }
 
-/* Das Attribut aus einer Stufe - fuer das Raster und fuer das Skelett, das
- * sie aus dem Layout-Hinweis liest. Nur eine der Stufen wird zum Attribut:
- * der Hinweis liegt im localStorage und ist von der Seite aus beschreibbar. */
-function listRowsAttr(rows) {
-  const limit = Number(rows);
-  return limit !== EVENT_LIMIT_DEFAULT && clampEventLimit(limit) === limit ? ` data-list-rows="${limit}"` : '';
+/** Eine Kachel ohne Eintrag: Kopf und genau die Leerzeile, in jeder Groesse. */
+function emptySpanAttrs(size) {
+  return tileSpanAttrs(() => ({ items: 0 }), size ?? '1x1');
 }
 
-function calendarListRows(w) {
-  return listRowsAttr(calendarListRowsOf(w));
+/* `fill` (U14): so viele Zeilen hat die Kachel ueber das hinaus geladen, was
+ * ihre Groesse zeigt. `model(size, k)` beschreibt sie dann mit k Zusatzzeilen,
+ * und `data-fill-steps` sagt fuer k = 1 ... fill die Spuren, die sie dafuer
+ * braeuchte (`fillRowCount`, applyRowFill). Die Spanne selbst bleibt die ohne
+ * Zusatzzeilen - die Packung sieht sie nie. */
+function tileSpanAttrs(model, size, fill = 0) {
+  // Am Telefon steht jede Kachel in ihrer eigenen Hoehe untereinander (eine
+  // Spalte, kein Raster aus Spuren): dort wird nichts gerechnet. Ein Wechsel
+  // zur breiten Buehne baut die Uebersicht neu (createPhoneProgramFit).
+  if (onPhoneStage()) return '';
+  const rowsAt = (s, k = 0) => contentSpanRows(model(s, k) ?? {}).rows;
+  const sizes = [...new Set([...SPAN_SIZES, size].filter(Boolean))];
+  const steps = Array.from({ length: Math.max(0, fill | 0) }, (_, i) => rowsAt(size, i + 1));
+  return ` data-span-rows="${rowsAt(size)}" data-span-sizes="${sizes.map((s) => `${s}:${rowsAt(s)}`).join(',')}"`
+    + (steps.length ? ` data-fill-steps="${steps.join(',')}"` : '');
+}
+
+/** Die Spanne aus dem Markup eines Renderers (erstes `data-span-rows`). */
+function tileSpanOf(html) {
+  const rows = /\sdata-span-rows="(\d+)"/.exec(String(html ?? ''))?.[1];
+  const sizes = /\sdata-span-sizes="([0-9x:,]*)"/.exec(String(html ?? ''))?.[1];
+  const steps = /\sdata-fill-steps="([0-9,]*)"/.exec(String(html ?? ''))?.[1];
+  return rows ? { rows: Number(rows), sizes: sizes ?? '', steps: steps ?? '' } : null;
+}
+
+/** Die Attribute des Rahmens: Spanne und, als Wert fuer dashboard.css, `--tile-rows`. */
+function tileSpanWrapperAttrs(html) {
+  const span = tileSpanOf(html);
+  return span
+    ? ` data-span-rows="${span.rows}" data-span-sizes="${esc(span.sizes)}"${span.steps ? ` data-fill-steps="${esc(span.steps)}"` : ''} style="--tile-rows: ${span.rows}"`
+    : '';
+}
+
+/* DIE ZUSATZZEILEN (U14): wie viele Zeilen eine Liste ueber ihre Groesse hinaus
+ * mitbringt - die geladenen, die sie nicht zeigt, hoechstens sechs (die
+ * groesste gemessene Streckung, Familie bei zwei Spalten 359px, traegt keine
+ * sieben Zeilen; Entsorgung und Schichtplan liefern ungedeckelt). Am Telefon
+ * keine: dort wird nicht gestreckt. */
+const FILL_ROWS_MAX = 6;
+function fillRows(loaded, shown) {
+  return onPhoneStage() ? 0 : Math.min(FILL_ROWS_MAX, Math.max(0, (Number(loaded) || 0) - (Number(shown) || 0)));
+}
+
+/** Markiert die i-te Zeile einer Liste als Zusatzzeile, wenn sie hinter `cap` steht. */
+function fillRowAttr(index, cap) {
+  return index >= cap ? ' data-fill-row' : '';
+}
+
+/* "+N weitere" kennt seine Zusatzzeilen: applyRowFill zaehlt herunter
+ * (`data-more-key`, `data-more-rest`) und nimmt die Zeile weg, wenn alles
+ * steht - oder setzt dann `data-more-done` (der Kalender behaelt seine
+ * Faltzeile). */
+function fillMoreAttrs(fill, rest, key = '', done = '') {
+  if (!(fill > 0)) return '';
+  return ` data-fill-more data-more-rest="${rest}"${key ? ` data-more-key="${esc(key)}"` : ''}${done ? ` data-more-done="${esc(done)}"` : ''}`;
+}
+
+/* Die zuletzt gezeichnete Spanne je Kachel - fuer den Layout-Hinweis, der dem
+ * Skelett beim naechsten Laden dieselben Hoehen vorhersagt (DW-P2-5, U1 b). */
+const drawnSpanRows = new Map();
+function drawnSpanOf(w) {
+  return drawnSpanRows.get(w?.id) ?? null;
+}
+
+/** Ein neu gezeichneter Koerper bringt seine Spanne an den vorhandenen Rahmen (Geste, U1 b). */
+function setTileSpan(el, html) {
+  const span = tileSpanOf(html);
+  if (el.dataset?.widgetId) drawnSpanRows.set(el.dataset.widgetId, span?.rows ?? 0);
+  // Der neue Koerper zeigt noch keine Zusatzzeile (U14); applyRowFill setzt sie.
+  delete el.dataset.fillShown;
+  if (!span?.steps) delete el.dataset.fillSteps;
+  else el.dataset.fillSteps = span.steps;
+  if (!span) {
+    el.removeAttribute('data-span-rows');
+    el.removeAttribute('data-span-sizes');
+    el.style.removeProperty('--tile-rows');
+    return;
+  }
+  el.dataset.spanRows = String(span.rows);
+  el.dataset.spanSizes = span.sizes;
+  el.style.setProperty('--tile-rows', String(span.rows));
+}
+
+/** Spuren einer Kachel in einer anderen Groesse (aus `data-span-sizes`), sonst null. */
+function spanRowsForSize(el, size) {
+  const entry = String(el?.dataset?.spanSizes ?? '').split(',').find((part) => part.startsWith(`${size}:`));
+  const rows = Number(entry?.slice(size.length + 1));
+  return Number.isInteger(rows) && rows > 0 ? rows : null;
 }
 
 /*
@@ -1887,8 +2243,8 @@ function listTotal(total, loaded) {
   return Number.isFinite(n) ? Math.max(n, loaded) : loaded;
 }
 
-function listMoreLine(key, rest) {
-  return rest > 0 ? `<p class="widget-list-more">${esc(t(key, { count: rest }))}</p>` : '';
+function listMoreLine(key, rest, fill = 0) {
+  return rest > 0 ? `<p class="widget-list-more"${fillMoreAttrs(fill, rest, key)}>${esc(t(key, { count: rest }))}</p>` : '';
 }
 
 /* DATUM UND ABSTAND IN EINER ZEILE (#1454). Das Datum folgt der Stufung der
@@ -1907,18 +2263,18 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
   // was davon erscheint, entscheidet die Kachel. Die Badge zaehlte hier die
   // gezeigten Zeilen und sagte damit „5" bei acht anstehenden Anlaessen - jetzt
   // nennt sie `birthdayTotal`, und der Rest steht als Fusszeile da (listTotal).
-  const birthdays = allBirthdays.slice(0, listRowCap(size));
+  const cap = listRowCap(size);
+  const fill = fillRows(allBirthdays.length, cap);
+  const birthdays = allBirthdays.slice(0, cap + fill);
+  const span = tileSpanAttrs((s, k = 0) => ({ items: allBirthdays.length, total: listTotal(total, allBirthdays.length), cap: listRowCap(s) + k }), size, fill);
   if (!birthdays.length) {
-    return `<div class="widget widget--birthdays">
+    return `<div class="widget widget--birthdays"${span}>
       ${widgetHeader('birthdays', t('nav.birthdays'), 0, '/birthdays')}
-      <div class="widget__empty">
-        <i data-lucide="cake" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.noBirthdays')}</div>
-      </div>
+      ${widgetEmptyHtml(t('dashboard.noBirthdays'))}
     </div>`;
   }
 
-  const items = birthdays.map((b) => {
+  const items = birthdays.map((b, index) => {
     // "in 9 Tagen" wie im Geburtstagsmodul (R23, D11), nicht "9 Tage".
     const daysLabel = daysFromTodayText(b.days_until);
     // Familien-Geburtstage tragen die Identitaetsfarbe des Mitglieds - dieselbe
@@ -1936,23 +2292,23 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
         ? t('birthdays.turnsAge', { age: b.next_age })
         : '';
     return `
-      <div class="birthday-widget-item" data-route="${esc(b.id != null ? `/birthdays?open=${encodeURIComponent(String(b.id))}` : '/birthdays')}" role="button" tabindex="0">
-        <div class="birthday-widget-item__avatar"${avatarStyle}>
+      <div class="list-row birthday-widget-item" data-route="${esc(b.id != null ? `/birthdays?open=${encodeURIComponent(String(b.id))}` : '/birthdays')}" role="button" tabindex="0"${fillRowAttr(index, cap)}>
+        <div class="list-row__lead birthday-widget-item__avatar"${avatarStyle}>
           ${b.photo_data ? `<img src="${esc(b.photo_data)}" alt="" loading="lazy">` : `<span>${esc(initials(b.name))}</span>`}
         </div>
-        <div class="birthday-widget-item__body">
-          <div class="birthday-widget-item__name">${esc(b.name)}</div>
-          <div class="birthday-widget-item__meta">${dateAndCount(relativeDateLabel(b.next_date ?? b.next_birthday), daysLabel)}</div>
+        <div class="list-row__main birthday-widget-item__body">
+          <div class="list-row__name birthday-widget-item__name">${esc(b.name)}</div>
+          <div class="list-row__meta birthday-widget-item__meta">${dateAndCount(relativeDateLabel(b.next_date ?? b.next_birthday), daysLabel)}</div>
         </div>
-        ${occasionLabel ? `<div class="birthday-widget-item__age">${esc(occasionLabel)}</div>` : ''}
+        ${occasionLabel ? `<div class="list-row__end birthday-widget-item__age">${esc(occasionLabel)}</div>` : ''}
       </div>
     `;
   }).join('');
 
   const gesamt = listTotal(total, allBirthdays.length);
-  return `<div class="widget widget--birthdays">
+  return `<div class="widget widget--birthdays"${span}>
     ${widgetHeader('birthdays', t('nav.birthdays'), gesamt, '/birthdays')}
-    <div class="widget__body">${items}${listMoreLine('dashboard.birthdaysMore', gesamt - birthdays.length)}</div>
+    <div class="widget__body widget__body--rows">${widgetRows(items)}${listMoreLine('dashboard.birthdaysMore', gesamt - Math.min(birthdays.length, cap), fill)}</div>
   </div>`;
 }
 
@@ -1973,19 +2329,21 @@ export function renderUpcomingBirthdays(allBirthdays, size, total = null) {
  * Kachel nimmt die Liste, wie sie kommt (siehe services/countdowns.js). */
 function renderCountdowns(allItems, size, total = null) {
   const shown = visibleCountdowns(allItems);
-  const items = shown.slice(0, listRowCap(size));
+  const cap = listRowCap(size);
+  const fill = fillRows(shown.length, cap);
+  const items = shown.slice(0, cap + fill);
   // Kein Leerzustand: ohne Countdown ist die Kachel nicht leer, sondern nicht
   // vorhanden (isWidgetModuleEnabled). Diese Zeile ist der Notausgang für den
   // Fall, dass die Verfügbarkeit und die Daten auseinanderlaufen.
   if (!items.length) return '';
 
-  const rows = items.map((c) => {
+  const rows = items.map((c, index) => {
     const phrase = countdownPhrase(c.days_until);
     const label = phrase.count === undefined ? t(phrase.key) : t(phrase.key, { count: phrase.count });
     // Sagt der Zaehler rechts schon „Heute"/„Morgen", traegt die Zeile kein
     // zweites (#1454).
     const when = relativeDateLabel(c.date);
-    const meta = when && when !== label ? `<div class="countdown-item__meta">${esc(when)}</div>` : '';
+    const meta = when && when !== label ? `<div class="list-row__meta countdown-item__meta">${esc(when)}</div>` : '';
     // Die Farbe des Termins trägt die Zeile als schmale Marke - dieselbe
     // Zuordnung, die er im Kalender hat. Eine Aufgabe hat keine, sie bekommt
     // den Modulton.
@@ -2009,15 +2367,15 @@ function renderCountdowns(allItems, size, total = null) {
       ? ` data-task-id="${esc(String(c.id))}" data-task-title="${esc(c.title)}"`
       : ` data-route="/calendar?open=${encodeURIComponent(String(c.id))}&date=${encodeURIComponent(c.date)}"`;
     return `
-      <div class="countdown-item" role="button" tabindex="0"${anchor}${accent}>
-        <span class="countdown-item__icon" aria-hidden="true">
+      <div class="list-row countdown-item" role="button" tabindex="0"${anchor}${accent}${fillRowAttr(index, cap)}>
+        <span class="list-row__lead countdown-item__icon" aria-hidden="true">
           <i data-lucide="${esc(c.icon || 'calendar')}"></i>
         </span>
-        <div class="countdown-item__body">
-          <div class="countdown-item__title">${esc(c.title)}</div>
+        <div class="list-row__main countdown-item__body">
+          <div class="list-row__name countdown-item__title">${esc(c.title)}</div>
           ${meta}
         </div>
-        <div class="countdown-item__days countdown-item__days--${countdownRank(c.days_until)}">${esc(label)}</div>
+        <div class="list-row__end countdown-item__days countdown-item__days--${countdownRank(c.days_until)}">${esc(label)}</div>
       </div>
     `;
   }).join('');
@@ -2043,18 +2401,19 @@ function renderCountdowns(allItems, size, total = null) {
    * ist. Fehlt sie (älterer Server, Fehlerpfad), fällt sie auf die geladene
    * Länge zurück - dann stimmt sie wenigstens für den Kachelschnitt. */
   const gesamt = Number.isFinite(Number(total)) ? Number(total) : shown.length;
-  const rest = Math.max(0, gesamt - items.length);
+  const rest = Math.max(0, gesamt - Math.min(items.length, cap));
   const more = rest > 0
-    ? `<p class="countdown-more">${esc(t('dashboard.countdownMore', { count: rest }))}</p>`
+    ? `<p class="countdown-more"${fillMoreAttrs(fill, rest, 'dashboard.countdownMore')}>${esc(t('dashboard.countdownMore', { count: rest }))}</p>`
     : '';
 
-  return `<div class="widget widget--countdown">
+  const span = tileSpanAttrs((s, k = 0) => ({ items: shown.length, total: gesamt, cap: listRowCap(s) + k }), size, fill);
+  return `<div class="widget widget--countdown"${span}>
     ${widgetHeader('countdown', t('dashboard.countdownTitle'), gesamt, null, null, 'dashboard')}
-    <div class="widget__body">${rows}${more}</div>
+    <div class="widget__body widget__body--rows">${widgetRows(rows)}${more}</div>
   </div>`;
 }
 
-function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER, users = []) {
+function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER, users = [], size = '2x1') {
   const mealLabels = MEAL_LABELS();
   const safeMeals = Array.isArray(meals) ? meals : [];
   const slots = normalizeVisibleMealTypes(visibleMealTypes).map((type) => {
@@ -2092,7 +2451,14 @@ function renderTodayMeals(meals, visibleMealTypes = MEAL_ORDER, users = []) {
     `;
   }).join('');
 
-  return `<div class="widget widget--meals">
+  // Zwei Slots je Zeile; der Gerichtname steht breit in einer, schmal in zwei
+  // Zeilen (dashboard.css, "MIT SPALTEN IST DIE ZEILE EIN TAKT").
+  const slotRows = Math.ceil(normalizeVisibleMealTypes(visibleMealTypes).length / 2);
+  const span = tileSpanAttrs((s) => {
+    const slot = tileColumns(s) >= 2 ? TILE_PARTS.mealSlot : TILE_PARTS.mealSlotTwoLines;
+    return { body: TILE_PARTS.mealsPad + slotRows * slot + Math.max(0, slotRows - 1) * TILE_PARTS.mealGap };
+  }, size);
+  return `<div class="widget widget--meals"${span}>
     ${widgetHeader('meals', t('dashboard.todayMeals'), null, '/meals', t('dashboard.weekLink'))}
     <div class="meals-widget">
       <div class="meal-slots">${slots}</div>
@@ -2109,14 +2475,33 @@ function renderPinnedNotes(allNotes, size, total = null) {
    * Notizen angepinnt hatte, sah drei davon und keinen Hinweis auf die
    * uebrigen (#928). Dieselbe Korrektur haben die Geburtstage schon bekommen;
    * die Notizen wurden dabei uebersehen. */
-  const notes = allNotes.slice(0, listRowCap(size));
+  const cap = listRowCap(size);
+  const fill = fillRows(allNotes.length, cap);
+  const notes = allNotes.slice(0, cap + fill);
+  /* Notizkarten in Reihen (U1 b): schmal eine Spalte, breit drei (dashboard.css
+   * "MIT SPALTEN"), jede Reihe so hoch wie ihre hoechste Karte - Titel und
+   * Kategorien sind Daten, die Vorschau steht in genau zwei Zeilen.
+   * KATEGORIEN NUR, WO SIE STEHEN (Review p11): dashboard.css blendet sie in
+   * jeder einspaltigen und jeder einzeiligen Groesse aus; mitgezaehlt standen
+   * fuenf Notizen in 1x2 auf 177 statt 145 Spuren, rund 128px leer. */
+  const notesTotal = listTotal(total, allNotes.length);
+  const span = tileSpanAttrs((s, k = 0) => {
+    const shown = allNotes.slice(0, listRowCap(s) + k);
+    if (!shown.length) return { items: 0 };
+    const cols = tileColumns(s) >= 2 ? 3 : 1;
+    const categoryRow = tileColumns(s) >= 2 && isTallSize(s) ? TILE_PARTS.noteCategories : 0;
+    const card = (n) => TILE_PARTS.noteCard + (n.title ? TILE_PARTS.noteTitle : 0) + TILE_PARTS.noteContent
+      + ((n.categories || []).length ? categoryRow : 0);
+    let body = TILE_PARTS.notesPad;
+    for (let i = 0; i < shown.length; i += cols) {
+      body += Math.max(...shown.slice(i, i + cols).map(card)) + (i ? TILE_PARTS.notesGap : 0);
+    }
+    return { body: body + (notesTotal > shown.length ? TILE_PARTS.notesMore : 0) };
+  }, size, fill);
   if (!notes.length) {
-    return `<div class="widget widget--notes">
+    return `<div class="widget widget--notes"${span}>
       ${widgetHeader('notes', t('nav.notes'), 0, '/notes')}
-      <div class="widget__empty">
-        <i data-lucide="sticky-note" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.noPinnedNotes')}</div>
-      </div>
+      ${widgetEmptyHtml(t('dashboard.noPinnedNotes'))}
     </div>`;
   }
 
@@ -2137,16 +2522,16 @@ function renderPinnedNotes(allNotes, size, total = null) {
   // damit das ganze color-mix ungueltig macht. Uebrig blieb der nackte
   // Traegergrund: drei graubeige Kaesten, die wie deaktiviert aussahen. Ohne die
   // Deklaration greift der Fallback im Stylesheet (der Notizen-Ton).
-  const items = notes.map((n) => `
+  const items = notes.map((n, index) => `
     <div class="note-item" data-route="${esc(`/notes?open=${encodeURIComponent(String(n.id))}`)}"
-         ${n.color ? `style="--note-color:${esc(n.color)};"` : ''}>
+         ${n.color ? `style="--note-color:${esc(n.color)};"` : ''}${fillRowAttr(index, cap)}>
       <div class="note-item__body" role="link" tabindex="0">
       ${n.title ? `<div class="note-item__title">${esc(n.title)}</div>` : ''}
       <div class="note-item__content">${renderMarkdownLight(excerpt(n.content))}</div>
       </div>
       ${(n.categories || []).length ? `<div class="note-item__categories" role="group" aria-label="${esc(t('noteCategories.categories'))}">
-        ${n.categories.map((category) => `<span class="note-item__category u-badge">${esc(noteCategoryName(category))}<span class="sr-only"> (${esc(noteCategoryScope(category))})</span></span>`).join('')}
-        <button type="button" class="note-item__categories-more u-badge" aria-label="${esc(t('noteCategories.categories'))}" hidden></button>
+        ${n.categories.map((category) => `<span class="tag note-item__category">${esc(noteCategoryName(category))}<span class="sr-only"> (${esc(noteCategoryScope(category))})</span></span>`).join('')}
+        <button type="button" class="tag note-item__categories-more" aria-label="${esc(t('noteCategories.categories'))}" hidden></button>
       </div>` : ''}
     </div>
   `).join('');
@@ -2159,10 +2544,10 @@ function renderPinnedNotes(allNotes, size, total = null) {
   // gezaehlt wird deshalb die Menge, aus der sie schoepft (`notesTotal`, mit
   // demselben Kategoriefilter), nicht nur die angehefteten (listTotal).
   const gesamt = listTotal(total, allNotes.length);
-  return `<div class="widget widget--notes">
+  return `<div class="widget widget--notes"${span}>
     ${widgetHeader('notes', t('nav.notes'), gesamt, '/notes')}
     <div class="notes-grid-widget">${items}</div>
-    ${listMoreLine('dashboard.notesMore', gesamt - notes.length)}
+    ${listMoreLine('dashboard.notesMore', gesamt - Math.min(notes.length, cap), fill)}
   </div>`;
 }
 
@@ -2236,29 +2621,29 @@ function renderQuickLinkTile(s) {
   </a>`;
 }
 
-function renderQuickLinks(items) {
+function renderQuickLinks(items, size = '2x1') {
   const list = Array.isArray(items) ? items : [];
   const header = widgetHeader('quicklinks', t('dashboard.quickLinksTitle'), list.length, null, null, 'dashboard');
+  // Feste Spalten je Breite ab 768px (dashboard.css): drei schmal, sechs breit;
+  // dazu die Kachel "Verwalten".
+  const span = tileSpanAttrs((s) => {
+    if (!list.length) return { items: 0 };
+    const rows = Math.ceil((list.length + 1) / (tileColumns(s) >= 2 ? 6 : 3));
+    return { body: TILE_PARTS.quickLinksPad + rows * TILE_PARTS.quickLinkTile + (rows - 1) * TILE_PARTS.quickLinkGap };
+  }, size);
 
   if (!list.length) {
     // Der Leerzustand ist hier der WICHTIGSTE Zustand: das Widget kommt
     // ausgeblendet ins Haus, wer es holt, hat noch nichts angelegt, und es gibt
     // keine zweite Seite, auf der er anfangen könnte. Deshalb nicht der stumme
     // Hinweis der anderen Kacheln, sondern der Weg selbst.
-    return `<div class="widget widget--quicklinks">
+    return `<div class="widget widget--quicklinks"${span}>
       ${header}
-      <div class="widget__empty">
-        <i data-lucide="compass" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('quickLinks.emptyTitle')}</div>
-        <button type="button" class="widget__empty-cta" data-quick-links-manage>
-          <i data-lucide="plus" aria-hidden="true"></i>
-          <span>${esc(t('quickLinks.addFirst'))}</span>
-        </button>
-      </div>
+      ${widgetEmptyHtml(t('quickLinks.emptyTitle'), { label: t('common.add'), attrs: { 'data-quick-links-manage': '' } }, 'quicklinks')}
     </div>`;
   }
 
-  return `<div class="widget widget--quicklinks">
+  return `<div class="widget widget--quicklinks"${span}>
     ${header}
     <div class="quick-link-row">
       ${list.map(renderQuickLinkTile).join('')}
@@ -2355,7 +2740,7 @@ function familyManageHref(user) {
   return findSettingsLeaf(FAMILY_SETTINGS_LEAF, user)?.path ?? null;
 }
 
-function renderFamilyWidget(users, data, { manageHref = null } = {}) {
+function renderFamilyWidget(users, data, { manageHref = null, size = '1x2' } = {}) {
   // IM SOLO-HAUSHALT GIBT ES DIESES WIDGET NICHT - entschieden in
   // `isWidgetModuleEnabled`, damit es auch aus der „Anpassen"-Ablage faellt.
   // Es war das prominenteste Widget rechts oben und zeigte einer Solo-Nutzerin
@@ -2404,13 +2789,13 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
       ? t('dashboard.familyEveryone')
       : familyNameList(who.map((u) => u.display_name));
     sharedRow = `
-      <div class="family-member family-member--shared">
-        <span class="family-widget-avatar family-widget-avatar--group" aria-hidden="true">
+      <div class="list-row family-member family-member--shared">
+        <span class="list-row__lead family-widget-avatar family-widget-avatar--group" aria-hidden="true">
           <i data-lucide="users"></i>
         </span>
-        <span class="family-member__body">
-          <span class="family-member__name">${esc(label)}</span>
-          <span class="family-member__status">${familyEventLabel(sharedNext, todayKey)}</span>
+        <span class="list-row__main family-member__body">
+          <span class="list-row__name family-member__name">${esc(label)}</span>
+          <span class="list-row__meta family-member__status">${familyEventLabel(sharedNext, todayKey)}</span>
         </span>
       </div>`;
   }
@@ -2458,8 +2843,8 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
     // sind Malerei (`aria-hidden`), der Satz sagt dasselbe.
     const firstName = String(u.display_name || '').trim().split(/\s+/)[0] || '';
     return `
-      <div class="family-member">
-        <span class="family-member__face">
+      <div class="list-row family-member">
+        <span class="list-row__lead family-member__face">
           <span class="family-widget-avatar" style="background:${esc(u.avatar_color || AVATAR_FALLBACK_COLOR)};color:${getReadableTextColor(u.avatar_color || AVATAR_FALLBACK_COLOR)}">
             ${u.avatar_data ? `<img src="${esc(u.avatar_data)}" alt="" loading="lazy">` : esc(initials(u.display_name))}
           </span>
@@ -2470,9 +2855,9 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
           ${open > 0 ? `<span class="family-member__count" aria-hidden="true"><i data-lucide="${MODULE_ICON.tasks}" class="family-member__count-icon"></i>${esc(getNumberFormat().format(open))}</span>` : ''}
         </span>
         <span class="family-member__short" aria-hidden="true">${esc(firstName)}</span>
-        <span class="family-member__body">
-          <span class="family-member__name">${esc(u.display_name)}</span>
-          <span class="family-member__status${free ? ' family-member__status--free' : ''}">${status}</span>
+        <span class="list-row__main family-member__body">
+          <span class="list-row__name family-member__name">${esc(u.display_name)}</span>
+          <span class="list-row__meta family-member__status${free ? ' family-member__status--free' : ''}">${status}</span>
         </span>
       </div>`;
   }).join('');
@@ -2499,13 +2884,19 @@ function renderFamilyWidget(users, data, { manageHref = null } = {}) {
     ? esc(t('dashboard.familyDayTally', { open: openToday, done: doneToday }))
     : esc(t('dashboard.familyDayCalm'));
 
-  return `<div class="widget widget--family">
+  // Breit stehen Zeilen (am Telefon die Gesichterreihe, R19): die gemeinsame
+  // Zeile, eine je Mitglied, der Rest als Fussnote, darunter die Tagesbilanz.
+  const familyRows = (sharedRow ? 1 : 0) + shown.length;
+  const span = tileSpanAttrs(() => ({
+    body: TILE_PARTS.familyPad + familyRows * TILE_GEOMETRY.row + (moreCount > 0 ? TILE_PARTS.familyMore : 0) + TILE_PARTS.familyFooter,
+  }), size);
+  return `<div class="widget widget--family"${span}>
     ${/* EIN WORT FUER DEN KOPF-LINK (Critique 2026-10-16): jede Kachel fuehrt
          mit „Alle" zu ihrer Seite, nur die Familie sagte „Verwalten" - fuer
          denselben Weg, die ganze Liste. */ ''}
     ${widgetHeader('family', t('dashboard.familyTitle'), null, manageHref, null, 'contacts')}
     <div class="family-widget">
-      <div class="family-widget__list">
+      <div class="widget__rows row-divided family-widget__list">
         ${sharedRow}
         ${rows}
         ${moreCount > 0 ? `<div class="family-member family-member--more">${esc(t('dashboard.shoppingMore', { count: moreCount }))}</div>` : ''}
@@ -2574,11 +2965,22 @@ function renderBudgetSavings(budget, balance, income, savingsRate) {
  * DREI groessten Ausgabenkategorien statt einer - dieselbe Frage („wohin ging
  * das Geld?"), vollstaendiger beantwortet, und genau die Hoehe, die fehlte.
  * Die flache Kachel behaelt ihre eine Zeile; mehr trueg sie nicht. */
-function renderBudgetTopExpenses(budget, currency, size) {
+const BUDGET_TOP_TALL = 3;
+
+/* Die Zusatzzeilen der hohen Budget-Kachel (U14): weitere Kategorien, soweit
+ * geladen (der Server liefert fuenf). Die flache Kachel nennt eine Kategorie in
+ * einer Satzzeile - eine Liste wuerde sie erst durch Streckung, das ist kein
+ * Mehr an Zeilen, sondern eine andere Form. */
+function budgetTopFill(topCount, size) {
+  return listRowCap(size) === LIST_ROWS_TALL ? fillRows(topCount, BUDGET_TOP_TALL) : 0;
+}
+
+function renderBudgetTopExpenses(budget, currency, size, fill = 0) {
+  const cap = listRowCap(size) === LIST_ROWS_TALL ? BUDGET_TOP_TALL : 1;
   const rows = (Array.isArray(budget?.topExpenses) && budget.topExpenses.length
     ? budget.topExpenses
     : budget?.topExpenseCategory ? [{ category: budget.topExpenseCategory, amount: budget.topExpenseAmount }] : [])
-    .slice(0, listRowCap(size) === LIST_ROWS_TALL ? 3 : 1);
+    .slice(0, cap + (cap > 1 ? fill : 0));
   if (!rows.length) return '';
   if (rows.length === 1) {
     return `<div class="budget-widget__footer">${t('dashboard.topExpense')}: <strong>${esc(budgetCategoryLabel(rows[0].category))}</strong> · ${formatCurrency(rows[0].amount, currency)}</div>`;
@@ -2587,8 +2989,8 @@ function renderBudgetTopExpenses(budget, currency, size) {
     <div class="budget-widget__footer budget-widget__top">
       <p class="budget-widget__top-title">${esc(t('dashboard.topExpenses'))}</p>
       <ul class="budget-widget__top-list">
-        ${rows.map((row) => `
-        <li class="budget-widget__top-row">
+        ${rows.map((row, index) => `
+        <li class="budget-widget__top-row"${fillRowAttr(index, cap)}>
           <span>${esc(budgetCategoryLabel(row.category))}</span>
           <strong>${formatCurrency(row.amount, currency)}</strong>
         </li>`).join('')}
@@ -2611,19 +3013,25 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
   const savingsRate = income > 0 ? Math.round((balance / income) * 100) : 0;
   const balanceTone = balance >= 0 ? 'positive' : 'negative';
   const hasData = (budget?.entryCount || 0) > 0;
+  const topCount = (Array.isArray(budget?.topExpenses) && budget.topExpenses.length
+    ? budget.topExpenses.length : budget?.topExpenseCategory ? 1 : 0);
+  const fill = hasData ? budgetTopFill(topCount, size) : 0;
+  const span = tileSpanAttrs((s, k = 0) => {
+    if (!hasData) return { items: 0 };
+    const n = Math.min(topCount, listRowCap(s) === LIST_ROWS_TALL ? BUDGET_TOP_TALL + k : 1);
+    const savings = budget?.savingsGoal > 0 ? TILE_PARTS.budgetGoal : income > 0 ? TILE_PARTS.budgetSavings : TILE_PARTS.budgetSavingsBare;
+    const top = n === 0 ? 0 : n === 1 ? TILE_PARTS.budgetTopOne : TILE_PARTS.budgetTopList + n * TILE_PARTS.budgetTopRow - 4;
+    return { body: TILE_PARTS.budgetPad + TILE_PARTS.budgetHeadline + savings + TILE_PARTS.budgetFlow + top };
+  }, size, fill);
 
   if (!hasData) {
-    return `<div class="widget widget--budget">
+    return `<div class="widget widget--budget"${span}>
       ${widgetHeader('budget', t('nav.budget'), null, BUDGET_MONTH_ROUTE)}
-      <div class="widget__empty">
-        <i data-lucide="wallet" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.noBudgetData')}</div>
-        ${emptyStateCta(BUDGET_MONTH_ROUTE, t('budget.addEntryLabel'))}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.noBudgetData'), emptyRouteAction(BUDGET_MONTH_ROUTE, t('common.add')), 'budget')}
     </div>`;
   }
 
-  return `<div class="widget widget--budget">
+  return `<div class="widget widget--budget"${span}>
     ${widgetHeader('budget', t('nav.budget'), null, BUDGET_MONTH_ROUTE)}
     <div class="budget-widget">
       <div class="budget-widget__headline">
@@ -2641,7 +3049,7 @@ function renderBudgetWidget(budget, currency, size = '1x1') {
           <strong>${formatCurrency(expenses, currency)}</strong>
         </span>
       </div>
-      ${renderBudgetTopExpenses(budget, currency, size)}
+      ${renderBudgetTopExpenses(budget, currency, size, fill)}
     </div>
   </div>`;
 }
@@ -3004,9 +3412,21 @@ function selectMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new 
 /* Die AUSWAHL steht getrennt von der DARSTELLUNG, damit die Zusage pruefbar ist,
  * ohne ein Dokument zu bauen: was die Reihe zeigt, ist die Aussage - dass sie es
  * in einem <a> zeigt, ist ihre Form. */
-function renderMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new Set()) {
+function renderMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new Set(), size = '2x1') {
   const tiles = selectMetricTiles(data, currency, shown, sheetSpeaks);
   if (!tiles.length) return '';
+  /* Keine Karte, kein Kopf: vier Kacheln je Reihe breit, zwei schmal (U1 b).
+   * SPALTEN UND HOEHE AUS EINER REGEL (U15, Review p11): das Stylesheet legte
+   * Spalten nach Breite an (auto-fit, 160px) - eine 684px breite Reihe stand
+   * in drei Spalten und zwei Kachelreihen, 308 statt 120px, im Anpassen-Modus
+   * abgeschnitten. Jetzt bekommt es die Spaltenzahl von hier (`--metric-cols`,
+   * dashboard.css ab 768px), und Name und Notiz stehen dort in einer Zeile:
+   * die Kachel ist 119px hoch, wie breit sie auch ist. */
+  const metricColumns = (s) => Math.min(tiles.length, tileColumns(s) >= 2 ? 4 : 2);
+  const span = tileSpanAttrs((s) => {
+    const rows = Math.ceil(tiles.length / metricColumns(s));
+    return { bare: true, body: rows * TILE_PARTS.metricCard + (rows - 1) * TILE_PARTS.metricGap };
+  }, size);
   // Die Reihe war das einzige Widget ohne Ueberschrift: per H-Taste sprang man
   // an ihr vorbei, und ihre vier Zahlen hingen unter der vorigen Kachel. Die
   // Ueberschrift ist sr-only, weil jede Kachel ihr Modul schon sichtbar nennt -
@@ -3014,7 +3434,7 @@ function renderMetricTiles(data, currency, shown = new Set(), sheetSpeaks = new 
   // nur Kopfhoehe. Sie steht VOR der Reihe, nicht in ihr: `.metric-tiles` ist
   // selbst das Raster der Kacheln.
   return `<h3 class="sr-only">${esc(t('dashboard.metrics'))}</h3>
-    <div class="metric-tiles">${tiles.map(renderMetricTile).join('')}</div>`;
+    <div class="metric-tiles"${span} style="--metric-cols: ${metricColumns(size)}">${tiles.map(renderMetricTile).join('')}</div>`;
 }
 
 // --------------------------------------------------------
@@ -3097,13 +3517,21 @@ function rewardAvatarHTML(m) {
   const inner = m.avatar_data
     ? `<img src="${esc(m.avatar_data)}" alt="" loading="lazy">`
     : esc(initials(m.display_name));
-  return `<span class="rewards-member__avatar" aria-hidden="true" style="background:${esc(color)};color:${getReadableTextColor(color)}">${inner}</span>`;
+  return `<span class="list-row__lead rewards-member__avatar" aria-hidden="true" style="background:${esc(color)};color:${getReadableTextColor(color)}">${inner}</span>`;
 }
 
+/* DIE FREIGABE IST EINE ZEILE, KEINE KAPSEL (DW-P3-6). "2 zu bestaetigen"
+ * stand als 44px-Mulde ueber die volle Breite und las sich wie ein
+ * abgeschalteter Knopf; DESIGN.md sagt seit R10: ein getoentes Well ist die
+ * Form der Handlungsaufforderung, nicht der Auskunft - und ein Knopf, der wie
+ * ausgegraut aussieht, ist keins von beidem. Jetzt steht sie im Zeilengeruest
+ * der Kachel: Zeichen vorn, der Satz als Titel, der Druck auf der ganzen
+ * Zeile, der Pfeil sagt "fuehrt weiter". */
 function rewardsFooterHTML(text) {
-  return `<a class="rewards-widget__footer" href="/rewards" data-route="/rewards">
-      <i data-lucide="clock" aria-hidden="true"></i>
-      <span>${esc(text)}</span>
+  return `<a class="list-row rewards-widget__footer" href="/rewards" data-route="/rewards">
+      <span class="list-row__lead rewards-widget__footer-icon" aria-hidden="true"><i data-lucide="clock"></i></span>
+      <span class="list-row__main"><span class="list-row__name">${esc(text)}</span></span>
+      <i data-lucide="chevron-right" class="rewards-widget__footer-chevron" aria-hidden="true"></i>
     </a>`;
 }
 
@@ -3122,18 +3550,35 @@ function earnedWhenLabel(value) {
   return dateText(value);
 }
 
-function renderRewardsSelf(me, rewards, spans) {
-  // Die kleine Kachel traegt nur den Weg zum Ziel: mit einer Verlaufszeile
-  // und dem Anfrage-Chip stand sie bei 275px gegen 183px der Nachbarn
-  // (gemessen 1440px). Breit steht der Verlauf daneben, hoch darunter.
-  const recentCap = spans.rows >= 2 ? 3 : spans.cols >= 2 ? 2 : 0;
-  const recent = (Array.isArray(rewards.recent) ? rewards.recent : []).slice(0, recentCap);
+/* Wie viele juengste Punkte die eigene Sicht in ihrer Groesse zeigt: die kleine
+ * Kachel traegt nur den Weg zum Ziel - mit einer Verlaufszeile und dem
+ * Anfrage-Chip stand sie bei 275px gegen 183px der Nachbarn (gemessen 1440px).
+ * Breit steht der Verlauf daneben, hoch darunter. */
+function rewardsRecentCap(spans) {
+  return spans.rows >= 2 ? 3 : spans.cols >= 2 ? 2 : 0;
+}
+
+/* Die Zusatzzeilen der Belohnungskachel (U14): die juengsten Punkte, die die
+ * eigene Sicht geladen, aber in ihrer Groesse nicht zeigt, bzw. die Mitglieder
+ * hinter dem Deckel der Familiensicht. */
+function rewardsFillRows(r, own, members, spans) {
+  if (!members.length) return 0;
+  if (own && members.length === 1) return fillRows((Array.isArray(r.recent) ? r.recent : []).length, rewardsRecentCap(spans));
+  return fillRows(members.length, spans.rows >= 2 ? REWARD_MEMBERS_TALL : REWARD_MEMBERS_SHORT);
+}
+
+function renderRewardsSelf(me, rewards, spans, fill = 0) {
+  // HOEHE WIRD INHALT (U14, vorher R22 S10 als eigene CSS-Fuell-Liste): was
+  // die Packung der Kachel an Hoehe zuteilt, fuellen weitere juengste Punkte -
+  // in der kleinen Kachel samt Ueberschrift, die dann mit der ersten Zeile kommt.
+  const recentCap = rewardsRecentCap(spans);
+  const recent = (Array.isArray(rewards.recent) ? rewards.recent : []).slice(0, recentCap + fill);
   const recentHTML = recent.length ? `
-      <div class="rewards-self__recent">
+      <div class="rewards-self__recent"${recentCap === 0 ? ' data-fill-group' : ''}>
         <p class="rewards-self__recent-title" aria-hidden="true">${esc(t('dashboard.rewardsRecent'))}</p>
         <ul class="rewards-recent" aria-label="${esc(t('dashboard.rewardsRecent'))}">
-          ${recent.map((row) => `
-            <li class="rewards-recent__row">
+          ${recent.map((row, index) => `
+            <li class="rewards-recent__row"${fillRowAttr(index, recentCap)}>
               <span class="rewards-recent__delta">+${esc(formatPoints(row.delta))}</span>
               <span class="rewards-recent__reason">${esc(row.reason || t(`rewards.ledgerType.${row.type}`))}</span>
               <span class="rewards-recent__when">${esc(earnedWhenLabel(row.created_at))}</span>
@@ -3143,24 +3588,6 @@ function renderRewardsSelf(me, rewards, spans) {
   // Praemien- und Geld-Anfragen (#1734) zusammen: der Server fuehrt sie
   // getrennt, die Kachel sagt, wie viele warten.
   const pending = (Number(rewards.pending) || 0) + (Number(rewards.moneyPending) || 0);
-  // DIE KLEINE KACHEL FUELLT NUR, WAS IHR DIE REIHE SCHENKT (R22 S10, aus S9).
-  // 1x1 neben Familie und Geburtstagen streckt die Reihe sie auf deren Hoehe,
-  // und unter Ziel und Anfrage stand leere Flaeche. Der Verlauf steht deshalb
-  // auch hier - aber in einer Flaeche ohne eigene Hoehe (dashboard.css,
-  // `.rewards-recent--fill`): er nimmt nur den Ueberschuss, ganze Zeilen oder
-  // keine. In einer Reihe kurzer Kacheln bleibt die Kachel so kurz wie bisher.
-  const fill = recentCap === 0
-    ? (Array.isArray(rewards.recent) ? rewards.recent : []).slice(0, 3)
-    : [];
-  const fillHTML = fill.length ? `
-      <ul class="rewards-recent rewards-recent--fill" aria-label="${esc(t('dashboard.rewardsRecent'))}">
-        ${fill.map((row, i) => `
-          <li class="rewards-recent__row"${i === 0 ? ` data-recent-title="${esc(t('dashboard.rewardsRecent'))}"` : ''}>
-            <span class="rewards-recent__delta">+${esc(formatPoints(row.delta))}</span>
-            <span class="rewards-recent__reason">${esc(row.reason || t(`rewards.ledgerType.${row.type}`))}</span>
-            <span class="rewards-recent__when">${esc(earnedWhenLabel(row.created_at))}</span>
-          </li>`).join('')}
-      </ul>` : '';
   return `
     <div class="widget__body rewards-widget rewards-widget--self">
       <div class="rewards-self">
@@ -3171,35 +3598,32 @@ function renderRewardsSelf(me, rewards, spans) {
         ${recentHTML}
       </div>
       ${pending > 0 ? rewardsFooterHTML(t('dashboard.rewardsOwnPending', { count: pending })) : ''}
-      ${fillHTML}
     </div>`;
 }
 
-function renderRewardsFamily(members, rewards, spans) {
+function renderRewardsFamily(members, rewards, spans, fill = 0) {
   // In der Haushaltsreihenfolge (#1644), nicht nach Punkten: eine Reihenfolge
   // nach Stand WAERE die Rangliste, nur ohne Ziffern. Der Server liefert die
   // Liste schon so; sortiert wird hier trotzdem, weil die Zusage dieser Kachel
   // ("nie nach Stand") nicht an der Abfrage einer anderen Datei haengen soll.
   const sorted = sortMembers(members);
   const cap = spans.rows >= 2 ? REWARD_MEMBERS_TALL : REWARD_MEMBERS_SHORT;
-  const shown = sorted.slice(0, cap);
-  const rows = shown.map((m) => `
-      <li class="rewards-member">
+  const shown = sorted.slice(0, cap + fill);
+  const rows = shown.map((m, index) => `
+      <li class="list-row rewards-member"${fillRowAttr(index, cap)}>
         ${rewardAvatarHTML(m)}
-        <span class="rewards-member__body">
-          <span class="rewards-member__head">
-            <span class="rewards-member__name">${esc(m.display_name)}</span>
-            <span class="rewards-member__points">${esc(t('dashboard.metricPoints', { count: Number(m.balance) || 0 }))}</span>
-          </span>
+        <span class="list-row__main rewards-member__body">
+          <span class="list-row__name rewards-member__name">${esc(m.display_name)}</span>
           ${rewardGoalHTML(m.balance, rewards.catalog, m.display_name, { compact: spans.rows < 2 })}
         </span>
+        <span class="list-row__end rewards-member__points">${esc(t('dashboard.metricPoints', { count: Number(m.balance) || 0 }))}</span>
       </li>`).join('');
-  const more = sorted.length - shown.length;
+  const more = sorted.length - Math.min(shown.length, cap);
   const pending = rewards.view === 'approver' ? (Number(rewards.pending) || 0) + (Number(rewards.moneyPending) || 0) : 0;
   return `
-    <div class="widget__body rewards-widget">
-      <ul class="rewards-widget__members">${rows}</ul>
-      ${more > 0 ? `<p class="rewards-widget__more">${esc(t('dashboard.shoppingMore', { count: more }))}</p>` : ''}
+    <div class="widget__body widget__body--rows rewards-widget">
+      ${widgetRows(rows, { tag: 'ul', className: 'rewards-widget__members' })}
+      ${more > 0 ? `<p class="rewards-widget__more"${fillMoreAttrs(fill, more, 'dashboard.shoppingMore')}>${esc(t('dashboard.shoppingMore', { count: more }))}</p>` : ''}
       ${pending > 0 ? rewardsFooterHTML(t('dashboard.rewardsPending', { count: pending })) : ''}
     </div>`;
 }
@@ -3211,20 +3635,18 @@ function renderRewardsWidget(rewards, size) {
   // Das Kind sieht NUR sich, auch wenn eine Antwort mehr mitbraechte.
   const members = r.view === 'self' ? (own ? [own] : []) : standings;
   const header = widgetHeader('rewards', t('nav.rewards'), null, '/rewards');
+  const fill = rewardsFillRows(r, own, members, sizeSpans(size));
+  const span = tileSpanAttrs((sz, k = 0) => rewardsTileModel(r, own, members, sizeSpans(sz), k), size, fill);
 
   if (!members.length) {
     // Praemien anlegen ist Elternsache: einem Kind einen Knopf zu zeigen, der
     // in eine Seite fuehrt, auf der es nichts anlegen darf, waere die leere
     // Zusage aus #700.
     const cta = r.view === 'approver' && navModuleAccess('rewards') === 'write'
-      ? emptyStateCta('/rewards', t('rewards.addReward')) : '';
-    return `<div class="widget widget--rewards">
+      ? emptyRouteAction('/rewards', t('common.add')) : null;
+    return `<div class="widget widget--rewards"${span}>
       ${header}
-      <div class="widget__empty">
-        <i data-lucide="award" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.noRewards')}</div>
-        ${cta}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.noRewards'), cta, 'rewards')}
     </div>`;
   }
 
@@ -3233,27 +3655,52 @@ function renderRewardsWidget(rewards, size) {
   // Ein-Personen-Haushalt. Eine Uebersicht "je Kind" mit genau einer Zeile,
   // die man selbst ist, waere die Eltern-Sicht ohne Kinder.
   const body = own && members.length === 1
-    ? renderRewardsSelf(own, r, spans)
-    : renderRewardsFamily(members, r, spans);
-  return `<div class="widget widget--rewards">
+    ? renderRewardsSelf(own, r, spans, fill)
+    : renderRewardsFamily(members, r, spans, fill);
+  return `<div class="widget widget--rewards"${span}>
     ${header}
     ${body}
   </div>`;
+}
+
+/* Die Hoehe der Belohnungskachel aus denselben Zahlen wie ihre zwei Fassungen
+ * (U1 b): die eigene (Stand, Ziel, juengste Punkte, offene Freigaben) oder die
+ * der Familie (eine Zeile mit Balken je Mitglied, flach in 1x1). */
+function rewardsTileModel(r, own, members, spans, k = 0) {
+  if (!members.length) return { items: 0 };
+  const pendingAll = (Number(r.pending) || 0) + (Number(r.moneyPending) || 0);
+  const recentAll = Array.isArray(r.recent) ? r.recent : [];
+  if (own && members.length === 1) {
+    // Mit k Zusatzzeilen (U14) k juengste Punkte mehr - in der kleinen
+    // Kachel kommt mit der ersten auch die Ueberschrift.
+    const recent = recentAll.slice(0, rewardsRecentCap(spans) + Math.max(0, k)).length;
+    return {
+      body: TILE_PARTS.rewardsSelfPad + TILE_PARTS.rewardsSelfGoal
+        + (recent ? TILE_PARTS.rewardsGap + TILE_PARTS.rewardsRecentTitle + recent * TILE_PARTS.rewardsRecentRow : 0)
+        + (pendingAll > 0 ? TILE_PARTS.rewardsGap + TILE_PARTS.rewardsFooter : 0),
+    };
+  }
+  const cap = (spans.rows >= 2 ? REWARD_MEMBERS_TALL : REWARD_MEMBERS_SHORT) + Math.max(0, k);
+  const shown = Math.min(members.length, cap);
+  const pending = r.view === 'approver' ? pendingAll : 0;
+  const more = members.length > shown;
+  return {
+    items: shown,
+    row: spans.rows < 2 ? TILE_PARTS.rewardsMemberCompact : TILE_PARTS.rewardsMember,
+    more: false,
+    extra: (more ? TILE_PARTS.rewardsGap + TILE_PARTS.rewardsMore : 0) + (pending > 0 ? TILE_PARTS.rewardsGap + TILE_PARTS.rewardsFooter : 0),
+  };
 }
 
 // --------------------------------------------------------
 // Gesundheit-Widget (heutige Medikamenten-Dosen)
 // --------------------------------------------------------
 
-function renderHealthWidget(health) {
+function renderHealthWidget(health, size = '2x1') {
   if (!health?.hasMeds) {
-    return `<div class="widget widget--health">
+    return `<div class="widget widget--health"${emptySpanAttrs(size)}>
       ${widgetHeader('health', t('nav.health'), null, '/health')}
-      <div class="widget__empty">
-        <i data-lucide="heart-pulse" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.healthNoMeds')}</div>
-        ${emptyStateCta('/health', t('health.meds.add'))}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.healthNoMeds'), emptyRouteAction('/health', t('common.add')), 'health')}
     </div>`;
   }
 
@@ -3293,7 +3740,13 @@ function renderHealthWidget(health) {
     `;
   }
 
-  return `<div class="widget widget--health">
+  // Fortschritt und Satz darunter, oder "heute nichts"; dazu ggf. der Chip.
+  const span = tileSpanAttrs(() => ({
+    body: TILE_PARTS.statusPad
+      + (total === 0 ? TILE_PARTS.healthNone : TILE_PARTS.healthProgress + (allTaken || health?.nextDose ? TILE_PARTS.statusLine : 0))
+      + (lowStock > 0 ? TILE_PARTS.statusChip : 0),
+  }), size);
+  return `<div class="widget widget--health"${span}>
     ${widgetHeader('health', t('nav.health'), null, '/health')}
     <div class="widget__body">
       <div class="health-widget">${main}${lowChip}</div>
@@ -3331,7 +3784,7 @@ function cycleWidgetCountdown(prediction) {
   return t('health.cycle.status.inDays', { count: d });
 }
 
-function renderCycleWidget(cycle) {
+function renderCycleWidget(cycle, size = '2x1') {
   // cycle: { periods, settings } (owner-only) | null (Ladefehler) | undefined (Kachel versteckt)
   const prediction = cycle
     ? predictCycle(cycle.periods || [], cycle.settings || {})
@@ -3339,13 +3792,9 @@ function renderCycleWidget(cycle) {
 
   // Ohne Historie: Onboarding-Empty statt Fehlerkachel — führt in den Zyklus-Flow.
   if (!prediction.hasData) {
-    return `<div class="widget widget--cycle">
+    return `<div class="widget widget--cycle"${emptySpanAttrs(size)}>
       ${widgetHeader('cycle', t('health.cycle.title'), null, '/health/cycle')}
-      <div class="widget__empty">
-        <i data-lucide="calendar-heart" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('health.cycle.emptyTitle')}</div>
-        ${emptyStateCta('/health/cycle', t('health.cycle.add'))}
-      </div>
+      ${widgetEmptyHtml(t('health.cycle.emptyTitle'), emptyRouteAction('/health/cycle', t('health.cycle.add')), 'cycle')}
     </div>`;
   }
 
@@ -3375,7 +3824,11 @@ function renderCycleWidget(cycle) {
       <text class="cycle-widget__ring-num" x="32" y="32" text-anchor="middle" dominant-baseline="central">${esc(prediction.cycleDay)}</text>
     </svg>`;
 
-  return `<div class="widget widget--cycle">
+  // Ring neben Phase, Countdown und ggf. Datum - die hoehere der beiden Spalten.
+  const span = tileSpanAttrs(() => ({
+    body: TILE_PARTS.statusPad + Math.max(TILE_PARTS.cycleRing, TILE_PARTS.cycleInfo + (cycleDate ? TILE_PARTS.cycleDate : 0)),
+  }), size);
+  return `<div class="widget widget--cycle"${span}>
     ${widgetHeader('cycle', t('health.cycle.title'), null, '/health/cycle')}
     <div class="widget__body">
       <div class="cycle-widget" data-phase="${esc(prediction.phase)}">
@@ -3393,35 +3846,61 @@ function renderCycleWidget(cycle) {
   </div>`;
 }
 
-function renderFastingWidget(fasting) {
+/* DAS ZIFFERBLATT BEGLEITET DEN SATZ, ES TRAEGT IHN NICHT (DW-P3-5). Der Ring
+ * der Gesundheitsseite stand hier in ganzer Groesse (224px) und trug Satz und
+ * Uhr in seiner Mitte - am Telefon 374px Kachel fuer "Bereit fuer deinen
+ * naechsten Fastenstart", und daneben ein zweiter GEFUELLTER Primaerknopf
+ * neben "+ Neu". Jetzt ein kleiner Ring (hoechstens 120px, ohne Stundenmarken)
+ * NEBEN dem Satz, wie ein Ring in den Health-Widgets; Uhr und Tag stehen als
+ * Text daneben, und "Fasten starten/beenden" ist sekundaer: der eine gefuellte
+ * Knopf des Schirms ist das Anlegen. Die Selektoren der Uhr (`data-fasting-*`)
+ * gelten fuer die ganze Kachel, nicht nur fuer den Ring. */
+function renderFastingWidget(fasting, size = '2x1') {
   if (!fasting) throw new Error('fasting widget slice failed to load');
   const active = fasting.active;
   const writable = moduleAccess('health') === 'write';
-  return `<div class="widget widget--fasting">${widgetHeader('fasting', t('health.fasting.title'), null, null, null, 'health')}
+  const span = tileSpanAttrs((s) => ({
+    body: (active ? TILE_PARTS.fastingActive : TILE_PARTS.fasting)[tileColumns(s) >= 2 ? 'wide' : 'narrow'],
+  }), size);
+  return `<div class="widget widget--fasting"${span}>${widgetHeader('fasting', t('health.fasting.title'), null, null, null, 'health')}
     <div class="fasting-widget">
-      <div class="fasting-dial fasting-dial--segmented" data-fasting-progress><div data-fasting-segments></div><div class="fasting-dial__content">
-        <span class="fasting-widget__meta" data-fasting-clock-label></span>
-        <strong class="fasting-widget__timer" data-fasting-timer>00:00:00</strong>
-        <span class="fasting-widget__meta" data-fasting-days></span>
-      </div></div>
-      <div class="fasting-widget__controls">${fastingClockSwitchHtml()}
+      <div class="fasting-dial fasting-dial--segmented" data-fasting-progress><div data-fasting-segments></div></div>
+      <div class="fasting-widget__controls">
+        <div class="fasting-widget__status">
+          <span class="fasting-widget__meta" data-fasting-clock-label></span>
+          <strong class="fasting-widget__timer" data-fasting-timer>00:00:00</strong>
+          <span class="fasting-widget__meta" data-fasting-days></span>
+        </div>
+        ${fastingClockSwitchHtml()}
         ${active ? '<span class="fasting-widget__remaining" data-fasting-remaining></span>' : ''}
         <p class="sr-only" role="status" aria-live="polite" data-fasting-announcement></p>
-        <div class="fasting-widget__actions">${writable ? `<button type="button" class="btn btn--primary btn--sm" data-fasting-widget-action>${esc(t(active ? 'health.fasting.finish' : 'health.fasting.start'))}</button>` : `<p class="form-hint">${esc(t('health.fasting.readOnly'))}</p>`}<a href="/health/fasting#history" class="btn btn--secondary btn--sm">${esc(t('health.fasting.history'))}</a></div>
+        <div class="fasting-widget__actions">${writable ? `<button type="button" class="btn btn--secondary btn--sm" data-fasting-widget-action>${esc(t(active ? 'health.fasting.finish' : 'health.fasting.start'))}</button>` : `<p class="form-hint">${esc(t('health.fasting.readOnly'))}</p>`}<a href="/health/fasting#history" class="btn btn--ghost btn--sm">${esc(t('health.fasting.history'))}</a></div>
       </div>
-      <p class="form-hint" role="alert" data-fasting-widget-error></p>
+      <p class="form-hint fasting-widget__error" role="alert" data-fasting-widget-error></p>
     </div></div>`;
 }
 
-function wireFastingWidget(container, rerender, refresh, fasting, signal) {
+// `refresh` ist der stille Abgleich der Seite: Starten und Beenden lassen die
+// Uebersicht stehen (DW-P1-2), statt sie ueber das Skelett neu aufzubauen.
+//
+// IM ANPASSEN-MODUS STARTET UND BEENDET DIE KACHEL NICHTS (Review p11, B5) -
+// wie jeder andere Kachelinhalt dort (wireLinks: "dort zieht man Kacheln, man
+// bearbeitet ihren Inhalt nicht"). Der Knopf war der eine, der weiter schrieb:
+// der Server fastete, aber der stille Abgleich schweigt waehrend des
+// Anpassens, und die Kachel bot nach "Starten" weiter "Fasten starten" an -
+// auch nach "Abbrechen", das aus den alten Daten neu baut. Er steht dort
+// gesperrt; die Uhr laeuft weiter.
+function wireFastingWidget(container, refresh, fasting, signal, { editing = false } = {}) {
   const root = container.querySelector('.fasting-widget');
   if (!root || !fasting) return () => {};
-  root.querySelector('[data-fasting-widget-action]')?.addEventListener('click', async (event) => {
+  const action = root.querySelector('[data-fasting-widget-action]');
+  if (editing && action) action.disabled = true;
+  if (!editing) action?.addEventListener('click', async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
     try {
-      if (fasting.active) await finishFasting(fasting.active, rerender, () => !signal.aborted);
-      else if (await startFasting()) { await rerender(); refocusAfterRender(); }
+      if (fasting.active) await finishFasting(fasting.active, refresh, () => !signal.aborted);
+      else if (await startFasting()) { await refresh(); refocusAfterRender(); }
     } catch (error) {
       if (root.isConnected) root.querySelector('[data-fasting-widget-error]').textContent = fastingError(error);
     } finally { button.disabled = false; }
@@ -3448,19 +3927,15 @@ function wireFastingWidget(container, rerender, refresh, fasting, signal) {
  *   - ein Ziel von 0 (etwa Zucker) -> ein echtes Ziel, gegen das gemessen wird.
  *     `nutrientProgress()` haelt diesen Fall von "kein Ziel" getrennt.
  */
-function renderNutritionWidget(nutrition) {
+function renderNutritionWidget(nutrition, size = '2x1') {
   if (nutrition === null || nutrition === undefined) throw new Error('nutrition widget slice failed to load');
   const target = nutrition.target;
   const writable = moduleAccess('health') === 'write';
 
   if (!target) {
-    return `<div class="widget widget--nutrition">
+    return `<div class="widget widget--nutrition"${emptySpanAttrs(size)}>
       ${widgetHeader('nutrition', t('health.nutrition.title'), null, '/health/nutrition')}
-      <div class="widget__empty">
-        <i data-lucide="salad" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.nutritionNoTarget')}</div>
-        ${writable ? emptyStateCta('/health/nutrition', t('health.nutrition.targetSet')) : ''}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.nutritionNoTarget'), writable ? emptyRouteAction('/health/nutrition', t('health.nutrition.targetSet')) : null, 'nutrition')}
     </div>`;
   }
 
@@ -3487,9 +3962,15 @@ function renderNutritionWidget(nutrition) {
 
   const body = rows.length
     ? `<ul class="nutrition-widget__rows">${rows.join('')}</ul>`
-    : `<div class="widget__empty"><div>${t('dashboard.nutritionNoTarget')}</div></div>`;
+    : cardEmptyRowHtml(t('dashboard.nutritionNoTarget'));
 
-  return `<div class="widget widget--nutrition">
+  // Eine Zeile je Naehrwert mit Ziel (Wort, Zahl, Balken darunter), dann die Zaehlzeile.
+  const span = tileSpanAttrs(() => ({
+    body: TILE_PARTS.nutritionPad + (rows.length
+      ? rows.length * TILE_PARTS.nutritionRow + (rows.length - 1) * TILE_PARTS.nutritionGap
+      : TILE_GEOMETRY.empty) + TILE_PARTS.nutritionCount,
+  }), size);
+  return `<div class="widget widget--nutrition"${span}>
     ${widgetHeader('nutrition', t('health.nutrition.title'), null, '/health/nutrition')}
     <div class="widget__body">
       <div class="nutrition-widget">
@@ -3533,22 +4014,22 @@ function renderScheduleWidget(schedule, users, size) {
   if (schedule === null) throw new Error('schedule widget slice failed to load');
   const entries = schedule?.entries ?? [];
   const hasTypes = Boolean(schedule?.hasTypes);
+  // Kein "+N weitere": die Kachel nennt die Zahl der Schichten im Kopf.
+  const cap = listRowCap(size);
+  const fill = hasTypes ? fillRows(entries.length, cap) : 0;
+  const span = tileSpanAttrs((s, k = 0) => ({ items: hasTypes ? entries.length : 0, cap: listRowCap(s) + k, more: false }), size, fill);
 
   if (!hasTypes) {
-    return `<div class="widget widget--schedule">
+    return `<div class="widget widget--schedule"${span}>
       ${widgetHeader('schedule', t('nav.schedule'), null, '/schedule')}
-      <div class="widget__empty">
-        <i data-lucide="calendar-clock" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.scheduleEmpty')}</div>
-        ${emptyStateCta('/schedule', t('schedule.createShiftType'))}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.scheduleEmpty'), emptyRouteAction('/schedule', t('common.add')), 'schedule')}
     </div>`;
   }
 
   if (!entries.length) {
-    return `<div class="widget widget--schedule">
+    return `<div class="widget widget--schedule"${span}>
       ${widgetHeader('schedule', t('nav.schedule'), null, '/schedule/patterns')}
-      <div class="widget__body"><p class="u-meta schedule-widget-empty">${esc(t('schedule.empty'))}</p></div>
+      ${widgetEmptyHtml(t('schedule.empty'))}
     </div>`;
   }
 
@@ -3574,7 +4055,7 @@ function renderScheduleWidget(schedule, users, size) {
   // bestehender Plan von Hauspersonal traegt so einen Namen. Ohne Verzeichnis
   // bleibt es bei data.users.
   const directory = schedule?.people?.length ? schedule.people : users;
-  const rows = sorted.slice(0, listRowCap(size)).map((entry) => {
+  const rows = sorted.slice(0, cap + fill).map((entry, index) => {
     const user = directory.find((item) => Number(item.id) === Number(entry.user_id));
     const type = entry.shift_type;
     const accent = user?.avatar_color || AVATAR_FALLBACK_COLOR;
@@ -3593,18 +4074,18 @@ function renderScheduleWidget(schedule, users, size) {
     const icon = type?.icon ? `<i data-lucide="${esc(type.icon)}" class="schedule-widget-row__icon" aria-hidden="true"></i>` : '';
     const badge = entry.source === 'extra' ? `<i data-lucide="layers" class="schedule-widget-row__extra-badge" aria-label="${esc(t('schedule.extraBadgeLabel'))}"></i>` : '';
     return `
-      <div class="schedule-widget-row" data-route="/schedule/patterns" role="button" tabindex="0">
-        <span class="schedule-widget-row__avatar" style="background:${esc(accent)};color:${getReadableTextColor(accent)}">${avatarInner}</span>
-        <span class="schedule-widget-row__name">${esc(user?.display_name ?? '')}</span>
-        <span class="schedule-widget-row__shift">${icon}<span class="schedule-widget-row__dot" style="--schedule-color:${esc(swatchColor)}"></span>${shiftLabel}${badge}</span>
+      <div class="list-row schedule-widget-row" data-route="/schedule/patterns" role="button" tabindex="0"${fillRowAttr(index, cap)}>
+        <span class="list-row__lead schedule-widget-row__avatar" style="background:${esc(accent)};color:${getReadableTextColor(accent)}">${avatarInner}</span>
+        <span class="list-row__main">
+          <span class="list-row__name schedule-widget-row__name">${esc(user?.display_name ?? '')}</span>
+          <span class="list-row__meta schedule-widget-row__shift"><span class="schedule-widget-row__dot" style="--schedule-color:${esc(swatchColor)}"></span>${icon}${shiftLabel}${badge}</span>
+        </span>
       </div>`;
   }).join('');
 
-  return `<div class="widget widget--schedule">
+  return `<div class="widget widget--schedule"${span}>
     ${widgetHeader('schedule', t('nav.schedule'), onShift, '/schedule/patterns')}
-    <div class="widget__body">
-      <div class="schedule-widget">${rows}</div>
-    </div>
+    <div class="widget__body widget__body--rows">${widgetRows(rows, { className: 'schedule-widget' })}</div>
   </div>`;
 }
 
@@ -3644,19 +4125,20 @@ function renderPantryWidget(pantry, size) {
   if (pantry === null || pantry === undefined) throw new Error('pantry widget slice failed to load');
   const title = t('dashboard.pantryExpiringTitle');
   const items = Array.isArray(pantry.items) ? pantry.items : [];
+  const pantryTotal = Number.isFinite(Number(pantry.total)) ? Number(pantry.total) : items.length;
+  const cap = listRowCap(size);
+  const fill = fillRows(items.length, cap);
+  const span = tileSpanAttrs((s, k = 0) => ({ items: items.length, total: pantryTotal, cap: listRowCap(s) + k }), size, fill);
 
   if (!items.length) {
-    return `<div class="widget widget--pantry">
+    return `<div class="widget widget--pantry"${span}>
       ${widgetHeader('pantry', title, null, '/pantry')}
-      <div class="widget__empty">
-        <i data-lucide="archive" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${esc(t('dashboard.pantryExpiringEmpty', { count: EXPIRY_SOON_DAYS }))}</div>
-      </div>
+      ${widgetEmptyHtml(t('dashboard.pantryExpiringEmpty', { count: EXPIRY_SOON_DAYS }))}
     </div>`;
   }
 
-  const shown = items.slice(0, listRowCap(size));
-  const rows = shown.map((item) => {
+  const shown = items.slice(0, cap + fill);
+  const rows = shown.map((item, index) => {
     const days = Number(item.days_left);
     const tone = pantryExpiryTone(days);
     const phrase = pantryExpiryPhrase(days);
@@ -3666,13 +4148,13 @@ function renderPantryWidget(pantry, size) {
       .filter(Boolean).join(' · ');
     const filter = tone === 'expired' ? 'expired' : 'soon';
     return `
-      <div class="pantry-widget-row" data-route="/pantry?filter=${filter}" role="button" tabindex="0">
-        <span class="pantry-widget-row__icon" aria-hidden="true"><i data-lucide="${esc(icon)}"></i></span>
-        <div class="pantry-widget-row__body">
-          <div class="pantry-widget-row__name">${esc(item.name)}</div>
-          <div class="pantry-widget-row__meta">${esc(meta)}</div>
+      <div class="list-row pantry-widget-row" data-route="/pantry?filter=${filter}" role="button" tabindex="0"${fillRowAttr(index, cap)}>
+        <span class="list-row__lead pantry-widget-row__icon" aria-hidden="true"><i data-lucide="${esc(icon)}"></i></span>
+        <div class="list-row__main pantry-widget-row__body">
+          <div class="list-row__name pantry-widget-row__name">${esc(item.name)}</div>
+          <div class="list-row__meta pantry-widget-row__meta">${esc(meta)}</div>
         </div>
-        <div class="pantry-widget-row__days pantry-widget-row__days--${tone}">${esc(label)}</div>
+        <div class="list-row__end pantry-widget-row__days pantry-widget-row__days--${tone}">${esc(label)}</div>
       </div>`;
   }).join('');
 
@@ -3680,14 +4162,14 @@ function renderPantryWidget(pantry, size) {
   // und eine Fussnote aus der geladenen Laenge verschwiege genau diesen Schnitt
   // (dieselbe Lehre wie beim Countdown, #647).
   const total = Number.isFinite(Number(pantry.total)) ? Number(pantry.total) : items.length;
-  const rest = Math.max(0, total - shown.length);
+  const rest = Math.max(0, total - Math.min(shown.length, cap));
   const more = rest > 0
-    ? `<p class="pantry-widget-more">${esc(t('dashboard.pantryExpiringMore', { count: rest }))}</p>`
+    ? `<p class="pantry-widget-more"${fillMoreAttrs(fill, rest, 'dashboard.pantryExpiringMore')}>${esc(t('dashboard.pantryExpiringMore', { count: rest }))}</p>`
     : '';
 
-  return `<div class="widget widget--pantry">
+  return `<div class="widget widget--pantry"${span}>
     ${widgetHeader('pantry', title, total, '/pantry')}
-    <div class="widget__body">${rows}${more}</div>
+    <div class="widget__body widget__body--rows">${widgetRows(rows)}${more}</div>
   </div>`;
 }
 
@@ -3706,15 +4188,14 @@ function renderPantryWidget(pantry, size) {
 function renderWasteWidget(waste, size) {
   if (waste === null) throw new Error('waste widget slice failed to load');
   const items = waste?.items ?? [];
+  const cap = listRowCap(size);
+  const fill = fillRows(items.length, cap);
+  const span = tileSpanAttrs((s, k = 0) => ({ items: items.length, cap: listRowCap(s) + k, extra: waste?.needsRefresh ? TILE_PARTS.wasteWarning : 0 }), size, fill);
 
   if (!items.length) {
-    return `<div class="widget widget--waste">
+    return `<div class="widget widget--waste"${span}>
       ${widgetHeader('waste', t('nav.waste'), null, '/waste')}
-      <div class="widget__empty">
-        <i data-lucide="trash-2" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('waste.emptyTypesTitle')}</div>
-        ${emptyStateCta('/waste', t('waste.addType'))}
-      </div>
+      ${widgetEmptyHtml(t('waste.emptyTypesTitle'), emptyRouteAction('/waste', t('common.add')), 'waste')}
     </div>`;
   }
 
@@ -3732,8 +4213,8 @@ function renderWasteWidget(waste, size) {
   const earliestDate = sorted.find((e) => e.next)?.next.date_key ?? null;
   const upcomingCount = items.filter((e) => e.next).length;
 
-  const capped = sorted.slice(0, listRowCap(size));
-  const rows = capped.map((entry) => {
+  const capped = sorted.slice(0, cap + fill);
+  const rows = capped.map((entry, index) => {
     const type = entry.type;
     const next = entry.next;
     const accent = type.color || 'var(--color-border)';
@@ -3741,10 +4222,10 @@ function renderWasteWidget(waste, size) {
 
     if (!next) {
       return `
-        <div class="waste-widget-row" data-route="${esc(`/waste?type=${encodeURIComponent(String(type.id))}`)}" role="button" tabindex="0">
-          <span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span>
-          <span class="waste-widget-row__name">${icon}${esc(type.name)}</span>
-          <span class="waste-widget-row__date waste-widget-row__date--none">${esc(t('waste.noUpcomingPickup'))}</span>
+        <div class="list-row waste-widget-row" data-route="${esc(`/waste?type=${encodeURIComponent(String(type.id))}`)}" role="button" tabindex="0"${fillRowAttr(index, cap)}>
+          <span class="list-row__lead" aria-hidden="true"><span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span></span>
+          <span class="list-row__main"><span class="list-row__name waste-widget-row__name">${icon}${esc(type.name)}</span></span>
+          <span class="list-row__end waste-widget-row__date waste-widget-row__date--none">${esc(t('waste.noUpcomingPickup'))}</span>
         </div>`;
     }
 
@@ -3763,16 +4244,16 @@ function renderWasteWidget(waste, size) {
     const emphasize = next.date_key === earliestDate ? ' waste-widget-row__date--next' : '';
 
     return `
-      <div class="waste-widget-row" data-route="${esc(`/waste${next.deep_link}`)}" role="button" tabindex="0">
-        <span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span>
-        <span class="waste-widget-row__name">${icon}${esc(type.name)}${moved}${coalesced}</span>
-        <span class="waste-widget-row__date${emphasize}">${esc(relativeDateLabel(next.date_key))}</span>
+      <div class="list-row waste-widget-row" data-route="${esc(`/waste${next.deep_link}`)}" role="button" tabindex="0"${fillRowAttr(index, cap)}>
+        <span class="list-row__lead" aria-hidden="true"><span class="waste-widget-row__dot" style="--waste-color:${esc(accent)}"></span></span>
+        <span class="list-row__main"><span class="list-row__name waste-widget-row__name">${icon}${esc(type.name)}${moved}${coalesced}</span></span>
+        <span class="list-row__end waste-widget-row__date${emphasize}">${esc(relativeDateLabel(next.date_key))}</span>
       </div>`;
   }).join('');
 
-  const rest = Math.max(0, sorted.length - capped.length);
+  const rest = Math.max(0, sorted.length - Math.min(capped.length, cap));
   const more = rest > 0
-    ? `<p class="waste-widget-more">${esc(t('dashboard.wasteMore', { count: rest }))}</p>`
+    ? `<p class="waste-widget-more"${fillMoreAttrs(fill, rest, 'dashboard.wasteMore')}>${esc(t('dashboard.wasteMore', { count: rest }))}</p>`
     : '';
   // Quelle-braucht-Auffrischung (invariant #6) ist ein Source-, kein
   // Occurrence-Feld - eigener Fetch auf /waste/sources in ensureWasteSlice(),
@@ -3784,10 +4265,10 @@ function renderWasteWidget(waste, size) {
       </div>`
     : '';
 
-  return `<div class="widget widget--waste">
+  return `<div class="widget widget--waste"${span}>
     ${widgetHeader('waste', t('nav.waste'), upcomingCount, '/waste')}
-    <div class="widget__body">
-      <div class="waste-widget">${rows}${more}</div>
+    <div class="widget__body widget__body--rows">
+      ${widgetRows(rows, { className: 'waste-widget' })}${more}
       ${refreshWarning}
     </div>
   </div>`;
@@ -3797,15 +4278,11 @@ function renderWasteWidget(waste, size) {
 // Haushaltshilfe-Widget (Anwesenheit + offene Zahlung)
 // --------------------------------------------------------
 
-function renderHousekeepingWidget(hk, currency) {
+function renderHousekeepingWidget(hk, currency, size = '1x1') {
   if (!hk?.configured) {
-    return `<div class="widget widget--housekeeping">
+    return `<div class="widget widget--housekeeping"${emptySpanAttrs(size)}>
       ${widgetHeader('housekeeping', t('nav.housekeeping'), null, '/housekeeping')}
-      <div class="widget__empty">
-        <i data-lucide="paintbrush" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.housekeepingNone')}</div>
-        ${emptyStateCta('/housekeeping', t('housekeeping.addTask'))}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.housekeepingNone'), emptyRouteAction('/housekeeping', t('common.add')), 'housekeeping')}
     </div>`;
   }
 
@@ -3833,7 +4310,10 @@ function renderHousekeepingWidget(hk, currency) {
     ? `<div class="housekeeping-widget__unpaid"><i data-lucide="banknote" aria-hidden="true"></i><span>${t('dashboard.housekeepingUnpaid', { amount: formatCurrency(unpaid, currency) })}</span></div>`
     : '';
 
-  return `<div class="widget widget--housekeeping">
+  const span = tileSpanAttrs(() => ({
+    body: TILE_PARTS.statusPad + TILE_PARTS.housekeepingStatus + (unpaid > 0 ? TILE_PARTS.statusChip : 0),
+  }), size);
+  return `<div class="widget widget--housekeeping"${span}>
     ${widgetHeader('housekeeping', t('nav.housekeeping'), null, '/housekeeping')}
     <div class="widget__body">
       <div class="housekeeping-widget">${statusBlock}${unpaidChip}</div>
@@ -3872,9 +4352,11 @@ function renderTodayRow(row, extraClass = '') {
   // Trailing-Detail ist die ZEIT, kein Zähler mehr: die Programm-Zeile
   // beantwortet „wann", und dieselbe Badge-Form für drei Bedeutungen
   // (Anzahl/offen/Alter) war ein Critique-Befund (H6).
+  // „in 25 Min" spricht im Ton seines Moduls (Entwurf „Heute wichtig"), alles
+  // Spaetere sekundaer; die Einkaufszeile hat keine Zeit und zeigt ihren Weg.
   const time = row.timeLabel
-    ? `<span class="today-cockpit-card__time${row.overdue ? ' today-cockpit-card__time--overdue' : ''}">${esc(row.timeLabel)}</span>`
-    : '';
+    ? `<span class="today-cockpit-card__time${row.overdue ? ' today-cockpit-card__time--overdue' : ''}${row.soon ? ' today-cockpit-card__time--soon' : ''}">${esc(row.timeLabel)}</span>`
+    : row.chevron ? '<i data-lucide="chevron-right" class="icon-sm today-cockpit-card__chevron" aria-hidden="true"></i>' : '';
   // Objekt-Anker für die Objekt-Deep-Links (Paket 2): die Zeile weiß bereits,
   // WOVON sie spricht - nur das Ziel bleibt vorerst die Modul-Route.
   const objectAttrs = row.objectId != null
@@ -3902,7 +4384,7 @@ function renderTodayRow(row, extraClass = '') {
   // Johnson Einverstaendnis fuer ...". Das Paar ist hier nur Bild; der Name
   // folgt als eigener Text hinter Titel und Modul - dieselbe Auskunft, in der
   // Reihenfolge, in der man eine Zeile liest.
-  const whoName = mark ? `<span class="sr-only">, ${esc(row.who?.display_name ?? '')}</span>` : '';
+  const whoName = mark && !row.namesInSub ? `<span class="sr-only">, ${esc(row.who?.display_name ?? '')}</span>` : '';
   const inner = `
       <span class="${mark ? 'seal-pair' : ''}"${mark ? ' aria-hidden="true"' : ''}><span class="module-seal today-cockpit-card__icon">${programRowGlyph(row)}</span>${mark}</span>
       <span class="today-cockpit-card__body">
@@ -3960,6 +4442,8 @@ const PROGRAM_ROW_CAP_PHONE = 2;
 
 /** Zuletzt gemessene Zeilenzahl je Fensterhoehe (fitPhoneProgram). */
 let phoneProgramFit = null;
+/** Zuletzt gemessene Hoehe der Ueberschrift „Ausserdem heute" (D6). */
+let phoneDividerHeight = null;
 
 function phoneProgramCap() {
   const height = globalThis.window?.innerHeight;
@@ -3982,11 +4466,18 @@ function phoneProgramCap() {
  * 744 von 764), und die Einkaufszeile darunter stand bei 744-809 halb hinter der
  * Kapsel. Was ohne Ueberlauf unter den Zeilen bleibt, zaehlt jetzt mit; passt es
  * nicht, faltet die Einkaufszeile mit der letzten Zeile in "+N weitere". */
-function programRowsThatFit({ fold, rowsTop, rowHeight, trailing, total, rest = 0 }) {
+/* DIE UEBERSCHRIFT ZWISCHEN DEN TEILEN ZAEHLT MIT (D6). Steht nach den `lead`
+ * Zeilen der Leiste noch eine des Rests, traegt die Liste „Ausserdem heute"
+ * (`divider` hoch) - die Rechnung nimmt sie nur dann mit, wenn der Deckel
+ * ueber `lead` hinausreicht. */
+function programRowsThatFit({ fold, rowsTop, rowHeight, trailing, total, rest = 0, lead = 0, divider = 0 }) {
   if (!(rowHeight > 0) || !(total > 0)) return PROGRAM_ROW_CAP_PHONE;
   const room = fold - rowsTop;
-  if (total * rowHeight + rest <= room) return total;
-  return Math.max(PROGRAM_ROW_CAP_PHONE, Math.min(total - 1, Math.floor((room - trailing) / rowHeight)));
+  const dividerFor = (cap) => (lead > 0 && cap > lead ? divider : 0);
+  if (total * rowHeight + dividerFor(total) + rest <= room) return total;
+  let fit = Math.floor((room - trailing) / rowHeight);
+  if (dividerFor(fit)) fit = Math.max(lead, Math.floor((room - trailing - divider) / rowHeight));
+  return Math.max(PROGRAM_ROW_CAP_PHONE, Math.min(total - 1, fit));
 }
 
 /**
@@ -4022,9 +4513,17 @@ function measurePhoneProgram(shell, { shrinkOnly = false } = {}) {
   // ist es gemessen, sonst steckt die Einkaufszeile im Ueberlauf und zaehlt
   // als eine Zeile (gleiche Karte), die Coda mit ihrer Hoehe.
   const coda = section.querySelector('.today-cockpit__coda')?.getBoundingClientRect().height ?? 0;
+  // Die Ueberschrift „Ausserdem heute" (D6): gezeichnet ist sie gemessen,
+  // sonst gilt der zuletzt gemessene Wert, beim ersten Mal eine halbe Zeile.
+  const lead = Number(section.dataset.programLead) || 0;
+  const drawnAlso = section.querySelector('.today-cockpit__also--row:not(.today-cockpit__rows--more *)');
+  if (drawnAlso) phoneDividerHeight = drawnAlso.getBoundingClientRect().height;
+  const divider = lead ? phoneDividerHeight ?? rowHeight / 2 : 0;
+  // Bildet die Einkaufszeile den Rest allein, steht die Ueberschrift vor ihr.
+  const shoppingDivider = section.dataset.programShopping === '1' && lead >= total ? divider : 0;
   const rest = shown >= total
     ? trailing
-    : (section.dataset.programShopping === '1' ? rowHeight : 0) + coda;
+    : (section.dataset.programShopping === '1' ? rowHeight + shoppingDivider : 0) + coda;
   const geometry = {
     fold: foldViewport + scrollTop - gap,
     rowsTop: rowsRect.top + scrollTop,
@@ -4032,6 +4531,8 @@ function measurePhoneProgram(shell, { shrinkOnly = false } = {}) {
     trailing,
     total,
     rest,
+    lead,
+    divider,
   };
   // Ein leerer Tag hat eine Zustandszeile und nichts zu deckeln.
   if (!geometry.total) return null;
@@ -4052,6 +4553,98 @@ function measurePhoneProgram(shell, { shrinkOnly = false } = {}) {
   return cap === shown ? null : cap;
 }
 
+/**
+ * Die erste Schaetzung der Buehne (todayStage) kannte das Blatt noch nicht:
+ * jetzt steht es, und ist es schmaler oder breiter als geschaetzt, zeichnet es
+ * sich im selben Task neu - bevor der Browser ein Bild davon malt.
+ */
+function refitTodayStage(shell, render) {
+  const drawn = shell?.querySelector?.('.today-cockpit')?.dataset.todayStage;
+  if (drawn && drawn !== todayStage()) replaceProgramSheet(shell, render());
+}
+
+/**
+ * Ersetzt nur die Zeichen, die noch Platzhalter sind. `createIcons` auf der
+ * ganzen Flaeche ersetzte jedes fertige SVG ein zweites Mal - `data-lucide`
+ * bleibt am SVG (lucide-scope.js) -, und jeder Ersatz legte die Flaeche neu
+ * aus (DW-P2-4).
+ */
+function createPendingIcons(root) {
+  const lucide = globalThis.window?.lucide;
+  if (!lucide || !root?.querySelectorAll) return;
+  // Frisch gezeichnet (noch kein fertiges Zeichen darin): ein Lauf ueber alles.
+  if (!root.querySelector('svg[data-lucide]')) {
+    lucide.createIcons({ el: root });
+    return;
+  }
+  for (const node of root.querySelectorAll('[data-lucide]:not(svg)')) lucide.createIcons({ el: node });
+}
+
+/* DIE HOEHE JEDER KACHEL AUS DEM LETZTEN BILD (DW-P2-4, PLAN H9). Kacheln
+ * ausser Sicht rechnet der Browser erst, wenn sie kommen (`content-visibility`,
+ * dashboard.css), und bis dahin steht ihr Platzhalter. `auto` merkt sich die
+ * echte Hoehe nur am selben Knoten - jeder Neuaufbau zeichnet neue. Darum
+ * merkt sich die Seite die Hoehen selbst (je Fensterbreite und Kachel) und
+ * gibt sie dem naechsten Aufbau mit, bevor er zum ersten Mal ausgelegt wird.
+ * Gelesen wird nur, was der ResizeObserver nach dem Layout ohnehin meldet. */
+const tileBlockSizes = new Map();
+// Die Fensterbreite wird gelesen, solange das Layout sauber ist (vor dem
+// Zeichnen bzw. im Rueckruf nach dem Layout) - `innerWidth` mitten im Aufbau
+// verlangte ein Layout der halbfertigen Flaeche.
+const tileSizeKey = (width, id) => `${width}:${id}`;
+
+/**
+ * DAS SKELETT SAGT DAS RASTER VORAUS, DAS GEZEICHNET WURDE (DW-P2-5). Gemerkt
+ * wurden die sichtbaren Kacheln der Anordnung - auch die, die das Raster gar
+ * nicht zeichnet (Modul abgeschaltet oder ohne Recht, Renderer ohne Inhalt).
+ * Jede davon stand im Skelett als Kachel und verschob beim Laden alles
+ * dahinter. Jetzt lernt der Hinweis aus derselben Liste, die das Raster
+ * gezeichnet hat (`drawn` in renderDashboardLayout).
+ */
+function rememberGridHint(drawn, cfg) {
+  rememberLayoutHint(drawn, dashboardQuery(cfg), drawnSpanOf);
+}
+
+/** Der Schluessel der Kopfhoehe (headHint): die Fenstergroesse. */
+function viewportKey() {
+  const win = globalThis.window;
+  return win ? `${win.innerWidth}x${win.innerHeight}` : '';
+}
+
+/** Merkt die gezeichnete Hoehe des Kopfbands fuer das naechste Skelett. */
+function watchHeadSize(shell) {
+  const band = shell?.querySelector?.(':scope > .dashboard-masthead');
+  if (!band || typeof ResizeObserver !== 'function') return null;
+  const observer = new ResizeObserver((entries) => {
+    const entry = entries[entries.length - 1];
+    const px = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect?.height ?? 0;
+    if (px > 0 && band.isConnected) rememberHeadHint(viewportKey(), px, Boolean(band.querySelector('.today-cockpit')));
+  });
+  observer.observe(band);
+  return observer;
+}
+
+function carryTileSizes(shell, width) {
+  for (const el of shell.querySelectorAll('#dashboard-widget-grid > .widget-wrapper[data-widget-id]')) {
+    const px = tileBlockSizes.get(tileSizeKey(width, el.dataset.widgetId));
+    if (px) el.style.setProperty('--tile-block-size', `${px}px`);
+  }
+}
+
+function watchTileSizes(grid) {
+  if (!grid || typeof ResizeObserver !== 'function') return null;
+  const observer = new ResizeObserver((entries) => {
+    const width = globalThis.window?.innerWidth ?? 0;
+    for (const entry of entries) {
+      const id = entry.target.dataset?.widgetId;
+      const px = Math.round(entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect?.height ?? 0);
+      if (id && px > 0 && entry.target.isConnected) tileBlockSizes.set(tileSizeKey(width, id), px);
+    }
+  });
+  for (const el of grid.querySelectorAll(':scope > .widget-wrapper[data-widget-id]')) observer.observe(el);
+  return observer;
+}
+
 /** Tauscht das Heute-Blatt gegen eine neu gezeichnete Fassung (gleicher Platz). */
 function replaceProgramSheet(shell, html) {
   shell.querySelector('.today-cockpit')?.insertAdjacentHTML('afterend', html);
@@ -4067,15 +4660,21 @@ function replaceProgramSheet(shell, html) {
  * Buehne zwischen Telefon und breit wechselt, baut die Uebersicht neu. */
 function createPhoneProgramFit(win, signal, rebuild) {
   let frame = 0;
-  let phone = onPhoneStage();
   win.addEventListener('resize', () => {
     if (frame) return;
     frame = win.requestAnimationFrame(() => {
       frame = 0;
-      const now = onPhoneStage();
-      const crossed = now !== phone;
-      phone = now;
-      rebuild(crossed);
+      // Die Buehne, fuer die das Blatt gezeichnet ist, gegen die gemessene:
+      // Telefon, schmal oder breit (todayStage).
+      const drawn = win.document?.querySelector?.('.today-cockpit')?.dataset?.todayStage;
+      /* UND DIE DER KACHELN, OHNE DAS BLATT (Review p11, B6). Das Blatt ist
+       * abwaehlbar; ohne es sah das Drehen vom Telefon zur breiten Buehne
+       * keinen Wechsel, und die Kacheln blieben ohne Spannen (tileSpanAttrs
+       * rechnet am Telefon nichts) - gemessen 390 -> 800px: Notizen 1x2
+       * 546px hoch, nach Daten 612, und die Listen kurz wie am Telefon. */
+      const tiles = win.document?.querySelector?.('#dashboard-widget-grid')?.dataset?.tileStage;
+      const tilesCrossed = Boolean(tiles) && tiles !== (onPhoneStage() ? 'phone' : 'wide');
+      rebuild((Boolean(drawn) && drawn !== todayStage()) || tilesCrossed);
     });
   }, { signal, passive: true });
   signal.addEventListener('abort', () => win.cancelAnimationFrame(frame), { once: true });
@@ -4161,18 +4760,50 @@ function todaySheetSpeaks(data, cfg, now = new Date()) {
   return speakingSourceIds(data, todaySheetContextFor(cfg, now));
 }
 
+/**
+ * Spricht eine Domaene im Heute-Blatt? Kein Echo: ist das Modul-Widget einer
+ * Domaene sichtbar, entfallen ihre Programm-Zeilen - jede Domaene hat genau
+ * eine Repraesentation (Cockpit ODER Widget), statt dieselbe Aufgabe/Termin
+ * doppelt zu zeigen. Die Zeitleiste fragt dieselbe Regel, bevor es das Modell
+ * gibt.
+ */
+function todayDomainSpeaks(cfg, module) {
+  const widgetShown = Array.isArray(cfg) && cfg.some((w) => w.id === module && w.visible);
+  return !window.yuvomi?.isModuleDisabled(module) && !widgetShown;
+}
+
+/**
+ * DIE WAND RECHNET WIE DAS COCKPIT UNTER DER BREITEN BUEHNE (R24, Uebergabe
+ * aus S1 zu Critique G1-Uebersicht-P2-1). Ohne Leiste deckelte die Wand
+ * „offen zuerst": dieselben Daten zeigten bei 1440 das Sportfest, bei 1024
+ * nicht - offene Aufgaben drueckten es hinter „+N weitere", und Filmabend
+ * fehlte in beiden. Jetzt fuehren die Eintraege der Zeitleiste (Termine und
+ * Mahlzeiten; Ganztaegiges vorn, dann chronologisch), der Rest folgt - der
+ * Deckel kuerzt zuerst den Rest. Dieselben Riegel wie im Cockpit, nur ohne
+ * Kachel-Konfiguration. Eine eigene Schicht kennt die Wand nicht: sie fragt
+ * die Haushaltsfassung der Daten, ein Wandtablet ist keine Person.
+ */
+function wallTimelineOptions(data, now = new Date()) {
+  if (!todayDomainSpeaks([], 'calendar')) return {};
+  return {
+    timeline: buildTodayTimeline(data, { now, includeMeals: todayDomainSpeaks([], 'meals'), includeShifts: todayDomainSpeaks([], 'schedule') }),
+    timelineRows: true,
+  };
+}
+
 function buildTodayCockpitModel(data, cfg = [], {
   cap = onPhoneStage() ? phoneProgramCap() : PROGRAM_ROW_CAP,
   now = new Date(),
   groupOverdue = onPhoneStage(),
   isDisplay = false,
+  timeline = null,
+  // Breit (false) verlassen die Eintraege der Leiste die Liste; darunter
+  // (true) SIND ihre kommenden Eintraege die Zeilen (timelineSheetRows).
+  timelineRows = false,
   viewer = dashboardViewer,
 } = {}) {
-  // Kein Echo: ist das Modul-Widget einer Domäne sichtbar, entfallen ihre
-  // Programm-Zeilen — jede Domäne hat genau eine Repräsentation (Cockpit ODER
-  // Widget), statt dieselbe Aufgabe/Termin doppelt zu zeigen.
   const widgetShown = (id) => Array.isArray(cfg) && cfg.some((w) => w.id === id && w.visible);
-  const domainInCockpit = (module) => !window.yuvomi?.isModuleDisabled(module) && !widgetShown(module);
+  const domainInCockpit = (module) => todayDomainSpeaks(cfg, module);
 
   const includeTasks = domainInCockpit('tasks');
   const includeCalendar = domainInCockpit('calendar');
@@ -4180,6 +4811,17 @@ function buildTodayCockpitModel(data, cfg = [], {
   const includeShopping = domainInCockpit('shopping');
 
   const program = buildTodayProgram(data, { includeTasks, includeCalendar, includeMeals, now, viewer });
+  // Unter der breiten Buehne kommen Termine, Mahlzeiten und die eigene
+  // Schicht aus der Leiste (timelineSheetRows), nicht aus `upcomingEvents`
+  // und der einen Mahlzeit des Programms. Ohne Kalender im Blatt gibt es
+  // keine Leiste und keinen Tausch.
+  const rowsFromTimeline = timelineRows && includeCalendar;
+  if (rowsFromTimeline) {
+    program.rows = [
+      ...program.rows.filter((row) => !TIMELINE_PROGRAM_KINDS.has(row.kind)),
+      ...timelineSheetRows(data, timeline, now),
+    ];
+  }
 
   // Die uebrigen Quellen des Blatts (Dosen, Freigaben, Abfuhr, Geburtstag,
   // Schicht, Erinnerungen, Haushaltshilfe) sprechen ueber den Beitrags-Vertrag
@@ -4188,8 +4830,28 @@ function buildTodayCockpitModel(data, cfg = [], {
   // Wand fragen beide hier; die Wand reicht nur keine Kachel-Konfiguration mit.
   const sheetContext = todaySheetContextFor(cfg, now, program.rows, { isDisplay });
   const contributed = collectSourceRows(data, sheetContext);
-  const programRows = groupOverdue ? groupOverdueRows(program.rows) : program.rows;
-  const sheet = composeTodaySheet([...programRows, ...contributed.rows], { cap });
+  // DER TERMIN STEHT EINMAL (Ulas, 2026-10-26). Traegt die Zeitleiste einen
+  // Termin als Block, verlaesst seine Zeile die Liste: der Block klappt sie
+  // unter der Leiste auf (renderTodayTimeline). Ganztaegiges hat keinen Block
+  // und bleibt. `existing` oben sieht weiter alle Zeilen - eine Erinnerung an
+  // einen Termin der Leiste bleibt so dessen Echo und keine eigene Zeile.
+  // Seit der Critique (Befund 3) gilt das fuer alles, was die Leiste traegt:
+  // Termin, ganztaegiger Termin, Mahlzeit, die eigene Schicht.
+  // Unter der breiten Buehne stehen die Eintraege der Leiste schon in
+  // `program.rows`; die Beitraege verlieren nur ihre Doppel (die Schicht).
+  const inTimeline = timelineRowKeys(timeline);
+  const notInTimeline = (row) => !inTimeline.has(`${row.kind}:${row.objectId}`);
+  const listed = inTimeline.size && !rowsFromTimeline ? program.rows.filter(notInTimeline) : program.rows;
+  // ZWEI TEILE (D6, composeTodaySheet): unter der breiten Buehne fuehren die
+  // Eintraege der Leiste, der Rest steht unter „Ausserdem heute". Der erste
+  // Eintrag mit Uhrzeit - was gerade laeuft, sonst das Naechste - bleibt
+  // unter jedem Deckel sichtbar, auch wenn Ganztaegiges ihn fuellt.
+  const lead = rowsFromTimeline ? listed.filter((row) => row.timelineKey) : null;
+  const own = lead ? listed.filter((row) => !row.timelineKey) : listed;
+  const programRows = groupOverdue ? groupOverdueRows(own) : own;
+  const anchor = (lead ?? []).reduce((best, row) => (/^\d{2}:\d{2}$/.test(String(row.sortKey)) && row.sortKey > '00:02'
+    && (!best || row.sortKey < best.sortKey) ? row : best), null);
+  const sheet = composeTodaySheet([...programRows, ...(inTimeline.size ? contributed.rows.filter(notInTimeline) : contributed.rows)], { cap, lead, anchor });
   const visibleRows = sheet.rows;
   const overflow = sheet.overflow;
 
@@ -4258,15 +4920,22 @@ function buildTodayCockpitModel(data, cfg = [], {
   // Schichtplan-Kachel mehr etwas behauptet.
   const scheduleWidgetVisible = !window.yuvomi?.isModuleDisabled('schedule') && widgetShown('schedule');
   let state = null;
-  if (!sheet.allRows.length && !scheduleWidgetVisible) {
+  // Steht in der Leiste noch etwas aus, ist der Tag weder frei noch durch.
+  const timelineAhead = (timeline?.lanes ?? []).some((lane) => lane.items.some((item) => item.state !== 'past'));
+  if (!sheet.allRows.length && !scheduleWidgetVisible && !timelineAhead) {
     // „Alles erledigt" sagt auch eine Quelle, deren Offenes heute geschafft
     // ist (alle Dosen genommen) - sonst hiesse derselbe Tag „Heute frei".
     const sayAllDone = (includeTasks && program.tasksDoneToday > 0) || contributed.settled;
+    // EIN NEUER HAUSHALT IST NICHT FREI, SONDERN LEER (R24, Critique G6 P2-2).
+    // Nach der Einrichtung stand "Heute frei" ueber einer Uebersicht ohne einen
+    // einzigen Eintrag. Solange die Erste-Schritte-Karte laeuft und nichts
+    // kommt, sagt die Zeile das: noch nichts geplant, und was hier erscheint.
+    const fresh = !sayAllDone && !outlook && firstStepsActive();
     if (sayAllDone || includeCalendar) {
       state = {
-        title: sayAllDone ? t('dashboard.todayAllDone') : t('dashboard.todayFree'),
-        sub: outlook?.sub ?? '',
-        icon: sayAllDone ? 'check-circle' : 'sparkles',
+        title: sayAllDone ? t('dashboard.todayAllDone') : t(fresh ? 'dashboard.todayNothingPlanned' : 'dashboard.todayFree'),
+        sub: fresh ? t('dashboard.todayNothingPlannedSub') : (outlook?.sub ?? ''),
+        icon: sayAllDone ? 'check-circle' : fresh ? 'calendar-plus' : 'sparkles',
         route: outlook?.route ?? null,
       };
     }
@@ -4298,8 +4967,11 @@ function buildTodayCockpitModel(data, cfg = [], {
   // (`codaAllowed`): unter einer offenen Dosis, einer wartenden Freigabe oder
   // der Tonne am Morgen ist „nichts mehr" keine Entwarnung, sondern ein
   // Widerspruch zur Zeile darueber.
+  // Die Coda schliesst auch eine Leiste ab, deren Termine noch ausstehen und
+  // deren Zeilen deshalb nicht in der Liste stehen - sonst fiele unter einem
+  // Tag nur aus Terminen die Warnung vor der Morgen-Frist weg (Critique P3).
   let coda = null;
-  if (codaAllowed(sheet)) {
+  if (codaAllowed(sheet) || (timelineAhead && !sheet.allRows.length)) {
     const tomorrowKey = sheetContext.tomorrowKey;
     const tomorrowTask = includeTasks && program.nextDueTask?.due_date === tomorrowKey ? program.nextDueTask : null;
     coda = tomorrowTask
@@ -4313,7 +4985,10 @@ function buildTodayCockpitModel(data, cfg = [], {
   // Zeilen hinter dem Deckel liegen.
   const hidden = sheet.allRows.filter((row) => !visibleRows.includes(row));
   const moreRoute = overflow > 0 ? todayMoreRoute(hidden, sheetContext.todayKey) : null;
-  return { rows: visibleRows, allRows: sheet.allRows, hiddenRows: hidden, overflow, moreRoute, state, shopping, coda };
+  // `lead`: wie viele Zeilen der Leiste es gibt und wie viele davon stehen
+  // (D6) - die verdeckten folgen in `hiddenRows` derselben Gliederung.
+  const leadPart = lead ? { shown: sheet.leadShown, total: lead.length } : null;
+  return { rows: visibleRows, allRows: sheet.allRows, hiddenRows: hidden, overflow, moreRoute, state, shopping, coda, includeCalendar, includeTasks, lead: leadPart };
 }
 
 /* „+N WEITERE HEUTE" FUEHRT DORTHIN, WO DIE VERSTECKTEN ZEILEN STEHEN
@@ -4393,85 +5068,1045 @@ function wireTodayOverdue(root) {
  * Der Aufklapp-Knopf des Ueberlaufs: schaltet die verdeckten Zeilen an Ort und
  * Stelle, ohne das Blatt neu zu zeichnen - so bleibt der Fokus auf dem Knopf,
  * und ein zweiter Tipp klappt wieder zu.
+ *
+ * Unter der breiten Buehne steuert auch das Bild ueber den Zeilen dieselbe
+ * Region (renderTodayPeek, `data-today-peek`): beide Knoepfe sagen
+ * denselben Zustand, und nur der Tipp aufs Bild fuehrt danach zur ersten
+ * kommenden Zeile. `+N weitere` behaelt den Fokus: das Aufgeklappte steht
+ * direkt ueber ihm, das Bild dagegen liegt ueber allen Zeilen.
  */
 function wireTodayMore(root) {
-  root.querySelectorAll('[data-today-more]').forEach((btn) => {
+  const toggles = [...root.querySelectorAll('[data-today-more]')];
+  toggles.forEach((btn) => {
     btn.addEventListener('click', () => {
       const open = btn.getAttribute('aria-expanded') !== 'true';
-      const region = root.querySelector(`#${btn.getAttribute('aria-controls')}`);
+      const controls = btn.getAttribute('aria-controls');
+      const region = root.querySelector(`#${controls}`);
       toggleRegion(region, open);
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      const label = btn.querySelector('span');
-      if (label) label.textContent = open ? btn.dataset.lessLabel : btn.dataset.moreLabel;
+      for (const toggle of toggles) {
+        if (toggle !== btn && toggle.getAttribute('aria-controls') !== controls) continue;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        const label = toggle.dataset.lessLabel ? toggle.querySelector('span') : null;
+        if (label) label.textContent = open ? toggle.dataset.lessLabel : toggle.dataset.moreLabel;
+      }
       todayMoreOpen = open;
+      if (open && btn.dataset.todayPeek != null) revealTodayPeekTarget(region, btn.dataset.peekTarget);
     });
   });
 }
 
-function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(), moreOpen = todayMoreOpen, overdueOpen = todayOverdueOpen, cap } = {}) {
-  const model = buildTodayCockpitModel(data, cfg, { now, ...(cap ? { cap } : {}) });
+/** Minute des Tages (0-1439) aus einem Wert, gelesen in der Wanduhr des Haushalts. */
+function householdMinuteOf(value) {
+  const [hour, minute] = String(zonedTimeKey(value) || '').split(':').map(Number);
+  return Number.isFinite(hour) && Number.isFinite(minute) ? hour * 60 + minute : null;
+}
 
-  /* DIE BREITE BUEHNE TRAEGT ZWEI SPALTEN ZEILEN (Critique 23.09.2026). Am
-   * Desktop ist das Blatt 1140px breit, und eine Zeile nutzte davon ~200px
-   * Text - dazwischen lag ein leeres Band bis zur Uhrzeit. Ab einer
-   * Containerbreite (dashboard.css, `today-cockpit__rows--split`) laufen die
-   * Zeilen deshalb in zwei Spalten, SPALTENWEISE: links die fruehe, rechts die
-   * spaete Haelfte des Tages, damit das Programm von oben nach unten gelesen
-   * bleibt. Die Haelfte steht hier, weil nur das Markup die Zahl kennt; auf
-   * schmaler Buehne haben die Klassen keine Wirkung, das Blatt bleibt eine
-   * Liste in unveraenderter Hoehe. */
-  const listRows = [];
-  if (model.state) listRows.push(renderTodayStateRow(model.state));
-  // Die Sammelzeile gibt es nur auf dem Telefon; dort teilt sich die Liste nie.
-  const grouped = model.rows.some((row) => row.kind === 'overdue');
-  const split = model.rows.length >= 2 && !grouped;
-  // BEI UNGERADER ZAHL SPANNT DIE LETZTE ZEILE (R22 D16). Mit `ceil` blieb
-  // rechts unten eine leere Zelle, und die Haarlinie darueber endete im Nichts.
-  // Jetzt teilen sich die ersten 2k Zeilen die Spalten, die letzte steht ueber
-  // die volle Breite darunter - gelesen wird links, rechts, dann „und zuletzt".
-  const perColumn = Math.floor(model.rows.length / 2);
-  const columnClass = (index) => {
-    if (!split) return '';
-    if (index >= perColumn * 2) return ' today-cockpit-card--span';
-    if (index < perColumn) return '';
-    return ` today-cockpit-card--col2${index === perColumn ? ' today-cockpit-card--col-start' : ''}`;
-  };
-  listRows.push(...model.rows.map((row, index) => (row.kind === 'overdue'
-    ? renderTodayOverdueGroup(row, overdueOpen)
-    : renderTodayRow(row, columnClass(index)))));
-  const parts = [];
-  const foldShopping = Boolean(model.shopping) && model.overflow > 0 && !model.moreRoute && onPhoneStage();
-  if (listRows.length) {
-    parts.push(`<div class="today-cockpit__rows${split ? ' today-cockpit__rows--split' : ''}"${split ? ` style="--today-rows-per-column:${perColumn}"` : ''}>${listRows.join('')}</div>`);
+/** Minute des Tages aus einer Wanduhrzeit 'HH:MM' (Schicht, Nennzeit einer Mahlzeit). */
+function clockMinute(time) {
+  const match = /^(\d{2}):(\d{2})/.exec(String(time ?? ''));
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+/**
+ * Wann etwas dran ist, relativ zu jetzt (Critique 2026-10-26, Befund 5):
+ * unter einer Stunde „in 25 Min" - im Ton des Moduls -, spaeter mit der Uhrzeit
+ * davor („15:00 · in 2 Std."), denn eine gerundete Stunde allein verlangt
+ * Kopfrechnen. Ueber Intl.RelativeTimeFormat, damit jede Sprache ihre Kurzform
+ * hat. `null`, wenn es schon begonnen hat.
+ */
+function relativeWhen(minuteOfDay, now, clock = '') {
+  const nowMinute = householdMinuteOf(now);
+  if (nowMinute == null || minuteOfDay == null || minuteOfDay <= nowMinute) return null;
+  const delta = minuteOfDay - nowMinute;
+  const format = new Intl.RelativeTimeFormat(getLocale(), { numeric: 'always', style: 'short' });
+  if (delta < 60) return { label: format.format(delta, 'minute'), soon: true };
+  const relative = format.format(Math.round(delta / 60), 'hour');
+  return { label: clock ? `${clock} · ${relative}` : relative, soon: false };
+}
+
+/**
+ * DIE TERMINE VON HEUTE, EINMAL (Entwurf „Heute wichtig", 2026-10-26).
+ *
+ * Aus BEIDEN Terminlisten der Antwort: `upcomingEvents` haelt die Kachel-
+ * Liste samt ihrem Deckel von fuenf Kommenden, `familyEvents` je Mitglied die
+ * heute beendeten und die naechsten (#1449). Erst zusammen tragen sie einen
+ * vollen Tag. Doppelte fallen ueber denselben Schluessel wie serverseitig
+ * (`id@start`). Beendete bleiben hier stehen: die Leiste zeigt den Tag, die
+ * Liste darunter nur, was noch kommt.
+ *
+ * @returns {{ timed: object[], allDay: object[] }}  `timed` fuer die Achse
+ *   (Minuten in der Haushaltszone), `allDay` fuer das Band ueber ihr
+ */
+function todayEventsForTimeline(data, now = new Date()) {
+  const todayKey = zonedDateKey(now);
+  const memberIds = (Array.isArray(data?.users) ? data.users : []).map((user) => user.id);
+  const seen = new Set();
+  const timed = [];
+  const allDay = [];
+  for (const key of ['upcomingEvents', 'familyEvents']) {
+    for (const event of Array.isArray(data?.[key]) ? data[key] : []) {
+      const id = `${event.id}@${event.start_datetime}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const span = overviewEventSpan(event, todayKey);
+      if (span.day !== todayKey) continue;
+      const peopleIds = (event.assigned_users ?? []).map((user) => user.id);
+      const base = {
+        id: event.id,
+        peopleIds,
+        title: event.title,
+        kind: 'event',
+        tone: 'calendar',
+        key: id,
+        sheetRow: timelineEventRow(event, span, memberIds),
+      };
+      if (span.allDay) {
+        allDay.push(base);
+        continue;
+      }
+      const start = span.carried ? 0 : householdMinuteOf(event.start_datetime);
+      if (start == null) continue;
+      const endRaw = String(event.end_datetime || '');
+      const endsToday = endRaw.length > 10 && zonedDateKey(endRaw) <= todayKey;
+      // Was ueber Mitternacht reicht, endet auf der Achse am Tagesende.
+      const end = endRaw.length > 10 ? (endsToday ? householdMinuteOf(endRaw) : 24 * 60) : start;
+      const timeLabel = overviewEventTime(event, span);
+      const endLabel = endsToday && end > start ? formatTime(endRaw) : '';
+      timed.push({
+        ...base,
+        start,
+        end: end ?? start,
+        // Sichtbar der Beginn allein, wie in der Terminzeile (#1698); das Ende
+        // traegt die Breite des Blocks und der zugaengliche Name (Befund 4).
+        timeLabel,
+        endLabel,
+        // Die aufgeklappte Zeile nennt Beginn UND Ende (timelineDetailRow) -
+        // ausser beim Uebertrag von gestern, der schon „bis 10:00" sagt.
+        rangeLabel: endLabel && !span.carried ? `${timeLabel} - ${endLabel}` : '',
+      });
+    }
   }
-  // DER EINKAUF STEHT VOR DEM AUFKLAPPER (R22 D16). Er folgte „+4 weitere
-  // heute" und las sich wie eine der verdeckten Zeilen, die schon aufgeklappt
-  // ist. Er ist die zeitlose Schlusszeile des SICHTBAREN Programms; der
-  // Aufklapper schliesst das Blatt ab. Auf dem Telefon klappt er weiter mit
-  // (`foldShopping`, R14).
-  if (model.shopping && !foldShopping) parts.push(renderTodayRow(model.shopping));
+  return { timed, allDay };
+}
+
+/**
+ * Die Zeile, die ein Block unter der Leiste aufklappt: dieselbe wie in der
+ * Liste, mit der Zuweisung. Das Siegel-Paar zeigt EIN Gesicht (whoMark); geht
+ * der Termin mehrere an, nennt die Unterzeile alle (#1828) - im Solo-Haushalt
+ * niemanden. Gehoert er dem ganzen Haushalt (alle Mitglieder zugewiesen),
+ * steht kein einzelnes Gesicht am Siegel, sondern „Alle" in der Unterzeile:
+ * er steht in der Spur „Alle", und Alex' Avatar daran sagte etwas anderes
+ * (Critique 2026-10-26).
+ */
+function timelineEventRow(event, span, memberIds = []) {
+  const row = todayEventRow(event, span);
+  const people = isSoloHousehold() ? [] : (event.assigned_users ?? []);
+  const everyone = memberIds.length >= 2 && memberIds.every((id) => people.some((person) => person.id === id));
+  if (everyone) {
+    row.who = null;
+    row.sub = `${row.sub} · ${t('dashboard.todayTimelineEveryone')}`;
+  } else if (people.length > 1) {
+    // Bei geteiltem Nachnamen die Vornamen (R19), wie in den Spuren.
+    const surname = sharedSurname(people);
+    const given = (name) => (surname && name.endsWith(` ${surname}`) ? name.slice(0, -(surname.length + 1)) : name);
+    row.sub = `${row.sub} · ${people.map((person) => given(String(person.display_name ?? ''))).join(', ')}`;
+    // Die Unterzeile nennt schon alle - der Name hinter dem Avatar entfaellt,
+    // sonst hoerte der Screenreader die erste Person zweimal.
+    row.namesInSub = true;
+  }
+  return row;
+}
+
+/**
+ * DIE MAHLZEITEN ALS PUNKT, NICHT ALS BLOCK (Critique 2026-10-26, Befund 3,
+ * Ulas: „nur Echtes"). Ihr Platz ist die Nennzeit des Typs (MEAL_SORT_TIME),
+ * nach der das Blatt sie ohnehin sortiert - eine Uhrzeit, die niemand
+ * eingetragen hat. Eine erfundene Stunde Dauer und ein „laeuft gerade"
+ * behaupteten mehr; der Punkt sagt nur „um diese Zeit, ungefaehr". Er klappt
+ * die Zeile der Mahlzeit auf; in der Liste steht sie dann nicht noch einmal.
+ */
+function todayMealsForTimeline(data) {
+  const labels = MEAL_LABELS();
+  return (Array.isArray(data?.todayMeals) ? data.todayMeals : [])
+    .filter((meal) => MEAL_SORT_TIME[meal?.meal_type])
+    .map((meal) => {
+      const time = MEAL_SORT_TIME[meal.meal_type];
+      const start = clockMinute(time);
+      const label = labels[meal.meal_type] ?? t('dashboard.todayDinner');
+      return {
+        id: meal.id,
+        start,
+        end: start,
+        point: true,
+        peopleIds: [],
+        title: label,
+        timeLabel: formatTime(time),
+        endLabel: '',
+        kind: 'meal',
+        tone: 'meals',
+        key: `meal-${meal.id}`,
+        sheetRow: {
+          kind: 'meal',
+          objectId: meal.id ?? null,
+          sortKey: time,
+          timeLabel: '',
+          title: meal.title,
+          sub: `${label} · ${formatTime(time)}`,
+          icon: MEAL_ICONS[meal.meal_type] ?? 'utensils',
+          tone: 'dinner',
+          route: meal.id != null ? `/meals?open=${encodeURIComponent(String(meal.id))}` : '/meals',
+          who: mealCookPerson(meal, data?.users),
+          // Dieselbe Stelle im Deckel wie die Mahlzeit des Programms
+          // (buildTodayProgram): eine Auskunft, die zuletzt weicht.
+          priority: 80,
+          open: false,
+        },
+      };
+    });
+}
+
+/**
+ * DIE EIGENE SCHICHT IN DER EIGENEN SPUR (Critique 2026-10-26, Befund 3). Die
+ * Schicht hat Beginn und Ende - echte Zeit, die bisher unter „+N weitere"
+ * steckte. Die Antwort traegt nur die EIGENE (`myShiftsToday`); die der
+ * anderen zeigt die Schichtplan-Kachel. Ohne Uhrzeit hat sie keinen Platz.
+ */
+function todayShiftsForTimeline(data, viewer) {
+  if (viewer?.id == null) return [];
+  return (Array.isArray(data?.myShiftsToday) ? data.myShiftsToday : []).flatMap((entry) => {
+    const type = entry.shift_type ?? {};
+    const start = clockMinute(type.start_time);
+    const endClock = clockMinute(type.end_time);
+    if (start == null || endClock == null) return [];
+    const end = entry.crosses_midnight || endClock <= start ? 24 * 60 : endClock;
+    const startTime = String(type.start_time).slice(0, 5);
+    const endTime = String(type.end_time).slice(0, 5);
+    return [{
+      id: type.id,
+      start,
+      end,
+      peopleIds: [viewer.id],
+      title: shiftTypeLabel(type),
+      timeLabel: formatTime(startTime),
+      endLabel: end < 24 * 60 ? formatTime(endTime) : '',
+      kind: 'shift',
+      tone: 'schedule',
+      key: `shift-${type.id}`,
+      sheetRow: {
+        kind: 'shift',
+        objectId: type.id ?? null,
+        sortKey: startTime,
+        timeLabel: `${formatTime(startTime)} - ${formatTime(endTime)}`,
+        title: shiftTypeLabel(type),
+        sub: t('nav.schedule'),
+        icon: MODULE_ICON.schedule,
+        tone: 'schedule',
+        route: '/schedule',
+        who: viewer,
+        // Wie die Schicht des Beitrags-Vertrags (utils/today-sheet.js): ein
+        // Rahmen des Tages, kein Auftrag.
+        priority: 50,
+        open: false,
+      },
+    }];
+  });
+}
+
+/**
+ * Die Leiste als Modell - null, wenn heute nichts eine Uhrzeit hat. Traegt
+ * dazu das Band der ganztaegigen Termine (`allDay`) und den Schluessel des
+ * naechsten kommenden Eintrags (`nextKey`, Befund 2: „Als Naechstes" spricht
+ * in der Leiste, nicht als zweite Zeile daneben).
+ */
+function buildTodayTimeline(data, { now = new Date(), includeMeals = false, includeShifts = false, viewer = dashboardViewer } = {}) {
+  const { timed, allDay } = todayEventsForTimeline(data, now);
+  if (includeMeals) timed.push(...todayMealsForTimeline(data));
+  if (includeShifts) timed.push(...todayShiftsForTimeline(data, viewer));
+  const members = (Array.isArray(data?.users) ? data.users : []).map((user) => ({
+    ...user,
+    // renderAvatarStack liest `color`, die Mitgliederliste traegt `avatar_color`.
+    color: user.color ?? user.avatar_color,
+  }));
+  const layout = layoutTodayTimeline(timed, {
+    nowMinute: householdMinuteOf(now),
+    members,
+    solo: isSoloHousehold(),
+  });
+  if (!layout) return null;
+  const upcoming = layout.lanes.flatMap((lane) => lane.items).filter((item) => item.state === 'next');
+  const next = upcoming.reduce((best, item) => (!best || item.start < best.start ? item : best), null);
+  return { ...layout, allDay, members, nextKey: next?.key ?? null };
+}
+
+/** Alles, was die Leiste traegt, als `art:id` - diese Zeilen verlassen die Liste. */
+function timelineRowKeys(timeline) {
+  if (!timeline) return new Set();
+  const items = [...timeline.lanes.flatMap((lane) => lane.items), ...(timeline.allDay ?? [])];
+  return new Set(items.map((item) => `${item.kind}:${item.id}`));
+}
+
+/* Die Arten, die das Programm selbst baut und die die Leiste ebenfalls traegt. */
+const TIMELINE_PROGRAM_KINDS = new Set(['event', 'meal']);
+
+/**
+ * DAS BILD UND DER TEXT ERZAEHLEN DENSELBEN TAG (Critique 2026-10-26, Lauf 2,
+ * D1). Unter der breiten Buehne ist die Leiste eine stumme Kurzfassung, und
+ * ihre Zeilen kamen aus `upcomingEvents` (Server-Deckel fuenf) plus EINER
+ * Mahlzeit: der Filmabend um 20:00 stand im Bild und nie als Text, das
+ * vergangene Mittagessen und die beendete Fruehschicht standen als Text, aber
+ * nicht mehr im Bild. Jetzt kommen die Zeilen aus demselben Modell wie die
+ * Balken: was dort nicht vorbei ist (`state !== 'past'`, eine Mahlzeit ist es,
+ * sobald ihre Zeit da war), ueber die Zeile, die auch der Block aufklappt.
+ * Ein Termin fuer zwei steht in zwei Spuren und EINMAL als Zeile. Das
+ * Ganztaegige bleibt Zeile - es hat keinen Balken, aber dieselbe Quelle.
+ */
+function timelineSheetRows(data, timeline, now = new Date()) {
+  const rows = [];
+  const seen = new Set();
+  const allDay = timeline?.allDay ?? todayEventsForTimeline(data, now).allDay;
+  for (const item of allDay) {
+    if (seen.has(item.key)) continue;
+    seen.add(item.key);
+    rows.push({ ...item.sheetRow, timelineKey: item.key });
+  }
+  for (const item of (timeline?.lanes ?? []).flatMap((lane) => lane.items)) {
+    if (item.state === 'past' || seen.has(item.key)) continue;
+    seen.add(item.key);
+    const row = item.kind === 'meal' ? timelineMealRow(item) : { ...item.sheetRow };
+    rows.push({ ...(item.state === 'now' ? runningRow(row) : row), timelineKey: item.key });
+  }
+  return rows;
+}
+
+/* WAS LAEUFT, SAGT ES (Critique 2026-10-26, Lauf 2, D6). Ein laufender Termin
+ * stand mit seinem Beginn da („16:00") - um 16:30 eine Uhrzeit von gestern,
+ * neben „in 25 Min" darunter. Jetzt steht dort „laeuft gerade" im Ton des
+ * Moduls; Beginn und Ende nennt der Block und die Zeile dahinter. Der
+ * Uebertrag von gestern behaelt sein „bis 10:00" (kein Beginn heute), die
+ * Schicht ihre Spanne. */
+function runningRow(row) {
+  if (row.kind !== 'event' || !/^\d{2}:\d{2}$/.test(String(row.sortKey)) || row.sortKey <= '00:02') return row;
+  return { ...row, timeLabel: t('dashboard.todayTimelineRunning'), soon: true };
+}
+
+/**
+ * DER KOPF ZAEHLT, WAS NOCH KOMMT - AUF JEDER BUEHNE (Ulas, 2026-10-26, D5).
+ * Breit zaehlte er den ganzen Tag samt Vergangenem („11 Termine"), darunter
+ * nur die kommenden Zeilen („6 Termine"): dieselbe Familie, derselbe Moment,
+ * zwei Zahlen. Jetzt zaehlt jede Buehne aus derselben Quelle wie die Zeilen
+ * unter der Kurzfassung (timelineSheetRows) - laufende, kommende und
+ * ganztaegige Termine, einmal je Termin - und sagt es: „noch 6 Termine". Ist
+ * keiner mehr uebrig, entfaellt der Teil. Der Minutentakt baut neu, sobald ein
+ * Termin endet (todayFingerprint, `ended`).
+ */
+function todayEventsAhead(data, timeline, now = new Date()) {
+  return timelineSheetRows(data, timeline, now).filter((row) => row.kind === 'event').length;
+}
+
+/* Die Mahlzeit nennt ihre Zeit rechts (withRelativeWhen); die Unterzeile
+ * traegt nur ihre Art, wie die Mahlzeit des Programms. */
+const timelineMealRow = (item) => ({ ...item.sheetRow, sub: item.title, timeLabel: item.timeLabel });
+
+/**
+ * DIE AUFGEKLAPPTE ZEILE NENNT DIE SPANNE (Critique 2026-10-26, Lauf 2). Der
+ * Block zeigt seine Dauer nur als Breite, die Zeile darunter jetzt in Worten:
+ * „15:00 - 16:00" und den vollen Titel, den ein schmaler Block abschneidet.
+ * Die Liste bleibt beim Beginn allein (#1698); ein Punkt (Mahlzeit) hat keine
+ * Dauer und nennt seinen Beginn, die Schicht traegt ihre Spanne schon.
+ */
+function timelineDetailRow(item) {
+  if (item.kind === 'meal') return timelineMealRow(item);
+  return item.rangeLabel ? { ...item.sheetRow, timeLabel: item.rangeLabel } : item.sheetRow;
+}
+
+/* DIE SUMME IM KOPF: der Tag in einem Satz, bevor man eine Zeile liest
+ * („noch 6 Termine · 1 Aufgabe ueberfaellig"). Nur, was das Blatt selbst
+ * spricht: Termine, wenn der Kalender im Blatt spricht (Kein-Echo-Regel),
+ * Ueberfaelliges, wenn die Aufgaben es tun. Ohne beides steht keine Summe da -
+ * „0 Termine" waere ein Satz ueber nichts. */
+function todaySummary(data, model, timeline = null, now = new Date()) {
+  const parts = [];
+  const events = model.includeCalendar ? todayEventsAhead(data, timeline, now) : 0;
+  if (events > 0) parts.push(t('dashboard.todaySummaryEventsAhead', { count: events }));
+  if (model.includeTasks) {
+    const overdue = model.allRows
+      .flatMap((row) => (row.kind === 'overdue' ? row.members ?? [] : [row]))
+      .filter((row) => row.kind === 'task' && row.overdue).length;
+    if (overdue > 0) parts.push(t('dashboard.todaySummaryOverdue', { count: overdue }));
+  }
+  return parts.join(' · ');
+}
+
+/** Der Ton eines Eintrags der Leiste: das Modul, aus dem er kommt. */
+const TIMELINE_TONES = { calendar: 'calendar', meals: 'meals', schedule: 'schedule' };
+const timelineTone = (item) => `var(--module-${TIMELINE_TONES[item.tone] ?? 'calendar'})`;
+
+/**
+ * DIE ZEITLEISTE DES TAGES (Entwurf „Heute wichtig", 2026-10-26; Modell in
+ * utils/today-timeline.js). Eine Spur fuer den Haushalt, eine je Person mit
+ * etwas Gezeitetem heute; Vergangenes tritt zurueck, ein Strich sagt „jetzt",
+ * das Ganztaegige steht als Band ueber der Achse.
+ *
+ * NUR AUF DER BREITEN BUEHNE (ab 900px Containerbreite, todayStage). Darunter
+ * - Telefon, Tablet hochkant, schmale Spalte - steht die Kurzfassung, und die
+ * Termine bleiben Zeilen: eine Stunde waere dort schmaler als ihr Titel
+ * (Critique 2026-10-26, Befund 1).
+ *
+ * DER BLOCK KLAPPT SEINEN EINTRAG AUF (Ulas, 2026-10-26): seine Zeile -
+ * Siegel, Zuweisung, Kalender - steht unter der Leiste, ein zweiter Klick
+ * klappt sie zu, Esc auch. Die Zeile oeffnet das Objekt wie jede Zeile des
+ * Blatts. Die Leiste ist EIN Tab-Stopp (roving tabindex), Pfeiltasten wandern
+ * zwischen den Bloecken, Tab fuehrt weiter zur aufgeklappten Zeile (Befund 4).
+ * Der zugaengliche Name eines Blocks nennt Person, Titel, Beginn und Ende und
+ * den Zustand: „Emma: Schule, 08:00 bis 13:00, laeuft gerade".
+ */
+function renderTodayTimeline(timeline, now = new Date(), openKey = null) {
+  if (!timeline) return '';
+  const nowMinute = householdMinuteOf(now);
+  // Stunden, Gitter, Bloecke, Strich und Fahne stehen auf DERSELBEN gewichteten
+  // Achse (timelineScale, D7); im gestauchten Teil spricht nur jede k-te Stunde.
+  const hours = timeline.marks.map((mark) => {
+    const classes = ['today-timeline__hour'];
+    if (mark.odd) classes.push('today-timeline__hour--odd');
+    if (mark.sparse) classes.push('today-timeline__hour--sparse');
+    if (timeline.now != null && timelineHourCovered(timeline.scale, mark.minute, nowMinute)) classes.push('today-timeline__hour--covered');
+    return `<span class="${classes.join(' ')}" data-minute="${mark.minute}" style="--tl-at:${mark.at}">${esc(axisHourLabel(mark.minute))}</span>`;
+  }).join('');
+  const grid = `<div class="today-timeline__grid" aria-hidden="true">${timeline.marks.map((mark) => `<span style="--tl-at:${mark.at}"></span>`).join('')}</div>`;
+  const stateLabel = { past: t('dashboard.todayTimelinePast'), now: t('dashboard.todayTimelineRunning') };
+  const solo = timeline.lanes.length === 1 && timeline.lanes[0].key === 'all' && isSoloHousehold();
+  // Der geteilte Nachname steht nicht in jeder Spur (R19): „Johnson" viermal
+  // unterscheidet niemanden. Der volle Name bleibt der zugaengliche Name.
+  const surname = sharedSurname(timeline.lanes.map((lane) => lane.member).filter(Boolean));
+  const shortName = (full) => (surname && full.endsWith(` ${surname}`) ? full.slice(0, -(surname.length + 1)) : full);
+  const everyone = t('dashboard.todayTimelineEveryone');
+  // EIN Tab-Stopp: der aufgeklappte Eintrag, sonst der naechste, sonst der erste.
+  const allKeys = [...(timeline.allDay ?? []).map((item) => item.key), ...timeline.lanes.flatMap((lane) => lane.items.map((item) => item.key))];
+  const focusKey = [openKey, timeline.nextKey, allKeys[0]].find((key) => key && allKeys.includes(key));
+  let focusTaken = false;
+  const tabindex = (key) => {
+    if (focusTaken || key !== focusKey) return ' tabindex="-1"';
+    focusTaken = true;
+    return '';
+  };
+  const button = (item, laneName, { allDay = false } = {}) => {
+    const next = item.key === timeline.nextKey;
+    const when = next ? relativeWhen(item.start, now, item.timeLabel) : null;
+    // EINE QUELLE FUER „WANN" (Critique 2026-10-26, Lauf 2, D2): das Naechste
+    // nennt seine Zeit in der Fahne ueber der Achse, nicht im Block - auch wo
+    // der Block breit genug waere. Zweimal „15:00 · in 2 Std." uebereinander
+    // waere dieselbe Auskunft doppelt, und nur die Fahne fuehrt der
+    // Minutentakt nach (updateTodayTimelineNow). Der Block traegt den Titel;
+    // der zugaengliche Name behaelt die Zeit (data-timeline-when, ebenfalls
+    // nachgefuehrt).
+    const visibleTime = allDay || when ? '' : item.timeLabel;
+    // Nach „in 2 Std." setzt ein Komma ab, sonst laese es sich „in 2 Std. bis 16:00".
+    const until = item.endLabel ? `${next && when ? ',' : ''} ${t('dashboard.todayUntil', { time: item.endLabel })}` : '';
+    const state = next ? t('dashboard.todayTimelineNext') : stateLabel[item.state] ?? '';
+    const classes = ['today-timeline__event', `today-timeline__event--${item.state ?? 'next'}`];
+    if (next) classes.push('today-timeline__event--upnext');
+    if (item.point) classes.push('today-timeline__event--point');
+    // DER VOLLE TITEL ALS TOOLTIP (D7): wo der Block ihn kuerzt, zeigt ihn der
+    // Zeiger samt Beginn - nur der Beginn, wie ueberall im Blatt (#1698); die
+    // Spanne nennt die aufgeklappte Zeile. Der zugaengliche Name bleibt der
+    // Inhalt des Knopfs.
+    const clock = allDay ? '' : item.timeLabel || '';
+    const tooltip = clock ? `${item.title} · ${clock}` : item.title;
+    return `<button type="button" class="${classes.join(' ')}" data-timeline-event="${esc(item.key)}"${tabindex(item.key)}
+                    aria-expanded="${item.key === openKey ? 'true' : 'false'}" aria-controls="today-timeline-detail" title="${esc(tooltip)}">
+              <span class="sr-only">${esc(laneName)}: </span><span class="today-timeline__title">${esc(item.title)}</span>${
+      visibleTime ? `<span class="today-timeline__time"><span class="sr-only">, </span>${esc(visibleTime)}</span>` : ''}${
+      when ? `<span class="sr-only" data-timeline-when>, ${esc(spokenWhen(when, item.timeLabel))}</span>` : ''}${
+      until ? `<span class="sr-only">${esc(until)}</span>` : ''}${state ? `<span class="sr-only">, ${esc(state)}</span>` : ''}
+            </button>`;
+  };
+  const band = (timeline.allDay ?? []).length ? `
+      <div class="today-timeline__allday">
+        <span class="today-timeline__allday-label">${esc(t('dashboard.allDay'))}</span>
+        <ul class="today-timeline__allday-list" aria-label="${esc(t('dashboard.allDay'))}">${
+      timeline.allDay.map((item) => `<li style="--c:${timelineTone(item)}">${button({ ...item, state: 'next' }, laneNameFor(item, timeline, everyone), { allDay: true })}</li>`).join('')
+    }</ul>
+      </div>` : '';
+  const lanes = timeline.lanes.map((lane) => {
+    const name = lane.member ? lane.member.display_name ?? '' : everyone;
+    const face = lane.member
+      ? renderAvatarStack([lane.member], { size: 28, maxVisible: 1 })
+      : `<span class="today-timeline__everyone" aria-hidden="true"><i data-lucide="users" class="icon-sm"></i></span>`;
+    const label = solo ? '' : `<span class="today-timeline__who" aria-hidden="true">${face}<span class="today-timeline__name">${esc(shortName(name))}</span></span>`;
+    const items = lane.items.map((item) => `
+          <li class="today-timeline__slot${item.point ? ' today-timeline__slot--point' : ''}" data-timeline-at="${item.start}" style="--tl-left:${item.left};--tl-width:${item.width};--tl-row:${item.row};--c:${timelineTone(item)}">
+            ${button(item, shortName(name))}
+          </li>`).join('');
+    return `
+        <div class="today-timeline__lane" style="--tl-rows:${lane.rows}">
+          ${label}
+          <ul class="today-timeline__track" aria-label="${esc(name)}">${items}</ul>
+        </div>`;
+  }).join('');
+  const nowMarker = timeline.now == null ? '' : `
+      <div class="today-timeline__past" aria-hidden="true"></div>
+      <div class="today-timeline__now" aria-hidden="true"><span class="today-timeline__now-time">${esc(formatTime(now))}</span></div>`;
+  // Je Eintrag EINE Zeile, auch wenn er in zwei Spuren steht.
+  const details = new Map();
+  for (const item of [...(timeline.allDay ?? []), ...timeline.lanes.flatMap((lane) => lane.items)]) {
+    if (!details.has(item.key)) details.set(item.key, timelineDetailRow(item));
+  }
+  const open = details.has(openKey) ? openKey : null;
+  const detail = `
+    <div class="today-timeline__detail" id="today-timeline-detail"${open ? '' : ' hidden'}>${
+      [...details].map(([key, row]) => `<div class="today-timeline__detail-row" data-timeline-detail="${esc(key)}"${key === open ? '' : ' hidden'}>${renderTodayRow(row)}</div>`).join('')
+    }</div>`;
+  return `${band}
+    <div class="today-timeline${solo ? ' today-timeline--solo' : ''}" role="group" aria-label="${esc(t('dashboard.todayTimelineLabel'))}"
+         data-timeline-start="${timeline.start}" data-timeline-end="${timeline.end}"${timeline.knee == null ? '' : ` data-timeline-knee="${timeline.knee}"`}${timeline.now == null ? '' : ` style="--tl-now:${timeline.now}"`}>
+      <div class="today-timeline__axis" aria-hidden="true">${hours}${renderTimelineFlag(timeline, now)}</div>
+      ${grid}
+      ${lanes}
+      ${nowMarker}
+    </div>${detail}`;
+}
+
+/** Wessen ein ganztaegiger Termin ist - fuer den zugaenglichen Namen seines Bands. */
+function laneNameFor(item, timeline, everyone) {
+  const people = (timeline.members ?? []).filter((member) => item.peopleIds.includes(member.id));
+  if (!people.length || people.length === (timeline.members ?? []).length) return everyone;
+  return people.map((person) => person.display_name ?? '').join(', ');
+}
+
+/**
+ * Die Stunde an der Achse, kurz wie im Entwurf: „07" statt „07:00", im
+ * 12-Stunden-Format „7 AM" (hourGutterLabel). Die Schreibweise der Locale
+ * bleibt (Punkt in `id`, persische Ziffern in `fa`) - gekuerzt wird nur ein
+ * „:00"/„.00" am Ende.
+ */
+function axisHourLabel(minute) {
+  const full = hourGutterLabel(minute / 60);
+  return full.replace(/^(\S+?)[:.]\D?[0０۰٠]{2}$/u, '$1');
+}
+
+/** Was der zugaengliche Name des Naechsten sagt: „in 25 Min, 15:00" - unter einer Stunde mit der Uhrzeit dahinter. */
+const spokenWhen = (when, clock) => (when.soon && clock ? `${when.label}, ${clock}` : when.label);
+
+/**
+ * DAS NAECHSTE SPRICHT, AUCH WENN SEIN BLOCK SCHMAL IST (Critique 2026-10-26,
+ * Lauf 2, D2). Bei 1440 war eine Stunde 59px breit - unter der Schwelle des
+ * Blocks (5rem) faellt seine Uhrzeit weg, und ausgerechnet beim Naechsten
+ * fehlte „15:00 · in 1 Std.". Die Fahne steht in der Achse ueber dem
+ * Blockanfang, geformt wie die Jetzt-Pille, aber im Ton des Moduls (--c):
+ * die Pille sagt „jetzt", die Fahne „das kommt". Sie ist Bild (aria-hidden),
+ * den Satz traegt der Block selbst („..., als Naechstes").
+ *
+ * Wo sie genau steht, entscheidet das Stylesheet (`.today-timeline__flag`):
+ * am Blockanfang, aber nie unter der Jetzt-Pille - die hat Vorrang und die
+ * Fahne weicht nach hinten aus - und nie ueber das Achsenende hinaus. Die
+ * Breiten dafuer misst placeTodayTimelineFlag.
+ */
+function renderTimelineFlag(timeline, now) {
+  const item = timeline.lanes.flatMap((lane) => lane.items).find((entry) => entry.key === timeline.nextKey);
+  const when = item ? relativeWhen(item.start, now, item.timeLabel) : null;
+  if (!when) return '';
+  return `<span class="today-timeline__flag" data-timeline-flag aria-hidden="true" data-flag-at="${item.start}" data-flag-clock="${esc(item.timeLabel)}" style="--tl-at:${item.left};--c:${timelineTone(item)}">${esc(when.label)}</span>`;
+}
+
+/* Abstand zwischen Fahne und dem, dem sie ausweicht (Jetzt-Pille, Stunde). */
+const TIMELINE_FLAG_GAP = 4;
+
+/**
+ * Misst, was das Stylesheet fuer die Lage der Fahne braucht: die halbe Breite
+ * der Jetzt-Pille (`--tl-now-half`, die Fahne beginnt erst dahinter) und die
+ * eigene Breite (`--tl-flag-w`, sie endet spaetestens am Achsenende). Die
+ * Stunden, die danach unter ihr liegen, schweigen wie die unter der Pille.
+ * Laeuft beim Verdrahten, im Minutentakt und wenn die Leiste ihre Breite
+ * aendert (ResizeObserver in wireTodayTimeline).
+ */
+function placeTodayTimelineFlag(timeline) {
+  const flag = timeline?.querySelector?.('[data-timeline-flag]');
+  if (!flag) return;
+  const pill = timeline.querySelector('.today-timeline__now-time');
+  const half = pill ? pill.getBoundingClientRect().width / 2 + TIMELINE_FLAG_GAP : 0;
+  flag.style.setProperty('--tl-now-half', `${half}px`);
+  flag.style.setProperty('--tl-flag-w', `${flag.getBoundingClientRect().width}px`);
+  const box = flag.getBoundingClientRect();
+  for (const hour of timeline.querySelectorAll('.today-timeline__hour[data-minute]')) {
+    const rect = hour.getBoundingClientRect();
+    const under = !flag.hidden && rect.right > box.left - TIMELINE_FLAG_GAP && rect.left < box.right + TIMELINE_FLAG_GAP;
+    hour.classList.toggle('today-timeline__hour--flagged', under);
+  }
+}
+
+/**
+ * DIE KURZFASSUNG (Entwurf, mobil): je Spur ein 6px-Balken, ein 20px-Gesicht
+ * statt des Namens, die Stunden in GLEICHEN Schritten (Critique 2026-10-26:
+ * 07/11/15/19/22 las sich ungleich), der Jetzt-Strich. Sie ist Bild
+ * (aria-hidden) - die Termine stehen darunter als Zeilen, denn ein Balken
+ * traegt weder Text noch ein eigenes Tippziel. Gilt auf dem Telefon und unter
+ * 900px Containerbreite.
+ *
+ * MOBIL VERSCHENKT DAS BILD KEINEN PLATZ (Critique 2026-10-26, Lauf 2, D3).
+ * Gemessen 390x844: 148px hoch, gut ein Viertel der Karte, fuer fuenf Spuren,
+ * von denen einige nur noch Vergangenes trugen. Jetzt:
+ *   - NUR SPUREN MIT KOMMENDEM. Eine Spur, deren Tag durch ist, sagt nichts,
+ *     was die Zeilen darunter brauchen; in einer Spur mit Kommendem bleiben
+ *     die vergangenen Balken grau stehen - sie zeigen die Form des Tages.
+ *     Hat keine Spur mehr etwas vor sich, entfaellt das Bild ganz: dann
+ *     sprechen die Zeilen und die Coda.
+ *   - PACKREIHEN ALS TEILSPUREN. Die Kurzfassung las `item.row` aus packLane
+ *     nicht: Zahnarzt 11-12 und Team-Call 11:30-12:30 verschmolzen zu einem
+ *     Balken, der Elternsprechtag 09-11 lag unsichtbar im Schichtbalken.
+ *     Eine Fuge (2px Flaeche um den spaeteren Balken) haette nur die Kante
+ *     gezeigt - ein Termin, der ganz in einem anderen liegt, bliebe verdeckt.
+ *     Eine duenne Zeile je Reihe zeigt jeden Termin ganz; bis drei Reihen
+ *     passen neben das 20px-Gesicht, ohne die Spur zu erhoehen.
+ */
+function renderTodayMiniTimeline(timeline, now = new Date()) {
+  if (!timeline) return '';
+  const ahead = timeline.lanes.filter((lane) => lane.items.some((item) => item.state !== 'past'));
+  if (!ahead.length) return '';
+  const span = timeline.end - timeline.start;
+  // LINEAR, NICHT GEWICHTET (D7): die Kurzfassung zeigt die Form des ganzen
+  // Tages in gleichen Schritten; die gestauchte Vergangenheit gilt nur der
+  // breiten Leiste, deren Bloecke Titel tragen.
+  const linear = timelineScale({ start: timeline.start, end: timeline.end });
+  const step = Math.ceil(span / 60 / 5) * 60;
+  const marks = [];
+  for (let minute = timeline.start; minute <= timeline.end; minute += step) marks.push(minute);
+  // Die Marke unter der Jetzt-Pille schweigt; schmal deckt die Pille mehr Zeit.
+  const nowMinute = householdMinuteOf(now);
+  const covered = (minute) => timeline.now != null && nowMinute != null && Math.abs(minute - nowMinute) < span / 12;
+  const axis = marks.map((minute) => `<span${covered(minute) ? ' class="today-timeline__hour--covered"' : ''} style="--tl-at:${linear.x(minute)}">${esc(axisHourLabel(minute))}</span>`).join('');
+  const solo = timeline.lanes.length === 1 && timeline.lanes[0].key === 'all' && isSoloHousehold();
+  const lanes = ahead.map((lane) => {
+    const face = lane.member
+      ? renderAvatarStack([lane.member], { size: 20, maxVisible: 1 })
+      : '<span class="today-timeline__everyone today-timeline__everyone--sm"><i data-lucide="users" class="icon-sm"></i></span>';
+    const rows = Math.max(1, lane.rows ?? 1);
+    const bars = lane.items.map((item) => `<i class="today-timeline__bar${item.state === 'past' ? ' today-timeline__bar--past' : ''}${item.point ? ' today-timeline__bar--point' : ''}" style="--tl-left:${linear.x(item.start)};--tl-width:${linear.width(item.start, item.end)};--tl-row:${item.row ?? 0};--c:${timelineTone(item)}"></i>`).join('');
+    return `${solo ? '' : `<span class="today-timeline__face">${face}</span>`}<div class="today-timeline__bars" style="--tl-rows:${rows}">${bars}</div>`;
+  }).join('');
+  const nowMarker = timeline.now == null ? '' : `<div class="today-timeline__now"><span class="today-timeline__now-time">${esc(formatTime(now))}</span></div>`;
+  return `
+    <div class="today-timeline today-timeline--mini${solo ? ' today-timeline--solo' : ''}" aria-hidden="true"
+         data-timeline-start="${timeline.start}" data-timeline-end="${timeline.end}" style="--tl-span:${span}${timeline.now == null ? '' : `;--tl-now:${linear.x(nowMinute)}`}">
+      <div class="today-timeline__axis">${axis}</div>
+      ${lanes}
+      ${nowMarker}
+    </div>`;
+}
+
+/**
+ * DAS GANZE BILD IST EIN TIPPZIEL (Critique 2026-10-26, Lauf 2, D3): die
+ * Kurzfassung hatte null Tippziele, und wer den Tag darin sah, musste den
+ * kleinen Link `+N weitere` darunter suchen. Gibt es Verdecktes, liegt
+ * ueber dem Bild EIN Knopf (oder Link, wenn `+N weitere` in eine Ansicht
+ * fuehrt) mit demselben Ziel wie `+N weitere`: dieselbe Region, dasselbe
+ * aria-expanded. Das Bild bleibt aria-hidden, der Knopf hat einen eigenen
+ * Namen (`Ganzen Tag zeigen`), den Inhalt tragen die Zeilen. Ohne
+ * Ueberlauf gibt es nichts zu oeffnen - dann ist das Bild nur Bild, ohne
+ * Fokusstopp.
+ *
+ * Als Geschwister ueber dem Bild und nicht als Huelle: ein <button> darf
+ * keine <div> enthalten, und ein Knopf in einer aria-hidden-Huelle waere ein
+ * Fokusstopp ohne Namen.
+ * @param {string} picture  renderTodayMiniTimeline
+ * @param {{ route?: string|null, open?: boolean, target?: string }} [peek]
+ *   route: Ziel von `+N weitere`; sonst klappt der Knopf die Region auf
+ */
+function renderTodayPeek(picture, peek = null) {
+  if (!picture) return '';
+  const label = esc(t('dashboard.todayShowDay'));
+  let hit = '';
+  if (peek?.route) {
+    hit = `<a href="${esc(peek.route)}" class="today-timeline-peek__hit" data-route="${esc(peek.route)}" aria-label="${label}"></a>`;
+  } else if (peek) {
+    hit = `<button type="button" class="today-timeline-peek__hit" id="today-cockpit-peek" data-today-more data-today-peek
+          aria-expanded="${peek.open ? 'true' : 'false'}" aria-controls="today-cockpit-more"${peek.target ? ` data-peek-target="${esc(peek.target)}"` : ''} aria-label="${label}"></button>`;
+  }
+  return `<div class="today-timeline-peek${hit ? ' today-timeline-peek--action' : ''}">${picture}${hit}</div>`;
+}
+
+/**
+ * Wohin der Knopf ueber dem Bild nach dem Aufklappen fuehrt: zur ersten
+ * kommenden Zeile unter den bisher verdeckten (Termin, Mahlzeit, Schicht mit
+ * Uhrzeit nach jetzt) - das, wonach man gefragt hat, als man den ganzen Tag
+ * sehen wollte. Sonst die erste verdeckte Zeile mit Objekt. `kind:id`.
+ */
+function todayPeekTarget(hidden, now) {
+  const nowKey = zonedTimeKey(now);
+  const upcoming = (row) => ['event', 'meal', 'shift'].includes(row?.kind)
+    && /^\d{2}:\d{2}$/.test(String(row.sortKey)) && row.sortKey > '00:02' && row.sortKey > nowKey;
+  const row = hidden.find((r) => upcoming(r) && r.objectId != null) ?? hidden.find((r) => r?.objectId != null);
+  return row ? `${row.kind}:${row.objectId}` : '';
+}
+
+/**
+ * Nach dem Aufklappen ueber das Bild: Fokus und Blick auf die Zielzeile
+ * (todayPeekTarget), sonst auf die erste Zeile der Region. `block: 'nearest'`
+ * mit dem scroll-padding des Scrollports (layout.css, --nav-tail): die Zeile
+ * landet ueber der Kapsel, nicht dahinter.
+ */
+function revealTodayPeekTarget(region, target) {
+  if (!region?.querySelector) return;
+  const [kind, id] = String(target ?? '').split(':');
+  const quote = (value) => (globalThis.CSS?.escape ? CSS.escape(value) : String(value).replace(/["\\]/g, '\\$&'));
+  const row = (kind && id ? region.querySelector(`[data-object-kind="${quote(kind)}"][data-object-id="${quote(id)}"]`) : null)
+    ?? region.querySelector('a[href], button');
+  if (!row) return;
+  row.focus?.({ preventScroll: true });
+  const still = globalThis.window?.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  row.scrollIntoView?.({ block: 'nearest', behavior: still ? 'auto' : 'smooth' });
+}
+
+/** Aufgeklappt bleibt aufgeklappt, auch wenn der Minutentakt das Blatt neu zeichnet. */
+let todayTimelineOpen = null;
+
+/* Welcher Block die Zeile aufgeklappt hat, als Schluessel und Stelle unter den
+ * Bloecken mit diesem Schluessel: ein Termin fuer zwei steht in zwei Spuren,
+ * und Esc gibt den Fokus dem zurueck, der ihn geoeffnet hat - auch nach einem
+ * Neuaufbau im Minutentakt. */
+let todayTimelineOwner = null;
+
+/* Misst die Fahne nach, wenn die Leiste ihre Breite aendert; einer je Aufbau. */
+let todayFlagObserver = null;
+
+/**
+ * Ein Block klappt seine Zeile unter der Leiste auf, ein zweiter Klick auf
+ * denselben klappt sie zu, ein Klick auf einen anderen wechselt; Esc klappt zu
+ * und gibt den Fokus an DEN Block zurueck, der sie geoeffnet hat. Die Leiste
+ * ist ein Tab-Stopp (roving tabindex): links/rechts, Pos1 und Ende wandern in
+ * der Lesereihenfolge, hoch/runter wechseln die Spur - zum Block der
+ * Nachbarspur, dessen Beginn dem eigenen am naechsten liegt (Critique
+ * 2026-10-26, Lauf 2: hoch/runter liefen wie links/rechts).
+ *
+ * DIE ZEILE GLEITET AUF WIE „+N WEITERE" (Critique 2026-10-26, Lauf 2): bis
+ * hierher schaltete nur `hidden`, und das Raster darunter sprang um 81px,
+ * waehrend „+N weitere" daneben 250ms glitt. Jetzt dieselbe Regel
+ * (toggleRegion: Hoehe per FLIP der Nachbarn, unter reduzierter Bewegung nur
+ * eine Blende). Wechselt die Auswahl bei offener Zeile, bleibt die Hoehe
+ * stehen und nur der Inhalt blendet ueber - mit dem Inhaltswechsel der App
+ * (swapContent), nicht mit einer eigenen Kurve.
+ */
+function wireTodayTimeline(root) {
+  const region = root?.querySelector?.('#today-timeline-detail');
+  if (!region) return;
+  const buttons = [...root.querySelectorAll('[data-timeline-event]')];
+  const keyOf = (btn) => btn.dataset.timelineEvent;
+  const sameKey = (key) => buttons.filter((btn) => keyOf(btn) === key);
+  // Die Spuren in Lesereihenfolge: das Band des Ganztaegigen, dann je Person.
+  const laneOf = (btn) => btn.closest('ul');
+  const lanes = [...new Set(buttons.map(laneOf))];
+  let owner = todayTimelineOwner?.key === todayTimelineOpen
+    ? sameKey(todayTimelineOpen)[todayTimelineOwner.nth] ?? null
+    : null;
+  const setOpen = (next, from = null) => {
+    const switching = todayTimelineOpen != null && next != null && !region.hidden;
+    todayTimelineOpen = next;
+    owner = next == null ? null : from;
+    todayTimelineOwner = owner ? { key: next, nth: sameKey(next).indexOf(owner) } : null;
+    for (const other of buttons) other.setAttribute('aria-expanded', keyOf(other) === next ? 'true' : 'false');
+    if (next == null) {
+      toggleRegion(region, false);
+      return;
+    }
+    const rows = [...region.querySelectorAll('[data-timeline-detail]')];
+    const showRow = () => {
+      for (const row of rows) row.hidden = row.dataset.timelineDetail !== next;
+    };
+    if (switching) swapContent(rows.find((row) => row.dataset.timelineDetail === next) ?? null, showRow);
+    else showRow();
+    // Auch beim Wechsel: ein Zuklappen, das gerade laeuft, haelt hier an.
+    toggleRegion(region, true);
+  };
+  const focusButton = (btn) => {
+    if (!btn) return;
+    for (const other of buttons) other.setAttribute('tabindex', other === btn ? '0' : '-1');
+    btn.focus();
+  };
+  // Der Block der Nachbarspur, dessen Beginn dem eigenen am naechsten liegt;
+  // im Band (ohne Beginn) der erste. Gleich nah gewinnt der fruehere.
+  const across = (btn, step) => {
+    const lane = lanes[lanes.indexOf(laneOf(btn)) + step];
+    if (!lane) return null;
+    const startOf = (other) => Number(other.closest('[data-timeline-at]')?.dataset.timelineAt ?? NaN);
+    const at = startOf(btn);
+    const distance = (other) => (Number.isFinite(at) && Number.isFinite(startOf(other)) ? Math.abs(startOf(other) - at) : 0);
+    return buttons.filter((other) => laneOf(other) === lane)
+      .reduce((best, other) => (!best || distance(other) < distance(best) ? other : best), null);
+  };
+  buttons.forEach((btn, index) => {
+    btn.addEventListener('click', () => {
+      const key = keyOf(btn);
+      setOpen(todayTimelineOpen === key ? null : key, btn);
+    });
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        focusButton(across(btn, e.key === 'ArrowUp' ? -1 : 1));
+        return;
+      }
+      const move = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: buttons.length - 1 }[e.key];
+      if (move != null) {
+        e.preventDefault();
+        focusButton(buttons[Math.max(0, Math.min(buttons.length - 1, move))]);
+      }
+    });
+  });
+  const close = (e) => {
+    if (e.key !== 'Escape' || todayTimelineOpen == null) return;
+    const back = owner ?? sameKey(todayTimelineOpen)[0];
+    e.preventDefault();
+    setOpen(null);
+    focusButton(back);
+  };
+  region.addEventListener('keydown', close);
+  for (const btn of buttons) btn.addEventListener('keydown', close);
+  const timeline = root.querySelector('.today-timeline:not(.today-timeline--mini)');
+  todayFlagObserver?.disconnect();
+  todayFlagObserver = null;
+  if (timeline?.querySelector('[data-timeline-flag]')) {
+    placeTodayTimelineFlag(timeline);
+    if (typeof ResizeObserver === 'function') {
+      todayFlagObserver = new ResizeObserver(() => placeTodayTimelineFlag(timeline));
+      todayFlagObserver.observe(timeline);
+    }
+  }
+}
+
+/**
+ * Der Jetzt-Strich wandert mit dem Minutentakt, ohne das Blatt neu zu bauen:
+ * der Fingerabdruck des Tages (todayFingerprint) aendert sich erst, wenn ein
+ * Eintrag beginnt oder endet - dann baut die Uebersicht ohnehin neu.
+ * Dazwischen setzt diese Funktion nur die Lage und die Uhrzeit, und die Fahne
+ * des Naechsten zaehlt herunter („in 25 Min" -> „in 24 Min"), samt dem
+ * zugaenglichen Namen ihres Blocks. Hat er begonnen, schweigt sie, bis der
+ * Neuaufbau den naechsten nennt.
+ */
+function updateTodayTimelineNow(root, now = new Date()) {
+  const timeline = root?.querySelector?.('.today-timeline');
+  if (!timeline) return;
+  const flag = timeline.querySelector('[data-timeline-flag]');
+  if (flag) {
+    const clock = flag.dataset.flagClock ?? '';
+    const when = relativeWhen(Number(flag.dataset.flagAt), now, clock);
+    flag.hidden = !when;
+    if (when) {
+      flag.textContent = when.label;
+      for (const spoken of timeline.querySelectorAll('[data-timeline-when]')) spoken.textContent = `, ${spokenWhen(when, clock)}`;
+    }
+  }
+  const start = Number(timeline.dataset.timelineStart);
+  const end = Number(timeline.dataset.timelineEnd);
+  const minute = householdMinuteOf(now);
+  if (!(end > start) || minute == null || minute < start || minute > end) {
+    placeTodayTimelineFlag(timeline);
+    return;
+  }
+  // Dasselbe Knie, mit dem die Leiste gezeichnet ist (data-timeline-knee):
+  // springt es zur vollen Stunde, baut der Fingerabdruck ohnehin neu. Die
+  // Kurzfassung traegt keins und bleibt linear.
+  const kneeAttr = timeline.dataset.timelineKnee;
+  const scale = timelineScale({ start, end, knee: kneeAttr == null || kneeAttr === '' ? null : Number(kneeAttr) });
+  timeline.style.setProperty('--tl-now', String(scale.x(minute)));
+  for (const hour of timeline.querySelectorAll('.today-timeline__hour[data-minute]')) {
+    hour.classList.toggle('today-timeline__hour--covered', timelineHourCovered(scale, Number(hour.dataset.minute), minute));
+  }
+  const label = timeline.querySelector('.today-timeline__now-time');
+  if (label) label.textContent = formatTime(now);
+  placeTodayTimelineFlag(timeline);
+}
+
+/* „ALS NAECHSTES" (Entwurf „Heute wichtig", 2026-10-26): auf der breiten
+ * Buehne drei Zellen nebeneinander - das Naechste, das Ueberfaellige, der
+ * Einkauf zuletzt. Was nicht passt, zaehlt „+N weitere" in der Fussleiste.
+ * Die Termine stehen dort in der Zeitleiste, nicht in der Liste. */
+const PROGRAM_STRIP_CAP = 3;
+
+/* Unter der breiten Buehne (Tablet, schmale Spalte) stehen die Zeilen
+ * untereinander, so viele wie der Entwurf mobil zeigt. */
+const PROGRAM_COMPACT_CAP = 4;
+
+/* DIE DREI BUEHNEN DES BLATTS (Critique 2026-10-26, Befund 1): `phone` (die
+ * Telefon-Buehne, dynamischer Deckel), `compact` (unter 900px Containerbreite:
+ * Kurzfassung plus Zeilen - dort waere eine Stunde schmaler als ihr Titel und
+ * ein Block auf Touch 35px breit) und `wide` (Leiste mit Bloecken). Gemessen
+ * wird das Blatt selbst, beim ersten Aufbau der Inhaltsbereich; ohne DOM
+ * (Tests) gilt `wide`. Wechselt die Buehne beim Groessenziehen, baut die
+ * Uebersicht neu (createPhoneProgramFit). */
+const TODAY_COMPACT_WIDTH = 900;
+let todayLastWidth = null;
+
+function todayStage() {
+  if (onPhoneStage()) return 'phone';
+  const doc = globalThis.document;
+  const sheet = doc?.querySelector?.('.today-cockpit');
+  const content = doc?.querySelector?.('.app-content');
+  const width = sheet?.clientWidth || (content?.clientWidth ? content.clientWidth - 2 * PAGE_PAD_ESTIMATE : 0) || todayLastWidth;
+  if (width) todayLastWidth = width;
+  return width && width < TODAY_COMPACT_WIDTH ? 'compact' : 'wide';
+}
+
+/* Das Seitenpolster des Inhaltsbereichs, nur fuer die erste Schaetzung, bevor
+ * es das Blatt gibt; danach misst todayStage das Blatt selbst. */
+const PAGE_PAD_ESTIMATE = 32;
+
+/**
+ * Wann ein Termin oder eine Mahlzeit dran ist, relativ zu jetzt: „in 25 Min"
+ * im Ton des Moduls (unter einer Stunde), spaeter „15:00 · in 2 Std." (relativeWhen). Ueber
+ * Intl.RelativeTimeFormat, damit jede Sprache ihre eigene Kurzform hat.
+ * Aufgaben behalten ihr „bis 18:00" - eine Frist ist kein Beginn.
+ */
+function withRelativeWhen(row, now) {
+  if (!row || !['event', 'meal'].includes(row.kind)) return row;
+  const time = String(row.sortKey ?? '');
+  if (!/^\d{2}:\d{2}$/.test(time) || time <= '00:02') return row;
+  const when = relativeWhen(clockMinute(time), now, formatTime(time));
+  return when ? { ...row, timeLabel: when.label, soon: when.soon } : row;
+}
+
+/**
+ * DAS NAECHSTE ZUERST (Entwurf: „naechster Termin/Mahlzeit, Ueberfaelliges,
+ * Einkauf zuletzt"). Der Deckel haelt Offenes vorn (composeTodaySheet), und so
+ * rutschte das Abendessen um 18:30 hinter „+N weitere". Hier rueckt der
+ * frueheste kommende Termin oder die Mahlzeit an die erste Stelle - steht er
+ * hinter dem Deckel, tauscht er mit der letzten sichtbaren Zeile. Die Zahl
+ * hinter „+N weitere" bleibt dieselbe; ihr Ziel rechnet neu.
+ */
+function nextFirst(model, now) {
+  // In zwei Teilen (D6) steht die Leiste schon chronologisch vorn, und der
+  // Deckel haelt ihr Naechstes (composeTodaySheet, anchor) - ein Vorziehen
+  // stellte es vor das Ganztaegige und das Laufende.
+  if (model.lead) return model;
+  const nowKey = zonedTimeKey(now);
+  const upcoming = (row) => ['event', 'meal'].includes(row?.kind)
+    && /^\d{2}:\d{2}$/.test(String(row.sortKey)) && row.sortKey > '00:02' && row.sortKey > nowKey;
+  const soonest = (list) => list.reduce((best, row, index) => (upcoming(row) && (best < 0 || row.sortKey < list[best].sortKey) ? index : best), -1);
+  const visible = soonest(model.rows);
+  const hiddenIndex = soonest(model.hiddenRows);
+  if (hiddenIndex >= 0 && model.rows.length && model.rows.at(-1).kind !== 'overdue' && (visible < 0 || model.hiddenRows[hiddenIndex].sortKey < model.rows[visible].sortKey)) {
+    const promoted = model.hiddenRows[hiddenIndex];
+    const demoted = model.rows.at(-1);
+    const hiddenRows = [demoted, ...model.hiddenRows.filter((_, i) => i !== hiddenIndex)];
+    return {
+      ...model,
+      rows: [promoted, ...model.rows.slice(0, -1)],
+      hiddenRows,
+      moreRoute: todayMoreRoute(hiddenRows, zonedDateKey(now)),
+    };
+  }
+  if (visible <= 0) return model;
+  return { ...model, rows: [model.rows[visible], ...model.rows.slice(0, visible), ...model.rows.slice(visible + 1)] };
+}
+
+function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(), moreOpen = todayMoreOpen, overdueOpen = todayOverdueOpen, timelineOpen = todayTimelineOpen, cap, stage = todayStage(), viewer = dashboardViewer } = {}) {
+  const phone = stage === 'phone';
+  const wide = stage === 'wide';
+  // Die Leiste nur, wenn der Kalender im Blatt spricht: neben einer sichtbaren
+  // Termin-Kachel waere sie deren Echo. Unter der breiten Buehne ist sie die
+  // stumme Kurzfassung (6px-Balken, kein Text); dort bleiben die Termine Zeilen.
+  const timeline = todayDomainSpeaks(cfg, 'calendar')
+    ? buildTodayTimeline(data, { now, viewer, includeMeals: todayDomainSpeaks(cfg, 'meals'), includeShifts: todayDomainSpeaks(cfg, 'schedule') })
+    : null;
+  // Breit nimmt die Leiste ihre Eintraege aus der Liste; darunter speist sie
+  // die Zeilen (timelineSheetRows) - Bild und Text aus einem Modell.
+  const timelineOptions = { timeline, timelineRows: !wide };
+  const stageCap = cap ? { cap } : phone ? {} : { cap: wide ? PROGRAM_STRIP_CAP : PROGRAM_COMPACT_CAP };
+  let model = buildTodayCockpitModel(data, cfg, { now, ...timelineOptions, ...stageCap });
+  // Breit ist der Einkauf eine der drei Zellen - die letzte.
+  if (wide && !cap && model.shopping && model.rows.length >= PROGRAM_STRIP_CAP) {
+    model = buildTodayCockpitModel(data, cfg, { now, ...timelineOptions, cap: PROGRAM_STRIP_CAP - 1 });
+  }
+
+  // „Heute frei" unter einer Leiste voller beendeter Termine widerspraeche ihr:
+  // der Tag war nicht frei, er ist durch.
+  const state = model.state && timeline && model.state.icon === 'sparkles'
+    ? { ...model.state, title: t('dashboard.todayNothingElse') }
+    : model.state;
+  model = nextFirst(model, now);
+  const rows = model.rows.map((row) => withRelativeWhen(row, now));
+  const shopping = model.shopping ? { ...model.shopping, chevron: true } : null;
+
+  const parts = [];
+  // Die Kurzfassung steht vorn, ihr Knopf kennt aber erst unten das Ziel von
+  // „+N weitere" (renderTodayPeek) - sie wird dort eingesetzt.
+  const picture = timeline && !wide ? renderTodayMiniTimeline(timeline, now) : '';
+  if (timeline && wide) parts.push(renderTodayTimeline(timeline, now, timelineOpen));
+
+  const listRows = [];
+  if (state) listRows.push(renderTodayStateRow(state));
+  listRows.push(...rows.map((row) => (row.kind === 'overdue'
+    ? renderTodayOverdueGroup(row, overdueOpen)
+    : renderTodayRow(row))));
+  const foldShopping = Boolean(shopping) && model.overflow > 0 && !model.moreRoute && !wide;
+  // „AUSSERDEM HEUTE" AUCH UNTER DER BREITEN BUEHNE (D6): zwischen den
+  // Eintraegen der Leiste und dem Rest, nur wenn beide Teile stehen - in der
+  // Liste, vor der Einkaufszeile (wenn sie allein den Rest bildet) oder in den
+  // aufgeklappten Zeilen, je nachdem, wo der Rest beginnt. Eine Ueberschrift,
+  // damit der Screenreader die Gliederung hoert und anspringen kann.
+  const lead = model.lead;
+  const leadShown = lead?.shown ?? 0;
+  const also = `<h3 class="today-cockpit__also today-cockpit__also--row">${esc(t('dashboard.todayAlsoTitle'))}</h3>`;
+  const alsoInRows = leadShown > 0 && rows.length > leadShown;
+  const alsoBeforeShopping = !alsoInRows && leadShown > 0 && Boolean(shopping) && !foldShopping;
+  if (alsoInRows) listRows.splice((state ? 1 : 0) + leadShown, 0, also);
+  // Breit steht der Einkauf als letzte Zelle in der Leiste; darunter bleibt er
+  // die Schlusszeile unter den Zeilen und klappt mit (R14).
+  if (wide && shopping) listRows.push(renderTodayRow(shopping));
+  if (listRows.length) {
+    const cols = Math.min(PROGRAM_STRIP_CAP, Math.max(1, listRows.length));
+    // „AUSSERDEM HEUTE" (Critique 2026-10-26, Befund 2): breit nennt die Leiste
+    // das Naechste selbst, der Streifen traegt den Rest des Tages - und sagt es.
+    if (wide && timeline && rows.length) parts.push(`<p class="today-cockpit__also">${esc(t('dashboard.todayAlsoTitle'))}</p>`);
+    parts.push(wide
+      ? `<div class="today-cockpit__rows today-cockpit__rows--next" style="--today-next-cols:${cols}">${listRows.join('')}</div>`
+      : `<div class="today-cockpit__rows">${listRows.join('')}</div>`);
+  }
+  if (!wide && shopping && !foldShopping) parts.push(`${alsoBeforeShopping ? also : ''}${renderTodayRow(shopping)}`);
+
+  // DIE FUSSLEISTE: links die Coda, rechts „+N weitere" (Entwurf). Beide
+  // zugleich gibt es nicht - neben verdeckten Zeilen waere „nichts mehr"
+  // gelogen (codaAllowed).
+  //
+  // UNTER DER BREITEN BUEHNE IST „+N WEITERE" DIE LETZTE ZEILE (Critique
+  // 2026-10-26, Lauf 2, D3): gemessen 390x844 trug ein 71-75px hohes Fussband
+  // nur diesen einen Link. Jetzt steht er als schlanke Zeile im Raster der
+  // Zeilen (44px, Text an der Titelkante); die Coda behaelt ihren Fuss. Breit
+  // bleibt der Fuss, wie er ist: dort steht der Link rechts unter drei Zellen
+  // nebeneinander, eine Zeile im Raster gibt es nicht.
+  const moreRow = wide ? '' : ' today-cockpit__more--row';
+  let more = '';
+  let peek = null;
   if (model.overflow > 0 && model.moreRoute) {
-    const moreText = esc(t('dashboard.todayMore', { count: model.overflow }));
-    parts.push(`<a href="${esc(model.moreRoute)}" class="today-cockpit__more today-cockpit__more--link" data-route="${esc(model.moreRoute)}">
-          <span>${moreText}</span><i data-lucide="chevron-right" class="icon-sm" aria-hidden="true"></i>
-        </a>`);
+    peek = { route: model.moreRoute };
+    more = `<a href="${esc(model.moreRoute)}" class="today-cockpit__more today-cockpit__more--link${moreRow}" data-route="${esc(model.moreRoute)}">
+          <span>${esc(t('dashboard.todayMore', { count: model.overflow }))}</span><i data-lucide="chevron-right" class="icon-sm" aria-hidden="true"></i>
+        </a>`;
   } else if (model.overflow > 0) {
     // Keine Ansicht zeigt alle verdeckten Zeilen (todayMoreRoute): sie stehen
     // hier, zugeklappt, und der Knopf darunter klappt sie auf. Auf dem Telefon
-    // klappt die Einkaufszeile mit (R14): sie ist zeitlos, und als eigene
-    // Zeile unter dem Knopf schob sie das erste Widget um 64px weiter hinab.
-    const hidden = foldShopping ? [...model.hiddenRows, model.shopping] : model.hiddenRows;
+    // klappt die Einkaufszeile mit (R14).
+    const hidden = (foldShopping ? [...model.hiddenRows, shopping] : model.hiddenRows).map((row) => withRelativeWhen(row, now));
+    // Die verdeckten Zeilen der Leiste stehen vorn (composeTodaySheet); folgt
+    // ihnen der Rest und hat ihn oben noch keine Ueberschrift eingeleitet,
+    // beginnt er hier.
+    const hiddenLead = lead ? lead.total - lead.shown : 0;
+    const alsoInMore = Boolean(lead?.total) && !alsoInRows && !alsoBeforeShopping && hidden.length > hiddenLead;
+    const hiddenRowsHtml = (list) => list.map((row, index) => `${alsoInMore && index === hiddenLead ? also : ''}${renderTodayRow(row)}`).join('');
     const moreText = t('dashboard.todayMore', { count: hidden.length });
     const lessText = t('dashboard.todayLess');
-    parts.push(`<div class="today-cockpit__rows today-cockpit__rows--more" id="today-cockpit-more"${moreOpen ? '' : ' hidden'}>${
-      hidden.map((row) => renderTodayRow(row)).join('')}</div>`);
-    parts.push(`<button type="button" class="today-cockpit__more today-cockpit__more--link" data-today-more
+    peek = { open: moreOpen, target: todayPeekTarget(hidden, now) };
+    parts.push(`<div class="today-cockpit__rows today-cockpit__rows--more${wide ? ' today-cockpit__rows--next' : ''}" id="today-cockpit-more"${wide ? ` style="--today-next-cols:${Math.min(PROGRAM_STRIP_CAP, hidden.length)}"` : ''}${moreOpen ? '' : ' hidden'}>${
+      hiddenRowsHtml(hidden)}</div>`);
+    more = `<button type="button" class="today-cockpit__more today-cockpit__more--link${moreRow}" data-today-more
           aria-expanded="${moreOpen ? 'true' : 'false'}" aria-controls="today-cockpit-more"
           data-more-label="${esc(moreText)}" data-less-label="${esc(lessText)}">
           <span>${esc(moreOpen ? lessText : moreText)}</span><i data-lucide="chevron-down" class="icon-sm today-cockpit__more-icon" aria-hidden="true"></i>
-        </button>`);
+        </button>`;
   }
-  if (model.coda) parts.push(`<div class="today-cockpit__coda">${esc(model.coda)}</div>`);
+  if (!wide && more) parts.push(more);
+  const footMore = wide ? more : '';
+  if (model.coda || footMore) {
+    parts.push(`<div class="today-cockpit__foot">${model.coda ? `<span class="today-cockpit__coda">${esc(model.coda)}</span>` : ''}${footMore}</div>`);
+  }
+  if (picture) parts.unshift(renderTodayPeek(picture, peek));
 
   // Deckt der Nutzer alle vier Domänen über Widgets ab, wäre das Cockpit leer —
   // dann entfällt der ganze Abschnitt statt einer leeren Kopfzeile. Im
@@ -4488,21 +6123,33 @@ function renderTodayCockpit(data, cfg = [], editing = false, { now = new Date(),
       <i data-lucide="eye-off" aria-hidden="true"></i>
     </button>` : '';
 
-  // Mobil klappt das Band im Anpassen-Modus auf diese Kopfzeile zusammen
-  // (dashboard.css, `.today-cockpit--editing`): angeordnet wird dort nichts,
-  // und sein Inhalt schob das erste Rasterwidget bis an den Bildschirmrand.
+  const summary = todaySummary(data, model, timeline, now);
+
+  /* DER KOPF STEHT IN DER KARTE (Entwurf): Siegel der Uebersicht, Titel, die
+   * Summe des Tages - auf jeder Buehne. Im Anpassen-Modus steht er ueber der
+   * Karte: mobil klappt das Band dort auf diese Kopfzeile zusammen
+   * (dashboard.css, `.today-cockpit--editing`), und der Ausblenden-Knopf
+   * muss sichtbar bleiben. */
+  const header = `
+      <div class="today-cockpit__header">
+        <span class="module-seal today-cockpit__seal" aria-hidden="true">${moduleIconHTML('sun-moon')}</span>
+        <div class="today-cockpit__heading">
+          <h2 id="today-cockpit-title" tabindex="-1">${esc(t('dashboard.todayTitle'))}</h2>
+          ${summary ? `<p class="today-cockpit__summary">${esc(summary)}</p>` : ''}
+        </div>
+        ${hideBtn}
+      </div>`;
+
   // Zeilenzahl und Tagesumfang stehen am Blatt, damit `measurePhoneProgram`
   // nach dem Zeichnen nachrechnen kann, ohne das Modell ein zweites Mal zu bauen.
-  const fit = onPhoneStage() && !editing
-    ? ` data-program-cap="${model.rows.length}" data-program-total="${model.allRows.length}"${model.shopping ? ' data-program-shopping="1"' : ''}`
+  const fit = phone && !editing
+    ? ` data-program-cap="${model.rows.length}" data-program-total="${model.allRows.length}"${model.shopping ? ' data-program-shopping="1"' : ''}${lead?.total ? ` data-program-lead="${lead.total}"` : ''}`
     : '';
   return `
-    <section class="today-cockpit${editing ? ' today-cockpit--editing' : ''}" aria-labelledby="today-cockpit-title"${fit}>
-      <div class="today-cockpit__header">
-        <h2 id="today-cockpit-title">${esc(t('dashboard.todayTitle'))}</h2>
-        ${hideBtn}
-      </div>
+    <section class="today-cockpit${editing ? ' today-cockpit--editing' : ''}" aria-labelledby="today-cockpit-title" data-today-stage="${stage}"${fit}>
+      ${editing ? header : ''}
       <div class="today-cockpit__grid">
+        ${editing ? '' : header}
         ${parts.join('')}
       </div>
     </section>
@@ -4537,10 +6184,25 @@ function renderCustomizeFootnote({ followsDefault = true, canPublish = false } =
   const actions = renderCustomizeScopeActions({ followsDefault, canPublish });
   return `
     <section class="dashboard-customize-footnote" aria-label="${esc(t('dashboard.customizeTitle'))}">
-      <p>${t('dashboard.customizeScopeHint')}</p>
-      ${followsDefault ? `<p class="dashboard-customize-scope__state">${t('dashboard.customizeFollowsDefault')}</p>` : ''}
+      ${renderCustomizeScopeHint(followsDefault)}
       ${actions.trim() ? `<div class="dashboard-customize-footnote__actions">${actions}</div>` : ''}
     </section>`;
+}
+
+/* DIE REICHWEITE IN EINER ZEILE, DER HINTERGRUND DAHINTER (DW-P2-9).
+ * Im Kopf standen zwei Saetze rechtsbuendig uebereinander, neben vier
+ * Knoepfen - der Kopf las sich wie eine Fussnote. Die Frage im Moment ist
+ * "trifft das die anderen?", und die beantwortet der erste Satz; woher der
+ * aktuelle Stand kommt (die Vorgabe des Haushalts), steht hinter "Mehr dazu" -
+ * dasselbe native `<details>` wie die Erklaerungen der Einstellungen
+ * (hintFoldHtml, R22 D13). Ohne Vorgabe gibt es nichts aufzuklappen. */
+function renderCustomizeScopeHint(followsDefault) {
+  const more = followsDefault ? `
+      <details class="dashboard-customize-scope__more">
+        <summary class="dashboard-customize-scope__summary">${esc(t('settings.hintMore'))}<i data-lucide="chevron-down" class="dashboard-customize-scope__icon" aria-hidden="true"></i></summary>
+        <p class="dashboard-customize-scope__state">${t('dashboard.customizeFollowsDefault')}</p>
+      </details>` : '';
+  return `<p class="dashboard-customize-scope__lead">${t('dashboard.customizeScopeHint')}</p>${more}`;
 }
 
 /* DER KOPF DER UEBERSICHT: Datumszeile mit Werkzeugen, darunter der Large
@@ -4594,8 +6256,7 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
                2026-08-16). Ein Satz im Anpassen-Modus beantwortet sie im
                richtigen Moment. -->
           <div class="dashboard-customize-scope">
-            <p>${t('dashboard.customizeScopeHint')}</p>
-            ${followsDefault ? `<p class="dashboard-customize-scope__state">${t('dashboard.customizeFollowsDefault')}</p>` : ''}
+            ${renderCustomizeScopeHint(followsDefault)}
           </div>
           <!-- MOBIL EINE ZEILE: [Abbrechen] Titel [Fertig] (R9 M7, iOS-Muster).
                Der Titel ist nur dort sichtbar (dashboard.css); am Desktop steht
@@ -4724,6 +6385,7 @@ const FOCUS_IDENTITY_ATTRS = [
 
 function focusKeyOf(el) {
   if (el.id) return `#${CSS.escape(el.id)}`;
+  if (el.hasAttribute('data-timeline-event')) return timelineFocusKeyOf(el);
   const attr = FOCUS_IDENTITY_ATTRS.find((a) => el.hasAttribute(a));
   if (!attr) return rowFocusKeyOf(el);
   const value = el.getAttribute(attr);
@@ -4767,6 +6429,117 @@ function rowFocusKeyOf(el) {
   const root = row.closest('#dashboard-shell') ?? row.ownerDocument;
   const index = Math.max(0, [...root.querySelectorAll(selector)].indexOf(el));
   return { selector, index, preventScroll: true };
+}
+
+/** Zeilen, die EIN Objekt nennen: Aufgabe, Termin, Notiz, Geburtstag. */
+const OBJECT_ROW_SELECTOR = '[data-task-id], [data-object-id], [data-route*="?open="]';
+
+/** Die sichtbaren Objektzeilen der Flaeche, je die aeusserste. */
+function shownObjectRows(shell) {
+  const hits = [...(shell?.querySelectorAll?.(OBJECT_ROW_SELECTOR) ?? [])];
+  return hits
+    .filter((el) => !hits.some((other) => other !== el && other.contains(el)))
+    .filter((el) => !el.hidden && el.getClientRects?.().length !== 0);
+}
+
+/**
+ * Die sichtbaren Objektzeilen der Kacheln, ohne das Heute-Blatt: das passt
+ * seine Zeilen nach jedem Aufbau neu ein (am Telefon auf den ersten Schirm,
+ * breit als Zeitleiste) - was dort nach dem Abgleich neu steht, ist meist
+ * nur nachgerueckt, nicht angekommen.
+ */
+function shownTileRows(shell) {
+  return shownObjectRows(shell).filter((row) => row.closest('.widget-wrapper[data-widget-id]'));
+}
+
+/** Die Schluessel (rowFocusKeyOf) der sichtbaren Kachelzeilen - fuer rowsArriving. */
+function shownRowKeys(shell) {
+  return new Set(shownTileRows(shell).map((row) => rowFocusKeyOf(row)?.selector).filter(Boolean));
+}
+
+/**
+ * Welche Kachelzeilen nach einem stillen Neuaufbau neu dazukamen (U2): die
+ * eben ueber der Uebersicht angelegte Aufgabe, der Termin, die angepinnte
+ * Notiz. Sie ziehen ein wie im Modul (`expandIn`, list-motion: "die
+ * eingefuegte klappt ein") - das Gegenstueck zu rowsLeaving. Hoechstens drei:
+ * mehr ist kein Ankommen, sondern ein neuer Stand (ein neuer Tag, ein anderes
+ * Geraet), und der steht still da wie bisher.
+ *
+ * @param {Element} shell      die Flaeche nach dem Neuaufbau
+ * @param {Set<string>} known  shownRowKeys(shell) davor
+ * @returns {Element[]}
+ */
+function rowsArriving(shell, known) {
+  if (!known?.size) return [];
+  const fresh = shownTileRows(shell).filter((row) => {
+    const key = rowFocusKeyOf(row)?.selector;
+    return Boolean(key) && !known.has(key);
+  });
+  return fresh.length <= ROWS_ARRIVING_MAX ? fresh : [];
+}
+const ROWS_ARRIVING_MAX = 3;
+
+/**
+ * Welche sichtbaren Objektzeilen der Flaeche das naechste Markup nicht mehr
+ * nennt (DW-P1-2) - die schliessen per `collapseRow`, bevor neu gezeichnet
+ * wird. Wiedererkannt wird eine Zeile am Schluessel, mit dem auch der Fokus
+ * den Neuaufbau ueberlebt (rowFocusKeyOf: Ziel, Objekt, Kachel). Gelesen wird
+ * das naechste Markup in einem traegen Dokument: dort laedt kein Bild und
+ * laeuft kein Skript. Schon ausgeblendete Zeilen (das Rueckgaengig-Fenster
+ * eines Loeschens) haben nichts mehr zu schliessen.
+ *
+ * @param {Element} shell     die Flaeche vor dem Neuaufbau
+ * @param {string} nextHtml   ihr Markup aus dem neuen Stand
+ * @returns {Element[]}
+ */
+function rowsLeaving(shell, nextHtml, doc = typeof document === 'undefined' ? null : document) {
+  if (!shell?.querySelectorAll || typeof doc?.implementation?.createHTMLDocument !== 'function') return [];
+  const rows = shownObjectRows(shell);
+  if (!rows.length) return [];
+  const next = doc.implementation.createHTMLDocument('');
+  next.body.insertAdjacentHTML('afterbegin', nextHtml);
+  return rows.filter((row) => {
+    const key = rowFocusKeyOf(row);
+    return Boolean(key) && !next.querySelector(key.selector);
+  });
+}
+
+/**
+ * EIN BLOCK DER ZEITLEISTE (Critique 2026-10-26, Lauf 2). Er hat weder Id noch
+ * Ziel, und nach jedem stillen Neuaufbau (Minutentakt, Beginn eines Termins)
+ * stand der Fokus auf <body>. Sein Schluessel ist der Eintrag und die Stelle
+ * unter den Bloecken desselben Eintrags - ein Termin fuer zwei steht in zwei
+ * Spuren, und der Fokus bleibt in der eigenen.
+ */
+function timelineFocusKeyOf(el) {
+  const selector = `[data-timeline-event="${CSS.escape(el.getAttribute('data-timeline-event'))}"]`;
+  const root = el.closest('#dashboard-shell') ?? el.ownerDocument;
+  const index = Math.max(0, [...(root?.querySelectorAll?.(selector) ?? [])].indexOf(el));
+  return { selector, index, preventScroll: true };
+}
+
+/**
+ * DER FOKUS UEBERLEBT DEN WECHSEL DER BUEHNE (Critique 2026-10-26, Lauf 2).
+ * Zieht man das Fenster ueber 900px Blattbreite, baut die Uebersicht neu
+ * (createPhoneProgramFit), und was eben fokussiert war, gibt es auf der neuen
+ * Buehne nicht: breit steht ein Termin als Block, schmal als Zeile. Danach
+ * stand der Fokus auf <body>. Die Ersatzkandidaten, wenn das Element selbst
+ * nicht wiederkommt: zum Block die Zeile mit demselben Ziel (die aufgeklappte
+ * Zeile des Blocks nennt es), dann der Tab-Stopp der Leiste, zuletzt der Kopf
+ * des Blatts.
+ * @returns {Array<string|object>} Kandidaten fuer restoreFocusAfterRebuild
+ */
+function todayFocusFallbacks(active) {
+  const sheet = active?.closest?.('.today-cockpit');
+  if (!sheet) return [];
+  const key = active.getAttribute?.('data-timeline-event');
+  const detail = key == null ? null : [...sheet.querySelectorAll('[data-timeline-detail]')].find((row) => row.dataset.timelineDetail === key);
+  const route = detail?.querySelector('[data-route]')?.getAttribute('data-route');
+  return [
+    ...(route ? [{ selector: `.today-cockpit__rows [data-route="${CSS.escape(route)}"]`, index: 0, preventScroll: true }] : []),
+    '.today-timeline [data-timeline-event]:not([tabindex="-1"])',
+    '#today-cockpit-title',
+  ];
 }
 
 /**
@@ -4829,25 +6602,36 @@ function announceDashboard(message) {
 
 /* DIE KACHELN GLEITEN, STATT ZU SPRINGEN (FLIP, Critique 2026-09-26).
  *
- * Jede Anpassen-Geste baut die Flaeche per setHtml neu; bis hierher sprang das
+ * Eine Anpassen-Geste aendert die Lage von Kacheln; bis hierher sprang das
  * Raster dabei in einem Frame auf den neuen Stand - wer eine Kachel eine Stelle
- * hoch schob oder breiter machte, musste sie danach suchen. Jetzt: vor dem
- * Neuaufbau die Lage jeder Kachel merken (First), danach die neue messen (Last),
+ * hoch schob oder breiter machte, musste sie danach suchen. Jetzt: vor der
+ * Aenderung die Lage jeder Kachel merken (First), danach die neue messen (Last),
  * die Kachel per transform auf die alte Stelle zuruecksetzen (Invert) und per
  * Web Animations nach Hause laufen lassen (Play). Die Identitaet traegt die
- * Widget-Id - die Elemente selbst ueberleben den Neuaufbau nicht.
+ * Widget-Id; seit DW-P2-1 ueberleben die Knoten die Geste ohnehin
+ * (patchCustomize), aber ein Neuaufbau ersetzt sie weiter.
  *
  * Eine Kachel, die waechst, deckt ihre neue Flaeche per clip-path von der alten
  * Groesse aus auf; eine, die schrumpft, kann nicht ueber ihren Rand hinaus
  * zeigen und blendet ihren umgebrochenen Inhalt kurz auf. Eine wieder
- * eingeblendete Kachel kommt ohne Vorlage und blendet ein. Die Kachel ist ein
- * Glas-Element: Dauer und Kurve aus den Token (`--duration-lg`, `--ease-glass`).
- * Unter reduzierter Bewegung bleibt es beim Sprung.
+ * eingeblendete Kachel kommt ohne Vorlage und blendet ein.
+ *
+ * DIE KURVE IST `--ease-out`, NICHT DIE GLASFEDER (DW-P2-2). Die Kachel lief
+ * auf `--ease-glass` und schoss dabei 9 % ueber ihr Ziel (gemessen 35 px beim
+ * Verschieben, 53 px beim Aus-/Einblenden) - eine Feder gehoert dem Glas, das
+ * man greift (Blatt-Eintritt, Schalter), nicht dem Inhalt, der sich ordnet.
+ * Dauer `--duration-lg` wie das Raster beim Betreten (playGridShift).
+ *
+ * UNTER REDUZIERTER BEWEGUNG BLENDET, WAS SICH BEWEGT HAETTE (DW-P3-9): kein
+ * Weg, aber auch kein stummer Sprung - 0,4 -> 1 in `--duration-sm`, das Muster
+ * von swapContent. So sieht man, WELCHE Kacheln die Geste getroffen hat.
  *
  * Gemessen wird in Viewport-Koordinaten: scrollt der Fokus-Nachfolger die Seite
  * mit, ist genau das der Weg, den das Auge gesehen hat. Laeuft noch eine
- * Animation, liefert getBoundingClientRect ihre momentane Lage mit - die
- * naechste Geste setzt dort an, wo die Kachel gerade IST. */
+ * Animation, liefert die Vorher-Messung ihre momentane Lage - die naechste
+ * Geste setzt dort an, wo die Kachel gerade IST; die laufende wird vor der
+ * Nachher-Messung beendet, sonst laege ihr Versatz im Ziel. Erst alles lesen,
+ * dann alles schreiben: eine Auslegung fuer das ganze Raster. */
 const DASHBOARD_TILE_SELECTOR = '#dashboard-widget-grid > .widget-wrapper[data-widget-id]';
 
 function captureTileRects(root) {
@@ -4861,17 +6645,6 @@ function captureTileRects(root) {
 function prefersReducedMotion() {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function motionTiming() {
-  const styles = typeof document !== 'undefined' && typeof getComputedStyle === 'function'
-    ? getComputedStyle(document.documentElement) : null;
-  const raw = styles?.getPropertyValue('--duration-lg').trim() ?? '';
-  const ms = /ms$/.test(raw) ? parseFloat(raw) : /s$/.test(raw) ? parseFloat(raw) * 1000 : NaN;
-  return {
-    duration: Number.isFinite(ms) ? ms : 250,
-    easing: styles?.getPropertyValue('--ease-glass').trim() || 'ease-out',
-  };
 }
 
 /**
@@ -4894,40 +6667,206 @@ function playGridShift(root, topBefore, options = {}) {
   ], { duration: durationToken('--duration-lg', 250), easing: easingToken('--ease-out', 'ease-out') });
 }
 
+// Die laufende Gleitbewegung je Kachel - die naechste Geste beendet sie.
+const tileFlips = new WeakMap();
+
 function playTileFlip(root, before, options = {}) {
+  return startTileFlip(measureTileFlip(root, before, options));
+}
+
+/**
+ * Der lesende Teil des Gleitens: alte gegen neue Lage je Kachel. Getrennt vom
+ * Abspielen, damit ein Aufrufer (patchCustomize) weitere Lesungen an DIESELBE
+ * Auslegung haengen kann, bevor die Animationen den Stil wieder anfassen.
+ */
+function measureTileFlip(root, before, options = {}) {
   const reduced = options.reduced ?? prefersReducedMotion();
-  if (!before || reduced) return [];
-  const timing = { ...motionTiming(), ...options.timing };
-  const played = [];
-  root.querySelectorAll(DASHBOARD_TILE_SELECTOR).forEach((tile) => {
-    if (typeof tile.animate !== 'function') return;
+  if (!before) return null;
+  const tiles = [...root.querySelectorAll(DASHBOARD_TILE_SELECTOR)].filter((tile) => typeof tile.animate === 'function');
+  // Nur eine LAUFENDE beenden: ein cancel() auf einer fertigen verlangte
+  // trotzdem eine neue Stilrechnung, bevor gemessen werden kann.
+  for (const tile of tiles) {
+    const running = tileFlips.get(tile);
+    if (running && running.playState !== 'finished' && running.playState !== 'idle') running.cancel?.();
+  }
+  const plans = [];
+  for (const tile of tiles) {
     const from = before.get(tile.dataset.widgetId);
     if (!from) {
-      played.push(tile.animate([
-        { opacity: 0, transform: 'scale(0.96)' },
-        { opacity: 1, transform: 'none' },
-      ], timing));
-      return;
+      plans.push({ tile, enter: true });
+      continue;
     }
     const to = tile.getBoundingClientRect();
     const dx = from.left - to.left;
     const dy = from.top - to.top;
     const dw = to.width - from.width;
     const dh = to.height - from.height;
-    if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(dw) < 1 && Math.abs(dh) < 1) return;
-    const first = { transform: `translate(${dx}px, ${dy}px)` };
-    const last = { transform: 'none' };
-    if (dw >= 1 || dh >= 1) {
-      const radius = typeof getComputedStyle === 'function' ? getComputedStyle(tile).borderTopLeftRadius || '0px' : '0px';
-      first.clipPath = `inset(0px ${Math.max(0, dw)}px ${Math.max(0, dh)}px 0px round ${radius})`;
-      last.clipPath = `inset(0px 0px 0px 0px round ${radius})`;
-    } else if (dw <= -1 || dh <= -1) {
-      first.opacity = 0.6;
-      last.opacity = 1;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(dw) < 1 && Math.abs(dh) < 1) continue;
+    const radius = !reduced && (dw >= 1 || dh >= 1) && typeof getComputedStyle === 'function'
+      ? getComputedStyle(tile).borderTopLeftRadius || '0px' : '0px';
+    plans.push({ tile, dx, dy, dw, dh, radius });
+  }
+  return { reduced, plans };
+}
+
+/** Der schreibende Teil: jede Kachel laeuft von der gemessenen Lage nach Hause. */
+function startTileFlip(measured) {
+  if (!measured) return [];
+  const { reduced, plans } = measured;
+  const timing = {
+    duration: reduced ? durationToken('--duration-sm', 150) : durationToken('--duration-lg', 250),
+    easing: easingToken('--ease-out', 'ease-out'),
+  };
+  return plans.map(({ tile, enter, dx, dy, dw, dh, radius }) => {
+    let keyframes;
+    if (reduced) {
+      keyframes = [{ opacity: SWAP_FROM_OPACITY }, { opacity: 1 }];
+    } else if (enter) {
+      keyframes = [{ opacity: 0, transform: 'scale(0.96)' }, { opacity: 1, transform: 'none' }];
+    } else {
+      const first = { transform: `translate(${dx}px, ${dy}px)` };
+      const last = { transform: 'none' };
+      if (dw >= 1 || dh >= 1) {
+        first.clipPath = `inset(0px ${Math.max(0, dw)}px ${Math.max(0, dh)}px 0px round ${radius})`;
+        last.clipPath = `inset(0px 0px 0px 0px round ${radius})`;
+      } else if (dw <= -1 || dh <= -1) {
+        first.opacity = 0.6;
+        last.opacity = 1;
+      }
+      keyframes = [first, last];
     }
-    played.push(tile.animate([first, last], timing));
+    const anim = tile.animate(keyframes, timing);
+    tileFlips.set(tile, anim);
+    return anim;
   });
-  return played;
+}
+
+/* EINE GESTE HAENGT KNOTEN UM, STATT SIE NEU ZU BAUEN (DW-P2-1).
+ *
+ * `moveBefore()` verschiebt einen Knoten, ohne ihn aus dem Baum zu nehmen:
+ * Fokus, laufende Animationen und offene Popover bleiben. Ohne die Methode
+ * (Safari) bleibt das klassische Entfernen-und-Einfuegen - den Fokus holt
+ * patchCustomize danach zurueck. Ein Knoten, der noch nicht im Dokument
+ * haengt (eine neu eingeblendete Kachel), geht immer den klassischen Weg:
+ * moveBefore nimmt ihn nicht an. */
+function placeBefore(parent, node, ref) {
+  if (node.isConnected && typeof parent.moveBefore === 'function') {
+    try {
+      parent.moveBefore(node, ref);
+      return;
+    } catch { /* anderer Wurzelbaum - dann der klassische Weg */ }
+  }
+  parent.insertBefore(node, ref);
+}
+
+/**
+ * Bringt die Kinder von `parent` in die Folge `nodes`: was fehlt, geht; was
+ * schon an seinem Platz steht, wird nicht angefasst. Ein Tausch zweier
+ * Nachbarn ist so EINE Bewegung, keine zweiundzwanzig.
+ */
+function arrangeChildren(parent, nodes) {
+  const keep = new Set(nodes);
+  for (const child of [...parent.children]) if (!keep.has(child)) child.remove();
+  nodes.forEach((node, index) => {
+    const at = parent.children[index] ?? null;
+    if (at !== node) placeBefore(parent, node, at);
+  });
+}
+
+/** Der erste bedienbare Kandidat (Selektoren in Reihenfolge) - nur gelesen, nicht fokussiert. */
+function focusTarget(root, candidates) {
+  for (const selector of candidates ?? []) {
+    const el = selector ? root.querySelector(selector) : null;
+    if (el && !el.disabled && el.getClientRects?.().length !== 0) return el;
+  }
+  return null;
+}
+
+/** Wie weit `scrollIntoView({ block: 'nearest' })` die Ansicht schoebe - ohne zu schieben. */
+function nearestScrollDelta(rect, view) {
+  if (rect.top < view.top) return rect.top - view.top;
+  if (rect.bottom > view.bottom) return Math.min(rect.bottom - view.bottom, rect.top - view.top);
+  return 0;
+}
+
+/** Elemente aus Markup, im Dokument der Seite geparst (nicht im Dokument eines <template>). */
+function elementsFromHtml(html) {
+  const holder = document.createElement('div');
+  holder.insertAdjacentHTML('afterbegin', html);
+  return [...holder.children];
+}
+
+/** Was eine Kachel neu zeichnen laesst: Groesse und Optionen. */
+function tileDrawKey(w) {
+  return `${w?.size}|${JSON.stringify(w?.options ?? null)}`;
+}
+
+/* EINE ERWEITERUNG ZEICHNET IHRE KACHEL SELBST (Review p11, B4). Ihr Koerper
+ * ist bei jeder Groesse und jeder Option derselbe Platzhalter, den erst
+ * mountExtensionWidgets mit { size, options } fuellt - der Vergleich des
+ * Markups sah darum nie eine Aenderung, und die Kachel zeigte nach einer
+ * Geste im Anpassen-Modus den alten Inhalt in der neuen Groesse. Gerufen nur,
+ * wenn sich Groesse oder Optionen geaendert haben (`tileDrawKey`). */
+function tileBodyChanged(w, body, drawn) {
+  return body !== drawn || isExtensionWidget(w?.id);
+}
+
+/**
+ * Was das Heute-Blatt und die Kennzahlreihe neu rechnen laesst: welche Kacheln
+ * sichtbar sind, ihre Optionen und das Kopfband - nicht Reihenfolge oder
+ * Groesse. Ein Verschieben rechnet so keines von beiden (Kein-Echo-Regel).
+ */
+function visibilityKey(cfg, glanceVisible) {
+  return [...cfg].map((w) => `${w.id}:${w.visible ? 1 : 0}:${JSON.stringify(w.options ?? null)}`).sort().join('|') + `|${glanceVisible ? 1 : 0}`;
+}
+
+/**
+ * Die Leiste einer Kachel folgt der Geste AN ORT UND STELLE: Hoch/Runter am
+ * Rand gesperrt, die aktive Groesse gedrueckt. Neu gezeichnet waere der
+ * Knopf, den man gerade gedrueckt hat, ein anderer - und der Fokus fort.
+ * Nur das mobile Groessen-Menue wechselt ganz, wenn sich die Breite geaendert
+ * hat (es bietet die Hoehen bei gleicher Breite an, renderWidgetSizeMenu) -
+ * die Breite waehlt man am Desktop, wo dieses Menue nicht steht.
+ * @returns {Element|null} das neu gezeichnete Menue (fuer seine Zeichen)
+ */
+function syncCustomizeControls(wrapper, w, index, total) {
+  const controls = wrapper.querySelector(':scope > [data-widget-controls]');
+  if (!controls) return null;
+  const moves = [
+    ...controls.querySelectorAll('[data-widget-move]'),
+    ...[...controls.querySelectorAll('.popover-menu > template')].flatMap((tpl) => [...tpl.content.querySelectorAll('[data-widget-move]')]),
+  ];
+  for (const btn of moves) {
+    const off = btn.dataset.widgetMove === 'up' ? index === 0 : index === total - 1;
+    if (btn.disabled !== off) btn.disabled = off;
+  }
+  const active = nearestPreset(w.size);
+  for (const btn of controls.querySelectorAll('.widget-edit-controls__size > [data-widget-size-preset]')) {
+    const on = btn.dataset.widgetSizePreset === active;
+    btn.classList.toggle('is-active', on);
+    if (btn.getAttribute('aria-pressed') !== String(on)) btn.setAttribute('aria-pressed', String(on));
+  }
+  const menu = controls.querySelector('.widget-edit-controls__size-menu');
+  if (!menu) return null;
+  const items = [...menu.querySelectorAll('[data-widget-size-preset]')];
+  if (!items.some((item) => item.dataset.widgetSizePreset === active)) {
+    const [next] = elementsFromHtml(renderWidgetSizeMenu(w.id, active));
+    menu.replaceWith(next);
+    return next;
+  }
+  for (const item of items) {
+    const on = item.dataset.widgetSizePreset === active;
+    if (item.getAttribute('aria-checked') === String(on)) continue;
+    item.setAttribute('aria-checked', String(on));
+    item.querySelector('.popover-menu__item-check')?.classList.toggle('popover-menu__item-check--hidden', !on);
+  }
+  const mini = menu.querySelector('.widget-edit-controls__size-trigger > .widget-size-mini');
+  if (mini && mini.dataset.size !== active) {
+    mini.replaceChildren();
+    mini.insertAdjacentHTML('afterbegin', renderSizeMiniGridCells(active));
+    mini.dataset.size = active;
+  }
+  return null;
 }
 
 function widgetSizeClass(size) {
@@ -4935,7 +6874,8 @@ function widgetSizeClass(size) {
 }
 
 function renderSizeMiniGrid(size) {
-  return `<span class="widget-size-mini" aria-hidden="true">${renderSizeMiniGridCells(size)}</span>`;
+  // `data-size`: woran syncCustomizeControls erkennt, ob die Form noch stimmt.
+  return `<span class="widget-size-mini" aria-hidden="true" data-size="${esc(size)}">${renderSizeMiniGridCells(size)}</span>`;
 }
 
 function renderSizeMiniGridCells(size) {
@@ -5313,59 +7253,143 @@ async function openWidgetOptions(id, current = {}, {
   });
 }
 
+/* DIE GROESSE GLEITET WIE JEDES SEGMENT (Kanon D1, utils/segment-indicator.js).
+ * Die Kapsel misst ihren Eintrag; je Kachel einmal Layout lesen, darum erst
+ * nach dem naechsten Bild - der Moduswechsel und die Geste stehen dann schon,
+ * und bis dahin traegt das aktive Segment seine eigene Flaeche (`.is-active`).
+ * Unter 768px ist das Segment aus (dort waehlt das Menue), also auch keine
+ * Kapsel. Eine Leiste, die mit ihrer Kachel geht, raeumt sich selbst ab. */
+function attachSizeIndicators(root, signal) {
+  if (!root || typeof requestAnimationFrame !== 'function') return;
+  if (!globalThis.matchMedia?.('(min-width: 768px)').matches) return;
+  requestAnimationFrame(() => setTimeout(() => {
+    if (signal?.aborted || !root.isConnected) return;
+    for (const bar of root.querySelectorAll('.widget-edit-controls__size:not(.has-seg-indicator)')) {
+      attachSegmentIndicator(bar);
+    }
+  }, 0));
+}
+
+/** Name und Massangabe einer Groesse: „Breit (2×1)" -> „Breit" + „(2×1)".
+ *  Jede Sprache fuehrt ihre Groessen so (test:dashboard-clarity haelt das
+ *  Format); ohne Klammer bleibt der ganze Text der Name. */
+function sizeLabelParts(label) {
+  const match = /^(.*\S)\s*(\([^()]*\))$/u.exec(label);
+  return match ? { name: match[1], dims: match[2] } : { name: label, dims: '' };
+}
+
 function renderWidgetCustomizeControls(w, index = 0, total = 1) {
   const isFirst = index === 0;
   const isLast = index === total - 1;
   const activeSize = nearestPreset(w.size);
 
-  // Segmentiertes Größen-Steuerelement: vier klickbare Mini-Grid-Presets ersetzen
-  // die frühere Kombination aus dekorativem Mini-Grid + „Größe"-Label + 132px-
-  // <select> (Critique P1: doppelte Kontrolle + Overflow auf 1×1-Kacheln). Jeder
-  // Button zeigt seine Form direkt und markiert die aktive Größe.
+  /* DIE GROESSE IST EIN BESCHRIFTETES SEGMENT (DW-P2-9). Vier Mini-Raster ohne
+   * Text verlangten, die Form zu deuten; man las die Wahl erst am Tooltip.
+   * Jetzt traegt jedes Segment den Namen der Groesse („Klein", „Breit",
+   * „Hoch", „Quadrat"), die Massangabe liest nur der Screenreader mit - der
+   * Name des Knopfs ist damit derselbe wie im Menue und in der Ansage, und
+   * der sichtbare Text steht an seinem Anfang (WCAG 2.5.3). Die Wahl zeigt
+   * die Kachel selbst; das Segment sagt nur, welche es ist. */
   const sizeButtons = WIDGET_SIZE_PRESETS.map((p) => {
     const active = p.value === activeSize;
-    return `<button type="button" class="widget-size-btn${active ? ' widget-size-btn--active' : ''}"
+    const { name, dims } = sizeLabelParts(t(p.labelKey));
+    return `<button type="button" class="segmented__item${active ? ' is-active' : ''}"
               data-widget-size-preset="${p.value}" data-widget-id="${esc(w.id)}"
-              aria-pressed="${active ? 'true' : 'false'}" aria-label="${esc(t(p.labelKey))}" title="${esc(t(p.labelKey))}">
-        ${renderSizeMiniGrid(p.value)}
-      </button>`;
+              aria-pressed="${active ? 'true' : 'false'}">${esc(name)}${dims ? `<span class="sr-only"> ${esc(dims)}</span>` : ''}</button>`;
   }).join('');
 
   // Die Leiste steht VOR der Ueberschrift der Kachel. Ohne eigenen Namen hoerte
   // man per Tab je Kachel denselben Griff und dieselben Groessen - welche Kachel
   // man anfasst, sagt erst die Gruppe.
+  //
+  // DER GRIFF STEHT AM ENDE (DW-P2-3), wie in jeder sortierbaren Zeile der App
+  // (Schnellzugriffe #2152, Mitglieder, Navigation): erst was die Kachel IST
+  // (Groesse, Optionen, Auge), dann woran man sie zieht. Er ist der Griff fuer
+  // SortableJS (makeSortable in wireDashboardEditMode) - per Maus und per
+  // Finger - und der Tastaturweg (Pfeil hoch/runter). Die Handlungen stehen
+  // als EINE Gruppe hinter dem Segment: reicht die Breite nicht, bricht die
+  // Gruppe als Ganzes in die zweite Zeile, statt den Griff allein zu lassen.
   return `
     <div class="widget-edit-controls" role="group" aria-label="${esc(widgetLabel(w.id))}" data-widget-controls>
       <span class="widget-edit-controls__caption" aria-hidden="true">${esc(widgetLabel(w.id))}</span>
-      <button type="button" class="widget-edit-controls__handle" data-widget-drag-handle
-              aria-label="${t('dashboard.customizeReorderHandle')}" aria-keyshortcuts="ArrowUp ArrowDown">
-        <i data-lucide="grip-vertical" aria-hidden="true"></i>
-      </button>
-      <div class="widget-edit-controls__move">
-        <button type="button" class="widget-edit-controls__move-btn" data-widget-move="up" data-widget-id="${esc(w.id)}"
-                ${isFirst ? 'disabled' : ''} aria-label="${t('dashboard.customizeMoveUp')}">
-          <i data-lucide="chevron-up" aria-hidden="true"></i>
-        </button>
-        <button type="button" class="widget-edit-controls__move-btn" data-widget-move="down" data-widget-id="${esc(w.id)}"
-                ${isLast ? 'disabled' : ''} aria-label="${t('dashboard.customizeMoveDown')}">
-          <i data-lucide="chevron-down" aria-hidden="true"></i>
-        </button>
-      </div>
-      <div class="widget-edit-controls__size" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
+      <div class="widget-edit-controls__size segmented" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
         ${sizeButtons}
       </div>
-      ${renderWidgetSizeMenu(w.id, activeSize)}
-      ${widgetHasOptions(w.id) ? `
-      <button type="button" class="widget-edit-controls__options" data-widget-options="${esc(w.id)}"
-              aria-label="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}"
-              title="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}">
-        <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
-      </button>` : ''}
-      <button type="button" class="widget-edit-controls__hide" data-widget-hide="${esc(w.id)}" aria-label="${esc(t('dashboard.customizeHide', { widget: widgetLabel(w.id) }))}">
-        <i data-lucide="eye-off" aria-hidden="true"></i>
-      </button>
+      <div class="widget-edit-controls__actions">
+        <div class="widget-edit-controls__move">
+          <button type="button" class="widget-edit-controls__move-btn" data-widget-move="up" data-widget-id="${esc(w.id)}"
+                  ${isFirst ? 'disabled' : ''} aria-label="${t('dashboard.customizeMoveUp')}">
+            <i data-lucide="chevron-up" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="widget-edit-controls__move-btn" data-widget-move="down" data-widget-id="${esc(w.id)}"
+                  ${isLast ? 'disabled' : ''} aria-label="${t('dashboard.customizeMoveDown')}">
+            <i data-lucide="chevron-down" aria-hidden="true"></i>
+          </button>
+        </div>
+        ${renderWidgetSizeMenu(w.id, activeSize)}
+        ${renderWidgetOptionsButton(w)}
+        ${renderWidgetTileMenu(w, index, total)}
+        <button type="button" class="widget-edit-controls__hide" data-widget-hide="${esc(w.id)}" aria-label="${esc(t('dashboard.customizeHide', { widget: widgetLabel(w.id) }))}">
+          <i data-lucide="eye-off" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="widget-edit-controls__handle" data-widget-drag-handle
+                aria-label="${t('dashboard.customizeReorderHandle')}" aria-keyshortcuts="ArrowUp ArrowDown">
+          <i data-lucide="grip-vertical" aria-hidden="true"></i>
+        </button>
+      </div>
     </div>
   `;
+}
+
+/* DAS OPTIONEN-MENUE DER KACHEL, AN JEDER KACHEL (U7, WCAG 2.5.7). Am Zeiger
+ * ordnete man eine Kachel nur per Ziehen am Griff oder per Pfeiltaste um -
+ * Hoch und Runter stehen nur am Finger (DW-P2-3). Wer die Maus fuehrt, aber
+ * nicht ziehen kann, hatte keinen Weg. Jetzt steht an jeder Kachel EIN Menue
+ * mit "Nach vorn" und "Nach hinten" (ein Platz in der Lesereihenfolge, wie
+ * Hoch/Runter) und, wo die Kachel welche hat, ihren Optionen - der Regler-Knopf,
+ * der dafuer allein stand, ist sein Ausloeser (dieselbe Form wie das Menue am
+ * Chip der Ablage, R22 D16). Am Rand ist der Eintrag gesperrt, nicht weg (Kanon
+ * des Menues, layout.css: "nach oben" an der ersten Kategorie). Die Eintraege
+ * entstehen erst beim Oeffnen (`defer`); `syncCustomizeControls` haelt ihre
+ * Sperre auch im ungeoeffneten Menue richtig. */
+/* AM FINGER IST DER OPTIONEN-KNOPF WIEDER EIN TIPP (U10, Ulas 2026-10-27).
+ * Mit U7 oeffnete der Regler-Knopf ein Menue, und die Optionen standen dort
+ * als dritter Eintrag: am Telefon zwei Tipps fuer die haeufigere Handlung,
+ * damit am Zeiger "Nach vorn"/"Nach hinten" einen Ort haben. Am Finger
+ * brauchen sie ihn nicht - dort stehen Hoch und Runter in der Leiste. Darum
+ * zwei Ausloeser, und die Zeigerart entscheidet, welcher steht (dashboard.css):
+ * am Finger dieser Knopf (nur an Kacheln mit Optionen), am Zeiger das Menue.
+ * Derselbe Handler (`[data-widget-options]`), dieselbe Form, derselbe Name
+ * wie der Eintrag im Menue. */
+function renderWidgetOptionsButton(w) {
+  if (!widgetHasOptions(w.id)) return '';
+  return `<button type="button" class="widget-edit-controls__options widget-edit-controls__options--direct" data-widget-options="${esc(w.id)}"
+            aria-label="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}">
+      <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+    </button>`;
+}
+
+function renderWidgetTileMenu(w, index = 0, total = 1) {
+  const label = widgetLabel(w.id);
+  const hasOptions = widgetHasOptions(w.id);
+  const items = [
+    { action: 'widget-move', icon: 'chevron-up', label: t('dashboard.customizeMoveForward'), disabled: index === 0,
+      attrs: { 'data-widget-move': 'up', 'data-widget-id': w.id } },
+    { action: 'widget-move', icon: 'chevron-down', label: t('dashboard.customizeMoveBack'), disabled: index === total - 1,
+      attrs: { 'data-widget-move': 'down', 'data-widget-id': w.id } },
+    ...(hasOptions ? [
+      { separator: true },
+      { action: 'widget-options', icon: 'sliders-horizontal', label: t('dashboard.optionsFor', { widget: label }), attrs: { 'data-widget-options': w.id } },
+    ] : []),
+  ];
+  return `<div class="widget-edit-controls__menu">${popoverMenuHtml({
+    id: `widget-tile-menu-${w.id}`,
+    label: t('common.moreActionsNamed', { name: label }),
+    icon: 'ellipsis',
+    triggerClass: 'widget-edit-controls__options',
+    defer: true,
+    items,
+  })}</div>`;
 }
 
 /* EIN GROESSEN-MENUE MIT NUR WIRKSAMEN GROESSEN (R9 M7, A7 P1-2).
@@ -5466,31 +7490,35 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
   `;
 }
 
-function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null } = {}) {
-  const widgetById = {
+/* DIE KACHELN EINZELN ZEICHENBAR (DW-P2-1). Das Raster zeichnet sie alle, eine
+ * Anpassen-Geste nur die, die sie aendert (patchCustomize in render()) - aus
+ * DENSELBEN drei Teilen, damit Geste und Aufbau nie zwei Fassungen einer Kachel
+ * zeichnen: die Renderer je Widget, der Koerper einer Kachel, ihr Rahmen. */
+function dashboardTileRenderers(cfg, data, weather, currency, { visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null } = {}) {
+  return {
     tasks: (size) => renderUrgentTasks(data.urgentTasks ?? [], data.openTaskCount, size),
     calendar: (size, options) => renderCalendarWidget(data, size, options),
     birthdays: (size) => renderUpcomingBirthdays(data.birthdays ?? [], size, data.birthdayTotal),
     countdown: (size) => renderCountdowns(data.countdowns ?? [], size, data.countdownTotal),
     budget: (size) => renderBudgetWidget(data.budget ?? {}, currency, size),
     rewards: (size) => renderRewardsWidget(data.rewards ?? {}, size),
-    health: () => renderHealthWidget(data.health ?? {}),
-    cycle: () => renderCycleWidget(data.cycle),
-    fasting: () => renderFastingWidget(data.fasting),
-    nutrition: () => renderNutritionWidget(data.nutrition),
-    housekeeping: () => renderHousekeepingWidget(data.housekeeping ?? {}, currency),
+    health: (size) => renderHealthWidget(data.health ?? {}, size),
+    cycle: (size) => renderCycleWidget(data.cycle, size),
+    fasting: (size) => renderFastingWidget(data.fasting, size),
+    nutrition: (size) => renderNutritionWidget(data.nutrition, size),
+    housekeeping: (size) => renderHousekeepingWidget(data.housekeeping ?? {}, currency, size),
     schedule: (size) => renderScheduleWidget(data.schedule, data.users ?? [], size),
     waste: (size) => renderWasteWidget(data.waste, size),
     pantry: (size) => renderPantryWidget(data.pantryExpiring, size),
-    family: () => renderFamilyWidget(data.users ?? [], data, { manageHref: familyManage }),
-    meals: () => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes, data.users),
+    family: (size) => renderFamilyWidget(data.users ?? [], data, { manageHref: familyManage, size }),
+    meals: (size) => renderTodayMeals(data.todayMeals ?? [], visibleMealTypes, data.users, size),
     notes: (size) => renderPinnedNotes(data.pinnedNotes ?? [], size, data.notesTotal),
-    shopping: () => renderShoppingTile(data),
+    shopping: (size) => renderShoppingTile(data, size),
     // Hier ankommen heisst eingerichtet (`isWidgetModuleEnabled`); fehlt das
     // Wetter trotzdem, sagt die Kachel es, statt zu verschwinden.
-    weather: () => (weather ? renderWeatherWidget(weather) : renderWeatherUnavailable()),
-    clock: () => renderClockWidget(),
-    quicklinks: () => renderQuickLinks(data.quicklinks ?? []),
+    weather: (size) => (weather ? renderWeatherWidget(weather, size) : renderWeatherUnavailable(size)),
+    clock: (size) => renderClockWidget({ size }),
+    quicklinks: (size) => renderQuickLinks(data.quicklinks ?? [], size),
     // Die Kachelreihe braucht als einziges Widget zu wissen, wer sonst noch
     // dasteht - sie ist die einzige, die fremde Zahlen zeigt. Gerechnet aus
     // DERSELBEN Bedingung, nach der die Kacheln gleich gefiltert werden, damit
@@ -5499,33 +7527,58 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
     // Dazu, welche Zahl das Heute-Blatt schon nennt (offene Freigaben): die
     // Kein-Echo-Regel gilt auch zwischen Blatt und Kachel. Ein ausgeblendetes
     // Blatt nennt nichts.
-    metrics: () => renderMetricTiles(data, currency, new Set(
+    metrics: (size) => renderMetricTiles(data, currency, new Set(
       cfg.filter((w) => w.visible && w.id !== 'metrics' && isWidgetModuleEnabled(w.id)).map((w) => w.id),
-    ), glanceHidden ? new Set() : todaySheetSpeaks(data, cfg)),
+    ), glanceHidden ? new Set() : todaySheetSpeaks(data, cfg), size),
   };
+}
 
-  const tiles = cfg
-    .filter((w) => w.visible && isWidgetModuleEnabled(w.id) && (widgetById[w.id] || isExtensionWidget(w.id)))
-    .map((w, index, arr) => {
-      let html;
-      try {
-        if (isExtensionWidget(w.id)) {
-          html = `<div class="widget extension-widget-mount" data-extension-widget-mount="1">
-            <div class="widget__empty">${esc(t('common.loading'))}</div>
+/** Steht die Kachel im Raster? (Sichtbar, Modul an, ein Renderer da.) */
+function dashboardTileListed(w, renderers) {
+  return Boolean(w.visible && isWidgetModuleEnabled(w.id) && (renderers[w.id] || isExtensionWidget(w.id)));
+}
+
+/** Der Koerper einer Kachel; leer heisst: keine Kachel (der Renderer hat nichts). */
+function renderWidgetBody(w, renderers) {
+  try {
+    if (isExtensionWidget(w.id)) {
+      return `<div class="widget extension-widget-mount" data-extension-widget-mount="1">
+            ${widgetEmptyHtml(t('common.loading'))}
           </div>`;
-        } else {
-          html = widgetById[w.id](w.size, w.options);
-        }
-      } catch (err) {
-        console.error(`[dashboard] Widget "${w.id}" konnte nicht gerendert werden`, err);
-        html = renderWidgetError(w.id);
-      }
-      if (!html) return '';
-      return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
-                   data-widget-id="${esc(w.id)}"${calendarListRows(w)} ${editing ? 'draggable="true"' : ''}>
-        ${editing ? renderWidgetCustomizeControls(w, index, arr.length) : ''}
+    }
+    return renderers[w.id](w.size, w.options);
+  } catch (err) {
+    console.error(`[dashboard] Widget "${w.id}" konnte nicht gerendert werden`, err);
+    return renderWidgetError(w.id);
+  }
+}
+
+/** Der Rahmen um den Koerper: Groesse, Id, im Anpassen-Modus die Leiste.
+ *  Kein `draggable="true"` (DW-P2-3): gezogen wird ueber SortableJS am Griff,
+ *  und das DOM-Attribut schaltete natives Ziehen ein, das ihm die Geste nimmt. */
+function renderWidgetWrapper(w, html, { editing = false, index = 0, total = 1 } = {}) {
+  return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
+                   data-widget-id="${esc(w.id)}"${tileSpanWrapperAttrs(html)}>
+        ${editing ? renderWidgetCustomizeControls(w, index, total) : ''}
         ${html}
       </div>`;
+}
+
+function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null, drawn = null, bodies = null } = {}) {
+  const widgetById = dashboardTileRenderers(cfg, data, weather, currency, { visibleMealTypes, glanceHidden, familyManage });
+
+  const tiles = cfg
+    .filter((w) => dashboardTileListed(w, widgetById))
+    .map((w, index, arr) => {
+      const html = renderWidgetBody(w, widgetById);
+      if (!html) return '';
+      // Was wirklich im Raster steht - die Vorhersage des Skeletts (rememberGridHint),
+      // samt der Hoehe aus den Daten (U1 b).
+      drawn?.push(w);
+      drawnSpanRows.set(w.id, tileSpanOf(html)?.rows ?? 0);
+      // Und was die naechste Geste nicht neu zeichnen muss (patchCustomize).
+      bodies?.set(w.id, html);
+      return renderWidgetWrapper(w, html, { editing, index, total: arr.length });
     })
     .join('');
 
@@ -5543,7 +7596,10 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
    * gebraucht wird sie nur als Gliederungsebene. Das Wort ist dasselbe, das die
    * Anpassen-Leiste benutzt („Widgets anpassen", „Ausgeblendete Widgets"). */
   const heading = `<h2 class="sr-only" id="dashboard-widgets-title">${esc(t('dashboard.widgetsHeading'))}</h2>`;
+  // Fuer welche Buehne die Kacheln gezeichnet sind (createPhoneProgramFit):
+  // am Telefon ohne Spannen und mit kurzen Listen, breit mit beidem.
   const grid = `<div class="dashboard__grid ${editing ? 'dashboard__grid--editing' : ''}" id="dashboard-widget-grid"
+                    data-tile-stage="${onPhoneStage() ? 'phone' : 'wide'}"
                     role="region" aria-labelledby="dashboard-widgets-title">${gridInner}</div>`;
   // Im Bearbeiten-Modus steht die Wieder-Einblenden-Leiste UEBER dem Raster
   // (R14, A7 P2-2), wie die Widget-Galerie in iOS: mobil lag der Vorrat mit 14
@@ -5568,25 +7624,79 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
  * Er liegt in utils/dashboard-layout-hint.js, weil er seit #585 auch beim
  * Abmelden verworfen werden muss - die Begruendung steht dort. */
 
-function renderDashboardSkeleton() {
-  // Mit den Listenzeilen (#2087): eine hohe Kalenderkachel mit acht oder
-  // zwoelf Terminen belegt schon im Skelett ihre drei oder vier Zeilen.
-  const defaults = buildDefaultWidgetConfig().filter((w) => w.visible);
+function renderDashboardSkeleton(user = null, { head = null } = {}) {
+  // Mit den Hoehen aus den Daten (U1 b): jede Kachel steht schon im Skelett so
+  // hoch, wie sie beim letzten Zeichnen war - auch die Kalenderliste mit acht
+  // oder zwoelf Terminen (#2087).
+  const defaults = buildDefaultWidgetConfig().filter((w) => w.visible && isWidgetModuleEnabled(w.id));
   const hint = layoutHintTiles(defaults.map((w) => w.size));
   const tiles = hint.sizes
-    .map((size, i) => `<div class="widget-wrapper ${widgetSizeClass(size)}"${listRowsAttr(hint.listRows[i])}>${skeletonWidget(3)}</div>`)
+    .map((size, i) => `<div class="widget-wrapper ${widgetSizeClass(size)}"${hint.spans[i] ? ` style="--tile-rows: ${hint.spans[i]}"` : ''}>${skeletonWidget(3)}</div>`)
     .join('');
   return `
-    <section class="dashboard-overview">
-      <div class="dashboard-overview__header">
-        <div>
-          <div class="skeleton skeleton-line skeleton-line--short"></div>
-          <div class="skeleton skeleton-line skeleton-line--medium"></div>
-        </div>
-      </div>
-    </section>
+    ${renderMastheadSkeleton(user, head)}
     <div class="dashboard__grid">${tiles}</div>
   `;
+}
+
+/* DAS SKELETT HAT DIE FORM DER SEITE, NICHT NUR DIE DER KACHELN (DW-P2-5,
+ * R22 D4 "Skelette in Zielform"). Es zeichnete zwei Balken und darunter
+ * gleich das Raster: kein Gruss, kein Heute-Blatt. Am Telefon stand das
+ * Raster bei y 80 und der Inhalt bei y 720, am Desktop 72 gegen 572 - die
+ * ganze Seite sprang beim Laden um, und die Rangordnung (Blatt, dann
+ * Kacheln) stand im Skelett auf dem Kopf.
+ *
+ * Jetzt traegt es dieselben Klassen wie der echte Kopf: Datumszeile,
+ * Gruss und Werkzeuge in ihren Zeilenboxen (Platzhaltertext in
+ * `.skeleton-text`, die Hoehe kommt aus Schrift und Zeilenhoehe), darunter
+ * das Blatt mit Kopf und Zeilen - so viele, wie zuletzt in den ersten Schirm
+ * passten. Wie hoch das Band zuletzt WIRKLICH war (das Blatt haengt am Tag),
+ * weiss `headHint` je Fenstergroesse; mit dem Wert steht das Raster dort, wo
+ * es gleich steht. Ohne Wert gilt die Form allein. */
+function renderMastheadSkeleton(user, head) {
+  // Platzhaltertext, schon maskiert: der Gruss kommt aus greeting() (maskiert den Namen).
+  const bar = (html) => `<span class="skeleton skeleton-text">${html}</span>`;
+  const sheet = head ? head.sheet : true;
+  // Am Telefon so viele Zeilen, wie das Blatt hoechstens zeigt: das Band
+  // endet an der gemerkten Hoehe bzw. am Falz (dashboard.css), und was
+  // darueber hinausgeht, schneidet die Karte ab - wie das echte Blatt fuellt
+  // es den ersten Schirm. Breit: Kopf, Zeitleiste und die naechsten Zeilen,
+  // gemessen im Seed etwa fuenf Zeilenhoehen.
+  const rows = onPhoneStage() ? PROGRAM_ROW_CAP + 2 : 5;
+  const row = `
+        <div class="today-cockpit-card today-cockpit-card--skeleton">
+          <span class="module-seal today-cockpit-card__icon skeleton"></span>
+          <span class="today-cockpit-card__body">
+            <strong class="today-cockpit-card__value">${bar(esc(t('dashboard.todayTitle')))}</strong>
+            <span class="today-cockpit-card__sub">${bar(esc(t('common.loading')))}</span>
+          </span>
+        </div>`;
+  const sheetHtml = sheet ? `
+      <div class="today-cockpit today-cockpit--skeleton">
+        <div class="today-cockpit__grid">
+          <div class="today-cockpit__header">
+            <span class="module-seal today-cockpit__seal skeleton"></span>
+            <div class="today-cockpit__heading"><h2>${bar(esc(t('dashboard.todayTitle')))}</h2></div>
+          </div>
+          <div class="today-cockpit__rows">${row.repeat(Math.max(1, rows))}</div>
+        </div>
+      </div>` : '';
+  const size = head ? ` style="--skeleton-head-size: ${head.px}px"` : '';
+  return `
+    <section class="dashboard-masthead dashboard-masthead--skeleton${sheet ? '' : ' dashboard-masthead--slim'}" aria-hidden="true"${size}>
+      <div class="dashboard-overview">
+        <div class="dashboard-overview__header">
+          <span class="dashboard-overview__date">${bar(esc(mastheadDateLabel()))}</span>
+          <div class="dashboard-overview__title">${bar(greeting(user?.display_name ?? ''))}</div>
+          <div class="dashboard-overview__tools">
+            <span class="skeleton dashboard-skeleton-tool"></span>
+            <span class="skeleton dashboard-skeleton-tool"></span>
+            <span class="skeleton dashboard-skeleton-tool dashboard-skeleton-tool--wide"></span>
+            ${onDesktopStage() ? '<span class="skeleton dashboard-skeleton-tool dashboard-skeleton-tool--pill"></span>' : ''}
+          </div>
+        </div>
+      </div>${sheetHtml}
+    </section>`;
 }
 
 // Distinkter Fehlerzustand: verhindert, dass ein Ladefehler wie ein ruhiger,
@@ -5611,25 +7721,23 @@ function renderDashboardError(status = null) {
   `;
 }
 
-// Inline-Fehlerkachel für ein einzelnes Widget (siehe Fehler-Isolation in
-// renderDashboardLayout). Nutzt die vorhandene .widget/.widget__empty-Grammatik,
-// damit sie sich ruhig einreiht statt wie ein Systemfehler zu schreien.
+/* DIE FEHLERKACHEL SPRICHT DEN KOPF DER ANDEREN (DW-P3-2). Sie baute ihren
+ * eigenen: ein `<span>` als Titel und eine nackte Glyphe - kein Siegel, keine
+ * Ueberschrift. Der dritte Kopf-Dialekt der Uebersicht, und am Screenreader
+ * fehlte genau diese Kachel in der Ueberschriften-Navigation. Jetzt derselbe
+ * `widgetHeader` (h3, Vollton-Siegel ihres Moduls, ohne Link: wohin sie
+ * fuehrt, weiss sie im Fehlerfall nicht sicher), darunter die ruhige Zeile mit
+ * dem Wiederholen am Ende. Der Rand in Danger-Toenung bleibt das Zeichen
+ * "kaputt, nicht leer" (siehe Fehler-Isolation in renderDashboardLayout). */
+function widgetErrorSeal(id) {
+  return MODULE_FOR_WIDGET[id] ?? (id === 'family' ? 'contacts' : 'dashboard');
+}
+
 function renderWidgetError(id) {
-  return `<div class="widget widget--error" role="alert">
-    <div class="widget__header">
-      <span class="widget__title">
-        <i data-lucide="${widgetIcon(id)}" class="widget__title-icon" aria-hidden="true"></i>
-        ${esc(widgetLabel(id))}
-      </span>
-    </div>
-    <div class="widget__empty">
-      <i data-lucide="cloud-off" class="empty-state__icon" aria-hidden="true"></i>
-      <div>${t('dashboard.widgetError')}</div>
-      <button type="button" class="btn btn--secondary widget__retry" data-widget-retry="${esc(id)}">
-        <i data-lucide="refresh-cw" aria-hidden="true"></i>
-        ${t('common.retry')}
-      </button>
-    </div>
+  const title = esc(widgetLabel(id));
+  return `<div class="widget widget--error" role="alert"${emptySpanAttrs('1x1')}>
+    ${widgetHeader(id, title, null, null, null, widgetErrorSeal(id))}
+    ${widgetEmptyHtml(t('dashboard.widgetError'), { label: t('common.retry'), icon: 'refresh-cw', attrs: { 'data-widget-retry': id } }, id)}
   </div>`;
 }
 
@@ -5644,23 +7752,19 @@ function renderWidgetError(id) {
  * Feld fehlt) gelten die Felder, die auch das Heute-Blatt und die Wand lesen.
  * Die Kachel ist der EINZIGE Leser von `shoppingTile`.
  */
-function renderShoppingTile(data) {
+function renderShoppingTile(data, size = '2x1') {
   const tile = data?.shoppingTile;
   if (tile && Array.isArray(tile.lists)) {
-    return renderShoppingLists(tile.lists, tile.openCount, tile.listCount);
+    return renderShoppingLists(tile.lists, tile.openCount, tile.listCount, size);
   }
-  return renderShoppingLists(data?.shoppingLists ?? [], data?.shoppingOpenCount, data?.shoppingOpenLists);
+  return renderShoppingLists(data?.shoppingLists ?? [], data?.shoppingOpenCount, data?.shoppingOpenLists, size);
 }
 
-function renderShoppingLists(lists, openTotal = null, listTotalCount = null) {
+function renderShoppingLists(lists, openTotal = null, listTotalCount = null, size = '2x1') {
   if (!lists.length) {
-    return `<div class="widget widget--shopping">
+    return `<div class="widget widget--shopping"${emptySpanAttrs(size)}>
       ${widgetHeader('shopping', t('nav.shopping'), 0, '/shopping')}
-      <div class="widget__empty">
-        <i data-lucide="shopping-cart" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.noShoppingLists')}</div>
-        ${emptyStateCta('/shopping', t('shopping.newListButton'))}
-      </div>
+      ${widgetEmptyHtml(t('dashboard.noShoppingLists'), emptyRouteAction('/shopping', t('common.add')), 'shopping')}
     </div>`;
   }
 
@@ -5683,7 +7787,6 @@ function renderShoppingLists(lists, openTotal = null, listTotalCount = null) {
 
     const itemsHtml = list.items.map((item) => `
       <div class="shopping-widget-item">
-        <span class="shopping-widget-item__dot"></span>
         <span class="shopping-widget-item__name">${esc(item.name)}</span>
         ${item.quantity ? `<span class="shopping-widget-item__qty">${esc(item.quantity)}</span>` : ''}
       </div>
@@ -5701,28 +7804,42 @@ function renderShoppingLists(lists, openTotal = null, listTotalCount = null) {
     const listRoute = `/shopping?list=${encodeURIComponent(String(list.id))}`;
 
     return `
-      <div class="shopping-widget-list" data-route="${esc(listRoute)}" role="button" tabindex="0">
+      <div class="list-row shopping-widget-list" data-route="${esc(listRoute)}" role="button" tabindex="0">
+        <span class="list-row__lead shopping-widget-list__icon" aria-hidden="true"><i data-lucide="${MODULE_ICON.shopping}"></i></span>
+        <div class="list-row__main">
         <div class="shopping-widget-list__header">
-          <span class="shopping-widget-list__name">${esc(list.name)}</span>
-          <span class="shopping-widget-list__count">${list.total_count - list.open_count}/${list.total_count}</span>
+          <span class="list-row__name shopping-widget-list__name">${esc(list.name)}</span>
+          <span class="list-row__end shopping-widget-list__count">${list.total_count - list.open_count}/${list.total_count}</span>
         </div>
         <div class="shopping-widget-list__progress">
           <div class="shopping-widget-list__bar" style="--progress-scale:${progress / 100}"></div>
         </div>
         <div class="shopping-widget-list__items">
           ${itemsHtml}
-          ${moreCount > 0 ? `<div class="shopping-widget-item shopping-widget-item--more">${t('dashboard.shoppingMore', { count: moreCount })}</div>` : ''}
+          ${listMoreLine('dashboard.shoppingMore', moreCount)}
           ${/* Eine AUSGEWAEHLTE Liste steht auch ohne Offenes da (#1818): die
                 Zeile bleibt der Weg zu ihr und sagt, warum sie leer ist. */ ''}
           ${list.open_count === 0 ? `<div class="shopping-widget-item shopping-widget-item--more">${esc(t('dashboard.shoppingListNothingOpen'))}</div>` : ''}
+        </div>
         </div>
       </div>
     `;
   }).join('');
 
-  return `<div class="widget widget--shopping">
+  /* Je Liste eine zusammengesetzte Zeile (U11): Name und Zahl, Balken, die
+   * Artikel in je einer Zeile, ggf. "+N weitere" bzw. "nichts offen". */
+  const listPx = (list) => {
+    const n = list.items.length;
+    return TILE_PARTS.shoppingList + n * TILE_PARTS.shoppingItem + Math.max(0, n - 1) * TILE_PARTS.shoppingItemGap
+      + (list.open_count - n > 0 ? TILE_PARTS.shoppingMore : 0) + (list.open_count === 0 ? TILE_PARTS.shoppingNothing : 0);
+  };
+  const listsPx = lists.reduce((sum, list, i) => sum + listPx(list) + (i ? 1 : 0), 0);
+  const span = tileSpanAttrs(() => ({
+    body: TILE_GEOMETRY.rowsPad + listsPx + (moreLists > 0 ? TILE_GEOMETRY.more : 0),
+  }), size);
+  return `<div class="widget widget--shopping"${span}>
     ${widgetHeader('shopping', t('nav.shopping'), totalOpen, '/shopping')}
-    <div class="widget__body">${listsHtml}${listMoreLine('dashboard.shoppingMoreLists', moreLists)}</div>
+    <div class="widget__body widget__body--rows">${widgetRows(listsHtml)}${listMoreLine('dashboard.shoppingMoreLists', moreLists)}</div>
   </div>`;
 }
 
@@ -5877,11 +7994,9 @@ function weatherTempBand(temp, units) {
 function mastheadWeatherHtml(weather, { card = false } = {}) {
   if (!weather?.current) return '';
   const desc = weatherDescText(weather, weather.current.desc);
-  // MIT KARTE NUR MOBIL (R19, Entscheidung Ulas 2026-10-16): die Wetterkarte
-  // stand auf dem Telefon bei y 1438 - die Kurzzeile unterm Gruss sagt das
-  // Jetzt sofort, die Karte weiter unten behaelt die Vorhersage. Ab 768px,
-  // wo die Karte neben dem Kopf im Bild steht, schliessen sich beide weiter
-  // aus (`--card`, dashboard.css).
+  // AUCH NEBEN DER KARTE (R19 mobil, seit R24 E7 in jeder Breite): die
+  // Kurzzeile unterm Gruss sagt das Jetzt sofort, die Karte weiter unten
+  // behaelt die Vorhersage. `--card` markiert nur noch, dass die Karte steht.
   return `
     <p class="dashboard-overview__weather${card ? ' dashboard-overview__weather--card' : ''}"${weatherToneAttr(weather.current.icon)}>
       ${weatherIconHtml(weather, weather.current.icon, 'dashboard-overview__weather-icon', 18, desc)}
@@ -5972,8 +8087,22 @@ function weatherSpanModel(forecast) {
   };
 }
 
-function renderWeatherWidget(weather) {
+/* DER AKTUALISIEREN-KNOPF STEHT IN DER ENDZONE DES KOPFES (DW-P3-3), wo jede
+ * andere Kachel ihren "Alle"-Link traegt - als Kopf-Icon-Knopf der Shell
+ * (`btn btn--secondary btn--icon`: Ring, Druckbild, Zeiger 40/Finger 48), nicht
+ * mehr als grauer Eigenbau-Kreis, der absolut ueber der Karte schwebte und dafuer
+ * dem Kopf per z-index das Treffen abringen musste. */
+function weatherRefreshButton() {
+  return `<button type="button" class="btn btn--secondary btn--icon weather-widget__refresh" id="weather-refresh-btn"
+            aria-label="${esc(t('dashboard.weatherRefresh'))}" title="${esc(t('dashboard.weatherRefreshTitle'))}">
+        <i data-lucide="refresh-cw" aria-hidden="true"></i>
+      </button>`;
+}
+
+function renderWeatherWidget(weather, size = '2x1') {
   if (!weather) return '';
+  // Jetzt-Block mit oder ohne Vorhersage daneben/darunter - eine Hoehe je Groesse.
+  const span = tileSpanAttrs((s) => ({ body: TILE_PARTS.weather[nearestPreset(s)] ?? TILE_PARTS.weather['2x1'] }), size);
 
   const { city, current, forecast, units } = weather;
 
@@ -6009,11 +8138,8 @@ function renderWeatherWidget(weather) {
   }).join('');
 
   return `
-    <div class="widget widget--weather weather-widget" id="weather-widget"${weatherToneAttr(current.icon)}${weatherMotionAttr(current.icon)}>
-      ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard')}
-      <button class="weather-widget__refresh" id="weather-refresh-btn" aria-label="${t('dashboard.weatherRefresh')}" title="${t('dashboard.weatherRefreshTitle')}">
-        <i data-lucide="refresh-cw" class="icon-md" aria-hidden="true"></i>
-      </button>
+    <div class="widget widget--weather weather-widget" id="weather-widget"${span}${weatherToneAttr(current.icon)}${weatherMotionAttr(current.icon)}>
+      ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard', { action: weatherRefreshButton() })}
       <div class="weather-widget__inner">
         <div class="weather-widget__main">
           <div class="weather-widget__left">
@@ -6038,17 +8164,11 @@ function renderWeatherWidget(weather) {
 // und nicht beheben muss, und er soll nicht bei jedem Aufbau vorgelesen werden.
 // Der Aktualisieren-Knopf bleibt - er ist der Weg zurueck, und
 // `wireWeatherRefresh` tauscht die Kachel bei Erfolg aus.
-function renderWeatherUnavailable() {
+function renderWeatherUnavailable(size = '2x1') {
   return `
-    <div class="widget widget--weather weather-widget weather-widget--unavailable" id="weather-widget">
-      ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard')}
-      <button class="weather-widget__refresh" id="weather-refresh-btn" aria-label="${t('dashboard.weatherRefresh')}" title="${t('dashboard.weatherRefreshTitle')}">
-        <i data-lucide="refresh-cw" class="icon-md" aria-hidden="true"></i>
-      </button>
-      <div class="widget__empty">
-        <i data-lucide="cloud-off" class="empty-state__icon" aria-hidden="true"></i>
-        <div>${t('dashboard.weatherUnavailable')}</div>
-      </div>
+    <div class="widget widget--weather weather-widget weather-widget--unavailable" id="weather-widget"${emptySpanAttrs(size)}>
+      ${widgetHeader('weather', t('dashboard.weather'), null, null, null, 'dashboard', { action: weatherRefreshButton() })}
+      ${widgetEmptyHtml(t('dashboard.weatherUnavailable'))}
     </div>`;
 }
 
@@ -6084,7 +8204,7 @@ function clockWidgetParts(now = new Date()) {
  *   Ihre IDs bleiben dieselben - der Minutentakt (`updateClockWidget`) findet
  *   sie so in beiden Zustaenden, statt ein zweites Mal geschrieben zu werden.
  */
-function renderClockWidget({ wall = false } = {}) {
+function renderClockWidget({ wall = false, size = '2x1' } = {}) {
   const { time, date, machineTime } = clockWidgetParts();
   const cls = wall ? 'clock-widget clock-widget--wall' : 'widget widget--clock clock-widget';
   // SPERRZONE FUER MELDUNGEN, NUR AN DER WAND (#1917): dort steht der Stapel
@@ -6104,8 +8224,10 @@ function renderClockWidget({ wall = false } = {}) {
   if (wall) {
     return `<div class="${cls}" id="clock-widget">${body}</div>`;
   }
+  // Die Ziffern wachsen mit der Hoehe der Groesse (dashboard.css, --clock-time-max).
+  const span = tileSpanAttrs((s) => ({ body: TILE_PARTS.clock[nearestPreset(s)] ?? TILE_PARTS.clock['2x1'] }), size);
   return `
-    <div class="${cls}" id="clock-widget">
+    <div class="${cls}" id="clock-widget"${span}>
       ${widgetHeader('clock', t('dashboard.clock'), null, null, null, 'dashboard')}
       <div class="widget__body clock-widget__body">${body}</div>
     </div>`;
@@ -6503,7 +8625,7 @@ function fitWallWho(root, data, { now = new Date(), reset = false, isDisplay = f
   if (!reset && !overflows()) return 0;
 
   // `allRows` haengt nicht am Deckel, der Timer spielt hier also keine Rolle.
-  const model = buildTodayCockpitModel(data, [], { cap: WALL_ROW_CAP, now, groupOverdue: false });
+  const model = buildTodayCockpitModel(data, [], { cap: WALL_ROW_CAP, now, groupOverdue: false, ...wallTimelineOptions(data, now) });
   const place = (step) => {
     const section = wall.querySelector('.wall__who');
     if (!section) return false;
@@ -6583,7 +8705,7 @@ function shedWallProgram(wall, data, overflows, { now = new Date(), isDisplay = 
   let shed = 0;
   while (rows > 2 && overflows()) {
     rows -= 1;
-    const model = buildTodayCockpitModel(data, [], { cap: rows, now, groupOverdue: false, isDisplay });
+    const model = buildTodayCockpitModel(data, [], { cap: rows, now, groupOverdue: false, isDisplay, ...wallTimelineOptions(data, now) });
     section.insertAdjacentHTML('afterend', renderWallProgram(model));
     const next = section.nextElementSibling;
     section.remove();
@@ -6745,7 +8867,7 @@ function renderWallSurface(data, weather, { failed = false, loading = false, upd
   // weniger, und „+N weitere" zaehlt sie mit. Der Start und das Ende rufen
   // ohnehin `rerender()` (wall-timer.js), der Deckel folgt also von selbst.
   const cap = timer.display ? WALL_ROW_CAP - 1 : WALL_ROW_CAP;
-  const model = failed || loading ? null : buildTodayCockpitModel(data, [], { cap, now, groupOverdue: false, isDisplay });
+  const model = failed || loading ? null : buildTodayCockpitModel(data, [], { cap, now, groupOverdue: false, isDisplay, ...wallTimelineOptions(data, now) });
 
   let main;
   if (failed) {
@@ -6926,27 +9048,90 @@ function renderNewPill() {
         </div>`;
 }
 
-/** Die Menuepunkte der Pille: dieselben Wege wie der Speed-Dial (FAB_NEW_BTN). */
-function wireNewMenu(container, signal) {
+/** Die Menuepunkte der Pille: dieselben Wege wie der Speed-Dial (openNewTarget). */
+function wireNewMenu(container, signal, host = {}) {
   installPopoverMenus(container);
   container.addEventListener('click', async (event) => {
     const item = event.target.closest?.('[data-new-route]');
     if (!item) return;
     item.closest('[popover]')?.hidePopover?.();
-    const route = item.dataset.newRoute;
-    await window.yuvomi.navigate(route);
-    const btnSelector = FAB_NEW_BTN[route];
-    if (btnSelector) document.querySelector(btnSelector)?.click();
+    await openNewTarget(item.dataset.newRoute, { ...host, signal });
   }, { signal });
 }
 
-// "Neu"-Button-Selector auf der jeweiligen Zielseite
-const FAB_NEW_BTN = {
-  '/tasks':    '#btn-new-task',
-  '/calendar': '#fab-new-event',
-  '/shopping': '#fab-new-item',
-  '/notes':    '#fab-new-note',
+/**
+ * DAS ANLEGEN-BLATT DES MODULS UEBER DER UEBERSICHT (DW, Ulas U2), wie das
+ * Lesen seit R22 D3 (openTaskFromOverview, openEventFromOverview). Pille und
+ * Speed-Dial wechselten ins Modul und klickten dort dessen FAB: die
+ * Uebersicht war weg, und nach dem Speichern stand man in der Liste statt
+ * dort, wo man angefangen hatte. Jetzt geht dasselbe Formular wie am FAB des
+ * Moduls ueber ihr auf, und nach dem Speichern gleicht sie still ab
+ * (`refresh` = refreshDashboardData, DW-P1-2): die neue Zeile steht in ihrer
+ * Kachel, ohne Skelett und ohne Sprung.
+ *
+ * Nachgeladen beim Tipp, nicht mitgeladen: jedes Modul zieht sein Formular mit
+ * sich, und dessen Gewicht gehoert nicht in den Start der Startseite
+ * (test:startup-preload).
+ *
+ * EINKAUF BLEIBT DER WEG INS MODUL. Sein FAB oeffnet kein Formular, sondern
+ * die Eingabezeile ueber der Liste, in die sie schreibt (shopping.js,
+ * syncQuickAddDisclosure: "KEIN BOTTOM-SHEET"); ein Blatt dafuer gibt es nicht.
+ */
+const NEW_SHEETS = {
+  '/tasks':    async (opts) => (await import('/pages/tasks.js')).openNewTask(opts),
+  '/calendar': async (opts) => (await import('/pages/calendar.js')).openNewEvent(opts),
+  '/notes':    async (opts) => (await import('/pages/notes.js')).openNewNote(opts),
 };
+
+/**
+ * DER ANLEGEN-KNOPF DER ZIELSEITE, ALS ID - fuer Einkauf, und fuer jedes
+ * andere Ziel der Weg, wenn sein Blatt nicht laedt: ein Fehler soll das
+ * Anlegen nicht verschliessen (wie openEventFromOverview). Bis DW-P1-1 stand
+ * hier ein Selektor je Ziel, und `'#btn-new-task'` ueberlebte die Umbenennung
+ * in `fab-new-task` (#1483): "+ Neu > Aufgabe" landete wortlos in der Liste.
+ * Eine Id fuer `findPageFab()` statt eines Selektors - der FAB lebt nach
+ * `adoptPageFab()` in der Shell-Layer, und dort sucht ihn nur diese eine
+ * Stelle. Dass jede Id im Markup ihrer Zielseite steht, haelt
+ * `test:dashboard-clarity`.
+ */
+const FAB_NEW_BTN = {
+  '/tasks':    'fab-new-task',
+  '/calendar': 'fab-new-event',
+  '/shopping': 'fab-new-item',
+  '/notes':    'fab-new-note',
+};
+
+/**
+ * Das Anlegen-Blatt eines Ziels oeffnen - der eine Weg fuer Pille und
+ * Speed-Dial. Ueber der Uebersicht, wo das Modul eins hat (NEW_SHEETS), sonst
+ * im Modul.
+ *
+ * DER FOKUS STEHT VORHER AUF "+ NEU". Das Blatt gibt ihn beim Schliessen an
+ * das Element zurueck, das ihn beim Oeffnen hielt - das waere der Menuepunkt,
+ * den Popover bzw. Speed-Dial gerade versteckt haben, und der Fokus fiele auf
+ * das Dokument. Abbrechen fuehrt so an den Knopf zurueck, von dem man kam.
+ * @param {string} route
+ * @param {{ user?: object|null, refresh?: () => Promise<void>, signal?: AbortSignal|null }} [host]
+ */
+async function openNewTarget(route, { user = null, refresh = null, signal = null } = {}) {
+  const sheet = NEW_SHEETS[route];
+  if (sheet) {
+    findPageFab('fab-main')?.focus({ preventScroll: true });
+    try {
+      await sheet({ user, onChanged: refresh ?? (() => {}), signal });
+      return;
+    } catch (err) {
+      console.error('[Dashboard] Anlegen-Blatt konnte nicht geöffnet werden:', err);
+    }
+    // Wer die Uebersicht inzwischen verlassen hat, steht schon woanders: der
+    // Weg ins Modul risse ihn von dort weg (Review p11). Das Blatt selbst
+    // prueft dasselbe Signal, bevor es aufgeht.
+    if (signal?.aborted) return;
+  }
+  await window.yuvomi.navigate(route);
+  const id = FAB_NEW_BTN[route];
+  if (id) findPageFab(id)?.click();
+}
 
 function renderFab() {
   // Am Desktop steht Anlegen als Pille im Kopf (renderNewPill).
@@ -7005,7 +9190,7 @@ function setCustomizeFabHidden(hidden) {
   fab.hidden = hidden;
 }
 
-function initFab(signal) {
+function initFab(signal, host = {}) {
   const fabMain     = findPageFab('fab-main');
   const fabGroup    = fabMain?.closest('.page-fab-group');
   const fabActions  = fabGroup?.querySelector('#fab-actions');
@@ -7039,9 +9224,7 @@ function initFab(signal) {
   fabActions.querySelectorAll('[data-route]').forEach((el) => {
     const go = async () => {
       toggleFab(false);
-      await window.yuvomi.navigate(el.dataset.route);
-      const btnSelector = FAB_NEW_BTN[el.dataset.route];
-      if (btnSelector) document.querySelector(btnSelector)?.click();
+      await openNewTarget(el.dataset.route, { ...host, signal });
     };
     el.addEventListener('click', go);
     el.addEventListener('keydown', (e) => {
@@ -7085,15 +9268,16 @@ function initFab(signal) {
  * Das Modul wird nachgeladen statt mitgeladen: Es zieht das Aufgabenformular
  * mit sich, und dessen Gewicht gehört nicht in den Start der Startseite.
  *
- * `rerender` frischt die Kachel auf, aus der geöffnet wurde - der Nutzer
- * bleibt, wo er war, statt im Aufgabenmodul zu landen. `user` reist mit,
+ * `refresh` gleicht die Uebersicht still ab (refreshDashboardData, DW-P1-2):
+ * der Nutzer bleibt, wo er war - kein Skelett, kein Sprung nach oben, und
+ * keine Reise ins Aufgabenmodul. `user` reist mit,
  * weil an ihm haengt, wem seine eigenen Kommentare gehoeren und wer eine
  * gesperrte Aufgabe umschreiben darf.
  */
-async function openTaskFromOverview(taskId, container, rerender, user) {
+async function openTaskFromOverview(taskId, container, refresh, user) {
   try {
     const { openTaskById } = await import('/pages/tasks.js');
-    await openTaskById(taskId, { user, container, onChanged: rerender });
+    await openTaskById(taskId, { user, container, onChanged: refresh });
   } catch (err) {
     console.error('[Dashboard] Aufgabe konnte nicht geöffnet werden:', err);
     window.yuvomi?.showToast(errorSentence(err, 'tasks.loadError'), 'danger');
@@ -7135,12 +9319,12 @@ export function eventRowRemovedBy(link, scope) {
  * DER TERMIN OEFFNET UEBER DER UEBERSICHT (Critique R22, D3), wie die
  * Aufgabe daneben (openTaskFromOverview): das Blatt des Kalenders, die
  * Uebersicht bleibt stehen. Seit R22-F wird dort auch bearbeitet und
- * geloescht: danach zeichnet sich die Uebersicht neu (`rerender`), und
+ * geloescht: danach gleicht die Uebersicht still ab (`refresh`), und
  * waehrend der Rueckgaengig-Frist sind die Zeilen des Termins ausgeblendet.
  * Scheitert das Laden, fuehrt die Zeile wie bisher in den Kalender - ein
  * Fehler soll den Weg nicht verschliessen.
  */
-async function openEventFromOverview(link, anchor, { container = null, rerender = null, user = null } = {}) {
+async function openEventFromOverview(link, anchor, { container = null, refresh = null, user = null, signal = null } = {}) {
   const onRemoving = (scope, removing) => {
     container?.querySelectorAll('[data-route]').forEach((row) => {
       if (eventRowRemovedBy(eventLinkOf(row.dataset.route), scope)) row.hidden = removing;
@@ -7148,7 +9332,9 @@ async function openEventFromOverview(link, anchor, { container = null, rerender 
   };
   try {
     const { openEventById } = await import('/pages/calendar.js');
-    await openEventById(link.id, { date: link.date, anchor, user, onChanged: rerender, onRemoving });
+    // `signal` ist die Lebenszeit der Uebersicht: so lange leiht das Blatt
+    // calendar.css fuer sein Formular (Farbwahl, Erinnerungszeilen).
+    await openEventById(link.id, { date: link.date, anchor, user, onChanged: refresh, onRemoving, signal });
   } catch (err) {
     console.error('[Dashboard] Termin konnte nicht geöffnet werden:', err);
     const params = new URLSearchParams({ open: link.id });
@@ -7161,9 +9347,10 @@ async function openEventFromOverview(link, anchor, { container = null, rerender 
 // Navigations-Links verdrahten
 // --------------------------------------------------------
 
-function wireLinks(container, rerender, { editing = false, user = null } = {}) {
+function wireLinks(container, refresh, { editing = false, user = null, signal = null } = {}) {
   wireTodayMore(container);
   wireTodayOverdue(container);
+  wireTodayTimeline(container);
   container.querySelectorAll('[data-route]').forEach((el) => {
     if (el.id === 'fab-main' || el.closest('#fab-actions')) return;
     if (editing && el.closest('.widget-wrapper--editing')) return;
@@ -7174,7 +9361,7 @@ function wireLinks(container, rerender, { editing = false, user = null } = {}) {
     // Essen-Zeile bewusst ohne Sonderweg: /meals öffnet die aktuelle Woche und
     // scrollt den Heute-Slot selbst in den Blick (meals.js, day-header--today).
     if (!editing && el.dataset.objectKind === 'task' && el.dataset.objectId) {
-      const show = () => openTaskFromOverview(el.dataset.objectId, container, rerender, user);
+      const show = () => openTaskFromOverview(el.dataset.objectId, container, refresh, user);
       el.addEventListener('click', show);
       el.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(); }
@@ -7185,7 +9372,7 @@ function wireLinks(container, rerender, { editing = false, user = null } = {}) {
     // Mittelklick auf einen Link behalten unten ihren neuen Tab.
     const eventLink = editing ? null : eventLinkOf(el.dataset.route);
     const go = eventLink
-      ? () => openEventFromOverview(eventLink, el, { container, rerender, user })
+      ? () => openEventFromOverview(eventLink, el, { container, refresh, user, signal })
       : () => window.yuvomi.navigate(el.dataset.route);
     if (el.tagName === 'A') {
       el.addEventListener('click', (e) => {
@@ -7215,7 +9402,7 @@ function wireLinks(container, rerender, { editing = false, user = null } = {}) {
       // lag sonst in der Startkette jeder Uebersicht, geoeffnet wird er selten.
       el.addEventListener('click', async () => {
         const { openQuickLinksManager } = await import('/components/quick-links-manager.js');
-        openQuickLinksManager({ onChange: rerender });
+        openQuickLinksManager({ onChange: refresh });
       });
     });
   }
@@ -7226,7 +9413,7 @@ function wireLinks(container, rerender, { editing = false, user = null } = {}) {
   // nennt ein Objekt, also trifft der Klick dieses Objekt. Ein eigener Handler
   // daneben wäre ein zweiter Weg zur selben Handlung.
   container.querySelectorAll('.task-item[data-task-id], .countdown-item[data-task-id]').forEach((el) => {
-    const show = () => openTaskFromOverview(el.dataset.taskId, container, rerender, user);
+    const show = () => openTaskFromOverview(el.dataset.taskId, container, refresh, user);
     el.addEventListener('click', show);
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(); }
@@ -7244,35 +9431,6 @@ function reorderWidgetConfig(config, fromId, toId, placement = 'before') {
   if (placement === 'after') toIdx += 1;
   next.splice(toIdx, 0, moved);
   return next.map((w, i) => ({ ...w, order: i }));
-}
-
-function closestWidgetDrop(grid, event, draggedId) {
-  const candidates = [...grid.querySelectorAll('.widget-wrapper[data-widget-id]')]
-    .filter((item) => item.dataset.widgetId !== draggedId);
-  if (!candidates.length) return null;
-
-  let nearest = null;
-  let nearestDistance = Number.POSITIVE_INFINITY;
-  for (const item of candidates) {
-    const rect = item.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const dx = event.clientX - centerX;
-    const dy = event.clientY - centerY;
-    const distance = (dy * dy * 1.7) + (dx * dx);
-    if (distance < nearestDistance) {
-      nearestDistance = distance;
-      nearest = { item, rect };
-    }
-  }
-  if (!nearest) return null;
-
-  const sameRow = event.clientY >= nearest.rect.top && event.clientY <= nearest.rect.bottom;
-  const placement = sameRow
-    ? (event.clientX > nearest.rect.left + nearest.rect.width / 2 ? 'after' : 'before')
-    : (event.clientY > nearest.rect.top + nearest.rect.height / 2 ? 'after' : 'before');
-
-  return { id: nearest.item.dataset.widgetId, placement, item: nearest.item };
 }
 
 /* DER LOCH-HINWEIS IM BEARBEITEN-MODUS (Critique 2026-09-23).
@@ -7295,15 +9453,36 @@ function gridSpans(el) {
   return { cols: span(cs.gridColumnStart, cs.gridColumnEnd), rows: span(cs.gridRowStart, cs.gridRowEnd) };
 }
 
+/* Die Spuren einer Groesse: die Breite aus dem Stylesheet (Klasse kurz
+ * tauschen, lesen, zurueck), die Hoehe aus den Daten der Kachel
+ * (`data-span-sizes`, U1 b) - plus der Abstand, den der Rahmen traegt
+ * (`--tile-gap-rows`, steckt in der gelesenen Spanne).
+ *
+ * GELESEN WIRD DIE GEWAEHLTE SPANNE, NICHT DIE GEFUELLTE. Seit der
+ * Anpassen-Modus fuellt wie die Ansicht (DW-P2-9), traegt eine Kachel dort
+ * schon die Spanne, mit der sie ein Loch schliesst (`data-col-fill`,
+ * `data-row-fill`, `data-col-lock`). Gelesen mit ihr, sah der Hinweis das Loch
+ * nie, das er beseitigen soll: gemessen 1440px, die Uhr zwischen Geburtstagen
+ * und Aufgaben stand mit 202px Geist ueber den Notizen, und kein Hinweis. Die
+ * Fuellung geht fuer die Probe mit der Klasse weg und kommt mit ihr zurueck. */
+const FILL_ATTRIBUTES = ['data-col-fill', 'data-row-fill', 'data-col-lock'];
+
 function spansForSize(el, size) {
   const current = [...el.classList].find((c) => c.startsWith('widget-size--'));
   const probe = widgetSizeClass(size);
-  if (!current || current === probe) return gridSpans(el);
-  el.classList.replace(current, probe);
+  const own = Number(el.dataset?.spanRows);
+  const content = spanRowsForSize(el, size);
+  const withContent = (spans) => (content && own ? { ...spans, rows: spans.rows - own + content } : spans);
+  const fills = FILL_ATTRIBUTES.filter((name) => el.hasAttribute(name));
+  const swap = current && current !== probe;
+  if (!swap && !fills.length) return withContent(gridSpans(el));
+  for (const name of fills) el.removeAttribute(name);
+  if (swap) el.classList.replace(current, probe);
   try {
-    return gridSpans(el);
+    return withContent(gridSpans(el));
   } finally {
-    el.classList.replace(probe, current);
+    if (swap) el.classList.replace(probe, current);
+    for (const name of fills) el.setAttribute(name, '');
   }
 }
 
@@ -7311,35 +9490,108 @@ function gridColumnCount(grid) {
   return getComputedStyle(grid).gridTemplateColumns.split(' ').filter((v) => v && v !== 'none').length;
 }
 
-function gridHoleSuggestion(grid) {
-  const columns = gridColumnCount(grid);
-  if (columns < 2) return null;
-  const items = [...grid.querySelectorAll(':scope > .widget-wrapper[data-widget-id]')].map((el) => ({
-    id: el.dataset.widgetId,
-    el,
-    size: [...el.classList].find((c) => c.startsWith('widget-size--'))?.slice('widget-size--'.length) ?? '1x1',
-    ...gridSpans(el),
-  }));
-  return suggestGridHoleFill(items, columns,
-    (item) => WIDGET_SIZE_PRESETS.map((p) => ({ size: p.value, ...spansForSize(item.el, p.value) })));
+/* DIE SPANNEN EINER GROESSE STEHEN IM STYLESHEET, NICHT IN DER KACHEL (DW-P2-1).
+ * Um zu wissen, welche Groesse ein Loch schliesst, probiert der Hinweis jede
+ * Groesse an jeder Kachel aus (spansForSize: Klasse tauschen, lesen, zurueck) -
+ * bei 22 Kacheln 66 Proben, und jede legte das Raster zur Auslegung frei: nach
+ * jeder Anpassen-Geste ein zweites volles Layout (gemessen 4x CPU ~25 ms).
+ * Was eine Probe misst, haengt nur an der Groessenklasse, den Spuren, die die
+ * Kachel in jeder Groesse belegt (`data-span-sizes`, U1 b), und den Spuren des
+ * Rasters - darum gilt sie je Spurbild, und nach der ersten Runde misst eine
+ * Geste nichts mehr nach. */
+const tileSpanMemo = new Map();
+function memoSpans(el, size, tracks) {
+  const key = `${tracks}|${size}|${el.dataset?.spanRows ?? ''}|${el.dataset?.spanSizes ?? ''}`;
+  let spans = tileSpanMemo.get(key);
+  if (!spans) {
+    spans = spansForSize(el, size);
+    if (tileSpanMemo.size > 200) tileSpanMemo.clear();
+    tileSpanMemo.set(key, spans);
+  }
+  return spans;
 }
 
+function gridHoleSuggestion(grid) {
+  const tracks = getComputedStyle(grid).gridTemplateColumns;
+  const columns = tracks.split(' ').filter((v) => v && v !== 'none').length;
+  if (columns < 2) return null;
+  const items = [...grid.querySelectorAll(':scope > .widget-wrapper[data-widget-id]')].map((el) => {
+    const size = [...el.classList].find((c) => c.startsWith('widget-size--'))?.slice('widget-size--'.length) ?? '1x1';
+    return { id: el.dataset.widgetId, el, size, ...memoSpans(el, size, tracks) };
+  });
+  return suggestGridHoleFill(items, columns,
+    (item) => WIDGET_SIZE_PRESETS.map((p) => ({ size: p.value, ...memoSpans(item.el, p.value, tracks) })));
+}
+
+/* WAS BREITE IN INHALT UMSETZT (DW-P2-6, U1 b): das Wetter zeigt in der
+ * Breite mehr Tage (4 ab 640px Kachelbreite, 5 ab 860px), in derselben Hoehe.
+ * Jede andere Kachel zeigte breiter nur dasselbe groesser. */
+const FILL_WIDE_WIDGETS = new Set(['weather']);
+
 /**
- * DAS RASTER HAT IM NORMALMODUS KEINE LOECHER (Re-Critique 2026-09-27, A7
- * P2-12 / R10 L9). Die Kachel vor einer freien Zelle waechst in den Rest ihrer
- * Zeile (`rowFillSpans`, utils/dashboard-widgets.js) - als Darstellung, nicht
- * als gespeicherte Groesse: `data-row-fill` plus `--widget-fill-span`
- * (dashboard.css). Im Anpassen-Modus waechst nichts; dort zeigt das Raster die
- * gewaehlten Groessen, und der Loch-Hinweis (`gridHoleSuggestion`) schlaegt die
- * dauerhafte Korrektur vor.
+ * DAS RASTER HAT KEIN LOCH - UND KEINE KACHEL HOEHE OHNE INHALT (R10 L9,
+ * R21 D5, neu gefasst mit U1 b). Nach der dichten Packung sind die Kacheln so
+ * hoch wie ihre Daten (`--tile-rows`); was dann noch frei ist:
+ *   - rechts neben dem Wetter waechst das Wetter hinein (`rowFillSpans`,
+ *     nur `wide`) und zeigt dort mehr Tage;
+ *   - ein Loch, unter dem noch eine Kachel steht, fuellt die Kachel darueber
+ *     (`columnFillSpans`);
+ *   - ein Spaltenende, laenger als ein Kachelabstand, ist auch ein Loch (F9):
+ *     eine Kachel daneben waechst in die Breite, sonst die letzte der Spalte
+ *     in die Hoehe. Ein kuerzeres laeuft ruhig aus.
+ * Beides ist Darstellung (`data-row-fill`/`data-col-fill`), gespeichert bleibt
+ * die gewaehlte Groesse.
  *
- * Gemessen wird mit abgenommenem Wachstum - die Spans kommen aus den
- * Groessenklassen, nicht aus der letzten Runde dieser Funktion.
+ * DER ANPASSEN-MODUS ZEIGT DASSELBE RASTER (DW-P2-9, WYSIWYG): er fuellte nicht,
+ * und der Lueckenhinweis schlug dann eine Korrektur fuer eine Luecke vor, die
+ * ausserhalb nie stand. Jetzt fuellt er wie der Normalmodus; die Hoehe, die
+ * eine Kachel nur zum Fuellen bekommt, steht dort als Geist
+ * (`--tile-ghost-rows`, dashboard.css) - man sieht, was Inhalt ist und was
+ * Platz.
+ *
+ * Gemessen wird mit abgenommenem Wachstum - die Spans kommen aus Groessenklasse
+ * und Daten, nicht aus der letzten Runde dieser Funktion.
  */
-function applyRowFill(grid, { editing = false } = {}) {
+const seenGridColumns = new WeakMap();
+
+function applyRowFill(grid, { editing = false, columns: knownColumns = null } = {}) {
   // Nur, was im Raster steht: ein verborgenes Kind belegt keine Zelle.
   const tiles = [...grid.children].filter((el) => getComputedStyle(el).display !== 'none');
+  /* ERST LESEN, DANN SCHREIBEN (DW-P2-4). Die Kacheln sind Container
+   * (`container: dashboard-widget`); ein `getComputedStyle` nach dem ersten
+   * gesetzten Fuell-Attribut verlangte darum Stil UND Layout der ganzen
+   * Flaeche noch einmal - gemessen 8 ms bei 4x CPU, mitten im Seitenwechsel.
+   * Ein frisch gezeichnetes Raster traegt noch keine Fuellung: dort wird
+   * alles vorab gelesen. Nur ein Raster, das schon gefuellt war (neue
+   * Spaltenzahl, eine Geste), muss erst zuruecksetzen, damit die Spannen die
+   * gewaehlten sind und nicht die gefuellten. */
+  const filled = tiles.some((el) => 'rowFill' in el.dataset || 'colFill' in el.dataset);
+  const read = () => {
+    const columns = knownColumns ?? gridColumnCount(grid);
+    seenGridColumns.set(grid, columns);
+    if (columns < 2) return { columns, items: [] };
+    return {
+      columns,
+      items: tiles.map((el, index) => {
+        const spans = gridSpans(el);
+        return {
+          id: el.dataset.widgetId || `#${index}`,
+          el,
+          ...spans,
+          wide: FILL_WIDE_WIDGETS.has(el.dataset.widgetId) && spans.cols >= 2,
+          // Die Kennzahlreihe waechst nicht (so hoch wie ihre Kacheln, `align-self: start`).
+          grow: !el.querySelector(':scope > .metric-tiles'),
+        };
+      }),
+    };
+  };
+  const early = filled ? null : read();
   for (const el of grid.children) {
+    if ('colLock' in el.dataset) {
+      delete el.dataset.colLock;
+      el.style.removeProperty('--tile-col');
+      el.style.removeProperty('--tile-span-cols');
+    }
     if ('rowFill' in el.dataset) {
       delete el.dataset.rowFill;
       el.style.removeProperty('--widget-fill-span');
@@ -7347,34 +9599,69 @@ function applyRowFill(grid, { editing = false } = {}) {
     if ('colFill' in el.dataset) {
       delete el.dataset.colFill;
       el.style.removeProperty('--widget-fill-rows');
+      el.style.removeProperty('--tile-ghost-rows');
+      delete el.dataset.ghostBlock;
     }
   }
-  if (editing) return;
-  const columns = gridColumnCount(grid);
-  if (columns < 2) return;
-  const items = tiles.map((el, index) => ({ id: el.dataset.widgetId || `#${index}`, el, ...gridSpans(el) }));
-  const grown = rowFillSpans(items, columns);
-  for (const item of items) {
-    const span = grown.get(item.id);
-    if (!span) continue;
-    item.el.dataset.rowFill = '';
-    item.el.style.setProperty('--widget-fill-span', String(span));
+  const { columns, items: read0 } = early ?? read();
+  if (columns < 2) {
+    // Einspaltig wird nichts gestreckt, also steht auch keine Zusatzzeile (U14).
+    for (const el of grid.children) if (el.dataset?.fillShown) showFillRows(el, 0);
+    return;
   }
-  /* UND WAS VON LINKS NIEMAND ERREICHT, FUELLT DIE KACHEL DARUEBER (R21, D5):
-   * `columnFillSpans`, utils/dashboard-widgets.js. Eine Kachel, die so hoch ist
-   * wie ihr Inhalt (`align-self: start`, die Kennzahlreihe), waechst nicht -
-   * gestreckt stuende die Leere nur in ihr. */
-  const widened = items.map((item) => ({
-    ...item,
-    cols: grown.get(item.id) ?? item.cols,
-    grow: getComputedStyle(item.el).alignSelf !== 'start',
-  }));
-  const taller = columnFillSpans(widened, columns);
-  for (const item of widened) {
-    const rows = taller.get(item.id);
-    if (!rows) continue;
-    item.el.dataset.colFill = '';
-    item.el.style.setProperty('--widget-fill-rows', String(rows));
+  // Packen und Fuellen: eine reine Rechnung (fillGridSpans, utils/dashboard-widgets.js).
+  const items = read0;
+  const spans = fillGridSpans(items, columns);
+  // Die Spalte breiter und gewachsener Kacheln steht fest: gleich frueh,
+  // weniger Loch (packGrid), und wer nach links waechst, beginnt dort (F9).
+  spans.forEach((item, i) => {
+    if (item.col === undefined) return;
+    items[i].el.dataset.colLock = '';
+    items[i].el.style.setProperty('--tile-col', String(item.col + 1));
+    items[i].el.style.setProperty('--tile-span-cols', String(Math.min(items[i].cols, columns)));
+  });
+  spans.forEach((item, i) => {
+    const own = items[i];
+    if (item.cols !== own.cols) {
+      item.el.dataset.rowFill = '';
+      item.el.style.setProperty('--widget-fill-span', String(item.cols));
+      // Kein Geist fuer Breite (F9): der Inhalt laeuft ueber die ganze Breite,
+      // ein Schlitz am Rand laege ueber ihm.
+    }
+    // HOEHE WIRD INHALT (U14): was die Packung einer Liste an Hoehe zuteilt,
+    // fuellen ihre geladenen Zeilen, soweit sie ganz hineinpassen. Gelesen
+    // wird nur, was der Renderer ausgerechnet hat (`data-fill-steps`).
+    const base = Number(item.el.dataset?.spanRows) || 0;
+    const steps = String(item.el.dataset?.fillSteps ?? '').split(',').map(Number).filter((n) => n > 0);
+    const extra = steps.length && base ? fillRowCount(steps, base + item.rows - own.rows) : 0;
+    if (steps.length || item.el.dataset?.fillShown) showFillRows(item.el, extra);
+    if (item.rows !== own.rows) {
+      item.el.dataset.colFill = '';
+      item.el.style.setProperty('--widget-fill-rows', String(item.rows));
+      // Im Anpassen-Modus steht als Geist nur, was danach noch Platz ist.
+      const ghost = item.rows - own.rows - (extra ? steps[extra - 1] - base : 0);
+      if (editing && ghost > 0) {
+        item.el.dataset.ghostBlock = '';
+        item.el.style.setProperty('--tile-ghost-rows', String(ghost));
+      }
+    }
+  });
+}
+
+/* Zeigt die ersten `k` Zusatzzeilen einer Kachel (U14) und zaehlt "+N weitere"
+ * herunter. Schreibt nur, was sich aendert; liest kein Layout. */
+function showFillRows(el, k) {
+  if ((Number(el.dataset.fillShown) || 0) === k) return;
+  if (k) el.dataset.fillShown = String(k);
+  else delete el.dataset.fillShown;
+  el.querySelectorAll('[data-fill-row]').forEach((row, i) => row.toggleAttribute('data-fill-on', i < k));
+  el.querySelectorAll('[data-fill-group]').forEach((group) => group.toggleAttribute('data-fill-on', k > 0));
+  for (const more of el.querySelectorAll('[data-fill-more]')) {
+    more.dataset.moreBase ??= more.textContent;
+    const rest = (Number(more.dataset.moreRest) || 0) - k;
+    const done = rest <= 0 ? more.dataset.moreDone ?? '' : '';
+    more.toggleAttribute('data-fill-gone', rest <= 0 && !done);
+    more.textContent = done || (rest > 0 && more.dataset.moreKey ? t(more.dataset.moreKey, { count: rest }) : more.dataset.moreBase);
   }
 }
 
@@ -7452,15 +9739,28 @@ export async function render(container, { user, signal: routeSignal = null } = {
     today: householdToday(),
   });
 
+  // Die zuletzt gezeichnete Hoehe des Kopfbands bei dieser Fenstergroesse.
+  const head = wallMode || memo ? null : headHint(viewportKey());
   setHtml(container, `
     <div class="dashboard app-page app-page--dashboard${wallMode ? ' dashboard--wall' : ''}" data-composition="dashboard">
       <h1 class="sr-only">${t('dashboard.title')}</h1>
       <div class="dashboard-shell" id="dashboard-shell">
-        ${wallMode ? renderWallSurface(null, null, { loading: true }) : memo ? '' : renderDashboardSkeleton()}
+        ${wallMode ? renderWallSurface(null, null, { loading: true }) : memo ? '' : renderDashboardSkeleton(user, { head })}
       </div>
     </div>
     ${wallMode ? '' : renderFab()}
   `);
+  if (!wallMode && !memo && globalThis.window?.matchMedia?.('(min-width: 768px)').matches) {
+    // Das Skelett-Raster packt wie das echte (applyRowFill): gleiche Spalten,
+    // gleiche Spannen. Erst ab zwei Spalten - einspaltig gibt es nichts zu
+    // fuellen, und das Lesen kostete am Telefon ein Layout der ganzen Shell
+    // vor dem ersten Bild (gemessen rund 50 ms bei 4x CPU).
+    const skeletonGrid = container.querySelector('#dashboard-shell > .dashboard__grid');
+    if (skeletonGrid) applyRowFill(skeletonGrid);
+  }
+  // Das Plus des Speed-Dials steht im ERSTEN Bild, nicht erst mit den Daten
+  // (DW-P2-5: eine violette Scheibe ohne Zeichen, solange das Skelett stand).
+  createPendingIcons(container.querySelector('#fab-group'));
 
   // Der Zonen-Hinweis fuer Bestandshaushalte (#1607): ein Admin, dessen Browser
   // in einer anderen Zone steht, als der Haushalt ohne eigene Einstellung
@@ -7639,7 +9939,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     savedGlanceVisible = glanceVisible;
     followsDefault = prefsRes.data?.dashboard_follows_default !== false;
     // Das Skelett des NAECHSTEN Aufrufs lernt hier seine Kachelform.
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
     screensaverEnabled = Boolean(prefsRes.data?.screensaver_enabled);
     currency     = prefsRes.data?.currency ?? 'EUR';
     visibleMealTypes = normalizeVisibleMealTypes(prefsRes.data?.visible_meal_types);
@@ -7786,7 +10086,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Ab jetzt liegt ein eigener Stand vor - die Vorgabe des Haushalts erreicht
     // mich erst wieder, wenn ich ihn loesche.
     followsDefault = false;
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
     isCustomizing = false;
     // Wird die Zyklus-Kachel gerade erst eingeblendet, ihren owner-only Slice
     // nachladen — sonst zeigte sie fälschlich den Empty-State bis zum Reload.
@@ -7816,7 +10116,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
             await api.put('/preferences', { dashboard_widgets: widgetConfig, dashboard_today_glance: glanceVisible });
             savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
             savedGlanceVisible = glanceVisible;
-            rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+            rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
             if (wasteOptionsBeforeUndo !== JSON.stringify(widgetConfig.find((w) => w.id === 'waste')?.options ?? null)) data.waste = undefined;
             if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) await ensureWasteSlice();
             await reloadAfterSave(() => reloadIfQueryChanged(queryBeforeUndo));
@@ -7926,7 +10226,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
     savedGlanceVisible = glanceVisible;
     followsDefault = true;
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
     isCustomizing = false;
     if (widgetConfig.some((w) => w.id === 'cycle' && w.visible)) await ensureCycleSlice();
     if (widgetConfig.some((w) => w.id === 'schedule' && w.visible)) await ensureScheduleSlice();
@@ -7953,7 +10253,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
         savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
         savedGlanceVisible = glanceVisible;
         followsDefault = false;
-        rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+        rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
         if (wasteOptionsBeforeUndo !== JSON.stringify(widgetConfig.find((w) => w.id === 'waste')?.options ?? null)) data.waste = undefined;
         if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) await ensureWasteSlice();
         await reloadAfterSave(() => reloadIfQueryChanged(queryBeforeUndo));
@@ -7997,7 +10297,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
     }
     savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
     savedGlanceVisible = glanceVisible;
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), calendarListRowsOf);
+    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
     isCustomizing = false;
     // Wie beim Speichern: haben sich mit den Optionen die Parameter der Abfrage
     // geaendert, steht noch die alte Antwort da. Ohne den Abruf zeigte die
@@ -8019,49 +10319,323 @@ export async function render(container, { user, signal: routeSignal = null } = {
   let rowFillObserver = null;
   signal.addEventListener('abort', () => rowFillObserver?.disconnect(), { once: true });
 
+  let tileSizeObserver = null;
+  let headSizeObserver = null;
+  signal.addEventListener('abort', () => { tileSizeObserver?.disconnect(); headSizeObserver?.disconnect(); }, { once: true });
+
   function wireRowFill() {
     rowFillObserver?.disconnect();
     rowFillObserver = null;
+    tileSizeObserver?.disconnect();
+    tileSizeObserver = null;
+    headSizeObserver?.disconnect();
+    headSizeObserver = null;
     const grid = container.querySelector('#dashboard-widget-grid');
     if (!grid) return;
+    if (!isCustomizing) {
+      rememberGridHint(drawnTiles, widgetConfig);
+      tileSizeObserver = watchTileSizes(grid);
+      headSizeObserver = watchHeadSize(container.querySelector('#dashboard-shell'));
+    }
     applyRowFill(grid, { editing: isCustomizing });
-    if (isCustomizing || typeof ResizeObserver !== 'function') return;
+    // Nach der Packung stehen die Breiten fest: eine Kennzahlkachel, deren Wert
+    // auch auf der Stufe ihrer Reihe nicht passt, tritt eine Stufe zurueck
+    // (DW-P2-7). Der ResizeObserver darin misst bei jeder Breitenaenderung neu.
+    fitMetricLeads(grid);
+    if (typeof ResizeObserver !== 'function') return;
     let shape = `${gridColumnCount(grid)}:${grid.childElementCount}`;
     rowFillObserver = new ResizeObserver(() => {
       const next = `${gridColumnCount(grid)}:${grid.childElementCount}`;
       if (next === shape) return;
       shape = next;
-      applyRowFill(grid);
+      applyRowFill(grid, { editing: isCustomizing });
     });
     rowFillObserver.observe(grid);
   }
 
-  function syncGridHint(grid) {
-    container.querySelector('.dashboard-grid-hint')?.remove();
+  /* DER LUECKENHINWEIS IN ZWEI SCHRITTEN (DW-P2-1): erst lesen, ob sich der
+   * Vorschlag aendert (planGridHint - liest nur, was das Gleiten ohnehin
+   * auslegen liess), dann schreiben (applyGridHint). Eine Geste schreibt ihn
+   * erst nach dem naechsten Bild: ein neuer oder anderer Hinweis veraendert
+   * die Hoehe ueber dem Raster, und im selben Task kostete das eine zweite
+   * Auslegung der ganzen Flaeche (gemessen 4x CPU ~20 ms je Geste). Das
+   * Raster gleitet dann an seine neue Oberkante (playGridShift). */
+  function planGridHint(grid) {
     const suggestion = gridHoleSuggestion(grid);
-    if (!suggestion) return;
+    const apply = container.querySelector('.dashboard-grid-hint [data-grid-hint-apply]');
+    if (!suggestion) return apply ? { suggestion: null } : null;
+    if (apply?.dataset.widgetId === suggestion.id && apply.dataset.size === suggestion.size) return null;
+    return { suggestion };
+  }
+
+  function applyGridHint(grid, plan) {
+    if (!plan) return;
+    const { suggestion } = plan;
+    const shown = container.querySelector('.dashboard-grid-hint');
+    if (!suggestion) {
+      shown?.remove();
+      return;
+    }
+    const apply = shown?.querySelector('[data-grid-hint-apply]');
+    if (apply) {
+      // Ein anderer Vorschlag wechselt nur seine Worte im selben Knoten.
+      const [next] = elementsFromHtml(renderGridHint(suggestion));
+      const text = shown.querySelector('.dashboard-grid-hint__text');
+      if (text) text.textContent = next.querySelector('.dashboard-grid-hint__text')?.textContent ?? '';
+      apply.dataset.widgetId = suggestion.id;
+      apply.dataset.size = suggestion.size;
+      return;
+    }
     // VOR dem Raster, nicht dahinter: das Loch steht oft oben, und ein Hinweis
     // unter zwanzig Kacheln waere einer, den man erst nach dem Scrollen findet.
     grid.insertAdjacentHTML('beforebegin', renderGridHint(suggestion));
-    container.querySelector('.dashboard-grid-hint [data-grid-hint-apply]')?.addEventListener('click', () => {
-      widgetConfig = updateWidgetConfig(widgetConfig, suggestion.id, { size: suggestion.size });
-      rebuildDashboard(widgetConfig);
+    container.querySelector('.dashboard-grid-hint [data-grid-hint-apply]')?.addEventListener('click', (event) => {
+      // Der Vorschlag steht am Knopf: er wechselt mit den Gesten (oben).
+      const { widgetId: id, size } = event.currentTarget.dataset;
+      widgetConfig = updateWidgetConfig(widgetConfig, id, { size });
+      patchCustomize();
+      // Der Hinweis geht nach dem naechsten Bild; der Fokus geht schon jetzt
+      // zur Groesse, die er gesetzt hat.
+      const tile = `.widget-wrapper[data-widget-id="${CSS.escape(id)}"]`;
+      restoreFocusAfterRebuild(container, [`${tile} [data-widget-size-preset="${CSS.escape(size)}"]`, `${tile} [data-widget-hide]`]);
     });
   }
+
+  function syncGridHint(grid) {
+    applyGridHint(grid, planGridHint(grid));
+  }
+
+  // Der juengste nachgereichte Hinweis gewinnt - eine schnelle zweite Geste
+  // ueberholt den der ersten.
+  let pendingHint = 0;
+  function applyGridHintAfterPaint(grid, plan) {
+    const token = ++pendingHint;
+    if (!plan) return;
+    requestAnimationFrame(() => setTimeout(() => {
+      if (token !== pendingHint || signal.aborted || !isCustomizing || !grid.isConnected) return;
+      const shell = container.querySelector('#dashboard-shell');
+      const top = grid.getBoundingClientRect().top;
+      // Der Vorschlag kann inzwischen ein anderer sein (Spalten, Fenster).
+      applyGridHint(grid, planGridHint(grid));
+      if (shell) playGridShift(shell, top);
+    }, 0));
+  }
+
+  /* DIE GESTE AENDERT, WAS SIE AENDERT (DW-P2-1).
+   *
+   * Bis hierher baute jede Anpassen-Geste die ganze Uebersicht neu: Kopf,
+   * Heute-Blatt, zweiundzwanzig Kacheln, alle Zeichen, alle Messungen - fuer
+   * EINE geaenderte Kachel. Gemessen bei 4x CPU 120-240 ms je Tipp, davon bis
+   * 170 ms erzwungenes Layout. Jetzt folgt die Flaeche dem neuen Stand an Ort
+   * und Stelle:
+   *   - Verschieben haengt die vorhandenen Kacheln um (arrangeChildren,
+   *     `moveBefore` wo vorhanden - der gedrueckte Knopf behaelt den Fokus);
+   *   - Groesse und Optionen tauschen die Klasse und zeichnen nur den Koerper
+   *     dieser einen Kachel, wenn sein Markup sich ueberhaupt aendert;
+   *   - Aus nimmt die Kachel heraus, Ein setzt sie an ihren Platz, und die
+   *     Ablage bekommt bzw. verliert genau ihren Chip;
+   *   - was von der Sichtbarkeit abhaengt, faellt mit: die Kennzahlreihe
+   *     (sie schweigt fuer sichtbare Domaenen), das Heute-Blatt (Kein-Echo) und
+   *     die Wetterzeile im Kopf - jeweils nur, wenn das neue Markup ein anderes ist.
+   * Die Leisten folgen per syncCustomizeControls, die Nachbarn gleiten
+   * (playTileFlip). Im Anpassen-Modus waechst nichts in den Zeilenrest
+   * (applyRowFill), und der Layout-Hinweis lernt erst beim Speichern - dort
+   * baut die Seite ohnehin neu, im Normalmodus.
+   * `focus`: wohin der Fokus geht, wenn sein Knopf mit der Geste gegangen ist. */
+  function patchCustomize({ focus = [] } = {}) {
+    if (signal.aborted || !isCustomizing || wallMode || loadFailed) return;
+    const shell = container.querySelector('#dashboard-shell');
+    const grid = shell?.querySelector('#dashboard-widget-grid');
+    if (!grid) return;
+    const before = captureTileRects(shell);
+    // Geht der gedrueckte Knopf mit der Geste (Aus, Ein), wechselt der Fokus
+    // VOR dem Umbau zum Nachfolger, wenn es ihn schon gibt (der Nachbar): ein
+    // fokussiertes Element zu entfernen zwang den Browser mitten im Umbau zu
+    // einer Stilrechnung der ganzen Flaeche (gemessen 4x CPU ~24 ms). Der
+    // Nachbar ruecht an den Platz des gegangenen - die Ansicht bleibt stehen.
+    const early = focus.length ? focusTarget(container, focus) : null;
+    if (early && early !== document.activeElement) early.focus({ preventScroll: true });
+    const active = document.activeElement;
+    const cfg = widgetConfig;
+    // Kein Echo: das Heute-Blatt spricht fuer die Domaenen ohne Kachel - und
+    // nur eine geaenderte Sichtbarkeit (oder Option) aendert, was es sagt.
+    // Gezeichnet VOR dem ersten Schreiben: es liest die Breite seiner Buehne
+    // (todayStage), und mitten im Umbau verlangte das eine Auslegung der
+    // halbfertigen Flaeche.
+    const visibility = visibilityKey(cfg, glanceVisible);
+    const visibilityChanged = visibility !== drawnVisibility;
+    drawnVisibility = visibility;
+    const cockpitHtml = visibilityChanged ? renderTodayCockpit(data, cfg, true) : drawnCockpit;
+    const renderers = dashboardTileRenderers(cfg, data, weather, currency, {
+      visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user),
+    });
+    const previous = new Map(drawnTiles.map((w) => [w.id, w]));
+    const present = new Map([...grid.querySelectorAll(':scope > .widget-wrapper[data-widget-id]')]
+      .map((el) => [el.dataset.widgetId, el]));
+    const listed = [];
+    const nodes = [];
+    // Was neues Markup bekam - es braucht Zeichen und seine Verdrahtung.
+    const fresh = [];
+    for (const w of cfg) {
+      if (!dashboardTileListed(w, renderers)) continue;
+      const old = present.get(w.id);
+      // Die Kennzahlreihe liest die Sichtbarkeit der anderen (renderMetricTiles).
+      const redraw = !old || tileDrawKey(previous.get(w.id)) !== tileDrawKey(w) || (w.id === 'metrics' && visibilityChanged);
+      const body = redraw ? renderWidgetBody(w, renderers) : drawnBodies.get(w.id);
+      if (!body) continue;
+      listed.push(w);
+      if (!old) {
+        const [el] = elementsFromHtml(renderWidgetWrapper(w, body, { editing: true }));
+        nodes.push(el);
+        fresh.push(el);
+      } else {
+        if (redraw) {
+          old.classList.remove(...[...old.classList].filter((name) => name.startsWith('widget-size--')));
+          old.classList.add(widgetSizeClass(w.size));
+          if (tileBodyChanged(w, body, drawnBodies.get(w.id))) {
+            // Der Koerper bringt seine Hoehe mit (U1 b): andere Groesse, andere Zeilenzahl.
+            setTileSpan(old, body);
+            for (const child of [...old.children]) if (!child.matches('[data-widget-controls]')) child.remove();
+            old.append(...elementsFromHtml(body));
+            fresh.push(old);
+          }
+        }
+        nodes.push(old);
+      }
+      drawnBodies.set(w.id, body);
+    }
+    drawnTiles = listed;
+    arrangeChildren(grid, nodes);
+    if (!nodes.length) grid.insertAdjacentHTML('afterbegin', emptyHintHTML(t('dashboard.allWidgetsHidden'), { icon: 'layout-dashboard' }));
+    nodes.forEach((el, index) => {
+      const menu = syncCustomizeControls(el, listed[index], index, nodes.length);
+      if (menu) fresh.push(menu);
+    });
+
+    // Die Ablage: genau der Chip, der kommt oder geht.
+    const trayHtml = renderHiddenWidgetsTray(cfg, !glanceVisible);
+    const tray = shell.querySelector('.widget-restore');
+    if (!trayHtml) {
+      tray?.remove();
+    } else if (!tray) {
+      const [el] = elementsFromHtml(trayHtml);
+      grid.before(el);
+      fresh.push(el);
+    } else {
+      const chipKey = (el) => (el.matches('[data-glance-show]') ? '' : el.querySelector(':scope > [data-widget-show]')?.dataset.widgetShow);
+      const list = tray.querySelector('.widget-restore__chips');
+      const have = new Map([...list.children].map((el) => [chipKey(el), el]));
+      const [next] = elementsFromHtml(trayHtml);
+      arrangeChildren(list, [...next.querySelector('.widget-restore__chips').children].map((el) => {
+        const kept = have.get(chipKey(el));
+        if (kept) return kept;
+        fresh.push(el);
+        return el;
+      }));
+    }
+
+    // Ohne Nachmessen: die Buehne las das Blatt oben am sauberen Layout, und
+    // eine Kachel aendert sie nicht; die Zeilenzahl am Telefon (measurePhoneProgram)
+    // zaehlt im Anpassen-Modus nicht - dort ist das Blatt auf seinen Kopf
+    // zusammengeklappt. Das Speichern baut ohnehin neu und misst.
+    let sheet = null;
+    if (cockpitHtml !== drawnCockpit) {
+      drawnCockpit = cockpitHtml;
+      replaceProgramSheet(shell, cockpitHtml);
+      sheet = shell.querySelector('.today-cockpit');
+      createPendingIcons(sheet);
+    }
+    // Die Wetterzeile im Kopf schweigt, solange die Karte im Raster steht.
+    const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
+    shell.querySelector('.dashboard-overview__weather')?.classList.toggle('dashboard-overview__weather--card', weatherCardShown);
+
+    for (const el of fresh) createPendingIcons(el);
+    wireFreshTiles(shell, fresh.filter((el) => el.matches('.widget-wrapper')));
+    // DASSELBE RASTER WIE AUSSERHALB (DW-P2-9, WYSIWYG): neu gefuellt nach den
+    // Spannen, die die Geste gesetzt hat - ohne Neuaufbau, und ohne Auslegung:
+    // die Spaltenzahl ist die der letzten (sie aendert keine Geste).
+    applyRowFill(grid, { editing: true, columns: seenGridColumns.get(grid) });
+    // Ab hier wird gelesen, alles an EINER Auslegung des neuen Stands, und erst
+    // danach geschrieben. Jede Animation und jeder Fokuswechsel vor einer
+    // Lesung verlangte eine neue Stilrechnung der ganzen Flaeche (gemessen
+    // 4x CPU 15-18 ms je Runde, bis zu drei Runden je Geste).
+    // Das neue Blatt zuerst: seine Zeitleiste setzt ihre Fahne nach gemessener
+    // Lage (placeTodayTimelineFlag) und schreibt nur an der Fahne.
+    if (sheet) wireLinks(sheet, refreshAfterSheet, { editing: true, user, signal });
+    // Ging der Knopf mit der Geste, geht der Fokus zum Nachfolger (`focus`).
+    const successor = active?.isConnected ? null : focusTarget(container, focus);
+    const flip = measureTileFlip(shell, before);
+    // Der Lueckenhinweis wird hier nur gelesen; geschrieben nach dem naechsten Bild.
+    const hintPlan = planGridHint(grid);
+    // Der Nachfolger steht meist daneben: nur so weit scrollen, wie er es
+    // braucht (wie `block: 'nearest'`) - `focus()` allein holte ihn in die
+    // Mitte, und die ganze Seite sprang unter dem Finger weg.
+    const scroller = successor ? shell.closest('.app-content') : null;
+    const scrollBy = scroller ? nearestScrollDelta(successor.getBoundingClientRect(), scroller.getBoundingClientRect()) : 0;
+    // Schreiben. Blieb der Knopf, bleibt der Fokus dort (ohne moveBefore nahm
+    // das Umhaengen ihn mit).
+    if (active?.isConnected) {
+      if (document.activeElement !== active && active !== document.body) active.focus({ preventScroll: true });
+    } else {
+      successor?.focus({ preventScroll: true });
+      if (scrollBy) scroller.scrollTop += scrollBy;
+    }
+    startTileFlip(flip);
+    applyGridHintAfterPaint(grid, hintPlan);
+  }
+
+  /** Was eine neu gezeichnete Kachel ausser Markup braucht (wie im Neuaufbau). */
+  function wireFreshTiles(shell, wrappers) {
+    if (!wrappers.length) return;
+    const ids = new Set(wrappers.map((el) => el.dataset.widgetId));
+    if (isCustomizing) attachSizeIndicators(shell.querySelector('#dashboard-widget-grid'), editWiring?.signal);
+    for (const el of wrappers) {
+      wireRecipeThumbs(el);
+      fitMetricLeads(el);
+      if (isExtensionWidget(el.dataset.widgetId)) void mountExtensionWidgets(el, widgetConfig, user);
+    }
+    if (ids.has('fasting')) {
+      disposeFastingClock();
+      disposeFastingClock = wireFastingWidget(container, refreshAfterSheet, data.fasting, signal, { editing: isCustomizing });
+    }
+    if (ids.has('notes')) {
+      disposeNoteCategories();
+      disposeNoteCategories = wireNoteCategoryOverflow(
+        shell,
+        (count) => getNumberFormat().format(count),
+        (count) => t('noteCategories.moreAction', { count }),
+      );
+    }
+    if (ids.has('weather')) {
+      wireWeatherRefresh(container, (updatedWeather) => {
+        weather = updatedWeather;
+        rebuildDashboard(widgetConfig);
+      }, signal);
+    }
+  }
+
+  // Die Verdrahtung des Anpassen-Modus haengt an Raster und Flaeche, die eine
+  // Geste ueberleben (patchCustomize): einmal je Aufbau, nicht je Knopf.
+  let editWiring = null;
+  signal.addEventListener('abort', () => editWiring?.abort(), { once: true });
 
   function wireDashboardEditMode() {
     gridHintObserver?.disconnect();
     gridHintObserver = null;
+    editWiring?.abort();
+    editWiring = null;
     if (!isCustomizing) return;
+    const shell = container.querySelector('#dashboard-shell');
     const grid = container.querySelector('#dashboard-widget-grid');
-    if (!grid) return;
+    if (!shell || !grid) return;
+    editWiring = new AbortController();
+    const wired = { signal: editWiring.signal };
     // Groessen-Menue (R9 M7): Position, Pfeiltasten, Schliessen - einmal an der
     // stabilen Seitenwurzel, idempotent ueber sein data-Attribut.
     installPopoverMenus(container);
-    let draggedId = '';
-    let currentDrop = null;
 
     syncGridHint(grid);
+    attachSizeIndicators(grid, editWiring.signal);
     if (typeof ResizeObserver === 'function') {
       let columns = gridColumnCount(grid);
       gridHintObserver = new ResizeObserver(() => {
@@ -8073,107 +10647,57 @@ export async function render(container, { user, signal: routeSignal = null } = {
       gridHintObserver.observe(grid);
     }
 
-    const clearDropHint = () => {
-      grid.querySelectorAll('.widget-wrapper--drop-before, .widget-wrapper--drop-after').forEach((el) => {
-        el.classList.remove('widget-wrapper--drop-before', 'widget-wrapper--drop-after');
-      });
+    const resize = (btn) => {
+      const size = btn.dataset.widgetSizePreset;
+      if (!WIDGET_SIZE_OPTIONS.includes(size)) return;
+      // Aus dem Groessen-Menue (R9 M7): der Fokus gehoert danach dem Knopf,
+      // der das Menue oeffnete - der Eintrag steht in einem geschlossenen
+      // Panel und naehme ihn nicht an.
+      const menu = btn.closest('.popover-menu');
+      if (menu) {
+        menu.hidePopover?.();
+        grid.querySelector(`[popovertarget="${CSS.escape(menu.id)}"]`)?.focus();
+      }
+      widgetConfig = updateWidgetConfig(widgetConfig, btn.dataset.widgetId, { size });
+      // Der Fokus bleibt auf demselben Knopf (die Leiste wird nicht neu
+      // gezeichnet), und der traegt jetzt aria-pressed - gesagt wird trotzdem,
+      // was sich geaendert hat: die Kachel ist gewachsen, nicht der Knopf.
+      patchCustomize();
+      const preset = WIDGET_SIZE_PRESETS.find((p) => p.value === size);
+      announceDashboard(t('dashboard.customizeSizeDone', {
+        widget: widgetLabel(btn.dataset.widgetId),
+        size: preset ? t(preset.labelKey) : size,
+      }));
     };
 
-    const updateDropHint = (event) => {
-      if (!draggedId) return null;
-      clearDropHint();
-      currentDrop = closestWidgetDrop(grid, event, draggedId);
-      if (currentDrop) {
-        currentDrop.item.classList.add(currentDrop.placement === 'after' ? 'widget-wrapper--drop-after' : 'widget-wrapper--drop-before');
+    const editOptions = async (btn) => {
+      const id = btn.dataset.widgetOptions;
+      // Aus einem Menue (Kachel, Chip der Ablage): der Dialog gibt den Fokus
+      // dem zurueck, der ihn beim Oeffnen hielt - das soll der Ausloeser sein,
+      // nicht der Eintrag im geschlossenen Menue.
+      const menu = btn.closest('.popover-menu');
+      if (menu) {
+        menu.hidePopover?.();
+        shell.querySelector(`[popovertarget="${CSS.escape(menu.id)}"]`)?.focus({ preventScroll: true });
       }
-      return currentDrop;
+      const current = widgetConfig.find((w) => w.id === id)?.options ?? {};
+      const next = await openWidgetOptions(id, current);
+      if (next === null || signal.aborted || !isCustomizing) return;
+      // Ein leeres Optionsobjekt wird zu „keine Optionen": so bleibt der
+      // gespeicherte Stand identisch mit dem eines Layouts, das den Dialog
+      // nie gesehen hat.
+      widgetConfig = updateWidgetConfig(widgetConfig, id,
+        Object.keys(next).length ? { options: next } : { options: undefined });
+      patchCustomize();
     };
-
-    grid.querySelectorAll('.widget-wrapper[data-widget-id]').forEach((wrapper) => {
-      wrapper.addEventListener('dragstart', (event) => {
-        draggedId = wrapper.dataset.widgetId;
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', draggedId);
-        wrapper.classList.add('widget-wrapper--dragging');
-      });
-      wrapper.addEventListener('dragend', () => {
-        draggedId = '';
-        wrapper.classList.remove('widget-wrapper--dragging');
-        currentDrop = null;
-        clearDropHint();
-      });
-    });
-
-    grid.addEventListener('dragover', (event) => {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-      updateDropHint(event);
-    });
-
-    grid.addEventListener('dragleave', (event) => {
-      if (!grid.contains(event.relatedTarget)) {
-        currentDrop = null;
-        clearDropHint();
-      }
-    });
-
-    grid.addEventListener('drop', (event) => {
-      event.preventDefault();
-      const fromId = event.dataTransfer.getData('text/plain') || draggedId;
-      const drop = currentDrop || updateDropHint(event);
-      if (fromId && drop) {
-        widgetConfig = reorderWidgetConfig(widgetConfig, fromId, drop.id, drop.placement);
-        rebuildDashboard(widgetConfig);
-      }
-    });
-
-    grid.querySelectorAll('[data-widget-size-preset]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const size = btn.dataset.widgetSizePreset;
-        if (!WIDGET_SIZE_OPTIONS.includes(size)) return;
-        // Aus dem Groessen-Menue (R9 M7): der Fokus gehoert danach dem Knopf,
-        // der das Menue oeffnete - der Eintrag steht nach dem Neuaufbau in
-        // einem geschlossenen Panel und naehme ihn nicht an.
-        const menu = btn.closest('.popover-menu');
-        if (menu) {
-          menu.hidePopover?.();
-          grid.querySelector(`[popovertarget="${CSS.escape(menu.id)}"]`)?.focus();
-        }
-        widgetConfig = updateWidgetConfig(widgetConfig, btn.dataset.widgetId, { size });
-        // Der Fokus bleibt auf demselben Knopf (rebuildDashboard traegt ihn
-        // hinueber), und der traegt jetzt aria-pressed - gesagt wird trotzdem,
-        // was sich geaendert hat: die Kachel ist gewachsen, nicht der Knopf.
-        rebuildDashboard(widgetConfig);
-        const preset = WIDGET_SIZE_PRESETS.find((p) => p.value === size);
-        announceDashboard(t('dashboard.customizeSizeDone', {
-          widget: widgetLabel(btn.dataset.widgetId),
-          size: preset ? t(preset.labelKey) : size,
-        }));
-      });
-    });
-
-    container.querySelectorAll('[data-widget-options]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.widgetOptions;
-        const current = widgetConfig.find((w) => w.id === id)?.options ?? {};
-        const next = await openWidgetOptions(id, current);
-        if (next === null) return;
-        // Ein leeres Optionsobjekt wird zu „keine Optionen": so bleibt der
-        // gespeicherte Stand identisch mit dem eines Layouts, das den Dialog
-        // nie gesehen hat.
-        widgetConfig = updateWidgetConfig(widgetConfig, id,
-          Object.keys(next).length ? { options: next } : { options: undefined });
-        rebuildDashboard(widgetConfig);
-      });
-    });
 
     /* WER AUSBLENDET, VERLIERT SEINEN KNOPF - UND DARF DESHALB NICHT DEN FOKUS
-     * VERLIEREN. Der Neuaufbau ersetzt das ganze Raster; der gedrueckte Knopf
-     * ist danach fort, und der Fokus fiel bis hierher auf <body> zurueck: wer
-     * per Tastatur drei Kacheln ausblenden wollte, stand nach der ersten wieder
-     * am Seitenanfang. Er geht deshalb zum gleichen Knopf der Nachbarkachel
-     * (so laesst sich eine Reihe nacheinander abraeumen), und wo es keine gibt,
-     * zum Chip, der sie zurueckholt. Beim Einblenden spiegelbildlich. */
+     * VERLIEREN. Die Kachel geht samt Knopf, und der Fokus fiel bis hierher auf
+     * <body> zurueck: wer per Tastatur drei Kacheln ausblenden wollte, stand
+     * nach der ersten wieder am Seitenanfang. Er geht deshalb zum gleichen
+     * Knopf der Nachbarkachel (so laesst sich eine Reihe nacheinander
+     * abraeumen), und wo es keine gibt, zum Chip, der sie zurueckholt. Beim
+     * Einblenden spiegelbildlich. */
     const neighbourIds = (el, selector, attr) => {
       const next = el?.nextElementSibling?.closest(selector) ? el.nextElementSibling : null;
       const prev = el?.previousElementSibling?.closest(selector) ? el.previousElementSibling : null;
@@ -8181,101 +10705,153 @@ export async function render(container, { user, signal: routeSignal = null } = {
         .filter(Boolean);
     };
 
-    grid.querySelectorAll('[data-widget-hide]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.widgetHide;
-        const wrapper = btn.closest('.widget-wrapper');
-        focusAfterRebuild = [
-          ...neighbourIds(wrapper, '.widget-wrapper', 'data-widget-id')
-            .map((n) => `.widget-wrapper[data-widget-id="${CSS.escape(n)}"] [data-widget-hide]`),
-          `[data-widget-show="${CSS.escape(id)}"]`,
-        ];
-        widgetConfig = updateWidgetConfig(widgetConfig, id, { visible: false });
-        rebuildDashboard(widgetConfig);
-        announceDashboard(t('dashboard.customizeHiddenDone', { widget: widgetLabel(id) }));
-      });
-    });
+    const hide = (btn) => {
+      const id = btn.dataset.widgetHide;
+      const wrapper = btn.closest('.widget-wrapper');
+      const focus = [
+        ...neighbourIds(wrapper, '.widget-wrapper', 'data-widget-id')
+          .map((n) => `.widget-wrapper[data-widget-id="${CSS.escape(n)}"] [data-widget-hide]`),
+        `[data-widget-show="${CSS.escape(id)}"]`,
+      ];
+      widgetConfig = updateWidgetConfig(widgetConfig, id, { visible: false });
+      patchCustomize({ focus });
+      announceDashboard(t('dashboard.customizeHiddenDone', { widget: widgetLabel(id) }));
+    };
 
-    // Wieder-Einblenden aus der Tray-Leiste (außerhalb des Grids, daher container-
-    // weit gesucht): der Gegenpart zum Ausblenden, macht den Inline-Editor komplett.
-    container.querySelectorAll('[data-widget-show]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.widgetShow;
-        focusAfterRebuild = [
-          ...neighbourIds(btn.closest('.widget-restore-chip-group') ?? btn, '.widget-restore-chip-group, [data-glance-show]', 'data-widget-show')
-            .map((n) => `[data-widget-show="${CSS.escape(n)}"]`),
-          `.widget-wrapper[data-widget-id="${CSS.escape(id)}"] [data-widget-hide]`,
-        ];
-        widgetConfig = updateWidgetConfig(widgetConfig, id, { visible: true });
-        rebuildDashboard(widgetConfig);
-        announceDashboard(t('dashboard.customizeShownDone', { widget: widgetLabel(id) }));
-      });
-    });
+    // Wieder-Einblenden aus der Ablage (ausserhalb des Rasters): der Gegenpart
+    // zum Ausblenden, macht den Inline-Editor komplett.
+    const show = (btn) => {
+      const id = btn.dataset.widgetShow;
+      const focus = [
+        ...neighbourIds(btn.closest('.widget-restore-chip-group') ?? btn, '.widget-restore-chip-group, [data-glance-show]', 'data-widget-show')
+          .map((n) => `[data-widget-show="${CSS.escape(n)}"]`),
+        `.widget-wrapper[data-widget-id="${CSS.escape(id)}"] [data-widget-hide]`,
+      ];
+      widgetConfig = updateWidgetConfig(widgetConfig, id, { visible: true });
+      patchCustomize({ focus });
+      announceDashboard(t('dashboard.customizeShownDone', { widget: widgetLabel(id) }));
+    };
 
-    // Kopfband: beide Knoepfe sitzen ausserhalb des Grids (der eine im Masthead,
-    // der andere in der Tray-Leiste), deshalb container-weit gesucht.
-    container.querySelector('[data-glance-hide]')?.addEventListener('click', () => {
-      glanceVisible = false;
-      focusAfterRebuild = ['[data-glance-show]'];
-      rebuildDashboard(widgetConfig);
-      announceDashboard(t('dashboard.customizeHiddenDone', { widget: t('dashboard.todayTitle') }));
-    });
-    container.querySelector('[data-glance-show]')?.addEventListener('click', () => {
-      glanceVisible = true;
-      focusAfterRebuild = ['[data-glance-hide]'];
-      rebuildDashboard(widgetConfig);
-      announceDashboard(t('dashboard.customizeShownDone', { widget: t('dashboard.todayTitle') }));
-    });
+    // Kopfband: beide Knoepfe sitzen ausserhalb des Rasters (der eine im
+    // Heute-Blatt, der andere in der Ablage).
+    const glance = (visible) => {
+      glanceVisible = visible;
+      patchCustomize({ focus: [visible ? '[data-glance-hide]' : '[data-glance-show]'] });
+      announceDashboard(t(visible ? 'dashboard.customizeShownDone' : 'dashboard.customizeHiddenDone', { widget: t('dashboard.todayTitle') }));
+    };
 
-    // Reorder ohne HTML5-DnD (das feuert nicht per Finger und ist nicht per
-    // Tastatur bedienbar). Ein Pfad für drei Auslöser: Touch-Up/Down-Buttons,
-    // Desktop-Grip-Pfeiltasten und (indirekt) das Modal — alle über den Nachbarn
-    // aus der gerenderten Grid-Reihenfolge und dasselbe reorderWidgetConfig.
+    /* EIN WEG FUER JEDES UMORDNEN. Hoch/Runter (Finger, Screenreader), die
+     * Pfeiltasten am Griff und das Ziehen (SortableJS, unten) legen eine Kachel
+     * neben eine andere - ueber dasselbe reorderWidgetConfig und denselben
+     * Patch (patchCustomize), nie ueber einen Neuaufbau. Gesagt wird der neue
+     * Platz: wohin sie gerutscht ist, sieht nur, wer hinsieht. */
+    const placeWidget = (id, targetId, placement) => {
+      widgetConfig = reorderWidgetConfig(widgetConfig, id, targetId, placement);
+      patchCustomize();
+      const order = [...grid.querySelectorAll(':scope > .widget-wrapper[data-widget-id]')]
+        .map((w) => w.dataset.widgetId);
+      announceDashboard(t('dashboard.customizeMovedTo', {
+        widget: widgetLabel(id), position: order.indexOf(id) + 1, total: order.length,
+      }));
+    };
+
     const moveWidget = (id, dir) => {
       const wrapper = grid.querySelector(`.widget-wrapper[data-widget-id="${CSS.escape(id)}"]`);
       const sibling = dir === 'up' ? wrapper?.previousElementSibling : wrapper?.nextElementSibling;
       const siblingId = sibling?.dataset?.widgetId;
       if (!id || !siblingId) return false;
-      widgetConfig = reorderWidgetConfig(widgetConfig, id, siblingId, dir === 'up' ? 'before' : 'after');
-      rebuildDashboard(widgetConfig);
-      // Der Fokus folgt der Kachel (die Aufrufer unten), aber wohin sie
-      // gerutscht ist, sieht nur, wer hinsieht: gesagt wird der neue Platz.
-      const order = [...container.querySelectorAll('#dashboard-widget-grid > .widget-wrapper[data-widget-id]')]
-        .map((w) => w.dataset.widgetId);
-      announceDashboard(t('dashboard.customizeMovedTo', {
-        widget: widgetLabel(id), position: order.indexOf(id) + 1, total: order.length,
-      }));
+      placeWidget(id, siblingId, dir === 'up' ? 'before' : 'after');
       return true;
     };
 
-    grid.querySelectorAll('[data-widget-move]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.widgetId;
-        const dir = btn.dataset.widgetMove;
-        if (!moveWidget(id, dir)) return;
-        // Fokus dem bewegten Widget nachführen (Tastatur-Kontinuität): gleiche
-        // Richtung, sonst die noch aktive Gegenrichtung.
-        const movedWrapper = container.querySelector(`.widget-wrapper[data-widget-id="${CSS.escape(id)}"]`);
-        const sameDir = movedWrapper?.querySelector(`[data-widget-move="${dir}"]:not([disabled])`);
-        const anyMove = movedWrapper?.querySelector('[data-widget-move]:not([disabled])');
-        (sameDir ?? anyMove)?.focus();
-      });
-    });
+    // Nach dem Ablegen steht die Kachel schon an ihrem Platz (SortableJS haengt
+    // sie selbst um); der Stand folgt dem Platz, den sie im Raster hat.
+    const dropWidget = (item) => {
+      const id = item?.dataset?.widgetId;
+      const nextId = item?.nextElementSibling?.dataset?.widgetId;
+      const prevId = item?.previousElementSibling?.dataset?.widgetId;
+      if (!id || !(nextId || prevId)) return;
+      placeWidget(id, nextId || prevId, nextId ? 'before' : 'after');
+    };
 
-    // Desktop-Tastatur: der Grip ist ein fokussierbarer Button — Pfeil hoch/runter
-    // ordnet um. Schließt die Inline-Reorder-Lücke für Tastatur-Nutzer, ohne die
-    // schmale Edit-Leiste mit zusätzlichen Buttons zu überladen (Drag bleibt Maus).
-    grid.querySelectorAll('[data-widget-drag-handle]').forEach((handle) => {
-      handle.addEventListener('keydown', (event) => {
-        const dir = event.key === 'ArrowUp' ? 'up' : event.key === 'ArrowDown' ? 'down' : null;
-        if (!dir) return;
-        event.preventDefault();
-        const id = handle.closest('.widget-wrapper[data-widget-id]')?.dataset.widgetId;
-        if (moveWidget(id, dir)) {
-          container.querySelector(`.widget-wrapper[data-widget-id="${CSS.escape(id)}"] [data-widget-drag-handle]`)?.focus();
-        }
-      });
-    });
+    const move = (btn) => {
+      const id = btn.dataset.widgetId;
+      const dir = btn.dataset.widgetMove;
+      if (!moveWidget(id, dir)) return;
+      // Am Rand ist der gedrueckte Knopf jetzt gesperrt: der Fokus geht zur
+      // Gegenrichtung derselben Kachel (Tastatur-Kontinuitaet).
+      if (!btn.disabled && document.activeElement === btn) return;
+      const movedWrapper = grid.querySelector(`.widget-wrapper[data-widget-id="${CSS.escape(id)}"]`);
+      const sameDir = movedWrapper?.querySelector(`[data-widget-move="${dir}"]:not([disabled])`);
+      const anyMove = movedWrapper?.querySelector('[data-widget-move]:not([disabled])');
+      (sameDir ?? anyMove)?.focus();
+    };
+
+    // AUS DEM MENUE DER KACHEL (U7): das Menue schliesst, der Fokus bleibt an
+    // seinem Ausloeser - der wandert mit der Kachel (arrangeChildren haengt
+    // sie um und gibt den Fokus zurueck), wie der Griff bei den Pfeiltasten.
+    // Gesagt wird der neue Platz wie bei Hoch/Runter (placeWidget).
+    const moveFromMenu = (item) => {
+      const menu = item.closest('.popover-menu');
+      menu?.hidePopover?.();
+      const trigger = menu ? shell.querySelector(`[popovertarget="${CSS.escape(menu.id)}"]`) : null;
+      trigger?.focus({ preventScroll: true });
+      if (moveWidget(item.dataset.widgetId, item.dataset.widgetMove) && trigger && document.activeElement !== trigger) {
+        trigger.focus({ preventScroll: true });
+      }
+    };
+
+    // EIN Zuhoerer fuer alle Knoepfe der Leisten und der Ablage: die Knoepfe
+    // kommen und gehen mit den Gesten, die Flaeche bleibt.
+    shell.addEventListener('click', (event) => {
+      const btn = event.target?.closest?.('[data-widget-move], [data-widget-size-preset], [data-widget-options], [data-widget-hide], [data-widget-show], [data-glance-hide], [data-glance-show]');
+      if (!btn || !shell.contains(btn) || btn.disabled) return;
+      if (btn.matches('.popover-menu [data-widget-move]')) moveFromMenu(btn);
+      else if (btn.matches('[data-widget-move]')) move(btn);
+      else if (btn.matches('[data-widget-size-preset]')) resize(btn);
+      else if (btn.matches('[data-widget-options]')) void editOptions(btn);
+      else if (btn.matches('[data-widget-hide]')) hide(btn);
+      else if (btn.matches('[data-widget-show]')) show(btn);
+      else glance(btn.matches('[data-glance-show]'));
+    }, wired);
+
+    // Tastatur: der Griff ist ein fokussierbarer Button - Pfeil hoch/runter
+    // ordnet um. Schliesst die Inline-Reorder-Luecke fuer Tastatur-Nutzer, ohne die
+    // schmale Edit-Leiste mit zusaetzlichen Buttons zu ueberladen.
+    grid.addEventListener('keydown', (event) => {
+      const handle = event.target?.closest?.('[data-widget-drag-handle]');
+      if (!handle) return;
+      const dir = event.key === 'ArrowUp' ? 'up' : event.key === 'ArrowDown' ? 'down' : null;
+      if (!dir) return;
+      event.preventDefault();
+      const id = handle.closest('.widget-wrapper[data-widget-id]')?.dataset.widgetId;
+      if (moveWidget(id, dir) && document.activeElement !== handle) handle.focus({ preventScroll: true });
+    }, wired);
+
+    /* ZIEHEN NACH N3 (DW-P2-3). Bis hier zog die Uebersicht als einzige Stelle
+     * der App per HTML5-Drag-and-Drop: die Quelle blieb als 45-%-Abbild stehen,
+     * der Browser malte sein eigenes durchscheinendes Ziehbild, das Ziel war
+     * eine 4-px-Linie, die Nachbarn standen still bis zum Loslassen - und per
+     * Finger ging es gar nicht. Jetzt derselbe Baustein wie jede Liste
+     * (utils/sortable.js): Ziehen am Griff, per Maus und per Finger (Halten
+     * 120 ms), der Platz ist der leere Schlitz `.sortable-ghost`, das Ziehbild
+     * die Kachel selbst, deckend, und die Nachbarn weichen in --duration-sm.
+     * Geladen erst hier: der Anpassen-Modus ist selten, der Startgraph der
+     * Uebersicht bleibt ohne sortable.js. Scheitert das Laden, bleiben Hoch,
+     * Runter und die Pfeiltasten. */
+    const ownWiring = editWiring;
+    void import('/utils/sortable.js')
+      .then(({ makeSortable }) => (ownWiring.signal.aborted ? null : makeSortable(grid, {
+        handle: '[data-widget-drag-handle]',
+        draggable: '.widget-wrapper[data-widget-id]',
+        onEnd: (evt) => dropWidget(evt.item),
+      })))
+      .then((sortable) => {
+        if (!sortable) return;
+        if (ownWiring.signal.aborted || !grid.isConnected) { sortable.destroy(); return; }
+        ownWiring.signal.addEventListener('abort', () => sortable.destroy(), { once: true });
+      })
+      .catch(() => { /* ohne SortableJS bleiben Hoch/Runter und die Pfeiltasten */ });
   }
 
   let disposeNoteCategories = () => {};
@@ -8294,6 +10870,43 @@ export async function render(container, { user, signal: routeSignal = null } = {
     if (signal.aborted || wallMode || loadFailed || isCustomizing) return;
     if (crossed || measurePhoneProgram(container.querySelector('#dashboard-shell'))) rebuildDashboard(widgetConfig);
   });
+  const refreshAfterSheet = () => refreshDashboardData();
+  // Die Lage vor dem Ausklappen gehender Zeilen, fuer den naechsten Aufbau.
+  let quietScrollTop = null;
+  /** Das Markup der Flaeche aus dem aktuellen Stand - fuer den Aufbau und fuer
+   *  den Blick voraus, welche Zeilen der stille Abgleich mitnimmt. */
+  // Die Kacheln des letzten Aufbaus, so wie sie im Raster stehen.
+  let drawnTiles = [];
+  // Und ihr Markup samt dem des Heute-Blatts: was eine Anpassen-Geste davon
+  // unveraendert laesst, zeichnet sie nicht neu (patchCustomize).
+  let drawnBodies = new Map();
+  let drawnCockpit = '';
+  let drawnVisibility = '';
+  function dashboardShellHtml(cfg) {
+    // Signature-„Heute"-Masthead: Begrüßung und Glance-Cockpit teilen sich EIN
+    // erhöhtes Material-Band (statt zweier gestapelter gerahmter Kästen). Die
+    // inneren Sections sind entrahmt; das Band trägt Rahmen/Schatten/Tönung.
+    // Fehlt das Cockpit (alle Domänen als Widgets sichtbar → kein Glance-Inhalt),
+    // kollabiert das Band per --slim auf eine schlanke Gruß-Leiste statt ein
+    // großes leeres Rechteck zu zeigen (Critique R3 P1).
+    const cockpitHtml = (glanceVisible || isCustomizing) ? renderTodayCockpit(data, cfg, isCustomizing) : '';
+    drawnCockpit = cockpitHtml;
+    drawnVisibility = visibilityKey(cfg, glanceVisible);
+    const mastheadSlim = cockpitHtml ? '' : ' dashboard-masthead--slim';
+    // Kein Wetter-Echo: die Masthead-Zeile spricht nur, wenn die Wetter-Karte
+    // nicht ohnehin im Raster sichtbar ist (Opt-in fürs Wandtablet).
+    // Eine nicht verfuegbare Karte steht nicht im Raster, spricht also auch
+    // nicht fuer die Zeile.
+    const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
+    return `
+      <section class="dashboard-masthead dashboard-masthead--${greetingPeriod()}${mastheadSlim}">
+        ${renderDashboardOverview(user, isCustomizing, weather, { followsDefault, canPublish, weatherCard: weatherCardShown })}
+        ${cockpitHtml}
+      </section>
+      ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user), drawn: (drawnTiles = []), bodies: (drawnBodies = new Map()) })}
+      ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish }) : ''}
+    `;
+  }
   function rebuildDashboard(cfg) {
     // Der eine Engpass fuer jeden verspaeteten Neuaufbau (#977): eine Antwort,
     // die nach dem Verlassen der Seite oder nach dem naechsten render()
@@ -8320,27 +10933,27 @@ export async function render(container, { user, signal: routeSignal = null } = {
       container.querySelector('#dashboard-retry')?.addEventListener('click', rerender, { signal: signal });
       return;
     }
-    // Signature-„Heute"-Masthead: Begrüßung und Glance-Cockpit teilen sich EIN
-    // erhöhtes Material-Band (statt zweier gestapelter gerahmter Kästen). Die
-    // inneren Sections sind entrahmt; das Band trägt Rahmen/Schatten/Tönung.
-    // Fehlt das Cockpit (alle Domänen als Widgets sichtbar → kein Glance-Inhalt),
-    // kollabiert das Band per --slim auf eine schlanke Gruß-Leiste statt ein
-    // großes leeres Rechteck zu zeigen (Critique R3 P1).
-    const cockpitHtml = (glanceVisible || isCustomizing) ? renderTodayCockpit(data, cfg, isCustomizing) : '';
-    const mastheadSlim = cockpitHtml ? '' : ' dashboard-masthead--slim';
-    // Kein Wetter-Echo: die Masthead-Zeile spricht nur, wenn die Wetter-Karte
-    // nicht ohnehin im Raster sichtbar ist (Opt-in fürs Wandtablet).
-    // Eine nicht verfuegbare Karte steht nicht im Raster, spricht also auch
-    // nicht fuer die Zeile.
-    const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
+    const html = dashboardShellHtml(cfg);
+    // Vor dem Zeichnen, solange nichts Neues auszulegen ist (carryTileSizes).
+    const viewportWidth = window.innerWidth;
     // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr
     // (captureRebuildFocus / restoreFocusAfterRebuild).
     const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);
+    const todayFallback = hadFocus ? todayFocusFallbacks(document.activeElement) : [];
     const modeChanged = renderedCustomizing !== null && renderedCustomizing !== isCustomizing;
-    // Nur eine Geste IM Anpassen-Modus gleitet (playTileFlip): beim Betreten
-    // und Verlassen wachsen und schwinden die Bearbeiten-Leisten aller Kacheln,
-    // da waere jede Bewegung nur Unruhe.
-    const tileRectsBefore = isCustomizing && renderedCustomizing === true ? captureTileRects(shell) : null;
+    // Nur ein Neuaufbau IM Anpassen-Modus gleitet (playTileFlip; die Gesten
+    // selbst patchen, patchCustomize): beim Betreten und Verlassen wachsen und
+    // schwinden die Bearbeiten-Leisten aller Kacheln, da waere jede Bewegung
+    // nur Unruhe.
+    /* UND EIN STILLER ABGLEICH GLEITET (U1 b): seit die Kachel so hoch ist wie
+     * ihre Daten, aendert ein Erledigen, ein neuer Termin oder ein neuer
+     * Wetterbericht ihre Spanne - und alles darunter rueckte von einem Bild
+     * aufs naechste. Jetzt gleiten die Kacheln von ihrer alten Lage an die
+     * neue (FLIP, `--ease-out`, unter reduzierter Bewegung blenden sie). Nicht
+     * aus dem Skelett und nicht beim ersten Bild einer Rueckkehr (dort steht
+     * noch keine Kachel). */
+    const quietRebuild = !isCustomizing && !modeChanged && !shell.querySelector('.widget-skeleton');
+    const tileRectsBefore = (isCustomizing && renderedCustomizing === true) || quietRebuild ? captureTileRects(shell) : null;
     // BETRETEN UND VERLASSEN: das Raster gleitet ALS GANZES an seine neue Lage
     // (R16, Bewegung). Der Gruss bricht um, die Ablage schiebt sich davor - das
     // Raster sprang beim Betreten um mehrere hundert Pixel (gemessen 486 ->
@@ -8361,32 +10974,53 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // still, und unter der Seitenblende ist die Blende schon das Einblenden.
     const fromSkeleton = Boolean(shell.querySelector('.widget-skeleton'))
       && !document.documentElement.classList.contains('page-swapping');
+    // DER SCROLL BLEIBT (DW-P1-2). Ein stiller Neuaufbau tauscht die ganze
+    // Flaeche, und die Scroll-Verankerung des Browsers hat danach keinen
+    // Anker mehr: gemessen 390x844 nach dem Erledigen 400 -> 384 (die Zeile,
+    // die oberhalb der Sicht ausklappt, zog die Lage mit). Gemerkt wird die
+    // Lage vor dem Ausklappen (`quietScrollTop`, refreshDashboardData) bzw. hier,
+    // und am Ende des Aufbaus - nach Icons und Messungen - wiederhergestellt.
+    // Nicht beim Anpassen (dort gleitet das Raster selbst, playGridShift) und
+    // nicht nach dem Skelett, das keine Lage hatte.
+    const scroller = fromSkeleton || isCustomizing || modeChanged ? null : shell.closest?.('.app-content') ?? null;
+    const keptScroll = scroller ? (quietScrollTop ?? scroller.scrollTop) : 0;
+    quietScrollTop = null;
     swapContent(shell, () => {
-      setHtml(shell, `
-      <section class="dashboard-masthead dashboard-masthead--${greetingPeriod()}${mastheadSlim}">
-        ${renderDashboardOverview(user, isCustomizing, weather, { followsDefault, canPublish, weatherCard: weatherCardShown })}
-        ${cockpitHtml}
-      </section>
-      ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user) })}
-      ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish }) : ''}
-    `);
+      setHtml(shell, html);
+      carryTileSizes(shell, viewportWidth);
+      // DIE ZEICHEN VOR DEM ERSTEN MESSEN (DW-P2-4): kamen sie erst nach den
+      // Messungen, legte der Browser die Flaeche zweimal aus - einmal ohne,
+      // einmal mit rund 600 Zeichen-Knoten (gemessen 19 ms bei 4x CPU im
+      // Seitenwechsel). Und das Blatt misst so die Zeilen, die man sieht.
+      createPendingIcons(shell);
       // Telefon: das Blatt fuellt den ersten Schirm (D5). Gemessen im selben
       // Task wie das Zeichnen, also bevor der Browser ein Bild davon malt.
       const fitted = measurePhoneProgram(shell);
       if (fitted) {
         replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: fitted }));
+        createPendingIcons(shell);
         // Zweiter Blick, nur nach unten: der Rest unter den Zeilen hat gewechselt.
         const tighter = measurePhoneProgram(shell, { shrinkOnly: true });
         if (tighter) replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: tighter }));
       }
+      refitTodayStage(shell, () => renderTodayCockpit(data, cfg, isCustomizing));
     }, { animate: fromSkeleton });
-    wireLinks(container, rerender, { editing: isCustomizing, user });
-    disposeFastingClock = wireFastingWidget(container, rerender, refreshDashboardData, data.fasting, signal);
+    // Die Packung liest, solange das Layout vom Zeichnen noch sauber ist -
+    // nach den Verdrahtungen darunter (Kategorie-Ueberlauf der Notizen)
+    // verlangte ihr Lesen ein zweites Layout des Rasters (DW-P2-4).
+    wireRowFill();
+    // Was ein Blatt UEBER der Uebersicht aendert (Erledigen, Bearbeiten,
+    // Loeschen, Fasten), gleicht still ab: kein Skelett, Scroll und Fokus
+    // bleiben (refreshDashboardData). Das volle render() gehoert dem Aufbau.
+    // Ohne Argumente: was ein Blatt seinem `onChanged` mitgibt, ist keine Option.
+    wireLinks(container, refreshAfterSheet, { editing: isCustomizing, user, signal });
+    disposeFastingClock = wireFastingWidget(container, refreshAfterSheet, data.fasting, signal, { editing: isCustomizing });
     // Retry einer isolierten Widget-Fehlerkachel: da /dashboard aggregiert lädt,
     // ist „erneut versuchen" ein voller Neuaufbau (wie der Page-Level-Retry).
     container.querySelectorAll('[data-widget-retry]').forEach((btn) =>
       btn.addEventListener('click', rerender, { signal: signal }));
-    if (window.lucide) window.lucide.createIcons({ el: shell });
+    // Nur, was seit dem Zeichnen neu ist (ein neu gezeichnetes Blatt).
+    createPendingIcons(shell);
     // Vorschaubilder der Mahlzeitenkachel: Ruecksturz auf den Platzhalter per
     // Listener, weil ein `onerror` im Markup gegen die CSP liefe (#1059).
     wireRecipeThumbs(shell);
@@ -8447,13 +11081,12 @@ export async function render(container, { user, signal: routeSignal = null } = {
     container.querySelectorAll('[data-customize-reset]').forEach((btn) => btn.addEventListener('click', resetDashboardConfig, { signal: signal }));
     container.querySelectorAll('[data-customize-publish]').forEach((btn) => btn.addEventListener('click', publishHouseholdDefault, { signal: signal }));
     wireDashboardEditMode();
-    wireRowFill();
     void mountExtensionWidgets(shell, cfg, user);
 
-    /* DER FOKUS UEBERLEBT DEN NEUAUFBAU. Jede Geste im Anpassen-Modus baut die
-     * Flaeche neu - und bis hierher fiel der Fokus danach auf <body>: wer per
-     * Tastatur „Anpassen" drueckte, eine Groesse waehlte oder speicherte, stand
-     * wieder am Seitenanfang. Reihenfolge der Kandidaten: dasselbe Element
+    /* DER FOKUS UEBERLEBT DEN NEUAUFBAU. Ein Moduswechsel baut die Flaeche neu
+     * (die Gesten darin patchen seit DW-P2-1 und behalten ihre Knoten) - und
+     * bis hierher fiel der Fokus danach auf <body>: wer per Tastatur
+     * „Anpassen" drueckte oder speicherte, stand wieder am Seitenanfang. Reihenfolge der Kandidaten: dasselbe Element
      * (gleiche Id bzw. gleiches data-Attribut), dann das, was die Geste selbst
      * als Nachfolger nennt (Ausblenden -> Nachbarkachel), und wenn die Geste den
      * Modus gewechselt hat (Speichern, Abbrechen), der Anpassen-Knopf, der ihn
@@ -8463,9 +11096,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
       ...(focusAfterRebuild ?? []),
       ...(hadFocus && modeChanged ? ['#dashboard-customize-btn', '.dashboard-tools-btn'] : []),
       ...(takeWallFocusIntent('leave') ? ['#dashboard-wall-enter', '.dashboard-tools-btn'] : []),
+      ...todayFallback,
     ]);
     focusAfterRebuild = null;
-    playTileFlip(shell, tileRectsBefore);
+    // Erst die Lage zurueck, dann gleiten: sonst stuende der Scroll-Versatz der
+    // Verankerung mit in der Bewegung.
+    if (scroller && scroller.scrollTop !== keptScroll) scroller.scrollTop = keptScroll;
+    if (tileRectsBefore?.size) playTileFlip(shell, tileRectsBefore);
     playGridShift(shell, gridTopBefore);
   }
 
@@ -8488,8 +11125,9 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // test-frontend-audit.js).
     findPageFab('fab-main')?.closest('.page-fab-group')?.remove();
   } else {
-    initFab(signal);
-    wireNewMenu(container, signal);
+    // "+ Neu" legt ueber der Uebersicht an und gleicht danach still ab (U2).
+    initFab(signal, { user, refresh: refreshAfterSheet });
+    wireNewMenu(container, signal, { user, refresh: refreshAfterSheet });
   }
 
   // SELBSTHEILUNG STATT RETRY-KNOPF. Am Wandtablet drueckt niemand auf
@@ -8508,16 +11146,49 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Tab), bewusst ohne Skeleton (das gehört dem Erstaufbau) und still bei
   // Fehlern, wie der Wetter-Timer. Während „Anpassen" wird nicht neu gebaut -
   // ein Rebuild würde den Bearbeitungszustand wegwerfen.
-  let refreshInFlight = false;
+  //
+  // SEIT DW-P1-2 (Critique 26.10.) auch der Weg nach einer Aktion in einem
+  // Blatt ueber der Uebersicht. Dort stand `render()`: Skelett ueber dem
+  // Inhalt, die Seite schrumpfte auf Bildschirmhoehe und der Scroll fiel auf
+  // 0 (gemessen 1596 -> 900 px, 400 -> 0, 120-250 ms Skelett) - genau dort,
+  // wo das Blatt versprach, die Uebersicht bleibe stehen (R22 D3). Die
+  // Zeile, die mit dem neuen Stand geht, schliesst vorher sichtbar
+  // (closeLeavingRows).
+  //
+  // Laeuft schon eine Nachfrage, kann ihre Antwort aelter sein als der
+  // Schreibvorgang, der die naechste ausloest: dann faehrt sie danach ein
+  // zweites Mal, statt den Aufruf zu verschlucken.
+  let refreshInFlight = null;
+  let refreshAgain = false;
+  // Was der neue Stand nicht mehr nennt, klappt aus, bevor die Flaeche ohne
+  // es neu entsteht (utils/list-motion.js: collapseRow VOR dem Neuzeichnen).
+  // Nachgeladen, nicht im Startgraphen: gebraucht wird es erst nach einem
+  // Schreibvorgang (test:startup-preload).
+  async function closeLeavingRows(cfg) {
+    const shell = container.querySelector('#dashboard-shell');
+    if (!shell || wallMode) return;
+    const leaving = rowsLeaving(shell, dashboardShellHtml(cfg));
+    if (!leaving.length) return;
+    const { collapseRow } = await import('/utils/list-motion.js');
+    await Promise.all(leaving.map((row) => collapseRow(row)));
+  }
   // `onlyIfChanged`: die stille Nachfrage nach einem Aufbau aus dem gemerkten
   // Stand (`_overviewMemo`) - gleiche Antwort, kein Neuaufbau.
   async function refreshDashboardData({ onlyIfChanged = false } = {}) {
-    if (isCustomizing || loadFailed || refreshInFlight) return;
-    refreshInFlight = true;
+    if (isCustomizing || loadFailed) return;
+    if (refreshInFlight) { refreshAgain = true; return refreshInFlight; }
+    let settled;
+    refreshInFlight = new Promise((resolve) => { settled = resolve; });
     const before = onlyIfChanged ? overviewSignature(data) : null;
     try {
       const requestDay = householdToday();
-      const fresh = await api.get(overviewRequest(dashboardQuery(widgetConfig)));
+      // Die Erinnerungen haengen an nichts davon: sie laufen neben der
+      // Uebersicht, nicht danach - nach einer Blatt-Aktion wartet die Flaeche
+      // sonst eine Runde laenger auf ihren neuen Stand.
+      const [fresh, pendingReminders] = await Promise.all([
+        api.get(overviewRequest(dashboardQuery(widgetConfig))),
+        loadPendingReminders(overviewRequest),
+      ]);
       if (signal.aborted) return;
       localizeEventLists(fresh);
       // DIE EIGENEN SLICES WERDEN NEU GEHOLT, NICHT WEITERGEREICHT. /dashboard
@@ -8552,15 +11223,34 @@ export async function render(container, { user, signal: routeSignal = null } = {
         if (signal.aborted) return;
       }
       fresh.waste = data.waste;
-      fresh.pendingReminders = await loadPendingReminders(overviewRequest);
-      if (signal.aborted) return;
+      fresh.pendingReminders = pendingReminders;
       const unchanged = before !== null && overviewSignature(fresh) === before;
       data = fresh;
+      // Wie der Aufbau: ob die Countdown-Kachel steht, sagt der neue Stand -
+      // ein im Blatt angelegter Countdown bringt sie mit (Review zu #2314).
+      setCountdownAvailability(data?.countdowns);
       markLoaded(requestDay);
       rememberOverview();
-      if (!unchanged) rebuildDashboard(widgetConfig);
+      if (unchanged) return;
+      const scrollTop = container.querySelector('#dashboard-shell')?.closest?.('.app-content')?.scrollTop ?? null;
+      await closeLeavingRows(widgetConfig);
+      // Waehrenddessen verlassen oder ins Anpassen gewechselt: dort hat der
+      // eigene Aufbau den neuen Stand schon gezeichnet.
+      if (signal.aborted || isCustomizing) return;
+      quietScrollTop = scrollTop;
+      const known = shownRowKeys(container.querySelector('#dashboard-shell'));
+      rebuildDashboard(widgetConfig);
+      rowsArriving(container.querySelector('#dashboard-shell'), known).forEach((row) => expandIn(row));
     } catch { /* Hintergrund-Refresh: bewusst still */ }
-    finally { refreshInFlight = false; }
+    finally {
+      refreshInFlight = null;
+      // Wer waehrenddessen fragte, wartet auf den Nachlauf mit.
+      if (refreshAgain && !signal.aborted) {
+        refreshAgain = false;
+        await refreshDashboardData();
+      }
+      settled();
+    }
   }
   const refreshTimerId = setInterval(() => {
     if (!document.hidden) refreshDashboardData();
@@ -8616,6 +11306,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
   startClockTicker(container, signal, () => {
     if (wallMode) syncWallMode(location.pathname);
     followDayBoundaries();
+    updateTodayTimelineNow(container);
   });
 
   // 30-Minuten Auto-Refresh für Wetter (inkl. optionaler Standort-Aktualisierung).
@@ -8634,8 +11325,14 @@ export async function render(container, { user, signal: routeSignal = null } = {
         });
         const res = await api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null }));
         if (signal.aborted) return;
+        // GLEICHE ANTWORT, KEIN NEUAUFBAU (DW-P3-13): der Takt baute alle 30
+        // Minuten die ganze Flaeche neu, auch wenn der Anbieter dasselbe
+        // sagte - anders als der stille Abgleich mit `onlyIfChanged`. Der Tag
+        // gehoert zum Abdruck: um Mitternacht rueckt die Heute-Marke der Vorschau.
+        const shown = overviewSignature({ weather, available: weatherAvailable, day: householdToday() });
         weather = res.data ?? null;
         setWeatherAvailability(res, weatherPrefs);
+        if (overviewSignature({ weather, available: weatherAvailable, day: householdToday() }) === shown) return;
         rebuildDashboard(widgetConfig);
       } catch { /* Hintergrund-Timer: bewusst still — der Nutzer hat nichts
                    angestoßen, ein Toast alle 30 Min wäre reiner Lärm. */ }
@@ -8690,9 +11387,27 @@ function todayFingerprint(data, cfg, now = new Date()) {
     .flatMap((key) => (Array.isArray(data[key]) ? data[key] : []))
     .filter((event) => eventHasEnded(event, nowStamp))
     .map((event) => `${event.id}@${event.start_datetime}`);
+  // Und die Mahlzeit, deren Zeit da war, und die beendete eigene Schicht: unter
+  // der breiten Buehne verlassen sie die Zeilen (timelineSheetRows), ohne dass
+  // ein Termin endet.
+  const timeline = buildTodayTimeline(data, { now, includeMeals: true, includeShifts: true });
+  const items = (timeline?.lanes ?? []).flatMap((lane) => lane.items);
+  const passed = items
+    .filter((item) => item.kind !== 'event' && item.state === 'past')
+    .map((item) => item.key);
+  // UND WAS BEGONNEN HAT (Critique 2026-10-26, Lauf 2): breit stehen die
+  // Termine in keiner Zeile, und ein Beginn aenderte nichts am Stempel - der
+  // Block hiess weiter „als Naechstes", seine Fahne zaehlte ins Leere, und der
+  // naechste kam erst dran, wenn irgendwo etwas endete.
+  const running = items.filter((item) => item.state === 'now').map((item) => item.key);
   return JSON.stringify([
     model.rows.map((row) => [row.kind, row.objectId ?? row.members?.map((m) => m.objectId), row.title, row.open, Boolean(row.overdue)]),
-    model.overflow, Boolean(model.coda), Boolean(model.state), ended,
+    model.overflow, Boolean(model.coda), Boolean(model.state), ended, [...new Set(passed)],
+    timeline?.nextKey ?? null, [...new Set(running)],
+    // DAS KNIE DER ACHSE (D7): es springt zur vollen Stunde, und mit ihm jede
+    // Lage der Leiste - dann baut die Uebersicht neu; dazwischen wandert nur
+    // der Strich (updateTodayTimelineNow).
+    timeline?.knee ?? null,
   ]);
 }
 
@@ -8739,10 +11454,11 @@ async function loadScheduleSlice(day) {
 }
 
 export const __test = {
+  onboardingCardPlacement,
   usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
   getOverviewMemo: () => _overviewMemo,
   setOverviewMemo: (memo) => { _overviewMemo = memo; },
-  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarListRowsOf, renderDashboardSkeleton, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, playGridShift, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, renderCustomizeFootnote, applyRowFill, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit };
+  childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarTileModel, tileSpanOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, measureTileFlip, startTileFlip, playGridShift, arrangeChildren, placeBefore, focusTarget, nearestScrollDelta, tileDrawKey, dashboardTileRenderers, dashboardTileListed, renderWidgetBody, renderWidgetWrapper, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, NEW_SHEETS, wireNewMenu, initFab, rowsArriving, shownRowKeys, renderCustomizeFootnote, applyRowFill, gridHoleSuggestion, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit, renderWidgetError, renderWidgetCustomizeControls, renderWidgetTileMenu, syncCustomizeControls, wireLinks, renderFastingWidget, renderNutritionWidget, renderWasteWidget, renderQuickLinks, renderShoppingLists };
 
 // `signal` ist der Controller des Aufbaus, der die Wetterkarte gezeichnet hat
 // (#976/#977). Vorher las diese Funktion das Modul-Feld `_fabController` -
@@ -8754,7 +11470,10 @@ function wireWeatherRefresh(container, onUpdated = null, signal) {
   if (!refreshBtn) return;
   const doWeatherRefresh = async () => {
     refreshBtn.disabled = true;
-    refreshBtn.classList.add('weather-widget__refresh--spinning');
+    // Die Statusdrehung der Knoepfe (`.btn--loading`, layout.css): die Klasse
+    // `--spinning`, die hier stand, hatte keine einzige Regel - der Kringel
+    // drehte nie (DW-P3-3, mit dem Knopf aus der Shell).
+    refreshBtn.classList.add('btn--loading');
     try {
       const res = await api.get(`/weather?lang=${encodeURIComponent(getLocale())}`).catch(() => ({ data: null }));
       if (signal.aborted) return;
@@ -8782,7 +11501,7 @@ function wireWeatherRefresh(container, onUpdated = null, signal) {
       // Immer aufräumen, damit der Button nach jedem Ausgang wieder bedienbar
       // ist (bei Erfolg wird das Widget ohnehin frisch gerendert).
       refreshBtn.disabled = false;
-      refreshBtn.classList.remove('weather-widget__refresh--spinning');
+      refreshBtn.classList.remove('btn--loading');
     }
   };
   refreshBtn.addEventListener('click', doWeatherRefresh, { signal: signal });
@@ -8812,7 +11531,21 @@ Object.assign(__test, { renderUpcomingEvents, renderShoppingLists, renderShoppin
 
 // Test-Tor fuer die Uebersichts-Bugs vom 2026-09-29 (#1449, #1451-#1457).
 Object.assign(__test, { renderBudgetWidget });
+// Review p11: der Weg zum Anlegen-Blatt, wenn die Seite waehrenddessen geht.
+Object.assign(__test, { openNewTarget });
+// Review p11 (B4): wann eine Kachel im Anpassen-Modus neu gezeichnet und verdrahtet wird.
+Object.assign(__test, { tileBodyChanged });
+// Review p11 (B5): die Fasten-Kachel im Anpassen-Modus.
+Object.assign(__test, { wireFastingWidget });
 
 // Test-Tor fuer die Kalender-Auswahl der Kalender-Kachel (#2062).
 Object.assign(__test, { loadCalendarSources });
 Object.assign(__test, { renderCountdowns, renderHousekeepingWidget, renderCycleWidget, todayFingerprint });
+
+// Test-Tor fuer die Zeitleiste (Critique 2026-10-26, Lauf 2): Verdrahtung,
+// Minutentakt, Fahne und der Fokus ueber den Buehnenwechsel.
+Object.assign(__test, { wireTodayTimeline, updateTodayTimelineNow, placeTodayTimelineFlag, todayFocusFallbacks });
+// D3 (Lauf 2): das Bild als Tippziel auf dem Telefon.
+Object.assign(__test, { renderTodayMiniTimeline, renderTodayPeek, todayPeekTarget, revealTodayPeekTarget });
+// D6 (Lauf 2): die Gliederung unter der breiten Buehne gegen das Modell der Leiste.
+Object.assign(__test, { buildTodayTimeline });

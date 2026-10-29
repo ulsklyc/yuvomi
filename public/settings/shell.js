@@ -4,6 +4,7 @@ import { renderSkeletonList, placeSkeletonUntilContent } from '/utils/skeleton.j
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { swapRegion } from '/utils/content-swap.js';
 import { wireScrollFade } from '/utils/ux.js';
+import { searchEmptyEl } from '/utils/empty-state.js';
 import { MODULE_ICON, moduleIconHTML } from '/nav-icons.js';
 import { createRetryState } from './components.js';
 import { watchLeafForms } from './dirty-guard.js';
@@ -14,6 +15,7 @@ import {
   findSettingsLeaf,
   firstSettingsSheet,
   searchSettings,
+  orderSettingsHits,
   settingsOptionUrl,
   settingsOverviewUrl,
   settingsSectionUrl,
@@ -170,6 +172,19 @@ function createNavigationResult({ entry, href, label, context, activeLeaf, exact
 }
 
 /**
+ * "Suche zuruecksetzen" im Leerzustand: das Feld leeren wie sein eigenes X
+ * (`input` laesst wirePageSearch den Leeren-Knopf verstecken und die Liste
+ * zurueckholen) und den Fokus dort lassen, wo weitergetippt wird.
+ * @param {HTMLInputElement|null} input
+ */
+function resetSearchField(input) {
+  if (!input) return;
+  input.value = '';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.focus();
+}
+
+/**
  * Suchfeld der Seitenleiste - AN DER LISTENKANTE (S3): am Desktop ist die
  * Seitenleiste die Liste der Liste-+-Detail-Form, und ihre Suche filtert
  * genau diese Liste. Seit 2026-09-26 findet sie auch die EINZELNE Option
@@ -210,43 +225,49 @@ function createNavigationSearch(navigation, domains, user, activeLeaf) {
 
     if (!searching) {
       results.replaceChildren();
+      empty.replaceChildren();
+      empty.hidden = true;
       status.textContent = '';
       return;
     }
 
     const hits = searchSettings(query, { user, translate: t });
-    results.replaceChildren(
-      ...hits.leaves.map((entry) => createNavigationResult({
-        entry,
-        href: entry.path,
-        label: settingsLeafLabel(entry, t),
-        context: domainLabels.get(entry.domainId) ?? '',
-        activeLeaf,
-      })),
-      ...hits.sections.map(({ leaf, section, label }) => createNavigationResult({
-        entry: leaf,
-        href: settingsSectionUrl(leaf, section.id),
-        label,
-        context: settingsLeafLabel(leaf, t),
-        activeLeaf,
-        exact: false,
-      })),
-      ...hits.options.map(({ leaf, key, label }) => createNavigationResult({
-        entry: leaf,
-        href: settingsOptionUrl(leaf, key),
-        label,
-        context: settingsLeafLabel(leaf, t),
-        activeLeaf,
-        exact: false,
-      })),
-    );
+    // Wer so heisst wie das Gesuchte, steht vorn (orderSettingsHits, R24).
+    results.replaceChildren(...orderSettingsHits(hits, query, t).map((hit) => createNavigationResult(
+      hit.kind === 'leaf'
+        ? { entry: hit.leaf, href: hit.leaf.path, label: hit.label, context: domainLabels.get(hit.leaf.domainId) ?? '', activeLeaf }
+        : {
+          entry: hit.leaf,
+          href: hit.kind === 'section' ? settingsSectionUrl(hit.leaf, hit.section.id) : settingsOptionUrl(hit.leaf, hit.key),
+          label: hit.label,
+          context: settingsLeafLabel(hit.leaf, t),
+          activeLeaf,
+          exact: false,
+        },
+    )));
     hydrateIcons(results);
 
     const count = hits.leaves.length + hits.sections.length + hits.options.length;
-    status.textContent = count ? t('settings.searchResults', { count }) : t('search.noResults');
+    // OHNE TREFFER DER LEERZUSTAND DER APP (Critique R24, G6-Einst-P3-5): hier
+    // stand der nackte Satz "Keine Ergebnisse gefunden." - jede andere Suche
+    // nennt den Begriff und bietet "Suche zuruecksetzen" (searchEmptyEl). Er
+    // ist selbst die Live-Region (`role="status"`), die Zahlzeile schweigt.
+    status.textContent = count ? t('settings.searchResults', { count }) : '';
+    status.hidden = !count;
+    empty.hidden = Boolean(count);
+    empty.replaceChildren(...(count ? [] : [searchEmptyEl({
+      query,
+      className: 'settings-shell__navigation-empty-state',
+      onReset: () => resetSearchField(navigation.querySelector('#settings-navigation-search')),
+    })]));
+    if (!count) hydrateIcons(empty);
   };
 
-  field.after(status, results);
+  const empty = document.createElement('div');
+  empty.className = 'settings-shell__navigation-empty';
+  empty.hidden = true;
+
+  field.after(status, results, empty);
   wirePageSearch(navigation, { id: 'settings-navigation-search', delay: 0, onQuery: applyFilter });
 }
 
@@ -533,10 +554,9 @@ function renderOverview(content, domains, user) {
     const heading = document.createElement('h2');
     heading.className = 'settings-overview__heading';
     heading.id = `${section.id}-heading`;
-    heading.append(
-      createIcon(domain.icon, 'settings-overview__heading-icon'),
-      document.createTextNode(domainLabel),
-    );
+    // Ohne Glyphe (R24): die Gruppe spricht wie in der Spalte und der
+    // Seitenleiste, das Zeichen tragen ihre Blaetter.
+    heading.textContent = domainLabel;
     section.setAttribute('aria-labelledby', heading.id);
 
     const list = document.createElement('div');
@@ -557,10 +577,7 @@ function renderOverview(content, domains, user) {
   const optionsHeading = document.createElement('h2');
   optionsHeading.className = 'settings-overview__heading';
   optionsHeading.id = 'settings-overview-options-heading';
-  optionsHeading.append(
-    createIcon('sliders-horizontal', 'settings-overview__heading-icon'),
-    document.createTextNode(t('settings.searchOptionsHeading')),
-  );
+  optionsHeading.textContent = t('settings.searchOptionsHeading');
   optionsSection.setAttribute('aria-labelledby', optionsHeading.id);
   const optionsList = document.createElement('div');
   optionsList.className = 'settings-overview__list';
@@ -617,23 +634,59 @@ function filterOverview(content, value) {
   }
 
   const optionsSection = overview.querySelector('.settings-overview__section--options');
-  const extra = [
-    ...hits.sections.map(({ leaf, section, label }) => ({ leaf, label, href: settingsSectionUrl(leaf, section.id) })),
-    ...hits.options.map(({ leaf, key, label }) => ({ leaf, label, href: settingsOptionUrl(leaf, key) })),
-  ];
+  const ordered = orderSettingsHits(hits, query, t);
+  const extra = ordered
+    .filter((hit) => hit.kind !== 'leaf')
+    .map(({ kind, leaf, section, key, label }) => ({
+      leaf,
+      label,
+      href: kind === 'section' ? settingsSectionUrl(leaf, section.id) : settingsOptionUrl(leaf, key),
+    }));
   if (optionsSection) {
     const list = optionsSection.querySelector('.settings-overview__list');
     list.replaceChildren(...extra.map(createOptionRow));
     optionsSection.hidden = extra.length === 0;
     hydrateIcons(list);
+    // Heisst eine Option so wie das Gesuchte und kein Blatt (Rang, R24), steht
+    // ihr Abschnitt VOR den Blaettern: "passwort" zeigt zuerst "Passwort
+    // aendern", nicht Konto und E-Mail (SMTP), die nur ihre Beschreibung traf.
+    const firstLeaf = ordered.findIndex((hit) => hit.kind === 'leaf');
+    const firstOther = ordered.findIndex((hit) => hit.kind !== 'leaf');
+    const optionsFirst = firstOther >= 0 && (firstLeaf < 0 || firstOther < firstLeaf);
+    const empty = emptyOf(overview);
+    if (optionsFirst) {
+      if (status) status.after(optionsSection);
+      else overview.prepend(optionsSection);
+    } else if (optionsSection.nextElementSibling !== empty) {
+      overview.insertBefore(optionsSection, empty);
+    }
   }
 
   if (!status) return;
   const count = hits.leaves.length + extra.length;
-  status.hidden = !query;
-  status.textContent = !query
-    ? ''
-    : (count ? t('settings.searchResults', { count }) : t('search.noResults'));
+  // OHNE TREFFER DER LEERZUSTAND DER APP (R24, G6-Einst-P3-5) - wie in der
+  // Seitenleiste; die Zahlzeile schweigt, der Leerzustand ist die Ansage.
+  status.hidden = !query || count === 0;
+  status.textContent = query && count ? t('settings.searchResults', { count }) : '';
+  const empty = emptyOf(overview);
+  empty.hidden = !query || count > 0;
+  empty.replaceChildren(...(query && !count ? [searchEmptyEl({
+    query,
+    onReset: () => resetSearchField(document.getElementById('settings-search')),
+  })] : []));
+  if (query && !count) hydrateIcons(empty);
+}
+
+/** Der Platz des Leerzustands am Ende der Wurzel (legt ihn beim ersten Mal an). */
+function emptyOf(overview) {
+  let empty = overview.querySelector(':scope > .settings-overview__empty');
+  if (!empty) {
+    empty = document.createElement('div');
+    empty.className = 'settings-overview__empty';
+    empty.hidden = true;
+    overview.appendChild(empty);
+  }
+  return empty;
 }
 
 /**
@@ -680,9 +733,27 @@ function renderToolbar(toolbar, content, { activeLeaf, domain }) {
     // Name hier ist die Ortsangabe der Shell wie in jedem Modul.
     const moduleTitle = document.createElement('p');
     moduleTitle.className = 'page-toolbar__title settings-toolbar__module-title';
-    moduleTitle.textContent = t('settings.title');
+    const moduleName = document.createElement('span');
+    moduleName.className = 'settings-toolbar__module-name';
+    moduleName.textContent = t('settings.title');
+    // DIE LEISTE TRAEGT DEN LARGE TITLE (R24, E4, Ulas 2026-10-28). Mobil
+    // stand „< Einstellungen" allein in einer 65px-Zeile, darunter Zahnrad,
+    // Large Title und Beschreibung - die erste Karte bei y180, die Rechte erst
+    // bei y750 bedienbar. Jetzt EINE Zeile wie im Gesundheitsbereich: Rueckweg,
+    // das Zeichen des BLATTS (nicht das Zahnrad) und sein Name im Large Title;
+    // der Kopf ist einzeilig (Kopfregel 1a) und steht in jedem Scrollstand
+    // gleich. Der Name hier ist Bild, die Ueberschrift bleibt das <h1> des
+    // Blatts (mobil im Baum, settings.css) - darum aria-hidden.
+    const leafName = document.createElement('span');
+    leafName.className = 'settings-toolbar__leaf-name';
+    leafName.setAttribute('aria-hidden', 'true');
+    const leafLabel = document.createElement('span');
+    leafLabel.className = 'settings-toolbar__leaf-label';
+    leafLabel.textContent = settingsLeafLabel(activeLeaf, t);
+    leafName.append(createLeafMark(activeLeaf, 'settings-toolbar__leaf-seal'), leafLabel);
+    moduleTitle.append(moduleName, leafName);
     toolbar.dataset.mode = 'leaf';
-    toolbar.classList.remove('page-toolbar--title-tools');
+    toolbar.classList.add('page-toolbar--title-tools');
     toolbar.replaceChildren(back, moduleTitle);
     hydrateIcons(toolbar);
     return;

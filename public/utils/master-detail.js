@@ -633,6 +633,13 @@ export function mountMasterDetail({
     // dieselbe Richtung wie ein Schliessen, ohne das Gelesene wegzuwerfen.
     // Ein offenes Menue oder Feld im Detail hat Esc schon selbst verbraucht.
     if (event.defaultPrevented) return;
+    // EIN OFFENES POPOVER-MENUE SCHLIESST DER BROWSER SELBST (R24, Critique G5
+    // P2-5) - aber erst NACH keydown und nur, wenn niemand preventDefault()
+    // gerufen hat. Hier stand der Fokus im Menue, also kam Esc vor dem Browser
+    // an: das "..." des Fastens blieb offen, und der Fokus sprang in die
+    // Bereichsliste. Ein Menue (Fokus im Panel) und sein Ausloeser, solange
+    // es offen ist, behalten Esc fuer sich.
+    if (event.target?.closest?.('[popover], [aria-haspopup][aria-expanded="true"]')) return;
     const row = rowFor(selected);
     if (!row) return;
     event.preventDefault();

@@ -47,6 +47,7 @@ const row = (name, i, { readOnly = false } = {}) => `<div class="caldav-reminder
     <div class="settings-setting-row__control form-row__control"><input type="checkbox" class="caldav-reminder-checkbox" id="c${i}" checked></div>
   </div>
   <select class="form-input caldav-reminder-module"><option value="tasks">Aufgaben</option><option value="shopping" selected>Einkaufsliste</option></select>
+  <button type="button" class="form-input caldav-reminder-assignees assignee-menu__trigger popover-menu__trigger" hidden><span class="assignee-menu__text">Keine</span></button>
   ${readOnly ? '<p class="caldav-calendar-source caldav-reminder-note">Nur lesbar geteilt: neue Aufgaben landen nicht in dieser Liste.</p>' : ''}
 </div>`;
 
@@ -142,7 +143,11 @@ test('die Sonde misst das Markup, das sync-reminders.js und createSettingRow() b
   assert.ok(page.includes("wrapper.className = 'caldav-reminder-item';"), 'die Listenzeile heisst anders');
   assert.ok(page.includes("select.className = 'form-input caldav-reminder-module';"), 'die Modulwahl heisst anders');
   assert.ok(page.includes("toggle.className = 'caldav-reminder-checkbox';"), 'der Schalter heisst anders');
-  assert.ok(page.includes('wrapper.append(row, select);'), 'Name samt Schalter und Modulwahl stehen nicht mehr als Geschwister in der Zeile');
+  // Seit #2316 steht die Personenwahl als dritter Geschwister in der Zeile. Die
+  // Sonde fuehrt Einkaufslisten, und dort ist sie verborgen (`hidden`).
+  assert.ok(page.includes('wrapper.append(row, select, assignees);'), 'Name samt Schalter, Modulwahl und Personenwahl stehen nicht mehr als Geschwister in der Zeile');
+  assert.ok(page.includes("triggerClass: 'form-input caldav-reminder-assignees',"), 'die Personenwahl heisst anders');
+  assert.ok(page.includes("trigger.hidden = list.targetModule !== 'tasks';"), 'die Personenwahl steht auch neben einer Einkaufsliste');
   assert.ok(page.includes("note.className = 'caldav-calendar-source caldav-reminder-note';"), 'der Nur-lesbar-Hinweis heisst anders');
   assert.ok(page.includes("list.className = 'caldav-calendars-list';"), 'die Liste heisst anders');
   const components = readFileSync(join(ROOT, 'public/settings/components.js'), 'utf8');

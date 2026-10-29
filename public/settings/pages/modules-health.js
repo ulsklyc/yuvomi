@@ -9,7 +9,7 @@
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
-import { openModal, closeModal, captureModalContext, confirmOverModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmOverModal, refocusAfterRender, reportFieldErrors, constraintErrors, dialogInitialFocus } from '/components/modal.js';
 import { intervalMonthsToInput, intervalInputToMonths } from '/utils/health-prevention.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
@@ -135,33 +135,34 @@ function openTypeModal(type) {
 
   openModal({
     title: isEdit ? t('settings.healthPreventionEditType') : t('settings.healthPreventionAddType'),
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'sm',
     content: `
       <form id="health-prevention-type-form" class="form-stack" novalidate>
         <div class="form-field">
-          <label class="label" for="hpt-name">${esc(t('settings.healthPreventionTypeName'))}${REQUIRED_MARK}</label>
-          <input class="input" id="hpt-name" type="text" maxlength="200" required value="${esc(val(type?.name))}">
+          <label class="form-label" for="hpt-name">${esc(t('settings.healthPreventionTypeName'))}${REQUIRED_MARK}</label>
+          <input class="form-input" id="hpt-name" type="text" maxlength="200" required value="${esc(val(type?.name))}">
         </div>
         <div class="form-field">
-          <label class="label" for="hpt-kind">${esc(t('settings.healthPreventionTypeKind'))}</label>
-          <select class="input" id="hpt-kind">
+          <label class="form-label" for="hpt-kind">${esc(t('settings.healthPreventionTypeKind'))}</label>
+          <select class="form-input" id="hpt-kind">
             ${KINDS.map((k) => `<option value="${esc(k)}" ${type?.kind === k ? 'selected' : ''}>${esc(t(`settings.healthPreventionKind.${k}`))}</option>`).join('')}
           </select>
         </div>
         <div class="modal-grid modal-grid--2">
           <div class="form-field">
-            <label class="label" for="hpt-interval">${esc(t('settings.healthPreventionTypeInterval'))}</label>
-            <input class="input" id="hpt-interval" type="number" inputmode="numeric" min="1" step="1"
+            <label class="form-label" for="hpt-interval">${esc(t('settings.healthPreventionTypeInterval'))}</label>
+            <input class="form-input" id="hpt-interval" type="number" inputmode="numeric" min="1" step="1"
                    value="${esc(val(interval.value))}" placeholder="${esc(t('settings.healthPreventionTypeIntervalPlaceholder'))}">
           </div>
           <div class="form-field">
-            <label class="label" for="hpt-interval-unit">${esc(t('common.unit'))}</label>
-            <select class="input" id="hpt-interval-unit">${intervalUnitOptions(interval.unit)}</select>
+            <label class="form-label" for="hpt-interval-unit">${esc(t('common.unit'))}</label>
+            <select class="form-input" id="hpt-interval-unit">${intervalUnitOptions(interval.unit)}</select>
           </div>
         </div>
         <p class="form-hint">${esc(t('settings.healthPreventionTypeIntervalHint'))}</p>
         <div class="form-field">
-          <label class="label" id="hpt-icon-label">${esc(t('settings.healthPreventionTypeIcon'))}</label>
+          <label class="form-label" id="hpt-icon-label">${esc(t('settings.healthPreventionTypeIcon'))}</label>
           <button type="button" class="btn btn--secondary settings-icon-trigger" id="hpt-icon-trigger" aria-labelledby="hpt-icon-label">
             <i data-lucide="${esc(type?.icon || 'syringe')}" aria-hidden="true"></i>
             <span>${esc(t('iconPicker.title'))}</span>

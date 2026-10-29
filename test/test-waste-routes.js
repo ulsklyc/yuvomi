@@ -1307,3 +1307,144 @@ test('every waste_* reason a route answers has a sentence in the client, and the
     'server and client disagree: a reason without a sentence shows the general one and hides the cause, '
     + 'a sentence without a reason is never shown');
 });
+
+// -------------------------------------------------------------------------
+// One label, several types (#2273): a provider names two bins in one entry
+// ("Leerung Bio-Tonne, Blaue Tonne"). The label maps to every type it names,
+// and the day becomes one pickup per type, so colour, overview and reminder
+// stay per bin.
+// -------------------------------------------------------------------------
+
+function sharedDayIcs(uid = `shared-${randomUUID()}@x`) {
+  return icsFixture('2027-03-05', 'Bio und Papier', uid);
+}
+
+async function commitSharedDay(typeIds, uid) {
+  const r = await call('POST', '/waste/import/commit', {
+    body: { ics: sharedDayIcs(uid), name: `Shared-${randomUUID()}`, mappings: [{ normalized_label: 'bio und papier', type_ids: typeIds }] },
+  });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  return r.body.data;
+}
+
+test('#2273 one label mapped to two types becomes one pickup per type on that day', async () => {
+  const bio = await createType({ name: `Bio-${randomUUID()}` });
+  const paper = await createType({ name: `Papier-${randomUUID()}` });
+  const { source, diff } = await commitSharedDay([bio.id, paper.id]);
+  assert.deepEqual(diff, { added: 2, changed: 0, removed: 0, coalesced: 0 });
+
+  const occ = await call('GET', '/waste/occurrences?from=2027-03-01&to=2027-03-10');
+  const onDay = occ.body.data.filter((o) => o.date_key === '2027-03-05' && o.origins.some((og) => og.source_id === source.id));
+  assert.deepEqual(onDay.map((o) => o.type_id).sort((a, b) => a - b), [bio.id, paper.id].sort((a, b) => a - b));
+
+  const detail = await call('GET', `/waste/sources/${source.id}`);
+  assert.deepEqual(detail.body.data.mappings[0].type_ids, [bio.id, paper.id].sort((a, b) => a - b));
+  assert.equal(detail.body.data.mappings[0].ignored, false);
+});
+
+test('#2273 a re-import remembers every type of a label, and the same file again changes nothing', async () => {
+  const bio = await createType();
+  const paper = await createType();
+  const uid = `shared-same-${randomUUID()}@x`;
+  const { source } = await commitSharedDay([bio.id, paper.id], uid);
+
+  const preview = await call('POST', `/waste/sources/${source.id}/reimport/preview`, { body: { ics: sharedDayIcs(uid) } });
+  assert.equal(preview.status, 200);
+  assert.deepEqual(preview.body.data.labels[0].remembered_type_ids, [bio.id, paper.id].sort((a, b) => a - b));
+
+  const again = await call('POST', `/waste/sources/${source.id}/reimport/commit`, {
+    body: { ics: sharedDayIcs(uid), mappings: [{ normalized_label: 'bio und papier', type_ids: preview.body.data.labels[0].remembered_type_ids }], expected_version: 1 },
+  });
+  assert.equal(again.status, 200, JSON.stringify(again.body));
+  assert.deepEqual(again.body.data.diff, { added: 0, changed: 0, removed: 0, coalesced: 0 });
+});
+
+test('#2273 adding and dropping a type of a label adds and removes only that pickup', async () => {
+  const bio = await createType();
+  const paper = await createType();
+  const uid = `shared-grow-${randomUUID()}@x`;
+  const r = await call('POST', '/waste/import/commit', {
+    body: { ics: sharedDayIcs(uid), name: `Grow-${randomUUID()}`, mappings: [{ normalized_label: 'bio und papier', type_id: bio.id }] },
+  });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const sourceId = r.body.data.source.id;
+
+  const grow = await call('POST', `/waste/sources/${sourceId}/reimport/commit`, {
+    body: { ics: sharedDayIcs(uid), mappings: [{ normalized_label: 'bio und papier', type_ids: [bio.id, paper.id] }], expected_version: 1 },
+  });
+  assert.equal(grow.status, 200, JSON.stringify(grow.body));
+  assert.deepEqual(grow.body.data.diff, { added: 1, changed: 0, removed: 0, coalesced: 0 });
+
+  const shrink = await call('POST', `/waste/sources/${sourceId}/reimport/commit`, {
+    body: { ics: sharedDayIcs(uid), mappings: [{ normalized_label: 'bio und papier', type_ids: [paper.id] }], expected_version: 2 },
+  });
+  assert.equal(shrink.status, 200, JSON.stringify(shrink.body));
+  assert.deepEqual(shrink.body.data.diff, { added: 0, changed: 0, removed: 1, coalesced: 0 });
+  assert.equal(importedPickupCount(sourceId), 1);
+});
+
+test('#2273 a label with types and ignored at once, or with neither, is refused', async () => {
+  const bio = await createType();
+  for (const decision of [{ type_ids: [bio.id], ignored: true }, { type_ids: [] }]) {
+    const r = await call('POST', '/waste/import/commit', {
+      body: { ics: sharedDayIcs(), name: `Refused-${randomUUID()}`, mappings: [{ normalized_label: 'bio und papier', ...decision }] },
+    });
+    assert.equal(r.status, 400, JSON.stringify(decision));
+  }
+});
+
+test('#2273 PUT mapping takes several types, and an emptied list without ignored is refused', async () => {
+  const bio = await createType();
+  const paper = await createType();
+  const { source } = await commitSharedDay([bio.id]);
+  const mapping = (await call('GET', `/waste/sources/${source.id}`)).body.data.mappings[0];
+
+  const both = await call('PUT', `/waste/sources/${source.id}/mappings/${mapping.id}`, { body: { type_ids: [paper.id, bio.id] } });
+  assert.equal(both.status, 200, JSON.stringify(both.body));
+  assert.deepEqual(both.body.data.type_ids, [bio.id, paper.id].sort((a, b) => a - b));
+
+  const empty = await call('PUT', `/waste/sources/${source.id}/mappings/${mapping.id}`, { body: { type_ids: [] } });
+  assert.equal(empty.status, 400);
+
+  const ignored = await call('PUT', `/waste/sources/${source.id}/mappings/${mapping.id}`, { body: { ignored: true } });
+  assert.equal(ignored.status, 200);
+  assert.deepEqual(ignored.body.data.type_ids, []);
+  assert.equal(ignored.body.data.ignored, true);
+});
+
+test('#2273 a mapping profile carries every type of a label, and applying it sets all of them', async () => {
+  const bio = await createType({ name: `Profile-Bio-${randomUUID()}` });
+  const paper = await createType({ name: `Profile-Papier-${randomUUID()}` });
+  const { source } = await commitSharedDay([bio.id, paper.id]);
+  const exported = (await call('GET', `/waste/sources/${source.id}/mapping-profile/export`)).body.data;
+  assert.deepEqual(exported.mappings.map((m) => m.type_name).sort(), [bio.name, paper.name].sort());
+  assert.ok(exported.mappings.every((m) => m.pattern === 'bio und papier'));
+
+  const other = await createType();
+  const target = (await commitSharedDay([other.id])).source;
+  const preview = await call('POST', `/waste/sources/${target.id}/mapping-profile/import/preview`, { body: { profile: exported } });
+  assert.deepEqual(preview.body.data.entries.map((e) => e.status), ['applicable', 'applicable']);
+  const commit = await call('POST', `/waste/sources/${target.id}/mapping-profile/import/commit`, {
+    body: { profile: exported, profile_digest: preview.body.data.profile_digest },
+  });
+  assert.equal(commit.status, 200, JSON.stringify(commit.body));
+  const detail = await call('GET', `/waste/sources/${target.id}`);
+  assert.deepEqual(detail.body.data.mappings[0].type_ids, [bio.id, paper.id].sort((a, b) => a - b));
+
+  const again = await call('POST', `/waste/sources/${target.id}/mapping-profile/import/preview`, { body: { profile: exported } });
+  assert.deepEqual(again.body.data.entries.map((e) => e.status), ['unchanged', 'unchanged']);
+});
+
+test('#2273 a label mapped to two same-named types keeps both through a round trip of its own profile', async () => {
+  const name = `Tonne-${randomUUID()}`;
+  const first = await createType({ name });
+  const second = await createType({ name });
+  const { source } = await commitSharedDay([first.id, second.id]);
+  const exported = (await call('GET', `/waste/sources/${source.id}/mapping-profile/export`)).body.data;
+  assert.equal(exported.mappings.length, 2);
+
+  const preview = await call('POST', `/waste/sources/${source.id}/mapping-profile/import/preview`, { body: { profile: exported } });
+  assert.deepEqual(preview.body.data.entries.map((e) => e.status), ['unchanged', 'unchanged']);
+  assert.deepEqual(preview.body.data.entries.map((e) => e.resolved_type_id).sort((a, b) => a - b), [first.id, second.id].sort((a, b) => a - b),
+    'each entry resolves to ANOTHER of the two own types, never both to the first');
+});

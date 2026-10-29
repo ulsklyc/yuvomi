@@ -1,9 +1,9 @@
 /**
  * Modul: Fehler -> Satz
- * Zweck: friendlyError - der eine Satz, den die App fuer einen Fehler zeigt, den
- *        keine Seite selbst behandelt (Fehlerbildschirm, unbehandelte Rejection,
- *        window.yuvomi.friendlyError). Aus router.js hierher gezogen (#1640),
- *        damit die Zuordnung ohne Browser pruefbar ist:
+ * Zweck: der Satz, den die App fuer einen Fehler zeigt - errorSentence fuer die
+ *        Seiten, loadErrorSentence fuer Ladefehler, unhandledErrorSentence fuer
+ *        Fehlerbildschirm und unbehandelte Rejection. Aus router.js hierher
+ *        gezogen (#1640), damit die Zuordnung ohne Browser pruefbar ist:
  *        test/test-friendly-error.js.
  * Abhaengigkeiten: i18n.js
  */
@@ -13,7 +13,7 @@ import { t } from '/i18n.js';
  * Grund einer Absage (403, `reason` im Rumpf) -> Schluessel ihres Satzes.
  *
  * EINE Liste fuer beide Stellen: api.js uebersetzt damit `message` und
- * `data.error`, friendlyError reicht denselben Satz durch. Eine Map, damit ein
+ * `data.error`, errorSentence sagt denselben Satz. Eine Map, damit ein
  * Grund wie `__proto__` nichts findet.
  *
  * Hier steht nur, was fuer JEDE Seite dasselbe heisst. Gruende, die eine Seite
@@ -188,6 +188,10 @@ export const CASE_MESSAGES = new Map([
   // Die im Zuordnungs-Dialog GEWAEHLTE Vorratszeile fehlt: der Dialog bleibt
   // offen und bietet den aktuellen Vorrat an.
   ['recipes_selected_pantry_item_not_found', 'recipes.errorSelectedPantryItemGone'],
+  // Die Uebernahme mit umgerechneten Mengen nannte Zutaten, die das Rezept so
+  // nicht mehr hat (gespeichert oder abgeglichen seit dem Laden). KEIN "gibt es
+  // nicht mehr": das Rezept steht, die Seite zeigt den Stand aus der Antwort.
+  ['recipes_ingredients_changed', 'recipes.errorIngredientsChanged'],
   // Eine Mahlzeit aus einem Rezept, das es nicht mehr gibt (server/routes/meals.js).
   ['meals_selected_recipe_not_found', 'recipes.errorRecipeGone'],
   // Abos (#1909). Die "gibt es nicht mehr" stehen auch in GONE_REASONS. Die
@@ -203,6 +207,7 @@ export const CASE_MESSAGES = new Map([
   // der Dialog bleibt offen und bietet die aktuellen an.
   ['subscriptions_selected_category_not_found', 'subscriptions.errorSelectedCategoryGone'],
   ['subscriptions_selected_payment_method_not_found', 'subscriptions.errorSelectedPaymentMethodGone'],
+  ['subscriptions_account_not_found', 'subscriptions.errorAccountGone'],
   ['subscriptions_category_exists', 'subscriptions.errorCategoryExists'],
   ['subscriptions_payment_method_exists', 'subscriptions.errorPaymentMethodExists'],
   // Eingaben, die der Abo-Dialog durchlaesst und erst der Server prueft.
@@ -375,6 +380,13 @@ export const CASE_MESSAGES = new Map([
   // dieser Satz ist derselbe wie dort.
   ['calendar_series_no_occurrence', 'calendar.errorSeriesNoOccurrence'],
   ['calendar_series_ends_before_start', 'calendar.recurrenceEndBeforeStart'],
+  // Personen einer Sync-Quelle oder eines Imports (#1897, #1221, #1940): die
+  // Auswahl bietet nur Mitglieder an, beide Saetze erreicht nur ein veralteter
+  // Stand (Person entfernt, Konto geloescht). Die Einkaufsliste nennt, warum
+  // sie keine Personen traegt.
+  ['calendar_assignee_not_member', 'settings.syncAssigneeNotMember'],
+  ['calendar_assignee_unknown', 'settings.syncAssigneeUnknown'],
+  ['reminder_list_assignee_not_tasks', 'settings.reminderListAssigneesTasksOnly'],
   // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909). Die drei
   // Eingaben, die der Server beim Speichern abweist, und was der
   // Verbindungstest von Immich zurueckbekommt: ein abgelehnter API-Schluessel
@@ -498,6 +510,7 @@ export const GONE_REASONS = new Set([
   'subscriptions_payment_method_not_found',
   'subscriptions_selected_category_not_found',
   'subscriptions_selected_payment_method_not_found',
+  'subscriptions_account_not_found',
   'inventory_item_not_found',
   'inventory_tracked_date_not_found',
   'inventory_selected_location_not_found',
@@ -571,7 +584,8 @@ export function isAlreadyDeleted(err, reason) {
 
 /**
  * Der Satz, den die App fuer diesen Fehler SICHER kennt - oder nichts.
- * Eine Stelle fuer friendlyError und errorSentence, damit beide dasselbe sagen.
+ * Eine Stelle fuer errorSentence, loadErrorSentence und unhandledErrorSentence,
+ * damit alle dasselbe sagen.
  *
  * @param {unknown} err
  * @returns {string|undefined} Schluessel
@@ -638,8 +652,7 @@ export function errorSentence(err, fallbackKey = 'common.errorGeneric', params =
 
 /**
  * DER SATZ FUER DAS, WAS KEINE SEITE SELBST FAENGT (#1909): Fehlerbildschirm
- * und unbehandelte Rejection im Router. Dieselben Faelle wie friendlyError -
- * bekannter Fall, offline, 404, 5xx, Zeitueberschreitung, Netzfehler -, nur
+ * und unbehandelte Rejection im Router. Bekannter Fall, offline, 404, 5xx, Zeitueberschreitung, Netzfehler -, nur
  * kommt an einer unbekannten Antwort (400, 409) oder einem Wurf im Code nie
  * dessen Text heraus, sondern der unerwartete Fehler. Die rohe Meldung steht
  * beim Fehlerbildschirm in den aufklappbaren Details.
@@ -656,51 +669,14 @@ export function unhandledErrorSentence(err) {
 }
 
 /**
- * UEBERGANG (#1909): der Satz fuer Aufrufer, die noch nicht umgestellt sind.
- * Jeder wandert mit der Scheibe seines Moduls zu `errorSentence`; bis dahin
- * sagt er hier nicht weniger als vor #1909. Bekannter Fall -> sein Satz, sonst
- * der Text des Servers (`err.data.error`), sonst der allgemeine Satz. Wer noch
- * hier fragt, steht als Zahl in test:frontend-audit (FRIENDLY_ERROR_CALLERS).
- *
- * @param {unknown} err - ApiError (status, data), ein Netzfehler oder irgendein Wurf
- * @returns {string} uebersetzter Satz, oder an einem Status ohne eigenen Satz
- *   (400, 409, 422 ohne bekannten Grund) der Text des Servers
- */
-export function friendlyError(err) {
-  // Offline-Mutation (ApiError status 0): spezifische Meldung - auch wenn
-  // navigator.onLine faelschlich true meldet (Netz weg, aber kein offline-Event).
-  if (err?.status === 0) return t('common.errorOfflineMutation');
-  if (!navigator.onLine) return t('common.errorOffline');
-  // Nachgeschlagen wird am Grund, nicht am Text des Fehlers - an einer Absage
-  // (403) ergibt ein unbekannter oder gar kein Grund den allgemeinen Satz, nie
-  // den des Servers. Bis #1640 stand fuer die 403 ein zweiter Satz hier
-  // ("Zugriff verweigert. Bitte erneut anmelden."), und der riet zur Anmeldung,
-  // wo die Sitzung in Ordnung war: eine abgelaufene Sitzung ist ein 401 und
-  // laeuft ueber auth:expired, nie hier durch.
-  const known = knownSentence(err);
-  if (known) return known;
-  const status = err?.status ?? err?.response?.status;
-  if (status === 404) return t('common.errorNotFound');
-  if (status >= 500) return t('common.errorServer');
-  if (err?.name === 'AbortError' || err?.name === 'TimeoutError') return t('common.errorTimeout');
-  if (/Failed to fetch|NetworkError|Load failed/i.test(err?.message || '')) return t('common.errorServer');
-  if (err?.name === 'TypeError') return t('common.unexpectedError');
-  // Jede andere Antwort des Servers (400, 409, 422 ohne bekannten Grund):
-  // ihr eigener Text. Er nennt die Ursache (welches Feld, welcher Konflikt),
-  // und der allgemeine Satz an seiner Stelle sagte weniger - das gilt, bis der
-  // Aufrufer umgestellt ist und der Server den Fall mit einem `reason` benennt.
-  return err?.data?.error || err?.message || t('common.errorGeneric');
-}
-
-/**
  * DER SATZ FUER EINEN FEHLGESCHLAGENEN LADEVORGANG (Critique R19, 2026-10-16) -
  * oder nichts, wenn die Ursache unbekannt ist.
  *
  * Bis hierher sagte jeder Ladefehler fest "Bitte pruefe die Verbindung", auch
  * bei einer Bremse (429) oder einem Serverfehler: die Familie suchte den Fehler
  * am eigenen WLAN, waehrend der Server nur kurz warten wollte. Die Zuordnung
- * ist die von friendlyError, mit EINEM Unterschied: der Text des Servers kommt
- * hier nie heraus. Bei einer unbekannten Ursache (400, 409 ohne Grund) bleibt
+ * kennt dieselben Faelle wie unhandledErrorSentence, und der Text des Servers
+ * kommt hier nie heraus. Bei einer unbekannten Ursache (400, 409 ohne Grund) bleibt
  * der allgemeine Satz des Aufrufers stehen - `mountLoadError` und der
  * Fehlerzustand der Shell nehmen ihn als Rueckfall.
  *

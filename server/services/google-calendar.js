@@ -32,7 +32,8 @@ import {
 import { localDayEndUtc, utcStamp } from '../utils/rrule-until.js';
 import { authoredAfterInbound, outboundEvent, outboundRecurrenceRule } from './outbound-dtstart.js';
 import { alignmentMoved, googleReading, isEcho, sentSnapshot } from './outbound-echo.js';
-import { assignNewOverride, reassignDefaultOnCalendarMove } from './sync-assignment.js';
+import { assignNewOverride, calendarDefaultAssignees, reassignDefaultOnCalendarMove } from './sync-assignment.js';
+import { assigneeFields, readAllDefaultAssignees } from './default-assignees.js';
 import { countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
 import { readSyncOutcome, withSyncOutcome } from './sync-outcome.js';
 import { rruleValue } from './recurrence.js';
@@ -726,10 +727,12 @@ async function listCalendarsWith(track = (client) => client) {
   const client   = track(loadAuthorizedClient());
   const calendar = google.calendar({ version: 'v3', auth: client });
   const enabledSet = new Set(enabledCalendarIds());
-  // Standard-Zuweisung je Kalender (#459) aus der geteilten external_calendars-Tabelle.
+  // Standard-Personen je Kalender (#459, #1897) aus der geteilten
+  // external_calendars-Tabelle und ihrer Join-Tabelle.
+  const sets = readAllDefaultAssignees(db.get(), 'calendar');
   const assigneeMap = new Map(
-    db.get().prepare(`SELECT external_id, default_assignee_user_id FROM external_calendars WHERE source = 'google'`)
-      .all().map((r) => [r.external_id, r.default_assignee_user_id])
+    db.get().prepare(`SELECT id, external_id FROM external_calendars WHERE source = 'google'`)
+      .all().map((r) => [r.external_id, sets.get(Number(r.id)) ?? []])
   );
 
   const items = [];
@@ -745,7 +748,7 @@ async function listCalendarsWith(track = (client) => client) {
         enabled:         enabledSet.has(cal.id),
         accessRole:      cal.accessRole ?? null,
         writable:        isWritableRole(cal.accessRole),
-        default_assignee_user_id: assigneeMap.get(cal.id) ?? null,
+        ...assigneeFields(assigneeMap.get(cal.id) ?? []),
         synced:          assigneeMap.has(cal.id),
       });
     }
@@ -1306,11 +1309,8 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
       AND (? IS NULL OR calendar_ref_id IS NULL OR calendar_ref_id = ?)
   `);
 
-  // Standard-Zuweisung dieses Kalenders (#459) — einmal auflösen.
-  const defaultAssignee = calRefId
-    ? db.get().prepare('SELECT default_assignee_user_id FROM external_calendars WHERE id = ?')
-        .get(calRefId)?.default_assignee_user_id ?? null
-    : null;
+  // Standard-Personen dieses Kalenders (#459, #1897) - einmal auflösen.
+  const defaultAssignees = calendarDefaultAssignees(db.get(), calRefId);
 
   // Ein Event mit offenem Tombstone ist lokal bereits gelöscht und wartet nur
   // noch auf die Löschung bei Google. Solange darf der Inbound es nicht wieder
@@ -1464,7 +1464,7 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
       reassignDefaultOnCalendarMove(db.get(), existing.id, {
         fromCalRefId: existing.calendar_ref_id,
         toCalRefId: calRefId,
-        toDefaultUserId: defaultAssignee,
+        toDefaultUserIds: defaultAssignees,
       });
     } else {
       // Ohne Nutzer gibt es niemanden, dem der Termin gehören könnte. Die Zweige
@@ -1480,7 +1480,7 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
       // Ein geaendertes Einzelvorkommen erbt die Zuweisung seiner Serie (#2202),
       // sonst gilt die Standard-Person des Kalenders.
       const series = item.recurringEventId ? findLocal.get(item.recurringEventId) : null;
-      assignNewOverride(db.get(), Number(inserted.lastInsertRowid), series?.id ?? null, defaultAssignee);
+      assignNewOverride(db.get(), Number(inserted.lastInsertRowid), series?.id ?? null, defaultAssignees);
     }
 
     // EXDATEs, die Google an der Serie selbst führt, als Ausnahmen ablegen.

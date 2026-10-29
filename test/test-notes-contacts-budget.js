@@ -358,6 +358,14 @@ test('Empréstimo com parcelas calcula restante', () => {
 // --- Guard-Helfer (Kategorienverwaltung) ---
 // Fixtures: Kategorien/Subkategorien selbst seeden (Test-Schema seedet sie nicht).
 console.log('\n[Budget-Guards] Kategorie-Verwaltung\n');
+// Die Loeschsperre zaehlt seit Codex an #2364 auch Ausgaben und Serien der
+// Aufteilung (`budget_category`, Migration 271). Der Auszug in db-schema-test.js
+// fuehrt die Aufteilung nicht; hier steht nur die Spalte, die die Sperre liest.
+// Das volle Verhalten haelt test-split-expenses-routes.js gegen server/db.js.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY, budget_category TEXT);
+  CREATE TABLE IF NOT EXISTS recurring_expenses (id INTEGER PRIMARY KEY, budget_category TEXT);
+`);
 db.exec(`
   INSERT OR IGNORE INTO budget_categories (key, name, type, sort_order) VALUES
     ('housing', 'Housing', 'expense', 0),

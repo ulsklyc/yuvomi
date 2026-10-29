@@ -106,16 +106,16 @@ function validateItemFields(body, { partial = false, current = null } = {}) {
   const results = [];
 
   if (!partial || body.name !== undefined) {
-    const vName = str(body.name, 'Name', { max: MAX_TITLE });
+    const vName = str(body.name, 'name', { max: MAX_TITLE });
     results.push(vName);
     values.name = vName.value;
   }
 
   if (!partial || body.quantity !== undefined) {
-    const vQty = num(body.quantity, 'Menge');
+    const vQty = num(body.quantity, 'quantity');
     results.push(vQty);
     if (vQty.value !== null && vQty.value < 0) {
-      results.push({ error: 'Menge darf nicht negativ sein.' });
+      results.push({ error: 'quantity must not be negative.' });
     }
     // null/leer explizit abfangen: normalizePantryQuantity(null) wäre 0, und
     // "Artikel ohne Mengenangabe" heißt 1 Stück, nicht "leer".
@@ -134,11 +134,11 @@ function validateItemFields(body, { partial = false, current = null } = {}) {
     if (body.location_id === null || body.location_id === '' || body.location_id === undefined) {
       values.location_id = null;
     } else {
-      const vLoc = idParam(body.location_id, 'Lagerort');
+      const vLoc = idParam(body.location_id, 'location_id');
       results.push(vLoc);
       if (vLoc.value !== null) {
         const exists = db.get().prepare('SELECT id FROM pantry_locations WHERE id = ?').get(vLoc.value);
-        if (!exists) results.push({ error: 'Lagerort nicht gefunden.' });
+        if (!exists) results.push({ error: 'Location not found.' });
       }
       values.location_id = vLoc.value;
     }
@@ -148,13 +148,13 @@ function validateItemFields(body, { partial = false, current = null } = {}) {
     const names = validCategoryNames();
     const fallback = current?.category ?? names[names.length - 1] ?? 'Sonstiges';
     const requested = body.category || fallback;
-    const vCat = oneOf(requested, names, 'Kategorie');
+    const vCat = oneOf(requested, names, 'category');
     results.push(vCat);
     values.category = vCat.value ?? fallback;
   }
 
   if (!partial || body.expires_on !== undefined) {
-    const vExp = date(body.expires_on, 'Mindesthaltbarkeitsdatum');
+    const vExp = date(body.expires_on, 'expires_on');
     results.push(vExp);
     values.expires_on = vExp.value;
   }
@@ -163,17 +163,17 @@ function validateItemFields(body, { partial = false, current = null } = {}) {
     if (body.min_quantity === null || body.min_quantity === '' || body.min_quantity === undefined) {
       values.min_quantity = null;
     } else {
-      const vMin = num(body.min_quantity, 'Mindestbestand');
+      const vMin = num(body.min_quantity, 'min_quantity');
       results.push(vMin);
       if (vMin.value !== null && vMin.value < 0) {
-        results.push({ error: 'Mindestbestand darf nicht negativ sein.' });
+        results.push({ error: 'min_quantity must not be negative.' });
       }
       values.min_quantity = vMin.value === null ? null : normalizePantryQuantity(vMin.value, { fallback: 0 });
     }
   }
 
   if (!partial || body.notes !== undefined) {
-    const vNotes = str(body.notes, 'Notiz', { max: MAX_TEXT, required: false });
+    const vNotes = str(body.notes, 'notes', { max: MAX_TEXT, required: false });
     results.push(vNotes);
     values.notes = vNotes.value;
   }
@@ -202,7 +202,7 @@ router.get('/locations', (_req, res) => {
 // --------------------------------------------------------
 router.post('/locations', (req, res) => {
   try {
-    const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
+    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
     const existing = db.get()
@@ -210,7 +210,7 @@ router.post('/locations', (req, res) => {
       .get(vName.value);
     if (existing) return res.status(409).json({ error: 'Storage location already exists.', code: 409 });
 
-    const vIcon = str(req.body.icon, 'Icon', { max: MAX_SHORT, required: false });
+    const vIcon = str(req.body.icon, 'icon', { max: MAX_SHORT, required: false });
     if (vIcon.error) return res.status(400).json({ error: vIcon.error, code: 400 });
 
     const maxOrder = db.get()
@@ -260,14 +260,14 @@ router.patch('/locations/reorder', (req, res) => {
 // --------------------------------------------------------
 router.put('/locations/:locId', (req, res) => {
   try {
-    const vId = idParam(req.params.locId, 'Lagerort-ID');
+    const vId = idParam(req.params.locId, 'locId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
     const loc = db.get().prepare('SELECT * FROM pantry_locations WHERE id = ?').get(vId.value);
     if (!loc) return res.status(404).json({ error: 'Storage location not found.', code: 404 });
 
-    const vName = str(req.body.name, 'Name', { max: MAX_SHORT });
-    const vIcon = str(req.body.icon, 'Icon', { max: MAX_SHORT, required: false });
+    const vName = str(req.body.name, 'name', { max: MAX_SHORT });
+    const vIcon = str(req.body.icon, 'icon', { max: MAX_SHORT, required: false });
     const errors = collectErrors([vName, vIcon]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -295,7 +295,7 @@ router.put('/locations/:locId', (req, res) => {
 // --------------------------------------------------------
 router.delete('/locations/:locId', (req, res) => {
   try {
-    const vId = idParam(req.params.locId, 'Lagerort-ID');
+    const vId = idParam(req.params.locId, 'locId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
     const loc = db.get().prepare('SELECT * FROM pantry_locations WHERE id = ?').get(vId.value);
@@ -354,7 +354,7 @@ router.post('/import-shopping', (req, res) => {
       return res.status(403).json({ error: 'Read access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
     }
 
-    const vList = idParam(req.body.list_id, 'Listen-ID');
+    const vList = idParam(req.body.list_id, 'list_id');
     if (vList.error) return res.status(400).json({ error: vList.error, code: 400 });
 
     const list = db.get().prepare('SELECT id FROM shopping_lists WHERE id = ?').get(vList.value);
@@ -433,7 +433,7 @@ router.post('/import-shopping', (req, res) => {
         // Vorrat. Ein Artikel ohne Ablaufdatum ist der kleinere Verlust, und
         // es ist der Zustand, den der Vorrat für die Mehrheit seiner Zeilen
         // ohnehin kennt.
-        const expiresOn = date(entry.expires_on, 'Mindesthaltbarkeitsdatum').value;
+        const expiresOn = date(entry.expires_on, 'expires_on').value;
         const category = categoryNames.includes(source.category) ? source.category : fallbackCategory;
 
         // Gleicher Name, gleicher Ort, vertraegliche Einheit, MHD gleich oder
@@ -567,7 +567,7 @@ router.get('/', (_req, res) => {
 // --------------------------------------------------------
 router.delete('/products/:productId', (req, res) => {
   try {
-    const vId = idParam(req.params.productId, 'Produkt-ID');
+    const vId = idParam(req.params.productId, 'productId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
     const outcome = db.get().transaction(() => {
@@ -639,7 +639,7 @@ router.post('/', (req, res) => {
 // --------------------------------------------------------
 router.put('/:itemId', (req, res) => {
   try {
-    const vId = idParam(req.params.itemId, 'Artikel-ID');
+    const vId = idParam(req.params.itemId, 'itemId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
     const item = getItem(vId.value);
@@ -686,7 +686,7 @@ router.put('/:itemId', (req, res) => {
 // --------------------------------------------------------
 router.patch('/:itemId', (req, res) => {
   try {
-    const vId = idParam(req.params.itemId, 'Artikel-ID');
+    const vId = idParam(req.params.itemId, 'itemId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
     const item = getItem(vId.value);
@@ -735,7 +735,7 @@ router.patch('/:itemId', (req, res) => {
 // --------------------------------------------------------
 router.delete('/:itemId', (req, res) => {
   try {
-    const vId = idParam(req.params.itemId, 'Artikel-ID');
+    const vId = idParam(req.params.itemId, 'itemId');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
     const removed = db.get().transaction(() => {

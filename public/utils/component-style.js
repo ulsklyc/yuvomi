@@ -130,3 +130,60 @@ export function warmStyle(href) {
   if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 3000 });
   else setTimeout(run, 1500);
 }
+
+/** Die geliehenen Seitenblaetter (lendPageStyle), je Pfad.
+ * @type {Map<string, { link: HTMLLinkElement, ready: Promise<void> }>} */
+const lent = new Map();
+
+/**
+ * DAS SEITENBLATT EINES MODULS, DESSEN FORMULAR UEBER EINER FREMDEN SEITE
+ * AUFGEHT (DW, Ulas U2: "+ Neu" auf der Uebersicht legt Termin und Notiz an,
+ * ohne die Seite zu wechseln). Der Router laedt je Route nur das Blatt des
+ * eigenen Moduls; die Farbwahl des Terminformulars oder die Schreibflaeche des
+ * Notizen-Editors stehen in calendar.css bzw. notes.css und fielen ueber der
+ * Uebersicht auf Browser-Vorgaben zurueck.
+ *
+ * GELIEHEN, NICHT BEHALTEN. Das Blatt haengt so lange, wie die Seite steht, die
+ * es geliehen hat (`signal`, das AbortSignal ihres render()): verlaesst man
+ * sie, geht es mit. Sonst laege ein Seitenblatt fuer den Rest der Sitzung auf
+ * jeder Seite - dasselbe Leck, gegen das dashboard.css seit #1400 die Masse
+ * des Aufgabenrings selbst festlegt (tasks.css bleibt nach ensureTaskStyles).
+ *
+ * AM ENDE VON <head>, nicht am Platz der Komponenten: dort steht das Blatt
+ * auch, wenn der Router es fuer seine Seite laedt - das Formular gewinnt und
+ * verliert ueber der Uebersicht gegen dieselben Regeln wie im Modul.
+ *
+ * Steht das Blatt schon (die Seite des Moduls selbst, oder ein zweites
+ * Oeffnen), wird nichts geladen. Ein Fehler loest ebenfalls auf und nimmt den
+ * Link wieder heraus, damit das naechste Oeffnen neu laedt.
+ * @param {string} href  z. B. '/styles/calendar.css'
+ * @param {AbortSignal|null} [signal]
+ * @returns {Promise<void>}
+ */
+export function lendPageStyle(href, signal = null) {
+  if (noDom() || loadedLink(href) || signal?.aborted) return Promise.resolve();
+  const known = lent.get(href);
+  if (known?.link.isConnected) return known.ready;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  link.dataset.lentStyle = '';
+  const entry = { link, ready: null };
+  entry.ready = new Promise((resolve) => {
+    link.addEventListener('load', () => resolve(), { once: true });
+    // Gescheitert: raus damit, wie bei ensureStyle - sonst hielte der tote
+    // Link jedes weitere Oeffnen auf diesem Versprechen fest.
+    link.addEventListener('error', () => {
+      link.remove();
+      if (lent.get(href) === entry) lent.delete(href);
+      resolve();
+    }, { once: true });
+  });
+  document.head.appendChild(link);
+  lent.set(href, entry);
+  signal?.addEventListener('abort', () => {
+    link.remove();
+    if (lent.get(href) === entry) lent.delete(href);
+  }, { once: true });
+  return entry.ready;
+}

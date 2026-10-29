@@ -222,11 +222,11 @@ function grundNach(eingabe, currency = 'KRW') {
   return { gueltig, gesperrt: felder['#split-save-expense'].disabled, text: grund.hidden ? '' : grund.textContent, felder, panel };
 }
 
-test('P2c: 0, negativ und gruppiert sperren das Speichern MIT Grund', () => {
+test('P2c / R24: 0, negativ und gruppiert halten das Absenden auf MIT Grund - der Primaerknopf bleibt bedienbar', () => {
   unter('ko-KR', () => {
     const ok = grundNach('10000');
     assert.equal(ok.gueltig, true);
-    assert.equal(ok.gesperrt, false);
+    assert.notEqual(ok.gesperrt, true);
     assert.equal(ok.text, '', 'ein gueltiger Betrag traegt keinen Grund');
 
     for (const [eingabe, grund] of [
@@ -236,7 +236,8 @@ test('P2c: 0, negativ und gruppiert sperren das Speichern MIT Grund', () => {
       ['abc', /^common\.amountInvalid\{"example":"1250"\}$/],
     ]) {
       const r = grundNach(eingabe);
-      assert.equal(r.gesperrt, true, `"${eingabe}" sperrt`);
+      assert.equal(r.gueltig, false, `"${eingabe}" haelt auf`);
+      assert.notEqual(r.gesperrt, true, `"${eingabe}" sperrt den Knopf nicht (R24, D4)`);
       assert.match(r.text, grund, `"${eingabe}" nennt den Grund`);
       assert.equal(r.felder['[name="amount"]'].getAttribute('aria-invalid'), 'true');
     }
@@ -253,8 +254,8 @@ test('P2c: der Grund erscheint erst nach dem Verlassen des Feldes und geht beim 
     const { panel, felder } = formular({ amount: '0', currency: 'KRW' });
     const grund = felder['#split-amount-reason'];
     // Beim Tippen: "0" ist der Anfang von "0.5" - gesperrt, aber noch still.
-    split.validateSplitForm(panel);
-    assert.equal(felder['#split-save-expense'].disabled, true);
+    assert.equal(split.validateSplitForm(panel), false);
+    assert.notEqual(felder['#split-save-expense'].disabled, true, 'der Primaerknopf bleibt bedienbar (R24, D4)');
     assert.equal(grund.hidden, true, 'waehrend des Tippens kein Fehlertext');
     split.validateSplitForm(panel, { reveal: true });
     assert.equal(grund.hidden, false);
@@ -270,11 +271,19 @@ test('P2c: der Grund erscheint erst nach dem Verlassen des Feldes und geht beim 
   });
 });
 
-test('P2c: der Dialog verdrahtet das Verlassen des Betragsfeldes', async () => {
+test('P2c / R24: das Absenden nennt den Grund unter dem Betrag, das Verlassen des Feldes ebenso', async () => {
   await unter('ko-KR', async () => {
     const { panel, felder } = formular({ amount: '10,000', currency: 'KRW' });
+    const { gesendet, gemeldet } = await speichern(neueAusgabe, panel, { currency: 'KRW' });
+    assert.deepEqual(gesendet, [], 'nichts geht an den Server');
+    assert.equal(felder['#split-amount-reason'].hidden, false, 'der Tipp auf den Primaerknopf zeigt den Grund');
+    assert.match(felder['#split-amount-reason'].textContent, /^common\.amountGrouped/);
+    assert.equal(gemeldet.length, 0, 'kein zweiter Satz am selben Feld');
+  });
+  await unter('ko-KR', async () => {
+    const { panel, felder } = formular({ amount: '10000', currency: 'KRW' });
     await speichern(neueAusgabe, panel, { currency: 'KRW' });
-    assert.equal(felder['#split-amount-reason'].hidden, true, 'beim Oeffnen still');
+    felder['[name="amount"]'].value = '10,000';
     await felder['[name="amount"]'].feuere('change');
     assert.equal(felder['#split-amount-reason'].hidden, false);
     assert.match(felder['#split-amount-reason'].textContent, /^common\.amountGrouped/);

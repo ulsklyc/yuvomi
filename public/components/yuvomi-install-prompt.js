@@ -141,12 +141,18 @@ class YuvomiInstallPrompt extends HTMLElement {
   }
 
   _waitForInteractions() {
-    const onInteraction = () => {
+    const onInteraction = (event) => {
+      // DER RUNDGANG ZAEHLT NICHT (R24, Critique G6 P2-1). Seine zwei "Weiter"
+      // waren die zwei Interaktionen, und der Hinweis sprang mitten in Schritt
+      // 3 ueber die Kapsel, die der Schritt gerade erklaert - zwei
+      // Erstnutzer-Ebenen gleichzeitig. Gezaehlt wird erst, was nach dem
+      // Rundgang in der App geklickt wird.
+      if (event?.target?.closest?.('.onboarding-overlay')) return;
       const count = Number(localStorage.getItem(INTERACTION_KEY) || '0') + 1;
       localStorage.setItem(INTERACTION_KEY, String(count));
 
       if (count >= INTERACTION_THRESHOLD) {
-        document.removeEventListener('click', onInteraction);
+        document.removeEventListener('click', onInteraction, true);
         if (this._isIOS()) {
           this._showIOSPrompt();
         } else {
@@ -154,8 +160,11 @@ class YuvomiInstallPrompt extends HTMLElement {
         }
       }
     };
-    document.addEventListener('click', onInteraction);
-    this._offInteraction = () => document.removeEventListener('click', onInteraction);
+    // IN DER CAPTURE-PHASE: der Rundgang baut seinen Schritt im Klick neu auf,
+    // und in der Bubble-Phase haengt der "Weiter"-Knopf schon nicht mehr im
+    // Dokument - `closest()` fand den Rundgang nicht mehr (im Browser gemessen).
+    document.addEventListener('click', onInteraction, true);
+    this._offInteraction = () => document.removeEventListener('click', onInteraction, true);
   }
 
   /** iOS Safari erkennen (kein beforeinstallprompt-Support) */

@@ -29,6 +29,12 @@
  * Doku ist rot, und ein Eintrag, der inzwischen dokumentiert ist (oder nicht
  * mehr gesendet wird), ist ebenfalls rot, bis er hier gestrichen ist.
  *
+ * LOG-ZEILEN (#2267): ein `reason` in einem Aufruf von `log.*` geht ins Log,
+ * nicht an den Client - die Anmeldung schreibt `user_not_found` und
+ * `invalid_password` nur dorthin und antwortet beiden gleich. Der Leser nimmt
+ * Logger-Aufrufe deshalb vorher heraus. GEGENPROBE (27.10.2026): ohne das
+ * Herausnehmen ist der Leser-Test rot und nennt beide Gruende der Anmeldung.
+ *
  * GEGENPROBE (26.10.2026): den `withCaseReasons`-Aufruf in
  * server/openapi/paths/recipes.js entfernt - der erste Test wird rot und nennt
  * PUT/DELETE /api/v1/recipes/{id} mit `recipes_recipe_not_found`.
@@ -46,9 +52,12 @@ import { withoutCommentsKeepingLines } from './source-text.js';
 const spec = buildOpenApiSpec({});
 
 const SENT = /\breason:\s*'([a-z0-9_]+)'/g;
+// Ein Aufruf des Loggers bis zu seinem Semikolon: was darin steht, geht ins
+// Log, nicht in die Antwort.
+const LOG_CALL = /\blog\.(?:debug|info|warn|error)\s*\([^;]*;/g;
 
 function sentReasons(body) {
-  return [...new Set([...body.matchAll(SENT)].map((m) => m[1]))].sort();
+  return [...new Set([...body.replace(LOG_CALL, '').matchAll(SENT)].map((m) => m[1]))].sort();
 }
 
 function documents(operation, reason) {
@@ -73,62 +82,6 @@ function undocumented() {
  * seiner Operation dokumentiert, nimmt ihn hier heraus - der Test verlangt es.
  */
 const UNDOCUMENTED_REASONS = new Map([
-  ['POST /api/v1/auth/2fa/disable', ['invalid_code', 'not_enabled']],
-  ['POST /api/v1/auth/2fa/enable', ['invalid_code']],
-  ['POST /api/v1/auth/2fa/recovery-codes', ['invalid_code', 'not_enabled']],
-  ['POST /api/v1/auth/api-tokens', ['account_deactivated']],
-  ['POST /api/v1/auth/login', ['account_cannot_sign_in', 'invalid_password', 'password_login_disabled', 'user_not_found']],
-  ['POST /api/v1/auth/logout-others', ['browser_session_required']],
-  ['GET /api/v1/auth/oidc/callback', ['user_gone']],
-  ['POST /api/v1/auth/setup', ['setup_completed']],
-  ['PATCH /api/v1/auth/users/{id}', ['account_deactivated']],
-  ['POST /api/v1/birthdays/import', ['cross_module_access']],
-  ['GET /api/v1/birthdays/import/candidates', ['cross_module_access']],
-  ['POST /api/v1/budget/categories', ['category_exists']],
-  ['POST /api/v1/budget/categories/{categoryKey}/subcategories', ['subcategory_exists']],
-  ['DELETE /api/v1/budget/categories/{key}', ['category_in_use', 'category_last']],
-  ['PUT /api/v1/budget/categories/{key}', ['category_exists']],
-  ['DELETE /api/v1/budget/categories/{key}/subcategories/{subKey}', ['subcategory_in_use', 'subcategory_last']],
-  ['PUT /api/v1/budget/categories/{key}/subcategories/{subKey}', ['subcategory_exists']],
-  ['POST /api/v1/contacts/categories', ['category_exists']],
-  ['DELETE /api/v1/contacts/categories/{key}', ['category_in_use', 'category_last']],
-  ['PUT /api/v1/contacts/categories/{key}', ['category_exists']],
-  ['DELETE /api/v1/contacts/{id}', ['family_member_contact']],
-  ['PUT /api/v1/contacts/{id}', ['contact_email_protected']],
-  ['GET /api/v1/contacts/{id}/vcard', ['contacts_contact_not_found']],
-  ['GET /api/v1/displays/people', ['display_only']],
-  ['PUT /api/v1/health/caregivers/{subjectId}', ['account_deactivated']],
-  ['POST /api/v1/housekeeping/supply-requests', ['cross_module_access']],
-  ['GET /api/v1/inventory/items/{id}/history', ['inventory_item_not_found']],
-  ['GET /api/v1/inventory/items/{id}/service-log', ['inventory_item_not_found']],
-  ['POST /api/v1/inventory/items/{id}/service-log', ['inventory_item_not_found']],
-  ['DELETE /api/v1/inventory/items/{id}/service-log/{logId}', ['inventory_item_not_found']],
-  ['PUT /api/v1/inventory/items/{id}/service-log/{logId}', ['inventory_item_not_found']],
-  ['POST /api/v1/meals/week-to-shopping-list', ['cross_module_access']],
-  ['POST /api/v1/meals/{id}/to-shopping-list', ['cross_module_access']],
-  ['POST /api/v1/pantry/import-shopping', ['cross_module_access']],
-  ['DELETE /api/v1/recipes/{id}', ['recipe_mirrored']],
-  ['PUT /api/v1/recipes/{id}', ['recipe_mirrored']],
-  ['PUT /api/v1/recipes/{id}/ingredient-match', ['cross_module_access']],
-  ['POST /api/v1/recipes/{id}/to-shopping-list', ['cross_module_access']],
-  ['POST /api/v1/shopping/items/undo-transfer', ['cross_module_access']],
-  ['DELETE /api/v1/shopping/items/{itemId}', ['shopping_item_not_found']],
-  ['DELETE /api/v1/shopping/{listId}', ['shopping_list_not_found']],
-  ['PUT /api/v1/shopping/{listId}', ['shopping_list_not_found']],
-  ['POST /api/v1/shopping/{listId}/duplicate', ['shopping_list_not_found']],
-  ['POST /api/v1/shopping/{listId}/import-meal-plan', ['cross_module_access', 'shopping_list_not_found']],
-  ['POST /api/v1/shopping/{listId}/import-pantry', ['cross_module_access', 'shopping_list_not_found']],
-  ['GET /api/v1/shopping/{listId}/items', ['shopping_list_not_found']],
-  ['POST /api/v1/shopping/{listId}/items', ['shopping_list_not_found']],
-  ['PATCH /api/v1/shopping/{listId}/items/reorder', ['shopping_list_not_found']],
-  ['POST /api/v1/shopping/{listId}/send', ['nothing_open', 'recipient_no_email', 'shopping_list_not_found', 'smtp_unconfigured']],
-  ['POST /api/v1/split-expenses/groups/{id}/members', ['cross_module_access']],
-  ['POST /api/v1/tasks/categories', ['category_exists']],
-  ['DELETE /api/v1/tasks/categories/{key}', ['category_in_use', 'category_last']],
-  ['PUT /api/v1/tasks/categories/{key}', ['category_exists']],
-  ['GET /api/v1/tasks/sync-targets', ['cross_module_access']],
-  ['GET /api/v1/tasks/{id}/documents', ['cross_module_access']],
-  ['PATCH /api/v1/tasks/{id}/status', ['display_action']],
 ]);
 
 test('jeder Grund, den eine Route sendet, steht an ihrer Operation in der Spec', () => {
@@ -172,6 +125,13 @@ test('der Leser findet die Gruende und ordnet sie der richtigen Route zu', () =>
   // er sendet nichts.
   assert.equal(sentReasons(body('get', '/api/v1/weather')).includes('name_too_short'), false,
     'ein Kommentar zaehlt als gesendeter Grund');
+  // Ein `reason` in einer Log-Zeile geht ins Log, nicht an den Client: die
+  // Anmeldung antwortet auf unbekanntes Konto und falsches Passwort gleich
+  // (401 ohne Grund) und schreibt den Unterschied nur ins Log (#2267).
+  const login = sentReasons(body('post', '/api/v1/auth/login'));
+  assert.ok(login.includes('account_cannot_sign_in'), 'die Absagen der Anmeldung werden gelesen');
+  assert.deepEqual(login.filter((reason) => ['user_not_found', 'invalid_password'].includes(reason)), [],
+    'ein Grund aus einer Log-Zeile zaehlt als gesendet');
 });
 
 test('withCaseReasons gibt es genau einmal, in server/openapi/helpers.js', () => {

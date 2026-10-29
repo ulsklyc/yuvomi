@@ -93,7 +93,7 @@ router.get('/nutrition/targets', (req, res) => {
     // Deshalb die Betreuungsfrage statt einer Sichtbarkeits-Klausel: wer fuer
     // jemanden eintraegt, muss dessen Ziel kennen, alle anderen nicht.
     if (!mayReadTarget(viewer, ownerId)) {
-      return res.status(403).json({ error: 'Keine Berechtigung fuer dieses Ziel.', code: 403 });
+      return res.status(403).json({ error: 'You cannot view this target.', code: 403 });
     }
     res.json({ data: { user_id: ownerId, target: nutritionTargetFor(db.get(), ownerId) } });
   } catch (err) {

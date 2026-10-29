@@ -973,8 +973,12 @@ router.get('/', (req, res) => {
       // 1x2-Standardgroesse blieb darunter rund ein Drittel der Karte leer, weil
       // der Server gar nicht mehr hergab. Wie viele Zeilen wirklich erscheinen,
       // entscheidet die Kachel (`listRowCap` in public/pages/dashboard.js) - der
-      // Server liefert nur den Vorrat fuer die groesste Fassung.
-      .slice(0, 5);
+      // Server liefert nur den Vorrat fuer die groesste Fassung. ACHT seit U14:
+      // eine hohe Kachel, die die Packung streckt, zeigt im gewonnenen Platz
+      // weitere Zeilen (gemessen 1440px bis 93px, knapp zwei Zeilen). Die Liste
+      // ist schon sortiert im Speicher, drei Eintraege mehr kosten nichts; das
+      // Heute-Blatt liest daraus nur, was heute ist.
+      .slice(0, 8);
     result.birthdayCount = rows.length;
     // Die Liste zaehlt ANLAESSE (Geburtstag und Namenstag je eine Zeile),
     // `birthdayCount` die Personen. Badge und „+N weitere" der Kachel brauchen
@@ -1054,9 +1058,11 @@ router.get('/', (req, res) => {
       WHERE date BETWEEN ? AND ?${ownerClause} AND is_pending = 0 AND transfer_entry_id IS NULL
     `).get(from, to, ...ownerParams);
 
-    // Die drei groessten Ausgabenkategorien, nicht nur die groesste: die hohe
+    // Die groessten Ausgabenkategorien, nicht nur die groesste: die hohe
     // Budget-Kachel (1x2) fuellt damit ihre Hoehe mit Inhalt statt mit einem
-    // leeren Band ueber der Fusszeile (Critique 2026-09-23). Die erste bleibt
+    // leeren Band ueber der Fusszeile (Critique 2026-09-23). Sie zeigt drei;
+    // FUENF, weil eine gestreckte Kachel weitere zeigt (U14, Hoehe wird
+    // Inhalt) - dieselbe Gruppierung, nur zwei Zeilen mehr. Die erste bleibt
     // zusaetzlich als `topExpenseCategory`/`topExpenseAmount` stehen - die
     // flache Kachel und aeltere Clients lesen genau diese beiden Felder.
     const topExpenses = d.prepare(`
@@ -1065,7 +1071,7 @@ router.get('/', (req, res) => {
       WHERE amount < 0 AND date BETWEEN ? AND ?${ownerClause} AND is_pending = 0 AND transfer_entry_id IS NULL
       GROUP BY category
       ORDER BY ABS(SUM(amount)) DESC
-      LIMIT 3
+      LIMIT 5
     `).all(from, to, ...ownerParams);
     const topExpense = topExpenses[0];
 

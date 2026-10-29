@@ -48,6 +48,27 @@ test('ein Termin-Treffer oeffnet den Kalender an SEINEM Tag (#1607)', async () =
     'die Sektion bekommt die Helfer nicht, wenn ihr Ziel gebaut wird');
 });
 
+test('R24 G0 P1-1: ein Geburtstagstermin heisst in der Suche wie im Kalender, nicht "Birthday: <Name>"', async () => {
+  // Der Termin steht sprachneutral in calendar_events (#524). Die Zeile nimmt
+  // den Titel aus `fmt.eventTitle`, und router.js reicht dafuer dieselbe
+  // Uebersetzung herein wie Kalender und Uebersicht.
+  const { SEARCH_SECTIONS } = await import('../public/utils/search-sections.js');
+  const events = SEARCH_SECTIONS.find((s) => s.bucket === 'events');
+  assert.equal(typeof events.label, 'function', 'die Termin-Sektion nimmt den Rohtitel');
+  const hit = { id: 3, title: 'Birthday: Emma', birthday_name: 'Emma', birthday_event_kind: 'birthday' };
+  const fmt = { eventTitle: (item) => (item.birthday_name ? `Geburtstag von ${item.birthday_name}` : item.title) };
+  assert.equal(events.label(hit, fmt), 'Geburtstag von Emma');
+  assert.equal(events.label({ id: 4, title: 'Zahnarzt' }, fmt), 'Zahnarzt', 'ein gewoehnlicher Termin bleibt, wie er heisst');
+  assert.equal(events.label(hit), 'Birthday: Emma', 'ohne Helfer bleibt der Titel stehen');
+
+  assert.ok(/import \{ localizeBirthdayEvent \} from '\/utils\/birthday-event\.js'/.test(router),
+    'router.js holt die Geburtstags-Uebersetzung nicht');
+  assert.ok(/const fmt = \{[^}]*\beventTitle: \(item\) => localizeBirthdayEvent\(item\)\.title/.test(router),
+    'fmt traegt keinen eventTitle');
+  assert.ok(router.includes('title: (item) => (section.label ? section.label(item, fmt) : item.title)'),
+    'die Sektion bekommt die Helfer nicht, wenn ihr Titel gebaut wird');
+});
+
 const marked = (segments) => segments.filter((s) => s.mark).map((s) => s.text);
 
 test('markSegments markiert den Wortteil im Original, gefaltet wie der Server', () => {

@@ -493,9 +493,10 @@ test('der Push-Lauf haelt remind_at als Zeitpunkt, nicht als Text', async () => 
 
 test('Zuweisung nachtragen: eine vergangene Erinnerung mit Offset gilt als vergangen', async () => {
   const refId = db.prepare(`
-    INSERT INTO external_calendars (source, external_id, name, default_assignee_user_id)
-    VALUES ('caldav', 'https://dav.example/offset-backfill/', 'Offset', ?)
-  `).run(ANNA).lastInsertRowid;
+    INSERT INTO external_calendars (source, external_id, name)
+    VALUES ('caldav', 'https://dav.example/offset-backfill/', 'Offset')
+  `).run().lastInsertRowid;
+  db.prepare('INSERT INTO external_calendar_assignees (calendar_id, user_id) VALUES (?, ?)').run(refId, ANNA);
   const mk = (title) => db.prepare(`
     INSERT INTO calendar_events (title, start_datetime, created_by, external_source, calendar_ref_id)
     VALUES (?, '2026-09-30T10:00', ?, 'caldav', ?)
@@ -525,13 +526,16 @@ test('Zuweisung nachtragen: eine vergangene Erinnerung mit Offset gilt als verga
 
 test('Kalenderumzug: eine vergangene geerbte Erinnerung mit Offset gilt als verworfen', () => {
   const refA = db.prepare(`
-    INSERT INTO external_calendars (source, external_id, name, default_assignee_user_id)
-    VALUES ('caldav', 'https://dav.example/offset-move-a/', 'A', ?)
-  `).run(ANNA).lastInsertRowid;
+    INSERT INTO external_calendars (source, external_id, name)
+    VALUES ('caldav', 'https://dav.example/offset-move-a/', 'A')
+  `).run().lastInsertRowid;
   const refB = db.prepare(`
-    INSERT INTO external_calendars (source, external_id, name, default_assignee_user_id)
-    VALUES ('caldav', 'https://dav.example/offset-move-b/', 'B', ?)
-  `).run(BEN).lastInsertRowid;
+    INSERT INTO external_calendars (source, external_id, name)
+    VALUES ('caldav', 'https://dav.example/offset-move-b/', 'B')
+  `).run().lastInsertRowid;
+  const setDefault = db.prepare('INSERT INTO external_calendar_assignees (calendar_id, user_id) VALUES (?, ?)');
+  setDefault.run(refA, ANNA);
+  setDefault.run(refB, BEN);
   const id = db.prepare(`
     INSERT INTO calendar_events
       (title, start_datetime, external_calendar_id, external_source, calendar_ref_id, created_by, assigned_to)
@@ -545,7 +549,7 @@ test('Kalenderumzug: eine vergangene geerbte Erinnerung mit Offset gilt als verw
   insert.run(id, '2026-09-22T13:00:00-04:00', ADMIN);   // 17:00Z, in 30 Minuten
 
   assert.equal(reassignDefaultOnCalendarMove(db, id, {
-    fromCalRefId: refA, toCalRefId: refB, toDefaultUserId: BEN, now: new Date(NOW),
+    fromCalRefId: refA, toCalRefId: refB, toDefaultUserIds: BEN, now: new Date(NOW),
   }), true);
   const bens = db.prepare(`
     SELECT remind_at, dismissed FROM reminders

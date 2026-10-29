@@ -43,7 +43,7 @@ router.get('/', (req, res) => {
     const to   = req.query.to   || `${year}-${month}-31`;
 
     if (!DATE_RE.test(from) || !DATE_RE.test(to))
-      return res.status(400).json({ error: 'from/to müssen YYYY-MM-DD sein', code: 400 });
+      return res.status(400).json({ error: 'from and to must be in YYYY-MM-DD format.', code: 400 });
 
     let sql = `
       SELECT e.*,
@@ -130,7 +130,7 @@ router.get('/', (req, res) => {
     res.json({ data: events, from, to });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -158,7 +158,7 @@ router.get('/upcoming', (req, res) => {
     res.json({ data: expanded });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 
@@ -257,7 +257,7 @@ router.get('/search', (req, res) => {
     });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 

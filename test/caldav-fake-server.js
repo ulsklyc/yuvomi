@@ -244,6 +244,10 @@ export async function startFakeDavServer() {
     getObject(collectionUrl, filename) {
       return collections.get(new URL(collectionUrl).pathname)?.objects.get(filename) ?? null;
     },
+    /** Nimmt ein Objekt fort, als hätte es ein anderer Client gelöscht. */
+    removeObject(collectionUrl, filename) {
+      return collections.get(new URL(collectionUrl).pathname)?.objects.delete(filename) ?? false;
+    },
     objectNames(collectionUrl) {
       return [...(collections.get(new URL(collectionUrl).pathname)?.objects.keys() ?? [])];
     },

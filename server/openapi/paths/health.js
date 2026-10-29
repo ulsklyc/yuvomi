@@ -250,7 +250,7 @@ export function healthPaths() {
       get: op({ summary: 'List all caregiver relationships', tag: 'Health', admin: true, description: 'Returns `{ subject_id: [caregiver_id, ...] }` for the admin rights matrix.' }),
     },
     '/api/v1/health/caregivers/{subjectId}': {
-      put: op({ summary: 'Set who may record health data for one person', tag: 'Health', admin: true, stateChanging: true, params: [idParam('subjectId', 'The person being cared for')], requestBody: jsonBody(null), description: 'Sets the caregivers to exactly the list given. An empty array withdraws care, so removing is the same path as changing and needs no route of its own.' }),
+      put: op({ summary: 'Set who may record health data for one person', tag: 'Health', admin: true, stateChanging: true, params: [idParam('subjectId', 'The person being cared for')], requestBody: jsonBody(null), description: 'Sets the caregivers to exactly the list given. An empty array withdraws care, so removing is the same path as changing and needs no route of its own. A deactivated account cannot become a new caregiver: 400 with `reason: "account_deactivated"`.' }),
     },
     '/api/v1/health/cycle/visibility': {
       patch: op({ summary: 'Set the visibility of all own cycle entries at once', tag: 'Health', stateChanging: true, requestBody: jsonBody(null), description: 'Applies one visibility to every period and daily log of the CALLER. Other people\'s entries are untouched, and periods and logs move together in one transaction - either both or neither. Never exposes `cervix_mucus`, `lh_test`, `pregnancy_test` or `intimacy` to anyone else even when logs move to `family`: those four fields are stripped from every non-owner read regardless of visibility (see GET /cycle/logs).' }),

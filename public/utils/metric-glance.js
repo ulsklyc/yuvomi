@@ -34,9 +34,13 @@ import { esc } from '/utils/html.js';
  *        hoechstens zwei Nebenwerte rechts; `amount` optional (z.B. „8 aktiv")
  * @param {boolean} [o.lead]   die Zahl FUEHRT den Bildschirm (R18): Display-Stufe,
  *        die Nebenwerte stehen als ruhige Zeile darunter (`glanceLeadClass`)
+ * @param {boolean} [o.everywhere] die Zeile steht in JEDER Breite, nicht nur unter
+ *        640px (Critique R24, E2 "eine Kennzahlkarte oben"): fuer Flaechen, deren
+ *        Kennzahlen keine Seitenspalte mehr tragen. Nur statisch (ohne `controls`) -
+ *        es gibt dann keine Karten, die sie aufklappen koennte.
  */
-export function metricGlanceHtml({ id, controls, expanded, label, value, tone = 'neutral', flows = [], lead: leads = false }) {
-  const carrier = `row-carrier budget-glance${leads ? ` ${glanceLeadClass(value)}` : ''}`;
+export function metricGlanceHtml({ id, controls, expanded, label, value, tone = 'neutral', flows = [], lead: leads = false, everywhere = false }) {
+  const carrier = `row-carrier budget-glance${leads ? ` ${glanceLeadClass(value)}` : ''}${everywhere && !controls ? ' budget-glance--everywhere' : ''}`;
   const side = flows.filter(Boolean).slice(0, 2);
   const flowsHtml = side.length ? `
         <span class="budget-glance__flows">${side.map((f) => `
@@ -109,9 +113,10 @@ export function wireMetricGlance(root, id, onChange) {
  * @param {boolean} [o.lead]      wie `metricGlanceHtml` - die Zahl fuehrt
  * @param {boolean} [o.controls]  die echte Zeile klappt auf (Pfeil)
  * @param {number}  [o.flows]     Zahl der Nebenwerte (0-2)
+ * @param {boolean} [o.everywhere] wie `metricGlanceHtml` - die Zeile steht in jeder Breite (R24, E2)
  * @returns {string}
  */
-export function metricGlanceSkeletonHtml({ lead = false, controls = true, flows = 1 } = {}) {
+export function metricGlanceSkeletonHtml({ lead = false, controls = true, flows = 1, everywhere = false } = {}) {
   const bar = (text) => `<span class="skeleton skeleton-text">${text}</span>`;
   const side = Math.max(0, Math.min(2, flows));
   const flowsHtml = side ? `
@@ -119,7 +124,7 @@ export function metricGlanceSkeletonHtml({ lead = false, controls = true, flows 
           <span class="budget-glance__flow">${bar('0000000 00,00')}</span>`).join('')}
         </span>` : '';
   return `
-    <div class="row-carrier budget-glance${lead ? ` ${glanceLeadClass('000,00')}` : ''}" aria-hidden="true">
+    <div class="row-carrier budget-glance${lead ? ` ${glanceLeadClass('000,00')}` : ''}${everywhere && !controls ? ' budget-glance--everywhere' : ''}" aria-hidden="true">
       <div class="budget-glance__row${controls ? ' budget-glance__balance' : ' budget-glance__row--static'}">
         <span class="budget-glance__lead">
           <span class="budget-glance__label">${bar('0000000000')}</span>

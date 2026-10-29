@@ -201,9 +201,7 @@
 
 .documents-folder-browser__title {
   margin: 0;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
 }
 
 /* Der Auslöser der aufklappbaren Auswahl stand hier als eigene Zeile im Kopf
@@ -481,10 +479,6 @@
 
   .documents-context-menu__item {
     min-height: var(--target-lg);
-  }
-
-  .document-member-option {
-    min-height: var(--target-base);
   }
 }
 
@@ -1364,20 +1358,13 @@
   background-color: var(--color-surface);
 }
 
+/* Die Personen als Chips wie renderUserMultiSelect (`.user-ms__option`,
+ * user-multi-select.css) - eine umbrechende Reihe (Critique R24, D4). */
 .document-member-picker__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-2);
-}
-
-.document-member-option {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--target-sm);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
 }
 
 /* Bis Tablet: Ordner-Browser als horizontale Chip-Leiste statt fixer Seitenspalte,
@@ -1777,6 +1764,12 @@
 
 .document-viewer__pager + .document-viewer__actions {
   margin-inline-start: 0;
+}
+
+/* Das Mehr-Menue der Handlungen gibt es nur schmal (S10-F4, unten). Mit dem
+ * Elternteil im Selektor: `.document-viewer__meta span` (oben) schlaegt sonst. */
+.document-viewer__meta > .document-viewer__more {
+  display: none;
 }
 
 /* Eine Zeile unter den Meta-Angaben, die sagt, warum Teilen hier nicht geht
@@ -2427,14 +2420,6 @@
   flex-wrap: wrap;
 }
 
-/* Deep-Link in die (admin-only) Speicher-Einstellungen — bisher war das Ziel von
- * der Dokumente-Seite aus überhaupt nicht verlinkt. */
-.document-storage-target__link {
-  color: var(--module-accent);
-  font-size: var(--text-xs);
-  text-decoration: underline;
-}
-
 /* Fehlerzeile der DMS-Suche: eigener Zustand mit Retry, klar getrennt von
  * „keine Treffer" (das ist eine Antwort, kein Fehler). */
 .dms-results__error {
@@ -2575,8 +2560,27 @@
     border-inline-end: none;
   }
 
-  .document-viewer__pager + .document-viewer__actions {
+  /* EINE ZEILE (Ulas 28.10., S10-F4): Kategorie-Knopf, Blaettern und das
+   * Mehr-Menue mit allen Handlungen (Zeichen + Wort). Die Leiste der breiten
+   * Fassung tritt zurueck - sie bleibt im Dokument, das Menue loest ihre
+   * Knoepfe aus. Bis R24 S12 brach sie in eine zweite Zeile (Vorschau ab
+   * y206 bei 390px). */
+  .document-viewer__meta > .document-viewer__actions {
+    display: none;
+  }
+
+  .document-viewer__meta > .document-viewer__more {
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+
+  /* Ohne Blaettern schiebt sich das Menue selbst an den Zeilenrand. */
+  .document-viewer__meta > .document-viewer__actions + .document-viewer__more {
     margin-inline-start: auto;
+  }
+
+  .document-viewer__pager ~ .document-viewer__more {
+    margin-inline-start: 0;
   }
 
   .document-viewer__meta {
@@ -2584,7 +2588,7 @@
     gap: var(--space-2);
   }
 
-  .document-viewer:not(.document-viewer--info-open) .document-viewer__meta > span:not(.document-viewer__actions):not(.document-viewer__pager):not(.doc-badge),
+  .document-viewer:not(.document-viewer--info-open) .document-viewer__meta > span:not(.document-viewer__actions):not(.document-viewer__pager):not(.document-viewer__more):not(.doc-badge),
   .document-viewer:not(.document-viewer--info-open) .document-viewer__note,
   .document-viewer:not(.document-viewer--info-open) .document-viewer__details {
     display: none;

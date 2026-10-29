@@ -242,7 +242,9 @@
   --note-action-bg: color-mix(in srgb, var(--color-text-primary) var(--tint-state), transparent);
   --note-action-bg-hover: color-mix(in srgb, var(--color-text-primary) var(--tint-surface), transparent);
   min-width: 0;
-  border-radius: var(--radius-md);
+  /* Der Kartenradius jeder Traegerflaeche (R24, G0-Inv-5): `row-carrier`,
+   * `metric-card`, Einstellungskarte - die Notiz stand als einzige bei 12. */
+  border-radius: var(--radius-lg);
   padding: var(--space-3);
   cursor: pointer;
   position: relative;
@@ -360,15 +362,11 @@
   margin-top: var(--space-2);
 }
 
+/* Die Form ist das geteilte Etikett (`.tag`, list-row.css, R24); der Name
+ * bricht hier um, statt zu kappen. */
 .note-category-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
   max-width: 100%;
-  padding: var(--space-0h) var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--color-fill-well);
-  color: var(--color-text-secondary);
+  white-space: normal;
 }
 
 .note-category-badge__name {
@@ -376,11 +374,6 @@
   overflow-wrap: anywhere;
 }
 
-.note-category-badge svg {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  flex: 0 0 auto;
-}
 
 .note-card__content {
   font-size: var(--type-body);
@@ -514,18 +507,18 @@
 .note-category-picker__option svg { width: var(--icon-md); height: var(--icon-md); color: var(--color-text-secondary); }
 .note-category-picker__scope { color: var(--color-text-tertiary); font-size: var(--text-xs); }
 
+/* Die Wahl des Kategorietyps ist ein Feld mit Label, die Erklaerung hinter
+ * "Mehr dazu" (R24, G4-Notizen-P3-1). */
 .note-category-editor__scope {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   flex: 1 1 0;
   min-width: 0;
   gap: var(--space-1);
 }
 
-.note-category-editor__scope .form-input {
-  flex: 1;
-  min-width: 0;
-  width: 100%;
+.note-category-editor__scope .settings-hint-fold {
+  margin-block-end: 0;
 }
 
 .note-category-editor__create {
@@ -544,7 +537,6 @@
   }
   .note-category-editor__create { align-items: stretch; }
   .note-category-editor__scope { flex: 1 1 100%; }
-  .note-category-editor__scope .form-input { flex: 1; }
   .note-category-editor__create > .btn { width: 100%; }
 }
 
@@ -743,7 +735,10 @@
   min-height: max(18.75rem, 38vh);
   min-height: max(18.75rem, 38dvh);
   field-sizing: content;
-  resize: vertical;
+  /* Kein Ziehgriff (Critique R24 G4-Notizen-P3-1): das Feld waechst mit dem
+   * Text (field-sizing) und traegt die Hoehe der Flaeche - der native Griff
+   * war ein Bedienelement ohne Aufgabe in der Ecke der Arbeitsflaeche. */
+  resize: none;
   line-height: var(--line-height-relaxed);
 }
 
@@ -810,29 +805,15 @@
   .note-pane--enter { animation: none; }
 }
 
-/* Farb-Auswahl */
-.note-color-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
 
-.note-color-swatch {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-full);
-  border: 2px solid transparent;
-  position: relative;
-  cursor: pointer;
-  transition: transform var(--transition-fast), border-color var(--transition-fast);
+/* DER CHECKLISTEN-RING IST DER RING DER AUFGABEN (R24, G4-Notizen-P3-2):
+ * 20px wie `.check-ring`, 2px Kante. Er stand in `1em` und mass neben dem
+ * 17px-Notiztext 17px mit 1,5px Kante - eine dritte Groesse neben Ring (20)
+ * und Teilaufgabe (16). Ueber die Schriftgroesse des Kreises gesetzt, damit
+ * Haken und Lage (in em, typography.css) mitwachsen; die Farbe bleibt die der
+ * Karte (`currentColor`), weil Notizen eigene Flaechenfarben tragen. */
+.note-card .note-md-box,
+.note-modal .note-md-box {
+  font-size: var(--space-5);
+  border-width: 2px;
 }
-
-.note-color-swatch::before {
-  content: '';
-  position: absolute;
-  inset: -10px;
-  border-radius: var(--radius-full);
-}
-
-.note-color-swatch:hover       { transform: scale(1.15); }
-.note-color-swatch--active     { border-color: var(--color-text-primary); transform: scale(1.1); }

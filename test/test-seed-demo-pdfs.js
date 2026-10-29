@@ -179,6 +179,39 @@ for (const locale of ['en', 'de']) {
   });
 }
 
+/* Abmessungen aus dem ersten SOF-Segment einer JPEG-Datei - ohne Bildbibliothek,
+ * nur die Segmentkette ab SOI. null, wenn die Datei kein JPEG ist. */
+function jpegSize(buffer) {
+  if (buffer.length < 4 || buffer[0] !== 0xFF || buffer[1] !== 0xD8) return null;
+  let at = 2;
+  while (at + 4 <= buffer.length) {
+    if (buffer[at] !== 0xFF) return null;
+    const marker = buffer[at + 1];
+    const length = buffer.readUInt16BE(at + 2);
+    // SOF0..SOF15 ohne DHT (C4), JPG (C8) und DAC (CC)
+    if (marker >= 0xC0 && marker <= 0xCF && ![0xC4, 0xC8, 0xCC].includes(marker)) {
+      return { height: buffer.readUInt16BE(at + 5), width: buffer.readUInt16BE(at + 7) };
+    }
+    at += 2 + length;
+  }
+  return null;
+}
+
+// R24, Critique G4 P2-1: die Bildbelege waren Klartext mit image/jpeg, und
+// jede Demo-Vorschau zeigte ein kaputtes Bild.
+test('Seed: jedes Dokument mit image/jpeg ist ein JPEG, das ein Bild traegt', async () => {
+  const images = seed('de').filter((doc) => doc.mime_type === 'image/jpeg');
+  assert.ok(images.length >= 3, `erwartet die drei Bildbelege, gefunden ${images.length}`);
+  for (const doc of images) {
+    const { buffer, mime } = await readDocumentContent(doc);
+    assert.equal(mime, 'image/jpeg', `${doc.original_name}: MIME`);
+    const size = jpegSize(buffer);
+    assert.ok(size, `${doc.original_name}: kein JPEG (beginnt mit ${buffer.subarray(0, 8).toString('hex')})`);
+    assert.ok(size.width >= 200 && size.height >= 200, `${doc.original_name}: ${size.width}x${size.height}`);
+    assert.equal(buffer.readUInt16BE(buffer.length - 2), 0xFFD9, `${doc.original_name}: endet nicht mit EOI`);
+  }
+});
+
 test('Seed (de): Umlaute, ß und Klammern sind im Seed wirklich vertreten', () => {
   // Hält den Fall oben ehrlich: verschwände der Titel mit Klammern aus dem
   // Seed, prüfte die Schleife das Escaping nicht mehr.
@@ -203,6 +236,42 @@ function readSeeded(locale, query) {
     db.close();
   }
 }
+
+// R24, Critique G2 P3-2 / G2 P3-3 / G3 P3-3: der Seed provozierte Fehlbilder.
+// Eltern lasen im Belohnungsverlauf sechsmal "Aufgabe erledigt" (earn ohne
+// task_id, der Server maskiert den Grund dann), der Aufgaben-Verlauf war in
+// jeder Demo leer, und nach der Rezept-Uebergabe standen "Zitronen" und
+// "Zitrone" nebeneinander auf dem Einkaufszettel.
+test('Seed (de): jede Punkte-Gutschrift nennt ihre erledigte Aufgabe, und der Verlauf hat Eintraege', () => {
+  const { earns, completions } = readSeeded('de', (db) => ({
+    earns: db.prepare(`SELECT l.reason, l.task_id, l.created_at, t.title, t.status, t.points, c.completed_at
+      FROM reward_ledger l LEFT JOIN tasks t ON t.id = l.task_id LEFT JOIN task_completions c ON c.task_id = l.task_id
+      WHERE l.type = 'earn'`).all(),
+    completions: db.prepare(`SELECT t.title, t.status FROM task_completions c JOIN tasks t ON t.id = c.task_id`).all(),
+  }));
+  assert.ok(earns.length >= 5, `erwartet mehrere Gutschriften, gefunden ${earns.length}`);
+  const orphans = earns.filter((e) => e.task_id == null).map((e) => e.reason);
+  assert.deepEqual(orphans, [], `Gutschriften ohne Aufgabe: ${orphans.join(', ')}`);
+  for (const e of earns) {
+    assert.equal(e.status, 'done', `${e.reason}: die Aufgabe ist nicht erledigt`);
+    assert.equal(e.reason, e.title, `${e.reason}: Grund und Aufgabentitel weichen ab`);
+    assert.ok(e.points > 0, `${e.reason}: die Aufgabe traegt keine Punkte`);
+    assert.equal(e.completed_at, e.created_at, `${e.reason}: Verlaufseintrag und Gutschrift zu verschiedenen Zeiten`);
+  }
+  assert.ok(completions.length >= 5, `der Aufgaben-Verlauf hat ${completions.length} Eintraege`);
+  assert.deepEqual(completions.filter((c) => c.status !== 'done').map((c) => c.title), [], 'Verlauf an offenen Aufgaben');
+});
+
+test('Seed (de): die Rezept-Uebergabe stellt keine "Zitrone" neben die "Zitronen"', () => {
+  const { items, ingredients } = readSeeded('de', (db) => ({
+    items: db.prepare('SELECT name FROM shopping_items').all().map((r) => r.name),
+    ingredients: db.prepare('SELECT name FROM recipe_ingredients').all().map((r) => r.name),
+  }));
+  const names = [...new Set([...items, ...ingredients])];
+  const stem = (n) => n.toLowerCase().replace(/(en|n|e|s)$/u, '');
+  const near = names.filter((a) => names.some((b) => a !== b && stem(a) === stem(b)));
+  assert.deepEqual(near, [], `fast gleiche Namen zwischen Einkauf und Rezepten: ${near.join(', ')}`);
+});
 
 test('Seed (de): Listen in Notizen sind Markdown, die Gartenliste hakt man ab', () => {
   const notes = readSeeded('de', (db) => db.prepare('SELECT title, content FROM notes').all());

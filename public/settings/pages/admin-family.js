@@ -8,7 +8,8 @@ import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { prefersInkText } from '/utils/contrast.js';
-import { AVATAR_COLORS } from '/utils/color.js';
+import { USER_COLORS, USER_COLOR_DEFAULT } from '/utils/color.js';
+import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
 import { sortMembers } from '/utils/member-order.js';
 import { makeSortable } from '/utils/sortable.js';
 import { vibrate } from '/utils/ux.js';
@@ -18,13 +19,16 @@ import { openModal, closeModal, captureModalContext, captureOpenContext, isModal
 import { createRetryState, formSwitchRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import { birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
+import { mediaPickerBadgeHtml } from '/utils/media-picker.js';
 import {
   renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect,
 } from '/components/user-multi-select.js';
 
 const FAMILY_ROLES = ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'];
 
-const randomAvatarColor = () => AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+// Aus den Familientoenen, die der Farbwaehler auch anbietet (Critique R24 E6):
+// die Vorgabe steht dann als gewaehlter Swatch in der Reihe, nicht als "Eigene".
+const randomAvatarColor = () => USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
 
 /**
  * Ist auf diesem Server SSO konfiguriert? (#847)
@@ -116,18 +120,18 @@ function avatarHtml(user, className = 'settings-avatar') {
 function avatarEditorHtml(user, prefix) {
   return `
     <div class="settings-avatar-editor">
-      <button type="button" class="settings-avatar-button" id="${prefix}-avatar-preview" aria-label="${t('settings.profilePictureLabel')}">
-        ${avatarHtml(user, 'settings-avatar settings-avatar--lg')}
-      </button>
+      ${/* Dieselbe Bildwahl wie im Konto (R24, `.media-picker`): die Scheibe
+           ist der Knopf, Entfernen steht als Text nur mit Bild. */ ''}
+      <span class="media-picker">
+        <button type="button" class="settings-avatar-button" id="${prefix}-avatar-preview" aria-label="${t('settings.profilePictureLabel')}">
+          ${avatarHtml(user, 'settings-avatar settings-avatar--lg')}
+        </button>
+        ${mediaPickerBadgeHtml()}
+      </span>
       <input class="sr-only" type="file" id="${prefix}-avatar-file" accept="image/png,image/jpeg,image/webp"
         aria-label="${t('settings.profilePictureLabel')}" tabindex="-1" />
       <div class="settings-avatar-actions">
-        <button type="button" class="settings-avatar-action" id="${prefix}-avatar-edit" aria-label="${t('settings.profilePictureLabel')}" title="${t('settings.profilePictureLabel')}">
-          <i data-lucide="edit-2" aria-hidden="true"></i>
-        </button>
-        <button type="button" class="settings-avatar-action settings-avatar-action--danger" id="${prefix}-avatar-remove" aria-label="${t('settings.profilePictureRemove')}" title="${t('settings.profilePictureRemove')}">
-          <i data-lucide="trash-2" aria-hidden="true"></i>
-        </button>
+        <button type="button" class="btn btn--ghost btn--sm media-picker__remove" id="${prefix}-avatar-remove"${user?.avatar_data ? '' : ' hidden'}>${t('settings.profilePictureRemove')}</button>
       </div>
     </div>
   `;
@@ -136,6 +140,9 @@ function avatarEditorHtml(user, prefix) {
 function setAvatarPreview(container, selector, user) {
   const preview = container.querySelector(selector);
   if (!preview) return;
+  // Entfernen gibt es nur, wenn es ein Bild gibt (R24, `.media-picker`).
+  const remove = container.querySelector(selector.replace(/-preview$/, '-remove'));
+  if (remove) remove.hidden = !user?.avatar_data;
   preview.replaceChildren();
   preview.insertAdjacentHTML('beforeend', avatarHtml(user, 'settings-avatar settings-avatar--lg'));
   window.lucide?.createIcons({ el: preview });
@@ -143,12 +150,7 @@ function setAvatarPreview(container, selector, user) {
 
 function bindAvatarPicker(container, prefix) {
   const fileInput = container.querySelector(`#${prefix}-avatar-file`);
-  [
-    container.querySelector(`#${prefix}-avatar-preview`),
-    container.querySelector(`#${prefix}-avatar-edit`),
-  ].forEach((picker) => {
-    picker?.addEventListener('click', () => fileInput?.click());
-  });
+  container.querySelector(`#${prefix}-avatar-preview`)?.addEventListener('click', () => fileInput?.click());
 }
 
 function memberHtml(u, currentUserId, { orderable = false, aligned = false } = {}) {
@@ -291,8 +293,8 @@ function addMemberFormHtml() {
               control: '<input class="form-input" type="text" id="new-display-name" required />',
             }),
             formRowHtml({
-              label: t('settings.colorLabel'), labelFor: 'new-avatar-color',
-              control: `<input class="settings-color-button" type="color" id="new-avatar-color" value="${randomAvatarColor()}" />`,
+              label: t('settings.colorLabel'), labelId: 'new-avatar-color-label', stacked: true,
+              control: colorPickerHtml({ id: 'new-avatar-color', value: randomAvatarColor(), labelledBy: 'new-avatar-color-label' }),
             }),
             ssoAvailable ? switchRowHtml({
               id: 'new-member-sso-only', label: t('settings.memberSsoOnlyLabel'), hint: t('settings.memberSsoOnlyHint'),
@@ -333,12 +335,11 @@ function addMemberFormHtml() {
 function addInviteFormHtml() {
   return `
         <form id="add-invite-form" class="settings-form" novalidate>
+          ${/* DER ERSTFOKUS STEHT AUF DEM NAMEN (R24, Critique G6 P2-1): vorn
+               stand der optionale Benutzername, den die eingeladene Person
+               meist selbst waehlt. Jetzt Anzeigename, Rolle, Startrechte, dann
+               die optionalen Konto-Felder. */ ''}
           ${formRowsHtml([
-            formRowHtml({
-              label: t('settings.usernameLabel'), labelFor: 'invite-username', field: true,
-              description: t('settings.invites.usernameHint'), descriptionId: 'invite-username-hint',
-              control: '<input class="form-input" type="text" id="invite-username" autocomplete="off" aria-describedby="invite-username-hint" />',
-            }),
             formRowHtml({
               label: t('settings.displayNameLabel'), labelFor: 'invite-display-name', field: true,
               control: '<input class="form-input" type="text" id="invite-display-name" maxlength="128" />',
@@ -357,6 +358,11 @@ function addInviteFormHtml() {
               extra: '<p class="form-hint" id="invite-preset-hint"></p>',
             }),
             formRowHtml({
+              label: t('settings.usernameLabel'), labelFor: 'invite-username', field: true,
+              description: t('settings.invites.usernameHint'), descriptionId: 'invite-username-hint',
+              control: '<input class="form-input" type="text" id="invite-username" autocomplete="off" aria-describedby="invite-username-hint" />',
+            }),
+            formRowHtml({
               label: t('settings.memberEmailLabel'), labelFor: 'invite-email', field: true,
               control: '<input class="form-input" type="email" id="invite-email" autocomplete="email" />',
             }),
@@ -369,17 +375,23 @@ function addInviteFormHtml() {
           <label class="form-label" for="invite-link-value">${t('settings.invites.linkTitle')}</label>
           <div class="settings-token-output__row">
             <input class="form-input" id="invite-link-value" type="text" readonly />
-            <button type="button" class="btn btn--secondary btn--sm" id="invite-link-copy">
-              <i data-lucide="copy" class="icon-sm" aria-hidden="true"></i>
-              ${t('settings.invites.copy')}
-            </button>
           </div>
           <p class="form-hint">${t('settings.invites.linkOnce')}</p>
           <p class="form-hint" id="invite-email-note" hidden></p>
+          <p class="form-hint" id="invite-copy-status" role="status"></p>
         </div>
+        ${/* NACH DEM ERSTELLEN IST DER LINK DIE AUFGABE (R24, Critique G6 P2-1).
+             Vorher blieb der Fuss [Abbrechen][Einladung erstellen], und ein
+             zweiter Klick legte eine zweite Einladung an. Jetzt tauscht der Fuss
+             auf [Fertig][Link kopieren]; das Formular tritt ab. */ ''}
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button type="button" class="btn btn--secondary" id="cancel-add-invite">${t('settings.cancelAddMember')}</button>
           <button type="submit" class="btn btn--primary" form="add-invite-form">${t('settings.invites.submit')}</button>
+          <button type="button" class="btn btn--secondary" id="invite-done" hidden>${t('settings.invites.done')}</button>
+          <button type="button" class="btn btn--primary" id="invite-link-copy" hidden>
+            <i data-lucide="copy" class="icon-sm" aria-hidden="true"></i>
+            ${t('settings.invites.copy')}
+          </button>
         </div>`;
 }
 
@@ -682,13 +694,15 @@ function wireMemberOrder(container, currentUser, users) {
 }
 
 function inviteHtml(invite) {
-  // Eine Einladung muss weder Namen noch Adresse tragen: dann benennt sie die
-  // Familienrolle, damit die Zeile nicht namenlos in der Liste steht.
+  // Eine Einladung muss weder Namen noch Adresse tragen.
+  // Ohne beides heisst sie "Offene Einladung"; die Rolle steht in der
+  // Metazeile wie bei jedem Mitglied (R24, Critique G6 P2-1) - als Titel
+  // stand sie groesser als jeder Mitgliedsname darueber.
   const roleLabel = familyRoleLabel(invite.family_role);
-  const primary = invite.display_name || invite.username || invite.email || roleLabel;
+  const primary = invite.display_name || invite.username || invite.email || t('settings.invites.untitled');
   const meta = [
     invite.username && invite.username !== primary ? `@${invite.username}` : '',
-    roleLabel === primary ? '' : roleLabel,
+    roleLabel,
     invite.role === 'admin' ? t('settings.systemAdminBadge') : '',
   ].filter(Boolean).map(esc).join(' · ');
   return `
@@ -864,9 +878,6 @@ function bindInviteEvents(container, initialInvites) {
             const res = await auth.createInvite(payload);
             invites.unshift(res.data.invite);
             renderInviteList(container, invites);
-            form.reset();
-            updatePresetHint();
-            syncChildHint?.();
             // Der Klartext-Token kommt nur aus dieser einen Antwort. Der Dialog
             // bleibt deshalb offen: wuerde er sich wie beim Mitglied-Anlegen
             // schliessen, waere der Link im selben Moment weg, in dem er entsteht.
@@ -880,10 +891,15 @@ function bindInviteEvents(container, initialInvites) {
             } else {
               emailNote.hidden = true;
             }
-            window.lucide?.createIcons({ el: output });
+            // Das Formular tritt ab, der Fuss traegt jetzt den Link. KEIN Toast:
+            // er lag ueber dem Label "Einladungslink", und die Meldung ist der
+            // Link selbst.
+            form.hidden = true;
+            for (const el of panel.querySelectorAll('#cancel-add-invite, .modal-panel__footer [type=submit]')) el.hidden = true;
+            for (const el of panel.querySelectorAll('#invite-done, #invite-link-copy')) el.hidden = false;
+            window.lucide?.createIcons({ el: panel.querySelector('.modal-panel__footer') ?? output });
             outputValue.focus();
             outputValue.select();
-            window.yuvomi?.showToast(t('settings.invites.created'), 'success');
           } catch (err) {
             showError(errorEl, err.message);
           } finally {
@@ -891,13 +907,13 @@ function bindInviteEvents(container, initialInvites) {
           }
         });
 
+        panel.querySelector('#invite-done')?.addEventListener('click', () => closeModal());
         panel.querySelector('#invite-link-copy')?.addEventListener('click', async () => {
           if (!outputValue.value) return;
           const copied = await copyInviteLink(outputValue);
-          window.yuvomi?.showToast(
-            copied ? t('settings.invites.copied') : t('settings.invites.copyFailed'),
-            copied ? 'success' : 'danger',
-          );
+          // Die Rueckmeldung steht am Link, nicht als Toast ueber dem Dialog.
+          const status = panel.querySelector('#invite-copy-status');
+          if (status) status.textContent = copied ? t('settings.invites.copied') : t('settings.invites.copyFailed');
         });
       },
     });
@@ -1032,15 +1048,13 @@ async function openEditMemberModal(member, currentUser, users, container) {
               <label class="form-label" for="edit-member-username">${t('settings.usernameLabel')}${REQUIRED_MARK}</label>
               <input class="form-input" type="text" id="edit-member-username" value="${esc(member.username)}" required autocomplete="off" />
             </div>
-            <div class="settings-name-color-row">
-              <div class="form-group settings-name-color-row__name">
-                <label class="form-label" for="edit-member-display-name">${t('settings.displayNameLabel')}${REQUIRED_MARK}</label>
-                <input class="form-input" type="text" id="edit-member-display-name" value="${esc(member.display_name)}" required maxlength="128" />
-              </div>
-              <div class="form-group settings-color-field">
-                <label class="form-label" for="edit-member-avatar-color">${t('settings.colorLabel')}</label>
-                <input class="settings-color-button" type="color" id="edit-member-avatar-color" value="${esc(member.avatar_color || '#007AFF')}" />
-              </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-member-display-name">${t('settings.displayNameLabel')}${REQUIRED_MARK}</label>
+              <input class="form-input" type="text" id="edit-member-display-name" value="${esc(member.display_name)}" required maxlength="128" />
+            </div>
+            <div class="form-group">
+              <span class="form-label" id="edit-member-avatar-color-label">${t('settings.colorLabel')}</span>
+              ${colorPickerHtml({ id: 'edit-member-avatar-color', value: member.avatar_color || USER_COLOR_DEFAULT, labelledBy: 'edit-member-avatar-color-label' })}
             </div>
           </div>
         </div>
@@ -1100,6 +1114,7 @@ async function openEditMemberModal(member, currentUser, users, container) {
       </form>
     `,
     onSave(panel) {
+      wireColorPicker(panel);
       const fileInput = panel.querySelector('#edit-member-avatar-file');
       const errorEl = panel.querySelector('#edit-member-error');
       bindAvatarPicker(panel, 'edit-member');
@@ -1251,6 +1266,7 @@ function openAddMemberModal(container, currentUser, users) {
     size: 'md',
     content: addMemberFormHtml(),
     onSave(panel) {
+      wireColorPicker(panel);
       const form = panel.querySelector('#add-member-form');
       form.querySelector('#new-member-sso-only')
         ?.addEventListener('change', () => syncSsoOnlyField(panel));

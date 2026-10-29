@@ -667,6 +667,10 @@ async function assertCalendarSaveGateEditor(page) {
   });
 }
 
+const CALENDAR_SAVE_ERROR_DE = JSON.parse(
+  readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'),
+).calendar.saveError;
+
 test('calendar save gates retain unsaved fields after orphan confirmation, server failure and canceled retry', async () => {
   const page = await openPage(harness, { device: 'desktop', locale: 'de' });
   try {
@@ -697,15 +701,19 @@ test('calendar save gates retain unsaved fields after orphan confirmation, serve
     await page.waitForSelector('#confirm-modal-ok');
     assert.equal(attempts.length, 1, 'the real server must reject the rule that orphans its linked child');
     await clickPastDeadTime(page, '#confirm-modal-ok');
-    await page.waitForFunction(() => [...document.querySelectorAll('[role="alert"], .toast')]
-      .some((element) => element.textContent.includes('Save gate test server failure')));
+    // Seit #2251 sagt der Toast den Satz der App, nie den Text des Servers.
+    await page.waitForFunction((sentence) => [...document.querySelectorAll('[role="alert"], .toast')]
+      .some((element) => element.textContent.includes(sentence)), {}, CALENDAR_SAVE_ERROR_DE);
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('[role="alert"], .toast')]
+      .some((element) => element.textContent.includes('Save gate test server failure'))), false,
+    'the server text must not reach the toast (#2251)');
     await assertCalendarSaveGateEditor(page);
     assert.equal(attempts.length, 2);
     assert.equal(attempts[1].confirmed_orphan_count, 1);
     assert.equal(attempts[1].title, 'Calendar save gate unsaved');
 
-    await page.waitForFunction(() => ![...document.querySelectorAll('.toast')]
-      .some((element) => element.textContent.includes('Save gate test server failure')));
+    await page.waitForFunction((sentence) => ![...document.querySelectorAll('.toast')]
+      .some((element) => element.textContent.includes(sentence)), {}, CALENDAR_SAVE_ERROR_DE);
     await page.click('#modal-save');
     await page.waitForSelector('[data-scope="series"]');
     await clickPastDeadTime(page, '[data-scope="series"]');
@@ -1240,6 +1248,11 @@ const SHAPE_EXEMPT = new Map([
   // ganz auf `.segmented__item` lief - seine eigene Regel ist entfallen.
   ['ydp__trigger', 'Griff: Feld-Oeffner des Datepickers, traegt Feldkante'],
   ['more-sheet__search', 'Griff: Suchfeld des More-Sheets, traegt Feldkante'],
+  // Die Personenwahl (settings/assignee-menu.js) ist seit #2316 ein Knopf, der
+  // ein Menue oeffnet, wo vorher ein <select> stand. Sie traegt .form-input und
+  // damit die Feldkante des Auswahlfelds, das sie ersetzt - dieselbe Lage wie
+  // der Datepicker-Griff. Eine Kapsel waere ein Knopf zwischen Feldern.
+  ['assignee-menu__trigger', 'Griff: Feld-Oeffner der Personenwahl, ersetzt das Auswahlfeld, traegt Feldkante'],
   // Das Kanon-Segment (panel.css, DESIGN.md: konzentrisch eingesetzte
   // .segmented__item im radius-md-Traeger). Es stand bis 2026-09-25 auf keiner
   // gemessenen Route im Bild; seit der Dokumente-Critique traegt der Status
@@ -1270,6 +1283,10 @@ const SHAPE_EXEMPT = new Map([
   ['week-event', 'Rasterzelle: Terminblock im Zeitraster der Woche, Hoehe = Dauer'],
   ['day-event', 'Rasterzelle: Terminblock im Zeitraster des Tages, Hoehe = Dauer'],
   ['allday-event', 'Rasterzelle: Ganztags-Balken der Woche/des Tages, gleiche Bar wie .month-day__event'],
+  // Die Zeitleiste im Heute-Blatt (#2278) legt ihre Termine auf dasselbe
+  // Zeitraster (time-grid.js), nur waagerecht: Breite = Dauer. Ein Klick
+  // klappt die Zeile des Termins darunter auf.
+  ['today-timeline__event', 'Rasterzelle: Terminblock der Tageszeitleiste, Breite = Dauer (time-grid.js)'],
   // Seit R9 M13 (Re-Critique 2026-09-27) oeffnet die Notizkarte als GANZE
   // Karte: der Oeffnen-Knopf liegt unsichtbar ueber ihr (notes.css, keine
   // Flaeche, keine Kante) und erbt ihren Radius nur, damit der Fokusring die
@@ -1291,6 +1308,17 @@ const SHAPE_EXEMPT = new Map([
   // einer Bar waeren zwei Formen in EINER Zeilenliste. Gefunden vom Handlauf
   // des Releases v2.65.0, dem ersten vollen Lauf seit dem Eintrag.
   ['cal-task-chip', 'Zeile: Aufgabe in der Eintragsliste einer Kalenderzelle, gleiche Bar wie .month-day__event'],
+  // Die Teilaufgaben im Detail sind eine Zeilenliste (`.detail-subtasks`,
+  // detail-view.css): jede Zeile ein <button> mit dem Ring vorn, unter dem
+  // Zeiger die Flaeche im Radius der Zeile. "Teilaufgabe hinzufuegen" war bis
+  // R24 eine gestrichelte Kapsel nach Inhalt breit - und deshalb hier nicht
+  // noetig. Die Critique R24 (G2-Aufgaben-P3-2, 6c8571a24) hat sie bewusst zur
+  // letzten ZEILE derselben Liste gemacht, wie "Neue Erinnerung" in Apples
+  // Erinnerungen: das Plus steht, wo die Teilaufgaben ihren Ring tragen, der
+  // Text fluchtet mit ihren Titeln, die Hervorhebung ist die der Zeile. Eine
+  // Kapsel waere dort eine zweite Form in EINER Zeilenliste. Gefunden vom
+  // Handlauf R24 (Sonde 3, 10px auf h=44 auf /tasks).
+  ['detail-subtask', 'Zeile: Teilaufgabe und "Teilaufgabe hinzufuegen" in der Teilaufgabenliste des Details (.detail-subtasks)'],
 ]);
 
 test('Sonde 3 - es gibt EINE Buttonform, und die Ausnahmen sind Kategorien', async () => {
@@ -2123,10 +2151,12 @@ describe('Sonde 6 - die Kacheln einer Kennzahlreihe sind gleich hoch', () => {
       const page = await openPage(harness, { device, theme: 'light', locale: 'de' });
       const findings = [];
       let rowsSeen = 0;
+      const carriers = new Set();
 
       const check = (where, rows) => {
         for (const row of rows) {
           rowsSeen += 1;
+          carriers.add(row.grid);
           const spread = Math.max(...row.heights) - Math.min(...row.heights);
           if (spread > 0) {
             findings.push(`${where} · ${row.grid} (${row.scope}): Hoehen ${row.heights.join(', ')} (Streuung ${spread}px).`);
@@ -2137,24 +2167,66 @@ describe('Sonde 6 - die Kacheln einer Kennzahlreihe sind gleich hoch', () => {
       // Auch die Sichten hinter den Leisten: sie wechseln nach der
       // Leisten-Regel (§2) die SICHT innerhalb eines Moduls, nicht die Route.
       // Ohne sie saehe die Sonde von sieben Kennzahlreihen genau eine.
+      const measure = async (where) => {
+        await openMetricDisclosures(page);
+        check(where, await metricRowHeights(page));
+      };
       for (const name of sweep('Sonde 6')) {
         await gotoRoute(page, ALL_ROUTES[name]);
-        await visitViews(page, name, async (where) => {
-          await openMetricDisclosures(page);
-          check(where, await metricRowHeights(page));
-        });
+        await visitViews(page, name, measure);
+
+        /* DIE BEREICHE EINES MODULS SIND ROUTEN, KEINE SICHTEN (R24 S15). Die
+         * Gesundheit fuehrt ihre Bereiche als Zeilenliste auf eigene Routen
+         * (/health/vitals, /health/activity, /health/cycle ...), und dort
+         * stehen drei der Kennzahlreihen der App - die Vitalwerte, die
+         * Aktivitaet, der Zyklus. `visitViews` faehrt nur Tablists und
+         * aria-pressed-Gruppen; die Aktivitaets-Reihe, die der Nachweis unten
+         * seit 2026-08-10 verlangt, hat die Sonde so nie erreicht - bestanden
+         * hat sie dank der Geld-Reiter. Gefolgt wird deshalb jedem Link im
+         * Inhalt, der unter die eigene Route fuehrt: die Beziehung steht im
+         * Markup, kein Klassenname. Nicht von der Uebersicht (dort fuehrt jede
+         * Route "unter /") und nicht von /settings (die Blaetter laesst diese
+         * Sonde aus, siehe LEAVES_SKIPPED). Gemessen: nur die Gesundheit hat
+         * solche Links, acht Bereiche; ihre Sicht-Gruppen schreiben nichts
+         * (Zeitraum, gewaehlte Kennzahl, gewaehlter Laborbefund). */
+        const route = ALL_ROUTES[name];
+        if (route === '/' || route === '/settings') continue;
+        const areas = await page.evaluate((own) => [...new Set([...document.querySelectorAll('#main-content a[href]')]
+          .map((a) => a.getAttribute('href'))
+          .filter((href) => href.startsWith(`${own}/`)))], route);
+        for (const area of areas) {
+          await gotoRoute(page, area);
+          await visitViews(page, area, measure);
+        }
       }
       await page.close();
 
-      // Eine Sonde, die nichts gemessen hat, darf nicht urteilen (dieselbe
-      // Zusicherung wie bei Sonde 3, 4 und 5).
-      // Der Reichweiten-Nachweis steigt mit der Reichweite: seit die Reihe aus
-      // den KARTEN kommt statt aus `.metric-grid`, gehoert die Aktivitaets-Reihe
-      // der Gesundheit dazu, die vorher unsichtbar war.
-      assert.ok(rowsSeen >= 5,
-        `Nur ${rowsSeen} Kennzahlreihen gesehen - erwartet sind mindestens Budget, Abos, Aufteilen, `
-        + 'Darlehen und die Aktivitaets-Reihe der Gesundheit. Entweder hat der Seed keine Zahlen '
-        + 'geliefert, oder die Bauart hat sich geaendert.');
+      /* Eine Sonde, die nichts gemessen hat, darf nicht urteilen (dieselbe
+       * Zusicherung wie bei Sonde 3, 4 und 5).
+       *
+       * GEZAEHLT WERDEN TRAEGER, NICHT ZEILEN (R24 S15). Hier stand
+       * `rowsSeen >= 5` mit "Budget, Abos, Aufteilen, Darlehen" als Beleg.
+       * Seit R24 E2 ("eine Kennzahlkarte oben", Critique 2026-10-26) tragen
+       * Konten, Abos, Darlehen, Aufteilung, Haushaltshilfe und Inventar keine
+       * Kachelreihe mehr, sondern EINE Kurzzeile (`metricGlanceHtml`,
+       * `.budget-glance`): eine Leitzahl, daneben hoechstens zwei Fluesse in
+       * einer Textzeile. Dort stehen keine Kacheln nebeneinander, deren Hoehen
+       * sich unterscheiden koennten - die Zusage dieser Sonde hat an der Zeile
+       * keinen Gegenstand, und mitzaehlen hiesse gruen aus dem falschen Grund.
+       * Die Reichweite gab bis dahin die ZAHL DER ZEILEN an, und die haengt an
+       * der Breite (dieselbe Reihe zaehlte mobil doppelt, sobald sie umbrach).
+       * Gefragt ist, ob die Sonde die Reihen der App sieht - also verschiedene
+       * Traeger. Gemessen nach E2 (Demo-Seed): die Uebersicht (.metric-tiles),
+       * die Gesundheit-Uebersicht und die Vitalwerte (.metric-rows), die
+       * Aktivitaet (.health-activity__summary), der Zyklus (.cycle-stats) -
+       * dazu mobil die Monatsbilanz des Budgets (.metric-grid--led; am Desktop
+       * steht ihre Leitkachel neben zwei gestapelten, keine Zeile teilt sich
+       * zwei Karten). Fuenf in beiden Breiten. */
+      assert.ok(carriers.size >= 5,
+        `Nur ${carriers.size} Kennzahlreihen-Traeger gesehen (${[...carriers].join(', ')}; ${rowsSeen} Zeilen) - `
+        + 'erwartet sind mindestens die Uebersicht, die Gesundheit-Uebersicht, die Vitalwerte, die '
+        + 'Aktivitaet und der Zyklus. Entweder hat der Seed keine Zahlen geliefert, oder die Bauart '
+        + 'hat sich geaendert.');
 
       assert.deepEqual(findings, [],
         'Kennzahlreihen im gerenderten Dokument. Gleichartige Kacheln nebeneinander sind gleich hoch, '
@@ -3436,6 +3508,17 @@ async function openFabModal(page) {
     }
     if (!panel) return { skipped: 'Aktionsmenue oeffnete kein Modal' };
 
+    // DIE EINGEKLAPPTEN ABSCHNITTE WERDEN AUFGEKLAPPT (R24 S15). Seltene
+    // Felder stehen in `details.form-advanced` (modal.js, "Weitere Angaben").
+    // Ihr Inhalt ist bei geschlossenem `<details>` nicht gezeichnet, wird von
+    // getBoundingClientRect aber trotzdem ausgelegt - die Sonde mass ihn
+    // bisher in einem Zustand, den niemand sieht (die Farbreihe des Termins
+    // lag bei y=1325 in einem 563px hohen Koerper, Scrollhoehe 814). Gemessen
+    // wird jetzt, was ein Tipp auf "Weitere Angaben" zeigt; ein Klick auf das
+    // `<summary>` ist eine Sicht, kein Schreiben.
+    for (const fold of panel.querySelectorAll('details:not([open])')) fold.open = true;
+    await wait(300);
+
     const path3 = (el) => {
       const parts = [];
       for (let n = el; n && n.nodeType === 1 && parts.length < 3; n = n.parentElement) {
@@ -3448,8 +3531,11 @@ async function openFabModal(page) {
       return parts.join(' > ');
     };
     // Dieselben zwei Ausnahmen wie in Sonde 10 - siehe Sondenkommentar.
+    // Dazu, was nicht gezeichnet wird (dieselbe Pruefung wie in Sonde 4):
+    // `content-visibility`, ein geschlossenes `<details>` darueber.
     const vis = (el) => {
       if (el.closest('[aria-hidden="true"], .sr-only')) return false;
+      if (typeof el.checkVisibility === 'function' && !el.checkVisibility()) return false;
       const r = el.getBoundingClientRect();
       const cs = getComputedStyle(el);
       return r.width > 1 && r.height > 1 && cs.visibility !== 'hidden' && cs.display !== 'none';
@@ -3458,6 +3544,38 @@ async function openFabModal(page) {
     const fields = [...panel.querySelectorAll('input:not([type=hidden]), select, textarea')].filter(vis);
     const targets = [...panel.querySelectorAll('button, [role="button"], a[href], input[type=checkbox], input[type=radio], select')].filter(vis);
     const min = window.innerWidth < 768 ? 44 : 24;
+
+    // DIE BOX IST NICHT DIE TREFFERFLAECHE - Falle 1 aus Sonde 4, hier erst
+    // seit R24 S15 gebraucht. Bis dahin stand in keinem Dialog ein Knopf, der
+    // seine Flaeche per `::before` dehnt; der Farbwaehler (utils/color-picker.js)
+    // ist seit R24 eine radiogroup aus echten <button>s - vorher waren es
+    // `div[role=radio]`, die diese Sonde gar nicht fragte - und ist 28px gross
+    // bei 44/48px Trefferflaeche. Getastet wird wie in Sonde 4 mit
+    // elementFromPoint vom Zentrum nach aussen, und nur, wo die Box allein
+    // nicht reicht. Das Tasten zaehlt, was WIRKLICH trifft: ueberlappen zwei
+    // Nachbarflaechen, gewinnt die obere, und die untere misst kleiner. Genau
+    // das war der Befund - 40x36 statt der versprochenen 48 (layout.css).
+    // Liegt das Zentrum unter etwas anderem (Fusszeile), bleibt es bei der Box.
+    const tasted = (el) => {
+      el.scrollIntoView({ block: 'center', inline: 'nearest' });
+      const r = el.getBoundingClientRect();
+      const cx = Math.round(r.left + r.width / 2);
+      const cy = Math.round(r.top + r.height / 2);
+      const mine = (x, y) => {
+        const hit = document.elementFromPoint(x, y);
+        return !!hit && (hit === el || el.contains(hit));
+      };
+      if (!mine(cx, cy)) return { w: r.width, h: r.height };
+      const reach = (dx, dy) => {
+        let n = 0;
+        while (n < min && mine(cx + dx * (n + 1), cy + dy * (n + 1))) n += 1;
+        return n;
+      };
+      return {
+        w: Math.max(r.width, reach(-1, 0) + reach(1, 0) + 1),
+        h: Math.max(r.height, reach(0, -1) + reach(0, 1) + 1),
+      };
+    };
 
     return {
       title: (panel.querySelector('.modal-panel__title, h2, h3')?.textContent || '').trim().slice(0, 40),
@@ -3486,10 +3604,14 @@ async function openFabModal(page) {
         const box = label && (label.control === el || label.contains(el)) ? label.getBoundingClientRect() : r;
         const w = Math.max(r.width, box.width);
         const h = Math.max(r.height, box.height);
-        return w < min && h < min;
+        if (w >= min || h >= min) return false;
+        const hit = tasted(el);
+        return hit.w < min && hit.h < min;
       }).map((el) => {
         const r = el.getBoundingClientRect();
-        return `${path3(el)} ${Math.round(r.width)}x${Math.round(r.height)} (min ${min})`;
+        const hit = tasted(el);
+        return `${path3(el)} ${Math.round(r.width)}x${Math.round(r.height)}, `
+          + `getastet ${Math.round(hit.w)}x${Math.round(hit.h)} (min ${min})`;
       }),
     };
   });
@@ -4254,7 +4376,7 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
             + 'ueber der Fensterkante - die FAB-Reserve verkuerzt ihn wieder statt als Nachlauf zu reiten.');
         }
 
-        // Drei Module fuehren ihre Primaeraktion ohne FAB - kein Befund.
+        // Seiten ohne FAB (Haushaltshilfe, Einstellungen und ihre Blaetter) - kein Befund.
         if (m.keinFab) {
           if (!m.angedockt && !m.eingeklappt) ohneFab += 1;
           continue;
@@ -4318,16 +4440,24 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
          *
          * Einkauf dockt seit der Kopfregel mobil (2026-09-26) an, Aufgaben,
          * Notizen, Kontakte, Kalender und Budget seit #1483 ("one add button"),
-         * die Uebersicht seit R14, Punkte mit "Bonus vergeben" seit R23. Eingeklappt
-         * ist keiner mehr. */
+         * die Uebersicht seit R14, Punkte mit "Bonus vergeben" seit R23, die
+         * Gesundheit seit R24 (E9 "FAB ueberall", 108684c28: die Uebersicht
+         * traegt ein Erfassen-Menue, jeder Bereich seinen Hinzufuegen-Knopf;
+         * Fasten startet von dort, R23 D14 / S11-F1). Eingeklappt ist keiner
+         * mehr; ohne FAB bleiben Haushaltshilfe, Einstellungen und ihre Blaetter.
+         * Gegengeprueft (R24 S15, 375x812): am Scroll-Ende liegt auf /health und
+         * allen acht Bereichen nichts Bedienbares unter dem Knopf; am Zeiger
+         * docken alle neun an. */
         const ANGEDOCKT_AM_ZEIGER = ['dashboard', 'tasks', 'calendar', 'shopping', 'meals', 'recipes',
-          'pantry', 'notes', 'contacts', 'birthdays', 'budget', 'documents', 'rewards'];
+          'pantry', 'notes', 'contacts', 'birthdays', 'budget', 'documents', 'health', 'rewards'];
         assert.deepEqual({ angedockt: [...angedockt].sort(), eingeklappt },
           { angedockt: [...ANGEDOCKT_AM_ZEIGER].sort(), eingeklappt: [] },
           `Erwartet auf dem Zeiger: ${ANGEDOCKT_AM_ZEIGER.length} FABs in der Kopfleiste und kein eingeklappter, `
           + `dazu ${ohneFab} Seiten ohne FAB. Aendert sich das, aendert sich die Reichweite dieser Sonde.`);
       } else {
-        // 15 Routen minus die drei ohne FAB.
+        // 16 Routen minus die zwei ohne FAB (Haushaltshilfe, Einstellungen);
+        // gemessen 14 seit R24. Die Untergrenze laesst einer Seite Luft, die ihr
+        // Scroll-Ende nicht rechtzeitig erreicht.
         assert.ok(seen >= 12,
           `Nur ${seen} Zustaende am Scroll-Ende gemessen - erwartet sind mindestens 12. Entweder `
           + 'fehlt Modulen ihr FAB, oder keine Seite kam an ihr Scroll-Ende.');

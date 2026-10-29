@@ -203,7 +203,10 @@ test('der Monats-Stepper steht im Kopf, nicht im Inhalt (Critique 2026-09-26)', 
   hk.state().tab = 'reports';
 });
 
-test('die Besuchszeile ist eine list-row: der Koerper oeffnet, Bezahlen steht im Mehr-Knopf (D6)', async () => {
+// R24 (Critique G2-Haushaltshilfe-P2-2): "Ausstehend" ist ein Etikett, und
+// Bezahlen ist die EINE sichtbare Handlung der Endzone (D10) - bis R24 stand
+// es im Mehr-Knopf (D6), zwei Tipps tief fuer den haeufigsten Schritt.
+test('die Besuchszeile ist eine list-row: der Koerper oeffnet, ein offener Besuch traegt Etikett und "Bezahlt"', async () => {
   const content = await freshReports();
   await hk.stepReportMonth(content, -1);
   const rows = content.html.split('<article').slice(1).filter((row) => row.includes('housekeeping-report-item'));
@@ -215,10 +218,16 @@ test('die Besuchszeile ist eine list-row: der Koerper oeffnet, Bezahlen steht im
   }
   const offen = rows.find((row) => row.includes('data-pay-visit'));
   assert.ok(offen, 'der offene Besuch bietet Bezahlen an');
-  assert.match(offen, /class="row-action row-action--more popover-menu__trigger"/, 'EIN Mehr-Knopf');
-  assert.match(offen, /class="popover-menu__item"\s+data-action="pay-visit" data-pay-visit="12">[\s\S]{0,160}housekeeping\.markPaid</);
-  assert.doesNotMatch(offen, /data-lucide="(?:file-text|edit-2|pencil)"[^>]*><\/i>\s*<\/button>\s*<\/article/, 'kein Stift, kein Bericht-Knopf neben dem Koerper');
-  assert.doesNotMatch(offen, /btn--secondary/, 'kein beschrifteter Knopf mehr in der Zeile');
+  assert.match(offen, /<span class="list-row__name">[^<]*<span class="tag housekeeping-visit-tag">housekeeping\.paymentPending<\/span><\/span>/,
+    '"Ausstehend" als Etikett neben dem Datum, nicht als drittes Wort der Metazeile');
+  assert.doesNotMatch(offen, /list-row__meta">[^<]*housekeeping\.paymentPending/, 'und nicht doppelt');
+  assert.match(offen, /<\/button>\s*<button type="button" class="btn btn--secondary btn--sm housekeeping-visit-pay" data-pay-visit="12"\s+aria-label="housekeeping\.markPaidNamed[^"]*">housekeeping\.markPaidShort<\/button>/,
+    'Bezahlen steht sichtbar hinter dem Koerper, mit dem Tag im Namen');
+  assert.match(offen, /class="row-action row-action--more popover-menu__trigger"/, 'dahinter EIN Mehr-Knopf');
+  assert.doesNotMatch(offen, /data-action="pay-visit"/, 'Bezahlen nicht noch einmal im Menue');
+  assert.equal((offen.match(/btn--secondary/g) ?? []).length, 1, 'genau eine sichtbare Handlung (D10)');
+  const bezahlt = rows.find((row) => !row.includes('data-pay-visit'));
+  assert.ok(bezahlt && !/housekeeping-visit-tag/.test(bezahlt), 'ein bezahlter Besuch traegt kein Etikett und keinen Knopf');
   assert.match(content.html, /class="housekeeping-reports row-carrier"/);
   assert.doesNotMatch(content.html, /metric-card--inset/, 'dieselben Kennzahlkarten wie die Uebersicht');
 });
@@ -578,11 +587,11 @@ function visitRows(html) {
   }));
 }
 
-function dashboardHtml({ lastVisit } = {}) {
+function dashboardHtml({ lastVisit, months = [{ month: '2026-09', total: 90 }] } = {}) {
   const state = hk.state();
   state.tab = 'dashboard';
   state.workers = [{ id: 7, display_name: 'Maria Silva', rate_type: 'daily', daily_rate: 45, payment_schedule: 'weekly' }];
-  state.dashboard = { visits_this_month: 3, last_visit: lastVisit ? { check_in: lastVisit } : null, pending_tasks: 1, finished_tasks_this_month: 2, monthly_payments: [{ month: '2026-09', total: 90 }], pending_payments: 45 };
+  state.dashboard = { visits_this_month: 3, last_visit: lastVisit ? { check_in: lastVisit } : null, pending_tasks: 1, finished_tasks_this_month: 2, monthly_payments: months, pending_payments: 45 };
   state.recentVisits = [asAdmin({ ...openVisit, worker_name: 'Maria Silva' })];
   const content = fakeContainer();
   hk.renderDashboard(content);
@@ -614,7 +623,9 @@ test('ein Besuch, eine Zeile: das Datum fuehrt, die Person steht im Meta - in Ue
 });
 
 test('Uebersicht: die letzten Besuche stehen vor dem Zahlungsdiagramm', () => {
-  const html = dashboardHtml();
+  // Das Diagramm steht seit R24 erst ab zwei Monaten mit Zahlungen.
+  hk.state().dashboard = null;
+  const html = dashboardHtml({ months: [{ month: '2026-08', total: 45 }, { month: '2026-09', total: 90 }] });
   const liste = html.indexOf('housekeeping-staff-log-list');
   const diagramm = html.indexOf('class="housekeeping-chart"');
   assert.ok(liste > 0 && diagramm > 0, 'beide Abschnitte stehen da');
@@ -679,50 +690,31 @@ test('Uebersicht: das Zahlungsdiagramm zeigt Saeulen mit Legende, leere Monate o
   assert.match(html, /role="listitem" aria-label="[^"]*housekeeping\.paymentPending/, 'jede Saeule nennt ihren offenen Teil im Namen');
 });
 
-test('Uebersicht: der letzte Besuch nennt im laufenden Jahr kein Jahr, in einem anderen schon', () => {
-  const jahr = new Date().getFullYear();
-  const vorher = globalThis.__formatDayMonth;
-  globalThis.__formatDayMonth = (d) => `KURZ(${d})`;
-  try {
-    const wert = (html) => /metric-card__label">housekeeping\.lastVisit<\/div>\s*<div class="metric-card__value">([^<]*)</.exec(html)?.[1];
-    // Seit R23 entscheidet dateText (utils/date-format.js) und gibt den KEY der
-    // Haushaltszone an die Formatierer, nicht den Zeitpunkt.
-    assert.equal(wert(dashboardHtml({ lastVisit: `${jahr}-01-15T08:30:00Z` })), `KURZ(${jahr}-01-15)`,
-      'im laufenden Jahr die Kurzform - sie passt in die Viertelzeile');
-    assert.equal(wert(dashboardHtml({ lastVisit: `${jahr - 1}-12-20T08:30:00Z` })), `${jahr - 1}-12-20`,
-      'aus einem anderen Jahr bleibt das volle Datum - dann ist das Jahr die Auskunft');
-  } finally {
-    globalThis.__formatDayMonth = vorher;
-  }
-});
-
-// Codex P2 zu R10 L10: die Anzeige rechnet in die Haushaltszone, der
-// Jahresvergleich nahm das Jahr des rohen UTC-Strings und das der Geraetezone.
-// `<Jahr>-01-01T00:30Z` steht in New York am 31.12. des Vorjahrs - und verlor
-// trotzdem sein Jahr; umgekehrt in Tokio.
-test('Uebersicht: ob der letzte Besuch sein Jahr nennt, entscheidet die Haushaltszone wie die Anzeige', async () => {
-  const { setDisplayTimeZone, _resetDisplayTimeZoneCache } = await import('../public/utils/timezone.js');
-  const { todayKey } = await import('../public/utils/date.js');
-  const vorher = globalThis.__formatDayMonth;
-  globalThis.__formatDayMonth = (d) => `KURZ(${d})`;
-  const wert = (html) => /metric-card__label">housekeeping\.lastVisit<\/div>\s*<div class="metric-card__value">([^<]*)</.exec(html)?.[1];
-  try {
-    setDisplayTimeZone('America/New_York');
-    let jahr = Number(todayKey().slice(0, 4));
-    const silvester = `${jahr}-01-01T00:30:00Z`;
-    assert.equal(wert(dashboardHtml({ lastVisit: silvester })), `${jahr - 1}-12-31`,
-      'New York: der Besuch liegt am 31.12. des Vorjahrs - das Jahr bleibt stehen');
-
-    setDisplayTimeZone('Asia/Tokyo');
-    jahr = Number(todayKey().slice(0, 4));
-    const neujahr = `${jahr - 1}-12-31T20:00:00Z`;
-    assert.equal(wert(dashboardHtml({ lastVisit: neujahr })), `KURZ(${jahr}-01-01)`,
-      'Tokio: derselbe Zeitpunkt ist dort schon der 1.1. des laufenden Jahres - Kurzform');
-  } finally {
-    globalThis.__formatDayMonth = vorher;
-    setDisplayTimeZone(null);
-    _resetDisplayTimeZoneCache();
-  }
+// R24 (E2, Ulas 28.10.): die Besuche fuehrten am Desktop vier Kacheln (Besuche,
+// Letzter Besuch, Faellig, Erledigt), mobil die Kurzzeile mit Aufklapper zu
+// denselben Kacheln. Jetzt EINE statische Kurzzeile in jeder Breite wie die
+// Berichte. "Letzter Besuch" entfaellt - er ist die erste Zeile der Besuche
+// darunter (S9-F2: eine Zahl nie doppelt auf einer Flaeche). Die Tests zur
+// Jahreszahl des letzten Besuchs (R10 L10) sind damit gegenstandslos; die
+// Regel selbst haelt dateText (test:date-format).
+test('Besuche: EINE Kennzahlzeile in jeder Breite, der letzte Besuch steht nur in der Liste (R24 E2)', () => {
+  const html = dashboardHtml({ lastVisit: '2026-09-20T08:30:00Z' });
+  const glance = /<div class="row-carrier budget-glance[^"]*">[\s\S]*?<\/div>\s*<\/div>/.exec(html)?.[0] ?? '';
+  assert.match(glance, /budget-glance--everywhere/, 'die Zeile steht in jeder Breite');
+  assert.match(glance, /budget-glance__row--static/, 'ohne Aufklapper - es gibt keine Kacheln mehr');
+  assert.match(glance, /housekeeping\.visitsThisMonth[\s\S]*budget-glance__value[^>]*>3</, 'die Besuche des Monats fuehren');
+  assert.match(glance, /housekeeping\.pendingChores <span class="budget-glance__amount">1</);
+  assert.match(glance, /housekeeping\.finishedChores <span class="budget-glance__amount">2</);
+  assert.doesNotMatch(html, /metric-card|metric-grid|budget-glance__balance|housekeeping-metrics/, 'kein Kachelturm, nichts aufzuklappen');
+  assert.doesNotMatch(html, /housekeeping\.lastVisit/, 'der letzte Besuch ist die erste Zeile der Liste');
+  const leer = hk.state();
+  leer.dashboard = { ...leer.dashboard, pending_tasks: 0, finished_tasks_this_month: 0 };
+  const content = fakeContainer();
+  hk.renderDashboard(content);
+  assert.doesNotMatch(content.html, /budget-glance__flows/, 'ohne Arbeiten im Monat steht nur die Leitzahl');
+  const rules = [...eachRule(HK_STYLES)];
+  assert.deepEqual(rules.filter((r) => /metric-grid--quad|metric-card/.test(r.selector)).map((r) => r.selector.trim()), [],
+    'die Regeln der Viertelzeile sind mit ihr gegangen');
 });
 
 test('Faelligkeit spricht als Tinte am Wort, nicht als Waesche der Zeile (wie die Aufgaben)', () => {
@@ -734,20 +726,6 @@ test('Faelligkeit spricht als Tinte am Wort, nicht als Waesche der Zeile (wie di
     const tinte = rules.find((r) => r.selector.trim() === `.housekeeping-task--${zustand} .housekeeping-task__status`);
     assert.match(tinte?.body ?? '', new RegExp(`color:\\s*var\\(--color-${farbe}\\)`), `${zustand}: das Wort traegt die Farbe`);
   }
-});
-
-test('die vier Kennzahlen stehen auf jeder Breite in einer Zeile, schmal mit Labels an Wortgrenzen', () => {
-  const rules = [...eachRule(HK_STYLES)];
-  const quad = rules.filter((r) => /metric-grid--quad/.test(r.selector));
-  const zeile = quad.find((r) => !r.at.length && r.selector.trim() === '.housekeeping-content .metric-grid--quad');
-  assert.match(zeile?.body ?? '', /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/,
-    'vier Spalten, unbedingt - und spezifischer als die Telefonstufe in panel.css');
-  assert.deepEqual(quad.filter((r) => /--summary-cards:\s*2/.test(r.body)).map((r) => r.at.join(' ')), [],
-    'keine Zwei-mal-zwei-Stufe mehr (189px mobil)');
-  const label = rules.find((r) => r.selector.trim() === '.metric-grid--quad .metric-card__label'
-    && r.at.includes('@container housekeeping-page (max-width: 479px)'));
-  assert.match(label?.body ?? '', /text-transform:\s*none/, 'Versal brach in der Viertelzeile mitten im Wort');
-  assert.match(label?.body ?? '', /hyphens:\s*auto/);
 });
 
 // Re-Critique 2026-09-28 (P5, A3 P2-3 / A8 P2-3): die Uebersicht mit
@@ -789,20 +767,17 @@ test('Listenreiter am Desktop: Liste im Spaltenraster, Kennzahlen bzw. Protokoll
   // renderTasks() reicht seit R16 an redrawList() weiter; das Markup baut drawTasks().
   const tasks = fn('drawTasks');
   assert.match(tasks, /renderPageColumns\(\{\s*main:[\s\S]*housekeeping-task-list/, 'Aufgaben: die Liste steht in der Listenspalte');
-  // R17: der Reiter HAT einen zweiten Inhalt - „Faellig" und „Erledigt im Monat"
-  // standen nur auf der Uebersicht, die Spalte daneben blieb leer (384px bei 1280).
-  assert.match(tasks, /\brail: taskSummaryHtml\(\),/, 'Aufgaben: die zwei Kennzahlen stehen in der Seitenspalte');
-  assert.doesNotMatch(tasks, /railFirst/, 'hinter der Liste im DOM: schmal stehen sie darunter, nie davor');
-  const summary = fn('taskSummaryHtml');
-  assert.match(summary, /state\.dashboard/, 'derselbe Bestand wie die Uebersicht (nach jedem Erledigen neu geladen)');
-  assert.match(summary, /class="metric-grid budget-glance-details housekeeping-task-summary"/,
-    'unter 640px bleiben die Kacheln aus - das Telefon bekommt nichts vor oder unter die Liste');
-  assert.match(summary, /t\('housekeeping\.pendingChores'\)[\s\S]*data\.pending_tasks|pending_tasks[\s\S]*t\('housekeeping\.pendingChores'\)/);
-  assert.match(summary, /t\('housekeeping\.finishedChores'\)/, 'dieselben Worte wie auf der Uebersicht');
-  assert.equal(summary.match(/class="metric-card\$\{/g)?.length, 2, 'zwei Karten, keine dritte erfunden');
+  // R24 (Critique, E2): KEINE Kennzahlspalte mehr. R17 hatte "Faellig" und
+  // "Erledigt im Monat" als Seitenspalte neben die Liste gestellt - zwei grosse
+  // Karten fuer zwei Ziffern, dieselben wie auf "Besuche" (der Kennzahlturm).
+  assert.doesNotMatch(tasks, /\brail:/, 'Aufgaben: keine Seitenspalte');
+  assert.doesNotMatch(HK_SRC, /function taskSummaryHtml|housekeeping-task-summary/, 'die Kennzahlkarten der Arbeiten sind weg, nicht nur ausgeblendet');
   const reports = fn('renderReports');
-  assert.match(reports, /renderPageColumns\(\{\s*railFirst: true,\s*rail:[\s\S]*metric-grid[\s\S]*main:[\s\S]*housekeeping-reports/,
-    'Berichte: Kennzahlen im DOM vor der Liste (mobil darueber), am Desktop in der Seitenspalte');
+  // R24 (E2): EINE Kennzahlkarte oben in jeder Breite - die Kurzzeile mit der
+  // offenen Summe als Leitzahl, keine drei Karten in einer Seitenspalte.
+  assert.doesNotMatch(reports, /\brail:|metric-grid/, 'Berichte: kein Kennzahlturm in der Seitenspalte');
+  assert.match(reports, /metricGlanceHtml\(\{[\s\S]*everywhere: true/, 'die Kurzzeile steht in jeder Breite');
+  assert.match(reports, /main: `\s*\$\{glance\}\s*<section class="housekeeping-reports/, 'ueber der Liste, in derselben Spalte');
   const staff = fn('renderStaff');
   assert.match(staff, /rail: state\.selectedStaffId \? renderStaffVisitLog\(\) : ''/,
     'Personal: das Protokoll der gewaehlten Person steht in der Seitenspalte');
@@ -1207,4 +1182,65 @@ test('Einstellungen: der Hinweis zu Zahlungsaufgaben nennt, wer sie sieht', () =
   const en = JSON.parse(readFileSync(new URL('en.json', localeDir), 'utf8'));
   assert.match(de.settings.housekeepingPaymentTasksHint, /nur die Person, die eincheckt, und die Administratoren/);
   assert.match(en.settings.housekeepingPaymentTasksHint, /Only the person who checks in and the administrators/);
+});
+
+// R24 (Critique G2-Haushaltshilfe-P2-2): mit EINEM Monat Daten zeigte das
+// Diagramm fuenf leere Grundlinien und eine Saeule. Dann steht ein Satz.
+test('R24: das Zahlungsdiagramm erst ab zwei Monaten, vorher ein Satz', () => {
+  const ein = dashboardHtml({ months: [{ month: '2026-05', total: 0 }, { month: '2026-09', total: 90, pending: 45 }] });
+  assert.doesNotMatch(ein, /class="housekeeping-chart"/, 'ein Monat: kein Diagramm');
+  assert.match(ein, /<p class="housekeeping-payments-sentence">housekeeping\.paymentsMonthWithOpen\{[^<]*&quot;pending&quot;:&quot;45,00/, 'sondern der Satz mit dem offenen Teil');
+  const bezahlt = dashboardHtml({ months: [{ month: '2026-09', total: 90, pending: 0 }] });
+  assert.match(bezahlt, /housekeeping\.paymentsMonthAllPaid/);
+  const zwei = dashboardHtml({ months: [{ month: '2026-08', total: 45 }, { month: '2026-09', total: 90 }] });
+  assert.match(zwei, /class="housekeeping-chart" role="list"/, 'ab zwei Monaten der Verlauf');
+  const keiner = dashboardHtml({ months: [] });
+  assert.match(keiner, /housekeeping\.noPaymentData/);
+});
+
+// R24 (Critique G2-Haushaltshilfe-P3-1): der Bereich war Freitext - jeder
+// Tippfehler ein neuer Bereich. Die Liste schlaegt die vorhandenen vor.
+test('R24: der Bereich schlaegt die vorhandenen Bereiche vor, ohne Dubletten in Gross/klein', () => {
+  const state = hk.state();
+  state.tasks = [{ id: 1, name: 'A', area: 'Küche' }, { id: 2, name: 'B', area: 'küche' }, { id: 3, name: 'C', area: 'Bad' }];
+  state.templates = [];
+  assert.deepEqual(hk.knownAreas(), ['Bad', 'Küche']);
+  const html = hk.areaDatalistHtml();
+  assert.match(html, /^<datalist id="housekeeping-area-options"><option value="Bad"><\/option><option value="Küche"><\/option><\/datalist>$/);
+  const src = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
+  assert.equal((src.match(/<input name="area" required maxlength="100" autocomplete="off" list="\$\{AREA_LIST_ID\}"/g) ?? []).length, 2,
+    'Anlegen und Bearbeiten nehmen beide die Liste');
+  assert.match(src, /housekeeping-create__hint[^>]*>\$\{esc\(t\('housekeeping\.taskTemplatesHint'\)\)\}/, 'die Vorlagen sagen, dass ein Tipp anlegt');
+});
+
+// R24 (Critique G2-Haushaltshilfe-P2-1): fuenfzehn Felder offen, 829px. Name
+// und Abrechnung oben, der Rest hinter "Weitere Angaben" mit Hinweis.
+test('R24: der Haushaltshilfe-Dialog zeigt Name und Abrechnung, der Rest liegt hinter "Weitere Angaben"', () => {
+  const src = readFileSync(new URL('../public/pages/housekeeping.js', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('function openStaffModal('), src.indexOf('onSave: (panel) => {', src.indexOf('function openStaffModal(')));
+  const advanced = body.indexOf('advancedSection(`');
+  assert.ok(advanced > 0, 'es gibt den Aufklapper');
+  for (const name of ['rate_type', 'daily_rate', 'payment_schedule']) {
+    const at = body.indexOf(`name="${name}"`);
+    assert.ok(at > 0 && at < advanced, `${name} steht oben`);
+  }
+  for (const name of ['phone', 'email', 'calendar_color', 'avatar_color', 'notes']) {
+    assert.ok(body.indexOf(`name="${name}"`) > advanced || body.indexOf(`name: '${name}'`) > advanced, `${name} steht hinter "Weitere Angaben"`);
+  }
+  assert.match(body, /hint: t\('housekeeping\.workerMoreHint'\)/, 'der Aufklapper nennt, was dahinter liegt');
+  assert.match(body, /initialFocus: dialogInitialFocus\(Boolean\(item\.id\)\)/);
+});
+
+
+// R24 (E2): die Kurzzeile "in jeder Breite" ist EIN Baustein mit der mobilen
+// Zeile, keine zweite Bauart fuer den Desktop.
+test('R24 E2: metricGlanceHtml({ everywhere }) zeigt die Kurzzeile in jeder Breite', async () => {
+  const { metricGlanceHtml } = await import('../public/utils/metric-glance.js');
+  assert.match(metricGlanceHtml({ label: 'L', value: '1', everywhere: true }), /class="row-carrier budget-glance budget-glance--everywhere"/);
+  assert.doesNotMatch(metricGlanceHtml({ id: 'x', controls: 'y', label: 'L', value: '1', everywhere: true }), /budget-glance--everywhere/,
+    'mit Aufklapper nicht - es gaebe keine Karten, die er zeigt');
+  const { eachRule } = await import('./css-rules.js');
+  const css = readFileSync(new URL('../public/styles/panel.css', import.meta.url), 'utf8');
+  const r = [...eachRule(css)].find((x) => x.selector.trim() === '.budget-glance.budget-glance--everywhere' && !x.at.length);
+  assert.match(r?.body ?? '', /display:\s*block/, 'ausserhalb jeder Breitenabfrage sichtbar');
 });

@@ -2603,7 +2603,7 @@ test('R17 E7: ein Tipp auf die Geburtstagszeile oeffnet das Leseblatt, Bearbeite
   assert.equal(blatt.pane, undefined, 'als Blatt, nicht in der Spalte');
   assert.ok(blatt.sections.some((row) => row.value === 'Mag Kuchen'), 'die Notiz, die die Zeile am Telefon ausblendet');
   assert.deepEqual(blatt.actions.map((a) => [a.id, a.variant, a.align ?? 'end']), [
-    ['birthday-detail-delete', 'danger-ghost', 'start'],
+    ['birthday-detail-delete', 'danger-outline', 'start'],
     ['detail-view-edit', 'primary', 'end'],
   ], 'Loeschen zurueckgenommen am Anfang, Bearbeiten als Primaerknopf am Ende - wie im Termin');
 
@@ -2755,7 +2755,6 @@ async function geburtstagSpeichern(eintrag, { mode = 'edit', bedienen = async ()
     '#bd-name': editorElement({ value: eintrag.name }),
     '#birthday-preview': editorElement(),
     '#bd-photo': editorElement(),
-    '#bd-photo-edit': editorElement(),
     '#bd-remove-photo': editorElement(),
     '#bd-birth-date': editorElement({ value: eintrag.birth_date }),
     // "Jahr unbekannt" (#2095, utils/birth-date.js): Haken, Monat, Tag.
@@ -3597,6 +3596,8 @@ test('Faellige Dosis mit `health: read`: kein Buchungsknopf, aber die Ansage „
       const html = health.dueRowMarkup(dosis(), medikament(), null);
       assert.doesNotMatch(html, /data-dose-take|data-dose-skip/);
       assert.doesNotMatch(html, /<button/);
+      // Der Ring bleibt als Zeichen (R24, E10), nicht als Knopf.
+      assert.match(html, /<span class="health-dose__check check-ring check-ring--static" aria-hidden="true">/);
       // ZUSTAND BLEIBT ALS ZEICHEN: die Zeile sagt weiter, woran sie ist.
       assert.match(html, /<span class="health-dose__status">health\.meds\.status\.pending<\/span>/);
       assert.match(html, /Ibuprofen/);
@@ -3607,8 +3608,9 @@ test('Faellige Dosis mit `health: read`: kein Buchungsknopf, aber die Ansage „
     for (const stufe of ['read', 'write']) {
       withAccess({ health: stufe }, () => {
         const html = health.dueRowMarkup(dosis(), medikament(), { id: 5, status: 'taken' });
-        assert.match(html, /health-dose__status--taken/);
-        assert.match(html, /health\.meds\.status\.taken/);
+        // Eingenommen sagt der volle Ring vorn (R24, E10), benannt fuer die Hilfstechnik.
+        assert.match(html, /class="health-dose__check check-ring check-ring--static check-ring--done" role="img" aria-label="health\.meds\.status\.taken"/);
+        assert.doesNotMatch(html, /<button/);
       });
     }
   });
@@ -3729,17 +3731,15 @@ test('Vorsorge-Zeile: Bearbeiten weg, Datum und Charge bleiben', () => {
 // Uebersicht
 // -------------------------------------------------------------------------
 
-test('Schnellerfassung der Uebersicht faellt bei `health: read` ganz weg', () => {
+test('Das Erfassen-Menue der Uebersicht faellt bei `health: read` ganz weg (R24 E9, vorher „Schnell erfassen")', () => {
   mitView('overview', { meId: 1, personId: 1, __reset: {} }, () => {
     withAccess({ health: 'write' }, () => {
-      const html = health.quickCaptureMarkup();
-      assert.match(html, /data-action="ov-add-vital"/);
-      assert.match(html, /data-action="ov-add-activity"/);
-      assert.match(html, /data-action="ov-go-meds"/);
+      const actions = health.overviewCaptureItems().map((item) => item.action);
+      assert.ok(actions.includes('ov-add-vital') && actions.includes('ov-add-activity') && actions.includes('ov-go-meds'), actions.join(','));
     });
     withAccess({ health: 'read' }, () => {
-      assert.equal(health.quickCaptureMarkup(), '',
-        'drei Knoepfe, die nur anlegen - es bleibt nichts zu zeigen');
+      assert.deepEqual(health.overviewCaptureItems(), [],
+        'Wege, die nur anlegen - es bleibt nichts anzubieten, der FAB geht');
     });
   });
 });
@@ -3919,8 +3919,10 @@ test('READ_SAFE_ACTIONS ist eine Positivliste und enthaelt nur lesende Aktionen'
   // R16: dazu der dritte Tabwechsel (Kartentitel "Letzte Vitalwerte") und der
   // CSV-Export im Kopf - ein Download, der schon als Karte ohne Schreibrecht
   // offenstand (dort als blosse Links, deshalb ohne `data-action`).
-  assert.deepEqual(erlaubt, ['cancel', 'health-export', 'ov-go-cycle', 'ov-go-meds', 'ov-go-vitals'],
-    'Dialog schliessen, drei Tabwechsel und der Export-Dialog - alles andere dieser Seite schreibt');
+  // R24 (E9): `ov-go-meds` stand in der Karte „Schnell erfassen" - die ist weg,
+  // das Erfassen-Menue am FAB gibt es nur mit Schreibrecht.
+  assert.deepEqual(erlaubt, ['cancel', 'health-export', 'ov-go-cycle', 'ov-go-vitals'],
+    'Dialog schliessen, zwei Bereichswechsel und der Export-Dialog - alles andere dieser Seite schreibt');
 
   // Und die Gegenprobe gegen den Quelltext: JEDE andere `data-action` der Seite
   // ist damit gesperrt. Kaeme morgen eine dazu, waere sie es auch - das ist der
@@ -4462,7 +4464,8 @@ test('Erledigen: der Toast nimmt es zurueck - auf den VORHERIGEN Zeitpunkt, nich
   const anfragen = await mitHkApi(async () => {
     globalThis.window.yuvomi.showToast = (...args) => toasts.push(args);
     await withAccess({ housekeeping: 'write' }, () => hk.completeTask({ id: 3, last_completed: '2026-09-07T07:00:00Z' }, hkContainer()));
-    const undo = toasts.find((args) => args[0] === 'housekeeping.taskDoneToast')?.[3];
+    // Seit R24 nennt die Quittung die Arbeit (housekeeping.taskDoneNamed) und steht vor der Antwort.
+    const undo = toasts.find((args) => String(args[0]).startsWith('housekeeping.taskDoneNamed'))?.[3];
     assert.equal(typeof undo, 'function', 'der Erledigt-Toast traegt einen Rueckweg');
     await withAccess({ housekeeping: 'write' }, () => undo());
   });
@@ -4559,18 +4562,24 @@ test('Personal-Tab mit `housekeeping: read`: kein Bearbeiten, die Auswahl und da
   }
 });
 
-test('Bezahlen im Mehr-Knopf der Besuchszeile: nur wo der Server es zugesteht, nie gesperrt', () => {
+// R24 (G2-Haushaltshilfe-P2-2): Bezahlen ist die sichtbare Handlung der
+// Zeile (visitRowHtml), nicht mehr ein Menueeintrag - dieselbe Regel: nur wo
+// der Server es zugesteht, nie gesperrt, bei `read` gar nicht.
+test('Bezahlen in der Besuchszeile: nur wo der Server es zugesteht, nie gesperrt', () => {
   const offen = hkBesuch();
   const bezahlt = hkBesuch({ paid_at: '2026-08-07T10:00:00Z', can_mark_paid: false });
+  const zeile = (v) => hk.visitRowHtml(v, { dateText: 'x' });
   withAccess({ housekeeping: 'read' }, () => {
     assert.equal(hk.visitMenuHtml(offen, 'x'), '');
+    assert.doesNotMatch(zeile(offen), /data-pay-visit/);
     assert.equal(hk.visitMenuHtml(bezahlt, 'x'), '', 'der Zahlstatus steht in der Metazeile, nicht an einem Knopf');
   });
   withAccess({ housekeeping: 'write' }, () => {
-    assert.match(hk.visitMenuHtml(offen, 'x'), /data-pay-visit="12"/, 'mit Schreibrecht da');
-    assert.doesNotMatch(hk.visitMenuHtml(offen, 'x'), /disabled/, 'und offen');
-    // Der Server bietet das Bezahlen nicht an: der Eintrag fehlt.
-    assert.doesNotMatch(hk.visitMenuHtml(hkBesuch({ can_mark_paid: false }), 'x'), /data-pay-visit/);
+    assert.match(zeile(offen), /class="btn btn--secondary btn--sm housekeeping-visit-pay" data-pay-visit="12"/, 'mit Schreibrecht da');
+    assert.doesNotMatch(zeile(offen), /housekeeping-visit-pay"[^>]*disabled/, 'und offen');
+    assert.doesNotMatch(hk.visitMenuHtml(offen, 'x'), /data-pay-visit/, 'nicht zweimal');
+    // Der Server bietet das Bezahlen nicht an: der Knopf fehlt.
+    assert.doesNotMatch(zeile(hkBesuch({ can_mark_paid: false })), /data-pay-visit/);
     // Seit D6 auch am bezahlten Besuch kein gesperrter Knopf mehr: ein Eintrag
     // "Als bezahlt markieren" an einem bezahlten Besuch versprache nichts.
     assert.doesNotMatch(hk.visitMenuHtml(hkBesuch({ paid_at: '2026-08-07T10:00:00Z' }), 'x'), /data-pay-visit/);
@@ -5362,9 +5371,9 @@ test('Kanon R5: der Lesedialog einer Notiz fuehrt "Bearbeiten" als Primaerknopf,
       modalOptionen(() => notes.openNoteModal({ mode: 'edit', note: notiz() }))
     )));
     // R22 D20: Detail-Fuss-Kanon wie das Leseblatt der Kontakte - Bearbeiten
-    // gefuellt MIT Stift, Loeschen in der Leseansicht leise (danger-ghost).
+    // gefuellt MIT Stift, Loeschen umrandet mit Wort (R24: EINE Loeschen-Form).
     assert.match(offen.content, /<button type="button" class="btn btn--primary" id="note-modal-edit" data-reader-only>\s*<i data-lucide="pencil" class="icon-md" aria-hidden="true"><\/i><span class="btn__label">common\.edit<\/span>/);
-    assert.match(offen.content, /class="btn btn--danger-ghost" id="note-modal-delete">\s*<i data-lucide="trash-2"/, 'Loeschen leise als Textknopf mit Icon, links');
+    assert.match(offen.content, /class="btn btn--danger-outline" id="note-modal-delete">\s*<i data-lucide="trash-2"/, 'Loeschen als umrandeter Textknopf mit Icon, links');
     assert.doesNotMatch(offen.content, /id="note-modal-delete"[^>]*style=/, 'den Anfangsrand haelt .modal-panel__delete, kein Inline-Style');
     const neu = withAccess({ notes: 'write' }, () => modalOptionen(() => notes.openNoteModal({ mode: 'create' })));
     assert.doesNotMatch(neu.content, /note-modal-edit/, 'eine neue Notiz oeffnet im Editor - dort gibt es nichts umzuschalten');
@@ -5407,7 +5416,9 @@ test('Kanon R5: der Kanban-Statusknopf trifft auf --target-base, obwohl er 24px 
   assert.ok(flaeche, 'ohne ::before ist die 24px-Box die ganze Trefferflaeche');
   assert.match(flaeche.body, /content:\s*''/);
   assert.match(flaeche.body, /position:\s*absolute/);
-  assert.match(flaeche.body, /inset:\s*calc\(\(100% - var\(--target-base\)\) \/ 2\)/);
+  // Senkrecht auf --target-base; waagerecht etwas ueber die Kapsel hinaus,
+  // seit sie ihr Verb traegt (R24, G2-Aufgaben-P3-4) und breiter als hoch ist.
+  assert.match(flaeche.body, /inset-block:\s*calc\(\(100% - var\(--target-base\)\) \/ 2\)/);
 });
 
 // -------------------------------------------------------------------------

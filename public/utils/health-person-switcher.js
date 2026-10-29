@@ -9,7 +9,7 @@
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
-import { getReadableTextColor } from '/utils/color.js';
+import { getReadableTextColor, safeHexColor } from '/utils/color.js';
 
 // Geteilter Personen-Umschalter: EIN Knopf mit der aktiven Person statt einer
 // Dauer-Pillenzeile (Critique 2026-08-31: 6 Ansichts-Tabs + 4 Personen-Pillen
@@ -25,14 +25,19 @@ export function personSwitcherMarkup(members, activeId, meId, { menuId, label })
   const nameOf = (m) => (m.id === meId
     ? `${m.display_name} · ${t('health.vitals.you')}`
     : m.display_name);
+  const colorOf = (m) => safeHexColor(m.avatar_color, null);
   const dotOf = (m) => `<span class="health-person-chip__dot" aria-hidden="true"
-          style="background:${esc(m.avatar_color) || 'var(--module-health)'}"></span>`;
+          style="background:${colorOf(m) || 'var(--module-health)'}"></span>`;
   // Am Knopf traegt der Punkt die Initialen: im Seitenkopf des Telefons waechst
   // er zum Gesicht (health.css, R23). Ohne Farbe bleibt die Schrift die des
   // Moduls auf seiner Toenung.
   const faceOf = (m) => `<span class="health-person-chip__dot" aria-hidden="true"
-          style="background:${esc(m.avatar_color) || 'var(--module-health)'}${m.avatar_color ? `;color:${getReadableTextColor(m.avatar_color)}` : ''}"><span class="health-person-chip__initials">${esc(initials(m.display_name, '?'))}</span></span>`;
+          style="background:${colorOf(m) || 'var(--module-health)'}${colorOf(m) ? `;color:${getReadableTextColor(colorOf(m))}` : ''}"><span class="health-person-chip__initials">${esc(initials(m.display_name, '?'))}</span></span>`;
   const active = list.find((m) => m.id === activeId) ?? list[0];
+  // „ICH" ZUERST (R24, Critique G5 P3-1): die Mitgliederliste kam in
+  // Haushaltsreihenfolge, die eigene Ansicht stand zuletzt - sie ist die,
+  // zu der man am haeufigsten zurueckkehrt.
+  const ordered = [...list.filter((m) => m.id === meId), ...list.filter((m) => m.id !== meId)];
   return `
     <div class="health-person-switcher">
       <button type="button" class="health-person-switcher__trigger popover-menu__trigger"
@@ -43,7 +48,7 @@ export function personSwitcherMarkup(members, activeId, meId, { menuId, label })
         <i data-lucide="chevron-down" class="icon-sm health-person-switcher__chevron" aria-hidden="true"></i>
       </button>
       <div class="popover-menu" id="${esc(menuId)}" popover role="menu" aria-label="${esc(label)}">
-        ${list.map((m) => `
+        ${ordered.map((m) => `
           <button type="button" role="menuitemradio" aria-checked="${m.id === activeId}"
                   class="popover-menu__item" data-person-id="${esc(m.id)}">
             <i data-lucide="check" class="icon-md popover-menu__item-check${m.id === activeId ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i>

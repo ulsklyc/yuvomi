@@ -54,6 +54,8 @@ describe('pruneRemoved (#508)', () => {
     db = new DatabaseSync(':memory:');
     db.exec(`
       CREATE TABLE tasks (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         id                  INTEGER PRIMARY KEY AUTOINCREMENT,
         title               TEXT NOT NULL,
         external_uid        TEXT,
@@ -61,6 +63,8 @@ describe('pruneRemoved (#508)', () => {
         external_account_id INTEGER
       );
       CREATE TABLE shopping_items (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         id                  INTEGER PRIMARY KEY AUTOINCREMENT,
         name                TEXT NOT NULL,
         external_uid        TEXT,
@@ -177,11 +181,14 @@ describe('caldav_reminder_selection schema & upsert logic', () => {
         FOREIGN KEY (account_id) REFERENCES caldav_accounts(id) ON DELETE CASCADE,
         UNIQUE(account_id, list_url)
       );
+      CREATE TABLE caldav_reminder_assignees (selection_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (selection_id, user_id));
       CREATE TABLE shopping_lists (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL
       );
       CREATE TABLE shopping_items (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         list_id INTEGER NOT NULL REFERENCES shopping_lists(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
@@ -195,6 +202,8 @@ describe('caldav_reminder_selection schema & upsert logic', () => {
       CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL);
       INSERT INTO users (username) VALUES ('owner');
       CREATE TABLE tasks (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         description TEXT,
@@ -243,6 +252,7 @@ describe('caldav_reminder_selection schema & upsert logic', () => {
         list_url TEXT NOT NULL, list_name TEXT NOT NULL,
         FOREIGN KEY (account_id) REFERENCES caldav_accounts(id) ON DELETE CASCADE
       );
+      CREATE TABLE caldav_reminder_assignees (selection_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (selection_id, user_id));
     `);
     tmp.exec('PRAGMA foreign_keys = ON');
     tmp.prepare('INSERT INTO caldav_accounts (name) VALUES (?)').run('A');
@@ -389,12 +399,19 @@ describe('Aufgabenlisten erscheinen ohne Knopfdruck (#617)', () => {
         writable      INTEGER,
         UNIQUE(account_id, list_url)
       );
+      CREATE TABLE caldav_reminder_assignees (selection_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (selection_id, user_id));
+      -- Die gelesene Auswahl nennt die Standard-Personen je Liste (#1221).
+      CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT);
       -- Die gelesene Auswahl zaehlt die wartenden Uploads je Liste (#1840).
       CREATE TABLE tasks (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         id INTEGER PRIMARY KEY AUTOINCREMENT, external_source TEXT DEFAULT 'local',
         target_caldav_account_id INTEGER, target_caldav_list_url TEXT, parent_task_id INTEGER
       );
       CREATE TABLE shopping_items (
+        -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+        seen_on_server INTEGER NOT NULL DEFAULT 1,
         id INTEGER PRIMARY KEY AUTOINCREMENT, external_source TEXT DEFAULT 'local', list_id INTEGER
       );
       INSERT INTO caldav_accounts (name, caldav_url, username, password)
@@ -507,6 +524,8 @@ describe('applyTaskRelations (#671)', () => {
   const seed = (rows) => {
     db = new DatabaseSync(':memory:');
     db.exec(`CREATE TABLE tasks (
+  -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
+  seen_on_server INTEGER NOT NULL DEFAULT 1,
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       parent_task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE

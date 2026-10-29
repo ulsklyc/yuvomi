@@ -254,22 +254,22 @@ function isMirrored(row) {
 
 /**
  * Löst die gespiegelten Zeilen eines Kontos von ihm ab - zu rufen, bevor das
- * Konto verschwindet. Was hier steht, sind Nutzerdaten und bleibt; nur die
- * Verbindung zum Server geht. Danach ist es eine gewöhnliche Aufgabe bzw. ein
- * gewöhnlicher Einkaufsposten: kein Tombstone, kein Push, und der Prune-Lauf
- * eines anderen Kontos fasst sie nicht an.
+ * Konto verschwindet. Dieselbe Regel wie bei Terminen (#1885, #1906): die
+ * Zeile bleibt Spiegel ihrer UID, verliert nur ihr Konto, und das nächste
+ * Konto, das die UID liefert, übernimmt sie - statt dass es neben ihr eine
+ * zweite anlegt. Kein Tombstone und kein Push ohne Konto, und der Prune-Lauf
+ * eines anderen Kontos fasst sie nicht an. Der Trigger
+ * `trg_caldav_accounts_release_rows` (v268) tut dasselbe für jeden anderen
+ * Weg, auf dem ein Konto verschwindet.
  *
- * @returns {number} Anzahl entkoppelter Zeilen
+ * @returns {number} Anzahl abgelöster Zeilen
  */
 export function detachAccountRows(accountId) {
   let detached = 0;
   for (const def of Object.values(MODULES)) {
     detached += db.get().prepare(`
       UPDATE ${def.table}
-         SET external_source     = 'local',
-             external_uid        = NULL,
-             external_account_id = NULL,
-             external_object_url = NULL,${def.table === 'shopping_items' ? `
+         SET external_account_id = NULL,${def.table === 'shopping_items' ? `
              outbound_move          = 0,
              outbound_move_attempts = 0,
              outbound_move_since    = NULL,
@@ -720,7 +720,9 @@ export function adoptOwnUpload(module, uid, accountId, objectUrl, { listUrl, tar
            target_caldav_account_id = NULL,
            target_caldav_list_url   = NULL,` : ''}
            outbound_dirty      = 1,
-           outbound_attempts   = 0
+           outbound_attempts   = 0,
+           -- Der Abruf hat das Objekt gerade gefunden (#1839).
+           seen_on_server      = 1
      WHERE id = ? AND external_source = 'local'
   `).run(uid, accountId, objectUrl, rowId).changes > 0;
   if (adopted) {
@@ -1094,7 +1096,9 @@ function bookTodoUpload(module, sent, { uid, objectUrl, accountId, collectionUrl
            target_caldav_account_id = NULL,
            target_caldav_list_url   = NULL,` : ''}
            outbound_dirty      = ?,
-           outbound_attempts   = 0
+           outbound_attempts   = 0,
+           -- Ein Upload belegt nichts (#1839): gesehen setzt nur der Abruf.
+           seen_on_server      = 0
      WHERE id = ? AND external_source = 'local'
   `).run(uid, accountId, objectUrl, adopted || edited ? 1 : 0, sent.id).changes > 0;
   if (!mirrored) return 'unchanged';
@@ -1253,17 +1257,18 @@ export function leftoverHoldsCarriedItem(uid, listUrl) {
  *
  * @param {object} client
  * @param {number} accountId
- * @param {{clientFor?: (accountId: number) => Promise<object|null>}} [opts]
- *        Client eines anderen Kontos - die Kopie kann dort liegen
+ * @param {{clientFor?: (accountId: number) => Promise<object|null>, stop?: object}} [opts]
+ *        Client eines anderen Kontos - die Kopie kann dort liegen; Stoppsignal
+ *        des Durchgangs (#2135)
  * @returns {Promise<number>} entfernte Objekte
  */
-export function releaseLeftoverTodoUploads(client, accountId, { clientFor = null } = {}) {
+export function releaseLeftoverTodoUploads(client, accountId, { clientFor = null, stop = null } = {}) {
   // Nur in Listen, die für dieses Konto eingeschaltet sind.
   const enabled = db.get().prepare(
     'SELECT list_url FROM caldav_reminder_selection WHERE account_id = ? AND enabled = 1'
   ).all(accountId).map((r) => r.list_url);
   return removeLeftoverUploads(client, {
-    source: 'caldav', accountId, kinds: ['task', 'item'],
+    source: 'caldav', accountId, kinds: ['task', 'item'], stop,
     stateOf: (attempt) => todoAttemptState(attempt.kind === 'item' ? 'shopping' : 'tasks', attempt),
     inScope: (url) => enabled.some((known) => sameCollection(known, url)),
     beforeRemove: (attempt) => confirmCarriedCopy(attempt, client, accountId, clientFor),
@@ -1389,13 +1394,16 @@ function reportClosedLists(gate, what) {
  * @param {number} accountId
  * @param {string} module
  * @param {Map}    listsByUrl   Listen-URL → Collection des Servers
+ * @param {{stop?: object}} [opts]  Stoppsignal des Durchgangs (#2135)
  * @returns {Promise<number>} erfolgreich hochgeladene Einträge
  */
-export async function processPendingCreations(client, accountId, module, listsByUrl) {
+export async function processPendingCreations(client, accountId, module, listsByUrl, { stop = null } = {}) {
   const rows = pendingCreations(accountId, module);
   if (rows.length === 0) return 0;
 
-  const gate = createUploadGate();
+  // Das Stoppsignal des Durchgangs (#2135): nach einer kontoweiten Absage einer
+  // früheren Phase geht auch kein Upload mehr hinaus.
+  const gate = createUploadGate(stop);
   const readOnly = new Map();
   let done = 0;
   for (const listed of rows) {
@@ -1490,10 +1498,11 @@ export async function processPendingCreations(client, accountId, module, listsBy
  * @param {number} accountId
  * @param {Array<{listUrl: string, targetListId: number}>} targets  aktive Zuordnungen
  * @param {Map}    listsByUrl  Listen-URL → Collection des Servers
+ * @param {{stop?: object}} [opts]  Stoppsignal des Durchgangs (#2135)
  * @returns {Promise<number>} erfolgreich hochgeladene Artikel
  */
-export async function processPendingShoppingCreations(client, accountId, targets, listsByUrl) {
-  const gate = createUploadGate();
+export async function processPendingShoppingCreations(client, accountId, targets, listsByUrl, { stop = null } = {}) {
+  const gate = createUploadGate(stop);
   const readOnly = new Map();
   let done = 0;
   for (const { listUrl, targetListId } of targets) {
@@ -2503,14 +2512,18 @@ async function runFlushOutbound({ createClient } = {}) {
     try {
       const client = await createTodoClient(account, makeClient);
 
+      // Ein Stoppsignal für jede schreibende Phase aller Module dieses
+      // Kontos (#1863, #2137, #2135): Aufräumen, Löschen, Ändern, Uploads und
+      // Mitnahmen. Nach einer kontoweiten Absage geht keine Anfrage mehr an
+      // das Konto, auch kein Abruf, der nur einer späteren Phase diente.
+      const stop = createRefusalStop();
+
       // Vor allem anderen: die Reste nie bestätigter Uploads entfernen
       // (#1882), damit eine Zeile mit neuem Ziel nicht neben ihren Rest geht.
-      await releaseLeftoverTodoUploads(client, accountId, { clientFor });
+      await releaseLeftoverTodoUploads(client, accountId, { clientFor, stop });
 
-      // Ein Stoppsignal für Löschen, Ändern und Mitnahmen aller Module dieses
-      // Kontos (#1863, #2137).
-      const stop = createRefusalStop();
       for (const module of modules) {
+        if (stop.blocks()) break;
         const wanted = [
           ...pendingDeletions(accountId, module)
             .filter((r) => r.object_url && !inUnselectedList(accountId, r.object_url))
@@ -2531,9 +2544,10 @@ async function runFlushOutbound({ createClient } = {}) {
         // Uploads brauchen die Collection selbst, nicht einzelne Objekte - und
         // damit den einzigen Listenabruf in diesem Pfad. Er läuft deshalb nur,
         // wenn wirklich etwas wartet.
+        if (stop.blocks()) break;
         if (module === 'tasks' && pendingCreations(accountId, module).length) {
           total.created += await processPendingCreations(
-            client, accountId, module, await taskListsOf(client, accountId)
+            client, accountId, module, await taskListsOf(client, accountId), { stop }
           );
         }
         if (module === 'shopping') {
@@ -2546,7 +2560,7 @@ async function runFlushOutbound({ createClient } = {}) {
           if (targets.length || moves.length) {
             const collections = await collectionsForTargets(client, [...targets, ...moves]);
             if (targets.length) {
-              total.created += await processPendingShoppingCreations(client, accountId, targets, collections);
+              total.created += await processPendingShoppingCreations(client, accountId, targets, collections, { stop });
             }
             if (moves.length) {
               // Als `updated` gezählt: das Objekt ist dasselbe, nur sein Platz nicht.

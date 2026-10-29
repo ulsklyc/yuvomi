@@ -25,6 +25,7 @@ import {
   markSettingsOverviewEntry,
   resolveSettingsDestination,
   searchSettings,
+  orderSettingsHits,
   settingsOptionUrl,
   settingsOverviewUrl,
 } from '../public/settings/registry.js';
@@ -315,7 +316,6 @@ test('Gravatar: der Knopf steht im Bild-Editor, gesperrt ohne gespeicherte Adres
   const locked = buttonOf(avatarEditorHtml({ display_name: 'Ada', email: null }, on));
   assert.ok(locked, 'der Knopf existiert');
   assert.match(locked, /aria-disabled="true"/);
-  assert.match(locked, /aria-label="settings\.gravatarUse"/);
   assert.match(locked, /aria-describedby="profile-gravatar-hint"/);
   assert.doesNotMatch(locked, /\sdisabled[\s>]/, 'aria-disabled statt disabled: erreichbar bleiben');
   assert.equal(gravatarHintText({ email: null }), 'settings.gravatarNeedsEmail');
@@ -332,9 +332,16 @@ test('Gravatar: der Knopf steht im Bild-Editor, gesperrt ohne gespeicherte Adres
   assert.equal(gravatarHintText({ email: ' ada@example.org ' }), 'settings.gravatarHintUnnamed{"email":"ada@example.org"}');
   assert.equal(gravatarHintText({ email: null }, 'gravatar.com'), 'settings.gravatarNeedsEmail');
 
-  // Dieselbe Familie wie Hochladen und Entfernen daneben, mit Icon.
-  assert.match(free, /class="settings-avatar-action"/);
-  assert.match(avatarEditorHtml({ email: 'ada@example.org' }, on), /id="profile-avatar-gravatar"[^]*?data-lucide="cloud-download"/);
+  // R24 (`.media-picker`): Gravatar ist ein kleiner Textknopf mit Symbol und
+  // Wort; die Scheibe ist die Bildwahl (Abzeichen), Entfernen steht als Text
+  // nur mit Bild, kein Stift und kein nackter Papierkorb mehr daneben.
+  assert.match(free, /class="btn btn--secondary btn--sm"/);
+  const editor = avatarEditorHtml({ email: 'ada@example.org' }, on);
+  assert.match(editor, /id="profile-avatar-gravatar"[^]*?data-lucide="cloud-download"[^]*?settings\.gravatarUse/);
+  assert.match(editor, /<span class="media-picker">\s*<button type="button" class="settings-avatar-button" id="profile-avatar-preview"[^]*?<\/button>\s*<span class="media-picker__badge"/);
+  assert.doesNotMatch(editor, /profile-avatar-edit|settings-avatar-action(?!s)/);
+  assert.match(editor, /id="profile-avatar-remove" hidden>/, 'ohne Bild kein Entfernen');
+  assert.doesNotMatch(avatarEditorHtml({ email: 'ada@example.org', avatar_data: 'data:image/png;base64,AA' }, on), /id="profile-avatar-remove" hidden/);
 });
 
 test('Gravatar: die Hinweiszeile kommt leer aus dem HTML und wird als Text gefuellt - die Adresse steht woertlich da', async () => {
@@ -1151,30 +1158,17 @@ test('Einstellungen: ein Sofort-Schalter im Formular hinterlaesst keinen offenen
   });
 });
 
-test('Einstellungen: ein Blatt ohne Formular (Rechte-Matrix) meldet seinen Entwurf selbst an (R15 A7 P1-1)', async () => {
-  await withGuardEnv(async ({ guard, leave, gefragt }) => {
-    const { container } = guardFakes();
-    guard.watchLeafForms(container);
-    let dirty = false;
-    const knoten = { isConnected: true };
-    const abmelden = guard.trackLeafEdits(knoten, () => dirty);
-    assert.equal(leave.hasLeaveGuard(), false, 'sauberer Entwurf: kein Waechter');
-    dirty = true;
-    guard.syncLeafEdits();
-    assert.equal(leave.hasLeaveGuard(), true, 'offener Entwurf: angemeldet');
-    assert.equal(await leave.mayLeave('/calendar'), false, 'und gefragt');
-    assert.equal(gefragt.length, 1);
-    guard.watchLeafForms(container);
-    assert.equal(leave.hasLeaveGuard(), true, 'ein Neuaufbau der Formularwache wirft die Quelle des Blatts nicht weg');
-    dirty = false;
-    guard.syncLeafEdits();
-    assert.equal(leave.hasLeaveGuard(), false, 'gespeichert: abgemeldet');
-    abmelden();
-  });
+// R24 (E11): die Rechte-Matrix speichert jede Wahl sofort und hat keinen
+// Entwurf mehr - sie meldet nichts an, und es gibt nichts zu verlieren. Der
+// Weg fuer Blaetter ohne Formular (`trackLeafEdits`, R15 A7 P1-1) hatte damit
+// keinen Nutzer und ist seit R24 S12 entfallen: offen ist nur ein Formular
+// mit eigenem Absenden (die Tests darueber).
+test('Einstellungen: kein Blatt meldet einen Entwurf ohne Formular an - die Rechte-Matrix speichert sofort (R24 E11, S12)', async () => {
+  const guard = await import('/settings/dirty-guard.js');
+  assert.equal('trackLeafEdits' in guard, false, 'der Anmeldeweg ohne Formular ist entfallen');
   const src = await readFile(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
-  assert.match(src, /trackLeafEdits\(container, \(\) => state\.dirty\)/, 'die Matrix meldet ihren Entwurf an');
-  const update = src.slice(src.indexOf('function updateSaveState('), src.indexOf('\n}\n', src.indexOf('function updateSaveState(')));
-  assert.match(update, /syncLeafEdits\(\)/, 'jede Aenderung des Entwurfs gleicht die Anmeldung ab');
+  assert.doesNotMatch(src, /trackLeafEdits|state\.dirty/, 'kein Entwurf, keine Anmeldung');
+  assert.match(src, /matrix\?\.addEventListener\('change'/, 'die Wahl wirkt beim Aendern');
 });
 
 test('Feiertage: die Ebenen-Schalter speichern sofort, ein Fehler legt zurueck (R15 A7 P1-1)', async () => {
@@ -1291,8 +1285,46 @@ test('die Navigation laesst sich ueber alle Blaetter durchsuchen', async () => {
   assert.match(registry, /descriptionKey/, 'gefiltert wird ueber Label UND Beschreibung');
   assert.match(registry, /normalize\('NFD'\)/, 'die Suche muss Gross-/Kleinschreibung und Diakritika ignorieren');
   assert.match(navSearch, /setAttribute\('role',\s*'status'\)/, 'die Trefferzahl gehoert in eine Live-Region');
-  // Ohne Treffer greift der bestehende Leerzustand, statt stumm zu bleiben.
-  assert.match(navSearch, /t\('search\.noResults'\)/);
+  // Ohne Treffer der Leerzustand der App (R24, G6-Einst-P3-5): Begriff als
+  // Chip und "Suche zuruecksetzen" - nicht mehr der nackte Satz
+  // "Keine Ergebnisse gefunden.". Seitenleiste UND Wurzel.
+  assert.doesNotMatch(source, /t\('search\.noResults'\)/, 'kein nackter Satz mehr');
+  assert.match(navSearch, /searchEmptyEl\(\{\s*query,/);
+  const overview = source.slice(source.indexOf('function filterOverview('), source.indexOf('function emptyOf('));
+  assert.match(overview, /searchEmptyEl\(\{\s*query,/);
+  assert.match(source, /function resetSearchField\(input\) \{[\s\S]{0,200}dispatchEvent\(new Event\('input'/, 'Zuruecksetzen wie das X des Felds');
+  // Die Reihenfolge der Treffer kommt aus EINER Funktion, an beiden Orten.
+  assert.match(navSearch, /orderSettingsHits\(hits, query, t\)/);
+  assert.match(overview, /orderSettingsHits\(hits, query, t\)/);
+});
+
+/* "GERADE ENGLISCH" (Critique R24, G6-Einst-P3-6): neben deutscher Oberflaeche las
+ * sich das Automatik-Ergebnis der Datensprache wie "sogar Englisch". Der Wert
+ * steht wie in jeder anderen Sprache als "Zurzeit: <Wert>." vorn im Hinweis. */
+test('R24: die Hinweiszeile nennt den geltenden Wert als "Zurzeit:", nicht "Gerade"', async () => {
+  const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  assert.equal(de.settings.hintWithCurrent, 'Zurzeit: {{value}}. {{hint}}');
+});
+
+/* DER TREFFER, DER SO HEISST, STEHT VORN (Critique R24, G6-Einst-P3-5): "passwort"
+ * reihte die Option "Passwort aendern" HINTER die Blaetter Konto und E-Mail
+ * (SMTP), die nur ihre Beschreibung traf (gemessen 1440 und 390). */
+test('R24: die Einstellungssuche stellt den Treffer mit dem gesuchten Namen vor die Beschreibungs-Treffer', async () => {
+  const de = JSON.parse(await readFile(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
+  const translate = (key) => key.split('.').reduce((value, segment) => value?.[segment], de) ?? key;
+  const admin = { role: 'admin' };
+  const order = (query) => orderSettingsHits(searchSettings(query, { user: admin, translate }), query, translate);
+  const passwort = order('passwort');
+  assert.equal(passwort[0].label, 'Passwort ändern', 'die Option, die so heisst, zuerst');
+  assert.equal(passwort[0].kind, 'option');
+  assert.ok(passwort.slice(1).some((hit) => hit.kind === 'leaf' && hit.leaf.id === 'personal-account'), 'Konto bleibt Treffer, dahinter');
+  // Ein Blatt, das so heisst, bleibt vorn.
+  const wetter = order('Wetter');
+  assert.equal(wetter[0].kind, 'leaf');
+  assert.equal(wetter[0].leaf.id, 'personal-weather');
+  // Gleicher Rang: die Reihenfolge der Suche bleibt (Blatt, Abschnitt, Option).
+  const ranks = order('kalender').map((hit) => hit.rank);
+  assert.deepEqual(ranks, [...ranks].sort((a, b) => a - b), 'aufsteigend nach Rang');
 });
 
 /**
@@ -2460,7 +2492,8 @@ test('die Wurzel sucht ueber das Such-Icon im geteilten Kopf, in jeder Breite', 
   // Dieselbe Suche wie in der Seitenleiste (searchSettings); ein Abschnitt ohne
   // Treffer faellt weg, und fruehere Blaetter und Optionen bekommen einen
   // eigenen Abschnitt.
-  assert.match(shell, /function filterOverview[\s\S]*?searchSettings\(query[\s\S]*?section\.hidden = visible === 0[\s\S]*?hits\.sections\.map[\s\S]*?hits\.options\.map[\s\S]*?extra\.map\(createOptionRow\)/);
+  // Seit R24 in der Rangfolge von orderSettingsHits (Abschnitte und Optionen aus EINER Liste).
+  assert.match(shell, /function filterOverview[\s\S]*?searchSettings\(query[\s\S]*?section\.hidden = visible === 0[\s\S]*?orderSettingsHits\(hits, query, t\)[\s\S]*?kind === 'section' \? settingsSectionUrl[\s\S]*?settingsOptionUrl[\s\S]*?extra\.map\(createOptionRow\)/);
 });
 
 /**
@@ -3600,9 +3633,14 @@ test('R16: die Sprungmarken sind Links im Blatt, eine scrollende Zeile, und spri
   const row = rules.find((r) => r.selector.trim() === '.settings-sheet-jump__list' && !r.at.length);
   assert.match(row?.body ?? '', /overflow-x:\s*auto/);
   assert.match(row?.body ?? '', /flex-wrap:\s*nowrap/, 'eine Zeile: umgebrochen kosteten fuenf Marken mobil drei Reihen vor dem ersten Schalter');
-  // R20: am Desktop schnitt die Zeile im Kalender-Blatt zwei Marken ab (999px in 660px).
-  const wide = rules.find((r) => r.selector.trim() === '.settings-sheet-jump__list' && r.at.some((a) => /min-width:\s*768px/.test(a)));
-  assert.match(wide?.body ?? '', /flex-wrap:\s*wrap/, 'ab 768px brechen die Marken um, statt an der Kante zu enden');
+  // R20 brach die Zeile ab 768px um (am Desktop schnitt sie im Kalender-Blatt
+  // zwei Marken ohne Anriss ab). R24 (G6-Einst-P3-6): der Umbruch liess
+  // „Termine" allein in Reihe zwei stehen; seit R22 D13 traegt die Zeile den
+  // Anriss, also bleibt sie in jeder Breite eine Zeile.
+  const wide = rules.filter((r) => r.selector.trim() === '.settings-sheet-jump__list' && r.at.length);
+  assert.ok(wide.every((r) => !/flex-wrap:\s*wrap/.test(r.body)), 'keine Breite bricht die Marken um');
+  assert.match(shell.slice(shell.indexOf('function createSheetJump('), shell.indexOf('function syncJumpLabels(')), /wireScrollFade\(list\)/,
+    'der Anriss zeigt in jeder Breite, dass es weitergeht');
 });
 
 test('R16/R20: mobil ist die Blattbeschreibung hoechstens drei Zeilen lang', async () => {
@@ -4140,9 +4178,12 @@ test('R19: umgestellte Blaetter sprechen den Zeilen-Dialekt', async () => {
   const account = await readFile(new URL('../public/settings/pages/personal-account.js', import.meta.url), 'utf8');
   // Re-Kritik 2026-10-17: auch Anzeigename und Farbe neben dem Bild (vorher
   // Felder unter Etiketten, zwei Dialekte in einer Karte).
-  for (const id of ['profile-display-name', 'profile-avatar-color', 'profile-phone', 'profile-email', 'profile-birth-date', 'current-password', 'new-password', 'confirm-password']) {
+  for (const id of ['profile-display-name', 'profile-phone', 'profile-email', 'profile-birth-date', 'current-password', 'new-password', 'confirm-password']) {
     assert.match(account, new RegExp(`settingRowHtml\\(\\{\\s*label: t\\('settings\\.[a-zA-Z]+'\\), labelFor: '${id}'`), `Konto: ${id} als Zeile`);
   }
+  // Die Farbe ist eine Gruppe (Farbwaehler, Critique R24 E6): Zeile mit
+  // Etikett-id, die Reihe darunter.
+  assert.match(account, /label: t\('settings\.colorLabel'\), labelId: 'profile-avatar-color-label', stacked: true,\s*control: colorPickerHtml\(\{ id: 'profile-avatar-color'/, 'Konto: Farbe als Zeile mit Farbwaehler');
   const profile = account.slice(account.indexOf('<div class="settings-profile-editor">'), account.indexOf('id="profile-error"'));
   assert.ok(profile.length > 0, 'Vorbedingung: das Profil steht im Konto-Blatt');
   assert.doesNotMatch(profile, /class="form-group/, 'Konto: das Profil fuehrt keine gestapelten Felder mehr');
@@ -5440,7 +5481,8 @@ test('R22 D13: lange Erklaerungen vor dem ersten Feld - Kern vorn, der Rest hint
     const sentences = de.settings[key].split(/(?<=[.!?])\s+/).length;
     assert.ok(sentences <= 2, `${key}: ${sentences} Saetze vor dem ersten Feld`);
   }
-  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  // Seit R24 ein geteilter Baustein (utils/hint-fold.js), die Regeln in layout.css.
+  const css = await readFile(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
   const summary = [...eachRule(css)].find((r) => r.selector.trim() === '.settings-hint-fold__summary');
   assert.ok(summary, 'der Ausloeser hat eine Regel');
   assert.match(summary.body, /min-block-size:\s*var\(--target-base\)/, 'Zielgroesse der Geraetewelt');
@@ -5680,4 +5722,36 @@ test('#2166: Darstellung - Waehrung und Zone stehen kurz in der Auswahl, voll vo
   assert.match(page, /currencySelect\?\.addEventListener\('change', async \(\) => \{\s*if \(currencySelect\.disabled\) return;\s*(?:\/\/[^\n]*\n\s*)*syncCurrencyHint\(container\);/);
   assert.match(page, /\} catch \(error\) \{\s*syncCurrencyHint\(container\);\s*showError\(errorElement, errorSentence\(error, 'settings\.preferenceSaveFailed'\)\);/);
   assert.match(page, /if \(currencySelect\) currencySelect\.value = preset\.currency;\s*syncCurrencyHint\(container\);/);
+});
+
+// R24 E4 (Ulas 2026-10-28; Critique G6-Einst-P2-3): mobil traegt EINE Leiste
+// den Rueckweg, das Zeichen des Blatts und seinen Namen im Large Title. Vorher
+// stand „< Einstellungen" allein in einer Zeile, darunter Zahnrad, Large Title
+// und Beschreibung - erste Karte y180 (gemessen 390px), danach y81.
+test('R24 E4: das Blatt nennt sich mobil in der Leiste, mit seinem Zeichen, ohne Beschreibung', async () => {
+  const shell = await readFile(new URL('../public/settings/shell.js', import.meta.url), 'utf8');
+  const leaf = shell.match(/if \(activeLeaf && domain\) \{[\s\S]*?\n    return;\n  \}/)?.[0] ?? '';
+  assert.match(leaf, /toolbar\.classList\.add\('page-toolbar--title-tools'\)/, 'eine Zeile (Kopfregel 1a)');
+  assert.match(leaf, /leafName\.setAttribute\('aria-hidden', 'true'\)/, 'Bild, die Ueberschrift bleibt das h1 des Blatts');
+  assert.match(leaf, /createLeafMark\(activeLeaf, 'settings-toolbar__leaf-seal'\)/, 'das Zeichen des Blatts, nicht das Zahnrad');
+  assert.match(leaf, /settingsLeafLabel\(activeLeaf, t\)/);
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  const phone = [...eachRule(css)].filter((r) => r.at.some((a) => /\(max-width:\s*767px\)/.test(a)));
+  const header = phone.find((r) => r.selector.trim() === '.settings-leaf-header');
+  assert.match(header?.body ?? '', /clip:\s*rect\(0, 0, 0, 0\)/, 'Kopf im Inhalt nur im Baum (Titel + Beschreibung)');
+  assert.ok(phone.some((r) => r.selector.includes(".settings-toolbar__leaf-name") && /display:\s*flex/.test(r.body)), 'der Blattname steht mobil in der Leiste');
+  assert.ok(phone.some((r) => r.selector.includes('.settings-toolbar__back-label') && /display:\s*none/.test(r.body)), 'der Rueckweg ist neben dem Titel ein Zeichen');
+});
+
+// R24 (Critique G6-Einst-P3-2): die drei Mobil-Plaetze sind EINE Karte mit drei
+// Optionszeilen (Label links, randlose Auswahl rechts) - vorher je Platz eine
+// Karte mit vollbreitem Feld (rund 450px fuer drei Werte).
+test('R24: die Mobil-Plaetze stehen als Optionszeilen in einem Traeger', async () => {
+  const src = await readFile(new URL('../public/settings/pages/modules-navigation.js', import.meta.url), 'utf8');
+  const slot = src.slice(src.indexOf('function mobileSlotHtml('), src.indexOf('function desktopGroupHtml('));
+  assert.match(slot, /return settingRowHtml\(\{/, 'die Zeile der Einstellungen');
+  assert.match(slot, /labelFor: id/, 'das Label benennt die Auswahl (kein aria-label-Ersatz)');
+  assert.match(src, /<div class="row-carrier settings-group settings-mobile-nav-slots">/, 'ein Traeger fuer alle drei');
+  const css = await readFile(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
+  assert.ok(![...eachRule(css)].some((r) => r.selector.trim() === '.settings-mobile-nav-slot'), 'keine eigene Karte je Platz');
 });

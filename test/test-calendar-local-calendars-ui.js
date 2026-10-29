@@ -40,7 +40,9 @@ test('one local calendar adds neither an event name nor a destination picker', (
   } finally { calendar.localCalendarState.localCalendars = before; }
 });
 
-test('calendar manager rows keep save and more visible, with labelled feed and destructive actions in the menu', () => {
+// R24 (E6): die Zeile ist Punkt, Name und Terminzahl - ihr Hauptteil oeffnet
+// das Bearbeiten-Blatt; Speichern steht im Blatt, nicht mehr in der Zeile.
+test('calendar manager rows keep edit and more visible, with labelled feed and destructive actions in the menu', () => {
   const previous = getPermissions();
   try {
     for (const admin of [true, false]) {
@@ -51,8 +53,9 @@ test('calendar manager rows keep save and more visible, with labelled feed and d
             is_default: isDefault, feed_url: hasFeed ? 'http://lan/feed/calendar/token.ics' : null });
           const buttons = html.match(/<button\b[^>]*>/g) ?? [];
           const visible = buttons.filter(button => !button.includes('role="menuitem"'));
-          assert.ok(visible.length <= 2, 'at most two icon actions remain outside the menu');
-          assert.ok(visible.some(button => button.includes('js-calendar-save')));
+          assert.ok(visible.length <= 2, 'at most the row body and the menu remain outside the menu');
+          assert.ok(visible.some(button => button.includes('js-calendar-edit')), 'the row body opens the edit sheet');
+          assert.ok(!/js-calendar-save|type="color"/.test(html), 'no save button and no raw colour field in the row');
           const expected = [];
           if (admin) {
             if (hasFeed) expected.push('calendar-copy-feed', 'calendar-disable-feed');
@@ -161,7 +164,7 @@ test('copying a calendar feed works without Clipboard API and exposes the link i
 
 test('deleting a calendar names the iCloud upload only while the default calendar uploads', async () => {
   const previous = { document: globalThis.document, window: globalThis.window, apiStub: globalThis.__apiStub,
-    confirmOverModal: globalThis.__confirmOverModal, calendars: calendar.localCalendarState.localCalendars };
+    confirmOverModal: globalThis.__confirmOverModal, askOverModal: globalThis.__askOverModal, calendars: calendar.localCalendarState.localCalendars };
   const permissions = getPermissions();
   const questions = [];
   const deleted = [];
@@ -208,6 +211,8 @@ test('deleting a calendar names the iCloud upload only while the default calenda
     if (previous.apiStub === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = previous.apiStub;
     if (previous.confirmOverModal === undefined) delete globalThis.__confirmOverModal;
     else globalThis.__confirmOverModal = previous.confirmOverModal;
+    if (previous.askOverModal === undefined) delete globalThis.__askOverModal;
+    else globalThis.__askOverModal = previous.askOverModal;
   }
 });
 
@@ -219,7 +224,7 @@ function apiError(status, body) {
 
 async function withManager(api, run) {
   const previous = { document: globalThis.document, window: globalThis.window, apiStub: globalThis.__apiStub,
-    confirmOverModal: globalThis.__confirmOverModal, calendars: calendar.localCalendarState.localCalendars };
+    confirmOverModal: globalThis.__confirmOverModal, askOverModal: globalThis.__askOverModal, calendars: calendar.localCalendarState.localCalendars };
   const permissions = getPermissions();
   const toasts = [];
   const handlers = {};
@@ -234,18 +239,28 @@ async function withManager(api, run) {
   ];
   globalThis.__apiStub = { get: async (...args) => { gets.push(args); return { data: served }; }, ...api };
   globalThis.__confirmOverModal = async () => true;
+  // Seit R24 (E6) fragen Anlegen und Bearbeiten im Blatt ueber der Verwaltung
+  // (askOverModal); hier antwortet das Blatt mit einem gueltigen Namen.
+  let sheetAnswer = null;
+  globalThis.__askOverModal = async () => sheetAnswer;
   calendar.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
   try {
     setPermissions({ admin: false, modules: { calendar: 'write' } });
     await calendar.openLocalCalendarsModal();
     gets.length = 0;
-    const click = (action) => handlers.click({ target: { closest: (selector) => {
-      if (selector === '.cal-calendar-row') return { dataset: { calendarId: '2' }, querySelector: (sel) => (sel.includes('__name') ? { value: 'School' } : { value: '#336699' }) };
-      if (action === 'save') return selector === '.js-calendar-save' ? {} : null;
-      return selector.split(',').map(part => part.trim()).includes(`[data-action="${action}"]`) ? {} : null;
-    } } });
-    const submit = () => handlers.submit({ preventDefault() {}, target: { closest: (selector) => (selector === '#local-calendar-create' ? {} : null) } });
-    panel.querySelector = (selector) => (selector === '#local-calendar-name' ? { value: 'Work' } : (selector === '#local-calendar-color' ? { value: '#112233' } : null));
+    const click = (action) => {
+      if (action === 'save') sheetAnswer = { name: 'School 2', color: '#336699' };
+      return handlers.click({ target: { closest: (selector) => {
+        if (selector === '.cal-calendar-row') return { dataset: { calendarId: '2' } };
+        if (action === 'save') return selector === '.js-calendar-edit' ? {} : null;
+        return selector.split(',').map(part => part.trim()).includes(`[data-action="${action}"]`) ? {} : null;
+      } } });
+    };
+    // Anlegen: „+ Kalender" oeffnet das Blatt, das mit Name und Farbe antwortet.
+    const submit = () => {
+      sheetAnswer = { name: 'Work', color: '#112233' };
+      return handlers.click({ target: { closest: (selector) => (selector === '.js-calendar-add' ? {} : null) } });
+    };
     await run({ click, submit, toasts, gets });
   } finally {
     calendar.localCalendarState.localCalendars = previous.calendars;
@@ -255,6 +270,8 @@ async function withManager(api, run) {
     if (previous.apiStub === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = previous.apiStub;
     if (previous.confirmOverModal === undefined) delete globalThis.__confirmOverModal;
     else globalThis.__confirmOverModal = previous.confirmOverModal;
+    if (previous.askOverModal === undefined) delete globalThis.__askOverModal;
+    else globalThis.__askOverModal = previous.askOverModal;
   }
 }
 
@@ -312,13 +329,14 @@ test('the manager names an invalid name, a changed order and an export only an a
   });
 });
 
-test('renaming a calendar has the same length limit as creating one (#1909)', () => {
-  const permissions = getPermissions();
-  try {
-    setPermissions({ admin: false, modules: { calendar: 'write' } });
-    const html = calendar.renderLocalCalendarRow({ id: 7, name: 'Family', color: '#336699', is_default: false });
-    assert.match(html, /class="form-input cal-calendar-row__name"[^>]*maxlength="80"/);
-  } finally { setPermissions(permissions); }
+test('renaming a calendar has the same length limit as creating one (#1909)', async () => {
+  // Seit R24 (E6) benennt EIN Blatt beim Anlegen und Bearbeiten - mit einem Feld.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const sheet = src.slice(src.indexOf('function localCalendarSheet('), src.indexOf('\n}\n', src.indexOf('function localCalendarSheet(')));
+  assert.match(sheet, /<input class="form-input" id="local-calendar-name" maxlength="80" required/);
+  assert.match(src, /askOverModal\(\(\) => localCalendarSheet\(\)\)/, 'Anlegen nimmt dasselbe Blatt');
+  assert.match(src, /askOverModal\(\(\) => localCalendarSheet\(calendar\)\)/, 'Umbenennen ebenso');
 });
 
 // #1909, Termine: Speichern, Zuruecksetzen und Loeschen sagen den Satz der App,

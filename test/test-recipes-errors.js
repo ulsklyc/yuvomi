@@ -187,13 +187,19 @@ test('Server: der deutsche Satz zur Rezept-ID ist englisch', async () => {
 });
 
 const SERVER_REASONS = ['recipes_recipe_not_found', 'recipes_ingredient_not_found', 'recipes_selected_pantry_item_not_found', 'meals_selected_recipe_not_found'];
+// Gruende, die KEIN "gibt es nicht mehr" sind: das Ziel steht, nur anders.
+const SERVER_CHANGED = ['recipes_ingredients_changed'];
 
 test('Server: jeder Grund der Rezepte hat einen Satz, und jeder "gibt es nicht mehr" ist als solcher bekannt', () => {
   for (const reason of [...SERVER_REASONS, 'shopping_list_not_found']) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: kein Satz`);
     assert.ok(GONE_REASONS.has(reason), `${reason}: nicht in GONE_REASONS`);
   }
-  assert.deepEqual([...CASE_MESSAGES.keys()].filter((r) => /^(recipes|meals)_/.test(r)).sort(), [...SERVER_REASONS].sort(),
+  for (const reason of SERVER_CHANGED) {
+    assert.ok(CASE_MESSAGES.has(reason), `${reason}: kein Satz`);
+    assert.ok(!GONE_REASONS.has(reason), `${reason}: ist kein "gibt es nicht mehr"`);
+  }
+  assert.deepEqual([...CASE_MESSAGES.keys()].filter((r) => /^(recipes|meals)_/.test(r)).sort(), [...SERVER_REASONS, ...SERVER_CHANGED].sort(),
     'ein Grund in CASE_MESSAGES, den kein Server dieser Suite nennt');
 });
 
@@ -543,6 +549,31 @@ test('Seite: auf die Einkaufsliste - Rezept oder Liste weg nimmt genau das aus d
     assert.deepEqual(stand, standNach(was), `${label}: der Stand danach`);
     assertNoServerText();
   }
+});
+
+// Codex an #2364 (P2): die umgerechneten Mengen lagen positionsweise auf den
+// Zutaten des Servers - nach einer Aenderung des Rezepts bei den falschen.
+test('Seite: auf die Einkaufsliste mit anderen Portionen - jede Menge nennt ihre Zutat; hat sich das Rezept geaendert, steht der neue Stand da und der Satz sagt es', async () => {
+  const jetzt = rezept({
+    servings: 2,
+    ingredients: [{ id: 12, name: 'Salz', quantity: '1 TL', pantry_item_id: null }, { id: 11, name: 'Mehl', quantity: '200 g', pantry_item_id: null }],
+  });
+  const err = fehler(409, 'recipes_ingredients_changed');
+  err.data.recipe = jetzt;
+  let gesendet = null;
+  const geladen = rezept({
+    servings: 2,
+    ingredients: [{ id: 1, name: 'Mehl', quantity: '200 g', pantry_item_id: null }, { id: 2, name: 'Salz', quantity: '1 TL', pantry_item_id: null }],
+  });
+  const { gets, stand } = await mitSeite({ recipes: [geladen], servingsChoice: new Map([[5, 4]]) }, () => mit({
+    post: async (_path, body) => { gesendet = body; throw err; },
+  }, () => page.transferRecipe(page.state.recipes[0], null)));
+  assert.deepEqual(gesendet.ingredientIds, [1, 2], 'die Zeilen-IDs gehen mit, in der Reihenfolge der Mengen');
+  assert.equal(gesendet.quantities.length, 2);
+  assert.deepEqual(toasts, [['recipes.errorIngredientsChanged', 'danger']]);
+  assert.equal(reloaded(gets), false, `nachgeladen ${gets.join(', ')}`);
+  assert.deepEqual(stand.zutaten, ['Salz', 'Mehl'], 'die Seite zeigt das Rezept, wie es jetzt ist');
+  assertNoServerText();
 });
 
 test('Seite: auf die Einkaufsliste - nach "Liste weg" faellt genau die gewaehlte Liste aus der Auswahl', async () => {

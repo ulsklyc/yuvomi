@@ -49,43 +49,27 @@
         var(--budget-rail-max)
       );
     grid-template-rows: auto 1fr;
-    column-gap: var(--budget-column-gap);
+    gap: var(--space-4) var(--budget-column-gap);
     align-items: start;
   }
 
+  /* DIE KENNZAHL STEHT OBEN IN DER BAHN (R24, E2; Critique G4-Budget-P2-3):
+   * EINE Kurzzeile ueber der Liste, die Seitenspalte traegt nur noch die
+   * Zweitansichten (Prognose, Kategorie, Zahlungsart). Bis R24 stapelten sich
+   * dort drei Kennzahlkarten ueber den Diagrammen. */
   .budget-page .subscriptions-summary {
-    grid-column: 2;
+    grid-column: 1;
     grid-row: 1;
-  }
-
-  /* WIE DIE SPALTE DER DARLEHEN (R22, D9; budget.css `.budget-loans >
-   * .metric-grid`): die Spalte beginnt an der Werkzeuglinie der Liste (vorher
-   * 12px darunter, das `padding-block` der Kennzahl-Zeile), und jede Karte ist
-   * so hoch wie ihr Inhalt - `1fr` streckte "Jahresprognose" auf die Hoehe der
-   * Karte mit Fortschrittsbalken, eine Spalte stapelt, sie reiht nicht. */
-  .budget-page .subscriptions-summary > .metric-grid {
-    --summary-cards: 1;
-    --metric-value-size: var(--text-3xl);
-    grid-auto-rows: auto;
-    padding-block: 0;
-  }
-
-  /* Die Monatskosten fuehren die Spalte wie Saldo und Restschuld (R23, D12):
-   * die Spalte meldet sich als Spalte, die Leitzahl steht in Large Title und
-   * die uebrigen in Title 2 - bis R23 stand sie hier in 28px, daneben 18px. */
-  .budget-page .subscriptions-summary > .metric-grid--led {
-    --metric-rail: ;
-    --metric-quiet-size: var(--text-2xl);
   }
 
   .budget-page .subscriptions-list-section {
     grid-column: 1;
-    grid-row: 1 / span 2;
+    grid-row: 2;
   }
 
   .budget-page #subscriptions-analytics {
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 1 / span 2;
   }
 
   .budget-page .subscriptions-analytics {
@@ -635,6 +619,16 @@
   margin-inline-end: var(--space-1);
 }
 
+/* Die Fussnote vor den Zeilen der Liste (R24 E2, seit S13 nicht mehr unter
+ * der Kurzzeile - dort wuchs der Kennzahl-Slot ueber sein Skelett): "126 %
+ * des Budgets genutzt" und der Weg "Teuerste zuerst", nur bei einer
+ * Ueberschreitung. */
+.subscriptions-over-budget {
+  margin-block: 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
 /* Der Weg aus „Ueber Budget" heraus: ein Textknopf IN der Fussnote, hinter
  * „126 % genutzt" - eine eigene Knopfzeile machte die ganze Kennzahlreihe um
  * 36px hoeher. Sichtbar ist nur das Wort; die Treffflaeche reicht per
@@ -746,15 +740,22 @@
 
 .subscription-logo-picker {
   display: grid;
-  gap: var(--space-2);
-  justify-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: var(--radius-lg);
   cursor: pointer;
+}
+
+.subscription-logo-picker:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .subscription-logo-tools {
   display: grid;
   gap: var(--space-2);
-  justify-items: stretch;
+  justify-items: center;
 }
 
 .subscription-logo-picker > span {
@@ -776,55 +777,32 @@
   object-fit: contain;
 }
 
-.subscription-logo-picker small {
-  display: inline-flex;
-  gap: var(--space-1);
-  align-items: center;
-  color: var(--color-text-secondary);
-  text-align: center;
-}
-
-.subscription-logo-picker small svg {
-  width: 14px;
-  height: 14px;
-}
-
-.subscription-logo-picker input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-}
-
 .subscription-find-logo-btn {
   justify-content: center;
-  min-height: 38px;
-  padding-inline: var(--space-2);
-  font-size: var(--text-sm);
-}
-
-.subscription-find-logo-btn svg {
-  width: 16px;
-  height: 16px;
 }
 
 .subscription-form__billing-grid {
   display: grid;
-  grid-template-columns: minmax(110px, 0.8fr) minmax(180px, 1.3fr) minmax(130px, 1fr) minmax(90px, 0.65fr);
+  /* Betrag mit der Waehrung im Suffix, daneben der Zyklus als Satz "Alle
+     [1] [Monate]", darunter die naechste Zahlung (R24, G4-Budget-P1-1 und
+     P3-3) - bis dahin Betrag, eine eigene Waehrungs-Combobox und der Zyklus
+     in drei Spalten, die naechste Zahlung im Abschnitt der Erinnerung. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   gap: var(--space-3);
   align-items: end;
 }
 
 .subscription-form__organization-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 90px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-3);
   align-items: end;
 }
 
-.subscription-form__color .form-input--color {
-  width: 100%;
+/* Die Markenfarbe ist die Farbreihe (Critique R24 E6) und nimmt die ganze
+   Zeile; die 90px-Spalte war fuer das nackte Farbfeld. */
+.subscription-form__color {
+  grid-column: 1 / -1;
 }
 
 .subscriptions-combobox {
@@ -1081,10 +1059,16 @@
   min-width: 0;
 }
 
-.subscriptions-metadata-row__edit .form-input--color {
-  width: 44px;
-  flex: 0 0 44px;
-  padding: 2px;
+/* Die Farbreihe der Kategorie bricht unter den Namen (Critique R24 E6) -
+   neben Name und zwei Knoepfen haetten elf Swatches keinen Platz. */
+.subscriptions-metadata-row__edit {
+  flex-wrap: wrap;
+}
+
+.subscriptions-metadata-row__color,
+.subscriptions-metadata-add__color {
+  order: 1;
+  flex: 1 0 100%;
 }
 
 .subscriptions-metadata-row__view > i {
@@ -1097,9 +1081,8 @@
   align-items: stretch;
 }
 
-.subscriptions-metadata-add .form-input--color {
-  width: 52px;
-  flex: 0 0 52px;
+.subscriptions-metadata-add {
+  flex-wrap: wrap;
 }
 
 .subscriptions-metadata > .subscriptions-modal-footer {
@@ -1171,19 +1154,14 @@
     grid-template-columns: 1fr;
   }
 
+  /* Mobil steht "Logo finden" neben der Kachel, nicht darunter. */
   .subscription-logo-tools {
     grid-template-columns: auto 1fr;
     align-items: center;
-    justify-items: stretch;
-  }
-
-  .subscription-logo-picker {
-    grid-template-columns: auto minmax(0, 1fr);
     justify-items: start;
   }
 
   .subscription-logo-picker > span {
-    grid-row: span 2;
     width: 68px;
     height: 68px;
   }

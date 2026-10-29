@@ -202,11 +202,17 @@ const STATUS_ACTIONS = {
   ],
 };
 
-/** Prioritätsbadge als DOM - dieselbe Optik wie auf der Karte. */
+/**
+ * Die Prioritaet als WERT, nicht als Etikett (Critique R24, G2-Aufgaben-P2-2).
+ * Hier stand `.priority-badge` - das Etikett der Metazeile (13px, sekundaer) -
+ * mitten unter Werten in Body 17: "Offen", "Haushalt", und dazwischen "Hoch"
+ * zwei Stufen kleiner. Der Punkt bleibt die Rangmarke, der Text ist ein Wert
+ * wie jeder andere in der Leseansicht (`.detail-priority`, tasks.css).
+ */
 function priorityNode(priority) {
   if (!priority || priority === 'none') return null;
   const badge = document.createElement('span');
-  badge.className = 'priority-badge';
+  badge.className = 'detail-priority';
   const dot = document.createElement('span');
   dot.className = `priority-dot priority-dot--${priority}`;
   badge.append(dot, document.createTextNode(PRIORITY_LABELS()[priority] ?? priority));
@@ -220,7 +226,7 @@ function chipListNode(items, toLabel) {
   wrap.className = 'detail-chips';
   items.forEach((item) => {
     const chip = document.createElement('span');
-    chip.className = 'task-tag';
+    chip.className = 'tag task-tag';
     chip.textContent = toLabel(item);
     wrap.appendChild(chip);
   });
@@ -858,29 +864,55 @@ function commentsNode(task, ctx) {
 
   const form = document.createElement('form');
   form.className = 'task-comments__form';
+  // EINE ZEILE MIT DEM SENDEN IM FELD (Critique R24, G2-Aufgaben-P2-2). Hier
+  // stand eine zweizeilige Textarea mit nativem Ziehgriff und darunter ein
+  // eigener Knopf "Kommentieren" in einer eigenen Zeile; mobil lag er halb
+  // unter dem Blattfuss. Jetzt ist es das Muster von Nachrichten: einzeilig,
+  // waechst beim Tippen (`field-sizing: content`, tasks.css), der Pfeil steht
+  // im Feld - dieselbe Bauart wie das Auge im Passwortfeld.
   const field = document.createElement('textarea');
   field.className = 'input task-comment__input';
-  field.rows = 2;
+  field.rows = 1;
   field.maxLength = 5000;
   field.placeholder = t('tasks.commentPlaceholder');
   field.setAttribute('aria-label', t('tasks.commentsLabel'));
   const submit = document.createElement('button');
   submit.type = 'submit';
   // Bewusst nicht `--primary`: der auffälligste Knopf im Panel gehört der
-  // Fußzeile („Starten", „Ablegen"). Ein leuchtendes „Kommentieren" mitten im
-  // Blatt zöge die Aufmerksamkeit auf die Nebensache.
-  submit.className = 'btn btn--secondary btn--sm task-comments__submit';
-  submit.textContent = t('tasks.commentSubmit');
+  // Fußzeile („Erledigen"). Der Pfeil traegt den Akzent erst, wenn im Feld
+  // etwas steht (tasks.css, `:placeholder-shown`).
+  submit.className = 'task-comments__send';
+  submit.setAttribute('aria-label', t('tasks.commentSubmit'));
+  submit.title = t('tasks.commentSubmit');
+  const sendIcon = document.createElement('i');
+  sendIcon.dataset.lucide = 'arrow-up';
+  sendIcon.setAttribute('aria-hidden', 'true');
+  submit.appendChild(sendIcon);
   const fieldBox = document.createElement('div');
   // Eigener Träger: die Vorschlagsliste hängt relativ darin, nicht am Formular.
   fieldBox.className = 'task-comments__field';
-  fieldBox.appendChild(field);
-  form.append(fieldBox, submit);
+  fieldBox.append(field, submit);
+  form.append(fieldBox);
+  // Mit Cmd/Strg+Enter abschicken, Enter allein bleibt der Zeilenumbruch
+  // (ein Kommentar darf Absaetze haben).
+  field.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !isImeComposing(e)) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
 
+  // Die Sperre steht im Handler, nicht nur am Pfeil: Cmd/Strg+Enter ruft
+  // `requestSubmit()`, das ein gesperrter Knopf nicht aufhaelt - ein zweiter
+  // Druck (oder die Tastenwiederholung) schickte denselben Kommentar samt
+  // Erwaehnungen noch einmal (Codex an #2364).
+  let saving = false;
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (saving) return;
     const value = field.value.trim();
     if (!value) return;
+    saving = true;
     submit.disabled = true;
     try {
       await api.post(`/tasks/${task.id}/comments`, { comment: value });
@@ -889,6 +921,7 @@ function commentsNode(task, ctx) {
     } catch (err) {
       window.yuvomi.showToast(errorSentence(err), 'danger');
     } finally {
+      saving = false;
       submit.disabled = false;
     }
   });
@@ -1146,7 +1179,7 @@ export function openTaskDetail({
   const actions = canEdit ? [{
     id: 'task-detail-delete',
     label: t('common.delete'),
-    variant: 'danger-ghost',
+    variant: 'danger-outline',
     icon: 'trash-2',
     align: 'start',
     // Siehe closeDetailView: nach dem Löschen gibt es nichts mehr zu verwerfen,
@@ -1284,7 +1317,7 @@ function wireDetailMoreMenu(task, overflowIds, pane = null) {
     const item = document.createElement('button');
     item.type = 'button';
     // Loeschen bleibt im Menue als destruktiv erkennbar.
-    item.className = target.classList.contains('btn--danger-ghost')
+    item.className = target.classList.contains('btn--danger-outline')
       ? 'popover-menu__item popover-menu__item--danger' : 'popover-menu__item';
     item.setAttribute('role', 'menuitem');
     const icon = document.createElement('i');
@@ -1461,7 +1494,7 @@ async function advanceTaskStatus(task, status, button, ctx, close = closeDetailV
   // gleich, und die Umgebung zeigt danach eine offene Zeile, die aussieht wie
   // diese. Ohne Serie bleibt es still wie bisher - der Knopf selbst und die
   // verschwindende Zeile sind dort die Quittung.
-  const seriesText = status === 'done' ? seriesDoneText(response) : null;
+  const seriesText = status === 'done' ? seriesDoneText(response, { title: task.title }) : null;
   if (seriesText) window.yuvomi.showToast(seriesText, 'default', SERIES_TOAST_MS);
   await afterConfirmedWrite(ctx, close);
 }

@@ -815,20 +815,23 @@ html.navigating .app-content *::after {
  * Gleiche Bereinigung wie bei den Note-Items: der Dashboard-Zweig war
  * geglast, der Modul-Zweig nicht. Eine Fläche für beide.
  * ================================================================ */
-.dashboard .meal-slot,
 .meals-page .meal-slot {
   background-color: var(--color-surface-work);
 }
 
-.dashboard .meal-slot:hover,
-.meals-page .meal-slot:hover {
-  background-color: var(--color-surface-raised);
+@media (hover: hover) {
+  .meals-page .meal-slot:hover {
+    background-color: var(--color-surface-raised);
+  }
 }
 
-.dashboard .meal-slot--filled,
 .meals-page .meal-slot--filled {
   background-color: color-mix(in srgb, var(--module-accent, var(--module-meals)) var(--tint-wash), var(--color-surface-raised));
 }
+
+/* Die Uebersicht stand hier mit im Selektor (`.dashboard .meal-slot*`) und
+ * wusch ihre gefuellten Slots damit in IHREM Akzent, also violett (DW-P2-8).
+ * Ihr Slot ist seither eine neutrale Mulde und steht in dashboard.css. */
 
 /* ================================================================
  * 31. Form-Inputs — Arbeitsfläche

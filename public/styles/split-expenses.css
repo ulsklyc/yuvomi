@@ -457,6 +457,12 @@
   flex-wrap: wrap;
 }
 
+/* Die Salden ohne eigene Zeile (die einzige Schuld steht in der Kennzahl,
+ * S10-F6): nur ihre Handlung, am Ende der Zeile. */
+.split-section--folded > .split-section-head {
+  justify-content: flex-end;
+}
+
 .split-section-head > * {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -689,7 +695,7 @@ button.split-expense:hover {
   padding-inline-end: var(--space-1);
 }
 
-.split-recurring-row .split-expense__icon {
+.split-recurring-row .split-expense__dot {
   grid-column: 1;
   grid-row: 1 / span 4;
   align-self: center;
@@ -741,13 +747,6 @@ button.split-expense:hover {
   margin-inline-end: var(--space-1);
 }
 
-/* Die Kategorie-Marke braucht 54px. In der schmalen Spalte gehoeren die dem
- * Termin, der sonst wieder umbricht; ab 400px Traegerbreite steht sie. */
-@container list-rows (max-width: 399px) {
-  .split-recurring-row .split-expense__icon {
-    display: none;
-  }
-}
 
 /* Die Frage beim Fortsetzen (#1647): zwei Antworten, jede mit ihrem Datum im
  * Text. Ein Knopf kuerzt sonst nicht und bricht nicht um - hier muss die ganze
@@ -780,7 +779,6 @@ button.split-expense:hover {
  * 16px primaer, Pflicht-Stern, Betrag als `.budget-amount-input`. Diese Regel
  * gilt nur noch den Haken-Zeilen und den Gruppen. */
 .split-form .split-check,
-.split-participants,
 .split-defaults {
   display: flex;
   flex-direction: column;
@@ -812,7 +810,6 @@ button.split-expense:hover {
 }
 
 /* Formular-Gruppen im Sheet: Inset-Well statt Kasten (tokens.css). */
-.split-participants,
 .split-defaults {
   border: none;
   border-radius: var(--radius-md);
@@ -828,11 +825,43 @@ button.split-expense:hover {
   font-weight: var(--font-weight-medium);
 }
 
+/* DIE BETEILIGTEN ALS PERSONEN-CHIPS (Critique R24 G4-Budget-P1-1):
+ * dieselbe Chip-Form wie renderUserMultiSelect (`.user-ms__option`). Gleich
+ * verteilt ist die Liste eine umbrechende Reihe; braucht die Aufteilung je
+ * Person einen Wert, wird sie ein Raster Chip | Wert. Die Zeile loest sich
+ * dafuer auf (`display: contents`), Chip und Feld stehen direkt im Raster. */
 .split-participant-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(96px, 140px);
+  grid-template-columns: minmax(0, 1fr) minmax(calc(var(--space-16) + var(--space-8)), calc(var(--space-16) + var(--space-12) + var(--space-5)));
   align-items: center;
   gap: var(--space-2);
+}
+
+.split-participant-list > .split-participant-row {
+  display: contents;
+}
+
+.split-participant-list:has(.split-split-value:not([hidden])) {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(calc(var(--space-16) + var(--space-8)), 1fr);
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.split-participant-list:has(.split-split-value:not([hidden])) .user-ms__option {
+  justify-self: start;
+  max-inline-size: 100%;
+}
+
+.split-participant-list .user-ms__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Der Kategoriepunkt einer Ausgabe (R24, E12): derselbe Punkt wie im Journal
+ * des Budgets (`.budget-entry__indicator`, budget.css), mittig zur Zeile. */
+.split-expense__dot {
+  align-self: center;
 }
 
 .split-empty-inline {
@@ -1047,14 +1076,13 @@ button.split-expense:hover {
 }
 
 /* Formularzeilen leben im Modal und richten sich nach dessen Container. */
-@container modal-body (max-width: 480px) {
+/* Zwei kurze Felder (Datum | Zahler, Aufteilung | Kategorie) bleiben am
+ * Telefon eine Zeile wie Datum | Konto der Buchung (R22 D9, Critique R24
+ * G4-Budget-P1-1); erst unter 320px Dialogbreite stapeln sie. */
+@container modal-body (max-width: 320px) {
   .split-form-row {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .split-participant-row {
-    grid-template-columns: 1fr;
   }
 }
 

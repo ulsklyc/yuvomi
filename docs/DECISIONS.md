@@ -1024,3 +1024,120 @@ to a commit SHA instead of a ref, so that an update needs a new approval, and a 
 reviewer besides the maintainer. Only then is a list pinned to reviewed SHAs worth discussing.
 A community-run list linked from MODULES.md is not undoing this decision; a list in this
 repository or in the app, curated or not, is.
+
+---
+
+## 16. A tile on the overview is as tall as its data
+
+**From tablet width up, every tile on the overview takes the height of what it shows: the rows
+its data gives, at most as many as its chosen size allows, plus its header and padding; an empty
+tile is one line. The grid packs densely in fine tracks, and only a hole is closed by a
+neighbour: empty space with a tile below it, or the end of a column that stops more than one tile
+gap short of the others** (DW-P1-3, critique of the overview widgets 2026-10-26, decided by Ulas on
+2026-10-26 as option b, written down 2026-10-27; this revises R10 L9 and R21 D5; the column end
+added after F9 on 2026-10-27).
+
+The grid had been closed against holes twice before: R10 L9 let a tile grow into the rest of its
+row, R21 D5 into the cell below it ("no hole - right, then down"). Both stretched a tile to the size
+of its grid cells, and a grid row was as tall as its tallest tile. Measured with every tile shown,
+19 % of the card area at 1440px and 27 % at 1920px was blank card below the last line of content -
+the empty waste tile 629 of 759px, the shift plan 608 of 759px. Four ways were weighed: (a) let the
+browser pack masonry-style with `grid-lanes` - no major browser ships it, and the fallback brings
+the holes of R21 D5 back; (b) take each tile's height from its data before drawing; (c) measure
+each tile after drawing and set its span in JavaScript - exact, but a layout read after every
+build, against the work on return speed; (d) leave it. (b) was chosen: the height comes from the
+same source as the content, the same in every browser, and the skeleton and the layout hint know
+it before the data arrives.
+
+### Where the rule lives
+
+- `contentSpanRows` and `TILE_GEOMETRY` in `public/utils/dashboard-widgets.js`: rows times row
+  height plus header and padding, in tracks of `--dashboard-row-unit` (4px). Each renderer in
+  `public/pages/dashboard.js` describes its content as a function of size (`tileSpanAttrs`,
+  `TILE_PARTS` for tiles that are not lists) and writes `data-span-rows`; `dashboard.css` turns
+  `--tile-rows` into the span. A row in a tile has one fixed height from tablet width up, so its
+  title stays on one line there.
+- `fillGridSpans`: dense packing with one deviation (a wide tile that fits in several places
+  almost equally early - at most one tile gap, `GRID_END_SLACK` - takes the one with the smallest
+  hole above it, `packGrid`, and keeps that column), then the weather grows into free width, a hole
+  is filled from above, what is still a hole by a neighbour growing sideways (right or left), and a
+  column end longer than one tile gap by its last tile growing down. Customize shows the same grid,
+  filled height as a dashed slot; filled width has no slot, because the content runs across it.
+- Why the column end counts (F9, found 2026-10-27 in the first build): with only "a tile below it"
+  as a hole, the weather took a place 8px earlier in columns 2-3, every later wide tile followed it,
+  and column 1 stood empty for 536px beside three tiles in the demo household at 1440px (588px for
+  a child). The hole count reported zero. `gridHoleCount` now counts a column end beyond one tile
+  gap.
+- Height becomes content (U14, decided by Ulas on 2026-10-27, option b of the open question after
+  the first build): a list tile that gets more height while filling shows further rows it already
+  loaded (the server sends the supply for the tallest size, the size shows fewer), whole rows only,
+  and "+N more" counts down or goes. Without more data the space stays empty. The renderer carries
+  those rows hidden (`data-fill-row`) and says how many tracks it would need with one, two ... more
+  (`data-fill-steps`, same `contentSpanRows`); `applyRowFill` shows as many as fit after packing
+  (`fillRowCount`). The span stays the one of the chosen size, so the extra rows never feed back into
+  the packing, and nothing is measured. Weighed against it: (a) accept the empty space, (c) let a
+  later narrow tile move ahead of a wide one - fewer gaps, but the order would no longer be the
+  ranking. The overview loads eight birthdays and five expense categories for this, both already
+  sorted or grouped in one query. Tasks and expiring food keep their limit because the Today sheet
+  reads the same list or constant, notes because their preview has a contract test; countdowns keep
+  theirs for now (no measured stretch needed it).
+- `npm run test:dashboard` ("U1 b", "F9", "U14") holds the equivalence with the data rows, the measurements
+  against `dashboard.css`, no hole and no empty column end in the demo household at two, three and
+  four columns, fewer than 5 % of 3000 random grids with a hole, and that filling never moves a
+  tile.
+
+### What counts as undoing it
+
+A tile that gets height its content does not have in the normal grid when no hole needs it -
+stretching rows to their tallest tile, a fixed height per size, filling a column end that stops
+within one tile gap of the others. A column left empty beside full ones. A tile whose height is measured
+after drawing instead of taken from its data. And a tile on the overview that does not report its
+height. Extra rows that change a tile's span, trigger a second packing pass or are fitted by
+measuring, a tile with loaded rows that leaves its filled height blank, and a second fill
+mechanism beside the one all lists share.
+
+## 17. The two week grids share one build: own port, head that folds
+
+**The week of the calendar and the overview of the shift schedule are one time grid and are
+built the same way: the page is capped, the grid scrolls in its own port under the day heads,
+the period stepper and the view switch stand in the module head, and the head folds by class
+while the grid scrolls. Neither module lets the page itself scroll through the hours** (R24
+S7-F1, decided by Ulas on 2026-10-28; this takes back R22 D6 "the page scrolls, not a box in
+it" for the shift schedule).
+
+R22 D6 put the shift overview on the calendar's grid (#2034 thread, critique a3 "two week
+grids") and took it out of a 70vh box, because the head above that box never docked and the
+grid began at y 315 on a phone. The answer then was to let the page scroll: the head docked by a
+negative `top`, and a sticky content row carried the stepper, the view switch, the people and the
+day heads underneath it. Two rounds later the same question came back from the other side
+(critique G1-Schichtplan-P2-1/P3-3, R24): aligning to the current hour scrolled the page, so the
+head was docked before anyone touched it, the period stood in a content row while calendar and
+budget carry it in the head, and the title of a running shift had to be pushed below the sticky
+edge by script because `position: sticky` stuck to the horizontal scroller. Three options were
+weighed: (a) keep the content row - no rebuild, but a second place for the period; (b) the
+stepper in the head only from 1024px - the calendar's head on desktop, but two layouts of the same
+tools; (c) the calendar's build in every width. (c) was chosen: one head pattern for both week
+grids, and the problem D6 solved - a head that never moved - is solved by the head that folds.
+
+### Where the rule lives
+
+- `public/pages/schedule.js`: the head carries `page-toolbar--period page-toolbar--period-inline`
+  and an empty center slot `.schedule-nav` that `renderOverviewNav()` fills on the overview;
+  `renderOverview()` puts the grid in `#schedule-week-scroll` (`.page-scrollport`), every other
+  tab scrolls in `.schedule-content.page-scrollport`. `public/styles/schedule.css` caps
+  `.schedule-page` (`overflow: hidden`), so the shell's collapsing head runs in its "inner list"
+  architecture (`public/utils/ux.js`). On a phone the tools are the last head row, under the tabs:
+  next to the large title the name kept 125 of 184px, and above the tabs they would have moved the
+  tabs on every switch to a tab without tools.
+- `scrollGridToNow()` in `public/utils/time-grid.js` aligns both grids to the current hour, from
+  the earliest block in the morning, without counting the area behind the tab bar; the calendar's
+  week and day and the shift overview call it.
+- `npm run test:schedule` ("Compare/Overview tab", "R22 D6", "R22-F", "R24 S7b") and
+  `npm run test:calendar` ("R24 G1 P1-1").
+
+### What counts as undoing it
+
+The page scrolling through the hours of either grid again; a period stepper or view switch of a
+week grid placed in a sticky content row instead of the head; a second alignment rule beside
+`scrollGridToNow`; a shift title pinned by script instead of `position: sticky` in the port; a
+head that is docked or folded by the alignment rather than by the user's scroll.

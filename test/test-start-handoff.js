@@ -189,6 +189,13 @@ test('the dashboard takes the preferences of the start instead of asking again',
   assert.match(read('../public/router.js'), /takeStartPreferences: \(\) => startHandoff\.takePreferences\(\),/);
 });
 
+// R24 S12 (Critique G5-Gesundheit-P3-8): /health als erste Seite fragte
+// `/preferences` ein zweites Mal - 21 Anfragen je Einstieg, eine davon doppelt.
+test('health takes the preferences of the start instead of asking again', () => {
+  const health = read('../public/pages/health.js');
+  assert.match(health, /await \(window\.yuvomi\?\.takeStartPreferences\?\.\(\) \?\? api\.get\('\/preferences'\)\)/);
+});
+
 test('the handoff module ships with the shell', () => {
   assert.match(read('../public/sw.js'), /'\/utils\/start-handoff\.js',/);
 });

@@ -31,7 +31,8 @@ import { esc } from '/utils/html.js';
 import { t } from '/i18n.js';
 import { openModal, closeModal } from '/components/modal.js';
 import { durationToken } from '/utils/ux.js';
-import { getReadableTextColor } from '/utils/color.js';
+import { getReadableTextColor, AVATAR_FALLBACK_COLOR, safeHexColor } from '/utils/color.js';
+import { initials, sharedSurname } from '/utils/initials.js';
 
 /**
  * @typedef {object} FilterLabels
@@ -145,9 +146,10 @@ export function syncFilterButton(button, count, labels = defaultFilterLabels()) 
  * @returns {string}
  */
 export function filterChipHtml({ filter, value, label, active, swatchColor = null, swatchLabel = '', srSuffix = '' }) {
-  const swatch = swatchColor
+  const hex = swatchColor ? safeHexColor(swatchColor) : null;
+  const swatch = hex
     ? `<span class="filter-chip__swatch" aria-hidden="true"`
-      + ` style="--swatch-color:${esc(String(swatchColor))};color:${getReadableTextColor(String(swatchColor))}">`
+      + ` style="--swatch-color:${hex};color:${getReadableTextColor(hex)}">`
       + `${esc(String(swatchLabel ?? ''))}</span>`
     : '';
   return `<button type="button" class="filter-chip filter-chip--sm${active ? ' filter-chip--active' : ''}"
@@ -165,6 +167,52 @@ export function filterChipHtml({ filter, value, label, active, swatchColor = nul
 export function filterChipsHtml(filter, label, items) {
   return `
     <div class="filter-panel__chips" role="group" aria-label="${esc(label)}">
+      ${items.map((item) => filterChipHtml({ filter, ...item })).join('')}
+    </div>`;
+}
+
+/**
+ * EINE PERSONENZEILE (Critique R24 G2-Quer-P2-1). Der Personenfilter stand in
+ * drei Formen: als Umschalter mit Avatar und nacktem Kuerzel (Aufgaben-
+ * Verlauf, mobil ohne Namen), als Chip mit vollem Namen ohne Scheibe
+ * (Belohnungen) und als Chip mit Scheibe und Vorname (Kalender, Aufgaben-
+ * Filterblatt). Kanon ist die letzte: `filter-chip--sm` mit der Scheibe der
+ * Person (Farbe + Initialen) und dem Vornamen, solange alle denselben
+ * Nachnamen tragen (`sharedSurname`; der volle Name bleibt der zugaengliche
+ * Name). "Alle" steht vorn als Text.
+ *
+ * @param {object} opts
+ * @param {string} opts.filter        Achse (`data-filter` jedes Chips)
+ * @param {string} opts.label         Name der Gruppe
+ * @param {Array<{id: number|string, display_name: string, avatar_color?: string, color?: string}>} opts.people
+ * @param {(person: object) => boolean} opts.isActive
+ * @param {{ value?: string, label: string, active: boolean }} [opts.all]  Chip "Alle" vorn
+ * @param {Array<{value: string, label: string, active: boolean}>} [opts.after]  weitere Chips hinten
+ * @param {string} [opts.className='filter-panel__chips']  `page-chip-row` fuer eine Zeile auf der Seite (scrollt erst bei Ueberlauf)
+ * @returns {string}
+ */
+export function personChipsHtml({ filter, label, people, isActive, all = null, after = [], className = 'filter-panel__chips' }) {
+  const surname = sharedSurname(people);
+  const items = [];
+  if (all) items.push({ value: all.value ?? '', label: all.label, active: all.active });
+  for (const person of people) {
+    const full = String(person.display_name ?? '').trim();
+    const short = surname && full.endsWith(` ${surname}`);
+    items.push({
+      value: String(person.id),
+      label: short ? full.slice(0, -(surname.length + 1)) : full,
+      srSuffix: short ? surname : '',
+      active: Boolean(isActive(person)),
+      // ZWEI NAMEN FUER DIESELBE FARBE: `/family/members` und die Optionen der
+      // Module liefern sie roh als `avatar_color`, zugewiesene Personen
+      // heissen `color` (ASSIGNED_USERS_SQL).
+      swatchColor: person.avatar_color ?? person.color ?? AVATAR_FALLBACK_COLOR,
+      swatchLabel: initials(full),
+    });
+  }
+  items.push(...after);
+  return `
+    <div class="${esc(className)}" role="group" aria-label="${esc(label)}" data-person-chips="${esc(filter)}">
       ${items.map((item) => filterChipHtml({ filter, ...item })).join('')}
     </div>`;
 }

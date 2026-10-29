@@ -1192,6 +1192,37 @@ export function searchSettings(query, { user, translate }) {
   return { leaves, sections, options };
 }
 
+/**
+ * DER TREFFER, DER SO HEISST, STEHT VORN (Critique R24, G6-Einst-P3-5). "passwort"
+ * fand die Blaetter Konto und E-Mail (SMTP) ueber ihre Beschreibung und reihte
+ * die Option "Passwort aendern" dahinter - die Zeile, die genau so heisst wie
+ * das Gesuchte, stand zuletzt. Rang 0: die Beschriftung beginnt mit dem
+ * Begriff, 1: sie enthaelt ihn, 2: nur Beschreibung, Bereich oder Synonym.
+ * Innerhalb eines Rangs bleibt die Reihenfolge (Blatt, Abschnitt, Option).
+ *
+ * @param {{ leaves: object[], sections: object[], options: object[] }} hits  aus searchSettings
+ * @param {string} query
+ * @param {(key: string) => string} translate
+ * @returns {{ kind: 'leaf'|'section'|'option', rank: number, label: string, leaf: object, section?: object, key?: string }[]}
+ */
+export function orderSettingsHits(hits, query, translate) {
+  const needle = normalizeSettingsSearch(String(query ?? '').trim());
+  const rank = (label) => {
+    const text = normalizeSettingsSearch(label);
+    if (needle && text.startsWith(needle)) return 0;
+    return needle && text.includes(needle) ? 1 : 2;
+  };
+  const all = [
+    ...hits.leaves.map((leaf) => ({ kind: 'leaf', leaf, label: settingsLeafLabel(leaf, translate) })),
+    ...hits.sections.map(({ leaf, section, label }) => ({ kind: 'section', leaf, section, label })),
+    ...hits.options.map(({ leaf, section, key, label }) => ({ kind: 'option', leaf, section, key, label })),
+  ];
+  return all
+    .map((hit, index) => ({ ...hit, rank: rank(hit.label), index }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map(({ index, ...hit }) => hit);
+}
+
 /** Sprungziel eines Options-Treffers: das Blatt, mit der Option als Anker. */
 export function settingsOptionUrl(leaf, key) {
   return `${leaf.path}?option=${encodeURIComponent(key)}`;

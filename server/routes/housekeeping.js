@@ -978,6 +978,8 @@ router.post('/worker', async (req, res) => {
       return res.status(400).json({ error: 'hourly_rate must be greater than or equal to zero.', code: 400 });
     }
     const avatarColor = String(req.body.avatar_color || existing?.avatar_color || NEW_WORKER_COLOR).trim();
+    const colorError = color(avatarColor, 'avatar_color').error;
+    if (colorError) return res.status(400).json({ error: colorError, code: 400 });
     const avatarData = req.body.avatar_data !== undefined
       ? normalizeAvatarData(req.body.avatar_data)
       : existing?.avatar_data ?? null;

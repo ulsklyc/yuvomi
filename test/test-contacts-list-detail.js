@@ -410,9 +410,7 @@ test('Neuer Kontakt ist nicht als „Arzt" vorbelegt: aktive Filterkategorie, so
 // weil nur er das abgewiesene Feld nannte. Jetzt nennt der Server den Fall
 // (`reason`, `params.limit`, server/routes/contacts.js), und der Satz der App
 // nennt Feld und Grenze. Gemessen wird am echten Aufrufer mit der echten
-// Zuordnung (utils/friendly-error.js); `window.yuvomi.friendlyError` traegt
-// hier einen Stellvertreter, der den Servertext zurueckgaebe - fragt die Seite
-// ihn noch, steht der im Toast.
+// Zuordnung (utils/friendly-error.js).
 // -------------------------------------------------------------------------
 test('Import-Toast: schlaegt alles fehl, nennt er das Feld als Satz der App, nie den Servertext (#1909)', async () => {
   // Wie der Fehler aus api.js kommt: `message` und `data.error` tragen den Text des Servers.
@@ -420,12 +418,11 @@ test('Import-Toast: schlaegt alles fehl, nennt er das Feld als Satz der App, nie
     name: 'ApiError', status, data: { error, code: status, ...extra },
   });
   const yuvomi = globalThis.window.yuvomi;
-  const saved = { showToast: yuvomi.showToast, friendlyError: yuvomi.friendlyError };
+  const saved = { showToast: yuvomi.showToast };
   const savedNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
   const toasts = [];
   yuvomi.showToast = (message, type, duration, action) => toasts.push({ message, type, duration, action });
-  yuvomi.friendlyError = (err) => err?.data?.error ?? 'friendlyError';
   const failed = (lastError) => {
     toasts.length = 0;
     contacts.showImportResult({ imported: 0, withBirthday: 0, failedList: [{ name: '' }], lastName: null, lastError });
@@ -738,4 +735,32 @@ test('Kontakt bearbeiten: Abbrechen ist der eine Rueckweg in die Leseansicht', (
   assert.match(js, /<button type="button" class="btn btn--secondary" id="cm-cancel" data-action="close-modal">/);
   const dv = read('../public/components/detail-view.js');
   assert.match(dv, /state\.formCancel = state\.formFooter\?\.querySelector\('\[data-action="close-modal"\]'\)/, 'daran erkennt die Detailansicht das Abbrechen');
+});
+
+// R24 (Critique G5 Kontakte-P3-2): die Kategorie-Chips liefen am Desktop in
+// der 424px-Spalte aus dem Bild („Dienstleistungen" nur per Querscroll), am
+// Telefon schon ab „Familie". Gemessen nachher: 1440 und 390 ein Filterknopf
+// „Filter", Blatt/Popover mit 5 Chips, Wahl „Arzt" -> 2 Zeilen, „1 Filter
+// aktiv"; 1024 (Lesemass, Reihe passt) bleiben die Chips.
+test('R24 Kontakte-P3-2: passt die Kategoriereihe nicht oder sind es mehr als vier, steht ein Filterknopf', () => {
+  const src = read('../public/pages/contacts.js');
+  const fn = src.slice(src.indexOf('function renderCategoryFilters()'), src.indexOf('function openContactCategoryManager()'));
+  assert.match(src, /const CONTACT_CHIP_MAX = 4;/);
+  assert.match(fn, /const asButton = keys\.length > CONTACT_CHIP_MAX \|\| _chipOverflowWidth != null;/, 'Zahl ODER gemessene Enge');
+  assert.match(fn, /filterButtonHtml\(\{ id: 'contacts-category-filter', count: active \? 1 : 0, showLabel: true \}\)/, 'der geteilte Filterknopf mit Zaehler');
+  assert.match(fn, /if \(bar\.clientWidth > 0 && bar\.scrollWidth > bar\.clientWidth \+ 1\) \{\s*_chipOverflowWidth = bar\.clientWidth;/, 'schneidet die Reihe, wird sie zum Knopf');
+  const sheet = src.slice(src.indexOf('function openContactCategoryFilter()'), src.indexOf('function renderCategoryFilters()'));
+  assert.match(sheet, /openFilterSheet\(\{/, 'die Kategorien im geteilten Filterblatt');
+  assert.match(sheet, /filterChipHtml\(\{ filter: 'contacts-category', value: '', label: t\('contacts\.filterAll'\)/);
+  assert.match(src, /if \(e\.target\.closest\('#contacts-category-filter'\)\) \{ openContactCategoryFilter\(\); return; \}/);
+});
+
+// R24 D4: der vCard-Import sperrt seinen Primaerknopf nicht mehr; ohne Wahl
+// sagt er am Dialog, was fehlt. Weitere Angaben nennt, was dahinter liegt.
+test('R24 D4: Kontakte - Import nie gesperrt, Weitere Angaben benannt', () => {
+  const src = read('../public/pages/contacts.js');
+  const imp = src.slice(src.indexOf('<div class="vcard-import">'), src.indexOf('importParsedContacts(chosen)'));
+  assert.doesNotMatch(imp, /submitBtn\.disabled = n === 0/);
+  assert.match(imp, /reasonEl\.textContent = t\('birthdays\.importNothingSelected'\)/);
+  assert.match(src, /advancedSection\(advancedFieldsHtml, \{\s*open: advancedOpen,[\s\S]{0,120}hint: \[t\('contacts\.addressLabel'\)/);
 });

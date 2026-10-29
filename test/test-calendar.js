@@ -1218,6 +1218,33 @@ test('Monatsraster: die Tönung folgt dem Wochentag, nicht der Spaltenposition',
     'bei Montag-Start dürfen beide Regeln dasselbe ergeben (Regression der Standardansicht)');
 });
 
+// R24, Critique G1-Kalender-P3-1: der Nachbarmonat trug `--color-bg` und war
+// hell kaum vom Wochenende zu unterscheiden (Nachbar-Sonntag heller als jedes
+// Wochenende), dunkel umgekehrt. Jetzt steht er auf der Flaeche seines
+// Wochentags; „nicht dieser Monat" sagen Ziffer und Bar.
+test('R24 G1-Kalender-P3-1: der Nachbarmonat dimmt ueber Ziffer und Bar, die Flaeche folgt dem Wochentag', () => {
+  const rules = [...eachRule(calendarCss)].filter((r) => r.at.length === 0);
+  const own = rules.filter((r) => r.selector.split(',').some((sel) => sel.trim() === '.month-day--outside'));
+  assert(own.every((r) => !/background/.test(r.body)), 'keine eigene Flaeche fuer den Nachbarmonat');
+  assert(rules.some((r) => r.selector.trim() === '.month-day--outside .month-day__number' && /--color-text-tertiary/.test(r.body)),
+    'die Ziffer ist tertiaer');
+  const weekend = rules.find((r) => /\.month-day--weekend/.test(r.selector) && /background-color/.test(r.body));
+  assert(weekend && !/:not\(\.month-day--outside\)/.test(weekend.selector), `das Wochenende gilt auch im Nachbarmonat: ${weekend?.selector}`);
+});
+
+// R24, Critique G1-Kalender-P3-2: mobil sass ein dunkler Auswahlring um die
+// Akzentscheibe von heute und las sich wie ein Fokusring. Auswahl = Toenung
+// der Zelle, heute = Scheibe.
+test('R24 G1-Kalender-P3-2: die Auswahl im Telefon-Monat toent die Zelle, die Ziffer traegt keinen Ring', () => {
+  const rules = [...eachRule(calendarCss)];
+  const sel = rules.filter((r) => r.selector.includes('.month-day--selected'));
+  assert(sel.length > 0, 'die Auswahl hat eine Regel');
+  assert(sel.every((r) => !/outline:/.test(r.body)), 'kein Ring an der gewaehlten Ziffer');
+  const cell = sel.find((r) => r.selector.trim() === '.month-view--split .month-day--selected');
+  assert(cell && /color-mix\(in srgb, var\(--module-accent\) var\(--tint-state\), transparent\)/.test(cell.body),
+    'die Zelle traegt die Zustandssprosse im Modulton ueber ihrer Flaeche');
+});
+
 test('Monatsraster: das CSS hängt die Tönung an die Klasse, nicht an nth-child', () => {
   // Der Filter fragt die ZUSICHERUNG ab (eine Wochenend-Zelle wird ueber ihre
   // Klasse gemalt), nicht die Farbquelle: bis 2026-08-27 suchte er
@@ -2242,7 +2269,8 @@ test('Filterblatt (D2): Kalender und Aufgaben fahren EINEN Baustein - Personen a
   assert(!/function openFiltersPopover|showPopover\(\)/.test(calSrc), 'kein eigenes Kalender-Popover mehr neben dem Baustein');
   assert(!/resetLabel:/.test(calSrc + taskSrc), 'kein Modul ueberschreibt den einen Reset-Text');
   for (const [name, src] of [['Kalender', calSrc], ['Aufgaben', taskSrc]]) {
-    assert(/filterChipsHtml\(/.test(src), `${name}: Personen als Chips aus dem Baustein`);
+    // Seit R24 (G2-Quer-P2-1) die EINE Personenzeile personChipsHtml().
+    assert(/personChipsHtml\(\{/.test(src), `${name}: Personen als Chips aus dem Baustein`);
   }
   // Ebenen, Quellen und Ansichtsoptionen sind Schalter, keine Haken.
   for (const attr of ['data-filter-layer', 'data-filter-source', 'data-filter-mine', 'data-filter-schedule-display', 'data-filter-waste-type']) {
@@ -2294,25 +2322,31 @@ test('Kalender verwalten: unter 1024px erreichbar - das Filterblatt traegt den E
   assert(!/if \(sourceRows\) groups\.push/.test(fn), 'die Kalender-Gruppe steht auch ohne Quellen, sobald der Eintrag da ist');
 });
 
-// Das Anlegen-Formular im Dialog „Kalender verwalten" teilte sich unter 640px
-// die Spaltenvorlage der Kalenderzeilen - erste Spalte die 16px der
-// Farbscheibe. Das Formular hat aber keine Scheibe: sein Namensfeld fiel in
-// die 16px, das Farbfeld in die freie Breite und lag als blauer Balken da.
-test('Kalender verwalten: unter 640px steht das Namensfeld des Anlegen-Formulars in der freien Spalte, nicht in der Scheibenspalte', () => {
+// R24, Entscheidung E6 (Critique G1-Kalender-P2-1): „Kalender verwalten" ist
+// eine Zeilenliste - Punkt, Name, Terminzahl, „..." -, der Tipp oeffnet das
+// Bearbeiten-Blatt mit dem EINEN Farbwaehler. Kein Formular je Zeile, kein
+// rohes Farbfeld, kein Disketten-Knopf; „+ Kalender" klein und sekundaer,
+// unten der Weg zu Abos und Synchronisation.
+test('R24 E6: Kalender verwalten ist eine Zeilenliste mit Bearbeiten-Blatt', () => {
   const calSrc = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
-  const open = 'id="local-calendar-create"';
-  const at = calSrc.indexOf(open) + open.length;
-  const form = calSrc.slice(at, calSrc.indexOf('</form>', at));
-  const fields = [...form.matchAll(/id="(local-calendar-[a-z]+)"/g)].map((m) => m[1]);
-  assert(JSON.stringify(fields) === JSON.stringify(['local-calendar-name', 'local-calendar-color']), 'das Formular traegt Name, dann Farbe - keine Scheibe davor');
-  const phone = [...eachRule(calendarCss)].filter((r) =>
-    r.at.some((a) => /max-width:\s*639px/.test(a))
-    && r.selector.split(',').some((sel) => sel.trim() === '.cal-calendar-create')
-    && /grid-template-columns/.test(r.body));
-  assert(phone.length > 0, 'unter 640px legt eine Regel die Spalten des Formulars fest');
-  const tracks = phone.at(-1).body.match(/grid-template-columns:\s*([^;]+)/)[1].trim();
-  assert(/^minmax\(0,\s*1fr\)/.test(tracks),
-    `die erste Spalte gehoert dem Namensfeld und waechst (minmax(0, 1fr)), nicht der Scheibe - steht: ${tracks}`);
+  const fn = (name) => {
+    const at = calSrc.indexOf(`function ${name}(`);
+    return calSrc.slice(at, calSrc.indexOf('\n}\n', at));
+  };
+  const row = fn('renderLocalCalendarRow');
+  assert(/class="list-row cal-calendar-row"/.test(row) && /list-row__main--interactive js-calendar-edit/.test(row),
+    'die Zeile ist die geteilte Zeile, ihr Hauptteil oeffnet das Blatt');
+  assert(!/type="color"|cal-calendar-row__name|icon: 'save'/.test(row), 'kein Formular in der Zeile (Namensfeld, Farbfeld, Speichern)');
+  const content = fn('renderLocalCalendarsContent');
+  assert(/btn btn--secondary btn--sm cal-calendar-manager__add/.test(content), '„+ Kalender" ist klein und sekundaer');
+  assert(!/btn--primary/.test(content), 'keine Primaerpille im Verwalten-Dialog');
+  assert(/href="\/settings\/modules\/calendar"/.test(content) && /calendar\.manageSubscriptionsLink/.test(content),
+    'unten fuehrt ein Weg zu Abos und Synchronisation');
+  const sheet = fn('localCalendarSheet');
+  assert(/colorPickerHtml\(\{ id: 'local-calendar-color'/.test(sheet), 'die Farbe kommt aus dem EINEN Farbwaehler');
+  assert(/initialFocus: dialogInitialFocus\(isEdit\)/.test(sheet), 'Erstfokus nach der Dialogregel');
+  assert(/askOverModal\(\(\) => localCalendarSheet\(calendar\)\)/.test(calSrc) && /askOverModal\(\(\) => localCalendarSheet\(\)\)/.test(calSrc),
+    'Bearbeiten und Anlegen oeffnen das Blatt ueber der Verwaltung');
 });
 
 test('Filterblatt (D2): „Mir zugewiesen" steht in beiden Blaettern als erster Schalter der Personengruppe, die Personen sind Chips', () => {
@@ -2322,7 +2356,7 @@ test('Filterblatt (D2): „Mir zugewiesen" steht in beiden Blaettern als erster 
   assert(/heading: t\('calendar\.filtersPeople'\), html: meRow \+ peopleChips/.test(calSrc)
     && /peopleChips: people\.length \? personFilterChipsHtml\(people\)/.test(calSrc),
     'Kalender: Schalter, dann Personen-Chips in EINER Gruppe');
-  assert(/heading: t\('tasks\.filterGroupPerson'\),\s*html: mine \+ chipsHtml\('assigned_to'/.test(taskSrc),
+  assert(/heading: t\('tasks\.filterGroupPerson'\),\s*html: mine \+ personChipsHtml\(\{\s*filter: 'assigned_to'/.test(taskSrc),
     'Aufgaben: Schalter, dann Personen-Chips in EINER Gruppe');
   assert(!/data-filter-person/.test(calSrc), 'keine Personen-Haken mehr im Kalender');
   const html = calendarHelpers.personFilterChipsHtml([{ id: 1, display_name: 'Linda Johnson', avatar_color: '#C2185B' }]);
@@ -2551,46 +2585,47 @@ test('layoutScheduleBlocks: gleicher Schichttyp und gleiche Zeit bleiben zwei ei
     'inhaltsgleiche Eintraege (gleicher Typ, gleiche Zeit, verschiedene Quelle) duerfen sich trotzdem nicht ueberdecken');
 });
 
-test('renderScheduleTimeBlock: ohne Layout bleibt der bisherige volle Balken erhalten (Wochenansicht)', () => {
-  const html = calendarHelpers.renderScheduleTimeBlock(scheduleEntry({ start: '08:00', end: '12:00' }), 'week-event');
-  assert(html.includes('left:calc(0% + 2px)') && html.includes('width:calc(100% - 4px)'),
-    `ein einzelner Block muss die alten Aussenraender behalten: ${html}`);
+// R24, Entscheidung E5 a (Critique G1-Kalender-P1-1 c): die Schicht ist ein
+// schmales Band vorn in der Spalte, kein spaltenbreiter Block mehr. Lage und
+// Breite kommen aus calendar.css (`--band-lane`, `--cal-shift-band`) - das
+// Markup traegt nur die Spur, nie eine Spaltenbreite.
+test('R24 E5: renderScheduleTimeBlock zeichnet ein Band in Spur 0, ohne Spaltenbreite', () => {
+  const html = calendarHelpers.renderScheduleTimeBlock(scheduleEntry({ start: '08:00', end: '12:00' }));
+  assert(/class="schedule-time-block"/.test(html), `eigene Form, nicht .week-event/.day-event: ${html}`);
+  assert(html.includes('--band-lane:0;'), `ohne Layout Spur 0: ${html}`);
+  assert(!/width:|left:/.test(html), `das Band traegt keine Spaltenbreite im Markup: ${html}`);
+  assert(/role="button"/.test(html) && /aria-label="Schicht/.test(html), 'das Band ist die Schaltflaeche und traegt den vollen Namen');
 });
 
-test('renderScheduleTimeBlock: ohne Layout bleibt der bisherige volle Balken erhalten (Tagesansicht)', () => {
-  const html = calendarHelpers.renderScheduleTimeBlock(scheduleEntry({ start: '08:00', end: '12:00' }), 'day-event');
-  assert(html.includes('left:calc(0% + 4px)') && html.includes('width:calc(100% - 14px)'),
-    `ein einzelner Block muss die alten Aussenraender behalten: ${html}`);
-});
-
-test('renderScheduleTimeBlock: mit berechnetem Layout bekommt jeder Block seine eigene Spalte (Wochenansicht, #1043)', () => {
+test('R24 E5: ueberlappende Schichten liegen als Baender in eigenen Spuren (#1043)', () => {
   const basti = scheduleEntry({ start: '08:00', end: '12:00' });
   const emma = scheduleEntry({ start: '08:00', end: '12:45' });
   const layout = calendarHelpers.layoutScheduleBlocks([basti, emma]);
-  const htmlA = calendarHelpers.renderScheduleTimeBlock(basti, 'week-event', layout.get(basti));
-  const htmlB = calendarHelpers.renderScheduleTimeBlock(emma, 'week-event', layout.get(emma));
-  assert(!htmlA.includes('width:calc(100% - 4px)') && !htmlB.includes('width:calc(100% - 4px)'),
-    'ueberlappende Bloecke duerfen nicht mehr die volle Spaltenbreite bekommen (das war der Bug)');
-  assert(htmlA.includes('width:calc(50% - 4px)') && htmlB.includes('width:calc(50% - 4px)'),
-    `zwei ueberlappende Bloecke teilen sich je die Haelfte: ${htmlA} / ${htmlB}`);
-  const leftA = htmlA.match(/left:calc\(([\d.]+)% \+ 2px\)/)?.[1];
-  const leftB = htmlB.match(/left:calc\(([\d.]+)% \+ 2px\)/)?.[1];
-  assert(leftA !== undefined && leftB !== undefined && leftA !== leftB,
-    `beide Bloecke muessen an unterschiedlicher Stelle beginnen, damit keiner den anderen verdeckt: ${leftA} vs ${leftB}`);
+  const laneA = calendarHelpers.renderScheduleTimeBlock(basti, layout.get(basti)).match(/--band-lane:(\d+)/)?.[1];
+  const laneB = calendarHelpers.renderScheduleTimeBlock(emma, layout.get(emma)).match(/--band-lane:(\d+)/)?.[1];
+  assert(laneA !== undefined && laneB !== undefined && laneA !== laneB,
+    `beide Baender brauchen eine eigene Spur, sonst verdeckt eines das andere: ${laneA} vs ${laneB}`);
 });
 
-test('renderScheduleTimeBlock: mit berechnetem Layout bekommt jeder Block seine eigene Spalte (Tagesansicht, #1043)', () => {
+test('R24 E5: ein Termin beginnt hinter den Baendern, die er beruehrt - sonst volle Spalte', () => {
   const basti = scheduleEntry({ start: '08:00', end: '12:00' });
   const emma = scheduleEntry({ start: '08:00', end: '12:45' });
-  const layout = calendarHelpers.layoutScheduleBlocks([basti, emma]);
-  const htmlA = calendarHelpers.renderScheduleTimeBlock(basti, 'day-event', layout.get(basti));
-  const htmlB = calendarHelpers.renderScheduleTimeBlock(emma, 'day-event', layout.get(emma));
-  assert(!htmlA.includes('width:calc(100% - 14px)') && !htmlB.includes('width:calc(100% - 14px)'),
-    'ueberlappende Bloecke duerfen nicht mehr die volle Spaltenbreite bekommen (das war der Bug)');
-  const leftA = htmlA.match(/left:calc\(([\d.]+)% \+ 4px\)/)?.[1];
-  const leftB = htmlB.match(/left:calc\(([\d.]+)% \+ 4px\)/)?.[1];
-  assert(leftA !== undefined && leftB !== undefined && leftA !== leftB,
-    `beide Bloecke muessen an unterschiedlicher Stelle beginnen, damit keiner den anderen verdeckt: ${leftA} vs ${leftB}`);
+  const blocks = [basti, emma];
+  const layout = calendarHelpers.layoutScheduleBlocks(blocks);
+  const lanes = (from, to) => calendarHelpers.scheduleBandLanes({ start: from * 60, end: to * 60 }, blocks, layout);
+  assert(lanes(9, 10) === 2, `mitten in beiden Schichten: zwei Baender frei, bekommen ${lanes(9, 10)}`);
+  assert(lanes(12.5, 13) === 2, `nur noch Emmas Schicht (Spur 1): zwei Spuren frei, bekommen ${lanes(12.5, 13)}`);
+  assert(lanes(13, 14) === 0, `nach den Schichten die volle Spalte, bekommen ${lanes(13, 14)}`);
+  assert(lanes(12.75, 13) === 0, 'ein Termin, der beginnt, wo die Schicht endet, beruehrt sie nicht');
+  const rules = [...eachRule(calendarCss)];
+  const band = rules.find((r) => r.at.length === 0 && r.selector.trim() === '.schedule-time-block');
+  assert(band && /inline-size:\s*var\(--cal-shift-band\)/.test(band.body), 'das Band ist so breit wie --cal-shift-band');
+  assert(/inset-inline-start:[^;]*var\(--band-lane/.test(band.body), 'die Spur setzt das Band nebeneinander');
+  assert(!/pointer-events:\s*none/.test(band.body), 'das Band nimmt den Tipp selbst (kein Hintergrund mehr)');
+  const inset = rules.find((r) => r.at.length === 0 && r.selector.split(',').map((x) => x.trim()).includes('.week-event')
+    && /--band-inset:/.test(r.body));
+  assert(inset && /var\(--band-lanes,\s*0\)/.test(inset.body) && inset.selector.includes('.day-event'),
+    'Woche und Tag rechnen den Vorsprung aus --band-lanes');
 });
 
 // --------------------------------------------------------
@@ -2625,8 +2660,9 @@ function fakeContainer() {
   };
 }
 
+// Seit R24 E5 traegt ein Schichtband seine Spur statt einer Spaltenlage.
 function scheduleBlockLefts(html) {
-  return [...html.matchAll(/left:calc\((\d+(?:\.\d+)?)%/g)].map((m) => m[1]);
+  return [...html.matchAll(/class="schedule-time-block"[^>]*--band-lane:(\d+);/g)].map((m) => m[1]);
 }
 
 function withOverlappingScheduleState(extra, fn) {
@@ -2670,6 +2706,19 @@ test('renderWeekView: zwei ueberlappende Schichten am selben Tag bekommen unters
     assert(lefts[0] !== lefts[1],
       `renderWeekView() muss das berechnete Layout an renderScheduleTimeBlock() weiterreichen, sonst liegen `
       + `beide Bloecke deckungsgleich uebereinander (#1043): ${lefts}`);
+  });
+});
+
+test('R24 E5: renderWeekView reicht die Baender an den Termin weiter, der sie beruehrt', () => {
+  const ev = (id, from, to) => ({ id, title: `T${id}`, start_datetime: `2026-09-07T${from}:00`, end_datetime: `2026-09-07T${to}:00`, all_day: 0, assigned_users: [] });
+  withOverlappingScheduleState({ events: [ev(901, '09:00', '10:00'), ev(902, '15:00', '16:00')] }, () => {
+    const container = fakeContainer();
+    calendarHelpers.renderWeekView(container);
+    const block = (id) => container.html.match(new RegExp(`class="week-event" data-id="${id}"[\\s\\S]*?style="([^"]*)"`))?.[1] ?? '';
+    assert(/--band-lanes:2;/.test(block(901)), `09:00 liegt in beiden Schichten: ${block(901)}`);
+    assert(/left:calc\(var\(--band-inset\)/.test(block(901)), `und beginnt hinter den Baendern: ${block(901)}`);
+    assert(!/--band-lanes/.test(block(902)) && /width:calc\(100% - 4px\)/.test(block(902)),
+      `15:00 beruehrt keine Schicht und behaelt die volle Spalte: ${block(902)}`);
   });
 });
 
@@ -6437,9 +6486,10 @@ test('Seitenleiste: erst ab 86.25rem Kalenderflaeche, nur mit Leiste rueckt die 
     'die Leiste haelt den Platz ihrer Bildlaufleiste - sonst rueckt der Mini-Monat, wenn „Als Naechstes" nachkommt (R19-Nachlese)');
   assert(rules.some((r) => /\.calendar-page\.app-page--list-detail/.test(r.selector) && /container-name:\s*module-surface cal-page/.test(r.body)),
     'in Agenda und Tag behaelt die Seite ihren Namen module-surface');
-  const label = rules.find((r) => r.selector.trim() === '.cal-toolbar__label' && r.at.some((a) => /min-width:\s*1024px/.test(a)));
-  assert(/font-weight:\s*var\(--font-weight-bold\)/.test(label?.body ?? '') && /font-size:\s*var\(--text-lg\)/.test(label?.body ?? ''),
-    'der Desktop-Zeitraum steht fett in 18px, nicht mehr leiser als Fliesstext-Gewicht');
+  // Seit #1797 ist der Desktop-Zeitraum der Titel selbst (Titelrolle 22px fett,
+  // typography.css) - geprueft im Test "#1797" unten, hier nur die Kennung.
+  assert(/className: 'cal-toolbar__label page-toolbar__period-title'/.test(readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8')),
+    'der Desktop-Zeitraum traegt die Titelrolle, nicht mehr leiser als der Modulname');
   const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   // R20: nur die Suche steht ohne Leiste. Die Agenda behaelt sie - ohne „Als
   // Naechstes" (das IST die Agenda); vorher sprang der Inhalt beim
@@ -7139,7 +7189,186 @@ test('R23: dayHeading baut seinen Formatierer einmal', () => {
 });
 
 // --------------------------------------------------------
+// #1797 + #1462: der Zeitraum ist der Titel, die Ueberlappung ein Status-Zeichen
+// --------------------------------------------------------
+
+/* DIE SHELL-VARIANTE „ZEITRAUM ALS TITEL" (#1797, Ulas 2026-10-26). Ab 1024px
+ * ist der Zeitraum der sichtbare Titel des Kopfs, das <h1> nennt das Modul nur
+ * noch der Hilfstechnik - versteckt per Clip, nicht per display/visibility,
+ * sonst fiele die Seitenueberschrift aus dem Baum. Die Pfeile stehen direkt am
+ * Titel (vor ihm, damit sie bei wechselnder Textbreite stillstehen), "Heute"
+ * dahinter. */
+const layoutCssV = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+const typographyCssV = readFileSync(new URL('../public/styles/typography.css', import.meta.url), 'utf8');
+const desktopRules = (css) => [...eachRule(css)].filter((r) => r.at.some((a) => /min-width:\s*1024px/.test(a)));
+const phoneTabletRules = (css) => [...eachRule(css)].filter((r) => r.at.some((a) => /max-width:\s*1023px/.test(a)));
+
+test('#1797: der Kalenderkopf traegt die Shell-Variante "Zeitraum als Titel", das <h1> nennt das Modul', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const renderSrc = src.slice(src.indexOf('export async function render('), src.indexOf('export async function render(') + 4000);
+  assert(/class="page-toolbar [^"]*\bpage-toolbar--period-as-title\b[^"]*" id="cal-toolbar"/.test(renderSrc), 'der Kopf ist als Variante markiert, nicht geraten');
+  const html = calendarHelpers.toolbarHtml();
+  assert(/<h1 class="page-toolbar__title">calendar\.title<\/h1>/.test(html), 'das <h1> bleibt und nennt das Modul');
+  assert(/class="period-stepper__value [^"]*\bpage-toolbar__period-title\b/.test(html), 'der Zeitraum traegt die Titelrolle der Variante');
+  const hidden = desktopRules(layoutCssV).find((r) => /\.page-toolbar--period-as-title[^,{]*>\s*\.page-toolbar__title\s*$/.test(r.selector.trim()));
+  assert(hidden, 'die Shell blendet das <h1> der Variante ab 1024px aus');
+  assert(/clip-path:\s*inset\(50%\)/.test(hidden.body) && /width:\s*1px/.test(hidden.body), `per Clip versteckt (${hidden.body})`);
+  // IM FLUSS, NICHT ABSOLUT (Sonde 19, uk 1280): ein absolut gesetztes <h1>
+  // stand in einem zweizeiligen Kopf mittig zwischen den Zeilen und zaehlte als
+  // eigene Zeile der Titelzeile. Als 1px-Flex-Element steht es IN Zeile 1.
+  assert(!/position:\s*absolute/.test(hidden.body), 'das versteckte <h1> bleibt ein Element der Titelzeile');
+  assert(/margin-inline-end:\s*calc\(-1 \* var\(--page-toolbar-gap\)/.test(hidden.body), 'und kostet die Zeile keine Luecke');
+  assert(!/display:\s*none|visibility:\s*hidden/.test(hidden.body), 'nie aus dem Baum: der Screenreader sagt weiter "Kalender"');
+  const order = (part) => {
+    const rule = desktopRules(layoutCssV).find((r) => r.selector.includes('.page-toolbar--period-as-title') && r.selector.includes(part) && /order:/.test(r.body));
+    return Number(/order:\s*(\d+)/.exec(rule?.body ?? '')?.[1] ?? NaN);
+  };
+  assert(order('.period-stepper__value') > 0, 'der Titel steht hinter beiden Pfeilen, direkt am naechsten');
+  assert(order('.period-stepper__reset') > order('.period-stepper__value'), '"Heute" steht hinter dem Titel');
+  const label = desktopRules(calendarCss).filter((r) => r.selector.trim() === '.cal-toolbar__label');
+  assert(label.length && label.every((r) => !/11\.75rem|15rem/.test(r.body)), 'keine feste Labelbreite mehr, die die Pfeile vom Zeitraum trennt');
+  const role = desktopRules(typographyCssV).find((r) => r.selector.includes('.page-toolbar--period-as-title') && r.selector.includes('.page-toolbar__period-title'));
+  assert(/font-size:\s*var\(--type-toolbar-title\)/.test(role?.body ?? '') && /font-weight:\s*var\(--font-weight-bold\)/.test(role?.body ?? ''),
+    'der Zeitraum ist die groesste Schrift des Kopfs: die Titelrolle (22px fett)');
+  const year = desktopRules(typographyCssV).find((r) => r.selector.includes('.page-toolbar__period-year'));
+  assert(/color:\s*var\(--color-text-secondary\)/.test(year?.body ?? ''), 'das Jahr steht in der Sekundaerfarbe');
+});
+
+test('#1797: das Jahr eines Zeitraum-Titels ist ein eigenes Wort, und nur dann', () => {
+  const { periodTitleParts } = calendarHelpers;
+  assert(JSON.stringify(periodTitleParts('Oktober 2026', '2026')) === JSON.stringify({ before: 'Oktober ', year: '2026', after: '' }), `${JSON.stringify(periodTitleParts('Oktober 2026', '2026'))}`);
+  assert(JSON.stringify(periodTitleParts('KW 42 · Oktober 2026', '2026')) === JSON.stringify({ before: 'KW 42 · Oktober ', year: '2026', after: '' }), `${JSON.stringify(periodTitleParts('KW 42 · Oktober 2026', '2026'))}`);
+  assert(JSON.stringify(periodTitleParts('2026년 10월', '2026')) === JSON.stringify({ before: '', year: '2026년', after: ' 10월' }), `${JSON.stringify(periodTitleParts('2026년 10월', '2026'))}`);
+  assert(JSON.stringify(periodTitleParts('2026年10月', '2026')) === JSON.stringify({ before: '', year: '2026年', after: '10月' }), `${JSON.stringify(periodTitleParts('2026年10月', '2026'))}`);
+  assert(periodTitleParts('Mittwoch, 21.10.2026', '2026') === null, 'in einem Datum bleibt das Jahr Teil des Datums');
+  assert(periodTitleParts('07.10. - 06.11.2026', '2026') === null);
+});
+
+/* DIE UEBERLAPPUNG IST EIN STATUS-ZEICHEN IN DER TITELZEILE (#1462). Sie stand
+ * im Aktions-Slot und baute mobil eine eigene Kopfzeile. Jetzt traegt sie der
+ * Status-Slot der Shell direkt hinter dem Zeitraum: unter 1024px ein
+ * Icon-Knopf, dessen Name der volle Satz ist, ab 1024px mit kurzem Text. */
+test('#1462: die Ueberlappungswarnung steht im Status-Slot der Titelzeile, nicht im Aktions-Slot', () => {
+  const { scheduleStatusHtml, toolbarHtml } = calendarHelpers;
+  assert(scheduleStatusHtml([]) === '', 'ohne Ueberlappung kein Slot, also keine Breite');
+  const status = scheduleStatusHtml([{ date_key: '2026-10-21', user_id: 1 }]);
+  const html = toolbarHtml({ statusHtml: status });
+  const at = (needle) => html.indexOf(needle);
+  const slot = at('class="page-toolbar__status"');
+  assert(slot > at('class="page-toolbar__center') && slot < at('class="page-toolbar__actions"'), 'der Slot folgt dem Zeitraum in der Titelzeile');
+  assert(!html.slice(at('class="page-toolbar__actions"'), at('class="page-toolbar__bar')).includes('overlap'), 'die Warnung steht nicht mehr im Aktions-Slot');
+  const btn = /<button[^>]*id="cal-overlap"[^>]*>/.exec(status)?.[0] ?? '';
+  assert(/aria-label="schedule\.overlapWarning\{/.test(btn), `der Name ist der volle Satz (${btn})`);
+  assert(/aria-haspopup="dialog"/.test(btn), 'ein Tipp oeffnet den vollen Satz als Blatt oder Popover');
+  assert(/class="page-toolbar__status-text">schedule\.overlapWarningShort</.test(status), 'am Desktop bleibt der kurze Text');
+  const base = [...eachRule(layoutCssV)].find((r) => !r.at.length && r.selector.trim() === '.page-toolbar__status');
+  assert(/flex-shrink:\s*0/.test(base?.body ?? ''), 'die Shell kennt den Slot');
+  const compact = phoneTabletRules(layoutCssV);
+  assert(/display:\s*none/.test(compact.find((r) => r.selector.trim() === '.page-toolbar__status-text')?.body ?? ''), 'unter 1024px nur das Zeichen');
+  assert(![...eachRule(layoutCssV), ...eachRule(calendarCss)].some((r) => r.selector.includes('page-toolbar__status') && /flex-basis:\s*100%|order:\s*[1-9]/.test(r.body)),
+    'der Slot oeffnet keine eigene Zeile');
+  const actions = phoneTabletRules(calendarCss).find((r) => /^\.cal-toolbar > \.page-toolbar__actions/.test(r.selector.trim()));
+  assert(actions && !/schedule-warning/.test(actions.selector) && /display:\s*none/.test(actions.body),
+    'unter 1024px steht der Aktions-Slot nie als Zeile da - auch nicht mit einer Warnung');
+  const tabletTitle = [...eachRule(calendarCss)].find((r) => r.at.some((a) => /min-width:\s*768px\)\s*and\s*\(max-width:\s*1023px/.test(a))
+    && /> \.page-toolbar__title$/.test(r.selector.trim()));
+  assert(/--page-status-lead/.test(tabletTitle?.body ?? ''), 'am Tablet rechnet die Titelbasis das Zeichen ab, die Zeile bricht nicht um');
+});
+
+/* DER STATUS GIBT SEIN WORT AB, BEVOR DIE TITELZEILE BRICHT (Sonde 19, #1462).
+ * Am Desktop steht die Ueberlappung mit kurzem Text. Passt die eine Zeile nur
+ * ohne ihn - oder bricht ohne ihn sogar die Titelzeile -, steht nur das
+ * Zeichen (Name: der volle Satz). Gemessen gegen den Text, nicht gegen die
+ * gerade gezeigte Form, damit die Entscheidung nicht pendelt. */
+test('#1462: am Desktop wird der Status zum Zeichen, wenn die Zeile sonst nicht passt', () => {
+  const box = (width, extra = {}) => ({ getBoundingClientRect: () => ({ width }), classList: { contains: () => false }, ...extra });
+  const make = (inner) => {
+    const classes = new Set();
+    // Wie im Browser: in der Zeichen-Form misst der Status 40 statt 200px.
+    const status = { getBoundingClientRect: () => ({ width: classes.has('page-toolbar--status-icon') ? 40 : 200 }), classList: { contains: () => false } };
+    const kids = [box(36), box(120), box(340), box(160), status];
+    const barEl = { classList: { contains: (c) => c === 'page-toolbar__bar' }, getBoundingClientRect: () => ({ width: 600 }) };
+    return {
+      isConnected: true,
+      clientWidth: inner + 64,
+      children: [...kids, barEl],
+      classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), remove: (...c) => c.forEach((x) => classes.delete(x)), contains: (c) => classes.has(c) },
+      querySelector: (sel) => ({ '.cal-toolbar__views': { scrollWidth: 280 }, '#cal-filters': box(40), '.page-toolbar__status-btn': status }[sel] ?? null),
+      classes,
+    };
+  };
+  const prevWindow = globalThis.window;
+  const prevGcs = globalThis.getComputedStyle;
+  try {
+    globalThis.window = { matchMedia: () => ({ matches: true }) };
+    globalThis.getComputedStyle = () => ({ paddingInlineStart: '32', paddingInlineEnd: '32', columnGap: '8', display: 'flex' });
+    // Titelzeile 856 + 5 Luecken = 896; kompakte Bar 280 + 8 + 8 + 40 + 44 = 380.
+    const text = make(1276);
+    calendarHelpers.syncToolbarFit(text);
+    assert(text.classes.has('cal-toolbar--compact') && !text.classes.has('page-toolbar--status-icon'), 'passt mit Text: der Text bleibt');
+    // Ohne Text (Zeichen 40 statt 200): 736 + 380 = 1116.
+    const icon = make(1200);
+    calendarHelpers.syncToolbarFit(icon);
+    assert(icon.classes.has('cal-toolbar--one-row') && icon.classes.has('page-toolbar--status-icon'), 'eine Zeile nur ohne Text: das Zeichen');
+    calendarHelpers.syncToolbarFit(icon);
+    assert(icon.classes.has('page-toolbar--status-icon'), 'die Entscheidung pendelt nicht');
+    const tight = make(800);
+    calendarHelpers.syncToolbarFit(tight);
+    assert(!tight.classes.has('cal-toolbar--one-row') && tight.classes.has('page-toolbar--status-icon'), 'bricht sonst die Titelzeile, steht nur das Zeichen');
+  } finally {
+    globalThis.window = prevWindow;
+    globalThis.getComputedStyle = prevGcs;
+  }
+  const iconRule = desktopRules(layoutCssV).find((r) => /\.page-toolbar--status-icon .*\.page-toolbar__status-text$/.test(r.selector.trim()));
+  assert(/display:\s*none/.test(iconRule?.body ?? ''), 'die Shell kennt die Zeichen-Form am Desktop');
+});
+
+// R24, Critique G1 P1-1: Woche und Tag begannen um 07:00, auch wenn eine
+// Fruehschicht um 06:00 beginnt - ihr Titel stand ueber dem Bild. Der Morgen
+// kommt jetzt aus dem fruehesten Block im Raster (wie im Schichtplan, R22 D6),
+// und der Schichttitel klebt an der sichtbaren Oberkante seines Blocks.
+await test('R24 G1 P1-1: Woche/Tag beginnen mit dem fruehesten Block, nicht fest um 07:00', () => {
+  const HOUR = 56;
+  const prevDate = globalThis.Date;
+  // 09:18 Haushaltszeit: ohne Block steht das Raster um 07:00.
+  class Fixed extends prevDate { constructor(...a) { if (a.length) super(...a); else super('2026-10-28T09:18:00'); } static now() { return new prevDate('2026-10-28T09:18:00').getTime(); } }
+  globalThis.Date = Fixed;
+  try {
+    const block = (hour) => ({ getBoundingClientRect: () => ({ top: 100 + hour * HOUR }) });
+    const grid = (hours) => ({
+      getBoundingClientRect: () => ({ top: 100, height: 24 * HOUR }),
+      querySelectorAll: (sel) => { assert(/\.week-event/.test(sel) && /\.day-event/.test(sel), `misst ${sel}`); return hours.map(block); },
+    });
+    const port = () => ({ scrollTop: 0, scrollHeight: 24 * HOUR + 60, clientHeight: 800 });
+    const run = (hours) => { const p = port(); calendarHelpers.scrollToHour(p, grid(hours)); return p.scrollTop / HOUR; };
+    assert(run([]) === 7, `ohne Block 07:00, bekommen ${run([])}`);
+    assert(run([6, 10]) === 6, `Fruehschicht 06:00 -> 06:00, bekommen ${run([6, 10])}`);
+    assert(run([5.5]) === 5, `Block 05:30 -> 05:00, bekommen ${run([5.5])}`);
+    assert(run([0, 8]) === 7, `was um 00:00 beginnt (Fortsetzung von gestern), zaehlt nicht: ${run([0, 8])}`);
+    assert(run([9]) === 7, `ein spaeter Block verschiebt den Morgen nie nach hinten: ${run([9])}`);
+  } finally {
+    globalThis.Date = prevDate;
+  }
+  const sticky = [...eachRule(calendarCss)].find((r) => r.selector.trim() === '.schedule-time-block__title' && /position:\s*sticky/.test(r.body));
+  assert(sticky && /(^|[;\s])top:\s*0/.test(sticky.body), 'der Schichttitel klebt nicht an der sichtbaren Oberkante seines Blocks');
+});
+
+/* R24 S13 (Uebergabe S1): der Titel eines Wochenblocks klebt an der sichtbaren
+ * Oberkante (R9), die Zeitzeile darunter scrollt weiter - ohne eigene Flaeche
+ * lief sie DURCH den Titel: "Ausflug ins Naturkundemu-/seum" lag gescrollt
+ * ueber "08:30 - 15:00" (1440, Woche, gesehen). Der Titel traegt die Flaeche
+ * seines Blocks (`inherit`, auch im Hover), die Zeitzeile gleitet darunter -
+ * wie in Apple Kalender. */
+test('R24 S13: der klebende Wochentitel deckt die Zeitzeile, die unter ihm durchlaeuft', () => {
+  const rule = [...eachRule(calendarCss)].find((r) => !r.at.length && r.selector.trim() === '.week-event__title');
+  assert(rule, 'Regel fehlt');
+  assert(/position:\s*sticky/.test(rule.body), 'der Titel klebt nicht');
+  assert(/background:\s*inherit/.test(rule.body), 'ohne Flaeche laeuft die Zeitzeile durch den Titel');
+});
+
+// --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 const { failed } = await finish();
 if (failed > 0) process.exit(1);
+

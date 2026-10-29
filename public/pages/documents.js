@@ -6,6 +6,9 @@
 
 import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal, selectModal, advancedSection, promptModal, confirmModal, refocusAfterRender, renderKeepingFocus, captureModalContext, captureOpenContext, isModalContextCurrent, reportFieldError, reportFieldErrors, constraintErrors, lastInputWasKeyboard } from '/components/modal.js';
+import { hintFoldHtml } from '/utils/hint-fold.js';
+import { initials } from '/utils/initials.js';
+import { safeHexColor, getReadableTextColor } from '/utils/color.js';
 import { t, getLocale } from '/i18n.js';
 import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
@@ -31,7 +34,7 @@ import { mountEmptyState, mountSearchEmpty } from '/utils/empty-state.js';
 import { subtreeIds, folderPath, flattenFolderTree } from '/utils/folder-tree.js';
 import { dateStatus } from '/utils/date-status.js';
 import { expiryChipSpec, expiryViewerSpec } from '/utils/document-expiry.js';
-import { installPopoverMenus } from '/utils/popover-menu.js';
+import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import {
@@ -719,10 +722,14 @@ function documentsToolsMenuHtml() {
     ['desc', t('documents.sortDescending'), 'arrow-down-wide-narrow'],
   ];
   return `
-    <button type="button" class="btn btn--secondary btn--icon documents-tools-btn popover-menu__trigger"
+    <button type="button" class="btn btn--secondary btn--icon page-tools-btn documents-tools-btn popover-menu__trigger"
             popovertarget="documents-tools-menu" aria-haspopup="menu" aria-expanded="false"
             aria-label="${esc(label)}" title="${esc(label)}">
-      <i data-lucide="arrow-up-down" class="icon-md" aria-hidden="true"></i>
+      ${/* EIN ZEICHEN FUER DAS MENUE DES KOPFS (R24, G4-Quer-P2-1): die
+           Ellipse wie in jedem anderen Modul. Die Pfeile nannten nur einen der
+           drei Inhalte (Ansicht, Sortierung, Auswahl) und standen am selben
+           Platz wie das „..." von Inventar und Kontakten. */ ''}
+      <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
     </button>
     <div class="popover-menu documents-tools-menu" id="documents-tools-menu" popover role="menu" aria-label="${esc(label)}">
       ${/* ANSICHT IM MENUE, NUR UNTER 768px (R16, Kopfregel mobil 1a). Der
@@ -2658,12 +2665,20 @@ function memberOptions(selected = []) {
   const granted = selected
     .map((id) => (state.directory ?? []).find((person) => Number(person.id) === Number(id)))
     .filter(Boolean);
-  return withChosenPeople(state.members, granted).map((member) => `
-    <label class="document-member-option">
-      <input type="checkbox" value="${member.id}" ${selectedSet.has(String(member.id)) ? 'checked' : ''}>
-      <span>${esc(member.display_name)}</span>
-    </label>
-  `).join('');
+  // PERSONEN ALS CHIPS (Critique R24, D4 people-checkbox): dieselbe Form wie
+  // renderUserMultiSelect - Scheibe, Name, eine Trefferflaeche je Person -
+  // statt 13px-Kaestchen mit Namen daneben. Gelesen wird weiter ueber
+  // `.document-member-picker input:checked`.
+  return withChosenPeople(state.members, granted).map((member) => {
+    const color = safeHexColor(member.avatar_color);
+    const inner = member.avatar_data ? `<img src="${esc(member.avatar_data)}" alt="" loading="lazy">` : esc(initials(member.display_name));
+    return `
+    <label class="user-ms__option">
+      <input type="checkbox" class="user-ms__checkbox" value="${member.id}" data-ms-input="document-members" ${selectedSet.has(String(member.id)) ? 'checked' : ''}>
+      <span class="user-ms__avatar" style="background-color:${color};color:${getReadableTextColor(color)}">${inner}</span>
+      <span class="user-ms__name">${esc(member.display_name)}</span>
+    </label>`;
+  }).join('');
 }
 
 /** Das Sichtbarkeitsfeld des Dokument-Dialogs. */
@@ -2789,12 +2804,14 @@ function openDocumentModal(doc = null) {
                Dateien werden gespeichert in: Lokal" stand fuer jedes Mitglied
                im Dialog - eine Angabe, an der niemand ausser dem Admin etwas
                aendern kann (Critique a4); fuer ihn fuehrt sie zur Einstellung. */ ''}
+          ${/* ALS SATZ, OHNE LINK AUS DEM DIALOG (Critique R24 G4-Dokumente-P3-2):
+               "Speicher-Einstellungen" verliess das halb ausgefuellte Formular.
+               Der Ort ist eine Auskunft; geaendert wird er in den Einstellungen. */ ''}
           ${state.isAdmin ? `<p class="document-storage-target">
             <i data-lucide="${uploadTargetIcon(state.activeUploadBackend)}" aria-hidden="true"></i>
             <span>${t('documents.activeUploadTarget', {
               target: uploadBackendLabel(state.activeUploadBackend),
             })}</span>
-            <a class="document-storage-target__link" href="/settings/modules/documents?section=documents-storage" data-nav>${t('documents.storageSettingsLink')}</a>
           </p>` : ''}
           <section class="folder-upload-preview" id="document-folder-upload-preview" aria-live="polite" hidden></section>
         </div>`;
@@ -2802,6 +2819,10 @@ function openDocumentModal(doc = null) {
   openSharedModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('documents.editTitle') : t('documents.newTitle'),
+    // KEIN FOKUS IM NAMEN BEIM HOCHLADEN (Critique R24 G4-Dokumente-P3-2): die
+    // Datei kommt zuerst und liefert den Namen; am Telefon fuhr sonst die
+    // Tastatur fuer ein Feld hoch, das leer bleiben darf. Bearbeiten: D4.
+    initialFocus: isEdit ? 'edit' : 'none',
     size: 'lg',
     content: `
       <form id="document-form" class="document-form" novalidate>
@@ -2811,31 +2832,37 @@ function openDocumentModal(doc = null) {
             <label class="label" for="document-name">${t('documents.nameLabel')}${isEdit ? REQUIRED_MARK : ''}</label>
             <input class="input" id="document-name" name="name" maxlength="200" value="${esc(doc?.name || '')}"
                    ${isEdit ? 'required' : `placeholder="${esc(t('documents.namePlaceholder'))}"`}>
-            ${isEdit ? '' : `<p class="document-form__hint" id="document-name-hint">${t('documents.nameHint')}</p>`}
           </div>
           <div class="form-group">
             <label class="label" for="document-category">${t('documents.categoryLabel')}</label>
-            <select class="input" id="document-category" aria-describedby="document-category-hint">
+            <select class="input" id="document-category">
               ${CATEGORIES.map((category) => `<option value="${category}" ${(doc?.category || 'other') === category ? 'selected' : ''}>${categoryLabels()[category]}</option>`).join('')}
             </select>
-            <p class="document-form__hint" id="document-category-hint">${t('documents.categoryHint')}</p>
           </div>
           <div class="form-group">
             <label class="label" for="document-folder">${t('documents.folderLabel')}</label>
-            <select class="input" id="document-folder" aria-describedby="document-folder-hint">
+            <select class="input" id="document-folder">
               <option value="">${t('documents.noFolder')}</option>
               ${state.folders.map((folder) => `<option value="${folder.id}" ${presetFolderId === String(folder.id) ? 'selected' : ''}>${esc(folder.name)}</option>`).join('')}
             </select>
-            <p class="document-form__hint" id="document-folder-hint">${t('documents.folderHint')}</p>
           </div>
           ${documentVisibilityFieldHtml(doc)}
         </div>
+        ${/* DIE HILFEN STEHEN HINTER "MEHR DAZU" (Critique R24 G4-Dokumente-P3-2):
+             unter Name, Kategorie und Ordner stand je ein Satz - zusammen
+             hoeher als die Felder. Der Platzhalter sagt schon, dass der Name
+             aus der Datei kommt; die Erklaerungen sind einen Tipp entfernt. */ ''}
+        ${hintFoldHtml({
+          className: 'document-form__help',
+          moreHtml: [isEdit ? '' : t('documents.nameHint'), t('documents.categoryHint'), t('documents.folderHint')]
+            .filter(Boolean).map((text) => `<p class="form-hint">${esc(text)}</p>`).join(''),
+        })}
         <div class="document-member-picker" id="document-member-picker">
           <div class="label">${t('documents.allowedMembersLabel')}</div>
           <div class="document-member-picker__grid">${memberOptions(doc?.allowed_member_ids || [])}</div>
         </div>
         ${expiryFieldsHtml}
-        ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
+        ${advancedSection(advancedFieldsHtml, { open: advancedOpen, hint: t('documents.moreDetailsHint') })}
         <div id="document-error" class="form-error" role="alert" hidden></div>
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button type="button" class="btn btn--secondary" data-action="close-modal">${t('common.cancel')}</button>
@@ -3586,7 +3613,11 @@ async function saveDocument(event, doc, panel) {
         documentFolderOptionsHtml, owner);
     }
   } finally {
-    submit.disabled = panel._folderUpload?.completed === true;
+    // Nach einem fertigen Ordner-Upload traegt das Ergebnis seinen eigenen
+    // Knopf ("Schliessen"); "Hochladen" faellt dann weg, statt gesperrt
+    // stehenzubleiben (Critique R24, D4: ein Primaerknopf ist nie gesperrt).
+    submit.hidden = panel._folderUpload?.completed === true;
+    submit.disabled = false;
   }
 }
 
@@ -4234,17 +4265,49 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
               <i data-lucide="external-link" class="icon-md" aria-hidden="true"></i>
               ${t('documents.dmsOpenExternal')}
             </a>` : ''}
+            ${/* DIE HANDLUNGEN MIT WORT (Critique R24 G4-Dokumente-P3-3): Oeffnen,
+                 Bearbeiten und Teilen standen als nackte Zeichen, Herunterladen
+                 als gefuellter Kreis ohne Text. Jetzt Knoepfe der Kapselform mit
+                 Zeichen UND Wort; Herunterladen bleibt der eine Primaerknopf, am
+                 Ende. Der zugaengliche Name nennt weiter das Dokument. */ ''}
             ${previewKind(doc.mime_type) === 'pdf' ? `
-            ${rowActionHtml({ icon: 'external-link', href: previewUrl, label: t('documents.openInTabNamed', { name: doc.name }), attrs: { target: '_blank', rel: 'noopener noreferrer', title: t('documents.viewerOpenInTab') } })}` : ''}
+            <a class="btn btn--secondary btn--sm document-viewer__action" href="${esc(previewUrl)}" target="_blank" rel="noopener noreferrer"
+               aria-label="${esc(t('documents.openInTabNamed', { name: doc.name }))}">
+              <i data-lucide="external-link" class="icon-md" aria-hidden="true"></i><span>${t('documents.viewerOpenInTab')}</span>
+            </a>` : ''}
             ${mayManage(doc) ? `
-            ${rowActionHtml({ icon: 'pencil', action: 'edit-document', label: t('common.editNamed', { name: doc.name }), attrs: { title: t('common.edit') } })}` : ''}
+            <button type="button" class="btn btn--secondary btn--sm document-viewer__action" data-action="edit-document"
+                    aria-label="${esc(t('common.editNamed', { name: doc.name }))}">
+              <i data-lucide="pencil" class="icon-md" aria-hidden="true"></i><span>${t('common.edit')}</span>
+            </button>` : ''}
             ${shareSupport === 'ok' ? `
-            ${rowActionHtml({ icon: 'share-2', action: 'share', label: t('documents.shareNamed', { name: doc.name }), attrs: { disabled: true, 'aria-busy': 'true', title: t('documents.sharePreparing') } })}` : ''}
-            <a class="btn btn--primary btn--icon btn--icon-sm" href="${downloadUrl}" download
-               title="${t('documents.downloadAction')}" aria-label="${t('documents.downloadAction')}">
-              <i data-lucide="download" class="icon-md" aria-hidden="true"></i>
+            <button type="button" class="btn btn--secondary btn--sm document-viewer__action" data-action="share" disabled aria-busy="true"
+                    aria-label="${esc(t('documents.shareNamed', { name: doc.name }))}" title="${esc(t('documents.sharePreparing'))}">
+              <i data-lucide="share-2" class="icon-md" aria-hidden="true"></i><span>${t('documents.shareAction')}</span>
+            </button>` : ''}
+            <a class="btn btn--primary btn--sm document-viewer__action" href="${downloadUrl}" download data-viewer-download>
+              <i data-lucide="download" class="icon-md" aria-hidden="true"></i><span>${t('documents.downloadAction')}</span>
             </a>
           </span>
+          ${/* SCHMAL STEHEN DIE HANDLUNGEN IM MEHR-MENUE, DER KOPF IST EINE ZEILE
+               (Ulas 28.10., S10-F4; Muster Kopf-Werkzeug S5/R16). Vier Knoepfe
+               brachen unter Kategorie und Blaettern in eine zweite Zeile - die
+               Vorschau begann bei 390px erst bei y206. Die Eintraege tragen
+               Zeichen UND Wort und loesen die Knoepfe der breiten Leiste aus
+               (ein Weg je Handlung, auch fuer Teilen, das im Tipp bleibt).
+               Ab 640px ist das Menue unsichtbar und die Leiste steht. */ ''}
+          <span class="document-viewer__more">${popoverMenuHtml({
+            id: 'document-viewer-more-menu',
+            label: t('common.moreActionsNamed', { name: doc.name }),
+            triggerClass: 'btn btn--secondary btn--icon document-viewer__more-btn',
+            items: [
+              ...(externalUrl ? [{ action: 'viewer-dms', icon: 'external-link', label: t('documents.dmsOpenExternal') }] : []),
+              ...(previewKind(doc.mime_type) === 'pdf' ? [{ action: 'viewer-open-tab', icon: 'external-link', label: t('documents.viewerOpenInTab') }] : []),
+              ...(mayManage(doc) ? [{ action: 'viewer-edit', icon: 'pencil', label: t('common.edit') }] : []),
+              ...(shareSupport === 'ok' ? [{ action: 'viewer-share', icon: 'share-2', label: t('documents.shareAction'), disabled: true }] : []),
+              { action: 'viewer-download', icon: 'download', label: t('documents.downloadAction') },
+            ],
+          })}</span>
           ${shareSupport !== 'ok' ? `<p class="document-viewer__note">${t(SHARE_NOTE_KEYS[shareSupport])}</p>` : ''}
         </div>
         ${viewerDetailsHtml(doc)}
@@ -4283,7 +4346,25 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
         if (opener?.isConnected && opener !== document.body) opener.focus();
         openDocumentModal(doc);
       });
-      wireViewerStage(panel);
+      wireViewerStage(panel, doc);
+      // Das Mehr-Menue (schmal) loest die Knoepfe der Leiste aus - ein Weg je
+      // Handlung. Synchron im Tipp: Teilen und Herunterladen brauchen die
+      // Nutzeraktivierung des Klicks.
+      installPopoverMenus(panel);
+      const VIEWER_MENU_TARGETS = {
+        'viewer-dms': '.doc-viewer__dms-link',
+        'viewer-open-tab': 'a.document-viewer__action[target="_blank"]',
+        'viewer-edit': '[data-action="edit-document"]',
+        'viewer-share': '[data-action="share"]',
+        'viewer-download': '[data-viewer-download]',
+      };
+      panel.querySelector('#document-viewer-more-menu')?.addEventListener('click', (event) => {
+        const item = event.target.closest?.('.popover-menu__item[data-action]');
+        const target = item && panel.querySelector(VIEWER_MENU_TARGETS[item.dataset.action] ?? '');
+        if (!target || target.disabled) return;
+        panel.querySelector('#document-viewer-more-menu')?.hidePopover?.();
+        target.click();
+      });
       // Vor/Zurueck: die Knoepfe und die Pfeiltasten, die auf sie zeigen
       // (RTL gespiegelt). Nicht aus einem Feld oder der PDF-Seitenleiste heraus
       // - dort gehoeren die Pfeile dem Element.
@@ -4339,12 +4420,16 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
         shareFile = new File([blob], doc.original_name || doc.name, { type: doc.mime_type });
         btn.disabled = false;
         btn.removeAttribute('aria-busy');
+        // Der Eintrag im Mehr-Menue (schmal) wird mit dem Knopf frei.
+        const menuItem = panel.querySelector('#document-viewer-more-menu [data-action="viewer-share"]');
+        if (menuItem) menuItem.disabled = false;
         // Der Name ("<Dokument> teilen") steht schon; nur der Hinweis wechselt.
         btn.title = t('documents.shareAction');
       })
       .catch((err) => {
         if (err?.name === 'AbortError') return;
         btn.remove();
+        panel.querySelector('#document-viewer-more-menu [data-action="viewer-share"]')?.remove();
         panel.querySelector('.document-viewer__meta')
           ?.insertAdjacentHTML('beforeend', `<p class="document-viewer__note">${t('documents.shareFailed')}</p>`);
       });
@@ -4390,14 +4475,31 @@ function viewerStageStatusHtml() {
  * das Bild blendet ueber das Poster, Poster und Ladezeichen treten zurueck.
  * Ein Bild aus dem Cache ist beim Verdrahten schon `complete`.
  */
-function wireViewerStage(panel) {
+function wireViewerStage(panel, doc) {
   const stage = panel.querySelector('.document-viewer__stage[data-stage-loading]');
   const img = stage?.querySelector('img.document-viewer__image:not(.document-viewer__poster)');
   if (!stage || !img) return;
   const done = () => stage.removeAttribute('data-stage-loading');
-  if (img.complete && img.naturalWidth > 0) { done(); return; }
+  // EIN KAPUTTES BILD IST KEINE BUEHNE (R24, Critique G4 P2-1). Bei `error`
+  // nahm die Buehne nur ihr Ladezeichen weg, und das Broken-Image-Zeichen mit
+  // dem Alt-Text blieb stehen (naturalWidth 0). Jetzt steht dort dieselbe
+  // Ersatzkarte wie fuer eine PDF, die pdf.js nicht zeichnen kann - Typzeichen,
+  // Dateiname, Hinweis; Herunterladen bleibt in der Meta-Leiste.
+  const failed = () => {
+    if (!stage.isConnected) return;
+    stage.insertAdjacentHTML('afterend', renderViewerFallback(doc, {
+      hint: t('documents.viewerImageFallbackHint'), icon: 'image-off', alert: true,
+    }));
+    const fallback = stage.nextElementSibling;
+    stage.remove();
+    if (window.lucide && fallback) window.lucide.createIcons({ el: fallback });
+  };
+  if (img.complete) {
+    if (img.naturalWidth > 0) done(); else failed();
+    return;
+  }
   img.addEventListener('load', done, { once: true });
-  img.addEventListener('error', done, { once: true });
+  img.addEventListener('error', failed, { once: true });
 }
 
 function renderViewerContent(doc, previewUrl, downloadUrl) {

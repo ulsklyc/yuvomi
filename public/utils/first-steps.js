@@ -52,6 +52,16 @@ export function startFirstSteps(storage) {
   writeState({ active: true, dismissed: false, done: {} }, storage);
 }
 
+/**
+ * Laeuft die Karte noch? Fuer die Uebersicht, die einem neuen Haushalt nicht
+ * "Heute frei" sagen soll (R24, Critique G6 P2-2) - er ist nicht frei, er ist
+ * leer.
+ */
+export function firstStepsActive(storage) {
+  const state = readState(storage);
+  return Boolean(state?.active && !state.dismissed);
+}
+
 /** Ein Schritt wurde gegangen. */
 export function markFirstStep(id, storage) {
   const state = readState(storage);

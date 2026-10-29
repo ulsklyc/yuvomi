@@ -365,6 +365,16 @@ test('GET /invites/preview: gültiger Token liefert die vorgegebenen Namen', asy
   assert.equal(res.body.data.valid, true);
   assert.equal(res.body.data.username, 'gustav');
   assert.equal(res.body.data.display_name, 'Gustav');
+  // R24 (G6-Zugang-P3-1): die Seite nennt, wer eingeladen hat.
+  assert.equal(res.body.data.invited_by, 'ADMIN');
+});
+
+test('GET /invites/preview: ohne einladendes Konto nennt die Vorschau niemanden', async () => {
+  const { token } = await invite({ username: 'ida' });
+  routeDb.prepare('UPDATE invites SET created_by = NULL WHERE username = ?').run('ida');
+  const res = await call('GET', `/auth/invites/preview?token=${token}`, { actor: null });
+  assert.equal(res.body.data.valid, true);
+  assert.equal(res.body.data.invited_by, null);
 });
 
 test('accept legt den Nutzer an; Rolle und Familienrolle stammen aus der Einladung', async () => {

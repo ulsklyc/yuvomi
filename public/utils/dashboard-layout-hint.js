@@ -30,12 +30,12 @@ const LAYOUT_HINT_KEY = 'yuvomi-dash-layout-hint';
 function readHint() {
   try {
     const stored = JSON.parse(localStorage.getItem(LAYOUT_HINT_KEY) ?? 'null');
-    if (Array.isArray(stored)) return { sizes: stored, query: null, listRows: null };
+    if (Array.isArray(stored)) return { sizes: stored, query: null, spans: null };
     if (stored && typeof stored === 'object') {
-      return { sizes: stored.sizes, query: stored.query ?? null, listRows: stored.listRows ?? null };
+      return { sizes: stored.sizes, query: stored.query ?? null, spans: stored.spans ?? null };
     }
   } catch { /* unlesbar: Standard */ }
-  return { sizes: null, query: null, listRows: null };
+  return { sizes: null, query: null, spans: null };
 }
 
 /**
@@ -49,46 +49,48 @@ function readHint() {
  * Abfrage. Er bleibt eine Vorhersage wie die Formen darueber: stimmt er nicht
  * mehr, holt die Seite nach, bevor sie zeichnet.
  *
- * UND DIE LISTENZEILEN (#2087, Codex-Review zu PR #2117): eine hohe
- * Kalenderkachel mit acht oder zwoelf Terminen belegt drei oder vier
- * Rasterzeilen, obwohl ihre Groesse 1x2 bleibt. Die Groesse allein sagte dem
- * Skelett zwei Zeilen voraus, und beim Laden wuchs die Kachel um eine oder
- * zwei. `listRowsOf` liefert je Kachel die Zahl, die das Raster als
- * `data-list-rows` traegt, oder nichts; welche Kachel das kennt, weiss
- * dashboard.js, nicht dieses Modul. Ein Eintrag ohne das Feld (vor #2087)
- * bleibt gueltig und sagt nur die Groessen voraus.
+ * UND DIE HOEHEN (U1 b, DW-P1-3; vorher die Listenstufe der Kalenderkachel,
+ * #2087): seit jede Kachel so hoch ist wie ihre Daten, sagt die Groesse dem
+ * Skelett die Hoehe nicht mehr voraus - eine 1x2-Liste mit zwei Eintraegen
+ * ist halb so hoch wie eine mit fuenf. `spanOf` liefert je Kachel die Spuren
+ * (`data-span-rows`), die sie beim letzten Zeichnen belegt hat, oder nichts;
+ * welche das sind, weiss dashboard.js, nicht dieses Modul. Ein Eintrag ohne
+ * das Feld (vor U1 b) bleibt gueltig und sagt nur die Groessen voraus.
  *
  * @param {object[]} cfg     Widget-Konfiguration
  * @param {string} [query]   Abfragepfad zu dieser Konfiguration
- * @param {(w: object) => (number|null)} [listRowsOf] Listenzeilen je Kachel
+ * @param {(w: object) => (number|null)} [spanOf] Rasterspuren je Kachel
  */
-export function rememberLayoutHint(cfg, query = null, listRowsOf = () => null) {
+export function rememberLayoutHint(cfg, query = null, spanOf = () => null) {
   try {
     const visible = cfg.filter((w) => w.visible);
-    const listRows = visible.map((w) => listRowsOf(w) ?? 0);
+    const spans = visible.map((w) => spanOf(w) ?? 0);
     localStorage.setItem(LAYOUT_HINT_KEY, JSON.stringify({
       sizes: visible.map((w) => w.size),
       ...(query ? { query } : {}),
-      ...(listRows.some(Boolean) ? { listRows } : {}),
+      ...(spans.some(Boolean) ? { spans } : {}),
     }));
   } catch { /* z.B. voller oder gesperrter Speicher: der Hinweis ist entbehrlich */ }
 }
 
+/** Mehr Spuren hat keine Kachel (eine 12-Termine-Liste: rund 190). */
+const SPAN_MAX = 1000;
+
 /**
- * Gemerkte Kachelformen samt Listenzeilen, sonst die uebergebenen
- * Standardformen ohne. Die Listenzeilen gelten nur zusammen mit den gemerkten
- * Groessen und nur als ganze Zahl je Kachel - alles andere ist 0 (keine
- * Angabe), denn der Wert landet im Markup des Skeletts.
+ * Gemerkte Kachelformen samt Hoehen, sonst die uebergebenen Standardformen
+ * ohne. Die Hoehen gelten nur zusammen mit den gemerkten Groessen und nur als
+ * ganze Zahl je Kachel - alles andere ist 0 (keine Angabe), denn der Wert
+ * landet im Markup des Skeletts.
  *
- * @returns {{ sizes: string[], listRows: number[] }}
+ * @returns {{ sizes: string[], spans: number[] }}
  */
 export function layoutHintTiles(fallbackSizes) {
-  const { sizes, listRows } = readHint();
+  const { sizes, spans } = readHint();
   if (!(Array.isArray(sizes) && sizes.length && sizes.every((s) => typeof s === 'string'))) {
-    return { sizes: fallbackSizes, listRows: fallbackSizes.map(() => 0) };
+    return { sizes: fallbackSizes, spans: fallbackSizes.map(() => 0) };
   }
-  const rows = Array.isArray(listRows) && listRows.length === sizes.length ? listRows : [];
-  return { sizes, listRows: sizes.map((_, i) => (Number.isInteger(rows[i]) && rows[i] > 0 ? rows[i] : 0)) };
+  const rows = Array.isArray(spans) && spans.length === sizes.length ? spans : [];
+  return { sizes, spans: sizes.map((_, i) => (Number.isInteger(rows[i]) && rows[i] > 0 && rows[i] <= SPAN_MAX ? rows[i] : 0)) };
 }
 
 /** Gemerkte Formen, sonst die uebergebenen Standardformen. */
@@ -105,9 +107,60 @@ export function layoutHintQuery(fallbackQuery) {
   return typeof query === 'string' && query.startsWith('/dashboard') ? query : fallbackQuery;
 }
 
+/* DIE HOEHE DES KOPFES (DW-P2-5). Das Raster beginnt unter Gruss und
+ * Heute-Blatt, und deren Hoehe haengt am Fenster (das Blatt fuellt am Telefon
+ * den ersten Schirm) und am Tag. Ohne sie stand das Skelett-Raster bei y 80
+ * und der Inhalt bei y 720 - die ganze Seite sprang beim Laden um. Gemerkt
+ * wird je Fenstergroesse die zuletzt gezeichnete Hoehe des Kopfbands und ob
+ * es ein Blatt trug; wenige Eintraege, der juengste gewinnt. Wie die
+ * Kachelformen eine Vorhersage: ein fremder oder kaputter Wert faellt still
+ * auf die Form des Skeletts zurueck. */
+const HEAD_HINT_KEY = 'yuvomi-dash-head-hint';
+const HEAD_HINT_MAX = 6;
+
+function readHeadHints() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(HEAD_HINT_KEY) ?? 'null');
+    return stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Merkt die Hoehe des Kopfbands fuer eine Fenstergroesse.
+ * @param {string} viewport  z. B. "390x844"
+ * @param {number} px        Rahmenhoehe des Bands
+ * @param {boolean} sheet    ob es ein Heute-Blatt trug
+ */
+export function rememberHeadHint(viewport, px, sheet) {
+  if (!viewport || !(px > 0)) return;
+  try {
+    const hints = readHeadHints();
+    const next = { px: Math.round(px), sheet: Boolean(sheet) };
+    const prev = hints[viewport];
+    if (prev && prev.px === next.px && prev.sheet === next.sheet) return;
+    delete hints[viewport];
+    const kept = Object.entries(hints).slice(-(HEAD_HINT_MAX - 1));
+    localStorage.setItem(HEAD_HINT_KEY, JSON.stringify(Object.fromEntries([...kept, [viewport, next]])));
+  } catch { /* der Hinweis ist entbehrlich */ }
+}
+
+/**
+ * Die gemerkte Kopfhoehe fuer diese Fenstergroesse, sonst null. Nur eine
+ * ganze Zahl in Bildschirmgroesse wird zum Wert - er landet im Markup.
+ * @returns {{ px: number, sheet: boolean } | null}
+ */
+export function headHint(viewport) {
+  const hint = readHeadHints()[viewport];
+  if (!hint || !Number.isInteger(hint.px) || hint.px <= 0 || hint.px > 4000) return null;
+  return { px: hint.px, sheet: hint.sheet !== false };
+}
+
 /** Beim Abmelden: der naechste Nutzer an diesem Geraet hat sein eigenes Raster. */
 export function forgetLayoutHint() {
   try {
     localStorage.removeItem(LAYOUT_HINT_KEY);
+    localStorage.removeItem(HEAD_HINT_KEY);
   } catch { /* gesperrter Speicher: dann bleibt hoechstens ein Skelett falsch */ }
 }

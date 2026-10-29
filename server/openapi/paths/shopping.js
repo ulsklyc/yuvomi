@@ -1,9 +1,9 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 export function shoppingPaths() {
-  return {
+  return withCaseReasons('shopping', CASE_REASONS, {
     '/api/v1/shopping': {
-      get: op({ summary: 'List shopping lists', tag: 'Shopping' }),
+      get: op({ summary: 'List shopping lists', tag: 'Shopping', description: 'Each list carries `item_total`, `item_checked` and `accepts_new_items` (1 or 0). `accepts_new_items` is 0 when the list mirrors a CalDAV reminder list that is read-only for its account: such a list is not offered as the target of a move, and moving an item there is refused.' }),
       post: op({ summary: 'Create shopping list', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/shopping/categories': {
@@ -69,7 +69,7 @@ export function shoppingPaths() {
           + 'a field that is not sent stays as it is. `list_id` moves the item to another list: it keeps its name, quantity, '
           + 'category, note, link, price and shop, and goes to the end of its category on the list it lands on. `list_id` and '
           + '`store_id` are positive integers, as a number or a string of digits; anything else and an unknown '
-          + '`list_id` are refused with 400 and nothing changes. If the item is mirrored from a CalDAV list and the target '
+          + '`list_id` are refused with 400 and nothing changes, as is a move to a list with `accepts_new_items: 0`. If the item is mirrored from a CalDAV list and the target '
           + 'list is mirrored too, its object on the server moves along after the response, unchanged and under the same UID; '
           + 'if the target list is not mirrored, the object is removed on the server and its mirrored tags are dropped. '
           + '`list_change` in the response names the list the item came from. A case a household member can run into carries a '
@@ -181,5 +181,25 @@ export function shoppingPaths() {
         },
       }),
     },
-  };
+  });
 }
+
+// #2267: die Gruende, die die Routen neben `error` senden.
+const LIST_GONE = '`shopping_list_not_found` (404, the list does not exist - deleted)';
+const MEALS_WRITE_REQUIRED = '`cross_module_access` (403, the caller has no write access to the meal plan - for API tokens a `meals:write` scope)';
+const PANTRY_READ_REQUIRED = '`cross_module_access` (403, the caller has no read access to the pantry - for API tokens a `pantry:read` scope)';
+const CASE_REASONS = {
+  '/api/v1/shopping/{listId}': { put: LIST_GONE, delete: LIST_GONE },
+  '/api/v1/shopping/{listId}/duplicate': { post: LIST_GONE },
+  '/api/v1/shopping/{listId}/items': { get: LIST_GONE, post: LIST_GONE },
+  '/api/v1/shopping/{listId}/items/reorder': { patch: LIST_GONE },
+  '/api/v1/shopping/{listId}/import-meal-plan': { post: `${LIST_GONE}, ${MEALS_WRITE_REQUIRED}` },
+  '/api/v1/shopping/{listId}/import-pantry': { post: `${LIST_GONE}, ${PANTRY_READ_REQUIRED}` },
+  '/api/v1/shopping/{listId}/send': {
+    post: `${LIST_GONE}, \`nothing_open\` (422, the list has no open item to send), `
+      + '`recipient_no_email` (422, the chosen member has no email address on their contact), '
+      + '`smtp_unconfigured` (422, email is not set up for this instance)',
+  },
+  '/api/v1/shopping/items/{itemId}': { delete: '`shopping_item_not_found` (404, the item does not exist - deleted)' },
+  '/api/v1/shopping/items/undo-transfer': { post: `${MEALS_WRITE_REQUIRED}, when the undo touches meal ingredients` },
+};

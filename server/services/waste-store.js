@@ -520,16 +520,69 @@ export function getSource(d, id) {
   return decorateSourceHealth(d, row, todayKey(d));
 }
 
+/**
+ * One source's label decisions. A label maps to any number of types (#2273):
+ * `type_ids` is the full set (ascending), an empty set means the label is
+ * ignored. `type_id` stays in the answer for API callers from before #2273 -
+ * the lowest of the set, or null - and says nothing about a second type.
+ */
 export function listMappings(d, sourceId) {
-  return d.prepare('SELECT * FROM waste_source_mappings WHERE source_id = ? ORDER BY normalized_label')
+  const rows = d.prepare('SELECT * FROM waste_source_mappings WHERE source_id = ? ORDER BY normalized_label')
     .all(sourceId);
+  if (!rows.length) return rows;
+  const typesByMapping = new Map();
+  for (const r of d.prepare(`
+    SELECT mt.mapping_id, mt.type_id FROM waste_source_mapping_types mt
+    JOIN waste_source_mappings m ON m.id = mt.mapping_id
+    WHERE m.source_id = ? ORDER BY mt.mapping_id, mt.type_id
+  `).all(sourceId)) {
+    if (!typesByMapping.has(r.mapping_id)) typesByMapping.set(r.mapping_id, []);
+    typesByMapping.get(r.mapping_id).push(r.type_id);
+  }
+  return rows.map((row) => decorateMapping(row, typesByMapping.get(row.id) ?? []));
 }
 
-/** normalized_label -> { type_id, ignored } for an existing source, used to prefill a re-import preview. */
+function decorateMapping(row, typeIds) {
+  return { ...row, type_ids: typeIds, type_id: typeIds[0] ?? null, ignored: typeIds.length === 0 };
+}
+
+function getMapping(d, mappingId) {
+  const row = d.prepare('SELECT * FROM waste_source_mappings WHERE id = ?').get(mappingId);
+  if (!row) return null;
+  const typeIds = d.prepare('SELECT type_id FROM waste_source_mapping_types WHERE mapping_id = ? ORDER BY type_id')
+    .all(mappingId).map((r) => r.type_id);
+  return decorateMapping(row, typeIds);
+}
+
+/** Replaces a label's whole type set; an empty set leaves it ignored. */
+function setMappingTypes(d, mappingId, typeIds) {
+  d.prepare('DELETE FROM waste_source_mapping_types WHERE mapping_id = ?').run(mappingId);
+  const insert = d.prepare('INSERT INTO waste_source_mapping_types (mapping_id, type_id) VALUES (?, ?)');
+  for (const typeId of typeIds) insert.run(mappingId, typeId);
+  // The label's own row changed in meaning - updated_at says so.
+  d.prepare('UPDATE waste_source_mappings SET original_label = original_label WHERE id = ?').run(mappingId);
+}
+
+/**
+ * The type set of one decision, from `type_ids` (#2273) or the single
+ * `type_id` API callers from before it send. Never both: a caller that sends
+ * both has a meaning this function would have to guess.
+ */
+function decisionTypeIds(decision) {
+  const hasList = decision.type_ids !== undefined && decision.type_ids !== null;
+  const hasSingle = decision.type_id !== undefined && decision.type_id !== null;
+  if (hasList && hasSingle) return { error: 'type_id and type_ids cannot both be given.' };
+  if (hasSingle) return { ids: [decision.type_id] };
+  if (!hasList) return { ids: [] };
+  if (!Array.isArray(decision.type_ids)) return { error: 'type_ids must be an array of waste type ids.' };
+  return { ids: [...new Set(decision.type_ids)] };
+}
+
+/** normalized_label -> { type_ids, ignored } for an existing source, used to prefill a re-import preview. */
 export function mappingsByLabel(d, sourceId) {
   const map = new Map();
   for (const row of listMappings(d, sourceId)) {
-    map.set(row.normalized_label, { type_id: row.type_id, ignored: !!row.ignored, original_label: row.original_label });
+    map.set(row.normalized_label, { type_ids: row.type_ids, ignored: row.ignored, original_label: row.original_label });
   }
   return map;
 }
@@ -621,21 +674,29 @@ export function listDueUrlSources(d) {
  * silently rewrite import history outside the atomic-commit path) - the next
  * re-import commit is what applies a changed mapping to the data.
  */
-export function updateMapping(d, sourceId, mappingId, { type_id = null, ignored = false }) {
+export function updateMapping(d, sourceId, mappingId, body = {}) {
   const source = getSource(d, sourceId);
   if (!source) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
   const existing = d.prepare('SELECT * FROM waste_source_mappings WHERE id = ? AND source_id = ?').get(mappingId, sourceId);
   if (!existing) throw new WasteNotFoundError('Mapping not found.', 'waste_mapping_not_found');
 
-  if (ignored) {
-    d.prepare('UPDATE waste_source_mappings SET type_id = NULL, ignored = 1 WHERE id = ?').run(mappingId);
+  const { ids, error } = decisionTypeIds(body);
+  if (error) throw new WasteValidationError([error]);
+  if (body.ignored) {
+    if (ids.length) throw new WasteValidationError(['A mapping is either ignored or has types, not both.']);
   } else {
-    if (!type_id || !getType(d, type_id)) {
-      throw new WasteValidationError(['type_id must reference an existing waste type when a mapping is not ignored.'], 'waste_selected_type_not_found');
+    if (!ids.length) {
+      // Only an API caller gets here - the dialog sends ignored for a label with no type ticked.
+      throw new WasteValidationError(['type_ids must name at least one waste type when a mapping is not ignored.']);
     }
-    d.prepare('UPDATE waste_source_mappings SET type_id = ?, ignored = 0 WHERE id = ?').run(type_id, mappingId);
+    for (const typeId of ids) {
+      if (!Number.isInteger(typeId) || !getType(d, typeId)) {
+        throw new WasteValidationError(['type_ids must reference existing waste types.'], 'waste_selected_type_not_found');
+      }
+    }
   }
-  return d.prepare('SELECT * FROM waste_source_mappings WHERE id = ?').get(mappingId);
+  d.transaction(() => setMappingTypes(d, mappingId, body.ignored ? [] : ids))();
+  return getMapping(d, mappingId);
 }
 
 /** Splits an inclusive date-key range into chunks no wider than the occurrence-range ceiling (invariant #7), so a wide import coverage window never violates getOccurrences' own bound. */
@@ -689,7 +750,7 @@ export function previewImport(d, { sourceId = null, icsText } = {}) {
  * @param {number|null} opts.sourceId null for a fresh import, an existing source id for a re-import
  * @param {string} opts.name required for a fresh import; defaults to the existing name on a re-import
  * @param {string} opts.icsText
- * @param {Array<{normalized_label:string, type_id?:number, new_type?:object, ignored?:boolean}>} opts.mappingDecisions one decision per distinct label
+ * @param {Array<{normalized_label:string, type_ids?:number[], type_id?:number, new_type?:object, ignored?:boolean}>} opts.mappingDecisions one decision per distinct label
  * @param {string[]} [opts.skipEventKeys] blocking-diagnostic event keys the caller explicitly acknowledges and excludes
  * @param {number|null} [opts.expectedVersion] the source's version as last seen in a preview (re-import concurrency guard)
  * @param {string|null} [opts.previewDigest] the digest the preview returned for this same file - a
@@ -751,23 +812,28 @@ export function commitImport(d, {
   const nameValidation = str(name ?? source?.name, 'name', { max: 150 });
   if (nameValidation.error) throw new WasteValidationError([nameValidation.error]);
 
-  // Every label present in this parse needs exactly one decision - map to an
-  // existing type, create a new type inline, or be explicitly ignored.
-  // Suggestions and remembered decisions never become decisions on their own.
+  // Every label present in this parse needs exactly one decision - map to
+  // existing types and/or a new type created inline (#2273: as many types as
+  // the entry names bins), or be explicitly ignored. Suggestions and
+  // remembered decisions never become decisions on their own.
   const decisionsByLabel = new Map(mappingDecisions.map((m) => [m.normalized_label, m]));
+  const existingTypeIdsByLabel = new Map();
   for (const label of preview.labels) {
     const decision = decisionsByLabel.get(label.normalized_label);
     if (!decision) throw new WasteValidationError([`No mapping decision was given for label "${label.original_label}".`]);
-    const hasType = decision.type_id != null;
-    const hasNewType = decision.new_type && typeof decision.new_type === 'object';
+    const { ids, error } = decisionTypeIds(decision);
+    if (error) throw new WasteValidationError([`Label "${label.original_label}": ${error}`]);
+    const hasTypes = ids.length > 0 || !!(decision.new_type && typeof decision.new_type === 'object');
     const isIgnored = !!decision.ignored;
-    if ([hasType, hasNewType, isIgnored].filter(Boolean).length !== 1) {
-      throw new WasteValidationError([`Label "${label.original_label}" must be mapped to exactly one of: an existing type, a new type, or ignored.`]);
+    if (hasTypes === isIgnored) {
+      throw new WasteValidationError([`Label "${label.original_label}" must be mapped to at least one type (existing or new), or be ignored - not both and not neither.`]);
     }
+    existingTypeIdsByLabel.set(label.normalized_label, ids);
   }
 
   return d.transaction(() => {
-    const resolvedTypeIdByLabel = new Map();
+    // normalized_label -> the label's types, ascending (a label may name several bins, #2273).
+    const resolvedTypeIdsByLabel = new Map();
     // Two labels that both say "create a new type" with the same name (after
     // trim/case-fold) mean the same type, not two - the household edited one
     // label's new-type name to match another's precisely so they would merge
@@ -778,21 +844,24 @@ export function commitImport(d, {
     // choice, not an automatic name match.
     const newTypeIdByName = new Map();
     for (const [normalizedLabel, decision] of decisionsByLabel) {
-      if (decision.ignored) continue;
-      if (decision.new_type) {
+      if (decision.ignored || !existingTypeIdsByLabel.has(normalizedLabel)) continue;
+      const typeIds = new Set();
+      for (const typeId of existingTypeIdsByLabel.get(normalizedLabel)) {
+        if (!Number.isInteger(typeId) || !getType(d, typeId)) {
+          throw new WasteValidationError([`type_id ${typeId} does not reference an existing waste type.`], 'waste_selected_type_not_found');
+        }
+        typeIds.add(typeId);
+      }
+      if (decision.new_type && typeof decision.new_type === 'object') {
         const nameKey = String(decision.new_type.name ?? '').trim().toLowerCase();
         let typeId = newTypeIdByName.get(nameKey);
         if (typeId === undefined) {
           typeId = createType(d, decision.new_type, userId).id;
           newTypeIdByName.set(nameKey, typeId);
         }
-        resolvedTypeIdByLabel.set(normalizedLabel, typeId);
-      } else {
-        if (!getType(d, decision.type_id)) {
-          throw new WasteValidationError([`type_id ${decision.type_id} does not reference an existing waste type.`], 'waste_selected_type_not_found');
-        }
-        resolvedTypeIdByLabel.set(normalizedLabel, decision.type_id);
+        typeIds.add(typeId);
       }
+      resolvedTypeIdsByLabel.set(normalizedLabel, [...typeIds].sort((x, y) => x - y));
     }
 
     let resolvedSourceId = source?.id ?? null;
@@ -831,23 +900,31 @@ export function commitImport(d, {
     }
 
     for (const label of preview.labels) {
-      const decision = decisionsByLabel.get(label.normalized_label);
-      const typeId = decision.ignored ? null : resolvedTypeIdByLabel.get(label.normalized_label);
       d.prepare(`
-        INSERT INTO waste_source_mappings (source_id, original_label, normalized_label, type_id, ignored)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(source_id, normalized_label) DO UPDATE SET
-          original_label = excluded.original_label, type_id = excluded.type_id, ignored = excluded.ignored
-      `).run(resolvedSourceId, label.original_label, label.normalized_label, typeId, decision.ignored ? 1 : 0);
+        INSERT INTO waste_source_mappings (source_id, original_label, normalized_label)
+        VALUES (?, ?, ?)
+        ON CONFLICT(source_id, normalized_label) DO UPDATE SET original_label = excluded.original_label
+      `).run(resolvedSourceId, label.original_label, label.normalized_label);
+      const mappingId = d.prepare('SELECT id FROM waste_source_mappings WHERE source_id = ? AND normalized_label = ?')
+        .get(resolvedSourceId, label.normalized_label).id;
+      setMappingTypes(d, mappingId, resolvedTypeIdsByLabel.get(label.normalized_label) ?? []);
     }
 
-    const existingRows = d.prepare('SELECT * FROM waste_imported_pickups WHERE source_id = ?').all(resolvedSourceId);
-    const existingByIdentity = new Map(existingRows.map((r) => [r.identity_key, r]));
-    const keptCandidates = preview.candidates.filter((c) => {
-      const decision = decisionsByLabel.get(c.normalized_label);
-      return decision && !decision.ignored;
-    });
-    const nextIdentities = new Set();
+    // One pickup per (entry, type): an entry whose label names two bins is
+    // two pickups on that day (#2273). A label with one type - the common
+    // case - is exactly one unit per entry, as before.
+    const units = [];
+    for (const c of preview.candidates) {
+      for (const typeId of resolvedTypeIdsByLabel.get(c.normalized_label) ?? []) units.push({ c, typeId });
+    }
+
+    const existingRows = d.prepare('SELECT * FROM waste_imported_pickups WHERE source_id = ? ORDER BY id').all(resolvedSourceId);
+    const existingByIdentity = new Map();
+    for (const row of existingRows) {
+      if (!existingByIdentity.has(row.identity_key)) existingByIdentity.set(row.identity_key, []);
+      existingByIdentity.get(row.identity_key).push(row);
+    }
+    const matchedRowIds = new Set();
     let added = 0, changed = 0, removed = 0;
 
     const insertStmt = d.prepare(`
@@ -857,18 +934,37 @@ export function commitImport(d, {
     const updateStmt = d.prepare(`
       UPDATE waste_imported_pickups SET type_id = ?, external_uid = ?, original_summary = ?, date_key = ?, tz_note = ? WHERE id = ?
     `);
-    // Pass 1: match by identity, the normal case of a feed with stable UIDs.
-    const unmatchedCandidates = [];
-    for (const c of keptCandidates) {
-      nextIdentities.add(c.identity_key);
-      const typeId = resolvedTypeIdByLabel.get(c.normalized_label);
-      const existingRow = existingByIdentity.get(c.identity_key);
-      if (!existingRow) {
-        unmatchedCandidates.push(c);
-      } else if (existingRow.type_id !== typeId || existingRow.date_key !== c.date_key
-        || existingRow.original_summary !== c.original_summary || existingRow.tz_note !== c.tz_note) {
-        updateStmt.run(typeId, c.external_uid, c.original_summary, c.date_key, c.tz_note, existingRow.id);
+    const claim = (unit, row) => {
+      matchedRowIds.add(row.id);
+      const { c, typeId } = unit;
+      if (row.type_id !== typeId || row.date_key !== c.date_key
+        || row.original_summary !== c.original_summary || row.tz_note !== c.tz_note) {
+        updateStmt.run(typeId, c.external_uid, c.original_summary, c.date_key, c.tz_note, row.id);
         changed++;
+      }
+    };
+    // Pass 1: match by identity, the normal case of a feed with stable UIDs.
+    // Within one identity a row of the unit's own type comes first; only
+    // what is left pairs up across types, so a label moved from one type to
+    // another stays one changed pickup, while a type added to a label is
+    // one pickup more and a type taken off one fewer (#2273).
+    const unitsByIdentity = new Map();
+    for (const unit of units) {
+      if (!unitsByIdentity.has(unit.c.identity_key)) unitsByIdentity.set(unit.c.identity_key, []);
+      unitsByIdentity.get(unit.c.identity_key).push(unit);
+    }
+    const unmatchedUnits = [];
+    for (const [identity, identityUnits] of unitsByIdentity) {
+      const rows = [...(existingByIdentity.get(identity) ?? [])];
+      const rest = [];
+      for (const unit of identityUnits) {
+        const same = rows.findIndex((row) => row.type_id === unit.typeId);
+        if (same === -1) rest.push(unit);
+        else claim(unit, rows.splice(same, 1)[0]);
+      }
+      for (const unit of rest) {
+        if (rows.length) claim(unit, rows.shift());
+        else unmatchedUnits.push(unit);
       }
     }
 
@@ -880,7 +976,7 @@ export function commitImport(d, {
     // nothing moved, on every scheduled run. The row keeps its id and takes
     // over the identity the feed uses NOW, so a feed whose UIDs are stable
     // after all is matched in pass 1 again from the next import on. Rows are
-    // handed out one per candidate (a queue per type and day), so two pickups
+    // handed out one per unit (a queue per type and day), so two pickups
     // of one type on one day stay two rows.
     //
     // The TYPE is half of the key on purpose: a row of another type on the
@@ -889,12 +985,12 @@ export function commitImport(d, {
     // one type ("Rest 2w", "Rest 4w") on the same day are told apart by their
     // summary, so a provider that merely lists them in another order does not
     // cross the rows and get two "changes" reported. Hence two rounds - first
-    // every candidate that finds a row with its own summary, and only then
+    // every unit that finds a row with its own summary, and only then
     // the rest in order. One round with a mere preference would let an
-    // earlier candidate without a namesake take the row a later one matches.
+    // earlier unit without a namesake take the row a later one matches.
     const orphanRowsByFact = new Map();
     for (const row of existingRows) {
-      if (nextIdentities.has(row.identity_key)) continue;
+      if (matchedRowIds.has(row.id)) continue;
       const fact = `${row.type_id}|${row.date_key}`;
       if (!orphanRowsByFact.has(fact)) orphanRowsByFact.set(fact, []);
       orphanRowsByFact.get(fact).push(row);
@@ -902,16 +998,16 @@ export function commitImport(d, {
     const rekeyStmt = d.prepare(`
       UPDATE waste_imported_pickups SET identity_key = ?, external_uid = ?, original_summary = ?, tz_note = ? WHERE id = ?
     `);
-    const orphansFor = (c) => orphanRowsByFact.get(`${resolvedTypeIdByLabel.get(c.normalized_label)}|${c.date_key}`) ?? [];
-    const rowByCandidate = new Map();
-    for (const c of unmatchedCandidates) {
-      const orphans = orphansFor(c);
-      const namesake = orphans.findIndex((row) => row.original_summary === c.original_summary);
-      if (namesake !== -1) rowByCandidate.set(c, orphans.splice(namesake, 1)[0]);
+    const orphansFor = (unit) => orphanRowsByFact.get(`${unit.typeId}|${unit.c.date_key}`) ?? [];
+    const rowByUnit = new Map();
+    for (const unit of unmatchedUnits) {
+      const orphans = orphansFor(unit);
+      const namesake = orphans.findIndex((row) => row.original_summary === unit.c.original_summary);
+      if (namesake !== -1) rowByUnit.set(unit, orphans.splice(namesake, 1)[0]);
     }
-    for (const c of unmatchedCandidates) {
-      const typeId = resolvedTypeIdByLabel.get(c.normalized_label);
-      const row = rowByCandidate.get(c) ?? orphansFor(c).shift();
+    for (const unit of unmatchedUnits) {
+      const { c, typeId } = unit;
+      const row = rowByUnit.get(unit) ?? orphansFor(unit).shift();
       if (!row) {
         insertStmt.run(resolvedSourceId, typeId, c.identity_key, c.external_uid, c.original_summary, c.date_key, c.tz_note);
         added++;
@@ -928,14 +1024,14 @@ export function commitImport(d, {
       }
     }
 
-    // Informational only: how many of the accepted candidates land on a date
+    // Informational only: how many of the accepted pickups land on a date
     // a manual schedule or one-off (or another source's import) already
     // provides for the same type. The resolver already coalesces these
     // correctly at read time regardless (invariant #3); this count just
     // makes the overlap visible at commit time.
     let coalesced = 0;
-    if (keptCandidates.length && preview.coverage.start && preview.coverage.end) {
-      const touched = new Set(keptCandidates.map((c) => `${resolvedTypeIdByLabel.get(c.normalized_label)}:${c.date_key}`));
+    if (units.length && preview.coverage.start && preview.coverage.end) {
+      const touched = new Set(units.map((unit) => `${unit.typeId}:${unit.c.date_key}`));
       for (const [from, to] of chunkDateRange(preview.coverage.start, preview.coverage.end)) {
         for (const occ of getOccurrences(d, { from, to })) {
           if (touched.has(`${occ.type_id}:${occ.date_key}`) && occ.origins.some((o) => o.kind !== 'import' || o.source_id !== resolvedSourceId)) {
@@ -1023,15 +1119,20 @@ export function computeMappingProfileDigest(profile) {
   return crypto.createHash('sha256').update(JSON.stringify(canonical), 'utf8').digest('hex');
 }
 
-/** Exports the current, resolved (non-ignored, mapped) label -> type-name mappings of one source as a portable profile. */
+/**
+ * Exports the current, resolved (non-ignored, mapped) label -> type-name
+ * mappings of one source as a portable profile. A label with several types
+ * (#2273) is one entry per type under the same pattern - the format stays
+ * version 1, and a profile from before reads exactly as it did.
+ */
 export function exportMappingProfile(d, sourceId) {
   const source = getSource(d, sourceId);
   if (!source) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
   const typesById = new Map(listTypes(d, { includeArchived: true }).map((t) => [t.id, t]));
   const mappings = listMappings(d, sourceId)
-    .filter((m) => !m.ignored && m.type_id && typesById.has(m.type_id))
-    .map((m) => ({ pattern: m.normalized_label, type_name: typesById.get(m.type_id).name }))
-    .sort((a, b) => a.pattern.localeCompare(b.pattern));
+    .flatMap((m) => m.type_ids.filter((id) => typesById.has(id))
+      .map((id) => ({ pattern: m.normalized_label, type_name: typesById.get(id).name })))
+    .sort((a, b) => a.pattern.localeCompare(b.pattern) || a.type_name.localeCompare(b.type_name));
   return { version: 1, source_name: source.name, mappings };
 }
 
@@ -1041,6 +1142,12 @@ export function exportMappingProfile(d, sourceId) {
  * types (by name, case-insensitive) - never creates a mapping row or type
  * that doesn't already exist, so an unrelated/foreign profile just reports
  * everything as unmatched rather than fabricating new local state.
+ *
+ * Every entry of one pattern together is that label's type set (#2273):
+ * applying the profile sets the label to exactly the types its entries
+ * resolve to. An entry is 'unchanged' when that set is already the label's,
+ * 'applicable' otherwise; an entry that does not resolve keeps its own
+ * status and leaves its type out of the set.
  */
 export function previewMappingProfileImport(d, sourceId, profile) {
   const source = getSource(d, sourceId);
@@ -1058,28 +1165,47 @@ export function previewMappingProfileImport(d, sourceId, profile) {
     typesByLowerName.get(key).push(type);
   }
 
-  const entries = profile.mappings.map((entry) => {
+  // Own types already claimed by an earlier entry of the same pattern: a
+  // label mapped to two same-named types exports two entries with one name,
+  // and each must resolve to ANOTHER of the two, or a round trip of the
+  // label's own profile would fold them into one (#2273).
+  const claimedByPattern = new Map();
+  const resolved = profile.mappings.map((entry) => {
     const pattern = sameLabelNormalization(entry.pattern);
     const mappingRow = existingMappingsByLabel.get(pattern) ?? null;
     const candidates = typesByLowerName.get(entry.type_name.trim().toLowerCase()) ?? [];
-    // A name collision resolves to the mapping's OWN current type when that
-    // type is one of the candidates (the idempotent, "keep pointing at what
-    // it already points at" reading) rather than guessing between look-alikes.
+    if (!claimedByPattern.has(pattern)) claimedByPattern.set(pattern, new Set());
+    const claimed = claimedByPattern.get(pattern);
+    // A name collision resolves to one of the mapping's OWN current types
+    // when one of them is among the candidates (the idempotent, "keep
+    // pointing at what it already points at" reading) rather than guessing
+    // between look-alikes.
     const type = candidates.length <= 1
       ? (candidates[0] ?? null)
-      : (candidates.find((c) => c.id === mappingRow?.type_id) ?? null);
-    let status;
+      : (candidates.find((c) => mappingRow?.type_ids.includes(c.id) && !claimed.has(c.id)) ?? null);
+    if (type) claimed.add(type.id);
+    let status = null;
     if (!mappingRow) status = 'unmatched_pattern';
     else if (!candidates.length) status = 'unmatched_type';
     else if (!type) status = 'ambiguous_type';
-    else if (!mappingRow.ignored && mappingRow.type_id === type.id) status = 'unchanged';
-    else status = 'applicable';
-    return {
-      pattern, type_name: entry.type_name,
-      mapping_id: mappingRow?.id ?? null, original_label: mappingRow?.original_label ?? null,
-      resolved_type_id: type?.id ?? null, status,
-    };
+    return { entry, pattern, mappingRow, type, status };
   });
+
+  // The type set each pattern's resolvable entries add up to.
+  const targetByPattern = new Map();
+  for (const r of resolved) {
+    if (r.status) continue;
+    if (!targetByPattern.has(r.pattern)) targetByPattern.set(r.pattern, new Set());
+    targetByPattern.get(r.pattern).add(r.type.id);
+  }
+  const sameSet = (a, b) => a.length === b.size && a.every((id) => b.has(id));
+
+  const entries = resolved.map(({ entry, pattern, mappingRow, type, status }) => ({
+    pattern, type_name: entry.type_name,
+    mapping_id: mappingRow?.id ?? null, original_label: mappingRow?.original_label ?? null,
+    resolved_type_id: type?.id ?? null,
+    status: status ?? (sameSet(mappingRow.type_ids, targetByPattern.get(pattern)) ? 'unchanged' : 'applicable'),
+  }));
 
   return {
     source_id: source.id,
@@ -1106,14 +1232,17 @@ export function commitMappingProfileImport(d, sourceId, profile, profileDigest) 
   }
   const preview = previewMappingProfileImport(d, sourceId, profile);
   const applied = d.transaction(() => {
-    let count = 0;
+    // All applicable entries of one label together are its new type set.
+    const typeIdsByMapping = new Map();
     for (const entry of preview.entries) {
       if (entry.status !== 'applicable') continue;
-      d.prepare('UPDATE waste_source_mappings SET type_id = ?, ignored = 0 WHERE id = ?')
-        .run(entry.resolved_type_id, entry.mapping_id);
-      count++;
+      if (!typeIdsByMapping.has(entry.mapping_id)) typeIdsByMapping.set(entry.mapping_id, new Set());
+      typeIdsByMapping.get(entry.mapping_id).add(entry.resolved_type_id);
     }
-    return count;
+    for (const [mappingId, typeIds] of typeIdsByMapping) {
+      setMappingTypes(d, mappingId, [...typeIds].sort((a, b) => a - b));
+    }
+    return preview.entries.filter((e) => e.status === 'applicable').length;
   })();
   return { applied_count: applied, entries: preview.entries };
 }

@@ -72,10 +72,18 @@ const STUBS = {
   `,
   '/i18n.js': `
     export const t = (key, values = {}) => {
+      // Wer echte Saetze braucht (der Intervall-Satz waehlt seine Pluralform an
+      // der Vorlage, R24 S4), setzt globalThis.__tDict auf flache Schluessel ->
+      // Text; Platzhalter werden wie im Original eingesetzt, unbekannte bleiben.
+      const dict = globalThis.__tDict;
+      if (dict && Object.prototype.hasOwnProperty.call(dict, key)) {
+        return String(dict[key]).replace(/\{\{(\w+)\}\}/g, (m, name) => (values && name in values ? String(values[name]) : m));
+      }
       if (!values || Object.keys(values).length === 0) return key;
       return key + JSON.stringify(values);
     };
     export const initI18n = async () => {};
+    export const whenI18nReady = async () => {};
     export const setLocale = async () => {};
     // Wie __formatLocale: Tests, die lokalisierte Monatsnamen pruefen, setzen
     // globalThis.__locale; ohne das bleibt es bei 'de'.
@@ -169,6 +177,8 @@ const STUBS = {
     export const intervalUnitLabel = () => '';
   `,
   '/components/modal.js': `
+    // Dialogregel Erstfokus (Critique R24 S3): wie das Original, rein.
+    export const dialogInitialFocus = (isEdit, required = 'first-field') => (isEdit ? 'edit' : required);
     export const openModal = (...args) => globalThis.__openModal?.(...args);
     // Die letzte Eingabe (Taste oder Zeiger); wer den Tastaturweg meint, setzt
     // globalThis.__lastInputKeyboard = true.
@@ -355,9 +365,15 @@ const STUBS = {
     export const scheduleUndoableDelete = (opts) => { globalThis.__undoStub?.(opts); };
     // Die Quittung einer Statusaktion (R23, D6): dieselbe Form wie das Original,
     // damit ein Test am showToast-Stub Satz und Rueckgaengig in die Hand bekommt.
-    export const offerUndo = ({ message, undo, onError, label, duration = 5000 }) => {
-      const run = async () => { try { await undo(); } catch (err) { onError?.(err); } };
-      return globalThis.window?.yuvomi?.showToast?.(message, 'default', duration, label ? { label, onClick: run } : run) === true;
+    // Seit R24 mit pending (Quittung im Tipp) und update (Satz nachtragen).
+    export const offerUndo = ({ message, undo, onError, label, duration = 5000, pending = null, scope = null }) => {
+      const run = async () => {
+        if (pending) { try { await pending; } catch { return; } }
+        try { await undo(); } catch (err) { onError?.(err); }
+      };
+      const handle = {};
+      const shown = globalThis.window?.yuvomi?.showToast?.(message, 'default', duration, label ? { label, onClick: run } : run, { scope, handle }) === true;
+      return { shown, update: (text) => { handle.setMessage?.(text); globalThis.__offerUndoUpdate?.(text); } };
     };
     // Im Test gibt es keine Animation, die ausspielen koennte - der Aufrufer
     // awaitet das Ergebnis, also loest der Stub sofort auf.
@@ -369,7 +385,8 @@ const STUBS = {
     export const expandIn = (el) => { globalThis.__expandIn?.(el); return Promise.resolve(); };
     // Token-Leser ohne Stylesheet: der Rueckfall ist der Wert (utils/flip.js).
     // Region auf-/zuklappen: ohne Layout bleibt nur der Zustand selbst (hidden).
-    export const toggleRegion = (region, open) => { if (region) region.hidden = !open; return Promise.resolve(); };
+    // Wer sehen will, DASS geklappt wird, setzt globalThis.__motionStub (wie swapContent).
+    export const toggleRegion = (region, open) => { globalThis.__motionStub?.('toggleRegion', region, open); if (region) region.hidden = !open; return Promise.resolve(); };
     // Ohne Layout kein Ladezustand am Knopf: nur die Arbeit selbst.
     export const withBusy = (_el, work) => work();
     // Balken wachsen lassen: ohne Layout nichts zu tun, der Endwert steht im Markup.

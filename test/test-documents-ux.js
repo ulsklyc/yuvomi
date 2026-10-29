@@ -352,12 +352,22 @@ test('nicht konfigurierte Upload-Ziele sind nicht auswählbar', () => {
   assert.match(storageSettings, /option\.disabled\s*=\s*!availableBackends\.has\(backend\)/);
 });
 
-test('die Speicher-Einstellungen sind von der Seite aus verlinkt — nur für Admins', () => {
+test('R24 D4: der Auswahl-Dialog der Belege sperrt "Uebernehmen" nicht, ohne Wahl sagt er, was fehlt', () => {
+  const attach = read('../public/components/document-attach.js');
+  assert.match(attach, /<button class="btn btn--primary" type="button" data-picker-confirm>/, 'nie gesperrt');
+  assert.doesNotMatch(attach, /confirmEl\.disabled/);
+  assert.match(attach, /if \(!selected\.size\) \{\s*reasonEl\.textContent = t\('documentAttach\.pickNone'\);\s*reasonEl\.hidden = false;/);
+});
+
+test('der Speicherort steht als Satz fuer Admins - ohne Link aus dem halb ausgefuellten Dialog (R24)', () => {
   // Seit R10 (2026-09-27) ein Abschnitt im Modulblatt Dokumente; der Link
   // zielt direkt dorthin, nicht ueber die Umleitung der Alt-Adresse.
   // Seit R22 (D11) gehoert die ganze Auskunft dem Admin, nicht nur der Link:
   // "Neue Dateien werden gespeichert in: Lokal" stand fuer jedes Mitglied da.
-  assert.match(page, /\$\{state\.isAdmin \? `<p class="document-storage-target">[\s\S]*?<a class="document-storage-target__link" href="\/settings\/modules\/documents\?section=documents-storage" data-nav>[\s\S]*?<\/p>` : ''\}/);
+  // Seit R24 (Critique G4-Dokumente-P3-2) ohne den Link "Speicher-Einstellungen":
+  // er verliess das halb ausgefuellte Formular.
+  assert.match(page, /\$\{state\.isAdmin \? `<p class="document-storage-target">[\s\S]*?documents\.activeUploadTarget[\s\S]*?<\/p>` : ''\}/);
+  assert.doesNotMatch(page, /document-storage-target__link|documents\.storageSettingsLink/);
   assert.equal((page.match(/class="document-storage-target"/g) ?? []).length, 1, 'kein zweiter Weg zur Auskunft');
   const routes = read('../server/routes/documents.js');
   assert.match(routes, /is_admin: isAdminRequest\(req\)/);
@@ -627,8 +637,8 @@ test('Teilen gibt es nur im Viewer, gated ueber die eine Probe, nie ueber "share
   assert.doesNotMatch(page, /'share' in navigator/, 'das ist auch dort wahr, wo nur Links teilbar sind');
   assert.doesNotMatch(page, /navigator\.share\b[^(]/, 'navigator.share wird aufgerufen, nicht abgefragt');
   // Der Knopf existiert nur bei 'ok'; sonst steht die Erklaerung, kein toter Knopf.
-  // Der Knopf ist die geteilte Zeilenaktion (Runde 5): rowActionHtml rendert <button type="button">.
-  assert.match(page, /\$\{shareSupport === 'ok' \? `\s*\$\{rowActionHtml\(\{ icon: 'share-2', action: 'share',/);
+  // Seit R24 (G4-Dokumente-P3-3) ein Knopf mit Zeichen UND Wort.
+  assert.match(page, /\$\{shareSupport === 'ok' \? `\s*<button type="button" class="btn btn--secondary btn--sm document-viewer__action" data-action="share"/);
   assert.match(page, /shareSupport !== 'ok' \? `<p class="document-viewer__note">\$\{t\(SHARE_NOTE_KEYS\[shareSupport\]\)\}<\/p>`/);
   // Die Zeile bleibt bei Ansehen/Download/Kebab.
   const actions = page.slice(page.indexOf('function renderActions(doc)'), page.indexOf('function renderSelectBox'));
@@ -650,7 +660,7 @@ test('die Datei wird beim Oeffnen geholt, der Klick muendet ohne await in naviga
   assert.match(close, /shareAbort\.abort\(\)/);
   assert.match(close, /shareFile = null/);
   // Der Knopf startet gesperrt und beschaeftigt, bis die Datei da ist.
-  assert.match(page, /action: 'share',[^\n]*attrs: \{ disabled: true, 'aria-busy': 'true'/);
+  assert.match(page, /data-action="share" disabled aria-busy="true"/);
   assert.match(prep, /btn\.disabled = false;\s*btn\.removeAttribute\('aria-busy'\)/);
   for (const key of ['shareAction', 'sharePreparing', 'shareUnsupportedType', 'shareInsecure', 'shareBrowserUnsupported', 'shareFailed']) {
     assert.equal(typeof de.documents[key], 'string', `de.json: documents.${key} fehlt`);
@@ -1176,11 +1186,14 @@ test('Kategorie und Ordner sagen, wofuer sie stehen - im Dialog und im Filter', 
   // Zwei Ordnungsachsen nebeneinander ("Versicherung" und "Versicherungen"),
   // und nirgends stand, wann welche gilt (Critique H10). Option A: beide
   // bleiben, die Rolle steht dabei - Art des Dokuments gegen Ablageort.
+  // Seit R24 (G4-Dokumente-P3-2) stehen die Saetze hinter "Mehr dazu" (hintFoldHtml)
+  // statt unter jedem Feld.
   const modal = fnBody('openDocumentModal', 'bindDropzone');
-  assert.match(modal, /<select class="input" id="document-category" aria-describedby="document-category-hint">/);
-  assert.match(modal, /<p class="document-form__hint" id="document-category-hint">\$\{t\('documents\.categoryHint'\)\}<\/p>/);
-  assert.match(modal, /<select class="input" id="document-folder" aria-describedby="document-folder-hint">/);
-  assert.match(modal, /<p class="document-form__hint" id="document-folder-hint">\$\{t\('documents\.folderHint'\)\}<\/p>/);
+  assert.match(modal, /<select class="input" id="document-category">/);
+  assert.match(modal, /<select class="input" id="document-folder">/);
+  assert.match(modal, /hintFoldHtml\(\{\s*className: 'document-form__help',\s*moreHtml: \[isEdit \? '' : t\('documents\.nameHint'\), t\('documents\.categoryHint'\), t\('documents\.folderHint'\)\]/);
+  assert.doesNotMatch(modal, /id="document-(?:name|category|folder)-hint"/, 'kein Satz mehr unter jedem Feld');
+  assert.match(modal, /initialFocus: isEdit \? 'edit' : 'none'/, 'Hochladen holt keine Tastatur fuer den Namen');
   assert.match(page, /id="documents-category" role="group" aria-label="\$\{t\('documents\.categoryFilterLabel'\)\}"/);
   assert.match(page, /<aside class="documents-folder-browser" aria-label="\$\{t\('documents\.folderFilterLabel'\)\}">/);
   assert.match(de.documents.categoryHint, /Art/);
@@ -1655,7 +1668,9 @@ test('der Betrachter bietet Bearbeiten an, schliesst sich dafuer und gibt den Au
   // Die geteilte Zeilenaktion (Runde 5): Name mit Objekt, "<Dokument> bearbeiten".
   // Seit #1265 fragt der Stift das DOKUMENT (Modulrecht UND Besitzregel), nicht
   // nur das Modul; das Verhalten faehrt test-inventory-documents-readonly-ui.js.
-  assert.match(actions, /\$\{mayManage\(doc\) \? `\s*\$\{rowActionHtml\(\{ icon: 'pencil', action: 'edit-document', label: t\('common\.editNamed', \{ name: doc\.name \}\)/);
+  // Seit R24 (G4-Dokumente-P3-3) mit Wort; der Name nennt das Dokument.
+  assert.match(actions, /\$\{mayManage\(doc\) \? `\s*<button type="button" class="btn btn--secondary btn--sm document-viewer__action" data-action="edit-document"\s+aria-label="\$\{esc\(t\('common\.editNamed', \{ name: doc\.name \}\)\)\}">\s*<i data-lucide="pencil" class="icon-md" aria-hidden="true"><\/i><span>\$\{t\('common\.edit'\)\}<\/span>/);
+  assert.match(actions, /<a class="btn btn--primary btn--sm document-viewer__action" href="\$\{downloadUrl\}" download data-viewer-download>\s*<i data-lucide="download"[^>]*><\/i><span>\$\{t\('documents\.downloadAction'\)\}<\/span>/, 'Herunterladen mit Wort, der eine Primaerknopf');
   // Der Ausloeser des Betrachters wird VOR dem Oeffnen gemerkt; beim Wechsel
   // bekommt er den Fokus zurueck, damit der Bearbeiten-Dialog ihn als seinen
   // Ausloeser merkt (modal.js merkt document.activeElement). Mobil schliesst
@@ -1963,8 +1978,8 @@ test('der Betrachter ist schmal vollflaechig, und der Meta-Block klappt hinter d
   assert.ok(hidden && /display:\s*none/.test(hidden.body), 'eingeklappt blendet der Meta-Block aus');
   assert.match(hidden.selector, /\.document-viewer__note/, 'samt Teilen-Hinweis');
   assert.match(hidden.selector, /\.document-viewer__details/, 'und Lesezeilen');
-  assert.match(hidden.selector, /> span:not\(\.document-viewer__actions\):not\(\.document-viewer__pager\):not\(\.doc-badge\)/,
-    'die Aktionen, das Vor/Zurueck-Paar (R22) und ein Ablauf in Warnfarbe bleiben stehen');
+  assert.match(hidden.selector, /> span:not\(\.document-viewer__actions\):not\(\.document-viewer__pager\):not\(\.document-viewer__more\):not\(\.doc-badge\)/,
+    'die Aktionen (schmal: ihr Mehr-Menue, S10-F4), das Vor/Zurueck-Paar (R22) und ein Ablauf in Warnfarbe bleiben stehen');
   // Die Regeln stehen NACH den Grundregeln des Betrachters (gleiche Spezifitaet).
   assert.ok(css.lastIndexOf('.document-viewer__pdf {') > css.indexOf('height: 65vh'), 'die schmale Regel folgt der Grundregel');
 
@@ -1988,7 +2003,7 @@ test('R18: der PDF-Betrachter am Desktop blendet die Leiste des Browsers aus, de
   assert.match(viewer, /<iframe class="document-viewer__pdf" src="\$\{previewUrl\}\$\{PDF_EMBED_FRAGMENT\}"/,
     'das Fragment haengt an der Adresse des eingebetteten Betrachters');
   // "In neuem Tab oeffnen" traegt die nackte Adresse - dort bleiben Zoom und Druck des Browsers.
-  assert.match(page, /rowActionHtml\(\{ icon: 'external-link', href: previewUrl,/);
+  assert.match(page, /<a class="btn btn--secondary btn--sm document-viewer__action" href="\$\{esc\(previewUrl\)\}" target="_blank"/);
   assert.equal((page.match(/PDF_EMBED_FRAGMENT/g) ?? []).length, 2, 'das Fragment steht nur am iframe, an keinem Link');
 });
 
@@ -2180,4 +2195,24 @@ test('R23: die Ablage prueft die Groesse gleich bei der Wahl', () => {
   const fn = page.slice(page.indexOf('function bindDropzone('), page.indexOf('function reportDropzoneError('));
   assert.match(fn, /const tooBig = files\.find\(\(file\) => file\.size > maxSize\);/);
   assert.match(fn, /setTimeout\(\(\) => reportDropzoneError\(form, t\('documents\.fileTooLargeNamed', \{ name: tooBig\.name \}\)\), 0\)/);
+});
+
+// R24 S10-F4 (Ulas 28.10.): schmal stehen die Handlungen des Betrachters im
+// Mehr-Menue, der Kopf ist EINE Zeile (Kategorie, Blaettern, Menue). Gemessen
+// 390px: Vorschau ab y206 -> y150. Die Eintraege loesen die Knoepfe der
+// breiten Leiste aus (ein Weg je Handlung, Teilen bleibt im Tipp).
+test('R24 S10-F4: schmal ein Mehr-Menue statt einer zweiten Knopfzeile, breit bleibt die Leiste', () => {
+  const viewer = fnBody('openDocumentViewer', 'renderViewerContent');
+  assert.match(viewer, /<span class="document-viewer__more">\$\{popoverMenuHtml\(\{\s*id: 'document-viewer-more-menu'/, 'ein Menue am Ende der Meta-Zeile');
+  for (const action of ['viewer-open-tab', 'viewer-edit', 'viewer-share', 'viewer-download']) {
+    assert.match(viewer, new RegExp(`action: '${action}'`), `${action} steht im Menue`);
+  }
+  assert.match(viewer, /'viewer-download': '\[data-viewer-download\]'/, 'der Eintrag loest den Knopf der Leiste aus');
+  assert.match(viewer, /target\.click\(\);/, 'synchron im Tipp (Teilen, Herunterladen)');
+  const css = readFileSync(new URL('../public/styles/documents.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const narrow = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
+  assert.match(rules.find((r) => !r.at.length && r.selector.trim() === '.document-viewer__meta > .document-viewer__more')?.body ?? '', /display:\s*none/, 'breit kein Menue');
+  assert.match(rules.find((r) => narrow(r) && r.selector.trim() === '.document-viewer__meta > .document-viewer__more')?.body ?? '', /display:\s*inline-flex/, 'schmal das Menue');
+  assert.match(rules.find((r) => narrow(r) && r.selector.trim() === '.document-viewer__meta > .document-viewer__actions')?.body ?? '', /display:\s*none/, 'schmal keine zweite Knopfzeile');
 });

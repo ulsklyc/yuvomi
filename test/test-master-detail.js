@@ -372,6 +372,29 @@ test('Esc im Detail fuehrt zur Zeile zurueck und behaelt die Auswahl', () => {
   handle.destroy();
 });
 
+test('R24 G5 P2-5: Esc in einem offenen Menue im Detail gehoert dem Menue', () => {
+  // Der Browser schliesst ein Popover erst NACH keydown, und nur ohne
+  // preventDefault() - also darf die Spalte Esc dort nicht verbrauchen.
+  const p = makePage();
+  const handle = p.mount();
+  handle.open('4');
+  const panel = new Node('popover-menu', { popover: 'auto' });
+  const item = new Node('popover-menu__item');
+  panel.append(item);
+  const trigger = new Node('popover-menu__trigger', { 'aria-haspopup': 'menu', 'aria-expanded': 'true' });
+  p.body.append(panel, trigger);
+  for (const target of [item, trigger]) {
+    document.activeElement = target;
+    assert.equal(key(target, 'Escape'), false, 'Esc wurde verbraucht - das Menue bleibt offen');
+    assert.equal(document.activeElement, target, 'der Fokus sprang aus dem Menue in die Liste');
+  }
+  // Ein geschlossenes Menue (Ausloeser ohne aria-expanded) gibt Esc wieder frei.
+  trigger.setAttribute('aria-expanded', 'false');
+  assert.equal(key(trigger, 'Escape'), true);
+  assert.equal(document.activeElement, p.focusOf(3));
+  handle.destroy();
+});
+
 // ── Renderer, Deep-Link, Zurueck-Taste ───────────────────────────────────
 
 test('meldet der Renderer eine unbekannte ID, faellt die Auswahl auf den Leerzustand', async () => {

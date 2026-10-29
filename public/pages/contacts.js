@@ -26,6 +26,7 @@ import { splitViewDetailHtml, mountMasterDetail, setSelectionBulk } from '/utils
 import { redrawList, collapseRow } from '/utils/list-motion.js';
 import '/components/category-manager.js';
 import { findPageFab } from '/utils/fab.js';
+import { filterButtonHtml, syncFilterButton, openFilterSheet, filterChipHtml } from '/utils/filter-sheet.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { mayWritePath, pathAccess } from '/utils/module-access.js';
 
@@ -418,6 +419,7 @@ export async function render(container, { user, signal } = {}) {
   wireScrollFade(_container.querySelector('#contacts-filters'));
   wireWheelToRow(_container.querySelector('#contacts-filters'));
   _container.querySelector('#contacts-filters').addEventListener('click', (e) => {
+    if (e.target.closest('#contacts-category-filter')) { openContactCategoryFilter(); return; }
     const chip = e.target.closest('[data-cat]');
     if (!chip) return;
     _container.querySelectorAll('.contact-filter-chip').forEach((c) => {
@@ -510,6 +512,63 @@ function filterCategoryKeys() {
   return keys.length < 2 && !state.activeCategory ? [] : keys;
 }
 
+/**
+ * PASST DIE REIHE NICHT, STEHT EIN FILTERKNOPF (R24, Critique G5 Kontakte-P3-2).
+ * Die Chipreihe lief am Desktop in der 424px-Spalte aus dem Bild
+ * („Dienstleistungen" nur per Querscroll), am Telefon schon ab „Familie".
+ * Solange alle Chips in die Reihe passen und es hoechstens vier Kategorien
+ * sind, bleibt sie die schnelle Facette im Scrollport (Kopfregel „wenige
+ * Facetten"); sonst steht an ihrer Stelle EIN Filterknopf mit Zaehler, die
+ * Kategorien als Chips im Blatt bzw. am Desktop als Popover - derselbe
+ * Baustein wie die Aufteilung. Gemessen wird die Reihe selbst: schneidet sie,
+ * merkt sie sich ihre Breite und versucht die Chips erst wieder, wenn sie
+ * breiter geworden ist.
+ */
+const CONTACT_CHIP_MAX = 4;
+let _chipOverflowWidth = null;
+let _chipRowObserver = null;
+let _chipRowObserved = null;
+
+function watchChipRow(bar) {
+  if (typeof ResizeObserver !== 'function' || _chipRowObserved === bar) return;
+  _chipRowObserver?.disconnect();
+  _chipOverflowWidth = null;
+  _chipRowObserved = bar;
+  _chipRowObserver = new ResizeObserver(() => {
+    if (!bar.isConnected) { _chipRowObserver?.disconnect(); _chipRowObserver = null; _chipRowObserved = null; return; }
+    const width = bar.clientWidth;
+    if (_chipOverflowWidth != null && width > _chipOverflowWidth) { _chipOverflowWidth = null; renderCategoryFilters(); }
+    else if (_chipOverflowWidth == null && bar.querySelector('[data-cat]') && bar.scrollWidth > width + 1) renderCategoryFilters();
+  });
+  _chipRowObserver.observe(bar);
+}
+
+function openContactCategoryFilter() {
+  const keys = filterCategoryKeys();
+  const active = state.activeCategory || '';
+  const chips = [
+    filterChipHtml({ filter: 'contacts-category', value: '', label: t('contacts.filterAll'), active: !active }),
+    ...state.categories.filter((c) => keys.includes(c.key))
+      .map((c) => filterChipHtml({ filter: 'contacts-category', value: c.key, label: catLabel(c.key), active: c.key === active })),
+  ].join('');
+  const panel = openFilterSheet({
+    groups: [{ heading: t('contacts.categoryLabel'), html: `<div class="filter-panel__chips" role="group" aria-label="${esc(t('contacts.categoryLabel'))}">${chips}</div>` }],
+    anchor: () => _container?.querySelector('#contacts-category-filter'),
+    onReset: () => { state.activeCategory = null; renderList(); },
+  });
+  panel?.addEventListener('click', (e) => {
+    const chip = e.target.closest('.filter-chip[data-filter="contacts-category"]');
+    if (!chip) return;
+    panel.querySelectorAll('.filter-chip[data-filter="contacts-category"]').forEach((el) => {
+      const on = el === chip;
+      el.classList.toggle('filter-chip--active', on);
+      el.setAttribute('aria-pressed', String(on));
+    });
+    state.activeCategory = chip.dataset.value || null;
+    renderList();
+  });
+}
+
 function renderCategoryFilters() {
   const bar = _container?.querySelector('#contacts-filters');
   if (!bar) return;
@@ -518,10 +577,22 @@ function renderCategoryFilters() {
   bar.removeAttribute('data-pending');
   const active = state.activeCategory;
   const keys = filterCategoryKeys();
+  watchChipRow(bar);
+  const asButton = keys.length > CONTACT_CHIP_MAX || _chipOverflowWidth != null;
+  bar.classList.toggle('contacts-filters--button', asButton);
   // Nur neu bauen, wenn sich die Menge der Chips geaendert hat: renderList()
   // ruft hier bei jedem Tastendruck der Suche, und ein Neubau naehme einem
   // gerade fokussierten Chip den Fokus.
-  const signature = keys.join(',');
+  const signature = `${asButton ? 'button:' : ''}${keys.join(',')}`;
+  if (asButton) {
+    const button = bar.querySelector('#contacts-category-filter');
+    if (bar.dataset.chips === signature && button) { syncFilterButton(button, active ? 1 : 0); return; }
+    bar.dataset.chips = signature;
+    bar.replaceChildren();
+    bar.insertAdjacentHTML('beforeend', filterButtonHtml({ id: 'contacts-category-filter', count: active ? 1 : 0, showLabel: true }));
+    if (window.lucide) lucide.createIcons({ el: bar });
+    return;
+  }
   const chips = () => bar.querySelectorAll('[data-cat]');
   if (bar.dataset.chips === signature && (chips().length > 0) === (keys.length > 0)) {
     for (const chip of chips()) {
@@ -544,6 +615,13 @@ function renderCategoryFilters() {
   bar.replaceChildren();
   bar.insertAdjacentHTML('beforeend', allChip + catChips);
   if (window.lucide) lucide.createIcons({ el: bar });
+  // Schneidet die Reihe, wird sie zum Knopf (siehe oben). Ohne Layout (Sonden,
+  // verborgene Spalte) ist clientWidth 0 - dann bleibt es bei den Chips.
+  if (bar.clientWidth > 0 && bar.scrollWidth > bar.clientWidth + 1) {
+    _chipOverflowWidth = bar.clientWidth;
+    renderCategoryFilters();
+    return;
+  }
   if (focusedCat !== undefined) bar.querySelector(`[data-cat="${CSS.escape(focusedCat)}"]`)?.focus();
 }
 
@@ -1194,8 +1272,9 @@ function openContactDetail(contact, { inPane = null } = {}) {
   const actions = [{
     id: 'contact-detail-export',
     label: t('contacts.exportLabel'),
-    variant: 'ghost',
     icon: 'download',
+    // Selten gesucht, darum im Mehr-Menue des Fusses mit Wort (R24).
+    more: true,
     onClick: () => window.open(`/api/v1/contacts/${contact.id}/vcard`, '_blank', 'noopener'),
   }];
 
@@ -1208,7 +1287,7 @@ function openContactDetail(contact, { inPane = null } = {}) {
     actions.unshift({
       id: 'contact-detail-delete',
       label: t('common.delete'),
-      variant: 'danger-ghost',
+      variant: 'danger-outline',
       icon: 'trash-2',
       align: 'start',
       // force + await wie überall in dieser Grammatik: Löschen entscheidet über
@@ -1459,7 +1538,7 @@ function buildContactForm({ mode, contact = null }) {
       <div class="contact-mv-list" data-mv-list>${rows.map((r, i) => mvRow(kind, r, i === 0)).join('')}</div>
       ${mvLocked(kind)
         ? `<p class="form-hint" id="cm-email-locked">${t('contacts.emailLockedHint')}</p>`
-        : `<button type="button" class="btn btn--ghost contact-mv-add" data-mv-add>
+        : `<button type="button" class="btn btn--ghost btn--sm contact-mv-add" data-mv-add>
         <i data-lucide="plus" class="icon-sm" aria-hidden="true"></i>${t(addKey)}
       </button>`}
       ${kind === 'phone'
@@ -1556,7 +1635,11 @@ function buildContactForm({ mode, contact = null }) {
     ${mvSection('phone', phoneRows, 'contacts.phoneLabel', 'contacts.mvAddPhone')}
     ${mvSection('email', emailRows, 'contacts.emailLabel', 'contacts.mvAddEmail')}
 
-    ${advancedSection(advancedFieldsHtml, { open: advancedOpen })}
+    ${advancedSection(advancedFieldsHtml, {
+      open: advancedOpen,
+      // Was dahinter liegt, nennt die Zeile (R24 D4, Inventar-Muster).
+      hint: [t('contacts.addressLabel'), t('contacts.birthdayLabel'), t('contacts.notesLabel')].join(', '),
+    })}
 
     <div class="modal-panel__footer contact-modal__footer">
       ${isEdit && !contact.family_user_id ? `<button type="button" class="btn btn--danger-outline" id="cm-delete">
@@ -2023,6 +2106,7 @@ function openImportSelectionModal(named, skipped) {
         </div>
         <div class="vcard-import__list">${named.map(importSelectionRowHtml).join('')}</div>
         ${skippedHtml}
+        <p class="form-hint form-hint--danger vcard-import__reason" data-import-reason role="status" hidden></p>
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button class="btn btn--secondary" type="button" id="vcard-import-cancel">${t('common.cancel')}</button>
           <button class="btn btn--primary" type="button" id="vcard-import-submit">${t('contacts.importSubmit', { count: 0 })}</button>
@@ -2034,13 +2118,16 @@ function openImportSelectionModal(named, skipped) {
       const toggleBtn = panel.querySelector('#vcard-import-toggle');
       const status    = panel.querySelector('#vcard-import-status');
       const boxes     = [...panel.querySelectorAll('.vcard-import__list input[type="checkbox"]')];
+      const reasonEl  = panel.querySelector('[data-import-reason]');
 
       const selectedIndices = () => boxes.filter((b) => b.checked).map((b) => Number(b.value));
 
       const refresh = (announce = false) => {
         const n = selectedIndices().length;
         submitBtn.textContent = t('contacts.importSubmit', { count: n });
-        submitBtn.disabled = n === 0;
+        // DER PRIMAERKNOPF IST NIE GESPERRT (R24, D4): ohne Wahl sagt er beim
+        // Tippen, was fehlt (unten), statt grau dazustehen.
+        if (n > 0) reasonEl.hidden = true;
         toggleBtn.textContent = boxes.every((b) => b.checked)
           ? t('contacts.importDeselectAll')
           : t('contacts.importSelectAll');
@@ -2059,7 +2146,13 @@ function openImportSelectionModal(named, skipped) {
 
       submitBtn.addEventListener('click', async () => {
         const chosen = selectedIndices().map((i) => named[i]);
-        if (chosen.length === 0) return;
+        if (chosen.length === 0) {
+          // Derselbe Satz wie im Geburtstags-Import (dieselbe Lage: Kontakte waehlen).
+          reasonEl.textContent = t('birthdays.importNothingSelected');
+          reasonEl.hidden = false;
+          boxes[0]?.focus();
+          return;
+        }
         // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend des
         // Imports aufgegangen ist (#1997).
         const dialog = captureModalContext();

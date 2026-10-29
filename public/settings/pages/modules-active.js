@@ -254,7 +254,7 @@ function rowHtml(row) {
       </div>
       <div class="settings-module-row__body">
         <div class="settings-module-row__title">
-          <strong>${esc(row.label)}</strong>
+          <strong class="settings-module-row__name">${esc(row.label)}</strong>
           ${row.type === 'third-party' ? `<span class="settings-module-origin">${esc(t('settings.modulesExternalBadge'))}</span>` : ''}
           ${statusChipHtml(row)}
         </div>

@@ -748,6 +748,44 @@ test('"Heute frei"/"Fuer heute alles erledigt" entfaellt neben einer sichtbaren 
   }
 });
 
+// R24 (Critique G6 P2-2): ein neuer Haushalt ist nicht "frei", sondern leer.
+// Solange die Erste-Schritte-Karte laeuft und nichts kommt, sagt die Zeile
+// "Noch nichts geplant". Ein Ausblick (morgen faellig) oder ein Haushalt ohne
+// laufende Karte behaelt "Heute frei". Setzen und Zuruecksetzen des Speichers
+// stehen in EINEM synchronen Block: die Tests dieser Datei laufen verschraenkt.
+test('R24: ein neuer Haushalt sagt "Noch nichts geplant" statt "Heute frei"', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const tomorrowStr = addLocalDays(toLocalDateKey(new Date()), 1);
+  const store = new Map([['yuvomi-first-steps', JSON.stringify({ active: true, dismissed: false, done: {} })]]);
+  const prevLs = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const prevWindow = global.window;
+  let fresh, withOutlook, dismissed, noCard;
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) },
+  });
+  global.window = { yuvomi: null };
+  try {
+    fresh = __test.renderTodayCockpit({}, []);
+    withOutlook = __test.renderTodayCockpit({ urgentTasks: [{ id: 5, title: 'Zettel abgeben', due_date: tomorrowStr, status: 'open' }] }, []);
+    store.set('yuvomi-first-steps', JSON.stringify({ active: false, dismissed: true, done: {} }));
+    dismissed = __test.renderTodayCockpit({}, []);
+    store.clear();
+    noCard = __test.renderTodayCockpit({}, []);
+  } finally {
+    if (prevLs) Object.defineProperty(globalThis, 'localStorage', prevLs);
+    else delete globalThis.localStorage;
+    global.window = prevWindow;
+  }
+  nodeAssert.match(fresh, /todayNothingPlanned/, 'der neue Haushalt sagt, dass noch nichts geplant ist');
+  nodeAssert.match(fresh, /todayNothingPlannedSub/, 'und was hier erscheinen wird');
+  nodeAssert.ok(!/todayFree/.test(fresh), 'kein "Heute frei" ueber einer leeren Uebersicht');
+  nodeAssert.match(withOutlook, /todayFree/, 'kommt etwas, ist heute frei');
+  nodeAssert.match(withOutlook, /todayNextUp/);
+  nodeAssert.match(dismissed, /todayFree/, 'weggeklickte Karte: wie jeder Haushalt');
+  nodeAssert.match(noCard, /todayFree/, 'ohne Karte: wie bisher');
+});
+
 // Review of #1099, finding 11: scheduleWidgetVisible read only widgetShown('schedule')
 // (the layout config's `visible` flag), never isModuleDisabled('schedule') -
 // unlike domainInCockpit() above it, which checks both. A household that
@@ -1129,7 +1167,8 @@ test('Notiz-Widget: die Zeilenzahl kommt aus der Kachelgroesse, nicht aus einer 
   const notes = ['A', 'B', 'C', 'D', 'E'].map((titel, i) => ({
     id: i + 1, title: `Notiz ${titel}`, content: titel, pinned: 1,
   }));
-  const zeilen = (html) => (html.match(/class="note-item"/g) || []).length;
+  // Was ohne Streckung steht: Zusatzzeilen (U14, `data-fill-row`) zeigt erst applyRowFill.
+  const zeilen = (html) => (html.match(/<div class="note-item"[^>]*>/g) || []).filter((tag) => !tag.includes('data-fill-row')).length;
 
   // Die Standardgroesse der Kachel ist 1x2, also hoch: dort passen fuenf.
   // Genau hier stand der Fehler - die Kachel hatte den Platz und bekam drei.
@@ -1212,7 +1251,7 @@ test('Aufgaben-Kachel: begonnene Aufgabe traegt das Zeichen der Aufgabenliste, s
     { id: 1, title: 'Offen', priority: 'none', due_date: todayStr, status: 'open' },
     { id: 2, title: 'Angefangen', priority: 'none', due_date: todayStr, status: 'in_progress' },
   ]);
-  const rows = html.split('class="task-item"').slice(1);
+  const rows = html.split('class="list-row task-item"').slice(1);
   nodeAssert.equal(rows.length, 2);
   const [offen, angefangen] = rows;
   nodeAssert.match(angefangen, /class="task-status-btn task-status-btn--in_progress task-status-btn--static"[^>]*aria-hidden="true"/,
@@ -2026,6 +2065,7 @@ cdb.exec(`
     source TEXT NOT NULL DEFAULT 'google', external_id TEXT,
     name TEXT NOT NULL, color TEXT
   );
+  CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
   -- color gehoert dazu: sie ist die GEERBTE Farbe eines Abos und wird seit #891
   -- als cal_color mitgelesen, weil ein Abo-Termin keinen external_calendars-
   -- Eintrag hat. Fehlt sie hier, misst dieses verkuerzte Schema an der echten
@@ -3163,12 +3203,15 @@ test('dashboardQuery uebersetzt Optionen in Parameter, die die Route versteht (#
 });
 
 // --------------------------------------------------------
-// Das dichte Raster, nachgerechnet (Critique 2026-09-23)
+// Das dichte Raster, nachgerechnet (Critique 2026-09-23; neu gefasst mit
+// U1 b, DW-P1-3, Entscheidung Ulas 2026-10-26)
 //
 // `packGrid` rechnet `grid-auto-flow: row dense` fuer Kacheln mit reinen Spans
-// nach; der Loch-Hinweis im Bearbeiten-Modus schlaegt darauf eine Groesse vor.
-// Ob der Browser genauso packt, misst test:dashboard-surface-browser am
-// gerenderten Raster - hier steht die Rechnung selbst.
+// nach - seit U1 b in feinen Spuren (4px), mit EINER Abweichung: passt eine
+// breite Kachel an zwei Stellen gleich frueh, nimmt sie die mit dem kleineren
+// Loch darueber (CSS bekommt dafuer ihre Spalte fest, `--tile-col`). Ob der
+// Browser genauso packt, misst test:dashboard-surface-browser am gerenderten
+// Raster - hier steht die Rechnung selbst.
 // --------------------------------------------------------
 
 const kachel = (id, cols, rows, size = `${cols}x${rows}`) => ({ id, cols, rows, size });
@@ -3189,53 +3232,81 @@ test('packGrid: eine hohe Kachel belegt beide Zeilen, eine zu breite wird an der
   assert(cells[2].every((v) => v === 'weather'), `weather: ${JSON.stringify(cells)}`);
   assert(cells[0][1] === null && cells[1][1] === null && cells[3].every((v) => v === 'notes'),
     `notes passt nicht neben family und landet unten: ${JSON.stringify(cells)}`);
-  assert(widgets.gridHoleCount(cells) === 2);
+  assert(widgets.gridHoleCount(cells) === 2, 'neben family, ueber weather: ein Loch aus zwei Zellen');
 });
 
-test('suggestGridHoleFill: schlaegt die billigste Aenderung am Nachbarn des Lochs vor', () => {
-  // Drei Breitkacheln in drei Spalten: rechts bleibt je eine Zelle frei.
-  // Billigste Loesung ist dieselbe Flaeche in anderer Form, und zwar an der
-  // Kachel links neben dem ersten Loch.
-  const items = [kachel('calendar', 2, 1), kachel('tasks', 2, 1), kachel('notes', 2, 1)];
-  const presets = (item) => [['1x1', 1, 1], ['2x1', 2, 1], ['1x2', 1, 2], ['2x2', 2, 2]]
-    .map(([size, cols, rows]) => ({ size, cols, rows, id: item.id }));
-  const vorschlag = widgets.suggestGridHoleFill(items, 3, presets);
-  nodeAssert.deepEqual(vorschlag, { id: 'calendar', size: '1x2' });
-  const danach = widgets.packGrid(items.map((it) => (it.id === 'calendar' ? { ...it, cols: 1, rows: 2 } : it)), 3);
-  assert(widgets.gridHoleCount(danach) === 0, 'der Vorschlag schliesst das Loch nicht');
+/* U1 b, F9: FAST GLEICH FRUEH, WENIGER LOCH. Der Demo-Haushalt bei 1440px
+ * (drei Spalten): die Familie endet 2 Spuren (8px) tiefer als die
+ * Geburtstage. `dense` - und die erste Fassung dieser Regel (nur exakt gleich
+ * frueh) - setzte das Wetter darum in Spalte 2-3, jede weitere breite Kachel
+ * folgte ihm, und Spalte 1 blieb unter der Familie 536px leer. Bis zu einem
+ * Kachelabstand spaeter gilt als gleich frueh: das Wetter beginnt links unter
+ * der Familie, darueber bleiben 2 Spuren statt 98. */
+test('U1 b, F9: packGrid - eine breite Kachel nimmt unter fast gleich fruehen Stellen die mit dem kleineren Loch', () => {
+  const items = [kachel('family', 1, 100), kachel('birthdays', 1, 98), kachel('weather', 2, 50), kachel('metrics', 2, 35)];
+  const at = (cells, id) => { for (let r = 0; r < cells.length; r += 1) { const c = cells[r].indexOf(id); if (c >= 0) return [r, c]; } return null; };
+  const cells = widgets.packGrid(items, 3);
+  nodeAssert.equal(widgets.GRID_END_SLACK, 5, 'gleich frueh heisst hoechstens ein Kachelabstand (5 Spuren, 20px)');
+  nodeAssert.deepEqual(at(cells, 'weather'), [100, 0], 'das Wetter beginnt 8px spaeter links - nicht 8px frueher rechts');
+  nodeAssert.deepEqual(at(cells, 'metrics'), [150, 0], 'die Kennzahlen folgen ihm, Spalte 1 bleibt im Raster');
+  // Ohne Spielraum waere es die frueheste Stelle - genau der Befund F9.
+  nodeAssert.deepEqual(at(widgets.packGrid(items, 3, { slack: 0 }), 'weather'), [98, 1]);
+  // Viel spaeter ist nicht gleich frueh: dann gewinnt die frueheste.
+  const tief = [kachel('family', 1, 100), kachel('birthdays', 1, 60), kachel('weather', 2, 50)];
+  nodeAssert.deepEqual(at(widgets.packGrid(tief, 3), 'weather'), [60, 1]);
+  // Mit fester Spalte rechnet packGrid wie CSS mit `grid-column-start`.
+  const locked = widgets.packGrid(items.map((it) => (it.id === 'metrics' ? { ...it, col: 1 } : it)), 3);
+  nodeAssert.equal(locked[150][1], 'metrics', 'eine feste Spalte gilt');
+  nodeAssert.deepEqual([...widgets.wideTileColumns(items, 3)], [['weather', 0], ['metrics', 0]]);
 });
 
-test('suggestGridHoleFill: waechst lieber, als Inhalt wegzunehmen', () => {
-  // Der Demo-Haushalt bei 1440px, in seiner gespeicherten Rangfolge: unter
-  // „Belohnungen" (1x1, dicht nach vorn gerueckt) bleibt ein Loch neben den
-  // Kennzahlen (2x1). Kennzahlen als 1x1 schloesse es auch - und naehme einer
-  // Kachel die Haelfte. Belohnungen als 1x2 waechst in das Loch hinein.
+/* EIN LOCH IST, WAS LEER STEHT (U1 b, F9). Seit die Kacheln so hoch sind wie
+ * ihr Inhalt, enden die Spalten verschieden tief. U1 b zaehlte das Ende einer
+ * Spalte nie - und meldete "0 Loecher", waehrend im Demo-Haushalt eine ganze
+ * Spalte 536px leer stand. Jetzt ist nur ein ausgefranster Rand bis zu einem
+ * Kachelabstand kein Loch. */
+test('F9: gridHoleCount zaehlt das Loch mitten im Raster und ein Spaltenende laenger als ein Kachelabstand', () => {
+  const enclosed = widgets.packGrid([kachel('a', 1, 10), kachel('b', 1, 4), kachel('c', 2, 3)], 2);
+  nodeAssert.equal(widgets.gridHoleCount(enclosed), 6, 'unter b und ueber c: sechs Zellen Loch');
+  const fringe = widgets.packGrid([kachel('a', 1, 10), kachel('b', 1, 5)], 2);
+  nodeAssert.equal(widgets.gridHoleCount(fringe), 0, 'b endet 5 Spuren frueher: ein Rand, kein Loch');
+  const ragged = widgets.packGrid([kachel('a', 1, 10), kachel('b', 1, 4)], 2);
+  nodeAssert.equal(widgets.gridHoleCount(ragged), 6, 'b endet 6 Spuren frueher: ein Loch');
+  const emptyColumn = widgets.packGrid([kachel('a', 1, 10), kachel('b', 1, 10)], 3);
+  nodeAssert.equal(widgets.gridHoleCount(emptyColumn), 10, 'eine leere Spalte neben vollen ist ein Loch');
+  nodeAssert.equal(widgets.gridHoleCount(ragged, { slack: Infinity }), 0, 'nur mitten im Raster (der Lueckenhinweis)');
+});
+
+const presets4 = (item) => [['1x1', 1, 1], ['2x1', 2, 1], ['1x2', 1, 2], ['2x2', 2, 2]]
+  .map(([size, cols, rows]) => ({ size, cols, rows: item.base * rows, id: item.id }));
+
+test('suggestGridHoleFill: schlaegt die Groesse vor, nach der kein Loch mehr gefuellt werden muss', () => {
+  // Zwei Spalten: links die Familie (60 Spuren), rechts die Notizen (30), darunter
+  // das Wetter ueber beide - unter den Notizen bleiben 30 Spuren Loch. Hoch (1x2)
+  // sind die Notizen so hoch wie die Familie.
   const items = [
-    kachel('family', 1, 2), kachel('budget', 1, 2), kachel('birthdays', 1, 2),
-    kachel('weather', 2, 1), kachel('metrics', 2, 1), kachel('rewards', 1, 1), kachel('notes', 2, 1),
+    { ...kachel('family', 1, 60, '1x2'), base: 30 },
+    { ...kachel('notes', 1, 30, '1x1'), base: 30 },
+    { ...kachel('weather', 2, 40, '2x1'), base: 40 },
   ];
-  const presets = (item) => [['1x1', 1, 1], ['2x1', 2, 1], ['1x2', 1, 2], ['2x2', 2, 2]]
-    .map(([size, cols, rows]) => ({ size, cols, rows, id: item.id }));
-  assert(widgets.gridHoleCount(widgets.packGrid(items, 3)) === 1, 'Reichweite: das Ausgangsraster hat genau ein Loch');
-  nodeAssert.deepEqual(widgets.suggestGridHoleFill(items, 3, presets), { id: 'rewards', size: '1x2' });
+  nodeAssert.ok(widgets.gridHoleCount(widgets.packGrid(items, 2)) > 0, 'Vorbedingung: ein Loch');
+  nodeAssert.deepEqual(widgets.suggestGridHoleFill(items, 2, presets4), { id: 'notes', size: '1x2' });
 });
 
 test('suggestGridHoleFill: ohne Loch und ohne Ausweg schweigt er', () => {
-  const presets = (item) => [{ size: item.size, cols: item.cols, rows: item.rows }];
-  assert(widgets.suggestGridHoleFill([kachel('a', 1, 1), kachel('b', 1, 1)], 2, presets) === null,
+  const own = (item) => [{ size: item.size, cols: item.cols, rows: item.rows }];
+  assert(widgets.suggestGridHoleFill([kachel('a', 1, 1), kachel('b', 1, 1)], 2, own) === null,
     'eine volle Zeile hat kein Loch');
-  // Nur die eigene Groesse im Angebot: es gibt nichts vorzuschlagen.
-  assert(widgets.suggestGridHoleFill([kachel('a', 2, 1), kachel('b', 2, 1), kachel('c', 1, 1)], 3, presets) === null,
+  assert(widgets.suggestGridHoleFill([kachel('a', 1, 60), kachel('b', 1, 30), kachel('c', 2, 40)], 2, own) === null,
     'ohne Kandidaten darf kein Vorschlag entstehen');
 });
 
 // --------------------------------------------------------
-// Normalmodus ohne Loecher (Re-Critique 2026-09-27, A7 P2-12 / R10 L9)
-//
-// Gemessen bei 1440x900 im Demo-Haushalt: neben den Kennzahlen (367x110) und
-// neben den Notizen (367x201) blieb je eine Spalte leer, und den Loch-Hinweis
-// gibt es nur im Anpassen-Modus. `rowFillSpans` sagt, welche Kachel in den
-// Rest ihrer Zeile waechst; applyRowFill() setzt es als Darstellung.
+// Normalmodus ohne Loecher (Re-Critique 2026-09-27, A7 P2-12 / R10 L9; R21 D5;
+// neu gefasst mit U1 b): nach rechts waechst nur, was Breite in Inhalt
+// umsetzt (das Wetter), nach unten nur in ein echtes Loch, und was dann noch
+// Loch ist, nimmt die Kachel links daneben. `fillGridSpans` ist die eine
+// Rechnung, applyRowFill() setzt sie als Darstellung.
 // --------------------------------------------------------
 
 /** Die Positionen einer Packung: Id -> [Zeile, Spalte] der ersten Zelle. */
@@ -3245,96 +3316,690 @@ function positions(cells) {
   return pos;
 }
 
-const DEMO_RASTER = [
-  kachel('family', 1, 2), kachel('budget', 1, 2), kachel('birthdays', 1, 2),
-  kachel('weather', 2, 1), kachel('metrics', 2, 1), kachel('rewards', 1, 1), kachel('notes', 2, 1),
-];
+/** Bleibt jede Kachel, wo sie stand? Ihre Zeile ist dieselbe, und jede Zelle,
+ *  die sie vor dem Fuellen belegte, belegt sie danach noch (gewachsen ist sie
+ *  nach rechts, unten oder - seit F9 - links). */
+function stays(before, after) {
+  const top = (cells) => Object.fromEntries(Object.entries(positions(cells)).map(([id, [r]]) => [id, r]));
+  return JSON.stringify(top(before)) === JSON.stringify(top(after))
+    && before.every((row, r) => row.every((id, c) => !id || after[r]?.[c] === id));
+}
 
-test('rowFillSpans: im Demo-Raster wachsen Kennzahlen und Notizen in ihren Zeilenrest', () => {
+/** Das freie Ende jeder Spalte in Spuren - unabhaengig von gridHoleCount gemessen. */
+function columnEnds(cells) {
+  return (cells[0] ?? []).map((_, c) => {
+    let r = cells.length - 1;
+    while (r >= 0 && !cells[r][c]) r -= 1;
+    return cells.length - 1 - r;
+  });
+}
+
+/** Gemessene Spuren (Inhalt + 5 Spuren Abstand) im Demo-Haushalt, 2026-10-27. */
+const span = ([id, cols, rows]) => ({ id, cols, rows: rows + 5, wide: id === 'weather', grow: id !== 'metrics' });
+const DEMO_SEED = [['family', 1, 95], ['birthdays', 1, 93], ['weather', 2, 45], ['metrics', 2, 30], ['rewards', 1, 62], ['notes', 2, 51]].map(span);
+const DEMO_KIND = [['rewards', 1, 54], ['family', 1, 95], ['birthdays', 1, 93], ['weather', 2, 45], ['notes', 2, 51]].map(span);
+const DEMO_ALLE = [['tasks', 1, 93], ['calendar', 1, 86], ['meals', 2, 58], ['shopping', 2, 76], ['pantry', 1, 59],
+  ['birthdays', 1, 93], ['budget', 1, 94], ['rewards', 1, 74], ['health', 2, 44], ['cycle', 2, 45], ['fasting', 2, 75],
+  ['nutrition', 2, 57], ['housekeeping', 1, 52], ['schedule', 1, 46], ['waste', 1, 46], ['family', 1, 95],
+  ['notes', 1, 153], ['weather', 2, 45], ['clock', 2, 42], ['quicklinks', 2, 42]].map(span);
+
+test('U1 b: rowFillSpans - nach rechts waechst nur, was Breite in Inhalt umsetzt', () => {
   nodeAssert.equal(typeof widgets.rowFillSpans, 'function', 'rowFillSpans fehlt in utils/dashboard-widgets.js');
-  const grown = widgets.rowFillSpans(DEMO_RASTER, 3);
-  nodeAssert.deepEqual([...grown], [['metrics', 3], ['notes', 3]]);
-  // Einspaltig gibt es keinen Rest, und ein volles Raster laesst alles stehen.
-  nodeAssert.equal(widgets.rowFillSpans(DEMO_RASTER, 1).size, 0);
-  nodeAssert.equal(widgets.rowFillSpans([kachel('a', 1, 1), kachel('b', 1, 1)], 2).size, 0);
+  // Notizen (2 Spalten) neben einem freien Rest: ohne `wide` waechst nichts.
+  const items = [kachel('notes', 2, 20), kachel('weather', 2, 30)];
+  nodeAssert.deepEqual([...widgets.rowFillSpans(items, 3)], [], 'Breite ohne Inhalt ist Leere quer (DW-P2-6)');
+  nodeAssert.deepEqual([...widgets.rowFillSpans(items.map((it) => ({ ...it, wide: it.id === 'weather' })), 3)], [['weather', 3]],
+    'das Wetter zeigt in der Breite mehr Tage');
+  nodeAssert.equal(widgets.rowFillSpans(items, 1).size, 0, 'einspaltig gibt es keinen Rest');
 });
 
-test('rowFillSpans: eine hohe Kachel waechst nur, wo BEIDE ihrer Zeilen frei sind', () => {
-  // family 1x2 links, rechts daneben oben notes 1x1, unten nichts: die Zelle
-  // unten rechts ist frei, aber die obere nicht - family darf nicht wachsen,
-  // die einzeilige Kachel daneben schon nicht, weil ihre Zeile voll ist.
-  const grown = widgets.rowFillSpans([kachel('family', 1, 2), kachel('notes', 1, 1)], 2);
-  nodeAssert.deepEqual([...grown], []);
-  // Zwei hohe Kacheln in drei Spalten: die zweite waechst in die dritte Spalte.
-  nodeAssert.deepEqual([...widgets.rowFillSpans([kachel('a', 1, 2), kachel('b', 1, 2)], 3)], [['b', 2]]);
+test('U1 b, F9: rowFillSpans holes - schmal und breit in ein Loch, auch in ein leeres Spaltenende', () => {
+  // 1024px im Demo-Haushalt: Belohnungen (schmal) unten links, rechts daneben
+  // frei, darunter die Notizen ueber beide Spalten - ein Loch.
+  const loch = [kachel('rewards', 1, 62), kachel('notes', 2, 51)];
+  nodeAssert.deepEqual([...widgets.rowFillSpans(loch, 2, { holes: true })], [['rewards', 2]]);
+  // Steht darunter nichts, ist es ein Spaltenende - seit F9 ein Loch, wenn es
+  // laenger ist als ein Kachelabstand: auch die schmale Kachel waechst hinein.
+  nodeAssert.deepEqual([...widgets.rowFillSpans([kachel('a', 1, 10), kachel('b', 1, 4)], 3, { holes: true })], [['b', 2]]);
+  // Drei breite Kacheln in drei Spalten liessen eine ganze Spalte leer.
+  nodeAssert.deepEqual([...widgets.rowFillSpans([kachel('a', 2, 10), kachel('b', 2, 10), kachel('c', 2, 10)], 3, { holes: true })],
+    [['a', 3], ['b', 3], ['c', 3]]);
 });
 
-test('rowFillSpans: das Wachstum wirft die Packung nicht um (Aequivalenz)', () => {
-  // Gewachsen wird nur in Zellen, die nach der VOLLEN Packung leer sind - die
-  // Neupackung mit den breiteren Spans muss jede Kachel an ihrer Stelle lassen
-  // und die gewachsenen Zeilen voll machen. Geprueft an mehreren Rastern,
-  // nicht nur am Demo-Haushalt.
-  const raster = [
-    [DEMO_RASTER, 3],
-    [DEMO_RASTER, 4],
-    [DEMO_RASTER, 2],
-    [[kachel('a', 2, 1), kachel('b', 1, 2), kachel('c', 1, 1), kachel('d', 2, 2), kachel('e', 1, 1)], 3],
-    [[kachel('a', 1, 1), kachel('b', 3, 1), kachel('c', 1, 2), kachel('d', 1, 1)], 4],
-  ];
-  for (const [items, cols] of raster) {
-    const before = widgets.packGrid(items, cols);
-    const grown = widgets.rowFillSpans(items, cols);
-    const widened = items.map((it) => (grown.has(it.id) ? { ...it, cols: grown.get(it.id) } : it));
-    const after = widgets.packGrid(widened, cols);
-    nodeAssert.deepEqual(positions(after), positions(before), `Positionen verschoben (${cols} Spalten)`);
-    nodeAssert.ok(after.length <= before.length, 'das Raster wird nicht hoeher');
-    for (const [id] of grown) {
-      const [r] = positions(after)[id];
-      nodeAssert.ok(after[r].every(Boolean), `die Zeile von ${id} ist nach dem Wachsen voll (${cols} Spalten)`);
+test('U1 b: columnFillSpans fuellt nur ein echtes Loch, kein Spaltenende', () => {
+  nodeAssert.equal(typeof widgets.columnFillSpans, 'function', 'columnFillSpans fehlt in utils/dashboard-widgets.js');
+  // a ist hoeher als b, darunter c ueber beide: b waechst bis an c.
+  nodeAssert.deepEqual([...widgets.columnFillSpans([kachel('a', 1, 10), kachel('b', 1, 4), kachel('c', 2, 3)], 2)], [['b', 10]]);
+  // Ohne c ist es das Ende der Spalte: keine Hoehe ohne Inhalt.
+  nodeAssert.deepEqual([...widgets.columnFillSpans([kachel('a', 1, 10), kachel('b', 1, 4)], 2)], []);
+  // Eine Kachel, die so hoch ist wie ihr Inhalt (die Kennzahlreihe), waechst nicht.
+  nodeAssert.deepEqual([...widgets.columnFillSpans([kachel('a', 1, 10), { ...kachel('b', 1, 4), grow: false }, kachel('c', 2, 3)], 2)], []);
+});
+
+test('U1 b: fillGridSpans - kein Loch im Demo-Haushalt (Erwachsene, Kind, alle Kacheln) bei 2, 3 und 4 Spalten', () => {
+  nodeAssert.equal(typeof widgets.fillGridSpans, 'function', 'fillGridSpans fehlt in utils/dashboard-widgets.js');
+  for (const [name, items] of [['Seed', DEMO_SEED], ['Kind', DEMO_KIND], ['alle', DEMO_ALLE]]) {
+    for (const cols of [2, 3, 4]) {
+      const filled = widgets.fillGridSpans(items, cols);
+      const before = widgets.packGrid(items, cols);
+      const after = widgets.packGrid(filled, cols);
+      nodeAssert.equal(widgets.gridHoleCount(after), 0, `${name}, ${cols} Spalten: Loch`);
+      nodeAssert.ok(stays(before, after), `${name}, ${cols} Spalten: keine Kachel wechselt den Platz`);
+      nodeAssert.ok(after.length <= before.length, `${name}, ${cols} Spalten: das Raster wird nicht hoeher`);
     }
   }
 });
 
-test('applyRowFill: waechst im Normalmodus, im Anpassen-Modus nimmt es alles zurueck', async () => {
-  const { __test } = await import('../public/pages/dashboard.js');
-  nodeAssert.equal(typeof __test.applyRowFill, 'function', 'applyRowFill fehlt im __test-Export');
-  const SPANS = { family: [1, 2], budget: [1, 2], birthdays: [1, 2], weather: [2, 1], metrics: [2, 1], rewards: [1, 1], notes: [2, 1] };
+/* F9 (selbst eingebaut in p9, gemessen 2026-10-27): Demo-Haushalt bei 1440 und
+ * 1920px, drei Spalten. Das Wetter setzte sich 8px frueher in Spalte 2-3,
+ * Kennzahlen und Notizen folgten, und Spalte 1 blieb unter der Familie von
+ * 1020 bis 1556px leer (536 x 372px); im Kinderkonto unter den Belohnungen
+ * 588px. Gemessen wird das Spaltenende hier selbst, nicht mit gridHoleCount -
+ * die Funktion, die das Loch uebersah, darf nicht ihre eigene Zeugin sein. */
+test('F9: im Demo-Haushalt bleibt keine Spalte leer - das Wetter steht bei drei Spalten ueber die ganze Breite', () => {
+  const slack = widgets.GRID_END_SLACK ?? 5;
+  for (const [name, items] of [['Seed', DEMO_SEED], ['Kind', DEMO_KIND], ['alle', DEMO_ALLE]]) {
+    for (const cols of [2, 3, 4]) {
+      const filled = widgets.fillGridSpans(items, cols);
+      const ends = columnEnds(widgets.packGrid(filled, cols));
+      nodeAssert.ok(Math.max(...ends) <= slack, `${name}, ${cols} Spalten: Spaltenende ${JSON.stringify(ends)} Spuren`);
+    }
+  }
+  for (const [name, items] of [['Seed', DEMO_SEED], ['Kind', DEMO_KIND]]) {
+    const weather = widgets.fillGridSpans(items, 3).find((it) => it.id === 'weather');
+    nodeAssert.deepEqual([weather.col ?? null, weather.cols], [0, 3], `${name}: das Wetter ab Spalte 1 ueber alle drei`);
+  }
+});
+
+/* Dieselbe Frage an 3000 Zufallsraster (2-3 Spalten, 3-17 Kacheln, 100-580px
+ * hoch, ein Drittel breit): vor F9 liessen 65 % ein Loch oder ein leeres
+ * Spaltenende stehen. Was bleibt, liegt unter einem Teil einer breiten Kachel,
+ * die links und rechts von hoeheren eingefasst ist - dort passt kein Rechteck. */
+test('F9: von 3000 Zufallsrastern behalten weniger als 5 % ein Loch oder ein leeres Spaltenende', () => {
+  const slack = widgets.GRID_END_SLACK ?? 5;
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  let bad = 0;
+  for (let trial = 0; trial < 3000; trial += 1) {
+    const cols = 2 + Math.floor(rnd() * 2);
+    const items = Array.from({ length: 3 + Math.floor(rnd() * 15) }, (_, i) => ({
+      id: `t${i}`, cols: rnd() < 0.35 ? 2 : 1, rows: 25 + Math.floor(rnd() * 120), grow: true,
+    }));
+    const after = widgets.packGrid(widgets.fillGridSpans(items, cols), cols);
+    const enclosed = after.some((row, r) => row.some((id, c) => !id && after.slice(r + 1).some((below) => below[c])));
+    if (enclosed || Math.max(...columnEnds(after)) > slack) bad += 1;
+  }
+  nodeAssert.ok(bad / 3000 < 0.05, `${(100 * bad / 3000).toFixed(1)} % der Raster mit Loch`);
+});
+
+test('U1 b: fillGridSpans - das Wachsen wirft die Packung nie um (Aequivalenz, 500 zufaellige Raster)', () => {
+  // Gewachsen wird nur in Zellen, die nach der VOLLEN Packung leer sind - die
+  // Neupackung mit den gefuellten Spannen laesst jede Kachel an ihrer Stelle.
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let trial = 0; trial < 500; trial += 1) {
+    const cols = 2 + Math.floor(rnd() * 3);
+    const items = Array.from({ length: 3 + Math.floor(rnd() * 15) }, (_, i) => ({
+      id: `t${i}`, cols: rnd() < 0.35 ? 2 : 1, rows: 25 + Math.floor(rnd() * 120), wide: rnd() < 0.1,
+    }));
+    const before = widgets.packGrid(items, cols);
+    const after = widgets.packGrid(widgets.fillGridSpans(items, cols), cols);
+    nodeAssert.ok(stays(before, after), `Positionen verschoben (Versuch ${trial})`);
+    nodeAssert.ok(after.length <= before.length, `das Raster wird hoeher (Versuch ${trial})`);
+  }
+});
+
+/* Ein Raster aus Attrappen fuer applyRowFill: Spannen wie getComputedStyle sie
+ * liest (Inhalt + 5 Spuren Abstand), Schreibzugriffe protokolliert. */
+function stubGrid(spans, { columns = 3, log = null } = {}) {
   const tile = (id) => {
     const props = new Map();
+    const dataset = new Proxy({ widgetId: id }, {
+      set(target, key, value) { log?.push('write'); target[key] = value; return true; },
+      deleteProperty(target, key) { log?.push('write'); delete target[key]; return true; },
+    });
     return {
-      dataset: { widgetId: id },
-      style: { setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k), props },
+      dataset,
+      querySelector: (sel) => (id === 'metrics' && sel.includes('metric-tiles') ? {} : null),
+      style: { setProperty: (k, v) => { log?.push('write'); props.set(k, v); }, removeProperty: (k) => props.delete(k), props },
     };
   };
-  const tiles = Object.keys(SPANS).map(tile);
+  const tiles = Object.keys(spans).map(tile);
   const grid = { children: tiles };
-  const vorher = globalThis.getComputedStyle;
-  globalThis.getComputedStyle = (el) => {
-    if (el === grid) return { gridTemplateColumns: '366px 366px 366px' };
-    const [cols, rows] = SPANS[el.dataset.widgetId];
-    return { display: 'flex', gridColumnStart: 'auto', gridColumnEnd: `span ${cols}`, gridRowStart: 'auto', gridRowEnd: `span ${rows}` };
+  const style = (el) => {
+    log?.push('read');
+    if (el === grid) return { gridTemplateColumns: Array(columns).fill('300px').join(' ') };
+    const [cols, rows] = spans[el.dataset.widgetId];
+    const filled = 'rowFill' in el.dataset ? Number(el.style.props.get('--widget-fill-span')) : cols;
+    return { display: 'flex', gridColumnStart: 'auto', gridColumnEnd: `span ${filled}`, gridRowStart: 'auto', gridRowEnd: `span ${rows}` };
   };
+  return { grid, tiles, style };
+}
+const GRID_SEED = Object.fromEntries(DEMO_SEED.map((it) => [it.id, [it.cols, it.rows]]));
+const filledOf = (tiles) => tiles.filter((t) => 'rowFill' in t.dataset || 'colFill' in t.dataset || 'colLock' in t.dataset)
+  .map((t) => [t.dataset.widgetId, t.style.props.get('--widget-fill-span') ?? null, t.style.props.get('--widget-fill-rows') ?? null, t.style.props.get('--tile-col') ?? null]);
+
+/* DW-P2-4: ERST LESEN, DANN SCHREIBEN. Die Kacheln sind Container; ein
+ * `getComputedStyle` nach dem ersten gesetzten Fuell-Attribut verlangte Stil
+ * und Layout der ganzen Flaeche noch einmal (gemessen 8 ms bei 4x CPU, mitten
+ * im Seitenwechsel). Ein frisches Raster wird ganz vorab gelesen; ein schon
+ * gefuelltes setzt erst zurueck und kommt zum selben Ergebnis. */
+test('DW-P2-4: applyRowFill liest alles, bevor es schreibt - und ein gefuelltes Raster fuellt gleich', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const log = [];
+  const { grid, tiles, style } = stubGrid(GRID_SEED, { log });
+  const vorher = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = style;
   try {
     __test.applyRowFill(grid);
-    const gewachsen = tiles.filter((t) => 'rowFill' in t.dataset).map((t) => [t.dataset.widgetId, t.style.props.get('--widget-fill-span')]);
-    nodeAssert.deepEqual(gewachsen, [['metrics', '3'], ['notes', '3']]);
-    __test.applyRowFill(grid, { editing: true });
-    nodeAssert.equal(tiles.filter((t) => 'rowFill' in t.dataset || t.style.props.size).length, 0,
-      'im Anpassen-Modus zeigt das Raster die gewaehlten Groessen');
+    const firstWrite = log.indexOf('write');
+    nodeAssert.ok(firstWrite > 0, 'Vorbedingung: es wird gefuellt');
+    nodeAssert.equal(log.slice(firstWrite).filter((e) => e === 'read').length, 0, 'kein Lesen nach dem ersten Schreiben');
+    const once = filledOf(tiles);
+    // Neue Spaltenzahl (ResizeObserver): dasselbe Raster noch einmal.
+    __test.applyRowFill(grid);
+    nodeAssert.deepEqual(filledOf(tiles), once, 'ein schon gefuelltes Raster liest die gewaehlten Spannen, nicht die gefuellten');
   } finally {
     globalThis.getComputedStyle = vorher;
   }
 });
 
-test('das Wachstum ist verdrahtet: CSS liest den Span, der Aufbau ruft es nach dem Anpassen-Draht', () => {
+/* U1 b / DW-P2-9: DER ANPASSEN-MODUS ZEIGT DASSELBE RASTER. Vorher nahm er alles
+ * Wachstum zurueck - das Raster dort war ein anderes als danach. Jetzt fuellt
+ * er wie der Normalmodus und markiert die Hoehe, die nur Platz ist, als Geist. */
+test('U1 b: applyRowFill fuellt im Normal- und im Anpassen-Modus gleich - dort steht die Fuellung als Geist', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  nodeAssert.equal(typeof __test.applyRowFill, 'function', 'applyRowFill fehlt im __test-Export');
+  const { grid, tiles, style } = stubGrid(GRID_SEED);
+  const vorher = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = style;
+  try {
+    __test.applyRowFill(grid);
+    const normal = filledOf(tiles);
+    // Der Demo-Haushalt, drei Spalten (F9): das Wetter beginnt in Spalte 1 und
+    // zeigt ueber alle drei Tage, Kennzahlen und Notizen schliessen den Rest
+    // ihrer Zeile, "Belohnungen" fuellt das Loch ueber dem Wetter.
+    nodeAssert.deepEqual(normal.find(([id]) => id === 'weather'), ['weather', '3', null, '1'], 'das Wetter ab Spalte 1 ueber alle drei');
+    nodeAssert.deepEqual(normal.find(([id]) => id === 'notes'), ['notes', '3', null, '1']);
+    nodeAssert.ok(normal.some(([id, , rows]) => id === 'rewards' && Number(rows) > GRID_SEED.rewards[1]), 'Belohnungen schliesst das Loch');
+    nodeAssert.equal(tiles.filter((t) => 'ghostBlock' in t.dataset).length, 0, 'ausserhalb des Anpassens kein Geist');
+    __test.applyRowFill(grid, { editing: true });
+    nodeAssert.deepEqual(filledOf(tiles), normal, 'im Anpassen-Modus dasselbe Raster');
+    const ghost = tiles.find((t) => t.dataset.widgetId === 'rewards');
+    nodeAssert.ok('ghostBlock' in ghost.dataset, 'die Fuellhoehe der Belohnungen steht als Geist');
+    nodeAssert.equal(Number(ghost.style.props.get('--tile-ghost-rows')), Number(normal.find(([id]) => id === 'rewards')[2]) - GRID_SEED.rewards[1]);
+    // F9: kein Geist fuer Breite - Kennzahlen und Notizen laufen ueber die ganze Breite.
+    nodeAssert.ok(tiles.every((t) => !('ghostInline' in t.dataset) && !t.style.props.has('--tile-ghost-cols')), 'kein Breiten-Geist ueber dem Inhalt');
+  } finally {
+    globalThis.getComputedStyle = vorher;
+  }
+});
+
+/* F9 im Kinderkonto (drei Spalten): die Belohnungen enden 164px vor Familie
+ * und Geburtstagen, Wetter und Notizen standen rechts, Spalte 1 blieb darunter
+ * 588px leer. Jetzt wachsen beide nach links - ihre Spalte beginnt dort, und
+ * die Belohnungen schliessen das Loch darueber (im Anpassen-Modus als Geist). */
+test('F9: applyRowFill - wer nach links waechst, beginnt dort', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const { grid, tiles, style } = stubGrid(Object.fromEntries(DEMO_KIND.map((it) => [it.id, [it.cols, it.rows]])));
+  const vorher = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = style;
+  try {
+    __test.applyRowFill(grid, { editing: true });
+    const filled = filledOf(tiles);
+    nodeAssert.deepEqual(filled.find(([id]) => id === 'weather'), ['weather', '3', null, '1']);
+    nodeAssert.deepEqual(filled.find(([id]) => id === 'notes'), ['notes', '3', null, '1']);
+    const rewards = tiles.find((t) => t.dataset.widgetId === 'rewards');
+    nodeAssert.ok('ghostBlock' in rewards.dataset, 'die Belohnungen schliessen das Loch ueber dem Wetter');
+  } finally {
+    globalThis.getComputedStyle = vorher;
+  }
+});
+
+/* DER LUECKENHINWEIS LIEST DIE GEWAEHLTEN GROESSEN, NICHT DIE GEFUELLTEN (p10).
+ * Seit p9 fuellt der Anpassen-Modus wie die Ansicht, und `gridHoleSuggestion`
+ * las die Spannen danach - mit der Fuellung, die das Loch schon schloss. Der
+ * Hinweis schwieg so bei jedem Loch, das eine Kachel darueber schliesst:
+ * gemessen 1440px, Geburtstage 1x2, Uhr, Aufgaben 1x2, Notizen breit - die Uhr
+ * stand mit 202px Geist ueber den Notizen, und kein Hinweis
+ * (test:dashboard-surface-browser). Die Attrappe liest Spannen wie das
+ * Stylesheet: Breite aus der Groessenklasse, ueberstimmt von `data-row-fill`
+ * und `data-col-lock`; Hoehe aus den Daten plus Abstand, ueberstimmt von
+ * `data-col-fill`. */
+test('p10: der Lueckenhinweis sieht das Loch, das die Fuellung im Anpassen-Modus schliesst', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  nodeAssert.equal(typeof __test.gridHoleSuggestion, 'function', 'gridHoleSuggestion fehlt im __test-Export');
+  const GAP = 5;
+  const sizes = {
+    birthdays: { '1x1': 66, '2x1': 66, '1x2': 93, '2x2': 93 },
+    clock: { '1x1': 41, '2x1': 42, '1x2': 47, '2x2': 48 },
+    tasks: { '1x1': 66, '2x1': 66, '1x2': 93, '2x2': 93 },
+    notes: { '1x1': 102, '2x1': 51, '1x2': 153, '2x2': 77 },
+  };
+  const chosen = { birthdays: '1x2', clock: '1x1', tasks: '1x2', notes: '2x1' };
+  const attr = (name) => name.replace(/^data-/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  const tiles = Object.entries(chosen).map(([id, size]) => {
+    const props = new Map();
+    const classes = new Set(['widget-wrapper', `widget-size--${size}`]);
+    const dataset = {
+      widgetId: id,
+      spanRows: String(sizes[id][size]),
+      spanSizes: Object.entries(sizes[id]).map(([s, r]) => `${s}:${r}`).join(','),
+    };
+    return {
+      dataset,
+      classList: Object.assign(classes, {
+        replace(a, b) { if (!classes.has(a)) return false; classes.delete(a); classes.add(b); return true; },
+        [Symbol.iterator]: () => [...Set.prototype.values.call(classes)][Symbol.iterator](),
+      }),
+      hasAttribute: (name) => attr(name) in dataset,
+      removeAttribute: (name) => { delete dataset[attr(name)]; },
+      setAttribute: (name, value) => { dataset[attr(name)] = String(value); },
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      style: { setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k), props },
+    };
+  });
+  const grid = {
+    children: tiles,
+    querySelectorAll: (sel) => (sel.includes('.widget-wrapper') ? tiles : []),
+  };
+  const style = (el) => {
+    if (el === grid) return { gridTemplateColumns: '372px 372px 372px' };
+    const size = [...el.classList].find((c) => c.startsWith('widget-size--')).slice('widget-size--'.length);
+    let cols = size.startsWith('2') ? 2 : 1;
+    if ('colLock' in el.dataset) cols = Number(el.style.props.get('--tile-span-cols'));
+    if ('rowFill' in el.dataset) cols = Number(el.style.props.get('--widget-fill-span'));
+    const rows = 'colFill' in el.dataset ? Number(el.style.props.get('--widget-fill-rows')) : Number(el.dataset.spanRows) + GAP;
+    return { display: 'flex', gridColumnStart: 'auto', gridColumnEnd: `span ${cols}`, gridRowStart: 'auto', gridRowEnd: `span ${rows}` };
+  };
+  const vorher = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = style;
+  try {
+    __test.applyRowFill(grid, { editing: true });
+    const clock = tiles.find((t) => t.dataset.widgetId === 'clock');
+    nodeAssert.ok('colFill' in clock.dataset && 'ghostBlock' in clock.dataset, 'Vorbedingung: die Uhr schliesst das Loch, im Anpassen-Modus als Geist');
+    nodeAssert.deepEqual(__test.gridHoleSuggestion(grid), { id: 'birthdays', size: '2x1' }, 'der Hinweis schlaegt die Groesse vor, nach der kein Loch entsteht');
+    nodeAssert.ok('colFill' in clock.dataset && 'ghostBlock' in clock.dataset, 'die Probe nimmt die Fuellung zurueck, wie sie war');
+    nodeAssert.equal([...clock.classList].filter((c) => c.startsWith('widget-size--')).join(), 'widget-size--1x1', 'und die Groessenklasse');
+  } finally {
+    globalThis.getComputedStyle = vorher;
+  }
+});
+
+test('das Fuellen ist verdrahtet: CSS liest Spannen und Spalte, der Aufbau ruft es direkt nach dem Zeichnen, eine Geste ohne Auslegung', () => {
   const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
-  const regel = [...eachRule(css)].find((r) => r.selector.trim() === '.dashboard__grid > [data-row-fill]');
-  nodeAssert.ok(regel, 'keine Regel fuer [data-row-fill] in dashboard.css');
-  nodeAssert.match(regel.body, /grid-column:\s*span var\(--widget-fill-span\)/);
-  nodeAssert.ok(regel.at.some((a) => /min-width:\s*768px/.test(a)), 'nur ab zwei Spalten');
+  const regel = (sel) => [...eachRule(css)].find((r) => r.selector.trim() === sel);
+  for (const [sel, body] of [
+    ['.dashboard__grid > [data-row-fill]', /grid-column:\s*span var\(--widget-fill-span\)/],
+    ['.dashboard__grid > [data-col-fill]', /grid-row:\s*span var\(--widget-fill-rows\)/],
+    ['.dashboard__grid > [data-col-lock]', /grid-column:\s*var\(--tile-col\) \/ span var\(--tile-span-cols\)/],
+    ['.dashboard__grid > [data-col-lock][data-row-fill]', /grid-column-end:\s*span var\(--widget-fill-span\)/],
+  ]) {
+    const r = regel(sel);
+    nodeAssert.ok(r, `keine Regel fuer ${sel} in dashboard.css`);
+    nodeAssert.match(r.body, body, sel);
+    nodeAssert.ok(r.at.some((a) => /min-width:\s*768px/.test(a)), `${sel}: nur ab zwei Spalten`);
+  }
   const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
-  nodeAssert.match(src, /wireDashboardEditMode\(\);\s*wireRowFill\(\);/, 'rebuildDashboard ruft wireRowFill() nach dem Anpassen-Draht');
-  nodeAssert.match(src, /applyRowFill\(grid, \{ editing: isCustomizing \}\)/, 'wireRowFill nimmt das Wachstum im Anpassen-Modus zurueck');
+  // Seit DW-P2-4 direkt nach dem Zeichnen: dort ist das Layout noch sauber,
+  // und die Packung liest, bevor eine Verdrahtung schreibt.
+  nodeAssert.match(src, /\}, \{ animate: fromSkeleton \}\);\s*(?:\/\/[^\n]*\n\s*)*wireRowFill\(\);/, 'rebuildDashboard ruft wireRowFill() direkt nach dem Zeichnen');
+  nodeAssert.equal(src.match(/\bwireRowFill\(\);/g)?.length, 1, 'genau ein Aufruf je Aufbau');
+  nodeAssert.match(src, /applyRowFill\(grid, \{ editing: isCustomizing \}\)/, 'wireRowFill fuellt im Anpassen-Modus wie ausserhalb');
+  // Eine Geste fuellt neu, mit der Spaltenzahl der letzten Auslegung (kein Layout-Lesen).
+  nodeAssert.match(src, /applyRowFill\(grid, \{ editing: true, columns: seenGridColumns\.get\(grid\) \}\)/, 'patchCustomize fuellt ohne Neuaufbau');
+});
+
+// --------------------------------------------------------
+// U1 b (DW-P1-3): die Hoehe kommt aus den Daten. Eine Liste zeigt so viele
+// Zeilen, wie die Daten hergeben und die Groesse erlaubt, und ist genau so
+// hoch: `contentSpanRows` rechnet daraus die Rasterspuren.
+// --------------------------------------------------------
+
+test('U1 b: contentSpanRows - Zeilen aus den Daten, die Groesse ist die Obergrenze, leer ist eine Zeile', () => {
+  nodeAssert.equal(typeof widgets.contentSpanRows, 'function', 'contentSpanRows fehlt in utils/dashboard-widgets.js');
+  const g = widgets.TILE_GEOMETRY;
+  const spurenFuer = (px) => Math.ceil(px / g.unit - 1e-6);
+  // Aequivalenz gegen die Datenzeilen: fuer jede Zahl an Eintraegen, jede
+  // Obergrenze und jeden Rest dieselbe Rechnung wie Zeile fuer Zeile gezaehlt.
+  for (const cap of [3, 5, 8, 12]) {
+    for (let items = 0; items <= 14; items += 1) {
+      for (const extraTotal of [0, 4]) {
+        const total = items + extraTotal;
+        const r = widgets.contentSpanRows({ items, total, cap });
+        const shown = Math.min(items, cap);
+        let px = g.frame + g.head;
+        if (!shown) px += g.empty;
+        else {
+          px += g.rowsPad;
+          for (let i = 0; i < shown; i += 1) px += g.row;
+          if (total > shown) px += g.more;
+        }
+        nodeAssert.equal(r.shown, shown, `cap ${cap}, ${items} Eintraege: gezeigt`);
+        nodeAssert.equal(r.rest, total - shown, `cap ${cap}, ${items}/${total}: Rest`);
+        nodeAssert.equal(r.rows, spurenFuer(px), `cap ${cap}, ${items}/${total}: Spuren`);
+      }
+    }
+  }
+  // Leer ist genau eine Zeile, in jeder Groesse.
+  const leer = widgets.contentSpanRows({ items: 0, cap: 5 });
+  nodeAssert.equal(leer.rows, widgets.contentSpanRows({ items: 0, cap: 3 }).rows);
+  nodeAssert.ok(leer.rows * g.unit < g.frame + g.head + g.rowsPad + 2 * g.row, 'eine leere Kachel ist nicht hoeher als eine mit einer Zeile');
+  // Die Obergrenze haelt: mehr Daten machen die Kachel nicht hoeher.
+  nodeAssert.equal(widgets.contentSpanRows({ items: 9, cap: 5 }).rows, widgets.contentSpanRows({ items: 50, cap: 5 }).rows);
+  // Ohne "+N weitere" (more: false), eigene Zeilenhoehe, feste Teile, eigener Aufbau, ohne Karte.
+  nodeAssert.equal(widgets.contentSpanRows({ items: 7, cap: 5, more: false }).rows, spurenFuer(g.frame + g.head + g.rowsPad + 5 * g.row));
+  nodeAssert.equal(widgets.contentSpanRows({ items: 2, row: 77, extra: 64 }).rows, spurenFuer(g.frame + g.head + g.rowsPad + 2 * 77 + 64));
+  nodeAssert.equal(widgets.contentSpanRows({ body: 125 }).rows, spurenFuer(g.frame + g.head + 125));
+  nodeAssert.equal(widgets.contentSpanRows({ body: 119, bare: true }).rows, spurenFuer(119));
+});
+
+/* Dieselben Masse wie das Stylesheet - sonst rechnete die Kachel eine andere
+ * Hoehe, als der Browser zeichnet, und die Spuren waechsen nach. */
+test('U1 b: TILE_GEOMETRY sind die Masse aus dashboard.css und tokens.css', () => {
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const tok = (name) => Number(new RegExp(`--${name}:\\s*([\\d.]+)px`).exec(tokens)?.[1]);
+  const rules = [...eachRule(css)];
+  const g = widgets.TILE_GEOMETRY;
+  const grid = rules.find((r) => r.selector.trim() === '.dashboard__grid' && /--dashboard-row-unit/.test(r.body));
+  nodeAssert.ok(grid, 'das Raster hat eine Spur (--dashboard-row-unit)');
+  nodeAssert.match(grid.body, /--dashboard-row-unit:\s*var\(--space-1\)/);
+  nodeAssert.equal(g.unit, tok('space-1'), 'eine Spur ist --space-1');
+  nodeAssert.match(grid.body, /grid-auto-rows:\s*minmax\(var\(--dashboard-row-unit\),\s*auto\)/, 'eine Spur waechst mit, statt Inhalt ragen zu lassen');
+  nodeAssert.match(grid.body, /row-gap:\s*0/);
+  nodeAssert.equal(Number(/--tile-gap-rows:\s*(\d+)/.exec(grid.body)?.[1]) * g.unit, tok('space-4'), 'ab 768px: 16px Abstand');
+  const wide = rules.find((r) => r.selector.trim() === '.dashboard__grid' && /--tile-gap-rows:\s*5/.test(r.body));
+  nodeAssert.ok(wide?.at.some((a) => /min-width:\s*1024px/.test(a)) && 5 * g.unit === tok('space-5'), 'ab 1024px: 20px Abstand');
+  const wrapper = rules.find((r) => r.selector.trim() === '.dashboard__grid > .widget-wrapper' && /grid-row-end/.test(r.body));
+  nodeAssert.match(wrapper?.body ?? '', /grid-row-end:\s*span calc\(var\(--tile-rows, var\(--tile-size-rows\)\) \+ var\(--tile-gap-rows\)\)/);
+  nodeAssert.match(wrapper.body, /margin-block-end:\s*var\(--dashboard-grid-gap\)/, 'den Abstand traegt der Rahmen');
+  const row = rules.find((r) => r.selector.includes('.widget__rows > .list-row:not(') && /block-size/.test(r.body));
+  nodeAssert.match(row?.body ?? '', /block-size:\s*calc\(var\(--target-lg\) \+ var\(--space-1h\)\)/);
+  nodeAssert.equal(g.row, tok('target-lg') + tok('space-1h'), 'Zeilenhoehe');
+  const body = rules.find((r) => r.selector.trim() === '.dashboard .widget > .widget__body--rows');
+  nodeAssert.match(body?.body ?? '', /padding-block:\s*var\(--space-2\) var\(--space-3\)/);
+  nodeAssert.equal(g.rowsPad, tok('space-2') + tok('space-3'), 'Polster der Zeilenkachel');
+});
+
+/* Die Spanne jeder Listenkachel ist die ihrer gezeichneten Zeilen - gezaehlt
+ * im Markup, nicht behauptet. */
+test('U1 b: jede Listenkachel meldet die Spuren ihrer gezeichneten Zeilen (data-span-rows)', async () => {
+  const dash = await import('../public/pages/dashboard.js');
+  const { __test } = dash;
+  const g = widgets.TILE_GEOMETRY;
+  // Gezaehlt wird, was ohne Streckung steht - Zusatzzeilen (U14) traegt die
+  // Kachel mit, sie zaehlen erst, wenn applyRowFill sie zeigt.
+  const zeilen = (html) => (html.match(/<[a-z]+ class="list-row [^>]*>/g) ?? []).filter((tag) => !/data-fill-row/.test(tag)).length;
+  const fuss = (html) => /class="(widget-list-more|countdown-more|pantry-widget-more|waste-widget-more)"/.test(html);
+  const spuren = (html) => Number(/data-span-rows="(\d+)"/.exec(html)?.[1]);
+  const erwartet = (html) => {
+    const n = zeilen(html);
+    const px = n ? g.frame + g.head + g.rowsPad + n * g.row + (fuss(html) ? g.more : 0) : g.frame + g.head + g.empty;
+    return Math.ceil(px / g.unit - 1e-6);
+  };
+  const tasks = (n) => Array.from({ length: n }, (_, i) => ({ id: i + 1, title: `T${i}`, priority: 'none', status: 'open', assigned_users: [] }));
+  const birthdays = (n) => Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `B${i}`, days_until: i + 1, next_birthday: '2027-01-01' }));
+  for (const size of ['1x1', '1x2', '2x2']) {
+    for (const n of [0, 1, 3, 5, 7]) {
+      for (const html of [
+        __test.renderUrgentTasks(tasks(n), n + 2, size),
+        dash.renderUpcomingBirthdays(birthdays(n), size, n),
+        __test.renderPantryWidget({ items: birthdays(n).map((b) => ({ ...b, days_left: 2 })), total: n }, size),
+      ]) {
+        nodeAssert.equal(spuren(html), erwartet(html), `${size}, ${n} Eintraege: ${html.slice(0, 60)}`);
+      }
+    }
+  }
+});
+
+/* U14 (Entscheidung Ulas 2026-10-27): HOEHE WIRD INHALT. Bekommt eine
+ * Listenkachel beim Fuellen mehr Hoehe, als ihre Daten melden, zeigt sie darin
+ * weitere geladene Zeilen - und "+N weitere" zaehlt herunter. Die Spanne bleibt
+ * die ohne Zusatzzeilen (keine Rueckkopplung in die Packung). */
+test('U14: fillRowCount - so viele Zusatzzeilen, wie ganz in die zugeteilten Spuren passen', () => {
+  nodeAssert.equal(typeof widgets.fillRowCount, 'function', 'fillRowCount fehlt in utils/dashboard-widgets.js');
+  nodeAssert.equal(widgets.fillRowCount([60, 74, 81], 59), 0, 'nicht gestreckt: keine');
+  nodeAssert.equal(widgets.fillRowCount([60, 74, 81], 60), 1);
+  nodeAssert.equal(widgets.fillRowCount([60, 74, 81], 80), 2, 'eine angeschnittene Zeile steht nicht');
+  nodeAssert.equal(widgets.fillRowCount([60, 74, 81], 400), 3, 'nie mehr, als geladen ist');
+  nodeAssert.equal(widgets.fillRowCount([], 400), 0, 'ohne Mehrdaten bleibt der Platz leer');
+});
+
+/** Die Zusatzzeilen einer Kachel: Spuren je Stufe und die markierten Zeilen. */
+function fillOf(html) {
+  const steps = (/data-fill-steps="([0-9,]*)"/.exec(html)?.[1] ?? '').split(',').filter(Boolean).map(Number);
+  const rows = (html.match(/<[a-z]+ class="(?:list-row|note-item|budget-widget__top-row|rewards-recent__row)[ "][^>]*>/g) ?? []).filter((tag) => /data-fill-row/.test(tag)).length;
+  return { steps, rows, base: Number(/data-span-rows="(\d+)"/.exec(html)?.[1]) };
+}
+
+test('U14: jede Listenkachel traegt ihre geladenen Zeilen mit - und rechnet ihre Spuren mit derselben Geometrie', async () => {
+  const dash = await import('../public/pages/dashboard.js');
+  const { __test } = dash;
+  const g = widgets.TILE_GEOMETRY;
+  const spurenFuer = (px) => Math.ceil(px / g.unit - 1e-6);
+  const many = (n, f) => Array.from({ length: n }, (_, i) => f(i));
+  const tasks = many(5, (i) => ({ id: i + 1, title: `T${i}`, priority: 'none', status: 'open', assigned_users: [] }));
+  const birthdays = many(8, (i) => ({ id: i + 1, name: `B${i}`, days_until: i + 1, next_birthday: '2027-01-01' }));
+  // Aufgaben 1x1: drei stehen, zwei sind geladen und warten, 12 offen insgesamt.
+  const t11 = __test.renderUrgentTasks(tasks, 12, '1x1');
+  const f = fillOf(t11);
+  nodeAssert.equal(f.rows, 2, 'Aufgaben 1x1: die zwei geladenen, nicht gezeigten Zeilen stehen im Markup');
+  const rowsPx = (n, rest) => g.frame + g.head + g.rowsPad + n * g.row + (rest > 0 ? g.more : 0);
+  nodeAssert.deepEqual(f.steps, [spurenFuer(rowsPx(4, 8)), spurenFuer(rowsPx(5, 7))], 'Spuren mit 1 und 2 Zusatzzeilen');
+  nodeAssert.equal(f.base, spurenFuer(rowsPx(3, 9)), 'die Spanne bleibt die ohne Zusatzzeilen');
+  nodeAssert.match(t11, /data-fill-more data-more-rest="9" data-more-key="dashboard\.tasksMore"/, '"+N weitere" kennt seinen Rest');
+  // Hoch zeigt die Aufgabenkachel alle fuenf geladenen: nichts wartet.
+  nodeAssert.deepEqual(fillOf(__test.renderUrgentTasks(tasks, 12, '1x2')).steps, [], '1x2: ohne Mehrdaten keine Stufe');
+  // Geburtstage 1x2: der Server liefert acht (U14), die Kachel zeigt fuenf.
+  const b12 = fillOf(dash.renderUpcomingBirthdays(birthdays, '1x2', 8));
+  nodeAssert.equal(b12.rows, 3);
+  nodeAssert.deepEqual(b12.steps, [6, 7, 8].map((n) => spurenFuer(rowsPx(n, 8 - n))), 'die letzte Stufe ohne "+N weitere"');
+  // Jede Listenkachel macht mit (eine Mechanik, keine Einzelloesung).
+  const pantry = __test.renderPantryWidget({ items: many(5, (i) => ({ name: `P${i}`, days_left: i })), total: 9 }, '1x1');
+  nodeAssert.equal(fillOf(pantry).rows, 2, 'Vorrat');
+  const waste = __test.renderWasteWidget({ items: many(5, (i) => ({ type: { id: i + 1, name: `W${i}`, sort_order: i }, next: null })) }, '1x1');
+  nodeAssert.equal(fillOf(waste).rows, 2, 'Entsorgung');
+  const schedule = __test.renderScheduleWidget({ hasTypes: true, entries: many(5, (i) => ({ user_id: i + 1, shift_type: null })) }, many(5, (i) => ({ id: i + 1, display_name: `U${i}` })), '1x1');
+  nodeAssert.equal(fillOf(schedule).rows, 2, 'Schichtplan');
+  const notes = __test.renderPinnedNotes(many(5, (i) => ({ id: i + 1, title: `N${i}`, content: 'x', categories: [] })), '1x1', 8);
+  nodeAssert.equal(fillOf(notes).rows, 2, 'Notizen');
+  const kids = many(4, (i) => ({ id: 20 + i, display_name: `K${i}`, balance: 5 }));
+  const rewards = __test.renderRewardsWidget({ view: 'approver', me: 1, standings: kids, catalog: [], pending: 0 }, '1x1');
+  nodeAssert.equal(fillOf(rewards).rows, 2, 'Belohnungen (Familie)');
+  const recent = many(3, (n) => ({ delta: n + 1, reason: `R${n}`, type: 'earn', created_at: '2026-09-01T08:00:00Z' }));
+  const self = __test.renderRewardsWidget({ view: 'self', me: 7, standings: [{ id: 7, display_name: 'Emma', balance: 4 }], catalog: [], recent }, '1x1');
+  nodeAssert.equal(fillOf(self).rows, 3, 'Belohnungen (eigene Sicht): die juengsten Punkte');
+  nodeAssert.match(self, /class="rewards-self__recent" data-fill-group/, 'mit der ersten Zeile kommt die Ueberschrift');
+  const budget = __test.renderBudgetWidget({ entryCount: 4, income: 3000, expenses: 1200, balance: 1800,
+    topExpenses: many(5, (i) => ({ category: `c${i}`, amount: 100 - i })) }, 'EUR', '1x2');
+  nodeAssert.equal(fillOf(budget).rows, 2, 'Budget hoch: zwei Kategorien mehr');
+  const now = new Date();
+  const soon = (h) => new Date(now.getTime() + h * 3600e3).toISOString();
+  const events = many(5, (i) => ({ id: i + 1, title: `E${i}`, start_datetime: soon(i + 2), end_datetime: soon(i + 3) }));
+  const cal = __test.renderCalendarWidget({ upcomingEvents: events }, '1x1', {});
+  nodeAssert.equal(fillOf(cal).rows, 2, 'Kalender 1x1: die Kommenden, die die Stufe geladen hat');
+  nodeAssert.match(cal, /data-fill-more data-more-rest="2"/, '"Weitere im Kalender" geht, wenn alle Geladenen stehen');
+  // Am Telefon wird nicht gestreckt - dort traegt keine Kachel Zusatzzeilen.
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { configurable: true, writable: true, value: { ...(globalThis.window ?? {}), matchMedia: () => ({ matches: true }) } });
+  try {
+    nodeAssert.equal(fillOf(__test.renderUrgentTasks(tasks, 12, '1x1')).rows, 0, 'Telefon: keine Zusatzzeile');
+  } finally {
+    if (saved) Object.defineProperty(globalThis, 'window', saved);
+    else delete globalThis.window;
+  }
+});
+
+test('U14: jede Stufe ist die Hoehe der Kachel mit genau so vielen Zeilen (Aequivalenz gegen das Markup)', async () => {
+  const dash = await import('../public/pages/dashboard.js');
+  const g = widgets.TILE_GEOMETRY;
+  const birthdays = (n) => Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `B${i}`, days_until: i + 1, next_birthday: '2027-01-01' }));
+  let stufen = 0;
+  for (const size of ['1x1', '1x2']) {
+    for (const n of [0, 2, 4, 6, 8]) {
+      for (const total of [n, n + 3]) {
+        const html = dash.renderUpcomingBirthdays(birthdays(n), size, total);
+        const { steps, rows, base } = fillOf(html);
+        nodeAssert.equal(steps.length, rows, `${size}, ${n}/${total}: eine Stufe je Zusatzzeile`);
+        const shown = (html.match(/<[a-z]+ class="list-row [^>]*>/g) ?? []).length - rows;
+        steps.forEach((spuren, i) => {
+          const k = i + 1;
+          const px = g.frame + g.head + g.rowsPad + (shown + k) * g.row + (total - shown - k > 0 ? g.more : 0);
+          nodeAssert.equal(spuren, Math.ceil(px / g.unit - 1e-6), `${size}, ${n}/${total}: Stufe ${k}`);
+          nodeAssert.ok(spuren > (i ? steps[i - 1] : base), 'jede Stufe ist hoeher als die vorige');
+        });
+        stufen += steps.length;
+      }
+    }
+  }
+  nodeAssert.ok(stufen >= 10, `Vorbedingung: Kacheln mit Zusatzzeilen geprueft (${stufen} Stufen)`);
+});
+
+/** Eine Kachel-Attrappe mit Zusatzzeilen fuer applyRowFill. */
+function fillTile(tile, { steps, rows = steps.length, rest = rows + 2, key = 'dashboard.tasksMore', spanRows }) {
+  const attrs = (bag) => ({ toggleAttribute: (name, on) => { if (on) bag.add(name); else bag.delete(name); }, has: (name) => bag.has(name) });
+  const zeilen = Array.from({ length: rows }, () => attrs(new Set()));
+  const more = { ...attrs(new Set()), dataset: { moreRest: String(rest), moreKey: key }, textContent: `+${rest}` };
+  tile.dataset.fillSteps = steps.join(',');
+  tile.dataset.spanRows = String(spanRows);
+  tile.querySelectorAll = (sel) => (sel === '[data-fill-row]' ? zeilen : sel === '[data-fill-more]' ? [more] : []);
+  return { zeilen, more, shown: () => zeilen.filter((z) => z.has('data-fill-on')).length };
+}
+
+test('U14: applyRowFill zeigt im gestreckten Platz weitere Zeilen - und die Packung bleibt, wie sie ohne sie war', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const vorher = globalThis.getComputedStyle;
+  try {
+    // Ohne Zusatzzeilen: das Raster des Demo-Haushalts (Belohnungen schliessen
+    // ueber dem Wetter ein Loch, drei Spalten).
+    const plain = stubGrid(GRID_SEED);
+    globalThis.getComputedStyle = plain.style;
+    __test.applyRowFill(plain.grid);
+    const ohne = filledOf(plain.tiles);
+    const zugeteilt = Number(ohne.find(([id]) => id === 'rewards')[2]) - 5;
+    // Dieselben Spannen, die Belohnungen haben drei Zusatzzeilen: zwei passen.
+    const own = GRID_SEED.rewards[1] - 5;
+    const stub = stubGrid(GRID_SEED);
+    globalThis.getComputedStyle = stub.style;
+    const rewards = stub.tiles.find((t) => t.dataset.widgetId === 'rewards');
+    const steps = [own + 14, zugeteilt - 1, zugeteilt + 13];
+    const fill = fillTile(rewards, { steps, rest: 5, spanRows: own });
+    __test.applyRowFill(stub.grid);
+    nodeAssert.deepEqual(filledOf(stub.tiles), ohne, 'die Zusatzzeilen veraendern die Packung nicht');
+    nodeAssert.equal(fill.shown(), 2, 'so viele, wie ganz in die zugeteilte Hoehe passen');
+    nodeAssert.equal(rewards.dataset.fillShown, '2');
+    nodeAssert.equal(fill.more.textContent, 'dashboard.tasksMore{"count":3}', '"+N weitere" zaehlt herunter');
+    nodeAssert.ok(!fill.more.has('data-fill-gone'));
+    // Im Anpassen-Modus steht als Geist nur noch der Rest.
+    __test.applyRowFill(stub.grid, { editing: true });
+    nodeAssert.deepEqual(filledOf(stub.tiles), ohne, 'Anpassen = Normal');
+    nodeAssert.equal(Number(rewards.style.props.get('--tile-ghost-rows')), zugeteilt - steps[1], 'der Geist ist der Platz unter der letzten Zusatzzeile');
+    // Passt alles, geht "+N weitere".
+    const all = stubGrid(GRID_SEED);
+    globalThis.getComputedStyle = all.style;
+    const r2 = all.tiles.find((t) => t.dataset.widgetId === 'rewards');
+    const fill2 = fillTile(r2, { steps: [own + 14, own + 27], rest: 2, spanRows: own });
+    __test.applyRowFill(all.grid);
+    nodeAssert.equal(fill2.shown(), 2);
+    nodeAssert.ok(fill2.more.has('data-fill-gone'), 'alles steht: keine Fusszeile mehr');
+    // Eine Kachel, die nicht gestreckt ist, zeigt keine Zusatzzeile.
+    const fam = all.tiles.find((t) => t.dataset.widgetId === 'family');
+    const fill3 = fillTile(fam, { steps: [GRID_SEED.family[1] - 5 + 14], spanRows: GRID_SEED.family[1] - 5 });
+    __test.applyRowFill(all.grid);
+    nodeAssert.equal(fill3.shown(), 0, 'ohne zugeteilte Hoehe keine Zusatzzeile');
+  } finally {
+    globalThis.getComputedStyle = vorher;
+  }
+});
+
+test('U14: die Zusatzzeilen fragen nie zurueck - kein Layout-Lesen, keine eigene Spanne, versteckt bis applyRowFill sie zeigt', () => {
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  const body = /function showFillRows\(el, k\) \{([\s\S]*?)\n\}/.exec(src)?.[1] ?? '';
+  nodeAssert.ok(body, 'showFillRows fehlt');
+  nodeAssert.doesNotMatch(body, /getComputedStyle|getBoundingClientRect|offset(Height|Width|Top)|client(Height|Width)|scrollHeight/, 'kein Layout-Lesen');
+  nodeAssert.doesNotMatch(body, /--tile-rows|spanRows\s*=|fillGridSpans|packGrid/, 'keine Rueckkopplung in die Spanne');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const rule = [...eachRule(css)].find((r) => r.selector.includes('[data-fill-row]:not([data-fill-on])'));
+  nodeAssert.match(rule?.body ?? '', /display:\s*none/, 'eine Zusatzzeile steht erst, wenn applyRowFill sie zeigt');
+  nodeAssert.ok(rule.selector.includes('[data-fill-more][data-fill-gone]'), '"+N weitere" geht, wenn alles steht');
+  nodeAssert.doesNotMatch(css, /rewards-recent--fill/, 'die Belohnungen fuellen ueber dieselbe Mechanik, nicht mehr mit eigener Liste');
+});
+
+test('U1 b: jede Kachel meldet ihre Hoehe - fuer jede Groesse, damit der Hinweis Groessen probieren kann', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const cfg = widgets.WIDGET_IDS.map((id, i) => ({ id, visible: true, order: i, size: widgets.defaultWidgetSize(id) }));
+  const html = __test.renderDashboardLayout(cfg, {
+    urgentTasks: [], upcomingEvents: [], todayMeals: [], shoppingLists: [], pantryExpiring: { items: [] }, birthdays: [],
+    countdowns: [{ id: 1, title: 'x', date: '2027-01-01', days_until: 30, source: 'task' }], budget: {}, rewards: {}, health: {},
+    fasting: { active: null }, nutrition: { target: null }, housekeeping: {}, schedule: { entries: [], hasTypes: false },
+    waste: { items: [] }, users: [{ id: 1, display_name: 'A' }, { id: 2, display_name: 'B' }], pinnedNotes: [], quicklinks: [],
+  }, null, 'EUR');
+  const wrappers = [...html.matchAll(/<div class="widget-wrapper [^"]*"\s+data-widget-id="([^"]+)"([^>]*)>/g)];
+  nodeAssert.ok(wrappers.length > 10, `Vorbedingung: Kacheln gezeichnet (${wrappers.length})`);
+  for (const [, id, attrs] of wrappers) {
+    nodeAssert.match(attrs, /data-span-rows="\d+"/, `${id} meldet keine Hoehe`);
+    nodeAssert.match(attrs, /style="--tile-rows: \d+"/, `${id}: der Rahmen setzt --tile-rows`);
+    for (const p of widgets.WIDGET_SIZE_PRESETS) nodeAssert.match(attrs, new RegExp(`data-span-sizes="[^"]*${p.value}:\\d+`), `${id}: Hoehe als ${p.value}`);
+  }
+});
+
+/* Die Hoehe, die eine Kachel fuer eine ANDERE Groesse ansagt (`data-span-sizes`,
+ * fuer den Lueckenhinweis), ist die, die sie in dieser Groesse meldet. */
+test('U1 b: data-span-sizes sagt je Groesse dieselbe Hoehe, die die Kachel dort meldet', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  global.window ??= { yuvomi: null };
+  const items = (n, f) => Array.from({ length: n }, (_, i) => f(i));
+  const data = {
+    urgentTasks: items(7, (i) => ({ id: i + 1, title: `T${i}`, priority: 'none', status: 'open', assigned_users: [] })), openTaskCount: 9,
+    birthdays: items(8, (i) => ({ id: i + 1, name: `B${i}`, days_until: i + 1, next_birthday: '2027-01-01' })), birthdayTotal: 8,
+    pinnedNotes: items(6, (i) => ({ id: i + 1, title: i % 2 ? `N${i}` : '', content: 'x', categories: [] })), notesTotal: 8,
+    budget: { entryCount: 4, income: 3000, expenses: 1200, balance: 1800, topExpenses: items(3, (i) => ({ category: `c${i}`, amount: 100 })) },
+    users: items(3, (i) => ({ id: i + 1, display_name: `U${i}` })),
+    todayMeals: [], shoppingLists: [{ id: 1, name: 'Wochenmarkt', open_count: 9, total_count: 12, items: items(6, (i) => ({ name: `A${i}` })) }],
+    pantryExpiring: { items: items(4, (i) => ({ name: `P${i}`, days_left: i })), total: 6 },
+  };
+  const ids = ['tasks', 'birthdays', 'notes', 'budget', 'family', 'meals', 'shopping', 'pantry', 'clock'];
+  const cfg = ids.map((id, i) => ({ id, visible: true, order: i, size: '1x1' }));
+  const spuren = (html) => Number(/data-span-rows="(\d+)"/.exec(html)?.[1]);
+  for (const id of ids) {
+    const render = (size) => __test.dashboardTileRenderers(cfg, data, null, 'EUR')[id](size, {});
+    const angesagt = Object.fromEntries((/data-span-sizes="([^"]*)"/.exec(render('1x1'))?.[1] ?? '').split(',').map((e) => e.split(':')).map(([k, v]) => [k, Number(v)]));
+    for (const size of ['1x1', '2x1', '1x2', '2x2']) {
+      nodeAssert.equal(angesagt[size], spuren(render(size)), `${id}: ${size} angesagt = gemeldet`);
+    }
+  }
+});
+
+/* DW-P2-4: DIE HOEHE JEDER KACHEL REIST MIT. Kacheln ausser Sicht stehen bis
+ * zum Rendern mit ihrem Platzhalter da (content-visibility); `auto` merkt sich
+ * die echte Hoehe nur am selben Knoten. Ohne die mitgenommene Hoehe stand nach
+ * dem Zurueck der wiederhergestellte Scrollstand gemessen 387px neben der
+ * Kachel von vorher (390x844, alle Widgets). */
+test('DW-P2-4: die gemeldete Hoehe einer Kachel steht beim naechsten Aufbau als Platzhalter an ihr', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const saved = { window: Object.getOwnPropertyDescriptor(globalThis, 'window'), RO: Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver') };
+  let callback = null;
+  Object.defineProperty(globalThis, 'window', { configurable: true, writable: true, value: { innerWidth: 390 } });
+  Object.defineProperty(globalThis, 'ResizeObserver', { configurable: true, writable: true, value: class { constructor(cb) { callback = cb; } observe() {} disconnect() {} } });
+  const wrapper = (id) => { const props = new Map(); return { dataset: { widgetId: id }, isConnected: true, style: { setProperty: (k, v) => props.set(k, v) }, props }; };
+  try {
+    const old = [wrapper('family'), wrapper('notes')];
+    __test.watchTileSizes({ querySelectorAll: () => old });
+    callback(old.map((target, i) => ({ target, borderBoxSize: [{ blockSize: [166.4, 406][i] }] })));
+    const fresh = [wrapper('family'), wrapper('notes'), wrapper('clock')];
+    __test.carryTileSizes({ querySelectorAll: () => fresh }, 390);
+    nodeAssert.deepEqual(fresh.map((w) => w.props.get('--tile-block-size') ?? null), ['166px', '406px', null]);
+    const other = [wrapper('family')];
+    __test.carryTileSizes({ querySelectorAll: () => other }, 1440);
+    nodeAssert.equal(other[0].props.size, 0, 'eine andere Fensterbreite hat ihre eigenen Hoehen');
+  } finally {
+    for (const [name, desc] of [['window', saved.window], ['ResizeObserver', saved.RO]]) {
+      if (desc) Object.defineProperty(globalThis, name, desc);
+      else delete globalThis[name];
+    }
+  }
 });
 
 // --------------------------------------------------------
@@ -3353,85 +4018,6 @@ test('R21 D5: der Saldo steht ab Werk nirgends - Budget-Widget aus, keine Saldo-
   nodeAssert.equal(saved.find((w) => w.id === 'budget').visible, true, 'gespeichert bleibt gespeichert');
 });
 
-/** Leere Zellen VOR der letzten Zeile nach Wachsen nach rechts und nach unten. */
-function holesAfterFill(items, columns) {
-  const wide = widgets.rowFillSpans(items, columns);
-  const widened = items.map((it) => ({ ...it, cols: wide.get(it.id) ?? it.cols }));
-  const tall = widgets.columnFillSpans(widened, columns);
-  const filled = widened.map((it) => ({ ...it, rows: tall.get(it.id) ?? it.rows }));
-  return { cells: widgets.packGrid(filled, columns), before: widgets.packGrid(items, columns), filled };
-}
-
-test('R21 D5: columnFillSpans schliesst das Loch unter einer 1x1-Kachel neben zwei hohen', () => {
-  nodeAssert.equal(typeof widgets.columnFillSpans, 'function', 'columnFillSpans fehlt in utils/dashboard-widgets.js');
-  // Der gemessene Fall (1440px, Seitenleiste eingeklappt, vier Spalten): drei
-  // hohe Kacheln und daneben Belohnungen 1x1 - darunter blieben 305x185px leer.
-  const demo = [kachel('family', 1, 2), kachel('budget', 1, 2), kachel('birthdays', 1, 2),
-    kachel('weather', 2, 1), kachel('metrics', 2, 1), kachel('rewards', 1, 1), kachel('notes', 2, 1)];
-  nodeAssert.ok(widgets.gridHoleCount(widgets.packGrid(demo, 4)) > 0, 'Vorbedingung: ohne Fuellung ein Loch');
-  for (const cols of [2, 3, 4]) {
-    const { cells, before } = holesAfterFill(demo, cols);
-    nodeAssert.equal(widgets.gridHoleCount(cells), 0, `kein Loch bei ${cols} Spalten`);
-    nodeAssert.deepEqual(positions(cells), positions(before), `keine Kachel wechselt den Platz (${cols} Spalten)`);
-    nodeAssert.ok(cells.length <= before.length, 'das Raster wird nicht hoeher');
-  }
-  // Das Kinderkonto (R20: Belohnungen zuerst) bei drei Spalten: 1x1 vorn links.
-  const kind = [kachel('rewards', 1, 1), kachel('family', 1, 2), kachel('birthdays', 1, 2),
-    kachel('weather', 2, 1), kachel('metrics', 2, 1), kachel('notes', 2, 1)];
-  nodeAssert.equal(widgets.gridHoleCount(holesAfterFill(kind, 3).cells), 0, 'auch das Kinderkonto ohne Loch');
-  // Eine Kachel, die so hoch ist wie ihr Inhalt, waechst nicht.
-  const stiff = widgets.columnFillSpans([kachel('a', 1, 2), kachel('b', 1, 1, '1x1')].map((it) => (it.id === 'b' ? { ...it, grow: false } : it)), 2);
-  nodeAssert.equal(stiff.size, 0);
-});
-
-test('R21 D5: die Standardgroessen sind bei drei und vier Spalten lueckenlos', () => {
-  const sichtbar = widgets.DEFAULT_WIDGET_CONFIG.filter((w) => w.visible);
-  const span = (size) => size.split('x').map(Number);
-  // Mit und ohne Countdown (der erscheint erst, wenn jemand etwas markiert).
-  for (const withCountdown of [false, true]) {
-    const items = sichtbar.filter((w) => withCountdown || w.id !== 'countdown')
-      .map((w) => kachel(w.id, ...span(w.size)))
-      // Die Kennzahlreihe ist so hoch wie ihr Inhalt (align-self: start).
-      .map((it) => (it.id === 'metrics' ? { ...it, grow: false } : it));
-    for (const cols of [3, 4]) {
-      nodeAssert.equal(widgets.gridHoleCount(holesAfterFill(items, cols).cells), 0,
-        `Loch bei ${cols} Spalten (${withCountdown ? 'mit' : 'ohne'} Countdown): ${items.map((i) => i.id).join(',')}`);
-    }
-  }
-});
-
-test('R21 D5: applyRowFill setzt das Wachsen nach unten als Darstellung, und CSS liest es', async () => {
-  const { __test } = await import('../public/pages/dashboard.js');
-  const SPANS = { family: [1, 2], budget: [1, 2], birthdays: [1, 2], rewards: [1, 1], weather: [2, 1], metrics: [2, 1], notes: [2, 1] };
-  const tile = (id) => {
-    const props = new Map();
-    return { dataset: { widgetId: id }, style: { setProperty: (k, v) => props.set(k, v), removeProperty: (k) => props.delete(k), props } };
-  };
-  const tiles = Object.keys(SPANS).map(tile);
-  const grid = { children: tiles };
-  const vorher = globalThis.getComputedStyle;
-  globalThis.getComputedStyle = (el) => {
-    if (el === grid) return { gridTemplateColumns: '305px 305px 305px 305px' };
-    const [cols, rows] = SPANS[el.dataset.widgetId];
-    return { display: 'flex', alignSelf: el.dataset.widgetId === 'metrics' ? 'start' : 'stretch',
-      gridColumnStart: 'auto', gridColumnEnd: `span ${cols}`, gridRowStart: 'auto', gridRowEnd: `span ${rows}` };
-  };
-  try {
-    __test.applyRowFill(grid);
-    const tiefer = tiles.filter((t) => 'colFill' in t.dataset).map((t) => [t.dataset.widgetId, t.style.props.get('--widget-fill-rows')]);
-    nodeAssert.deepEqual(tiefer, [['rewards', '2']], 'Belohnungen fuellt die Zelle unter sich');
-    __test.applyRowFill(grid, { editing: true });
-    nodeAssert.equal(tiles.filter((t) => 'colFill' in t.dataset || t.style.props.size).length, 0,
-      'im Anpassen-Modus zeigt das Raster die gewaehlten Groessen');
-  } finally {
-    globalThis.getComputedStyle = vorher;
-  }
-  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
-  const regel = [...eachRule(css)].find((r) => r.selector.trim() === '.dashboard__grid > [data-col-fill]');
-  nodeAssert.ok(regel, 'keine Regel fuer [data-col-fill] in dashboard.css');
-  nodeAssert.match(regel.body, /grid-row:\s*span var\(--widget-fill-rows\)/);
-});
-
 test('R21 D5: auf dem Telefon zeigt das Blatt so viele Zeilen, wie in den ersten Schirm passen', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   nodeAssert.equal(typeof __test.programRowsThatFit, 'function', 'programRowsThatFit fehlt');
@@ -3444,7 +4030,11 @@ test('R21 D5: auf dem Telefon zeigt das Blatt so viele Zeilen, wie in den ersten
     'auf einem sehr kleinen Schirm bleiben die zwei Zeilen als Untergrenze');
   // Verdrahtet: gemessen wird im selben Task wie das Zeichnen, vor dem Bild.
   const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
-  nodeAssert.match(src, /setHtml\(shell, `[\s\S]{0,900}`\);\s*\/\/[^\n]*\n[^\n]*\n\s*const fitted = measurePhoneProgram\(shell\);/,
+  // Das Markup kommt seit DW-P1-2 aus dashboardShellHtml() - der stille Abgleich
+  // liest daraus voraus, welche Zeilen gehen.
+  // Seit DW-P2-4 stehen dazwischen nur die mitgenommenen Kachelhoehen und
+  // die Zeichen - gemessen wird das Blatt, wie man es sieht.
+  nodeAssert.match(src, /setHtml\(shell, html\);\s*carryTileSizes\(shell, viewportWidth\);\s*(?:\/\/[^\n]*\n\s*)*createPendingIcons\(shell\);\s*(?:\/\/[^\n]*\n\s*)*const fitted = measurePhoneProgram\(shell\);/,
     'rebuildDashboard misst direkt nach dem Zeichnen');
   nodeAssert.match(src, /renderTodayCockpit\(data, cfg, isCustomizing, \{ cap: fitted \}\)/, 'und zeichnet nur das Blatt neu');
   nodeAssert.match(src, /cap = onPhoneStage\(\) \? phoneProgramCap\(\) : PROGRAM_ROW_CAP/, 'der naechste Aufbau rechnet mit dem gemessenen Wert');
@@ -3666,7 +4256,8 @@ test('Schedule-Widget: die Zeilenzahl kommt aus der Kachelgroesse, nicht aus der
     hasTypes: true,
     entries: users.map((u) => ({ user_id: u.id, shift_type: type })),
   };
-  const zeilen = (html) => (html.match(/class="schedule-widget-row"/g) || []).length;
+  // Was ohne Streckung steht: Zusatzzeilen (U14, `data-fill-row`) zeigt erst applyRowFill.
+  const zeilen = (html) => (html.match(/<div class="list-row schedule-widget-row"[^>]*>/g) || []).filter((tag) => !tag.includes('data-fill-row')).length;
 
   // Die hohe Kachel (1x2, ihr eigener Standard) zeigt fuenf von sechs Zeilen -
   // genau hier stand der Fehler: ohne Deckel waeren es alle sechs gewesen.
@@ -3721,13 +4312,15 @@ test('renderScheduleWidget() zaehlt Personen, nicht Schicht-Eintraege, und begre
     { user_id: 3, source: 'override', shift_type: shiftType },
   ];
 
+  // Gezaehlt wird, was ohne Streckung steht (U14: Zusatzzeilen zeigt erst applyRowFill).
+  const zeilen = (html) => (html.match(/<div class="list-row schedule-widget-row"[^>]*>/g) || []).filter((tag) => !tag.includes('data-fill-row')).length;
   const wide = __test.renderScheduleWidget({ entries, hasTypes: true }, users, '1x2');
   nodeAssert.match(wide, /widget__badge">3</, 'drei verschiedene Personen sind im Dienst, nicht vier Zeilen');
-  nodeAssert.equal((wide.match(/schedule-widget-row"/g) || []).length, 4, 'auf 1x2 (Deckel 5) passen alle vier Zeilen');
+  nodeAssert.equal(zeilen(wide), 4, 'auf 1x2 (Deckel 5) passen alle vier Zeilen');
 
   const narrow = __test.renderScheduleWidget({ entries, hasTypes: true }, users, '1x1');
   nodeAssert.match(narrow, /widget__badge">3</, 'die Kopfzahl bleibt der wahre Bestand, unabhaengig von der Kachelgroesse');
-  nodeAssert.equal((narrow.match(/schedule-widget-row"/g) || []).length, 3, 'auf 1x1 (Deckel 3) werden nur drei der vier Zeilen gezeigt');
+  nodeAssert.equal(zeilen(narrow), 3, 'auf 1x1 (Deckel 3) werden nur drei der vier Zeilen gezeigt');
 });
 
 test('Kennzahlreihe fuehrt mit den Modulen, die sonst kein Widget zeigen', async () => {
@@ -3794,6 +4387,74 @@ test('Kennzahlreihe bezieht ihre Hoehe aus ihrem Inhalt, nicht von aussen', () =
   // hat: die Sonde steht dort, wo repariert wurde, nicht dort, wo es weh tat.
   assert(/\.widget-wrapper:has\(>\s*\.metric-tiles\)\s*\{[^}]*align-self:\s*start/.test(css),
     'die ZELLE der Kennzahlreihe muss auf ihren Inhalt schrumpfen - sonst steht die Reihe richtig und die Buehne darunter ist leer');
+});
+
+/* DW-P2-7 (Polish der Dashboard-Widgets, 2026-10-26; G1-Uebersicht-P2-2,
+ * P3-2, P3-3): die Kennzahlreihe stand als zweites Kartensystem im Raster -
+ * Radius 16, shadow-sm, Polster 12, Label 12/500 sekundaer, Wert 28/700,
+ * 10px Luecke. Mobil lief "10 im Monat" 6px ueber die Kachel, weil die Reihe
+ * kein `metric-grid`-Container war und die Wertstufen nie griffen; ab 1024px
+ * lagen 41 statt 20px bis zur naechsten Kachel (111px Reihe in einer
+ * 132px-Zeile). Gegen den Stand davor rot gelaufen (Dateikopie). */
+test('DW-P2-7: die Kennzahlreihe ist aus dem Material der Widgets und ein metric-grid', async () => {
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const parts = (rule) => rule.selector.split(',').map((part) => part.trim().replace(/\s+/g, ' '));
+  const decl = (body, prop) => body.match(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;]+)`))?.[1].trim() ?? '';
+  const at = (selector, test = (a) => a.length === 0) => rules.filter((r) => test(r.at) && parts(r).includes(selector));
+  const has = (selector, prop, want, test) => at(selector, test).some((r) => want.test(decl(r.body, prop)));
+
+  // Die Reihe ist der Container, den die Wertstufen von panel.css fragen.
+  assert(has('.metric-tiles', 'container', /^metric-grid\s*\/\s*inline-size$/),
+    '.metric-tiles deklariert `container: metric-grid / inline-size` - sonst greifen die Wertstufen nie (mobil 6px Ueberlauf)');
+  // EINE Materialregel fuer Widgets und Kacheln - Flaeche, Radius, Schatten.
+  const material = rules.find((r) => r.at.length === 0 && parts(r).includes('.dashboard .widget') && /--shadow-md/.test(r.body));
+  assert(material, 'die Materialregel `.dashboard .widget` mit shadow-md muss es geben - sonst prueft dieser Guard nichts');
+  assert(parts(material).some((part) => /\.metric-tiles > \.metric-card/.test(part)),
+    `die Kennzahlkachel steht in DERSELBEN Materialregel wie die Widgets (gefunden: ${parts(material).join(' | ')})`);
+  assert(has('.metric-tiles > .metric-card', 'padding', /^var\(--space-4\)$/),
+    'Polster der Kachel = Polster des Widget-Koerpers (16px), nicht die 12px der Budget-Karte');
+  // Kopf im Widget-Dialekt.
+  assert(has('.metric-tiles .metric-card__label', 'font-weight', /--font-weight-semibold/)
+    && has('.metric-tiles .metric-card__label', 'color', /--color-text-primary/)
+    && has('.metric-tiles .metric-card__label', 'font-size', /--type-secondary/),
+    'der Kachelkopf nennt den Absender wie ein Widget-Kopf: Label-Farbe, semibold, Headline-Dichtestufe');
+  // Das Gewicht des Werts (semibold) haelt seit p6b die Rolle selbst:
+  // test:typography "Title 1 traegt semibold" - keine eigene Regel hier.
+  // Gleicher Rhythmus: Luecke und Zeilenminimum kommen aus dem Raster.
+  assert(has('.metric-tiles', 'gap', /^var\(--dashboard-grid-gap\)$/) && has('.dashboard__grid', 'gap', /^var\(--dashboard-grid-gap\)$/),
+    'die Kacheln stehen mit der Rasterluecke nebeneinander, nicht mit eigenen 10px');
+  // Seit U1 b gibt es kein Zeilenminimum mehr, an dem sich die Reihe messen
+  // muesste: sie meldet ihre Kachelzeilen wie jede Liste ihre Zeilen
+  // (`contentSpanRows`, bare) - vier je Reihe breit, zwei schmal.
+  assert(!rules.some((r) => /--dashboard-row-min/.test(r.body)), 'das Zeilenminimum der 132px-Rasterzeilen ist mit U1 b gegangen');
+  const { __test } = await import('../public/pages/dashboard.js');
+  global.window ??= { yuvomi: null };
+  const reihe = (size) => Number(/class="metric-tiles"[^>]*data-span-rows="(\d+)"/.exec(__test.renderMetricTiles({
+    budget: { entryCount: 3, balance: 120, income: 200 },
+    birthdays: [{ days_until: 3, name: 'Anna', kind: 'birthday' }],
+    pinnedNotes: [{ id: 1, pinned: 1 }], pinnedNotesCount: 1,
+  }, 'EUR', new Set(), new Set(), size))?.[1]);
+  // Zwei Kacheln: eine Reihe, schmal wie breit - genau eine Kachelhoehe (119px).
+  assert(reihe('2x1') === Math.ceil(119 / widgets.TILE_GEOMETRY.unit) && reihe('1x1') === reihe('2x1'),
+    `die Kennzahlreihe meldet die Hoehe einer Kachelreihe (${reihe('2x1')} / ${reihe('1x1')})`);
+
+  // Was auch auf der Stufe nicht passt, verkleinert fitMetricLeads - auch die Kachel.
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver');
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} };
+  try {
+    const { fitMetricLeads } = await import('../public/utils/metric-card.js');
+    const asked = [];
+    fitMetricLeads({ querySelectorAll: (selector) => { asked.push(selector); return []; } });
+    assert(asked.length === 1 && asked[0].split(',').map((x) => x.trim()).includes('.metric-card--tile > .metric-card__value'),
+      `fitMetricLeads misst die Werte der Kennzahlkachel (gefragt: ${asked.join(' | ') || 'nichts'})`);
+  } finally {
+    if (saved) Object.defineProperty(globalThis, 'ResizeObserver', saved);
+    else delete globalThis.ResizeObserver;
+  }
+  const source = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  assert(/applyRowFill\(grid, \{ editing: isCustomizing \}\);[^}]*?fitMetricLeads\(grid\);/.test(source),
+    'die Uebersicht ruft fitMetricLeads nach der Packung ihres Rasters (wireRowFill)');
 });
 
 // --------------------------------------------------------
@@ -4405,6 +5066,993 @@ test('Wand-Modus: render() reicht screensaver_enabled bis zum Knopf, der Klick r
     controller.abort();
     for (const handle of timeouts) clearTimeout(handle);
     for (const handle of intervals) clearInterval(handle);
+    for (const name of names) {
+      if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
+      else delete globalThis[name];
+    }
+  }
+});
+
+// --------------------------------------------------------
+// DW-P1-2: Eine Aktion im Blatt laesst die Uebersicht stehen
+// --------------------------------------------------------
+// Erledigen, Bearbeiten, Loeschen, Fasten aus einem Blatt ueber der Uebersicht
+// riefen `rerender` = das volle render(): Skelett ueber dem Inhalt, die Seite
+// schrumpfte auf Bildschirmhoehe, der Scroll fiel auf 0 (gemessen 400 -> 0,
+// 120-250 ms Skelett), und die erledigte Zeile war ohne Ausklappen weg.
+//
+// Hier laeuft die echte Seite gegen eine Attrappe des Containers. Geklickt
+// wird die Aufgabenzeile aus dem Markup, das render() geschrieben hat; das
+// Aufgabenmodul ist ein Stub, der das `onChanged` des Blatts in die Hand gibt.
+// Gezaehlt wird, was danach passiert: kein Schreiben in den Container (das
+// waere render()), kein Skelett, ein neuer Stand in der Flaeche, und die
+// gehende Zeile ist vorher per collapseRow geschlossen.
+register(`data:text/javascript,${encodeURIComponent(`
+  export async function resolve(spec, ctx, next) {
+    if (spec === '/pages/tasks.js') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const openTaskById = (id, opts) => globalThis.__openTaskById?.(id, opts); export const openNewTask = (opts) => globalThis.__openNewSheet?.("/tasks", opts);') };
+    if (spec === '/pages/calendar.js') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const openNewEvent = (opts) => globalThis.__openNewSheet?.("/calendar", opts); export const openEventById = (id, opts) => globalThis.__openEventById?.(id, opts);') };
+    if (spec === '/pages/notes.js') return { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent('export const openNewNote = (opts) => globalThis.__openNewSheet?.("/notes", opts);') };
+    return next(spec, ctx);
+  }`)}`);
+const beforeQuietRefresh = pendingTests.slice();
+test('DW-P1-2 + DW-P3-13: onChanged eines Blatts gleicht still ab - kein render(), kein Skelett, die gehende Zeile schliesst; der Wetter-Takt baut nur bei neuer Antwort', async () => {
+  await Promise.allSettled(beforeQuietRefresh);
+  const names = ['window', 'document', 'localStorage', 'location', 'history', 'MutationObserver', 'setTimeout', 'setInterval', 'CSS', 'ResizeObserver', '__apiStub', '__openTaskById', '__motionStub'];
+  const saved = Object.fromEntries(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const realSetTimeout = globalThis.setTimeout;
+  const realSetInterval = globalThis.setInterval;
+  const timeouts = [];
+  const intervals = [];
+  const ticks = [];
+  const log = [];
+
+  const makeNode = (attrs = new Map()) => {
+    const listeners = new Map();
+    return {
+      dataset: {},
+      style: {},
+      hidden: false,
+      classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+      listeners,
+      addEventListener(type, fn) { listeners.set(type, [...(listeners.get(type) ?? []), fn]); },
+      removeEventListener() {},
+      setAttribute(name, value) { attrs.set(name, String(value)); },
+      getAttribute: (name) => attrs.get(name) ?? null,
+      removeAttribute(name) { attrs.delete(name); },
+      hasAttribute: (name) => attrs.has(name),
+      toggleAttribute() {},
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      closest: () => null,
+      append() {},
+      appendChild() {},
+      prepend() {},
+      before() {},
+      remove() {},
+      contains: () => false,
+      focus() {},
+      getClientRects: () => [{}],
+      getBoundingClientRect: () => ({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }),
+    };
+  };
+
+  // Die Flaeche kennt genau das, was die Seite hineingeschrieben hat. Eine
+  // Aufgabenzeile gibt es fuer jedes `data-task-id` darin - als derselbe
+  // Knoten, bis die Flaeche neu geschrieben wird.
+  let shellHtml = '';
+  let rows = new Map();
+  const shell = makeNode();
+  const taskRows = () => [...shellHtml.matchAll(/class="list-row task-item" data-task-id="(\d+)"/g)].map(([, id]) => {
+    if (!rows.has(id)) {
+      const row = makeNode(new Map([['data-task-id', id]]));
+      row.dataset.taskId = id;
+      row.closest = (selector) => {
+        if (selector.includes('data-widget-id')) return { dataset: { widgetId: 'tasks' } };
+        if (selector === '#dashboard-shell') return shell;
+        return row;
+      };
+      rows.set(id, row);
+    }
+    return rows.get(id);
+  });
+  Object.assign(shell, {
+    replaceChildren() { shellHtml = ''; rows = new Map(); },
+    insertAdjacentHTML(_position, html) {
+      shellHtml += html;
+      log.push(['shell', /widget-skeleton/.test(html) ? 'skeleton' : 'content']);
+    },
+    querySelectorAll: (selector) => (/data-task-id/.test(selector) ? taskRows() : []),
+  });
+  const container = Object.assign(makeNode(), {
+    replaceChildren() { log.push(['container']); shellHtml = ''; rows = new Map(); },
+    insertAdjacentHTML(_position, html) { shellHtml += html; },
+    querySelector: (selector) => (selector === '#dashboard-shell' ? shell : null),
+    querySelectorAll: (selector) => (/task-item\[data-task-id\]/.test(selector) ? taskRows() : []),
+  });
+  // Ein traeges Dokument fuer den Blick voraus (rowsLeaving): es kennt eine
+  // Aufgabe, wenn das Markup ihre Zeile traegt.
+  const inertDoc = () => {
+    let html = '';
+    return {
+      body: { insertAdjacentHTML(_position, markup) { html += markup; } },
+      querySelector: (selector) => {
+        const id = /\[data-task-id="(\d+)"\]/.exec(selector)?.[1];
+        return id && html.includes(`data-task-id="${id}"`) ? {} : null;
+      },
+    };
+  };
+
+  let tasks = [5, 6];
+  let countdowns = [];
+  let weather = { provider: 'open-meteo', city: 'Dortmund', units: 'metric', current: { temp: 21, icon: 'sun', desc: 'wmo.0' }, forecast: [] };
+  const asked = [];
+  const globals = {
+    window: Object.assign(makeNode(), {
+      yuvomi: { showToast() {}, isModuleDisabled: () => false, replacePageFab() {} },
+      requestAnimationFrame: () => 0,
+      cancelAnimationFrame() {},
+      innerWidth: 1440,
+      innerHeight: 900,
+      matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+    }),
+    document: Object.assign(makeNode(), {
+      documentElement: makeNode(),
+      body: makeNode(),
+      hidden: false,
+      activeElement: null,
+      createElement: () => makeNode(),
+      getElementById: () => null,
+      implementation: { createHTMLDocument: () => inertDoc() },
+    }),
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    location: { pathname: '/', search: '', hash: '', href: 'http://overview.test/' },
+    history: { state: null, pushState() {}, replaceState() {}, back() {}, go() {} },
+    MutationObserver: class { observe() {} disconnect() {} },
+    ResizeObserver: class { observe() {} unobserve() {} disconnect() {} },
+    setTimeout: (...args) => { const handle = realSetTimeout(...args); timeouts.push(handle); return handle; },
+    setInterval: (...args) => { const handle = realSetInterval(...args); intervals.push(handle); ticks.push(args); return handle; },
+    CSS: { escape: (value) => String(value), supports: () => false },
+    __apiStub: {
+      get: async (path) => {
+        asked.push(path);
+        // Nur die Aufgabenkachel: sie traegt die Zeilen, um die es geht.
+        // Dazu der Countdown: seine Kachel steht nur, wenn es einen gibt
+        // (setCountdownAvailability) - der Abgleich muss das neu lesen.
+        if (path === '/preferences') return { data: { dashboard_widgets: [{ id: 'tasks', visible: true, order: 0, size: '1x2' }, { id: 'countdown', visible: true, order: 1, size: '1x1' }] } };
+        if (path.startsWith('/dashboard')) {
+          return { urgentTasks: tasks.map((id) => ({ id, title: `Aufgabe ${id}`, status: 'open', priority: 'high', due_date: null })), openTaskCount: tasks.length, upcomingEvents: [], users: [], countdowns };
+        }
+        if (path.startsWith('/weather')) return { data: weather };
+        return { data: null };
+      },
+    },
+    __openTaskById: async (id, opts) => { log.push(['open', String(id)]); opened = opts; },
+    __motionStub: (name, host) => { if (name === 'collapseRow') log.push(['collapseRow', host?.dataset?.taskId ?? null]); },
+  };
+  let opened = null;
+  for (const [name, value] of Object.entries(globals)) {
+    Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  }
+  const settle = async () => { for (let i = 0; i < 30; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
+  const controller = new AbortController();
+  try {
+    const { render } = await import('../public/pages/dashboard.js');
+    await render(container, { user: { id: 1, role: 'admin', display_name: 'Anna' }, signal: controller.signal });
+    await settle();
+    nodeAssert.match(shellHtml, /data-task-id="5"/, 'Reichweite: die Aufgabenkachel steht mit Aufgabe 5');
+    nodeAssert.doesNotMatch(shellHtml, /data-widget-id="countdown"/, 'Reichweite: ohne Countdown keine Countdown-Kachel');
+
+    const row = taskRows().find((el) => el.dataset.taskId === '5');
+    const clicks = row?.listeners.get('click') ?? [];
+    nodeAssert.equal(clicks.length, 1, 'die Zeile oeffnet ihr Blatt per Klick');
+    await clicks[0]();
+    await settle();
+    nodeAssert.equal(typeof opened?.onChanged, 'function', 'Reichweite: das Blatt bekommt ein onChanged');
+
+    // Aufgabe 5 ist im Blatt erledigt: der Server nennt sie nicht mehr. Und
+    // Aufgabe 6 hat im Blatt einen Countdown bekommen (Review zu #2314).
+    tasks = [6];
+    countdowns = [{ id: 6, source: 'task', title: 'Aufgabe 6', date: '2026-12-24', days_until: 59 }];
+    log.length = 0;
+    asked.length = 0;
+    await opened.onChanged();
+    await settle();
+
+    nodeAssert.ok(asked.some((path) => path.startsWith('/dashboard')), 'Reichweite: der Abgleich hat die Uebersicht neu gefragt');
+    nodeAssert.deepEqual(log.filter(([kind]) => kind === 'container'), [],
+      'kein Schreiben in den Container - das waere das volle render() mit Skelett');
+    nodeAssert.deepEqual(log.filter(([, what]) => what === 'skeleton'), [], 'kein Skelett nach einer Blatt-Aktion');
+    nodeAssert.doesNotMatch(shellHtml, /data-task-id="5"/, 'die Flaeche zeigt den neuen Stand: Aufgabe 5 ist weg');
+    nodeAssert.match(shellHtml, /data-task-id="6"/, 'und Aufgabe 6 steht noch');
+    const collapsed = log.findIndex(([kind, id]) => kind === 'collapseRow' && id === '5');
+    const redrawn = log.findIndex(([kind, what]) => kind === 'shell' && what === 'content');
+    nodeAssert.ok(collapsed >= 0, 'die gehende Zeile schliesst per collapseRow');
+    nodeAssert.ok(collapsed < redrawn, 'und zwar bevor die Flaeche ohne sie neu entsteht');
+    nodeAssert.ok(!log.some(([kind, id]) => kind === 'collapseRow' && id === '6'), 'die bleibende Zeile schliesst nicht');
+    nodeAssert.match(shellHtml, /data-widget-id="countdown"/,
+      'ein im Blatt angelegter Countdown bringt seine Kachel mit - die Verfuegbarkeit kommt aus dem neuen Stand');
+
+    // DW-P3-13: der 30-Minuten-Takt des Wetters. Dieselbe Antwort baut nichts
+    // neu; eine neue genau einmal (Reichweite: der Takt zeichnet ueberhaupt).
+    const weatherTick = ticks.find(([, ms]) => ms === 30 * 60 * 1000)?.[0];
+    nodeAssert.equal(typeof weatherTick, 'function', 'Reichweite: der Wetter-Takt ist eingerichtet');
+    log.length = 0;
+    await weatherTick();
+    await settle();
+    nodeAssert.deepEqual(log.filter(([kind]) => kind === 'shell' || kind === 'container'), [],
+      'gleiche Wetter-Antwort: kein Neuaufbau');
+    weather = { ...weather, current: { ...weather.current, temp: 12 } };
+    await weatherTick();
+    await settle();
+    nodeAssert.equal(log.filter(([kind, what]) => kind === 'shell' && what === 'content').length, 1,
+      'neue Wetter-Antwort: die Flaeche zeichnet sie');
+  } finally {
+    controller.abort();
+    for (const handle of timeouts) clearTimeout(handle);
+    for (const handle of intervals) clearInterval(handle);
+    for (const name of names) {
+      if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
+      else delete globalThis[name];
+    }
+  }
+});
+
+// --------------------------------------------------------
+// U2 (DW p5b): "+ Neu" legt an, ohne die Uebersicht zu verlassen
+// --------------------------------------------------------
+// Pille und Speed-Dial wechselten ins Modul und klickten dort dessen FAB: die
+// Uebersicht war weg, und nach dem Speichern stand man in der Liste. Jetzt
+// oeffnen Aufgabe, Termin und Notiz das Formular ihres Moduls ueber der
+// Uebersicht; nach dem Speichern gleicht sie still ab (kein render(), kein
+// Skelett), und die neue Zeile zieht in ihrer Kachel ein. Einkauf hat kein
+// Blatt (sein FAB oeffnet die Eingabezeile ueber der Liste) und bleibt der
+// Weg ins Modul. Gemessen an der echten Seite: Klicks auf die Menuepunkte der
+// Pille und die Ziele des Speed-Dials, die Module sind Stubs.
+const beforeNewSheet = pendingTests.slice();
+test('U2: "+ Neu" oeffnet das Anlegen-Blatt ueber der Uebersicht - kein navigate, danach stiller Abgleich mit der neuen Zeile', async () => {
+  await Promise.allSettled(beforeNewSheet);
+  const names = ['window', 'document', 'localStorage', 'location', 'history', 'MutationObserver', 'setTimeout', 'setInterval', 'CSS', 'ResizeObserver', '__apiStub', '__openNewSheet', '__expandIn'];
+  const saved = Object.fromEntries(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const realSetTimeout = globalThis.setTimeout;
+  const realSetInterval = globalThis.setInterval;
+  const timeouts = [];
+  const intervals = [];
+  const log = [];
+  const makeNode = (attrs = new Map()) => {
+    const listeners = new Map();
+    return {
+      dataset: {}, style: {}, hidden: false, listeners,
+      classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+      addEventListener(type, fn) { listeners.set(type, [...(listeners.get(type) ?? []), fn]); },
+      removeEventListener() {},
+      setAttribute(name, value) { attrs.set(name, String(value)); },
+      getAttribute: (name) => attrs.get(name) ?? null,
+      removeAttribute(name) { attrs.delete(name); },
+      hasAttribute: (name) => attrs.has(name),
+      toggleAttribute() {},
+      querySelector: () => null, querySelectorAll: () => [], closest: () => null,
+      append() {}, appendChild() {}, prepend() {}, before() {}, remove() {},
+      contains: () => false, focus() {},
+      getClientRects: () => [{}],
+      getBoundingClientRect: () => ({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }),
+    };
+  };
+  let shellHtml = '';
+  let rows = new Map();
+  const shell = makeNode();
+  const taskRows = () => [...shellHtml.matchAll(/class="list-row task-item" data-task-id="(\d+)"/g)].map(([, id]) => {
+    if (!rows.has(id)) {
+      const row = makeNode(new Map([['data-task-id', id]]));
+      row.dataset.taskId = id;
+      row.closest = (selector) => {
+        if (selector.includes('data-widget-id')) return { dataset: { widgetId: 'tasks' } };
+        if (selector === '#dashboard-shell') return shell;
+        return row;
+      };
+      rows.set(id, row);
+    }
+    return rows.get(id);
+  });
+  Object.assign(shell, {
+    replaceChildren() { shellHtml = ''; rows = new Map(); },
+    insertAdjacentHTML(_position, html) { shellHtml += html; log.push(['shell', /widget-skeleton/.test(html) ? 'skeleton' : 'content']); },
+    querySelectorAll: (selector) => (/data-task-id/.test(selector) ? taskRows() : []),
+  });
+  const container = Object.assign(makeNode(), {
+    replaceChildren() { log.push(['container']); shellHtml = ''; rows = new Map(); },
+    insertAdjacentHTML(_position, html) { shellHtml += html; },
+    querySelector: (selector) => (selector === '#dashboard-shell' ? shell : null),
+    querySelectorAll: (selector) => (/task-item\[data-task-id\]/.test(selector) ? taskRows() : []),
+  });
+  const inertDoc = () => {
+    let html = '';
+    return {
+      body: { insertAdjacentHTML(_position, markup) { html += markup; } },
+      querySelector: (selector) => {
+        const id = /\[data-task-id="(\d+)"\]/.exec(selector)?.[1];
+        return id && html.includes(`data-task-id="${id}"`) ? {} : null;
+      },
+    };
+  };
+  // Der Speed-Dial lebt in der Shell-Layer; findPageFab findet ihn per Id.
+  const routes = ['/tasks', '/calendar', '/shopping', '/notes'];
+  const dialItems = routes.map((route) => Object.assign(makeNode(), { dataset: { route } }));
+  const fabActions = Object.assign(makeNode(), { querySelectorAll: (sel) => (sel === '[data-route]' ? dialItems : []) });
+  const fabGroup = Object.assign(makeNode(), { querySelector: (sel) => (sel === '#fab-actions' ? fabActions : null) });
+  const fabMain = Object.assign(makeNode(), {
+    id: 'fab-main',
+    closest: (sel) => (sel === '.page-fab-group' ? fabGroup : null),
+    focus() { log.push(['focus', 'fab-main']); },
+  });
+  const pageFabs = new Map([['fab-main', fabMain]]);
+  for (const id of ['fab-new-task', 'fab-new-event', 'fab-new-item', 'fab-new-note']) {
+    pageFabs.set(id, Object.assign(makeNode(), { click() { log.push(['click', id]); } }));
+  }
+
+  let tasks = [5];
+  const visited = [];
+  const opened = [];
+  const user = { id: 1, role: 'admin', display_name: 'Anna' };
+  const globals = {
+    window: Object.assign(makeNode(), {
+      yuvomi: { showToast() {}, isModuleDisabled: () => false, replacePageFab() {}, navigate: async (route) => { visited.push(route); log.push(['navigate', route]); } },
+      requestAnimationFrame: () => 0, cancelAnimationFrame() {},
+      innerWidth: 390, innerHeight: 844,
+      matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+    }),
+    document: Object.assign(makeNode(), {
+      documentElement: makeNode(), body: makeNode(), hidden: false, activeElement: null,
+      createElement: () => makeNode(),
+      getElementById: (id) => pageFabs.get(id) ?? null,
+      implementation: { createHTMLDocument: () => inertDoc() },
+    }),
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    location: { pathname: '/', search: '', hash: '', href: 'http://overview.test/' },
+    history: { state: null, pushState() {}, replaceState() {}, back() {}, go() {} },
+    MutationObserver: class { observe() {} disconnect() {} },
+    ResizeObserver: class { observe() {} unobserve() {} disconnect() {} },
+    setTimeout: (...args) => { const handle = realSetTimeout(...args); timeouts.push(handle); return handle; },
+    setInterval: (...args) => { const handle = realSetInterval(...args); intervals.push(handle); return handle; },
+    CSS: { escape: (value) => String(value), supports: () => false },
+    __apiStub: {
+      get: async (path) => {
+        if (path === '/preferences') return { data: { dashboard_widgets: [{ id: 'tasks', visible: true, order: 0, size: '1x2' }] } };
+        if (path.startsWith('/dashboard')) {
+          return { urgentTasks: tasks.map((id) => ({ id, title: `Aufgabe ${id}`, status: 'open', priority: 'high', due_date: null })), openTaskCount: tasks.length, upcomingEvents: [], users: [], countdowns: [] };
+        }
+        return { data: null };
+      },
+    },
+    __openNewSheet: async (route, opts) => {
+      log.push(['sheet', route]);
+      opened.push({ route, opts });
+      if (route === '/notes' && globalThis.__sheetFails) throw new Error('offline');
+    },
+    __expandIn: (el) => { log.push(['expandIn', el?.dataset?.taskId ?? null]); },
+  };
+  for (const [name, value] of Object.entries(globals)) {
+    Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  }
+  const settle = async () => { for (let i = 0; i < 30; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
+  const controller = new AbortController();
+  try {
+    const { render, __test } = await import('../public/pages/dashboard.js');
+    // Ohne gemerkten Stand: der Test davor hinterlaesst einen frischen (R21,
+    // _overviewMemo), und mit ihm zeichnete der Aufbau zuerst dessen Zeilen und
+    // holte die eigenen erst in der stillen Nachfrage - auf einem langsamen
+    // Runner nach `settle()` (CI #2349, Node 22).
+    __test.setOverviewMemo(null);
+    await render(container, { user, signal: controller.signal });
+    await settle();
+    nodeAssert.match(shellHtml, /data-task-id="5"/, 'Reichweite: die Aufgabenkachel steht');
+
+    // 1. Pille: der Menuepunkt im Seiten-Container (nicht der Griff der Popover-Mechanik).
+    const pillClick = (container.listeners.get('click') ?? []).find((fn) => fn.name !== 'onItemClick');
+    nodeAssert.equal(typeof pillClick, 'function', 'Reichweite: die Pille ist verdrahtet');
+    for (const route of routes) {
+      const item = { dataset: { newRoute: route }, closest: () => null };
+      await pillClick({ target: { closest: (sel) => (sel === '[data-new-route]' ? item : null) } });
+    }
+    await settle();
+    nodeAssert.deepEqual(opened.map((o) => o.route), ['/tasks', '/calendar', '/notes'],
+      'Pille: Aufgabe, Termin und Notiz oeffnen ihr Blatt ueber der Uebersicht');
+    nodeAssert.deepEqual(visited, ['/shopping'], 'Pille: kein navigate beim Anlegen - nur Einkauf wechselt ins Modul');
+    nodeAssert.ok(log.some(([kind, id]) => kind === 'click' && id === 'fab-new-item'), 'Einkauf: dort oeffnet sein FAB die Eingabezeile');
+    for (const { route, opts } of opened) {
+      nodeAssert.equal(opts.user, user, `${route}: das Blatt kennt den angemeldeten Menschen`);
+      nodeAssert.equal(opts.signal?.aborted, false, `${route}: das Blatt bekommt das Signal der Seite (geliehenes Seitenblatt)`);
+      nodeAssert.equal(typeof opts.onChanged, 'function', `${route}: das Blatt bekommt ein onChanged`);
+    }
+    const firstSheet = log.findIndex(([kind]) => kind === 'sheet');
+    nodeAssert.ok(firstSheet > 0 && log[firstSheet - 1][0] === 'focus', 'der Fokus steht vor dem Oeffnen auf "+ Neu" - Abbrechen fuehrt dorthin zurueck');
+
+    // 2. Speed-Dial: dieselben Wege.
+    opened.length = 0;
+    visited.length = 0;
+    for (const el of dialItems) {
+      const go = el.listeners.get('click')?.[0];
+      nodeAssert.equal(typeof go, 'function', `Speed-Dial: ${el.dataset.route} ist verdrahtet`);
+      await go();
+    }
+    await settle();
+    nodeAssert.deepEqual(opened.map((o) => o.route), ['/tasks', '/calendar', '/notes'], 'Speed-Dial: dieselben drei Blaetter');
+    nodeAssert.deepEqual(visited, ['/shopping'], 'Speed-Dial: kein navigate beim Anlegen');
+
+    // 3. Ein Blatt, das nicht laedt, verschliesst das Anlegen nicht: der Weg ins Modul.
+    visited.length = 0;
+    globalThis.__sheetFails = true;
+    const origError = console.error;
+    console.error = () => {};
+    try {
+      await pillClick({ target: { closest: (sel) => (sel === '[data-new-route]' ? { dataset: { newRoute: '/notes' }, closest: () => null } : null) } });
+      await settle();
+    } finally {
+      console.error = origError;
+      delete globalThis.__sheetFails;
+    }
+    nodeAssert.deepEqual(visited, ['/notes'], 'scheitert das Blatt, fuehrt der Tipp ins Modul');
+    nodeAssert.ok(log.some(([kind, id]) => kind === 'click' && id === 'fab-new-note'), 'und oeffnet dort das Anlegen');
+
+    // 4. Gespeichert: der stille Abgleich, kein render(), kein Skelett, die neue Zeile zieht ein.
+    const { opts } = opened[0];
+    tasks = [5, 7];
+    log.length = 0;
+    await opts.onChanged();
+    await settle();
+    nodeAssert.deepEqual(log.filter(([kind]) => kind === 'container'), [], 'kein Schreiben in den Container - das waere das volle render() mit Skelett');
+    nodeAssert.deepEqual(log.filter(([, what]) => what === 'skeleton'), [], 'kein Skelett nach dem Anlegen');
+    nodeAssert.match(shellHtml, /data-task-id="7"/, 'die neue Aufgabe steht in ihrer Kachel');
+    nodeAssert.deepEqual(log.filter(([kind]) => kind === 'expandIn'), [['expandIn', '7']], 'nur die neue Zeile zieht ein, die bleibende nicht');
+    nodeAssert.deepEqual(log.filter(([kind]) => kind === 'navigate'), [], 'und niemand hat navigiert');
+  } finally {
+    controller.abort();
+    for (const handle of timeouts) clearTimeout(handle);
+    for (const handle of intervals) clearInterval(handle);
+    for (const name of names) {
+      if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
+      else delete globalThis[name];
+    }
+  }
+});
+
+const beforeArriving = pendingTests.slice();
+test('U2: rowsArriving - neu sind Kachelzeilen, die vorher fehlten; das Heute-Blatt passt sich nur ein, und mehr als drei sind ein neuer Stand', async () => {
+  await Promise.allSettled(beforeArriving);
+  const savedCss = Object.getOwnPropertyDescriptor(globalThis, 'CSS');
+  Object.defineProperty(globalThis, 'CSS', { value: { escape: (v) => String(v) }, configurable: true, writable: true });
+  try {
+    const { __test } = await import('../public/pages/dashboard.js');
+    const fakeShell = (spec) => {
+      const shell = {};
+      const rowsOf = spec.map(([id, inTile]) => {
+        const attrs = new Map([['data-task-id', String(id)]]);
+        const row = {
+          dataset: { taskId: String(id) }, hidden: false,
+          getAttribute: (n) => attrs.get(n) ?? null, hasAttribute: (n) => attrs.has(n),
+          getClientRects: () => [{}], contains: () => false,
+        };
+        row.closest = (sel) => {
+          if (sel.includes('data-widget-id')) return inTile ? { dataset: { widgetId: 'tasks' } } : null;
+          if (sel === '#dashboard-shell') return shell;
+          return row;
+        };
+        return row;
+      });
+      shell.querySelectorAll = () => rowsOf;
+      return shell;
+    };
+    const known = __test.shownRowKeys(fakeShell([[1, true], [2, true], [9, false]]));
+    nodeAssert.equal(known.size, 2, 'das Heute-Blatt zaehlt nicht mit');
+    const arriving = __test.rowsArriving(fakeShell([[1, true], [2, true], [3, true], [9, false], [10, false]]), known);
+    nodeAssert.deepEqual(arriving.map((r) => r.dataset.taskId), ['3'], 'neu ist die Kachelzeile 3 - die nachgerueckte Zeile 10 im Heute-Blatt nicht');
+    const many = __test.rowsArriving(fakeShell([[1, true], [3, true], [4, true], [5, true], [6, true]]), known);
+    nodeAssert.deepEqual(many, [], 'vier neue Zeilen sind ein neuer Stand, kein Ankommen');
+    nodeAssert.deepEqual(__test.rowsArriving(fakeShell([[3, true]]), new Set()), [], 'ohne Vorher kein Ankommen (erster Aufbau)');
+  } finally {
+    if (savedCss) Object.defineProperty(globalThis, 'CSS', savedCss);
+    else delete globalThis.CSS;
+  }
+});
+
+// --------------------------------------------------------
+// DW-P2-5: Das Skelett hat die Form der Seite
+// --------------------------------------------------------
+// Es zeichnete zwei Balken und gleich darunter das Raster - kein Gruss, kein
+// Heute-Blatt; am Telefon stand das Skelett-Raster bei y 80 und der Inhalt
+// bei y 720. Und seine Kacheln kamen aus der Anordnung, nicht aus dem, was das
+// Raster gezeichnet hat: eine Kachel ohne Inhalt oder mit abgeschaltetem
+// Modul stand im Skelett und verschob beim Laden alles dahinter.
+const beforeSkeletonForm = pendingTests.slice();
+test('DW-P2-5: das Skelett traegt Kopf und Heute-Blatt, seine Kacheln sind die gezeichneten', async () => {
+  await Promise.allSettled(beforeSkeletonForm);
+  const names = ['window', 'localStorage'];
+  const saved = Object.fromEntries(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const store = new Map();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, writable: true, value: {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => { store.set(k, String(v)); },
+    removeItem: (k) => { store.delete(k); },
+  } });
+  Object.defineProperty(globalThis, 'window', { configurable: true, writable: true, value: {
+    innerWidth: 390, innerHeight: 844,
+    yuvomi: { isModuleDisabled: (mod) => mod === 'notes' },
+  } });
+  try {
+    const { __test } = await import('../public/pages/dashboard.js');
+    const hint = await import('../public/utils/dashboard-layout-hint.js');
+    const user = { display_name: 'Linda Johnson' };
+
+    // 1. Die Form: Kopfband mit Datum, Gruss und Werkzeugen, darunter das
+    //    Blatt mit Kopf und Zeilen - in den Klassen des echten Kopfs.
+    const skeleton = __test.renderDashboardSkeleton(user);
+    for (const cls of ['dashboard-masthead dashboard-masthead--skeleton', 'dashboard-overview__header', 'dashboard-overview__date',
+      'dashboard-overview__title', 'dashboard-overview__tools', 'today-cockpit today-cockpit--skeleton', 'today-cockpit__header', 'today-cockpit-card--skeleton']) {
+      nodeAssert.ok(skeleton.includes(cls), `das Skelett traegt ${cls}`);
+    }
+    nodeAssert.match(skeleton, /dashboard-masthead--skeleton[^>]*aria-hidden="true"/, 'die Platzhalter sprechen nicht');
+    nodeAssert.ok(skeleton.indexOf('dashboard-masthead--skeleton') < skeleton.indexOf('class="dashboard__grid"'), 'Kopf vor dem Raster');
+
+    // 2. Die gemerkte Hoehe des Bands steht am Band; ohne Blatt kein Blatt.
+    hint.rememberHeadHint('390x844', 692.4, true);
+    nodeAssert.deepEqual(hint.headHint('390x844'), { px: 692, sheet: true });
+    nodeAssert.match(__test.renderDashboardSkeleton(user, { head: hint.headHint('390x844') }), /--skeleton-head-size: 692px/);
+    const slim = __test.renderDashboardSkeleton(user, { head: { px: 120, sheet: false } });
+    nodeAssert.ok(!slim.includes('today-cockpit'), 'ein Band ohne Blatt zeichnet keins');
+    nodeAssert.ok(slim.includes('dashboard-masthead--slim'));
+    store.set('yuvomi-dash-head-hint', JSON.stringify({ '390x844': { px: '"><b>', sheet: true } }));
+    nodeAssert.equal(hint.headHint('390x844'), null, 'nur eine Zahl wird zum Wert');
+    hint.forgetLayoutHint();
+    nodeAssert.equal(store.has('yuvomi-dash-head-hint'), false, 'beim Abmelden geht auch die Kopfhoehe');
+
+    // 3. Die Kacheln des Skeletts sind die, die das Raster gezeichnet hat -
+    //    gemerkt ueber denselben Aufruf wie im Aufbau (rememberGridHint).
+    const cfg = [
+      { id: 'family', visible: true, order: 0, size: '1x2' },
+      { id: 'notes', visible: true, order: 1, size: '2x1' },     // Modul aus
+      { id: 'countdown', visible: true, order: 2, size: '1x1' }, // ohne Countdowns nicht verfuegbar
+      { id: 'calendar', visible: true, order: 3, size: '1x2', options: { limit: 12 } },
+      { id: 'clock', visible: true, order: 4, size: '1x1' },
+      { id: 'tasks', visible: false, order: 5, size: '1x1' },
+    ];
+    const drawn = [];
+    const grid = __test.renderDashboardLayout(cfg, { users: [{ id: 1 }, { id: 2 }], upcomingEvents: [], urgentTasks: [] }, null, 'EUR', { drawn });
+    __test.rememberGridHint(drawn, cfg);
+    const wrappers = (html) => [...html.matchAll(/<div class="widget-wrapper (widget-size--[0-9x]+)[^"]*"[^>]*?(data-list-rows="\d+")?[\s>]/g)].map((m) => `${m[1]} ${m[2] ?? ''}`.trim());
+    const drawnTiles = wrappers(grid);
+    nodeAssert.ok(drawnTiles.length >= 2 && drawnTiles.length < 5, `Vorbedingung: das Raster laesst Kacheln aus (${drawnTiles.join(', ')})`);
+    nodeAssert.deepEqual(wrappers(__test.renderDashboardSkeleton(user)), drawnTiles, 'Skelett = gezeichnetes Raster');
+  } finally {
+    for (const name of names) {
+      if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
+      else delete globalThis[name];
+    }
+  }
+});
+
+// DW-P2-1 (PLAN p4): jede Anpassen-Geste baute die ganze Uebersicht neu -
+// gemessen bei 4x CPU 120-240 ms je Tipp. Jetzt patcht sie die betroffene
+// Kachel; der Neuaufbau gehoert dem Moduswechsel (Betreten, Speichern,
+// Abbrechen) und dem Laden.
+test('DW-P2-1: eine Anpassen-Geste ruft rebuildDashboard nicht, sie haengt Knoten um', async () => {
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  const bodyOf = (head) => {
+    const start = src.indexOf(head);
+    nodeAssert.ok(start > -1, `${head} nicht gefunden - die Signatur greift nicht mehr`);
+    const end = src.indexOf('\n  }\n', start);
+    return src.slice(start, end);
+  };
+  const wiring = bodyOf('  function wireDashboardEditMode() {');
+  const hint = bodyOf('  function applyGridHint(grid, plan) {');
+  const patch = bodyOf('  function patchCustomize(');
+  for (const [name, body] of [['wireDashboardEditMode', wiring], ['applyGridHint', hint]]) {
+    nodeAssert.doesNotMatch(body, /rebuildDashboard\(/, `${name}: eine Geste baut die Uebersicht neu`);
+  }
+  // Jede Geste geht ueber den Patch: Groesse, Optionen, Aus, Ein, Kopfband,
+  // Umordnen (placeWidget), Lueckenhinweis.
+  for (const gesture of ['const resize = ', 'const editOptions = ', 'const hide = ', 'const show = ', 'const glance = ', 'const placeWidget = ']) {
+    const at = wiring.indexOf(gesture);
+    nodeAssert.ok(at > -1, `Geste ${gesture} nicht gefunden`);
+    nodeAssert.match(wiring.slice(at, at + 1600), /patchCustomize\(/, `${gesture} patcht nicht`);
+  }
+  // Umordnen per Knopf, Pfeiltaste und Ziehen (DW-P2-3) ist EIN Weg: moveWidget
+  // und das Ablegen (dropWidget, der onEnd von makeSortable) legen ueber placeWidget.
+  for (const gesture of ['const moveWidget = ', 'const dropWidget = ']) {
+    const at = wiring.indexOf(gesture);
+    nodeAssert.ok(at > -1, `Geste ${gesture} nicht gefunden`);
+    nodeAssert.match(wiring.slice(at, wiring.indexOf('\n    };\n', at)), /placeWidget\(/, `${gesture} legt nicht ueber placeWidget`);
+  }
+  // U7: "Nach vorn"/"Nach hinten" aus dem Menue der Kachel nehmen denselben Weg
+  // (moveWidget -> placeWidget -> patchCustomize), nie einen eigenen Umbau.
+  {
+    const at = wiring.indexOf('const moveFromMenu = ');
+    nodeAssert.ok(at > -1, 'U7: der Weg aus dem Menue der Kachel fehlt');
+    const body = wiring.slice(at, wiring.indexOf('\n    };\n', at));
+    nodeAssert.match(body, /moveWidget\(item\.dataset\.widgetId, item\.dataset\.widgetMove\)/, 'U7: Nach vorn/hinten legt ueber moveWidget/placeWidget');
+    nodeAssert.doesNotMatch(body, /reorderWidgetConfig|rebuildDashboard|patchCustomize/, 'U7: kein zweiter Umordnen-Weg neben placeWidget');
+  }
+  nodeAssert.match(hint, /patchCustomize\(/, 'der Lueckenhinweis patcht nicht');
+  nodeAssert.doesNotMatch(patch, /rebuildDashboard\(|setHtml\(/, 'der Patch zeichnet die Flaeche doch neu');
+  const order = ['captureTileRects(shell)', 'arrangeChildren(grid, nodes)', 'measureTileFlip(shell, before)', 'planGridHint(grid)', 'startTileFlip(flip)']
+    .map((call) => patch.indexOf(call));
+  nodeAssert.ok(order.every((at, i) => at > -1 && (i === 0 || at > order[i - 1])),
+    `erst messen, dann umhaengen, dann alles lesen, dann gleiten (${order.join(', ')})`);
+
+  // Umhaengen statt neu bauen: nur, was nicht an seinem Platz steht, wandert -
+  // per moveBefore, wenn der Knoten schon im Dokument haengt.
+  const { __test } = await import('../public/pages/dashboard.js');
+  const calls = [];
+  const parent = { children: [] };
+  const node = (id, connected = true) => ({
+    id,
+    isConnected: connected,
+    remove() { parent.children.splice(parent.children.indexOf(this), 1); calls.push(`remove ${id}`); },
+  });
+  const put = (kind) => (n, ref) => {
+    const from = parent.children.indexOf(n);
+    if (from > -1) parent.children.splice(from, 1);
+    parent.children.splice(ref ? parent.children.indexOf(ref) : parent.children.length, 0, n);
+    n.isConnected = true;
+    calls.push(`${kind} ${n.id}`);
+  };
+  parent.moveBefore = put('move');
+  parent.insertBefore = put('insert');
+  const [a, b, c, gone] = ['a', 'b', 'c', 'gone'].map((id) => node(id));
+  parent.children.push(a, b, c, gone);
+  __test.arrangeChildren(parent, [b, a, c]);
+  nodeAssert.deepEqual(parent.children.map((n) => n.id), ['b', 'a', 'c']);
+  nodeAssert.deepEqual(calls, ['remove gone', 'move b'], 'ein Tausch ist EINE Bewegung, die gegangene Kachel geht');
+  calls.length = 0;
+  const fresh = node('fresh', false);
+  __test.arrangeChildren(parent, [b, fresh, a, c]);
+  nodeAssert.deepEqual(parent.children.map((n) => n.id), ['b', 'fresh', 'a', 'c']);
+  nodeAssert.deepEqual(calls, ['insert fresh'], 'ein neuer Knoten haengt nicht im Dokument: klassisch eingefuegt');
+  calls.length = 0;
+  delete parent.moveBefore;
+  __test.arrangeChildren(parent, [fresh, b, a, c]);
+  nodeAssert.deepEqual(calls, ['insert fresh'], 'ohne moveBefore (Safari) der klassische Weg');
+
+  // Was eine Kachel neu zeichnen laesst: Groesse oder Optionen, nicht die Reihenfolge.
+  nodeAssert.equal(__test.tileDrawKey({ id: 'x', size: '1x1', order: 3 }), __test.tileDrawKey({ id: 'x', size: '1x1', order: 0 }));
+  nodeAssert.notEqual(__test.tileDrawKey({ size: '1x1' }), __test.tileDrawKey({ size: '2x1' }));
+  nodeAssert.notEqual(__test.tileDrawKey({ size: '1x1' }), __test.tileDrawKey({ size: '1x1', options: { limit: 12 } }));
+});
+
+// --------------------------------------------------------
+// DW p7 (Nachtrag p5b): ein Termin, der ueber der Uebersicht bearbeitet wird,
+// leiht calendar.css fuer die Lebenszeit der Uebersicht. Dafuer muss ihr
+// Signal bis zum Blatt reichen - am echten Weg: die Zeile in wireLinks.
+// --------------------------------------------------------
+const beforeEventSignal = pendingTests.slice();
+test('DW p7: eine Terminzeile reicht das Signal der Uebersicht an openEventById (calendar.css fuer das Formular)', async () => {
+  await Promise.allSettled(beforeEventSignal);
+  const names = ['window', '__openEventById'];
+  const saved = Object.fromEntries(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const listeners = new Map();
+  const row = {
+    tagName: 'DIV', id: '', dataset: { route: '/calendar?open=7&date=2026-10-23' },
+    closest: () => null,
+    addEventListener(type, fn) { listeners.set(type, fn); },
+  };
+  const container = { querySelectorAll: (sel) => (sel === '[data-route]' ? [row] : []), querySelector: () => null, addEventListener() {} };
+  let got = null;
+  Object.defineProperty(globalThis, 'window', { value: { yuvomi: { navigate() {}, showToast() {} }, matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) }, configurable: true, writable: true });
+  Object.defineProperty(globalThis, '__openEventById', { value: async (id, opts) => { got = { id, opts }; }, configurable: true, writable: true });
+  try {
+    const { __test } = await import('../public/pages/dashboard.js');
+    const page = new AbortController();
+    __test.wireLinks(container, () => {}, { user: { id: 1 }, signal: page.signal });
+    nodeAssert.equal(typeof listeners.get('click'), 'function', 'Reichweite: die Terminzeile ist verdrahtet');
+    await listeners.get('click')();
+    nodeAssert.equal(got?.id, '7', 'der Termin oeffnet ueber der Uebersicht');
+    nodeAssert.equal(got?.opts?.signal, page.signal, 'mit dem Signal der Uebersicht - daran haengt das geliehene calendar.css');
+  } finally {
+    for (const name of names) {
+      if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
+      else delete globalThis[name];
+    }
+  }
+  // Und render() reicht es an beiden Aufrufen herein (Flaeche und Heute-Blatt).
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  const calls = [...src.matchAll(/wireLinks\((?:sheet|container), refreshAfterSheet, \{[^}]*\}\)/g)].map((m) => m[0]);
+  nodeAssert.equal(calls.length, 2, `Reichweite: zwei Aufrufe in render() (${calls.length})`);
+  for (const call of calls) nodeAssert.match(call, /\bsignal\b/, `${call}: ohne Signal leiht das Blatt kein calendar.css`);
+});
+
+/* U14: eine gestreckte Kachel zeigt weitere geladene Zeilen - dafuer liefert
+ * der Server den Vorrat ueber die hohe Fassung hinaus, wo das billig ist:
+ * Geburtstage acht (die Liste ist sortiert im Speicher), die groessten
+ * Ausgabenkategorien fuenf (dieselbe Gruppierung). */
+// Erst nach allen anderen: die Tests teilen eine Datenbank und laufen
+// nebeneinander, zehn Geburtstage mehr verschoeben deren Zaehlungen.
+const othersFirst = pendingTests.slice();
+test('U14: der Server liefert Geburtstage und Ausgabenkategorien ueber die hohe Kachel hinaus', async () => {
+  await Promise.allSettled(othersFirst);
+  const { get } = await import('../server/db.js');
+  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const routeDb = get();
+  const cleanup = () => {
+    routeDb.prepare("DELETE FROM reminders WHERE created_by IN (SELECT id FROM users WHERE username LIKE 'dashboard-u14-%')").run();
+    routeDb.prepare("DELETE FROM calendar_events WHERE created_by IN (SELECT id FROM users WHERE username LIKE 'dashboard-u14-%')").run();
+    routeDb.prepare("DELETE FROM birthdays WHERE created_by IN (SELECT id FROM users WHERE username LIKE 'dashboard-u14-%')").run();
+    routeDb.prepare("DELETE FROM budget_entries WHERE created_by IN (SELECT id FROM users WHERE username LIKE 'dashboard-u14-%')").run();
+    routeDb.prepare("DELETE FROM users WHERE username LIKE 'dashboard-u14-%'").run();
+  };
+  cleanup();
+  const owner = routeDb.prepare(`
+    INSERT INTO users (username, display_name, password_hash, avatar_color, role)
+    VALUES ('dashboard-u14-owner', 'Owner', 'x', '#007AFF', 'admin')
+  `).run().lastInsertRowid;
+  for (let i = 0; i < 10; i += 1) {
+    routeDb.prepare('INSERT INTO birthdays (name, birth_date, created_by) VALUES (?, ?, ?)')
+      .run(`U14 Anlass ${i}`, `2000-${String(1 + (i % 12)).padStart(2, '0')}-1${i % 9}`, owner);
+  }
+  const month = today.slice(0, 7);
+  ['housing', 'food', 'transport', 'health', 'leisure', 'education'].forEach((category, i) => {
+    routeDb.prepare(`INSERT INTO budget_entries (title, amount, category, subcategory, date, created_by)
+      VALUES (?, ?, ?, '', ?, ?)`).run(`U14 ${category}`, -(600 - i * 50), category, `${month}-0${1 + i}`, owner);
+  });
+  const app = express();
+  app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
+  app.use('/', dashboardRouter);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  try {
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    nodeAssert.equal(body.birthdays.length, 8, 'acht Geburtstage: fuenf fuer die hohe Kachel, drei fuer den gestreckten Platz');
+    nodeAssert.ok(body.birthdayTotal >= 10, 'die Gesamtzahl bleibt die ganze');
+    nodeAssert.equal(body.budget.topExpenses.length, 5, 'fuenf Kategorien: drei fuer die hohe Kachel, zwei fuer den gestreckten Platz');
+  } finally {
+    server.close();
+    cleanup();
+  }
+});
+
+// --------------------------------------------------------
+// U15 (Review p11, Ulas 2026-10-27): DIE KENNZAHLREIHE HAT EINE REGEL FUER
+// SPALTEN UND HOEHE. Das Modell rechnete vier Kacheln je Reihe breit und zwei
+// schmal, das Stylesheet legte Spalten nach Breite an (auto-fit, 160px): eine
+// 684px breite Reihe (1320px-Fenster, drei Rasterspalten) stand in drei
+// Spalten und zwei Kachelreihen, 308 statt 120px. Und bei vier Kacheln brachen
+// Modulname und Notiz um (150 statt 119px) - im Anpassen-Modus abgeschnitten.
+// Jetzt sagt die Reihe dem Stylesheet ihre Spaltenzahl (`--metric-cols`, aus
+// derselben Funktion wie die Hoehe), und Name und Notiz stehen ab 768px in
+// einer Zeile (wie U13 fuer Kachelzeilen).
+// --------------------------------------------------------
+test('U15: Kennzahlreihe - Spalten und Hoehe aus einer Regel, Name und Notiz ab 768px einzeilig', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  global.window ??= { yuvomi: null };
+  const data = {
+    birthdays: [{ days_until: 3, name: 'Anna', kind: 'birthday' }],
+    pinnedNotes: [{ id: 1, pinned: 1 }], pinnedNotesCount: 1,
+    health: { hasMeds: true, dosesTotal: 3, dosesTaken: 1, nextDose: null },
+    rewards: { view: 'approver', pending: 2, standings: [] },
+  };
+  const variants = [
+    ['birthdays', 'pinnedNotes', 'pinnedNotesCount'],
+    ['birthdays', 'pinnedNotes', 'pinnedNotesCount', 'health'],
+    ['birthdays', 'pinnedNotes', 'pinnedNotesCount', 'health', 'rewards'],
+  ];
+  const card = Math.ceil(119 / widgets.TILE_GEOMETRY.unit);
+  for (const keys of variants) {
+    const subset = Object.fromEntries(keys.map((key) => [key, data[key]]));
+    const keep = keys.filter((key) => key !== 'pinnedNotesCount');
+    for (const size of ['1x1', '1x2', '2x1', '2x2']) {
+      const html = __test.renderMetricTiles(subset, 'EUR', new Set(), new Set(), size);
+      const n = (html.match(/class="metric-card metric-card--tile/g) ?? []).length;
+      nodeAssert.equal(n, keep.length, `Reichweite: ${keep.length} Kacheln (${size})`);
+      const cols = Number(/class="metric-tiles"[^>]*style="--metric-cols: (\d+)"/.exec(html)?.[1]);
+      const expected = Math.min(n, Number(size[0]) >= 2 ? 4 : 2);
+      nodeAssert.equal(cols, expected, `${size}, ${n} Kacheln: das Stylesheet bekommt die Spaltenzahl des Modells`);
+      const rows = Math.ceil(n / cols);
+      const span = Number(/class="metric-tiles"[^>]*data-span-rows="(\d+)"/.exec(html)?.[1]);
+      nodeAssert.equal(span, Math.ceil((rows * 119 + (rows - 1) * 20) / widgets.TILE_GEOMETRY.unit),
+        `${size}, ${n} Kacheln: die Hoehe sind genau ${rows} Kachelreihen`);
+      if (rows === 1) nodeAssert.equal(span, card);
+    }
+  }
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const wide = [...eachRule(css)].filter((rule) => rule.at.some((a) => /min-width:\s*768px/.test(a)));
+  const columns = wide.find((rule) => rule.selector.trim() === '.metric-tiles');
+  nodeAssert.match(columns?.body ?? '', /grid-template-columns:\s*repeat\(var\(--metric-cols\),\s*minmax\(0,\s*1fr\)\)/,
+    'ab 768px stehen so viele Spalten, wie das Modell rechnet - nicht so viele, wie die Breite hergibt');
+  for (const part of ['.metric-card__label', '.metric-card__note']) {
+    const rule = wide.find((r) => r.selector.split(',').map((s) => s.trim()).includes(`.metric-tiles ${part}`));
+    nodeAssert.ok(rule && /white-space:\s*nowrap/.test(rule.body) && /text-overflow:\s*ellipsis/.test(rule.body) && /overflow:\s*hidden/.test(rule.body),
+      `${part}: ab 768px einzeilig mit Ellipse`);
+  }
+  // Unter 768px rechnet niemand Spuren: dort bleibt auto-fit, und Texte brechen.
+  const base = [...eachRule(css)].find((rule) => !rule.at.length && rule.selector.trim() === '.metric-tiles');
+  nodeAssert.match(base.body, /repeat\(auto-fit,\s*minmax\(160px,\s*1fr\)\)/, 'mobil bleibt die Spaltenzahl der Breite');
+  // Die Zahl passt weiter per fitMetricLeads - auch wenn sie nur ins Polster
+  // der Kachel laeuft (gemessen "-196,14 €" 10px vor der Kante in 158px): die
+  // Karte selbst laeuft dann nicht ueber, die Box der Zahl schon.
+  const { fitMetricLeads } = await import('../public/utils/metric-card.js');
+  const savedObserver = Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver');
+  let callback = null;
+  globalThis.ResizeObserver = class { constructor(cb) { callback = cb; } observe() {} unobserve() {} };
+  try {
+    const value = {
+      attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; },
+      closest: () => box, clientWidth: 124,
+      get scrollWidth() { return [130, 118, 110][Number(this.attrs['data-fit'] ?? 0)]; },
+    };
+    const box = { isConnected: true, clientWidth: 156, scrollWidth: 156, querySelector: () => value };
+    fitMetricLeads({ querySelectorAll: () => [value] });
+    callback([{ target: box }]);
+    nodeAssert.equal(value.attrs['data-fit'], '1', 'eine Zahl, die ins Polster laeuft, tritt eine Stufe zurueck');
+  } finally {
+    if (savedObserver) Object.defineProperty(globalThis, 'ResizeObserver', savedObserver); else delete globalThis.ResizeObserver;
+  }
+});
+
+// --------------------------------------------------------
+// Review p11 (B4): EINE ERWEITERUNGS-KACHEL WIRD NACH EINER GESTE NEU
+// EINGEHAENGT. Ihr Koerper ist in jeder Groesse derselbe Platzhalter; der
+// Markup-Vergleich in patchCustomize sah nie eine Aenderung, und die Kachel
+// zeigte im Browser nach 1x1 -> 2x1 weiter "size=1x1" (zwei statt drei
+// renderWidget-Aufrufe). Eine Kernkachel mit gleichem Markup bleibt stehen.
+// --------------------------------------------------------
+test('Review p11 (B4): eine Erweiterungs-Kachel wird nach Groesse oder Option neu eingehaengt, auch bei gleichem Platzhalter', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const placeholder = '<div class="widget extension-widget-mount" data-extension-widget-mount="1"></div>';
+  nodeAssert.equal(__test.tileBodyChanged({ id: 'demo:hello', size: '2x1' }, placeholder, placeholder), true,
+    'Erweiterung: gleicher Platzhalter, trotzdem neu - erst mountExtensionWidgets kennt Groesse und Optionen');
+  nodeAssert.equal(__test.tileBodyChanged({ id: 'clock', size: '2x1' }, '<div>a</div>', '<div>a</div>'), false,
+    'Kernkachel mit gleichem Markup: nichts neu zu zeichnen');
+  nodeAssert.equal(__test.tileBodyChanged({ id: 'clock', size: '2x1' }, '<div>b</div>', '<div>a</div>'), true);
+  // Der echte Aufrufer: patchCustomize entscheidet damit, ob die Kachel neu
+  // gezeichnet und ueber wireFreshTiles (mountExtensionWidgets) verdrahtet wird.
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  const patch = src.slice(src.indexOf('  function patchCustomize('), src.indexOf('  function wireFreshTiles('));
+  nodeAssert.match(patch, /if \(tileBodyChanged\(w, body, drawnBodies\.get\(w\.id\)\)\) \{[\s\S]{0,400}fresh\.push\(old\);/,
+    'patchCustomize zeichnet neu und gibt die Kachel an wireFreshTiles');
+  nodeAssert.match(patch, /wireFreshTiles\(shell, fresh\.filter/);
+  const wire = src.slice(src.indexOf('  function wireFreshTiles('), src.indexOf('\n  }\n', src.indexOf('  function wireFreshTiles(')));
+  nodeAssert.match(wire, /isExtensionWidget\(el\.dataset\.widgetId\)\) void mountExtensionWidgets\(el, widgetConfig, user\)/);
+});
+
+// --------------------------------------------------------
+// Review p11 (B5): IM ANPASSEN-MODUS STARTET DIE FASTEN-KACHEL NICHTS. Der
+// Knopf schrieb weiter, der stille Abgleich schweigt dort: im Browser fastete
+// der Server, die Kachel bot weiter "Fasten starten" an, auch nach
+// "Abbrechen". Wie jeder Kachelinhalt im Anpassen-Modus (wireLinks) steht er
+// dort still - gesperrt, ohne Handler; ausserhalb bleibt er verdrahtet.
+// --------------------------------------------------------
+test('Review p11 (B5): der Fasten-Knopf ist im Anpassen-Modus gesperrt und schreibt nichts', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const make = () => {
+    const listeners = [];
+    const button = { disabled: false, addEventListener: (type, fn) => listeners.push([type, fn]) };
+    const root = {
+      isConnected: false,
+      querySelector: (sel) => (sel === '[data-fasting-widget-action]' ? button : null),
+      querySelectorAll: () => [],
+    };
+    return { button, listeners, container: { querySelector: (sel) => (sel === '.fasting-widget' ? root : null) } };
+  };
+  // Ohne `refresh`: die Uhr haengt sich dann nicht an das Dokument (Attrappe).
+  const signal = new AbortController().signal;
+  const editing = make();
+  const disposeEditing = __test.wireFastingWidget(editing.container, null, { active: null }, signal, { editing: true });
+  nodeAssert.equal(editing.button.disabled, true, 'Anpassen: der Knopf ist gesperrt');
+  nodeAssert.equal(editing.listeners.length, 0, 'Anpassen: kein Handler, der schreiben koennte');
+  const normal = make();
+  const disposeNormal = __test.wireFastingWidget(normal.container, null, { active: null }, signal);
+  nodeAssert.equal(normal.button.disabled, false);
+  nodeAssert.deepEqual(normal.listeners.map(([type]) => type), ['click'], 'ausserhalb startet der Knopf');
+  disposeEditing?.();
+  disposeNormal?.();
+  // Beide Aufrufer reichen den Modus durch: der Aufbau und die Geste im Anpassen-Modus.
+  const src = withoutBlockComments(readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8'));
+  const calls = src.match(/wireFastingWidget\(container, refreshAfterSheet, data\.fasting, signal(?:, \{ editing: isCustomizing \})?\)/g) ?? [];
+  nodeAssert.equal(calls.length, 2, 'Reichweite: zwei Aufrufer');
+  nodeAssert.ok(calls.every((call) => call.includes('editing: isCustomizing')), `jeder Aufrufer nennt den Modus: ${calls.join(' | ')}`);
+});
+
+// --------------------------------------------------------
+// Review p11 (B6): DAS DREHEN SIEHT DEN BUEHNENWECHSEL AUCH OHNE HEUTE-BLATT.
+// createPhoneProgramFit las die gezeichnete Buehne nur am Blatt; ist es
+// abgewaehlt, blieben die am Telefon gezeichneten Kacheln nach 390 -> 800px
+// ohne Spannen (gemessen Notizen 1x2 546 statt 612px, Listen kurz).
+// --------------------------------------------------------
+test('Review p11 (B6): das Raster nennt seine Buehne, und ein Wechsel baut neu - auch ohne Heute-Blatt', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const run = (tileStage) => {
+    const listeners = {};
+    const frames = [];
+    const grid = { dataset: { tileStage } };
+    const win = {
+      addEventListener: (type, fn) => { listeners[type] = fn; },
+      requestAnimationFrame: (fn) => { frames.push(fn); return frames.length; },
+      cancelAnimationFrame: () => {},
+      document: { querySelector: (sel) => (sel === '#dashboard-widget-grid' ? grid : null) },
+    };
+    const calls = [];
+    __test.createPhoneProgramFit(win, new AbortController().signal, (crossed) => calls.push(crossed));
+    listeners.resize();
+    frames[0]();
+    return calls;
+  };
+  // Ohne matchMedia ist hier die breite Buehne (onPhoneStage).
+  nodeAssert.deepEqual(run('phone'), [true], 'am Telefon gezeichnet, jetzt breit: neu bauen');
+  nodeAssert.deepEqual(run('wide'), [false], 'dieselbe Buehne: nur nachmessen');
+  // Das Raster traegt die Buehne, fuer die es gezeichnet ist.
+  const html = __test.renderDashboardLayout([{ id: 'clock', visible: true, order: 0, size: '1x1' }], {}, null, 'EUR');
+  nodeAssert.match(html, /id="dashboard-widget-grid"[^>]*data-tile-stage="wide"/);
+});
+
+// --------------------------------------------------------
+// Review p11: KATEGORIEN TRAGEN HOEHE NUR, WO SIE STEHEN. dashboard.css blendet
+// `.note-item__categories` in jeder einspaltigen und jeder einzeiligen Groesse
+// aus; die Hoehenrechnung der Notizkachel zaehlte sie trotzdem mit - fuenf
+// Notizen in 1x2 sprangen von 145 auf 177 Spuren, nur weil sie Kategorien
+// trugen (~128px leer unter der letzten Karte).
+// --------------------------------------------------------
+test('Review p11: die Notizkachel rechnet Kategorien nur in den Groessen ein, in denen dashboard.css sie zeigt', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const hidden = new Set();
+  for (const rule of eachRule(css)) {
+    if (rule.at.length || !/display:\s*none/.test(rule.body)) continue;
+    for (const selector of rule.selector.split(',')) {
+      const size = /^\.widget-size--(\d+x\d+) \.note-item__categories$/.exec(selector.trim())?.[1];
+      if (size) hidden.add(size);
+    }
+  }
+  nodeAssert.ok(hidden.has('1x2') && hidden.has('2x1') && !hidden.has('2x2'), `Reichweite: die Regel steht (${[...hidden]})`);
+  const notes = (categories) => Array.from({ length: 5 }, (_, i) => ({
+    id: i + 1, title: `N${i}`, content: 'x', categories: categories ? [{ id: 1, name: 'Haus', scope: 'family' }] : [],
+  }));
+  for (let cols = 1; cols <= 4; cols += 1) {
+    for (let rows = 1; rows <= 4; rows += 1) {
+      const size = `${cols}x${rows}`;
+      const plain = __test.tileSpanOf(__test.renderPinnedNotes(notes(false), size, 5));
+      const tagged = __test.tileSpanOf(__test.renderPinnedNotes(notes(true), size, 5));
+      if (hidden.has(size)) {
+        // `sizes` nennt auch die anderen Groessen (2x2 zeigt Kategorien) - verglichen
+        // wird die Spanne dieser Groesse und ihre Fuellstufen.
+        nodeAssert.deepEqual([tagged.rows, tagged.steps], [plain.rows, plain.steps], `${size}: Kategorien stehen nicht, also keine Hoehe dafuer`);
+      } else {
+        nodeAssert.ok(tagged.rows > plain.rows, `${size}: Kategorien stehen und brauchen ihre Zeile (${tagged.rows} / ${plain.rows})`);
+      }
+    }
+  }
+});
+
+// --------------------------------------------------------
+// Review p11: SCHEITERT EIN ANLEGEN-BLATT, NACHDEM DIE UEBERSICHT GEGANGEN IST,
+// bleibt man, wo man jetzt steht. Der Ausweichweg ins Modul (openNewTarget)
+// riss einen sonst von der neuen Seite weg. Dass das Blatt selbst nicht mehr
+// aufgeht, haelt test:dashboard-a11y "DW p11".
+// --------------------------------------------------------
+const beforeNewSheetAbort = pendingTests.slice();
+test('Review p11: ein Anlegen-Blatt, das erst nach dem Verlassen der Uebersicht scheitert, wechselt nicht ins Modul', async () => {
+  await Promise.allSettled(beforeNewSheetAbort);
+  const names = ['window', 'document', '__openNewSheet'];
+  const saved = Object.fromEntries(names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
+  const visited = [];
+  const set = (name, value) => Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  set('window', { ...(globalThis.window ?? {}), yuvomi: { navigate: async (route) => { visited.push(route); } } });
+  set('document', { getElementById: () => null });
+  let page = null;
+  set('__openNewSheet', async () => {
+    page?.abort();
+    throw new Error('offline');
+  });
+  const origError = console.error;
+  console.error = () => {};
+  try {
+    const { __test: dash } = await import('../public/pages/dashboard.js');
+    // Gegenprobe: steht die Uebersicht noch, nimmt das Anlegen den Weg ins Modul.
+    page = null;
+    await dash.openNewTarget('/notes', { signal: new AbortController().signal });
+    nodeAssert.deepEqual(visited, ['/notes'], 'das Blatt laedt nicht - der Weg ins Modul');
+    visited.length = 0;
+    page = new AbortController();
+    await dash.openNewTarget('/notes', { signal: page.signal });
+    nodeAssert.deepEqual(visited, [], 'die Uebersicht ist schon gegangen - kein Sprung ins Modul');
+  } finally {
+    console.error = origError;
     for (const name of names) {
       if (saved[name]) Object.defineProperty(globalThis, name, saved[name]);
       else delete globalThis[name];

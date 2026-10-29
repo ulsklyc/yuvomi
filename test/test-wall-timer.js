@@ -294,6 +294,17 @@ test('die Startknoepfe ruhen sichtbar - ein unsichtbarer Knopf ist eine Falle', 
   assert.ok(opacity == null || Number(opacity) > 0, `opacity: ${opacity} waere dieselbe Falle`);
 });
 
+// R24, Critique G1-Wand-P3-1: „3 Min" ... „30 Min" standen als 15px-Text ohne
+// Rand im Fuss - aus zwei Metern kaum zu lesen und kaum als Ziel zu erkennen.
+test('R24: die Startknoepfe ruhen als Kapsel in Body-Groesse', () => {
+  const { value: border } = restingValue('.wall__timer-preset', 'border');
+  assert.match(border ?? '', /var\(--color-border\)/, `die Kapsel hat ihre Haarlinie schon im Ruhezustand: ${border}`);
+  const { value: size } = restingValue('.wall__timer-preset', 'font-size');
+  assert.equal(size, 'var(--type-body)', 'Body 17, nicht Sekundaertext 15');
+  const { value: height } = restingValue('.wall__timer-preset', 'min-height');
+  assert.equal(height, 'var(--target-lg)');
+});
+
 // Eine Wand aus dem, was wireWallTimer anfasst - kein DOM-Nachbau, sondern die
 // Methoden, die das Modul aufruft. EventTarget ist echt (Node), damit die
 // Reihenfolge pointerdown -> click so laeuft wie im Browser.

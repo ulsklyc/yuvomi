@@ -12,9 +12,10 @@ import { MAX_INTERVAL_COUNT } from '/utils/budget-recurrence.js';
 import { SAVINGS_CHART_CATEGORY, budgetChartCategory } from '/utils/budget-chart-category.js';
 import { openModal as openSharedModal, closeModal, captureModalContext, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
-import { openDetailView } from '/components/detail-view.js';
+import { openDetailView, closeDetailView, withPrimaryEdit } from '/components/detail-view.js';
 import { stagger, vibrate, scheduleUndoableDelete, growBars, isImeComposing } from '/utils/ux.js';
 import { wireTablist } from '/utils/tablist.js';
+import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import { t, formatDayMonth, formatMonthYear, getLocale, getNumberFormat } from '/i18n.js';
 import { dateText, dateRangeText } from '/utils/date-format.js';
@@ -33,10 +34,10 @@ import { renderPlans, openAddPlan } from '/pages/budget-plans.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays,
          monthPeriodKeys, defaultDateInPeriod,
         todayKey} from '/utils/date.js';
-import { formatMoney, formatSignedAmount, sharePercent, roundToCurrency, currencySymbol, parseAmountInput } from '/utils/money.js';
-import { amountInputAttrs, setAmountCurrency, amountFieldError } from '/utils/amount-field.js';
+import { formatMoney, formatSignedAmount, sharePercent, roundToCurrency, currencySymbol, parseAmountInput, setFallbackCurrency } from '/utils/money.js';
+import { amountInputAttrs, setAmountCurrency, amountFieldError, amountFieldHtml, setAmountUnit } from '/utils/amount-field.js';
 import { budgetCategoryLabel } from '/utils/category-labels.js';
-import { trendMarkup, leadCardClass, leadStep, fitMetricLeads } from '/utils/metric-card.js';
+import { trendMarkup, leadCardClass, fitMetricLeads } from '/utils/metric-card.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { LOAN_SORTS, DEFAULT_LOAN_SORT, normalizeLoanSort, sortLoans, groupLoans } from '/utils/loan-order.js';
 import { LEDGER_SORTS, DEFAULT_LEDGER_SORT, normalizeLedgerSort, sortLedger } from '/utils/ledger-order.js';
@@ -243,6 +244,21 @@ function accountName(id) {
   return state.accounts.find((a) => a.id === id)?.name || '';
 }
 
+// Die Waehrung eines Kontos (#2302): jeder Betrag auf ihm steht in ihr - Saldo,
+// Startsaldo, Buchungen. Ohne Konto oder ohne eigene gilt die Budget-Waehrung.
+function accountCurrency(id) {
+  if (id == null) return state.currency;
+  return (state.accounts ?? []).find((a) => a.id === id)?.currency || state.currency;
+}
+
+// DIE WAEHRUNG DER UEBERSICHT (#2302). Auf ein Konto gefiltert stehen Karten,
+// Diagramm und Summen in dessen Waehrung - es sind seine Buchungen, und sie
+// stehen dort so wie auf dem Kontoauszug. Ungefiltert bleibt die
+// Budget-Waehrung; alle Karten wechseln zusammen, nie eine allein.
+function viewCurrency() {
+  return state.accountFilterId != null ? accountCurrency(state.accountFilterId) : state.currency;
+}
+
 // --------------------------------------------------------
 // State
 // --------------------------------------------------------
@@ -258,7 +274,11 @@ let state = {
   loans:       { loans: [], summary: { active_count: 0, remaining_amount: 0, remaining_installments: 0 } },
   accounts:    [],
   netWorth:    0,
+  // Naeherung und Teilsummen des Nettovermoegens bei Konten in mehreren
+  // Waehrungen (#2302, netWorthSummary in server/routes/budget/helpers.js).
+  netWorthInfo: { approx: false, ratesAt: null, byCurrency: [] },
   accountFilterId: null,      // aktiver Konto-Filter für die Transaktionsliste (Drilldown)
+  accountFilterFrom: null,    // 'accounts': der Auszug kam aus dem Leseblatt eines Kontos (S10-F3)
   accountsShowArchived: false,
   categoryFilter: null,       // active category filter
   subcategoryFilter: null,    // { category, key } or null
@@ -277,7 +297,6 @@ let state = {
   categoriesExpanded: false,  // Kategorie-Diagramm einspaltig ganz aufgeklappt (sonst Top 3)
   plannedExpandedMonth: null, // Monat, in dem "Geplant" ganz aufgeklappt ist (sonst die naechsten 3); gilt nur fuer DIESEN Monat
   balanceExpanded: false,     // mobil: Bilanz-Karten unter der Kopfzeile aufgeklappt (balanceGlanceHtml)
-  loansExpanded: false,       // mobil: Darlehens-Karten unter der Glance-Zeile aufgeklappt (metricGlanceHtml)
   loanPaymentsExpanded: false, // Raten: alle statt der letzten sechs (renderLoanTransactions)
   meta:        { expenseCategories: [], incomeCategories: [], subcategories: {} },
   metaError:   null,
@@ -359,10 +378,6 @@ const TAB_CAPS = {
   // widersprechen. Der Slot haelt seine Hoehe (budget.css, .budget-nav__month).
   'split-expenses': { month: false, add: 'splitExpenses.addExpense', label: 'newLabel.splitExpenses' },
 };
-
-// Sentinel für „keine eigene Farbe" im Kontofarb-Wähler: der echte Wert ist der
-// leere String, den eine Auswahl-Leiste nicht als Auswahl unterscheiden kann.
-const DEFAULT_COLOR_ID = 'default';
 
 /** Reiter aus `?tab=` - nur einer, den es gibt (TAB_CAPS ist die Liste). */
 function tabFromQuery(search) {
@@ -482,11 +497,11 @@ function transferSummaryHtml(s) {
   const out = Number(s?.transfers) || 0;
   const filtered = state.accountFilterId && s?.transfers_in !== undefined;
   if (!filtered) {
-    return out > 0 ? `<div class="metric-card budget-transfer-summary"><div class="metric-card__label">${t('budget.summaryTransfers')}</div><div class="metric-card__value">${amountByRole(out, 'total').text}</div></div>` : '';
+    return out > 0 ? `<div class="metric-card budget-transfer-summary"><div class="metric-card__label">${t('budget.summaryTransfers')}</div><div class="metric-card__value">${amountByRole(out, 'total', { currency: viewCurrency() }).text}</div></div>` : '';
   }
   const incoming = Number(s.transfers_in) || 0;
   if (!(incoming > 0) && !(out > 0)) return '';
-  const flow = (key, n) => `<div class="budget-transfer-summary__flow"><dt class="budget-transfer-summary__flow-label">${t(key)}</dt><dd class="budget-transfer-summary__flow-value">${amountByRole(n, 'flow').text}</dd></div>`;
+  const flow = (key, n) => `<div class="budget-transfer-summary__flow"><dt class="budget-transfer-summary__flow-label">${t(key)}</dt><dd class="budget-transfer-summary__flow-value">${amountByRole(n, 'flow', { currency: viewCurrency() }).text}</dd></div>`;
   return `<div class="metric-card budget-transfer-summary budget-transfer-summary--split">
       <div class="metric-card__label" id="budget-transfer-summary-label">${t('budget.summaryTransfers')}</div>
       <dl class="budget-transfer-summary__flows" aria-labelledby="budget-transfer-summary-label">${flow('budget.summaryTransfersIn', incoming)}${flow('budget.summaryTransfersOut', -out)}</dl>
@@ -728,7 +743,7 @@ function ledgerStatusText() {
   const sum = entries.reduce((total, entry) => (
     total + (entry.is_pending ? 0 : Number(entry.amount) || 0)
   ), 0);
-  return t('budget.ledgerFilterSummary', { count: entries.length, sum: formatAmount(sum) });
+  return t('budget.ledgerFilterSummary', { count: entries.length, sum: formatAmount(sum, viewCurrency()) });
 }
 
 function findEntry(id) {
@@ -769,7 +784,12 @@ async function loadAccounts() {
     // serverseitig; die Kachel-Liste filtert clientseitig.
     const res = await api.get('/budget/accounts?include_archived=1');
     state.accounts = (res.data?.accounts ?? []).filter((entry) => !pendingAccountDeletes.has(entry.id));
-    state.netWorth = res.data?.net_worth ?? 0;
+    state.netWorth = res.data?.net_worth ?? (res.data?.net_worth_by_currency ? null : 0);
+    state.netWorthInfo = {
+      approx: Boolean(res.data?.net_worth_approx),
+      ratesAt: res.data?.net_worth_rates_at ?? null,
+      byCurrency: res.data?.net_worth_by_currency ?? [],
+    };
   } catch (err) {
     console.error('[Budget] loadAccounts Fehler:', err);
   }
@@ -826,8 +846,60 @@ function monthNavHtml() {
     next: { id: 'budget-next', label: t('budget.nextMonth'), keys: keys.next },
     reset: { id: 'budget-today', className: 'budget-nav__today', label: t('budget.currentMonth') },
   })}
+          ${statsRangeHtml()}
           <span class="budget-nav__note" id="budget-period-note" hidden></span>
   `;
+}
+
+const STATS_RANGES = ['week', 'month', 'year'];
+const STATS_RANGE_LABELS = { week: 'budget.statsRangeWeek', month: 'budget.statsRangeMonth', year: 'budget.statsRangeYear' };
+
+/**
+ * DER BEREICH DER STATISTIK IST EINE WAHL AM ZEITRAUM (Critique R24
+ * G4-Budget-P2-5). Die Statistik hatte zwei Zeitsteuerungen: den Stepper
+ * "Oktober 2026" im Kopf UND darunter ein Segment Woche/Monat/Jahr. Jetzt
+ * steht der Bereich direkt am Wert des Steppers ("Oktober 2026 | Monat ⌄"),
+ * als Menue mit Haken wie die Sortierungen des Moduls; das Segment im Reiter
+ * entfaellt. Nur auf dem Reiter mit Bereichen (TAB_CAPS.range) sichtbar.
+ * Am Telefon teilen sich Titel und Stepper die Kopfzeile ohne Platz fuer die
+ * Wahl ("B..." neben "Okt. 2026 ⌄" gemessen): dort hat dasselbe Menue einen
+ * zweiten Ausloeser als erste Zeile der Statistik (budget-stats.js), je
+ * Breite steht genau einer - dasselbe Muster wie das Gruppenmenue der
+ * Aufteilung (popover-menu.js richtet sich am sichtbaren aus).
+ */
+function statsRangeHtml() {
+  const range = state.range ?? 'month';
+  return `
+          <span class="budget-nav__range" id="budget-range-slot" hidden>
+            <button type="button" class="btn btn--secondary btn--sm budget-nav__range-trigger popover-menu__trigger" id="budget-range-trigger"
+                    popovertarget="budget-range-menu" aria-haspopup="menu" aria-expanded="false"
+                    aria-label="${esc(t('budget.statsRangeLabel'))}: ${esc(t(STATS_RANGE_LABELS[range]))}">
+              <span class="budget-range-value" id="budget-range-value">${esc(t(STATS_RANGE_LABELS[range]))}</span>
+              <i data-lucide="chevron-down" class="icon-sm" aria-hidden="true"></i>
+            </button>
+            <div class="popover-menu budget-range-menu" id="budget-range-menu" popover role="menu" aria-label="${esc(t('budget.statsRangeLabel'))}">
+              ${STATS_RANGES.map((id) => menuRadioHtml({ on: range === id, attr: 'data-stats-range', value: id, label: t(STATS_RANGE_LABELS[id]) })).join('')}
+            </div>
+          </span>`;
+}
+
+/** Bereich und Menue nach einem Wechsel nachziehen, ohne den Kopf neu zu bauen. */
+function syncStatsRange() {
+  const trigger = _container?.querySelector('#budget-range-trigger');
+  if (!trigger) return;
+  const label = t(STATS_RANGE_LABELS[state.range] ?? STATS_RANGE_LABELS.month);
+  // Beide Ausloeser desselben Menues (Kopf und, am Telefon, die Zeile ueber
+  // der Statistik) nennen denselben Bereich.
+  for (const el of _container.querySelectorAll?.('.budget-nav__range-trigger') ?? [trigger]) {
+    const value = el.querySelector?.('.budget-range-value');
+    if (value) value.textContent = label;
+    el.setAttribute?.('aria-label', `${t('budget.statsRangeLabel')}: ${label}`);
+  }
+  for (const item of _container.querySelectorAll?.('[data-stats-range]') ?? []) {
+    const on = item.dataset.statsRange === state.range;
+    item.setAttribute('aria-checked', String(on));
+    item.querySelector('.popover-menu__item-check')?.classList.toggle('popover-menu__item-check--hidden', !on);
+  }
 }
 
 /**
@@ -889,6 +961,7 @@ function syncCurrentButton(root = _container) {
  */
 function resetSessionFilters(target) {
   target.accountFilterId = null;
+  target.accountFilterFrom = null;
   target.categoryFilter = null;
   target.subcategoryFilter = null;
   target.responsibleFilterId = null;
@@ -930,6 +1003,7 @@ export async function render(container, { user }) {
         loadBudgetMeta(),
       ]);
       state.currency = prefsRes.data?.currency ?? 'EUR';
+      setFallbackCurrency(state.currency);
       state.budgetMode = prefsRes.data?.budget_mode === 'personal' ? 'personal' : 'shared';
       state.members = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data?.users ?? []);
     } catch (_) { /* Fallback auf EUR */ }
@@ -1100,7 +1174,29 @@ async function changeTab(id, { direction = 0 } = {}) {
   }
 }
 
+/**
+ * Woche/Monat/Jahr der Statistik wechseln (Menue am Zeitraum, statsRangeHtml):
+ * die Aufloesung gehoert dem Modul und ueberlebt den Reiterwechsel; der Inhalt
+ * wechselt mit einer Blende ohne Richtung, Kopf und Menue ziehen nach.
+ */
+function changeStatsRange(range) {
+  if (!STATS_RANGES.includes(range)) return;
+  state.range = range;
+  syncStatsRange();
+  if (state.activeTab === 'reports') swapContent(bodyEl(), renderBody);
+}
+
 function wireNav() {
+  // Bereich der Statistik am Zeitraum (Critique R24 G4-Budget-P2-5).
+  _container.querySelector('#budget-range-menu')?.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-stats-range]');
+    if (!item) return;
+    e.currentTarget.hidePopover?.();
+    changeStatsRange(item.dataset.statsRange);
+    // Der Fokus geht an den Ausloeser, der in dieser Breite steht.
+    [..._container.querySelectorAll('.budget-nav__range-trigger')]
+      .find((el) => el.getClientRects().length > 0)?.focus();
+  });
   // EIN Stepper für alle Tabs mit Zeitbezug. Welche Achse er bewegt, sagt der
   // Tab: Budget und Plan rechnen in Monaten, die Berichte in ihrer gewählten
   // Auflösung. Vorher trugen die Berichte einen zweiten Stepper im Panel.
@@ -1297,12 +1393,6 @@ function renderBody() {
       // bei `read` gibt es die Handlung nicht. Das Panel reicht den Zeitraum
       // mit, den es zeigt - der Dialog datiert den Eintrag dort hinein.
       onAddEntry: readOnly() ? null : (period) => openBudgetModal({ mode: 'create', period }),
-      onRangeChange: (r) => {
-        state.range = r;
-        // Woche/Monat/Jahr wechselt die Aufloesung: Blende ohne Richtung.
-        swapContent(body, renderBody);
-        refocusSegmented('.budget-stats__ranges');
-      },
       // Die Wochengrenzen kennt der Server; das Kopf-Label holt sie sich von dort
       // nach, statt die Wochenlogik ein zweites Mal im Client zu führen. Die
       // rohen Grenzen (reportRangeFrom/To) braucht reportShowsToday() für die
@@ -1413,7 +1503,7 @@ function renderBody() {
          <i data-lucide="clock" class="icon-sm" aria-hidden="true"></i>
          <span>${esc(t('budget.pendingSummary', {
            count: s.pending.count,
-           amount: amountByRole(pendingTotal, 'flow').text,
+           amount: amountByRole(pendingTotal, 'flow', { currency: viewCurrency() }).text,
          }))}</span>
        </p>`
     : '';
@@ -1429,7 +1519,7 @@ function renderBody() {
   const incomeCard = `
       <div class="metric-card metric-card--income">
         <div class="metric-card__label">${t('budget.income')}</div>
-        <div class="metric-card__value">${amountByRole(s.income, 'total').text}</div>
+        <div class="metric-card__value">${amountByRole(s.income, 'total', { currency: viewCurrency() }).text}</div>
         ${p ? renderTrend(s.income, p.income, prevLabel) : ''}
       </div>`;
   // Ausgaben-Trend im Betragsraum (Math.abs), wie die Zahl auf der Karte:
@@ -1438,16 +1528,16 @@ function renderBody() {
   const expensesCard = `
       <div class="metric-card metric-card--expenses">
         <div class="metric-card__label">${t('budget.expenses')}</div>
-        <div class="metric-card__value">${amountByRole(s.expenses, 'total').text}</div>
+        <div class="metric-card__value">${amountByRole(s.expenses, 'total', { currency: viewCurrency() }).text}</div>
         ${p ? renderTrend(Math.abs(s.expenses), Math.abs(p.expenses), prevLabel) : ''}
       </div>`;
   // Rolle `balance`: hier trägt die Zahl selbst die Richtung.
   // DER SALDO FUEHRT (Critique R18): eine Display-Stufe in der Seitenleiste,
   // Einnahmen und Ausgaben eine Stufe leiser (panel.css `.metric-card--lead`).
   const balanceCard = `
-      <div class="metric-card budget-balance-card ${balanceTone} ${leadCardClass(amountByRole(s.balance, 'balance').text)}">
+      <div class="metric-card budget-balance-card ${balanceTone} ${leadCardClass(amountByRole(s.balance, 'balance', { currency: viewCurrency() }).text)}">
         <div class="metric-card__label">${t('budget.balance')}</div>
-        <div class="metric-card__value">${amountByRole(s.balance, 'balance').text}</div>
+        <div class="metric-card__value">${amountByRole(s.balance, 'balance', { currency: viewCurrency() }).text}</div>
         ${p && !balanceNeutral ? renderTrend(s.balance, p.balance, prevLabel) : ''}
       </div>`;
 
@@ -1595,9 +1685,19 @@ function renderBody() {
   _container.querySelector('#budget-balance-more')?.addEventListener('click', toggleBalanceDetails);
   _container.querySelector('#budget-manage-categories')?.addEventListener('click', openCategoryManager);
   _container.querySelector('#budget-clear-account-filter')?.addEventListener('click', async () => {
+    const from = state.accountFilterFrom;
     state.accountFilterId = null;
-    await reloadMonth();
+    state.accountFilterFrom = null;
+    // Aus dem Leseblatt eines Kontos gekommen: das x fuehrt in die Konten zurueck.
+    if (from === 'accounts') {
+      state.activeTab = 'accounts';
+      _tablist?.sync('accounts');
+      writeTabToUrl('accounts');
+    } else {
+      await reloadMonth();
+    }
     renderBody();
+    if (from === 'accounts') _container.querySelector('#budget-body')?.focus();
   });
   // Sortierung und Konto aus dem Werkzeug-Menue des Listenkopfs (R19). Die
   // Sortierzeile oeffnet dasselbe Menue (wie bei den Darlehen: kein zweites
@@ -1615,6 +1715,8 @@ function renderBody() {
     } else {
       const id = accountItem.dataset.ledgerAccount ? parseInt(accountItem.dataset.ledgerAccount, 10) : null;
       if (id === state.accountFilterId) return;
+      // Aus dem Menue gewaehlt: das x am Chip bleibt in der Uebersicht.
+      state.accountFilterFrom = null;
       state.accountFilterId = id;
       // Der Kontoauszug kommt vom Server (`account_id`), wie beim Drilldown.
       await reloadMonth();
@@ -1684,12 +1786,13 @@ function renderBody() {
       return;
     }
 
-    // Der Zeilen-Klick fragt NICHT selbst: openBudgetModal verzweigt bei
-    // `read` in die Leseansicht, und die ist der Leseweg dieser Zeile.
+    // DER TIPP OEFFNET DAS LESEBLATT (R24, E1; Critique G4-Budget-P2-4).
+    // Mit Schreibrecht steht Bearbeiten als der eine Primaerknopf darin; bei
+    // `read` dieselbe Ansicht ohne Fuss (openEntryReadView).
     const item = e.target.closest('.budget-entry[data-id]');
     if (item && !action) {
       const entry = findEntry(parseInt(item.dataset.id, 10));
-      if (entry) openBudgetModal({ mode: 'edit', entry });
+      if (entry) openEntryReadView(entry, { editable: !readOnly() && !entry.details_hidden });
     }
   });
 
@@ -1761,6 +1864,9 @@ function updateTabs() {
     note.hidden = !caps.note;
     if (caps.note) note.textContent = t(caps.note);
   }
+  const rangeSlot = _container.querySelector('#budget-range-slot');
+  if (rangeSlot) rangeSlot.hidden = !caps.range;
+  syncStatsRange();
 
   syncAddAction();
 }
@@ -1848,8 +1954,8 @@ function blockTotal(rows) {
  * Vorzeichen, denn dort IST es die Auskunft (hinein oder hinaus). */
 function blockAmountText(amount, kind) {
   return kind === 'transfers'
-    ? amountByRole(amount, 'flow').text
-    : amountByRole(amount, 'total').text;
+    ? amountByRole(amount, 'flow', { currency: viewCurrency() }).text
+    : amountByRole(amount, 'total', { currency: viewCurrency() }).text;
 }
 
 /* Wie in der Statistik: der Anteil steht nur bei Ausgaben, leise hinter dem Betrag. */
@@ -1913,7 +2019,7 @@ function chartIncomeLine(blocks) {
   return `
           <p class="budget-chart-head__income">
             <span>${esc(t('budget.income'))}</span>
-            <span class="budget-chart-head__income-amount">${amountByRole(blockTotal(blocks.income), 'flow').text}</span>
+            <span class="budget-chart-head__income-amount">${amountByRole(blockTotal(blocks.income), 'flow', { currency: viewCurrency() }).text}</span>
           </p>`;
 }
 
@@ -1966,12 +2072,12 @@ function balanceGlanceHtml(s, { expensesOnly, forecast, balanceTone }) {
     : balanceTone === 'metric-card--balance-positive' ? 'positive'
       : balanceTone === 'metric-card--balance-negative' ? 'negative' : 'neutral';
   const lead = expensesOnly
-    ? { label: t('budget.expenses'), value: amountByRole(s.expenses, 'total').text, tone: 'neutral' }
-    : { label: t(forecast ? 'budget.summaryTitleForecast' : 'budget.balance'), value: amountByRole(s.balance, 'balance').text, tone };
+    ? { label: t('budget.expenses'), value: amountByRole(s.expenses, 'total', { currency: viewCurrency() }).text, tone: 'neutral' }
+    : { label: t(forecast ? 'budget.summaryTitleForecast' : 'budget.balance'), value: amountByRole(s.balance, 'balance', { currency: viewCurrency() }).text, tone };
   const flows = expensesOnly ? '' : `
         <span class="budget-glance__flows">
-          <span class="budget-glance__flow">${esc(t('budget.income'))} <span class="budget-glance__amount">${amountByRole(s.income, 'total').text}</span></span>
-          <span class="budget-glance__flow">${esc(t('budget.expenses'))} <span class="budget-glance__amount">${amountByRole(s.expenses, 'total').text}</span></span>
+          <span class="budget-glance__flow">${esc(t('budget.income'))} <span class="budget-glance__amount">${amountByRole(s.income, 'total', { currency: viewCurrency() }).text}</span></span>
+          <span class="budget-glance__flow">${esc(t('budget.expenses'))} <span class="budget-glance__amount">${amountByRole(s.expenses, 'total', { currency: viewCurrency() }).text}</span></span>
         </span>`;
   const count = s.byCategory?.length ?? 0;
   return `
@@ -2235,7 +2341,7 @@ function subcategoryRows(category, entries) {
                 style="--bar-scale:${scale}"${parentTexture ? ` data-texture="${parentTexture}"` : ''}></span>
         </span>
         <span class="budget-bar-row__amount">
-          ${amountByRole(row.amount, 'flow').text}${kind === 'expenses' && row.amount !== 0 ? shareHtml(row.amount, categoryTotal) : ''}
+          ${amountByRole(row.amount, 'flow', { currency: viewCurrency() }).text}${kind === 'expenses' && row.amount !== 0 ? shareHtml(row.amount, categoryTotal) : ''}
         </span>
       </button>`;
   }).join('');
@@ -2258,7 +2364,7 @@ function renderSubcategoryBreakdowns() {
                 aria-labelledby="${esc(titleId)}">
           <h3 class="budget-chart-block__title" id="${esc(titleId)}">
             <span>${esc(categoryLabel(category))}</span>
-            <span class="budget-chart-block__total">${amountByRole(total, 'total').text}</span>
+            <span class="budget-chart-block__total">${amountByRole(total, 'total', { currency: viewCurrency() }).text}</span>
           </h3>
           <div class="budget-chart-block__rows">
             ${rows}
@@ -2338,6 +2444,7 @@ function toggleSubcategoryFilter(category, key) {
 async function clearBudgetFilters() {
   const needsReload = state.accountFilterId != null;
   state.accountFilterId = null;
+  state.accountFilterFrom = null;
   state.categoryFilter = null;
   state.subcategoryFilter = null;
   state.responsibleFilterId = null;
@@ -2648,8 +2755,13 @@ function togglePlanned(button) {
  */
 function statementCreditLimitHtml() {
   const account = (state.accounts ?? []).find((a) => a.id === state.accountFilterId);
-  if (!account || account.type !== 'credit' || account.credit_limit == null) return '';
-  return `<div class="budget-list-header__filter">${esc(t('budget.creditLimitLabel'))} ${esc(formatAmount(account.credit_limit, account.currency || state.currency))}</div>`;
+  if (!account) return '';
+  const currency = account.currency || state.currency;
+  // Der Startsaldo stand bis R24 in jeder Kontozeile; im Auszug des Kontos
+  // gehoert er an den Anfang (Critique G4-Budget-P3-1).
+  const start = `<div class="budget-list-header__filter">${esc(t('budget.startingBalanceShort'))} ${esc(formatAmount(account.starting_balance ?? 0, currency))}</div>`;
+  if (account.type !== 'credit' || account.credit_limit == null) return start;
+  return `${start}<div class="budget-list-header__filter">${esc(t('budget.creditLimitLabel'))} ${esc(formatAmount(account.credit_limit, currency))}</div>`;
 }
 
 /** Die Buchungszeilen selbst - einmal gebaut, von Liste und Gruppen benutzt. */
@@ -2686,7 +2798,7 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
     // Rolle `flow`: eine einzelne Kontobewegung trägt immer ein Vorzeichen, und
     // das Vorzeichen kommt aus dem Zahlformat (signDisplay), nicht aus einem
     // vorangestellten '+' - sonst steht es in RTL-Locales auf der falschen Seite.
-    const amountText = amountByRole(e.amount, 'flow').text;
+    const amountText = amountByRole(e.amount, 'flow', { currency: accountCurrency(e.account_id) }).text;
     /* DER MONAT STEHT ÜBER DER LISTE, NICHT IN JEDER ZEILE.
      *
      * Die Liste ist per Konstruktion EIN Monat - loadMonth() holt
@@ -2801,9 +2913,11 @@ function entryRows(list, { fullDate = false, rowClass = '' } = {}) {
     const rowInteraction = masked ? ''
       : fromSubscription ? `data-open-subscription="${Number(e.subscription_id)}"`
         : `data-id="${e.id}"`;
+    // Seit R24 (E1) oeffnet der Tipp auch mit Schreibrecht das Leseblatt -
+    // der Name verspricht deshalb in keinem Fall mehr "bearbeiten".
     const titleAction = fromSubscription
       ? `${esc(t('budget.expectedSubscriptionOpen'))}: `
-      : (ro ? '' : `${esc(t('budget.editEntry'))}: `);
+      : '';
     const titleCell = masked
       ? `<div class="list-row__name budget-entry__title">${esc(displayTitle)}${sharedBadge}${maskedBadge}${pendingBadge}${transferMark}</div>`
       : `<button class="list-row__name budget-entry__title" type="button"
@@ -2875,10 +2989,22 @@ function renderAccountsPage() {
   // Rolle `balance`: das Vorzeichen steckt in der Zahl. Nebenbei behebt die
   // Rollenlogik, dass ein Nettovermögen von exakt 0 vorher als Erfolg grün
   // erschien - null Vermögen ist keine gute Nachricht, sondern gar keine.
-  const netWorth = amountByRole(state.netWorth, 'balance', { block: 'metric-card' });
+  const netWorth = amountByRole(state.netWorth ?? 0, 'balance', { block: 'metric-card' });
   // EIN STAND IST KEINE NACHRICHT (R18, budget.css `.budget-account__balance`):
   // das Nettovermoegen steht in Textfarbe, nur ein Minus traegt Rot.
   const netWorthTone = Number(state.netWorth) < 0 ? 'negative' : 'neutral';
+  // KONTEN IN MEHREREN WAEHRUNGEN (#2302). Mit Kursen ist die Summe eine
+  // Naeherung in der Budget-Waehrung: "≈" vor der Zahl, das Kursdatum
+  // darunter. Fehlt ein Kurs, steht die Summe je Waehrung da - eine
+  // Rohsumme aus Dollar und Euro waere eine falsche Zahl.
+  const parts = state.netWorth == null ? state.netWorthInfo.byCurrency : [];
+  const approx = state.netWorth != null && state.netWorthInfo.approx;
+  const netWorthText = parts.length
+    ? parts.map((p) => formatAmount(p.amount, p.currency)).join(' · ')
+    : `${approx ? '≈ ' : ''}${netWorth.text}`;
+  const netWorthNote = parts.length
+    ? t('budget.netWorthPerCurrencyNote')
+    : (approx && state.netWorthInfo.ratesAt ? t('budget.netWorthApproxNote', { date: dateText(state.netWorthInfo.ratesAt, { year: true }) }) : '');
 
   const archiveToggle = hasArchived ? `
       <button class="budget-accounts__toggle" id="budget-toggle-archived" type="button" aria-pressed="${state.accountsShowArchived}">
@@ -2903,37 +3029,29 @@ function renderAccountsPage() {
       ${title}
       <div class="panel-head__actions">${archiveToggle}</div>
     </div>` : title}
-    ${/* Mobil die Kurzzeile wie in jedem Reiter mit Kennzahlen (R16): hier stand
-       * unter 640px als einzige Stelle des Moduls noch die Karte. EINE Zahl,
-       * also ohne Aufklapper (metric-glance.js) - die Karte bleibt dort aus. */ ''}
-    ${metricGlanceHtml({
-      label: t('budget.netWorth'),
-      value: netWorth.text,
-      tone: netWorthTone,
-      lead: true,
-    })}
     `;
-  // DAS NETTOVERMOEGEN IST EINE LEISTENKARTE NEBEN DEN KONTEN (Critique R17,
-  // E14). Bis dahin trug die eine Kennzahl eine ganze Zeile ueber dem Raster:
-  // EINE Karte ueber 981px (1280) bzw. 1124px (1440), davon rund 800px leer.
-  // Ab 960px Modulflaeche steht sie in der Seitenleiste der Budget-Bahn wie
-  // die Kennzahlen der Uebersicht und der Darlehen (`.metric-grid--rail`),
-  // die Konten daneben auf dem Lesemass. Im Markup bleibt sie VORN: schmaler
-  // steht sie ueber den Konten, mobil vertritt sie die Kurzzeile.
-  const rail = `
-    <div class="metric-grid metric-grid--rail budget-glance-details">
-      <div class="metric-card metric-card--${netWorthTone} ${leadCardClass(netWorth.text)}">
-        <div class="metric-card__label">${t('budget.netWorth')}</div>
-        <div class="metric-card__value">${netWorth.text}</div>
-      </div>
-    </div>`;
+  // DAS NETTOVERMOEGEN IST EINE KARTE OBEN, IN JEDER BREITE (R24, E2; Critique
+  // G4-Budget-P2-3). Seit R17 (E14) stand es als einsame Leistenkarte neben
+  // den Konten, darunter 680px leer; die Kurzzeile darueber trug mobil
+  // dieselbe Zahl. Jetzt ist es EINE Aussage: die Kurzzeile ueber den Konten
+  // (`metricGlanceHtml({ everywhere })`), am Desktop wie am Telefon, die Konten
+  // darunter auf dem Lesemass, keine Seitenspalte. Bei Konten in mehreren
+  // Waehrungen ohne Kurs steht die Summe je Waehrung in der Zeile.
+  const glance = metricGlanceHtml({
+    label: t('budget.netWorth'),
+    value: netWorthText,
+    tone: netWorthTone,
+    flows: netWorthNote ? [{ label: netWorthNote }] : [],
+    lead: true,
+    everywhere: true,
+  });
 
   if (!all.length) {
     return `
       <div class="budget-tab-panel page-scrollport budget-tab-panel--accounts" data-scroll-port="budget">
         ${header}
         <div class="budget-accounts">
-        ${rail}
+        ${glance}
         ${emptyStateHTML({
     icon: 'wallet',
     title: t('budget.accountsEmptyTitle'),
@@ -2959,7 +3077,7 @@ function renderAccountsPage() {
     const creditMeta = a.type === 'credit' && (a.credit_bank || a.available_limit != null)
       ? `<span class="budget-account__meta">${[
           a.credit_bank ? esc(a.credit_bank) : '',
-          a.available_limit != null ? `${t('budget.availableLimitShort')} ${formatAmount(a.available_limit)}` : '',
+          a.available_limit != null ? `${t('budget.availableLimitShort')} ${formatAmount(a.available_limit, accountCurrency(a.id))}` : '',
         ].filter(Boolean).join(' · ')}</span>`
       : '';
     return `
@@ -2972,22 +3090,22 @@ function renderAccountsPage() {
           <span class="budget-account__icon budget-tile"><i data-lucide="${icon}" class="icon-md" aria-hidden="true"></i></span>
           <span class="budget-account__body">
             <span class="budget-account__name"><span class="budget-account__name-text">${esc(a.name)}</span>${archivedBadge}</span>
-            ${/* Am Telefon steht der Start in der Zeile der Kontoart (budget.css,
-                  unter 640px); dort ist `.budget-account__starting` ausgeblendet,
-                  hier `__type-start` daneben - genau eine Fassung ist sichtbar
-                  und im Barrierebaum. */ ''}
-            <span class="budget-account__type">${esc(accountTypeLabel(a.type))}<span class="budget-account__type-start"> · ${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance)}</span></span></span>
+            ${/* DER STARTSALDO STEHT NICHT IN DER ZEILE (Critique R24
+                  G4-Budget-P3-1): "Start: 2.480,00 €" in jeder Zeile war
+                  Rauschen neben dem Stand, und mobil brachen die Namen daneben.
+                  Er steht im Kontoauszug (Kopf der gefilterten Liste) und im
+                  Konto-Dialog. */ ''}
+            <span class="budget-account__type">${esc(accountTypeLabel(a.type))}</span>
             ${creditMeta}
           </span>
           <span class="budget-account__figures">
-            <span class="budget-account__balance ${balClass}">${formatAmount(a.current_balance)}</span>
-            <span class="budget-account__starting">${t('budget.startingBalanceShort')} <span class="budget-account__starting-amount">${formatAmount(a.starting_balance)}</span></span>
+            <span class="budget-account__balance ${balClass}">${formatAmount(a.current_balance, accountCurrency(a.id))}</span>
           </span>
-          <span class="sr-only">, ${esc(t('budget.showAccountTransactions'))}</span>
         </button>
-        ${/* EIN OEFFNEN-WEG (D6): der Zeilentipp oeffnet den Kontoauszug; das
-              Konto selbst bearbeitet der Eintrag im Mehr-Knopf statt eines
-              zweiten Stifts am Zeilenende. */ ''}
+        ${/* EIN OEFFNEN-WEG (D6): der Zeilentipp oeffnet das Leseblatt des
+              Kontos (S10-F3), von dort "Buchungen anzeigen"; bearbeitet wird
+              im Blatt oder ueber den Eintrag im Mehr-Knopf statt eines zweiten
+              Stifts am Zeilenende. */ ''}
         ${ro ? '' : `<div class="row-actions budget-account__actions">${rowMenuHtml({
           id: `budget-account-menu-${a.id}`,
           label: t('common.moreActionsNamed', { name: a.name }),
@@ -3000,7 +3118,7 @@ function renderAccountsPage() {
     <div class="budget-tab-panel page-scrollport budget-tab-panel--accounts" data-scroll-port="budget">
       ${header}
       <div class="budget-accounts">
-        ${rail}
+        ${glance}
         <div class="budget-accounts__list">${cards}</div>
       </div>
     </div>`;
@@ -3012,21 +3130,12 @@ function wireAccountsPage() {
     state.accountsShowArchived = !state.accountsShowArchived;
     renderBody();
   });
-  // Zeilen-Klick öffnet den Kontoauszug (Drilldown-Filter), das Stift-Icon bearbeitet.
+  // Zeilen-Klick öffnet das Leseblatt des Kontos (S10-F3), von dort fuehrt
+  // "Buchungen anzeigen" in den Kontoauszug; bearbeitet wird im Blatt oder im Mehr-Knopf.
   _container.querySelectorAll('.budget-account__main[data-drill]').forEach((el) => {
-    el.addEventListener('click', async () => {
-      state.accountFilterId = parseInt(el.dataset.drill, 10);
-      state.activeTab = 'budget';
-      // Aktive Pille mitziehen: dieser Wechsel läuft nicht über die Tab-Leiste,
-      // daher malt wireTablist ihn nur über sync() nach (updateTabs tut es nicht mehr).
-      _tablist?.sync('budget');
-      writeTabToUrl('budget');
-      await reloadMonth();
-      renderBody();
-      // Der geklickte Button wird beim Re-Render entfernt — ohne Fokus-Umzug
-      // fällt der Fokus auf <body> und Tastatur-/Screenreader-Nutzer landen
-      // wieder am Seitenanfang. Das Panel ist tabindex="0" und trägt den Titel.
-      _container.querySelector('#budget-body')?.focus();
+    el.addEventListener('click', () => {
+      const account = (state.accounts ?? []).find((a) => a.id === parseInt(el.dataset.drill, 10));
+      if (account) openAccountReadView(account);
     });
   });
   _container.querySelectorAll('.budget-account [data-edit]').forEach((el) => {
@@ -3034,6 +3143,75 @@ function wireAccountsPage() {
       const account = state.accounts.find((a) => a.id === parseInt(el.dataset.edit, 10));
       if (account) openAccountModal(account);
     });
+  });
+}
+
+/**
+ * Der Kontoauszug eines Kontos (Drilldown-Filter in der Buchungsliste). Kommt
+ * der Weg aus dem Reiter Konten, fuehrt das x am Konto-Chip dorthin zurueck
+ * (`accountFilterFrom`, S10-F3) - nicht in die ungefilterte Uebersicht.
+ */
+async function showAccountStatement(accountId, { from = null } = {}) {
+  state.accountFilterId = accountId;
+  state.accountFilterFrom = from;
+  state.activeTab = 'budget';
+  // Aktive Pille mitziehen: dieser Wechsel läuft nicht über die Tab-Leiste,
+  // daher malt wireTablist ihn nur über sync() nach (updateTabs tut es nicht mehr).
+  _tablist?.sync('budget');
+  writeTabToUrl('budget');
+  await reloadMonth();
+  renderBody();
+  // Der Ausloeser ist weg (Blatt geschlossen, Liste neu) - ohne Fokus-Umzug
+  // faellt der Fokus auf <body> und Tastatur-/Screenreader-Nutzer landen
+  // wieder am Seitenanfang. Das Panel ist tabindex="0" und trägt den Titel.
+  _container.querySelector('#budget-body')?.focus();
+}
+
+/**
+ * DAS KONTO LIEST SICH ZUERST (Ulas 28.10., S10-F3; E1). Der Tipp auf ein Konto
+ * verliess den Reiter Konten und stand in der Uebersicht mit einem Filter-Chip -
+ * der Rueckweg war das x am Chip. Jetzt oeffnet er das Leseblatt des Kontos wie
+ * Buchung, Abo und Ausgabe: Typ, Saldo, Startsaldo, bei Kreditkarten Bank und
+ * Rahmen. "Buchungen anzeigen" ist die Nebenhandlung (dann der Auszug, dessen
+ * x in die Konten zurueckfuehrt), "Bearbeiten" der eine Primaerknopf; bei
+ * Nur-lesen steht nur der Weg zu den Buchungen.
+ */
+function accountReadSections(account) {
+  const currency = account.currency || state.currency;
+  const credit = account.type === 'credit';
+  return [
+    { icon: ACCOUNT_TYPE_ICONS[account.type] || ACCOUNT_TYPE_ICONS.other, label: t('budget.accountTypeLabel'), value: accountTypeLabel(account.type) },
+    { icon: 'banknote', label: t('budget.balance'), value: formatAmount(account.current_balance ?? 0, currency) },
+    { icon: 'flag', label: t('budget.startingBalanceLabel'), value: formatAmount(account.starting_balance ?? 0, currency) },
+    { icon: 'landmark', label: t('budget.creditBankLabel'), value: credit ? (account.credit_bank || '') : '' },
+    { icon: 'credit-card', label: t('budget.creditLimitLabel'), value: credit && account.credit_limit != null ? formatAmount(account.credit_limit, currency) : '' },
+  ];
+}
+
+function openAccountReadView(account) {
+  const leave = (next) => async ({ close } = {}) => {
+    await (close ?? closeDetailView)({ force: true });
+    await next();
+  };
+  const statement = {
+    id: 'budget-account-read-statement',
+    label: t('budget.showAccountTransactions'),
+    icon: 'list',
+    variant: 'secondary',
+    onClick: leave(() => showAccountStatement(account.id, { from: 'accounts' })),
+  };
+  const actions = readOnly() ? [statement] : withPrimaryEdit([statement], {
+    id: 'budget-account-read-edit',
+    label: t('common.edit'),
+    onClick: leave(() => openAccountModal(account)),
+  });
+  return openDetailView({
+    title: account.name,
+    key: `budget-account:${account.id}`,
+    accentColor: accountAccent(account.color),
+    size: 'sm',
+    sections: accountReadSections(account),
+    actions,
   });
 }
 
@@ -3051,18 +3229,16 @@ function openAccountModal(account = null) {
 
   const currentColor = isEdit ? (account.color || '') : '';
   const activeType = isEdit ? account.type : 'checking';
-  // Einfachauswahl wie die Filterleisten des Moduls: role="radiogroup" und die
-  // geteilte Verhaltensschicht statt role="group" mit eigenem Klick-Handler.
-  // Die Standardfarbe hat den leeren Wert und trägt deshalb den Sentinel als
-  // data-tab-id - wireTablist erkennt einen leeren String nicht als Auswahl.
-  const swatch = (value, styleColor, label) => {
-    const on = currentColor === value;
-    return `<button type="button" role="radio" class="budget-color-swatch${on ? ' is-active' : ''}"
-             data-tab-id="${esc(value || DEFAULT_COLOR_ID)}" style="--swatch:${esc(styleColor)}"
-             aria-label="${esc(label)}" aria-checked="${on}" tabindex="${on ? '0' : '-1'}"></button>`;
-  };
-  const colorSwatches = swatch('', 'var(--module-accent)', t('budget.accountColorDefault'))
-    + ACCOUNT_COLORS.map((c) => swatch(c.value, c.value, t(c.nameKey))).join('');
+  // EIN FARBWAEHLER (Critique R24, E6; Uebergabe S3): die Kontofarben sind
+  // kuratierte Token-Toene (sie sind zugleich die Serienfarben der Diagramme)
+  // und gehen deshalb OHNE "Eigene" durch denselben Baustein wie jede andere
+  // Farbreihe der App - vorher eine eigene Swatch-Reihe mit eigener Klasse
+  // (`.budget-color-swatch`) und wireTablist. Die Standardfarbe ist der leere
+  // Wert und malt den Modulton.
+  const colorOptions = [
+    { value: '', paint: 'var(--module-accent)', label: t('budget.accountColorDefault') },
+    ...ACCOUNT_COLORS.map((c) => ({ value: c.value, label: t(c.nameKey) })),
+  ];
 
   const content = `
     <div class="form-group">
@@ -3076,7 +3252,7 @@ function openAccountModal(account = null) {
     </div>
     <div class="form-group">
       <label class="form-label" for="am-balance">${t('budget.startingBalanceLabel')}</label>
-      <input class="form-input" id="am-balance"${amountInputAttrs(accountCurrency, isEdit ? account.starting_balance : '')}>
+      ${amountFieldHtml({ id: 'am-balance', currency: accountCurrency, value: isEdit ? account.starting_balance : '', required: false })}
       <p class="form-hint">${t('budget.startingBalanceHint')}</p>
     </div>
     <div id="am-credit-fields" ${activeType === 'credit' ? '' : 'hidden'}>
@@ -3090,13 +3266,13 @@ function openAccountModal(account = null) {
         <!-- Platzhalter aus der Kontowährung: bei JPY ist ein Hundertstel keine
              Einheit, die es gibt. Ein Rahmen ist nie negativ, 0 ist erlaubt, und
              leer heisst "kein Rahmen gepflegt". -->
-        <input class="form-input" id="am-credit-limit"${amountInputAttrs(accountCurrency, isEdit ? (account.credit_limit ?? '') : '')}>
+        ${amountFieldHtml({ id: 'am-credit-limit', currency: accountCurrency, value: isEdit ? (account.credit_limit ?? '') : '', required: false })}
         <p class="form-hint">${t('budget.creditLimitHint')}</p>
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">${t('budget.accountColorLabel')}</label>
-      <div class="budget-color-picker" id="am-color" role="radiogroup" aria-label="${t('budget.accountColorLabel')}">${colorSwatches}</div>
+      <span class="form-label" id="am-color-label">${t('budget.accountColorLabel')}</span>
+      ${colorPickerHtml({ id: 'am-color', value: currentColor, labelledBy: 'am-color-label', options: colorOptions, custom: false })}
     </div>
 
     <div class="modal-panel__footer modal-panel__footer--plain">
@@ -3119,16 +3295,11 @@ function openAccountModal(account = null) {
   openSharedModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('budget.editAccount') : t('budget.newAccount'),
+    initialFocus: isEdit ? 'edit' : 'first-field',
     content,
     size: 'sm',
     onSave(panel) {
-      let selectedColor = currentColor;
-      wireTablist(panel.querySelector('#am-color'), {
-        activeId: currentColor || DEFAULT_COLOR_ID,
-        activeClass: 'is-active',
-        mode: 'select',
-        onChange: (id) => { selectedColor = id === DEFAULT_COLOR_ID ? '' : id; },
-      });
+      wireColorPicker(panel);
 
       panel.querySelector('#am-cancel').addEventListener('click', closeModal);
 
@@ -3213,7 +3384,7 @@ function openAccountModal(account = null) {
         saveBtn.disabled = true;
         saveBtn.textContent = '…';
         try {
-          const body = { name, type, starting_balance: startingBalance, color: selectedColor || null };
+          const body = { name, type, starting_balance: startingBalance, color: panel.querySelector('#am-color').value || null };
           // Ein Typwechsel weg von der Kreditkarte räumt die Felder mit ab, sonst
           // blieben Bank und Limit unsichtbar am Konto hängen.
           body.credit_bank  = type === 'credit' ? (panel.querySelector('#am-credit-bank').value.trim() || null) : null;
@@ -3282,56 +3453,52 @@ function renderLoansDashboard() {
 
   const cards = loanSummaryCards(summary);
   const [leadCard, ...restCards] = cards;
+  /* EINE KENNZAHL OBEN, KEIN TURM (R24, E2; Critique G4-Budget-P2-3). Bis R24
+   * standen rechts vier Karten (Restschuld, Steht dir zu, Bezahlt,
+   * Zurueckerhalten) neben den Darlehen, mobil dieselben hinter einem
+   * Aufklapper. Jetzt EINE Zeile in jeder Breite: die Restschuld fuehrt, zwei
+   * Nebenwerte stehen daneben; was die Karten einzeln sagen (gezahlt, offen
+   * je Darlehen), steht an jeder Karte.
+   *
+   * DER KOPF BEGINNT AN DER KANTE DER LISTE (Critique G4-Budget-P2-5): das
+   * Segment Aktiv/Bezahlt/Alle stand rechtsbuendig ohne Titel, links 470px
+   * leer. Jetzt steht es vorn wie ein Abschnittskopf (`section-toolbar`), die
+   * Werkzeuge am Ende; ein sichtbarer Titel "Darlehen" wiederholte nur den
+   * Reiter (test:typography), er bleibt fuer die Gliederung unsichtbar. */
   return `
     <section class="budget-loans">
       ${metricGlanceHtml({
-    id: 'budget-loans-more',
-    controls: 'budget-loans-details',
-    expanded: state.loansExpanded,
     label: leadCard.label,
     value: leadCard.value,
     lead: true,
+    everywhere: true,
     flows: restCards.map((card) => ({ label: card.label, amount: card.value })),
   })}
-      <div class="panel-head budget-loans__header">
-        <div>
-          <!-- Unsichtbar wie bei den Konten: sichtbar wiederholte der Titel nur den Tab. -->
-          <h2 class="panel-head__title sr-only">${t('budget.loansTitle')}</h2>
-          <!-- Die Summenzeile („2 aktiv · 175.444,93 € offen") ist entfallen:
-               sie wiederholte die Karte RESTSCHULD direkt darunter (R14 P1). -->
-          ${state.loanFilterId ? `<div class="budget-list-header__filter">${esc(activeLoanLabel())}</div>` : ''}
-          ${loanSortNoteHtml()}
+      <div class="budget-loans__header section-toolbar">
+        <!-- Unsichtbar wie bei den Konten: sichtbar wiederholte der Titel nur
+             den Reiter "Darlehen" (test:typography). -->
+        <h2 class="sr-only" tabindex="-1">${t('budget.loansTitle')}</h2>
+        <!-- Einfachauswahl, keine Sicht: role="radiogroup" statt des früheren
+             role="group", damit der Zustand angesagt wird UND die geteilte
+             Verhaltensschicht Pfeiltasten liefert (Critique 2026-07-30, P1). -->
+        <div class="segmented budget-loans__filters" role="radiogroup" aria-label="${t('budget.loanStatusFilterLabel')}">
+          ${[['active', 'budget.loanStatusActive'], ['paid', 'budget.loanStatusPaid'], ['all', 'budget.loanStatusAll']]
+            .map(([id, key]) => {
+              const on = state.loanStatusFilter === id;
+              return `<button class="segmented__item${on ? ' is-active' : ''}"
+                  type="button" role="radio" data-tab-id="${id}" aria-checked="${on}"
+                  tabindex="${on ? '0' : '-1'}">${t(key)}</button>`;
+            }).join('')}
         </div>
+        ${state.loanFilterId ? `<span class="budget-list-header__filter">${esc(activeLoanLabel())}</span>` : ''}
+        ${loanSortNoteHtml()}
         <div class="panel-head__actions">
           ${state.loanFilterId ? `
           <button class="btn btn--secondary btn--sm" type="button" id="budget-clear-loan-filter">
             <i data-lucide="x" aria-hidden="true"></i>${t('budget.clearLoanFilter')}
           </button>` : ''}
-          <!-- Einfachauswahl, keine Sicht: role="radiogroup" statt des früheren
-               role="group", damit der Zustand angesagt wird UND die geteilte
-               Verhaltensschicht Pfeiltasten liefert (Critique 2026-07-30, P1). -->
-          <div class="segmented budget-loans__filters" role="radiogroup" aria-label="${t('budget.loanStatusFilterLabel')}">
-            ${[['active', 'budget.loanStatusActive'], ['paid', 'budget.loanStatusPaid'], ['all', 'budget.loanStatusAll']]
-              .map(([id, key]) => {
-                const on = state.loanStatusFilter === id;
-                return `<button class="segmented__item${on ? ' is-active' : ''}"
-                    type="button" role="radio" data-tab-id="${id}" aria-checked="${on}"
-                    tabindex="${on ? '0' : '-1'}">${t(key)}</button>`;
-              }).join('')}
-          </div>
           ${loanToolsMenuHtml()}
         </div>
-      </div>
-      <!-- Geteilte Kennzahl-Zeile statt der früheren eigenen budget-loans__stats
-           (fünfte Kartenbauart des Moduls, Critique 2026-07-30, P0). Rolle
-           total: die Richtung steht im Label, nicht im Vorzeichen.
-           Mobil wartet sie hinter EINER Zeile (metricGlanceHtml, R14 P1). -->
-      <div class="metric-grid metric-grid--led${cards.length === 4 ? ' metric-grid--quad' : ''}${leadStep(cards[0]?.value) ? ' metric-grid--long-lead' : ''} budget-glance-details${state.loansExpanded ? ' is-expanded' : ''}" id="budget-loans-details">
-        ${cards.map((card, i) => `
-        <div class="metric-card${i === 0 ? ` ${leadCardClass(card.value)}` : ''}">
-          <div class="metric-card__label">${card.label}</div>
-          <div class="metric-card__value">${card.value}</div>
-        </div>`).join('')}
       </div>
       ${summary.has_foreign_currency ? `<p class="form-hint budget-loan-hint">${t('budget.loanSummaryConverted', {
         currency: esc(summary.currency || state.currency),
@@ -3672,7 +3839,6 @@ function wireLoanCards(root, open = openLoanReport) {
 
 function wireLoansPage() {
   _container.querySelector('[data-action="toggle-loan-payments"]')?.addEventListener('click', (e) => toggleLoanPayments(e.currentTarget));
-  wireMetricGlance(_container, 'budget-loans-more', (on) => { state.loansExpanded = on; });
   _container.querySelector('#budget-empty-loan')?.addEventListener('click', () => openBudgetModal({ mode: 'create', initialType: 'loan' }));
   _container.querySelector('#budget-clear-loan-filter')?.addEventListener('click', () => {
     state.loanFilterId = null;
@@ -4009,12 +4175,12 @@ function renderLoanCard(loan) {
         <span data-bar-key="loan:${loan.id}" style="--bar-scale:${paidPct / 100}"></span>
       </div>
       <div class="budget-loan-card__footer">
+        ${/* EINE DATUMSZEILE (Critique R24 G4-Budget-P3-7): "Naechste" und
+            * "Ende voraussichtlich" standen als zwei Zeilen neben der
+            * Endzone. Jetzt ein Satz; der Monat der letzten Rate (#1706)
+            * faellt weg, wenn ihn der Server nicht kennt. */ ''}
         <div class="budget-loan-card__dates">
-          <span>${t('budget.loanNextDue', { month: nextDue })}</span>
-          ${/* Der Monat der letzten Rate (#1706), vom Server aus derselben
-              * Restlaufzeit gerechnet, die auch der Bericht zeigt. Fehlt er
-              * (getilgt, oder die Rate deckt den Zins nicht), faellt die Zeile weg. */ ''}
-          ${loan.projected_end_month ? `<span class="budget-loan-card__end">${t('budget.loanProjectedEnd', { month: formatMonthLabel(loan.projected_end_month) })}</span>` : ''}
+          <span>${t('budget.loanNextDue', { month: nextDue })}${loan.projected_end_month ? `<span class="budget-loan-card__end"> · ${t('budget.loanProjectedEnd', { month: formatMonthLabel(loan.projected_end_month) })}</span>` : ''}</span>
         </div>
         ${/* Bei `budget: read` gehen alle drei: Bearbeiten, Loeschen und das
             * Buchen einer Rate schreiben. Faelligkeit, Fortschritt und der
@@ -4031,7 +4197,7 @@ function renderLoanCard(loan) {
           ${/* Sekundaer, nicht primaer (Critique 2026-09-25): drei Darlehen
               * zeigten drei violette Primaerknoepfe nebeneinander, und keiner
               * war der Weg der Seite. Der steht im Kopf („+ Darlehen"). */ ''}
-          <button class="btn btn--secondary" data-action="loan-pay" data-id="${loan.id}" ${payDisabled}>
+          <button class="btn btn--secondary btn--sm" data-action="loan-pay" data-id="${loan.id}" ${payDisabled}>
             ${t(isBorrowedLoan(loan) ? 'budget.loanBookInstallment' : 'budget.loanReceiveRepayment')}
           </button>
         </div>`}
@@ -4071,7 +4237,8 @@ function renderLoanCard(loan) {
 function renderTrend(current, prev, prevLabel) {
   // Auf die Waehrung gerundet (Critique R19, roundToCurrency): die feste
   // Schwelle 0,005 kannte nur Waehrungen mit zwei Nachkommastellen.
-  const delta = roundToCurrency(current - prev, state.currency);
+  // Der Vergleich steht in derselben Waehrung wie die Karte darueber (#2302).
+  const delta = roundToCurrency(current - prev, viewCurrency());
   if (delta === 0) {
     return trendMarkup({
       delta: 0, text: esc(t('budget.trendNeutral', { month: prevLabel })), icon: false,
@@ -4080,7 +4247,7 @@ function renderTrend(current, prev, prevLabel) {
   // Rolle `flow`: eine Veränderung gegenüber dem Vormonat trägt immer ein
   // Vorzeichen, aus demselben Zahlformat wie die Buchungen selbst. Den Pfeil
   // setzt utils/metric-card.js; ohne `betterWhen` bleibt die Farbe neutral.
-  const deltaText = amountByRole(delta, 'flow').text;
+  const deltaText = amountByRole(delta, 'flow', { currency: viewCurrency() }).text;
   return trendMarkup({
     delta,
     text: esc(t('budget.trendDelta', { amount: deltaText, month: prevLabel })),
@@ -4243,19 +4410,30 @@ function entryReadSections(entry) {
 }
 
 /**
- * Die Buchung bei `budget: read`: eine Leseansicht, sonst nichts (#1265 P7).
+ * Die Buchung als LESEBLATT (R24, E1; Critique G4-Budget-P2-4).
  *
- * Die Bauart aus P1: der Einstieg in den Editor verzweigt bei `read` in eine
- * Leseansicht (`openNoteModal` -> `openNoteReadModal` in notes.js), gezeichnet
- * mit der geteilten Leseansicht, die P1 fuer die Kontakte bei `read` auf
- * reines Lesen zurueckschneidet - kein `edit`, keine `actions`. Damit gibt es
- * weder „Bearbeiten" im Kopf noch eine Fusszeile, und keinen gesperrten Knopf.
+ * Bei `budget: read` (#1265 P7) die reine Leseansicht ohne `actions` - weder
+ * „Bearbeiten" noch eine Fusszeile, kein gesperrter Knopf. Seit R24 oeffnet
+ * auch der Zeilen-Tipp mit Schreibrecht zuerst dieses Blatt: wer eine Buchung
+ * antippt, will sie meist ansehen (Betrag, Kategorie, Konto, Beleg, Serie);
+ * Bearbeiten ist darin der EINE Primaerknopf (withPrimaryEdit), dieselbe
+ * Antwort wie Inventar, Notiz, Termin und Mahlzeit.
  */
-function openEntryReadView(entry) {
+function openEntryReadView(entry, { editable = false } = {}) {
+  const actions = editable ? withPrimaryEdit([], {
+    id: 'budget-read-edit',
+    label: t('common.edit'),
+    onClick: async ({ close } = {}) => {
+      await (close ?? closeDetailView)({ force: true });
+      openBudgetModal({ mode: 'edit', entry });
+    },
+  }) : [];
   return openDetailView({
-    title: entry.title,
+    title: entry.details_hidden ? t('budget.maskedEntryTitle') : entry.title,
+    key: `budget-entry:${entry.id}`,
     size: 'sm',
     sections: entryReadSections(entry),
+    actions,
   });
 }
 
@@ -4312,6 +4490,9 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
   // rundet nie; einen Bestandswert neben dem Raster laesst das Speichern
   // unangetastet durch (amountFieldError mit `original`).
   const absAmount  = isEdit ? String(Math.abs(editAmount)) : '';
+  // Der Betrag steht in der Waehrung des gewaehlten Kontos (#2302); die
+  // Einheit am Feld wechselt mit der Kontowahl (bindEntryAccountCurrency).
+  const entryCurrency = accountCurrency(isEdit ? entry.account_id : null);
   const curInterval = isEdit && entry.recurrence_interval ? entry.recurrence_interval : 'monthly';
   // „Alle N" (#636). Bestandsserien tragen 1, solange niemand etwas anderes wählt.
   const curCount = Math.min(MAX_INTERVAL_COUNT, Math.max(1, Number(isEdit && entry.recurrence_interval_count) || 1));
@@ -4383,9 +4564,9 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
            war die einzige Zahl des Moduls ohne Waehrung. Sie steht als Suffix
            im Feld, in Sekundaerfarbe; die Ziffern tragen das Gewicht. */ ''}
       <div class="budget-amount-field">
-        <input class="form-input budget-amount-input" id="bm-amount"${amountInputAttrs(state.currency, absAmount)}
+        <input class="form-input budget-amount-input" id="bm-amount"${amountInputAttrs(entryCurrency, absAmount)}
                aria-describedby="bm-amount-unit" required>
-        <span class="budget-amount-field__unit" id="bm-amount-unit">${esc(currencySymbol(state.currency))}</span>
+        <span class="budget-amount-field__unit" id="bm-amount-unit">${esc(currencySymbol(entryCurrency))}</span>
       </div>
     </div>
 
@@ -4481,6 +4662,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
           icon: 'receipt',
         })}`,
         {
+          hint: t('budget.entryMoreDetailsHint'),
           // Beim Bearbeiten offen, sobald eine der Angaben gesetzt ist - ein
           // gesetzter Wert hinter einem geschlossenen Riegel waere unsichtbar.
           open: isEdit && (entry.is_recurring
@@ -4539,7 +4721,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
           title: entry.title,
           amount: Math.abs(entry.amount),
           date: entry.date,
-          currency: state.currency,
+          currency: accountCurrency(entry.account_id),
           participantIds: (entry.responsible_users ?? []).map((u) => u.id),
         });
         await closeModal({ force: true });
@@ -4548,7 +4730,19 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         renderBody();
       });
 
+      // DER DIALOG SPRINGT BEIM TYPWECHSEL NICHT (Critique R24
+      // G4-Budget-P2-1): Ausgabe -> Umbuchung liess ihn um 220px wachsen, die
+      // Oberkante sprang von y134 auf y24. Die Hoehe, die er einmal hatte,
+      // bleibt sein Mindestmass; ein kuerzerer Typ laesst unten Luft statt
+      // die Felder unter dem Finger zu verschieben.
+      const holdHeight = () => {
+        const sheet = panel.closest?.('.modal-panel') ?? panel;
+        const height = sheet.getBoundingClientRect?.().height ?? 0;
+        const held = parseFloat(sheet.style?.minBlockSize) || 0;
+        if (height > held && sheet.style) sheet.style.minBlockSize = `${Math.round(height)}px`;
+      };
       const setType = (type) => {
+        if (type !== currentType) holdHeight();
         currentType = type;
         // Den Zustand der Leiste (is-active, aria-checked, tabindex) malt
         // wireTablist - hier nur, was am Typ haengt.
@@ -4682,6 +4876,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         }),
       });
       panel.querySelector('#bm-category').addEventListener('change', () => updateSubcategoryOptions());
+      bindEntryAccountCurrency(panel);
       panel.querySelector('#bm-recurring').addEventListener('change', (e) => {
         panel.querySelector('#bm-recurrence-options').hidden = !e.target.checked;
       });
@@ -4952,6 +5147,28 @@ function requestNameInPanel(panel, { title, label, placeholder }) {
 // Kursfeld erscheint nur bei einer von der Budget-Währung abweichenden Wahl -
 // solange beide gleich sind, gibt es nichts umzurechnen. Die Option-Liste füllt
 // wireLoanCurrencyFields() nach dem Einfügen (geteilte CURRENCY_CODES).
+/** Die Waehrung des im Buchungsdialog gewaehlten Kontos (#2302). */
+function entryDialogCurrency(panel) {
+  const value = panel.querySelector('#bm-account')?.value;
+  return accountCurrency(value ? Number(value) : null);
+}
+
+/**
+ * Die Einheit am Betragsfeld folgt der Kontowahl (#2302) - wie die Umbuchung
+ * dem Quellkonto folgt. Platzhalter und Stellenzahl gehen mit; den Wert
+ * prueft das Speichern.
+ */
+function bindEntryAccountCurrency(panel) {
+  const select = panel.querySelector('#bm-account');
+  if (!select) return;
+  select.addEventListener('change', () => {
+    const currency = entryDialogCurrency(panel);
+    const unit = panel.querySelector('#bm-amount-unit');
+    if (unit) unit.textContent = currencySymbol(currency);
+    setAmountCurrency(panel.querySelector('#bm-amount'), currency);
+  });
+}
+
 /**
  * Die Feldfehler des Buchungsdialogs, ALLE zugleich, als `[feld, meldung]`
  * fuer reportFieldErrors (Critique R19). Ein Betrag, der fehlt, und einer, der
@@ -4967,7 +5184,7 @@ export function entryFormErrors(panel, { title, category, subcategory, date, ori
     !title && [panel.querySelector('#bm-title'), t('common.titleRequired')],
     // Der Grund kommt aus dem TEXT des Feldes (D1): gruppiert, keine Zahl,
     // nicht positiv oder zu viele Stellen - nie ein stilles Fehllesen.
-    amountFieldError(panel.querySelector('#bm-amount'), state.currency, { required: true, original }),
+    amountFieldError(panel.querySelector('#bm-amount'), entryDialogCurrency(panel), { required: true, original }),
     !category && [panel.querySelector('#bm-category'), t('budget.categoryRequired')],
     Boolean(category) && !subcategory && subcategoryChoice(category).required
       && [panel.querySelector('#bm-subcategory'), t('budget.subcategoryRequired')],
@@ -5029,8 +5246,8 @@ function wireLoanCurrencyFields(panel) {
     // Kreditsumme und Darlehensbetrag stehen in der gewählten Währung, nicht in
     // der Budget-Währung: ohne das Nachziehen zeigte ein auf JPY gestelltes
     // Darlehen weiter "0,00" und liesse Hundertstel Yen zu.
-    setAmountCurrency(panel.querySelector('#lm-amount'), select.value);
-    setAmountCurrency(panel.querySelector('#lm-principal'), select.value);
+    setAmountUnit(panel.querySelector('#lm-amount'), select.value);
+    setAmountUnit(panel.querySelector('#lm-principal'), select.value);
 
     const foreign = select.value !== state.currency;
     rateGroup.hidden = !foreign;
@@ -5057,6 +5274,7 @@ function wireLoanCurrencyFields(panel) {
 function loanIdentityFieldsHtml(loan) {
   const borrowed = isBorrowedLoan(loan);
   return `
+    <div class="form-grid-2">
     <div class="form-group">
       <label class="form-label" for="lm-direction">${t('budget.loanDirectionLabel')}</label>
       <select class="form-input" id="lm-direction">
@@ -5072,12 +5290,17 @@ function loanIdentityFieldsHtml(loan) {
              placeholder="${t(borrowed ? 'budget.loanLenderPlaceholder' : 'budget.loanBorrowerPlaceholder')}"
              value="${esc(loan?.borrower ?? '')}" required>
     </div>
+    </div>`;
+}
+
+/** Titel des Darlehens - selten gesetzt, er steht hinter "Weitere Angaben" (R24). */
+function loanTitleFieldHtml(loan) {
+  return `
     <div class="form-group">
       <label class="form-label" for="lm-title">${t('budget.loanTitleLabel')}</label>
       <input type="text" class="form-input" id="lm-title" maxlength="200"
              placeholder="${t('budget.loanTitlePlaceholder')}" value="${esc(loan?.title ?? '')}">
-    </div>
-    ${loanAccountFieldHtml(loan)}`;
+    </div>`;
 }
 
 // Konto für die Raten (#638): Bis dahin hatte der Raten-Eintrag nie eine
@@ -5135,7 +5358,7 @@ function loanInterestFieldsHtml(loan) {
     <div id="lm-interest-fields" ${mode === 'none' ? 'hidden' : ''}>
       <div class="form-group">
         <label class="form-label" for="lm-principal">${t('budget.loanPrincipalLabel')}${REQUIRED_MARK}</label>
-        <input class="form-input" id="lm-principal"${amountInputAttrs(currency, it?.principal ?? '')} required>
+        ${amountFieldHtml({ id: 'lm-principal', currency, value: it?.principal ?? '' })}
       </div>
       <div class="form-grid-2">
         <div class="form-group">
@@ -5342,13 +5565,20 @@ function wireLoanPaidInstallmentsField(panel) {
 function loanFormFieldsHtml(loan, { startMonth }) {
   const isEdit = Boolean(loan);
   const loanCurrency = loan?.currency || state.currency;
+  /* DAS DARLEHEN IM GELDGERUEST (Critique R24 G4-Budget-P1-1): zwoelf Felder
+   * standen offen untereinander, 850px. Jetzt zuerst, was das Darlehen
+   * ausmacht - Richtung und Gegenueber, Zinsart, Betrag (Zeichen der Waehrung
+   * im Feld) und Raten, Start und Faelligkeit -, dahinter "Weitere Angaben"
+   * mit Titel, Konto, Waehrung und Notizen. Offen, sobald eines davon einen
+   * Wert traegt (auch eine fremde Waehrung). */
+  const foreign = loanCurrency !== state.currency;
+  const more = Boolean(loan?.title || loan?.notes || loan?.account_id) || foreign;
   return `
     ${loanIdentityFieldsHtml(loan)}
-    ${loanCurrencyFieldsHtml(loan)}
     <div class="form-grid-2" id="lm-manual-fields">
       <div class="form-group">
         <label class="form-label" for="lm-amount">${t('budget.loanAmountLabel')}${REQUIRED_MARK}</label>
-        <input class="form-input" id="lm-amount"${amountInputAttrs(loanCurrency, loan ? loan.total_amount : '')} required>
+        ${amountFieldHtml({ id: 'lm-amount', currency: loanCurrency, value: loan ? loan.total_amount : '' })}
       </div>
       <div class="form-group">
         <label class="form-label" for="lm-installments">${t('budget.loanInstallmentsLabel')}${REQUIRED_MARK}</label>
@@ -5357,6 +5587,7 @@ function loanFormFieldsHtml(loan, { startMonth }) {
       </div>
     </div>
     ${loanInterestFieldsHtml(loan)}
+    <div class="form-grid-2">
     <div class="form-group">
       <label class="form-label" for="lm-start">${t('budget.loanStartMonthLabel')}${REQUIRED_MARK}</label>
       <input type="month" class="form-input" id="lm-start" value="${esc(loan?.start_month ?? startMonth)}" required>
@@ -5369,6 +5600,7 @@ function loanFormFieldsHtml(loan, { startMonth }) {
              inputmode="numeric" value="${loan?.due_day ?? ''}" aria-describedby="lm-due-day-hint">
       <p class="form-hint budget-loan-hint" id="lm-due-day-hint">${t('budget.loanDueDayHint')}</p>
     </div>
+    </div>
     ${isEdit ? '' : `
     <div class="form-group">
       <label class="form-label" for="lm-paid">${t('budget.loanPaidInstallmentsLabel')}</label>
@@ -5376,10 +5608,14 @@ function loanFormFieldsHtml(loan, { startMonth }) {
              inputmode="numeric" value="0">
       <p class="form-hint budget-loan-hint">${t('budget.loanPaidInstallmentsHint')}</p>
     </div>`}
+    ${advancedSection(`
+    ${loanTitleFieldHtml(loan)}
+    ${loanAccountFieldHtml(loan)}
+    ${loanCurrencyFieldsHtml(loan)}
     <div class="form-group">
       <label class="form-label" for="lm-notes">${t('budget.loanNotesLabel')}</label>
       <textarea class="form-input" id="lm-notes" rows="3" maxlength="1000">${esc(loan?.notes ?? '')}</textarea>
-    </div>`;
+    </div>`, { hint: t('budget.loanMoreDetailsHint'), open: more })}`;
 }
 
 /** Verhalten zu loanFormFieldsHtml() - ebenfalls die eine Stelle für beide Dialoge. */
@@ -5545,6 +5781,7 @@ const BUDGET_REFUSALS = new Map([
   ['account_type_invalid', ['#am-type', BUDGET_SAVE_FAILED]],
   ['account_has_transfers', [null, 'budget.accountHasTransfers']],
   ['account_color_invalid', [null, BUDGET_SAVE_FAILED]],
+  ['account_currency_invalid', [null, 'budget.loanCurrencyInvalid']],
   // Kategorie aus dem Buchungsdialog (categories.js) - die Saetze der Verwaltung.
   ['category_name_invalid', [null, 'common.nameRequired']],
   ['subcategory_name_invalid', [null, 'common.nameRequired']],
@@ -5558,6 +5795,7 @@ const BUDGET_REFUSALS = new Map([
   ['loan_payment_amount_exceeds', [null, 'budget.amountExceedsLoanRemaining']],
   ['loan_payment_date_invalid', [null, 'calendar.invalidDate']],
   ['loan_payment_installment_invalid', [null, BUDGET_FAILED]],
+  ['loan_payment_rate_unavailable', ['#bm-amount', 'budget.loanPaymentRateUnavailable']],
 ]);
 
 /**
@@ -5817,6 +6055,7 @@ function openLoanModal(loan = null) {
   openSharedModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('budget.editLoan') : t('budget.newLoan'),
+    initialFocus: isEdit ? 'edit' : 'first-field',
     content,
     // 520 statt 400 (R17, E6): achtzehn Felder, darunter Zweierreihen - im
     // 400er-Blatt (innen 366) fielen die Paare einspaltig und der Dialog
@@ -6303,6 +6542,14 @@ async function deleteEntrySeries(id) {
 // statt Quelltext-Regex.
 export const __test = {
   entryFormErrors,
+  // R24 S10-F3: der Tipp auf ein Konto oeffnet sein Leseblatt (test-budget-readonly-ui.js).
+  openAccountReadView,
+  // R24 E1: der Tipp auf eine Buchung oeffnet das Leseblatt (test-budget-readonly-ui.js).
+  openEntryReadView,
+  // #2302: der Betrag im Buchungsdialog folgt der Waehrung des Kontos.
+  bindEntryAccountCurrency,
+  // #2302: im Kontofilter steht die Uebersicht in der Waehrung des Kontos.
+  viewCurrency, transferSummaryHtml, entryRows, renderTrend,
   monthNavHtml,
   // #1775: das Datum eines neuen Eintrags folgt dem gezeigten Zeitraum.
   newEntryDefaultDate,

@@ -1,3 +1,4 @@
+import { wirePasswordToggle } from "/utils/auth-ui.js";
 import { api } from "/api.js";
 import { dateTimeText } from '/utils/date-format.js';
 import { t } from "/i18n.js";
@@ -115,14 +116,9 @@ function buildConnectionForm() {
       })}
       ${settingRowHtml({
         label: t("settings.documentStoragePassword"), labelFor: "document-storage-password",
-        control: `<div class="settings-webdav-pw-wrap">
-          <input class="form-input" type="password" id="document-storage-password" name="password"
-            autocomplete="new-password" placeholder="${t("settings.documentStoragePasswordPlaceholder")}" />
-          <button type="button" class="btn btn--icon btn--ghost settings-webdav-reveal-btn"
-            data-reveal-target="document-storage-password" aria-label="${t("common.togglePasswordVisibility")}">
-            <i data-lucide="eye" aria-hidden="true"></i>
-          </button>
-        </div>`,
+        // Das Auge sitzt IM Feld (wirePasswordToggle), wie bei der Sicherung.
+        control: `<input class="form-input" type="password" id="document-storage-password" name="password"
+            autocomplete="new-password" placeholder="${t("settings.documentStoragePasswordPlaceholder")}" />`,
         extra: `<span class="form-hint" data-env-hint="password" hidden>${t("settings.documentStorageEnvHint")}</span>`,
       })}
       ${settingRowHtml({
@@ -245,16 +241,7 @@ function bindConnectionForm(container, form, reload) {
     syncBackupWarning(event.currentTarget.checked);
   });
 
-  form.querySelector("[data-reveal-target]")?.addEventListener("click", (event) => {
-    const button = event.currentTarget;
-    const input = form.querySelector(`#${button.dataset.revealTarget}`);
-    if (!input) return;
-    const reveal = input.type === "password";
-    input.type = reveal ? "text" : "password";
-    const icon = button.querySelector("[data-lucide]");
-    if (icon) icon.dataset.lucide = reveal ? "eye-off" : "eye";
-    window.lucide?.createIcons({ el: button });
-  });
+  wirePasswordToggle(form.querySelector("#document-storage-password"), { show: t("login.showPassword"), hide: t("login.hidePassword") });
 
   const testBtn = form.querySelector("#document-storage-test-btn");
   const result = form.querySelector("#document-storage-test-result");

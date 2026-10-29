@@ -342,6 +342,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  /* Die Liste nimmt die Spalte, nicht ihre Inhaltsbreite (R24): seit der
+   * Hinzufuegen-Knopf eine Zeile ist statt einer Kapsel nach Inhalt, gab es
+   * kein Kind mehr, das die Breite vorgab, und "Formular unterschreiben" brach
+   * in einer 150px-Liste um. Werte nehmen sonst ihre eigene Breite
+   * (`.detail-row__text`, align-items: flex-start). */
+  align-self: stretch;
 }
 
 .detail-subtask {
@@ -421,37 +427,29 @@
 
 /* Der Einstieg steht IN der Liste, nicht daneben: die Karte blendet ihre
    Inline-Aktionen unter 640px aus, und ohne diesen Knopf gab es auf dem
-   Telefon keinen Weg zur ersten Teilaufgabe (#925). Gestrichelt und in
-   Sekundaerfarbe wie sein Gegenstueck in der aufgeklappten Kartenliste
-   (.subtask-item__add) - er ist eine Einladung, kein Teilschritt. */
+   Telefon keinen Weg zur ersten Teilaufgabe (#925).
+
+   EINE RUHIGE ZEILE, KEINE GESTRICHELTE KAPSEL (Critique R24,
+   G2-Aufgaben-P3-2). Er war die einzige gestrichelte Kapsel der App neben
+   seinem Gegenstueck in der Kartenliste (.subtask-item__add). Jetzt ist er
+   eine Zeile der Liste wie in Apples Erinnerungen: das Plus steht, wo bei den
+   Teilaufgaben der Ring steht (gleich breit, der Text fluchtet mit ihren
+   Titeln), Schrift sekundaer, unter dem Zeiger im Modulton. */
 .detail-subtask--add {
-  /* Nach Inhalt breit, ohne den Negativrand der Zeilen: die Liste ist in der
-   * Detailzeile nur so breit wie ihr Inhalt, und `width: 100%` plus -8px Rand
-   * je Seite machte den Knopf 16px schmaler als seinen Text - "Teilaufgabe /
-   * hinzufuegen" brach auf 60px Hoehe um (Sichtpruefung 2026-09-26). */
-  width: auto;
-  margin-inline: 0;
-  /* EINE BUTTONFORM: die Kapsel (tokens.css, Sonde 3 der Dokument-Guards).
-   * Er ist kein Teilschritt, also keine Zeile der Liste, sondern ein Knopf
-   * nach Inhalt breit - wie die gestrichelte Kapsel `.list-tab__new` im
-   * Einkauf. Mit dem 10px-Radius der Zeilen stand er seit der Detailspalte
-   * ab 1280px (R10) als zweite Form im Dokument. Das Polster rueckt den Text
-   * aus der Rundung. */
-  padding-inline: var(--space-3);
-  border-radius: var(--radius-full);
   color: var(--color-text-secondary);
-  border: var(--space-px) dashed var(--color-border);
-  transition: border-color var(--transition-fast), color var(--transition-fast);
+  transition: color var(--transition-fast);
+}
+
+.detail-subtask--add > svg {
+  box-sizing: content-box;
+  flex-shrink: 0;
+  width: var(--icon-md);
+  height: var(--icon-md);
+  padding-inline: calc((var(--space-5) - var(--icon-md)) / 2);
 }
 
 .detail-subtask--add:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-  background: none;
-}
-
-.detail-subtask--add:hover svg {
-  color: var(--color-accent);
+  color: var(--module-accent, var(--color-accent));
 }
 
 /* Die Eingabezeile, in die sich „Teilaufgabe hinzufuegen" verwandelt (A3
@@ -593,6 +591,17 @@
    * Kurzform eine zweite Timing-Funktion mit. Die Deklaration wäre ungültig und
    * fiele stillschweigend auf animation: none zurück. */
   animation: detail-pane-enter var(--duration-sm) var(--ease-out);
+}
+
+/* DER BEHAELTER TRAEGT KEINEN RING (R24 S13). Das Popover nimmt beim Oeffnen
+ * selbst den Fokus (detail-view.js, tabIndex -1), damit Tab in seine Knoepfe
+ * fuehrt. Nach einem Mausklick auf eine Mahlzeitkarte gab Chrome ihm den
+ * violetten Ring (die Karte haengt an SortableJS, der Klick fokussierte
+ * nichts), am Termin nicht - dieselbe Karte in zwei Zustaenden. Wie beim
+ * Dialogtitel (`.modal-panel__title[tabindex="-1"]:focus`, layout.css): ein
+ * Ring um eine Karte verspraeche eine Bedienung, die es nicht gibt. */
+.detail-popover:focus {
+  outline: none;
 }
 
 /* DER AUSGANG (Critique R18): die Karte blendete ein und war beim Schliessen

@@ -325,3 +325,40 @@ test('R23: der Weiterschalt-Knopf der Karte traegt kein Abspielzeichen', async (
   assert.match(line, /next === 'in_progress' \? 'circle-dot-dashed'/, line);
   assert.doesNotMatch(src, /'circle-play'/);
 });
+
+// R24 (Critique G2-Aufgaben-P3-1): die LEERE Ablage nahm ein Viertel des
+// Bretts ("Keine Aufgaben" in 280px neben drei arbeitenden Spalten). Leer ist
+// sie am Desktop nur so breit wie ihr Kopf - und bleibt Ablageziel.
+test('R24: die leere Ablage ist nur ihr Kopf breit, die gefuellte eine volle Spalte', () => {
+  const cols = tasks.KANBAN_COLS();
+  const grouped = {};
+  for (const col of cols) grouped[col.status] = [];
+  grouped.open.push(AUFGABE(1, 'open'));
+  const leer = tasks.kanbanBoardHtml(cols, grouped);
+  assert.match(leer, /class="kanban-col kanban-col--vacant" data-status="archived"/, 'die leere Ablage traegt ihre Marke');
+  assert.match(leer, /data-drop-zone="archived"/, 'und bleibt Ablageziel');
+  assert.equal((leer.match(/kanban-col--vacant/g) ?? []).length, 1, 'nur die Ablage, keine leere Arbeitsspalte');
+  grouped.archived.push({ ...AUFGABE(2, 'done'), archived_at: '2026-10-01T10:00:00Z' });
+  assert.doesNotMatch(tasks.kanbanBoardHtml(cols, grouped), /kanban-col--vacant/, 'mit Karte ist sie eine volle Spalte');
+  const regel = [...eachRule(tasksCss)].find((r) => r.selector.trim() === '.kanban-board:has(> .kanban-col--vacant)');
+  assert.ok(regel, 'Rasterregel fuer die leere Ablage fehlt');
+  assert.ok(regel.at.some((a) => /min-width:\s*1024px/.test(a)), 'nur dort, wo alle Spalten nebeneinander stehen');
+  assert.match(regel.body, new RegExp(`repeat\\(${cols.length - 1}, minmax\\(0, 1fr\\)\\) max-content`),
+    'die arbeitenden Spalten teilen sich den Rest, die Ablage nimmt ihre Inhaltsbreite');
+});
+
+// R24 (Critique G2-Aufgaben-P3-4): der Weiterschalt-Knopf war ein 24px-Kreis
+// mit wechselndem Zeichen; das Verb stand nur im Tooltip. Jetzt steht es da.
+test('R24: der Weiterschalt-Knopf traegt sein Verb sichtbar, der Name nennt weiter die Aufgabe', () => {
+  const verb = (task) => /<span class="kanban-card__status-verb">([^<]*)<\/span>/.exec(tasks.renderKanbanCard(task))?.[1];
+  assert.equal(verb(AUFGABE(1, 'open')), 'tasks.detailStart');
+  assert.equal(verb(AUFGABE(1, 'in_progress')), 'tasks.detailFinish');
+  assert.equal(verb(AUFGABE(1, 'done')), 'tasks.detailReopen');
+  assert.equal(verb({ ...AUFGABE(1, 'done'), archived_at: '2026-10-01T10:00:00Z' }), 'tasks.kanbanRestore');
+  assert.match(tasks.renderKanbanCard(AUFGABE(1, 'open')), /aria-label="[^"]*kanbanMoveToInProgressNamed/,
+    'der Name nennt weiter Handlung UND Aufgabe (#1607)');
+  // Mobil ist die Karte eine Zeile: dort bleibt der Kreis, das Verb geht.
+  const mobil = [...eachRule(tasksCss)].find((r) => r.selector.trim() === '.kanban-card__status-verb'
+    && r.at.some((a) => /max-width:\s*639px/.test(a)));
+  assert.ok(mobil && /display:\s*none/.test(mobil.body), 'unter 640px kostete das Verb dem Titel 90px');
+});

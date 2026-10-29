@@ -27,15 +27,19 @@ function body(src, signature) {
 test('ux.js: offerUndo ist der eine Baustein der Quittung mit Rueckweg', () => {
   const ux = read('public/utils/ux.js');
   const fn = body(ux, 'export function offerUndo(');
-  assert.match(fn, /showToast\(message, 'default', duration, action\)/, 'eine Form: default, Frist, Aktion');
+  assert.match(fn, /showToast\(message, 'default', duration, action, \{ scope, handle \}\)/, 'eine Form: default, Frist, Aktion (seit R24 mit Modul-Marke und Nachtrag)');
+  // QUITTUNG IM TIPP (R24): Rueckgaengig wartet auf die laufende Anfrage und tut nichts, wenn sie scheiterte.
+  assert.match(fn, /if \(pending\) \{\s*try \{ await pending; \} catch \{ return; \}\s*\}\s*try \{\s*await undo\(\);/);
 });
 
 test('Aufgaben: die Quittung liest den Titel VOR dem Neuladen und nennt offene Teilaufgaben', () => {
   const src = read('public/pages/tasks.js');
-  // An beiden Gesten (Haken, Wisch) steht der Schnappschuss vor dem Statuswechsel.
-  const sites = [...src.matchAll(/const before = taskSnapshot\((\w+)\);\s*\n\s*try \{\s*\n\s*const response = await toggleTaskStatus/g)];
-  assert.equal(sites.length, 2, 'Haken und Wisch merken Titel und Teilaufgaben vor dem Wechsel');
-  assert.equal((src.match(/acknowledgeStatusToggle\(container, \w+, nextStatus, response, before\)/g) ?? []).length, 2);
+  // An beiden Gesten (Haken, Wisch) steht der Schnappschuss vor dem Statuswechsel -
+  // und seit R24 (G0-Shell-P1-2) die Quittung auch VOR dem ersten `await`: sie
+  // bekommt die laufende Anfrage, nicht deren Antwort.
+  const sites = [...src.matchAll(/const before = taskSnapshot\((\w+)\);(?:\s*\/\/[^\n]*)*\s*const pending = toggleTaskStatus\(\w+, \w+\);\s*acknowledgeStatusToggle\(container, \1, nextStatus, pending, before\);\s*try \{\s*await pending;/g)];
+  assert.equal(sites.length, 2, 'Haken und Wisch quittieren im Tipp, mit Titel und Teilaufgaben von vor dem Wechsel');
+  assert.equal((src.match(/acknowledgeStatusToggle\(container, \w+, nextStatus, \w+, before\)/g) ?? []).length, 2);
   const ack = body(src, 'function acknowledgeStatusToggle(');
   assert.match(ack, /tasks\.doneSubtasksOpen/);
   assert.match(ack, /tasks\.checkAllSubtasks/);
@@ -58,6 +62,27 @@ test('Haushaltshilfe: Auschecken quittiert mit Name und oeffnet die Sitzung wied
   // Folgezustand: nach dem Auschecken ist "Einchecken" nicht mehr der Primaerknopf.
   assert.match(src, /checkedIn \|\| doneToday \? 'btn--secondary' : 'btn--primary'/);
   assert.match(src, /housekeeping\.checkInAgain/);
+});
+
+// R24 (G0-Shell-P1-2, G2-Quer-P2-2): die Quittung kam nach dem Roundtrip
+// (300-700 ms) und hiess "Aufgabe erledigt." - ohne Objekt, und nach einem
+// Modulwechsel im naechsten Modul. Jetzt steht sie VOR dem ersten `await` und
+// nennt die Arbeit; der Besuch geht mit Rueckgaengig statt mit Rueckfrage.
+test('Haushaltshilfe: Erledigen und Ein-/Auschecken quittieren im Tipp, der Besuch geht mit Rueckgaengig', () => {
+  const src = read('public/pages/housekeeping.js');
+  const complete = body(src, 'async function completeTask(');
+  assert.match(complete, /const pending = api\.post\(`\/housekeeping\/decay-tasks\/\$\{task\.id\}\/complete`, \{\}\);\s*offerUndo\(\{\s*message: t\('housekeeping\.taskDoneNamed', \{ name: task\.name \}\),\s*pending,/,
+    'Erledigen: Quittung mit Namen, bevor die Anfrage antwortet');
+  assert.ok(complete.indexOf('offerUndo(') < complete.indexOf('await '), 'kein await vor der Quittung');
+  const session = body(src, 'async function toggleSession(');
+  assert.ok(session.indexOf("t('housekeeping.checkedOutNamed'") < session.indexOf('await pending'), 'Auschecken: Quittung vor dem Warten');
+  assert.ok(session.indexOf("t('housekeeping.checkedInNamed'") < session.lastIndexOf('await pending'), 'Einchecken: Quittung vor dem Warten');
+  const wire = body(src, 'function wireVisitRows(');
+  assert.doesNotMatch(wire, /confirmModal\(/, 'ein Besuch ist kein Behaelter - keine Rueckfrage');
+  const del = body(src, 'function deleteVisitWithUndo(');
+  assert.match(del, /scheduleUndoableDelete\(\{\s*message: t\('housekeeping\.visitDeletedNamed', \{ date \}\)/);
+  assert.match(body(src, 'async function payVisit('), /housekeeping\.visitPaidNamed/);
+  assert.match(body(src, 'async function unpayVisit('), /housekeeping\.visitUnpaidNamed/);
 });
 
 test('Gesundheit: eine Dosis quittiert mit Namen und schreibt beim Rueckgaengig den Abzug gut', () => {

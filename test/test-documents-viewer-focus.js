@@ -194,9 +194,13 @@ test('R21 S8: das Bild steht auf einer Buehne mit Ladezeichen, die mit dem Bild 
 
     const attrs = new Set(['data-stage-loading']);
     const img = element('img', { complete: false, naturalWidth: 0 });
+    const inserted = [];
+    let removed = false;
     const stage = element('stage', {
       removeAttribute: (a) => { attrs.delete(a); },
       querySelector: (sel) => (sel.startsWith('img.document-viewer__image') ? img : null),
+      insertAdjacentHTML: (where, html) => { inserted.push({ where, html }); },
+      remove: () => { removed = true; },
     });
     const panel = element('panel', {
       querySelector: (sel) => (sel === '.document-viewer__stage[data-stage-loading]' ? stage : null),
@@ -204,9 +208,41 @@ test('R21 S8: das Bild steht auf einer Buehne mit Ladezeichen, die mit dem Bild 
     options.onSave(panel);
     assert.ok(attrs.has('data-stage-loading'), 'die Buehne gab den Ladezustand vor dem Bild auf');
     img.fire(outcome);
-    assert.equal(attrs.has('data-stage-loading'), false, `nach ${outcome} blieben Poster und Ladezeichen stehen`);
+    if (outcome === 'load') {
+      assert.equal(attrs.has('data-stage-loading'), false, 'nach load blieben Poster und Ladezeichen stehen');
+      assert.equal(removed, false, 'ein geladenes Bild bleibt stehen');
+    } else {
+      // R24, Critique G4 P2-1: ein kaputtes Bild ist keine Buehne. Statt des
+      // Broken-Image-Zeichens steht die Ersatzkarte des Betrachters da.
+      assert.equal(removed, true, 'nach error blieb das kaputte Bild auf der Buehne stehen');
+      assert.equal(inserted.length, 1, 'keine Ersatzkarte eingesetzt');
+      assert.equal(inserted[0].where, 'afterend');
+      assert.match(inserted[0].html, /class="document-viewer__unsupported" role="alert"/);
+      assert.match(inserted[0].html, /documents\.viewerImageFallbackHint/);
+      assert.match(inserted[0].html, /impfpass\.jpg/, 'die Karte nennt die Datei');
+    }
     options.onClose?.();
   }
+});
+
+test('R24 G4 P2-1: ein Bild, das schon gescheitert ist, bevor die Buehne verdrahtet wird, bekommt die Ersatzkarte', () => {
+  const IMG = { ...PDF, id: 5, name: 'Kassenbon', original_name: 'bon.jpg', mime_type: 'image/jpeg' };
+  let options = null;
+  const previous = globalThis.__openModal;
+  globalThis.__openModal = (opts) => { options = opts; };
+  try { documentsPage.openDocumentViewer(IMG); } finally { globalThis.__openModal = previous; }
+  const img = element('img', { complete: true, naturalWidth: 0 });
+  const inserted = [];
+  let removed = false;
+  const stage = element('stage', {
+    querySelector: () => img,
+    insertAdjacentHTML: (where, html) => { inserted.push(html); },
+    remove: () => { removed = true; },
+  });
+  options.onSave(element('panel', { querySelector: (sel) => (sel.includes('data-stage-loading') ? stage : null) }));
+  assert.equal(removed, true);
+  assert.match(inserted[0] ?? '', /documents\.viewerImageFallbackHint/);
+  options.onClose?.();
 });
 
 // Critique R21 (Persona Alex): Vor und Zurueck im Betrachter - Knoepfe mit dem

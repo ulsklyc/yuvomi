@@ -9,7 +9,7 @@ import {
   confirmModal,
   openModal,
   validateAll,
-  wireBlurValidation, refocusAfterRender } from '/components/modal.js';
+  wireBlurValidation, refocusAfterRender, dialogInitialFocus } from '/components/modal.js';
 import {
   createDisclosure,
   createInlineError,
@@ -516,6 +516,8 @@ function openAccountModal(account, onDone) {
   const isEdit = Boolean(account);
   openModal({
     title: isEdit ? t('settings.cardavEditAccount') : t('settings.cardavAddAccount'),
+    // Anlegen: erstes Pflichtfeld; Bearbeiten: am Finger der Titel (R24 D4).
+    initialFocus: dialogInitialFocus(isEdit),
     size: 'sm',
     content: `
       <form id="cardav-account-form" novalidate autocomplete="off">

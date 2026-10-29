@@ -18,7 +18,7 @@
  * rechts in der Titelzeile, auf der Uebersicht wie in jedem Bereich, am
  * Telefon als Gesicht (health.css). Auf der Telefon-Uebersicht stehen
  * weiterhin der Hinweis auf die fremde Ansicht, der Satz, „Heute faellig" und
- * „Schnell erfassen" VOR der Bereichsliste - das, was man heute tut, vor dem,
+ * „Bei Bedarf" (R24) VOR der Bereichsliste - das, was man heute tut, vor dem,
  * wohin man geht.
  *
  * UMZIEHEN STATT NEU BAUEN: die Panels bauen ihren Inhalt selbst (Person,
@@ -34,7 +34,10 @@ export const HOIST_PARTS = {
   // Der Satz der Uebersicht (R21, D6) steht vor "Heute faellig".
   brief: '.health-brief',
   due: '.health-overview__card--due',
-  quick: '.health-overview__card--quick',
+  // "Bei Bedarf" steht neben "Heute faellig" (R24, Critique G5 P2-7): beides
+  // ist, was man heute einnimmt - vorher lag es mobil in der Falte unter der
+  // Bereichsliste. "Schnell erfassen" ist weg (E9: der FAB traegt das Menue).
+  prn: '.health-overview__card--prn',
 };
 
 /**
@@ -45,7 +48,7 @@ export const HOIST_PARTS = {
 export function hoistPlan({ split, overview, phone }) {
   const person = [{ part: 'person', slot: 'toolbar' }];
   if (split || !overview || !phone) return person;
-  return [...person, ...['banner', 'brief', 'due', 'quick'].map((part) => ({ part, slot: 'priority' }))];
+  return [...person, ...['banner', 'brief', 'due', 'prn'].map((part) => ({ part, slot: 'priority' }))];
 }
 
 const homes = new WeakMap();

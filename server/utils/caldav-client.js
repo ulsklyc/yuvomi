@@ -341,22 +341,41 @@ export function isAccountWideRefusal(err) {
  * geht in DIESE Collection nichts mehr hinaus. Gezählt wird ohne Spalte und
  * ohne Aufgeben - im nächsten Lauf ist die Schranke wieder offen.
  *
- *   const gate = createUploadGate();
+ * `stop` ist das Stoppsignal des Durchgangs (`createRefusalStop`,
+ * calendar-outbound.js, #2135): sperrt es das ganze Konto, gilt hier jede
+ * Collection als geschlossen, und eine kontoweite Absage eines Uploads (ohne
+ * 403) löst es für alle übrigen Phasen aus.
+ *
+ *   const gate = createUploadGate(stop);
  *   if (gate.isClosed(url)) continue;        // zählt die übersprungene Zeile
  *   try { ... } catch (err) { if (!gate.refused(url, err)) log.warn(...); }
  *   gate.report((url, err, waiting) => log.warn(...));   // EINE Zeile je Collection
  */
-export function createUploadGate() {
+export function createUploadGate(stop = null) {
   const closed = new Map(); // Collection-URL → { err, waiting }
   return {
     isClosed(collectionUrl) {
       const entry = closed.get(collectionUrl);
-      if (!entry) return false;
-      entry.waiting++;
-      return true;
+      if (entry) {
+        entry.waiting++;
+        return true;
+      }
+      // Eine frühere Phase dieses Durchgangs hat das ganze Konto gesperrt:
+      // auch der erste Upload geht nicht mehr hinaus. Ein 403 einer
+      // Collection zählt hier nicht - ein abgelehntes Löschen oder Ändern sagt
+      // nichts darüber, ob sie neue Einträge annimmt (WebDAV trennt die
+      // Rechte), und eine Absage des Uploads selbst schliesst sie ohnehin.
+      if (stop?.blocks()) {
+        closed.set(collectionUrl, { err: stop.reason(), waiting: 1 });
+        return true;
+      }
+      return false;
     },
     /** @returns {boolean} true, wenn die Absage die Collection schliesst */
     refused(collectionUrl, err) {
+      // Kontoweit (401, 429, 5xx, Netz): auch die übrigen Phasen des
+      // Durchgangs schweigen. Ein 403 schliesst nur hier diese Collection.
+      if (stop && isAccountWideRefusal(err) && err?.status !== 403) stop.trip(err, collectionUrl);
       if (!isCollectionRefusal(err)) return false;
       if (!closed.has(collectionUrl)) closed.set(collectionUrl, { err, waiting: 1 });
       return true;

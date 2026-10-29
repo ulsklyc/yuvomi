@@ -258,11 +258,121 @@
   color: var(--color-text-receded);
 }
 
+/* DIE TERMINE STEHEN UNTER DEM NAMEN IHRER ART (Critique R24,
+ * G2-Entsorgung-P3-2): zwischen Kopf und Terminzeile lagen 60px Luft (zwei
+ * 48er-Zeilen plus Polster), und die Zeile stand mit eigenem "..." eingerueckt
+ * wie eine zweite Karte. Jetzt rueckt sie unter den Namen (Polster der Zeile +
+ * Symbol + Abstand), ohne eigenes Polster des Traegers, und folgt dem Kopf im
+ * Takt einer Metazeile. */
 .waste-schedule-list {
-  padding: 0 var(--space-4) var(--space-3);
+  --waste-name-inset: calc(var(--space-3) + var(--icon-xl) + var(--space-3));
+  padding: 0 0 var(--space-2);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0;
+}
+
+.waste-schedule-list > .waste-schedule-row {
+  min-height: var(--target-md);
+  padding-block: 0;
+  padding-inline-start: var(--waste-name-inset);
+}
+
+/* Der Kopf einer Art mit Terminen gibt sein unteres Polster an die Zeilen
+ * darunter ab - sie gehoeren zu ihm, nicht neben ihn. */
+.waste-type-card:has(.waste-schedule-row) > .waste-type-row {
+  padding-block-end: 0;
+}
+
+.waste-schedule-list > .waste-schedule-row .list-row__name {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.waste-schedule-list > .waste-schedule-row > .list-row__main > svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  color: var(--color-text-tertiary);
+}
+
+.waste-schedule-list > .waste-schedule-list__empty {
+  padding-inline: var(--waste-name-inset) var(--space-3);
+}
+
+/* LEERE ARTEN IN EINER KARTE (R24, G2-Entsorgung-P3-2; waste.js
+ * `unscheduledTypesHtml`): "Ohne Termin" als Etikett, die Namen mit ihrem
+ * Symbol als leise Knoepfe (jeder oeffnet seine Art), daneben EINE Handlung. */
+.waste-unscheduled {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+}
+
+.waste-unscheduled__text {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.waste-unscheduled__label {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.waste-unscheduled__names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+
+.waste-unscheduled__name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1h);
+  min-height: var(--target-base);
+  margin-block: calc((var(--target-base) - 1lh) / -2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.waste-unscheduled__name > svg {
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  flex: none;
+}
+
+span.waste-unscheduled__name {
+  cursor: default;
+}
+
+@media (hover: hover) {
+  button.waste-unscheduled__name:hover > span {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+}
+
+.waste-unscheduled__name:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+/* HEUTE RAUSSTELLEN (R24, G2-Entsorgung-P3-2): das Etikett der Zeile, die
+ * heute zaehlt - getoent im Modulton, Text primaer (traegt auf der Toenung
+ * die volle Lesbarkeit), sonst dieselbe Form wie jedes `.tag`. */
+.tag.waste-today-tag {
+  background: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), transparent);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
 }
 
 .waste-schedule-list__empty {
@@ -390,10 +500,10 @@
 
 .waste-source-mapping-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -401,13 +511,36 @@
 
 .waste-source-mapping-row__label {
   font-size: var(--text-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
-.waste-source-mapping-row select {
-  max-width: 55%;
+/* EIN EINTRAG, MEHRERE TONNEN (#2273): die Abfallarten eines Labels als
+ * umbrechende Chip-Reihe, dieselbe Geometrie wie die Wochentage
+ * (.waste-weekday-picker). Die Glyphe traegt die Farbe der Art; der Chip
+ * selbst bleibt im Aktiv-Zustand des Kanons (filter-chip.css). */
+.waste-label-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.waste-label-types[aria-invalid="true"] {
+  outline: var(--focus-ring-width) solid var(--color-danger);
+  outline-offset: var(--space-1);
+  border-radius: var(--radius-md);
+}
+
+/* Kein Chip an: das Label wird nicht uebernommen. Ein ruhiger Satz unter der
+ * Reihe statt eines "Ignorieren"-Chips zwischen den Arten. */
+.waste-label-types__ignored {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
 }
 
 /* -------------------------------------------------------------------- */
@@ -445,37 +578,39 @@
 .waste-import-labels {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+}
+
+.waste-import-labels-hint {
+  font-size: var(--type-caption);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-2);
 }
 
 .waste-import-label-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: var(--space-2);
-  padding: var(--space-2) 0;
+  padding: var(--space-3) 0;
   border-bottom: 1px solid var(--color-border);
 }
 
 .waste-import-label-row:last-child { border-bottom: none; }
 
 .waste-import-label-row__name {
-  flex: 1 1 auto;
-  min-width: 120px;
   font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  hyphenate-limit-chars: 6 4 4;
+  -webkit-hyphenate-limit-before: 4;
+  -webkit-hyphenate-limit-after: 4;
 }
 
 .waste-import-label-row__count {
   color: var(--color-text-secondary);
   font-size: var(--text-2xs);
-}
-
-.waste-import-label-row select {
-  flex: 1 1 160px;
-}
-
-.waste-import-new-type-name {
-  flex: 1 1 160px;
+  font-weight: var(--font-weight-regular);
 }
 
 /* -------------------------------------------------------------------- */
@@ -513,59 +648,6 @@
   outline: 2px solid var(--module-accent);
   outline-offset: 2px;
 }
-
-/* -------------------------------------------------------------------- */
-/* Farbauswahl der Abfallart (Audit UX, 2026-09-12)                      */
-/* -------------------------------------------------------------------- */
-
-/* Die vierte Kopie derselben Auswahl - und bewusst eine Kopie. Notizen
-   (.note-color-swatch), Budget (.budget-color-swatch) und der
-   Kategorie-Verwalter (.cat-color-swatch) fuehren jeweils ihre eigene, obwohl
-   calendar.css mit .color-swatch eine unpraefixierte Fassung anbietet: die ist
-   trotz globalem Blatt der Hausgebrauch des Kalenders, und ein fuenftes Modul,
-   das sich stillschweigend daran haengt, macht jede Aenderung dort zu einer
-   Aenderung an fuenf Seiten. Geometrie und Zustaende sind deshalb identisch
-   uebernommen, der Name ist es nicht.
-
-   Der Swatch ist ein Farbfeld von 28px - unter der Zielgroesse. Die
-   Trefferflaeche holt `::before` mit `inset: -10px` zurueck (28 + 2x10 = 48px,
-   also --target-lg), ohne das Feld selbst aufzublasen: eine Farbwahl muss man
-   sehen koennen, und zehn tastbare Kacheln nebeneinander waeren keine Palette
-   mehr, sondern eine zweite Liste. Dieselbe Rechnung steht hinter den drei
-   Fassungen in notes.css/calendar.css. */
-.waste-color-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.waste-color-swatch {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-full);
-  border: 2px solid transparent;
-  /* Eine ruhige Innenkante in beiden Themes (Re-Critique 2026-09-28, P9):
-     im Dark lief ein Swatch ohne Kante in den Kartengrund, und der Ring der
-     Auswahl stand dann um ein Feld, dessen Rand man nicht sah. */
-  box-shadow: inset 0 0 0 1px var(--color-border);
-  position: relative;
-  cursor: pointer;
-  transition: transform var(--transition-fast), border-color var(--transition-fast);
-}
-
-.waste-color-swatch::before {
-  content: '';
-  position: absolute;
-  inset: -10px;
-  border-radius: var(--radius-full);
-}
-
-.waste-color-swatch:hover   { transform: scale(1.15); }
-
-/* Der Ring nimmt die Textfarbe, nicht die Akzentfarbe des Moduls: er muss
-   gegen ZEHN verschiedene Fuellungen bestehen, und --module-accent ist selbst
-   ein Gruenton - auf dem gruenen Swatch waere die Auswahl unsichtbar gewesen. */
-.waste-color-swatch--active { border-color: var(--color-text-primary); transform: scale(1.1); }
 
 /* -------------------------------------------------------------------- */
 /* EIN Leerzustand statt drei (Re-Critique 2026-09-28, P4)                */
@@ -620,13 +702,13 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--space-2);
-  max-inline-size: 32rem;
+  /* Sechs Vorlagen als kleine Knoepfe brauchen 628px; bei 32rem stand
+   * "Sperrmuell" allein in Zeile zwei (Critique G2-Entsorgung-P3-1). */
+  max-inline-size: 40rem;
 }
 
 .waste-onboarding__preset svg {
-  inline-size: var(--icon-md);
-  block-size: var(--icon-md);
-  flex-shrink: 0;
+  color: var(--waste-type-color, currentColor);
 }
 
 /* Die Abschnitte stehen im Spaltenraster der Seite (`.page-columns`,

@@ -283,14 +283,19 @@ export function formatDueDate(dateStr, timeStr, isDone = false) {
  * oder „Heute faellig" gehoeren an die Zeile, nicht in diesen Satz.
  *
  * @param {{ data?: { next_due_date?: string|null } | null } | null | undefined} response
- * @param {{ name?: string }} [who] die benannte Person (#1205), falls es eine gibt
+ * @param {{ name?: string, title?: string }} [who] die benannte Person (#1205), falls es eine gibt,
+ *   und der Titel der Aufgabe fuer den Satz ohne Person
  * @returns {string|null}
  */
-export function seriesDoneText(response, { name } = {}) {
+export function seriesDoneText(response, { name, title } = {}) {
   const next = response?.data?.next_due_date;
   const due = next ? formatDueDate(next, null, true) : null;
   if (!due) return null;
-  return name
-    ? t('tasks.seriesDoneByToast', { name, date: due.label })
+  if (name) return t('tasks.seriesDoneByToast', { name, date: due.label });
+  // DER SATZ NENNT DIE AUFGABE (Critique R24, Uebergabe S2; R22 D6
+  // "‹Objekt› ‹Verb›"): "Erledigt - naechstes Mal am 04.11." sagte nicht,
+  // WAS - neben jedem anderen Haken der Liste, der "„Titel“ erledigt." sagt.
+  return title
+    ? t('tasks.seriesDoneNamed', { title, date: due.label })
     : t('tasks.seriesDoneToast', { date: due.label });
 }

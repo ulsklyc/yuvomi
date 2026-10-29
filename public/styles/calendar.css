@@ -503,18 +503,14 @@
     flex: 0 0 auto;
   }
 
-  /* DER ZEITRAUM IST DER TITEL DER FLAECHE (Critique R19). Er stand in 16px/600
-   * und war damit leiser als „Kalender" (22px/700) daneben - in Apple Kalender
-   * und Fantastical ist „Oktober 2026" der Titel. Jetzt 18px fett - eine Stufe
-   * unter dem Modultitel, aber kein Fliesstext mehr. Die feste Breite waechst
-   * mit (11.75rem: „KW 42 · Oktober 2026" misst 186px), damit die Pfeile
-   * weiter stillstehen; Title 3 (20px) haette den Kopf bei 1440 zweizeilig
-   * gemacht (113 statt 69px, gemessen). */
+  /* DER ZEITRAUM IST DER TITEL DES KOPFS (#1797; vorher R19: 18px fett in
+   * einer festen 11.75rem-Box neben „Kalender" 22px). Seit der Shell-Variante
+   * „Zeitraum als Titel" (layout.css) traegt er die Titelrolle (typography.css)
+   * in seiner natuerlichen Breite, die Pfeile stehen direkt davor. Die feste
+   * Box hielt die Pfeile vom Zeitraum fern; stillstehen laesst sie jetzt die
+   * gemessene Mindestbreite je Ansicht (`syncPeriodTitleWidth`). */
   .cal-toolbar__label {
-    flex: 0 0 11.75rem;
-    font-size: var(--text-lg);
-    font-weight: var(--font-weight-bold);
-    letter-spacing: var(--tracking-tight);
+    flex: 0 0 auto;
   }
 
   .cal-toolbar__views {
@@ -671,8 +667,9 @@
     display: contents;
   }
 
+  /* `--page-status-lead`: das Ueberlappungszeichen (#1462) steht mit in Zeile 1. */
   .page-toolbar.cal-toolbar:not(.page-toolbar--in-group) > .page-toolbar__title {
-    flex: 1 1 calc(100% - var(--seal-head-lead) - var(--page-search-width) - var(--target-base) - 2 * var(--page-toolbar-gap));
+    flex: 1 1 calc(100% - var(--seal-head-lead) - var(--page-search-width) - var(--target-base) - 2 * var(--page-toolbar-gap) - var(--page-status-lead, 0px));
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -971,12 +968,12 @@
  * Klasse im Markup (calendar.js). Gemessen im Kalender: ausgeklappt 166 statt
  * 230px, eingeklappt 121px (Critique 2026-09-24: Monat 56 -> 65 % Inhalt). */
 @media (max-width: 1023px) {
-  /* Ein leerer Aktions-Slot ist keine Zeile. Unter 1024px wohnt „Neu" im
-   * schwebenden FAB (angedockt wird erst ab 1024px), und ohne
-   * Ueberlappungswarnung steht nichts mehr darin - der Slot brach trotzdem als
-   * hoehenlose Flex-Zeile um und kostete ihren Zeilenabstand (gemessen 8px in
-   * der Woche) oder verengte die Zeitraum-Zeile um seinen Gap. */
-  .cal-toolbar > .page-toolbar__actions:not(:has(.cal-toolbar__schedule-warning)) {
+  /* Der Aktions-Slot ist unter 1024px keine Zeile. „Neu" wohnt dort im
+   * schwebenden FAB (angedockt wird erst ab 1024px), „Kalender verwalten" im
+   * Filterblatt, und die Ueberlappungswarnung steht seit #1462 als Zeichen in
+   * der Titelzeile. Bis dahin hielt die Warnung den Slot offen: er brach als
+   * eigene Kopfzeile um (#1460: 166px Kopf, mit Warnung eine Zeile mehr). */
+  .cal-toolbar > .page-toolbar__actions {
     display: none;
   }
 }
@@ -1103,16 +1100,19 @@
   pointer-events: none;
 }
 
-/* Nachbarmonat: gedimmt über die FLÄCHE (Grouped-Bg statt Arbeitsweiß) und
- * die Ziffer, NICHT über Zell-Opacity. Das frühere `opacity: 0.5` halbierte
+/* Nachbarmonat: gedimmt über die ZIFFER und die Bars, NICHT über die Fläche
+ * und nie über Zell-Opacity. Bis R24 trug er `--color-bg`: hell kaum vom
+ * Wochenende (`--color-fill-well`) zu unterscheiden, der Nachbar-Sonntag 1.11.
+ * wirkte heller als jedes Wochenende, dunkel umgekehrt schwärzer (Critique
+ * G1-Kalender-P3-1). Jetzt steht er auf der Fläche seines Wochentags - werktags
+ * Arbeitsweiß, am Wochenende der Well wie im Monat selbst -, und „nicht dieser
+ * Monat" sagen die tertiäre Ziffer und die leisere Bar.
+ *
+ * Das frühere `opacity: 0.5` halbierte
  * auch den Text-Kontrast der Event-Bars: gemessen 2.3-2.7:1 light / 2.9-3.4:1
  * dark (12 Seed-Layer-Farben) - klar unter AA. Die Bars selbst behalten ihr
  * volles Rezept (≥7.2:1, Messung an .month-day__event); zurückgenommen wird
  * nur ihr Tint (10 % statt 16 %), was den Text-Kontrast noch erhöht. */
-.month-day--outside {
-  background-color: var(--color-bg);
-}
-
 .month-day--outside .month-day__number {
   color: var(--color-text-tertiary);
 }
@@ -1121,14 +1121,14 @@
   background: color-mix(in srgb, var(--ev-color) var(--tint-wash), var(--color-surface-work));
 }
 
-/* Wochenende dezent zur Orientierung getönt (Richtung Modul-Akzent). Nur Tage
- * außerhalb des Monats sind ausgenommen (eigene, gedimmte Fläche). "Heute"
+/* Wochenende dezent zur Orientierung getönt (Richtung Modul-Akzent), seit R24
+ * auch im Nachbarmonat (die Fläche folgt dem Wochentag, siehe oben). "Heute"
  * braucht keine Ausnahme mehr: die Markierung trägt seit dem Kanon-Umbau
  * allein die Ziffer, die Zelle hat keine eigene Fläche. Welche Zelle Wochenende
  * ist, entscheidet die Klasse aus renderMonthDay und nicht die Spaltenposition:
  * `:nth-child(7n)`/`7n-1` traf nur bei Wochenstart Montag Sa/So, bei Sonntag-
  * oder Samstag-Start färbte es Fr/Sa bzw. Do/Fr (#780). */
-.month-day--weekend:not(.month-day--outside) {
+.month-day--weekend {
   /* NEUTRAL statt Modul-Waschung (Critique 2026-08-27, P3): „Wochenende" ist
    * ein Kalender-Zustand, keine Herkunftsaussage - die frühere
    * --module-accent-Waschung war Modulton als Dauer-Dekor im eigenen Modul
@@ -1491,14 +1491,19 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-1);
-  /* Titel halbfett, Zeitzeile normal - dieselbe Rangfolge wie am Tagesblock. */
-  font-weight: var(--font-weight-semibold);
+  /* Titel halbfett, Zeitzeile normal - dieselbe Rangfolge wie am Tagesblock.
+   * Groesse und Gewicht: Rolle Blocktitel im Zeitraster (typography.css, R24). */
   overflow: hidden;
   /* Der Titel bleibt an der SICHTBAREN Oberkante seines Blocks, nicht an
      dessen tatsaechlicher - siehe die Begruendung an `.week-event`. Apple
      Kalender und Fantastical halten es genauso. */
   position: sticky;
   top: 0;
+  /* DIE FLAECHE DES BLOCKS (R24 S13): die Zeitzeile darunter scrollt weiter
+   * und lief ohne sie DURCH den klebenden Titel ("...Naturkundemu-/seum"
+   * ueber "08:30 - 15:00"). `inherit` nimmt die Flaeche des Blocks samt
+   * Hover; die Zeitzeile gleitet darunter weg. */
+  background: inherit;
 }
 
 /* DER TITEL BRICHT UM, SOLANGE DER BLOCK HOEHE HAT (R9 M5, A2 P2).
@@ -1835,9 +1840,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-tight);
+  /* Groesse, Gewicht, Zeilenhoehe: Rolle Blocktitel im Zeitraster (typography.css). */
   min-width: 0;
   overflow: hidden;
 }
@@ -2500,39 +2503,8 @@
  * Calendar-Modal Content-Styles (Overlay/Panel via shared modal.js)
  * -------------------------------------------------------- */
 
-/* Farbauswahl */
-.color-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.color-swatch {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-full);
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: transform var(--transition-fast), border-color var(--transition-fast);
-  position: relative;
-}
-
-.color-swatch::before {
-  content: '';
-  position: absolute;
-  inset: -10px;
-  border-radius: var(--radius-full);
-}
-
-.color-swatch:hover {
-  transform: scale(1.15);
-}
-
-.color-swatch--active {
-  border-color: var(--color-text-primary);
-  transform: scale(1.1);
-}
-
+/* Farbauswahl: der geteilte Baustein steht in layout.css (utils/color-picker.js,
+   Critique R24 E6); hier nur der Erben-Swatch des Termins. */
 /* "Keine eigene Farbe" - der Termin leiht sich die der zugewiesenen Person
    (#891). Er traegt bewusst keinen Farbwert, sondern zeigt als einziger Swatch
    ein Symbol: eine Farbflaeche waere von einer Wahl nicht zu unterscheiden, und
@@ -3615,21 +3587,27 @@
     display: none;
   }
 
-  /* Der Titel-Ring braucht links Luft: die Ziffer sitzt dort sonst auf der
-   * Zellkante, und der Auswahlring (unten) wuerde abgeschnitten. */
+  /* Die Ziffer braucht links Luft: sie sitzt dort sonst auf der Zellkante,
+   * und die Scheibe von heute wuerde angeschnitten. */
   .month-view--split.month-view--titles .month-day__number {
     margin-inline-start: var(--space-0h);
   }
 
-  /* AUSWAHL IST EIN RING, HEUTE BLEIBT DIE FUELLUNG. Beide koennen am selben
-   * Tag stehen, und dann muessen beide lesbar sein: der gefuellte Akzentkreis
-   * sagt „heute", der Ring mit 2px Luft sagt „gewaehlt". `--color-text-primary`
-   * haelt gegen jede Zellflaeche weit ueber 3:1 (light und dark), und die
-   * Luft kommt von outline-offset - kein zweiter Ring in einer Flaechenfarbe,
-   * die auf dem Wochenende eine andere waere. */
+  /* AUSWAHL IST EINE TOENUNG DER ZELLE, HEUTE DIE SCHEIBE (R24, Critique
+   * G1-Kalender-P3-2). Bis R24 trug die gewaehlte Ziffer einen dunklen Ring
+   * mit 2px Luft; am heutigen Tag sass er um die Akzentscheibe und las sich
+   * wie ein Fokusring. Jetzt sagt die Zelle „gewaehlt" - die Zustandssprosse
+   * (`--tint-state`) im Modulton UEBER ihrer Flaeche, damit Werktag und
+   * Wochenende darunter unterscheidbar bleiben -, und die Ziffer sagt allein
+   * „heute". Beide stehen am selben Tag ohne zweiten Ring. */
+  .month-view--split .month-day--selected {
+    background-image: linear-gradient(
+      color-mix(in srgb, var(--module-accent) var(--tint-state), transparent),
+      color-mix(in srgb, var(--module-accent) var(--tint-state), transparent)
+    );
+  }
+
   .month-view--split .month-day--selected .month-day__number {
-    outline: var(--space-0h) solid var(--color-text-primary);
-    outline-offset: var(--space-0h);
     font-weight: var(--font-weight-bold);
   }
 }
@@ -3816,24 +3794,17 @@
   gap: var(--space-4);
 }
 
-.cal-calendar-create {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--space-12) auto;
-  gap: var(--space-2);
-  align-items: center;
+/* KALENDER VERWALTEN IST EINE ZEILENLISTE (R24, Entscheidung E6): die
+ * geteilte Zeile (list-row.css) mit dem Farbpunkt als Fuehrung, Name und
+ * Terminzahl, am Ende das „..." - Bearbeiten ist der Tipp auf die Zeile.
+ * Darueber „+ Kalender" (klein, sekundaer, an der Startkante), darunter der
+ * Weg zu Abos und Synchronisation. */
+.cal-calendar-manager__add {
+  align-self: flex-start;
 }
 
 .cal-calendar-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.cal-calendar-row {
-  display: grid;
-  grid-template-columns: var(--space-4) minmax(8rem, 1fr) var(--space-12) auto auto;
-  gap: var(--space-2);
-  align-items: center;
+  max-width: none;
 }
 
 .cal-calendar-row__swatch {
@@ -3843,95 +3814,114 @@
   box-shadow: 0 0 0 1px var(--color-border) inset;
 }
 
-.cal-calendar-row__count {
-  color: var(--color-text-tertiary);
+.cal-calendar-manager__link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--space-1);
+  min-height: var(--target-base);
+  color: var(--color-accent);
   font-size: var(--text-sm);
-  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
 }
 
-.cal-calendar-row__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-
-@media (max-width: 639px) {
-  .cal-calendar-row {
-    grid-template-columns: var(--space-4) minmax(0, 1fr) var(--space-12);
-  }
-
-  /* Das Formular hat KEINE Farbscheibe vorn: mit der Zeilenvorlage fiel sein
-   * Namensfeld in die 16px der Scheibenspalte und das Farbfeld in die freie
-   * Breite - ein blauer Balken neben einem Feld ohne lesbaren Platzhalter.
-   * Name und Farbe stehen deshalb in eigener Vorlage, „Erstellen" darunter
-   * ueber die volle Breite. */
-  .cal-calendar-create {
-    grid-template-columns: minmax(0, 1fr) var(--space-12);
-  }
-
-  .cal-calendar-create .btn {
-    grid-column: 1 / -1;
-  }
-
-  .cal-calendar-row__count,
-  .cal-calendar-row__actions {
-    grid-column: 2 / -1;
-  }
-
-  .cal-calendar-create .btn,
-  .cal-calendar-row__actions {
-    width: 100%;
-  }
+.cal-calendar-manager__link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-xs);
 }
 
 /* Die Feiertags- und Schul-Layer tragen eine NUTZERFARBE und bekommen sie
    deshalb als Inline-Style aus den Einstellungen. Der Schichtplan hat keine -
    seine Farbe ist eine Designentscheidung und gehoert damit hierher und nicht
    ins Markup. */
-/* Der Schichtblock ist HINTERGRUND, kein Termin. Er erbt Groesse und Lage von
-   .week-event/.day-event, faellt aber in beiden Sichten vor die Termine ins
-   Markup, damit die darueber malen. `pointer-events: none` haelt die Spalte
-   klickbar: der Block trug sonst die volle Spaltenbreite und verdeckte einen
-   Termin nicht nur optisch, sondern nahm ihm auch den Klick - die Handler
-   steigen auf `.schedule-time-block` bewusst aus. */
-.schedule-time-block {
-  pointer-events: none;
-  z-index: 0;
+/* DIE SCHICHT IST EIN BAND AN DER SPALTENKANTE (R24, Entscheidung E5 a,
+ * Critique G1-Kalender-P1-1 c; calendar.js renderScheduleTimeBlock).
+ *
+ * Bis R24 stand sie als spaltenbreiter Block HINTER den Terminen
+ * (`pointer-events: none`, z-index 0): eine Fruehschicht 06-14 tuenchte jede
+ * Spalte Mo-Fr, die Termine lagen in voller Breite darueber, und keine der
+ * beiden Flaechen las sich. Jetzt ein schmales Band vorn in der Spalte, in der
+ * Zeitspanne der Schicht - Zeitblock im Sinn von R23 D14, aber der Termin
+ * bleibt das Lesbare. Ein Termin, der die Schicht beruehrt, beginnt hinter
+ * ihren Baendern (`--band-inset`, aus `--band-lanes` am Termin); einer
+ * ausserhalb behaelt die volle Spalte. Ueberlappende Schichten liegen Spur an
+ * Spur (`--band-lane`).
+ *
+ * Form und Farbe wie ein Termin, nur schmal: die 16-%-Toenung der Nutzerfarbe
+ * auf der Arbeitsflaeche, die Vollton-Kante, die 35-%-Tinte (Begruendung an
+ * `.week-event`). Das Etikett steht senkrecht, klebt an der sichtbaren
+ * Oberkante und kuerzt mit Ellipse - eine Zeile in Caption 1. */
+.week-view__col,
+.day-view__col {
+  --cal-shift-band: var(--space-5);
+  --cal-shift-lane: calc(var(--cal-shift-band) + var(--space-0h));
 }
 
-/* Migration 188 (eigene Felder): note plus jedes ueberlagerungssichtbare Feld
- * mit einem Wert, auf der Uhrzeit-Zeile statt nur im (durch
- * pointer-events:none praktisch unerreichbaren) title. Zwei FESTE Zeilen statt
- * des vorherigen Fliesstexts (Titel+Badge, Uhrzeit+Feldwert), jede einzeilig
- * mit Ellipse: bei den ueblichen 30-60-min-Bloecken der Wochenansicht fuellte
- * unvorhersehbar umbrechender Fliesstext den knappen Block schon mit
- * Titel+Uhrzeit, eine dritte Zeile fuer das Feld blieb praktisch immer unter
- * der Blockkante verborgen (overflow:clip). Mit dem Feld AUF der Uhrzeit-Zeile
- * reicht der Platz, den Titel+Uhrzeit ohnehin schon beanspruchten. */
-.schedule-time-block__title,
-.schedule-time-block__time {
-  display: block;
+.week-event,
+.day-event {
+  --band-inset: calc(var(--band-lanes, 0) * var(--cal-shift-lane));
+}
+
+.schedule-time-block {
+  --ev-color: var(--color-accent);
+  position: absolute;
+  z-index: 1;
+  inset-inline-start: calc(var(--space-0h) + var(--band-lane, 0) * var(--cal-shift-lane));
+  inline-size: var(--cal-shift-band);
+  box-sizing: border-box;
+  border-radius: var(--radius-xs);
+  border-inline-start: var(--cal-event-edge) solid var(--ev-color);
+  background: color-mix(in srgb, var(--ev-color) var(--tint-surface), var(--color-surface-work));
+  color: color-mix(in srgb, var(--ev-color) 35%, var(--color-text-primary));
+  /* `clip` statt `hidden`: das Etikett klebt sonst am Band statt am Raster
+   * (dieselbe Begruendung wie an `.week-event`). */
+  overflow: clip;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+@media (hover: hover) {
+  .schedule-time-block:hover {
+    background: color-mix(in srgb, var(--ev-color) var(--tint-raised), var(--color-surface-work));
+  }
+}
+
+.schedule-time-block:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  z-index: 3;
+}
+
+/* DAS ETIKETT BLEIBT IM BILD (R24, Critique G1 P1-1 b): eine Fruehschicht
+ * 06:00-14:00 ist 444px hoch; beginnt das Bild spaeter, klebt ihr Name an der
+ * SICHTBAREN Oberkante. Senkrecht gesetzt, weil das Band 20px breit ist;
+ * Groesse und Gewicht gibt die Rolle Blocktitel (typography.css). */
+.schedule-time-block__title {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-0h);
+  /* Senkrecht ist die Zeilenrichtung die Hoehe: das Band begrenzt sie. */
+  max-inline-size: 100%;
+  padding-inline: var(--space-1);
+  writing-mode: vertical-rl;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  /* S-17: der Block selbst bleibt pointer-events:none (siehe oben - die Spalte
-   * muss klickbar bleiben, um dort einen neuen Termin anzulegen), aber ein
-   * Klick GENAU auf den sichtbaren Text soll die Detailansicht oeffnen -
-   * deshalb hier gezielt zurueckgeholt, nur fuer diese beiden Zeilen. */
-  pointer-events: auto;
-  cursor: pointer;
+  font-variant-numeric: tabular-nums;
 }
 
-.schedule-time-block__time {
-  opacity: .85;
+.schedule-time-block__title .schedule-entry__extra-badge {
+  inline-size: var(--icon-sm);
+  block-size: var(--icon-sm);
+  flex: 0 0 auto;
 }
 
+/* Form und Farbe gibt der Status-Slot der Shell (layout.css, #1462). */
 .cal-toolbar__schedule-warning {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--color-warning);
   font-size: var(--text-sm);
 }
 

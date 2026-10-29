@@ -1,14 +1,12 @@
-<!-- version: 2.81.0 -->
-This update fixes calendar sync with iCloud, improves wall tablets on older browsers and brings a quicker birthday import.
+<!-- version: 2.82.0 -->
+This update reworks the overview, lets notes be private and brings several defaults for shared calendars and expenses.
 
-Importing birthdays from contacts now has "Select all" and "Deselect all", so a large address book no longer has to be picked one by one. On a phone, the currency and long time zones in the appearance settings are no longer cut off.
+The overview now shows the shape of your day at a glance. Every tile is as tall as what it shows, all tiles look and read alike, and "+ New" adds a task, an appointment or a note right where you are. Tiles are dragged like any list in the app, by finger too, and the Calendar tile can show only the calendars you choose.
 
-Calendar sync keeps more of what you set: assigning a household member to an iCloud event no longer turns its Apple Maps place into plain text, and a single occurrence changed on the iPhone keeps the person assigned to its series. A new event appears at its time in the day right away. A planned snack now shows up on the wall and in Today.
+A note can now be private, or locked so only its author can change it. A synced calendar, a calendar import and a reminder list can assign new entries to several people at once. A subscription books to an account of your choice, accounts in another currency show their own currency, and a shared-expenses group shows what each person paid and where the money went. Health vitals show every reading with a low-high band, one waste calendar entry can fill several bins, and the Stock page lists products with their batches underneath.
 
-Wall tablets with an older browser that cannot be updated get their footer back at the bottom of the screen, and buttons, selections and colors no longer disappear there.
+Wall tablets get night hours per device, and the screensaver dims during them. A wall display keeps its saved lists for 72 hours without your server, and the app opened without a connection shows your saved lists. Many error messages now speak your language instead of showing technical text, and calendar and reminder sync is more careful about what it removes.
 
-Creating a recipe through an AI assistant connected over MCP works again, and requests without a body now get a clear error instead of a server error. Three dependencies were updated for published security advisories.
+This update changes the database. The changes are applied automatically on the first start and need no action from you; as always, a backup before updating is a good idea.
 
-No database migration and no action is needed. As always, a backup before updating is a good idea.
-
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.81.0
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.82.0

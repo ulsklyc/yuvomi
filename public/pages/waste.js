@@ -17,7 +17,7 @@ import { dateText, dateRangeText, dateWithDistanceText } from '/utils/date-forma
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formSwitchRowHtml } from '/settings/components.js';
 import { todayKey, addLocalDays, parseLocalDateKey, toLocalDateKey } from '/utils/date.js';
-import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, confirmOverModal, btnLoading, refocusAfterRender, reportFieldError } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, confirmOverModal, btnLoading, refocusAfterRender, reportFieldError, dialogInitialFocus } from '/components/modal.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import {
@@ -25,9 +25,11 @@ import {
   renderPageActions, renderListSection, renderPageColumns,
 } from '/utils/page-layout.js';
 import { findPageFab, setPageFabAction } from '/utils/fab.js';
-import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { isNavModuleReadOnly } from '/permissions.js';
 import { createPageController } from '/utils/page-lifecycle.js';
+import { colorPickerHtml, setColorPickerValue, wireColorPicker } from '/utils/color-picker.js';
+import { intervalSentenceHtml, setIntervalSentenceKey } from '/utils/interval-sentence.js';
 import { USER_COLORS } from '/utils/color.js';
 import { redrawList } from '/utils/list-motion.js';
 import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.js';
@@ -128,19 +130,6 @@ const TYPE_PRESETS = [
  * Palette ist.
  */
 const WASTE_TYPE_COLORS = USER_COLORS;
-
-const WASTE_TYPE_COLOR_NAMES = () => ({
-  '#78808C': t('waste.colorGray'),
-  '#3B82F6': t('waste.colorBlue'),
-  '#16A34A': t('waste.colorGreen'),
-  '#D97706': t('waste.colorOcher'),
-  '#059669': t('waste.colorEmerald'),
-  '#D946EF': t('waste.colorFuchsia'),
-  '#EF4444': t('waste.colorRed'),
-  '#0891B2': t('waste.colorCyan'),
-  '#EA580C': t('waste.colorOrange'),
-  '#EC4899': t('waste.colorPink'),
-});
 
 let _container = null;
 let state = { types: [], schedules: [], occurrences: [], sources: [], loading: true, error: null, upcomingExpanded: false };
@@ -315,7 +304,12 @@ function occurrenceRowHtml(occurrence) {
         <i data-lucide="${esc(occurrence.type_icon || 'trash-2')}" style="color:${esc(occurrence.type_color || '')}" aria-hidden="true"></i>
         <span class="list-row__body">
           <span class="list-row__name">${esc(occurrence.type_name ?? '')}</span>
-          <span class="list-row__meta">${esc(pickupWhenLabel(occurrence.date_key))} ${originBadges(occurrence)}</span>
+          <span class="list-row__meta">${occurrence.date_key === todayKey()
+    // HEUTE IST DIE WICHTIGSTE ZEILE DER SEITE (Critique R24,
+    // G2-Entsorgung-P3-2): sie stand als "Heute" in derselben Metafarbe wie
+    // "in 2 Tagen". Jetzt ein Etikett im Modulton, das sagt, was zu tun ist.
+    ? `<span class="tag waste-today-tag">${esc(t('waste.putOutToday'))}</span>`
+    : esc(pickupWhenLabel(occurrence.date_key))} ${originBadges(occurrence)}</span>
         </span>
       </div>
       ${actions}
@@ -453,10 +447,14 @@ function scheduleRowHtml(schedule) {
   // dem Zeilenkoerper loeschte hier sofort eine ganze Serie.
   // Ein Menue mit einem Eintrag ist bewusst in Kauf genommen - die Alternative
   // waere, die Ausnahme zur Regel zu machen.
-  const menuId = `waste-schedule-menu-${schedule.id}`;
+  // EINE ELLIPSE JE KARTE (Critique R24, G2-Entsorgung-P3-2): die Terminzeile
+  // trug ein eigenes "..." mit genau einem Eintrag (Loeschen) unter dem "..."
+  // ihrer Abfallart - zwei Menues in einer Karte. Loeschen steht im Dialog,
+  // den die Zeile oeffnet (Fuss: Loeschen mit Wort), die Zeile selbst ist
+  // nur noch der Weg dorthin.
   return `
     <div class="list-row waste-row waste-schedule-row${schedule.active ? '' : ' waste-schedule-row--paused'}" data-id="${schedule.id}">
-      <div class="list-row__main${ro ? '' : ' list-row__main--interactive'}"${ro ? '' : ` data-action="edit-schedule" data-id="${schedule.id}" role="button" tabindex="0"`}>
+      <div class="list-row__main${ro ? '' : ' list-row__main--interactive'}"${ro ? '' : ` data-action="edit-schedule" data-id="${schedule.id}" role="button" tabindex="0" aria-label="${esc(t('common.editNamed', { name: scheduleRowName(schedule) }))}"`}>
         <i data-lucide="repeat" aria-hidden="true"></i>
         <span class="list-row__body">
           <span class="list-row__name">${esc(recurrenceSummary(schedule))}</span>
@@ -466,15 +464,6 @@ function scheduleRowHtml(schedule) {
           </span>`}
         </span>
       </div>
-      ${ro ? '' : `
-        <div class="row-actions">
-          <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('common.moreActionsNamed', { name: scheduleRowName(schedule) }))}">
-            <i data-lucide="more-horizontal" aria-hidden="true"></i>
-          </button>
-          <div class="popover-menu" id="${menuId}" popover role="menu">
-            <button type="button" role="menuitem" class="popover-menu__item popover-menu__item--danger" data-action="delete-schedule" data-id="${schedule.id}"><i data-lucide="trash-2" aria-hidden="true"></i>${esc(t('common.delete'))}</button>
-          </div>
-        </div>`}
     </div>`;
 }
 
@@ -529,14 +518,63 @@ function remainingTypePresets(types = state.types) {
     && !looks.has(`${preset.icon}|${preset.color.toUpperCase()}`));
 }
 
+/**
+ * EINE VORLAGE IST EINE ANLEGEN-HANDLUNG, KEIN FILTER (R24, G2-Entsorgung-P3-1).
+ * Sie stand als `.filter-chip` da - Filter-Optik fuer einen Knopf, der sofort
+ * eine Abfallart anlegt, und darum 48px am Desktop, wo jeder Filterchip `--sm`
+ * traegt. Jetzt der kleine Sekundaerknopf mit der Glyphe der Art; ihre Farbe
+ * kommt als Variable (`--waste-type-color`, waste.css), nicht als Farbe am
+ * Zeichen.
+ */
+function presetButtonHtml(preset) {
+  return `
+      <button type="button" class="btn btn--secondary btn--sm waste-onboarding__preset" data-action="create-preset-type" data-preset="${preset.key}" style="--waste-type-color:${esc(preset.color)}">
+        <i data-lucide="${esc(preset.icon)}" class="icon-md" aria-hidden="true"></i>
+        <span>${esc(presetLabel(preset))}</span>
+      </button>`;
+}
+
 function remainingPresetsHtml() {
   if (readOnly()) return '';
   const presets = remainingTypePresets();
   if (!presets.length) return '';
   return `<div class="waste-type-presets-more" role="group" aria-label="${esc(t('waste.typePresetLabel'))}">`
-    + presets.map((preset) => `<button type="button" class="filter-chip waste-onboarding__preset" data-action="create-preset-type" data-preset="${preset.key}">`
-      + `<i data-lucide="${esc(preset.icon)}" style="color:${esc(preset.color)}" aria-hidden="true"></i><span>${esc(presetLabel(preset))}</span></button>`).join('')
+    + presets.map(presetButtonHtml).join('')
     + '</div>';
+}
+
+/**
+ * LEERE ARTEN IN EINER ZEILE (Critique R24, G2-Entsorgung-P3-2). Vier Karten
+ * wiederholten "Noch kein Termin fuer diese Abfallart." und "+ Termin
+ * hinzufuegen" - die Seite bestand zur Haelfte aus derselben Aussage. Arten
+ * ohne Termin und ohne anstehende Abholung (und nicht archiviert) stehen jetzt
+ * gesammelt in EINER Karte: "Ohne Termin", ihre Namen (jeder oeffnet seine
+ * Art) und EINE Handlung, die nach der Art fragt.
+ */
+function isUnscheduledType(type, schedules = state.schedules, occurrences = state.occurrences) {
+  return !type.archived
+    && !schedules.some((schedule) => schedule.type_id === type.id)
+    && !occurrences.some((occ) => occ.type_id === type.id);
+}
+
+function unscheduledTypesHtml(types, ro = readOnly()) {
+  if (!types.length) return '';
+  const names = types.map((type) => {
+    const icon = `<i data-lucide="${esc(type.icon || 'trash-2')}" style="color:${esc(type.color)}" aria-hidden="true"></i>`;
+    return ro
+      ? `<span class="waste-unscheduled__name">${icon}<span>${esc(type.name)}</span></span>`
+      : `<button type="button" class="waste-unscheduled__name" data-action="edit-type" data-id="${type.id}" aria-label="${esc(t('common.editNamed', { name: type.name }))}">${icon}<span>${esc(type.name)}</span></button>`;
+  }).join('');
+  return `
+    <div class="waste-type-card waste-type-card--unscheduled">
+      <div class="waste-unscheduled">
+        <div class="waste-unscheduled__text">
+          <span class="waste-unscheduled__label">${esc(t('waste.typesWithoutSchedule'))}</span>
+          <span class="waste-unscheduled__names">${names}</span>
+        </div>
+        ${ro ? '' : `<button type="button" class="btn btn--secondary btn--sm" data-action="add-schedule"><i data-lucide="plus" aria-hidden="true"></i>${esc(t('waste.addSchedule'))}</button>`}
+      </div>
+    </div>`;
 }
 
 function typeCardHtml(type, index, total) {
@@ -663,11 +701,7 @@ function onboardingHtml({ readOnly: ro, emptyHtml = null }) {
     description: ro ? '' : t('waste.emptyTypesDescription'),
   });
   if (ro) return `<div class="waste-onboarding">${empty}</div>`;
-  const chips = TYPE_PRESETS.map((preset) => `
-      <button type="button" class="filter-chip waste-onboarding__preset" data-action="create-preset-type" data-preset="${preset.key}">
-        <i data-lucide="${esc(preset.icon)}" style="color:${esc(preset.color)}" aria-hidden="true"></i>
-        <span>${esc(presetLabel(preset))}</span>
-      </button>`).join('');
+  const chips = TYPE_PRESETS.map(presetButtonHtml).join('');
   return `
     <div class="waste-onboarding">
       ${empty}
@@ -688,7 +722,9 @@ async function createPresetType(key, button) {
   try {
     await api.post('/waste/types', { name: presetLabel(preset), icon: preset.icon, color: preset.color });
     await reloadAfterSave(() => reloadAndRender());
-    window.yuvomi?.showToast(t('waste.typeSavedToast'), 'success');
+    // "Restmuell angelegt." statt dreimal "Abfallart gespeichert" mit
+    // Zaehler (Critique R24, G2-Quer-P2-2): jede Vorlage ist ein anderer Satz.
+    window.yuvomi?.showToast(t('common.createdNamed', { name: presetLabel(preset) }), 'success');
   } catch (err) {
     if (button) button.disabled = false;
     reportError(err);
@@ -757,7 +793,13 @@ function drawTypes(host) {
     return;
   }
   host.replaceChildren();
-  host.insertAdjacentHTML('beforeend', state.types.map((type, index) => typeCardHtml(type, index, state.types.length)).join('')
+  const unscheduled = state.types.filter((type) => isUnscheduledType(type));
+  // Position und Grenzen des Hoch/Runter-Menues zaehlen nur die Karten, die
+  // stehen (R24 S13) - die leeren Arten haben in der Zeile "Ohne Termin" keine
+  // Lage, und ein Tausch mit ihnen waere unsichtbar (moveType).
+  const listed = state.types.filter((type) => !unscheduled.includes(type));
+  host.insertAdjacentHTML('beforeend', listed.map((type, index) => typeCardHtml(type, index, listed.length)).join('')
+    + unscheduledTypesHtml(unscheduled)
     + remainingPresetsHtml());
   if (window.lucide) window.lucide.createIcons({ el: host });
 }
@@ -984,11 +1026,15 @@ async function deleteOrAlreadyGone(path, goneReason) {
  * "drag is never the only way" convention).
  */
 async function moveType(id, direction) {
-  const index = state.types.findIndex((t2) => t2.id === id);
+  // NUR UNTER DEN KARTEN, DIE STEHEN (R24 S13). Seit die leeren Arten in EINER
+  // Zeile "Ohne Termin" stehen (G2-Entsorgung-P3-2), tauschte eine Karte vor
+  // einer leeren Art mit ihr - unsichtbar, die Liste stand danach wie vorher.
+  const listed = state.types.filter((type) => !isUnscheduledType(type));
+  const index = listed.findIndex((t2) => t2.id === id);
   const swapWith = direction === 'up' ? index - 1 : index + 1;
-  if (index === -1 || swapWith < 0 || swapWith >= state.types.length) return;
-  const a = state.types[index];
-  const b = state.types[swapWith];
+  if (index === -1 || swapWith < 0 || swapWith >= listed.length) return;
+  const a = listed[index];
+  const b = listed[swapWith];
   try {
     await api.put(`/waste/types/${a.id}`, { sort_order: b.sort_order });
     await api.put(`/waste/types/${b.id}`, { sort_order: a.sort_order });
@@ -1065,55 +1111,6 @@ async function pickTypeIcon(button) {
   setTypeIconButtonIcon(button, chosen);
 }
 
-/**
- * Pure: liest die Farbe des aktuell aktiven Swatch aus einem Dialog-Panel,
- * mit Rueckfall auf die Farbe, mit der der Dialog geoeffnet wurde (kein
- * Swatch aktiv waere ein Zustand, den die Tastatur-/Klick-Verdrahtung oben
- * eigentlich nie zulaesst - der Rueckfall ist trotzdem kein leerer Wert).
- *
- * Eigens herausgezogen (Review-Nice-to-have), weil die Speicherlogik sonst
- * nirgends bindend testbar war: ein Gegenbeweis am PR-Kopf zeigte, dass das
- * Speichern immer die Oeffnungsfarbe schicken konnte, ohne dass
- * `test:waste-ui` das bemerkt haette.
- *
- * @param {ParentNode} panel
- * @param {string} fallback
- * @returns {string}
- */
-function activeSwatchColor(panel, fallback) {
-  return panel.querySelector('.waste-color-swatch--active')?.dataset.color ?? fallback;
-}
-
-/**
- * Pure: welche Swatches der Farb-Dialog zeigt, und mit welchem (gross-
- * geschriebenen) Wert der aktive Swatch verglichen wird.
- *
- * GROSS-/KLEINSCHREIBUNG: `<input type="color">` liefert seinen Wert laut
- * HTML-Spec IMMER klein geschrieben zurueck - auch fuer eine Preset-Farbe,
- * die selbst genau diesen Weg gesetzt hat. Abfallarten aus der Zeit vor
- * diesem Umbau (und jede ueber ein Preset angelegte) tragen deshalb z.B.
- * `#16a34a`, waehrend `WASTE_TYPE_COLORS` grossgeschrieben ist. Ein
- * case-sensitiver Vergleich faende hier nie eine Uebereinstimmung und haengte
- * einen elften, optisch identischen "Aktuelle Farbe"-Swatch an. Der Vergleich
- * normalisiert deshalb auf Grossschreibung; das Raster selbst bleibt in
- * seiner eigenen Schreibweise, die im `data-color`/`style` unveraendert bleibt.
- *
- * EINE BESTEHENDE FARBE AUSSERHALB DER PALETTE WIRD NICHT STILL UEBERSCHRIEBEN.
- * Abfallarten aus der Zeit des freien Waehlers tragen beliebige Hex-Werte;
- * stuenden sie nicht im Raster, waere beim ersten Speichern die Farbe des
- * Nutzers weg, ohne dass er es angefasst hat. Derselbe Weg, den Notizen und
- * Kalender fuer ihren Altbestand gehen: der Wert bekommt einen eigenen
- * Swatch am Ende und heisst dort „Aktuelle Farbe".
- *
- * @param {string} selColor
- * @returns {{ swatchColors: string[], selColorUpper: string }}
- */
-function resolveSwatchColors(selColor) {
-  const selColorUpper = selColor.toUpperCase();
-  const swatchColors = WASTE_TYPE_COLORS.includes(selColorUpper) ? WASTE_TYPE_COLORS : [...WASTE_TYPE_COLORS, selColor];
-  return { swatchColors, selColorUpper };
-}
-
 function openTypeModal(type = null) {
   const isEdit = !!type;
   const presetOptions = TYPE_PRESETS.map((p) => `<option value="${p.key}">${esc(t(`waste.preset${p.key.charAt(0).toUpperCase()}${p.key.slice(1)}`))}</option>`).join('');
@@ -1121,7 +1118,6 @@ function openTypeModal(type = null) {
   // (vorher `#22C55E`, das in keinem Raster auftauchte und den Dialog damit
   // ohne aktiven Swatch geoeffnet haette).
   const selColor = isEdit ? (type.color || WASTE_TYPE_COLORS[0]) : WASTE_TYPE_COLORS[2];
-  const { swatchColors, selColorUpper } = resolveSwatchColors(selColor);
 
   const content = `
     ${isEdit ? '' : `
@@ -1141,28 +1137,8 @@ function openTypeModal(type = null) {
       <div id="wtm-icon-wrap">${iconButtonHtml(isEdit ? type.icon : 'trash-2')}</div>
     </div>
     <div class="form-group">
-      <label class="form-label" id="wtm-color-label">${t('waste.typeColorLabel')}</label>
-      <div class="waste-color-picker" role="radiogroup" aria-labelledby="wtm-color-label">
-        ${(() => {
-          // Ein Kartenaufbau je Renderdurchlauf statt je Swatch (Nice-to-have,
-          // Review): `WASTE_TYPE_COLOR_NAMES()` ruft `t()` fuer alle zehn
-          // Farben auf, egal welcher Swatch gerade dran ist - das gehoert vor
-          // die Schleife, nicht in sie hinein.
-          const colorNames = WASTE_TYPE_COLOR_NAMES();
-          return swatchColors.map((c) => {
-            const active = c.toUpperCase() === selColorUpper;
-            return `
-          <div class="waste-color-swatch${active ? ' waste-color-swatch--active' : ''}"
-               data-color="${esc(c)}"
-               style="background-color:${esc(c)}"
-               role="radio"
-               tabindex="${active ? '0' : '-1'}"
-               aria-checked="${active ? 'true' : 'false'}"
-               aria-label="${esc(colorNames[c.toUpperCase()] ?? t('waste.colorCurrent'))}"></div>
-        `;
-          }).join('');
-        })()}
-      </div>
+      <span class="form-label" id="wtm-color-label">${t('waste.typeColorLabel')}</span>
+      ${colorPickerHtml({ id: 'wtm-color', value: selColor, labelledBy: 'wtm-color-label' })}
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
       ${isEdit ? `
@@ -1179,6 +1155,7 @@ function openTypeModal(type = null) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('waste.editType') : t('waste.newType'),
+    initialFocus: dialogInitialFocus(isEdit),
     content,
     // 520 statt 400: Loeschen, Archivieren, Abbrechen und Speichern brauchen
     // 395px, das 400er-Blatt hat innen 366 - der Fuss brach in zwei Zeilen.
@@ -1187,38 +1164,10 @@ function openTypeModal(type = null) {
       panel.querySelector('#wtm-cancel').addEventListener('click', () => closeModal());
       panel.querySelector('[data-action="pick-type-icon"]').addEventListener('click', (e) => pickTypeIcon(e.currentTarget));
 
-      // Farb-Swatch: Auswahl + ARIA + Keyboard (Roving Tabindex) - dieselbe
-      // Mechanik wie in notes.js/calendar.js, nur auf `waste-` getauft.
-      function selectSwatch(target) {
-        if (!target) return;
-        panel.querySelectorAll('.waste-color-swatch').forEach((s) => {
-          s.classList.remove('waste-color-swatch--active');
-          s.setAttribute('aria-checked', 'false');
-          s.setAttribute('tabindex', '-1');
-        });
-        target.classList.add('waste-color-swatch--active');
-        target.setAttribute('aria-checked', 'true');
-        target.setAttribute('tabindex', '0');
-      }
-      panel.querySelectorAll('.waste-color-swatch').forEach((sw) => {
-        sw.addEventListener('click', () => { selectSwatch(sw); sw.focus(); });
-        sw.addEventListener('keydown', (e) => {
-          const swatches = [...panel.querySelectorAll('.waste-color-swatch')];
-          const idx = swatches.indexOf(sw);
-          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-            e.preventDefault();
-            const next = swatches[(idx + 1) % swatches.length];
-            selectSwatch(next); next.focus();
-          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-            e.preventDefault();
-            const prev = swatches[(idx - 1 + swatches.length) % swatches.length];
-            selectSwatch(prev); prev.focus();
-          } else if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            selectSwatch(sw);
-          }
-        });
-      });
+      // Die Farbe ist der geteilte Waehler (utils/color-picker.js, Critique
+      // R24 E6) - Familientoene, "Eigene" dahinter, eine Bestandsfarbe
+      // ausserhalb der Reihe bleibt als eigener Swatch gewaehlt.
+      wireColorPicker(panel);
 
       panel.querySelector('#wtm-preset')?.addEventListener('change', (e) => {
         const preset = TYPE_PRESETS.find((p) => p.key === e.target.value);
@@ -1229,7 +1178,7 @@ function openTypeModal(type = null) {
         // markiert die Vorlage jetzt einen Swatch, statt ein Eingabefeld zu
         // fuellen. Das Raster bleibt danach frei bedienbar - eine Vorlage ist
         // ein Startpunkt, keine Festlegung.
-        selectSwatch(panel.querySelector(`.waste-color-swatch[data-color="${preset.color}"]`));
+        setColorPickerValue(panel.querySelector('[data-color-picker]'), preset.color);
         const hidden = panel.querySelector('input[name="icon"]');
         hidden.value = preset.icon;
         setTypeIconButtonIcon(panel.querySelector('[data-action="pick-type-icon"]'), preset.icon);
@@ -1242,7 +1191,7 @@ function openTypeModal(type = null) {
           closeModal({ force: true, context: modalContext });
           await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
-          window.yuvomi?.showToast(type.archived ? t('waste.typeRestoredToast') : t('waste.typeArchivedToast'), 'success');
+          window.yuvomi?.showToast(t(type.archived ? 'waste.typeRestoredNamed' : 'waste.typeArchivedNamed', { name: type.name }), 'success');
         } catch (err) {
           reportError(err);
         }
@@ -1257,7 +1206,7 @@ function openTypeModal(type = null) {
           closeModal({ force: true, context: modalContext });
           await reloadAndRender();
           refocusAfterRender();
-          window.yuvomi?.showToast(t('waste.typeDeletedToast'), 'success');
+          window.yuvomi?.showToast(t('common.deletedNamed', { name: type.name }), 'success');
         } catch (err) {
           reportError(err);
         }
@@ -1269,10 +1218,9 @@ function openTypeModal(type = null) {
         const body = {
           name,
           icon: panel.querySelector('input[name="icon"]').value || 'trash-2',
-          // Der Rueckfall greift nur, wenn gar kein Swatch aktiv ist - dann
-          // gilt der Stand, mit dem der Dialog geoeffnet wurde, nicht etwa
-          // eine leere Farbe.
-          color: activeSwatchColor(panel, selColor),
+          // Der Rueckfall greift nur bei leerem Wertfeld - dann gilt der
+          // Stand, mit dem der Dialog geoeffnet wurde, nicht etwa eine leere Farbe.
+          color: panel.querySelector('#wtm-color')?.value || selColor,
         };
         const modalContext = captureModalContext();
         try {
@@ -1281,7 +1229,7 @@ function openTypeModal(type = null) {
           closeModal({ force: true, context: modalContext });
           await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
-          window.yuvomi?.showToast(t('waste.typeSavedToast'), 'success');
+          window.yuvomi?.showToast(t(isEdit ? 'common.savedNamed' : 'common.createdNamed', { name: body.name }), 'success');
         } catch (err) {
           reportError(err);
         }
@@ -1312,7 +1260,7 @@ function intervalStepperHtml(value) {
   const v = Math.min(52, Math.max(1, Number(value) || 1));
   return `<div class="waste-interval-stepper">`
     + `<button type="button" class="btn btn--secondary btn--icon" data-interval-step="-1" aria-controls="wsm-interval" aria-label="${esc(t('waste.intervalDecrease'))}"${v <= 1 ? ' disabled' : ''}><i data-lucide="minus" class="icon-md" aria-hidden="true"></i></button>`
-    + `<input type="number" class="form-input waste-interval-stepper__input" id="wsm-interval" min="1" max="52" step="1" inputmode="numeric" value="${esc(String(v))}">`
+    + `<input type="number" class="form-input waste-interval-stepper__input" id="wsm-interval" min="1" max="52" step="1" inputmode="numeric" value="${esc(String(v))}" aria-labelledby="wsm-interval-label">`
     + `<button type="button" class="btn btn--secondary btn--icon" data-interval-step="1" aria-controls="wsm-interval" aria-label="${esc(t('waste.intervalIncrease'))}"${v >= 52 ? ' disabled' : ''}><i data-lucide="plus" class="icon-md" aria-hidden="true"></i></button>`
     + `</div>`;
 }
@@ -1346,6 +1294,34 @@ function weekdayPickerHtml(selected) {
     <button type="button" class="filter-chip${set.has(code) ? ' filter-chip--active' : ''}" data-weekday="${code}"
             aria-pressed="${set.has(code) ? 'true' : 'false'}">${esc(t(WEEKDAY_LABEL_KEYS[code]))}</button>`).join('')}
     <input type="hidden" name="weekdays" value="${chosen.join(',')}"></div>`;
+}
+
+/**
+ * DER WOCHENTAG FOLGT DER ERSTEN ABHOLUNG (Critique R24, G2-Entsorgung-P2-1).
+ * Ein neuer Termin stand auf "Woechentlich" ohne gewaehlten Tag, waehrend
+ * "Erste Abholung" schon heute trug - erst das Absenden sagte "Waehle
+ * mindestens einen Wochentag". Jetzt ist der Tag der ersten Abholung
+ * vorgewaehlt und zieht mit, wenn man sie aendert - bis man selbst einen Tag
+ * waehlt; dann gehoert die Auswahl einem selbst.
+ */
+function weekdayCodeOf(dateKey) {
+  const date = parseLocalDateKey(dateKey);
+  if (!date || Number.isNaN(date.getTime?.())) return null;
+  const day = date.getDay();
+  return WEEKDAY_CODES.find((code) => DAY_INDEX[code] === day) ?? null;
+}
+
+function setWeekdayPickerValue(root, codes) {
+  const picker = root.querySelector('.waste-weekday-picker');
+  if (!picker) return;
+  const set = new Set(codes);
+  picker.querySelectorAll('[data-weekday]').forEach((chip) => {
+    const on = set.has(chip.dataset.weekday);
+    chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+    chip.classList.toggle('filter-chip--active', on);
+  });
+  const hidden = picker.querySelector('input[name="weekdays"]');
+  if (hidden) hidden.value = WEEKDAY_CODES.filter((code) => set.has(code)).join(',');
 }
 
 function weekdayPickerValue(root) {
@@ -1411,7 +1387,7 @@ function openScheduleModal(type, schedule = null) {
     </div>
     <div class="form-group form-field" id="wsm-weekly-fields" ${kind === 'weekly' ? '' : 'hidden'}>
       <span class="form-label" id="wsm-weekdays-label">${t('waste.weekdaysLabel')}</span>
-      ${weekdayPickerHtml(schedule?.weekdays)}
+      ${weekdayPickerHtml(schedule?.weekdays ?? weekdayCodeOf(schedule?.anchor_date ?? todayKey()))}
     </div>
     <div class="form-group" id="wsm-monthly-fields" ${kind === 'monthly_fixed_day' ? '' : 'hidden'}>
       <label class="form-label" for="wsm-month-day">${t('waste.monthDayLabel')}</label>
@@ -1429,8 +1405,13 @@ function openScheduleModal(type, schedule = null) {
       </select>
     </div>
     <div class="form-group">
-      <label class="form-label" for="wsm-interval" id="wsm-interval-label">${t(kind === 'weekly' ? 'waste.intervalLabelWeekly' : 'waste.intervalLabelMonthly')}</label>
-      ${intervalStepperHtml(schedule?.interval ?? 1)}
+      <span class="form-label" id="wsm-interval-label">${t('waste.intervalLabel')}</span>
+      ${intervalSentenceHtml({
+        key: kind === 'weekly' ? 'common.everyNWeeks' : 'common.everyNMonths',
+        count: schedule?.interval ?? 1,
+        countHtml: intervalStepperHtml(schedule?.interval ?? 1),
+        labelledBy: 'wsm-interval-label', className: 'wsm-interval-sentence',
+      })}
     </div>
     <div class="form-group">
       <label class="form-label" for="wsm-anchor">${t('waste.anchorDateLabel')}${REQUIRED_MARK}</label>
@@ -1440,9 +1421,12 @@ function openScheduleModal(type, schedule = null) {
       <label class="form-label" for="wsm-valid-until">${t('waste.validUntilLabel')}</label>
       <yuvomi-datepicker id="wsm-valid-until" name="valid_until" type="date" value="${esc(schedule?.valid_until ?? '')}"></yuvomi-datepicker>
     </div>
-    <div class="form-group">
+    ${/* "AKTIV" NUR BEIM BEARBEITEN (R24, G2-Entsorgung-P2-1): ein neuer Termin
+          ist aktiv - der Schalter beim Anlegen fragte nach etwas, das niemand
+          anders will. Pausieren ist eine Frage an einen bestehenden Termin. */ ''}
+    ${isEdit ? `<div class="form-group">
       ${formSwitchRowHtml({ label: t('waste.activeLabel'), checked: schedule?.active !== 0, attrs: { id: 'wsm-active' } })}
-    </div>
+    </div>` : ''}
     <div class="modal-panel__footer modal-panel__footer--plain">
       ${isEdit ? `<button type="button" class="btn btn--danger-outline" id="wsm-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${t('common.delete')}</button>` : ''}
       <div class="modal-panel__footer-group">
@@ -1454,6 +1438,7 @@ function openScheduleModal(type, schedule = null) {
   openModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('waste.editSchedule') : t('waste.newSchedule'),
+    initialFocus: dialogInitialFocus(isEdit),
     content,
     size: 'sm',
     onSave(panel) {
@@ -1461,6 +1446,17 @@ function openScheduleModal(type, schedule = null) {
 
       wireWeekdayPicker(panel);
       wireIntervalStepper(panel);
+      if (!isEdit) {
+        let ownWeekdays = false;
+        panel.querySelector('.waste-weekday-picker')?.addEventListener('click', (event) => {
+          if (event.target.closest?.('[data-weekday]')) ownWeekdays = true;
+        });
+        panel.querySelector('#wsm-anchor')?.addEventListener('change', (event) => {
+          if (ownWeekdays || panel.querySelector('#wsm-kind')?.value !== 'weekly') return;
+          const code = weekdayCodeOf(event.target.value);
+          if (code) setWeekdayPickerValue(panel, [code]);
+        });
+      }
       const kindSelect = panel.querySelector('#wsm-kind');
       const weeklyFields = panel.querySelector('#wsm-weekly-fields');
       const monthlyFields = panel.querySelector('#wsm-monthly-fields');
@@ -1485,7 +1481,8 @@ function openScheduleModal(type, schedule = null) {
         weeklyFields.hidden = kindSelect.value !== 'weekly';
         monthlyFields.hidden = kindSelect.value !== 'monthly_fixed_day';
         ordinalFields.hidden = kindSelect.value !== 'monthly_ordinal_weekday';
-        panel.querySelector('#wsm-interval-label').textContent = t(kindSelect.value === 'weekly' ? 'waste.intervalLabelWeekly' : 'waste.intervalLabelMonthly');
+        // "Alle [2] Wochen" / "Alle [2] Monate" - der Satz folgt der Wiederholung, das Feld behaelt den Wert.
+        setIntervalSentenceKey(panel.querySelector('.wsm-interval-sentence'), kindSelect.value === 'weekly' ? 'common.everyNWeeks' : 'common.everyNMonths');
         if (kindSelect.value === 'monthly_ordinal_weekday') refreshOrdinalAnchor();
       });
 
@@ -1498,7 +1495,7 @@ function openScheduleModal(type, schedule = null) {
           closeModal({ force: true, context: modalContext });
           await reloadAndRender();
           refocusAfterRender();
-          window.yuvomi?.showToast(t('waste.scheduleDeletedToast'), 'success');
+          window.yuvomi?.showToast(t('waste.scheduleDeletedNamed', { name: typeById(schedule.type_id)?.name ?? type?.name ?? '' }), 'success');
         } catch (err) {
           reportError(err);
         }
@@ -1509,7 +1506,7 @@ function openScheduleModal(type, schedule = null) {
         const anchor = panel.querySelector('#wsm-anchor').value;
         const validUntil = panel.querySelector('#wsm-valid-until').value || null;
         const interval = Number(panel.querySelector('#wsm-interval').value) || 1;
-        const active = panel.querySelector('#wsm-active').checked;
+        const active = panel.querySelector('#wsm-active')?.checked ?? true;
 
         const typeSelect = panel.querySelector('#wsm-type');
         if (typeSelect && !typeSelect.value) { typeSelect.focus(); return; }
@@ -1533,7 +1530,7 @@ function openScheduleModal(type, schedule = null) {
           closeModal({ force: true, context: modalContext });
           await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
-          window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
+          window.yuvomi?.showToast(scheduleSavedSentence(typeById(body.type_id)?.name), 'success');
         } catch (err) {
           if (await keepDialogForMissingType(err, typeSelect)) return;
           // Dieselbe Absage vom Server (z. B. eine aeltere Seite): ans Feld.
@@ -1581,6 +1578,7 @@ function openPickupModal(pickup = null) {
 
   openModal({
     title: isEdit ? t('waste.editPickup') : t('waste.newPickup'),
+    initialFocus: dialogInitialFocus(isEdit),
     content,
     size: 'sm',
     onSave(panel) {
@@ -1589,6 +1587,8 @@ function openPickupModal(pickup = null) {
 
       panel.querySelector('#wpm-delete')?.addEventListener('click', async () => {
         const modalContext = captureModalContext();
+        // Der Name VOR dem Nachladen: danach kann die Art schon fehlen.
+        const name = typeById(pickup.type_id)?.name ?? '';
         const ok = await confirmOverModal(t('waste.pickupDeleteConfirm'), { danger: true, confirmLabel: t('common.delete'), detail: t('waste.pickupDeleteConfirmDetail') });
         if (!ok) return;
         try {
@@ -1596,7 +1596,7 @@ function openPickupModal(pickup = null) {
           closeModal({ force: true, context: modalContext });
           await reloadAndRender();
           refocusAfterRender();
-          window.yuvomi?.showToast(t('waste.pickupDeletedToast'), 'success');
+          window.yuvomi?.showToast(t('waste.pickupDeletedNamed', { name }), 'success');
         } catch (err) {
           reportError(err);
         }
@@ -1617,7 +1617,9 @@ function openPickupModal(pickup = null) {
           closeModal({ force: true, context: modalContext });
           await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
-          window.yuvomi?.showToast(t('waste.pickupSavedToast'), 'success');
+          window.yuvomi?.showToast(typeById(body.type_id)?.name
+            ? t('waste.pickupSavedNamed', { name: typeById(body.type_id).name })
+            : t('waste.pickupSavedToast'), 'success');
         } catch (err) {
           if (await keepDialogForMissingType(err, typeSelect, ownTypeId)) return;
           reportError(err);
@@ -1631,12 +1633,18 @@ function openPickupModal(pickup = null) {
 // ICS import wizard and source management (#1063 Phase 3)
 // -------------------------------------------------------------------------
 
-/** Pure: a sensible starting decision for a label - remembered beats suggested beats "create a new type". */
-function defaultLabelDecision(label) {
-  if (label.remembered_ignored) return '';
-  if (label.remembered_type_id) return String(label.remembered_type_id);
-  if (label.suggested_type_id) return String(label.suggested_type_id);
-  return '__new__';
+/**
+ * Pure: a sensible starting selection for a label - remembered beats suggested
+ * beats "create a new type". A label can name several bins (#2273), so the
+ * selection is a set of types plus, at most, one new type; nothing selected
+ * means the label is ignored.
+ * @returns {{ typeIds: number[], createNew: boolean }}
+ */
+function defaultLabelSelection(label) {
+  if (label.remembered_ignored) return { typeIds: [], createNew: false };
+  if (label.remembered_type_ids?.length) return { typeIds: [...label.remembered_type_ids], createNew: false };
+  if (label.suggested_type_id) return { typeIds: [label.suggested_type_id], createNew: false };
+  return { typeIds: [], createNew: true };
 }
 
 /** Pure: blocking diagnostics not yet covered by an explicit skip. */
@@ -1646,22 +1654,28 @@ function unresolvedBlockingDiagnostics(diagnostics, skippedEventKeys) {
 }
 
 /**
- * Pure: builds the commit body's `mappings` array from each label row's chosen
- * decision (`'' | '__new__' | '<type id>'`). Returns `{ error, label }` instead
- * of throwing, so the DOM-facing caller can show a field-level message.
+ * Pure: builds the commit body's `mappings` array from each label row's
+ * selection (`{ typeIds, createNew, newTypeName }`). No type and no new type
+ * is "ignored"; otherwise every chosen type and the new one together (#2273).
+ * Returns `{ error, label }` instead of throwing, so the DOM-facing caller can
+ * show a field-level message.
  */
 function buildMappingDecisions(rows) {
   const mappings = [];
   for (const row of rows) {
-    if (row.decision === '__new__') {
+    const typeIds = [...new Set(row.typeIds ?? [])];
+    if (!typeIds.length && !row.createNew) {
+      mappings.push({ normalized_label: row.normalized_label, ignored: true });
+      continue;
+    }
+    const decision = { normalized_label: row.normalized_label };
+    if (typeIds.length) decision.type_ids = typeIds;
+    if (row.createNew) {
       const name = (row.newTypeName || '').trim();
       if (!name) return { error: 'missing_new_type_name', label: row.normalized_label };
-      mappings.push({ normalized_label: row.normalized_label, new_type: { name } });
-    } else if (row.decision === '') {
-      mappings.push({ normalized_label: row.normalized_label, ignored: true });
-    } else {
-      mappings.push({ normalized_label: row.normalized_label, type_id: Number(row.decision) });
+      decision.new_type = { name };
     }
+    mappings.push(decision);
   }
   return { mappings };
 }
@@ -1699,28 +1713,90 @@ function importDiagnosticRowHtml(diag) {
   return `<p class="waste-import-diagnostic waste-import-diagnostic--info">${esc(importDiagnosticText(diag))}</p>`;
 }
 
-/** The options of one label's decision: ignore, every type, create a new one. `decision` is `'' | '__new__' | '<type id>'`. */
-function importDecisionOptionsHtml(decision) {
-  const typeOptions = state.types.filter((t2) => !t2.archived || decision === String(t2.id))
-    .map((t2) => `<option value="${t2.id}"${decision === String(t2.id) ? ' selected' : ''}>${esc(t2.name)}</option>`).join('');
-  return `<option value=""${decision === '' ? ' selected' : ''}>${esc(t('waste.importIgnoreLabel'))}</option>
-        ${typeOptions}
-        <option value="__new__"${decision === '__new__' ? ' selected' : ''}>${esc(t('waste.importCreateNewType'))}</option>`;
+/**
+ * EIN EINTRAG, MEHRERE TONNEN (#2273): die Abfallarten eines Labels als Chips
+ * des Kanons (`.filter-chip`, `aria-pressed`) in einer benannten Gruppe, wie
+ * die Wochentage im Termin-Dialog. Dresden nennt Bio- und Blaue Tonne in einem
+ * Eintrag; beide Chips an heisst ein Termin je Art. Kein Chip an heisst: das
+ * Label wird nicht uebernommen - das sagt die Zeile darunter, statt dass
+ * "Ignorieren" wie eine weitere Abfallart zwischen den Arten steht.
+ *
+ * Eine archivierte Art steht nur da, wenn sie schon gewaehlt ist, damit eine
+ * inzwischen archivierte Zuordnung als gewaehlt erscheint, statt still
+ * wegzufallen. `createNew` ist `null`, wo es keinen "Neue Abfallart"-Chip gibt
+ * (die Zuordnungen einer Quelle legen keine Art an).
+ */
+function labelTypeChipsHtml({ labelId, typeIds, createNew = null }) {
+  const chosen = new Set(typeIds);
+  const types = state.types.filter((t2) => !t2.archived || chosen.has(t2.id));
+  const chip = (attrs, on, icon, color, text) => `
+        <button type="button" class="filter-chip${on ? ' filter-chip--active' : ''}" ${attrs} aria-pressed="${on ? 'true' : 'false'}">`
+    + `<i data-lucide="${esc(icon)}"${color ? ` style="color:${esc(color)}"` : ''} aria-hidden="true"></i><span>${esc(text)}</span></button>`;
+  const none = !chosen.size && !createNew;
+  // Die Wahl steht zusaetzlich in einem versteckten Feld (wie bei den
+  // Wochentagen): nur Felder sieht der Verwerfen-Schutz des Dialogs, und ohne
+  // es ginge eine Aenderung nur an den Chips beim Schliessen still verloren.
+  return `
+      <div class="waste-label-types" role="group" aria-labelledby="${esc(labelId)}" data-role="label-types">
+        ${types.map((t2) => chip(`data-type-chip="${t2.id}"`, chosen.has(t2.id), t2.icon || 'trash-2', t2.color, t2.name)).join('')}
+        ${createNew === null ? '' : chip('data-new-type-chip', !!createNew, 'plus', null, t('waste.importCreateNewType'))}
+        <input type="hidden" name="${esc(labelId)}-types" data-role="label-types-value" value="${esc(labelTypesValue([...chosen], createNew))}">
+      </div>
+      <p class="waste-label-types__ignored" data-role="label-ignored"${none ? '' : ' hidden'}>${esc(t('waste.importLabelIgnoredHint'))}</p>`;
 }
 
-function importLabelRowHtml(label) {
-  const decision = defaultLabelDecision(label);
-  // Include an archived type only when it's the remembered/suggested decision
-  // itself, so a since-archived mapping still renders as a real selected
-  // option instead of silently falling back to "ignore" in the live DOM.
+/** Pure: the hidden field's value for one row's choice - what the dialog's discard guard compares. */
+function labelTypesValue(typeIds, createNew) {
+  return [...[...typeIds].sort((a, b) => a - b), ...(createNew ? ['new'] : [])].join(',');
+}
+
+/** Reads one row's chips back: the pressed types and whether "new type" is on. */
+function labelTypeSelection(row) {
+  return {
+    typeIds: [...row.querySelectorAll('[data-type-chip][aria-pressed="true"]')].map((el) => Number(el.dataset.typeChip)),
+    createNew: row.querySelector('[data-new-type-chip]')?.getAttribute('aria-pressed') === 'true',
+  };
+}
+
+/**
+ * Schaltet einen Chip und haelt die Zeile nach: der Satz "wird nicht
+ * uebernommen", sobald nichts mehr gewaehlt ist, und das Namensfeld der neuen
+ * Art, solange ihr Chip an ist. Gibt die Zeile zurueck, oder null, wenn der
+ * Klick keinen Chip traf.
+ */
+function toggleLabelTypeChip(event, rowSelector) {
+  const chip = event.target.closest('[data-type-chip], [data-new-type-chip]');
+  const row = chip?.closest(rowSelector);
+  if (!row) return null;
+  const on = chip.getAttribute('aria-pressed') !== 'true';
+  chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+  chip.classList.toggle('filter-chip--active', on);
+  syncLabelRow(row);
+  row.querySelector('[data-role="label-types-value"]')?.dispatchEvent(new Event('input', { bubbles: true }));
+  if (on && chip.hasAttribute('data-new-type-chip')) row.querySelector('[data-role="label-new-type-name"]')?.focus();
+  return row;
+}
+
+function syncLabelRow(row) {
+  const { typeIds, createNew } = labelTypeSelection(row);
+  const ignored = row.querySelector('[data-role="label-ignored"]');
+  if (ignored) ignored.hidden = typeIds.length > 0 || createNew;
+  const name = row.querySelector('[data-role="label-new-type-name"]');
+  if (name) name.hidden = !createNew;
+  const value = row.querySelector('[data-role="label-types-value"]');
+  if (value) value.value = labelTypesValue(typeIds, createNew);
+}
+
+function importLabelRowHtml(label, index) {
+  const { typeIds, createNew } = defaultLabelSelection(label);
+  const labelId = `wiz-label-${index}`;
   return `
     <div class="waste-import-label-row" data-label="${esc(label.normalized_label)}">
-      <span class="waste-import-label-row__name">${esc(label.original_label)} <span class="waste-import-label-row__count">(${label.count})</span></span>
-      <select class="form-input" data-role="label-decision-type">
-        ${importDecisionOptionsHtml(decision)}
-      </select>
+      <span class="waste-import-label-row__name" id="${labelId}">${esc(label.original_label)} <span class="waste-import-label-row__count">(${label.count})</span></span>
+      ${labelTypeChipsHtml({ labelId, typeIds, createNew })}
       <input type="text" class="form-input waste-import-new-type-name" data-role="label-new-type-name"
-        placeholder="${esc(t('waste.typeNameLabel'))}" value="${esc(label.original_label)}"${decision === '__new__' ? '' : ' hidden'}>
+        aria-label="${esc(t('waste.typeNameLabel'))}"
+        placeholder="${esc(t('waste.typeNameLabel'))}" value="${esc(label.original_label)}"${createNew ? '' : ' hidden'}>
     </div>`;
 }
 
@@ -1729,7 +1805,8 @@ function importPreviewStepHtml(preview) {
     <p class="waste-import-summary">${esc(t('waste.importSummary', { events: preview.counts.events, candidates: preview.counts.candidates }))}</p>
     ${preview.diagnostics.length ? `<div class="waste-import-diagnostics">${preview.diagnostics.map(importDiagnosticRowHtml).join('')}</div>` : ''}
     ${preview.labels.length
-    ? `<div class="waste-import-labels">${preview.labels.map(importLabelRowHtml).join('')}</div>`
+    ? `<p class="waste-import-labels-hint">${esc(t('waste.importLabelsHint'))}</p>
+      <div class="waste-import-labels">${preview.labels.map(importLabelRowHtml).join('')}</div>`
     : `<p>${esc(t('waste.importNoLabels'))}</p>`}`;
 }
 
@@ -1746,24 +1823,27 @@ function importErrorText(err) {
 /**
  * The import commit failed only because a label was mapped to a type somebody
  * deleted in the meantime: the assistant stays, every decision stays, and the
- * selects are rebuilt from the fresh types. A row whose type is gone falls
- * back to "create a new type" - the same default the assistant gives a label
- * it knows no type for - and gets the focus.
+ * chips are rebuilt from the fresh types. A row that loses its last type to
+ * the deletion falls back to "create a new type" - the same default the
+ * assistant gives a label it knows no type for - and its first chip gets the
+ * focus.
  */
 async function refreshImportTypeChoices(panel) {
   await reloadAndRender();
   let first = null;
   for (const row of panel.querySelectorAll('.waste-import-label-row')) {
-    const select = row.querySelector('[data-role="label-decision-type"]');
-    const chosen = select.value;
-    const isType = chosen !== '' && chosen !== '__new__';
-    const stillThere = isType && state.types.some((t2) => String(t2.id) === chosen);
-    const decision = isType && !stillThere ? '__new__' : chosen;
-    select.replaceChildren();
-    select.insertAdjacentHTML('beforeend', importDecisionOptionsHtml(decision));
-    row.querySelector('[data-role="label-new-type-name"]').hidden = decision !== '__new__';
-    if (isType && !stillThere && !first) first = select;
+    const { typeIds, createNew } = labelTypeSelection(row);
+    const kept = typeIds.filter((id) => state.types.some((t2) => t2.id === id));
+    const lostAll = typeIds.length > 0 && kept.length === 0;
+    const group = row.querySelector('[data-role="label-types"]');
+    const labelId = group.getAttribute('aria-labelledby');
+    group.nextElementSibling?.remove();
+    group.insertAdjacentHTML('afterend', labelTypeChipsHtml({ labelId, typeIds: kept, createNew: createNew || lostAll }));
+    group.remove();
+    syncLabelRow(row);
+    if (kept.length < typeIds.length && !first) first = row.querySelector('[data-role="label-types"] .filter-chip');
   }
+  if (window.lucide) window.lucide.createIcons({ el: panel });
   first?.focus();
 }
 
@@ -1809,12 +1889,7 @@ function openImportWizard(source = null) {
 
       panel.querySelector('#wiz-cancel').addEventListener('click', () => closeModal());
 
-      panel.addEventListener('change', (e) => {
-        const select = e.target.closest('[data-role="label-decision-type"]');
-        if (!select) return;
-        const row = select.closest('.waste-import-label-row');
-        row.querySelector('[data-role="label-new-type-name"]').hidden = select.value !== '__new__';
-      });
+      panel.addEventListener('click', (e) => { toggleLabelTypeChip(e, '.waste-import-label-row'); });
 
       panel.querySelector('#wiz-preview').addEventListener('click', async () => {
         errorEl.hidden = true;
@@ -1864,7 +1939,7 @@ function openImportWizard(source = null) {
 
         const rows = [...panel.querySelectorAll('.waste-import-label-row')].map((row) => ({
           normalized_label: row.dataset.label,
-          decision: row.querySelector('[data-role="label-decision-type"]').value,
+          ...labelTypeSelection(row),
           newTypeName: row.querySelector('[data-role="label-new-type-name"]').value,
         }));
         const built = buildMappingDecisions(rows);
@@ -1902,16 +1977,19 @@ function openImportWizard(source = null) {
 }
 
 function sourceMappingRowHtml(mapping) {
-  const typeOptions = state.types.filter((t2) => !t2.archived || t2.id === mapping.type_id)
-    .map((t2) => `<option value="${t2.id}"${t2.id === mapping.type_id ? ' selected' : ''}>${esc(t2.name)}</option>`).join('');
+  const labelId = `wsrc-mapping-${mapping.id}`;
   return `
     <div class="waste-source-mapping-row" data-mapping-id="${mapping.id}">
-      <span class="waste-source-mapping-row__label">${esc(mapping.original_label)}</span>
-      <select class="form-input" data-role="mapping-type">
-        <option value=""${mapping.ignored ? ' selected' : ''}>${esc(t('waste.importIgnoreLabel'))}</option>
-        ${typeOptions}
-      </select>
+      <span class="waste-source-mapping-row__label" id="${labelId}">${esc(mapping.original_label)}</span>
+      ${labelTypeChipsHtml({ labelId, typeIds: mapping.type_ids ?? [] })}
     </div>`;
+}
+
+/** Pure: whether a row's chosen types differ from the mapping as the server has it. */
+function mappingTypesChanged(mapping, typeIds) {
+  const before = [...(mapping.type_ids ?? [])].sort((a, b) => a - b);
+  const after = [...typeIds].sort((a, b) => a - b);
+  return before.length !== after.length || before.some((id, i) => id !== after[i]);
 }
 
 // -------------------------------------------------------------------------
@@ -2071,6 +2149,7 @@ function openSourceModal(source) {
     size: 'md',
     onSave(panel) {
       panel.querySelector('#wsrc-cancel').addEventListener('click', () => closeModal());
+      panel.addEventListener('click', (e) => { toggleLabelTypeChip(e, '.waste-source-mapping-row'); });
 
       panel.querySelector('#wsrc-mapping-profile-export').addEventListener('click', () => exportMappingProfileFile(source));
       panel.querySelector('#wsrc-mapping-profile-import').addEventListener('click', () => openMappingProfileImportModal(source));
@@ -2106,11 +2185,9 @@ function openSourceModal(source) {
             const mappingId = Number(row.dataset.mappingId);
             failedMappingId = mappingId;
             const mapping = source.mappings.find((m) => m.id === mappingId);
-            const value = row.querySelector('[data-role="mapping-type"]').value;
-            const ignored = value === '';
-            const typeId = ignored ? null : Number(value);
-            if (!!mapping.ignored === ignored && mapping.type_id === typeId) continue;
-            await api.put(`/waste/sources/${source.id}/mappings/${mappingId}`, { type_id: typeId, ignored });
+            const { typeIds } = labelTypeSelection(row);
+            if (!mappingTypesChanged(mapping, typeIds)) continue;
+            await api.put(`/waste/sources/${source.id}/mappings/${mappingId}`, typeIds.length ? { type_ids: typeIds } : { ignored: true });
           }
           closeModal({ force: true, context: modalContext });
           await reloadAfterSave(() => reloadAndRender());
@@ -2131,7 +2208,8 @@ function openSourceModal(source) {
  * der Name im Feld bleibt. Die Zeilen werden aus der frisch gelesenen Quelle neu
  * gebaut - was vor der gescheiterten Zeile schon gespeichert wurde, steht damit
  * als gespeichert da, und die gescheiterte zeigt wieder ihren Stand am Server
- * statt still auf "Ignorieren" zu fallen. Der Fokus steht auf ihrer Auswahl.
+ * statt still auf "nicht uebernommen" zu fallen. Die Gruppe ihrer Abfallarten
+ * ist als ungueltig markiert, der Fokus steht auf ihrem ersten Chip.
  *
  * @returns {Promise<boolean>} true: behandelt
  */
@@ -2153,9 +2231,9 @@ async function keepSourceDialogForMissingType(err, panel, source, mappingId) {
   const host = panel.querySelector('#wsrc-mappings');
   host.replaceChildren();
   host.insertAdjacentHTML('beforeend', fresh.mappings.map(sourceMappingRowHtml).join(''));
-  const select = host.querySelector(`[data-mapping-id="${mappingId}"] [data-role="mapping-type"]`);
-  select?.setAttribute('aria-invalid', 'true');
-  select?.focus();
+  if (window.lucide) window.lucide.createIcons({ el: host });
+  host.querySelector(`[data-mapping-id="${mappingId}"] [data-role="label-types"]`)?.setAttribute('aria-invalid', 'true');
+  host.querySelector(`[data-mapping-id="${mappingId}"] [data-role="label-types"] .filter-chip`)?.focus();
   return true;
 }
 
@@ -2381,6 +2459,16 @@ async function openReminderSettingsModal() {
 // Occurrence move / skip / restore
 // -------------------------------------------------------------------------
 
+/**
+ * "Termin fuer „Restmuell“ gespeichert." (Critique R24, G2-Quer-P2-2): der Satz
+ * nennt die Abfallart, um deren Termin es ging - "Termin gespeichert" sagte
+ * nach Anlegen, Verschieben und Auslassen dasselbe. Ohne Namen bleibt er kurz.
+ * @param {string|null|undefined} name
+ */
+function scheduleSavedSentence(name) {
+  return name ? t('waste.scheduleSavedNamed', { name }) : t('waste.scheduleSavedToast');
+}
+
 function findScheduleOrigin(occurrenceKey, occurrences = state.occurrences) {
   const occ = occurrences.find((o) => o.key === occurrenceKey);
   const origin = occ?.origins.find((o) => o.kind === 'schedule');
@@ -2419,7 +2507,7 @@ async function moveOccurrence(occurrenceKey) {
           closeModal({ force: true, context: modalContext });
           await reloadAfterSave(() => reloadAndRender());
           refocusAfterRender();
-          window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
+          window.yuvomi?.showToast(scheduleSavedSentence(found.occ.type_name), 'success');
         } catch (err) {
           reportError(err);
         }
@@ -2437,7 +2525,7 @@ async function skipOccurrence(occurrenceKey) {
     await api.put(`/waste/schedules/${found.scheduleId}/overrides/${found.originalDate}`, { replacement_date: null });
     await reloadAfterSave(() => reloadAndRender());
     refocusAfterRender();
-    window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
+    window.yuvomi?.showToast(scheduleSavedSentence(found.occ.type_name), 'success');
   } catch (err) {
     reportError(err);
   }
@@ -2449,7 +2537,7 @@ async function restoreOccurrence(occurrenceKey) {
   try {
     await deleteOrAlreadyGone(`/waste/schedules/${found.scheduleId}/overrides/${found.originalDate}`, 'waste_override_not_found');
     await reloadAndRender();
-    window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
+    window.yuvomi?.showToast(scheduleSavedSentence(found.occ.type_name), 'success');
   } catch (err) {
     reportError(err);
   }
@@ -2530,7 +2618,11 @@ function renderPage() {
       // Mit der Klasse waere „Abholung" am Desktop ersatzlos verschwunden -
       // ein groesserer Schaden als der, den dieser Knopf behebt.
       actions: readOnly() ? '' : renderPageActions([
-        popoverMenuHtml({
+        // DAS WERKZEUGMENUE DES KOPFS (R24, G0 Inv-3): `pageToolsMenuHtml`
+        // wie jedes Modul, nicht der nackte Menue-Ausloeser - so traegt der
+        // Knopf die Kennklasse `page-tools-btn`, an der Shell und Guards das
+        // eine „..." eines Kopfs erkennen.
+        pageToolsMenuHtml({
           id: 'waste-page-menu',
           label: t('waste.moreActions'),
           items: [
@@ -2638,26 +2730,15 @@ function bindEvents() {
     } else if (kind === 'move-type-down') {
       moveType(Number(action.dataset.id), 'down');
     } else if (kind === 'add-schedule') {
+      // Ohne Art (die Zeile "Ohne Termin" fuer mehrere Arten): der Dialog
+      // fragt nach der Art, vorbelegt mit der ersten ohne Termin.
+      if (!action.dataset.typeId) { openScheduleModal(null); return; }
       const type = typeById(Number(action.dataset.typeId));
       if (type) openScheduleModal(type);
     } else if (kind === 'edit-schedule') {
       const schedule = state.schedules.find((s) => s.id === Number(action.dataset.id));
       const type = schedule && typeById(schedule.type_id);
       if (schedule && type) openScheduleModal(type, schedule);
-    } else if (kind === 'delete-schedule') {
-      const schedule = state.schedules.find((s) => s.id === Number(action.dataset.id));
-      if (!schedule) return;
-      confirmModal(t('waste.scheduleDeleteConfirm'), { danger: true, confirmLabel: t('common.delete'), detail: t('waste.scheduleDeleteConfirmDetail') }).then(async (ok) => {
-        if (!ok) return;
-        try {
-          await deleteOrAlreadyGone(`/waste/schedules/${schedule.id}`, 'waste_schedule_not_found');
-          await reloadAndRender();
-          refocusAfterRender();
-          window.yuvomi?.showToast(t('waste.scheduleDeletedToast'), 'success');
-        } catch (err) {
-          reportError(err);
-        }
-      });
     } else if (kind === 'move-occurrence') {
       moveOccurrence(action.closest('.waste-occurrence-row')?.dataset.key);
     } else if (kind === 'skip-occurrence') {
@@ -2667,7 +2748,7 @@ function bindEvents() {
     } else if (kind === 'edit-pickup') {
       loadPickupAndEdit(Number(action.dataset.id));
     } else if (kind === 'delete-pickup') {
-      deletePickup(Number(action.dataset.id));
+      deletePickup(Number(action.dataset.id), typeById(Number(action.closest('.waste-occurrence-row')?.dataset.typeId))?.name ?? null);
     } else if (kind === 'open-source') {
       loadSourceAndOpen(Number(action.dataset.id));
     } else if (kind === 'reimport-source') {
@@ -2710,14 +2791,18 @@ async function loadPickupAndEdit(id) {
   }
 }
 
-async function deletePickup(id) {
+async function deletePickup(id, typeName = null) {
+  // Der Name VOR dem Loeschen: danach steht die Abholung nicht mehr in der Liste.
+  // Die Zeile reicht ihre Art mit; sonst die Abholung im Stand.
+  const occ = state.occurrences.find((o) => o.origins?.some((x) => x.kind === 'one_off' && x.one_off_id === id));
+  const name = typeName ?? occ?.type_name ?? typeById(occ?.type_id)?.name ?? '';
   const ok = await confirmModal(t('waste.pickupDeleteConfirm'), { danger: true, confirmLabel: t('common.delete'), detail: t('waste.pickupDeleteConfirmDetail') });
   if (!ok) return;
   try {
     await deleteOrAlreadyGone(`/waste/pickups/${id}`, 'waste_pickup_not_found');
     await reloadAndRender();
     refocusAfterRender();
-    window.yuvomi?.showToast(t('waste.pickupDeletedToast'), 'success');
+    window.yuvomi?.showToast(t('waste.pickupDeletedNamed', { name }), 'success');
   } catch (err) {
     reportError(err);
   }
@@ -2816,14 +2901,17 @@ export const __test = {
   // R17/E6: die Wochentage des Termin-Dialogs als Chips.
   weekdayPickerHtml, weekdayPickerValue, intervalStepperHtml, wireIntervalStepper,
   findScheduleOrigin, parseDeepLinkParams, deepLinkSelectors, recurrenceSummary, originBadges,
-  defaultLabelDecision, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
+  defaultLabelSelection, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
+  // #2273: die Abfallarten eines Labels als Chips.
+  labelTypeChipsHtml, labelTypesValue, mappingTypesChanged, importLabelRowHtml, sourceMappingRowHtml,
   splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,
   // Die drei Zeilenbauer und die Palette: seit der Vereinheitlichung der
   // Zeilengrammatik (Audit UX 2026-09-12) tragen sie Bedingungen, die man
   // nicht mehr am Markup ablesen kann - welcher Eintrag bei welcher Position
   // im Menue steht, und dass die Preset-Farben allesamt im Raster liegen.
   typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, typeWithoutScheduleHtml, remainingTypePresets, remainingPresetsHtml, WASTE_TYPE_COLORS,
-  activeSwatchColor, resolveSwatchColors,
+  // R24 (G2-Entsorgung-P2-1/P3-2): Wochentag aus der ersten Abholung, leere Arten in einer Zeile.
+  weekdayCodeOf, isUnscheduledType, unscheduledTypesHtml,
   isOnboarding, onboardingHtml, sectionVisibility, fabIntent, pageModeClasses,
   importErrorText,
   // #1909: die echten Aufrufer hinter den Fehler-Toasts, fuer test:waste-errors.

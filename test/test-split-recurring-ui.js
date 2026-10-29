@@ -45,7 +45,7 @@ test.after(() => { miniDomAbraeumen(); mock.timers.reset(); });
 
 const serie = (id, extra = {}) => ({
   id, group_id: 2, title: `Serie ${id}`, description: '', amount_minor: 90000, amount: '900.00', currency: 'EUR',
-  payer_id: 1, payer_name: 'Alex', category: 'rent', split_method: 'equal', frequency: 'monthly',
+  payer_id: 1, payer_name: 'Alex', category: 'rent', budget_category: 'housing', split_method: 'equal', frequency: 'monthly',
   next_run_date: '2026-11-01', anchor_day: 1, paused_at: null, created_by: 1,
   participants: [1, 3], splits: [], blocked_reason: null, can_edit: true, missed_count: 0, resume_date: null,
   ...extra,
@@ -570,7 +570,7 @@ function knoten(extra = {}) {
  * JETZT. `haken[id].checked = false` hakt eine Person ab.
  */
 function formular(werte, { method = 'equal', teilnehmer = { 1: '', 3: '' }, abgehakt = [] } = {}) {
-  const namen = ['title', 'amount', 'currency', 'payer_id', 'frequency', 'next_run_date', 'category', 'description'];
+  const namen = ['title', 'amount', 'currency', 'payer_id', 'frequency', 'next_run_date', 'budget_category', 'description'];
   const felder = {
     '[name="split_method"]': knoten({ value: method }),
     '#split-method-hint': knoten(),
@@ -769,11 +769,11 @@ test('Der Server weist einen schon gebuchten Termin ab: der Satz steht am Datums
 test('Speichern einer neuen Serie sendet POST mit allen Feldern der Route; ein unbrauchbarer Betrag sendet nichts', async () => {
   await buehne({}, async (spur) => {
     const { panel, setze } = offenerDialog(spur, null);
-    setze('title', 'Strom'); setze('amount', '30'); setze('frequency', 'weekly'); setze('next_run_date', '2026-11-05'); setze('category', 'utilities');
+    setze('title', 'Strom'); setze('amount', '30'); setze('frequency', 'weekly'); setze('next_run_date', '2026-11-05'); setze('budget_category', 'housing');
     await panel.feuere('submit');
     assert.deepEqual(spur.gesendet, [['POST', '/split-expenses/groups/2/recurring', {
       title: 'Strom', amount: '30', currency: 'EUR', payer_id: '1', frequency: 'weekly', next_run_date: '2026-11-05',
-      split_method: 'equal', category: 'utilities', description: '', participants: [1, 3], splits: [],
+      split_method: 'equal', budget_category: 'housing', description: '', participants: [1, 3], splits: [],
     }]]);
   });
   await buehne({}, async (spur) => {
@@ -1065,5 +1065,42 @@ test('#1748 Faellt das Recht waehrend der Frage, sendet Speichern nichts', async
     spur.fragen[0].antworte('skip');
     await gesendet;
     assert.deepEqual(spur.gesendet, []);
+  });
+});
+
+// --------------------------------------------------------------------------
+// #1746: eine Serie, die der Lauf unerwartet nicht buchen kann, laeuft weiter
+// (`failed_at` vom Server, die Serie bleibt unpausiert) und sagt es an der Zeile.
+// --------------------------------------------------------------------------
+test('#1746 Ein unerwarteter Fehlschlag steht an der Zeile, bei jedem Recht und im Archiv, samt Leseansicht und Dialog', async () => {
+  const scheitert = serie(70, { title: 'Wasser', failed_at: '2026-09-30T08:00:00Z' });
+  for (const lage of [{ modus: 'write' }, { modus: 'read' }, { modus: 'write', archiviert: true }]) {
+    await buehne({ ...lage, recurring: [scheitert, MIETE] }, () => {
+      const html = hauptteil();
+      const name = JSON.stringify(lage);
+      const zeilen = html.split('data-row-key=');
+      const wasser = zeilen.find((z) => z.startsWith('"recurring-70"'));
+      const miete = zeilen.find((z) => z.startsWith('"recurring-11"'));
+      assert.match(wasser, /<span>splitExpenses\.recurring\.nextDate: 2026-11-01<\/span>\s*<span class="split-recurring__reason">splitExpenses\.recurring\.failing<\/span>/, name);
+      assert.doesNotMatch(miete, /splitExpenses\.recurring\.failing/, `${name}: nur die Serie, die scheitert`);
+    });
+  }
+  await buehne({ recurring: [scheitert] }, (spur) => {
+    split.openRecurringModal(scheitert);
+    assert.match(spur.dialoge[0].content, /<span>splitExpenses\.recurring\.failing<\/span>/, 'der Dialog nennt den Zustand');
+  });
+  await buehne({ recurring: [scheitert], modus: 'read' }, (spur) => {
+    split.openRecurringModal(scheitert);
+    const zustand = spur.leseansichten[0].sections.flat?.() ?? spur.leseansichten[0];
+    assert.match(JSON.stringify(zustand), /splitExpenses\.recurring\.failing/, 'die Leseansicht nennt ihn');
+  });
+});
+
+test('#1746 Eine pausierte Serie nennt keinen Fehlschlag: sie wird nicht neu versucht', async () => {
+  const pausiert = serie(71, { title: 'Gas', paused_at: '2026-09-30T09:00:00Z', failed_at: '2026-09-30T08:00:00Z' });
+  await buehne({ recurring: [pausiert] }, (spur) => {
+    assert.doesNotMatch(hauptteil(), /splitExpenses\.recurring\.failing/);
+    split.openRecurringModal(pausiert);
+    assert.doesNotMatch(spur.dialoge[0].content, /splitExpenses\.recurring\.failing/);
   });
 });

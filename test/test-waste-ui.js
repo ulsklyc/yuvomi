@@ -36,10 +36,10 @@ global.document = {
 const { __test } = await import('../public/pages/waste.js');
 const {
   findScheduleOrigin, parseDeepLinkParams, deepLinkSelectors, recurrenceSummary, originBadges,
-  defaultLabelDecision, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
+  defaultLabelSelection, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
+  labelTypeChipsHtml, mappingTypesChanged, importLabelRowHtml, sourceMappingRowHtml,
   splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,
   typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, WASTE_TYPE_COLORS,
-  activeSwatchColor, resolveSwatchColors,
   isOnboarding, onboardingHtml, sectionVisibility, fabIntent,
 } = __test;
 
@@ -238,11 +238,12 @@ test('originBadges: a moved AND coalesced occurrence shows both badges', () => {
 // Import wizard pure helpers (#1063 Phase 3)
 // -------------------------------------------------------------------------
 
-test('defaultLabelDecision: remembered_ignored beats remembered_type_id beats suggested_type_id beats "create new"', () => {
-  assert.equal(defaultLabelDecision({ remembered_ignored: true, remembered_type_id: 5, suggested_type_id: 9 }), '');
-  assert.equal(defaultLabelDecision({ remembered_ignored: false, remembered_type_id: 5, suggested_type_id: 9 }), '5');
-  assert.equal(defaultLabelDecision({ remembered_ignored: false, remembered_type_id: null, suggested_type_id: 9 }), '9');
-  assert.equal(defaultLabelDecision({ remembered_ignored: false, remembered_type_id: null, suggested_type_id: null }), '__new__');
+test('defaultLabelSelection: remembered_ignored beats remembered types beats suggested_type_id beats "create new"', () => {
+  assert.deepEqual(defaultLabelSelection({ remembered_ignored: true, remembered_type_ids: [5], suggested_type_id: 9 }), { typeIds: [], createNew: false });
+  assert.deepEqual(defaultLabelSelection({ remembered_ignored: false, remembered_type_ids: [5, 7], suggested_type_id: 9 }), { typeIds: [5, 7], createNew: false },
+    'every remembered type of a label that names two bins (#2273)');
+  assert.deepEqual(defaultLabelSelection({ remembered_ignored: false, remembered_type_ids: [], suggested_type_id: 9 }), { typeIds: [9], createNew: false });
+  assert.deepEqual(defaultLabelSelection({ remembered_ignored: false, remembered_type_ids: [], suggested_type_id: null }), { typeIds: [], createNew: true });
 });
 
 test('unresolvedBlockingDiagnostics: only blocking diagnostics count, and an explicit skip resolves one', () => {
@@ -256,26 +257,73 @@ test('unresolvedBlockingDiagnostics: only blocking diagnostics count, and an exp
   assert.equal(unresolvedBlockingDiagnostics(diagnostics, ['uid:a', 'uid:b']).length, 0);
 });
 
-test('buildMappingDecisions: builds type_id / new_type / ignored entries from each row\'s decision', () => {
+test('buildMappingDecisions: several types, a new type, both together, or nothing (= ignored) from each row (#2273)', () => {
   const rows = [
-    { normalized_label: 'restmüll', decision: '5', newTypeName: '' },
-    { normalized_label: 'papier', decision: '__new__', newTypeName: 'Papier' },
-    { normalized_label: 'sperrmüll', decision: '', newTypeName: '' },
+    { normalized_label: 'restmüll', typeIds: [5], createNew: false, newTypeName: '' },
+    { normalized_label: 'bio, blaue tonne', typeIds: [5, 7, 7], createNew: false, newTypeName: '' },
+    { normalized_label: 'papier', typeIds: [], createNew: true, newTypeName: 'Papier' },
+    { normalized_label: 'bio, gelb', typeIds: [5], createNew: true, newTypeName: 'Gelb' },
+    { normalized_label: 'sperrmüll', typeIds: [], createNew: false, newTypeName: '' },
   ];
   const { mappings, error } = buildMappingDecisions(rows);
   assert.equal(error, undefined);
   assert.deepEqual(mappings, [
-    { normalized_label: 'restmüll', type_id: 5 },
+    { normalized_label: 'restmüll', type_ids: [5] },
+    { normalized_label: 'bio, blaue tonne', type_ids: [5, 7] },
     { normalized_label: 'papier', new_type: { name: 'Papier' } },
+    { normalized_label: 'bio, gelb', type_ids: [5], new_type: { name: 'Gelb' } },
     { normalized_label: 'sperrmüll', ignored: true },
   ]);
 });
 
 test('buildMappingDecisions: a "create new" decision without a name reports an error instead of committing a blank type', () => {
-  const rows = [{ normalized_label: 'papier', decision: '__new__', newTypeName: '  ' }];
+  const rows = [{ normalized_label: 'papier', typeIds: [], createNew: true, newTypeName: '  ' }];
   const result = buildMappingDecisions(rows);
   assert.equal(result.error, 'missing_new_type_name');
   assert.equal(result.label, 'papier');
+});
+
+test('#2273 a label row offers every type as a chip of the canon, pressed as remembered, in a group named by the label', () => {
+  __test.setStateForTest({ types: [
+    { id: 1, name: 'Bio', icon: 'leaf', color: '#2E7D32', archived: false },
+    { id: 2, name: 'Papier', icon: 'newspaper', color: '#1565C0', archived: false },
+    { id: 3, name: 'Alt', icon: 'trash-2', color: '#666666', archived: true },
+  ] });
+  const html = importLabelRowHtml({ normalized_label: 'bio, blaue tonne', original_label: 'Bio, Blaue Tonne', count: 3, remembered_type_ids: [1, 2] }, 0);
+  assert.match(html, /role="group" aria-labelledby="wiz-label-0"/);
+  assert.match(html, /id="wiz-label-0"/);
+  assert.match(html, /class="filter-chip filter-chip--active" data-type-chip="1" aria-pressed="true"/);
+  assert.match(html, /class="filter-chip filter-chip--active" data-type-chip="2" aria-pressed="true"/);
+  assert.doesNotMatch(html, /data-type-chip="3"/, 'an archived type that is not chosen is no offer');
+  assert.match(html, /data-new-type-chip aria-pressed="false"/);
+  assert.match(html, /data-role="label-ignored" hidden/, 'chosen types: no "not imported" line');
+  assert.match(html, /data-role="label-new-type-name"[^>]*hidden/);
+
+  const ignored = importLabelRowHtml({ normalized_label: 'info', original_label: 'Info', count: 1, remembered_ignored: true, remembered_type_ids: [] }, 1);
+  assert.doesNotMatch(ignored, /aria-pressed="true"/);
+  assert.match(ignored, /data-role="label-ignored">/, 'nothing chosen: the line says the label is not imported');
+
+  const sheet = sourceMappingRowHtml({ id: 9, original_label: 'Bio, Blaue Tonne', type_ids: [1, 3] });
+  assert.match(sheet, /data-type-chip="3" aria-pressed="true"/, 'an archived type stays visible while it is chosen');
+  assert.doesNotMatch(sheet, /data-new-type-chip/, 'a source\'s mapping sheet creates no type');
+  assert.match(sheet, /aria-labelledby="wsrc-mapping-9"/);
+  // The discard guard of a dialog only sees fields: the choice also stands in a hidden one.
+  assert.match(sheet, /<input type="hidden" name="wsrc-mapping-9-types" data-role="label-types-value" value="1,3">/);
+  assert.match(html, /name="wiz-label-0-types" data-role="label-types-value" value="1,2"/);
+});
+
+test('#2273 labelTypesValue: the hidden field changes with every chip, including "new type"', () => {
+  assert.equal(__test.labelTypesValue([3, 1], false), '1,3');
+  assert.equal(__test.labelTypesValue([], true), 'new');
+  assert.equal(__test.labelTypesValue([2], true), '2,new');
+  assert.equal(__test.labelTypesValue([], false), '');
+});
+
+test('#2273 mappingTypesChanged compares the type set, not its order', () => {
+  assert.equal(mappingTypesChanged({ type_ids: [1, 2] }, [2, 1]), false);
+  assert.equal(mappingTypesChanged({ type_ids: [1] }, [1, 2]), true);
+  assert.equal(mappingTypesChanged({ type_ids: [] }, []), false);
+  assert.equal(mappingTypesChanged({ type_ids: [1] }, []), true);
 });
 
 test('sourceHealthBadgeInfo: an error takes priority over needs_refresh, and a healthy source shows nothing', () => {
@@ -375,16 +423,18 @@ test('typeCardHtml: bei genau einer Abfallart bleibt nur das Anlegen einer Serie
   assert.match(only, /data-action="add-schedule"/);
 });
 
-test('scheduleRowHtml: die Loeschung liegt hinter dem Menue und ist als gefaehrlich markiert', () => {
+// R24 (Critique G2-Entsorgung-P3-2): EINE Ellipse je Karte. Die Terminzeile
+// trug ein eigenes "..." mit genau einem Eintrag (Loeschen) unter dem "..."
+// ihrer Art. Loeschen steht im Dialog, den die Zeile oeffnet (Fuss, mit Wort).
+test('scheduleRowHtml: die Terminzeile oeffnet ihren Dialog und traegt kein eigenes Menue', () => {
   const html = scheduleRowHtml({ id: 42, type_id: 7, active: true, freq: 'weekly', weekday: 1, interval: 1 });
-  assert.equal((html.match(/class="row-action"/g) ?? []).length, 1);
-  assert.match(html, /popovertarget="waste-schedule-menu-42"/);
-  assert.match(html, /<div class="popover-menu" id="waste-schedule-menu-42" popover role="menu">/);
-  assert.match(html, /class="row-action" popovertarget="waste-schedule-menu-42" aria-haspopup="menu" aria-expanded="false"/);
-  assert.match(html, /class="popover-menu__item popover-menu__item--danger" data-action="delete-schedule" data-id="42"/);
-  // Der nackte Muelltonnen-Knopf direkt in der Zeile ist weg - ein Fehlgriff
-  // daneben loeschte vorher sofort eine ganze Serie.
-  assert.doesNotMatch(html, /class="row-action" data-action="delete-schedule"/);
+  assert.doesNotMatch(html, /row-action|popover/, 'kein zweites "..." in der Karte');
+  assert.doesNotMatch(html, /data-action="delete-schedule"/, 'Loeschen nicht in der Zeile');
+  assert.match(html, /data-action="edit-schedule" data-id="42" role="button" tabindex="0" aria-label="common\.editNamed/,
+    'die Zeile ist der Weg in den Dialog, mit Namen');
+  assert.match(WASTE_SRC, /\$\{isEdit \? `<button type="button" class="btn btn--danger-outline" id="wsm-delete">/,
+    'Loeschen steht im Fuss des Bearbeiten-Dialogs');
+  assert.doesNotMatch(WASTE_SRC, /kind === 'delete-schedule'/, 'kein Handler fuer einen Knopf, den es nicht gibt');
 });
 
 test('scheduleRowHtml: eine pausierte Serie traegt ihren eigenen Chip', () => {
@@ -445,8 +495,9 @@ test('alle vier "..."-Knoepfe kuendigen ein Menue an, auch der vorbestehende der
   // Abfallart, Quelle) bauen ihr Markup separat und hatten diese zwei
   // Attribute keiner von ihnen - auch der Abholzeilen-Knopf nicht, der schon
   // vor diesem PR auf `main` stand.
+  // R24: die Serie hat kein eigenes "..." mehr (eine Ellipse je Karte).
   const rowActionButtons = WASTE_SRC.match(/<button type="button" class="row-action"[^>]*>/g) ?? [];
-  assert.equal(rowActionButtons.length, 4, 'Abholung, Serie, Abfallart und Quelle');
+  assert.equal(rowActionButtons.length, 3, 'Abholung, Abfallart und Quelle');
   for (const btn of rowActionButtons) {
     assert.match(btn, /aria-haspopup="menu"/, `${btn} kuendigt kein Menue an`);
     assert.match(btn, /aria-expanded="false"/, `${btn} traegt keinen Anfangszustand`);
@@ -491,100 +542,6 @@ test('WASTE_TYPE_COLORS: jede Preset-Farbe liegt im Raster', () => {
     assert.ok(WASTE_TYPE_COLORS.includes(preset.color),
       `Preset ${preset.key} (${preset.color}) fehlt in WASTE_TYPE_COLORS`);
   }
-});
-
-/**
- * DER FARBNAME NENNT DEN FARBTON (#1507).
- *
- * Die Swatches tragen ihren Namen als `aria-label` und `title` - wer die Farbe
- * nicht sieht, hat nur ihn. Nach dem Wechsel auf die geteilte Palette hiess
- * #D946EF (Fuchsia, Farbton 292) weiter "Violett" und #059669 (Smaragd, 161)
- * weiter "Tuerkis": die Hex-Werte waren gewandert, die Namen nicht.
- *
- * Gemessen wird der Farbton des Hex-Werts gegen den Sektor, den der
- * Schluesselname behauptet. Die Sektoren sind grob und ueberlappen nicht; sie
- * sollen einen vertauschten Namen fangen, keine Nuance.
- *
- * Eine Ausnahme vom Nicht-Ueberlappen (#1723): Magenta und Fuchsia teilen
- * sich einen Sektor, weil sie derselbe Farbton sind (300 Grad, in CSS sogar
- * derselbe Wert). #EC4899 liegt bei 330 und hiess trotzdem "Magenta" - der
- * Sektor stand hier zu weit und hat den Namen gedeckt, statt ihn zu pruefen.
- * 310 bis 345 ist Pink.
- */
-const HUE_SECTORS = {
-  colorRed: [345, 15],
-  colorOrange: [15, 28],
-  colorOcher: [28, 50],
-  colorGreen: [90, 150],
-  colorEmerald: [150, 170],
-  colorTeal: [170, 185],
-  colorCyan: [185, 200],
-  colorBlue: [200, 250],
-  colorViolet: [250, 280],
-  colorFuchsia: [280, 310],
-  colorMagenta: [280, 310],
-  colorPink: [310, 345],
-};
-
-function hueAndSaturation(hex) {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-  let hue = 0;
-  if (delta > 0) {
-    if (max === r) hue = ((g - b) / delta) % 6;
-    else if (max === g) hue = (b - r) / delta + 2;
-    else hue = (r - g) / delta + 4;
-    hue = (hue * 60 + 360) % 360;
-  }
-  return { hue, saturation: max === 0 ? 0 : delta / max };
-}
-
-test('WASTE_TYPE_COLOR_NAMES: jeder Farbname liegt im Farbton seines Hex-Werts (#1507)', () => {
-  const pairs = [...WASTE_CODE.matchAll(/'(#[0-9A-F]{6})':\s*t\('waste\.(color\w+)'\)/g)].map((m) => [m[1], m[2]]);
-  assert.equal(pairs.length, WASTE_TYPE_COLORS.length, 'nicht jede Palettenfarbe hat einen Namen');
-  assert.deepEqual(pairs.map(([hex]) => hex).sort(), [...WASTE_TYPE_COLORS].sort());
-  const failures = [];
-  for (const [hex, key] of pairs) {
-    const { hue, saturation } = hueAndSaturation(hex);
-    if (key === 'colorGray') {
-      if (saturation > 0.2) failures.push(`${hex} heisst ${key}, ist aber bunt (Saettigung ${saturation.toFixed(2)})`);
-      continue;
-    }
-    const sector = HUE_SECTORS[key];
-    assert.ok(sector, `${key}: kein Farbton-Sektor hinterlegt`);
-    const [from, to] = sector;
-    const inside = from < to ? hue >= from && hue < to : hue >= from || hue < to;
-    if (!inside) failures.push(`${hex} heisst ${key}, liegt aber bei Farbton ${Math.round(hue)}`);
-  }
-  assert.deepEqual(failures, []);
-});
-
-test('#EC4899 heisst in jeder Sprache Pink, und der alte Name ist kein zweiter (#1723)', async () => {
-  const { readFileSync, readdirSync } = await import('node:fs');
-  // Das Etikett ist neu, der gespeicherte Wert nicht: eine Abfallart traegt den
-  // Hex-Wert, und der bleibt in der Palette.
-  assert.ok(WASTE_TYPE_COLORS.includes('#EC4899'), '#EC4899 ist nicht mehr waehlbar - Bestandsdaten zeigten dann auf nichts');
-  const name = WASTE_CODE.match(/'#EC4899':\s*t\('waste\.(color\w+)'\)/);
-  assert.ok(name, '#EC4899 hat keinen Namen mehr');
-  assert.equal(name[1], 'colorPink');
-  const dir = new URL('../public/locales/', import.meta.url);
-  const files = readdirSync(dir).filter((file) => file.endsWith('.json'));
-  assert.ok(files.length >= 20, 'zu wenige Locale-Dateien gelesen');
-  const seen = new Map();
-  for (const file of files) {
-    const { waste } = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
-    assert.equal(typeof waste.colorPink, 'string', `${file}: waste.colorPink fehlt`);
-    assert.equal(waste.colorMagenta, undefined, `${file}: waste.colorMagenta ist ein toter zweiter Name`);
-    // Kein Name darf doppelt in der Palette stehen - ein Screenreader koennte
-    // die zwei Swatches sonst nicht unterscheiden.
-    const names = Object.entries(waste).filter(([key]) => /^color[A-Z]/.test(key) && key !== 'colorCurrent').map(([, value]) => value);
-    assert.equal(new Set(names).size, names.length, `${file}: zwei Farben heissen gleich (${names.join(', ')})`);
-    seen.set(file, waste.colorPink);
-  }
-  assert.equal(seen.get('de.json'), 'Pink');
-  assert.equal(seen.get('en.json'), 'Pink');
 });
 
 test('WASTE_TYPE_COLORS: eine kuratierte Auswahl ohne Dubletten und ohne Extremwerte', () => {
@@ -646,13 +603,6 @@ test('USER_COLORS: kein Ton im Markenband (#6C3AED/#7C3AED), der Primaerknopf bl
     assert.ok(hue === null || hue < 245 || hue > 275, `${hex} (Hue ${hue?.toFixed(0)}) liegt im Markenband`);
   }
   assert.ok(USER_COLORS.includes(USER_COLOR_DEFAULT), 'die Vorgabe fuer neue Datensaetze ist ein Palettenmitglied');
-});
-
-test('Farb-Swatch traegt eine Innenkante, damit er im Dark nicht in den Kartengrund laeuft', () => {
-  const css = readFileSync(new URL('../public/styles/waste.css', import.meta.url), 'utf8');
-  const base = [...eachRule(css)].find((r) => r.selector.trim() === '.waste-color-swatch' && !r.at.length);
-  assert.ok(base, '.waste-color-swatch fehlt');
-  assert.match(base.body, /box-shadow:\s*inset 0 0 0 1px var\(--color-border[a-z-]*\)/);
 });
 
 test('WASTE_TYPE_COLORS ist die geteilte Palette, und Sperrmuell traegt nicht mehr die Stimme', async () => {
@@ -733,81 +683,25 @@ test('jeder Schreib-Weg im Kopf bleibt hinter dem Nur-lesen-Riegel', () => {
   // Unterschied, auf dem dieses Modul seit der ersten Fassung besteht.
   assert.match(WASTE_SRC, /actions: readOnly\(\) \? '' : renderPageActions\(\[/);
   // Und die Zeilenmenues ebenso - je einmal pro Zeilentyp.
-  assert.equal((WASTE_SRC.match(/\$\{ro \? '' : `\n\s*<div class="row-actions">/g) ?? []).length, 2,
-    'Serien- und Typzeile unterdruecken ihre Aktionen ueber dasselbe `ro`');
+  assert.equal((WASTE_SRC.match(/\$\{ro \? '' : `\n\s*<div class="row-actions">/g) ?? []).length, 1,
+    'die Typzeile unterdrueckt ihre Aktionen ueber `ro` (die Serie hat seit R24 keine eigenen)');
+  assert.match(WASTE_SRC, /list-row__main\$\{ro \? '' : ' list-row__main--interactive'\}"\$\{ro \? '' : ` data-action="edit-schedule"/,
+    'die Serienzeile oeffnet bei `read` nichts');
   assert.match(WASTE_SRC, /\$\{readOnly\(\) \? '' : `\n\s*<div class="row-actions">/, 'die Quellenzeile ebenso');
 });
 
 test('der freie Farbwaehler ist aus dem Abfallart-Dialog verschwunden', () => {
   // 16,7 Millionen Farben ohne Untergrenze: Weiss oder Schwarz liessen das
-  // Symbol der Abfallart auf hellem bzw. dunklem Grund verschwinden.
+  // Symbol der Abfallart auf hellem bzw. dunklem Grund verschwinden. Seit
+  // Critique R24 (E6) ist es der geteilte Waehler: Familientoene, "Eigene"
+  // dahinter, eine Bestandsfarbe als eigener Swatch (test:color-picker).
   assert.doesNotMatch(WASTE_CODE, /type="color"/);
   assert.doesNotMatch(WASTE_CODE, /form-input--color/);
-  assert.match(WASTE_SRC, /class="waste-color-picker" role="radiogroup" aria-labelledby="wtm-color-label"/);
-  // Die gespeicherte Farbe gewinnt ihren eigenen Swatch, statt still ersetzt
-  // zu werden - Abfallarten aus der Zeit des freien Waehlers tragen beliebige
-  // Hex-Werte.
-  assert.match(WASTE_SRC, /WASTE_TYPE_COLORS\.includes\(selColorUpper\) \? WASTE_TYPE_COLORS : \[\.\.\.WASTE_TYPE_COLORS, selColor\]/);
-});
-
-// -------------------------------------------------------------------------
-// resolveSwatchColors - Gross-/Kleinschreibung des gespeicherten Hex-Werts
-// (Review PR #1146, "should fix" 1). `<input type="color">` liefert seinen
-// Wert laut HTML-Spec IMMER kleingeschrieben - jede Abfallart von vor diesem
-// Umbau (und jede ueber ein Preset angelegte) traegt deshalb z.B. `#16a34a`,
-// waehrend `WASTE_TYPE_COLORS` grossgeschrieben ist. Ein case-sensitiver
-// Vergleich fand da nie eine Uebereinstimmung: keiner der zehn Swatches
-// zeigte sich aktiv, und ein optisch identischer elfter "Aktuelle Farbe"-
-// Swatch haengte sich an - bei JEDER bestehenden Abfallart.
-// -------------------------------------------------------------------------
-
-test('resolveSwatchColors: ein kleingeschriebener gespeicherter Wert trifft seinen Palette-Swatch statt einen elften anzuhaengen', () => {
-  const { swatchColors, selColorUpper } = resolveSwatchColors('#16a34a');
-  assert.equal(selColorUpper, '#16A34A');
-  assert.deepEqual(swatchColors, WASTE_TYPE_COLORS, 'kein elfter "Aktuelle Farbe"-Swatch fuer eine Palettenfarbe, nur anders geschrieben');
-  assert.ok(swatchColors.some((c) => c.toUpperCase() === selColorUpper), 'ein Swatch des Rasters muss auf den Wert passen');
-});
-
-test('resolveSwatchColors: eine Farbe ausserhalb der Palette bekommt weiterhin genau einen zusaetzlichen Swatch', () => {
-  const { swatchColors, selColorUpper } = resolveSwatchColors('#123456');
-  assert.equal(selColorUpper, '#123456');
-  assert.equal(swatchColors.length, WASTE_TYPE_COLORS.length + 1);
-  assert.equal(swatchColors.at(-1), '#123456', 'der Altwert bleibt in seiner eigenen Schreibweise erhalten');
-});
-
-test('resolveSwatchColors: bereits grossgeschriebene Palettenfarben verhalten sich unveraendert', () => {
-  const { swatchColors } = resolveSwatchColors('#3B82F6');
-  assert.deepEqual(swatchColors, WASTE_TYPE_COLORS);
-});
-
-// -------------------------------------------------------------------------
-// activeSwatchColor - Speichern liest den TATSAECHLICH aktiven Swatch
-// (Review PR #1146, "nice to have"). Der Gegenbeweis am PR-Kopf zeigte: ein
-// Speichern, das immer die Oeffnungsfarbe schickt, liess test:waste-ui grün.
-// Die Funktion ist die kleinste testbare Einheit dieses Lese-Schritts - mit
-// einem gestellten Panel-Stub statt einem echten Dialog (siehe Kommentar am
-// Dateikopf: Full modal open/save braucht einen echten DOM).
-// -------------------------------------------------------------------------
-
-function stubSwatchPanel(activeColor) {
-  return {
-    querySelector(selector) {
-      if (selector === '.waste-color-swatch--active') {
-        return activeColor === null ? null : { dataset: { color: activeColor } };
-      }
-      return null;
-    },
-  };
-}
-
-test('activeSwatchColor: liest die Farbe des aktiven Swatch, nicht die Oeffnungsfarbe', () => {
-  const panel = stubSwatchPanel('#DC2626');
-  assert.equal(activeSwatchColor(panel, '#16A34A'), '#DC2626', 'ein neu angeklickter Swatch muss gewinnen, nicht der Stand beim Oeffnen');
-});
-
-test('activeSwatchColor: faellt ohne aktiven Swatch auf die uebergebene Oeffnungsfarbe zurueck', () => {
-  const panel = stubSwatchPanel(null);
-  assert.equal(activeSwatchColor(panel, '#16A34A'), '#16A34A');
+  assert.match(WASTE_SRC, /colorPickerHtml\(\{ id: 'wtm-color', value: selColor, labelledBy: 'wtm-color-label' \}\)/);
+  // Speichern liest das Wertfeld des Waehlers, nicht die Oeffnungsfarbe.
+  assert.match(WASTE_SRC, /color: panel\.querySelector\('#wtm-color'\)\?\.value \|\| selColor/);
+  // Die Vorlage markiert ihren Swatch ueber den Baustein.
+  assert.match(WASTE_SRC, /setColorPickerValue\(panel\.querySelector\('\[data-color-picker\]'\), preset\.color\)/);
 });
 
 // -------------------------------------------------------------------------
@@ -1126,7 +1020,7 @@ function openScheduleDialog(recurrenceKind) {
   opts.onSave({ querySelector: element, querySelectorAll: () => [], addEventListener() {} });
   return {
     content: opts.content,
-    label: () => element('#wsm-interval-label').textContent,
+    sentenceKey: () => element('.wsm-interval-sentence').dataset.intervalKey,
     chooseKind(value) {
       element('#wsm-kind').value = value;
       const fn = handlers.get('#wsm-kind:change');
@@ -1136,30 +1030,34 @@ function openScheduleDialog(recurrenceKind) {
   };
 }
 
-const intervalLabelAtOpen = (content) => {
-  const m = content.match(/<label\b[^>]*\bfor="wsm-interval"[^>]*>([^<]*)<\/label>/);
-  assert.ok(m, 'das Intervallfeld hat ein Label');
+// Seit Critique R24 ist das Intervall ein Satz (utils/interval-sentence.js):
+// "Alle [2] Wochen" - das Feld steht im Satz, die Gruppe heisst "Abstand".
+const intervalSentenceAtOpen = (content) => {
+  const m = content.match(/<div class="interval-sentence wsm-interval-sentence" role="group" aria-labelledby="wsm-interval-label" data-interval-key="([\w.]+)">([\s\S]*?)<\/div>\s*<\/div>/);
+  assert.ok(m, 'das Intervall steht als Satz-Gruppe');
+  assert.match(m[2], /<div class="waste-interval-stepper">[\s\S]*id="wsm-interval"[^>]*aria-labelledby="wsm-interval-label"/, 'der Stepper steht im Satz, das Feld traegt den Namen der Gruppe');
+  assert.match(content, /<span class="form-label" id="wsm-interval-label">waste\.intervalLabel<\/span>/);
   return m[1];
 };
 
 for (const [kind, key] of [
-  ['weekly', 'waste.intervalLabelWeekly'],
-  ['monthly_fixed_day', 'waste.intervalLabelMonthly'],
-  ['monthly_ordinal_weekday', 'waste.intervalLabelMonthly'],
+  ['weekly', 'common.everyNWeeks'],
+  ['monthly_fixed_day', 'common.everyNMonths'],
+  ['monthly_ordinal_weekday', 'common.everyNMonths'],
 ]) {
-  test(`Termin-Dialog: eine Serie "${kind}" oeffnet mit dem Intervall-Label ${key}`, () => {
-    assert.equal(intervalLabelAtOpen(openScheduleDialog(kind).content), key);
+  test(`Termin-Dialog: eine Serie "${kind}" oeffnet mit dem Intervall-Satz ${key}`, () => {
+    assert.equal(intervalSentenceAtOpen(openScheduleDialog(kind).content), key);
   });
 }
 
-test('Termin-Dialog: der Wechsel der Wiederholung tauscht das Intervall-Label mit', () => {
+test('Termin-Dialog: der Wechsel der Wiederholung tauscht den Intervall-Satz mit', () => {
   const d = openScheduleDialog('weekly');
   d.chooseKind('monthly_fixed_day');
-  assert.equal(d.label(), 'waste.intervalLabelMonthly');
+  assert.equal(d.sentenceKey(), 'common.everyNMonths');
   d.chooseKind('weekly');
-  assert.equal(d.label(), 'waste.intervalLabelWeekly');
+  assert.equal(d.sentenceKey(), 'common.everyNWeeks');
   d.chooseKind('monthly_ordinal_weekday');
-  assert.equal(d.label(), 'waste.intervalLabelMonthly');
+  assert.equal(d.sentenceKey(), 'common.everyNMonths');
 });
 
 // R23 S10 (Critique G2 P2/P3, D14): die Typkarte nennt nur die Regel - die
@@ -1173,4 +1071,89 @@ test('Typkarte ohne doppelte naechste Abholung, Leertext passend zu Vorlagen und
   assert.match(ob, /description: ro \? '' : t\('waste\.emptyTypesDescription'\)/);
   const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8')).waste;
   assert.doesNotMatch(de.emptyUpcomingDescription, /Abfallart und einen Termin/, 'die Liste erscheint erst mit Abfallart - sie verlangt keine zweite');
+});
+
+// --------------------------------------------------------------------------
+// Critique R24 (2026-10-28): G2-Entsorgung-P2-1 und P3-2
+// --------------------------------------------------------------------------
+
+test('R24 P2-1: der Wochentag eines neuen Termins kommt aus der ersten Abholung, "Aktiv" nur beim Bearbeiten', () => {
+  assert.equal(__test.weekdayCodeOf('2026-10-28'), 'WE');
+  assert.equal(__test.weekdayCodeOf('2026-11-01'), 'SU');
+  assert.equal(__test.weekdayCodeOf('kein Datum'), null);
+  assert.match(WASTE_SRC, /weekdayPickerHtml\(schedule\?\.weekdays \?\? weekdayCodeOf\(schedule\?\.anchor_date \?\? todayKey\(\)\)\)/,
+    'ein neuer Termin hat seinen Tag vorgewaehlt - kein Fehler erst nach dem Absenden');
+  assert.match(WASTE_SRC, /if \(ownWeekdays \|\| panel\.querySelector\('#wsm-kind'\)\?\.value !== 'weekly'\) return;/,
+    'der Tag zieht mit der ersten Abholung mit, bis man selbst waehlt');
+  assert.match(WASTE_SRC, /\$\{isEdit \? `<div class="form-group">\n\s*\$\{formSwitchRowHtml\(\{ label: t\('waste\.activeLabel'\)/,
+    '"Aktiv" fragt nur ein bestehender Termin');
+  assert.match(WASTE_SRC, /const active = panel\.querySelector\('#wsm-active'\)\?\.checked \?\? true;/, 'neu ist aktiv');
+});
+
+test('R24 P3-2: leere Abfallarten stehen in EINER Karte mit EINER Handlung', () => {
+  const rest = { id: 1, name: 'Restmuell', icon: 'trash-2', color: '#6B7280', archived: 0 };
+  const bio = { id: 2, name: 'Bio', icon: 'leaf', color: '#16A34A', archived: 0 };
+  const glas = { id: 3, name: 'Glas', icon: 'wine', color: '#0D9488', archived: 0 };
+  const alt = { id: 4, name: 'Alt', icon: 'box', color: '#000000', archived: 1 };
+  const schedules = [{ id: 9, type_id: 1 }];
+  const occurrences = [{ type_id: 3 }];
+  assert.equal(__test.isUnscheduledType(rest, schedules, occurrences), false, 'mit Serie: eigene Karte');
+  assert.equal(__test.isUnscheduledType(glas, schedules, occurrences), false, 'mit anstehender Abholung: eigene Karte');
+  assert.equal(__test.isUnscheduledType(alt, schedules, occurrences), false, 'archiviert: eigene Karte zum Wiederherstellen');
+  assert.equal(__test.isUnscheduledType(bio, schedules, occurrences), true);
+  const html = __test.unscheduledTypesHtml([bio, glas], false);
+  assert.match(html, /waste\.typesWithoutSchedule/);
+  assert.equal((html.match(/data-action="edit-type"/g) ?? []).length, 2, 'jeder Name oeffnet seine Art');
+  assert.equal((html.match(/data-action="add-schedule"/g) ?? []).length, 1, 'EINE Handlung fuer alle');
+  assert.doesNotMatch(html, /data-type-id/, 'sie fragt im Dialog nach der Art');
+  assert.doesNotMatch(__test.unscheduledTypesHtml([bio], true), /<button/, 'bei `read` keine Knoepfe');
+  assert.equal(__test.unscheduledTypesHtml([]), '');
+});
+
+test('R24 P3-2: die Abholung von heute traegt "Heute rausstellen" als Etikett', async () => {
+  // Derselbe Tagesschluessel wie im Code (Haushaltszone), nie toISOString().
+  const { todayKey } = await import('../public/utils/date.js');
+  const heute = __test.occurrenceRowHtml({ key: 'k', type_id: 1, type_name: 'Restmuell', date_key: todayKey(), origins: [] });
+  assert.match(heute, /<span class="tag waste-today-tag">waste\.putOutToday<\/span>/);
+  const morgen = __test.occurrenceRowHtml({ key: 'k2', type_id: 1, type_name: 'Restmuell', date_key: '2099-01-01', origins: [] });
+  assert.doesNotMatch(morgen, /waste-today-tag/);
+});
+
+
+/* R24 S13 (Uebergabe S8, G2-Entsorgung-P3-2): seit die leeren Arten in EINER
+ * Zeile "Ohne Termin" stehen, ist nicht jede Abfallart eine Karte. Hoch/
+ * Runter zaehlte aber weiter ueber ALLE Arten: eine Karte vor einer leeren Art
+ * tauschte mit ihr - unsichtbar, die Liste stand danach wie vorher -, und die
+ * erste Karte bot "Nach oben" an, wenn eine leere Art vor ihr sortiert war.
+ * Jetzt zaehlen und tauschen beide nur unter den Karten, die stehen. Die
+ * leeren Arten brauchen keinen eigenen Sortierweg: sie haben keine Lage, bis
+ * sie einen Termin bekommen - dann stehen sie an ihrem Platz und bekommen
+ * das Menue. */
+test('R24 S13: Hoch/Runter tauscht mit der naechsten stehenden Karte, nie mit einer Art ohne Termin', async () => {
+  const before = { ...__test.state() };
+  const type = (id, sort) => ({ id, name: `Art ${id}`, color: '#123456', icon: 'trash-2', sort_order: sort, archived: 0 });
+  const puts = [];
+  __test.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
+  __test.setStateForTest({
+    types: [type(1, 1), type(2, 2), type(3, 3)],
+    schedules: [{ id: 11, type_id: 1 }, { id: 13, type_id: 3 }],
+    occurrences: [],
+  });
+  globalThis.__apiStub = {
+    put: async (path, body) => { puts.push([path, body.sort_order]); return { data: {} }; },
+    get: async () => ({ data: [] }),
+  };
+  try {
+    assert.ok(__test.isUnscheduledType(type(2, 2)), 'Art 2 steht in der Zeile "Ohne Termin"');
+    await __test.moveType(3, 'up');
+    assert.deepEqual(puts, [['/waste/types/3', 1], ['/waste/types/1', 3]],
+      'Art 3 tauscht mit Art 1, der Karte darueber - nicht mit der unsichtbaren Art 2');
+  } finally {
+    delete globalThis.__apiStub;
+    __test.setStateForTest(before);
+  }
+  const src = readFileSync(new URL('../public/pages/waste.js', import.meta.url), 'utf8');
+  const render = src.slice(src.indexOf('function renderTypes('), src.indexOf('// Import sources'));
+  assert.match(render, /listed\.map\(\(type, index\) => typeCardHtml\(type, index, listed\.length\)\)/,
+    'Position und Grenzen des Menues zaehlen nur die stehenden Karten');
 });

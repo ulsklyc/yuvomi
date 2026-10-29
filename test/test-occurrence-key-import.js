@@ -277,7 +277,7 @@ for (const [way, w] of Object.entries(STORED)) {
   });
 }
 
-// ── Einmaliger ICS-Import: lokale Zeile ohne `tzid` ────────────────────────────
+// ── Einmaliger ICS-Import ──────────────────────────────────────────────────────
 
 test('ICS-Import ganztaegig: eine Datums-Absage bleibt ihr Tag', async () => {
   setHousehold('Europe/Berlin');
@@ -289,6 +289,64 @@ test('ICS-Import ganztaegig: eine Datums-Absage bleibt ihr Tag', async () => {
   await importToLocal(1, { ics });
   const series = seriesRow();
   assert.deepEqual(exceptionsOf(series.id), ['2035-03-26']);
+});
+
+// #2306: der einmalige Import legte eine Serie ohne `tzid` ab. Ihre Vorkommen
+// liefen dann auf der UTC-Uhr des Starts weiter, nach der Umstellung eine
+// Stunde neben dem Originalstart der Absage - die traf nichts oder den
+// Nachbartag. Mit `tzid` liest die Zeile wie CalDAV und iCloud.
+
+// Europe/Berlin woechentlich 01:30, Start im Sommer (23:30Z am Vortag).
+// Umstellung 28.10.2035: das Vorkommen vom 11.11. liegt um 00:30Z.
+const BERLIN_WEEKLY = {
+  zone: 'Europe/Berlin',
+  ics: () => vcalendar(...vevent('berlin-weekly@test', {
+    start: 'TZID=Europe/Berlin:20351007T013000', end: 'TZID=Europe/Berlin:20351007T023000',
+    rule: 'FREQ=WEEKLY', exdates: ['TZID=Europe/Berlin:20351111T013000'],
+  })),
+  window: ['2035-11-01', '2035-11-30'],
+  expected: ['2035-11-04', '2035-11-18', '2035-11-25'],
+};
+
+for (const [name, c] of Object.entries({ 'Berlin woechentlich 01:30': BERLIN_WEEKLY, ...CASES })) {
+  test(`ICS-Import, ${name}: die Serie behaelt ihre Zone, die Absage trifft ihr Vorkommen`, async () => {
+    setHousehold(c.zone);
+    await importToLocal(1, { ics: c.ics() });
+    const series = seriesRow();
+    assert.deepEqual(shownDays(c.zone, c.window), c.expected, 'Kalender');
+    assert.equal(series.tzid, c.zone, 'tzid des DTSTART bleibt an der Serie');
+
+    db.prepare('UPDATE calendar_events SET countdown = 1 WHERE id = ?').run(series.id);
+    const next = getCountdowns(db, { userId: 1, todayKey: shiftDay(c.expected[0], 1) }).items
+      .find((item) => item.id === series.id)?.date ?? null;
+    assert.equal(next, c.expected[1], 'Countdown nennt dasselbe naechste Vorkommen wie der Kalender');
+  });
+}
+
+test('ICS-Import, Berlin woechentlich: eine Haushaltszone ausserhalb der Serie aendert nichts', async () => {
+  setHousehold('America/Chicago');
+  await importToLocal(1, { ics: BERLIN_WEEKLY.ics() });
+  assert.deepEqual(shownDays(BERLIN_WEEKLY.zone, BERLIN_WEEKLY.window), BERLIN_WEEKLY.expected);
+});
+
+test('ICS-Import mit fremdem Zonennamen: die Serie bleibt ohne Zone', async () => {
+  setHousehold('Europe/Berlin');
+  const ics = vcalendar(...vevent('windows@test', {
+    start: 'TZID=W. Europe Standard Time:20351007T013000', end: 'TZID=W. Europe Standard Time:20351007T023000',
+    rule: 'FREQ=WEEKLY',
+  }));
+  await importToLocal(1, { ics });
+  assert.equal(seriesRow().tzid, null);
+});
+
+test('ICS-Import ohne TZID: die Serie bleibt ohne Zone', async () => {
+  setHousehold('Europe/Berlin');
+  const ics = vcalendar(...vevent('utc@test', {
+    start: 'VALUE=DATE-TIME:20351007T120000Z', end: 'VALUE=DATE-TIME:20351007T130000Z',
+    rule: 'FREQ=WEEKLY',
+  }));
+  await importToLocal(1, { ics });
+  assert.equal(seriesRow().tzid, null);
 });
 
 function shiftDay(day, days) {

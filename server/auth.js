@@ -15,7 +15,7 @@ import { refuseWhileRestoring } from './middleware/restore-gate.js';
 import { restoreInProgressError } from './utils/restore-messages.js';
 import { runExternalJob } from './utils/restore-state.js';
 import { SESSION_MAX_AGE_MS, sessionCookieRefreshDue } from './utils/session-lifetime.js';
-import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TITLE } from './middleware/validate.js';
+import { collectErrors, color as validateColor, date as validateDate, str, MAX_SHORT, MAX_TITLE } from './middleware/validate.js';
 import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
 import { GravatarError, fetchGravatar, gravatarEnabled, gravatarHost } from './services/gravatar.js';
@@ -26,7 +26,8 @@ import {
 import { RemovalRefused, removeUser } from './services/user-removal.js';
 import {
   DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayCookieIdentity, displayCookieOptions,
-  displayMayRead, displayTokenFromRequest, isDisplayAccount, markDisplayCookieRefreshed,
+  displayMayRead, displayOfflineExpiresAt, displayTokenFromRequest, isDisplayAccount,
+  markDisplayCookieRefreshed, OFFLINE_EXPIRES_HEADER,
 } from './services/display-accounts.js';
 import { birthDateInput, deleteBirthdayArtifacts, placeholderBirthDate, syncBirthdayArtifacts, validateYearUnknown } from './services/birthdays.js';
 import { syncFastingRemindersForUser } from './services/fasting-reminders.js';
@@ -1036,6 +1037,12 @@ function requireAuth(req, res, next) {
       req.authScopes = [...DISPLAY_SCOPES];
       req.displayDeviceId = device.deviceId;
       req.displayShowsScreensaver = device.showScreensaver === true;
+      // DIE OFFLINE-FRIST RUECKT MIT JEDEM KONTAKT VOR (Folge von #2293). Der
+      // Service Worker legt sie neben die gecachten Listen; `/auth/me` nennt
+      // denselben Wert als `sessionExpiresAt`. Begruendung und Dauer bei
+      // `DISPLAY_OFFLINE_GRACE_MS`.
+      req.displayOfflineExpiresAt = displayOfflineExpiresAt();
+      res.set(OFFLINE_EXPIRES_HEADER, String(req.displayOfflineExpiresAt));
       // DAS COOKIE WIRD NACHDATIERT, ABER NICHT BEI JEDEM ZUGRIFF. Browser
       // kappen die Lebensdauer persistenter Cookies (Chromium: 400 Tage), eine
       // einmal geschriebene Jahreszahl haelt also nicht, was sie sagt - ein
@@ -2148,6 +2155,13 @@ export function buildInviteRoutes(targetRouter, {
     try {
       const invite = inviteService.verifyToken(String(req.query.token || ''));
       if (!invite) return res.json({ data: { valid: false } });
+      // WER EINLAEDT, STEHT AUF DER SEITE (Critique R24, G6-Zugang-P3-1): die
+      // Seite sagte nur "Du wurdest zu Yuvomi eingeladen" - ohne Haushalt, ohne
+      // Person. Der Anzeigename der einladenden Person ist alles, was der
+      // Inhaber eines gueltigen Links dafuer braucht, und nichts darueber hinaus
+      // (kein Benutzername, keine Rolle). Ein geloeschtes Konto nennt niemanden.
+      const inviter = invite.created_by == null ? null
+        : getDb().prepare('SELECT display_name FROM users WHERE id = ?').get(invite.created_by);
       res.json({
         // `password_required` sagt der /join-Seite, ob sie ueberhaupt nach einem
         // Passwort fragen soll (#847). Ohne die Angabe zeigte sie zwei
@@ -2157,6 +2171,7 @@ export function buildInviteRoutes(targetRouter, {
           valid: true,
           display_name: invite.display_name,
           username: invite.username,
+          invited_by: inviter?.display_name || null,
           password_required: isPasswordLoginEnabled(getDb()),
         },
       });
@@ -2746,6 +2761,21 @@ router.post('/setup', loginLimiter, async (req, res) => {
 });
 
 /**
+ * Der Ablauf, bis zu dem der Service Worker den Offline-Stand dieses Geraets
+ * halten darf: fuer eine Anmeldesitzung der Ablauf ihres Cookies, fuer ein
+ * Display seine gleitende Frist, sonst keiner (`null`, fail-closed).
+ */
+function sessionExpiresAtFor(req) {
+  if (req.authMethod === 'display') {
+    return Number.isFinite(req.displayOfflineExpiresAt) ? req.displayOfflineExpiresAt : null;
+  }
+  if (req.authMethod === 'session' && req.session.cookie?.expires instanceof Date) {
+    return req.session.cookie.expires.getTime();
+  }
+  return null;
+}
+
+/**
  * GET /api/v1/auth/me
  * Response: { user: { id, username, display_name, avatar_color, role } }
  */
@@ -2818,6 +2848,16 @@ router.get('/me', requireAuth, (req, res) => {
       othersCanRead: othersCanRead(db.get(), user.id),
       ...gravatarClientState(user.id),
       csrfToken: req.session.csrfToken,
+      // Wann diese Sitzung ohne weitere Benutzung endet: der Ablauf, den der
+      // Browser fuer sein Session-Cookie zuletzt bekommen hat (bei der Anmeldung
+      // oder von refreshSessionCookieIfDue). Der Service Worker haelt den
+      // Offline-Abzug samt Listen nicht laenger (#2293, public/sw.js); ohne
+      // diesen Wert legt er keinen an. Ein Wanddisplay laeuft auf seinem
+      // eigenen Cookie, und das `req.session` daneben ist eine leere Huelle:
+      // es bekommt stattdessen seine gleitende Offline-Frist, jetzt + 72 h
+      // (`DISPLAY_OFFLINE_GRACE_MS`, gesetzt in `requireAuth`). Einen
+      // Sitzungsabzug legt der Worker fuer ein Display trotzdem nicht an.
+      sessionExpiresAt: sessionExpiresAtFor(req),
     });
   } catch (err) {
     log.error('/me error:', err);
@@ -3495,6 +3535,8 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
     if (!FAMILY_ROLES.includes(family_role)) {
       return res.status(400).json({ error: 'Invalid family role.', code: 400 });
     }
+    const colorError = validateColor(avatar_color, 'avatar_color').error;
+    if (colorError) return res.status(400).json({ error: colorError, code: 400 });
 
     const normalizedAvatarData = normalizeAvatarData(avatar_data);
     if (normalizedAvatarData?.error) {
@@ -3605,6 +3647,8 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     if (!FAMILY_ROLES.includes(familyRole)) {
       return res.status(400).json({ error: 'Invalid family role.', code: 400 });
     }
+    const colorError = validateColor(avatarColor, 'avatar_color').error;
+    if (colorError) return res.status(400).json({ error: colorError, code: 400 });
     if (avatarData?.error) {
       return res.status(400).json({ error: avatarData.error, code: 400 });
     }
@@ -3738,6 +3782,10 @@ router.patch('/me/profile', requireAuth, csrfMiddleware, (req, res) => {
     if (displayName.length > 128) {
       return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
     }
+    // Die Farbe steht bei allen Mitgliedern in einem style-Attribut: nur #RRGGBB,
+    // sonst setzt sich ein Konto eine CSS-Deklaration in fremde Ansichten.
+    const colorError = validateColor(avatarColor, 'avatar_color').error;
+    if (colorError) return res.status(400).json({ error: colorError, code: 400 });
     if (avatarData?.error) {
       return res.status(400).json({ error: avatarData.error, code: 400 });
     }

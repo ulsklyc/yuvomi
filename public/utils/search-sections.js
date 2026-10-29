@@ -42,6 +42,10 @@ export const SEARCH_SECTIONS = Object.freeze([
       const day = i.start_datetime && fmt?.dateKey ? fmt.dateKey(i.start_datetime) : '';
       return day ? `/calendar?open=${i.id}&date=${day}` : `/calendar?open=${i.id}`;
     },
+    // Ein Geburtstagstermin heisst in der Zeile "Birthday: <Name>" (#524); der
+    // Server liefert `birthday_name`, und `fmt.eventTitle` uebersetzt ihn wie
+    // Kalender und Uebersicht (R24, Critique G0 P1-1).
+    label: (i, fmt) => (fmt?.eventTitle ? fmt.eventTitle(i) : i.title),
     meta: (i, fmt) => (i.start_datetime
       ? `${fmt.dateText(i.start_datetime)}${i.all_day ? '' : ` · ${fmt.formatTime(i.start_datetime)}`}`
       : '') },

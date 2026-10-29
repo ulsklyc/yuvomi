@@ -124,11 +124,18 @@ async function aufrufe(fn, antworten = {}) {
 async function modalMitschnitt(fn) {
   const geoeffnet = [];
   const zuvor = globalThis.__openModal;
+  const zuvorDetail = globalThis.__openDetailView;
   globalThis.__openModal = (opts) => { geoeffnet.push(opts); };
+  // Die Leseansicht der Mahlzeit ist seit R24 (E1) ein Leseblatt
+  // (openDetailView); ihr Inhalt steht im ersten Abschnitt.
+  globalThis.__openDetailView = (opts) => {
+    geoeffnet.push({ ...opts, content: opts.sections?.map((s) => s.node?.innerHTML ?? '').join('') ?? '' });
+  };
   try {
     await fn();
   } finally {
     globalThis.__openModal = zuvor;
+    globalThis.__openDetailView = zuvorDetail;
   }
   return geoeffnet;
 }
@@ -306,7 +313,14 @@ test('Wandtablett, "Wer heute dran ist": der Koch der heutigen Mahlzeit zaehlt m
     const zuvor = globalThis.window.yuvomi;
     globalThis.window.yuvomi = null;
     try {
-      const html = dashboard.renderWallSurface({ todayMeals, urgentTasks, wallTasks, users: [ANNA_WAND, BEN_WAND] }, null, {});
+      // DIE UHR STEHT AM NACHMITTAG (R24 S7b): seit die Wand ihre Zeilen aus
+      // der Zeitleiste nimmt (R24 S7, 08fe2de19), zaehlt jede Mahlzeit, die
+      // heute noch kommt - morgens drei, ab dem Abendessen keine. Der Test lief
+      // mit der Wanduhr und war nur zwischen Mittag und Abendessen gruen. Um
+      // 15:00 steht genau das Abendessen noch aus: eine Sache.
+      const afternoon = new Date();
+      afternoon.setHours(15, 0, 0, 0);
+      const html = dashboard.renderWallSurface({ todayMeals, urgentTasks, wallTasks, users: [ANNA_WAND, BEN_WAND] }, null, { now: afternoon });
       return abschnitt(html, 'class="wall__who"', '</section>');
     } finally {
       globalThis.window.yuvomi = zuvor;
@@ -521,16 +535,23 @@ test('Dialog einer Serie: der Umfang steht als Erstes im Dialog, nicht hinter "W
   assert.match(neu.abschnitte.map((a) => a.inner).join(''), /id="modal-repeat-weekly"/, 'Anlegen: "Woechentlich wiederholen" bleibt, wo es war');
 });
 
-test('Dialog: die Zutaten sind beim Bearbeiten eingeklappt und nennen ihre Zahl - beim Anlegen und ohne Zutaten stehen sie offen', async () => {
-  const drei = mahlzeit({ ingredients: [1, 2, 3].map((id) => ({ id, name: `Zutat ${id}`, quantity: '', category: 'Vorrat', on_shopping_list: 1 })) });
+// R24 (Critique G3-Mahlzeiten-P3-3): EINE Form fuer die Zutaten einer
+// bestehenden Mahlzeit. Bis R24 stand sie aus dem Rezept als Leseliste mit
+// "Anpassen", mit eigenen Zutaten als Aufklapper "Zutaten · 3" - zwei Formen
+// derselben Sache. Jetzt immer die Leseliste; die Zeilen stehen verborgen
+// darunter und kommen mit "Anpassen".
+test('Dialog: die Zutaten einer Mahlzeit stehen beim Bearbeiten als Leseliste mit "Anpassen" - beim Anlegen und ohne Zutaten offen', async () => {
+  const drei = mahlzeit({ ingredients: [1, 2, 3].map((id) => ({ id, name: `Zutat ${id}`, quantity: id === 1 ? '200 g' : '', category: 'Vorrat', on_shopping_list: 1 })) });
   const { html, abschnitte } = await dialogMitAbschnitten({ mode: 'edit', date: drei.date, mealType: 'lunch', meal: drei });
-  const zutaten = abschnitte.find((a) => /id="ingredient-list"/.test(a.inner));
-  assert.ok(zutaten, 'die Zutaten stehen im geteilten Aufklapper');
-  assert.equal(zutaten.options.label, 'meals.ingredientsLabel · 3', 'er nennt die Zahl');
-  assert.ok(!zutaten.options.open, 'und startet geschlossen');
-  assert.match(zutaten.inner, /id="add-ingredient-btn"/, '"Zutat hinzufuegen" steht bei der Liste');
-  assert.equal((zutaten.inner.match(/class="ingredient-row/g) ?? []).length, 3);
-  assert.match(html, /<div class="meal-ingredients-fold" id="modal-ingredients-fold">\s*<!--abschnitt-0-->/, 'vor "Weitere Einstellungen"');
+  assert.ok(!abschnitte.some((a) => /id="ingredient-list"/.test(a.inner)), 'kein Aufklapper mehr fuer die Zutaten');
+  assert.doesNotMatch(html, /modal-ingredients-fold/, 'die zweite Form ist weg');
+  assert.match(html, /id="meal-recipe-ingredients"/, 'die Leseliste steht');
+  assert.match(html, /id="meal-recipe-ingredients-label">meals\.ingredientsLabel</, 'eigene Zutaten heissen "Zutaten", nicht "aus dem Rezept"');
+  assert.match(html, /id="meal-recipe-ingredients-edit"/, '"Anpassen" fuehrt in die Zeilen');
+  assert.equal((html.match(/<li>/g) ?? []).length, 3, 'jede Zutat eine Zeile der Leseliste');
+  assert.match(html, /<span class="meal-recipe-ingredients__qty">200 g<\/span> Zutat 1/, 'die Menge vorn');
+  assert.match(html, /<div id="meal-own-ingredients" hidden>[\s\S]*id="ingredient-list"/, 'die Zeilen stehen verborgen darunter');
+  assert.equal((html.match(/class="ingredient-row/g) ?? []).length, 3, 'und tragen alle drei - Speichern liest sie');
 
   for (const [name, opts] of [
     ['Anlegen', { mode: 'create', date: drei.date, mealType: 'lunch' }],
@@ -538,7 +559,7 @@ test('Dialog: die Zutaten sind beim Bearbeiten eingeklappt und nennen ihre Zahl 
   ]) {
     const offen = await dialogMitAbschnitten(opts);
     assert.match(offen.html, /<label class="form-label">meals\.ingredientsLabel<\/label>\s*<div class="ingredient-list" id="ingredient-list">/, `${name}: Liste offen im Dialog`);
-    assert.ok(!offen.abschnitte.some((a) => /id="ingredient-list"/.test(a.inner)), `${name}: nicht im Aufklapper`);
+    assert.doesNotMatch(offen.html, /id="meal-recipe-ingredients"/, `${name}: keine Leseliste`);
   }
 });
 

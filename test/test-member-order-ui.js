@@ -283,3 +283,32 @@ test('#1997: Erfolg nach Dialogwechsel - Mitglied anlegen und bearbeiten schlies
     globalThis.window = vorher.window;
   }
 });
+
+// R24 (Critique G6 P2-1): die Einladung nach dem Erstellen. Der Fuss blieb
+// [Abbrechen][Einladung erstellen] - ein zweiter Klick legte eine zweite
+// Einladung an -, ein Erfolgs-Toast lag ueber dem Label "Einladungslink", der
+// Erstfokus stand auf dem optionalen Benutzernamen, und eine Einladung ohne
+// Namen trug ihre Rolle als Titel, groesser als jeder Mitgliedsname.
+test('R24: Einladen - Name zuerst, nach dem Erstellen [Fertig][Link kopieren], kein Toast', () => {
+  const html = family.addInviteFormHtml();
+  const ids = [...html.matchAll(/id="(invite-[\w-]+)"/g)].map((m) => m[1]);
+  assert.ok(ids.indexOf('invite-display-name') < ids.indexOf('invite-username'), 'der Anzeigename steht vor dem optionalen Benutzernamen');
+  assert.ok(ids.indexOf('invite-family-role') < ids.indexOf('invite-username'), 'die Rolle steht vor dem optionalen Benutzernamen');
+  const foot = html.slice(html.indexOf('modal-panel__footer'));
+  assert.match(foot, /<button type="button" class="btn btn--secondary" id="invite-done" hidden>settings\.invites\.done<\/button>/);
+  assert.match(foot, /<button type="button" class="btn btn--primary" id="invite-link-copy" hidden>/, 'Link kopieren ist der Primaerknopf des Fusses');
+  assert.ok(foot.indexOf('invite-done') < foot.indexOf('invite-link-copy'), '[Fertig] vor [Link kopieren]');
+  assert.equal((html.match(/id="invite-link-copy"/g) || []).length, 1, 'genau ein Kopieren-Knopf');
+
+  const source = readFileSync(path.join(ROOT, 'public/settings/pages/admin-family.js'), 'utf8');
+  const submit = source.slice(source.indexOf("form.addEventListener('submit'", source.indexOf('function openInviteModal(')), source.indexOf("panel.querySelector('#invite-done')"));
+  assert.match(submit, /form\.hidden = true;/, 'das Formular tritt nach dem Erstellen ab');
+  assert.match(submit, /#cancel-add-invite, \.modal-panel__footer \[type=submit\]'\)\) el\.hidden = true/);
+  assert.match(submit, /#invite-done, #invite-link-copy'\)\) el\.hidden = false/);
+  assert.doesNotMatch(submit, /showToast/, 'kein Toast im offenen Dialog');
+  assert.match(source, /panel\.querySelector\('#invite-done'\)\?\.addEventListener\('click', \(\) => closeModal\(\)\)/);
+
+  const untitled = family.inviteHtml({ id: 9, family_role: 'grandparent', expires_at: '2026-11-04T10:00:00Z' });
+  assert.match(untitled, /<span class="settings-member__name">settings\.invites\.untitled<\/span>/, 'ohne Namen: "Offene Einladung" als Titel');
+  assert.match(untitled, /<span class="settings-member__meta">[^<]*familyRole[^<]*<\/span>/, 'die Rolle steht in der Metazeile');
+});

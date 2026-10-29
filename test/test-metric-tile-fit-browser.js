@@ -57,9 +57,9 @@ function tile(extraClass, [value, unit], { label = 'Blutdruck', spark = false } 
 
 /* GEMISCHTE KACHELN, wie die Seite sie hat: mit und ohne Trendlinie, ein- und
  * zweizeiliges Label. Acht gleiche Kacheln sind von selbst gleich hoch und
- * sagen nichts ueber die geteilten Zeilen aus `.metric-rows`. Die Uebersicht
- * fuehrt keine Trendlinien (`overviewVitalCardMarkup()`), die Vitalwerte-Seite
- * schon (`cardMarkup()`). */
+ * sagen nichts ueber die geteilten Zeilen aus `.metric-rows`. Seit R24 (G5
+ * P2-6) fuehren beide Kachelbauer die Trendlinie (`overviewVitalCardMarkup()`,
+ * `cardMarkup()`). */
 const mixed = (extraClass, { sparks }) => VALUES.map((v, i) => tile(extraClass, v, {
   label: i % 4 === 1 ? LONG_LABEL : 'Blutdruck',
   spark: sparks && i % 2 === 0,
@@ -69,8 +69,20 @@ const PAGE = `<!doctype html><html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 ${SHEETS.map((name) => `<link rel="stylesheet" href="${pathToFileURL(join(ROOT, 'public/styles', `${name}.css`)).href}">`).join('\n')}
 </head><body>
-<div id="host-overview"><div class="health-overview__vitals-grid metric-rows">${mixed(' metric-card--inset', { sparks: false })}</div></div>
+<div id="host-overview"><div class="health-overview__vitals-grid metric-rows">${mixed(' metric-card--inset', { sparks: true })}</div></div>
 <div id="host-vitals"><div class="health-vitals__cards metric-rows">${mixed('', { sparks: true })}</div></div>
+<div id="host-cycle" style="padding: 0 16px"><div class="cycle-hero">
+  <div class="cycle-ring"></div>
+  <div class="cycle-today">Heute</div>
+  <div class="cycle-hero__side">
+    <div class="cycle-stats">
+      <div class="metric-card cycle-stat"><span class="metric-card__label cycle-stat__head">Nächste Periode</span><span class="metric-card__value cycle-stat__value">12.11.</span></div>
+      <div class="metric-card cycle-stat"><span class="metric-card__label cycle-stat__head">Fruchtbares Fenster</span><span class="metric-card__value cycle-stat__value">29.10. - 03.11.</span><span class="metric-card__note cycle-stat__sub">Eisprung: 03.11.</span></div>
+      <div class="metric-card cycle-stat"><span class="metric-card__label cycle-stat__head">Zyklusschwankung</span><span class="metric-card__value cycle-stat__value">2 Tage</span><span class="metric-card__note cycle-stat__sub">Regelmäßig</span></div>
+      <div class="metric-card cycle-stat cycle-stat--dual"><div class="cycle-stat__pair-row"><div class="cycle-stat__pair-item"><span class="metric-card__label cycle-stat__head">Ø Zykluslänge</span><span class="metric-card__value cycle-stat__value">28 Tage</span></div><div class="cycle-stat__pair-item"><span class="metric-card__label cycle-stat__head">Ø Periodenlänge</span><span class="metric-card__value cycle-stat__value">5 Tage</span></div></div></div>
+    </div>
+  </div>
+</div></div>
 <div id="host-plain"><div class="metric-grid"><article class="metric-card"><div class="metric-card__label">Einnahmen</div><div class="metric-card__value">24.503,00 €</div></article><article class="metric-card"><div class="metric-card__label">Ausgaben</div><div class="metric-card__value">1.200,00 €</div></article><article class="metric-card"><div class="metric-card__label">Saldo</div><div class="metric-card__value">23.303,00 €</div></article></div></div>
 </body></html>`;
 
@@ -153,9 +165,10 @@ test('die Sonde misst das Markup, das health.js schreibt', () => {
   assert.ok(source.includes('class="health-vitals__cards metric-rows"'), 'das Raster der Vitalwerte-Seite heisst anders');
   assert.ok(source.includes('class="health-overview__vitals-grid metric-rows"'), 'das Raster der Uebersicht heisst anders');
   assert.ok(source.includes('metric-card metric-card--select metric-card--inset'), 'die Kachel der Uebersicht ist nicht mehr --inset');
-  // Die Trendlinie steht zwischen Wert und Meta, nur auf der Vitalwerte-Seite.
+  // Die Trendlinie steht zwischen Wert und Meta - seit R24 (G5 P2-6, EINE
+  // Kachel) auch in der Uebersicht.
   assert.ok(source.includes('<svg class="metric-card__spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">'), 'die Trendlinie ist anders gebaut');
-  assert.equal(source.split("${latest ? sparklineMarkup(series.points, 'value_num', metric) : ''}").length - 1, 1, 'genau ein Kachelbauer fuehrt die Trendlinie');
+  assert.equal(source.split("${latest ? sparklineMarkup(series.points, 'value_num', metric) : ''}").length - 1, 2, 'beide Kachelbauer fuehren die Trendlinie');
 });
 
 test('die Sonde erkennt einen Umbruch: eine zu schmale Kachel faellt auf', async () => {
@@ -299,5 +312,45 @@ test('der Container ist die Wertzeile, nicht die Kachel', async () => {
     assert.deepEqual(types, { card: 'normal', body: 'inline-size', name: 'metric-tile' });
   } finally {
     await page.close();
+  }
+});
+
+/* ZYKLUS MOBIL (R24, Critique G5 P0-1). Seit `.cycle-stats` der Container
+ * `metric-grid` ist (#2203), hat die Reihe keine Eigenbreite mehr. Unter 640px
+ * stellt `.cycle-hero` die Spalte um, und deren `align-items: center` machte
+ * `.cycle-hero__side` shrink-to-fit: gemessen 8px Seite, Raster "0px 0px",
+ * Kacheln 26px, die Texte liefen buchstabenweise senkrecht. */
+test('die Sonde misst das Zyklus-Markup, das health.js schreibt', () => {
+  const source = readFileSync(join(ROOT, 'public/pages/health.js'), 'utf8');
+  assert.match(source, /<div class="cycle-hero">\s*\$\{cycleRingMarkup\(prediction\)\}/, 'der Zykluskopf beginnt nicht mehr mit dem Ring');
+  assert.match(source, /<div class="cycle-hero__side">\s*\$\{cycleStatsMarkup\(prediction\)\}\s*<\/div>/, 'die Kennzahlen stehen nicht mehr in .cycle-hero__side');
+  assert.ok(source.includes('return `<div class="cycle-stats">${tiles.join(\'\')}</div>`;'), 'die Kennzahlreihe heisst anders');
+});
+
+test('Zyklus am Telefon: die Kennzahlreihe nimmt die Spaltenbreite, nichts faellt zusammen', async () => {
+  for (const viewport of [390, 320]) {
+    const page = await browser.newPage();
+    try {
+      await page.setViewport({ width: viewport, height: 900 });
+      await page.goto(url);
+      const m = await page.evaluate(() => {
+        const host = document.getElementById('host-cycle');
+        const hero = host.querySelector('.cycle-hero');
+        const w = (el) => Math.round(el.getBoundingClientRect().width);
+        return {
+          direction: getComputedStyle(hero).flexDirection,
+          hero: w(hero),
+          stats: w(host.querySelector('.cycle-stats')),
+          narrowest: Math.min(...[...host.querySelectorAll('.cycle-stat')].map(w)),
+        };
+      });
+      // Vorbedingung: die Spalte greift - sonst misst die Sonde den Desktop-Fall.
+      assert.equal(m.direction, 'column', `${viewport}px: .cycle-hero steht nicht als Spalte`);
+      assert.ok(m.stats >= m.hero - 1, `${viewport}px: .cycle-stats ist ${m.stats}px breit, die Spalte ${m.hero}px`);
+      if (viewport === 390) assert.ok(m.stats >= 300, `390px: .cycle-stats ist nur ${m.stats}px breit`);
+      assert.ok(m.narrowest >= 120, `${viewport}px: die schmalste Kachel ist ${m.narrowest}px breit`);
+    } finally {
+      await page.close();
+    }
   }
 });

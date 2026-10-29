@@ -561,6 +561,38 @@
 }
 
 /* --------------------------------------------------------
+ * Fuehrung und Endzone (Critique DW 2026-10-26, DW-P1-4)
+ *
+ * Was links vor dem Namen steht und was rechts am Ende, hatte die geteilte
+ * Zeile bisher jedem Modul ueberlassen - und die Listen-Kacheln der Uebersicht
+ * zeigten, was daraus wird: Fuehrungen von 5 bis 40px (Punkt, Scheibe,
+ * Avatar 32/38/40), Endangaben als Pille, als fetter Satzteil, als
+ * Kleinschrift. Die beiden Teile sind jetzt benannt:
+ *
+ * - `.list-row__lead`: EIN Zeichen, 32px (`--target-sm`) im Quadrat - ein
+ *   Avatar, ein Siegel oder eine Glyphe; ein kleineres Zeichen (Punkt, Ring)
+ *   steht mittig darin. So beginnt jeder Name an derselben Kante, gleich was
+ *   davor steht.
+ * - `.list-row__end`: EINE Angabe, Footnote halbfett mit gleich breiten
+ *   Ziffern (Rolle in typography.css); der Ton einer Dringlichkeit kommt vom
+ *   Modul, die Flaeche nie - eine Pille hiesse "Etikett", und die Angabe ist
+ *   ein Satzteil.
+ * -------------------------------------------------------- */
+.list-row__lead {
+  flex: none;
+  inline-size: var(--target-sm);
+  block-size: var(--target-sm);
+  display: inline-grid;
+  place-items: center;
+}
+
+.list-row__end {
+  flex: none;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------
    Gespiegelte VTODO-CATEGORIES einer Zeile (#586)
    Anzeige, keine Bedienung: die Etiketten gehören der CalDAV-Quellliste.
    Optisch leiser als der Name, damit sie die Zeile ordnen und nicht führen.
@@ -573,21 +605,44 @@
   margin-top: var(--space-1);
 }
 
-.list-row__tag {
+/* --------------------------------------------------------
+ * DAS ETIKETT: EIN Baustein fuer eine neutrale Zuordnung (R24, G0-Shell-P3-3)
+ *
+ * Tags der Aufgaben, gespiegelte Etiketten des Einkaufs, Notiz-Kategorien
+ * (Seite und Uebersicht) und die Abzeichen der Medikamentenkarte waren
+ * fuenf Fassungen derselben Kapsel: mal mit Haarlinie auf `--color-surface-2`,
+ * mal auf der Mulde, in 11 oder 12px, 12rem oder 14rem breit. Die Skalen-Regel
+ * (DESIGN.md) sagt fuer eine Zuordnung im eigenen Raum: neutral, Mulde plus
+ * Sekundaertinte - das ist diese Regel, einmal. Module setzen nur, was die
+ * Stelle betrifft (Klick filtert, Klick entfernt, Platz in der Zeile).
+ * NICHT hierher gehoeren: Meldungen (Ton in der Schrift, ohne Flaeche), die
+ * Rangmarke (Punkt) und die Aufgabe im Kalender (`.cal-task-chip` ist ein
+ * Eintrag wie ein Termin, kein Etikett).
+ * -------------------------------------------------------- */
+.tag {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-1);
   padding: var(--space-0h) var(--space-2);
-  border: var(--space-px) solid var(--color-border-subtle);
+  border: 0;
   border-radius: var(--radius-full);
-  background: var(--color-surface-2);
+  background: var(--color-fill-well);
   color: var(--color-text-secondary);
+  font: inherit;
   font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
   line-height: 1.4;
   /* Ein sehr langer Fremd-Tag darf die Zeile nicht sprengen. */
-  max-width: 12rem;
+  max-width: 14rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tag > svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex: 0 0 auto;
 }
 
 /* Abgehakte Posten treten insgesamt zurück - die Etiketten mit.
@@ -599,7 +654,7 @@
  * gilt 4.5:1. Dieselbe Antwort wie `.shopping-item--checked .item-meta`
  * (shopping.css): tertiary trägt 5,39 (light) und 7,71 (dark) auf
  * --color-surface-2 und bleibt sichtbar leiser als der Name. */
-.shopping-item--checked .list-row__tag {
+.shopping-item--checked .tag {
   color: var(--color-text-tertiary);
 }
 

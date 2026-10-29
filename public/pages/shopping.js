@@ -14,7 +14,7 @@ import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formSwitchRowHtml } from '/settings/components.js';
 import { formRowsHtml, formRowHtml } from '/utils/form-row.js';
 import { readRowHtml, readDetailsLabel } from '/utils/read-row.js';
-import { promptModal, openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { promptModal, openModal, closeModal, captureModalContext, captureOpenContext, isModalContextCurrent, confirmModal, reportFieldError, refocusAfterRender, advancedSection } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { addLocalDays, todayKey } from '/utils/date.js';
 import { renderKitchenTabsBar, refreshKitchenBadges } from '/utils/kitchen-tabs.js';
@@ -1305,11 +1305,12 @@ function renderListContent(container) {
         <select class="quick-add__cat" id="item-cat-select" aria-label="${t('shopping.categoryLabel')}">
           ${state.categories.map((c) => `<option value="${esc(c.name)}" ${c.name === DEFAULT_CATEGORY_NAME ? 'selected' : ''}>${esc(categoryLabel(c.name))}</option>`).join('')}
         </select>
-        <!-- Return-Glyphe statt eines zweiten "+" (Re-Critique 2026-09-28,
-             A4 P2-4): das Plus gehoert der Kopf-Pille bzw. dem FAB. -->
-        <button class="quick-add__btn" type="submit" aria-label="${t('shopping.addItemLabel')}">
-          <i data-lucide="corner-down-left" class="icon-lg" aria-hidden="true"></i>
-        </button>
+        <!-- EIN WORT STATT EINES ZEICHENS (R24, Critique G3-Einkauf-P3-1): hier
+             stand eine nackte Return-Glyphe (Re-Critique 2026-09-28, A4 P2-4:
+             kein zweites "+" neben der Kopf-Pille). Ein Pfeil ohne Wort sagt
+             nur dem etwas, der Enter schon kennt; der ruhige Knopf mit
+             „Hinzufuegen" sagt es jedem und bleibt dabei sekundaer. -->
+        <button class="btn btn--secondary btn--sm quick-add__btn" type="submit">${esc(t('common.add'))}</button>
       </form>
     </div>`}
 
@@ -1590,9 +1591,9 @@ function renderItemTags(tags) {
   if (!tags?.length) return '';
   const shown = tags.slice(0, ITEM_TAGS_VISIBLE);
   const rest  = tags.length - shown.length;
-  const chips = shown.map((tag) => `<span class="list-row__tag">${esc(tag)}</span>`);
+  const chips = shown.map((tag) => `<span class="tag list-row__tag">${esc(tag)}</span>`);
   if (rest > 0) {
-    chips.push(`<span class="list-row__tag list-row__tag--more"
+    chips.push(`<span class="tag list-row__tag list-row__tag--more"
                       title="${esc(tags.slice(ITEM_TAGS_VISIBLE).join(', '))}">+${rest}</span>`);
   }
   // KEIN eigener Block mehr: die Etiketten stehen in der Metazeile neben der
@@ -2112,6 +2113,9 @@ function wireQuickAdd(container) {
     if (!name) { nameInput.focus(); return; }
 
     submitting = true;
+    // Die Quittung des Zurueckholens kommt nach der Anfrage - nie im
+    // naechsten Modul (Modul-Marke, R24).
+    const scope = window.yuvomi?.feedbackScope?.() ?? null;
     try {
       // Steht der Name abgehakt auf dieser Liste, kommt DIESE Zeile zurueck
       // (#1816) - gewaehlt aus dem Vorschlag oder von Hand getippt, verglichen
@@ -2124,7 +2128,7 @@ function wireQuickAdd(container) {
         if (!back) return;
         // Die Zeile taucht irgendwo in der Liste auf, nicht unter dem Feld:
         // ein Satz sagt, was aus der Eingabe geworden ist.
-        window.yuvomi.showToast(t('shopping.itemBackToast', { name: revive.name }), 'info');
+        window.yuvomi.showToast(t('shopping.itemBackToast', { name: revive.name }), 'info', 3000, null, { scope });
       } else {
         const data = await api.post(`/shopping/${state.activeListId}/items`, { name, quantity, category });
         acknowledgeOwnChange(data);
@@ -2822,66 +2826,12 @@ function openItemReadModal(item) {
   });
 }
 
-function openItemDetails(itemId, container) {
-  const item = state.items.find((i) => i.id === itemId);
-  if (!item) return;
-  // Der Riegel steht VOR jeder Vorbereitung: bei `read` geht die Leseansicht auf.
-  if (readOnly()) {
-    openItemReadModal(item);
-    return;
-  }
-
-  const linkPreview = (value) => {
-    const v = String(value ?? '').trim();
-    if (!/^https?:\/\//i.test(v)) return '';
-    return `
-      <a class="item-details__link" href="${esc(v)}" target="_blank" rel="noopener noreferrer">
-        <i data-lucide="external-link" class="icon-sm" aria-hidden="true"></i>${t('shopping.openLink')}
-      </a>`;
-  };
-
-  // DIE LISTE IST EINE EIGENE FORMULARZEILE (#1700, Entscheidung 2026-10-08),
-  // unter Menge und Kategorie - die beiden bleiben nebeneinander, wie sie
-  // waren, und der Dialog sieht mit einer Liste genauso aus wie mit fuenf,
-  // nur ohne diese Zeile: mit einer Liste gibt es nichts zu waehlen. Sie
-  // spricht die Zielform des Hauses (utils/form-row.js, DESIGN.md
-  // "Formularzeile"): Etikett links, der Wert rechts als randlose Auswahl.
-  // Kein eigener "Verschieben"-Weg und kein Ziehen: der Dialog ist ohnehin der
-  // Ort, an dem man einen Artikel umhaengt.
-  const fromListId = state.activeListId;
-  const listRow = state.lists.length > 1 ? formRowsHtml(formRowHtml({
-    label: t('shopping.itemListLabel'),
-    labelFor: 'item-details-list',
-    field: true,
-    control: `<select class="form-input" id="item-details-list">
-              ${state.lists.map((l) => `<option value="${l.id}" ${l.id === fromListId ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}
-            </select>`,
-  })) : '';
-
-  openModal({
-    title: t('common.editItem'),
-    size: 'md',
-    content: `
-      <form id="item-details-form" class="item-details-form" novalidate autocomplete="off">
-        <div class="form-group">
-          <label class="form-label" for="item-details-name">${t('common.nameLabel')}${REQUIRED_MARK}</label>
-          <input class="form-input" type="text" id="item-details-name" required
-                 value="${esc(item.name)}">
-        </div>
-        <div class="form-pair">
-          <div class="form-group">
-            <label class="form-label" for="item-details-qty">${t('shopping.itemQtyLabel')}</label>
-            <input class="form-input" type="text" id="item-details-qty"
-                   placeholder="${t('shopping.itemQtyPlaceholder')}" value="${esc(item.quantity || '')}">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="item-details-cat">${t('shopping.categoryLabel')}</label>
-            <select class="form-input" id="item-details-cat">
-              ${state.categories.map((c) => `<option value="${esc(c.name)}" ${c.name === item.category ? 'selected' : ''}>${esc(categoryLabel(c.name))}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        ${listRow}
+/**
+ * Die Nebenfelder des Artikel-Dialogs (Preis, Laden, Link, Notiz) - der Inhalt
+ * von „Weitere Angaben" (R24, G3-Quer-P2-1).
+ */
+function itemMoreDetailsHtml(item, linkPreview) {
+  return `
         ${/* PREIS UND LADEN (#1003).
             *
             * NICHT ALS ZWANGSDIALOG BEIM ABHAKEN. Das Ticket sagt "erfasst,
@@ -2932,6 +2882,87 @@ function openItemDetails(itemId, container) {
           <textarea class="form-input" id="item-details-notes" rows="4"
                     placeholder="${t('shopping.notesPlaceholder')}">${esc(item.notes || '')}</textarea>
         </div>
+`;
+}
+
+function openItemDetails(itemId, container) {
+  const item = state.items.find((i) => i.id === itemId);
+  if (!item) return;
+  // Der Riegel steht VOR jeder Vorbereitung: bei `read` geht die Leseansicht auf.
+  if (readOnly()) {
+    openItemReadModal(item);
+    return;
+  }
+
+  const linkPreview = (value) => {
+    const v = String(value ?? '').trim();
+    if (!/^https?:\/\//i.test(v)) return '';
+    return `
+      <a class="item-details__link" href="${esc(v)}" target="_blank" rel="noopener noreferrer">
+        <i data-lucide="external-link" class="icon-sm" aria-hidden="true"></i>${t('shopping.openLink')}
+      </a>`;
+  };
+
+  // DIE LISTE IST EINE EIGENE FORMULARZEILE (#1700, Entscheidung 2026-10-08),
+  // unter Menge und Kategorie - die beiden bleiben nebeneinander, wie sie
+  // waren, und der Dialog sieht mit einer Liste genauso aus wie mit fuenf,
+  // nur ohne diese Zeile: mit einer Liste gibt es nichts zu waehlen. Sie
+  // spricht die Zielform des Hauses (utils/form-row.js, DESIGN.md
+  // "Formularzeile"): Etikett links, der Wert rechts als randlose Auswahl.
+  // Kein eigener "Verschieben"-Weg und kein Ziehen: der Dialog ist ohnehin der
+  // Ort, an dem man einen Artikel umhaengt.
+  const fromListId = state.activeListId;
+  // Ziel ist nur eine Liste, die neue Artikel annimmt (#2283): eine nur lesbar
+  // gespiegelte wiese den Upload ab. Die eigene bleibt immer stehen - sie ist
+  // kein Umzug. Ohne das Feld (ältere Antwort) gilt eine Liste als offen.
+  const targets = state.lists.filter((l) => l.id === fromListId || l.accepts_new_items !== 0);
+  const listRow = targets.length > 1 ? formRowsHtml(formRowHtml({
+    label: t('shopping.itemListLabel'),
+    labelFor: 'item-details-list',
+    field: true,
+    control: `<select class="form-input" id="item-details-list">
+              ${targets.map((l) => `<option value="${l.id}" ${l.id === fromListId ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}
+            </select>`,
+  })) : '';
+
+  openModal({
+    title: t('common.editItem'),
+    size: 'md',
+    // Die Zeile oeffnen holt am Finger keine Tastatur (R23 D13; R24
+    // G3-Quer-P2-1: Name fokussiert, Tastatur ueber dem halben Blatt).
+    initialFocus: 'edit',
+    content: `
+      <form id="item-details-form" class="item-details-form form-stack" novalidate autocomplete="off">
+        <div class="form-group">
+          <label class="form-label" for="item-details-name">${t('common.nameLabel')}${REQUIRED_MARK}</label>
+          <input class="form-input" type="text" id="item-details-name" required
+                 value="${esc(item.name)}">
+        </div>
+        ${/* KATEGORIE NICHT HALB (R24, G3-Quer-P2-1): am Telefon stand
+            * „Obst & Gemue..." abgeschnitten in der halben Zeile. `--wide`
+            * stapelt das Paar, sobald zwei Spalten unter 11rem fielen. */ ''}
+        <div class="form-pair form-pair--wide">
+          <div class="form-group">
+            <label class="form-label" for="item-details-qty">${t('shopping.itemQtyLabel')}</label>
+            <input class="form-input" type="text" id="item-details-qty"
+                   placeholder="${t('shopping.itemQtyPlaceholder')}" value="${esc(item.quantity || '')}">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="item-details-cat">${t('shopping.categoryLabel')}</label>
+            <select class="form-input" id="item-details-cat">
+              ${state.categories.map((c) => `<option value="${esc(c.name)}" ${c.name === item.category ? 'selected' : ''}>${esc(categoryLabel(c.name))}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        ${listRow}
+        ${/* PREIS, LADEN, LINK, NOTIZ HINTER „WEITERE ANGABEN" (R24, Critique
+            * G3-Quer-P2-1): der Artikel-Dialog zeigte als einziger der Kueche
+            * alles offen; Vorrat, Mahlzeit und Rezept falten ihre Nebenfelder.
+            * Offen, sobald eines davon einen Wert traegt. */ ''}
+        ${advancedSection(itemMoreDetailsHtml(item, linkPreview), {
+          open: item.price_cents != null || item.store_id != null || !!item.url || !!item.notes,
+          hint: t('shopping.moreDetailsHint'),
+        })}
         ${/* LOESCHEN OHNE WISCHGESTE (A4 P1-1, WCAG 2.5.1). Am Touchgeraet
             * blendet shopping.css den Papierkorb der Zeile aus; einziger Weg
             * war das Wischen, das VoiceOver abfaengt. Jetzt links im Fuss wie
@@ -3290,6 +3321,9 @@ function pantryTransferPreset(item, pantry, unitWords, fallbackLocationId) {
  * Und der ganze Vorgang ist zuruecknehmbar - die Uebernahme war bis R23 der
  * einzige Kuechenweg, der ohne Rueckgaengig schrieb und dabei die Liste leerte.
  */
+/** Wert des Platzhalters der Sammelwahl („Ort waehlen ...") - kein Ort. */
+const PICK_PLACE = '__pick';
+
 async function openPantryTransfer(container) {
   // Der Uebertrag schreibt in den VORRAT (Pfad-Guard `pantry`) - die Frage
   // gehoert dem fremden Modul, nicht dieser Seite (Regel 1).
@@ -3348,7 +3382,14 @@ async function openPantryTransfer(container) {
       <p class="pantry-transfer__intro">${esc(t('shopping.toPantryDescription', { count: checked.length }))}</p>
       <div class="form-group pantry-transfer__all">
         <label class="form-label" for="pantry-transfer-location">${esc(t('shopping.toPantryAllTo'))}</label>
-        <select id="pantry-transfer-location" class="form-input">${locationOptions(fallbackLocationId)}</select>
+        ${/* NICHTS VORGEWAEHLT (R24, Critique G3-Einkauf-P3-4): hier stand der
+            * erste Ort („Vorratsschrank"), waehrend die Zeilen darunter je eigene
+            * Orte trugen - das Feld wirkte gesetzt, war es aber nicht. Bis zur
+            * Wahl steht ein Platzhalter; erst die Wahl gilt fuer alle Zeilen. */ ''}
+        <select id="pantry-transfer-location" class="form-input">
+          <option value="${PICK_PLACE}" disabled selected>${esc(t('shopping.toPantryAllToPlaceholder'))}</option>
+          ${locationOptions(null)}
+        </select>
       </div>
       <ul class="pantry-transfer__list">${rows}</ul>
       <!-- Der Schalter der Moduldialoge (formSwitchRowHtml, R23 D8). Das war die
@@ -3370,7 +3411,9 @@ async function openPantryTransfer(container) {
       // ausdrueckliche Sammelwahl, und eine Zeile laesst sich danach einzeln
       // zuruecksetzen.
       panel.querySelector('#pantry-transfer-location')?.addEventListener('change', (e) => {
-        for (const select of panel.querySelectorAll('.pantry-transfer__loc')) select.value = e.currentTarget.value;
+        const value = e.currentTarget.value;
+        if (value === PICK_PLACE) return;
+        for (const select of panel.querySelectorAll('.pantry-transfer__loc')) select.value = value;
       });
 
       panel.querySelector('#pantry-transfer-confirm').addEventListener('click', async (e) => {
@@ -3712,12 +3755,12 @@ function openMealPlanImport(container) {
         <p class="form-hint" id="shopping-import-preview" role="status" aria-live="polite"></p>
         <div class="modal-panel__footer modal-panel__footer--plain">
           <button type="button" class="btn btn--secondary" id="shopping-import-cancel">${t('common.cancel')}</button>
-          <!-- Startet deaktiviert und wird von updatePreview() freigeschaltet, sobald
-               der Zeitraum Zutaten enthaelt. Die Schwesteraktion „Plan zufaellig
-               fuellen" macht das seit dem Audit korrekt; hier blieb „Uebernehmen"
-               bei 0 Treffern klickbar und quittierte mit einem Info-Toast, dass
-               nichts passiert ist (Critique 2026-07-30, P2). -->
-          <button type="submit" class="btn btn--primary" id="shopping-import-submit" disabled>${t('common.apply')}</button>
+          <!-- IMMER BEDIENBAR (R24, Dialogregel „primary-disabled"): bis R24 startete
+               der Knopf gesperrt und wartete auf die Vorschau (Critique 2026-07-30,
+               P2). Die Vorschau darueber sagt schon, was passiert; steht im Zeitraum
+               nichts, sagt das Absenden es an derselben Zeile, statt dass ein
+               grauer Knopf schweigt. -->
+          <button type="submit" class="btn btn--primary" id="shopping-import-submit">${t('common.apply')}</button>
         </div>
       </form>`,
     onSave: (panel) => {
@@ -3728,7 +3771,6 @@ function openMealPlanImport(container) {
       // Vorschau vor dem Import (Audit A1-22): dieselbe Route rechnet mit
       // preview:true nur, statt zu schreiben - der Dialog sagt, was passiert.
       const previewEl = panel.querySelector('#shopping-import-preview');
-      const submitBtn = panel.querySelector('#shopping-import-submit');
       async function updatePreview() {
         const from = panel.querySelector('#shopping-import-from')?.value || '';
         const to = panel.querySelector('#shopping-import-to')?.value || '';
@@ -3758,13 +3800,8 @@ function openMealPlanImport(container) {
           }
           if (skipped) parts.push(t(added ? 'shopping.importMealsPreviewSkipped' : 'kitchen.transferAllPresent', { count: skipped }));
           previewEl.textContent = transferred ? parts.join(' ') : t('shopping.importMealsEmpty');
-          submitBtn.disabled = !added;
         } catch {
           previewEl.textContent = '';
-          // Vorschau fehlgeschlagen: nicht sperren. Der Nutzer soll es versuchen
-          // duerfen, statt an einem toten Knopf zu haengen, weil eine
-          // Nebenanfrage scheiterte.
-          submitBtn.disabled = false;
         }
       }
       updatePreview();
@@ -3781,7 +3818,8 @@ function openMealPlanImport(container) {
           const listId = state.activeListId;
           const data = await api.post(`/shopping/${listId}/import-meal-plan`, { from, to });
           if (!data.data?.transferred) {
-            window.yuvomi.showToast(t('shopping.importMealsEmpty'), 'default');
+            // Die Antwort steht dort, wo die Vorschau sie schon sagte.
+            if (previewEl) previewEl.textContent = t('shopping.importMealsEmpty');
             return;
           }
           if (!data.data.added) {

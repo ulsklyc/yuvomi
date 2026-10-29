@@ -532,8 +532,12 @@ test('Lader: der Dialog holt die Listen von /shopping, und ein Fehler loescht di
   // Der Aufrufer nimmt `null` als "nichts aendern" - sonst wuerde er `undefined` speichern.
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
-  const wiring = src.slice(src.indexOf("container.querySelectorAll('[data-widget-options]')"));
-  assert.match(wiring.slice(0, 600), /const next = await openWidgetOptions\(id, current\);\n\s+if \(next === null\) return;/);
+  // Seit DW-P2-1 (p4) ein Handler am Zuhoerer der Flaeche (`editOptions`); der
+  // alte Anker `container.querySelectorAll('[data-widget-options]')` gibt es
+  // nicht mehr, und dieser Guard las seither ins Leere (rot seit p4, DW p7).
+  const at = src.indexOf('const editOptions = async (btn) => {');
+  assert.ok(at > -1, 'editOptions nicht gefunden - die Signatur greift nicht mehr');
+  assert.match(src.slice(at, at + 1200), /const next = await openWidgetOptions\(id, current\);\n\s+if \(next === null\b[^\n]*\) return;/);
 });
 
 test('Dialog: scheitert der Katalog, geht er nicht auf und die Auswahl bleibt', async () => {
@@ -551,7 +555,7 @@ test('Kachel: eine gewaehlte Liste ohne Offenes sagt, dass nichts offen ist, und
     { id: 5, name: 'Fest', open_count: 0, total_count: 4, items: [] },
   ];
   const html = dash.renderShoppingTile({ shoppingTile: { lists, openCount: 1, listCount: 2 }, shoppingLists: [], shoppingOpenCount: 14, shoppingOpenLists: 4 });
-  const rows = html.split('class="shopping-widget-list"').slice(1);
+  const rows = html.split('class="list-row shopping-widget-list"').slice(1);
   assert.equal(rows.length, 2);
   assert.ok(!/shoppingListNothingOpen/.test(rows[0]), 'eine Liste mit Offenem traegt den Satz nicht');
   assert.match(rows[1], /dashboard\.shoppingListNothingOpen/);
@@ -570,7 +574,7 @@ test('Kachel: eine gewaehlte Liste, die der Deckel abschneidet, ist als "+1 weit
   // und CHANGELOG sagen, eine gewaehlte Liste bleibe stehen.
   const four = await getJson(query(FEST, GARTEN, WOCHE, BAUMARKT));
   const html = dash.renderShoppingTile(four);
-  assert.equal(html.split('class="shopping-widget-list"').length - 1, 3);
+  assert.equal(html.split('class="list-row shopping-widget-list"').length - 1, 3);
   assert.ok(!html.includes('>Fest<'), 'Vorbedingung: die fertig gekaufte Liste ist abgeschnitten');
   assert.match(html, /dashboard\.shoppingMoreLists\{&quot;count&quot;:1\}/);
 

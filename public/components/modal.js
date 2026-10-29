@@ -471,6 +471,16 @@ function applyInitialFocus(container, initialFocus) {
 function resolveInitialFocus(container, initialFocus) {
   if (initialFocus === 'none') return null;
   if (initialFocus && typeof initialFocus.focus === 'function') return initialFocus;
+  // EIN SELEKTOR NENNT DAS PFLICHTFELD, DAS DIE REGEL NICHT FINDET (R24,
+  // Critique G5 P2-4). `firstEntryField` sucht zuerst ein Tippfeld - steht
+  // vor dem ersten Tippfeld eine Pflicht-AUSWAHL (Aktivitaet: „Art *" vor dem
+  // Zeitpunkt), landete der Fokus im Datum und die Tastatur fuhr hoch. Ein
+  // Dialog, dessen Pflichtfeld eine Auswahl ist, nennt sie; fehlt sie, gilt
+  // die Regel.
+  if (typeof initialFocus === 'string' && /^[#.[]/.test(initialFocus)) {
+    const named = container.querySelector?.(initialFocus);
+    if (named && !named.closest?.('[hidden], [inert]')) return named;
+  }
   if (initialFocus === 'edit' && typeof matchMedia === 'function' && matchMedia('(hover: none)').matches) {
     const heading = container.querySelector?.('.modal-panel__title');
     if (heading) {
@@ -1764,12 +1774,12 @@ export function collapseEmptyBody(panel) {
 
 /**
  * Woran der Fuß sein Löschen erkennt. Die Module schreiben es seit Jahren als
- * `.btn--danger-outline` (einige als `.btn--danger-ghost`) - die Klasse IST
- * die Auszeichnung, kein Modul muss etwas nachtragen. `data-footer-delete`
+ * `.btn--danger-outline` (seit R24 alle; `.btn--danger-ghost` ist entfallen) -
+ * die Klasse IST die Auszeichnung, kein Modul muss etwas nachtragen. `data-footer-delete`
  * nimmt einen Knopf auf, der anders aussieht; `data-footer-delete="off"` nimmt
  * einen heraus, bei dem Löschen die Primäraktion des Dialogs ist.
  */
-export const FOOTER_DELETE_SELECTOR = '.btn--danger-outline, .btn--danger-ghost, [data-footer-delete]';
+export const FOOTER_DELETE_SELECTOR = '.btn--danger-outline, [data-footer-delete]';
 
 /**
  * Der Name des Objekts, das der Knopf löscht: ausdrücklich gesetzt
@@ -1832,9 +1842,11 @@ export function decorateFooterDelete(footer) {
   const leseFuss = footer.classList.contains('detail-view__footer') && Boolean(footer.querySelector(':scope > .btn--primary'));
   const faltetZumSymbol = (b) => leseFuss && b.classList.contains('btn--ghost')
     && Boolean(b.querySelector(':scope > svg, :scope > i')) && Boolean(b.querySelector(':scope > .btn__label'));
+  // Die Eintraege eines Mehr-Menues im Fuss (R24, detailFooterEl `more`)
+  // stehen nicht im Fuss, sondern im Popover darueber - sie zaehlen nicht.
   const labelled = [...footer.querySelectorAll('button')]
     .filter((b) => !found.includes(b) && !b.classList.contains('btn--icon') && !b.hidden && b.style?.display !== 'none'
-      && !faltetZumSymbol(b));
+      && !faltetZumSymbol(b) && !b.classList.contains('popover-menu__item'));
   footer.classList.toggle('modal-panel__footer--one-row', found.length > 0 && labelled.length <= 2);
   // DAS WORT BLEIBT, WO PLATZ IST (R23, Critique G3/G5). Der Papierkorb ist
   // die Antwort auf die DREIHEIT, die bei 390px nicht in eine Zeile passt. Die
@@ -2002,7 +2014,8 @@ export function armPointerDeadTime(root, { now = () => performance.now(), durati
  * @param {Function} [opts.onClose]  - Callback, wird aufgerufen wenn das Modal geschlossen wird
  * @param {Function} [opts.onDelete] - Falls vorhanden, wird ein Löschen-Button eingebaut
  * @param {string}   [opts.size='md'] - 'sm' (400px) | 'md' (520px) | 'lg' (680px) | 'xl' (min(960px, 95vw)); Breiten siehe layout.css .modal-panel--*
- * @param {'first-field'|'edit'|'none'|HTMLElement} [opts.initialFocus='first-field'] - siehe applyInitialFocus;
+ * @param {'first-field'|'edit'|'none'|HTMLElement|string} [opts.initialFocus='first-field'] - siehe applyInitialFocus
+ *   (ein Selektor ab `#`, `.` oder `[` nennt das Pflichtfeld, resolveInitialFocus);
  *   `'edit'` fuer das Bearbeiten eines bestehenden Eintrags (resolveInitialFocus)
  * @param {{label: string, id?: string, onClick?: Function}} [opts.headerAction] - Textbutton rechts im Kopf, links vom Schließen-X
  * @param {boolean} [opts.dirtyGuard=true] - `false` für Ansichtsblätter, deren
@@ -2986,6 +2999,10 @@ function _describesOnFocus(input) {
 }
 
 function _focusField(input) {
+  // Ein Feld hinter einem geschlossenen "Weitere Angaben" (advancedSection)
+  // ist nicht fokussierbar und unsichtbar: der Fehler klappt seinen Abschnitt
+  // auf, statt ins Leere zu zeigen (R24, Umbuchung/Darlehen).
+  for (let d = input?.closest?.('details:not([open])'); d; d = d.parentElement?.closest?.('details:not([open])')) d.open = true;
   // Custom Elements (z. B. yuvomi-datepicker) sind selbst nicht fokussierbar:
   // stattdessen ihren inneren Formular-Knoten fokussieren.
   const isNative = typeof input.matches === 'function' && input.matches('input, select, textarea, button');
@@ -3287,6 +3304,26 @@ export function btnError(btn) {
   void btn.offsetWidth;
   btn.classList.add('btn--shaking');
   btn.addEventListener('animationend', () => btn.classList.remove('btn--shaking'), { once: true });
+}
+
+// --------------------------------------------------------
+// Dialogregel Erstfokus (Critique R24 S3, DESIGN.md D4)
+// --------------------------------------------------------
+
+/**
+ * DER ERSTFOKUS EINES DIALOGS, DER ANLEGT UND BEARBEITET. Anlegen: das erste
+ * Pflichtfeld (Tastatur ist gewollt, es wird gleich getippt). Bearbeiten:
+ * `'edit'` - am Finger nimmt der Titel den Fokus, keine Tastatur ueber dem
+ * halben Blatt (R23 D13; resolveInitialFocus). Guard: `test:control-dialect`
+ * "edit-autofocus" (jeder Dialog mit Bearbeiten-Titel setzt initialFocus).
+ *
+ * @param {boolean} isEdit
+ * @param {string} [required] - Selektor des ersten Pflichtfelds, wenn es eine
+ *   Auswahl ist (die Regel sucht Tippfelder zuerst, resolveInitialFocus)
+ * @returns {string}
+ */
+export function dialogInitialFocus(isEdit, required = 'first-field') {
+  return isEdit ? 'edit' : required;
 }
 
 // --------------------------------------------------------

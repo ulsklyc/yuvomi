@@ -450,11 +450,53 @@ test('S10: eine neue Erinnerung verdraengt nur eine aeltere Erinnerung, nie die 
 test('D18: die Rueckmeldung endet beim Modulwechsel, zwischen den Kuechen-Reitern nicht (router.js)', async () => {
   const { readFileSync } = await import('node:fs');
   const router = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
-  assert.match(router, /if \(moduleSectionOf\(previousPath\) !== moduleSectionOf\(route\.path\)\) endFeedbackToasts\(\);/,
-    'der Seitentausch beendet die Rueckmeldung des alten Moduls');
+  assert.match(router, /if \(moduleSectionOf\(previousPath\) !== moduleSectionOf\(route\.path\)\) endModuleFeedback\(\);/,
+    'der Seitentausch beendet die Rueckmeldung des alten Moduls - und macht ihre Marke alt (R24)');
   assert.match(router, /function moduleSectionOf\(path\) \{\s*if \(!path\) return null;\s*return isKitchenRoute\(path\) \? '\/kitchen' : topLevelSection\(path\);/,
     'die Kueche zaehlt als ein Modul, Einstellungen/Gesundheit/Schichtplan ueber topLevelSection');
 });
+
+/* DIE MODUL-MARKE (Critique R24, G0-Shell-P1-2). Die Quittung des Abhakens kam
+ * 700-1500 ms nach dem Tipp, hinter `await` - wer in der Zeit das Modul
+ * wechselte, sah "„Kinderzimmer aufraeumen“ erledigt." 300 ms spaeter im
+ * Kalender stehen (gemessen 1440, s2/bin/toast.mjs). `endFeedbackToasts` traf
+ * sie nicht: sie stand noch nicht. Eine Quittung mit alter Marke erscheint
+ * jetzt gar nicht; ihre Handlung gilt trotzdem (`onExpire`). */
+test('R24: eine Quittung mit der Marke eines verlassenen Moduls erscheint nicht, ihre Handlung gilt', async () => {
+  const { polite, assertive } = installDom();
+  mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  try {
+    const { showToast, feedbackScope, endModuleFeedback } = await import('../public/utils/toast-show.js');
+    const scope = feedbackScope();
+    assert.equal(showToast('Frisch', 'default', 5000, () => {}, { scope }), true, 'gleiche Marke: der Toast steht');
+    const ended = [];
+    endModuleFeedback();
+    assert.equal(toastsIn(polite).length, 0, 'der Wechsel beendet, was steht');
+    assert.notEqual(feedbackScope(), scope, 'der Wechsel macht die alte Marke alt');
+    const shown = showToast('„Kinderzimmer aufraeumen“ erledigt.', 'default', 5000, () => ended.push('undo'), {
+      scope,
+      onExpire: () => ended.push('gilt'),
+    });
+    assert.equal(shown, false);
+    assert.equal(toastsIn(polite).length, 0, 'die spaete Quittung erscheint nicht im naechsten Modul');
+    assert.equal(polite.children.length, 0, 'auch keine stille Ansage');
+    assert.deepEqual(ended, ['gilt'], 'ihre Handlung gilt wie nach der Frist');
+    // Ein Fehler sagt, dass etwas NICHT geschah - er erscheint auch spaet.
+    showToast('Konnte nicht abgehakt werden', 'danger', 5000, null, { scope });
+    assert.equal(toastsIn(assertive).length, 1, 'Fehler erscheinen trotz alter Marke');
+    // Ohne Marke bleibt alles wie bisher.
+    endFeedbackToastsSafe();
+    assert.equal(showToast('Gespeichert', 'default', 3000), true);
+  } finally {
+    mock.timers.reset();
+    removeDom();
+  }
+});
+
+/** Raeumt vor dem Gegenfall ab, ohne die Marke zu bewegen. */
+function endFeedbackToastsSafe() {
+  for (const el of document.querySelectorAll('.toast-container .toast')) el._toastEnd?.();
+}
 
 /* EIN DIALEKT FUER DIE RUECKMELDUNG MIT RUECKWEG (Critique R23, D6/N1): dieselbe
  * Quittung trug mal ein Haekchen ('success'), mal keins ('default'). Ein Toast

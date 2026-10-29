@@ -434,3 +434,22 @@ export function compactInitials(name, fallback = '') {
   // In einer Kollisionsgruppe das Zeichen, das dort unterscheidet (compactGroup).
   return compactRoster?.get(keyOf(name)) ?? chars[1];
 }
+
+/**
+ * DER GETEILTE NACHNAME STEHT NICHT IN JEDEM CHIP (R19, Critique 2026-10-16:
+ * Termin-Dialog mobil 1,6 Bildschirme). "Alex Johnson, Emma Johnson, Leo
+ * Johnson, Linda Johnson" brauchten bei 390px drei Chip-Zeilen, und das
+ * vierfache "Johnson" unterscheidet niemanden. Tragen ALLE Personen der Wahl
+ * denselben Nachnamen, zeigt der Chip den Vornamen; der volle Name bleibt sein
+ * zugaenglicher Name (`.sr-only`). Ein Konto mit anderem Nachnamen (Hilfe,
+ * Grosseltern) laesst alle Namen voll stehen - dann unterscheidet er.
+ * @param {Array<{display_name?: string}>} users
+ * @returns {string} der geteilte Nachname, sonst ''
+ */
+export function sharedSurname(users) {
+  if (!Array.isArray(users) || users.length < 2) return '';
+  const lasts = users.map((u) => String(u?.display_name ?? '').trim().split(/\s+/))
+    .map((parts) => (parts.length >= 2 ? parts[parts.length - 1] : ''));
+  const [first] = lasts;
+  return first && lasts.every((l) => l === first) ? first : '';
+}

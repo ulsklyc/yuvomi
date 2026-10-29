@@ -42,14 +42,12 @@ export async function render(container) {
           <div class="form-group">
             <label class="label" for="username">${esc(t('setup.usernameLabel'))}</label>
             <input class="input" type="text" id="username" name="username"
-              autocomplete="username" autocapitalize="none" autocorrect="off"
-              placeholder="${esc(t('setup.usernamePlaceholder'))}" required />
+              autocomplete="username" autocapitalize="none" autocorrect="off" required />
           </div>
           <div class="form-group">
             <label class="label" for="display_name">${esc(t('setup.displayNameLabel'))}</label>
             <input class="input" type="text" id="display_name" name="display_name"
-              autocomplete="name"
-              placeholder="${esc(t('setup.displayNamePlaceholder'))}" required />
+              autocomplete="name" required />
           </div>
           <div class="form-group">
             <label class="label" for="password">${esc(t('setup.passwordLabel'))}</label>

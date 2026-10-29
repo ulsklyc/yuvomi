@@ -109,11 +109,11 @@ test('Notiz-Kategorie-Picker und Manager verwenden den gemeinsamen Namensvertrag
 test('Scope-Tooltip und Berechtigungs-Einzüge funktionieren auch in RTL-Sprachen', () => {
   assert(/inset-inline-end:\s*0/.test(compCss), 'Tooltip muss logisch am Inline-Ende verankert sein');
   const rules = [...eachRule(settingsCss)];
-  const widgets = rules.find((rule) => rule.selector === '.perm-modgroup__widgets' && !rule.at.length)?.body || '';
-  const capabilities = rules.find((rule) => rule.selector === '.perm-modgroup__capabilities' && !rule.at.length)?.body || '';
-  assert(/padding-inline-start:\s*var\(--space-8\)/.test(widgets), 'Widget-Einzug muss logisch sein');
-  assert(!/padding-left\s*:/.test(widgets), 'Widget-Einzug darf kein physisches padding-left nutzen');
-  assert(/margin-inline:\s*var\(--space-8\)/.test(capabilities), 'Capability-Einzug muss logisch sein');
+  // Seit R24 (E11) ruecken Widgets und Zusatzrechte gemeinsam in der
+  // aufgeklappten Zeile ein (`.perm-modgroup__more`).
+  const more = rules.find((rule) => rule.selector === '.perm-modgroup__more' && !rule.at.length)?.body || '';
+  assert(/padding-inline-start:\s*var\(--space-4\)/.test(more), 'Einzug der aufgeklappten Zeile muss logisch sein');
+  assert(!/padding-left\s*:|margin-left\s*:/.test(more), 'kein physischer Einzug');
 });
 test('Budget konfiguriert basePath /budget/categories und Gruppen', () => {
   assert(/configure\(/.test(budgetPage), 'configure() muss aufgerufen werden');

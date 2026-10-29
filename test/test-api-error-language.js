@@ -33,6 +33,24 @@
  *        Bein 2 nennt jede der 13 gefuehrten Absagen deutsch.
  *        Ebenso fuer die Schnellzugriffe (quick-links.js): `quick-links.js: 10
  *        (erlaubt 0)`, und Bein 2 nennt die fuenf deutschen Absagen.
+ *        Ebenso fuer das Inventar (inventory/items.js 9, item-dates.js 5,
+ *        service-log.js 6): Bein 2 nennt 20 deutsche Absagen, darunter
+ *        Feldnamen, die Bein 1 nicht liest (`idParam(..., 'Buchung-ID')`,
+ *        `date(..., 'Datum')`, ein Satz aus einem `return` im Helfer).
+ *        Ebenso fuer die Kontakte (contacts.js): `contacts.js: 13 (erlaubt 0)`,
+ *        und Bein 2 nennt 12 deutsche Absagen - elf davon Feldnamen, die
+ *        Bein 1 nicht liest (`limitedStr(..., 'Telefon')`, `date(..., 'Geburtstag')`).
+ *        Ebenso fuer die Gesundheit (health/*.js, 32 Stellen in acht Dateien):
+ *        Bein 1 nennt jede Datei, Bein 2 nennt alle 20 gefuehrten Absagen deutsch.
+ *        Ebenso fuer die Kalender-Abos, die Apple-Anbindung, den Feed, das Lesen
+ *        und die Kalenderziele (calendar/{apple,feed,helpers,read,subscriptions}.js,
+ *        46 Stellen): Bein 2 nennt 26 der 28 gefuehrten Absagen deutsch; "url:
+ *        Pflichtfeld." sah die Regel erst mit diesem Wort.
+ *        Ebenso fuer Einkauf, Aufgaben, Push und Wetter (shopping.js 19 mit
+ *        "Menge" in der Regel, tasks.js 4, push.js 3, weather.js 2): Bein 2
+ *        nennt alle 29 gefuehrten Absagen deutsch.
+ *        Ebenso fuer Essensplan, Vorrat und Rezepte (meals.js 34, pantry.js 5,
+ *        recipes.js 2): Bein 2 nennt 30 der 38 gefuehrten Absagen deutsch.
  *
  * Ausführen: npm run test:api-error-language
  */
@@ -54,30 +72,6 @@ const ROUTES = new URL('../server/routes/', import.meta.url);
  * Modul umstellt, streicht seine Zeile - der Test verlangt es.
  */
 const GERMAN_LEFT = new Map([
-  ['calendar/apple.js', 6],
-  ['calendar/feed.js', 5],
-  ['calendar/helpers.js', 9],
-  ['calendar/read.js', 4],
-  ['calendar/subscriptions.js', 24],
-  ['contacts.js', 13],
-  ['health/activities.js', 2],
-  ['health/caregivers.js', 4],
-  ['health/cycle.js', 3],
-  ['health/helpers.js', 2],
-  ['health/labs.js', 6],
-  ['health/medications.js', 12],
-  ['health/nutrition.js', 1],
-  ['health/vitals.js', 2],
-  ['inventory/item-dates.js', 5],
-  ['inventory/items.js', 9],
-  ['inventory/service-log.js', 6],
-  ['meals.js', 34],
-  ['pantry.js', 5],
-  ['push.js', 3],
-  ['recipes.js', 2],
-  ['shopping.js', 17],
-  ['tasks.js', 4],
-  ['weather.js', 2],
 ]);
 
 function routeFiles(dir = ROUTES, prefix = '') {
@@ -114,6 +108,10 @@ test('die Regel erkennt die alten Saetze der uebrigen Module und laesst englisch
     'calendar_default_target: maximal 300 Zeichen',
     'Unbekannte Nutzer-ID.',
     'target_google_calendar_id: zu lang.',
+    'Menge may be at most 100 characters long.',
+    'url: Pflichtfeld.',
+    'Telefon is too long.',
+    'Geburtstag must be a valid date.',
   ]) assert.ok(germanIn(old), `nicht erkannt: ${old}`);
   for (const fine of [
     'Internal server error.',
@@ -123,6 +121,7 @@ test('die Regel erkennt die alten Saetze der uebrigen Module und laesst englisch
     'Admin access required.',
     'Invalid country code (2 capital letters, e.g. DE).',
     'calendar_default_target may be at most 300 characters long.',
+    'phone may be at most 50 characters long.',
   ]) assert.equal(germanIn(fine), null, `faelschlich erkannt: ${fine}`);
 });
 
@@ -494,5 +493,415 @@ test('keine Absage der Schnellzugriffe traegt deutschen Wortlaut', async () => {
     assertRefusedInEnglish(seen);
   } finally {
     qlServer.close();
+  }
+});
+
+test('keine Absage des Inventars traegt deutschen Wortlaut', async () => {
+  const { default: inventoryRouter } = await import('../server/routes/inventory/index.js');
+  const invApp = express();
+  invApp.use(express.json({ limit: '10mb' }));
+  invApp.use((req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  });
+  invApp.use('/inventory', inventoryRouter);
+  const invServer = invApp.listen(0, '127.0.0.1');
+  const invUrl = await new Promise((r) => invServer.on('listening', () => r(`http://127.0.0.1:${invServer.address().port}`)));
+  try {
+    const seen = [];
+    const call = async (method, route, body) => {
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${invUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      return { status: res.status, body: json };
+    };
+    const run = async (label, method, route, body) => {
+      const r = await call(method, route, body);
+      seen.push({ label, status: r.status, error: r.body?.error ?? null });
+    };
+    const car = await call('POST', '/inventory/items', {
+      name: 'Auto', category: 'vehicles', odometer: 50000, odometer_unit: 'km', odometer_on: '2026-09-01',
+    });
+    assert.equal(car.status, 201, 'Vorbedingung: das Fahrzeug wird angelegt');
+    const id = car.body.data.id;
+    const item = (extra) => ({ name: 'Ding', ...extra });
+    const date = (extra) => ({ name: 'Ding', tracked_dates: [{ label: 'TÜV', date: '2027-01-01', ...extra }] });
+
+    await run('name', 'POST', '/inventory/items', {});
+    await run('category', 'POST', '/inventory/items', item({ category: 'nope' }));
+    await run('location', 'POST', '/inventory/items', item({ location_id: 'abc' }));
+    await run('purchase-date', 'POST', '/inventory/items', item({ purchase_date: 'nope' }));
+    await run('price', 'POST', '/inventory/items', item({ purchase_price: -1 }));
+    await run('price-type', 'POST', '/inventory/items', item({ purchase_price: 'abc' }));
+    await run('warranty', 'POST', '/inventory/items', item({ warranty_months: 601 }));
+    await run('odometer', 'POST', '/inventory/items', item({ category: 'vehicles', odometer: -5 }));
+    await run('odometer-unit', 'POST', '/inventory/items', item({ category: 'vehicles', odometer: 5, odometer_unit: 'nope' }));
+    await run('odometer-on', 'POST', '/inventory/items', item({ category: 'vehicles', odometer: 5, odometer_on: 'nope' }));
+    await run('condition', 'POST', '/inventory/items', item({ condition: 'nope' }));
+    await run('status', 'POST', '/inventory/items', item({ status: 'nope' }));
+    await run('entry-id', 'POST', '/inventory/items', item({ entry_id: 'abc' }));
+    await run('date-label', 'POST', '/inventory/items', date({ label: '' }));
+    await run('date-date', 'POST', '/inventory/items', date({ date: 'nope' }));
+    await run('date-offset', 'POST', '/inventory/items', date({ reminder_offset_days: 400 }));
+    await run('date-interval', 'POST', '/inventory/items', date({ interval_months: 0 }));
+    await run('date-distance', 'POST', '/inventory/items', date({ interval_distance: -1 }));
+    await run('dates-many', 'POST', '/inventory/items', {
+      name: 'Ding', tracked_dates: Array.from({ length: 11 }, (_, i) => ({ label: `F${i}`, date: '2027-01-01' })),
+    });
+    await run('item-id', 'GET', '/inventory/items/abc');
+    await run('link-entry', 'POST', `/inventory/items/${id}/entries`, { entry_id: 'abc' });
+    await run('link-role', 'POST', `/inventory/items/${id}/entries`, { entry_id: 1, role: 'nope' });
+    await run('link-share', 'POST', `/inventory/items/${id}/entries`, { entry_id: 1, amount_share: -1 });
+    await run('unlink-entry', 'DELETE', `/inventory/items/${id}/entries/abc`);
+    await run('complete-date', 'POST', `/inventory/items/${id}/dates/abc/complete`, {});
+    await run('log-label', 'POST', `/inventory/items/${id}/service-log`, { performed_on: '2026-10-01' });
+    await run('log-date', 'POST', `/inventory/items/${id}/service-log`, { label: 'Ölwechsel' });
+    await run('log-odometer', 'POST', `/inventory/items/${id}/service-log`, { label: 'Ölwechsel', performed_on: '2026-10-01', odometer: -1 });
+    await run('log-regression', 'POST', `/inventory/items/${id}/service-log`, { label: 'Ölwechsel', performed_on: '2026-10-01', odometer: 40000 });
+    await run('log-id', 'PUT', `/inventory/items/${id}/service-log/abc`, { label: 'X', performed_on: '2026-10-01' });
+    await run('entry-items-id', 'GET', '/inventory/entries/abc/items');
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    invServer.close();
+  }
+});
+
+test('keine Absage der Kontakte traegt deutschen Wortlaut', async () => {
+  const { default: contactsRouter } = await import('../server/routes/contacts.js');
+  const cApp = express();
+  cApp.use(express.json());
+  cApp.use((req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  });
+  cApp.use('/contacts', contactsRouter);
+  const cServer = cApp.listen(0, '127.0.0.1');
+  const cUrl = await new Promise((r) => cServer.on('listening', () => r(`http://127.0.0.1:${cServer.address().port}`)));
+  try {
+    const seen = [];
+    const run = async (label, method, route, body) => {
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${cUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      seen.push({ label, status: res.status, error: json?.error ?? null });
+    };
+    const family = db.prepare("INSERT INTO contacts (name, family_user_id) VALUES ('Member', ?)").run(MEMBER).lastInsertRowid;
+    const long = 'x'.repeat(20000);
+
+    await run('post-name', 'POST', '/contacts', {});
+    await run('post-first-name', 'POST', '/contacts', { firstName: long });
+    await run('post-last-name', 'POST', '/contacts', { name: 'A', lastName: long });
+    await run('post-middle-name', 'POST', '/contacts', { name: 'A', middleName: long });
+    await run('post-name-prefix', 'POST', '/contacts', { name: 'A', namePrefix: long });
+    await run('post-name-suffix', 'POST', '/contacts', { name: 'A', nameSuffix: long });
+    await run('post-phone', 'POST', '/contacts', { name: 'A', phone: long });
+    await run('post-email', 'POST', '/contacts', { name: 'A', email: long });
+    await run('post-address', 'POST', '/contacts', { name: 'A', address: long });
+    await run('post-notes', 'POST', '/contacts', { name: 'A', notes: long });
+    await run('post-birthday', 'POST', '/contacts', { name: 'A', birthday: 'nope' });
+    await run('post-category', 'POST', '/contacts', { name: 'A', category: 'nope' });
+    await run('put-birthday', 'PUT', `/contacts/${family}`, { birthday: 'nope' });
+    await run('put-phone', 'PUT', `/contacts/${family}`, { phone: long });
+    await run('put-gone', 'PUT', '/contacts/987654', { name: 'X' });
+    await run('delete-family', 'DELETE', `/contacts/${family}`);
+    await run('delete-gone', 'DELETE', '/contacts/987654');
+    await run('category-name', 'POST', '/contacts/categories', {});
+    await run('category-rename', 'PUT', '/contacts/categories/nope', { name: 'X' });
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    cServer.close();
+  }
+});
+
+test('keine Absage der Gesundheit traegt deutschen Wortlaut', async () => {
+  const { default: healthRouter } = await import('../server/routes/health.js');
+  const who = { userId: ADMIN, role: 'admin' };
+  const hApp = express();
+  hApp.use(express.json());
+  hApp.use((req, _res, next) => {
+    req.authUserId = who.userId;
+    req.authRole = who.role;
+    req.session = { userId: who.userId, role: who.role };
+    next();
+  });
+  hApp.use('/health', healthRouter);
+  const hServer = hApp.listen(0, '127.0.0.1');
+  const hUrl = await new Promise((r) => hServer.on('listening', () => r(`http://127.0.0.1:${hServer.address().port}`)));
+  try {
+    const seen = [];
+    const call = async (method, route, body, as = { userId: ADMIN, role: 'admin' }) => {
+      Object.assign(who, as);
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${hUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      return { status: res.status, body: json };
+    };
+    const run = async (label, method, route, body, as) => {
+      const r = await call(method, route, body, as);
+      seen.push({ label, status: r.status, error: r.body?.error ?? null });
+    };
+    const member = { userId: MEMBER, role: 'member' };
+    const report = await call('POST', '/health/labs', {
+      report_date: '2026-10-01', results: [{ analyte: 'HbA1c', value_num: 5.4 }],
+    });
+    assert.equal(report.status, 201, 'Vorbedingung: der Laborbefund wird angelegt');
+    const resultId = db.prepare('SELECT id FROM health_lab_results WHERE report_id = ?').get(report.body.data.id).id;
+
+    for (const route of ['/health/activities/x', '/health/vitals/x', '/health/medications/x', '/health/labs/x',
+      '/health/results/x', '/health/schedules/x', '/health/logs/x', '/health/cycle/periods/x', '/health/cycle/logs/x']) {
+      await run(`delete-id ${route}`, 'DELETE', route);
+    }
+    await run('labs-get-id', 'GET', '/health/labs/x');
+    await run('labs-results-id', 'POST', '/health/labs/x/results', { analyte: 'A', value_num: 1 });
+    await run('med-logs-id', 'GET', '/health/medications/x/logs');
+    await run('result-clear', 'PATCH', `/health/results/${resultId}`, { value_num: null });
+    await run('owner-invalid', 'POST', '/health/labs', { report_date: '2026-10-01', user_id: 'x' });
+    await run('owner-foreign', 'POST', '/health/labs', { report_date: '2026-10-01', user_id: ADMIN }, member);
+    await run('target-foreign', 'GET', `/health/nutrition/targets?user_id=${ADMIN}`, undefined, member);
+    await run('caregivers-subject', 'PUT', '/health/caregivers/x', { caregiver_ids: [] });
+    await run('caregivers-gone', 'PUT', '/health/caregivers/987654', { caregiver_ids: [] });
+    await run('caregivers-shape', 'PUT', `/health/caregivers/${MEMBER}`, { caregiver_ids: 'x' });
+    await run('caregivers-unknown', 'PUT', `/health/caregivers/${MEMBER}`, { caregiver_ids: [987654] });
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    hServer.close();
+  }
+});
+
+test('keine Absage der Kalender-Abos, Apple-Anbindung und Kalenderziele traegt deutschen Wortlaut', async () => {
+  const { default: calendarRouter } = await import('../server/routes/calendar.js');
+  const who = { userId: ADMIN, role: 'admin' };
+  const calApp = express();
+  calApp.use(express.json());
+  calApp.use((req, _res, next) => {
+    req.authUserId = who.userId;
+    req.authRole = who.role;
+    req.session = { userId: who.userId, role: who.role };
+    next();
+  });
+  calApp.use('/calendar', calendarRouter);
+  const calServer = calApp.listen(0, '127.0.0.1');
+  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}`)));
+  try {
+    const seen = [];
+    const run = async (label, method, route, body, as = { userId: ADMIN, role: 'admin' }) => {
+      Object.assign(who, as);
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${calUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      seen.push({ label, status: res.status, error: json?.error ?? null });
+    };
+    const member = { userId: MEMBER, role: 'member' };
+    const sub = db.prepare("INSERT INTO ics_subscriptions (name, url, created_by) VALUES ('Abo', 'https://ics.example/a.ics', ?)").run(ADMIN).lastInsertRowid;
+    const event = { title: 'T', start_datetime: '2026-11-01T10:00', end_datetime: '2026-11-01T11:00' };
+
+    await run('read-range', 'GET', '/calendar?from=x&to=y');
+    await run('apple-url', 'POST', '/calendar/apple/connect', { url: 'nope', username: 'u', password: 'p' });
+    await run('apple-user', 'POST', '/calendar/apple/connect', { url: 'https://caldav.example/', password: 'p' });
+    await run('apple-password', 'POST', '/calendar/apple/connect', { url: 'https://caldav.example/', username: 'u' });
+    await run('sub-name', 'POST', '/calendar/subscriptions', { url: 'https://ics.example/b.ics', color: '#112233' });
+    await run('sub-url', 'POST', '/calendar/subscriptions', { name: 'B', color: '#112233' });
+    await run('sub-scheme', 'POST', '/calendar/subscriptions', { name: 'B', url: 'ftp://ics.example/b.ics', color: '#112233' });
+    await run('sub-color', 'POST', '/calendar/subscriptions', { name: 'B', url: 'https://ics.example/b.ics', color: 'red' });
+    await run('sub-patch-id', 'PATCH', '/calendar/subscriptions/x', { name: 'X' });
+    await run('sub-patch-name', 'PATCH', `/calendar/subscriptions/${sub}`, { name: '' });
+    await run('sub-patch-color', 'PATCH', `/calendar/subscriptions/${sub}`, { color: 'red' });
+    await run('sub-patch-gone', 'PATCH', '/calendar/subscriptions/987654', { name: 'X' });
+    await run('sub-patch-foreign', 'PATCH', `/calendar/subscriptions/${sub}`, { name: 'X' }, member);
+    await run('sub-delete-id', 'DELETE', '/calendar/subscriptions/x');
+    await run('sub-delete-gone', 'DELETE', '/calendar/subscriptions/987654');
+    await run('sub-delete-foreign', 'DELETE', `/calendar/subscriptions/${sub}`, undefined, member);
+    await run('sub-sync-id', 'POST', '/calendar/subscriptions/x/sync');
+    await run('sub-sync-gone', 'POST', '/calendar/subscriptions/987654/sync');
+    await run('sub-sync-foreign', 'POST', `/calendar/subscriptions/${sub}/sync`, undefined, member);
+    await run('target-caldav-id', 'POST', '/calendar', { ...event, target_caldav_account_id: 'x' });
+    await run('target-caldav-url', 'POST', '/calendar', { ...event, target_caldav_account_id: 1 });
+    await run('target-caldav-long', 'POST', '/calendar', { ...event, target_caldav_account_id: 1, target_caldav_calendar_url: 'x'.repeat(3000) });
+    await run('target-outlook-id', 'POST', '/calendar', { ...event, target_outlook_account_id: 'x' });
+    await run('target-outlook-cal', 'POST', '/calendar', { ...event, target_outlook_account_id: 1 });
+    await run('target-outlook-long', 'POST', '/calendar', { ...event, target_outlook_account_id: 1, target_outlook_calendar_id: 'x'.repeat(3000) });
+    await run('target-google-long', 'POST', '/calendar', { ...event, target_google_calendar_id: 'x'.repeat(3000) });
+    await run('target-caldav-offered', 'POST', '/calendar', { ...event, target_caldav_account_id: 987654, target_caldav_calendar_url: 'https://dav.example/cal/' });
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    calServer.close();
+  }
+});
+
+test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortlaut', async () => {
+  const { default: shoppingRouter } = await import('../server/routes/shopping.js');
+  const { default: tasksRouter } = await import('../server/routes/tasks.js');
+  const { default: pushRouter } = await import('../server/routes/push.js');
+  const { buildRouter: buildWeatherRouter } = await import('../server/routes/weather.js');
+  const gApp = express();
+  gApp.use(express.json());
+  gApp.use((req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  });
+  gApp.use('/shopping', shoppingRouter);
+  gApp.use('/tasks', tasksRouter);
+  gApp.use('/push', pushRouter);
+  gApp.use('/weather', buildWeatherRouter({ fetchFn: async () => ({ ok: false, status: 404 }) }));
+  const gServer = gApp.listen(0, '127.0.0.1');
+  const gUrl = await new Promise((r) => gServer.on('listening', () => r(`http://127.0.0.1:${gServer.address().port}`)));
+  try {
+    const seen = [];
+    const call = async (method, route, body) => {
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${gUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      return { status: res.status, body: json };
+    };
+    const run = async (label, method, route, body) => {
+      const r = await call(method, route, body);
+      seen.push({ label, status: r.status, error: r.body?.error ?? null });
+    };
+    const list = await call('POST', '/shopping', { name: 'L' });
+    assert.equal(list.status, 201, 'Vorbedingung: die Liste wird angelegt');
+    const listId = list.body.data.id;
+    const item = await call('POST', `/shopping/${listId}/items`, { name: 'Milch' });
+    assert.equal(item.status, 201, 'Vorbedingung: der Artikel wird angelegt');
+    const itemId = item.body.data.id;
+    const category = item.body.data.category;
+    const top = await call('POST', '/tasks', { title: 'A' });
+    const sub = await call('POST', '/tasks', { title: 'B', parent_task_id: top.body.data.id });
+    assert.equal(sub.status, 201, 'Vorbedingung: die Unteraufgabe wird angelegt');
+    const long = 'x'.repeat(500);
+
+    await run('categories-order', 'PATCH', '/shopping/categories/reorder', { order: [] });
+    await run('item-price', 'PATCH', `/shopping/items/${itemId}`, { price_cents: -1 });
+    await run('item-store', 'PATCH', `/shopping/items/${itemId}`, { store_id: 'x' });
+    await run('item-name', 'PATCH', `/shopping/items/${itemId}`, { name: ' ' });
+    await run('item-list', 'PATCH', `/shopping/items/${itemId}`, { list_id: 'x' });
+    await run('item-notes', 'PATCH', `/shopping/items/${itemId}`, { notes: 'x'.repeat(20000) });
+    await run('reorder-empty', 'PATCH', `/shopping/${listId}/items/reorder`, { category, order: [] });
+    await run('reorder-ids', 'PATCH', `/shopping/${listId}/items/reorder`, { category, order: ['x'] });
+    await run('reorder-twice', 'PATCH', `/shopping/${listId}/items/reorder`, { category, order: [itemId, itemId] });
+    await run('reorder-category', 'PATCH', `/shopping/${listId}/items/reorder`, { order: [itemId] });
+    await run('reorder-category-unknown', 'PATCH', `/shopping/${listId}/items/reorder`, { category: 'nope', order: [itemId] });
+    await run('reorder-foreign', 'PATCH', `/shopping/${listId}/items/reorder`, { category, order: [987654] });
+    await run('add-quantity', 'POST', `/shopping/${listId}/items`, { name: 'A', quantity: long });
+    await run('add-notes', 'POST', `/shopping/${listId}/items`, { name: 'A', notes: 'x'.repeat(20000) });
+    await run('add-category', 'POST', `/shopping/${listId}/items`, { name: 'A', category: 'nope' });
+    await run('checked-ids', 'DELETE', `/shopping/${listId}/items/checked`, { ids: [] });
+    await run('checked-ids-shape', 'DELETE', `/shopping/${listId}/items/checked`, { ids: ['x'] });
+    await run('task-sync-shape', 'POST', '/tasks', { title: 'C', sync_target: 'nope' });
+    await run('task-sync-google', 'POST', '/tasks', { title: 'C', sync_target: 'google:primary' });
+    await run('task-sync-list', 'POST', '/tasks', { title: 'C', sync_target: 'caldav:1|https://dav.example/list/' });
+    await run('task-nesting', 'POST', '/tasks', { title: 'C', parent_task_id: sub.body.data.id });
+    await run('push-subscribe', 'POST', '/push/subscribe', {});
+    await run('push-unsubscribe', 'POST', '/push/unsubscribe', {});
+    await run('push-wall-mode', 'PUT', '/push/wall-mode', {});
+    await run('weather-icon-code', 'GET', '/weather/icon/!!');
+    await run('weather-icon-upstream', 'GET', '/weather/icon/01d');
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    gServer.close();
+  }
+});
+
+test('keine Absage von Essensplan, Vorrat und Rezepten traegt deutschen Wortlaut', async () => {
+  const { default: mealsRouter } = await import('../server/routes/meals.js');
+  const { default: pantryRouter } = await import('../server/routes/pantry.js');
+  const { default: recipesRouter } = await import('../server/routes/recipes.js');
+  const kApp = express();
+  kApp.use(express.json({ limit: '10mb' }));
+  kApp.use((req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  });
+  kApp.use('/meals', mealsRouter);
+  kApp.use('/pantry', pantryRouter);
+  kApp.use('/recipes', recipesRouter);
+  const kServer = kApp.listen(0, '127.0.0.1');
+  const kUrl = await new Promise((r) => kServer.on('listening', () => r(`http://127.0.0.1:${kServer.address().port}`)));
+  try {
+    const seen = [];
+    const call = async (method, route, body) => {
+      const headers = {};
+      let payload;
+      if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+      const res = await fetch(`${kUrl}${route}`, { method, headers, body: payload });
+      let json = null;
+      try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
+      return { status: res.status, body: json };
+    };
+    const run = async (label, method, route, body) => {
+      const r = await call(method, route, body);
+      seen.push({ label, status: r.status, error: r.body?.error ?? null });
+    };
+    const series = await call('POST', '/meals', { date: '2026-11-02', meal_type: 'dinner', title: 'Suppe', repeat_weekly: true });
+    assert.equal(series.status, 201, 'Vorbedingung: die Serie wird angelegt');
+    const mealId = series.body.data.id;
+    const longText = 'x'.repeat(20000);
+
+    await run('meal-date', 'POST', '/meals', { meal_type: 'dinner', title: 'A' });
+    await run('meal-type', 'POST', '/meals', { date: '2026-11-02', meal_type: 'nope', title: 'A' });
+    await run('meal-title', 'POST', '/meals', { date: '2026-11-02', meal_type: 'dinner' });
+    await run('meal-notes', 'POST', '/meals', { date: '2026-11-02', meal_type: 'dinner', title: 'A', notes: longText });
+    await run('meal-until', 'POST', '/meals', { date: '2026-11-02', meal_type: 'dinner', title: 'A', repeat_weekly: true, repeat_until: 'x' });
+    await run('plan-skip', 'POST', '/meals/apply-plan', { assignments: [], skip_occupied: 'x' });
+    await run('plan-both', 'POST', '/meals/apply-plan', { assignments: [], skip_occupied: true, replace_existing: true });
+    await run('plan-empty', 'POST', '/meals/apply-plan', { assignments: [] });
+    await run('plan-entry', 'POST', '/meals/apply-plan', { assignments: [{ date: '2026-11-02', meal_type: 'nope' }] });
+    await run('put-gone', 'PUT', '/meals/987654', { title: 'X' });
+    await run('put-type', 'PUT', `/meals/${mealId}`, { meal_type: 'nope' });
+    await run('put-until', 'PUT', `/meals/${mealId}?scope=series`, { repeat_until: '2026-10-01' });
+    await run('put-until-shape', 'PUT', `/meals/${mealId}?scope=series`, { repeat_until: 'x' });
+    await run('delete-gone', 'DELETE', '/meals/987654');
+    await run('ingredient-meal', 'POST', '/meals/987654/ingredients', { name: 'Salz' });
+    await run('ingredient-name', 'POST', `/meals/${mealId}/ingredients`, {});
+    await run('ingredient-gone', 'PATCH', '/meals/ingredients/987654', { name: 'X' });
+    await run('ingredient-delete-gone', 'DELETE', '/meals/ingredients/987654');
+    await run('to-list-meal', 'POST', '/meals/987654/to-shopping-list', { listId: 1 });
+    await run('to-list-id', 'POST', `/meals/${mealId}/to-shopping-list`, {});
+    await run('to-list-gone', 'POST', `/meals/${mealId}/to-shopping-list`, { listId: 987654 });
+    await run('week-list-id', 'POST', '/meals/week-to-shopping-list', { week: '2026-11-02' });
+    await run('week-date', 'POST', '/meals/week-to-shopping-list', { listId: 1, week: 'x' });
+    await run('week-list-gone', 'POST', '/meals/week-to-shopping-list', { listId: 987654, week: '2026-11-02' });
+    await run('pantry-quantity', 'POST', '/pantry', { name: 'Reis', quantity: -1 });
+    await run('pantry-location', 'POST', '/pantry', { name: 'Reis', location_id: 987654 });
+    await run('pantry-category', 'POST', '/pantry', { name: 'Reis', category: 'nope' });
+    await run('pantry-expires', 'POST', '/pantry', { name: 'Reis', expires_on: 'x' });
+    await run('pantry-min', 'POST', '/pantry', { name: 'Reis', min_quantity: -1 });
+    await run('pantry-notes', 'POST', '/pantry', { name: 'Reis', notes: longText });
+    await run('pantry-item-id', 'PUT', '/pantry/x', { name: 'Reis' });
+    await run('location-name', 'POST', '/pantry/locations', {});
+    await run('location-id', 'PUT', '/pantry/locations/x', { name: 'X' });
+    await run('recipe-title', 'POST', '/recipes', {});
+    await run('recipe-notes', 'POST', '/recipes', { title: 'A', notes: longText });
+
+    assertRefusedInEnglish(seen);
+  } finally {
+    kServer.close();
   }
 });

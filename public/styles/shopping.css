@@ -104,21 +104,29 @@
  * Die ~3.5:1 aus dem Absatz darüber galten vor den Familientönen (v2.1.0):
  * heute hält selbst der rohe Ton 5.04:1 hell und 4.82:1 dunkel, die
  * --tint-ink-Mischung 7.37:1 / 6.61:1. Der Ton darf deshalb wieder Tinte sein,
- * und der Zustand kommt aus der erhabenen Pille (tokens.css, Abschnitt 6c). */
+ * und der Zustand kommt aus der erhabenen Pille (tokens.css, Abschnitt 6c).
+ *
+ * SEIT R24 (E3) DIE FLAECHE DES AKTIVEN REITERS: die Listen-Kapseln sind
+ * Reiter (welche Liste), keine Ansichtswahl, und stehen direkt unter der
+ * Kuechen-Leiste - dort trug der aktive Reiter jetzt die getoente Kapsel, die
+ * Liste darunter noch den weissen Daumen mit Ring. Zwei Zustandsbilder
+ * uebereinander fuer dieselbe Frage. Jetzt dieselbe getoente Kapsel ohne Ring
+ * (sub-tabs.css, `.sub-tab--active`). */
 .list-tab--active {
-  background-color: var(--seg-active-bg);
-  box-shadow: var(--seg-active-shadow);
+  background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), transparent);
+  box-shadow: none;
   border-color: transparent;
   color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
   font-weight: var(--font-weight-semibold);
 }
 
-/* Getönte Marke auf der Surface-Pille - gleiche Rechnung wie
- * .sub-tab--active .sub-tab__badge. Die frühere Umkehr (weiß auf Vollton)
- * wäre auf der hellen Pille eine weiße Marke auf Weiß. */
+/* Neutrale Marke auf der getoenten Kapsel - gleiche Rechnung wie
+ * .sub-tab--active .sub-tab__badge (R24, E3): eine Toenung auf der Toenung
+ * naennte den Modulton zweimal blass. Die fruehere Umkehr (weiss auf Vollton)
+ * waere eine weisse Marke auf heller Flaeche. */
 .list-tab--active .list-tab__count {
-  background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-state), transparent);
-  color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
+  background-color: var(--color-fill-well);
+  color: var(--color-text-primary);
 }
 
 .list-tab__count {
@@ -400,9 +408,17 @@
  * braucht, kennt keine Zahl in diesem Blatt. Fest ist nur der Knopf. */
 .quick-add__form {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) var(--target-base);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
   gap: var(--space-2);
   align-items: stretch;
+  /* EINE HOEHE FUER FELDER UND KNOPF (R24 S14). Die Felder trugen eine
+   * Mindesthoehe UND ihr Polster obendrauf, der Knopf nur seine: am Finger
+   * 50px Name neben 48px Menge, Kategorie und "Hinzufuegen", am Zeiger 41,5
+   * neben 40. Jetzt nennt die Zeile ihre Hoehe einmal - die Zielgroesse der
+   * Geraetewelt (`--target-base`: 48 am Finger), am Zeiger die 40px der Shell
+   * (unten) -, die Felder tragen kein Polster in der Hoehe, und der Knopf
+   * nimmt dieselbe statt der seines Bausteins. */
+  --quick-add-height: var(--target-base);
 }
 
 .quick-add__input-wrap {
@@ -419,17 +435,18 @@
    * Polster der Schnellzeile. */
   font-size: var(--text-base);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  min-height: var(--target-base);
+  min-height: var(--quick-add-height);
+  padding-block: 0;
 }
 
 /* DER FOKUS IST DIE EINE STIMME (R18, 2026-10-07): die Felder der
  * Schnellzeile zogen ihren Fokus aus dem Kuechenton (Orange). Seit D5 kommt er
  * mit der Haut aus page-search.css - violett wie jede Suche. */
 
-/* Nur `min-height`, keine `height` (#1372). Die Zeile ist ein Grid mit
- * `align-items: stretch`: Namensfeld und Kategorie wachsen mit ihrem Polster
- * auf 50px, und eine feste Hoehe nahm die Menge als einziges Feld aus der
- * Dehnung - sie stand 6px niedriger daneben (44 gegen 50 bei 1280px).
+/* Nur `min-height`, keine `height` (#1372): eine feste Hoehe nahm die Menge
+ * als einziges Feld aus der Dehnung des Grids - sie stand 6px niedriger
+ * daneben (44 gegen 50 bei 1280px). Seit R24 S14 tragen alle drei Felder
+ * dieselbe Mindesthoehe ohne Polster in der Hoehe (`--quick-add-height`).
  *
  * Seitlich `--space-2` statt `--space-3`: der Inhalt steht mittig und ist kurz,
  * das gesparte Polster geht an den Platzhalter. Reicht die Breite trotzdem
@@ -443,7 +460,8 @@
   font-variant-numeric: tabular-nums;
   text-align: center;
   text-overflow: ellipsis;
-  min-height: var(--target-base);
+  min-height: var(--quick-add-height);
+  padding-block: 0;
 }
 
 
@@ -458,7 +476,8 @@
    * darunter (wie `select.input` in layout.css). */
   text-overflow: ellipsis;
   cursor: pointer;
-  min-height: var(--target-base);
+  min-height: var(--quick-add-height);
+  padding-block: 0;
   /* Das Zeichen der Auswahl wie am Feldkanon (select.form-input, layout.css). */
   -webkit-appearance: none;
   appearance: none;
@@ -482,7 +501,7 @@
      * DIE KATEGORIE BEHAELT IHR WORT (R22 S9, Critique a2): in der ersten der
      * zwei Spalten (1280) blieben ihr 116px, „Sonstig..." - die Untergrenze
      * 8.5rem traegt „Sonstiges" samt Chevron, das Namensfeld gibt dafuer nach. */
-    grid-template-columns: minmax(0, 5fr) minmax(0, 2fr) minmax(8.5rem, 3fr) var(--target-base);
+    grid-template-columns: minmax(0, 5fr) minmax(0, 2fr) minmax(8.5rem, 3fr) auto;
   }
 
   .quick-add__input-wrap {
@@ -494,29 +513,26 @@
   .quick-add__cat   { font-size: var(--text-base); }
 }
 
-.quick-add__btn {
-  width: var(--target-base);
-  height: var(--target-base);
-  border-radius: var(--radius-full);
-  /* EIN PLUS, UND ES GEHOERT DER PILLE (Re-Critique 2026-09-28, A4 P2-4).
-   * Hier stand ein gefuellter Kreis in der Stimme mit "+" - am Zeiger direkt
-   * unter der angedockten Kopf-Pille "+ Artikel", die dasselbe tut (sie
-   * fokussiert dieses Feld). Zwei violette Plus fuer eine Absicht. Der
-   * Absender ist jetzt die ruhige Return-Glyphe wie in Erinnerungen: wer
-   * tippt, drueckt Enter; der Knopf bleibt fuer Maus und Touch da. */
-  background-color: transparent;
-  color: var(--color-text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background-color var(--transition-fast);
-  min-height: var(--target-lg);
+/* AM ZEIGER IN DER HOEHE DER SHELL (R24, Critique G3-Einkauf-P3-1): drei
+ * gefuellte 50px-Kapseln (44 Mindesthoehe plus Polster) standen unter einem
+ * Kopf, dessen Felder und Knoepfe 40px messen. Die Fingergroesse bleibt dem
+ * Touch-Fall, wo das Feld per FAB aufgeht. */
+@media (hover: hover) {
+  .quick-add__form {
+    --quick-add-height: var(--target-md);
+  }
 }
 
-.quick-add__btn:hover { background-color: var(--color-surface-2); color: var(--color-text-primary); }
+/* DER ABSENDER IST EIN RUHIGER KNOPF MIT WORT (R24, Critique G3-Einkauf-P3-1).
+ * Bis R24 eine nackte Return-Glyphe im 44px-Kreis (Re-Critique 2026-09-28: das
+ * „+" gehoert der Kopf-Pille). Jetzt `btn--secondary btn--sm` mit „Hinzufuegen":
+ * kein zweites Plus, keine zweite gefuellte Stimme, und das Ziel nennt seine
+ * Handlung. Die Haut kommt vom Knopf-Baustein, die Hoehe von der Zeile. */
+.quick-add .quick-add__btn {
+  align-self: center;
+  min-height: var(--quick-add-height);
+  white-space: nowrap;
+}
 
 /* Autocomplete-Dropdown */
 .autocomplete-dropdown {
@@ -1097,13 +1113,10 @@
 }
 
 /* Klickbare Link-Vorschau im Detail-Drawer. */
-/* Die Listen-Zeile im Bearbeiten-Dialog (#1700) steht zwischen Feldgruppen,
- * die ihren Abstand selbst mitbringen (`.form-group`, --space-4 darunter). Der
- * Traeger der Formularzeile hat keinen - ohne diesen stiesse "Preis" direkt
- * an sie an. */
-.item-details-form .form-rows {
-  margin-block-end: var(--space-4);
-}
+/* Den Takt des Bearbeiten-Dialogs setzt `.form-stack` (layout.css, EIN
+ * FELDTAKT IM DIALOG): seit R24 steht dort neben Feldern, Paar und Listenzeile
+ * auch "Weitere Angaben", und mit Margen je Feld klebte dessen Kante an der
+ * Kategorie (0px gemessen). Die Marge der Listenzeile (#1700) ist damit weg. */
 
 .item-details__link-wrap:not(:empty) {
   margin-top: var(--space-2);

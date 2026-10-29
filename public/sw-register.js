@@ -95,7 +95,7 @@ if ('serviceWorker' in navigator) {
 /**
  * Weist den aktiven Service Worker an, den Read-only-Offline-API-Cache zu leeren.
  * Aufgerufen bei Logout und Session-Ende, um Daten-Leaks bei Nutzerwechsel am
- * selben Gerät zu verhindern. Defensive Guards: kein SW / kein Controller → No-Op.
+ * selben Gerät zu verhindern. Ohne Controller loescht die Seite selbst (#2293).
  */
 /**
  * Den API-Cache leeren - und WARTEN, bis er wirklich leer ist.
@@ -114,6 +114,33 @@ if ('serviceWorker' in navigator) {
  * Aufrufer entscheidet nichts anders, er wartet nur nicht laenger.
  */
 export function clearApiCache({ timeoutMs = 2000 } = {}) {
+  return Promise.all([askWorkerToClear(timeoutMs), deleteApiCachesHere()]).then(() => {});
+}
+
+// Die API-Caches des Workers, auch die der Vorversionen (sw.js API_CACHE;
+// `oikos-api-` vor der Umbenennung).
+const API_CACHE_PREFIXES = ['yuvomi-api-', 'oikos-api-'];
+
+/**
+ * DIE SEITE LOESCHT SELBST MIT (#2293). Die Nachricht allein erreicht nur einen
+ * STEUERNDEN Worker; ohne Controller (harter Reload, Worker im Wechsel) blieb
+ * der Cache samt Sitzungsabzug liegen, und am geteilten Geraet las die naechste
+ * Person offline den Stand der vorigen. CacheStorage gehoert dem Ursprung, die
+ * Seite darf es genauso leeren wie der Worker.
+ */
+async function deleteApiCachesHere() {
+  try {
+    if (typeof caches === 'undefined' || typeof caches.keys !== 'function') return;
+    const names = await caches.keys();
+    await Promise.all(names
+      .filter((name) => API_CACHE_PREFIXES.some((prefix) => name.startsWith(prefix)))
+      .map((name) => caches.delete(name)));
+  } catch (err) {
+    console.warn('[SW] API-Cache konnte nicht geleert werden:', err);
+  }
+}
+
+function askWorkerToClear(timeoutMs) {
   return new Promise((resolve) => {
     let done = false;
     const finish = () => {

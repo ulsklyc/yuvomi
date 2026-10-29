@@ -368,7 +368,11 @@ function tileEvents(count, { ended = 0 } = {}) {
   }
   return list;
 }
-const rowTitles = (html) => [...html.matchAll(/event-item__title">([^<]*)</g)].map((m) => m[1]);
+// Was ohne Streckung steht: Zusatzzeilen (U14, `data-fill-row`) zeigt erst
+// applyRowFill, wenn die Packung der Kachel die Hoehe dafuer zuteilt.
+const rowTitles = (html) => html.split('<div class="list-row event-item').slice(1)
+  .filter((row) => !/^[^>]*data-fill-row/.test(row))
+  .map((row) => /event-item__title">([^<]*)</.exec(row)?.[1]).filter((title) => title !== undefined);
 const aheadRows = (html) => rowTitles(html).filter((title) => title.startsWith('Kommt'));
 
 /** Den Dialog oeffnen, ohne DOM: der Stub faengt Inhalt und Speichern-Handler. */
@@ -441,7 +445,7 @@ for (const [limit, expected] of [[undefined, 5], [5, 5], [8, 8], [12, 12], [7, 5
 /* #2087: die Kachel folgt ihrer Groesse wie jede Liste (`listRowCap`). Vorher
  * zeigte eine 1x1-Kachel ihre Stufe - acht oder zwoelf Zeilen in einer
  * Rasterzeile, die die Nachbarn mitstreckte. */
-const aheadMore = (html) => /widget-list-more">dashboard\.eventsMoreAhead</.test(html);
+const aheadMore = (html) => /widget-list-more"[^>]*>dashboard\.eventsMoreAhead</.test(html);
 
 test('Kachel: 1x1 zeigt drei wie jede Liste, hoch die Stufe, 2x1 bleibt der Wochenstreifen (#2087)', inBrowser(THU_14_BERLIN, 'Europe/Berlin', () => {
   const data = { upcomingEvents: tileEvents(14), weekEvents: [] };
@@ -522,7 +526,7 @@ test('Kachel: 1x1 voll und mit beendeten von heute traegt nur eine Zusatzzeile (
     const html = dash.renderCalendarWidget({ upcomingEvents: tileEvents(5, { ended }) }, '1x1', {});
     assert.equal(rowTitles(html).length, 3, `${ended} beendet: drei Terminzeilen`);
     assert.equal(auxLines(html), 1, `${ended} beendet: eine Zusatzzeile wie jede 1x1-Liste`);
-    const foot = /<p class="widget-list-more">([^<]*)<\/p>/.exec(html)?.[1] ?? '';
+    const foot = /<p class="widget-list-more"[^>]*>([^<]*)<\/p>/.exec(html)?.[1] ?? '';
     assert.match(foot, new RegExp(`eventsEndedMore\\{&quot;count&quot;:${ended}\\}`), 'die Fusszeile nennt die frueheren');
     assert.match(foot, /eventsMoreAhead/, 'und dass weitere kommen');
   }
@@ -532,32 +536,39 @@ test('Kachel: 1x1 voll und mit beendeten von heute traegt nur eine Zusatzzeile (
   assert.match(rest, /event-list__earlier/);
 }));
 
-/* Die Stufe ist in den hohen Groessen die Hoehe der Kachel (#2087): 5/8/12 ->
- * 2/3/4 Rasterzeilen. Darstellung, nicht Groesse - das Markup traegt die Stufe,
- * dashboard.css die Spanne, und nur an den hohen Klassen. */
+/* Die Stufe ist in den hohen Groessen die Obergrenze der Liste (#2087), und
+ * seit U1 b (DW-P1-3) ist die Kachel so hoch wie ihre Zeilen: 5/8/12 Termine
+ * sind 5/8/12 Zeilen hoch - nicht 2/3/4 Rasterzeilen, die weniger Termine mit
+ * Leere auffuellten. Darstellung, nicht Groesse: die Klasse bleibt. */
 const wrapperOf = (html) => /<div class="widget-wrapper [^"]*"[^>]*data-widget-id="calendar"[^>]*>/.exec(html)?.[0] ?? '';
 const tileAt = (size, options) => [{ id: 'calendar', visible: true, order: 0, size, ...(options ? { options } : {}) }];
+const spurenOf = (html) => Number(/data-span-rows="(\d+)"/.exec(html)?.[1]);
 
-test('Raster: die hohe Kalenderkachel traegt ihre Stufe, die Groesse bleibt (#2087)', inBrowser(THU_14_BERLIN, 'Europe/Berlin', () => {
+test('Raster: die hohe Kalenderkachel ist so hoch wie ihre Termine, die Groesse bleibt (#2087, U1 b)', inBrowser(THU_14_BERLIN, 'Europe/Berlin', () => {
   const data = { upcomingEvents: tileEvents(14), weekEvents: [] };
   const wrap = (size, options) => wrapperOf(dash.renderDashboardLayout(tileAt(size, options), data, null, 'EUR'));
-  assert.match(wrap('1x2', { limit: 8 }), /data-list-rows="8"/);
-  assert.match(wrap('2x2', { limit: 12 }), /data-list-rows="12"/);
-  assert.doesNotMatch(wrap('1x2'), /data-list-rows/, 'fuenf ist die normale hohe Kachel');
-  assert.doesNotMatch(wrap('1x2', { limit: 500 }), /data-list-rows/, 'ein Fremdwert geht durch die Klemme');
+  const fuenf = spurenOf(wrap('1x2'));
+  const acht = spurenOf(wrap('1x2', { limit: 8 }));
+  const zwoelf = spurenOf(wrap('2x2', { limit: 12 }));
+  assert.ok(fuenf > 0 && acht > fuenf && zwoelf > acht, `mehr Termine, hoehere Kachel: ${fuenf} / ${acht} / ${zwoelf}`);
+  // Drei Zeilen mehr sind drei Zeilenhoehen mehr - nicht eine ganze Rasterzeile.
+  const g = widgets.TILE_GEOMETRY;
+  assert.ok(Math.abs((acht - fuenf) * g.unit - 3 * g.row) < g.unit, `8 statt 5: drei Zeilen mehr (${(acht - fuenf) * g.unit}px)`);
+  assert.equal(spurenOf(wrap('1x2', { limit: 500 })), fuenf, 'ein Fremdwert geht durch die Klemme');
   for (const options of [{ limit: 8 }, { limit: 12 }]) {
     assert.match(wrap('1x2', options), /widget-size--1x2/, 'die gespeicherte Groesse bleibt die Klasse');
   }
-  const other = wrapperOf(dash.renderDashboardLayout(
-    [{ id: 'birthdays', visible: true, order: 0, size: '1x2', options: { limit: 12 } }], { birthdays: [] }, null, 'EUR',
-  ).replace('data-widget-id="birthdays"', 'data-widget-id="calendar"'));
-  assert.doesNotMatch(other, /data-list-rows/, 'nur der Kalender kennt die Stufe');
+  assert.doesNotMatch(wrap('1x2', { limit: 8 }), /data-list-rows/, 'die eigene Stufe-Spanne ist mit U1 b gegangen');
+  // Weniger Termine als die Stufe: die Kachel ist kuerzer, nicht leerer.
+  const wenige = spurenOf(wrapperOf(dash.renderDashboardLayout(tileAt('1x2', { limit: 12 }), { upcomingEvents: tileEvents(2), weekEvents: [] }, null, 'EUR')));
+  assert.ok(wenige < fuenf, `zwei Termine bei Stufe 12 sind zwei Zeilen hoch (${wenige} < ${fuenf})`);
 }));
 
-/* Codex-Review zu PR #2117: das Skelett sagt das Raster voraus, das gleich
- * kommt. Kannte der Layout-Hinweis nur die Groesse, stand die hohe
- * Kalenderkachel mit zwoelf Terminen im Skelett zwei Zeilen hoch und wuchs beim
- * Laden auf vier - die Nachbarn sprangen. */
+/* Codex-Review zu PR #2117, neu gefasst mit U1 b: das Skelett sagt das Raster
+ * voraus, das gleich kommt - auch die Hoehen. Kannte der Layout-Hinweis nur die
+ * Groesse, stand die Kalenderkachel mit zwoelf Terminen im Skelett zu kurz und
+ * wuchs beim Laden - die Nachbarn sprangen. Jetzt merkt er sich die Spuren,
+ * die jede Kachel zuletzt belegt hat. */
 const hintLayouts = await import('../public/utils/dashboard-layout-hint.js');
 function withStorage(fn) {
   const store = new Map();
@@ -573,50 +584,39 @@ function withStorage(fn) {
     globalThis.localStorage = prev;
   }
 }
-const skeletonCalendar = (html) => [...html.matchAll(/<div class="widget-wrapper (widget-size--[0-9x]+)"([^>]*)>/g)].map((m) => `${m[1]}${m[2]}`);
+const skeletonTiles = (html) => [...html.matchAll(/<div class="widget-wrapper (widget-size--[0-9x]+)"([^>]*)>/g)].map((m) => `${m[1]}${m[2]}`);
 
-test('Skelett: die hohe Kalenderkachel steht schon mit ihren Rasterzeilen da (Review #2117)', inBrowser(THU_14_BERLIN, 'Europe/Berlin', () => withStorage((store) => {
+test('Skelett: jede Kachel steht schon in ihrer gezeichneten Hoehe da (Review #2117, U1 b)', inBrowser(THU_14_BERLIN, 'Europe/Berlin', () => withStorage((store) => {
   const cfg = [
     { id: 'calendar', visible: true, order: 0, size: '1x2', options: { limit: 12 } },
     { id: 'tasks', visible: true, order: 1, size: '1x1' },
     { id: 'notes', visible: false, order: 2, size: '1x2' },
   ];
-  hintLayouts.rememberLayoutHint(cfg, '/dashboard?events_limit=12', dash.calendarListRowsOf);
-  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--1x2 data-list-rows="12"', 'widget-size--1x1']);
-  hintLayouts.rememberLayoutHint([{ ...cfg[0], options: { limit: 8 } }], null, dash.calendarListRowsOf);
-  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--1x2 data-list-rows="8"']);
-  hintLayouts.rememberLayoutHint([{ ...cfg[0], options: {} }], null, dash.calendarListRowsOf);
-  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--1x2'], 'fuenf ist die normale hohe Kachel');
+  const spans = { calendar: 182, tasks: 66 };
+  hintLayouts.rememberLayoutHint(cfg, '/dashboard?events_limit=12', (w) => spans[w.id] ?? null);
+  assert.deepEqual(skeletonTiles(dash.renderDashboardSkeleton()), ['widget-size--1x2 style="--tile-rows: 182"', 'widget-size--1x1 style="--tile-rows: 66"']);
+  // Der Aufbau merkt sich, was er gezeichnet hat (drawnSpanOf in rememberGridHint).
+  const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
+  assert.match(src, /rememberLayoutHint\(drawn, dashboardQuery\(cfg\), drawnSpanOf\)/);
 
-  // Alte Eintraege (vor #2087, auch die Array-Form) sagen weiter die Groessen voraus.
-  store.set('yuvomi-dash-layout-hint', JSON.stringify({ sizes: ['1x2', '2x1'], query: '/dashboard' }));
-  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--1x2', 'widget-size--2x1']);
+  // Alte Eintraege (vor U1 b, auch die Array-Form und die Listenstufe aus #2087)
+  // sagen weiter die Groessen voraus - die Hoehe kommt dann aus der Groesse.
+  store.set('yuvomi-dash-layout-hint', JSON.stringify({ sizes: ['1x2', '2x1'], query: '/dashboard', listRows: [12, 0] }));
+  assert.deepEqual(skeletonTiles(dash.renderDashboardSkeleton()), ['widget-size--1x2', 'widget-size--2x1']);
   store.set('yuvomi-dash-layout-hint', JSON.stringify(['2x2']));
-  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--2x2']);
-  // Der Eintrag ist von der Seite aus beschreibbar: nur eine Stufe wird zum Attribut.
-  store.set('yuvomi-dash-layout-hint', JSON.stringify({ sizes: ['1x2', '1x2', '1x2'], listRows: ['"><b>', 7, 500] }));
-  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--1x2', 'widget-size--1x2', 'widget-size--1x2']);
-  store.set('yuvomi-dash-layout-hint', JSON.stringify({ sizes: ['1x2'], listRows: [12, 8] }));
-  assert.deepEqual(skeletonCalendar(dash.renderDashboardSkeleton()), ['widget-size--1x2'], 'Listenzeilen nur passend zu den Groessen');
+  assert.deepEqual(skeletonTiles(dash.renderDashboardSkeleton()), ['widget-size--2x2']);
+  // Der Eintrag ist von der Seite aus beschreibbar: nur eine ganze Zahl in Grenzen wird zum Stil.
+  store.set('yuvomi-dash-layout-hint', JSON.stringify({ sizes: ['1x2', '1x2', '1x2', '1x2'], spans: ['"><b>', 7.5, 5000, 40] }));
+  assert.deepEqual(skeletonTiles(dash.renderDashboardSkeleton()), ['widget-size--1x2', 'widget-size--1x2', 'widget-size--1x2', 'widget-size--1x2 style="--tile-rows: 40"']);
+  store.set('yuvomi-dash-layout-hint', JSON.stringify({ sizes: ['1x2'], spans: [12, 8] }));
+  assert.deepEqual(skeletonTiles(dash.renderDashboardSkeleton()), ['widget-size--1x2'], 'Hoehen nur passend zu den Groessen');
 })));
 
-test('Raster: dashboard.css macht aus 8 drei und aus 12 vier Rasterzeilen, nur hoch und nur ab 1024px', () => {
+test('Raster: dashboard.css kennt keine Stufen-Spannen mehr - die Hoehe kommt aus --tile-rows (U1 b)', () => {
   const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
-  const start = css.indexOf('@media (min-width: 1024px) {\n  .dashboard__grid {');
-  assert.ok(start >= 0, 'der Raster-Block ab 1024px');
-  // Der Block endet am ersten Zeilenanfang mit „}" - die Regeln darin sind eingerueckt.
-  const block = css.slice(start, css.indexOf('\n}', start));
-  const spanOf = (selector) => {
-    const at = block.indexOf(selector);
-    if (at < 0) return null;
-    return Number(/grid-row:\s*span\s+(\d+)/.exec(block.slice(at, block.indexOf('}', at)))?.[1]);
-  };
-  for (const size of ['1x2', '2x2']) {
-    assert.equal(spanOf(`.widget-size--${size}[data-list-rows="8"]`), 3, `${size} mit 8`);
-    assert.equal(spanOf(`.widget-size--${size}[data-list-rows="12"]`), 4, `${size} mit 12`);
-  }
-  assert.doesNotMatch(css, /\.widget-size--(1x1|2x1)\[data-list-rows/, 'an 1x1 und 2x1 setzt die Stufe keine Spanne');
-  assert.equal((css.match(/\[data-list-rows=/g) ?? []).length, 4, 'keine weitere Regel ausserhalb des Blocks');
+  assert.doesNotMatch(css.replace(/\/\*[\s\S]*?\*\//g, ''), /\[data-list-rows=/, 'keine Regel liest mehr die Listenstufe');
+  assert.match(css, /grid-row-end:\s*span calc\(var\(--tile-rows, var\(--tile-size-rows\)\) \+ var\(--tile-gap-rows\)\)/,
+    'die Spanne jeder Kachel kommt aus ihren Daten');
 });
 
 test('Kachel: weniger Termine als die Stufe - keine Luecke, kein Badge, Leerzustand bleibt', inBrowser(THU_14_BERLIN, 'Europe/Berlin', () => {
@@ -672,7 +672,12 @@ test('Wand: vier Zeilen, mit und ohne Telefon-Buehne dieselbe Flaeche (#2087)', 
     narrow = dash.renderWallSurface(data, null, { now: new Date() });
   }, { phone: true })();
   assert.match(wide, /wall__program/, 'Reichweite: die Wand ist gebaut');
-  assert.equal((wide.match(/Aufgabe \d/g) ?? []).length, dash.WALL_ROW_CAP, 'die Wand zeigt vier Zeilen, nicht drei und nicht fuenf');
+  // Seit R24 fuehrt auf der Wand die Leiste wie im Cockpit (wallTimelineOptions):
+  // die vier Zeilen sind die ersten Termine des Tages, die Aufgaben stehen
+  // dahinter in „+N weitere".
+  const rows = [...wide.matchAll(/<li class="wall-row wall-row--(\w+)"[\s\S]*?wall-row__title">([^<]*)</g)]
+    .filter(([, tone]) => tone !== 'shopping' && tone !== 'state').map(([, , title]) => title);
+  assert.deepEqual(rows, ['Heute 08', 'Heute 09', 'Heute 10', 'Heute 11'], 'die Wand zeigt vier Zeilen, nicht drei und nicht fuenf');
   assert.equal(narrow, wide, 'die Telefon-Buehne aendert an der Wand nichts');
 });
 

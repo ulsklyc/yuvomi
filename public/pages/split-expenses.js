@@ -4,9 +4,9 @@
  */
 
 import { api } from '/api.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, reportFieldError, reportFieldErrors, constraintErrors, refocusAfterRender, whenModalClosed, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, askOverModal, reportFieldError, reportFieldErrors, constraintErrors, refocusAfterRender, whenModalClosed, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen, advancedSection } from '/components/modal.js';
 import { renderDocumentAttachField, bindDocumentAttachField, attachmentLinksNode } from '/components/document-attach.js';
-import { openDetailView } from '/components/detail-view.js';
+import { openDetailView, closeDetailView, withPrimaryEdit } from '/components/detail-view.js';
 import { t, getLocale, getNumberFormat, dateInputPlaceholder, parseDateInput, isDateInputValid } from '/i18n.js';
 import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
@@ -30,7 +30,12 @@ import { findPageFab } from '/utils/fab.js';
 import { emptyStateHTML, searchEmptyHTML } from '/utils/empty-state.js';
 import { metricGlanceHtml, wireMetricGlance, metricGlanceSkeletonHtml, metricCardsSkeletonHtml } from '/utils/metric-glance.js';
 import { isNavModuleReadOnly } from '/permissions.js';
-import { CATEGORY_SERIES_COLORS } from '/utils/budget-category-colors.js';
+import { categoryPaint } from '/utils/budget-category-colors.js';
+import { budgetCategoryLabel } from '/utils/category-labels.js';
+import { amountFieldHtml } from '/utils/amount-field.js';
+import { filterButtonHtml, syncFilterButton, openFilterSheet, filterChipHtml } from '/utils/filter-sheet.js';
+import { initials } from '/utils/initials.js';
+import { safeHexColor, getReadableTextColor } from '/utils/color.js';
 
 let state = {
   meta: null,
@@ -62,7 +67,12 @@ let state = {
   activityGroupId: null,
   activityLoadingMore: false,
   query: '',
+  // Der Kategoriefilter (R24, E12): ein Schluessel der Budget-Kategorien,
+  // 'none' fuer "ohne Kategorie", '' fuer alle.
   category: '',
+  // Die Ausgaben-Kategorien des Budgets ({ key, name }), aus /budget/meta.
+  // Die Aufteilung fuehrt seit R24 dieselben (Migration 271).
+  budgetCategories: [],
   // Statusfilter der Gruppenliste (#574): 'archived' zeigt das Archiv
   // schreibgeschützt, inklusive Weg zurück über restoreGroup().
   groupStatus: 'active',
@@ -307,7 +317,12 @@ async function loadInitial() {
     api.get('/split-expenses/groups'),
   ];
   if (!isSplitGuest()) calls.push(api.get('/family/members'));
+  // Die Kategorien des Budgets (R24, E12). Ein Gast ohne Budget-Recht bekommt
+  // sie nicht - dann tragen die Ausgaben ihren Schluessel als Namen, gerechnet
+  // wird trotzdem, und das Laden der Seite scheitert nicht daran.
+  const budgetMeta = api.get('/budget/meta').catch(() => null);
   const [meta, dashboard, groups, members] = await Promise.all(calls);
+  state.budgetCategories = (await budgetMeta)?.data?.expenseCategories ?? [];
   state.meta = meta.data;
   state.dashboard = dashboard.data;
   state.groups = groups.data || [];
@@ -398,7 +413,7 @@ const EXPENSE_MAX_PAGE = 100;
 
 function expensesPath(groupId, category, limit, cursor = null) {
   const params = new URLSearchParams({ limit: String(limit) });
-  if (category) params.set('category', category);
+  if (category) params.set('budget_category', category);
   if (cursor) {
     params.set('before_date', cursor.before_date);
     params.set('before_at', cursor.before_at);
@@ -721,6 +736,24 @@ function renderGroupsTotal() {
     ${parts.length ? parts.join('\n    ') : `<span class="split-groups-total__part">${t('splitExpenses.balanced')}</span>`}`);
 }
 
+/**
+ * EINE SALDO-AUSSAGE, MIT NAMEN (R22 D9, Critique R24 G4-Aufteilung-P2-6).
+ * Mobil stand "Du schuldest" dreimal untereinander: die Kennzahl "Du schuldest
+ * 24,14 €", darunter die Salden-Zeile "Du schuldest Alex Johnson 24,14 €".
+ * Steht in der Gruppe genau EINE Schuld und betrifft sie mich, ist sie die
+ * Kennzahl - mit dem Namen des Gegenuebers -, und die Salden-Liste laesst sie
+ * weg. Erst ab zwei Gegenuebern (oder bei einer Schuld zwischen anderen)
+ * fuehrt die Liste. Im Archiv-Leerzustand und ohne Gruppe nie.
+ */
+function foldedDebt() {
+  if (!state.activeGroupId || isGroupSearchMiss()) return null;
+  const debts = state.balances?.simplified_debts || [];
+  if (debts.length !== 1) return null;
+  const me = Number(state.user?.id);
+  const [debt] = debts;
+  return Number(debt.from_user_id) === me || Number(debt.to_user_id) === me ? debt : null;
+}
+
 function renderSummary() {
   const summary = _container.querySelector('#split-summary');
   // DIE KURZZEILE GEHOERT DER GEWAEHLTEN GRUPPE (Entscheidung R17, E5). Bis R17
@@ -757,7 +790,14 @@ function renderSummary() {
    * Richtung, die nicht null ist; ohne Saldo "Ausgeglichen". Nur wer in einer
    * Gruppe in zwei Waehrungen in beide Richtungen steht, sieht beide. */
   const both = owed.length > 0 && owing.length > 0;
-  const lead = owing.length && !owed.length
+  const folded = both ? null : foldedDebt();
+  const lead = folded
+    ? {
+      text: debtSentence(folded),
+      value: money(folded.amount, folded.currency),
+      tone: Number(folded.to_user_id) === Number(state.user?.id) ? 'positive' : 'neutral',
+    }
+    : owing.length && !owed.length
     ? { label: 'splitExpenses.youOwe', scoped: 'splitExpenses.youOweInGroup', value: owingText, tone: 'neutral' }
     : owed.length
       ? { label: 'splitExpenses.youAreOwed', scoped: 'splitExpenses.youAreOwedInGroup', value: owedText, tone: 'positive' }
@@ -769,7 +809,7 @@ function renderSummary() {
     // darunter wiederholte nur dieselbe Zahl mit dem Gruppennamen.
     setHtml(glance, metricGlanceHtml({
       ...(both ? { id: 'split-glance-more', controls: 'split-summary', expanded } : {}),
-      label: t(lead.label),
+      label: lead.text ?? t(lead.label),
       value: lead.value,
       tone: lead.tone,
       // Eine offene Schuld in der Gruppe ist Alltag, kein Alarm (Critique R21,
@@ -788,7 +828,7 @@ function renderSummary() {
   setHtml(summary, both
     ? card(inGroup('splitExpenses.youAreOwed', 'splitExpenses.youAreOwedInGroup'), owedText, 'positive')
       + card(inGroup('splitExpenses.youOwe', 'splitExpenses.youOweInGroup'), owingText, 'neutral')
-    : card(inGroup(lead.label, lead.scoped), lead.value, lead.tone));
+    : card(lead.text ?? inGroup(lead.label, lead.scoped), lead.value, lead.tone));
 }
 
 /**
@@ -1004,6 +1044,18 @@ function drawMain(main) {
         * Budget > Aufteilung > Gruppe > Abschnitt; die Rolle kommt von der
         * Klasse. Ein leerer Abschnitt traegt keine Flaeche. */ ''}
     <div class="split-content-grid">
+      ${/* DER ABSCHNITT "SALDEN" ENTFAELLT, WENN DIE EINZIGE SCHULD IN DER
+          * KENNZAHL STEHT (Ulas 29.10., S10-F6). Uebrig blieb sonst ein Titel
+          * ueber nichts. Die Handlung an der Schuld ("Ausgleichen", mobil dazu
+          * der zweite Ausloeser der Gruppenwerkzeuge) bleibt - als Werkzeugzeile
+          * ohne Titel direkt unter der Kennzahl; der Name des Bereichs steht fuer
+          * Screenreader am Abschnitt. Ohne Handlung (Nur-lesen, Archiv) faellt
+          * der Abschnitt ganz weg. */ ''}
+      ${foldedDebt() ? (balanceActions ? `
+      <section class="split-section split-section--balances split-section--folded" aria-label="${esc(t('splitExpenses.balances'))}">
+        <div class="split-section-head">${balanceActions}
+        </div>
+      </section>` : '') : `
       <section class="split-section split-section--balances">
         <div class="split-section-head">
           <div class="split-section-head__lead">
@@ -1012,7 +1064,7 @@ function drawMain(main) {
           </div>${balanceActions}
         </div>
         <div id="split-balances">${renderBalances()}</div>
-      </section>
+      </section>`}
       <section class="split-section split-section--expenses">
         <div class="split-section-head">
           <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.recentExpenses')}</${SectionTag}>
@@ -1046,7 +1098,7 @@ function drawMain(main) {
   const settleButton = main.querySelector('#split-settle');
   // Gefiltert kann die Liste leer sein, obwohl die Gruppe Ausgaben hat.
   if (settleButton) settleButton.disabled = state.expenses.length === 0 && !state.category;
-  main.querySelector('#split-category-filter')?.addEventListener('change', (e) => setCategoryFilter(e.target.value));
+  main.querySelector('#split-category-filter')?.addEventListener('click', (e) => openCategoryFilter(e.currentTarget));
   main.querySelector('#split-invite')?.addEventListener('click', () => openMemberModal());
   main.querySelector('.split-activity')?.addEventListener('click', onActivityClick);
   main.querySelector('#split-expense-list')?.addEventListener('click', onExpenseListClick);
@@ -1068,8 +1120,7 @@ function onExpenseListClick(e) {
   if (!btn) return undefined;
   const expense = state.expenses.find((item) => item.id === Number(btn.dataset.expenseView ?? btn.dataset.expenseId));
   if (!expense) return undefined;
-  if (btn.dataset.expenseView) openExpenseReadView(expense);
-  else openExpenseModal(expense);
+  openExpenseReadView(expense, { editable: !btn.dataset.expenseView && !readOnly() && !isArchivedView() });
   return undefined;
 }
 
@@ -1135,57 +1186,109 @@ export function debtSentence(debt, userId = state.user?.id) {
   return t('splitExpenses.debtOwes', { from: debt.from_name, to: debt.to_name });
 }
 
-/** Der Name einer Kategorie in der Sprache der Oberflaeche (die zwoelf aus `/meta`). */
-function categoryLabel(category) {
-  return t(`splitExpenses.category.${category || 'general'}`);
+/**
+ * DIE KATEGORIE IST EINE BUDGET-KATEGORIE (R24, E12; Critique
+ * G4-Aufteilung-P2-6). Bis R24 fuehrte die Aufteilung zwoelf eigene Schluessel
+ * mit Icon-Mulden neben den Budget-Kategorien mit Farbpunkt - wer im selben
+ * Modul vom Eintrag zur Ausgabe wechselte, las zwei Codierungen fuer dieselbe
+ * Frage. Jetzt derselbe Katalog (budget_categories, Typ Ausgabe), derselbe Name
+ * (budgetCategoryLabel) und derselbe Punkt in der Farbe der Katalogstelle
+ * (categoryPaint, budget-category-colors.js) wie im Journal. `null` ist "ohne
+ * Kategorie".
+ */
+function categoryLabel(key) {
+  if (!key || key === 'none') return t('splitExpenses.noCategory');
+  const known = state.budgetCategories.find((c) => c.key === key);
+  return budgetCategoryLabel(key, known?.name ?? key, t);
 }
 
-/** Die Wahl der Kategorie in den Dialogen: die zwoelf der Route, vorbelegt mit `selected`. */
-function categoryOptions(selected = 'general') {
-  return (state.meta?.categories || [])
-    .map((c) => `<option value="${esc(c)}"${c === selected ? ' selected' : ''}>${esc(categoryLabel(c))}</option>`)
-    .join('');
+/** Der Punkt einer Kategorie: Farbe (und Zweitkanal) wie im Budget-Journal, ohne Kategorie neutral. */
+function categoryDotHtml(key) {
+  const { color, texture } = key
+    ? categoryPaint(null, key, state.budgetCategories.map((c) => c.key))
+    : { color: null, texture: null };
+  const paint = color ? ` style="--entry-color:${color}"${texture ? ` data-texture="${texture}"` : ''}` : '';
+  return `<span class="budget-entry__indicator budget-entry__indicator--expenses split-expense__dot" aria-hidden="true"${paint}></span>`;
+}
+
+/** Die Wahl der Kategorie in den Dialogen: "Ohne Kategorie" und die Ausgaben-Kategorien des Budgets. */
+function categoryOptions(selected = null) {
+  const value = selected || '';
+  const list = state.budgetCategories.map((c) => c.key);
+  const keys = value && !list.includes(value) ? [...list, value] : list;
+  return `<option value=""${value ? '' : ' selected'}>${esc(t('splitExpenses.noCategory'))}</option>`
+    + keys.map((key) => `<option value="${esc(key)}"${key === value ? ' selected' : ''}>${esc(categoryLabel(key))}</option>`).join('');
 }
 
 /**
- * Die Kategorien, die in der Gruppe vorkommen (#1941), in der Reihenfolge der
- * Route. Quelle sind die Summen des Servers, nicht die geladene Seite der
- * Liste - eine Kategorie weiter unten fehlte sonst im Filter.
+ * Die Kategorien, die in der Gruppe vorkommen (#1941), groesste Summe zuerst;
+ * 'none' fuer Ausgaben ohne. Quelle sind die Summen des Servers, nicht die
+ * geladene Seite der Liste - eine Kategorie weiter unten fehlte sonst im Filter.
  */
 function groupCategories() {
-  const present = new Set((state.balances?.category_totals || []).map((row) => row.category));
-  return (state.meta?.categories || []).filter((c) => present.has(c));
+  const keys = (state.balances?.budget_category_totals || []).map((row) => row.budget_category || 'none');
+  return [...new Set(keys)];
 }
 
 /**
- * DER FILTER IST EINE AUSWAHL NEBEN DEM LISTENTITEL (#1941): eine Zeile, ruhig,
- * zwoelf Eintraege ohne Umbruch - eine Chipreihe braeche mobil auf drei Zeilen.
- * Angeboten wird, was in der Gruppe vorkommt, dazu "Alle Kategorien". Mit nur
- * einer Kategorie gibt es nichts zu filtern, und die Wahl entfaellt - ausser
- * ein Filter steht schon: der bleibt waehlbar, damit er sich zuruecknehmen
- * laesst. Lesen ist keine Handlung: die Wahl steht bei jedem Recht und im Archiv.
+ * DER KATEGORIEFILTER IST EIN FILTERKNOPF IM ABSCHNITTSKOPF (Critique R24
+ * G4-Aufteilung-P2-6). Hier stand ein natives `<select>` "Alle Kategorien"
+ * neben dem Titel - die einzige Auswahlliste als Filter im Modul, waehrend Abos
+ * und Transaktionen den Knopf mit Zaehler fuehren. Jetzt derselbe Knopf
+ * (filterButtonHtml), dahinter die Kategorien als Chips im Filterblatt bzw. am
+ * Desktop als Popover. Angeboten wird, was in der Gruppe vorkommt; mit nur
+ * einer Kategorie gibt es nichts zu filtern, und der Knopf entfaellt - ausser
+ * ein Filter steht schon. Lesen ist keine Handlung: der Knopf steht bei jedem
+ * Recht und im Archiv.
  */
 function renderCategoryFilter() {
   const present = groupCategories();
   const active = state.category || '';
   if (present.length < 2 && !active) return '';
+  return filterButtonHtml({ id: 'split-category-filter', count: active ? 1 : 0, className: 'split-category-filter' });
+}
+
+function openCategoryFilter(button) {
+  const present = groupCategories();
+  const active = state.category || '';
   const offered = active && !present.includes(active) ? [...present, active] : present;
-  return `<select class="form-input split-category-filter" id="split-category-filter" aria-label="${esc(t('splitExpenses.categoryFilter'))}">
-    <option value=""${active ? '' : ' selected'}>${esc(t('splitExpenses.allCategories'))}</option>
-    ${offered.map((c) => `<option value="${esc(c)}"${c === active ? ' selected' : ''}>${esc(categoryLabel(c))}</option>`).join('')}
-  </select>`;
+  const chips = [
+    filterChipHtml({ filter: 'split-category', value: '', label: t('splitExpenses.allCategories'), active: !active }),
+    ...offered.map((key) => filterChipHtml({ filter: 'split-category', value: key, label: categoryLabel(key), active: key === active })),
+  ].join('');
+  const panel = openFilterSheet({
+    groups: [{ heading: t('splitExpenses.categoryLabel'), html: `<div class="filter-panel__chips" role="group" aria-label="${esc(t('splitExpenses.categoryFilter'))}">${chips}</div>` }],
+    anchor: () => _container?.querySelector('#split-category-filter'),
+    onReset: () => setCategoryFilter(''),
+  });
+  panel?.addEventListener('click', async (e) => {
+    const chip = e.target.closest('.filter-chip[data-filter="split-category"]');
+    if (!chip) return;
+    const value = chip.dataset.value || '';
+    panel.querySelectorAll('.filter-chip[data-filter="split-category"]').forEach((el) => {
+      const on = el === chip;
+      el.classList.toggle('filter-chip--active', on);
+      el.setAttribute('aria-pressed', String(on));
+    });
+    await setCategoryFilter(value);
+  });
+  return panel;
 }
 
 /**
  * Setzt den Kategoriefilter und laedt die Liste dazu vom Server - gefiltert
  * wird dort, das Ergebnis ist also vollstaendig, wie weit die Liste auch
- * geladen war. Neu gezeichnet wird nur die Liste: die Auswahl behaelt ihren
- * Fokus.
+ * geladen war. Neu gezeichnet werden die Liste und der Zaehler am Knopf; der
+ * Knopf selbst bleibt (Fokus, offenes Popover).
  */
 async function setCategoryFilter(category) {
-  state.category = (state.meta?.categories || []).includes(category) ? category : '';
+  const known = category === 'none' || state.budgetCategories.some((c) => c.key === category)
+    || groupCategories().includes(category);
+  state.category = category && known ? category : '';
   await loadGroupData();
   renderExpenseBox();
+  const button = _container?.querySelector('#split-category-filter');
+  if (button) syncFilterButton(button, state.category ? 1 : 0);
 }
 
 /**
@@ -1208,14 +1311,14 @@ function renderMemberTotals() {
     </div>`).join('')}</div>`;
 }
 
-/** Wohin das Geld ging (#1941): je Kategorie und Waehrung die Summe, die groesste zuerst. */
+/** Wohin das Geld ging (#1941): je Budget-Kategorie und Waehrung die Summe, die groesste zuerst (R24, E12). */
 function renderCategoryTotals() {
-  const rows = state.balances?.category_totals || [];
+  const rows = state.balances?.budget_category_totals || [];
   if (!rows.length) return '';
   return `<div class="row-carrier">${rows.map((row) => `
     <div class="split-expense split-total">
-      <div class="split-expense__icon budget-tile"${categoryTone(row.category)}><i data-lucide="${categoryIcon(row.category)}" aria-hidden="true"></i></div>
-      <div class="split-expense__body"><strong>${esc(categoryLabel(row.category))}</strong></div>
+      ${categoryDotHtml(row.budget_category)}
+      <div class="split-expense__body"><strong>${esc(categoryLabel(row.budget_category))}</strong></div>
       <div class="split-expense__amount">${esc(money(row.total, row.currency))}</div>
     </div>`).join('')}</div>`;
 }
@@ -1252,6 +1355,9 @@ function renderTotalsSections(SectionTag) {
 
 function renderBalances() {
   const debts = state.balances.simplified_debts || [];
+  // Die eine eigene Schuld steht schon als Kennzahl (foldedDebt): hier nicht
+  // ein zweites Mal.
+  if (foldedDebt()) return '';
   if (!debts.length) return `<div class="split-muted">${t('splitExpenses.noBalances')}</div>`;
   return `<div class="row-carrier">${debts.map((debt) => `
     <div class="split-debt">
@@ -1282,11 +1388,12 @@ function renderExpenses(asList = false) {
     const receiptMark = receiptCount
       ? ` <span class="split-expense__receipt" role="img" aria-label="${esc(t('splitExpenses.receiptsAttachedLabel', { count: receiptCount }))}"><i data-lucide="paperclip" aria-hidden="true"></i></span>`
       : '';
+    const categoryMeta = expense.budget_category ? ` · ${esc(categoryLabel(expense.budget_category))}` : '';
     const body = `
-      <div class="split-expense__icon budget-tile"${categoryTone(expense.category)}><i data-lucide="${categoryIcon(expense.category)}" aria-hidden="true"></i></div>
+      ${categoryDotHtml(expense.budget_category)}
       <div class="split-expense__body">
         <strong>${esc(expense.title)}</strong>
-        <span>${t('splitExpenses.paidBy')}: ${esc(expense.payer_name || '')} · ${dateText(expense.expense_date)}${receiptMark}</span>
+        <span>${t('splitExpenses.paidBy')}: ${esc(expense.payer_name || '')} · ${dateText(expense.expense_date)}${categoryMeta}${receiptMark}</span>
       </div>
       <div class="split-expense__amount">${money(expense.amount, expense.currency)}</div>
     `;
@@ -1308,7 +1415,6 @@ function renderExpenses(asList = false) {
            nennt danach, was der Tipp tut. */ ''}
       <button type="button" class="split-expense" data-expense-id="${expense.id}" data-row-key="expense-${expense.id}">
         ${body}
-        <span class="sr-only"> - ${esc(t('splitExpenses.editExpense'))}</span>
       </button>
     `;
   }).join('')}</div>${more}`;
@@ -1373,13 +1479,19 @@ function renderRecurring(asList = false) {
     const reason = recurring.blocked_reason
       ? `<span class="split-recurring__reason">${esc(t(`splitExpenses.recurring.reason.${recurring.blocked_reason}`))}</span>`
       : '';
+    // Unerwartet gescheitert (#1746): die Serie laeuft weiter, der Lauf
+    // versucht sie stuendlich - gesagt wird es hier, nicht nur im Serverlog.
+    const failing = recurringIsFailing(recurring)
+      ? `<span class="split-recurring__reason">${esc(t('splitExpenses.recurring.failing'))}</span>`
+      : '';
     const body = `
-      <div class="split-expense__icon budget-tile"${categoryTone(recurring.category)}><i data-lucide="${categoryIcon(recurring.category)}" aria-hidden="true"></i></div>
+      ${categoryDotHtml(recurring.budget_category)}
       <div class="split-expense__body">
         <strong>${esc(recurring.title)}</strong>
         <span>${esc(frequencyLabel(recurring.frequency))}</span>
         ${when}
         ${reason}
+        ${failing}
       </div>
       <div class="split-expense__amount">${money(recurring.amount, recurring.currency)}</div>
     `;
@@ -1763,29 +1875,6 @@ async function reverseSettlement(settlementId) {
  * "Allgemein" (und was unbekannt ist) bleibt neutral - der Rest der Liste
  * sagt es ueber das Zeichen.
  */
-const CATEGORY_TONE_ORDER = ['groceries', 'rent', 'utilities', 'baby', 'pets', 'school', 'travel', 'shopping', 'subscriptions', 'health', 'home'];
-function categoryTone(category) {
-  const i = CATEGORY_TONE_ORDER.indexOf(category);
-  return i < 0 ? '' : ` style="--tile-color:${CATEGORY_SERIES_COLORS[i % CATEGORY_SERIES_COLORS.length]}"`;
-}
-
-function categoryIcon(category) {
-  return {
-    groceries: 'shopping-basket',
-    rent: 'home',
-    utilities: 'plug-zap',
-    baby: 'baby',
-    pets: 'paw-print',
-    school: 'graduation-cap',
-    travel: 'plane',
-    shopping: 'shopping-bag',
-    subscriptions: 'badge-dollar-sign',
-    health: 'heart-pulse',
-    home: 'sofa',
-    general: 'receipt',
-  }[category] || 'receipt';
-}
-
 async function archiveGroup(groupId) {
   if (readOnly()) return;
   const confirmed = await confirmModal(t('splitExpenses.archiveGroupConfirm'), {
@@ -1854,23 +1943,47 @@ function memberCandidateOptions(candidates = []) {
     }).join('');
 }
 
+/**
+ * DIE BETEILIGTEN ALS PERSONEN-CHIPS (Critique R24 G4-Budget-P1-1, Sam).
+ * Hier standen native 13px-Kaestchen in einem rohen `<fieldset>` - waehrend
+ * Budget, Kalender und Mahlzeiten Personen mit Scheibe und Namen waehlen
+ * (renderUserMultiSelect). Jetzt dieselbe Form (`.user-ms__option`: Scheibe,
+ * Vorname, eine Trefferflaeche je Person, Haken im Chip); daneben steht je
+ * Person der Wert der Aufteilung, solange die Art einen braucht. Gleich
+ * verteilt bleiben die Chips eine umbrechende Reihe wie im Baustein.
+ * Die Kaestchen behalten `name="participants"` - Pruefung und Senden lesen sie.
+ */
+function participantChip(member, checked, name = 'participants', value = member.id ?? member.user_id, extra = '') {
+  const color = safeHexColor(member.avatar_color);
+  const inner = member.avatar_data
+    ? `<img src="${esc(member.avatar_data)}" alt="" loading="lazy">`
+    : esc(initials(member.display_name));
+  return `<label class="user-ms__option">
+        <input type="checkbox" class="user-ms__checkbox" name="${esc(name)}" value="${esc(String(value))}" data-ms-input="${esc(name)}"${checked ? ' checked' : ''}${extra}>
+        <span class="user-ms__avatar" style="background-color:${color};color:${getReadableTextColor(color)}">${inner}</span>
+        <span class="user-ms__name">${esc(member.display_name ?? '')}</span>
+      </label>`;
+}
+
 function groupMemberCheckboxes(selectedIds = null, splitValues = {}) {
   const members = state.groupMembers.length ? state.groupMembers : state.members;
   const selectedSet = selectedIds ? new Set(selectedIds.map(Number)) : null;
-  return members.map((member) => {
+  const rows = members.map((member) => {
     const id = member.id ?? member.user_id;
     const checked = selectedSet ? selectedSet.has(Number(id)) : true;
     const value = splitValues[id] ?? '';
     return `
     <div class="split-participant-row" data-participant-row="${id}">
-      <label class="split-check">
-        <input type="checkbox" name="participants" value="${id}" ${checked ? 'checked' : ''}>
-        <span>${esc(member.display_name)}</span>
-      </label>
+      ${participantChip(member, checked)}
       <input class="form-input split-split-value" name="split_value_${id}" inputmode="decimal" aria-label="${esc(member.display_name)} ${t('splitExpenses.splitValue')}" placeholder="" value="${esc(value)}">
     </div>
   `;
   }).join('');
+  return `
+    <div class="form-field split-participants user-ms" data-ms-name="participants" role="group" aria-labelledby="split-participants-label">
+      <span class="form-label" id="split-participants-label">${t('splitExpenses.participants')}${REQUIRED_MARK}</span>
+      <div class="user-ms__options split-participant-list">${rows}</div>
+    </div>`;
 }
 
 /**
@@ -2080,9 +2193,41 @@ function validateSplitForm(panel, { reveal = false } = {}) {
   }
   const hint = panel.querySelector('#split-method-hint');
   if (hint) hint.textContent = message;
-  const save = panel.querySelector('#split-save-expense') || panel.querySelector('#split-save-recurring');
-  if (save) save.disabled = !valid;
+  // DER PRIMAERKNOPF BLEIBT BEDIENBAR (Critique R24 G4-Budget-P1-1, D4): bis
+  // R24 war "Hinzufuegen" gesperrt, bis die Aufteilung aufging - ohne zu sagen,
+  // was fehlte. Jetzt sagt der Hinweis es laufend, und das Absenden nennt den
+  // Grund am Feld (reportSplitProblem).
   return valid;
+}
+
+/**
+ * Was das Absenden einer Ausgabe oder Serie aufhaelt, am Feld, das es behebt:
+ * niemand beteiligt (an der ersten Person), eine Aufteilung, die nicht aufgeht
+ * (am ersten Wert, mit demselben Satz wie der Hinweis darunter).
+ *
+ * @returns {boolean} true, wenn gemeldet wurde (der Aufrufer bricht ab)
+ */
+function reportSplitProblem(panel) {
+  if (validateSplitForm(panel, { reveal: true })) return false;
+  const selected = [...panel.querySelectorAll('input[name="participants"]:checked')];
+  if (!selected.length) {
+    return reportFieldErrors([[panel.querySelector('input[name="participants"]'), t('splitExpenses.participantsRequired')]]);
+  }
+  // Ein Betrag, der das Absenden aufhaelt, nennt seinen Grund schon unter
+  // dem Feld (syncAmountReason, eben mit `reveal` gezeigt): der Fokus geht
+  // dorthin, ein zweiter Satz am selben Feld waere eine Dublette.
+  const amount = panel.querySelector('[name="amount"]');
+  const currency = panel.querySelector('[name="currency"]')?.value || state.meta?.default_currency || 'EUR';
+  const amountProblem = amountInputProblem(amount?.value, currency);
+  if (amountProblem && amountProblem !== 'precision') {
+    amount.focus?.();
+    return true;
+  }
+  const field = selected
+    .map((input) => panel.querySelector(`[name="split_value_${input.value}"]`))
+    .find((el) => el && !el.hidden);
+  const message = panel.querySelector('#split-method-hint')?.textContent || '';
+  return reportFieldErrors([[field ?? selected[0], message]]);
 }
 
 /**
@@ -2126,7 +2271,7 @@ function renderGroupDefaults(group) {
  */
 function updateGroupDefaults(panel) {
   const select = panel.querySelector('[name="default_split_method"]');
-  if (!select) return;
+  if (!select) return true;
   const method = select.value;
   const rows = [...panel.querySelectorAll('.split-default-value')];
   rows.forEach((input) => {
@@ -2150,8 +2295,9 @@ function updateGroupDefaults(panel) {
   }
   const hint = panel.querySelector('#split-default-hint');
   if (hint) hint.textContent = valid ? message : `${t('splitExpenses.defaultSplitInvalid')} ${message}`.trim();
-  const save = panel.querySelector('#split-save-group');
-  if (save) save.disabled = !valid;
+  // Der Primaerknopf bleibt bedienbar (R24, D4); das Absenden meldet den
+  // Grund an der ersten Zahl (openGroupModal).
+  return valid;
 }
 
 /**
@@ -2205,20 +2351,19 @@ function collectSplitPayload(form) {
 function renderGroupMemberEditor(candidates = []) {
   if (!candidates.length) return '';
   return `
-    <fieldset class="split-participants">
-      <legend>${t('splitExpenses.members')}</legend>
+    <div class="form-field user-ms split-members" data-ms-name="group_members" role="group" aria-labelledby="split-members-label">
+      <span class="form-label" id="split-members-label">${t('splitExpenses.members')}</span>
+      <div class="user-ms__options">
       ${candidates.map((candidate) => {
         const key = candidate.source === 'contact' ? `contact:${candidate.contact_id}` : `user:${candidate.user_id}`;
         const locked = candidate.group_role === 'owner';
         const badge = candidate.source === 'contact' ? ` · ${t('nav.contacts')}` : '';
-        return `
-          <label class="split-check">
-            <input type="checkbox" name="group_members" value="${esc(key)}" ${candidate.in_group ? 'checked' : ''} ${locked ? 'disabled' : ''}>
-            <span>${esc(candidate.display_name)}${badge}${candidate.group_role === 'guest' ? ` · ${t('splitExpenses.roleGuest')}` : ''}</span>
-          </label>
-        `;
+        const role = candidate.group_role === 'guest' ? ` · ${t('splitExpenses.roleGuest')}` : '';
+        return participantChip({ ...candidate, display_name: `${candidate.display_name ?? ''}${badge}${role}` },
+          candidate.in_group, 'group_members', key, locked ? ' disabled' : '');
       }).join('')}
-    </fieldset>
+      </div>
+    </div>
   `;
 }
 
@@ -2256,6 +2401,7 @@ async function openGroupModal(group = null) {
   if (!isModalContextCurrent(context)) return;
   openSharedModal({
     title: isEdit ? t('splitExpenses.editGroup') : t('splitExpenses.addGroup'),
+    initialFocus: isEdit ? 'edit' : 'first-field',
     content: `
       <form id="split-group-form" class="split-form" novalidate>
         <label class="form-field"><span class="form-label">${t('splitExpenses.name')}${REQUIRED_MARK}</span><input class="form-input" name="name" required maxlength="200" value="${esc(group?.name || '')}"></label>
@@ -2281,6 +2427,11 @@ async function openGroupModal(group = null) {
         // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
         // Markups melden sich am Feld (constraintErrors, components/modal.js).
         if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
+        if (!updateGroupDefaults(panel)) {
+          const first = panel.querySelector('.split-default-value:not([hidden])');
+          reportFieldErrors([[first, panel.querySelector('#split-default-hint')?.textContent || t('splitExpenses.defaultSplitInvalid')]]);
+          return;
+        }
         const form = panel.querySelector('#split-group-form');
         const data = Object.fromEntries(new FormData(form));
         collectGroupDefaults(form, data);
@@ -2319,7 +2470,7 @@ function expenseReadSections(expense) {
     { icon: 'banknote', label: t('splitExpenses.amount'), value: money(expense.amount, expense.currency) },
     { icon: 'user', label: t('splitExpenses.paidBy'), value: expense.payer_name || '' },
     { icon: 'calendar', label: t('splitExpenses.date'), value: expense.expense_date ? dateText(expense.expense_date) : '' },
-    { icon: categoryIcon(expense.category), label: t('splitExpenses.categoryLabel'), value: categoryLabel(expense.category) },
+    { icon: 'tag', label: t('splitExpenses.categoryLabel'), value: expense.budget_category ? categoryLabel(expense.budget_category) : '' },
     { icon: 'split', label: t('splitExpenses.splitMethod'),
       value: t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`) },
     { icon: 'users', label: t('splitExpenses.participants'), value: shares, multiline: true },
@@ -2329,15 +2480,29 @@ function expenseReadSections(expense) {
 }
 
 /**
- * Die Ausgabe in der Leseansicht: bei `budget: read` und im Archiv. Dieselbe
- * Bauart wie Buchung und Abo (P1-Muster, geteilte Leseansicht ohne `edit` und
- * ohne `actions`).
+ * DER TIPP AUF EINE AUSGABE OEFFNET DAS LESEBLATT (R24, E1; Critique
+ * G4-Budget-P2-4). Bis R24 ging das Bearbeiten-Formular auf, Titel fokussiert -
+ * am Telefon mit Tastatur ueber dem halben Blatt -, obwohl die Frage meist
+ * "wer hat was bezahlt" ist. Jetzt dieselbe Leseansicht wie Buchung, Abo,
+ * Inventar: Betrag, Zahler, Datum, Kategorie, Beteiligte, Belege, und im Fuss
+ * EIN Primaerknopf "Bearbeiten" (withPrimaryEdit). Bei `budget: read` und im
+ * Archiv dieselbe Ansicht ohne Fuss (P1-Muster).
  */
-function openExpenseReadView(expense) {
+function openExpenseReadView(expense, { editable = false } = {}) {
+  const actions = editable ? withPrimaryEdit([], {
+    id: 'split-read-edit',
+    label: t('common.edit'),
+    onClick: async ({ close } = {}) => {
+      await (close ?? closeDetailView)({ force: true });
+      openExpenseModal(expense);
+    },
+  }) : [];
   return openDetailView({
     title: expense.title,
+    key: `split-expense:${expense.id}`,
     size: 'sm',
     sections: expenseReadSections(expense),
+    actions,
   });
 }
 
@@ -2382,20 +2547,29 @@ function openExpenseModal(expense = null, prefill = null) {
   // den Nachbartag (#829, Nachlese #851).
   const today = todayKey();
   const methodOption = (value, label) => `<option value="${value}" ${value === method ? 'selected' : ''}>${label}</option>`;
+  const currency = expense?.currency || group.default_currency;
+  /* EIN GERUEST FUER JEDES GELD (Critique R24 G4-Budget-P1-1, D1 + D8): wie
+   * die Buchung beginnt die Ausgabe mit dem Betrag, die Waehrung als Wahl im
+   * Suffix (amountFieldHtml) statt als eigenes Feld; dann Titel, Datum und
+   * Zahler in einer Zeile, Aufteilung und Kategorie, die Beteiligten als
+   * Personen-Chips. Notiz und Belege stehen hinter "Weitere Angaben" und
+   * nennen sich dort; beim Bearbeiten offen, sobald eines davon einen Wert
+   * hat. Bearbeiten holt am Finger keine Tastatur (initialFocus 'edit'). */
   openSharedModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('splitExpenses.editExpense') : t('splitExpenses.addExpense'),
+    initialFocus: isEdit ? 'edit' : 'first-field',
     content: `
       <form id="split-expense-form" class="split-form" novalidate>
-        <label class="form-field"><span class="form-label">${t('splitExpenses.titleLabel')}${REQUIRED_MARK}</span><input class="form-input" name="title" required maxlength="200" value="${esc(expense?.title || '')}"></label>
-        <div class="split-form-row">
-          <label class="form-field"><span class="form-label">${t('splitExpenses.amount')}${REQUIRED_MARK}</span><input class="form-input budget-amount-input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(isEdit ? expense.currency : group.default_currency)}" required aria-describedby="split-amount-reason" value="${esc(amountToInput(expense?.amount || '', expense?.currency || group.default_currency))}"></label>
-          <label class="form-field"><span class="form-label">${t('splitExpenses.paidBy')}</span><select class="form-input" name="payer_id">${memberOptions(isEdit ? expense.payer_id : state.user?.id)}</select></label>
+        <div class="form-field">
+          <label class="form-label" for="split-amount">${t('splitExpenses.amount')}${REQUIRED_MARK}</label>
+          ${amountFieldHtml({ id: 'split-amount', name: 'amount', currency, value: expense?.amount || '', currencies: state.meta.currencies, describedBy: 'split-amount-reason' })}
         </div>
         <p class="form-hint form-hint--danger" id="split-amount-reason" role="status" hidden></p>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.titleLabel')}${REQUIRED_MARK}</span><input class="form-input" name="title" required maxlength="200" value="${esc(expense?.title || '')}"></label>
         <div class="split-form-row">
-          <label class="form-field"><span class="form-label">${t('splitExpenses.currency')}</span><select class="form-input" name="currency">${state.meta.currencies.map((c) => `<option value="${c}" ${c === (expense?.currency || group.default_currency) ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
           <label class="form-field"><span class="form-label">${t('splitExpenses.date')}</span><yuvomi-datepicker name="expense_date" type="date" value="${esc(expense?.expense_date || today)}"></yuvomi-datepicker></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.paidBy')}</span><select class="form-input" name="payer_id">${memberOptions(isEdit ? expense.payer_id : state.user?.id)}</select></label>
         </div>
         <div class="split-form-row">
           <label class="form-field"><span class="form-label">${t('splitExpenses.splitMethod')}</span><select class="form-input" name="split_method">
@@ -2404,16 +2578,20 @@ function openExpenseModal(expense = null, prefill = null) {
             ${methodOption('exact', t('splitExpenses.splitExact'))}
             ${methodOption('shares', t('splitExpenses.splitShares'))}
           </select></label>
-          <label class="form-field"><span class="form-label">${t('splitExpenses.categoryLabel')}</span><select class="form-input" name="category">${categoryOptions(expense?.category || 'general')}</select></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.categoryLabel')}</span><select class="form-input" name="budget_category">${categoryOptions(expense?.budget_category ?? null)}</select></label>
         </div>
+        ${groupMemberCheckboxes(selectedIds, splitValues)}
         <p class="form-hint" id="split-method-hint">${t(`splitExpenses.splitHint.${method}`)}</p>
-        <fieldset class="split-participants"><legend>${t('splitExpenses.participants')}</legend>${groupMemberCheckboxes(selectedIds, splitValues)}</fieldset>
+        ${advancedSection(`
         <label class="form-field"><span class="form-label">${t('splitExpenses.notes')}</span><textarea class="form-input" name="description" rows="3" maxlength="5000">${esc(expense?.description || '')}</textarea></label>
         ${renderDocumentAttachField({
           attachments: isEdit ? (expense.attachments || []) : [],
           label: t('splitExpenses.receiptsLabel'),
           hint: t('splitExpenses.receiptsHint'),
           icon: 'receipt',
+        })}`, {
+          hint: t('splitExpenses.moreDetailsHint'),
+          open: isEdit && (Boolean(expense.description) || (expense.attachments?.length ?? 0) > 0),
         })}
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button class="btn btn--danger-outline" type="button" id="split-delete-expense">
@@ -2477,7 +2655,7 @@ function openExpenseModal(expense = null, prefill = null) {
         // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
         // Markups melden sich am Feld (constraintErrors, components/modal.js).
         if (reportFieldErrors(constraintErrors(e.currentTarget))) return;
-        if (!validateSplitForm(panel)) return;
+        if (reportSplitProblem(panel)) return;
         const form = panel.querySelector('#split-expense-form');
         const data = Object.fromEntries(new FormData(form));
         data.amount = decimalString(data.amount);
@@ -2574,7 +2752,22 @@ function recurringStateText(recurring) {
   return [
     recurring.paused_at ? t('splitExpenses.recurring.paused') : '',
     recurring.blocked_reason ? t(`splitExpenses.recurring.reason.${recurring.blocked_reason}`) : '',
+    recurringIsFailing(recurring) ? t('splitExpenses.recurring.failing') : '',
   ].filter(Boolean).join(' · ');
+}
+
+/**
+ * Ob der Lauf diese Serie unerwartet nicht buchen kann (#1746): `failed_at`
+ * vom Server, an einer Serie, die laeuft. Eine pausierte wird nicht neu
+ * versucht, also sagt sie es auch nicht.
+ */
+function recurringIsFailing(recurring) {
+  return Boolean(recurring.failed_at) && !recurring.paused_at;
+}
+
+/** Das Zeichen zum Zustand: Pause, oder ein Warnzeichen fuer eine scheiternde, laufende Serie. */
+function recurringStateIcon(recurring) {
+  return recurring.paused_at || !recurringIsFailing(recurring) ? 'circle-pause' : 'alert-triangle';
 }
 
 /**
@@ -2596,8 +2789,8 @@ function recurringReadSections(recurring) {
     { icon: 'user', label: t('splitExpenses.paidBy'), value: recurring.payer_name || '' },
     { icon: 'repeat', label: t('budget.recurringIntervalLabel'), value: frequencyLabel(recurring.frequency) },
     { icon: 'calendar', label: t('splitExpenses.recurring.nextDate'), value: recurring.paused_at ? '' : dateText(recurring.next_run_date) },
-    { icon: 'circle-pause', label: t('splitExpenses.statusLabel'), value: recurringStateText(recurring) },
-    { icon: categoryIcon(recurring.category), label: t('splitExpenses.categoryLabel'), value: categoryLabel(recurring.category) },
+    { icon: recurringStateIcon(recurring), label: t('splitExpenses.statusLabel'), value: recurringStateText(recurring) },
+    { icon: 'tag', label: t('splitExpenses.categoryLabel'), value: recurring.budget_category ? categoryLabel(recurring.budget_category) : '' },
     { icon: 'split', label: t('splitExpenses.splitMethod'),
       value: t(`splitExpenses.split${method.charAt(0).toUpperCase()}${method.slice(1)}`) },
     { icon: 'users', label: t('splitExpenses.participants'), value: people, multiline: true },
@@ -2651,36 +2844,43 @@ function openRecurringModal(recurring = null) {
   const formerPayer = formerPayerId == null ? ''
     : `<option value="${formerPayerId}" selected>${esc(`${recurring.payer_name || ''} (${t('settings.memberFormerBadge')})`)}</option>`;
   const option = (value, label, selected) => `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`;
+  // Dasselbe Geldgeruest wie die Ausgabe (openExpenseModal): Betrag mit der
+  // Waehrung im Suffix zuerst, dann Titel, Rhythmus und Termin, Zahler.
   openSharedModal({
     title: isEdit ? t('splitExpenses.recurring.edit') : t('splitExpenses.recurring.add'),
+    initialFocus: isEdit ? 'edit' : 'first-field',
     content: `
       <form id="split-recurring-form" class="split-form" novalidate>
-        ${stateText ? `<p class="form-hint field-hint--warn" role="status"><i data-lucide="circle-pause" aria-hidden="true"></i><span>${esc(stateText)}</span></p>` : ''}
-        <label class="form-field"><span class="form-label">${t('splitExpenses.titleLabel')}${REQUIRED_MARK}</span><input class="form-input" name="title" required maxlength="200" value="${esc(recurring?.title || '')}"></label>
-        <div class="split-form-row">
-          <label class="form-field"><span class="form-label">${t('splitExpenses.amount')}${REQUIRED_MARK}</span><input class="form-input budget-amount-input" name="amount" inputmode="decimal" placeholder="${amountPlaceholder(currency)}" required aria-describedby="split-amount-reason" value="${esc(amountToInput(recurring?.amount || '', currency))}"></label>
-          <label class="form-field"><span class="form-label">${t('splitExpenses.paidBy')}</span><select class="form-input" name="payer_id">${formerPayer}${memberOptions(isEdit ? recurring.payer_id : state.user?.id)}</select></label>
+        ${stateText ? `<p class="form-hint field-hint--warn" role="status"><i data-lucide="${recurringStateIcon(recurring)}" aria-hidden="true"></i><span>${esc(stateText)}</span></p>` : ''}
+        <div class="form-field">
+          <label class="form-label" for="split-recurring-amount">${t('splitExpenses.amount')}${REQUIRED_MARK}</label>
+          ${amountFieldHtml({ id: 'split-recurring-amount', name: 'amount', currency, value: recurring?.amount || '', currencies: state.meta.currencies, describedBy: 'split-amount-reason' })}
         </div>
         <p class="form-hint form-hint--danger" id="split-amount-reason" role="status" hidden></p>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.titleLabel')}${REQUIRED_MARK}</span><input class="form-input" name="title" required maxlength="200" value="${esc(recurring?.title || '')}"></label>
         <div class="split-form-row">
-          <label class="form-field"><span class="form-label">${t('splitExpenses.currency')}</span><select class="form-input" name="currency">${state.meta.currencies.map((c) => option(c, c, currency)).join('')}</select></label>
           <label class="form-field"><span class="form-label">${t('budget.recurringIntervalLabel')}</span><select class="form-input" name="frequency">
             ${['weekly', 'monthly', 'yearly'].map((f) => option(f, frequencyLabel(f), frequency)).join('')}
           </select></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.recurring.nextDate')}</span><yuvomi-datepicker name="next_run_date" type="date" value="${esc(recurring?.next_run_date || todayKey())}"></yuvomi-datepicker></label>
         </div>
-        <label class="form-field"><span class="form-label">${t('splitExpenses.recurring.nextDate')}</span><yuvomi-datepicker name="next_run_date" type="date" value="${esc(recurring?.next_run_date || todayKey())}"></yuvomi-datepicker></label>
         <div class="split-form-row">
-          <label class="form-field"><span class="form-label">${t('splitExpenses.splitMethod')}</span><select class="form-input" name="split_method">
-            ${option('equal', t('splitExpenses.splitEqual'), method)}
-            ${option('percentage', t('splitExpenses.splitPercentage'), method)}
-            ${option('exact', t('splitExpenses.splitExact'), method)}
-            ${option('shares', t('splitExpenses.splitShares'), method)}
-          </select></label>
-          <label class="form-field"><span class="form-label">${t('splitExpenses.categoryLabel')}</span><select class="form-input" name="category">${categoryOptions(recurring?.category || 'general')}</select></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.paidBy')}</span><select class="form-input" name="payer_id">${formerPayer}${memberOptions(isEdit ? recurring.payer_id : state.user?.id)}</select></label>
+          <label class="form-field"><span class="form-label">${t('splitExpenses.categoryLabel')}</span><select class="form-input" name="budget_category">${categoryOptions(recurring?.budget_category ?? null)}</select></label>
         </div>
+        <label class="form-field"><span class="form-label">${t('splitExpenses.splitMethod')}</span><select class="form-input" name="split_method">
+          ${option('equal', t('splitExpenses.splitEqual'), method)}
+          ${option('percentage', t('splitExpenses.splitPercentage'), method)}
+          ${option('exact', t('splitExpenses.splitExact'), method)}
+          ${option('shares', t('splitExpenses.splitShares'), method)}
+        </select></label>
+        ${groupMemberCheckboxes(selectedIds, splitValues)}
         <p class="form-hint" id="split-method-hint">${t(`splitExpenses.splitHint.${method}`)}</p>
-        <fieldset class="split-participants"><legend>${t('splitExpenses.participants')}</legend>${groupMemberCheckboxes(selectedIds, splitValues)}</fieldset>
-        <label class="form-field"><span class="form-label">${t('splitExpenses.notes')}</span><textarea class="form-input" name="description" rows="3" maxlength="5000">${esc(recurring?.description || '')}</textarea></label>
+        ${advancedSection(`
+        <label class="form-field"><span class="form-label">${t('splitExpenses.notes')}</span><textarea class="form-input" name="description" rows="3" maxlength="5000">${esc(recurring?.description || '')}</textarea></label>`, {
+          hint: t('splitExpenses.notes'),
+          open: Boolean(recurring?.description),
+        })}
         ${isEdit ? `<p class="form-hint">${t('splitExpenses.recurring.editHint')}</p>` : ''}
         <div class="modal-panel__footer modal-panel__footer--plain">
           ${isEdit ? `<button class="btn btn--danger-outline" type="button" id="split-delete-recurring">
@@ -2736,7 +2936,7 @@ function openRecurringModal(recurring = null) {
         // KEINE BROWSER-BLASEN (Critique R21): `novalidate`, die Regeln des
         // Markups melden sich am Feld (constraintErrors, components/modal.js).
         if (reportFieldErrors(constraintErrors(form))) return;
-        if (!validateSplitForm(panel)) return;
+        if (reportSplitProblem(panel)) return;
         const chosenCurrency = form.querySelector('[name="currency"]')?.value || group.default_currency;
         if (rejectSplitAmounts(form, chosenCurrency,
           { original: isEdit ? recurring.amount : null, originalCurrency: isEdit ? recurring.currency : null })) return;
@@ -2805,7 +3005,7 @@ function readRecurringForm(form) {
     frequency: data.frequency,
     next_run_date: data.next_run_date,
     split_method: data.split_method || 'equal',
-    category: data.category || 'general',
+    budget_category: data.budget_category || null,
     description: String(data.description ?? ''),
     participants,
     splits,
@@ -2835,7 +3035,7 @@ function changedRecurringFields(shown, now, recurring) {
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const ids = (list) => (list || []).map(Number).sort((a, b) => a - b);
   const out = {};
-  for (const key of ['title', 'payer_id', 'frequency', 'next_run_date', 'category', 'description']) {
+  for (const key of ['title', 'payer_id', 'frequency', 'next_run_date', 'budget_category', 'description']) {
     if (!same(shown[key], now[key])) out[key] = now[key];
   }
   if (!same(shown.amount, now.amount) || !same(shown.currency, now.currency)) {
@@ -3089,6 +3289,9 @@ export const __test = {
   renderSummaryForTest(container) { _container = container; renderSummary(); },
   // R17/E5: der eigene Saldo der gewaehlten Gruppe und die Summe aller Gruppen.
   ownGroupBalance, groupToolsTriggerHtml,
+  // R24 (Critique G4): eine Saldo-Aussage mit Namen, Leseblatt (E1), Absenden
+  // ohne gesperrten Primaerknopf (test-split-totals-ui.js).
+  foldedDebt, renderBalances, reportSplitProblem,
   // R22 D9: der Typ einer Gruppe faellt weg, wo er ihren Namen wiederholt.
   groupTypeLabel,
   // #1997: Mitglied und Gast speichern schliessen nur ihren eigenen Dialog

@@ -374,7 +374,7 @@ test('M3: das Blatt traegt Zeitraum, Stepper, ein hohes Diagramm und die Messlis
     assert.equal(blatt.headerAction?.label, 'health.vitals.addShort', 'Erfassen steht im Kopf des Blatts');
 
     const html = health.vitalSheetMarkup(vitalMetric('weight'));
-    assert.match(html, /class="health-vitals__ranges health-vital-sheet__ranges" role="tablist"/);
+    assert.match(html, /class="segmented health-vitals__ranges health-vital-sheet__ranges" role="tablist"/, 'das Kanon-Segment (R24 G5 P2-6)');
     assert.deepEqual([...html.matchAll(/data-sheet-range="(\w+)"/g)].map((m) => m[1]), ['day', 'week', 'month', 'year'],
       'der Zeitraum-Umschalter steht IM Blatt');
     assert.match(html, /data-sheet-step="-1"[\s\S]*data-sheet-step="1"/);
@@ -814,6 +814,9 @@ test('R18: die Kennzahlkarte hat vier feste Zeilen - Kopf, Wert, Trendlinie, Met
   });
   // Farbe: Modulton mit Rueckfall, Flaeche laeuft auf 0, Endpunkt in Label-Farbe.
   assert.match(body('.metric-card__spark', plain), /color:\s*var\(--module-accent, var\(--color-text-secondary\)\)/);
+  // R24 S15: die Wurzel fuellt nicht. Ohne Angabe ist `fill` schwarz - Sonde 14
+  // las die Trendlinie der Uebersicht im Dark als #000 auf #37332E (1,68:1).
+  assert.match(body('.metric-card__spark', plain), /(?:^|;)\s*fill:\s*none\b/, 'das SVG traegt fill: none, die Tinte ist currentColor');
   assert.match(body('.metric-card__spark-to'), /stop-opacity:\s*0\b/);
   assert.match(body('.metric-card__spark-end'), /stroke:\s*var\(--color-text-primary\)/);
   // Grafikkontrast 3:1 der Linie gegen Karte und Well, beide Themes (Gesundheitston).
@@ -1029,13 +1032,13 @@ async function inUebersicht(fn, rows, { access = 'write' } = {}) {
   }
 }
 
-test('R21 D6: ohne Messung keine grauen Wells, sondern eine ruhige Zeile mit Erfassen', async () => {
+test('R21 D6 + R24 E9: ohne Messung keine grauen Wells, sondern eine ruhige Zeile - erfasst wird am FAB', async () => {
   await inUebersicht(() => {
     const html = health.overviewVitalsMarkup();
     assert.doesNotMatch(html, /metric-card__value--empty|metric-card/, 'keine Kachel ohne Wert');
-    assert.match(html, /health-overview__empty-row/);
+    assert.match(html, /card-empty-row/, 'die geteilte ruhige Zeile (utils/empty-state.js)');
     assert.match(html, /health\.vitals\.emptyTitle/);
-    assert.match(html, /data-action="ov-add-vital"/, 'mit Schreibrecht der Weg zum Erfassen');
+    assert.doesNotMatch(html, /data-action="ov-add-vital"/, 'R24 E9: kein zweiter Erfassen-Weg neben dem FAB-Menue');
   }, []);
   await inUebersicht(() => {
     assert.doesNotMatch(health.overviewVitalsMarkup(), /data-action="ov-add-vital"/, 'ohne Schreibrecht nur die Zeile');

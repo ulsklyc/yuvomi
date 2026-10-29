@@ -16,6 +16,8 @@ import { ingredientRowHTML } from '/utils/ingredient-row.js';
 import { scheduleUndoableDelete } from '/utils/ux.js';
 import { normalizeRecipeMealTypes, RECIPE_MEAL_TYPE_KEYS } from '/utils/recipe-meal-types.js';
 import { mealPayloadFromRecipe } from '/utils/recipe-to-meal.js';
+import { scaleQuantityText, scaledIngredients, servingsFactor } from '/utils/scale-quantity.js';
+import { servingsStepperHtml, wireServingsSteppers, setServingsValue } from '/utils/servings-stepper.js';
 import { todayKey } from '/utils/date.js';
 import '/components/datepicker.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -31,6 +33,8 @@ import { errorSentence, isGone, isAlreadyDeleted } from '/utils/friendly-error.j
 import { ingredientMatchKey } from '/utils/ingredient-match-key.js';
 
 let _container = null;
+/** Laufende Nummer fuer die Label-IDs der Portionen-Stepper (Spalte + Blatt). */
+let _stepperSeq = 0;
 /**
  * Rezepte, deren Loeschen gerade im Ruecknahme-Fenster steht: sie stehen noch
  * in `state.recipes` (Rueckgaengig stellt sie zurueck), aber nicht mehr in der
@@ -57,7 +61,21 @@ const state = {
   sourceFilter: 'all',
   // Rezept-IDs, die im Wochenplan der AKTUELLEN Woche stehen (loadPlannedRecipes).
   plannedRecipeIds: new Set(),
+  // Gewaehlte Portionen je Rezept (R24, E12): der Stepper ueber den Zutaten.
+  // Fuer den Besuch der Seite, nicht gespeichert - die gespeicherte Zahl ist
+  // die des Rezepts. Einplanen und „Auf die Einkaufsliste" nehmen die Wahl mit.
+  servingsChoice: new Map(),
 };
+
+/** Die gewaehlten Portionen eines Rezepts (sonst seine eigenen bzw. 1). */
+function chosenServings(recipe) {
+  return state.servingsChoice.get(recipe.id) ?? recipe.servings ?? 1;
+}
+
+/** Der Faktor der aktuellen Wahl gegenueber den gespeicherten Mengen. */
+function chosenFactor(recipe) {
+  return servingsFactor(recipe.servings ?? null, chosenServings(recipe));
+}
 
 /**
  * Darf dieses Konto Rezepte schreiben? Regel 1 in utils/module-access.js
@@ -766,7 +784,7 @@ function renderRecipePane(id, body) {
 
 /**
  * Die Aktionen eines Rezepts im Fuss von Leseblatt und Detailspalte: Loeschen
- * zurueckgenommen am Anfang, Duplizieren leise, Bearbeiten als Primaerknopf
+ * am Anfang, Duplizieren im Mehr-Menue (R24), Bearbeiten als Primaerknopf
  * am Ende (withPrimaryEdit). Ein gespiegeltes Rezept ist schreibgeschuetzt:
  * nur Duplizieren (legt eine eigene Kopie an).
  */
@@ -775,9 +793,9 @@ function recipeActions(recipe, { edit, duplicate, remove }) {
   return withPrimaryEdit([
     !isMirrored && {
       id: 'recipe-detail-delete', label: t('common.delete'), icon: 'trash-2',
-      variant: 'danger-ghost', align: 'start', onClick: remove,
+      variant: 'danger-outline', align: 'start', onClick: remove,
     },
-    { id: 'recipe-detail-duplicate', label: t('recipes.duplicate'), icon: 'copy', variant: 'ghost', onClick: duplicate },
+    { id: 'recipe-detail-duplicate', label: t('recipes.duplicate'), icon: 'copy', more: true, onClick: duplicate },
   ], isMirrored ? null : { label: t('common.edit'), ...edit });
 }
 
@@ -915,6 +933,11 @@ function buildRecipeList() {
   }
 
   const visible = filteredRecipes();
+  // „DIESE WOCHE GEPLANT" UNTERSCHEIDET NUR, WENN NICHT ALLE ES SIND (R24,
+  // Critique G3-Rezepte-P3-1): im Seed standen 6 von 6 Zeilen damit da - eine
+  // Angabe in jeder Zeile sagt nichts. Gemessen an der ganzen Sammlung, nicht
+  // an der Suche: ein Treffer verliert sein Wort nicht, weil er allein steht.
+  const allPlanned = listedRecipes().every((r) => state.plannedRecipeIds.has(r.id));
   if (!visible.length) {
     // Geteilter Renderer, Variante 'no-results' (role="status", sekundärer CTA).
     // Vorher war das hier ein nacktes <p class="recipes-search-empty"> - die eine
@@ -1028,7 +1051,7 @@ function buildRecipeList() {
     // Zweite Meta-Angabe, getrennt ueber den Mittelpunkt des +-Kombinators
     // (Hausform, Vorrat): neutraler Sekundaertext, keine Flaeche - der
     // Zustand ist eine Meldung, keine Identitaet (Skalen-Regel).
-    if (state.plannedRecipeIds.has(recipe.id)) {
+    if (state.plannedRecipeIds.has(recipe.id) && !allPlanned) {
       const planned = document.createElement('span');
       planned.className = 'recipe-row__planned';
       planned.textContent = t('recipes.plannedThisWeek');
@@ -1169,7 +1192,13 @@ function fillRecipeDetail(detail, recipe) {
   // VOLLSTÄNDIGE Zutatenliste, nicht die ersten vier: das Kürzen war nur
   // nötig, um die Kartenhöhe zu bändigen. Ein Detail, das sich öffnet, hat
   // keinen Grund, etwas zu verschweigen.
-  if (ingredients.length) detail.appendChild(ingredientsSectionEl(recipe));
+  if (ingredients.length) {
+    detail.appendChild(ingredientsSectionEl(recipe));
+    wireServingsSteppers(detail, (stepper, value, factor) => {
+      state.servingsChoice.set(recipe.id, value);
+      rescaleIngredientSections(recipe, value, factor);
+    });
+  }
 
   if (recipe.notes) {
     const section = detailSectionEl(t('recipes.notesLabel'));
@@ -1237,13 +1266,22 @@ function fillRecipeDetail(detail, recipe) {
  * dem Rezepttitel: der ist im Aufklapper wie in der Detailspalte ein <h2>
  * (`recipe-row__heading`, `detailPaneHeaderEl`). Die Worte sind die Feldnamen
  * des Formulars - dieselbe Sache heisst an beiden Stellen gleich. */
-function detailSectionEl(title) {
+function detailSectionEl(title, { headExtraHtml = '' } = {}) {
   const section = document.createElement('section');
   section.className = 'recipe-detail__section';
   const heading = document.createElement('h3');
   heading.className = 'recipe-detail__section-title u-section-title u-compact';
   heading.textContent = title;
-  section.appendChild(heading);
+  if (!headExtraHtml) {
+    section.appendChild(heading);
+    return section;
+  }
+  // Ueberschrift plus Werkzeug in EINER Zeile (Portionen-Stepper, R24 E12).
+  const head = document.createElement('div');
+  head.className = 'recipe-detail__section-head';
+  head.appendChild(heading);
+  head.insertAdjacentHTML('beforeend', headExtraHtml);
+  section.appendChild(head);
   return section;
 }
 
@@ -1254,7 +1292,17 @@ function detailSectionEl(title) {
  */
 function ingredientsSectionEl(recipe) {
   const ingredients = recipe.ingredients ?? [];
-  const section = detailSectionEl(t('recipes.ingredientsLabel'));
+  // PORTIONEN NEBEN DER UEBERSCHRIFT (R24, E12): „Zutaten ... Portionen − 4 +".
+  // Der Stepper rechnet die Mengen darunter live um; ohne gespeicherte
+  // Portionen in Vielfachen (utils/servings-stepper.js).
+  const factor = chosenFactor(recipe);
+  const section = detailSectionEl(t('recipes.ingredientsLabel'), {
+    headExtraHtml: servingsStepperHtml({
+      id: `recipe-servings-${recipe.id}-${++_stepperSeq}`,
+      base: recipe.servings ?? null,
+      value: chosenServings(recipe),
+    }),
+  });
   section.classList.add('recipe-detail__ingredients-section');
   section.dataset.recipeId = String(recipe.id);
   const ul = document.createElement('ul');
@@ -1271,7 +1319,8 @@ function ingredientsSectionEl(recipe) {
     // steht auch ohne Menge da (leer), damit der Name seine Spalte haelt.
     const quantity = document.createElement('span');
     quantity.className = 'recipe-detail__ingredient-quantity';
-    quantity.textContent = ing.quantity ?? '';
+    quantity.dataset.quantity = ing.quantity ?? '';
+    quantity.textContent = scaleQuantityText(ing.quantity ?? '', factor) ?? '';
     item.appendChild(quantity);
     label.textContent = ing.name;
     item.appendChild(label);
@@ -1292,6 +1341,21 @@ function ingredientsSectionEl(recipe) {
   const bulk = pantryMatchBulkEl(recipe);
   if (bulk) section.appendChild(bulk);
   return section;
+}
+
+/**
+ * Rechnet die Mengen jedes Zutaten-Abschnitts dieses Rezepts um (Spalte und
+ * offenes Blatt) - im Platz, ohne Neubau: der Fokus bleibt auf dem Stepper.
+ */
+function rescaleIngredientSections(recipe, value, factor) {
+  const sel = `.recipe-detail__ingredients-section[data-recipe-id="${CSS.escape(String(recipe.id))}"]`;
+  for (const section of document.querySelectorAll(sel)) {
+    const stepper = section.querySelector('[data-servings-stepper]');
+    if (stepper && Number(stepper.dataset.value) !== value) setServingsValue(stepper, value);
+    for (const cell of section.querySelectorAll('.recipe-detail__ingredient-quantity')) {
+      cell.textContent = scaleQuantityText(cell.dataset.quantity ?? '', factor) ?? '';
+    }
+  }
 }
 
 /** Baut jeden Zutaten-Abschnitt dieses Rezepts neu (Aufklapper + Spalte). */
@@ -1702,6 +1766,8 @@ function openRecipeModal(mode, recipe = null) {
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit ? t('recipes.editRecipe') : t('recipes.addRecipe'),
     size: 'md',
+    // Bearbeiten holt am Finger keine Tastatur (R23 D13, R24 S9).
+    initialFocus: isEdit ? 'edit' : 'first-field',
     content: `
       <div class="form-group">
         <label class="form-label" for="recipe-title">${t('common.nameLabel')}${REQUIRED_MARK}</label>
@@ -1719,6 +1785,12 @@ function openRecipeModal(mode, recipe = null) {
           `).join('')}
           <input type="hidden" id="recipe-meal-types-value" value="">
         </div>
+      </div>
+      <div class="form-group recipe-servings-field">
+        <label class="form-label" for="recipe-servings">${t('recipes.servingsLabel')}</label>
+        <input id="recipe-servings" class="form-input" type="number" min="1" max="99" step="1" inputmode="numeric"
+               aria-describedby="recipe-servings-hint">
+        <p class="form-hint" id="recipe-servings-hint">${esc(t('recipes.servingsHint'))}</p>
       </div>
       <div class="form-group">
         <label class="form-label">${t('recipes.ingredientsLabel')}</label>
@@ -1749,13 +1821,14 @@ function openRecipeModal(mode, recipe = null) {
           <label class="form-label" for="recipe-url">${t('recipes.urlLabel')}</label>
           <input id="recipe-url" class="form-input" type="url" placeholder="${t('recipes.urlPlaceholder')}">
         </div>`,
-        { open: isEdit && (!!recipe.notes || !!recipe.recipe_url) })}
+        { open: isEdit && (!!recipe.notes || !!recipe.recipe_url), hint: t('recipes.moreDetailsHint') })}
       ${recipeModalFooterHtml(isEdit, recipe)}
     `,
     onSave(panel) {
       panel.querySelector('#recipe-title').value = isEdit ? recipe.title : '';
       panel.querySelector('#recipe-notes').value = isEdit && recipe.notes ? recipe.notes : '';
       panel.querySelector('#recipe-url').value = isEdit && recipe.recipe_url ? recipe.recipe_url : '';
+      panel.querySelector('#recipe-servings').value = isEdit && recipe.servings ? String(recipe.servings) : '';
 
       /* BILD (#1059, Schritt 2) - dasselbe Vorgehen wie beim Gegenstandsfoto:
        * Auswahl, Zuschnitt und Groessenpruefung macht `pickCroppedImage`.
@@ -1900,6 +1973,15 @@ async function saveRecipe(panel, mode, recipe) {
     return;
   }
 
+  // Portionen (R24, E12): leer heisst „nicht angegeben", sonst 1 bis 99.
+  const servingsField = panel.querySelector('#recipe-servings');
+  const servingsRaw = servingsField?.value.trim() ?? '';
+  const servings = servingsRaw === '' ? null : Number(servingsRaw);
+  if (servings !== null && (!Number.isInteger(servings) || servings < 1 || servings > 99)) {
+    reportFieldError(servingsField, t('recipes.servingsInvalid'));
+    return;
+  }
+
   const ingredients = [];
   panel.querySelectorAll('.ingredient-row').forEach((row) => {
     const name = row.querySelector('.ingredient-row__name')?.value.trim() || '';
@@ -1920,11 +2002,13 @@ async function saveRecipe(panel, mode, recipe) {
   try {
     let createdId = null;
     if (mode === 'create') {
-      const res = await api.post('/recipes', { title, notes, recipe_url, meal_types, ingredients, ...bildFeld });
+      const res = await api.post('/recipes', { title, notes, recipe_url, meal_types, servings, ingredients, ...bildFeld });
       state.recipes.push(res.data);
       createdId = res.data?.id ?? null;
     } else {
-      const res = await api.put(`/recipes/${recipe.id}`, { title, notes, recipe_url, meal_types, ingredients, ...bildFeld });
+      const res = await api.put(`/recipes/${recipe.id}`, { title, notes, recipe_url, meal_types, servings, ingredients, ...bildFeld });
+      // Neue Portionen: die Wahl des Steppers beginnt wieder bei der gespeicherten Zahl.
+      state.servingsChoice.delete(recipe.id);
       const idx = state.recipes.findIndex((r) => r.id === recipe.id);
       if (idx >= 0) state.recipes[idx] = res.data;
     }
@@ -2028,7 +2112,11 @@ async function planRecipe(recipe, btn) {
         const dialog = captureModalContext();
         const owner = _container;
         try {
-          await api.post('/meals', mealPayloadFromRecipe(recipe, date, mealType));
+          // Mit den gewaehlten Portionen (R24, E12): die Mahlzeit traegt die
+          // umgerechneten Mengen als ihre eigenen Zutaten.
+          const factor = chosenFactor(recipe);
+          const source = factor === 1 ? recipe : { ...recipe, ingredients: scaledIngredients(recipe.ingredients, factor) };
+          await api.post('/meals', mealPayloadFromRecipe(source, date, mealType));
           closeSharedModal({ force: true, context: dialog });
           window.yuvomi?.showToast(
             t('recipes.planSuccess', { name: recipe.title, date: dateText(date, { weekday: true }) }),
@@ -2077,7 +2165,18 @@ async function transferRecipe(recipe, btn) {
   if (btn) btn.disabled = true;
   const owner = _container;
   try {
-    const res = await api.post(`/recipes/${recipe.id}/to-shopping-list`, { listId: target.id });
+    // Die gewaehlten Portionen gehen mit (R24, E12): der Server ersetzt die
+    // Mengen je Zutat, Namen und Kategorien bleiben die des Rezepts.
+    // Jede Menge nennt die Zeile, zu der sie gehoert (Codex an #2364): hat
+    // jemand das Rezept seit dem Laden gespeichert, antwortet der Server 409,
+    // statt die Mengen positionsweise auf andere Zutaten zu legen.
+    const factor = chosenFactor(recipe);
+    const body = { listId: target.id };
+    if (factor !== 1) {
+      body.quantities = scaledIngredients(recipe.ingredients, factor).map((ing) => ing.quantity);
+      body.ingredientIds = recipe.ingredients.map((ing) => ing.id);
+    }
+    const res = await api.post(`/recipes/${recipe.id}/to-shopping-list`, body);
     const added = res.data?.transferred ?? 0;
     const skipped = res.data?.skipped ?? 0;
 
@@ -2103,9 +2202,24 @@ async function transferRecipe(recipe, btn) {
     }
   } catch (err) {
     reportError(err, { owner, recipeId: recipe.id, listId: target.id });
+    if (err?.data?.reason === 'recipes_ingredients_changed') showChangedRecipe(err.data.recipe, owner);
   } finally {
     if (btn) btn.disabled = false;
   }
+}
+
+/**
+ * Das Rezept, wie der Server es jetzt kennt (409 `recipes_ingredients_changed`
+ * traegt es mit): genau dieses eine ersetzen, wie nach dem eigenen Speichern -
+ * kein Nachladen der ganzen Liste. Die Portionswahl bleibt; der Nutzer sieht
+ * die neuen Zutaten und uebernimmt noch einmal.
+ */
+function showChangedRecipe(fresh, owner) {
+  if (!fresh || fresh.id == null || !stillShown(owner)) return;
+  const idx = state.recipes.findIndex((r) => r.id === fresh.id);
+  if (idx < 0) return;
+  state.recipes[idx] = fresh;
+  renderRecipeList({ repaint: true });
 }
 
 async function removeRecipe(recipe) {
@@ -2194,7 +2308,8 @@ async function duplicateRecipe(recipe) {
 
   const owner = _container;
   try {
-    const res = await api.post('/recipes', { title, notes, recipe_url, ingredients });
+    // Die Kopie nimmt die Portionen mit: ihre Mengen gelten fuer dieselbe Zahl.
+    const res = await api.post('/recipes', { title, notes, recipe_url, servings: recipe.servings ?? null, ingredients });
     state.recipes.push(res.data);
     renderRecipeList();
     // Die Kopie ist das, was man als Naechstes bearbeitet: in der Spalte steht

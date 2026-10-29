@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { capabilityDeviationHtml, capabilityRowHtml } from '../public/settings/pages/admin-permissions.js';
 
+// R24 (E11): die Stufe ist eine Auswahl je Zeile - gewaehlt ist die <option selected>.
 function selectedValue(html) {
-  return html.match(/<button[^>]*aria-checked="true"[^>]*data-value="([^"]+)"/)?.[1];
+  return html.match(/<option value="([^"]+)" selected>/)?.[1];
 }
 
 test('sparse role capability rows render each catalog default as selected', () => {
@@ -108,7 +109,9 @@ test('die Rollen-Chips sagen ihren Zustand, und die erste Rolle steht gewaehlt d
 test('jede Stufe nennt das Wort ihres Abschnitts (H7, Codex an #1485)', async () => {
   const { initialSubject } = await import('../public/settings/pages/admin-permissions.js');
   const page = (await import('node:fs')).readFileSync(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
-  assert.match(page, /<span class="perm-seg__label">\$\{esc\(o\.label\)\}<\/span>/, 'das Wort steht im Segment');
+  // R24 (E11): das Wort ist die Option der Auswahl - am Modul "Nur lesen", am
+  // Widget "Verfuegbar", an einer Faehigkeit "Erlaubt".
+  assert.match(page, /<option value="\$\{esc\(o\.value\)\}"\$\{o\.value === current \? ' selected' : ''\}>\$\{esc\(o\.label\)\}<\/option>/, 'das Wort steht in der Auswahl');
   assert.equal(initialSubject('role', CATALOG), 'parent');
   assert.equal(initialSubject('user', CATALOG), null, 'Mitglieder bleiben ohne Vorwahl');
 });
@@ -149,8 +152,8 @@ test('Codex an #1485: scheitert das Laden der Rechte, zeigt das Blatt Meldung un
     const ui = wiredSheet();
     await render(ui.sheet, { user: { role: 'admin' } });
     const matrix = ui.sheet.parts.get('#perm-matrix');
-    assert.doesNotMatch(matrix.html, /perm-seg/, `keine Segmente, die eine Voreinstellung vortaeuschen: ${matrix.html}`);
-    assert.doesNotMatch(matrix.html, /perm-reset|perm-save/, 'kein Zuruecksetzen und kein Speichern ohne geladene Rechte');
+    assert.doesNotMatch(matrix.html, /perm-select/, `keine Auswahl, die eine Voreinstellung vortaeuscht: ${matrix.html}`);
+    assert.doesNotMatch(matrix.html, /perm-reset/, 'kein Zuruecksetzen ohne geladene Rechte');
     const [retry] = matrix.nodes;
     assert.equal(retry?.className, 'settings-retry-state', 'der Fehler-Baustein der Einstellungen steht im Blatt');
     const [message, button] = retry.children;
@@ -166,8 +169,8 @@ test('Codex an #1485: scheitert das Laden der Rechte, zeigt das Blatt Meldung un
     fail = false;
     await button.listeners.click();
     assert.match(matrix.html, /class="perm-matrix__subject">settings\.familyRoleParent</);
-    assert.match(matrix.html, /data-group="module:tasks" data-value="read"/);
-    assert.match(matrix.html, /aria-checked="true"[^>]*data-group="module:tasks" data-value="read"/,
+    assert.match(matrix.html, /data-group="module:tasks"/);
+    assert.match(matrix.html, /data-group="module:tasks"[\s\S]*?<option value="read" selected>/,
       'der geladene Wert, nicht die Voreinstellung');
   } finally {
     console.error = origErr;
@@ -178,7 +181,7 @@ test('Codex an #1485: scheitert das Laden der Rechte, zeigt das Blatt Meldung un
   }
 });
 
-test('Codex an #1485: waehrend die Rechte eines Subjekts laden, sind die stehenden Segmente gesperrt', async () => {
+test('Codex an #1485: waehrend die Rechte eines Subjekts laden, sind die stehenden Auswahlen gesperrt', async () => {
   const { render } = await import('../public/settings/pages/admin-permissions.js');
   const hadWindow = 'window' in globalThis;
   const prevWindow = globalThis.window;
@@ -206,7 +209,7 @@ test('Codex an #1485: waehrend die Rechte eines Subjekts laden, sind die stehend
     ui.clickRole('child');
     await tick();
     assert.ok(release, 'die Rolle wird geladen');
-    assert.ok(asked.some((sel) => /\.perm-seg__opt/.test(sel)), 'gesucht werden die Segmente');
+    assert.ok(asked.some((sel) => /\.perm-select/.test(sel)), 'gesucht werden die Auswahlen der Zeilen');
     assert.deepEqual(controls.map((c) => c.disabled), [true, true, true], 'bis die Rechte da sind, ist nichts bedienbar');
     release();
     await tick();
@@ -230,7 +233,10 @@ function wiredSheet() {
   sheet.querySelector = (sel) => {
     const found = baseQuery(sel);
     if (found && sel.startsWith('#')) {
-      found.addEventListener = (type, fn) => { if (type === 'click') listeners.set(sel, fn); };
+      found.addEventListener = (type, fn) => {
+        if (type === 'click') listeners.set(sel, fn);
+        if (type === 'change') listeners.set(`${sel}:change`, fn);
+      };
     }
     return found;
   };
@@ -246,7 +252,12 @@ function wiredSheet() {
     sheet,
     clickMode: (mode) => modeButtons.find((b) => b.dataset.mode === mode).onclick(),
     clickUser: (id) => listeners.get('#perm-subjects')({ target: target({ '.perm-chip': { dataset: { user: String(id) } } }) }),
-    clickSave: () => listeners.get('#perm-matrix')({ target: target({ '#perm-save': {} }) }),
+    // R24 (E11): kein Speichern-Knopf mehr - eine Wahl in einer Zeile speichert sofort.
+    change: (group, value) => {
+      const select = { dataset: { group }, value, disabled: false };
+      select.closest = (sel) => (sel === '.perm-select' ? select : null);
+      return listeners.get('#perm-matrix:change')({ target: select });
+    },
     clickReset: () => listeners.get('#perm-matrix')({ target: target({ '#perm-reset': {} }) }),
     clickRole: (role) => listeners.get('#perm-subjects')({ target: target({ '.perm-chip': { dataset: { role } } }) }),
   };
@@ -299,7 +310,8 @@ test('eine spaet eintreffende Rollen-Antwort landet nicht in den Overrides des i
     releaseRole();
     await tick();
     await tick();
-    await ui.clickSave();
+    await ui.change('module:tasks', 'read');
+    await tick();
     await tick();
     for (const put of puts) {
       if (put.url === '/permissions/user/7') {
@@ -315,7 +327,7 @@ test('eine spaet eintreffende Rollen-Antwort landet nicht in den Overrides des i
   }
 });
 
-test('solange die Rechte des Subjekts laden, speichert der Knopf nichts', async () => {
+test('solange die Rechte des Subjekts laden, speichert eine Wahl nichts', async () => {
   const { render } = await import('../public/settings/pages/admin-permissions.js');
   const hadWindow = 'window' in globalThis;
   const prevWindow = globalThis.window;
@@ -348,17 +360,19 @@ test('solange die Rechte des Subjekts laden, speichert der Knopf nichts', async 
     ui.clickMode('role');
     await tick();
     assert.ok(releaseRole, 'die Rolle wird geladen');
-    // Der alte Speichern-Knopf ist noch da: ein Tipp darf die Rolle nicht mit
-    // dem leeren Platzhalter-Entwurf ueberschreiben.
-    await ui.clickSave();
+    // Die alten Zeilen stehen noch: eine Wahl darf die Rolle nicht mit dem
+    // leeren Platzhalter-Entwurf ueberschreiben.
+    await ui.change('module:tasks', 'none');
     await tick();
     assert.deepEqual(puts, [], 'kein PUT mit einem Entwurf, der nicht geladen ist');
     releaseRole();
     await tick();
     await tick();
-    await ui.clickSave();
+    await ui.change('module:tasks', 'write');
     await tick();
-    assert.deepEqual(puts, [{ url: '/permissions/role/parent', payload: { modules: { tasks: 'read' }, widgets: {}, capabilities: {} } }]);
+    await tick();
+    assert.deepEqual(puts, [{ url: '/permissions/role/parent', payload: { modules: { tasks: 'write' }, widgets: {}, capabilities: {} } }],
+      'erst der geladene Entwurf, mit der neuen Wahl');
   } finally {
     delete globalThis.__apiStub;
     if (hadWindow) globalThis.window = prevWindow;
@@ -366,112 +380,248 @@ test('solange die Rechte des Subjekts laden, speichert der Knopf nichts', async 
   }
 });
 
-// ── Re-Critique 2026-09-28 (A7 P1-1, P2-5): die gewaehlte Stufe ist sichtbar, der Fuss klebt nur bei Aenderung ──
-
-test('Rechte-Matrix: das aktive Segment traegt getoente Flaeche, eine Kante >= 3:1 und ein gefuelltes Glyph - hell UND dunkel', async () => {
-  // Gemessen: Daumen rgb(255,255,255) auf Segment rgb(251,251,253) = 1,03:1,
-  // in Dark sogar DUNKLER als das Segment; das Glyph 1,2:1 gegen das inaktive.
-  // Ursache: der Modulton der Einstellungen ist neutral. Eine Toenung allein
-  // erreicht die 3:1 nicht (24 %: 1,41 hell / 1,28 dunkel) - die Kante traegt
-  // den Kontrast, Flaeche und gefuelltes Glyph den Zustand (Label-Verlust-Regel).
+// ── R24 (E11; Critique G6-Familie-P2-2): Modulzeile mit EINEM Wert, sofort gespeichert ──
+//
+// Vorher: je Modul ein Dreier-Segment (A7: aktive Pille getoent, Kante 3:1),
+// je Widget ein Zweier, je Zusatzrecht ein dritter, „Speichern" klebte am
+// Telefon, sobald etwas ungespeichert war (A7 P2-5). Gemessen 1440: 4166px,
+// 390: 4989px. Nachher: 2186 / 2535px mit einer aufgeklappten Zeile; die
+// Segment-Tests dieser Datei (getoente Pille, klebender Fuss, Wort am Zeiger)
+// sind mit den Segmenten gegenstandslos.
+test('R24 E11: je Modul eine Optionszeile, Widgets und Zusatzrechte aufgeklappt, sofort gespeichert mit Rueckgaengig', async () => {
   const { readFileSync } = await import('node:fs');
   const { eachRule } = await import('./css-rules.js');
+  const page = readFileSync(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
-  const layout = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
-  const tokens = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(page, /perm-seg|perm-save|state\.dirty|confirmDiscardIfDirty/, 'keine Segmente, kein Speichern, kein Entwurf');
+  const group = page.slice(page.indexOf('function moduleGroupHtml('), page.indexOf('// ── Abweichungs'));
+  assert.match(group, /data-perm-expand="\$\{esc\(mod\.key\)\}"\s*aria-expanded=/, 'die Zeile klappt auf');
+  assert.match(group, /<div class="perm-modgroup__more" id="\$\{esc\(moreId\)\}"\$\{open \? '' : ' hidden'\}>\$\{moduleMoreHtml\(mod\.key\)\}<\/div>/, 'eingeklappt nur die Zeile');
+  const apply = page.slice(page.indexOf('async function applyChange('), page.indexOf('// ── Interaktion'));
+  assert.match(apply, /persist\(\(\) => \{\s*if \(ownsRow\(bucket, key, seq\)\) set\(savedOf\.get\(draft\)/, 'ein Fehler legt zurueck, solange die Wahl die Zeile besitzt');
+  assert.match(apply, /label: t\('common\.undo'\)/, 'Rueckgaengig im Toast');
   const rules = [...eachRule(css)];
-  const base = (sel) => rules.find(({ selector, at }) => selector.trim() === sel && at.length === 0);
+  assert.ok(!rules.some((r) => /\.perm-actions/.test(r.selector) && /position:\s*sticky/.test(r.body)), 'kein klebender Fuss mehr');
 
-  const thumb = base('.perm-seg__thumb');
-  assert.match(thumb.body, /background(?:-color)?:\s*color-mix\(in srgb, var\(--color-accent\) var\(--tint-[a-z]+\), var\(--color-surface\)\)/,
-    'getoente Flaeche im App-Akzent, nicht die neutrale Surface-Pille');
-  const edge = thumb.body.match(/box-shadow:\s*inset 0 0 0 ([\d.]+)px var\(--color-accent\)/);
-  assert.ok(edge, 'eine Kante im App-Akzent traegt die 3:1');
-  assert.ok(Number(edge[1]) >= 1.5, 'mindestens 1,5px - eine Haarlinie liest niemand als Zustand');
-
-  const active = base('.perm-seg__opt.is-active');
-  assert.match(active.body, /color:\s*color-mix\(in srgb, var\(--color-accent\) var\(--tint-ink\), var\(--color-text-primary\)\)/,
-    'das Glyph in der Akzent-Tinte - der neutrale Modulton der Einstellungen trug keinen Unterschied');
-  assert.match(layout, /\.perm-seg__opt\.is-active svg\s*\{[^}]*fill:\s*color-mix\(in srgb, currentColor 30%, transparent\)/,
-    'gefuelltes Glyph (Filled Variant, layout.css)');
-
-  // Die 3:1 NACHGERECHNET, aus den Token-Werten beider Themes.
-  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-  const lum = (rgb) => {
-    const [r, g, b] = rgb.map((c) => { const s = c / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  };
-  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
-  const darkStart = tokens.indexOf('@media screen and (prefers-color-scheme: dark)');
-  assert.ok(darkStart > 0);
-  const pick = (name, from, to) => {
-    const m = tokens.slice(from, to).match(new RegExp(`${name}:\\s*(#[0-9A-Fa-f]{6})`));
-    assert.ok(m, `${name} nicht gefunden`);
-    return hex(m[1]);
-  };
-  for (const [theme, from, to] of [['hell', 0, darkStart], ['dunkel', darkStart, tokens.length]]) {
-    const accent = pick('--_color-accent', from, to);
-    const track = pick('--_color-surface-raised', from, to);
-    const r = ratio(accent, track);
-    assert.ok(r >= 3, `${theme}: Kante gegen das Segment ${r.toFixed(2)}:1, verlangt 3:1`);
-  }
-});
-
-test('Rechte-Matrix: der Fuss klebt am Telefon nur, solange etwas ungespeichert ist (A7 P2-5)', async () => {
-  // 73px dauerhaft klebend ueber der 76px-Kapsel, auch mit gesperrtem
-  // „Speichern" - im ersten Bild verdeckte er den Rollen-Hinweis.
-  const { readFileSync } = await import('node:fs');
-  const { eachRule } = await import('./css-rules.js');
-  const css = readFileSync(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
-  const narrow = [...eachRule(css)].filter(({ at }) => at.some((a) => /max-width:\s*1023px/.test(a)));
-  const ruhig = narrow.find(({ selector }) => selector.trim() === '.perm-actions:not(.is-dirty)');
-  assert.ok(ruhig && /position:\s*static/.test(ruhig.body), 'ohne Aenderung steht der Fuss am Ende, nicht klebend');
-
+  // Gefahren: aendern -> PUT, Rueckgaengig -> PUT mit dem alten Stand.
   const { render } = await import('../public/settings/pages/admin-permissions.js');
   const hadWindow = 'window' in globalThis;
   const prevWindow = globalThis.window;
-  globalThis.window = {};
+  const toasts = [];
+  globalThis.window = { yuvomi: { showToast: (...args) => toasts.push(args) } };
+  const puts = [];
+  const tick = () => new Promise((r) => setTimeout(r, 0));
   globalThis.__apiStub = {
     get: async (url) => (url === '/permissions/catalog'
       ? { data: CATALOG }
       : { data: { modules: {}, widgets: {}, capabilities: {} } }),
+    put: async (url, payload) => { puts.push({ url, payload: JSON.parse(JSON.stringify(payload)) }); return { data: payload }; },
   };
   try {
-    const sheet = fakeSheet();
-    const classes = new Set(['perm-actions', 'is-dirty']); // ein alter Zustand, den render() abraeumen muss
-    const actions = sheet.querySelector('#perm-matrix').querySelector('.perm-actions');
-    actions.classList = { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) };
-    await render(sheet, { user: { role: 'admin' } });
-    assert.equal(classes.has('is-dirty'), false, 'frisch geladen: nichts ungespeichert');
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    await ui.change('module:tasks', 'read');
+    await tick(); await tick();
+    assert.deepEqual(puts, [{ url: '/permissions/role/parent', payload: { modules: { tasks: 'read' }, widgets: {}, capabilities: {} } }], 'die Wahl wirkt sofort');
+    const [, kind, , action] = toasts.at(-1);
+    assert.equal(kind, 'success');
+    assert.equal(action.label, 'common.undo');
+    await action.onClick();
+    await tick();
+    assert.deepEqual(puts.at(-1), { url: '/permissions/role/parent', payload: { modules: {}, widgets: {}, capabilities: {} } }, 'Rueckgaengig schreibt den alten Stand');
   } finally {
     delete globalThis.__apiStub;
     if (hadWindow) globalThis.window = prevWindow; else delete globalThis.window;
   }
-  const src = readFileSync(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
-  const fn = src.slice(src.indexOf('function updateSaveState('), src.indexOf('\n}\n', src.indexOf('function updateSaveState(')));
-  assert.match(fn, /classList\??\.toggle\('is-dirty', state\.dirty\)/, 'derselbe Weg, der Speichern freigibt, schaltet den Fuss');
 });
 
-/* DIE STUFEN STEHEN AM ZEIGER IN WORTEN (Critique R21, a5 P3; clarify). Ab
- * 1024px mit Maus trug die Matrix nur Icons - Auge, durchgestrichenes Auge,
- * Stift - und eine Legende darueber, die man beim Setzen jedes Schalters
- * nachschlagen musste. Die Aufgabe mit den groessten sozialen Folgen ("was
- * darf das Kind") steht jetzt in jeder Breite mit Wort: neben dem Icon am
- * Zeiger, darunter am Finger. Die Legende entfaellt, sie waere die zweite
- * Beschriftung derselben Knoepfe. Die Segmente bleiben gleich breit - der
- * gleitende Daumen rechnet mit (100% - 4px) / --seg-count. */
-test('R21: die Rechte-Matrix nennt ihre Stufen auch am Zeiger in Worten, ohne Legende', async () => {
+/* R24 S13 (Critique G6-Einst-P2-3): die Rollen-Chips brachen am Telefon in
+ * drei Zeilen (390px: y254/310/366), das erste Recht stand 170px tiefer. Sie
+ * sind jetzt EINE waagerecht scrollende Zeile wie jede Chipreihe
+ * (`.page-chip-row`), mit Fade-Kanten aus wireScrollFade. */
+test('R24 S13: Rollen- und Mitglieder-Chips stehen in EINER scrollenden Zeile', async () => {
   const { readFileSync } = await import('node:fs');
   const { eachRule } = await import('./css-rules.js');
-  const css = readFileSync(new URL('../public/styles/settings.css', import.meta.url), 'utf8');
-  const page = readFileSync(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
-  const rules = [...eachRule(css)];
-  const base = (sel) => rules.filter(({ selector, at }) => selector.split(',').map((s) => s.trim()).includes(sel) && at.length === 0);
-  const label = base('.perm-seg__label').map((r) => r.body).join(';');
-  assert.doesNotMatch(label, /display:\s*none/, 'am Zeiger ist das Wort nicht mehr versteckt');
-  assert.match(label, /font-size:\s*var\(--type-caption\)/, 'das Wort steht in der Footnote-Rolle');
-  const seg = base('.perm-seg').map((r) => r.body).join(';');
-  assert.match(seg, /grid-template-columns:\s*repeat\(var\(--seg-count, 3\), 1fr\)/, 'gleich breite Stufen - der Daumen rechnet mit gleichen Spalten');
-  assert.doesNotMatch(page, /perm-legend/, 'keine Legende mehr im Blatt');
-  assert.doesNotMatch(css, /\.perm-legend/, 'und keine Regel fuer sie');
+  const css = [...eachRule(readFileSync(new URL('../public/styles/settings.css', import.meta.url), 'utf8'))];
+  const row = css.find((r) => !r.at.length && r.selector.trim() === '.perm-subjects');
+  assert.ok(row, 'Regel fehlt');
+  assert.doesNotMatch(row.body, /flex-wrap:\s*wrap/, 'die Chips duerfen nicht umbrechen - mobil drei Zeilen');
+  assert.match(row.body, /overflow-x:\s*auto/, 'die Zeile scrollt waagerecht');
+  assert.ok(css.some((r) => !r.at.length && r.selector.trim() === '.perm-subjects > *' && /flex-shrink:\s*0/.test(r.body)),
+    'kein Chip wird gestaucht');
+  assert.ok(!css.some((r) => r.at.length && r.selector.trim() === '.perm-subjects' && /flex-wrap:\s*wrap/.test(r.body)),
+    'auch keine Breite bricht wieder um');
+  const js = readFileSync(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
+  assert.match(js, /wireScrollFade\(container\.querySelector\('#perm-subjects'\)\)/, 'die Kanten sagen, dass es weitergeht');
+});
+
+// ── Codex an #2364 (P1): ein spaet fertiges Zuruecksetzen schreibt nicht ins neue Subjekt ──
+//
+// `persist()` meldet false, sobald inzwischen ein anderes Subjekt gewaehlt ist -
+// auch wenn der PUT gelang. Das Zuruecksetzen stellte dann `before` wieder her,
+// sobald nur IRGENDEIN Entwurf geladen war: die Rechte der alten Rolle standen
+// unter der neuen, und die naechste Wahl speicherte sie dort.
+test('ein Zuruecksetzen, das erst nach dem Subjektwechsel fertig wird, laesst den Entwurf des neuen Subjekts stehen', async () => {
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  const had = { window: 'window' in globalThis, document: 'document' in globalThis };
+  const prev = { window: globalThis.window, document: globalThis.document, confirm: globalThis.__confirmModal };
+  globalThis.window = {};
+  globalThis.document = fakeDocument();
+  globalThis.__confirmModal = async () => true;
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  let releasePut = null;
+  const puts = [];
+  globalThis.__apiStub = {
+    get: async (url) => {
+      if (url === '/permissions/catalog') return { data: CATALOG };
+      if (url === '/permissions/role/parent') return { data: { modules: { tasks: 'read', notes: 'none' }, widgets: {}, capabilities: {} } };
+      return { data: { modules: {}, widgets: {}, capabilities: {} } };
+    },
+    put: (url, payload) => {
+      puts.push({ url, payload });
+      if (url === '/permissions/role/parent') return new Promise((resolve) => { releasePut = () => resolve({ data: payload }); });
+      return Promise.resolve({ data: payload });
+    },
+  };
+  try {
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    const reset = ui.clickReset();
+    await tick();
+    assert.ok(releasePut, 'das Zuruecksetzen der Eltern-Rolle speichert');
+    ui.clickRole('child');
+    await tick();
+    await tick();
+    releasePut();
+    await reset;
+    await tick();
+    await ui.change('module:tasks', 'write');
+    await tick();
+    await tick();
+    assert.deepEqual(puts.at(-1), { url: '/permissions/role/child', payload: { modules: { tasks: 'write' }, widgets: {}, capabilities: {} } },
+      'die Kind-Rolle speichert ihre eigene Wahl, nicht die alten Rechte der Eltern-Rolle');
+  } finally {
+    delete globalThis.__apiStub;
+    if (prev.confirm === undefined) delete globalThis.__confirmModal; else globalThis.__confirmModal = prev.confirm;
+    if (had.window) globalThis.window = prev.window; else delete globalThis.window;
+    if (had.document) globalThis.document = prev.document; else delete globalThis.document;
+  }
+});
+
+// ── Codex an #2364 (P1): ein gescheiterter PUT legt keine neuere Wahl zurueck ──
+//
+// Die Wahlen laufen in einer Speicherreihe. Scheiterte der ERSTE PUT, waehrend
+// eine zweite Wahl derselben Zeile schon wartete, setzte `set(before)` den
+// aelteren Wert zurueck - der Entwurf stand ohne Einschraenkung da, der Server
+// auf `none`, und die naechste Wahl hob die Sperre wieder auf. Ebenso schickte
+// ein wartender PUT einer anderen Zeile noch den Stand mit der gescheiterten
+// Wahl, und ein spaetes Rueckgaengig einer aelteren Wahl ueberschrieb eine neuere.
+function queuedPutStub(catalog) {
+  const puts = [];
+  const held = [];
+  globalThis.__apiStub = {
+    get: async (url) => (url === '/permissions/catalog'
+      ? { data: catalog }
+      : { data: { modules: {}, widgets: {}, capabilities: {} } }),
+    put: (url, payload) => {
+      const entry = { url, payload: JSON.parse(JSON.stringify(payload)) };
+      puts.push(entry);
+      return new Promise((resolve, reject) => {
+        held.push({ ok: () => resolve({ data: payload }), fail: () => reject(new Error('offline')) });
+      });
+    },
+  };
+  return { puts, held };
+}
+
+async function withPermissionWindow(fn) {
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  const toasts = [];
+  globalThis.window = { yuvomi: { showToast: (...args) => toasts.push(args) } };
+  try {
+    await fn(toasts);
+  } finally {
+    delete globalThis.__apiStub;
+    if (hadWindow) globalThis.window = prevWindow; else delete globalThis.window;
+  }
+}
+
+const settle = async () => { for (let i = 0; i < 8; i += 1) await new Promise((r) => setTimeout(r, 0)); };
+const TWO_MODULES = { ...CATALOG, modules: [...CATALOG.modules, { key: 'notes', icon: 'sticky-note', labelKey: 'nav.notes' }] };
+
+test('scheitert der erste PUT, waehrend die zweite Wahl derselben Zeile wartet, bleibt die neuere Wahl im Entwurf', async () => {
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  await withPermissionWindow(async () => {
+    const { puts, held } = queuedPutStub(TWO_MODULES);
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    ui.change('module:tasks', 'read');
+    await settle();
+    ui.change('module:tasks', 'none');
+    await settle();
+    held[0].fail();
+    await settle();
+    held[1].ok();
+    await settle();
+    await settle();
+    assert.deepEqual(puts.at(-1).payload.modules, { tasks: 'none' }, 'der Server haelt die Sperre');
+    ui.change('module:notes', 'read');
+    await settle();
+    held.at(-1).ok();
+    await settle();
+    assert.deepEqual(puts.at(-1).payload.modules, { tasks: 'none', notes: 'read' },
+      'die naechste Wahl schickt die Sperre mit, statt sie aufzuheben');
+  });
+});
+
+test('scheitert ein PUT, schickt der wartende PUT einer anderen Zeile die gescheiterte Wahl nicht mehr mit', async () => {
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  await withPermissionWindow(async () => {
+    const { puts, held } = queuedPutStub(TWO_MODULES);
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    ui.change('module:tasks', 'read');
+    await settle();
+    ui.change('module:notes', 'none');
+    await settle();
+    held[0].fail();
+    await settle();
+    held[1].ok();
+    await settle();
+    await settle();
+    assert.equal(puts.length, 2);
+    assert.deepEqual(puts[1].payload.modules, { notes: 'none' },
+      'der zweite PUT traegt nur, was im Entwurf steht - die gescheiterte Wahl ist zurueckgelegt');
+  });
+});
+
+test('Rueckgaengig einer aelteren Wahl ueberschreibt keine neuere derselben Zeile', async () => {
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  await withPermissionWindow(async (toasts) => {
+    const { puts, held } = queuedPutStub(TWO_MODULES);
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    ui.change('module:tasks', 'read');
+    await settle();
+    held[0].ok();
+    await settle();
+    const undoFirst = toasts.at(-1)[3];
+    ui.change('module:tasks', 'none');
+    await settle();
+    held[1].ok();
+    await settle();
+    const count = puts.length;
+    undoFirst.onClick();
+    await settle();
+    held.slice(count).forEach((h) => h.ok());
+    await settle();
+    await settle();
+    ui.change('module:notes', 'read');
+    await settle();
+    held.at(-1).ok();
+    await settle();
+    assert.deepEqual(puts.at(-1).payload.modules, { tasks: 'none', notes: 'read' },
+      'die Sperre der neueren Wahl steht noch');
+  });
 });

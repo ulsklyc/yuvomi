@@ -42,6 +42,7 @@
 import { addBillingCycle, convertAmount, parseDateKey, BILLING_CYCLES, END_TYPES } from './subscriptions.js';
 import { dateKey } from '../utils/interval-date.js';
 import { todayKey } from '../utils/timezone.js';
+import { cachedRate } from './subscription-rates.js';
 
 /** Kategorie jeder Abo-Buchung im Budget (Migration v104, syncBudgetExpense). */
 export const SUBSCRIPTION_BUDGET_CATEGORY = 'subscriptions';
@@ -288,7 +289,7 @@ export function upcomingPaymentDates(subscription, from, to, stats = { steps: 0 
  *          Zeile. `until`: der Bereich war breiter als das Fenster, die
  *          Projektion endet an diesem Tag (einschliesslich); sonst null.
  */
-export function expectedSubscriptionEntries(database, { from, to, filter, today = todayKey(database), stats = { steps: 0 } }) {
+export function expectedSubscriptionEntries(database, { from, to, filter, accountId = null, today = todayKey(database), stats = { steps: 0 } }) {
   const none = { entries: [], omitted: false, until: null };
   if (!DATE_KEY_RE.test(String(from)) || !DATE_KEY_RE.test(String(to))) return none;
   const monthStart = `${today.slice(0, 7)}-01`;
@@ -309,14 +310,20 @@ export function expectedSubscriptionEntries(database, { from, to, filter, today 
            sub.next_payment_date, sub.enabled, sub.completed_at, sub.end_type, sub.end_date,
            sub.occurrence_count, sub.occurrences_done, sub.created_by,
            b.owner_id, b.visibility, b.amount AS booked_amount,
+           CASE WHEN acc.archived = 0 THEN sub.account_id END AS account_id,
+           CASE WHEN acc.archived = 0 THEN acc.currency END AS account_currency,
+           b.account_id AS booked_account_id, bacc.currency AS booked_account_currency,
            COALESCE(c.budget_subcategory_key, '') AS subcategory,
            u.display_name AS creator_name
     FROM budget_subscriptions sub
     JOIN budget_entries b ON b.id = sub.budget_entry_id
     LEFT JOIN subscription_categories c ON c.id = sub.category_id
     LEFT JOIN users u ON u.id = sub.created_by
+    LEFT JOIN budget_accounts acc ON acc.id = sub.account_id
+    LEFT JOIN budget_accounts bacc ON bacc.id = b.account_id
     WHERE sub.enabled = 1 AND sub.completed_at IS NULL AND sub.next_payment_date < ?${f.clause}
-  `).all(to, ...f.params);
+      ${accountId != null ? 'AND sub.account_id = ? AND acc.archived = 0' : ''}
+  `).all(to, ...f.params, ...(accountId != null ? [accountId] : []));
   if (!subscriptions.length) return { entries: [], omitted: false, until };
 
   const currency = subscriptionBudgetCurrency(database);
@@ -334,10 +341,25 @@ export function expectedSubscriptionEntries(database, { from, to, filter, today 
     if (!dates.length) continue;
     // Beide Spalten sind NOT NULL, die des Abos per CHECK nie negativ; was
     // trotzdem keine Zahl ist, ergibt keine Zahlung - auch keine von 0.
-    const source = subscription.currency === currency ? subscription.amount : subscription.booked_amount;
+    // Die Buchung steht in der Waehrung ihres Kontos (#2302), ohne Konto in
+    // der Budget-Waehrung - dieselbe Regel wie bookingCurrency im Schreibpfad.
+    const target = subscription.account_currency || currency;
+    // Die gebuchte Zeile kann fuer diese eine Zahlung auf einem anderen Konto
+    // stehen (#1277) und damit in einer anderen Waehrung (Codex zu #2302): ihr
+    // Betrag gilt nur, wenn sie in der Waehrung der Vorgabe steht. Sonst
+    // rechnet der Kurs-Cache um, und ohne Kurs gibt es keine Zahl.
+    const bookedCurrency = subscription.booked_account_id != null
+      ? (subscription.booked_account_currency || currency) : currency;
+    let source;
+    if (subscription.currency === target) source = subscription.amount;
+    else if (bookedCurrency === target) source = subscription.booked_amount;
+    else {
+      const rate = cachedRate(subscription.currency, target);
+      source = rate == null ? null : Math.round(Number(subscription.amount) * rate * 100) / 100;
+    }
     if (source == null || !Number.isFinite(Number(source))) continue;
     const amount = -Math.abs(Number(source));
-    const title = subscriptionBudgetTitle(subscription, currency);
+    const title = subscriptionBudgetTitle(subscription, target);
     for (const date of dates) {
       entries.push({
         id: null,
@@ -351,7 +373,11 @@ export function expectedSubscriptionEntries(database, { from, to, filter, today 
         is_recurring: 0,
         recurrence_parent_id: null,
         is_pending: 1,
-        account_id: null,
+        // DAS KONTO DES ABOS (#1277), nicht das der gebuchten Zeile: die darf
+        // fuer diese eine Zahlung umgestellt sein, das Verlaengern bucht die
+        // folgenden aber wieder auf die Vorgabe. Ein archiviertes Konto ergibt
+        // keins - dieselbe Regel wie bookingAccountId in routes/subscriptions.js.
+        account_id: subscription.account_id ?? null,
         created_by: subscription.created_by,
         creator_name: subscription.creator_name ?? null,
         owner_id: subscription.owner_id,

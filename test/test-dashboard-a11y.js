@@ -121,7 +121,9 @@ test('jedes Widget-Siegel nennt einen Modulton, den tokens.css kennt (R18)', asy
   for (const [text, id] of calls) {
     const route = text.match(/'(\/[^']*)'/)?.[1];
     const constant = text.match(/\b([A-Z_]+_ROUTE)\b/)?.[1];
-    const seal = text.match(/,\s*'([a-z-]+)'\)$/)?.[1] ?? null;
+    // Die benannte Herkunft ist das letzte Argument - oder das vor dem
+    // Optionsobjekt (`{ action }`, die Endzone des Wetter-Kopfes, DW-P3-3).
+    const seal = text.match(/,\s*'([a-z-]+)'(?:,\s*\{[^{}]*\})?\)$/)?.[1] ?? null;
     if (constant) viaConstant += 1;
     const href = route ?? (constant ? constants[constant] : null);
     if (constant) assert.ok(href, `${constant} ist aufloesbar`);
@@ -358,7 +360,8 @@ test('Codex an #1485: gemischte verdeckte Zeilen klappen an Ort und Stelle auf, 
     assert.match(more[0], /aria-expanded="false"/);
     const controls = more[0].match(/aria-controls="([^"]+)"/)?.[1];
     assert.ok(controls, 'der Knopf nennt, was er aufklappt');
-    const region = html.match(new RegExp(`<div\\b[^>]*id="${controls}"[^>]*>([\\s\\S]*?)</div>\\s*<button`));
+    // Der Knopf steht seit dem Entwurf „Heute wichtig" in der Fussleiste, rechts neben der Coda.
+    const region = html.match(new RegExp(`<div\\b[^>]*id="${controls}"[^>]*>([\\s\\S]*?)</div>\\s*<div class="today-cockpit__foot">\\s*(?:<span class="today-cockpit__coda">[^<]*</span>)?\\s*<button`));
     assert.ok(region, 'die verdeckten Zeilen stehen im Markup');
     assert.match(region[0], /\bhidden\b/, 'zugeklappt');
     assert.match(region[1], /Elternabend/, 'der verdeckte Termin');
@@ -471,7 +474,8 @@ test('R9 M7: einspaltig bietet die Kachel EIN Groessen-Menue mit nur den wirksam
 
   assert.match(dashboardSource, /'data-widget-size-preset', 'data-widget-size-menu'/, 'der Menue-Knopf ist eine Fokus-Identitaet');
   assert.match(dashboardSource, /installPopoverMenus\(container\)/, 'Position, Pfeiltasten und Schliessen kommen vom geteilten Menue');
-  const handler = dashboardSource.slice(dashboardSource.indexOf("grid.querySelectorAll('[data-widget-size-preset]')"));
+  // Seit DW-P2-1 ein Handler am Zuhoerer der Flaeche (wireDashboardEditMode).
+  const handler = dashboardSource.slice(dashboardSource.indexOf('const resize = (btn) => {'));
   assert.match(handler.slice(0, 900), /menu\.hidePopover\?\.\(\);\s*grid\.querySelector\(`\[popovertarget=/, 'nach der Wahl gehoert der Fokus dem Menue-Knopf');
 
   const rules = [...eachRule(css)];
@@ -726,25 +730,32 @@ test('R14 P2: am Desktop bleiben die Zeilen einzeln, und eine einzelne Ueberfael
 
 test('R14 P2: mobil deckelt das Blatt bei zwei Zeilen, die Sammelzeile zaehlt als eine, Einkauf klappt mit', () => withStage(true, () => {
   const todayStr = toLocalDateKey(new Date());
-  // Die Uhr steht fest auf dem Morgen: die Termine liegen am Abend und waren
-  // nach 21 Uhr schon vorbei - dann fiel der Test je nach Tageszeit.
-  const now = new Date(`${todayStr}T08:00:00`);
+  // Die Uhr steht fest auf 13:00: die Termine liegen am Abend und waren
+  // nach 21 Uhr schon vorbei - dann fiel der Test je nach Tageszeit. Um 13:00
+  // ist das Mittagessen schon dran, also nicht „das Naechste" (nextFirst).
+  const now = new Date(`${todayStr}T13:00:00`);
   const upcomingEvents = [1, 2, 3].map((i) => ({ id: 40 + i, title: `Termin ${i}`, start_datetime: `${todayStr}T2${i}:00:00` }));
   const model = __test.buildTodayCockpitModel({ urgentTasks: fiveOverdue(), upcomingEvents }, [], { now });
   assert.equal(model.rows.length, 2, `zwei Zeilen auf dem Telefon, erhalten: ${model.rows.map((r) => r.title)}`);
   assert.equal(model.rows[0].kind, 'overdue', 'das Offene bleibt unter dem Deckel');
   assert.equal(model.overflow, 2, 'der Rest steht hinter "+N weitere"');
   // Termine plus Essen: keine Ansicht zeigt beides, also klappt die Fusszeile auf.
-  const shop = { urgentTasks: fiveOverdue(), upcomingEvents, todayMeals: [{ id: 9, meal_type: 'dinner', title: 'Pasta' }],
+  // So bleiben die verdeckten Zeilen gemischt (Termine und Essen), und nur dann klappt der Einkauf mit.
+  // Seit D1 (Critique 2026-10-26, Lauf 2) steht eine Mahlzeit nur als Zeile, solange ihre Zeit
+  // noch kommt: um 13:00 ist das Mittagessen vorbei. Der Snack rueckt als Naechstes nach vorn
+  // (nextFirst), das Abendessen bleibt verdeckt.
+  const shop = { urgentTasks: fiveOverdue(), upcomingEvents, todayMeals: [{ id: 9, meal_type: 'snack', title: 'Obst' }, { id: 10, meal_type: 'dinner', title: 'Pasta' }],
     shoppingLists: [{ id: 1, name: 'Wocheneinkauf', open_count: 7 }] };
   const withShop = renderTodayCockpit(shop, [], false, { now, moreOpen: false });
   assert.match(withShop, /dashboard\.todayShopping</, 'Reichweite: die Einkaufszeile steht im Blatt');
   const regionStart = withShop.indexOf('id="today-cockpit-more"');
-  const button = withShop.indexOf('data-today-more');
+  // Der Knopf am Ende der Liste - nicht das Bild ueber den Zeilen, das seit D3
+  // (Lauf 2) dieselbe Region steuert.
+  const button = withShop.indexOf('<button type="button" class="today-cockpit__more');
   const shopAt = withShop.indexOf('dashboard.todayShopping<');
   assert.ok(regionStart > 0 && regionStart < shopAt && shopAt < button,
     'auf dem Telefon steht der Einkauf hinter dem Knopf, nicht als eigene Zeile darunter');
-  assert.match(withShop, /dashboard\.todayMore\{(?:"|&quot;)count(?:"|&quot;):4\}/, 'und der Knopf zaehlt ihn mit (zwei Termine, Essen, Einkauf)');
+  assert.match(withShop, /dashboard\.todayMore\{(?:"|&quot;)count(?:"|&quot;):5\}/, 'und der Knopf zaehlt ihn mit (drei Termine, Abendessen, Einkauf)');
   const wall = __test.buildTodayCockpitModel({ urgentTasks: fiveOverdue() }, [], { cap: 8, groupOverdue: false });
   assert.equal(wall.rows.filter((r) => r.overdue).length, 5, 'die Wand bekommt ihre Zeilen, wenn sie es sagt');
 }));
@@ -821,8 +832,9 @@ test('R14: am Desktop traegt die Uebersicht "+ Neu" als angedockte Pille mit dem
   assert.equal(__test.renderFab(), '', 'kein schwebender Speed-Dial daneben');
   const editing = renderDashboardOverview({ display_name: 'Linda' }, true, null, {});
   assert.doesNotMatch(editing, /id="fab-main"/, 'im Anpassen-Modus gibt es kein Anlegen');
-  assert.match(dashboardSource, /function wireNewMenu\(container, signal\)/);
-  assert.match(dashboardSource, /wireNewMenu\(container, signal\)/);
+  // Seit U2 reist der Gastgeber mit (user, refresh): das Blatt geht ueber der Uebersicht auf.
+  assert.match(dashboardSource, /function wireNewMenu\(container, signal, host = \{\}\)/);
+  assert.match(dashboardSource, /wireNewMenu\(container, signal, \{ user, refresh: refreshAfterSheet \}\)/);
 }));
 
 test('R14: auf dem Telefon bleibt der Speed-Dial in der Kapsel', () => withStage(true, () => {
@@ -881,10 +893,10 @@ test('R22 D3: ein Termin aus der Uebersicht oeffnet sein Blatt ueber ihr, die an
   const dash = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   const wire = dash.slice(dash.indexOf('function wireLinks('), dash.indexOf('function reorderWidgetConfig('));
   assert.match(wire, /const eventLink = editing \? null : eventLinkOf\(el\.dataset\.route\);/);
-  assert.match(wire, /\? \(\) => openEventFromOverview\(eventLink, el, \{ container, rerender, user \}\)/, 'der Termin geht ueber das Blatt, nicht ueber navigate()');
+  assert.match(wire, /\? \(\) => openEventFromOverview\(eventLink, el, \{ container, refresh, user, signal \}\)/, 'der Termin geht ueber das Blatt, nicht ueber navigate()');
   assert.match(dash, /const \{ openEventById \} = await import\('\/pages\/calendar\.js'\);/, 'nachgeladen wie die Aufgabe');
   const cal = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
-  assert.match(cal, /export async function openEventById\(id, \{ date = null, anchor = null, user = null, onChanged = null, onRemoving = null \} = \{\}\)/);
+  assert.match(cal, /export async function openEventById\(id, \{ date = null, anchor = null, user = null, onChanged = null, onRemoving = null, signal = null \} = \{\}\)/);
 
   const { buildTodayProgram } = __test;
   // Jede Tageszeit belegt: selectTodayMeal waehlt nach der Uhr, gefunden wird immer id 16.
@@ -1013,4 +1025,374 @@ test('R22 D16: die Optionen einer ausgeblendeten Kachel stehen am Chip, in einem
     'das Menue nennt beide Handlungen mit Wort');
   const clock = tray.slice(tray.indexOf('data-widget-show="clock"') - 200, tray.indexOf('data-widget-show="clock"'));
   assert.doesNotMatch(clock, /--split/, 'ohne Optionen bleibt es ein einfacher Chip');
+});
+
+// --------------------------------------------------------------------------
+// DW-P3-2: DIE FEHLERKACHEL HAT DEN KOPF JEDER KACHEL. Sie baute ihren eigenen
+// (`<span class="widget__title">` + nackte Glyphe): kein Siegel, keine h3 - in
+// der Ueberschriften-Navigation fehlte genau die Kachel, die gerade kaputt ist.
+// --------------------------------------------------------------------------
+test('DW-P3-2: die Fehlerkachel traegt eine h3 mit Siegel ihres Moduls und die ruhige Zeile mit Wiederholen', () => {
+  for (const [id, slug] of [['tasks', 'tasks'], ['schedule', 'schedule'], ['nutrition', 'health'], ['weather', 'dashboard'], ['family', 'contacts']]) {
+    const html = __test.renderWidgetError(id);
+    assert.match(html, /<h3 class="widget__title">/, `${id}: der Kopf ist eine Ueberschrift`);
+    assert.match(html, new RegExp(`<span class="module-seal module-seal--sm" style="--seal-accent: var\\(--module-${slug}, var\\(--color-accent\\)\\)"`),
+      `${id}: das Vollton-Siegel nennt die Herkunft (${slug})`);
+    assert.doesNotMatch(html, /widget__title-icon|<span class="widget__title"/, `${id}: kein eigener Kopf-Dialekt`);
+    assert.match(html, /role="alert"/, `${id}: der Fehler wird angesagt`);
+    // Die Zeile: Satz, dann EIN Knopf, der auf den Satz verweist.
+    assert.match(html, new RegExp(`class="card-empty-row widget__empty"[\\s\\S]*id="widget-empty-${id}"[\\s\\S]*data-widget-retry="${id}"`));
+    assert.match(html, new RegExp(`aria-describedby="widget-empty-${id}"[^>]*data-widget-retry="${id}"|data-widget-retry="${id}"[^>]*aria-describedby="widget-empty-${id}"`),
+      `${id}: "Erneut versuchen" nennt, was nicht geladen wurde`);
+  }
+});
+
+// --------------------------------------------------------------------------
+// U7 (Ulas, WCAG 2.5.7): AM ZEIGER UMORDNEN OHNE ZIEHEN. Hoch/Runter stehen nur
+// am Finger (DW-P2-3); wer die Maus fuehrt und nicht ziehen kann, hatte nur die
+// Pfeiltasten am Griff. Jetzt traegt JEDE Kachel ein Menue (ihr Optionen-
+// Knopf als Ausloeser) mit "Nach vorn" und "Nach hinten" - am Rand gesperrt,
+// wie "nach oben" an der ersten Kategorie (Menue-Kanon, layout.css).
+// --------------------------------------------------------------------------
+test('U7: jede Kachel hat ein Menue mit Nach vorn / Nach hinten - Eintraege mit Namen, am Rand gesperrt', () => {
+  const entries = (html) => [...html.matchAll(/<button type="button" role="menuitem"( disabled)?\s+class="popover-menu__item"\s+data-action="([^"]+)"([^>]*)>\s*<i[^>]*><\/i>\s*<span>([^<]*)<\/span>/g)]
+    .map(([, disabled, action, attrs, label]) => `${action}${/data-widget-move="(up|down)"/.exec(attrs)?.[1] ? `:${/data-widget-move="(up|down)"/.exec(attrs)[1]}` : ''}=${label}${disabled ? ' (gesperrt)' : ''}`);
+  for (const id of ['birthdays', 'calendar']) {
+    const w = { id, size: '1x1', visible: true };
+    const first = __test.renderWidgetCustomizeControls(w, 0, 3);
+    const mid = __test.renderWidgetCustomizeControls(w, 1, 3);
+    const last = __test.renderWidgetCustomizeControls(w, 2, 3);
+    const trigger = mid.match(/<button type="button" class="widget-edit-controls__options popover-menu__trigger"\s+popovertarget="([^"]+)" aria-haspopup="menu" aria-expanded="false"\s+aria-label="([^"]+)"/);
+    assert.ok(trigger, `${id}: der Optionen-Knopf oeffnet ein Menue`);
+    assert.equal(trigger[1], `widget-tile-menu-${id}`);
+    assert.match(trigger[2], new RegExp(`common\\.moreActionsNamed.*${id === 'birthdays' ? 'nav.birthdays' : 'nav.calendar'}|common\\.moreActionsNamed`), `${id}: der Knopf nennt seine Kachel`);
+    const options = id === 'calendar' ? ['widget-options=dashboard.optionsFor'] : [];
+    const expected = (up, down) => [`widget-move:up=dashboard.customizeMoveForward${up ? ' (gesperrt)' : ''}`, `widget-move:down=dashboard.customizeMoveBack${down ? ' (gesperrt)' : ''}`];
+    assert.deepEqual(entries(mid).map((e) => e.replace(/\{.*$/, '')), [...expected(false, false), ...options], `${id}: mitten in der Reihe`);
+    assert.deepEqual(entries(first).map((e) => e.replace(/\{.*$/, '')).slice(0, 2), expected(true, false), `${id}: an erster Stelle geht es nicht weiter nach vorn`);
+    assert.deepEqual(entries(last).map((e) => e.replace(/\{.*$/, '')).slice(0, 2), expected(false, true), `${id}: an letzter Stelle nicht weiter nach hinten`);
+    assert.match(mid, /data-widget-move="down" data-widget-id="[^"]+"/, 'der Eintrag traegt seine Kachel - derselbe Handler wie Hoch/Runter');
+  }
+});
+
+// U10 (Ulas 2026-10-27): AM FINGER IST DER OPTIONEN-KNOPF EIN TIPP. Mit U7
+// standen die Optionen im "..."-Menue - am Telefon zwei Tipps fuer die
+// haeufigere Handlung, und das Menue wiederholte dort nur Hoch/Runter aus der
+// Leiste. Jetzt traegt jede Kachel mit Optionen zusaetzlich den direkten Knopf;
+// die Zeigerart entscheidet, welcher Ausloeser steht: am Finger der Knopf, am
+// Zeiger das Menue (mit Nach vorn/hinten). Nie beide, nie keiner.
+test('U10: am Finger oeffnet EIN Tipp die Optionen - der direkte Knopf statt des Menues, am Zeiger umgekehrt', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const dashboardCss = await readFile(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
+  const visible = (html) => html.replace(/<template[\s\S]*?<\/template>/g, '');
+  const direct = (html) => [...visible(html).matchAll(/<button type="button" class="widget-edit-controls__options widget-edit-controls__options--direct" data-widget-options="([^"]+)"\s+aria-label="([^"]+)"/g)];
+  const withOptions = __test.renderWidgetCustomizeControls({ id: 'calendar', size: '1x1' }, 1, 3);
+  const [hit] = direct(withOptions);
+  assert.ok(hit, 'eine Kachel mit Optionen traegt den direkten Knopf - ausserhalb des Menues, also ohne Oeffnen erreichbar');
+  assert.equal(hit[1], 'calendar', 'er nennt seine Kachel - derselbe Handler wie der Menue-Eintrag ([data-widget-options])');
+  assert.match(hit[2], /dashboard\.optionsFor/, 'derselbe Name wie der Eintrag im Menue');
+  assert.equal(direct(__test.renderWidgetCustomizeControls({ id: 'birthdays', size: '1x1' }, 1, 3)).length, 0,
+    'ohne Optionen kein Knopf - er oeffnete nichts');
+  assert.match(withOptions, /class="widget-edit-controls__menu"/, 'das Menue bleibt im Markup: am Zeiger ist es der Weg zu Nach vorn/hinten');
+
+  // Welcher Ausloeser steht, entscheidet die Zeigerart.
+  const rules = [...eachRule(dashboardCss)];
+  const displayOf = (selector, coarse) => rules
+    .filter((r) => r.selector.split(',').map((x) => x.trim()).includes(selector)
+      && (coarse ? r.at.some((a) => /\(pointer:\s*coarse\)/.test(a)) : !r.at.length))
+    .map((r) => /(?:^|;)\s*display:\s*([^;]+)/.exec(r.body)?.[1]?.trim())
+    .filter(Boolean)
+    .at(-1);
+  assert.equal(displayOf('.widget-edit-controls__options--direct', false), 'none', 'am Zeiger steht der direkte Knopf nicht - die Optionen liegen im Menue');
+  assert.equal(displayOf('.widget-edit-controls__options--direct', true), 'inline-flex', 'am Finger steht der direkte Knopf');
+  assert.equal(displayOf('.widget-edit-controls__menu', true), 'none', 'am Finger kein Menue: Hoch/Runter stehen in der Leiste, die Optionen am Knopf');
+  assert.equal(displayOf('.widget-edit-controls__menu', false), 'inline-flex', 'am Zeiger das Menue');
+
+  // Ein Tipp: der Klick auf den Knopf geht ohne Umweg an den Optionen-Dialog.
+  const wiring = dashboardSource.slice(dashboardSource.indexOf('function wireDashboardEditMode() {'));
+  const click = wiring.slice(wiring.indexOf("shell.addEventListener('click', (event) => {"));
+  assert.match(click.slice(0, 900), /else if \(btn\.matches\('\[data-widget-options\]'\)\) void editOptions\(btn\);/,
+    'der Knopf laeuft durch denselben Handler wie der Menue-Eintrag');
+});
+
+test('U7: die Sperre der Menue-Eintraege folgt dem Platz - auch im noch nicht geoeffneten Menue', () => {
+  const btn = (dir) => ({ dataset: { widgetMove: dir }, disabled: false });
+  const live = [btn('up'), btn('down')];
+  const inTemplate = [btn('up'), btn('down')];
+  const controls = {
+    querySelectorAll(sel) {
+      if (sel === '[data-widget-move]') return live;
+      if (sel === '.popover-menu > template') return [{ content: { querySelectorAll: (s) => (s === '[data-widget-move]' ? inTemplate : []) } }];
+      return [];
+    },
+    querySelector: () => null,
+  };
+  const wrapper = { querySelector: (sel) => (sel === ':scope > [data-widget-controls]' ? controls : null) };
+  __test.syncCustomizeControls(wrapper, { id: 'birthdays', size: '1x1' }, 0, 3);
+  assert.deepEqual([...live, ...inTemplate].map((b) => b.disabled), [true, false, true, false], 'erste Stelle: nach vorn gesperrt, auch im Template');
+  __test.syncCustomizeControls(wrapper, { id: 'birthdays', size: '1x1' }, 2, 3);
+  assert.deepEqual([...live, ...inTemplate].map((b) => b.disabled), [false, true, false, true], 'letzte Stelle: nach hinten gesperrt');
+});
+
+test('U7: ein Eintrag aus dem Menue ordnet ueber denselben Weg wie Hoch/Runter um, und der Fokus bleibt am Optionen-Knopf', () => {
+  const wiring = dashboardSource.slice(dashboardSource.indexOf('function wireDashboardEditMode() {'));
+  const click = wiring.slice(wiring.indexOf("shell.addEventListener('click', (event) => {"));
+  assert.match(click.slice(0, 700), /if \(btn\.matches\('\.popover-menu \[data-widget-move\]'\)\) moveFromMenu\(btn\);\s*else if \(btn\.matches\('\[data-widget-move\]'\)\) move\(btn\);/,
+    'der Menue-Eintrag hat seinen eigenen Weg (Fokus), vor dem Knopf');
+  const fromMenu = wiring.slice(wiring.indexOf('const moveFromMenu = (item) => {'), wiring.indexOf('\n    };\n', wiring.indexOf('const moveFromMenu = (item) => {')));
+  assert.match(fromMenu, /menu\?\.hidePopover\?\.\(\);/, 'das Menue schliesst');
+  assert.match(fromMenu, /trigger\?\.focus\(\{ preventScroll: true \}\);[\s\S]*moveWidget\(item\.dataset\.widgetId, item\.dataset\.widgetMove\)/,
+    'der Fokus geht VOR dem Umhaengen an den Ausloeser - arrangeChildren gibt ihn dann zurueck');
+  const moveWidget = wiring.slice(wiring.indexOf('const moveWidget = '), wiring.indexOf('\n    };\n', wiring.indexOf('const moveWidget = ')));
+  assert.match(moveWidget, /placeWidget\(/, 'moveWidget legt ueber placeWidget (Patch + Ansage "Platz n von m")');
+});
+
+// --------------------------------------------------------------------------
+// DW p7, Nachtrag p5b: TERMIN BEARBEITEN UEBER DER UEBERSICHT. Das Formular
+// traegt Regeln aus calendar.css (Farbwahl, Symbolwahl, Anhang); der Router
+// laedt das Blatt nur fuer die Kalenderseite. Ueber der Uebersicht stand
+// "Farbe" ohne einen Farbknopf (0px hoch, gemessen 390/1440).
+// --------------------------------------------------------------------------
+test('DW p7: openEventById leiht calendar.css fuer sein Formular - mit dem Signal der Seite darunter', async () => {
+  const savedDoc = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const head = [];
+  const makeLink = () => {
+    const listeners = {};
+    return {
+      rel: '', href: '', dataset: {}, isConnected: false, sheet: null,
+      getAttribute(name) { return this[name] ?? null; },
+      addEventListener(type, fn) { listeners[type] = fn; },
+      fire(type) { listeners[type]?.(); },
+      remove() { head.splice(head.indexOf(this), 1); this.isConnected = false; },
+    };
+  };
+  const fakeDoc = {
+    head: { appendChild(el) { head.push(el); el.isConnected = true; return el; } },
+    querySelectorAll: () => [],
+    querySelector: () => null,
+    createElement: () => makeLink(),
+    addEventListener() {}, removeEventListener() {},
+    documentElement: { dataset: {} },
+  };
+  Object.defineProperty(globalThis, 'document', { value: fakeDoc, configurable: true, writable: true });
+  globalThis.window ??= {};
+  globalThis.window.matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  const priorYuvomi = globalThis.window.yuvomi;
+  globalThis.window.yuvomi = { showToast: () => {}, navigate: () => {} };
+  let opened = null;
+  globalThis.__apiStub = {
+    get: async (path) => {
+      if (path === '/calendar/7') return { data: { id: 7, title: 'Sportfest', start_datetime: '2026-10-23', end_datetime: '2026-10-23', all_day: 1, assigned_users: [], external_source: 'local' } };
+      return { data: [] };
+    },
+  };
+  globalThis.__openDetailView = (opts) => { opened = opts; };
+  const page = new AbortController();
+  try {
+    const { openEventById } = await import('../public/pages/calendar.js');
+    await openEventById(7, { date: '2026-10-23', user: { id: 1, role: 'admin' }, onChanged: () => {}, signal: page.signal });
+    assert.ok(opened, 'das Blatt geht auf');
+    const lent = head.filter((el) => el.href === '/styles/calendar.css');
+    assert.equal(lent.length, 1, 'calendar.css haengt am Ende von <head>, einmal');
+    let ready = false;
+    void Promise.resolve(opened.edit?.ready).then(() => { ready = true; });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(ready, false, 'das Formular wartet auf das Blatt - die Farbwahl stuende sonst ohne Regeln da');
+    lent[0].fire('load');
+    await opened.edit.ready;
+    page.abort();
+    assert.equal(lent[0].isConnected, false, 'die Uebersicht geht, ihr geliehenes Blatt mit');
+  } finally {
+    delete globalThis.__apiStub;
+    delete globalThis.__openDetailView;
+    globalThis.window.yuvomi = priorYuvomi;
+    if (savedDoc) Object.defineProperty(globalThis, 'document', savedDoc); else delete globalThis.document;
+  }
+});
+
+// --------------------------------------------------------------------------
+// DW p11 (Review zu U2): DAS ANLEGEN-BLATT GEHOERT DER SEITE, VON DER ES KAM.
+// "+ Neu" wartet vor dem Oeffnen auf Daten und Seitenblatt (Kategorien,
+// Mitglieder, Praeferenzen). Wechselte man in der Zeit die Seite, ging das
+// Formular trotzdem auf - ueber der neuen Seite, mit `onChanged` der alten.
+// Das Signal der Uebersicht nahm nur das geliehene Seitenblatt mit.
+// --------------------------------------------------------------------------
+test('DW p11: verlaesst man die Uebersicht, waehrend ein Anlegen-Blatt laedt, geht es nicht ueber der naechsten Seite auf', async () => {
+  const savedDoc = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const head = [];
+  const makeLink = () => {
+    const listeners = {};
+    return {
+      rel: '', href: '', dataset: {}, isConnected: false, sheet: null, listeners,
+      getAttribute(name) { return this[name] ?? null; },
+      addEventListener(type, fn) { listeners[type] = fn; },
+      remove() { head.splice(head.indexOf(this), 1); this.isConnected = false; },
+    };
+  };
+  const fakeDoc = {
+    // Ein Blatt laedt einen Takt spaeter - wie im Browser nie im selben Task.
+    head: { appendChild(el) { head.push(el); el.isConnected = true; setImmediate(() => { el.onload?.(); el.listeners.load?.(); }); return el; } },
+    styleSheets: [],
+    querySelectorAll: () => [],
+    querySelector: () => null,
+    getElementById: () => null,
+    createElement: () => makeLink(),
+    addEventListener() {}, removeEventListener() {},
+    documentElement: { dataset: {} },
+  };
+  Object.defineProperty(globalThis, 'document', { value: fakeDoc, configurable: true, writable: true });
+  globalThis.window ??= {};
+  globalThis.window.matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  const priorYuvomi = globalThis.window.yuvomi;
+  globalThis.window.yuvomi = { showToast: () => {}, navigate: () => {} };
+  globalThis.__apiStub = {
+    get: async (path) => {
+      // /tasks/meta/options antwortet ohne data-Huelle (ensureAwayMeta).
+      if (path === '/tasks/meta/options') return { users: [{ id: 1, display_name: 'Linda' }], categories: [{ key: 'household', label: 'Haushalt' }], tags: [] };
+      if (path === '/notes/categories') return { data: [], meta: { can_manage_household: true } };
+      if (path === '/preferences') return { data: {} };
+      return { data: [] };
+    },
+  };
+  const opened = [];
+  globalThis.__openModal = () => { opened.push('modal'); };
+  const user = { id: 1, role: 'admin' };
+  // notes.js zieht Custom Elements (category-manager) mit.
+  const customGlobals = { HTMLElement: class {}, customElements: { define() {}, get() {} } };
+  const missingGlobals = Object.keys(customGlobals).filter((name) => !(name in globalThis));
+  for (const name of missingGlobals) globalThis[name] = customGlobals[name];
+  try {
+    const sheets = {
+      '/tasks': (await import('../public/pages/tasks.js')).openNewTask,
+      '/calendar': (await import('../public/pages/calendar.js')).openNewEvent,
+      '/notes': (await import('../public/pages/notes.js')).openNewNote,
+    };
+    for (const [route, openNew] of Object.entries(sheets)) {
+      // Gegenprobe: bleibt die Uebersicht stehen, geht das Formular auf.
+      opened.length = 0;
+      await openNew({ user, onChanged: () => {}, signal: new AbortController().signal });
+      assert.equal(opened.length, 1, `${route}: das Formular geht ueber der Uebersicht auf`);
+      // Die Uebersicht geht, waehrend das Blatt noch vorbereitet.
+      opened.length = 0;
+      const page = new AbortController();
+      const pending = openNew({ user, onChanged: () => {}, signal: page.signal });
+      page.abort();
+      await pending;
+      assert.equal(opened.length, 0, `${route}: das Formular geht nicht ueber der naechsten Seite auf`);
+    }
+  } finally {
+    for (const name of missingGlobals) delete globalThis[name];
+    delete globalThis.__apiStub;
+    delete globalThis.__openModal;
+    globalThis.window.yuvomi = priorYuvomi;
+    if (savedDoc) Object.defineProperty(globalThis, 'document', savedDoc); else delete globalThis.document;
+  }
+});
+
+// --------------------------------------------------------------------------
+// Review p11 (B7): DIE NEUE AUFGABE UEBER DER UEBERSICHT KENNT DAS
+// STANDARDZIEL. Bis U2 wechselte "+ Neu > Aufgabe" auf die Aufgabenseite,
+// deren render() die Praeferenzen las; das Blatt ueber der Uebersicht holte
+// nur Mitglieder und Kategorien, und das Formular stand auf "Nur lokal" -
+// die Aufgabe kam nie in der eingestellten CalDAV-Liste an. Der Termin holt
+// seine Praeferenzen schon (loadAwayFormContext), die Notiz hat kein Ziel.
+// --------------------------------------------------------------------------
+test('Review p11 (B7): openNewTask uebernimmt tasks_default_target, ohne dass die Aufgabenseite stand', async () => {
+  const savedDoc = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const head = [];
+  const fakeDoc = {
+    head: { appendChild(el) { head.push(el); setImmediate(() => el.onload?.()); return el; } },
+    styleSheets: [],
+    querySelectorAll: () => [], querySelector: () => null, getElementById: () => null,
+    createElement: () => ({ rel: '', href: '', dataset: {}, addEventListener() {} }),
+    addEventListener() {}, removeEventListener() {},
+    documentElement: { dataset: {} },
+  };
+  Object.defineProperty(globalThis, 'document', { value: fakeDoc, configurable: true, writable: true });
+  globalThis.window ??= {};
+  globalThis.window.matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  const priorYuvomi = globalThis.window.yuvomi;
+  globalThis.window.yuvomi = { showToast: () => {}, navigate: () => {} };
+  const target = 'caldav:3|https://dav.example/lists/family/';
+  globalThis.__apiStub = {
+    get: async (path) => {
+      if (path === '/tasks/meta/options') return { users: [{ id: 1, display_name: 'Linda' }], categories: [{ key: 'household', label: 'Haushalt' }], tags: [] };
+      if (path === '/preferences') return { data: { tasks_default_target: target } };
+      return { data: [] };
+    },
+  };
+  globalThis.__openModal = () => {};
+  // tasks.js zieht Custom Elements mit.
+  const customGlobals = { HTMLElement: class {}, customElements: { define() {}, get() {} } };
+  const missingGlobals = Object.keys(customGlobals).filter((name) => !(name in globalThis));
+  for (const name of missingGlobals) globalThis[name] = customGlobals[name];
+  try {
+    const { openNewTask, __test: tasks } = await import('../public/pages/tasks.js');
+    tasks.state.defaultSyncTarget = '';
+    await openNewTask({ user: { id: 1, role: 'admin' }, onChanged: () => {}, signal: new AbortController().signal });
+    assert.equal(tasks.state.defaultSyncTarget, target, 'das Formular waehlt das eingestellte Ziel vor (wireSyncTarget liest state.defaultSyncTarget)');
+  } finally {
+    for (const name of missingGlobals) delete globalThis[name];
+    delete globalThis.__apiStub;
+    delete globalThis.__openModal;
+    globalThis.window.yuvomi = priorYuvomi;
+    if (savedDoc) Object.defineProperty(globalThis, 'document', savedDoc); else delete globalThis.document;
+  }
+});
+
+// --------------------------------------------------------------------------
+// DW-P2-11: EINE LEERZEILE. Naehrwerte, Entsorgung und Schnellzugriffe sagten
+// "noch nichts" in drei Formen (Glyphe + Caption + Akzent-Textknopf, der je
+// nach Breite rechts stand oder unter den Satz brach). Jetzt die ruhige Zeile
+// der App (`cardEmptyRowHtml`, utils/empty-state.js): Satz, dann EIN
+// sekundaerer Knopf am Ende, der auf den Satz verweist.
+// --------------------------------------------------------------------------
+test('DW-P2-11: die leeren Kacheln sprechen die eine ruhige Zeile - Satz, Aktion am Ende, kein Glyphen-Dialekt', () => {
+  const rows = {
+    waste: __test.renderWasteWidget({ items: [] }, '1x1'),
+    quicklinks: __test.renderQuickLinks([]),
+    shopping: __test.renderShoppingLists([]),
+  };
+  for (const [id, html] of Object.entries(rows)) {
+    const row = html.match(/<div class="card-empty-row widget__empty">\s*<span class="card-empty-row__text" id="([^"]+)">[^<]+<\/span>\s*<button type="button" class="btn btn--secondary btn--sm card-empty-row__action"([^>]*)>/);
+    assert.ok(row, `${id}: die ruhige Zeile mit der Aktion am Ende`);
+    assert.match(row[2], new RegExp(`aria-describedby="${row[1]}"`), `${id}: die Aktion verweist auf den Satz, der ihr Objekt nennt`);
+    assert.doesNotMatch(html, /empty-state__icon|widget__empty-cta/, `${id}: keine Glyphe, kein Akzent-Textknopf`);
+  }
+  // Ohne Aktion: nur der Satz, ohne Verweis.
+  const pantry = __test.renderPantryWidget({ items: [] }, '1x1');
+  assert.match(pantry, /<div class="card-empty-row widget__empty">\s*<span class="card-empty-row__text">/);
+});
+
+/* DIE RUNDGANG-KARTE STEHT AM ERKLAERTEN ELEMENT (Critique R24, G6-Rundgang-P3-1).
+ * Gemessen vorher (s2/bin/tour.mjs): 1440 Karte x 540 bei Ring x 2-234 (306 px
+ * daneben), 390 Karte y 64 bei Ring y 766 (Leiste) bzw. 774 (Plus). Nachher
+ * neben der Seitenleiste, ueber Leiste und Plus, unter dem Plus im Kopf. */
+test('R24: die Rundgang-Karte haengt an der Seite des Rings, die Platz hat', () => {
+  const { onboardingCardPlacement: place } = __test;
+  const card = { width: 360, height: 375 };
+  // Desktop, Seitenleiste (hoch): rechts daneben, senkrecht in der Mitte.
+  assert.deepEqual(place({ left: 2, top: 2, right: 234, bottom: 898 }, card, { width: 1440, height: 900 }),
+    { side: 'right', x: 250, y: 263 });
+  // Desktop, Plus im Kopf (breit): darunter, am rechten Rand gehalten.
+  assert.deepEqual(place({ left: 1319, top: 26, right: 1414, bottom: 78 }, card, { width: 1440, height: 900 }),
+    { side: 'below', x: 1064, y: 94 });
+  // Telefon, Leiste unten (breit): darueber, mittig.
+  const phone = { width: 320, height: 376 };
+  assert.deepEqual(place({ left: 2, top: 766, right: 388, bottom: 842 }, phone, { width: 390, height: 844 }),
+    { side: 'above', x: 35, y: 374 });
+  // Telefon, Plus unten rechts (quadratisch): darueber, im Fenster gehalten.
+  assert.deepEqual(place({ left: 320, top: 774, right: 380, bottom: 834 }, phone, { width: 390, height: 844 }),
+    { side: 'above', x: 54, y: 382 });
+  // Kein Platz an keiner Seite: die Karte bleibt, wo das Overlay sie stellt.
+  assert.equal(place({ left: 0, top: 200, right: 390, bottom: 600 }, phone, { width: 390, height: 844 }), null);
+});
+
+test('R24: der Rundgang setzt nach einem Tipp keinen Ring - der Titel nimmt den Fokus', () => {
+  const src = dashboardSource;
+  const fn = src.slice(src.indexOf('function focusStep(button)'), src.indexOf('let finished = false;'));
+  assert.match(fn, /if \(lastInputWasKeyboard\(\) && !touch\) \{ button\?\.focus\(\); return; \}/);
+  assert.match(fn, /querySelector\('\.onboarding-title'\)\?\.focus\(\{ preventScroll: true \}\)/);
+  assert.doesNotMatch(src, /next\?\.focus\(\);/, 'kein Fokus an "Weiter" am Zeiger vorbei');
+  assert.match(src, /setTimeout\(\(\) => focusStep\(stepEl\.querySelector\('\.btn--primary'\)\), 50\);/);
 });

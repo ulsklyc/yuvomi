@@ -98,6 +98,26 @@
   }
 }
 
+/* DER ZEITRAUM ALS TITEL (#1797, Shell-Variante `page-toolbar--period-as-title`,
+ * layout.css). Ab 1024px traegt der Zeitraum den Inline-Schnitt der
+ * Canonical-Page-Head-Rolle - er ist dort der sichtbare Titel, die groesste
+ * Schrift des Kopfs. Das Jahr steht in der Sekundaerfarbe, wie Apples
+ * Kalender „Oktober 2026" setzt; Ziffern tabellarisch, damit die gemessene
+ * Titelbreite fuer jeden Tag einer Ansicht gilt. */
+@media (min-width: 1024px) {
+  .page-toolbar--period-as-title .page-toolbar__period-title {
+    font-size: var(--type-toolbar-title);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-tight);
+    letter-spacing: var(--tracking-tight);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .page-toolbar--period-as-title .page-toolbar__period-year {
+    color: var(--color-text-secondary);
+  }
+}
+
 /* DAS EINSTELLUNGS-BLATT MOBIL: EINE EBENE TIEFER, EINE GRAMMATIK (R14,
  * A8 P2-4). Unter 768px steht ueber dem Blatt die Zurueck-Leiste, der Titel
  * steht im Inhalt - bisher im Inline-Schnitt (22px), direkt ueber einem
@@ -146,15 +166,23 @@
 .loan-report__title,
 .day-view__date-label,
 .today-cockpit__header h2,
+/* EIN ABSCHNITT IST IMMER 20 (R24, Critique G6-Einst-P2-2). Bis R24 trat er
+ * unter einer Reichweite ("Fuer mich" / "Fuer den Haushalt") auf 17 zurueck -
+ * dieselbe Ueberschrift "Termin-Vorgaben" stand fuer Linda in 17, fuer Emma
+ * (ohne Haushalts-Reichweite) in 20. Die Reichweite ist jetzt ein
+ * Gruppenlabel (Block "Navigations-Gruppierungslabel"), keine Stufe ueber dem
+ * Abschnitt; damit haengt die Groesse eines Abschnitts nicht mehr davon ab,
+ * wer das Blatt oeffnet. */
 .settings-section__title,
-/* Die Reichweite eines Einstellungsblatts ("Fuer mich" / "Fuer den Haushalt")
- * gliedert Abschnitte, also traegt sie deren Stufe - siehe die Stufenleiter
- * weiter unten (R16). */
-/* Der Titel des Lese-Popovers traegt die Stufe des Blatts und der
- * Detailspalte (`.modal-panel__title`, Title 3): derselbe Termin stand im
- * Popover in 17px und im Blatt in 20px (Critique R18). */
+/* Der Titel des Lese-Popovers traegt die Stufe des Blatts (`.modal-panel__title`,
+ * Title 3): derselbe Termin stand im Popover in 17px und im Blatt in 20px
+ * (Critique R18). Die DETAILSPALTE hat seit R24 ihre eigene Rolle
+ * (Detailtitel, unten). */
 .detail-popover__title,
-.settings-scope__title,
+/* Der Kopf einer Listenspalte benennt die Spalte, wie "Alle Bereiche" der
+ * Gesundheit (`.health-areas__title`, u-section-title): "Ordner" stand dort in
+ * 14/600 sekundaer, eine Stufe ausserhalb jeder Rolle (R24, G0-Shell-P2-4). */
+.documents-folder-browser__title,
 .settings-navigation-panel__title,
 .split-group-name,
 .subscriptions-section-head h2,
@@ -232,10 +260,25 @@
  * und Filter-Labels): ganze Phrasen wie "Überfällig" oder Kategorienamen
  * ("Haushalt", "Schule") lasen in Versal + Tracking geschrien (Critique P2).
  * ------------------------------------------------------------------------ */
+/* DIE GRUPPE IN DEN EINSTELLUNGEN IST EINE ROLLE (R24, Critique G6-Einst-P2-2).
+ * Dieselben Gruppen standen in drei Groessen: die Spalte 12/600, die mobile
+ * Uebersicht 16/600 mit Glyphe (18 am Desktop), "Aktive Module"/"Navigation"
+ * 15/600 mit Haarlinie - und die Reichweite eines Blatts ("Fuer mich" / "Fuer
+ * den Haushalt") stand als 20er-Ueberschrift UEBER ihren Abschnitten, die
+ * deshalb auf 17 zurueckwichen. Alle vier gruppieren, keiner benennt einen
+ * Bereich: sie nehmen das Gruppierungslabel der Seitenleiste (Satzschreibung,
+ * Sekundaerton aus dem Modulblatt), und der Abschnitt darunter bleibt 20. */
 .nav-section-label,
 .more-sheet__section-label,
 .settings-shell__navigation-heading,
-.kanban-col__title {
+.settings-overview__heading,
+.settings-navigation-group__title,
+.settings-scope__title,
+.kanban-col__title,
+/* Die Gruppen der Schichtarten („Mit Uhrzeit", „Ganztaegig") gliedern EINEN
+ * Abschnitt - neben dem Abschnittstitel „Eigene Felder" (20) standen sie in
+ * 15/600 wie eine zweite Stufe (R24, Critique G1-Schichtplan-P3-2). */
+.schedule-type-group__title {
   font-size: var(--text-xs);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
@@ -251,14 +294,14 @@
 .document-viewer__unsupported-title,
 .recipe-card__title,
 .settings-card__title,
-/* EINE STUFENLEITER IM EINSTELLUNGSBLATT (Critique 2026-10-05, R16). Gemessen
- * im Kalender-Blatt: Blatt 22px, Reichweite 16px, Abschnitt 20px, Karte 17px -
- * die Reichweite, die alles darunter gliedert, war die KLEINSTE Stufe. Jetzt
- * folgt die Groesse der Tiefe: Blatt 22, Reichweite 20, Abschnitt 17, Karte 16.
- * Ein Blatt ohne Reichweite hat eine Stufe weniger (22 / 20 / 17) - dieselbe
- * Leiter, nur kuerzer. Die Ebene im Baum zieht shell.js nach (`aria-level`). */
-.settings-scope .settings-section__title,
-.settings-member__name,
+/* DIE LEITER IM EINSTELLUNGSBLATT (R16, seit R24 ohne Sonderstufe): Blatt 22,
+ * Abschnitt 20, Karte 17 - gleich, ob das Blatt Reichweiten hat. R16 hatte die
+ * Reichweite zur 20er-Stufe gemacht und Abschnitt (17) und Karte (16) darunter
+ * geschoben; die Groesse eines Abschnitts hing damit an der Rolle dessen, der
+ * das Blatt oeffnet. Die Reichweite ist jetzt ein Gruppenlabel (oben), die
+ * Ebene im Baum zieht shell.js weiter nach (`aria-level`). Die
+ * Zusammenfassung eines Status ("Lokal", Dokumentablage) ist ein Kartentitel. */
+.settings-status-summary__title,
 .settings-provider__name,
 .settings-sync-info__name,
 /* Dashboard-Widget-Titel eine Stufe über den Zeilen-Titeln (17px vs. 15px, die
@@ -266,6 +309,11 @@
  * und Inhalt (Critique P3). Hier stand „16px vs. 14px" - die Zahlen der Skala
  * VOR der Apple-Umstellung, während die Regel darunter längst --type-card-title
  * liest. */
+/* Gesundheit: der Titel eines Diagramms ("Blutdruck") und der Kopf der
+ * letzten Messungen sind Untertitel unter dem Abschnitt - Headline, nicht 18
+ * (ausserhalb der Skala) und nicht 14 sekundaer (R24, G5-Gesundheit-P2-2/P3-2). */
+.health-chart-section__title,
+.health-recent__title,
 .widget__title {
   font-size: var(--type-card-title);
   font-weight: var(--font-weight-semibold);
@@ -286,12 +334,7 @@
 .dms-result__title,
 .housekeeping-section-heading span,
 .cat-row__name,
-.cat-subrow__name,
-/* Gruppentitel über den Modul-Listen ("Übersicht", "Planen"). Sie standen in
- * der Section-Rolle (18px) und wurden in settings.css auf 14px übersteuert -
- * die Registrierung behauptete das eine, die Datei tat das andere, und im
- * Ergebnis rendert dasselbe h3-Element zwei Größen (Critique 2026-07-27). */
-.settings-navigation-group__title {
+.cat-subrow__name {
   font-size: var(--type-secondary);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
@@ -328,17 +371,58 @@
  * (list-row.css), und zwei Zeilen Lesetext stehen im Body-Abstand.
  * Guard: test-typography.js, "der Zeilentitel ist eine Rolle".
  * ------------------------------------------------------------------------ */
+/* Die offene Anfrage der Belohnungen ist eine Zeile ihrer Liste und stand mit
+ * einem Literal-Gewicht in 16/600 (R24, G0-Inv-4). Der Modulname in Aktive
+ * Module und Navigation stand als nacktes `<strong>` in 16/700 (R24, S4-Rest). */
 .u-row-title,
-.settings-scope .settings-card__title,
+.rw-pending__title,
+.settings-module-row__name,
 .list-row__name,
 .budget-loan-card__title,
 .meal-card__title,
 .agenda-event__title,
 .contact-item__name,
 .subscription-card__name,
+.settings-member__name,
 .rw-standing__name {
   font-size: var(--text-base);
   font-weight: var(--font-weight-medium);
+}
+
+/* --------------------------------------------------------------------------
+ * Detailtitel: der Name des Objekts im Kopf einer Detailspalte (R24)
+ *
+ * Title 2, semibold. Die Spalte rechts neben der Liste (`.split-view__detail-
+ * title`, master-detail.js: Aufgaben, Kontakte, Rezepte, Inventar, Gesundheit)
+ * trug 18px - eine Stufe, die es in der Skala nicht gibt, und kleiner als der
+ * 20er-Abschnitt, der in der Gesundheit direkt darunter beginnt (Critique
+ * G0-Shell-P2-4, G5-Gesundheit-P2-2). Bold bleibt dem Modulkopf (Title 2 bold
+ * eine Ebene darueber); der Detailtitel tritt ueber das Gewicht zurueck, nicht
+ * ueber die Groesse.
+ * Guard: test-typography.js, "R24: die Titelleiter".
+ * ------------------------------------------------------------------------ */
+.split-view__detail-title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* --------------------------------------------------------------------------
+ * Blocktitel im Zeitraster: der Name eines Blocks in Woche und Tag (R24)
+ *
+ * Caption 1, semibold - die Groesse des Rasters (der Block ist Mikrotext, seine
+ * Hoehe ist die Dauer). Der Schichtblock stand im Tag in 16/400 neben dem
+ * Termin in 12/600, in der Woche in 12/500 (Critique G1-Kalender-P3-3): drei
+ * Schnitte fuer dieselbe Stelle. Die Zeitzeile darunter bleibt im Modulblatt
+ * (calendar.css) und tritt ueber das Gewicht zurueck.
+ * ------------------------------------------------------------------------ */
+.week-event__title,
+.day-event__title,
+.schedule-time-block__title {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
 }
 
 /* --------------------------------------------------------------------------
@@ -373,6 +457,22 @@
 }
 
 /* --------------------------------------------------------------------------
+ * DIE ENDZONE EINER ZEILE: Footnote 13, halbfett, gleich breite Ziffern
+ * (Critique DW 2026-10-26, DW-P1-4)
+ *
+ * Die eine Angabe am Ende einer Zeile (`.list-row__end`, list-row.css):
+ * "wird 41", "Noch 2 Tage", "120 Punkte", "3/26". Sie steht eine Stufe unter
+ * dem Namen und eine Gewichtsstufe ueber der Metazeile - sie ist der Grund,
+ * warum man auf die Zeile schaut, aber nicht ihr Name. Auf der Uebersicht
+ * standen dafuer vier Formen (Pille 13/600 auf Mulde, 15/700, 12/500, 15/600).
+ * ------------------------------------------------------------------------ */
+.list-row__end {
+  font-size: var(--type-caption);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
  * DIE METAZEILE: Footnote 13, regular (R21, Critique 2026-10-21, D4)
  *
  * EINE ZEILE IST TITEL 16 + METAZEILE 13. Was unter dem Namen einer Zeile,
@@ -401,6 +501,10 @@
 .kanban-card__meta,
 .due-date,
 .priority-badge,
+/* Kueche (R24): die Metazeile des Vorrats (Menge, Status, MHD, Ort) und die
+   Zutatenzahl der Rezeptkachel unter dem Essensplan */
+.pantry-row__meta,
+.recipe-sidebar__card-meta,
 /* Kalender, Kontakte, Geburtstage */
 .agenda-event__meta,
 .contact-item__meta,

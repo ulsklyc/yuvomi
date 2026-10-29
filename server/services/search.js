@@ -373,6 +373,43 @@ export function upcomingEventsFirst(rows, fromMs, zone) {
 }
 
 /**
+ * DER GEBURTSTAGSTERMIN TRAEGT SEINEN NAMEN (R24, Critique G0 P1-1). Der Termin
+ * steht mit dem sprachneutralen Titel "Birthday: <Name>" in calendar_events
+ * (#524); Kalender und Uebersicht uebersetzen ihn ueber `birthday_name`
+ * (public/utils/birthday-event.js). Die globale Suche lieferte das Feld nicht,
+ * und Palette wie mobile Suche zeigten "Birthday: Emma" auf Deutsch. Dieselben
+ * Felder wie `serializeEvent()` (routes/calendar/helpers.js), mit derselben
+ * Regel fuer das unbekannte Geburtsjahr. Eine Abfrage fuer die (hoechstens
+ * SEARCH_LIMIT) Treffer, nicht ein Join in der FTS-Abfrage.
+ * @returns {Map<number, object>} Termin-ID -> Geburtstagsfelder
+ */
+function birthdayFieldsByEvent(database, events) {
+  const out = new Map();
+  if (!events.length) return out;
+  const ids = events.map((event) => Number(event.id));
+  const marks = ids.map(() => '?').join(', ');
+  const rows = database.prepare(`
+    SELECT calendar_event_id, name_day_calendar_event_id, name,
+           CASE WHEN year_unknown = 1 THEN NULL ELSE birth_date END AS birth_date
+    FROM birthdays
+    WHERE calendar_event_id IN (${marks}) OR name_day_calendar_event_id IN (${marks})
+  `).all(...ids, ...ids);
+  for (const row of rows) {
+    if (row.calendar_event_id != null && ids.includes(Number(row.calendar_event_id))) {
+      out.set(Number(row.calendar_event_id), {
+        birthday_name: row.name, birthday_date: row.birth_date ?? null, birthday_event_kind: 'birthday',
+      });
+    }
+    if (row.name_day_calendar_event_id != null && ids.includes(Number(row.name_day_calendar_event_id))) {
+      out.set(Number(row.name_day_calendar_event_id), {
+        birthday_name: row.name, birthday_date: null, birthday_event_kind: 'name_day',
+      });
+    }
+  }
+  return out;
+}
+
+/**
  * Führt die Suche aus und liefert dieselbe Ergebnis-Form wie zuvor, erweitert
  * um Gesundheitsdaten: { tasks, events, notes, contacts, items, meds, activities }.
  * Pro Entität wird der FTS-Treffer auf die Quelltabelle zurückgejoined,
@@ -459,11 +496,13 @@ export function runSearch(database, q, userId, { hiddenModules = null, disabledN
     // Preserve the compact global-search payload. The resolver-capable
     // projection supplies linked inheritance without loading attachment bodies
     // or unrelated sync metadata into this result bucket.
+    const birthdays = birthdayFieldsByEvent(database, eventRows);
     results.events = eventRows.map((event) => withExcerpt({
       id: event.id,
       title: event.title,
       start_datetime: event.start_datetime,
       all_day: event.all_day,
+      ...(birthdays.get(Number(event.id)) || {}),
       ...(event.is_occurrence_override ? {
         series_id: event.series_id,
         recurrence_id: event.recurrence_id,

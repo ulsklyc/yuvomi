@@ -3,9 +3,15 @@
  * Zweck: VAPID-Schlüssel auflösen/persistieren und Web-Push-Nachrichten senden.
  * Abhängigkeiten: web-push, server/db.js
  */
+import https from 'node:https';
+import { isIP } from 'node:net';
+import { parse as legacyParseUrl } from 'node:url';
 import webpushDefault from 'web-push';
 import * as dbModule from '../db.js';
 import { createLogger } from '../logger.js';
+import {
+  createGuardedLookup, isBlockedAddress, isBlockedHostname, normalizeHostname,
+} from '../utils/ssrf.js';
 import { isActiveAccount } from './household-members.js';
 
 const log = createLogger('Push');
@@ -19,6 +25,65 @@ const FALLBACK_SUBJECT = 'mailto:admin@example.com';
 
 const LOCAL_HOSTS = new Set(['localhost', 'localhost.localdomain', '127.0.0.1', '[::1]', '::1']);
 const LOCAL_SUFFIXES = ['.local', '.localdomain', '.internal', '.lan', '.home', '.invalid'];
+
+/**
+ * Obergrenze fuer einen einzelnen Versand. Ein Push-Dienst antwortet in
+ * Millisekunden; ein Ziel, das die Verbindung annimmt und dann schweigt, darf
+ * weder die Erinnerungsrunde noch den Restore aufhalten, der auf laufende
+ * Versandjobs wartet. Dient als Leerlauf-Timeout des Sockets UND als harte
+ * Frist fuer den ganzen Versand (ein tropfender Server unterliefe das erste).
+ */
+export const PUSH_SEND_TIMEOUT_MS = 10_000;
+
+/**
+ * Darf an diesen Endpoint gesendet werden? Echte Push-Dienste (FCM, Mozilla,
+ * Apple, Microsoft) sind oeffentliche https-Hosts. Abgewiesen werden alles
+ * ausser https, `localhost` und reservierte interne Suffixe sowie IP-Literale
+ * aus privaten, lokalen oder reservierten Netzen.
+ *
+ * Ein IP-Literal muss hier fallen: Node fragt den `lookup` des Agents nur fuer
+ * Hostnamen, eine Literal-Adresse wird ohne ihn verbunden. Hostnamen prueft
+ * der Guard-Lookup beim Verbindungsaufbau (gegen DNS-Rebinding) - deshalb hier
+ * keine eigene Aufloesung.
+ *
+ * `href` ist die WHATWG-normalisierte Form (z. B. `https://2130706433/` wird
+ * `https://127.0.0.1/`); gesendet wird an sie, damit Pruefung und Versand
+ * dieselbe Adresse sehen.
+ *
+ * DERSELBE HOST AUCH FUER web-push: Es liest den Endpoint mit dem alten
+ * `url.parse`, und das schneidet einen Hostnamen am ersten Zeichen ab, das es
+ * dort nicht erwartet. Aus `127.0.0.1{.evil.com` (fuer WHATWG ein Domainname,
+ * also erst beim Lookup geprueft) wurde so das Literal 127.0.0.1, verbunden
+ * ohne Lookup. Deshalb nur Hostnamen aus Buchstaben, Ziffern, `-` und `.` - so
+ * sieht jeder Push-Dienst aus - und zur Sicherheit derselbe Host in beiden
+ * Parsern.
+ *
+ * @returns {{ ok: true, href: string, host: string } | { ok: false, reason: string }}
+ */
+export function checkPushEndpoint(endpoint) {
+  if (typeof endpoint !== 'string' || !endpoint || endpoint.length > 2048) {
+    return { ok: false, reason: 'invalid' };
+  }
+  let url;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return { ok: false, reason: 'invalid' };
+  }
+  if (url.protocol !== 'https:') return { ok: false, reason: 'scheme' };
+  if (url.username || url.password) return { ok: false, reason: 'invalid' };
+  const hostname = normalizeHostname(url.hostname).replace(/\.$/, '');
+  if (!hostname) return { ok: false, reason: 'invalid' };
+  if (!isIP(hostname) && !/^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/.test(hostname)) {
+    return { ok: false, reason: 'invalid' };
+  }
+  if (normalizeHostname(legacyParseUrl(url.href).hostname ?? '').replace(/\.$/, '') !== hostname) {
+    return { ok: false, reason: 'invalid' };
+  }
+  if (isBlockedHostname(hostname)) return { ok: false, reason: 'private' };
+  if (isIP(hostname) && isBlockedAddress(hostname)) return { ok: false, reason: 'private' };
+  return { ok: true, href: url.href, host: url.host };
+}
 
 /** Nur der Host des Endpoints - der volle Endpoint enthält ein Geräte-Token. */
 function pushHost(endpoint) {
@@ -80,7 +145,13 @@ function normalizeSubject(raw) {
 /** Eine Pause laeuft nach dieser Zeit ab und heilt sich ohne Erneuerung (#1904). */
 const WALL_PAUSE_MAX_AGE_HOURS = 12;
 
-export function createPushService({ db, webpush = webpushDefault } = {}) {
+export function createPushService({
+  db,
+  webpush = webpushDefault,
+  // Fuer Tests injizierbar: der DNS-Lookup UNTER dem Guard, die Frist.
+  dnsLookup,
+  timeoutMs = PUSH_SEND_TIMEOUT_MS,
+} = {}) {
   const getDb = () => (db || dbModule.get());
   // ensureVapid() läuft bei jedem Versand - der Hinweis auf den Platzhalter soll
   // die Logs nicht fluten, aber nach einer Konfigurationsänderung wieder greifen.
@@ -148,6 +219,33 @@ export function createPushService({ db, webpush = webpushDefault } = {}) {
     return ensureVapid().publicKey;
   }
 
+  /**
+   * Ein Versand mit eigenem Agent: dessen `lookup` prueft jede aufgeloeste
+   * Adresse beim Verbindungsaufbau, `timeout` begrenzt den Leerlauf des
+   * Sockets, die Frist den ganzen Versand. web-push folgt keinen Redirects,
+   * es gibt also genau einen Hop. Der Agent lebt nur fuer diesen Versand und
+   * wird danach zerstoert - bei Fristablauf samt haengendem Socket.
+   */
+  async function sendGuarded(subscription, body) {
+    const agent = new https.Agent({
+      keepAlive: false,
+      lookup: createGuardedLookup(dnsLookup ? { lookup: dnsLookup } : {}),
+    });
+    let timer;
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`Push send timed out after ${timeoutMs} ms`)), timeoutMs);
+    });
+    try {
+      return await Promise.race([
+        webpush.sendNotification(subscription, body, { agent, timeout: timeoutMs }),
+        deadline,
+      ]);
+    } finally {
+      clearTimeout(timer);
+      agent.destroy();
+    }
+  }
+
   async function sendPushToUser(userId, payload) {
     // DER EINE ENGPASS FUER WEB PUSH: Erinnerungen, die Zuweisung einer Aufgabe
     // und die Medikamenten-Meldung enden alle hier. Ein ehemaliges Konto
@@ -160,9 +258,19 @@ export function createPushService({ db, webpush = webpushDefault } = {}) {
     ).all(userId);
     let sent = 0;
     for (const sub of subs) {
-      const subscription = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };
+      // Auch Bestandszeilen von vor der Pruefung beim Speichern: ein Endpoint
+      // ins eigene Netz wird nie angefasst und wie ein erloschenes Abo (404/410)
+      // entfernt - zustellbar wird er nie. Geloggt nur der Host - der volle
+      // Endpoint traegt ein Geraete-Token.
+      const target = checkPushEndpoint(sub.endpoint);
+      if (!target.ok) {
+        getDb().prepare('DELETE FROM push_subscriptions WHERE id = ?').run(sub.id);
+        log.warn(`Removed push subscription ${sub.id} with a non-public endpoint (host=${pushHost(sub.endpoint)}, reason=${target.reason})`);
+        continue;
+      }
+      const subscription = { endpoint: target.href, keys: { p256dh: sub.p256dh, auth: sub.auth } };
       try {
-        await webpush.sendNotification(subscription, JSON.stringify(payload));
+        await sendGuarded(subscription, JSON.stringify(payload));
         getDb().prepare('UPDATE push_subscriptions SET last_used_at = ? WHERE id = ?')
           .run(new Date().toISOString(), sub.id);
         sent += 1;

@@ -203,13 +203,16 @@ export function googleFailureAction(err, attempts) {
  * Stoppsignal eines Durchgangs über CalDAV (#1863) und Google (#2136, dort
  * immer ohne Collection, also für das ganze Konto). Nach der ersten
  * kontoweiten Absage geht in diesem Durchgang keine Anfrage mehr an das
- * Konto - weder Löschen noch Ändern; die Aufträge bleiben, ohne Versuch, für
- * den nächsten. Ein 403 sperrt nur seine Collection: er kann einem einzelnen,
+ * Konto - weder Löschen noch Ändern, und über CalDAV auch kein Aufräumen
+ * alter Upload-Reste, kein Upload und keine Mitnahme (#2135); die Aufträge
+ * bleiben, ohne Versuch, für den nächsten. Ein 403 sperrt nur seine Collection: er kann einem einzelnen,
  * nur lesbar geteilten Kalender gelten, und dessen Aufträge stünden sonst bei
  * jedem Durchgang vor denen aller anderen Kalender.
  *
- * Ein Durchgang ist EIN Konto mit EINEM Client: Löschen und Ändern teilen sich
- * das Signal, der nächste Durchgang beginnt mit einem neuen.
+ * Ein Durchgang ist EIN Konto mit EINEM Client: jede schreibende Phase teilt
+ * sich das Signal - es entsteht vor der ersten Anfrage und geht an alle
+ * (`createUploadGate(stop)` für die Uploads) -, der nächste Durchgang beginnt
+ * mit einem neuen.
  *
  *   const stop = createRefusalStop();
  *   if (stop.blocks(collectionUrl)) continue;   // vor jeder Anfrage
@@ -217,15 +220,20 @@ export function googleFailureAction(err, attempts) {
  */
 export function createRefusalStop() {
   let account = null;
-  const collections = new Set();
+  const collections = new Map(); // Collection-URL → Absage
   const key = (url) => String(url || '').replace(/\/?$/, '/');
   return {
+    /** Ohne Collection: nur die Frage, ob das ganze Konto gesperrt ist. */
     blocks(collectionUrl) {
       return account !== null || (!!collectionUrl && collections.has(key(collectionUrl)));
     },
     trip(err, collectionUrl) {
-      if (outboundErrorStatus(err) === 403 && collectionUrl) collections.add(key(collectionUrl));
+      if (outboundErrorStatus(err) === 403 && collectionUrl) collections.set(key(collectionUrl), err);
       else account = err;
+    },
+    /** Die Absage, die diese Collection sperrt, für das Log; sonst null. */
+    reason(collectionUrl) {
+      return account ?? (collectionUrl ? collections.get(key(collectionUrl)) ?? null : null);
     },
   };
 }
@@ -1152,6 +1160,8 @@ export function markEventUploaded(eventId, { source, uid, objectUrl, calRefId, a
     UPDATE calendar_events
     SET external_source = ?, external_calendar_id = ?, local_calendar_id = NULL,
         external_object_url = ?, calendar_ref_id = ?,${forCaldav ? '\n        caldav_account_id = ?,' : ''}
+        -- Ein Upload belegt nichts (#1839): gesehen setzt nur der Abruf.
+        seen_on_server = 0,
         color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END,
         outbound_dirty = CASE WHEN ? = 1 THEN 1 ELSE outbound_dirty END,
         outbound_move_to = COALESCE(?, outbound_move_to),
@@ -1478,11 +1488,12 @@ export function isUnbookedOwnUpload({ source, uid, calendarUrl }) {
  * @param {(row: object, calendarUrl: string) => boolean} [p.wantsUploadHere]
  *        iCloud: will diese lokale Zeile weiter hinauf?
  * @param {Set<string>} [p.calendarUrls]  die in diesem Lauf abgerufenen Kalender
+ * @param {object} [p.stop]  Stoppsignal des Durchgangs (#2135)
  * @returns {Promise<number>} entfernte Objekte
  */
-export function releaseLeftoverUploads(client, { source, accountId = null, wantsUploadHere = null, calendarUrls = null }) {
+export function releaseLeftoverUploads(client, { source, accountId = null, wantsUploadHere = null, calendarUrls = null, stop = null }) {
   return removeLeftoverUploads(client, {
-    source, accountId, kinds: ['event'],
+    source, accountId, kinds: ['event'], stop,
     stateOf: (attempt) => uploadAttemptState(attempt, wantsUploadHere),
     inScope: calendarUrls
       ? (url) => [...calendarUrls].some((known) => sameCalendarUrl(known, url))

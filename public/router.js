@@ -16,13 +16,14 @@ import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
 import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight, bindNavMinimize } from '/utils/ux.js';
+import { glideSidebar } from '/utils/sidebar-glide.js';
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { inertOutside } from '/utils/background-inert.js';
-import { showToast, endFeedbackToasts } from '/utils/toast-show.js';
+import { showToast, endModuleFeedback, feedbackScope } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
 import { createNavigate, prefetchPathOf, focusMainAfterNavigation, unlessAborted, isCurrentAddress } from '/utils/router-navigate.js';
 import { pageMountTarget } from '/utils/page-mount.js';
-import { friendlyError, unhandledErrorSentence } from '/utils/friendly-error.js';
+import { unhandledErrorSentence } from '/utils/friendly-error.js';
 import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
 import { dismissFilterPopovers } from '/utils/filter-sheet.js';
 import { watchToastPlacement } from '/utils/toast-placement.js';
@@ -39,6 +40,7 @@ import { brandMarkSvg } from '/utils/brand-mark.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
+import { localizeBirthdayEvent } from '/utils/birthday-event.js';
 import {
   SEARCH_SECTIONS, NEW_ACTIONS, searchResultCount, markSegments, paletteCommands, paletteStatusText,
   readRecent, rememberRecent, visibleRecent, forgetAllRecent, RECENT_MAX,
@@ -51,6 +53,7 @@ import { hasLeaveGuard, mayLeave } from '/utils/leave-guard.js';
 import { createUpdateFlow, isUserBusy } from '/utils/app-update.js';
 import { createStartHandoff } from '/utils/start-handoff.js';
 import { showSessionUnreachable, showPageUnreachable, isUnreachableFailure } from '/utils/session-unreachable.js';
+import { createOfflineSession } from '/utils/offline-session.js';
 import { wireSheetDrag } from '/utils/sheet-drag.js';
 import {
   handleBackNavigation, closeAllOverlays, consumeOverlayMarker,
@@ -140,6 +143,9 @@ const ROUTES = [
   { path: '/housekeeping', page: '/pages/housekeeping.js', requiresAuth: true, module: 'housekeeping', titleKey: 'nav.housekeeping' },
   { path: '/waste', page: '/pages/waste.js', requiresAuth: true, module: 'waste', titleKey: 'nav.waste' },
   { path: '/rewards',  page: '/pages/rewards.js',    requiresAuth: true, module: 'rewards',   titleKey: 'nav.rewards' },
+  // Der Verlauf der Belohnungen ist ein Ort (R24 S8-F1): eigene Adresse, dieselbe
+  // Seite, dasselbe Modul - Zurueck, Neuladen und Link landen im Verlauf.
+  { path: '/rewards/history', page: '/pages/rewards.js', requiresAuth: true, module: 'rewards', titleKey: 'nav.rewards' },
 ];
 
 // Settings ist eine Sektion mit einer Wurzel und je einer exakten Route pro
@@ -369,9 +375,15 @@ function navigationIdle() {
  * Als WeakRef: ein abgehaengter Port der Vorseite bleibt nicht im Speicher.
  */
 let _lastContentPort = null;
+// NUR DER KNOTEN, KEINE MESSUNG (Critique R24 G3-Quer-P2-2): `scrollTop` hier
+// zu lesen verlangte je Scroll-Ereignis ein aktuelles Layout - nach jedem
+// Klassenwechsel eines anderen Lauschers (Kapsel minimiert, Kopf faltet) als
+// erzwungenes Layout gemessen (`router.js:onscroll` 40 ms im Vorrat, 4x CPU).
+// Ob der Port oben steht, fragt scrollPageToTop() erst beim Tipp.
 document.addEventListener('scroll', (e) => {
   const port = e.target;
-  if (port instanceof Element && port.scrollTop > 0 && port.closest('#main-content')) {
+  if (!(port instanceof Element) || port === _lastContentPort?.deref?.()) return;
+  if (port.closest('#main-content')) {
     _lastContentPort = typeof WeakRef === 'function' ? new WeakRef(port) : null;
   }
 }, { capture: true, passive: true });
@@ -683,6 +695,8 @@ function topLevelSection(path) {
   // startsWith('/schedule') traefe auch einen hypothetischen kuenftigen Pfad
   // wie '/schedules...', der zu keinem echten Schedule-Tab gehoert.
   if (typeof path === 'string' && (path === '/schedule' || path.startsWith('/schedule/'))) return '/schedule';
+  // Der Verlauf der Belohnungen (R24 S8-F1) markiert "Belohnungen".
+  if (path === '/rewards/history') return '/rewards';
   return path ?? '/';
 }
 
@@ -836,12 +850,38 @@ const startHandoff = createStartHandoff({
  * Namen sind der Vertrag (NAVIGATE_DEPS): fehlt einer, wirft createNavigate()
  * schon beim Laden.
  */
+// Kaltstart ohne Verbindung aus dem Abzug der letzten Sitzung (#2293,
+// utils/offline-session.js): der Hinweisstreifen sagt es, und sobald der
+// Server antwortet, startet die Sitzung wie jede andere und die Seite holt
+// ihren frischen Stand. Eine 401 dabei meldet api.js als `auth:expired`.
+const offlineSession = createOfflineSession({
+  window,
+  document,
+  verify: () => auth.me(),
+  onChange: () => refreshOfflineBanner(),
+  onVerified: async (result) => {
+    routerState.currentUser = result.user;
+    routerState._preferencesLoaded = false;
+    await syncPreferencesOnce();
+    if (!routerState.currentUser) return;
+    startThirdPartyModulePolling();
+    if (!['split_guest', 'display'].includes(routerState.currentUser.access_scope)) {
+      loadReminderStyles();
+      initReminders();
+      initPushAndReport();
+    }
+    rebuildNavigation();
+    refreshCurrentRoute();
+  },
+});
+
 const navigate = createNavigate(routerState, {
   ROUTES, allRoutes, unknownPathDetour, publicPathDetour, detourPaths, canAccessNavModule,
   location, history, window, document,
   hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
   auth: startHandoff.auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush: initPushAndReport,
   armScreensaver, forgetSessionState,
+  holdOfflineSession: () => offlineSession.start(),
   // Nur ein 401 fuehrt zur Anmeldung; jeder andere Fehler der Sitzungspruefung
   // zeichnet diesen Zustand in #app und versucht selbst erneut (Critique R19).
   showSessionUnreachable: (err, retry) => showSessionUnreachable(document.getElementById('app'), err, retry),
@@ -1893,8 +1933,10 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // DIE RUECKMELDUNG ENDET MIT IHREM MODUL (Critique R22, D18): der Toast
       // "Aufgabe erledigt - Rueckgaengig" wanderte in den Einkauf mit (a2,
       // Casey). Ihre Handlung gilt (utils/toast-show.js); zwischen den Reitern
-      // der Kueche bleibt sie - die Kueche ist EIN Modul der Navigation.
-      if (moduleSectionOf(previousPath) !== moduleSectionOf(route.path)) endFeedbackToasts();
+      // der Kueche bleibt sie - die Kueche ist EIN Modul der Navigation. Seit
+      // R24 (G0-Shell-P1-2) auch die, die erst NACH dem Wechsel kaeme: der
+      // Wechsel macht jede vorher genommene Modul-Marke alt (feedbackScope).
+      if (moduleSectionOf(previousPath) !== moduleSectionOf(route.path)) endModuleFeedback();
       style.cleanup();
       // Lebenszyklus-Vertrag (#976): der Router besitzt EIN AbortController je
       // Seitenaufbau und bricht ihn hier ab, wo die Route ersetzt wird. Die
@@ -2136,16 +2178,19 @@ function renderAppShell(container) {
   sidebarToggle.addEventListener('click', (event) => {
     const nowCollapsed = !document.documentElement.classList.contains('sidebar-collapsed');
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, nowCollapsed ? '1' : '0');
-    applySidebarCollapsed(nowCollapsed);
-    if (event.detail > 0) {
-      document.documentElement.classList.toggle('sidebar-collapse-pointer-lock', nowCollapsed);
-    }
-    // Pointer clicks leave the toggle focused, which immediately re-expands the
-    // collapsed rail via .nav-sidebar:focus-within. Blur only for pointer-driven
-    // activation so keyboard users keep the expected focus behavior.
-    if (nowCollapsed && event.detail > 0) {
-      requestAnimationFrame(() => sidebarToggle.blur());
-    }
+    // Ein Layout, die Kanten gleiten per View Transition (utils/sidebar-glide.js).
+    // Zeigersperre und Blur gehoeren in denselben Wechsel: ohne sie hielten
+    // Hover-Ausklappen und `:focus-within` die Tafel im neuen Bild breit.
+    glideSidebar(() => {
+      applySidebarCollapsed(nowCollapsed);
+      if (event.detail > 0) {
+        document.documentElement.classList.toggle('sidebar-collapse-pointer-lock', nowCollapsed);
+      }
+      // Pointer clicks leave the toggle focused, which immediately re-expands the
+      // collapsed rail via .nav-sidebar:focus-within. Blur only for pointer-driven
+      // activation so keyboard users keep the expected focus behavior.
+      if (nowCollapsed && event.detail > 0) sidebarToggle.blur();
+    });
     const lbl = nowCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse');
     sidebarToggle.setAttribute('aria-label', lbl);
     sidebarToggle.setAttribute('title', lbl);
@@ -3506,20 +3551,29 @@ function loadReminderStyles() {
   document.head.appendChild(link);
 }
 
-function initOfflineBanner() {
+/**
+ * Der Streifen steht, solange das Geraet offline ist ODER die App aus dem
+ * Abzug der letzten Sitzung gestartet ist (#2293). Im zweiten Fall meldet
+ * `navigator.onLine` oft "online" (Mobilnetz da, Heimserver nicht erreichbar),
+ * und der Streifen sagt dann, was wirklich gilt: gespeicherter Stand.
+ */
+function refreshOfflineBanner() {
   const banner = document.getElementById('offline-banner');
   if (!banner) return;
   const i18nSpan = banner.querySelector('[data-i18n]');
-  function update() {
-    banner.hidden = navigator.onLine;
-    if (i18nSpan) i18nSpan.textContent = t('offline.banner');
-    document.documentElement.style.setProperty(
-      '--offline-banner-height', navigator.onLine ? '0px' : `${banner.offsetHeight || 40}px`
-    );
-  }
-  window.addEventListener('online', update);
-  window.addEventListener('offline', update);
-  update();
+  const fromSnapshot = offlineSession.isActive();
+  const show = !navigator.onLine || fromSnapshot;
+  banner.hidden = !show;
+  if (i18nSpan) i18nSpan.textContent = t(fromSnapshot ? 'offline.snapshot' : 'offline.banner');
+  document.documentElement.style.setProperty(
+    '--offline-banner-height', show ? `${banner.offsetHeight || 40}px` : '0px'
+  );
+}
+
+function initOfflineBanner() {
+  window.addEventListener('online', refreshOfflineBanner);
+  window.addEventListener('offline', refreshOfflineBanner);
+  refreshOfflineBanner();
 }
 
 /**
@@ -4164,7 +4218,7 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   // `dateKey` ist der Kalendertag in der ANZEIGEZONE: der Termin-Treffer baut
   // daraus den Tag seines Links (#1607), und ein synchronisierter Termin liegt
   // als Instant in der Zeile - sein UTC-Tag waere der falsche.
-  const fmt = { dateText, formatTime, activityLabel, dateKey: zonedDateKey };
+  const fmt = { dateText, formatTime, activityLabel, dateKey: zonedDateKey, eventTitle: (item) => localizeBirthdayEvent(item).title };
   if (data) {
     SEARCH_SECTIONS.forEach((section) => {
       const hits = Array.isArray(data?.[section.bucket]) ? data[section.bucket] : [];
@@ -4751,9 +4805,20 @@ function placeNavIndicator(indicator, apply, instant = false) {
   if (first) indicator.style.transition = 'none';
   apply();
   if (!first) return;
-  indicator.getBoundingClientRect();
-  indicator.style.transition = '';
-  if (indicator.getClientRects().length) indicator.dataset.placed = '1';
+  // DER SPRUNG BRAUCHT KEIN SOFORTIGES LAYOUT (Critique R24 S12): damit
+  // `transition: none` gilt, genuegt EIN berechneter Stil mit dem neuen Wert -
+  // den rechnet das naechste Bild ohnehin. Bis dahin las hier
+  // `getBoundingClientRect()` und legte im Seitenwechsel die eben eingesetzte
+  // Zielseite ein zweites Mal aus (4x CPU ~17 ms in der Rueckkehr zur
+  // Uebersicht). Freigegeben wird nach dem gemalten Bild; markiert wird nur
+  // ein Indikator mit gezeichneter Box.
+  const token = (indicator._placeToken ?? 0) + 1;
+  indicator._placeToken = token;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (indicator._placeToken !== token) return;
+    indicator.style.transition = '';
+    if (indicator.checkVisibility ? indicator.checkVisibility() : indicator.getClientRects().length) indicator.dataset.placed = '1';
+  }));
 }
 
 /**
@@ -4854,6 +4919,51 @@ const TAB_INDICATOR_MAX_WIDTH = 64;
  * die Label-Grundlinie frei bleibt und die Kapsel weder in die Safe-Area noch
  * an die Bar-Kante läuft.
  */
+/* DIE LAGE DER PILLE HAENGT AN DER KAPSEL, NICHT AM INHALT (Critique R24
+ * S12, G0-Shell-P2-6). Im Seitenwechsel springt die Pille im Frame des neuen
+ * Inhalts (`instant`) - ihre Messung lief damit IN der View Transition, direkt
+ * nach dem Einsetzen der Zielseite, und legte diese ein zweites Mal aus
+ * (gemessen 17 ms bei 4x CPU in der Rueckkehr zur Uebersicht). Die Kapsel
+ * aendert sich dabei nicht. Gemerkt wird je Ziel die Lage relativ zur Kapsel,
+ * gueltig, solange Kapselgroesse (ResizeObserver, `_tabGeomEpoch`) und
+ * Kapselzustand (Klassen: minimiert, Rueckweg) gleich sind; gemessen wird sie
+ * spaetestens beim Druck auf das Ziel, wenn das Layout noch sauber ist
+ * (`warmTabGeometry`). */
+let _tabGeomEpoch = 0;
+const _tabGeom = new WeakMap();
+
+function tabGeometry(nav, active) {
+  const key = `${_tabGeomEpoch}|${nav.className}`;
+  const cached = _tabGeom.get(active);
+  if (cached?.key === key) return cached;
+  const nr = nav.getBoundingClientRect();
+  const ar = active.getBoundingClientRect();
+  const well = active.querySelector('.nav-item__icon-well');
+  const wr = well ? well.getBoundingClientRect() : ar;
+  const width = Math.max(
+    wr.width,
+    Math.min(ar.width - TAB_INDICATOR_INSET * 2, TAB_INDICATOR_MAX_WIDTH),
+  );
+  const geometry = {
+    key,
+    width,
+    height: wr.height,
+    // clientTop: der Indikator sitzt in der Padding-Box der Bar, das Rect an der
+    // Border-Kante - ohne den Abzug sitzt die Kapsel 1px zu tief.
+    top: wr.top - nr.top - nav.clientTop,
+    left: ar.left - nr.left + (ar.width - width) / 2,
+  };
+  _tabGeom.set(active, geometry);
+  return geometry;
+}
+
+/** Misst das gedrueckte Ziel, solange das Layout noch das der alten Seite ist. */
+function warmTabGeometry(event) {
+  const item = event.target?.closest?.('.nav-bottom__items .nav-item');
+  const nav = item?.closest('.nav-bottom');
+  if (item && nav && !isDesktopViewport()) tabGeometry(nav, item);
+}
+
 function positionTabIndicator(instant = false) {
   // Dasselbe umgekehrt: ab 1024px ist die Tab-Leiste verborgen (layout.css).
   if (isDesktopViewport()) return;
@@ -4867,21 +4977,10 @@ function positionTabIndicator(instant = false) {
     indicator.style.opacity = '0';
     return;
   }
-  const nr = nav.getBoundingClientRect();
-  const ar = active.getBoundingClientRect();
-  const well = active.querySelector('.nav-item__icon-well');
-  const wr = well ? well.getBoundingClientRect() : ar;
-  const width = Math.max(
-    wr.width,
-    Math.min(ar.width - TAB_INDICATOR_INSET * 2, TAB_INDICATOR_MAX_WIDTH),
-  );
-  // clientTop: der Indikator sitzt in der Padding-Box der Bar, das Rect an der
-  // Border-Kante - ohne den Abzug sitzt die Kapsel 1px zu tief.
-  const top = wr.top - nr.top - nav.clientTop;
-  const left = ar.left - nr.left + (ar.width - width) / 2;
+  const { width, height, top, left } = tabGeometry(nav, active);
   placeNavIndicator(indicator, () => {
     indicator.style.width = `${width}px`;
-    indicator.style.height = `${wr.height}px`;
+    indicator.style.height = `${height}px`;
     indicator.style.transform = `translate(${left}px, ${top}px)`;
     indicator.style.opacity = '';
   }, instant);
@@ -5167,8 +5266,7 @@ function errorDetails(err) {
 
 // Die Zuordnung Fehler -> Satz lebt in utils/friendly-error.js (#1640), damit
 // sie ohne Browser pruefbar ist. Fehlerbildschirm und Rejection sagen
-// unhandledErrorSentence, nie den Text des Servers (#1909);
-// window.yuvomi.friendlyError unten reicht den Uebergang nur weiter.
+// unhandledErrorSentence, nie den Text des Servers (#1909).
 
 // --------------------------------------------------------
 // Globale Fehler-Handler (Error Boundary)
@@ -5287,6 +5385,8 @@ window.addEventListener('popstate', (e) => {
  * Fenster, in dem eine abgeschaltete Route wieder erreichbar waere. */
 function forgetSessionState() {
   routerState.currentUser = null;
+  // Eine ungepruefte Sitzung aus dem Abzug (#2293) endet mit.
+  offlineSession.stop();
   routerState._preferencesLoaded = false;
   forgetZonePrefs();
   _hiddenModules = new Set();
@@ -5483,7 +5583,12 @@ function observeNavCapsule() {
   const items = document.querySelector('.nav-bottom__items');
   if (!items || items.dataset.indicatorObserved === '1') return;
   items.dataset.indicatorObserved = '1';
-  new ResizeObserver(() => requestAnimationFrame(() => positionTabIndicator())).observe(items);
+  new ResizeObserver(() => {
+    _tabGeomEpoch += 1;
+    requestAnimationFrame(() => positionTabIndicator());
+  }).observe(items);
+  // Die Lage des Ziels steht vor dem Tausch fest (tabGeometry).
+  items.addEventListener('pointerdown', warmTabGeometry, { capture: true, passive: true });
   // Dieselbe Kapsel, ihre HOEHE: umbrechende Labels machen sie hoeher als
   // --nav-height-mobile, und die Zone darunter muss mitwachsen (Review zu #1475).
   watchNavCapsuleHeight(items);
@@ -5535,8 +5640,14 @@ function isTextEntry(el) {
 function syncKeyboardVisible() {
   const focused = isTextEntry(document.activeElement);
   const vv = window.visualViewport;
+  // OHNE TIPPFELD NICHTS MESSEN (Critique R24 S12): `innerHeight` verlangt ein
+  // aktuelles Layout. Jeder Fokuswechsel im Seitenwechsel (der Tipp auf die
+  // Kapsel, das Wegraeumen der alten Seite) lief hier durch und legte die eben
+  // eingesetzte Zielseite ein zweites Mal aus - gemessen 23 ms bei 4x CPU in
+  // der Rueckkehr zur Uebersicht. Ohne Tippfeld ist die Antwort ohnehin "keine
+  // Tastatur"; der Viewport wird erst danach gefragt (Kurzschluss).
   // Ohne visualViewport trägt der Fokus die Entscheidung allein.
-  const shrunk = !vv || vv.height < window.innerHeight * 0.75;
+  const shrunk = focused && (!vv || vv.height < window.innerHeight * 0.75);
   document.body.classList.toggle('keyboard-visible', focused && shrunk);
 }
 
@@ -5672,7 +5783,9 @@ window.yuvomi = {
   // Seitenleiste, Mehr-Blatt und Cmd-K.
   openSearch: () => _openSearch?.(),
   showToast,
-  friendlyError,
+  // Die Modul-Marke einer Quittung, die erst nach einer Anfrage kommt (R24,
+  // utils/toast-show.js): VOR dem `await` nehmen, als `{ scope }` reichen.
+  feedbackScope,
   setThemeColor,
   setDisabledModules,
   setHiddenModules,

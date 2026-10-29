@@ -129,6 +129,10 @@ export function passwordRuleHtml(id, text) {
 export function flagField(field, errorEl) {
   if (!field || !errorEl?.id) return;
   field.setAttribute('aria-invalid', 'true');
+  // EIN FEHLERBILD (Critique R24 G6-Zugang-P2-1): das Feld wird rot, auf
+  // JEDER Zugangsseite. Bis R24 tat das nur die Anmeldung von Hand;
+  // Einrichtung und Einladung markierten das Feld nur fuer Vorlesehilfen.
+  field.closest?.('.form-group')?.classList?.add('form-group--error');
   const ids = (field.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
   if (!ids.includes(errorEl.id)) field.setAttribute('aria-describedby', [...ids, errorEl.id].join(' '));
   if (field._authFlagged) return;
@@ -179,6 +183,7 @@ export function showAuthError(errorEl, message, field = null) {
 function unflagField(field, errorEl) {
   field._authFlagged = false;
   field.removeAttribute('aria-invalid');
+  field.closest?.('.form-group')?.classList?.remove('form-group--error');
   const rest = (field.getAttribute('aria-describedby') || '').split(/\s+/).filter((id) => id && id !== errorEl.id);
   if (rest.length) field.setAttribute('aria-describedby', rest.join(' '));
   else field.removeAttribute('aria-describedby');

@@ -29,6 +29,7 @@ import { durationToken } from '/utils/ux.js';
 import { detailPaneHeaderEl } from '/utils/master-detail.js';
 import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
 import { initials } from '/utils/initials.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 
 // Ab dieser Breite ist ein Popover am Auslöser die bessere Präsentation: Der
 // Auslöser bleibt sichtbar, der Weg ist kurz. Darunter deckt ein 320px-Kärtchen
@@ -429,7 +430,28 @@ export function detailFooterEl(actions = [], close = closeDetailView) {
   const footer = document.createElement('div');
   footer.className = 'modal-panel__footer modal-panel__footer--plain detail-view__footer';
 
+  // SELTENE HANDLUNGEN STEHEN IM MEHR-MENUE, MIT WORT (R24, G5-Kontakte-P3-2,
+  // G3-Rezepte-P3-3). "Als vCard exportieren" und "Duplizieren" standen als
+  // leiser Knopf im Fuss und falteten mobil zum nackten Symbol (Download, zwei
+  // Blaetter) - ein Zeichen ohne Wort fuer eine Handlung, die man selten sucht.
+  // `more: true` legt sie hinter EINE Ellipse an der Stelle der ersten; der
+  // Eintrag traegt Symbol und Wort, und der Fuss bleibt [Loeschen] [...]
+  // [Bearbeiten] in jeder Breite.
+  // Steht im Fuss NUR Seltenes (gespiegeltes Rezept: nur Duplizieren), ist es
+  // die Handlung des Fusses und steht als Knopf mit Wort - ein Menue hinter
+  // einer Ellipse ohne Nachbarn fragte nach nichts.
+  const folds = visible.some((a) => !a.more);
+  const overflow = folds ? visible.filter((a) => a.more) : [];
+  let moreSlot = null;
+
   visible.forEach((action) => {
+    if (action.more && folds) {
+      if (!moreSlot) {
+        moreSlot = footerMoreMenuEl(overflow, close);
+        footer.appendChild(moreSlot);
+      }
+      return;
+    }
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = `btn btn--${action.variant ?? 'secondary'}`;
@@ -463,7 +485,63 @@ export function detailFooterEl(actions = [], close = closeDetailView) {
     footer.appendChild(btn);
   });
 
+  if (moreSlot) installPopoverMenus(footer);
   return footer;
+}
+
+/**
+ * Das Mehr-Menue eines Detail-Fusses: Ausloeser (Ellipse, Name "Weitere
+ * Aktionen") und Panel in einer Huelle, damit der Fuss es wie EINEN Knopf
+ * zaehlt. Die Eintraege rufen dieselben `onClick` wie ein Fussknopf.
+ */
+function footerMoreMenuEl(actions, close) {
+  const wrap = document.createElement('div');
+  wrap.className = 'detail-view__more';
+  const panelId = `detail-view-more-${Math.random().toString(36).slice(2, 9)}`;
+  const label = t('common.moreActions');
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'btn btn--ghost btn--icon detail-view__more-btn popover-menu__trigger';
+  trigger.setAttribute('popovertarget', panelId);
+  trigger.setAttribute('aria-haspopup', 'menu');
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.setAttribute('aria-label', label);
+  trigger.title = label;
+  const glyph = document.createElement('i');
+  glyph.className = 'icon-md';
+  glyph.dataset.lucide = 'ellipsis';
+  glyph.setAttribute('aria-hidden', 'true');
+  trigger.appendChild(glyph);
+
+  const panel = document.createElement('div');
+  panel.className = 'popover-menu';
+  panel.id = panelId;
+  panel.setAttribute('popover', '');
+  panel.setAttribute('role', 'menu');
+  for (const action of actions) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'popover-menu__item';
+    item.setAttribute('role', 'menuitem');
+    if (action.id) item.id = action.id;
+    if (action.icon) {
+      const i = document.createElement('i');
+      i.className = 'icon-md';
+      i.dataset.lucide = action.icon;
+      i.setAttribute('aria-hidden', 'true');
+      item.appendChild(i);
+    }
+    const name = document.createElement('span');
+    name.textContent = action.label;
+    item.appendChild(name);
+    item.addEventListener('click', () => {
+      panel.hidePopover?.();
+      if (typeof action.onClick === 'function') action.onClick({ close, button: trigger });
+    });
+    panel.appendChild(item);
+  }
+  wrap.append(trigger, panel);
+  return wrap;
 }
 
 // --------------------------------------------------------

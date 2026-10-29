@@ -6,8 +6,18 @@
  * pflegt nur die Konfiguration über /api/v1/permissions.
  *
  * Craft-Rework: fokussierte schmale Spalte, Widgets sitzen unter ihrem Modul,
- * ein Abweichungs-Überblick zeigt die Form einer Rolle auf einen Blick, und die
- * Zugriffsstufe wird über Icon-Segmente mit gleitender Aktiv-Pille gesetzt.
+ * ein Abweichungs-Überblick zeigt die Form einer Rolle auf einen Blick.
+ *
+ * EINE ZEILE JE MODUL, EIN WERT RECHTS (R24, E11; Critique G6-Familie-P2-2).
+ * Je Modul stand ein Dreier-Segment (Kein Zugriff / Nur lesen / Voll), darunter
+ * je Widget ein Zweier und je Zusatzrecht noch einer - drei Segmentformen,
+ * 4166px am Laptop, 4989px am Telefon, und „Speichern" klebte ohne Aenderung
+ * blass unten. Jetzt ist jedes Modul eine Optionszeile der Einstellungen: Name
+ * links, die Stufe als Auswahl rechts („Voll ⌄"). Widgets und Zusatzrechte
+ * stehen in derselben Form in der aufgeklappten Zeile („Widgets und weitere
+ * Rechte"). Eine Wahl wirkt sofort (Einstellungsregel „Auswahl wirkt sofort")
+ * und meldet sich mit Rueckgaengig - der Speichern-Knopf, der Entwurf und die
+ * Verwerfen-Rueckfrage entfallen.
  */
 
 import { api, auth } from '/api.js';
@@ -15,10 +25,10 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { prefersInkText } from '/utils/contrast.js';
-import { confirmModal } from '/components/modal.js';
+import { confirmModal, refocusAfterRender } from '/components/modal.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
-import { createRetryState, hintFoldHtml } from '/settings/components.js';
-import { syncLeafEdits, trackLeafEdits } from '/settings/dirty-guard.js';
+import { wireScrollFade } from '/utils/ux.js';
+import { createRetryState, hintFoldHtml, settingRowHtml } from '/settings/components.js';
 import { resolveExtensionLabel } from '/utils/extension-i18n.js';
 import {
   effectiveCapabilityAccess as resolveCapabilityAccess,
@@ -81,8 +91,6 @@ const WIDGET_LABEL_KEYS = {
 
 // Icon je Zugriffsstufe (Icon-Segmente statt langer Textlabels). Tooltip/aria
 // tragen weiterhin den Klartext, damit Bedienung UND a11y stimmen.
-const MODULE_OPT_ICONS = { none: 'eye-off', read: 'eye', write: 'pencil', inherit: 'corner-down-right' };
-const WIDGET_OPT_ICONS = { none: 'eye-off', allow: 'eye', inherit: 'corner-down-right' };
 
 const widgetLabel = (id) => {
   const w = state.catalog?.widgets.find((x) => x.id === id);
@@ -105,8 +113,8 @@ const state = {
   subjectId: null,     // familyRole (role) | userId (user)
   draft: { modules: {}, widgets: {}, capabilities: {} },
   inherited: { modules: {}, widgets: {}, capabilities: {} },
-  dirty: false,
   loadedFor: null,     // subjectKey(), dessen Rechte in draft/inherited stehen
+  expanded: new Set(), // aufgeklappte Modulzeilen (Widgets + Zusatzrechte)
   loadFailed: false,   // das Laden der Rechte fuer das aktuelle Subjekt scheiterte
 };
 
@@ -167,29 +175,29 @@ function effectiveCapabilityAccess(item, view = {}) {
 
 function moduleOptions(mode = state.mode) {
   const base = [
-    { value: 'none', label: t('settings.permAccessNone'), icon: MODULE_OPT_ICONS.none },
-    { value: 'read', label: t('settings.permAccessRead'), icon: MODULE_OPT_ICONS.read },
-    { value: 'write', label: t('settings.permAccessWrite'), icon: MODULE_OPT_ICONS.write },
+    { value: 'none', label: t('settings.permAccessNone') },
+    { value: 'read', label: t('settings.permAccessRead') },
+    { value: 'write', label: t('settings.permAccessWrite') },
   ];
-  if (mode === 'user') return [{ value: 'inherit', label: t('settings.permInherit'), icon: MODULE_OPT_ICONS.inherit }, ...base];
+  if (mode === 'user') return [{ value: 'inherit', label: t('settings.permInherit') }, ...base];
   return base;
 }
 
 function widgetOptions(mode = state.mode) {
   const base = [
-    { value: 'none', label: t('settings.permWidgetBlocked'), icon: WIDGET_OPT_ICONS.none },
-    { value: 'allow', label: t('settings.permWidgetAllowed'), icon: WIDGET_OPT_ICONS.allow },
+    { value: 'none', label: t('settings.permWidgetBlocked') },
+    { value: 'allow', label: t('settings.permWidgetAllowed') },
   ];
-  if (mode === 'user') return [{ value: 'inherit', label: t('settings.permInherit'), icon: WIDGET_OPT_ICONS.inherit }, ...base];
+  if (mode === 'user') return [{ value: 'inherit', label: t('settings.permInherit') }, ...base];
   return base;
 }
 
 function capabilityOptions(mode = state.mode) {
   const base = [
-    { value: 'none', label: t('settings.permCapabilityBlocked'), icon: WIDGET_OPT_ICONS.none },
-    { value: 'allow', label: t('settings.permCapabilityAllowed'), icon: WIDGET_OPT_ICONS.allow },
+    { value: 'none', label: t('settings.permCapabilityBlocked') },
+    { value: 'allow', label: t('settings.permCapabilityAllowed') },
   ];
-  if (mode === 'user') return [{ value: 'inherit', label: t('settings.permInherit'), icon: WIDGET_OPT_ICONS.inherit }, ...base];
+  if (mode === 'user') return [{ value: 'inherit', label: t('settings.permInherit') }, ...base];
   return base;
 }
 
@@ -202,87 +210,53 @@ function accessShort(value) {
   }
 }
 
-// ── Segment-Control (Icon + Label + gleitende Aktiv-Pille) ────────────────────
+// ── Die Auswahl als Wert der Zeile ───────────────────────────────────────────
 //
-// Die Zugriffsstufen waren reine Icon-Segmente; ihr Klartext stand nur in
-// `title`, und `title` erscheint auf Touch nie (Critique 2026-07-27). Genau
-// die Aufgabe mit den groessten sozialen Folgen war damit auf dem Telefon
-// unbeschriftet. Das Label steht im Markup und ist seit R21 in JEDER Breite
-// sichtbar: am Zeiger neben dem Icon, am Finger darunter (settings.css). Die
-// Legende ueber der Matrix, die am Zeiger die Icons erklaerte, entfiel damit -
-// jedes Segment nennt das Wort seines Abschnitts selbst (am Modul "Lesen", am
-// Widget "Verfuegbar", an einer Faehigkeit "Erlaubt").
-function segControl({ group, label, current, options, disabled = false }) {
-  const activeIdx = Math.max(0, options.findIndex((o) => o.value === current));
-  const opts = options.map((o) => {
-    const checked = o.value === current;
-    return `
-      <button type="button" class="perm-seg__opt${checked ? ' is-active' : ''}"
-        role="radio" aria-checked="${checked ? 'true' : 'false'}" title="${esc(o.label)}"
-        data-group="${esc(group)}" data-value="${esc(o.value)}"
-        aria-label="${esc(label || group)}: ${esc(o.label)}"
-        tabindex="${checked ? '0' : '-1'}"${disabled ? ' disabled' : ''}>
-        <i data-lucide="${esc(o.icon)}" aria-hidden="true"></i>
-        <span class="perm-seg__label">${esc(o.label)}</span>
-      </button>
-    `;
-  }).join('');
-  return `<div class="perm-seg" role="radiogroup" aria-label="${esc(label || group)}"
-    style="--seg-count:${options.length};--seg-index:${activeIdx}"${disabled ? ' data-disabled="true"' : ''}>
-    <span class="perm-seg__thumb" aria-hidden="true"></span>${opts}</div>`;
-}
+// Die Stufen waren Icon-Segmente mit gleitender Pille (bis R24). Jetzt ist jede
+// Zeile eine Optionszeile der Einstellungen (settingRowHtml) mit der Stufe als
+// randloser Auswahl rechts - dieselbe Form wie „Gueltigkeit 90 Tage ⌄" im
+// API-Zugriff. Das Wort steht in jeder Breite (der Wert IST das Wort), die
+// Optionen nennt das native Menue; Tastatur und Screenreader bringt `<select>`
+// mit.
+const domId = (group) => `perm-${String(group).replace(/[^a-z0-9_-]/gi, '-')}`;
 
-// Aktivzustand einer Segmentgruppe in-place setzen (bewahrt die Slide-Animation).
-function updateSegActive(group, opt) {
-  const opts = [...group.querySelectorAll('.perm-seg__opt')];
-  const idx = opts.indexOf(opt);
-  if (idx >= 0) group.style.setProperty('--seg-index', String(idx));
-  opts.forEach((o) => {
-    const active = o === opt;
-    o.classList.toggle('is-active', active);
-    o.setAttribute('aria-checked', active ? 'true' : 'false');
-    o.tabIndex = active ? 0 : -1;
-  });
+function accessSelectHtml({ group, label, current, options, disabled = false }) {
+  return `<select class="form-input perm-select" id="${esc(domId(group))}" data-group="${esc(group)}"
+    aria-label="${esc(label)}"${disabled ? ' disabled' : ''}>${options.map((o) => `
+      <option value="${esc(o.value)}"${o.value === current ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}
+    </select>`;
 }
 
 // ── Zeilen-Markup ──────────────────────────────────────────────────────────────
 
-function moduleRowHtml(mod) {
+function moduleRowHtml(mod, expand = '') {
   const current = state.draft.modules[mod.key] ?? (state.mode === 'user' ? 'inherit' : 'write');
-  const inheritedHint = state.mode === 'user'
-    ? `<span class="perm-row__hint">${esc(t('settings.permInheritedHint', {
-        value: accessShort(state.inherited.modules[mod.key] ?? 'write'),
-      }))}</span>`
-    : '';
-  return `
-    <div class="perm-row perm-row--module" data-module="${esc(mod.key)}">
-      <div class="perm-row__label">
-        <span class="perm-row__dot" aria-hidden="true" style="background:${MODULE_ACCENT[mod.key] || 'var(--color-accent)'}"></span>
-        <i data-lucide="${esc(mod.icon)}" aria-hidden="true"></i>
-        <span class="perm-row__name">${esc(moduleLabel(mod.key))}</span>
-        ${inheritedHint}
-      </div>
-      ${segControl({ group: `module:${mod.key}`, label: moduleLabel(mod.key), current, options: moduleOptions() })}
-    </div>
-  `;
+  const group = `module:${mod.key}`;
+  return settingRowHtml({
+    label: moduleLabel(mod.key),
+    labelFor: domId(group),
+    description: state.mode === 'user'
+      ? t('settings.permInheritedHint', { value: accessShort(state.inherited.modules[mod.key] ?? 'write') })
+      : '',
+    extra: expand,
+    control: accessSelectHtml({ group, label: moduleLabel(mod.key), current, options: moduleOptions() }),
+    className: 'perm-row perm-row--module',
+    attrs: { 'data-module': mod.key },
+  });
 }
 
 function widgetRowHtml(w) {
   const current = state.draft.widgets[w.id] ?? (state.mode === 'user' ? 'inherit' : 'allow');
-  const moduleLocked = w.module && effectiveModuleAccess(w.module) === 'none';
-  const meta = moduleLocked
-    ? `<span class="perm-row__hint perm-row__hint--warn">${esc(t('settings.permModuleLockedHint'))}</span>`
-    : '';
-  return `
-    <div class="perm-row perm-row--widget${moduleLocked ? ' is-locked' : ''}" data-widget="${esc(w.id)}">
-      <div class="perm-row__label">
-        <i data-lucide="layout-dashboard" class="perm-row__wicon" aria-hidden="true"></i>
-        <span class="perm-row__name">${esc(widgetLabel(w.id))}</span>
-        ${meta}
-      </div>
-      ${segControl({ group: `widget:${w.id}`, label: widgetLabel(w.id), current, options: widgetOptions(), disabled: moduleLocked })}
-    </div>
-  `;
+  const moduleLocked = Boolean(w.module) && effectiveModuleAccess(w.module) === 'none';
+  const group = `widget:${w.id}`;
+  return settingRowHtml({
+    label: widgetLabel(w.id),
+    labelFor: domId(group),
+    description: moduleLocked ? t('settings.permModuleLockedHint') : '',
+    control: accessSelectHtml({ group, label: widgetLabel(w.id), current, options: widgetOptions(), disabled: moduleLocked }),
+    className: `perm-row perm-row--widget${moduleLocked ? ' is-locked' : ''}`,
+    attrs: { 'data-widget': w.id },
+  });
 }
 
 export function capabilityRowHtml(item, view = {}) {
@@ -294,33 +268,38 @@ export function capabilityRowHtml(item, view = {}) {
     ?? (mode === 'user' ? 'inherit' : resolveCapabilityAccess(item, {
       mode, inherited: inherited[item.key],
     }));
-  return `
-    <div class="perm-row perm-row--capability" data-capability="${esc(item.key)}">
-      <div class="perm-row__label">
-        <i data-lucide="tags" class="perm-row__wicon" aria-hidden="true"></i>
-        <span class="perm-row__name">${esc(label)}</span>
-      </div>
-      ${segControl({ group: `capability:${item.key}`, label, current, options: capabilityOptions(mode) })}
-    </div>
-  `;
+  const group = `capability:${item.key}`;
+  return settingRowHtml({
+    label,
+    labelFor: domId(group),
+    control: accessSelectHtml({ group, label, current, options: capabilityOptions(mode) }),
+    className: 'perm-row perm-row--capability',
+    attrs: { 'data-capability': item.key },
+  });
 }
 
-// Ein Modul mit seinen Widgets (genestet) — die Beziehung wird strukturell sichtbar.
+/** Was in der aufgeklappten Zeile eines Moduls steht: Widgets, dann Zusatzrechte. */
+function moduleMoreHtml(moduleKey) {
+  const widgets = widgetsForModule(moduleKey);
+  const capabilities = capabilitiesForModule(moduleKey);
+  return `${widgets.length ? `<div class="settings-group perm-modgroup__widgets">${widgets.map(widgetRowHtml).join('')}</div>` : ''}${
+    capabilities.length ? `<div class="settings-group perm-modgroup__capabilities">
+      <p class="perm-modgroup__capabilities-title">${esc(t('settings.permCapabilitiesHeading'))}</p>
+      ${capabilities.map((item) => capabilityRowHtml(item)).join('')}
+    </div>` : ''}`;
+}
+
+// Ein Modul mit seinen Widgets und Zusatzrechten - eingeklappt nur die Zeile.
 function moduleGroupHtml(mod) {
-  const widgets = widgetsForModule(mod.key);
-  const capabilities = capabilitiesForModule(mod.key);
-  const widgetsHtml = widgets.length
-    ? `<div class="perm-modgroup__widgets">${widgets.map(widgetRowHtml).join('')}</div>`
+  const count = widgetsForModule(mod.key).length + capabilitiesForModule(mod.key).length;
+  const moreId = `perm-more-${String(mod.key).replace(/[^a-z0-9_-]/gi, '-')}`;
+  const open = state.expanded.has(mod.key);
+  const expand = count
+    ? `<button type="button" class="perm-row__more" data-perm-expand="${esc(mod.key)}"
+        aria-expanded="${open ? 'true' : 'false'}" aria-controls="${esc(moreId)}">${esc(t('settings.permDetails'))}<i data-lucide="chevron-down" aria-hidden="true"></i></button>`
     : '';
-  const capabilitiesHtml = capabilities.length
-    ? `<div class="perm-modgroup__capabilities">
-        <div class="perm-modgroup__capabilities-title">
-          <i data-lucide="shield-check" aria-hidden="true"></i>${esc(t('settings.permCapabilitiesHeading'))}
-        </div>
-        ${capabilities.map(capabilityRowHtml).join('')}
-      </div>`
-    : '';
-  return `<div class="perm-modgroup" data-module="${esc(mod.key)}">${moduleRowHtml(mod)}${widgetsHtml}${capabilitiesHtml}</div>`;
+  return `<div class="settings-group perm-modgroup" data-module="${esc(mod.key)}">${moduleRowHtml(mod, expand)}${
+    count ? `<div class="perm-modgroup__more" id="${esc(moreId)}"${open ? '' : ' hidden'}>${moduleMoreHtml(mod.key)}</div>` : ''}</div>`;
 }
 
 // ── Abweichungs-Überblick (auf einen Blick) ────────────────────────────────────
@@ -456,9 +435,9 @@ function renderMatrix(container) {
   const groupsHtml = state.catalog.modules.map(moduleGroupHtml).join('');
   const general = generalWidgets();
   const generalHtml = general.length
-    ? `<div class="perm-modgroup perm-modgroup--general">
-        <div class="perm-modgroup__general-title">${esc(t('settings.permWidgetsHeading'))}</div>
-        <div class="perm-modgroup__widgets">${general.map(widgetRowHtml).join('')}</div>
+    ? `<div class="settings-group perm-modgroup perm-modgroup--general">
+        <p class="perm-modgroup__general-title">${esc(t('settings.permWidgetsHeading'))}</p>
+        <div class="settings-group perm-modgroup__widgets">${general.map(widgetRowHtml).join('')}</div>
       </div>`
     : '';
 
@@ -476,60 +455,26 @@ function renderMatrix(container) {
         : ''}
     </div>
     <div id="perm-summary"></div>
-    <div class="perm-list">${groupsHtml}${generalHtml}</div>
+    <div class="row-carrier settings-group perm-list">${groupsHtml}${generalHtml}</div>
+    ${/* Kein Speichern mehr (R24, E11): jede Wahl wirkt sofort. Zuruecksetzen
+         bleibt - als Handlung mit Rueckfrage, nicht als Entwurf. */ ''}
     <div class="perm-actions">
-      <span class="perm-actions__status" id="perm-dirty" hidden>
-        <i data-lucide="circle-dot" aria-hidden="true"></i>${esc(t('settings.permUnsaved'))}
-      </span>
       <button type="button" class="btn btn--secondary" id="perm-reset">${esc(t('settings.permResetSubject'))}</button>
-      <button type="button" class="btn btn--primary" id="perm-save" disabled>${esc(t('settings.permSave'))}</button>
     </div>
   `);
   window.lucide?.createIcons({ el: panel });
   renderSummary(container);
-  updateSaveState(panel);
 }
 
-function updateSaveState(panel) {
-  const save = panel.querySelector('#perm-save');
-  if (save) save.disabled = !state.dirty;
-  const dirty = panel.querySelector('#perm-dirty');
-  if (dirty) dirty.hidden = !state.dirty;
-  // Am Telefon klebt der Fuss nur mit ungespeicherten Aenderungen (settings.css).
-  panel.querySelector('.perm-actions')?.classList?.toggle('is-dirty', state.dirty);
-  // Offener Entwurf = Rueckfrage vor jedem Verlassen des Blatts (R15 A7 P1-1):
-  // die Matrix ist kein Formular, der Guard erfaehrt ihren Stand von hier.
-  syncLeafEdits();
-}
-
-// Widgets eines Moduls neu rendern (nach Modul-Änderung: Sperr-Zustände hängen daran).
+// Die aufgeklappte Zeile eines Moduls neu zeichnen (nach Modul-Aenderung: die
+// Sperr-Zustaende der Widgets haengen daran).
 function rebuildModuleWidgets(container, moduleKey) {
   const moduleGroup = container.querySelector(`.perm-modgroup[data-module="${moduleKey}"]`);
-  if (!moduleGroup) return;
-  const widgets = widgetsForModule(moduleKey);
-  const capabilities = capabilitiesForModule(moduleKey);
-  const widgetsGroup = moduleGroup.querySelector('.perm-modgroup__widgets');
-  if (widgetsGroup) {
-    widgetsGroup.replaceChildren();
-    widgetsGroup.insertAdjacentHTML('beforeend', widgets.map(widgetRowHtml).join(''));
-  }
-  const capabilityGroup = moduleGroup.querySelector('.perm-modgroup__capabilities');
-  if (capabilityGroup) {
-    capabilityGroup.replaceChildren();
-    capabilityGroup.insertAdjacentHTML('beforeend', `
-      <div class="perm-modgroup__capabilities-title">
-        <i data-lucide="shield-check" aria-hidden="true"></i>${esc(t('settings.permCapabilitiesHeading'))}
-      </div>
-      ${capabilities.map(capabilityRowHtml).join('')}`);
-  }
-  window.lucide?.createIcons({ el: moduleGroup });
-}
-
-// Verwerfen-Schutz (#467-Critique P1): warnt vor Datenverlust, bevor ein anderes
-// Subjekt/Modus gewählt wird, solange ungespeicherte Änderungen bestehen.
-async function confirmDiscardIfDirty() {
-  if (!state.dirty) return true;
-  return confirmModal(t('settings.permDiscardConfirm'), { confirmLabel: t('settings.permDiscard') });
+  const more = moduleGroup?.querySelector('.perm-modgroup__more');
+  if (!more) return;
+  more.replaceChildren();
+  more.insertAdjacentHTML('beforeend', moduleMoreHtml(moduleKey));
+  window.lucide?.createIcons({ el: more });
 }
 
 // ── Subjekt-Auswahl ──────────────────────────────────────────────────────────
@@ -595,7 +540,6 @@ async function selectSubject(container, mode, id) {
   const generation = ++loadGeneration;
   state.mode = mode;
   state.subjectId = id;
-  state.dirty = false;
   state.loadedFor = null;
   state.loadFailed = false;
   state.draft = { modules: {}, widgets: {}, capabilities: {} };
@@ -622,15 +566,14 @@ async function selectSubject(container, mode, id) {
         state.draft = { modules: { ...ov.data.modules }, widgets: { ...ov.data.widgets }, capabilities: { ...ov.data.capabilities } };
         state.inherited = { modules: { ...roleRes.data.modules }, widgets: { ...roleRes.data.widgets }, capabilities: { ...roleRes.data.capabilities } };
       }
-      state.loadedFor = subjectKey();
-      state.dirty = false;
+      markLoaded();
     } catch (err) {
       if (generation !== loadGeneration) return;
       console.error('[Permissions] subject load failed:', err);
       state.loadFailed = true;
     }
   } else {
-    state.loadedFor = subjectKey();
+    markLoaded();
   }
 
   renderSubjectSelector(container);
@@ -639,41 +582,151 @@ async function selectSubject(container, mode, id) {
 
 function lockMatrix(container) {
   const panel = container.querySelector('#perm-matrix');
-  panel?.querySelectorAll('.perm-seg__opt, #perm-reset, #perm-save').forEach((el) => { el.disabled = true; });
+  panel?.querySelectorAll('.perm-select, #perm-reset').forEach((el) => { el.disabled = true; });
 }
 
-async function save(container) {
-  if (!draftIsCurrent()) return;
-  const generation = loadGeneration;
-  const title = subjectTitle();
+/** Was ein PUT fuer diesen Entwurf schickt: nur eigene Eintraege, kein `inherit`. */
+function payloadOf(draft) {
   const payload = { modules: {}, widgets: {}, capabilities: {} };
-  for (const [k, v] of Object.entries(state.draft.modules)) if (v && v !== 'inherit') payload.modules[k] = v;
-  for (const [k, v] of Object.entries(state.draft.widgets)) if (v && v !== 'inherit') payload.widgets[k] = v;
-  for (const [k, v] of Object.entries(state.draft.capabilities)) if (v && v !== 'inherit') payload.capabilities[k] = v;
+  for (const [k, v] of Object.entries(draft.modules)) if (v && v !== 'inherit') payload.modules[k] = v;
+  for (const [k, v] of Object.entries(draft.widgets)) if (v && v !== 'inherit') payload.widgets[k] = v;
+  for (const [k, v] of Object.entries(draft.capabilities)) if (v && v !== 'inherit') payload.capabilities[k] = v;
+  return payload;
+}
 
+/* WAS DER SERVER HAELT, JE ENTWURF (Codex an #2364, P1). Der PUT ersetzt die
+ * Rechte des Subjekts als Ganzes, also steht auf dem Server genau der Stand des
+ * letzten gelungenen PUT (oder der geladene). Ein gescheiterter Schritt legt
+ * seine Zeile auf DIESEN Wert zurueck, nicht auf den Wert vor dem Klick: der
+ * stammte womoeglich von einer Wahl, deren PUT selbst scheiterte. */
+const savedOf = new WeakMap();
+function markLoaded() {
+  state.loadedFor = subjectKey();
+  savedOf.set(state.draft, payloadOf(state.draft));
+}
+
+/* WER EINE ZEILE ZULETZT GESETZT HAT. Jede Wahl und jedes Rueckgaengig zieht
+ * eine laufende Nummer; zuruecklegen oder rueckgaengig machen darf nur, wer
+ * die Zeile noch besitzt. Sonst legte ein gescheiterter erster PUT die schon
+ * getroffene zweite Wahl derselben Zeile zurueck (Vorgabe -> read -> none:
+ * Server none, Entwurf ohne Einschraenkung - die naechste Wahl hob die Sperre auf). */
+let writeSeq = 0;
+const rowWriter = new WeakMap(); // Bucket des Entwurfs -> Map(Schluessel -> Nummer)
+function claimRow(bucket, key) {
+  let owners = rowWriter.get(bucket);
+  if (!owners) rowWriter.set(bucket, owners = new Map());
+  writeSeq += 1;
+  owners.set(key, writeSeq);
+  return writeSeq;
+}
+const ownsRow = (bucket, key, seq) => rowWriter.get(bucket)?.get(key) === seq;
+
+/**
+ * SPEICHERT SOFORT, NACHEINANDER (R24, E11). Jede Wahl schreibt die Rechte des
+ * Subjekts als Ganzes (PUT, wie bisher der Knopf); Wahlen kurz hintereinander
+ * laufen in einer Reihe, damit die spaetere nie von einer frueheren Antwort
+ * ueberholt wird. Der Entwurf bleibt der lokale Stand - eine Antwort schreibt
+ * ihn nicht zurueck (eine inzwischen getroffene Wahl ginge sonst verloren).
+ *
+ * Der Stand wird erst gelesen, wenn der PUT an der Reihe ist, und `onFail`
+ * laeuft IN der Reihe, bevor der naechste ihn liest: ein wartender PUT schickt
+ * so nie eine Wahl mit, die ein frueherer Schritt schon zurueckgelegt hat.
+ * @param {() => void} [onFail]
+ * @returns {Promise<boolean>} gespeichert
+ */
+let saveQueue = Promise.resolve(true);
+function persist(onFail) {
+  if (!draftIsCurrent()) return Promise.resolve(false);
+  const key = subjectKey();
+  const draft = state.draft;
   const url = state.mode === 'role'
     ? `/permissions/role/${encodeURIComponent(state.subjectId)}`
     : `/permissions/user/${encodeURIComponent(state.subjectId)}`;
-
-  const saveBtn = container.querySelector('#perm-save');
-  if (saveBtn) saveBtn.disabled = true;
-  try {
-    const res = await api.put(url, payload);
-    // Neue Rechte koennen neue Mitleser eines Moduls schaffen: `othersCanRead`
-    // neu holen, damit die Schutzfelder in derselben Sitzung stimmen.
-    await auth.me().catch(() => {});
-    // Inzwischen ein anderes Subjekt gewaehlt: die Antwort gehoert nicht in
-    // dessen Entwurf.
-    if (generation === loadGeneration) {
-      state.draft = { modules: { ...res.data.modules }, widgets: { ...res.data.widgets }, capabilities: { ...res.data.capabilities } };
-      state.dirty = false;
-      renderMatrix(container);
+  const run = async () => {
+    const payload = payloadOf(draft);
+    try {
+      await api.put(url, payload);
+      savedOf.set(draft, payload);
+      // Neue Rechte koennen neue Mitleser eines Moduls schaffen: `othersCanRead`
+      // neu holen, damit die Schutzfelder in derselben Sitzung stimmen.
+      await auth.me().catch(() => {});
+      return true;
+    } catch (err) {
+      onFail?.();
+      window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
+      return false;
     }
-    window.yuvomi?.showToast(t('settings.permSaved', { name: title }), 'success');
-  } catch (err) {
-    window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
-    if (saveBtn && generation === loadGeneration) saveBtn.disabled = false;
+  };
+  saveQueue = saveQueue.then(run, run);
+  return saveQueue.then((ok) => ok && subjectKey() === key);
+}
+
+const BUCKET = { module: 'modules', widget: 'widgets', capability: 'capabilities' };
+
+/** Den Wert einer Zeile setzen, wie er im Entwurf steht (Rueckgaengig, Fehler). */
+function syncSelect(container, group) {
+  const select = container.querySelector(`#${domId(group)}`);
+  if (!select) return;
+  const { type, key } = parsePermissionGroup(group);
+  const value = state.draft[BUCKET[type]]?.[key];
+  if (value !== undefined) { select.value = value; return; }
+  // Ohne eigenen Eintrag steht, was die Zeile beim Zeichnen zeigt: erben
+  // (Mitglied) bzw. die Vorgabe der Rolle.
+  if (state.mode === 'user') { select.value = 'inherit'; return; }
+  if (type === 'module') select.value = 'write';
+  else if (type === 'widget') select.value = 'allow';
+  else {
+    const item = (state.catalog.capabilities || []).find((entry) => entry.key === key);
+    if (item) select.value = resolveCapabilityAccess(item, { mode: 'role', inherited: state.inherited.capabilities[key] });
   }
+}
+
+async function applyChange(container, select) {
+  // Am ERSTEN Doppelpunkt trennen, nicht an allen (#1009): der Schluessel eines
+  // Fremdmoduls ist selbst `ext:<modulId>` und eine Fremd-Widget-Id
+  // `<modulId>:<widgetId>`. Ein destrukturierendes split(':') behielt davon nur
+  // `ext` bzw. die Modul-Id, und der Server wies das zu Recht ab.
+  const group = select.dataset.group;
+  const { type, key } = parsePermissionGroup(select.dataset.group);
+  if (!key || !draftIsCurrent() || !BUCKET[type]) return;
+  const draft = state.draft;
+  const bucket = draft[BUCKET[type]];
+  const before = Object.hasOwn(bucket, key) ? bucket[key] : undefined;
+  const value = select.value;
+  const subject = subjectKey();
+  const title = subjectTitle();
+  const set = (next) => {
+    if (next === undefined) delete bucket[key]; else bucket[key] = next;
+    // Inzwischen ein anderes Subjekt oder ein neuer Entwurf: dessen Zeilen
+    // zeichnen sich selbst, hier gibt es nichts zu zeigen.
+    if (subjectKey() !== subject || state.draft !== draft) return;
+    syncSelect(container, group);
+    // Modul-Aenderung: nur die aufgeklappte Zeile DIESES Moduls neu (Sperr-Zustaende).
+    if (type === 'module') rebuildModuleWidgets(container, key);
+    renderSummary(container);
+  };
+  // Setzen und speichern; scheitert der PUT, legt er die Zeile auf den Stand
+  // des Servers zurueck - aber nur, solange keine neuere Wahl sie besitzt.
+  const write = (next) => {
+    const seq = claimRow(bucket, key);
+    set(next);
+    const ok = persist(() => {
+      if (ownsRow(bucket, key, seq)) set(savedOf.get(draft)?.[BUCKET[type]]?.[key]);
+    });
+    return ok.then((saved) => ({ saved, seq }));
+  };
+  const first = await write(value);
+  if (!first.saved) return;
+  window.yuvomi?.showToast(t('settings.permSaved', { name: title }), 'success', 5000, {
+    label: t('common.undo'),
+    onClick: async () => {
+      // Inzwischen ein anderes Subjekt: dessen Entwurf ist nicht der, der sich
+      // geaendert hat. Eine neuere Wahl derselben Zeile: sie gilt, ein spaetes
+      // Rueckgaengig dieser aelteren nahm sie sonst still zurueck.
+      if (subjectKey() !== subject || state.draft !== draft || !ownsRow(bucket, key, first.seq)) return;
+      await write(before);
+    },
+  });
 }
 
 // ── Interaktion ──────────────────────────────────────────────────────────────
@@ -688,7 +741,6 @@ function bindEvents(container) {
     btn.addEventListener('click', async () => {
       const next = btn.dataset.mode;
       if (next === state.mode) return;
-      if (!(await confirmDiscardIfDirty())) return;
       container.querySelectorAll('[data-mode]').forEach((b) => {
         const active = b.dataset.mode === next;
         b.classList.toggle('is-active', active);
@@ -698,64 +750,40 @@ function bindEvents(container) {
     });
   });
 
-  // Subjekt-Auswahl (Event-Delegation)
+  // Subjekt-Auswahl (Event-Delegation). Eine scrollende Zeile (R24 S13):
+  // die Fade-Kanten sagen, dass es weitergeht (settings.css, .perm-subjects).
+  wireScrollFade(container.querySelector('#perm-subjects'));
   container.querySelector('#perm-subjects')?.addEventListener('click', async (e) => {
     const chip = e.target.closest('.perm-chip');
     if (!chip) return;
     const same = (chip.dataset.role != null && state.mode === 'role' && String(chip.dataset.role) === String(state.subjectId))
       || (chip.dataset.user != null && state.mode === 'user' && String(chip.dataset.user) === String(state.subjectId));
     if (same) return;
-    if (!(await confirmDiscardIfDirty())) return;
     if (chip.dataset.role != null) selectSubject(container, 'role', chip.dataset.role);
     else if (chip.dataset.user != null) selectSubject(container, 'user', chip.dataset.user);
   });
 
-  // Matrix: Segment-Auswahl + Aktionen (Delegation)
+  // Matrix: Auswahl je Zeile, Aufklappen, Zuruecksetzen (Delegation).
   const matrix = container.querySelector('#perm-matrix');
-  matrix?.addEventListener('click', (e) => {
-    const opt = e.target.closest('.perm-seg__opt');
-    if (opt && !opt.disabled) return applySegment(container, opt);
-    if (e.target.closest('#perm-save')) return save(container);
-    if (e.target.closest('#perm-reset')) return resetSubject(container);
+  matrix?.addEventListener('change', (e) => {
+    const select = e.target?.closest?.('.perm-select');
+    if (select && !select.disabled) applyChange(container, select);
   });
-  // Pfeiltasten innerhalb einer Segment-Gruppe (Roving)
-  matrix?.addEventListener('keydown', (e) => {
-    if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
-    const opt = e.target.closest('.perm-seg__opt');
-    if (!opt) return;
-    const group = opt.closest('.perm-seg');
-    const opts = [...group.querySelectorAll('.perm-seg__opt:not([disabled])')];
-    const idx = opts.indexOf(opt);
-    const nextIdx = e.key === 'ArrowRight' ? Math.min(idx + 1, opts.length - 1) : Math.max(idx - 1, 0);
-    if (opts[nextIdx] && opts[nextIdx] !== opt) {
-      e.preventDefault();
-      applySegment(container, opts[nextIdx]);
-      opts[nextIdx].focus();
-    }
+  matrix?.addEventListener('click', (e) => {
+    const expand = e.target.closest('[data-perm-expand]');
+    if (expand) return toggleModule(container, expand);
+    if (e.target.closest('#perm-reset')) return resetSubject(container);
   });
 }
 
-function applySegment(container, opt) {
-  // Am ERSTEN Doppelpunkt trennen, nicht an allen (#1009): der Schluessel eines
-  // Fremdmoduls ist selbst `ext:<modulId>` und eine Fremd-Widget-Id
-  // `<modulId>:<widgetId>`. Ein destrukturierendes split(':') behielt davon nur
-  // `ext` bzw. die Modul-Id, und der Server wies das zu Recht ab.
-  const { type, key } = parsePermissionGroup(opt.dataset.group);
-  if (!key || !draftIsCurrent()) return;
-  const value = opt.dataset.value;
-  if (type === 'module') state.draft.modules[key] = value;
-  else if (type === 'widget') state.draft.widgets[key] = value;
-  else state.draft.capabilities[key] = value;
-  state.dirty = true;
-
-  // Segment in-place aktualisieren (Slide bleibt erhalten).
-  updateSegActive(opt.closest('.perm-seg'), opt);
-
-  // Modul-Änderung: nur die Widgets DIESES Moduls neu (Sperr-Zustände).
-  if (type === 'module') rebuildModuleWidgets(container, key);
-
-  renderSummary(container);
-  updateSaveState(container.querySelector('#perm-matrix'));
+/** Die Zeile eines Moduls auf- oder zuklappen; der Zustand ueberlebt den Neubau. */
+function toggleModule(container, button) {
+  const key = button.dataset.permExpand;
+  const open = button.getAttribute('aria-expanded') !== 'true';
+  if (open) state.expanded.add(key); else state.expanded.delete(key);
+  button.setAttribute('aria-expanded', open ? 'true' : 'false');
+  const more = container.querySelector(`#${button.getAttribute('aria-controls')}`);
+  if (more) more.hidden = !open;
 }
 
 async function resetSubject(container) {
@@ -769,9 +797,26 @@ async function resetSubject(container) {
     detail: t('settings.permResetConfirmDetail'),
   });
   if (!ok || !draftIsCurrent()) return;
-  state.draft = { modules: {}, widgets: {}, capabilities: {} };
-  state.dirty = true;
+  const before = state.draft;
+  const title = subjectTitle();
+  const cleared = { modules: {}, widgets: {}, capabilities: {} };
+  // Bis der PUT gelingt, haelt der Server noch die alten Rechte: eine Wahl im
+  // geleerten Entwurf, deren PUT scheitert, legt sich darauf zurueck.
+  savedOf.set(cleared, savedOf.get(before));
+  state.draft = cleared;
   renderMatrix(container);
+  refocusAfterRender();
+  if (await persist()) {
+    window.yuvomi?.showToast(t('settings.permSaved', { name: title }), 'success');
+  } else if (state.draft === cleared) {
+    // Nur zurueck, solange der geleerte Entwurf noch DERSELBE ist: inzwischen
+    // ein anderes Subjekt gewaehlt (persist() meldet dann false, auch wenn der
+    // PUT gelang), stuenden dessen Zeilen sonst mit den alten Rechten da, und
+    // die naechste Wahl speicherte sie dort (Codex an #2364).
+    state.draft = before;
+    renderMatrix(container);
+    refocusAfterRender();
+  }
 }
 
 // ── Render-Einstieg ──────────────────────────────────────────────────────────
@@ -822,10 +867,7 @@ export async function render(container, { user } = {}) {
   state.subjectId = null;
   state.draft = { modules: {}, widgets: {}, capabilities: {} };
   state.inherited = { modules: {}, widgets: {}, capabilities: {} };
-  state.dirty = false;
-  // Die Matrix hat keinen <form>: sie meldet ihren Entwurf selbst beim
-  // Verlassen-Schutz der Einstellungen an (settings/dirty-guard.js).
-  trackLeafEdits(container, () => state.dirty);
+  state.expanded = new Set();
 
   bindEvents(container);
   await selectSubject(container, 'role', initialSubject('role', catalog));

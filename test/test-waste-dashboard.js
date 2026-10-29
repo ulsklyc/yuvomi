@@ -117,7 +117,10 @@ test('renderWasteWidget: ohne Typen zeigt es den Erststart-Leerzustand mit CTA n
   const html = renderWasteWidget({ items: [], needsRefresh: false }, '1x2');
   assert.match(html, /waste\.emptyTypesTitle/, 'Leertitel fehlt');
   assert.match(html, /data-route="\/waste"/, 'die CTA muss ins Modul fuehren');
-  assert.match(html, /waste\.addType/, 'die CTA-Beschriftung fehlt');
+  // Seit DW p7 das Verb der ruhigen Zeile; das Objekt nennt der Satz daneben,
+  // auf den die Aktion per aria-describedby verweist.
+  assert.match(html, /common\.add/, 'die CTA-Beschriftung fehlt');
+  assert.match(html, /aria-describedby="widget-empty-waste"/, 'die Aktion nennt per Verweis ihr Objekt');
 });
 
 test('renderWasteWidget: undefined items (Slice noch nicht geladen) faellt auf denselben Leerzustand zurueck', () => {
@@ -148,7 +151,8 @@ function occurrence(typeId, dateKey, overrides = {}) {
 
 test('renderWasteWidget: ein Eintrag je aktivem Typ, Zeilendeckel aus der Kachelgroesse (wie listRowCap)', () => {
   const items = [1, 2, 3, 4, 5, 6, 7].map((id) => ({ type: type(id), next: occurrence(id, `2026-06-${10 + id}`) }));
-  const zeilen = (html) => (html.match(/class="waste-widget-row"/g) || []).length;
+  // Was ohne Streckung steht: Zusatzzeilen (U14, `data-fill-row`) zeigt erst applyRowFill.
+  const zeilen = (html) => (html.match(/<div class="list-row waste-widget-row"[^>]*>/g) || []).filter((tag) => !tag.includes('data-fill-row')).length;
 
   const wide = renderWasteWidget({ items, needsRefresh: false }, '1x2');
   assert.equal(zeilen(wide), listRowCap('1x2'), 'die hohe Kachel muss beim Zeilendeckel (5) stoppen, nicht alle 7 zeigen');

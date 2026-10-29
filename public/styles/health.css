@@ -186,6 +186,17 @@
   background: var(--color-fill-well);
 }
 
+/* EINE STEUERHOEHE IM DESKTOP-KOPF (R24, G0-Shell-P3-2): am Zeiger misst
+ * die Personenwahl wie Suche, Werkzeug und angedockte Pille daneben
+ * (`--target-md`, layout.css) - sie stand mit 44px als einziges Kopf-
+ * element darueber. Am Finger bleibt `--target-base`. */
+@media (min-width: 1024px) and (hover: hover) {
+  .health-toolbar__person .health-person-switcher__trigger {
+    min-height: var(--target-md);
+    padding-block: 0;
+  }
+}
+
 .health-toolbar__person .health-person-switcher__name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -249,6 +260,15 @@
   visibility: hidden;
 }
 
+/* DIE LISTE ERSCHEINT MIT IHREN STATUS (R24 S13, S12-F3). Ein Name allein
+ * steht mittig (unten, R18), der Status kommt nach ihm an und hob ihn um eine
+ * halbe Zeile - am Desktop Shift 0,0024 beim Eintritt. Bis die erste Runde
+ * der Status steht, haelt die Liste ihren Platz unsichtbar wie oben (R22 D4);
+ * health.js nimmt die Marke nach hoechstens STATUS_WAIT_MS weg. */
+.health-areas[data-health-status-pending] {
+  visibility: hidden;
+}
+
 .health-priority-skeleton__pill {
   inline-size: 12rem;
   block-size: var(--target-base);
@@ -260,7 +280,6 @@
 }
 
 .health-priority-skeleton__card--due   { min-block-size: 14.5rem; }
-.health-priority-skeleton__card--quick { min-block-size: 11rem; }
 
 .health-priority > .health-overview__card {
   margin-bottom: 0;
@@ -277,9 +296,9 @@
   flex: 0 0 auto;
 }
 
-.health-detail-head__title {
-  font-size: var(--text-lg);
-}
+/* Groesse und Gewicht: Rolle Detailtitel (typography.css, R24) - hier stand
+ * ein zweites `--text-lg`, das die Rolle der Split-Views fuer die Gesundheit
+ * noch einmal festschrieb. */
 
 .health-toolbar__back-icon {
   width: var(--icon-lg);
@@ -409,34 +428,23 @@
     border-radius: 0;
   }
 
-  /* DER KOPF DES BEREICHS HAT EINEN TRAEGER (R21 S7, D9). Die Spalte traegt
-   * hier keine Karte (siehe oben), und ihr klebender Kopf stand als weisser
-   * eckiger Balken ueber der Buehne, ohne Rundung, Schatten oder Flaeche
-   * darunter - als einziges Element der Seite. Er wird die Karte, die er
-   * ohnehin schon ist: Radius und leiser Schatten wie die Bereichskarten
-   * darunter, ohne Trennlinie (die Kante ist der Schatten), und Luft zum
-   * ersten Bereich. */
+  /* DER KOPF DES BEREICHS STEHT IN DER BUEHNE, OHNE EIGENE FLAECHE (R24,
+   * Critique G5 P2-2). Seit R21 (D9) war er eine weisse 64px-Karte, die mit
+   * Grundstreifen klebte (R22 D12) - der einzige Detailkopf der App als
+   * eigener Kasten, 40px ueber dem Inhalt, und auf der Uebersicht stand
+   * „Übersicht" doppelt. Jetzt: Siegel und Name in der Rolle Detailtitel
+   * (22/600, typography.css) direkt ueber dem Bereich, auf der Hoehe der
+   * Liste, ohne Karte, ohne Kleben - die Bereichskarten darunter tragen die
+   * Flaechen. Die Uebersicht zeigt keinen Kopf (health.js syncDetailHead). */
   .health-split > .split-view__detail .split-view__detail-head {
-    border-radius: var(--radius-lg);
-    border-block-end-color: transparent;
-    margin-block-end: var(--space-3);
-    /* DER KOPF FLUCHTET MIT DER LISTE UND KLEBT MIT ABSTAND (R22, D12;
-     * Critique a5 P2). Er stand bei y=69 direkt unter dem Modulkopf, die
-     * Bereichsliste daneben bei 85, und beim Scrollen liefen Kacheln durch
-     * den Spalt darueber und unter seinen runden Ecken durch. Jetzt beginnt
-     * er auf der Hoehe der Liste und klebt dort (`top` = Abstand), und ein
-     * Grundstreifen im Seitengrund liegt hinter ihm: ein Ring von --space-2
-     * deckt die Ecken, derselbe nach oben versetzt den Spalt bis zur Kante
-     * der Spalte. Zuerst der eigene Schatten, damit er ueber dem Streifen
-     * liegt. Der Ring bleibt unter der Luft zum Inhalt (--space-3), in Ruhe
-     * verdeckt er nichts. */
+    position: static;
+    min-height: 0;
+    padding: 0;
     margin-block-start: var(--space-4);
-    top: var(--space-4);
-    box-shadow:
-      var(--shadow-sm),
-      0 0 0 var(--space-2) var(--color-bg),
-      0 calc(-1 * var(--space-4)) 0 var(--space-2) var(--color-bg);
+    background-color: transparent;
+    border-block-end: 0;
   }
+
 
   .health-areas__overview {
     display: block;
@@ -468,6 +476,26 @@
 @media (min-width: 1024px) {
   .health-toolbar > .page-toolbar__actions {
     min-height: var(--target-base);
+    /* DER PLATZ DES KNOPFS STEHT (R24, Critique G5 P2-3): so breit wie sein
+     * laengstes Nomen (gemessen in fitHealthFabSlot, health.js), auch wenn er
+     * im Fasten oder ohne Recht fehlt. Vorher sprang die Personenwahl links
+     * daneben bei jedem Bereichswechsel (1440: x 1008-1167). */
+    min-inline-size: var(--health-fab-slot, auto);
+    /* DAS WERKZEUG STEHT AM ANFANG DES PLATZES, DER KNOPF AM ENDE (R24 S14).
+     * Mit `flex-end` rueckte der Export an den rechten Rand, solange der Knopf
+     * fehlte, und sprang um dessen Breite nach links, sobald er erschien - beim
+     * Eintritt einmal (0,0002 an #health-tools, x 1368 -> 1246: die Uebersicht
+     * kennt erst nach ihrem Laden die Person, fuer die sie erfasst), dazu bei
+     * jedem Wechsel in einen Bereich ohne Knopf. Jetzt haelt der Export seine
+     * Lage, und der Knopf schliesst an der Kante der Inhaltsspalte ab (der
+     * Aussenrand des Werkzeugs schiebt ihn dorthin). */
+    justify-content: flex-start;
+  }
+
+  /* Am Werkzeug, nicht am Knopf: der FAB zieht in die Shell um (#634), und
+   * ein Selektor ueber den Modulkopf griffe nur, solange er angedockt ist. */
+  .health-toolbar__tools {
+    margin-inline-end: auto;
   }
 }
 
@@ -553,7 +581,10 @@
   flex: 0 0 auto;
 }
 
-.health-vitals__toolbar {
+/* DIE ZEITRAUM-ZEILE EINES BEREICHS (R24, G5 P2-6): Segment links, EIN
+ * Stepper rechts - Vitalwerte und Aktivitaet tragen dieselbe Zeile. */
+.health-vitals__toolbar,
+.health-period-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -561,36 +592,8 @@
   flex-wrap: wrap;
 }
 
-.health-vitals__ranges {
-  display: inline-flex;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border-radius: var(--radius-full);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-}
-
-.health-vitals__range {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(var(--target-base) - var(--space-2));
-  padding: var(--space-1) var(--space-3);
-  border: none;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-/* Aktiv = erhabene Surface-Pille, Ton in der Tinte (tokens.css, Abschnitt 6c). */
-.health-vitals__range.is-active {
-  background: var(--seg-active-bg);
-  box-shadow: var(--seg-active-shadow);
-  color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary));
-}
-
+/* Das Segment ist das Kanon-Segment (.segmented, panel.css) seit R24 (G5 P2-6):
+ * vorher eine eigene Kapsel mit Ring, 36px statt 40. */
 
 /* Karten-Grid je Metrik. Mindestbreite 160px: die schmalste Karte muss den
  * längsten Metrik-Namen („Sauerstoffsättigung") einzeilig tragen können,
@@ -608,6 +611,47 @@
   /* Hoehe der Trendzeile im Rueckfall ohne Subgrid (panel.css `.metric-rows`):
    * die der Trendlinie (`.metric-card__spark`). */
   --metric-spark-row: 22px;
+}
+
+/* KEIN LOCH IM RASTER (R24, Critique G5 P3-3; Muster `.cycle-stats`). Neun
+ * Kacheln in vier Spalten liessen neben der letzten drei leere Zellen. Die
+ * letzte Kachel nimmt die freien Spuren ihrer Zeile. Die Schwellen sind die
+ * des Rasters selbst: auto-fill mit 160px Mindestbreite und --space-3 (12px)
+ * Abstand ergibt n Spalten ab 172n - 12px Reihenbreite. */
+/* Unter 640px Fenster haelt eine eigene Regel das Raster bei hoechstens zwei
+ * Spalten (`max-width: 639px` weiter unten, Mindestspur 150px): dort zaehlt
+ * nur die Zweierregel, ab 312px Reihenbreite. */
+@media (max-width: 639px) {
+  @container metric-grid (min-width: 312px) {
+    .health-vitals__cards > :last-child:nth-child(2n+1) { grid-column: span 2; }
+  }
+}
+@media (min-width: 640px) {
+  @container metric-grid (min-width: 332px) and (max-width: 503.98px) {
+    .health-vitals__cards > :last-child:nth-child(2n+1) { grid-column: span 2; }
+  }
+  @container metric-grid (min-width: 504px) and (max-width: 675.98px) {
+    .health-vitals__cards > :last-child:nth-child(3n+1) { grid-column: span 3; }
+    .health-vitals__cards > :last-child:nth-child(3n+2) { grid-column: span 2; }
+  }
+  @container metric-grid (min-width: 676px) and (max-width: 847.98px) {
+    .health-vitals__cards > :last-child:nth-child(4n+1) { grid-column: span 4; }
+    .health-vitals__cards > :last-child:nth-child(4n+2) { grid-column: span 3; }
+    .health-vitals__cards > :last-child:nth-child(4n+3) { grid-column: span 2; }
+  }
+  @container metric-grid (min-width: 848px) and (max-width: 1019.98px) {
+    .health-vitals__cards > :last-child:nth-child(5n+1) { grid-column: span 5; }
+    .health-vitals__cards > :last-child:nth-child(5n+2) { grid-column: span 4; }
+    .health-vitals__cards > :last-child:nth-child(5n+3) { grid-column: span 3; }
+    .health-vitals__cards > :last-child:nth-child(5n+4) { grid-column: span 2; }
+  }
+  @container metric-grid (min-width: 1020px) and (max-width: 1191.98px) {
+    .health-vitals__cards > :last-child:nth-child(6n+1) { grid-column: span 6; }
+    .health-vitals__cards > :last-child:nth-child(6n+2) { grid-column: span 5; }
+    .health-vitals__cards > :last-child:nth-child(6n+3) { grid-column: span 4; }
+    .health-vitals__cards > :last-child:nth-child(6n+4) { grid-column: span 3; }
+    .health-vitals__cards > :last-child:nth-child(6n+5) { grid-column: span 2; }
+  }
 }
 
 /* Die Kachel selbst ist seit Block 2 die geteilte Kennzahlkarte:
@@ -738,8 +782,10 @@
   flex: 1 1 0;
 }
 
-.health-vital-sheet__stepper {
+.health-vitals__stepper.health-vital-sheet__stepper {
+  display: flex;
   justify-content: space-between;
+  margin-inline-start: 0;
 }
 
 .health-vital-sheet__chart .health-chart-empty {
@@ -777,8 +823,6 @@
 }
 
 .health-chart-section__title {
-  font-size: var(--text-lg);
-  font-weight: var(--font-weight-semibold, 600);
   color: var(--color-text-primary);
 }
 
@@ -788,16 +832,26 @@
   color: var(--color-text-secondary);
 }
 
-.health-vitals__stepper {
+/* DER STEPPER DER ZEITRAUM-ZEILE (R24, G5 P2-6): der geteilte Baustein
+ * (utils/period-stepper.js) am Ende der Zeile, der Wert wie im Budget und den
+ * Berichten der Haushaltshilfe (16/600, primaer) mit fester Breite, damit kein
+ * Pfeil wandert (DESIGN „Zeitraum blaettern"). Vorher 14px sekundaer. */
+.health-vitals__stepper,
+.health-activity__stepper {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  margin-inline-start: auto;
 }
 
-.health-vitals__period {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  min-width: 0;
+.health-vitals__period,
+.health-activity__period {
+  min-inline-size: 8.5rem;
+  text-align: center;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  white-space: nowrap;
 }
 
 .health-chart {
@@ -1048,17 +1102,58 @@
  * fuer alle Module, siehe oben). Hier bricht eine Zeile um, die das mit
  * Absicht tut - der Name traegt die volle Basis und die Reihenfolge, nichts
  * faellt dem Zufall der Breite zu. */
+/* MIT RING BLEIBT DIE GEPLANTE DOSIS EINE ZEILE (R24, E10): der Umbruch
+ * unten war die Antwort auf den Einnehmen-Knopf mit Wort neben dem Namen.
+ * Seit Einnehmen der Ring vorn ist, traegt das Ende nur den schmalen
+ * Mehr-Knopf, und Ring, Uhrzeit, Name und Mehr passen bei 320px in eine
+ * Zeile; ein langer Name bricht in seiner Spalte (zwei Zeilen, s. oben). */
 @container list-rows (max-width: 26rem) {
-  .health-dose {
+  .health-dose:not(.health-dose--check) {
     flex-wrap: wrap;
     row-gap: var(--space-1);
   }
 
-  .health-dose > .health-dose__name {
+  .health-dose:not(.health-dose--check) > .health-dose__name {
     order: -1;
     flex: 1 0 100%;
     min-width: 0;
   }
+}
+
+/* DER EINNEHMEN-RING (R24, E10): derselbe Ring wie an der Aufgabe
+ * (`.check-ring`, list-row.css) - hier Trefferflaeche und Stellung. Der
+ * 20px-Ring steht auf der Inhaltskante der Zeile, die halbe Differenz zur
+ * Trefferflaeche reicht in die Zeilenpolsterung (Bauart Haushaltshilfe). Der
+ * Haken ist das Kind (`.check-ring__check`) und erscheint erst, wenn der Ring
+ * voll ist. */
+.health-dose__check {
+  position: relative;
+  flex: none;
+  width: var(--target-base);
+  height: var(--target-base);
+  margin-inline-start: calc((var(--target-base) - var(--space-5)) / -2);
+  margin-inline-end: calc((var(--target-base) - var(--space-5)) / -2);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.health-dose__check:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset-inset);
+}
+
+.health-dose__check:active::after {
+  transform: scale(var(--press-scale-sm));
+}
+
+.check-ring--static.health-dose__check {
+  cursor: default;
 }
 
 .health-dose__actions {
@@ -1128,10 +1223,6 @@
   font-weight: var(--font-weight-medium, 500);
 }
 
-.health-prn__take {
-  flex: 0 0 auto;
-  margin-inline-start: var(--space-2);
-}
 
 /* DIE BEDARFSZEILE BRICHT FRUEHER UM ALS DIE GEPLANTE DOSIS (R22, Critique a5).
  * Sie fuehrt neben Name und Knopf eine Statusangabe; bei 1920 stand die Karte
@@ -1149,6 +1240,18 @@
     order: -1;
     flex: 1 0 100%;
     min-width: 0;
+  }
+
+  .health-prn.health-dose--check > .health-dose__check {
+    order: -2;
+  }
+
+  .health-prn.health-dose--check > .health-dose__name {
+    flex-basis: calc(100% - var(--space-5) - var(--space-3));
+  }
+
+  .health-prn.health-dose--check > .health-prn__status {
+    margin-inline-start: calc(var(--space-5) + var(--space-3));
   }
 }
 
@@ -1212,7 +1315,7 @@ button.health-med-card:hover {
   color: var(--color-text-receded);
 }
 
-.health-med-card.is-inactive .health-med-badge--muted {
+.health-med-card.is-inactive .tag.health-med-badge--muted {
   background: var(--color-surface-3);
 }
 
@@ -1238,16 +1341,8 @@ button.health-med-card:hover {
   flex: 0 0 auto;
 }
 
-.health-med-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--space-0h) var(--space-2);
-  border-radius: var(--radius-full);
-  font-size: var(--type-micro);
-  background: var(--color-fill-well);
-  color: var(--color-text-secondary);
-}
-
+/* Die Abzeichen sind das geteilte Etikett (`.tag`, list-row.css, R24);
+ * "Inaktiv" steht eine Stufe tiefer. */
 .health-med-badge--muted {
   background: var(--color-surface-2);
   color: var(--color-text-secondary);
@@ -1624,8 +1719,14 @@ button.health-med-card:hover {
   color: var(--color-text-secondary);
 }
 
-.health-lab-table tbody tr:last-child td {
+.health-lab-table tbody tr:last-child > * {
   border-bottom: none;
+}
+
+/* Die Zeilenkoepfe (Analyt, R24 G5 P3-5) lesen wie die Zellen der Zeile, nicht
+ * wie der Spaltenkopf darueber. */
+.health-lab-table tbody th {
+  font-size: inherit;
 }
 
 .health-lab-table__analyte {
@@ -1681,8 +1782,45 @@ button.health-med-card:hover {
   color: var(--color-text-primary);
 }
 
-.health-lab-trend__select .input {
-  min-width: 140px;
+/* DER ANALYT ALS WEG ZU SEINEM VERLAUF (R24, G5 P3-5): sieht aus wie der
+ * Name (Gewicht, Farbe der Zelle), traegt die Trefferflaeche des Zeilenziels
+ * und zeigt den gewaehlten Verlauf in Modultinte - kein Kapselknopf in der
+ * Tabelle. Die Bewertung steht als Zeichen am Wert. */
+.health-lab-analyte {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  text-decoration: underline;
+  text-decoration-color: var(--color-border);
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+  position: relative;
+}
+
+.health-lab-analyte::before {
+  content: "";
+  position: absolute;
+  inset: calc((var(--target-base) - 1lh) / -2) calc(-1 * var(--space-2));
+}
+
+.health-lab-analyte[aria-pressed="true"] {
+  color: color-mix(in srgb, var(--module-health) var(--tint-ink), var(--color-text-primary));
+  text-decoration-color: currentColor;
+}
+
+@media (hover: hover) {
+  .health-lab-analyte:hover {
+    text-decoration-color: currentColor;
+  }
+}
+
+.health-lab-table__value .health-lab-flag {
+  margin-inline-start: var(--space-1);
 }
 
 .health-lab-trend__unit {
@@ -1799,31 +1937,14 @@ button.health-med-card:hover {
   gap: var(--space-4);
 }
 
-.health-activity__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.health-activity__stepper {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.health-activity__period {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  min-width: 0;
-}
 
 
 /* Summen-Karten */
 .health-activity__summary {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  /* auto-fit (R24, G5 P3-3): vier Kennzahlen fuellen die Zeile - mit
+   * auto-fill standen rechts daneben 170px leere Spuren (1440). */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--space-3);
 }
 
@@ -2188,32 +2309,8 @@ button.health-med-card:hover {
   margin-block-end: 0;
 }
 
-/* EINE RUHIGE ZEILE STATT LEERER KACHELN (R21, D6): "Noch keine Messwerte"
- * und daneben die Erfassen-Aktion. In der Uebersichtskarte steht sie auf der
- * Karte; auf der Vitalwerte-Seite traegt sie die Flaeche einer Zeile selbst. */
-.health-overview__empty-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-3);
-  min-block-size: var(--target-base);
-}
-
-.health-overview__empty-text {
-  font-size: var(--type-secondary);
-  color: var(--color-text-secondary);
-}
-
-/* DIESELBE ZEILE AUF EIGENER FLAECHE (R22, D12): wo sie nicht in einer
- * Karte steht ("Heute faellig" im Medikamentenbereich, eine leere Woche der
- * Aktivitaet), traegt sie die Flaeche einer Karte selbst. */
-.health-overview__empty-row--surface {
-  padding: var(--space-2) var(--space-4);
-  background-color: var(--color-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-}
+/* Die ruhige Zeile eines leeren Abschnitts (R21 D6, R22 D12) steht seit DW p7
+ * als `.card-empty-row` in layout.css: die Kacheln der Uebersicht teilen sie. */
 
 /* Der Leerzustand der Vitalwerte steht im Kachelraster und nimmt die Zeile. */
 .health-vitals__empty {
@@ -2389,6 +2486,8 @@ button.health-med-card:hover {
    * `.metric-card` baut, deklariert `container: metric-grid / inline-size` -
    * `.metric-grid` selbst tut nichts anderes. */
   container: metric-grid / inline-size;
+  /* Dieselbe Trendzeile wie die Kacheln des Bereichs (R24, G5 P2-6). */
+  --metric-spark-row: 22px;
 }
 
 /* TELEFON: ZWEI KERNWERTE (R16). Neun Kacheln waren 575px auf einer Seite,
@@ -2450,13 +2549,6 @@ button.health-med-card:hover {
 .health-overview__export-hint {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
-}
-
-/* Schnell-Erfassung */
-.health-overview__quick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
 }
 
 /* Export */
@@ -3853,6 +3945,15 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
     align-self: stretch;
     margin-top: 0;
   }
+
+  /* Die Kennzahlen ebenso volle Breite. `.cycle-stats` ist der Container
+   * `metric-grid` und hat damit keine Eigenbreite: unter `align-items: center`
+   * schrumpfte die Seite auf ihr Polster (8px), die Kacheln auf 26px, und die
+   * Texte liefen buchstabenweise senkrecht (R24, Critique G5 P0-1). Haelt
+   * test:metric-tile-fit-browser. */
+  .cycle-hero > .cycle-hero__side {
+    align-self: stretch;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3872,9 +3973,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 
 .health-recent__title {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
   margin-bottom: var(--space-1);
 }
 
@@ -4075,11 +4174,18 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .fasting-panel { display: grid; gap: var(--space-6); }
 .fasting-card { padding: var(--space-5); border-radius: var(--radius-md); background: var(--color-surface-work); box-shadow: var(--shadow-sm); }
 .fasting-hero { text-align: center; align-items: center; padding: var(--space-5); }
-.fasting-hero__timer { font-size: var(--text-3xl); line-height: var(--line-height-tight); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-bold); overflow-wrap: anywhere; }
+/* Der Timer ist die Kennzahl der Karte: Title 1 semibold (test:typography). */
+.fasting-hero__timer { font-size: var(--text-3xl); line-height: var(--line-height-tight); font-variant-numeric: tabular-nums; font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
 .fasting-dial__days { display: block; margin-top: var(--space-2); color: var(--color-text-secondary); }
 .fasting-hero__remaining { font-weight: var(--font-weight-semibold); }
 .fasting-hero__meta { margin-block: var(--space-2) var(--space-4); color: var(--color-text-secondary); }
 .fasting-hero__actions { display: flex; justify-content: center; gap: var(--space-2); flex-wrap: wrap; }
+/* Die Ziel-Leiste vor dem Start (R24, Critique G5 P2-5): Feldetikett ueber dem
+ * Segment, mittig wie die Karte; laeuft ein Fasten, steht sie nicht da. */
+.fasting-hero__goal { display: grid; justify-items: center; gap: var(--space-1); max-inline-size: 100%; margin-block-end: var(--space-4); }
+.fasting-goal--compact { display: grid; justify-items: center; max-inline-size: 100%; }
+.fasting-goal--compact .fasting-presets { margin-block: var(--space-2) 0; }
+.fasting-goal--compact .fasting-custom { justify-self: stretch; text-align: start; }
 /* Vor dem ersten Fasten (health-fasting.js `idle`): kein leerer Ring, keine
  * Umschaltung der Uhr - Satz und Knoepfe, darunter gleich der Leerzustand
  * des Verlaufs (Critique 2026-10-16). */

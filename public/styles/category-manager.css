@@ -79,33 +79,7 @@
  * `flex-wrap`, dieselbe Mechanik, die die Sublist nutzt. */
 .cat-row__colors {
   flex-basis: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
   padding: var(--space-2) 0 var(--space-1) calc(var(--space-6) + var(--space-4));
-}
-
-.cat-color-swatch {
-  width: var(--space-6);
-  height: var(--space-6);
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-}
-
-.cat-color-swatch:not(.vivid-mark) {
-  background: var(--color-fill-well);
-  /* „Keine Farbe" ist ein Zustand, kein leeres Feld: der Ring macht das Feld
-   * als Wahl erkennbar, ohne ihm eine Farbe zu geben. */
-  box-shadow: inset 0 0 0 var(--space-px) var(--color-border);
-}
-
-/* Der Aktivzustand liegt AUSSERHALB der Scheibe, damit er ihren Ton nicht
- * ueberzeichnet - dieselbe Antwort wie beim Fokusring. */
-.cat-color-swatch--active {
-  outline: var(--space-0h) solid var(--color-accent);
-  outline-offset: var(--space-0h);
 }
 
 .cat-row__name,

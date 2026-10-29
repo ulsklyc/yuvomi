@@ -163,7 +163,10 @@ test('Buchungszeile mit Schreibrecht: Bearbeiten und Verbuchen stehen da, Loesch
     // R14 P8: EINE Zeilenbedienung - Loeschen steht im Blatt (#bm-delete).
     assert.doesNotMatch(html, /data-action="delete"/);
     assert.match(html, /id="budget-manage-categories"/);
-    assert.match(html, /aria-label="budget\.editEntry: Stromabschlag, /);
+    // Seit R24 (E1) oeffnet der Tipp das Leseblatt - der Name nennt die
+    // Buchung, nicht "bearbeiten".
+    assert.match(html, /aria-label="Stromabschlag, /);
+    assert.doesNotMatch(html, /aria-label="budget\.editEntry/);
   });
 });
 
@@ -472,7 +475,9 @@ const abo = (over = {}) => ({
 test('Abo-Karte mit `budget: read`: der Koerper oeffnet die Leseansicht, Verlaengern, Loeschen und Wischflaechen gehen', () => {
   withAccess({ budget: 'write' }, () => {
     const html = abos.renderCard(abo());
-    assert.match(html, /<button type="button" class="subscription-card__main list-row__main--interactive"\s+data-action="edit">/);
+    // R24 (E1): auch mit Schreibrecht oeffnet der Koerper das Leseblatt;
+    // Bearbeiten ist dort der Primaerknopf.
+    assert.match(html, /<button type="button" class="subscription-card__main list-row__main--interactive"\s+data-action="view">/);
     assert.match(html, /data-action="renew"/);
     // R14 P8: kein sichtbarer Papierkorb an der Zeile. Seit R22 (D9, Endzone
     // R21-D10) steht Loeschen als Eintrag im Mehr-Knopf, wie bei Konten und
@@ -483,7 +488,6 @@ test('Abo-Karte mit `budget: read`: der Koerper oeffnet die Leseansicht, Verlaen
     assert.match(html, /class="popover-menu__item popover-menu__item--danger"\s+data-action="delete"/);
     assert.ok(html.indexOf('row-action--more') > html.indexOf('data-action="renew"'), 'Endzone: [Verlaengern][Mehr]');
     assert.match(html, /swipe-reveal--done/);
-    assert.match(html, /common\.edit/);
     // Der Wisch-Chevron faellt neben dem Mehr-Knopf (layout.css `:has(.row-action--more)`), die Geste bleibt.
     assert.doesNotMatch(html, /swipe-row--static/, 'die Geste bleibt');
   });
@@ -501,7 +505,8 @@ test('Abo-Karte mit `budget: read`: der Koerper oeffnet die Leseansicht, Verlaen
     assert.doesNotMatch(html, /subscription-status/);
     assert.match(abos.renderCard(abo({ enabled: false, status: 'paused' })), /class="subscription-status [^"]*">\s*subscriptions\.disabled/);
     assert.match(html, /subscriptions\.cycle\.monthly/);
-    assert.match(html, /subscriptions\.reminderMeta/);
+    // Die Standard-Erinnerung steht seit R24 (G4-Budget-P3-2) im Leseblatt, nicht in jeder Zeile.
+    assert.doesNotMatch(html, /subscriptions\.reminderMeta/);
     assert.match(html, /12[.,]99/);
   });
 });
@@ -522,44 +527,25 @@ test('Abos ohne Eintrag mit `budget: read`: kein Anlegen-CTA; der Filter-Ausweg 
   } finally { Object.assign(abos.state, vorher); }
 });
 
-test('Abo-Kennzahlen ohne Monatsbudget: bei `budget: read` keine Aufforderung, eines festzulegen', () => {
-  const vorher = abos.state.summary;
-  abos.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 0, remaining_budget: 0, base_currency: 'EUR' };
-  try {
-    withAccess({ budget: 'write' }, () => assert.match(abos.renderSummary(), /subscriptions\.setBudgetHint/));
-    withAccess({ budget: 'read' }, () => {
-      const html = abos.renderSummary();
-      assert.doesNotMatch(html, /subscriptions\.setBudgetHint/);
-      assert.match(html, /subscriptions\.unlimited/, 'der Zustand „kein Limit" bleibt');
-    });
-  } finally { abos.state.summary = vorher; }
-});
-
-test('Abo-Budget spricht wie der Plan: ab 85 % Warnton, ueberschritten Danger (Critique 2026-09-25)', () => {
+test('R24 E2: die Abo-Kennzahl ist bei jedem Recht dieselbe Zeile; ueber dem Budget EINMAL rot, der Weg zur Liste ist Lesen', () => {
   const vorher = abos.state.summary;
   const summe = (used) => ({ active_count: 3, monthly_total: used, monthly_budget: 100, remaining_budget: 100 - used, base_currency: 'EUR' });
   try {
-    abos.state.summary = summe(123.6);
-    const over = abos.renderSummary();
-    // R21 S7 (Critique a4 "Warnung doppelt", D8): die Ueberschreitung steht
-    // EINMAL rot - am Balken der Kostenkarte, wie im Plan; die Karte daneben
-    // nennt sie in Worten, ohne zweite rote Flaeche.
-    assert.doesNotMatch(over, /metric-card--over/, 'keine zweite rote Karte neben dem roten Balken');
-    assert.match(over, /triangle-alert[\s\S]{0,120}subscriptions\.overBudget/, 'das Label nennt die Tatsache samt Symbol');
-    assert.doesNotMatch(over, /metric-card--warning/);
-    assert.match(over, /metric-card__progress metric-card__progress--over/);
-    assert.match(over, /id="subscriptions-over-budget-action"/, 'der Handlungsweg bleibt');
-    abos.state.summary = summe(90);
-    const near = abos.renderSummary();
-    assert.match(near, /metric-card__progress--near/, 'ab 85 % der Warnton, wie im Plan');
-    assert.doesNotMatch(near, /metric-card--over|progress--over/);
-    abos.state.summary = summe(50);
-    assert.doesNotMatch(abos.renderSummary(), /progress--(near|over)|metric-card--over/);
+    for (const modus of ['write', 'read']) {
+      withAccess({ budget: modus }, () => {
+        abos.state.summary = summe(123.6);
+        const over = abos.renderSummary();
+        assert.equal((over.match(/budget-glance__flow--negative/g) ?? []).length, 1, `${modus}: die Ueberschreitung steht EINMAL rot`);
+        assert.doesNotMatch(over, /metric-card|role="progressbar"/, `${modus}: kein Balken, keine zweite Karte`);
+        assert.match(abos.renderOverBudgetNote(), /id="subscriptions-over-budget-action"/, `${modus}: der Handlungsweg ist Lesen und bleibt`);
+        abos.state.summary = summe(50);
+        const under = abos.renderSummary();
+        assert.doesNotMatch(under + abos.renderOverBudgetNote(), /budget-glance__flow--negative|subscriptions-over-budget-action/);
+        abos.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 0, remaining_budget: 0, base_currency: 'EUR' };
+        assert.doesNotMatch(abos.renderSummary(), /subscriptions\.setBudgetHint|remainingBudget/, `${modus}: ohne Budget keine Aufforderung und kein Stand`);
+      });
+    }
   } finally { abos.state.summary = vorher; }
-  const panel = readFileSync(new URL('../public/styles/panel.css', import.meta.url), 'utf8');
-  const rule = (sel) => [...eachRule(panel)].find((r) => r.selector.trim() === sel)?.body ?? '';
-  assert.match(rule('.metric-card__progress--over > span'), /--color-danger/);
-  assert.match(rule('.metric-card__progress--near > span'), /--color-warning/);
   const plansCss = readFileSync(new URL('../public/styles/budget.css', import.meta.url), 'utf8');
   assert.match(plansCss, /\.budget-plan-row--tone-over \{ --plan-tone-color: var\(--color-danger\);/, 'der Plan ist die Referenz');
 });
@@ -804,7 +790,9 @@ test('Regel 6: `renderExpenses` traegt nicht mehr den Namen des Modulrechts', ()
   // `data-expense-id` ins Bearbeiten. Seit #2108 ist er benannt
   // (`onExpenseListClick`, dort steht auch "Mehr laden"); drawMain haengt ihn an.
   assert.match(fn(SPLIT_CODE, 'drawMain'), /querySelector\('#split-expense-list'\)\?\.addEventListener\('click', onExpenseListClick\)/);
-  assert.match(fn(SPLIT_CODE, 'onExpenseListClick'), /if \(btn\.dataset\.expenseView\) openExpenseReadView\(expense\);\n\s*else openExpenseModal\(expense\);/);
+  // Seit R24 (E1) oeffnet JEDE Zeile das Leseblatt; Bearbeiten steht dort als
+  // Primaerknopf - nur mit Schreibrecht und ausserhalb des Archivs.
+  assert.match(fn(SPLIT_CODE, 'onExpenseListClick'), /openExpenseReadView\(expense, \{ editable: !btn\.dataset\.expenseView && !readOnly\(\) && !isArchivedView\(\) \}\)/);
 });
 
 test('Keine Gruppe mit `budget: read`: der Titel bleibt, „Erstelle eine Gruppe" geht', () => {
@@ -963,9 +951,9 @@ test('der delegierte Listen-Handler fragt VOR der ersten Aktion, und der Zeilen-
   const riegel = handler.indexOf('if (action && readOnly() && !READ_SAFE_ACTIONS.has(action.dataset.action)) return;');
   const ersteAktion = handler.indexOf('[data-action="confirm"]');
   assert.ok(riegel > 0 && ersteAktion > 0 && riegel < ersteAktion, 'der Riegel steht hinter dem Verbuchen');
-  // Der Zeilen-Klick geht an openBudgetModal - und DER verzweigt bei `read`
-  // in die Leseansicht (Test unten), wie openNoteModal in P1.
-  assert.match(handler, /if \(item && !action\) \{\n[^\n]*\n\s*if \(entry\) openBudgetModal\(\{ mode: 'edit', entry \}\);/);
+  // Der Zeilen-Klick oeffnet seit R24 (E1) das Leseblatt; Bearbeiten steht
+  // darin nur mit Schreibrecht und nie fuer eine maskierte Buchung.
+  assert.match(handler, /if \(item && !action\) \{\n[^\n]*\n\s*if \(entry\) openEntryReadView\(entry, \{ editable: !readOnly\(\) && !entry\.details_hidden \}\);/);
 });
 
 test('Kopfknopf und FAB: der Anlege-Handler fragt selbst, obwohl CSS beide ausblendet', () => {
@@ -1131,6 +1119,25 @@ const belegDocx = {
   mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 };
 
+test('R24 E1: mit Schreibrecht traegt das Leseblatt der Buchung EINEN Primaerknopf Bearbeiten, der den Editor oeffnet', async () => {
+  const eintrag = buchung({ attachments: [beleg] });
+  const lesend = withAccess({ budget: 'write' }, () => detailOptionen(() => budget.openEntryReadView(eintrag, { editable: true })));
+  assert.equal(lesend.title, 'Stromabschlag');
+  assert.deepEqual(lesend.actions.map((a) => [a.id, a.variant]), [['budget-read-edit', 'primary']]);
+  assert.ok(lesend.sections.some((s) => s.label === 'budget.amountLabel'), 'das Blatt zeigt den Betrag');
+  let editor = null;
+  await withAccess({ budget: 'write' }, async () => {
+    const vorher = globalThis.__openModal;
+    globalThis.__openModal = (opts) => { editor = opts; };
+    try { await lesend.actions[0].onClick({ close: async () => {} }); } finally {
+      if (vorher === undefined) delete globalThis.__openModal; else globalThis.__openModal = vorher;
+    }
+  });
+  assert.equal(editor?.title, 'budget.editEntry', 'Bearbeiten fuehrt in den Editor der Buchung');
+  // Ohne `editable` (Leserecht, maskierte Buchung) bleibt es ein Blatt ohne Fuss.
+  keineHandlung(detailOptionen(() => budget.openEntryReadView(eintrag)), 'Buchung ohne Schreibweg');
+});
+
 test('Buchung bei `budget: read`: der Einstieg oeffnet die Leseansicht, nicht den Editor', () => {
   const eintrag = buchung({ attachments: [beleg] });
   const lesend = withAccess({ budget: 'read' }, () => detailOptionen(() => budget.openBudgetModal({ mode: 'edit', entry: eintrag })));
@@ -1247,11 +1254,11 @@ test('Abo: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlu
     end_type: 'on_date', end_date: '2026-12-31', brand_color: '#E50914',
   });
   const werte = {
-    'subscriptions.detailAmountLabel': [[/id="subscription-amount"[^>]*value="12,99"/, /id="subscription-currency" type="hidden" value="EUR"/],
+    'subscriptions.detailAmountLabel': [[/id="subscription-amount"[^>]*value="12,99"/, /id="subscription-currency"[^>]*>[\s\S]*?<option value="EUR" selected>EUR</],
       /^12,99\s€ · subscriptions\.monthlyEquivalent\{"amount":"12,99\s€"\}$/],
     'subscriptions.filterLabelStatus': [[/role="switch" id="subscription-enabled"[^>]*checked/], /^subscriptions\.active$/],
     'subscriptions.descriptionLabel': [[/id="subscription-description"[^>]*value="Premium"/], /^Premium$/],
-    'subscriptions.billingCycleLabel': [[/id="subscription-cycle" type="hidden" value="monthly"/, /id="subscription-interval"[^>]*value="1"/],
+    'subscriptions.billingCycleLabel': [[/id="subscription-cycle"[^>]*>[\s\S]*?<option value="monthly" selected>/, /id="subscription-interval"[^>]*value="1"/],
       /^subscriptions\.cycle\.monthly$/],
     'subscriptions.detailNextPaymentLabel': [[/id="subscription-next-date"[^>]*value="2026-10-01"/], /^[^,\s]+, 2026-10-01 · subscriptions\./],
     'subscriptions.reminderDaysLabel': [[/id="subscription-reminder"[^>]*value="3"/], /^subscriptions\.reminderMeta\{"count":3\}$/],
@@ -1268,7 +1275,7 @@ test('Abo: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlu
     assert.equal(lesend.title, 'Streamingdienst');
     jederWert(werte, editor.content, zeilen(lesend.sections), 'Abo');
     // Die Markenfarbe ist keine Zeile, sondern der Farbstreifen der Ansicht.
-    assert.match(editor.content, /id="subscription-color" type="color" value="#E50914"/);
+    assert.match(editor.content, /<input type="hidden" id="subscription-color" value="#E50914">/);
     assert.equal(lesend.accentColor, '#E50914');
 
     assert.equal(withAccess({ budget: 'read' }, () => modalOptionen(() => abos.openSubscriptionModal(eintrag))), null,
@@ -1286,7 +1293,7 @@ test('Abo: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlu
 
 const ausgabe = {
   id: 40, title: 'Ferienwohnung', amount: 600, currency: 'EUR', payer_id: 1, payer_name: 'Alex',
-  expense_date: '2026-08-02', split_method: 'exact', category: 'travel', description: 'Anzahlung', attachments: [beleg],
+  expense_date: '2026-08-02', split_method: 'exact', category: 'travel', budget_category: 'urlaub_x', description: 'Anzahlung', attachments: [beleg],
   splits: [
     { user_id: 1, display_name: 'Alex', amount: 400, currency: 'EUR' },
     { user_id: 3, display_name: 'Emma', amount: 200, currency: 'EUR' },
@@ -1296,7 +1303,8 @@ const ausgabe = {
 test('Ausgabe: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Handlung', () => {
   const vorher = { ...split.state };
   Object.assign(split.state, {
-    activeGroupId: 2, groups: [{ id: 2, default_currency: 'EUR' }], meta: { currencies: ['EUR', 'USD'], categories: ['groceries', 'travel', 'general'] },
+    activeGroupId: 2, groups: [{ id: 2, default_currency: 'EUR' }], meta: { currencies: ['EUR', 'USD'] },
+    budgetCategories: [{ key: 'essen_x', name: 'Essen' }, { key: 'urlaub_x', name: 'Urlaub' }],
     groupMembers: [{ id: 1, display_name: 'Alex' }, { id: 3, display_name: 'Emma' }],
   });
   const werte = {
@@ -1306,8 +1314,9 @@ test('Ausgabe: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs - ohne Ha
     'splitExpenses.paidBy': [[/<option value="1" selected>Alex</], /^Alex$/],
     'splitExpenses.date': [[/name="expense_date"[^>]*value="2026-08-02"/], /^2026-08-02$/],
     'splitExpenses.splitMethod': [[/<option value="exact" selected>/], /^splitExpenses\.splitExact$/],
-    // Die Kategorie (#1941): im Dialog gewaehlt, in der Leseansicht benannt.
-    'splitExpenses.categoryLabel': [[/<option value="travel" selected>/], /^splitExpenses\.category\.travel$/],
+    // Die Kategorie (#1941, seit R24 E12 eine Budget-Kategorie): im Dialog
+    // gewaehlt, in der Leseansicht benannt.
+    'splitExpenses.categoryLabel': [[/<option value="urlaub_x" selected>/], /^Urlaub$/],
     'splitExpenses.participants': [[/name="split_value_1"[^>]*value="400,00"/, /name="split_value_3"[^>]*value="200,00"/],
       /^Alex: 400,00\s€\nEmma: 200,00\s€$/],
     'splitExpenses.notes': [[/Anzahlung<\/textarea>/], /^Anzahlung$/],
@@ -1605,7 +1614,7 @@ test('Gruppenkopf bei `budget: read`: Waehrung, Standardaufteilung und Mitgliede
     'splitExpenses.currency': [[/<option value="EUR" selected>EUR</], /^EUR$/],
     'splitExpenses.defaultSplit': [[/<option value="percentage" selected>/, /name="default_value_1"[^>]*value="60"/, /name="default_value_3"[^>]*value="40"/],
       /^splitExpenses\.splitPercentage - Alex 60\u00a0%, Emma 40\u00a0%$/],
-    'splitExpenses.members': [[/value="user:1" checked[\s\S]*Alex/, /value="user:3" checked[\s\S]*Emma · splitExpenses\.roleGuest/],
+    'splitExpenses.members': [[/value="user:1"[^>]* checked[\s\S]*Alex/, /value="user:3"[^>]* checked[\s\S]*Emma · splitExpenses\.roleGuest/],
       /^Alex, Emma \(splitExpenses\.roleGuest\)$/],
   };
   jederWert(werte, editor.content, gruppenZeile(gruppenKopf(gruppe(), mitglieder, 'read')), 'Gruppe');
@@ -1696,6 +1705,28 @@ test('Plan: kein zweites „+ Budget festlegen" im Koerper - der Budget-FAB ruft
   }
 });
 
+test('R24 E1: mit Schreibrecht traegt das Abo-Leseblatt Bearbeiten als Primaerknopf, "Verlaengert" davor - abgeschlossen ohne', () => {
+  const offen = withAccess({ budget: 'write' }, () => detailOptionen(() => abos.openSubscriptionReadView(abo(), { editable: true })));
+  assert.deepEqual(offen.actions.map((a) => [a.id, a.variant]), [['subscription-read-renew', 'secondary'], ['subscription-read-edit', 'primary']]);
+  const fertig = withAccess({ budget: 'write' }, () => detailOptionen(() => abos.openSubscriptionReadView(abo({ status: 'completed' }), { editable: true })));
+  assert.deepEqual(fertig.actions.map((a) => a.id), ['subscription-read-edit'], 'ein abgeschlossenes Abo hat keine naechste Zahlung');
+  keineHandlung(detailOptionen(() => abos.openSubscriptionReadView(abo())), 'Abo ohne Schreibweg');
+});
+
+test('R24 G4-Budget-P3-3: im Abo-Dialog ist das Logo EIN Bedienelement, die naechste Zahlung steht bei der Abrechnung', () => {
+  const editor = withAccess({ budget: 'write' }, () => modalOptionen(() => abos.openSubscriptionModal(abo())));
+  const html = editor.content;
+  assert.equal(editor.initialFocus, 'edit', 'Bearbeiten holt am Finger keine Tastatur');
+  assert.match(html, /<span class="media-picker">\s*<button type="button" class="subscription-logo-picker" id="subscription-logo-button"/, 'die Kachel IST die Dateiwahl');
+  assert.match(html, /media-picker__badge/);
+  assert.doesNotMatch(html, /<small>[\s\S]*?subscriptions\.logoLabel/, 'keine zweite Beschriftung "Logo hochladen" unter der Kachel');
+  assert.match(html, /id="subscription-find-logo"/, '"Logo finden" bleibt eine eigene Handlung');
+  const billing = html.slice(html.indexOf('subscription-form__billing-grid'), html.indexOf('subscriptions.renewalDetails'));
+  assert.match(billing, /id="subscription-next-date"/, 'die naechste Zahlung gehoert zur Abrechnung');
+  assert.match(billing, /class="budget-amount-field budget-amount-field--choice"[\s\S]*id="subscription-currency"/, 'die Waehrung ist die Wahl im Suffix des Betrags');
+  assert.doesNotMatch(html, /subscription-currency-search/, 'keine Such-Combobox mehr fuer die Waehrung');
+});
+
 test('Abo: the payment reminder switch defaults on and displays a saved off choice', () => {
   for (const reminderEnabled of [undefined, true, false]) {
     const subscription = abo({ reminder_enabled: reminderEnabled });
@@ -1710,10 +1741,12 @@ test('Abo: the payment reminder switch defaults on and displays a saved off choi
     assert.equal(detail['subscriptions.reminderDaysLabel'], reminderEnabled === false
       ? 'subscriptions.noReminder' : 'subscriptions.reminderMeta{"count":3}');
     const card = withAccess({ budget: 'read' }, () => abos.renderCard(subscription));
-    assert.equal(card.includes('subscriptions.reminderMeta'), reminderEnabled !== false);
+    // Seit R24 (G4-Budget-P3-2) steht in der Zeile nur eine Erinnerung, die
+    // vom Standard abweicht - die ausgeschaltete; die Standardfrist nicht.
+    assert.equal(card.includes('subscriptions.reminderMeta'), false);
     assert.equal(card.includes('subscriptions.noReminder'), reminderEnabled === false);
     const reminderIcon = reminderEnabled === false ? 'bell-off' : 'bell';
-    assert.ok(card.includes(`data-lucide="${reminderIcon}"`));
+    if (reminderEnabled === false) assert.ok(card.includes(`data-lucide="${reminderIcon}"`));
     const reminderRow = abos.subscriptionReadSections(subscription)
       .find(row => row.label === 'subscriptions.reminderDaysLabel');
     assert.equal(reminderRow.icon, reminderIcon);
@@ -1880,4 +1913,36 @@ test('#1997: Plan setzen und loeschen schliessen nur mit dem Kontext von VOR der
     Object.assign(view, { data: vorher.data, ctx: vorher.ctx, root: vorher.root, month: vorher.month });
     globalThis.window = vorher.window;
   }
+});
+
+// R24 S10-F3 (Ulas 28.10.): der Tipp auf ein Konto verliess den Reiter Konten
+// (Uebersicht mit Filter-Chip). Jetzt oeffnet er das Leseblatt des Kontos wie
+// Buchung, Abo und Ausgabe (E1): Typ, Saldo, Startsaldo, Kreditrahmen; die
+// Buchungen sind die Nebenhandlung, Bearbeiten der eine Primaerknopf. Bei
+// `read` bleibt nur der Weg zu den Buchungen.
+test('R24 S10-F3: ein Konto liest sich zuerst - Buchungen anzeigen sekundaer, Bearbeiten primaer, bei read nur die Buchungen', () => {
+  const konto = { id: 4, name: 'Kreditkarte', type: 'credit', color: '#0F766E', current_balance: -120.5, starting_balance: 0, credit_limit: 2000, credit_bank: 'Musterbank', currency: 'EUR' };
+  setPermissions({ admin: false, modules: { budget: 'write' }, widgets: {}, capabilities: {} });
+  try {
+    const opts = detailOptionen(() => budget.openAccountReadView(konto));
+    assert.ok(opts, 'das Blatt oeffnet');
+    assert.equal(opts.title, 'Kreditkarte');
+    const z = zeilen(opts.sections);
+    assert.ok(z['budget.accountTypeLabel'] && z['budget.balance'] && z['budget.startingBalanceLabel'], 'Typ, Saldo, Startsaldo');
+    assert.ok(z['budget.creditLimitLabel'] && z['budget.creditBankLabel'] === 'Musterbank', 'die Kreditkarte nennt Rahmen und Bank');
+    assert.deepEqual(opts.actions.map((a) => [a.id, a.variant]), [
+      ['budget-account-read-statement', 'secondary'],
+      ['budget-account-read-edit', 'primary'],
+    ]);
+  } finally { clearPermissions(); }
+  setPermissions({ admin: false, modules: { budget: 'read' }, widgets: {}, capabilities: {} });
+  try {
+    const opts = detailOptionen(() => budget.openAccountReadView({ ...konto, type: 'checking' }));
+    assert.deepEqual(opts.actions.map((a) => a.id), ['budget-account-read-statement'], 'read: nur der Weg zu den Buchungen');
+    assert.equal(zeilen(opts.sections)['budget.creditLimitLabel'], undefined, 'kein Rahmen ausserhalb der Kreditkarte');
+  } finally { clearPermissions(); }
+  const src = readFileSync(new URL('../public/pages/budget.js', import.meta.url), 'utf8');
+  assert.match(src, /\.budget-account__main\[data-drill\]'\)\.forEach\(\(el\) => \{\s*el\.addEventListener\('click', \(\) => \{[\s\S]{0,200}openAccountReadView\(account\)/,
+    'der Zeilentipp oeffnet das Blatt, nicht den Auszug');
+  assert.match(src, /if \(from === 'accounts'\) \{\s*state\.activeTab = 'accounts';/, 'das x am Konto-Chip fuehrt in die Konten zurueck');
 });

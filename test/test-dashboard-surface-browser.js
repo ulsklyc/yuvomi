@@ -256,6 +256,7 @@ async function measureHead(page) {
       tools: box('.dashboard-overview__tools'),
       overview: box('.dashboard-overview'),
       updated: box('.dashboard-overview__updated'),
+      weather: box('.dashboard-overview__weather'),
       firstContent: first ? Math.round(first.getBoundingClientRect().top) : null,
     };
   });
@@ -288,8 +289,12 @@ test('Kopf desktop: nicht hoeher als vorher, Werkzeuge rechts auf Hoehe des Datu
   const m = await measureHead(page);
   await page.close();
   // Vorher 67px: Datum, Titel und darunter rechts der Stand-Anker unter den
-  // Knoepfen. Ohne den Anker sind es Datum plus Titel.
-  assert.ok(m.overview.height <= 67, `Der Kopf ist am Desktop ${m.overview.height}px hoch`);
+  // Knoepfen. Ohne den Anker sind es Datum plus Titel - und seit R24 (E7 a)
+  // die Wetterzeile darunter, in jeder Breite wie mobil. Sie ist die EINE Zeile,
+  // die der Kopf dafuer waechst (19px Text plus 4px Abstand).
+  const weatherLine = m.weather?.shown ? m.weather.height + 4 : 0;
+  assert.ok(m.overview.height <= 67 + weatherLine, `Der Kopf ist am Desktop ${m.overview.height}px hoch (Wetterzeile ${weatherLine}px)`);
+  assert.ok(weatherLine === 0 || m.weather.top >= m.title.bottom, 'die Wetterzeile steht unter dem Gruss');
   assert.equal(m.titleLines['Guten Morgen, Linda'], 1);
   assert.ok(Math.abs(m.tools.top - m.date.top) <= 2, 'Die Werkzeuge haengen oben, auf der Datumszeile');
   assert.ok(!m.updated?.shown, 'Kein Stand-Anker ausserhalb des Wand-Modus');
@@ -510,7 +515,45 @@ async function saveLayout(page, layout) {
   }, layout);
 }
 
-/** Belegt die Zellen aus den gerenderten Rechtecken - nicht aus der eigenen Rechnung. */
+/* DREI SPALTEN STEHEN SEIT DW-P2-12 (H5) ERST AB RUND 1440px. Das
+ * Spaltenminimum ist 330px statt 280px; bei 1280px (Harness `desktop`) misst
+ * das Raster neben der Seitenleiste 996px und legt zwei Spalten an. Die
+ * Rasterfaelle hier sind Faelle in drei Spalten (eine 1x1-Kachel neben einer
+ * breiten, drei Breitkacheln mit je einer freien Zelle, drei hohe Karten
+ * nebeneinander) - darum fahren sie in einem Fenster, das drei Spalten hat,
+ * und pruefen das als Reichweite. */
+const THREE_COLUMNS = { width: 1440, height: 900, deviceScaleFactor: 1, isMobile: false, hasTouch: false };
+
+async function openGridPage() {
+  const page = await openPage(harness, { device: 'desktop' });
+  await page.setViewport(THREE_COLUMNS);
+  return page;
+}
+
+/**
+ * Belegt die Zellen aus den gerenderten Rechtecken - nicht aus der eigenen Rechnung.
+ *
+ * DIE LUECKE GEHOERT ZUR KACHEL, NICHT ZUM LOCH (U1 b). Ab 768px rechnet das
+ * Raster in 4px-Spuren ohne Zeilenluecke; den Abstand zur naechsten Kachel
+ * traegt der Rahmen als Aussenabstand unten und belegt dafuer
+ * `--tile-gap-rows` Spuren mehr. Gemessen wird darum die Randbox (Rechteck plus
+ * `margin-block-end`): sonst stuende unter jeder Kachel ein Band aus fuenf
+ * leeren Spuren, und jede Kachelluecke laese sich als Loch.
+ *
+ * WAS EIN LOCH IST: eine leere Zelle, unter der in derselben Spalte noch eine
+ * Kachel steht (`inner`), und das freie Ende einer Spalte, das laenger ist als
+ * ein Kachelabstand (`ends`, F9 - eine leere Spalte neben vollen). Ein Ende bis
+ * zu einem Abstand ist der ausgefranste Rand eines Rasters, dessen Kacheln so
+ * hoch sind wie ihr Inhalt. Der Abstand kommt aus dem gemessenen Rand, nicht
+ * aus der Rechnung der App.
+ *
+ * IM BEARBEITEN-MODUS ZEIGT DAS RASTER DASSELBE WIE AUSSERHALB (DW-P2-9): ein
+ * Loch schliesst auch dort die Kachel darueber, und die Hoehe, die sie nur
+ * dafuer bekommt, steht als Geist (`[data-ghost-block]::after`). Ein Geist, unter
+ * dem in seinen Spalten noch eine Kachel steht, ist das Loch der gewaehlten
+ * Groessen mitten im Raster (`filled`) - das, wofuer der Hinweis da ist. Ein
+ * Geist am Ende seiner Spalte schliesst nur das Spaltenende.
+ */
 async function gridCells(page) {
   return page.evaluate(() => {
     const g = document.getElementById('dashboard-widget-grid');
@@ -541,25 +584,49 @@ async function gridCells(page) {
     };
     const occ = rowsT.map(() => Array(colsT.length).fill(null));
     const order = [];
+    const ghosts = [];
+    let gapTracks = 0;
     for (const it of g.querySelectorAll(':scope > .widget-wrapper')) {
       const r = it.getBoundingClientRect();
+      const gap = parseFloat(getComputedStyle(it).marginBlockEnd) || 0;
       const x0 = r.left - gr.left - offX;
       const y0 = r.top - gr.top - offY;
       const c0 = trackAt(colsT, cg, x0);
       const r0 = trackAt(rowsT, rg, y0);
       const c1 = trackEnd(colsT, cg, c0, x0 + r.width);
-      const r1 = trackEnd(rowsT, rg, r0, y0 + r.height);
+      const r1 = trackEnd(rowsT, rg, r0, y0 + r.height + gap);
+      const r1Box = trackEnd(rowsT, rg, r0, y0 + r.height);
+      gapTracks = Math.max(gapTracks, r1 - r1Box);
       for (let a = r0; a <= r1; a += 1) for (let b = c0; b <= c1; b += 1) occ[a][b] = it.dataset.widgetId;
       order.push(it.dataset.widgetId);
+      const ghost = getComputedStyle(it, '::after');
+      if (it.hasAttribute('data-ghost-block') && ghost.content !== 'none') {
+        ghosts.push({ id: it.dataset.widgetId, px: Math.round(parseFloat(ghost.height) || 0), r1, c0, c1 });
+      }
     }
-    const lastRow = occ.length - 1;
+    const filled = ghosts
+      .filter((gh) => gh.px > 0 && occ.slice(gh.r1 + 1).some((row) => row.slice(gh.c0, gh.c1 + 1).some((v) => v && v !== gh.id)))
+      .map((gh) => `${gh.id}: ${gh.px}px Geist ueber einer Kachel`);
     const inner = [];
-    occ.forEach((row, ri) => row.forEach((v, ci) => { if (!v && ri < lastRow) inner.push(`${ri}/${ci}`); }));
+    const ends = [];
+    for (let ci = 0; ci < colsT.length; ci += 1) {
+      let below = false;
+      let end = 0;
+      for (let ri = occ.length - 1; ri >= 0; ri -= 1) {
+        if (occ[ri][ci]) below = true;
+        else if (below) inner.unshift(`${ri}/${ci}`);
+        else end += 1;
+      }
+      if (end > gapTracks) ends.push(`Spalte ${ci}: ${end} Spuren frei`);
+    }
     return {
       cols: colsT.length,
       flow: cs.gridAutoFlow,
       order,
       inner,
+      ends,
+      filled,
+      gapTracks,
       cells: occ,
       map: occ.map((row) => row.map((v) => (v || '.').slice(0, 8)).join(' | ')).join('\n'),
     };
@@ -588,7 +655,7 @@ const REORDERED = [
 ];
 
 test('Raster: eine eigene Reihenfolge laesst keine Loecher, in Ansicht UND Bearbeiten', async () => {
-  const page = await openPage(harness, { device: 'desktop' });
+  const page = await openGridPage();
   await saveLayout(page, REORDERED);
   await gotoRoute(page, '/');
   const view = await gridCells(page);
@@ -600,6 +667,8 @@ test('Raster: eine eigene Reihenfolge laesst keine Loecher, in Ansicht UND Bearb
   assert.deepEqual(view.order, ['calendar', 'tasks', 'notes'], 'Die gespeicherte Reihenfolge bleibt die Rangfolge im Dokument');
   assert.deepEqual(view.inner, [], `Loch in der Ansicht:\n${view.map}`);
   assert.deepEqual(edit.inner, [], `Loch im Bearbeiten-Modus:\n${edit.map}`);
+  assert.deepEqual(view.ends, [], `Leere Spalte in der Ansicht:\n${view.map}`);
+  assert.deepEqual(edit.ends, [], `Leere Spalte im Bearbeiten-Modus:\n${edit.map}`);
   // Keine Karte springt: jede Zelle, die im Bearbeiten-Modus belegt ist, traegt
   // in der Ansicht dieselbe Kachel. Die Ansicht darf nur LEERE Zellen fuellen -
   // seit R10 (L9) waechst die Kachel vor einer Luecke in den Rest ihrer Reihe,
@@ -615,43 +684,65 @@ test('Raster: eine eigene Reihenfolge laesst keine Loecher, in Ansicht UND Bearb
 });
 
 test('Raster: Ziehen und Ablegen ordnet im dichten Raster weiter um', async () => {
-  const page = await openPage(harness, { device: 'desktop' });
+  const page = await openGridPage();
   await saveLayout(page, REORDERED);
   await gotoRoute(page, '/');
   await enterEditMode(page);
-  // Natives HTML5-Drag (draggable="true" am Wrapper): dieselben Ereignisse, die
-  // der Browser beim Ziehen schickt, mit einem echten DataTransfer.
-  await page.evaluate(() => {
-    const grid = document.getElementById('dashboard-widget-grid');
-    const from = grid.querySelector('[data-widget-id="notes"]');
-    const to = grid.querySelector('[data-widget-id="calendar"]').getBoundingClientRect();
-    const dt = new DataTransfer();
-    const at = { clientX: to.left + 10, clientY: to.top + to.height / 2 };
-    from.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
-    grid.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt, ...at }));
-    grid.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt, ...at }));
+  // Gezogen wird am Griff ueber SortableJS (DW-P2-3, utils/sortable.js) - mit
+  // echter Maus, denn der Baustein simuliert das Ziehen selbst (forceFallback)
+  // und hoert auf Zeiger-, nicht auf HTML5-Drag-Ereignisse. Er wird erst im
+  // Anpassen-Modus geladen: erst warten, bis er am Raster haengt.
+  await page.waitForFunction(async () => {
+    const { default: Sortable } = await import('/vendor/sortablejs/sortable.esm.min.js');
+    return !!Sortable.get(document.getElementById('dashboard-widget-grid'));
+  }, { timeout: 10000 });
+  const handle = await page.$('#dashboard-widget-grid [data-widget-id="notes"] [data-widget-drag-handle]');
+  await handle.scrollIntoView();
+  const from = await handle.boundingBox();
+  const to = await page.$eval('#dashboard-widget-grid [data-widget-id="calendar"]', (el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width * 0.25, y: r.top + r.height / 2 };
   });
-  await wait(300);
+  const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) {
+    await page.mouse.move(start.x + (to.x - start.x) * i / 12, start.y + (to.y - start.y) * i / 12);
+    await wait(30);
+  }
+  await wait(200);
+  await page.mouse.up();
+  await wait(400);
+  await freeze(page);
   const after = await gridCells(page);
   await page.close();
   assert.deepEqual(after.order, ['notes', 'calendar', 'tasks'], `Ablegen vor "calendar" ergab ${after.order.join(', ')}`);
   assert.deepEqual(after.inner, [], `Loch nach dem Ablegen:\n${after.map}`);
+  assert.deepEqual(after.ends, [], `Leere Spalte nach dem Ablegen:\n${after.map}`);
 });
 
-// Drei Breitkacheln in drei Spalten: auch dicht gepackt bleibt rechts je eine
-// Zelle frei, weil keine spaetere Kachel hineinpasst. Das ist der Fall fuer den
-// Hinweis - und eine Groesse, die ihn loest, gibt es.
-const UNFILLABLE = [
-  { id: 'calendar', size: '2x1' },
-  { id: 'tasks', size: '2x1' },
+// EIN LOCH, DAS DIE GEWAEHLTEN GROESSEN LASSEN (U1 b). Bis p9 waren das drei
+// Breitkacheln in drei Spalten (je eine freie Zelle rechts); seit die Kacheln
+// so hoch sind wie ihre Daten und ein Spaltenende als Loch gilt (F9), schliesst
+// eine Kachel daneben es in die Breite, und es bleibt kein Loch - der Fall war
+// keiner mehr. Ein Loch entsteht jetzt, wenn eine kurze Kachel zwischen zwei
+// hohen steht und danach eine breite folgt: die breite setzt sich unter die
+// hohen, ueber ihr bleibt unter der Uhr ein Loch. Die Uhr schliesst es (Hoehe
+// ohne Inhalt, im Bearbeiten-Modus als Geist), und der Hinweis bietet eine
+// Groesse an, nach der es gar nicht erst entsteht.
+const HOLED = [
+  { id: 'birthdays', size: '1x2' },
+  { id: 'clock', size: '1x1' },
+  { id: 'tasks', size: '1x2' },
   { id: 'notes', size: '2x1' },
 ];
 
 test('Raster: bleibt im Bearbeiten-Modus ein Loch, schlaegt ein Hinweis eine Groesse vor, die es schliesst', async () => {
-  const page = await openPage(harness, { device: 'desktop' });
-  await saveLayout(page, UNFILLABLE);
+  const page = await openGridPage();
+  await saveLayout(page, HOLED);
   await gotoRoute(page, '/');
   const view = await page.evaluate(() => !!document.querySelector('.dashboard-grid-hint'));
+  const shown = await gridCells(page);
   await enterEditMode(page);
   const before = await gridCells(page);
   const hint = await page.evaluate(() => {
@@ -659,9 +750,12 @@ test('Raster: bleibt im Bearbeiten-Modus ein Loch, schlaegt ein Hinweis eine Gro
     const btn = el?.querySelector('[data-grid-hint-apply]');
     return el ? { text: el.textContent.replace(/\s+/g, ' ').trim(), apply: !!btn } : null;
   });
+  assert.equal(before.cols, 3, `Reichweite: ${before.cols} Spalten statt 3`);
   assert.ok(!view, 'Der Hinweis gehoert in den Bearbeiten-Modus, nicht in die Ansicht');
-  assert.ok(before.inner.length > 0, `Reichweite: kein Loch im Ausgangsraster\n${before.map}`);
-  assert.ok(hint, `Kein Hinweis trotz Loch:\n${before.map}`);
+  assert.deepEqual([...shown.inner, ...shown.ends], [], `Die Ansicht zeigt das Loch:\n${shown.map}`);
+  const holes = [...before.inner, ...before.filled];
+  assert.ok(holes.length > 0, `Reichweite: kein Loch im Ausgangsraster\n${before.map}`);
+  assert.ok(hint, `Kein Hinweis trotz Loch (${holes.join('; ')}):\n${before.map}`);
   assert.ok(hint.apply, 'Der Hinweis bietet seinen Vorschlag nicht zum Uebernehmen an');
 
   await page.click('.dashboard-grid-hint [data-grid-hint-apply]');
@@ -670,7 +764,7 @@ test('Raster: bleibt im Bearbeiten-Modus ein Loch, schlaegt ein Hinweis eine Gro
   const after = await gridCells(page);
   const still = await page.evaluate(() => !!document.querySelector('.dashboard-grid-hint'));
   await page.close();
-  assert.deepEqual(after.inner, [], `Der Vorschlag schliesst das Loch nicht:\n${after.map}`);
+  assert.deepEqual([...after.inner, ...after.filled], [], `Der Vorschlag schliesst das Loch nicht:\n${after.map}`);
   assert.ok(!still, 'Der Hinweis bleibt stehen, obwohl kein Loch mehr da ist');
 });
 
@@ -678,37 +772,126 @@ test('Raster: bleibt im Bearbeiten-Modus ein Loch, schlaegt ein Hinweis eine Gro
  * 4. Die hohe Budget-Kachel fuellt ihre Hoehe mit Inhalt
  * ──────────────────────────────────────────────────────────────────────────── */
 
-test('Budget 1x2: zwischen Einnahmen/Ausgaben und Fusszeile steht kein leeres Band', async () => {
-  const page = await openPage(harness, { device: 'desktop' });
-  // Drei hohe Karten nebeneinander: die Zeilenhoehe kommt von den Listen links
-  // und rechts, nicht von der Budget-Karte - genau die Lage der Critique.
-  await saveLayout(page, [
-    { id: 'birthdays', size: '1x2' },
-    { id: 'budget', size: '1x2' },
-    { id: 'tasks', size: '1x2' },
-  ]);
-  await gotoRoute(page, '/');
-  await freeze(page);
-  const m = await page.evaluate(() => {
+const BUDGET_TALL = [
+  { id: 'birthdays', size: '1x2' },
+  { id: 'budget', size: '1x2' },
+  { id: 'tasks', size: '1x2' },
+];
+
+/** Band zwischen Ein-/Ausgaben und Fusszeile, die Kategorien (geladen/gezeigt) und die Lage der drei Karten. */
+async function budgetBand(page) {
+  return page.evaluate(() => {
     const card = document.querySelector('[data-widget-id="budget"]');
     const flow = card?.querySelector('.budget-widget__flow');
     const foot = card?.querySelector('.budget-widget__footer');
     if (!flow || !foot) return null;
+    const rows = [...foot.querySelectorAll('li')];
+    const tops = ['birthdays', 'budget', 'tasks'].map((id) => Math.round(document.querySelector(`#dashboard-widget-grid > [data-widget-id="${id}"]`)?.getBoundingClientRect().top ?? -1));
+    const grid = document.getElementById('dashboard-widget-grid');
     return {
+      cols: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+      sideBySide: new Set(tops).size === 1,
+      stretched: card.closest('.widget-wrapper')?.hasAttribute('data-col-fill') ?? false,
       band: Math.round(foot.getBoundingClientRect().top - flow.getBoundingClientRect().bottom),
-      rows: foot.querySelectorAll('li').length,
+      loaded: rows.length,
+      shown: rows.filter((li) => getComputedStyle(li).display !== 'none').length,
     };
   });
+}
+
+test('Budget 1x2: zwischen Einnahmen/Ausgaben und Fusszeile steht kein leeres Band', async () => {
+  // Drei hohe Karten nebeneinander - die Lage der Critique. Seit U1 b ist jede
+  // so hoch wie ihre Daten; die Budget-Karte bekommt keine Hoehe von den
+  // Nachbarn, und ihr Inhalt schliesst an.
+  const page = await openGridPage();
+  await saveLayout(page, BUDGET_TALL);
+  await gotoRoute(page, '/');
+  await freeze(page);
+  const m = await budgetBand(page);
   await page.close();
   assert.ok(m, 'Reichweite: die Budget-Kachel traegt keine Buchungen oder keine Fusszeile');
+  assert.ok(m.cols === 3 && m.sideBySide, `Reichweite: die drei Karten stehen nicht nebeneinander (${m.cols} Spalten)`);
   // Vorher 69px bei 1280px (90px bei 1440px): Abstand der Zeile plus ein Band,
   // das die unten verankerte Fusszeile aufgerissen hat.
   assert.ok(m.band <= 40, `Zwischen Ein-/Ausgaben und Fusszeile stehen ${m.band}px leer`);
-  assert.ok(m.rows >= 2, `Die hohe Kachel nennt nur ${m.rows} Ausgabenkategorie(n)`);
+  assert.ok(m.shown >= 2, `Die hohe Kachel nennt nur ${m.shown} Ausgabenkategorie(n)`);
 });
 
-test('Raster: ohne Loch schweigt der Hinweis', async () => {
+// HOEHE WIRD INHALT (U14). Bei zwei Spalten (1280px, H5) steht die Budget-Karte
+// allein neben Geburtstagen und Aufgaben und schliesst das Spaltenende (F9).
+// Die gewonnene Hoehe fuellen zuerst die weiteren geladenen Kategorien; was
+// danach bleibt, faellt zwischen Inhalt und Fusszeile (DESIGN.md
+// "Fusszeilen-Regel") - mehr Zeilen, als geladen sind, gibt es nicht. Gegen
+// 6aa1e2bb2 (F9 ohne U14) stand dort ein Band von 110px vor drei Kategorien.
+test('Budget 1x2 gestreckt: die Hoehe, die sie zum Fuellen bekommt, zeigt zuerst weitere Kategorien', async () => {
   const page = await openPage(harness, { device: 'desktop' });
+  await saveLayout(page, BUDGET_TALL);
+  await gotoRoute(page, '/');
+  await freeze(page);
+  const m = await budgetBand(page);
+  await page.close();
+  assert.ok(m, 'Reichweite: die Budget-Kachel traegt keine Buchungen oder keine Fusszeile');
+  assert.ok(m.cols === 2 && m.stretched, `Reichweite: die Budget-Kachel ist nicht gestreckt (${m.cols} Spalten)`);
+  assert.ok(m.loaded > 3, `Reichweite: nur ${m.loaded} Kategorien geladen - nichts, was die Streckung zeigen koennte`);
+  assert.equal(m.shown, m.loaded, `Gestreckt zeigt die Kachel ${m.shown} von ${m.loaded} geladenen Kategorien`);
+});
+
+/* U15 (Review p11): DIE KENNZAHLREIHE IST SO HOCH, WIE IHR MODELL SAGT. Vier
+ * Kennzahlen neben einer schmalen Kachel. Vorher (gemessen): bei 1330px stand
+ * die 684-697px breite Reihe in drei Spalten und zwei Kachelreihen (308 statt
+ * 120px), und von 768 bis 1440px brachen "Gemeinsame Ausgaben" und die Notiz
+ * um (150 statt 119px) - im Anpassen-Modus fehlte die Notizzeile bzw. die
+ * zweite Kachelreihe. */
+const METRICS_FOUR = [
+  { id: 'metrics', size: '2x1' },
+  { id: 'calendar', size: '1x1' },
+];
+
+async function metricRow(page) {
+  return page.evaluate(() => {
+    const wrapper = document.querySelector('#dashboard-widget-grid > .widget-wrapper[data-widget-id="metrics"]');
+    const row = wrapper?.querySelector(':scope > .metric-tiles');
+    if (!row) return null;
+    const box = wrapper.getBoundingClientRect();
+    const cards = [...row.querySelectorAll(':scope > .metric-card')].map((c) => c.getBoundingClientRect());
+    const notes = [...row.querySelectorAll('.metric-card__note')].map((n) => n.getBoundingClientRect());
+    return {
+      cards: cards.length,
+      width: Math.round(row.getBoundingClientRect().width),
+      cardRows: new Set(cards.map((r) => Math.round(r.top))).size,
+      height: Math.round(box.height),
+      modelled: Number(wrapper.dataset.spanRows) * 4,
+      // Was unter der Unterkante des Rahmens liegt, ist abgeschnitten (Anpassen) oder schiebt Spuren (Normal).
+      below: Math.round(Math.max(...cards.map((r) => r.bottom), ...notes.map((r) => r.bottom)) - box.bottom),
+    };
+  });
+}
+
+for (const width of [768, 1024, 1330, 1440]) {
+  test(`Kennzahlreihe ${width}px: vier Kennzahlen stehen in einer Reihe und in der Hoehe ihres Modells, auch im Anpassen-Modus (U15)`, async () => {
+    const page = await openPage(harness, { device: 'desktop' });
+    await page.setViewport({ width, height: 900, deviceScaleFactor: 1, isMobile: false, hasTouch: false });
+    await saveLayout(page, METRICS_FOUR);
+    await gotoRoute(page, '/');
+    await freeze(page);
+    const view = await metricRow(page);
+    await enterEditMode(page);
+    const edit = await metricRow(page);
+    await page.close();
+    assert.ok(view && view.cards === 4, `Reichweite: ${view?.cards} Kennzahlen statt vier`);
+    if (width === 1330) assert.ok(view.width < 700, `Reichweite: die Reihe ist ${view.width}px breit - der Fall "drei Spalten" braucht unter 700`);
+    for (const [mode, m] of [['Ansicht', view], ['Anpassen', edit]]) {
+      assert.equal(m.cardRows, 1, `${mode}: ${m.cardRows} Kachelreihen`);
+      // Nie hoeher als das Modell; kuerzer hoechstens um die eine Stufe, die
+      // fitMetricLeads einer zu breiten Zahl nimmt (Title 1 -> 2, 34 -> 27px).
+      assert.ok(m.height <= m.modelled + 1 && m.height >= m.modelled - 8, `${mode}: Rahmen ${m.height}px, Modell ${m.modelled}px`);
+      assert.ok(m.below <= 1, `${mode}: ${m.below}px der Kacheln liegen unter dem Rahmen`);
+    }
+  });
+}
+
+test('Raster: ohne Loch schweigt der Hinweis', async () => {
+  const page = await openGridPage();
   await saveLayout(page, REORDERED);
   await gotoRoute(page, '/');
   await enterEditMode(page);

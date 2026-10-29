@@ -274,7 +274,7 @@ test('Inventar (#1463): Bearbeiten ist im Blatt der Primaerknopf, Loeschen bleib
   // (withPrimaryEdit, test:detail-view), keine Option mehr.
   assert.ok(voll.edit?.mount, 'das Blatt traegt Bearbeiten');
   const [loeschen] = voll.actions;
-  assert.equal(loeschen.variant, 'danger-ghost');
+  assert.equal(loeschen.variant, 'danger-outline', 'R24: EINE Loeschen-Form, umrandet mit Wort');
   assert.equal(loeschen.align, 'start', 'Loeschen steht am Anfang der Fusszeile, weg vom Daumen');
 });
 

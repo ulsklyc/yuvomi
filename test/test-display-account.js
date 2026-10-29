@@ -44,7 +44,9 @@ const { baseUrl: BASE } = await startTestServer({
 });
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
-const { DISPLAY_COOKIE, DISPLAY_SCOPES } = await import('../server/services/display-accounts.js');
+const {
+  DISPLAY_COOKIE, DISPLAY_SCOPES, DISPLAY_OFFLINE_GRACE_MS, OFFLINE_EXPIRES_HEADER,
+} = await import('../server/services/display-accounts.js');
 
 await fetch(`${BASE}/api/v1/auth/setup`, {
   method: 'POST',
@@ -80,7 +82,7 @@ function asDisplay(token) {
       headers: { 'Content-Type': 'application/json', Cookie: `${DISPLAY_COOKIE}=${token}` },
       body: body ? JSON.stringify(body) : undefined,
     });
-    return { status: res.status, body: await res.json().catch(() => null) };
+    return { status: res.status, headers: res.headers, body: await res.json().catch(() => null) };
   };
 }
 
@@ -383,6 +385,45 @@ test('die Rechte-Nutzlast traegt die Scope-Liste als Modulrechte', async () => {
   }
   // `read` und nicht `write`: daran haengt, dass der Anlege-Knopf verschwindet.
   assert.ok(!Object.values(modules).includes('write'), 'ein Display schreibt in keinem Modul');
+});
+
+// DIE OFFLINE-FRIST EINES DISPLAYS GLEITET (Folge von #2293). Ein Display hat
+// keine Anmeldesitzung, also keinen Cookie-Ablauf. Ohne Ablauf legte der
+// Service Worker keinen Offline-Stand an, und ein Tablett an der Wand sah
+// offline keine Listen mehr. Der Server nennt deshalb jetzt + 72 Stunden - in
+// `/auth/me` und in jeder Antwort, damit die Frist mit jedem Kontakt vorrueckt.
+test('ein Display meldet als Ablauf jetzt + 72 Stunden', async () => {
+  assert.equal(DISPLAY_OFFLINE_GRACE_MS, 72 * 60 * 60 * 1000, 'die Frist ist die entschiedene: 72 Stunden');
+  const before = Date.now();
+  const me = await asDisplay(displayToken)('GET', '/auth/me');
+  const after = Date.now();
+  assert.equal(me.status, 200);
+  const expiresAt = me.body.sessionExpiresAt;
+  assert.ok(Number.isFinite(expiresAt), `ein Display meldet einen Ablauf, war ${expiresAt}`);
+  assert.ok(expiresAt >= before + DISPLAY_OFFLINE_GRACE_MS && expiresAt <= after + DISPLAY_OFFLINE_GRACE_MS,
+    'jetzt + 72 Stunden, gemessen am Server');
+});
+
+test('jede Antwort an ein Display traegt die vorgerueckte Frist', async () => {
+  const first = await asDisplay(displayToken)('GET', '/tasks');
+  assert.equal(first.status, 200);
+  const firstAt = Number(first.headers.get(OFFLINE_EXPIRES_HEADER));
+  assert.ok(Number.isFinite(firstAt) && firstAt > Date.now(), `Listen tragen die Frist, war ${first.headers.get(OFFLINE_EXPIRES_HEADER)}`);
+  await new Promise((r) => setTimeout(r, 5));
+  const second = await asDisplay(displayToken)('GET', '/tasks');
+  assert.ok(Number(second.headers.get(OFFLINE_EXPIRES_HEADER)) > firstAt, 'ein neuer Kontakt rueckt sie vor');
+});
+
+test('der Service Worker liest die Frist aus derselben Kopfzeile', async () => {
+  const { readFileSync } = await import('node:fs');
+  const sw = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
+  assert.ok(sw.includes(`'${OFFLINE_EXPIRES_HEADER.toLowerCase()}'`), 'public/sw.js nennt die Kopfzeile des Servers');
+});
+
+test('eine Familiensitzung bekommt keine Display-Frist', async () => {
+  const res = await fetch(`${BASE}/api/v1/tasks`, { headers: { Cookie: (await login('admin', 'adminpass123')).cookie } });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get(OFFLINE_EXPIRES_HEADER), null);
 });
 
 test('gesperrte Module nehmen ihre Kacheln mit', async () => {

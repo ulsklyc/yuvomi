@@ -27,7 +27,7 @@
 import { esc } from '/utils/html.js';
 import { compactInitials } from '/utils/initials.js';
 import { isSoloHousehold } from '/utils/household.js';
-import { getReadableTextColor, AVATAR_FALLBACK_COLOR } from '/utils/color.js';
+import { getReadableTextColor, safeHexColor } from '/utils/color.js';
 
 /**
  * Haengt einem fertigen Siegel den Avatar seines Beteiligten an.
@@ -72,7 +72,7 @@ function whoMarkHtml(user) {
   // `compactInitials`, nicht `initials`: das Zeichen ist 20px breit, neben dem
   // kleinen Siegel 16px, bei 10px Schrift. Zwei Hangul- oder Han-Zeichen
   // brauchen 20px und stiessen an den Rand oder liefen darueber.
-  const color = user.avatar_color ?? user.color ?? AVATAR_FALLBACK_COLOR;
+  const color = safeHexColor(user.avatar_color ?? user.color);
   const inner = user.avatar_data
     ? `<img src="${esc(user.avatar_data)}" alt="" loading="lazy">`
     : esc(compactInitials(name));

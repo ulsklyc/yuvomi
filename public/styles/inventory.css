@@ -42,15 +42,16 @@
   padding-inline: var(--page-inline-pad);
 }
 
-/* .metric-grid (panel.css) traegt bewusst KEIN max-width - Budget (dessen
- * Herkunft) hat direkt darunter keine schmal gekappte Liste und darf die
- * volle Spalte fuellen. Hier steht darunter aber .list-group/.list-rows mit
- * ihrem eigenen 720px-Lesemass (list-row.css) - ohne dieselbe Kappung lief
- * die Kennzahlreihe 500px weiter nach rechts als die Gruppe darunter
- * (gemessen 1440 vs. 940px bei 1440px Viewport). Scoped statt am geteilten
- * Selektor, damit Budgets eigene volle Breite unangetastet bleibt. */
-.inventory-list .metric-grid {
+/* Die Kurzzeile und der Fristen-Chip (R24, E2) stehen auf dem Lesemass der
+ * Gruppen darunter - ohne Kappung liefen sie bis zur Kopfkante. */
+.inventory-list > .budget-glance,
+.inventory-list > .inventory-attention {
   max-width: var(--page-measure, var(--layout-reading));
+}
+
+.inventory-list > .inventory-attention {
+  margin-block: var(--space-2) 0;
+  padding-block: 0;
 }
 
 /* Lange Listen rechnen nur, was in Sicht ist (Critique R21 S8; dieselbe Regel
@@ -640,22 +641,6 @@
      * dem Fuss. Jetzt endet sie unter ihrem Inhalt und scrollt, wo er laenger
      * ist, wie Kontakte, Rezepte und Aufgaben. */
     max-height: calc(var(--viewport-height) - var(--inventory-detail-top, calc(var(--inventory-head-block, 0px) + var(--space-3))) - var(--space-4) - var(--shell-tail, 0px));
-  }
-
-  /* KENNZAHLEN ALS KARTEN, ZU ZWEIT (R23, D12). Seit R10 standen sie in der
-   * 424px-Listenspur als gruppierte Liste mit 18px-Zahlen am Zeilenende - die
-   * einzige Kennzahl der App, die eine Tabellenzeile war, und die Zahl war so
-   * gross wie ein Zeilentitel. Drei Kacheln je 136px brachen dagegen
-   * "Braucht Aufmerksamkeit" mitten im Wort (A8). Zwei Spalten sind die Mitte:
-   * Gegenstaende | Gesamtwert, darunter die waehlbare Karte ueber die volle
-   * Zeile (dieselbe Regel wie die mobile Reihe in panel.css). Wert-Stufe und
-   * Verkleinern bei Ueberlauf kommen aus panel.css, nicht von hier. */
-  .inventory-list .metric-grid {
-    --summary-cards: 2;
-  }
-
-  .inventory-list .metric-grid > .metric-card:last-child:nth-child(odd) {
-    grid-column: 1 / -1;
   }
 }
 

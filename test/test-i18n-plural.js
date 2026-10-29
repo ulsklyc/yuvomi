@@ -273,7 +273,6 @@ const PLURAL_EXCEPTIONS = {
   'dashboard.rewardsPending': 'NO_NOUN',
   'dashboard.healthRefill': 'NO_NOUN',
   'health.labs.abnormalBadge': 'NO_NOUN',
-  'subscriptions.activeCount': 'NO_NOUN',
 
   // --- Zahl in Klammern / hinter Doppelpunkt ------------------------------
   'category.errorInUse': 'PARENTHETICAL',
@@ -310,8 +309,6 @@ const PLURAL_EXCEPTIONS = {
   'health.meds.doseQty': 'NOT_A_COUNT',
 
   // --- n=1 am Aufrufer ausgeschlossen ------------------------------------
-  // subscriptions.js:135 - `cycle_interval === 1 ? t(key) : t('everyCycle', …)`.
-  'subscriptions.everyCycle': 'GUARDED',
   // budget.js, ledgerSectionsHtml() - der Knopf entsteht nur bei
   // `planned.length - PLANNED_PREVIEW_ROWS > 0`, also ab vier Zeilen; die Zahl
   // steht in Klammern hinter dem Satz ("Alle anzeigen (11)").
@@ -718,5 +715,56 @@ test('Vorrat und Uebersicht setzen die Menge ueber den flektierenden Helfer', ()
     const own = body(src, fn);
     assert.match(own, /pantryQuantityLabel\(/, `${file} ${fn}: Menge ohne flektierende Einheit („6 Dose")`);
     assert.doesNotMatch(own, /pantry\.units\.\$\{|unitLabel\(/, `${file} ${fn}: setzt den Singular selbst hinter die Zahl`);
+  }
+});
+
+// R24 S4 (Frage F1, Ulas 28.10.): der Intervall-Satz (utils/interval-sentence.js)
+// zaehlt. Bei 1 las er "Alle 1 Wochen" in jeder Sprache - und 1 ist der
+// haeufigste Wert (Abo monatlich, Tonne woechentlich). Die Stichproben gehen
+// durch die echte t(); der Satz im Dialog waehlt dieselbe Variante ueber
+// dieselbe Regel (Intl.PluralRules der UI-Sprache).
+test('R24 F1: der Intervall-Satz waehlt die Form der Zahl - 1, 2, 5, 11, 21', async () => {
+  const faelle = [
+    ['de', 'common.everyNWeeks', 1, 'Alle 1 Woche'],
+    ['de', 'common.everyNWeeks', 2, 'Alle 2 Wochen'],
+    ['de', 'common.everyNMonths', 1, 'Alle 1 Monat'],
+    ['de', 'common.everyNDays', 1, 'Alle 1 Tag'],
+    ['de', 'common.everyNYears', 3, 'Alle 3 Jahre'],
+    ['en', 'common.everyNMonths', 1, 'Every 1 month'],
+    ['en', 'common.everyNYears', 1, 'Every 1 year'],
+    ['fr', 'common.everyNWeeks', 1, 'Toutes les 1 semaine'],
+    ['cs', 'common.everyNWeeks', 1, 'Jednou za 1 týden'],
+    ['cs', 'common.everyNWeeks', 3, 'Jednou za 3 týdny'],
+    ['cs', 'common.everyNWeeks', 5, 'Jednou za 5 týdnů'],
+    ['pl', 'common.everyNMonths', 1, 'Co 1 miesiąc'],
+    ['pl', 'common.everyNMonths', 2, 'Co 2 miesiące'],
+    ['pl', 'common.everyNMonths', 5, 'Co 5 miesięcy'],
+    ['pl', 'common.everyNMonths', 22, 'Co 22 miesiące'],
+    ['ru', 'common.everyNWeeks', 1, 'Раз в 1 неделю'],
+    ['ru', 'common.everyNWeeks', 2, 'Раз в 2 недели'],
+    ['ru', 'common.everyNWeeks', 5, 'Раз в 5 недель'],
+    ['ru', 'common.everyNWeeks', 21, 'Раз в 21 неделю'],
+    ['uk', 'common.everyNDays', 3, 'Раз на 3 дні'],
+    ['uk', 'common.everyNDays', 11, 'Раз на 11 днів'],
+    ['ar', 'common.everyNDays', 5, 'كل 5 أيام'],
+    ['ar', 'common.everyNDays', 11, 'كل 11 يومًا'],
+  ];
+  for (const [locale, key, count, erwartet] of faelle) {
+    await setLocale(locale);
+    assert.equal(t(key, { count }), erwartet, `${locale} ${key} bei ${count}`);
+  }
+  await setLocale('de');
+});
+
+test('R24 F1: jeder Satz traegt in jeder Form genau EIN {{count}} - dort steht das Feld', () => {
+  for (const file of readdirSync(LOCALE_DIR).filter((f) => f.endsWith('.json'))) {
+    const entries = flattenLocale(JSON.parse(readFileSync(new URL(file, LOCALE_DIR), 'utf8')));
+    for (const [key, value] of entries) {
+      if (!/^common\.everyN(?:Days|Weeks|Months|Years)(?:_\w+)?$/.test(key)) continue;
+      assert.equal((String(value).match(/\{\{count\}\}/g) ?? []).length, 1, `${file}: ${key} = ${value}`);
+    }
+    for (const dead of ['subscriptions.intervalLabel', 'subscriptions.everyCycle', 'subscriptions.cyclePlural.monthly']) {
+      assert.ok(!entries.has(dead), `${file}: ${dead} ist seit dem Satz der Einheit tot`);
+    }
   }
 });

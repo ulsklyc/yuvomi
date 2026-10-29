@@ -51,8 +51,42 @@ const OCCURRENCE = () => ({
 });
 const SOURCE = () => ({
   id: 4, kind: 'file', name: 'Kalender', version: 1, needs_mapping: 0,
-  mappings: [{ id: 30, original_label: 'Bio', normalized_label: 'bio', type_id: 1, ignored: 0 }],
+  mappings: [{ id: 30, original_label: 'Bio', normalized_label: 'bio', type_ids: [1], type_id: 1, ignored: false }],
 });
+
+/**
+ * Eine Zeile mit Abfallart-Chips als Attrappe (#2273): die gedrueckten Arten,
+ * der "Neue Abfallart"-Chip (null: es gibt keinen) und das Namensfeld. Ein
+ * Neubau der Chips (`insertAdjacentHTML`) liest den Stand aus dem Markup.
+ */
+function chipZeile(dataset, typeIds, createNew = null, fokus = [], fokusName = '') {
+  const stand = { typeIds: [...typeIds], createNew, html: null };
+  const name = { value: dataset.label ?? '', hidden: !createNew };
+  const ignoriert = { hidden: typeIds.length > 0 || !!createNew };
+  const gruppe = {
+    getAttribute: () => 'label-id',
+    nextElementSibling: { remove() {} },
+    insertAdjacentHTML(_position, html) {
+      stand.html = html;
+      stand.typeIds = [...html.matchAll(/data-type-chip="(\d+)" aria-pressed="true"/g)].map((m) => Number(m[1]));
+      stand.createNew = /data-new-type-chip aria-pressed="true"/.test(html) ? true : (/data-new-type-chip/.test(html) ? false : null);
+    },
+    remove() {},
+  };
+  return {
+    dataset, stand, name, ignoriert,
+    querySelectorAll: (selector) => (selector === '[data-type-chip][aria-pressed="true"]'
+      ? stand.typeIds.map((id) => ({ dataset: { typeChip: String(id) } })) : []),
+    querySelector(selector) {
+      if (selector === '[data-new-type-chip]') return stand.createNew === null ? null : { getAttribute: () => String(stand.createNew) };
+      if (selector === '[data-role="label-new-type-name"]') return name;
+      if (selector === '[data-role="label-ignored"]') return ignoriert;
+      if (selector === '[data-role="label-types"]') return gruppe;
+      if (selector === '[data-role="label-types"] .filter-chip') return { focus() { fokus.push(fokusName); } };
+      return null;
+    },
+  };
+}
 
 function zustand() {
   toasts.length = 0;
@@ -276,8 +310,10 @@ test('Termin aus der Zeile SEINER Abfallart speichern, die inzwischen geloescht 
 });
 
 for (const [name, reason, key, lauf] of [
+  // Beide Arten mit Termin: seit R24 S13 tauscht Hoch/Runter nur unter den
+  // Karten, die stehen - eine Art ohne Termin ist kein Nachbar.
   ['eine Abfallart verschieben, die es nicht mehr gibt', 'waste_type_not_found', 'waste.errorTypeGone',
-    () => waste.moveType(1, 'down')],
+    () => { waste.setStateForTest({ schedules: [SCHEDULE(), { ...SCHEDULE(), id: 8, type_id: 2 }] }); return waste.moveType(1, 'down'); }],
   ['eine Abholung aussetzen, deren Termin geloescht wurde', 'waste_schedule_not_found', 'waste.errorScheduleGone',
     () => waste.skipOccurrence('1:2026-01-12')],
   ['eine Abholung aussetzen, die nach einer Aenderung des Termins nicht mehr im Plan steht', 'waste_occurrence_not_found', 'waste.errorOccurrenceGone',
@@ -311,7 +347,7 @@ for (const [name, reason, key, lauf] of [
 
 test('Quelle speichern, eine Zuordnung wurde inzwischen entfernt: Satz, Dialog zu, nachladen', async () => {
   zustand();
-  const row = { dataset: { mappingId: '30' }, querySelector: () => ({ value: '2' }) };
+  const row = chipZeile({ mappingId: '30' }, [2]);
   const d = await dialog(() => waste.openSourceModal(SOURCE()), {
     werte: { '#wsrc-name': { value: 'Kalender' } },
     listen: { '.waste-source-mapping-row': [row] },
@@ -344,14 +380,17 @@ test('Ein scheiterndes Nachladen meldet sich nicht und loest kein weiteres aus',
 // -------------------------------------------------------------------------
 
 for (const [name, reason, erfolg, pfad, oeffne] of [
-  ['Abfallart (Dialog)', 'waste_type_not_found', 'waste.typeDeletedToast', '/waste/types/1',
+  // Der Satz nennt die Abfallart (R24, G2-Quer-P2-2).
+  ['Abfallart (Dialog)', 'waste_type_not_found', 'common.deletedNamed{"name":"Restmuell"}', '/waste/types/1',
     async () => (await dialog(() => waste.openTypeModal(TYPE()))).klick('#wtm-delete')],
-  ['Termin (Dialog)', 'waste_schedule_not_found', 'waste.scheduleDeletedToast', '/waste/schedules/7',
+  // Termin und Abholung nennen ihre Abfallart (R24, Uebergabe S2) - auch
+  // wenn die Art nach dem Nachladen fehlt: der Name steht VOR dem Loeschen fest.
+  ['Termin (Dialog)', 'waste_schedule_not_found', 'waste.scheduleDeletedNamed{"name":"Restmuell"}', '/waste/schedules/7',
     async () => (await terminDialog()).klick('#wsm-delete')],
-  ['Einzelabholung (Dialog)', 'waste_pickup_not_found', 'waste.pickupDeletedToast', '/waste/pickups/55',
+  ['Einzelabholung (Dialog)', 'waste_pickup_not_found', 'waste.pickupDeletedNamed{"name":"Restmuell"}', '/waste/pickups/55',
     async () => (await dialog(() => waste.openPickupModal({ id: 55, type_id: 1, date: '2026-03-01', note: null }))).klick('#wpm-delete')],
-  ['Einzelabholung (Zeile)', 'waste_pickup_not_found', 'waste.pickupDeletedToast', '/waste/pickups/55',
-    () => waste.deletePickup(55)],
+  ['Einzelabholung (Zeile)', 'waste_pickup_not_found', 'waste.pickupDeletedNamed{"name":"Restmuell"}', '/waste/pickups/55',
+    () => waste.deletePickup(55, 'Restmuell')],
   ['Quelle (Dialog)', 'waste_source_not_found', 'waste.sourceDeletedToast', '/waste/sources/4',
     async () => (await dialog(() => waste.openSourceModal(SOURCE()))).klick('#wsrc-delete')],
   ['verschobene Abholung zuruecksetzen', 'waste_override_not_found', 'waste.scheduleSavedToast', '/waste/schedules/7/overrides/2026-01-05',
@@ -477,10 +516,10 @@ test('Einzelabholung bearbeiten: die eigene, archivierte Abfallart bleibt nach d
 test('Quelle speichern, eine Zuordnung zeigt auf eine geloeschte Abfallart: der Dialog bleibt, die Zeilen kommen frisch vom Server, der Fokus steht auf der gescheiterten', async () => {
   zustand();
   const quelle = { ...SOURCE(), mappings: [
-    { id: 30, original_label: 'Bio', normalized_label: 'bio', type_id: 2, ignored: 0 },
-    { id: 31, original_label: 'Papier', normalized_label: 'papier', type_id: null, ignored: 1 },
+    { id: 30, original_label: 'Bio', normalized_label: 'bio', type_ids: [2], type_id: 2, ignored: false },
+    { id: 31, original_label: 'Papier', normalized_label: 'papier', type_ids: [], type_id: null, ignored: true },
   ] };
-  const zeile = (id, value) => ({ dataset: { mappingId: String(id) }, querySelector: () => ({ value }) });
+  const zeile = (id, typeIds) => chipZeile({ mappingId: String(id) }, typeIds);
   const fokus = [];
   const attrs = {};
   const d = await dialog(() => waste.openSourceModal(quelle), {
@@ -494,12 +533,12 @@ test('Quelle speichern, eine Zuordnung zeigt auf eine geloeschte Abfallart: der 
       },
     },
     // Zeile 30 wird gespeichert (auf Art 2), Zeile 31 zeigt auf die geloeschte Art 1.
-    listen: { '.waste-source-mapping-row': [zeile(30, '2'), zeile(31, '1')] },
+    listen: { '.waste-source-mapping-row': [zeile(30, [2]), zeile(31, [1])] },
   });
   // Der Server nach dem Teil-Speichern: Name und Zeile 30 stehen, Zeile 31 unveraendert.
   const frisch = { ...quelle, name: 'Mein Kalender', mappings: [
-    { id: 30, original_label: 'Bio', normalized_label: 'bio', type_id: 2, ignored: 0 },
-    { id: 31, original_label: 'Papier', normalized_label: 'papier', type_id: null, ignored: 1 },
+    { id: 30, original_label: 'Bio', normalized_label: 'bio', type_ids: [2], type_id: 2, ignored: false },
+    { id: 31, original_label: 'Papier', normalized_label: 'papier', type_ids: [], type_id: null, ignored: true },
   ] };
   const { calls, closed, gets } = await mit({
     quelle: frisch,
@@ -512,8 +551,8 @@ test('Quelle speichern, eine Zuordnung zeigt auf eine geloeschte Abfallart: der 
   assert.deepEqual(gets, [...NACHLADEN, '/waste/sources/4'].sort(), 'der Stand der Seite und die Quelle selbst, je einmal');
   const host = d.element('#wsrc-mappings');
   assert.equal([...host.html.matchAll(/data-mapping-id="(\d+)"/g)].map((m) => m[1]).join(), '30,31', 'beide Zeilen neu gebaut');
-  assert.doesNotMatch(host.html, /<option value="1"/, 'die geloeschte Abfallart steht nicht mehr zur Wahl');
-  assert.deepEqual(fokus, ['[data-mapping-id="31"] [data-role="mapping-type"]'], 'der Fokus steht auf der gescheiterten Zeile');
+  assert.doesNotMatch(host.html, /data-type-chip="1"/, 'die geloeschte Abfallart steht nicht mehr zur Wahl');
+  assert.deepEqual(fokus, ['[data-mapping-id="31"] [data-role="label-types"] .filter-chip'], 'der Fokus steht auf der gescheiterten Zeile');
   assert.equal(attrs['aria-invalid'], 'true');
   assert.equal(d.element('#wsrc-name').value, 'Mein Kalender', 'der Name im Feld bleibt');
   assert.equal(quelle.mappings, frisch.mappings, 'der Dialog vergleicht ab jetzt gegen den frischen Stand');
@@ -524,7 +563,7 @@ test('Quelle speichern, die Zuordnung zeigt auf eine geloeschte Art UND die Quel
   zustand();
   const d = await dialog(() => waste.openSourceModal(SOURCE()), {
     werte: { '#wsrc-name': { value: 'Kalender' } },
-    listen: { '.waste-source-mapping-row': [{ dataset: { mappingId: '30' }, querySelector: () => ({ value: '2' }) }] },
+    listen: { '.waste-source-mapping-row': [chipZeile({ mappingId: '30' }, [2])] },
   });
   const { closed } = await mit({
     put: async () => { throw GEWAEHLT_WEG(); },
@@ -623,22 +662,10 @@ test('Import-Vorschau einer Quelle, die es nicht mehr gibt: Satz im Toast, der A
   assert.deepEqual(gets, NACHLADEN);
 });
 
-/** Der Assistent nach einer gelungenen Vorschau: die Zeilen der Bezeichnungen als Attrappen. */
+/** Der Assistent nach einer gelungenen Vorschau: die Zeilen der Bezeichnungen als Attrappen - [label, Arten, neue Art]. */
 async function assistentMitVorschau(entscheidungen) {
   const fokus = [];
-  const zeilen = entscheidungen.map(([label, value]) => {
-    const select = {
-      value, html: null,
-      replaceChildren() { this.html = ''; },
-      insertAdjacentHTML(_position, html) { this.html += html; this.value = html.match(/<option value="([^"]*)" selected>/)?.[1] ?? ''; },
-      focus() { fokus.push(label); },
-    };
-    const name = { value: label, hidden: value !== '__new__' };
-    return {
-      dataset: { label }, select, name,
-      querySelector: (selector) => (selector.includes('decision-type') ? select : name),
-    };
-  });
+  const zeilen = entscheidungen.map(([label, typeIds, createNew = false]) => chipZeile({ label }, typeIds, createNew, fokus, label));
   const d = await assistent(null, {
     '#wiz-step2': { replaceChildren() {}, insertAdjacentHTML() {} },
   }, { '.waste-import-label-row': zeilen, '#wiz-step1 input': [] });
@@ -648,21 +675,32 @@ async function assistentMitVorschau(entscheidungen) {
 
 test('Import uebernehmen, eine Bezeichnung zeigt auf eine geloeschte Abfallart: der Assistent bleibt, jede Entscheidung bleibt, die Auswahl zeigt den frischen Stand', async () => {
   zustand();
-  // Bio -> Art 1 (wird geloescht), Papier -> Art 2 (bleibt), Glas -> ignorieren, Metall -> neu.
-  const { d, zeilen, fokus } = await assistentMitVorschau([['bio', '1'], ['papier', '2'], ['glas', ''], ['metall', '__new__']]);
+  // Bio -> Art 1 (wird geloescht), Bio+Papier -> 1 und 2 (2 bleibt), Papier -> Art 2,
+  // Glas -> nichts (nicht uebernehmen), Metall -> neu.
+  const { d, zeilen, fokus } = await assistentMitVorschau([['bio', [1]], ['bio und papier', [1, 2]], ['papier', [2]], ['glas', []], ['metall', [], true]]);
   toasts.length = 0;
-  const { calls, closed, gets } = await mit({ post: async () => { throw GEWAEHLT_WEG(); } }, () => d.klick('#wiz-commit'));
+  let gesendet = null;
+  const { calls, closed, gets } = await mit({ post: async (_path, body) => { gesendet = body; throw GEWAEHLT_WEG(); } }, () => d.klick('#wiz-commit'));
 
   assert.deepEqual(calls[0], ['POST', '/waste/import/commit']);
+  assert.deepEqual(gesendet.mappings, [
+    { normalized_label: 'bio', type_ids: [1] },
+    { normalized_label: 'bio und papier', type_ids: [1, 2] },
+    { normalized_label: 'papier', type_ids: [2] },
+    { normalized_label: 'glas', ignored: true },
+    { normalized_label: 'metall', new_type: { name: 'metall' } },
+  ], 'jede Zeile schickt ihre Arten, keine Art heisst nicht uebernehmen');
   assert.equal(d.element('#wiz-error').textContent, 'waste.errorSelectedTypeGone', 'der Satz steht im Dialog');
   assert.deepEqual(toasts, []);
   assert.deepEqual(closed, [], 'der Assistent bleibt offen');
   assert.deepEqual(gets, NACHLADEN);
-  assert.deepEqual(zeilen.map((zeile) => zeile.select.value), ['__new__', '2', '', '__new__'],
-    'nur die Zeile der geloeschten Art faellt auf "neue Abfallart anlegen", jede andere Entscheidung bleibt');
-  assert.deepEqual(zeilen.map((zeile) => zeile.name.hidden), [false, true, true, false], 'das Namensfeld der betroffenen Zeile ist sichtbar');
-  for (const zeile of zeilen) assert.doesNotMatch(zeile.select.html, /<option value="1"/, 'die geloeschte Art steht in keiner Auswahl mehr');
-  assert.deepEqual(fokus, ['bio'], 'der Fokus steht auf der betroffenen Auswahl');
+  assert.deepEqual(zeilen.map((zeile) => [zeile.stand.typeIds, zeile.stand.createNew]),
+    [[[], true], [[2], false], [[2], false], [[], false], [[], true]],
+    'nur die Zeile, die ihre letzte Art verliert, faellt auf "neue Abfallart anlegen"; jede andere Entscheidung bleibt');
+  assert.deepEqual(zeilen.map((zeile) => zeile.name.hidden), [false, true, true, true, false], 'das Namensfeld der betroffenen Zeile ist sichtbar');
+  assert.deepEqual(zeilen.map((zeile) => zeile.ignoriert.hidden), [true, true, true, false, true], 'nur Glas sagt "wird nicht uebernommen"');
+  for (const zeile of zeilen) assert.doesNotMatch(zeile.stand.html, /data-type-chip="1"/, 'die geloeschte Art steht in keiner Zeile mehr');
+  assert.deepEqual(fokus, ['bio'], 'der Fokus steht auf der ersten betroffenen Zeile');
 });
 
 for (const [name, err, satz] of [
@@ -673,12 +711,12 @@ for (const [name, err, satz] of [
 ]) {
   test(`Import uebernehmen scheitert: der Satz im Dialog, der Assistent bleibt, nichts wird nachgeladen - ${name}`, async () => {
     zustand();
-    const { d, zeilen } = await assistentMitVorschau([['bio', '1'], ['papier', '2']]);
+    const { d, zeilen } = await assistentMitVorschau([['bio', [1]], ['papier', [2]]]);
     const { closed, gets } = await mit({ post: async () => { throw err; } }, () => d.klick('#wiz-commit'));
     assert.equal(d.element('#wiz-error').textContent, satz);
     assert.deepEqual(closed, []);
     assert.deepEqual(gets, []);
-    assert.equal(zeilen[0].select.html, null, 'die Auswahl wird nicht angefasst');
+    assert.equal(zeilen[0].stand.html, null, 'die Auswahl wird nicht angefasst');
   });
 }
 
@@ -984,13 +1022,13 @@ const WASTE_ERFOLGSWEGE = [
     return () => d.klick('#wiz-preview');
   }],
   ['Import uebernehmen', async () => {
-    const { d } = await assistentMitVorschau([['bio', '1'], ['papier', '2']]);
+    const { d } = await assistentMitVorschau([['bio', [1]], ['papier', [2]]]);
     return () => d.klick('#wiz-commit');
   }],
   ['Zuordnungsprofil anwenden', profilDialog],
   ['Quelle loeschen', async () => { const d = await dialog(() => waste.openSourceModal(SOURCE())); return () => d.klick('#wsrc-delete'); }],
   ['Quelle speichern', async () => {
-    const row = { dataset: { mappingId: '30' }, querySelector: () => ({ value: '2' }) };
+    const row = chipZeile({ mappingId: '30' }, [2]);
     const d = await dialog(() => waste.openSourceModal(SOURCE()), {
       werte: { '#wsrc-name': { value: 'Kalender neu' } }, listen: { '.waste-source-mapping-row': [row] },
     });

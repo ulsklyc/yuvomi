@@ -147,15 +147,23 @@ const TASK_GONE = '`tasks_task_not_found` (404, the task does not exist or is no
 const PARENT_GONE = '`tasks_parent_not_found` (404, `parent_task_id` names a task that does not exist or is not visible to you)';
 const COMMENT_GONE = `${TASK_GONE}, \`tasks_comment_not_found\` (404, the task is there, the comment is not - deleted in the meantime)`;
 const REORDER_DENIED = '`reorder_not_allowed` (403, the caller lacks `tasks_reorder_family` - the hand order belongs to the household, R23)';
+const CAT_EXISTS = '`category_exists` (409, a category with this name already exists)';
+const CAT_DELETE = '`category_in_use` (409, tasks still use the category; `count` carries how many), `category_last` (409, the last category cannot be deleted)';
 const CASE_REASONS = {
   '/api/v1/tasks': { post: PARENT_GONE },
   '/api/v1/tasks/reorder': { patch: `${TASK_GONE}, ${REORDER_DENIED}` },
   '/api/v1/tasks/reorder/reset': { post: `${TASK_GONE}, ${REORDER_DENIED}` },
   '/api/v1/tasks/{id}': { get: TASK_GONE, put: TASK_GONE, delete: TASK_GONE },
-  '/api/v1/tasks/{id}/status': { patch: TASK_GONE },
+  '/api/v1/tasks/{id}/status': { patch: `${TASK_GONE}, \`display_action\` (403, a paired display can only tick a task off)` },
   '/api/v1/tasks/{id}/archive': { patch: TASK_GONE },
   '/api/v1/tasks/{id}/check': { patch: TASK_GONE },
-  '/api/v1/tasks/{id}/documents': { get: TASK_GONE, put: TASK_GONE },
+  '/api/v1/tasks/{id}/documents': {
+    get: `${TASK_GONE}, \`cross_module_access\` (403, reading linked documents needs access to the documents module)`,
+    put: TASK_GONE,
+  },
+  '/api/v1/tasks/sync-targets': { get: '`cross_module_access` (403, the list is only for callers who may write tasks - for API tokens a `tasks:write` scope)' },
+  '/api/v1/tasks/categories': { post: CAT_EXISTS },
+  '/api/v1/tasks/categories/{key}': { put: CAT_EXISTS, delete: CAT_DELETE },
   '/api/v1/tasks/{id}/completions': { get: TASK_GONE },
   '/api/v1/tasks/{id}/comments': { get: TASK_GONE, post: TASK_GONE },
   '/api/v1/tasks/{id}/comments/{commentId}': { patch: COMMENT_GONE, delete: COMMENT_GONE },

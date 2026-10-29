@@ -11,8 +11,10 @@
  * Die Tab-Reihe füllt die Restbreite und bleibt rechtsbündig (wie zuvor die
  * 1fr-Grid-Spalte). */
 
+/* DIE HOEHE KOMMT AUS `.btn` (R24, G0-Shell-P3-2): `--target-lg` am Finger,
+ * `--target-md` am Zeiger. Hier stand `--target-lg` fest - "Auschecken" mass
+ * am Desktop 48 neben 40er Knoepfen in jedem anderen Modul. */
 .housekeeping-check-small {
-  min-height: var(--target-lg);
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -107,35 +109,10 @@
   container: housekeeping-page / inline-size;
 }
 
-/* DIE VIER KENNZAHLEN STEHEN IN EINER ZEILE, auch mobil (Re-Critique
- * 2026-09-27, A3 P2-10 / R10 L10). Hier stand die Kompaktstufe „zwei mal
- * zwei": gemessen bei 390x844 belegte sie 189px (y287-476), und die letzten
- * Besuche begannen erst bei y760. Eine Zeile sind 117px - moeglich, weil der
- * Wert „Letzter Besuch" im laufenden Jahr ohne Jahreszahl steht
- * (housekeeping.js) und die Labels unten in Satzschreibung umbrechen. Die
- * panel.css-Stufe fuer Telefone (`auto-fit`, 150px) gilt deshalb hier nicht. */
-.housekeeping-content .metric-grid--quad {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-@container housekeeping-page (max-width: 479px) {
-  /* Der SCHRIFTGRAD stand hier auch (`--text-base`, 16px) und ist entfallen:
-   * die Kennzahl-Zeile klemmt ihn seit 2026-08-19 selbst, gestuft und mit
-   * Title 3 als Untergrenze (panel.css). Zwei Hosts unterboten sie lokal
-   * auf Fussnotengroesse - genau die Drift, gegen die das geteilte Bauteil
-   * gebaut wurde. Die Polsterung bleibt: sie ist eine Platzfrage, keine
-   * Typo-Entscheidung. */
-  .metric-card { padding: var(--space-2); }
-
-  /* In der Viertelzeile bricht das Versal-Label mitten im Wort („ERLEDIGT/E",
-   * gemessen 4 Zeilen in 69px). In Satzschreibung und mit Silbentrennung der
-   * Dokumentsprache stehen alle vier Labels auf zwei Zeilen, an Wortgrenzen. */
-  .metric-grid--quad .metric-card__label {
-    text-transform: none;
-    letter-spacing: normal;
-    hyphens: auto;
-  }
-}
+/* Hier standen die vier Kennzahlkacheln der Besuche als Viertelzeile (R10 L10)
+ * samt Kompaktstufe unter 480px. Seit R24 (E2) traegt der Reiter die
+ * statische Kurzzeile (`metricGlanceHtml({ everywhere })`, panel.css) wie die
+ * Berichte - die Kacheln und ihre Regeln sind entfallen. */
 
 /* HIG-Karte: randlos auf dem Grouped-Grund, opake Fläche, shadow-sm - dieselbe
  * Bauart wie das Dashboard-Widget und .metric-card. Die Kante bleibt als
@@ -203,6 +180,18 @@
 .housekeeping-worker-strip__identity span,
 .housekeeping-muted {
   color: var(--color-text-secondary);
+}
+
+/* Ein Monat Zahlungen ist ein Satz, kein Diagramm (R24, G2-Haushaltshilfe-P2-2). */
+.housekeeping-payments-sentence {
+  margin: 0;
+}
+
+/* Das Etikett "Ausstehend" neben dem Datum einer Besuchszeile (R24): mittig
+ * zur Titelzeile, ohne sie zu strecken. */
+.housekeeping-visit-tag {
+  vertical-align: middle;
+  margin-inline-start: var(--space-2);
 }
 
 .housekeeping-avatar {
@@ -487,12 +476,14 @@
   resize: vertical;
 }
 
-.housekeeping-field--inline {
-  min-width: 180px;
+/* Die Farbreihen (Critique R24 E6) nehmen die ganze Zeile - in einer
+   Rasterzelle brachen zehn Swatches dreimal um. */
+.housekeeping-field--color {
+  grid-column: 1 / -1;
 }
 
-.housekeeping-field--color input {
-  padding: var(--space-1);
+.housekeeping-field--inline {
+  min-width: 180px;
 }
 
 .housekeeping-task-form,
@@ -538,6 +529,19 @@
   color: var(--color-text-secondary);
 }
 
+/* "Ein Tipp fuegt die Aufgabe hinzu." direkt unter der Ueberschrift der
+ * Vorlagen (R24, G2-Haushaltshilfe-P3-1) - die Ueberschrift ruckt dafuer an
+ * den Satz heran, der Satz haelt den Abstand zur Kachelreihe. */
+.housekeeping-create__heading:has(+ .housekeeping-create__hint) {
+  margin-block-end: var(--space-0h);
+}
+
+.housekeeping-create__hint {
+  margin: 0 0 var(--space-2);
+  font-size: var(--type-caption);
+  color: var(--color-text-secondary);
+}
+
 .housekeeping-template-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
@@ -555,8 +559,13 @@
   padding: var(--space-2) var(--space-3);
   text-align: start;
   display: grid;
+  /* Name und Rhythmus links, das Plus rechts ueber beide Zeilen: die Kachel
+   * sagt, dass ein Tipp anlegt (R24, G2-Haushaltshilfe-P3-1). */
+  grid-template-columns: minmax(0, 1fr) auto;
   align-content: center;
-  gap: var(--space-0h);
+  align-items: center;
+  column-gap: var(--space-2);
+  row-gap: var(--space-0h);
   font: inherit;
   font-size: var(--text-sm);
   cursor: pointer;
@@ -572,8 +581,21 @@
 }
 
 .housekeeping-template small {
+  grid-column: 1;
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
+}
+
+.housekeeping-template__name {
+  grid-column: 1;
+}
+
+.housekeeping-template__add {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: var(--icon-md);
+  height: var(--icon-md);
+  color: var(--module-accent, var(--color-accent));
 }
 
 /* Nur das Layout - die Trägergrammatik kommt aus `.row-carrier` (list-row.css).
@@ -1123,12 +1145,3 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-/* Die Kennzahlen der Aufgaben (housekeeping.js, taskSummaryHtml) bleiben unter
- * 640px aus (`.budget-glance-details`, panel.css). Dann geht auch ihre Spur:
- * eine leere Seitenspalte liesse den Zeilenabstand des Rasters als 16px unter
- * der Liste stehen. 639px ist dieselbe Grenze wie dort, kein neuer Breakpoint. */
-@media (max-width: 639px) {
-  .page-columns__rail:has(> .housekeeping-task-summary) {
-    display: none;
-  }
-}

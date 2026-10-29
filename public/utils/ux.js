@@ -898,19 +898,34 @@ export function scheduleUndoableDelete({
  * baut ihn ueber t(), dieser Helfer nur die eine Form: kein Haekchen (der Toast
  * traegt eine Aktion, toast-show.js), fuenf Sekunden, ein Knopf.
  *
+ * QUITTUNG IM TIPP (Critique R24, G0-Shell-P1-2): wer das Ergebnis kennt, ehe
+ * der Server antwortet (Abhaken, Erledigen, Auschecken), quittiert sofort und
+ * reicht die laufende Anfrage als `pending` herein. "Rueckgaengig" wartet dann
+ * auf sie und nimmt erst danach zurueck; scheitert sie, tut es nichts - den
+ * Fehler meldet der Aufrufer, und sein Fehler-Toast ersetzt diesen. Vorher
+ * kam die Quittung 700-1500 ms nach dem Tipp und erschien nach einem
+ * Modulwechsel im naechsten Modul.
+ *
  * @param {Object} opts
  * @param {string} opts.message
  * @param {() => Promise<void>} opts.undo  der Gegenweg am Server; wirft er, kommt `onError`
  * @param {(err: Error) => void} [opts.onError]  Fehlersatz zeigen, Ansicht neu laden
  * @param {string} [opts.label]  ein anderer Knopf als "Rueckgaengig" ("Alle abhaken")
  * @param {number} [opts.duration=5000]
- * @returns {boolean} ob ein Toast steht
+ * @param {Promise<unknown>} [opts.pending]  die Anfrage, die quittiert wird, wenn sie noch laeuft
+ * @param {number} [opts.scope]  die Modul-Marke von vor der Anfrage (feedbackScope, toast-show.js)
+ * @returns {{ shown: boolean, update: (message: string) => void }} ob ein Toast
+ *          steht, und der Weg, seinen Satz nachzutragen (die naechste
+ *          Faelligkeit einer Serie kennt erst die Antwort)
  */
-export function offerUndo({ message, undo, onError, label, duration = 5000 }) {
+export function offerUndo({ message, undo, onError, label, duration = 5000, pending = null, scope = null }) {
   let running = false;
   const run = async () => {
     if (running) return;
     running = true;
+    if (pending) {
+      try { await pending; } catch { return; }
+    }
     try {
       await undo();
     } catch (err) {
@@ -918,7 +933,9 @@ export function offerUndo({ message, undo, onError, label, duration = 5000 }) {
     }
   };
   const action = label ? { label, onClick: run } : run;
-  return window.yuvomi?.showToast(message, 'default', duration, action) === true;
+  const handle = {};
+  const shown = window.yuvomi?.showToast(message, 'default', duration, action, { scope, handle }) === true;
+  return { shown, update: (text) => handle.setMessage?.(text) };
 }
 
 /**
@@ -1306,6 +1323,18 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     const port = e.target;
     if (!(port instanceof Element) || port === toolbar || toolbar.contains(port)) return;
     if (port.closest?.(`[${HEAD_COLLAPSE_ATTR}="module"]`)) return;
+    // ERST DIE FRAGEN OHNE LAYOUT (Critique R24 G3-Quer-P2-2, G4-Budget-P3-8).
+    // Jede Messung unten verlangt ein aktuelles Layout - und je Scroll-Ereignis
+    // hatte ein anderer Lauscher oft gerade eine Klasse gewechselt (Kapsel
+    // minimiert, angedockter Titel): gemessen als erzwungenes Layout in
+    // `onInnerScroll` (Vorrat 155 ms, Abos 139 ms bei 4x CPU unter Last). Ein
+    // Kopf, der nicht falten kann, und ein Scroll ohne Geste an einem
+    // ausgeklappten Kopf entscheiden nichts - sie kommen ohne Messung aus.
+    const collapsedNow = toolbar.classList.contains('is-collapsed');
+    const foldRow = toolbar.classList.contains('page-toolbar--fold-row') && foldH > 0;
+    if (!foldRow && !toolbar.classList.contains('page-toolbar--capped')) return;
+    const byUser = Boolean(gestureTarget) && port.contains(gestureTarget);
+    if (!byUser && !collapsedNow) return;
     const reserve = port.scrollHeight - port.clientHeight;
     // EIN WAAGERECHTER STREIFEN IST NICHT DER SCROLLPORT DER SEITE. Der
     // Lauscher haengt in der Capture-Phase am Modul-Root und faengt damit auch
@@ -1325,8 +1354,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // Eine Faltzeile (siehe `foldRow` in update) hat keine Lead-Zone, aber
     // eine vermessene Hoehe - sie ist ihre ganze Lead-Zone. Ihre Linie bleibt
     // in beiden Zustaenden: sie ist die Kante des angedockten Kopfes.
-    const fold = toolbar.classList.contains('page-toolbar--fold-row') && foldH > 0;
-    if (!fold && !toolbar.classList.contains('page-toolbar--capped')) return;
+    const fold = foldRow;
     const states = fold ? ['is-collapsed'] : ['is-collapsed', 'is-docked'];
     // Nur kollabieren, wenn der Port das Ausklappen danach auch verkraftet -
     // sonst schiebt die zurückkehrende Kopfhöhe den Scroll auf 0, der Kopf
@@ -1343,18 +1371,21 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // eingeklappte Reserve gemessen, pendelte eine Liste, deren Reserve
     // zwischen Schwelle und Schwelle + Differenz liegt. `openH` ist die Hoehe
     // der letzten ausgeklappten Messung.
-    const shorter = !fold && toolbar.classList.contains('is-collapsed') && openH > 0
+    const shorter = !fold && collapsedNow && openH > 0
       ? Math.max(0, openH - toolbar.getBoundingClientRect().height)
       : 0;
+    // Ausgeklappt traegt die Faltzeile keinen negativen Rand - der Stil wird
+    // nur gefragt, wenn sie gefaltet ist (Fokus, Suchbegriff und offenes Menue
+    // halten sie dann trotzdem offen, layout.css).
     const unfolded = fold
-      ? reserve - Math.min(0, parseFloat(getComputedStyle(toolbar).marginBlockEnd) || 0)
+      ? reserve - (collapsedNow ? Math.min(0, parseFloat(getComputedStyle(toolbar).marginBlockEnd) || 0) : 0)
       : reserve + shorter;
     if (unfolded < (fold ? foldH : lead) + 48) {
       setCollapsed(false, states);
       return;
     }
     // Ab hier nur noch der Nutzer (siehe `gestureTarget` oben).
-    if (!gestureTarget || !port.contains(gestureTarget)) return;
+    if (!byUser) return;
     const top = port.scrollTop;
     if (fold) {
       foldByDirection(port, top);

@@ -56,16 +56,32 @@ const TOAST_ICONS = {
  * @param {'default'|'success'|'danger'|'warning'} [type='default']
  * @param {number} [duration=3000]  Frist in ms
  * @param {null | (() => void) | { label: string, onClick: () => void }} [onUndo]
- * @param {{ onExpire?: () => void }} [opts]
+ * @param {{ onExpire?: () => void, scope?: number, handle?: object }} [opts]
  *        `onExpire` laeuft einmal, wenn die Frist des Toasts endet, ohne dass
  *        seine Aktion genutzt wurde (abgelaufen, weggewischt, oder aus dem
  *        Dokument genommen, waehrend ihn ein Griff hielt). Sie steht mit der
  *        Frist still: was an ihr haengt (das Loeschen hinter "Rueckgaengig",
  *        scheduleUndoableDelete in utils/ux.js), laeuft mit dem Toast synchron.
+ *        `scope` ist die Modul-Marke von VOR der Anfrage (`feedbackScope()`):
+ *        gilt inzwischen ein anderes Modul, erscheint die Rueckmeldung nicht.
+ *        `handle` bekommt `setMessage(text)`: der Satz eines stehenden Toasts
+ *        laesst sich nachtragen, ohne einen zweiten zu zeigen (offerUndo).
  * @returns {boolean} ob dieser Aufruf einen Toast anlegte, dessen `onExpire` noch kommt
  */
-export function showToast(message, type = 'default', duration = 3000, onUndo = null, { onExpire = null } = {}) {
-  const container = toastSurface((type === 'danger' || type === 'warning') ? 'assertive' : 'polite');
+export function showToast(message, type = 'default', duration = 3000, onUndo = null, { onExpire = null, scope = null, handle = null } = {}) {
+  const alarm = type === 'danger' || type === 'warning';
+  // DIE RUECKMELDUNG ENDET AUCH, WENN SIE ZU SPAET KOMMT (Critique R24,
+  // G0-Shell-P1-2). `endModuleFeedback` beendet beim Modulwechsel, was steht -
+  // eine Quittung hinter einem `await` stand da noch nicht: "Aufgabe erledigt"
+  // erschien 300 ms nach dem Wechsel im Kalender und blieb dort. Wer seine
+  // Marke vor der Anfrage nimmt, endet hier wie eine, die schon stand: keine
+  // Flaeche, keine Ansage, ihre Handlung gilt (`onExpire`). Fehler und
+  // Warnung erscheinen trotzdem - sie sagen, dass etwas NICHT geschah.
+  if (scope != null && scope !== feedbackEpoch && !alarm) {
+    onExpire?.();
+    return false;
+  }
+  const container = toastSurface(alarm ? 'assertive' : 'polite');
   if (!container) return false;
 
   // Aktions-Button: Legacy-Undo (Funktion) oder benannte Aktion ({ label, onClick }).
@@ -126,6 +142,8 @@ export function showToast(message, type = 'default', duration = 3000, onUndo = n
   const span = document.createElement('span');
   span.textContent = message;
   toast.appendChild(span);
+  // Nur, solange dieser Toast steht: ein ersetzter nimmt keinen Satz mehr an.
+  if (handle) handle.setMessage = (text) => { if (toast.isConnected) span.textContent = text; };
 
   if (action) {
     const actionBtn = document.createElement('button');
@@ -194,13 +212,38 @@ export function showToast(message, type = 'default', duration = 3000, onUndo = n
 
 /**
  * Beendet jede stehende Rueckmeldung (Critique R22, D18): beim naechsten Toast
- * und beim Modulwechsel (router.js). Wie nach ihrer Frist - ihre Handlung gilt,
- * `onExpire` laeuft. Dauerhafte Toasts (Erinnerungen) bleiben.
+ * und beim Modulwechsel (`endModuleFeedback`). Wie nach ihrer Frist - ihre
+ * Handlung gilt, `onExpire` laeuft. Dauerhafte Toasts (Erinnerungen) bleiben.
  */
 export function endFeedbackToasts() {
   for (const toast of document.querySelectorAll('.toast-container .toast')) {
     if (typeof toast._toastEnd === 'function') toast._toastEnd();
   }
+}
+
+/**
+ * DIE MODUL-MARKE DER RUECKMELDUNG (Critique R24, G0-Shell-P1-2). Sie zaehlt
+ * die Modulwechsel; eine Seite nimmt sie VOR einer Anfrage, deren Quittung
+ * hinter dem `await` steht, und reicht sie an `showToast({ scope })`. Hat der
+ * Router inzwischen das Modul gewechselt, ist die Marke alt, und die Quittung
+ * erscheint nicht mehr im falschen Modul. Wer im Tipp quittiert (optimistisch,
+ * DESIGN.md "Eine Geste, deren Ergebnis feststeht, wartet nicht auf den
+ * Server"), braucht sie nicht: sein Toast steht schon, wenn der Wechsel kommt.
+ */
+let feedbackEpoch = 0;
+
+/** @returns {number} die Marke des Moduls, das gerade gilt */
+export function feedbackScope() {
+  return feedbackEpoch;
+}
+
+/**
+ * Der Modulwechsel (router.js): stehende Rueckmeldungen enden, und jede Marke
+ * von vorher ist ab jetzt alt - auch die einer Quittung, die erst noch kommt.
+ */
+export function endModuleFeedback() {
+  feedbackEpoch += 1;
+  endFeedbackToasts();
 }
 
 /**

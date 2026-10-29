@@ -171,9 +171,11 @@ test('R17: schmal bekommt der Medikamentenname die Zeile, die Aktionen stehen da
   const { eachRule } = await import('./css-rules.js');
   const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
   const narrow = [...eachRule(css)].filter((r) => r.at.some((a) => /@container list-rows \(max-width: 26rem\)/.test(a)));
-  const row = narrow.find((r) => r.selector.trim() === '.health-dose');
+  // Seit R24 (E10) traegt die Zeile mit Abhak-Ring keinen Knopf mit Wort mehr
+  // und bleibt eine Zeile; der Umbruch gilt nur noch der Zeile OHNE Ring.
+  const row = narrow.find((r) => r.selector.trim() === '.health-dose:not(.health-dose--check)');
   assert.match(row?.body ?? '', /flex-wrap:\s*wrap/, 'nur diese Zeile, nur schmal, bricht um');
-  const name = narrow.find((r) => r.selector.trim() === '.health-dose > .health-dose__name');
+  const name = narrow.find((r) => r.selector.trim() === '.health-dose:not(.health-dose--check) > .health-dose__name');
   assert.match(name?.body ?? '', /flex:\s*1 0 100%/, 'der Name nimmt die ganze erste Zeile (vorher 81px, Bruch mitten im Wort)');
   assert.match(name?.body ?? '', /order:\s*-1/, 'vor der Uhrzeit - Uhrzeit und Aktionen teilen die zweite Zeile');
   // Die geteilte Zeile bleibt nowrap: die Regel steht NUR in der Container-Abfrage.

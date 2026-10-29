@@ -217,7 +217,7 @@ test('im Sheet steht Bearbeiten als Hauptaktion unten, Löschen zurückgenommen 
   // Der Kalender: sein Löschen bleibt zurückgenommen.
   const cal = await calendarJs();
   const detail = cal.slice(cal.indexOf('async function openEventDetail('), cal.indexOf('async function loadReminderForEvent('));
-  assert.match(detail, /id: 'detail-delete',[\s\S]{0,80}variant: 'danger-ghost',[\s\S]{0,40}align: 'start'/,
+  assert.match(detail, /id: 'detail-delete',[\s\S]{0,80}variant: 'danger-outline',[\s\S]{0,40}align: 'start'/,
     'Löschen bleibt destruktiv gestylt und am Anfang, nicht an der Primärposition');
 });
 
@@ -513,7 +513,7 @@ test('die Leseansicht ist nicht an ihr Modul genagelt (#918)', async () => {
   // Und die zwei Ansichten, die vorher eine kleinere Fassung bauten oder
   // wegnavigierten, oeffnen jetzt genau diese.
   const dash = await dashboardJs();
-  assert.match(dash, /openTaskById\(taskId, \{ user, container, onChanged: rerender \}\)/,
+  assert.match(dash, /openTaskById\(taskId, \{ user, container, onChanged: refresh \}\)/,
     'die Uebersicht oeffnet die geteilte Ansicht');
   assert.doesNotMatch(dash, /openTaskQuickAction/,
     'das Zwei-Knopf-Kaertchen ist ersetzt, nicht daneben stehen geblieben');
@@ -572,7 +572,7 @@ test('der Rueckgaengig-Streifen blendet JEDE Darstellung der Aufgabe aus (#918)'
   const dash = await dashboardJs();
   assert.match(dash, /data-object-kind="\$\{esc\(row\.kind\)\}" data-object-id=/,
     'die Cockpit-Zeile benennt ihr Objekt');
-  assert.match(dash, /class="task-item" data-task-id=/, 'die Widget-Zeile nennt ihre Aufgabe');
+  assert.match(dash, /class="list-row task-item" data-task-id=/, 'die Widget-Zeile nennt ihre Aufgabe');
 });
 
 test('wer die Aufgabe von aussen oeffnet, bekommt ihr Blatt (#918)', async () => {
@@ -1335,4 +1335,23 @@ test('Kontakt-Website und Rezept-URL laufen durch externalHref', async () => {
   const meals = await read('public/pages/meals.js');
   assert.match(meals, /externalHref\(meal\.recipe_url\)/, 'meals.js: Rezept-Knopf der Mahlzeitkarte');
   assert.doesNotMatch(meals, /href="\$\{esc\(meal\.recipe_url\)\}"/, 'meals.js: roher Wert als href');
+});
+
+/* R24 S13 (Uebergabe S9): das Popover ist ein Behaelter, kein Steuerelement.
+ * Es nimmt beim Oeffnen den Fokus (tabIndex -1, popover.focus()), und Chrome
+ * gab ihm nach einem Mausklick auf eine Mahlzeitkarte den violetten
+ * Fokusring (`:focus-visible` true - der Klick fokussierte nichts, die Karte
+ * haengt an SortableJS), am Termin nicht. Derselbe Fall wie der Dialogtitel
+ * (`.modal-panel__title[tabindex="-1"]:focus`): ein Ring um eine Karte
+ * verspraeche eine Bedienung, die es nicht gibt. Tab fuehrt in die Knoepfe,
+ * die ihren Ring tragen. */
+test('R24 S13: das Detail-Popover traegt als Fokusziel keinen Ring - Mahlzeit wie Termin', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/detail-view.css', import.meta.url), 'utf8'))];
+  const quiet = rules.find((r) => !r.at.length && r.selector.trim() === '.detail-popover:focus');
+  assert.ok(quiet, 'Regel fehlt - nach einem Mausklick stand ein violetter Ring um die ganze Karte');
+  assert.match(quiet.body, /outline:\s*none/);
+  const js = readFileSync(new URL('../public/components/detail-view.js', import.meta.url), 'utf8');
+  assert.match(js, /popover\.tabIndex = -1;/, 'die Regel gilt nur dem Behaelter als Fokusziel');
 });

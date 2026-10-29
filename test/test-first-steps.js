@@ -9,7 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  FIRST_STEPS, startFirstSteps, markFirstStep, dismissFirstSteps, firstStepsModel, firstStepsHtml,
+  FIRST_STEPS, startFirstSteps, markFirstStep, dismissFirstSteps, firstStepsModel, firstStepsHtml, firstStepsActive,
 } from '../public/utils/first-steps.js';
 
 function memoryStorage() {
@@ -74,7 +74,7 @@ test('Bauform: Abhakkreis als Zeichen, Zaehler, Schliessen mit Namen, erledigt f
 
 test('dashboard.js: die Karte steht vom ersten Bild an neben dem Zonen-Hinweis und beginnt nach dem Rundgang', () => {
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
-  assert.match(src, /import \{ mountFirstSteps, startFirstSteps \} from '\/utils\/first-steps\.js';/);
+  assert.match(src, /import \{ firstStepsActive, mountFirstSteps, startFirstSteps \} from '\/utils\/first-steps\.js';/);
   assert.match(src, /let firstSteps = mountSteps\(\);/);
   assert.match(src, /firstSteps\.update\(Array\.isArray\(data\?\.users\) \? data\.users\.length : null\);/);
   assert.match(src, /if \(!replayTour\) startFirstSteps\(\);/, 'nach dem ersten Rundgang, nicht nach einer Wiederholung aus der Hilfe');
@@ -95,4 +95,14 @@ test('Rundgang: Zurueck ab Schritt 2, Wiederholen aus der Hilfe', () => {
   assert.match(help, /data-help-tour/);
   assert.match(help, /sessionStorage\.setItem\('yuvomi-replay-tour', '1'\)/);
   assert.match(help, /navigate\('\/'\);/);
+});
+
+test('R24: firstStepsActive sagt, ob die Karte laeuft', () => {
+  const data = new Map();
+  const storage = { getItem: (k) => (data.has(k) ? data.get(k) : null), setItem: (k, v) => data.set(k, String(v)) };
+  assert.equal(firstStepsActive(storage), false, 'vor dem Rundgang');
+  startFirstSteps(storage);
+  assert.equal(firstStepsActive(storage), true, 'nach dem Rundgang');
+  dismissFirstSteps(storage);
+  assert.equal(firstStepsActive(storage), false, 'weggeklickt');
 });

@@ -479,15 +479,14 @@ test('R16: die Kennzahl-Kurzzeile ist ein geteilter Baustein, und Inventar und H
   assert.ok(panel.some((r) => phone(r) && r.selector === '.budget-glance-details > .metric-card--empty' && decl(r.body, 'display') === 'none'),
     'eine leere Kennzahl entfaellt mobil');
   assert.ok(panel.some((r) => r.selector === '.budget-glance__row'), 'die Zeile selbst steht in panel.css');
-  for (const [file, id, controls] of [
-    ['../public/pages/inventory.js', 'inventory-glance-more', 'inventory-metrics'],
-    ['../public/pages/housekeeping.js', 'housekeeping-glance-more', 'housekeeping-metrics'],
-  ]) {
+  // Inventar und Haushaltshilfe fuehren seit R24 (E2; Besuche seit S14) die
+  // statische Kurzzeile in jeder Breite (test:inventory-list-detail,
+  // test:housekeeping-ui) - nichts klappt dort mehr auf.
+  for (const file of ['../public/pages/housekeeping.js', '../public/pages/inventory.js']) {
     const src = read(file);
-    assert.match(src, /import \{ metricGlanceHtml, wireMetricGlance \} from '\/utils\/metric-glance\.js';/, file);
-    assert.match(src, new RegExp(`id: '${id}',\\s*controls: '${controls}'`), `${file}: Zeile und Bereich gehoeren zusammen`);
-    assert.match(src, new RegExp(`class="metric-grid[^"]*budget-glance-details[^"]*" id="${controls}"`), `${file}: die Karten sind der aufklappbare Bereich`);
-    assert.match(src, new RegExp(`wireMetricGlance\\(\\w+, '${id}'`), `${file}: der Aufklapper ist verdrahtet`);
+    assert.match(src, /import \{ metricGlanceHtml \} from '\/utils\/metric-glance\.js';/, file);
+    assert.match(src, /everywhere: true/, `${file}: die Zeile steht in jeder Breite`);
+    assert.doesNotMatch(src, /wireMetricGlance|budget-glance-details/, `${file}: kein Aufklapper, keine Karten dahinter`);
   }
 });
 
@@ -704,7 +703,10 @@ test('R20 + R23: der Gesundheits-Bereichskopf ist einzeilig, die Person rechts w
 // noch ihre Reiter - kein Kopf nannte den Ort, die Kapsel sagte "Mehr". Unter
 // 768px steht wieder der Kopf aller Module: Siegel und Name, die Reiter als
 // Bar-Zeile darunter (wie Budget), mit demselben Einklappen beim Scrollen.
-const TABS_TITLE_MODULES = ['pages/housekeeping.js', 'pages/rewards.js', 'pages/schedule.js'];
+// R24 S7b (S7-F1): der Schichtplan traegt seitdem den Zeitraum-Kopf des
+// Budgets (`--period-inline`, Reiter als eigene Zeile) - er hat einen Zeitraum
+// im Kopf, die Titelzeile gehoert ihm, nicht den Reitern.
+const TABS_TITLE_MODULES = ['pages/housekeeping.js', 'pages/rewards.js'];
 test('R19/R21: Reiter in der Titelzeile ab 768px, darunter nennt der Kopf den Ort', () => {
   for (const f of TABS_TITLE_MODULES) {
     assert.match(read(`../public/${f}`), /<header class="page-toolbar [^"]*\bpage-toolbar--tabs-title\b/, `${f}: der Kopf traegt die Variante`);
@@ -829,4 +831,87 @@ test('R21 S7: das Mehr-Blatt hat einen festen Fuss und gruppierten Grund', () =>
   const list = all.find((r) => r.selector.trim() === '.more-sheet__list');
   assert.ok(list, 'Regel der Modulliste fehlt');
   assert.equal(decl(list.body, 'box-shadow'), null, 'keine Karte mit Schatten auf dem Blatt');
+});
+
+test('R24 G5 P0-1: in der Zyklus-Spalte nimmt die Kennzahlseite die volle Breite', () => {
+  // `.cycle-stats` ist ein Groessen-Container ohne Eigenbreite. Steht
+  // `.cycle-hero` schmal als Spalte mit `align-items: center`, schrumpft die
+  // Seite ohne `align-self: stretch` auf ihr Polster (gemessen 8px). Die
+  // Browser-Messung haelt test:metric-tile-fit-browser; hier die Regel in der Kette.
+  const healthCss = read('../public/styles/health.css');
+  const all = rules(healthCss);
+  const stats = all.find((r) => r.selector === '.cycle-stats' && !r.at.length);
+  assert.match(decl(stats?.body ?? '', 'container') ?? '', /inline-size/, 'die Reihe ist kein Groessen-Container mehr - Guard pruefen');
+  const column = all.find((r) => r.selector === '.cycle-hero' && r.at.some((a) => /max-width:\s*639px/.test(a)));
+  assert.equal(decl(column?.body ?? '', 'flex-direction'), 'column', 'schmal steht der Zykluskopf als Spalte');
+  const side = all.find((r) => r.selector === '.cycle-hero > .cycle-hero__side' && r.at.some((a) => /max-width:\s*639px/.test(a)));
+  assert.equal(decl(side?.body ?? '', 'align-self'), 'stretch', '.cycle-hero__side streckt sich in der schmalen Spalte nicht');
+});
+
+// R24 (Critique G0 P2-3): EINE Kopfhoehe mobil. Die Zeitraum-Koepfe (Budget,
+// Kalender) trugen unter 768px den halben Zeilenabstand, die Reiter-Koepfe
+// (Belohnungen, Haushaltshilfe, Schichtplan) den vollen - gemessen 390px Kopf
+// 117 gegen 121px, die Reiter auf y60 gegen y64. Jetzt traegt jeder Kopf mit
+// Bar-Zeile denselben Abstand, mit genug Spezifitaet gegen die Large-Title-Regel.
+test('R24: jeder mobile Kopf mit Bar-Zeile hat denselben Zeilenabstand wie der Zeitraum-Kopf', () => {
+  const gap = rules(layoutCss).filter((r) => r.at.some((a) => /max-width:\s*767px/.test(a)) && decl(r.body, 'row-gap') === 'var(--space-1)');
+  const selectors = gap.flatMap((r) => r.selector.split(/,\s*/).map((s) => s.trim()));
+  assert.ok(selectors.includes('.page-toolbar.page-toolbar--period:not(.page-toolbar--in-group):has(> .page-toolbar__title)'), 'Zeitraum-Kopf');
+  assert.ok(selectors.includes('.page-toolbar:not(.page-toolbar--in-group):has(> .page-toolbar__title):has(> .page-toolbar__bar)'),
+    'jeder Kopf mit Bar-Zeile (Reiter) - sonst 121 statt 117px');
+  const large = rules(layoutCss).find((r) => r.selector === '.page-toolbar:not(.page-toolbar--in-group):has(> .page-toolbar__title)'
+    && r.at.some((a) => /max-width:\s*1023px/.test(a)) && decl(r.body, 'row-gap'));
+  assert.equal(decl(large.body, 'row-gap'), 'var(--space-2)', 'die Large-Title-Regel selbst bleibt (Koepfe ohne Bar-Zeile)');
+});
+
+// R24 (Critique G4-Quer-P2-1, G0 Inv-3): das Werkzeugmenue eines Modulkopfs
+// hat EIN Zeichen, die Ellipse. Die Dokumente zeigten am selben Platz zwei
+// Pfeile (Inhalt: Ansicht, Sortierung, Auswahl), die Entsorgung baute ihr
+// Menue am Baustein vorbei (ohne `page-tools-btn`). Ein einzelner Eintrag
+// bleibt nach R16 ein direkter Knopf mit eigenem Zeichen (pageToolsMenuHtml).
+test('R24: das Werkzeugmenue eines Kopfs ist ueberall die Ellipse mit page-tools-btn', () => {
+  const pages = new URL('../public/pages/', import.meta.url);
+  const offenders = [];
+  for (const file of readdirSync(pages).filter((f) => f.endsWith('.js'))) {
+    const src = readFileSync(new URL(file, pages), 'utf8');
+    for (const m of src.matchAll(/\bpopoverMenuHtml\(\{\s*id:\s*'([\w-]+-(?:page|tools)-menu)'/g)) {
+      if (m[1] === 'dashboard-tools-menu') continue; // „Anpassen" der Uebersicht, kein Werkzeugmenue eines Modulkopfs
+      offenders.push(`${file}: ${m[1]}`);
+    }
+  }
+  assert.deepEqual(offenders, [], 'Kopf-Menues nehmen pageToolsMenuHtml (Kennklasse page-tools-btn, Ellipse)');
+  const docs = read('../public/pages/documents.js');
+  const trigger = docs.match(/<button[^>]*documents-tools-btn[\s\S]*?<\/button>/)?.[0] ?? '';
+  assert.match(trigger, /page-tools-btn/, 'Dokumente: Kennklasse des Kopf-Menues');
+  assert.match(trigger, /data-lucide="ellipsis"/, 'Dokumente: die Ellipse, nicht die Sortierpfeile');
+});
+
+// R24 (Critique G0 P2-1/P3-2): die Ansichtswahl im Kopf hat ZWEI Formen, Wort
+// (Kalender, Aufgaben ab 1440) oder Zeichen (Aufgaben darunter, Dokumente) -
+// nie Zeichen + Wort. Und ein Zeichen-Segment ist nie schmaler als ein
+// Kopfknopf (Dokumente massen 32px breit).
+test('R24: Zeichen-Segmente sind mindestens --target-md breit, Aufgaben zeigt breit nur das Wort', () => {
+  const panel = rules(read('../public/styles/panel.css')).find((r) => r.at.length === 0 && r.selector === '.segmented--icons .segmented__item');
+  assert.equal(decl(panel.body, 'min-inline-size'), 'var(--target-md)');
+  const wide = rules(read('../public/styles/tasks.css')).filter((r) => r.at.some((a) => /min-width:\s*1440px/.test(a)) && /tasks-view-toggle \.segmented__item > \[data-lucide\]/.test(r.selector));
+  assert.ok(wide.length && decl(wide[0].body, 'display') === 'none', 'ab 1440 weicht das Zeichen dem Wort');
+});
+
+// R24 (Critique G0 P2-5, Inv-1): die Uebersicht hat keinen hoeheren Kopf als
+// ein Modul. Mobil stand das Heute-Blatt bei 390x844 auf y141 (Ziel <= 120),
+// am Desktop „+ Neu" auf y32 statt y14 wie jedes „+ Nomen". Gemessen nach dem
+// Fix: Blatt y117, „+ Neu" y14. Hier die Rechnung, die das traegt.
+test('R24: der Kopf der Uebersicht steht wie ein Modulkopf (Werkzeuge y14, Blatt mobil <= 120)', () => {
+  const dash = rules(read('../public/styles/dashboard.css'));
+  const at = (r, re) => r.at.some((a) => re.test(a));
+  const desk = dash.find((r) => r.selector === '.dashboard' && at(r, /min-width:\s*1024px/) && decl(r.body, 'padding-block-start'));
+  assert.equal(decl(desk?.body ?? '', 'padding-block-start'), 'var(--space-3)', 'Desktop: oben das Polster der Titelzeile');
+  const tools = dash.find((r) => r.selector === '.dashboard-overview__tools' && at(r, /min-width:\s*1024px/));
+  assert.equal(decl(tools?.body ?? '', 'min-block-size'), 'var(--target-base)', 'Werkzeugzeile ein Ziel hoch');
+  assert.equal(decl(tools.body, 'align-items'), 'center');
+  const base = dash.filter((r) => r.selector === '.dashboard-masthead' && !r.at.length);
+  assert.ok(base.every((r) => !decl(r.body, 'padding') || decl(r.body, 'padding') === '0'), 'das Kopfband polstert oben nicht');
+  const phone = (sel) => dash.find((r) => r.selector === sel && at(r, /max-width:\s*639px/) && /padding/.test(r.body));
+  assert.equal(decl(phone('.dashboard').body, 'padding-top'), 'var(--space-2)', 'mobil 8px bis zur Werkzeugzeile');
+  assert.equal(decl(phone('.today-cockpit').body, 'padding'), '0', 'den Abstand zum Blatt traegt allein die Luecke des Kopfbands');
 });

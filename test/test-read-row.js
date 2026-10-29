@@ -246,30 +246,28 @@ test('Vorrat: die Leseansicht baut ihre Zeilen ueber den geteilten Baustein', ()
   assert.equal(zeilen(ansicht({ notes: '   ' })), zeilen(voll) - 1);
 });
 
-/* Schmales Telefon: pantry.css laesst das MHD in Zeilen mit Warenkorb weg, weil
- * dort Warenkorb UND Stepper die Textspalte auf 168px druecken. Die Lesezeile
- * hat keinen Stepper - die Regel traf sie trotzdem, und das Datum stand nur in
- * der Leseansicht. Gemessen an beiden Seiten: der Selektor verlangt den
- * Stepper, und der Renderer zeichnet ihn bei `read` nicht (das Datum aber
- * schon). Die Breiten selbst sieht nur ein Browser. */
-test('Vorrat, schmale Zeile: das MHD faellt nur weg, wo auch ein Stepper steht', () => {
+/* Schmales Telefon: bis R24 liess pantry.css das MHD in Zeilen mit Warenkorb
+ * UND Stepper weg (168px Textspalte) - die Lesezeile ohne Stepper behielt es.
+ * Seit R24 (Critique G3-Vorrat-P2-1) faellt es nirgends weg: mit Status rueckt
+ * "MHD · Ort" in eine eigene Zeile. Gemessen an beiden Seiten: keine Regel
+ * blendet das MHD aus, und Lese- wie Schreibzeile tragen es. */
+test('Vorrat, schmale Zeile: das MHD bleibt in Lese- und Schreibzeile', () => {
   const css = readFileSync(new URL('../public/styles/pantry.css', import.meta.url), 'utf8');
   const versteckt = [];
   for (const rule of eachRule(css)) {
     if (/\.pantry-row__expiry/.test(rule.selector) && /display:\s*none/.test(rule.body)) versteckt.push(rule.selector.trim());
   }
-  assert.equal(versteckt.length, 1, `genau eine Regel blendet das MHD aus: ${versteckt.join(' | ')}`);
-  assert.match(versteckt[0], /:has\(\.pantry-row__cart\)/, 'sie fragt nach dem Warenkorb');
-  assert.match(versteckt[0], /:has\(\.pantry-stepper\)/, 'und nach dem Stepper - ohne ihn ist Platz');
+  assert.deepEqual(versteckt, [], 'keine Regel blendet das MHD aus');
 
   const knapp = vorrat({ quantity: 1, min_quantity: 5 });
   const zeile = (modules) => withAccess(modules, () => pantry.rowEl(knapp).outerHTML);
   const lesend = zeile({ pantry: 'read', shopping: 'write' });
   assert.match(lesend, /pantry-row__cart"/, 'die Lesezeile traegt den Warenkorb');
   assert.match(lesend, /pantry-row__expiry/, 'und das MHD');
-  assert.doesNotMatch(lesend, /pantry-stepper/, 'aber keinen Stepper: die Regel trifft sie nicht');
+  assert.doesNotMatch(lesend, /pantry-stepper/, 'aber keinen Stepper');
 
   const schreibend = zeile({ pantry: 'write', shopping: 'write' });
   assert.match(schreibend, /pantry-row__cart"/);
-  assert.match(schreibend, /class="pantry-stepper"/, 'Gegenfall: mit Schreibrecht stehen beide, die Regel greift weiter');
+  assert.match(schreibend, /class="pantry-stepper"/);
+  assert.match(schreibend, /pantry-row__expiry/, 'auch mit Stepper bleibt das MHD');
 });

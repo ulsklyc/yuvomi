@@ -233,7 +233,7 @@ router.patch('/cycle/periods/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const existing = db.get().prepare('SELECT * FROM cycle_periods WHERE id = ? AND user_id = ?').get(id, viewer);
     if (!existing) return res.status(404).json({ error: 'Period not found.', code: 404, reason: 'health_cycle_period_not_found' });
@@ -266,7 +266,7 @@ router.delete('/cycle/periods/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const existing = db.get().prepare('SELECT id FROM cycle_periods WHERE id = ? AND user_id = ?').get(id, viewer);
     if (!existing) return res.status(404).json({ error: 'Period not found.', code: 404, reason: 'health_cycle_period_not_found' });
@@ -419,7 +419,7 @@ router.delete('/cycle/logs/:id', (req, res) => {
   try {
     const viewer = viewerId(req);
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'Ungültige ID.', code: 400 });
+    if (!id) return res.status(400).json({ error: 'Invalid id.', code: 400 });
 
     const existing = db.get().prepare('SELECT id FROM cycle_day_logs WHERE id = ? AND user_id = ?').get(id, viewer);
     if (!existing) return res.status(404).json({ error: 'Day entry not found.', code: 404, reason: 'health_cycle_log_not_found' });

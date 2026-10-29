@@ -352,7 +352,7 @@ test('Verschieben: scheitert der Server, kehrt die Karte zurueck UND es gibt ein
   globalThis.__apiStub = { put: async () => { const err = new Error('boom'); err.data = { error: 'Nicht erlaubt' }; throw err; } };
   const toasts = [];
   const prevYuvomi = globalThis.window.yuvomi;
-  globalThis.window.yuvomi = { ...prevYuvomi, showToast: (...args) => toasts.push(args), friendlyError: (err) => err.data?.error };
+  globalThis.window.yuvomi = { ...prevYuvomi, showToast: (...args) => toasts.push(args) };
   let renders = 0;
   try {
     await meals.moveMeal(5, '2026-10-07', 'dinner', { rerender: () => { renders += 1; } });
@@ -362,7 +362,8 @@ test('Verschieben: scheitert der Server, kehrt die Karte zurueck UND es gibt ein
   }
   assert.deepEqual([meal.date, meal.meal_type], ['2026-10-05', 'lunch'], 'der Zustand steht wieder am Ursprung');
   assert.equal(renders, 2, 'einmal optimistisch, einmal zurueck');
-  assert.deepEqual(toasts, [['Nicht erlaubt', 'danger']], 'der Fehler wird gemeldet, nicht verschluckt');
+  // Die App sagt ihren eigenen Satz, nie den des Servers (#1695).
+  assert.deepEqual(toasts, [['common.errorGeneric', 'danger']], 'der Fehler wird gemeldet, nicht verschluckt');
 });
 
 // Zweimal ziehen, bevor der Server geantwortet hat (Review #1673). Jeder Zug
@@ -382,7 +383,7 @@ test('Verschieben: scheitern zwei Zuege derselben Karte, steht sie am letzten BE
   const { calls, put } = gatedPut();
   globalThis.__apiStub = { put };
   const prevYuvomi = globalThis.window.yuvomi;
-  globalThis.window.yuvomi = { ...prevYuvomi, showToast: () => {}, friendlyError: () => 'x' };
+  globalThis.window.yuvomi = { ...prevYuvomi, showToast: () => {} };
   try {
     const first = meals.moveMeal(5, '2026-10-06', 'lunch', { rerender: () => {} });
     const second = meals.moveMeal(5, '2026-10-07', 'dinner', { rerender: () => {} });
@@ -409,7 +410,7 @@ test('Verschieben: gelingt der erste Zug und scheitert der zweite, bleibt das Zi
   const { calls, put } = gatedPut();
   globalThis.__apiStub = { put };
   const prevYuvomi = globalThis.window.yuvomi;
-  globalThis.window.yuvomi = { ...prevYuvomi, showToast: () => {}, friendlyError: () => 'x' };
+  globalThis.window.yuvomi = { ...prevYuvomi, showToast: () => {} };
   try {
     const first = meals.moveMeal(5, '2026-10-06', 'lunch', { rerender: () => {} });
     const second = meals.moveMeal(5, '2026-10-07', 'dinner', { rerender: () => {} });

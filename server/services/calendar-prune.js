@@ -11,7 +11,28 @@
 // --------------------------------------------------------
 
 import { createLogger } from '../logger.js';
+import { parseOwnUid, installationId } from '../utils/own-uid.js';
 const log = createLogger('CalendarPrune');
+
+/**
+ * Hat DIESE Installation das Objekt mit dieser UID für genau diese Zeile
+ * angelegt, so dass ein erneuter Upload es wieder unter DERSELBEN UID ablegt
+ * (#1839)? Nur das neue Muster mit der Kennung dieser Installation: der Upload
+ * vergibt heute nur dieses (`ownUid`). Eine Zeile mit der UID nach dem alten
+ * Muster ginge unter einer neuen hinauf - lag ihr Objekt doch noch oben, gäbe
+ * es zwei; sie bleibt deshalb stehen wie eine fremde (Review). Eine fremde
+ * Kennung ist eine andere Yuvomi-Installation am selben Konto.
+ *
+ * @param {object} database
+ * @param {string} uid
+ * @param {'event'|'task'|'item'} kind
+ * @param {number} rowId
+ */
+export function createdHere(database, uid, kind, rowId) {
+  const parsed = parseOwnUid(uid);
+  if (!parsed || parsed.kind !== kind || parsed.id !== Number(rowId)) return false;
+  return parsed.installation !== null && parsed.installation === installationId(database);
+}
 
 /**
  * Entfernt lokal die Termine eines externen Kalenders, die der Server nicht mehr
@@ -42,6 +63,10 @@ const log = createLogger('CalendarPrune');
  *   Kalender oder dieselbe UID, sagt der Abruf des einen nichts über den
  *   Termin des anderen, und eine Zeile ohne Konto hat niemand abgerufen.
  *   Ohne Angabe (Apple) zählt wie bisher nur Kalender und Quelle.
+ * Gesehen (#1839): jede Zeile, deren UID der Abruf geliefert hat, wird als
+ * gesehen markiert; gelöscht wird nur eine gesehene. Eine nie gesehene, hier
+ * angelegte fällt auf lokal zurück (`backToLocal`), eine fremde bleibt.
+ *
  * @returns {number} Anzahl gelöschter Termine.
  */
 export function pruneDeletedEvents(database, {
@@ -54,13 +79,19 @@ export function pruneDeletedEvents(database, {
 } = {}) {
   const localEvents = accountId == null
     ? database.prepare(`
-      SELECT id, external_calendar_id FROM calendar_events
+      SELECT id, external_calendar_id, seen_on_server FROM calendar_events
       WHERE calendar_ref_id = ? AND external_source = ?
     `).all(calRefId, source)
     : database.prepare(`
-      SELECT id, external_calendar_id FROM calendar_events
+      SELECT id, external_calendar_id, seen_on_server FROM calendar_events
       WHERE calendar_ref_id = ? AND external_source = ? AND caldav_account_id = ?
     `).all(calRefId, source, accountId);
+
+  // Gesehen (#1839): was dieser Abruf liefert, ist ab jetzt belegt gespiegelt.
+  const markSeen = database.prepare('UPDATE calendar_events SET seen_on_server = 1 WHERE id = ?');
+  for (const ev of localEvents) {
+    if (!ev.seen_on_server && accountUids.has(ev.external_calendar_id)) markSeen.run(ev.id);
+  }
 
   const stale = localEvents.filter(ev => !accountUids.has(ev.external_calendar_id));
   if (stale.length === 0) return 0;
@@ -74,10 +105,53 @@ export function pruneDeletedEvents(database, {
     return 0;
   }
 
+  // NUR WAS GESEHEN WURDE, FÄLLT (#1839). Eine Zeile, deren Objekt kein Abruf
+  // je gefunden hat, ist nicht "anderswo gelöscht" - ihr Upload kann nie
+  // angekommen sein (ein abgelehnter PUT galt vor #1837 als Erfolg). Hier
+  // angelegt, fällt sie auf lokal zurück und geht erneut hinauf; sonst bleibt
+  // sie stehen, wie sie ist.
   const del = database.prepare('DELETE FROM calendar_events WHERE id = ?');
-  for (const ev of stale) del.run(ev.id);
+  let removed = 0;
+  let restored = 0;
+  for (const ev of stale) {
+    if (ev.seen_on_server) {
+      del.run(ev.id);
+      removed++;
+    } else if (createdHere(database, ev.external_calendar_id, 'event', ev.id)) {
+      restored += backToLocal(database, ev.id, { source, accountId, calRefId });
+    }
+  }
+  if (restored) {
+    const label = calendarName ? `"${calendarName}"` : `ref ${calRefId}`;
+    log.warn(`Calendar ${label}: ${restored} event(s) created here were never seen on the server; they are local again and are uploaded once more.`);
+  }
+  return removed;
+}
 
-  return stale.length;
+/**
+ * Macht einen nie gesehenen, hier angelegten Termin wieder lokal (#1839): er
+ * verliert, was ihn als Spiegel ausweist, und behält sein Ziel - über CalDAV
+ * Konto und Kalender, aus denen er kam, oder den eines wartenden Umzugs; die alte iCloud-Verbindung lädt jeden
+ * lokalen Termin ohne lokalen Kalender hinauf. Der nächste Upload trägt
+ * dieselbe UID: liegt das Objekt doch oben, übernimmt er es (412).
+ * @returns {number} 1, wenn die Zeile zurückgesetzt wurde
+ */
+function backToLocal(database, eventId, { source, accountId, calRefId }) {
+  const target = source === 'caldav' && accountId != null
+    ? database.prepare('SELECT external_id FROM external_calendars WHERE id = ?').get(calRefId)?.external_id ?? null
+    : null;
+  const forCaldav = source === 'caldav' && target != null;
+  return Number(database.prepare(`
+    UPDATE calendar_events
+       SET external_source = 'local', external_calendar_id = NULL, external_object_url = NULL,
+           calendar_ref_id = NULL, caldav_account_id = NULL,${forCaldav ? `
+           -- Ein wartender Umzug ist der letzte Wunsch des Nutzers: er wird
+           -- das Ziel, nicht der Kalender, aus dem der Termin kam.
+           target_caldav_account_id = ?, target_caldav_calendar_url = COALESCE(outbound_move_to, ?),` : ''}
+           outbound_dirty = 0, outbound_attempts = 0, outbound_move_to = NULL,
+           outbound_snapshot = NULL, seen_on_server = 0
+     WHERE id = ? AND external_source = ?
+  `).run(...(forCaldav ? [accountId, target] : []), eventId, source).changes);
 }
 
 // --------------------------------------------------------

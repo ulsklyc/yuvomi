@@ -76,8 +76,8 @@ function generateRecurringExpense(database, recurring) {
   const expenseId = database.prepare(`
     INSERT INTO expenses
       (group_id, title, description, amount_minor, currency, converted_amount_minor, converted_currency,
-       payer_id, category, split_method, expense_date, recurring_rule_id, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       payer_id, category, budget_category, split_method, expense_date, recurring_rule_id, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     recurring.group_id,
     recurring.title,
@@ -88,6 +88,9 @@ function generateRecurringExpense(database, recurring) {
     recurring.currency,
     recurring.payer_id,
     recurring.category,
+    // Die Budget-Kategorie der Serie (R24, E12, Migration 271) geht an jede
+    // gebuchte Ausgabe mit.
+    recurring.budget_category ?? null,
     recurring.split_method,
     recurring.next_run_date,
     recurring.id,
@@ -115,7 +118,8 @@ function generateRecurringExpense(database, recurring) {
 // verletzt wird. Alles andere (TypeError, ReferenceError, SQLite) ist ein Fehler im
 // Code oder in der Umgebung: er liefert null, die Serie bleibt unpausiert, und
 // der naechste Lauf versucht sie wieder. Schluckte der Lauf ihn als "Serie
-// kaputt", schaltete ein Bug still gesunde Serien ab.
+// kaputt", schaltete ein Bug still gesunde Serien ab. Sichtbar wird er an der
+// Zeile (`failed_at`, rememberFailure, #1746).
 function pauseReason(err) {
   if (err instanceof RecurringNotBookable) return err.reason;
   if (err instanceof SplitInputError) return 'split_invalid';
@@ -143,10 +147,26 @@ function unbookableReason(database, recurring) {
 // `actor_id` NULL: das war niemand, die App zeigt dafuer "System".
 function pauseUnbookable(database, recurring, reason) {
   database.transaction(() => {
-    const paused = database.prepare("UPDATE recurring_expenses SET paused_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ? AND paused_at IS NULL").run(recurring.id);
+    // Der Grund ersetzt einen unerwarteten Fehlschlag von vorher (#1746): die
+    // Zeile nennt dann ihn.
+    const paused = database.prepare("UPDATE recurring_expenses SET paused_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), failed_at = NULL WHERE id = ? AND paused_at IS NULL").run(recurring.id);
     if (!paused.changes) return;
     insertActivity(database, recurring.group_id, null, 'recurring_auto_paused', 'recurring_expense', recurring.id, { title: recurring.title, reason });
   })();
+}
+
+// Merkt sich den ersten unerwarteten Fehlschlag einer Serie (#1746). Die Serie
+// bleibt unpausiert (siehe pauseReason), aber nicht mehr unsichtbar: die Zeile
+// zeigt "wird stuendlich neu versucht", bis eine Buchung oder ein Bearbeiten
+// den Zeitpunkt leert. Weitere Fehlschlaege lassen ihn stehen - er sagt, SEIT
+// wann. Ein eigener Schritt nach dem Zurueckrollen der Buchung; scheitert auch
+// er, bleibt es beim Serverlog wie zuvor.
+function rememberFailure(database, recurring) {
+  try {
+    database.prepare("UPDATE recurring_expenses SET failed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ? AND failed_at IS NULL").run(recurring.id);
+  } catch (err) {
+    log.error(`Recurring split expense ${recurring.id}: failure could not be recorded:`, err);
+  }
 }
 
 // `today` in der Haushaltszone (#829): eine wiederkehrende Ausgabe mit
@@ -177,13 +197,19 @@ function processDueRecurringExpenses(today = todayKey(db.get()), book = generate
   const result = { generated: 0, paused: 0, failed: 0 };
   for (const recurring of due) {
     try {
-      database.transaction(() => book(database, recurring))();
+      database.transaction(() => {
+        book(database, recurring);
+        // Gebucht: ein Fehlschlag von vorher ist vorbei (#1746). In derselben
+        // Transaktion, damit Buchung und Zustand der Zeile zusammen gelten.
+        if (recurring.failed_at) database.prepare('UPDATE recurring_expenses SET failed_at = NULL WHERE id = ?').run(recurring.id);
+      })();
       result.generated += 1;
     } catch (err) {
       const reason = pauseReason(err);
       if (!reason) {
         result.failed += 1;
         log.error(`Recurring split expense ${recurring.id} failed, left unpaused:`, err);
+        rememberFailure(database, recurring);
         continue;
       }
       try {

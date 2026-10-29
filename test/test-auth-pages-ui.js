@@ -205,11 +205,12 @@ test('Befund 15: die Pruefungen der Auth-Seiten markieren ihr Feld', () => {
   };
   for (const [page, fields] of Object.entries(expected)) {
     const src = read(`../public/pages/${page}.js`);
-    assert.match(src, /import \{[^}]*\bflagField\b[^}]*\} from '\/utils\/auth-ui\.js'/, `${page}.js importiert flagField nicht`);
+    assert.match(src, /import \{[^}]*\b(?:flagField|showAuthError)\b[^}]*\} from '\/utils\/auth-ui\.js'/, `${page}.js importiert weder flagField noch showAuthError`);
     for (const f of fields) {
       // R23 D14: die Einrichtung meldet am Feld mit showAuthError (markiert per
-      // flagField und setzt den Fokus) - das zaehlt wie ein flagField.
-      assert.match(src, new RegExp(`(?:flagField\\((?:form\\.)?${f}\\b|showAuthError\\(errorEl, [^\\n]*form\\.${f}\\)|form\\.${f}\\b[^\\n]*\\]\\.filter\\(Boolean\\))`), `${page}.js: kein flagField fuer ${f}`);
+      // flagField und setzt den Fokus) - das zaehlt wie ein flagField. Seit
+      // R24 (G6-Zugang-P2-1) auch die Einladung.
+      assert.match(src, new RegExp(`(?:flagField\\((?:form\\.)?${f}\\b|showAuthError\\(errorEl, [^\\n]*(?:form\\.)?${f}\\)|form\\.${f}\\b[^\\n]*\\]\\.filter\\(Boolean\\))`), `${page}.js: kein flagField fuer ${f}`);
     }
   }
 });
@@ -319,6 +320,48 @@ test('/join ohne gueltige Einladung: der Titel nennt sie, EIN Satz, "Zur Anmeldu
   }
 });
 
+/* WER HILFT, WER EINLAEDT (Critique R24, G6-Zugang-P3-1). Ohne SMTP stand nach
+ * "Ungueltige Anmeldedaten." kein Weg da (der Link "Passwort vergessen?" fehlt
+ * dort zu Recht); die Einladung sagte "Du wurdest zu Yuvomi eingeladen" ohne
+ * Person und mit dem Produktnamen auch dort, wo der Haushalt einen eigenen hat. */
+test('R24: falsche Zugangsdaten ohne Zuruecksetzen nennen die Administration, die Einladung nennt die Person', () => {
+  const login = read('../public/pages/login.js');
+  assert.match(login, /const resetOffered = form\.querySelector\('\.auth-form__forgot'\)\?\.hidden === false;/,
+    'gefragt wird der Link im Formular, nicht der Gast-Knopf des SSO-Blocks');
+  assert.match(login, /err\.status === 401\) message = t\(resetOffered \? 'login\.invalidCredentials' : 'login\.invalidCredentialsAskAdmin'\)/);
+  const join = read('../public/pages/join.js');
+  assert.match(join, /if \(preview\.invited_by\) \{\s*intro\.textContent = t\('join\.introNamed', \{ name: preview\.invited_by, app: getStoredAppName\(\) \}\);/);
+  const de = JSON.parse(read('../public/locales/de.json'));
+  assert.match(de.login.invalidCredentialsAskAdmin, /^Ungültige Anmeldedaten\. .*Administration/);
+  assert.equal(de.join.introNamed, '{{name}} hat dich zu {{app}} eingeladen. Lege hier deine Zugangsdaten fest.');
+});
+
+/* EIN OFFLINE-ZUSTAND, EIN WORT (Critique R24, G6-Rand-P3-1). offline.html hatte
+ * eine eigene Karte (Radius 12, Haarlinie, graues wifi-off, "Keine Verbindung")
+ * neben dem Zustand der App ("Verbindung unterbrochen", page-unreachable). Jetzt
+ * steht sie auf der Buehne der Zugangsseiten: Lichtfeld, Glastafel 26 px, die
+ * Bildmarke als Absender und derselbe Titel. */
+test('R24: offline.html steht auf der Buehne der Zugangsseiten und heisst wie der Zustand der App', async () => {
+  const offline = read('../public/offline.html');
+  const de = JSON.parse(read('../public/locales/de.json'));
+  const title = de.common.sessionUnreachableTitle;
+  assert.equal(offline.match(/<h1>([^<]+)<\/h1>/)?.[1], title, 'derselbe Titel wie page-unreachable');
+  assert.match(offline, new RegExp(`<title>${title} - Yuvomi</title>`));
+  const style = offline.slice(offline.indexOf('<style>') + 7, offline.indexOf('</style>'));
+  const stage = [...eachRule(style)].find((r) => r.selector === '.stage' && !r.at.length);
+  assert.ok(stage, '.stage fehlt');
+  assert.match(stage.body, /border-radius:\s*var\(--radius-xl\)/);
+  assert.match(style, /--radius-xl:\s*26px;/, 'die Tafel traegt den Radius schwebender Flaechen');
+  assert.match(stage.body, /box-shadow:\s*var\(--glass-inset-elevated\), var\(--glass-shadow-lg\)/, 'Lichtkante und Glas-Schatten wie .auth-page');
+  assert.match(style, /radial-gradient\(circle 24rem at calc\(50% - 13rem\) calc\(50% - 12rem\)/, 'das Marken-Lichtfeld liegt auf dem Grund');
+  // Die Bildmarke: dieselben drei Kreise wie utils/brand-mark.js.
+  const { BRAND_MARK_CIRCLES } = await import('../public/utils/brand-mark.js');
+  for (const [cx, cy, r] of BRAND_MARK_CIRCLES) {
+    assert.ok(offline.includes(`<circle cx="${cx}" cy="${cy}" r="${r}"/>`), `Kreis ${cx}/${cy}/${r} der Bildmarke`);
+  }
+  assert.doesNotMatch(offline, /Keine Verbindung/, 'kein zweites Wort fuer denselben Zustand');
+});
+
 /* /pair: DER FEHLER STEHT AM FELD, UND ES GIBT EINEN WEG ZURUECK (Critique R22,
  * D19). Die Meldung stand als Banner unter dem Formular, das Feld zeigte keinen
  * Fehlerzustand, ein falscher Code kam als englischer Servertext an, und von der
@@ -409,4 +452,57 @@ test('R23: /pair prueft die zehn Zeichen vorab und traegt die Marke', () => {
   const serverLen = Number(/const CODE_LENGTH = (\d+);/.exec(server)?.[1]);
   const clientLen = Number(/const PAIR_CODE_LENGTH = (\d+);/.exec(src)?.[1]);
   assert.equal(clientLen, serverLen, 'dieselbe Laenge wie der Server');
+});
+
+// Critique R24 G6-Zugang-P2-1: drei Fehler-Dialekte auf den Zugangsseiten.
+// Die Einladung meldete im Kasten ueber dem Formular (Fokus auf dem Kasten,
+// Feld grau), die Einrichtung markierte das Feld nur fuer Vorlesehilfen, die
+// Anmeldung faerbte es rot. Jetzt: EIN Weg - showAuthError zieht die Meldung
+// unter das Feld, flagField faerbt es (form-group--error), Fokus ins Feld.
+test('R24: jede Zugangsseite meldet am Feld, rot, mit Fokus - EIN Fehlerbild', async () => {
+  const { flagField, hideAuthError } = await import('../public/utils/auth-ui.js');
+  const classes = new Set();
+  const group = { classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c) }, appendChild() {} };
+  const attrs = new Map();
+  const field = {
+    closest: (sel) => (sel === '.form-group' ? group : null), addEventListener() {},
+    setAttribute: (k, v) => attrs.set(k, String(v)), getAttribute: (k) => attrs.get(k) ?? null, removeAttribute: (k) => attrs.delete(k),
+  };
+  const errorEl = { id: 'join-error', hidden: false };
+  flagField(field, errorEl);
+  assert.ok(classes.has('form-group--error'), 'das Feld wird rot');
+  hideAuthError({ querySelectorAll: () => [field] }, errorEl);
+  assert.ok(!classes.has('form-group--error'), 'mit der Meldung geht die Farbe');
+  const join = read('../public/pages/join.js');
+  assert.doesNotMatch(join, /flagField\([^)]*\);\s*fail\(/, 'kein Kasten ueber dem Formular fuer einen Feldfehler');
+  for (const key of ['usernameRequired', 'usernameInvalid', 'displayNameTooLong', 'tooShort', 'mismatch', 'usernameTaken']) {
+    assert.match(join, new RegExp(`showAuthError\\(errorEl, t\\('join\\.${key}'\\), `), `join.${key} steht am Feld`);
+  }
+  // Keine Platzhalter mehr nur in der Einrichtung, kein Stern nur auf /pair.
+  const setup = read('../public/pages/setup.js');
+  assert.doesNotMatch(setup, /placeholder=/, 'Einrichtung ohne Platzhalter wie die anderen Zugangsseiten');
+  assert.doesNotMatch(read('../public/pages/pair-display.js'), /REQUIRED_MARK/, '/pair ohne Stern - ein Formular aus einem Feld');
+  // Das einzige Kannfeld einer Zugangsseite sagt es selbst.
+  const de = JSON.parse(read('../public/locales/de.json'));
+  assert.equal(de.join.displayNameLabel, 'Anzeigename (optional)');
+  assert.doesNotMatch(join, /id="join-display-name"[^>]*\brequired\b/);
+});
+
+// Critique R24 G6-Einst-P3-4: die Sicherung (und die Dokumentablage) bauten
+// ihr eigenes Auge AUSSERHALB des Felds (13px-Glyphe, `data-reveal-target`),
+// und der Zeitplan zeigte den Cron-Ausdruck jedem unter dem Klartext.
+test('R24: das Auge sitzt auch in den Einstellungen im Feld, der Cron-Ausdruck hinter "Mehr dazu"', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  for (const page of ['admin-backup', 'documents-storage']) {
+    const src = read(`../public/settings/pages/${page}.js`);
+    assert.doesNotMatch(src, /data-reveal-target|settings-webdav-reveal-btn|settings-webdav-pw-wrap/, `${page}.js baut kein eigenes Auge`);
+    assert.match(src, /wirePasswordToggle\(form\.querySelector\(["']#(?:webdav|document-storage)-password["']\)/, `${page}.js nimmt den einen Baustein`);
+  }
+  const layout = [...eachRule(read('../public/styles/layout.css'))].filter((r) => !r.at.length).map((r) => r.selector.trim());
+  assert.ok(layout.includes('.password-toggle'), 'die Regel des Auges ist global (layout.css), nicht nur auf den Zugangsseiten');
+  assert.ok(layout.includes('.input-password-wrapper :is(.input, .form-input)'), 'auch ein .form-input macht dem Auge Platz');
+  assert.ok(![...eachRule(read('../public/styles/auth.css'))].some((r) => r.selector.trim() === '.password-toggle'), 'keine zweite Fassung in auth.css');
+  const backup = read('../public/settings/pages/admin-backup.js');
+  const cell = backup.slice(backup.indexOf('function scheduleValue('), backup.indexOf('\n}\n', backup.indexOf('function scheduleValue(')));
+  assert.match(cell, /createElement\('details'\)[\s\S]*summary\.textContent = t\('settings\.hintMore'\)[\s\S]*more\.append\(summary, expression\)/, 'der Ausdruck liegt im Aufklapper');
 });
