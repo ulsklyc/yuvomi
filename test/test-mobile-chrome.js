@@ -479,16 +479,14 @@ test('R16: die Kennzahl-Kurzzeile ist ein geteilter Baustein, und Inventar und H
   assert.ok(panel.some((r) => phone(r) && r.selector === '.budget-glance-details > .metric-card--empty' && decl(r.body, 'display') === 'none'),
     'eine leere Kennzahl entfaellt mobil');
   assert.ok(panel.some((r) => r.selector === '.budget-glance__row'), 'die Zeile selbst steht in panel.css');
-  // Das Inventar fuehrt seit R24 (E2) die statische Kurzzeile in jeder Breite
-  // (test:inventory-list-detail); die Haushaltshilfe klappt weiter auf.
-  for (const [file, id, controls] of [
-    ['../public/pages/housekeeping.js', 'housekeeping-glance-more', 'housekeeping-metrics'],
-  ]) {
+  // Inventar und Haushaltshilfe fuehren seit R24 (E2; Besuche seit S14) die
+  // statische Kurzzeile in jeder Breite (test:inventory-list-detail,
+  // test:housekeeping-ui) - nichts klappt dort mehr auf.
+  for (const file of ['../public/pages/housekeeping.js', '../public/pages/inventory.js']) {
     const src = read(file);
-    assert.match(src, /import \{ metricGlanceHtml, wireMetricGlance \} from '\/utils\/metric-glance\.js';/, file);
-    assert.match(src, new RegExp(`id: '${id}',\\s*controls: '${controls}'`), `${file}: Zeile und Bereich gehoeren zusammen`);
-    assert.match(src, new RegExp(`class="metric-grid[^"]*budget-glance-details[^"]*" id="${controls}"`), `${file}: die Karten sind der aufklappbare Bereich`);
-    assert.match(src, new RegExp(`wireMetricGlance\\(\\w+, '${id}'`), `${file}: der Aufklapper ist verdrahtet`);
+    assert.match(src, /import \{ metricGlanceHtml \} from '\/utils\/metric-glance\.js';/, file);
+    assert.match(src, /everywhere: true/, `${file}: die Zeile steht in jeder Breite`);
+    assert.doesNotMatch(src, /wireMetricGlance|budget-glance-details/, `${file}: kein Aufklapper, keine Karten dahinter`);
   }
 });
 

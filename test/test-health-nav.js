@@ -1020,7 +1020,7 @@ test('R24 S14: im Kopf der Gesundheit haelt der Export seine Lage, der Knopf ste
   assert.match(slot, /min-inline-size:\s*var\(--health-fab-slot, auto\)/, 'der Platz steht');
   assert.match(slot, /justify-content:\s*flex-start/, 'das Werkzeug beginnt den Platz');
   assert.doesNotMatch(slot, /flex-end/, 'kein Rechtsbuendig, das den Export mit dem Knopf wandern laesst');
-  assert.match(wide('.health-toolbar > .page-toolbar__actions > .page-fab--docked'), /margin-inline-start:\s*auto/, 'der Knopf an der Kante');
+  assert.match(wide('.health-toolbar__tools'), /margin-inline-end:\s*auto/, 'das Werkzeug schiebt den Knopf an die Kante');
 });
 
 test('R24 E9: FAB in jeder Ansicht - Uebersicht mit Erfassen-Menue, Zyklus „+ Tag", fester Platz', () => {

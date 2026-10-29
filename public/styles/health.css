@@ -487,12 +487,15 @@
      * Eintritt einmal (0,0002 an #health-tools, x 1368 -> 1246: die Uebersicht
      * kennt erst nach ihrem Laden die Person, fuer die sie erfasst), dazu bei
      * jedem Wechsel in einen Bereich ohne Knopf. Jetzt haelt der Export seine
-     * Lage, und der Knopf schliesst an der Kante der Inhaltsspalte ab. */
+     * Lage, und der Knopf schliesst an der Kante der Inhaltsspalte ab (der
+     * Aussenrand des Werkzeugs schiebt ihn dorthin). */
     justify-content: flex-start;
   }
 
-  .health-toolbar > .page-toolbar__actions > .page-fab--docked {
-    margin-inline-start: auto;
+  /* Am Werkzeug, nicht am Knopf: der FAB zieht in die Shell um (#634), und
+   * ein Selektor ueber den Modulkopf griffe nur, solange er angedockt ist. */
+  .health-toolbar__tools {
+    margin-inline-end: auto;
   }
 }
 

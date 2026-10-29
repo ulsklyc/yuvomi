@@ -5085,7 +5085,7 @@ EIN Nomen („Training" / „Training erfassen"; die Naehrwerte-Pille bleibt „
 2026-10-25). Angedockt haelt der Aktions-Slot der Gesundheit die Breite seines laengsten
 Nomens (`--health-fab-slot`, gemessen in `fitHealthFabSlot`): die Personenwahl daneben steht
 in jedem Bereich auf x 1008 (vorher 1008-1167 je Nomen). Im Slot steht der Export AM ANFANG,
-der Knopf schliesst am Ende ab (`margin-inline-start: auto`, R24 S14): rechtsbuendig rueckte der
+der Knopf schliesst am Ende ab (`margin-inline-end: auto` am Werkzeug, R24 S14): rechtsbuendig rueckte der
 Export an den Rand, solange der Knopf fehlte, und sprang beim Eintritt und zweimal je
 Bereichswechsel um dessen Breite (x 1209-1368); jetzt steht er auf x 1209. Die Plan-Pille des Budgets nennt das
 Objekt („+ Kategoriebudget"), nicht das Modul. Guards: `test:health-nav` "R24 E9",
