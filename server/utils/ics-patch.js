@@ -29,12 +29,13 @@ const MANAGED_VEVENT = new Set([
 // gespiegelt worden wäre, hätte jeder Push die übrigen Tags des Servers
 // gelöscht.
 //
-// RRULE kam mit #2350 dazu: eine wiederkehrende Aufgabe ging ohne ihre Regel
-// hinaus. Ersetzt oder entfernt wird sie nur, wenn der Aufrufer das Feld
-// mitgibt - icsFieldsForTask laesst es bei einer fremden Serie weg.
+// RRULE, ihr Anker DTSTART und Yuvomis Marke X-YUVOMI-RRULE kamen mit #2350
+// dazu: eine wiederkehrende Aufgabe ging ohne ihre Regel hinaus. Ersetzt oder
+// entfernt wird jede nur, wenn der Aufrufer das Feld mitgibt - an einer fremden
+// Serie laesst icsFieldsForTask sie weg (caldav-todo-outbound.js).
 const MANAGED_VTODO = new Set([
   'SUMMARY', 'DESCRIPTION', 'DUE', 'PRIORITY', 'STATUS', 'COMPLETED', 'PERCENT-COMPLETE',
-  'CATEGORIES', 'RRULE',
+  'CATEGORIES', 'RRULE', 'DTSTART', 'X-YUVOMI-RRULE',
 ]);
 
 // Properties, deren Wert eine kommaseparierte Liste ist.

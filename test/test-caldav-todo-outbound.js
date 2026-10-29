@@ -1391,3 +1391,52 @@ test('Die Regel eines fremden Eintrags bleibt stehen, solange Yuvomi keine eigen
     indexOf('todo-1@test', serverTodo({ extra: ['RRULE:FREQ=DAILY;INTERVAL=3'] })));
   assert.match(client.calls.updated[0].data, /\r\nRRULE:FREQ=DAILY;INTERVAL=3\r\n/);
 });
+
+// RFC 5545 §3.8.2.4: DTSTART ist in jeder Komponente mit RRULE Pflicht - DUE
+// ersetzt den Anker nicht (Codex-Befund auf #2370). Gleicher Wert und Typ wie DUE.
+test('Eine wiederkehrende Aufgabe traegt DTSTART im Wert und Typ von DUE (#2350)', async () => {
+  const dated = icsFieldsForTask({ title: 'x', status: 'open', due_date: '2026-11-02', is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY' });
+  assert.deepStrictEqual(dated.DTSTART, dated.DUE);
+  assert.strictEqual(dated.DTSTART.params, ';VALUE=DATE');
+  const timed = icsFieldsForTask({ title: 'x', status: 'open', due_date: '2026-11-02', due_time: '07:00', is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY' }, false, 'Europe/Berlin');
+  assert.deepStrictEqual(timed.DTSTART, { value: '20261102T060000Z', params: '' });
+
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=WEEKLY', { due_date: '2026-11-02' });
+  const created = buildTodoICS('tasks', task, uid);
+  assert.match(created, /\r\nDTSTART;VALUE=DATE:20261102\r\n/);
+  // Spaeter verschobene Faelligkeit: DTSTART zieht mit, statt alt stehen zu bleiben.
+  db.prepare("UPDATE tasks SET due_date = '2026-11-09', outbound_dirty = 1 WHERE id = ?").run(task.id);
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf(uid, created));
+  const data = client.calls.updated[0].data;
+  assert.strictEqual(data.match(/^DTSTART[;:]/gm)?.length, 1);
+  assert.match(data, /\r\nDTSTART;VALUE=DATE:20261109\r\n/);
+});
+
+// Codex-Befund auf #2370: an einem fremden Eintrag schrieb das Einschalten eine
+// RRULE, das Ausschalten nahm sie nie wieder weg. Die Regel, die Yuvomi dort
+// schreibt, traegt deshalb eine Marke; nur eine RRULE, die noch genau ihr
+// entspricht, nimmt Yuvomi wieder weg.
+test('An einem fremden Eintrag nimmt Yuvomi nur die eigene Regel wieder weg (#2350)', async () => {
+  const accountId = reset();
+  const task = insertTask({ accountId, title: 'Blumen giessen', due_date: '2026-11-02' });
+  db.prepare("UPDATE tasks SET is_recurring = 1, recurrence_rule = 'FREQ=WEEKLY', outbound_dirty = 1 WHERE id = ?").run(task.id);
+  let client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf('todo-1@test'));
+  const written = client.calls.updated[0].data;
+  assert.match(written, /\r\nRRULE:FREQ=WEEKLY\r\n/);
+
+  // Ausschalten: die von Yuvomi geschriebene Regel verschwindet.
+  db.prepare('UPDATE tasks SET is_recurring = 0, recurrence_rule = NULL, outbound_dirty = 1 WHERE id = ?').run(task.id);
+  client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf('todo-1@test', written));
+  assert.ok(!/^RRULE:/m.test(client.calls.updated[0].data), 'Yuvomis Regel blieb auf dem Server stehen');
+
+  // Hat die andere App die Regel inzwischen selbst geaendert, gehoert sie ihr.
+  const changedThere = written.replace('RRULE:FREQ=WEEKLY', 'RRULE:FREQ=DAILY');
+  db.prepare('UPDATE tasks SET outbound_dirty = 1 WHERE id = ?').run(task.id);
+  client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf('todo-1@test', changedThere));
+  assert.match(client.calls.updated[0].data, /\r\nRRULE:FREQ=DAILY\r\n/);
+});

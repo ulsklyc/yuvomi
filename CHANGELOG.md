@@ -341,9 +341,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on the first upload and on every later edit, and an end date is written the way RFC 5545 wants it
   next to the due date - a plain date for a task without a time, the end of that day in UTC for one
   with a time. A ticked-off occurrence goes up without the rule, because the next occurrence is its
-  own task on the server, and a series someone set up in another app keeps its rule even though
-  Yuvomi does not read it in. "Repeat from completion" stays a Yuvomi setting: the standard has no
-  way to say it.
+  own task on the server, and the series starts on the due date (`DTSTART`, which the standard
+  requires next to a rule). A series someone set up in another app keeps its rule even though Yuvomi
+  does not read it in; a rule Yuvomi added to such a task is marked, so switching the repeat off
+  here takes it away again unless the other app has changed it since. "Repeat from completion"
+  stays a Yuvomi setting: the standard has no way to say it.
 - **Amount fields accept comma or point decimals across devices.** (#2170) Budget entries,
   transfers, confirmations, plans, subscriptions, shopping prices, inventory, housekeeping,
   rewards and shared expenses preserve cents even when the keyboard and household number

@@ -205,7 +205,7 @@ function completionFields(done, inProgress, hadCompleted) {
  * der eine rohe Zeile aus `SELECT *` durchreicht, die Tags des Servers
  * stillschweigend löschen - `reloadRow` hängt sie deshalb an.
  */
-export function icsFieldsForTask(task, hadCompleted = false, tz = householdTimeZone(null)) {
+export function icsFieldsForTask(task, hadCompleted = false, tz = householdTimeZone(null), serverIcs = null) {
   const fields = {
     SUMMARY:     task.title,
     DESCRIPTION: task.description || null,
@@ -214,17 +214,71 @@ export function icsFieldsForTask(task, hadCompleted = false, tz = householdTimeZ
     ...completionFields(task.status === 'done', task.status === 'in_progress', hadCompleted),
   };
   if (Array.isArray(task.tags)) fields.CATEGORIES = task.tags;
-  const rrule = vtodoRecurrence(task, tz);
-  if (rrule) fields.RRULE = rrule;
-  else if (ownsRecurrence(task)) fields.RRULE = null;
+  Object.assign(fields, recurrenceFields(task, fields.DUE, tz, serverIcs));
   return fields;
+}
+
+/** Marke an einem fremden Objekt: die RRULE, die Yuvomi dort geschrieben hat. */
+const YUVOMI_RRULE = 'X-YUVOMI-RRULE';
+
+/**
+ * RRULE, DTSTART und Marke einer Aufgabe - nur die Felder, die der Push
+ * anfassen darf (#2350). Ein fehlendes Feld laesst die Property auf dem Server
+ * stehen, null entfernt sie.
+ *
+ * DTSTART: RFC 5545 §3.8.2.4 verlangt es in jeder Komponente mit RRULE; DUE
+ * ersetzt den Anker nicht. Es traegt Wert und Typ von DUE, so beginnt die Serie
+ * an der Faelligkeit, und es zieht mit, wenn sie sich verschiebt. Der Inbound
+ * liest DTSTART eines VTODO nicht ein.
+ *
+ * Ein eigenes Objekt (von Yuvomi angelegt) fuehrt Yuvomi ganz: ohne Regel
+ * verschwinden RRULE und DTSTART. An einem fremden Objekt bleibt eine Regel
+ * stehen, die Yuvomi nicht kennt - der Inbound liest VTODO-Wiederholungen nicht
+ * ein, eine dort angelegte Serie ist hier also nicht wiederkehrend. Was Yuvomi
+ * dort selbst schreibt, traegt deshalb die Marke X-YUVOMI-RRULE mit derselben
+ * Regel; wird die Wiederholung hier abgeschaltet, nimmt der Push die RRULE nur
+ * weg, solange sie noch genau dieser Marke entspricht. Hat die andere App sie
+ * inzwischen geaendert oder die Marke verworfen, gehoert sie ihr und bleibt.
+ * DTSTART bleibt dabei stehen: an einem fremden Objekt kann es auch vorher ein
+ * Beginn gewesen sein.
+ */
+function recurrenceFields(task, due, tz, serverIcs) {
+  const rrule = vtodoRecurrence(task, tz);
+  const own = ownsRecurrence(task);
+  if (rrule) return { RRULE: rrule, DTSTART: due, [YUVOMI_RRULE]: own ? null : rrule };
+  if (own) return { RRULE: null, DTSTART: null, [YUVOMI_RRULE]: null };
+  // Fremd und erledigt oder ohne Faelligkeit: nichts anfassen. Nur die hier
+  // abgeschaltete Wiederholung nimmt Yuvomis eigene Regel zurueck.
+  if (task.is_recurring && task.recurrence_rule) return {};
+  const mark = propertyValue(serverIcs, YUVOMI_RRULE);
+  if (!mark) return {};
+  const current = propertyValue(serverIcs, 'RRULE');
+  if (current && sameRule(current, unescapeText(mark))) return { RRULE: null, [YUVOMI_RRULE]: null };
+  return { [YUVOMI_RRULE]: null };
+}
+
+/** Rohwert der ersten Property `name` im (entfalteten) Objekt - oder null. */
+function propertyValue(icsText, name) {
+  if (!icsText) return null;
+  const re = new RegExp(`^${name}(?:;[^:\\r\\n]*)?:(.*)$`, 'im');
+  const m = re.exec(String(icsText).replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, ''));
+  return m ? m[1].trim() : null;
+}
+
+function unescapeText(value) {
+  return String(value).replace(/\\([\\;,nN])/g, (_, c) => (c === 'n' || c === 'N' ? '\n' : c));
+}
+
+function sameRule(a, b) {
+  const norm = (r) => rruleValue(r).trim().toUpperCase().split(';').filter(Boolean).sort().join(';');
+  return norm(a) === norm(b);
 }
 
 /**
  * Die Wiederholung einer Aufgabe als RRULE-Wert (ohne Praefix) - oder null (#2350).
  *
- * Keine Regel ohne DUE: VTODO rechnet die Serie an DUE (Yuvomi sendet kein
- * DTSTART), und eine Aufgabe, die ab Erledigung zaehlt, kann ganz ohne
+ * Keine Regel ohne DUE: DTSTART, der Anker der Serie, steht auf DUE (siehe
+ * recurrenceFields), und eine Aufgabe, die ab Erledigung zaehlt, kann ganz ohne
  * Faelligkeit wiederkehren. Keine Regel an einer erledigten Aufgabe: das
  * Abhaken legt in Yuvomi eine Folgeinstanz als eigene Zeile und eigenes VTODO
  * an; behielte das erledigte Objekt seine Regel, zeigte ein Client die Serie
@@ -245,12 +299,7 @@ function vtodoRecurrence(task, tz) {
   return task.due_time ? timedSeriesUntil(dated, tz) : dated;
 }
 
-/**
- * Darf der Push eine RRULE auf dem Server entfernen? Nur an einem Objekt, das
- * Yuvomi selbst angelegt hat. Der Inbound liest die Regel eines VTODO nicht
- * ein: eine in einer anderen App angelegte Serie ist hier nicht wiederkehrend,
- * und ein Entfernen bei jeder Bearbeitung loeschte ihre Wiederholung.
- */
+/** Hat Yuvomi dieses Objekt selbst angelegt (oder liegt es noch gar nicht oben)? */
 function ownsRecurrence(task) {
   return task.external_source !== 'caldav' || isOwnUidOfRow(task.external_uid, 'task', task.id);
 }
@@ -2345,7 +2394,7 @@ export async function processPendingUpdates(client, accountId, module, objectInd
     if (!fresh) continue; // parallel gelöscht - der Tombstone-Pfad übernimmt
 
     const patched = patchICSTodo(
-      known.data, row.external_uid, def.icsFields(fresh, hasCompleted(known.data), householdTimeZone(db.get()))
+      known.data, row.external_uid, def.icsFields(fresh, hasCompleted(known.data), householdTimeZone(db.get()), known.data)
     );
     if (!patched) {
       log.warn(`VTODO ${row.external_uid} has no editable component in its calendar object, dropping its update.`);
