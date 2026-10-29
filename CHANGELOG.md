@@ -329,6 +329,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that is not a colour falls back to the default blue on update.
 
 ### Fixed
+- **A colour is picked where you tap it.** In every colour row (events, notes, categories, accounts,
+  your own colour) the tap area of one colour reached into its neighbour's, so a tap just beside a
+  colour could pick the next one. The tap areas now meet without overlapping, each as large as a
+  touch target, and on phones the colours are a little larger.
 - **Switching views no longer nudges the page.** Opening Subscriptions in Budget, switching tasks from
   the list to the board and arriving in Health on the desktop each moved content a few pixels after it
   appeared. The "% of budget used - Most expensive first" note now sits above the subscriptions it

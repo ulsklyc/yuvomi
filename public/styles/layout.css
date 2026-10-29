@@ -7565,14 +7565,25 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
  * Stand bis R24 als `.color-swatch` in calendar.css und in vier Abschriften
  * (waste, notes, budget, Schnellzugriffe) - eine geteilte Form, deren CSS in
  * einem Modul wohnt, ist nur dort eine Form.
- * Der Swatch ist 28px gross; die Trefferflaeche holt `::before` auf 48px
- * zurueck (28 + 2 x 10), ohne die Palette aufzublasen. Kein `overflow` am
- * Swatch: er schnitte das `::before` ab. */
+ * Die Trefferflaeche ist die Zielgroesse (`--target-base`: 44 am Zeiger,
+ * 48 am Finger); `::before` holt sie um den kleineren Swatch herum, ohne die
+ * Palette aufzublasen. Kein `overflow` am Swatch: er schnitte das `::before` ab.
+ *
+ * SWATCH + ABSTAND = TREFFERFLAECHE (R24 S15). Hier stand ein fester
+ * Ueberstand von 10px bei 12px/8px Abstand: je zwei Nachbarflaechen
+ * ueberlappten, und weil die spaetere oben liegt, traf ein Tipp knapp neben
+ * einem Swatch den naechsten. Wirklich treffbar blieben 40x36 (gemessen,
+ * elementFromPoint). Jetzt ist der Abstand fest (16px) und der Swatch die
+ * Zielgroesse minus Abstand: 28px am Zeiger (wie bisher), 32px am Finger.
+ * Die Flaechen stossen aneinander, Zentrumsabstand = Zielgroesse in beiden
+ * Achsen, keine Ueberlappung - fuer Reihe, Umbruch und "Eigene". */
 .color-picker {
-  --swatch-size: calc(var(--space-6) + var(--space-1));
+  --swatch-hit: var(--target-base);
+  --swatch-gap: var(--space-4);
+  --swatch-size: calc(var(--swatch-hit) - var(--swatch-gap));
   display: flex;
   align-items: flex-end;
-  gap: var(--space-3);
+  gap: var(--swatch-gap);
 }
 
 /* Bricht die Reihe um, bleibt "Eigene" am Ende der letzten Zeile stehen,
@@ -7582,7 +7593,7 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   flex-wrap: wrap;
   flex: 0 1 auto;
   min-inline-size: 0;
-  gap: var(--space-2) var(--space-3);
+  gap: var(--swatch-gap);
 }
 
 .color-picker__custom {
@@ -7595,7 +7606,7 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   block-size: var(--swatch-size, calc(var(--space-6) + var(--space-1)));
   padding: 0;
   border-radius: var(--radius-full);
-  border: 2px solid transparent;
+  border: var(--space-0h) solid transparent;
   background: var(--swatch, transparent);
   background-clip: padding-box;
   /* Eine ruhige Innenkante in beiden Themes: im Dark lief ein Swatch ohne
@@ -7605,10 +7616,13 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   transition: transform var(--transition-fast), border-color var(--transition-fast);
 }
 
+/* `inset` misst von der Innenkante des Rings aus (Polsterkasten des
+ * Absolut-Bezugs), nicht von der Aussenkante - daher der Ring abgezogen.
+ * Ohne ihn fehlten 4px: die alte 48er Flaeche war in Wahrheit 44. */
 .color-swatch::before {
   content: '';
   position: absolute;
-  inset: calc(-1 * var(--space-2h));
+  inset: calc((var(--swatch-size) - var(--swatch-hit)) / 2 - var(--space-0h));
   border-radius: var(--radius-full);
 }
 
@@ -7654,10 +7668,10 @@ dialog.dialog-surface.dialog-surface--closing::backdrop {
   /* Doppelte Klasse: Modulregeln wie `.housekeeping-field input` (0,1,1)
      haetten das Feld sonst wieder sichtbar und breit gemacht. */
   position: absolute;
-  inset: calc(-1 * var(--space-2h));
-  inline-size: calc(100% + 2 * var(--space-2h));
+  inset: calc((var(--swatch-size) - var(--swatch-hit)) / 2);
+  inline-size: var(--swatch-hit);
   min-inline-size: 0;
-  block-size: calc(100% + 2 * var(--space-2h));
+  block-size: var(--swatch-hit);
   min-block-size: 0;
   margin: 0;
   padding: 0;

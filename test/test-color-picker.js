@@ -218,17 +218,33 @@ test('setColorPickerValue: von aussen ohne Ereignis, Schreibweise egal', () => {
   assert.ok(sameColor('#aabbcc', '#AABBCC'));
 });
 
-test('Form in layout.css (global): 28er Swatch mit 48er Trefferflaeche, Innenkante, Ring in Textfarbe', () => {
+test('Form in layout.css (global): Swatch + Abstand = Zielgroesse, Innenkante, Ring in Textfarbe', () => {
   const rules = [...eachRule(LAYOUT)].filter((r) => !r.at.length);
   const base = rules.find((r) => r.selector.trim() === '.color-swatch');
   assert.ok(base, '.color-swatch fehlt in layout.css');
   assert.match(base.body, /box-shadow:\s*inset 0 0 0 1px var\(--color-border\)/, 'Innenkante, sonst laeuft der Swatch im Dark in den Kartengrund');
+  // R24 S15: DIE TREFFERFLAECHEN STOSSEN ANEINANDER, KEINE UEBERLAPPT. Bis
+  // dahin stand ein fester Ueberstand von 10px bei 12px/8px Abstand - je zwei
+  // Nachbarflaechen ueberlappten, und ein Tipp neben einem Swatch traf den
+  // naechsten (gemessen 40x36 statt 48). Gehalten wird die Rechnung, nicht
+  // eine Zahl: Swatch = Zielgroesse - Abstand, ein Abstand fuer beide Achsen,
+  // der Ueberstand die halbe Differenz abzueglich des Rings (`inset` zaehlt ab
+  // der Innenkante des Rings).
+  const picker = rules.find((r) => r.selector.trim() === '.color-picker');
+  assert.match(picker?.body ?? '', /--swatch-hit:\s*var\(--target-base\)/, 'die Trefferflaeche ist die Zielgroesse');
+  assert.match(picker?.body ?? '', /--swatch-size:\s*calc\(var\(--swatch-hit\) - var\(--swatch-gap\)\)/, 'Swatch = Zielgroesse - Abstand');
+  assert.match(picker?.body ?? '', /gap:\s*var\(--swatch-gap\)/, 'Abstand zu "Eigene" ist derselbe');
+  const row = rules.find((r) => r.selector.trim() === '.color-picker__swatches');
+  assert.match(row?.body ?? '', /gap:\s*var\(--swatch-gap\);/, 'EIN Abstand fuer Reihe und Umbruch - laengs enger hiesse wieder Ueberlappung');
+  assert.match(base.body, /border:\s*var\(--space-0h\) solid transparent/);
   const hit = rules.find((r) => r.selector.trim() === '.color-swatch::before');
-  assert.match(hit?.body ?? '', /inset:\s*calc\(-1 \* var\(--space-2h\)\)/);
+  assert.match(hit?.body ?? '', /inset:\s*calc\(\(var\(--swatch-size\) - var\(--swatch-hit\)\) \/ 2 - var\(--space-0h\)\)/);
   const active = rules.find((r) => r.selector.trim() === '.color-swatch.color-swatch--active');
   assert.match(active?.body ?? '', /border-color:\s*var\(--color-text-primary\)/);
   const native = rules.find((r) => r.selector.trim() === '.color-picker .color-picker__native');
   assert.match(native?.body ?? '', /opacity:\s*0/);
+  assert.match(native?.body ?? '', /inset:\s*calc\(\(var\(--swatch-size\) - var\(--swatch-hit\)\) \/ 2\)/, '"Eigene" hat keinen Ring, sonst dieselbe Flaeche');
+  assert.match(native?.body ?? '', /inline-size:\s*var\(--swatch-hit\)/);
   for (const sheet of ['calendar', 'waste']) {
     const css = readFileSync(new URL(`../public/styles/${sheet}.css`, import.meta.url), 'utf8');
     assert.ok(![...eachRule(css)].some((r) => /^\.(?:waste-)?color-swatch$|^\.color-picker$/.test(r.selector.trim())), `${sheet}.css fuehrt eine eigene Fassung`);
