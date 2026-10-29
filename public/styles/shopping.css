@@ -411,6 +411,14 @@
   grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
   gap: var(--space-2);
   align-items: stretch;
+  /* EINE HOEHE FUER FELDER UND KNOPF (R24 S14). Die Felder trugen eine
+   * Mindesthoehe UND ihr Polster obendrauf, der Knopf nur seine: am Finger
+   * 50px Name neben 48px Menge, Kategorie und "Hinzufuegen", am Zeiger 41,5
+   * neben 40. Jetzt nennt die Zeile ihre Hoehe einmal - die Zielgroesse der
+   * Geraetewelt (`--target-base`: 48 am Finger), am Zeiger die 40px der Shell
+   * (unten) -, die Felder tragen kein Polster in der Hoehe, und der Knopf
+   * nimmt dieselbe statt der seines Bausteins. */
+  --quick-add-height: var(--target-base);
 }
 
 .quick-add__input-wrap {
@@ -427,17 +435,18 @@
    * Polster der Schnellzeile. */
   font-size: var(--text-base);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  min-height: var(--target-base);
+  min-height: var(--quick-add-height);
+  padding-block: 0;
 }
 
 /* DER FOKUS IST DIE EINE STIMME (R18, 2026-10-07): die Felder der
  * Schnellzeile zogen ihren Fokus aus dem Kuechenton (Orange). Seit D5 kommt er
  * mit der Haut aus page-search.css - violett wie jede Suche. */
 
-/* Nur `min-height`, keine `height` (#1372). Die Zeile ist ein Grid mit
- * `align-items: stretch`: Namensfeld und Kategorie wachsen mit ihrem Polster
- * auf 50px, und eine feste Hoehe nahm die Menge als einziges Feld aus der
- * Dehnung - sie stand 6px niedriger daneben (44 gegen 50 bei 1280px).
+/* Nur `min-height`, keine `height` (#1372): eine feste Hoehe nahm die Menge
+ * als einziges Feld aus der Dehnung des Grids - sie stand 6px niedriger
+ * daneben (44 gegen 50 bei 1280px). Seit R24 S14 tragen alle drei Felder
+ * dieselbe Mindesthoehe ohne Polster in der Hoehe (`--quick-add-height`).
  *
  * Seitlich `--space-2` statt `--space-3`: der Inhalt steht mittig und ist kurz,
  * das gesparte Polster geht an den Platzhalter. Reicht die Breite trotzdem
@@ -451,7 +460,8 @@
   font-variant-numeric: tabular-nums;
   text-align: center;
   text-overflow: ellipsis;
-  min-height: var(--target-base);
+  min-height: var(--quick-add-height);
+  padding-block: 0;
 }
 
 
@@ -466,7 +476,8 @@
    * darunter (wie `select.input` in layout.css). */
   text-overflow: ellipsis;
   cursor: pointer;
-  min-height: var(--target-base);
+  min-height: var(--quick-add-height);
+  padding-block: 0;
   /* Das Zeichen der Auswahl wie am Feldkanon (select.form-input, layout.css). */
   -webkit-appearance: none;
   appearance: none;
@@ -507,11 +518,8 @@
  * Kopf, dessen Felder und Knoepfe 40px messen. Die Fingergroesse bleibt dem
  * Touch-Fall, wo das Feld per FAB aufgeht. */
 @media (hover: hover) {
-  .quick-add__input,
-  .quick-add__qty,
-  .quick-add__cat {
-    min-height: var(--target-md);
-    padding-block: var(--space-2);
+  .quick-add__form {
+    --quick-add-height: var(--target-md);
   }
 }
 
@@ -519,9 +527,10 @@
  * Bis R24 eine nackte Return-Glyphe im 44px-Kreis (Re-Critique 2026-09-28: das
  * „+" gehoert der Kopf-Pille). Jetzt `btn--secondary btn--sm` mit „Hinzufuegen":
  * kein zweites Plus, keine zweite gefuellte Stimme, und das Ziel nennt seine
- * Handlung. Groesse und Haut kommen vom Knopf-Baustein. */
-.quick-add__btn {
+ * Handlung. Die Haut kommt vom Knopf-Baustein, die Hoehe von der Zeile. */
+.quick-add .quick-add__btn {
   align-self: center;
+  min-height: var(--quick-add-height);
   white-space: nowrap;
 }
 

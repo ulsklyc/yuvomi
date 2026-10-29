@@ -2365,11 +2365,29 @@ test('Einkauf: EIN Plus - der Absender des Schnellfelds ist ein ruhiger Knopf mi
   assert.doesNotMatch(btn[0], /data-lucide="(?:plus|corner-down-left)"/, 'kein Plus und keine nackte Glyphe');
   const { eachRule } = await import('./css-rules.js');
   const rules = [...eachRule(readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8'))];
-  const rule = rules.find((r) => r.selector.trim() === '.quick-add__btn' && !r.at.length);
-  assert.doesNotMatch(rule?.body ?? '', /background|border-radius|width|height/, 'Haut und Groesse kommen vom Knopf-Baustein');
+  const rule = rules.find((r) => r.selector.trim() === '.quick-add .quick-add__btn' && !r.at.length);
+  assert.ok(rule, 'die Regel des Absenders fehlt');
+  assert.doesNotMatch(rule.body, /background|border-radius|width/, 'die Haut kommt vom Knopf-Baustein');
   // Am Zeiger stehen die Felder in der Hoehe der Shell (40px), nicht 50.
-  const zeiger = rules.find((r) => /\.quick-add__input/.test(r.selector) && r.at.some((at) => /hover:\s*hover/.test(at)));
-  assert.match(zeiger?.body ?? '', /min-height:\s*var\(--target-md\)/);
+  const zeiger = rules.find((r) => r.selector.trim() === '.quick-add__form' && r.at.some((at) => /hover:\s*hover/.test(at)));
+  assert.match(zeiger?.body ?? '', /--quick-add-height:\s*var\(--target-md\)/);
+});
+
+// R24 S14: am Finger stand das Namensfeld 50px hoch neben 48px Menge, Kategorie
+// und "Hinzufuegen", am Zeiger 41,5 neben 40 - die Felder trugen ihr Polster
+// auf die Mindesthoehe obendrauf. Die Zeile nennt ihre Hoehe EINMAL.
+test('Einkauf: Schnellfeld - Felder und Absender stehen in EINER Hoehe', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/shopping.css', import.meta.url), 'utf8'))];
+  const base = (sel) => rules.filter((r) => r.selector.trim() === sel && !r.at.length).map((r) => r.body).join('\n');
+  assert.match(base('.quick-add__form'), /--quick-add-height:\s*var\(--target-base\)/, 'am Finger die Zielgroesse der Geraetewelt');
+  for (const sel of ['.quick-add__input', '.quick-add__qty', '.quick-add__cat']) {
+    assert.match(base(sel), /min-height:\s*var\(--quick-add-height\)/, `${sel}: die Hoehe der Zeile`);
+    assert.match(base(sel), /padding-block:\s*0/, `${sel}: kein Polster obendrauf`);
+  }
+  assert.match(base('.quick-add .quick-add__btn'), /min-height:\s*var\(--quick-add-height\)/, 'der Knopf nimmt dieselbe Hoehe');
+  const fremd = rules.filter((r) => /quick-add__(?:input|qty|cat|btn)\b/.test(r.selector) && /(?:min-)?height:\s*var\(--target-/.test(r.body));
+  assert.deepEqual(fremd.map((r) => `${r.at.join(' ')} ${r.selector.trim()}`), [], 'keine zweite Hoehe neben der Zeile');
 });
 
 // Re-Critique 2026-09-28 (P11 / A4 P2-8): eine neu gezeichnete Einkaufsliste

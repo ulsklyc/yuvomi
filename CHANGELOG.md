@@ -97,7 +97,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shopping item details are shorter.** Price, store, link and note sit under "More details" (open
   when one of them is filled in), the category has the full width on phones, and opening an item no
   longer brings up the keyboard. The quick-add row is as tall as the rest of the header and sends with
-  an "Add" button instead of a bare return arrow. "Add from meal plan" can always be pressed and says
+  an "Add" button instead of a bare return arrow; its fields and the button share one height (on a
+  phone the name field was 2 px taller than the button). "Add from meal plan" can always be pressed and says
   at its preview line when the range has nothing to add. "To pantry" starts with "Choose a place …"
   instead of pretending every item goes to the first place.
 - **Waste collection is calmer.** Today's pickup carries a "Put out today" label instead of the same grey
