@@ -161,3 +161,46 @@ export function accessEnv(choice, rerun = null) {
     ? { SESSION_SECURE: 'false', TRUST_PROXY: 'loopback' }
     : { SESSION_SECURE: 'true', TRUST_PROXY: '1' };
 }
+
+/**
+ * Das save-Request ohne die Werte, die unverändert dem Bestand entsprechen.
+ *
+ * Der Server bewahrt eine Zeile nur VERBATIM, wenn der Client den Schlüssel
+ * nicht schickt (preserveUnmanagedLines). Schickte der Wizard den vorbelegten
+ * Wert zurück, rendert der Server ihn neu - und jede Abweichung zwischen dem
+ * Parser und Compose (Inline-Kommentar, einfache Quotes, Escapes) wird so zu
+ * einem anderen Wert: aus `DATA_DIR=./data # storage` wurde
+ * `DATA_DIR="./data # storage"`, ein anderes Verzeichnis. Unverändert heisst
+ * deshalb: ungesendet, die Originalzeile bleibt Zeichen für Zeichen.
+ */
+export function omitUnchanged(env, rerun = null) {
+  if (!rerun) return env;
+  const out = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (rerun[key] !== undefined && value === rerun[key]) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+/** Die Felder des E-Mail-Schritts samt Schalter (Vollständigkeitsprüfung). */
+export const EMAIL_SECTION_FIELDS = [
+  'email-enable', 'email-host', 'email-port', 'email-secure', 'email-user',
+  'email-pass', 'email-from', 'email-from-name',
+];
+
+/**
+ * Stimmt der Zustand dieser Felder mit dem nach der Vorbelegung überein?
+ * `baseline`/`current`: Feld-ID -> Wert (String) bzw. Haken (Boolean).
+ *
+ * Eine Teilkonfiguration aus der .env (nur EMAIL_SMTP_HOST, der Absender steht
+ * in der App, sync_config) ist gültig: server/services/email.js löst jedes Feld
+ * einzeln aus Umgebung oder Datenbank auf. Die Vorbelegung schaltet den
+ * Abschnitt dann ein, und die Vollständigkeitsprüfung hielt einen
+ * unveränderten Rerun an email.errIncomplete fest. Geprüft wird deshalb nur,
+ * was der Nutzer im Abschnitt angefasst hat.
+ */
+export function unchangedSince(baseline, current, ids) {
+  if (!baseline) return false;
+  return ids.every(id => baseline[id] === current[id]);
+}

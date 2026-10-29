@@ -2660,7 +2660,9 @@
 // JS only: toggles active class, reads/writes input values, sets textContent.
 // No dynamic DOM generation. DOM API only (textContent, classList, style).
 import { initInstallerI18n, setLocale, getLocale, t, applyTranslations, applyRich } from '/i18n-mini.js';
-import { prefillPlan, accessEnv } from '/rerun-prefill.js';
+import {
+  prefillPlan, accessEnv, omitUnchanged, unchangedSince, EMAIL_SECTION_FIELDS,
+} from '/rerun-prefill.js';
 import {
   isValidCron, isAbsoluteContainerPath, isPlaceholderSecret, pairGap, enabledWithoutUrl,
 } from '/field-checks.js';
@@ -3025,7 +3027,26 @@ function applyRerunPrefill(plan) {
   for (const id of plan.touched) $(id).dataset.touched = '1';
   keptFieldIds = plan.kept;
   applyKeptPlaceholders();
+  emailBaseline = fieldState(EMAIL_SECTION_FIELDS);
 }
+
+/** Feld-ID -> Wert bzw. Haken, für den Vergleich mit der Vorbelegung. */
+function fieldState(ids) {
+  return Object.fromEntries(ids.map(id => {
+    const el = $(id);
+    return [id, el.type === 'checkbox' ? el.checked : el.value];
+  }));
+}
+
+/**
+ * Der E-Mail-Abschnitt direkt nach der Vorbelegung (null ohne Rerun). Bleibt
+ * er so, wird er nicht auf Vollständigkeit geprüft - siehe unchangedSince().
+ */
+let emailBaseline = null;
+const EMAIL_KEYS = [
+  'EMAIL_SMTP_HOST', 'EMAIL_SMTP_PORT', 'EMAIL_SMTP_SECURE', 'EMAIL_SMTP_USER',
+  'EMAIL_SMTP_PASS', 'EMAIL_FROM_ADDRESS', 'EMAIL_FROM_NAME',
+];
 
 /** Feld-IDs übernommener Secrets; localize() setzt ihren Platzhalter neu. */
 let keptFieldIds = [];
@@ -4144,7 +4165,14 @@ $('email-enable').addEventListener('change', function() {
 
 $('email-next').addEventListener('click', () => {
   clearInvalid();
-  if ($('email-enable').checked) {
+  // Ein unverändert übernommener Abschnitt wird nicht geprüft und nicht
+  // gesendet: eine Teilkonfiguration (nur EMAIL_SMTP_HOST in der .env, der
+  // Absender in der App) läuft schon so, und erst recht soll kein Default
+  // (Port, TLS) eine Einstellung aus der App überschreiben. S trägt den
+  // Bestand für die Prüfseite; omitUnchanged nimmt ihn aus dem Request.
+  if (unchangedSince(emailBaseline, fieldState(EMAIL_SECTION_FIELDS), EMAIL_SECTION_FIELDS)) {
+    for (const key of EMAIL_KEYS) S[key] = rerunValues?.[key] || '';
+  } else if ($('email-enable').checked) {
     const host = $('email-host').value.trim();
     const from = $('email-from').value.trim();
     // Host und Absenderadresse sind das Minimum für einen funktionierenden Versand.
@@ -4165,8 +4193,7 @@ $('email-next').addEventListener('click', () => {
     S.EMAIL_FROM_ADDRESS = from;
     S.EMAIL_FROM_NAME   = $('email-from-name').value.trim();
   } else {
-    S.EMAIL_SMTP_HOST = ''; S.EMAIL_SMTP_PORT = ''; S.EMAIL_SMTP_SECURE = '';
-    S.EMAIL_SMTP_USER = ''; S.EMAIL_SMTP_PASS = ''; S.EMAIL_FROM_ADDRESS = ''; S.EMAIL_FROM_NAME = '';
+    for (const key of EMAIL_KEYS) S[key] = '';
   }
   showErr('email-err', '');
   next();
@@ -4535,7 +4562,9 @@ $('rev-next').addEventListener('click', async () => {
   if (Date.now() - reviewArmedAt < CONFIRM_COOLDOWN_MS) return;
   btn.disabled = true; btn.textContent = t('review.saving'); btn.classList.remove('is-armed');
   $('rev-armed-note').textContent = '';
-  const env = buildEnv();
+  // Unverändert vorbelegte Werte gehen nicht zurück: der Server bewahrt ihre
+  // Originalzeile dann Zeichen für Zeichen (siehe omitUnchanged).
+  const env = omitUnchanged(buildEnv(), rerunValues);
   try {
     const r = await fetch('/api/save-env', {
       method: 'POST',
@@ -4595,7 +4624,7 @@ $('simple-next').addEventListener('click', async () => {
     const r = await fetch('/api/save-env', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ env: buildEnv() }),
+      body: JSON.stringify({ env: omitUnchanged(buildEnv(), rerunValues) }),
     });
     const d = await r.json().catch(() => null);
     if (!r.ok) throw new Error(d?.error || '');

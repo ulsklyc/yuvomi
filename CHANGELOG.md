@@ -14,7 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them to defaults when you only wanted to add something. A hand-tuned `TRUST_PROXY=2` stays as long
   as you keep the pre-selected access choice, and the review page shows the kept values instead of
   "Not set up". Passwords, client secrets and keys never reach the browser: their fields stay empty
-  with the note "Current value is kept", and the existing values are written back.
+  with the note "Current value is kept", and the existing values are written back. Lines you leave
+  unchanged stay exactly as written, inline comments and quotes included, and a secret read from a
+  file (`GOOGLE_CLIENT_SECRET_FILE`, `SESSION_SECRET_FILE` and the other `_FILE` variables) counts as
+  kept instead of being written a second time, which stopped Yuvomi from starting.
 - **The simple setup makes Yuvomi reachable on your home network.** It used to write
   `http://localhost:3000` as the address, so invitation and password-reset links and the app on
   your phones pointed at a device that could not be reached. It now uses this computer's address on

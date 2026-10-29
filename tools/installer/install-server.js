@@ -16,6 +16,8 @@ import { resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENV_SCHEMA } from './env-schema.js';
 import { RERUN_PREFILL_KEYS, RERUN_SECRET_KEYS } from './env-schema.js';
+// Nur Node-Built-ins; dieselbe Liste wie beim App-Start (applyFileSecrets).
+import { FILE_SECRET_VARS } from '../../server/utils/file-secrets.js';
 import { SUPPORTED_LOCALES as INSTALLER_LOCALES } from './i18n-mini.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -126,13 +128,49 @@ export function renderEnvFile(env) {
   return lines.join('\n') + '\n';
 }
 
-/** Gegenstück zu encodeEnvValue(): eine .env-Zeile zurück in ihren Rohwert. */
+/** Escapes in doppelten Anfuehrungszeichen, wie Compose sie aufloest. */
+const DOUBLE_QUOTE_ESCAPES = { n: '\n', r: '\r', t: '\t', '\\': '\\', '"': '"' };
+
+/**
+ * Gegenstück zu encodeEnvValue(): der Wert rechts vom `=` so, wie Docker
+ * Compose ihn liest (docs.docker.com/compose/how-tos/environment-variables/
+ * variable-interpolation, ".env file syntax"):
+ *   - unquoted: ein Inline-Kommentar beginnt erst an einem `#` NACH Leerraum
+ *     (`./data # x` -> `./data`, `a#b` bleibt), danach wird getrimmt; `$$` ist
+ *     ein wörtliches `$`
+ *   - 'einfach': wörtlich, kein `$$`, nur `\'` ist ein Escape; alles nach dem
+ *     schliessenden Quote ist Kommentar
+ *   - "doppelt": `\n \r \t \\ \"` als Escapes, `$$` als `$`; alles nach dem
+ *     schliessenden Quote ist Kommentar
+ * Vorher kannte der Parser nur doppelte Quotes: `DATA_DIR=./data # storage`
+ * kam MIT Kommentar zurück, der Rerun belegte das Feld damit vor und schrieb
+ * `DATA_DIR="./data # storage"` - ein anderes Verzeichnis, die Daten schienen
+ * weg. Variablen (`$VAR`) löst er bewusst nicht auf.
+ */
 export function decodeEnvValue(raw) {
-  let value = raw.trim();
-  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
-    value = value.slice(1, -1).replace(/\\(["\\])/g, '$1');
+  const value = raw.trim();
+  const quote = value[0];
+  if (quote === "'" || quote === '"') {
+    let out = '';
+    for (let i = 1; i < value.length; i++) {
+      const ch = value[i];
+      if (ch === quote) return quote === '"' ? out.replace(/\$\$/g, '$') : out;
+      if (ch === '\\' && i + 1 < value.length) {
+        const next = value[i + 1];
+        if (quote === "'" ? next === "'" : next in DOUBLE_QUOTE_ESCAPES) {
+          out += quote === "'" ? "'" : DOUBLE_QUOTE_ESCAPES[next];
+          i++;
+          continue;
+        }
+      }
+      out += ch;
+    }
+    // Kein schliessendes Quote (mehrzeiliger Wert): die Zeile bleibt, wie sie
+    // ist - geraten wird nicht.
+    return value;
   }
-  return value.replace(/\$\$/g, '$');
+  const comment = value.search(/\s#/);
+  return (comment === -1 ? value : value.slice(0, comment)).trim().replace(/\$\$/g, '$');
 }
 
 /**
@@ -166,9 +204,9 @@ export function readEnvFile(envPath) {
  * Das ist der Unterschied zu readEnvFile(): dort wird dekodiert, hier nicht.
  * Eine Zeile, die niemand ändern will, soll die Datei genauso wieder verlassen,
  * wie sie hineingekommen ist. Parsen und neu rendern hiesse, Compose-Syntax zu
- * interpretieren, die decodeEnvValue gar nicht kennt (einfache
- * Anführungszeichen, angehängte Kommentare) - der Rerun änderte damit still
- * Passwörter und Pfade.
+ * interpretieren und neu maskieren - jede Abweichung zwischen decodeEnvValue
+ * und Compose änderte still Passwörter und Pfade (bis Oktober 2026 kannte der
+ * Parser weder einfache Anführungszeichen noch angehängte Kommentare).
  *
  * Kommentare und Leerzeilen fallen weg: sie beziehen sich auf den alten Aufbau
  * der Datei und stünden im neuen an der falschen Stelle.
@@ -223,8 +261,26 @@ export function rerunSnapshot(existingEnv) {
   for (const key of RERUN_PREFILL_KEYS) {
     if (existingEnv[key]) rerunValues[key] = existingEnv[key];
   }
-  const keptSecrets = RERUN_SECRET_KEYS.filter(key => Boolean(existingEnv[key]));
+  const keptSecrets = RERUN_SECRET_KEYS.filter(key => secretInEnv(existingEnv, key));
   return { rerunValues, keptSecrets };
+}
+
+/** Steht `<NAME>_FILE` (server/utils/file-secrets.js) für dieses Secret in der .env? */
+export function secretFromFile(existingEnv, key) {
+  return FILE_SECRET_VARS.includes(key) && Boolean(existingEnv[`${key}_FILE`]);
+}
+
+/**
+ * Ist dieses Secret in der .env eingerichtet - als Wert ODER als `<NAME>_FILE`?
+ * Ein `GOOGLE_CLIENT_SECRET_FILE` zählte vorher nicht: der Wizard sah eine
+ * Client-ID ohne Secret, die Paarprüfung blockierte den Rerun, und wer das
+ * Secret dann eintippte, hatte beide Quellen gesetzt - applyFileSecrets()
+ * bricht den App-Start in dem Fall ab. Bei SESSION_SECRET_FILE und
+ * DB_ENCRYPTION_KEY_FILE erzeugte der Wizard sogar selbst einen zweiten Wert.
+ * Gemeldet wird nur der Name, nie der Pfad.
+ */
+export function secretInEnv(existingEnv, key) {
+  return Boolean(existingEnv[key]) || secretFromFile(existingEnv, key);
 }
 
 /**
@@ -767,7 +823,7 @@ async function route(req, res, server) {
       const envExists = existsSync(resolve(projectRoot(), '.env'));
       // Nur die NAMEN der vorhandenen Schlüssel - die Werte bleiben auf dem
       // Server. Das Frontend erzeugt für diese keinen neuen Wert mehr.
-      const preservedKeys = PRESERVED_KEYS.filter(key => Boolean(existingEnv[key]));
+      const preservedKeys = PRESERVED_KEYS.filter(key => secretInEnv(existingEnv, key));
       // Die nicht geheimen Werte (Allowlist) für die Vorbelegung, von den
       // Secrets nur die Namen - siehe rerunSnapshot().
       const { rerunValues, keptSecrets } = rerunSnapshot(existingEnv);
@@ -846,13 +902,23 @@ async function route(req, res, server) {
       // starten - dann hat niemand einen Wert bewusst entfernt, er hat ihn nie
       // gesehen. Zum Löschen dient die .env selbst.
       // ... und zwar VERBATIM, nicht ueber readEnvFile geparst und neu
-      // gerendert. decodeEnvValue kennt nur doppelte Anfuehrungszeichen: ein
-      // `EMAIL_SMTP_PASS='a b'` oder ein `DATA_DIR=./data # storage` sind
-      // gueltige Compose-Syntax, kaemen aber als Wert MIT Quotes bzw. MIT
-      // Kommentar zurueck und wuerden beim Rendern erneut maskiert. Der Rerun
-      // haette so still das Passwort geaendert oder ein anderes Verzeichnis
-      // gemountet. Der Parser war nie fuer diesen Zweck gedacht - sein eigener
-      // Kommentar sagt "nur fuer Werte, die erhalten bleiben muessen".
+      // gerendert. Ein `EMAIL_SMTP_PASS='a b'` oder ein
+      // `DATA_DIR=./data # storage` ist gueltige Compose-Syntax; jede
+      // Abweichung zwischen decodeEnvValue und Compose kaeme beim Rendern als
+      // anderer Wert zurueck - der Rerun haette still das Passwort geaendert
+      // oder ein anderes Verzeichnis gemountet. Der Wizard laesst deshalb auch
+      // unveraendert vorbelegte Werte aus dem Request (omitUnchanged in
+      // rerun-prefill.js), damit ihre Originalzeile hier ueberlebt.
+      //
+      // Ein Secret, das die .env per `<NAME>_FILE` bezieht, schreibt der
+      // Installer nicht zusaetzlich als Klartext: beide Quellen zugleich lehnt
+      // applyFileSecrets() beim App-Start ab. Die Datei-Variante bleibt.
+      const existingEnv = readEnvFile(envPath);
+      for (const key of FILE_SECRET_VARS) {
+        if (result.env[key] && secretFromFile(existingEnv, key) && !result.env[`${key}_FILE`]) {
+          delete result.env[key];
+        }
+      }
       const preserved = preserveUnmanagedLines(envPath, result.env);
 
       let backup = null;

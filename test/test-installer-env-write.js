@@ -916,11 +916,12 @@ test('der Einfach-Pfad liest seine Sperre erst nach dem Preflight - beim Start u
 });
 
 test('ein Rerun schreibt gueltige Compose-Syntax unveraendert zurueck', async () => {
-  // readEnvFile/decodeEnvValue kennen nur doppelte Anfuehrungszeichen. Werden
-  // ALLE Zeilen darueber geparst und neu gerendert, wird aus `PASS='a b'` der
-  // Wert mit Quotes und aus `DIR=./data # x` der Wert mit Kommentar - der Rerun
-  // aendert still das Passwort oder mountet ein anderes Verzeichnis. Zeilen,
-  // die niemand anfasst, gehoeren deshalb Zeichen fuer Zeichen zurueck.
+  // Werden ALLE Zeilen ueber readEnvFile geparst und neu gerendert, wird jede
+  // Abweichung zwischen Parser und Compose zu einem anderen Wert (bis Oktober
+  // 2026: aus `PASS='a b'` der Wert mit Quotes, aus `DIR=./data # x` der Wert
+  // mit Kommentar) - der Rerun aendert still das Passwort oder mountet ein
+  // anderes Verzeichnis. Zeilen, die niemand anfasst, gehoeren deshalb Zeichen
+  // fuer Zeichen zurueck.
   const dir = mkdtempSync(join(tmpdir(), 'oikos-verbatim-'));
   try {
     const tricky = [
