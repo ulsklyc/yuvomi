@@ -566,14 +566,14 @@ async function selectSubject(container, mode, id) {
         state.draft = { modules: { ...ov.data.modules }, widgets: { ...ov.data.widgets }, capabilities: { ...ov.data.capabilities } };
         state.inherited = { modules: { ...roleRes.data.modules }, widgets: { ...roleRes.data.widgets }, capabilities: { ...roleRes.data.capabilities } };
       }
-      state.loadedFor = subjectKey();
+      markLoaded();
     } catch (err) {
       if (generation !== loadGeneration) return;
       console.error('[Permissions] subject load failed:', err);
       state.loadFailed = true;
     }
   } else {
-    state.loadedFor = subjectKey();
+    markLoaded();
   }
 
   renderSubjectSelector(container);
@@ -585,33 +585,74 @@ function lockMatrix(container) {
   panel?.querySelectorAll('.perm-select, #perm-reset').forEach((el) => { el.disabled = true; });
 }
 
+/** Was ein PUT fuer diesen Entwurf schickt: nur eigene Eintraege, kein `inherit`. */
+function payloadOf(draft) {
+  const payload = { modules: {}, widgets: {}, capabilities: {} };
+  for (const [k, v] of Object.entries(draft.modules)) if (v && v !== 'inherit') payload.modules[k] = v;
+  for (const [k, v] of Object.entries(draft.widgets)) if (v && v !== 'inherit') payload.widgets[k] = v;
+  for (const [k, v] of Object.entries(draft.capabilities)) if (v && v !== 'inherit') payload.capabilities[k] = v;
+  return payload;
+}
+
+/* WAS DER SERVER HAELT, JE ENTWURF (Codex an #2364, P1). Der PUT ersetzt die
+ * Rechte des Subjekts als Ganzes, also steht auf dem Server genau der Stand des
+ * letzten gelungenen PUT (oder der geladene). Ein gescheiterter Schritt legt
+ * seine Zeile auf DIESEN Wert zurueck, nicht auf den Wert vor dem Klick: der
+ * stammte womoeglich von einer Wahl, deren PUT selbst scheiterte. */
+const savedOf = new WeakMap();
+function markLoaded() {
+  state.loadedFor = subjectKey();
+  savedOf.set(state.draft, payloadOf(state.draft));
+}
+
+/* WER EINE ZEILE ZULETZT GESETZT HAT. Jede Wahl und jedes Rueckgaengig zieht
+ * eine laufende Nummer; zuruecklegen oder rueckgaengig machen darf nur, wer
+ * die Zeile noch besitzt. Sonst legte ein gescheiterter erster PUT die schon
+ * getroffene zweite Wahl derselben Zeile zurueck (Vorgabe -> read -> none:
+ * Server none, Entwurf ohne Einschraenkung - die naechste Wahl hob die Sperre auf). */
+let writeSeq = 0;
+const rowWriter = new WeakMap(); // Bucket des Entwurfs -> Map(Schluessel -> Nummer)
+function claimRow(bucket, key) {
+  let owners = rowWriter.get(bucket);
+  if (!owners) rowWriter.set(bucket, owners = new Map());
+  writeSeq += 1;
+  owners.set(key, writeSeq);
+  return writeSeq;
+}
+const ownsRow = (bucket, key, seq) => rowWriter.get(bucket)?.get(key) === seq;
+
 /**
  * SPEICHERT SOFORT, NACHEINANDER (R24, E11). Jede Wahl schreibt die Rechte des
  * Subjekts als Ganzes (PUT, wie bisher der Knopf); Wahlen kurz hintereinander
  * laufen in einer Reihe, damit die spaetere nie von einer frueheren Antwort
  * ueberholt wird. Der Entwurf bleibt der lokale Stand - eine Antwort schreibt
  * ihn nicht zurueck (eine inzwischen getroffene Wahl ginge sonst verloren).
+ *
+ * Der Stand wird erst gelesen, wenn der PUT an der Reihe ist, und `onFail`
+ * laeuft IN der Reihe, bevor der naechste ihn liest: ein wartender PUT schickt
+ * so nie eine Wahl mit, die ein frueherer Schritt schon zurueckgelegt hat.
+ * @param {() => void} [onFail]
  * @returns {Promise<boolean>} gespeichert
  */
 let saveQueue = Promise.resolve(true);
-function persist() {
+function persist(onFail) {
   if (!draftIsCurrent()) return Promise.resolve(false);
   const key = subjectKey();
-  const payload = { modules: {}, widgets: {}, capabilities: {} };
-  for (const [k, v] of Object.entries(state.draft.modules)) if (v && v !== 'inherit') payload.modules[k] = v;
-  for (const [k, v] of Object.entries(state.draft.widgets)) if (v && v !== 'inherit') payload.widgets[k] = v;
-  for (const [k, v] of Object.entries(state.draft.capabilities)) if (v && v !== 'inherit') payload.capabilities[k] = v;
+  const draft = state.draft;
   const url = state.mode === 'role'
     ? `/permissions/role/${encodeURIComponent(state.subjectId)}`
     : `/permissions/user/${encodeURIComponent(state.subjectId)}`;
   const run = async () => {
+    const payload = payloadOf(draft);
     try {
       await api.put(url, payload);
+      savedOf.set(draft, payload);
       // Neue Rechte koennen neue Mitleser eines Moduls schaffen: `othersCanRead`
       // neu holen, damit die Schutzfelder in derselben Sitzung stimmen.
       await auth.me().catch(() => {});
       return true;
     } catch (err) {
+      onFail?.();
       window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
       return false;
     }
@@ -648,29 +689,42 @@ async function applyChange(container, select) {
   const group = select.dataset.group;
   const { type, key } = parsePermissionGroup(select.dataset.group);
   if (!key || !draftIsCurrent() || !BUCKET[type]) return;
-  const bucket = state.draft[BUCKET[type]];
+  const draft = state.draft;
+  const bucket = draft[BUCKET[type]];
   const before = Object.hasOwn(bucket, key) ? bucket[key] : undefined;
+  const value = select.value;
   const subject = subjectKey();
   const title = subjectTitle();
-  const set = (value) => {
-    if (value === undefined) delete bucket[key]; else bucket[key] = value;
+  const set = (next) => {
+    if (next === undefined) delete bucket[key]; else bucket[key] = next;
+    // Inzwischen ein anderes Subjekt oder ein neuer Entwurf: dessen Zeilen
+    // zeichnen sich selbst, hier gibt es nichts zu zeigen.
+    if (subjectKey() !== subject || state.draft !== draft) return;
     syncSelect(container, group);
     // Modul-Aenderung: nur die aufgeklappte Zeile DIESES Moduls neu (Sperr-Zustaende).
     if (type === 'module') rebuildModuleWidgets(container, key);
     renderSummary(container);
   };
-  set(select.value);
-  if (!(await persist())) {
-    if (subjectKey() === subject) set(before);
-    return;
-  }
+  // Setzen und speichern; scheitert der PUT, legt er die Zeile auf den Stand
+  // des Servers zurueck - aber nur, solange keine neuere Wahl sie besitzt.
+  const write = (next) => {
+    const seq = claimRow(bucket, key);
+    set(next);
+    const ok = persist(() => {
+      if (ownsRow(bucket, key, seq)) set(savedOf.get(draft)?.[BUCKET[type]]?.[key]);
+    });
+    return ok.then((saved) => ({ saved, seq }));
+  };
+  const first = await write(value);
+  if (!first.saved) return;
   window.yuvomi?.showToast(t('settings.permSaved', { name: title }), 'success', 5000, {
     label: t('common.undo'),
     onClick: async () => {
-      // Inzwischen ein anderes Subjekt: dessen Entwurf ist nicht der, der sich geaendert hat.
-      if (subjectKey() !== subject) return;
-      set(before);
-      if (!(await persist()) && subjectKey() === subject) set(select.value);
+      // Inzwischen ein anderes Subjekt: dessen Entwurf ist nicht der, der sich
+      // geaendert hat. Eine neuere Wahl derselben Zeile: sie gilt, ein spaetes
+      // Rueckgaengig dieser aelteren nahm sie sonst still zurueck.
+      if (subjectKey() !== subject || state.draft !== draft || !ownsRow(bucket, key, first.seq)) return;
+      await write(before);
     },
   });
 }
@@ -746,6 +800,9 @@ async function resetSubject(container) {
   const before = state.draft;
   const title = subjectTitle();
   const cleared = { modules: {}, widgets: {}, capabilities: {} };
+  // Bis der PUT gelingt, haelt der Server noch die alten Rechte: eine Wahl im
+  // geleerten Entwurf, deren PUT scheitert, legt sich darauf zurueck.
+  savedOf.set(cleared, savedOf.get(before));
   state.draft = cleared;
   renderMatrix(container);
   refocusAfterRender();

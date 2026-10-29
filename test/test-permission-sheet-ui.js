@@ -398,7 +398,7 @@ test('R24 E11: je Modul eine Optionszeile, Widgets und Zusatzrechte aufgeklappt,
   assert.match(group, /data-perm-expand="\$\{esc\(mod\.key\)\}"\s*aria-expanded=/, 'die Zeile klappt auf');
   assert.match(group, /<div class="perm-modgroup__more" id="\$\{esc\(moreId\)\}"\$\{open \? '' : ' hidden'\}>\$\{moduleMoreHtml\(mod\.key\)\}<\/div>/, 'eingeklappt nur die Zeile');
   const apply = page.slice(page.indexOf('async function applyChange('), page.indexOf('// ── Interaktion'));
-  assert.match(apply, /if \(!\(await persist\(\)\)\) \{\s*if \(subjectKey\(\) === subject\) set\(before\);/, 'ein Fehler legt zurueck');
+  assert.match(apply, /persist\(\(\) => \{\s*if \(ownsRow\(bucket, key, seq\)\) set\(savedOf\.get\(draft\)/, 'ein Fehler legt zurueck, solange die Wahl die Zeile besitzt');
   assert.match(apply, /label: t\('common\.undo'\)/, 'Rueckgaengig im Toast');
   const rules = [...eachRule(css)];
   assert.ok(!rules.some((r) => /\.perm-actions/.test(r.selector) && /position:\s*sticky/.test(r.body)), 'kein klebender Fuss mehr');
@@ -506,4 +506,122 @@ test('ein Zuruecksetzen, das erst nach dem Subjektwechsel fertig wird, laesst de
     if (had.window) globalThis.window = prev.window; else delete globalThis.window;
     if (had.document) globalThis.document = prev.document; else delete globalThis.document;
   }
+});
+
+// ── Codex an #2364 (P1): ein gescheiterter PUT legt keine neuere Wahl zurueck ──
+//
+// Die Wahlen laufen in einer Speicherreihe. Scheiterte der ERSTE PUT, waehrend
+// eine zweite Wahl derselben Zeile schon wartete, setzte `set(before)` den
+// aelteren Wert zurueck - der Entwurf stand ohne Einschraenkung da, der Server
+// auf `none`, und die naechste Wahl hob die Sperre wieder auf. Ebenso schickte
+// ein wartender PUT einer anderen Zeile noch den Stand mit der gescheiterten
+// Wahl, und ein spaetes Rueckgaengig einer aelteren Wahl ueberschrieb eine neuere.
+function queuedPutStub(catalog) {
+  const puts = [];
+  const held = [];
+  globalThis.__apiStub = {
+    get: async (url) => (url === '/permissions/catalog'
+      ? { data: catalog }
+      : { data: { modules: {}, widgets: {}, capabilities: {} } }),
+    put: (url, payload) => {
+      const entry = { url, payload: JSON.parse(JSON.stringify(payload)) };
+      puts.push(entry);
+      return new Promise((resolve, reject) => {
+        held.push({ ok: () => resolve({ data: payload }), fail: () => reject(new Error('offline')) });
+      });
+    },
+  };
+  return { puts, held };
+}
+
+async function withPermissionWindow(fn) {
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  const toasts = [];
+  globalThis.window = { yuvomi: { showToast: (...args) => toasts.push(args) } };
+  try {
+    await fn(toasts);
+  } finally {
+    delete globalThis.__apiStub;
+    if (hadWindow) globalThis.window = prevWindow; else delete globalThis.window;
+  }
+}
+
+const settle = async () => { for (let i = 0; i < 8; i += 1) await new Promise((r) => setTimeout(r, 0)); };
+const TWO_MODULES = { ...CATALOG, modules: [...CATALOG.modules, { key: 'notes', icon: 'sticky-note', labelKey: 'nav.notes' }] };
+
+test('scheitert der erste PUT, waehrend die zweite Wahl derselben Zeile wartet, bleibt die neuere Wahl im Entwurf', async () => {
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  await withPermissionWindow(async () => {
+    const { puts, held } = queuedPutStub(TWO_MODULES);
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    ui.change('module:tasks', 'read');
+    await settle();
+    ui.change('module:tasks', 'none');
+    await settle();
+    held[0].fail();
+    await settle();
+    held[1].ok();
+    await settle();
+    await settle();
+    assert.deepEqual(puts.at(-1).payload.modules, { tasks: 'none' }, 'der Server haelt die Sperre');
+    ui.change('module:notes', 'read');
+    await settle();
+    held.at(-1).ok();
+    await settle();
+    assert.deepEqual(puts.at(-1).payload.modules, { tasks: 'none', notes: 'read' },
+      'die naechste Wahl schickt die Sperre mit, statt sie aufzuheben');
+  });
+});
+
+test('scheitert ein PUT, schickt der wartende PUT einer anderen Zeile die gescheiterte Wahl nicht mehr mit', async () => {
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  await withPermissionWindow(async () => {
+    const { puts, held } = queuedPutStub(TWO_MODULES);
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    ui.change('module:tasks', 'read');
+    await settle();
+    ui.change('module:notes', 'none');
+    await settle();
+    held[0].fail();
+    await settle();
+    held[1].ok();
+    await settle();
+    await settle();
+    assert.equal(puts.length, 2);
+    assert.deepEqual(puts[1].payload.modules, { notes: 'none' },
+      'der zweite PUT traegt nur, was im Entwurf steht - die gescheiterte Wahl ist zurueckgelegt');
+  });
+});
+
+test('Rueckgaengig einer aelteren Wahl ueberschreibt keine neuere derselben Zeile', async () => {
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  await withPermissionWindow(async (toasts) => {
+    const { puts, held } = queuedPutStub(TWO_MODULES);
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    ui.change('module:tasks', 'read');
+    await settle();
+    held[0].ok();
+    await settle();
+    const undoFirst = toasts.at(-1)[3];
+    ui.change('module:tasks', 'none');
+    await settle();
+    held[1].ok();
+    await settle();
+    const count = puts.length;
+    undoFirst.onClick();
+    await settle();
+    held.slice(count).forEach((h) => h.ok());
+    await settle();
+    await settle();
+    ui.change('module:notes', 'read');
+    await settle();
+    held.at(-1).ok();
+    await settle();
+    assert.deepEqual(puts.at(-1).payload.modules, { tasks: 'none', notes: 'read' },
+      'die Sperre der neueren Wahl steht noch');
+  });
 });
