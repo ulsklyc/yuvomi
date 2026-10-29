@@ -454,3 +454,56 @@ test('R24 S13: Rollen- und Mitglieder-Chips stehen in EINER scrollenden Zeile', 
   const js = readFileSync(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
   assert.match(js, /wireScrollFade\(container\.querySelector\('#perm-subjects'\)\)/, 'die Kanten sagen, dass es weitergeht');
 });
+
+// ── Codex an #2364 (P1): ein spaet fertiges Zuruecksetzen schreibt nicht ins neue Subjekt ──
+//
+// `persist()` meldet false, sobald inzwischen ein anderes Subjekt gewaehlt ist -
+// auch wenn der PUT gelang. Das Zuruecksetzen stellte dann `before` wieder her,
+// sobald nur IRGENDEIN Entwurf geladen war: die Rechte der alten Rolle standen
+// unter der neuen, und die naechste Wahl speicherte sie dort.
+test('ein Zuruecksetzen, das erst nach dem Subjektwechsel fertig wird, laesst den Entwurf des neuen Subjekts stehen', async () => {
+  const { render } = await import('../public/settings/pages/admin-permissions.js');
+  const had = { window: 'window' in globalThis, document: 'document' in globalThis };
+  const prev = { window: globalThis.window, document: globalThis.document, confirm: globalThis.__confirmModal };
+  globalThis.window = {};
+  globalThis.document = fakeDocument();
+  globalThis.__confirmModal = async () => true;
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  let releasePut = null;
+  const puts = [];
+  globalThis.__apiStub = {
+    get: async (url) => {
+      if (url === '/permissions/catalog') return { data: CATALOG };
+      if (url === '/permissions/role/parent') return { data: { modules: { tasks: 'read', notes: 'none' }, widgets: {}, capabilities: {} } };
+      return { data: { modules: {}, widgets: {}, capabilities: {} } };
+    },
+    put: (url, payload) => {
+      puts.push({ url, payload });
+      if (url === '/permissions/role/parent') return new Promise((resolve) => { releasePut = () => resolve({ data: payload }); });
+      return Promise.resolve({ data: payload });
+    },
+  };
+  try {
+    const ui = wiredSheet();
+    await render(ui.sheet, { user: { role: 'admin' } });
+    const reset = ui.clickReset();
+    await tick();
+    assert.ok(releasePut, 'das Zuruecksetzen der Eltern-Rolle speichert');
+    ui.clickRole('child');
+    await tick();
+    await tick();
+    releasePut();
+    await reset;
+    await tick();
+    await ui.change('module:tasks', 'write');
+    await tick();
+    await tick();
+    assert.deepEqual(puts.at(-1), { url: '/permissions/role/child', payload: { modules: { tasks: 'write' }, widgets: {}, capabilities: {} } },
+      'die Kind-Rolle speichert ihre eigene Wahl, nicht die alten Rechte der Eltern-Rolle');
+  } finally {
+    delete globalThis.__apiStub;
+    if (prev.confirm === undefined) delete globalThis.__confirmModal; else globalThis.__confirmModal = prev.confirm;
+    if (had.window) globalThis.window = prev.window; else delete globalThis.window;
+    if (had.document) globalThis.document = prev.document; else delete globalThis.document;
+  }
+});

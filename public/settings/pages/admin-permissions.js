@@ -744,12 +744,18 @@ async function resetSubject(container) {
   });
   if (!ok || !draftIsCurrent()) return;
   const before = state.draft;
-  state.draft = { modules: {}, widgets: {}, capabilities: {} };
+  const title = subjectTitle();
+  const cleared = { modules: {}, widgets: {}, capabilities: {} };
+  state.draft = cleared;
   renderMatrix(container);
   refocusAfterRender();
   if (await persist()) {
-    window.yuvomi?.showToast(t('settings.permSaved', { name: subjectTitle() }), 'success');
-  } else if (draftIsCurrent()) {
+    window.yuvomi?.showToast(t('settings.permSaved', { name: title }), 'success');
+  } else if (state.draft === cleared) {
+    // Nur zurueck, solange der geleerte Entwurf noch DERSELBE ist: inzwischen
+    // ein anderes Subjekt gewaehlt (persist() meldet dann false, auch wenn der
+    // PUT gelang), stuenden dessen Zeilen sonst mit den alten Rechten da, und
+    // die naechste Wahl speicherte sie dort (Codex an #2364).
     state.draft = before;
     renderMatrix(container);
     refocusAfterRender();
