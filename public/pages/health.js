@@ -151,7 +151,10 @@ let fastingEnabled = false;
 
 async function loadHealthPrefs() {
   try {
-    const res = await api.get('/preferences');
+    // Ist die Gesundheit die erste Seite, hat der Start `/preferences` schon
+    // angefragt (utils/start-handoff.js): diese Antwort statt eines zweiten
+    // Abrufs (Critique R24 G5-Gesundheit-P3-8, doppelt je Einstieg).
+    const res = await (window.yuvomi?.takeStartPreferences?.() ?? api.get('/preferences'));
     cycleEnabled = res?.data?.health_cycle_effective !== false;
     fastingEnabled = canUseFasting();
   } catch {
