@@ -348,6 +348,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that is not a colour falls back to the default blue on update.
 
 ### Fixed
+- **Recipes mirrored from Mealie bring their steps along** (#2363). The mirror took over title,
+  ingredients and image, but not the preparation steps. The notes of a mirrored recipe now show
+  Mealie's description followed by the steps as a numbered list, with a step's title in front of its
+  text. Empty steps are left out. A recipe that was already mirrored picks up its steps the next time
+  it changes in Mealie.
 - **Weights in grams and kilograms sit on the same line** (#2328). A weight sent over the API in
   grams (95400 g) was drawn next to the kilogram readings as a spike at 95400, and the change card
   showed +95,304.7. Readings of one kind are now converted to a single unit before the chart, the

@@ -93,6 +93,27 @@ function flattenIngredient(ing) {
   return { name, quantity, category };
 }
 
+/**
+ * Beschreibung und Zubereitungsschritte zu einem `notes`-Text (#2363).
+ * Yuvomi-Rezepte haben kein Schrittfeld; `notes` ist Klartext und wird im
+ * Frontend per textContent mit white-space: pre-wrap gezeigt - Markdown (etwa
+ * fette Titel) bliebe dort als Sternchen stehen. Deshalb: Beschreibung, eine
+ * Leerzeile, dann je Schritt "N. Titel: Text". Leere Schritte fallen raus und
+ * zählen nicht mit; nichts von beidem ergibt null wie bisher.
+ */
+function composeNotes(description, instructions) {
+  const steps = (Array.isArray(instructions) ? instructions : [])
+    .map((step) => {
+      const title = String(step?.title ?? '').trim();
+      const text = String(step?.text ?? '').trim();
+      return title && text ? `${title}: ${text}` : title || text;
+    })
+    .filter(Boolean)
+    .map((line, i) => `${i + 1}. ${line}`);
+  const parts = [String(description ?? '').trim(), steps.join('\n')].filter(Boolean);
+  return parts.length ? parts.join('\n\n') : null;
+}
+
 export class MealieAdapter {
   constructor(account) {
     this.provider = 'mealie';
@@ -162,7 +183,7 @@ export class MealieAdapter {
       updatedAt: detail.updatedAt,
       slug: detail.slug,
       title: detail.name,
-      notes: detail.description || null,
+      notes: composeNotes(detail.description, detail.recipeInstructions),
       hasImage: Boolean(detail.image),
       ingredients: (detail.recipeIngredient || []).map(flattenIngredient),
     };

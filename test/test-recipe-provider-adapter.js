@@ -153,6 +153,46 @@ test('getRecipe: kein Bild → hasImage=false, keine Notes → notes=null', asyn
   assert.equal(recipe.notes, null);
 });
 
+// #2363: Yuvomi-Rezepte haben kein Schrittfeld, nur `notes` (Klartext, im
+// Frontend per textContent + white-space: pre-wrap, kein Markdown). Mealies
+// recipeInstructions landen deshalb als nummerierte Liste unter der
+// Beschreibung; ein Schritttitel steht mit Doppelpunkt vor dem Text.
+function mealieDetail(extra) {
+  return { id: 'id-s', name: 'Mit Schritten', slug: 'mit-schritten', updatedAt: 't1', image: null, recipeIngredient: [], ...extra };
+}
+
+test('getRecipe: Beschreibung + recipeInstructions → notes mit nummerierten Schritten (#2363)', async () => {
+  mockHandler((req, res) => sendJson(res, mealieDetail({
+    description: 'Omas Rezept',
+    recipeInstructions: [
+      { id: 'a', title: 'Teig', text: 'Mehl und Eier verrühren.', ingredientReferences: [] },
+      { id: 'b', title: '', text: '   ', ingredientReferences: [] },
+      { id: 'c', title: null, text: '  Ruhen lassen.\nDann ausrollen.  ', ingredientReferences: [] },
+      { id: 'd', title: 'Backen', text: '', ingredientReferences: [] },
+    ],
+  })));
+  const recipe = await new MealieAdapter(account).getRecipe('mit-schritten');
+  assert.equal(recipe.notes, 'Omas Rezept\n\n1. Teig: Mehl und Eier verrühren.\n2. Ruhen lassen.\nDann ausrollen.\n3. Backen');
+});
+
+test('getRecipe: nur recipeInstructions ohne Beschreibung → notes nur mit Schritten (#2363)', async () => {
+  mockHandler((req, res) => sendJson(res, mealieDetail({
+    description: '',
+    recipeInstructions: [{ text: 'Alles mischen.' }, { text: 'Servieren.' }],
+  })));
+  const recipe = await new MealieAdapter(account).getRecipe('mit-schritten');
+  assert.equal(recipe.notes, '1. Alles mischen.\n2. Servieren.');
+});
+
+test('getRecipe: nur Beschreibung, leere oder fehlende Schritte → notes = Beschreibung bzw. null (#2363)', async () => {
+  mockHandler((req, res) => sendJson(res, mealieDetail({ description: 'Nur Text', recipeInstructions: [{ title: ' ', text: '' }] })));
+  assert.equal((await new MealieAdapter(account).getRecipe('mit-schritten')).notes, 'Nur Text');
+  mockHandler((req, res) => sendJson(res, mealieDetail({ description: null, recipeInstructions: [{ title: '', text: ' ' }] })));
+  assert.equal((await new MealieAdapter(account).getRecipe('mit-schritten')).notes, null);
+  mockHandler((req, res) => sendJson(res, mealieDetail({ description: null, recipeInstructions: null })));
+  assert.equal((await new MealieAdapter(account).getRecipe('mit-schritten')).notes, null);
+});
+
 test('getRecipe: HTTP-Fehler wirft mit Statuscode', async () => {
   mockHandler((req, res) => sendJson(res, {}, 404));
   const adapter = new MealieAdapter(account);
