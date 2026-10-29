@@ -593,6 +593,17 @@
   animation: detail-pane-enter var(--duration-sm) var(--ease-out);
 }
 
+/* DER BEHAELTER TRAEGT KEINEN RING (R24 S13). Das Popover nimmt beim Oeffnen
+ * selbst den Fokus (detail-view.js, tabIndex -1), damit Tab in seine Knoepfe
+ * fuehrt. Nach einem Mausklick auf eine Mahlzeitkarte gab Chrome ihm den
+ * violetten Ring (die Karte haengt an SortableJS, der Klick fokussierte
+ * nichts), am Termin nicht - dieselbe Karte in zwei Zustaenden. Wie beim
+ * Dialogtitel (`.modal-panel__title[tabindex="-1"]:focus`, layout.css): ein
+ * Ring um eine Karte verspraeche eine Bedienung, die es nicht gibt. */
+.detail-popover:focus {
+  outline: none;
+}
+
 /* DER AUSGANG (Critique R18): die Karte blendete ein und war beim Schliessen
  * in einem Frame weg. Jetzt die Grammatik des Popover-Menues: sie blendet aus
  * und nimmt 4 % zurueck, zum Anker hin (`transform-origin` setzt

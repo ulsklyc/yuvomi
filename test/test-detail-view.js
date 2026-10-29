@@ -1336,3 +1336,22 @@ test('Kontakt-Website und Rezept-URL laufen durch externalHref', async () => {
   assert.match(meals, /externalHref\(meal\.recipe_url\)/, 'meals.js: Rezept-Knopf der Mahlzeitkarte');
   assert.doesNotMatch(meals, /href="\$\{esc\(meal\.recipe_url\)\}"/, 'meals.js: roher Wert als href');
 });
+
+/* R24 S13 (Uebergabe S9): das Popover ist ein Behaelter, kein Steuerelement.
+ * Es nimmt beim Oeffnen den Fokus (tabIndex -1, popover.focus()), und Chrome
+ * gab ihm nach einem Mausklick auf eine Mahlzeitkarte den violetten
+ * Fokusring (`:focus-visible` true - der Klick fokussierte nichts, die Karte
+ * haengt an SortableJS), am Termin nicht. Derselbe Fall wie der Dialogtitel
+ * (`.modal-panel__title[tabindex="-1"]:focus`): ein Ring um eine Karte
+ * verspraeche eine Bedienung, die es nicht gibt. Tab fuehrt in die Knoepfe,
+ * die ihren Ring tragen. */
+test('R24 S13: das Detail-Popover traegt als Fokusziel keinen Ring - Mahlzeit wie Termin', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readFileSync(new URL('../public/styles/detail-view.css', import.meta.url), 'utf8'))];
+  const quiet = rules.find((r) => !r.at.length && r.selector.trim() === '.detail-popover:focus');
+  assert.ok(quiet, 'Regel fehlt - nach einem Mausklick stand ein violetter Ring um die ganze Karte');
+  assert.match(quiet.body, /outline:\s*none/);
+  const js = readFileSync(new URL('../public/components/detail-view.js', import.meta.url), 'utf8');
+  assert.match(js, /popover\.tabIndex = -1;/, 'die Regel gilt nur dem Behaelter als Fokusziel');
+});
