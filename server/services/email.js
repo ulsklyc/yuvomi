@@ -137,6 +137,10 @@ export function createEmailService({ db, nodemailer = nodemailerDefault, env = p
       socketTimeout: TRANSPORT_TIMEOUT_MS,
     };
     if (c.secure === 'starttls') opts.requireTLS = true;
+    // "keine" heisst wirklich keine (#2326): ohne ignoreTLS versucht nodemailer
+    // STARTTLS, sobald der Server es anbietet, und scheitert dann z.B. an einem
+    // selbstsignierten Zertifikat eines internen Relays auf Port 25.
+    if (c.secure === 'none') opts.ignoreTLS = true;
     if (c.user) opts.auth = { user: c.user, pass: c.pass || '' };
     return nodemailer.createTransport(opts);
   }

@@ -3653,7 +3653,7 @@
         "screensaverConnectImmich": "Połącz Immich",
         "weatherPlaceLabel": "Miejsce",
         "weatherPlaceHint": "Wyszukiwanie odbywa się w serwisie pogodowym Open-Meteo. Wysyłana jest tylko nazwa miejsca.",
-        "weatherPlacePlaceholder": "Miasto lub kod pocztowy",
+        "weatherPlacePlaceholder": "Miasto lub miejscowość",
         "weatherPlaceSearch": "Szukaj",
         "weatherPlaceCurrent": "Obecnie: {{place}}",
         "weatherPlaceNone": "Nie wybrano jeszcze miejsca.",

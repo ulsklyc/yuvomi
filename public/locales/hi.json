@@ -3413,7 +3413,7 @@
         "screensaverConnectImmich": "Immich जोड़ें",
         "weatherPlaceLabel": "स्थान",
         "weatherPlaceHint": "खोज मौसम सेवा Open-Meteo पर होती है। केवल स्थान का नाम भेजा जाता है।",
-        "weatherPlacePlaceholder": "शहर या पिन कोड",
+        "weatherPlacePlaceholder": "शहर या कस्बा",
         "weatherPlaceSearch": "खोजें",
         "weatherPlaceCurrent": "वर्तमान: {{place}}",
         "weatherPlaceNone": "अभी कोई स्थान नहीं चुना गया।",

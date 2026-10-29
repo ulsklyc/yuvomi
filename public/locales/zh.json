@@ -3413,7 +3413,7 @@
         "screensaverConnectImmich": "连接 Immich",
         "weatherPlaceLabel": "地点",
         "weatherPlaceHint": "搜索由天气服务 Open-Meteo 完成，只会发送地名。",
-        "weatherPlacePlaceholder": "城市或邮政编码",
+        "weatherPlacePlaceholder": "城市或乡镇",
         "weatherPlaceSearch": "搜索",
         "weatherPlaceCurrent": "当前：{{place}}",
         "weatherPlaceNone": "尚未选择地点。",

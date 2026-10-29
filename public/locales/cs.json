@@ -3527,7 +3527,7 @@
         "screensaverConnectImmich": "Připojit Immich",
         "weatherPlaceLabel": "Místo",
         "weatherPlaceHint": "Hledá se u meteorologické služby Open-Meteo. Odesílá se jen název místa.",
-        "weatherPlacePlaceholder": "Město nebo PSČ",
+        "weatherPlacePlaceholder": "Město nebo obec",
         "weatherPlaceSearch": "Hledat",
         "weatherPlaceCurrent": "Aktuálně: {{place}}",
         "weatherPlaceNone": "Zatím není vybráno žádné místo.",

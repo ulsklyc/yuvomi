@@ -3413,7 +3413,7 @@
         "screensaverConnectImmich": "Collega Immich",
         "weatherPlaceLabel": "Luogo",
         "weatherPlaceHint": "La ricerca avviene presso il servizio meteo Open-Meteo. Viene inviato solo il nome del luogo.",
-        "weatherPlacePlaceholder": "Città o CAP",
+        "weatherPlacePlaceholder": "Città o comune",
         "weatherPlaceSearch": "Cerca",
         "weatherPlaceCurrent": "Attuale: {{place}}",
         "weatherPlaceNone": "Nessun luogo scelto per ora.",
