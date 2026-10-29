@@ -2662,6 +2662,7 @@
 import { initInstallerI18n, setLocale, getLocale, t, applyTranslations, applyRich } from '/i18n-mini.js';
 import {
   prefillPlan, accessEnv, omitUnchanged, unchangedSince, EMAIL_SECTION_FIELDS,
+  BASELINE_FIELDS, REDIRECT_SOURCES,
 } from '/rerun-prefill.js';
 import {
   isValidCron, isAbsoluteContainerPath, isPlaceholderSecret, pairGap, enabledWithoutUrl,
@@ -3027,8 +3028,7 @@ function applyRerunPrefill(plan) {
   for (const id of plan.touched) $(id).dataset.touched = '1';
   keptFieldIds = plan.kept;
   applyKeptPlaceholders();
-  emailBaseline = fieldState(EMAIL_SECTION_FIELDS);
-  calBaseline = fieldState(CAL_PAIR_FIELDS);
+  fieldBaseline = fieldState(BASELINE_FIELDS);
 }
 
 /** Feld-ID -> Wert bzw. Haken, für den Vergleich mit der Vorbelegung. */
@@ -3040,20 +3040,46 @@ function fieldState(ids) {
 }
 
 /**
- * Der E-Mail-Abschnitt direkt nach der Vorbelegung (null ohne Rerun). Bleibt
- * er so, wird er nicht auf Vollständigkeit geprüft - siehe unchangedSince().
+ * Die vorbelegten Felder direkt nach der Vorbelegung (null ohne Rerun), siehe
+ * BASELINE_FIELDS in rerun-prefill.js.
  */
-let emailBaseline = null;
+let fieldBaseline = null;
 
 /**
- * Die Kalender-Paare direkt nach der Vorbelegung (null ohne Rerun). Ein Paar,
- * das so bleibt, wird nicht geprüft: steht nur APPLE_USERNAME in der .env und
- * das App-Passwort in der App (sync_config), ist das gültig, denn
- * server/services/apple-calendar.js löst jedes Feld einzeln auf - keptSecrets
- * kennt aber nur .env-Secrets und kann ein fehlendes Passwort nicht belegen.
+ * Stehen diese Felder noch so, wie die Vorbelegung sie gesetzt hat? Dann gilt
+ * EINE Regel: nicht prüfen, nicht neu ableiten, nicht senden (omitUnchanged).
+ * Der Bestand läuft bereits so, und die Prüfer des Wizards sind mit Absicht
+ * enger als der Server - eine Teilkonfiguration (nur EMAIL_SMTP_HOST, das
+ * Apple-Passwort in der App), Compose-Interpolation (`${HTTP_PORT:-3000}`)
+ * oder ein node-cron-Ausdruck mit L hielt sonst einen unveränderten Rerun
+ * fest. Ohne Rerun ist nichts unverändert, also wird alles geprüft.
  */
-let calBaseline = null;
-const CAL_PAIR_FIELDS = ['gcal-id', 'gcal-secret', 'outlook-id', 'outlook-secret', 'apple-user', 'apple-pass'];
+function untouched(...ids) {
+  return unchangedSince(fieldBaseline, fieldState(ids), ids);
+}
+
+/** Bildet der Wizard die öffentliche Adresse noch wie der Bestand? */
+function originUnchanged() {
+  if (!rerunValues) return false;
+  // Mit BASE_URL-Zeile gilt sie (vorbelegt und touched), ohne sie die
+  // Ableitung aus Host, Port und Zugriff.
+  if (rerunValues.BASE_URL) return untouched('adv-base-url');
+  return untouched('cfg-host', 'cfg-port', 'adv-proxy') && !$('adv-base-url').dataset.touched;
+}
+
+/**
+ * Die bestehende Redirect-URI, solange Adresse und Client unverändert sind,
+ * sonst null (dann leitet der Aufrufer neu ab). Eine URI ist beim Anbieter
+ * registriert und darf einen anderen Host tragen als BASE_URL; neu abgeleitet
+ * ersetzte der Rerun `https://login.example.com/...` still durch die
+ * BASE_URL-Fassung, und die nächste Anmeldung scheiterte an
+ * redirect_uri_mismatch.
+ */
+function keptRedirect(key) {
+  const kept = rerunValues?.[key];
+  return kept && originUnchanged() && untouched(...REDIRECT_SOURCES[key]) ? kept : null;
+}
+
 const EMAIL_KEYS = [
   'EMAIL_SMTP_HOST', 'EMAIL_SMTP_PORT', 'EMAIL_SMTP_SECURE', 'EMAIL_SMTP_USER',
   'EMAIL_SMTP_PASS', 'EMAIL_FROM_ADDRESS', 'EMAIL_FROM_NAME',
@@ -4025,12 +4051,17 @@ function isValidHost(host) {
 $('cfg-next').addEventListener('click', () => {
   clearInvalid();
   const rawHost = $('cfg-host').value.trim() || 'localhost';
-  const rawPort = parseInt($('cfg-port').value.trim(), 10);
-  if (!isValidHost(rawHost)) {
+  const typedPort = $('cfg-port').value.trim();
+  const rawPort = parseInt(typedPort, 10);
+  // Unverändert übernommene Felder laufen schon so (untouched): ein
+  // OIKOS_HTTP_PORT=${HTTP_PORT:-3000} ist für Compose ein Port, für diese
+  // Prüfung keiner, und hielt den Rerun fest.
+  const keepPort = untouched('cfg-port');
+  if (!untouched('cfg-host') && !isValidHost(rawHost)) {
     fail('cfg-err', t('config.errHost'), 'cfg-host');
     return;
   }
-  if (isNaN(rawPort) || rawPort < 1 || rawPort > 65535) {
+  if (!keepPort && (isNaN(rawPort) || rawPort < 1 || rawPort > 65535)) {
     fail('cfg-err', t('config.errPort'), 'cfg-port');
     return;
   }
@@ -4039,13 +4070,13 @@ $('cfg-next').addEventListener('click', () => {
   // Haushaltszonen-Vorbelegung laufen falsch, ohne dass irgendwo etwas rot wird.
   // Der eigene Port wird streng geprueft - dieses Feld war das einzige ohne Riegel.
   const rawTz = $('cfg-tz').value.trim();
-  if (rawTz && !isValidTimeZone(rawTz)) {
+  if (rawTz && !untouched('cfg-tz') && !isValidTimeZone(rawTz)) {
     fail('cfg-err', t('config.errTz'), 'cfg-tz');
     return;
   }
   showErr('cfg-err', '');
   S.host = rawHost;
-  S.port = String(rawPort);
+  S.port = keepPort ? typedPort : String(rawPort);
   S.tz   = rawTz || 'UTC';
 
   // Reverse proxy vs. direct access drives the secure-cookie / trust-proxy pair.
@@ -4064,11 +4095,14 @@ $('cfg-next').addEventListener('click', () => {
   // Bildschirm stand.
   const typedBase = $('adv-base-url');
   const typedBaseVal = typedBase.value.trim();
-  if (typedBase.dataset.touched && typedBaseVal && !/^https?:\/\/[^/\s]+/.test(typedBaseVal)) {
+  const keepBase = rerunValues?.BASE_URL && untouched('adv-base-url');
+  if (!keepBase && typedBase.dataset.touched && typedBaseVal && !/^https?:\/\/[^/\s]+/.test(typedBaseVal)) {
     fail('cfg-err', t('config.errBaseUrlScheme'), 'adv-base-url');
     return;
   }
-  S.BASE_URL = plannedOrigin();
+  // Die übernommene Adresse bleibt Zeichen für Zeichen (auch `${PUBLIC_URL}`,
+  // das plannedOrigin() nicht als Origin erkennt und neu ableiten würde).
+  S.BASE_URL = keepBase ? rerunValues.BASE_URL : plannedOrigin();
 
   // Der eine Widerspruch, der garantiert die Anmeldung bricht: die oeffentliche
   // Adresse ist http://, aber Cookies werden auf Secure gezwungen. Der Browser
@@ -4113,11 +4147,15 @@ $('wea-next').addEventListener('click', () => {
     const lat = $('wea-lat').value.trim();
     const lon = $('wea-lon').value.trim();
     if (!lat || !lon) { fail('wea-err', t('weather.errCoords'), !lat ? 'wea-lat' : 'wea-lon'); return; }
+    // Übernommene Koordinaten gehen unverändert zurück (untouched), auch nicht
+    // durch parseFloat normalisiert: aus 41.880 würde sonst 41.88, ein
+    // gesendeter, anderer Wert.
+    const keepCoords = untouched('wea-lat', 'wea-lon');
     const latN = parseFloat(lat), lonN = parseFloat(lon);
-    if (isNaN(latN) || latN < -90 || latN > 90)   { fail('wea-err', t('weather.errLat'), 'wea-lat'); return; }
-    if (isNaN(lonN) || lonN < -180 || lonN > 180) { fail('wea-err', t('weather.errLon'), 'wea-lon'); return; }
-    S.WEATHER_LAT   = String(latN);
-    S.WEATHER_LON   = String(lonN);
+    if (!keepCoords && (isNaN(latN) || latN < -90 || latN > 90))   { fail('wea-err', t('weather.errLat'), 'wea-lat'); return; }
+    if (!keepCoords && (isNaN(lonN) || lonN < -180 || lonN > 180)) { fail('wea-err', t('weather.errLon'), 'wea-lon'); return; }
+    S.WEATHER_LAT   = keepCoords ? lat : String(latN);
+    S.WEATHER_LON   = keepCoords ? lon : String(lonN);
     S.WEATHER_CITY  = $('wea-city').value.trim();
     S.WEATHER_UNITS = $('wea-units').value;
   } else {
@@ -4139,7 +4177,7 @@ $('cal-next').addEventListener('click', () => {
     ['outlook-id', 'outlook-secret', 'MS_CLIENT_SECRET', 'calendar.errOutlookPair'],
     ['apple-user', 'apple-pass', 'APPLE_APP_SPECIFIC_PASSWORD', 'calendar.errApplePair'],
   ]) {
-    if (unchangedSince(calBaseline, fieldState([idField, secretField]), [idField, secretField])) continue;
+    if (untouched(idField, secretField)) continue;
     const gap = pairGap($(idField).value.trim(), $(secretField).value.trim(), keptSecrets.has(secretKey));
     if (gap) { fail('cal-err', t(msg), gap === 'id' ? idField : secretField); return; }
   }
@@ -4150,7 +4188,7 @@ $('cal-next').addEventListener('click', () => {
   // derselben Origin. Beide lesen plannedOrigin(), damit sie nicht auseinander
   // laufen - hier stand `http://host:port` fest verdrahtet.
   S.GOOGLE_REDIRECT_URI = S.GOOGLE_CLIENT_ID
-    ? `${plannedOrigin()}/api/v1/calendar/google/callback` : '';
+    ? keptRedirect('GOOGLE_REDIRECT_URI') ?? `${plannedOrigin()}/api/v1/calendar/google/callback` : '';
   S.APPLE_USERNAME = $('apple-user').value.trim();
   S.APPLE_APP_SPECIFIC_PASSWORD = $('apple-pass').value.trim();
   S.APPLE_CALDAV_URL = $('apple-url').value.trim();
@@ -4158,7 +4196,7 @@ $('cal-next').addEventListener('click', () => {
   S.MS_CLIENT_SECRET = $('outlook-secret').value.trim();
   // Wie die Google-URI: vorläufig aus plannedOrigin(), adv-next zieht nach.
   S.MS_REDIRECT_URI = S.MS_CLIENT_ID
-    ? `${plannedOrigin()}/api/v1/calendar/outlook/callback` : '';
+    ? keptRedirect('MS_REDIRECT_URI') ?? `${plannedOrigin()}/api/v1/calendar/outlook/callback` : '';
 
   // Prefill the OIDC redirect URI from the chosen host/port as a starting point.
   // Auch hier aus plannedOrigin(): anders als die Google-URI wird diese NICHT in
@@ -4182,7 +4220,7 @@ $('email-next').addEventListener('click', () => {
   // Absender in der App) läuft schon so, und erst recht soll kein Default
   // (Port, TLS) eine Einstellung aus der App überschreiben. S trägt den
   // Bestand für die Prüfseite; omitUnchanged nimmt ihn aus dem Request.
-  if (unchangedSince(emailBaseline, fieldState(EMAIL_SECTION_FIELDS), EMAIL_SECTION_FIELDS)) {
+  if (untouched(...EMAIL_SECTION_FIELDS)) {
     for (const key of EMAIL_KEYS) S[key] = rerunValues?.[key] || '';
   } else if ($('email-enable').checked) {
     const host = $('email-host').value.trim();
@@ -4299,7 +4337,7 @@ $('storage-next').addEventListener('click', () => {
   // der Server rundet ab und klemmt still auf 1-100, "7.5" oder "500" landeten
   // sonst als etwas anderes in der App, als hier stand. Leer = Server-Default.
   const maxUpload = $('adv-max-upload').value.trim();
-  if (maxUpload && !(/^[1-9]\d*$/.test(maxUpload) && Number(maxUpload) <= 100)) {
+  if (maxUpload && !untouched('adv-max-upload') && !(/^[1-9]\d*$/.test(maxUpload) && Number(maxUpload) <= 100)) {
     fail('storage-err', t('storage.errMaxUpload'), 'adv-max-upload');
     return;
   }
@@ -4322,19 +4360,23 @@ $('storage-next').addEventListener('click', () => {
   }
   S.GOOGLE_DRIVE_CLIENT_ID = driveEnabled ? driveClientId : '';
   S.GOOGLE_DRIVE_CLIENT_SECRET = driveEnabled ? driveClientSecret : '';
-  S.GOOGLE_DRIVE_REDIRECT_URI = driveEnabled
-    ? `${origin}/api/v1/documents/storage/google-drive/callback`
-    : '';
-  $('document-google-drive-redirect-hint').textContent =
-    `${origin}/api/v1/documents/storage/google-drive/callback`;
+  const driveRedirect = keptRedirect('GOOGLE_DRIVE_REDIRECT_URI')
+    ?? `${origin}/api/v1/documents/storage/google-drive/callback`;
+  S.GOOGLE_DRIVE_REDIRECT_URI = driveEnabled ? driveRedirect : '';
+  $('document-google-drive-redirect-hint').textContent = driveRedirect;
   const backupOn = $('adv-backup-enable').checked;
   const schedule = backupOn ? $('adv-backup-schedule').value.trim() : '';
   const keep = backupOn ? $('adv-backup-keep').value.trim() : '';
   // Wertebereiche je Feld wie der Scheduler (field-checks.js): vorher zaehlte
   // nur die Feldzahl, `99 * * * *` ging durch, und der Server schaltete die
-  // Backups beim Start still ab.
-  if (schedule && !isValidCron(schedule)) { fail('storage-err', t('advanced.errSchedule'), 'adv-backup-schedule'); return; }
-  if (keep && !/^[1-9]\d*$/.test(keep)) { fail('storage-err', t('advanced.errKeep'), 'adv-backup-keep'); return; }
+  // Backups beim Start still ab. Ein unverändert übernommener Zeitplan läuft
+  // schon (auch mit L, W oder #, die isValidCron nicht kennt).
+  if (schedule && !untouched('adv-backup-schedule') && !isValidCron(schedule)) {
+    fail('storage-err', t('advanced.errSchedule'), 'adv-backup-schedule'); return;
+  }
+  if (keep && !untouched('adv-backup-keep') && !/^[1-9]\d*$/.test(keep)) {
+    fail('storage-err', t('advanced.errKeep'), 'adv-backup-keep'); return;
+  }
   // only persist BACKUP_ENABLED=false when explicitly disabled.
   S.BACKUP_ENABLED = backupOn ? '' : 'false';
   S.BACKUP_SCHEDULE = schedule;
@@ -4351,7 +4393,7 @@ $('storage-next').addEventListener('click', () => {
   // Compose bindet den Host-Ordner an diesen Pfad; ein relatives Mount-Ziel
   // laesst `compose up` scheitern.
   const localPath = $('adv-document-local-path').value.trim();
-  if (localPath && !isAbsoluteContainerPath(localPath)) {
+  if (localPath && !untouched('adv-document-local-path') && !isAbsoluteContainerPath(localPath)) {
     fail('storage-err', t('storage.errLocalPath'), 'adv-document-local-path');
     return;
   }
@@ -4390,7 +4432,7 @@ $('storage-next').addEventListener('click', () => {
   S.WEBDAV_BACKUP_PASSWORD = $('adv-webdav-backup-password').value;
   S.WEBDAV_BACKUP_PATH     = $('adv-webdav-backup-path').value.trim();
   const webdavKeep = $('adv-webdav-backup-keep').value.trim();
-  if (webdavKeep && !/^[1-9]\d*$/.test(webdavKeep)) { fail('storage-err', t('advanced.errKeep'), 'adv-webdav-backup-keep'); return; }
+  if (webdavKeep && !untouched('adv-webdav-backup-keep') && !/^[1-9]\d*$/.test(webdavKeep)) { fail('storage-err', t('advanced.errKeep'), 'adv-webdav-backup-keep'); return; }
   S.WEBDAV_BACKUP_KEEP = webdavKeep;
 
   S.DATA_DIR = $('adv-data-dir').value.trim();
@@ -4404,12 +4446,18 @@ $('adv-next').addEventListener('click', () => {
   // Alles, was entscheidet, WOMIT sich Yuvomi verbindet. Speicher und
   // Sicherungen stehen einen Schritt davor.
   const origin = S.BASE_URL;
-  if (S.GOOGLE_CLIENT_ID) S.GOOGLE_REDIRECT_URI = `${origin}/api/v1/calendar/google/callback`;
-  if (S.MS_CLIENT_ID) S.MS_REDIRECT_URI = `${origin}/api/v1/calendar/outlook/callback`;
+  // Eine registrierte URI bleibt, solange Adresse und Client unverändert sind.
+  if (S.GOOGLE_CLIENT_ID) {
+    S.GOOGLE_REDIRECT_URI = keptRedirect('GOOGLE_REDIRECT_URI') ?? `${origin}/api/v1/calendar/google/callback`;
+  }
+  if (S.MS_CLIENT_ID) {
+    S.MS_REDIRECT_URI = keptRedirect('MS_REDIRECT_URI') ?? `${origin}/api/v1/calendar/outlook/callback`;
+  }
 
   const oidcRedirectField = $('oidc-redirect');
   const redirectVal = oidcRedirectField.value.trim();
-  if (!redirectVal || /\/api\/v1\/auth\/oidc\/callback$/.test(redirectVal)) {
+  if (!keptRedirect('OIDC_REDIRECT_URI')
+    && (!redirectVal || /\/api\/v1\/auth\/oidc\/callback$/.test(redirectVal))) {
     oidcRedirectField.value = `${origin}/api/v1/auth/oidc/callback`;
   }
 
@@ -4467,7 +4515,7 @@ $('adv-next').addEventListener('click', () => {
   S.VAPID_SUBJECT  = $('adv-push-subject').value.trim();
 
   const syncInterval = $('adv-sync-interval').value.trim();
-  if (syncInterval && !/^[1-9]\d*$/.test(syncInterval)) {
+  if (syncInterval && !untouched('adv-sync-interval') && !/^[1-9]\d*$/.test(syncInterval)) {
     fail('adv-err', t('advanced.errSyncInterval'), 'adv-sync-interval'); return;
   }
   S.SYNC_INTERVAL_MINUTES = syncInterval;

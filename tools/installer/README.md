@@ -92,7 +92,9 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
      the pre-fill when it names a full `http://` or `https://` origin.
      Every redirect URI the wizard
      shows - Google Calendar, Outlook, Google Drive, OIDC - is built from that one value, so
-     what you copy into a provider console is what the app will send.
+     what you copy into a provider console is what the app will send. On a
+     rerun an existing redirect URI stays as written (it may name another host
+     than `BASE_URL`) until the address or that provider's client changes.
    - A language switcher (top corner) overrides the auto-detected browser
      language and remembers your choice.
    - Reloading or closing the page mid-setup asks for confirmation first: the

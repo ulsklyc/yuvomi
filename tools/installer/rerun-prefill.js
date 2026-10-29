@@ -108,6 +108,22 @@ export function hostFromBaseUrl(baseUrl) {
 }
 
 /**
+ * Ein Wert mit Compose-Interpolation (`${PUBLIC_HOST}`, `$HTTP_PORT`). Der
+ * Parser lässt ihn bewusst unaufgelöst (decodeEnvValue); erst Compose setzt
+ * ein. In ein konkretes Feld abgeleitet (Host aus der BASE_URL) wäre er ein
+ * anderer, ungültiger Wert - `https://${PUBLIC_HOST}` ergab den Host
+ * `${public_host}`, und cfg-next hielt den unveränderten Rerun daran fest.
+ */
+export function isInterpolated(value) {
+  return /\$(\{|[A-Za-z_])/.test(String(value ?? ''));
+}
+
+/** Der Hostname aus einer BASE_URL, oder '' wenn sie keiner ist (auch bei Interpolation). */
+function hostForField(baseUrl) {
+  return isInterpolated(baseUrl) ? '' : hostFromBaseUrl(baseUrl);
+}
+
+/**
  * Der Vorbelegungsplan für eine bestehende .env.
  *
  * `fields`: Feld-ID -> Wert (String) bzw. Haken (Boolean).
@@ -132,7 +148,7 @@ export function prefillPlan(values = {}, keptSecrets = []) {
   // Die Zeitzone ohne Zeile ist die des Containers (UTC), nicht die des
   // Browsers: die Vorbelegung mit der Browserzone schriebe sonst still eine neue.
   fields['cfg-tz'] = values.TZ || 'UTC';
-  const host = hostFromBaseUrl(values.BASE_URL || '');
+  const host = hostForField(values.BASE_URL || '');
   if (host) fields['cfg-host'] = host;
   if (values.BASE_URL) touched.push('adv-base-url');
   const access = accessFromEnv(values);
@@ -199,6 +215,36 @@ export function omitUnchanged(env, rerun = null) {
 const SWITCH_KINDS = new Map(
   PREFILL_FIELDS.filter(([, , kind]) => kind === 'on' || kind === 'notFalse').map(([key, , kind]) => [key, kind]),
 );
+
+/**
+ * Die Felder, deren Zustand nach der Vorbelegung festgehalten wird
+ * (applyRerunPrefill -> fieldBaseline). Für sie gilt EINE Regel: ein seit der
+ * Vorbelegung unverändertes Feld wird weder geprüft noch neu abgeleitet noch
+ * gesendet (untouched() in install.html, omitUnchanged() hier). Der Bestand
+ * läuft bereits so; ein Prüfer des Wizards, der enger ist als der Server
+ * (Compose-Interpolation, Sekundenfeld im Cron), hielt sonst einen
+ * unveränderten Rerun fest, und eine Ableitung aus BASE_URL überschrieb
+ * bewusst anders gesetzte Werte (registrierte Redirect-URIs).
+ */
+export const BASELINE_FIELDS = [...new Set([
+  ...PREFILL_FIELDS.map(([, id]) => id),
+  ...KEPT_SECRET_FIELDS.map(([, id]) => id),
+  'cfg-host', 'cfg-tz', 'adv-proxy',
+  'wea-enable', 'email-enable', 'adv-document-google-drive-enable',
+])];
+
+/**
+ * Redirect-URI -> die Felder, von denen sie neben der Adresse abhängt. Bleiben
+ * Adresse und diese Felder unverändert, geht die bestehende URI zurück
+ * (ungesendet): sie ist beim Anbieter registriert und darf einen anderen Host
+ * tragen als BASE_URL. Erst eine Änderung leitet sie neu ab.
+ */
+export const REDIRECT_SOURCES = {
+  GOOGLE_REDIRECT_URI: ['gcal-id'],
+  MS_REDIRECT_URI: ['outlook-id'],
+  GOOGLE_DRIVE_REDIRECT_URI: ['adv-document-google-drive-enable', 'adv-document-google-drive-client-id'],
+  OIDC_REDIRECT_URI: ['oidc-redirect'],
+};
 
 /** Die Felder des E-Mail-Schritts samt Schalter (Vollständigkeitsprüfung). */
 export const EMAIL_SECTION_FIELDS = [

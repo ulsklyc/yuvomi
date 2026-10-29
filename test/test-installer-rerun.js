@@ -20,12 +20,16 @@ import { tempDir } from './tmp-dir.js';
 import { createInstallerServer, readEnvFile, decodeEnvValue } from '../tools/installer/install-server.js';
 import { FILE_SECRET_VARS } from '../server/utils/file-secrets.js';
 import {
-  ENV_SCHEMA, RERUN_PREFILL_KEYS, RERUN_SECRET_KEYS, RERUN_DERIVED_KEYS,
+  ENV_SCHEMA, RERUN_PREFILL_KEYS, RERUN_SECRET_KEYS,
 } from '../tools/installer/env-schema.js';
 import {
   prefillPlan, accessEnv, PREFILL_FIELDS, KEPT_SECRET_FIELDS,
   omitUnchanged, unchangedSince, EMAIL_SECTION_FIELDS,
+  BASELINE_FIELDS, REDIRECT_SOURCES, isInterpolated,
 } from '../tools/installer/rerun-prefill.js';
+import {
+  isValidCron, isAbsoluteContainerPath, pairGap, enabledWithoutUrl,
+} from '../tools/installer/field-checks.js';
 
 const html = readFileSync(new URL('../tools/installer/install.html', import.meta.url), 'utf8');
 
@@ -73,14 +77,14 @@ const envText = Object.entries(EXISTING).map(([k, v]) => `${k}=${v}`).join('\n')
 // ── Allowlist: jeder Schema-Schlüssel ist eingeordnet ─────────────────────────
 
 test('jeder Schema-Schlüssel steht in genau einer Rerun-Liste', () => {
-  const lists = { RERUN_PREFILL_KEYS, RERUN_SECRET_KEYS, RERUN_DERIVED_KEYS };
+  const lists = { RERUN_PREFILL_KEYS, RERUN_SECRET_KEYS };
   for (const { key } of ENV_SCHEMA) {
     const hits = Object.entries(lists).filter(([, l]) => l.includes(key)).map(([n]) => n);
     assert.equal(hits.length, 1,
       `${key} steht in ${hits.length ? hits.join(' und ') : 'keiner Liste'} - neu einordnen (env-schema.js)`);
   }
   const schemaKeys = new Set(ENV_SCHEMA.map(e => e.key));
-  for (const key of [...RERUN_PREFILL_KEYS, ...RERUN_SECRET_KEYS, ...RERUN_DERIVED_KEYS]) {
+  for (const key of [...RERUN_PREFILL_KEYS, ...RERUN_SECRET_KEYS]) {
     assert.ok(schemaKeys.has(key), `${key} steht in einer Rerun-Liste, aber nicht im Schema`);
   }
 });
@@ -101,8 +105,10 @@ test('die Allowlist enthält kein Secret, auch keins ohne secret-Merkmal', () =>
 test('jeder vorbelegte Schlüssel hat ein Feld im Wizard und jedes Feld gibt es', () => {
   const mapped = new Set(PREFILL_FIELDS.map(([k]) => k));
   // TZ und SESSION_SECURE/TRUST_PROXY laufen über eigene Wege (cfg-tz, adv-proxy),
-  // GOOGLE_DRIVE_REDIRECT_URI schaltet nur die Drive-Gruppe ein.
-  const special = new Set(['TZ', 'SESSION_SECURE', 'TRUST_PROXY', 'GOOGLE_DRIVE_REDIRECT_URI']);
+  // GOOGLE_DRIVE_REDIRECT_URI schaltet die Drive-Gruppe ein; die Redirect-URIs
+  // ohne Feld gehen über keptRedirect() unverändert zurück (REDIRECT_SOURCES).
+  const special = new Set(['TZ', 'SESSION_SECURE', 'TRUST_PROXY', 'GOOGLE_DRIVE_REDIRECT_URI',
+    'GOOGLE_REDIRECT_URI', 'MS_REDIRECT_URI']);
   for (const key of RERUN_PREFILL_KEYS) {
     assert.ok(mapped.has(key) || special.has(key), `${key} ist erlaubt, wird aber nirgends vorbelegt`);
   }
@@ -388,10 +394,11 @@ test('ein unverändert übernommener Teil-SMTP-Abschnitt wird nicht auf Vollstä
   assert.equal(unchangedSince(null, baseline, Object.keys(baseline)), false, 'ohne Rerun wird immer geprüft');
 
   const email = handler('email-next');
-  const skip = email.indexOf('unchangedSince(emailBaseline');
+  const skip = email.indexOf('untouched(...EMAIL_SECTION_FIELDS)');
   const check = email.indexOf("t('email.errIncomplete')");
   assert.ok(skip !== -1 && skip < check, 'email-next prüft auch einen unveränderten Bestand');
-  assert.match(html, /emailBaseline = fieldState\(EMAIL_SECTION_FIELDS\)/,
+  for (const id of EMAIL_SECTION_FIELDS) assert.ok(BASELINE_FIELDS.includes(id), `${id} fehlt in BASELINE_FIELDS`);
+  assert.match(html, /fieldBaseline = fieldState\(BASELINE_FIELDS\)/,
     'applyRerunPrefill hält den Stand nach der Vorbelegung nicht fest');
 });
 
@@ -401,11 +408,12 @@ test('ein unverändert übernommenes Kalender-Paar wird beim Rerun nicht blockie
   // URL, Nutzer und Passwort einzeln auf). keptSecrets kennt nur .env-Secrets,
   // die Paarprüfung hielt einen unveränderten Rerun an calendar.errApplePair fest.
   const cal = handler('cal-next');
-  const skip = cal.indexOf('unchangedSince(calBaseline');
+  const skip = cal.indexOf('untouched(idField, secretField)');
   const check = cal.indexOf('pairGap(');
   assert.ok(skip !== -1 && skip < check, 'cal-next prüft auch ein unverändert übernommenes Paar');
-  assert.match(html, /calBaseline = fieldState\(CAL_PAIR_FIELDS\)/,
-    'applyRerunPrefill hält den Kalender-Stand nach der Vorbelegung nicht fest');
+  for (const id of ['gcal-id', 'gcal-secret', 'outlook-id', 'outlook-secret', 'apple-user', 'apple-pass']) {
+    assert.ok(BASELINE_FIELDS.includes(id), `${id} fehlt in BASELINE_FIELDS`);
+  }
 });
 
 test('ein umgelegter, vorbelegter Schalter wird ausdrücklich gesendet', () => {
@@ -429,4 +437,173 @@ test('eine IPv6-BASE_URL belegt das Host-Feld nicht mit einem ungültigen Host v
   assert.equal(plan.fields['cfg-host'], undefined);
   assert.ok(plan.touched.includes('adv-base-url'));
   assert.equal(prefillPlan({ BASE_URL: 'https://yuvomi.example.test' }).fields['cfg-host'], 'yuvomi.example.test');
+});
+
+// ── Review #2382 (Runde 2): unverändert heisst ungeprüft, unabgeleitet, ungesendet ──
+//
+// Die Schritt-Handler laufen hier wirklich: Quelltext aus install.html, ein
+// Feld-Stub statt DOM, dieselbe Vorbelegung wie applyRerunPrefill.
+
+/** Quelltext einer Funktion aus install.html ('' wenn es sie nicht gibt). */
+function fnSource(name) {
+  return html.match(new RegExp(`\\nfunction ${name}\\([^)]*\\) \\{[\\s\\S]*?\\n\\}`))?.[0] ?? '';
+}
+
+function arrowOf(id) {
+  const src = handler(id);
+  return `${src.slice(src.indexOf('() => {'))}\n}`;
+}
+
+/** Der Standardwert eines Feldes laut Markup. */
+function markupDefault(id) {
+  const tag = html.match(new RegExp(`<input[^>]*\\bid="${id}"[^>]*>`))?.[0] || '';
+  return {
+    checkbox: /type="checkbox"/.test(tag),
+    checked: /\bchecked\b/.test(tag),
+    value: tag.match(/\bvalue="([^"]*)"/)?.[1] ?? (id === 'adv-proxy' ? 'proxy' : ''),
+  };
+}
+
+const HANDLER_SCOPE = [
+  '$', 'S', 't', 'fail', 'clearInvalid', 'showErr', 'next', 'accessEnv', 'rerunValues',
+  'fieldBaseline', 'unchangedSince', 'REDIRECT_SOURCES', 'EMAIL_SECTION_FIELDS', 'EMAIL_KEYS',
+  'keptSecrets', 'hasSecret', 'pairGap', 'isValidCron', 'isAbsoluteContainerPath', 'enabledWithoutUrl',
+];
+const HANDLER_FNS = [
+  'fieldState', 'untouched', 'originUnchanged', 'keptRedirect', 'plannedOrigin', 'deriveBaseUrl',
+  'isValidHost', 'isValidTimeZone',
+];
+
+/**
+ * Ein Wizard über einer bestehenden .env: Felder vorbelegt wie
+ * applyRerunPrefill, danach `edit` (Feld-ID -> Wert), dann die Schritte.
+ */
+function rerunWizard(rerun, edit = {}) {
+  const fields = {};
+  const $ = id => {
+    if (!fields[id]) {
+      const d = markupDefault(id);
+      fields[id] = {
+        id, type: d.checkbox ? 'checkbox' : 'text', checked: d.checked, value: d.value,
+        dataset: {}, style: {}, textContent: '', focus() {}, setAttribute() {}, removeAttribute() {},
+      };
+    }
+    return fields[id];
+  };
+  const plan = rerun ? prefillPlan(rerun, []) : { fields: {}, touched: [] };
+  for (const [id, v] of Object.entries(plan.fields)) {
+    if (typeof v === 'boolean') $(id).checked = v; else $(id).value = v;
+  }
+  for (const id of plan.touched) $(id).dataset.touched = '1';
+  const S = {};
+  const failures = [];
+  let advanced = 0;
+  const scope = {
+    $, S, t: k => k, fail: (_, msg, id) => failures.push(`${msg} @ ${id}`), clearInvalid() {}, showErr() {},
+    next: () => { advanced++; }, accessEnv, rerunValues: rerun, fieldBaseline: null, unchangedSince,
+    REDIRECT_SOURCES, EMAIL_SECTION_FIELDS, EMAIL_KEYS: [], keptSecrets: new Set(), hasSecret: (key, typed) => Boolean(typed),
+    pairGap, isValidCron, isAbsoluteContainerPath, enabledWithoutUrl,
+  };
+  const build = new Function(...HANDLER_SCOPE, `
+    ${HANDLER_FNS.map(fnSource).join('\n')}
+    if (rerunValues) fieldBaseline = fieldState(BASELINE_IDS);
+    return {
+      ${['cfg-next', 'cal-next', 'storage-next', 'adv-next'].map(id => `'${id}': (${arrowOf(id)})`).join(',\n')}
+    };
+  `.replace('BASELINE_IDS', JSON.stringify(BASELINE_FIELDS)));
+  const steps = build(...HANDLER_SCOPE.map(n => scope[n]));
+  for (const [id, v] of Object.entries(edit)) {
+    if (typeof v === 'boolean') $(id).checked = v; else $(id).value = v;
+    $(id).dataset.touched = '1';
+  }
+  const run = ids => {
+    for (const id of ids) {
+      const before = advanced;
+      steps[id]();
+      if (advanced === before) return false;
+    }
+    return true;
+  };
+  return { S, $, failures, run };
+}
+
+test('Compose-Interpolation in Port und Adresse hält den unveränderten Rerun nicht fest', () => {
+  const rerun = {
+    BASE_URL: 'https://${PUBLIC_HOST}', OIKOS_HTTP_PORT: '${HTTP_PORT:-3000}',
+    SESSION_SECURE: 'true', TZ: 'Europe/Berlin',
+  };
+  assert.equal(isInterpolated(rerun.BASE_URL), true);
+  assert.equal(prefillPlan(rerun).fields['cfg-host'], undefined,
+    'der Host aus einer interpolierten BASE_URL landet im Host-Feld');
+  const w = rerunWizard(rerun);
+  assert.equal(w.run(['cfg-next']), true, `cfg-next blockiert: ${w.failures.join('; ')}`);
+  assert.equal(w.S.BASE_URL, rerun.BASE_URL, 'die übernommene BASE_URL wurde neu abgeleitet');
+  assert.equal(w.S.port, rerun.OIKOS_HTTP_PORT);
+  const sent = omitUnchanged({ BASE_URL: w.S.BASE_URL, OIKOS_HTTP_PORT: w.S.port }, rerun);
+  assert.deepEqual(sent, {}, 'unveränderte Werte gehen in den save-Request');
+
+  // Wer den Port anfasst, wird wieder geprüft.
+  const typed = rerunWizard(rerun, { 'cfg-port': '${HTTP_PORT}x' });
+  assert.equal(typed.run(['cfg-next']), false, 'ein geänderter, ungültiger Port geht durch');
+  assert.match(typed.failures.join(), /config\.errPort/);
+});
+
+test('ohne Rerun prüft cfg-next weiter jeden Wert', () => {
+  const w = rerunWizard(null, { 'cfg-port': '${HTTP_PORT:-3000}' });
+  assert.equal(w.run(['cfg-next']), false);
+  assert.match(w.failures.join(), /config\.errPort/);
+});
+
+const OAUTH_RERUN = {
+  BASE_URL: 'https://app.example.test', SESSION_SECURE: 'true', TRUST_PROXY: '1',
+  GOOGLE_CLIENT_ID: 'gid.apps.example.test',
+  GOOGLE_REDIRECT_URI: 'https://login.example.test/api/v1/calendar/google/callback',
+  MS_CLIENT_ID: 'ms-client',
+  MS_REDIRECT_URI: 'https://login.example.test/api/v1/calendar/outlook/callback',
+  GOOGLE_DRIVE_CLIENT_ID: 'drive.apps.example.test',
+  GOOGLE_DRIVE_REDIRECT_URI: 'https://login.example.test/api/v1/documents/storage/google-drive/callback',
+  OIDC_ISSUER: 'https://idp.example.test', OIDC_CLIENT_ID: 'yuvomi',
+  OIDC_REDIRECT_URI: 'https://login.example.test/api/v1/auth/oidc/callback',
+};
+const REDIRECT_KEYS = ['GOOGLE_REDIRECT_URI', 'MS_REDIRECT_URI', 'GOOGLE_DRIVE_REDIRECT_URI', 'OIDC_REDIRECT_URI'];
+
+test('registrierte Redirect-URIs bleiben beim unveränderten Rerun stehen und ungesendet', () => {
+  for (const key of REDIRECT_KEYS) {
+    assert.ok(RERUN_PREFILL_KEYS.includes(key), `${key} fehlt in der Allowlist - omitUnchanged kann ihn nicht bewahren`);
+    assert.ok(REDIRECT_SOURCES[key], `${key} ohne REDIRECT_SOURCES`);
+  }
+  const w = rerunWizard(OAUTH_RERUN);
+  // Die Secrets als getippt: die Paarprüfungen sollen hier nicht stören.
+  w.$('gcal-secret').value = 'x'; w.$('outlook-secret').value = 'x';
+  w.$('adv-document-google-drive-client-secret').value = 'x'; w.$('oidc-client-secret').value = 'x';
+  assert.equal(w.run(['cfg-next', 'cal-next', 'storage-next', 'adv-next']), true, w.failures.join('; '));
+  for (const key of REDIRECT_KEYS) assert.equal(w.S[key], OAUTH_RERUN[key], `${key} wurde aus BASE_URL neu abgeleitet`);
+  const sent = omitUnchanged(Object.fromEntries(REDIRECT_KEYS.map(k => [k, w.S[k]])), OAUTH_RERUN);
+  assert.deepEqual(sent, {}, 'unveränderte Redirect-URIs gehen in den save-Request');
+});
+
+test('eine geänderte Adresse oder Client-ID leitet die Redirect-URI neu ab', () => {
+  const moved = rerunWizard(OAUTH_RERUN, { 'adv-base-url': 'https://neu.example.test' });
+  for (const id of ['gcal-secret', 'outlook-secret', 'adv-document-google-drive-client-secret', 'oidc-client-secret']) {
+    moved.$(id).value = 'x';
+  }
+  assert.equal(moved.run(['cfg-next', 'cal-next', 'storage-next', 'adv-next']), true, moved.failures.join('; '));
+  for (const key of REDIRECT_KEYS) assert.match(moved.S[key], /^https:\/\/neu\.example\.test\//, `${key} folgt der neuen Adresse nicht`);
+
+  const client = rerunWizard(OAUTH_RERUN, { 'gcal-id': 'other.apps.example.test' });
+  client.$('gcal-secret').value = 'x'; client.$('outlook-secret').value = 'x';
+  assert.equal(client.run(['cfg-next', 'cal-next']), true, client.failures.join('; '));
+  assert.equal(client.S.GOOGLE_REDIRECT_URI, 'https://app.example.test/api/v1/calendar/google/callback');
+  assert.equal(client.S.MS_REDIRECT_URI, OAUTH_RERUN.MS_REDIRECT_URI, 'Outlook hängt nicht an der Google-ID');
+});
+
+test('ein unverändert übernommener Zeitplan wird nicht gegen isValidCron geprüft', () => {
+  // node-cron nimmt L (letzter Tag) an, isValidCron bewusst nicht.
+  const rerun = { BACKUP_SCHEDULE: '0 2 L * *', BACKUP_KEEP: '7' };
+  assert.equal(isValidCron(rerun.BACKUP_SCHEDULE), false, 'Testannahme: isValidCron kennt L nicht');
+  const w = rerunWizard(rerun);
+  assert.equal(w.run(['storage-next']), true, `storage-next blockiert: ${w.failures.join('; ')}`);
+  assert.equal(w.S.BACKUP_SCHEDULE, rerun.BACKUP_SCHEDULE);
+  const typed = rerunWizard(rerun, { 'adv-backup-schedule': '99 * * * *' });
+  assert.equal(typed.run(['storage-next']), false, 'ein geänderter, ungültiger Zeitplan geht durch');
 });

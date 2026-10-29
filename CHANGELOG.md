@@ -17,7 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the note "Current value is kept", and the existing values are written back. Lines you leave
   unchanged stay exactly as written, inline comments and quotes included, and a secret read from a
   file (`GOOGLE_CLIENT_SECRET_FILE`, `SESSION_SECRET_FILE` and the other `_FILE` variables) counts as
-  kept instead of being written a second time, which stopped Yuvomi from starting.
+  kept instead of being written a second time, which stopped Yuvomi from starting. A setting you
+  leave as it was is no longer checked against the installer's stricter rules either: a port or
+  address written as a Compose variable (`${HTTP_PORT:-3000}`), a backup schedule with a seconds
+  field or a full weekday name, and OAuth redirect addresses registered under a different host all
+  stay as they are until you change the address or the client.
 - **The simple setup makes Yuvomi reachable on your home network.** It used to write
   `http://localhost:3000` as the address, so invitation and password-reset links and the app on
   your phones pointed at a device that could not be reached. It now uses this computer's address on

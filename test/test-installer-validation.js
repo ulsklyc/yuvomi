@@ -46,13 +46,18 @@ const CRON_OK = [
   '0 2 1 * *', '0 2 31 12 *', '0 0,12 * * 1-5', '0-59/10 * * * *',
   '0 2 * * mon', '0 2 * * MON-FRI', '0 2 1 jan *', '0 2 1-15/2 * *', '00 02 * * *',
   '  0 2 * * *  ',
+  // Sechs Felder mit fuehrender Sekunde, volle Namen, ? und Kurzformen: die
+  // Grammatik des Schedulers (node-cron 4), Review #2382.
+  '0 0 2 * * *', '*/30 0 2 * * MON-FRI', '0 2 * * Sunday', '0 2 1 January *',
+  '0 2 * * monday-friday', '0 2 1 jan-march *', '0 2 ? * mon', '@daily', '@Weekly',
 ];
 const CRON_BAD = [
   '99 * * * *',     // Minute ausserhalb 0-59 - der Befund aus der Critique
   '60 * * * *', '* 24 * * *', '* * 0 * *', '* * 32 * *', '* * * 0 *', '* * * 13 *',
   '* * * * 8', '*/0 * * * *', '1-60 * * * *', '0,60 * * * *', '- * * * *',
   '1- * * * *', ',1 * * * *', '2/5 * * * *', 'a * * * *', '0 2 * * jan', '',
-  '0 2 * *', '0 0 2 * * *',
+  '0 2 * *', '0 0 0 2 * * *', '60 0 2 * * *', '0 2 ? ? *', '? 2 * * *', '0 2 * * sundays',
+  '@sometimes',
 ];
 
 test('isValidCron prueft die Wertebereiche je Feld, nicht nur die Feldzahl', () => {
@@ -78,10 +83,11 @@ test('was der Wizard als Cron annimmt, nimmt auch der Backup-Scheduler an', () =
   let seed = 7;
   const rnd = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
   const atoms = ['*', '*/1', '*/7', '*/59', '*/60', '0', '1', '7', '12', '13', '23', '24', '31', '32',
-    '59', '60', '0-7', '1-5', '5-1', '1-31/2', '0-59/15', 'mon', 'sun-sat', 'jan', 'jan-dec', 'feb-jan', '1,2', '0,59'];
+    '59', '60', '0-7', '1-5', '5-1', '1-31/2', '0-59/15', 'mon', 'sun-sat', 'jan', 'jan-dec', 'feb-jan', '1,2', '0,59',
+    'Monday', 'sunday-SATURDAY', 'March', 'january-june', 'mar-december', '?', 'mon,friday'];
   let accepted = 0;
-  for (let i = 0; i < 40000; i++) {
-    const expr = Array.from({ length: 5 }, () => atoms[rnd(atoms.length)]).join(' ');
+  for (let i = 0; i < 60000; i++) {
+    const expr = Array.from({ length: 5 + rnd(2) }, () => atoms[rnd(atoms.length)]).join(' ');
     if (!isValidCron(expr)) continue;
     accepted++;
     assert.equal(cron.validate(expr), true, `isValidCron nimmt "${expr}" an, der Scheduler nicht`);
@@ -89,10 +95,26 @@ test('was der Wizard als Cron annimmt, nimmt auch der Backup-Scheduler an', () =
   assert.ok(accepted > 300, `zu wenige angenommene Ausdruecke im Korpus (${accepted}) - der Test misst nichts`);
 });
 
+test('was der Backup-Scheduler in gaengiger Form annimmt, nimmt auch der Wizard an', () => {
+  // Gegenrichtung fuer die Formen aus dem Review (#2382): BACKUP_SCHEDULE=0 0 2 * * *
+  // lief auf dem Server, der Wizard hielt den unveraenderten Rerun daran fest.
+  const forms = [
+    '0 0 2 * * *', '30 15 3 * * 0', '*/10 * * * * *', '0 2 * * Sunday', '0 2 * * SAT',
+    '0 2 1 December *', '0 2 1 feb *', '0 0 2 * * monday-friday', '0 2 ? * *', '0 2 * * ?',
+    '@daily', '@hourly', '@yearly', '@annually', '@monthly', '@weekly', '@midnight',
+  ];
+  for (const expr of forms) {
+    assert.equal(cron.validate(expr), true, `node-cron lehnt "${expr}" ab - Liste pruefen`);
+    assert.equal(isValidCron(expr), true, `der Scheduler nimmt "${expr}" an, der Wizard nicht`);
+  }
+});
+
 test('storage-next prueft den Zeitplan mit isValidCron', () => {
   assert.match(html, /import \{[^}]*isValidCron[^}]*\} from '\/field-checks\.js'/, 'field-checks.js wird nicht importiert');
   const body = handler('storage-next');
-  assert.match(body, /schedule && !isValidCron\(schedule\)/, 'storage-next prueft den Cron-Ausdruck nicht mit isValidCron');
+  // Ein unveraendert uebernommener Zeitplan bleibt ungeprueft (untouched, Review #2382).
+  assert.match(body, /schedule && !untouched\('adv-backup-schedule'\) && !isValidCron\(schedule\)/,
+    'storage-next prueft den Cron-Ausdruck nicht mit isValidCron');
   assert.doesNotMatch(body, /schedule\.split\(\/\\s\+\/\)\.length !== 5/, 'die alte Feldzaehlung steht noch');
 });
 
@@ -135,7 +157,8 @@ test('DOCUMENT_STORAGE_LOCAL_PATH muss absolut sein', () => {
   assert.match(read('../docker-compose.yml'), /:\$\{DOCUMENT_STORAGE_LOCAL_PATH:-\/documents\}/);
 
   const body = handler('storage-next');
-  assert.match(body, /localPath && !isAbsoluteContainerPath\(localPath\)/, 'storage-next prueft den Container-Pfad nicht');
+  assert.match(body, /localPath && !untouched\('adv-document-local-path'\) && !isAbsoluteContainerPath\(localPath\)/,
+    'storage-next prueft den Container-Pfad nicht');
   assert.match(body, /fail\('storage-err', t\('storage\.errLocalPath'\), 'adv-document-local-path'\)/);
 });
 

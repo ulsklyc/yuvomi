@@ -460,7 +460,8 @@ test('das Upload-Limit prueft dieselben Grenzen wie der Server und meldet am Fel
   assert.ok(cond, 'storage-next prueft adv-max-upload nicht mit Meldung am Feld');
   assert.match(block, /S\.MAX_UPLOAD_MB = maxUpload;/, 'der gepruefte Wert wird nicht in S geschrieben');
   // Die Bedingung AUSFUEHREN, nicht nachlesen.
-  const rejects = new Function('maxUpload', `return Boolean(${cond[1]});`);
+  // untouched() ist ohne Rerun immer false (Erstinstallation: alles wird geprueft).
+  const rejects = maxUpload => new Function('maxUpload', 'untouched', `return Boolean(${cond[1]});`)(maxUpload, () => false);
   for (const ok of ['', String(min), String(def), String(max)]) assert.equal(rejects(ok), false, `${JSON.stringify(ok)} muss durchgehen`);
   for (const bad of [String(min - 1), String(max + 1), '7.5', '1e2', '-5', 'abc', '05']) {
     assert.ok(rejects(bad), `${JSON.stringify(bad)} muss abgelehnt werden - der Server naehme etwas anderes`);
