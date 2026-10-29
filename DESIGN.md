@@ -2367,7 +2367,13 @@ minmax(0, max-content) auto`, vorher `1fr` mit 145-325px leerem Band darueber); 
 Fensterhoehe beginnt sie eingeklappt (Werkzeugmenue blendet sie ein). Ihre Kacheln tragen
 Bild (wo es eins gibt) und Zutatenzahl, der Titel ist ein Abschnittstitel (20/600). Karten-
 Titel am Board klammern auf drei Zeilen. Der Tageskopf am Telefon liest "Mi 28.10." vorn,
-das Plus ruhig am Ende.
+das Plus ruhig am Ende. **Das Raster ist so hoch wie sein Inhalt (R24 S13-F1):** die Karte
+traegt am Board `--space-3` Polster (Spalte 128-140px), eine Aktionsleiste ohne Knopf haelt
+keinen Abstand, der Slot nur die Hoehe seines Plus (`--target-lg`, nicht 72px), die
+Typzeile unter 72rem ist so hoch wie ihr Wort (Abstand `--space-5`, kein Mindestmass), und
+ohne Leiste steht unter dem Plan-Port nur `--space-4` wie unter der Kalenderwoche. Gemessen
+1024x768: Woche 684px in 611px Port -> 624 in 624, die Snack-Reihe ohne Hochscrollen; ab
+fuenf Tagen bleibt das Querscrollen.
 
 **Die Uebergaben der Kueche (R23, D2/D3).** Jeder Weg in den Einkauf (Rezept, Mahlzeit-Karte,
 "Aus dem Essensplan", Warenkorb im Vorrat) folgt EINER Regel (server/services/kitchen-handover.js):

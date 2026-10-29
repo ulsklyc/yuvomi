@@ -82,7 +82,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the bottom of the window with an empty band above it, starts folded on low screens, and its tiles
   show the number of ingredients (and the picture where there is one). Meal names on the week board
   use up to three lines before they are shortened, the two card icons share one quiet colour, and on
-  phones a day reads "Wed 28.10." with the plus at the end.
+  phones a day reads "Wed 28.10." with the plus at the end. The week board is as tall as its meals:
+  cards without buttons end below their name, an empty slot is only as tall as its plus, and the
+  meal-type lines sit closer to their row - at 1024 x 768 a whole week down to the snacks fits
+  without scrolling up and down.
 - **The pantry says everything in one line, in the same order.** "2 days left" and "Running low" now
   follow the quantity under the name ("1 l · 3 days left · Running low"), instead of floating next to
   the name. On phones the best-before date moves to its own line instead of disappearing, and the side

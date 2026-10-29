@@ -2737,6 +2737,25 @@ test('R23 D13: Wochenplan - Rezepte als Leiste unter dem Plan, unter 72rem der T
     'die Leiste klappt nicht mehr von selbst ein - sie nimmt der Woche keine Breite');
 });
 
+test('R24 S13-F1: das Wochenraster ist so hoch wie sein Inhalt (1024x768 ohne Hochscrollen)', () => {
+  // Gemessen vorher bei 1024x768: Woche 684px in 611px Port, die Snack-Reihe
+  // unter der Falz. Hoehen, die nicht aus dem Inhalt kamen: 72px Slot,
+  // Aktionsleiste ohne Knopf (Abstand + Polster), 20px Typzeile, 16er-Polster
+  // in der 128px-Spalte, 32px Seitenpolster unter dem eigenen Scrollport.
+  const rules = rulesOf('styles/meals.css');
+  const board = rules.filter((r) => r.at.length === 1 && /min-width:\s*1024px/.test(r.at[0]));
+  const narrow = rules.filter((r) => r.at.some((a) => /meals-board \(width < 72rem\)/.test(a)));
+  const one = (list, sel) => list.filter((r) => r.selector.trim() === sel).map((r) => r.body).join('\n');
+  assert.match(one(board, '.week-grid .meal-slot'), /min-height:\s*var\(--target-lg\)/, 'am Board traegt der Slot nur die Hoehe seines Plus');
+  assert.match(one(board, '.week-grid .meal-card__open'), /padding:\s*var\(--space-3\) var\(--space-3\) 0/);
+  assert.match(one(board, '.week-grid .meal-card__actions'), /padding:\s*0 var\(--space-3\) var\(--space-3\)/);
+  assert.match(one(board, '.week-grid .meal-card__actions:not(:has(*))'), /margin-top:\s*0/, 'eine Leiste ohne Knopf haelt keinen Abstand');
+  assert.match(one(board, '.meals-layout--rail-hidden'), /padding-block-end:\s*var\(--space-4\)/);
+  assert.doesNotMatch(one(narrow, '.week-gutter-label'), /min-block-size/, 'die Typzeile ist so hoch wie ihr Wort');
+  assert.match(one(narrow, '.week-grid .meal-slot'), /margin-block-start:\s*var\(--space-5\)/);
+  assert.match(one(narrow, '.week-grid .day-header'), /padding-block-start:\s*var\(--space-2\)/);
+});
+
 test('R23 D13: Mahlzeit aus einem Rezept zeigt dessen Zutaten zum Lesen, "Anpassen" macht eigene Zeilen daraus', () => {
   const meals = readPub('pages/meals.js');
   const of = fnBody(meals, 'function recipeIngredientsOf(', '\n}\n');

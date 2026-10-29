@@ -1750,6 +1750,37 @@
     line-clamp: 3;
     overflow-wrap: break-word;
   }
+
+  /* DIE KARTE IST SO HOCH WIE IHR INHALT (R24 S13-F1, Ulas 29.10.). Bei
+   * 1024x768 stand die Snack-Reihe unter der Falz (Port 611px, Woche 684px).
+   * Zwei Hoehen kamen nicht aus dem Inhalt: die Aktionsleiste trug ihren
+   * Abstand und ihr Polster auch ohne einen Knopf (20px unter einem Titel,
+   * 16 darueber), und der Slot hielt 72px Mindesthoehe - eine leere Reihe war
+   * so hoch wie eine einzeilige Karte. Das Polster der Karte folgt der
+   * Spaltenbreite (128-140px): `--space-3` wie die Kacheln der Leiste.
+   * Gemessen 1024x768: Woche 684 -> 624px in 624px Port, kein Hochscrollen. */
+  .week-grid .meal-slot {
+    min-height: var(--target-lg);
+  }
+
+  .week-grid .meal-card__open {
+    padding: var(--space-3) var(--space-3) 0;
+  }
+
+  .week-grid .meal-card__actions {
+    padding: 0 var(--space-3) var(--space-3);
+  }
+
+  .week-grid .meal-card__actions:not(:has(*)) {
+    margin-top: 0;
+  }
+
+  /* Der Plan ist ein eigener Scrollport mit eigenem Bodenpolster
+   * (`--scrollport-pad`); darunter reicht der Abstand der Kalenderwoche. Nur
+   * ohne Leiste - mit ihr steht die Leiste unten und haelt den Seitenabstand. */
+  .meals-layout--rail-hidden {
+    padding-block-end: var(--space-4);
+  }
 }
 
 /* --------------------------------------------------------
@@ -1787,7 +1818,6 @@
       align-items: center;
       padding: 0;
       margin-inline-start: var(--space-2);
-      min-block-size: var(--space-5);
       background-color: transparent;
     }
 
@@ -1802,8 +1832,17 @@
       margin-top: 0;
     }
 
+    /* DIE TYPZEILE IST SO HOCH WIE IHR WORT (R24 S13-F1): das Etikett trug
+     * 20px Mindesthoehe in 24px Abstand fuer 15px Schrift. Jetzt traegt der
+     * Abstand das Wort (15px) und eine Luecke darunter; ueber ihm bleibt die
+     * Reihenluecke (8px) - mehr Luft ueber dem Kopf als unter ihm. Der
+     * Tageskopf ruht oben auf der Kopfleiste und braucht dort nur `--space-2`. */
     .week-grid .meal-slot {
-      margin-block-start: var(--space-6);
+      margin-block-start: var(--space-5);
+    }
+
+    .week-grid .day-header {
+      padding-block-start: var(--space-2);
     }
 
     .week-grid.has-fade-start .week-gutter-label {
