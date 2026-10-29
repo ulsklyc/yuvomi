@@ -639,7 +639,7 @@
         "commentsLabel": "評論",
         "commentsEmpty": "還沒有評論。",
         "commentsLoadError": "無法載入評論。",
-        "commentPlaceholder": "寫下評論，用 @ 提到某人",
+        "commentPlaceholder": "評論，@ 提及某人",
         "commentSubmit": "發表評論",
         "commentEdit": "編輯評論",
         "commentDelete": "刪除評論",

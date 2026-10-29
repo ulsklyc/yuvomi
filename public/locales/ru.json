@@ -751,7 +751,7 @@
         "commentsLabel": "Комментарии",
         "commentsEmpty": "Комментариев пока нет.",
         "commentsLoadError": "Не удалось загрузить комментарии.",
-        "commentPlaceholder": "Напишите комментарий, @ упоминает кого-то",
+        "commentPlaceholder": "Комментарий, @ для отметки",
         "commentSubmit": "Комментировать",
         "commentEdit": "Изменить комментарий",
         "commentDelete": "Удалить комментарий",

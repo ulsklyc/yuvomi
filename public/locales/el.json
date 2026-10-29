@@ -639,7 +639,7 @@
         "commentsLabel": "Σχόλια",
         "commentsEmpty": "Δεν υπάρχουν ακόμη σχόλια.",
         "commentsLoadError": "Τα σχόλια δεν φορτώθηκαν.",
-        "commentPlaceholder": "Γράψτε ένα σχόλιο, το @ αναφέρει κάποιον",
+        "commentPlaceholder": "Σχόλιο, @ για αναφορά",
         "commentSubmit": "Σχολιασμός",
         "commentEdit": "Επεξεργασία σχολίου",
         "commentDelete": "Διαγραφή σχολίου",

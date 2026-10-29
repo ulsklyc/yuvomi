@@ -639,7 +639,7 @@
         "commentsLabel": "Opmerkingen",
         "commentsEmpty": "Nog geen opmerkingen.",
         "commentsLoadError": "Opmerkingen konden niet worden geladen.",
-        "commentPlaceholder": "Schrijf een opmerking, @ noemt iemand",
+        "commentPlaceholder": "Opmerking, @ om te noemen",
         "commentSubmit": "Plaatsen",
         "commentEdit": "Opmerking bewerken",
         "commentDelete": "Opmerking verwijderen",

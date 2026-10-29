@@ -657,7 +657,7 @@
         "commentsLabel": "Kommentare",
         "commentsEmpty": "Noch keine Kommentare.",
         "commentsLoadError": "Kommentare konnten nicht geladen werden.",
-        "commentPlaceholder": "Kommentar schreiben, @ erwähnt jemanden",
+        "commentPlaceholder": "Kommentar, @ zum Erwähnen",
         "commentSubmit": "Kommentieren",
         "commentEdit": "Kommentar bearbeiten",
         "commentDelete": "Kommentar löschen",

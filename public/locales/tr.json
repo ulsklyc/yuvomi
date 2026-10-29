@@ -639,7 +639,7 @@
         "commentsLabel": "Yorumlar",
         "commentsEmpty": "Henüz yorum yok.",
         "commentsLoadError": "Yorumlar yüklenemedi.",
-        "commentPlaceholder": "Yorum yazın, @ birini etiketler",
+        "commentPlaceholder": "Yorum, @ ile etiketle",
         "commentSubmit": "Yorum yap",
         "commentEdit": "Yorumu düzenle",
         "commentDelete": "Yorumu sil",

@@ -639,7 +639,7 @@
         "commentsLabel": "コメント",
         "commentsEmpty": "まだコメントはありません。",
         "commentsLoadError": "コメントを読み込めませんでした。",
-        "commentPlaceholder": "コメントを書く。@ で誰かに触れます",
+        "commentPlaceholder": "コメント（@ でメンション）",
         "commentSubmit": "コメントする",
         "commentEdit": "コメントを編集",
         "commentDelete": "コメントを削除",

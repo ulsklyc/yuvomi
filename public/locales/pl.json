@@ -769,7 +769,7 @@
         "commentsLabel": "Komentarze",
         "commentsEmpty": "Jeszcze brak komentarzy.",
         "commentsLoadError": "Nie udało się wczytać komentarzy.",
-        "commentPlaceholder": "Napisz komentarz, @ oznacza kogoś",
+        "commentPlaceholder": "Komentarz, @ by oznaczyć",
         "commentSubmit": "Skomentuj",
         "commentEdit": "Edytuj komentarz",
         "commentDelete": "Usuń komentarz",

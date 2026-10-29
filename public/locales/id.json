@@ -657,7 +657,7 @@
         "commentsLabel": "Komentar",
         "commentsEmpty": "Belum ada komentar.",
         "commentsLoadError": "Komentar gagal dimuat.",
-        "commentPlaceholder": "Tulis komentar, @ menyebut seseorang",
+        "commentPlaceholder": "Komentar, @ untuk menyebut",
         "commentSubmit": "Komentari",
         "commentEdit": "Ubah komentar",
         "commentDelete": "Hapus komentar",

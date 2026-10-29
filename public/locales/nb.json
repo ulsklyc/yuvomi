@@ -639,7 +639,7 @@
         "commentsLabel": "Kommentarer",
         "commentsEmpty": "Ingen kommentarer ennå.",
         "commentsLoadError": "Kunne ikke laste kommentarer.",
-        "commentPlaceholder": "Skriv en kommentar, @ nevner noen",
+        "commentPlaceholder": "Kommentar, @ for å nevne",
         "commentSubmit": "Kommenter",
         "commentEdit": "Rediger kommentar",
         "commentDelete": "Slett kommentar",

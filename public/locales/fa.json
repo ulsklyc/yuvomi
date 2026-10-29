@@ -657,7 +657,7 @@
         "commentsLabel": "دیدگاه‌ها",
         "commentsEmpty": "هنوز دیدگاهی نیست.",
         "commentsLoadError": "دیدگاه‌ها بارگذاری نشد.",
-        "commentPlaceholder": "دیدگاهی بنویسید، @ کسی را نام می‌برد",
+        "commentPlaceholder": "دیدگاه، @ برای نام‌بردن",
         "commentSubmit": "ثبت دیدگاه",
         "commentEdit": "ویرایش دیدگاه",
         "commentDelete": "حذف دیدگاه",

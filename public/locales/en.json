@@ -639,7 +639,7 @@
         "commentsLabel": "Comments",
         "commentsEmpty": "No comments yet.",
         "commentsLoadError": "Comments could not be loaded.",
-        "commentPlaceholder": "Write a comment, @ mentions someone",
+        "commentPlaceholder": "Comment, @ to mention",
         "commentSubmit": "Comment",
         "commentEdit": "Edit comment",
         "commentDelete": "Delete comment",

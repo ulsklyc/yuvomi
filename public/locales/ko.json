@@ -657,7 +657,7 @@
         "commentsLabel": "댓글",
         "commentsEmpty": "아직 댓글이 없습니다.",
         "commentsLoadError": "댓글을 불러오지 못했습니다.",
-        "commentPlaceholder": "댓글을 쓰세요. @로 누군가를 언급합니다",
+        "commentPlaceholder": "댓글, @로 언급",
         "commentSubmit": "댓글 쓰기",
         "commentEdit": "댓글 수정",
         "commentDelete": "댓글 삭제",

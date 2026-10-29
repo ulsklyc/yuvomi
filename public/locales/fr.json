@@ -639,7 +639,7 @@
         "commentsLabel": "Commentaires",
         "commentsEmpty": "Aucun commentaire pour l'instant.",
         "commentsLoadError": "Impossible de charger les commentaires.",
-        "commentPlaceholder": "Écrire un commentaire, @ mentionne quelqu'un",
+        "commentPlaceholder": "Commentaire, @ pour citer",
         "commentSubmit": "Commenter",
         "commentEdit": "Modifier le commentaire",
         "commentDelete": "Supprimer le commentaire",

@@ -639,7 +639,7 @@
         "commentsLabel": "Kommentarer",
         "commentsEmpty": "Inga kommentarer än.",
         "commentsLoadError": "Kommentarerna kunde inte laddas.",
-        "commentPlaceholder": "Skriv en kommentar, @ nämner någon",
+        "commentPlaceholder": "Kommentar, @ för att nämna",
         "commentSubmit": "Kommentera",
         "commentEdit": "Redigera kommentar",
         "commentDelete": "Ta bort kommentar",

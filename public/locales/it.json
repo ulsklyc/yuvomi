@@ -639,7 +639,7 @@
         "commentsLabel": "Commenti",
         "commentsEmpty": "Ancora nessun commento.",
         "commentsLoadError": "Impossibile caricare i commenti.",
-        "commentPlaceholder": "Scrivi un commento, @ menziona qualcuno",
+        "commentPlaceholder": "Commento, @ per menzionare",
         "commentSubmit": "Commenta",
         "commentEdit": "Modifica commento",
         "commentDelete": "Elimina commento",

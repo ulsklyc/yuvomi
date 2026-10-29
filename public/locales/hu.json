@@ -639,7 +639,7 @@
         "commentsLabel": "Hozzászólások",
         "commentsEmpty": "Még nincs hozzászólás.",
         "commentsLoadError": "A hozzászólásokat nem sikerült betölteni.",
-        "commentPlaceholder": "Írj hozzászólást, a @ megemlít valakit",
+        "commentPlaceholder": "Hozzászólás, @ említéshez",
         "commentSubmit": "Hozzászólás",
         "commentEdit": "Hozzászólás szerkesztése",
         "commentDelete": "Hozzászólás törlése",

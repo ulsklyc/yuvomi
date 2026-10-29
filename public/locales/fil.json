@@ -657,7 +657,7 @@
         "commentsLabel": "Mga komento",
         "commentsEmpty": "Wala pang komento.",
         "commentsLoadError": "Hindi na-load ang mga komento.",
-        "commentPlaceholder": "Sumulat ng komento, ang @ ay bumabanggit ng tao",
+        "commentPlaceholder": "Komento, @ para bumanggit",
         "commentSubmit": "Magkomento",
         "commentEdit": "I-edit ang komento",
         "commentDelete": "Burahin ang komento",

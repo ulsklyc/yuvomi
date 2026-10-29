@@ -310,3 +310,21 @@ test('R24: "Teilaufgabe hinzufuegen" ist eine ruhige Zeile, keine gestrichelte K
     assert.doesNotMatch(r.body, /radius-full/, `${sel}: keine Kapsel`);
   }
 });
+
+/* R24 S13 (Uebergabe S8): der Hinweis im einzeiligen Kommentarfeld endete am
+ * Telefon in einer Ellipse - "Kommentar schreiben, @ erwähnt jemanden" ist bei
+ * 17px 320px breit, das Feld laesst neben dem Senden-Pfeil 238px (390px,
+ * gemessen). Jetzt die kurze Form "Kommentar, @ zum Erwähnen": gemessen in
+ * allen 27 Sprachen 92-225px. Der Guard zaehlt Zeichen als Naeherung - die
+ * Breite haengt an der Schrift, die Zahl an der Fassung. */
+test('R24 S13: der Kommentar-Hinweis passt am Telefon in jeder Sprache in die Zeile', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const zuLang = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const text = JSON.parse(readFileSync(new URL(file, dir), 'utf8')).tasks?.commentPlaceholder ?? '';
+    assert.ok(text.includes('@'), `${file}: der Hinweis nennt die Erwaehnung`);
+    if ([...text].length > 30) zuLang.push(`${file}: ${[...text].length}`);
+  }
+  assert.deepEqual(zuLang, [], 'laenger als 30 Zeichen laeuft am Telefon in die Ellipse');
+});

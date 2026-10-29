@@ -807,7 +807,7 @@
         "commentsLabel": "التعليقات",
         "commentsEmpty": "لا توجد تعليقات بعد.",
         "commentsLoadError": "تعذّر تحميل التعليقات.",
-        "commentPlaceholder": "اكتب تعليقًا، و@ يذكر شخصًا",
+        "commentPlaceholder": "تعليق، @ للإشارة",
         "commentSubmit": "علّق",
         "commentEdit": "تعديل التعليق",
         "commentDelete": "حذف التعليق",

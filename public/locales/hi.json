@@ -639,7 +639,7 @@
         "commentsLabel": "टिप्पणियाँ",
         "commentsEmpty": "अभी कोई टिप्पणी नहीं.",
         "commentsLoadError": "टिप्पणियाँ लोड नहीं हो सकीं.",
-        "commentPlaceholder": "टिप्पणी लिखें, @ किसी का उल्लेख करता है",
+        "commentPlaceholder": "टिप्पणी, उल्लेख के लिए @",
         "commentSubmit": "टिप्पणी करें",
         "commentEdit": "टिप्पणी संपादित करें",
         "commentDelete": "टिप्पणी हटाएँ",

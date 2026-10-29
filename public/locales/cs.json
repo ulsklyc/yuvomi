@@ -697,7 +697,7 @@
         "commentsLabel": "Komentáře",
         "commentsEmpty": "Zatím žádné komentáře.",
         "commentsLoadError": "Komentáře se nepodařilo načíst.",
-        "commentPlaceholder": "Napište komentář, @ někoho zmíní",
+        "commentPlaceholder": "Komentář, @ pro zmínku",
         "commentSubmit": "Komentovat",
         "commentEdit": "Upravit komentář",
         "commentDelete": "Smazat komentář",

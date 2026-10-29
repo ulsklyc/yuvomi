@@ -639,7 +639,7 @@
         "commentsLabel": "Bình luận",
         "commentsEmpty": "Chưa có bình luận.",
         "commentsLoadError": "Không tải được bình luận.",
-        "commentPlaceholder": "Viết bình luận, @ nhắc đến ai đó",
+        "commentPlaceholder": "Bình luận, @ để nhắc tên",
         "commentSubmit": "Bình luận",
         "commentEdit": "Sửa bình luận",
         "commentDelete": "Xóa bình luận",

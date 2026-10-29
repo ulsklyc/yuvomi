@@ -639,7 +639,7 @@
         "commentsLabel": "评论",
         "commentsEmpty": "还没有评论。",
         "commentsLoadError": "无法加载评论。",
-        "commentPlaceholder": "写下评论，用 @ 提到某人",
+        "commentPlaceholder": "评论，@ 提及某人",
         "commentSubmit": "发表评论",
         "commentEdit": "编辑评论",
         "commentDelete": "删除评论",

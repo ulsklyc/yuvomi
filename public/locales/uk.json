@@ -751,7 +751,7 @@
         "commentsLabel": "Коментарі",
         "commentsEmpty": "Коментарів поки немає.",
         "commentsLoadError": "Не вдалося завантажити коментарі.",
-        "commentPlaceholder": "Напишіть коментар, @ згадує когось",
+        "commentPlaceholder": "Коментар, @ для згадки",
         "commentSubmit": "Коментувати",
         "commentEdit": "Редагувати коментар",
         "commentDelete": "Видалити коментар",
