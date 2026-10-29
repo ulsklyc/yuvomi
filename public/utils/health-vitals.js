@@ -319,6 +319,72 @@ export function widenToSpan(lo, hi, span, { ceiling = Infinity } = {}) {
 
 const CHANNEL_KEYS = ['value_num', 'value_num2', 'value_num3'];
 
+// EINE EINHEIT JE SERIE (#2328). `unit` ist freier Text, und die API nimmt
+// auch an, was der Dialog nicht anbietet: 95.400 g neben 95,4 kg zeichneten
+// eine Spitze bei 95400 und eine Aenderung von +95.304,7. Umgerechnet wird
+// beim Lesen, gespeichert bleibt, was kam. Je Messart eine Basis-Einheit und
+// je Einheit (klein geschrieben) die Umrechnung dorthin; Temperatur ist nicht
+// proportional und traegt deshalb Hin- und Rueckweg.
+const linear = (factor) => ({ toBase: (v) => v * factor, fromBase: (v) => v / factor });
+const fahrenheit = { toBase: (v) => (v - 32) * 5 / 9, fromBase: (v) => v * 9 / 5 + 32 };
+const LENGTH_UNITS = { cm: linear(1), mm: linear(0.1), m: linear(100), in: linear(2.54) };
+const UNIT_CONVERSIONS = Object.freeze({
+  weight: { kg: linear(1), g: linear(0.001), lb: linear(0.45359237), lbs: linear(0.45359237) },
+  height: LENGTH_UNITS,
+  head_circumference: LENGTH_UNITS,
+  // 1 mmol/L Glukose = 18,0182 mg/dL (molare Masse 180,182 g/mol).
+  glucose: { 'mg/dl': linear(1), 'mmol/l': linear(18.0182) },
+  temp: { '°c': linear(1), c: linear(1), '°f': fahrenheit, f: fahrenheit },
+});
+
+function unitConversion(type, unit) {
+  if (unit === null || unit === undefined) return undefined;
+  return ownEntry(ownEntry(UNIT_CONVERSIONS, type), String(unit).trim().toLowerCase());
+}
+
+/**
+ * Die Einheit, in der eine Messart gezeigt wird: die haeufigste der im Dialog
+ * waehlbaren (`metric.units`), bei Gleichstand die erste der Liste; kommt
+ * keine vor (nur Gramm per API), die erste waehlbare.
+ */
+function vitalDisplayUnit(metric, rows) {
+  const units = metric?.units ?? [];
+  if (units.length < 2) return units[0] ?? null;
+  const counts = new Map(units.map((u) => [u.toLowerCase(), 0]));
+  for (const row of rows) {
+    const key = row.unit == null ? '' : String(row.unit).trim().toLowerCase();
+    if (counts.has(key)) counts.set(key, counts.get(key) + 1);
+  }
+  let best = units[0];
+  for (const u of units) if (counts.get(u.toLowerCase()) > counts.get(best.toLowerCase())) best = u;
+  return best;
+}
+
+/**
+ * Rechnet einen Wert zwischen zwei Einheiten derselben Messart um. Ohne
+ * bekannte Umrechnung (fremde Einheit, Einheit fehlt) kommt der Wert
+ * unveraendert zurueck - raten waere schlimmer als stehen lassen.
+ */
+export function convertVitalValue(type, value, fromUnit, toUnit) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return value;
+  const from = unitConversion(type, fromUnit);
+  const to = unitConversion(type, toUnit);
+  if (!from || !to || from === to) return value;
+  // Auf 1e-6 gerundet: 95400 * 0,001 ist sonst 95,39999999999999.
+  return Math.round(to.fromBase(from.toBase(value)) * 1e6) / 1e6;
+}
+
+/** Kopie einer Zeile in der Anzeige-Einheit; ohne Umrechnung die Zeile selbst. */
+function toDisplayUnit(row, type, unit) {
+  if (!unit || !unitConversion(type, row.unit) || !unitConversion(type, unit)) return row;
+  const out = { ...row, unit };
+  for (const key of CHANNEL_KEYS) {
+    const val = toFiniteOrNull(row[key]);
+    if (val !== null) out[key] = convertVitalValue(type, val, row.unit, unit);
+  }
+  return out;
+}
+
 /** Datums-Anteil (YYYY-MM-DD) eines measured_at-Zeitstempels ohne UTC-Shift. */
 function dateKeyOf(measuredAt) {
   return String(measuredAt).slice(0, 10);
@@ -512,7 +578,7 @@ export function buildVitalBuckets(range, anchorKey, weekStartsOn = 1, { today = 
  * @param {number} [opts.weekStartsOn=1]
  * @returns {{
  *   type: string, range: string, from: string, to: string, gran: string,
- *   channels: string[],
+ *   channels: string[], unit: string|null,  // Anzeige-Einheit (#2328)
  *   points: Array<{ key:string, date:string, count:number,
  *                   value_num:number|null, value_num2:number|null, value_num3:number|null,
  *                   min: Object, max: Object }>,  // je Kanal kleinster/groesster Wert
@@ -528,7 +594,10 @@ export function computeVitalSeries(rows, opts = {}) {
   const metric = vitalMetric(type);
   const channels = metric ? metric.channels : ['value_num'];
 
-  const typeRows = (Array.isArray(rows) ? rows : []).filter((r) => r && r.type === type);
+  const ownRows = (Array.isArray(rows) ? rows : []).filter((r) => r && r.type === type);
+  // #2328: vor Delta, Mittelwert und Achse alles in eine Einheit.
+  const unit = vitalDisplayUnit(metric, ownRows);
+  const typeRows = ownRows.map((r) => toDisplayUnit(r, type, unit));
 
   // Kennzahlen: letzter + vorletzter Wert über ALLE Messungen dieses Typs,
   // unabhängig vom gewählten Zeitraum (das Delta zeigt die jüngste Änderung).
@@ -617,6 +686,7 @@ export function computeVitalSeries(rows, opts = {}) {
     to,
     gran,
     channels,
+    unit,
     points,
     readings,
     hasData: points.some((p) => p.count > 0),

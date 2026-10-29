@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Secrets can be read from files (`<NAME>_FILE`).** `SESSION_SECRET`, `DB_ENCRYPTION_KEY` and the
+  other secrets (client secrets, passwords, API keys) can now come from a file instead of an
+  environment variable: set `SESSION_SECRET_FILE=/run/secrets/session_secret` and the content of that
+  file is used, the same convention as the official postgres and mysql images. That keeps the value
+  out of `.env`, the compose file and `docker inspect`, and works with Docker and Podman secrets or a
+  Vault Agent without a wrapper around the entrypoint. Setting both `<NAME>` and `<NAME>_FILE` stops
+  the start, and so does a missing or empty file: falling back would be harmful for
+  `DB_ENCRYPTION_KEY`, where the app would otherwise start on a new, unencrypted database. Only line
+  breaks at the end of the file are removed. The app reads the file as the user it runs as - uid
+  1000 in the image, 568 on TrueNAS - not as root, so the file needs that owner and mode `600`; a
+  file that other users can read and that is not read-only, such as one written by a plain `printf`,
+  logs a warning at start-up. The
+  list of supported names and how to create the file are in the environment variables reference.
 - **New tasks remember your preferred visibility and lock setting (#2125).** In Settings > Tasks
   you can now choose the visibility and lock state that the new-task dialog opens with. Each
   individual task can still use different values; the defaults only prefill the dialog.
@@ -346,6 +359,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not read it in; a rule Yuvomi added to such a task is marked, so switching the repeat off
   here takes it away again unless the other app has changed it since. "Repeat from completion"
   stays a Yuvomi setting: the standard has no way to say it.
+- **Weights in grams and kilograms sit on the same line** (#2328). A weight sent over the API in
+  grams (95400 g) was drawn next to the kilogram readings as a spike at 95400, and the change card
+  showed +95,304.7. Readings of one kind are now converted to a single unit before the chart, the
+  average and the change are calculated - the unit most of your readings use, otherwise kilograms.
+  The same applies to height and head circumference (cm, m, mm, in), temperature (°C, °F) and blood
+  sugar (mg/dL, mmol/L). The stored readings stay as they were sent.
 - **SMTP with encryption "None" sends without encryption** (#2326). Until now Yuvomi still switched
   to STARTTLS whenever the mail server offered it, so an internal relay on port 25 with a self-signed
   certificate failed with "self-signed certificate". "None" now never upgrades the connection, both

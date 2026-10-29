@@ -7,6 +7,7 @@
 
 import readline from 'node:readline';
 import bcrypt from 'bcrypt';
+import './server/utils/load-file-secrets.js';
 import * as db from './server/db.js';
 import os from 'node:os';
 

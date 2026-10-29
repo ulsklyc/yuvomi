@@ -1228,3 +1228,79 @@ test('#1699: der Zeitraum-Umschalter beginnt mit "Tag"', async () => {
     assert.deepEqual([...html.matchAll(/data-sheet-range="(\w+)"/g)].map((m) => m[1]), ['day', 'week', 'month', 'year']);
   });
 });
+
+// --------------------------------------------------------
+// #2328: Einheiten einer Messart vor jeder Rechnung angleichen
+// --------------------------------------------------------
+// Die API nimmt `unit` als freien Text. 95.400 g neben 95,4 kg zeichneten eine
+// Spitze bei 95400 und eine Aenderung von +95.304,7. Gespeichert bleibt, was
+// kam; die Serie rechnet alles in EINE Anzeige-Einheit um.
+
+test('#2328: Gramm und Kilogramm landen auf derselben Hoehe', () => {
+  const rows = [
+    { id: 1, type: 'weight', value_num: 95.6, unit: 'kg', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'weight', value_num: 95.4, unit: 'kg', measured_at: '2026-06-11T08:00' },
+    { id: 3, type: 'weight', value_num: 95400, unit: 'g', measured_at: '2026-06-12T08:00' },
+  ];
+  const s = computeVitalSeries(rows, { type: 'weight', range: 'month', anchor: '2026-06-15', today: '2026-06-15' });
+  assert.equal(s.unit, 'kg');
+  assert.equal(s.latest.unit, 'kg');
+  assert.equal(s.latest.value_num, 95.4);
+  assert.equal(s.deltas.value_num, 0);
+  const max = Math.max(...s.readings.map((r) => r.value_num));
+  assert.ok(max < 100, `hoechster Punkt ${max} statt rund 95`);
+  assert.ok(s.points.every((p) => p.max.value_num === null || p.max.value_num < 100));
+});
+
+test('#2328: die Anzeige-Einheit ist die haeufigste waehlbare', () => {
+  const rows = [
+    { id: 1, type: 'weight', value_num: 200, unit: 'lb', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'weight', value_num: 202, unit: 'lb', measured_at: '2026-06-11T08:00' },
+    { id: 3, type: 'weight', value_num: 91, unit: 'kg', measured_at: '2026-06-12T08:00' },
+  ];
+  const s = computeVitalSeries(rows, { type: 'weight', range: 'month', anchor: '2026-06-15', today: '2026-06-15' });
+  assert.equal(s.unit, 'lb');
+  assert.equal(s.latest.unit, 'lb');
+  assert.ok(Math.abs(s.latest.value_num - 200.62) < 0.01, String(s.latest.value_num));
+  // Nur Gramm erfasst: angezeigt wird trotzdem die erste waehlbare Einheit.
+  const g = computeVitalSeries([{ id: 9, type: 'weight', value_num: 3500, unit: 'g', measured_at: '2026-06-12T08:00' }],
+    { type: 'weight', range: 'month', anchor: '2026-06-15', today: '2026-06-15' });
+  assert.equal(g.latest.unit, 'kg');
+  assert.equal(g.latest.value_num, 3.5);
+});
+
+test('#2328: Laenge, Temperatur und Blutzucker rechnen genauso um', () => {
+  const opts = { range: 'month', anchor: '2026-06-15', today: '2026-06-15' };
+  const height = computeVitalSeries([
+    { id: 1, type: 'height', value_num: 180, unit: 'cm', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'height', value_num: 181, unit: 'cm', measured_at: '2026-06-11T08:00' },
+    { id: 3, type: 'height', value_num: 1.8, unit: 'm', measured_at: '2026-06-12T08:00' },
+  ], { type: 'height', ...opts });
+  assert.equal(height.latest.value_num, 180);
+  assert.equal(height.deltas.value_num, -1);
+  const temp = computeVitalSeries([
+    { id: 1, type: 'temp', value_num: 37, unit: '°C', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'temp', value_num: 37.5, unit: '°C', measured_at: '2026-06-11T08:00' },
+    { id: 3, type: 'temp', value_num: 98.6, unit: '°F', measured_at: '2026-06-12T08:00' },
+  ], { type: 'temp', ...opts });
+  assert.equal(temp.latest.unit, '°C');
+  assert.equal(temp.latest.value_num, 37);
+  const glucose = computeVitalSeries([
+    { id: 1, type: 'glucose', value_num: 90, unit: 'mg/dL', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'glucose', value_num: 100, unit: 'mg/dL', measured_at: '2026-06-11T08:00' },
+    { id: 3, type: 'glucose', value_num: 5, unit: 'mmol/L', measured_at: '2026-06-12T08:00' },
+  ], { type: 'glucose', ...opts });
+  assert.equal(glucose.latest.unit, 'mg/dL');
+  assert.ok(Math.abs(glucose.latest.value_num - 90.09) < 0.01, String(glucose.latest.value_num));
+});
+
+test('#2328: unbekannte oder fehlende Einheit bleibt unangetastet', () => {
+  const rows = [
+    { id: 1, type: 'weight', value_num: 15, unit: 'stone', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'weight', value_num: 95, unit: null, measured_at: '2026-06-11T08:00' },
+  ];
+  const s = computeVitalSeries(rows, { type: 'weight', range: 'month', anchor: '2026-06-15', today: '2026-06-15' });
+  assert.equal(s.latest.value_num, 95);
+  assert.equal(s.previous.value_num, 15);
+  assert.equal(s.previous.unit, 'stone');
+});

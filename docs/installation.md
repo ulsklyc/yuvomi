@@ -555,6 +555,42 @@ Generate a secure `SESSION_SECRET`:
 openssl rand -hex 32
 ```
 
+### Secrets from Files (Optional)
+
+Instead of putting a secret into `.env` or an environment variable, point `<NAME>_FILE` at a file that holds it. The content of the file is used as the value of `<NAME>`, the same convention as the official postgres and mysql images. This fits Docker and Podman secrets, a Vault Agent, or any mounted secret file.
+
+Supported names: `SESSION_SECRET`, `DB_ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_DRIVE_CLIENT_SECRET`, `MS_CLIENT_SECRET`, `OIDC_CLIENT_SECRET`, `APPLE_APP_SPECIFIC_PASSWORD`, `OPENWEATHER_API_KEY`, `FIXER_API_KEY`, `WEBDAV_BACKUP_PASSWORD`, `DOCUMENT_STORAGE_WEBDAV_PASSWORD`, `VAPID_PRIVATE_KEY`, `EMAIL_SMTP_PASS` and `IMMICH_API_KEY`. Each takes a `_FILE` variant, for example `SESSION_SECRET_FILE`.
+
+```yaml
+services:
+  yuvomi:
+    environment:
+      SESSION_SECRET_FILE: /run/secrets/session_secret
+      DB_ENCRYPTION_KEY_FILE: /run/secrets/db_encryption_key
+    secrets: [session_secret, db_encryption_key]
+
+secrets:
+  session_secret:
+    file: ./secrets/session_secret
+  db_encryption_key:
+    file: ./secrets/db_encryption_key
+```
+
+- Set either `<NAME>` or `<NAME>_FILE`, not both: the start stops with a message naming the variable.
+- A missing, unreadable or empty file stops the start. There is no silent fallback, because for `DB_ENCRYPTION_KEY` that would start on a new, unencrypted database.
+- Line breaks at the end of the file are ignored; everything else, spaces included, belongs to the value. Keep a copy of the database key elsewhere: it cannot be recovered or changed on an existing database.
+- Remove the matching `<NAME>=` lines from `.env`.
+
+**File permissions.** The file is read by the user the app runs as, not by root: the image's entrypoint switches to `node` (uid 1000) before the server starts, and TrueNAS starts the container as uid 568 from the outset. This differs from the postgres image, which reads its secret files as root. A file that belongs to root with mode `600` therefore stops the start with `EACCES`. With Docker Compose the secret is a bind mount that keeps the owner and mode from the host, so create the file under `umask 077` and hand it to that uid:
+
+```bash
+mkdir -p secrets
+(umask 077; printf '%s' "$(openssl rand -hex 32)" > secrets/db_encryption_key)
+sudo chown 1000:1000 secrets/db_encryption_key   # 568:568 on TrueNAS
+```
+
+Without `umask 077`, a plain `printf ... >` creates a file every user on the host can read; the start then logs a warning naming the variable, the path and the mode. Podman and Docker Swarm mount their secrets read-only and readable (`0444`) inside the container, so there is nothing to change there and no warning. Kubernetes secret volumes default to `0644` and do get the warning: set `defaultMode: 0440` together with `fsGroup: 1000` on the pod.
+
 ### Web Push (Optional)
 
 Push notifications deliver due reminders to a device as system notifications even when the app
