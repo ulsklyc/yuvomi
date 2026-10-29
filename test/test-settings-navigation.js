@@ -1158,28 +1158,14 @@ test('Einstellungen: ein Sofort-Schalter im Formular hinterlaesst keinen offenen
   });
 });
 
-test('Einstellungen: ein Blatt ohne Formular (Rechte-Matrix) meldet seinen Entwurf selbst an (R15 A7 P1-1)', async () => {
-  await withGuardEnv(async ({ guard, leave, gefragt }) => {
-    const { container } = guardFakes();
-    guard.watchLeafForms(container);
-    let dirty = false;
-    const knoten = { isConnected: true };
-    const abmelden = guard.trackLeafEdits(knoten, () => dirty);
-    assert.equal(leave.hasLeaveGuard(), false, 'sauberer Entwurf: kein Waechter');
-    dirty = true;
-    guard.syncLeafEdits();
-    assert.equal(leave.hasLeaveGuard(), true, 'offener Entwurf: angemeldet');
-    assert.equal(await leave.mayLeave('/calendar'), false, 'und gefragt');
-    assert.equal(gefragt.length, 1);
-    guard.watchLeafForms(container);
-    assert.equal(leave.hasLeaveGuard(), true, 'ein Neuaufbau der Formularwache wirft die Quelle des Blatts nicht weg');
-    dirty = false;
-    guard.syncLeafEdits();
-    assert.equal(leave.hasLeaveGuard(), false, 'gespeichert: abgemeldet');
-    abmelden();
-  });
-  // R24 (E11): die Rechte-Matrix speichert jede Wahl sofort und hat keinen
-  // Entwurf mehr - sie meldet nichts an, und es gibt nichts zu verlieren.
+// R24 (E11): die Rechte-Matrix speichert jede Wahl sofort und hat keinen
+// Entwurf mehr - sie meldet nichts an, und es gibt nichts zu verlieren. Der
+// Weg fuer Blaetter ohne Formular (`trackLeafEdits`, R15 A7 P1-1) hatte damit
+// keinen Nutzer und ist seit R24 S12 entfallen: offen ist nur ein Formular
+// mit eigenem Absenden (die Tests darueber).
+test('Einstellungen: kein Blatt meldet einen Entwurf ohne Formular an - die Rechte-Matrix speichert sofort (R24 E11, S12)', async () => {
+  const guard = await import('/settings/dirty-guard.js');
+  assert.equal('trackLeafEdits' in guard, false, 'der Anmeldeweg ohne Formular ist entfallen');
   const src = await readFile(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /trackLeafEdits|state\.dirty/, 'kein Entwurf, keine Anmeldung');
   assert.match(src, /matrix\?\.addEventListener\('change'/, 'die Wahl wirkt beim Aendern');

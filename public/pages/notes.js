@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
-import { openModal as openSharedModal, closeModal, btnError, advancedSection, reportFieldError, captureModalContext, decorateFooterDelete } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, btnError, advancedSection, reportFieldError, captureModalContext, decorateFooterDelete, dialogInitialFocus } from '/components/modal.js';
 // Der Kategorie-Verwalter (`<yuvomi-category-manager>`, unten) registriert
 // sich beim Import.
 import '/components/category-manager.js';
@@ -1129,6 +1129,9 @@ function openNoteModal({ mode, note = null }) {
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
     title: isEdit && note.title && note.title.trim() ? note.title : (isEdit ? t('notes.viewNote') : t('notes.newNote')),
     content,
+    // Eine bestehende Notiz oeffnet lesend: am Finger nimmt der Titel den
+    // Fokus, keine Tastatur ueber dem Text (D4, R23 D13).
+    initialFocus: dialogInitialFocus(isEdit),
     // 'lg' statt 'md' (#826): eine Notiz ist fast nur Textflaeche und bekam
     // dieselbe Breite wie ein Formular aus vier kurzen Feldern. Das ist der
     // Dialog, der einheitlich ist, wo er es nicht sein sollte. 'lg' (680px) ist

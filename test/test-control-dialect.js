@@ -2156,17 +2156,13 @@ const PENDING = {
   // Gesundheit/Kontakte/Familie; Schnellzugriffe und Einstellungen S6.
   // R24 S11: Gesundheit, Kontakte, Geburtstage, Schnellzugriffe und die
   // Einstellungsblaetter der Gesundheit und der Adressbuch-Synchronisation
-  // sind umgestellt. Es bleiben Kalender, Notizen, Schichtplan (S7/S10 haben
-  // sie nicht angefasst - Uebergabe im handoff-11).
-  'edit-autofocus': {
-    'public/pages/calendar.js': 1,
-    'public/pages/notes.js': 1, 'public/pages/schedule.js': 1,
-  },
+  // sind umgestellt. R24 S12: Termin, Notiz und eigenes Schichtplan-Feld
+  // ebenso - die Liste ist leer.
+  'edit-autofocus': {},
   'advanced-hint': {},
-  // Die Rechte-Matrix hat seit R24 S11 (E11) keinen Speichern-Knopf mehr.
-  'primary-disabled': {
-    'public/pages/schedule.js': 1,
-  },
+  // Die Rechte-Matrix hat seit R24 S11 (E11) keinen Speichern-Knopf mehr; der
+  // Schichtplan meldet "Extra ohne Schichttyp" seit R24 S12 beim Absenden.
+  'primary-disabled': {},
   'people-checkbox': {},
 };
 

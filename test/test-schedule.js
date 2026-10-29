@@ -3797,3 +3797,41 @@ test('FAB nennt den Schichtplan und fehlt nur in der Auswertung; freie Tage steh
   assert.doesNotMatch(stats, /countItems\.push/, 'kein Balken fuer freie Tage');
   assert.match(stats, /t\('schedule\.freeDaysCount', \{ count: summary\.freeDays \}\)/);
 });
+
+// R24 S12 (Dialogregel D4, PENDING primary-disabled): "Extra" ohne einen
+// einzigen Schichttyp sperrte den Primaerknopf - grau, ohne zu sagen, was
+// fehlt. Jetzt bleibt er bedienbar, und das Absenden macht den Hinweis an der
+// Stelle der Typ-Auswahl zur Meldung (role=alert, Fokus) und sendet nichts.
+test('R24 S12: Extra ohne Schichttyp meldet sich beim Absenden am Hinweis, statt den Knopf zu sperren', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const src = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /saveButton\.disabled\s*=/, 'kein gesperrter Speichern-Knopf');
+  assert.match(src, /if \(reportFieldErrors\(constraintErrors\(form\)\)\) return;\s*if \(reportMissingShiftTypes\(form\)\) return;/,
+    'saveCreatedSchedule fragt vor dem Senden');
+  const typesBefore = __test.scheduleState().types;
+  const attrs = {};
+  const classes = new Set();
+  let focused = false;
+  const hint = {
+    classList: { add: (c) => classes.add(c) },
+    setAttribute: (k, v) => { attrs[k] = v; },
+    focus: () => { focused = true; },
+  };
+  let mode = 'add';
+  const form = {
+    dataset: { form: 'pattern-create' },
+    querySelector: (sel) => (sel === '[name="mode"]' ? { value: mode } : sel === '.schedule-no-types-hint' ? hint : null),
+  };
+  try {
+    __test.scheduleState().types = [];
+    assert.equal(__test.reportMissingShiftTypes(form), true, 'nichts senden');
+    assert.ok(classes.has('form-hint--danger') && attrs.role === 'alert' && focused, 'der Hinweis wird zur Meldung und nimmt den Fokus');
+    mode = 'replace';
+    assert.equal(__test.reportMissingShiftTypes(form), false, 'andere Modi brauchen keinen Typ an dieser Stelle');
+    mode = 'add';
+    __test.scheduleState().types = [{ id: 1 }];
+    assert.equal(__test.reportMissingShiftTypes(form), false, 'mit Schichttyp gilt die Auswahl');
+  } finally {
+    __test.scheduleState().types = typesBefore;
+  }
+});

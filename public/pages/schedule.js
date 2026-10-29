@@ -8,7 +8,7 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { initials } from '/utils/initials.js';
 import { shiftTypeLabel } from '/utils/shift-label.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
-import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError, reportFieldErrors, constraintErrors } from '/components/modal.js';
+import { openModal, closeModal, captureModalContext, confirmModal, confirmOverModal, advancedSection, refocusAfterRender, reportFieldError, reportFieldErrors, constraintErrors, dialogInitialFocus } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
 import { memberRanks, memberRankOf } from '/utils/member-order.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
@@ -2673,9 +2673,10 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
       // number." zurueckgab. `required` laesst den Browser das jetzt selbst
       // verhindern, der Hinweis ersetzt das leere <select> ganz (ein leerer
       // Waehler ist kein Formularfeld, das ausfuellbar waere), und der
-      // Speichern-Knopf bleibt fuer diesen Modus zusaetzlich gesperrt
-      // (updateAddModeAvailability() unten) - kein einziger Weg mehr zu einem
-      // Absenden ohne Typ.
+      // Speichern-Knopf bleibt bedienbar (Dialogregel D4, R24): wer ohne Typ
+      // absendet, bekommt den Hinweis als Meldung (saveCreatedSchedule,
+      // reportMissingShiftTypes) - kein Absenden ohne Typ, kein grauer Knopf,
+      // der nicht sagt, was fehlt.
       + '<fieldset data-field="mode-add"' + (mode === 'add' ? '' : ' hidden disabled') + '>' + (state.types.length
         ? formField(t('schedule.shiftType'), '<select class="form-input" required name="shift_type_id">' + typeOptions(null, false) + '</select>')
         : '<p class="form-hint schedule-no-types-hint">' + esc(t('schedule.noShiftTypesHint')) + '</p>')
@@ -2699,18 +2700,6 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
       // jeder Klick setzt `hidden` UND `disabled` gemeinsam auf jedem
       // <fieldset> - `disabled` ist der eigentliche Fix, nicht nur Kosmetik,
       // siehe Kommentar oben an der Formularerzeugung.
-      // S-02/S-07: der Speichern-Knopf bleibt gesperrt, solange der Modus
-      // "Extra" aktiv ist UND kein Schichttyp existiert - dieselbe Bedingung,
-      // unter der die Fieldset oben den Hinweis statt eines leeren <select>
-      // zeigt. Jeder andere Modus/Zustand bleibt unberuehrt.
-      // Der Knopf steht im Fuss, und den hebt mountFooter() aus dem <form> ans
-      // Panel - `form.querySelector` faende ihn nicht mehr.
-      const updateAddModeAvailability = () => {
-        const saveButton = modal.querySelector('[data-role="save-entry"]');
-        if (!saveButton) return;
-        const currentMode = form.querySelector('[name="mode"]')?.value;
-        saveButton.disabled = currentMode === 'add' && !state.types.length;
-      };
       // Die Kapsel des Umschalters gleitet wie jede Segmentleiste (Kanon,
       // Runde 7 D8) und folgt dem Klassenwechsel unten selbst.
       const modeBar = form?.querySelector('.schedule-create-mode');
@@ -2733,10 +2722,8 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
           setGroup('one-time-shared', mode !== 'pattern');
           setGroup('mode-replace', mode === 'replace');
           setGroup('mode-add', mode === 'add');
-          updateAddModeAvailability();
         });
       });
-      updateAddModeAvailability();
       form?.querySelector('[name="reminder_enabled"]')?.addEventListener('change', (event) => {
         form.querySelector('[name="reminder_offset_minutes"]').disabled = !event.currentTarget.checked;
       });
@@ -2762,12 +2749,31 @@ function collectFieldValues(scope) {
   return values;
 }
 
+/**
+ * "Extra" ohne einen einzigen Schichttyp (S-02/S-07): der Primaerknopf bleibt
+ * bedienbar (D4), und das Absenden meldet sich an der Stelle, an der sonst die
+ * Typ-Auswahl stuende - der Hinweis wird zur Meldung und nimmt den Fokus.
+ * @returns {boolean} true, wenn nichts gesendet werden darf
+ */
+function reportMissingShiftTypes(form) {
+  if (form?.dataset.form !== 'pattern-create') return false;
+  if (form.querySelector('[name="mode"]')?.value !== 'add' || state.types.length) return false;
+  const hint = form.querySelector('.schedule-no-types-hint');
+  if (!hint) return false;
+  hint.classList.add('form-hint--danger');
+  hint.setAttribute('role', 'alert');
+  hint.tabIndex = -1;
+  hint.focus({ preventScroll: false });
+  return true;
+}
+
 async function saveCreatedSchedule(event) {
   event.preventDefault();
   const form = event.currentTarget;
   // KEINE BROWSER-BLASEN (Critique R21, Muster der Gesundheit): das Formular
   // traegt `novalidate`, die Regeln des Markups melden sich am Feld.
   if (reportFieldErrors(constraintErrors(form))) return;
+  if (reportMissingShiftTypes(form)) return;
   const data = formData(form);
   if (reportReversedRange(form, data)) return;
   // Der Dialog, aus dem gesendet wird - VOR der ersten Rueckfrage und Anfrage
@@ -2925,6 +2931,7 @@ function openCustomFieldModal(field = null) {
   openModal({
     title: isEdit ? t('schedule.editCustomField') : t('schedule.createCustomField'),
     size: 'sm',
+    initialFocus: dialogInitialFocus(isEdit),
     content: '<form id="schedule-custom-field-form" novalidate class="form-stack schedule-modal-form">'
       + formField(t('schedule.fieldName'), '<input class="form-input" required name="name" maxlength="100" value="' + esc(field?.name ?? '') + '">')
       + '<div class="modal-panel__footer modal-panel__footer--plain"><button type="button" class="btn btn--secondary" data-action="close-modal">' + esc(t('common.cancel')) + '</button><button type="submit" class="btn btn--primary">' + esc(t(isEdit ? 'schedule.save' : 'common.add')) + '</button></div></form>',
@@ -3760,4 +3767,4 @@ export async function update({ path } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { shiftTypeGroups, shiftTypeListHtml, PRESET_TEMPLATES, presetShortCode, presetAlreadyThere, NUMERIC_PRESET_CODES, setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, saveCustomField, saveShiftTypeEdit, savePatternEdit, setRootForTest: (element) => { root = element; scheduleTablist = null; }, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, setOverviewForTest: (next) => { overview = { ...overview, ...next }; }, isOvernightEntry, overviewEntryBlock, alignOverviewToNow, renderOverviewNav, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
+export const __test = { reportMissingShiftTypes, shiftTypeGroups, shiftTypeListHtml, PRESET_TEMPLATES, presetShortCode, presetAlreadyThere, NUMERIC_PRESET_CODES, setStatisticsEntries: (entries) => { statistics = { ...statistics, entries }; }, availableTypeFields, shiftTypeFieldsEditor, syncTypeFieldPicker, editorAction, shiftTypeRow, patternRow, patternDaysEditorHtml, patternSaveOrder, initialOverviewSelection, renderOverview, overviewLaneHeader, planningPanel, scheduleFabIntent, renderStatistics, patternFields, formField, shiftFields, reminderOffsetField, emptyShiftTypesState, emptyPatternState, emptyOverrideState, emptyExtraShiftsState, emptyCustomFieldsState, customFieldsSection, scheduleState: () => state, userOptions, setOwnerContext, overrideGroups, extraGroups, patternsInMemberOrder, rangeDifference, wireRangeFollow, reportReversedRange, saveCreatedSchedule, saveCustomField, saveShiftTypeEdit, savePatternEdit, setRootForTest: (element) => { root = element; scheduleTablist = null; }, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, setOverviewForTest: (next) => { overview = { ...overview, ...next }; }, isOvernightEntry, overviewEntryBlock, alignOverviewToNow, renderOverviewNav, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };

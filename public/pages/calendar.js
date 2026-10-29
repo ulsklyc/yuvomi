@@ -9036,7 +9036,9 @@ function openEventModal({ mode, event = null, date = null, reminder = null, time
     staged: !isEdit,
     size: 'md',
     // Ein neuer Termin startet weiterhin mit dem Fokus im Titelfeld: Hier ist
-    // Tippen die Absicht, hier ist der Autofokus richtig.
+    // Tippen die Absicht, hier ist der Autofokus richtig. Bearbeiten holt am
+    // Finger keine Tastatur (D4, R23 D13): der Titel des Blatts nimmt ihn.
+    initialFocus: dialogInitialFocus(isEdit),
     onSave(panel) { wireEventForm(panel, { mode, event, reminder }); },
   });
 }

@@ -226,6 +226,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   select at least one contact." at the dialog instead. "More details" in the contact form names what it
   holds, and editing a birthday, quick link or address book account no longer brings up the keyboard on
   phones.
+- **Editing an event, a note or a custom shift field no longer brings up the keyboard on phones.** The
+  sheet opens with its title focused, as everywhere else. Adding an extra shift before any shift type
+  exists keeps "Add" pressable; it points at the missing shift types instead of staying grey.
 - **Health vitals have one time line.** Day, week, month or year is the same switch as elsewhere in the
   app, and the period arrows sit in the same line instead of above the chart - activity uses the same
   line for its week. The vitals chart keeps its height on wide screens (two charts of 200 px instead of
