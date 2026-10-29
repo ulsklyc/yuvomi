@@ -1044,15 +1044,27 @@ function drawMain(main) {
         * Budget > Aufteilung > Gruppe > Abschnitt; die Rolle kommt von der
         * Klasse. Ein leerer Abschnitt traegt keine Flaeche. */ ''}
     <div class="split-content-grid">
+      ${/* DER ABSCHNITT "SALDEN" ENTFAELLT, WENN DIE EINZIGE SCHULD IN DER
+          * KENNZAHL STEHT (Ulas 29.10., S10-F6). Uebrig blieb sonst ein Titel
+          * ueber nichts. Die Handlung an der Schuld ("Ausgleichen", mobil dazu
+          * der zweite Ausloeser der Gruppenwerkzeuge) bleibt - als Werkzeugzeile
+          * ohne Titel direkt unter der Kennzahl; der Name des Bereichs steht fuer
+          * Screenreader am Abschnitt. Ohne Handlung (Nur-lesen, Archiv) faellt
+          * der Abschnitt ganz weg. */ ''}
+      ${foldedDebt() ? (balanceActions ? `
+      <section class="split-section split-section--balances split-section--folded" aria-label="${esc(t('splitExpenses.balances'))}">
+        <div class="split-section-head">${balanceActions}
+        </div>
+      </section>` : '') : `
       <section class="split-section split-section--balances">
         <div class="split-section-head">
           <div class="split-section-head__lead">
             <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.balances')}</${SectionTag}>
-            ${foldedDebt() ? '' : `<span>${t('splitExpenses.simplified')}</span>`}
+            <span>${t('splitExpenses.simplified')}</span>
           </div>${balanceActions}
         </div>
         <div id="split-balances">${renderBalances()}</div>
-      </section>
+      </section>`}
       <section class="split-section split-section--expenses">
         <div class="split-section-head">
           <${SectionTag} class="split-section-title u-section-title">${t('splitExpenses.recentExpenses')}</${SectionTag}>

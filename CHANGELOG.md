@@ -65,7 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explanation under "Learn more" instead of an info tooltip, and the text field no longer shows a
   resize handle.
 - **One balance sentence.** When a group has a single open debt that involves you, the figure at the
-  top says it with the name ("You owe Alex Johnson 24.14 €") and the balances list no longer repeats it.
+  top says it with the name ("You owe Alex Johnson 24.14 €") and the balances list no longer repeats it;
+  the "Balances" heading then goes too, and "Settle up" stays right below the figure.
 - **Tapping a meal shows it first.** The meal card opens a read view (date, meal, cook, ingredients,
   recipe, notes) with Edit as the one main button and "Add to shopping list" next to it, instead of
   the full edit form. On a computer it opens next to the card. In the form, a meal's ingredients are

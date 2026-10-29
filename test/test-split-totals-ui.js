@@ -394,3 +394,27 @@ test('R24 G4-Aufteilung-P2-6: eine eigene Schuld steht EINMAL - als Kennzahl mit
     assert.equal(split.foldedDebt(), null);
   } finally { zurueck(); }
 });
+
+// R24 S10-F6 (Ulas 29.10.): steht die einzige Schuld schon in der Kennzahl,
+// entfaellt der Abschnitt "Salden" - kein Titel ueber nichts. "Ausgleichen"
+// bleibt als Werkzeugzeile; ohne Handlung (Nur-lesen) faellt er ganz weg.
+test('R24 S10-F6: die gefaltete Schuld laesst keinen leeren Salden-Abschnitt stehen, Ausgleichen bleibt', () => {
+  const schuld = { from_user_id: 1, from_name: 'Alex', to_user_id: 3, to_name: 'Emma', amount: '24.14', currency: 'EUR' };
+  const zurueck = gruppe({ balances: { balances: [], simplified_debts: [schuld], member_totals: MITGLIEDER, budget_category_totals: JE_KATEGORIE } });
+  try {
+    setPermissions({ admin: false, modules: { budget: 'write' }, widgets: {}, capabilities: {} });
+    let html = hauptteil();
+    assert.doesNotMatch(html, /u-section-title">splitExpenses\.balances</, 'kein Titel "Salden"');
+    assert.doesNotMatch(html, /id="split-balances"/, 'kein leerer Koerper');
+    assert.match(html, /split-section--folded" aria-label="splitExpenses\.balances"[\s\S]*id="split-settle"/, 'die Handlung bleibt, benannt');
+    setPermissions({ admin: false, modules: { budget: 'read' }, widgets: {}, capabilities: {} });
+    html = hauptteil();
+    assert.doesNotMatch(html, /split-section--balances/, 'ohne Handlung kein Abschnitt');
+    // Zwei Schulden: die Liste fuehrt wie bisher.
+    setPermissions({ admin: false, modules: { budget: 'write' }, widgets: {}, capabilities: {} });
+    split.state.balances.simplified_debts = [schuld, { ...schuld, from_user_id: 4, from_name: 'Leo' }];
+    html = hauptteil();
+    assert.match(html, /u-section-title">splitExpenses\.balances</);
+    assert.match(html, /id="split-balances"/);
+  } finally { clearPermissions(); zurueck(); }
+});

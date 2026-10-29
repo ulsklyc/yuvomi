@@ -445,6 +445,12 @@
   max-width: 100%;
 }
 
+/* Die Salden ohne eigene Zeile (die einzige Schuld steht in der Kennzahl,
+ * S10-F6): nur ihre Handlung, am Ende der Zeile. */
+.split-section--folded > .split-section-head {
+  justify-content: flex-end;
+}
+
 .split-section-head {
   justify-content: space-between;
   /* Ein volles Ziel hoch, wie der Listenkopf der Uebersicht - der Titel steht
