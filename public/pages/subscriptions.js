@@ -779,6 +779,7 @@ function drawContent() {
         </button>`);
   }
   setHtml(content, `
+      ${renderOverBudgetNote()}
       <div class="subscriptions-list row-carrier" id="subscriptions-list">
         ${rows.length ? rows.map(renderCard).join('') : renderEmpty()}
       </div>
@@ -800,8 +801,8 @@ function renderSummary() {
   const budget = Number(summary.monthly_budget || 0);
   const used = Number(summary.monthly_total || 0);
   const hasBudget = budget > 0;
-  // Die echte Auslastung (121 % statt "100 %") nennt der Satz unter der Zeile.
-  const realPercentage = hasBudget ? Math.round((used / budget) * 100) : 0;
+  // Die echte Auslastung (121 % statt "100 %") nennt die Fussnote vor der
+  // Liste (renderOverBudgetNote).
   const isOverBudget = hasBudget && summary.remaining_budget < 0;
   // Geteilte Kennzahl-Zeile und -Karte des Budget-Moduls (budget.css). Die
   // frühere eigene .subscriptions-summary-card war die zweite von fünf
@@ -834,7 +835,7 @@ function renderSummary() {
    * Kurzzeile oben in der Bahn: die Monatskosten fuehren, daneben der
    * Budgetstand (ueber dem Budget im Danger-Ton) und das Jahr. Die Zahl der
    * Abos steht am Kopf der Liste, die sie zaehlt. Der Weg zur Handlung bei
-   * einer Ueberschreitung ("Teuerste zuerst") bleibt, unter der Zeile. */
+   * einer Ueberschreitung ("Teuerste zuerst") steht seit S13 vor der Liste. */
   const budgetFlow = hasBudget
     ? { label: t(isOverBudget ? 'subscriptions.overBudget' : 'subscriptions.remainingBudget'),
       amount: money(Math.abs(summary.remaining_budget)), tone: isOverBudget ? 'negative' : '' }
@@ -847,8 +848,23 @@ function renderSummary() {
     everywhere: true,
     flows: [budgetFlow, { label: t('subscriptions.yearlyProjection'), amount: money(used * 12) }],
   })}
-    ${isOverBudget ? `<p class="subscriptions-over-budget">${esc(percentText(realPercentage))} ${t('subscriptions.budgetUsed')} <button type="button" class="subscriptions-over-budget-action" id="subscriptions-over-budget-action">${t('subscriptions.overBudgetAction')}</button></p>` : ''}
   `;
+}
+
+/* DIE FUSSNOTE STEHT VOR DER LISTE, DIE SIE SORTIERT (R24 S13, S12-F3).
+ * "126 % des Budgets genutzt - Teuerste zuerst" stand unter der Kurzzeile.
+ * Deren Skelett (82px) kannte sie nicht, die echte Zeile wuchs auf 111px und
+ * schob beim Reiterwechsel den Listenkopf (Shift 0,0233 mobil, 0,0068
+ * Desktop). Jetzt ist der Kennzahl-Slot so hoch wie sein Skelett, und die
+ * Fussnote kommt im selben Bild wie die Zeilen, die das Listen-Skelett
+ * ersetzen - neue Knoten verschieben nichts. Der Weg steht so auch dort, wo
+ * er wirkt: direkt ueber den Zeilen, die er umsortiert. */
+function renderOverBudgetNote() {
+  const summary = state.summary;
+  const budget = Number(summary?.monthly_budget || 0);
+  if (!(budget > 0) || !(summary.remaining_budget < 0)) return '';
+  const realPercentage = Math.round((Number(summary.monthly_total || 0) / budget) * 100);
+  return `<p class="subscriptions-over-budget">${esc(percentText(realPercentage))} ${t('subscriptions.budgetUsed')} <button type="button" class="subscriptions-over-budget-action" id="subscriptions-over-budget-action">${t('subscriptions.overBudgetAction')}</button></p>`;
 }
 
 /** „Teuerste zuerst": sortiert die Liste und bringt ihren Kopf in den Blick. */
@@ -2675,7 +2691,7 @@ function openMetadataModal() {
  * Renderer sind reine Funktionen ueber `state`.
  */
 export const __test = {
-  readOnly, READ_SAFE_ACTIONS, renderCard, renderEmpty, renderSummary, state, toolsMenuHtml, activeFilters,
+  readOnly, READ_SAFE_ACTIONS, renderCard, renderEmpty, renderSummary, renderOverBudgetNote, state, toolsMenuHtml, activeFilters,
   renderBreakdown, renderAreaChart,
   subscriptionReadSections, openSubscriptionModal, saveSubscription,
   // R24 E1: der Tipp auf ein Abo oeffnet das Leseblatt (test-budget-readonly-ui.js).

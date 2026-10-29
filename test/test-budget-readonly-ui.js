@@ -537,10 +537,10 @@ test('R24 E2: die Abo-Kennzahl ist bei jedem Recht dieselbe Zeile; ueber dem Bud
         const over = abos.renderSummary();
         assert.equal((over.match(/budget-glance__flow--negative/g) ?? []).length, 1, `${modus}: die Ueberschreitung steht EINMAL rot`);
         assert.doesNotMatch(over, /metric-card|role="progressbar"/, `${modus}: kein Balken, keine zweite Karte`);
-        assert.match(over, /id="subscriptions-over-budget-action"/, `${modus}: der Handlungsweg ist Lesen und bleibt`);
+        assert.match(abos.renderOverBudgetNote(), /id="subscriptions-over-budget-action"/, `${modus}: der Handlungsweg ist Lesen und bleibt`);
         abos.state.summary = summe(50);
         const under = abos.renderSummary();
-        assert.doesNotMatch(under, /budget-glance__flow--negative|subscriptions-over-budget-action/);
+        assert.doesNotMatch(under + abos.renderOverBudgetNote(), /budget-glance__flow--negative|subscriptions-over-budget-action/);
         abos.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 0, remaining_budget: 0, base_currency: 'EUR' };
         assert.doesNotMatch(abos.renderSummary(), /subscriptions\.setBudgetHint|remainingBudget/, `${modus}: ohne Budget keine Aufforderung und kein Stand`);
       });

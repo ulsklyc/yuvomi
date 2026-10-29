@@ -4198,8 +4198,21 @@ test('R24 E2: die Abo-Kennzahl ist EINE Zeile - Monatskosten, Budgetstand (nur m
     abosGlance.state.summary = { active_count: 8, monthly_total: 113.6, monthly_budget: 90, remaining_budget: -23.6, base_currency: 'EUR' };
     const ueber = abosGlance.renderSummary();
     assert.match(ueber, /budget-glance__flow budget-glance__flow--negative">subscriptions\.overBudget/, 'die Ueberschreitung im Danger-Ton, EINMAL');
-    assert.match(ueber, /<p class="subscriptions-over-budget">[^<]*subscriptions\.budgetUsed <button type="button" class="subscriptions-over-budget-action" id="subscriptions-over-budget-action">/, 'der Weg "Teuerste zuerst" bleibt');
+    // R24 S13 (S12-F3): die Fussnote stand UNTER der Kurzzeile - das Skelett
+    // (82px) kannte sie nicht, die echte Zeile wuchs auf 111px und schob den
+    // Listenkopf (Shift 0,0233 mobil, 0,0068 Desktop beim Reiterwechsel). Sie
+    // steht jetzt vor den Zeilen der Liste, die sie sortiert: der Kennzahl-Slot
+    // ist so hoch wie sein Skelett, und die Fussnote kommt im selben Bild wie
+    // die Zeilen, die das Skelett der Liste ersetzen.
+    assert.doesNotMatch(ueber, /subscriptions-over-budget/, 'die Kennzahl-Zeile traegt keine Fussnote - sonst waechst sie ueber ihr Skelett');
+    assert.match(abosGlance.renderOverBudgetNote(), /<p class="subscriptions-over-budget">[^<]*subscriptions\.budgetUsed <button type="button" class="subscriptions-over-budget-action" id="subscriptions-over-budget-action">/, 'der Weg "Teuerste zuerst" bleibt');
+    abosGlance.state.summary = { active_count: 1, monthly_total: 12.99, monthly_budget: 50, remaining_budget: 37.01, base_currency: 'EUR' };
+    assert.equal(abosGlance.renderOverBudgetNote(), '', 'unter dem Budget keine Fussnote');
   } finally { abosGlance.state.summary = vorher; }
+  const src = withoutCommentsKeepingLines(readFileSync(new URL('../public/pages/subscriptions.js', import.meta.url), 'utf8'));
+  const draw = src.slice(src.indexOf('function drawContent('), src.indexOf('function renderSummary('));
+  assert.match(draw, /setHtml\(content, `\s*\$\{renderOverBudgetNote\(\)\}\s*<div class="subscriptions-list row-carrier"/,
+    'die Fussnote steht im Inhalt der Liste vor den Zeilen und kommt mit ihnen im selben Bild');
 });
 
 /* DER KOPF SPRINGT NICHT (Re-Critique 2026-09-28, A5 P2-9). Mobil 162 <-> 135px

@@ -619,10 +619,12 @@
   margin-inline-end: var(--space-1);
 }
 
-/* Die Fussnote unter der Kurzzeile (R24, E2): "126 % des Budgets genutzt"
- * und der Weg zur Liste, nur bei einer Ueberschreitung. */
+/* Die Fussnote vor den Zeilen der Liste (R24 E2, seit S13 nicht mehr unter
+ * der Kurzzeile - dort wuchs der Kennzahl-Slot ueber sein Skelett): "126 %
+ * des Budgets genutzt" und der Weg "Teuerste zuerst", nur bei einer
+ * Ueberschreitung. */
 .subscriptions-over-budget {
-  margin-block: var(--space-2) 0;
+  margin-block: 0 var(--space-2);
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
 }
