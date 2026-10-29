@@ -3635,7 +3635,7 @@
         "screensaverConnectImmich": "Підключити Immich",
         "weatherPlaceLabel": "Місце",
         "weatherPlaceHint": "Пошук виконується в погодному сервісі Open-Meteo. Передається лише назва місця.",
-        "weatherPlacePlaceholder": "Місто або поштовий індекс",
+        "weatherPlacePlaceholder": "Місто або населений пункт",
         "weatherPlaceSearch": "Знайти",
         "weatherPlaceCurrent": "Зараз: {{place}}",
         "weatherPlaceNone": "Місце ще не вибрано.",

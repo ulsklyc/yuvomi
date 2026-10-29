@@ -343,6 +343,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   day, week, month and detail views. The import used to copy the colour into every event, which then
   kept the old one. The colour field of the import now starts on the colour of the chosen calendar;
   picking a different one still gives those events their own colour.
+- **SMTP with encryption "None" sends without encryption** (#2326). Until now Yuvomi still switched
+  to STARTTLS whenever the mail server offered it, so an internal relay on port 25 with a self-signed
+  certificate failed with "self-signed certificate". "None" now never upgrades the connection, both
+  from the settings page and from `EMAIL_SMTP_SECURE=none`. "STARTTLS" and "SSL/TLS" are unchanged.
+- **The weather place search no longer promises postcodes** (#2353). The field said "City or
+  postcode", but the place search at Open-Meteo only finds a postcode where its place data happens
+  to list one: 01099 (Dresden) found nothing, and 10115 (Berlin) even offered New York. The field
+  now asks for a city or town.
 - **Old daily series show up in the calendar again** (#2341). The calendar view counted every
   repeating event from its very first day and gave up after 1000 steps, so a daily event that
   started more than about three years ago was missing from the month entirely, and every page of

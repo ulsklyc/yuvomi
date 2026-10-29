@@ -3431,7 +3431,7 @@
         "screensaverConnectImmich": "Ikonekta ang Immich",
         "weatherPlaceLabel": "Lugar",
         "weatherPlaceHint": "Sa weather service na Open-Meteo hinahanap ito. Ang pangalan lang ng lugar ang ipinapadala.",
-        "weatherPlacePlaceholder": "Lungsod o postal code",
+        "weatherPlacePlaceholder": "Lungsod o bayan",
         "weatherPlaceSearch": "Hanapin",
         "weatherPlaceCurrent": "Kasalukuyan: {{place}}",
         "weatherPlaceNone": "Wala pang napiling lugar.",

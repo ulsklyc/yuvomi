@@ -794,3 +794,30 @@ test('Ortssuche: dieselbe Frage in derselben Sprache kommt aus dem Cache', async
     assert.equal(calls, 2, 'eine andere Sprache ist eine andere Frage');
   } finally { await close(); }
 });
+
+// #2353: Das Suchfeld versprach in allen Sprachen "Stadt oder Postleitzahl".
+// Open-Meteo findet eine Postleitzahl aber nur, wo GeoNames sie einem Ort
+// angeheftet hat (gemessen 2026-10-29): 01099 und 01067 (Dresden) liefern
+// nichts, 10115 (Berlin) liefert New York City, 80331 zufaellig Muenchen.
+// Der Platzhalter darf deshalb keine Postleitzahl mehr anbieten.
+test('#2353: der Platzhalter der Ortssuche verspricht keine Postleitzahl', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../public/locales/', import.meta.url);
+  const postcodeTerms = [
+    'postleitzahl', 'postcode', 'postal', 'código postal', 'code postal', 'psč', 'ταχυδρομικ',
+    'البريدي', 'پستی', 'पिन', 'irányítószám', 'kode pos', 'cap', '郵便番号', '우편번호',
+    'postnummer', 'pocztowy', 'cep', 'почтов', 'поштов', 'posta kodu', 'bưu chính', '郵遞區號', '邮政编码',
+  ];
+  const files = readdirSync(dir).filter((f) => f.endsWith('.json'));
+  assert.ok(files.length > 20);
+  for (const f of files) {
+    const json = JSON.parse(readFileSync(new URL(f, dir), 'utf8'));
+    const value = JSON.stringify(json).match(/"weatherPlacePlaceholder":"([^"]*)"/)?.[1];
+    assert.ok(value, `${f}: weatherPlacePlaceholder fehlt`);
+    const words = value.toLowerCase();
+    for (const term of postcodeTerms) {
+      const hit = term === 'cap' || term === 'cep' ? new RegExp(`\\b${term}\\b`).test(words) : words.includes(term);
+      assert.ok(!hit, `${f}: "${value}" verspricht eine Postleitzahl ("${term}")`);
+    }
+  }
+});

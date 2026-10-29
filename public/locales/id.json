@@ -3431,7 +3431,7 @@
         "screensaverConnectImmich": "Hubungkan Immich",
         "weatherPlaceLabel": "Tempat",
         "weatherPlaceHint": "Pencarian dilakukan di layanan cuaca Open-Meteo. Hanya nama tempat yang dikirim.",
-        "weatherPlacePlaceholder": "Kota atau kode pos",
+        "weatherPlacePlaceholder": "Kota atau desa",
         "weatherPlaceSearch": "Cari",
         "weatherPlaceCurrent": "Saat ini: {{place}}",
         "weatherPlaceNone": "Belum ada tempat yang dipilih.",

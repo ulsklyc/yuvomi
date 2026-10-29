@@ -3413,7 +3413,7 @@
         "screensaverConnectImmich": "Ligar o Immich",
         "weatherPlaceLabel": "Local",
         "weatherPlaceHint": "A pesquisa é feita no serviço meteorológico Open-Meteo. Só é enviado o nome do local.",
-        "weatherPlacePlaceholder": "Cidade ou código postal",
+        "weatherPlacePlaceholder": "Cidade ou localidade",
         "weatherPlaceSearch": "Pesquisar",
         "weatherPlaceCurrent": "Atual: {{place}}",
         "weatherPlaceNone": "Ainda não foi escolhido nenhum local.",

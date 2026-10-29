@@ -3747,7 +3747,7 @@
         "screensaverConnectImmich": "ربط Immich",
         "weatherPlaceLabel": "المكان",
         "weatherPlaceHint": "يتم البحث لدى خدمة الطقس Open-Meteo. يُرسل اسم المكان فقط.",
-        "weatherPlacePlaceholder": "المدينة أو الرمز البريدي",
+        "weatherPlacePlaceholder": "المدينة أو البلدة",
         "weatherPlaceSearch": "بحث",
         "weatherPlaceCurrent": "الحالي: {{place}}",
         "weatherPlaceNone": "لم يتم اختيار مكان بعد.",

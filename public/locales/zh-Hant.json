@@ -3417,7 +3417,7 @@
         "screensaverConnectImmich": "連線 Immich",
         "weatherPlaceLabel": "地點",
         "weatherPlaceHint": "搜尋由天氣服務 Open-Meteo 完成，只會傳送地名。",
-        "weatherPlacePlaceholder": "城市或郵遞區號",
+        "weatherPlacePlaceholder": "城市或鄉鎮",
         "weatherPlaceSearch": "搜尋",
         "weatherPlaceCurrent": "目前：{{place}}",
         "weatherPlaceNone": "尚未選擇地點。",

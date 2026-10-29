@@ -3431,7 +3431,7 @@
         "screensaverConnectImmich": "وصل کردن Immich",
         "weatherPlaceLabel": "مکان",
         "weatherPlaceHint": "جست‌وجو در سرویس هواشناسی Open-Meteo انجام می‌شود. فقط نام مکان ارسال می‌شود.",
-        "weatherPlacePlaceholder": "شهر یا کد پستی",
+        "weatherPlacePlaceholder": "شهر یا روستا",
         "weatherPlaceSearch": "جست‌وجو",
         "weatherPlaceCurrent": "فعلی: {{place}}",
         "weatherPlaceNone": "هنوز مکانی انتخاب نشده است.",

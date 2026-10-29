@@ -3413,7 +3413,7 @@
         "screensaverConnectImmich": "Connect Immich",
         "weatherPlaceLabel": "Place",
         "weatherPlaceHint": "The search runs at the weather service Open-Meteo. Only the place name is sent.",
-        "weatherPlacePlaceholder": "City or postcode",
+        "weatherPlacePlaceholder": "City or town",
         "weatherPlaceSearch": "Search",
         "weatherPlaceCurrent": "Current: {{place}}",
         "weatherPlaceNone": "No place chosen yet.",

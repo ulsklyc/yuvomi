@@ -3431,7 +3431,7 @@
         "screensaverConnectImmich": "Immich verbinden",
         "weatherPlaceLabel": "Ort",
         "weatherPlaceHint": "Gesucht wird beim Wetterdienst Open-Meteo. Dabei geht nur der Ortsname hinaus.",
-        "weatherPlacePlaceholder": "Stadt oder Postleitzahl",
+        "weatherPlacePlaceholder": "Stadt oder Gemeinde",
         "weatherPlaceSearch": "Suchen",
         "weatherPlaceCurrent": "Aktuell: {{place}}",
         "weatherPlaceNone": "Noch kein Ort gewählt.",
