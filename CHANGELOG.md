@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   categories as the budget, shown with the same coloured dot, instead of a separate list of twelve with
   icons. Existing expenses keep their meaning where a budget category fits (groceries become Food, rent
   Housing, travel Leisure and so on); the rest show "No category". The category filter above the
-  expenses is a filter button like elsewhere in the budget. Over the API, `budget_category` sits next
+  expenses is a filter button like elsewhere in the budget. A budget category that shared expenses
+  still use cannot be deleted, just like one with bookings. Over the API, `budget_category` sits next
   to the older `category`, which stays as it was.
 
 ### Changed

@@ -3981,7 +3981,7 @@ Immutable expense records — amounts stored in integer minor currency units (e.
 | exchange_snapshot | TEXT | JSON, nullable — the rate source as it stood at booking time, so a later rate change never rewrites a recorded expense |
 | payer_id | INTEGER | FK → Users (RESTRICT on delete), NOT NULL |
 | category | TEXT | NOT NULL DEFAULT 'general' - the older split-expense list of twelve; kept for the `/api/v1` surface, the app no longer reads it |
-| budget_category | TEXT | nullable - a key of `budget_categories` (type `expense`), NULL = no category (migration 271, R24 E12). The app shows and filters by it with the budget's dot and name; the migration carried existing rows over where a budget key fits (groceries → food, rent/utilities/home → housing, school → education, travel/subscriptions → leisure, shopping → shopping_clothing, health → personal_health) |
+| budget_category | TEXT | nullable - a key of `budget_categories` (type `expense`), NULL = no category (migration 271, R24 E12). A budget category an expense or series still carries counts as in use and cannot be deleted; an update that sends the key the row already carries passes even if the category is gone, a new choice must exist. The app shows and filters by it with the budget's dot and name; the migration carried existing rows over where a budget key fits (groceries → food, rent/utilities/home → housing, school → education, travel/subscriptions → leisure, shopping → shopping_clothing, health → personal_health) |
 | split_method | TEXT | 'equal', 'exact', 'percentage', 'shares' (default 'equal') |
 | status | TEXT | 'active' (default) or 'deleted' |
 | expense_date | TEXT | DATE, NOT NULL |

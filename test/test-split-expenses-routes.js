@@ -2388,6 +2388,82 @@ test('Serie: budget_category wird gespeichert, ein PUT ohne sie laesst sie stehe
   assert.equal(db.prepare('SELECT budget_category FROM expenses WHERE recurring_rule_id = ?').get(id).budget_category, 'housing');
 });
 
+// ── Codex an #2364 (P2): eine Kategorie, die nur Aufteilungs-Ausgaben tragen ──
+//
+// Die Loeschsperre zaehlte nur Buchungen (`budget_entries`). Eine Kategorie,
+// die nur eine Ausgabe der Aufteilung trug, liess sich loeschen - und danach
+// lehnte jedes Speichern der Ausgabe mit 400 ab, weil der Editor die alte
+// Kategorie mitschickt.
+test('eine Budget-Kategorie, die nur Aufteilungs-Ausgaben oder Serien tragen, ist in Benutzung und laesst sich nicht loeschen', async () => {
+  const { categoryInUseCount } = await import('../server/routes/budget/helpers.js');
+  const { default: catRouter } = await import('../server/routes/budget/categories.js');
+  const insertCategory = db.prepare("INSERT INTO budget_categories (key, name, type, sort_order) VALUES (?, ?, 'expense', 900)");
+  insertCategory.run('split_only_expense', 'Nur Aufteilung');
+  insertCategory.run('split_only_series', 'Nur Serie');
+  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Loeschsperre', type: 'general', default_currency: 'EUR' } });
+  const gid = g.body.data.id;
+  const expense = await call('POST', `/groups/${gid}/expenses`, {
+    actor: OWNER_A,
+    body: { title: 'Kino', amount: '12.00', currency: 'EUR', split_method: 'equal', payer_id: OWNER, participants: [OWNER], budget_category: 'split_only_expense' },
+  });
+  assert.equal(expense.status, 201, JSON.stringify(expense.body));
+  const series = await call('POST', `/groups/${gid}/recurring`, {
+    actor: OWNER_A,
+    body: { title: 'Abo', amount: '9.00', currency: 'EUR', frequency: 'monthly', next_run_date: '2099-01-01', payer_id: OWNER, participants: [OWNER], budget_category: 'split_only_series' },
+  });
+  assert.equal(series.status, 201, JSON.stringify(series.body));
+  assert.equal(categoryInUseCount(db, 'split_only_expense'), 1, 'die Ausgabe zaehlt');
+  assert.equal(categoryInUseCount(db, 'split_only_series'), 1, 'die Serie zaehlt');
+
+  const budgetApp = express();
+  budgetApp.use(express.json());
+  budgetApp.use((req, _res, next) => { req.authUserId = OWNER; req.authRole = 'member'; req.session = { userId: OWNER, role: 'member' }; next(); });
+  budgetApp.use('/', catRouter);
+  const budgetServer = budgetApp.listen(0, '127.0.0.1');
+  await new Promise((r) => budgetServer.on('listening', r));
+  try {
+    for (const key of ['split_only_expense', 'split_only_series']) {
+      const res = await fetch(`http://127.0.0.1:${budgetServer.address().port}/categories/${key}`, { method: 'DELETE' });
+      assert.equal(res.status, 409, `${key} ist in Benutzung`);
+      assert.equal((await res.json()).reason, 'category_in_use');
+      assert.ok(db.prepare('SELECT 1 FROM budget_categories WHERE key = ?').get(key), `${key} steht noch`);
+    }
+  } finally {
+    await new Promise((r) => budgetServer.close(r));
+  }
+});
+
+// Altbestand: geloescht vor der Sperre, oder per Migration 271 gemappt und
+// spaeter geloescht. Der Editor schickt den Schluessel unveraendert mit - das
+// darf das Speichern nicht brechen; eine NEUE Wahl bleibt streng.
+test('ein unveraenderter, inzwischen geloeschter Kategorie-Schluessel bricht das Speichern einer Ausgabe oder Serie nicht', async () => {
+  db.prepare("INSERT INTO budget_categories (key, name, type, sort_order) VALUES ('split_gone', 'Weg', 'expense', 901)").run();
+  const g = await call('POST', '/groups', { actor: OWNER_A, body: { name: 'Altbestand', type: 'general', default_currency: 'EUR' } });
+  const gid = g.body.data.id;
+  const base = { title: 'Bus', amount: '3.00', currency: 'EUR', split_method: 'equal', payer_id: OWNER, participants: [OWNER] };
+  const expense = await call('POST', `/groups/${gid}/expenses`, { actor: OWNER_A, body: { ...base, budget_category: 'split_gone' } });
+  assert.equal(expense.status, 201, JSON.stringify(expense.body));
+  const seriesBase = { title: 'Abo', amount: '9.00', currency: 'EUR', frequency: 'monthly', next_run_date: '2099-01-01', payer_id: OWNER, participants: [OWNER] };
+  const series = await call('POST', `/groups/${gid}/recurring`, { actor: OWNER_A, body: { ...seriesBase, budget_category: 'split_gone' } });
+  assert.equal(series.status, 201, JSON.stringify(series.body));
+  // Wie vor der Sperre (oder nach Migration 271): die Kategorie ist weg, die Ausgaben tragen sie noch.
+  db.prepare("DELETE FROM budget_categories WHERE key = 'split_gone'").run();
+
+  const edited = await call('PUT', `/expenses/${expense.body.data.id}`, { actor: OWNER_A, body: { ...base, amount: '4.00', budget_category: 'split_gone' } });
+  assert.equal(edited.status, 200, JSON.stringify(edited.body));
+  assert.equal(edited.body.data.budget_category, 'split_gone', 'der Schluessel bleibt, wie er war');
+  const editedSeries = await call('PUT', `/recurring/${series.body.data.id}`, { actor: OWNER_A, body: { ...seriesBase, amount: '10.00', budget_category: 'split_gone' } });
+  assert.equal(editedSeries.status, 200, JSON.stringify(editedSeries.body));
+
+  const fresh = await call('POST', `/groups/${gid}/expenses`, { actor: OWNER_A, body: { ...base, title: 'Neu', budget_category: 'split_gone' } });
+  assert.equal(fresh.status, 400, 'eine neue Ausgabe nimmt keinen unbekannten Schluessel');
+  const freshSeries = await call('POST', `/groups/${gid}/recurring`, { actor: OWNER_A, body: { ...seriesBase, title: 'Neu', budget_category: 'split_gone' } });
+  assert.equal(freshSeries.status, 400, 'eine neue Serie auch nicht');
+  const other = await call('POST', `/groups/${gid}/expenses`, { actor: OWNER_A, body: { ...base, title: 'Zweite', budget_category: 'food' } });
+  const moved = await call('PUT', `/expenses/${other.body.data.id}`, { actor: OWNER_A, body: { ...base, budget_category: 'split_gone' } });
+  assert.equal(moved.status, 400, 'den geloeschten Schluessel neu waehlen bleibt verboten');
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });

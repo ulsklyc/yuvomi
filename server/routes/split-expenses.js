@@ -53,11 +53,19 @@ const FREQUENCIES = ['weekly', 'monthly', 'yearly'];
  * den Betrag korrigiert, laesst die Kategorie stehen - dieselbe Regel wie
  * #1941 fuer `category`); `null` oder '' leert sie. Ein unbekannter Schluessel
  * ist ein Fehler am Feld, kein stilles "ohne Kategorie".
+ *
+ * Ausnahme: derselbe Schluessel, den die Zeile schon traegt (`keep`), geht
+ * ungeprueft durch. Der Editor schickt ihn bei jedem Speichern mit, und eine
+ * Kategorie kann weg sein, waehrend Ausgaben sie noch tragen (geloescht, bevor
+ * die Loeschsperre Ausgaben zaehlte, oder per Migration 271 gemappt und danach
+ * geloescht) - sonst lehnte jedes Speichern dieser Ausgabe mit 400 ab (Codex
+ * an #2364). Eine Neuanlage hat kein `keep` und bleibt streng.
  */
 function parseBudgetCategory(value, keep = null) {
   if (value === undefined) return keep;
   if (value === null || value === '') return null;
   const key = String(value);
+  if (keep !== null && key === keep) return key;
   const known = db.get().prepare("SELECT 1 FROM budget_categories WHERE key = ? AND type = 'expense'").get(key);
   if (!known) throw new Refusal(400, 'Unknown budget category.', 'unknown_budget_category');
   return key;

@@ -2,7 +2,7 @@ import { op, jsonBody, idParam, DOCUMENT_LINKS_READ_NOTE, withCaseReasons } from
 
 // Betraege im Request (#1607): eine Regel fuer Ausgabe, Genau-Anteil und Zahlung,
 // durchgesetzt in parseMoneyToMinor().
-const BUDGET_CATEGORY_NOTE = '`budget_category` is a key from `GET /api/v1/budget/categories` of type `expense`, or `null` for none; an unknown key answers 400. On an update an omitted `budget_category` stays as it is. `category` is the older split-expense category and is kept as it was.';
+const BUDGET_CATEGORY_NOTE = '`budget_category` is a key from `GET /api/v1/budget/categories` of type `expense`, or `null` for none; an unknown key answers 400. On an update an omitted `budget_category` stays as it is, and so does the key the row already carries even when that category no longer exists. A budget category that split expenses or series still use cannot be deleted. `category` is the older split-expense category and is kept as it was.';
 const AMOUNT_NOTE = 'Amounts are decimal strings with a dot (`"12.50"`, not a number), with at most the currency\'s decimal places, and must be greater than zero: `0`, `-0` and negative values are answered with `400`.';
 const EXACT_SPLIT_NOTE = 'With `split_method: "exact"`, every participant needs a `splits[].amount` under the same rule, and the shares must add up to the expense amount.';
 const RECURRING_SPLIT_NOTE = 'The split is checked when the recurring expense is created, by the same rule as a single expense: `payer_id` and every entry of `participants` must be members of the group, `exact` amounts must add up to the amount, `percentage` values to 100, and `shares` must be positive integers. Anything else is answered with `400` and nothing is stored.';

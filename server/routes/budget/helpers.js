@@ -688,8 +688,18 @@ export function uniqueKey(table, base) {
   return key;
 }
 
+/**
+ * Wer eine Kategorie traegt: Buchungen, und seit Migration 271 auch Ausgaben
+ * und Serien der Aufteilung (`budget_category`). Zaehlte bis Codex an #2364
+ * nur Buchungen - eine Kategorie, die nur Aufteilungs-Ausgaben trugen, liess
+ * sich loeschen, und danach scheiterte jedes Speichern dieser Ausgaben.
+ */
 export function categoryInUseCount(database, key) {
-  return database.prepare('SELECT COUNT(*) AS n FROM budget_entries WHERE category = ?').get(key).n;
+  return database.prepare(`
+    SELECT (SELECT COUNT(*) FROM budget_entries WHERE category = @key)
+         + (SELECT COUNT(*) FROM expenses WHERE budget_category = @key)
+         + (SELECT COUNT(*) FROM recurring_expenses WHERE budget_category = @key) AS n
+  `).get({ key }).n;
 }
 
 export function subcategoryInUseCount(database, key) {

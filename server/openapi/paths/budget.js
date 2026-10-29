@@ -199,7 +199,7 @@ const CASE_REASONS = {
   '/api/v1/budget/categories': { post: '`category_exists` (409, a category with this name already exists)' },
   '/api/v1/budget/categories/{key}': {
     put: '`category_exists` (409, a category with this name already exists)',
-    delete: '`category_in_use` (409, entries still use the category; `count` carries how many), `category_last` (409, the last category cannot be deleted)',
+    delete: '`category_in_use` (409, budget entries or split expenses and their recurring series still use the category; `count` carries how many), `category_last` (409, the last category cannot be deleted)',
   },
   '/api/v1/budget/categories/{categoryKey}/subcategories': { post: '`subcategory_exists` (409, a subcategory with this name already exists)' },
   '/api/v1/budget/categories/{key}/subcategories/{subKey}': {
