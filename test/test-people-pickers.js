@@ -753,3 +753,14 @@ test('R24: Aufgaben-Verlauf, Filterblatt, Belohnungen und Kalender bauen ihre Pe
   assert.match(notesSrc, /personChipsHtml\(\{\s*filter: 'creator'[\s\S]{0,400}className: 'notes-filter-group'/, 'Notizen');
   assert.doesNotMatch(notesSrc, /dataset\.creator|\[data-creator\]/, 'kein handgebauter Namen-Chip mehr');
 });
+
+test('settings: the calendar import proposes the colour of the chosen calendar (#2303)', () => {
+  // Bleibt die vorgeschlagene Farbe stehen, erbt der Import die Kalenderfarbe
+  // und folgt dem Umfaerben; der alte feste Vorschlag (#0891B2) wurde zur
+  // Eigenfarbe jedes Termins und hielt ihn auf der alten Farbe fest.
+  const calendars = [{ id: 1, color: '#007AFF', is_default: true }, { id: 7, color: '#2E7D32' }];
+  assert.equal(icsSettings.importTargetColor(calendars, '7'), '#2E7D32');
+  assert.equal(icsSettings.importTargetColor(calendars, '1'), '#007AFF');
+  assert.equal(icsSettings.importTargetColor(calendars, '__new'), null, 'a new calendar takes the chosen colour itself');
+  assert.equal(icsSettings.importTargetColor(calendars, '99'), null);
+});

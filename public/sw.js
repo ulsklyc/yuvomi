@@ -421,6 +421,7 @@ const APP_SHELL = [
   '/utils/money.js',
   '/utils/amount-field.js',
   '/utils/nav-badges.js',
+  '/utils/sidebar-pinned.js',
   '/utils/note-access.js',
   '/utils/note-category-filter.js',
   '/utils/note-category-name.js',

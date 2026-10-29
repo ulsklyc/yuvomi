@@ -466,10 +466,10 @@ test('kein Importpfad schreibt die geerbte Kalenderfarbe in die Eigenfarb-Spalte
   for (const datei of DIENSTE) {
     const quelle = await readFile(new URL(`../${datei}`, import.meta.url), 'utf8');
     const treffer = [...quelle.matchAll(FALLBACK_RE)].map((m) => m[0]);
-    // `importToLocal` ist die eine begruendete Ausnahme: dort werden aus
-    // Abo-Terminen LOKALE Termine ohne Quelle, sie haben danach keinen Kalender
-    // mehr, von dem sie erben koennten - und der Wert ist der, den der Nutzer
-    // fuer genau diesen Import angegeben hat.
+    // `importToLocal` ist die eine begruendete Ausnahme: `fallbackColor` ist
+    // dort die Farbe, die jemand fuer genau diesen Import gewaehlt hat - und
+    // `null`, sobald sie nur die Farbe des Zielkalenders wiederholt
+    // (`importedEventColor`, #2303), damit der Termin dem Kalender folgt.
     const echte = treffer.filter((t) => !/fallbackColor/.test(t));
     assert.deepEqual(echte, [],
       `${datei}: die geerbte Farbe gehoert nicht in calendar_events.color (#891), gefunden: ${echte.join(', ')}`);

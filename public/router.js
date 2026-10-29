@@ -80,6 +80,7 @@ import {
 import { openModal, confirmModal, closeModal } from '/components/modal.js';
 import { armScreensaver, disarmScreensaver } from '/components/photo-screensaver.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { placeSidebarNavItems, splitPinnedNavItems } from '/utils/sidebar-pinned.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { handleMasterDetailPopstate } from '/utils/master-detail.js';
 import '/components/datepicker.js';
@@ -2217,11 +2218,9 @@ function renderAppShell(container) {
   // Sidebar ist eine Flex-Spalte, und was nicht im Scroller liegt, scrollt
   // nicht weg. Strukturell ist das ohnehin der richtige Ort - die Einstellungen
   // sind Systemebene, kein Modul unter Modulen.
-  const pinnedSidebarItems = [];
-  sidebarNavItems().forEach((item) => {
-    if (item.classList?.contains('nav-item--pinned-end')) pinnedSidebarItems.push(item);
-    else sidebarItems.appendChild(item);
-  });
+  // Dieselbe Teilung wie im Neuaufbau (utils/sidebar-pinned.js, #2324).
+  const { listed: listedSidebarItems, pinned: pinnedSidebarItems } = splitPinnedNavItems(sidebarNavItems());
+  sidebarItems.append(...listedSidebarItems);
 
   // Scroll-Affordanz (Audit F-01): weiche Fade-Anrisse oben/unten, sobald die
   // Liste überläuft — der Scrollbalken ist bewusst versteckt, ohne Anriss waren
@@ -5471,9 +5470,13 @@ function rebuildNavigation({ updateLabels = true } = {}) {
     // Auto-Scroll unten riss sie sofort wieder zum aktiven Item — sichtbar als
     // Springen zwischen erstem und letztem Eintrag.
     const previousScrollTop = navSidebarItems.scrollTop;
-    const sidebarEls = sidebarNavItems();
-    navSidebarItems.replaceChildren(...sidebarEls);
-    if (window.lucide) window.lucide.createIcons({ el: navSidebarItems });
+    // Liste in den Scroller, Einstellungen dahinter - ueber denselben Helfer
+    // wie der Erstaufbau. Hier lag der gepinnte Eintrag einmal mit im
+    // Scroller, waehrend der alte daneben stehen blieb: „Einstellungen"
+    // zweimal nach jedem Modul-Schalter (#2324).
+    placeSidebarNavItems(navSidebarItems, sidebarNavItems());
+    // Die Spalte, nicht nur der Scroller: der gepinnte Eintrag steht daneben.
+    if (window.lucide) window.lucide.createIcons({ el: navSidebar ?? navSidebarItems });
     requestAnimationFrame(() => {
       navSidebarItems.scrollTop = Math.min(
         previousScrollTop,
