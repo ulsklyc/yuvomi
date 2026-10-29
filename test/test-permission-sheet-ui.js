@@ -434,3 +434,23 @@ test('R24 E11: je Modul eine Optionszeile, Widgets und Zusatzrechte aufgeklappt,
     if (hadWindow) globalThis.window = prevWindow; else delete globalThis.window;
   }
 });
+
+/* R24 S13 (Critique G6-Einst-P2-3): die Rollen-Chips brachen am Telefon in
+ * drei Zeilen (390px: y254/310/366), das erste Recht stand 170px tiefer. Sie
+ * sind jetzt EINE waagerecht scrollende Zeile wie jede Chipreihe
+ * (`.page-chip-row`), mit Fade-Kanten aus wireScrollFade. */
+test('R24 S13: Rollen- und Mitglieder-Chips stehen in EINER scrollenden Zeile', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { eachRule } = await import('./css-rules.js');
+  const css = [...eachRule(readFileSync(new URL('../public/styles/settings.css', import.meta.url), 'utf8'))];
+  const row = css.find((r) => !r.at.length && r.selector.trim() === '.perm-subjects');
+  assert.ok(row, 'Regel fehlt');
+  assert.doesNotMatch(row.body, /flex-wrap:\s*wrap/, 'die Chips duerfen nicht umbrechen - mobil drei Zeilen');
+  assert.match(row.body, /overflow-x:\s*auto/, 'die Zeile scrollt waagerecht');
+  assert.ok(css.some((r) => !r.at.length && r.selector.trim() === '.perm-subjects > *' && /flex-shrink:\s*0/.test(r.body)),
+    'kein Chip wird gestaucht');
+  assert.ok(!css.some((r) => r.at.length && r.selector.trim() === '.perm-subjects' && /flex-wrap:\s*wrap/.test(r.body)),
+    'auch keine Breite bricht wieder um');
+  const js = readFileSync(new URL('../public/settings/pages/admin-permissions.js', import.meta.url), 'utf8');
+  assert.match(js, /wireScrollFade\(container\.querySelector\('#perm-subjects'\)\)/, 'die Kanten sagen, dass es weitergeht');
+});

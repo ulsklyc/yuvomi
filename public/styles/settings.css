@@ -3556,12 +3556,33 @@
   margin-bottom: var(--space-4);
 }
 
-/* Subjekt-Auswahl (Rollen-/Mitglieder-Chips) */
+/* Subjekt-Auswahl (Rollen-/Mitglieder-Chips)
+ *
+ * EINE SCROLLENDE ZEILE (R24 S13, Critique G6-Einst-P2-3). Sieben Rollen
+ * brachen am Telefon in drei Zeilen (390px: y254/310/366), und das erste
+ * Recht stand erst nach 170px Chips. Jetzt dieselbe Form wie jede Chipreihe
+ * (`.page-chip-row`, layout.css): eine Zeile, die waagerecht scrollt, mit
+ * den Fade-Kanten aus wireScrollFade (admin-permissions.js). Am Desktop
+ * passen Rollen und Mitglieder ohnehin in eine Zeile. Das Polster laesst
+ * dem Fokusring Luft - ein waagerechter Scroller clippt senkrecht mit. */
 .perm-subjects {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-5);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  padding-block: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.perm-subjects::-webkit-scrollbar {
+  display: none;
+}
+
+.perm-subjects > * {
+  flex-shrink: 0;
 }
 
 .perm-chip {

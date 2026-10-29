@@ -27,6 +27,7 @@ import { initials } from '/utils/initials.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { confirmModal, refocusAfterRender } from '/components/modal.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
+import { wireScrollFade } from '/utils/ux.js';
 import { createRetryState, hintFoldHtml, settingRowHtml } from '/settings/components.js';
 import { resolveExtensionLabel } from '/utils/extension-i18n.js';
 import {
@@ -695,7 +696,9 @@ function bindEvents(container) {
     });
   });
 
-  // Subjekt-Auswahl (Event-Delegation)
+  // Subjekt-Auswahl (Event-Delegation). Eine scrollende Zeile (R24 S13):
+  // die Fade-Kanten sagen, dass es weitergeht (settings.css, .perm-subjects).
+  wireScrollFade(container.querySelector('#perm-subjects'));
   container.querySelector('#perm-subjects')?.addEventListener('click', async (e) => {
     const chip = e.target.closest('.perm-chip');
     if (!chip) return;
