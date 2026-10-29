@@ -343,6 +343,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   postcode", but the place search at Open-Meteo only finds a postcode where its place data happens
   to list one: 01099 (Dresden) found nothing, and 10115 (Berlin) even offered New York. The field
   now asks for a city or town.
+- **Old daily series show up in the calendar again** (#2341). The calendar view counted every
+  repeating event from its very first day and gave up after 1000 steps, so a daily event that
+  started more than about three years ago was missing from the month entirely, and every page of
+  the calendar got slower as the household's series got older. The calendar, the overview and the
+  upcoming list now start each series just before the days they show.
 - **Amount fields accept comma or point decimals across devices.** (#2170) Budget entries,
   transfers, confirmations, plans, subscriptions, shopping prices, inventory, housekeeping,
   rewards and shared expenses preserve cents even when the keyboard and household number
