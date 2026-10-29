@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to the older `category`, which stays as it was.
 
 ### Changed
+- **The document viewer on a phone has one line above the document.** Open in a new tab, Edit, Share
+  and Download sit in the "..." menu next to the category and the arrows, with their names, instead
+  of a second row of buttons - the document starts about 56 px higher. Wider screens keep the row.
 - **A shared expense shows itself before it edits.** Tapping an expense opens a read view with Edit as
   the one main button instead of the form with the keyboard up. The expense and recurring-expense forms
   start with the amount, with the currency chosen right inside the amount field; date and payer share a

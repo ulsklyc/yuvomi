@@ -34,7 +34,7 @@ import { mountEmptyState, mountSearchEmpty } from '/utils/empty-state.js';
 import { subtreeIds, folderPath, flattenFolderTree } from '/utils/folder-tree.js';
 import { dateStatus } from '/utils/date-status.js';
 import { expiryChipSpec, expiryViewerSpec } from '/utils/document-expiry.js';
-import { installPopoverMenus } from '/utils/popover-menu.js';
+import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import {
@@ -4285,10 +4285,29 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
                     aria-label="${esc(t('documents.shareNamed', { name: doc.name }))}" title="${esc(t('documents.sharePreparing'))}">
               <i data-lucide="share-2" class="icon-md" aria-hidden="true"></i><span>${t('documents.shareAction')}</span>
             </button>` : ''}
-            <a class="btn btn--primary btn--sm document-viewer__action" href="${downloadUrl}" download>
+            <a class="btn btn--primary btn--sm document-viewer__action" href="${downloadUrl}" download data-viewer-download>
               <i data-lucide="download" class="icon-md" aria-hidden="true"></i><span>${t('documents.downloadAction')}</span>
             </a>
           </span>
+          ${/* SCHMAL STEHEN DIE HANDLUNGEN IM MEHR-MENUE, DER KOPF IST EINE ZEILE
+               (Ulas 28.10., S10-F4; Muster Kopf-Werkzeug S5/R16). Vier Knoepfe
+               brachen unter Kategorie und Blaettern in eine zweite Zeile - die
+               Vorschau begann bei 390px erst bei y206. Die Eintraege tragen
+               Zeichen UND Wort und loesen die Knoepfe der breiten Leiste aus
+               (ein Weg je Handlung, auch fuer Teilen, das im Tipp bleibt).
+               Ab 640px ist das Menue unsichtbar und die Leiste steht. */ ''}
+          <span class="document-viewer__more">${popoverMenuHtml({
+            id: 'document-viewer-more-menu',
+            label: t('common.moreActionsNamed', { name: doc.name }),
+            triggerClass: 'btn btn--secondary btn--icon document-viewer__more-btn',
+            items: [
+              ...(externalUrl ? [{ action: 'viewer-dms', icon: 'external-link', label: t('documents.dmsOpenExternal') }] : []),
+              ...(previewKind(doc.mime_type) === 'pdf' ? [{ action: 'viewer-open-tab', icon: 'external-link', label: t('documents.viewerOpenInTab') }] : []),
+              ...(mayManage(doc) ? [{ action: 'viewer-edit', icon: 'pencil', label: t('common.edit') }] : []),
+              ...(shareSupport === 'ok' ? [{ action: 'viewer-share', icon: 'share-2', label: t('documents.shareAction'), disabled: true }] : []),
+              { action: 'viewer-download', icon: 'download', label: t('documents.downloadAction') },
+            ],
+          })}</span>
           ${shareSupport !== 'ok' ? `<p class="document-viewer__note">${t(SHARE_NOTE_KEYS[shareSupport])}</p>` : ''}
         </div>
         ${viewerDetailsHtml(doc)}
@@ -4328,6 +4347,24 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
         openDocumentModal(doc);
       });
       wireViewerStage(panel, doc);
+      // Das Mehr-Menue (schmal) loest die Knoepfe der Leiste aus - ein Weg je
+      // Handlung. Synchron im Tipp: Teilen und Herunterladen brauchen die
+      // Nutzeraktivierung des Klicks.
+      installPopoverMenus(panel);
+      const VIEWER_MENU_TARGETS = {
+        'viewer-dms': '.doc-viewer__dms-link',
+        'viewer-open-tab': 'a.document-viewer__action[target="_blank"]',
+        'viewer-edit': '[data-action="edit-document"]',
+        'viewer-share': '[data-action="share"]',
+        'viewer-download': '[data-viewer-download]',
+      };
+      panel.querySelector('#document-viewer-more-menu')?.addEventListener('click', (event) => {
+        const item = event.target.closest?.('.popover-menu__item[data-action]');
+        const target = item && panel.querySelector(VIEWER_MENU_TARGETS[item.dataset.action] ?? '');
+        if (!target || target.disabled) return;
+        panel.querySelector('#document-viewer-more-menu')?.hidePopover?.();
+        target.click();
+      });
       // Vor/Zurueck: die Knoepfe und die Pfeiltasten, die auf sie zeigen
       // (RTL gespiegelt). Nicht aus einem Feld oder der PDF-Seitenleiste heraus
       // - dort gehoeren die Pfeile dem Element.
@@ -4383,12 +4420,16 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
         shareFile = new File([blob], doc.original_name || doc.name, { type: doc.mime_type });
         btn.disabled = false;
         btn.removeAttribute('aria-busy');
+        // Der Eintrag im Mehr-Menue (schmal) wird mit dem Knopf frei.
+        const menuItem = panel.querySelector('#document-viewer-more-menu [data-action="viewer-share"]');
+        if (menuItem) menuItem.disabled = false;
         // Der Name ("<Dokument> teilen") steht schon; nur der Hinweis wechselt.
         btn.title = t('documents.shareAction');
       })
       .catch((err) => {
         if (err?.name === 'AbortError') return;
         btn.remove();
+        panel.querySelector('#document-viewer-more-menu [data-action="viewer-share"]')?.remove();
         panel.querySelector('.document-viewer__meta')
           ?.insertAdjacentHTML('beforeend', `<p class="document-viewer__note">${t('documents.shareFailed')}</p>`);
       });

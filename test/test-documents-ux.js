@@ -1670,7 +1670,7 @@ test('der Betrachter bietet Bearbeiten an, schliesst sich dafuer und gibt den Au
   // nur das Modul; das Verhalten faehrt test-inventory-documents-readonly-ui.js.
   // Seit R24 (G4-Dokumente-P3-3) mit Wort; der Name nennt das Dokument.
   assert.match(actions, /\$\{mayManage\(doc\) \? `\s*<button type="button" class="btn btn--secondary btn--sm document-viewer__action" data-action="edit-document"\s+aria-label="\$\{esc\(t\('common\.editNamed', \{ name: doc\.name \}\)\)\}">\s*<i data-lucide="pencil" class="icon-md" aria-hidden="true"><\/i><span>\$\{t\('common\.edit'\)\}<\/span>/);
-  assert.match(actions, /<a class="btn btn--primary btn--sm document-viewer__action" href="\$\{downloadUrl\}" download>\s*<i data-lucide="download"[^>]*><\/i><span>\$\{t\('documents\.downloadAction'\)\}<\/span>/, 'Herunterladen mit Wort, der eine Primaerknopf');
+  assert.match(actions, /<a class="btn btn--primary btn--sm document-viewer__action" href="\$\{downloadUrl\}" download data-viewer-download>\s*<i data-lucide="download"[^>]*><\/i><span>\$\{t\('documents\.downloadAction'\)\}<\/span>/, 'Herunterladen mit Wort, der eine Primaerknopf');
   // Der Ausloeser des Betrachters wird VOR dem Oeffnen gemerkt; beim Wechsel
   // bekommt er den Fokus zurueck, damit der Bearbeiten-Dialog ihn als seinen
   // Ausloeser merkt (modal.js merkt document.activeElement). Mobil schliesst
@@ -1978,8 +1978,8 @@ test('der Betrachter ist schmal vollflaechig, und der Meta-Block klappt hinter d
   assert.ok(hidden && /display:\s*none/.test(hidden.body), 'eingeklappt blendet der Meta-Block aus');
   assert.match(hidden.selector, /\.document-viewer__note/, 'samt Teilen-Hinweis');
   assert.match(hidden.selector, /\.document-viewer__details/, 'und Lesezeilen');
-  assert.match(hidden.selector, /> span:not\(\.document-viewer__actions\):not\(\.document-viewer__pager\):not\(\.doc-badge\)/,
-    'die Aktionen, das Vor/Zurueck-Paar (R22) und ein Ablauf in Warnfarbe bleiben stehen');
+  assert.match(hidden.selector, /> span:not\(\.document-viewer__actions\):not\(\.document-viewer__pager\):not\(\.document-viewer__more\):not\(\.doc-badge\)/,
+    'die Aktionen (schmal: ihr Mehr-Menue, S10-F4), das Vor/Zurueck-Paar (R22) und ein Ablauf in Warnfarbe bleiben stehen');
   // Die Regeln stehen NACH den Grundregeln des Betrachters (gleiche Spezifitaet).
   assert.ok(css.lastIndexOf('.document-viewer__pdf {') > css.indexOf('height: 65vh'), 'die schmale Regel folgt der Grundregel');
 
@@ -2195,4 +2195,24 @@ test('R23: die Ablage prueft die Groesse gleich bei der Wahl', () => {
   const fn = page.slice(page.indexOf('function bindDropzone('), page.indexOf('function reportDropzoneError('));
   assert.match(fn, /const tooBig = files\.find\(\(file\) => file\.size > maxSize\);/);
   assert.match(fn, /setTimeout\(\(\) => reportDropzoneError\(form, t\('documents\.fileTooLargeNamed', \{ name: tooBig\.name \}\)\), 0\)/);
+});
+
+// R24 S10-F4 (Ulas 28.10.): schmal stehen die Handlungen des Betrachters im
+// Mehr-Menue, der Kopf ist EINE Zeile (Kategorie, Blaettern, Menue). Gemessen
+// 390px: Vorschau ab y206 -> y150. Die Eintraege loesen die Knoepfe der
+// breiten Leiste aus (ein Weg je Handlung, Teilen bleibt im Tipp).
+test('R24 S10-F4: schmal ein Mehr-Menue statt einer zweiten Knopfzeile, breit bleibt die Leiste', () => {
+  const viewer = fnBody('openDocumentViewer', 'renderViewerContent');
+  assert.match(viewer, /<span class="document-viewer__more">\$\{popoverMenuHtml\(\{\s*id: 'document-viewer-more-menu'/, 'ein Menue am Ende der Meta-Zeile');
+  for (const action of ['viewer-open-tab', 'viewer-edit', 'viewer-share', 'viewer-download']) {
+    assert.match(viewer, new RegExp(`action: '${action}'`), `${action} steht im Menue`);
+  }
+  assert.match(viewer, /'viewer-download': '\[data-viewer-download\]'/, 'der Eintrag loest den Knopf der Leiste aus');
+  assert.match(viewer, /target\.click\(\);/, 'synchron im Tipp (Teilen, Herunterladen)');
+  const css = readFileSync(new URL('../public/styles/documents.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const narrow = (r) => r.at.some((a) => /max-width:\s*639px/.test(a));
+  assert.match(rules.find((r) => !r.at.length && r.selector.trim() === '.document-viewer__meta > .document-viewer__more')?.body ?? '', /display:\s*none/, 'breit kein Menue');
+  assert.match(rules.find((r) => narrow(r) && r.selector.trim() === '.document-viewer__meta > .document-viewer__more')?.body ?? '', /display:\s*inline-flex/, 'schmal das Menue');
+  assert.match(rules.find((r) => narrow(r) && r.selector.trim() === '.document-viewer__meta > .document-viewer__actions')?.body ?? '', /display:\s*none/, 'schmal keine zweite Knopfzeile');
 });

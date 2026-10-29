@@ -1766,6 +1766,12 @@
   margin-inline-start: 0;
 }
 
+/* Das Mehr-Menue der Handlungen gibt es nur schmal (S10-F4, unten). Mit dem
+ * Elternteil im Selektor: `.document-viewer__meta span` (oben) schlaegt sonst. */
+.document-viewer__meta > .document-viewer__more {
+  display: none;
+}
+
 /* Eine Zeile unter den Meta-Angaben, die sagt, warum Teilen hier nicht geht
  * (D#1014): eigener Umbruch in der umbrechenden Meta-Zeile, Schrift und Farbe
  * erbt sie von dort. Wird nur gerendert, wenn es etwas zu erklaeren gibt. */
@@ -2554,22 +2560,27 @@
     border-inline-end: none;
   }
 
-  .document-viewer__pager + .document-viewer__actions {
+  /* EINE ZEILE (Ulas 28.10., S10-F4): Kategorie-Knopf, Blaettern und das
+   * Mehr-Menue mit allen Handlungen (Zeichen + Wort). Die Leiste der breiten
+   * Fassung tritt zurueck - sie bleibt im Dokument, das Menue loest ihre
+   * Knoepfe aus. Bis R24 S12 brach sie in eine zweite Zeile (Vorschau ab
+   * y206 bei 390px). */
+  .document-viewer__meta > .document-viewer__actions {
+    display: none;
+  }
+
+  .document-viewer__meta > .document-viewer__more {
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+
+  /* Ohne Blaettern schiebt sich das Menue selbst an den Zeilenrand. */
+  .document-viewer__meta > .document-viewer__actions + .document-viewer__more {
     margin-inline-start: auto;
   }
 
-  /* Schmal behaelt nur der Primaerknopf sein Wort ("Herunterladen"); Oeffnen,
-   * Bearbeiten und Teilen stehen als Zeichen in Knopfgroesse - ihr Name steht
-   * im aria-label (Critique R24 G4-Dokumente-P3-3). Mit Wort liefen vier
-   * Knoepfe bei 390px aus der Zeile. */
-  .document-viewer__action:not(.btn--primary) {
-    inline-size: var(--target-base);
-    padding-inline: 0;
-    justify-content: center;
-  }
-
-  .document-viewer__action:not(.btn--primary) > span {
-    display: none;
+  .document-viewer__pager ~ .document-viewer__more {
+    margin-inline-start: 0;
   }
 
   .document-viewer__meta {
@@ -2577,7 +2588,7 @@
     gap: var(--space-2);
   }
 
-  .document-viewer:not(.document-viewer--info-open) .document-viewer__meta > span:not(.document-viewer__actions):not(.document-viewer__pager):not(.doc-badge),
+  .document-viewer:not(.document-viewer--info-open) .document-viewer__meta > span:not(.document-viewer__actions):not(.document-viewer__pager):not(.document-viewer__more):not(.doc-badge),
   .document-viewer:not(.document-viewer--info-open) .document-viewer__note,
   .document-viewer:not(.document-viewer--info-open) .document-viewer__details {
     display: none;
