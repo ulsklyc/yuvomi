@@ -3720,6 +3720,7 @@
         "errorMirrored": "Denne oppskriften kommer fra en tilkoblet oppskriftskilde og endres der.",
         "errorRecipeGone": "Denne oppskriften finnes ikke lenger.",
         "errorIngredientGone": "Denne ingrediensen står ikke lenger i oppskriften.",
+        "errorIngredientsChanged": "Oppskriften er endret i mellomtiden. Sjekk ingrediensene og legg dem til på nytt.",
         "errorSelectedPantryItemGone": "Den valgte varen i matlageret finnes ikke lenger.",
         "plannedThisWeek": "Planlagt denne uken",
         "imageLabel": "Bilde",

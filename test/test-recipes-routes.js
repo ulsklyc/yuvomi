@@ -928,6 +928,11 @@ test('POST/PUT /: servings ausserhalb 1-99 oder keine ganze Zahl -> 400, nichts 
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM recipes WHERE title LIKE 'Falsch %'").get().n, 0);
 });
 
+/** Die Zeilen-IDs der Zutaten, wie GET /recipes sie liefert (`id` je Zutat). */
+function ingredientIds(recipeId) {
+  return db.prepare('SELECT id FROM recipe_ingredients WHERE recipe_id = ? ORDER BY id ASC').all(recipeId).map((r) => r.id);
+}
+
 test('POST /:id/to-shopping-list: quantities ersetzt die Mengen fuer diese Uebergabe, Namen bleiben', async () => {
   const listId = newList('Portionen-Liste');
   const created = await call('POST', '/', {
@@ -935,21 +940,61 @@ test('POST /:id/to-shopping-list: quantities ersetzt die Mengen fuer diese Ueber
     ingredients: [{ name: 'Nudeln', quantity: '250 g', category: 'Backen' }, { name: 'Salz' }],
   });
   const id = created.body.data.id;
-  const r = await call('POST', `/${id}/to-shopping-list`, { listId, quantities: ['500 g', null] });
-  assert.equal(r.status, 200);
+  assert.deepEqual(created.body.data.ingredients.map((i) => i.id), ingredientIds(id), 'die API liefert die Zeilen-ID je Zutat');
+  const r = await call('POST', `/${id}/to-shopping-list`, { listId, quantities: ['500 g', null], ingredientIds: ingredientIds(id) });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
   const items = shoppingItems(listId);
   assert.deepEqual(items.map((i) => [i.name, i.quantity, i.category]), [['Nudeln', '500 g', 'Backen'], ['Salz', null, 'Sonstiges']]);
   // Das Rezept selbst bleibt unveraendert.
   assert.deepEqual(ingredientRows(id).map((x) => x.quantity), ['250 g', null]);
 });
 
-test('POST /:id/to-shopping-list: quantities in falscher Laenge oder Form -> 400, nichts uebernommen', async () => {
+test('POST /:id/to-shopping-list: quantities in falscher Form, ohne oder mit kaputten ingredientIds -> 400, nichts uebernommen', async () => {
   const listId = newList('Portionen-Falsch');
   const created = await call('POST', '/', { title: 'Skaliert-Falsch', ingredients: [{ name: 'Mehl', quantity: '1 kg' }] });
   const id = created.body.data.id;
-  for (const quantities of [['1 kg', '2 kg'], [], 'x', [42]]) {
-    const r = await call('POST', `/${id}/to-shopping-list`, { listId, quantities });
-    assert.equal(r.status, 400, JSON.stringify(quantities));
+  const ids = ingredientIds(id);
+  for (const body of [
+    { quantities: 'x', ingredientIds: ids },
+    { quantities: [42], ingredientIds: ids },
+    { quantities: ['2 kg'] },
+    { quantities: ['2 kg'], ingredientIds: 'x' },
+    { quantities: ['2 kg'], ingredientIds: ['1'] },
+    { quantities: ['2 kg'], ingredientIds: [...ids, ids[0] + 1] },
+  ]) {
+    const r = await call('POST', `/${id}/to-shopping-list`, { listId, ...body });
+    assert.equal(r.status, 400, JSON.stringify(body));
   }
   assert.equal(shoppingItems(listId).length, 0);
+});
+
+// Codex an #2364 (P2): die Mengen lagen positionsweise auf den Zutaten des
+// Servers. Aenderte jemand das Rezept zwischen Laden und Uebernahme (oder ein
+// Abgleich die Reihenfolge), landeten sie still bei den falschen Zutaten.
+test('POST /:id/to-shopping-list: hat sich das Rezept seit dem Laden geaendert, antwortet die Uebergabe 409 und nennt den neuen Stand', async () => {
+  const listId = newList('Portionen-Geaendert');
+  const created = await call('POST', '/', {
+    title: 'Geaendert', servings: 2,
+    ingredients: [{ name: 'Nudeln', quantity: '250 g' }, { name: 'Salz', quantity: '1 TL' }],
+  });
+  const id = created.body.data.id;
+  const loaded = ingredientIds(id);
+  // Inzwischen dreht jemand die Reihenfolge um - gleiche Laenge, gleiche Namen.
+  const edited = await call('PUT', `/${id}`, {
+    title: 'Geaendert', servings: 2,
+    ingredients: [{ name: 'Salz', quantity: '1 TL' }, { name: 'Nudeln', quantity: '250 g' }],
+  });
+  assert.equal(edited.status, 200);
+  const r = await call('POST', `/${id}/to-shopping-list`, { listId, quantities: ['500 g', '2 TL'], ingredientIds: loaded });
+  assert.equal(r.status, 409, JSON.stringify(r.body));
+  assert.equal(r.body.reason, 'recipes_ingredients_changed');
+  assert.deepEqual(r.body.recipe.ingredients.map((i) => [i.id, i.name]), ingredientIds(id).map((rid, i) => [rid, ['Salz', 'Nudeln'][i]]),
+    'die Antwort traegt das Rezept, wie es jetzt ist');
+  assert.equal(shoppingItems(listId).length, 0, 'nichts uebernommen, statt Mengen falsch zuzuordnen');
+  const fewer = await call('PUT', `/${id}`, { title: 'Geaendert', ingredients: [] });
+  assert.equal(fewer.status, 200);
+  const none = await call('POST', `/${id}/to-shopping-list`, { listId, quantities: ['500 g', '2 TL'], ingredientIds: loaded });
+  assert.equal(none.status, 409, 'auch ohne Zutaten: die geladenen gibt es nicht mehr');
+  const plain = await call('POST', `/${id}/to-shopping-list`, { listId });
+  assert.equal(plain.status, 200, 'ohne quantities unveraendert');
 });

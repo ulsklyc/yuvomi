@@ -3720,6 +3720,7 @@
         "errorMirrored": "Công thức này đến từ một nguồn công thức đã kết nối và được thay đổi tại đó.",
         "errorRecipeGone": "Công thức này không còn nữa.",
         "errorIngredientGone": "Nguyên liệu này không còn trong công thức.",
+        "errorIngredientsChanged": "Công thức đã thay đổi trong lúc đó. Hãy kiểm tra nguyên liệu và thêm lại.",
         "errorSelectedPantryItemGone": "Mục trong kho thực phẩm đã chọn không còn nữa.",
         "plannedThisWeek": "Đã lên kế hoạch tuần này",
         "imageLabel": "Hình ảnh",

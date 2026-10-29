@@ -2167,9 +2167,15 @@ async function transferRecipe(recipe, btn) {
   try {
     // Die gewaehlten Portionen gehen mit (R24, E12): der Server ersetzt die
     // Mengen je Zutat, Namen und Kategorien bleiben die des Rezepts.
+    // Jede Menge nennt die Zeile, zu der sie gehoert (Codex an #2364): hat
+    // jemand das Rezept seit dem Laden gespeichert, antwortet der Server 409,
+    // statt die Mengen positionsweise auf andere Zutaten zu legen.
     const factor = chosenFactor(recipe);
     const body = { listId: target.id };
-    if (factor !== 1) body.quantities = scaledIngredients(recipe.ingredients, factor).map((ing) => ing.quantity);
+    if (factor !== 1) {
+      body.quantities = scaledIngredients(recipe.ingredients, factor).map((ing) => ing.quantity);
+      body.ingredientIds = recipe.ingredients.map((ing) => ing.id);
+    }
     const res = await api.post(`/recipes/${recipe.id}/to-shopping-list`, body);
     const added = res.data?.transferred ?? 0;
     const skipped = res.data?.skipped ?? 0;
@@ -2196,9 +2202,24 @@ async function transferRecipe(recipe, btn) {
     }
   } catch (err) {
     reportError(err, { owner, recipeId: recipe.id, listId: target.id });
+    if (err?.data?.reason === 'recipes_ingredients_changed') showChangedRecipe(err.data.recipe, owner);
   } finally {
     if (btn) btn.disabled = false;
   }
+}
+
+/**
+ * Das Rezept, wie der Server es jetzt kennt (409 `recipes_ingredients_changed`
+ * traegt es mit): genau dieses eine ersetzen, wie nach dem eigenen Speichern -
+ * kein Nachladen der ganzen Liste. Die Portionswahl bleibt; der Nutzer sieht
+ * die neuen Zutaten und uebernimmt noch einmal.
+ */
+function showChangedRecipe(fresh, owner) {
+  if (!fresh || fresh.id == null || !stillShown(owner)) return;
+  const idx = state.recipes.findIndex((r) => r.id === fresh.id);
+  if (idx < 0) return;
+  state.recipes[idx] = fresh;
+  renderRecipeList({ repaint: true });
 }
 
 async function removeRecipe(recipe) {

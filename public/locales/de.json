@@ -3738,6 +3738,7 @@
         "errorMirrored": "Dieses Rezept kommt aus einer verbundenen Rezeptquelle und wird dort geändert.",
         "errorRecipeGone": "Dieses Rezept gibt es nicht mehr.",
         "errorIngredientGone": "Diese Zutat steht nicht mehr im Rezept.",
+        "errorIngredientsChanged": "Das Rezept wurde inzwischen geändert. Prüfe die Zutaten und übernimm sie noch einmal.",
         "errorSelectedPantryItemGone": "Die gewählte Zeile im Vorrat gibt es nicht mehr.",
         "plannedThisWeek": "Diese Woche geplant",
         "imageLabel": "Bild",

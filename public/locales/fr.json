@@ -3603,6 +3603,7 @@
         "errorMirrored": "Cette recette provient d'une source de recettes connectée et se modifie là-bas.",
         "errorRecipeGone": "Cette recette n’existe plus.",
         "errorIngredientGone": "Cet ingrédient ne figure plus dans la recette.",
+        "errorIngredientsChanged": "La recette a été modifiée entre-temps. Vérifie les ingrédients et ajoute-les à nouveau.",
         "errorSelectedPantryItemGone": "L’article du garde-manger choisi n’existe plus.",
         "plannedThisWeek": "Prévu cette semaine",
         "imageLabel": "Image",

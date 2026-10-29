@@ -3603,6 +3603,7 @@
         "errorMirrored": "此食譜來自已連線的食譜來源，需在那裡修改。",
         "errorRecipeGone": "這個食譜已不存在。",
         "errorIngredientGone": "這個食材已不在食譜中。",
+        "errorIngredientsChanged": "這個食譜在此期間已被修改。請檢查食材後再加入一次。",
         "errorSelectedPantryItemGone": "所選的儲藏項目已不存在。",
         "plannedThisWeek": "本週已安排",
         "imageLabel": "圖片",

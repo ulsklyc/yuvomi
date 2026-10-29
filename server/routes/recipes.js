@@ -539,7 +539,8 @@ router.get('/:id/provider-thumbnail', async (req, res) => {
 /**
  * POST /api/v1/recipes/:id/to-shopping-list
  * Zutaten eines Rezepts auf eine Einkaufsliste übernehmen.
- * Body: { listId: number }
+ * Body: { listId: number, quantities?: (string|null)[], ingredientIds?: number[] }
+ * (`ingredientIds` ist Pflicht, sobald `quantities` mitkommt.)
  * Response: { data: { transferred: number, skipped: number, added_ids: number[] } }
  *
  * Anders als bei Mahlzeiten wird hier NICHTS am Rezept markiert: ein Rezept ist
@@ -581,29 +582,49 @@ router.post('/:id/to-shopping-list', (req, res) => {
     if (!list) return res.status(404).json({ error: 'Shopping list not found.', code: 404, reason: 'shopping_list_not_found' });
 
     const ingredients = db.get().prepare(
-      'SELECT name, quantity, category FROM recipe_ingredients WHERE recipe_id = ? ORDER BY id ASC',
+      'SELECT id, name, quantity, category FROM recipe_ingredients WHERE recipe_id = ? ORDER BY id ASC',
     ).all(id);
-    if (!ingredients.length) return res.json({ data: { transferred: 0, skipped: 0, added_ids: [] } });
 
     // UMGERECHNETE MENGEN (R24, E12). Wer das Rezept fuer mehr oder weniger
     // Portionen ansieht, uebernimmt auch diese Mengen. Gerechnet wird im
     // Browser (scaleQuantityText, utils/scale-quantity.js - dieselbe Rechnung
-    // wie im Mahlzeit-Dialog); hierher kommt nur der Text je Zutat, in der
-    // Reihenfolge der Zutaten. Namen und Kategorien bleiben die des Rezepts:
-    // die Liste ersetzt die Menge, sie legt keine Zutat an.
-    const { quantities } = bodyOf(req);
+    // wie im Mahlzeit-Dialog); hierher kommt nur der Text je Zutat. Namen und
+    // Kategorien bleiben die des Rezepts: die Liste ersetzt die Menge, sie
+    // legt keine Zutat an.
+    //
+    // JE MENGE DIE ZEILE, ZU DER SIE GEHOERT (Codex an #2364). Die Mengen
+    // lagen positionsweise auf den Zutaten DIESER Abfrage; aenderte jemand das
+    // Rezept zwischen Laden und Uebernahme (oder ein Abgleich mit der
+    // Rezeptquelle die Reihenfolge), landeten sie still bei falschen Zutaten.
+    // `ingredientIds` nennt deshalb die Zeilen-ID je Menge, und sie ist Pflicht:
+    // Speichern und Abgleich legen alle Zutaten neu an, eine geaenderte Zeile
+    // hat also immer eine neue ID - auch eine geaenderte Grundmenge, auf der
+    // die umgerechnete aufbaut. Weicht der Stand ab, 409 mit dem Rezept, wie es
+    // jetzt ist, statt still falsch zuzuordnen.
+    const { quantities, ingredientIds } = bodyOf(req);
     if (quantities !== undefined) {
-      if (!Array.isArray(quantities) || quantities.length !== ingredients.length
+      if (!Array.isArray(quantities)
         || quantities.some((q) => q !== null && (typeof q !== 'string' || q.length > MAX_SHORT))) {
         return res.status(400).json({ error: 'Quantities must be one text per ingredient.', code: 400 });
       }
+      if (!Array.isArray(ingredientIds) || ingredientIds.length !== quantities.length
+        || ingredientIds.some((v) => !Number.isSafeInteger(v) || v < 1)) {
+        return res.status(400).json({ error: 'Quantities need the ingredientIds they belong to, one per quantity.', code: 400 });
+      }
+      if (ingredientIds.length !== ingredients.length || ingredients.some((ing, i) => ing.id !== ingredientIds[i])) {
+        return res.status(409).json({
+          error: 'The recipe ingredients changed since they were loaded.', code: 409,
+          reason: 'recipes_ingredients_changed', recipe: loadRecipeWithIngredients(req, id),
+        });
+      }
       quantities.forEach((q, i) => { ingredients[i].quantity = q?.trim() || null; });
     }
+    if (!ingredients.length) return res.json({ data: { transferred: 0, skipped: 0, added_ids: [] } });
 
     // Die Regel ist die der ganzen Kueche (services/kitchen-handover.js, R23 D2):
     // dieser Weg hatte sie als einziger schon, die drei anderen nicht.
     const result = db.transaction(() => {
-      const { added_ids: addedIds, skipped } = handOverToShoppingList(db.get(), vList.value, ingredients);
+      const { added_ids: addedIds, skipped } = handOverToShoppingList(db.get(), vList.value, ingredients.map(({ name, quantity, category }) => ({ name, quantity, category })));
       return { transferred: addedIds.length, skipped, added_ids: addedIds };
     });
 

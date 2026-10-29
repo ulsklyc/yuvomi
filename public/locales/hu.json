@@ -3720,6 +3720,7 @@
         "errorMirrored": "Ez a recept egy csatlakoztatott receptforrásból származik, és ott módosítható.",
         "errorRecipeGone": "Ez a recept már nem létezik.",
         "errorIngredientGone": "Ez a hozzávaló már nem szerepel a receptben.",
+        "errorIngredientsChanged": "A recept időközben megváltozott. Nézd át a hozzávalókat, és add hozzá őket újra.",
         "errorSelectedPantryItemGone": "A kiválasztott kamratétel már nem létezik.",
         "plannedThisWeek": "Erre a hétre betervezve",
         "imageLabel": "Kép",

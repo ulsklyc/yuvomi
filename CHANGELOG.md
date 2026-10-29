@@ -12,7 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ingredients get a "Servings − 4 +" stepper that recalculates every amount as you step. Planning the
   recipe or putting it on the shopping list takes the servings you chose. In the meal dialog the same
   stepper replaces the "Scale ingredients" number field once a recipe fills the list. A recipe without
-  servings steps in multiples ("Amount × 1.5") instead of inventing a number.
+  servings steps in multiples ("Amount × 1.5") instead of inventing a number. If someone changed the
+  recipe in the meantime, the transfer shows the new ingredients and asks you to add them again,
+  instead of putting an amount on the wrong ingredient.
 - **Shared expenses use your budget categories.** An expense in a split group now picks from the same
   categories as the budget, shown with the same coloured dot, instead of a separate list of twelve with
   icons. Existing expenses keep their meaning where a budget category fits (groceries become Food, rent

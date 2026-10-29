@@ -3603,6 +3603,7 @@
         "errorMirrored": "Det här receptet kommer från en ansluten receptkälla och ändras där.",
         "errorRecipeGone": "Det här receptet finns inte längre.",
         "errorIngredientGone": "Den här ingrediensen finns inte längre i receptet.",
+        "errorIngredientsChanged": "Receptet har ändrats under tiden. Kontrollera ingredienserna och lägg till dem igen.",
         "errorSelectedPantryItemGone": "Den valda varan i skafferiet finns inte längre.",
         "plannedThisWeek": "Planerad denna vecka",
         "imageLabel": "Bild",

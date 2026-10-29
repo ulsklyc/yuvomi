@@ -188,6 +188,10 @@ export const CASE_MESSAGES = new Map([
   // Die im Zuordnungs-Dialog GEWAEHLTE Vorratszeile fehlt: der Dialog bleibt
   // offen und bietet den aktuellen Vorrat an.
   ['recipes_selected_pantry_item_not_found', 'recipes.errorSelectedPantryItemGone'],
+  // Die Uebernahme mit umgerechneten Mengen nannte Zutaten, die das Rezept so
+  // nicht mehr hat (gespeichert oder abgeglichen seit dem Laden). KEIN "gibt es
+  // nicht mehr": das Rezept steht, die Seite zeigt den Stand aus der Antwort.
+  ['recipes_ingredients_changed', 'recipes.errorIngredientsChanged'],
   // Eine Mahlzeit aus einem Rezept, das es nicht mehr gibt (server/routes/meals.js).
   ['meals_selected_recipe_not_found', 'recipes.errorRecipeGone'],
   // Abos (#1909). Die "gibt es nicht mehr" stehen auch in GONE_REASONS. Die

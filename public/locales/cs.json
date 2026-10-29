@@ -4609,6 +4609,7 @@
         "errorMirrored": "Tento recept pochází z připojeného zdroje receptů a upravuje se tam.",
         "errorRecipeGone": "Tento recept už neexistuje.",
         "errorIngredientGone": "Tato surovina už v receptu není.",
+        "errorIngredientsChanged": "Recept se mezitím změnil. Zkontroluj suroviny a přidej je znovu.",
         "errorSelectedPantryItemGone": "Vybraná položka ve spíži už neexistuje.",
         "plannedThisWeek": "Naplánováno na tento týden",
         "imageLabel": "Obrázek",

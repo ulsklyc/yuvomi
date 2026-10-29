@@ -3738,6 +3738,7 @@
         "errorMirrored": "Galing ang resipeng ito sa isang nakakonektang pinagmulan ng resipe at doon ito binabago.",
         "errorRecipeGone": "Wala na ang recipe na ito.",
         "errorIngredientGone": "Wala na sa recipe ang sangkap na ito.",
+        "errorIngredientsChanged": "Nabago na ang recipe samantala. Suriin ang mga sangkap at idagdag muli.",
         "errorSelectedPantryItemGone": "Wala na ang napiling item sa pantry.",
         "plannedThisWeek": "Nakaplano ngayong linggo",
         "imageLabel": "Larawan",

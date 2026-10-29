@@ -3738,6 +3738,7 @@
         "errorMirrored": "Resep ini berasal dari sumber resep yang terhubung dan diubah di sana.",
         "errorRecipeGone": "Resep ini sudah tidak ada.",
         "errorIngredientGone": "Bahan ini sudah tidak ada di resep.",
+        "errorIngredientsChanged": "Resep ini sudah berubah sementara itu. Periksa bahan-bahannya lalu tambahkan lagi.",
         "errorSelectedPantryItemGone": "Item persediaan yang dipilih sudah tidak ada.",
         "plannedThisWeek": "Direncanakan minggu ini",
         "imageLabel": "Gambar",

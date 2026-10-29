@@ -3603,6 +3603,7 @@
         "errorMirrored": "Bu tarif bağlı bir tarif kaynağından geliyor ve orada değiştirilir.",
         "errorRecipeGone": "Bu tarif artık yok.",
         "errorIngredientGone": "Bu malzeme artık tarifte yok.",
+        "errorIngredientsChanged": "Tarif bu arada değişti. Malzemeleri kontrol et ve yeniden ekle.",
         "errorSelectedPantryItemGone": "Seçilen kiler ürünü artık yok.",
         "plannedThisWeek": "Bu hafta planlandı",
         "imageLabel": "Görsel",

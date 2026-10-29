@@ -3738,6 +3738,7 @@
         "errorMirrored": "이 레시피는 연결된 레시피 출처에서 가져온 것이며 그곳에서 변경합니다.",
         "errorRecipeGone": "이 레시피는 더 이상 없습니다.",
         "errorIngredientGone": "이 재료는 더 이상 레시피에 없습니다.",
+        "errorIngredientsChanged": "그사이 레시피가 변경되었습니다. 재료를 확인하고 다시 추가하세요.",
         "errorSelectedPantryItemGone": "선택한 식료품 항목이 더 이상 없습니다.",
         "plannedThisWeek": "이번 주에 계획됨",
         "imageLabel": "이미지",

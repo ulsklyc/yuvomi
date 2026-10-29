@@ -3603,6 +3603,7 @@
         "errorMirrored": "このレシピは接続済みのレシピソースから取り込まれており、変更はそちらで行います。",
         "errorRecipeGone": "このレシピはもうありません。",
         "errorIngredientGone": "この材料はもうレシピにありません。",
+        "errorIngredientsChanged": "このレシピはその間に変更されました。材料を確認して、もう一度追加してください。",
         "errorSelectedPantryItemGone": "選んだ在庫の品目はもうありません。",
         "plannedThisWeek": "今週の予定あり",
         "imageLabel": "画像",

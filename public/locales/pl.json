@@ -3968,6 +3968,7 @@
         "errorMirrored": "Ten przepis pochodzi z połączonego źródła przepisów i tam się go zmienia.",
         "errorRecipeGone": "Ten przepis już nie istnieje.",
         "errorIngredientGone": "Tego składnika nie ma już w przepisie.",
+        "errorIngredientsChanged": "Przepis został w międzyczasie zmieniony. Sprawdź składniki i dodaj je ponownie.",
         "errorSelectedPantryItemGone": "Wybrana pozycja w spiżarni już nie istnieje.",
         "plannedThisWeek": "Zaplanowane na ten tydzień",
         "imageLabel": "Obraz",

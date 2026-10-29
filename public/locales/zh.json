@@ -3603,6 +3603,7 @@
         "errorMirrored": "此食谱来自已连接的食谱来源，需在那里修改。",
         "errorRecipeGone": "这个食谱已不存在。",
         "errorIngredientGone": "这个食材已不在食谱中。",
+        "errorIngredientsChanged": "这个食谱在此期间已被修改。请检查食材后再添加一次。",
         "errorSelectedPantryItemGone": "所选的储藏项目已不存在。",
         "plannedThisWeek": "本周已安排",
         "imageLabel": "图片",

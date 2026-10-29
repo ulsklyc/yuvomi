@@ -3720,6 +3720,7 @@
         "errorMirrored": "This recipe comes from a connected recipe source and is changed there.",
         "errorRecipeGone": "This recipe no longer exists.",
         "errorIngredientGone": "This ingredient is no longer in the recipe.",
+        "errorIngredientsChanged": "This recipe has changed in the meantime. Check the ingredients and add them again.",
         "errorSelectedPantryItemGone": "The chosen pantry item no longer exists.",
         "plannedThisWeek": "Planned this week",
         "imageLabel": "Image",

@@ -3949,6 +3949,7 @@
         "errorMirrored": "هذه الوصفة تأتي من مصدر وصفات متصل ويتم تغييرها هناك.",
         "errorRecipeGone": "هذه الوصفة لم تعد موجودة.",
         "errorIngredientGone": "هذا المكوّن لم يعد موجودًا في الوصفة.",
+        "errorIngredientsChanged": "تغيّرت هذه الوصفة في هذه الأثناء. راجع المكوّنات وأضفها مرة أخرى.",
         "errorSelectedPantryItemGone": "عنصر المخزن المختار لم يعد موجودًا.",
         "plannedThisWeek": "مخطط لهذا الأسبوع",
         "imageLabel": "صورة",

@@ -27,7 +27,7 @@ export function recipesPaths() {
       post: op({
         summary: 'Transfer recipe ingredients to shopping list',
         tag: 'Recipes',
-        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). ' + 'An optional `quantities` array - one text (or `null`) per ingredient, in the recipe\'s order - replaces the stored quantities for this transfer, so a recipe viewed for another number of servings hands over the scaled amounts; names and categories stay the recipe\'s, and a list of the wrong length is refused with 400. ' + 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` (which owns `/recipes`) - a credential scoped to the recipes alone is refused with 403.',
+        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). ' + 'An optional `quantities` array - one text (or `null`) per ingredient - replaces the stored quantities for this transfer, so a recipe viewed for another number of servings hands over the scaled amounts; names and categories stay the recipe\'s. With `quantities`, `ingredientIds` is required: the `id` of each ingredient as `GET /recipes` returned it, one per quantity in the same order; a missing or malformed list answers 400. Saving a recipe or syncing it from a provider recreates its ingredient rows, so when the ids no longer match the recipe as it is now, nothing is transferred and the answer is 409 `recipes_ingredients_changed` with the current recipe in `recipe`, instead of putting amounts on the wrong ingredients. Without `quantities` the stored amounts are used and `ingredientIds` is ignored. ' + 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` (which owns `/recipes`) - a credential scoped to the recipes alone is refused with 403.',
         params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody(null),
@@ -36,6 +36,7 @@ export function recipesPaths() {
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
+          409: { description: 'The recipe\'s ingredients changed since `ingredientIds` were loaded; `recipe` carries the current recipe' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -108,7 +109,7 @@ const PANTRY_WRITE_REQUIRED = '`cross_module_access` (403, the caller has no wri
 const CASE_REASONS = {
   '/api/v1/recipes/{id}': { put: `${RECIPE_GONE}, ${MIRRORED}`, delete: `${RECIPE_GONE}, ${MIRRORED}` },
   '/api/v1/recipes/{id}/to-shopping-list': {
-    post: `${RECIPE_GONE}, \`shopping_list_not_found\` (404, the chosen shopping list does not exist), ${SHOPPING_WRITE_REQUIRED}`,
+    post: `${RECIPE_GONE}, \`shopping_list_not_found\` (404, the chosen shopping list does not exist), \`recipes_ingredients_changed\` (409, the ingredients changed since \`ingredientIds\` were loaded; \`recipe\` carries the current recipe), ${SHOPPING_WRITE_REQUIRED}`,
   },
   '/api/v1/recipes/{id}/ingredient-match': {
     put: `${RECIPE_GONE}, \`recipes_ingredient_not_found\` (404, the recipe no longer has this ingredient), \`recipes_selected_pantry_item_not_found\` (404, the chosen pantry item does not exist), ${PANTRY_WRITE_REQUIRED}`,
