@@ -9,6 +9,8 @@ import {
   localCalendarById,
   localCalendarIdSql,
   regenerateCalendarFeedToken,
+  releaseCopiedCalendarColor,
+  restoreInheritedImportColors,
   serializeCalendar,
   validateCalendarColor,
   validateCalendarName,
@@ -160,6 +162,10 @@ router.put('/calendars/:id', (req, res) => {
     }
     if (checks.some((check) => check.error)) return sendValidationErrors(res, checks);
     if (Object.keys(changes).length) {
+      // Importierte Termine trugen bis #2303 eine Kopie der Kalenderfarbe und
+      // blieben beim Umfaerben auf der alten stehen. Im selben Schritt wie das
+      // Umfaerben, damit keine Antwort dazwischen den halben Stand liest.
+      if (changes.color && changes.color !== row.color) releaseCopiedCalendarColor(database, id, row.color);
       database.prepare(`
         UPDATE local_calendars
         SET name = COALESCE(@name, name),
@@ -197,7 +203,10 @@ router.delete('/calendars/:id', (req, res) => {
     if (row.feed_token && !isAdminUser(req)) {
       return res.status(403).json({ error: 'Admin access required.', code: 403, reason: 'calendar_feed_admin_only' });
     }
-    database.prepare('DELETE FROM local_calendars WHERE id = ?').run(id);
+    database.transaction(() => {
+      database.prepare('DELETE FROM local_calendars WHERE id = ?').run(id);
+      restoreInheritedImportColors(database);
+    })();
     res.status(204).end();
   } catch (err) {
     log.error('DELETE /calendars/:id', err);

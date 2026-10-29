@@ -957,3 +957,141 @@ test('the calendar manager cases carry a reason and an English error text (#1909
     await call('DELETE', `/calendars/${calendar.id}`);
   }
 });
+
+// --------------------------------------------------------
+// #2303: die Farbe eines importierten Kalenders
+// --------------------------------------------------------
+
+/** Die Anzeigefarbe wie im Frontend (utils/event-color.js), ohne Personen. */
+function shownColor(event) {
+  return event.color || event.cal_color || event.local_calendar_color || null;
+}
+
+async function listedImport(uid) {
+  const list = await call('GET', '/api/v1/calendar?from=2036-03-01&to=2036-03-31');
+  assert.equal(list.status, 200);
+  const row = list.body.data.find((event) => event.external_calendar_id === uid);
+  assert.ok(row, `importierter Termin ${uid} fehlt in der Liste`);
+  return row;
+}
+
+function importIcs(uid) {
+  return `BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:${uid}\r\nDTSTART:20360310T100000Z\r\nDTEND:20360310T110000Z\r\nSUMMARY:Import ${uid}\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+}
+
+test('ein in einen neuen Kalender importierter Termin folgt der Kalenderfarbe (#2303)', async () => {
+  const { importToLocal } = await import('../server/services/ics-subscription.js');
+  // Der Weg der Einstellungen: neuer Kalender in der Farbe des Formulars,
+  // dann der Import mit derselben Farbe.
+  const calendar = await createCalendar('Schulferien', '#2E7D32');
+  try {
+    await importToLocal(ADMIN.id, { ics: importIcs('ferien-2303'), color: '#2E7D32', localCalendarId: calendar.id });
+    assert.equal(shownColor(await listedImport('ferien-2303')), '#2E7D32');
+
+    assert.equal((await call('PUT', `/calendars/${calendar.id}`, { body: { color: '#C62828' } })).status, 200);
+    assert.equal(shownColor(await listedImport('ferien-2303')), '#C62828',
+      'nach "Kalender verwalten" zeigt der Termin die neue Kalenderfarbe');
+  } finally {
+    await call('DELETE', `/calendars/${calendar.id}`);
+  }
+});
+
+test('ein frueher importierter Termin mit kopierter Kalenderfarbe zieht beim Umfaerben nach (#2303)', async () => {
+  // Bestandsdaten: bis zum Fix schrieb der Import die Formularfarbe in jede
+  // Zeile. Ohne Migration repariert das Umfaerben genau diese Zeilen.
+  const calendar = await createCalendar('Muellabfuhr', '#6A1B9A');
+  try {
+    const insert = db.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, end_datetime, color, external_calendar_id,
+        external_source, created_by, local_calendar_id, series_authored, color_modified)
+      VALUES (?, '2036-03-12T08:00', '2036-03-12T09:00', ?, ?, 'local', ?, ?, 1, ?)
+    `);
+    insert.run('kopiert', '#6a1b9a', 'kopiert-2303', ADMIN.id, calendar.id, 0);
+    insert.run('eigene Farbe', '#FF8F00', 'eigen-2303', ADMIN.id, calendar.id, 0);
+    insert.run('umgefaerbt', '#6A1B9A', 'umgefaerbt-2303', ADMIN.id, calendar.id, 1);
+    // Von Hand angelegt, ausdruecklich in der Kalenderfarbe: keine UID, kein Import.
+    insert.run('von Hand', '#6A1B9A', null, ADMIN.id, calendar.id, 0);
+
+    assert.equal((await call('PUT', `/calendars/${calendar.id}`, { body: { color: '#00838F' } })).status, 200);
+
+    assert.equal(shownColor(await listedImport('kopiert-2303')), '#00838F', 'die kopierte Farbe folgt dem Kalender');
+    assert.equal(shownColor(await listedImport('eigen-2303')), '#FF8F00', 'eine abweichende Terminfarbe bleibt');
+    assert.equal(shownColor(await listedImport('umgefaerbt-2303')), '#6A1B9A', 'eine von Hand gesetzte Terminfarbe bleibt');
+    assert.equal(db.prepare("SELECT color FROM calendar_events WHERE title = 'von Hand' AND local_calendar_id = ?").get(calendar.id).color,
+      '#6A1B9A', 'ein von Hand angelegter Termin behaelt seine Farbe');
+  } finally {
+    await call('DELETE', `/calendars/${calendar.id}`);
+  }
+});
+
+test('ein Import mit eigener Farbe behaelt sie, auch wenn der Kalender umgefaerbt wird (#2303)', async () => {
+  const { importToLocal } = await import('../server/services/ics-subscription.js');
+  const calendar = await createCalendar('Vereinstermine', '#1565C0');
+  try {
+    await importToLocal(ADMIN.id, { ics: importIcs('verein-2303'), color: '#F9A825', localCalendarId: calendar.id });
+    assert.equal((await call('PUT', `/calendars/${calendar.id}`, { body: { color: '#4E342E' } })).status, 200);
+    assert.equal(shownColor(await listedImport('verein-2303')), '#F9A825');
+  } finally {
+    await call('DELETE', `/calendars/${calendar.id}`);
+  }
+});
+
+test('eine COLOR aus der ICS-Datei bleibt, auch wenn sie der Kalenderfarbe gleicht (#2303, Review)', async () => {
+  const { importToLocal } = await import('../server/services/ics-subscription.js');
+  const calendar = await createCalendar('Chor', '#AD1457');
+  try {
+    const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:chor-2303\r\nDTSTART:20360311T180000Z\r\nDTEND:20360311T190000Z\r\nCOLOR:#AD1457\r\nSUMMARY:Probe\r\nEND:VEVENT\r\nEND:VCALENDAR';
+    await importToLocal(ADMIN.id, { ics, color: '#AD1457', localCalendarId: calendar.id });
+    assert.equal((await call('PUT', `/calendars/${calendar.id}`, { body: { color: '#283593' } })).status, 200);
+    assert.equal(shownColor(await listedImport('chor-2303')), '#AD1457',
+      'die Farbe stand in der Datei - sie gehoert dem Termin, nicht dem Kalender');
+  } finally {
+    await call('DELETE', `/calendars/${calendar.id}`);
+  }
+});
+
+test('faellt der Haushalt auf einen Kalender zurueck, behalten geerbte Importe ihre Farbe (#2303, Review)', async () => {
+  const { importToLocal } = await import('../server/services/ics-subscription.js');
+  // Nur dieser Test bestimmt die Zahl der Kalender: alles ausser dem Standard weg.
+  for (const row of (await call('GET', '/calendars')).body.data) {
+    if (!row.is_default) await call('DELETE', `/calendars/${row.id}`);
+  }
+  const standard = (await call('GET', '/calendars')).body.data.find((row) => row.is_default);
+  const second = await createCalendar('Zweiter', '#558B2F');
+  await importToLocal(ADMIN.id, { ics: importIcs('erbe-2303'), color: standard.color, localCalendarId: standard.id });
+  assert.equal(shownColor(await listedImport('erbe-2303')), standard.color.toUpperCase());
+
+  assert.equal((await call('DELETE', `/calendars/${second.id}`)).status, 204);
+  assert.equal(shownColor(await listedImport('erbe-2303')), standard.color.toUpperCase(),
+    'mit einem Kalender zeigt der Lesepfad keine Kalenderfarbe - der Termin darf nicht grau werden');
+});
+
+test('eine im Formular abweichend gewaehlte Farbe ueberlebt jedes Umfaerben (#2303, Review)', async () => {
+  const { importToLocal } = await import('../server/services/ics-subscription.js');
+  const calendar = await createCalendar('Sportverein', '#1565C0');
+  try {
+    await importToLocal(ADMIN.id, { ics: importIcs('sport-2303'), color: '#F9A825', localCalendarId: calendar.id });
+    // Erst auf genau die gewaehlte Farbe, dann weiter: die Wahl ist keine Kopie.
+    assert.equal((await call('PUT', `/calendars/${calendar.id}`, { body: { color: '#F9A825' } })).status, 200);
+    assert.equal((await call('PUT', `/calendars/${calendar.id}`, { body: { color: '#4E342E' } })).status, 200);
+    assert.equal(shownColor(await listedImport('sport-2303')), '#F9A825');
+  } finally {
+    await call('DELETE', `/calendars/${calendar.id}`);
+  }
+});
+
+test('der Schritt zurueck auf einen Kalender ueberdeckt die Farbe einer zugewiesenen Person nicht (#2303, Review)', async () => {
+  const { importToLocal } = await import('../server/services/ics-subscription.js');
+  for (const row of (await call('GET', '/calendars')).body.data) {
+    if (!row.is_default) await call('DELETE', `/calendars/${row.id}`);
+  }
+  const standard = (await call('GET', '/calendars')).body.data.find((row) => row.is_default);
+  const second = await createCalendar('Noch einer', '#00695C');
+  await importToLocal(ADMIN.id, {
+    ics: importIcs('person-2303'), color: standard.color, localCalendarId: standard.id, assigneeIds: [ADMIN.id],
+  });
+  assert.equal((await call('DELETE', `/calendars/${second.id}`)).status, 204);
+  // Die Rangfolge (utils/event-color.js): eigene Farbe vor Person vor Kalender.
+  // Eine zurueckgeschriebene Eigenfarbe nahme der Person ihren Platz.
+  assert.equal(db.prepare("SELECT color FROM calendar_events WHERE external_calendar_id = 'person-2303'").get().color, null);
+});

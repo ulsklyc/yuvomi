@@ -27,7 +27,7 @@ import { dateTimeText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { captureModalContext, closeModal, confirmModal, openModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { settingRowHtml, settingSwitchRowHtml, toggleRowHtml, fileDropzoneHtml, wireFileDropzone } from '/settings/components.js';
-import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
+import { colorPickerHtml, setColorPickerValue, wireColorPicker } from '/utils/color-picker.js';
 import { USER_COLOR_DEFAULT } from '/utils/color.js';
 import { assigneeIdsOf, buildAssigneeMenu } from '/settings/assignee-menu.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
@@ -425,6 +425,18 @@ function populateCalendarImportTarget(container, calendars = []) {
   if (!select.value && select.options.length) select.selectedIndex = 0;
 }
 
+/**
+ * Die Farbe, die das Importformular fuer ein Ziel vorschlaegt (#2303): bei
+ * einem bestehenden Kalender dessen Farbe. Bleibt sie stehen, erbt der Import
+ * die Kalenderfarbe und folgt jedem spaeteren Umfaerben; erst eine andere Wahl
+ * wird zur Eigenfarbe der Termine. Fuer einen neuen Kalender `null` - dort
+ * faerbt die Wahl den Kalender selbst.
+ */
+function importTargetColor(calendars, value) {
+  if (!value || value === '__new') return null;
+  return calendars.find((calendar) => String(calendar.id) === String(value))?.color ?? null;
+}
+
 function bindCalendarImport(container, calendars = []) {
   wireColorPicker(container);
   const form = container.querySelector('#cal-import-form');
@@ -445,6 +457,8 @@ function bindCalendarImport(container, calendars = []) {
 
   const syncNewCalendarVisibility = () => {
     if (newCalendarGroup) newCalendarGroup.hidden = calendarSelect?.value !== '__new';
+    const targetColor = importTargetColor(importedCalendars, calendarSelect?.value);
+    if (targetColor && colorInput) setColorPickerValue(colorInput, targetColor);
   };
   calendarSelect?.addEventListener('change', syncNewCalendarVisibility);
   syncNewCalendarVisibility();
@@ -485,7 +499,7 @@ function bindCalendarImport(container, calendars = []) {
 
       const res = await api.post('/calendar/import', payload);
       if (createdCalendarId != null) {
-        importedCalendars.push({ id: createdCalendarId, name: newCalendarNameInput?.value.trim() });
+        importedCalendars.push({ id: createdCalendarId, name: newCalendarNameInput?.value.trim(), color: payload.color });
       }
       const { imported = 0, skipped = 0, assigned = 0 } = res.data || {};
       form.reset();
@@ -564,7 +578,7 @@ function assigneePatch(trigger, stored) {
   return same ? {} : { default_assignee_user_ids: ids };
 }
 
-export const __test = { assigneePatch, openIcsEditModal, storedAssigneeIds };
+export const __test = { assigneePatch, importTargetColor, openIcsEditModal, storedAssigneeIds };
 
 export async function render(container, { user } = {}) {
   renderPage(container);
