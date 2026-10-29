@@ -51,7 +51,7 @@
     "keepValuePlaceholder": "현재 값이 유지됩니다",
     "keyWarn": "설정이 끝나면 두 키가 담긴 키 파일(.env)을 받게 됩니다. 안전한 곳에 보관하세요. 데이터베이스 키가 없으면 데이터가 사라지며 재설정할 방법이 없습니다.",
     "errGenerate": "키를 생성하지 못했습니다. 설치 프로그램이 아직 실행 중인지 확인한 뒤 페이지를 새로 고치세요.",
-    "errPlaceholder": "이것은 .env.example의 자리 표시자이며 키가 아닙니다. 실제 키를 만들려면 \"생성\"을(를) 클릭하세요."
+    "errPlaceholder": "이것은 .env.example의 자리 표시자이며 키가 아닙니다. 실제 키를 만들려면 \"생성\"을 클릭하세요."
   },
   "weather": {
     "title": "날씨 위젯",
@@ -92,9 +92,9 @@
     "outlookIdLabel": "클라이언트 ID",
     "outlookSecretLabel": "클라이언트 시크릿",
     "outlookNote": "단방향 푸시: Yuvomi가 기준이며 Outlook에서의 변경 사항은 덮어쓰기됩니다. 가족 계정은 나중에 앱 설정에서 연결합니다.",
-    "errGooglePair": "Google 캘린더에는 클라이언트 ID와(과) 클라이언트 시크릿이(가) 모두 필요합니다. 둘 다 입력하거나 둘 다 비워 두세요.",
-    "errOutlookPair": "Outlook에는 클라이언트 ID와(과) 클라이언트 시크릿이(가) 모두 필요합니다. 둘 다 입력하거나 둘 다 비워 두세요.",
-    "errApplePair": "iCloud에는 Apple ID와(과) 앱 전용 비밀번호이(가) 모두 필요합니다. 둘 다 입력하거나 둘 다 비워 두세요."
+    "errGooglePair": "Google 캘린더에는 클라이언트 ID와 클라이언트 시크릿이 모두 필요합니다. 둘 다 입력하거나 둘 다 비워 두세요.",
+    "errOutlookPair": "Outlook에는 클라이언트 ID와 클라이언트 시크릿이 모두 필요합니다. 둘 다 입력하거나 둘 다 비워 두세요.",
+    "errApplePair": "iCloud에는 Apple ID와 앱 전용 비밀번호가 모두 필요합니다. 둘 다 입력하거나 둘 다 비워 두세요."
   },
   "advanced": {
     "title": "고급 설정",
