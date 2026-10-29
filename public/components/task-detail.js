@@ -902,10 +902,17 @@ function commentsNode(task, ctx) {
     }
   });
 
+  // Die Sperre steht im Handler, nicht nur am Pfeil: Cmd/Strg+Enter ruft
+  // `requestSubmit()`, das ein gesperrter Knopf nicht aufhaelt - ein zweiter
+  // Druck (oder die Tastenwiederholung) schickte denselben Kommentar samt
+  // Erwaehnungen noch einmal (Codex an #2364).
+  let saving = false;
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (saving) return;
     const value = field.value.trim();
     if (!value) return;
+    saving = true;
     submit.disabled = true;
     try {
       await api.post(`/tasks/${task.id}/comments`, { comment: value });
@@ -914,6 +921,7 @@ function commentsNode(task, ctx) {
     } catch (err) {
       window.yuvomi.showToast(errorSentence(err), 'danger');
     } finally {
+      saving = false;
       submit.disabled = false;
     }
   });

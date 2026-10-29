@@ -328,3 +328,45 @@ test('R24 S13: der Kommentar-Hinweis passt am Telefon in jeder Sprache in die Ze
   }
   assert.deepEqual(zuLang, [], 'laenger als 30 Zeichen laeuft am Telefon in die Ellipse');
 });
+
+/* Codex an #2364: Cmd/Strg+Enter ruft `requestSubmit()` - der gesperrte
+ * Senden-Pfeil haelt das nicht auf. Ein zweiter Druck (oder die
+ * Tastenwiederholung), waehrend der erste Kommentar noch speichert, schickte
+ * denselben Kommentar noch einmal, samt Erwaehnungs-Mitteilungen. */
+test('R24: ein zweites Cmd+Enter, waehrend der Kommentar speichert, schickt ihn nicht noch einmal', async () => {
+  const { MiniElement } = await import('./mini-dom.js');
+  const vorher = MiniElement.prototype.addEventListener;
+  MiniElement.prototype.addEventListener = function (typ, handler) {
+    this.listener = typ;
+    ((this.handlers ??= {})[typ] ??= []).push(handler);
+  };
+  const posts = [];
+  let fertig;
+  const zuvor = globalThis.__apiStub;
+  globalThis.__apiStub = {
+    get: async () => ({ data: [] }),
+    post: (path, body) => { posts.push([path, body]); return new Promise((r) => { fertig = r; }); },
+  };
+  try {
+    const sec = leseansicht({}).find((s) => s?.label === 'tasks.commentsLabel');
+    const form = knoten(sec.node, (n) => n.tagName === 'form');
+    const feld = knoten(form, (n) => n.tagName === 'textarea');
+    form.requestSubmit = () => form.handlers.submit.forEach((h) => h({ preventDefault() {} }));
+    feld.value = 'Bin dabei @Alex';
+    const cmdEnter = () => feld.handlers.keydown.forEach((h) => h({ key: 'Enter', metaKey: true, isComposing: false, keyCode: 13, preventDefault() {} }));
+    cmdEnter();
+    cmdEnter();
+    cmdEnter();
+    await new Promise((r) => setImmediate(r));
+    assert.equal(posts.length, 1, 'jeder Druck schickte denselben Kommentar noch einmal');
+    fertig({ data: {} });
+    for (let i = 0; i < 4; i += 1) await new Promise((r) => setImmediate(r));
+    feld.value = 'Zweiter';
+    cmdEnter();
+    await new Promise((r) => setImmediate(r));
+    assert.equal(posts.length, 2, 'nach dem Speichern geht der naechste Kommentar wieder');
+  } finally {
+    MiniElement.prototype.addEventListener = vorher;
+    globalThis.__apiStub = zuvor;
+  }
+});
