@@ -13,9 +13,9 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { tempDir } from './tmp-dir.js';
 
 import { createInstallerServer, readEnvFile } from '../tools/installer/install-server.js';
 import {
@@ -112,7 +112,7 @@ test('jeder vorbelegte Schlüssel hat ein Feld im Wizard und jedes Feld gibt es'
 // ── (a) Preflight: Werte der Allowlist, nie ein Secret ───────────────────────
 
 test('GET /api/preflight liefert die Allowlist-Werte und von Secrets nur die Namen', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'oikos-rerun-'));
+  const dir = tempDir('oikos-rerun-');
   try {
     writeFileSync(join(dir, '.env'), envText + 'LOG_LEVEL=debug\nOPENWEATHER_API_KEY=owm-geheim-8888\n');
     await withServer(dir, async base => {
@@ -137,7 +137,7 @@ test('GET /api/preflight liefert die Allowlist-Werte und von Secrets nur die Nam
 });
 
 test('GET /api/preflight ohne .env liefert leere Rerun-Felder', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'oikos-rerun-'));
+  const dir = tempDir('oikos-rerun-');
   try {
     await withServer(dir, async base => {
       const d = await (await fetch(`${base}/api/preflight`)).json();
@@ -177,7 +177,7 @@ function envFromUntouchedWizard(plan, rerunValues) {
 }
 
 test('ein Rerun über den Erweitert-Pfad ohne Änderung lässt Port, Adresse, Proxy, Zone und Einheiten stehen', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'oikos-rerun-'));
+  const dir = tempDir('oikos-rerun-');
   try {
     writeFileSync(join(dir, '.env'), envText);
     await withServer(dir, async base => {
