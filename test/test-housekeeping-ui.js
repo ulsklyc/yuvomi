@@ -690,50 +690,31 @@ test('Uebersicht: das Zahlungsdiagramm zeigt Saeulen mit Legende, leere Monate o
   assert.match(html, /role="listitem" aria-label="[^"]*housekeeping\.paymentPending/, 'jede Saeule nennt ihren offenen Teil im Namen');
 });
 
-test('Uebersicht: der letzte Besuch nennt im laufenden Jahr kein Jahr, in einem anderen schon', () => {
-  const jahr = new Date().getFullYear();
-  const vorher = globalThis.__formatDayMonth;
-  globalThis.__formatDayMonth = (d) => `KURZ(${d})`;
-  try {
-    const wert = (html) => /metric-card__label">housekeeping\.lastVisit<\/div>\s*<div class="metric-card__value">([^<]*)</.exec(html)?.[1];
-    // Seit R23 entscheidet dateText (utils/date-format.js) und gibt den KEY der
-    // Haushaltszone an die Formatierer, nicht den Zeitpunkt.
-    assert.equal(wert(dashboardHtml({ lastVisit: `${jahr}-01-15T08:30:00Z` })), `KURZ(${jahr}-01-15)`,
-      'im laufenden Jahr die Kurzform - sie passt in die Viertelzeile');
-    assert.equal(wert(dashboardHtml({ lastVisit: `${jahr - 1}-12-20T08:30:00Z` })), `${jahr - 1}-12-20`,
-      'aus einem anderen Jahr bleibt das volle Datum - dann ist das Jahr die Auskunft');
-  } finally {
-    globalThis.__formatDayMonth = vorher;
-  }
-});
-
-// Codex P2 zu R10 L10: die Anzeige rechnet in die Haushaltszone, der
-// Jahresvergleich nahm das Jahr des rohen UTC-Strings und das der Geraetezone.
-// `<Jahr>-01-01T00:30Z` steht in New York am 31.12. des Vorjahrs - und verlor
-// trotzdem sein Jahr; umgekehrt in Tokio.
-test('Uebersicht: ob der letzte Besuch sein Jahr nennt, entscheidet die Haushaltszone wie die Anzeige', async () => {
-  const { setDisplayTimeZone, _resetDisplayTimeZoneCache } = await import('../public/utils/timezone.js');
-  const { todayKey } = await import('../public/utils/date.js');
-  const vorher = globalThis.__formatDayMonth;
-  globalThis.__formatDayMonth = (d) => `KURZ(${d})`;
-  const wert = (html) => /metric-card__label">housekeeping\.lastVisit<\/div>\s*<div class="metric-card__value">([^<]*)</.exec(html)?.[1];
-  try {
-    setDisplayTimeZone('America/New_York');
-    let jahr = Number(todayKey().slice(0, 4));
-    const silvester = `${jahr}-01-01T00:30:00Z`;
-    assert.equal(wert(dashboardHtml({ lastVisit: silvester })), `${jahr - 1}-12-31`,
-      'New York: der Besuch liegt am 31.12. des Vorjahrs - das Jahr bleibt stehen');
-
-    setDisplayTimeZone('Asia/Tokyo');
-    jahr = Number(todayKey().slice(0, 4));
-    const neujahr = `${jahr - 1}-12-31T20:00:00Z`;
-    assert.equal(wert(dashboardHtml({ lastVisit: neujahr })), `KURZ(${jahr}-01-01)`,
-      'Tokio: derselbe Zeitpunkt ist dort schon der 1.1. des laufenden Jahres - Kurzform');
-  } finally {
-    globalThis.__formatDayMonth = vorher;
-    setDisplayTimeZone(null);
-    _resetDisplayTimeZoneCache();
-  }
+// R24 (E2, Ulas 28.10.): die Besuche fuehrten am Desktop vier Kacheln (Besuche,
+// Letzter Besuch, Faellig, Erledigt), mobil die Kurzzeile mit Aufklapper zu
+// denselben Kacheln. Jetzt EINE statische Kurzzeile in jeder Breite wie die
+// Berichte. "Letzter Besuch" entfaellt - er ist die erste Zeile der Besuche
+// darunter (S9-F2: eine Zahl nie doppelt auf einer Flaeche). Die Tests zur
+// Jahreszahl des letzten Besuchs (R10 L10) sind damit gegenstandslos; die
+// Regel selbst haelt dateText (test:date-format).
+test('Besuche: EINE Kennzahlzeile in jeder Breite, der letzte Besuch steht nur in der Liste (R24 E2)', () => {
+  const html = dashboardHtml({ lastVisit: '2026-09-20T08:30:00Z' });
+  const glance = /<div class="row-carrier budget-glance[^"]*">[\s\S]*?<\/div>\s*<\/div>/.exec(html)?.[0] ?? '';
+  assert.match(glance, /budget-glance--everywhere/, 'die Zeile steht in jeder Breite');
+  assert.match(glance, /budget-glance__row--static/, 'ohne Aufklapper - es gibt keine Kacheln mehr');
+  assert.match(glance, /housekeeping\.visitsThisMonth[\s\S]*budget-glance__value[^>]*>3</, 'die Besuche des Monats fuehren');
+  assert.match(glance, /housekeeping\.pendingChores <span class="budget-glance__amount">1</);
+  assert.match(glance, /housekeeping\.finishedChores <span class="budget-glance__amount">2</);
+  assert.doesNotMatch(html, /metric-card|metric-grid|budget-glance__balance|housekeeping-metrics/, 'kein Kachelturm, nichts aufzuklappen');
+  assert.doesNotMatch(html, /housekeeping\.lastVisit/, 'der letzte Besuch ist die erste Zeile der Liste');
+  const leer = hk.state();
+  leer.dashboard = { ...leer.dashboard, pending_tasks: 0, finished_tasks_this_month: 0 };
+  const content = fakeContainer();
+  hk.renderDashboard(content);
+  assert.doesNotMatch(content.html, /budget-glance__flows/, 'ohne Arbeiten im Monat steht nur die Leitzahl');
+  const rules = [...eachRule(HK_STYLES)];
+  assert.deepEqual(rules.filter((r) => /metric-grid--quad|metric-card/.test(r.selector)).map((r) => r.selector.trim()), [],
+    'die Regeln der Viertelzeile sind mit ihr gegangen');
 });
 
 test('Faelligkeit spricht als Tinte am Wort, nicht als Waesche der Zeile (wie die Aufgaben)', () => {
@@ -745,20 +726,6 @@ test('Faelligkeit spricht als Tinte am Wort, nicht als Waesche der Zeile (wie di
     const tinte = rules.find((r) => r.selector.trim() === `.housekeeping-task--${zustand} .housekeeping-task__status`);
     assert.match(tinte?.body ?? '', new RegExp(`color:\\s*var\\(--color-${farbe}\\)`), `${zustand}: das Wort traegt die Farbe`);
   }
-});
-
-test('die vier Kennzahlen stehen auf jeder Breite in einer Zeile, schmal mit Labels an Wortgrenzen', () => {
-  const rules = [...eachRule(HK_STYLES)];
-  const quad = rules.filter((r) => /metric-grid--quad/.test(r.selector));
-  const zeile = quad.find((r) => !r.at.length && r.selector.trim() === '.housekeeping-content .metric-grid--quad');
-  assert.match(zeile?.body ?? '', /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/,
-    'vier Spalten, unbedingt - und spezifischer als die Telefonstufe in panel.css');
-  assert.deepEqual(quad.filter((r) => /--summary-cards:\s*2/.test(r.body)).map((r) => r.at.join(' ')), [],
-    'keine Zwei-mal-zwei-Stufe mehr (189px mobil)');
-  const label = rules.find((r) => r.selector.trim() === '.metric-grid--quad .metric-card__label'
-    && r.at.includes('@container housekeeping-page (max-width: 479px)'));
-  assert.match(label?.body ?? '', /text-transform:\s*none/, 'Versal brach in der Viertelzeile mitten im Wort');
-  assert.match(label?.body ?? '', /hyphens:\s*auto/);
 });
 
 // Re-Critique 2026-09-28 (P5, A3 P2-3 / A8 P2-3): die Uebersicht mit

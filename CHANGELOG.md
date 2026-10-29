@@ -115,7 +115,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with one month it says the total and how much is still open.
 - **Household help's numbers sit on top.** Reports shows the open amount as one line above the visits,
   with the number of visits and the paid amount next to it, instead of three cards at the side; the
-  chores tab no longer repeats "Due" and "Done this month" next to the list.
+  chores tab no longer repeats "Due" and "Done this month" next to the list. The Visits tab does the
+  same in every width: one line with the visits this month and, when there are any, the chores due
+  and done, instead of four tiles on a computer and a fold on a phone. "Last visit" is gone from it -
+  it is the first visit in the list right below.
 - **The household help form is shorter.** Name and billing (type, rate, payment rhythm) come first;
   phone, e-mail, birthday, colours and notes are under "More details". Adding a chore suggests the
   areas you already use, so "Kitchen" is not created twice, and the suggestions say that a tap adds

@@ -10,7 +10,7 @@ import { dateText, timeSpanText } from '/utils/date-format.js';
 import { birthDateText, birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
-import { metricGlanceHtml, wireMetricGlance } from '/utils/metric-glance.js';
+import { metricGlanceHtml } from '/utils/metric-glance.js';
 import { initials } from '/utils/initials.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
@@ -64,9 +64,6 @@ function localDayParams() {
   return new URLSearchParams({ timezone: dayTimeZone() });
 }
 
-// Aufklapp-Zustand der Kennzahl-Kurzzeile der Uebersicht (mobil, R16): haelt
-// ueber den Neuaufbau der Uebersicht nach einem Check-in.
-let _metricsExpanded = false;
 
 let state = {
   tab: 'dashboard',
@@ -707,25 +704,6 @@ function renderDashboard(content) {
     });
     return;
   }
-  // DATUM ALS WERT, UHRZEIT ALS FUSSNOTE.
-  // Beides zusammen in der Kennzahl ergab „18.08.2026 · 08:30" und lief in
-  // Title 1 gemessen 38px ueber die Kartenkante - eine Kennzahl traegt EINE
-  // Aussage, die Praezisierung darunter gehoert in `.metric-card__note`
-  // (dieselbe Rolle wie „7 aktiv" bei den Abos).
-  const hasLastVisit = Boolean(data.last_visit?.check_in);
-  // OHNE JAHR, WENN ES DAS LAUFENDE IST (R10 L10): mobil stehen die vier
-  // Kennzahlen in EINER Zeile, und „23.09.2026" passt in eine Viertelzeile nicht
-  // (gemessen 112px Bedarf gegen 67px). Liegt der letzte Besuch in einem
-  // anderen Jahr, bleibt es stehen - dann ist es die Auskunft.
-  // BEIDE JAHRE IN DER ANZEIGEZONE: formatDate/formatDayMonth rechnen in die
-  // Haushaltszone, also muss der Vergleich es auch. Mit dem Jahr des rohen
-  // UTC-Strings und dem der Geraetezone erschien `2026-01-01T00:30Z` in New
-  // York als „31.12." - der Tag aus 2025, das Jahr trotzdem weggelassen.
-  // Seit R23 die Regel von utils/date-format.js (dateText), die genau das sagt.
-  const lastVisit = !hasLastVisit
-    ? t('housekeeping.noVisits')
-    : dateText(data.last_visit.check_in);
-  const lastVisitTime = hasLastVisit ? formatTime(data.last_visit.check_in) : '';
   const maxPayment = Math.max(1, ...(data.monthly_payments || []).map((row) => row.total));
   const bars = (data.monthly_payments || []).map((row) => {
     // ANTEIL, KEINE PIXELHOEHE. Hier stand `style="height:${...}px"` mit einer
@@ -783,41 +761,24 @@ function renderDashboard(content) {
 
   content.insertAdjacentHTML('beforeend', `
     ${renderWorkerSummary()}
-    ${/* MOBIL EINE KURZZEILE (R16, utils/metric-glance.js): die vier Kacheln
-          standen als 2x2 vor den Besuchen (erste Besuchszeile y=475 von 844).
-          Die Zeile nennt die Besuche im Monat, daneben den letzten Besuch und
-          - nur wenn es welche gibt - die faelligen Aufgaben; ein Tipp klappt
-          die Kacheln auf. Ab 640px stehen die Kacheln wie bisher. */ ''}
+    ${/* EINE KENNZAHLZEILE OBEN, IN JEDER BREITE (Critique R24, E2): am
+          Desktop standen vier Kacheln (Besuche, Letzter Besuch, Faellig,
+          Erledigt) als Reihe ueber den Besuchen, mobil die Kurzzeile mit
+          Aufklapper zu denselben Kacheln. Jetzt die statische Kurzzeile wie
+          Konten, Darlehen, Abos und die Berichte nebenan. "Letzter Besuch"
+          entfaellt: dieselbe Angabe steht in der ersten Zeile der Besuche
+          darunter (und beim Check-in in der Karte darueber) - eine Zahl nie
+          doppelt auf einer Flaeche (R24 S9-F2). Die Nebenwerte nennen die
+          Arbeiten des Monats, nur wenn es welche gibt. */ ''}
     ${metricGlanceHtml({
-    id: 'housekeeping-glance-more',
-    controls: 'housekeeping-metrics',
-    expanded: _metricsExpanded,
     label: t('housekeeping.visitsThisMonth'),
     value: String(data.visits_this_month ?? 0),
+    everywhere: true,
     flows: [
-      hasLastVisit ? { label: t('housekeeping.lastVisit'), amount: lastVisit } : null,
       (data.pending_tasks ?? 0) > 0 ? { label: t('housekeeping.pendingChores'), amount: String(data.pending_tasks) } : null,
+      (data.finished_tasks_this_month ?? 0) > 0 ? { label: t('housekeeping.finishedChores'), amount: String(data.finished_tasks_this_month) } : null,
     ],
   })}
-    <section class="metric-grid metric-grid--quad budget-glance-details${_metricsExpanded ? ' is-expanded' : ''}" id="housekeeping-metrics">
-      <article class="metric-card">
-        <div class="metric-card__label">${esc(t('housekeeping.visitsThisMonth'))}</div>
-        <div class="metric-card__value">${esc(data.visits_this_month ?? 0)}</div>
-      </article>
-      <article class="metric-card">
-        <div class="metric-card__label">${esc(t('housekeeping.lastVisit'))}</div>
-        <div class="metric-card__value">${esc(lastVisit)}</div>
-        ${lastVisitTime ? `<div class="metric-card__note">${esc(lastVisitTime)}</div>` : ''}
-      </article>
-      <article class="metric-card${(data.pending_tasks ?? 0) > 0 ? '' : ' metric-card--empty'}">
-        <div class="metric-card__label">${esc(t('housekeeping.pendingChores'))}</div>
-        <div class="metric-card__value">${esc(data.pending_tasks ?? 0)}</div>
-      </article>
-      <article class="metric-card${(data.finished_tasks_this_month ?? 0) > 0 ? '' : ' metric-card--empty'}">
-        <div class="metric-card__label">${esc(t('housekeeping.finishedChores'))}</div>
-        <div class="metric-card__value">${esc(data.finished_tasks_this_month ?? 0)}</div>
-      </article>
-    </section>
     <!-- DIE LISTE VOR DEM DIAGRAMM (R10 L10, A3 P2-10): mobil begannen die
          letzten Besuche bei y=760 von 844, hinter Personal, Kennzahlen und dem
          252px hohen Zahlungsdiagramm. Die Besuche sind, was man hier nachsieht;
@@ -871,7 +832,6 @@ function renderDashboard(content) {
     </div>
   `);
   if (window.lucide) window.lucide.createIcons({ el: content });
-  wireMetricGlance(content, 'housekeeping-glance-more', (expanded) => { _metricsExpanded = expanded; });
   content.querySelector('[data-show-reports]')?.addEventListener('click', () => {
     (content.closest('.housekeeping-page') || document).querySelector('.housekeeping-tab[data-tab-id="reports"]')?.click();
   });
@@ -1769,13 +1729,13 @@ function stepReportMonth(content, dir) {
 }
 
 /**
- * Der Berichte-Tab: die drei Kennzahlen des Monats, darunter die Besuche als
+ * Der Berichte-Tab: die Kennzahlzeile des Monats, darunter die Besuche als
  * Zeilen. Den Monat waehlt der Stepper darueber (syncReportPeriod()).
  *
- * DIE KENNZAHLEN SIND DIE DER UEBERSICHT (`.metric-card`), nicht mehr die
- * graue `--inset`-Fassung in einer Karte: zwei KPI-Looks im selben Modul
- * (Critique 2026-09-26, A3 P2-4), und die Karte trug nur noch Ueberschrift und
- * Stepper, seit der Stepper ueber dem Inhalt steht.
+ * DIE KENNZAHLEN SPRECHEN WIE DIE DER BESUCHE: seit R24 (E2) beide Reiter als
+ * statische Kurzzeile (`metricGlanceHtml({ everywhere })`), vorher
+ * `.metric-card` und davor eine graue `--inset`-Fassung in einer Karte - zwei
+ * KPI-Looks im selben Modul (Critique 2026-09-26, A3 P2-4).
  *
  * DIE BESUCHSZEILE IST EINE `.list-row` wie im Personal-Protokoll: Avatar |
  * Name + Datum, Betrag, Status | Aktionen. Vorher stand „Als bezahlt
