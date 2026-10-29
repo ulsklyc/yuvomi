@@ -1317,7 +1317,7 @@ test('Review p11 (B7): openNewTask uebernimmt tasks_default_target, ohne dass di
   globalThis.__apiStub = {
     get: async (path) => {
       if (path === '/tasks/meta/options') return { users: [{ id: 1, display_name: 'Linda' }], categories: [{ key: 'household', label: 'Haushalt' }], tags: [] };
-      if (path === '/preferences') return { data: { tasks_default_target: target } };
+      if (path === '/preferences') return { data: { tasks_default_target: target, tasks_default_visibility: 'private', tasks_default_locked: true } };
       return { data: [] };
     },
   };
@@ -1329,8 +1329,14 @@ test('Review p11 (B7): openNewTask uebernimmt tasks_default_target, ohne dass di
   try {
     const { openNewTask, __test: tasks } = await import('../public/pages/tasks.js');
     tasks.state.defaultSyncTarget = '';
+    tasks.state.defaultVisibility = 'all';
+    tasks.state.defaultLocked = false;
     await openNewTask({ user: { id: 1, role: 'admin' }, onChanged: () => {}, signal: new AbortController().signal });
     assert.equal(tasks.state.defaultSyncTarget, target, 'das Formular waehlt das eingestellte Ziel vor (wireSyncTarget liest state.defaultSyncTarget)');
+    // #2125: Sichtbarkeit und Sperre kommen auf demselben Weg mit - vorher las
+    // nur der Seitenpfad sie, und "+ Neu > Aufgabe" oeffnete auf "alle"/offen.
+    assert.equal(tasks.state.defaultVisibility, 'private', 'die eingestellte Sichtbarkeit kommt auch ohne Aufgabenseite mit (#2125)');
+    assert.equal(tasks.state.defaultLocked, true, 'die eingestellte Sperre kommt auch ohne Aufgabenseite mit (#2125)');
   } finally {
     for (const name of missingGlobals) delete globalThis[name];
     delete globalThis.__apiStub;

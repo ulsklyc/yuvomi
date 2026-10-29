@@ -6358,6 +6358,20 @@ async function ensureAwayMeta(user) {
 }
 
 /**
+ * Die persoenlichen Vorgaben fuer eine NEUE Aufgabe (#695, #2125) aus den
+ * Praeferenzen in den Zustand: Ziel, Sichtbarkeit, Sperre. EINE Stelle fuer
+ * beide Wege - die Aufgabenseite (render) und "+ Neu > Aufgabe" vom Dashboard
+ * (openNewTask). Mit #2130 las nur die Seite Sichtbarkeit und Sperre, und das
+ * Formular vom Dashboard stand auf "alle"/offen, solange die Seite nicht da war.
+ * @param {object|null|undefined} prefs  der Rumpf von `/preferences`
+ */
+function applyNewTaskDefaults(prefs) {
+  state.defaultSyncTarget = prefs?.tasks_default_target || '';
+  state.defaultVisibility = prefs?.tasks_default_visibility || 'all';
+  state.defaultLocked = prefs?.tasks_default_locked === true;
+}
+
+/**
  * EINE NEUE AUFGABE ANLEGEN, OHNE AUF DIESER SEITE ZU STEHEN (DW, Ulas U2).
  * "+ Neu > Aufgabe" auf der Uebersicht wechselte hierher und klickte den FAB:
  * die Uebersicht war weg, und nach dem Speichern stand man in der Liste statt
@@ -6391,7 +6405,7 @@ export async function openNewTask({ user = null, onChanged = () => {}, signal = 
   // DIE SEITE DARUNTER IST GEGANGEN, waehrend geladen wurde (Review p11): das
   // Formular ginge sonst ueber der neuen Seite auf, mit `onChanged` der alten.
   if (signal?.aborted) return;
-  if (prefs) state.defaultSyncTarget = prefs.data?.tasks_default_target || '';
+  if (prefs) applyNewTaskDefaults(prefs.data);
   if (!state.categories.length) throw new Error(t('tasks.loadError'));
   openTaskModal({ users: state.users, onChanged }, null);
 }
@@ -6651,9 +6665,7 @@ export async function render(container, { user, signal } = {}) {
     state.allTags = meta.tags ?? [];
     state.defaultPoints = Number(meta.default_points) || 0;
     state.subtasksExpandedByDefault = preferencesData.data?.tasks_subtasks_expanded === true;
-    state.defaultSyncTarget = preferencesData.data?.tasks_default_target || '';
-    state.defaultVisibility = preferencesData.data?.tasks_default_visibility || 'all';
-    state.defaultLocked = preferencesData.data?.tasks_default_locked === true;
+    applyNewTaskDefaults(preferencesData.data);
   } catch (err) {
     console.error('[Tasks] Ladefehler:', err);
     // Der Toast allein war die falsche Antwort: er verging, und darunter blieb
@@ -6671,7 +6683,7 @@ export async function render(container, { user, signal } = {}) {
     state.metaStale = { users: false, categories: false, tags: false };
     state.defaultPoints = 0;
     state.subtasksExpandedByDefault = false;
-    state.defaultSyncTarget = '';
+    applyNewTaskDefaults(null);
   }
 
   // UI verdrahten
