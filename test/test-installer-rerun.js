@@ -345,7 +345,7 @@ test('omitUnchanged lässt bei einer Erstinstallation alles durch', () => {
 
 test('install.html schickt unveränderte Vorbelegung nicht zurück', () => {
   const saves = html.split("fetch('/api/save-env'").length - 1;
-  const omitted = (html.match(/omitUnchanged\(buildEnv\(\), rerunValues\)/g) || []).length;
+  const omitted = (html.match(/omitUnchanged\(buildEnv\(\), rerunValues[^)]*\)/g) || []).length;
   assert.ok(saves >= 2 && omitted === saves,
     `${saves} save-env-Aufrufe, ${omitted} davon ohne unveränderte Werte`);
 });
@@ -606,4 +606,19 @@ test('ein unverändert übernommener Zeitplan wird nicht gegen isValidCron gepr�
   assert.equal(w.S.BACKUP_SCHEDULE, rerun.BACKUP_SCHEDULE);
   const typed = rerunWizard(rerun, { 'adv-backup-schedule': '99 * * * *' });
   assert.equal(typed.run(['storage-next']), false, 'ein geänderter, ungültiger Zeitplan geht durch');
+});
+
+test('ein unberührter Schalter mit Compose-Ausdruck bleibt ungesendet', () => {
+  // BACKUP_ENABLED=${BACKUPS:-false}: prefillPlan liest den Ausdruck als "an",
+  // storage-next setzt '', die Schalter-Normalisierung machte daraus 'true' -
+  // der Vergleich mit dem Ausdruck erkannte das nie als unverändert, und ein
+  // unberührter Rerun schaltete abgeschaltete Backups ein.
+  const rerun = { BACKUP_ENABLED: '${BACKUPS:-false}', MODULES_ALLOW_WEB_INSTALL: '${WEB:-true}' };
+  const env = { BACKUP_ENABLED: '', MODULES_ALLOW_WEB_INSTALL: '' };
+  assert.deepEqual(omitUnchanged(env, rerun, () => true), {}, 'unberührte Schalter wurden gesendet');
+  // Umgelegt bleibt ausdrücklich.
+  assert.deepEqual(omitUnchanged(env, rerun, () => false), { BACKUP_ENABLED: 'true', MODULES_ALLOW_WEB_INSTALL: 'false' });
+  const calls = html.match(/omitUnchanged\(buildEnv\(\), rerunValues[^)]*\)/g) || [];
+  assert.ok(calls.length >= 2 && calls.every(c => /untouched/.test(c)),
+    'install.html gibt omitUnchanged den Feldstand nach der Vorbelegung nicht mit');
 });

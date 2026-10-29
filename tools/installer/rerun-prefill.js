@@ -193,10 +193,15 @@ export function accessEnv(choice, rerun = null) {
  * `DATA_DIR="./data # storage"`, ein anderes Verzeichnis. Unverändert heisst
  * deshalb: ungesendet, die Originalzeile bleibt Zeichen für Zeichen.
  */
-export function omitUnchanged(env, rerun = null) {
+export function omitUnchanged(env, rerun = null, untouchedField = () => false) {
   if (!rerun) return env;
   const out = {};
   for (const [key, raw] of Object.entries(env)) {
+    // Ein unberührter Schalter bleibt ungesendet - verglichen am Feldstand nach
+    // der Vorbelegung, nicht am serialisierten Wert: ein Compose-Ausdruck wie
+    // BACKUP_ENABLED=${BACKUPS:-false} wird als "an" vorbelegt, und die
+    // Normalisierung darunter machte daraus beim unberührten Rerun 'true'.
+    if (SWITCH_FIELDS.has(key) && untouchedField(SWITCH_FIELDS.get(key))) continue;
     // Ein Schalter schreibt für seinen Standard '' - und '' verwirft der
     // Server, die alte Zeile kaeme zurueck. Wer einen vorbelegten Schalter
     // umlegt, bekommt deshalb den Standard ausdruecklich: aus
@@ -210,6 +215,11 @@ export function omitUnchanged(env, rerun = null) {
   }
   return out;
 }
+
+/** Schalter-Schlüssel -> Feld-ID. */
+const SWITCH_FIELDS = new Map(
+  PREFILL_FIELDS.filter(([, , kind]) => kind === 'on' || kind === 'notFalse').map(([key, id]) => [key, id]),
+);
 
 /** Schalter-Schlüssel -> 'on' | 'notFalse' (siehe PREFILL_FIELDS). */
 const SWITCH_KINDS = new Map(
