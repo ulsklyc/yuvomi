@@ -3980,7 +3980,8 @@ unter den Falz schob. Vier Antworten, je eine Bauart, gemessen bei 390x844:
   Tageskopf („MO 19" nebeneinander, mittig, heute im Akzentkreis), 24-Stunden-Achse in
   `--cal-hour-height`, Stundenlinien, Jetzt-Linie und der Scroll zur laufenden Stunde
   (`alignedHourScroll`, morgens ab 07:00 bzw. ab dem ersten frueheren Block - im Kalender seit R24
-  auch in Woche/Tag, gemessen am Raster, der Schichttitel klebt an der sichtbaren Blockkante) kommen aus EINEM
+  auch in Woche/Tag, gemessen am Raster, der Schichttitel klebt an der sichtbaren Blockkante; ein
+  klebender Termintitel traegt die Flaeche seines Blocks, die Zeitzeile gleitet darunter, R24 S13) kommen aus EINEM
   Baustein: `utils/time-grid.js` + `styles/time-grid.css` (per `@import` in calendar.css und
   schedule.css, `PAGE_STYLE_IMPORTS` im Router). Die verdichtete Stundenskala des Schichtplans
   (nur belegte Stunden) ist entfallen. **Seit R24 S7b (S7-F1) dieselbe BAUART wie die
