@@ -814,6 +814,9 @@ test('R18: die Kennzahlkarte hat vier feste Zeilen - Kopf, Wert, Trendlinie, Met
   });
   // Farbe: Modulton mit Rueckfall, Flaeche laeuft auf 0, Endpunkt in Label-Farbe.
   assert.match(body('.metric-card__spark', plain), /color:\s*var\(--module-accent, var\(--color-text-secondary\)\)/);
+  // R24 S15: die Wurzel fuellt nicht. Ohne Angabe ist `fill` schwarz - Sonde 14
+  // las die Trendlinie der Uebersicht im Dark als #000 auf #37332E (1,68:1).
+  assert.match(body('.metric-card__spark', plain), /(?:^|;)\s*fill:\s*none\b/, 'das SVG traegt fill: none, die Tinte ist currentColor');
   assert.match(body('.metric-card__spark-to'), /stop-opacity:\s*0\b/);
   assert.match(body('.metric-card__spark-end'), /stroke:\s*var\(--color-text-primary\)/);
   // Grafikkontrast 3:1 der Linie gegen Karte und Well, beide Themes (Gesundheitston).

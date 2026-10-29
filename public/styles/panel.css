@@ -981,11 +981,19 @@ svg.chart {
  *     Ohne Modulton (Karte ausserhalb eines Moduls) bleibt Sekundärtext.
  * Der Endpunkt trägt die Label-Farbe mit einem Ring in Kartenfläche: er
  * markiert den aktuellen Wert, nicht den Verlauf dorthin. */
+/* `fill: none` AM WURZELKNOTEN (R24 S15). Ein SVG ohne Fuellangabe fuellt
+ * schwarz (Anfangswert von `fill`); gemalt hat das nie, weil Flaeche, Linie
+ * und Endpunkt ihre Farbe selbst tragen - aber jede kuenftige Form ohne
+ * eigene Angabe kaeme schwarz, im Dark 1,68:1 auf der Kachel. Wie bei jedem
+ * Lucide-Zeichen sagt die Wurzel: hier fuellt nichts, die Tinte ist
+ * `currentColor`. Die Flaeche behaelt ihren Verlauf (Praesentationsattribut
+ * schlaegt Vererbung). */
 .metric-card__spark {
   width: 100%;
   height: 22px;
   display: block;
   overflow: visible;
+  fill: none;
   color: var(--module-accent, var(--color-text-secondary));
 }
 
