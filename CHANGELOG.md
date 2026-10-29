@@ -102,6 +102,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   example values in the address and name fields are in your language, the start screen says that a
   first run usually takes 1-3 minutes and counts in minutes, and technical terms like "session
   secret", "SSRF protection" and "Compose file" follow a plain description instead of leading it.
+- **Installer hints read at a calmer line length.** Explanations under fields wrap at about 80
+  characters instead of 90, spacing follows the app's scale, a failed copy shows its note on its own
+  line instead of breaking around the button, and the "taking longer than usual" note no longer
+  touches the line above it.
 
 ## [2.83.0] - 2026-10-29
 

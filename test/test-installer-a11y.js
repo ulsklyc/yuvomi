@@ -52,6 +52,31 @@ test('jedes error-banner trägt role="alert"', () => {
   }
 });
 
+/* Sichtbarkeit laeuft ueber das hidden-Attribut, wie in renderStepNav und
+ * renderKeyFile - nicht ueber style.display. Vorher standen 38 Zuweisungen und
+ * zehn Inline-`display:none` daneben, und jede musste die Anzeigeart des CSS
+ * kennen: 'flex' fuer .warn-banner, 'inline-flex' fuer den Knopf, 'block' fuer
+ * den Rest. Ein falscher Wert stellte das Icon unter den Text. Mit hidden
+ * bleibt die Anzeigeart beim CSS ([hidden] traegt !important). Weil das CSS die
+ * Fehlerbanner und das Protokoll nicht mehr selbst versteckt, muss jedes davon
+ * im Markup verborgen starten - sonst stuende ein leerer roter Kasten da. */
+test('Sichtbarkeit nur per hidden: kein style.display, Banner starten verborgen', () => {
+  const script = html.slice(html.indexOf('<script', html.indexOf('</style>')));
+  const uses = [...script.matchAll(/\.style\.display\s*(?:=|!==|===|!=|==)|setProperty\(\s*['"]display/g)];
+  assert.deepEqual(uses.map(m => m[0]), [], `style.display im Skript (${uses.length}x) - hidden setzen`);
+  const inline = [...html.matchAll(/<[a-z][^>]*\sstyle="[^"]*\bdisplay\s*:[^>]*>/gi)].map(m => m[0]);
+  assert.deepEqual(inline, [], 'Inline-display im Markup - hidden-Attribut verwenden');
+  const css = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
+  for (const sel of ['.error-banner', '.log-box']) {
+    const rule = css.match(new RegExp(`(?:^|\\})\\s*\\${sel}\\s*\\{([^}]*)\\}`, 'm'));
+    assert.ok(rule, `${sel} fehlt im CSS`);
+    assert.doesNotMatch(rule[1], /display\s*:\s*none/, `${sel} versteckt sich per CSS - hidden im Markup tut das`);
+  }
+  const boxes = [...html.matchAll(/<div[^>]*class="(?:error-banner|log-box)\b[^"]*"[^>]*>/g)].map(m => m[0]);
+  assert.ok(boxes.length >= 14, `erwartet 13 Fehlerbanner und das Protokoll, gefunden ${boxes.length}`);
+  for (const tag of boxes) assert.match(tag, /\shidden[\s>]/, `startet sichtbar: ${tag}`);
+});
+
 test('die Docker-Statuszeile ist eine Live-Region', () => {
   // Seit der Phasen-Checkliste ist sie visuell versteckt (class="vh status-row"):
   // sichtbar steht dasselbe in der Liste, die Region traegt nur die Ansage.
@@ -2061,8 +2086,8 @@ test('Docker-Schirm: Phasen-Checkliste, Erfolg mit neuem Titel und Fokus, Fehler
     assert.equal(states(rows), 'done failed waiting', 'die gescheiterte Phase ist nicht markiert');
     assert.equal(rows[1].note.textContent, 'docker.stepFailed');
     assert.equal(els['dkr-title'].dataset.i18n, 'docker.failed');
-    assert.equal(els['dkr-log'].style.display, 'block', 'das Protokoll bleibt im Fehler nicht stehen');
-    assert.equal(els['dkr-foot'].style.display, 'flex', 'Erneut versuchen fehlt im Fehler');
+    assert.equal(els['dkr-log'].hidden, false, 'das Protokoll bleibt im Fehler nicht stehen');
+    assert.equal(els['dkr-foot'].hidden, false, 'Erneut versuchen fehlt im Fehler');
     assert.equal(els['dkr-title'].focused, 0, 'der Fehler reisst den Fokus an sich');
   }
   {

@@ -205,7 +205,7 @@ test('cal-next prueft Google, Outlook und Apple als Paar - mit uebernommenen Sec
     assert.ok(body.includes(`calendar.${key}`), `cal-next meldet calendar.${key} nicht`);
   }
   // Der Fehler braucht ein Banner im Schritt, an das fail() ihn bindet.
-  assert.match(html, /<div class="error-banner" id="cal-err" role="alert"><\/div>/, 'Kalender-Schritt ohne Fehler-Banner');
+  assert.match(html, /<div class="error-banner" id="cal-err" role="alert" hidden><\/div>/, 'Kalender-Schritt ohne Fehler-Banner');
   // Und das Feld liegt evtl. in einer zugeklappten Karte: fail() klappt sie auf.
   assert.match(fnSource('fail'), /closest\('\.toggle-body'\)/, 'fail() oeffnet eine zugeklappte Karte nicht');
 });

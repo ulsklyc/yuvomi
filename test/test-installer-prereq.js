@@ -388,12 +388,13 @@ test('der Erweitert-Pfad zeigt die Warnung über eine bestehende .env', () => {
   assert.match(banner[2], /class="warn-icon"/, 'cfg-existing trägt kein Warn-Icon');
   assert.match(banner[2], /<span data-i18n="config\.existing">/,
     'cfg-existing trägt den falschen i18n-Schlüssel, oder er sitzt nicht im inneren span');
-  // Ein Banner, das der Preflight nie einblendet, ist so gut wie keins - und
-  // .warn-banner ist ein Flex-Container: mit display 'block' fiele das Icon
-  // aus der Zeile.
+  // Ein Banner, das der Preflight nie einblendet, ist so gut wie keins. Per
+  // hidden, nicht style.display: .warn-banner ist ein Flex-Container, und ein
+  // gesetztes display 'block' stellte das Icon aus der Zeile.
   const preflight = src.slice(src.indexOf('d.envExists'), src.indexOf('d.envExists') + 300);
-  assert.ok(preflight.includes("$('cfg-existing').style.display = 'flex'"),
-    'cfg-existing wird bei envExists nicht als Flex-Banner eingeblendet');
+  assert.ok(preflight.includes("$('cfg-existing').hidden = false"),
+    'cfg-existing wird bei envExists nicht eingeblendet');
+  assert.match(src, /<div class="warn-banner" id="cfg-existing"[^>]*\shidden[\s>]/, 'cfg-existing steht schon vor dem Preflight da');
 });
 
 // ── Der Wartebildschirm: eine Phase ist kein Fehlschlag ───────────────────────

@@ -224,7 +224,7 @@
     html { scroll-padding-block: 16px 96px; }
     body {
       font-family: var(--font-sans); color: var(--color-text-primary);
-      min-height: 100dvh; padding: var(--space-12) var(--space-4) 80px;
+      min-height: 100dvh; padding: var(--space-12) var(--space-4) var(--space-16);
       /* HIER STAND EIN AKZENT-HAUCH am oberen Rand - ein radialer Verlauf, der
          bis v2.0.0 wortgleich auf der Login-Seite der App stand. Dort ist er mit
          dem HIG-Redesign gefallen, und der Grund gilt hier genauso: die Marke
@@ -254,7 +254,7 @@
 
     /* Marken-Anker über der Karte: Zeichen plus Wortmarke, dasselbe Motiv wie
        .login-hero__mark in der App. Der Wizard trug bisher kein Yuvomi-Zeichen. */
-    .brand { text-align: center; margin-bottom: 22px; }
+    .brand { text-align: center; margin-bottom: var(--space-6); }
     /* Die Bildmarke der App (utils/brand-mark.js, .auth-hero__mark): Verlauf
        --brand-mark-from nach --brand-mark-to, drei weisse Kreise mit 0,82
        Deckung, in BEIDEN Themes dieselbe. Hier stand bis zur Re-Critique
@@ -322,7 +322,7 @@
     .lang-switch select:focus-visible { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent); }
 
     /* Modus-Wahl: zwei große, klar unterscheidbare Wege. */
-    .mode-grid { display: grid; gap: 14px; }
+    .mode-grid { display: grid; gap: var(--space-3); }
     .mode-card {
       display: flex; flex-direction: column; gap: var(--space-1h); width: 100%; text-align: start;
       padding: var(--space-5); border: 1.5px solid var(--color-border); border-radius: var(--radius-md);
@@ -555,7 +555,7 @@
       font-size: var(--text-xs); font-weight: 600; line-height: var(--line-height-tight);
       letter-spacing: var(--tracking-label); text-transform: uppercase;
       color: var(--color-text-secondary);
-      margin: 28px 0 var(--space-2); padding-inline: var(--space-4);
+      margin: var(--space-8) 0 var(--space-2); padding-inline: var(--space-4);
     }
     /* Das erste Label eines Schritts rueckt an den Kopf heran; erst zwischen
        zwei Gruppen braucht es den vollen Abstand. */
@@ -564,7 +564,7 @@
        sie VOR der Entscheidung gelesen werden muss (Heimnetz-Freigaben). */
     .group-note {
       font-size: var(--type-caption); line-height: 1.38; color: var(--color-text-secondary);
-      padding-inline: var(--space-4); margin: -2px 0 var(--space-2h); max-inline-size: 70ch; text-wrap: pretty;
+      padding-inline: var(--space-4); margin: -2px 0 var(--space-2h); max-inline-size: 60ch; text-wrap: pretty;
     }
     /* Nach einer Gruppe: ein Ausweg zu ihr (Kalender -> weitere Konten in der
        App). Abstand wie unter einem Label, nur in die andere Richtung. */
@@ -584,12 +584,12 @@
       background: none; border: none; cursor: pointer;
       font-family: var(--font-sans); font-size: var(--type-secondary); font-weight: 600;
       color: var(--color-accent);
-      min-height: 44px; padding: 0 var(--space-4); border-radius: var(--radius-full);
+      min-height: var(--target-base); padding: 0 var(--space-4); border-radius: var(--radius-full);
     }
     .group-edit:hover { background: color-mix(in srgb, var(--color-accent) var(--tint-state, 12%), transparent); }
     .group-edit:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
-    .field { margin-bottom: 18px; }
+    .field { margin-bottom: var(--space-4); }
     .field label, .field-label { display: block; font-size: var(--text-sm); font-weight: 600; margin-bottom: var(--space-1h); }
     /* ── Segment: die Umschaltleiste der App (public/styles/panel.css) ───────
        Nachgebaut, nicht importiert (Einzeldatei). Well mit 1px-Rand, darin
@@ -606,7 +606,7 @@
     }
     .field .segmented__item {
       position: relative; display: flex; align-items: center; justify-content: center;
-      min-height: 44px; padding: var(--space-1h) var(--space-3); margin: 0;
+      min-height: var(--target-base); padding: var(--space-1h) var(--space-3); margin: 0;
       border-radius: var(--radius-sm);
       font-size: var(--text-sm); font-weight: 500; line-height: 1.25; text-align: center;
       color: var(--color-text-secondary); cursor: pointer;
@@ -645,7 +645,7 @@
     .inset-group .field:has(> .toggle-row) { padding: 0; }
     label.toggle-row {
       display: flex; align-items: center; gap: var(--space-3); margin-bottom: 0; cursor: pointer;
-      min-height: 48px; padding: var(--space-3) var(--space-4);
+      min-height: var(--target-lg); padding: var(--space-3) var(--space-4);
     }
     .toggle-row__label { flex: 1; min-width: 0; }
     .toggle { position: relative; display: inline-flex; flex-shrink: 0; margin-inline-start: auto; }
@@ -691,7 +691,7 @@
        Lesemass waechst um genau das, sonst braeche er frueher um als die
        Hinweise der Textfelder. */
     .inset-group .field > .toggle-row ~ .hint {
-      margin-top: -6px; padding: 0 var(--space-4) var(--space-3); max-inline-size: calc(70ch + var(--space-8));
+      margin-top: -6px; padding: 0 var(--space-4) var(--space-3); max-inline-size: calc(60ch + var(--space-8));
     }
     /* "Mehr erfahren": Hintergrund zu einer Frage, der beim Ausfuellen nicht
        gebraucht wird (was eine Abschaltung spaeter bewirkt, wie sich Werte
@@ -699,7 +699,7 @@
        zwischen den Feldern; jetzt zeigt ihn ein Tipp. Ab 641px ist Platz, dort
        oeffnet syncHintMore() ihn und die Zeile "Mehr erfahren" entfaellt. */
     .hint-more > summary {
-      display: flex; align-items: center; gap: var(--space-1); min-height: 44px; width: fit-content;
+      display: flex; align-items: center; gap: var(--space-1); min-height: var(--target-base); width: fit-content;
       font-size: var(--type-caption); font-weight: 600; color: var(--color-accent);
       cursor: pointer; list-style: none;
     }
@@ -794,7 +794,7 @@
       border-color: var(--color-danger);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 18%, transparent);
     }
-    .secret-row { display: flex; gap: 7px; flex-wrap: wrap; }
+    .secret-row { display: flex; gap: var(--space-2); flex-wrap: wrap; }
     /* `flex: 1` hatte Flex-Basis 0: das Feld schrumpfte auf den Rest, den die
        Buttons übrig liessen, gemessen 102px für einen 64-Zeichen-Schlüssel bei
        390px Breite - direkt unter „Speichere diese Schlüssel jetzt". Mit
@@ -822,12 +822,14 @@
        erklaerende Prosa fuer Laien, keine Metazeile, und sie braucht den
        Kontrast. Auf 12px war sie einmal kleiner als in der fertigen App; die
        Footnote ist die Stufe, auf der Apple Feld- und Gruppenfussnoten setzt. */
-    /* Lesemass 70ch. Auf dem Desktop ist die Spalte mit rund 65ch die engere
-       Grenze (gemessen 86-92 Zeichen je Zeile, Critique 2026-10-29). Enger
-       gestellt (56ch) brach die Redirect-URI mitten im Pfad und liess neben
-       jedem Hinweis ein Drittel der Gruppe leer - der Hinweis gehoert zur
-       Feldbreite. text-wrap: pretty nimmt der letzten Zeile das einzelne Wort. */
-    .hint { font-size: var(--type-caption); color: var(--color-text-secondary); margin-top: var(--space-1h); line-height: 1.38; max-inline-size: 70ch; text-wrap: pretty; }
+    /* Lesemass 60ch. `ch` misst die Ziffer 0, Fliesstext laeuft schmaler: 70ch
+       ergaben gemessen 86-92 Zeichen je Zeile (Re-Critique 2026-10-29), ueber
+       den 65-75 eines ruhigen Lesemasses; 60ch landen dort. Die Redirect-URIs
+       duerfen dabei brechen (`.hint code` unten), Fliesstext bricht nur an
+       Wortgrenzen. text-wrap: pretty nimmt der letzten Zeile das einzelne Wort.
+       line-height 1.38 ist die Footnote der App-Skala (13/18) - dafuer gibt es
+       kein --line-height-*, snug (1.3) und base (1.47) liegen daneben. */
+    .hint { font-size: var(--type-caption); color: var(--color-text-secondary); margin-top: var(--space-1h); line-height: 1.38; max-inline-size: 60ch; text-wrap: pretty; }
     .hint a { color: var(--color-accent); }
     /* Redirect-URIs sind unzerbrechliche Maschinenwerte in fester Kartenbreite:
        ohne Umbruch clippte overflow:hidden der Toggle-Card sie mobil kommentarlos
@@ -839,10 +841,10 @@
        --radius-glass-button (= --radius-full) vor, der Installer erfand hier
        eine fremde Grammatik. --radius-full lag ungenutzt im Dokument. */
     .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1h);
       /* 48px wie .btn der App (DESIGN.md, --target-lg); 44px ist das
          Minimum, kein Ziel. */
-      min-height: 48px; padding: var(--space-2h) var(--space-5);
+      min-height: var(--target-lg); padding: var(--space-2h) var(--space-5);
       border-radius: var(--radius-full); font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600;
       cursor: pointer; border: none;
       transition: background var(--duration-xs) var(--ease-out), opacity var(--duration-xs) var(--ease-out);
@@ -902,7 +904,7 @@
        klebte es ohne Abstand am naechsten Label. Am Ende des card-body traegt
        das Padding den Abstand, deshalb dort 0. */
     .error-banner {
-      display: none; margin-top: var(--space-3); margin-bottom: 18px; padding: var(--space-2h) 14px; border-radius: var(--radius-sm);
+      margin-top: var(--space-3); margin-bottom: var(--space-4); padding: var(--space-2h) var(--space-4); border-radius: var(--radius-sm);
       background: color-mix(in srgb, var(--color-danger) 8%, transparent);
       border: 1.5px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
       color: var(--color-danger); font-size: var(--text-sm);
@@ -911,7 +913,7 @@
     }
     .error-banner:last-child { margin-bottom: 0; }
     .info-banner {
-      margin-bottom: 18px; padding: var(--space-2h) 14px; border-radius: var(--radius-sm);
+      margin-bottom: var(--space-4); padding: var(--space-2h) var(--space-4); border-radius: var(--radius-sm);
       background: color-mix(in srgb, var(--color-accent) 8%, transparent);
       border: 1.5px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
       color: var(--color-text-primary); font-size: var(--text-sm); line-height: 1.45;
@@ -931,7 +933,7 @@
          und fiel damit durch beide Netze: weder `.btn { min-height: 44px }` noch
          die mobile `.btn-sm`-Regel erfassen ihn. Sieben dieser Köpfe stehen im
          Erweitert-Schritt untereinander. 48px wie jede Zeile der App. */
-      min-height: 48px;
+      min-height: var(--target-lg);
     }
     /* Neutral statt --color-surface-2: das liegt im Dark Mode TIEFER als die
        Gruppe (#0F0E0D auf #2B2825), die Zeile fiel beim Hover in ein Loch. */
@@ -977,7 +979,13 @@
        Abstand unten ein ::after statt Polster. Zugeklappt ist der Inhalt
        `visibility: hidden` - fuer Tastatur und Screenreader so unerreichbar wie
        vorher mit display:none. Beim Zuklappen schaltet die Sichtbarkeit erst
-       NACH dem Gleiten ab (Verzoegerung = Dauer), beim Aufklappen sofort. */
+       NACH dem Gleiten ab (Verzoegerung = Dauer), beim Aufklappen sofort.
+
+       Geprueft und verworfen (2026-10-29): <details> mit ::details-content.
+       Die Karte ist ein Knopf mit aria-expanded, den fail() auch von aussen
+       oeffnet; der Umbau hiesse neues Markup, neue Oeffnungslogik und neue
+       Guards, und die Hoehe nach `auto` braeuchte trotzdem interpolate-size -
+       ohne Safari. Das 0fr/1fr-Raster gleitet heute schon ueberall. */
     .toggle-card {
       display: grid; grid-template-rows: auto 0fr;
       transition: grid-template-rows var(--duration-lg) var(--ease-in-out);
@@ -1059,12 +1067,15 @@
     /* Fussnote unter der Gruppe (Dauer, Erwartung), eingerueckt wie deren Text. */
     .phase-meta { padding: var(--space-2) var(--space-4) 0; }
     .elapsed  { font-size: var(--type-caption); color: var(--color-text-secondary); line-height: 1.38; }
-    .phase-meta + .warn-banner { margin-top: var(--space-4); }
+    /* ~ statt +: zwischen beiden steht die versteckte Live-Region (.vh
+       status-row), der Nachbar-Selektor griff nie - das Banner klebte an der
+       Erwartungszeile darueber. */
+    .phase-meta ~ .warn-banner { margin-top: var(--space-4); }
     /* Radius --radius-sm wie das Warnbanner direkt darueber: mit 4px stand
        die Box als einzige eckige Flaeche zwischen 10px-Bannern und 16px-Gruppen
        (frueher sogar 4px IN einer 10px-Box - nicht konzentrisch). */
     .log-box  {
-      display: none; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-secondary);
+      font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-secondary);
       white-space: pre-wrap; max-height: 180px; overflow-y: auto;
       margin-top: var(--space-3); padding: var(--space-2h) var(--space-3); background: var(--color-surface-2);
       border: 1px solid var(--color-border); border-radius: var(--radius-sm);
@@ -1155,7 +1166,17 @@
        zweiter Alarm - er ist wahr, aber nicht die Hauptsache. */
     .keyfile__text .keyfile__stops { margin-top: var(--space-1); font-size: var(--type-caption); color: var(--color-text-tertiary); }
     /* Fehler und Speicherpfad stehen unter der Zeile, eingerueckt wie ihr Text. */
-    .keyfile__note { margin: 0; padding: var(--space-2) var(--space-4) var(--space-3) calc(var(--space-4) + 24px + var(--space-3)); }
+    /* Der Speicherpfad ist eine Fussnote der Schluesselzeile, keine eigene
+       Zeile: ohne Haarlinie (die Gruppenregel zog sie, auf 60ch gekappt nur
+       bis kurz vor den Rand, und unter dem Fehlerbanner trennte sie den Pfad
+       von der Meldung, die ihn nennt). Einzug logisch, sonst stand er in RTL
+       auf der falschen Seite. */
+    .keyfile__note {
+      margin: 0; max-inline-size: none;
+      padding-block: var(--space-2) var(--space-3);
+      padding-inline: calc(var(--space-4) + 24px + var(--space-3)) var(--space-4);
+    }
+    .keyfile > .keyfile__note { border-top: 0; margin-top: 0; }
     #done-path.keyfile__note { font-family: var(--font-mono); overflow-wrap: anywhere; }
     .keyfile__err { margin: 0 var(--space-4) var(--space-3); text-align: start; }
     @media (max-width: 640px) {
@@ -1170,25 +1191,25 @@
       font-size: var(--text-3xl); font-weight: 700;
       letter-spacing: var(--tracking-tight); line-height: var(--line-height-tight); text-wrap: balance;
     }
-    .done-wrap > p { color: var(--color-text-secondary); margin: var(--space-2) 0 28px; font-size: var(--text-base); }
+    .done-wrap > p { color: var(--color-text-secondary); margin: var(--space-2) 0 var(--space-8); font-size: var(--text-base); }
     /* Geometrie und Schrift wie .btn: der Abschluss-CTA ist ein Primaerknopf
        wie jeder davor (700/16px gegen 600/14px las sich als zweites System).
        Flaeche siehe .btn-primary. */
     .open-link {
       display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
-      min-height: 48px; padding: var(--space-2h) var(--space-5); text-decoration: none;
+      min-height: var(--target-lg); padding: var(--space-2h) var(--space-5); text-decoration: none;
       border: none; cursor: pointer; font-family: var(--font-sans);
       border-radius: var(--radius-full); font-weight: 600; font-size: var(--text-sm);
       transition: background var(--duration-xs) var(--ease-out);
     }
     .open-link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-    .done-actions { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .done-actions { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); }
     .done-actions .open-link, .done-actions .btn { width: 100%; max-width: 300px; }
 
     /* „Als Naechstes" auf dem Abschluss. Zeilen in EINER Inset-Gruppe - dieselbe
        Grammatik wie .ready-list im Einfach-Pfad und wie jede Gruppe davor,
        damit der Abschluss nicht eine dritte Listenform erfindet. */
-    .next-steps { margin-top: 28px; text-align: start; }
+    .next-steps { margin-top: var(--space-8); text-align: start; }
     .next-step {
       display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4);
       color: inherit; text-decoration: none; font-size: var(--text-sm); line-height: 1.5;
@@ -1215,7 +1236,7 @@
     /* Weichere Erinnerung (kein Live-Hazard, z. B. Backup-Hinweis auf „Fertig"). */
     .warn-banner {
       display: flex; gap: var(--space-2h); align-items: flex-start;
-      margin-bottom: 18px; padding: var(--space-3) 14px; border-radius: var(--radius-sm);
+      margin-bottom: var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm);
       background: color-mix(in srgb, var(--color-warning) 10%, transparent);
       border: 1.5px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
       color: var(--color-text-primary); font-size: var(--text-sm); line-height: 1.5;
@@ -1247,7 +1268,10 @@
     .copied-note { font-size: var(--text-xs); color: var(--color-success); }
     /* Gescheitertes Kopieren ist keine Erfolgsmeldung: Warnton wie die
        Schluessel-Warnung, der Text sagt, was jetzt zu tun ist. */
-    .copied-note--fail { color: var(--color-warning); }
+    /* Eigene Zeile unter dem Knopf: der Satz ist lang und brach neben dem
+       Inline-Knopf der Redirect-Hinweise mitten in dessen Zeile um. Das kurze
+       "Kopiert" bleibt daneben stehen. */
+    .copied-note--fail { display: block; margin-top: var(--space-1); color: var(--color-warning); }
 
     /* ── Desktop ab 1024px: Schrittliste links, Inhalt rechts ─────────────────
        Die 560px-Karte stand auf 1440px allein in der Mitte, und der Fortschritt
@@ -1267,7 +1291,7 @@
       .shell:not(.shell--solo) .rail { position: sticky; top: 56px; }
       .shell:not(.shell--solo) .brand {
         display: flex; align-items: center; gap: var(--space-2h);
-        text-align: start; margin-bottom: 28px;
+        text-align: start; margin-bottom: var(--space-8);
       }
       .shell:not(.shell--solo) .brand__mark { width: var(--space-10); height: var(--space-10); margin-bottom: 0; }
       .shell:not(.shell--solo) .steps-nav { display: block; }
@@ -1282,7 +1306,7 @@
     .steps-nav__list { list-style: none; display: grid; gap: var(--space-0h); }
     .steps-nav__link {
       display: flex; align-items: center; gap: var(--space-3); width: 100%;
-      min-height: 44px; padding: var(--space-2) var(--space-3); border: none; border-radius: var(--radius-md);
+      min-height: var(--target-base); padding: var(--space-2) var(--space-3); border: none; border-radius: var(--radius-md);
       background: transparent; color: var(--color-text-primary); text-align: start;
       font-family: var(--font-sans); font-size: var(--type-secondary); font-weight: 500; line-height: 1.25;
       cursor: pointer;
@@ -1404,7 +1428,7 @@
       .shell--solo .brand { padding-top: 56px; }
       .shell:not(.shell--solo) .brand {
         display: flex; align-items: center; gap: var(--space-2h);
-        min-height: 44px; margin-bottom: var(--space-4); text-align: start;
+        min-height: var(--target-base); margin-bottom: var(--space-4); text-align: start;
       }
       .shell:not(.shell--solo) .brand__mark { width: var(--space-10); height: var(--space-10); margin-bottom: 0; }
 
@@ -1419,7 +1443,7 @@
       .card-foot { gap: var(--space-2); }
       .card-foot .btn-primary { flex: 1 1 auto; padding-inline: var(--space-3); }
       .card-foot .btn-ghost[data-back] {
-        flex: none; width: 48px; padding: 0; font-size: 0;
+        flex: none; width: var(--target-lg); padding: 0; font-size: 0;
       }
       .card-foot .btn-ghost[data-back]::before {
         content: ''; width: 20px; height: 20px; background: currentColor;
@@ -1428,7 +1452,7 @@
       }
       html[dir="rtl"] .card-foot .btn-ghost[data-back]::before { transform: scaleX(-1); }
 
-      .btn-sm { min-height: 44px; min-width: 44px; padding: var(--space-2) var(--space-3); }
+      .btn-sm { min-height: var(--target-base); min-width: var(--target-base); padding: var(--space-2) var(--space-3); }
       .secret-row .btn-sm { flex: 0 0 auto; min-height: var(--target-lg); }
       .secret-row [data-eye], .secret-row [data-copy] { min-width: var(--target-lg); padding: 0; }
       /* Felder brauchen hier keine eigene Zeile mehr: sie stehen in jeder
@@ -1437,7 +1461,7 @@
          schlägt das nackte `select` (0,0,1), und eine Media-Query hebt die
          Spezifität nicht an - die Zeile darüber hat ihn deshalb nie erreicht, er
          blieb bei seinen 36px. Gleiche Spezifität, spätere Regel, sie gewinnt. */
-      .lang-switch select { min-height: 44px; }
+      .lang-switch select { min-height: var(--target-base); }
       /* Schlank im Kopf: der Select war so breit wie die laengste Sprache
          (163px fuer "Deutsch", Critique 2026-10-29) und stand neben der
          Wortmarke lauter als sie. field-sizing misst den gewaehlten Eintrag;
@@ -1582,14 +1606,14 @@
              applyTranslations beim Sprachwechsel die Rohfassung zurück und der
              Nutzer las wörtlich „Fehlende Voraussetzungen: {{list}}". localize()
              baut ihn stattdessen neu auf, wie bei gcal-hint und apple-hint. -->
-        <div class="error-banner" id="welcome-prereq" role="alert"></div>
-        <button type="button" class="btn btn-ghost" id="prereq-recheck" style="display:none" data-i18n="config.prereqRecheck">Check again</button>
+        <div class="error-banner" id="welcome-prereq" role="alert" hidden></div>
+        <button type="button" class="btn btn-ghost" id="prereq-recheck" hidden data-i18n="config.prereqRecheck">Check again</button>
         <!-- Bestehende Installation: der Einfach-Pfad ist dann gesperrt, weil er
              Host, Port, SESSION_SECURE und TRUST_PROXY hart setzt und eine
              laufende HTTPS-Instanz damit stumm degradieren würde. Kein
              role="alert" - das ist eine Wegweisung beim Laden der Seite, keine
              Reaktion auf eine Handlung. -->
-        <div class="info-banner" id="welcome-existing" style="display:none" role="note" data-i18n="welcome.existingLocked">
+        <div class="info-banner" id="welcome-existing" hidden role="note" data-i18n="welcome.existingLocked">
           An existing installation was detected. Continue with the advanced setup so your current settings are kept.
         </div>
         <!-- Der Preflight ermittelt per docker inspect, ob der Container gerade
@@ -1598,7 +1622,7 @@
              Ausfallzeit fuer den Haushalt. Der Wert wurde bisher berechnet, per
              Test als Boolean zugesichert und in der README angekuendigt, aber von
              keiner Zeile gelesen. -->
-        <div class="info-banner" id="welcome-running" style="display:none" role="note" data-i18n="welcome.containerRunning">
+        <div class="info-banner" id="welcome-running" hidden role="note" data-i18n="welcome.containerRunning">
           Yuvomi is currently running. Saving will restart the container, so it will be briefly unavailable.
         </div>
         <div class="mode-grid">
@@ -1689,7 +1713,7 @@
           <span data-i18n="simple.backupReminder">At the end you can download your key file (.env). Keep it somewhere safe - without it your data cannot be recovered.</span>
         </div>
         <button type="button" class="link-btn" id="simple-to-advanced" data-i18n="simple.switchAdvanced">Need more options? Switch to advanced setup</button>
-        <div class="error-banner" id="simple-err" role="alert"></div>
+        <div class="error-banner" id="simple-err" role="alert" hidden></div>
       </div>
       <div class="card-foot">
         <!-- Was der zweite Klick bestaetigt (armConfirm). Sichtbar und in der
@@ -1712,12 +1736,12 @@
         <p data-i18n="config.subtitle">How will you access Yuvomi?</p>
       </div>
       <div class="card-body">
-        <div class="warn-banner" id="cfg-existing" role="note" style="display:none">
+        <div class="warn-banner" id="cfg-existing" role="note" hidden>
           <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
           <span data-i18n="config.existing">Existing configuration detected - your current .env file will be backed up before saving.</span>
         </div>
         <!-- Wie #welcome-prereq: Text zur Laufzeit, kein data-i18n. -->
-        <div class="error-banner" id="cfg-prereq" role="alert"></div>
+        <div class="error-banner" id="cfg-prereq" role="alert" hidden></div>
         <div class="group-label" data-i18n="common.groupServer">Server</div>
         <div class="inset-group">
         <div class="field">
@@ -1784,7 +1808,7 @@
         </div>
         </div>
 
-        <div class="error-banner" id="cfg-err" role="alert"></div>
+        <div class="error-banner" id="cfg-err" role="alert" hidden></div>
       </div>
       <div class="card-foot">
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
@@ -1804,7 +1828,7 @@
           <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
           <span data-i18n="secrets.keyWarn">At the end of setup you get your key file (.env) with both keys. Keep it somewhere safe: without the database key your data is lost - there is no reset.</span>
         </div>
-        <div class="info-banner" id="sec-preserved" style="display:none" role="note" data-i18n="secrets.preserved">
+        <div class="info-banner" id="sec-preserved" hidden role="note" data-i18n="secrets.preserved">
           Your existing keys are kept, so this setup will not lock you out of the current database. Leave a field empty to keep its key; entering a new value replaces it.
         </div>
         <!-- Eine Gruppe ohne Label: der Schritt heisst schon "Sicherheitsschluessel",
@@ -1844,7 +1868,7 @@
           <div class="hint" data-i18n="secrets.dbHint">Encrypts the SQLite database at rest.</div>
         </div>
         </div>
-        <div class="error-banner" id="sec-err" role="alert"></div>
+        <div class="error-banner" id="sec-err" role="alert" hidden></div>
       </div>
       <div class="card-foot">
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
@@ -1871,7 +1895,7 @@
                ein Fehler, weil die App weiter ihren eigenen Wert zeigt. -->
           <div class="hint" data-i18n="weather.appHint">These values apply until a household location is saved in the app under Settings → Household → Photos and weather.</div>
         </div>
-        <div class="inset-sub" id="wea-fields" style="display:none">
+        <div class="inset-sub" id="wea-fields" hidden>
           <div class="field">
             <label for="wea-lat" data-i18n="weather.latLabel">Latitude</label>
             <input type="number" id="wea-lat" step="any" min="-90" max="90" placeholder="52.52" enterkeyhint="next">
@@ -1894,7 +1918,7 @@
           </div>
         </div>
         </div>
-        <div class="error-banner" id="wea-err" role="alert"></div>
+        <div class="error-banner" id="wea-err" role="alert" hidden></div>
       </div>
       <div class="card-foot">
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
@@ -2008,7 +2032,7 @@
         </div>
         <!-- Der Weg zu weiteren Konten, sichtbar ohne Aufklappen. -->
         <p class="group-note" data-i18n="calendar.moreInApp">Add more CalDAV accounts, such as Nextcloud or a second iCloud account, in the app under Settings → Modules → Calendar.</p>
-        <div class="error-banner" id="cal-err" role="alert"></div>
+        <div class="error-banner" id="cal-err" role="alert" hidden></div>
       </div>
       <div class="card-foot">
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
@@ -2036,7 +2060,7 @@
         </div>
         <!-- Eingeschaltet folgen zwei Gruppen entlang der Frage, die sie
              beantworten: wie Yuvomi den Server erreicht, und als wer es schreibt. -->
-        <div id="email-fields" style="display:none">
+        <div id="email-fields" hidden>
           <div class="group-label" data-i18n="common.groupServer">Server</div>
           <div class="inset-group">
           <div class="field">
@@ -2083,7 +2107,7 @@
           </div>
           </div>
         </div>
-        <div class="error-banner" id="email-err" role="alert"></div>
+        <div class="error-banner" id="email-err" role="alert" hidden></div>
       </div>
       <div class="card-foot">
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
@@ -2285,7 +2309,7 @@
         </div>
         </div>
 
-        <div class="error-banner" id="storage-err" role="alert"></div>
+        <div class="error-banner" id="storage-err" role="alert" hidden></div>
       </div>
       <div class="card-foot">
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
@@ -2407,7 +2431,7 @@
         </div>
         </div>
 
-        <div class="error-banner" id="adv-err" role="alert"></div>
+        <div class="error-banner" id="adv-err" role="alert" hidden></div>
       </div>
       <div class="card-foot">
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
@@ -2512,7 +2536,7 @@
             <div class="rv-row" id="rv-cleared-row" hidden><dt data-i18n="review.cleared">Removed from .env</dt><dd id="rv-cleared" dir="ltr"></dd></div>
           </dl>
         </section>
-        <div class="error-banner" id="rev-err" role="alert"></div>
+        <div class="error-banner" id="rev-err" role="alert" hidden></div>
       </div>
       <div class="card-foot">
         <p class="confirm-line" id="rev-confirm-line" hidden></p>
@@ -2580,7 +2604,7 @@
         <div class="vh status-row" role="status" aria-live="polite">
           <span id="dkr-text">Downloading image</span>
         </div>
-        <div class="warn-banner" id="dkr-stalled" role="status" style="display:none">
+        <div class="warn-banner" id="dkr-stalled" role="status" hidden>
           <span class="warn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
           <span data-i18n="docker.stalled">This is taking longer than usual. The log below shows why.</span>
         </div>
@@ -2592,10 +2616,10 @@
              um (336px Bedarf, 328px Platz), und er gehoert zu dem, was er
              aufklappt - das Banner darueber sagt "das Protokoll unten".
              Kein data-i18n: wechselt zwischen Anzeigen und Verbergen. -->
-        <button type="button" class="btn btn-ghost btn-sm" id="dkr-logs-toggle" aria-controls="dkr-log" aria-expanded="false" style="display:none">Show log</button>
-        <div class="log-box" id="dkr-log" tabindex="0" role="region" aria-label="Startup log" data-i18n-aria="docker.logLabel"></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="dkr-logs-toggle" aria-controls="dkr-log" aria-expanded="false" hidden>Show log</button>
+        <div class="log-box" id="dkr-log" hidden tabindex="0" role="region" aria-label="Startup log" data-i18n-aria="docker.logLabel"></div>
       </div>
-      <div class="card-foot" id="dkr-foot" style="display:none">
+      <div class="card-foot" id="dkr-foot" hidden>
         <!-- Kein data-i18n: zustandsbehaftet (siehe setDockerPrimary). -->
         <button class="btn btn-primary" id="dkr-next">Continue to Admin Setup</button>
       </div>
@@ -2657,7 +2681,7 @@
           </div>
         </div>
         </div>
-        <div class="error-banner" id="adm-err" role="alert"></div>
+        <div class="error-banner" id="adm-err" role="alert" hidden></div>
       </div>
       <!-- Kein "Zurueck": davor liegt nur der erledigte Docker-Schirm, und
            zurueck hinter den Container-Start fuehrt kein Weg mehr - die .env
@@ -2718,10 +2742,10 @@
                  mit. Der Speicherpfad steht in #done-path direkt darunter und
                  wird im Fehlerfall mit eingeblendet - so bleibt die Meldung auch
                  dann vollständig, wenn savedEnvPath leer ist. -->
-            <div class="error-banner keyfile__err" id="done-err" role="alert" data-i18n="done.downloadFailed">
+            <div class="error-banner keyfile__err" id="done-err" role="alert" hidden data-i18n="done.downloadFailed">
               The file could not be loaded - the installer has most likely shut down already. Your keys are in the .env file on your server.
             </div>
-            <div class="hint keyfile__note" id="done-path" style="display:none"></div>
+            <div class="hint keyfile__note" id="done-path" hidden></div>
           </div>
 
           <div class="done-actions">
@@ -3416,11 +3440,12 @@ const preflightDone = (async () => {
     const d = await r.json();
     // Unabhaengig von envExists: ein laufender Container ist die schaerfere
     // Auskunft, denn der Speichern-Schritt startet ihn neu.
-    if (d.containerRunning) $('welcome-running').style.display = 'block';
+    if (d.containerRunning) $('welcome-running').hidden = false;
 
     if (d.envExists) {
-      // flex, nicht block: .warn-banner stellt Icon und Text in eine Zeile.
-      $('cfg-existing').style.display = 'flex';
+      // hidden statt style.display: die Anzeigeart (.warn-banner ist flex,
+      // Icon und Text in einer Zeile) bleibt beim CSS.
+      $('cfg-existing').hidden = false;
       // Und der Einfach-Pfad wird gesperrt. applySimpleDefaults() setzt host,
       // port, SESSION_SECURE='false' und TRUST_PROXY='loopback' hart, buildEnv()
       // schickt sie mit - der Rerun-Schutz des Servers bewahrt aber nur, was der
@@ -3435,7 +3460,7 @@ const preflightDone = (async () => {
       rerunValues = d.rerunValues || {};
       for (const key of d.keptSecrets || []) keptSecrets.add(key);
       applyRerunPrefill(prefillPlan(d.rerunValues || {}, d.keptSecrets || []));
-      $('welcome-existing').style.display = 'block';
+      $('welcome-existing').hidden = false;
       simpleLockedByEnv = true;
       const simple = $('mode-simple');
       simple.disabled = true;
@@ -3483,7 +3508,7 @@ function renderPrereq() {
       list: lastPrereqMissing.join(', '),
       link: prereqLinkNode(lastPrereqMissing),
     });
-    $(id).style.display = 'block';
+    $(id).hidden = false;
   }
 }
 
@@ -3506,14 +3531,14 @@ async function checkPrereqs() {
     // laesst sich nicht anklicken.
     simple.classList.toggle('is-primary', !simple.disabled);
     $('mode-advanced').classList.toggle('is-primary', simple.disabled && !blocked);
-    $('prereq-recheck').style.display = blocked ? '' : 'none';
+    $('prereq-recheck').hidden = !blocked;
 
     if (blocked) {
       renderPrereq();
     } else {
       for (const id of ['cfg-prereq', 'welcome-prereq']) {
         $(id).textContent = '';
-        $(id).style.display = 'none';
+        $(id).hidden = true;
       }
     }
   } catch { /* prereq check is best-effort */ }
@@ -3933,7 +3958,7 @@ function onEnterStep(name) {
     if (savedEnvPath) {
       const p = $('done-path');
       p.textContent = t('done.savedTo', { path: savedEnvPath });
-      p.style.display = 'block';
+      p.hidden = false;
     }
     renderKeyFile();
   }
@@ -3974,7 +3999,7 @@ $('done-download').addEventListener('click', async () => {
   // DB_ENCRYPTION_KEY, für den es ausdrücklich kein Zurücksetzen gibt.
   const btn = $('done-download');
   const err = $('done-err');
-  err.style.display = 'none';
+  err.hidden = true;
   btn.disabled = true;
   let url = '';
   try {
@@ -3991,10 +4016,10 @@ $('done-download').addEventListener('click', async () => {
     keysDownloaded = true;
     renderKeyFile();
   } catch {
-    err.style.display = 'block';
+    err.hidden = false;
     // Den Speicherpfad mit einblenden, damit die Datei von Hand auffindbar
     // bleibt. Im Erweitert-Pfad steht er ohnehin schon da, im Einfach-Pfad nicht.
-    if (savedEnvPath) $('done-path').style.display = 'block';
+    if (savedEnvPath) $('done-path').hidden = false;
   } finally {
     btn.disabled = false;
     // Erst nach dem Klick freigeben, sonst zieht Safari den Blob unter dem
@@ -4019,7 +4044,7 @@ $('done-link').addEventListener('click', e => {
     Nicht-Techniker nicht selbst „Generieren" klicken müssen. */
 async function autofillSecretFields() {
   await preflightDone;
-  if (preservedKeys.size) $('sec-preserved').style.display = 'block';
+  if (preservedKeys.size) $('sec-preserved').hidden = false;
   for (const [inpId, key] of [['sec-session', 'SESSION_SECRET'], ['sec-db', 'DB_ENCRYPTION_KEY']]) {
     const inp = $(inpId);
     if (inp.value) continue;
@@ -4089,7 +4114,7 @@ async function startFlow(m) {
 function showErr(id, msg, detail = '') {
   const el = $(id);
   el.textContent = msg && detail ? `${msg}\n${t('common.errorDetail', { detail })}` : msg;
-  el.style.display = msg ? 'block' : 'none';
+  el.hidden = !msg;
 }
 
 /** aria-invalid auf allen Feldern zurücksetzen (bei Schrittwechsel / erneuter Prüfung). */
@@ -4443,7 +4468,7 @@ $('sec-next').addEventListener('click', () => {
 });
 
 $('wea-enable').addEventListener('change', function() {
-  $('wea-fields').style.display = this.checked ? 'block' : 'none';
+  $('wea-fields').hidden = !this.checked;
 });
 
 $('wea-next').addEventListener('click', () => {
@@ -4518,7 +4543,7 @@ $('cal-next').addEventListener('click', () => {
 });
 
 $('email-enable').addEventListener('change', function() {
-  $('email-fields').style.display = this.checked ? 'block' : 'none';
+  $('email-fields').hidden = !this.checked;
 });
 
 $('email-next').addEventListener('click', () => {
@@ -5179,7 +5204,7 @@ function showDockerLog(text) {
   if (el.textContent === text) return;
   el.textContent = text;
   // Beim Verfolgen soll das Neueste sichtbar sein.
-  if (el.style.display === 'block') el.scrollTop = el.scrollHeight;
+  if (!el.hidden) el.scrollTop = el.scrollHeight;
 }
 
 function tickElapsed() {
@@ -5224,8 +5249,8 @@ function setDockerPrimary(labelKey, handler) {
 // Der Protokoll-Umschalter wird einmal verdrahtet, nicht bei jedem Einblenden.
 $('dkr-logs-toggle').addEventListener('click', () => {
   const log = $('dkr-log');
-  const open = log.style.display !== 'block';
-  log.style.display = open ? 'block' : 'none';
+  const open = log.hidden;
+  log.hidden = !open;
   logsOpen = open;
   $('dkr-logs-toggle').textContent = t(logsOpen ? 'docker.hideLogs' : 'docker.showLogs');
   $('dkr-logs-toggle').setAttribute('aria-expanded', String(open));
@@ -5235,11 +5260,11 @@ $('dkr-logs-toggle').addEventListener('click', () => {
 /** Protokoll-Umschalter und „Erneut versuchen" einblenden (idempotent). */
 function revealDockerEscape() {
   const foot = $('dkr-foot');
-  if (foot.style.display === 'flex') return;
-  $('dkr-stalled').style.display = 'flex';
-  $('dkr-logs-toggle').style.display = 'inline-flex';
+  if (!foot.hidden) return;
+  $('dkr-stalled').hidden = false;
+  $('dkr-logs-toggle').hidden = false;
   setDockerPrimary('docker.retry', restartDocker);
-  foot.style.display = 'flex';
+  foot.hidden = false;
 }
 
 async function pollDocker(run) {
@@ -5283,12 +5308,12 @@ function dockerSucceeded() {
   dockerDoneSecs = Math.max(1, Math.round((Date.now() - dockerStart) / 1000));
   $('dkr-elapsed').textContent = t('docker.doneIn', { n: dockerDoneSecs });
   setDockerHead('docker.doneTitle', 'docker.doneSubtitle');
-  $('dkr-stalled').style.display = 'none';
-  $('dkr-expect').style.display = 'none';
-  $('dkr-logs-toggle').style.display = 'none';
-  $('dkr-log').style.display = 'none';
+  $('dkr-stalled').hidden = true;
+  $('dkr-expect').hidden = true;
+  $('dkr-logs-toggle').hidden = true;
+  $('dkr-log').hidden = true;
   setDockerPrimary('docker.toAdmin', () => next());
-  $('dkr-foot').style.display = 'flex';
+  $('dkr-foot').hidden = false;
   // Der Schirm hat sein Ergebnis: der Fokus geht auf den neuen Titel, wie bei
   // jedem Schrittwechsel - von dort ist "Weiter" der naechste Tab-Halt. Nur
   // solange der Schritt noch steht (ein spaeter Tick darf nicht springen).
@@ -5297,16 +5322,16 @@ function dockerSucceeded() {
 
 function restartDocker() {
   setDockerHead('docker.title', 'docker.subtitle');
-  $('dkr-elapsed').style.display = '';
-  $('dkr-stalled').style.display = 'none';
-  $('dkr-expect').style.display = '';
-  $('dkr-log').style.display = 'none';
+  $('dkr-elapsed').hidden = false;
+  $('dkr-stalled').hidden = true;
+  $('dkr-expect').hidden = false;
+  $('dkr-log').hidden = true;
   $('dkr-log').textContent = '';
-  $('dkr-logs-toggle').style.display = 'none';
+  $('dkr-logs-toggle').hidden = true;
   logsOpen = false;
   $('dkr-logs-toggle').textContent = t('docker.showLogs');
   $('dkr-logs-toggle').setAttribute('aria-expanded', 'false');
-  $('dkr-foot').style.display = 'none';
+  $('dkr-foot').hidden = true;
   startDocker();
 }
 
@@ -5326,16 +5351,16 @@ function dockerFailed(logs) {
   // Kein Fokuswechsel: der Fehler kann mitten ins Lesen des Protokolls
   // fallen, die Live-Region sagt ihn an. Der Titel nennt ihn sichtbar.
   setDockerHead('docker.failed', 'docker.failedSubtitle');
-  $('dkr-elapsed').style.display = 'none';
-  $('dkr-stalled').style.display = 'none';
-  $('dkr-expect').style.display = 'none';
+  $('dkr-elapsed').hidden = true;
+  $('dkr-stalled').hidden = true;
+  $('dkr-expect').hidden = true;
   const logEl = $('dkr-log');
-  logEl.style.display = 'block';
+  logEl.hidden = false;
   logEl.textContent = logs;
   logEl.scrollTop = logEl.scrollHeight;
-  $('dkr-logs-toggle').style.display = 'none';
+  $('dkr-logs-toggle').hidden = true;
   setDockerPrimary('docker.retry', restartDocker);
-  $('dkr-foot').style.display = 'flex';
+  $('dkr-foot').hidden = false;
 }
 
 $('adm-next').addEventListener('click', createAdmin);
