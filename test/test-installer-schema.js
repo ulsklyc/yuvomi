@@ -141,6 +141,15 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
     + 'ohnehin von Hand an. Eine Checkbox waere hier ausserdem invertiert beschriftet ("private '
     + 'Ziele SPERREN") und damit die einzige im Wizard, die man rueckwaerts liest.',
 
+  // Der Wizard erzeugt die Schluessel selbst und schreibt sie in die .env. Die
+  // _FILE-Varianten sind fuer Betreiber, die Secrets ausserhalb der .env halten.
+  SESSION_SECRET_FILE:
+    'Fuer Docker/Podman-Secrets: der Wizard schreibt SESSION_SECRET in die .env, und beides '
+    + 'zugleich bricht den Start ab. Wer das Secret aus einer Datei liest, pflegt es von Hand.',
+  DB_ENCRYPTION_KEY_FILE:
+    'Wie SESSION_SECRET_FILE. Ein vom Wizard erzeugter Schluessel in der .env und eine Datei '
+    + 'daneben waeren zwei Quellen fuer denselben Schluessel; die App bricht dann ab, statt zu raten.',
+
   // Werden zur Laufzeit erzeugt und in der Datenbank abgelegt.
   VAPID_PUBLIC_KEY: 'Wird bei Erstnutzung automatisch erzeugt; nur VAPID_SUBJECT ist konfigurierbar.',
   VAPID_PRIVATE_KEY: 'Wird bei Erstnutzung automatisch erzeugt.',

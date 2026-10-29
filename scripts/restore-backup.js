@@ -19,6 +19,9 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import 'dotenv/config';
+// <NAME>_FILE (#2249) vor dem dynamischen Import von db.js, das DB_ENCRYPTION_KEY
+// beim Laden liest - sonst scheitert der Restore an einer Instanz mit Schluesseldatei.
+import '../server/utils/load-file-secrets.js';
 
 const args = process.argv.slice(2);
 const keyFromStdin = args.includes('--backup-key-stdin');
