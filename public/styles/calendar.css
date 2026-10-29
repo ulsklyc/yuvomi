@@ -1499,6 +1499,11 @@
      Kalender und Fantastical halten es genauso. */
   position: sticky;
   top: 0;
+  /* DIE FLAECHE DES BLOCKS (R24 S13): die Zeitzeile darunter scrollt weiter
+   * und lief ohne sie DURCH den klebenden Titel ("...Naturkundemu-/seum"
+   * ueber "08:30 - 15:00"). `inherit` nimmt die Flaeche des Blocks samt
+   * Hover; die Zeitzeile gleitet darunter weg. */
+  background: inherit;
 }
 
 /* DER TITEL BRICHT UM, SOLANGE DER BLOCK HOEHE HAT (R9 M5, A2 P2).

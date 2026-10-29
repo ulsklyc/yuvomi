@@ -7353,8 +7353,22 @@ await test('R24 G1 P1-1: Woche/Tag beginnen mit dem fruehesten Block, nicht fest
   assert(sticky && /(^|[;\s])top:\s*0/.test(sticky.body), 'der Schichttitel klebt nicht an der sichtbaren Oberkante seines Blocks');
 });
 
+/* R24 S13 (Uebergabe S1): der Titel eines Wochenblocks klebt an der sichtbaren
+ * Oberkante (R9), die Zeitzeile darunter scrollt weiter - ohne eigene Flaeche
+ * lief sie DURCH den Titel: "Ausflug ins Naturkundemu-/seum" lag gescrollt
+ * ueber "08:30 - 15:00" (1440, Woche, gesehen). Der Titel traegt die Flaeche
+ * seines Blocks (`inherit`, auch im Hover), die Zeitzeile gleitet darunter -
+ * wie in Apple Kalender. */
+test('R24 S13: der klebende Wochentitel deckt die Zeitzeile, die unter ihm durchlaeuft', () => {
+  const rule = [...eachRule(calendarCss)].find((r) => !r.at.length && r.selector.trim() === '.week-event__title');
+  assert(rule, 'Regel fehlt');
+  assert(/position:\s*sticky/.test(rule.body), 'der Titel klebt nicht');
+  assert(/background:\s*inherit/.test(rule.body), 'ohne Flaeche laeuft die Zeitzeile durch den Titel');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
 const { failed } = await finish();
 if (failed > 0) process.exit(1);
+
