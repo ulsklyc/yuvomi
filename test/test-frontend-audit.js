@@ -23584,7 +23584,12 @@ test('R22-F F2.1: Rueckweg ganz, Wischgeste einmal je Zeile, Spalten-Abfrage nur
 
   const tasks = read('../public/pages/tasks.js');
   assert.match(tasks, /claimInitial: sheetFor == null,[\s\S]{0,400}?splitMedia: '\(min-width: 65rem\)',/, 'mountMasterDetail fragt mobil die Box ab');
-  assert.match(tasks.slice(tasks.indexOf('function syncSplitHeight(')), /const split = \(typeof window\.matchMedia !== 'function' \|\| window\.matchMedia\('\(min-width: 65rem\)'\)\.matches\)\n\s*&& getComputedStyle\(detail\)\.display !== 'none';/,
+  // Seit R24 S13 fragt auch das Brett die Schwelle (Seitenbreite) - beide
+  // Fragen stehen HINTER der Fensterabfrage, mobil liest keine ein Layout.
+  const split = tasks.slice(tasks.indexOf('function syncSplitHeight('));
+  assert.match(split, /const wide = typeof window\.matchMedia !== 'function' \|\| window\.matchMedia\('\(min-width: 65rem\)'\)\.matches;/,
+    'syncSplitHeight erzwingt mobil ein Layout');
+  assert.match(split, /const split = wide && \(isKanbanMode\(\)\n\s*\? page\.clientWidth >= [^\n]+\n\s*: getComputedStyle\(detail\)\.display !== 'none'\);/,
     'syncSplitHeight erzwingt mobil ein Layout');
 });
 

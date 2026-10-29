@@ -80,6 +80,18 @@
   padding-bottom: 0;
 }
 
+/* DAS BRETT IN DER HOEHENKETTE (R24 S13, Critique G2-Aufgaben-P2-1). Traegt
+ * die Modulflaeche die Spaltenform, bleibt das Brett in ihr (tasks.js,
+ * syncSplitHeight): ohne Detailspalte ist `.split-view` die Flex-Spalte der
+ * Shell, und die Liste fuellt sie und scrollt selbst - wie in der Liste, nur
+ * ueber die volle Breite. So wechselt beim Umschalten nicht der Scrollport,
+ * und Liste -> Kanban ist ein Schnitt ohne Shift (vorher 0,0538). */
+.tasks-page--split:not(.app-page--list-detail) .split-view__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 /* Das Bodenpolster wandert mit dem Scrollen in die Liste - als Summand der
  * Scrollport-Rolle, die tasks.js dort in der Spaltenform setzt; den Nachlauf
  * der Shell legt `.page-scrollport` darauf (layout.css). */

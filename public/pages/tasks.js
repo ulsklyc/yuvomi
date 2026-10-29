@@ -6192,8 +6192,19 @@ function syncSplitHeight(container) {
   // nie breiter als das Fenster) - ohne die Abfrage loeste getComputedStyle
   // die Container-Abfrage auf und erzwang mobil zweimal je Wechsel ein Layout
   // (4x CPU: 13 ms, Critique R22-F F2.1).
-  const split = (typeof window.matchMedia !== 'function' || window.matchMedia('(min-width: 65rem)').matches)
-    && getComputedStyle(detail).display !== 'none';
+  const wide = typeof window.matchMedia !== 'function' || window.matchMedia('(min-width: 65rem)').matches;
+  // DAS BRETT BLEIBT IN DER KETTE (R24 S13, Critique G2-Aufgaben-P2-1). Ohne
+  // `app-page--list-detail` hat das Brett keine Detailspalte, die man fragen
+  // koennte; es gab die Kette deshalb ab, das Scrollen wanderte von der Liste
+  // an `.app-content`, und Liste -> Kanban meldete bei 1440 einen Shift von
+  // 0,0538 an `#task-list` (Chrome rechnete die alte Lage im Raum des alten
+  // Scrollports). Jetzt fragt das Brett dieselbe Schwelle wie die Spalte -
+  // 65rem Modulflaeche, `--layout-split-threshold` - an der Seitenbreite:
+  // traegt die Flaeche Liste + Detail, scrollt im Brett die Liste selbst, nur
+  // breiter, und der Wechsel ist ein Schnitt ohne Shift (D13).
+  const split = wide && (isKanbanMode()
+    ? page.clientWidth >= 65 * parseFloat(getComputedStyle(document.documentElement).fontSize)
+    : getComputedStyle(detail).display !== 'none');
   page.classList.toggle('tasks-page--split', split);
   // In der Spaltenform scrollt die Liste selbst, nicht mehr `.app-content` -
   // sie traegt dann die Rolle, damit der Nachlauf der Shell-Flaechen (FAB,

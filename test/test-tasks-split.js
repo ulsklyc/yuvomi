@@ -566,6 +566,70 @@ test('Liste und Verlauf sind Liste + Detail mit Lesebahn darunter, das Brett ist
   }
 });
 
+/* DAS BRETT BLEIBT IN DER HOEHENKETTE (R24 S13, Critique G2-Aufgaben-P2-1,
+ * S12-F3). Liste -> Kanban bei 1440 meldete einen Layout-Shift von 0,0538 an
+ * `#task-list` (220,0 480x799 -> 252,101 1156x799), obwohl die Liste sichtbar
+ * an derselben Stelle begann: die Spaltenform gab `.tasks-page--split` ab, das
+ * Scrollen wanderte von der Liste an `.app-content`, und Chrome rechnete die
+ * alte Lage im Koordinatenraum des alten Scrollports. Das Brett behaelt jetzt
+ * die Hoehenkette (die Liste bleibt der Scrollport, nur breiter), solange die
+ * Modulflaeche die Spaltenform truege - der Wechsel ist dann ein Schnitt ohne
+ * Shift (D13). Darunter (Telefon, schmales Tablet) wechselt nichts. */
+function splitContainer({ mode, width, detailDisplay, wide = true }) {
+  const classes = new Set(['tasks-page', 'app-page', 'app-page--full']);
+  const listClasses = new Set(['split-view__list']);
+  const cls = (set) => ({
+    toggle: (name, on) => { if (on) set.add(name); else set.delete(name); return on; },
+    add: (name) => set.add(name), remove: (name) => set.delete(name), contains: (name) => set.has(name),
+  });
+  const detail = { __display: detailDisplay };
+  const list = { classList: cls(listClasses) };
+  const page = {
+    classList: cls(classes),
+    clientWidth: width,
+    querySelector: (sel) => (sel === '.split-view__detail' ? detail : sel === '#task-list' ? list : null),
+  };
+  return {
+    classes, listClasses, wide, mode,
+    isConnected: true,
+    querySelector: (sel) => (sel === '.tasks-page' ? page : null),
+    querySelectorAll: () => [],
+  };
+}
+
+test('R24 S13: das Brett behaelt die Hoehenkette der Spaltenform - Liste -> Kanban ohne Shift', () => {
+  const before = tasks.state.viewMode;
+  const saved = { gcs: globalThis.getComputedStyle, mm: globalThis.window.matchMedia };
+  let wide = true;
+  globalThis.window.matchMedia = () => ({ matches: wide });
+  globalThis.getComputedStyle = (el) => (el === globalThis.document.documentElement
+    ? { fontSize: '16px' }
+    : { display: el.__display });
+  try {
+    for (const [mode, width, detailDisplay, winWide, expected, why] of [
+      ['list', 1220, 'flex', true, true, 'Liste ab der Schwelle: Spaltenform'],
+      ['kanban', 1220, 'none', true, true, 'Brett auf derselben Flaeche: dieselbe Hoehenkette, die Liste bleibt Scrollport'],
+      ['kanban', 900, 'none', true, false, 'Brett unter der Schwelle der Flaeche (Seitenleiste abgezogen): die Seite scrollt'],
+      ['kanban', 1220, 'none', false, false, 'Telefon/schmales Fenster: keine Abfrage, keine Kette'],
+      ['list', 900, 'none', true, false, 'Liste unter der Schwelle: keine Spalte'],
+    ]) {
+      tasks.state.viewMode = mode;
+      wide = winWide;
+      const c = splitContainer({ mode, width, detailDisplay });
+      tasks.syncViewChrome(c);
+      assert.equal(c.classes.has('tasks-page--split'), expected, `${mode} ${width}px: ${why}`);
+      assert.equal(c.listClasses.has('page-scrollport'), expected, `${mode} ${width}px: der Scrollport folgt der Kette`);
+    }
+  } finally {
+    tasks.state.viewMode = before;
+    globalThis.getComputedStyle = saved.gcs;
+    globalThis.window.matchMedia = saved.mm;
+  }
+  const css = readFileSync(new URL('../public/styles/tasks.css', import.meta.url), 'utf8');
+  assert.match(css, /\.tasks-page--split:not\(\.app-page--list-detail\) \.split-view__list \{[^}]*flex: 1 1 auto;[^}]*min-height: 0;[^}]*overflow-y: auto;/,
+    'im Brett scrollt die Liste selbst - ohne die Regel waechst sie ueber die Kette hinaus');
+});
+
 test('ein Ansichtswechsel raeumt die Auswahl der alten Ansicht ab und stellt die Vorwahl wieder scharf', () => {
   // Liste und Verlauf teilen sich EINE Spalte, aber nicht ihre Zeilen: ohne
   // das Abraeumen stuende eine Aufgabe der Liste rechts neben dem Verlauf.
