@@ -943,6 +943,14 @@ test('R24 S13: die Bereichsliste erscheint mit ihren Status, nicht davor - nie d
   const all = HEALTH_JS.slice(HEALTH_JS.indexOf('function refreshAllAreaStatuses('), HEALTH_JS.indexOf('function wireAreasNav('));
   assert.match(all, /Promise\.allSettled\(loads\)/, 'die erste Runde wartet auf ALLE Abrufe, nicht auf den ersten');
   assert.match(all, /setTimeout\(revealAreaStatuses, STATUS_WAIT_MS\)/, 'ohne Frist verbirgt ein haengender Abruf die Navigation');
+  // Codex an #2364 (P2): die Frist gilt, bis die Liste WIRKLICH erscheint. Endeten
+  // die eigenen Abrufe vor der Uebersicht, loeschte ihr Ende die Frist, und eine
+  // haengende Uebersicht hielt die Navigation verborgen.
+  assert.doesNotMatch(all.slice(all.indexOf('Promise.allSettled(loads)')), /clearTimeout/,
+    'das Ende der eigenen Abrufe loescht die Frist nicht - die Uebersicht kann noch fehlen');
+  const reveal = HEALTH_JS.slice(HEALTH_JS.indexOf('function revealAreaStatuses('), HEALTH_JS.indexOf('function maybeRevealAreaStatuses('));
+  assert.match(reveal, /clearTimeout\(_statusRevealTimer\)/, 'erst das Erscheinen raeumt die Frist ab');
+  assert.match(all, /_statusRevealTimer = setTimeout\(revealAreaStatuses, STATUS_WAIT_MS\)/);
   assert.match(all, /if \(healthPersonIsOther\(healthUser\?\.id\)\) \{[\s\S]{0,200}?revealAreaStatuses\(\);\s*return;/, 'fremde Person: kein Status, also sofort sichtbar');
   const shell = HEALTH_JS.slice(HEALTH_JS.indexOf('function renderOverviewShell('));
   assert.match(shell.slice(0, shell.indexOf('applyOverviewStatuses();') + 200), /maybeRevealAreaStatuses\(\)/, 'die Uebersicht liefert drei Status - danach darf die Liste erscheinen');

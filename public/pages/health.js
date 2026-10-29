@@ -1200,8 +1200,12 @@ let _statusReveal = null;
 /** So lange haelt die Liste hoechstens ihre Marke: ein haengender Abruf
  * verbirgt die Navigation nicht. */
 const STATUS_WAIT_MS = 800;
+// Die Frist der ersten Runde. Sie gilt, bis die Liste wirklich erscheint: auch
+// wenn die eigenen Abrufe fertig sind, kann die Uebersicht noch fehlen.
+let _statusRevealTimer = 0;
 
 function revealAreaStatuses() {
+  clearTimeout(_statusRevealTimer);
   _statusRevealPending = false;
   _statusReveal = null;
   _container?.querySelector('.health-areas')?.removeAttribute('data-health-status-pending');
@@ -1266,10 +1270,9 @@ function refreshAllAreaStatuses() {
   if (!_statusRevealPending || _statusReveal) return;
   const round = { loading: true, overview: overviewProvides };
   _statusReveal = round;
-  const giveUp = setTimeout(revealAreaStatuses, STATUS_WAIT_MS);
+  _statusRevealTimer = setTimeout(revealAreaStatuses, STATUS_WAIT_MS);
   Promise.allSettled(loads).then(() => {
     if (_statusReveal !== round) return;
-    clearTimeout(giveUp);
     round.loading = false;
     maybeRevealAreaStatuses();
   });
