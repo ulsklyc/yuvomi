@@ -418,7 +418,7 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
   // koennte - seit es lokale Kalender gibt, hat er einen, und die kopierte
   // Farbe hielt ihn bei jedem Umfaerben auf der alten fest. Eine COLOR aus der
   // Datei selbst bleibt wie im Abo-Sync (#891) die Farbe dieses Termins.
-  const fallbackColor = importedEventColor(db.get(), localCalendarId, color);
+  const { color: fallbackColor, chosen: fallbackChosen } = importedEventColor(db.get(), localCalendarId, color);
   // `series_authored = 1`: die Termine gehoeren nach dem Import dem Nutzer und
   // sind lokale Zeilen wie jede hier angelegte - so hat sie der ausgehende Weg
   // schon behandelt, als er noch `external_source` las (#1935).
@@ -504,10 +504,10 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
           ev.summary, ev.description, ev.dtstart, ev.dtend,
           ev.allDay ? 1 : 0, ev.location, ev.color || fallbackColor || null,
           ev.uid || null, localRule, tzid, userId, localCalendarId,
-          // Eine COLOR aus der Datei ist eine Angabe UEBER DIESEN Termin, keine
-          // Kopie der Kalenderfarbe: `color_modified = 1` nimmt sie aus dem
-          // Nachziehen beim Umfaerben (`releaseCopiedCalendarColor`, #2303).
-          ev.color ? 1 : 0,
+          // Die Herkunft der Farbe (#2303): eine COLOR aus der Datei und eine
+          // abweichend gewaehlte Formularfarbe sind Angaben UEBER DIESEN
+          // Termin (1); nur eine Kopie der Kalenderfarbe (0) folgt dem Kalender.
+          ev.color || fallbackChosen ? 1 : 0,
         );
         // EXDATE nur übernehmen, wenn die Serie erhalten blieb (localRule != null).
         // Schluessel in Format A, wo die Uhr der Zeile das Vorkommen kennt

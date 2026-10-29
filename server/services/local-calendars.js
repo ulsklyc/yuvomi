@@ -181,20 +181,26 @@ function hasSeveralCalendars(conn) {
 const sameHex = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase();
 
 /**
- * Die Eigenfarbe, die ein importierter Termin bekommt: `null`, wenn sie nur die
- * Farbe des Zielkalenders wiederholt.
+ * Die Eigenfarbe, die ein importierter Termin bekommt, und ob sie GEWAEHLT ist.
+ *
+ * Die Herkunft steht in `color_modified` (1 = gewaehlt, 0 = Kopie der
+ * Kalenderfarbe): nur eine Kopie folgt dem Kalender beim Umfaerben
+ * (`releaseCopiedCalendarColor`) und beim Schritt zurueck auf einen Kalender
+ * (`restoreInheritedImportColors`). Gewaehlt ist eine Formularfarbe, die von
+ * der Kalenderfarbe abweicht; gleicht sie ihr, ist sie eine Kopie - ab zwei
+ * Kalendern bleibt die Spalte dann leer und erbt, mit einem einzigen steht die
+ * Kopie drin, weil der Lesepfad dort keine Kalenderfarbe zeigt.
  * @param {object} conn
  * @param {?number} calendarId  Zielkalender, `null` heisst Standardkalender
  * @param {?string} color       Farbe aus dem Importformular, leer = Kalenderfarbe
+ * @returns {{ color: ?string, chosen: boolean }}
  */
 export function importedEventColor(conn, calendarId, color) {
   const calendar = localCalendarById(conn, calendarId ?? defaultCalendarId(conn));
-  // Ohne Angabe die Kalenderfarbe - mit einem einzigen Kalender ist sie die
-  // Farbe, die der Termin sonst nirgends herbekaeme (vorher fest '#007AFF',
-  // die Farbe des Standardkalenders).
-  const chosen = color || calendar?.color || null;
-  if (calendar && sameHex(chosen, calendar.color) && hasSeveralCalendars(conn)) return null;
-  return chosen;
+  const value = color || calendar?.color || null;
+  if (!value) return { color: null, chosen: false };
+  if (!calendar || !sameHex(value, calendar.color)) return { color: value, chosen: true };
+  return { color: hasSeveralCalendars(conn) ? null : value, chosen: false };
 }
 
 /**

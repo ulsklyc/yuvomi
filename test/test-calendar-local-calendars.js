@@ -1065,3 +1065,17 @@ test('faellt der Haushalt auf einen Kalender zurueck, behalten geerbte Importe i
   assert.equal(shownColor(await listedImport('erbe-2303')), standard.color.toUpperCase(),
     'mit einem Kalender zeigt der Lesepfad keine Kalenderfarbe - der Termin darf nicht grau werden');
 });
+
+test('eine im Formular abweichend gewaehlte Farbe ueberlebt jedes Umfaerben (#2303, Review)', async () => {
+  const { importToLocal } = await import('../server/services/ics-subscription.js');
+  const calendar = await createCalendar('Sportverein', '#1565C0');
+  try {
+    await importToLocal(ADMIN.id, { ics: importIcs('sport-2303'), color: '#F9A825', localCalendarId: calendar.id });
+    // Erst auf genau die gewaehlte Farbe, dann weiter: die Wahl ist keine Kopie.
+    assert.equal((await call('PUT', `/calendars/${calendar.id}`, { body: { color: '#F9A825' } })).status, 200);
+    assert.equal((await call('PUT', `/calendars/${calendar.id}`, { body: { color: '#4E342E' } })).status, 200);
+    assert.equal(shownColor(await listedImport('sport-2303')), '#F9A825');
+  } finally {
+    await call('DELETE', `/calendars/${calendar.id}`);
+  }
+});
