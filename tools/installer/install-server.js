@@ -11,6 +11,7 @@ import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { randomBytes } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
+import { gzipSync, brotliCompressSync, constants as zlibConstants } from 'node:zlib';
 import { resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ENV_SCHEMA } from './env-schema.js';
@@ -593,14 +594,77 @@ function readBody(req) {
   });
 }
 
-function json(res, status, body) {
-  const payload = JSON.stringify(body);
-  res.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(payload),
-    'Cache-Control': 'no-store',
-  });
+/**
+ * Sicherheits-Header fuer JEDE Antwort. Der Installer zeigt Secrets (Session-
+ * und Datenbankschluessel) im Klartext: keine Einbettung in fremde Seiten
+ * (Clickjacking - X-Frame-Options fuer alte Browser, frame-ancestors fuer
+ * neue), kein Referrer mit der Installer-Adresse an Dritte, kein MIME-Raten.
+ * Bewusst KEINE script-src-Regel: install.html traegt sein Skript inline, eine
+ * Skript-CSP braeche den Wizard (Critique 2026-10-29).
+ */
+export const SECURITY_HEADERS = Object.freeze({
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+  'Content-Security-Policy': "frame-ancestors 'none'",
+});
+
+/** Textformate, die sich lohnen zu komprimieren (HTML, JS, JSON, CSS). */
+const COMPRESSIBLE = /^(?:text\/(?:html|javascript|css)|application\/json)\b/;
+/** Darunter kostet die Kompression mehr, als sie spart (Status-Polling). */
+const COMPRESS_MIN_BYTES = 1024;
+
+/**
+ * Bevorzugte Kodierung aus Accept-Encoding: br vor gzip, `q=0` heisst nein.
+ * Bis 2026-10-29 ging alles unkomprimiert raus - rund 520 kB je Aufruf, davon
+ * 280 kB install.html (Critique 2026-10-29, Fast 4G).
+ */
+export function negotiateEncoding(acceptEncoding = '') {
+  const offered = new Map();
+  for (const part of String(acceptEncoding).toLowerCase().split(',')) {
+    const [name, ...params] = part.trim().split(';');
+    if (!name) continue;
+    const q = params.map(p => p.trim().match(/^q=([\d.]+)$/)).find(Boolean);
+    offered.set(name.trim(), q ? Number(q[1]) : 1);
+  }
+  const ok = name => (offered.has(name) ? offered.get(name) > 0 : (offered.get('*') ?? 0) > 0);
+  if (ok('br')) return 'br';
+  if (ok('gzip')) return 'gzip';
+  return null;
+}
+
+/**
+ * Eine Antwort senden, komprimiert, wenn Format, Groesse und Accept-Encoding
+ * es hergeben. Die Anfrage kommt ueber res.req (Node setzt sie am Response).
+ * Brotli auf Stufe 5 statt 11: der Installer liest seine Dateien je Aufruf
+ * frisch (no-store), Stufe 11 kostete bei 280 kB spuerbar CPU je Laden.
+ */
+function send(res, status, headers, body) {
+  let payload = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
+  const out = { ...headers, 'Cache-Control': 'no-store' };
+  if (COMPRESSIBLE.test(headers['Content-Type'] || '')) {
+    out.Vary = 'Accept-Encoding';
+    const encoding = payload.length >= COMPRESS_MIN_BYTES
+      ? negotiateEncoding(res.req?.headers?.['accept-encoding'])
+      : null;
+    if (encoding === 'br') {
+      payload = brotliCompressSync(payload, { params: {
+        [zlibConstants.BROTLI_PARAM_QUALITY]: 5,
+        [zlibConstants.BROTLI_PARAM_SIZE_HINT]: payload.length,
+      } });
+      out['Content-Encoding'] = 'br';
+    } else if (encoding === 'gzip') {
+      payload = gzipSync(payload, { level: 6 });
+      out['Content-Encoding'] = 'gzip';
+    }
+  }
+  out['Content-Length'] = payload.length;
+  res.writeHead(status, out);
   res.end(payload);
+}
+
+function json(res, status, body) {
+  send(res, status, { 'Content-Type': 'application/json' }, JSON.stringify(body));
 }
 
 /**
@@ -609,17 +673,13 @@ function json(res, status, body) {
  * of throwing, keeping the route handler exception-free.
  */
 function serveStatic(res, filePath, contentType) {
+  let body;
   try {
-    const body = readFileSync(filePath);
-    res.writeHead(200, {
-      'Content-Type': contentType,
-      'Content-Length': body.length,
-      'Cache-Control': 'no-store',
-    });
-    res.end(body);
+    body = readFileSync(filePath);
   } catch {
-    json(res, 404, { error: 'Not found' });
+    return json(res, 404, { error: 'Not found' });
   }
+  send(res, 200, { 'Content-Type': contentType }, body);
 }
 
 
@@ -637,10 +697,15 @@ async function route(req, res, server) {
   }
 
   if (req.method === 'GET' && url.pathname === '/') {
-    const html = readFileSync(resolve(__dirname, 'install.html'));
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': html.length, 'Cache-Control': 'no-store' });
-    res.end(html);
-    return;
+    return send(res, 200, { 'Content-Type': 'text/html; charset=utf-8' }, readFileSync(resolve(__dirname, 'install.html')));
+  }
+
+  // Das App-Icon als Favicon. Ohne die Route fragte jeder Browser /favicon.ico
+  // an und bekam 404 - ein roter Eintrag in der Konsole bei jedem Laden, und
+  // im Tab stand kein Zeichen (Critique 2026-10-29). Dieselbe Datei wie die
+  // App (public/favicon.ico), read-only wie tokens.css.
+  if (req.method === 'GET' && url.pathname === '/favicon.ico') {
+    return serveStatic(res, resolve(projectRoot(), 'public', 'favicon.ico'), 'image/x-icon');
   }
 
   // App-Designtokens, read-only aus dem Repo (Phase 3: Token-Angleich).
@@ -947,6 +1012,7 @@ function postSetup(port, account) {
 
 export function createInstallerServer() {
   const server = http.createServer((req, res) => {
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
     route(req, res, server).catch(err => json(res, 500, { error: err.message }));
   });
   return server;

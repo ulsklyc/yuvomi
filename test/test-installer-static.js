@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import http from 'node:http';
+import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 
-import { createInstallerServer } from '../tools/installer/install-server.js';
+import { createInstallerServer, negotiateEncoding, SECURITY_HEADERS } from '../tools/installer/install-server.js';
 
 // Repo-Root = Verzeichnis dieser Testdatei. Die statischen Routen liefern aus
 // public/ relativ zu PROJECT_ROOT, daher zeigt OIKOS_INSTALLER_ROOT dorthin.
@@ -209,4 +211,85 @@ test('Einstellungs-Pfade in Hinweisen, Fallbacks und README gibt es in der App',
   assert.equal(seen.size, SUPPORTED_LOCALES.length, `nur ${seen.size} Sprachen mit Pfad gefunden - der Scanner greift nicht`);
   assert.ok(htmlPaths > 0 && readmeResult.paths > 0, 'keine Pfade in install.html oder README - der Scanner greift nicht');
   assert.deepEqual(problems, [], problems.join('\n'));
+});
+
+// ── Auslieferung: Kompression, Sicherheits-Header, Favicon (Critique 2026-10-29) ──
+
+/** Roher GET ohne die automatische Dekompression von fetch(). */
+function rawGet(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    http.get(url, { headers }, res => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }));
+    }).on('error', reject);
+  });
+}
+
+const HTML = readFileSync(new URL('../tools/installer/install.html', import.meta.url));
+
+test('HTML, JS und JSON gehen komprimiert raus, wenn der Browser es anbietet', async () => {
+  await withServer(async base => {
+    let r = await rawGet(`${base}/`, { 'Accept-Encoding': 'gzip, deflate, br' });
+    assert.equal(r.status, 200);
+    assert.equal(r.headers['content-encoding'], 'br', 'install.html geht ohne Brotli raus');
+    assert.match(r.headers.vary ?? '', /Accept-Encoding/i, 'ohne Vary teilt ein Cache die Fassungen');
+    assert.equal(Number(r.headers['content-length']), r.body.length);
+    assert.ok(brotliDecompressSync(r.body).equals(HTML), 'die entpackte Seite ist nicht install.html');
+    assert.ok(r.body.length < HTML.length / 3, `komprimiert ${r.body.length} von ${HTML.length} Bytes`);
+
+    r = await rawGet(`${base}/`, { 'Accept-Encoding': 'gzip' });
+    assert.equal(r.headers['content-encoding'], 'gzip');
+    assert.ok(gunzipSync(r.body).equals(HTML));
+
+    r = await rawGet(`${base}/`);
+    assert.equal(r.headers['content-encoding'], undefined, 'ohne Accept-Encoding darf nichts komprimiert sein');
+    assert.ok(r.body.equals(HTML));
+
+    for (const path of ['/i18n-mini.js', '/locales/de.json', '/api/defaults']) {
+      r = await rawGet(`${base}${path}`, { 'Accept-Encoding': 'br' });
+      assert.equal(r.status, 200, path);
+      assert.equal(r.headers['content-encoding'], 'br', `${path} geht unkomprimiert raus`);
+      const plain = await (await fetch(`${base}${path}`, { headers: { 'Accept-Encoding': 'identity' } })).arrayBuffer();
+      assert.ok(brotliDecompressSync(r.body).equals(Buffer.from(plain)), `${path}: entpackt nicht dasselbe`);
+    }
+  });
+});
+
+test('Accept-Encoding: br vor gzip, q=0 heisst nein', () => {
+  assert.equal(negotiateEncoding('gzip, deflate, br'), 'br');
+  assert.equal(negotiateEncoding('gzip'), 'gzip');
+  assert.equal(negotiateEncoding('br;q=0, gzip;q=0.8'), 'gzip');
+  assert.equal(negotiateEncoding('br;q=0, gzip;q=0'), null);
+  assert.equal(negotiateEncoding('identity'), null);
+  assert.equal(negotiateEncoding('*'), 'br');
+  assert.equal(negotiateEncoding(''), null);
+  assert.equal(negotiateEncoding(undefined), null);
+});
+
+/* Der Installer zeigt Secrets im Klartext. Jede Antwort - Seite, Skript, API,
+ * auch der 404 - verbietet Einbettung, Referrer und MIME-Raten. Eine Skript-CSP
+ * gibt es bewusst nicht: sie braeche das Inline-Skript des Wizards. */
+test('jede Antwort traegt die Sicherheits-Header, aber keine Skript-CSP', async () => {
+  await withServer(async base => {
+    for (const path of ['/', '/i18n-mini.js', '/api/defaults', '/gibt-es-nicht']) {
+      const r = await rawGet(`${base}${path}`);
+      assert.equal(r.headers['x-content-type-options'], 'nosniff', path);
+      assert.equal(r.headers['referrer-policy'], 'no-referrer', path);
+      assert.equal(r.headers['x-frame-options'], 'DENY', path);
+      assert.equal(r.headers['content-security-policy'], "frame-ancestors 'none'", path);
+    }
+  });
+  assert.doesNotMatch(SECURITY_HEADERS['Content-Security-Policy'], /script-src|default-src/,
+    'eine Skript-CSP braeche das Inline-Skript von install.html');
+});
+
+test('GET /favicon.ico liefert das App-Icon, und die Seite verweist darauf', async () => {
+  await withServer(async base => {
+    const r = await rawGet(`${base}/favicon.ico`);
+    assert.equal(r.status, 200, 'favicon.ico fehlt - jeder Aufruf erzeugt einen 404 in der Konsole');
+    assert.equal(r.headers['content-type'], 'image/x-icon');
+    assert.ok(r.body.equals(readFileSync(new URL('../public/favicon.ico', import.meta.url))), 'nicht das Icon der App');
+  });
+  assert.match(HTML.toString('utf8'), /<link rel="icon" href="\/favicon\.ico"/);
 });

@@ -5,6 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title data-i18n="title">Yuvomi Setup</title>
   <meta name="description" content="Set up your self-hosted Yuvomi family planner: server, security keys, integrations and the first admin account.">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <!-- Die Module und die Fallback-Locale stehen sonst erst am Ende von 270 KB
+       Markup im Blick des Browsers: das Modul-Script am Body-Ende wird erst
+       nach dem Parsen entdeckt, seine Importe danach, die Locales erst nach
+       den Importen - eine Kette aus vier Roundtrips. Vorab geladen startet
+       alles mit dem ersten Byte. en.json braucht jeder Lauf (Fallback); die
+       Ziel-Locale kennt erst resolveLocale(). crossorigin am Fetch-Preload
+       passt zum Modus von fetch() - ohne laedt der Browser die Datei doppelt. -->
+  <link rel="modulepreload" href="/i18n-mini.js">
+  <link rel="modulepreload" href="/rerun-prefill.js">
+  <link rel="modulepreload" href="/field-checks.js">
+  <link rel="preload" href="/locales/en.json" as="fetch" crossorigin>
+  <!-- Verhuellt, bis die Sprache steht (Critique 2026-10-29: rund 440 ms
+       Englisch bzw. leere Huelle vor dem lokalisierten Einstieg). Die Klasse
+       setzt NUR dieses Skript: ohne JavaScript bleibt die Seite sichtbar. Das
+       Modul nimmt sie nach dem ersten Bild ab (Ende des Modul-Skripts); haengt oder
+       scheitert es, nimmt der Zeitgeber sie ab - ein Installer, der wegen
+       eines Ladefehlers leer bleibt, waere schlimmer als einer in Englisch.
+       Ein Skriptfehler oder eine nicht ladbare Datei (Modul, Stylesheet)
+       hebt sie sofort auf. -->
+  <script>
+    (function () {
+      var root = document.documentElement;
+      var reveal = function () { root.classList.remove('i18n-pending'); };
+      root.classList.add('i18n-pending');
+      setTimeout(reveal, 1200);
+      window.addEventListener('error', reveal, { capture: true, once: true });
+      window.addEventListener('unhandledrejection', reveal, { once: true });
+    })();
+  </script>
   <!-- Fallback-Tokens VOR dem tokens.css-Link: lädt tokens.css (inkl. Dark-Mode-
        Media-Query), gewinnen dessen spätere :root-Regeln per Cascade. Fehlt
        tokens.css (falscher OIKOS_INSTALLER_ROOT, Packaging-/Volume-Fehler), bleibt
@@ -131,6 +161,9 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     [hidden] { display: none !important; }
+    /* Siehe das Skript im Kopf: verhuellt, nicht entfernt - das Layout steht
+       schon, nur das Bild wartet auf die Sprache. */
+    html.i18n-pending body { visibility: hidden; }
     /* Die Fussleiste schwebt ueber dem Inhalt (sticky, 73px). Ohne diesen Rand
        hielt der Browser ein Feld fuer "sichtbar", das unter ihr lag - Fokus per
        Tab, reveal() nach einem Fehler und aufgeklappte Akkordeons endeten
@@ -490,7 +523,40 @@
     .group-edit:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
     .field { margin-bottom: 18px; }
-    .field label { display: block; font-size: var(--text-sm); font-weight: 600; margin-bottom: 6px; }
+    .field label, .field-label { display: block; font-size: var(--text-sm); font-weight: 600; margin-bottom: 6px; }
+    /* ── Segment: die Umschaltleiste der App (public/styles/panel.css) ───────
+       Nachgebaut, nicht importiert (Einzeldatei). Well mit 1px-Rand, darin
+       gleich breite Segmente; die Wahl ist die erhabene Surface-Pille der App.
+       Ein Segment ist ein <label> um ein natives Radio: die ganze Flaeche ist
+       Ziel (44px wie --target-base der App), das Radio bleibt im Fokus-Weg und
+       traegt den Ring an seinem Segment. Anders als in der App duerfen die
+       Beschriftungen umbrechen: zwei Segmente teilen sich die Feldbreite, und
+       "Proxy inverso (HTTPS)" passt bei 390px nicht in eine halbe Zeile. */
+    .segmented {
+      display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; gap: 4px;
+      padding: 2px; border: 1px solid var(--color-border); border-radius: var(--radius-md);
+      background: var(--color-surface-3, var(--color-bg));
+    }
+    .field .segmented__item {
+      position: relative; display: flex; align-items: center; justify-content: center;
+      min-height: 44px; padding: 6px 12px; margin: 0;
+      border-radius: var(--radius-sm);
+      font-size: var(--text-sm); font-weight: 500; line-height: 1.25; text-align: center;
+      color: var(--color-text-secondary); cursor: pointer;
+      transition: background-color var(--duration-sm) var(--ease-out), color var(--duration-sm) var(--ease-out);
+    }
+    .segmented__item:hover:not(:has(input:checked)) { color: var(--color-text-primary); }
+    .segmented__item input {
+      position: absolute; width: 1px; height: 1px; margin: 0;
+      overflow: hidden; clip: rect(0, 0, 0, 0); opacity: 0;
+    }
+    .segmented__item:has(input:checked) {
+      background: var(--seg-active-bg, var(--color-surface));
+      box-shadow: var(--seg-active-shadow, var(--shadow-sm));
+      color: var(--color-text-primary); font-weight: 600;
+    }
+    .segmented__item:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    .segmented[aria-invalid="true"] { border-color: var(--color-danger); }
     /* ── Schalter: die Boolean-Einstellung der App ───────────────────────────
        Komponenten-Kanon (DESIGN.md, "Boolean in den Einstellungen"): ein
        Schalter wie in Apples Einstellungen, Label links, Zustand rechts. Die
@@ -909,9 +975,9 @@
     }
     .rv-row dt { color: var(--color-text-secondary); }
     .rv-row dd { overflow-wrap: anywhere; }
-    /* Die EINE Zeile fuer alles, was nicht eingerichtet ist - statt fuenf
-       Zeilen mit einem Strich. Leiser als die Werte darueber: sie meldet eine
-       Abwesenheit, keine Entscheidung. */
+    /* "Nicht eingerichtet" in der Wertspalte der eigenen Zeile - statt eines
+       Strichs. Leiser als gesetzte Werte: es meldet eine Abwesenheit, keine
+       Entscheidung. */
     .rv-row--unset dd { color: var(--color-text-secondary); }
     .done-wrap   { text-align: center; padding: 20px 0 8px; }
     /* Der Abschluss trug ein 🎉-Systemsemoji: der einzige Bildinhalt der ganzen
@@ -1115,6 +1181,9 @@
        dasselbe Zeichen wie der Schirm daneben, nur kleiner und leiser. */
     .steps-nav__item[data-run="running"] .steps-nav__mark {
       background: none; box-shadow: inset 0 0 0 2px var(--color-border);
+      /* Die Ziffer steht im drehenden Ring - ohne Flaeche dahinter in
+         Primaertext, das Weiss des aktuellen Eintrags verschwaende. */
+      color: var(--color-text-primary);
     }
     .steps-nav__item[data-run="running"] .steps-nav__mark::after {
       content: ''; position: absolute; inset: 0; border-radius: inherit;
@@ -1124,6 +1193,7 @@
     /* Gescheitert: das Kreuz der Checkliste auf Danger-Toenung. */
     .steps-nav__item[data-run="failed"] .steps-nav__mark {
       box-shadow: none; background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+      font-size: 0;
     }
     .steps-nav__item[data-run="failed"] .steps-nav__mark::before {
       content: ''; width: 12px; height: 12px; background: var(--color-danger);
@@ -1286,9 +1356,9 @@
       <li class="steps-nav__item" data-nav-step="storage" hidden><button type="button" class="steps-nav__link" data-goto="storage" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="storage.title">Storage &amp; backups</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
       <li class="steps-nav__item" data-nav-step="advanced" hidden><button type="button" class="steps-nav__link" data-goto="advanced" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="advanced.title">Advanced Settings</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
       <li class="steps-nav__item" data-nav-step="review" hidden><button type="button" class="steps-nav__link" data-goto="review" disabled><span class="steps-nav__mark" aria-hidden="true"></span><span data-i18n="review.title">Review</span><span class="vh steps-nav__done" data-i18n="common.stepDone">(done)</span></button></li>
-      <!-- Der Containerstart hat keine Nummer (er fragt nichts), aber einen
-           Platz in der Liste: ohne ihn stand die Liste waehrend des laengsten
-           Wartens ohne aktuellen Eintrag da, und niemand wusste, wo er ist.
+      <!-- Der Containerstart ist ein nummerierter Schritt wie jeder andere:
+           ohne ihn stand die Liste waehrend des laengsten Wartens ohne
+           aktuellen Eintrag da, und niemand wusste, wo er ist.
            Kein Knopf: zurueck auf einen laufenden oder fertigen Start fuehrt
            nichts. renderStepNav() setzt data-run (running/ok/failed), solange
            sein Schirm steht; "(fehlgeschlagen)" sagt nur der Screenreader. -->
@@ -1480,13 +1550,22 @@
              Die Locale-Schluessel behalten ihr advanced.*-Praefix. -->
         <div class="group-label" data-i18n="review.access">Access</div>
         <div class="inset-group">
+        <!-- Zwei Antworten auf eine Frage: das Segment der App (.segmented,
+             public/styles/panel.css), kein Select. Bis 2026-10-29 stand hier ein
+             <select> mit zwei Optionen - eine Wahl, die man erst aufklappen
+             musste, um zu sehen, dass es nur zwei gibt (Critique 2026-10-29).
+             Native Radios statt role="radio"-Knoepfen: Pfeiltasten, Tab-Halt auf
+             der Wahl und die Spiegelung in RTL bringt der Browser mit. Die
+             Gruppe ist der Traeger von id="adv-proxy" und spricht nach aussen
+             wie das Select davor (value, change, focus) - siehe
+             segmentedAsField() im Skript. -->
         <div class="field">
-          <label for="adv-proxy" data-i18n="advanced.proxyLabel">How is Yuvomi exposed?</label>
-          <select id="adv-proxy">
-            <option value="proxy" data-i18n="advanced.proxyBehindHttps">Behind a reverse proxy with HTTPS (Caddy, nginx, Traefik)</option>
-            <option value="direct" data-i18n="advanced.proxyDirect">Direct access over localhost / HTTP</option>
-          </select>
-          <div class="hint" data-i18n="advanced.proxyHint">Pick "Direct access" if you open Yuvomi over http:// - otherwise you cannot sign in. Behind a reverse proxy with HTTPS, pick the first option.</div>
+          <div class="field-label" id="adv-proxy-label" data-i18n="advanced.proxyLabel">How is Yuvomi exposed?</div>
+          <div class="segmented" id="adv-proxy" role="radiogroup" aria-labelledby="adv-proxy-label" aria-describedby="adv-proxy-hint" data-describedby="adv-proxy-hint">
+            <label class="segmented__item"><input type="radio" name="adv-proxy" value="proxy" checked><span data-i18n="review.accessProxy">Reverse proxy (HTTPS)</span></label>
+            <label class="segmented__item"><input type="radio" name="adv-proxy" value="direct"><span data-i18n="review.accessDirect">Direct / HTTP</span></label>
+          </div>
+          <div class="hint" id="adv-proxy-hint" data-i18n="advanced.proxyHint">Pick "Direct / HTTP" if you open Yuvomi over http:// - otherwise you cannot sign in. Behind a reverse proxy with HTTPS, pick the first option.</div>
         </div>
         <!-- BASE_URL wurde bisher aus Schema, Host und Port abgeleitet. Hinter
              einem Reverse-Proxy stimmt das nie: die öffentliche Adresse ist
@@ -2068,13 +2147,17 @@
              weil sie technisch an verschiedenen Feldern haengen. Die Pruefseite fasst
              sie laengst zu einer Zeile zusammen und begruendet das dort auch; was sie
              als eine Auskunft zeigt, wird hier als eine Frage gestellt. -->
-        <div class="group-label" data-i18n="advanced.sectionPrivateNetwork">Access to your home network</div>
-        <p class="group-note" data-i18n="advanced.privateNetworkHint">Yuvomi refuses connections to addresses on your own network by default, which protects against a server being tricked into reaching internal services. Enable what you actually run at home.</p>
+        <div class="group-label" id="adv-pn-label" data-i18n="advanced.sectionPrivateNetwork">Access to your home network</div>
+        <p class="group-note" id="adv-pn-note" data-i18n="advanced.privateNetworkHint">Yuvomi refuses connections to addresses on your own network by default, which protects against a server being tricked into reaching internal services. Enable what you actually run at home.</p>
         <!-- Die drei Einzel-Hints lagen fertig uebersetzt in allen 24 Locales,
              wurden aber nie gerendert - dabei tragen genau sie die Anker
              (Mealie, Tandoor, Nextcloud), an denen ein Erstinstallierer erkennt,
              ob ihn die Freigabe betrifft. -->
-        <div class="inset-group">
+        <!-- Eine benannte Gruppe, nicht nur eine Ueberschrift darueber: die vier
+             Schalter heben einen Schutz auf (SSRF), und wer sie per Tab erreicht,
+             hoert beim Eintritt "Zugriff auf dein Heimnetz, Gruppe" samt der
+             Warnung darueber - nicht nur "Kalender-Abos ... erlauben, Schalter". -->
+        <div class="inset-group" role="group" aria-labelledby="adv-pn-label" aria-describedby="adv-pn-note">
         <div class="field">
           <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.icsPrivateNetwork">Allow calendar subscriptions from your home network</span><span class="toggle"><input type="checkbox" role="switch" id="adv-ics-private"><span class="toggle__track" aria-hidden="true"></span></span></label>
           <div class="hint" data-i18n="advanced.icsPrivateNetworkHint">Needed for ICS feeds from devices on your own network. Lifts the SSRF protection for calendar subscriptions.</div>
@@ -2093,11 +2176,11 @@
         </div>
         </div>
 
-        <div class="group-label" data-i18n="advanced.sectionMore">More options</div>
+        <div class="group-label" id="adv-more-label" data-i18n="advanced.sectionMore">More options</div>
         <!-- Stand hart auf 15 im Code und wurde bei jedem weiteren Lauf wieder
              auf 15 zurückgeschrieben - wer wegen iCloud-Ratenbegrenzung auf 60
              gestellt hatte, verlor die Einstellung stillschweigend. -->
-        <div class="inset-group">
+        <div class="inset-group" role="group" aria-labelledby="adv-more-label">
         <div class="field">
           <label for="adv-sync-interval" data-i18n="advanced.syncIntervalLabel">Calendar sync interval (minutes)</label>
           <input type="number" id="adv-sync-interval" min="5" max="1440" step="5" placeholder="15">
@@ -2143,7 +2226,8 @@
         <!-- Gruppiert nach den Schritten, aus denen die Werte kommen - jede Gruppe
              mit einem Weg zurueck. Vorher standen 20 Zeilen ungegliedert
              untereinander, 11 davon mit einem Strich (Critique 2026-09-29).
-             Was nicht eingerichtet ist, steht je Gruppe in EINER Zeile.
+             Was nicht eingerichtet ist, behaelt seine Zeile und sagt es in der
+             Wertspalte (siehe fillReviewGroup).
              "Aendern" fuehrt zum ersten Schritt der Gruppe; "Weiter" fuehrt nach
              ihrem letzten zurueck hierher, die Schritte dazwischen pruefen sich
              dabei erneut (siehe next()). Die Werte setzt renderReview(). -->
@@ -2191,7 +2275,6 @@
             <div class="rv-row"><dt data-i18n="review.outlook">Outlook Calendar</dt><dd id="rv-outlook"></dd></div>
             <div class="rv-row"><dt data-i18n="review.apple">Apple CalDAV</dt><dd id="rv-apple"></dd></div>
             <div class="rv-row"><dt data-i18n="review.email">Email</dt><dd id="rv-email"></dd></div>
-            <div class="rv-row rv-row--unset"><dt data-i18n="review.notSetUp">Not set up</dt><dd id="rv-integrations-unset"></dd></div>
           </dl>
         </section>
         <section class="rv-group" aria-labelledby="rvg-storage">
@@ -2208,7 +2291,6 @@
             <div class="rv-row"><dt data-i18n="review.documentLocal">Local documents</dt><dd id="rv-document-local"></dd></div>
             <div class="rv-row"><dt data-i18n="review.documentWebdav">WebDAV documents</dt><dd id="rv-document-webdav"></dd></div>
             <div class="rv-row"><dt data-i18n="review.documentGoogleDrive">Google Drive documents</dt><dd id="rv-document-google-drive"></dd></div>
-            <div class="rv-row rv-row--unset"><dt data-i18n="review.notSetUp">Not set up</dt><dd id="rv-storage-unset"></dd></div>
           </dl>
         </section>
         <section class="rv-group" aria-labelledby="rvg-advanced">
@@ -2222,7 +2304,6 @@
                  sicherheitsrelevanten Schalter auslaesst, prueft das Falsche. -->
             <div class="rv-row"><dt data-i18n="review.privateNetwork">Private-network access</dt><dd id="rv-private-network"></dd></div>
             <div class="rv-row"><dt data-i18n="review.moduleWebInstall">Install modules from Settings</dt><dd id="rv-module-web-install"></dd></div>
-            <div class="rv-row rv-row--unset"><dt data-i18n="review.notSetUp">Not set up</dt><dd id="rv-advanced-unset"></dd></div>
           </dl>
         </section>
         <div class="error-banner" id="rev-err" role="alert"></div>
@@ -2512,6 +2593,26 @@ import {
 
 const $ = id => document.getElementById(id);
 
+/**
+ * Eine Radiogruppe (.segmented) spricht nach aussen wie das <select>, das sie
+ * ersetzt: `value` liest und setzt die Wahl, `focus()` landet auf dem
+ * gewaehlten Radio. So bleiben alle Leser unveraendert - plannedOrigin,
+ * cfg-next, die Rerun-Vorbelegung (applyRerunPrefill setzt `el.value`) und
+ * fail(), das ein Feld per id fokussiert. input/change der Radios steigen zur
+ * Gruppe auf, ihre Listener bleiben also an der Gruppe.
+ */
+function segmentedAsField(group) {
+  const radios = () => [...group.querySelectorAll('input[type="radio"]')];
+  Object.defineProperty(group, 'value', {
+    configurable: true,
+    get: () => radios().find(r => r.checked)?.value ?? '',
+    set: v => { for (const r of radios()) r.checked = r.value === v; },
+  });
+  group.focus = opts => (radios().find(r => r.checked) || radios()[0])?.focus(opts);
+  return group;
+}
+segmentedAsField($('adv-proxy'));
+
 // Gespeicherte Sprache > Browser-Sprache erkennen, Übersetzungen laden und ins
 // Markup einsetzen, bevor die UI sichtbar interagiert. Setzt lang/dir am <html>.
 await initInstallerI18n();
@@ -2523,13 +2624,17 @@ const FLOWS = {
   advanced: ['welcome', 'config', 'secrets', 'weather', 'calendar', 'email', 'storage', 'advanced', 'review', 'docker', 'admin', 'done'],
 };
 const ALL_STEPS = ['welcome','simple','config','secrets','weather','calendar','email','storage','advanced','review','docker','admin','done'];
-// Diese Schritte tragen bewusst keine „Schritt N von M"-Nummer: Einstieg,
-// der reine Docker-Wartebildschirm (keine Eingabe) und der Abschluss.
-// 'advanced' stand hier als "optionaler Sammel-Schritt" - er war damit der
-// groesste Bildschirm der Reise UND der einzige ohne Fortschrittsangabe. Seit
-// der Teilung in Speicher und Erweitert ist er weder Sammelbecken noch
-// Ausnahme.
-const UNNUMBERED = new Set(['welcome', 'docker', 'done']);
+// Diese Schritte tragen bewusst keine „Schritt N von M"-Nummer: Einstieg und
+// Abschluss. 'advanced' stand hier als "optionaler Sammel-Schritt" - er war
+// damit der groesste Bildschirm der Reise UND der einzige ohne
+// Fortschrittsangabe. Seit der Teilung in Speicher und Erweitert ist er weder
+// Sammelbecken noch Ausnahme.
+// 'docker' stand bis zur Critique 2026-10-29 ebenfalls hier ("fragt nichts").
+// Die Liste zeigte ihn trotzdem als eigenen Eintrag - mit leerem Ring zwischen
+// zwei Ziffern ("8, o, 9"), und der Zaehler sagte "Schritt 8 von 9" bei zehn
+// Eintraegen, im Einfach-Weg "1 von 2" bei dreien. Was in der Liste steht,
+// zaehlt jetzt auch: Rail und Zaehler rechnen mit derselben Menge.
+const UNNUMBERED = new Set(['welcome', 'done']);
 
 let flow = FLOWS.advanced;
 let mode = 'advanced';
@@ -2654,10 +2759,9 @@ function localize() {
  * Schirme (Einstieg, Docker, Abschluss mitgezaehlt), der Zaehler durch die
  * nummerierten - "Schritt 1 von 9" stand bei 9 %, "2 von 2" bei 75 %.
  * Unnummerierte Schirme liegen zwischen ihren Nachbarn: der Einstieg bei 0,
- * der Abschluss bei m, der Docker-Schirm auf halbem Weg zwischen dem Schritt
- * davor und dem danach. Er fragt nichts und traegt deshalb keine Nummer, aber
- * er ist ein Stueck des Weges - der Balken rueckt waehrend des Wartens vor,
- * statt auf dem Stand der Pruefseite stehen zu bleiben.
+ * der Abschluss bei m. Ein unnummerierter Schirm mitten im Weg laege auf
+ * halbem Weg zwischen dem Schritt davor und dem danach (so stand bis
+ * 2026-10-29 der Docker-Schirm da; seitdem traegt er eine Nummer).
  */
 function stepPosition(name) {
   const nums = flow.filter(s => !UNNUMBERED.has(s));
@@ -3104,25 +3208,41 @@ function showStep(n, { animate = true } = {}) {
   const swap = ++stepSwap;
   // Ein ueberholter Wechsel zeichnet nicht mehr: sein Rueckruf kaeme nach dem
   // juengsten und risse Fokus und Scrollstand an sich.
-  swapStep(() => { if (swap === stepSwap) renderStep(); }, dir, animate && dir !== '');
+  swapStep(() => { if (swap === stepSwap) renderStep(); }, dir, animate && dir !== '',
+    () => { if (swap === stepSwap) focusStep(); });
   onEnterStep(flow[n]);
 }
 
 /**
- * Das Bild des aktuellen Schritts: aktiver Schritt, Layout, Schrittliste,
- * Scrollstand, Fokus. Liest nur den Zustand, deshalb gleich, wann es laeuft.
+ * Das Bild des aktuellen Schritts: Scrollstand, aktiver Schritt, Layout,
+ * Schrittliste. Liest nur den Zustand, deshalb gleich, wann es laeuft.
+ *
+ * Der Fokus steht NICHT mehr hier (focusStep): renderStep ist der Rueckruf der
+ * View Transition, und focus() auf der neuen H2 erzwang dort ein synchrones
+ * Layout des ganzen neuen Schritts, bevor der Browser es ohnehin rechnet
+ * (gemessen 42 ms bei 4x CPU, Critique 2026-10-29). Gescrollt wird ZUERST:
+ * dann ist das Layout noch das des alten, schon gerechneten Bildes, und
+ * scrollTo kostet keinen Layoutlauf - danach erst die Klassen.
  */
 function renderStep() {
   const active = flow[currentStep];
+  window.scrollTo(0, 0);
   ALL_STEPS.forEach(name => {
     const el = $(`step-${name}`);
     if (el) el.classList.toggle('active', name === active);
   });
   $('shell').classList.toggle('shell--solo', SOLO_STEPS.has(active));
   renderStepNav();
-  window.scrollTo(0, 0);
-  // Fokus auf die Überschrift des neuen Schritts, damit Tastatur-/Screenreader-
-  // Nutzer der Navigation folgen (WCAG 2.4.3). preventScroll verhindert Sprünge.
+}
+
+/**
+ * Fokus auf die Überschrift des aktuellen Schritts, damit Tastatur-/
+ * Screenreader-Nutzer der Navigation folgen (WCAG 2.4.3). preventScroll
+ * verhindert Sprünge. Laeuft nach renderStep - mit View Transition erst, wenn
+ * der Browser das neue Bild aufgenommen hat (swapStep), das Layout also steht.
+ */
+function focusStep() {
+  const active = flow[currentStep];
   const heading = $(`step-${active}`)?.querySelector('h1, h2');
   if (heading) {
     // Der Schrittzaehler steht im DOM VOR der fokussierten H2 und wurde beim
@@ -3158,7 +3278,7 @@ let stepTransition = null;
  * kein Fehler. Ohne View Transition laeuft `update` sofort, und die CSS-
  * Animation am neuen Schritt traegt die Richtung (data-step-dir).
  */
-function swapStep(update, dir, animate) {
+function swapStep(update, dir, animate, settle = null) {
   const root = document.documentElement;
   if (!animate || !canViewTransition()) {
     // Eine noch laufende Transition gehoert zu einem ueberholten Wechsel.
@@ -3168,6 +3288,7 @@ function swapStep(update, dir, animate) {
     if (dir) root.dataset.stepDir = dir;
     else delete root.dataset.stepDir;
     update();
+    settle?.();
     return;
   }
   // VOR startViewTransition: der Browser nimmt das alte Bild gleich danach auf,
@@ -3179,6 +3300,13 @@ function swapStep(update, dir, animate) {
   // `ready` lehnt ab, wenn der Browser die Transition verwirft - der Tausch
   // selbst laeuft trotzdem.
   transition.ready.catch(() => {});
+  // `settle` (Fokus) erst nach dem Tausch UND der Aufnahme des neuen Bildes:
+  // dann ist das Layout gerechnet, und focus() erzwingt keins mehr. Verworfen
+  // laeuft er nach dem Tausch; scheitert schon der Tausch, gibt es nichts zu
+  // fokussieren.
+  transition.updateCallbackDone
+    .then(() => transition.ready.catch(() => {}))
+    .then(() => settle?.(), () => {});
   // Waehrend der Blende trifft Chromium jeden Zeiger nur auf <html>; der erste
   // Tipp beendet sie, damit der naechste die Seite erreicht (swapPage der App).
   const skipOnTap = () => transition.skipTransition();
@@ -3249,8 +3377,8 @@ function renderStepNav() {
     if (idx === -1) return;
     const state = idx === currentStep ? 'current' : idx < currentStep ? 'done' : 'upcoming';
     item.dataset.state = state;
-    // Der Docker-Eintrag traegt keine Ziffer: sein Ring bleibt leer, solange
-    // er kommt, und zeigt waehrend seines Schirms den Ausgang des Starts.
+    // Jeder Eintrag traegt die Ziffer seines Zaehlers. Der Docker-Eintrag
+    // zeigt waehrend seines Schirms zusaetzlich den Ausgang des Starts.
     const pos = nums.indexOf(name);
     item.querySelector('.steps-nav__mark').textContent = pos === -1 ? '' : String(pos + 1);
     if (name === 'docker' && state === 'current') {
@@ -3571,7 +3699,8 @@ function clearInvalid(root = document) {
 // sagt weiter "ungueltig". Das Banner bleibt stehen, bis erneut geprueft wird;
 // ob die Korrektur stimmt, weiss erst die Pruefung beim Absenden.
 function clearFieldInvalid(e) {
-  const el = e.target;
+  // Ein Radio meldet sich, markiert ist aber seine Gruppe (.segmented).
+  const el = e.target?.closest?.('[role="radiogroup"]') || e.target;
   if (el.getAttribute?.('aria-invalid') !== 'true') return;
   el.removeAttribute('aria-invalid');
   // Das Banner geht, der eigene Hinweis (z. B. die Mindestlaenge) bleibt.
@@ -4008,8 +4137,8 @@ function refreshPlannedOrigin() {
 // „oeffentlicher Host, bewusst auf Direktzugriff": zurueckgesetzt auf `proxy`
 // heisst SESSION_SECURE=true, und der Widerspruchs-Riegel greift nicht, weil die
 // abgeleitete Adresse dann https:// ist.
-$('adv-proxy').addEventListener('input', e => { e.target.dataset.touched = '1'; });
-$('adv-proxy').addEventListener('change', e => { e.target.dataset.touched = '1'; });
+$('adv-proxy').addEventListener('input', e => { e.currentTarget.dataset.touched = '1'; });
+$('adv-proxy').addEventListener('change', e => { e.currentTarget.dataset.touched = '1'; });
 
 for (const id of ['adv-proxy', 'cfg-host', 'cfg-port']) {
   $(id).addEventListener('input', refreshPlannedOrigin);
@@ -4215,10 +4344,9 @@ $('adv-next').addEventListener('click', () => {
  */
 function renderReview() {
   const setUp = t('common.setUp');
-  // Kein Wert zeigt je "-": was nicht eingerichtet ist, verschwindet aus seiner
-  // Zeile und steht stattdessen in der EINEN Zeile "Nicht eingerichtet" seiner
-  // Gruppe. Wo ein leerer Wert einen Default bedeutet, steht der Default.
-  fillReviewGroup(null, [
+  // Kein Wert zeigt je "-": was nicht eingerichtet ist, sagt es in seiner
+  // eigenen Zeile. Wo ein leerer Wert einen Default bedeutet, steht der Default.
+  fillReviewGroup([
     ['rv-host', S.host],
     ['rv-port', S.port],
     ['rv-tz', S.tz],
@@ -4227,16 +4355,16 @@ function renderReview() {
   ]);
   // Was mit den Schlüsseln geschieht, nicht wie sie aussehen. preservedKeys
   // kennt die Antwort schon, seit der Preflight sie meldet.
-  fillReviewGroup(null, [['rv-session-secret', 'SESSION_SECRET'], ['rv-db-key', 'DB_ENCRYPTION_KEY']]
+  fillReviewGroup([['rv-session-secret', 'SESSION_SECRET'], ['rv-db-key', 'DB_ENCRYPTION_KEY']]
     .map(([id, key]) => [id, t(preservedKeys.has(key) ? 'review.keyPreserved' : 'review.keyGenerated')]));
-  fillReviewGroup('rv-integrations-unset', [
+  fillReviewGroup([
     ['rv-weather', S.WEATHER_LAT ? (S.WEATHER_CITY || `${S.WEATHER_LAT}, ${S.WEATHER_LON}`) : ''],
     ['rv-google', S.GOOGLE_CLIENT_ID ? setUp : ''],
     ['rv-outlook', S.MS_CLIENT_ID ? setUp : ''],
     ['rv-apple', S.APPLE_USERNAME],
     ['rv-email', S.EMAIL_SMTP_HOST ? (S.EMAIL_FROM_ADDRESS || setUp) : ''],
   ]);
-  fillReviewGroup('rv-storage-unset', [
+  fillReviewGroup([
     ['rv-data-dir', S.DATA_DIR || './data'],
     ['rv-backups', S.BACKUP_ENABLED === 'false' ? t('review.off') : t('review.on')],
     ['rv-webdav-backup', S.WEBDAV_BACKUP_ENABLED === 'true' ? (S.WEBDAV_BACKUP_URL || setUp) : ''],
@@ -4258,7 +4386,7 @@ function renderReview() {
     S.WASTE_SOURCE_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkWaste'),
     S.DOCUMENT_STORAGE_WEBDAV_ALLOW_PRIVATE_NETWORK === 'true' && t('review.privateNetworkWebdav'),
   ].filter(Boolean);
-  fillReviewGroup('rv-advanced-unset', [
+  fillReviewGroup([
     ['rv-oidc', S.OIDC_ISSUER ? setUp : ''],
     ['rv-private-network', privateNet.length ? privateNet.join(', ') : t('review.off')],
     // Wie die Heimnetz-Zeile immer da, auch mit "Aus": ein Schalter, der
@@ -4268,22 +4396,20 @@ function renderReview() {
 }
 
 /**
- * Eine Gruppe der Pruefseite fuellen. Leere Werte blenden ihre Zeile aus und
- * sammeln deren Beschriftung (das schon uebersetzte <dt>) in der Zeile
- * `unsetId`; die verschwindet, wenn alles eingerichtet ist.
+ * Eine Gruppe der Pruefseite fuellen. Ein leerer Wert behaelt seine Zeile und
+ * zeigt "Nicht eingerichtet" in der WERTspalte, gedaempft (.rv-row--unset).
+ * Bis 2026-10-29 sammelte je Gruppe EINE Zeile die Namen alles Fehlenden -
+ * "Nicht eingerichtet" stand dort in der Beschriftungsspalte und die Dienste
+ * in der Wertspalte: Schluessel und Wert vertauscht, und das Auge las
+ * "Nicht eingerichtet: Google, Outlook" als eine Einstellung mit zwei Werten
+ * (Critique 2026-10-29).
  */
-function fillReviewGroup(unsetId, rows) {
-  const unset = [];
+function fillReviewGroup(rows) {
   for (const [id, value] of rows) {
     const cell = $(id);
-    cell.textContent = value || '';
-    cell.parentElement.hidden = !value;
-    if (!value) unset.push(cell.previousElementSibling.textContent.trim());
+    cell.textContent = value || t('review.notSetUp');
+    cell.parentElement.classList.toggle('rv-row--unset', !value);
   }
-  if (!unsetId) return;
-  const cell = $(unsetId);
-  cell.textContent = unset.join(', ');
-  cell.parentElement.hidden = unset.length === 0;
 }
 
 $('rev-next').addEventListener('click', async () => {
@@ -4758,6 +4884,8 @@ window.addEventListener('beforeunload', e => {
 });
 
 showStep(0);
+// Das erste Bild steht in der richtigen Sprache: jetzt sichtbar machen.
+document.documentElement.classList.remove('i18n-pending');
 </script>
 </body>
 </html>

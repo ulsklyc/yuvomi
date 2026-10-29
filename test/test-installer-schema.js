@@ -376,7 +376,12 @@ function fieldSources() {
   const body = script.match(/function buildEnv\(\)\s*\{\s*return\s*\{([\s\S]*?)\n\s*\};/);
   assert.ok(body, 'buildEnv() in install.html nicht gefunden');
   const pairs = [...body[1].matchAll(/\b([A-Z][A-Z0-9_]*)\s*:\s*S\.(\w+)/g)].map(m => [m[1], m[2]]);
-  const controls = new Set([...html.matchAll(/<(?:input|select|textarea)\b[^>]*\bid="([^"]+)"/g)].map(m => m[1]));
+  // Steuernde Felder: Eingabeelemente und Radiogruppen (das Segment fuer den
+  // Zugriff, #adv-proxy, ist seit 2026-10-29 eine Gruppe nativer Radios).
+  const controls = new Set([
+    ...[...html.matchAll(/<(?:input|select|textarea)\b[^>]*\bid="([^"]+)"/g)].map(m => m[1]),
+    ...[...html.matchAll(/<div\b[^>]*\bid="([^"]+)"[^>]*\brole="radiogroup"/g)].map(m => m[1]),
+  ]);
   const esc = str => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const all = re => [...script.matchAll(re)].map(m => m[1]);
   const expand = (expr, depth, seen) => {

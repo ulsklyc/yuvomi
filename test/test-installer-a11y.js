@@ -1030,9 +1030,9 @@ test('die Schrittliste folgt dem Weg: erledigt anklickbar, aktuell markiert, kom
   const UNNUMBERED = literal('UNNUMBERED');
   const numbered = new Set([...FLOWS.simple, ...FLOWS.advanced].filter(s => !UNNUMBERED.has(s)));
   const navItems = [...html.matchAll(/<li class="steps-nav__item" data-nav-step="([a-z]+)"[^>]*>(.*?)<\/li>/g)];
-  // Dazu der Containerstart: ohne Nummer, aber mit Platz (eigener Test unten).
-  assert.deepEqual(new Set(navItems.map(m => m[1])), new Set([...numbered, 'docker']), 'die Liste fuehrt andere Schritte als die Wege');
-  for (const m of navItems.filter(i => numbered.has(i[1]))) {
+  assert.deepEqual(new Set(navItems.map(m => m[1])), numbered, 'die Liste fuehrt andere Schritte als die Wege');
+  // Der Containerstart ist kein Knopf (eigener Test unten).
+  for (const m of navItems.filter(i => i[1] !== 'docker')) {
     assert.match(m[2], new RegExp(`<button type="button" class="steps-nav__link" data-goto="${m[1]}"`),
       `Eintrag ${m[1]} ist kein Knopf mit data-goto`);
   }
@@ -1043,7 +1043,7 @@ test('die Schrittliste folgt dem Weg: erledigt anklickbar, aktuell markiert, kom
   assert.match(fnSource('renderStep'), /renderStepNav\(\)/, 'renderStep aktualisiert die Liste nicht');
 
   const run = (flow, currentStep, dockerOutcome = null) => {
-    const items = navFakes([...numbered, 'docker']);
+    const items = navFakes([...numbered]);
     const document = { querySelectorAll: () => items };
     new Function('flow', 'currentStep', 'UNNUMBERED', 'dockerOutcome', 'document', `${fnSource('renderStepNav')}; renderStepNav();`)(
       flow, currentStep, UNNUMBERED, dockerOutcome, document);
@@ -1150,8 +1150,8 @@ test('der Rueckweg zur Pruefseite prueft jeden Schritt dazwischen erneut', () =>
 /* Die Pruefseite: nach Schritten gruppiert, jede Gruppe mit "Aendern", und KEINE
  * nackte "-"-Zeile mehr. Vorher 20 ungegliederte Zeilen, 11 davon mit Strich
  * (Critique 2026-09-29). renderReview wird mit leerem und mit vollem Zustand
- * AUSGEFUEHRT: jede sichtbare Zeile traegt einen Wert, was fehlt, steht je
- * Gruppe in EINER Zeile "Nicht eingerichtet". */
+ * AUSGEFUEHRT: jede Zeile traegt einen Wert, was fehlt, sagt "Nicht
+ * eingerichtet" in seiner eigenen Wertspalte. */
 test('die Pruefseite hat Gruppen mit Aendern-Link und keine Strich-Zeile', () => {
   const FLOWS = literal('FLOWS');
   const review = stepSource('review');
@@ -1177,12 +1177,18 @@ test('die Pruefseite hat Gruppen mit Aendern-Link und keine Strich-Zeile', () =>
   // Zellen aus dem Markup: id -> Beschriftung.
   const cells = new Map();
   for (const m of review.matchAll(/<dt data-i18n="([^"]+)">[^<]*<\/dt><dd id="([^"]+)"><\/dd>/g)) {
-    cells.set(m[2], { key: m[1], textContent: 'VORHER', parentElement: { hidden: false }, previousElementSibling: { textContent: m[1] } });
+    const classes = new Set();
+    cells.set(m[2], { key: m[1], textContent: 'VORHER', parentElement: { hidden: false, classes,
+      classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) } } });
   }
   assert.ok(cells.size >= 20, `nur ${cells.size} Zellen gefunden - der Scanner greift nicht`);
+  // Schluessel links, Wert rechts: "Nicht eingerichtet" ist ein WERT und steht
+  // nie in der Beschriftungsspalte (Critique 2026-10-29: dort stand es, die
+  // fehlenden Dienste in der Wertspalte - Schluessel und Wert vertauscht).
+  assert.doesNotMatch(review, /<dt[^>]*data-i18n="review\.notSetUp"/, '"Nicht eingerichtet" steht in der Beschriftungsspalte');
 
   const run = (overrides) => {
-    for (const c of cells.values()) { c.textContent = 'VORHER'; c.parentElement.hidden = false; }
+    for (const c of cells.values()) { c.textContent = 'VORHER'; c.parentElement.classes.clear(); }
     const S = { ...literal('S'), ...overrides };
     new Function('S', '$', 't', 'preservedKeys', 'deriveBaseUrl',
       `${fnSource('fillReviewGroup')}; ${fnSource('renderReview')}; renderReview();`)(
@@ -1192,25 +1198,22 @@ test('die Pruefseite hat Gruppen mit Aendern-Link und keine Strich-Zeile', () =>
 
   const check = (label) => {
     for (const [id, c] of cells) {
-      if (c.parentElement.hidden) continue;
-      assert.ok(c.textContent.trim() !== '', `${label}: sichtbare Zeile ${id} ohne Wert`);
+      assert.equal(c.parentElement.hidden, false, `${label}: Zeile ${id} verschwindet`);
+      assert.ok(c.textContent.trim() !== '' && c.textContent !== 'VORHER', `${label}: Zeile ${id} ohne Wert`);
       assert.doesNotMatch(c.textContent, /^\s*[-\u2013\u2014]\s*$/, `${label}: ${id} zeigt einen nackten Strich`);
     }
   };
 
-  // Frischer Zustand: nichts eingerichtet.
+  // Frischer Zustand: nichts eingerichtet - jede Integration sagt es in IHRER Zeile.
   run({ host: 'localhost', port: '3000', tz: 'Europe/Berlin' });
   check('leer');
-  const unset = cells.get('rv-integrations-unset');
-  assert.equal(unset.parentElement.hidden, false, 'nichts eingerichtet, aber keine Zeile "Nicht eingerichtet"');
-  // Reihenfolge wie im Kalenderschritt: Apple (Legacy) steht nach Outlook.
-  assert.equal(unset.textContent, 'review.weather, review.google, review.outlook, review.apple, review.email',
-    'die Zeile "Nicht eingerichtet" nennt nicht alles, was fehlt');
-  for (const id of ['rv-weather', 'rv-google', 'rv-outlook', 'rv-apple', 'rv-email']) {
-    assert.equal(cells.get(id).parentElement.hidden, true, `${id} steht leer als eigene Zeile`);
+  for (const id of ['rv-weather', 'rv-google', 'rv-outlook', 'rv-apple', 'rv-email', 'rv-oidc']) {
+    assert.equal(cells.get(id).textContent, 'T:review.notSetUp', `${id}: "Nicht eingerichtet" steht nicht in der Wertspalte`);
+    assert.ok(cells.get(id).parentElement.classes.has('rv-row--unset'), `${id} ist nicht als leer gedaempft`);
   }
+  assert.equal(cells.get('rv-host').parentElement.classes.has('rv-row--unset'), false);
 
-  // Voller Zustand: alles eingerichtet, keine "Nicht eingerichtet"-Zeile.
+  // Voller Zustand: alles eingerichtet, keine Zeile meldet "Nicht eingerichtet".
   run({
     host: 'nas.local', port: '3000', tz: 'Europe/Berlin', BASE_URL: 'https://yuvomi.example.com',
     WEATHER_LAT: '52.5', WEATHER_LON: '13.4', GOOGLE_CLIENT_ID: 'id', APPLE_USERNAME: 'a@b.c',
@@ -1219,8 +1222,9 @@ test('die Pruefseite hat Gruppen mit Aendern-Link und keine Strich-Zeile', () =>
     DOCUMENT_STORAGE_WEBDAV_ENABLED: 'true', GOOGLE_DRIVE_REDIRECT_URI: 'https://x/cb', OIDC_ISSUER: 'https://idp',
   });
   check('voll');
-  for (const id of ['rv-integrations-unset', 'rv-storage-unset', 'rv-advanced-unset']) {
-    assert.equal(cells.get(id).parentElement.hidden, true, `${id} steht, obwohl alles eingerichtet ist`);
+  for (const [id, c] of cells) {
+    assert.notEqual(c.textContent, 'T:review.notSetUp', `${id} meldet "Nicht eingerichtet", obwohl alles eingerichtet ist`);
+    assert.equal(c.parentElement.classes.has('rv-row--unset'), false, `${id} bleibt gedaempft`);
   }
 });
 
@@ -1273,7 +1277,7 @@ test('jedes Feld und jedes Akkordeon steht in einer Inset-Gruppe', () => {
   const loose = [];
   for (const name of ['config', 'secrets', 'weather', 'calendar', 'email', 'storage', 'advanced', 'admin']) {
     const seg = stepSource(name);
-    const groups = [...seg.matchAll(/<(?:div|dl) class="inset-group">/g)].map(m => elementRange(seg, m.index));
+    const groups = [...seg.matchAll(/<(?:div|dl) class="inset-group"[ >]/g)].map(m => elementRange(seg, m.index));
     assert.ok(groups.length > 0, `step-${name} hat keine Inset-Gruppe`);
     const inside = i => groups.some(([a, b]) => i > a && i < b);
     for (const m of seg.matchAll(/<div class="(field|toggle-card)"/g)) {
@@ -1655,7 +1659,7 @@ test('swapStep: View Transition mit Richtung, sonst sofort mit CSS-Rueckfall', a
       doc.startViewTransition = cb => {
         let resolve;
         const vt = {
-          cb, skipped: false, ready: Promise.resolve(),
+          cb, skipped: false, ready: Promise.resolve(), updateCallbackDone: Promise.resolve(),
           finished: new Promise(r => { resolve = r; }),
           skipTransition() { this.skipped = true; },
           end() { resolve(); },
@@ -1744,7 +1748,62 @@ test('showStep: Richtung aus dem Zustand, nur der juengste Wechsel zeichnet, Ket
   const next = fnSource('next');
   assert.match(next, /showStep\(target, \{ animate: !\(reviewReturn !== null && target > reviewReturn\) \}\)/,
     'next() wechselt in der Kette zur Pruefseite mit Bildwechsel');
-  assert.match(fnSource('renderStep'), /\.focus\(\{ preventScroll: true \}\)/, 'renderStep fokussiert die H2 nicht');
+  assert.match(fnSource('focusStep'), /\.focus\(\{ preventScroll: true \}\)/, 'focusStep fokussiert die H2 nicht');
+  assert.match(fnSource('showStep'), /focusStep\(\)/, 'showStep fuehrt den Fokus nicht nach');
+});
+
+/* Der Rueckruf der View Transition erzwang ein Layout: renderStep fokussierte
+ * die neue H2 (focus() rechnet synchron das Layout des ganzen neuen Schritts)
+ * und scrollte NACH dem Klassentausch (gemessen 42 ms bei 4x CPU, Critique
+ * 2026-10-29). Jetzt: im Rueckruf zuerst scrollen, dann tauschen, kein
+ * focus(); der Fokus folgt als `settle` - sofort ohne Transition, mit
+ * Transition erst nach dem Tausch UND `ready`. swapStep wird AUSGEFUEHRT. */
+test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt nach ready', async () => {
+  const render = fnSource('renderStep');
+  assert.doesNotMatch(render, /\.focus\(/, 'renderStep fokussiert im Rueckruf der View Transition');
+  assert.ok(render.indexOf('scrollTo(') !== -1 && render.indexOf('scrollTo(') < render.indexOf("classList.toggle('active'"),
+    'renderStep scrollt erst nach dem Klassentausch (erzwingt das Layout des neuen Schritts)');
+
+  const src = `${fnSource('canViewTransition')}\nlet stepTransition = null;\n${fnSource('swapStep')}\nreturn swapStep;`;
+  const make = (api) => {
+    const order = [];
+    const root = fakeEl();
+    let resolveReady;
+    const doc = { documentElement: root, visibilityState: 'visible', addEventListener() {}, removeEventListener() {} };
+    if (api) {
+      doc.startViewTransition = cb => {
+        let done;
+        const vt = {
+          updateCallbackDone: new Promise(r => { done = r; }),
+          ready: new Promise(r => { resolveReady = r; }),
+          finished: new Promise(() => {}), skipTransition() {},
+        };
+        doc.run = () => { cb(); done(); };
+        return vt;
+      };
+    }
+    const swapStep = new Function('document', 'matchMedia', src)(doc, () => ({ matches: false }));
+    return { swapStep, doc, order, ready: () => resolveReady() };
+  };
+  // Ohne Transition: Tausch, dann sofort Fokus.
+  {
+    const { swapStep, order } = make(false);
+    swapStep(() => order.push('update'), 'forward', true, () => order.push('focus'));
+    assert.deepEqual(order, ['update', 'focus']);
+  }
+  // Mit Transition: Fokus weder vor dem Tausch noch vor ready.
+  {
+    const { swapStep, doc, order, ready } = make(true);
+    swapStep(() => order.push('update'), 'forward', true, () => order.push('focus'));
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(order, [], 'Fokus vor der Aufnahme des alten Bildes');
+    doc.run();
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(order, ['update'], 'Fokus vor ready - er erzwingt das Layout des neuen Bildes');
+    ready();
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(order, ['update', 'focus'], 'der Fokus folgt nach ready nicht');
+  }
 });
 
 /* Akkordeons gleiten auf und zu (Rasterzeile 0fr -> 1fr, --ease-in-out wie jede
@@ -2116,12 +2175,13 @@ test('jede Boolean-Einstellung ist ein Schalter der App, keine nackte Checkbox',
 
 /* Der Docker-Schritt hatte in der Liste keinen Eintrag: waehrend des laengsten
  * Wartens stand sie ohne aktuellen Schritt und ohne aria-current da. Jetzt ein
- * unnummerierter Eintrag zwischen Pruefung/Einfach-Start und Admin, kein Knopf,
- * mit dem Ausgang des Starts. renderStepNav wird AUSGEFUEHRT. */
-test('Docker in der Schrittliste: eigener Eintrag ohne Nummer, genau ein aria-current, Ausgang sichtbar', () => {
+ * Eintrag zwischen Pruefung/Einfach-Start und Admin, kein Knopf, mit dem
+ * Ausgang des Starts - und seit 2026-10-29 mit seiner Nummer (eigener Test:
+ * "Rail und Zaehler"). renderStepNav wird AUSGEFUEHRT. */
+test('Docker in der Schrittliste: eigener Eintrag mit Nummer, genau ein aria-current, Ausgang sichtbar', () => {
   const FLOWS = literal('FLOWS');
   const UNNUMBERED = literal('UNNUMBERED');
-  assert.ok(UNNUMBERED.has('docker'), 'der Docker-Schritt traegt eine Nummer - Regel pruefen');
+  assert.ok(!UNNUMBERED.has('docker'), 'der Docker-Schritt traegt keine Nummer, steht aber in der Liste');
 
   const li = html.match(/<li class="steps-nav__item" data-nav-step="docker"[^>]*>(.*?)<\/li>/);
   assert.ok(li, 'kein Listeneintrag fuer den Docker-Schritt');
@@ -2150,7 +2210,8 @@ test('Docker in der Schrittliste: eigener Eintrag ohne Nummer, genau ein aria-cu
     assert.equal(r.docker.hidden, false, 'der Docker-Eintrag fehlt im Weg');
     assert.equal(r.docker.dataset.state, 'upcoming');
     assert.equal(r.docker.dataset.run, undefined);
-    assert.equal(r.docker.mark.textContent, '', 'der Docker-Eintrag traegt eine Ziffer');
+    assert.equal(r.docker.mark.textContent, String(flow.filter(s => !UNNUMBERED.has(s)).indexOf('docker') + 1),
+      'der Docker-Eintrag traegt nicht die Ziffer seines Zaehlers');
     for (const [outcome, shown] of [[null, 'running'], ['running', 'ok'], ['failed', 'failed']]) {
       r = run(flow, d, outcome);
       assert.deepEqual(currentOf(r), ['docker'], `waehrend Docker (${shown}) traegt nicht genau der Docker-Eintrag aria-current`);
@@ -2177,6 +2238,97 @@ test('Docker in der Schrittliste: eigener Eintrag ohne Nummer, genau ein aria-cu
   assert.ok(RULES.some(r => r.selector === '.steps-nav__item[data-run="ok"] .steps-nav__mark::before'), 'Erfolg zeigt keinen Haken');
   assert.equal(declared(sel('.steps-nav__item:not([data-run="failed"]) .steps-nav__failed'), 'display'), 'none',
     '"fehlgeschlagen" steht auch ohne Fehler im Namen');
+});
+
+/* Rail und Zaehler zaehlten verschiedene Mengen (Critique 2026-10-29): die
+ * Liste zeigte den Docker-Schritt als Eintrag ohne Ziffer ("8, o, 9"), der
+ * Zaehler sagte "Schritt 8 von 9" bei zehn Eintraegen und im Einfach-Weg
+ * "1 von 2" bei dreien. Fuer JEDEN Schritt beider Wege, der eine Liste zeigt,
+ * werden renderStepNav, stepPosition und applyStepCounters AUSGEFUEHRT: die
+ * Ziffer am Eintrag ist das N des Zaehlers, M ist die Zahl der sichtbaren
+ * Eintraege, und jeder sichtbare Eintrag traegt eine Ziffer. */
+test('Rail und "Schritt N von M" zaehlen in beiden Wegen dieselben Schritte', () => {
+  const FLOWS = literal('FLOWS');
+  const UNNUMBERED = literal('UNNUMBERED');
+  const SOLO = literal('SOLO_STEPS');
+  const names = [...html.matchAll(/<li class="steps-nav__item" data-nav-step="([a-z]+)"/g)].map(m => m[1]);
+  for (const [way, flow] of Object.entries(FLOWS)) {
+    flow.forEach((step, currentStep) => {
+      if (SOLO.has(step)) return;   // Einstieg und Abschluss zeigen keine Liste
+      const items = navFakes(names);
+      new Function('flow', 'currentStep', 'UNNUMBERED', 'dockerOutcome', 'document', `${fnSource('renderStepNav')}; renderStepNav();`)(
+        flow, currentStep, UNNUMBERED, null, { querySelectorAll: () => items });
+      const visible = items.filter(i => !i.hidden);
+      const tags = {};
+      new Function('flow', 'UNNUMBERED', 'document', 't', `${fnSource('stepPosition')}; ${fnSource('applyStepCounters')}; applyStepCounters();`)(
+        flow, UNNUMBERED, { querySelector: q => (tags[q.match(/#step-(\w+)/)[1]] ??= { textContent: '' }) }, (k, p) => `${p.n}/${p.total}`);
+      const tag = tags[step]?.textContent;
+      assert.ok(tag, `${way}/${step}: kein Zaehler, obwohl die Liste den Schritt zeigt`);
+      const [n, total] = tag.split('/').map(Number);
+      assert.equal(total, visible.length, `${way}/${step}: "von ${total}", die Liste zeigt ${visible.length} Eintraege`);
+      const own = items.find(i => i.name === step);
+      assert.equal(own.mark.textContent, String(n), `${way}/${step}: Liste zeigt ${own.mark.textContent || 'keine Ziffer'}, der Zaehler ${n}`);
+      for (const i of visible) assert.notEqual(i.mark.textContent, '', `${way}: Eintrag ${i.name} ohne Ziffer`);
+    });
+  }
+});
+
+/* Zugriff war ein <select> mit zwei Optionen (Critique 2026-10-29): eine Wahl,
+ * die man aufklappen musste, um zu sehen, dass es nur zwei gibt. Jetzt das
+ * Segment der App aus nativen Radios. Geprueft: Radiogruppe mit Namen,
+ * zwei Radios mit den Werten des Selects, 44px-Ziel, Fokusring am Segment, und
+ * die Fassade segmentedAsField AUSGEFUEHRT - value/focus sprechen wie das
+ * Select, also greift die Rerun-Vorbelegung (applyRerunPrefill setzt el.value)
+ * und fail() fokussiert die gewaehlte Option. */
+test('Zugriff ist ein Segment aus nativen Radios und spricht wie das Select davor', () => {
+  const config = stepSource('config');
+  assert.doesNotMatch(config, /<select id="adv-proxy"/, 'Zugriff ist noch ein Select');
+  const group = config.match(/<div class="segmented" id="adv-proxy"[^>]*>/);
+  assert.ok(group, 'kein Segment #adv-proxy');
+  assert.match(group[0], /role="radiogroup"/);
+  const label = group[0].match(/aria-labelledby="([^"]+)"/)?.[1];
+  assert.ok(label && new RegExp(`id="${label}"[^>]*data-i18n="advanced\\.proxyLabel"`).test(config), 'die Gruppe hat keinen sichtbaren Namen');
+  const [a, b] = elementRange(config, config.indexOf(group[0]));
+  const radios = [...config.slice(a, b).matchAll(/<label class="segmented__item"><input type="radio" name="adv-proxy" value="([a-z]+)"( checked)?>/g)];
+  assert.deepEqual(radios.map(r => r[1]), ['proxy', 'direct'], 'die Werte des Selects fehlen');
+  assert.equal(radios.filter(r => r[2]).length, 1, 'genau eine Option muss vorgewaehlt sein');
+
+  // Ziel und Ring wie .segmented der App.
+  assert.equal(toPx(declared(r => r === '.field .segmented__item', 'min-height')), 44, 'Segment unter 44px');
+  assert.match(declared(r => r === '.segmented__item:has(input:focus-visible)', 'outline') ?? '', /^2px solid var\(--color-accent\)/, 'kein Fokusring am Segment');
+  assert.ok(RULES.some(r => r.selector === '.segmented__item:has(input:checked)'), 'die Wahl ist nicht sichtbar');
+
+  // Die Fassade ausfuehren.
+  const inputs = ['proxy', 'direct'].map((value, i) => ({ type: 'radio', value, checked: i === 0, focused: 0, focus() { this.focused++; } }));
+  const el = { querySelectorAll: () => inputs };
+  new Function('group', `${fnSource('segmentedAsField')}; segmentedAsField(group);`)(el);
+  assert.equal(el.value, 'proxy');
+  el.value = 'direct';   // so setzt applyRerunPrefill die Vorbelegung
+  assert.deepEqual(inputs.map(r => r.checked), [false, true]);
+  assert.equal(el.value, 'direct');
+  el.focus({ preventScroll: true });
+  assert.equal(inputs[1].focused, 1, 'focus() landet nicht auf der gewaehlten Option');
+  assert.match(html, /segmentedAsField\(\$\('adv-proxy'\)\)/, 'die Fassade wird nie angelegt');
+  // Der touched-Merker gehoert an die Gruppe, nicht an das Radio, das das Ereignis ausloest.
+  assert.match(html, /\$\('adv-proxy'\)\.addEventListener\('change', e => \{ e\.currentTarget\.dataset\.touched = '1'; \}\)/);
+});
+
+/* Die Heimnetz-Schalter heben den SSRF-Schutz auf. Sie standen unter einer
+ * Ueberschrift, aber nicht in einer GRUPPE: per Tab hoerte man nur "... im
+ * Heimnetz erlauben, Schalter", ohne die Warnung darueber. Jetzt eine benannte
+ * Gruppe mit Beschreibung, die genau diese vier Schalter traegt - kein
+ * Komfortfeld dazwischen, keiner der vier ausserhalb. */
+test('die Heimnetz-Schalter stehen in einer eigenen, benannten Gruppe', () => {
+  const adv = stepSource('advanced');
+  const open = adv.match(/<div class="inset-group" role="group" aria-labelledby="([^"]+)" aria-describedby="([^"]+)">/);
+  assert.ok(open, 'keine benannte Gruppe fuer die Heimnetz-Schalter');
+  assert.match(adv, new RegExp(`id="${open[1]}" data-i18n="advanced\\.sectionPrivateNetwork"`), 'die Gruppe traegt nicht den Heimnetz-Namen');
+  assert.match(adv, new RegExp(`id="${open[2]}" data-i18n="advanced\\.privateNetworkHint"`), 'die Warnung beschreibt die Gruppe nicht');
+  const [a, b] = elementRange(adv, adv.indexOf(open[0]));
+  const inside = [...adv.slice(a, b).matchAll(/<(?:input|select|textarea)\b[^>]*\bid="([^"]+)"/g)].map(m => m[1]);
+  assert.deepEqual(inside, ['adv-ics-private', 'adv-recipe-provider-private', 'adv-waste-source-private', 'adv-document-webdav-private']);
+  const outside = adv.slice(0, a) + adv.slice(b);
+  assert.doesNotMatch(outside, /id="adv-[a-z-]+-private"/, 'ein Heimnetz-Schalter steht ausserhalb der Gruppe');
 });
 
 /* Balken und Zaehler rechneten mit verschiedenen Nennern: der Balken durch alle

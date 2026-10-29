@@ -387,3 +387,78 @@ test('geteilte Begriffe heissen wie in der App', () => {
   assert.doesNotMatch(de, /Passwort-Reset/, 'de: "Passwort-Reset" statt "Passwort zuruecksetzen" (App)');
   assert.match(loadLocale('de').storage.sectionDocuments, new RegExp(appLocale('de').settings.pageDocumentStorage));
 });
+
+// ── Seitenaufbau: Sprache ohne Flackern (Critique 2026-10-29) ─────────────────
+
+/* Die Ziel-Locale wartete auf die Fallback-Locale: zwei Roundtrips
+ * hintereinander, ~440 ms mehr bis zum lokalisierten Titel bei Fast 4G.
+ * initInstallerI18n wird gegen ein gefaelschtes fetch AUSGEFUEHRT: beide
+ * Anfragen muessen laufen, bevor die erste beantwortet ist. */
+test('initInstallerI18n laedt Fallback und Ziel-Locale parallel', async () => {
+  const pending = [];
+  const saved = { fetch: globalThis.fetch, localStorage: globalThis.localStorage, document: globalThis.document };
+  const html = { lang: '', dir: '' };
+  globalThis.fetch = url => new Promise(resolve => pending.push({ url: String(url), resolve }));
+  globalThis.localStorage = { getItem: () => 'de', setItem() {} };
+  globalThis.document = { documentElement: html };
+  try {
+    const { initInstallerI18n, t } = await import(`../tools/installer/i18n-mini.js?parallel=${Date.now()}`);
+    const done = initInstallerI18n();
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(pending.map(p => p.url).sort(), ['/locales/de.json', '/locales/en.json'],
+      'die Ziel-Locale wird erst nach der Fallback-Locale angefragt');
+    for (const p of pending) {
+      const body = p.url.includes('/de.') ? { title: 'Einrichtung' } : { title: 'Setup', only: 'en' };
+      p.resolve({ ok: true, json: async () => body });
+    }
+    assert.equal(await done, 'de');
+    assert.equal(html.lang, 'de');
+    assert.equal(t('title'), 'Einrichtung');
+    assert.equal(t('only'), 'en', 'der Fallback greift nicht');
+
+    // Scheitert die Ziel-Locale, bleibt die Seite englisch statt leer.
+    pending.length = 0;
+    const again = initInstallerI18n();
+    await new Promise(r => setTimeout(r, 0));
+    for (const p of pending) {
+      p.resolve(p.url.includes('/de.') ? { ok: false } : { ok: true, json: async () => ({ title: 'Setup' }) });
+    }
+    assert.equal(await again, 'en');
+    assert.equal(html.lang, 'en');
+  } finally {
+    globalThis.fetch = saved.fetch;
+    if (saved.localStorage === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved.localStorage;
+    if (saved.document === undefined) delete globalThis.document; else globalThis.document = saved.document;
+  }
+});
+
+/* Bis die Sprache steht, ist die Seite verhuellt - aber NUR per Skript, damit
+ * sie ohne JavaScript sichtbar bleibt, mit Zeitgeber und Fehlerausgang, damit
+ * ein haengendes oder kaputtes Modul sie nie leer laesst. Die Module und die
+ * Fallback-Locale laden ab dem Kopf vor. */
+test('Verhuellen bis zur Sprache: nur per Skript, mit Zeitgeber, Fehlerausgang und Vorladen', () => {
+  const html = readFileSync(HTML_PATH, 'utf8');
+  const head = html.slice(0, html.indexOf('</head>'));
+  for (const mod of ['/i18n-mini.js', '/rerun-prefill.js', '/field-checks.js']) {
+    assert.match(head, new RegExp(`<link rel="modulepreload" href="${mod.replace('.', '\\.')}">`), `${mod} wird nicht vorgeladen`);
+    assert.match(html, new RegExp(`from '${mod.replace('.', '\\.')}'`), `${mod} wird vorgeladen, aber nicht importiert`);
+  }
+  assert.match(head, /<link rel="preload" href="\/locales\/en\.json" as="fetch" crossorigin>/, 'die Fallback-Locale laedt erst nach den Modulen');
+
+  // Die Klasse setzt ein Skript - kein class-Attribut im Markup.
+  assert.doesNotMatch(html, /<html[^>]*class="[^"]*i18n-pending/, 'ohne JavaScript bliebe die Seite verhuellt');
+  const cloak = head.match(/<script>([\s\S]*?)<\/script>/);
+  assert.ok(cloak, 'kein Skript im Kopf, das verhuellt');
+  assert.match(cloak[1], /classList\.add\('i18n-pending'\)/);
+  const timeout = cloak[1].match(/setTimeout\(reveal, (\d+)\)/);
+  assert.ok(timeout, 'kein Zeitgeber - ein haengendes Modul liesse die Seite leer');
+  assert.ok(Number(timeout[1]) <= 1500, `Zeitgeber ${timeout[1]} ms - zu lang leer`);
+  assert.match(cloak[1], /addEventListener\('error', reveal/, 'ein Ladefehler laesst die Seite bis zum Zeitgeber leer');
+  assert.match(head, /html\.i18n-pending body \{ visibility: hidden; \}/);
+
+  // Abgenommen wird nach dem ersten Bild, also nach showStep(0).
+  const script = html.slice(html.indexOf('<script type="module">'));
+  const shown = script.lastIndexOf('showStep(0);');
+  const lifted = script.indexOf("classList.remove('i18n-pending')");
+  assert.ok(shown !== -1 && lifted > shown, 'die Verhuellung faellt vor dem ersten Bild - oder nie');
+});

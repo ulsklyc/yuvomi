@@ -191,20 +191,29 @@ out of that answer, since both server defaults are wrong for the other mode
 which is what the per-IP login rate limit counts). An existing value in `.env`
 wins over the derivation.
 
+## Delivery
+
+Every response carries `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+no-referrer`, `X-Frame-Options: DENY` and `Content-Security-Policy:
+frame-ancestors 'none'` - the wizard shows keys in plain text and must not be
+embeddable. There is deliberately no `script-src` policy: the wizard's script is
+inline. HTML, JavaScript, CSS and JSON go out Brotli- or gzip-compressed when
+the browser offers it (`Accept-Encoding`), plain otherwise.
+
 ## Design
 
 The wizard reuses the app's design language: the shared design tokens
 (`public/styles/tokens.css`) are served read-only from the repo, so the
 installer matches the app's violet accent, radii, shadows, and automatic dark
-mode. No font is served any more - the app took the system font stack with the
+mode, and `/favicon.ico` serves the app icon (`public/favicon.ico`). No font is served any more - the app took the system font stack with the
 v2.0.0 redesign, and the `/fonts/` route went with the typeface it carried.
 An inline fallback token block (with a dark-mode variant) precedes the
 `tokens.css` link, so the wizard stays legible even if that stylesheet cannot be
 served; its values mirror the current tokens, because a fallback that shows the
 previous release sends the diagnosis in the wrong direction. The layout follows the app's settings screens: options sit in grouped inset
 lists with the app's switches for on/off settings, wide screens show a step list
-beside the content (finished steps can be revisited, and the Docker start has its
-own entry), the action bar stays in reach at every width, and the review page
+beside the content (finished steps can be revisited, and the Docker start is a
+numbered step, so the list and "Step N of M" always agree), the action bar stays in reach at every width, and the review page
 is grouped by topic with an edit link per group. The wizard meets WCAG 2.1 AA
 (keyboard-operable accordions, ARIA live regions for Docker status, focus
 management, labelled controls, a `<main>` landmark, and field-level error

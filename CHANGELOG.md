@@ -37,6 +37,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   downloading, starting and checking Yuvomi instead of images, containers and health checks, the
   start button reads "Save & Start Yuvomi" for Docker and Podman alike, and the iCloud row no longer
   carries a "Legacy" label.
+- **The installer's step count matches its step list.** "Start Yuvomi" is now a numbered step like
+  the others, so the list and "Step N of M" count the same steps: the advanced setup used to show
+  "Step 8 of 9" next to ten entries, the simple setup "Step 1 of 2" next to three.
+- **How you reach Yuvomi is a two-way switch in the installer** instead of a drop-down with two
+  entries, and the home-network switches in the advanced step form their own named group, so screen
+  readers announce the warning above them. On the review page, anything not set up says so in its
+  own row ("Not set up") instead of one row that listed the missing services in the value column. A
+  failed save now reads "The settings could not be saved." instead of naming the `.env` file.
+- **The installer opens faster and in your language right away.** The language files load in
+  parallel and the scripts are fetched with the first byte, the page stays hidden until it can show
+  your language (with a safety timeout), and HTML, scripts and language files go out compressed:
+  about 160 kB instead of 520 kB per visit. Every response now forbids embedding the installer in
+  another page (it shows your keys) and sends no referrer, and the browser tab shows the Yuvomi icon
+  instead of a missing-icon error.
 
 ## [2.83.0] - 2026-10-29
 
