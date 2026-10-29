@@ -1006,6 +1006,23 @@ test('R22 D12: das Erfassen-Formular steht in EINEM Traeger, der Tag-Titel brich
 // Knopf (popovertarget, die Popover-API oeffnet, schliesst und gibt den Fokus
 // zurueck); Zyklus: „+ Tag". Der Platz des angedockten Knopfs steht, damit
 // die Personenwahl daneben nicht springt (gemessen 1440: x 1008-1167 -> 1008).
+// R24 S14: der Export stand mit `justify-content: flex-end` am rechten Rand des
+// Platzes, solange der Knopf fehlte, und sprang um dessen Breite, sobald er
+// erschien - beim Eintritt (0,0002 an #health-tools, x 1368 -> 1246; die
+// Uebersicht kennt die Person erst nach dem Laden) und zweimal je
+// Bereichswechsel (gemessen 1440: x 1209-1280 je Nomen). Jetzt steht das
+// Werkzeug am Anfang des Platzes, der Knopf schliesst an dessen Ende ab.
+test('R24 S14: im Kopf der Gesundheit haelt der Export seine Lage, der Knopf steht am Ende', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(read('public/styles/health.css'))];
+  const wide = (sel) => rules.filter((r) => r.selector.trim() === sel && r.at.some((a) => /min-width:\s*1024px/.test(a))).map((r) => r.body).join('\n');
+  const slot = wide('.health-toolbar > .page-toolbar__actions');
+  assert.match(slot, /min-inline-size:\s*var\(--health-fab-slot, auto\)/, 'der Platz steht');
+  assert.match(slot, /justify-content:\s*flex-start/, 'das Werkzeug beginnt den Platz');
+  assert.doesNotMatch(slot, /flex-end/, 'kein Rechtsbuendig, das den Export mit dem Knopf wandern laesst');
+  assert.match(wide('.health-toolbar > .page-toolbar__actions > .page-fab--docked'), /margin-inline-start:\s*auto/, 'der Knopf an der Kante');
+});
+
 test('R24 E9: FAB in jeder Ansicht - Uebersicht mit Erfassen-Menue, Zyklus „+ Tag", fester Platz', () => {
   const update = functionSource('updateHealthFab');
   const at = update.indexOf('case HEALTH_OVERVIEW_ROUTE:');

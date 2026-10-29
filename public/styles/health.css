@@ -481,7 +481,18 @@
      * im Fasten oder ohne Recht fehlt. Vorher sprang die Personenwahl links
      * daneben bei jedem Bereichswechsel (1440: x 1008-1167). */
     min-inline-size: var(--health-fab-slot, auto);
-    justify-content: flex-end;
+    /* DAS WERKZEUG STEHT AM ANFANG DES PLATZES, DER KNOPF AM ENDE (R24 S14).
+     * Mit `flex-end` rueckte der Export an den rechten Rand, solange der Knopf
+     * fehlte, und sprang um dessen Breite nach links, sobald er erschien - beim
+     * Eintritt einmal (0,0002 an #health-tools, x 1368 -> 1246: die Uebersicht
+     * kennt erst nach ihrem Laden die Person, fuer die sie erfasst), dazu bei
+     * jedem Wechsel in einen Bereich ohne Knopf. Jetzt haelt der Export seine
+     * Lage, und der Knopf schliesst an der Kante der Inhaltsspalte ab. */
+    justify-content: flex-start;
+  }
+
+  .health-toolbar > .page-toolbar__actions > .page-fab--docked {
+    margin-inline-start: auto;
   }
 }
 

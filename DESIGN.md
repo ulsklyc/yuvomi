@@ -5084,9 +5084,12 @@ Leerzustand), Fasten weiter „Fasten starten" (R23 D14). Pille, Ansage und Dial
 EIN Nomen („Training" / „Training erfassen"; die Naehrwerte-Pille bleibt „Mahlzeit", Ulas
 2026-10-25). Angedockt haelt der Aktions-Slot der Gesundheit die Breite seines laengsten
 Nomens (`--health-fab-slot`, gemessen in `fitHealthFabSlot`): die Personenwahl daneben steht
-in jedem Bereich auf x 1008 (vorher 1008-1167 je Nomen). Die Plan-Pille des Budgets nennt das
+in jedem Bereich auf x 1008 (vorher 1008-1167 je Nomen). Im Slot steht der Export AM ANFANG,
+der Knopf schliesst am Ende ab (`margin-inline-start: auto`, R24 S14): rechtsbuendig rueckte der
+Export an den Rand, solange der Knopf fehlte, und sprang beim Eintritt und zweimal je
+Bereichswechsel um dessen Breite (x 1209-1368); jetzt steht er auf x 1209. Die Plan-Pille des Budgets nennt das
 Objekt („+ Kategoriebudget"), nicht das Modul. Guards: `test:health-nav` "R24 E9",
-`test:budget-ui` "R24".
+`test:budget-ui` "R24", `test:health-nav` "R24 S14".
 
 Getoente Glas-Kapsel: der App-Akzent mit 78 % Deckung
 (`color-mix(in srgb, var(--color-accent) 78%, transparent)`) ueber

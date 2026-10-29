@@ -333,7 +333,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the list to the board and arriving in Health on the desktop each moved content a few pixels after it
   appeared. The "% of budget used - Most expensive first" note now sits above the subscriptions it
   sorts, the board scrolls in the same place as the list, and Health's list of areas appears together
-  with its status lines.
+  with its status lines. In Health's header the export button keeps its place on a computer - it used
+  to slide aside each time the add button appeared, on arrival and when moving between areas.
 - **Moving a waste type up or down always moves it.** A type without a schedule sits in the "No
   schedule" line, and a card next to it could swap places with it invisibly; up and down now move a
   card past the next card that is shown.
