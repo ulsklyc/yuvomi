@@ -87,6 +87,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Browsers no longer offer saved passwords in the installer's secret fields.** Calendar, sign-on
   and app-password fields are marked as new secrets, so a password manager does not fill in an
   unrelated login.
+- **The installer's last screen leads with the success.** One check mark says Yuvomi is ready, and
+  saving the key file is a quiet checklist row that ticks itself off after the download, instead of
+  a warning banner, a second logo and a download button above "Open Yuvomi". The note that the
+  installer shuts down soon stays as a small line until the file is saved.
+- **Skipped steps look skipped in the installer's step list.** Weather, calendar, email, storage and
+  advanced steps you leave empty show a dash instead of a green check mark.
+- **Installer fields match the app's.** Fields are 48 pixels high on the app's field background, the
+  show-password and copy buttons are full-size touch targets, the Yuvomi mark in the header looks
+  the same as in the app in dark mode, and hovering the advanced option no longer pulls harder than
+  the recommended one.
+- **Clearer installer messages.** A missing field in the admin step is named and focused instead of
+  "All fields are required", a server's own error text appears as a separate "Details" line, the
+  example values in the address and name fields are in your language, the start screen says that a
+  first run usually takes 1-3 minutes and counts in minutes, and technical terms like "session
+  secret", "SSRF protection" and "Compose file" follow a plain description instead of leading it.
 
 ## [2.83.0] - 2026-10-29
 
