@@ -259,6 +259,9 @@ test('editing an existing entry in de-DE saves its comma-formatted amount unchan
       await page.goto(`${baseUrl}/__budget-probe.html`);
       await page.waitForFunction(() => window.__ready === true);
       await page.$eval(`.budget-entry[data-id="${id}"] .budget-entry__title`, el => el.click());
+      // Since R24 a tap opens the read view first; Edit opens the dialog.
+      await page.waitForSelector('#budget-read-edit');
+      await page.$eval('#budget-read-edit', el => el.click());
       await page.waitForSelector('#bm-amount');
       assert.deepEqual(await page.$eval('#bm-amount', el => ({ value: el.value, type: el.type,
         inputMode: el.inputMode, step: el.hasAttribute('step'), min: el.hasAttribute('min') })),
