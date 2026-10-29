@@ -171,8 +171,8 @@ loaded by `i18n-mini.js`, which mirrors the app's locale resolution.
 The **CLI installer** (`install.sh` at the repo root) is localized into the same
 27 languages. It detects the language from the shell environment
 (`OIKOS_INSTALLER_LANG` > `LC_ALL` > `LC_MESSAGES` > `LANG`) and accepts a
-`--lang <code>` override. Its strings live in `tools/installer/locales/cli/<lang>.sh`
-- one sourced shell file per language that sets `MSG_*` variables; `en.sh` is the
+`--lang <code>` override. Its strings live in `tools/installer/locales/cli/<lang>.sh` -
+one sourced shell file per language that sets `MSG_*` variables; `en.sh` is the
 fallback base, the active language overlays it. Key parity across all 27 files is
 enforced by `test-installer-cli-i18n.js`, which also checks that every value is a
 `printf` format matching its call site (each value is passed to `printf` as the
