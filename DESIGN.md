@@ -1501,7 +1501,15 @@ das Verhaeltnis haelt.
   mit `.skeleton-text`), nach dem Reiterwechsel mobil 0,0996/0,060 -> 0, Laptop 0,025 -> 0
   (Guard `test:budget-ui`). Gesundheit mobil: solange die Heute-Region wartet, steht die
   Bereichsliste unsichtbar an ihrem Platz (`visibility: hidden`, hoechstens
-  `PRIORITY_WAIT_MS`), 0,023 -> 0 (Guard `test:health-nav`). Zeilenweise `content-visibility`
+  `PRIORITY_WAIT_MS`), 0,023 -> 0 (Guard `test:health-nav`). Ebenso haelt sie sich, bis die
+  erste Runde ihrer Statuszeilen steht (`data-health-status-pending`, hoechstens
+  `STATUS_WAIT_MS`): ein Name ohne Status steht mittig und rueckte mit dem Status hoch, Desktop-
+  Eintritt 0,0024 -> 0 (R24 S13). Abos: die Fussnote "x % genutzt - Teuerste zuerst" steht vor den
+  Zeilen der Liste, nicht unter der Kurzzeile - der Kennzahl-Slot bleibt so hoch wie sein Skelett,
+  Reiterwechsel mobil 0,0233 -> 0 (R24 S13, `test:budget-ui`). Liste -> Brett der Aufgaben: das
+  Brett bleibt in der Hoehenkette der Spaltenform, die Liste bleibt sein Scrollport (nur breiter) -
+  wechselte der Scrollport mit, meldete Chrome 0,0538 an `#task-list`, obwohl die Liste sichtbar
+  an derselben Stelle begann (R24 S13, `test:tasks-split`). Zeilenweise `content-visibility`
   siehe „Lange Listen" (ab Zeile 20, Platzhalter = Content-Box, `test:frontend-audit`).
 - **Inhaltswechsel - der Standard (`utils/content-swap.js`):** derselbe Traeger, neuer Inhalt
   (Reiterwechsel im Modul, Monats-/Wochen-Blaettern, Bereichswechsel) tauscht ueber
@@ -1870,7 +1878,7 @@ Kernseite fuehrt es. Die Zuordnung aller Seiten:
 | `housekeeping.js` Haushaltshilfe | Flaeche | `dashboard` + Spalten (`.page-columns`); die Uebersicht fuehrt zwei gleiche Karten |
 | `birthdays.js` Geburtstage | Liste + Detail | `reading` + `list-detail` |
 | `contacts.js` Kontakte | Liste + Detail | `reading` + `list-detail` |
-| `tasks.js` Aufgaben | Liste + Detail | `full` + `list-detail` in Liste und Verlauf (#1550: neben dem Eintrag seine Aufgabe); Kanban ist Flaeche |
+| `tasks.js` Aufgaben | Liste + Detail | `full` + `list-detail` in Liste und Verlauf (#1550: neben dem Eintrag seine Aufgabe); Kanban ist Flaeche, bleibt aber ab der Schwelle in der Hoehenkette (`#task-list` scrollt, R24 S13) |
 | `recipes.js` Rezepte | Liste + Detail | `reading` + `list-detail` |
 | `inventory.js` Inventar | Liste + Detail | `reading` + `list-detail` (vorher `data`); seit R17 EINE Liste aller Gegenstaende nach Kategorie gruppiert, die Kategorien als Filter-Chips darueber (`?category=` waehlt den Chip vor und wird ersetzt, nicht gestapelt), kein Kategorie-Zwischenschritt; kurze Angaben im Detail zweispaltig ab 35rem Spaltenbreite (`@container detail-pane`) |
 | `calendar.js` Kalender | Liste + Detail | `full` + `list-detail` in der Agenda; Monat, Woche, Tag sind Flaeche; der Tag fuehrt ab der Schwelle eine Seitenspalte mit den Folgetagen (`.day-rail`); ab 86.25rem Kalenderflaeche (ca. 1600er Fenster) steht in Monat, Woche und Tag links die Seitenleiste (Mini-Monat, Kalender und Personen aus derselben Quelle wie das Filterblatt, „Als Naechstes“), auf der Inhaltsspalte wie jedes Modul (R23 D13; R19 rueckte die Seite dafuer noch auf den Seitenrand). Steht die Leiste, gehoeren Kalender und Personen IHR: das Filterblatt traegt dann nur Ebenen und Anzeige, sein Zaehler zaehlt nur diese, und Zuruecksetzen laesst die Leiste stehen (`railCarriesFilters`, R23 - vorher dieselben Schalter an zwei Orten). Heute ist im Mini-Monat wie im Raster die gefuellte Akzent-Scheibe (`--color-accent`), der gewaehlte Tag ein Ring derselben Farbe; Personen-Chips lassen einen gemeinsamen Nachnamen weg (`sharedSurname`, Re-Kritik 2026-10-17) |
@@ -3853,7 +3861,9 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Eine Chipreihe bleibt EINE Reihe, auch am Zeigergeraet (R22, D20; Kontakte brachen bis
    dahin ab 1024px in zwei Reihen um, rund 48px Kopf): sie scrollt waagerecht mit Fade an der
    Kante (`wireScrollFade`), das Mausrad bewegt sie, bis sie am Ende ist, dann die Seite
-   (`wireWheelToRow` in contacts.js; `test:contacts-list-detail`).
+   (`wireWheelToRow` in contacts.js; `test:contacts-list-detail`). Dasselbe gilt fuer
+   Auswahlreihen, die keine Filter sind: die Rollen- und Mitglieder-Chips der Rechte-Seite
+   scrollen als EINE Reihe (R24 S13; vorher drei Zeilen bei 390px).
    Am Desktop (ab 1024px) ist das Blatt ein POPOVER am Filterknopf (R17, E13:
    `openFilterSheet({ anchor })`, `.filter-popover` in layout.css) - ohne Overlay und
    Unschaerfe, die Liste dahinter bleibt sichtbar und filtert live; Esc und Tipp daneben
@@ -4990,7 +5000,10 @@ unter einem breiten oder quadratischen (Kapsel, Plus), quer dazu an seiner Mitte
 im Fenster gehalten (`onboardingCardPlacement`); der Ortswechsel gleitet mit dem Ring (FLIP,
 `--duration-lg`/`--ease-glass`). Vorher stand sie mittig, 306px neben der Seitenleiste. **Kein
 Ring am Finger:** nach einem Tipp nimmt der Titel des Schritts den Fokus (`tabindex=-1`, ohne
-Ring, wie der Dialogtitel), nach Tastatur der Hauptknopf.
+Ring, wie der Dialogtitel), nach Tastatur der Hauptknopf. Dieselbe Regel gilt fuer das
+Detail-Popover (`.detail-popover:focus`, R24 S13): es nimmt beim Oeffnen selbst den Fokus, damit
+Tab in seine Knoepfe fuehrt, und traegt als Behaelter keinen Ring - nach einem Mausklick auf eine
+Mahlzeitkarte stand vorher ein violetter Ring um die ganze Karte, am Termin nicht.
 Ab Schritt 2 steht **„Zurueck"** dort, wo auf Schritt 1 „Ueberspringen" steht (R23 S10);
 Esc und die Zurueck-Geste beenden den Rundgang weiter. Die Hilfe fuehrt mit „Rundgang
 ansehen" zurueck auf die Uebersicht und zeigt ihn dort erneut (einmal je Wunsch, ohne die

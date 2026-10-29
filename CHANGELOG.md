@@ -322,6 +322,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that is not a colour falls back to the default blue on update.
 
 ### Fixed
+- **Switching views no longer nudges the page.** Opening Subscriptions in Budget, switching tasks from
+  the list to the board and arriving in Health on the desktop each moved content a few pixels after it
+  appeared. The "% of budget used - Most expensive first" note now sits above the subscriptions it
+  sorts, the board scrolls in the same place as the list, and Health's list of areas appears together
+  with its status lines.
+- **Moving a waste type up or down always moves it.** A type without a schedule sits in the "No
+  schedule" line, and a card next to it could swap places with it invisibly; up and down now move a
+  card past the next card that is shown.
+- **Roles and members fit in one line on the phone.** The role and member chips in Roles and
+  permissions scroll sideways instead of filling three lines above the first permission.
+- **A meal's details have no purple ring.** Clicking a meal on the desktop drew a focus ring around the
+  whole details card; it now opens like an appointment's.
+- **The comment hint fits the phone.** The comment field's hint is shorter and no longer ends in "..."
+  on a phone, in every language.
 - **Tapping a column tab on the phone board opens that column.** Jumping two columns ahead stopped at
   the column in between.
 - **The password eye sits inside the field in the settings too.** The WebDAV backup target and the
