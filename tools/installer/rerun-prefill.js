@@ -97,7 +97,11 @@ export function hostFromBaseUrl(baseUrl) {
   try {
     const u = new URL(baseUrl);
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
-    return u.hostname.replace(/^\[|\]$/g, '');
+    // Ein IPv6-Literal kennt isValidHost() in install.html nicht; vorbelegt
+    // blockierte es cfg-next beim unveränderten Rerun. Die BASE_URL selbst
+    // bleibt übernommen (touched), nur das Host-Feld behält seinen Standard.
+    if (u.hostname.startsWith('[')) return '';
+    return u.hostname;
   } catch {
     return '';
   }
@@ -176,12 +180,25 @@ export function accessEnv(choice, rerun = null) {
 export function omitUnchanged(env, rerun = null) {
   if (!rerun) return env;
   const out = {};
-  for (const [key, value] of Object.entries(env)) {
+  for (const [key, raw] of Object.entries(env)) {
+    // Ein Schalter schreibt für seinen Standard '' - und '' verwirft der
+    // Server, die alte Zeile kaeme zurueck. Wer einen vorbelegten Schalter
+    // umlegt, bekommt deshalb den Standard ausdruecklich: aus
+    // BACKUP_ENABLED=false wird beim Einschalten 'true', nicht ''.
+    const kind = SWITCH_KINDS.get(key);
+    const value = kind && raw === '' && rerun[key] !== undefined
+      ? (kind === 'on' ? 'false' : 'true')
+      : raw;
     if (rerun[key] !== undefined && value === rerun[key]) continue;
     out[key] = value;
   }
   return out;
 }
+
+/** Schalter-Schlüssel -> 'on' | 'notFalse' (siehe PREFILL_FIELDS). */
+const SWITCH_KINDS = new Map(
+  PREFILL_FIELDS.filter(([, , kind]) => kind === 'on' || kind === 'notFalse').map(([key, , kind]) => [key, kind]),
+);
 
 /** Die Felder des E-Mail-Schritts samt Schalter (Vollständigkeitsprüfung). */
 export const EMAIL_SECTION_FIELDS = [

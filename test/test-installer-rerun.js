@@ -407,3 +407,26 @@ test('ein unverändert übernommenes Kalender-Paar wird beim Rerun nicht blockie
   assert.match(html, /calBaseline = fieldState\(CAL_PAIR_FIELDS\)/,
     'applyRerunPrefill hält den Kalender-Stand nach der Vorbelegung nicht fest');
 });
+
+test('ein umgelegter, vorbelegter Schalter wird ausdrücklich gesendet', () => {
+  // BACKUP_ENABLED=false vorbelegt, der Nutzer schaltet Backups ein: storage-next
+  // setzt '' (Standard = an), sanitizeEnv verwirft es, preserveUnmanagedLines
+  // stellte die alte Zeile wieder her - Backups blieben aus, die Prüfseite sagte an.
+  assert.deepEqual(omitUnchanged({ BACKUP_ENABLED: '' }, { BACKUP_ENABLED: 'false' }), { BACKUP_ENABLED: 'true' });
+  assert.deepEqual(omitUnchanged({ MODULES_ALLOW_WEB_INSTALL: '' }, { MODULES_ALLOW_WEB_INSTALL: 'true' }),
+    { MODULES_ALLOW_WEB_INSTALL: 'false' });
+  // Unverändert bleibt ungesendet, auch wenn der Bestand ausdrücklich den Standard schreibt.
+  assert.deepEqual(omitUnchanged({ MODULES_ALLOW_WEB_INSTALL: '' }, { MODULES_ALLOW_WEB_INSTALL: 'false' }), {});
+  assert.deepEqual(omitUnchanged({ BACKUP_ENABLED: 'false' }, { BACKUP_ENABLED: 'false' }), {});
+  // Ohne Vorbelegung bleibt der leere Standard leer.
+  assert.deepEqual(omitUnchanged({ BACKUP_ENABLED: '' }, {}), { BACKUP_ENABLED: '' });
+});
+
+test('eine IPv6-BASE_URL belegt das Host-Feld nicht mit einem ungültigen Host vor', () => {
+  // isValidHost() kennt nur Namen und IPv4; `::1` blockierte cfg-next beim
+  // unveränderten Rerun. Die BASE_URL selbst bleibt übernommen.
+  const plan = prefillPlan({ BASE_URL: 'http://[::1]:3000' });
+  assert.equal(plan.fields['cfg-host'], undefined);
+  assert.ok(plan.touched.includes('adv-base-url'));
+  assert.equal(prefillPlan({ BASE_URL: 'https://yuvomi.example.test' }).fields['cfg-host'], 'yuvomi.example.test');
+});
