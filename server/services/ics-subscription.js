@@ -426,8 +426,8 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
     INSERT INTO calendar_events
       (title, description, start_datetime, end_datetime, all_day, location,
        color, external_calendar_id, external_source, subscription_id,
-       recurrence_rule, tzid, user_modified, created_by, local_calendar_id, series_authored)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, ?, 0, ?, ?, 1)
+       recurrence_rule, tzid, user_modified, created_by, local_calendar_id, series_authored, color_modified)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', NULL, ?, ?, 0, ?, ?, 1, ?)
   `);
   const existsStmt = db.get().prepare(`
     SELECT 1 FROM calendar_events e
@@ -504,6 +504,10 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
           ev.summary, ev.description, ev.dtstart, ev.dtend,
           ev.allDay ? 1 : 0, ev.location, ev.color || fallbackColor || null,
           ev.uid || null, localRule, tzid, userId, localCalendarId,
+          // Eine COLOR aus der Datei ist eine Angabe UEBER DIESEN Termin, keine
+          // Kopie der Kalenderfarbe: `color_modified = 1` nimmt sie aus dem
+          // Nachziehen beim Umfaerben (`releaseCopiedCalendarColor`, #2303).
+          ev.color ? 1 : 0,
         );
         // EXDATE nur übernehmen, wenn die Serie erhalten blieb (localRule != null).
         // Schluessel in Format A, wo die Uhr der Zeile das Vorkommen kennt

@@ -1035,3 +1035,33 @@ test('ein Import mit eigener Farbe behaelt sie, auch wenn der Kalender umgefaerb
     await call('DELETE', `/calendars/${calendar.id}`);
   }
 });
+
+test('eine COLOR aus der ICS-Datei bleibt, auch wenn sie der Kalenderfarbe gleicht (#2303, Review)', async () => {
+  const { importToLocal } = await import('../server/services/ics-subscription.js');
+  const calendar = await createCalendar('Chor', '#AD1457');
+  try {
+    const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:chor-2303\r\nDTSTART:20360311T180000Z\r\nDTEND:20360311T190000Z\r\nCOLOR:#AD1457\r\nSUMMARY:Probe\r\nEND:VEVENT\r\nEND:VCALENDAR';
+    await importToLocal(ADMIN.id, { ics, color: '#AD1457', localCalendarId: calendar.id });
+    assert.equal((await call('PUT', `/calendars/${calendar.id}`, { body: { color: '#283593' } })).status, 200);
+    assert.equal(shownColor(await listedImport('chor-2303')), '#AD1457',
+      'die Farbe stand in der Datei - sie gehoert dem Termin, nicht dem Kalender');
+  } finally {
+    await call('DELETE', `/calendars/${calendar.id}`);
+  }
+});
+
+test('faellt der Haushalt auf einen Kalender zurueck, behalten geerbte Importe ihre Farbe (#2303, Review)', async () => {
+  const { importToLocal } = await import('../server/services/ics-subscription.js');
+  // Nur dieser Test bestimmt die Zahl der Kalender: alles ausser dem Standard weg.
+  for (const row of (await call('GET', '/calendars')).body.data) {
+    if (!row.is_default) await call('DELETE', `/calendars/${row.id}`);
+  }
+  const standard = (await call('GET', '/calendars')).body.data.find((row) => row.is_default);
+  const second = await createCalendar('Zweiter', '#558B2F');
+  await importToLocal(ADMIN.id, { ics: importIcs('erbe-2303'), color: standard.color, localCalendarId: standard.id });
+  assert.equal(shownColor(await listedImport('erbe-2303')), standard.color.toUpperCase());
+
+  assert.equal((await call('DELETE', `/calendars/${second.id}`)).status, 204);
+  assert.equal(shownColor(await listedImport('erbe-2303')), standard.color.toUpperCase(),
+    'mit einem Kalender zeigt der Lesepfad keine Kalenderfarbe - der Termin darf nicht grau werden');
+});

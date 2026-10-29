@@ -10,6 +10,7 @@ import {
   localCalendarIdSql,
   regenerateCalendarFeedToken,
   releaseCopiedCalendarColor,
+  restoreInheritedImportColors,
   serializeCalendar,
   validateCalendarColor,
   validateCalendarName,
@@ -202,7 +203,10 @@ router.delete('/calendars/:id', (req, res) => {
     if (row.feed_token && !isAdminUser(req)) {
       return res.status(403).json({ error: 'Admin access required.', code: 403, reason: 'calendar_feed_admin_only' });
     }
-    database.prepare('DELETE FROM local_calendars WHERE id = ?').run(id);
+    database.transaction(() => {
+      database.prepare('DELETE FROM local_calendars WHERE id = ?').run(id);
+      restoreInheritedImportColors(database);
+    })();
     res.status(204).end();
   } catch (err) {
     log.error('DELETE /calendars/:id', err);

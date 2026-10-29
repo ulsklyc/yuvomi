@@ -217,3 +217,27 @@ export function releaseCopiedCalendarColor(conn, calendarId, oldColor) {
       AND UPPER(e.color) = UPPER(@oldColor)
   `).run({ calendarId, oldColor }).changes;
 }
+
+/**
+ * Der Schritt zurueck auf EINEN Kalender (#2303, Review): ab dann zeigt der
+ * Lesepfad keine Kalenderfarbe mehr (`localCalendarColorSql`), und ein Import,
+ * der bis hierher geerbt hat (Eigenfarbe leer), stuende grau da. Er bekommt die
+ * Farbe des verbliebenen Kalenders zurueck - dieselbe, die er zuletzt gezeigt
+ * hat oder (aus dem geloeschten Kalender umgezogen) ein Import mit einem
+ * Kalender bekommen haette. Nur Importe ohne ausdrueckliche Farbwahl
+ * (`color_modified = 0`); ein bewusst geleerter Termin bleibt leer.
+ * @returns {number} geaenderte Zeilen
+ */
+export function restoreInheritedImportColors(conn) {
+  if (hasSeveralCalendars(conn)) return 0;
+  const calendar = ensureDefaultCalendar(conn);
+  return conn.prepare(`
+    UPDATE calendar_events AS e SET color = @color
+    WHERE ${localCalendarIdSql('e')} = @calendarId
+      AND e.external_source = 'local'
+      AND e.subscription_id IS NULL
+      AND e.external_calendar_id IS NOT NULL
+      AND e.color_modified = 0
+      AND e.color IS NULL
+  `).run({ calendarId: calendar.id, color: calendar.color }).changes;
+}
