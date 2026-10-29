@@ -1127,7 +1127,8 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
   // Wen der Zustaendigen-Picker anbietet: die Mitglieder und wer schon an der
   // Aufgabe steht. Versteckt wird er nur, wenn darin wirklich eine Person steht.
   const assigneePeople = withChosenPeople(users, task?.assigned_users);
-  const visibility  = task?.visibility || 'all';
+  const visibility = isEdit ? (task?.visibility || 'all') : (state.defaultVisibility || 'all');
+  const locked = isEdit ? !!task?.locked : (state.defaultLocked === true);
 
   const selectedCat = task?.category ?? FALLBACK_CATEGORY;
   const categoryOptions = state.categories.map((c) =>
@@ -1192,7 +1193,7 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
     advancedSummary.push(STATUSES().find((s) => s.value === statusValue).label);
   }
   if (!hidesPrivacyControls('tasks') && visibility !== 'all') advancedSummary.push(t(`common.visibility.${visibility}`));
-  if (!hidesPrivacyControls('tasks') && task?.locked) advancedSummary.push(t('tasks.lockedBadge'));
+  if (!hidesPrivacyControls('tasks') && locked) advancedSummary.push(t('tasks.lockedBadge'));
   if (task?.documents?.length) advancedSummary.push(task.documents.map((d) => d.name).join(', '));
 
   const advancedLabel = advancedSummary.length
@@ -1335,7 +1336,7 @@ ${syncTargetFieldHtml(task)}
            nichts, also verschwinden sie zusammen (isSoloHousehold). -->
       <div class="form-group"${hidesPrivacyControls('tasks') ? ' hidden' : ''}>
         ${formSwitchRowHtml({
-          label: t('tasks.lockedToggle'), checked: Boolean(task?.locked),
+          label: t('tasks.lockedToggle'), checked: locked,
           hint: t('tasks.lockedHint'), hintId: 'task-locked-hint', attrs: { id: 'task-locked', name: 'locked' },
         })}
       </div>
@@ -6651,6 +6652,8 @@ export async function render(container, { user, signal } = {}) {
     state.defaultPoints = Number(meta.default_points) || 0;
     state.subtasksExpandedByDefault = preferencesData.data?.tasks_subtasks_expanded === true;
     state.defaultSyncTarget = preferencesData.data?.tasks_default_target || '';
+    state.defaultVisibility = preferencesData.data?.tasks_default_visibility || 'all';
+    state.defaultLocked = preferencesData.data?.tasks_default_locked === true;
   } catch (err) {
     console.error('[Tasks] Ladefehler:', err);
     // Der Toast allein war die falsche Antwort: er verging, und darunter blieb

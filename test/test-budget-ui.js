@@ -1042,8 +1042,8 @@ test('Geldbeträge gehen als Punkt-Dezimalstring an den Server', () => {
   // pl trennt ein Komma. Ohne Umschrift stimmt die Client-Prüfung zu und der
   // Server lehnt danach ab, mit einem Fehler, der auf kein Feld zeigt.
   const src = withoutComments(splitExpenses);
-  assert.match(src, /toDecimalString[^\n]*from '\/utils\/money\.js'/, 'die Umschrift kommt aus utils/money.js');
-  assert.match(src, /decimalString\s*=\s*toDecimalString/, 'die Umschrift fehlt');
+  assert.match(src, /toAmountDecimalString[^\n]*from '\/utils\/money\.js'/, 'die Umschrift kommt aus utils/money.js');
+  assert.match(src, /decimalString\s*=\s*toAmountDecimalString/, 'die Umschrift fehlt');
   // Jeder Payload-Betrag läuft durch die Umschrift: FormData liefert den
   // Rohwert des Textfeldes, nicht den normalisierten.
   const posted = src.match(/data\.amount\s*=\s*[^\n;]+/g) || [];
@@ -1149,7 +1149,9 @@ test('keine Seite schreibt einen Dezimaltrenner von Hand um', () => {
   assert.match(clean, /export function amountInputToCents/, 'amountInputToCents fehlt in utils/money.js');
 
   const rein = clean.match(/export function amountInputToCents[\s\S]*?\n\}/)[0];
-  assert.match(rein, /toDecimalString\(/, 'die Eingabe muss durch toDecimalString laufen');
+  assert.match(rein, /toAmountDecimalString\(/, 'die Eingabe muss durch die gemeinsame Betrags-Umschrift laufen');
+  const amountNormalizer = withoutComments(money).match(/export function toAmountDecimalString[\s\S]*?\n\}/)[0];
+  assert.match(amountNormalizer, /toDecimalString\(/, 'die Betrags-Umschrift erhaelt die Ziffern- und Gruppierungspruefung');
 
   // Ohne useGrouping:false schriebe das Feld "1.234,56" - und genau das weist
   // toDecimalString beim naechsten Speichern ab. Der Wert kaeme also nicht

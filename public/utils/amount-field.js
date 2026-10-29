@@ -130,7 +130,7 @@ export function amountProblemText(problem, currency, { digits = null } = {}) {
  */
 export function amountFieldError(input, currency, { precision = true, ...options } = {}) {
   if (!input) return false;
-  const problem = amountInputProblem(input.value, currency, options);
+  const problem = amountInputProblem(input.value, currency, { ...options, decimalComma: true });
   if (!problem || (problem === 'precision' && !precision)) return false;
   return [input, amountProblemText(problem, currency)];
 }

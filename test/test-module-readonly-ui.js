@@ -1021,6 +1021,46 @@ test('Taschengeld: ein Betrag ueberlebt den Rundlauf durch das Feld, in jeder wa
     `die Probe braucht Waehrungen, bei denen Intl und ISO 4217 auseinandergehen (gefunden: ${abweichend.join(', ')})`);
 });
 
+test('rewards plan accepts an en-US keyboard comma and submits a decimal string (#2170)', async () => {
+  const previous = { locale: globalThis.__formatLocale, modal: globalThis.__openModal, api: globalThis.__apiStub };
+  globalThis.__formatLocale = 'en-US';
+  try {
+    await mitTaschengeld(() => withAccess({ rewards: 'write' }, async () => {
+      let options;
+      let submit;
+      const writes = [];
+      const fields = new Map();
+      const panel = { querySelector(selector) {
+        if (!fields.has(selector)) fields.set(selector, { value: '', checked: false, hidden: false,
+          setAttribute() {}, removeAttribute() {}, addEventListener(type, fn) {
+            if (selector === '#rw-plan-form' && type === 'submit') submit = fn;
+          } });
+        return fields.get(selector);
+      } };
+      panel.querySelector('#rw-plan-frequency').value = 'weekly';
+      panel.querySelector('#rw-plan-weekday').value = '5';
+      globalThis.__openModal = value => { options = value; };
+      // Capture the request; a refused response keeps this test in the dialog.
+      globalThis.__apiStub = { put: async (_path, body) => { writes.push(body); throw new Error('offline'); } };
+      rewards.openMoneyPlanModal(3);
+      options.onSave(panel);
+      assert.equal(rewards.moneyAmountProblem('12,50', { currency: 'EUR', minor_unit: 2 }), null);
+      panel.querySelector('#rw-money-amount').value = '12,50';
+      await submit({ preventDefault() {} });
+      assert.equal(writes[0]?.amount, '12.50');
+      panel.querySelector('#rw-money-amount').value = '12,5000';
+      await submit({ preventDefault() {} });
+      assert.equal(writes.length, 1, 'excess precision must not reach the API');
+      assert.equal(panel.querySelector('#rw-money-error').hidden, false);
+    }), { role: 'admin', me: 1 });
+  } finally {
+    if (previous.locale === undefined) delete globalThis.__formatLocale;
+    else globalThis.__formatLocale = previous.locale;
+    globalThis.__openModal = previous.modal;
+    globalThis.__apiStub = previous.api;
+  }
+});
+
 test('Taschengeld: der Plan-Dialog eines Forint-Haushalts zeigt 5000, nicht 500000', () => {
   const vorher = rewards.state.money;
   try {

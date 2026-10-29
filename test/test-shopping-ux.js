@@ -1987,6 +1987,40 @@ const dialogFields = (name, qty = '') => ({
   'item-details-link': '', 'item-details-cancel': '',
 });
 
+test('an en-US comma price replaces an existing shopping price without clearing it (#2170)', async () => {
+  const previousLocale = globalThis.__formatLocale;
+  globalThis.__formatLocale = 'en-US';
+  resetShoppingState();
+  __test.state.currency = 'EUR';
+  __test.state.lists = [listRow(0)];
+  __test.state.items = [{ ...milk(0), price_cents: 499 }];
+  __test.state.categories = [{ id: 1, name: 'Sonstiges' }];
+  let onSave;
+  const writes = [];
+  globalThis.__openModal = opts => { onSave = opts.onSave; };
+  globalThis.__apiStub = {
+    get: async () => ({ data: [listRow(0)] }),
+    patch: async (_path, body) => {
+      writes.push(body);
+      return { data: { ...milk(0), ...body }, list_change: { list_id: 1, before: 6, after: 7 } };
+    },
+  };
+  try {
+    __test.openItemDetails(10, makeNullContainer());
+    const panel = makeDialogPanel({ ...dialogFields('Milch'), 'item-details-price': '1,99' });
+    onSave(panel);
+    await panel.submit();
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].price_cents, 199);
+    assert.equal(__test.state.items.find(item => item.id === 10).price_cents, 199);
+  } finally {
+    if (previousLocale === undefined) delete globalThis.__formatLocale;
+    else globalThis.__formatLocale = previousLocale;
+    delete globalThis.__apiStub;
+    delete globalThis.__openModal;
+  }
+});
+
 test('Speichern im Artikeldialog nach einer Auffrischung trifft die Zeile im BESTAND, nicht das alte Objekt', async () => {
   resetShoppingState();
   __test.state.lists = [listRow(0)];

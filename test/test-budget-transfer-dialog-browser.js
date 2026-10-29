@@ -173,7 +173,8 @@ test('transfer stays in the entry dialog, loads categories, and switches back', 
 test('saving a transfer posts a valid category and books matching account entries', async () => {
   await withTransfer(async page => {
     await page.$eval('#bt-title', el => { el.value = 'Transfer regression'; });
-    await page.$eval('#bt-amount', el => { el.value = '42.50'; });
+    await page.type('#bt-amount', '42,50');
+    assert.equal(await page.$eval('#bt-amount', el => el.value), '42,50');
     await page.select('#bt-from', String(accounts[0]));
     await page.select('#bt-to', String(accounts[1]));
     // Pick a category with multiple subcategories to exercise the dependent selector.
@@ -197,11 +198,89 @@ test('saving a transfer posts a valid category and books matching account entrie
   });
 });
 
+test('budget entries preserve cents typed with either decimal key and reject invalid input (#2170)', async () => {
+  for (const [type, input, expected, locale] of [
+    ['expense', '12,50', -12.5, 'en-US'], ['income', '12.50', 12.5, 'en-US'],
+    ['expense', '12.50', -12.5, 'de-DE'], ['income', '12,50', 12.5, 'de-DE'],
+  ]) {
+    const page = await newPage();
+    try {
+      await page.evaluateOnNewDocument(locale => localStorage.setItem('yuvomi-number-locale', locale), locale);
+      await page.goto(`${baseUrl}/__budget-probe.html`);
+      await page.waitForFunction(() => window.__ready === true);
+      await page.$eval('#fab-new-budget', el => el.click());
+      await page.waitForSelector('#bm-amount');
+      await page.$eval(`#type-${type}`, el => el.click());
+      assert.deepEqual(await page.$eval('#bm-amount', el => [el.type, el.inputMode]), ['text', 'decimal']);
+      const title = `Decimal keyboard ${type} ${locale}`;
+      await page.type('#bm-title', title);
+      const category = await page.$eval('#bm-category option[value]:not([value=""])', el => el.value);
+      await page.select('#bm-category', category);
+      if (await page.$eval('#bm-subcategory', el => el.required)) {
+        const subcategory = await page.$eval('#bm-subcategory option[value]:not([value=""])', el => el.value);
+        await page.select('#bm-subcategory', subcategory);
+      }
+      // The same save handler must reject partial parses and off-grid amounts.
+      for (const invalid of ['12,50oops', locale === 'de-DE' ? '1.234' : '1,234', '12.505']) {
+        await page.$eval('#bm-amount', (el, value) => { el.value = value; }, invalid);
+        const before = writes.length;
+        await page.$eval('#bm-save', el => el.click());
+        await page.waitForFunction(() => document.querySelector('#bm-amount')?.getAttribute('aria-invalid') === 'true');
+        assert.equal(writes.length, before);
+      }
+      await page.$eval('#bm-amount', el => { el.value = ''; });
+      await page.type('#bm-amount', input);
+      assert.equal(await page.$eval('#bm-amount', el => el.value), input);
+      const response = page.waitForResponse(res => res.request().method() === 'POST' && /\/budget\/?$/.test(res.url()));
+      await page.$eval('#bm-save', el => el.click());
+      const result = await response;
+      assert.equal(result.status(), 201, await result.text());
+      assert.equal(db.prepare('SELECT amount FROM budget_entries WHERE title = ?').get(title).amount, expected);
+    } finally {
+      await page.evaluate(() => localStorage.removeItem('yuvomi-number-locale'));
+      await page.close();
+    }
+  }
+});
+
+test('editing an existing entry in de-DE saves its comma-formatted amount unchanged (#2170)', async () => {
+  for (const amount of [-1014.5, 1014.5]) {
+    const category = db.prepare('SELECT key FROM budget_categories WHERE type = ? ORDER BY sort_order LIMIT 1')
+      .get(amount < 0 ? 'expense' : 'income').key;
+    const subcategory = db.prepare('SELECT key FROM budget_subcategories WHERE category_key = ? ORDER BY sort_order LIMIT 1')
+      .get(category)?.key ?? '';
+    const created = await request('POST', '/', { title: `Unchanged comma edit ${amount}`, amount,
+      category, subcategory, date: todayKey(db) });
+    assert.equal(created.status, 201);
+    const id = created.body.data.id;
+    const page = await newPage();
+    try {
+      await page.evaluateOnNewDocument(() => localStorage.setItem('yuvomi-number-locale', 'de-DE'));
+      await page.goto(`${baseUrl}/__budget-probe.html`);
+      await page.waitForFunction(() => window.__ready === true);
+      await page.$eval(`.budget-entry[data-id="${id}"] .budget-entry__title`, el => el.click());
+      await page.waitForSelector('#bm-amount');
+      assert.deepEqual(await page.$eval('#bm-amount', el => ({ value: el.value, type: el.type,
+        inputMode: el.inputMode, step: el.hasAttribute('step'), min: el.hasAttribute('min') })),
+      { value: '1014,50', type: 'text', inputMode: 'decimal', step: false, min: false });
+      const response = page.waitForResponse(res => res.request().method() === 'PUT' && res.url().endsWith(`/budget/${id}`));
+      await page.$eval('#bm-save', el => el.click());
+      assert.equal((await response).status(), 200);
+      assert.equal(db.prepare('SELECT amount FROM budget_entries WHERE id = ?').get(id).amount, amount);
+      await page.waitForFunction(() => !document.querySelector('#bm-amount'));
+    } finally {
+      await page.evaluate(() => localStorage.removeItem('yuvomi-number-locale'));
+      await page.close();
+    }
+  }
+});
+
 // Since Critique R23 (D1) a money field is a text field: the source currency
 // shows in its placeholder ("0,00", "0", "0,000"), and saving checks the digits.
 test('transfer amount placeholder follows the source account currency and its household fallback', async () => {
   await withTransfer(async page => {
     const zero = currency => page.evaluate(async c => (await import('/utils/money.js')).amountPlaceholder(c), currency);
+    assert.equal(await page.$eval('#bt-amount', el => el.hasAttribute('step') || el.hasAttribute('min')), false);
     const shown = () => page.$eval('#bt-amount', el => ({ type: el.type, inputMode: el.inputMode, placeholder: el.placeholder }));
     const field = async currency => ({ type: 'text', inputMode: 'decimal', placeholder: await zero(currency) });
     assert.deepEqual(await shown(), await field('EUR'));
@@ -429,14 +508,17 @@ test('confirming a pending transfer uses its account currency step and preserves
   assert.ok(occurrence);
   const page = await newPage();
   try {
+    await page.evaluateOnNewDocument(() => localStorage.setItem('yuvomi-number-locale', 'de-DE'));
     await page.goto(`${baseUrl}/__budget-probe.html`);
     await page.waitForFunction(() => window.__ready === true);
     await page.$eval(`.budget-entry[data-id="${occurrence.id}"] [data-action="confirm"]`, el => el.click());
     await page.waitForSelector('#cb-amount');
+    assert.equal(await page.$eval('#cb-amount', el => el.hasAttribute('step') || el.hasAttribute('min')), false);
     const money = (fn, ...args) => page.evaluate(async (name, rest) => (await import('/utils/money.js'))[name](...rest), fn, args);
     assert.equal(await page.$eval('#cb-amount', el => el.placeholder), await money('amountPlaceholder', 'KWD'));
-    const corrected = await money('amountToInput', 2.005, 'KWD');
-    await page.$eval('#cb-amount', (el, value) => { el.value = value; }, corrected);
+    await page.$eval('#cb-amount', el => { el.value = ''; });
+    await page.type('#cb-amount', '2,005');
+    assert.equal(await page.$eval('#cb-amount', el => el.value), '2,005');
     const response = page.waitForResponse(res => res.request().method() === 'PATCH' && res.url().endsWith(`/${occurrence.id}/confirm`));
     await page.$eval('#cb-save', el => el.click());
     assert.equal((await response).status(), 200);

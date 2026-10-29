@@ -464,12 +464,12 @@ export function amountToInput(amount, currency) {
 /**
  * Eingabe -> ganze Einheiten, oder null bei Unsinn.
  *
- * Über `toDecimalString`, nicht über ein eigenes `replace(',', '.')`: das nähme
+ * Über `toAmountDecimalString`, nicht über ein eigenes `replace(',', '.')`: das nähme
  * unter en-US aus "1,000" die Zahl 1 und unter ar/fa die östlichen Ziffern
  * überhaupt nicht an. Beides fällt nicht auf - der Preis wäre nur falsch.
  */
 export function amountInputToCents(text, currency) {
-  const norm = toDecimalString(text);
+  const norm = toAmountDecimalString(text);
   if (!/^\d+(\.\d+)?$/.test(norm)) return null;
   const digits = currencyFractionDigits(currency);
   const cents = Math.round(Number(norm) * 10 ** digits);
@@ -501,13 +501,13 @@ export function amountInputToCents(text, currency) {
  * MEHR Stellen trägt als vorher. Ein Währungswechsel hebt den Schutz auf
  * (`originalCurrency`): 12.50 EUR, auf JPY umgestellt, ist ein neuer Betrag.
  */
-export function amountInputProblem(text, currency, { original = null, originalCurrency = null, required = false, sign = 'positive' } = {}) {
+export function amountInputProblem(text, currency, { original = null, originalCurrency = null, required = false, sign = 'positive', decimalComma = false } = {}) {
   const raw = withAsciiMinus(text);
   // Leer ist Sache des Pflichtfelds - ausser der Aufrufer sagt, dass ein Betrag
   // da sein muss: `required` des Browsers nimmt ein Feld aus Leerzeichen an,
   // und die Genau-Beträge einer Aufteilung haben gar kein Pflichtfeld.
   if (!raw) return required ? 'notPositive' : null;
-  const decimal = toDecimalString(raw);
+  const decimal = decimalComma ? toAmountDecimalString(raw) : toDecimalString(raw);
   // Leer trotz Eingabe heisst: toDecimalString hat eine Gruppierung abgewiesen.
   // Ein Leerzeichen zwischen Ziffern ist dasselbe in der Schreibweise von fr
   // oder sv ("10 000").
@@ -538,19 +538,32 @@ function withAsciiMinus(text) {
 }
 
 /**
+ * Device and household decimal keys can differ (#2170). Keep grouping checks
+ * and decimal digits intact for APIs that require strings, including large
+ * amounts and trailing zeros. Validation still checks the entire result.
+ */
+export function toAmountDecimalString(text) {
+  const decimal = toDecimalString(withAsciiMinus(text));
+  if (/,\d{3}(?!\d)/.test(decimal)) return '';
+  return decimal.replace(',', '.').replace(/^(-?)\./, (_, sign) => `${sign}0.`);
+}
+
+/**
  * Der Wert eines Betrags-TEXTFELDES als Zahl - `null` bei leerem Feld, `NaN`
  * bei allem, was `amountInputProblem` abweist. Gegenstueck zu `amountToInput`.
  *
- * Gelesen wird ueber `toDecimalString`, also mit dem Trenner der Region und
+ * Gelesen wird ueber `toDecimalString`, mit dem Trenner der Region oder dem
+ * Komma einer abweichenden Geraetetastatur (#2170), weiterhin
  * ohne Gruppierung: "1.200" ist unter de nie still 1,2 (das war der Fehler der
  * `type="number"`-Felder, Critique R23 P1), sondern wird abgewiesen.
  */
 export function parseAmountInput(text) {
   const raw = withAsciiMinus(text);
   if (!raw) return null;
-  const decimal = toDecimalString(raw);
+  const decimal = toAmountDecimalString(raw);
   if (!/^-?\d+(\.\d+)?$/.test(decimal)) return NaN;
-  return Number(decimal);
+  const value = Number(decimal);
+  return Number.isFinite(value) ? value : NaN;
 }
 
 /** Stellen hinter dem Punkt einer Dezimalangabe: "10.000" -> 3, "10" -> 0. */

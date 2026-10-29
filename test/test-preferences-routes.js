@@ -1036,3 +1036,48 @@ test('wirft die Berechnung der Erfolgsantwort, ist die Patch nicht geschrieben (
   assert.equal(db.prepare("SELECT value FROM sync_config WHERE key = 'dashboard_widgets:user:1'").get(), undefined);
   cfgDelete('week_start');
 });
+
+// --------------------------------------------------------
+// tasks_default_visibility / tasks_default_locked (#2125)
+// --------------------------------------------------------
+test('tasks_default_visibility: PUT speichert den Wert, GET liefert ihn zurueck', async () => {
+  const r = await put({ tasks_default_visibility: 'private' }, { userId: 2 });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.tasks_default_visibility, 'private');
+  const r2 = await get({ userId: 2 });
+  assert.equal(r2.body.data.tasks_default_visibility, 'private');
+  cfgDelete('tasks_default_visibility:user:2');
+});
+
+test('tasks_default_visibility: ein anderer Nutzer sieht den eigenen Standard, nicht den des ersten', async () => {
+  await put({ tasks_default_visibility: 'private' }, { userId: 1 });
+  const r = await get({ userId: 3 });
+  assert.equal(r.body.data.tasks_default_visibility, 'all', 'Nutzer 3 sieht nicht den Wert von Nutzer 1');
+  cfgDelete('tasks_default_visibility:user:1');
+});
+
+test('tasks_default_visibility: 400 fuer ungueltige Sichtbarkeit', async () => {
+  const r = await put({ tasks_default_visibility: 'public' });
+  assert.equal(r.status, 400);
+});
+
+test('tasks_default_locked: PUT speichert true, GET liefert true zurueck', async () => {
+  const r = await put({ tasks_default_locked: true }, { userId: 4 });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.tasks_default_locked, true);
+  const r2 = await get({ userId: 4 });
+  assert.equal(r2.body.data.tasks_default_locked, true);
+  cfgDelete('tasks_default_locked:user:4');
+});
+
+test('tasks_default_locked: ein anderer Nutzer erhaelt false als Standard', async () => {
+  await put({ tasks_default_locked: true }, { userId: 1 });
+  const r = await get({ userId: 5 });
+  assert.equal(r.body.data.tasks_default_locked, false, 'Nutzer 5 sieht nicht den Wert von Nutzer 1');
+  cfgDelete('tasks_default_locked:user:1');
+});
+
+test('tasks_default_locked: 400 fuer nicht-boolean', async () => {
+  const r = await put({ tasks_default_locked: 'true' });
+  assert.equal(r.status, 400);
+});

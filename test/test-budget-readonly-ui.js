@@ -1181,6 +1181,8 @@ const belegLink = (id, name, art = 'preview') => (node) => (
 );
 
 test('Buchung: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs', async () => {
+  const previousFormatLocale = globalThis.__formatLocale;
+  globalThis.__formatLocale = 'de-DE';
   const echt = await import('../public/components/user-multi-select.js');
   const vorher = { ...budget.state };
   const vorherPicker = globalThis.__renderUserMultiSelect;
@@ -1236,6 +1238,8 @@ test('Buchung: die Leseansicht zeigt jeden Wert des Bearbeiten-Dialogs', async (
       }
     });
   } finally {
+    if (previousFormatLocale === undefined) delete globalThis.__formatLocale;
+    else globalThis.__formatLocale = previousFormatLocale;
     Object.assign(budget.state, vorher);
     if (vorherPicker === undefined) delete globalThis.__renderUserMultiSelect;
     else globalThis.__renderUserMultiSelect = vorherPicker;

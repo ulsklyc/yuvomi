@@ -29,7 +29,7 @@ import { isNavModuleReadOnly } from '/permissions.js';
 import { isRedeemable, nextRewardGoal } from '/utils/reward-goal.js';
 import {
   formatMoney, amountPlaceholder, amountInputProblem,
-  amountToInput, currencyFractionDigits, toDecimalString,
+  amountToInput, currencyFractionDigits, toAmountDecimalString,
 } from '/utils/money.js';
 import { amountProblemText } from '/utils/amount-field.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
@@ -1794,9 +1794,9 @@ function wireMoney(el) {
  * viele Nachkommastellen erlaubt sind, sagt der Server (`moneyDigits()`).
  */
 function moneyAmountProblem(text, ctx) {
-  const problem = amountInputProblem(text, moneyCurrencyCode(ctx), { required: true });
+  const problem = amountInputProblem(text, moneyCurrencyCode(ctx), { required: true, decimalComma: true });
   if (problem && problem !== 'precision') return problem;
-  const fraction = toDecimalString(text).split('.')[1] || '';
+  const fraction = toAmountDecimalString(text).split('.')[1] || '';
   return fraction.length > moneyDigits(ctx) ? 'precision' : null;
 }
 
@@ -1815,7 +1815,7 @@ function readMoneyAmount(input, errEl, ctx) {
     return null;
   }
   input.removeAttribute('aria-invalid');
-  return toDecimalString(input.value);
+  return toAmountDecimalString(input.value);
 }
 
 function moneyAmountField(id, value = '', ctx = undefined) {

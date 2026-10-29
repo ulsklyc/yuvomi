@@ -2744,7 +2744,9 @@ async function withTasksDefaults({ preferences = {}, syncTargets }, run) {
   const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
   const prev = { window: globalThis.window, document: globalThis.document, error: console.error };
   const navigations = [];
-  globalThis.window = { yuvomi: { showToast() {}, navigate: (href) => navigations.push(href) } };
+  const puts = [];
+  const toasts = [];
+  globalThis.window = { yuvomi: { showToast: (...args) => toasts.push(args), navigate: (href) => navigations.push(href) } };
   globalThis.document = fakeDocument();
   console.error = () => {};
   const state = { syncTargets };
@@ -2757,10 +2759,11 @@ async function withTasksDefaults({ preferences = {}, syncTargets }, run) {
       }
       return { data: null };
     },
+    put: async (url, body) => { puts.push([url, body]); return { data: body }; },
   };
   resetPreferencesCache();
   try {
-    await run({ render, state, navigations });
+    await run({ render, state, navigations, puts, toasts });
   } finally {
     delete globalThis.__apiStub;
     globalThis.window = prev.window;
@@ -2832,6 +2835,71 @@ test('Standard-Erinnerungsliste: eine gescheiterte Abfrage ist ein Fehler mit Au
     assert.match(host.html, /id="tasks-default-target"/, 'Erneut versuchen laedt die Listen und zeigt das Feld');
     assert.equal(walkNodes(host.appended).some((node) => node.getAttribute?.('role') === 'alert'), false, 'der Fehler ist weg');
   });
+});
+
+test('Aufgaben-Standardwerte: Sichtbarkeit und Sperre erscheinen immer, gespeicherter Wert wird vorbelegt (#2125)', async () => {
+  await withTasksDefaults({
+    preferences: { tasks_default_visibility: 'assignees', tasks_default_locked: true },
+    syncTargets: [],
+  }, async ({ render }) => {
+    const host = tasksDefaultsSheet();
+    await render(host, { user: { role: 'member' } });
+    assert.match(host.html, /id="tasks-default-visibility"/, 'Sichtbarkeitsfeld fehlt');
+    assert.match(host.html, /id="tasks-default-locked"/, 'Sperrfeld fehlt');
+    assert.match(host.html, /value="assignees" selected/, 'gespeicherter Wert "assignees" ist nicht vorbelegt');
+    assert.match(host.html, / checked/, 'gespeicherter Wert "locked" ist nicht angehakt');
+  });
+});
+
+test('Aufgaben-Standardwerte: Aenderung der Sichtbarkeit speichert per PUT /preferences (#2125)', async () => {
+  await withTasksDefaults({ preferences: { tasks_default_visibility: 'all' }, syncTargets: [] }, async ({ render, puts, toasts }) => {
+    const host = tasksDefaultsSheet();
+    await render(host, { user: { role: 'member' } });
+    const select = host.querySelector('#tasks-default-visibility');
+    assert.ok(select, 'Sichtbarkeitsfeld nicht gefunden');
+    select.value = 'private';
+    await select.fire('change');
+    assert.deepEqual(puts, [['/preferences', { tasks_default_visibility: 'private' }]], 'Wert nicht gespeichert');
+    assert.equal(toasts.length, 1, 'kein Toast nach Speichern');
+  });
+});
+
+test('Aufgaben-Standardwerte: Aenderung der Sperre speichert per PUT /preferences (#2125)', async () => {
+  await withTasksDefaults({ preferences: { tasks_default_locked: false }, syncTargets: [] }, async ({ render, puts, toasts }) => {
+    const host = tasksDefaultsSheet();
+    await render(host, { user: { role: 'member' } });
+    const toggle = host.querySelector('#tasks-default-locked');
+    assert.ok(toggle, 'Sperrfeld nicht gefunden');
+    toggle.checked = true;
+    await toggle.fire('change');
+    assert.deepEqual(puts, [['/preferences', { tasks_default_locked: true }]], 'Wert nicht gespeichert');
+    assert.equal(toasts.length, 1, 'kein Toast nach Speichern');
+  });
+});
+
+test('Aufgaben-Standardwerte: neue Aufgabe belegt Sichtbarkeit und Sperre aus den Einstellungen vor (#2125)', async () => {
+  globalThis.HTMLElement    ??= class {};
+  globalThis.customElements ??= { define() {}, get() {} };
+  const { __test: tasks } = await import('../public/pages/tasks.js');
+  const prevVisibility = tasks.state.defaultVisibility;
+  const prevLocked    = tasks.state.defaultLocked;
+  try {
+    // Neue Aufgabe: gespeicherte Einstellungen vorbelegen.
+    tasks.state.defaultVisibility = 'private';
+    tasks.state.defaultLocked     = true;
+    const htmlNew = tasks.renderModalContent({ task: null, users: [], reminder: null });
+    assert.match(htmlNew, /value="private"\s+selected/, 'neue Aufgabe: gespeicherte Sichtbarkeit "private" ist nicht vorbelegt');
+    assert.match(htmlNew, /id="task-locked"[^>]*checked/, 'neue Aufgabe: gespeicherter Sperr-Wert ist nicht angehakt');
+
+    // Bestehende Aufgabe: eigener Wert der Aufgabe, nicht die Einstellung.
+    const task = { id: 1, title: 'T', visibility: 'assignees', locked: 0 };
+    const htmlEdit = tasks.renderModalContent({ task, users: [], reminder: null });
+    assert.match(htmlEdit, /value="assignees"\s+selected/, 'bearbeitete Aufgabe: Sichtbarkeit aus der Aufgabe, nicht aus der Einstellung');
+    assert.doesNotMatch(htmlEdit, /id="task-locked"[^>]*checked/, 'bearbeitete Aufgabe: locked=0 darf kein checked setzen');
+  } finally {
+    tasks.state.defaultVisibility = prevVisibility;
+    tasks.state.defaultLocked     = prevLocked;
+  }
 });
 
 /* ==========================================================================

@@ -143,6 +143,17 @@ async function speichern(oeffnen, panel, { currency = 'EUR', beimSchreiben = () 
 
 const neueAusgabe = () => split.openExpenseModal(null);
 
+test('en-US keyboard commas reach the shared-expense API as exact decimal strings (#2170)', async () => {
+  await unter('en-US', async () => {
+    const { panel } = formular({ amount: '12,50', method: 'exact', teilnehmer: { 1: '6,20', 3: '6,30' } });
+    const { gesendet, gemeldet } = await speichern(neueAusgabe, panel);
+    assert.deepEqual(gemeldet, []);
+    assert.equal(gesendet.length, 1);
+    assert.equal(gesendet[0].daten.amount, '12.50');
+    assert.deepEqual(gesendet[0].daten.splits, [{ user_id: 1, amount: '6.20' }, { user_id: 3, amount: '6.30' }]);
+  });
+});
+
 test('Gegenprobe: ein gueltiger Betrag wird gesendet, in der Schreibweise des Servers', async () => {
   await unter('de', async () => {
     const { panel } = formular({ amount: '12,50' });

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **New tasks remember your preferred visibility and lock setting (#2125).** In Settings > Tasks
+  you can now choose the visibility and lock state that the new-task dialog opens with. Each
+  individual task can still use different values; the defaults only prefill the dialog.
 - **Recipes know their servings.** A recipe can say how many servings its amounts are for, and its
   ingredients get a "Servings − 4 +" stepper that recalculates every amount as you step. Planning the
   recipe or putting it on the shopping list takes the servings you chose. In the meal dialog the same
@@ -340,6 +343,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   day, week, month and detail views. The import used to copy the colour into every event, which then
   kept the old one. The colour field of the import now starts on the colour of the chosen calendar;
   picking a different one still gives those events their own colour.
+- **Amount fields accept comma or point decimals across devices.** (#2170) Budget entries,
+  transfers, confirmations, plans, subscriptions, shopping prices, inventory, housekeeping,
+  rewards and shared expenses preserve cents even when the keyboard and household number
+  formats differ. Existing amounts use the household's number format when edited. Currency
+  precision checks still apply; malformed amounts and ambiguous thousands grouping are
+  rejected before saving.
 - **The dashboard and calendar are fast again with synced recurring events** (#2226). Since the
   fix for occurrences on the clock change day (#2034), every occurrence of a repeating event is
   placed in its time zone with several lookups, and each lookup set up a fresh date formatter - the
