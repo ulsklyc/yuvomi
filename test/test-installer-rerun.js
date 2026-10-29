@@ -394,3 +394,16 @@ test('ein unverändert übernommener Teil-SMTP-Abschnitt wird nicht auf Vollstä
   assert.match(html, /emailBaseline = fieldState\(EMAIL_SECTION_FIELDS\)/,
     'applyRerunPrefill hält den Stand nach der Vorbelegung nicht fest');
 });
+
+test('ein unverändert übernommenes Kalender-Paar wird beim Rerun nicht blockiert', () => {
+  // Nur APPLE_USERNAME in der .env, das App-Passwort steht in der App
+  // (sync_config; server/services/apple-calendar.js getCredentials() löst
+  // URL, Nutzer und Passwort einzeln auf). keptSecrets kennt nur .env-Secrets,
+  // die Paarprüfung hielt einen unveränderten Rerun an calendar.errApplePair fest.
+  const cal = handler('cal-next');
+  const skip = cal.indexOf('unchangedSince(calBaseline');
+  const check = cal.indexOf('pairGap(');
+  assert.ok(skip !== -1 && skip < check, 'cal-next prüft auch ein unverändert übernommenes Paar');
+  assert.match(html, /calBaseline = fieldState\(CAL_PAIR_FIELDS\)/,
+    'applyRerunPrefill hält den Kalender-Stand nach der Vorbelegung nicht fest');
+});
