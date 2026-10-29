@@ -1,7 +1,7 @@
 # Yuvomi Web Installer
 
 A browser-based setup wizard for Yuvomi. Run it once to configure your `.env`,
-start your container engine, and create your admin account — no hand-editing of
+start your container engine, and create your admin account - no hand-editing of
 config files. Works with both Docker and Podman (auto-detected).
 
 ## Usage
@@ -20,7 +20,7 @@ of inactivity otherwise). Download the generated `.env` before you close the tab
 ## Requirements
 
 - Node.js 22+ (the installer itself has zero npm dependencies - Node built-ins only; running the app outside a container needs Node.js 22.14 or newer, see `engines` in `package.json`)
-- A container engine — either **Docker** with Compose v2, or **Podman** with the
+- A container engine - either **Docker** with Compose v2, or **Podman** with the
   `podman compose` subcommand (4.1+) or the `podman-compose` package
 - The repository cloned locally
 
@@ -45,7 +45,7 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
    they were while the exposure choice is the pre-selected one, and secret fields
    stay empty ("Current value is kept") so the server restores their existing lines
 2. Lets you pick a setup path on the welcome screen:
-   - **Simple setup** (recommended for non-technical users) — auto-generates the
+   - **Simple setup** (recommended for non-technical users) - auto-generates the
      security keys, applies safe HTTP defaults, and goes straight to
      creating your admin account. Two or three clicks, no jargon. The address
      it writes (`BASE_URL`) is this computer's private IPv4 on the home network
@@ -53,7 +53,7 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
      `docker0`, `br-*`, `utun*`, `wg*`), so invitation and reset links work on the
      family's phones; "Change" on the summary screen edits it. Without such an
      address the summary says it is reachable on this device only (`localhost`).
-   - **Advanced setup** — walks every option, step by step. Security keys are
+   - **Advanced setup** - walks every option, step by step. Security keys are
      still pre-generated (regenerate any time), and each screen is optional:
      - **Basics** - domain/IP, HTTP host port (`OIKOS_HTTP_PORT`), timezone (`TZ`,
        which also pre-sets the household zone - changeable later in the app),
@@ -104,7 +104,7 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
      would leave the app unable to start. Their fields stay empty on the
      security-keys screen and the old values are written back unchanged. Typing
      a value anyway overrides this, which is the deliberate way to start over.
-     The wizard never receives the existing values — the server reports only
+     The wizard never receives the existing values - the server reports only
      which keys exist and restores them when it writes the file.
 3. Backs up any existing `.env` to `.env.bak-<ISO>` before writing
 4. Writes `.env` to the project root (keys are allowlisted against the shared
@@ -122,7 +122,7 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
    with 400, it retries once without it, so the account never fails over the
    language. `timezone` is deliberately not sent: `TZ` in the `.env` already
    pre-sets the household zone, and a stored zone would decouple the two
-8. Offers to download the written `.env` on the final screen — the only backup
+8. Offers to download the written `.env` on the final screen - the only backup
    of newly generated encryption keys, which cannot be recovered if lost. The
    download is served from disk (`GET /api/env-file`), so it is the file itself,
    including values carried over from a previous run and the two secrets the
@@ -141,7 +141,7 @@ The two local-storage paths are the two ends of one mount and must not drift apa
 `DOCUMENT_STORAGE_LOCAL_DIR` is the **host** folder, `DOCUMENT_STORAGE_LOCAL_PATH` the **container**
 path the app writes to. The Compose files derive both ends from the `.env`
 (`${DOCUMENT_STORAGE_LOCAL_DIR}:${DOCUMENT_STORAGE_LOCAL_PATH}`), because a mount fixed at
-`/documents` would send uploads into the container layer as soon as anyone changes the path — gone on
+`/documents` would send uploads into the container layer as soon as anyone changes the path - gone on
 the next image update, while the database keeps referencing them.
 
 The WebDAV document-storage fields are optional. Non-empty
@@ -172,7 +172,7 @@ The **CLI installer** (`install.sh` at the repo root) is localized into the same
 27 languages. It detects the language from the shell environment
 (`OIKOS_INSTALLER_LANG` > `LC_ALL` > `LC_MESSAGES` > `LANG`) and accepts a
 `--lang <code>` override. Its strings live in `tools/installer/locales/cli/<lang>.sh`
-— one sourced shell file per language that sets `MSG_*` variables; `en.sh` is the
+- one sourced shell file per language that sets `MSG_*` variables; `en.sh` is the
 fallback base, the active language overlays it. Key parity across all 27 files is
 enforced by `test-installer-cli-i18n.js`, which also checks that every value is a
 `printf` format matching its call site (each value is passed to `printf` as the
@@ -185,7 +185,7 @@ re-run; the set of keys the dialog owns is the `MANAGED_KEYS` array in
 `install.sh`, and `test-installer-env-write.js` enforces that it matches the
 template in both directions. It asks for `BASE_URL` instead of deriving it,
 because behind a reverse proxy the public origin differs from the host and port
-the container listens on — and it reads `SESSION_SECURE` and `TRUST_PROXY` back
+the container listens on - and it reads `SESSION_SECURE` and `TRUST_PROXY` back
 out of that answer, since both server defaults are wrong for the other mode
 (no HSTS behind HTTPS; `X-Forwarded-For` trusted without a proxy in front,
 which is what the per-IP login rate limit counts). An existing value in `.env`
@@ -226,7 +226,7 @@ double-click cannot pass both confirmation stages at once.
 
 ## Architecture
 
-- `install-server.js` — the temporary HTTP server (port 8090), bound to
+- `install-server.js` - the temporary HTTP server (port 8090), bound to
   loopback. State-changing `POST`s are rejected (403) unless the request's Host
   and any Origin/Referer are loopback, guarding against DNS-rebinding/CSRF while
   the installer runs. Endpoints:
@@ -243,7 +243,7 @@ double-click cannot pass both confirmation stages at once.
   re-run allowlists. It is not the only place a variable lives: the wizard's
   fields and `buildEnv()` in `install.html`, the CLI installer and `.env.example`
   carry their own copies, and `test/test-installer-schema.js` binds them to it.
-- `rerun-prefill.js` — pure functions that turn the re-run values from
+- `rerun-prefill.js` - pure functions that turn the re-run values from
   `/api/preflight` into field pre-fills (`prefillPlan`) and keep `SESSION_SECURE`/
   `TRUST_PROXY` while the exposure choice is unchanged (`accessEnv`); served to the
   page and tested without a browser.
@@ -251,6 +251,6 @@ double-click cannot pass both confirmation stages at once.
   the backup scheduler accepts them, the `REPLACE_WITH_` placeholder, an absolute
   container path, ID/secret pairs, WebDAV without URL); served to the page and
   bound to the server code by `test/test-installer-validation.js`.
-- `i18n-mini.js` + `locales/*.json` — web-wizard localization.
-- `locales/cli/*.sh` — CLI-installer localization (sourced by `install.sh`).
-- `install.html` — the wizard UI.
+- `i18n-mini.js` + `locales/*.json` - web-wizard localization.
+- `locales/cli/*.sh` - CLI-installer localization (sourced by `install.sh`).
+- `install.html` - the wizard UI.

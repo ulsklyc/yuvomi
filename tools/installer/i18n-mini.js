@@ -1,5 +1,5 @@
 /**
- * i18n-mini — schlanke Internationalisierung für den Yuvomi-Installer.
+ * i18n-mini - schlanke Internationalisierung für den Yuvomi-Installer.
  * Spiegelt die Locale-Auflösung der App (public/i18n.js:26-34) wider, ohne
  * deren Abhängigkeiten. Keine externen Libs, reine Fetch-/DOM-/Intl-APIs.
  *
@@ -165,7 +165,7 @@ export function applyTranslations(root = document) {
 
 /**
  * Baut einen Text mit eingebetteten Knoten (Links, <code>) aus einer
- * Übersetzung mit {{slot}}-Platzhaltern — ohne innerHTML, nur Text-/Elementknoten.
+ * Übersetzung mit {{slot}}-Platzhaltern - ohne innerHTML, nur Text-/Elementknoten.
  * `slots` bildet Platzhaltername → vorbereiteten DOM-Knoten ab.
  */
 export function applyRich(el, key, slots = {}) {
