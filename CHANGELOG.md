@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Kitchen search is now in the tab bar on phones (#2043).** Recipes and Pantry show a search
+  icon at the right end of the kitchen tab bar, keeping the second header row collapsed until you
+  tap it. Meals and Shopping clear the zone so nothing appears there.
+
 ### Fixed
 - **Running the web installer again keeps your settings.** On an existing installation the advanced
   setup now fills its fields with the values from your `.env` - port, public address, reverse-proxy

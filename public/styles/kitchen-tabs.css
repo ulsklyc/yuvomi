@@ -107,7 +107,11 @@
      * 8px SEIT R21 (D11): seit R9 stehen keine Werkzeuge mehr in der Leiste
      * (Kontextzeile, unten), die 32px sind wieder frei. Die Kapsel ragt 4px
      * darueber hinaus (`--seg-pill-outset` oben): 12px Luft ums Wort im
-     * aktiven Tab, zwischen zwei Worten weiter 16px. */
+     * aktiven Tab, zwischen zwei Worten weiter 16px.
+     *
+     * Auf der Trailing-Zone (#2043): Rezepte und Vorrat zeigen dort eine Lupe.
+     * Die Zone passt in die 375px, weil der Suchschalter auf Telefonen
+     * nur das Symbol zeigt (20px, --space-5) statt das volle Touch-Ziel. */
     padding-inline: var(--space-2);
   }
 
@@ -130,6 +134,77 @@
    * Traegt diese Zeile NUR Werkzeuge (Rezepte, Vorrat), faltet sie angedockt
    * ein und kommt beim Hochscrollen wieder (R17 K1, R22 D15) - erkannt von wireCollapsingHeader
    * (utils/ux.js), gefaltet in layout.css ("DIE FALTZEILE"), nicht hier. */
+}
+
+/* --------------------------------------------------------
+ * TRAILING-WERKZEUGZONE (Issue #2043)
+ *
+ * Klebt mit `position: sticky; inset-inline-end: 0` am Ende der scrollbaren
+ * Leiste: Tabs können links hinter ihr durchscrollen, die Zone bleibt immer
+ * sichtbar. Hintergrund deckt die durchlaufenden Tabs ab; ein schmaler
+ * Farbverlauf links davon gibt einen weichen Übergang.
+ *
+ * Auf dem Desktop (≥ 640 px) ist die Zone ausgeblendet - dort steht die Suche
+ * im Kontext-Kopf darunter. Auf Mobilgeräten füllt sie jedes Rezepte-/
+ * Vorrat-Modul mit einem Suchschalter; Mahlzeiten und Einkauf leeren sie.
+ * -------------------------------------------------------- */
+.kitchen-tabs-bar__trailing {
+  position: sticky;
+  inset-inline-end: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  background-color: var(--color-bg);
+  padding-inline-start: var(--space-2);
+  /* Farbverlauf-Overlay zur Inline-Start-Seite hin (folgt der Schreibrichtung) */
+  box-shadow: calc(-1 * var(--space-1)) 0 var(--space-2) var(--space-1) var(--color-bg);
+}
+
+[dir="rtl"] .kitchen-tabs-bar__trailing {
+  box-shadow: var(--space-1) 0 var(--space-2) var(--space-1) var(--color-bg);
+}
+
+/* Suchschalter in der Trailing-Zone: Lucide-Icon-Knopf in Fingergröße */
+.kitchen-tabs-bar__trailing .btn--icon {
+  flex-shrink: 0;
+}
+
+/* Desktop (>= 640 px): Zone ausblenden - Suche steht im Kontext-Kopf darunter */
+@media (min-width: 640px) {
+  .kitchen-tabs-bar__trailing {
+    display: none;
+  }
+}
+
+@media (max-width: 639px) {
+  /* Auf Mobilgeräten bekommt die Zone kein zusätzliches Padding, wenn leer */
+  .kitchen-tabs-bar__trailing:empty {
+    padding-inline-start: 0;
+    box-shadow: none;
+  }
+
+  /* Symbol mit Trefferflaeche: der Schalter wird auf 24px Breite/Hoehe
+   * begrenzt (max-width/max-height statt --target-base ueberschreiben, WCAG
+   * 2.5.8 >= 24px erfuellt). Ein ::before vergrossert die Trefferflaeche auf
+   * --target-base in der Hoehe. Ein negativer Rand (-2px) neben der 24px-Taste
+   * deckt den 1,3px-Ueberlauf bei 375px ab: 16 + 336,3 + (−2 + 24) = 374,3px
+   * (<= 375), damit vier Tabs mit --space-2 Polster passen (#2043). */
+  .kitchen-tabs-bar__trailing {
+    padding-inline-start: 0;
+    margin-inline-start: -2px;
+  }
+  .kitchen-tabs-bar__trailing .btn--icon {
+    padding: 0;
+    max-width: 24px;
+    max-height: 24px;
+    position: relative;
+  }
+  .kitchen-tabs-bar__trailing .btn--icon::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    inset-block: calc((24px - var(--target-base)) / 2);
+  }
 }
 
 /* Mahlzeiten + Rezepte: Viewport-Höhe um Tab-Leiste reduzieren (Mobile).

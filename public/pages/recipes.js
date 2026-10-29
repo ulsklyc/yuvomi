@@ -9,7 +9,7 @@ import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, captureModalContext, captureOpenContext, isModalContextCurrent, isOwnModalOpen } from '/components/modal.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
-import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
+import { renderKitchenTabsBar, mountKitchenSearchTrailing } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, transferMessage, mayTransferRecipeToShopping } from '/utils/kitchen-transfer.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
@@ -530,6 +530,14 @@ export async function render(container, { signal } = {}) {
   page.append(...[title, toolbar, split, fab].filter(Boolean));
   container.replaceChildren(page);
   renderKitchenTabsBar(container, '/recipes');
+
+  mountKitchenSearchTrailing({
+    toolbar, container,
+    searchId: 'recipes-search',
+    ariaLabel: t('recipes.searchPlaceholder'),
+    btnClass: 'recipes-search-toggle',
+  });
+
   // Positionierung und Schliessen der Zeilen-Ueberlaufmenues. Idempotent, haengt an
   // der stabilen Seitenwurzel - die Liste darin wird bei jedem Filter neu gebaut.
   installPopoverMenus(page);

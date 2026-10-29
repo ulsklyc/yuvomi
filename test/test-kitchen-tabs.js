@@ -388,14 +388,14 @@ test('Seitenleiste: Pille <= 300ms aus Tokens, Hover-Absicht 150-250ms aus einem
 });
 
 // --------------------------------------------------------
-// EINE REGEL FUER DEN KUECHENKOPF MOBIL (Re-Critique 2026-09-28, P7 / A4 P2-3).
-// R9 M10 hatte Lupe und "..." von Rezepte/Vorrat IN die Kuechen-Leiste gelegt;
-// dafuer schrumpften dort die Zaehler zu Punkten, waehrend Mahlzeiten und
-// Einkauf ihre Werkzeuge in einer eigenen Kontextzeile trugen. Vier Tabs, vier
-// Kopfbauarten: die Leiste sprang beim Tabwechsel. Jetzt traegt die Leiste nur
-// Tabs mit Zahlen, und jedes Werkzeug steht in der Kontextzeile seines Tabs.
+// EINE REGEL FUER DEN KUECHENKOPF MOBIL (Issue #2043 / Re-Critique 2026-09-28 P7).
+// R9 M10 hatte Werkzeuge in der Leiste, schrumpfte aber Zaehler zu Punkten.
+// R19 (2026-09-28) verschob Werkzeuge in die Kontextzeile. Issue #2043 (2026-10):
+// Suchschalter wieder in die Leiste (Trailing-Zone mit sticky), Kontextzeile
+// startet auf Mobilgeraeten eingeklappt. Keine --kitchen-tools-CSS-Variable mehr,
+// kein transparenter Zaehler, kein negatives margin-block-start.
 // --------------------------------------------------------
-test('Kueche mobil: die Leiste traegt nur Tabs mit Zahlen, Werkzeuge stehen in der Kontextzeile', async () => {
+test('Kueche mobil: die Leiste traegt Tabs mit Zahlen und einen Suchschalter in der Trailing-Zone', async () => {
   const { eachRule } = await import('./css-rules.js');
   const rules = [...eachRule(readSrc('../public/styles/kitchen-tabs.css'))];
   const narrow = rules.filter((r) => r.at.some((a) => /\(max-width:\s*639px\)/.test(a)));
@@ -428,6 +428,8 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
   const px = (v) => {
     const s = String(v ?? '').trim();
     if (s === '0') return 0;
+    const lit = s.match(/^(-?[\d.]+)px$/);
+    if (lit) return Number(lit[1]);
     const m = s.match(/^var\(--([\w-]+)\)$/);
     assert.ok(m, `Laenge nicht lesbar: "${s}"`);
     return tok(m[1]);
@@ -454,12 +456,29 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
     }
     return out;
   };
+  const kitchenAll = [...eachRule(readSrc('../public/styles/kitchen-tabs.css'))];
+  const kitchenBase = kitchenAll.filter((r) => !r.at.length);
   const barGap = px(decl(kitchen, '.kitchen-tabs-bar', 'gap'));
   const tabPad = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab', 'padding-inline'));
   const tabGap = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab', 'gap'));
   const badgeMargin = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab__badge', 'margin-inline-start') ?? decl(base, '.sub-tab__badge', 'margin-inline-start'));
   const badgePad = px(decl(kitchen, '.kitchen-tabs-bar .sub-tab__badge', 'padding-inline') ?? decl(base, '.sub-tab__badge', 'padding').split(/\s+/)[1]);
   const badgeMin = px(decl(base, '.sub-tab__badge', 'min-width'));
+  // Trailing-Zone: Rezepte und Vorrat fuellen sie mit einer Lupe (Suchschalter).
+  // Auf Telefonen ist der Schalter 24px breit (max-width, WCAG 2.5.8 >= 24px).
+  // Ein ::before vergrossert die Trefferflaeche auf --target-base Hoehe.
+  // Ein negativer Rand (-2px) auf der Zone ergibt netto 22px Layoutbreite,
+  // damit vier Tabs mit --space-2 Polster in 375px passen (#2043).
+  // Am Desktop ist die Zone ganz ausgeblendet.
+  const iconMaxW = decl(kitchen, '.kitchen-tabs-bar__trailing .btn--icon', 'max-width');
+  const trailingMargin = decl(kitchen, '.kitchen-tabs-bar__trailing', 'margin-inline-start');
+  const trailingPad = px(decl(kitchen, '.kitchen-tabs-bar__trailing', 'padding-inline-start') ?? decl(kitchenBase, '.kitchen-tabs-bar__trailing', 'padding-inline-start') ?? '0');
+  const trailingBtn = iconMaxW ? px(iconMaxW) : tok('target-base');
+  const trailingZoneW = (trailingMargin ? px(trailingMargin) : 0) + trailingPad + trailingBtn;
+  // WCAG 2.5.8: Suchschalter mind. 24px breit.
+  assert.ok(trailingBtn >= 24, `Suchschalter ${trailingBtn}px breit - WCAG 2.5.8 braucht 24px`);
+  const beforeInsetBlock = decl(kitchen, '.kitchen-tabs-bar__trailing .btn--icon::before', 'inset-block');
+  assert.ok(beforeInsetBlock, '.btn--icon::before hat eine inset-block-Regel fuer die Trefferflaeche');
   // Seit der Re-Critique 2026-09-28 (P7) stehen keine Werkzeuge mehr in der
   // Leiste und kein Zaehler wird zum Punkt - die Rechnung hat vier Tabs mit
   // Zahlen und das Seitenpolster an beiden Enden.
@@ -469,10 +488,14 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
   const PAGE_PAD = tok('space-4');
   const W = 375;
   const numeric = Math.max(badgeMin, DIGITS + 2 * badgePad);
+  // Rezepte und Vorrat: Trailing-Zone ersetzt das rechte Seitenpolster.
+  // Mahlzeiten und Einkauf: leere Zone (padding-inline-start:0, box-shadow:none),
+  // das normale rechte Seitenpolster schliesst die Leiste ab.
   const width = ({ active, badges }) => {
     const tabs = Object.keys(WORD).map((id) => WORD[id][id === active ? 1 : 0] + 2 * tabPad
       + (badges.includes(id) && id !== active ? tabGap + badgeMargin + numeric : 0));
-    return PAGE_PAD + tabs.reduce((a, b) => a + b, 0) + (tabs.length - 1) * barGap + PAGE_PAD;
+    const right = (active === 'recipes' || active === 'pantry') ? trailingZoneW : PAGE_PAD;
+    return PAGE_PAD + tabs.reduce((a, b) => a + b, 0) + (tabs.length - 1) * barGap + right;
   };
   // Einkauf und Vorrat tragen Zaehler; der aktive Tab zeigt seinen nicht.
   for (const tab of Object.keys(WORD)) {
@@ -526,4 +549,59 @@ test('R24 E3: der aktive Reiter ist eine getoente Kapsel ohne Ring, das Segment 
   const base = rules.find((r) => r.selector === '.seg-indicator');
   assert.match(base.body, /background-color:\s*var\(--seg-active-bg\)/, 'das Segment behaelt den Daumen');
   assert.match(base.body, /box-shadow:\s*var\(--seg-active-shadow\)/, 'und seine 3:1-Kante');
+});
+
+// --------------------------------------------------------
+// Trailing-Zone (Issue #2043, reviewer-Feedback 2026-10-18)
+// --------------------------------------------------------
+
+test('Trailing-Zone: Desktop-Hide >= 640px via CSS, RTL-sicheres Sticky', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(readSrc('../public/styles/kitchen-tabs.css'))];
+  const wide = rules.filter((r) => r.at.some((a) => /\(min-width:\s*640px\)/.test(a)));
+  assert.ok(
+    wide.some((r) => /\.kitchen-tabs-bar__trailing/.test(r.selector) && /display:\s*none/.test(r.body)),
+    'ab 640px ist die Trailing-Zone ausgeblendet - auf dem Desktop steht die Suche im Kontext-Kopf',
+  );
+  const base = rules.filter((r) => !r.at.length);
+  const trailing = base.find((r) => /^\.kitchen-tabs-bar__trailing$/.test(r.selector.trim()));
+  assert.ok(trailing, '.kitchen-tabs-bar__trailing hat eine Basis-Regel');
+  assert.doesNotMatch(trailing.body, /(?:^|;)\s*right\s*:/, 'physisches right: 0 ist RTL-unsicher - bitte inset-inline-end');
+  assert.match(trailing.body, /inset-inline-end/, 'inset-inline-end macht die Zone RTL-sicher');
+});
+
+test('Trailing-Zone: Rezepte und Vorrat fuellen die Zone, Mahlzeiten und Einkauf leeren sie', () => {
+  const recipes  = readSrc('../public/pages/recipes.js');
+  const pantry   = readSrc('../public/pages/pantry.js');
+  const meals    = readSrc('../public/pages/meals.js');
+  const shopping = readSrc('../public/pages/shopping.js');
+
+  assert.match(recipes,  /mountKitchenSearchTrailing\b/, 'Rezepte: mountKitchenSearchTrailing setzt den Suchschalter in die Zone');
+  assert.match(pantry,   /mountKitchenSearchTrailing\b/, 'Vorrat: mountKitchenSearchTrailing setzt den Suchschalter in die Zone');
+  assert.doesNotMatch(meals,    /mountKitchenSearchTrailing\b/, 'Mahlzeiten: kein Suchschalter in der Zone');
+  assert.doesNotMatch(shopping, /mountKitchenSearchTrailing\b/, 'Einkauf: kein Suchschalter in der Zone');
+  assert.match(meals,    /setKitchenTabsTrailing\(null\)/, 'Mahlzeiten: leert die Zone explizit');
+  assert.match(shopping, /setKitchenTabsTrailing\(null\)/, 'Einkauf: leert die Zone explizit');
+});
+
+test('Trailing-Zone: der geteilte Helfer steckt den Schalter und klappt Zeile 2 erst beim Laden ein', () => {
+  const src = readSrc('../public/utils/kitchen-tabs.js');
+  const helper = src.slice(src.indexOf('export function mountKitchenSearchTrailing('));
+  assert.ok(helper.length > 0, 'mountKitchenSearchTrailing ist exportiert');
+  assert.match(helper, /setKitchenTabsTrailing\(btn\)/, 'der Helfer setzt den Knopf in die Trailing-Zone');
+  assert.match(helper, /MutationObserver/, 'der Helfer beobachtet die Klasse, um Zeile 2 beim Laden einzuklappen');
+  assert.match(helper, /is-collapsed/, 'der Helfer ergaenzt is-collapsed sobald --fold-row gesetzt ist');
+  assert.match(helper, /mo\.disconnect\(\)/, 'der Observer laeuft nur einmal und haengt sich selbst ab');
+  // Kein doppelter Observer auf dem Desktop: matchMedia-Guard muss vorhanden sein
+  assert.match(helper, /matchMedia.*639/, 'der Collapse-Observer laeuft nur auf Mobilgeraeten (<= 639px)');
+});
+
+test('Trailing-Zone: Tabs sind text-only, kein Werkzeugknopf direkt in renderKitchenTabsBar', () => {
+  const kitchen = readSrc('../public/utils/kitchen-tabs.js');
+  // Nur der Leisten-Baustein selbst darf keine Icon-Knoepfe einbauen;
+  // mountKitchenSearchTrailing (der Helfer dahinter) darf sie weiterhin nutzen.
+  const start = kitchen.indexOf('export function renderKitchenTabsBar(');
+  const end   = kitchen.indexOf('\nexport function setKitchenTabsTrailing(');
+  const bar = kitchen.slice(start, end);
+  assert.doesNotMatch(bar, /btn--icon|btn--ghost/, 'kein Icon-Knopf mehr im Leisten-HTML selbst');
 });

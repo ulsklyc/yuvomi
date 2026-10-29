@@ -23,7 +23,7 @@ import {
   reportFieldError,
   refocusAfterRender,
 } from '/components/modal.js';
-import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
+import { renderKitchenTabsBar, mountKitchenSearchTrailing } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, transferMessage, mayTransferPantryToShopping } from '/utils/kitchen-transfer.js';
 import { mayWritePath } from '/utils/module-access.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -537,6 +537,13 @@ export async function render(container) {
   page.append(title, live, toolbar, body, fab);
   container.replaceChildren(page);
   renderKitchenTabsBar(container, '/pantry');
+
+  mountKitchenSearchTrailing({
+    toolbar, container,
+    searchId: 'pantry-search',
+    ariaLabel: t('pantry.searchPlaceholder'),
+    btnClass: 'pantry-search-toggle',
+  });
 
   if (window.lucide) window.lucide.createIcons({ el: container });
 
