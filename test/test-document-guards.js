@@ -1308,6 +1308,17 @@ const SHAPE_EXEMPT = new Map([
   // einer Bar waeren zwei Formen in EINER Zeilenliste. Gefunden vom Handlauf
   // des Releases v2.65.0, dem ersten vollen Lauf seit dem Eintrag.
   ['cal-task-chip', 'Zeile: Aufgabe in der Eintragsliste einer Kalenderzelle, gleiche Bar wie .month-day__event'],
+  // Die Teilaufgaben im Detail sind eine Zeilenliste (`.detail-subtasks`,
+  // detail-view.css): jede Zeile ein <button> mit dem Ring vorn, unter dem
+  // Zeiger die Flaeche im Radius der Zeile. "Teilaufgabe hinzufuegen" war bis
+  // R24 eine gestrichelte Kapsel nach Inhalt breit - und deshalb hier nicht
+  // noetig. Die Critique R24 (G2-Aufgaben-P3-2, 6c8571a24) hat sie bewusst zur
+  // letzten ZEILE derselben Liste gemacht, wie "Neue Erinnerung" in Apples
+  // Erinnerungen: das Plus steht, wo die Teilaufgaben ihren Ring tragen, der
+  // Text fluchtet mit ihren Titeln, die Hervorhebung ist die der Zeile. Eine
+  // Kapsel waere dort eine zweite Form in EINER Zeilenliste. Gefunden vom
+  // Handlauf R24 (Sonde 3, 10px auf h=44 auf /tasks).
+  ['detail-subtask', 'Zeile: Teilaufgabe und "Teilaufgabe hinzufuegen" in der Teilaufgabenliste des Details (.detail-subtasks)'],
 ]);
 
 test('Sonde 3 - es gibt EINE Buttonform, und die Ausnahmen sind Kategorien', async () => {
