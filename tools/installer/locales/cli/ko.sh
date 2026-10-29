@@ -1,4 +1,4 @@
-# Yuvomi CLI 설치 프로그램 — 한국어 (ko)
+# Yuvomi CLI 설치 프로그램 - 한국어 (ko)
 # 자동 생성됨 (키는 모든 로케일과 동일). en = 대체, de = 참조.
 # install.sh에서 소싱됨; 각 키에 대해 영어 기본값을 재정의함.
 # 점 키 → 밑줄 변수 (MSG_<영역>_<이름>).
@@ -6,7 +6,7 @@ MSG_prereq_step="사전 요구 사항 확인"
 MSG_prereq_curl_found="curl 발견됨"
 MSG_prereq_curl_missing="curl을 찾을 수 없음"
 MSG_prereq_engine_found="Compose가 있는 %s 발견됨 (%s)"
-MSG_prereq_engine_missing="컨테이너 엔진을 찾을 수 없음 — Docker (Compose v2) 또는 Podman (podman compose / podman-compose)이 필요합니다"
+MSG_prereq_engine_missing="컨테이너 엔진을 찾을 수 없음 - Docker (Compose v2) 또는 Podman (podman compose / podman-compose)이 필요합니다"
 MSG_prereq_fix="누락된 사전 요구 사항을 설치하고 다시 실행하세요."
 MSG_basic_step="1/7단계: 기본 구성"
 MSG_basic_host="도메인 또는 IP 주소 [localhost]:"
@@ -70,7 +70,7 @@ MSG_review_proceed="계속할까요? [Y/n]:"
 MSG_review_aborted="취소됨."
 MSG_container_step="6/7단계: 컨테이너 시작 (%s)"
 MSG_container_backup_ok="기존 .env가 %s에 백업됨"
-MSG_container_backup_fail="기존 .env를 백업하지 못함 — 데이터 손실 방지를 위해 중단합니다."
+MSG_container_backup_fail="기존 .env를 백업하지 못함 - 데이터 손실 방지를 위해 중단합니다."
 MSG_container_env_written=".env 작성됨"
 MSG_container_preserved="이전 .env에서 %s개 항목을 유지했습니다"
 MSG_container_start_fail="%s를 시작하지 못했습니다. 최근 로그:"
@@ -96,7 +96,7 @@ MSG_noninteractive_ready="준비됨"
 MSG_noninteractive_started="컨테이너가 시작되었습니다."
 MSG_noninteractive_create_admin="관리자 만들기:"
 MSG_noninteractive_env_not_found="Env 파일을 찾을 수 없음: %s"
-MSG_noninteractive_no_engine="컨테이너 엔진을 찾을 수 없음 — Docker (Compose v2) 또는 Podman (podman compose / podman-compose)이 필요합니다."
+MSG_noninteractive_no_engine="컨테이너 엔진을 찾을 수 없음 - Docker (Compose v2) 또는 Podman (podman compose / podman-compose)이 필요합니다."
 MSG_common_interrupted="취소됨. 종료합니다."
 MSG_usage_envfile="사용법: %s --env-file /경로/의/.env"
 MSG_document_google_drive_step="선택 사항: Google Drive 문서 저장소"

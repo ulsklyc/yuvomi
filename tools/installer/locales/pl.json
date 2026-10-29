@@ -22,7 +22,7 @@
   "config": {
     "title": "Konfiguracja podstawowa",
     "subtitle": "Jak będziesz uzyskiwać dostęp do Yuvomi?",
-    "existing": "Wykryto istniejącą konfigurację — przed zapisaniem zostanie utworzona kopia zapasowa bieżącego pliku .env.",
+    "existing": "Wykryto istniejącą konfigurację - przed zapisaniem zostanie utworzona kopia zapasowa bieżącego pliku .env.",
     "hostLabel": "Domena lub adres IP",
     "hostHint": "Adres, którego użyjesz, aby otworzyć Yuvomi w przeglądarce.",
     "portLabel": "Port",
@@ -55,7 +55,7 @@
   },
   "weather": {
     "title": "Widget pogodowy",
-    "subtitle": "Pogoda na żywo na pulpicie — bezpłatnie, bez konta, bez klucza API.",
+    "subtitle": "Pogoda na żywo na pulpicie - bezpłatnie, bez konta, bez klucza API.",
     "enable": "Włącz widget pogodowy",
     "appHint": "Te wartości obowiązują, dopóki w aplikacji nie zostanie zapisana lokalizacja domu: Ustawienia → Dom → Zdjęcia i pogoda.",
     "latLabel": "Szerokość geograficzna",
@@ -189,7 +189,7 @@
     "title": "Yuvomi jest gotowy!",
     "subtitle": "Twój planer rodzinny działa, a konto administratora jest skonfigurowane.",
     "open": "Otwórz Yuvomi →",
-    "backupReminder": "Pamiętaj, aby teraz utworzyć kopię pliku .env — zawiera on Twoje klucze.",
+    "backupReminder": "Pamiętaj, aby teraz utworzyć kopię pliku .env - zawiera on Twoje klucze.",
     "download": "Pobierz plik .env",
     "savedTo": "Zapisano w {{path}}",
     "downloadFailed": "Nie udało się pobrać pliku - instalator prawdopodobnie już się zakończył. Twoje klucze znajdziesz w pliku .env na serwerze.",
@@ -319,7 +319,7 @@
   "email": {
     "title": "E-mail i resetowanie hasła",
     "groupSender": "Nadawca",
-    "subtitle": "Pozwól członkom rodziny zresetować zapomniane hasło przez e-mail. Opcjonalne — pomiń, jeśli niepotrzebne.",
+    "subtitle": "Pozwól członkom rodziny zresetować zapomniane hasło przez e-mail. Opcjonalne - pomiń, jeśli niepotrzebne.",
     "enable": "Włącz wysyłanie e-maili",
     "hint": "Używa Twojego serwera SMTP (dostawca poczty, self-hosted lub usługa transakcyjna).",
     "appHint": "To, co tu wpiszesz, będzie w aplikacji tylko do odczytu. Jeśli wolisz zarządzać SMTP i go testować w aplikacji (Ustawienia → Dom → E-mail (SMTP)), pomiń ten krok.",

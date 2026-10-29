@@ -22,7 +22,7 @@
   "config": {
     "title": "Temel Yapılandırma",
     "subtitle": "Yuvomi'a nasıl erişeceksiniz?",
-    "existing": "Mevcut yapılandırma algılandı — kaydetmeden önce geçerli .env dosyanızın yedeği alınacak.",
+    "existing": "Mevcut yapılandırma algılandı - kaydetmeden önce geçerli .env dosyanızın yedeği alınacak.",
     "hostLabel": "Alan adı veya IP adresi",
     "hostHint": "Yuvomi'u tarayıcınızda açmak için kullanacağınız adres.",
     "portLabel": "Bağlantı noktası",
@@ -55,7 +55,7 @@
   },
   "weather": {
     "title": "Hava Durumu Widget",
-    "subtitle": "Panelde canlı hava durumu — ücretsiz, hesap yok, API anahtarı yok.",
+    "subtitle": "Panelde canlı hava durumu - ücretsiz, hesap yok, API anahtarı yok.",
     "enable": "Hava durumu widget'ını etkinleştir",
     "appHint": "Bu değerler, uygulamada Ayarlar → Ev → Fotoğraflar ve hava durumu altından bir ev konumu kaydedilene kadar geçerlidir.",
     "latLabel": "Enlem",
@@ -189,7 +189,7 @@
     "title": "Yuvomi hazır!",
     "subtitle": "Aile planlayıcınız çalışıyor ve yönetici hesabınız ayarlandı.",
     "open": "Yuvomi'u aç →",
-    "backupReminder": "Şimdi .env dosyanızı yedeklemeyi unutmayın — anahtarlarınızı içerir.",
+    "backupReminder": "Şimdi .env dosyanızı yedeklemeyi unutmayın - anahtarlarınızı içerir.",
     "download": ".env dosyasını indir",
     "savedTo": "Şuraya kaydedildi: {{path}}",
     "downloadFailed": "Dosya yüklenemedi - kurulum aracı büyük olasılıkla çoktan kapandı. Anahtarların sunucundaki .env dosyasında.",
@@ -319,7 +319,7 @@
   "email": {
     "title": "E-posta ve parola sıfırlama",
     "groupSender": "Gönderen",
-    "subtitle": "Aile üyelerinin unuttukları parolayı e-postayla sıfırlamasına izin verin. İsteğe bağlı — gerekmiyorsa atlayın.",
+    "subtitle": "Aile üyelerinin unuttukları parolayı e-postayla sıfırlamasına izin verin. İsteğe bağlı - gerekmiyorsa atlayın.",
     "enable": "E-posta göndermeyi etkinleştir",
     "hint": "Kendi SMTP sunucunuzu kullanır (e-posta sağlayıcısı, self-hosted veya bir işlemsel hizmet).",
     "appHint": "Buraya girdikleriniz uygulamada salt okunur olur. SMTP’yi uygulamada Ayarlar → Ev → E-posta (SMTP) altından yönetip test etmek isterseniz bu adımı atlayın.",

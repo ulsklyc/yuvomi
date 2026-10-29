@@ -22,7 +22,7 @@
   "config": {
     "title": "Grundkonfiguration",
     "subtitle": "Hur kommer du att nå Yuvomi?",
-    "existing": "Befintlig konfiguration upptäckt — en säkerhetskopia av din nuvarande .env-fil skapas innan den sparas.",
+    "existing": "Befintlig konfiguration upptäckt - en säkerhetskopia av din nuvarande .env-fil skapas innan den sparas.",
     "hostLabel": "Domän eller IP-adress",
     "hostHint": "Adressen du använder för att öppna Yuvomi i webbläsaren.",
     "portLabel": "Port",
@@ -55,7 +55,7 @@
   },
   "weather": {
     "title": "Väder-widget",
-    "subtitle": "Liveväder på instrumentpanelen — gratis, inget konto, ingen API-nyckel.",
+    "subtitle": "Liveväder på instrumentpanelen - gratis, inget konto, ingen API-nyckel.",
     "enable": "Aktivera väder-widget",
     "appHint": "De här värdena gäller tills en plats för hushållet sparas i appen under Inställningar → Hushåll → Foton och väder.",
     "latLabel": "Latitud",
@@ -189,7 +189,7 @@
     "title": "Yuvomi är klart!",
     "subtitle": "Din familjeplanerare körs och ditt administratörskonto är konfigurerat.",
     "open": "Öppna Yuvomi →",
-    "backupReminder": "Kom ihåg att säkerhetskopiera din .env-fil nu — den innehåller dina nycklar.",
+    "backupReminder": "Kom ihåg att säkerhetskopiera din .env-fil nu - den innehåller dina nycklar.",
     "download": "Ladda ner .env-filen",
     "savedTo": "Sparad i {{path}}",
     "downloadFailed": "Filen kunde inte hämtas - installationsprogrammet har troligen redan avslutats. Dina nycklar finns i .env-filen på din server.",
@@ -319,7 +319,7 @@
   "email": {
     "title": "E-post & lösenordsåterställning",
     "groupSender": "Avsändare",
-    "subtitle": "Låt familjemedlemmar återställa ett glömt lösenord via e-post. Valfritt — hoppa över om du inte behöver det.",
+    "subtitle": "Låt familjemedlemmar återställa ett glömt lösenord via e-post. Valfritt - hoppa över om du inte behöver det.",
     "enable": "Aktivera e-postutskick",
     "hint": "Använder din egen SMTP-server (e-postleverantör, självhostad eller en transaktionstjänst).",
     "appHint": "Det du anger här är skrivskyddat i appen. Vill du hellre sköta och testa SMTP i appen under Inställningar → Hushåll → E-post (SMTP), hoppa över det här steget.",

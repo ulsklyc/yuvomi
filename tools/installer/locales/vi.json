@@ -22,7 +22,7 @@
   "config": {
     "title": "Cấu hình cơ bản",
     "subtitle": "Bạn sẽ truy cập Yuvomi như thế nào?",
-    "existing": "Đã phát hiện cấu hình hiện có — tệp .env hiện tại của bạn sẽ được sao lưu trước khi lưu.",
+    "existing": "Đã phát hiện cấu hình hiện có - tệp .env hiện tại của bạn sẽ được sao lưu trước khi lưu.",
     "hostLabel": "Tên miền hoặc địa chỉ IP",
     "hostHint": "Địa chỉ bạn sẽ dùng để mở Yuvomi trong trình duyệt.",
     "portLabel": "Cổng",
@@ -55,7 +55,7 @@
   },
   "weather": {
     "title": "Widget thời tiết",
-    "subtitle": "Thời tiết trực tiếp trên bảng điều khiển — miễn phí, không cần tài khoản, không cần API key.",
+    "subtitle": "Thời tiết trực tiếp trên bảng điều khiển - miễn phí, không cần tài khoản, không cần API key.",
     "enable": "Bật widget thời tiết",
     "appHint": "Các giá trị này có hiệu lực cho đến khi vị trí của gia đình được lưu trong ứng dụng, tại Cài đặt → Gia đình → Ảnh và thời tiết.",
     "latLabel": "Vĩ độ",
@@ -189,7 +189,7 @@
     "title": "Yuvomi đã sẵn sàng!",
     "subtitle": "Trình lên kế hoạch gia đình của bạn đang chạy và tài khoản admin đã được thiết lập.",
     "open": "Mở Yuvomi →",
-    "backupReminder": "Nhớ sao lưu tệp .env của bạn ngay bây giờ — nó chứa các khóa của bạn.",
+    "backupReminder": "Nhớ sao lưu tệp .env của bạn ngay bây giờ - nó chứa các khóa của bạn.",
     "download": "Tải xuống tệp .env",
     "savedTo": "Đã lưu vào {{path}}",
     "downloadFailed": "Không tải được tệp - trình cài đặt nhiều khả năng đã dừng. Các khóa của bạn nằm trong tệp .env trên máy chủ.",
@@ -319,7 +319,7 @@
   "email": {
     "title": "Email & đặt lại mật khẩu",
     "groupSender": "Người gửi",
-    "subtitle": "Cho phép các thành viên gia đình đặt lại mật khẩu đã quên qua email. Tùy chọn — bỏ qua nếu không cần.",
+    "subtitle": "Cho phép các thành viên gia đình đặt lại mật khẩu đã quên qua email. Tùy chọn - bỏ qua nếu không cần.",
     "enable": "Bật gửi email",
     "hint": "Dùng máy chủ SMTP của riêng bạn (nhà cung cấp email, tự lưu trữ hoặc dịch vụ giao dịch).",
     "appHint": "Những gì bạn nhập ở đây sẽ chỉ đọc trong ứng dụng. Nếu muốn quản lý và kiểm tra SMTP trong ứng dụng, tại Cài đặt → Gia đình → Email (SMTP), hãy bỏ qua bước này.",

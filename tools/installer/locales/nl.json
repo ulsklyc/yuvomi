@@ -22,7 +22,7 @@
   "config": {
     "title": "Basisconfiguratie",
     "subtitle": "Hoe wil je Yuvomi bereiken?",
-    "existing": "Bestaande configuratie gevonden — je huidige .env-bestand wordt voor het opslaan geback-upt.",
+    "existing": "Bestaande configuratie gevonden - je huidige .env-bestand wordt voor het opslaan geback-upt.",
     "hostLabel": "Domein of IP-adres",
     "hostHint": "Het adres waarmee je Yuvomi in de browser opent.",
     "portLabel": "Poort",
@@ -55,7 +55,7 @@
   },
   "weather": {
     "title": "Weer-widget",
-    "subtitle": "Live weer op het dashboard — gratis, geen account, geen API-sleutel.",
+    "subtitle": "Live weer op het dashboard - gratis, geen account, geen API-sleutel.",
     "enable": "Weer-widget inschakelen",
     "appHint": "Deze waarden gelden totdat in de app onder Instellingen → Huishouden → Foto's en weer een locatie voor het huishouden is opgeslagen.",
     "latLabel": "Breedtegraad",
@@ -269,7 +269,7 @@
     "title": "Yuvomi is klaar!",
     "subtitle": "Je gezinsplanner werkt en je beheerdersaccount is ingesteld.",
     "open": "Yuvomi openen →",
-    "backupReminder": "Vergeet niet je .env-bestand nu te back-uppen — het bevat je sleutels.",
+    "backupReminder": "Vergeet niet je .env-bestand nu te back-uppen - het bevat je sleutels.",
     "download": ".env-bestand downloaden",
     "savedTo": "Opgeslagen in {{path}}",
     "downloadFailed": "Het bestand kon niet worden geladen - de installer is waarschijnlijk al gestopt. Je sleutels staan in het .env-bestand op je server.",
@@ -319,7 +319,7 @@
   "email": {
     "title": "E-mail & wachtwoordherstel",
     "groupSender": "Afzender",
-    "subtitle": "Laat gezinsleden een vergeten wachtwoord per e-mail herstellen. Optioneel — sla over als je het niet nodig hebt.",
+    "subtitle": "Laat gezinsleden een vergeten wachtwoord per e-mail herstellen. Optioneel - sla over als je het niet nodig hebt.",
     "enable": "E-mailverzending inschakelen",
     "hint": "Gebruikt je eigen SMTP-server (mailprovider, zelf gehost of een transactionele dienst).",
     "appHint": "Wat je hier invult, is in de app alleen-lezen. Wil je SMTP liever in de app beheren en testen onder Instellingen → Huishouden → E-mail (SMTP), sla deze stap dan over.",

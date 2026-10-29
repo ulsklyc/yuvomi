@@ -22,7 +22,7 @@
   "config": {
     "title": "Konfigurasi dasar",
     "subtitle": "Bagaimana Anda ingin mengakses Yuvomi?",
-    "existing": "Konfigurasi yang ada terdeteksi — file .env Anda saat ini dicadangkan sebelum menyimpan.",
+    "existing": "Konfigurasi yang ada terdeteksi - file .env Anda saat ini dicadangkan sebelum menyimpan.",
     "hostLabel": "Domain atau alamat IP",
     "hostHint": "Alamat yang Anda gunakan untuk membuka Yuvomi di browser.",
     "portLabel": "Port",
@@ -55,7 +55,7 @@
   },
   "weather": {
     "title": "Widget cuaca",
-    "subtitle": "Cuaca langsung di dasbor — gratis, tanpa akun, tanpa kunci API.",
+    "subtitle": "Cuaca langsung di dasbor - gratis, tanpa akun, tanpa kunci API.",
     "enable": "Aktifkan widget cuaca",
     "appHint": "Nilai ini berlaku sampai lokasi rumah tangga disimpan di aplikasi, di Pengaturan → Rumah tangga → Foto dan cuaca.",
     "latLabel": "Lintang",
@@ -269,7 +269,7 @@
     "title": "Yuvomi siap!",
     "subtitle": "Perencana keluarga Anda berjalan dan akun admin Anda telah disiapkan.",
     "open": "Buka Yuvomi →",
-    "backupReminder": "Ingat untuk mencadangkan berkas .env Anda sekarang — berkas itu berisi kunci Anda.",
+    "backupReminder": "Ingat untuk mencadangkan berkas .env Anda sekarang - berkas itu berisi kunci Anda.",
     "download": "Unduh berkas .env",
     "savedTo": "Disimpan di {{path}}",
     "downloadFailed": "File tidak dapat dimuat - installer kemungkinan sudah berhenti. Kuncimu ada di file .env pada servermu.",
@@ -319,7 +319,7 @@
   "email": {
     "title": "Email & atur ulang kata sandi",
     "groupSender": "Pengirim",
-    "subtitle": "Izinkan anggota keluarga mengatur ulang kata sandi yang terlupa melalui email. Opsional — lewati jika tidak perlu.",
+    "subtitle": "Izinkan anggota keluarga mengatur ulang kata sandi yang terlupa melalui email. Opsional - lewati jika tidak perlu.",
     "enable": "Aktifkan pengiriman email",
     "hint": "Menggunakan server SMTP Anda sendiri (penyedia email, self-hosted, atau layanan transaksional).",
     "appHint": "Apa yang Anda isi di sini menjadi hanya-baca di aplikasi. Jika lebih suka mengelola dan menguji SMTP di aplikasi, di Pengaturan → Rumah tangga → Email (SMTP), lewati langkah ini.",

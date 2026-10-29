@@ -55,7 +55,7 @@
   },
   "weather": {
     "title": "Widget Meteo",
-    "subtitle": "Meteo in tempo reale nella dashboard — gratuito, senza account, senza chiave API.",
+    "subtitle": "Meteo in tempo reale nella dashboard - gratuito, senza account, senza chiave API.",
     "enable": "Attiva widget meteo",
     "appHint": "Questi valori valgono finché nell’app non viene salvata una posizione della famiglia, in Impostazioni → Famiglia → Foto e meteo.",
     "latLabel": "Latitudine",
@@ -319,7 +319,7 @@
   "email": {
     "title": "E-mail e reimpostazione password",
     "groupSender": "Mittente",
-    "subtitle": "Consenti ai familiari di reimpostare una password dimenticata via e-mail. Facoltativo — salta se non serve.",
+    "subtitle": "Consenti ai familiari di reimpostare una password dimenticata via e-mail. Facoltativo - salta se non serve.",
     "enable": "Attiva l’invio di e-mail",
     "hint": "Usa il tuo server SMTP (provider di posta, self-hosted o un servizio transazionale).",
     "appHint": "Ciò che inserisci qui sarà di sola lettura nell’app. Se preferisci gestire e provare l’SMTP nell’app, in Impostazioni → Famiglia → Email (SMTP), salta questo passaggio.",

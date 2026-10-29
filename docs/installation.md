@@ -1251,7 +1251,7 @@ SESSION_SECURE=true
 TRUST_PROXY=1
 ```
 
-> Both installers set these for you. The web installer's **Advanced** step asks for your deployment type; the CLI installer derives them from the scheme of the base URL you enter — `https://` means proxy (`SESSION_SECURE=true`, `TRUST_PROXY=1`), anything else means direct access (`SESSION_SECURE=false`, `TRUST_PROXY=loopback`). On a re-run both keep a hand-tuned `TRUST_PROXY=2`: the CLI installer keeps any value already in your `.env`, and the web installer keeps it as long as you leave the exposure choice it pre-selects from your `.env` unchanged.
+> Both installers set these for you. The web installer's **Basic Configuration** step asks how Yuvomi is exposed (direct or behind a reverse proxy); the CLI installer derives them from the scheme of the base URL you enter — `https://` means proxy (`SESSION_SECURE=true`, `TRUST_PROXY=1`), anything else means direct access (`SESSION_SECURE=false`, `TRUST_PROXY=loopback`). On a re-run both keep a hand-tuned `TRUST_PROXY=2`: the CLI installer keeps any value already in your `.env`, and the web installer keeps it as long as you leave the exposure choice it pre-selects from your `.env` unchanged.
 
 Then restart the container so the new values take effect:
 

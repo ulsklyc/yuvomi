@@ -462,3 +462,23 @@ test('Verhuellen bis zur Sprache: nur per Skript, mit Zeitgeber, Fehlerausgang u
   const lifted = script.indexOf("classList.remove('i18n-pending')");
   assert.ok(shown !== -1 && lifted > shown, 'die Verhuellung faellt vor dem ersten Bild - oder nie');
 });
+
+/* Kein Geviert- oder Halbgeviertstrich in den Installer-Texten (Web und CLI).
+ * Die Projektregel ist "-" ueberall, auch in UI-Texten (CONTRIBUTING.md); die
+ * Locales trugen trotzdem Em-Dashes in 21 Sprachen und Halbgeviertstriche als
+ * Minus ("-90") und Bereich ("3-64") (Critique 2026-10-29). Geprueft wird der
+ * Rohtext, nicht nur Werte: auch Kopfkommentare der CLI-Dateien. */
+test('Installer-Locales (Web + CLI) enthalten keine Em- oder En-Dashes', () => {
+  const files = [
+    ...readdirSync(LOCALES_DIR).filter(f => f.endsWith('.json')).map(f => new URL(f, LOCALES_DIR)),
+    ...readdirSync(new URL('cli/', LOCALES_DIR)).filter(f => f.endsWith('.sh')).map(f => new URL(`cli/${f}`, LOCALES_DIR)),
+  ];
+  assert.ok(files.length >= 50, `nur ${files.length} Locale-Dateien gefunden - der Leser greift nicht`);
+  const hits = [];
+  for (const url of files) {
+    readFileSync(url, 'utf8').split('\n').forEach((line, i) => {
+      if (/[–—]/.test(line)) hits.push(`${url.pathname.split('/locales/')[1]}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(hits, [], `Em-/En-Dash statt "-": ${hits.join(', ')}`);
+});

@@ -22,7 +22,7 @@
   "config": {
     "title": "Základní konfigurace",
     "subtitle": "Jak chceš přistupovat k Yuvomi?",
-    "existing": "Nalezena stávající konfigurace – před uložením bude záloha tvého souboru .env.",
+    "existing": "Nalezena stávající konfigurace - před uložením bude záloha tvého souboru .env.",
     "hostLabel": "Doména nebo IP adresa",
     "hostHint": "Adresa, na které otevřeš Yuvomi v prohlížeči.",
     "portLabel": "Port",
@@ -55,7 +55,7 @@
   },
   "weather": {
     "title": "Widget počasí",
-    "subtitle": "Živé počasí na nástěnce — zdarma, bez účtu, bez API klíče.",
+    "subtitle": "Živé počasí na nástěnce - zdarma, bez účtu, bez API klíče.",
     "enable": "Povolit widget počasí",
     "appHint": "Tyto hodnoty platí, dokud se v aplikaci v Nastavení → Domácnost → Fotky a počasí neuloží poloha domácnosti.",
     "latLabel": "Zeměpisná šířka",
@@ -269,7 +269,7 @@
     "title": "Yuvomi je připraven!",
     "subtitle": "Tvůj rodinný plánovač běží a účet správce je nastaven.",
     "open": "Otevřít Yuvomi →",
-    "backupReminder": "Nezapomeňte nyní zálohovat soubor .env — obsahuje vaše klíče.",
+    "backupReminder": "Nezapomeňte nyní zálohovat soubor .env - obsahuje vaše klíče.",
     "download": "Stáhnout soubor .env",
     "savedTo": "Uloženo do {{path}}",
     "downloadFailed": "Soubor se nepodařilo načíst - instalátor se pravděpodobně už ukončil. Tvé klíče najdeš v souboru .env na serveru.",
@@ -319,7 +319,7 @@
   "email": {
     "title": "E-mail a obnovení hesla",
     "groupSender": "Odesílatel",
-    "subtitle": "Umožněte členům rodiny obnovit zapomenuté heslo e-mailem. Volitelné — přeskočte, pokud to nepotřebujete.",
+    "subtitle": "Umožněte členům rodiny obnovit zapomenuté heslo e-mailem. Volitelné - přeskočte, pokud to nepotřebujete.",
     "enable": "Povolit odesílání e-mailů",
     "hint": "Používá váš vlastní SMTP server (poskytovatel pošty, self-hosted nebo transakční služba).",
     "appHint": "Co tu zadáš, bude v aplikaci jen pro čtení. Pokud chceš SMTP spravovat a testovat v aplikaci v Nastavení → Domácnost → E-mail (SMTP), tento krok přeskoč.",

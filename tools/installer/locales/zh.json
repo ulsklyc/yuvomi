@@ -22,7 +22,7 @@
   "config": {
     "title": "基本配置",
     "subtitle": "您将如何访问 Yuvomi？",
-    "existing": "检测到现有配置——保存前将备份您当前的 .env 文件。",
+    "existing": "检测到现有配置 - 保存前将备份您当前的 .env 文件。",
     "hostLabel": "域名或 IP 地址",
     "hostHint": "您将用于在浏览器中打开 Yuvomi 的地址。",
     "portLabel": "端口",
@@ -55,7 +55,7 @@
   },
   "weather": {
     "title": "天气小组件",
-    "subtitle": "在仪表板上显示实时天气——免费、无需账户、无需 API 密钥。",
+    "subtitle": "在仪表板上显示实时天气 - 免费、无需账户、无需 API 密钥。",
     "enable": "启用天气小组件",
     "appHint": "这些值会一直生效，直到在应用的 设置 → 家庭 → 照片和天气 中保存了家庭位置。",
     "latLabel": "纬度",
@@ -189,7 +189,7 @@
     "title": "Yuvomi 已就绪！",
     "subtitle": "您的家庭规划器正在运行，管理员账户已设置完成。",
     "open": "打开 Yuvomi →",
-    "backupReminder": "记得现在备份你的 .env 文件——它保存着你的密钥。",
+    "backupReminder": "记得现在备份你的 .env 文件 - 它保存着你的密钥。",
     "download": "下载 .env 文件",
     "savedTo": "已保存到 {{path}}",
     "downloadFailed": "无法加载文件 - 安装程序很可能已经退出。你的密钥保存在服务器上的 .env 文件中。",
@@ -319,7 +319,7 @@
   "email": {
     "title": "电子邮件与密码重置",
     "groupSender": "发件人",
-    "subtitle": "让家庭成员通过电子邮件重置忘记的密码。可选——如无需要可跳过。",
+    "subtitle": "让家庭成员通过电子邮件重置忘记的密码。可选 - 如无需要可跳过。",
     "enable": "启用邮件发送",
     "hint": "使用你自己的 SMTP 服务器（邮箱提供商、自托管或事务性服务）。",
     "appHint": "在此填写的内容在应用中为只读。如果你更想在应用的 设置 → 家庭 → 邮件 (SMTP) 中管理和测试 SMTP，请跳过此步骤。",

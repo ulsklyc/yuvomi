@@ -91,7 +91,7 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
      exposure choice); the simple path derives it. A typed value only wins over
      the pre-fill when it names a full `http://` or `https://` origin.
      Every redirect URI the wizard
-     shows - Google Calendar, Google Drive, OIDC - is built from that one value, so
+     shows - Google Calendar, Outlook, Google Drive, OIDC - is built from that one value, so
      what you copy into a provider console is what the app will send.
    - A language switcher (top corner) overrides the auto-detected browser
      language and remembers your choice.
@@ -238,8 +238,11 @@ double-click cannot pass both confirmation stages at once.
   `POST /api/start`, `GET /api/status`, `POST /api/create-admin`,
   `GET /api/env-file` (serves the written `.env` for the final download - same
   loopback guard, since the file carries the encryption keys).
-- `env-schema.js` — the single source of truth (`ENV_SCHEMA`) for every
-  configurable variable, its group, default, and whether it is written to `.env`.
+- `env-schema.js` - the variable catalogue (`ENV_SCHEMA`): every configurable
+  variable, its group, default, and whether it is written to `.env`, plus the
+  re-run allowlists. It is not the only place a variable lives: the wizard's
+  fields and `buildEnv()` in `install.html`, the CLI installer and `.env.example`
+  carry their own copies, and `test/test-installer-schema.js` binds them to it.
 - `rerun-prefill.js` — pure functions that turn the re-run values from
   `/api/preflight` into field pre-fills (`prefillPlan`) and keep `SESSION_SECURE`/
   `TRUST_PROXY` while the exposure choice is unchanged (`accessEnv`); served to the

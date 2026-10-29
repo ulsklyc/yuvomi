@@ -1,4 +1,4 @@
-# Yuvomi CLI-Installer — हिन्दी (hi)
+# Yuvomi CLI-Installer - हिन्दी (hi)
 # Auto-generiert (Schlüssel identisch zu allen Locales). en = Fallback, de = Referenz.
 # Wird von install.sh gesourct; setzt die englische Basis pro Schlüssel außer Kraft.
 # Punkt-Schlüssel → Variablen mit Unterstrich (MSG_<bereich>_<name>).
@@ -6,7 +6,7 @@ MSG_prereq_step="पूर्वापेक्षाओं की जाँच 
 MSG_prereq_curl_found="curl मिल गया"
 MSG_prereq_curl_missing="curl नहीं मिला"
 MSG_prereq_engine_found="Compose के साथ %s मिला (%s)"
-MSG_prereq_engine_missing="कोई कंटेनर इंजन नहीं मिला — Docker (Compose v2) या Podman (podman compose / podman-compose) आवश्यक है"
+MSG_prereq_engine_missing="कोई कंटेनर इंजन नहीं मिला - Docker (Compose v2) या Podman (podman compose / podman-compose) आवश्यक है"
 MSG_prereq_fix="अनुपस्थित पूर्वापेक्षाएँ इंस्टॉल करें और फिर से चलाएँ।"
 MSG_basic_step="चरण 1/7: मूल कॉन्फ़िगरेशन"
 MSG_basic_host="डोमेन या IP पता [localhost]:"
@@ -24,8 +24,8 @@ MSG_weather_enable="मौसम विजेट सक्षम करें? [
 MSG_weather_coords_hint="  openstreetmap.org या Google Maps पर निर्देशांक खोजें।"
 MSG_weather_lat="  अक्षांश (-90 .. 90):"
 MSG_weather_lon="  देशांतर (-180 .. 180):"
-MSG_weather_err_lat="अमान्य अक्षांश (–90 से 90)।"
-MSG_weather_err_lon="अमान्य देशांतर (–180 से 180)।"
+MSG_weather_err_lat="अमान्य अक्षांश (-90 से 90)।"
+MSG_weather_err_lon="अमान्य देशांतर (-180 से 180)।"
 MSG_weather_city="  शहर का नाम (वैकल्पिक):"
 MSG_weather_units="  इकाइयाँ (metric/imperial) [metric]:"
 MSG_calendar_step="चरण 4/7: कैलेंडर सिंक (वैकल्पिक)"
@@ -70,7 +70,7 @@ MSG_review_proceed="आगे बढ़ें? [Y/n]:"
 MSG_review_aborted="निरस्त किया गया।"
 MSG_container_step="चरण 6/7: कंटेनर प्रारंभ हो रहा है (%s)"
 MSG_container_backup_ok="मौजूदा .env का बैकअप %s पर लिया गया"
-MSG_container_backup_fail="मौजूदा .env का बैकअप नहीं लिया जा सका — डेटा हानि से बचने के लिए निरस्त किया जा रहा है।"
+MSG_container_backup_fail="मौजूदा .env का बैकअप नहीं लिया जा सका - डेटा हानि से बचने के लिए निरस्त किया जा रहा है।"
 MSG_container_env_written=".env लिखा गया"
 MSG_container_preserved="पिछली .env से %s प्रविष्टियाँ रखी गईं"
 MSG_container_start_fail="%s प्रारंभ नहीं हो सका। हाल के लॉग:"
@@ -96,7 +96,7 @@ MSG_noninteractive_ready="तैयार"
 MSG_noninteractive_started="कंटेनर प्रारंभ हुआ।"
 MSG_noninteractive_create_admin="व्यवस्थापक बनाएँ:"
 MSG_noninteractive_env_not_found="env फ़ाइल नहीं मिली: %s"
-MSG_noninteractive_no_engine="कोई कंटेनर इंजन नहीं मिला — Docker (Compose v2) या Podman (podman compose / podman-compose) आवश्यक है।"
+MSG_noninteractive_no_engine="कोई कंटेनर इंजन नहीं मिला - Docker (Compose v2) या Podman (podman compose / podman-compose) आवश्यक है।"
 MSG_common_interrupted="बाधित। बाहर निकल रहे हैं।"
 MSG_usage_envfile="उपयोग: %s --env-file /path/to/.env"
 MSG_document_google_drive_step="वैकल्पिक: Google Drive दस्तावेज़ संग्रहण"

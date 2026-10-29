@@ -22,7 +22,7 @@
   "config": {
     "title": "Configuration de base",
     "subtitle": "Comment accéderez-vous à Yuvomi ?",
-    "existing": "Configuration existante détectée — une sauvegarde de votre fichier .env actuel sera créée avant l'enregistrement.",
+    "existing": "Configuration existante détectée - une sauvegarde de votre fichier .env actuel sera créée avant l'enregistrement.",
     "hostLabel": "Domaine ou adresse IP",
     "hostHint": "L'adresse que vous utiliserez pour ouvrir Yuvomi dans votre navigateur.",
     "portLabel": "Port",
@@ -55,7 +55,7 @@
   },
   "weather": {
     "title": "Widget Météo",
-    "subtitle": "Météo en direct sur le tableau de bord — gratuit, sans compte, sans clé API.",
+    "subtitle": "Météo en direct sur le tableau de bord - gratuit, sans compte, sans clé API.",
     "enable": "Activer le widget météo",
     "appHint": "Ces valeurs s’appliquent jusqu’à ce qu’un emplacement du foyer soit enregistré dans l’app, sous Paramètres → Foyer → Photos et météo.",
     "latLabel": "Latitude",
@@ -319,7 +319,7 @@
   "email": {
     "title": "E-mail et réinitialisation du mot de passe",
     "groupSender": "Expéditeur",
-    "subtitle": "Permettez aux membres de la famille de réinitialiser un mot de passe oublié par e-mail. Facultatif — ignorez si inutile.",
+    "subtitle": "Permettez aux membres de la famille de réinitialiser un mot de passe oublié par e-mail. Facultatif - ignorez si inutile.",
     "enable": "Activer l’envoi d’e-mails",
     "hint": "Utilise votre propre serveur SMTP (fournisseur de messagerie, auto-hébergé ou service transactionnel).",
     "appHint": "Ce que vous saisissez ici sera en lecture seule dans l’app. Pour gérer et tester le SMTP dans l’app, sous Paramètres → Foyer → E-mail (SMTP), passez cette étape.",

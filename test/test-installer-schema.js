@@ -123,9 +123,12 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
   DB_PATH: 'Vom Descriptor auf /data/yuvomi.db gesetzt.',
   BACKUP_DIR:
     'Die App liest diesen Namen selbst (backup-scheduler.js) und meint damit das Ziel IM '
-    + 'Container. Ein Host-Pfad in der .env wird dort zu /app/backups, ausserhalb des Mounts - '
-    + 'das war #579. Anders als DATA_DIR, das die App nie liest und deshalb im Wizard stehen '
-    + 'darf. Der Host-Ordner der Sicherungen wird ueber den Mount gesetzt, nicht hierueber.',
+    + 'Container; ungepinnt landete ein Host-Pfad aus der .env dort ausserhalb des Mounts - '
+    + 'das war #579. Seither pinnt jeder Descriptor ihn unter environment auf /backups (Guard '
+    + 'unten). Bei Compose verschiebt ein .env-Wert damit nur die Mount-Quelle '
+    + '(docker-compose.yml: ${BACKUP_DIR:-./backups}:/backups), wie bei MODULES_DIR. Der Wizard '
+    + 'fragt ihn trotzdem nicht ab: dieselbe Zeile hiesse im Container etwas anderes als auf dem '
+    + 'Host, und das Quadlet interpoliert nicht.',
   MODULES_DIR:
     'Dieselbe Regel wie bei BACKUP_DIR: die App liest den Namen selbst (services/modules.js) '
     + 'und meint das Verzeichnis IM Container. Docker, Podman und Quadlet laden die .env in den '
