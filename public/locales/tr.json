@@ -3413,7 +3413,7 @@
         "screensaverConnectImmich": "Immich'i bağla",
         "weatherPlaceLabel": "Yer",
         "weatherPlaceHint": "Arama, hava durumu hizmeti Open-Meteo üzerinde yapılır. Yalnızca yer adı gönderilir.",
-        "weatherPlacePlaceholder": "Şehir veya posta kodu",
+        "weatherPlacePlaceholder": "Şehir veya ilçe",
         "weatherPlaceSearch": "Ara",
         "weatherPlaceCurrent": "Şu an: {{place}}",
         "weatherPlaceNone": "Henüz bir yer seçilmedi.",

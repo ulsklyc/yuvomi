@@ -3431,7 +3431,7 @@
         "screensaverConnectImmich": "Immich 연결",
         "weatherPlaceLabel": "장소",
         "weatherPlaceHint": "검색은 날씨 서비스 Open-Meteo에서 이루어집니다. 장소 이름만 전송됩니다.",
-        "weatherPlacePlaceholder": "도시 또는 우편번호",
+        "weatherPlacePlaceholder": "도시 또는 마을",
         "weatherPlaceSearch": "검색",
         "weatherPlaceCurrent": "현재: {{place}}",
         "weatherPlaceNone": "아직 선택한 장소가 없습니다.",

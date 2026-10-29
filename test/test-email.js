@@ -98,6 +98,42 @@ test('starttls maps to secure:false + requireTLS:true', async () => {
   assert.equal(nm.created[0].requireTLS, true);
 });
 
+// #2326: "keine" hiess bisher nur secure:false - nodemailer macht dann aber
+// opportunistisch STARTTLS, sobald der Server es anbietet, und scheitert an
+// dessen selbstsigniertem Zertifikat. "keine" muss ignoreTLS setzen, egal ob
+// der Wert aus der Datenbank (UI) oder aus EMAIL_SMTP_SECURE kommt.
+for (const [label, cfg, env] of [
+  ['ui', { email_smtp_secure: 'none' }, {}],
+  ['env', { email_smtp_secure: 'starttls' }, { EMAIL_SMTP_SECURE: 'none' }],
+]) {
+  test(`none (${label}) maps to secure:false + ignoreTLS:true, never requireTLS`, async () => {
+    const db = makeDb();
+    setCfg(db, { email_smtp_host: 'smtp.test', email_smtp_port: '25', email_from_address: 'a@test', ...cfg });
+    const nm = makeNodemailerMock();
+    const svc = createEmailService({ db, nodemailer: nm, env });
+    await svc.sendTest('admin@test');
+    await svc.sendMail({ to: 'x@test', subject: 's', text: 't' });
+    assert.equal(nm.created.length, 2);
+    for (const opts of nm.created) {
+      assert.equal(opts.secure, false);
+      assert.equal(opts.ignoreTLS, true);
+      assert.equal(opts.requireTLS, undefined);
+      assert.equal(opts.port, 25);
+    }
+  });
+}
+
+test('ssl and starttls never set ignoreTLS', async () => {
+  for (const secure of ['ssl', 'starttls']) {
+    const db = makeDb();
+    setCfg(db, { email_smtp_host: 'smtp.test', email_smtp_secure: secure, email_from_address: 'a@test' });
+    const nm = makeNodemailerMock();
+    const svc = createEmailService({ db, nodemailer: nm, env: {} });
+    await svc.sendMail({ to: 'x@test', subject: 's', text: 't' });
+    assert.equal(nm.created[0].ignoreTLS, undefined, secure);
+  }
+});
+
 test('sendMail throws when not configured', async () => {
   const db = makeDb();
   const svc = createEmailService({ db, nodemailer: makeNodemailerMock(), env: {} });
