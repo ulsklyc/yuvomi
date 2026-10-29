@@ -63,6 +63,23 @@ function cronItem(item, field) {
   return lo !== null && hi !== null && lo <= hi;
 }
 
+/** Die Zahlen, die ein schon geprueftes Feld abdeckt (`*` und `?` = alle). */
+function cronNumbers(part, field) {
+  const out = new Set();
+  if (part === '?') part = '*';
+  for (const item of part.split(',')) {
+    const [range, step = '1'] = item.split('/');
+    const bounds = range === '*' ? [String(field.min), String(field.max)] : range.split('-');
+    const lo = cronValue(bounds[0], field);
+    const hi = bounds.length === 2 ? cronValue(bounds[1], field) : lo;
+    for (let n = lo; n <= hi; n += Number(step)) out.add(n);
+  }
+  return out;
+}
+
+/** Laengster Tag je Monat (Februar mit Schaltjahr), wie node-cron MAX_DAYS_IN_MONTH. */
+const MAX_DAYS_IN_MONTH = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
 function cronPart(part, field) {
   // `?` steht bei node-cron nur als ganzes Feld und nur bei Tag und Wochentag.
   if (part === '?') return Boolean(field.question);
@@ -73,7 +90,8 @@ function cronPart(part, field) {
  * Ein Cron-Ausdruck in der Grammatik des Backup-Schedulers (node-cron): fuenf
  * Felder oder sechs mit fuehrender Sekunde, je Feld `*`, `*\/n`, Zahl, Name,
  * Bereich `a-b`, Bereich mit Schritt `a-b/n` und Listen daraus, `?` bei Tag und
- * Wochentag, dazu die Kurzformen @daily usw.
+ * Wochentag, dazu die Kurzformen @daily usw. Tag und Monat muessen sich in
+ * mindestens einem Monat treffen (kein 31. Februar).
  *
  * Absichtlich eine Teilmenge von node-cron (server/services/backup-scheduler.js,
  * `cron.validate`): was hier durchgeht, nimmt der Scheduler garantiert an - der
@@ -90,7 +108,14 @@ export function isValidCron(expr) {
     if (!cronPart(parts.shift(), SECOND)) return false;
   }
   if (parts.length !== CRON_FIELDS.length) return false;
-  return parts.every((part, i) => cronPart(part, CRON_FIELDS[i]));
+  if (!parts.every((part, i) => cronPart(part, CRON_FIELDS[i]))) return false;
+  // Tag und Monat muessen in mindestens einem Monat zusammenpassen: `0 3 31 2 *`
+  // (31. Februar) laeuft nie, node-cron 4.6 lehnt es als "impossible day of
+  // month" ab (isImpossibleDayOfMonth), und der Server schaltete die Backups
+  // beim Start still ab.
+  const days = [...cronNumbers(parts[2], CRON_FIELDS[2])];
+  const months = [...cronNumbers(parts[3], CRON_FIELDS[3])];
+  return months.some(month => days.some(day => day <= MAX_DAYS_IN_MONTH[month]));
 }
 
 /**

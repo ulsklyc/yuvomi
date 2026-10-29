@@ -1217,9 +1217,14 @@ test('die Pruefseite hat Gruppen mit Aendern-Link und keine Strich-Zeile', () =>
   const run = (overrides) => {
     for (const c of cells.values()) { c.textContent = 'VORHER'; c.parentElement.classes.clear(); }
     const S = { ...literal('S'), ...overrides };
-    new Function('S', '$', 't', 'preservedKeys', 'deriveBaseUrl',
+    // Hinweis und Entfernt-Zeile (Re-Critique 29.10.) haben eigene Tests in
+    // test-installer-rerun.js; hier nur so weit gestubbt, dass renderReview laeuft.
+    const extra = id => ({ hidden: true, textContent: '', id });
+    new Function('S', '$', 't', 'preservedKeys', 'deriveBaseUrl', 'isLoopbackHost', 'originHost',
+      'pendingClears', 'buildEnv',
       `${fnSource('fillReviewGroup')}; ${fnSource('renderReview')}; renderReview();`)(
-      S, id => cells.get(id), key => `T:${key}`, new Set(), () => 'http://localhost:3000');
+      S, id => cells.get(id) ?? extra(id), key => `T:${key}`, new Set(), () => 'http://localhost:3000',
+      () => false, () => '', () => [], () => ({}));
     return cells;
   };
 
@@ -1810,8 +1815,11 @@ test('showStep: das erste Bild fokussiert nicht, ein echter Wechsel schon', () =
  * und scrollte NACH dem Klassentausch (gemessen 42 ms bei 4x CPU, Critique
  * 2026-10-29). Jetzt: im Rueckruf zuerst scrollen, dann tauschen, kein
  * focus(); der Fokus folgt als `settle` - sofort ohne Transition, mit
- * Transition erst nach dem Tausch UND `ready`. swapStep wird AUSGEFUEHRT. */
-test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt nach ready', async () => {
+ * Transition erst nach `finished`. Nach `ready` war es noch zu frueh: die
+ * Re-Critique (29.10.) mass dort 31 ms erzwungenen Reflow, weil focus() mitten
+ * in der laufenden Animation Stil und Layout neu rechnete. swapStep wird
+ * AUSGEFUEHRT. */
+test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt nach finished', async () => {
   const render = fnSource('renderStep');
   assert.doesNotMatch(render, /\.focus\(/, 'renderStep fokussiert im Rueckruf der View Transition');
   assert.ok(render.indexOf('scrollTo(') !== -1 && render.indexOf('scrollTo(') < render.indexOf("classList.toggle('active'"),
@@ -1821,7 +1829,7 @@ test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt 
   const make = (api) => {
     const order = [];
     const root = fakeEl();
-    let resolveReady;
+    let resolveReady, resolveFinished;
     const doc = { documentElement: root, visibilityState: 'visible', addEventListener() {}, removeEventListener() {} };
     if (api) {
       doc.startViewTransition = cb => {
@@ -1829,14 +1837,14 @@ test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt 
         const vt = {
           updateCallbackDone: new Promise(r => { done = r; }),
           ready: new Promise(r => { resolveReady = r; }),
-          finished: new Promise(() => {}), skipTransition() {},
+          finished: new Promise(r => { resolveFinished = r; }), skipTransition() {},
         };
         doc.run = () => { cb(); done(); };
         return vt;
       };
     }
     const swapStep = new Function('document', 'matchMedia', src)(doc, () => ({ matches: false }));
-    return { swapStep, doc, order, ready: () => resolveReady() };
+    return { swapStep, doc, order, ready: () => resolveReady(), finished: () => resolveFinished() };
   };
   // Ohne Transition: Tausch, dann sofort Fokus.
   {
@@ -1844,9 +1852,9 @@ test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt 
     swapStep(() => order.push('update'), 'forward', true, () => order.push('focus'));
     assert.deepEqual(order, ['update', 'focus']);
   }
-  // Mit Transition: Fokus weder vor dem Tausch noch vor ready.
+  // Mit Transition: Fokus weder vor dem Tausch noch waehrend der Animation.
   {
-    const { swapStep, doc, order, ready } = make(true);
+    const { swapStep, doc, order, ready, finished } = make(true);
     swapStep(() => order.push('update'), 'forward', true, () => order.push('focus'));
     await new Promise(r => setTimeout(r, 0));
     assert.deepEqual(order, [], 'Fokus vor der Aufnahme des alten Bildes');
@@ -1855,7 +1863,45 @@ test('Schrittwechsel: kein focus() im Rueckruf der View Transition, Fokus folgt 
     assert.deepEqual(order, ['update'], 'Fokus vor ready - er erzwingt das Layout des neuen Bildes');
     ready();
     await new Promise(r => setTimeout(r, 0));
-    assert.deepEqual(order, ['update', 'focus'], 'der Fokus folgt nach ready nicht');
+    assert.deepEqual(order, ['update'], 'Fokus waehrend der Animation - erzwungener Reflow (31 ms)');
+    finished();
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(order, ['update', 'focus'], 'der Fokus folgt nach finished nicht');
+  }
+  // Verworfen (finished lehnt ab): der Fokus folgt trotzdem, sobald der Tausch steht.
+  {
+    const order = [];
+    const doc = {
+      documentElement: fakeEl(), visibilityState: 'visible', addEventListener() {}, removeEventListener() {},
+      startViewTransition: cb => {
+        cb();
+        return {
+          updateCallbackDone: Promise.resolve(), ready: Promise.reject(new Error('skip')),
+          finished: Promise.reject(new Error('skip')), skipTransition() {},
+        };
+      },
+    };
+    const src2 = `${fnSource('canViewTransition')}\nlet stepTransition = null;\n${fnSource('swapStep')}\nreturn swapStep;`;
+    const swapStep = new Function('document', 'matchMedia', src2)(doc, () => ({ matches: false }));
+    swapStep(() => order.push('update'), 'forward', true, () => order.push('focus'));
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(order, ['update', 'focus'], 'eine verworfene Transition verliert den Fokus');
+  }
+  // Scheitert schon der Tausch, gibt es nichts zu fokussieren.
+  {
+    const order = [];
+    const doc = {
+      documentElement: fakeEl(), visibilityState: 'visible', addEventListener() {}, removeEventListener() {},
+      startViewTransition: () => ({
+        updateCallbackDone: Promise.reject(new Error('boom')), ready: Promise.reject(new Error('boom')),
+        finished: Promise.reject(new Error('boom')), skipTransition() {},
+      }),
+    };
+    const src3 = `${fnSource('canViewTransition')}\nlet stepTransition = null;\n${fnSource('swapStep')}\nreturn swapStep;`;
+    const swapStep = new Function('document', 'matchMedia', src3)(doc, () => ({ matches: false }));
+    swapStep(() => order.push('update'), 'forward', true, () => order.push('focus'));
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(order, [], 'Fokus nach gescheitertem Tausch');
   }
 });
 
@@ -2533,4 +2579,91 @@ test('theme-color folgt --color-bg in beiden Themes', () => {
   const light = fb.slice(0, dark).match(/--color-bg:\s*(#[0-9A-Fa-f]{6})/)?.[1].toLowerCase();
   const darkBg = fb.slice(dark).match(/--color-bg:\s*(#[0-9A-Fa-f]{6})/)?.[1].toLowerCase();
   assert.deepEqual(byScheme, { light, dark: darkBg });
+});
+
+// ── Re-Critique 2026-10-29: Kopierfehler und Autofill ─────────────────────────
+
+/* Kopieren meldete "Kopiert" auch, wenn die Zwischenablage ablehnte (Rechte,
+ * unsicherer Kontext): der catch war leer, die Erfolgsmeldung stand dahinter.
+ * Wer danach einfuegte, hatte nichts - ausgerechnet bei den Schluesseln und
+ * Redirect-URIs, die zeichengenau woanders hin muessen. Jetzt meldet nur der
+ * Erfolg Erfolg; scheitert es, ist der Wert markiert und die Meldung sagt,
+ * was zu tun ist. copyValue wird AUSGEFUEHRT. */
+test('Kopieren meldet nur bei Erfolg "Kopiert", sonst markiert es den Wert', async () => {
+  const make = (writeText) => {
+    const els = {};
+    const selection = { all: null, selectAllChildren(n) { this.all = n; } };
+    const $ = id => els[id];
+    const run = new Function('$', 't', 'navigator', 'document', 'window', 'setTimeout', 'clearTimeout',
+      `return (async ${fnSource('copyValue')});\n${fnSource('selectForManualCopy')}`)(
+      $, k => k, { clipboard: { writeText } }, { querySelector: () => null },
+      { getSelection: () => selection }, () => 0, () => {});
+    return { els, run, selection };
+  };
+  // Erfolg
+  {
+    const { els, run } = make(async () => {});
+    els.a = fakeEl({ value: 'geheim', type: 'text', select() { this.selected = true; } });
+    els['a-copied'] = fakeEl();
+    await run('a');
+    assert.equal(els['a-copied'].textContent, 'common.copied');
+    assert.ok(!els.a.selected, 'bei Erfolg wird nichts markiert');
+  }
+  // Abgelehnt: Feld
+  {
+    const { els, run } = make(async () => { throw new Error('denied'); });
+    els.a = fakeEl({ value: 'geheim', type: 'password', select() { this.selected = true; } });
+    els['a-copied'] = fakeEl();
+    await run('a');
+    assert.notEqual(els['a-copied'].textContent, 'common.copied', 'ein gescheitertes Kopieren meldet Erfolg');
+    assert.equal(els['a-copied'].textContent, 'common.copyFailed');
+    assert.ok(els.a.selected, 'der Wert ist zum manuellen Kopieren nicht markiert');
+    assert.equal(els.a.type, 'text', 'ein verdecktes Feld laesst sich nicht kopieren - es muss sichtbar werden');
+    assert.ok(els['a-copied'].classes.has('copied-note--fail'), 'die Fehlermeldung steht in Erfolgsgruen');
+  }
+  // Abgelehnt: <code> ohne value
+  {
+    const { els, run, selection } = make(async () => { throw new Error('denied'); });
+    els.c = fakeEl({ textContent: 'https://x.test/cb' });
+    els['c-copied'] = fakeEl();
+    await run('c');
+    assert.equal(els['c-copied'].textContent, 'common.copyFailed');
+    assert.equal(selection.all, els.c, 'die Redirect-URI ist nicht markiert');
+  }
+  // Ganz ohne Clipboard-API (unsicherer Kontext): derselbe Weg, kein TypeError nach aussen.
+  {
+    const els = {};
+    const run = new Function('$', 't', 'navigator', 'document', 'window', 'setTimeout', 'clearTimeout',
+      `return (async ${fnSource('copyValue')});\n${fnSource('selectForManualCopy')}`)(
+      id => els[id], k => k, {}, { querySelector: () => null },
+      { getSelection: () => ({ selectAllChildren() {} }) }, () => 0, () => {});
+    els.a = fakeEl({ value: 'x', type: 'text', select() {} });
+    els['a-copied'] = fakeEl();
+    await run('a');
+    assert.equal(els['a-copied'].textContent, 'common.copyFailed');
+  }
+  assert.match(html, /const copyBtn = e\.target\.closest\('\[data-copy\]'\);\s*if \(copyBtn\) \{\s*await copyValue\(copyBtn\.dataset\.copy\);/,
+    'der Klick-Handler kopiert nicht ueber copyValue');
+});
+
+/* Secret- und Passwortfelder ohne autocomplete: Chrome sah in apple-user
+ * (type=email) plus apple-pass ein Login, bot gespeicherte Passwoerter an und
+ * fuellte im schlimmsten Fall ein fremdes Passwort als App-Passwort ein.
+ * Gilt fuer JEDES Passwortfeld: autocomplete steht ausdruecklich, und nur
+ * "new-password" (fuellt nie ein bestehendes) oder "off". */
+test('jedes Passwort-/Secret-Feld traegt ein autocomplete, das nie ein gespeichertes Passwort einfuellt', () => {
+  const inputs = [...html.matchAll(/<input\b[^>]*>/g)].map(m => m[0]);
+  const pw = inputs.filter(tag => /\btype="password"/.test(tag));
+  assert.ok(pw.length >= 13, `nur ${pw.length} Passwortfelder gefunden - der Test misst nichts`);
+  const bad = pw.filter(tag => !/\bautocomplete="(new-password|off)"/.test(tag)).map(tag => tag.match(/id="([^"]+)"/)?.[1]);
+  assert.deepEqual(bad, [], 'Passwortfelder ohne autocomplete="new-password"/"off"');
+  // Das Feld direkt vor einem Passwortfeld macht daraus fuer Chrome ein Login-Paar.
+  const missing = [];
+  inputs.forEach((tag, i) => {
+    if (!/\btype="password"/.test(tag) || i === 0) return;
+    const prev = inputs[i - 1];
+    if (/\btype="(email|text)"/.test(prev) && !/\bautocomplete="/.test(prev)) missing.push(prev.match(/id="([^"]+)"/)?.[1]);
+  });
+  assert.deepEqual(missing, [], 'Nutzerfeld vor einem Passwortfeld ohne autocomplete');
+  assert.match(html, /<input type="email" id="apple-user"[^>]*autocomplete="off"/, 'apple-user sieht weiter wie ein Login aus');
 });

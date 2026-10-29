@@ -210,8 +210,10 @@ export function readEnvFile(envPath) {
  *
  * Kommentare und Leerzeilen fallen weg: sie beziehen sich auf den alten Aufbau
  * der Datei und stünden im neuen an der falschen Stelle.
+ *
+ * `cleared`: Schlüssel, deren Zeile bewusst wegfällt (siehe clearableKeys).
  */
-export function preserveUnmanagedLines(envPath, written) {
+export function preserveUnmanagedLines(envPath, written, cleared = new Set()) {
   if (!existsSync(envPath)) return [];
   let content;
   try {
@@ -227,7 +229,7 @@ export function preserveUnmanagedLines(envPath, written) {
     if (separator < 1) continue;
     const key = trimmed.slice(0, separator).trim();
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
-    if (written[key]) continue;
+    if (written[key] || cleared.has(key)) continue;
     lines.push(trimmed);
   }
   return lines;
@@ -246,6 +248,24 @@ export function preserveUnmanagedLines(envPath, written) {
  * hat der Nutzer ihn im Experten-Modus bewusst eingetragen.
  */
 export const PRESERVED_KEYS = ['SESSION_SECRET', 'DB_ENCRYPTION_KEY'];
+
+/**
+ * Die Schlüssel aus `clear` (save-env-Body), deren Zeile der Server entfernen
+ * darf: der Nutzer hat ihr vorbelegtes Feld im Wizard geleert (clearedKeys in
+ * rerun-prefill.js). Erzwungen wird hier, nicht im Client: nur Schlüssel der
+ * Allowlist RERUN_PREFILL_KEYS - also nie ein Secret, nie ein PRESERVED_KEY,
+ * nie eine `_FILE`-Variante oder eine von Hand ergänzte Zeile - und nur, wenn
+ * derselbe Request keinen Wert dafür schickt (dann gewinnt der Wert). Alles
+ * andere in `clear` wird stillschweigend ignoriert.
+ */
+export function clearableKeys(clear, written) {
+  if (!Array.isArray(clear)) return new Set();
+  return new Set(clear.filter(key => typeof key === 'string'
+    && RERUN_PREFILL_KEYS.includes(key)
+    && !PRESERVED_KEYS.includes(key)
+    && !RERUN_SECRET_KEYS.includes(key)
+    && !written[key]));
+}
 
 /**
  * Was der Wizard bei einem Rerun aus der bestehenden .env erfahren darf.
@@ -897,10 +917,13 @@ async function route(req, res, server) {
       // Einrichtungswerkzeug und darf keine Zeile verlieren, die er nicht
       // versteht. Dasselbe leistet preserve_unmanaged() in install.sh.
       //
-      // Preis: über den Wizard lässt sich ein Wert nicht mehr LEEREN, nur
-      // überschreiben. Das ist der richtige Tausch, solange die Felder leer
-      // starten - dann hat niemand einen Wert bewusst entfernt, er hat ihn nie
-      // gesehen. Zum Löschen dient die .env selbst.
+      // Leer heisst deshalb "nicht anfassen", nie "löschen". Seit der Wizard
+      // seine Felder beim Rerun mit dem Bestand vorbelegt, SIEHT der Nutzer
+      // den Wert aber - und wer ein vorbelegtes Feld leert, will ihn weg haben.
+      // Das sagt der Client ausdrücklich mit `clear: [KEY, ...]`
+      // (clearedKeys in rerun-prefill.js); entfernt werden nur diese Zeilen,
+      // und nur aus der Allowlist (clearableKeys). Ein leeres Feld OHNE
+      // Eintrag in `clear` bleibt "nicht anfassen".
       // ... und zwar VERBATIM, nicht ueber readEnvFile geparst und neu
       // gerendert. Ein `EMAIL_SMTP_PASS='a b'` oder ein
       // `DATA_DIR=./data # storage` ist gueltige Compose-Syntax; jede
@@ -919,7 +942,8 @@ async function route(req, res, server) {
           delete result.env[key];
         }
       }
-      const preserved = preserveUnmanagedLines(envPath, result.env);
+      const cleared = clearableKeys(body.clear, result.env);
+      const preserved = preserveUnmanagedLines(envPath, result.env, cleared);
 
       let backup = null;
       try {

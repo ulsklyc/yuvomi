@@ -17,7 +17,8 @@
     "copied": "Disalin ✓",
     "language": "Bahasa",
     "copyRedirect": "Salin URI pengalihan",
-    "opt": "(opsional)"
+    "opt": "(opsional)",
+    "copyFailed": "Gagal menyalin - nilainya sudah dipilih, silakan salin secara manual."
   },
   "config": {
     "title": "Konfigurasi dasar",
@@ -125,7 +126,7 @@
     "documentLocalEnable": "Simpan dokumen baru di folder lokal",
     "documentLocalPathLabel": "Jalur folder",
     "documentLocalPathHint": "Jalur di dalam kontainer. Biarkan kosong untuk /documents.",
-    "errSchedule": "Jadwal tidak valid. Diperlukan lima kolom cron: menit 0-59, jam 0-23, tanggal 1-31, bulan 1-12, hari dalam minggu 0-7 - misalnya 0 2 * * * untuk setiap hari pukul 02.00.",
+    "errSchedule": "Jadwal tidak valid. Diharapkan lima kolom cron (menit 0-59, jam 0-23, hari 1-31, bulan 1-12, hari dalam minggu 0-7), enam dengan detik di depan seperti 0 0 2 * * *, atau bentuk singkat seperti @daily - misalnya 0 2 * * * untuk setiap hari pukul 2. Hari dan bulan harus cocok (tidak ada 31 Februari).",
     "errKeep": "Jumlah cadangan yang disimpan harus berupa angka positif.",
     "webdavBackup": "Cadangan eksternal (WebDAV)",
     "webdavBackupHint": "Menyalin setiap cadangan ke server WebDAV (mis. Nextcloud) agar bertahan dari kegagalan disk.",
@@ -217,7 +218,13 @@
     "privateNetworkWebdav": "Dokumen WebDAV",
     "baseUrl": "Alamat publik",
     "outlook": "Kalender Outlook",
-    "moduleWebInstall": "Pasang modul dari Pengaturan"
+    "moduleWebInstall": "Pasang modul dari Pengaturan",
+    "localOnly": "Hanya dapat diakses di perangkat ini - ponsel dan tautan undangan tidak bisa menjangkau Yuvomi dengan cara ini.",
+    "confirmEnv": ".env yang ada akan diganti. Installer membuat cadangannya terlebih dahulu.",
+    "confirmRunning": "Container Yuvomi yang sedang berjalan akan dimulai ulang.",
+    "confirmBoth": ".env yang ada akan diganti (dicadangkan dulu), dan container yang sedang berjalan dimulai ulang.",
+    "confirmUnknown": "Tidak dapat memeriksa apakah sudah ada instalasi di sini. .env yang ada akan dicadangkan lalu diganti.",
+    "cleared": "Akan dihapus dari .env"
   },
   "docker": {
     "title": "Yuvomi sedang dimulai",

@@ -17,7 +17,8 @@
     "copied": "Đã sao chép ✓",
     "language": "Ngôn ngữ",
     "copyRedirect": "Sao chép URI chuyển hướng",
-    "opt": "(tùy chọn)"
+    "opt": "(tùy chọn)",
+    "copyFailed": "Không thể sao chép - giá trị đã được chọn, hãy sao chép thủ công."
   },
   "config": {
     "title": "Cấu hình cơ bản",
@@ -137,7 +138,13 @@
     "privateNetworkWebdav": "Tài liệu WebDAV",
     "baseUrl": "Địa chỉ công khai",
     "outlook": "Lịch Outlook",
-    "moduleWebInstall": "Cài đặt mô-đun từ Cài đặt"
+    "moduleWebInstall": "Cài đặt mô-đun từ Cài đặt",
+    "localOnly": "Chỉ truy cập được trên thiết bị này - điện thoại và liên kết mời không thể tới Yuvomi theo cách này.",
+    "confirmEnv": "Tệp .env hiện có sẽ bị thay thế. Trình cài đặt sẽ sao lưu trước.",
+    "confirmRunning": "Container Yuvomi đang chạy sẽ được khởi động lại.",
+    "confirmBoth": "Tệp .env hiện có sẽ bị thay thế (đã sao lưu trước) và container đang chạy sẽ khởi động lại.",
+    "confirmUnknown": "Không thể kiểm tra xem ở đây đã có bản cài đặt hay chưa. Tệp .env hiện có sẽ được sao lưu rồi thay thế.",
+    "cleared": "Sẽ bị xóa khỏi .env"
   },
   "docker": {
     "title": "Đang khởi động Yuvomi",
@@ -234,7 +241,7 @@
     "documentLocalEnable": "Lưu tài liệu mới vào thư mục cục bộ",
     "documentLocalPathLabel": "Đường dẫn thư mục",
     "documentLocalPathHint": "Đường dẫn trong container. Để trống để dùng /documents.",
-    "errSchedule": "Lịch không hợp lệ. Cần năm trường cron: phút 0-59, giờ 0-23, ngày 1-31, tháng 1-12, thứ trong tuần 0-7 - ví dụ 0 2 * * * cho hằng ngày lúc 2 giờ.",
+    "errSchedule": "Lịch không hợp lệ. Cần năm trường cron (phút 0-59, giờ 0-23, ngày 1-31, tháng 1-12, thứ 0-7), sáu trường với giây ở đầu như 0 0 2 * * *, hoặc dạng rút gọn như @daily - ví dụ 0 2 * * * cho hằng ngày lúc 2 giờ. Ngày và tháng phải khớp nhau (không có ngày 31 tháng 2).",
     "errKeep": "Số bản sao lưu cần giữ phải là một số dương.",
     "webdavBackup": "Sao lưu bên ngoài (WebDAV)",
     "webdavBackupHint": "Sao chép mỗi bản sao lưu tới máy chủ WebDAV (ví dụ Nextcloud) để tồn tại qua sự cố ổ đĩa.",

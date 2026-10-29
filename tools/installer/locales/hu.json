@@ -17,7 +17,8 @@
     "copied": "Másolva ✓",
     "language": "Nyelv",
     "copyRedirect": "Átirányítási URI másolása",
-    "opt": "(opcionális)"
+    "opt": "(opcionális)",
+    "copyFailed": "A másolás nem sikerült - az érték ki van jelölve, másold ki kézzel."
   },
   "config": {
     "title": "Alapbeállítások",
@@ -137,7 +138,13 @@
     "privateNetworkWebdav": "WebDAV-dokumentumok",
     "baseUrl": "Nyilvános cím",
     "outlook": "Outlook naptár",
-    "moduleWebInstall": "Modulok telepítése a Beállításokból"
+    "moduleWebInstall": "Modulok telepítése a Beállításokból",
+    "localOnly": "Csak erről az eszközről érhető el - a telefonok és a meghívólinkek így nem érik el a Yuvomit.",
+    "confirmEnv": "A meglévő .env fájlod lecserélődik. A telepítő előbb biztonsági mentést készít.",
+    "confirmRunning": "A futó Yuvomi-konténer újraindul.",
+    "confirmBoth": "A meglévő .env fájlod lecserélődik (előtte mentés készül), és a futó konténer újraindul.",
+    "confirmUnknown": "Nem sikerült ellenőrizni, van-e már itt telepítés. A meglévő .env biztonsági mentés után lecserélődik.",
+    "cleared": "Eltávolításra kerül a .env-ből"
   },
   "docker": {
     "title": "Yuvomi indítása",
@@ -234,7 +241,7 @@
     "documentLocalEnable": "Új dokumentumok mentése helyi mappába",
     "documentLocalPathLabel": "Mappa elérési útja",
     "documentLocalPathHint": "Elérési út a konténerben. Hagyja üresen a /documents használatához.",
-    "errSchedule": "Érvénytelen ütemezés. Öt cron mező szükséges: perc 0-59, óra 0-23, nap 1-31, hónap 1-12, a hét napja 0-7 - például 0 2 * * * minden nap 2 órakor.",
+    "errSchedule": "Érvénytelen ütemezés. Öt cron-mező szükséges (perc 0-59, óra 0-23, nap 1-31, hónap 1-12, hét napja 0-7), hat egy kezdő másodperccel, például 0 0 2 * * *, vagy egy rövidítés, például @daily - például 0 2 * * * minden nap 2 órakor. A napnak és a hónapnak össze kell illenie (nincs február 31.).",
     "errKeep": "A megőrzendő mentések számának pozitív számnak kell lennie.",
     "webdavBackup": "Külső biztonsági mentések (WebDAV)",
     "webdavBackupHint": "Minden mentést átmásol egy WebDAV-kiszolgálóra (pl. Nextcloud), hogy túléljen egy lemezhibát.",

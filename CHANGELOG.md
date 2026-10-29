@@ -68,6 +68,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   match the app, and the language picker on phones is only as wide as the language it shows.
 - **No more long dashes in the installer's texts.** All 27 languages of the web and command-line
   installer use a plain hyphen, also for ranges and negative numbers.
+- **Emptying a field when you run the installer again removes the setting.** A pre-filled value you
+  clear (for example the weather city or the sender name) used to come back from the old `.env`; it is
+  now removed, and the review page lists it under "Will be removed from .env". Fields you leave
+  alone, passwords and keys are never removed this way.
+- **The installer asks for a second click only when it replaces something.** A first installation
+  saves and starts with one click; with an existing `.env` or a running container the confirmation
+  stays, and a line above the button now says what you confirm - the old `.env` is replaced after a
+  backup, the running container restarts, or both.
+- **The advanced setup also starts with your home-network address.** Like the simple setup it fills
+  in this computer's address on the home network instead of `localhost`, and the review page says
+  calmly when an address is reachable only on this device.
+- **Backup schedules the scheduler would never run are refused.** A day that no chosen month has
+  (`0 3 31 2 *`, February 31) used to pass and switched backups off at startup. The message now also
+  names the six-field form with seconds and shorthands such as `@daily`.
+- **Copying in the installer says when it did not work.** If the clipboard refuses, the value is
+  selected for manual copying and the note says so, instead of claiming "Copied".
+- **Browsers no longer offer saved passwords in the installer's secret fields.** Calendar, sign-on
+  and app-password fields are marked as new secrets, so a password manager does not fill in an
+  unrelated login.
 
 ## [2.83.0] - 2026-10-29
 

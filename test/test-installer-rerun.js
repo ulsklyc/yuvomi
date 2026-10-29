@@ -27,6 +27,7 @@ import {
   omitUnchanged, unchangedSince, EMAIL_SECTION_FIELDS,
   BASELINE_FIELDS, REDIRECT_SOURCES, isInterpolated,
 } from '../tools/installer/rerun-prefill.js';
+import * as rerunPrefill from '../tools/installer/rerun-prefill.js';
 import {
   isValidCron, isAbsoluteContainerPath, pairGap, enabledWithoutUrl,
 } from '../tools/installer/field-checks.js';
@@ -642,4 +643,261 @@ test('der Erweitert-Pfad öffnet erst nach dem Preflight', () => {
   const wait = body.indexOf('await preflightDone');
   const branch = body.indexOf("if (m === 'simple')");
   assert.ok(wait !== -1 && wait < branch, 'startFlow wartet nur im Einfach-Pfad auf den Preflight');
+});
+
+// ── Re-Critique 2026-10-29 (Folge-PR): Feld leeren, Bestätigung, Heimnetz ─────
+
+/** Ein Element-Stub mit allem, was die Handler unten anfassen. */
+function stubEl(extra = {}) {
+  const classes = new Set();
+  return {
+    value: '', type: 'text', checked: false, hidden: true, disabled: false, textContent: '',
+    dataset: {}, style: {}, validity: { badInput: false },
+    classList: { add: c => classes.add(c), remove: c => classes.delete(c), toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)), contains: c => classes.has(c) },
+    classes, focus() {}, setAttribute() {}, removeAttribute() {},
+    ...extra,
+  };
+}
+
+// Entscheidung C: ein vorbelegtes Wert-Feld, das der Nutzer leert, entfernt die
+// Zeile. Vorher sendete der Wizard '', sanitizeEnv verwarf es, und
+// preserveUnmanagedLines setzte die alte Zeile wieder ein - die Prüfseite sagte
+// "Nicht eingerichtet", die .env behielt den Wert.
+
+test('clearedKeys: nur ein vorbelegtes, jetzt geleertes Wert-Feld landet in clear', () => {
+  const { clearedKeys } = rerunPrefill;
+  assert.equal(typeof clearedKeys, 'function', 'clearedKeys fehlt in rerun-prefill.js');
+  const rerun = {
+    WEATHER_CITY: 'Bad Homburg', EMAIL_FROM_NAME: 'Haus', WEATHER_LAT: '${LAT:-52.52}',
+    BASE_URL: 'https://app.example.test', BACKUP_ENABLED: 'false',
+  };
+  const baseline = {
+    'wea-city': 'Bad Homburg', 'email-from-name': 'Haus',
+    // type=number verwirft den Compose-Ausdruck beim Zuweisen: vorbelegt ist ''.
+    'wea-lat': '', 'adv-base-url': 'https://app.example.test', 'adv-backup-enable': false,
+  };
+  // Unberührter Rerun: nichts wird entfernt.
+  assert.deepEqual(clearedKeys(rerun, baseline, { ...baseline }, {}), []);
+  // Geleert: entfernt.
+  assert.deepEqual(clearedKeys(rerun, baseline, { ...baseline, 'wea-city': '' }, {}), ['WEATHER_CITY']);
+  // Nur Leerzeichen gilt als leer (der Handler trimmt).
+  assert.deepEqual(clearedKeys(rerun, baseline, { ...baseline, 'email-from-name': '   ' }, {}), ['EMAIL_FROM_NAME']);
+  // Ein sanitisierter Ausdruck war nie sichtbar vorbelegt - auch leer bleibt er.
+  assert.deepEqual(clearedKeys(rerun, baseline, { ...baseline, 'wea-lat': '' }, {}), []);
+  // badInput (Zahlfeld mit Buchstaben) meldet value '' - das ist kein Leeren.
+  assert.deepEqual(clearedKeys(rerun, baseline, { ...baseline, 'wea-city': null }, {}), []);
+  // Ein geleertes Feld, für das der Wizard trotzdem einen Wert baut (BASE_URL aus
+  // Host und Port), wird geschrieben, nicht entfernt - auch wenn der gebaute
+  // Wert dem Bestand gleicht und omitUnchanged ihn deshalb nicht sendet.
+  assert.deepEqual(clearedKeys(rerun, baseline, { ...baseline, 'adv-base-url': '' },
+    { BASE_URL: 'https://app.example.test' }), []);
+  // Schalter und Secrets sind nie "geleert".
+  assert.deepEqual(clearedKeys(rerun, baseline, { ...baseline, 'adv-backup-enable': true }, {}), []);
+  // Ohne Rerun gibt es nichts zu entfernen.
+  assert.deepEqual(clearedKeys(null, null, { 'wea-city': '' }, {}), []);
+  for (const key of ['WEATHER_CITY', 'DATA_DIR', 'OIDC_ISSUER']) {
+    assert.ok(PREFILL_FIELDS.some(([k, , kind]) => k === key && kind === 'value'), `${key} ist kein Wert-Feld`);
+  }
+});
+
+test('POST /api/save-env entfernt nur erlaubte geleerte Zeilen, der Rest bleibt byte-gleich', async () => {
+  const lines = [
+    'SESSION_SECRET=alt-session',
+    'DB_ENCRYPTION_KEY=alt-db',
+    'WEATHER_CITY="Bad Homburg" # Stadt',
+    'EMAIL_FROM_NAME=Haus',
+    'DATA_DIR=./data # storage',
+    'EMAIL_SMTP_PASS=geheim-1',
+    'LOG_LEVEL=debug',
+    'OIKOS_HTTP_PORT=${HTTP_PORT:-3000}',
+    'GOOGLE_CLIENT_SECRET_FILE=/run/secrets/g',
+  ];
+  const dir = tempDir('oikos-rerun-');
+  try {
+    writeFileSync(join(dir, '.env'), `${lines.join('\n')}\n`);
+    await withServer(dir, async base => {
+      const r = await fetch(`${base}/api/save-env`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          env: { TZ: 'UTC', EMAIL_FROM_NAME: 'Neu' },
+          // Erlaubt: WEATHER_CITY. Ignoriert: Secrets, PRESERVED_KEYS, Schlüssel
+          // ausserhalb der Allowlist, _FILE-Varianten, Unsinn - und ein Schlüssel,
+          // der zugleich mit Wert kommt (der Wert gewinnt).
+          clear: ['WEATHER_CITY', 'SESSION_SECRET', 'DB_ENCRYPTION_KEY', 'EMAIL_SMTP_PASS', 'LOG_LEVEL',
+            'GOOGLE_CLIENT_SECRET_FILE', 'NOPE', 42, null, 'EMAIL_FROM_NAME'],
+        }),
+      });
+      assert.equal(r.status, 200);
+    });
+    const after = readFileSync(join(dir, '.env'), 'utf8').split('\n');
+    assert.ok(!after.some(l => l.startsWith('WEATHER_CITY=')), 'die geleerte Zeile steht noch in der .env');
+    for (const line of lines.filter(l => !/^(WEATHER_CITY|EMAIL_FROM_NAME)=/.test(l))) {
+      assert.ok(after.includes(line), `Zeile nicht byte-gleich erhalten: ${line}`);
+    }
+    assert.ok(after.includes('EMAIL_FROM_NAME=Neu'), 'ein gesendeter Wert gewinnt gegen clear');
+    assert.equal(after.filter(l => l.startsWith('EMAIL_FROM_NAME=')).length, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('POST /api/save-env ohne clear (oder mit kaputtem clear) bewahrt alles wie bisher', async () => {
+  const lines = ['SESSION_SECRET=s', 'DB_ENCRYPTION_KEY=d', 'WEATHER_CITY=Berlin', 'DATA_DIR=./data # x'];
+  for (const clear of [undefined, 'WEATHER_CITY', { WEATHER_CITY: true }, []]) {
+    const dir = tempDir('oikos-rerun-');
+    try {
+      writeFileSync(join(dir, '.env'), `${lines.join('\n')}\n`);
+      await withServer(dir, async base => {
+        const r = await fetch(`${base}/api/save-env`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(clear === undefined ? { env: {} } : { env: {}, clear }),
+        });
+        assert.equal(r.status, 200);
+      });
+      const after = readFileSync(join(dir, '.env'), 'utf8').split('\n');
+      for (const line of lines) assert.ok(after.includes(line), `clear=${JSON.stringify(clear)}: Zeile verloren: ${line}`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test('install.html schickt die geleerten Felder mit und zeigt sie auf der Prüfseite', () => {
+  const saves = html.split("fetch('/api/save-env'").length - 1;
+  const withClear = (html.match(/JSON\.stringify\(\{ env[^}]*, clear: pendingClears\(/g) || []).length;
+  assert.ok(saves >= 2 && withClear === saves, `${saves} save-env-Aufrufe, ${withClear} davon mit clear`);
+  // pendingClears rechnet über den Feldstand nach der Vorbelegung und gegen
+  // das UNGEKÜRZTE buildEnv() (siehe clearedKeys: BASE_URL).
+  const fnSrc = fnSource('pendingClears');
+  assert.match(fnSrc, /clearedKeys\(rerunValues, fieldBaseline, clearState\(\), /);
+  assert.match(fnSource('clearState'), /badInput/, 'ein Zahlfeld mit Buchstaben gälte als geleert');
+  // Ausgeführt: badInput -> null, Wert sonst roh.
+  const els = {
+    'wea-city': stubEl({ value: '' }),
+    'wea-lat': stubEl({ value: '', validity: { badInput: true } }),
+    'adv-backup-enable': stubEl({ type: 'checkbox', checked: true }),
+  };
+  const clearState = new Function('$', 'BASELINE_FIELDS', `${fnSource('clearState')}\nreturn clearState;`)(
+    id => els[id] ?? stubEl(), Object.keys(els));
+  assert.deepEqual(clearState(), { 'wea-city': '', 'wea-lat': null, 'adv-backup-enable': true });
+  // Prüfseite: eigene Zeile "Wird entfernt".
+  assert.match(html, /id="rv-cleared"/, 'die Prüfseite hat keine Zeile für entfernte Werte');
+  assert.match(fnSource('renderReview'), /pendingClears\(/, 'renderReview zeigt die entfernten Werte nicht');
+  // Der Server-Kommentar behauptet nicht mehr, Leeren gehe nicht.
+  const server = readFileSync(new URL('../tools/installer/install-server.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(server, /lässt sich ein Wert nicht mehr LEEREN/);
+});
+
+// Entscheidung B: zwei Klicks nur, wenn etwas überschrieben oder neu gestartet
+// wird. Bei der Erstinstallation war der zweite Klick reine Reibung - und die
+// Bestätigung sagte nicht, WAS sie bestätigt.
+
+/** Den Klick-Handler (async) aus install.html mit Stubs ausführbar machen. */
+function saveHandler(id, state) {
+  const at = html.indexOf(`$('${id}').addEventListener('click', async () => {`);
+  assert.ok(at > 0, `Handler ${id} nicht gefunden`);
+  const body = html.slice(at, html.indexOf('\n});\n', at));
+  const arrow = `${body.slice(body.indexOf('async () => {'))}\n}`;
+  const els = {};
+  const $ = k => (els[k] ??= stubEl());
+  const fetches = [];
+  const fakeFetch = async (url, opts) => { fetches.push({ url, body: JSON.parse(opts.body) }); return { ok: true, json: async () => ({ path: '/x/.env' }) }; };
+  const scope = {
+    $, t: k => k, S: {}, showErr() {}, fail() {}, clearInvalid() {}, next() {}, startDocker() {},
+    buildEnv: () => ({ TZ: 'UTC' }), omitUnchanged: e => e, rerunValues: null, untouched: () => false,
+    pendingClears: () => [], fetch: fakeFetch, preflightDone: Promise.resolve(), simpleLockedByEnv: false,
+    startFlow() {}, isValidHost: () => true, ensureKeys: async () => {}, deriveBaseUrl: () => 'http://h:3000',
+    preflightState: state, savedEnvPath: '',
+  };
+  const names = Object.keys(scope);
+  const make = new Function(...names, `
+    let reviewConfirmed = false, reviewArmedAt = 0, simpleConfirmed = false, simpleArmedAt = 0;
+    const CONFIRM_COOLDOWN_MS = 0;
+    ${fnSource('needsConfirm')}
+    ${fnSource('confirmLineKey')}
+    ${fnSource('armConfirm')}
+    ${fnSource('disarmConfirm')}
+    return (${arrow});
+  `);
+  return { click: make(...names.map(n => scope[n])), fetches, els };
+}
+
+test('Erstinstallation: der erste Klick auf Speichern speichert sofort', async () => {
+  for (const id of ['rev-next', 'simple-next']) {
+    const h = saveHandler(id, { known: true, envExists: false, containerRunning: false });
+    await h.click();
+    assert.equal(h.fetches.length, 1, `${id}: die Erstinstallation verlangt weiter eine Bestätigung`);
+  }
+});
+
+test('bestehende .env oder laufender Container: erst bestätigen, und die Zeile sagt was', async () => {
+  const cases = [
+    [{ known: true, envExists: true, containerRunning: false }, 'review.confirmEnv'],
+    [{ known: true, envExists: false, containerRunning: true }, 'review.confirmRunning'],
+    [{ known: true, envExists: true, containerRunning: true }, 'review.confirmBoth'],
+    // Preflight gescheitert: unbekannt heisst vorsichtig.
+    [{ known: false, envExists: false, containerRunning: false }, 'review.confirmUnknown'],
+  ];
+  for (const [state, key] of cases) {
+    for (const [id, line] of [['rev-next', 'rev-confirm-line'], ['simple-next', 'simple-confirm-line']]) {
+      const h = saveHandler(id, state);
+      await h.click();
+      assert.equal(h.fetches.length, 0, `${id} ${JSON.stringify(state)}: speichert ohne Bestätigung`);
+      assert.equal(h.els[line]?.textContent, key, `${id}: die Bestätigungszeile nennt nicht, was bestätigt wird`);
+      assert.equal(h.els[line].hidden, false, `${id}: die Bestätigungszeile ist nicht sichtbar`);
+      await h.click();
+      assert.equal(h.fetches.length, 1, `${id}: der zweite Klick speichert nicht`);
+    }
+  }
+  for (const line of ['rev-confirm-line', 'simple-confirm-line']) {
+    assert.match(html, new RegExp(`id="${line}"[^>]*hidden`), `${line} fehlt im Markup oder ist nicht anfangs verborgen`);
+  }
+  assert.match(html, /preflightState\.containerRunning = Boolean\(d\.containerRunning\)/,
+    'der Preflight merkt sich den laufenden Container nicht');
+});
+
+// Entscheidung A: auch der Erweitert-Pfad beginnt bei der Erstinstallation mit
+// der Heimnetz-Adresse. cfg-host stand fest auf localhost: Einladungs- und
+// Reset-Links zeigten auf das Gerät, auf dem man sie öffnet.
+
+test('Erweitert-Pfad: cfg-host übernimmt bei der Erstinstallation die Heimnetz-Adresse', () => {
+  const run = (rerun, lan, edited, initial = 'localhost') => {
+    const els = { 'cfg-host': stubEl({ value: initial }) };
+    let refreshed = 0;
+    const fn = new Function('$', 'rerunValues', 'lanAddress', 'cfgHostEdited', 'refreshPlannedOrigin',
+      `${fnSource('prefillAdvancedHost')}\nreturn prefillAdvancedHost;`)(
+      id => els[id], rerun, lan, edited, () => { refreshed++; });
+    fn();
+    return { value: els['cfg-host'].value, refreshed };
+  };
+  assert.equal(fnSource('prefillAdvancedHost') !== '', true, 'prefillAdvancedHost fehlt');
+  assert.deepEqual(run(null, '192.168.1.20', false), { value: '192.168.1.20', refreshed: 1 });
+  assert.equal(run(null, null, false).value, 'localhost', 'ohne Heimnetz-Adresse bleibt localhost');
+  assert.equal(run(null, '192.168.1.20', true, 'nas.lan').value, 'nas.lan', 'eine eigene Eingabe wird überschrieben');
+  // Rerun: die Vorbelegung (oder ihr Fehlen) gilt; ein späteres Setzen änderte
+  // den Feldstand nach fieldBaseline und leitete eine neue BASE_URL ab.
+  assert.equal(run({}, '192.168.1.20', false).value, 'localhost', 'der Rerun bekommt die LAN-Adresse übergestülpt');
+  const start = html.slice(html.indexOf('async function startFlow('));
+  const body = start.slice(0, start.indexOf('\n}\n'));
+  assert.ok(body.indexOf('await lanDone') !== -1 && body.indexOf('await lanDone') < body.indexOf('prefillAdvancedHost()'),
+    'startFlow belegt cfg-host vor der Antwort von /api/lan-address');
+  assert.match(html, /\$\('cfg-host'\)\.addEventListener\('input', \(\) => \{ cfgHostEdited = true; \}\)/);
+});
+
+test('Prüfseite: eine Adresse nur für dieses Gerät bekommt einen ruhigen Hinweis', () => {
+  assert.match(html, /id="rv-local-note"[^>]*hidden/, 'der Hinweis fehlt oder steht immer da');
+  assert.match(html, /id="rv-local-note"[^>]*data-i18n="review.localOnly"/);
+  const review = fnSource('renderReview');
+  assert.match(review, /\$\('rv-local-note'\)\.hidden = !isLoopbackHost\(/,
+    'renderReview blendet den Hinweis nicht nach der öffentlichen Adresse ein');
+  // Ausgeführt: welche Adressen gelten als "nur dieses Gerät"?
+  const isLoopbackHost = new Function(`${fnSource('isLoopbackHost')}\nreturn isLoopbackHost;`)();
+  const originHost = new Function(`${fnSource('originHost')}\nreturn originHost;`)();
+  for (const url of ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://[::1]:3000']) {
+    assert.equal(isLoopbackHost(originHost(url)), true, url);
+  }
+  // Heimnetz und Compose-Ausdrücke sind NICHT "nur dieses Gerät".
+  for (const url of ['http://192.168.1.20:3000', 'https://app.example.test', 'https://${PUBLIC_HOST}', 'kaputt']) {
+    assert.equal(isLoopbackHost(originHost(url)), false, url);
+  }
 });

@@ -50,6 +50,8 @@ const CRON_OK = [
   // Grammatik des Schedulers (node-cron 4), Review #2382.
   '0 0 2 * * *', '*/30 0 2 * * MON-FRI', '0 2 * * Sunday', '0 2 1 January *',
   '0 2 * * monday-friday', '0 2 1 jan-march *', '0 2 ? * mon', '@daily', '@Weekly',
+  // Tag und Monat passen in mindestens einem Monat zusammen (Re-Critique 29.10.).
+  '0 3 29 2 *', '0 3 31 1,2 *', '0 3 30 feb-apr *', '0 3 1,31 2 *', '0 3 31 * *',
 ];
 const CRON_BAD = [
   '99 * * * *',     // Minute ausserhalb 0-59 - der Befund aus der Critique
@@ -58,6 +60,11 @@ const CRON_BAD = [
   '1- * * * *', ',1 * * * *', '2/5 * * * *', 'a * * * *', '0 2 * * jan', '',
   '0 2 * *', '0 0 0 2 * * *', '60 0 2 * * *', '0 2 ? ? *', '? 2 * * *', '0 2 * * sundays',
   '@sometimes',
+  // Tag und Monat gibt es nie zugleich: node-cron 4.6 lehnt das ab
+  // ("impossible day of month"), der Wizard nahm es an, und der Server schaltete
+  // die Backups beim Start still ab (Re-Critique 29.10.).
+  '0 3 31 2 *', '0 3 30 feb *', '0 3 30,31 2 *', '0 3 31 4,6,9,11 *', '0 0 3 31 apr *',
+  '0 3 30-31 2 *',
 ];
 
 test('isValidCron prueft die Wertebereiche je Feld, nicht nur die Feldzahl', () => {
@@ -73,6 +80,10 @@ test('was der Wizard als Cron annimmt, nimmt auch der Backup-Scheduler an', () =
     'der Scheduler prueft nicht mehr mit cron.validate - die Bindung zeigt ins Leere');
 
   for (const expr of CRON_OK) assert.equal(cron.validate(expr.trim()), true, `node-cron lehnt "${expr}" ab`);
+  // Die unmoeglichen Tag/Monat-Paare sind dieselbe Regel wie im Scheduler.
+  for (const expr of ['0 3 31 2 *', '0 3 30 feb *', '0 3 31 4,6,9,11 *']) {
+    assert.equal(cron.validate(expr), false, `node-cron nimmt "${expr}" inzwischen an`);
+  }
   for (const expr of ['99 * * * *', '* 24 * * *', '* * 32 * *', '* * * 13 *', '* * * * 8']) {
     assert.equal(cron.validate(expr), false, `node-cron nimmt "${expr}" inzwischen an`);
   }
@@ -84,7 +95,9 @@ test('was der Wizard als Cron annimmt, nimmt auch der Backup-Scheduler an', () =
   const rnd = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
   const atoms = ['*', '*/1', '*/7', '*/59', '*/60', '0', '1', '7', '12', '13', '23', '24', '31', '32',
     '59', '60', '0-7', '1-5', '5-1', '1-31/2', '0-59/15', 'mon', 'sun-sat', 'jan', 'jan-dec', 'feb-jan', '1,2', '0,59',
-    'Monday', 'sunday-SATURDAY', 'March', 'january-june', 'mar-december', '?', 'mon,friday'];
+    'Monday', 'sunday-SATURDAY', 'March', 'january-june', 'mar-december', '?', 'mon,friday',
+    // Tag-/Monat-Paare, die es nie gibt (31. Februar): node-cron lehnt sie ab.
+    '30', '29', '2', 'feb', '4,6', '30-31', 'feb,apr', 'nov'];
   let accepted = 0;
   for (let i = 0; i < 60000; i++) {
     const expr = Array.from({ length: 5 + rnd(2) }, () => atoms[rnd(atoms.length)]).join(' ');
@@ -282,4 +295,21 @@ test('das Docker-Polling wartet auf die Antwort, bevor es neu fragt', async () =
   resolveCurrent();
   await second;
   assert.equal(pending(), 0, 'nach stopPolling() laeuft die alte Kette nicht weiter');
+});
+
+test('die Meldung zum Zeitplan nennt fuenf oder sechs Felder und die Kurzformen - in jeder Sprache', async () => {
+  // Sie sagte "fuenf Cron-Felder", waehrend isValidCron (und node-cron) seit
+  // #2382 auch sechs mit Sekunde und @daily annimmt: wer einen funktionierenden
+  // Sechs-Felder-Plan aenderte und vertippte, las, seine Form sei falsch.
+  const { SUPPORTED_LOCALES } = await import('../tools/installer/i18n-mini.js');
+  const wrong = [];
+  for (const locale of SUPPORTED_LOCALES) {
+    const msg = JSON.parse(read(`../tools/installer/locales/${locale}.json`)).advanced?.errSchedule || '';
+    // Sprachneutrale Marken: ein Fuenf- und ein Sechs-Felder-Beispiel, eine Kurzform.
+    for (const mark of ['0 2 * * *', '0 0 2 * * *', '@daily']) {
+      if (!msg.includes(mark)) wrong.push(`${locale}: "${mark}" fehlt`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+  assert.match(html, /fail\('storage-err', t\('advanced\.errSchedule'\), 'adv-backup-schedule'\)/);
 });

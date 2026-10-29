@@ -17,7 +17,8 @@
     "copied": "Kopierat ✓",
     "language": "Språk",
     "copyRedirect": "Kopiera omdirigerings-URI",
-    "opt": "(valfritt)"
+    "opt": "(valfritt)",
+    "copyFailed": "Det gick inte att kopiera - värdet är markerat, kopiera det manuellt."
   },
   "config": {
     "title": "Grundkonfiguration",
@@ -137,7 +138,13 @@
     "privateNetworkWebdav": "WebDAV-dokument",
     "baseUrl": "Publik adress",
     "outlook": "Outlook-kalender",
-    "moduleWebInstall": "Installera moduler från Inställningar"
+    "moduleWebInstall": "Installera moduler från Inställningar",
+    "localOnly": "Nås bara från den här enheten - telefoner och inbjudningslänkar når inte Yuvomi så här.",
+    "confirmEnv": "Din befintliga .env ersätts. Installationsprogrammet säkerhetskopierar den först.",
+    "confirmRunning": "Den körande Yuvomi-containern startas om.",
+    "confirmBoth": "Din befintliga .env ersätts (säkerhetskopieras först) och den körande containern startas om.",
+    "confirmUnknown": "Det gick inte att kontrollera om det redan finns en installation här. En befintlig .env säkerhetskopieras och ersätts.",
+    "cleared": "Tas bort från .env"
   },
   "docker": {
     "title": "Startar Yuvomi",
@@ -234,7 +241,7 @@
     "documentLocalEnable": "Spara nya dokument i en lokal mapp",
     "documentLocalPathLabel": "Mappsökväg",
     "documentLocalPathHint": "Sökväg i containern. Lämna tomt för /documents.",
-    "errSchedule": "Ogiltigt schema. Fem cron-fält förväntas: minut 0-59, timme 0-23, dag 1-31, månad 1-12, veckodag 0-7 - till exempel 0 2 * * * för varje dag kl. 2.",
+    "errSchedule": "Ogiltigt schema. Fem cron-fält förväntas (minut 0-59, timme 0-23, dag 1-31, månad 1-12, veckodag 0-7), sex med en inledande sekund som 0 0 2 * * *, eller en kortform som @daily - till exempel 0 2 * * * för varje dag kl. 2. Dag och månad måste passa ihop (inget 31 februari).",
     "errKeep": "Antal säkerhetskopior att behålla måste vara ett positivt tal.",
     "webdavBackup": "Externa säkerhetskopior (WebDAV)",
     "webdavBackupHint": "Kopierar varje säkerhetskopia till en WebDAV-server (t.ex. Nextcloud) så att den överlever ett diskfel.",

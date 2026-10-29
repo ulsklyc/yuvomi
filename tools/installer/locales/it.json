@@ -17,7 +17,8 @@
     "copied": "Copiato ✓",
     "language": "Lingua",
     "copyRedirect": "Copia URI di reindirizzamento",
-    "opt": "(opzionale)"
+    "opt": "(opzionale)",
+    "copyFailed": "Copia non riuscita - il valore è selezionato, copialo manualmente."
   },
   "config": {
     "title": "Configurazione di base",
@@ -137,7 +138,13 @@
     "privateNetworkWebdav": "Documenti WebDAV",
     "baseUrl": "Indirizzo pubblico",
     "outlook": "Calendario Outlook",
-    "moduleWebInstall": "Installare moduli dalle Impostazioni"
+    "moduleWebInstall": "Installare moduli dalle Impostazioni",
+    "localOnly": "Raggiungibile solo da questo dispositivo - telefoni e link di invito non raggiungono Yuvomi così.",
+    "confirmEnv": "Il tuo .env esistente verrà sostituito. L'installer ne crea prima un backup.",
+    "confirmRunning": "Il container Yuvomi in esecuzione verrà riavviato.",
+    "confirmBoth": "Il tuo .env esistente verrà sostituito (con backup preventivo) e il container in esecuzione si riavvia.",
+    "confirmUnknown": "Non è stato possibile verificare se qui esiste già un'installazione. Un .env esistente verrà salvato e sostituito.",
+    "cleared": "Verrà rimosso dal .env"
   },
   "docker": {
     "title": "Avvio di Yuvomi",
@@ -234,7 +241,7 @@
     "documentLocalEnable": "Salva i nuovi documenti in una cartella locale",
     "documentLocalPathLabel": "Percorso della cartella",
     "documentLocalPathHint": "Percorso all'interno del contenitore. Lascia vuoto per /documents.",
-    "errSchedule": "Pianificazione non valida. Servono cinque campi cron: minuto 0-59, ora 0-23, giorno 1-31, mese 1-12, giorno della settimana 0-7 - ad esempio 0 2 * * * per ogni giorno alle 2:00.",
+    "errSchedule": "Pianificazione non valida. Sono attesi cinque campi cron (minuto 0-59, ora 0-23, giorno 1-31, mese 1-12, giorno della settimana 0-7), sei con un secondo iniziale come 0 0 2 * * *, oppure una forma breve come @daily - ad esempio 0 2 * * * per ogni giorno alle 2. Giorno e mese devono essere compatibili (niente 31 febbraio).",
     "errKeep": "I backup da conservare devono essere un numero positivo.",
     "webdavBackup": "Backup esterni (WebDAV)",
     "webdavBackupHint": "Copia ogni backup su un server WebDAV (es. Nextcloud) così sopravvive a un guasto del disco.",

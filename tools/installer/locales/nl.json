@@ -17,7 +17,8 @@
     "copied": "Gekopieerd ✓",
     "language": "Taal",
     "copyRedirect": "Redirect-URI kopiëren",
-    "opt": "(optioneel)"
+    "opt": "(optioneel)",
+    "copyFailed": "Kopiëren lukte niet - de waarde is geselecteerd, kopieer hem handmatig."
   },
   "config": {
     "title": "Basisconfiguratie",
@@ -125,7 +126,7 @@
     "documentLocalEnable": "Nieuwe documenten in een lokale map opslaan",
     "documentLocalPathLabel": "Mappad",
     "documentLocalPathHint": "Pad in de container. Laat leeg voor /documents.",
-    "errSchedule": "Ongeldig schema. Verwacht vijf cron-velden: minuut 0-59, uur 0-23, dag 1-31, maand 1-12, weekdag 0-7 - bijvoorbeeld 0 2 * * * voor elke dag om 2 uur.",
+    "errSchedule": "Ongeldig schema. Verwacht worden vijf cron-velden (minuut 0-59, uur 0-23, dag 1-31, maand 1-12, weekdag 0-7), zes met een seconde vooraan zoals 0 0 2 * * *, of een korte vorm zoals @daily - bijvoorbeeld 0 2 * * * voor dagelijks om 2 uur. Dag en maand moeten bij elkaar passen (geen 31 februari).",
     "errKeep": "Te bewaren back-ups moet een positief getal zijn.",
     "webdavBackup": "Externe back-ups (WebDAV)",
     "webdavBackupHint": "Kopieert elke back-up naar een WebDAV-server (bijv. Nextcloud) zodat die een schijfstoring overleeft.",
@@ -217,7 +218,13 @@
     "privateNetworkWebdav": "WebDAV-documenten",
     "baseUrl": "Openbaar adres",
     "outlook": "Outlook-agenda",
-    "moduleWebInstall": "Modules installeren vanuit Instellingen"
+    "moduleWebInstall": "Modules installeren vanuit Instellingen",
+    "localOnly": "Alleen op dit apparaat bereikbaar - telefoons en uitnodigingslinks bereiken Yuvomi zo niet.",
+    "confirmEnv": "Je bestaande .env wordt vervangen. De installer maakt eerst een back-up.",
+    "confirmRunning": "De draaiende Yuvomi-container wordt opnieuw gestart.",
+    "confirmBoth": "Je bestaande .env wordt vervangen (eerst geback-upt) en de draaiende container start opnieuw.",
+    "confirmUnknown": "Kon niet controleren of hier al een installatie draait. Een bestaande .env wordt geback-upt en vervangen.",
+    "cleared": "Wordt uit .env verwijderd"
   },
   "docker": {
     "title": "Yuvomi wordt gestart",

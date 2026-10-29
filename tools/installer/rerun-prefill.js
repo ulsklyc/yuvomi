@@ -277,3 +277,35 @@ export function unchangedSince(baseline, current, ids) {
   if (!baseline) return false;
   return ids.every(id => baseline[id] === current[id]);
 }
+
+/**
+ * Die Schlüssel, deren vorbelegtes Wert-Feld der Nutzer geleert hat - sie gehen
+ * als `clear` an /api/save-env, und der Server entfernt genau diese Zeilen.
+ *
+ * Vorher hiess leer "ungesendet", der Server setzte die alte Zeile wieder ein:
+ * die Prüfseite sagte "Nicht eingerichtet", die .env behielt den Wert. Geleert
+ * gilt ein Feld nur, wenn ALLES zutrifft:
+ *   - es ist ein Wert-Feld (kind 'value'); Schalter haben ihren eigenen Weg
+ *     (omitUnchanged), Secrets sind nie vorbelegt
+ *   - der Bestand hat den Schlüssel, und das Feld zeigte ihn nach der
+ *     Vorbelegung (baseline nicht leer). Ein type=number-Feld verwirft einen
+ *     Compose-Ausdruck wie `${LAT:-52.52}` schon beim Zuweisen zu '' - der
+ *     Nutzer hat nichts geleert, er hat den Wert nie gesehen
+ *   - jetzt steht dort nichts (nur Leerraum zählt als leer). `current[id]`
+ *     null heisst badInput (Buchstaben im Zahlfeld): kein Leeren
+ *   - der Wizard baut für den Schlüssel keinen eigenen Wert. `env` ist das
+ *     UNGEKÜRZTE buildEnv(): wer adv-base-url leert, bekommt die Ableitung aus
+ *     Host und Port - gleicht sie dem Bestand, lässt omitUnchanged sie weg,
+ *     und ein `clear` löschte dann eine BASE_URL, die bleiben soll.
+ * Ein unberührtes Feld steht auf seiner Vorbelegung und ist damit nie geleert.
+ */
+export function clearedKeys(rerun, baseline, current, env = {}) {
+  if (!rerun || !baseline) return [];
+  return PREFILL_FIELDS
+    .filter(([key, id, kind]) => kind === 'value'
+      && rerun[key]
+      && typeof baseline[id] === 'string' && baseline[id].trim() !== ''
+      && typeof current[id] === 'string' && current[id].trim() === ''
+      && !env[key])
+    .map(([key]) => key);
+}

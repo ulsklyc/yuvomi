@@ -17,7 +17,8 @@
     "copied": "Copié ✓",
     "language": "Langue",
     "copyRedirect": "Copier l'URI de redirection",
-    "opt": "(facultatif)"
+    "opt": "(facultatif)",
+    "copyFailed": "Copie impossible - la valeur est sélectionnée, copie-la manuellement."
   },
   "config": {
     "title": "Configuration de base",
@@ -137,7 +138,13 @@
     "privateNetworkWebdav": "Documents WebDAV",
     "baseUrl": "Adresse publique",
     "outlook": "Calendrier Outlook",
-    "moduleWebInstall": "Installer des modules depuis les Paramètres"
+    "moduleWebInstall": "Installer des modules depuis les Paramètres",
+    "localOnly": "Accessible uniquement sur cet appareil - les téléphones et les liens d'invitation ne peuvent pas atteindre Yuvomi ainsi.",
+    "confirmEnv": "Ton fichier .env existant sera remplacé. L'installateur en fait d'abord une sauvegarde.",
+    "confirmRunning": "Le conteneur Yuvomi en cours d'exécution sera redémarré.",
+    "confirmBoth": "Ton fichier .env existant sera remplacé (sauvegardé avant), et le conteneur en cours d'exécution redémarre.",
+    "confirmUnknown": "Impossible de vérifier si une installation existe déjà ici. Un fichier .env existant sera sauvegardé puis remplacé.",
+    "cleared": "Sera supprimé du .env"
   },
   "docker": {
     "title": "Démarrage d'Yuvomi",
@@ -234,7 +241,7 @@
     "documentLocalEnable": "Stocker les nouveaux documents dans un dossier local",
     "documentLocalPathLabel": "Chemin du dossier",
     "documentLocalPathHint": "Chemin dans le conteneur. Laissez vide pour /documents.",
-    "errSchedule": "Planification invalide. Cinq champs cron attendus : minute 0-59, heure 0-23, jour 1-31, mois 1-12, jour de la semaine 0-7 - par exemple 0 2 * * * pour chaque jour à 2 h.",
+    "errSchedule": "Planification invalide. Cinq champs cron sont attendus (minute 0-59, heure 0-23, jour 1-31, mois 1-12, jour de la semaine 0-7), six avec une seconde en tête comme 0 0 2 * * *, ou un raccourci comme @daily - par exemple 0 2 * * * pour tous les jours à 2 h. Le jour et le mois doivent correspondre (pas de 31 février).",
     "errKeep": "Le nombre de sauvegardes à conserver doit être un nombre positif.",
     "webdavBackup": "Sauvegardes externes (WebDAV)",
     "webdavBackupHint": "Copie chaque sauvegarde vers un serveur WebDAV (p. ex. Nextcloud) pour survivre à une panne de disque.",

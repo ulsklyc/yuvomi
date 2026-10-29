@@ -17,7 +17,8 @@
     "copied": "已复制 ✓",
     "language": "语言",
     "copyRedirect": "复制重定向 URI",
-    "opt": "（可选）"
+    "opt": "（可选）",
+    "copyFailed": "无法复制 - 已选中该值，请手动复制。"
   },
   "config": {
     "title": "基本配置",
@@ -137,7 +138,13 @@
     "privateNetworkWebdav": "WebDAV 文档",
     "baseUrl": "公开地址",
     "outlook": "Outlook 日历",
-    "moduleWebInstall": "从设置中安装模块"
+    "moduleWebInstall": "从设置中安装模块",
+    "localOnly": "仅能在此设备上访问 - 手机和邀请链接无法通过这种方式访问 Yuvomi。",
+    "confirmEnv": "现有的 .env 将被替换。安装程序会先进行备份。",
+    "confirmRunning": "正在运行的 Yuvomi 容器将被重新启动。",
+    "confirmBoth": "现有的 .env 将被替换（先备份），正在运行的容器也会重新启动。",
+    "confirmUnknown": "无法检查这里是否已有安装。现有的 .env 将先备份再替换。",
+    "cleared": "将从 .env 中删除"
   },
   "docker": {
     "title": "正在启动 Yuvomi",
@@ -234,7 +241,7 @@
     "documentLocalEnable": "将新文档存储到本地文件夹",
     "documentLocalPathLabel": "文件夹路径",
     "documentLocalPathHint": "容器内的路径。留空则使用 /documents。",
-    "errSchedule": "计划无效。需要五个 cron 字段：分钟 0-59、小时 0-23、日期 1-31、月份 1-12、星期 0-7 - 例如每天 2 点为 0 2 * * *。",
+    "errSchedule": "计划无效。需要五个 cron 字段（分钟 0-59、小时 0-23、日期 1-31、月份 1-12、星期 0-7）、开头带秒的六个字段（如 0 0 2 * * *），或 @daily 之类的简写 - 例如每天 2 点为 0 2 * * *。日期和月份必须能组合（没有 2 月 31 日）。",
     "errKeep": "要保留的备份数量必须为正数。",
     "webdavBackup": "异地备份（WebDAV）",
     "webdavBackupHint": "将每份备份复制到 WebDAV 服务器（如 Nextcloud），以在磁盘故障后依然保留。",

@@ -17,7 +17,8 @@
     "copied": "Copied ✓",
     "language": "Language",
     "copyRedirect": "Copy redirect URI",
-    "opt": "(optional)"
+    "opt": "(optional)",
+    "copyFailed": "Couldn't copy - the value is selected, please copy it manually."
   },
   "config": {
     "title": "Basic Configuration",
@@ -137,7 +138,13 @@
     "privateNetworkWebdav": "WebDAV documents",
     "baseUrl": "Public address",
     "outlook": "Outlook Calendar",
-    "moduleWebInstall": "Install modules from Settings"
+    "moduleWebInstall": "Install modules from Settings",
+    "localOnly": "Only reachable on this device - phones and invitation links cannot reach Yuvomi this way.",
+    "confirmEnv": "Your existing .env will be replaced. The installer backs it up first.",
+    "confirmRunning": "The running Yuvomi container will be restarted.",
+    "confirmBoth": "Your existing .env will be replaced (backed up first), and the running container restarts.",
+    "confirmUnknown": "We couldn't check whether an installation already exists here. An existing .env will be backed up and replaced.",
+    "cleared": "Will be removed from .env"
   },
   "docker": {
     "title": "Starting Yuvomi",
@@ -234,7 +241,7 @@
     "documentLocalEnable": "Store new documents in a local folder",
     "documentLocalPathLabel": "Folder path",
     "documentLocalPathHint": "Path inside the container. Leave empty to use /documents.",
-    "errSchedule": "Invalid schedule. Expected five cron fields: minute 0-59, hour 0-23, day 1-31, month 1-12, weekday 0-7 - for example 0 2 * * * for daily at 2 am.",
+    "errSchedule": "Invalid schedule. Expected five cron fields (minute 0-59, hour 0-23, day 1-31, month 1-12, weekday 0-7), six with a leading second such as 0 0 2 * * *, or a shorthand such as @daily - for example 0 2 * * * for daily at 2 am. Day and month must fit together (no February 31).",
     "errKeep": "Backups to keep must be a positive number.",
     "webdavBackup": "Off-site Backups (WebDAV)",
     "webdavBackupHint": "Copy each backup to a WebDAV server (e.g. Nextcloud) so it survives a disk failure.",

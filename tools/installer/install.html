@@ -474,7 +474,7 @@
       margin-top: var(--space-6); padding: var(--space-3) 0;
       padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
       border-top: 1px solid var(--color-border);
-      display: flex; justify-content: flex-end; gap: var(--space-2h);
+      display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2h);
       position: sticky; bottom: 0; z-index: 10;
       background: var(--color-bg);
     }
@@ -829,6 +829,17 @@
        muss SICHTBAR sein, nicht nur im Buttontext - ein Doppelklicker liest das
        Label nie, ein Zoegerer haelt den ersten Klick sonst fuer wirkungslos.
        Bleibt in der einen violetten Stimme: hellere Flaeche plus Akzentring. */
+    /* Was der zweite Klick bestaetigt (armConfirm): eigene Zeile in der
+       Fussleiste ueber den Knoepfen (flex-basis 100 %), am Knopf ausgerichtet,
+       in Textfarbe - es ist der Satz, den man vor dem Klick liest, keine
+       Fussnote. */
+    .confirm-line {
+      flex-basis: 100%; margin: 0;
+      font-size: var(--text-sm);
+      color: var(--color-text-primary);
+      text-align: end;
+      text-wrap: pretty;
+    }
     .btn-primary.is-armed {
       background: var(--color-accent-hover);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 28%, transparent);
@@ -1044,6 +1055,9 @@
        Strichs. Leiser als gesetzte Werte: es meldet eine Abwesenheit, keine
        Entscheidung. */
     .rv-row--unset dd { color: var(--color-text-secondary); }
+    /* Ruhiger Hinweis unter einer Gruppe (Adresse nur fuer dieses Geraet):
+       Sekundaertext wie .hint, kein Banner - es ist eine Folge, kein Fehler. */
+    .rv-note { margin-top: var(--space-2); padding-inline: var(--space-4); }
     .done-wrap   { text-align: center; padding: var(--space-5) 0 var(--space-2); }
     /* Der Abschluss trug ein 🎉-Systemsemoji: der einzige Bildinhalt der ganzen
        Reise, auf jedem Betriebssystem anders gerendert und gegen PRODUCT.md:22
@@ -1144,6 +1158,9 @@
     [data-eye][aria-pressed="true"] .icon-on  { display: none; }
     [data-eye][aria-pressed="true"] .icon-off { display: inline; }
     .copied-note { font-size: var(--text-xs); color: var(--color-success); }
+    /* Gescheitertes Kopieren ist keine Erfolgsmeldung: Warnton wie die
+       Schluessel-Warnung, der Text sagt, was jetzt zu tun ist. */
+    .copied-note--fail { color: var(--color-warning); }
 
     /* ── Desktop ab 1024px: Schrittliste links, Inhalt rechts ─────────────────
        Die 560px-Karte stand auf 1440px allein in der Mitte, und der Fortschritt
@@ -1570,6 +1587,11 @@
         <div class="error-banner" id="simple-err" role="alert"></div>
       </div>
       <div class="card-foot">
+        <!-- Was der zweite Klick bestaetigt (armConfirm). Sichtbar und in der
+             Fussleiste, also direkt am Knopf: "Zum Bestaetigen erneut klicken"
+             sagte nie, WAS - und am Ende der Karte laege der Satz beim
+             Scharfstellen meist ausser Sicht. -->
+        <p class="confirm-line" id="simple-confirm-line" hidden></p>
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
         <!-- Live-Region wie bei rev-next: das Scharfstellen muss angesagt werden. -->
         <span class="vh" role="status" id="simple-armed-note"></span>
@@ -1812,11 +1834,11 @@
             </p>
             <div class="field">
               <label for="gcal-id" data-i18n="calendar.googleIdLabel">Client ID</label>
-              <input type="text" id="gcal-id" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
+              <input type="text" id="gcal-id" autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="gcal-secret" data-i18n="calendar.googleSecretLabel">Client Secret</label>
-              <input type="password" id="gcal-secret" enterkeyhint="next">
+              <input type="password" id="gcal-secret" autocomplete="new-password" enterkeyhint="next">
             </div>
             <p class="hint" data-i18n="calendar.googleSelectNote">After connecting, you can choose which calendar to sync in the app settings (default: primary calendar).</p>
           </div>
@@ -1840,11 +1862,11 @@
             </p>
             <div class="field">
               <label for="outlook-id" data-i18n="calendar.outlookIdLabel">Application (client) ID</label>
-              <input type="text" id="outlook-id" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
+              <input type="text" id="outlook-id" autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="outlook-secret" data-i18n="calendar.outlookSecretLabel">Client Secret</label>
-              <input type="password" id="outlook-secret" enterkeyhint="next">
+              <input type="password" id="outlook-secret" autocomplete="new-password" enterkeyhint="next">
             </div>
             <p class="hint" data-i18n="calendar.outlookNote">One-way push: Yuvomi stays the source of truth and overwrites changes made in Outlook. Family accounts are connected later in the app under Settings.</p>
           </div>
@@ -1865,11 +1887,11 @@
             </p>
             <div class="field">
               <label for="apple-user" data-i18n="calendar.appleUserLabel">Apple ID (email)</label>
-              <input type="email" id="apple-user" enterkeyhint="next">
+              <input type="email" id="apple-user" autocomplete="off" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="apple-pass" data-i18n="calendar.applePassLabel">App-Specific Password</label>
-              <input type="password" id="apple-pass" enterkeyhint="next">
+              <input type="password" id="apple-pass" autocomplete="new-password" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="apple-url"><span data-i18n="calendar.appleUrlLabel">CalDAV URL</span> <span class="opt" data-i18n="common.opt">(optional)</span></label>
@@ -2189,11 +2211,11 @@
             </div>
             <div class="field">
               <label for="oidc-client-id" data-i18n="advanced.oidcClientIdLabel">Client ID</label>
-              <input type="text" id="oidc-client-id" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
+              <input type="text" id="oidc-client-id" autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="oidc-client-secret" data-i18n="advanced.oidcClientSecretLabel">Client Secret</label>
-              <input type="password" id="oidc-client-secret" enterkeyhint="next">
+              <input type="password" id="oidc-client-secret" autocomplete="new-password" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="oidc-redirect" data-i18n="advanced.oidcRedirectLabel">Redirect URI</label>
@@ -2322,6 +2344,7 @@
                  das faellt erst Wochen spaeter auf. -->
             <div class="rv-row"><dt data-i18n="review.baseUrl">Public address</dt><dd id="rv-base-url"></dd></div>
           </dl>
+          <p class="hint rv-note" id="rv-local-note" hidden data-i18n="review.localOnly">Only reachable on this device - phones and invitation links cannot reach Yuvomi this way.</p>
         </section>
         <section class="rv-group" aria-labelledby="rvg-secrets">
           <div class="group-head">
@@ -2378,11 +2401,16 @@
                  sicherheitsrelevanten Schalter auslaesst, prueft das Falsche. -->
             <div class="rv-row"><dt data-i18n="review.privateNetwork">Private-network access</dt><dd id="rv-private-network"></dd></div>
             <div class="rv-row"><dt data-i18n="review.moduleWebInstall">Install modules from Settings</dt><dd id="rv-module-web-install"></dd></div>
+            <!-- Geleerte Felder (Entscheidung C): ihre Zeile faellt aus der .env.
+                 Die Schluessel stehen woertlich da - es sind die Namen, unter
+                 denen man sie in der Datei wiederfindet. -->
+            <div class="rv-row" id="rv-cleared-row" hidden><dt data-i18n="review.cleared">Removed from .env</dt><dd id="rv-cleared" dir="ltr"></dd></div>
           </dl>
         </section>
         <div class="error-banner" id="rev-err" role="alert"></div>
       </div>
       <div class="card-foot">
+        <p class="confirm-line" id="rev-confirm-line" hidden></p>
         <button class="btn btn-ghost" data-back data-i18n="common.back">Back</button>
         <!-- Live-Region fuer das Scharfstellen: der Textwechsel am fokussierten
              Button wird nicht zuverlaessig angesagt - wer ihn nicht sieht, haelt
@@ -2662,7 +2690,7 @@
 import { initInstallerI18n, setLocale, getLocale, t, applyTranslations, applyRich } from '/i18n-mini.js';
 import {
   prefillPlan, accessEnv, omitUnchanged, unchangedSince, EMAIL_SECTION_FIELDS,
-  BASELINE_FIELDS, REDIRECT_SOURCES,
+  BASELINE_FIELDS, REDIRECT_SOURCES, clearedKeys,
 } from '/rerun-prefill.js';
 import {
   isValidCron, isAbsoluteContainerPath, isPlaceholderSecret, pairGap, enabledWithoutUrl,
@@ -2753,6 +2781,13 @@ let wizardReady = false;
 // nachinstallierte und „Erneut pruefen" klickte, sah die Meldung verschwinden
 // und die als „Empfohlen" ausgezeichnete Karte tot zurueckbleiben.
 let simpleLockedByEnv = false;
+/**
+ * Was der Preflight über den Bestand weiss. Die Zwei-Klick-Bestätigung gilt
+ * nur, wenn Speichern etwas überschreibt (bestehende .env) oder neu startet
+ * (laufender Container); bei einer Erstinstallation war der zweite Klick reine
+ * Reibung. Ist der Preflight gescheitert (known false), wird bestätigt.
+ */
+const preflightState = { known: false, envExists: false, containerRunning: false };
 // Beschriftungen, die vom Zustand abhaengen und einen Sprachwechsel ueberleben
 // muessen. Alle drei standen vorher als data-i18n im Markup und wurden dabei
 // auf ihren Grundtext zurueckgesetzt - beim Bestaetigungsknopf hiess das: die
@@ -2772,6 +2807,9 @@ let dockerOutcome = null;
 /** Sekunden bis zum Erfolg, fuer "Fertig in N s" (auch nach Sprachwechsel). */
 let dockerDoneSecs = null;
 let reviewConfirmed = false;
+// Steht hier oben, nicht am Handler: localize() liest es (Bestätigungszeile),
+// und localize() laeuft schon beim Laden.
+let simpleConfirmed = false;
 // Zeitstempel des Scharfstellens: ein woertlicher Doppelklick (~200 ms) traf
 // sonst beide Stufen der Zwei-Klick-Bestaetigung in einer Geste - derselbe
 // Button, dieselbe Position, und dahinter liegt .env-Schreiben plus
@@ -2810,6 +2848,12 @@ function localize() {
   // zuruecksetzt - beim Bestaetigungsknopf hiesse das, dass ein Sprachwechsel
   // die zweite Klick-Sicherung entwaffnet.
   $('rev-next').textContent = t(reviewConfirmed ? 'review.confirm' : 'review.save');
+  // Die Bestätigungszeilen tragen den Zustand wie der Knopf.
+  if (reviewConfirmed) $('rev-confirm-line').textContent = t(confirmLineKey());
+  if (simpleConfirmed) {
+    $('simple-confirm-line').textContent = t(confirmLineKey());
+    $('simple-next').textContent = t('review.confirm');
+  }
   $('dkr-next').textContent = t(dockerPrimaryKey);
   $('dkr-text').textContent = t(dockerTextKey);
   renderPhases();
@@ -3080,6 +3124,27 @@ function keptRedirect(key) {
   return kept && originUnchanged() && untouched(...REDIRECT_SOURCES[key]) ? kept : null;
 }
 
+/**
+ * Der Feldstand für clearedKeys(): wie fieldState, aber ein Zahlfeld mit
+ * Fehleingabe (validity.badInput, etwa Buchstaben) meldet null statt '' - der
+ * Browser liefert dafür value '', und das hiesse sonst "geleert".
+ */
+function clearState() {
+  return Object.fromEntries(BASELINE_FIELDS.map(id => {
+    const el = $(id);
+    if (el.type === 'checkbox') return [id, el.checked];
+    return [id, el.validity?.badInput ? null : el.value];
+  }));
+}
+
+/**
+ * Die Schlüssel, deren vorbelegtes Feld der Nutzer geleert hat (Entscheidung
+ * C, siehe clearedKeys). `env` ist das ungekürzte buildEnv().
+ */
+function pendingClears(env) {
+  return clearedKeys(rerunValues, fieldBaseline, clearState(), env);
+}
+
 const EMAIL_KEYS = [
   'EMAIL_SMTP_HOST', 'EMAIL_SMTP_PORT', 'EMAIL_SMTP_SECURE', 'EMAIL_SMTP_USER',
   'EMAIL_SMTP_PASS', 'EMAIL_FROM_ADDRESS', 'EMAIL_FROM_NAME',
@@ -3111,6 +3176,23 @@ const lanDone = (async () => {
     if (r.ok) lanAddress = (await r.json()).address || null;
   } catch { /* ohne Antwort bleibt es bei localhost */ }
 })();
+
+/** Hat der Nutzer cfg-host selbst bedient? Dann bleibt seine Eingabe. */
+let cfgHostEdited = false;
+
+/**
+ * Erweitert-Pfad bei der Erstinstallation: cfg-host mit der Heimnetz-Adresse
+ * vorbelegen wie im Einfach-Pfad (Entscheidung A), sonst bleibt localhost.
+ * Fest localhost hiess: Einladungs- und Reset-Links zeigten auf das Gerät, auf
+ * dem man sie öffnet. Beim Rerun nie - dort gilt die Vorbelegung aus der .env,
+ * und ein spätes Setzen änderte den Feldstand nach fieldBaseline (eine neue
+ * BASE_URL würde abgeleitet).
+ */
+function prefillAdvancedHost() {
+  if (rerunValues || cfgHostEdited) return;
+  $('cfg-host').value = lanAddress || 'localhost';
+  refreshPlannedOrigin();
+}
 
 /** Sichere Defaults für den Einfach-Modus (HTTP im Heimnetz, Backups an). */
 function applySimpleDefaults() {
@@ -3240,6 +3322,10 @@ const preflightDone = (async () => {
       $('mode-advanced').classList.add('is-primary');
     }
     for (const key of d.preservedKeys || []) preservedKeys.add(key);
+    // Zuletzt: bricht oben etwas ab, bleibt known false, und Speichern fragt nach.
+    preflightState.envExists = Boolean(d.envExists);
+    preflightState.containerRunning = Boolean(d.containerRunning);
+    preflightState.known = true;
   } catch { /* preflight is best-effort */ }
 })();
 
@@ -3377,7 +3463,7 @@ function renderStep() {
  * Fokus auf die Überschrift des aktuellen Schritts, damit Tastatur-/
  * Screenreader-Nutzer der Navigation folgen (WCAG 2.4.3). preventScroll
  * verhindert Sprünge. Laeuft nach renderStep - mit View Transition erst, wenn
- * der Browser das neue Bild aufgenommen hat (swapStep), das Layout also steht.
+ * sie fertig ist (`finished`, siehe swapStep), sonst direkt nach dem Tausch.
  */
 function focusStep() {
   const active = flow[currentStep];
@@ -3438,12 +3524,15 @@ function swapStep(update, dir, animate, settle = null) {
   // `ready` lehnt ab, wenn der Browser die Transition verwirft - der Tausch
   // selbst laeuft trotzdem.
   transition.ready.catch(() => {});
-  // `settle` (Fokus) erst nach dem Tausch UND der Aufnahme des neuen Bildes:
-  // dann ist das Layout gerechnet, und focus() erzwingt keins mehr. Verworfen
-  // laeuft er nach dem Tausch; scheitert schon der Tausch, gibt es nichts zu
-  // fokussieren.
+  // `settle` (Fokus) erst, wenn die Transition durch ist (`finished`). Nach
+  // `ready` war es zu frueh: focus() rechnete mitten in der laufenden Animation
+  // Stil und Layout neu (gemessen 31 ms erzwungener Reflow, Re-Critique
+  // 2026-10-29). Bis dahin steht der Fokus auf <body> - die Animation dauert
+  // Sekundenbruchteile, und WCAG 2.4.3 haelt die Reihenfolge, nicht den
+  // Zeitpunkt. Verworfen laeuft er nach dem Tausch; scheitert schon der Tausch,
+  // gibt es nichts zu fokussieren.
   transition.updateCallbackDone
-    .then(() => transition.ready.catch(() => {}))
+    .then(() => transition.finished.catch(() => {}))
     .then(() => settle?.(), () => {});
   // Waehrend der Blende trifft Chromium jeden Zeiger nur auf <html>; der erste
   // Tipp beendet sie, damit der naechste die Seite erreicht (swapPage der App).
@@ -3560,6 +3649,19 @@ function isLoopbackHost(host) {
   return !h || h === 'localhost' || h === '::1' || /^127\./.test(h);
 }
 
+/**
+ * Der Host einer öffentlichen Adresse ('' wenn sie keine ist). Ein
+ * Compose-Ausdruck (`https://${PUBLIC_HOST}`) ergibt einen Host, der nie
+ * "nur dieses Gerät" ist - aufgelöst wird er erst von Compose.
+ */
+function originHost(url) {
+  try {
+    return new URL(url).hostname.replace(/^\[|\]$/g, '');
+  } catch {
+    return 'invalid.';
+  }
+}
+
 /** Hat der Nutzer die Heimnetz-Adresse im Einfach-Pfad selbst geändert? */
 let simpleHostEdited = false;
 
@@ -3629,7 +3731,7 @@ function onEnterStep(name) {
     simpleConfirmed = false;
     $('simple-next').textContent = t('simple.start');
     $('simple-next').classList.remove('is-armed');
-    $('simple-armed-note').textContent = '';
+    disarmConfirm('simple');
   } else if (name === 'review') {
     // Angekommen: der Rueckweg ist gegangen, "Weiter" heisst wieder vorwaerts.
     reviewReturn = null;
@@ -3639,7 +3741,7 @@ function onEnterStep(name) {
     reviewConfirmed = false;
     $('rev-next').textContent = t('review.save');
     $('rev-next').classList.remove('is-armed');
-    $('rev-armed-note').textContent = '';
+    disarmConfirm('rev');
   } else if (name === 'config') {
     // Vorbelegen, aber nur solange der Nutzer nichts eingetippt hat: sonst
     // überschriebe ein Schritt zurück und wieder vor seine Eingabe.
@@ -3809,17 +3911,17 @@ async function startFlow(m) {
   // verloren - überschrieben und als "unverändert" festgehalten.
   await preflightDone;
   if (request !== flowRequest) return;
-  if (m === 'simple') {
-    // Die Einfach-Defaults unten brauchen die Heimnetz-Adresse.
-    await lanDone;
-    if (request !== flowRequest) return;
-    if (simpleLockedByEnv) m = 'advanced';
-  }
+  // Beide Pfade brauchen die Heimnetz-Adresse: die Einfach-Defaults und die
+  // Vorbelegung von cfg-host (prefillAdvancedHost).
+  await lanDone;
+  if (request !== flowRequest) return;
+  if (simpleLockedByEnv) m = 'advanced';
   mode = m;
   flow = FLOWS[m];
   reviewReturn = null;
   applyStepCounters();
   if (m === 'simple') applySimpleDefaults();
+  else prefillAdvancedHost();
   showStep(1);
 }
 
@@ -3940,6 +4042,54 @@ function reveal(el) {
  * Zeitgeber faengt ab, dass `transitionend` ausbleibt (unterbrochen, Tab
  * verdeckt); was zuerst kommt, gewinnt, `fn` laeuft einmal.
  */
+/**
+ * Den Wert eines Feldes oder einer <code>-Zeile in die Zwischenablage legen und
+ * das Ergebnis in die Live-Region daneben (`<id>-copied`) schreiben.
+ *
+ * value ODER textContent: die Redirect-URIs stehen in <code>, nicht in einem
+ * Feld. Sie und die Schlüssel muss der Nutzer zeichengenau woanders eintragen.
+ * Bis Oktober 2026 meldete der Knopf "Kopiert" auch, wenn die Zwischenablage
+ * ablehnte (Rechte, unsicherer Kontext) - der catch war leer, die Meldung
+ * stand dahinter. Jetzt meldet nur der Erfolg Erfolg; sonst ist der Wert
+ * markiert, und die Meldung sagt, dass er von Hand zu kopieren ist. Sie bleibt
+ * stehen, bis der nächste Versuch sie ersetzt: wer gerade Strg+C sucht, soll
+ * sie nicht verschwinden sehen.
+ */
+async function copyValue(id) {
+  const src = $(id);
+  const text = src.value ?? src.textContent;
+  if (!text) return;
+  let ok = true;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    ok = false;
+  }
+  if (!ok) selectForManualCopy(src);
+  const note = $(`${id}-copied`);
+  if (!note) return;
+  note.textContent = t(ok ? 'common.copied' : 'common.copyFailed');
+  note.classList.toggle('copied-note--fail', !ok);
+  clearTimeout(note._t);
+  if (ok) note._t = setTimeout(() => { note.textContent = ''; }, 1800);
+}
+
+/** Den Wert markieren, damit er sich mit Strg+C/⌘C kopieren lässt. */
+function selectForManualCopy(src) {
+  if (typeof src.select === 'function') {
+    // Aus einem verdeckten Feld lässt der Browser nichts kopieren: sichtbar
+    // machen, wie es das Auge täte.
+    if (src.type === 'password') {
+      src.type = 'text';
+      document.querySelector(`[data-eye="${src.id}"]`)?.setAttribute('aria-pressed', 'true');
+    }
+    src.focus();
+    src.select();
+    return;
+  }
+  window.getSelection()?.selectAllChildren(src);
+}
+
 function afterTransition(el, fn) {
   const ms = el ? Math.max(0, ...getComputedStyle(el).transitionDuration.split(',').map(v => parseFloat(v) * (v.trim().endsWith('ms') ? 1 : 1000))) : 0;
   if (!ms) { fn(); return; }
@@ -4002,23 +4152,7 @@ document.addEventListener('click', async e => {
 
   const copyBtn = e.target.closest('[data-copy]');
   if (copyBtn) {
-    const src = $(copyBtn.dataset.copy);
-    // value ODER textContent: die Redirect-URIs stehen in <code>, nicht in einem
-    // Feld. Sie sind der einzige Wert, den der Nutzer zeichengenau in eine
-    // fremde Oberfläche (Google Cloud Console) übertragen muss - und hatten als
-    // einzige keinen Kopieren-Knopf, obwohl der Mechanismus zwei Felder weiter
-    // schon stand.
-    const text = src.value ?? src.textContent;
-    if (!text) return;
-    try { await navigator.clipboard.writeText(text); } catch { /* Clipboard kann blockiert sein */ }
-    const note = $(`${copyBtn.dataset.copy}-copied`);
-    if (note) {
-      // In die Live-Region schreiben (statt nur einblenden), damit Screenreader
-      // die Bestätigung ansagen. Nach kurzer Zeit wieder leeren.
-      note.textContent = t('common.copied');
-      clearTimeout(note._t);
-      note._t = setTimeout(() => { note.textContent = ''; }, 1800);
-    }
+    await copyValue(copyBtn.dataset.copy);
     return;
   }
 
@@ -4334,6 +4468,7 @@ function refreshPlannedOrigin() {
 $('adv-proxy').addEventListener('input', e => { e.currentTarget.dataset.touched = '1'; });
 $('adv-proxy').addEventListener('change', e => { e.currentTarget.dataset.touched = '1'; });
 
+$('cfg-host').addEventListener('input', () => { cfgHostEdited = true; });
 for (const id of ['adv-proxy', 'cfg-host', 'cfg-port']) {
   $(id).addEventListener('input', refreshPlannedOrigin);
   $(id).addEventListener('change', refreshPlannedOrigin);
@@ -4557,6 +4692,16 @@ function renderReview() {
     ['rv-access', S.SESSION_SECURE === 'true' ? t('review.accessProxy') : t('review.accessDirect')],
     ['rv-base-url', S.BASE_URL || deriveBaseUrl()],
   ]);
+  // Ehrlich, aber ruhig (Entscheidung A): mit localhost erreicht kein Handy
+  // und kein Einladungslink die App. Nur bei einer Adresse, die wirklich nur
+  // dieses Gerät meint - eine Heimnetz-IP ist genau richtig und bekommt nichts.
+  $('rv-local-note').hidden = !isLoopbackHost(originHost(S.BASE_URL || deriveBaseUrl()));
+  // Geleerte, vorbelegte Felder (Entscheidung C): die Zeile fällt beim
+  // Speichern aus der .env. Ohne diese Zeile sah die Prüfseite aus wie
+  // "nicht eingerichtet" - wahr erst NACH dem Speichern.
+  const cleared = pendingClears(buildEnv());
+  $('rv-cleared').textContent = cleared.join(', ');
+  $('rv-cleared-row').hidden = !cleared.length;
   // Was mit den Schlüsseln geschieht, nicht wie sie aussehen. preservedKeys
   // kennt die Antwort schon, seit der Preflight sie meldet.
   fillReviewGroup([['rv-session-secret', 'SESSION_SECRET'], ['rv-db-key', 'DB_ENCRYPTION_KEY']]
@@ -4616,33 +4761,66 @@ function fillReviewGroup(rows) {
   }
 }
 
+/** Muss Speichern bestätigt werden? Nur wenn es etwas überschreibt oder neu startet. */
+function needsConfirm() {
+  return !preflightState.known || preflightState.envExists || preflightState.containerRunning;
+}
+
+/** Der Satz, der sagt, WAS der zweite Klick bestätigt. */
+function confirmLineKey() {
+  if (!preflightState.known) return 'review.confirmUnknown';
+  if (preflightState.envExists && preflightState.containerRunning) return 'review.confirmBoth';
+  return preflightState.envExists ? 'review.confirmEnv' : 'review.confirmRunning';
+}
+
+/**
+ * Scharfstellen: Knopftext, sichtbare Zeile darüber, Live-Region. Vorher sagte
+ * nur der Knopf "Zum Bestätigen erneut klicken" - was bestätigt wird, stand
+ * nirgends (Re-Critique 2026-10-29). `prefix` ist 'rev' oder 'simple'.
+ */
+function armConfirm(prefix, btn) {
+  btn.textContent = t('review.confirm');
+  // Sichtbar scharfstellen, nicht nur den Text wechseln (siehe .is-armed).
+  btn.classList.add('is-armed');
+  const line = $(`${prefix}-confirm-line`);
+  line.textContent = t(confirmLineKey());
+  line.hidden = false;
+  // Und hoerbar: der Textwechsel am fokussierten Button wird nicht
+  // zuverlaessig angesagt - ohne die Live-Region wirkte der erste Klick fuer
+  // Screenreader wie "nichts passiert".
+  $(`${prefix}-armed-note`).textContent = `${t(confirmLineKey())} ${t('review.confirm')}`;
+}
+
+/** Den Bestätigungszustand zurücknehmen (Rückkehr, Fehler, Speichern). */
+function disarmConfirm(prefix) {
+  $(`${prefix}-armed-note`).textContent = '';
+  $(`${prefix}-confirm-line`).hidden = true;
+}
+
 $('rev-next').addEventListener('click', async () => {
   const btn = $('rev-next');
-  // Irreversibler Schritt: erster Klick fordert Bestätigung, zweiter führt aus.
-  if (!reviewConfirmed) {
+  // Überschreibt oder startet Speichern etwas neu, fordert der erste Klick eine
+  // Bestätigung und der zweite führt aus. Bei der Erstinstallation gibt es
+  // nichts zu verlieren: der erste Klick speichert (Entscheidung B).
+  if (needsConfirm() && !reviewConfirmed) {
     reviewConfirmed = true;
     reviewArmedAt = Date.now();
-    btn.textContent = t('review.confirm');
-    // Sichtbar scharfstellen, nicht nur den Text wechseln (siehe .is-armed).
-    btn.classList.add('is-armed');
-    // Und hoerbar: der Textwechsel am fokussierten Button wird nicht
-    // zuverlaessig angesagt - ohne die Live-Region wirkte der erste Klick fuer
-    // Screenreader wie "nichts passiert".
-    $('rev-armed-note').textContent = t('review.confirm');
+    armConfirm('rev', btn);
     showErr('rev-err', '');
     return;
   }
-  if (Date.now() - reviewArmedAt < CONFIRM_COOLDOWN_MS) return;
+  if (reviewConfirmed && Date.now() - reviewArmedAt < CONFIRM_COOLDOWN_MS) return;
   btn.disabled = true; btn.textContent = t('review.saving'); btn.classList.remove('is-armed');
-  $('rev-armed-note').textContent = '';
+  disarmConfirm('rev');
   // Unverändert vorbelegte Werte gehen nicht zurück: der Server bewahrt ihre
-  // Originalzeile dann Zeichen für Zeichen (siehe omitUnchanged).
+  // Originalzeile dann Zeichen für Zeichen (siehe omitUnchanged). Geleerte
+  // gehen als `clear` mit, sonst bewahrte der Server auch sie.
   const env = omitUnchanged(buildEnv(), rerunValues, id => untouched(id));
   try {
     const r = await fetch('/api/save-env', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ env }),
+      body: JSON.stringify({ env, clear: pendingClears(buildEnv()) }),
     });
     const d = await r.json().catch(() => null);
     if (!r.ok) throw new Error(d?.error || '');
@@ -4651,7 +4829,7 @@ $('rev-next').addEventListener('click', async () => {
     startDocker();
   } catch (e) {
     btn.disabled = false; btn.textContent = t('review.save'); reviewConfirmed = false;
-    $('rev-armed-note').textContent = '';
+    disarmConfirm('rev');
     // Uebersetzte Hauptaussage zuerst, das rohe Server-/Netzwerkdetail nur als
     // Klammer: sanitizeEnv-Meldungen sind englisch, die Nutzerin liest hier
     // aber eine von 27 Sprachen.
@@ -4660,7 +4838,6 @@ $('rev-next').addEventListener('click', async () => {
 });
 
 // Einfach-Modus: Schlüssel sicherstellen, .env schreiben und direkt starten.
-let simpleConfirmed = false;
 $('simple-next').addEventListener('click', async () => {
   // Zweite Tuer derselben Sperre: kaeme der Einfach-Pfad je an startFlow()
   // vorbei, schreibt er trotzdem nicht ueber eine bestehende .env.
@@ -4674,30 +4851,27 @@ $('simple-next').addEventListener('click', async () => {
     fail('simple-err', t('config.errHost'), 'simple-host');
     return;
   }
-  // Genauso irreversibel wie rev-next, also dieselbe Zwei-Klick-Bestätigung.
-  // Dass der Laien-Pfad sie nicht hatte, drehte die Schutzlogik um: weniger
-  // Netz für die Nutzer, die weniger überblicken.
-  if (!simpleConfirmed) {
+  // Dieselbe Regel wie rev-next: bestätigt wird, wenn etwas überschrieben oder
+  // neu gestartet wird. Dass der Laien-Pfad die Bestätigung einmal gar nicht
+  // hatte, drehte die Schutzlogik um; dass er sie bei einer leeren Maschine
+  // verlangte, war Reibung ohne Schutz.
+  if (needsConfirm() && !simpleConfirmed) {
     simpleConfirmed = true;
     simpleArmedAt = Date.now();
-    btn.textContent = t('review.confirm');
-    // Sichtbar scharfstellen, nicht nur den Text wechseln (siehe .is-armed).
-    btn.classList.add('is-armed');
-    // Hoerbar wie bei rev-next (siehe dort).
-    $('simple-armed-note').textContent = t('review.confirm');
+    armConfirm('simple', btn);
     showErr('simple-err', '');
     return;
   }
-  if (Date.now() - simpleArmedAt < CONFIRM_COOLDOWN_MS) return;
+  if (simpleConfirmed && Date.now() - simpleArmedAt < CONFIRM_COOLDOWN_MS) return;
   btn.disabled = true; btn.textContent = t('review.saving'); btn.classList.remove('is-armed');
-  $('simple-armed-note').textContent = '';
+  disarmConfirm('simple');
   try {
     await ensureKeys();
     S.BASE_URL = deriveBaseUrl();
     const r = await fetch('/api/save-env', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ env: omitUnchanged(buildEnv(), rerunValues, id => untouched(id)) }),
+      body: JSON.stringify({ env: omitUnchanged(buildEnv(), rerunValues, id => untouched(id)), clear: pendingClears(buildEnv()) }),
     });
     const d = await r.json().catch(() => null);
     if (!r.ok) throw new Error(d?.error || '');
@@ -4706,7 +4880,7 @@ $('simple-next').addEventListener('click', async () => {
     startDocker();
   } catch (e) {
     btn.disabled = false; btn.textContent = t('simple.start'); simpleConfirmed = false;
-    $('simple-armed-note').textContent = '';
+    disarmConfirm('simple');
     // Wie bei rev-err: uebersetzte Hauptaussage, rohes Detail in Klammern.
     showErr('simple-err', e.message ? `${t('review.errSave')} (${e.message})` : t('review.errSave'));
   }

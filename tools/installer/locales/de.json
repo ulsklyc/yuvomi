@@ -17,7 +17,8 @@
     "copied": "Kopiert ✓",
     "language": "Sprache",
     "copyRedirect": "Redirect-URI kopieren",
-    "opt": "(optional)"
+    "opt": "(optional)",
+    "copyFailed": "Kopieren nicht möglich - der Wert ist markiert, bitte manuell kopieren."
   },
   "config": {
     "title": "Grundkonfiguration",
@@ -125,7 +126,7 @@
     "documentLocalEnable": "Neue Dokumente in einem lokalen Ordner speichern",
     "documentLocalPathLabel": "Ordnerpfad",
     "documentLocalPathHint": "Pfad im Container. Leer lassen für /documents.",
-    "errSchedule": "Ungültiger Zeitplan. Erwartet werden fünf Cron-Felder: Minute 0-59, Stunde 0-23, Tag 1-31, Monat 1-12, Wochentag 0-7 - etwa 0 2 * * * für täglich um 2 Uhr.",
+    "errSchedule": "Ungültiger Zeitplan. Erwartet werden fünf Cron-Felder (Minute 0-59, Stunde 0-23, Tag 1-31, Monat 1-12, Wochentag 0-7), sechs mit vorangestellter Sekunde wie 0 0 2 * * * oder eine Kurzform wie @daily - etwa 0 2 * * * für täglich um 2 Uhr. Tag und Monat müssen zusammenpassen (kein 31. Februar).",
     "errKeep": "Aufzubewahrende Backups muss eine positive Zahl sein.",
     "webdavBackup": "Externe Backups (WebDAV)",
     "webdavBackupHint": "Kopiert jedes Backup auf einen WebDAV-Server (z. B. Nextcloud), damit es einen Festplattenausfall übersteht.",
@@ -217,7 +218,13 @@
     "privateNetworkWebdav": "WebDAV-Ziel",
     "baseUrl": "Öffentliche Adresse",
     "outlook": "Outlook-Kalender",
-    "moduleWebInstall": "Module aus den Einstellungen"
+    "moduleWebInstall": "Module aus den Einstellungen",
+    "localOnly": "Nur auf diesem Gerät erreichbar - Handys und Einladungslinks erreichen Yuvomi so nicht.",
+    "confirmEnv": "Deine bestehende .env wird ersetzt. Eine Sicherung legt der Installer vorher an.",
+    "confirmRunning": "Der laufende Yuvomi-Container wird dabei neu gestartet.",
+    "confirmBoth": "Deine bestehende .env wird ersetzt (vorher gesichert), und der laufende Container startet neu.",
+    "confirmUnknown": "Ob hier schon eine Installation läuft, ließ sich nicht prüfen. Eine vorhandene .env wird gesichert und ersetzt.",
+    "cleared": "Wird aus der .env entfernt"
   },
   "docker": {
     "title": "Yuvomi wird gestartet",

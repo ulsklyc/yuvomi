@@ -17,7 +17,8 @@
     "copied": "已複製 ✓",
     "language": "語言",
     "copyRedirect": "複製重新導向 URI",
-    "opt": "（選填）"
+    "opt": "（選填）",
+    "copyFailed": "無法複製 - 已選取該值，請手動複製。"
   },
   "config": {
     "title": "基本設定",
@@ -137,7 +138,13 @@
     "privateNetworkWebdav": "WebDAV 文件",
     "baseUrl": "公開位址",
     "outlook": "Outlook 日曆",
-    "moduleWebInstall": "從設定中安裝模組"
+    "moduleWebInstall": "從設定中安裝模組",
+    "localOnly": "僅能在此裝置上存取 - 手機和邀請連結無法透過這種方式連到 Yuvomi。",
+    "confirmEnv": "現有的 .env 將被取代。安裝程式會先備份。",
+    "confirmRunning": "正在執行的 Yuvomi 容器將重新啟動。",
+    "confirmBoth": "現有的 .env 將被取代（先備份），正在執行的容器也會重新啟動。",
+    "confirmUnknown": "無法檢查這裡是否已有安裝。現有的 .env 會先備份再取代。",
+    "cleared": "將從 .env 中移除"
   },
   "docker": {
     "title": "正在啟動 Yuvomi",
@@ -234,7 +241,7 @@
     "documentLocalEnable": "將新文件儲存到本機資料夾",
     "documentLocalPathLabel": "資料夾路徑",
     "documentLocalPathHint": "容器內的路徑。留空則使用 /documents。",
-    "errSchedule": "排程無效。需要五個 cron 欄位：分鐘 0-59、小時 0-23、日期 1-31、月份 1-12、星期 0-7 - 例如每天 2 點為 0 2 * * *。",
+    "errSchedule": "排程無效。需要五個 cron 欄位（分鐘 0-59、小時 0-23、日期 1-31、月份 1-12、星期 0-7）、開頭帶秒的六個欄位（如 0 0 2 * * *），或 @daily 之類的簡寫 - 例如每天 2 點為 0 2 * * *。日期和月份必須能組合（沒有 2 月 31 日）。",
     "errKeep": "要保留的備份數量必須是正數。",
     "webdavBackup": "異地備份（WebDAV）",
     "webdavBackupHint": "將每份備份複製到 WebDAV 伺服器（如 Nextcloud），即使磁碟故障也能保留。",

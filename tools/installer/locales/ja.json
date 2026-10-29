@@ -17,7 +17,8 @@
     "copied": "コピーしました ✓",
     "language": "言語",
     "copyRedirect": "リダイレクト URI をコピー",
-    "opt": "（任意）"
+    "opt": "（任意）",
+    "copyFailed": "コピーできませんでした - 値を選択済みなので、手動でコピーしてください。"
   },
   "config": {
     "title": "基本設定",
@@ -137,7 +138,13 @@
     "privateNetworkWebdav": "WebDAV ドキュメント",
     "baseUrl": "公開アドレス",
     "outlook": "Outlook カレンダー",
-    "moduleWebInstall": "設定からのモジュールのインストール"
+    "moduleWebInstall": "設定からのモジュールのインストール",
+    "localOnly": "このデバイスからのみアクセスできます - スマートフォンや招待リンクからは、この設定では Yuvomi に届きません。",
+    "confirmEnv": "既存の .env は置き換えられます。インストーラーが先にバックアップを作成します。",
+    "confirmRunning": "実行中の Yuvomi コンテナが再起動されます。",
+    "confirmBoth": "既存の .env は置き換えられ(先にバックアップ)、実行中のコンテナも再起動されます。",
+    "confirmUnknown": "ここに既存のインストールがあるか確認できませんでした。既存の .env はバックアップされてから置き換えられます。",
+    "cleared": ".env から削除されます"
   },
   "docker": {
     "title": "Yuvomi を起動しています",
@@ -234,7 +241,7 @@
     "documentLocalEnable": "新しいドキュメントをローカルフォルダーに保存する",
     "documentLocalPathLabel": "フォルダーのパス",
     "documentLocalPathHint": "コンテナ内のパス。空欄の場合は /documents を使用します。",
-    "errSchedule": "スケジュールが無効です。5 つの cron フィールドが必要です: 分 0-59、時 0-23、日 1-31、月 1-12、曜日 0-7 - 例: 毎日 2 時なら 0 2 * * *。",
+    "errSchedule": "スケジュールが無効です。5 つの cron フィールド(分 0-59、時 0-23、日 1-31、月 1-12、曜日 0-7)、先頭に秒を付けた 6 つ(例: 0 0 2 * * *)、または @daily などの短縮形が必要です - 例: 毎日 2 時なら 0 2 * * *。日と月は組み合わせとして存在する必要があります(2 月 31 日は不可)。",
     "errKeep": "保持するバックアップ数は正の数である必要があります。",
     "webdavBackup": "外部バックアップ（WebDAV）",
     "webdavBackupHint": "各バックアップを WebDAV サーバー（例：Nextcloud）にコピーし、ディスク障害でも残るようにします。",

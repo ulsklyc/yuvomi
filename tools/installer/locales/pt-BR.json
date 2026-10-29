@@ -17,7 +17,8 @@
     "copied": "Copiado ✓",
     "language": "Idioma",
     "copyRedirect": "Copiar URI de redirecionamento",
-    "opt": "(opcional)"
+    "opt": "(opcional)",
+    "copyFailed": "Não foi possível copiar - o valor está selecionado, copie-o manualmente."
   },
   "config": {
     "title": "Configuração básica",
@@ -137,7 +138,13 @@
     "privateNetworkWebdav": "Documentos WebDAV",
     "baseUrl": "Endereço público",
     "outlook": "Calendário Outlook",
-    "moduleWebInstall": "Instalar módulos pelas Configurações"
+    "moduleWebInstall": "Instalar módulos pelas Configurações",
+    "localOnly": "Acessível só neste dispositivo - celulares e links de convite não chegam ao Yuvomi assim.",
+    "confirmEnv": "Seu .env atual será substituído. O instalador faz um backup antes.",
+    "confirmRunning": "O contêiner do Yuvomi em execução será reiniciado.",
+    "confirmBoth": "Seu .env atual será substituído (com backup antes) e o contêiner em execução reinicia.",
+    "confirmUnknown": "Não foi possível verificar se já existe uma instalação aqui. Um .env existente será salvo em backup e substituído.",
+    "cleared": "Será removido do .env"
   },
   "docker": {
     "title": "Iniciando o Yuvomi",
@@ -234,7 +241,7 @@
     "documentLocalEnable": "Armazenar novos documentos em uma pasta local",
     "documentLocalPathLabel": "Caminho da pasta",
     "documentLocalPathHint": "Caminho dentro do contêiner. Deixe em branco para usar /documents.",
-    "errSchedule": "Agendamento inválido. São esperados cinco campos cron: minuto 0-59, hora 0-23, dia 1-31, mês 1-12, dia da semana 0-7 - por exemplo 0 2 * * * para todo dia às 2h.",
+    "errSchedule": "Agendamento inválido. São esperados cinco campos cron (minuto 0-59, hora 0-23, dia 1-31, mês 1-12, dia da semana 0-7), seis com um segundo inicial como 0 0 2 * * *, ou uma forma curta como @daily - por exemplo 0 2 * * * para todo dia às 2h. Dia e mês precisam combinar (não existe 31 de fevereiro).",
     "errKeep": "A quantidade de backups a manter deve ser um número positivo.",
     "webdavBackup": "Backups externos (WebDAV)",
     "webdavBackupHint": "Copia cada backup para um servidor WebDAV (ex.: Nextcloud) para garantir redundância contra falhas de disco.",

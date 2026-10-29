@@ -17,7 +17,8 @@
     "copied": "Skopiowano ✓",
     "language": "Język",
     "copyRedirect": "Kopiuj URI przekierowania",
-    "opt": "(opcjonalnie)"
+    "opt": "(opcjonalnie)",
+    "copyFailed": "Nie udało się skopiować - wartość jest zaznaczona, skopiuj ją ręcznie."
   },
   "config": {
     "title": "Konfiguracja podstawowa",
@@ -137,7 +138,13 @@
     "privateNetworkWebdav": "Dokumenty WebDAV",
     "baseUrl": "Adres publiczny",
     "outlook": "Kalendarz Outlook",
-    "moduleWebInstall": "Instalowanie modułów z Ustawień"
+    "moduleWebInstall": "Instalowanie modułów z Ustawień",
+    "localOnly": "Dostępne tylko na tym urządzeniu - telefony i linki z zaproszeniami nie dotrą tak do Yuvomi.",
+    "confirmEnv": "Twój istniejący plik .env zostanie zastąpiony. Instalator najpierw tworzy kopię zapasową.",
+    "confirmRunning": "Działający kontener Yuvomi zostanie uruchomiony ponownie.",
+    "confirmBoth": "Twój istniejący plik .env zostanie zastąpiony (najpierw kopia zapasowa), a działający kontener uruchomi się ponownie.",
+    "confirmUnknown": "Nie udało się sprawdzić, czy istnieje już tu instalacja. Istniejący plik .env zostanie zarchiwizowany i zastąpiony.",
+    "cleared": "Zostanie usunięte z .env"
   },
   "docker": {
     "title": "Uruchamianie Yuvomi",
@@ -234,7 +241,7 @@
     "documentLocalEnable": "Zapisuj nowe dokumenty w folderze lokalnym",
     "documentLocalPathLabel": "Ścieżka folderu",
     "documentLocalPathHint": "Ścieżka w kontenerze. Pozostaw puste, aby użyć /documents.",
-    "errSchedule": "Nieprawidłowy harmonogram. Oczekiwano pięciu pól cron: minuta 0-59, godzina 0-23, dzień 1-31, miesiąc 1-12, dzień tygodnia 0-7 - na przykład 0 2 * * * codziennie o 2:00.",
+    "errSchedule": "Nieprawidłowy harmonogram. Oczekiwane jest pięć pól cron (minuta 0-59, godzina 0-23, dzień 1-31, miesiąc 1-12, dzień tygodnia 0-7), sześć z sekundą na początku, np. 0 0 2 * * *, albo skrót, np. @daily - na przykład 0 2 * * * codziennie o 2:00. Dzień i miesiąc muszą do siebie pasować (nie ma 31 lutego).",
     "errKeep": "Liczba kopii do zachowania musi być liczbą dodatnią.",
     "webdavBackup": "Kopie zewnętrzne (WebDAV)",
     "webdavBackupHint": "Kopiuje każdą kopię zapasową na serwer WebDAV (np. Nextcloud), aby przetrwała awarię dysku.",

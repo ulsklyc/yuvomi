@@ -17,7 +17,8 @@
     "copied": "Kopyalandı ✓",
     "language": "Dil",
     "copyRedirect": "Yönlendirme URI'sini kopyala",
-    "opt": "(isteğe bağlı)"
+    "opt": "(isteğe bağlı)",
+    "copyFailed": "Kopyalanamadı - değer seçili, lütfen elle kopyala."
   },
   "config": {
     "title": "Temel Yapılandırma",
@@ -137,7 +138,13 @@
     "privateNetworkWebdav": "WebDAV belgeleri",
     "baseUrl": "Herkese açık adres",
     "outlook": "Outlook Takvimi",
-    "moduleWebInstall": "Ayarlar'dan modül kurulumu"
+    "moduleWebInstall": "Ayarlar'dan modül kurulumu",
+    "localOnly": "Yalnızca bu cihazdan erişilebilir - telefonlar ve davet bağlantıları Yuvomi'ye bu şekilde ulaşamaz.",
+    "confirmEnv": "Mevcut .env dosyan değiştirilecek. Kurulum aracı önce bir yedek alır.",
+    "confirmRunning": "Çalışan Yuvomi konteyneri yeniden başlatılacak.",
+    "confirmBoth": "Mevcut .env dosyan değiştirilecek (önce yedeklenir) ve çalışan konteyner yeniden başlar.",
+    "confirmUnknown": "Burada zaten bir kurulum olup olmadığı kontrol edilemedi. Mevcut bir .env yedeklenip değiştirilecek.",
+    "cleared": ".env dosyasından kaldırılacak"
   },
   "docker": {
     "title": "Yuvomi başlatılıyor",
@@ -234,7 +241,7 @@
     "documentLocalEnable": "Yeni belgeleri yerel bir klasörde sakla",
     "documentLocalPathLabel": "Klasör yolu",
     "documentLocalPathHint": "Konteyner içindeki yol. /documents için boş bırakın.",
-    "errSchedule": "Geçersiz zamanlama. Beş cron alanı beklenir: dakika 0-59, saat 0-23, gün 1-31, ay 1-12, haftanın günü 0-7 - örneğin her gün saat 2’de için 0 2 * * *.",
+    "errSchedule": "Geçersiz zamanlama. Beş cron alanı beklenir (dakika 0-59, saat 0-23, gün 1-31, ay 1-12, haftanın günü 0-7), başta saniye ile altı alan, örneğin 0 0 2 * * *, ya da @daily gibi bir kısaltma - örneğin her gün saat 2 için 0 2 * * *. Gün ve ay birbirine uymalı (31 Şubat yok).",
     "errKeep": "Saklanacak yedek sayısı pozitif bir sayı olmalıdır.",
     "webdavBackup": "Harici yedeklemeler (WebDAV)",
     "webdavBackupHint": "Her yedeği bir WebDAV sunucusuna (örn. Nextcloud) kopyalar; böylece bir disk arızasından etkilenmez.",

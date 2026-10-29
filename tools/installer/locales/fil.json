@@ -17,7 +17,8 @@
     "copied": "Nakopya ✓",
     "language": "Wika",
     "copyRedirect": "Kopyahin ang redirect URI",
-    "opt": "(opsyonal)"
+    "opt": "(opsyonal)",
+    "copyFailed": "Hindi makopya - naka-select na ang value, pakikopya ito nang manu-mano."
   },
   "config": {
     "title": "Batayang Pagsasaayos",
@@ -125,7 +126,7 @@
     "documentLocalEnable": "Iimbak sa lokal na folder ang mga bagong dokumento",
     "documentLocalPathLabel": "Path ng folder",
     "documentLocalPathHint": "Path sa loob ng container. Iwanang blangko para gamitin ang /documents.",
-    "errSchedule": "Hindi wastong iskedyul. Inaasahan ang limang cron field: minuto 0-59, oras 0-23, araw 1-31, buwan 1-12, araw ng linggo 0-7 - halimbawa 0 2 * * * para araw-araw nang 2:00.",
+    "errSchedule": "Hindi valid ang iskedyul. Inaasahan ang limang cron field (minuto 0-59, oras 0-23, araw 1-31, buwan 1-12, araw ng linggo 0-7), anim na may segundo sa unahan gaya ng 0 0 2 * * *, o isang maikling anyo gaya ng @daily - halimbawa 0 2 * * * para araw-araw nang 2 am. Dapat magtugma ang araw at buwan (walang Pebrero 31).",
     "errKeep": "Dapat positibong numero ang mga backup na itatago.",
     "webdavBackup": "Mga Backup sa Labas (WebDAV)",
     "webdavBackupHint": "Kopyahin ang bawat backup sa WebDAV server (hal. Nextcloud) para makaligtas ito sa pagkasira ng disk.",
@@ -217,7 +218,13 @@
     "privateNetworkWebdav": "Mga dokumento sa WebDAV",
     "baseUrl": "Pampublikong address",
     "outlook": "Outlook Calendar",
-    "moduleWebInstall": "Pag-install ng mga module mula sa Mga Setting"
+    "moduleWebInstall": "Pag-install ng mga module mula sa Mga Setting",
+    "localOnly": "Maaabot lang sa device na ito - hindi maaabot ng mga phone at invitation link ang Yuvomi sa ganitong paraan.",
+    "confirmEnv": "Papalitan ang kasalukuyan mong .env. Gagawa muna ng backup ang installer.",
+    "confirmRunning": "Ire-restart ang tumatakbong Yuvomi container.",
+    "confirmBoth": "Papalitan ang kasalukuyan mong .env (may backup muna), at magre-restart ang tumatakbong container.",
+    "confirmUnknown": "Hindi masuri kung may installation na rito. Iba-backup at papalitan ang kasalukuyang .env.",
+    "cleared": "Aalisin sa .env"
   },
   "docker": {
     "title": "Sinisimulan ang Yuvomi",

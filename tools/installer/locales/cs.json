@@ -17,7 +17,8 @@
     "copied": "Zkopírováno ✓",
     "language": "Jazyk",
     "copyRedirect": "Kopírovat přesměrovací URI",
-    "opt": "(volitelné)"
+    "opt": "(volitelné)",
+    "copyFailed": "Kopírování se nezdařilo - hodnota je označená, zkopíruj ji ručně."
   },
   "config": {
     "title": "Základní konfigurace",
@@ -125,7 +126,7 @@
     "documentLocalEnable": "Ukládat nové dokumenty do místní složky",
     "documentLocalPathLabel": "Cesta ke složce",
     "documentLocalPathHint": "Cesta uvnitř kontejneru. Ponechte prázdné pro /documents.",
-    "errSchedule": "Neplatný plán. Očekává se pět polí cron: minuta 0-59, hodina 0-23, den 1-31, měsíc 1-12, den v týdnu 0-7 - například 0 2 * * * pro každý den ve 2:00.",
+    "errSchedule": "Neplatný plán. Očekává se pět polí cron (minuta 0-59, hodina 0-23, den 1-31, měsíc 1-12, den v týdnu 0-7), šest s úvodní sekundou jako 0 0 2 * * *, nebo zkratka jako @daily - například 0 2 * * * pro každý den ve 2 hodiny. Den a měsíc musí k sobě pasovat (žádný 31. únor).",
     "errKeep": "Počet zachovaných záloh musí být kladné číslo.",
     "webdavBackup": "Externí zálohy (WebDAV)",
     "webdavBackupHint": "Zkopíruje každou zálohu na server WebDAV (např. Nextcloud), aby přežila selhání disku.",
@@ -217,7 +218,13 @@
     "privateNetworkWebdav": "Dokumenty WebDAV",
     "baseUrl": "Veřejná adresa",
     "outlook": "Kalendář Outlook",
-    "moduleWebInstall": "Instalace modulů z Nastavení"
+    "moduleWebInstall": "Instalace modulů z Nastavení",
+    "localOnly": "Dostupné jen na tomto zařízení - telefony a odkazy s pozvánkou se k Yuvomi takto nedostanou.",
+    "confirmEnv": "Tvůj stávající soubor .env bude nahrazen. Instalátor si ho nejdřív zálohuje.",
+    "confirmRunning": "Běžící kontejner Yuvomi se restartuje.",
+    "confirmBoth": "Tvůj stávající soubor .env bude nahrazen (předem zálohován) a běžící kontejner se restartuje.",
+    "confirmUnknown": "Nepodařilo se ověřit, zda tu už nějaká instalace běží. Stávající .env bude zálohován a nahrazen.",
+    "cleared": "Bude odstraněno z .env"
   },
   "docker": {
     "title": "Spouštění Yuvomi",

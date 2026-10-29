@@ -17,7 +17,8 @@
     "copied": "복사됨 ✓",
     "language": "언어",
     "copyRedirect": "리디렉션 URI 복사",
-    "opt": "(선택 사항)"
+    "opt": "(선택 사항)",
+    "copyFailed": "복사하지 못했습니다 - 값이 선택되어 있으니 직접 복사하세요."
   },
   "config": {
     "title": "기본 구성",
@@ -125,7 +126,7 @@
     "documentLocalEnable": "새 문서를 로컬 폴더에 저장",
     "documentLocalPathLabel": "폴더 경로",
     "documentLocalPathHint": "컨테이너 내부 경로. 비워 두면 /documents를 사용합니다.",
-    "errSchedule": "일정이 올바르지 않습니다. cron 필드 다섯 개가 필요합니다: 분 0-59, 시 0-23, 일 1-31, 월 1-12, 요일 0-7 - 예: 매일 2시는 0 2 * * *.",
+    "errSchedule": "일정이 올바르지 않습니다. cron 필드 다섯 개(분 0-59, 시 0-23, 일 1-31, 월 1-12, 요일 0-7), 앞에 초를 붙인 여섯 개(예: 0 0 2 * * *), 또는 @daily 같은 단축형이 필요합니다 - 예: 매일 2시는 0 2 * * *. 일과 월이 함께 존재해야 합니다(2월 31일 불가).",
     "errKeep": "보관할 백업 수는 양수여야 합니다.",
     "webdavBackup": "외부 백업(WebDAV)",
     "webdavBackupHint": "각 백업을 WebDAV 서버(예: Nextcloud)에 복사하여 디스크 장애에도 살아남게 합니다.",
@@ -217,7 +218,13 @@
     "privateNetworkWebdav": "WebDAV 문서",
     "baseUrl": "공개 주소",
     "outlook": "Outlook 캘린더",
-    "moduleWebInstall": "설정에서 모듈 설치"
+    "moduleWebInstall": "설정에서 모듈 설치",
+    "localOnly": "이 기기에서만 접속할 수 있습니다 - 이렇게 하면 휴대폰과 초대 링크로는 Yuvomi에 접속할 수 없습니다.",
+    "confirmEnv": "기존 .env가 교체됩니다. 설치 프로그램이 먼저 백업합니다.",
+    "confirmRunning": "실행 중인 Yuvomi 컨테이너가 다시 시작됩니다.",
+    "confirmBoth": "기존 .env가 교체되고(먼저 백업), 실행 중인 컨테이너가 다시 시작됩니다.",
+    "confirmUnknown": "여기에 이미 설치가 있는지 확인하지 못했습니다. 기존 .env는 백업된 뒤 교체됩니다.",
+    "cleared": ".env에서 제거됩니다"
   },
   "docker": {
     "title": "Yuvomi 시작 중",
