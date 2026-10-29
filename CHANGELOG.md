@@ -51,6 +51,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   about 160 kB instead of 520 kB per visit. Every response now forbids embedding the installer in
   another page (it shows your keys) and sends no referrer, and the browser tab shows the Yuvomi icon
   instead of a missing-icon error.
+- **Installer fields behave like the app's.** Address fields open the URL keyboard on phones and are
+  no longer capitalised or spell-checked, ports open the number pad, and the Enter key on the
+  on-screen keyboard says "Next". A field the browser itself recognises as invalid (an address
+  without `https://`) turns red after you leave it, and screen readers hear the same. Long labels
+  on the review page ("Database encryption key") are hyphenated instead of running into the value,
+  addresses like `./data` read correctly in Arabic and Persian, and the page no longer puts a focus
+  ring on the first heading when it opens. Field borders, the main button and the browser bar now
+  match the app, and the language picker on phones is only as wide as the language it shows.
+- **No more long dashes in the installer's texts.** All 27 languages of the web and command-line
+  installer use a plain hyphen, also for ranges and negative numbers.
 
 ## [2.83.0] - 2026-10-29
 

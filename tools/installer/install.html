@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Browserleiste in der Farbe der Buehne (--color-bg), je Theme - wie
+       public/index.html. Ein meta kann kein var() lesen; der Guard in
+       test-installer-a11y.js haelt beide Werte am Fallback-Token. -->
+  <meta name="theme-color" content="#F5F3ED" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)">
   <title data-i18n="title">Yuvomi Setup</title>
   <meta name="description" content="Set up your self-hosted Yuvomi family planner: server, security keys, integrations and the first admin account.">
   <link rel="icon" href="/favicon.ico" sizes="any">
@@ -88,6 +93,23 @@
       --color-success: #1E7B35;
       --color-warning: #A85D00;
       --color-danger: #D70015;
+      /* Abstandsskala der App (tokens.css). Seit dem Aufraeumen 2026-10-29
+         rechnen Polster, Raender und Luecken des Installers in diesen Stufen;
+         fehlten sie hier, verloere die Seite ohne tokens.css jeden Abstand. */
+      --space-px: 1px;
+      --space-0h: 2px;
+      --space-1:  4px;
+      --space-1h: 6px;
+      --space-2:  8px;
+      --space-2h: 10px;
+      --space-3:  12px;
+      --space-4:  16px;
+      --space-5:  20px;
+      --space-6:  24px;
+      --space-8:  32px;
+      --space-10: 40px;
+      --space-12: 48px;
+      --space-16: 64px;
       --radius-xs: 4px;
       --radius-sm: 10px;
       --radius-md: 12px;
@@ -131,6 +153,20 @@
          --glass-inset-strength, das in beiden Themes 1 ist. */
       --ease-glass: cubic-bezier(0.34, 1.56, 0.64, 1);
       --glass-inset-thumb: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+      /* Glanzkante des Primaerknopfs (glass.css), Ruhe und Hover. */
+      --glass-inset-medium: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+      --glass-inset-soft: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    }
+    /* Wie tokens.css: wo der Browser linear() kennt, ist die Feder gedaempft
+       statt Bezier. Ohne diesen Rahmen zeigte der Fallback eine andere
+       Bewegung als die App (Critique 2026-10-29, Fallback-Drift). */
+    @supports (transition-timing-function: linear(0, 1)) {
+      :root {
+        --ease-glass: linear(0, 0.034 2.5%, 0.12 5%, 0.238 7.5%, 0.372 10%, 0.508 12.5%, 0.638 15%, 0.754 17.5%,
+          0.853 20%, 0.934 22.5%, 0.997 25%, 1.042 27.5%, 1.071 30%, 1.088 32.5%, 1.094 35%, 1.093 37.5%,
+          1.086 40%, 1.076 42.5%, 1.063 45%, 1.05 47.5%, 1.038 50%, 1.026 52.5%, 1.016 55%, 1.008 57.5%,
+          1.002 60%, 0.997 62.5%, 0.992 67.5%, 0.991 72.5%, 0.994 80%, 0.998 90%, 1);
+      }
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -145,6 +181,9 @@
         --color-border-subtle: #3E3933;
         --color-accent: #A78BFA; --color-accent-hover: #BCA6FC; --color-ink-on-vivid: #0A0A0C;
         --neutral-950: #FBFAF7; --neutral-500: #948E85; --color-switch-off: #948E85;
+        /* Die Feldkante folgt dunkel NICHT der Rampe (tokens.css setzt sie
+           eigens auf #857F76); ueber --neutral-500 stand sie hier auf #948E85. */
+        --color-border-control: #857F76;
         --color-success: #30D158; --color-warning: #FF9F0A; --color-danger: #FF6961;
         /* Inkl. des 1px-Kantenrings aus tokens.css (Dark-Kur 2026-08-17): ein
            reiner Schwarz-Wurf ist auf der Kohle-Buehne unsichtbar, die Karte
@@ -171,7 +210,7 @@
     html { scroll-padding-block: 16px 96px; }
     body {
       font-family: var(--font-sans); color: var(--color-text-primary);
-      min-height: 100dvh; padding: 48px 16px 80px;
+      min-height: 100dvh; padding: var(--space-12) var(--space-4) 80px;
       /* HIER STAND EIN AKZENT-HAUCH am oberen Rand - ein radialer Verlauf, der
          bis v2.0.0 wortgleich auf der Login-Seite der App stand. Dort ist er mit
          dem HIG-Redesign gefallen, und der Grund gilt hier genauso: die Marke
@@ -204,7 +243,7 @@
     .brand { text-align: center; margin-bottom: 22px; }
     .brand__mark {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 64px; height: 64px; margin-bottom: 12px;
+      width: 64px; height: 64px; margin-bottom: var(--space-3);
       border-radius: var(--radius-lg);
       background-color: var(--color-accent);
       /* Folgt dem Theme. --color-text-on-accent wäre hier statisches Weiss und
@@ -237,16 +276,16 @@
        (gemessen die H2 des Abschlusses, mitten im Wort durchschnitten). Er hat
        oben seinen Platz und muss nicht mitreisen - der Wizard ist ein Formular,
        keine Leseflaeche, und die Sprache waehlt man am Anfang. */
-    .lang-switch { position: absolute; top: 12px; inset-inline-end: 12px; z-index: 120; display: flex; align-items: center; gap: 6px; }
+    .lang-switch { position: absolute; top: 12px; inset-inline-end: 12px; z-index: 120; display: flex; align-items: center; gap: var(--space-1h); }
     .lang-switch svg { width: 15px; height: 15px; stroke: var(--color-text-secondary); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .lang-switch select {
       appearance: none; -webkit-appearance: none;
-      padding: 6px 26px 6px 10px; font-size: var(--text-sm); font-weight: 600;
-      border: 1.5px solid var(--color-border-control); border-radius: var(--radius-sm);
+      padding: var(--space-1h) 26px var(--space-1h) var(--space-2h); font-size: var(--text-sm); font-weight: 600;
+      border: 1px solid var(--color-border-control); border-radius: var(--radius-sm);
       background: var(--color-surface); color: var(--color-text-primary);
       font-family: var(--font-sans); cursor: pointer; min-height: 36px;
     }
-    html[dir="rtl"] .lang-switch select { padding: 6px 10px 6px 26px; }
+    html[dir="rtl"] .lang-switch select { padding: var(--space-1h) var(--space-2h) var(--space-1h) 26px; }
     /* Chevron als Maske statt background-image: url() kann keine var() tragen,
        der Strich stand deshalb hartkodiert auf #6c6b67 - im Dark Mode 2.77:1
        auf der Feldflaeche und damit unter der 3:1-Schwelle fuer UI-Grafik
@@ -264,8 +303,8 @@
     /* Modus-Wahl: zwei große, klar unterscheidbare Wege. */
     .mode-grid { display: grid; gap: 14px; }
     .mode-card {
-      display: flex; flex-direction: column; gap: 6px; width: 100%; text-align: start;
-      padding: 20px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md);
+      display: flex; flex-direction: column; gap: var(--space-1h); width: 100%; text-align: start;
+      padding: var(--space-5); border: 1.5px solid var(--color-border); border-radius: var(--radius-md);
       background: var(--color-surface); color: var(--color-text-primary);
       font-family: var(--font-sans); cursor: pointer;
       transition:
@@ -276,7 +315,7 @@
     .mode-card:hover { border-color: var(--color-accent); box-shadow: var(--shadow-md); transform: translateY(-2px); }
     .mode-card:focus-visible { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent); }
     .mode-card.is-primary { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border)); background: color-mix(in srgb, var(--color-accent) 4%, var(--color-surface)); }
-    .mode-card__top { display: flex; align-items: center; gap: 12px; }
+    .mode-card__top { display: flex; align-items: center; gap: var(--space-3); }
     .mode-card__icon {
       display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0;
       border-radius: var(--radius-sm); background: color-mix(in srgb, var(--color-accent) 12%, transparent);
@@ -285,7 +324,7 @@
     .mode-card__title { font-size: var(--text-base); font-weight: 700; letter-spacing: -.01em; }
     .mode-card__badge { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--color-accent); }
     .mode-card__desc { font-size: var(--text-sm); line-height: 1.5; color: var(--color-text-secondary); }
-    .mode-card__meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: var(--text-xs); font-weight: 600; color: var(--color-text-secondary); }
+    .mode-card__meta { display: flex; align-items: center; gap: var(--space-1h); margin-top: var(--space-1); font-size: var(--text-xs); font-weight: 600; color: var(--color-text-secondary); }
     .mode-card__meta svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     /* Gesperrt wird über Fläche und Textfarbe, nicht über Deckkraft: eine Karte,
        die ihren eigenen Text unlesbar macht, um Unantastbarkeit zu zeigen, reißt
@@ -312,9 +351,9 @@
     .mode-card:disabled .mode-card__meta svg { stroke: var(--color-text-secondary); }
 
     /* Simple-Bereitschaftsliste: „alles erledigt"-Zusammenfassung. */
-    .ready-list { margin: 0 0 20px; }
-    .ready-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; font-size: var(--text-sm); line-height: 1.45; }
-    .ready-item svg { width: 20px; height: 20px; flex-shrink: 0; stroke: var(--color-success); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; margin-top: 1px; }
+    .ready-list { margin: 0 0 var(--space-5); }
+    .ready-item { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); line-height: 1.45; }
+    .ready-item svg { width: 20px; height: 20px; flex-shrink: 0; stroke: var(--color-success); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; margin-top: var(--space-px); }
     .ready-item b { font-weight: 600; }
     .ready-item span { color: var(--color-text-secondary); }
     /* Zugriffszeile des Einfach-Pfads: Titel und "Aendern" auf einer Linie,
@@ -393,11 +432,11 @@
     /* Waehrend der Blende trifft Chromium jeden Zeiger nur auf <html>;
        swapStep() bricht deshalb beim ersten Tipp ab (wie swapPage der App). */
     ::view-transition { pointer-events: none; }
-    .card-head { padding: 0 0 24px; }
+    .card-head { padding: 0 0 var(--space-6); }
     /* Der Zaehler ist echte Information (Schritt 3 von 9), keine Zierzeile: er
        bleibt, verliert aber den Akzent. Violett ist die EINE Stimme der
        Primaeraktion - eine versale Akzentzeile ueber jedem Titel war eine zweite. */
-    .step-tag { font-size: var(--type-caption); font-weight: 600; color: var(--color-text-secondary); margin-bottom: 6px; }
+    .step-tag { font-size: var(--type-caption); font-weight: 600; color: var(--color-text-secondary); margin-bottom: var(--space-1h); }
     /* Title 1 der App-Skala (28/34, bold, -0.015em). Die H2 stand auf 20px und
        damit auf der Stufe der Wortmarke - zwei gleich laute Titel uebereinander,
        und keiner fuehrte (Critique 2026-09-29, "Typo flach"). */
@@ -420,7 +459,7 @@
        auf dem Desktop 680px breit ist. */
     .card-head p  {
       font-size: var(--type-secondary); color: var(--color-text-secondary);
-      margin-top: 8px; line-height: 1.4; max-width: 62ch;
+      margin-top: var(--space-2); line-height: 1.4; max-width: 62ch;
     }
     .card-body { padding: 0; }
     /* Sticky in JEDER Breite, nicht nur mobil: bei 1440x900 lag die Fussleiste
@@ -432,10 +471,10 @@
        Farbe - eine weisse Leiste unter weissen Gruppen hiesse eine weitere
        Karte am Seitenende. */
     .card-foot {
-      margin-top: 24px; padding: 12px 0;
-      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      margin-top: var(--space-6); padding: var(--space-3) 0;
+      padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
       border-top: 1px solid var(--color-border);
-      display: flex; justify-content: flex-end; gap: 10px;
+      display: flex; justify-content: flex-end; gap: var(--space-2h);
       position: sticky; bottom: 0; z-index: 10;
       background: var(--color-bg);
     }
@@ -473,13 +512,13 @@
       border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
       overflow: hidden;
     }
-    .inset-group + .inset-group { margin-top: 24px; }
+    .inset-group + .inset-group { margin-top: var(--space-6); }
     .inset-group > :not(.error-banner),
     .inset-sub > :not(.error-banner) {
       border-top: 1px solid var(--color-border-subtle); margin-top: -1px;
     }
-    .inset-group .field { padding: 12px 16px; margin: 0; }
-    .inset-group .error-banner { margin: 0 16px 12px; }
+    .inset-group .field { padding: var(--space-3) var(--space-4); margin: 0; }
+    .inset-group .error-banner { margin: 0 var(--space-4) var(--space-3); }
     /* Gruppen-Label im Stil des Versal-Mikro-Labels der App (typography.css):
        der Sektionskopf einer Grouped-Liste, 12px semibold, 0.05em, um die
        16px der Zeilen eingerueckt, damit er mit deren Text fluchtet. Die
@@ -488,7 +527,7 @@
       font-size: var(--text-xs); font-weight: 600; line-height: var(--line-height-tight);
       letter-spacing: var(--tracking-label); text-transform: uppercase;
       color: var(--color-text-secondary);
-      margin: 28px 0 8px; padding-inline: 16px;
+      margin: 28px 0 var(--space-2); padding-inline: var(--space-4);
     }
     /* Das erste Label eines Schritts rueckt an den Kopf heran; erst zwischen
        zwei Gruppen braucht es den vollen Abstand. */
@@ -497,18 +536,18 @@
        sie VOR der Entscheidung gelesen werden muss (Heimnetz-Freigaben). */
     .group-note {
       font-size: var(--type-caption); line-height: 1.38; color: var(--color-text-secondary);
-      padding-inline: 16px; margin: -2px 0 10px; max-width: 70ch;
+      padding-inline: var(--space-4); margin: -2px 0 var(--space-2h); max-inline-size: 70ch; text-wrap: pretty;
     }
     /* Nach einer Gruppe: ein Ausweg zu ihr (Kalender -> weitere Konten in der
        App). Abstand wie unter einem Label, nur in die andere Richtung. */
-    .inset-group + .group-note { margin: 10px 0 0; }
+    .inset-group + .group-note { margin: var(--space-2h) 0 0; }
     /* Kopf einer Pruefseiten-Gruppe: Label links, "Aendern" rechts. */
     /* Mittig ausgerichtet, damit "Aendern" auf der Zeile des Labels steht; der
        negative Abstand unten gleicht die 44px-Zielhoehe des Knopfs aus, sonst
        stuende die Gruppe weiter vom Label ab als ueberall sonst. */
     .group-head {
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      margin: 20px 0 -6px;
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+      margin: var(--space-5) 0 -6px;
     }
     .group-head .group-label { margin: 0; }
     .group-head + .inset-group { margin-top: 0; }
@@ -517,13 +556,13 @@
       background: none; border: none; cursor: pointer;
       font-family: var(--font-sans); font-size: var(--type-secondary); font-weight: 600;
       color: var(--color-accent);
-      min-height: 44px; padding: 0 16px; border-radius: var(--radius-full);
+      min-height: 44px; padding: 0 var(--space-4); border-radius: var(--radius-full);
     }
     .group-edit:hover { background: color-mix(in srgb, var(--color-accent) var(--tint-state, 12%), transparent); }
     .group-edit:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
     .field { margin-bottom: 18px; }
-    .field label, .field-label { display: block; font-size: var(--text-sm); font-weight: 600; margin-bottom: 6px; }
+    .field label, .field-label { display: block; font-size: var(--text-sm); font-weight: 600; margin-bottom: var(--space-1h); }
     /* ── Segment: die Umschaltleiste der App (public/styles/panel.css) ───────
        Nachgebaut, nicht importiert (Einzeldatei). Well mit 1px-Rand, darin
        gleich breite Segmente; die Wahl ist die erhabene Surface-Pille der App.
@@ -533,13 +572,13 @@
        Beschriftungen umbrechen: zwei Segmente teilen sich die Feldbreite, und
        "Proxy inverso (HTTPS)" passt bei 390px nicht in eine halbe Zeile. */
     .segmented {
-      display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; gap: 4px;
-      padding: 2px; border: 1px solid var(--color-border); border-radius: var(--radius-md);
+      display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; gap: var(--space-1);
+      padding: var(--space-0h); border: 1px solid var(--color-border); border-radius: var(--radius-md);
       background: var(--color-surface-3, var(--color-bg));
     }
     .field .segmented__item {
       position: relative; display: flex; align-items: center; justify-content: center;
-      min-height: 44px; padding: 6px 12px; margin: 0;
+      min-height: 44px; padding: var(--space-1h) var(--space-3); margin: 0;
       border-radius: var(--radius-sm);
       font-size: var(--text-sm); font-weight: 500; line-height: 1.25; text-align: center;
       color: var(--color-text-secondary); cursor: pointer;
@@ -577,8 +616,8 @@
        `.field label` (Block, Abstand darunter). */
     .inset-group .field:has(> .toggle-row) { padding: 0; }
     label.toggle-row {
-      display: flex; align-items: center; gap: 12px; margin-bottom: 0; cursor: pointer;
-      min-height: 48px; padding: 12px 16px;
+      display: flex; align-items: center; gap: var(--space-3); margin-bottom: 0; cursor: pointer;
+      min-height: 48px; padding: var(--space-3) var(--space-4);
     }
     .toggle-row__label { flex: 1; min-width: 0; }
     .toggle { position: relative; display: inline-flex; flex-shrink: 0; margin-inline-start: auto; }
@@ -624,7 +663,7 @@
        Lesemass waechst um genau das, sonst braeche er frueher um als die
        Hinweise der Textfelder. */
     .inset-group .field > .toggle-row ~ .hint {
-      margin-top: -6px; padding: 0 16px 12px; max-width: calc(70ch + 32px);
+      margin-top: -6px; padding: 0 var(--space-4) var(--space-3); max-inline-size: calc(70ch + var(--space-8));
     }
     /* "Mehr erfahren": Hintergrund zu einer Frage, der beim Ausfuellen nicht
        gebraucht wird (was eine Abschaltung spaeter bewirkt, wie sich Werte
@@ -632,7 +671,7 @@
        zwischen den Feldern; jetzt zeigt ihn ein Tipp. Ab 641px ist Platz, dort
        oeffnet syncHintMore() ihn und die Zeile "Mehr erfahren" entfaellt. */
     .hint-more > summary {
-      display: flex; align-items: center; gap: 4px; min-height: 44px; width: fit-content;
+      display: flex; align-items: center; gap: var(--space-1); min-height: 44px; width: fit-content;
       font-size: var(--type-caption); font-weight: 600; color: var(--color-accent);
       cursor: pointer; list-style: none;
     }
@@ -665,12 +704,12 @@
     .hint-more > .hint { margin-top: 0; }
     /* Unter einer Schalterzeile: der Knopf ueberlappt deren unteres Polster,
        damit er 44px Ziel hat, ohne 44px Hoehe dazuzulegen. */
-    .inset-group .field > .toggle-row ~ .hint-more { margin-top: -12px; padding: 0 16px 4px; }
-    .inset-group .field > .toggle-row ~ .hint-more > .hint { padding-bottom: 8px; }
-    .toggle-body > .hint-more { padding: 2px 16px 0; }
+    .inset-group .field > .toggle-row ~ .hint-more { margin-top: -12px; padding: 0 var(--space-4) var(--space-1); }
+    .inset-group .field > .toggle-row ~ .hint-more > .hint { padding-bottom: var(--space-2); }
+    .toggle-body > .hint-more { padding: var(--space-0h) var(--space-4) 0; }
     @media (min-width: 641px) {
       .hint-more > summary { display: none; }
-      .toggle-body > .hint-more { padding-top: 12px; }
+      .toggle-body > .hint-more { padding-top: var(--space-3); }
       .inset-group .field > .toggle-row ~ .hint-more { margin-top: -6px; }
     }
     .opt { font-weight: 400; color: var(--color-text-tertiary); font-size: var(--text-xs); }
@@ -693,11 +732,13 @@
        laeuft der laengste Optionstext in den Chevron - gemessen 288px Inhalt in
        einem 262px breiten Feld bei 390px, ohne Ellipse. Betrifft ausgerechnet den
        hervorgehobenen Sicherheits-Select. */
-    select { padding-inline-end: 40px; text-overflow: ellipsis; }
-    input[type=text], input[type=password], input[type=email], input[type=number], select {
+    select { padding-inline-end: var(--space-10); text-overflow: ellipsis; }
+    input[type=text], input[type=url], input[type=password], input[type=email], input[type=number], select {
       /* Kante --color-border-control (3:1, WCAG 1.4.11), nicht --color-border:
-         die Kartenkante verschwand auf der Feldflaeche fast ganz. */
-      width: 100%; padding: 10px 12px; border: 1.5px solid var(--color-border-control); border-radius: var(--radius-sm);
+         die Kartenkante verschwand auf der Feldflaeche fast ganz. 1px wie
+         .form-input der App (layout.css): die 1,5px des Installers lasen sich
+         neben ihr wie ein zweites, schwereres Formularsystem. */
+      width: 100%; padding: var(--space-2h) var(--space-3); border: 1px solid var(--color-border-control); border-radius: var(--radius-sm);
       background: var(--color-surface); color: var(--color-text-primary); font-family: var(--font-sans);
       font-size: var(--text-base);
       outline: none; transition: border-color var(--duration-sm) var(--ease-out);
@@ -708,8 +749,12 @@
     }
     /* Feldgebundene Fehlermarkierung (WCAG 3.3.1): das ungültige Feld selbst wird
        rot umrandet und bekommt Fokus, ergänzend zum role=alert-Banner. */
-    input[aria-invalid="true"], select[aria-invalid="true"] { border-color: var(--color-danger); }
-    input[aria-invalid="true"]:focus, select[aria-invalid="true"]:focus {
+    /* :user-invalid ergaenzt die Markierung um die Pruefung, die der Browser
+       selbst kennt (type=url, type=email, min/max) - erst nach der ersten
+       Eingabe, nie beim Laden. aria-invalid bleibt die Stimme fuer den
+       Screenreader: syncNativeInvalid() setzt es im selben Moment. */
+    input[aria-invalid="true"], select[aria-invalid="true"], input:user-invalid { border-color: var(--color-danger); }
+    input[aria-invalid="true"]:focus, select[aria-invalid="true"]:focus, input:user-invalid:focus {
       border-color: var(--color-danger);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 18%, transparent);
     }
@@ -731,7 +776,7 @@
     /* Der Haken steht HINTER dem Satz und ist bis zur Mindestlaenge nur
        unsichtbar: vorne haette er den Hinweis gegen alle anderen eingerueckt
        oder beim achten Zeichen seitlich geschoben. */
-    .pass-hint { display: flex; align-items: center; gap: 6px; }
+    .pass-hint { display: flex; align-items: center; gap: var(--space-1h); }
     .pass-hint__mark {
       width: 14px; height: 14px; flex-shrink: 0; fill: none; stroke: var(--color-success);
       stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; visibility: hidden;
@@ -741,7 +786,12 @@
        erklaerende Prosa fuer Laien, keine Metazeile, und sie braucht den
        Kontrast. Auf 12px war sie einmal kleiner als in der fertigen App; die
        Footnote ist die Stufe, auf der Apple Feld- und Gruppenfussnoten setzt. */
-    .hint { font-size: var(--type-caption); color: var(--color-text-secondary); margin-top: 6px; line-height: 1.38; max-width: 70ch; }
+    /* Lesemass 70ch. Auf dem Desktop ist die Spalte mit rund 65ch die engere
+       Grenze (gemessen 86-92 Zeichen je Zeile, Critique 2026-10-29). Enger
+       gestellt (56ch) brach die Redirect-URI mitten im Pfad und liess neben
+       jedem Hinweis ein Drittel der Gruppe leer - der Hinweis gehoert zur
+       Feldbreite. text-wrap: pretty nimmt der letzten Zeile das einzelne Wort. */
+    .hint { font-size: var(--type-caption); color: var(--color-text-secondary); margin-top: var(--space-1h); line-height: 1.38; max-inline-size: 70ch; text-wrap: pretty; }
     .hint a { color: var(--color-accent); }
     /* Redirect-URIs sind unzerbrechliche Maschinenwerte in fester Kartenbreite:
        ohne Umbruch clippte overflow:hidden der Toggle-Card sie mobil kommentarlos
@@ -756,7 +806,7 @@
       display: inline-flex; align-items: center; justify-content: center; gap: 5px;
       /* 48px wie .btn der App (DESIGN.md, --target-lg); 44px ist das
          Minimum, kein Ziel. */
-      min-height: 48px; padding: 10px 20px;
+      min-height: 48px; padding: var(--space-2h) var(--space-5);
       border-radius: var(--radius-full); font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600;
       cursor: pointer; border: none;
       transition: background var(--duration-xs) var(--ease-out), opacity var(--duration-xs) var(--ease-out);
@@ -769,6 +819,12 @@
        davor abwich - ausgerechnet im letzten Schritt. */
     .btn-primary, .open-link { background: color-mix(in srgb, var(--color-accent) 88%, var(--neutral-950)); color: var(--color-ink-on-vivid); }
     .btn-primary:hover:not(:disabled), .open-link:hover { background: var(--color-accent-hover); }
+    /* Tiefe und Glanzkante wie .btn--primary der App (glass.css, Abschnitt 4):
+       ohne sie stand der Installer-Knopf als flache Pille neben jedem
+       Primaerknopf der App. Gesperrt traegt er keine Tiefe - er ist nicht
+       anfassbar. */
+    .btn-primary:not(:disabled), .open-link { box-shadow: var(--shadow-sm), var(--glass-inset-medium); }
+    .btn-primary:hover:not(:disabled), .open-link:hover { box-shadow: var(--shadow-md), var(--glass-inset-soft); }
     /* Scharfgestellte Zwei-Klick-Bestaetigung (Speichern & Starten): der Zustand
        muss SICHTBAR sein, nicht nur im Buttontext - ein Doppelklicker liest das
        Label nie, ein Zoegerer haelt den ersten Klick sonst fuer wirkungslos.
@@ -786,21 +842,21 @@
       background: color-mix(in srgb, var(--color-accent) var(--tint-state, 12%), transparent);
       border-color: var(--color-accent);
     }
-    .btn-sm      { min-height: 40px; padding: 6px 12px; font-size: var(--text-xs); }
+    .btn-sm      { min-height: 40px; padding: var(--space-1h) var(--space-3); font-size: var(--text-xs); }
     .btn:disabled { opacity: .45; cursor: not-allowed; }
     .btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
     /* margin-bottom: fail() zieht das Banner unter das schuldige Feld, und dort
        klebte es ohne Abstand am naechsten Label. Am Ende des card-body traegt
        das Padding den Abstand, deshalb dort 0. */
     .error-banner {
-      display: none; margin-top: 12px; margin-bottom: 18px; padding: 10px 14px; border-radius: var(--radius-sm);
+      display: none; margin-top: var(--space-3); margin-bottom: 18px; padding: var(--space-2h) 14px; border-radius: var(--radius-sm);
       background: color-mix(in srgb, var(--color-danger) 8%, transparent);
       border: 1.5px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
       color: var(--color-danger); font-size: var(--text-sm);
     }
     .error-banner:last-child { margin-bottom: 0; }
     .info-banner {
-      margin-bottom: 18px; padding: 10px 14px; border-radius: var(--radius-sm);
+      margin-bottom: 18px; padding: var(--space-2h) 14px; border-radius: var(--radius-sm);
       background: color-mix(in srgb, var(--color-accent) 8%, transparent);
       border: 1.5px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
       color: var(--color-text-primary); font-size: var(--text-sm); line-height: 1.45;
@@ -812,8 +868,8 @@
        fort - dieselbe Flaeche, kein zweiter Grund. */
     .toggle-card { margin: 0; }
     .toggle-head {
-      display: flex; align-items: center; gap: 10px;
-      width: 100%; padding: 12px 16px; cursor: pointer; user-select: none;
+      display: flex; align-items: center; gap: var(--space-2h);
+      width: 100%; padding: var(--space-3) var(--space-4); cursor: pointer; user-select: none;
       font-family: var(--font-sans); font-size: var(--text-base); font-weight: 600; text-align: start;
       background: transparent; color: var(--color-text-primary); border: none;
       /* Aus 13 + 17 + 13 wurden gemessene 43px. Der Knopf trägt keine .btn-Klasse
@@ -844,7 +900,7 @@
        Google-Kalender. */
     .toggle-badge {
       margin-inline-start: auto;
-      display: inline-flex; align-items: center; gap: 4px;
+      display: inline-flex; align-items: center; gap: var(--space-1);
       font-size: var(--type-caption); font-weight: 500; color: var(--color-text-secondary);
     }
     .toggle-badge[data-state="set"] { color: var(--color-text-primary); }
@@ -879,7 +935,7 @@
     }
     .toggle-body.open { visibility: visible; transition-delay: 0s; }
     .toggle-body::after { content: ''; display: block; height: 4px; }
-    .toggle-body > .hint { padding: 12px 16px 0; margin: 0; }
+    .toggle-body > .hint { padding: var(--space-3) var(--space-4) 0; margin: 0; }
     .toggle-body > .field ~ .field { border-top: 1px solid var(--color-border-subtle); }
     /* ── Docker-Schirm: drei Phasen als Checkliste ─────────────────────────────
        Vorher stand hier ein Spinner mit einem Satz, der die Phase nannte - wie
@@ -892,7 +948,7 @@
        fertig ist. Die Ansage fuer Screenreader traegt die Live-Region darunter. */
     .phase-list { list-style: none; }
     .phase {
-      display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+      display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4);
       font-size: var(--text-sm); line-height: 1.45; color: var(--color-text-secondary);
       transition: color var(--duration-md) var(--ease-out);
     }
@@ -946,16 +1002,16 @@
       mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
     }
     /* Fussnote unter der Gruppe (Dauer, Erwartung), eingerueckt wie deren Text. */
-    .phase-meta { padding: 8px 16px 0; }
+    .phase-meta { padding: var(--space-2) var(--space-4) 0; }
     .elapsed  { font-size: var(--type-caption); color: var(--color-text-secondary); line-height: 1.38; }
-    .phase-meta + .warn-banner { margin-top: 16px; }
+    .phase-meta + .warn-banner { margin-top: var(--space-4); }
     /* Radius --radius-sm wie das Warnbanner direkt darueber: mit 4px stand
        die Box als einzige eckige Flaeche zwischen 10px-Bannern und 16px-Gruppen
        (frueher sogar 4px IN einer 10px-Box - nicht konzentrisch). */
     .log-box  {
       display: none; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-secondary);
       white-space: pre-wrap; max-height: 180px; overflow-y: auto;
-      margin-top: 12px; padding: 10px 12px; background: var(--color-surface-2);
+      margin-top: var(--space-3); padding: var(--space-2h) var(--space-3); background: var(--color-surface-2);
       border: 1px solid var(--color-border); border-radius: var(--radius-sm);
     }
     /* Die Box ist per Tastatur fokussier- und scrollbar (tabindex im Markup):
@@ -970,22 +1026,31 @@
     /* Seit der Gruppierung eine Zeile je Wert in einer Inset-Gruppe; die
        Spaltenregel gilt je Zeile, die Lehre von oben bleibt dieselbe. */
     .rv-row {
-      display: grid; grid-template-columns: minmax(96px, 38%) minmax(0, 1fr); gap: 2px 16px;
-      padding: 12px 16px; font-size: var(--type-secondary); line-height: 1.35;
+      display: grid; grid-template-columns: minmax(96px, 38%) minmax(0, 1fr); gap: var(--space-0h) var(--space-4);
+      padding: var(--space-3) var(--space-4); font-size: var(--type-secondary); line-height: 1.35;
     }
-    .rv-row dt { color: var(--color-text-secondary); }
+    /* Lange Komposita ("Datenbank-Verschluesselungsschluessel") ragten 43px in
+       die Wertspalte (Critique 2026-10-29): die Spalte darf sie trennen
+       (hyphens folgt dem lang-Attribut, das localize() setzt) und bricht als
+       letztes Mittel auch ohne Trennstelle. */
+    .rv-row dt { color: var(--color-text-secondary); min-width: 0; hyphens: auto; overflow-wrap: anywhere; }
     .rv-row dd { overflow-wrap: anywhere; }
+    /* Werte sind meist Maschinentext ("./data", URLs). In RTL drehte der
+       Bidi-Algorithmus den fuehrenden Punkt ans Ende ("data/."). plaintext
+       nimmt die Richtung je Wert aus seinem Inhalt; die Ausrichtung bleibt
+       die der Seite. */
+    html[dir="rtl"] .rv-row dd { unicode-bidi: plaintext; text-align: right; }
     /* "Nicht eingerichtet" in der Wertspalte der eigenen Zeile - statt eines
        Strichs. Leiser als gesetzte Werte: es meldet eine Abwesenheit, keine
        Entscheidung. */
     .rv-row--unset dd { color: var(--color-text-secondary); }
-    .done-wrap   { text-align: center; padding: 20px 0 8px; }
+    .done-wrap   { text-align: center; padding: var(--space-5) 0 var(--space-2); }
     /* Der Abschluss trug ein 🎉-Systemsemoji: der einzige Bildinhalt der ganzen
        Reise, auf jedem Betriebssystem anders gerendert und gegen PRODUCT.md:22
        („kein Konfetti"). Jetzt trägt ihn das Yuvomi-Zeichen in einem Erfolgsring. */
     .done-mark {
       display: inline-grid; place-items: center; width: 72px; height: 72px;
-      margin-bottom: 16px; border-radius: var(--radius-full);
+      margin-bottom: var(--space-4); border-radius: var(--radius-full);
       color: var(--color-success);
       background: color-mix(in srgb, var(--color-success) 12%, transparent);
       box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-success) 34%, transparent);
@@ -997,13 +1062,13 @@
       font-size: var(--text-3xl); font-weight: 700;
       letter-spacing: var(--tracking-tight); line-height: var(--line-height-tight); text-wrap: balance;
     }
-    .done-wrap p  { color: var(--color-text-secondary); margin: 8px 0 28px; font-size: var(--text-base); }
+    .done-wrap p  { color: var(--color-text-secondary); margin: var(--space-2) 0 28px; font-size: var(--text-base); }
     /* Geometrie und Schrift wie .btn: setDoneEmphasis() tauscht den Download
        zwischen .open-link und .btn-ghost, und mit 700/16px gegen 600/14px
        sprang der Knopf beim Tausch in Hoehe und Gewicht. Flaeche siehe .btn-primary. */
     .open-link {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-      min-height: 48px; padding: 10px 20px; text-decoration: none;
+      display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+      min-height: 48px; padding: var(--space-2h) var(--space-5); text-decoration: none;
       border: none; cursor: pointer; font-family: var(--font-sans);
       border-radius: var(--radius-full); font-weight: 600; font-size: var(--text-sm);
       transition: background var(--duration-xs) var(--ease-out);
@@ -1024,7 +1089,7 @@
        damit der Abschluss nicht eine dritte Listenform erfindet. */
     .next-steps { margin-top: 28px; text-align: start; }
     .next-step {
-      display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px;
+      display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4);
       color: inherit; text-decoration: none; font-size: var(--text-sm); line-height: 1.5;
     }
     /* fill/stroke-Angaben ausgeschrieben: die gemeinsame .icon-svg-Regel gilt nur
@@ -1032,7 +1097,7 @@
        gefüllte schwarze Fläche statt als Strichzeichnung - im ersten Screenshot
        sahen die drei Zeilen aus wie Klötze. */
     .next-step .icon-svg {
-      width: 20px; height: 20px; margin-top: 2px; flex-shrink: 0;
+      width: 20px; height: 20px; margin-top: var(--space-0h); flex-shrink: 0;
       stroke: var(--color-accent); fill: none;
       stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
     }
@@ -1048,8 +1113,8 @@
 
     /* Weichere Erinnerung (kein Live-Hazard, z. B. Backup-Hinweis auf „Fertig"). */
     .warn-banner {
-      display: flex; gap: 10px; align-items: flex-start;
-      margin-bottom: 18px; padding: 12px 14px; border-radius: var(--radius-sm);
+      display: flex; gap: var(--space-2h); align-items: flex-start;
+      margin-bottom: 18px; padding: var(--space-3) 14px; border-radius: var(--radius-sm);
       background: color-mix(in srgb, var(--color-warning) 10%, transparent);
       border: 1.5px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
       color: var(--color-text-primary); font-size: var(--text-sm); line-height: 1.5;
@@ -1065,7 +1130,7 @@
        Emoji oder ein Schriftzeichen in fremder Strichstaerke, neben lauter
        Lucide-Linien. Jetzt Lucide "triangle-alert" in der Bannerfarbe; 2px
        nach unten, damit es auf der ersten Textzeile (14px x 1.5) sitzt. */
-    .warn-icon svg { display: block; width: 18px; height: 18px; margin-top: 2px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .warn-icon svg { display: block; width: 18px; height: 18px; margin-top: var(--space-0h); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
     /* .field-emphasis ist gegangen: eine violett getoente Box mit violettem Label
        in einer weissen Gruppe waere Kasten-in-Kasten UND eine zweite violette
@@ -1088,16 +1153,16 @@
        (.shell--solo): vor der Wahl des Weges gibt es keine Schritte, die eine
        Liste zeigen koennte, und nach dem letzten ist sie nur noch Rueckschau. */
     @media (min-width: 1024px) {
-      body { padding: 56px 32px 96px; }
+      body { padding: 56px var(--space-8) 96px; }
       .progress-track { display: none; }
       .shell:not(.shell--solo) {
         display: grid; grid-template-columns: 240px minmax(0, 680px);
-        column-gap: 48px; justify-content: center; align-items: start;
+        column-gap: var(--space-12); justify-content: center; align-items: start;
         max-width: none;
       }
       .shell:not(.shell--solo) .rail { position: sticky; top: 56px; }
       .shell:not(.shell--solo) .brand {
-        display: flex; align-items: center; gap: 10px;
+        display: flex; align-items: center; gap: var(--space-2h);
         text-align: start; margin-bottom: 28px;
       }
       .shell:not(.shell--solo) .brand__mark { width: 40px; height: 40px; margin-bottom: 0; border-radius: var(--radius-md); }
@@ -1110,10 +1175,10 @@
       }
       .shell--solo { max-width: 560px; }
     }
-    .steps-nav__list { list-style: none; display: grid; gap: 2px; }
+    .steps-nav__list { list-style: none; display: grid; gap: var(--space-0h); }
     .steps-nav__link {
-      display: flex; align-items: center; gap: 12px; width: 100%;
-      min-height: 44px; padding: 8px 12px; border: none; border-radius: var(--radius-md);
+      display: flex; align-items: center; gap: var(--space-3); width: 100%;
+      min-height: 44px; padding: var(--space-2) var(--space-3); border: none; border-radius: var(--radius-md);
       background: transparent; color: var(--color-text-primary); text-align: start;
       font-family: var(--font-sans); font-size: var(--type-secondary); font-weight: 500; line-height: 1.25;
       cursor: pointer;
@@ -1219,13 +1284,13 @@
 
          Einstieg und Abschluss (.shell--solo) behalten das grosse Tile: dort
          ist die Marke die Aussage, und darunter liegt keine Formularstrecke. */
-      body { padding-top: 12px; padding-bottom: 0; }
+      body { padding-top: var(--space-3); padding-bottom: 0; }
       .lang-switch { top: 12px; inset-inline-end: 16px; }
-      .shell--solo { padding-bottom: 32px; }
+      .shell--solo { padding-bottom: var(--space-8); }
       .shell--solo .brand { padding-top: 56px; }
       .shell:not(.shell--solo) .brand {
-        display: flex; align-items: center; gap: 10px;
-        min-height: 44px; margin-bottom: 16px; text-align: start;
+        display: flex; align-items: center; gap: var(--space-2h);
+        min-height: 44px; margin-bottom: var(--space-4); text-align: start;
       }
       .shell:not(.shell--solo) .brand__mark { width: 40px; height: 40px; margin-bottom: 0; border-radius: var(--radius-md); }
 
@@ -1237,8 +1302,8 @@
          der Text bleibt als zugaenglicher Name im Knopf (font-size: 0 blendet
          ihn nur aus), die Primaeraktion bekommt die ganze restliche Breite und
          liegt damit dort, wo der Daumen ohnehin ist. */
-      .card-foot { gap: 8px; }
-      .card-foot .btn-primary { flex: 1 1 auto; padding-inline: 12px; }
+      .card-foot { gap: var(--space-2); }
+      .card-foot .btn-primary { flex: 1 1 auto; padding-inline: var(--space-3); }
       .card-foot .btn-ghost[data-back] {
         flex: none; width: 48px; padding: 0; font-size: 0;
       }
@@ -1249,16 +1314,25 @@
       }
       html[dir="rtl"] .card-foot .btn-ghost[data-back]::before { transform: scaleX(-1); }
 
-      .btn-sm { min-height: 44px; min-width: 44px; padding: 8px 12px; }
+      .btn-sm { min-height: 44px; min-width: 44px; padding: var(--space-2) var(--space-3); }
       .secret-row .btn-sm { flex: 0 0 auto; }
       /* Der Select war das letzte Bedienelement unter der Grenze (Primärbutton
          38px war es bis zur .btn-Regel oben). */
-      select, input[type=text], input[type=password], input[type=email], input[type=number] { min-height: 44px; }
+      select, input[type=text], input[type=url], input[type=password], input[type=email], input[type=number] { min-height: 44px; }
       /* Und der Sprachumschalter noch einmal eigens: `.lang-switch select` (0,1,1)
          schlägt das nackte `select` (0,0,1), und eine Media-Query hebt die
          Spezifität nicht an - die Zeile darüber hat ihn deshalb nie erreicht, er
          blieb bei seinen 36px. Gleiche Spezifität, spätere Regel, sie gewinnt. */
       .lang-switch select { min-height: 44px; }
+      /* Schlank im Kopf: der Select war so breit wie die laengste Sprache
+         (163px fuer "Deutsch", Critique 2026-10-29) und stand neben der
+         Wortmarke lauter als sie. field-sizing misst den gewaehlten Eintrag;
+         wo es fehlt, kappt die Obergrenze mit Ellipse. */
+      .lang-switch select {
+        field-sizing: content; max-inline-size: 9rem; text-overflow: ellipsis;
+        font-weight: 500; padding-inline-start: var(--space-2);
+      }
+      html[dir="rtl"] .lang-switch select { padding-inline-start: var(--space-2); }
     }
 
     /* Reduced-Motion: weniger und sanfter, nicht nichts. Was sich BEWEGT
@@ -1521,16 +1595,16 @@
         <div class="inset-group">
         <div class="field">
           <label for="cfg-host" data-i18n="config.hostLabel">Domain or IP address</label>
-          <input type="text" id="cfg-host" value="localhost" placeholder="localhost or 192.168.1.x">
+          <input type="text" id="cfg-host" value="localhost" placeholder="localhost or 192.168.1.x" inputmode="url" autocapitalize="off" spellcheck="false" dir="ltr" autocomplete="off" enterkeyhint="next">
           <div class="hint" data-i18n="config.hostHint">The address you'll use to open Yuvomi in your browser.</div>
         </div>
         <div class="field">
           <label for="cfg-port" data-i18n="config.portLabel">Port</label>
-          <input type="text" id="cfg-port" value="3000">
+          <input type="text" id="cfg-port" value="3000" inputmode="numeric" dir="ltr" autocomplete="off" enterkeyhint="next">
         </div>
         <div class="field">
           <label for="cfg-tz" data-i18n="config.tzLabel">Timezone</label>
-          <input type="text" id="cfg-tz" placeholder="Europe/Berlin">
+          <input type="text" id="cfg-tz" placeholder="Europe/Berlin" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
           <!-- TZ ist nur die Vorbelegung der Haushaltszone (#829); die App fuehrt
                sie als eigene Einstellung. Wer das nicht weiss, haelt das Feld fuer
                endgueltig und sucht spaeter in der .env statt in der App. -->
@@ -1578,7 +1652,7 @@
              leer, ändert sich gegenüber vorher nichts. -->
         <div class="field">
           <label for="adv-base-url" data-i18n="advanced.baseUrlLabel">Public address</label>
-          <input type="text" id="adv-base-url" placeholder="https://yuvomi.example.com">
+          <input type="url" id="adv-base-url" placeholder="https://yuvomi.example.com" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
           <div class="hint" data-i18n="advanced.baseUrlHint">The address your family opens Yuvomi at - not the container's host and port. Used for password reset and invitation links.</div>
         </div>
         </div>
@@ -1613,7 +1687,7 @@
         <div class="field">
           <label for="sec-session" data-i18n="secrets.sessionLabel">Session Secret</label>
           <div class="secret-row">
-            <input type="password" id="sec-session" autocomplete="off" spellcheck="false" dir="ltr">
+            <input type="password" id="sec-session" autocomplete="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             <button type="button" class="btn btn-ghost btn-sm" data-eye="sec-session" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
               <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
               <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
@@ -1629,7 +1703,7 @@
         <div class="field">
           <label for="sec-db" data-i18n="secrets.dbLabel">Database Encryption Key</label>
           <div class="secret-row">
-            <input type="password" id="sec-db" autocomplete="off" spellcheck="false" dir="ltr">
+            <input type="password" id="sec-db" autocomplete="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             <button type="button" class="btn btn-ghost btn-sm" data-eye="sec-db" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
               <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
               <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
@@ -1673,16 +1747,16 @@
         <div class="inset-sub" id="wea-fields" style="display:none">
           <div class="field">
             <label for="wea-lat" data-i18n="weather.latLabel">Latitude</label>
-            <input type="number" id="wea-lat" step="any" min="-90" max="90" placeholder="52.52">
+            <input type="number" id="wea-lat" step="any" min="-90" max="90" placeholder="52.52" enterkeyhint="next">
           </div>
           <div class="field">
             <label for="wea-lon" data-i18n="weather.lonLabel">Longitude</label>
-            <input type="number" id="wea-lon" step="any" min="-180" max="180" placeholder="13.41">
+            <input type="number" id="wea-lon" step="any" min="-180" max="180" placeholder="13.41" enterkeyhint="next">
             <div class="hint" data-i18n="weather.coordHint">Find your coordinates on openstreetmap.org or Google Maps.</div>
           </div>
           <div class="field">
             <label for="wea-city" data-i18n="weather.cityLabel">City name (optional)</label>
-            <input type="text" id="wea-city" placeholder="Berlin">
+            <input type="text" id="wea-city" placeholder="Berlin" enterkeyhint="next">
           </div>
           <div class="field">
             <label for="wea-units" data-i18n="weather.unitsLabel">Units</label>
@@ -1738,11 +1812,11 @@
             </p>
             <div class="field">
               <label for="gcal-id" data-i18n="calendar.googleIdLabel">Client ID</label>
-              <input type="text" id="gcal-id">
+              <input type="text" id="gcal-id" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="gcal-secret" data-i18n="calendar.googleSecretLabel">Client Secret</label>
-              <input type="password" id="gcal-secret">
+              <input type="password" id="gcal-secret" enterkeyhint="next">
             </div>
             <p class="hint" data-i18n="calendar.googleSelectNote">After connecting, you can choose which calendar to sync in the app settings (default: primary calendar).</p>
           </div>
@@ -1766,11 +1840,11 @@
             </p>
             <div class="field">
               <label for="outlook-id" data-i18n="calendar.outlookIdLabel">Application (client) ID</label>
-              <input type="text" id="outlook-id">
+              <input type="text" id="outlook-id" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="outlook-secret" data-i18n="calendar.outlookSecretLabel">Client Secret</label>
-              <input type="password" id="outlook-secret">
+              <input type="password" id="outlook-secret" enterkeyhint="next">
             </div>
             <p class="hint" data-i18n="calendar.outlookNote">One-way push: Yuvomi stays the source of truth and overwrites changes made in Outlook. Family accounts are connected later in the app under Settings.</p>
           </div>
@@ -1791,15 +1865,15 @@
             </p>
             <div class="field">
               <label for="apple-user" data-i18n="calendar.appleUserLabel">Apple ID (email)</label>
-              <input type="email" id="apple-user">
+              <input type="email" id="apple-user" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="apple-pass" data-i18n="calendar.applePassLabel">App-Specific Password</label>
-              <input type="password" id="apple-pass">
+              <input type="password" id="apple-pass" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="apple-url"><span data-i18n="calendar.appleUrlLabel">CalDAV URL</span> <span class="opt" data-i18n="common.opt">(optional)</span></label>
-              <input type="text" id="apple-url" placeholder="https://caldav.icloud.com">
+              <input type="url" id="apple-url" placeholder="https://caldav.icloud.com" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
               <div class="hint" data-i18n="calendar.appleUrlHint">Leave empty unless your provider uses a different CalDAV endpoint.</div>
             </div>
           </div>
@@ -1840,11 +1914,11 @@
           <div class="inset-group">
           <div class="field">
             <label for="email-host" data-i18n="email.hostLabel">SMTP server</label>
-            <input type="text" id="email-host" placeholder="smtp.example.com">
+            <input type="text" id="email-host" placeholder="smtp.example.com" inputmode="url" autocapitalize="off" spellcheck="false" dir="ltr" autocomplete="off" enterkeyhint="next">
           </div>
           <div class="field">
             <label for="email-port" data-i18n="email.portLabel">Port</label>
-            <input type="text" id="email-port" placeholder="587">
+            <input type="text" id="email-port" placeholder="587" inputmode="numeric" dir="ltr" autocomplete="off" enterkeyhint="next">
           </div>
           <div class="field">
             <label for="email-secure" data-i18n="email.secureLabel">Encryption</label>
@@ -1856,12 +1930,12 @@
           </div>
           <div class="field">
             <label for="email-user" data-i18n="email.userLabel">Username</label>
-            <input type="text" id="email-user" autocomplete="username">
+            <input type="text" id="email-user" autocomplete="username" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
           </div>
           <div class="field">
             <label for="email-pass" data-i18n="email.passLabel">Password</label>
             <div class="secret-row pw-row">
-              <input type="password" id="email-pass" autocomplete="new-password">
+              <input type="password" id="email-pass" autocomplete="new-password" enterkeyhint="next">
               <button type="button" class="btn btn-ghost btn-sm" data-eye="email-pass" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
                 <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
                 <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
@@ -1873,12 +1947,12 @@
           <div class="inset-group">
           <div class="field">
             <label for="email-from" data-i18n="email.fromLabel">Sender address</label>
-            <input type="email" id="email-from" placeholder="yuvomi@example.com">
+            <input type="email" id="email-from" placeholder="yuvomi@example.com" enterkeyhint="next">
             <div class="hint" data-i18n="email.fromHint">The “from” address recipients will see. Many providers require it to match your username.</div>
           </div>
           <div class="field">
             <label for="email-from-name"><span data-i18n="email.fromNameLabel">Sender name</span> <span class="opt" data-i18n="common.opt">(optional)</span></label>
-            <input type="text" id="email-from-name" placeholder="Yuvomi">
+            <input type="text" id="email-from-name" placeholder="Yuvomi" enterkeyhint="next">
           </div>
           </div>
         </div>
@@ -1913,7 +1987,7 @@
         <div class="inset-group">
         <div class="field">
           <label for="adv-data-dir" data-i18n="advanced.dataDirLabel">Host data folder</label>
-          <input type="text" id="adv-data-dir" placeholder="./data">
+          <input type="text" id="adv-data-dir" placeholder="./data" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
           <div class="hint" data-i18n="advanced.dataDirHint">Where the database and app data live on the server. Leave empty to use ./data next to the compose file.</div>
         </div>
         <!-- MAX_UPLOAD_MB stand im Schema und in buildEnv, aber in keinem Feld:
@@ -1923,7 +1997,7 @@
              Dokumentgruppe. Grenzen wie server/utils/upload-limit.js. -->
         <div class="field">
           <label for="adv-max-upload" data-i18n="storage.maxUploadLabel">Upload limit (MB)</label>
-          <input type="text" id="adv-max-upload" inputmode="numeric" placeholder="5">
+          <input type="text" id="adv-max-upload" inputmode="numeric" placeholder="5" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
           <div class="hint" data-i18n="storage.maxUploadHint">Largest file anyone can upload, 1-100 MB. Leave empty for 5 MB - higher values need more memory.</div>
         </div>
         </div>
@@ -1941,12 +2015,12 @@
             </div>
             <div class="field">
               <label for="adv-backup-schedule" data-i18n="advanced.backupScheduleLabel">Schedule (cron)</label>
-              <input type="text" id="adv-backup-schedule" placeholder="0 2 * * *">
+              <input type="text" id="adv-backup-schedule" placeholder="0 2 * * *" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
               <div class="hint" data-i18n="advanced.backupScheduleHint">When to run backups. Default: daily at 2 AM.</div>
             </div>
             <div class="field">
               <label for="adv-backup-keep" data-i18n="advanced.backupKeepLabel">Backups to keep</label>
-              <input type="text" id="adv-backup-keep" placeholder="7">
+              <input type="text" id="adv-backup-keep" placeholder="7" inputmode="numeric" dir="ltr" enterkeyhint="next">
             </div>
           </div>
         </div>
@@ -1962,16 +2036,16 @@
             </div>
             <div class="field">
               <label for="adv-webdav-backup-url" data-i18n="advanced.webdavBackupUrlLabel">WebDAV URL</label>
-              <input type="text" id="adv-webdav-backup-url" placeholder="https://cloud.example.com/remote.php/dav/files/user/">
+              <input type="url" id="adv-webdav-backup-url" placeholder="https://cloud.example.com/remote.php/dav/files/user/" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="adv-webdav-backup-username" data-i18n="advanced.webdavBackupUsernameLabel">Username</label>
-              <input type="text" id="adv-webdav-backup-username" autocomplete="username">
+              <input type="text" id="adv-webdav-backup-username" autocomplete="username" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="adv-webdav-backup-password" data-i18n="advanced.webdavBackupPasswordLabel">Password</label>
               <div class="secret-row pw-row">
-                <input type="password" id="adv-webdav-backup-password" autocomplete="new-password">
+                <input type="password" id="adv-webdav-backup-password" autocomplete="new-password" enterkeyhint="next">
                 <button type="button" class="btn btn-ghost btn-sm" data-eye="adv-webdav-backup-password" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
                   <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
                   <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
@@ -1980,11 +2054,11 @@
             </div>
             <div class="field">
               <label for="adv-webdav-backup-path" data-i18n="advanced.webdavBackupPathLabel">Remote path</label>
-              <input type="text" id="adv-webdav-backup-path" placeholder="/yuvomi/backups/">
+              <input type="text" id="adv-webdav-backup-path" placeholder="/yuvomi/backups/" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="adv-webdav-backup-keep" data-i18n="advanced.backupKeepLabel">Backups to keep</label>
-              <input type="text" id="adv-webdav-backup-keep" placeholder="7">
+              <input type="text" id="adv-webdav-backup-keep" placeholder="7" inputmode="numeric" dir="ltr" enterkeyhint="next">
             </div>
           </div>
         </div>
@@ -2003,12 +2077,12 @@
             </div>
             <div class="field">
               <label for="adv-document-local-dir" data-i18n="advanced.documentLocalDirLabel">Host folder</label>
-              <input type="text" id="adv-document-local-dir" placeholder="./documents">
+              <input type="text" id="adv-document-local-dir" placeholder="./documents" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
               <div class="hint" data-i18n="advanced.documentLocalDirHint">The folder on the server that gets mounted into the container. Leave empty to use ./documents.</div>
             </div>
             <div class="field">
               <label for="adv-document-local-path" data-i18n="advanced.documentLocalPathLabel">Folder path</label>
-              <input type="text" id="adv-document-local-path" placeholder="/documents">
+              <input type="text" id="adv-document-local-path" placeholder="/documents" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
               <div class="hint" data-i18n="advanced.documentLocalPathHint">Path inside the container. Leave empty to use /documents.</div>
             </div>
           </div>
@@ -2025,16 +2099,16 @@
             </div>
             <div class="field">
               <label for="adv-document-webdav-url" data-i18n="advanced.documentWebdavUrlLabel">WebDAV URL</label>
-              <input type="text" id="adv-document-webdav-url" placeholder="https://cloud.example.com/remote.php/dav/files/user/">
+              <input type="url" id="adv-document-webdav-url" placeholder="https://cloud.example.com/remote.php/dav/files/user/" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="adv-document-webdav-username" data-i18n="advanced.documentWebdavUsernameLabel">Username</label>
-              <input type="text" id="adv-document-webdav-username" autocomplete="username">
+              <input type="text" id="adv-document-webdav-username" autocomplete="username" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="adv-document-webdav-password" data-i18n="advanced.documentWebdavPasswordLabel">Password</label>
               <div class="secret-row pw-row">
-                <input type="password" id="adv-document-webdav-password" autocomplete="new-password">
+                <input type="password" id="adv-document-webdav-password" autocomplete="new-password" enterkeyhint="next">
                 <button type="button" class="btn btn-ghost btn-sm" data-eye="adv-document-webdav-password" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
                   <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
                   <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
@@ -2043,7 +2117,7 @@
             </div>
             <div class="field">
               <label for="adv-document-webdav-path" data-i18n="advanced.documentWebdavPathLabel">Base path</label>
-              <input type="text" id="adv-document-webdav-path" placeholder="yuvomi-documents">
+              <input type="text" id="adv-document-webdav-path" placeholder="yuvomi-documents" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
               <div class="hint" data-i18n="advanced.documentWebdavPathHint">Remote folder for document files. Leave empty to use yuvomi-documents.</div>
             </div>
                       </div>
@@ -2060,12 +2134,12 @@
             </div>
             <div class="field">
               <label for="adv-document-google-drive-client-id" data-i18n="advanced.documentGoogleDriveClientIdLabel">Own client ID (optional)</label>
-              <input type="text" id="adv-document-google-drive-client-id" autocomplete="off">
+              <input type="text" id="adv-document-google-drive-client-id" autocomplete="off" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="adv-document-google-drive-client-secret" data-i18n="advanced.documentGoogleDriveClientSecretLabel">Own client secret (optional)</label>
               <div class="secret-row pw-row">
-                <input type="password" id="adv-document-google-drive-client-secret" autocomplete="new-password">
+                <input type="password" id="adv-document-google-drive-client-secret" autocomplete="new-password" enterkeyhint="next">
                 <button type="button" class="btn btn-ghost btn-sm" data-eye="adv-document-google-drive-client-secret" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
                   <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
                   <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
@@ -2111,19 +2185,19 @@
             <p class="hint" data-i18n="advanced.oidcHint">Fill in all four fields to enable SSO, or leave them empty.</p>
             <div class="field">
               <label for="oidc-issuer" data-i18n="advanced.oidcIssuerLabel">Issuer URL</label>
-              <input type="text" id="oidc-issuer" placeholder="https://auth.example.com/application/o/oikos/">
+              <input type="url" id="oidc-issuer" placeholder="https://auth.example.com/application/o/oikos/" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="oidc-client-id" data-i18n="advanced.oidcClientIdLabel">Client ID</label>
-              <input type="text" id="oidc-client-id">
+              <input type="text" id="oidc-client-id" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="oidc-client-secret" data-i18n="advanced.oidcClientSecretLabel">Client Secret</label>
-              <input type="password" id="oidc-client-secret">
+              <input type="password" id="oidc-client-secret" enterkeyhint="next">
             </div>
             <div class="field">
               <label for="oidc-redirect" data-i18n="advanced.oidcRedirectLabel">Redirect URI</label>
-              <input type="text" id="oidc-redirect">
+              <input type="url" id="oidc-redirect" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
             </div>
             <div class="field">
               <label class="toggle-row"><span class="toggle-row__label" data-i18n="advanced.oidcTrustEmail">Trust email without a verified claim</span><span class="toggle"><input type="checkbox" role="switch" id="adv-oidc-trust-email"><span class="toggle__track" aria-hidden="true"></span></span></label>
@@ -2149,7 +2223,7 @@
              als eine Auskunft zeigt, wird hier als eine Frage gestellt. -->
         <div class="group-label" id="adv-pn-label" data-i18n="advanced.sectionPrivateNetwork">Access to your home network</div>
         <p class="group-note" id="adv-pn-note" data-i18n="advanced.privateNetworkHint">Yuvomi refuses connections to addresses on your own network by default, which protects against a server being tricked into reaching internal services. Enable what you actually run at home.</p>
-        <!-- Die drei Einzel-Hints lagen fertig uebersetzt in allen 24 Locales,
+        <!-- Die drei Einzel-Hints lagen fertig uebersetzt in allen 27 Locales,
              wurden aber nie gerendert - dabei tragen genau sie die Anker
              (Mealie, Tandoor, Nextcloud), an denen ein Erstinstallierer erkennt,
              ob ihn die Freigabe betrifft. -->
@@ -2183,17 +2257,17 @@
         <div class="inset-group" role="group" aria-labelledby="adv-more-label">
         <div class="field">
           <label for="adv-sync-interval" data-i18n="advanced.syncIntervalLabel">Calendar sync interval (minutes)</label>
-          <input type="number" id="adv-sync-interval" min="5" max="1440" step="5" placeholder="15">
+          <input type="number" id="adv-sync-interval" min="5" max="1440" step="5" placeholder="15" enterkeyhint="next">
           <div class="hint" data-i18n="advanced.syncIntervalHint">How often Yuvomi syncs calendars and contacts. Raise it if your provider rate-limits you.</div>
         </div>
         <div class="field">
           <label for="adv-fixer" data-i18n="advanced.fixerLabel">Fixer API key (live currency rates)</label>
-          <input type="password" id="adv-fixer" autocomplete="off">
+          <input type="password" id="adv-fixer" autocomplete="off" enterkeyhint="next">
           <div class="hint" data-i18n="advanced.fixerHint">Optional. Converts subscription currencies with live rates. Subscriptions work without it.</div>
         </div>
         <div class="field">
           <label for="adv-push-subject" data-i18n="advanced.pushSubjectLabel">Push contact address</label>
-          <input type="text" id="adv-push-subject" placeholder="mailto:admin@example.com">
+          <input type="text" id="adv-push-subject" placeholder="mailto:admin@example.com" autocapitalize="off" spellcheck="false" dir="ltr" enterkeyhint="next">
           <div class="hint" data-i18n="advanced.pushSubjectHint">Sent to push services as a contact for your server. Leave empty to use the default.</div>
         </div>
         <!-- Opt-in des Betreibers (DECISIONS.md, 12): ein Modul ist Skript im
@@ -2408,12 +2482,12 @@
           <!-- required: die Wizard-Konvention ist "alles optional" - gerade darum
                tragen die faktischen Pflichtfelder dieses Schritts den Zustand
                programmatisch (WCAG 3.3.2; validiert wird in createAdmin). -->
-          <input type="text" id="adm-user" placeholder="jane" autocomplete="username" required aria-required="true">
+          <input type="text" id="adm-user" placeholder="jane" autocomplete="username" required aria-required="true" enterkeyhint="go">
           <div class="hint" data-i18n="admin.userHint">3-64 characters: letters, numbers, . - _</div>
         </div>
         <div class="field">
           <label for="adm-name" data-i18n="admin.nameLabel">Display Name</label>
-          <input type="text" id="adm-name" placeholder="Jane Smith" autocomplete="name" required aria-required="true">
+          <input type="text" id="adm-name" placeholder="Jane Smith" autocomplete="name" required aria-required="true" enterkeyhint="go">
         </div>
         <div class="field">
           <label for="adm-pass" data-i18n="admin.passLabel">Password</label>
@@ -2423,7 +2497,7 @@
                eigene Beschreibung, damit fail()/clearFieldInvalid() sie nach
                einem Fehler zurueckgeben statt sie mit wegzuraeumen. -->
           <div class="secret-row pw-row">
-            <input type="password" id="adm-pass" autocomplete="new-password" required aria-required="true" aria-describedby="adm-pass-hint" data-describedby="adm-pass-hint">
+            <input type="password" id="adm-pass" autocomplete="new-password" required aria-required="true" aria-describedby="adm-pass-hint" data-describedby="adm-pass-hint" enterkeyhint="go">
             <button type="button" class="btn btn-ghost btn-sm" data-eye="adm-pass" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
               <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
               <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
@@ -2442,7 +2516,7 @@
         <div class="field">
           <label for="adm-conf" data-i18n="admin.confLabel">Confirm Password</label>
           <div class="secret-row pw-row">
-            <input type="password" id="adm-conf" autocomplete="new-password" required aria-required="true">
+            <input type="password" id="adm-conf" autocomplete="new-password" required aria-required="true" enterkeyhint="go">
             <button type="button" class="btn btn-ghost btn-sm" data-eye="adm-conf" aria-pressed="false" aria-label="Show or hide value" data-i18n-aria="common.toggleVisibility">
               <svg class="icon-svg icon-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
               <svg class="icon-svg icon-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 7 10 7a9.12 9.12 0 0 0 5.4-1.61"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
@@ -3206,10 +3280,16 @@ function showStep(n, { animate = true } = {}) {
   setProgress(n);
   const dir = n > from ? 'forward' : n < from ? 'back' : '';
   const swap = ++stepSwap;
+  // Fokus nur bei einem ECHTEN Wechsel. Beim ersten Bild (showStep(0) auf
+  // Schritt 0) hat niemand navigiert: der Fokus gehoert dem Dokumentanfang,
+  // sonst stand der Ring schon beim Laden auf der Ueberschrift, und der
+  // Screenreader begann mitten auf der Seite statt beim Titel (Critique
+  // 2026-10-29).
+  const moved = dir !== '';
   // Ein ueberholter Wechsel zeichnet nicht mehr: sein Rueckruf kaeme nach dem
   // juengsten und risse Fokus und Scrollstand an sich.
-  swapStep(() => { if (swap === stepSwap) renderStep(); }, dir, animate && dir !== '',
-    () => { if (swap === stepSwap) focusStep(); });
+  swapStep(() => { if (swap === stepSwap) renderStep(); }, dir, animate && moved,
+    () => { if (swap === stepSwap && moved) focusStep(); });
   onEnterStep(flow[n]);
 }
 
@@ -3710,6 +3790,30 @@ function clearFieldInvalid(e) {
 }
 document.addEventListener('input', clearFieldInvalid);
 document.addEventListener('change', clearFieldInvalid);
+
+// Die Pruefung, die der Browser selbst kennt (type=url, type=email, min/max),
+// zeigt :user-invalid rot - erst nach der ersten Eingabe. Damit Sehende und
+// Screenreader dasselbe erfahren, folgt aria-invalid demselben Zustand (nach
+// clearFieldInvalid, das bei jeder Eingabe die fail()-Markierung nimmt). Die
+// eigene Markierung steht in data-native-invalid, damit eine von fail()
+// gesetzte nicht still verschwindet. Kennt der Browser :user-invalid nicht,
+// bleibt alles wie vorher: dann gibt es auch kein Rot ohne Ansage.
+function syncNativeInvalid(e) {
+  const el = e.target;
+  if (!el?.matches?.('input:not([type=checkbox]):not([type=radio])')) return;
+  let invalid;
+  try { invalid = el.matches(':user-invalid'); } catch { return; }
+  if (invalid) {
+    el.setAttribute('aria-invalid', 'true');
+    el.dataset.nativeInvalid = '1';
+  } else if (el.dataset.nativeInvalid) {
+    delete el.dataset.nativeInvalid;
+    el.removeAttribute('aria-invalid');
+  }
+}
+document.addEventListener('input', syncNativeInvalid);
+document.addEventListener('change', syncNativeInvalid);
+document.addEventListener('blur', syncNativeInvalid, true);
 
 /** Banner-Fehler zeigen UND das schuldige Feld markieren + fokussieren (WCAG 3.3.1). */
 function fail(bannerId, msg, inputId) {
@@ -4448,7 +4552,7 @@ $('rev-next').addEventListener('click', async () => {
     $('rev-armed-note').textContent = '';
     // Uebersetzte Hauptaussage zuerst, das rohe Server-/Netzwerkdetail nur als
     // Klammer: sanitizeEnv-Meldungen sind englisch, die Nutzerin liest hier
-    // aber eine von 24 Sprachen.
+    // aber eine von 27 Sprachen.
     showErr('rev-err', e.message ? `${t('review.errSave')} (${e.message})` : t('review.errSave'));
   }
 });
@@ -4840,7 +4944,7 @@ async function createAdmin() {
     // NORMALFALL, kein Fehler: /auth/setup antwortet in production mit 404 und
     // nur ausserhalb davon mit 403 (server/auth.js). Der 403-Zweig existierte in
     // keinem realen Deployment - der Rerun-Nutzer bekam nach elf Schirmen den
-    // rohen englischen Serverstring „Not found." zu sehen, in allen 24 Sprachen,
+    // rohen englischen Serverstring „Not found." zu sehen, in allen 27 Sprachen,
     // ohne Hinweis und ohne Weiterweg. Seit der Preflight bestehende
     // Installationen ausdruecklich in DIESEN Pfad lenkt, ist das sein Regelfall.
     if (r.status === 201) {
@@ -4851,7 +4955,7 @@ async function createAdmin() {
     } else {
       btn.disabled = false; btn.textContent = t('admin.create');
       // Uebersetzte Hauptaussage zuerst, das rohe Serverdetail nur in Klammern -
-      // hier landen sonst englische Serverstrings in allen 24 Sprachen.
+      // hier landen sonst englische Serverstrings in allen 27 Sprachen.
       showErr('adm-err', d.error ? `${t('admin.errCreate')} (${d.error})` : t('admin.errCreate'));
     }
   } catch (e) {

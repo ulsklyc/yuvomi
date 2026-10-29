@@ -647,43 +647,70 @@ test('der Installer nutzt kein --color-text-on-accent (folgt dem Theme nicht)', 
  * Nichts hat das geprueft: die Werte sind zwei Kopien ohne Naht dazwischen.
  * Dieser Guard ist die Naht. Er prueft nur Tokens, die BEIDE Seiten fuehren -
  * der Fallback darf bewusst kleiner sein als tokens.css. */
+/* Die zweite Fassung loest var() AUF, statt nur Namen mit einem privaten
+ * --_-Gegenstueck zu vergleichen. Die erste blieb gruen, waehrend zwei Werte
+ * drifteten (Critique 2026-10-29): --color-border-control steht in tokens.css
+ * dunkel eigens auf #857F76 (kein --_-Token), der Fallback leitete es aus
+ * --neutral-500 (#948E85) ab; und --ease-glass ist in tokens.css hinter
+ * @supports eine linear()-Feder, im Fallback nur die Bezier. Verglichen wird
+ * jetzt der AUFGELOESTE Wert jedes Fallback-Tokens in drei Schichten: hell,
+ * hell mit linear() (der @supports-Rahmen), dunkel. */
 test('der Inline-Fallback stimmt Wert fuer Wert mit tokens.css ueberein', () => {
-  const darkHtml = html.indexOf('@media (prefers-color-scheme: dark)');
-  const darkTokens = tokensCss.indexOf('@media (prefers-color-scheme: dark)');
-  assert.ok(darkHtml > 0 && darkTokens > 0, 'Dark-Block nicht gefunden');
-
-  // Die :root-Deklarationen des Fallbacks, je Theme.
-  const fallbackVars = (from, to) => {
-    const map = new Map();
-    // Nicht nur Hex: auch Werte, die mit einer Zahl beginnen (Schatten, Radien,
-    // Typo-Stufen), driften sonst stumm. Gemessen 2026-08-31: der Dark-
-    // Kantenring aus tokens.css (0 0 0 1px rgba(255,255,255,.06)) fehlte im
-    // Fallback, und dieser Guard blieb gruen, weil er nur Hex verglich - Guard
-    // prueft Schreibweise, nicht Sache. Verglichen wird weiterhin nur, was
-    // tokens.css als privates --_-Token fuehrt.
-    for (const [, name, value] of html.slice(from, to).matchAll(/(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{3,8}|[\d.][^;]*)/g)) {
-      map.set(name, value.replace(/\s+/g, ' ').trim().toLowerCase());
+  const strip = css => css.replace(/\/\*[\s\S]*?\*\//g, '');
+  /** Inhalt des Blocks, dessen Kopf `head` ist (Klammerzaehlung). */
+  const block = (src, head, from = 0) => {
+    const at = src.indexOf(head, from);
+    if (at === -1) return null;
+    let depth = 0;
+    for (let k = src.indexOf('{', at); k < src.length; k++) {
+      if (src[k] === '{') depth++;
+      else if (src[k] === '}' && --depth === 0) return src.slice(src.indexOf('{', at) + 1, k);
     }
-    return map;
+    return null;
   };
-  const light = fallbackVars(0, darkHtml);
-  const dark = fallbackVars(darkHtml, html.indexOf('</style>', darkHtml));
+  /** Deklarationen der OBERSTEN Ebene eines Blocks (verschachtelte Regeln fallen weg). */
+  const decls = body => {
+    const flat = body.replace(/[^{}]*\{[^{}]*\}/g, '');
+    return Object.fromEntries([...flat.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(m => [m[1], m[2].trim()]));
+  };
+  const resolve = (value, env, depth = 0) => {
+    assert.ok(depth < 20, `var()-Kette zu tief: ${value}`);
+    const out = value.replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^()]*))?\)/g,
+      (_, name, fb) => env[name] !== undefined ? resolve(env[name], env, depth + 1) : (fb ?? `<${name}?>`));
+    return out
+      .replace(/calc\(\s*([\d.]+)\s*\*\s*([\d.]+)\s*\)/g, (_, a, b) => String(Number((a * b).toFixed(4))))
+      .replace(/(?<![\w#.])(\d+\.\d+)(?!\d)/g, n => String(Number(n)))
+      .replace(/\s+/g, ' ').trim().toLowerCase();
+  };
+
+  const fbCss = strip(html.slice(html.indexOf('<style>'), html.indexOf('</style>')));
+  const tkCss = strip(tokensCss);
+  const linear = '@supports (transition-timing-function: linear(0, 1))';
+  const fbBase = decls(block(fbCss, ':root'));
+  const fbLinear = decls(block(block(fbCss, linear) ?? '', ':root') ?? '');
+  const fbDark = decls(block(block(fbCss, '@media (prefers-color-scheme: dark)') ?? '', ':root') ?? '');
+  assert.ok(Object.keys(fbDark).length > 0, 'Dark-Block im Inline-Fallback nicht gefunden');
+  const tkBase = decls(block(tkCss, ':root {'));
+  const tkLinear = decls(block(block(tkCss, linear), ':root'));
+  const tkDark = decls(block(tkCss, ':root:not([data-theme="light"]) {'));
+  assert.ok(Object.keys(tkDark).length > 0, 'Dark-Block in tokens.css nicht gefunden');
 
   const drift = [];
-  for (const [theme, vars, tokensFrom] of [['light', light, 0], ['dark', dark, darkTokens]]) {
-    for (const [name, value] of vars) {
-      // tokens.css fuehrt die Basiswerte auf privaten --_-Variablen.
-      const privateName = name.replace(/^--/, '--_');
-      const re = new RegExp(`${privateName}:\\s*([^;]+);`, 'g');
-      re.lastIndex = tokensFrom;
-      const hit = re.exec(tokensCss);
-      if (!hit) continue; // Token nur im Fallback - erlaubt
-      const tokensValue = hit[1].replace(/\s+/g, ' ').trim().toLowerCase();
-      if (tokensValue !== value) {
-        drift.push(`${theme}: ${name} = ${value}, tokens.css = ${tokensValue}`);
-      }
+  const layers = [
+    ['hell', { ...fbBase }, { ...tkBase }],
+    ['hell mit linear()', { ...fbBase, ...fbLinear }, { ...tkBase, ...tkLinear }],
+    ['dunkel', { ...fbBase, ...fbLinear, ...fbDark }, { ...tkBase, ...tkLinear, ...tkDark }],
+  ];
+  for (const [theme, fb, tk] of layers) {
+    for (const name of Object.keys(fb)) {
+      // Nur Tokens, die BEIDE Seiten fuehren: color-scheme ist keine Variable,
+      // und der Fallback darf bewusst kleiner sein als tokens.css.
+      if (tk[name] === undefined) continue;
+      const a = resolve(fb[name], fb), b = resolve(tk[name], tk);
+      if (a !== b) drift.push(`${theme}: ${name} = ${a}, tokens.css = ${b}`);
     }
   }
+  assert.ok(Object.keys(fbBase).length >= 40, `nur ${Object.keys(fbBase).length} Fallback-Tokens gelesen - der Leser greift nicht`);
   assert.deepEqual(drift, [],
     `Fallback-Tokens weichen von tokens.css ab (der Fallback greift nur, wenn tokens.css fehlt - dort waere die Abweichung dann sichtbar): ${drift.join(' | ')}`);
 });
@@ -1752,6 +1779,32 @@ test('showStep: Richtung aus dem Zustand, nur der juengste Wechsel zeichnet, Ket
   assert.match(fnSource('showStep'), /focusStep\(\)/, 'showStep fuehrt den Fokus nicht nach');
 });
 
+/* Das erste Bild nimmt keinen Fokus. showStep(0) beim Laden fokussierte die H2
+ * des Einstiegs: der Ring stand ohne jede Navigation auf der Ueberschrift, und
+ * der Screenreader begann dort statt beim Seitentitel (Critique 2026-10-29).
+ * Ausgefuehrt, nicht gelesen: der Settle-Rueckruf von swapStep wird
+ * aufgerufen und gezaehlt. */
+test('showStep: das erste Bild fokussiert nicht, ein echter Wechsel schon', () => {
+  const settles = [];
+  let focused = 0;
+  const h = new Function('swapStep', 'renderStep', 'onEnterStep', 'focusStep', `
+    let currentStep = 0, stepSwap = 0;
+    const flow = ['welcome', 'config', 'secrets'];
+    const clearInvalid = () => {}, setProgress = () => {};
+    ${fnSource('showStep')}
+    return { showStep };
+  `)((update, dir, animate, settle) => settles.push(settle), () => {}, () => {}, () => { focused++; });
+  h.showStep(0);
+  settles.at(-1)?.();
+  assert.equal(focused, 0, 'das erste Bild setzt den Fokus auf die Ueberschrift');
+  h.showStep(1);
+  settles.at(-1)?.();
+  assert.equal(focused, 1, 'ein Schrittwechsel fuehrt den Fokus nicht nach');
+  h.showStep(0);
+  settles.at(-1)?.();
+  assert.equal(focused, 2, 'der Weg zurueck fuehrt den Fokus nicht nach');
+});
+
 /* Der Rueckruf der View Transition erzwang ein Layout: renderStep fokussierte
  * die neue H2 (focus() rechnet synchron das Layout des ganzen neuen Schritts)
  * und scrollte NACH dem Klassentausch (gemessen 42 ms bei 4x CPU, Critique
@@ -2373,4 +2426,111 @@ test('Balken und Zaehler folgen derselben Rechnung, der Docker-Schirm liegt zwis
       `der Balken steht waehrend Docker nicht zwischen den Nachbarn (${bar[d - 1]} / ${bar[d]} / ${bar[d + 1]})`);
     for (let i = 1; i < flow.length; i++) assert.ok(bar[i] >= bar[i - 1], `der Balken laeuft bei ${flow[i]} zurueck`);
   }
+});
+
+// ── Bedienelemente (Critique 2026-10-29, Schritt 7) ──────────────────────────
+
+/* Maschinenwerte bekommen die Tastatur und die Schreibhilfen, die zu ihnen
+ * passen: URLs sind type=url, Hosts inputmode=url, Ports inputmode=numeric;
+ * keiner wird gross geschrieben, korrigiert oder in RTL gespiegelt. Vorher
+ * waren alle type=text - iOS schrieb "Smtp.example.com" gross, und die
+ * Rechtschreibpruefung unterstrich jeden Host. Die Felder werden aus dem
+ * Markup ERKANNT (Id-Endung, https-Platzhalter), nicht aufgezaehlt: ein neues
+ * URL-Feld faellt sonst durch. */
+test('URL-, Host- und Portfelder tragen passende Tastatur und keine Schreibhilfen', () => {
+  const inputs = [...html.matchAll(/<input\b[^>]*>/g)].map(m => m[0])
+    .map(tag => ({ tag, id: tag.match(/\bid="([\w-]+)"/)?.[1], attr: name => tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1] }))
+    .filter(f => f.id);
+  const isUrl = f => /-(url|issuer|redirect)$/.test(f.id) || /^https?:\/\//.test(f.attr('placeholder') ?? '');
+  const isHost = f => /-host$/.test(f.id);
+  const isPort = f => /-port$/.test(f.id);
+  const urls = inputs.filter(isUrl), hosts = inputs.filter(isHost), ports = inputs.filter(isPort);
+  assert.ok(urls.length >= 6 && hosts.length >= 3 && ports.length >= 2,
+    `zu wenige Felder erkannt (URL ${urls.length}, Host ${hosts.length}, Port ${ports.length}) - der Leser greift nicht`);
+  const bad = [];
+  for (const f of urls) if (f.attr('type') !== 'url') bad.push(`${f.id}: type=${f.attr('type')} statt url`);
+  for (const f of hosts) if (f.attr('inputmode') !== 'url') bad.push(`${f.id}: inputmode fehlt (url)`);
+  for (const f of ports) if (f.attr('inputmode') !== 'numeric') bad.push(`${f.id}: inputmode fehlt (numeric)`);
+  for (const f of [...urls, ...hosts]) {
+    if (f.attr('autocapitalize') !== 'off') bad.push(`${f.id}: autocapitalize`);
+    if (f.attr('spellcheck') !== 'false') bad.push(`${f.id}: spellcheck`);
+  }
+  for (const f of [...urls, ...hosts, ...ports]) if (f.attr('dir') !== 'ltr') bad.push(`${f.id}: dir=ltr fehlt`);
+  // Enter loest die Primaeraktion des Schritts aus (globaler keydown-Handler):
+  // die Bildschirmtastatur sagt das mit enterkeyhint an, in jedem Textfeld.
+  for (const f of inputs) {
+    if (/^(checkbox|radio)$/.test(f.attr('type'))) continue;
+    if (!/^(next|done|go)$/.test(f.attr('enterkeyhint') ?? '')) bad.push(`${f.id}: enterkeyhint fehlt`);
+  }
+  assert.deepEqual(bad, []);
+  // type=url muss dieselbe Feldoptik bekommen wie type=text (Kante, 44px mobil).
+  assert.ok(RULES.some(r => r.selector === 'input[type=url]' && r.media === null && /border:/.test(r.body)),
+    'input[type=url] fehlt in der Feldregel - URL-Felder staenden als UA-Kasten');
+  assert.ok(RULES.some(r => r.selector === 'input[type=url]' && /max-width: 640px/.test(r.media ?? '') && /min-height:\s*44px/.test(r.body)),
+    'input[type=url] fehlt in der 44px-Regel fuer Touch');
+});
+
+/* Lange Komposita ragten in die Wertspalte der Pruefseite
+ * ("Datenbank-Verschluesselungsschluessel" 59px bei 390px, gemessen im
+ * Browser). Die Schluesselspalte muss trennen und notfalls brechen duerfen. */
+test('die Schluesselspalte der Pruefseite trennt lange Woerter, statt in die Werte zu ragen', () => {
+  assert.equal(declared(s => s === '.rv-row dt', 'overflow-wrap'), 'anywhere', '.rv-row dt bricht unzerbrechliche Woerter nicht');
+  assert.equal(declared(s => s === '.rv-row dt', 'hyphens'), 'auto', '.rv-row dt trennt nicht');
+  assert.equal(declared(s => s === '.rv-row dt', 'min-width'), '0', 'die Grid-Spalte waechst mit dem Wort statt zu brechen');
+});
+
+/* Feldkante und Primaerknopf wie in der App: 1px-Kante (.form-input,
+ * layout.css) statt 1,5px; Tiefe plus Glanzkante wie .btn--primary
+ * (glass.css). Gelesen wird die App-Quelle, nicht eine Zahl hier. */
+test('Feldkante und Primaerknopf folgen der App', () => {
+  const layoutCss = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const glassCss = readFileSync(new URL('../public/styles/glass.css', import.meta.url), 'utf8');
+  const appBorder = layoutCss.match(/\.form-input\s*\{[^}]*?\bborder:\s*([^;]+);/)?.[1].trim();
+  assert.ok(appBorder, 'Feldkante der App nicht gefunden');
+  assert.equal(declared(s => s === 'input[type=text]', 'border'), appBorder, 'die Feldkante weicht von .form-input der App ab');
+  const appShadow = glassCss.match(/\.btn--primary\s*\{\s*box-shadow:\s*([^;]+);/)?.[1].replace(/\s+/g, ' ').trim();
+  assert.ok(appShadow, 'Schatten von .btn--primary nicht gefunden');
+  assert.equal(declared(s => s === '.btn-primary:not(:disabled)', 'box-shadow')?.replace(/\s+/g, ' '), appShadow,
+    'der Primaerknopf traegt nicht die Tiefe der App');
+  for (const name of ['--glass-inset-medium', '--glass-inset-soft']) {
+    assert.ok(ROOT_VARS.has(name), `${name} fehlt im Inline-Fallback`);
+  }
+});
+
+/* :user-invalid zeigt, was der Browser selbst prueft (type=url), erst nach der
+ * Eingabe; aria-invalid folgt im selben Moment, sonst saehe der Sehende Rot,
+ * und der Screenreader schwiege. Ausgefuehrt mit einem Feld-Double. */
+test(':user-invalid zeichnet rot, und aria-invalid folgt demselben Zustand', () => {
+  assert.ok(RULES.some(r => r.selector === 'input:user-invalid' && /border-color:\s*var\(--color-danger\)/.test(r.body)),
+    'input:user-invalid zeichnet nicht rot');
+  const sync = new Function(`${fnSource('syncNativeInvalid')}; return syncNativeInvalid;`)();
+  const attrs = new Map();
+  let invalid = true;
+  const el = {
+    dataset: {},
+    matches: sel => sel === ':user-invalid' ? invalid : true,
+    setAttribute: (k, v) => attrs.set(k, v), removeAttribute: k => attrs.delete(k),
+  };
+  sync({ target: el });
+  assert.equal(attrs.get('aria-invalid'), 'true', 'aria-invalid folgt :user-invalid nicht');
+  invalid = false;
+  sync({ target: el });
+  assert.equal(attrs.has('aria-invalid'), false, 'die eigene Markierung bleibt nach der Korrektur stehen');
+  // Eine von fail() gesetzte Markierung nimmt der Abgleich NICHT weg.
+  attrs.set('aria-invalid', 'true');
+  sync({ target: el });
+  assert.equal(attrs.get('aria-invalid'), 'true', 'der Abgleich loescht die Markierung von fail()');
+  assert.match(html, /addEventListener\('blur', syncNativeInvalid, true\)/, 'der Abgleich laeuft nicht beim Verlassen des Feldes');
+});
+
+/* Browserleiste in der Buehnenfarbe, je Theme - und genau die Werte des
+ * Fallback-Tokens --color-bg (ein meta kann kein var() lesen). */
+test('theme-color folgt --color-bg in beiden Themes', () => {
+  const metas = [...html.matchAll(/<meta name="theme-color" content="(#[0-9A-Fa-f]{6})" media="\(prefers-color-scheme: (light|dark)\)">/g)];
+  const byScheme = Object.fromEntries(metas.map(m => [m[2], m[1].toLowerCase()]));
+  const fb = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+  const dark = fb.indexOf('@media (prefers-color-scheme: dark)');
+  const light = fb.slice(0, dark).match(/--color-bg:\s*(#[0-9A-Fa-f]{6})/)?.[1].toLowerCase();
+  const darkBg = fb.slice(dark).match(/--color-bg:\s*(#[0-9A-Fa-f]{6})/)?.[1].toLowerCase();
+  assert.deepEqual(byScheme, { light, dark: darkBg });
 });
