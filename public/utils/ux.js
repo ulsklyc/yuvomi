@@ -1323,6 +1323,18 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     const port = e.target;
     if (!(port instanceof Element) || port === toolbar || toolbar.contains(port)) return;
     if (port.closest?.(`[${HEAD_COLLAPSE_ATTR}="module"]`)) return;
+    // ERST DIE FRAGEN OHNE LAYOUT (Critique R24 G3-Quer-P2-2, G4-Budget-P3-8).
+    // Jede Messung unten verlangt ein aktuelles Layout - und je Scroll-Ereignis
+    // hatte ein anderer Lauscher oft gerade eine Klasse gewechselt (Kapsel
+    // minimiert, angedockter Titel): gemessen als erzwungenes Layout in
+    // `onInnerScroll` (Vorrat 155 ms, Abos 139 ms bei 4x CPU unter Last). Ein
+    // Kopf, der nicht falten kann, und ein Scroll ohne Geste an einem
+    // ausgeklappten Kopf entscheiden nichts - sie kommen ohne Messung aus.
+    const collapsedNow = toolbar.classList.contains('is-collapsed');
+    const foldRow = toolbar.classList.contains('page-toolbar--fold-row') && foldH > 0;
+    if (!foldRow && !toolbar.classList.contains('page-toolbar--capped')) return;
+    const byUser = Boolean(gestureTarget) && port.contains(gestureTarget);
+    if (!byUser && !collapsedNow) return;
     const reserve = port.scrollHeight - port.clientHeight;
     // EIN WAAGERECHTER STREIFEN IST NICHT DER SCROLLPORT DER SEITE. Der
     // Lauscher haengt in der Capture-Phase am Modul-Root und faengt damit auch
@@ -1342,8 +1354,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // Eine Faltzeile (siehe `foldRow` in update) hat keine Lead-Zone, aber
     // eine vermessene Hoehe - sie ist ihre ganze Lead-Zone. Ihre Linie bleibt
     // in beiden Zustaenden: sie ist die Kante des angedockten Kopfes.
-    const fold = toolbar.classList.contains('page-toolbar--fold-row') && foldH > 0;
-    if (!fold && !toolbar.classList.contains('page-toolbar--capped')) return;
+    const fold = foldRow;
     const states = fold ? ['is-collapsed'] : ['is-collapsed', 'is-docked'];
     // Nur kollabieren, wenn der Port das Ausklappen danach auch verkraftet -
     // sonst schiebt die zurückkehrende Kopfhöhe den Scroll auf 0, der Kopf
@@ -1360,18 +1371,21 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     // eingeklappte Reserve gemessen, pendelte eine Liste, deren Reserve
     // zwischen Schwelle und Schwelle + Differenz liegt. `openH` ist die Hoehe
     // der letzten ausgeklappten Messung.
-    const shorter = !fold && toolbar.classList.contains('is-collapsed') && openH > 0
+    const shorter = !fold && collapsedNow && openH > 0
       ? Math.max(0, openH - toolbar.getBoundingClientRect().height)
       : 0;
+    // Ausgeklappt traegt die Faltzeile keinen negativen Rand - der Stil wird
+    // nur gefragt, wenn sie gefaltet ist (Fokus, Suchbegriff und offenes Menue
+    // halten sie dann trotzdem offen, layout.css).
     const unfolded = fold
-      ? reserve - Math.min(0, parseFloat(getComputedStyle(toolbar).marginBlockEnd) || 0)
+      ? reserve - (collapsedNow ? Math.min(0, parseFloat(getComputedStyle(toolbar).marginBlockEnd) || 0) : 0)
       : reserve + shorter;
     if (unfolded < (fold ? foldH : lead) + 48) {
       setCollapsed(false, states);
       return;
     }
     // Ab hier nur noch der Nutzer (siehe `gestureTarget` oben).
-    if (!gestureTarget || !port.contains(gestureTarget)) return;
+    if (!byUser) return;
     const top = port.scrollTop;
     if (fold) {
       foldByDirection(port, top);

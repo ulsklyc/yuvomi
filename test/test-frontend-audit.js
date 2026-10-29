@@ -3041,8 +3041,13 @@ test('Aktiv-Indikatoren erscheinen am Ziel: die erste Platzierung gleitet nicht 
   // anderen Groessenklasse hat keine Geometrie und darf nicht als platziert
   // gelten, sonst glitt er nach dem Drehen ueber die Schwelle aus der
   // Nullposition herein (Codex-Review zu #2025).
-  assert.match(place, /if \(indicator\.getClientRects\(\)\.length\) indicator\.dataset\.placed = '1';/,
+  // checkVisibility() beantwortet dieselbe Frage (eine Box?) ohne Layout
+  // (R24 S12: die Platzierung laeuft im Seitenwechsel), getClientRects() bleibt
+  // der Rueckfall.
+  assert.match(place, /if \((?:indicator\.checkVisibility \? indicator\.checkVisibility\(\) : )?indicator\.getClientRects\(\)\.length\) indicator\.dataset\.placed = '1';/,
     'markiert wird nur ein Indikator mit gezeichneter Box');
+  assert.doesNotMatch(place, /getBoundingClientRect/,
+    'der Sprung braucht einen berechneten Stil, kein Layout (R24 S12)');
   for (const name of ['positionSidebarIndicator', 'positionTabIndicator']) {
     const body = functionBody(source, name);
     assert.ok(body, `${name} fehlt`);

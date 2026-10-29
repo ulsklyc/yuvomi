@@ -114,12 +114,16 @@ test('mobile tab indicator stays a capsule behind the icon, clear of the bar edg
   // Slot-breite Pille lief im ersten/letzten Tab bis an die Bar-Kante, wo die
   // Rundung gekappt wurde (#569-Nachtrag). Die Geometrie kommt aus dem
   // Icon-Well-Rect plus seitlichem Inset, nicht aus der reinen Slot-Breite.
-  const fn = routerJs.slice(routerJs.indexOf('function positionTabIndicator'));
-  const body = fn.slice(0, fn.indexOf('\n}\n') + 2);
+  // Seit R24 S12 misst `tabGeometry` (gemerkt je Ziel), positionTabIndicator setzt.
+  const fnBody = (name) => { const fn = routerJs.slice(routerJs.indexOf(`function ${name}`)); return fn.slice(0, fn.indexOf('\n}\n') + 2); };
+  const geometry = fnBody('tabGeometry');
+  const body = fnBody('positionTabIndicator');
 
-  assert.match(body, /querySelector\('\.nav-item__icon-well'\)/);
-  assert.match(body, /Math\.min\(ar\.width - TAB_INDICATOR_INSET \* 2, TAB_INDICATOR_MAX_WIDTH\)/);
-  assert.match(body, /indicator\.style\.height = `\$\{wr\.height\}px`/);
+  assert.match(geometry, /querySelector\('\.nav-item__icon-well'\)/);
+  assert.match(geometry, /Math\.min\(ar\.width - TAB_INDICATOR_INSET \* 2, TAB_INDICATOR_MAX_WIDTH\)/);
+  assert.match(geometry, /height: wr\.height/);
+  assert.match(body, /tabGeometry\(nav, active\)/);
+  assert.match(body, /indicator\.style\.height = `\$\{height\}px`/);
   assert.match(body, /translate\(\$\{left\}px, \$\{top\}px\)/);
   assert.doesNotMatch(body, /indicator\.style\.width = `\$\{ar\.width\}px`/);
   assert.match(routerJs, /const TAB_INDICATOR_INSET = 4;/);
@@ -431,4 +435,22 @@ test('a touch-action that restricts panning keeps pinch-zoom', () => {
     'pan-x/pan-y ohne pinch-zoom verwirft jeden Zwei-Finger-Bildlauf und das '
     + 'Aufziehen zum Zoomen (#1276) - `pinch-zoom` ergaenzen, z.B. `pan-y pinch-zoom`',
   );
+});
+
+// R24 S12 (Critique G0-Shell-P2-6, G3-Quer-P2-2): im Seitenwechsel und beim
+// Scrollen legt die Shell die Seite nicht zusaetzlich aus. Gemessen bei 4x CPU
+// in der Rueckkehr zur Uebersicht: Pille 17 ms, Tastatur-Abgleich 23 ms; beim
+// Scrollen `router.js:onscroll` 40 ms erzwungenes Layout.
+test('R24 S12: Pille, Tastatur-Abgleich und Port-Merker messen kein Layout, das sie nicht brauchen', () => {
+  const fnBody = (name) => { const fn = routerJs.slice(routerJs.indexOf(`function ${name}`)); return fn.slice(0, fn.indexOf('\n}\n') + 2); };
+  // Die Lage der Pille ist je Ziel gemerkt und wird beim Druck gemessen.
+  assert.match(fnBody('tabGeometry'), /if \(cached\?\.key === key\) return cached;/, 'gemerkte Lage je Ziel');
+  assert.match(routerJs, /items\.addEventListener\('pointerdown', warmTabGeometry/, 'gemessen beim Druck, vor dem Tausch');
+  assert.match(routerJs, /_tabGeomEpoch \+= 1;/, 'eine neue Kapselgroesse verwirft die gemerkte Lage');
+  // Ohne Tippfeld fragt der Abgleich den Viewport gar nicht.
+  assert.match(fnBody('syncKeyboardVisible'), /const shrunk = focused && \(/, 'innerHeight erst mit Tippfeld');
+  // Der Port-Merker liest keinen Scrollstand.
+  const merker = routerJs.slice(routerJs.indexOf('let _lastContentPort = null;'), routerJs.indexOf('function scrollPageToTop'));
+  assert.doesNotMatch(merker.replace(/^\s*\/\/.*$/gm, ''), /scrollTop/, 'kein scrollTop je Scroll-Ereignis');
+  assert.match(fnBody('scrollPageToTop'), /el\.scrollTop > 0/, 'gefragt wird erst beim Tipp');
 });

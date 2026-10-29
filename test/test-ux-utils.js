@@ -861,6 +861,28 @@ test('wireCollapsingHeader: ein Scroll, den die Seite selbst setzt, klappt den K
   } finally { s.restore(); }
 });
 
+// R24 S12 (Critique G3-Quer-P2-2, G4-Budget-P3-8): ein Scroll, den keine
+// Geste fuehrt, an einem ausgeklappten Kopf entscheidet nichts - er misst
+// nichts. Vorher las jedes Ereignis zuerst scrollHeight/clientHeight und damit
+// ein erzwungenes Layout (Vorrat 155 ms, Abos 139 ms bei 4x CPU).
+test('wireCollapsingHeader R24: ein Scroll ohne Geste am ausgeklappten Kopf liest kein Layout', () => {
+  const s = collapsingStub();
+  try {
+    wireCollapsingHeader(s.toolbar);
+    let reads = 0;
+    let height = 1600;
+    Object.defineProperty(s.port, 'scrollHeight', { get: () => { reads += 1; return height; }, set: (v) => { height = v; }, configurable: true });
+    s.scrollTo(s.port, 300);
+    s.scrollTo(s.port, 600);
+    assert.equal(reads, 0, 'ohne Geste und ausgeklappt: keine Messung');
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false);
+    s.fire('touchstart', s.cell);
+    s.scrollTo(s.port, 640);
+    assert.ok(reads > 0, 'mit Geste wird gemessen');
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'und eingeklappt wie zuvor');
+  } finally { s.restore(); }
+});
+
 test('wireCollapsingHeader: der Nutzer-Scroll klappt weiter ein und aus', () => {
   const s = collapsingStub();
   try {
