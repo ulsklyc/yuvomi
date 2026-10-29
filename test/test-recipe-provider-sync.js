@@ -116,6 +116,36 @@ test('sync(): unveränderte updatedAt → überspringt Neuimport der Zutaten', a
   assert.equal(result.updated, 0);
 });
 
+// #2363: ein Adapter, der mehr Felder spiegelt als frueher (Mealie: Schritte in
+// notes), muss schon gespiegelte Rezepte EINMAL neu holen, obwohl sich ihr
+// updatedAt beim Provider nicht geaendert hat - sonst bekommen genau die
+// Bestandsrezepte des Melders ihre Schritte nie. Ohne Migration: der Adapter
+// nennt sein mirrorFormat, der Sync haengt es an den gespeicherten Stand.
+test('sync(): neues mirrorFormat des Adapters → Bestandsrezept wird einmal neu geholt, danach wieder uebersprungen (#2363)', async () => {
+  const accountId = newAccount('FormatWechsel');
+  const summaries = [{ id: 'uuid-stew', ref: 'stew', updatedAt: '2026-01-01T00:00:00Z' }];
+  const oldDetail = { id: 'uuid-stew', updatedAt: '2026-01-01T00:00:00Z', slug: 'stew', title: 'Stew', notes: 'Deftig', hasImage: false, ingredients: [] };
+  // Erster Lauf wie vor dem Fix: Adapter ohne mirrorFormat.
+  _setAdapterFactory(fakeAdapter(summaries, { stew: oldDetail }));
+  await sync.sync();
+
+  let calls = 0;
+  const withFormat = () => ({
+    ...fakeAdapter(summaries, {})(),
+    mirrorFormat: 2,
+    getRecipe: async () => { calls++; return { ...oldDetail, notes: 'Deftig\n\n1. Kochen.' }; },
+  });
+  _setAdapterFactory(withFormat);
+  const first = await sync.sync();
+  assert.equal(calls, 1);
+  assert.equal(first.updated, 1);
+  assert.equal(conn.prepare('SELECT notes FROM recipes WHERE provider_account_id = ?').get(accountId).notes, 'Deftig\n\n1. Kochen.');
+
+  const second = await sync.sync();
+  assert.equal(calls, 1, 'zweiter Lauf mit gleichem updatedAt und gleichem Format holt nicht erneut');
+  assert.equal(second.updated, 0);
+});
+
 test('sync(): unveränderte updatedAt, aber geänderte external_url → recipe_url wird trotzdem neu gebaut, ohne getRecipe erneut aufzurufen', async () => {
   const accountId = newAccount('LinkWechsel');
   const summaries = [{ id: 'uuid-tarte', ref: 'tarte', updatedAt: '2026-01-01T00:00:00Z' }];

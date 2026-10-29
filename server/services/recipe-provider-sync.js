@@ -44,6 +44,20 @@ function getAccountById(id) {
  * mehr liefert. Wirft nie - ein Fehler wird als { failed: true } gemeldet,
  * damit ein kaputter Account den Sync-Lauf anderer Accounts nicht abbricht.
  */
+/**
+ * Der gespeicherte Sync-Stand eines Spiegel-Rezepts (#2363): Providers updatedAt,
+ * bei einem Adapter mit `mirrorFormat` mit angehaengter Formatnummer. Spiegelt
+ * ein Adapter nach einem Update mehr Felder (Mealie: Schritte in notes), passt
+ * der alte Stand nicht mehr, und jedes Bestandsrezept wird genau einmal neu
+ * geholt - ohne Migration. Der Wert ist auch die Bildversion (?v=, ETag in
+ * routes/recipes.js); dort ist er nur ein undurchsichtiger Schluessel, der
+ * Wechsel kostet einmal einen frischen Bildabruf.
+ */
+function syncStamp(adapter, updatedAt) {
+  if (!adapter.mirrorFormat || updatedAt == null) return updatedAt;
+  return `${updatedAt}#f${adapter.mirrorFormat}`;
+}
+
 async function syncAccount(account) {
   const adapter = getAdapter(account);
   const conn = db.get();
@@ -86,7 +100,7 @@ async function syncAccount(account) {
     // weiterhin für den Detail-Abruf gebraucht (adapter.getRecipe(ref)).
     seenIds.add(summary.id);
     const current = existingByProviderId.get(summary.id);
-    if (current && current.provider_updated_at === summary.updatedAt) {
+    if (current && current.provider_updated_at === syncStamp(adapter, summary.updatedAt)) {
       // Unverändert beim Provider - den vollen Detail-Abruf sparen, aber
       // recipe_url trotzdem aus den gespeicherten Feldern neu bauen: ein Sync ist
       // der einzige Moment, in dem eine nachträgliche external_url/base_url-
@@ -178,13 +192,13 @@ async function syncAccount(account) {
       const hasImage = detail.hasImage ? 1 : 0;
       let id;
       if (current) {
-        updRecipe.run(detail.title, detail.notes || null, recipeUrl, detail.updatedAt, detail.slug, hasImage, current.id);
+        updRecipe.run(detail.title, detail.notes || null, recipeUrl, syncStamp(adapter, detail.updatedAt), detail.slug, hasImage, current.id);
         id = current.id;
         updated++;
       } else {
         const result = insRecipe.run(
           detail.title, detail.notes || null, recipeUrl,
-          account.created_by, account.id, detail.id, detail.updatedAt, detail.slug, hasImage,
+          account.created_by, account.id, detail.id, syncStamp(adapter, detail.updatedAt), detail.slug, hasImage,
         );
         id = Number(result.lastInsertRowid);
         imported++;

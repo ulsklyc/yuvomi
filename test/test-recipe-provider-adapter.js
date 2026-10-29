@@ -193,6 +193,10 @@ test('getRecipe: nur Beschreibung, leere oder fehlende Schritte → notes = Besc
   assert.equal((await new MealieAdapter(account).getRecipe('mit-schritten')).notes, null);
 });
 
+test('MealieAdapter nennt ein mirrorFormat, damit Bestandsrezepte die Schritte einmal nachholen (#2363)', () => {
+  assert.ok(Number.isInteger(new MealieAdapter(account).mirrorFormat) && new MealieAdapter(account).mirrorFormat >= 2);
+});
+
 test('getRecipe: HTTP-Fehler wirft mit Statuscode', async () => {
   mockHandler((req, res) => sendJson(res, {}, 404));
   const adapter = new MealieAdapter(account);

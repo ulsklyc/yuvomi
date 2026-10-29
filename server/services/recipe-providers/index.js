@@ -21,6 +21,9 @@
  *                                                     Detail-Abruf rekonstruieren können
  *          recipeUrl(linkContext, { id, slug })   -> string | null   (Deep-Link zum Quell-Rezept)
  *          async fetchThumbnail({ id, slug })     -> { buffer: Buffer, mime: string }
+ *          mirrorFormat (optional, Zahl)          Stand der getRecipe()-Abbildung; hochzaehlen
+ *                                                     holt Bestandsrezepte einmal neu (#2363,
+ *                                                     recipe-provider-sync.js#syncStamp)
  *
  *        `recipeUrl`/`fetchThumbnail` nehmen ein { id, slug }-Objekt statt zweier
  *        positionaler Argumente an, weil jeder Adapter sich das Feld greift, das

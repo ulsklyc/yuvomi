@@ -117,6 +117,12 @@ function composeNotes(description, instructions) {
 export class MealieAdapter {
   constructor(account) {
     this.provider = 'mealie';
+    // Stand der Abbildung getRecipe() -> recipes. Hochzaehlen, wenn getRecipe()
+    // ein Feld neu oder anders spiegelt: der Sync haengt die Zahl an
+    // provider_updated_at und holt so jedes schon gespiegelte Rezept einmal neu,
+    // auch wenn es sich bei Mealie nicht geaendert hat (recipe-provider-sync.js,
+    // syncStamp). 2 = Zubereitungsschritte in notes (#2363).
+    this.mirrorFormat = 2;
     this.base = String(account.base_url || '').replace(/\/+$/, '');
     this.token = account.api_token;
     // `base_url` muss vom Server aus erreichbar sein (z. B. ein Docker-internes
