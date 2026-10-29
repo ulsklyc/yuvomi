@@ -1440,3 +1440,23 @@ test('An einem fremden Eintrag nimmt Yuvomi nur die eigene Regel wieder weg (#23
   await processPendingUpdates(client, accountId, 'tasks', indexOf('todo-1@test', changedThere));
   assert.match(client.calls.updated[0].data, /\r\nRRULE:FREQ=DAILY\r\n/);
 });
+
+// Codex-Befund auf #2370: RRULE und Marke wurden als erste Fundstelle im ganzen
+// Objekt gelesen - eine fuehrende VTIMEZONE lieferte ihre STANDARD-Regel, und
+// Yuvomis eigene Regel blieb beim Abschalten fuer immer stehen.
+test('Marke und Regel werden aus dem VTODO gelesen, nicht aus der VTIMEZONE davor (#2350)', async () => {
+  const accountId = reset();
+  const task = insertTask({ accountId, title: 'Blumen giessen', due_date: '2026-11-02' });
+  const withZone = serverTodo({ extra: ['RRULE:FREQ=WEEKLY', 'X-YUVOMI-RRULE:FREQ=WEEKLY'] }).replace(
+    'BEGIN:VTODO',
+    ['BEGIN:VTIMEZONE', 'TZID:Europe/Berlin', 'BEGIN:STANDARD', 'DTSTART:19701025T030000',
+      'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU', 'TZOFFSETFROM:+0200', 'TZOFFSETTO:+0100',
+      'END:STANDARD', 'END:VTIMEZONE', 'BEGIN:VTODO'].join('\r\n'),
+  );
+  db.prepare('UPDATE tasks SET outbound_dirty = 1 WHERE id = ?').run(task.id);
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf('todo-1@test', withZone));
+  const data = client.calls.updated[0].data;
+  assert.ok(!/RRULE:FREQ=WEEKLY\r\n/.test(data), 'Yuvomis Regel blieb am VTODO stehen');
+  assert.match(data, /RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU/, 'die Zonenregel bleibt unberuehrt');
+});

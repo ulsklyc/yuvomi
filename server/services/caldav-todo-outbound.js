@@ -47,7 +47,7 @@
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { davFailureAction, createRefusalStop, MAX_OUTBOUND_ATTEMPTS } from './calendar-outbound.js';
-import { patchICSTodo } from '../utils/ics-patch.js';
+import { patchICSTodo, unfoldICS } from '../utils/ics-patch.js';
 import {
   createCalDAVClient, collectionUrlOf, createUploadGate, sameObjectAddress, withAccountOrigin, isOriginRefusal,
   isAccountWideRefusal, acceptsNewEntries,
@@ -250,19 +250,49 @@ function recurrenceFields(task, due, tz, serverIcs) {
   // Fremd und erledigt oder ohne Faelligkeit: nichts anfassen. Nur die hier
   // abgeschaltete Wiederholung nimmt Yuvomis eigene Regel zurueck.
   if (task.is_recurring && task.recurrence_rule) return {};
-  const mark = propertyValue(serverIcs, YUVOMI_RRULE);
+  const mark = todoPropertyValue(serverIcs, task.external_uid, YUVOMI_RRULE);
   if (!mark) return {};
-  const current = propertyValue(serverIcs, 'RRULE');
+  const current = todoPropertyValue(serverIcs, task.external_uid, 'RRULE');
   if (current && sameRule(current, unescapeText(mark))) return { RRULE: null, [YUVOMI_RRULE]: null };
   return { [YUVOMI_RRULE]: null };
 }
 
-/** Rohwert der ersten Property `name` im (entfalteten) Objekt - oder null. */
-function propertyValue(icsText, name) {
-  if (!icsText) return null;
-  const re = new RegExp(`^${name}(?:;[^:\\r\\n]*)?:(.*)$`, 'im');
-  const m = re.exec(String(icsText).replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, ''));
-  return m ? m[1].trim() : null;
+/**
+ * Rohwert der Property `name` im VTODO mit `uid` ohne RECURRENCE-ID - oder null.
+ * Dieselbe Komponente, die der Patcher anfasst: eine VTIMEZONE davor traegt in
+ * STANDARD/DAYLIGHT eigene RRULEs, und die erste Fundstelle im ganzen Objekt
+ * waere deren Regel statt der der Aufgabe.
+ */
+function todoPropertyValue(icsText, uid, name) {
+  if (!icsText || !uid) return null;
+  const lines = unfoldICS(icsText).split('\n').map((l) => l.replace(/\r$/, ''));
+  const nameOf = (line) => { const cut = line.search(/[;:]/); return (cut === -1 ? line : line.slice(0, cut)).toUpperCase(); };
+  const valueOf = (line) => line.slice(line.indexOf(':') + 1).trim();
+  let block = null;
+  let depth = 0;
+  for (const line of lines) {
+    const upper = line.trim().toUpperCase();
+    if (!block) {
+      if (upper === 'BEGIN:VTODO') { block = { props: [], uid: null, override: false }; depth = 0; }
+      continue;
+    }
+    if (upper.startsWith('BEGIN:')) { depth++; continue; }
+    if (upper === 'END:VTODO' && depth === 0) {
+      if (block.uid === uid && !block.override) {
+        const hit = block.props.find((l) => nameOf(l) === name);
+        return hit ? valueOf(hit) : null;
+      }
+      block = null;
+      continue;
+    }
+    if (upper.startsWith('END:')) { depth--; continue; }
+    if (depth > 0) continue; // VALARM & Co.
+    const prop = nameOf(line);
+    if (prop === 'UID') block.uid = valueOf(line);
+    if (prop === 'RECURRENCE-ID') block.override = true;
+    block.props.push(line);
+  }
+  return null;
 }
 
 function unescapeText(value) {
