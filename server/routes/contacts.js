@@ -1041,7 +1041,7 @@ router.get('/:id/photo', (req, res) => {
     res.send(buf);
   } catch (err) {
     log.error('GET /:id/photo', err);
-    res.status(500).json({ error: 'Interner Fehler', code: 500 });
+    res.status(500).json({ error: 'Internal error', code: 500 });
   }
 });
 
