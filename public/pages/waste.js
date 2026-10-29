@@ -794,8 +794,11 @@ function drawTypes(host) {
   }
   host.replaceChildren();
   const unscheduled = state.types.filter((type) => isUnscheduledType(type));
-  host.insertAdjacentHTML('beforeend', state.types
-    .map((type, index) => (unscheduled.includes(type) ? '' : typeCardHtml(type, index, state.types.length))).join('')
+  // Position und Grenzen des Hoch/Runter-Menues zaehlen nur die Karten, die
+  // stehen (R24 S13) - die leeren Arten haben in der Zeile "Ohne Termin" keine
+  // Lage, und ein Tausch mit ihnen waere unsichtbar (moveType).
+  const listed = state.types.filter((type) => !unscheduled.includes(type));
+  host.insertAdjacentHTML('beforeend', listed.map((type, index) => typeCardHtml(type, index, listed.length)).join('')
     + unscheduledTypesHtml(unscheduled)
     + remainingPresetsHtml());
   if (window.lucide) window.lucide.createIcons({ el: host });
@@ -1023,11 +1026,15 @@ async function deleteOrAlreadyGone(path, goneReason) {
  * "drag is never the only way" convention).
  */
 async function moveType(id, direction) {
-  const index = state.types.findIndex((t2) => t2.id === id);
+  // NUR UNTER DEN KARTEN, DIE STEHEN (R24 S13). Seit die leeren Arten in EINER
+  // Zeile "Ohne Termin" stehen (G2-Entsorgung-P3-2), tauschte eine Karte vor
+  // einer leeren Art mit ihr - unsichtbar, die Liste stand danach wie vorher.
+  const listed = state.types.filter((type) => !isUnscheduledType(type));
+  const index = listed.findIndex((t2) => t2.id === id);
   const swapWith = direction === 'up' ? index - 1 : index + 1;
-  if (index === -1 || swapWith < 0 || swapWith >= state.types.length) return;
-  const a = state.types[index];
-  const b = state.types[swapWith];
+  if (index === -1 || swapWith < 0 || swapWith >= listed.length) return;
+  const a = listed[index];
+  const b = listed[swapWith];
   try {
     await api.put(`/waste/types/${a.id}`, { sort_order: b.sort_order });
     await api.put(`/waste/types/${b.id}`, { sort_order: a.sort_order });

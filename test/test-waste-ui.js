@@ -1119,3 +1119,41 @@ test('R24 P3-2: die Abholung von heute traegt "Heute rausstellen" als Etikett', 
   assert.doesNotMatch(morgen, /waste-today-tag/);
 });
 
+
+/* R24 S13 (Uebergabe S8, G2-Entsorgung-P3-2): seit die leeren Arten in EINER
+ * Zeile "Ohne Termin" stehen, ist nicht jede Abfallart eine Karte. Hoch/
+ * Runter zaehlte aber weiter ueber ALLE Arten: eine Karte vor einer leeren Art
+ * tauschte mit ihr - unsichtbar, die Liste stand danach wie vorher -, und die
+ * erste Karte bot "Nach oben" an, wenn eine leere Art vor ihr sortiert war.
+ * Jetzt zaehlen und tauschen beide nur unter den Karten, die stehen. Die
+ * leeren Arten brauchen keinen eigenen Sortierweg: sie haben keine Lage, bis
+ * sie einen Termin bekommen - dann stehen sie an ihrem Platz und bekommen
+ * das Menue. */
+test('R24 S13: Hoch/Runter tauscht mit der naechsten stehenden Karte, nie mit einer Art ohne Termin', async () => {
+  const before = { ...__test.state() };
+  const type = (id, sort) => ({ id, name: `Art ${id}`, color: '#123456', icon: 'trash-2', sort_order: sort, archived: 0 });
+  const puts = [];
+  __test.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
+  __test.setStateForTest({
+    types: [type(1, 1), type(2, 2), type(3, 3)],
+    schedules: [{ id: 11, type_id: 1 }, { id: 13, type_id: 3 }],
+    occurrences: [],
+  });
+  globalThis.__apiStub = {
+    put: async (path, body) => { puts.push([path, body.sort_order]); return { data: {} }; },
+    get: async () => ({ data: [] }),
+  };
+  try {
+    assert.ok(__test.isUnscheduledType(type(2, 2)), 'Art 2 steht in der Zeile "Ohne Termin"');
+    await __test.moveType(3, 'up');
+    assert.deepEqual(puts, [['/waste/types/3', 1], ['/waste/types/1', 3]],
+      'Art 3 tauscht mit Art 1, der Karte darueber - nicht mit der unsichtbaren Art 2');
+  } finally {
+    delete globalThis.__apiStub;
+    __test.setStateForTest(before);
+  }
+  const src = readFileSync(new URL('../public/pages/waste.js', import.meta.url), 'utf8');
+  const render = src.slice(src.indexOf('function renderTypes('), src.indexOf('// Import sources'));
+  assert.match(render, /listed\.map\(\(type, index\) => typeCardHtml\(type, index, listed\.length\)\)/,
+    'Position und Grenzen des Menues zaehlen nur die stehenden Karten');
+});

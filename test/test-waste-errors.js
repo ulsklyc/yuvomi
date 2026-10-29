@@ -310,8 +310,10 @@ test('Termin aus der Zeile SEINER Abfallart speichern, die inzwischen geloescht 
 });
 
 for (const [name, reason, key, lauf] of [
+  // Beide Arten mit Termin: seit R24 S13 tauscht Hoch/Runter nur unter den
+  // Karten, die stehen - eine Art ohne Termin ist kein Nachbar.
   ['eine Abfallart verschieben, die es nicht mehr gibt', 'waste_type_not_found', 'waste.errorTypeGone',
-    () => waste.moveType(1, 'down')],
+    () => { waste.setStateForTest({ schedules: [SCHEDULE(), { ...SCHEDULE(), id: 8, type_id: 2 }] }); return waste.moveType(1, 'down'); }],
   ['eine Abholung aussetzen, deren Termin geloescht wurde', 'waste_schedule_not_found', 'waste.errorScheduleGone',
     () => waste.skipOccurrence('1:2026-01-12')],
   ['eine Abholung aussetzen, die nach einer Aenderung des Termins nicht mehr im Plan steht', 'waste_occurrence_not_found', 'waste.errorOccurrenceGone',
