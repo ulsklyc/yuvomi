@@ -334,6 +334,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   permissions scroll sideways instead of filling three lines above the first permission.
 - **A meal's details have no purple ring.** Clicking a meal on the desktop drew a focus ring around the
   whole details card; it now opens like an appointment's.
+- **A long appointment's name stays readable while you scroll the week.** The name stays at the top of
+  the block as before, and the time below it now slides under the name instead of running through it.
 - **The comment hint fits the phone.** The comment field's hint is shorter and no longer ends in "..."
   on a phone, in every language.
 - **Tapping a column tab on the phone board opens that column.** Jumping two columns ahead stopped at
