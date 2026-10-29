@@ -447,7 +447,11 @@ test('Verhuellen bis zur Sprache: nur per Skript, mit Zeitgeber, Fehlerausgang u
 
   // Die Klasse setzt ein Skript - kein class-Attribut im Markup.
   assert.doesNotMatch(html, /<html[^>]*class="[^"]*i18n-pending/, 'ohne JavaScript bliebe die Seite verhuellt');
-  const cloak = head.match(/<script>([\s\S]*?)<\/script>/);
+  // Per indexOf statt Regex: hier wird kein HTML gefiltert, nur die eigene
+  // Datei zerlegt (CodeQL "Bad HTML filtering regexp" bei /<script>.../).
+  const open = head.indexOf('<script>');
+  const close = open === -1 ? -1 : head.indexOf('</script>', open);
+  const cloak = close === -1 ? null : [null, head.slice(open + '<script>'.length, close)];
   assert.ok(cloak, 'kein Skript im Kopf, das verhuellt');
   assert.match(cloak[1], /classList\.add\('i18n-pending'\)/);
   const timeout = cloak[1].match(/setTimeout\(reveal, (\d+)\)/);
