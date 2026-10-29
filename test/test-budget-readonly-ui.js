@@ -1914,3 +1914,35 @@ test('#1997: Plan setzen und loeschen schliessen nur mit dem Kontext von VOR der
     globalThis.window = vorher.window;
   }
 });
+
+// R24 S10-F3 (Ulas 28.10.): der Tipp auf ein Konto verliess den Reiter Konten
+// (Uebersicht mit Filter-Chip). Jetzt oeffnet er das Leseblatt des Kontos wie
+// Buchung, Abo und Ausgabe (E1): Typ, Saldo, Startsaldo, Kreditrahmen; die
+// Buchungen sind die Nebenhandlung, Bearbeiten der eine Primaerknopf. Bei
+// `read` bleibt nur der Weg zu den Buchungen.
+test('R24 S10-F3: ein Konto liest sich zuerst - Buchungen anzeigen sekundaer, Bearbeiten primaer, bei read nur die Buchungen', () => {
+  const konto = { id: 4, name: 'Kreditkarte', type: 'credit', color: '#0F766E', current_balance: -120.5, starting_balance: 0, credit_limit: 2000, credit_bank: 'Musterbank', currency: 'EUR' };
+  setPermissions({ admin: false, modules: { budget: 'write' }, widgets: {}, capabilities: {} });
+  try {
+    const opts = detailOptionen(() => budget.openAccountReadView(konto));
+    assert.ok(opts, 'das Blatt oeffnet');
+    assert.equal(opts.title, 'Kreditkarte');
+    const z = zeilen(opts.sections);
+    assert.ok(z['budget.accountTypeLabel'] && z['budget.balance'] && z['budget.startingBalanceLabel'], 'Typ, Saldo, Startsaldo');
+    assert.ok(z['budget.creditLimitLabel'] && z['budget.creditBankLabel'] === 'Musterbank', 'die Kreditkarte nennt Rahmen und Bank');
+    assert.deepEqual(opts.actions.map((a) => [a.id, a.variant]), [
+      ['budget-account-read-statement', 'secondary'],
+      ['budget-account-read-edit', 'primary'],
+    ]);
+  } finally { clearPermissions(); }
+  setPermissions({ admin: false, modules: { budget: 'read' }, widgets: {}, capabilities: {} });
+  try {
+    const opts = detailOptionen(() => budget.openAccountReadView({ ...konto, type: 'checking' }));
+    assert.deepEqual(opts.actions.map((a) => a.id), ['budget-account-read-statement'], 'read: nur der Weg zu den Buchungen');
+    assert.equal(zeilen(opts.sections)['budget.creditLimitLabel'], undefined, 'kein Rahmen ausserhalb der Kreditkarte');
+  } finally { clearPermissions(); }
+  const src = readFileSync(new URL('../public/pages/budget.js', import.meta.url), 'utf8');
+  assert.match(src, /\.budget-account__main\[data-drill\]'\)\.forEach\(\(el\) => \{\s*el\.addEventListener\('click', \(\) => \{[\s\S]{0,200}openAccountReadView\(account\)/,
+    'der Zeilentipp oeffnet das Blatt, nicht den Auszug');
+  assert.match(src, /if \(from === 'accounts'\) \{\s*state\.activeTab = 'accounts';/, 'das x am Konto-Chip fuehrt in die Konten zurueck');
+});

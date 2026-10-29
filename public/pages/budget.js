@@ -278,6 +278,7 @@ let state = {
   // Waehrungen (#2302, netWorthSummary in server/routes/budget/helpers.js).
   netWorthInfo: { approx: false, ratesAt: null, byCurrency: [] },
   accountFilterId: null,      // aktiver Konto-Filter für die Transaktionsliste (Drilldown)
+  accountFilterFrom: null,    // 'accounts': der Auszug kam aus dem Leseblatt eines Kontos (S10-F3)
   accountsShowArchived: false,
   categoryFilter: null,       // active category filter
   subcategoryFilter: null,    // { category, key } or null
@@ -960,6 +961,7 @@ function syncCurrentButton(root = _container) {
  */
 function resetSessionFilters(target) {
   target.accountFilterId = null;
+  target.accountFilterFrom = null;
   target.categoryFilter = null;
   target.subcategoryFilter = null;
   target.responsibleFilterId = null;
@@ -1683,9 +1685,19 @@ function renderBody() {
   _container.querySelector('#budget-balance-more')?.addEventListener('click', toggleBalanceDetails);
   _container.querySelector('#budget-manage-categories')?.addEventListener('click', openCategoryManager);
   _container.querySelector('#budget-clear-account-filter')?.addEventListener('click', async () => {
+    const from = state.accountFilterFrom;
     state.accountFilterId = null;
-    await reloadMonth();
+    state.accountFilterFrom = null;
+    // Aus dem Leseblatt eines Kontos gekommen: das x fuehrt in die Konten zurueck.
+    if (from === 'accounts') {
+      state.activeTab = 'accounts';
+      _tablist?.sync('accounts');
+      writeTabToUrl('accounts');
+    } else {
+      await reloadMonth();
+    }
     renderBody();
+    if (from === 'accounts') _container.querySelector('#budget-body')?.focus();
   });
   // Sortierung und Konto aus dem Werkzeug-Menue des Listenkopfs (R19). Die
   // Sortierzeile oeffnet dasselbe Menue (wie bei den Darlehen: kein zweites
@@ -1704,6 +1716,7 @@ function renderBody() {
       const id = accountItem.dataset.ledgerAccount ? parseInt(accountItem.dataset.ledgerAccount, 10) : null;
       if (id === state.accountFilterId) return;
       state.accountFilterId = id;
+      state.accountFilterFrom = null;
       // Der Kontoauszug kommt vom Server (`account_id`), wie beim Drilldown.
       await reloadMonth();
     }
@@ -2430,6 +2443,7 @@ function toggleSubcategoryFilter(category, key) {
 async function clearBudgetFilters() {
   const needsReload = state.accountFilterId != null;
   state.accountFilterId = null;
+  state.accountFilterFrom = null;
   state.categoryFilter = null;
   state.subcategoryFilter = null;
   state.responsibleFilterId = null;
@@ -3086,11 +3100,11 @@ function renderAccountsPage() {
           <span class="budget-account__figures">
             <span class="budget-account__balance ${balClass}">${formatAmount(a.current_balance, accountCurrency(a.id))}</span>
           </span>
-          <span class="sr-only">, ${esc(t('budget.showAccountTransactions'))}</span>
         </button>
-        ${/* EIN OEFFNEN-WEG (D6): der Zeilentipp oeffnet den Kontoauszug; das
-              Konto selbst bearbeitet der Eintrag im Mehr-Knopf statt eines
-              zweiten Stifts am Zeilenende. */ ''}
+        ${/* EIN OEFFNEN-WEG (D6): der Zeilentipp oeffnet das Leseblatt des
+              Kontos (S10-F3), von dort "Buchungen anzeigen"; bearbeitet wird
+              im Blatt oder ueber den Eintrag im Mehr-Knopf statt eines zweiten
+              Stifts am Zeilenende. */ ''}
         ${ro ? '' : `<div class="row-actions budget-account__actions">${rowMenuHtml({
           id: `budget-account-menu-${a.id}`,
           label: t('common.moreActionsNamed', { name: a.name }),
@@ -3115,21 +3129,12 @@ function wireAccountsPage() {
     state.accountsShowArchived = !state.accountsShowArchived;
     renderBody();
   });
-  // Zeilen-Klick öffnet den Kontoauszug (Drilldown-Filter), das Stift-Icon bearbeitet.
+  // Zeilen-Klick öffnet das Leseblatt des Kontos (S10-F3), von dort fuehrt
+  // "Buchungen anzeigen" in den Kontoauszug; bearbeitet wird im Blatt oder im Mehr-Knopf.
   _container.querySelectorAll('.budget-account__main[data-drill]').forEach((el) => {
-    el.addEventListener('click', async () => {
-      state.accountFilterId = parseInt(el.dataset.drill, 10);
-      state.activeTab = 'budget';
-      // Aktive Pille mitziehen: dieser Wechsel läuft nicht über die Tab-Leiste,
-      // daher malt wireTablist ihn nur über sync() nach (updateTabs tut es nicht mehr).
-      _tablist?.sync('budget');
-      writeTabToUrl('budget');
-      await reloadMonth();
-      renderBody();
-      // Der geklickte Button wird beim Re-Render entfernt — ohne Fokus-Umzug
-      // fällt der Fokus auf <body> und Tastatur-/Screenreader-Nutzer landen
-      // wieder am Seitenanfang. Das Panel ist tabindex="0" und trägt den Titel.
-      _container.querySelector('#budget-body')?.focus();
+    el.addEventListener('click', () => {
+      const account = (state.accounts ?? []).find((a) => a.id === parseInt(el.dataset.drill, 10));
+      if (account) openAccountReadView(account);
     });
   });
   _container.querySelectorAll('.budget-account [data-edit]').forEach((el) => {
@@ -3137,6 +3142,75 @@ function wireAccountsPage() {
       const account = state.accounts.find((a) => a.id === parseInt(el.dataset.edit, 10));
       if (account) openAccountModal(account);
     });
+  });
+}
+
+/**
+ * Der Kontoauszug eines Kontos (Drilldown-Filter in der Buchungsliste). Kommt
+ * der Weg aus dem Reiter Konten, fuehrt das x am Konto-Chip dorthin zurueck
+ * (`accountFilterFrom`, S10-F3) - nicht in die ungefilterte Uebersicht.
+ */
+async function showAccountStatement(accountId, { from = null } = {}) {
+  state.accountFilterId = accountId;
+  state.accountFilterFrom = from;
+  state.activeTab = 'budget';
+  // Aktive Pille mitziehen: dieser Wechsel läuft nicht über die Tab-Leiste,
+  // daher malt wireTablist ihn nur über sync() nach (updateTabs tut es nicht mehr).
+  _tablist?.sync('budget');
+  writeTabToUrl('budget');
+  await reloadMonth();
+  renderBody();
+  // Der Ausloeser ist weg (Blatt geschlossen, Liste neu) - ohne Fokus-Umzug
+  // faellt der Fokus auf <body> und Tastatur-/Screenreader-Nutzer landen
+  // wieder am Seitenanfang. Das Panel ist tabindex="0" und trägt den Titel.
+  _container.querySelector('#budget-body')?.focus();
+}
+
+/**
+ * DAS KONTO LIEST SICH ZUERST (Ulas 28.10., S10-F3; E1). Der Tipp auf ein Konto
+ * verliess den Reiter Konten und stand in der Uebersicht mit einem Filter-Chip -
+ * der Rueckweg war das x am Chip. Jetzt oeffnet er das Leseblatt des Kontos wie
+ * Buchung, Abo und Ausgabe: Typ, Saldo, Startsaldo, bei Kreditkarten Bank und
+ * Rahmen. "Buchungen anzeigen" ist die Nebenhandlung (dann der Auszug, dessen
+ * x in die Konten zurueckfuehrt), "Bearbeiten" der eine Primaerknopf; bei
+ * Nur-lesen steht nur der Weg zu den Buchungen.
+ */
+function accountReadSections(account) {
+  const currency = account.currency || state.currency;
+  const credit = account.type === 'credit';
+  return [
+    { icon: ACCOUNT_TYPE_ICONS[account.type] || ACCOUNT_TYPE_ICONS.other, label: t('budget.accountTypeLabel'), value: accountTypeLabel(account.type) },
+    { icon: 'banknote', label: t('budget.balance'), value: formatAmount(account.current_balance ?? 0, currency) },
+    { icon: 'flag', label: t('budget.startingBalanceLabel'), value: formatAmount(account.starting_balance ?? 0, currency) },
+    { icon: 'landmark', label: t('budget.creditBankLabel'), value: credit ? (account.credit_bank || '') : '' },
+    { icon: 'credit-card', label: t('budget.creditLimitLabel'), value: credit && account.credit_limit != null ? formatAmount(account.credit_limit, currency) : '' },
+  ];
+}
+
+function openAccountReadView(account) {
+  const leave = (next) => async ({ close } = {}) => {
+    await (close ?? closeDetailView)({ force: true });
+    await next();
+  };
+  const statement = {
+    id: 'budget-account-read-statement',
+    label: t('budget.showAccountTransactions'),
+    icon: 'list',
+    variant: 'secondary',
+    onClick: leave(() => showAccountStatement(account.id, { from: 'accounts' })),
+  };
+  const actions = readOnly() ? [statement] : withPrimaryEdit([statement], {
+    id: 'budget-account-read-edit',
+    label: t('common.edit'),
+    onClick: leave(() => openAccountModal(account)),
+  });
+  return openDetailView({
+    title: account.name,
+    key: `budget-account:${account.id}`,
+    accentColor: accountAccent(account.color),
+    size: 'sm',
+    sections: accountReadSections(account),
+    actions,
   });
 }
 
@@ -6467,6 +6541,8 @@ async function deleteEntrySeries(id) {
 // statt Quelltext-Regex.
 export const __test = {
   entryFormErrors,
+  // R24 S10-F3: der Tipp auf ein Konto oeffnet sein Leseblatt (test-budget-readonly-ui.js).
+  openAccountReadView,
   // R24 E1: der Tipp auf eine Buchung oeffnet das Leseblatt (test-budget-readonly-ui.js).
   openEntryReadView,
   // #2302: der Betrag im Buchungsdialog folgt der Waehrung des Kontos.

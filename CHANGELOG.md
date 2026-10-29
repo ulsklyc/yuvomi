@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   add up) at the field instead of staying grey.
 - **A booking shows itself before it edits.** Tapping a transaction opens a read view (amount, date,
   category, account, receipts, repeat) with Edit as the one main button, instead of the edit form.
+- **An account shows itself first.** Tapping an account opens a read view (type, balance, starting
+  balance, and bank and limit for credit cards) with Edit as the main button and "Show transactions"
+  beside it, instead of leaving the Accounts tab. From the statement, the account chip's × leads back
+  to Accounts.
 - **Transfers, loans and accounts use the same money form.** A transfer's amount shows its currency
   in the field, "From" and "To" sit side by side, the title may stay empty (it is then named after both
   accounts) and category and repeat sit under "More details" - switching the entry type no longer makes

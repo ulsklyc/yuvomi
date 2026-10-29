@@ -22925,7 +22925,9 @@ test('R20: sichtbare Etiketten stehen im Namen, und es gibt genau einen Hauptber
   assert.match(read('../public/utils/sub-tabs.js'), /btn\.append\(document\.createTextNode\(' '\), badge\);/, '„Einkauf 23" statt „Einkauf23"');
   const budget = read('../public/pages/budget.js');
   assert.match(budget, /<button class="budget-account__main" type="button" data-drill="\$\{a\.id\}">/, 'Kontozeile ohne aria-label');
-  assert.match(budget, /<span class="sr-only">, \$\{esc\(t\('budget\.showAccountTransactions'\)\)\}<\/span>/);
+  // Seit R24 S10-F3 oeffnet die Zeile das Leseblatt des Kontos: ihr Name ist
+  // ihr Inhalt (Name, Typ, Saldo), "Buchungen anzeigen" steht im Blatt.
+  assert.match(budget, /label: t\('budget\.showAccountTransactions'\)/);
   const split = read('../public/pages/split-expenses.js');
   assert.doesNotMatch(split, /class="split-expense" data-(?:expense|recurring)-id="[^"]*"[^>]*aria-label=/, 'Ausgleichszeilen ohne aria-label');
   assert.doesNotMatch(split, /<main class=/, 'kein zweites <main> im Budget-Reiter');

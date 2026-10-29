@@ -1827,14 +1827,14 @@ test('Filterzustand überlebt den Modulwechsel nicht', () => {
   // die Liste der Filter kommt aus dem Zustand selbst: ein neuer Filter, den
   // der Reset nicht kennt, faellt hier auf.
   const dirty = {
-    accountFilterId: 7, responsibleFilterId: 3, responsibleFilterCachedName: 'Clara',
+    accountFilterId: 7, accountFilterFrom: 'accounts', responsibleFilterId: 3, responsibleFilterCachedName: 'Clara',
     loanFilterId: 9, loanStatusFilter: 'paid', accountsShowArchived: true, categoryFilter: 'housing',
     subcategoryFilter: { category: 'housing', key: 'rent_mortgage' }
   };
   const target = { ...dirty, activeTab: 'loans', month: '2026-03', groupByResponsible: true };
   budgetUi.resetSessionFilters(target);
   assert.deepEqual(target, {
-    accountFilterId: null, responsibleFilterId: null, responsibleFilterCachedName: '',
+    accountFilterId: null, accountFilterFrom: null, responsibleFilterId: null, responsibleFilterCachedName: '',
     loanFilterId: null, loanStatusFilter: 'active', accountsShowArchived: false,
     categoryFilter: null, subcategoryFilter: null,
     // Bleibt bewusst: der Reiter, der Monat (render setzt ihn selbst) und die
