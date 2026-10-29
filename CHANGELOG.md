@@ -341,6 +341,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   average and the change are calculated - the unit most of your readings use, otherwise kilograms.
   The same applies to height and head circumference (cm, m, mm, in), temperature (°C, °F) and blood
   sugar (mg/dL, mmol/L). The stored readings stay as they were sent.
+- **Old daily series show up in the calendar again** (#2341). The calendar view counted every
+  repeating event from its very first day and gave up after 1000 steps, so a daily event that
+  started more than about three years ago was missing from the month entirely, and every page of
+  the calendar got slower as the household's series got older. The calendar, the overview and the
+  upcoming list now start each series just before the days they show.
 - **Amount fields accept comma or point decimals across devices.** (#2170) Budget entries,
   transfers, confirmations, plans, subscriptions, shopping prices, inventory, housekeeping,
   rewards and shared expenses preserve cents even when the keyboard and household number
