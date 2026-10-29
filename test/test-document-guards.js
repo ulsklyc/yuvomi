@@ -2151,10 +2151,12 @@ describe('Sonde 6 - die Kacheln einer Kennzahlreihe sind gleich hoch', () => {
       const page = await openPage(harness, { device, theme: 'light', locale: 'de' });
       const findings = [];
       let rowsSeen = 0;
+      const carriers = new Set();
 
       const check = (where, rows) => {
         for (const row of rows) {
           rowsSeen += 1;
+          carriers.add(row.grid);
           const spread = Math.max(...row.heights) - Math.min(...row.heights);
           if (spread > 0) {
             findings.push(`${where} · ${row.grid} (${row.scope}): Hoehen ${row.heights.join(', ')} (Streuung ${spread}px).`);
@@ -2165,24 +2167,66 @@ describe('Sonde 6 - die Kacheln einer Kennzahlreihe sind gleich hoch', () => {
       // Auch die Sichten hinter den Leisten: sie wechseln nach der
       // Leisten-Regel (§2) die SICHT innerhalb eines Moduls, nicht die Route.
       // Ohne sie saehe die Sonde von sieben Kennzahlreihen genau eine.
+      const measure = async (where) => {
+        await openMetricDisclosures(page);
+        check(where, await metricRowHeights(page));
+      };
       for (const name of sweep('Sonde 6')) {
         await gotoRoute(page, ALL_ROUTES[name]);
-        await visitViews(page, name, async (where) => {
-          await openMetricDisclosures(page);
-          check(where, await metricRowHeights(page));
-        });
+        await visitViews(page, name, measure);
+
+        /* DIE BEREICHE EINES MODULS SIND ROUTEN, KEINE SICHTEN (R24 S15). Die
+         * Gesundheit fuehrt ihre Bereiche als Zeilenliste auf eigene Routen
+         * (/health/vitals, /health/activity, /health/cycle ...), und dort
+         * stehen drei der Kennzahlreihen der App - die Vitalwerte, die
+         * Aktivitaet, der Zyklus. `visitViews` faehrt nur Tablists und
+         * aria-pressed-Gruppen; die Aktivitaets-Reihe, die der Nachweis unten
+         * seit 2026-08-10 verlangt, hat die Sonde so nie erreicht - bestanden
+         * hat sie dank der Geld-Reiter. Gefolgt wird deshalb jedem Link im
+         * Inhalt, der unter die eigene Route fuehrt: die Beziehung steht im
+         * Markup, kein Klassenname. Nicht von der Uebersicht (dort fuehrt jede
+         * Route "unter /") und nicht von /settings (die Blaetter laesst diese
+         * Sonde aus, siehe LEAVES_SKIPPED). Gemessen: nur die Gesundheit hat
+         * solche Links, acht Bereiche; ihre Sicht-Gruppen schreiben nichts
+         * (Zeitraum, gewaehlte Kennzahl, gewaehlter Laborbefund). */
+        const route = ALL_ROUTES[name];
+        if (route === '/' || route === '/settings') continue;
+        const areas = await page.evaluate((own) => [...new Set([...document.querySelectorAll('#main-content a[href]')]
+          .map((a) => a.getAttribute('href'))
+          .filter((href) => href.startsWith(`${own}/`)))], route);
+        for (const area of areas) {
+          await gotoRoute(page, area);
+          await visitViews(page, area, measure);
+        }
       }
       await page.close();
 
-      // Eine Sonde, die nichts gemessen hat, darf nicht urteilen (dieselbe
-      // Zusicherung wie bei Sonde 3, 4 und 5).
-      // Der Reichweiten-Nachweis steigt mit der Reichweite: seit die Reihe aus
-      // den KARTEN kommt statt aus `.metric-grid`, gehoert die Aktivitaets-Reihe
-      // der Gesundheit dazu, die vorher unsichtbar war.
-      assert.ok(rowsSeen >= 5,
-        `Nur ${rowsSeen} Kennzahlreihen gesehen - erwartet sind mindestens Budget, Abos, Aufteilen, `
-        + 'Darlehen und die Aktivitaets-Reihe der Gesundheit. Entweder hat der Seed keine Zahlen '
-        + 'geliefert, oder die Bauart hat sich geaendert.');
+      /* Eine Sonde, die nichts gemessen hat, darf nicht urteilen (dieselbe
+       * Zusicherung wie bei Sonde 3, 4 und 5).
+       *
+       * GEZAEHLT WERDEN TRAEGER, NICHT ZEILEN (R24 S15). Hier stand
+       * `rowsSeen >= 5` mit "Budget, Abos, Aufteilen, Darlehen" als Beleg.
+       * Seit R24 E2 ("eine Kennzahlkarte oben", Critique 2026-10-26) tragen
+       * Konten, Abos, Darlehen, Aufteilung, Haushaltshilfe und Inventar keine
+       * Kachelreihe mehr, sondern EINE Kurzzeile (`metricGlanceHtml`,
+       * `.budget-glance`): eine Leitzahl, daneben hoechstens zwei Fluesse in
+       * einer Textzeile. Dort stehen keine Kacheln nebeneinander, deren Hoehen
+       * sich unterscheiden koennten - die Zusage dieser Sonde hat an der Zeile
+       * keinen Gegenstand, und mitzaehlen hiesse gruen aus dem falschen Grund.
+       * Die Reichweite gab bis dahin die ZAHL DER ZEILEN an, und die haengt an
+       * der Breite (dieselbe Reihe zaehlte mobil doppelt, sobald sie umbrach).
+       * Gefragt ist, ob die Sonde die Reihen der App sieht - also verschiedene
+       * Traeger. Gemessen nach E2 (Demo-Seed): die Uebersicht (.metric-tiles),
+       * die Gesundheit-Uebersicht und die Vitalwerte (.metric-rows), die
+       * Aktivitaet (.health-activity__summary), der Zyklus (.cycle-stats) -
+       * dazu mobil die Monatsbilanz des Budgets (.metric-grid--led; am Desktop
+       * steht ihre Leitkachel neben zwei gestapelten, keine Zeile teilt sich
+       * zwei Karten). Fuenf in beiden Breiten. */
+      assert.ok(carriers.size >= 5,
+        `Nur ${carriers.size} Kennzahlreihen-Traeger gesehen (${[...carriers].join(', ')}; ${rowsSeen} Zeilen) - `
+        + 'erwartet sind mindestens die Uebersicht, die Gesundheit-Uebersicht, die Vitalwerte, die '
+        + 'Aktivitaet und der Zyklus. Entweder hat der Seed keine Zahlen geliefert, oder die Bauart '
+        + 'hat sich geaendert.');
 
       assert.deepEqual(findings, [],
         'Kennzahlreihen im gerenderten Dokument. Gleichartige Kacheln nebeneinander sind gleich hoch, '
