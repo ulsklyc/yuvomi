@@ -373,6 +373,32 @@ html.page-swapping .fab-layer .page-fab {
   animation-timing-function: var(--ease-out);
 }
 
+/* SEITENLEISTE EIN-/AUSKLAPPEN (utils/sidebar-glide.js, R24 S12): die Kanten
+ * von Tafel und Inhalt gleiten, die Bilder darin werden nicht gestaucht -
+ * links verankert, in ihrer Groesse, von der gleitenden Kante beschnitten.
+ * Die Tafel behaelt dabei ihre Rundung. Unter reduzierter Bewegung startet
+ * das Skript keine Transition (der Wechsel steht). */
+::view-transition-group(sidebar-panel),
+::view-transition-group(sidebar-content) {
+  animation-duration: var(--duration-xl);
+  animation-timing-function: var(--ease-out);
+  overflow: clip;
+}
+
+::view-transition-group(sidebar-panel) {
+  border-radius: var(--radius-glass-card);
+}
+
+::view-transition-old(sidebar-panel),
+::view-transition-new(sidebar-panel),
+::view-transition-old(sidebar-content),
+::view-transition-new(sidebar-content) {
+  inline-size: auto;
+  block-size: 100%;
+  object-fit: none;
+  object-position: left top;
+}
+
 ::view-transition-group(page-toolbar),
 ::view-transition-group(nav-sidebar),
 ::view-transition-group(nav-bottom),
@@ -6219,9 +6245,10 @@ a.popover-menu__item {
     min-height: 0;
     padding-bottom: 0;
     margin-left: var(--sidebar-width);
-    /* Begleitet den Sidebar-Collapse (siehe .nav-sidebar width): der Inhalt rückt
-     * nach - bewusste Layout-Transition, reduced-motion schaltet sie ab. */
-    transition: margin-left var(--transition-slow);
+    /* KEINE TRANSITION AM RAND (Critique R24 G0-Shell-P3-7): 400 ms
+     * `margin-left` legten den ganzen Inhalt in jedem Frame neu aus (gemessen
+     * 17 Breiten je Umschalten, Layout-Shift 0,20). Der Rand springt in EINEM
+     * Layout, der Inhalt gleitet per transform (utils/sidebar-glide.js). */
   }
 
   .nav-bottom {
@@ -6660,6 +6687,21 @@ a.popover-menu__item {
   /* ── Sidebar eingeklappt (icon-only) ── */
   html.sidebar-collapsed {
     --sidebar-width: 56px;
+  }
+
+  /* DER UMSCHALTER GLEITET OHNE LAYOUT JE FRAME (utils/sidebar-glide.js,
+   * Critique R24 G0-Shell-P3-7). Waehrend des Wechsels traegt eine View
+   * Transition die Bewegung: Tafel und Inhalt bekommen je einen Namen, ihre
+   * Breite springt (keine Transition - sonst zeichnete das neue Bild die
+   * Breite Frame fuer Frame nach). Das Hover-Ausklappen behaelt seine eigene
+   * Breiten-Transition. */
+  html.sidebar-gliding .nav-sidebar {
+    view-transition-name: sidebar-panel;
+    transition: none;
+  }
+
+  html.sidebar-gliding #main-content {
+    view-transition-name: sidebar-content;
   }
 
   html.sidebar-collapsed .nav-sidebar .nav-sidebar__brand-text {

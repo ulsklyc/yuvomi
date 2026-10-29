@@ -1104,7 +1104,10 @@ const SHELL_PARENTS = {
   'list-bulkbar': ['bulk-pill-layer'],
   toast: ['toast-container'],
 };
-const TRANSIENT_GATE = /\.page-swapping\b/;
+// Namen, die nur fuer die Dauer EINES Wechsels stehen (Seitenwechsel, seit
+// R24 S12 auch das Ein-/Ausklappen der Seitenleiste): waehrenddessen steht das
+// Glas ohnehin als eigenes Bild.
+const TRANSIENT_GATE = /\.(?:page-swapping|sidebar-gliding)\b/;
 
 function splitTop(src, isSep) {
   const out = [];
@@ -3412,4 +3415,43 @@ test('DW-P3-12: Ablage, Chips und Kachelleisten blenden per @starting-style ein'
       && /transition[^;]*opacity var\(--duration-md\) var\(--ease-out\)/.test(r.body));
     assert.ok(timed, `${sel}: blendet nicht in --duration-md auf --ease-out`);
   }
+});
+
+// R24 S12 (Critique G0-Shell-P3-7): die Seitenleiste klappte per 400 ms
+// `width` + `margin-left` - der ganze Inhalt wurde in jedem Frame neu ausgelegt
+// (gemessen 17 Breiten je Umschalten). Jetzt EIN Layout und eine View
+// Transition: Namen nur waehrend des Wechsels, Bilder nicht gestaucht, Dauer
+// und Kurve aus Tokens, reduzierte Bewegung ohne Transition.
+test('R24 S12: die Seitenleiste klappt in einem Layout, die Kanten gleiten per View Transition', async () => {
+  const css = readFileSync(new URL('../public/styles/layout.css', import.meta.url), 'utf8');
+  const rules = [...eachRule(css)];
+  const appContent = rules.filter((r) => r.selector.split(',').some((x) => x.trim() === '.app-content'));
+  assert.ok(appContent.length > 0);
+  for (const r of appContent) assert.doesNotMatch(r.body, /transition:[^;]*margin/, 'kein Rand, der Frame fuer Frame laeuft');
+  const gliding = (sel) => rules.find((r) => r.selector.trim() === sel)?.body ?? '';
+  assert.match(gliding('html.sidebar-gliding .nav-sidebar'), /view-transition-name:\s*sidebar-panel/);
+  assert.match(gliding('html.sidebar-gliding .nav-sidebar'), /transition:\s*none/, 'die Breite springt im neuen Bild');
+  assert.match(gliding('html.sidebar-gliding #main-content'), /view-transition-name:\s*sidebar-content/);
+  const group = rules.find((r) => /::view-transition-group\(sidebar-panel\)/.test(r.selector) && /animation-duration/.test(r.body))?.body ?? '';
+  assert.match(group, /animation-duration:\s*var\(--duration-[a-z0-9]+\)/, 'Dauer aus Token');
+  assert.match(group, /animation-timing-function:\s*var\(--ease-out\)/, 'Kurve aus Token');
+  const images = rules.find((r) => /::view-transition-new\(sidebar-content\)/.test(r.selector))?.body ?? '';
+  assert.match(images, /object-fit:\s*none/, 'nichts wird gestaucht');
+
+  const { glideSidebar } = await import('../public/utils/sidebar-glide.js');
+  const classes = new Set();
+  const log = [];
+  const doc = (reduce) => ({
+    documentElement: { classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) } },
+    defaultView: { matchMedia: () => ({ matches: reduce }) },
+    visibilityState: 'visible',
+    querySelector: () => ({ getClientRects: () => [1] }),
+    startViewTransition: (update) => { log.push(`vt:${classes.has('sidebar-gliding')}`); update(); return { ready: Promise.resolve(), finished: Promise.resolve() }; },
+  });
+  await glideSidebar(() => log.push('apply'), { doc: doc(false) });
+  assert.deepEqual(log, ['vt:true', 'apply'], 'die Namen stehen, bevor das alte Bild genommen wird');
+  assert.equal(classes.has('sidebar-gliding'), false, 'und gehen danach');
+  log.length = 0;
+  await glideSidebar(() => log.push('apply'), { doc: doc(true) });
+  assert.deepEqual(log, ['apply'], 'reduzierte Bewegung: der Wechsel steht');
 });

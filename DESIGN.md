@@ -1646,6 +1646,15 @@ das Verhaeltnis haelt.
   dort ist das Overlay zugleich Elternknoten der Tafel.
 - **Theme-Wechsel (R18):** die Wahl in den Einstellungen blendet ueber die Wurzel
   (`swapTheme`, 200ms). Der Nachtwechsel des Wandmodus schaltet ohne Blende.
+- **Seitenleiste ein-/ausklappen (R24 S12):** EIN Layout, dann eine View Transition
+  (`glideSidebar`, utils/sidebar-glide.js): Tafel und Inhalt tragen nur waehrend des
+  Wechsels einen Namen (`html.sidebar-gliding`), ihre Kanten gleiten in `--duration-xl` +
+  `--ease-out`, die Bilder werden nicht gestaucht (`object-fit: none`, links verankert,
+  von der Gruppe beschnitten). Vorher liefen `width` und `margin-left` 400 ms per
+  Transition - der Inhalt wurde in jedem Frame neu ausgelegt (17 Breiten je Umschalten).
+  Ein FLIP per `transform` traegt hier nicht: der Inhalt ist zentriert und rechtsbuendig
+  gegliedert. Reduzierte Bewegung, ein laufender Seitenwechsel, Browser ohne API: der
+  Wechsel steht. Das Hover-Ausklappen (Flyout) behaelt seine Breiten-Transition.
 - **Scroll-Affordanz:** horizontal scrollende Leisten (Chip-Reihen, Filterzeilen) tragen
   eine Fade-Mask an der ueberlaufenden Kante (`has-fade-start`/`has-fade-end`, gesetzt von
   `wireScrollFade`) und 24px `scroll-padding-inline`, damit das erste sichtbare Element nicht

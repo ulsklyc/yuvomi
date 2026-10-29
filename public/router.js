@@ -16,6 +16,7 @@ import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
 import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight, bindNavMinimize } from '/utils/ux.js';
+import { glideSidebar } from '/utils/sidebar-glide.js';
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { inertOutside } from '/utils/background-inert.js';
 import { showToast, endModuleFeedback, feedbackScope } from '/utils/toast-show.js';
@@ -2177,16 +2178,19 @@ function renderAppShell(container) {
   sidebarToggle.addEventListener('click', (event) => {
     const nowCollapsed = !document.documentElement.classList.contains('sidebar-collapsed');
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, nowCollapsed ? '1' : '0');
-    applySidebarCollapsed(nowCollapsed);
-    if (event.detail > 0) {
-      document.documentElement.classList.toggle('sidebar-collapse-pointer-lock', nowCollapsed);
-    }
-    // Pointer clicks leave the toggle focused, which immediately re-expands the
-    // collapsed rail via .nav-sidebar:focus-within. Blur only for pointer-driven
-    // activation so keyboard users keep the expected focus behavior.
-    if (nowCollapsed && event.detail > 0) {
-      requestAnimationFrame(() => sidebarToggle.blur());
-    }
+    // Ein Layout, die Kanten gleiten per View Transition (utils/sidebar-glide.js).
+    // Zeigersperre und Blur gehoeren in denselben Wechsel: ohne sie hielten
+    // Hover-Ausklappen und `:focus-within` die Tafel im neuen Bild breit.
+    glideSidebar(() => {
+      applySidebarCollapsed(nowCollapsed);
+      if (event.detail > 0) {
+        document.documentElement.classList.toggle('sidebar-collapse-pointer-lock', nowCollapsed);
+      }
+      // Pointer clicks leave the toggle focused, which immediately re-expands the
+      // collapsed rail via .nav-sidebar:focus-within. Blur only for pointer-driven
+      // activation so keyboard users keep the expected focus behavior.
+      if (nowCollapsed && event.detail > 0) sidebarToggle.blur();
+    });
     const lbl = nowCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse');
     sidebarToggle.setAttribute('aria-label', lbl);
     sidebarToggle.setAttribute('title', lbl);

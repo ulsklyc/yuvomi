@@ -488,6 +488,7 @@ const APP_SHELL = [
   '/utils/unknown-route.js',
   '/utils/page-mount.js',
   '/utils/ux.js',
+  '/utils/sidebar-glide.js',
   '/utils/vcard.js',
   '/utils/view-transition.js',
   '/utils/version.js',
