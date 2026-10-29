@@ -1715,8 +1715,9 @@ function renderBody() {
     } else {
       const id = accountItem.dataset.ledgerAccount ? parseInt(accountItem.dataset.ledgerAccount, 10) : null;
       if (id === state.accountFilterId) return;
-      state.accountFilterId = id;
+      // Aus dem Menue gewaehlt: das x am Chip bleibt in der Uebersicht.
       state.accountFilterFrom = null;
+      state.accountFilterId = id;
       // Der Kontoauszug kommt vom Server (`account_id`), wie beim Drilldown.
       await reloadMonth();
     }
