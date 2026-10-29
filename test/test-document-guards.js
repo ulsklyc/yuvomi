@@ -4376,7 +4376,7 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
             + 'ueber der Fensterkante - die FAB-Reserve verkuerzt ihn wieder statt als Nachlauf zu reiten.');
         }
 
-        // Drei Module fuehren ihre Primaeraktion ohne FAB - kein Befund.
+        // Seiten ohne FAB (Haushaltshilfe, Einstellungen und ihre Blaetter) - kein Befund.
         if (m.keinFab) {
           if (!m.angedockt && !m.eingeklappt) ohneFab += 1;
           continue;
@@ -4440,16 +4440,24 @@ describe('Sonde 18 - am Scroll-Ende liegt nichts Bedienbares unter dem FAB', () 
          *
          * Einkauf dockt seit der Kopfregel mobil (2026-09-26) an, Aufgaben,
          * Notizen, Kontakte, Kalender und Budget seit #1483 ("one add button"),
-         * die Uebersicht seit R14, Punkte mit "Bonus vergeben" seit R23. Eingeklappt
-         * ist keiner mehr. */
+         * die Uebersicht seit R14, Punkte mit "Bonus vergeben" seit R23, die
+         * Gesundheit seit R24 (E9 "FAB ueberall", 108684c28: die Uebersicht
+         * traegt ein Erfassen-Menue, jeder Bereich seinen Hinzufuegen-Knopf;
+         * Fasten startet von dort, R23 D14 / S11-F1). Eingeklappt ist keiner
+         * mehr; ohne FAB bleiben Haushaltshilfe, Einstellungen und ihre Blaetter.
+         * Gegengeprueft (R24 S15, 375x812): am Scroll-Ende liegt auf /health und
+         * allen acht Bereichen nichts Bedienbares unter dem Knopf; am Zeiger
+         * docken alle neun an. */
         const ANGEDOCKT_AM_ZEIGER = ['dashboard', 'tasks', 'calendar', 'shopping', 'meals', 'recipes',
-          'pantry', 'notes', 'contacts', 'birthdays', 'budget', 'documents', 'rewards'];
+          'pantry', 'notes', 'contacts', 'birthdays', 'budget', 'documents', 'health', 'rewards'];
         assert.deepEqual({ angedockt: [...angedockt].sort(), eingeklappt },
           { angedockt: [...ANGEDOCKT_AM_ZEIGER].sort(), eingeklappt: [] },
           `Erwartet auf dem Zeiger: ${ANGEDOCKT_AM_ZEIGER.length} FABs in der Kopfleiste und kein eingeklappter, `
           + `dazu ${ohneFab} Seiten ohne FAB. Aendert sich das, aendert sich die Reichweite dieser Sonde.`);
       } else {
-        // 15 Routen minus die drei ohne FAB.
+        // 16 Routen minus die zwei ohne FAB (Haushaltshilfe, Einstellungen);
+        // gemessen 14 seit R24. Die Untergrenze laesst einer Seite Luft, die ihr
+        // Scroll-Ende nicht rechtzeitig erreicht.
         assert.ok(seen >= 12,
           `Nur ${seen} Zustaende am Scroll-Ende gemessen - erwartet sind mindestens 12. Entweder `
           + 'fehlt Modulen ihr FAB, oder keine Seite kam an ihr Scroll-Ende.');
