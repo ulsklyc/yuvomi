@@ -260,6 +260,15 @@
   visibility: hidden;
 }
 
+/* DIE LISTE ERSCHEINT MIT IHREN STATUS (R24 S13, S12-F3). Ein Name allein
+ * steht mittig (unten, R18), der Status kommt nach ihm an und hob ihn um eine
+ * halbe Zeile - am Desktop Shift 0,0024 beim Eintritt. Bis die erste Runde
+ * der Status steht, haelt die Liste ihren Platz unsichtbar wie oben (R22 D4);
+ * health.js nimmt die Marke nach hoechstens STATUS_WAIT_MS weg. */
+.health-areas[data-health-status-pending] {
+  visibility: hidden;
+}
+
 .health-priority-skeleton__pill {
   inline-size: 12rem;
   block-size: var(--target-base);

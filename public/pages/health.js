@@ -832,7 +832,7 @@ function areasNavMarkup() {
   // Seite, auf der die Liste steht, die Übersicht - eine Zeile zu ihr wäre
   // ein Link auf sich selbst.
   return `
-    <nav class="health-areas" aria-label="${esc(t('nav.health'))}">
+    <nav class="health-areas" aria-label="${esc(t('nav.health'))}"${_statusRevealPending ? ' data-health-status-pending' : ''}>
       <ul class="row-divided health-areas__group health-areas__overview" role="list">${areaRowMarkup(overviewArea)}</ul>
       <h2 class="health-areas__title u-section-title" id="health-areas-title">${esc(t('health.overview.areasTitle'))}</h2>
       <ul class="row-divided health-areas__group health-areas__list" role="list" aria-labelledby="health-areas-title">${rest.map(areaRowMarkup).join('')}</ul>
@@ -1184,6 +1184,35 @@ let _statusGen = 0;
 // wer mobil direkt in einen Bereich springt, sieht sie nicht.
 let _statusesRequested = false;
 
+/* DIE LISTE ERSCHEINT MIT IHREN STATUS (R24 S13, S12-F3). Ein Name allein
+ * steht mittig in seiner Zeile (R18, #1770), und mit dem Status, der nach ihm
+ * ankommt, rueckte er um eine halbe Zeile hoch - Eintritt am Desktop: Shift
+ * 0,0015-0,0024 an fuenf Namen. Dieselbe Antwort wie R22 D4 fuer die Heute-
+ * Region: die Liste haelt ihren Platz unsichtbar (`data-health-status-pending`,
+ * health.css), bis die ERSTE Runde der Status steht - die eigenen Abrufe und,
+ * wo sie drei davon liefert, die Uebersicht -, und erscheint dann einmal an
+ * ihrem Ort. Spaetere Runden (Personenwahl, Speichern) zeigen die Liste
+ * schon; dort ist es eine Antwort auf eine Handlung. */
+let _statusRevealPending = false;
+// Die erste Runde laeuft: { loading, overview } - wartet sie noch auf ihre
+// Abrufe, und braucht sie dafuer die Uebersicht?
+let _statusReveal = null;
+/** So lange haelt die Liste hoechstens ihre Marke: ein haengender Abruf
+ * verbirgt die Navigation nicht. */
+const STATUS_WAIT_MS = 800;
+
+function revealAreaStatuses() {
+  _statusRevealPending = false;
+  _statusReveal = null;
+  _container?.querySelector('.health-areas')?.removeAttribute('data-health-status-pending');
+}
+
+function maybeRevealAreaStatuses() {
+  if (!_statusReveal || _statusReveal.loading) return;
+  if (_statusReveal.overview && !overview.loaded && !overview.error) return;
+  revealAreaStatuses();
+}
+
 function setAreaStatus(id, text) {
   const el = _container?.querySelector(`[data-health-area-status="${CSS.escape(id)}"]`);
   if (el && el.textContent !== text) el.textContent = text;
@@ -1222,16 +1251,28 @@ function refreshAllAreaStatuses() {
   // sagten sie "Blutdruck 120/80" ueber die falsche - sie bleiben dann leer.
   if (healthPersonIsOther(healthUser?.id)) {
     for (const area of HEALTH_AREAS({ cycleEnabled, fastingEnabled })) setAreaStatus(area.id, '');
+    revealAreaStatuses();
     return;
   }
   // Steht die Uebersicht (oder laedt sie gerade fuer die eigene Person),
   // liefert sie ihre drei Zeilen selbst (renderOverviewShell).
   const overviewProvides = applyOverviewStatuses()
     || (_activeArea === HEALTH_OVERVIEW_ID && !overview.loaded);
+  const loads = [];
   for (const area of HEALTH_AREAS({ cycleEnabled, fastingEnabled })) {
     if (overviewProvides && OVERVIEW_DERIVED.has(area.id)) continue;
-    refreshAreaStatus(area.id);
+    loads.push(refreshAreaStatus(area.id));
   }
+  if (!_statusRevealPending || _statusReveal) return;
+  const round = { loading: true, overview: overviewProvides };
+  _statusReveal = round;
+  const giveUp = setTimeout(revealAreaStatuses, STATUS_WAIT_MS);
+  Promise.allSettled(loads).then(() => {
+    if (_statusReveal !== round) return;
+    clearTimeout(giveUp);
+    round.loading = false;
+    maybeRevealAreaStatuses();
+  });
 }
 
 function wireAreasNav(signal) {
@@ -1270,6 +1311,8 @@ export async function render(container, ctx = {}) {
   _pushedFromOverview = false;
   _statusesRequested = false;
   _statusGen += 1;
+  _statusRevealPending = true;
+  _statusReveal = null;
   healthUser = ctx.user ?? healthUser;
   vitals.meId = ctx.user?.id ?? vitals.meId;
   vitals.root = null;
@@ -7360,6 +7403,7 @@ function renderOverviewShell() {
     // Es kommt nichts mehr, das vor die Liste zieht - das Skelett geht.
     _priorityPending = false;
     syncPriorityRegion();
+    maybeRevealAreaStatuses();
     return;
   }
 
@@ -7374,6 +7418,7 @@ function renderOverviewShell() {
   if (window.lucide) window.lucide.createIcons({ el: overview.root });
   wireOverview();
   applyOverviewStatuses();
+  maybeRevealAreaStatuses();
   syncHoists();
   // Das Erfassen-Menue am FAB kennt jetzt Person und Recht (R24, E9).
   refreshHealthFab();

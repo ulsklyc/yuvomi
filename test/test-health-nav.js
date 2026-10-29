@@ -922,6 +922,32 @@ test('R22 D4: die Bereichsliste erscheint erst, wenn ueber ihr nichts mehr waech
     'ohne Frist verbirgt ein haengender Abruf die Navigation');
 });
 
+// R24 S13 (S12-F3): der Status einer Bereichszeile kommt nach ihrem Namen an,
+// und ein Name allein steht mittig (R18, #1770) - mit dem Status rueckte er um
+// eine halbe Zeile hoch. Gemessen 1440x900, Eintritt ueber die Seitenleiste:
+// Shift 0,0015-0,0024 an fuenf `.health-area-row__name` (y 584 -> 573 ...).
+// Dieselbe Antwort wie R22 D4: die Liste haelt ihren Platz unsichtbar, bis
+// die erste Runde der Status steht, und erscheint dann EINMAL an ihrem Ort -
+// hoechstens STATUS_WAIT_MS lang, ein haengender Abruf verbirgt die
+// Navigation nie.
+test('R24 S13: die Bereichsliste erscheint mit ihren Status, nicht davor - nie dauerhaft verborgen', async () => {
+  const { eachRule } = await import('./css-rules.js');
+  const rules = [...eachRule(read('public/styles/health.css'))].filter((r) => !r.at.length);
+  const wait = rules.find((r) => /^\.health-areas\[data-health-status-pending\]$/.test(r.selector.trim()));
+  assert.ok(wait, 'die Liste steht sichtbar, waehrend ihre Status laden - die Namen ruecken dann hoch');
+  assert.match(wait.body, /visibility:\s*hidden/, 'verborgen, aber an ihrem Platz');
+  assert.doesNotMatch(wait.body, /display:/);
+  assert.match(HEALTH_JS, /<nav class="health-areas" aria-label="\$\{esc\(t\('nav\.health'\)\)\}"\$\{_statusRevealPending \? ' data-health-status-pending' : ''\}>/,
+    'schon im ERSTEN Markup, nicht erst nach einem Abgleich');
+  assert.match(HEALTH_JS, /const STATUS_WAIT_MS = \d+;/);
+  const all = HEALTH_JS.slice(HEALTH_JS.indexOf('function refreshAllAreaStatuses('), HEALTH_JS.indexOf('function wireAreasNav('));
+  assert.match(all, /Promise\.allSettled\(loads\)/, 'die erste Runde wartet auf ALLE Abrufe, nicht auf den ersten');
+  assert.match(all, /setTimeout\(revealAreaStatuses, STATUS_WAIT_MS\)/, 'ohne Frist verbirgt ein haengender Abruf die Navigation');
+  assert.match(all, /if \(healthPersonIsOther\(healthUser\?\.id\)\) \{[\s\S]{0,200}?revealAreaStatuses\(\);\s*return;/, 'fremde Person: kein Status, also sofort sichtbar');
+  const shell = HEALTH_JS.slice(HEALTH_JS.indexOf('function renderOverviewShell('));
+  assert.match(shell.slice(0, shell.indexOf('applyOverviewStatuses();') + 200), /maybeRevealAreaStatuses\(\)/, 'die Uebersicht liefert drei Status - danach darf die Liste erscheinen');
+});
+
 // ── R22 S8 (Critique a5, D12): Gesundheit ──────────────────────────────────
 
 // R22 D12 liess den Detailkopf mit Grundstreifen kleben; R24 (Critique G5
