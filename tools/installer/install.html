@@ -3608,7 +3608,13 @@ $('simple-host').addEventListener('input', e => {
   renderSimpleAccess();
 });
 $('simple-host').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); $('simple-access-edit').click(); }
+  if (e.key !== 'Enter') return;
+  // Enter schliesst nur den Editor. Ohne stopPropagation erreichte dasselbe
+  // Ereignis den dokumentweiten Enter-Handler, der simple-next klickt - war
+  // der Start schon bestätigt, speicherte "Fertig" die .env und startete.
+  e.preventDefault();
+  e.stopPropagation();
+  $('simple-access-edit').click();
 });
 
 function onEnterStep(name) {
@@ -5055,7 +5061,8 @@ async function createAdmin() {
 
 // Enter in einem Textfeld löst die primäre Aktion des aktuellen Schritts aus.
 document.addEventListener('keydown', e => {
-  if (e.key !== 'Enter') return;
+  // defaultPrevented: ein Feld hat Enter schon selbst behandelt (Adress-Editor).
+  if (e.key !== 'Enter' || e.defaultPrevented) return;
   const el = e.target;
   if (el.tagName !== 'INPUT' || el.type === 'checkbox') return;
   const primary = $(`step-${flow[currentStep]}`)?.querySelector('.card-foot .btn-primary');

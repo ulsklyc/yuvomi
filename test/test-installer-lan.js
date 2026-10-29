@@ -93,3 +93,43 @@ test('Compose lauscht auf allen Schnittstellen, der Installer nur auf Loopback',
   const server = readFileSync(new URL('../tools/installer/install-server.js', import.meta.url), 'utf8');
   assert.match(server, /server\.listen\(PORT, '127\.0\.0\.1'/);
 });
+
+test('Enter im Adress-Editor schliesst nur den Editor und startet nicht das Setup', () => {
+  // Review #2382: der Editor-Handler klickte "Fertig", das Ereignis lief weiter
+  // zum dokumentweiten Enter-Handler, und der klickte simple-next - bei schon
+  // bestätigtem Start speicherte das die .env und startete Yuvomi.
+  const arrow = marker => {
+    const at = html.indexOf(marker);
+    assert.ok(at !== -1, `${marker} nicht gefunden`);
+    const end = html.indexOf('\n});', at);
+    return `${html.slice(html.indexOf('e => {', at), end)}\n}`;
+  };
+  const clicks = { done: 0, primary: 0 };
+  const primary = { disabled: false, click: () => { clicks.primary++; } };
+  const $ = id => (id === 'simple-access-edit' ? { click: () => { clicks.done++; } }
+    : { querySelector: () => primary });
+  const editor = new Function('$', `return (${arrow("$('simple-host').addEventListener('keydown'")});`)($);
+  const onDocument = new Function('$', 'flow', 'currentStep',
+    `return (${arrow("document.addEventListener('keydown'")});`)($, ['simple'], 0);
+
+  // Ein Ereignis, das vom Feld zum Dokument aufsteigt wie im Browser.
+  const input = { tagName: 'INPUT', type: 'text' };
+  const enter = () => ({
+    key: 'Enter', target: input, defaultPrevented: false, stopped: false,
+    preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; },
+  });
+  const e = enter();
+  editor(e);
+  if (!e.stopped) onDocument(e);
+  assert.equal(clicks.done, 1, 'Enter schliesst den Editor nicht');
+  assert.equal(clicks.primary, 0, 'Enter im Adress-Editor löst den Start aus');
+
+  // Der dokumentweite Handler selbst respektiert ein schon behandeltes Enter ...
+  const handled = enter();
+  handled.preventDefault();
+  onDocument(handled);
+  assert.equal(clicks.primary, 0, 'der Dokument-Handler übergeht defaultPrevented');
+  // ... und löst in einem gewöhnlichen Feld weiter die primäre Aktion aus.
+  onDocument(enter());
+  assert.equal(clicks.primary, 1, 'Enter in einem Feld löst die primäre Aktion nicht mehr aus');
+});
