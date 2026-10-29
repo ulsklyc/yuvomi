@@ -1079,3 +1079,19 @@ test('eine im Formular abweichend gewaehlte Farbe ueberlebt jedes Umfaerben (#23
     await call('DELETE', `/calendars/${calendar.id}`);
   }
 });
+
+test('der Schritt zurueck auf einen Kalender ueberdeckt die Farbe einer zugewiesenen Person nicht (#2303, Review)', async () => {
+  const { importToLocal } = await import('../server/services/ics-subscription.js');
+  for (const row of (await call('GET', '/calendars')).body.data) {
+    if (!row.is_default) await call('DELETE', `/calendars/${row.id}`);
+  }
+  const standard = (await call('GET', '/calendars')).body.data.find((row) => row.is_default);
+  const second = await createCalendar('Noch einer', '#00695C');
+  await importToLocal(ADMIN.id, {
+    ics: importIcs('person-2303'), color: standard.color, localCalendarId: standard.id, assigneeIds: [ADMIN.id],
+  });
+  assert.equal((await call('DELETE', `/calendars/${second.id}`)).status, 204);
+  // Die Rangfolge (utils/event-color.js): eigene Farbe vor Person vor Kalender.
+  // Eine zurueckgeschriebene Eigenfarbe nahme der Person ihren Platz.
+  assert.equal(db.prepare("SELECT color FROM calendar_events WHERE external_calendar_id = 'person-2303'").get().color, null);
+});

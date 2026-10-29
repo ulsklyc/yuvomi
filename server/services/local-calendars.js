@@ -231,7 +231,9 @@ export function releaseCopiedCalendarColor(conn, calendarId, oldColor) {
  * Farbe des verbliebenen Kalenders zurueck - dieselbe, die er zuletzt gezeigt
  * hat oder (aus dem geloeschten Kalender umgezogen) ein Import mit einem
  * Kalender bekommen haette. Nur Importe ohne ausdrueckliche Farbwahl
- * (`color_modified = 0`); ein bewusst geleerter Termin bleibt leer.
+ * (`color_modified = 0`); ein bewusst geleerter Termin bleibt leer. Und nur
+ * ohne zugewiesene Person: dort zeigt `resolveEventColorOrNull()` die Farbe
+ * der Person, nie die des Kalenders - eine Eigenfarbe nahme ihr den Platz.
  * @returns {number} geaenderte Zeilen
  */
 export function restoreInheritedImportColors(conn) {
@@ -245,5 +247,6 @@ export function restoreInheritedImportColors(conn) {
       AND e.external_calendar_id IS NOT NULL
       AND e.color_modified = 0
       AND e.color IS NULL
+      AND NOT EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id)
   `).run({ calendarId: calendar.id, color: calendar.color }).changes;
 }
