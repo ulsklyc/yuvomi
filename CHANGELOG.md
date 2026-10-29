@@ -353,6 +353,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Mealie's description followed by the steps as a numbered list, with a step's title in front of its
   text. Empty steps are left out. A recipe that was already mirrored picks up its steps the next time
   it changes in Mealie.
+- **Recurring tasks keep their repeat on a CalDAV server** (#2350). A task that repeats in Yuvomi
+  went to the server as a one-off task: the outgoing VTODO carried title, due date and status but no
+  `RRULE`, so Tasks.org, Thunderbird or a Baikal-backed phone showed it once. The rule now goes along
+  on the first upload and on every later edit, and an end date is written the way RFC 5545 wants it
+  next to the due date - a plain date for a task without a time, the end of that day in UTC for one
+  with a time. A ticked-off occurrence goes up without the rule, because the next occurrence is its
+  own task on the server, and the series starts on the due date (`DTSTART`, which the standard
+  requires next to a rule). A series someone set up in another app keeps its rule even though Yuvomi
+  does not read it in; a rule Yuvomi added to such a task is marked, so switching the repeat off
+  here takes it away again unless the other app has changed it since. "Repeat from completion"
+  stays a Yuvomi setting: the standard has no way to say it.
 - **Switching a module on or off no longer doubles "Settings" in the sidebar** (#2324). After a
   module was toggled under Settings > Active modules, the sidebar showed "Settings" twice until the
   next reload. It now stays once, at its place at the bottom, however often the list is rebuilt.

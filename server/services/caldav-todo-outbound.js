@@ -47,7 +47,7 @@
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { davFailureAction, createRefusalStop, MAX_OUTBOUND_ATTEMPTS } from './calendar-outbound.js';
-import { patchICSTodo } from '../utils/ics-patch.js';
+import { patchICSTodo, unfoldICS } from '../utils/ics-patch.js';
 import {
   createCalDAVClient, collectionUrlOf, createUploadGate, sameObjectAddress, withAccountOrigin, isOriginRefusal,
   isAccountWideRefusal, acceptsNewEntries,
@@ -60,6 +60,8 @@ import {
   hasUploadAttempt, removeLeftoverUploads,
 } from './caldav-upload-attempts.js';
 import { householdTimeZone, localToUTC } from '../utils/timezone.js';
+import { timedSeriesUntil } from '../utils/rrule-until.js';
+import { rruleValue } from './recurrence.js';
 import { loadTags, tagsKey } from '../utils/task-tags.js';
 import { runSerialized } from '../utils/sync-lock.js';
 import { noteMoveTakenBack } from './shopping-move-notices.js';
@@ -108,7 +110,11 @@ export const MODULES = {
     // Feldvergleich sieht aber nur die Zeile. Der Aufrufer hängt den
     // kanonischen Schlüssel (utils/task-tags.js: tagsKey) an beide Seiten,
     // sonst bliebe eine reine Tag-Änderung unbemerkt (#586).
-    mirrored: ['title', 'description', 'priority', 'status', 'due_date', 'due_time', 'tags_key'],
+    // `is_recurring`/`recurrence_rule` reisen als RRULE (#2350).
+    mirrored: [
+      'title', 'description', 'priority', 'status', 'due_date', 'due_time', 'tags_key',
+      'is_recurring', 'recurrence_rule',
+    ],
     icsFields: icsFieldsForTask,
     labelOf: (row) => row.title,
   },
@@ -199,7 +205,7 @@ function completionFields(done, inProgress, hadCompleted) {
  * der eine rohe Zeile aus `SELECT *` durchreicht, die Tags des Servers
  * stillschweigend löschen - `reloadRow` hängt sie deshalb an.
  */
-export function icsFieldsForTask(task, hadCompleted = false, tz = householdTimeZone(null)) {
+export function icsFieldsForTask(task, hadCompleted = false, tz = householdTimeZone(null), serverIcs = null) {
   const fields = {
     SUMMARY:     task.title,
     DESCRIPTION: task.description || null,
@@ -208,7 +214,124 @@ export function icsFieldsForTask(task, hadCompleted = false, tz = householdTimeZ
     ...completionFields(task.status === 'done', task.status === 'in_progress', hadCompleted),
   };
   if (Array.isArray(task.tags)) fields.CATEGORIES = task.tags;
+  Object.assign(fields, recurrenceFields(task, fields.DUE, tz, serverIcs));
   return fields;
+}
+
+/** Marke an einem fremden Objekt: die RRULE, die Yuvomi dort geschrieben hat. */
+const YUVOMI_RRULE = 'X-YUVOMI-RRULE';
+
+/**
+ * RRULE, DTSTART und Marke einer Aufgabe - nur die Felder, die der Push
+ * anfassen darf (#2350). Ein fehlendes Feld laesst die Property auf dem Server
+ * stehen, null entfernt sie.
+ *
+ * DTSTART: RFC 5545 §3.8.2.4 verlangt es in jeder Komponente mit RRULE; DUE
+ * ersetzt den Anker nicht. Es traegt Wert und Typ von DUE, so beginnt die Serie
+ * an der Faelligkeit, und es zieht mit, wenn sie sich verschiebt. Der Inbound
+ * liest DTSTART eines VTODO nicht ein.
+ *
+ * Ein eigenes Objekt (von Yuvomi angelegt) fuehrt Yuvomi ganz: ohne Regel
+ * verschwinden RRULE und DTSTART. An einem fremden Objekt bleibt eine Regel
+ * stehen, die Yuvomi nicht kennt - der Inbound liest VTODO-Wiederholungen nicht
+ * ein, eine dort angelegte Serie ist hier also nicht wiederkehrend. Was Yuvomi
+ * dort selbst schreibt, traegt deshalb die Marke X-YUVOMI-RRULE mit derselben
+ * Regel; wird die Wiederholung hier abgeschaltet, nimmt der Push die RRULE nur
+ * weg, solange sie noch genau dieser Marke entspricht. Hat die andere App sie
+ * inzwischen geaendert oder die Marke verworfen, gehoert sie ihr und bleibt.
+ * DTSTART bleibt dabei stehen: an einem fremden Objekt kann es auch vorher ein
+ * Beginn gewesen sein.
+ */
+function recurrenceFields(task, due, tz, serverIcs) {
+  const rrule = vtodoRecurrence(task, tz);
+  const own = ownsRecurrence(task);
+  if (rrule) return { RRULE: rrule, DTSTART: due, [YUVOMI_RRULE]: own ? null : rrule };
+  if (own) return { RRULE: null, DTSTART: null, [YUVOMI_RRULE]: null };
+  // Fremd und erledigt oder ohne Faelligkeit: nichts anfassen. Nur die hier
+  // abgeschaltete Wiederholung nimmt Yuvomis eigene Regel zurueck.
+  if (task.is_recurring && task.recurrence_rule) return {};
+  const mark = todoPropertyValue(serverIcs, task.external_uid, YUVOMI_RRULE);
+  if (!mark) return {};
+  const current = todoPropertyValue(serverIcs, task.external_uid, 'RRULE');
+  if (current && sameRule(current, unescapeText(mark))) return { RRULE: null, [YUVOMI_RRULE]: null };
+  return { [YUVOMI_RRULE]: null };
+}
+
+/**
+ * Rohwert der Property `name` im VTODO mit `uid` ohne RECURRENCE-ID - oder null.
+ * Dieselbe Komponente, die der Patcher anfasst: eine VTIMEZONE davor traegt in
+ * STANDARD/DAYLIGHT eigene RRULEs, und die erste Fundstelle im ganzen Objekt
+ * waere deren Regel statt der der Aufgabe.
+ */
+function todoPropertyValue(icsText, uid, name) {
+  if (!icsText || !uid) return null;
+  const lines = unfoldICS(icsText).split('\n').map((l) => l.replace(/\r$/, ''));
+  const nameOf = (line) => { const cut = line.search(/[;:]/); return (cut === -1 ? line : line.slice(0, cut)).toUpperCase(); };
+  const valueOf = (line) => line.slice(line.indexOf(':') + 1).trim();
+  let block = null;
+  let depth = 0;
+  for (const line of lines) {
+    const upper = line.trim().toUpperCase();
+    if (!block) {
+      if (upper === 'BEGIN:VTODO') { block = { props: [], uid: null, override: false }; depth = 0; }
+      continue;
+    }
+    if (upper.startsWith('BEGIN:')) { depth++; continue; }
+    if (upper === 'END:VTODO' && depth === 0) {
+      if (block.uid === uid && !block.override) {
+        const hit = block.props.find((l) => nameOf(l) === name);
+        return hit ? valueOf(hit) : null;
+      }
+      block = null;
+      continue;
+    }
+    if (upper.startsWith('END:')) { depth--; continue; }
+    if (depth > 0) continue; // VALARM & Co.
+    const prop = nameOf(line);
+    if (prop === 'UID') block.uid = valueOf(line);
+    if (prop === 'RECURRENCE-ID') block.override = true;
+    block.props.push(line);
+  }
+  return null;
+}
+
+function unescapeText(value) {
+  return String(value).replace(/\\([\\;,nN])/g, (_, c) => (c === 'n' || c === 'N' ? '\n' : c));
+}
+
+function sameRule(a, b) {
+  const norm = (r) => rruleValue(r).trim().toUpperCase().split(';').filter(Boolean).sort().join(';');
+  return norm(a) === norm(b);
+}
+
+/**
+ * Die Wiederholung einer Aufgabe als RRULE-Wert (ohne Praefix) - oder null (#2350).
+ *
+ * Keine Regel ohne DUE: DTSTART, der Anker der Serie, steht auf DUE (siehe
+ * recurrenceFields), und eine Aufgabe, die ab Erledigung zaehlt, kann ganz ohne
+ * Faelligkeit wiederkehren. Keine Regel an einer erledigten Aufgabe: das
+ * Abhaken legt in Yuvomi eine Folgeinstanz als eigene Zeile und eigenes VTODO
+ * an; behielte das erledigte Objekt seine Regel, zeigte ein Client die Serie
+ * zweimal. Der Anker "ab Erledigung" (#658) reist nicht mit, RFC 5545 kennt ihn
+ * nicht.
+ *
+ * UNTIL hat nach RFC 5545 den Werttyp des Ankers: an einem reinen Datum ein
+ * Datum (ein altes `T235959Z` aus dem frueheren Formular wird darauf
+ * zurueckgeschnitten), an einer Uhrzeit das Ende des Ortstags in UTC (#1974,
+ * utils/rrule-until.js) - DUE steht dann ebenfalls in UTC. COUNT bleibt, wie es
+ * gespeichert ist.
+ */
+function vtodoRecurrence(task, tz) {
+  if (!task.is_recurring || !task.recurrence_rule || !task.due_date || task.status === 'done') return null;
+  const rule = rruleValue(task.recurrence_rule).trim();
+  if (!rule) return null;
+  const dated = rule.split(';').map((part) => part.replace(/^(\s*UNTIL\s*=\s*)(\d{8})T\d{6}Z?\s*$/i, '$1$2')).join(';');
+  return task.due_time ? timedSeriesUntil(dated, tz) : dated;
+}
+
+/** Hat Yuvomi dieses Objekt selbst angelegt (oder liegt es noch gar nicht oben)? */
+function ownsRecurrence(task) {
+  return task.external_source !== 'caldav' || isOwnUidOfRow(task.external_uid, 'task', task.id);
 }
 
 /** VTODO-Properties eines lokalen Einkaufspostens. */
@@ -2301,7 +2424,7 @@ export async function processPendingUpdates(client, accountId, module, objectInd
     if (!fresh) continue; // parallel gelöscht - der Tombstone-Pfad übernimmt
 
     const patched = patchICSTodo(
-      known.data, row.external_uid, def.icsFields(fresh, hasCompleted(known.data), householdTimeZone(db.get()))
+      known.data, row.external_uid, def.icsFields(fresh, hasCompleted(known.data), householdTimeZone(db.get()), known.data)
     );
     if (!patched) {
       log.warn(`VTODO ${row.external_uid} has no editable component in its calendar object, dropping its update.`);

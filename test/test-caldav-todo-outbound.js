@@ -1298,3 +1298,165 @@ test('Sofortversuch: ein nicht angefragtes Objekt wird keiner Zeile zugeordnet, 
   assert.equal(encoded.get('mine@test')?.etag, '"y"', 'dieselbe Adresse mit %40 wurde nicht erkannt');
   assert.equal(encoded.get('mine@test')?.url, 'https://dav.example/cal/todo/mine@test.ics', 'geschrieben wird an die angefragte Adresse');
 });
+
+// ── Wiederholung als RRULE (#2350) ──────────────────────────────────────────────
+//
+// Eine in Yuvomi wiederkehrende Aufgabe ging ohne RRULE hinaus: VTODO kannte
+// den Patcher nur fuer SUMMARY bis CATEGORIES, und icsFieldsForTask las die
+// Wiederholungsspalten nie. Am Telefon war die Serie eine einmalige Aufgabe.
+
+/** Eine von Yuvomi hochgeladene (eigene UID) wiederkehrende Aufgabe. */
+function insertOwnRecurringTask(accountId, rule, fields = {}) {
+  const task = insertTask({ accountId, uid: null, ...fields });
+  const uid = todoUidFor('tasks', task.id);
+  db.prepare('UPDATE tasks SET external_uid = ?, is_recurring = 1, recurrence_rule = ? WHERE id = ?')
+    .run(uid, rule, task.id);
+  return { task: reloadTask(task.id), uid };
+}
+
+test('Eine wiederkehrende Aufgabe traegt ihre Regel als RRULE, in beiden Schreibweisen (#2350)', () => {
+  const base = { title: 'Muell', status: 'open', due_date: '2026-11-02', is_recurring: 1 };
+  assert.strictEqual(icsFieldsForTask({ ...base, recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO' }).RRULE,
+    'FREQ=WEEKLY;BYDAY=MO');
+  assert.strictEqual(icsFieldsForTask({ ...base, recurrence_rule: 'RRULE:FREQ=MONTHLY;COUNT=5' }).RRULE,
+    'FREQ=MONTHLY;COUNT=5', 'COUNT reist unveraendert, das Praefix nicht doppelt');
+  // Reines Datum als DUE: UNTIL bleibt ein Datum (RFC 5545: Werttyp wie DTSTART/DUE).
+  assert.strictEqual(icsFieldsForTask({ ...base, recurrence_rule: 'FREQ=DAILY;UNTIL=20261231' }).RRULE,
+    'FREQ=DAILY;UNTIL=20261231');
+  // Altes Formular-UNTIL mit Uhrzeit an einem Datums-DUE wird zum Datum.
+  assert.strictEqual(icsFieldsForTask({ ...base, recurrence_rule: 'FREQ=DAILY;UNTIL=20261231T235959Z' }).RRULE,
+    'FREQ=DAILY;UNTIL=20261231');
+});
+
+test('Mit Uhrzeit wird UNTIL das Ende des Ortstags in UTC (#2350)', () => {
+  const fields = icsFieldsForTask({
+    title: 'Muell', status: 'open', due_date: '2026-11-02', due_time: '07:00',
+    is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY;UNTIL=20261231',
+  }, false, 'Europe/Berlin');
+  assert.strictEqual(fields.DUE.params, '');
+  assert.strictEqual(fields.RRULE, 'FREQ=WEEKLY;UNTIL=20261231T225959Z');
+});
+
+test('Ohne Wiederholung, ohne Faelligkeit oder erledigt geht keine Regel hinaus (#2350)', () => {
+  const rule = 'FREQ=WEEKLY';
+  // Eigene Zeile (kein fremder Spiegel): die Regel wird ausdruecklich entfernt.
+  assert.strictEqual(icsFieldsForTask({ title: 'x', status: 'open', due_date: '2026-11-02' }).RRULE, null);
+  assert.strictEqual(icsFieldsForTask({ title: 'x', status: 'open', is_recurring: 1, recurrence_rule: rule }).RRULE,
+    null, 'ohne DUE fehlt der Anker, an dem ein Client die Serie rechnet');
+  // Erledigt: die Serie laeuft in der Folgeinstanz weiter, die ihr eigenes VTODO bekommt.
+  assert.strictEqual(icsFieldsForTask({ title: 'x', status: 'done', due_date: '2026-11-02', is_recurring: 1, recurrence_rule: rule }).RRULE,
+    null);
+});
+
+test('Anlegen und jede spaetere Aenderung schicken die RRULE mit (#2350)', async () => {
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=WEEKLY;BYDAY=MO', { due_date: '2026-11-02' });
+
+  const created = buildTodoICS('tasks', task, uid);
+  assert.match(created, /\r\nRRULE:FREQ=WEEKLY;BYDAY=MO\r\n/);
+
+  // Der Server hat das Objekt mit RRULE; eine Titelaenderung darf sie nicht verlieren.
+  db.prepare("UPDATE tasks SET title = 'Altpapier', outbound_dirty = 1 WHERE id = ?").run(task.id);
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf(uid, created));
+  const data = client.calls.updated[0].data;
+  assert.ok(data.includes('SUMMARY:Altpapier'));
+  assert.strictEqual(data.match(/^RRULE:/gm)?.length, 1);
+  assert.match(data, /\r\nRRULE:FREQ=WEEKLY;BYDAY=MO\r\n/);
+});
+
+test('Eine geaenderte oder abgeschaltete Regel loest einen Push aus und kommt an (#2350)', async () => {
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=WEEKLY', { due_date: '2026-11-02' });
+
+  assert.strictEqual(markTodoOutbound('tasks', task, { ...task, recurrence_rule: 'FREQ=DAILY' }), true);
+  db.prepare('UPDATE tasks SET outbound_dirty = 0 WHERE id = ?').run(task.id);
+  assert.strictEqual(markTodoOutbound('tasks', task, { ...task, is_recurring: 0 }), true);
+
+  db.prepare('UPDATE tasks SET is_recurring = 0, recurrence_rule = NULL WHERE id = ?').run(task.id);
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks',
+    indexOf(uid, serverTodo({ uid, extra: ['RRULE:FREQ=WEEKLY'] })));
+  assert.ok(!/^RRULE:/m.test(client.calls.updated[0].data), 'abgeschaltete Wiederholung bleibt nicht stehen');
+});
+
+test('Die Regel eines fremden Eintrags bleibt stehen, solange Yuvomi keine eigene hat (#2350)', async () => {
+  // Der Inbound liest VTODO-RRULE nicht ein: eine in einer anderen App angelegte
+  // Serie ist hier nicht wiederkehrend. Ein Push darf ihre Regel nicht loeschen.
+  const accountId = reset();
+  const task = insertTask({ accountId, title: 'Blumen giessen' });
+  db.prepare('UPDATE tasks SET outbound_dirty = 1 WHERE id = ?').run(task.id);
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks',
+    indexOf('todo-1@test', serverTodo({ extra: ['RRULE:FREQ=DAILY;INTERVAL=3'] })));
+  assert.match(client.calls.updated[0].data, /\r\nRRULE:FREQ=DAILY;INTERVAL=3\r\n/);
+});
+
+// RFC 5545 §3.8.2.4: DTSTART ist in jeder Komponente mit RRULE Pflicht - DUE
+// ersetzt den Anker nicht (Codex-Befund auf #2370). Gleicher Wert und Typ wie DUE.
+test('Eine wiederkehrende Aufgabe traegt DTSTART im Wert und Typ von DUE (#2350)', async () => {
+  const dated = icsFieldsForTask({ title: 'x', status: 'open', due_date: '2026-11-02', is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY' });
+  assert.deepStrictEqual(dated.DTSTART, dated.DUE);
+  assert.strictEqual(dated.DTSTART.params, ';VALUE=DATE');
+  const timed = icsFieldsForTask({ title: 'x', status: 'open', due_date: '2026-11-02', due_time: '07:00', is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY' }, false, 'Europe/Berlin');
+  assert.deepStrictEqual(timed.DTSTART, { value: '20261102T060000Z', params: '' });
+
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=WEEKLY', { due_date: '2026-11-02' });
+  const created = buildTodoICS('tasks', task, uid);
+  assert.match(created, /\r\nDTSTART;VALUE=DATE:20261102\r\n/);
+  // Spaeter verschobene Faelligkeit: DTSTART zieht mit, statt alt stehen zu bleiben.
+  db.prepare("UPDATE tasks SET due_date = '2026-11-09', outbound_dirty = 1 WHERE id = ?").run(task.id);
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf(uid, created));
+  const data = client.calls.updated[0].data;
+  assert.strictEqual(data.match(/^DTSTART[;:]/gm)?.length, 1);
+  assert.match(data, /\r\nDTSTART;VALUE=DATE:20261109\r\n/);
+});
+
+// Codex-Befund auf #2370: an einem fremden Eintrag schrieb das Einschalten eine
+// RRULE, das Ausschalten nahm sie nie wieder weg. Die Regel, die Yuvomi dort
+// schreibt, traegt deshalb eine Marke; nur eine RRULE, die noch genau ihr
+// entspricht, nimmt Yuvomi wieder weg.
+test('An einem fremden Eintrag nimmt Yuvomi nur die eigene Regel wieder weg (#2350)', async () => {
+  const accountId = reset();
+  const task = insertTask({ accountId, title: 'Blumen giessen', due_date: '2026-11-02' });
+  db.prepare("UPDATE tasks SET is_recurring = 1, recurrence_rule = 'FREQ=WEEKLY', outbound_dirty = 1 WHERE id = ?").run(task.id);
+  let client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf('todo-1@test'));
+  const written = client.calls.updated[0].data;
+  assert.match(written, /\r\nRRULE:FREQ=WEEKLY\r\n/);
+
+  // Ausschalten: die von Yuvomi geschriebene Regel verschwindet.
+  db.prepare('UPDATE tasks SET is_recurring = 0, recurrence_rule = NULL, outbound_dirty = 1 WHERE id = ?').run(task.id);
+  client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf('todo-1@test', written));
+  assert.ok(!/^RRULE:/m.test(client.calls.updated[0].data), 'Yuvomis Regel blieb auf dem Server stehen');
+
+  // Hat die andere App die Regel inzwischen selbst geaendert, gehoert sie ihr.
+  const changedThere = written.replace('RRULE:FREQ=WEEKLY', 'RRULE:FREQ=DAILY');
+  db.prepare('UPDATE tasks SET outbound_dirty = 1 WHERE id = ?').run(task.id);
+  client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf('todo-1@test', changedThere));
+  assert.match(client.calls.updated[0].data, /\r\nRRULE:FREQ=DAILY\r\n/);
+});
+
+// Codex-Befund auf #2370: RRULE und Marke wurden als erste Fundstelle im ganzen
+// Objekt gelesen - eine fuehrende VTIMEZONE lieferte ihre STANDARD-Regel, und
+// Yuvomis eigene Regel blieb beim Abschalten fuer immer stehen.
+test('Marke und Regel werden aus dem VTODO gelesen, nicht aus der VTIMEZONE davor (#2350)', async () => {
+  const accountId = reset();
+  const task = insertTask({ accountId, title: 'Blumen giessen', due_date: '2026-11-02' });
+  const withZone = serverTodo({ extra: ['RRULE:FREQ=WEEKLY', 'X-YUVOMI-RRULE:FREQ=WEEKLY'] }).replace(
+    'BEGIN:VTODO',
+    ['BEGIN:VTIMEZONE', 'TZID:Europe/Berlin', 'BEGIN:STANDARD', 'DTSTART:19701025T030000',
+      'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU', 'TZOFFSETFROM:+0200', 'TZOFFSETTO:+0100',
+      'END:STANDARD', 'END:VTIMEZONE', 'BEGIN:VTODO'].join('\r\n'),
+  );
+  db.prepare('UPDATE tasks SET outbound_dirty = 1 WHERE id = ?').run(task.id);
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf('todo-1@test', withZone));
+  const data = client.calls.updated[0].data;
+  assert.ok(!/RRULE:FREQ=WEEKLY\r\n/.test(data), 'Yuvomis Regel blieb am VTODO stehen');
+  assert.match(data, /RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU/, 'die Zonenregel bleibt unberuehrt');
+});
