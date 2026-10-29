@@ -3453,6 +3453,17 @@ async function openFabModal(page) {
     }
     if (!panel) return { skipped: 'Aktionsmenue oeffnete kein Modal' };
 
+    // DIE EINGEKLAPPTEN ABSCHNITTE WERDEN AUFGEKLAPPT (R24 S15). Seltene
+    // Felder stehen in `details.form-advanced` (modal.js, "Weitere Angaben").
+    // Ihr Inhalt ist bei geschlossenem `<details>` nicht gezeichnet, wird von
+    // getBoundingClientRect aber trotzdem ausgelegt - die Sonde mass ihn
+    // bisher in einem Zustand, den niemand sieht (die Farbreihe des Termins
+    // lag bei y=1325 in einem 563px hohen Koerper, Scrollhoehe 814). Gemessen
+    // wird jetzt, was ein Tipp auf "Weitere Angaben" zeigt; ein Klick auf das
+    // `<summary>` ist eine Sicht, kein Schreiben.
+    for (const fold of panel.querySelectorAll('details:not([open])')) fold.open = true;
+    await wait(300);
+
     const path3 = (el) => {
       const parts = [];
       for (let n = el; n && n.nodeType === 1 && parts.length < 3; n = n.parentElement) {
@@ -3465,8 +3476,11 @@ async function openFabModal(page) {
       return parts.join(' > ');
     };
     // Dieselben zwei Ausnahmen wie in Sonde 10 - siehe Sondenkommentar.
+    // Dazu, was nicht gezeichnet wird (dieselbe Pruefung wie in Sonde 4):
+    // `content-visibility`, ein geschlossenes `<details>` darueber.
     const vis = (el) => {
       if (el.closest('[aria-hidden="true"], .sr-only')) return false;
+      if (typeof el.checkVisibility === 'function' && !el.checkVisibility()) return false;
       const r = el.getBoundingClientRect();
       const cs = getComputedStyle(el);
       return r.width > 1 && r.height > 1 && cs.visibility !== 'hidden' && cs.display !== 'none';
@@ -3475,6 +3489,38 @@ async function openFabModal(page) {
     const fields = [...panel.querySelectorAll('input:not([type=hidden]), select, textarea')].filter(vis);
     const targets = [...panel.querySelectorAll('button, [role="button"], a[href], input[type=checkbox], input[type=radio], select')].filter(vis);
     const min = window.innerWidth < 768 ? 44 : 24;
+
+    // DIE BOX IST NICHT DIE TREFFERFLAECHE - Falle 1 aus Sonde 4, hier erst
+    // seit R24 S15 gebraucht. Bis dahin stand in keinem Dialog ein Knopf, der
+    // seine Flaeche per `::before` dehnt; der Farbwaehler (utils/color-picker.js)
+    // ist seit R24 eine radiogroup aus echten <button>s - vorher waren es
+    // `div[role=radio]`, die diese Sonde gar nicht fragte - und ist 28px gross
+    // bei 44/48px Trefferflaeche. Getastet wird wie in Sonde 4 mit
+    // elementFromPoint vom Zentrum nach aussen, und nur, wo die Box allein
+    // nicht reicht. Das Tasten zaehlt, was WIRKLICH trifft: ueberlappen zwei
+    // Nachbarflaechen, gewinnt die obere, und die untere misst kleiner. Genau
+    // das war der Befund - 40x36 statt der versprochenen 48 (layout.css).
+    // Liegt das Zentrum unter etwas anderem (Fusszeile), bleibt es bei der Box.
+    const tasted = (el) => {
+      el.scrollIntoView({ block: 'center', inline: 'nearest' });
+      const r = el.getBoundingClientRect();
+      const cx = Math.round(r.left + r.width / 2);
+      const cy = Math.round(r.top + r.height / 2);
+      const mine = (x, y) => {
+        const hit = document.elementFromPoint(x, y);
+        return !!hit && (hit === el || el.contains(hit));
+      };
+      if (!mine(cx, cy)) return { w: r.width, h: r.height };
+      const reach = (dx, dy) => {
+        let n = 0;
+        while (n < min && mine(cx + dx * (n + 1), cy + dy * (n + 1))) n += 1;
+        return n;
+      };
+      return {
+        w: Math.max(r.width, reach(-1, 0) + reach(1, 0) + 1),
+        h: Math.max(r.height, reach(0, -1) + reach(0, 1) + 1),
+      };
+    };
 
     return {
       title: (panel.querySelector('.modal-panel__title, h2, h3')?.textContent || '').trim().slice(0, 40),
@@ -3503,10 +3549,14 @@ async function openFabModal(page) {
         const box = label && (label.control === el || label.contains(el)) ? label.getBoundingClientRect() : r;
         const w = Math.max(r.width, box.width);
         const h = Math.max(r.height, box.height);
-        return w < min && h < min;
+        if (w >= min || h >= min) return false;
+        const hit = tasted(el);
+        return hit.w < min && hit.h < min;
       }).map((el) => {
         const r = el.getBoundingClientRect();
-        return `${path3(el)} ${Math.round(r.width)}x${Math.round(r.height)} (min ${min})`;
+        const hit = tasted(el);
+        return `${path3(el)} ${Math.round(r.width)}x${Math.round(r.height)}, `
+          + `getastet ${Math.round(hit.w)}x${Math.round(hit.h)} (min ${min})`;
       }),
     };
   });
