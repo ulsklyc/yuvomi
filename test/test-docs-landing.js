@@ -4234,7 +4234,7 @@ const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
 
 function releaseFacts(pkg, changelog) {
   const version = JSON.parse(pkg).version;
-  const m = changelog.match(new RegExp(String.raw`^## \[${version.replace(/\./g, '\\.')}\] - (\d{4}-\d{2}-\d{2})`, 'm'));
+  const m = changelog.match(new RegExp(String.raw`^## \[${version.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}\] - (\d{4}-\d{2}-\d{2})`, 'm'));
   return { version, date: m ? m[1] : null };
 }
 
@@ -4448,10 +4448,18 @@ test('der Ausschnitt-Guard erkennt den Schaden, gegen den er gebaut ist', () => 
  */
 const EM_ALLOWED = ['hero_h1_em', 'cta_title'];
 
+/* Schneidet wiederholt, bis nichts mehr passt: ein einmaliger Durchlauf
+ * liesse verschachtelte Reste wie "<scr<script></script>ipt>" stehen. */
+function stripUntilStable(text, re) {
+  let prev;
+  do { prev = text; text = text.replace(re, ''); } while (text !== prev);
+  return text;
+}
+
 function headlineEmFindings(html) {
   const found = [];
-  const body = stripComments(html).replace(/<style\b[\s\S]*?<\/style>/gi, '');
-  const markup = body.replace(/<script\b[\s\S]*?<\/script>/gi, '');
+  const body = stripUntilStable(stripComments(html), /<style\b[\s\S]*?<\/style\s*>/gi);
+  const markup = stripUntilStable(body, /<script\b[\s\S]*?<\/script\s*>/gi);
   for (const m of markup.matchAll(/<em\b[^>]*>/g)) {
     const own = (m[0].match(/data-t="([^"]+)"/) || [])[1];
     const host = (markup.slice(Math.max(0, m.index - 300), m.index).match(/data-t="([^"]+)"[^<]*$/) || [])[1];

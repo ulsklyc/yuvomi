@@ -2882,7 +2882,12 @@
     return one + ' ' + w[0] + 'w, ' + two + ' ' + w[1] + 'w'
       + (w[2] ? ', ' + path.replace(/\.png$/, '@2400.webp') + ' ' + w[2] + 'w' : '');
   }
+  /* Bildpfade kommen aus data-Attributen dieser Seite; nur ein Pfad unter
+     screenshots/ aus Kleinbuchstaben, Ziffern, "/", "_" und "-" erreicht
+     src und srcset. */
+  var SHOT_PATH = /^screenshots\/[a-z0-9\/_-]+(\.png)?$/;
   function shotSrc(img, path, englishBase){
+    if (!SHOT_PATH.test(path)) return;
     img.onerror = function(){
       img.onerror = null;
       if (englishBase && path !== englishBase) { shotSrc(img, englishBase, null); return; }
@@ -2917,6 +2922,7 @@
      geladen, wenn die Karte naht - bis dahin hat dieses Skript getauscht);
      fehlt eine Sprachfassung, faellt sie auf die englische zurueck. */
   function cropSrc(img, path, en){
+    if (!SHOT_PATH.test(path)) return;
     img.onerror = function(){ img.onerror = null; if (path !== en) cropSrc(img, en, en); };
     img.srcset = path + '@1x.webp 320w, ' + path + '.webp 640w, ' + path + '@3x.webp 960w';
     img.src = path + '.webp';
