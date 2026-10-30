@@ -2892,7 +2892,7 @@
       img.onerror = null;
       if (englishBase && path !== englishBase) { shotSrc(img, englishBase, null); return; }
       img.srcset = '';
-      img.src = path;
+      if (SHOT_PATH.test(path)) img.src = path;
     };
     if (img.dataset.sizes) img.sizes = img.dataset.sizes;
     img.srcset = srcsetFor(path, img.dataset.sizes, img.dataset.shotProfile === 'lead');

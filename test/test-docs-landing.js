@@ -4458,8 +4458,8 @@ function stripUntilStable(text, re) {
 
 function headlineEmFindings(html) {
   const found = [];
-  const body = stripUntilStable(stripComments(html), /<style\b[\s\S]*?<\/style\s*>/gi);
-  const markup = stripUntilStable(body, /<script\b[\s\S]*?<\/script\s*>/gi);
+  const body = stripUntilStable(stripComments(html), /<style\b[\s\S]*?<\/style[^>]*>/gi);
+  const markup = stripUntilStable(body, /<script\b[\s\S]*?<\/script[^>]*>/gi);
   for (const m of markup.matchAll(/<em\b[^>]*>/g)) {
     const own = (m[0].match(/data-t="([^"]+)"/) || [])[1];
     const host = (markup.slice(Math.max(0, m.index - 300), m.index).match(/data-t="([^"]+)"[^<]*$/) || [])[1];
