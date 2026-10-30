@@ -30,6 +30,7 @@ process.env.SESSION_SECRET = 'dashboard-permissions-test-secret';
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { resolvePermissions, buildSessionModuleAccess, PERMISSION_MODULES } = await import('../server/permissions.js');
 const { moduleForPath } = await import('../server/scopes.js');
+const { DISPLAY_SCOPES } = await import('../server/display-scopes.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 
 const moduleDatabase = get();
@@ -588,6 +589,29 @@ test('Countdown per Token: `tasks:read` allein lässt nur die Aufgabe herunterz�
   assert.deepEqual(body.countdowns.map((c) => c.source), ['task']);
   assert.equal(body.countdownTotal, 1, 'die Gesamtzahl meint dieselbe Menge wie der Schnitt');
   assert.ok(!JSON.stringify(body).includes('Elterngespräch Schule'));
+});
+
+test('Countdown per Token: ein Dokument zählt nur mit `documents:read` (#1705)', async () => {
+  clearModuleDenials(KID);
+  const id = db.prepare(`
+    INSERT INTO family_documents (name, original_name, mime_type, file_size, content_data, created_by, expires_at)
+    VALUES ('Reisepass Token-Probe', 'pass.pdf', 'application/pdf', 1, '', ?, ?)
+  `).run(PARENT, inThreeDays).lastInsertRowid;
+  try {
+    const ohne = await dashboardWithScopes(KID, ['dashboard:read', 'tasks:read']);
+    assert.deepEqual(ohne.countdowns.map((c) => c.source), ['task'], '`dashboard:read` öffnet die Übersicht, nicht das Dokument');
+    assert.equal(ohne.countdownTotal, 1, 'die Gesamtzahl verrät das Dokument auch nicht');
+    assert.ok(!JSON.stringify(ohne).includes('Reisepass Token-Probe'));
+
+    const mit = await dashboardWithScopes(KID, ['dashboard:read', 'tasks:read', 'documents:read']);
+    assert.deepEqual(mit.countdowns.map((c) => c.source).sort(), ['document', 'task']);
+    assert.equal(mit.countdownTotal, 2);
+
+    const display = await dashboardWithScopes(KID, [...DISPLAY_SCOPES]);
+    assert.ok(!JSON.stringify(display).includes('Reisepass Token-Probe'), 'ein Wandtablett hat das Modul nicht');
+  } finally {
+    db.prepare('DELETE FROM family_documents WHERE id = ?').run(id);
+  }
 });
 
 test('`write` schließt `read` ein, und ein Scope erweitert keine Rollensperre', async () => {

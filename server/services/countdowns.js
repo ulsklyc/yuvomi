@@ -238,6 +238,13 @@ const COUNTDOWN_SOURCES = [
 ];
 
 /**
+ * Aus diesen Modulen liest die Kachel. `hiddenModulesFor()` prueft Token-Scopes
+ * nur fuer die Module, die man ihm nennt; die Route nennt diese Liste, damit
+ * eine neue Quelle die Pruefung nicht verpasst.
+ */
+export const COUNTDOWN_MODULES = COUNTDOWN_SOURCES.map((source) => source.module);
+
+/**
  * Alle für `userId` sichtbaren Countdowns, nach Nähe sortiert.
  *
  * @param {object} d            Offene DB-Verbindung
