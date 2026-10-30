@@ -3648,7 +3648,8 @@ test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () =
   const lift = html.replace('.plat-card:hover { transform: translateY(-1px);', '.plat-card:hover { transform: translateY(-4px);');
   assert.notEqual(lift, html);
   assert.ok(hit(platLiftFindings(lift), /hebt die Karte 4px/));
-  const nameless = site.replace('  .nav-gh-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }', '  .nav-gh-label { display: none; }');
+  // Seit S4 (Critique 2026-10-30) auf jeder Breite nur das Symbol: die Regel steht ohne Medienabfrage.
+  const nameless = site.replace('\n.nav-gh-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }', '\n.nav-gh-label { display: none; }');
   assert.notEqual(nameless, site);
   assert.ok(hit(ghNameFindings([nameless]), /nimmt dem Leistenknopf den Namen/));
 });
@@ -4362,7 +4363,48 @@ test('der Ausschnitt-Guard erkennt den Schaden, gegen den er gebaut ist', () => 
   assert.deepEqual(cropFindings(read('index.html').replace(/data-crop=/g, 'data-x='), build, all), ['keine Ausschnitte (data-crop) auf der Seite - Muster veraltet?']);
 });
 
-// ── (28) Messbefunde und Bedienelemente (S4, Critique 2026-10-30) ─────────────
+// ── (28) Bedienelemente, Bewegung, Messbefunde (S4, Critique 2026-10-30) ─────
+/**
+ * Die Stimme bleibt selten. Bis S4 trug JEDER Sektionskopf ein kursiv-
+ * violettes <em> (achtmal auf der Seite), und die Betonung las sich als
+ * Schriftart, nicht als Betonung. Erlaubt sind die h1 (hero_h1_em) und der
+ * Schluss (cta_title) - im Markup wie in beiden Woerterbuechern.
+ */
+const EM_ALLOWED = ['hero_h1_em', 'cta_title'];
+
+function headlineEmFindings(html) {
+  const found = [];
+  const body = stripComments(html).replace(/<style\b[\s\S]*?<\/style>/gi, '');
+  const markup = body.replace(/<script\b[\s\S]*?<\/script>/gi, '');
+  for (const m of markup.matchAll(/<em\b[^>]*>/g)) {
+    const own = (m[0].match(/data-t="([^"]+)"/) || [])[1];
+    const host = (markup.slice(Math.max(0, m.index - 300), m.index).match(/data-t="([^"]+)"[^<]*$/) || [])[1];
+    const key = own || host || '?';
+    if (!EM_ALLOWED.includes(key)) found.push(`Markup: <em> in ${key}`);
+  }
+  for (const lang of ['en', 'de']) {
+    const block = dictBlock(html, lang);
+    for (const m of block.matchAll(/(\w+):\s*(['"])((?:\\.|(?!\2).)*)\2/g)) {
+      if (/<em>/.test(m[3]) && !EM_ALLOWED.includes(m[1])) found.push(`T.${lang}.${m[1]}: <em>`);
+    }
+  }
+  return found;
+}
+
+test('index.html: kursiv-violett betont nur die h1 und den Schluss', () => {
+  assert.deepEqual(headlineEmFindings(read('index.html')), []);
+});
+
+test('der Betonungs-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const old = html.replace("ho_title:'Everything in it works together.'", "ho_title:'Everything in it <em>works together.</em>'")
+    .replace('data-t="ho_title">Everything in it works together.</h2>', 'data-t="ho_title">Everything in it <em>works together.</em></h2>');
+  assert.notEqual(old, html);
+  assert.deepEqual(headlineEmFindings(old), ['Markup: <em> in ho_title', 'T.en.ho_title: <em>']);
+  // Die erlaubten zwei bleiben still.
+  assert.ok(/<em data-t="hero_h1_em">/.test(html) && /cta_title:'[^']*<em>/.test(html), 'Vorbedingung: h1 und Schluss tragen ihr <em>');
+});
+
 /**
  * Das LCP-Bild wird auf JEDER Breite vorgeladen. Bis S4 nur am breiten
  * Schirm (`if (!n)`): am Telefon war damals der Text das LCP-Element. Seit S3
@@ -4389,4 +4431,114 @@ test('der Preload-Breiten-Guard erkennt den Schaden, gegen den er gebaut ist', (
     .replace("        document.head.appendChild(k);\n", "        document.head.appendChild(k);\n        }\n");
   assert.notEqual(narrowOnly, html);
   assert.equal(heroPreloadEverywhereFindings(narrowOnly).length, 1);
+});
+
+/**
+ * Die Leiste: Sprung, Sprache und Theme sind EINE Glasgruppe (.nav-group),
+ * Sprache ein Segment mit der gelesenen Sprache als erhabenem Inset
+ * (data-cur, gezeichnet als ::before mit leerem Alternativtext - als <span>,
+ * auch aria-hidden, zaehlte axe "ENDE" als sichtbares Label), Theme mit
+ * sichtbarem Zustand (.nav-theme-label), GitHub auf jeder Breite nur Symbol.
+ * Auf allen Seiten, die den Knopf tragen.
+ */
+function barGroupFindings(pages, siteCss) {
+  const found = [];
+  for (const [page, html] of pages) {
+    const head = (stripComments(html).match(/<header class="site-bar">[\s\S]*?<\/header>/) || [''])[0];
+    const group = (head.match(/<div class="nav-group">([\s\S]*?)\n\s*<\/div>/) || [])[1];
+    if (!group) { found.push(`${page}: keine .nav-group in der Leiste`); continue; }
+    if (!/id="themeBtn"/.test(group)) found.push(`${page}: Theme-Knopf ausserhalb der Gruppe`);
+    if (/id="langBtn"/.test(head) && !/id="langBtn"/.test(group)) found.push(`${page}: Sprachknopf ausserhalb der Gruppe`);
+    if (/id="navJump"/.test(head) && !/id="navJump"/.test(group)) found.push(`${page}: Sprungmenue ausserhalb der Gruppe`);
+    if (/nav-gh|nav-install/.test(group)) found.push(`${page}: GitHub oder Installieren in der Gruppe`);
+    const lb = (group.match(/<(?:a|button)\b[^>]*id="langBtn"[^>]*>/) || [])[0];
+    if (lb !== undefined && !/\bdata-cur="(?:EN|DE)"/.test(lb)) found.push(`${page}: Sprachsegment ohne data-cur (die gelesene Sprache)`);
+    if (!/<span class="nav-theme-label">/.test(group)) found.push(`${page}: Theme ohne sichtbaren Zustand (.nav-theme-label)`);
+  }
+  const top = [...eachRule(siteCss)].find((r) => r.selector === '.nav-gh-label' && !r.at.length);
+  if (!top || !/clip-path:\s*inset\(50%\)/.test(top.body)) found.push('site.css: .nav-gh-label nicht auf jeder Breite nur fuer Screenreader');
+  return found;
+}
+
+test('docs: Sprung, Sprache und Theme sind eine Glasgruppe, GitHub ein Symbol', () => {
+  assert.deepEqual(barGroupFindings(PAGES.map((p) => [p, read(p)]), read('assets/site.css')), []);
+});
+
+test('der Glasgruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const pages = PAGES.map((p) => [p, read(p)]);
+  const css = read('assets/site.css');
+  const flat = pages.map(([p, h]) => [p, p === 'install.html' ? h.replace('<div class="nav-group">\n', '').replace(/(<button class="nav-btn nav-theme"[\s\S]*?<\/button>)\n\s*<\/div>\n/, '$1\n') : h]);
+  assert.notDeepEqual(flat, pages);
+  assert.deepEqual(barGroupFindings(flat, css), ['install.html: keine .nav-group in der Leiste']);
+  const noSeg = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace(' data-cur="DE"', '') : h]);
+  assert.notDeepEqual(noSeg, pages);
+  assert.deepEqual(barGroupFindings(noSeg, css), ['datenschutz.html: Sprachsegment ohne data-cur (die gelesene Sprache)']);
+  const ghWord = css.replace('\n.nav-gh-label { position: absolute;', '\n@media (max-width: 700px) {\n.nav-gh-label { position: absolute;').replace('white-space: nowrap; }\n/* Phones.', 'white-space: nowrap; }\n}\n/* Phones.');
+  assert.notEqual(ghWord, css);
+  assert.deepEqual(barGroupFindings(pages, ghWord), ['site.css: .nav-gh-label nicht auf jeder Breite nur fuer Screenreader']);
+});
+
+/**
+ * Schwebende Pillen. Die Install-Pille weicht auch der Sektion Einrichten
+ * (#install) - von dort bis zum Ende ist lueckenlos ein Besitzer im Bild;
+ * auf Deutsch blieb sie vorher am Seitenende stehen (B, 98 %). "Nach oben"
+ * kommt erst nach der halben Seite (site.js), am Telefon erst mit der
+ * Fusszeile (html.pill-end), deren Band frei ist.
+ */
+function floatingPillFindings(html, siteJs) {
+  const found = [];
+  const body = stripComments(html);
+  const owners = (body.match(/var owners = \[([^\]]*)\]/) || [])[1] || '';
+  if (!/getElementById\('install'\)/.test(owners)) found.push('Install-Pille: #install ist kein Besitzer - sie schwebt ueber dem eigenen Ziel');
+  const end = (body.match(/classList\.toggle\('pill-end',[^\n]*/) || [''])[0];
+  if (/ctaBox/.test(end)) found.push('pill-end schon mit der Schlusskarte - "Nach oben" laege dort auf Text');
+  if (!/scrollHeight \* 0\.5/.test(siteJs)) found.push('site.js: "Nach oben" kommt nicht erst nach der halben Seite');
+  return found;
+}
+
+test('index.html: die schwebenden Pillen weichen dem Einrichten und kommen spaet', () => {
+  assert.deepEqual(floatingPillFindings(read('index.html'), read('assets/site.js')), []);
+});
+
+test('der Pillen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const js = read('assets/site.js');
+  const old = html.replace(", document.getElementById('install'), ctaBox, foot]", ', ctaBox, foot]')
+    .replace("toggle('pill-end', inView.indexOf(foot) >= 0)", "toggle('pill-end', inView.indexOf(ctaBox) >= 0 || inView.indexOf(foot) >= 0)");
+  assert.notEqual(old, html);
+  assert.equal(floatingPillFindings(old, js).length, 2);
+  const early = js.replace('document.documentElement.scrollHeight * 0.5', 'innerHeight');
+  assert.notEqual(early, js);
+  assert.deepEqual(floatingPillFindings(html, early), ['site.js: "Nach oben" kommt nicht erst nach der halben Seite']);
+});
+
+/**
+ * Katalog und Familie. Das Modulsymbol steht IN der h4, nicht als Kachel
+ * davor (Detektor icon-tile-stack, 17x bis S4); und die Familie hat ein
+ * eigenes Bild, seit die Wand in den Hero zog (S3) war sie Text.
+ */
+function catalogFamilyFindings(html) {
+  const found = [];
+  const body = stripComments(html);
+  const tiles = (body.match(/<div class="mod-ico">/g) || []).length;
+  if (tiles) found.push(`${tiles}x .mod-ico als eigene Kachel vor der Ueberschrift`);
+  const cards = (body.match(/<h4><span class="mod-ico">/g) || []).length;
+  if (!cards) found.push('kein Modul traegt sein Symbol in der h4');
+  const fam = (body.match(/<section class="family" id="family">[\s\S]*?<\/section>/) || [''])[0];
+  if (!/<img class="sc"[^>]*data-light="screenshots\//.test(fam)) found.push('#family ohne eigene Aufnahme');
+  return found;
+}
+
+test('index.html: Modulsymbol in der Ueberschrift, die Familie mit eigenem Bild', () => {
+  assert.deepEqual(catalogFamilyFindings(read('index.html')), []);
+});
+
+test('der Katalog-und-Familie-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const tile = html.replace('<h4><span class="mod-ico">', '<div class="mod-ico"></div><h4><span class="x">');
+  assert.notEqual(tile, html);
+  assert.deepEqual(catalogFamilyFindings(tile), ['1x .mod-ico als eigene Kachel vor der Ueberschrift']);
+  const bare = html.replace(/<figure class="fam-phone[\s\S]*?<\/figure>/, '');
+  assert.notEqual(bare, html);
+  assert.deepEqual(catalogFamilyFindings(bare), ['#family ohne eigene Aufnahme']);
 });

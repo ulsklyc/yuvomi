@@ -247,6 +247,10 @@
      mode and the opaque fallbacks below hand it --glass-bg. */
   --bar-glass-bg: rgba(250,250,252,0.74);
   --glass-blur: blur(18px) saturate(180%);
+  /* The recessed ground of the bar's control group (S4, Critique
+     2026-10-30), as in a segmented control: a tint of the text colour, so it
+     works on either theme. */
+  --glass-well: color-mix(in srgb, var(--text-1) 6%, transparent);
 
   /* The top bar's height, one value for all five pages: the legal pages pad
      their column by it, index and install their heroes. */
@@ -534,6 +538,11 @@
 .btn-primary:hover { background: var(--accent-fill-hover); color: var(--accent-ink); box-shadow: var(--shadow-md); }
 .btn-secondary { background: transparent; color: var(--accent); border-color: var(--border); }
 .btn-secondary:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: var(--accent); color: var(--accent); }
+/* Pressed, the secondary fills (S4): the press scale alone left a hairline
+   ring shrinking on the page, while the primary has a surface to push. The
+   fill is the hover tint, one step denser - the control answers under the
+   finger, not only under the pointer. */
+.btn-secondary:active { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
 
 /* The header controls of every page (back to the overview, language, theme,
    GitHub): small capsules with a hairline edge. */
@@ -579,15 +588,50 @@ html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
    bar control may carry the mark. */
 .nav-btn[aria-current="page"], .nav-btn[aria-current="page"]:hover {
   background: var(--accent-soft); color: var(--accent-on-soft); border-color: transparent; box-shadow: none; }
+/* ONE glass group (S4, Critique 2026-10-30): the controls that change how
+   the page reads - jump menu (index only), language, theme - sit in one
+   recessed well, as the app groups a toolbar's view options. Before, five
+   capsules of equal weight stood in a row and the eye had no place to start.
+   Inside the well they lose their own hairline; the press and hover stay.
+   GitHub is a way out and Install the goal: both stay outside. The group
+   carries no backdrop-filter of its own - that would make it the containing
+   block of the jump menu's list, which hangs from the bar on a phone. */
+.nav-group { display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: var(--r-full);
+  background: var(--glass-well); box-shadow: inset 0 0 0 1px var(--border); }
+.nav-group > .nav-btn, .nav-group > .nav-jump > summary { border-color: transparent; }
+.nav-group > .nav-btn:hover, .nav-group > .nav-jump > summary:hover { background: var(--surface); border-color: transparent; box-shadow: var(--shadow-sm); }
+/* Language as a segment: both languages visible, the one you read sits on
+   the raised inset (the app's segmented control, #2385), the other is the
+   target. The button is still ONE control that switches - its name starts
+   with the visible target, as before (SC 2.5.3). EN stays left in both
+   languages: the label (the target) moves in front when it is EN. */
+.nav-lang { gap: 0; padding: 3px; }
+.nav-lang svg { display: none; }
+/* The raised segment is a pseudo-element with an empty alternative text
+   (content: ... / ""): as a span, even aria-hidden, its letters counted as
+   visible label text, and "ENDE" no longer matched the name (axe
+   label-content-name-mismatch, SC 2.5.3). data-cur carries the language read. */
+.nav-lang::before, .nav-lang-label { display: grid; place-items: center; min-width: 34px; height: 36px; padding: 0 8px; border-radius: var(--r-full); }
+.nav-lang::before { content: attr(data-cur); content: attr(data-cur) / ""; background: var(--surface); color: var(--text-1); box-shadow: var(--shadow-sm); }
+.nav-lang[lang="en"] .nav-lang-label { order: -1; }
+.nav-group > .nav-lang:hover { background: transparent; box-shadow: none; }
+.nav-group > .nav-lang:hover .nav-lang-label { color: var(--text-1); }
+/* Theme: the icon says the mode, and on a wide screen the word does too -
+   the state was in the name only, so a sighted reader had to know the three
+   icons (S4). */
+.nav-theme-label { display: none; }
+@media (min-width: 1100px) {
+  .nav-theme-label { display: inline; }
+}
+/* GitHub: an icon with a name for screen readers, on every width (S4). The
+   word next to it made the way out as loud as the controls. */
+.nav-gh { padding: 0; }
+.nav-gh-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* Phones. Each step takes away only what is seen, never a name: the hidden
    labels stay in the accessibility tree (clip, not display: none). */
-@media (max-width: 700px) {
-  .nav-gh { padding: 0; }
-  .nav-gh-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-}
 @media (max-width: 480px) {
   .topbar .nav-logo { font-size: 0; gap: 0; margin-right: 8px; min-width: 44px; }
-  .nav-lang svg { display: none; }
+  .nav-lang::before, .nav-lang-label { min-width: 30px; padding: 0 6px; }
 }
 @media (max-width: 380px) {
   .nav-controls { gap: 6px; }
@@ -604,7 +648,7 @@ html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
 /* Bottom padding: the floating band (see --float-band). Back to top (and on a
    phone the landing page's install pill) floats there; with 48px the pill
    covered the meta line on every page once scrolled to the end. */
-.site-foot { border-top: 1px solid var(--border); padding: 56px 0 calc(var(--float-band) + env(safe-area-inset-bottom, 0px)); background: var(--bg); }
+.site-foot { border-top: 1px solid var(--border); padding: 44px 0 calc(var(--float-band) + env(safe-area-inset-bottom, 0px)); background: var(--bg); }
 .site-foot .foot-in { max-width: calc(var(--bar-maxw) - 48px + 2 * var(--bar-pad, 24px)); margin-inline: auto; padding-inline: var(--bar-pad, 24px); }
 .foot-grid { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
 .foot-brand { max-width: 320px; }
@@ -614,11 +658,11 @@ html:not(.js) button.nav-lang, html:not(.js) .nav-theme { display: none; }
 .foot-col h2 { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin: 0 0 14px; }
 .foot-col a { display: flex; align-items: center; min-height: 44px; font-size: var(--fs-small); color: var(--text-2); text-decoration: none; transition: color .15s; }
 .foot-col a:hover { color: var(--accent); }
-.foot-bottom { margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+.foot-bottom { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
   font-size: var(--fs-meta); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .foot-bottom b { color: var(--text-2); font-weight: 600; }
 @media (max-width: 560px) {
-  .site-foot { padding-top: 44px; }
+  .site-foot { padding-top: 36px; }
   .foot-cols { gap: 28px 40px; }
 }
 
@@ -712,8 +756,10 @@ html { scroll-padding-bottom: var(--float-band); }
 .to-top svg { width: 15px; height: 15px; }
 @media (max-width: 700px) {
   /* index.html: hidden while the install pill holds the band - but at the
-     end of the page, where the pill yields to the closing card and the
-     footer (html.pill-end, index.html), back to top takes the band over.
+     end of the page, where the pill has yielded to the setup section and
+     the closing card and the footer comes in (html.pill-end, index.html;
+     since S4 only the footer, whose band is kept free), back to top takes
+     the band over.
      One floating capsule at a time (S10).
      Hidden by visibility rather than display, so it fades and springs in
      like everywhere else and site.js can measure its corner. */
@@ -738,7 +784,7 @@ html { scroll-padding-bottom: var(--float-band); }
 
    Three kinds, chosen by what arrives (site.js sets the modifier):
    - text and heads (.rv): a fade and 12px of travel, nothing else;
-   - pictures (.rv-media: the gallery shots, the family's wall screen): a
+   - pictures (.rv-media: the gallery shots, the family's notes phone): a
      settle from 96.5% scale, as if the shot were set down on the page;
    - a row of cards: each card as text, delayed by its column (--i, at most
      five steps of --stagger), so a row arrives left to right and a second

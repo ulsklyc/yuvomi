@@ -175,6 +175,9 @@
          dieselbe Breite wie --ar-phone, zwei Drittel der Hoehe, unten
          ausgeblendet. Der volle Bildschirm stand dort 650-900px hoch. */
       --ar-phone-peek: 1320 / 1900;
+      /* Noch kuerzer: nur Kopfzeile und die ersten Eintraege (S4, die
+         Pinnwand der Familie am Telefon). */
+      --ar-phone-glance: 1320 / 1560;
     }
 
     /* scroll-padding-bottom (was per Tab fokussiert wird, scrollt ueber das
@@ -235,14 +238,15 @@
        bedienbar. Escape und das Schliessen beim Wegfokussieren kommen NICHT
        vom Browser - der Kommentar behauptete es bis 2026-09-29, gemessen blieb
        das Menue offen. Beides steht unten im Skript. */
-    .nav-jump { position: relative; margin-left: auto; margin-right: 14px; }
+    /* Seit S4 (Critique 2026-10-30) das erste Glied der Glasgruppe in der
+       Leiste (.nav-group, site.css) - ohne eigenen Rand und eigene Marge. */
+    .nav-jump { position: relative; }
     .nav-jump summary { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 12px;
       border-radius: var(--r-full); border: 1px solid var(--border); background: none;
       color: var(--text-2); font-size: var(--fs-meta); font-weight: 600; cursor: pointer; list-style: none;
       transition: background-color var(--dur-hover), border-color var(--dur-hover), color var(--dur-hover), transform var(--dur-press) var(--ease-out); }
     .nav-jump summary:active { transform: scale(var(--press-sm)); }
-    .nav-jump[open] summary { background: var(--surface); border-color: var(--border-strong); color: var(--text-1); }
-    .nav-jump + .nav-controls { margin-left: 0; }
+    .nav-jump[open] summary { background: var(--surface); border-color: transparent; box-shadow: var(--shadow-sm); color: var(--text-1); }
     /* Auf- und Zuklappen weich (S3): die Liste blendet ueber ::details-content
        ein und aus - nur Deckkraft, denn ein translate auf dem Pseudo-Element
        machte es zum Bezugsrahmen der absolut gesetzten Liste (mobil haengt
@@ -267,11 +271,21 @@
     /* So breit wie der laengste Eintrag: mit fester Mindestbreite von 232px
        brach "Everything your household needs" / "Alles, was euer Haushalt
        braucht" zweizeilig um, der Eintrag stand 64px statt 44px hoch. */
-    .nav-jump ul { position: absolute; top: calc(100% + 8px); left: 0; z-index: 60;
+    /* Material der Leiste (S4): die helle Glaskante innen, die groessere
+       Ecke und der Schatten eines schwebenden Menues - vorher ein Kasten mit
+       Haarlinie, der zur Leiste nicht gehoerte. Die Flaeche bleibt OPAK: die
+       Leiste ist ein view-transition-Element und damit Backdrop-Root, ein
+       Blur der Liste sieht dort nichts hinter sich, und jede Durchsicht liess
+       die 60px-Zeile des Hero als Geisterschrift unter den Eintraegen stehen
+       (gemessen bei 90 und 97 % Deckkraft, 390px).
+       Die Eintraege sind 46px hoch: mit min-height 44px und Polster rundete
+       die Zeile am Telefon auf 43px ab (gemessen 239x43, B 2026-10-30). */
+    .nav-jump ul { position: absolute; top: calc(100% + 10px); left: 0; z-index: 60;
       width: max-content; min-width: 232px; max-width: calc(100vw - 48px);
-      list-style: none; margin: 0; padding: 7px; border-radius: var(--r-md);
-      background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); }
-    .nav-jump a { display: block; padding: 9px 12px; border-radius: var(--r-sm); min-height: 44px;
+      list-style: none; margin: 0; padding: 6px; border-radius: var(--r-lg);
+      background: var(--surface);
+      border: 1px solid var(--border); box-shadow: inset 0 1px 0 var(--glass-border), var(--shadow-lg); }
+    .nav-jump a { padding: 0 12px; border-radius: var(--r-sm); min-height: 46px;
       display: flex; align-items: center; color: var(--text-2); font-size: var(--fs-small); font-weight: 500; text-decoration: none; }
     .nav-jump a:hover, .nav-jump a:focus-visible { background: var(--bg-alt); color: var(--text-1); }
     /* Die Fortschrittslinie sagt "wie weit", das Menue sagte nicht "wo". Der
@@ -289,7 +303,6 @@
        hat. Platz ist da, weil `.nav-install` unter 700px ohnehin der Pille
        weicht. Der barrierefreie Name steht am `summary` (data-t-aria). */
     @media (max-width: 700px) {
-      .nav-jump { margin-right: 8px; }
       /* Ohne Label faellt das `summary` auf die Breite seines Icons zusammen -
          gemessen 37x40, also unter der Zielgroesse. Die Hoehe steht hier
          ausdruecklich neben der Breite, weil `min-height: 40px` der Basisregel
@@ -390,7 +403,15 @@
       font-size: clamp(1.9rem, 4vw, 3rem); font-weight: 700; line-height: 1.08;
       letter-spacing: -0.035em; margin: 16px 0 14px; text-wrap: balance;
     }
-    .sec-title em { font-style: italic; font-weight: 600; color: var(--accent); }
+    /* Jeder Aufklapp-Pfeil der Seite dreht in derselben ruhigen Zeit (S4):
+       vorher .2s - die halbe Umdrehung schnappte mehr, als sie drehte, und
+       die Antwort darunter blendete langsamer ein (.28s). */
+    :root { --dur-turn: .34s; }
+    /* Kein kursiv-violettes <em> mehr in den Sektionskoepfen (S4, Critique
+       2026-10-30): achtmal auf der Seite nutzte sich die Betonung ab, und
+       keine Zeile stand mehr heraus. Die Stimme gehoert der h1 und dem
+       Schluss (.cta-box h2); die Kapitel tragen ihr Gewicht ueber Groesse
+       (.sec-head.lead) und Schwarz. test:docs-landing haelt das. */
     .sec-desc { font-size: var(--fs-lead); color: var(--text-2); line-height: 1.65; max-width: var(--m-prose); }
     .sec-head.center .sec-desc { margin-left: auto; margin-right: auto; }
     /* Four heads sit flush left under an eyebrow - see it (gallery), it fits
@@ -475,7 +496,7 @@
       color: var(--accent-deep); font-weight: 600; font-size: var(--fs-body); text-decoration: none; }
     .hero-more:hover { text-decoration: underline; text-underline-offset: 4px; }
     .hero-more svg { width: 17px; height: 17px; transition: transform .2s var(--ease-out); }
-    .hero-more:hover svg { transform: translateX(3px); }
+    .hero-more:hover svg, .hero-more:focus-visible svg { transform: translateX(3px); }
     /* Die Antwort auf "und der Rest der Familie?" stand erst bei ~5.200px
        (mobil ~6.000px). Hier steht sie im ersten Bildschirm, mit der Bildmarke
        als Zeichen: drei Kreise, ein Haushalt. Seit S1 (2026-10-30) als leise
@@ -538,6 +559,21 @@
         .hero-frame, .hero-float, .hero-wall { animation: hero-stay linear both; animation-timeline: --hero-shot; animation-range: exit 0% exit 100%; }
         .hero-float { animation-name: hero-lift; }
         .hero-wall { animation-name: hero-lift-s; }
+      }
+    }
+    /* Am Telefon und Tablet dieselbe Tiefe, leiser (S4, Critique 2026-10-30):
+       dort fehlte sie ganz, und die Buehne aus Telefon und Wand lag beim
+       Weiterscrollen flach wie ein Bild. Zwei Ebenen: das Telefon vorn zieht
+       nach oben, die Wand dahinter bleibt etwas zurueck - halbe Wege der
+       Schirmfassung, kein Skalieren (die Maske unten bliebe sonst sichtbar
+       stehen). Beim Laden in Ruhe, wie oben. */
+    @media (prefers-reduced-motion: no-preference) and (max-width: 1024px) {
+      @supports ((animation-timeline: view()) and (animation-range: entry)) {
+        @keyframes hero-front { to { translate: 0 -18px; } }
+        @keyframes hero-back { to { translate: 0 14px; } }
+        .hero-visual { view-timeline: --hero-shot; }
+        .hero-frame, .hero-wall { animation: hero-front linear both; animation-timeline: --hero-shot; animation-range: exit 0% exit 100%; }
+        .hero-wall { animation-name: hero-back; }
       }
     }
 
@@ -769,7 +805,24 @@
     /* Ohne eigenes Bild seit S3: das Wandtablet steht im Hero. Kopf, die drei
        Momente, der Weg der Eingeladenen - untereinander, ohne Leerspalte. */
     .fam-grid { display: grid; grid-template-columns: minmax(0, 1fr);
-      grid-template-areas: "head" "list" "invite"; gap: 36px; }
+      grid-template-areas: "head" "phone" "list" "invite"; gap: 36px; }
+    /* Am Schirm steht die Pinnwand rechts neben dem Kopf (S4), so hoch wie
+       er - die Zeile kostet damit kaum mehr als der Kopf allein (+0,08
+       Bildschirme statt +0,28 neben den untereinander gestellten Momenten,
+       gemessen 1440). Momente und der Weg der Eingeladenen bleiben ueber die
+       volle Breite. */
+    @media (min-width: 861px) {
+      .fam-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 15.5rem); column-gap: 64px;
+        grid-template-areas: "head phone" "list list" "invite invite"; }
+      .fam-grid .fam-head { align-self: center; }
+      .fam-grid .sec-head.split { display: block; }
+      .fam-phone { margin: 0 0 -36px; }
+    }
+    .fam-phone { grid-area: phone; position: relative; width: min(100%, 15.5rem); margin: 0 auto;
+      aspect-ratio: var(--ar-phone-peek); overflow: hidden;
+      border: 7px solid var(--bezel); border-bottom: 0; border-radius: var(--r-phone) var(--r-phone) 0 0; box-shadow: var(--shadow-xl);
+      -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+    .fam-phone img { width: 100%; aspect-ratio: var(--ar-phone); object-fit: cover; object-position: top center; border-radius: var(--r-phone-inset) var(--r-phone-inset) 0 0; }
     .fam-head { grid-area: head; }
     .fam-list { grid-area: list; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px;
       padding-top: 36px; border-top: 1px solid var(--border); }
@@ -805,6 +858,11 @@
         overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: 24px;
         margin-inline: -24px; padding: 26px 24px 14px; scrollbar-width: thin; }
       .fam-item { scroll-snap-align: start; }
+    }
+    /* Am Telefon ein kurzer Blick (S4): Kopfzeile und zwei Notizen reichen
+       als Beleg, und die Sektion war dort schon 1,4 Bildschirme lang. */
+    @media (max-width: 700px) {
+      .fam-phone { width: min(48%, 11rem); aspect-ratio: var(--ar-phone-glance); }
     }
     @media (max-width: 600px) {
       .fam-grid { gap: 28px; }
@@ -912,14 +970,19 @@
        Daumennagelgroesse belegte sie nichts, was der Name nicht auch sagt, und
        kostete mobil 527px. Lesbare Aufnahmen tragen die Galerie und die vier
        Feature-Karten. */
-    .mod-card { display: grid; grid-template-columns: 32px minmax(0, 1fr); column-gap: 12px; align-items: center;
-      padding: 16px 0 20px; border-top: 1px solid var(--border); }
-    .mod-ico { width: 32px; height: 32px; border-radius: var(--r-sm); display: grid; place-items: center;
+    /* Das Symbol steht IN der Ueberschrift, nicht als Kachel darueber (S4,
+       Critique 2026-10-30): im Markup stand die 32px-Kachel als eigenes
+       Element vor der h4 - die Bauform der Feature-Karten-Vorlage, die jeder
+       Generator ausgibt (Detektor icon-tile-stack, 17x). Gezeigt wurde es
+       schon nebeneinander; jetzt ist es auch eins: Name mit Symbol, wie ein
+       Menueeintrag der App. */
+    .mod-card { padding: 16px 0 20px; border-top: 1px solid var(--border); }
+    .mod-ico { flex-shrink: 0; width: 32px; height: 32px; border-radius: var(--r-sm); display: grid; place-items: center;
       color: var(--m); background: color-mix(in srgb, var(--m) 13%, transparent); }
     .mod-ico svg { width: 17px; height: 17px; }
-    .mod-card h4 { font-size: var(--fs-body); font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
-    .mod-card p { grid-column: 1 / -1; margin-top: 9px; font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; }
-    .mod-scope { max-width: var(--m-prose); margin: 44px auto 0; padding-top: 28px; border-top: 1px solid var(--border);
+    .mod-card h4 { display: flex; align-items: center; gap: 12px; font-size: var(--fs-body); font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
+    .mod-card p { margin-top: 9px; font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; }
+    .mod-scope { max-width: var(--m-prose); margin: 32px auto 0; padding-top: 24px; border-top: 1px solid var(--border);
       font-size: var(--fs-body); line-height: 1.7; color: var(--text-2); text-align: center; text-wrap: pretty; }
     @media (max-width: 860px) {
       .mod-group-body, .mod-pair { grid-template-columns: minmax(0, 1fr); }
@@ -974,7 +1037,7 @@
       transition: border-color var(--dur-hover), transform var(--dur-spring) var(--ease-glass); }
     html.js .mod-toggle:hover { border-color: var(--border-strong); }
     html.js .mod-toggle:active { transform: scale(var(--press-sm)); transition-duration: var(--dur-press); transition-timing-function: var(--ease-out); }
-    html.js .mod-toggle svg { width: 16px; height: 16px; color: var(--accent); transition: transform .2s var(--ease-out); }
+    html.js .mod-toggle svg { width: 16px; height: 16px; color: var(--accent); transition: transform var(--dur-turn) var(--ease-out); }
     /* Der Knopf bleibt nach dem Aufklappen stehen und klappt wieder zu. */
     html.js .mod-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
     /* Der zweite, obere Knopf (S10) steht nur aufgeklappt da; [hidden] muss
@@ -1032,7 +1095,7 @@
       font-size: var(--fs-small); font-weight: 600; color: var(--text-2); }
     .plat-sheet > summary::-webkit-details-marker { display: none; }
     .plat-sheet > summary:hover { color: var(--text-1); }
-    .plat-sheet > summary svg { width: 14px; height: 14px; transition: transform .2s var(--ease-out); }
+    .plat-sheet > summary svg { width: 14px; height: 14px; transition: transform var(--dur-turn) var(--ease-out); }
     .plat-sheet[open] > summary svg { transform: rotate(180deg); }
     .plat-sheet .trust-bar { margin-top: 6px; }
     @media (max-width: 860px) {
@@ -1084,7 +1147,7 @@
        platform brand colour (--pc) stays on the logo tint only. */
     .plat-go { grid-area: go; align-self: end; justify-self: start; display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-small); font-weight: 700; color: var(--accent); }
     .plat-go svg { width: 15px; height: 15px; transition: transform .2s var(--ease-out); }
-    .plat-card:hover .plat-go svg { transform: translateX(4px); }
+    .plat-card:hover .plat-go svg, .plat-card:focus-visible .plat-go svg { transform: translateX(3px); }
     /* Telefon: das Logo steht neben dem Namen statt darueber, das Abzeichen
        unter dem Namen statt in der Ecke (dort laege es auf dem Namen). Fuenf Karten untereinander kosteten je 227-248px, das Logo
        allein 58px davon. */
@@ -1101,7 +1164,10 @@
     /* Die Fakten-Leiste und der Knopf in die Anleitung: was vom Schnellstart
        blieb (S4). Die Leiste traegt ihre Haarlinie unten, der Knopf steht
        darunter mit dem Satz zu den zwei plattformlosen Wegen daneben. */
-    .plat-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; margin-top: 32px; }
+    /* Seit S4 (Critique 2026-10-30) in der rechten Spalte unter den Katalogen:
+       dort stand neben der Docker-Karte rund 150px leer, waehrend Knopf und
+       Satz eine eigene Zeile darunter belegten. */
+    .plat-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; margin-top: 28px; }
     .plat-cta .plat-more { margin-top: 0; flex: 1 1 22rem; }
     /* What the reader is actually deciding before they install on the machine
        that will hold their family's health records: what runs, how big it is,
@@ -1143,7 +1209,7 @@
       color: var(--accent-deep); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
     .tb-more summary::-webkit-details-marker { display: none; }
     .tb-more summary:hover { text-decoration-thickness: 2px; }
-    .tb-more summary svg { width: 14px; height: 14px; transition: transform .2s var(--ease-out); }
+    .tb-more summary svg { width: 14px; height: 14px; transition: transform var(--dur-turn) var(--ease-out); }
     .tb-more[open] summary svg { transform: rotate(180deg); }
     .tb-more > span { display: block; margin: 2px 0 8px; }
     /* Flex-Kind mit Block darin: ohne min-width 0 setzte das <details> die
@@ -1188,7 +1254,7 @@
       cursor: pointer; list-style: none; color: var(--accent-deep); font-weight: 600; font-size: var(--fs-small); }
     .long-more summary::-webkit-details-marker { display: none; }
     .long-more summary:hover { text-decoration: underline; text-underline-offset: 3px; }
-    .long-more summary svg { width: 14px; height: 14px; transition: transform .2s var(--ease-out); }
+    .long-more summary svg { width: 14px; height: 14px; transition: transform var(--dur-turn) var(--ease-out); }
     .long-more[open] summary { margin-bottom: 0; }
     .long-more[open] summary svg { transform: rotate(180deg); }
     .long-more > p { padding-bottom: 2px; }
@@ -1226,7 +1292,10 @@
     }
 
     /* ===== CTA ===== */
-    .cta { padding: var(--sec-m) 0; }
+    /* Oben kein eigener Rand (S4, Critique 2026-10-30): Einrichten endet
+       direkt davor mit seinem Kapitelrand, und beide zusammen standen 176px
+       leer zwischen Steckbrief und Karte - der Schluss gehoert zum Weg davor. */
+    .cta { padding: 0 0 var(--sec-m); }
     /* Was a full-bleed violet gradient covering 40% of the viewport (50% on a
        phone) on a page whose design system caps violet at 10%. Drenching the
        plate also forced its own text and button palette - white ink, a white
@@ -1438,22 +1507,24 @@
          Linie darueber beantwortet "wo bin ich", dieses Menue "was kommt noch".
          Als <details> und nicht als Dauerleiste: eine Persuade-Flaeche darf
          ihren ersten Bildschirm nicht an eine Inhaltsangabe verlieren. -->
-    <details class="nav-jump" id="navJump">
-      <summary aria-label="Jump to a section" data-t-aria="jump_aria"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="11" y2="18"/></svg><span data-t="jump_label">Jump to</span></summary>
-      <ul>
-        <li><a href="#swap" data-t="jump_swap">What it replaces</a></li>
-        <li><a href="#handoff" data-t="jump_handoff">Why one app</a></li>
-        <li><a href="#screens" data-t="jump_screens">A day at home</a></li>
-        <li><a href="#family" data-t="jump_family">For the family</a></li>
-        <li><a href="#modules" data-t="jump_modules">What’s inside</a></li>
-        <li><a href="#yours" data-t="jump_yours">Yours to keep</a></li>
-        <li><a href="#longevity" data-t="jump_longevity">Before you commit</a></li>
-        <li><a href="#install" data-t="jump_install">Where it runs</a></li>
-      </ul>
-    </details>
     <div class="nav-controls">
-      <button class="nav-btn nav-lang" id="langBtn" type="button" lang="de" aria-label="DE - Auf Deutsch lesen" title="DE - Auf Deutsch lesen"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg><span class="nav-lang-label">DE</span></button>
-      <button class="nav-btn nav-theme" id="themeBtn" type="button" data-mode="system" aria-label="Theme: system - switch to light" title="Theme: system - switch to light"><svg class="ico-system" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><svg class="ico-light" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg class="ico-dark" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
+      <div class="nav-group">
+        <details class="nav-jump" id="navJump">
+          <summary aria-label="Jump to a section" data-t-aria="jump_aria"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="11" y2="18"/></svg><span data-t="jump_label">Jump to</span></summary>
+          <ul>
+            <li><a href="#swap" data-t="jump_swap">What it replaces</a></li>
+            <li><a href="#handoff" data-t="jump_handoff">Why one app</a></li>
+            <li><a href="#screens" data-t="jump_screens">A day at home</a></li>
+            <li><a href="#family" data-t="jump_family">For the family</a></li>
+            <li><a href="#modules" data-t="jump_modules">What’s inside</a></li>
+            <li><a href="#yours" data-t="jump_yours">Yours to keep</a></li>
+            <li><a href="#longevity" data-t="jump_longevity">Before you commit</a></li>
+            <li><a href="#install" data-t="jump_install">Where it runs</a></li>
+          </ul>
+        </details>
+        <button class="nav-btn nav-lang" id="langBtn" type="button" lang="de" aria-label="DE - Auf Deutsch lesen" title="DE - Auf Deutsch lesen" data-cur="EN"><span class="nav-lang-label">DE</span></button>
+        <button class="nav-btn nav-theme" id="themeBtn" type="button" data-mode="system" aria-label="Theme: system - switch to light" title="Theme: system - switch to light"><svg class="ico-system" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><svg class="ico-light" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg class="ico-dark" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><span class="nav-theme-label">System</span></button>
+      </div>
       <a href="https://github.com/ulsklyc/yuvomi" class="nav-btn nav-gh" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg><span class="nav-gh-label" data-t="nav_gh">GitHub</span></a>
       <a href="install.html" class="nav-btn nav-install"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="nav-install-label" data-t="nav_install">Install</span></a>
     </div>
@@ -1595,7 +1666,7 @@
       jump_screens:'A day at home', jump_swap:'What it replaces', jump_handoff:'Why one app', jump_family:'For the family',
       jump_modules:'What’s inside', jump_longevity:'Before you commit', jump_install:'Where it runs',
       fam_eyebrow:'For the family',
-      fam_title:'On the kitchen wall, in every pocket, <em>for every age.</em>',
+      fam_title:'On the kitchen wall, in every pocket, for every age.',
       fam_desc:'Everyone at home gets their own account from a link and the app on their phone. Only the person who sets it up ever sees a server.',
       fam_1_t:'The tablet on the kitchen wall',
       fam_1_d:'Wall mode shows today’s plan and who is up, readable across the room; when nobody is looking it can show your photos from Immich, and at night it dims. The tablet has an account of its own: tap a task, pick who did it, and the points go to them.',
@@ -1609,7 +1680,7 @@
       fam_inv_2:'Choose a username, unless the invite already set one, and your own password. If your household signs in with single sign-on, there is no password to pick.',
       fam_inv_3:'Sign in, then put Yuvomi on your home screen: tap Install when the app offers it, or on iPhone and iPad open the Share menu and choose Add to Home Screen.',
       swap_rel:'is replaced by',
-      swap_title:'Six apps, <em>and one person who remembers it all.</em>',
+      swap_title:'Six apps, and one person who remembers it all.',
       swap_desc:'Each with its own account and its own copy of your life on someone else’s server, and none knows what the others know. So someone at home keeps the connections in their head. Yuvomi takes that on, and every line below works today.',
       swap_1_a:'a to-do & task app',                 swap_1_b:'<b>Tasks</b>',
       swap_2_a:'a family calendar app',              swap_2_b:'<b>Calendar</b>',
@@ -1624,7 +1695,7 @@
       m_family_t:'Family', m_family_d:'Member profiles with roles, photos and contact details, kept in sync with Contacts and Birthdays.',
       m_api_t:'API tokens', m_api_d:'Access tokens for scripts and tools such as Home Assistant, against a documented OpenAPI 3.1 spec, plus an MCP endpoint at <code>/mcp</code> that lets a client like Claude Desktop drive the API in plain language.',
       ho_eyebrow:'Why one app',
-      ho_title:'Everything in it <em>works together.</em>',
+      ho_title:'Everything in it works together.',
       ho_desc:'Separate apps cannot do this. What happens in one place shows up where it is needed next, with no retyping and nothing to remember. And one search finds it, in any module.',
       ho_1_a:'Meal plan for the week', ho_1_b:'Ingredients on the shopping list',
       ho_1_d:'One import sends every ingredient from the week\'s plan to the shared list, sorted by aisle, with the next seven days pre-selected. Nobody transcribes a recipe into a notes app again.',
@@ -1651,13 +1722,14 @@
       tb_data_k:'Your data', tb_data_v:'One SQLite file at', tb_data_v2:'Copying it is the whole export, unless documents live outside the database.',
       hero_install:'Install Yuvomi', hero_demo:'See a day with Yuvomi',
       hero_house:'One person sets it up. Everyone else gets an invite link and the app on their phone.',
-      gal_eyebrow:'A day at home', gal_title:'From breakfast to bedtime, <em>one plan.</em>',
+      gal_eyebrow:'A day at home', gal_title:'From breakfast to bedtime, one plan.',
       gal_desc:'Real screens, no demo account. In the morning who has to be where, at midday what is on the table, in the evening who did what.',
       gal_meals_k:'Meals', gal_meals_c:'<b>What is for dinner is already decided.</b> The whole week from breakfast to snacks, dragged into place and there for everyone at home.',
       alt_gal_meals:'Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks',
+      alt_fam_notes:"The shared notes board on a phone: pinned notes with emergency numbers, the children's activities and school details, and a holiday checklist",
       alt_fam_wall:"Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers",
       gal_cal_k:'Calendar', gal_cal_c:'<b>Who has to be where, before anyone asks.</b> Google, iCloud and Nextcloud calendars in one view, synced both ways, and the whole day on a single timeline.',
-      proof_modules:'modules', proof_langs:'languages', proof_telemetry:'trackers', proof_mit:'MIT licensed', feat_title:'All of it, <em>and only what you use.</em>',
+      proof_modules:'modules', proof_langs:'languages', proof_telemetry:'trackers', proof_mit:'MIT licensed', feat_title:'All of it, and only what you use.',
       /* "for families" war die eine Stelle, die die Solo-Zusage des Heros
          zurücknahm (Persona-Befund in zwei Läufen); "household" ist die
          Positionierung aus PRODUCT.md und deckt beide Zielgruppen. */
@@ -1685,7 +1757,7 @@
       m_rewards_t:'Rewards', m_rewards_d:'Points on tasks go to whoever did it, with a configurable default for new tasks, a parent-approved catalog, an auditable ledger and pocket money per child.',
       m_recipes_t:'Recipes', m_recipes_d:'Create, duplicate and scale reusable recipes, then pre-fill meal slots or send the ingredients to a shopping list. A self-hosted Mealie or Tandoor instance can be mirrored read-only.',
       m_rem_t:'Reminders', m_rem_d:'Reminders on tasks, events, shifts, subscription renewals, warranties, best-before dates and waste pickups, with an in-app badge, opt-in push notifications and household Gotify, ntfy, webhook or email channels.',
-      m_backup_t:'Backup', m_backup_d:'Scheduled backups with optional WebDAV upload (Nextcloud, ownCloud, Hetzner, etc.). Every restore saves the current state first, and a backup from another installation restores in the browser, no shell needed.', plat_title:'Runs on <em>your</em> hardware',
+      m_backup_t:'Backup', m_backup_d:'Scheduled backups with optional WebDAV upload (Nextcloud, ownCloud, Hetzner, etc.). Every restore saves the current state first, and a backup from another installation restores in the browser, no shell needed.', plat_title:'Runs on your hardware',
       plat_desc:"Yuvomi comes as a Docker container: one packaged program that runs the same on any home server or NAS.",
       plat_docker:'Pre-built image, one <code>compose</code> command - or rootless with Podman on RHEL, Fedora and CentOS Stream.',
       tb_out_proof:'What the site itself stores', tb_out_code:'The update check in the source',
@@ -1707,7 +1779,7 @@
       ho_list_aria:'Four connections between the modules', fam_list_aria:'Three moments at home',
       gal_rew_k:'Rewards', gal_rew_c:'<b>Chores done, points earned, and everyone sees what they are saving for.</b> A parent approves each request, and the history shows who did what.',
       alt_gal_rew:'Yuvomi rewards with requests waiting for a parent’s approval, pocket money, each child’s points and a history of completed tasks',
-      yours_eyebrow:'Yours to keep', yours_title:'It belongs to you, <em>not to us.</em>',
+      yours_eyebrow:'Yours to keep', yours_title:'It belongs to you, not to us.',
       yours_desc:'No account with us, no subscription, no ads and no premium tier that locks half the app away. It runs on a computer in your home and keeps running there.',
       yours_1_t:'Free, and it stays that way.', yours_1_d:'Open source under the MIT license. Every module is included, nothing waits behind a paywall, and anyone can read, keep and run the code.',
       yours_2_t:'On your own disk, encrypted if you want.', yours_2_d:'Everything lives in one database file on your own server, health records and budget included. Switch on encryption (AES-256) and nobody can read that file without your key; the guided installer creates the key for you.',
@@ -1736,7 +1808,7 @@
       jump_screens:'Ein Tag zu Hause', jump_swap:'Was es ersetzt', jump_handoff:'Warum eine App', jump_family:'Für die Familie',
       jump_modules:'Was drin ist', jump_longevity:'Bevor ihr euch festlegt', jump_install:'Wo es läuft',
       fam_eyebrow:'Für die Familie',
-      fam_title:'An der Küchenwand, in jeder Hosentasche, <em>für jedes Alter.</em>',
+      fam_title:'An der Küchenwand, in jeder Hosentasche, für jedes Alter.',
       fam_desc:'Alle zu Hause bekommen per Link ein eigenes Konto und die App aufs Handy. Einen Server sieht nur, wer es einrichtet.',
       fam_1_t:'Das Tablet an der Küchenwand',
       fam_1_d:'Der Wand-Modus zeigt den Tagesplan und wer heute dran ist, lesbar quer durch den Raum; schaut gerade niemand hin, zeigt er auf Wunsch eure Fotos aus Immich, und nachts dimmt er sich. Das Tablet hat ein eigenes Konto: Aufgabe antippen, auswählen, wer sie erledigt hat, und die Punkte gehen an diese Person.',
@@ -1750,7 +1822,7 @@
       fam_inv_2:'Wählt einen Benutzernamen, falls die Einladung keinen vorgibt, und euer eigenes Passwort. Meldet sich euer Haushalt per Single Sign-on an, fällt das Passwort weg.',
       fam_inv_3:'Meldet euch an und holt Yuvomi auf den Startbildschirm: Installieren antippen, wenn die App es anbietet, oder auf iPhone und iPad im Teilen-Menü Zum Home-Bildschirm wählen.',
       swap_rel:'wird ersetzt durch',
-      swap_title:'Sechs Apps, <em>und eine Person, die an alles denkt.</em>',
+      swap_title:'Sechs Apps, und eine Person, die an alles denkt.',
       swap_desc:'Jede mit eigenem Konto und eigener Kopie eures Alltags auf fremden Servern, und keine weiß, was die anderen wissen. Also behält jemand zu Hause die Zusammenhänge im Kopf. Yuvomi nimmt euch das ab, und jede Zeile hier gibt es schon heute.',
       swap_1_a:'eine To-do- und Aufgaben-App',        swap_1_b:'<b>Aufgaben</b>',
       swap_2_a:'eine Familienkalender-App',           swap_2_b:'<b>Kalender</b>',
@@ -1765,7 +1837,7 @@
       m_family_t:'Familie', m_family_d:'Mitgliederprofile mit Rollen, Fotos und Kontaktdaten, synchron mit Kontakten und Geburtstagen.',
       m_api_t:'API-Tokens', m_api_d:'Zugangstokens für Skripte und Werkzeuge wie Home Assistant, gegen eine dokumentierte OpenAPI-3.1-Spezifikation, dazu ein MCP-Endpunkt unter <code>/mcp</code>, über den ein Client wie Claude Desktop die API in natürlicher Sprache bedient.',
       ho_eyebrow:'Warum eine App',
-      ho_title:'Alles darin <em>greift ineinander.</em>',
+      ho_title:'Alles darin greift ineinander.',
       ho_desc:'Genau das können getrennte Apps nicht. Was an einer Stelle passiert, taucht dort auf, wo es als Nächstes gebraucht wird, ohne Abtippen und ohne Dran-Denken. Und eine Suche findet es wieder, in jedem Modul.',
       ho_1_a:'Mahlzeitenplan für die Woche', ho_1_b:'Zutaten auf der Einkaufsliste',
       ho_1_d:'Ein Import schickt alle Zutaten der Wochenplanung nach Gang sortiert auf die geteilte Liste; die nächsten sieben Tage sind schon ausgewählt. Niemand überträgt mehr ein Rezept in eine Notiz-App.',
@@ -1792,13 +1864,14 @@
       tb_data_k:'Eure Daten', tb_data_v:'Eine einzige SQLite-Datei unter', tb_data_v2:'Kopieren ist der ganze Export, solange die Dokumente in der Datenbank liegen.',
       hero_install:'Yuvomi installieren', hero_demo:'Einen Tag mit Yuvomi ansehen',
       hero_house:'Eine Person im Haus richtet es ein. Alle anderen bekommen einen Einladungslink und die App aufs Handy.',
-      gal_eyebrow:'Ein Tag zu Hause', gal_title:'Vom Frühstück bis zum Zubettgehen, <em>ein Plan.</em>',
+      gal_eyebrow:'Ein Tag zu Hause', gal_title:'Vom Frühstück bis zum Zubettgehen, ein Plan.',
       gal_desc:'Echte Bildschirme, kein Demo-Konto. Morgens, wer wann wo sein muss, mittags, was auf den Tisch kommt, abends, wer was erledigt hat.',
       gal_meals_k:'Mahlzeiten', gal_meals_c:'<b>Was es heute gibt, steht schon fest.</b> Die ganze Woche vom Frühstück bis zum Snack, per Ziehen verteilt und für alle zu Hause da.',
       alt_gal_meals:'Yuvomi-Essensplaner mit einer Woche Frühstück, Mittag- und Abendessen und Snacks',
+      alt_fam_notes:'Die gemeinsame Pinnwand am Handy: angeheftete Notizen mit Notfallnummern, den Terminen und Schulinfos der Kinder und einer Checkliste für den Urlaub',
       alt_fam_wall:'Yuvomi im Wand-Modus auf einem Tablet im Querformat: die Uhrzeit in großer Schrift, Termine, Aufgaben und Einkauf des Tages, wer heute dran ist, das Wetter und Küchentimer auf Fingertipp',
       gal_cal_k:'Kalender', gal_cal_c:'<b>Wer wann wo sein muss, bevor jemand fragt.</b> Google-, iCloud- und Nextcloud-Kalender in einer Ansicht, in beide Richtungen abgeglichen, und der ganze Tag auf einer Zeitleiste.',
-      proof_modules:'Module', proof_langs:'Sprachen', proof_telemetry:'Tracker', proof_mit:'MIT-lizenziert', feat_title:'Alles drin, <em>und nur, was ihr nutzt.</em>',
+      proof_modules:'Module', proof_langs:'Sprachen', proof_telemetry:'Tracker', proof_mit:'MIT-lizenziert', feat_title:'Alles drin, und nur, was ihr nutzt.',
       feat_desc:'Gegliedert wie in der App. Was euer Haushalt nicht braucht, schaltet ein Admin für alle ab, und es verschwindet aus dem Menü. Fehlt etwas, lassen sich Erweiterungsmodule dazuholen.',
       f_tasks_k:'Aufgaben', f_tasks_t:'Alle wissen, was zu tun ist.', f_tasks_d:'Gemeinsame Aufgaben mit Fristen, Prioritäten, Unteraufgaben, Tags und Wiederholungen, mehreren Mitgliedern gleichzeitig zuweisbar.',
       f_tasks_l1:'Kanban-Board mit Ein-Tipp-Status', f_tasks_l2:'Mehrere Personen an einer Aufgabe, auf einen Blick', f_tasks_l3:'Optionaler Zwei-Wege-Sync mit CalDAV-Erinnerungslisten', f_tasks_l4:'Aufgabe sperren, damit nur Ersteller:in und Admins sie \u00e4ndern', f_tasks_l5:'Ein Verlauf, was erledigt wurde - nach Tag und nach Mitglied',
@@ -1823,7 +1896,7 @@
       m_rewards_t:'Belohnungen', m_rewards_d:'Punkte auf Aufgaben bekommt, wer sie erledigt hat, mit einstellbarem Standardwert für neue Aufgaben, Prämien-Katalog mit Eltern-Freigabe, nachvollziehbarem Punktekonto und Taschengeld je Kind.',
       m_recipes_t:'Rezepte', m_recipes_d:'Wiederverwendbare Rezepte erstellen, duplizieren und skalieren, dann Mahlzeiten vorausfüllen oder die Zutaten auf die Einkaufsliste schicken. Eine selbst gehostete Mealie- oder Tandoor-Instanz lässt sich nur lesend daneben spiegeln.',
       m_rem_t:'Erinnerungen', m_rem_d:'Erinnerungen für Aufgaben, Termine, Schichten, Abo-Verlängerungen, Garantien, Mindesthaltbarkeit und Abfuhrtermine, mit In-App-Badge, optionalen Push-Benachrichtigungen und Gotify-, ntfy-, Webhook- oder E-Mail-Kanälen des Haushalts.',
-      m_backup_t:'Backup', m_backup_d:'Geplante Backups mit optionalem WebDAV-Upload (Nextcloud, ownCloud, Hetzner\xa0usw.). Vor jeder Wiederherstellung wird der aktuelle Stand gesichert, und ein Backup einer anderen Installation spielt ihr ohne Shell im Browser ein.', plat_title:'Läuft auf <em>eurer</em> Hardware',
+      m_backup_t:'Backup', m_backup_d:'Geplante Backups mit optionalem WebDAV-Upload (Nextcloud, ownCloud, Hetzner\xa0usw.). Vor jeder Wiederherstellung wird der aktuelle Stand gesichert, und ein Backup einer anderen Installation spielt ihr ohne Shell im Browser ein.', plat_title:'Läuft auf eurer Hardware',
       plat_desc:'Yuvomi kommt als Docker-Container: ein fertig verpacktes Programm, das auf jedem Heimserver und jedem NAS gleich läuft.',
       plat_docker:'Fertiges Image, ein <code>compose</code>-Befehl - oder rootless mit Podman auf RHEL, Fedora und CentOS Stream.',
       tb_out_proof:'Was die Website selbst speichert', tb_out_code:'Die Versionsprüfung im Quelltext',
@@ -1842,7 +1915,7 @@
       ho_list_aria:'Vier Verbindungen zwischen den Modulen', fam_list_aria:'Drei Momente zu Hause',
       gal_rew_k:'Belohnungen', gal_rew_c:'<b>Aufgaben erledigt, Punkte verdient, und alle sehen, worauf sie sparen.</b> Ein Elternteil gibt jede Anfrage frei, und der Verlauf zeigt, wer was gemacht hat.',
       alt_gal_rew:'Yuvomi-Belohnungen mit Anfragen, die auf die Freigabe der Eltern warten, Taschengeld, dem Punktestand jedes Kindes und dem Verlauf erledigter Aufgaben',
-      yours_eyebrow:'Gehört euch', yours_title:'Es gehört euch, <em>nicht uns.</em>',
+      yours_eyebrow:'Gehört euch', yours_title:'Es gehört euch, nicht uns.',
       yours_desc:'Kein Konto bei uns, kein Abo, keine Werbung und keine Premium-Stufe, die die halbe App wegsperrt. Es läuft auf einem Rechner bei euch zu Hause und bleibt dort.',
       yours_1_t:'Kostenlos, und das bleibt so.', yours_1_d:'Open Source unter der MIT-Lizenz. Jedes Modul ist dabei, nichts wartet hinter einer Bezahlschranke, und jeder kann den Code lesen, behalten und betreiben.',
       yours_2_t:'Auf eurer Platte, auf Wunsch verschlüsselt.', yours_2_d:'Alles liegt in einer Datenbankdatei auf eurem eigenen Server, Gesundheitsdaten und Budget eingeschlossen. Mit eingeschalteter Verschlüsselung (AES-256) kann diese Datei ohne euren Schlüssel niemand lesen; den Schlüssel legt der geführte Installer für euch an.',
@@ -1855,8 +1928,8 @@
       plat_sheet:'Technische Details für die Person, die es einrichtet'
     }
   };
-  /* Some translated strings carry inline markup: the <em> accent that gives each
-     section headline its voice, <code> around commands, and the inline link to
+  /* Some translated strings carry inline markup: the <em> accent of the closing
+     headline (since S4 the only section head that keeps one), <code> around commands, and the inline link to
      the guided installer. Assigning textContent would strip all of it, so those
      strings are built as real nodes through a strict tag/attribute whitelist.
      No innerHTML, and the input is always a static literal from the table
@@ -1986,7 +2059,7 @@
 <section class="swap" id="swap">
   <div class="wrap">
     <div class="sec-head center split reveal">
-      <h2 class="sec-title" data-t="swap_title">Six apps, <em>and one person who remembers it all.</em></h2>
+      <h2 class="sec-title" data-t="swap_title">Six apps, and one person who remembers it all.</h2>
       <p class="sec-desc" data-t="swap_desc">Each with its own account and its own copy of your life on someone else’s server, and none knows what the others know. So someone at home keeps the connections in their head. Yuvomi takes that on, and every line below works today.</p>
     </div>
     <ul class="swap-list reveal">
@@ -2013,7 +2086,7 @@
   <div class="wrap">
     <div class="sec-head lead split reveal">
       <span class="eyebrow" data-t="ho_eyebrow">Why one app</span>
-      <h2 class="sec-title" data-t="ho_title">Everything in it <em>works together.</em></h2>
+      <h2 class="sec-title" data-t="ho_title">Everything in it works together.</h2>
       <p class="sec-desc" data-t="ho_desc">Separate apps cannot do this. What happens in one place shows up where it is needed next, with no retyping and nothing to remember. And one search finds it, in any module.</p>
     </div>
     <ol class="ho-list" tabindex="0" aria-label="Four connections between the modules" data-t-aria="ho_list_aria">
@@ -2103,7 +2176,7 @@
   <div class="wrap">
     <div class="sec-head lead split reveal">
       <span class="eyebrow" data-t="gal_eyebrow">A day at home</span>
-      <h2 class="sec-title" data-t="gal_title">From breakfast to bedtime, <em>one plan.</em></h2>
+      <h2 class="sec-title" data-t="gal_title">From breakfast to bedtime, one plan.</h2>
       <p class="sec-desc" data-t="gal_desc">Real screens, no demo account. In the morning who has to be where, at midday what is on the table, in the evening who did what.</p>
     </div>
     <div class="day reveal" id="day">
@@ -2187,9 +2260,19 @@
     <div class="fam-grid">
       <div class="sec-head lead split fam-head reveal">
         <span class="eyebrow" data-t="fam_eyebrow">For the family</span>
-        <h2 class="sec-title" data-t="fam_title">On the kitchen wall, in every pocket, <em>for every age.</em></h2>
+        <h2 class="sec-title" data-t="fam_title">On the kitchen wall, in every pocket, for every age.</h2>
         <p class="sec-desc" data-t="fam_desc">Everyone at home gets their own account from a link and the app on their phone. Only the person who sets it up ever sees a server.</p>
       </div>
+      <!-- Ein eigenes Bild fuer die Familie (S4, Critique 2026-10-30): seit
+           S3 steht die Wand im Hero, und die Sektion war Text. Die gemeinsame
+           Pinnwand am Handy zeigt, was "fuer jedes Alter" heisst - Termine und
+           Schulinfos der Kinder neben den Notfallnummern, von zwei Eltern
+           angeheftet. Jedes Motiv einmal (test:docs-landing): notes steht
+           sonst nirgends. Oberer Ausschnitt im Telefonrahmen wie im Hero. -->
+      <figure class="fam-phone reveal">
+        <img class="sc" data-light="screenshots/notes-light-mobile.png" data-dark="screenshots/notes-dark-mobile.png" data-sizes="(max-width: 700px) 176px, 248px" alt="The shared notes board on a phone: pinned notes with emergency numbers, the children's activities and school details, and a holiday checklist" data-alt-t="alt_fam_notes" loading="lazy" decoding="async" width="1320" height="2867">
+        <noscript><img class="sc" src="screenshots/notes-light-mobile.png" alt="The shared notes board on a phone: pinned notes with emergency numbers, the children's activities and school details, and a holiday checklist" loading="lazy" decoding="async" width="1320" height="2867"></noscript>
+      </figure>
       <ul class="fam-list" tabindex="0" aria-label="Three moments at home" data-t-aria="fam_list_aria">
         <li class="fam-item reveal">
           <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="4.5" rx="2"/><line x1="18" x2="18.01" y1="12" y2="12"/></svg></span>
@@ -2241,7 +2324,7 @@
 <section class="showcase" id="modules">
   <div class="wrap">
     <div class="sec-head center split reveal">
-      <h2 class="sec-title" data-t="feat_title">All of it, <em>and only what you use.</em></h2>
+      <h2 class="sec-title" data-t="feat_title">All of it, and only what you use.</h2>
       <p class="sec-desc" data-t="feat_desc">Grouped the way the app groups them. Whatever your household does not need, an admin switches off for everyone, and it disappears from the menu. Missing something? Extension modules can be added.</p>
     </div>
 
@@ -2289,20 +2372,16 @@
         </div>
           <div class="mod-list">
           <div class="mod-card" style="--m: var(--m-calendar)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
-            <h4 data-t="m_cal_t">Calendar</h4><p data-t="m_cal_d">Two-way sync with Google and CalDAV, one-way push to Outlook.com via Microsoft Graph, public ICS subscriptions, recurring events, holiday overlays and per-event visibility.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><span data-t="m_cal_t">Calendar</span></h4><p data-t="m_cal_d">Two-way sync with Google and CalDAV, one-way push to Outlook.com via Microsoft Graph, public ICS subscriptions, recurring events, holiday overlays and per-event visibility.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-rewards)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg></div>
-            <h4 data-t="m_rewards_t">Rewards</h4><p data-t="m_rewards_d">Points on tasks go to whoever did it, with a configurable default for new tasks, a parent-approved catalog, an auditable ledger and pocket money per child.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg></span><span data-t="m_rewards_t">Rewards</span></h4><p data-t="m_rewards_d">Points on tasks go to whoever did it, with a configurable default for new tasks, a parent-approved catalog, an auditable ledger and pocket money per child.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-notes)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></div>
-            <h4 data-t="m_notes_t">Notes</h4><p data-t="m_notes_d">Colored Markdown sticky notes for recipes, memos and quick reminders, personal or for the household, with checklists you tick off with a tap. A note can be private, or locked so only its author can change it.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></span><span data-t="m_notes_t">Notes</span></h4><p data-t="m_notes_d">Colored Markdown sticky notes for recipes, memos and quick reminders, personal or for the household, with checklists you tick off with a tap. A note can be private, or locked so only its author can change it.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-schedule)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12h.01"/><path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M22 13a18.15 18.15 0 0 1-20 0"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg></div>
-            <h4 data-t="m_sched_t">Schedule</h4><p data-t="m_sched_d">Rotating shifts and fixed weekly timetables, with changes for single days and an explicit day off. The calendar shows them as a layer of their own, so changing a pattern never leaves old appointments behind. Off by default; households turn it on.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12h.01"/><path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M22 13a18.15 18.15 0 0 1-20 0"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg></span><span data-t="m_sched_t">Schedule</span></h4><p data-t="m_sched_d">Rotating shifts and fixed weekly timetables, with changes for single days and an explicit day off. The calendar shows them as a layer of their own, so changing a pattern never leaves old appointments behind. Off by default; households turn it on.</p>
           </div>
           </div>
         </div>
@@ -2331,32 +2410,25 @@
         </div>
           <div class="mod-list">
           <div class="mod-card" style="--m: var(--m-recipes)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 2.4 1.2 4.5 3 5.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3c1.8-1.2 3-3.3 3-5.7a7 7 0 0 0-7-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg></div>
-            <h4 data-t="m_recipes_t">Recipes</h4><p data-t="m_recipes_d">Create, duplicate and scale reusable recipes, then pre-fill meal slots or send the ingredients to a shopping list. A self-hosted Mealie or Tandoor instance can be mirrored read-only.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 2.4 1.2 4.5 3 5.7V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.3c1.8-1.2 3-3.3 3-5.7a7 7 0 0 0-7-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg></span><span data-t="m_recipes_t">Recipes</span></h4><p data-t="m_recipes_d">Create, duplicate and scale reusable recipes, then pre-fill meal slots or send the ingredients to a shopping list. A self-hosted Mealie or Tandoor instance can be mirrored read-only.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-shopping)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>
-            <h4 data-t="m_shop_t">Shopping</h4><p data-t="m_shop_d">Collaborative lists grouped by aisle and ordered to match your shop, with swipe gestures and an import from the meal plan.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span><span data-t="m_shop_t">Shopping</span></h4><p data-t="m_shop_d">Collaborative lists grouped by aisle and ordered to match your shop, with swipe gestures and an import from the meal plan.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-pantry)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14a1 1 0 0 1 1 1v3H4V4a1 1 0 0 1 1-1z"/><path d="M4 7h16v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><line x1="10" y1="12" x2="14" y2="12"/></svg></div>
-            <h4 data-t="m_pantry_t">Pantry</h4><p data-t="m_pantry_d">What is actually in the house: amount, storage location and best-before date, with expiry and low-stock filters, and a two-way handover with the shopping list.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14a1 1 0 0 1 1 1v3H4V4a1 1 0 0 1 1-1z"/><path d="M4 7h16v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><line x1="10" y1="12" x2="14" y2="12"/></svg></span><span data-t="m_pantry_t">Pantry</span></h4><p data-t="m_pantry_d">What is actually in the house: amount, storage location and best-before date, with expiry and low-stock filters, and a two-way handover with the shopping list.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-housekeeping)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2a2 2 0 0 0 2.8 0z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4z"/></svg></div>
-            <h4 data-t="m_house_t">Housekeeping</h4><p data-t="m_house_d">Manage household staff: schedules, check-in/out, daily or hourly billing, chores and supplies.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2a2 2 0 0 0 2.8 0z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4z"/></svg></span><span data-t="m_house_t">Housekeeping</span></h4><p data-t="m_house_d">Manage household staff: schedules, check-in/out, daily or hourly billing, chores and supplies.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-waste)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
-            <h4 data-t="m_waste_t">Waste collection</h4><p data-t="m_waste_d">Weekly, monthly or nth-weekday pickup rhythms, or a municipal ICS calendar imported once or subscribed by URL, with per-occurrence moves and skips, personal reminders, a Dashboard widget and a switchable Calendar layer. Off by default; households turn it on.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><span data-t="m_waste_t">Waste collection</span></h4><p data-t="m_waste_d">Weekly, monthly or nth-weekday pickup rhythms, or a municipal ICS calendar imported once or subscribed by URL, with per-occurrence moves and skips, personal reminders, a Dashboard widget and a switchable Calendar layer. Off by default; households turn it on.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-documents)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
-            <h4 data-t="m_docs_t">Documents</h4><p data-t="m_docs_d">Family files with previews, folders, visibility controls and bulk actions. Storage on a local folder, WebDAV or Google Drive; Paperless-ngx and Papra optional.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span><span data-t="m_docs_t">Documents</span></h4><p data-t="m_docs_d">Family files with previews, folders, visibility controls and bulk actions. Storage on a local folder, WebDAV or Google Drive; Paperless-ngx and Papra optional.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-inventory)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/></svg></div>
-            <h4 data-t="m_inv_t">Inventory</h4><p data-t="m_inv_d">What you own: brand, model, serial number, storage location, purchase price, warranty and condition, with linked receipts and bookings. Off by default; households turn it on.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/></svg></span><span data-t="m_inv_t">Inventory</span></h4><p data-t="m_inv_d">What you own: brand, model, serial number, storage location, purchase price, warranty and condition, with linked receipts and bookings. Off by default; households turn it on.</p>
           </div>
           </div>
         </div>
@@ -2384,12 +2456,10 @@
           </div>
             <div class="mod-list">
             <div class="mod-card" style="--m: var(--m-contacts)">
-              <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><circle cx="12" cy="8" r="2"/><path d="M15 13a3 3 0 1 0-6 0"/></svg></div>
-              <h4 data-t="m_contacts_t">Contacts</h4><p data-t="m_contacts_d">A shared contact directory that can bring in your contacts over CardDAV, with vCard import and export.</p>
+              <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><circle cx="12" cy="8" r="2"/><path d="M15 13a3 3 0 1 0-6 0"/></svg></span><span data-t="m_contacts_t">Contacts</span></h4><p data-t="m_contacts_d">A shared contact directory that can bring in your contacts over CardDAV, with vCard import and export.</p>
             </div>
             <div class="mod-card" style="--m: var(--m-birthdays)">
-              <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3M12 8v3M17 8v3M7 4h.01M12 3h.01M17 4h.01"/></svg></div>
-              <h4 data-t="m_bday_t">Birthdays</h4><p data-t="m_bday_d">Birthday tracker with optional name days, automatic annual calendar events, age display and custom reminders.</p>
+              <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3M12 8v3M17 8v3M7 4h.01M12 3h.01M17 4h.01"/></svg></span><span data-t="m_bday_t">Birthdays</span></h4><p data-t="m_bday_d">Birthday tracker with optional name days, automatic annual calendar events, age display and custom reminders.</p>
             </div>
             </div>
           </div>
@@ -2425,20 +2495,16 @@
         <div class="mod-group-body">
           <div class="mod-list">
           <div class="mod-card" style="--m: var(--m-settings)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-            <h4 data-t="m_family_t">Family</h4><p data-t="m_family_d">Member profiles with roles, photos and contact details, kept in sync with Contacts and Birthdays.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span data-t="m_family_t">Family</span></h4><p data-t="m_family_d">Member profiles with roles, photos and contact details, kept in sync with Contacts and Birthdays.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-reminders)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
-            <h4 data-t="m_rem_t">Reminders</h4><p data-t="m_rem_d">Reminders on tasks, events, shifts, subscription renewals, warranties, best-before dates and waste pickups, with an in-app badge, opt-in push notifications and household Gotify, ntfy, webhook or email channels.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><span data-t="m_rem_t">Reminders</span></h4><p data-t="m_rem_d">Reminders on tasks, events, shifts, subscription renewals, warranties, best-before dates and waste pickups, with an in-app badge, opt-in push notifications and household Gotify, ntfy, webhook or email channels.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-settings)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
-            <h4 data-t="m_api_t">API tokens</h4><p data-t="m_api_d">Access tokens for scripts and tools such as Home Assistant, against a documented OpenAPI 3.1 spec, plus an MCP endpoint at <code>/mcp</code> that lets a client like Claude Desktop drive the API in plain language.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span><span data-t="m_api_t">API tokens</span></h4><p data-t="m_api_d">Access tokens for scripts and tools such as Home Assistant, against a documented OpenAPI 3.1 spec, plus an MCP endpoint at <code>/mcp</code> that lets a client like Claude Desktop drive the API in plain language.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-settings)">
-            <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
-            <h4 data-t="m_backup_t">Backup</h4><p data-t="m_backup_d">Scheduled backups with optional WebDAV upload (Nextcloud, ownCloud, Hetzner, etc.). Every restore saves the current state first, and a backup from another installation restores in the browser, no shell needed.</p>
+            <h4><span class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span><span data-t="m_backup_t">Backup</span></h4><p data-t="m_backup_d">Scheduled backups with optional WebDAV upload (Nextcloud, ownCloud, Hetzner, etc.). Every restore saves the current state first, and a backup from another installation restores in the browser, no shell needed.</p>
           </div>
           </div>
         </div>
@@ -2475,7 +2541,7 @@
       <div class="yours-head">
         <div class="sec-head lead reveal">
           <span class="eyebrow" data-t="yours_eyebrow">Yours to keep</span>
-          <h2 class="sec-title" data-t="yours_title">It belongs to you, <em>not to us.</em></h2>
+          <h2 class="sec-title" data-t="yours_title">It belongs to you, not to us.</h2>
           <p class="sec-desc" data-t="yours_desc">No account with us, no subscription, no ads and no premium tier that locks half the app away. It runs on a computer in your home and keeps running there.</p>
         </div>
         <p class="yours-ver reveal"><span data-t="yours_latest">Latest release</span> <b>v2.83.0</b><span class="yours-date" data-released="2026-10-29">29 October 2026</span><a href="https://github.com/ulsklyc/yuvomi/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-t="yours_changelog">What changed</a></p>
@@ -2601,7 +2667,7 @@
 <section class="platforms" id="install">
   <div class="wrap">
     <div class="sec-head center reveal">
-      <h2 class="sec-title" data-t="plat_title">Runs on <em>your</em> hardware</h2>
+      <h2 class="sec-title" data-t="plat_title">Runs on your hardware</h2>
       <p class="sec-desc" data-t="plat_desc">Yuvomi comes as a Docker container: one packaged program that runs the same on any home server or NAS.</p>
       <p class="plat-who"><svg class="house-mark" viewBox="36 44 92 88" aria-hidden="true"><g fill="currentColor"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg><span data-t="plat_who">Setting it up takes one person, once. Everyone else just opens their invite link.</span></p>
     </div>
@@ -2620,11 +2686,11 @@
           <li><a class="plat-cap" style="--pc:#5351FB" href="install.html#umbrel"><span class="plat-logo plat-logo--sm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.853 8.302c2.628-.05 4.698.656 6.303 2.05 1.166 1.01 2.14 2.43 2.895 4.305a7.584 7.584 0 0 0-1.818-.21c-1.345 0-2.552.31-3.558.987-1.127-.687-2.339-1.049-3.623-1.049-1.313 0-2.573.378-3.77 1.087-1.154-.726-2.456-1.087-3.875-1.087-.513 0-1.003.048-1.466.147.678-1.724 1.575-3.054 2.664-4.028 1.557-1.393 3.607-2.15 6.248-2.202zM1.842 17.616c.04-.037.078-.076.112-.119.48-.557 1.233-.91 2.453-.91 1.151 0 2.139.32 3.002.952l.035.025c.469.35 1.108.364 1.592.036 1.032-.698 2.032-1.014 3.017-1.014.967 0 1.906.304 2.836.965l.02.014a1.376 1.376 0 0 0 1.699-.078c.614-.53 1.455-.84 2.625-.84 1.232 0 2.186.344 2.94.98a1.092 1.092 0 0 0 .435.235 1.095 1.095 0 0 0 .806-.087 1.103 1.103 0 0 0 .547-1.267c-.873-3.383-2.3-6.03-4.363-7.82-2.084-1.808-4.712-2.646-7.787-2.588-3.063.06-5.653.955-7.673 2.762-2.003 1.793-3.344 4.39-4.104 7.67a1.1 1.1 0 0 0 1.807 1.083z"/></svg></span><span>Umbrel</span></a></li>
           <li><a class="plat-cap" style="--pc:#FF8C2F" href="install.html#unraid"><span class="plat-logo plat-logo--sm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.406 8.528h1.17v6.926h-1.17zM1.17 15.454H0V8.528h1.17zm4.534.828h1.17v2.645h-1.17zm-2.86-2.969h1.169v4.282h-1.17zm5.703 0h1.17v4.282h-1.17zM22.83 8.528H24v6.926h-1.17zm-4.534-.81h-1.17V5.073h1.17zm2.86 2.95h-1.169V6.406h1.17zm-5.72 0h-1.17V6.406h1.17z"/></svg></span><span>Unraid</span></a></li>
         </ul>
+        <div class="plat-cta">
+          <a href="install.html" class="btn btn-secondary"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span data-t="plat_cta">Open the install guide</span></a>
+          <p class="plat-more" data-t="plat_more">On Proxmox it runs in a <a href="install.html#proxmox">Debian container or a VM</a>. Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.</p>
+        </div>
       </div>
-    </div>
-    <div class="plat-cta reveal">
-      <a href="install.html" class="btn btn-secondary"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span data-t="plat_cta">Open the install guide</span></a>
-      <p class="plat-more" data-t="plat_more">On Proxmox it runs in a <a href="install.html#proxmox">Debian container or a VM</a>. Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.</p>
     </div>
     <details class="plat-sheet reveal">
       <summary><span data-t="plat_sheet">Technical details for whoever sets it up</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary>
@@ -2860,11 +2926,18 @@
      Leiste verdeckt sie) - beobachtet war danach nichts mehr. Stehen Karte
      oder Fusszeile im Bild, setzt der Observer html.pill-end: dort uebernimmt
      "Nach oben" das Band (site.css, "Back to top"), eine Kapsel zur Zeit. */
+  /* Seit S4 (Critique 2026-10-30) auch die Sektion Einrichten (#install):
+     sie IST der Weg, den die Pille anbietet, und traegt ihren eigenen Knopf.
+     Von dort bis zum Ende stehen damit lueckenlos Besitzer im Bild - auf
+     Deutsch blieb die Pille vorher am Seitenende stehen (gemessen bei 98 %:
+     die laengere Karte rutschte unter die Leiste, bevor die Fusszeile
+     hereinkam). "Nach oben" uebernimmt erst mit der Fusszeile, deren Band
+     dafuer frei ist (--float-band) - ueber der Schlusskarte lag es auf Text. */
   (function(){
     var pill = document.querySelector('.mobile-cta');
     if (!pill) return;
     var ctaBox = document.querySelector('.cta-box'), foot = document.querySelector('.site-foot');
-    var owners = [document.querySelector('.hero-actions') || document.getElementById('top'), ctaBox, foot].filter(Boolean);
+    var owners = [document.querySelector('.hero-actions') || document.getElementById('top'), document.getElementById('install'), ctaBox, foot].filter(Boolean);
     if (owners.length && 'IntersectionObserver' in window) {
       var inView = [];
       var pObs = new IntersectionObserver(function(entries){
@@ -2874,7 +2947,7 @@
           else if (!e.isIntersecting && i >= 0) inView.splice(i, 1);
         });
         pill.classList.toggle('show', inView.length === 0);
-        document.documentElement.classList.toggle('pill-end', inView.indexOf(ctaBox) >= 0 || inView.indexOf(foot) >= 0);
+        document.documentElement.classList.toggle('pill-end', inView.indexOf(foot) >= 0);
       }, { rootMargin: '-70px 0px 0px 0px' });
       owners.forEach(function(el){ pObs.observe(el); });
     } else { pill.classList.add('show'); }

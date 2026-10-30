@@ -445,8 +445,9 @@ test('der Gruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const oldForm = groupFindings(md.replace(summary, `${asList}\n<details>\n<summary><b>Every module in one line</b></summary>`), html, 'en');
   assert.ok(hit(oldForm, /0 Gruppenzeilen, die Homepage zeigt 5 Gruppen/), oldForm.join(' | '));
   // Die Homepage bekommt ein Modul, das die Gruppenzeilen nicht kennen.
-  const more = html.replace('<h4 data-t="m_backup_t">', '<h4 data-t="m_backup_t">x</h4></div><div class="mod-card"><h4 data-t="m_bday_t">');
-  assert.notEqual(more, html, 'Vorbedingung: m_backup_t steht als <h4> im Markup');
+  // Seit S4 (Critique 2026-10-30) steht der Name in einem <span> der <h4>, neben dem Symbol.
+  const more = html.replace('<span data-t="m_backup_t">', '<span data-t="m_backup_t">x</span></h4></div><div class="mod-card"><h4><span data-t="m_bday_t">');
+  assert.notEqual(more, html, 'Vorbedingung: m_backup_t steht als Name einer <h4> im Markup');
   assert.ok(hit(groupFindings(md, more, 'en'), /Gruppe "Settings"/));
 });
 

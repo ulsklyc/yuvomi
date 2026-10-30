@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wall tablet and a phone together, each connection between two parts shows both ends as real
   excerpts from the app, the day at home shows each moment as a focused crop, and the overview,
   wall and health screenshots are current again. On a phone the page is nearly a third shorter.
+  The top bar groups the jump menu, language and theme in one glass control: the language is a
+  segment showing EN and DE with the current one raised, the theme names its mode on wide screens,
+  and GitHub is a single icon. The jump menu marks the section you are in. The floating Install
+  button on phones steps aside over the setup section and at the end of the page in both languages,
+  "Back to top" appears only after half the page, and the family section shows the shared notes
+  board on a phone. The overview image at the top now starts loading right away on phones too.
 
 ### Fixed
 - **The website no longer says contacts sync both ways.** Contacts come in over CardDAV and are
