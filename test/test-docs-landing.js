@@ -2712,7 +2712,9 @@ test('index.html: jeder Beleg-Link fuehrt auf das, was die Aussage belegt', () =
 /** Trennpunkte der Proof-Leiste stehen nicht als Text im Markup und nicht im Sternskript. */
 function proofSeparatorFindings(html, starScript) {
   const found = [];
-  const bar = (stripComments(html).match(/<div class="proof">([\s\S]*?)\n<\/div>/) || [])[1];
+  // Seit S1 (2026-10-30) steht die Leiste im Hero und traegt kein inneres
+  // .wrap mehr: sie endet am ersten </div>.
+  const bar = (stripComments(html).match(/<div class="proof">([\s\S]*?)<\/div>/) || [])[1];
   if (!bar) return ['Proof-Leiste nicht gefunden'];
   if (/·/.test(stripTags(bar))) found.push('Trennpunkt als Text in der Proof-Leiste (bleibt beim Umbruch am Zeilenende stehen)');
   const rule = (starScript.match(/gh-stars-proof[\s\S]*?replacement:\s*`([^`]*)`/) || [])[1];
@@ -3057,8 +3059,11 @@ const R2_CLAIMS = [
   { where: 'm_rewards_d', says: { en: /go to whoever did it/, de: /bekommt, wer sie erledigt hat/ },
     holds: (s) => /if \(doneByUserId\) return enrolled\.has\(doneByUserId\)/.test(s.rewards),
     what: 'die benannte Person schlaegt die Zuweisung (server/services/rewards.js rewardTargets)' },
-  // Sicherheit (long_a4)
-  { where: 'long_a4', says: { en: /an admin can require it for the whole household/, de: /ein Admin kann ihn für den ganzen Haushalt verlangen/ },
+  // Sicherheit (long_k4 + long_a4). Seit S1 (Website-Critique 2026-10-30) ist
+  // die Frage ein Akkordeon: der Kernsatz (vorher das <b> am Anfang von
+  // long_a4) steht offen als long_k4, der Rest der Antwort hinter der Klappe.
+  // Die Zusage zur haushaltsweiten Pflicht steht im Kernsatz.
+  { where: 'long_k4', says: { en: /an admin can require it for the whole household/, de: /ein Admin kann ihn für den ganzen Haushalt verlangen/ },
     holds: (s) => /export function setRequiredForHousehold/.test(s.twoFactor) && /export function isRequiredForHousehold/.test(s.twoFactor),
     what: 'haushaltsweite Pflicht (server/services/two-factor.js set/isRequiredForHousehold)' },
   { where: 'long_a4', says: { en: /\(TOTP\), with recovery codes/, de: /\(TOTP\), mit Wiederherstellungscodes/ },
@@ -3118,8 +3123,9 @@ function r2Findings(html, sources) {
   for (const [file, md] of Object.entries(sources.readmes)) {
     for (const re of R2_NEVER) if (re.test(md)) found.push(`${file} sagt wieder ${re}`);
   }
-  // Die Sicherheitsfrage steht auch im Markup (ohne JS), nicht nur im Woerterbuch.
-  if (!/<dt data-t="long_q4">/.test(html) || !/<dd data-t="long_a4">/.test(html)) found.push('long_q4/long_a4 fehlen im Markup');
+  // Die Sicherheitsfrage steht auch im Markup (ohne JS), nicht nur im Woerterbuch -
+  // Frage, Kernsatz und Rest der Antwort (Akkordeon seit S1).
+  if (!/<dt data-t="long_q4">/.test(html) || !/data-t="long_k4"/.test(html) || !/data-t="long_a4"/.test(html)) found.push('long_q4/long_a4 fehlen im Markup');
   return found;
 }
 
@@ -3156,7 +3162,7 @@ test('der Guard aus (16) erkennt den Schaden, gegen den er gebaut ist', () => {
   const noLogout = { ...real, auth: real.auth.replace("router.post('/logout-others'", "router.post('/logout-all'") };
   assert.ok(hit(r2Findings(html, noLogout), /long_a4 \(de\): haengt an andere Sitzungen beenden/), 'Abmelde-Guard blind');
   const no2fa = { ...real, twoFactor: real.twoFactor.replace('export function setRequiredForHousehold', 'function setRequiredForHousehold') };
-  assert.ok(hit(r2Findings(html, no2fa), /long_a4 \(en\): haengt an haushaltsweite Pflicht/), '2FA-Guard blind');
+  assert.ok(hit(r2Findings(html, no2fa), /long_k4 \(en\): haengt an haushaltsweite Pflicht/), '2FA-Guard blind');
   // Die Frage verschwindet aus dem Markup.
   assert.ok(hit(r2Findings(html.replace('<dt data-t="long_q4">', '<dt>'), real), /long_q4\/long_a4 fehlen im Markup/));
 });
@@ -3264,7 +3270,7 @@ function faqFindings(html, sources) {
   }
   // Ohne JS steht das Markup: jede Frage auch dort, nicht nur im Woerterbuch.
   for (const n of [5, 6, 7, 8]) {
-    if (!html.includes(`<dt data-t="long_q${n}">`) || !html.includes(`<dd data-t="long_a${n}">`)) found.push(`long_q${n}/long_a${n} fehlen im Markup`);
+    if (!html.includes(`<dt data-t="long_q${n}">`) || !html.includes(`data-t="long_k${n}"`) || !html.includes(`data-t="long_a${n}"`)) found.push(`long_q${n}/long_a${n} fehlen im Markup`);
   }
   return found;
 }
@@ -3278,9 +3284,10 @@ test('der Guard aus (16b) erkennt den Schaden, gegen den er gebaut ist', () => {
   const real = faqSources();
   const hit = (list, re) => list.some((l) => re.test(l));
   // Offline-Schreiben zugesagt.
-  const offline = html.replace('<b>For reading, yes.</b>', '<b>Yes, it works fully offline.</b>');
-  assert.notEqual(offline, html, 'Vorbedingung: long_a6 beginnt so');
-  assert.ok(hit(faqFindings(offline, real), /long_a6 \(en\) sagt \/works fully offline\/i/));
+  // Seit S1 steht der Kernsatz als eigener Schluessel (long_k6) vor dem Rest.
+  const offline = html.replace("long_k6:'For reading, yes.'", "long_k6:'Yes, it works fully offline.'");
+  assert.notEqual(offline, html, 'Vorbedingung: long_k6 lautet so');
+  assert.ok(hit(faqFindings(offline, real), /long_k6 \(en\) sagt \/works fully offline\/i/));
   // Der Code verliert, woran die Zusagen haengen.
   const noShopCache = { ...real, sw: real.sw.replace("'/shopping', ", '') };
   assert.notEqual(noShopCache.sw, real.sw, "Vorbedingung: '/shopping' steht in API_CACHE_WHITELIST");
@@ -3782,7 +3789,7 @@ test('der Rahmen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
  * Pille ueber der Install-Pille (zusammen 17 % des Bildschirms).
  * ========================================================================== */
 const RHYTHM_SECTIONS = {
-  'index.html': ['.gallery', '.swap', '.handoff', '.family', '.showcase', '.platforms', '.longevity', '.cta'],
+  'index.html': ['.gallery', '.swap', '.handoff', '.family', '.showcase', '.yours', '.platforms', '.longevity', '.cta'],
   'install.html': ['section'],
 };
 
