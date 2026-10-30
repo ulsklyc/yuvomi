@@ -15,12 +15,12 @@
        gehoert in die Beschreibung, die dafuer Platz hat - der bestaetigte
        Zweitnutzer ist der Ein-Personen-Haushalt, und der stand hier nur
        indirekt ("your household"). -->
-  <meta name="description" content="Self-hosted, privacy-first planner for families, couples and one-person households. Tasks, meals, calendar sync, budget - one private home, no subscriptions.">
+  <meta name="description" content="Self-hosted planner for families, couples and one-person households: calendar, tasks, meals, shopping and budget in one app on your own hardware. No subscription, no ads, no trackers.">
   <meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Yuvomi - The Self-Hosted Family Planner">
-  <meta property="og:description" content="Tasks, shopping, meals, calendar, budget - for families, couples and one-person households. All self-hosted, no cloud dependency.">
+  <meta property="og:description" content="Calendar, tasks, meals, shopping and budget in one app on your own hardware - for families, couples and one-person households. No subscription, no trackers.">
   <meta property="og:image" content="https://yuvomi.cloud/og-image.png">
   <meta property="og:url" content="https://yuvomi.cloud/">
   <meta property="og:site_name" content="Yuvomi">
@@ -29,7 +29,7 @@
   <meta property="og:image:alt" content="Yuvomi - one home instead of many subscriptions, beside the overview of the self-hosted family planner in a browser window">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Yuvomi - The Self-Hosted Family Planner">
-  <meta name="twitter:description" content="Tasks, shopping, meals, calendar, budget - for families, couples and one-person households. All self-hosted, no cloud dependency.">
+  <meta name="twitter:description" content="Calendar, tasks, meals, shopping and budget in one app on your own hardware - for families, couples and one-person households. No subscription, no trackers.">
   <meta name="twitter:image" content="https://yuvomi.cloud/twitter-image.png">
   <link rel="canonical" href="https://yuvomi.cloud/">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -46,7 +46,7 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Yuvomi",
-    "description": "Self-hosted, privacy-first planner for families, couples and one-person households. Tasks, meals, calendar sync, budget - one private home, no subscriptions.",
+    "description": "Self-hosted planner for families, couples and one-person households: calendar, tasks, meals, shopping and budget in one app on your own hardware. No subscription, no ads, no trackers.",
     "url": "https://yuvomi.cloud/",
     "image": "https://yuvomi.cloud/og-image.png",
     "applicationCategory": "HomeApplication",
@@ -528,11 +528,6 @@
     .proof-link { color: inherit; text-decoration: underline; text-underline-offset: 3px;
       text-decoration-color: var(--border-strong); min-height: 44px; display: inline-flex; align-items: center; gap: 4px; }
     .proof-link:hover { text-decoration-color: var(--accent); }
-    /* Was unter 560px faellt, war frueher "18 Module" und "24 Sprachen" - also
-       genau die zwei Zahlen, die die Positionierung tragen, waehrend die
-       Versionsnummer stehen blieb. Jetzt umgekehrt: die Leiste darf umbrechen,
-       und die Version ist das Entbehrliche. */
-    @media (max-width: 560px) { .proof .ver { display: none; } }
 
     /* ===== Gallery =====
        Position 2 on purpose. The screenshots used to render at 544px inside the
@@ -1454,7 +1449,7 @@
            reached "MCP endpoint" in the first paragraph a family reads. The
            sentence closes on the claim this audience actually came for instead;
            the homelab criteria are one scroll away, in the grid that owns them. -->
-      <p class="hero-sub" data-t="hero_sub">The self-hosted family planner: tasks, calendar, budget and shopping on your own computer at home, not in someone else’s cloud. For a family, a couple, or just you.</p>
+      <p class="hero-sub" data-t="hero_sub">Calendar, tasks, meals, shopping and money in one app whose parts work together. It runs on your own computer at home - for a family, a couple, or just you.</p>
       <div class="hero-actions">
         <a href="install.html" class="btn btn-primary"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span data-t="hero_install">Install Yuvomi</span></a>
         <!-- Eine Hauptaktion (S1, Critique 2026-10-30): der zweite Weg ist ein
@@ -1501,7 +1496,7 @@
          ~510px. Vorher stapelte der Hero Abzeichen, Untertitel, zwei Knoepfe, Technikzeile, Trenner und Haushaltszeile vor dem Produkt,
          und die Proof-Leiste kam als eigenes Band unter dem Bild. -->
     <div class="hero-note">
-      <p class="hero-house"><svg class="house-mark" viewBox="36 44 92 88" aria-hidden="true"><g fill="currentColor"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg><span data-t="hero_house">For the whole household: everyone gets their own login from an invite link, and the app on their phone.</span></p>
+      <p class="hero-house"><svg class="house-mark" viewBox="36 44 92 88" aria-hidden="true"><g fill="currentColor"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg><span data-t="hero_house">One person sets it up. Everyone else gets an invite link and the app on their phone.</span></p>
       <div class="proof">
         <!-- Die Trennpunkte sind kein Markup mehr, sondern ::before an jedem
              Eintrag ausser dem ersten (Regel .proof .pi). Als eigene Elemente
@@ -1517,7 +1512,10 @@
              the website's privacy policy: the claim is about the app. -->
         <a class="pi proof-link" href="https://github.com/ulsklyc/yuvomi#install" data-href-en="https://github.com/ulsklyc/yuvomi#install" data-href-de="https://github.com/ulsklyc/yuvomi/blob/main/README.de.md#installieren"><b>0</b> <span data-t="proof_telemetry">trackers</span></a>
         <span class="pi" data-t="proof_mit">MIT licensed</span>
-        <span class="pi ver"><b>v2.83.0</b></span>
+        <!-- Keine Versionsnummer mehr hier (S2, Critique 2026-10-30): sie stand
+             dreimal auf der Seite. Version und Datum stehen jetzt in "Gehoert
+             euch" (Lebenszeichen) und im Fuss, und test:docs-landing koppelt
+             beide an package.json und den CHANGELOG. -->
       </div>
     </div>
   </div>
@@ -1540,12 +1538,12 @@
     en: {
       ho_4_a:'The last jar goes out of the pantry', ho_4_b:'One tap puts it on the shopping list',
       ho_4_d:'Pantry keeps amounts and best-before dates, and reminds you before something expires. What runs low or runs out goes onto the shared list from its row, and buying it books it back into stock. Household of five or household of one, the loop is the same.',
-      long_q1:'What if this project stops?', long_k1:'Nothing changes on your machine.', long_a1:'It is MIT-licensed and self-hosted, there is no server of ours anywhere in the path, and on its own it only asks the GitHub releases API whether a newer version exists. The container you already pulled keeps running exactly as it does today, with or without us.',
+      long_q1:'What if this project stops?', long_k1:'Nothing changes on your machine.', long_a1:'It is MIT-licensed and runs on your own hardware, there is no server of ours anywhere in the path, and on its own it only asks GitHub whether a newer version exists. The copy you installed keeps running exactly as it does today, with or without us.',
       long_q2:'What if I want my data somewhere else?', long_k2:'Copying one file is the whole export.', long_a2:'Everything lives in a single SQLite file on your own disk, unless you moved documents to a folder, WebDAV or Google Drive; those files need their own backup. Scheduled backups write a restorable archive on top of that, and the documented API plus the MCP endpoint pull anything out in whatever shape you need.',
-      long_q3:'What if I lose the encryption key?', long_k3:'Then the database is gone, and we cannot help you.', long_a3:'That is the honest answer: SQLCipher has no recovery path and no back door, which is the entire point of it. Store the key the way you store the ones that matter. Encryption is optional; if you would rather not carry that risk, leave it off and the file stays readable.',
-      long_q4:'How safe is access from outside?', long_k4:'Every account can add a second factor, and an admin can require it for the whole household.', long_a4:'Sign-in then asks for a code from an authenticator app (TOTP), with recovery codes as the way back. New members join through an invite link and pick their own password. With single sign-on through an OIDC provider, password login can be switched off for the household, and a lost phone is signed out from any of your other devices.',
+      long_q3:'What if I lose the encryption key?', long_k3:'Then the database is gone, and we cannot help you.', long_a3:'That is the honest answer: the encryption (SQLCipher, AES-256) has no recovery path and no back door, which is the whole point. Keep the key the way you keep the ones that matter, in a password manager or on paper somewhere safe. Encryption is optional; if you would rather not carry that risk, leave it off and the file stays readable.',
+      long_q4:'How safe is access from outside?', long_k4:'Every account can add a second factor, and an admin can require it for the whole household.', long_a4:'Sign-in then also asks for a six-digit code from an authenticator app on the phone (TOTP), with recovery codes as the way back. New members join through an invite link and pick their own password. If you already run a single sign-on service (OIDC, such as Authentik or Keycloak), password login can be switched off for the household, and a lost phone is signed out from any of your other devices.',
       long_q5:'Is there an app in the store?', long_k5:'No, and you do not need one.', long_a5:'Yuvomi is a web app that installs from the browser: open it on the phone, choose “Add to Home Screen” (on an iPhone from the share menu), and it starts full screen like any other app. Reminders arrive as push notifications even while it is closed; for that your server needs HTTPS. Updates come with the server, so every phone is on the same version without a store review in between.',
-      long_q6:'Does it work without signal?', long_k6:'For reading, yes.', long_a6:'Calendar, tasks, the shopping list, contacts and the overview keep the state your phone last loaded, so the list stays readable in the supermarket basement. Changes need a connection again: ticking something off while offline is refused with a note instead of being lost silently. Open the list once before you leave, and you have that state with you, even if the app was closed in between. A strip at the top says it is the saved state and read-only until your server answers again. Signing a device out remotely takes effect once it is back online; until then, offline access ends at the latest when its session expires. A wall display keeps showing its lists for up to 72 hours after its last contact with your server, also after a restart.',
+      long_q6:'Does it work without signal?', long_k6:'For reading, yes.', long_a6:'Calendar, tasks, the shopping list, contacts and the overview keep the state your phone last loaded, so the list stays readable in the supermarket basement, with a strip at the top saying it is the saved state. Changes need a connection again: ticking something off while offline is refused with a note instead of being lost silently. A device signed out remotely loses offline access once it is back online, at the latest when its session expires. A wall tablet keeps showing its lists for up to 72 hours without contact with your server, also after a restart.',
       long_q7:'Do I still need my CalDAV or Nextcloud server?', long_k7:'Only if you want to keep using it.', long_a7:'Yuvomi keeps everything in its own database and runs fine on its own. It is not a CalDAV server itself, though: it syncs with yours, events both ways, tasks and shopping items through CalDAV reminders, and contacts it fetches over CardDAV. So if you want to keep editing in Apple Calendar or Thunderbird, keep the server and let Yuvomi sync with it; to just see the family calendar elsewhere, its ICS feed is enough. Nextcloud also works as WebDAV storage for documents and backups.',
       long_q8:'Does it work with Home Assistant?', long_k8:'Yes, through open interfaces rather than a plugin.', long_a8:'Calendar, waste collection and birthdays come as ICS feeds that Home Assistant’s Remote Calendar reads. Reminders can go to a webhook, and everything else is in the documented REST API, with tokens you can limit to single modules, read or write. There is no official integration with entities of its own.',
       long_title:'The questions worth asking first',
@@ -1555,36 +1553,36 @@
       jump_modules:'What’s inside', jump_longevity:'Before you commit', jump_install:'Where it runs',
       fam_eyebrow:'For the family',
       fam_title:'On the kitchen wall, in every pocket, <em>for every age.</em>',
-      fam_desc:'Everyone in the house gets their own login from a link and the app on their phone. A terminal, if needed at all, is only for whoever sets it up.',
+      fam_desc:'Everyone at home gets their own account from a link and the app on their phone. Only the person who sets it up ever sees a server.',
       fam_1_t:'The tablet on the kitchen wall',
-      fam_1_d:'Wall mode shows today’s plan and who is up, readable across the room. The tablet has an account of its own: tap a task, pick who did it, and the points go to them.',
+      fam_1_d:'Wall mode shows today’s plan and who is up, readable across the room; when nobody is looking it can show your photos from Immich, and at night it dims. The tablet has an account of its own: tap a task, pick who did it, and the points go to them.',
       fam_2_t:'The app on every phone',
       fam_2_d:'It goes on the home screen straight from the browser, no app store. Reminders arrive as notifications even while it is closed (your server needs HTTPS for that), and the last shopping list you opened stays readable without signal.',
       fam_3_t:'An invite, and just the right access',
-      fam_3_d:'An admin sends a link and the new member picks their own password; a child without a phone gets an account created directly. Per family role, each module is full, read only or not at all.',
+      fam_3_d:'An admin sends a link and the new member picks their own password; a child without a phone gets an account created directly. Per family role, each module is full, read only or not at all, and what is private stays private, down to a single note.',
       fam_inv_t:'Invited by your family?',
       fam_inv_lead:'No server and no terminal for you - only the link.',
       fam_inv_1:'Open the invite link your admin sent you. It works for seven days; after that, ask for a new one.',
       fam_inv_2:'Choose a username, unless the invite already set one, and your own password. If your household signs in with single sign-on, there is no password to pick.',
       fam_inv_3:'Sign in, then put Yuvomi on your home screen: tap Install when the app offers it, or on iPhone and iPad open the Share menu and choose Add to Home Screen.',
       swap_rel:'is replaced by',
-      swap_title:'Many apps, <em>one place.</em>',
-      swap_desc:'Each with its own account and its own copy of your data on someone else’s server - or one place on yours. Every line here is built and shipping today.',
+      swap_title:'Six apps, <em>and one person who remembers it all.</em>',
+      swap_desc:'Each with its own account and its own copy of your life on someone else’s server, and none knows what the others know. So someone at home keeps the connections in their head. Yuvomi takes that on, and every line below works today.',
       swap_1_a:'a to-do & task app',                 swap_1_b:'<b>Tasks</b>',
       swap_2_a:'a family calendar app',              swap_2_b:'<b>Calendar</b>',
       swap_3_a:'a meal planner & recipe app',        swap_3_b:'<b>Meals & Recipes</b>',
       swap_4_a:'a grocery-list app',                 swap_4_b:'<b>Shopping</b>',
       swap_5_a:'a budgeting & cost-splitting app',   swap_5_b:'<b>Budget</b>',
       swap_6_a:'a document manager',                 swap_6_b:'<b>Documents</b>',
-      swap_close:'There\'s a calmer way. <span>Self-hosted, and yours.</span>',
+      swap_close:'There is a calmer way: <span>one home, and it belongs to you.</span>',
       skip_link:'Skip to content',
-      more_scope:'Not a photo library, password manager or media server - what you already run can stay. Calendars and contacts sync both ways over CalDAV and CardDAV, documents can live on WebDAV or Google Drive, and the API and its MCP endpoint connect the rest.',
+      more_scope:'Not a photo library, password manager or media server - what you already run can stay. Calendars sync both ways over CalDAV, contacts come in over CardDAV, documents can live on WebDAV or Google Drive, and the API and its MCP endpoint connect the rest.',
       m_pantry_t:'Pantry', m_pantry_d:'What is actually in the house: amount, storage location and best-before date, with expiry and low-stock filters, and a two-way handover with the shopping list.',
       m_family_t:'Family', m_family_d:'Member profiles with roles, photos and contact details, kept in sync with Contacts and Birthdays.',
-      m_api_t:'API tokens', m_api_d:'Bearer and X-API-Key tokens against a documented OpenAPI 3.1 spec, plus an MCP endpoint at <code>/mcp</code> that lets a client like Claude Desktop drive the API in plain language.',
+      m_api_t:'API tokens', m_api_d:'Access tokens for scripts and tools such as Home Assistant, against a documented OpenAPI 3.1 spec, plus an MCP endpoint at <code>/mcp</code> that lets a client like Claude Desktop drive the API in plain language.',
       ho_eyebrow:'Why one app',
-      ho_title:'The modules <em>talk to each other</em>',
-      ho_desc:'This is the part a folder full of separate apps cannot do. What happens in one module shows up where you need it, without anyone re-typing it.',
+      ho_title:'Everything in it <em>works together.</em>',
+      ho_desc:'Separate apps cannot do this. What happens in one place shows up where it is needed next, with no retyping and nothing to remember. And one search finds it, in any module.',
       ho_1_a:'Meal plan for the week', ho_1_b:'Ingredients on the shopping list',
       ho_1_d:'One import sends every ingredient from the week\'s plan to the shared list, sorted by aisle, with the next seven days pre-selected. Nobody transcribes a recipe into a notes app again.',
       ho_2_a:'A chore gets ticked off', ho_2_b:"Points land on your kid's balance",
@@ -1599,43 +1597,43 @@
       alt_f_budget_m:"Budget on mobile",
       nav_main:'Main', foot_nav:'Footer',
       nav_gh:'GitHub', nav_install:'Install',
-      meta_desc:'Self-hosted, privacy-first planner for families, couples and one-person households. Tasks, meals, calendar sync, budget - one private home, no subscriptions.',
+      meta_desc:'Self-hosted planner for families, couples and one-person households: calendar, tasks, meals, shopping and budget in one app on your own hardware. No subscription, no ads, no trackers.',
       hero_h1_pre:'One home', hero_h1_em:'instead of many subscriptions.',
-      hero_sub:'The self-hosted family planner: tasks, calendar, budget and shopping on your own computer at home, not in someone else’s cloud. For a family, a couple, or just you.',
+      hero_sub:'Calendar, tasks, meals, shopping and money in one app whose parts work together. It runs on your own computer at home - for a family, a couple, or just you.',
       long_eyebrow:'Before you commit', tb_image_k:'Image', tb_image_v:'about 500 MB, for amd64 and arm64 - Raspberry\u00a0Pi\u00a04\u00a0and\u00a05 included',
       tb_needs_k:'Needs', tb_needs_v:'256 MB RAM and one port, 3000 by default.',
       tb_writes_k:'Writes', tb_writes_v:'Four volumes you own: data, backups, modules, documents.',
-      tb_out_k:'Outbound', tb_out_v:'Out of the box, one update check against the GitHub releases API. Everything else reaches out only when you use or switch on a feature that needs it.',
-      tb_out_more:'Which features', tb_out_list:'Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service’s website, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.',
+      tb_out_k:'Outbound', tb_out_v:'Out of the box, one update check against the GitHub releases API. Block it and nothing breaks. Everything else reaches out only when you use or switch on a feature that needs it.',
+      tb_out_more:'Which features', tb_out_list:'Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, and finding a logo for a subscription looks up the service’s website. If the operator turns them on, a profile picture from Gravatar sends a hash of your email address there, and an admin can install extension modules from GitHub. Weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.',
       tb_data_k:'Your data', tb_data_v:'One SQLite file at', tb_data_v2:'Copying it is the whole export, unless documents live outside the database.',
       hero_install:'Install Yuvomi', hero_demo:'See a day with Yuvomi',
-      hero_house:'For the whole household: everyone gets their own login from an invite link, and the app on their phone.',
+      hero_house:'One person sets it up. Everyone else gets an invite link and the app on their phone.',
       gal_eyebrow:'A day at home', gal_title:'From breakfast to bedtime, <em>one plan.</em>',
-      gal_desc:'No demo account, no sales call. The screens your family opens every day, at the size you will actually use them. The rest are further down.',
-      gal_meals_k:'Meals', gal_meals_c:'<b>Every meal of the week, planned in one place.</b> Breakfast to snacks, dragged into place and there for everyone in the house.',
+      gal_desc:'Real screens, no demo account. In the morning who has to be where, at midday what is on the table, in the evening who did what.',
+      gal_meals_k:'Meals', gal_meals_c:'<b>What is for dinner is already decided.</b> The whole week from breakfast to snacks, dragged into place and there for everyone at home.',
       alt_gal_meals:'Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks',
       alt_fam_wall:"Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers",
-      gal_cal_k:'Calendar', gal_cal_c:'<b>Google, iCloud and Nextcloud, finally in one calendar.</b> Two-way sync, so an appointment added here lands on every phone in the house.',
-      proof_modules:'modules', proof_langs:'languages', proof_telemetry:'trackers', proof_mit:'MIT licensed', feat_title:'Everything your household needs',
+      gal_cal_k:'Calendar', gal_cal_c:'<b>Who has to be where, before anyone asks.</b> Google, iCloud and Nextcloud calendars in one view, synced both ways, and the whole day on a single timeline.',
+      proof_modules:'modules', proof_langs:'languages', proof_telemetry:'trackers', proof_mit:'MIT licensed', feat_title:'All of it, <em>and only what you use.</em>',
       /* "for families" war die eine Stelle, die die Solo-Zusage des Heros
          zurücknahm (Persona-Befund in zwei Läufen); "household" ist die
          Positionierung aus PRODUCT.md und deckt beide Zielgruppen. */
-      feat_desc:'Grouped the way the app itself groups them. Anything your household does not need, an admin switches off for everyone, and it disappears from the menu.',
+      feat_desc:'Grouped the way the app groups them. Whatever your household does not need, an admin switches off for everyone, and it disappears from the menu. Missing something? Extension modules can be added.',
       f_tasks_k:'Tasks', f_tasks_t:'Everyone knows what needs doing.', f_tasks_d:'Shared tasks with deadlines, priorities, subtasks, tags and recurring schedules, assignable to several family members at once.',
-      f_tasks_l1:'Kanban board with one-tap status changes', f_tasks_l2:'Multi-member assignment with stacked avatars', f_tasks_l3:'Optional two-way sync with CalDAV reminder lists', f_tasks_l4:'Lock a task so only its creator and admins can change it', f_tasks_l5:'A history of what was completed, by day and by member',
+      f_tasks_l1:'Kanban board with one-tap status changes', f_tasks_l2:'Several people on one task, visible at a glance', f_tasks_l3:'Optional two-way sync with CalDAV reminder lists', f_tasks_l4:'Lock a task so only its creator and admins can change it', f_tasks_l5:'A history of what was completed, by day and by member',
       f_meals_k:'Meals', f_meals_t:'Dinner sorted before anyone asks.', f_meals_d:'A weekly drag-and-drop planner with repeating meals and ingredient lists that export straight to the shopping list in one click.',
       f_meals_l1:'Drag-and-drop weekly planner with repeats', f_meals_l2:'Reusable recipes you can scale & duplicate', f_meals_l3:'A shared shopping list, sorted by aisle and updating live',
       f_budget_k:'Budget', f_budget_t:'No surprise at the end of the month.', f_budget_d:'Track who spent what, split shared costs automatically, and see exactly where the money goes.',
       f_budget_l1:'61 currencies, recurring entries, weekly/monthly/yearly statistics, monthly budgets & savings goals', f_budget_l3:'Subscription tracker with renewals, budgets & alerts', f_budget_l4:'Shared costs for household, trips and events, with automatic debt simplification', f_budget_l5:'Share an entry\'s amount while its title and category stay private',
       f_health_k:'Health', f_health_t:'Health that stays in the family.', f_health_d:'Vitals, medications, preventive care, lab results, activity, cycles, fasting and nutrition, tracked per member, private by default, and stored only on your server.',
-      f_health_l1:'Cycle ring with period & fertile-window predictions', f_health_l2:'Medication reminders with refill alerts', f_health_l3:'Per-entry visibility: private or shared', f_health_l4:'Parents can record a child\u2019s fever and medication',
+      f_health_l1:'Cycle ring with period and fertile-window predictions', f_health_l2:'Medication reminders with refill alerts', f_health_l3:'Per-entry visibility: private or shared', f_health_l4:'Parents can record a child\u2019s fever and medication',
       m_sched_t:'Schedule', m_sched_d:'Rotating shifts and fixed weekly timetables, with changes for single days and an explicit day off. The calendar shows them as a layer of their own, so changing a pattern never leaves old appointments behind. Off by default; households turn it on.',
       m_waste_t:'Waste collection', m_waste_d:'Weekly, monthly or nth-weekday pickup rhythms, or a municipal ICS calendar imported once or subscribed by URL, with per-occurrence moves and skips, personal reminders, a Dashboard widget and a switchable Calendar layer. Off by default; households turn it on.',
       grp_plan:'Plan', grp_household:'Household', grp_people:'People', grp_finance:'Finance', grp_settings:'Settings',
       mods_more:'Show what each module does', mods_less:'Hide the details',
       m_docs_t:'Documents', m_docs_d:'Family files with previews, folders, visibility controls and bulk actions. Storage on a local folder, WebDAV or Google Drive; Paperless-ngx and Papra optional.',
-      m_notes_t:'Notes', m_notes_d:'Colored Markdown sticky notes for recipes, memos and quick reminders, sorted into personal or household categories, with checklists you tick off by tapping them.',
-      m_contacts_t:'Contacts', m_contacts_d:'A shared contact directory with CardDAV sync and vCard import/export.',
+      m_notes_t:'Notes', m_notes_d:'Colored Markdown sticky notes for recipes, memos and quick reminders, personal or for the household, with checklists you tick off with a tap. A note can be private, or locked so only its author can change it.',
+      m_contacts_t:'Contacts', m_contacts_d:'A shared contact directory that can bring in your contacts over CardDAV, with vCard import and export.',
       m_cal_t:'Calendar', m_cal_d:'Two-way sync with Google and CalDAV, one-way push to Outlook.com via Microsoft Graph, public ICS subscriptions, recurring events, holiday overlays and per-event visibility.',
       m_shop_t:'Shopping', m_shop_d:'Collaborative lists grouped by aisle and ordered to match your shop, with swipe gestures and an import from the meal plan.',
       m_bday_t:'Birthdays', m_bday_d:'Birthday tracker with optional name days, automatic annual calendar events, age display and custom reminders.',
@@ -1645,7 +1643,7 @@
       m_recipes_t:'Recipes', m_recipes_d:'Create, duplicate and scale reusable recipes, then pre-fill meal slots or send the ingredients to a shopping list. A self-hosted Mealie or Tandoor instance can be mirrored read-only.',
       m_rem_t:'Reminders', m_rem_d:'Reminders on tasks, events, shifts, subscription renewals, warranties, best-before dates and waste pickups, with an in-app badge, opt-in push notifications and household Gotify, ntfy, webhook or email channels.',
       m_backup_t:'Backup', m_backup_d:'Scheduled backups with optional WebDAV upload (Nextcloud, ownCloud, Hetzner, etc.). Every restore saves the current state first, and a backup from another installation restores in the browser, no shell needed.', plat_title:'Runs on <em>your</em> hardware',
-      plat_desc:"A Docker or Podman container that drops onto any home server or NAS. Or install it in a couple of clicks from your platform's app store.",
+      plat_desc:"Yuvomi comes as a Docker container: one packaged program that runs the same on any home server or NAS.",
       plat_docker:'Pre-built image, one <code>compose</code> command - or rootless with Podman on RHEL, Fedora and CentOS Stream.',
       tb_out_proof:'What the site itself stores', tb_out_code:'The update check in the source',
       plat_more:'On Proxmox it runs in a <a href="install.html#proxmox">Debian container or a VM</a>. Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.', plat_start:'Start here', plat_guide_docker:'Docker guide', plat_cta:'Open the install guide', to_top:'Back to top',
@@ -1654,38 +1652,38 @@
          (nav, hero, Sprungmenue sagen alle "Install") - gleiches Ziel, gleiches
          Icon, also auch dasselbe Verb. */
       cta_install:'Install Yuvomi', cta_family:'What the family gets',
-      footer_heart:'Built with care for households who value privacy and simplicity.',
+      footer_heart:'Made with care for households that keep their data at home.',
       foot_product:'Product', foot_screens:'Screenshots', foot_install:'Install', foot_docs:'Docs & spec',
       foot_guide:'User guide (community)',
       foot_project:'Project', foot_contrib:'Contributing', foot_changelog:'Changelog',
       foot_legal:'Legal', foot_impressum:'Imprint (DE)', foot_privacy:'Privacy',
-      foot_madewith:'Self-hosted · Privacy-first · Open source',
+      foot_madewith:'Self-hosted · No trackers · Open source',
       /* S1 (2026-10-30): Tagesablauf, Gehoert-euch-Block, Einrichten verdichtet. */
       jump_yours:'Yours to keep',
       day_aria:'Time of day', day_morning:'Morning', day_midday:'Midday', day_evening:'Evening',
       gal_rew_k:'Rewards', gal_rew_c:'<b>Chores done, points earned, and everyone sees what they are saving for.</b> A parent approves each request, and the history shows who did what.',
       alt_gal_rew:'Yuvomi rewards with requests waiting for a parent’s approval, pocket money, each child’s points and a history of completed tasks',
       yours_eyebrow:'Yours to keep', yours_title:'It belongs to you, <em>not to us.</em>',
-      yours_desc:'No account with us, no subscription, no ads and no premium tier that locks half the app away. It runs on a computer in your home, and it keeps running there.',
+      yours_desc:'No account with us, no subscription, no ads and no premium tier that locks half the app away. It runs on a computer in your home and keeps running there.',
       yours_1_t:'Free, and it stays that way.', yours_1_d:'Open source under the MIT license. Every module is included, nothing waits behind a paywall, and anyone can read, keep and run the code.',
-      yours_2_t:'On your own disk, encrypted if you like.', yours_2_d:'Everything lives in one database file on your server. Switch on encryption and that file is unreadable without your key; the guided installer creates one for you.',
-      yours_3_t:'One call home, and you can check it.',
-      yours_4_t:'Alive, and listed by others.', yours_4_d:'TrueNAS, Umbrel and Unraid carry it in their app catalogs, and every change is written down in the changelog.',
+      yours_2_t:'On your own disk, encrypted if you want.', yours_2_d:'Everything lives in one database file on your own server, health records and budget included. Switch on encryption (AES-256) and nobody can read that file without your key; the guided installer creates the key for you.',
+      yours_3_t:'One call out, and you can check it.',
+      yours_4_t:'Maintained in the open, and listed by others.', yours_4_d:'TrueNAS, Umbrel and Unraid carry it in their app catalogs, and every change is written down in the public changelog.',
       yours_latest:'Latest release', yours_changelog:'What changed',
       long_more:'The full answer',
-      plat_who:'Setting it up is a job for one person in the house. Everyone else gets an invite link.',
-      plat_oneclick_lead:'Or in one click from your NAS app store',
+      plat_who:'Setting it up takes one person, once. Everyone else just opens their invite link.',
+      plat_oneclick_lead:'Or with one click from your NAS app store',
       plat_sheet:'Technical details for whoever sets it up'
     },
     de: {
       ho_4_a:'Das letzte Glas geht aus dem Vorrat', ho_4_b:'Ein Tipp setzt es auf die Einkaufsliste',
       ho_4_d:'Der Vorrat kennt Mengen und Mindesthaltbarkeit und erinnert euch, bevor etwas abläuft. Was knapp wird oder ausgeht, kommt direkt aus seiner Zeile auf die geteilte Liste, und der Einkauf bucht es zurück in den Bestand. Ob zu fünft oder allein, der Kreislauf ist derselbe.',
-      long_q1:'Was, wenn dieses Projekt aufhört?', long_k1:'Auf eurer Maschine ändert sich nichts.', long_a1:'Es ist MIT-lizenziert und selbst gehostet, es steht nirgends ein Server von uns dazwischen, und von sich aus fragt es nur die GitHub-Releases-API, ob es eine neuere Version gibt. Der Container, den ihr längst geladen habt, läuft genau so weiter wie heute, mit uns oder ohne uns.',
+      long_q1:'Was, wenn dieses Projekt aufhört?', long_k1:'Auf eurer Maschine ändert sich nichts.', long_a1:'Es ist MIT-lizenziert und läuft auf eurer eigenen Hardware, es steht nirgends ein Server von uns dazwischen, und von sich aus fragt es nur bei GitHub, ob es eine neuere Version gibt. Was ihr installiert habt, läuft genau so weiter wie heute, mit uns oder ohne uns.',
       long_q2:'Was, wenn ich meine Daten woanders hin will?', long_k2:'Eine Datei kopieren ist der ganze Export.', long_a2:'Alles liegt in einer einzigen SQLite-Datei auf eurer eigenen Platte, außer ihr habt die Dokumente in einen Ordner, auf WebDAV oder in Google Drive ausgelagert; diese Dateien brauchen eine eigene Sicherung. Geplante Backups schreiben darüber hinaus ein wiederherstellbares Archiv, und die dokumentierte API samt MCP-Endpunkt holt alles in der Form heraus, die ihr braucht.',
-      long_q3:'Was, wenn ich den Verschlüsselungsschlüssel verliere?', long_k3:'Dann ist die Datenbank weg, und wir können euch nicht helfen.', long_a3:'Das ist die ehrliche Antwort: SQLCipher hat keinen Wiederherstellungsweg und keine Hintertür, und genau das ist der Sinn der Sache. Verwahrt den Schlüssel wie die, auf die es ankommt. Die Verschlüsselung ist optional; wer dieses Risiko nicht tragen will, lässt sie aus, dann bleibt die Datei lesbar.',
-      long_q4:'Wie sicher ist der Zugang von außen?', long_k4:'Jedes Konto kann einen zweiten Faktor bekommen, und ein Admin kann ihn für den ganzen Haushalt verlangen.', long_a4:'Die Anmeldung fragt dann nach einem Code aus einer Authenticator-App (TOTP), mit Wiederherstellungscodes als Weg zurück. Neue Mitglieder kommen per Einladungslink und wählen ihr Passwort selbst. Mit Single Sign-on über einen OIDC-Anbieter lässt sich die Passwort-Anmeldung für den Haushalt abschalten, und ein verlorenes Handy meldet ihr von jedem eurer anderen Geräte aus ab.',
+      long_q3:'Was, wenn ich den Verschlüsselungsschlüssel verliere?', long_k3:'Dann ist die Datenbank weg, und wir können euch nicht helfen.', long_a3:'Das ist die ehrliche Antwort: Die Verschlüsselung (SQLCipher, AES-256) hat keinen Wiederherstellungsweg und keine Hintertür, und genau das ist ihr Sinn. Verwahrt den Schlüssel wie die, auf die es ankommt, im Passwort-Manager oder auf Papier an einem sicheren Ort. Die Verschlüsselung ist optional; wer dieses Risiko nicht tragen will, lässt sie aus, dann bleibt die Datei lesbar.',
+      long_q4:'Wie sicher ist der Zugang von außen?', long_k4:'Jedes Konto kann einen zweiten Faktor bekommen, und ein Admin kann ihn für den ganzen Haushalt verlangen.', long_a4:'Die Anmeldung fragt dann zusätzlich nach einem sechsstelligen Code aus einer Authenticator-App auf dem Handy (TOTP), mit Wiederherstellungscodes als Weg zurück. Neue Mitglieder kommen per Einladungslink und wählen ihr Passwort selbst. Betreibt ihr schon eine zentrale Anmeldung (OIDC, etwa Authentik oder Keycloak), lässt sich die Passwort-Anmeldung für den Haushalt abschalten, und ein verlorenes Handy meldet ihr von jedem eurer anderen Geräte aus ab.',
       long_q5:'Gibt es eine App im Store?', long_k5:'Nein, und ihr braucht auch keine.', long_a5:'Yuvomi ist eine Web-App, die sich aus dem Browser installiert: auf dem Handy öffnen, „Zum Home-Bildschirm“ wählen (auf dem iPhone über das Teilen-Menü), dann startet sie im Vollbild wie jede andere App. Erinnerungen kommen als Push-Benachrichtigung, auch wenn sie geschlossen ist; dafür braucht euer Server HTTPS. Updates kommen mit dem Server, jedes Handy ist also auf demselben Stand, ohne Store-Prüfung dazwischen.',
-      long_q6:'Funktioniert es ohne Netz?', long_k6:'Zum Lesen ja.', long_a6:'Kalender, Aufgaben, Einkaufsliste, Kontakte und die Übersicht behalten den Stand, den euer Handy zuletzt geladen hat, die Liste bleibt also auch im Supermarktkeller lesbar. Änderungen brauchen wieder eine Verbindung: Abhaken ohne Netz lehnt Yuvomi mit einem Hinweis ab, statt es still zu verlieren. Wer die Liste vor dem Losgehen einmal öffnet, hat diesen Stand dabei, auch wenn die App zwischendurch geschlossen war. Ein Streifen oben sagt, dass es der gespeicherte Stand ist und nur gelesen werden kann, bis euer Server wieder antwortet. Eine Abmeldung aus der Ferne greift auf einem Gerät erst, wenn es wieder online ist; bis dahin endet der Offline-Zugriff spätestens mit dem Ablauf der Sitzung. Ein Wanddisplay zeigt seine Listen bis 72 Stunden nach seinem letzten Kontakt mit eurem Server, auch nach einem Neustart.',
+      long_q6:'Funktioniert es ohne Netz?', long_k6:'Zum Lesen ja.', long_a6:'Kalender, Aufgaben, Einkaufsliste, Kontakte und die Übersicht behalten den Stand, den euer Handy zuletzt geladen hat, die Liste bleibt also auch im Supermarktkeller lesbar, mit einem Streifen oben, der sagt, dass es der gespeicherte Stand ist. Änderungen brauchen wieder eine Verbindung: Abhaken ohne Netz lehnt Yuvomi mit einem Hinweis ab, statt es still zu verlieren. Ein aus der Ferne abgemeldetes Gerät verliert den Offline-Zugriff, sobald es wieder online ist, spätestens mit dem Ablauf der Sitzung. Ein Wandtablet zeigt seine Listen bis zu 72 Stunden ohne Kontakt zu eurem Server, auch nach einem Neustart.',
       long_q7:'Braucht es den CalDAV- oder Nextcloud-Server noch?', long_k7:'Nur, wenn ihr ihn weiter nutzen wollt.', long_a7:'Yuvomi hält alles in seiner eigenen Datenbank und läuft auch ganz für sich. Ein CalDAV-Server ist es selbst aber nicht: Es gleicht sich mit eurem ab, Termine in beide Richtungen, Aufgaben und Einkauf über CalDAV-Erinnerungen, Kontakte holt es per CardDAV. Wer also weiter im Apple-Kalender oder in Thunderbird bearbeiten will, behält den Server und lässt Yuvomi abgleichen; um den Familienkalender woanders nur zu sehen, reicht sein ICS-Feed. Nextcloud taugt außerdem als WebDAV-Ablage für Dokumente und Backups.',
       long_q8:'Funktioniert es mit Home Assistant?', long_k8:'Ja, über offene Schnittstellen statt über ein Plugin.', long_a8:'Kalender, Müllabfuhr und Geburtstage gibt es als ICS-Feeds, die der Remote Calendar von Home Assistant liest. Erinnerungen können an einen Webhook gehen, und alles andere steckt in der dokumentierten REST-API, mit Tokens, die sich auf einzelne Module beschränken lassen, lesend oder schreibend. Eine offizielle Integration mit eigenen Entitäten gibt es nicht.',
       long_title:'Die Fragen, die man vorher stellen sollte',
@@ -1695,36 +1693,36 @@
       jump_modules:'Was drin ist', jump_longevity:'Bevor ihr euch festlegt', jump_install:'Wo es läuft',
       fam_eyebrow:'Für die Familie',
       fam_title:'An der Küchenwand, in jeder Hosentasche, <em>für jedes Alter.</em>',
-      fam_desc:'Alle im Haus bekommen per Link ein eigenes Konto und die App aufs Handy. Ein Terminal braucht, wenn überhaupt, nur wer es einrichtet.',
+      fam_desc:'Alle zu Hause bekommen per Link ein eigenes Konto und die App aufs Handy. Einen Server sieht nur, wer es einrichtet.',
       fam_1_t:'Das Tablet an der Küchenwand',
-      fam_1_d:'Der Wand-Modus zeigt den Tagesplan und wer heute dran ist, lesbar quer durch den Raum. Das Tablet hat ein eigenes Konto: Aufgabe antippen, auswählen, wer sie erledigt hat, und die Punkte gehen an diese Person.',
+      fam_1_d:'Der Wand-Modus zeigt den Tagesplan und wer heute dran ist, lesbar quer durch den Raum; schaut gerade niemand hin, zeigt er auf Wunsch eure Fotos aus Immich, und nachts dimmt er sich. Das Tablet hat ein eigenes Konto: Aufgabe antippen, auswählen, wer sie erledigt hat, und die Punkte gehen an diese Person.',
       fam_2_t:'Die App auf jedem Handy',
       fam_2_d:'Sie kommt direkt aus dem Browser auf den Startbildschirm, ohne App Store. Erinnerungen kommen als Mitteilung, auch wenn die App zu ist (dafür braucht euer Server HTTPS), und die zuletzt geöffnete Einkaufsliste bleibt lesbar, wenn kein Netz da ist.',
       fam_3_t:'Eine Einladung und genau die richtigen Rechte',
-      fam_3_d:'Ein Admin schickt einen Link, und das neue Mitglied wählt sein Passwort selbst; ein Kind ohne Handy bekommt sein Konto direkt angelegt. Je Familienrolle ist jedes Modul voll, nur lesen oder gar nicht freigegeben.',
+      fam_3_d:'Ein Admin schickt einen Link, und das neue Mitglied wählt sein Passwort selbst; ein Kind ohne Handy bekommt sein Konto direkt angelegt. Je Familienrolle ist jedes Modul voll, nur lesen oder gar nicht freigegeben, und was privat ist, bleibt privat, bis hin zur einzelnen Notiz.',
       fam_inv_t:'Von eurer Familie eingeladen?',
       fam_inv_lead:'Für euch kein Server und kein Terminal - nur der Link.',
       fam_inv_1:'Öffnet den Einladungslink, den euer Admin geschickt hat. Er gilt sieben Tage; danach braucht ihr einen neuen.',
       fam_inv_2:'Wählt einen Benutzernamen, falls die Einladung keinen vorgibt, und euer eigenes Passwort. Meldet sich euer Haushalt per Single Sign-on an, fällt das Passwort weg.',
       fam_inv_3:'Meldet euch an und holt Yuvomi auf den Startbildschirm: Installieren antippen, wenn die App es anbietet, oder auf iPhone und iPad im Teilen-Menü Zum Home-Bildschirm wählen.',
       swap_rel:'wird ersetzt durch',
-      swap_title:'Viele Apps, <em>ein Ort.</em>',
-      swap_desc:'Jede mit eigenem Konto und eigener Kopie eurer Daten auf fremden Servern - oder ein Ort auf eurem. Jede Zeile hier ist gebaut und ausgeliefert.',
+      swap_title:'Sechs Apps, <em>und eine Person, die an alles denkt.</em>',
+      swap_desc:'Jede mit eigenem Konto und eigener Kopie eures Alltags auf fremden Servern, und keine weiß, was die anderen wissen. Also behält jemand zu Hause die Zusammenhänge im Kopf. Yuvomi nimmt euch das ab, und jede Zeile hier gibt es schon heute.',
       swap_1_a:'eine To-do- und Aufgaben-App',        swap_1_b:'<b>Aufgaben</b>',
       swap_2_a:'eine Familienkalender-App',           swap_2_b:'<b>Kalender</b>',
       swap_3_a:'eine Essensplaner- und Rezept-App',   swap_3_b:'<b>Mahlzeiten & Rezepte</b>',
       swap_4_a:'eine Einkaufslisten-App',             swap_4_b:'<b>Einkauf</b>',
       swap_5_a:'eine App für Budget und Kostenteilen',swap_5_b:'<b>Budget</b>',
       swap_6_a:'eine Dokumentenverwaltung',           swap_6_b:'<b>Dokumente</b>',
-      swap_close:'Es geht auch ruhiger. <span>Selbst gehostet, und es gehört euch.</span>',
+      swap_close:'Es geht ruhiger: <span>ein Zuhause, und es gehört euch.</span>',
       skip_link:'Zum Inhalt springen',
-      more_scope:'Keine Fotobibliothek, kein Passwort-Manager, kein Media-Server - was ihr schon betreibt, darf bleiben. Kalender und Kontakte synchronisieren in beide Richtungen über CalDAV und CardDAV, Dokumente können auf WebDAV oder Google Drive liegen, und die API samt MCP-Endpunkt bindet den Rest an.',
+      more_scope:'Keine Fotobibliothek, kein Passwort-Manager, kein Media-Server - was ihr schon betreibt, darf bleiben. Kalender gleichen sich über CalDAV in beide Richtungen ab, Kontakte kommen per CardDAV herein, Dokumente können auf WebDAV oder Google Drive liegen, und die API samt MCP-Endpunkt bindet den Rest an.',
       m_pantry_t:'Vorrat', m_pantry_d:'Was tatsächlich im Haus ist: Menge, Lagerort und Mindesthaltbarkeit, mit Filtern für Ablauf und knappe Bestände, und einer Übergabe in beide Richtungen mit der Einkaufsliste.',
       m_family_t:'Familie', m_family_d:'Mitgliederprofile mit Rollen, Fotos und Kontaktdaten, synchron mit Kontakten und Geburtstagen.',
-      m_api_t:'API-Tokens', m_api_d:'Bearer- und X-API-Key-Tokens gegen eine dokumentierte OpenAPI-3.1-Spezifikation, dazu ein MCP-Endpunkt unter <code>/mcp</code>, über den ein Client wie Claude Desktop die API in natürlicher Sprache bedient.',
+      m_api_t:'API-Tokens', m_api_d:'Zugangstokens für Skripte und Werkzeuge wie Home Assistant, gegen eine dokumentierte OpenAPI-3.1-Spezifikation, dazu ein MCP-Endpunkt unter <code>/mcp</code>, über den ein Client wie Claude Desktop die API in natürlicher Sprache bedient.',
       ho_eyebrow:'Warum eine App',
-      ho_title:'Die Module <em>reden miteinander</em>',
-      ho_desc:'Genau das kann ein Ordner voller einzelner Apps nicht. Was in einem Modul passiert, taucht dort auf, wo ihr es braucht, ohne dass es jemand abtippt.',
+      ho_title:'Alles darin <em>greift ineinander.</em>',
+      ho_desc:'Genau das können getrennte Apps nicht. Was an einer Stelle passiert, taucht dort auf, wo es als Nächstes gebraucht wird, ohne Abtippen und ohne Dran-Denken. Und eine Suche findet es wieder, in jedem Modul.',
       ho_1_a:'Mahlzeitenplan für die Woche', ho_1_b:'Zutaten auf der Einkaufsliste',
       ho_1_d:'Ein Import schickt alle Zutaten der Wochenplanung nach Gang sortiert auf die geteilte Liste; die nächsten sieben Tage sind schon ausgewählt. Niemand überträgt mehr ein Rezept in eine Notiz-App.',
       ho_2_a:'Eine Aufgabe wird abgehakt', ho_2_b:'Punkte landen auf dem Konto des Kindes',
@@ -1739,40 +1737,40 @@
       alt_f_budget_m:"Budget auf dem Handy",
       nav_main:'Hauptnavigation', foot_nav:'Fußzeile',
       nav_gh:'GitHub', nav_install:'Installieren',
-      meta_desc:'Selbst gehosteter Planer für Familien, Paare und Alleinlebende: Aufgaben, Essen, Kalender-Sync und Budget auf eurem eigenen Server. Open Source, ohne Abo, ohne Tracker.',
+      meta_desc:'Selbst gehosteter Planer für Familien, Paare und Alleinlebende: Kalender, Aufgaben, Essen, Einkauf und Budget in einer App auf eurer eigenen Hardware. Ohne Abo, ohne Werbung, ohne Tracker.',
       hero_h1_pre:'Ein Zuhause', hero_h1_em:'statt vieler Abos.',
-      hero_sub:'Der selbst gehostete Familienplaner: Aufgaben, Kalender, Budget und Einkauf auf eurem eigenen Rechner zu Hause statt in einer fremden Cloud. Für eine Familie, ein Paar oder euch allein.',
+      hero_sub:'Kalender, Aufgaben, Essen, Einkauf und Geld in einer App, deren Teile zusammenarbeiten. Sie läuft bei euch zu Hause, für die Familie, zu zweit oder allein.',
       long_eyebrow:'Bevor ihr euch festlegt', tb_image_k:'Image', tb_image_v:'rund 500 MB, für amd64 und arm64 - auch Raspberry\u00a0Pi\u00a04\u00a0und\u00a05',
       tb_needs_k:'Braucht', tb_needs_v:'256 MB RAM und einen Port, standardmäßig 3000.',
       tb_writes_k:'Legt an', tb_writes_v:'Vier Volumes, die euch gehören: Daten, Backups, Module, Dokumente.',
-      tb_out_k:'Nach außen', tb_out_v:'Ab Werk eine Update-Abfrage an die GitHub-Releases-API. Alles andere geht erst nach außen, wenn ihr eine Funktion nutzt oder einschaltet, die es braucht.',
-      tb_out_more:'Welche Funktionen', tb_out_list:'Das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org, die Logo-Suche für ein Abo ruft die Website des Dienstes auf, und Wetter, Feiertage, Wechselkurse, Kalender- und Kontakte-Sync, Rezept-Spiegel, Immich, Paperless oder Papra, Push- und Benachrichtigungskanäle, Cloud-Speicher und Backup verbinden sich erst, wenn ihr sie einschaltet.',
+      tb_out_k:'Nach außen', tb_out_v:'Ab Werk nur eine Update-Abfrage an die GitHub-Releases-API. Blockiert ihr sie, geht nichts kaputt. Alles andere geht erst nach außen, wenn ihr eine Funktion nutzt oder einschaltet, die es braucht.',
+      tb_out_more:'Welche Funktionen', tb_out_list:'Das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org, und die Logo-Suche für ein Abo ruft die Website des Dienstes auf. Schaltet der Betreiber sie ein, schickt das Profilbild von Gravatar einen Hash eurer E-Mail-Adresse dorthin, und ein Admin kann Erweiterungsmodule von GitHub installieren. Wetter, Feiertage, Wechselkurse, Kalender- und Kontakte-Sync, Rezept-Spiegel, Immich, Paperless oder Papra, Push- und Benachrichtigungskanäle, Cloud-Speicher und Backup verbinden sich erst, wenn ihr sie einschaltet.',
       tb_data_k:'Eure Daten', tb_data_v:'Eine einzige SQLite-Datei unter', tb_data_v2:'Kopieren ist der ganze Export, solange die Dokumente in der Datenbank liegen.',
       hero_install:'Yuvomi installieren', hero_demo:'Einen Tag mit Yuvomi ansehen',
-      hero_house:'Für den ganzen Haushalt: Alle bekommen per Einladungslink ein eigenes Konto und die App aufs Handy.',
+      hero_house:'Eine Person im Haus richtet es ein. Alle anderen bekommen einen Einladungslink und die App aufs Handy.',
       gal_eyebrow:'Ein Tag zu Hause', gal_title:'Vom Frühstück bis zum Zubettgehen, <em>ein Plan.</em>',
-      gal_desc:'Kein Demo-Konto, kein Verkaufsgespräch. Die Bildschirme, die eure Familie täglich öffnet, in der Größe, in der ihr sie wirklich nutzt. Der Rest kommt weiter unten.',
-      gal_meals_k:'Mahlzeiten', gal_meals_c:'<b>Alle Mahlzeiten der Woche, an einem Ort geplant.</b> Vom Frühstück bis zum Snack, per Ziehen verteilt und für alle im Haus da.',
+      gal_desc:'Echte Bildschirme, kein Demo-Konto. Morgens, wer wann wo sein muss, mittags, was auf den Tisch kommt, abends, wer was erledigt hat.',
+      gal_meals_k:'Mahlzeiten', gal_meals_c:'<b>Was es heute gibt, steht schon fest.</b> Die ganze Woche vom Frühstück bis zum Snack, per Ziehen verteilt und für alle zu Hause da.',
       alt_gal_meals:'Yuvomi-Essensplaner mit einer Woche Frühstück, Mittag- und Abendessen und Snacks',
       alt_fam_wall:'Yuvomi im Wand-Modus auf einem Tablet im Querformat: die Uhrzeit in großer Schrift, Termine, Aufgaben und Einkauf des Tages, wer heute dran ist, das Wetter und Küchentimer auf Fingertipp',
-      gal_cal_k:'Kalender', gal_cal_c:'<b>Google, iCloud und Nextcloud, endlich in einem Kalender.</b> Sync in beide Richtungen, damit ein hier eingetragener Termin auf jedem Handy im Haus landet.',
-      proof_modules:'Module', proof_langs:'Sprachen', proof_telemetry:'Tracker', proof_mit:'MIT-lizenziert', feat_title:'Alles, was euer Haushalt braucht',
-      feat_desc:'Gegliedert wie in der App selbst. Was euer Haushalt nicht braucht, schaltet ein Admin für alle ab, und es verschwindet aus dem Menü.',
+      gal_cal_k:'Kalender', gal_cal_c:'<b>Wer wann wo sein muss, bevor jemand fragt.</b> Google-, iCloud- und Nextcloud-Kalender in einer Ansicht, in beide Richtungen abgeglichen, und der ganze Tag auf einer Zeitleiste.',
+      proof_modules:'Module', proof_langs:'Sprachen', proof_telemetry:'Tracker', proof_mit:'MIT-lizenziert', feat_title:'Alles drin, <em>und nur, was ihr nutzt.</em>',
+      feat_desc:'Gegliedert wie in der App. Was euer Haushalt nicht braucht, schaltet ein Admin für alle ab, und es verschwindet aus dem Menü. Fehlt etwas, lassen sich Erweiterungsmodule dazuholen.',
       f_tasks_k:'Aufgaben', f_tasks_t:'Alle wissen, was zu tun ist.', f_tasks_d:'Gemeinsame Aufgaben mit Fristen, Prioritäten, Unteraufgaben, Tags und Wiederholungen, mehreren Mitgliedern gleichzeitig zuweisbar.',
-      f_tasks_l1:'Kanban-Board mit Ein-Tipp-Status', f_tasks_l2:'Mehrfachzuweisung mit gestapelten Avataren', f_tasks_l3:'Optionaler Zwei-Wege-Sync mit CalDAV-Erinnerungslisten', f_tasks_l4:'Aufgabe sperren, damit nur Ersteller:in und Admins sie \u00e4ndern', f_tasks_l5:'Ein Verlauf, was erledigt wurde - nach Tag und nach Mitglied',
+      f_tasks_l1:'Kanban-Board mit Ein-Tipp-Status', f_tasks_l2:'Mehrere Personen an einer Aufgabe, auf einen Blick', f_tasks_l3:'Optionaler Zwei-Wege-Sync mit CalDAV-Erinnerungslisten', f_tasks_l4:'Aufgabe sperren, damit nur Ersteller:in und Admins sie \u00e4ndern', f_tasks_l5:'Ein Verlauf, was erledigt wurde - nach Tag und nach Mitglied',
       f_meals_k:'Mahlzeiten', f_meals_t:'Das Abendessen steht, bevor jemand fragt.', f_meals_d:'Ein wöchentlicher Drag-and-Drop-Planer mit wiederkehrenden Mahlzeiten und Zutatenlisten, die per Klick direkt auf die Einkaufsliste wandern.',
       f_meals_l1:'Drag-and-Drop-Wochenplaner mit Wiederholungen', f_meals_l2:'Wiederverwendbare Rezepte zum Skalieren & Duplizieren', f_meals_l3:'Eine geteilte Einkaufsliste, nach Gang sortiert und live aktualisiert',
       f_budget_k:'Budget', f_budget_t:'Keine böse Überraschung am Monatsende.', f_budget_d:'Haltet fest, wer was ausgegeben hat, teilt gemeinsame Kosten automatisch auf und seht genau, wohin das Geld fließt.',
       f_budget_l1:'61 Währungen, wiederkehrende Einträge, Wochen-/Monats-/Jahresstatistik, Monatsbudgets & Sparziele', f_budget_l3:'Abo-Tracker mit Verlängerungen, Budgets & Erinnerungen', f_budget_l4:'Geteilte Kosten für Haushalt, Reisen und Events, mit automatischer Schuldenvereinfachung', f_budget_l5:'Betrag eines Eintrags teilen, Titel und Kategorie bleiben privat',
       f_health_k:'Gesundheit', f_health_t:'Gesundheit, die in der Familie bleibt.', f_health_d:'Vitalwerte, Medikamente, Vorsorge, Laborwerte, Aktivität, Zyklen, Fasten und Ernährung, pro Mitglied erfasst, standardmäßig privat und nur auf eurem Server gespeichert.',
-      f_health_l1:'Zyklus-Ring mit Perioden- & fruchtbare-Tage-Prognose', f_health_l2:'Medikamenten-Erinnerungen mit Nachfüll-Warnung', f_health_l3:'Sichtbarkeit pro Eintrag: privat oder geteilt', f_health_l4:'Eltern tragen Fieber und Medikamente ihres Kindes ein',
+      f_health_l1:'Zyklus-Ring mit Prognose für Periode und fruchtbare Tage', f_health_l2:'Medikamenten-Erinnerungen mit Nachfüll-Warnung', f_health_l3:'Sichtbarkeit pro Eintrag: privat oder geteilt', f_health_l4:'Eltern tragen Fieber und Medikamente ihres Kindes ein',
       m_sched_t:'Schichtplan', m_sched_d:'Wechselschichten und feste Wochenpläne, mit Änderungen für einzelne Tage und einem ausdrücklichen freien Tag. Der Kalender zeigt sie als eigene Ebene, eine Musteränderung lässt also keine alten Termine zurück. Standardmäßig aus; Haushalte schalten es ein.',
       m_waste_t:'Entsorgung', m_waste_d:'Wöchentliche, monatliche oder Wochentag-Abholrhythmen oder ein kommunaler ICS-Kalender, einmal importiert oder per URL abonniert, mit Verschieben/Ausfallenlassen je Termin, persönlichen Erinnerungen, einem Dashboard-Widget und einer schaltbaren Kalender-Ebene. Standardmäßig aus; Haushalte schalten es ein.',
       grp_plan:'Planen', grp_household:'Haushalt', grp_people:'Menschen', grp_finance:'Finanzen', grp_settings:'Einstellungen',
       mods_more:'Zeigen, was jedes Modul kann', mods_less:'Details ausblenden',
       m_docs_t:'Dokumente', m_docs_d:'Familiendateien mit Vorschau, Ordnern, Sichtbarkeitsregeln und Stapelaktionen. Ablage lokal, per WebDAV oder Google Drive; Paperless-ngx und Papra optional.',
-      m_notes_t:'Notizen', m_notes_d:'Farbige Markdown-Haftnotizen für Rezepte, Memos und schnelle Erinnerungen, in persönlichen oder Haushalts-Kategorien, mit Checklisten, die man antippt statt zu bearbeiten.',
-      m_contacts_t:'Kontakte', m_contacts_d:'Ein geteiltes Kontaktverzeichnis mit CardDAV-Sync und vCard-Import/-Export.',
+      m_notes_t:'Notizen', m_notes_d:'Farbige Markdown-Haftnotizen für Rezepte, Memos und schnelle Erinnerungen, persönlich oder für den Haushalt, mit Checklisten, die ihr per Tipp abhakt. Eine Notiz kann privat sein oder so gesperrt, dass nur ihr Verfasser sie ändert.',
+      m_contacts_t:'Kontakte', m_contacts_d:'Ein gemeinsames Kontaktverzeichnis, das eure Kontakte per CardDAV hereinholen kann, mit vCard-Import und -Export.',
       m_cal_t:'Kalender', m_cal_d:'Sync in beide Richtungen mit Google und CalDAV, einseitiger Push nach Outlook.com via Microsoft Graph, öffentliche ICS-Abos, wiederkehrende Termine, Feiertags-Overlays und Sichtbarkeit pro Termin.',
       m_shop_t:'Einkauf', m_shop_d:'Gemeinsame Listen nach Gang gruppiert und passend zum eigenen Laden sortiert, mit Wischgesten und einem Import aus dem Essensplan.',
       m_bday_t:'Geburtstage', m_bday_d:'Geburtstags-Tracker mit optionalen Namenstagen, automatischen jährlichen Kalendereinträgen, Altersanzeige und Erinnerungen.',
@@ -1782,32 +1780,32 @@
       m_recipes_t:'Rezepte', m_recipes_d:'Wiederverwendbare Rezepte erstellen, duplizieren und skalieren, dann Mahlzeiten vorausfüllen oder die Zutaten auf die Einkaufsliste schicken. Eine selbst gehostete Mealie- oder Tandoor-Instanz lässt sich nur lesend daneben spiegeln.',
       m_rem_t:'Erinnerungen', m_rem_d:'Erinnerungen für Aufgaben, Termine, Schichten, Abo-Verlängerungen, Garantien, Mindesthaltbarkeit und Abfuhrtermine, mit In-App-Badge, optionalen Push-Benachrichtigungen und Gotify-, ntfy-, Webhook- oder E-Mail-Kanälen des Haushalts.',
       m_backup_t:'Backup', m_backup_d:'Geplante Backups mit optionalem WebDAV-Upload (Nextcloud, ownCloud, Hetzner\xa0usw.). Vor jeder Wiederherstellung wird der aktuelle Stand gesichert, und ein Backup einer anderen Installation spielt ihr ohne Shell im Browser ein.', plat_title:'Läuft auf <em>eurer</em> Hardware',
-      plat_desc:'Ein Docker- oder Podman-Container, der auf jeden Heimserver oder jedes NAS passt. Oder in wenigen Klicks aus dem App-Store eurer Plattform.',
+      plat_desc:'Yuvomi kommt als Docker-Container: ein fertig verpacktes Programm, das auf jedem Heimserver und jedem NAS gleich läuft.',
       plat_docker:'Fertiges Image, ein <code>compose</code>-Befehl - oder rootless mit Podman auf RHEL, Fedora und CentOS Stream.',
       tb_out_proof:'Was die Website selbst speichert', tb_out_code:'Die Versionsprüfung im Quelltext',
       plat_more:'Auf Proxmox läuft es in einem <a href="install.html#proxmox">Debian-Container oder einer VM</a>. Zwei weitere Wege brauchen keine eigene Plattform: der <a href="install.html#installer">geführte Web-Installer</a> und die <a href="install.html#source">Installation aus dem Quelltext</a>.', plat_start:'Hier starten', plat_guide_docker:'Docker-Anleitung', plat_cta:'Zur Installationsanleitung', to_top:'Nach oben',
       cta_title:'Einmal einrichten. <em>Dann plant die ganze Familie mit.</em>', cta_desc:'Danach gehört es dem Haushalt: auf jedem Handy und an der Küchenwand, ohne Konto bei uns, ohne Abo und ohne etwas von uns dazwischen.',
       cta_install:'Yuvomi installieren', cta_family:'Was die Familie davon hat',
-      footer_heart:'Mit Sorgfalt gebaut für Haushalte, die Privatsphäre und Einfachheit schätzen.',
-      foot_product:'Produkt', foot_screens:'Screenshots', foot_install:'Installieren', foot_docs:'Doku & Spec',
+      footer_heart:'Mit Sorgfalt gemacht für Haushalte, die ihre Daten zu Hause behalten.',
+      foot_product:'Produkt', foot_screens:'Screenshots', foot_install:'Installieren', foot_docs:'Doku und Spezifikation',
       foot_guide:'Nutzerhandbuch (Community)',
       foot_project:'Projekt', foot_contrib:'Mitmachen', foot_changelog:'Changelog',
       foot_legal:'Rechtliches', foot_impressum:'Impressum', foot_privacy:'Datenschutz',
-      foot_madewith:'Selbst gehostet · Privacy-First · Open Source',
+      foot_madewith:'Selbst gehostet · Ohne Tracker · Open Source',
       /* S1 (2026-10-30): Tagesablauf, Gehoert-euch-Block, Einrichten verdichtet. */
       jump_yours:'Gehört euch',
       day_aria:'Tageszeit', day_morning:'Morgen', day_midday:'Mittag', day_evening:'Abend',
       gal_rew_k:'Belohnungen', gal_rew_c:'<b>Aufgaben erledigt, Punkte verdient, und alle sehen, worauf sie sparen.</b> Ein Elternteil gibt jede Anfrage frei, und der Verlauf zeigt, wer was gemacht hat.',
       alt_gal_rew:'Yuvomi-Belohnungen mit Anfragen, die auf die Freigabe der Eltern warten, Taschengeld, dem Punktestand jedes Kindes und dem Verlauf erledigter Aufgaben',
       yours_eyebrow:'Gehört euch', yours_title:'Es gehört euch, <em>nicht uns.</em>',
-      yours_desc:'Kein Konto bei uns, kein Abo, keine Werbung und keine Premium-Stufe, die die halbe App wegsperrt. Es läuft auf einem Rechner bei euch zu Hause, und dort läuft es weiter.',
+      yours_desc:'Kein Konto bei uns, kein Abo, keine Werbung und keine Premium-Stufe, die die halbe App wegsperrt. Es läuft auf einem Rechner bei euch zu Hause und bleibt dort.',
       yours_1_t:'Kostenlos, und das bleibt so.', yours_1_d:'Open Source unter der MIT-Lizenz. Jedes Modul ist dabei, nichts wartet hinter einer Bezahlschranke, und jeder kann den Code lesen, behalten und betreiben.',
-      yours_2_t:'Auf eurer Platte, auf Wunsch verschlüsselt.', yours_2_d:'Alles liegt in einer Datenbankdatei auf eurem Server. Mit eingeschalteter Verschlüsselung ist sie ohne euren Schlüssel unlesbar; der geführte Installer legt ihn für euch an.',
-      yours_3_t:'Ein Ruf nach draußen, und ihr könnt ihn prüfen.',
-      yours_4_t:'Lebendig, und von anderen gelistet.', yours_4_d:'TrueNAS, Umbrel und Unraid führen es in ihren App-Katalogen, und jede Änderung steht im Changelog.',
+      yours_2_t:'Auf eurer Platte, auf Wunsch verschlüsselt.', yours_2_d:'Alles liegt in einer Datenbankdatei auf eurem eigenen Server, Gesundheitsdaten und Budget eingeschlossen. Mit eingeschalteter Verschlüsselung (AES-256) kann diese Datei ohne euren Schlüssel niemand lesen; den Schlüssel legt der geführte Installer für euch an.',
+      yours_3_t:'Ein einziger Ruf nach draußen, und ihr könnt ihn prüfen.',
+      yours_4_t:'Offen gepflegt, und von anderen gelistet.', yours_4_d:'TrueNAS, Umbrel und Unraid führen es in ihren App-Katalogen, und jede Änderung steht im öffentlichen Changelog.',
       yours_latest:'Neueste Version', yours_changelog:'Was sich geändert hat',
       long_more:'Die ganze Antwort',
-      plat_who:'Einrichten muss es eine Person im Haus. Alle anderen bekommen einen Einladungslink.',
+      plat_who:'Einrichten muss es eine Person, und nur einmal. Alle anderen öffnen einfach ihren Einladungslink.',
       plat_oneclick_lead:'Oder mit einem Klick aus dem App-Store eures NAS',
       plat_sheet:'Technische Details für die Person, die es einrichtet'
     }
@@ -1943,8 +1941,8 @@
 <section class="swap" id="swap">
   <div class="wrap">
     <div class="sec-head center reveal">
-      <h2 class="sec-title" data-t="swap_title">Many apps, <em>one place.</em></h2>
-      <p class="sec-desc" data-t="swap_desc">Each with its own account and its own copy of your data on someone else’s server - or one place on yours. Every line here is built and shipping today.</p>
+      <h2 class="sec-title" data-t="swap_title">Six apps, <em>and one person who remembers it all.</em></h2>
+      <p class="sec-desc" data-t="swap_desc">Each with its own account and its own copy of your life on someone else’s server, and none knows what the others know. So someone at home keeps the connections in their head. Yuvomi takes that on, and every line below works today.</p>
     </div>
     <ul class="swap-list reveal">
       <li class="swap-row"><span class="swap-from" data-t="swap_1_a">a to-do &amp; task app</span><span class="sr-only" data-t="swap_rel">is replaced by</span><svg class="swap-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg><span class="swap-to" data-t="swap_1_b"><b>Tasks</b></span></li>
@@ -1954,7 +1952,7 @@
       <li class="swap-row"><span class="swap-from" data-t="swap_5_a">a budgeting &amp; cost-splitting app</span><span class="sr-only" data-t="swap_rel">is replaced by</span><svg class="swap-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg><span class="swap-to" data-t="swap_5_b"><b>Budget</b></span></li>
       <li class="swap-row"><span class="swap-from" data-t="swap_6_a">a document manager</span><span class="sr-only" data-t="swap_rel">is replaced by</span><svg class="swap-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg><span class="swap-to" data-t="swap_6_b"><b>Documents</b></span></li>
     </ul>
-    <p class="swap-close reveal" data-t="swap_close">There's a calmer way. <span>Self-hosted, and yours.</span></p>
+    <p class="swap-close reveal" data-t="swap_close">There is a calmer way: <span>one home, and it belongs to you.</span></p>
   </div>
 </section>
 
@@ -1968,8 +1966,8 @@
   <div class="wrap">
     <div class="sec-head lead reveal">
       <span class="eyebrow" data-t="ho_eyebrow">Why one app</span>
-      <h2 class="sec-title" data-t="ho_title">The modules <em>talk to each other</em></h2>
-      <p class="sec-desc" data-t="ho_desc">This is the part a folder full of separate apps cannot do. What happens in one module shows up where you need it, without anyone re-typing it.</p>
+      <h2 class="sec-title" data-t="ho_title">Everything in it <em>works together.</em></h2>
+      <p class="sec-desc" data-t="ho_desc">Separate apps cannot do this. What happens in one place shows up where it is needed next, with no retyping and nothing to remember. And one search finds it, in any module.</p>
     </div>
     <ol class="ho-list">
       <li class="ho-row reveal">
@@ -2058,7 +2056,7 @@
     <div class="sec-head lead reveal">
       <span class="eyebrow" data-t="gal_eyebrow">A day at home</span>
       <h2 class="sec-title" data-t="gal_title">From breakfast to bedtime, <em>one plan.</em></h2>
-      <p class="sec-desc" data-t="gal_desc">No demo account, no sales call. The screens your family opens every day, at the size you will actually use them. The rest are further down.</p>
+      <p class="sec-desc" data-t="gal_desc">Real screens, no demo account. In the morning who has to be where, at midday what is on the table, in the evening who did what.</p>
     </div>
     <div class="day reveal" id="day">
       <div class="day-tabs" role="tablist" aria-label="Time of day" data-t-aria="day_aria" hidden>
@@ -2073,7 +2071,7 @@
         <figcaption class="gal-cap">
           <span class="day-when" data-t="day_morning">Morning</span>
           <span class="gal-kicker" data-t="gal_cal_k">Calendar</span>
-          <p data-t="gal_cal_c"><b>Google, iCloud and Nextcloud, finally in one calendar.</b> Two-way sync, so an appointment added here lands on every phone in the house.</p>
+          <p data-t="gal_cal_c"><b>Who has to be where, before anyone asks.</b> Google, iCloud and Nextcloud calendars in one view, synced both ways, and the whole day on a single timeline.</p>
         </figcaption>
         <div class="gal-frame gal-frame--crop">
           <img class="sc" data-shot-profile="lead" data-light="screenshots/calendar-light-web.png" data-light-m="screenshots/calendar-light-mobile.png" data-dark-m="screenshots/calendar-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/calendar-dark-web.png" alt="Yuvomi calendar showing appointments, tasks and birthdays for the whole household" data-alt-t="alt_c_cal" loading="lazy" decoding="async" width="900" height="675">
@@ -2086,7 +2084,7 @@
         <figcaption class="gal-cap">
           <span class="day-when" data-t="day_midday">Midday</span>
           <span class="gal-kicker" data-t="gal_meals_k">Meals</span>
-          <p data-t="gal_meals_c"><b>Every meal of the week, planned in one place.</b> Breakfast to snacks, dragged into place and there for everyone in the house.</p>
+          <p data-t="gal_meals_c"><b>What is for dinner is already decided.</b> The whole week from breakfast to snacks, dragged into place and there for everyone at home.</p>
         </figcaption>
         <div class="gal-frame gal-frame--crop">
           <img class="sc" data-shot-profile="lead" data-light="screenshots/meals-light-web.png" data-light-m="screenshots/meals-light-mobile.png" data-dark-m="screenshots/meals-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/meals-dark-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" data-alt-t="alt_gal_meals" loading="lazy" decoding="async" width="900" height="675">
@@ -2150,14 +2148,14 @@
       <div class="sec-head lead fam-head reveal">
         <span class="eyebrow" data-t="fam_eyebrow">For the family</span>
         <h2 class="sec-title" data-t="fam_title">On the kitchen wall, in every pocket, <em>for every age.</em></h2>
-        <p class="sec-desc" data-t="fam_desc">Everyone in the house gets their own login from a link and the app on their phone. A terminal, if needed at all, is only for whoever sets it up.</p>
+        <p class="sec-desc" data-t="fam_desc">Everyone at home gets their own account from a link and the app on their phone. Only the person who sets it up ever sees a server.</p>
       </div>
       <ul class="fam-list">
         <li class="fam-item reveal">
           <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="4.5" rx="2"/><line x1="18" x2="18.01" y1="12" y2="12"/></svg></span>
           <div class="fam-text">
             <h3 data-t="fam_1_t">The tablet on the kitchen wall</h3>
-            <p data-t="fam_1_d">Wall mode shows today’s plan and who is up, readable across the room. The tablet has an account of its own: tap a task, pick who did it, and the points go to them.</p>
+            <p data-t="fam_1_d">Wall mode shows today’s plan and who is up, readable across the room; when nobody is looking it can show your photos from Immich, and at night it dims. The tablet has an account of its own: tap a task, pick who did it, and the points go to them.</p>
           </div>
         </li>
         <li class="fam-item reveal">
@@ -2171,7 +2169,7 @@
           <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg></span>
           <div class="fam-text">
             <h3 data-t="fam_3_t">An invite, and just the right access</h3>
-            <p data-t="fam_3_d">An admin sends a link and the new member picks their own password; a child without a phone gets an account created directly. Per family role, each module is full, read only or not at all.</p>
+            <p data-t="fam_3_d">An admin sends a link and the new member picks their own password; a child without a phone gets an account created directly. Per family role, each module is full, read only or not at all, and what is private stays private, down to a single note.</p>
           </div>
         </li>
       </ul>
@@ -2203,8 +2201,8 @@
 <section class="showcase" id="modules">
   <div class="wrap">
     <div class="sec-head center reveal">
-      <h2 class="sec-title" data-t="feat_title">Everything your household needs</h2>
-      <p class="sec-desc" data-t="feat_desc">Grouped the way the app itself groups them. Anything your household does not need, an admin switches off for everyone, and it disappears from the menu.</p>
+      <h2 class="sec-title" data-t="feat_title">All of it, <em>and only what you use.</em></h2>
+      <p class="sec-desc" data-t="feat_desc">Grouped the way the app groups them. Whatever your household does not need, an admin switches off for everyone, and it disappears from the menu. Missing something? Extension modules can be added.</p>
     </div>
 
     <!-- Gegliedert wie das Menue der App (public/router.js, NAV_SECTION:
@@ -2238,7 +2236,7 @@
             <p data-t="f_tasks_d">Shared tasks with deadlines, priorities, subtasks, tags and recurring schedules, assignable to several family members at once.</p>
             <ul class="feat-list">
               <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l1">Kanban board with one-tap status changes</span></li>
-              <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l2">Multi-member assignment with stacked avatars</span></li>
+              <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l2">Several people on one task, visible at a glance</span></li>
               <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l3">Optional two-way sync with CalDAV reminder lists</span></li>
               <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l4">Lock a task so only its creator and admins can change it</span></li>
               <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_tasks_l5">A history of what was completed, by day and by member</span></li>
@@ -2260,7 +2258,7 @@
           </div>
           <div class="mod-card" style="--m: var(--m-notes)">
             <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></div>
-            <h4 data-t="m_notes_t">Notes</h4><p data-t="m_notes_d">Colored Markdown sticky notes for recipes, memos and quick reminders, sorted into personal or household categories, with checklists you tick off by tapping them.</p>
+            <h4 data-t="m_notes_t">Notes</h4><p data-t="m_notes_d">Colored Markdown sticky notes for recipes, memos and quick reminders, personal or for the household, with checklists you tick off with a tap. A note can be private, or locked so only its author can change it.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-schedule)">
             <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12h.01"/><path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M22 13a18.15 18.15 0 0 1-20 0"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg></div>
@@ -2333,7 +2331,7 @@
               <h4 data-t="f_health_t">Health that stays in the family.</h4>
               <p data-t="f_health_d">Vitals, medications, preventive care, lab results, activity, cycles, fasting and nutrition, tracked per member, private by default, and stored only on your server.</p>
               <ul class="feat-list">
-                <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l1">Cycle ring with period &amp; fertile-window predictions</span></li>
+                <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l1">Cycle ring with period and fertile-window predictions</span></li>
                 <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l2">Medication reminders with refill alerts</span></li>
                 <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l3">Per-entry visibility: private or shared</span></li>
                 <li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="f_health_l4">Parents can record a child’s fever and medication</span></li>
@@ -2347,7 +2345,7 @@
             <div class="mod-list">
             <div class="mod-card" style="--m: var(--m-contacts)">
               <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><circle cx="12" cy="8" r="2"/><path d="M15 13a3 3 0 1 0-6 0"/></svg></div>
-              <h4 data-t="m_contacts_t">Contacts</h4><p data-t="m_contacts_d">A shared contact directory with CardDAV sync and vCard import/export.</p>
+              <h4 data-t="m_contacts_t">Contacts</h4><p data-t="m_contacts_d">A shared contact directory that can bring in your contacts over CardDAV, with vCard import and export.</p>
             </div>
             <div class="mod-card" style="--m: var(--m-birthdays)">
               <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3M12 8v3M17 8v3M7 4h.01M12 3h.01M17 4h.01"/></svg></div>
@@ -2396,7 +2394,7 @@
           </div>
           <div class="mod-card" style="--m: var(--m-settings)">
             <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
-            <h4 data-t="m_api_t">API tokens</h4><p data-t="m_api_d">Bearer and X-API-Key tokens against a documented OpenAPI 3.1 spec, plus an MCP endpoint at <code>/mcp</code> that lets a client like Claude Desktop drive the API in plain language.</p>
+            <h4 data-t="m_api_t">API tokens</h4><p data-t="m_api_d">Access tokens for scripts and tools such as Home Assistant, against a documented OpenAPI 3.1 spec, plus an MCP endpoint at <code>/mcp</code> that lets a client like Claude Desktop drive the API in plain language.</p>
           </div>
           <div class="mod-card" style="--m: var(--m-settings)">
             <div class="mod-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
@@ -2414,7 +2412,7 @@
       <span data-t="mods_more">Show what each module does</span>
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
     </button>
-    <p class="mod-scope reveal" data-t="more_scope">Not a photo library, password manager or media server - what you already run can stay. Calendars and contacts sync both ways over CalDAV and CardDAV, documents can live on WebDAV or Google Drive, and the API and its MCP endpoint connect the rest.</p>
+    <p class="mod-scope reveal" data-t="more_scope">Not a photo library, password manager or media server - what you already run can stay. Calendars sync both ways over CalDAV, contacts come in over CardDAV, documents can live on WebDAV or Google Drive, and the API and its MCP endpoint connect the rest.</p>
   </div>
 </section>
 
@@ -2438,7 +2436,7 @@
         <div class="sec-head lead reveal">
           <span class="eyebrow" data-t="yours_eyebrow">Yours to keep</span>
           <h2 class="sec-title" data-t="yours_title">It belongs to you, <em>not to us.</em></h2>
-          <p class="sec-desc" data-t="yours_desc">No account with us, no subscription, no ads and no premium tier that locks half the app away. It runs on a computer in your home, and it keeps running there.</p>
+          <p class="sec-desc" data-t="yours_desc">No account with us, no subscription, no ads and no premium tier that locks half the app away. It runs on a computer in your home and keeps running there.</p>
         </div>
         <p class="yours-ver reveal"><span data-t="yours_latest">Latest release</span> <b>v2.83.0</b><span class="yours-date" data-released="2026-10-29">29 October 2026</span><a href="https://github.com/ulsklyc/yuvomi/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-t="yours_changelog">What changed</a></p>
       </div>
@@ -2448,16 +2446,16 @@
           <dd data-t="yours_1_d">Open source under the MIT license. Every module is included, nothing waits behind a paywall, and anyone can read, keep and run the code.</dd>
         </div>
         <div class="yours-item reveal">
-          <dt data-t="yours_2_t">On your own disk, encrypted if you like.</dt>
-          <dd data-t="yours_2_d">Everything lives in one database file on your server. Switch on encryption and that file is unreadable without your key; the guided installer creates one for you.</dd>
+          <dt data-t="yours_2_t">On your own disk, encrypted if you want.</dt>
+          <dd data-t="yours_2_d">Everything lives in one database file on your own server, health records and budget included. Switch on encryption (AES-256) and nobody can read that file without your key; the guided installer creates the key for you.</dd>
         </div>
         <div class="yours-item reveal">
-          <dt data-t="yours_3_t">One call home, and you can check it.</dt>
-          <dd><span data-t="tb_out_v">Out of the box, one update check against the GitHub releases API. Everything else reaches out only when you use or switch on a feature that needs it.</span> <details class="tb-more"><summary><span data-t="tb_out_more">Which features</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><span data-t="tb_out_list">Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, finding a logo for a subscription looks up the service’s website, and weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.</span></details> <a class="tb-proof" href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="tb_out_proof">What the site itself stores</a><span class="tb-sep" aria-hidden="true"> · </span><a class="tb-proof" href="https://github.com/ulsklyc/yuvomi/blob/main/server/routes/changelog.js" data-t="tb_out_code">The update check in the source</a></dd>
+          <dt data-t="yours_3_t">One call out, and you can check it.</dt>
+          <dd><span data-t="tb_out_v">Out of the box, one update check against the GitHub releases API. Block it and nothing breaks. Everything else reaches out only when you use or switch on a feature that needs it.</span> <details class="tb-more"><summary><span data-t="tb_out_more">Which features</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><span data-t="tb_out_list">Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, and finding a logo for a subscription looks up the service’s website. If the operator turns them on, a profile picture from Gravatar sends a hash of your email address there, and an admin can install extension modules from GitHub. Weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup connect once you switch them on.</span></details> <a class="tb-proof" href="privacy.html" data-href-en="privacy.html" data-href-de="datenschutz.html" data-t="tb_out_proof">What the site itself stores</a><span class="tb-sep" aria-hidden="true"> · </span><a class="tb-proof" href="https://github.com/ulsklyc/yuvomi/blob/main/server/routes/changelog.js" data-t="tb_out_code">The update check in the source</a></dd>
         </div>
         <div class="yours-item reveal">
-          <dt data-t="yours_4_t">Alive, and listed by others.</dt>
-          <dd data-t="yours_4_d">TrueNAS, Umbrel and Unraid carry it in their app catalogs, and every change is written down in the changelog.</dd>
+          <dt data-t="yours_4_t">Maintained in the open, and listed by others.</dt>
+          <dd data-t="yours_4_d">TrueNAS, Umbrel and Unraid carry it in their app catalogs, and every change is written down in the public changelog.</dd>
         </div>
       </dl>
     </div>
@@ -2494,7 +2492,7 @@
         <dt data-t="long_q1">What if this project stops?</dt>
         <dd>
           <p class="long-core" data-t="long_k1">Nothing changes on your machine.</p>
-          <details class="long-more"><summary><span data-t="long_more">The full answer</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><p data-t="long_a1">It is MIT-licensed and self-hosted, there is no server of ours anywhere in the path, and on its own it only asks the GitHub releases API whether a newer version exists. The container you already pulled keeps running exactly as it does today, with or without us.</p></details>
+          <details class="long-more"><summary><span data-t="long_more">The full answer</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><p data-t="long_a1">It is MIT-licensed and runs on your own hardware, there is no server of ours anywhere in the path, and on its own it only asks GitHub whether a newer version exists. The copy you installed keeps running exactly as it does today, with or without us.</p></details>
         </dd>
       </div>
       <div class="long-item reveal">
@@ -2508,14 +2506,14 @@
         <dt data-t="long_q3">What if I lose the encryption key?</dt>
         <dd>
           <p class="long-core" data-t="long_k3">Then the database is gone, and we cannot help you.</p>
-          <details class="long-more"><summary><span data-t="long_more">The full answer</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><p data-t="long_a3">That is the honest answer: SQLCipher has no recovery path and no back door, which is the entire point of it. Store the key the way you store the ones that matter. Encryption is optional; if you would rather not carry that risk, leave it off and the file stays readable.</p></details>
+          <details class="long-more"><summary><span data-t="long_more">The full answer</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><p data-t="long_a3">That is the honest answer: the encryption (SQLCipher, AES-256) has no recovery path and no back door, which is the whole point. Keep the key the way you keep the ones that matter, in a password manager or on paper somewhere safe. Encryption is optional; if you would rather not carry that risk, leave it off and the file stays readable.</p></details>
         </dd>
       </div>
       <div class="long-item reveal">
         <dt data-t="long_q4">How safe is access from outside?</dt>
         <dd>
           <p class="long-core" data-t="long_k4">Every account can add a second factor, and an admin can require it for the whole household.</p>
-          <details class="long-more"><summary><span data-t="long_more">The full answer</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><p data-t="long_a4">Sign-in then asks for a code from an authenticator app (TOTP), with recovery codes as the way back. New members join through an invite link and pick their own password. With single sign-on through an OIDC provider, password login can be switched off for the household, and a lost phone is signed out from any of your other devices.</p></details>
+          <details class="long-more"><summary><span data-t="long_more">The full answer</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><p data-t="long_a4">Sign-in then also asks for a six-digit code from an authenticator app on the phone (TOTP), with recovery codes as the way back. New members join through an invite link and pick their own password. If you already run a single sign-on service (OIDC, such as Authentik or Keycloak), password login can be switched off for the household, and a lost phone is signed out from any of your other devices.</p></details>
         </dd>
       </div>
       <div class="long-item reveal">
@@ -2529,7 +2527,7 @@
         <dt data-t="long_q6">Does it work without signal?</dt>
         <dd>
           <p class="long-core" data-t="long_k6">For reading, yes.</p>
-          <details class="long-more"><summary><span data-t="long_more">The full answer</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><p data-t="long_a6">Calendar, tasks, the shopping list, contacts and the overview keep the state your phone last loaded, so the list stays readable in the supermarket basement. Changes need a connection again: ticking something off while offline is refused with a note instead of being lost silently. Open the list once before you leave, and you have that state with you, even if the app was closed in between. A strip at the top says it is the saved state and read-only until your server answers again. Signing a device out remotely takes effect once it is back online; until then, offline access ends at the latest when its session expires. A wall display keeps showing its lists for up to 72 hours after its last contact with your server, also after a restart.</p></details>
+          <details class="long-more"><summary><span data-t="long_more">The full answer</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><p data-t="long_a6">Calendar, tasks, the shopping list, contacts and the overview keep the state your phone last loaded, so the list stays readable in the supermarket basement, with a strip at the top saying it is the saved state. Changes need a connection again: ticking something off while offline is refused with a note instead of being lost silently. A device signed out remotely loses offline access once it is back online, at the latest when its session expires. A wall tablet keeps showing its lists for up to 72 hours without contact with your server, also after a restart.</p></details>
         </dd>
       </div>
       <div class="long-item reveal">
@@ -2564,8 +2562,8 @@
   <div class="wrap">
     <div class="sec-head center reveal">
       <h2 class="sec-title" data-t="plat_title">Runs on <em>your</em> hardware</h2>
-      <p class="sec-desc" data-t="plat_desc">A Docker or Podman container that drops onto any home server or NAS. Or install it in a couple of clicks from your platform's app store.</p>
-      <p class="plat-who"><svg class="house-mark" viewBox="36 44 92 88" aria-hidden="true"><g fill="currentColor"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg><span data-t="plat_who">Setting it up is a job for one person in the house. Everyone else gets an invite link.</span></p>
+      <p class="sec-desc" data-t="plat_desc">Yuvomi comes as a Docker container: one packaged program that runs the same on any home server or NAS.</p>
+      <p class="plat-who"><svg class="house-mark" viewBox="36 44 92 88" aria-hidden="true"><g fill="currentColor"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg><span data-t="plat_who">Setting it up takes one person, once. Everyone else just opens their invite link.</span></p>
     </div>
     <div class="plat-paths reveal">
       <a class="plat-card plat-card--main" style="--pc:#2496ED" href="install.html#docker">
@@ -2576,7 +2574,7 @@
         <span class="plat-go"><span data-t="plat_guide_docker">Docker guide</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
       </a>
       <div class="plat-oneclick">
-        <p class="plat-oneclick-lead" data-t="plat_oneclick_lead">Or in one click from your NAS app store</p>
+        <p class="plat-oneclick-lead" data-t="plat_oneclick_lead">Or with one click from your NAS app store</p>
         <ul class="plat-caps" role="list">
           <li><a class="plat-cap" style="--pc:#0095D5" href="install.html#truenas"><span class="plat-logo plat-logo--sm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M24 10.049v5.114l-10.949 6.324v-5.114L24 10.049zm-24 0v5.114l10.956 6.324v-5.114L0 10.049zm12.004-.605l-4.433 2.559 4.433 2.559 4.429-2.559-4.429-2.559zm10.952-1.207l-9.905-5.723v5.118l5.473 3.164 4.432-2.559zm-12-.605V2.513L1.044 8.236l4.432 2.555 5.48-3.159z"/></svg></span><span>TrueNAS</span></a></li>
           <li><a class="plat-cap" style="--pc:#5351FB" href="install.html#umbrel"><span class="plat-logo plat-logo--sm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.853 8.302c2.628-.05 4.698.656 6.303 2.05 1.166 1.01 2.14 2.43 2.895 4.305a7.584 7.584 0 0 0-1.818-.21c-1.345 0-2.552.31-3.558.987-1.127-.687-2.339-1.049-3.623-1.049-1.313 0-2.573.378-3.77 1.087-1.154-.726-2.456-1.087-3.875-1.087-.513 0-1.003.048-1.466.147.678-1.724 1.575-3.054 2.664-4.028 1.557-1.393 3.607-2.15 6.248-2.202zM1.842 17.616c.04-.037.078-.076.112-.119.48-.557 1.233-.91 2.453-.91 1.151 0 2.139.32 3.002.952l.035.025c.469.35 1.108.364 1.592.036 1.032-.698 2.032-1.014 3.017-1.014.967 0 1.906.304 2.836.965l.02.014a1.376 1.376 0 0 0 1.699-.078c.614-.53 1.455-.84 2.625-.84 1.232 0 2.186.344 2.94.98a1.092 1.092 0 0 0 .435.235 1.095 1.095 0 0 0 .806-.087 1.103 1.103 0 0 0 .547-1.267c-.873-3.383-2.3-6.03-4.363-7.82-2.084-1.808-4.712-2.646-7.787-2.588-3.063.06-5.653.955-7.673 2.762-2.003 1.793-3.344 4.39-4.104 7.67a1.1 1.1 0 0 0 1.807 1.083z"/></svg></span><span>Umbrel</span></a></li>
@@ -2633,7 +2631,7 @@
     <div class="foot-grid">
       <div class="foot-brand">
         <a href="#top" class="nav-logo"><svg viewBox="0 0 160 160" fill="none" aria-hidden="true"><defs><linearGradient id="logo-g-foot" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#6c3aed"/></linearGradient></defs><rect width="160" height="160" rx="36" fill="url(#logo-g-foot)"/><g fill="white" fill-opacity="0.82"><circle cx="64" cy="72" r="27"/><circle cx="100" cy="78" r="25"/><circle cx="80" cy="106" r="24"/></g></svg>Yuvomi</a>
-        <p data-t="footer_heart">Built with care for households who value privacy and simplicity.</p>
+        <p data-t="footer_heart">Made with care for households that keep their data at home.</p>
       </div>
       <nav class="foot-cols" data-t-aria="foot_nav" aria-label="Footer">
         <div class="foot-col">
@@ -2663,7 +2661,7 @@
     </div>
     <div class="foot-bottom">
       <span class="foot-meta"><span id="gh-stars-footer" data-gh-stars>★ 2.1k · </span><b>v2.83.0</b> · <span id="foot-released" data-released="2026-10-29">29 October 2026</span></span>
-      <span data-t="foot_madewith">Self-hosted · Privacy-first · Open source</span>
+      <span data-t="foot_madewith">Self-hosted · No trackers · Open source</span>
     </div>
   </div>
   <a class="to-top" href="#main-content" id="toTop"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg><span data-t="to_top">Back to top</span></a>

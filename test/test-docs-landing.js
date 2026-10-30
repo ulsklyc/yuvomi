@@ -4144,3 +4144,162 @@ test('der Retina-Stufen-Guard erkennt den Schaden, gegen den er gebaut ist', () 
   assert.match(retinaTierFindings(html, drift).join(), /SHOT_W\.webLead .* weicht vom Build-Skript ab/);
   assert.equal(slotWidth('(max-width: 467px) calc(100vw - 50px), (max-width: 860px) 418px, 1150px', 400), 350);
 });
+
+// ── (24) Version und Datum auf der Website = package.json und CHANGELOG ─────
+/**
+ * Seit S1 (Website-Critique 2026-10-30) standen Version und Datum dreimal in
+ * index.html (Proof-Zeile, "Gehoert euch", Fuss) und einmal in install.html,
+ * alle von Hand gepflegt; release-prep greift die alte Nummer woertlich, das
+ * Datum aber nur "als sichtbaren Text" - eine vergessene Stelle faellt dort
+ * niemandem auf. Seit S2 steht die Nummer nur noch in "Gehoert euch" und im
+ * Fuss, und dieser Guard koppelt jede Stelle an die Quelle: jede Version
+ * (`<b>vX.Y.Z</b>`) ist die aus package.json, jedes `data-released` das Datum,
+ * das der CHANGELOG fuer genau diese Version nennt, und der sichtbare Text
+ * (Fallback ohne JS) sagt dasselbe Datum.
+ */
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+function releaseFacts(pkg, changelog) {
+  const version = JSON.parse(pkg).version;
+  const m = changelog.match(new RegExp(String.raw`^## \[${version.replace(/\./g, '\\.')}\] - (\d{4}-\d{2}-\d{2})`, 'm'));
+  return { version, date: m ? m[1] : null };
+}
+
+function versionFindings(pages, facts) {
+  const found = [];
+  if (!facts.date) return [`CHANGELOG nennt kein Datum fuer ${facts.version}`];
+  const [y, mo, d] = facts.date.split('-').map(Number);
+  const visible = `${d} ${MONTH_NAMES[mo - 1]} ${y}`;
+  for (const [page, html] of Object.entries(pages)) {
+    const body = stripComments(html);
+    const versions = [...body.matchAll(/<b>v(\d+\.\d+\.\d+)<\/b>/g)].map((m) => m[1]);
+    const dates = [...body.matchAll(/data-released="([^"]*)"[^>]*>([^<]*)</g)].map((m) => [m[1], m[2].trim()]);
+    if (!versions.length) found.push(`${page}: keine Versionsangabe gefunden - Muster veraltet?`);
+    if (!dates.length) found.push(`${page}: kein data-released gefunden - Muster veraltet?`);
+    for (const v of versions) if (v !== facts.version) found.push(`${page}: nennt v${v}, package.json ist ${facts.version}`);
+    for (const [iso, text] of dates) {
+      if (iso !== facts.date) found.push(`${page}: data-released="${iso}", der CHANGELOG datiert ${facts.version} auf ${facts.date}`);
+      if (text !== visible) found.push(`${page}: sichtbares Datum "${text}" statt "${visible}"`);
+    }
+  }
+  return found;
+}
+
+const SITE_RELEASE = () => releaseFacts(
+  readFileSync(resolve(ROOT, 'package.json'), 'utf8'),
+  readFileSync(resolve(ROOT, 'CHANGELOG.md'), 'utf8'));
+
+test('docs: jede Version und jedes Release-Datum der Website folgen package.json und dem CHANGELOG', () => {
+  assert.deepEqual(versionFindings({ 'index.html': read('index.html'), [INSTALL]: read(INSTALL) }, SITE_RELEASE()), []);
+});
+
+test('index.html: die Versionsnummer steht hoechstens zweimal (Lebenszeichen und Fuss)', () => {
+  const n = (stripComments(read('index.html')).match(/<b>v\d+\.\d+\.\d+<\/b>/g) || []).length;
+  assert.ok(n <= 2, `${n} Versionsangaben in index.html - jede weitere ist eine Stelle, die beim Release vergessen wird`);
+});
+
+test('der Versions-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const facts = SITE_RELEASE();
+  const html = read('index.html');
+  // Eine Stelle bleibt beim Release auf der alten Nummer stehen.
+  const stale = html.replace(`<b>v${facts.version}</b>`, '<b>v2.82.0</b>');
+  assert.notEqual(stale, html);
+  assert.match(versionFindings({ 'index.html': stale }, facts).join(), /nennt v2\.82\.0/);
+  // Das Attribut zieht mit, der sichtbare Text nicht (der Fall, den release-prep nur per Hand prueft).
+  const [y, mo, d] = facts.date.split('-').map(Number);
+  const text = html.replace(`>${d} ${MONTH_NAMES[mo - 1]} ${y}<`, '>1 January 2020<');
+  assert.notEqual(text, html);
+  assert.match(versionFindings({ 'index.html': text }, facts).join(), /sichtbares Datum "1 January 2020"/);
+  // Das Attribut bleibt stehen.
+  const attr = html.replace(`data-released="${facts.date}"`, 'data-released="2020-01-01"');
+  assert.match(versionFindings({ 'index.html': attr }, facts).join(), /data-released="2020-01-01"/);
+  // Eine Version ohne CHANGELOG-Eintrag.
+  assert.deepEqual(versionFindings({}, releaseFacts('{"version":"9.9.9"}', '## [1.0.0] - 2020-01-01')), ['CHANGELOG nennt kein Datum fuer 9.9.9']);
+});
+
+// ── (25) Outbound: was der Betreiber einschaltet, steht auch auf der Seite ───
+/**
+ * Der Outbound-Guard (3) haelt nur die Liste "Once you switch them on" der
+ * README. Zwei Verbindungen schaltet der BETREIBER ein, und die Seite
+ * verschwieg beide (Website-Critique 2026-10-30, handoff-2 P2): das Profilbild
+ * von Gravatar (schickt einen Hash der E-Mail-Adresse) und die Installation
+ * von Erweiterungsmodulen von GitHub (MODULES_ALLOW_WEB_INSTALL). Beide haengen
+ * an je einem Dienst im Code; gibt es den Dienst, muss tb_out_list ihn nennen.
+ */
+const OPERATOR_OUTBOUND = [
+  { file: 'server/services/gravatar.js', says: { en: /Gravatar/, de: /Gravatar/ } },
+  { file: 'server/services/module-github.js', says: { en: /modules from GitHub/, de: /Erweiterungsmodule von GitHub/ } },
+];
+
+function operatorOutboundFindings(html, has = (p) => existsSync(resolve(ROOT, p))) {
+  const found = [];
+  for (const lang of ['en', 'de']) {
+    const list = dictValue(dictBlock(html, lang), 'tb_out_list');
+    const text = list === null ? '' : stripTags(unescapeJs(list));
+    for (const c of OPERATOR_OUTBOUND) {
+      if (has(c.file) && !c.says[lang].test(text)) found.push(`tb_out_list (${lang}) verschweigt ${c.file} (${c.says[lang]})`);
+    }
+  }
+  return found;
+}
+
+test('index.html: die Outbound-Liste nennt auch, was der Betreiber einschaltet', () => {
+  assert.deepEqual(operatorOutboundFindings(read('index.html')), []);
+});
+
+test('der Betreiber-Outbound-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  // Der Stand vor S2, woertlich: ohne Gravatar und ohne Modulinstallation.
+  const before = read('index.html').replace(/(tb_out_list:')[^']*'/g,
+    "$1Opening the calendar settings loads the list of holiday countries from openholidaysapi.org, and weather connect once you switch them on.'");
+  const found = operatorOutboundFindings(before);
+  assert.equal(found.length, 4, found.join('\n'));
+  // Gibt es den Dienst nicht mehr, verlangt der Guard ihn auch nicht.
+  assert.deepEqual(operatorOutboundFindings(before, () => false), []);
+});
+
+// ── (26) CardDAV ist nur Lesen: kein Satz verspricht Kontakte in beide Richtungen ──
+/**
+ * Der Kontakte-Abgleich holt nur herein (docs/SPEC.md "CardDAV multi-account
+ * sync: ... read-only inbound sync", server/services/cardav-sync.js schreibt
+ * nichts zurueck). Die Startseite sagte trotzdem "Calendars and contacts sync
+ * both ways over CalDAV and CardDAV", install.html "Two-way sync with ...
+ * CalDAV/CardDAV" - und widersprach damit der eigenen FAQ (long_a7, Website-
+ * Critique 2026-10-30, handoff-2 P1). Ein Satz, der CardDAV und "beide
+ * Richtungen" nennt, muss deshalb sagen, dass Kontakte nur hereinkommen.
+ */
+const TWO_WAY = /both ways|two-way|beide Richtungen|Zwei-Wege/i;
+const INBOUND_ONLY = /come in|read in|fetches|holt|herein|nur lesend/i;
+
+function carddavTwoWayFindings(pages) {
+  const found = [];
+  for (const [page, html] of Object.entries(pages)) {
+    for (const lang of ['en', 'de']) {
+      for (const [key, text] of dictEntries(dictBlock(html, lang) || '')) {
+        for (const sentence of text.split(/(?<=\.)\s+/)) {
+          if (/CardDAV/.test(sentence) && TWO_WAY.test(sentence) && !INBOUND_ONLY.test(sentence)) {
+            found.push(`${page} ${key} (${lang}): "${sentence.slice(0, 90)}..." verspricht CardDAV in beide Richtungen`);
+          }
+        }
+      }
+    }
+  }
+  return found;
+}
+
+test('docs: kein Satz verspricht den Kontakte-Abgleich in beide Richtungen', () => {
+  assert.ok(existsSync(resolve(ROOT, 'server/services/cardav-sync.js')), 'Vorbedingung: der CardDAV-Abgleich liegt dort');
+  assert.match(readFileSync(resolve(ROOT, 'docs/SPEC.md'), 'utf8'), /read-only inbound sync/, 'SPEC sagt nicht mehr "read-only inbound" - Guard pruefen');
+  assert.deepEqual(carddavTwoWayFindings({ 'index.html': read('index.html'), [INSTALL]: read(INSTALL) }), []);
+});
+
+test('der CardDAV-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  // Die Saetze vor S2, woertlich.
+  const old = {
+    'index.html': "  var T = {\n    en: {\n      more_scope:'Calendars and contacts sync both ways over CalDAV and CardDAV, documents can live on WebDAV.'\n    },\n    de: {\n      more_scope:'Kalender und Kontakte synchronisieren in beide Richtungen über CalDAV und CardDAV.'\n    }\n  };",
+  };
+  assert.equal(carddavTwoWayFindings(old).length, 2, carddavTwoWayFindings(old).join('\n'));
+  const install = read(INSTALL).replace('multi-account CalDAV (iCloud, Nextcloud, Radicale), contacts read in over CardDAV,', 'multi-account CalDAV/CardDAV (iCloud, Nextcloud, Radicale),');
+  assert.notEqual(install, read(INSTALL));
+  assert.match(carddavTwoWayFindings({ [INSTALL]: install }).join(), /pt_cal_desc \(en\)/);
+});

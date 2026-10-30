@@ -227,7 +227,7 @@ and the [installation guide](docs/installation.md).
 - **Writes** - four volumes you own: data, backups, modules, documents.
 - **Outbound** - on its own, one update check against the GitHub releases API. Block it and nothing breaks, only the hint about a newer version stays away. Everything else reaches out only when you use or switch on a feature that needs it:
   - **When you use it** - opening the calendar settings loads the list of holiday countries from openholidaysapi.org; finding a logo for a subscription looks up the service's website.
-  - **If the operator turns it on** - fetching your profile picture from Gravatar sends a hash of your email address to gravatar.com or the mirror the operator chose.
+  - **If the operator turns it on** - fetching your profile picture from Gravatar sends a hash of your email address to gravatar.com or the mirror the operator chose; with web install allowed, an admin can install extension modules from GitHub.
   - **Once you switch them on** - weather, public holidays, exchange rates, calendar and contact sync, recipe mirrors, Immich, Paperless or Papra, push and notification channels, cloud storage and backup.
 - **Your LAN** - calendar subscriptions, notification channels (webhook, Gotify, ntfy), WebDAV document storage, recipe mirrors and waste-collection feeds on private or internal addresses stay blocked until you opt in ([how](docs/installation.md#environment-variables)). Paperless and Papra are the exception: they may reach the LAN out of the box.
 - **Your data** - one SQLite file at `/data/yuvomi.db`, plus the folder, WebDAV or Drive if you moved documents there.

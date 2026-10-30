@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The website tells Yuvomi as one story instead of a feature list.** The homepage at yuvomi.cloud
+  now starts with the problem it takes off your hands - many apps, and one person who keeps it all
+  in their head - then shows how the parts work together, a day at home from morning to evening,
+  what the family gets, and why it stays yours: no subscription, your data on your own disk and
+  encrypted if you want, and one update check as the only call out of the box. Setup comes last,
+  with one main route, the NAS app stores as one-click options and the technical details folded
+  away, and the questions worth asking first open one answer at a time. The text is plainer in
+  English and German, technical terms are explained where they appear, and the list of outbound
+  connections now also names Gravatar profile pictures and installing extension modules from GitHub.
+
 ### Fixed
+- **The website no longer says contacts sync both ways.** Contacts come in over CardDAV and are
+  not written back; the homepage and the install page promised a two-way sync for them.
 - **Running the web installer again keeps your settings.** On an existing installation the advanced
   setup now fills its fields with the values from your `.env` - port, public address, reverse-proxy
   settings, timezone, weather, email, sign-on, storage and backups - so a second run no longer resets
