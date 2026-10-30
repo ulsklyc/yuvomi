@@ -110,4 +110,5 @@ const CASE_REASONS = {
     delete: `${CONTACT_GONE}, ${FAMILY_MEMBER}`,
   },
   '/api/v1/contacts/{id}/vcard': { get: CONTACT_GONE },
+  '/api/v1/contacts/{id}/photo': { get: `${CONTACT_GONE}, \`contacts_no_photo\` (404, the contact exists but has no photo)` },
 };
