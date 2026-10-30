@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   footer says "MIT-Lizenz" on the German pages.
 
 ### Fixed
+- **Vietnamese counts show the real number.** In browsers with current language data, Vietnamese
+  picks the singular wording for 0 as well as for 1, so eleven messages such as the active filter
+  count said "1" when nothing was selected. They now show the actual count.
 - **The website no longer says contacts sync both ways.** Contacts come in over CardDAV and are
   not written back; the homepage and the install page promised a two-way sync for them.
 - **Running the web installer again keeps your settings.** On an existing installation the advanced
