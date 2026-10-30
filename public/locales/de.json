@@ -3467,7 +3467,14 @@
         "reminderListAssigneesTasksOnly": "Personen gibt es nur für Listen, die in Aufgaben landen.",
         "syncAssigneeNotMember": "Nur Haushaltsmitglieder können hier gewählt werden.",
         "syncAssigneeUnknown": "Diese Person gibt es nicht mehr. Lade die Seite neu.",
-        "permDetails": "Widgets und weitere Rechte"
+        "permDetails": "Widgets und weitere Rechte",
+        "llmImportLabel": "KI-Rezeptimport",
+        "llmImportHint": "Ein Sprachmodell macht aus einer Rezeptseite oder eingefügtem Text ein strukturiertes Rezept. Standardmäßig aus.",
+        "llmImportBaseUrlLabel": "LLM-Basis-URL",
+        "llmImportApiKeyLabel": "API-Schlüssel",
+        "llmImportApiKeySet": "Gespeichert (nur schreibbar)",
+        "llmImportModelLabel": "Modellname",
+        "llmImportSaved": "Einstellungen gespeichert"
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",
@@ -3715,6 +3722,20 @@
         "urlLabel": "Rezept-Link",
         "urlPlaceholder": "https://…",
         "ingredientsLabel": "Zutaten",
+        "llmImportOption": "Mit KI importieren",
+        "llmImportTitle": "KI-Rezeptimport",
+        "llmImportSourceLabel": "Quelle",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Text",
+        "llmImportUrlPlaceholder": "https://example.de/recipe",
+        "llmImportTextPlaceholder": "Rezepttext hier einfügen (mindestens 40 Zeichen)",
+        "llmImportAnalyze": "Analysieren",
+        "llmImportPreviewTitle": "Vorschau",
+        "llmImportIngredientsHeading": "Zutaten",
+        "llmImportStepsHeading": "Schritte",
+        "llmImportSave": "Rezept speichern",
+        "llmImportToast": "Rezept importiert",
+        "llmImportAnalyzing": "Analyse mit dem Modell läuft...",
         "addToMeals": "In den Essensplan",
         "toShoppingSuccess": "{{count}} Zutaten auf {{list}} übernommen.",
         "toShoppingSuccess_one": "{{count}} Zutat auf {{list}} übernommen.",
@@ -6758,5 +6779,17 @@
         "custom": "Eigene Farbe",
         "chooseCustom": "Eigene Farbe wählen",
         "standard": "Standardfarbe"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "Der KI-Import ist für diesen Haushalt ausgeschaltet (Einstellungen).",
+            "llmImportNotConfigured": "Der KI-Import braucht eine Basis-URL, einen API-Schlüssel und ein Modell (Einstellungen).",
+            "llmImportSourceRequired": "Gib eine URL an oder füge den Rezepttext ein.",
+            "llmImportUrlBlocked": "Diese Adresse lässt sich nicht abrufen (privates oder ungültiges Netzwerkziel).",
+            "llmImportUrlEmpty": "An dieser Adresse wurde kein Rezepttext gefunden.",
+            "llmImportBadResponse": "Das Modell hat kein brauchbares Rezept geliefert. Versuche es erneut.",
+            "llmImportRateLimited": "Zu viele KI-Importe in der letzten Stunde. Versuche es später erneut.",
+            "llmImportUrlInvalid": "Diese Adresse lässt sich nicht abrufen (privates oder ungültiges Netzwerkziel)."
+        }
     }
 }

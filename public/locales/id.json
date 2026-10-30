@@ -3467,7 +3467,14 @@
         "reminderListAssigneesTasksOnly": "Orang hanya bisa diatur untuk daftar yang masuk ke Tugas.",
         "syncAssigneeNotMember": "Hanya anggota rumah tangga yang bisa dipilih di sini.",
         "syncAssigneeUnknown": "Orang ini sudah tidak ada. Muat ulang halaman.",
-        "permDetails": "Widget dan izin lainnya"
+        "permDetails": "Widget dan izin lainnya",
+        "llmImportLabel": "Impor resep dengan AI",
+        "llmImportHint": "Biarkan model bahasa mengubah halaman resep atau teks yang ditempel menjadi resep terstruktur. Mati secara bawaan.",
+        "llmImportBaseUrlLabel": "URL dasar LLM",
+        "llmImportApiKeyLabel": "Kunci API",
+        "llmImportApiKeySet": "Tersimpan (hanya tulis)",
+        "llmImportModelLabel": "Nama model",
+        "llmImportSaved": "Pengaturan tersimpan"
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",
@@ -3715,6 +3722,20 @@
         "urlLabel": "Tautan resep",
         "urlPlaceholder": "https://…",
         "ingredientsLabel": "Bahan",
+        "llmImportOption": "Impor dengan AI",
+        "llmImportTitle": "Impor resep dengan AI",
+        "llmImportSourceLabel": "Sumber",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Teks",
+        "llmImportUrlPlaceholder": "https://example.id/recipe",
+        "llmImportTextPlaceholder": "Tempel teks resep di sini (minimal 40 karakter)",
+        "llmImportAnalyze": "Analisis",
+        "llmImportPreviewTitle": "Pratinjau",
+        "llmImportIngredientsHeading": "Bahan",
+        "llmImportStepsHeading": "Langkah",
+        "llmImportSave": "Simpan resep",
+        "llmImportToast": "Resep diimpor",
+        "llmImportAnalyzing": "Menganalisis dengan model...",
         "addToMeals": "Ke rencana menu",
         "toShoppingSuccess": "{{count}} bahan ditambahkan ke {{list}}.",
         "toShoppingSuccess_one": "{{count}} bahan ditambahkan ke {{list}}.",
@@ -6758,5 +6779,17 @@
         "custom": "Warna sendiri",
         "chooseCustom": "Pilih warna sendiri",
         "standard": "Warna bawaan"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "Impor AI dimatikan untuk rumah tangga ini (Pengaturan).",
+            "llmImportNotConfigured": "Impor AI memerlukan URL dasar, kunci API, dan model (Pengaturan).",
+            "llmImportSourceRequired": "Berikan URL atau tempel teks resep.",
+            "llmImportUrlBlocked": "Alamat itu tidak dapat diambil (target jaringan privat atau tidak valid).",
+            "llmImportUrlEmpty": "Tidak ditemukan teks resep di alamat itu.",
+            "llmImportBadResponse": "Model tidak mengembalikan resep yang bisa dipakai. Coba lagi.",
+            "llmImportRateLimited": "Terlalu banyak impor AI dalam satu jam terakhir. Coba lagi nanti.",
+            "llmImportUrlInvalid": "Alamat itu tidak dapat diambil (target jaringan privat atau tidak valid)."
+        }
     }
 }

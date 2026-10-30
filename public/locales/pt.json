@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "As pessoas só podem ser definidas para listas que vão para Tarefas.",
         "syncAssigneeNotMember": "Aqui só podem ser escolhidos membros do agregado.",
         "syncAssigneeUnknown": "Esta pessoa já não existe. Recarregue a página.",
-        "permDetails": "Widgets e mais permissões"
+        "permDetails": "Widgets e mais permissões",
+        "llmImportLabel": "Importação de receitas com IA",
+        "llmImportHint": "Deixe um modelo de linguagem transformar uma página de receita ou texto colado numa receita estruturada. Desativado por omissão.",
+        "llmImportBaseUrlLabel": "URL base do LLM",
+        "llmImportApiKeyLabel": "Chave API",
+        "llmImportApiKeySet": "Guardado (só escrita)",
+        "llmImportModelLabel": "Nome do modelo",
+        "llmImportSaved": "Definições guardadas"
     },
     "login": {
         "tagline": "Bem-vindo de volta. A tua casa num só lugar.",
@@ -3579,6 +3586,20 @@
         "urlLabel": "Link da receita",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Ingredientes",
+        "llmImportOption": "Importar com IA",
+        "llmImportTitle": "Importação de receitas com IA",
+        "llmImportSourceLabel": "Origem",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Texto",
+        "llmImportUrlPlaceholder": "https://example.pt/recipe",
+        "llmImportTextPlaceholder": "Cole aqui o texto da receita (pelo menos 40 caracteres)",
+        "llmImportAnalyze": "Analisar",
+        "llmImportPreviewTitle": "Pré-visualização",
+        "llmImportIngredientsHeading": "Ingredientes",
+        "llmImportStepsHeading": "Passos",
+        "llmImportSave": "Guardar receita",
+        "llmImportToast": "Receita importada",
+        "llmImportAnalyzing": "A analisar com o modelo...",
         "addToMeals": "Para o plano de refeições",
         "toShoppingSuccess": "{{count}} ingredientes adicionados a {{list}}.",
         "toShoppingSuccess_one": "{{count}} ingrediente adicionado a {{list}}.",
@@ -6758,5 +6779,17 @@
         "custom": "Cor personalizada",
         "chooseCustom": "Escolher cor personalizada",
         "standard": "Cor predefinida"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "A importação com IA está desativada para esta casa (Definições).",
+            "llmImportNotConfigured": "A importação com IA precisa de um URL base, uma chave API e um modelo (Definições).",
+            "llmImportSourceRequired": "Indique um URL ou cole o texto da receita.",
+            "llmImportUrlBlocked": "Esse endereço não pode ser obtido (destino de rede privado ou inválido).",
+            "llmImportUrlEmpty": "Não foi encontrado texto de receita nesse endereço.",
+            "llmImportBadResponse": "O modelo não devolveu uma receita utilizável. Tente novamente.",
+            "llmImportRateLimited": "Demasiadas importações com IA na última hora. Tente mais tarde.",
+            "llmImportUrlInvalid": "Esse endereço não pode ser obtido (destino de rede privado ou inválido)."
+        }
     }
 }

@@ -12,6 +12,15 @@ export function recipesPaths() {
       get: op({ summary: 'List recipes', tag: 'Recipes', description: 'Every ingredient carries `pantry_item_id` and `pantry_item_name`, the household\'s own confirmed match to one row of its pantry, both `null` when there is none. They name a row of the `pantry` module although this path belongs to `meals`, so they are also `null` for a member whose pantry access is `none` and for a token that carries no pantry scope - the ingredient itself stays, simply unmatched.' }),
       post: op({ summary: 'Create recipe', tag: 'Recipes', stateChanging: true, requestBody: jsonBody(null), description: '`servings` (optional, a whole number from 1 to 99, or `null`) says how many portions the ingredient quantities are for; `null` means not stated. The app scales the quantities from it and never invents a number for a recipe that has none.' }),
     },
+    '/api/v1/recipes/llm-import': {
+      post: op({
+        summary: 'Create a recipe from a language model',
+        tag: 'Recipes',
+        stateChanging: true,
+        requestBody: jsonBody(null),
+        description: 'Exactly one of `source_url` (a public http(s) recipe page) or `text` (the recipe pasted, at least 40 characters) - the connected model turns it into a recipe. With `preview: true` the call creates nothing: the recipe arrives complete as `data.recipe` (title, notes, ingredients with quantity sentences, servings) and nothing lands in the database; saving is then the confirmed call - `{ confirmed: true, recipe: ... }` - which trusts the shown recipe and does not ask the model a second time (no second cost). Without `preview` the recipe is saved directly and the answer is 201 with `id` and `title` (the same insert as `POST /recipes`, so the imported recipe has the same shape as a typed one). The source fetch and the model call count against a brake of ten attempts per user per hour (429). An address into a private or local network is refused before any request (SSRF bar), an unreadable page is a 400 at the address, an unusable model answer a 502. Requires the household switch `llm_import_enabled` and the stored model configuration (Settings, admin-only).',
+      }),
+    },
     '/api/v1/recipes/{id}': {
       put: op({
         summary: 'Update recipe',
@@ -113,5 +122,8 @@ const CASE_REASONS = {
   },
   '/api/v1/recipes/{id}/ingredient-match': {
     put: `${RECIPE_GONE}, \`recipes_ingredient_not_found\` (404, the recipe no longer has this ingredient), \`recipes_selected_pantry_item_not_found\` (404, the chosen pantry item does not exist), ${PANTRY_WRITE_REQUIRED}`,
+  },
+  '/api/v1/recipes/llm-import': {
+    post: '`llm_import_disabled` (403, the household switch is off), `llm_import_not_configured` (403, base URL, API key or model is missing), `llm_import_source_required` (400, not exactly one usable source, or the confirmed recipe is missing), `llm_import_url_invalid` (400, the address is not a valid http(s) address), `llm_import_url_blocked` (400, the address points into a private or local network - refused before any request), `llm_import_url_empty` (400, the page gave no readable text), `llm_import_bad_response` (502, the model did not return a usable recipe), `llm_import_rate_limited` (429, more than ten attempts in the last hour)',
   },
 };

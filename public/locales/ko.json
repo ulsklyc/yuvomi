@@ -3467,7 +3467,14 @@
         "reminderListAssigneesTasksOnly": "사람은 할 일로 가는 목록에만 정할 수 있습니다.",
         "syncAssigneeNotMember": "여기서는 가구 구성원만 고를 수 있습니다.",
         "syncAssigneeUnknown": "이 사람은 더 이상 없습니다. 페이지를 새로 고치세요.",
-        "permDetails": "위젯 및 기타 권한"
+        "permDetails": "위젯 및 기타 권한",
+        "llmImportLabel": "AI 레시피 가져오기",
+        "llmImportHint": "언어 모델이 레시피 페이지나 붙여넣은 텍스트를 구조화된 레시피로 바꾸게 합니다. 기본값은 꺼짐입니다.",
+        "llmImportBaseUrlLabel": "LLM 기본 URL",
+        "llmImportApiKeyLabel": "API 키",
+        "llmImportApiKeySet": "저장됨 (쓰기 전용)",
+        "llmImportModelLabel": "모델 이름",
+        "llmImportSaved": "설정을 저장했습니다"
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",
@@ -3715,6 +3722,20 @@
         "urlLabel": "레시피 링크",
         "urlPlaceholder": "https://…",
         "ingredientsLabel": "재료",
+        "llmImportOption": "AI로 가져오기",
+        "llmImportTitle": "AI 레시피 가져오기",
+        "llmImportSourceLabel": "출처",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "텍스트",
+        "llmImportUrlPlaceholder": "https://example.kr/recipe",
+        "llmImportTextPlaceholder": "여기에 레시피 텍스트를 붙여넣으세요 (최소 40자)",
+        "llmImportAnalyze": "분석",
+        "llmImportPreviewTitle": "미리보기",
+        "llmImportIngredientsHeading": "재료",
+        "llmImportStepsHeading": "단계",
+        "llmImportSave": "레시피 저장",
+        "llmImportToast": "레시피를 가져왔습니다",
+        "llmImportAnalyzing": "모델로 분석 중...",
         "addToMeals": "식단으로",
         "toShoppingSuccess": "{{list}}에 재료 {{count}}개를 추가했습니다.",
         "toShoppingSuccess_one": "{{list}}에 재료 {{count}}개를 추가했습니다.",
@@ -6758,5 +6779,17 @@
         "custom": "사용자 지정 색상",
         "chooseCustom": "사용자 지정 색상 선택",
         "standard": "기본 색상"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "이 가구에서는 AI 가져오기가 꺼져 있습니다 (설정).",
+            "llmImportNotConfigured": "AI 가져오기에는 기본 URL, API 키, 모델이 필요합니다 (설정).",
+            "llmImportSourceRequired": "URL을 입력하거나 레시피 텍스트를 붙여넣으세요.",
+            "llmImportUrlBlocked": "해당 주소는 가져올 수 없습니다 (개인 네트워크이거나 잘못된 대상입니다).",
+            "llmImportUrlEmpty": "해당 주소에서 레시피 텍스트를 찾지 못했습니다.",
+            "llmImportBadResponse": "모델이 사용할 수 있는 레시피를 반환하지 않았습니다. 다시 시도하세요.",
+            "llmImportRateLimited": "최근 1시간에 AI 가져오기가 너무 많습니다. 나중에 다시 시도하세요.",
+            "llmImportUrlInvalid": "해당 주소는 가져올 수 없습니다 (개인 네트워크이거나 잘못된 대상입니다)."
+        }
     }
 }

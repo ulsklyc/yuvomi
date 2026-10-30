@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "Személyek csak a Feladatokba kerülő listákhoz állíthatók be.",
         "syncAssigneeNotMember": "Itt csak a háztartás tagjai választhatók.",
         "syncAssigneeUnknown": "Ez a személy már nem létezik. Töltsd újra az oldalt.",
-        "permDetails": "Widgetek és további jogok"
+        "permDetails": "Widgetek és további jogok",
+        "llmImportLabel": "AI receptimport",
+        "llmImportHint": "Hagyja, hogy egy nyelvi modell a recept oldalt vagy a beillesztett szöveget strukturált receptté alakítsa. Alapértelmezés szerint kikapcsolva.",
+        "llmImportBaseUrlLabel": "LLM alap URL",
+        "llmImportApiKeyLabel": "API-kulcs",
+        "llmImportApiKeySet": "Mentve (csak írható)",
+        "llmImportModelLabel": "Modell neve",
+        "llmImportSaved": "Beállítások mentve"
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",
@@ -3696,6 +3703,20 @@
         "urlLabel": "Recept link",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Hozzávalók",
+        "llmImportOption": "Importálás AI-jal",
+        "llmImportTitle": "AI receptimport",
+        "llmImportSourceLabel": "Forrás",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Szöveg",
+        "llmImportUrlPlaceholder": "https://example.hu/recipe",
+        "llmImportTextPlaceholder": "Illessze be a recept szövegét ide (legalább 40 karakter)",
+        "llmImportAnalyze": "Elemzés",
+        "llmImportPreviewTitle": "Előnézet",
+        "llmImportIngredientsHeading": "Hozzávalók",
+        "llmImportStepsHeading": "Lépések",
+        "llmImportSave": "Recept mentése",
+        "llmImportToast": "Recept importálva",
+        "llmImportAnalyzing": "Elemzés a modellel...",
         "addToMeals": "Az étkezési tervbe",
         "toShoppingSuccess": "{{count}} hozzávaló hozzáadva a következőhöz: {{list}}.",
         "toShoppingSuccess_one": "{{count}} hozzávaló hozzáadva a következőhöz: {{list}}.",
@@ -6758,5 +6779,17 @@
         "custom": "Saját szín",
         "chooseCustom": "Saját szín választása",
         "standard": "Alapértelmezett szín"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "Az AI import ki van kapcsolva ebben a háztartásban (Beállítások).",
+            "llmImportNotConfigured": "Az AI importnak alap URL-re, API-kulcsra és modellre van szüksége (Beállítások).",
+            "llmImportSourceRequired": "Adj meg egy URL-t vagy illessz be a recept szövegét.",
+            "llmImportUrlBlocked": "Ez a cím nem lekérhető (privát vagy érvénytelen hálózati cél).",
+            "llmImportUrlEmpty": "Ezen a címen nem volt receptszöveg.",
+            "llmImportBadResponse": "A modell nem adott használható receptet. Próbáld újra.",
+            "llmImportRateLimited": "Túl sok AI import az utolsó órában. Próbáld újra később.",
+            "llmImportUrlInvalid": "Ez a cím nem lekérhető (privát vagy érvénytelen hálózati cél)."
+        }
     }
 }

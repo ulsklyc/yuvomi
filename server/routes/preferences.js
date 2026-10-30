@@ -33,6 +33,10 @@ const log = createLogger('Preferences');
 
 const router = express.Router();
 
+const MAX_LLM_BASE_URL_LENGTH = 2000;
+const MAX_LLM_API_KEY_LENGTH = 2000;
+const MAX_LLM_MODEL_LENGTH = 2000;
+
 const VALID_MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
 const DEFAULT_MEAL_TYPES = VALID_MEAL_TYPES.join(',');
 
@@ -679,6 +683,14 @@ router.get('/', (req, res) => {
         // A derived flag (#1766): true when Immich is configured and, for a
         // paired display, when an admin has switched the screensaver on for it.
         screensaver_enabled: isScreensaverEnabled() && (req.authMethod !== 'display' || req.displayShowsScreensaver === true),
+        // DER IMPORT AUS EINEM MODELL. Drei Felder sind einsehbar, eines
+        // nicht: der Schluessel selbst wird nie ausgeliefert, nur die Frage
+        // "ist einer hinterlegt?" - ein Schluessel, den die Antwort preisgibt,
+        // waere in jedem Protokoll und in jedem Screenshot der Welt.
+        llm_import_enabled: cfgGet('llm_import_enabled') === '1',
+        llm_base_url: cfgGet('llm_base_url') || null,
+        llm_model: cfgGet('llm_model') || null,
+        has_llm_api_key: Boolean(cfgGet('llm_api_key')),
     };
     // EIN WANDTABLETT BEKOMMT NUR DEN DARSTELLUNGSTEIL (#1208). Diese Antwort
     // ist die Sammelstelle des ganzen Haushalts - Wohnkoordinaten,
@@ -721,7 +733,7 @@ router.put('/', (req, res) => {
   try {
     database = db.get();
     database.exec('BEGIN');
-    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, tasks_default_visibility, tasks_default_locked, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
+    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, tasks_default_visibility, tasks_default_locked, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color, llm_import_enabled, llm_base_url, llm_api_key, llm_model } = req.body;
 
     // Welche Quickstart-Vorlagen der Schichtplan-Schnellstart zeigt - wie
     // disabled_modules haushaltweit und admin-only, nicht wie hidden_modules
@@ -1228,6 +1240,54 @@ router.put('/', (req, res) => {
       cfgSet('countdown_grace_days', String(days));
     }
 
+    // DER IMPORT AUS EINEM MODELL (Admin-only).
+    //
+    // Drei Felder, eine Regel: nur ein Administrator darf sie setzen, und der
+    // Schluessel wird nie zurueckgeliefert - die Antwort sagt nur, OB einer
+    // hinterlegt ist. Ein leerer Schluessel loescht die hinterlegte Fassung
+    // nicht, sondern wird ignoriert: sonst koennte ein Formular, das den
+    // Schluessel nicht kennt (er kommt ja nicht zurueck), ihn beim Speichern
+    // versehentlich wegraeumen.
+    if (llm_import_enabled !== undefined || llm_base_url !== undefined || llm_api_key !== undefined || llm_model !== undefined) {
+      if (!isAdminRequest(req)) {
+        return res.status(403).json({ error: 'Admin access required.', code: 403 });
+      }
+      if (llm_import_enabled !== undefined) {
+        if (typeof llm_import_enabled !== 'boolean') {
+          return res.status(400).json({ error: 'llm_import_enabled must be a boolean', code: 400 });
+        }
+        cfgSet('llm_import_enabled', llm_import_enabled ? '1' : '0');
+      }
+      if (llm_base_url !== undefined) {
+        if (typeof llm_base_url !== 'string') {
+          return res.status(400).json({ error: 'llm_base_url must be a string', code: 400 });
+        }
+        if (llm_base_url.length > MAX_LLM_BASE_URL_LENGTH) {
+          return res.status(400).json({ error: `llm_base_url must be at most ${MAX_LLM_BASE_URL_LENGTH} characters`, code: 400 });
+        }
+        cfgSet('llm_base_url', llm_base_url.trim());
+      }
+      if (llm_model !== undefined) {
+        if (typeof llm_model !== 'string') {
+          return res.status(400).json({ error: 'llm_model must be a string', code: 400 });
+        }
+        if (llm_model.length > MAX_LLM_MODEL_LENGTH) {
+          return res.status(400).json({ error: `llm_model must be at most ${MAX_LLM_MODEL_LENGTH} characters`, code: 400 });
+        }
+        cfgSet('llm_model', llm_model.trim());
+      }
+      if (llm_api_key !== undefined) {
+        if (typeof llm_api_key !== 'string') {
+          return res.status(400).json({ error: 'llm_api_key must be a string', code: 400 });
+        }
+        if (llm_api_key.length > MAX_LLM_API_KEY_LENGTH) {
+          return res.status(400).json({ error: `llm_api_key must be at most ${MAX_LLM_API_KEY_LENGTH} characters`, code: 400 });
+        }
+        // Ein leeres Feld heisst "unveraendert" - es loescht nichts.
+        if (llm_api_key.trim()) cfgSet('llm_api_key', llm_api_key.trim());
+      }
+    }
+
     // Weather configuration — admin only
     if (
       weather_provider !== undefined ||
@@ -1508,6 +1568,12 @@ router.put('/', (req, res) => {
         holiday_public_color:  cfgGet('holiday_public_color')  ?? '#FF3B30',
         holiday_school_color:  cfgGet('holiday_school_color')  ?? '#34C759',
         holiday_last_sync:     cfgGet('holiday_last_sync')     ?? null,
+        // DER IMPORT AUS EINEM MODELL - dieselben Felder wie im GET, und
+        // derselbe Schutz: der Schluessel kommt nicht zurueck.
+        llm_import_enabled: cfgGet('llm_import_enabled') === '1',
+        llm_base_url: cfgGet('llm_base_url') || null,
+        llm_model: cfgGet('llm_model') || null,
+        has_llm_api_key: Boolean(cfgGet('llm_api_key')),
       },
     };
 

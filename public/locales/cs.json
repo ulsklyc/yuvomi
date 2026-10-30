@@ -3567,7 +3567,14 @@
         "reminderListAssigneesTasksOnly": "Osoby lze nastavit jen u seznamů, které jdou do Úkolů.",
         "syncAssigneeNotMember": "Zde lze vybrat pouze členy domácnosti.",
         "syncAssigneeUnknown": "Tato osoba již neexistuje. Načtěte stránku znovu.",
-        "permDetails": "Widgety a další oprávnění"
+        "permDetails": "Widgety a další oprávnění",
+        "llmImportLabel": "Import receptu pomocí AI",
+        "llmImportHint": "Nechte jazykový model převést stránku receptu nebo vložený text na strukturovaný recept. Ve výchozím stavu vypnuto.",
+        "llmImportBaseUrlLabel": "Základní URL LLM",
+        "llmImportApiKeyLabel": "API klíč",
+        "llmImportApiKeySet": "Uloženo (jen pro zápis)",
+        "llmImportModelLabel": "Název modelu",
+        "llmImportSaved": "Nastavení uloženo"
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",
@@ -4586,6 +4593,20 @@
         "urlLabel": "Odkaz na recept",
         "urlPlaceholder": "https://…",
         "ingredientsLabel": "Ingredience",
+        "llmImportOption": "Importovat s AI",
+        "llmImportTitle": "Import receptu pomocí AI",
+        "llmImportSourceLabel": "Zdroj",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Text",
+        "llmImportUrlPlaceholder": "https://example.cz/recipe",
+        "llmImportTextPlaceholder": "Sem vložte text receptu (minimálně 40 znaků)",
+        "llmImportAnalyze": "Analyzovat",
+        "llmImportPreviewTitle": "Náhled",
+        "llmImportIngredientsHeading": "Suroviny",
+        "llmImportStepsHeading": "Postup",
+        "llmImportSave": "Uložit recept",
+        "llmImportToast": "Recept importován",
+        "llmImportAnalyzing": "Analyzuji modelem...",
         "addToMeals": "Do jídelního plánu",
         "toShoppingSuccess": "{{count}} ingrediencí přidáno do {{list}}.",
         "toShoppingSuccess_one": "{{count}} ingredience přidána do {{list}}.",
@@ -6938,5 +6959,17 @@
         "custom": "Vlastní barva",
         "chooseCustom": "Vybrat vlastní barvu",
         "standard": "Výchozí barva"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "Import s AI je pro tento domácnost vypnutý (Nastavení).",
+            "llmImportNotConfigured": "Import s AI potřebuje základní URL, API klíč a model (Nastavení).",
+            "llmImportSourceRequired": "Zadejte URL nebo vložte text receptu.",
+            "llmImportUrlBlocked": "Tuto adresu nelze načíst (soukromá nebo neplatná síťová adresa).",
+            "llmImportUrlEmpty": "Na této adrese nebyl nalezen žádný text receptu.",
+            "llmImportBadResponse": "Model nevrátil použitelný recept. Zkuste to znovu.",
+            "llmImportRateLimited": "Příliš mnoho importů s AI za poslední hodinu. Zkuste to později.",
+            "llmImportUrlInvalid": "Tuto adresu nelze načíst (soukromá nebo neplatná síťová adresa)."
+        }
     }
 }

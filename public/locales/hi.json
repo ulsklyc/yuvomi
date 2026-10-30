@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "लोग केवल उन सूचियों के लिए तय किए जा सकते हैं जो कार्यों में जाती हैं।",
         "syncAssigneeNotMember": "यहाँ केवल परिवार के सदस्य चुने जा सकते हैं।",
         "syncAssigneeUnknown": "यह व्यक्ति अब मौजूद नहीं है। पेज फिर से लोड करें।",
-        "permDetails": "विजेट और अन्य अनुमतियाँ"
+        "permDetails": "विजेट और अन्य अनुमतियाँ",
+        "llmImportLabel": "AI रेसिपी आयात",
+        "llmImportHint": "भाषा मॉडल को रेसिपी पेज या चिपकाए गए पाठ को संरचित रेसिपी में बदलने दें। डिफ़ॉल्ट रूप से बंद है।",
+        "llmImportBaseUrlLabel": "LLM बेस URL",
+        "llmImportApiKeyLabel": "API कुंजी",
+        "llmImportApiKeySet": "सहेजा गया (केवल लिखने योग्य)",
+        "llmImportModelLabel": "मॉडल का नाम",
+        "llmImportSaved": "सेटिंग सहेजी गईं"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",
@@ -3579,6 +3586,20 @@
         "urlLabel": "रेसिपी लिंक",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "सामग्री",
+        "llmImportOption": "AI से आयात करें",
+        "llmImportTitle": "AI रेसिपी आयात",
+        "llmImportSourceLabel": "स्रोत",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "पाठ",
+        "llmImportUrlPlaceholder": "https://example.in/recipe",
+        "llmImportTextPlaceholder": "यहाँ रेसिपी का पाठ चिपकाएँ (कम से कम 40 अक्षर)",
+        "llmImportAnalyze": "विश्लेषण करें",
+        "llmImportPreviewTitle": "पूर्वावलोकन",
+        "llmImportIngredientsHeading": "सामग्री",
+        "llmImportStepsHeading": "कदम",
+        "llmImportSave": "रेसिपी सहेजें",
+        "llmImportToast": "रेसिपी आयात हो गई",
+        "llmImportAnalyzing": "मॉडल से विश्लेषण हो रहा है...",
         "addToMeals": "भोजन योजना में",
         "toShoppingSuccess": "{{list}} में {{count}} सामग्री जोड़े गए।",
         "toShoppingSuccess_one": "{{list}} में {{count}} सामग्री जोड़ा गया।",
@@ -6758,5 +6779,17 @@
         "custom": "अपना रंग",
         "chooseCustom": "अपना रंग चुनें",
         "standard": "डिफ़ॉल्ट रंग"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "इस परिवार के लिए AI आयात बंद है (सेटिंग)।",
+            "llmImportNotConfigured": "AI आयात को बेस URL, API कुंजी और मॉडल चाहिए (सेटिंग)।",
+            "llmImportSourceRequired": "URL दें या रेसिपी का पाठ चिपकाएँ।",
+            "llmImportUrlBlocked": "वह पता नहीं लाया जा सकता (निजी या अमान्य नेटवर्क लक्ष्य)।",
+            "llmImportUrlEmpty": "उस पते पर कोई रेसिपी का पाठ नहीं मिला।",
+            "llmImportBadResponse": "मॉडल ने उपयोग योग्य रेसिपी नहीं लौटाई। फिर कोशिश करें।",
+            "llmImportRateLimited": "पिछले घंटे में बहुत सारे AI आयात। बाद में कोशिश करें।",
+            "llmImportUrlInvalid": "वह पता नहीं लाया जा सकता (निजी या अमान्य नेटवर्क लक्ष्य)।"
+        }
     }
 }

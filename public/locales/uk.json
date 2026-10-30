@@ -3675,7 +3675,14 @@
         "reminderListAssigneesTasksOnly": "Людей можна задати лише для списків, що йдуть у Завдання.",
         "syncAssigneeNotMember": "Тут можна вибрати лише членів родини.",
         "syncAssigneeUnknown": "Цієї людини більше немає. Перезавантажте сторінку.",
-        "permDetails": "Віджети та інші права"
+        "permDetails": "Віджети та інші права",
+        "llmImportLabel": "Імпорт рецепта через ШІ",
+        "llmImportHint": "Дозвольте мовній моделі перетворити сторінку рецепта або вставлений текст на структурований рецепт. Типово вимкнено.",
+        "llmImportBaseUrlLabel": "Базова URL ШІ",
+        "llmImportApiKeyLabel": "Ключ API",
+        "llmImportApiKeySet": "Збережено (лише для запису)",
+        "llmImportModelLabel": "Назва моделі",
+        "llmImportSaved": "Налаштування збережено"
     },
     "login": {
         "tagline": "З поверненням. Ваш дім - в одному місці.",
@@ -3849,6 +3856,20 @@
         "urlLabel": "Посилання на рецепт",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Інгредієнти",
+        "llmImportOption": "Імпорт за допомогою ШІ",
+        "llmImportTitle": "Імпорт рецепта через ШІ",
+        "llmImportSourceLabel": "Джерело",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Текст",
+        "llmImportUrlPlaceholder": "https://example.ua/recipe",
+        "llmImportTextPlaceholder": "Вставте тут текст рецепта (щонайменше 40 символів)",
+        "llmImportAnalyze": "Аналізувати",
+        "llmImportPreviewTitle": "Попередній перегляд",
+        "llmImportIngredientsHeading": "Інгредієнти",
+        "llmImportStepsHeading": "Кроки",
+        "llmImportSave": "Зберегти рецепт",
+        "llmImportToast": "Рецепт імпортовано",
+        "llmImportAnalyzing": "Аналізуємо моделлю...",
         "addToMeals": "До плану харчування",
         "toShoppingSuccess": "До {{list}} додано: {{count}} інгредієнтів.",
         "toShoppingSuccess_one": "До {{list}} додано {{count}} інгредієнт.",
@@ -7098,5 +7119,17 @@
         "custom": "Власний колір",
         "chooseCustom": "Вибрати власний колір",
         "standard": "Колір за замовчуванням"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "Імпорт через ШІ вимкнено для цього дому (Налаштування).",
+            "llmImportNotConfigured": "Для імпорту через ШІ потрібні базова URL, ключ API і модель (Налаштування).",
+            "llmImportSourceRequired": "Укажіть URL або вставте текст рецепта.",
+            "llmImportUrlBlocked": "Цю адресу неможливо отримати (приватна або недійсна мережева ціль).",
+            "llmImportUrlEmpty": "За цією адресою текст рецепта не знайдено.",
+            "llmImportBadResponse": "Модель не повернула придатний рецепт. Спробуйте ще раз.",
+            "llmImportRateLimited": "За останню годину забагато імпортів через ШІ. Спробуйте пізніше.",
+            "llmImportUrlInvalid": "Цю адресу неможливо отримати (приватна або недійсна мережева ціль)."
+        }
     }
 }

@@ -15,6 +15,18 @@ import { getAdapter } from '../services/recipe-providers/index.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import { mayReadModule, mayWriteModule } from '../permissions.js';
 import { handOverToShoppingList } from '../services/kitchen-handover.js';
+import { isBlockedBaseUrl } from '../services/recipe-providers/private-network.js';
+import {
+  LLM_IMPORT_MIN_TEXT_LENGTH,
+  LlmImportError,
+  consumeLlmImportQuota,
+  fetchSourceText,
+  isLlmImportConfigured,
+  mapLlmRecipeToRecipe,
+  normalizeLlmRecipe,
+  readLlmImportConfig,
+  requestLlmRecipe,
+} from '../services/llm-recipe-import.js';
 
 const log = createLogger('Recipes');
 const router = express.Router();
@@ -225,6 +237,51 @@ function validateServings(val) {
   return { value: n, error: null };
 }
 
+/* DAS REZEPT ANLEGEN - EINE STELLE, ZWEI WEGE.
+ *
+ * POST / legt ein Rezept an, POST /llm-import legt dasselbe Rezept an, nur
+ * geholt statt getippt. Der INSERT ist derselbe, sonst haetten die beiden
+ * Wege bald zwei Rezeptformen: dieselben Zutatenzeilen, dieselbe
+ * Mengen-Ueberfuehrung, dieselbe Spalte fuer die Mahlzeiten.
+ *
+ * @param {object} req - die Anfrage (der Ersteller steht an req.authUserId)
+ * @param {object} rezept - { title, notes, recipe_url, servings, meal_types, ingredients }
+ * @returns {number} die neue Rezept-ID
+ */
+function insertRecipe(req, rezept) {
+  const zutaten = Array.isArray(rezept.ingredients) ? rezept.ingredients : [];
+  const mealTypes = normalizeRecipeMealTypes(rezept.meal_types);
+  return db.transaction(() => {
+    const result = db.get().prepare(`
+      INSERT INTO recipes (title, notes, recipe_url, meal_types, image_data, servings, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      String(rezept.title ?? '').trim().slice(0, MAX_TITLE),
+      rezept.notes == null ? null : String(rezept.notes).slice(0, MAX_TEXT),
+      rezept.recipe_url == null ? null : String(rezept.recipe_url).slice(0, MAX_TEXT),
+      mealTypes.join(','),
+      rezept.image_data ?? null,
+      rezept.servings ?? null,
+      req.authUserId || req.session?.userId,
+    );
+
+    const rid = Number(result.lastInsertRowid);
+    const insertIng = db.get().prepare(`
+      INSERT INTO recipe_ingredients (recipe_id, name, quantity, category)
+      VALUES (?, ?, ?, ?)
+    `);
+
+    for (const ing of zutaten) {
+      const name = String(ing.name || '').trim().slice(0, MAX_TITLE);
+      const quantity = String(ing.quantity || '').trim().slice(0, MAX_SHORT) || null;
+      const category = String(ing.category || '').trim().slice(0, MAX_SHORT) || 'Sonstiges';
+      if (name) insertIng.run(rid, name, quantity, category);
+    }
+
+    return rid;
+  });
+}
+
 router.post('/', (req, res) => {
   try {
     const body = bodyOf(req);
@@ -241,33 +298,162 @@ router.post('/', (req, res) => {
     const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage, vIngredients, vServings]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    const recipeId = db.transaction(() => {
-      const result = db.get().prepare(`
-        INSERT INTO recipes (title, notes, recipe_url, meal_types, image_data, servings, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(vTitle.value, vNotes.value, vRecipeUrl.value, mealTypes.join(','),
-        vImage.value ?? null, vServings.value ?? null, req.authUserId || req.session.userId);
-
-      const rid = Number(result.lastInsertRowid);
-      const insertIng = db.get().prepare(`
-        INSERT INTO recipe_ingredients (recipe_id, name, quantity, category)
-        VALUES (?, ?, ?, ?)
-      `);
-
-      for (const ing of ingredients) {
-        const name = String(ing.name || '').trim().slice(0, MAX_TITLE);
-        const quantity = String(ing.quantity || '').trim().slice(0, MAX_SHORT) || null;
-        const category = String(ing.category || '').trim().slice(0, MAX_SHORT) || 'Sonstiges';
-        if (name) insertIng.run(rid, name, quantity, category);
-      }
-
-      return rid;
+    const recipeId = insertRecipe(req, {
+      title: vTitle.value,
+      notes: vNotes.value,
+      recipe_url: vRecipeUrl.value,
+      meal_types: mealTypes,
+      image_data: vImage.value ?? null,
+      servings: vServings.value ?? null,
+      ingredients,
     });
 
     const created = loadRecipeWithIngredients(req, recipeId);
     res.status(201).json({ data: created });
   } catch (err) {
     log.error('POST / error:', err);
+    res.status(500).json({ error: 'Internal error', code: 500 });
+  }
+});
+
+/* ── Der Import aus einem Modell ───────────────────────────────────────────
+ *
+ * ZWEI WEGE, EIN ERGEBNIS.
+ *
+ *   1. Der Nutzer schickt einen Text oder eine Adresse. Die Route holt die
+ *      Quelle (Adresse) und fragt das Modell, das ein Rezept daraus macht.
+ *   2. Der Nutzer schickt `{ confirmed: true, recipe: {...} }` - die Vorschau,
+ *      die der Dialog ihm gezeigt hat. Das Modell wird NICHT mehr gefragt:
+ *      was der Dialog zeigte, wird genau so uebernommen.
+ *
+ * Beide Wege laufen durch dieselbe Ueberfuehrung
+ * (`mapLlmRecipeToRecipe()` im Dienst), damit beide dasselbe Rezept ergeben -
+ * ein Rezept, das beim Import anders aussieht als in der Vorschau, waere
+ * kein Import, sondern ein zweiter.
+ *
+ * DIE DREI ABSAGEN VOR DER ARBEIT, in dieser Reihenfolge:
+ *   - der Schalter `llm_import_enabled` steht aus: 403 llm_import_disabled.
+ *   - die Konfiguration ist unvollstaendig: 403 llm_import_not_configured.
+ *   - die Bremse (zehn Versuche je Nutzer und Stunde): 429
+ *     llm_import_rate_limited.
+ * Die Quelle steht unter demselben SSRF-Riegel wie die Rezeptdienste: eine
+ * Adresse im privaten Netz wird 400 llm_import_url_blocked, BEVOR sie
+ * geholt wird.
+ *
+ * Die Fehlergruende stehen als `reason` neben dem englischen Satz - die App
+ * uebersetzt ueber den Grund, ein Integrator liest ihn (#1909).
+ */
+router.post('/llm-import', async (req, res) => {
+  try {
+    const body = bodyOf(req);
+    const bestaetigt = body.confirmed === true;
+    const adresse = body.source_url === undefined ? '' : String(body.source_url ?? '').trim();
+    const text = body.text === undefined ? '' : String(body.text ?? '').trim();
+    const vorschau = body.recipe;
+
+    // Genau EIN Quellfeld. Beide zugleich sind zwei Quellen - der Weg
+    // waere nicht zu entscheiden, und still eine davon zu nehmen waere eine
+    // Antwort, die der Nutzer nicht gegeben hat.
+    if (!bestaetigt) {
+      const hatAdresse = adresse.length > 0;
+      const hatText = text.length > 0;
+      if (hatAdresse === hatText) return res.status(400).json({ error: 'Exactly one of source_url or text is required.', code: 400, reason: 'llm_import_source_required' });
+      // Kuerzer als das ist kein Rezept, sondern ein Stichwort.
+      if (hatText && text.length < LLM_IMPORT_MIN_TEXT_LENGTH) return res.status(400).json({ error: 'The text is too short to be a recipe.', code: 400, reason: 'llm_import_source_required' });
+    }
+
+    const cfg = readLlmImportConfig(db.get());
+    if (!cfg.enabled) return res.status(403).json({ error: 'The recipe import by language model is disabled.', code: 403, reason: 'llm_import_disabled' });
+    if (!isLlmImportConfigured(cfg)) return res.status(403).json({ error: 'The recipe import is not configured.', code: 403, reason: 'llm_import_not_configured' });
+
+    let rezept = null;
+    let quelle = null;
+    let quellText = null;
+
+    if (bestaetigt) {
+      if (!vorschau || typeof vorschau !== 'object' || Array.isArray(vorschau)) {
+        return res.status(400).json({ error: 'The confirmed recipe is missing.', code: 400, reason: 'llm_import_source_required' });
+      }
+      try {
+        rezept = normalizeLlmRecipe(vorschau);
+      } catch (err) {
+        if (err instanceof LlmImportError) return res.status(502).json({ error: err.message, code: 502, reason: 'llm_import_bad_response' });
+        throw err;
+      }
+    } else {
+      if (adresse) {
+        let geparst = null;
+        try { geparst = new URL(adresse); } catch { geparst = null; }
+        if (!geparst || (geparst.protocol !== 'http:' && geparst.protocol !== 'https:')) {
+          return res.status(400).json({ error: 'The source URL is not a valid http(s) address.', code: 400, reason: 'llm_import_url_invalid' });
+        }
+        // DERSELBE RIEGEL WIE BEI DEN REZEPTDIENSTEN: eine Adresse im privaten
+        // Netz wird abgewiesen, BEVOR sie geholt wird.
+        if (isBlockedBaseUrl(adresse)) return res.status(400).json({ error: 'The source URL must not point to a private or local network address.', code: 400, reason: 'llm_import_url_blocked' });
+        quelle = adresse;
+        try {
+          quellText = await fetchSourceText(adresse);
+        } catch (err) {
+          // Eine Seite, die nicht lesbar ist (nicht erreichbar, nicht da oder
+          // ohne Text), liefert keinen Rezepttext - das ist die Quelle, nicht
+          // der Nutzer, und deshalb eine 400 an der Adresse.
+          if (err instanceof LlmImportError && err.code === 'source_unreachable') {
+            return res.status(400).json({ error: 'The recipe page could not be read.', code: 400, reason: 'llm_import_url_empty' });
+          }
+          throw err;
+        }
+      } else {
+        quellText = text;
+      }
+    }
+
+    // DIE BREMSE. Sie zaehlt die Versuche, die beim Modell etwas kosten, und
+    // steht VOR dem Aufruf: ein Versuch, der abgewiesen wird, hat beim Modell
+    // nichts gekostet und darf dennoch keinen der zehn Versuche verbrauchen.
+    if (!consumeLlmImportQuota(req.authUserId || req.session?.userId).allowed) {
+      return res.status(429).json({ error: 'Too many recipe imports. Please try again later.', code: 429, reason: 'llm_import_rate_limited' });
+    }
+
+    if (!bestaetigt) {
+      try {
+        rezept = await requestLlmRecipe({
+          baseUrl: cfg.baseUrl,
+          apiKey: cfg.apiKey,
+          model: cfg.model,
+          source: { sourceText: quellText, sourceUrl: quelle },
+        });
+      } catch (err) {
+        // Das Modell hat etwas anderes geliefert als ein Rezept. Das ist die
+        // Fremdquelle, nicht der Nutzer - deshalb 502.
+        if (err instanceof LlmImportError) return res.status(502).json({ error: err.message, code: 502, reason: 'llm_import_bad_response' });
+        throw err;
+      }
+    }
+
+    const gemappt = mapLlmRecipeToRecipe(rezept, { recipeUrl: quelle });
+    if (!gemappt.title) return res.status(502).json({ error: 'The model did not return a recipe.', code: 502, reason: 'llm_import_bad_response' });
+
+    // DIE VORSCHAU. Der Analyse-Schritt der Oberflaeche soll zeigen, was das
+    // Modell gemacht hat, bevor etwas entsteht: mit `preview` liefert die Route
+    // das Rezept vollstaendig zurueck und legt nichts an. Gespeichert wird
+    // erst mit der Bestaetigung ({ confirmed: true, recipe }) - die fragt das
+    // Modell nicht nochmal, sondern vertraut dem gezeigten Stand. Ein Aufruf
+    // ohne Vorschau-Zwischenschritt speichert wie bisher direkt.
+    if (!bestaetigt && body.preview === true) {
+      return res.status(200).json({ data: { recipe: gemappt } });
+    }
+
+    const recipeId = insertRecipe(req, {
+      title: gemappt.title,
+      notes: gemappt.notes,
+      recipe_url: gemappt.recipe_url,
+      servings: gemappt.servings,
+      ingredients: gemappt.ingredients,
+    });
+
+    res.status(201).json({ data: { id: recipeId, title: gemappt.title } });
+  } catch (err) {
+    log.error('POST /llm-import error:', err);
     res.status(500).json({ error: 'Internal error', code: 500 });
   }
 });

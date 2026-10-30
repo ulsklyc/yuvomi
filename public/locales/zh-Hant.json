@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "只有進入任務的清單才能設定人員。",
         "syncAssigneeNotMember": "這裡只能選擇家庭成員。",
         "syncAssigneeUnknown": "此人已不存在。請重新載入頁面。",
-        "permDetails": "小工具與其他權限"
+        "permDetails": "小工具與其他權限",
+        "llmImportLabel": "AI 食譜匯入",
+        "llmImportHint": "讓語言模型把食譜頁面或貼上的文字轉成結構化食譜。預設關閉。",
+        "llmImportBaseUrlLabel": "LLM 基礎網址",
+        "llmImportApiKeyLabel": "API 金鑰",
+        "llmImportApiKeySet": "已儲存（僅寫入）",
+        "llmImportModelLabel": "模型名稱",
+        "llmImportSaved": "設定已儲存"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",
@@ -3579,6 +3586,20 @@
         "urlLabel": "食譜連結",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "材料",
+        "llmImportOption": "使用 AI 匯入",
+        "llmImportTitle": "AI 食譜匯入",
+        "llmImportSourceLabel": "來源",
+        "llmImportSourceUrl": "網址",
+        "llmImportSourceText": "文字",
+        "llmImportUrlPlaceholder": "https://example.tw/recipe",
+        "llmImportTextPlaceholder": "在此貼上食譜文字（至少 40 個字元）",
+        "llmImportAnalyze": "分析",
+        "llmImportPreviewTitle": "預覽",
+        "llmImportIngredientsHeading": "食材",
+        "llmImportStepsHeading": "步驟",
+        "llmImportSave": "儲存食譜",
+        "llmImportToast": "食譜已匯入",
+        "llmImportAnalyzing": "正在用模型分析...",
         "addToMeals": "加入用餐計劃",
         "toShoppingSuccess": "已向 {{list}} 新增 {{count}} 個食材。",
         "toShoppingSuccess_one": "已向 {{list}} 新增 {{count}} 個食材。",
@@ -6758,5 +6779,17 @@
         "custom": "自訂顏色",
         "chooseCustom": "選擇自訂顏色",
         "standard": "預設顏色"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "此家庭已關閉 AI 匯入（設定）。",
+            "llmImportNotConfigured": "AI 匯入需要基礎網址、API 金鑰和模型（設定）。",
+            "llmImportSourceRequired": "請提供網址或貼上食譜文字。",
+            "llmImportUrlBlocked": "該網址無法取得（私人或無效的網路目標）。",
+            "llmImportUrlEmpty": "在該網址找不到食譜文字。",
+            "llmImportBadResponse": "模型沒有回傳可用的食譜。請重試。",
+            "llmImportRateLimited": "最近一小時 AI 匯入次數過多。請稍後再試。",
+            "llmImportUrlInvalid": "該網址無法取得（私人或無效的網路目標）。"
+        }
     }
 }

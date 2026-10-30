@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "People can only be set for lists that go to Tasks.",
         "syncAssigneeNotMember": "Only household members can be chosen here.",
         "syncAssigneeUnknown": "This person no longer exists. Reload the page.",
-        "permDetails": "Widgets and more permissions"
+        "permDetails": "Widgets and more permissions",
+        "llmImportLabel": "AI recipe import",
+        "llmImportHint": "Let a language model turn a recipe page or pasted text into a structured recipe. Off by default.",
+        "llmImportBaseUrlLabel": "LLM base URL",
+        "llmImportApiKeyLabel": "API key",
+        "llmImportApiKeySet": "Saved (write-only)",
+        "llmImportModelLabel": "Model name",
+        "llmImportSaved": "Settings saved"
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",
@@ -3696,6 +3703,20 @@
         "urlLabel": "Recipe link",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Ingredients",
+        "llmImportOption": "Import with AI",
+        "llmImportTitle": "AI recipe import",
+        "llmImportSourceLabel": "Source",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Text",
+        "llmImportUrlPlaceholder": "https://example.com/recipe",
+        "llmImportTextPlaceholder": "Paste the recipe text here (at least 40 characters)",
+        "llmImportAnalyze": "Analyze",
+        "llmImportPreviewTitle": "Preview",
+        "llmImportIngredientsHeading": "Ingredients",
+        "llmImportStepsHeading": "Steps",
+        "llmImportSave": "Save recipe",
+        "llmImportToast": "Recipe imported",
+        "llmImportAnalyzing": "Analyzing with the model...",
         "addToMeals": "To the meal plan",
         "toShoppingSuccess": "{{count}} ingredients added to {{list}}.",
         "toShoppingSuccess_one": "{{count}} ingredient added to {{list}}.",
@@ -6758,5 +6779,17 @@
         "custom": "Custom color",
         "chooseCustom": "Choose a custom color",
         "standard": "Default color"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "AI import is turned off for this household (Settings).",
+            "llmImportNotConfigured": "AI import needs a base URL, an API key and a model (Settings).",
+            "llmImportSourceRequired": "Give a URL or paste the recipe text.",
+            "llmImportUrlBlocked": "That address cannot be fetched (private or invalid network target).",
+            "llmImportUrlEmpty": "No recipe text found at that address.",
+            "llmImportBadResponse": "The model did not return a usable recipe. Try again.",
+            "llmImportRateLimited": "Too many AI imports in the last hour. Try again later.",
+            "llmImportUrlInvalid": "The address is not a valid http(s) address."
+        }
     }
 }

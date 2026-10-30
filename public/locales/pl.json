@@ -3693,7 +3693,14 @@
         "reminderListAssigneesTasksOnly": "Osoby można ustawić tylko dla list trafiających do Zadań.",
         "syncAssigneeNotMember": "Tutaj można wybrać tylko członków gospodarstwa domowego.",
         "syncAssigneeUnknown": "Ta osoba już nie istnieje. Odśwież stronę.",
-        "permDetails": "Widżety i dodatkowe uprawnienia"
+        "permDetails": "Widżety i dodatkowe uprawnienia",
+        "llmImportLabel": "Import przepisu przez AI",
+        "llmImportHint": "Pozwól modelowi językowemu zamienić stronę przepisu lub wklejony tekst w uporządkowany przepis. Domyślnie wyłączone.",
+        "llmImportBaseUrlLabel": "Bazowy adres URL LLM",
+        "llmImportApiKeyLabel": "Klucz API",
+        "llmImportApiKeySet": "Zapisano (tylko do zapisu)",
+        "llmImportModelLabel": "Nazwa modelu",
+        "llmImportSaved": "Ustawienia zapisane"
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",
@@ -3944,6 +3951,20 @@
         "urlLabel": "Link do przepisu",
         "urlPlaceholder": "https://…",
         "ingredientsLabel": "Składniki",
+        "llmImportOption": "Importuj za pomocą AI",
+        "llmImportTitle": "Import przepisu przez AI",
+        "llmImportSourceLabel": "Źródło",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Tekst",
+        "llmImportUrlPlaceholder": "https://example.pl/recipe",
+        "llmImportTextPlaceholder": "Wklej tutaj tekst przepisu (co najmniej 40 znaków)",
+        "llmImportAnalyze": "Analizuj",
+        "llmImportPreviewTitle": "Podgląd",
+        "llmImportIngredientsHeading": "Składniki",
+        "llmImportStepsHeading": "Kroki",
+        "llmImportSave": "Zapisz przepis",
+        "llmImportToast": "Przepis zaimportowany",
+        "llmImportAnalyzing": "Analizowanie w modelu...",
         "addToMeals": "Do planu posiłków",
         "toShoppingSuccess": "Dodano {{count}} składników do {{list}}.",
         "toShoppingSuccess_one": "Dodano {{count}} składnik do {{list}}.",
@@ -7098,5 +7119,17 @@
         "custom": "Własny kolor",
         "chooseCustom": "Wybierz własny kolor",
         "standard": "Kolor domyślny"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "Import przez AI jest wyłączony w tym gospodarstwie (Ustawienia).",
+            "llmImportNotConfigured": "Import przez AI wymaga bazowego adresu URL, klucza API i modelu (Ustawienia).",
+            "llmImportSourceRequired": "Podaj adres URL lub wklej tekst przepisu.",
+            "llmImportUrlBlocked": "Tego adresu nie można pobrać (prywatny lub nieprawidłowy cel sieciowy).",
+            "llmImportUrlEmpty": "Nie znaleziono tekstu przepisu pod tym adresem.",
+            "llmImportBadResponse": "Model nie zwrócił użytecznego przepisu. Spróbuj ponownie.",
+            "llmImportRateLimited": "Zbyt wiele importów przez AI w ostatniej godzinie. Spróbuj później.",
+            "llmImportUrlInvalid": "Tego adresu nie można pobrać (prywatny lub nieprawidłowy cel sieciowy)."
+        }
     }
 }

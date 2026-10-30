@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "只有进入任务的清单才能设置人员。",
         "syncAssigneeNotMember": "这里只能选择家庭成员。",
         "syncAssigneeUnknown": "此人已不存在。请重新加载页面。",
-        "permDetails": "小组件和其他权限"
+        "permDetails": "小组件和其他权限",
+        "llmImportLabel": "AI 食谱导入",
+        "llmImportHint": "让语言模型把食谱页面或粘贴的文本转成结构化食谱。默认关闭。",
+        "llmImportBaseUrlLabel": "LLM 基础网址",
+        "llmImportApiKeyLabel": "API 密钥",
+        "llmImportApiKeySet": "已保存（只写）",
+        "llmImportModelLabel": "模型名称",
+        "llmImportSaved": "设置已保存"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",
@@ -3579,6 +3586,20 @@
         "urlLabel": "食谱链接",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "材料",
+        "llmImportOption": "使用 AI 导入",
+        "llmImportTitle": "AI 食谱导入",
+        "llmImportSourceLabel": "来源",
+        "llmImportSourceUrl": "网址",
+        "llmImportSourceText": "文本",
+        "llmImportUrlPlaceholder": "https://example.cn/recipe",
+        "llmImportTextPlaceholder": "在此粘贴食谱文本（至少 40 个字符）",
+        "llmImportAnalyze": "分析",
+        "llmImportPreviewTitle": "预览",
+        "llmImportIngredientsHeading": "食材",
+        "llmImportStepsHeading": "步骤",
+        "llmImportSave": "保存食谱",
+        "llmImportToast": "食谱已导入",
+        "llmImportAnalyzing": "正在用模型分析...",
         "addToMeals": "加入用餐计划",
         "toShoppingSuccess": "已向 {{list}} 添加 {{count}} 个食材。",
         "toShoppingSuccess_one": "已向 {{list}} 添加 {{count}} 个食材。",
@@ -6758,5 +6779,17 @@
         "custom": "自定义颜色",
         "chooseCustom": "选择自定义颜色",
         "standard": "默认颜色"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "此家庭已关闭 AI 导入（设置）。",
+            "llmImportNotConfigured": "AI 导入需要基础网址、API 密钥和模型（设置）。",
+            "llmImportSourceRequired": "请提供网址或粘贴食谱文本。",
+            "llmImportUrlBlocked": "该地址无法获取（私有或无效的网络目标）。",
+            "llmImportUrlEmpty": "在该地址没有找到食谱文本。",
+            "llmImportBadResponse": "模型没有返回可用的食谱。请重试。",
+            "llmImportRateLimited": "最近一小时 AI 导入次数过多。请稍后再试。",
+            "llmImportUrlInvalid": "该地址无法获取（私有或无效的网络目标）。"
+        }
     }
 }

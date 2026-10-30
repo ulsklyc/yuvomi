@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "Personer kan bare settes for lister som går til Oppgaver.",
         "syncAssigneeNotMember": "Bare medlemmer av husstanden kan velges her.",
         "syncAssigneeUnknown": "Denne personen finnes ikke lenger. Last inn siden på nytt.",
-        "permDetails": "Widgeter og flere rettigheter"
+        "permDetails": "Widgeter og flere rettigheter",
+        "llmImportLabel": "KI-import av oppskrift",
+        "llmImportHint": "La en språkmodell gjøre en oppskriftside eller innlimt tekst om til en strukturert oppskrift. Av som standard.",
+        "llmImportBaseUrlLabel": "LLM-basis-URL",
+        "llmImportApiKeyLabel": "API-nøkkel",
+        "llmImportApiKeySet": "Lagret (skrivebeskyttet)",
+        "llmImportModelLabel": "Modellnavn",
+        "llmImportSaved": "Innstillingene er lagret"
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",
@@ -3696,6 +3703,20 @@
         "urlLabel": "Oppskriftslenke",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Ingredienser",
+        "llmImportOption": "Importer med KI",
+        "llmImportTitle": "KI-import av oppskrift",
+        "llmImportSourceLabel": "Kilde",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Tekst",
+        "llmImportUrlPlaceholder": "https://example.no/recipe",
+        "llmImportTextPlaceholder": "Lim inn oppskriftsteksten her (minst 40 tegn)",
+        "llmImportAnalyze": "Analyser",
+        "llmImportPreviewTitle": "Forhåndsvisning",
+        "llmImportIngredientsHeading": "Ingredienser",
+        "llmImportStepsHeading": "Trinn",
+        "llmImportSave": "Lagre oppskrift",
+        "llmImportToast": "Oppskriften er importert",
+        "llmImportAnalyzing": "Analyserer med modellen...",
         "addToMeals": "Til måltidsplanen",
         "toShoppingSuccess": "{{count}} ingredienser lagt til i {{list}}.",
         "toShoppingSuccess_one": "{{count}} ingrediens lagt til i {{list}}.",
@@ -6758,5 +6779,17 @@
         "custom": "Egen farge",
         "chooseCustom": "Velg egen farge",
         "standard": "Standardfarge"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "KI-import er slått av for dette husholdet (Innstillinger).",
+            "llmImportNotConfigured": "KI-import trenger en basis-URL, en API-nøkkel og en modell (Innstillinger).",
+            "llmImportSourceRequired": "Oppgi en URL eller lim inn oppskriftsteksten.",
+            "llmImportUrlBlocked": "Adressen kan ikke hentes (privat eller ugyldig nettverksmål).",
+            "llmImportUrlEmpty": "Fant ingen oppskriftstekst på den adressen.",
+            "llmImportBadResponse": "Modellen returnerte ikke en brukbar oppskrift. Prøv igjen.",
+            "llmImportRateLimited": "For mange KI-importer den siste timen. Prøv igjen senere.",
+            "llmImportUrlInvalid": "Adressen kan ikke hentes (privat eller ugyldig nettverksmål)."
+        }
     }
 }

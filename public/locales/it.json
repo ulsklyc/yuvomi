@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "Le persone si impostano solo per liste che finiscono nelle Attività.",
         "syncAssigneeNotMember": "Qui si possono scegliere solo membri della famiglia.",
         "syncAssigneeUnknown": "Questa persona non esiste più. Ricarica la pagina.",
-        "permDetails": "Widget e altri permessi"
+        "permDetails": "Widget e altri permessi",
+        "llmImportLabel": "Importazione ricette con IA",
+        "llmImportHint": "Lascia che un modello linguistico trasformi una pagina di ricetta o un testo incollato in una ricetta strutturata. Disattivato per impostazione predefinita.",
+        "llmImportBaseUrlLabel": "URL base dell'LLM",
+        "llmImportApiKeyLabel": "Chiave API",
+        "llmImportApiKeySet": "Salvato (sola scrittura)",
+        "llmImportModelLabel": "Nome del modello",
+        "llmImportSaved": "Impostazioni salvate"
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",
@@ -3579,6 +3586,20 @@
         "urlLabel": "Link ricetta",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Ingredienti",
+        "llmImportOption": "Importa con IA",
+        "llmImportTitle": "Importazione ricette con IA",
+        "llmImportSourceLabel": "Fonte",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Testo",
+        "llmImportUrlPlaceholder": "https://example.it/recipe",
+        "llmImportTextPlaceholder": "Incolla qui il testo della ricetta (almeno 40 caratteri)",
+        "llmImportAnalyze": "Analizza",
+        "llmImportPreviewTitle": "Anteprima",
+        "llmImportIngredientsHeading": "Ingredienti",
+        "llmImportStepsHeading": "Passaggi",
+        "llmImportSave": "Salva ricetta",
+        "llmImportToast": "Ricetta importata",
+        "llmImportAnalyzing": "Analisi con il modello...",
         "addToMeals": "Al piano dei pasti",
         "toShoppingSuccess": "{{count}} ingredienti aggiunti a {{list}}.",
         "toShoppingSuccess_one": "{{count}} ingrediente aggiunto a {{list}}.",
@@ -6758,5 +6779,17 @@
         "custom": "Colore personalizzato",
         "chooseCustom": "Scegli un colore personalizzato",
         "standard": "Colore predefinito"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "L'importazione con IA è disattivata per questa famiglia (Impostazioni).",
+            "llmImportNotConfigured": "L'importazione con IA richiede un URL base, una chiave API e un modello (Impostazioni).",
+            "llmImportSourceRequired": "Indica un URL o incolla il testo della ricetta.",
+            "llmImportUrlBlocked": "Quell'indirizzo non può essere recuperato (destinazione di rete privata o non valida).",
+            "llmImportUrlEmpty": "Nessun testo di ricetta trovato a quell'indirizzo.",
+            "llmImportBadResponse": "Il modello non ha restituito una ricetta utilizzabile. Riprova.",
+            "llmImportRateLimited": "Troppe importazioni con IA nell'ultima ora. Riprova più tardi.",
+            "llmImportUrlInvalid": "Quell'indirizzo non può essere recuperato (destinazione di rete privata o non valida)."
+        }
     }
 }

@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "Άτομα ορίζονται μόνο για λίστες που πηγαίνουν στις Εργασίες.",
         "syncAssigneeNotMember": "Μόνο μέλη του νοικοκυριού μπορούν να επιλεγούν εδώ.",
         "syncAssigneeUnknown": "Αυτό το άτομο δεν υπάρχει πια. Φορτώστε ξανά τη σελίδα.",
-        "permDetails": "Widgets και πρόσθετα δικαιώματα"
+        "permDetails": "Widgets και πρόσθετα δικαιώματα",
+        "llmImportLabel": "Εισαγωγή συνταγής με AI",
+        "llmImportHint": "Αφήστε ένα γλωσσικό μοντέλο να μετατρέψει μια σελίδα συνταγής ή κείμενο σε δομημένη συνταγή. Απενεργοποιημένο από προεπιλογή.",
+        "llmImportBaseUrlLabel": "Βασική URL LLM",
+        "llmImportApiKeyLabel": "Κλειδί API",
+        "llmImportApiKeySet": "Αποθηκευμένο (μόνο για εγγραφή)",
+        "llmImportModelLabel": "Όνομα μοντέλου",
+        "llmImportSaved": "Οι ρυθμίσεις αποθηκεύτηκαν"
     },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά. Το σπίτι σας σε ένα μέρος.",
@@ -3579,6 +3586,20 @@
         "urlLabel": "Σύνδεσμος συνταγής",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Συστατικά",
+        "llmImportOption": "Εισαγωγή με AI",
+        "llmImportTitle": "Εισαγωγή συνταγής με AI",
+        "llmImportSourceLabel": "Πηγή",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Κείμενο",
+        "llmImportUrlPlaceholder": "https://example.gr/recipe",
+        "llmImportTextPlaceholder": "Επικολλήστε εδώ το κείμενο της συνταγής (τουλάχιστον 40 χαρακτήρες)",
+        "llmImportAnalyze": "Ανάλυση",
+        "llmImportPreviewTitle": "Προεπισκόπηση",
+        "llmImportIngredientsHeading": "Συστατικά",
+        "llmImportStepsHeading": "Βήματα",
+        "llmImportSave": "Αποθήκευση συνταγής",
+        "llmImportToast": "Η συνταγή εισήχθη",
+        "llmImportAnalyzing": "Ανάλυση με το μοντέλο...",
         "addToMeals": "Στο πρόγραμμα γευμάτων",
         "toShoppingSuccess": "{{count}} υλικά προστέθηκαν στη λίστα {{list}}.",
         "toShoppingSuccess_one": "{{count}} υλικό προστέθηκε στη λίστα {{list}}.",
@@ -6758,5 +6779,17 @@
         "custom": "Προσαρμοσμένο χρώμα",
         "chooseCustom": "Επιλογή προσαρμοσμένου χρώματος",
         "standard": "Προεπιλεγμένο χρώμα"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "Η εισαγωγή με AI είναι απενεργοποιημένη για αυτό το νοικοκυριό (Ρυθμίσεις).",
+            "llmImportNotConfigured": "Η εισαγωγή με AI χρειάζεται βασική URL, κλειδί API και μοντέλο (Ρυθμίσεις).",
+            "llmImportSourceRequired": "Δώστε μια URL ή επικολλήστε το κείμενο της συνταγής.",
+            "llmImportUrlBlocked": "Δεν είναι δυνατή η λήψη αυτής της διεύθυνσης (ιδιωτικός ή μη έγκυρος στόχος δικτύου).",
+            "llmImportUrlEmpty": "Δεν βρέθηκε κείμενο συνταγής σε αυτή τη διεύθυνση.",
+            "llmImportBadResponse": "Το μοντέλο δεν επέστρεψε χρήσιμη συνταγή. Δοκιμάστε ξανά.",
+            "llmImportRateLimited": "Πάρα πολλές εισαγωγές με AI την τελευταία ώρα. Δοκιμάστε αργότερα.",
+            "llmImportUrlInvalid": "Δεν είναι δυνατή η λήψη αυτής της διεύθυνσης (ιδιωτικός ή μη έγκυρος στόχος δικτύου)."
+        }
     }
 }

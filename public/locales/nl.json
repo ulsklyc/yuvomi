@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "Personen kunnen alleen worden ingesteld voor lijsten die naar Taken gaan.",
         "syncAssigneeNotMember": "Hier kunnen alleen leden van het huishouden worden gekozen.",
         "syncAssigneeUnknown": "Deze persoon bestaat niet meer. Laad de pagina opnieuw.",
-        "permDetails": "Widgets en meer rechten"
+        "permDetails": "Widgets en meer rechten",
+        "llmImportLabel": "AI-receptimport",
+        "llmImportHint": "Laat een taalmodel een receptpagina of geplakte tekst omzetten in een gestructureerd recept. Standaard uit.",
+        "llmImportBaseUrlLabel": "LLM-basis-URL",
+        "llmImportApiKeyLabel": "API-sleutel",
+        "llmImportApiKeySet": "Opgeslagen (alleen schrijven)",
+        "llmImportModelLabel": "Modelnaam",
+        "llmImportSaved": "Instellingen opgeslagen"
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",
@@ -3696,6 +3703,20 @@
         "urlLabel": "Receptlink",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Ingrediënten",
+        "llmImportOption": "Importeren met AI",
+        "llmImportTitle": "AI-receptimport",
+        "llmImportSourceLabel": "Bron",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Tekst",
+        "llmImportUrlPlaceholder": "https://example.nl/recipe",
+        "llmImportTextPlaceholder": "Plak hier de recepttekst (minimaal 40 tekens)",
+        "llmImportAnalyze": "Analyseren",
+        "llmImportPreviewTitle": "Voorbeeld",
+        "llmImportIngredientsHeading": "Ingrediënten",
+        "llmImportStepsHeading": "Stappen",
+        "llmImportSave": "Recept opslaan",
+        "llmImportToast": "Recept geïmporteerd",
+        "llmImportAnalyzing": "Analyseren met het model...",
         "addToMeals": "Naar het maaltijdplan",
         "toShoppingSuccess": "{{count}} ingrediënten toegevoegd aan {{list}}.",
         "toShoppingSuccess_one": "{{count}} ingrediënt toegevoegd aan {{list}}.",
@@ -6758,5 +6779,17 @@
         "custom": "Eigen kleur",
         "chooseCustom": "Eigen kleur kiezen",
         "standard": "Standaardkleur"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "AI-import staat uit voor dit huishouden (Instellingen).",
+            "llmImportNotConfigured": "AI-import heeft een basis-URL, een API-sleutel en een model nodig (Instellingen).",
+            "llmImportSourceRequired": "Geef een URL of plak de recepttekst.",
+            "llmImportUrlBlocked": "Dat adres kan niet worden opgehaald (privé of ongeldig netwerkdoel).",
+            "llmImportUrlEmpty": "Geen recepttekst gevonden op dat adres.",
+            "llmImportBadResponse": "Het model gaf geen bruikbaar recept terug. Probeer het opnieuw.",
+            "llmImportRateLimited": "Te veel AI-importen in het laatste uur. Probeer het later opnieuw.",
+            "llmImportUrlInvalid": "Dat adres kan niet worden opgehaald (privé of ongeldig netwerkdoel)."
+        }
     }
 }

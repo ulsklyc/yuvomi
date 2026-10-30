@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "人を設定できるのはタスクに入るリストだけです。",
         "syncAssigneeNotMember": "ここで選べるのは世帯のメンバーだけです。",
         "syncAssigneeUnknown": "この人はもう存在しません。ページを再読み込みしてください。",
-        "permDetails": "ウィジェットとその他の権限"
+        "permDetails": "ウィジェットとその他の権限",
+        "llmImportLabel": "AIレシピインポート",
+        "llmImportHint": "言語モデルにレシピページや貼り付けたテキストを構造化されたレシピへ変換させます。既定ではオフです。",
+        "llmImportBaseUrlLabel": "LLMのベースURL",
+        "llmImportApiKeyLabel": "APIキー",
+        "llmImportApiKeySet": "保存済み（書き込み専用）",
+        "llmImportModelLabel": "モデル名",
+        "llmImportSaved": "設定を保存しました"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",
@@ -3579,6 +3586,20 @@
         "urlLabel": "レシピリンク",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "材料",
+        "llmImportOption": "AIでインポート",
+        "llmImportTitle": "AIレシピインポート",
+        "llmImportSourceLabel": "ソース",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "テキスト",
+        "llmImportUrlPlaceholder": "https://example.jp/recipe",
+        "llmImportTextPlaceholder": "ここにレシピのテキストを貼り付けてください（40文字以上）",
+        "llmImportAnalyze": "解析",
+        "llmImportPreviewTitle": "プレビュー",
+        "llmImportIngredientsHeading": "材料",
+        "llmImportStepsHeading": "手順",
+        "llmImportSave": "レシピを保存",
+        "llmImportToast": "レシピをインポートしました",
+        "llmImportAnalyzing": "モデルで解析しています...",
         "addToMeals": "献立へ",
         "toShoppingSuccess": "{{list}} に {{count}} 件の材料を追加しました。",
         "toShoppingSuccess_one": "{{list}} に {{count}} 件の材料を追加しました。",
@@ -6758,5 +6779,17 @@
         "custom": "カスタムカラー",
         "chooseCustom": "カスタムカラーを選択",
         "standard": "既定の色"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "この世帯ではAIインポートはオフです（設定）。",
+            "llmImportNotConfigured": "AIインポートにはベースURL、APIキー、モデルが必要です（設定）。",
+            "llmImportSourceRequired": "URLを指定するか、レシピのテキストを貼り付けてください。",
+            "llmImportUrlBlocked": "そのアドレスは取得できません（プライベートまたは無効なネットワーク宛先です）。",
+            "llmImportUrlEmpty": "そのアドレスにレシピのテキストが見つかりませんでした。",
+            "llmImportBadResponse": "モデルが使えるレシピを返しませんでした。もう一度お試しください。",
+            "llmImportRateLimited": "1時間内のAIインポートが多すぎます。しばらくしてからお試しください。",
+            "llmImportUrlInvalid": "そのアドレスは取得できません（プライベートまたは無効なネットワーク宛先です）。"
+        }
     }
 }

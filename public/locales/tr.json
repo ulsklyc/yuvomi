@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "Kişiler yalnızca Görevler’e giden listeler için ayarlanabilir.",
         "syncAssigneeNotMember": "Burada yalnızca hane üyeleri seçilebilir.",
         "syncAssigneeUnknown": "Bu kişi artık yok. Sayfayı yeniden yükleyin.",
-        "permDetails": "Widget'lar ve diğer izinler"
+        "permDetails": "Widget'lar ve diğer izinler",
+        "llmImportLabel": "Yapay zeka ile tarif içe aktarma",
+        "llmImportHint": "Bir dil modelinin bir tarif sayfasını veya yapıştırılan metni yapılandırılmış bir tarife dönüştürmesine izin verin. Varsayılan olarak kapalı.",
+        "llmImportBaseUrlLabel": "LLM temel URL",
+        "llmImportApiKeyLabel": "API anahtarı",
+        "llmImportApiKeySet": "Kaydedildi (yalnızca yazılabilir)",
+        "llmImportModelLabel": "Model adı",
+        "llmImportSaved": "Ayarlar kaydedildi"
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",
@@ -3579,6 +3586,20 @@
         "urlLabel": "Tarif bağlantısı",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Malzemeler",
+        "llmImportOption": "Yapay zeka ile içe aktar",
+        "llmImportTitle": "Yapay zeka ile tarif içe aktarma",
+        "llmImportSourceLabel": "Kaynak",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Metin",
+        "llmImportUrlPlaceholder": "https://example.tr/recipe",
+        "llmImportTextPlaceholder": "Tarif metnini buraya yapıştırın (en az 40 karakter)",
+        "llmImportAnalyze": "Analiz et",
+        "llmImportPreviewTitle": "Önizleme",
+        "llmImportIngredientsHeading": "Malzemeler",
+        "llmImportStepsHeading": "Adımlar",
+        "llmImportSave": "Tarifi kaydet",
+        "llmImportToast": "Tarif içe aktarıldı",
+        "llmImportAnalyzing": "Modelle analiz ediliyor...",
         "addToMeals": "Öğün planına",
         "toShoppingSuccess": "{{list}} listesine {{count}} malzeme eklendi.",
         "toShoppingSuccess_one": "{{list}} listesine {{count}} malzeme eklendi.",
@@ -6758,5 +6779,17 @@
         "custom": "Özel renk",
         "chooseCustom": "Özel renk seç",
         "standard": "Varsayılan renk"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "Yapay zeka içe aktarma bu hane için kapalı (Ayarlar).",
+            "llmImportNotConfigured": "Yapay zeka içe aktarma için temel URL, API anahtarı ve model gerekir (Ayarlar).",
+            "llmImportSourceRequired": "Bir URL verin veya tarif metnini yapıştırın.",
+            "llmImportUrlBlocked": "Bu adres alınamaz (özel veya geçersiz ağ hedefi).",
+            "llmImportUrlEmpty": "Bu adreste tarif metni bulunamadı.",
+            "llmImportBadResponse": "Model kullanılabilir bir tarif döndürmedi. Tekrar deneyin.",
+            "llmImportRateLimited": "Son bir saatte çok fazla yapay zeka içe aktarma. Daha sonra tekrar deneyin.",
+            "llmImportUrlInvalid": "Bu adres alınamaz (özel veya geçersiz ağ hedefi)."
+        }
     }
 }

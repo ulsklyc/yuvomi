@@ -3467,7 +3467,14 @@
         "reminderListAssigneesTasksOnly": "افراد را فقط برای فهرست‌هایی می‌توان تعیین کرد که به کارها می‌روند.",
         "syncAssigneeNotMember": "اینجا فقط اعضای خانوار را می‌توان انتخاب کرد.",
         "syncAssigneeUnknown": "این فرد دیگر وجود ندارد. صفحه را دوباره بارگیری کنید.",
-        "permDetails": "ویجت‌ها و مجوزهای بیشتر"
+        "permDetails": "ویجت‌ها و مجوزهای بیشتر",
+        "llmImportLabel": "ورود دستور پخت با هوش مصنوعی",
+        "llmImportHint": "بگذارید یک مدل زبانی صفحه دستور پخت یا متن چسبانده شده را به دستور پختی ساختاریافته تبدیل کند. به طور پیش فرض خاموش است.",
+        "llmImportBaseUrlLabel": "نشانی پایه LLM",
+        "llmImportApiKeyLabel": "کلید API",
+        "llmImportApiKeySet": "ذخیره شد (فقط نوشتن)",
+        "llmImportModelLabel": "نام مدل",
+        "llmImportSaved": "تنظیمات ذخیره شد"
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",
@@ -3715,6 +3722,20 @@
         "urlLabel": "پیوند دستور غذا",
         "urlPlaceholder": "https://…",
         "ingredientsLabel": "مواد اولیه",
+        "llmImportOption": "ورود با هوش مصنوعی",
+        "llmImportTitle": "ورود دستور پخت با هوش مصنوعی",
+        "llmImportSourceLabel": "منبع",
+        "llmImportSourceUrl": "نشانی وب",
+        "llmImportSourceText": "متن",
+        "llmImportUrlPlaceholder": "https://example.ir/recipe",
+        "llmImportTextPlaceholder": "متن دستور پخت را اینجا بچسبانید (دست کم ۴۰ نویسه)",
+        "llmImportAnalyze": "تحلیل",
+        "llmImportPreviewTitle": "پیش نمایش",
+        "llmImportIngredientsHeading": "مواد اولیه",
+        "llmImportStepsHeading": "مراحل",
+        "llmImportSave": "ذخیره دستور پخت",
+        "llmImportToast": "دستور پخت وارد شد",
+        "llmImportAnalyzing": "در حال تحلیل با مدل...",
         "addToMeals": "به برنامهٔ غذایی",
         "toShoppingSuccess": "{{count}} ماده به {{list}} اضافه شد.",
         "toShoppingSuccess_one": "{{count}} ماده به {{list}} اضافه شد.",
@@ -6758,5 +6779,17 @@
         "custom": "رنگ دلخواه",
         "chooseCustom": "انتخاب رنگ دلخواه",
         "standard": "رنگ پیش‌فرض"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "ورود با هوش مصنوعی برای این خانه خاموش است (تنظیمات).",
+            "llmImportNotConfigured": "ورود با هوش مصنوعی به نشانی پایه، کلید API و مدل نیاز دارد (تنظیمات).",
+            "llmImportSourceRequired": "یک نشانی وب بدهید یا متن دستور پخت را بچسبانید.",
+            "llmImportUrlBlocked": "این نشانی قابل دریافت نیست (هدف شبکه خصوصی یا نامعتبر).",
+            "llmImportUrlEmpty": "در این نشانی متن دستور پختی یافت نشد.",
+            "llmImportBadResponse": "مدل دستور پختی قابل استفاده برنگرداند. دوباره تلاش کنید.",
+            "llmImportRateLimited": "ورودهای هوش مصنوعی در یک ساعت گذشته بیش از حد است. بعدا تلاش کنید.",
+            "llmImportUrlInvalid": "این نشانی قابل دریافت نیست (هدف شبکه خصوصی یا نامعتبر)."
+        }
     }
 }

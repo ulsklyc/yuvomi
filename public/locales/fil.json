@@ -3467,7 +3467,14 @@
         "reminderListAssigneesTasksOnly": "Maitatakda lang ang mga tao para sa mga listahang napupunta sa Mga Gawain.",
         "syncAssigneeNotMember": "Mga miyembro lang ng sambahayan ang mapipili rito.",
         "syncAssigneeUnknown": "Wala na ang taong ito. I-reload ang pahina.",
-        "permDetails": "Mga widget at iba pang pahintulot"
+        "permDetails": "Mga widget at iba pang pahintulot",
+        "llmImportLabel": "AI na import ng recipe",
+        "llmImportHint": "Hayaang gawing structured recipe ng isang language model ang isang recipe page o pinasteng teksto. Naka-off sa pamamagitan.",
+        "llmImportBaseUrlLabel": "Base URL ng LLM",
+        "llmImportApiKeyLabel": "API key",
+        "llmImportApiKeySet": "Naka-save (write-only)",
+        "llmImportModelLabel": "Pangalan ng modelo",
+        "llmImportSaved": "Naka-save ang mga setting"
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",
@@ -3715,6 +3722,20 @@
         "urlLabel": "Link ng resipe",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Mga sangkap",
+        "llmImportOption": "Mag-import gamit ang AI",
+        "llmImportTitle": "AI na import ng recipe",
+        "llmImportSourceLabel": "Pinagmulan",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Teksto",
+        "llmImportUrlPlaceholder": "https://example.ph/recipe",
+        "llmImportTextPlaceholder": "I-paste dito ang teksto ng recipe (hindi bababa sa 40 karakter)",
+        "llmImportAnalyze": "Suriin",
+        "llmImportPreviewTitle": "Panonood",
+        "llmImportIngredientsHeading": "Mga sangkap",
+        "llmImportStepsHeading": "Mga hakbang",
+        "llmImportSave": "I-save ang recipe",
+        "llmImportToast": "Na-import ang recipe",
+        "llmImportAnalyzing": "Sinusuri ng modelo...",
         "addToMeals": "Sa plano ng pagkain",
         "toShoppingSuccess": "{{count}} sangkap ang naidagdag sa {{list}}.",
         "toShoppingSuccess_one": "{{count}} sangkap ang naidagdag sa {{list}}.",
@@ -6758,5 +6779,17 @@
         "custom": "Sariling kulay",
         "chooseCustom": "Pumili ng sariling kulay",
         "standard": "Default na kulay"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "Naka-off ang AI import para sa sambahayang ito (Mga setting).",
+            "llmImportNotConfigured": "Kailangan ng AI import ng base URL, API key at modelo (Mga setting).",
+            "llmImportSourceRequired": "Bigay ang URL o i-paste ang teksto ng recipe.",
+            "llmImportUrlBlocked": "Hindi makuha ang address na iyon (privado o hindi wasto ang network target).",
+            "llmImportUrlEmpty": "Walang teksto ng recipe na natagpuan sa address na iyon.",
+            "llmImportBadResponse": "Hindi nagbalik ng gamit na recipe ang modelo. Subukan muli.",
+            "llmImportRateLimited": "Masyadong maraming AI import sa loob ng isang oras. Subukan muli mamaya.",
+            "llmImportUrlInvalid": "Hindi makuha ang address na iyon (privado o hindi wasto ang network target)."
+        }
     }
 }

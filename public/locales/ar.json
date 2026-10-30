@@ -3789,7 +3789,14 @@
         "reminderListAssigneesTasksOnly": "يمكن تحديد الأشخاص فقط للقوائم التي تذهب إلى المهام.",
         "syncAssigneeNotMember": "يمكن اختيار أفراد المنزل فقط هنا.",
         "syncAssigneeUnknown": "هذا الشخص لم يعد موجودًا. أعد تحميل الصفحة.",
-        "permDetails": "الأدوات والصلاحيات الإضافية"
+        "permDetails": "الأدوات والصلاحيات الإضافية",
+        "llmImportLabel": "استيراد الوصفة بالذكاء الاصطناعي",
+        "llmImportHint": "دع نموذج لغوي يحوّل صفحة وصفة أو نصا ملصقا إلى وصفة منظمة. معطل افتراضيا.",
+        "llmImportBaseUrlLabel": "الرابط الأساسي لنموذج اللغة",
+        "llmImportApiKeyLabel": "مفتاح واجهة البرمجة",
+        "llmImportApiKeySet": "تم الحفظ (للكتابة فقط)",
+        "llmImportModelLabel": "اسم النموذج",
+        "llmImportSaved": "تم حفظ الإعدادات"
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",
@@ -3923,6 +3930,20 @@
         "urlLabel": "رابط الوصفة",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "المكونات",
+        "llmImportOption": "استيراد بالذكاء الاصطناعي",
+        "llmImportTitle": "استيراد الوصفة بالذكاء الاصطناعي",
+        "llmImportSourceLabel": "المصدر",
+        "llmImportSourceUrl": "الرابط",
+        "llmImportSourceText": "النص",
+        "llmImportUrlPlaceholder": "https://example.ar/recipe",
+        "llmImportTextPlaceholder": "الصق نص الوصفة هنا (40 حرفا على الأقل)",
+        "llmImportAnalyze": "تحليل",
+        "llmImportPreviewTitle": "معاينة",
+        "llmImportIngredientsHeading": "المكونات",
+        "llmImportStepsHeading": "الخطوات",
+        "llmImportSave": "حفظ الوصفة",
+        "llmImportToast": "تم استيراد الوصفة",
+        "llmImportAnalyzing": "جار التحليل عبر النموذج...",
         "addToMeals": "إلى خطة الوجبات",
         "toShoppingSuccess": "تمت إضافة {{count}} مكونات إلى {{list}}.",
         "toShoppingSuccess_one": "تمت إضافة {{count}} مكوّن إلى {{list}}.",
@@ -7269,5 +7290,17 @@
         "custom": "لون مخصص",
         "chooseCustom": "اختر لونًا مخصصًا",
         "standard": "اللون الافتراضي"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "استيراد الذكاء الاصطناعي معطل لهذا المنزل (الإعدادات).",
+            "llmImportNotConfigured": "يحتاج استيراد الذكاء الاصطناعي إلى رابط أساسي ومفتاح واجهة برمجة ونموذج (الإعدادات).",
+            "llmImportSourceRequired": "أعط رابطا أو الصق نص الوصفة.",
+            "llmImportUrlBlocked": "لا يمكن جلب هذا العنوان (هدف شبكي خاص أو غير صالح).",
+            "llmImportUrlEmpty": "لم يُعثر على نص وصفة في هذا العنوان.",
+            "llmImportBadResponse": "لم يُرجع النموذج وصفة قابلة للاستخدام. حاول مرة أخرى.",
+            "llmImportRateLimited": "عدد كبير من عمليات استيراد الذكاء الاصطناعي في الساعة الأخيرة. حاول لاحقا.",
+            "llmImportUrlInvalid": "لا يمكن جلب هذا العنوان (هدف شبكي خاص أو غير صالح)."
+        }
     }
 }

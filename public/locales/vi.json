@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "Chỉ đặt được người cho danh sách đi vào Công việc.",
         "syncAssigneeNotMember": "Ở đây chỉ chọn được thành viên trong gia đình.",
         "syncAssigneeUnknown": "Người này không còn tồn tại. Hãy tải lại trang.",
-        "permDetails": "Tiện ích và quyền khác"
+        "permDetails": "Tiện ích và quyền khác",
+        "llmImportLabel": "Nhập công thức bằng AI",
+        "llmImportHint": "Để một mô hình ngôn ngữ biến trang công thức hoặc văn bản đã dán thành công thức có cấu trúc. Mặc định tắt.",
+        "llmImportBaseUrlLabel": "URL cơ sở của LLM",
+        "llmImportApiKeyLabel": "Khóa API",
+        "llmImportApiKeySet": "Đã lưu (chỉ ghi)",
+        "llmImportModelLabel": "Tên mô hình",
+        "llmImportSaved": "Đã lưu cài đặt"
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",
@@ -3696,6 +3703,20 @@
         "urlLabel": "Liên kết công thức",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Nguyên liệu",
+        "llmImportOption": "Nhập bằng AI",
+        "llmImportTitle": "Nhập công thức bằng AI",
+        "llmImportSourceLabel": "Nguồn",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Văn bản",
+        "llmImportUrlPlaceholder": "https://example.vn/recipe",
+        "llmImportTextPlaceholder": "Dán văn bản công thức vào đây (ít nhất 40 ký tự)",
+        "llmImportAnalyze": "Phân tích",
+        "llmImportPreviewTitle": "Xem trước",
+        "llmImportIngredientsHeading": "Nguyên liệu",
+        "llmImportStepsHeading": "Các bước",
+        "llmImportSave": "Lưu công thức",
+        "llmImportToast": "Đã nhập công thức",
+        "llmImportAnalyzing": "Đang phân tích bằng mô hình...",
         "addToMeals": "Vào kế hoạch bữa ăn",
         "toShoppingSuccess": "Đã thêm {{count}} nguyên liệu vào {{list}}.",
         "toShoppingSuccess_one": "Đã thêm {{count}} nguyên liệu vào {{list}}.",
@@ -6758,5 +6779,17 @@
         "custom": "Màu tùy chỉnh",
         "chooseCustom": "Chọn màu tùy chỉnh",
         "standard": "Màu mặc định"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "Nhập bằng AI đang tắt cho hộ gia đình này (Cài đặt).",
+            "llmImportNotConfigured": "Nhập bằng AI cần URL cơ sở, khóa API và tên mô hình (Cài đặt).",
+            "llmImportSourceRequired": "Nhập một URL hoặc dán văn bản công thức.",
+            "llmImportUrlBlocked": "Không thể lấy địa chỉ đó (mục tiêu mạng riêng tư hoặc không hợp lệ).",
+            "llmImportUrlEmpty": "Không tìm thấy văn bản công thức tại địa chỉ đó.",
+            "llmImportBadResponse": "Mô hình không trả về công thức dùng được. Hãy thử lại.",
+            "llmImportRateLimited": "Quá nhiều lần nhập bằng AI trong giờ qua. Hãy thử lại sau.",
+            "llmImportUrlInvalid": "Không thể lấy địa chỉ đó (mục tiêu mạng riêng tư hoặc không hợp lệ)."
+        }
     }
 }

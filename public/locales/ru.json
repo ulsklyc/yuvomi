@@ -3675,7 +3675,14 @@
         "reminderListAssigneesTasksOnly": "Людей можно задать только для списков, которые идут в Задачи.",
         "syncAssigneeNotMember": "Здесь можно выбрать только членов семьи.",
         "syncAssigneeUnknown": "Этого человека больше нет. Перезагрузите страницу.",
-        "permDetails": "Виджеты и другие права"
+        "permDetails": "Виджеты и другие права",
+        "llmImportLabel": "Импорт рецепта через ИИ",
+        "llmImportHint": "Позвольте языковой модели превратить страницу рецепта или вставленный текст в структурированный рецепт. По умолчанию выключено.",
+        "llmImportBaseUrlLabel": "Базовый URL LLM",
+        "llmImportApiKeyLabel": "Ключ API",
+        "llmImportApiKeySet": "Сохранено (только запись)",
+        "llmImportModelLabel": "Название модели",
+        "llmImportSaved": "Настройки сохранены"
     },
     "login": {
         "tagline": "С возвращением. Ваш дом - в одном месте.",
@@ -3808,6 +3815,20 @@
         "urlLabel": "Ссылка на рецепт",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Ингредиенты",
+        "llmImportOption": "Импорт с помощью ИИ",
+        "llmImportTitle": "Импорт рецепта через ИИ",
+        "llmImportSourceLabel": "Источник",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Текст",
+        "llmImportUrlPlaceholder": "https://example.ru/recipe",
+        "llmImportTextPlaceholder": "Вставьте сюда текст рецепта (не менее 40 символов)",
+        "llmImportAnalyze": "Анализировать",
+        "llmImportPreviewTitle": "Предпросмотр",
+        "llmImportIngredientsHeading": "Ингредиенты",
+        "llmImportStepsHeading": "Шаги",
+        "llmImportSave": "Сохранить рецепт",
+        "llmImportToast": "Рецепт импортирован",
+        "llmImportAnalyzing": "Анализ моделью...",
         "addToMeals": "В план питания",
         "toShoppingSuccess": "В {{list}} добавлено: {{count}} ингредиентов.",
         "toShoppingSuccess_one": "В {{list}} добавлен {{count}} ингредиент.",
@@ -7098,5 +7119,17 @@
         "custom": "Свой цвет",
         "chooseCustom": "Выбрать свой цвет",
         "standard": "Цвет по умолчанию"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "Импорт с ИИ выключен в этом доме (Настройки).",
+            "llmImportNotConfigured": "Для импорта с ИИ нужны базовый URL, ключ API и модель (Настройки).",
+            "llmImportSourceRequired": "Укажите URL или вставьте текст рецепта.",
+            "llmImportUrlBlocked": "Этот адрес нельзя получить (приватная или недействительная сетевая цель).",
+            "llmImportUrlEmpty": "По этому адресу текст рецепта не найден.",
+            "llmImportBadResponse": "Модель не вернула пригодный рецепт. Попробуйте ещё раз.",
+            "llmImportRateLimited": "Слишком много импортов с ИИ за последний час. Попробуйте позже.",
+            "llmImportUrlInvalid": "Этот адрес нельзя получить (приватная или недействительная сетевая цель)."
+        }
     }
 }

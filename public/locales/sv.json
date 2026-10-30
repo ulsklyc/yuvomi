@@ -3449,7 +3449,14 @@
         "reminderListAssigneesTasksOnly": "Personer kan bara anges för listor som går till Uppgifter.",
         "syncAssigneeNotMember": "Bara medlemmar i hushållet kan väljas här.",
         "syncAssigneeUnknown": "Den här personen finns inte längre. Ladda om sidan.",
-        "permDetails": "Widgetar och fler behörigheter"
+        "permDetails": "Widgetar och fler behörigheter",
+        "llmImportLabel": "AI-import av recept",
+        "llmImportHint": "Låt en språkmodell göra en receptsida eller inklistrad text till ett strukturerat recept. Av som standard.",
+        "llmImportBaseUrlLabel": "LLM-bas-URL",
+        "llmImportApiKeyLabel": "API-nyckel",
+        "llmImportApiKeySet": "Sparat (skrivskyddat)",
+        "llmImportModelLabel": "Modellnamn",
+        "llmImportSaved": "Inställningarna sparade"
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",
@@ -3579,6 +3586,20 @@
         "urlLabel": "Receptlänk",
         "urlPlaceholder": "https://...",
         "ingredientsLabel": "Ingredienser",
+        "llmImportOption": "Importera med AI",
+        "llmImportTitle": "AI-import av recept",
+        "llmImportSourceLabel": "Källa",
+        "llmImportSourceUrl": "URL",
+        "llmImportSourceText": "Text",
+        "llmImportUrlPlaceholder": "https://example.se/recipe",
+        "llmImportTextPlaceholder": "Klistra in recepttexten här (minst 40 tecken)",
+        "llmImportAnalyze": "Analysera",
+        "llmImportPreviewTitle": "Förhandsgranskning",
+        "llmImportIngredientsHeading": "Ingredienser",
+        "llmImportStepsHeading": "Steg",
+        "llmImportSave": "Spara recept",
+        "llmImportToast": "Receptet importerat",
+        "llmImportAnalyzing": "Analyserar med modellen...",
         "addToMeals": "Till måltidsplanen",
         "toShoppingSuccess": "{{count}} ingredienser tillagda i {{list}}.",
         "toShoppingSuccess_one": "{{count}} ingrediens tillagd i {{list}}.",
@@ -6758,5 +6779,17 @@
         "custom": "Egen färg",
         "chooseCustom": "Välj egen färg",
         "standard": "Standardfärg"
+    },
+    "friendlyError": {
+        "reasons": {
+            "llmImportDisabled": "AI-importen är avstängd för det här hushållet (Inställningar).",
+            "llmImportNotConfigured": "AI-importen behöver en bas-URL, en API-nyckel och en modell (Inställningar).",
+            "llmImportSourceRequired": "Ange en URL eller klistra in recepttexten.",
+            "llmImportUrlBlocked": "Adressen kan inte hämtas (privat eller ogiltigt nätverksmål).",
+            "llmImportUrlEmpty": "Ingen recepttext hittades på den adressen.",
+            "llmImportBadResponse": "Modellen returnerade inte ett användbart recept. Försök igen.",
+            "llmImportRateLimited": "För många AI-importer den senaste timmen. Försök igen senare.",
+            "llmImportUrlInvalid": "Adressen kan inte hämtas (privat eller ogiltigt nätverksmål)."
+        }
     }
 }
