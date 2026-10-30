@@ -252,6 +252,12 @@ deletions cannot be learned at all. Tracked as #1002.
   weight under Health. The full log is a third-party module, with a page of its own in the app
   and its state in a separate service beside Yuvomi rather than in `yuvomi.db`
   ([MODULES.md](../MODULES.md)).
+- **Updating the app from its own interface** (D#2348) is *not here*. In Docker or Podman the app
+  cannot replace its own image without being handed the host's container engine, and a web
+  interface that holds that key is a far larger target than a button is worth. Each install route
+  also updates differently, so one button would mean something different on each. Settings says
+  when a newer version is out; the update itself stays outside the app, with the tools of the
+  install route.
 
 ---
 
