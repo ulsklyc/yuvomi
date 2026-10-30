@@ -1223,6 +1223,7 @@ const GUARDED_SWITCH_FORMS = new Map([
   ['admin-family.js#add-member-form', 'Anlegen eines Mitglieds'],
   ['admin-family.js#edit-member-form', 'Dialog mit eigenem Dirty-Schutz (components/modal.js)'],
   ['admin-weather.js#weather-form', 'Automatisch orten fuellt die Koordinaten desselben Formulars'],
+  ['modules-kitchen.js#llm-import-form', 'Der Schalter ohne Adresse, Schluessel und Modell waere ein Import, der nur Absagen sammelt - er haelt sich an die Felder desselben Formulars'],
   ['personal-weather.js#pweather-form', 'Automatisch orten fuellt die Koordinaten desselben Formulars'],
   ['notifications.js#${esc(channel.id ?? \'\')}', 'Kanal: Aktiv haengt an Adresse und Zugang des Kanals'],
   ['personal-calendar-subscriptions.js#ics-add-form', 'Anlegen eines Abos'],

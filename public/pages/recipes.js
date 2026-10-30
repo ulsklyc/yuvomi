@@ -14,6 +14,7 @@ import { resolveShoppingTarget, announceTransfer, transferMessage, mayTransferRe
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
 import { scheduleUndoableDelete } from '/utils/ux.js';
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { normalizeRecipeMealTypes, RECIPE_MEAL_TYPE_KEYS } from '/utils/recipe-meal-types.js';
 import { mealPayloadFromRecipe } from '/utils/recipe-to-meal.js';
 import { scaleQuantityText, scaledIngredients, servingsFactor } from '/utils/scale-quantity.js';
@@ -397,6 +398,12 @@ function openRecipeFromQuery() {
 /**
  * Der Anlegeknopf - oder `null` bei `read`: der Knopf steht dann nicht im
  * Markup, statt per CSS (html[data-module-readonly]) nur ausgeblendet zu sein.
+ *
+ * Seit dem Modell-Import ist er der AUSLOESER des Neu-Menues (zwei Wege, ein
+ * Rezept entstehen zu lassen - siehe `recipeNewMenuHtml`), nicht mehr der
+ * direkte Weg ins Formular. Sein Name ist das Nomen aus `newLabel.recipes`:
+ * angedockt zeigt der Knopf genau dieses Wort, und der Name enthaelt ihn
+ * (WCAG 2.5.3, utils/fab.js).
  */
 function fabEl() {
   if (readOnly()) return null;
@@ -404,13 +411,39 @@ function fabEl() {
   fab.className = 'page-fab';
   fab.type = 'button';
   fab.id = 'fab-new-recipe';
-  fab.setAttribute('aria-label', t('recipes.addRecipe'));
+  fab.setAttribute('aria-label', t('newLabel.recipes'));
   fab.dataset.dockLabel = t('newLabel.recipes');
+  fab.setAttribute('popovertarget', 'recipe-new-menu');
+  fab.setAttribute('aria-haspopup', 'menu');
+  fab.setAttribute('aria-expanded', 'false');
   const fabIcon = document.createElement('i');
   fabIcon.dataset.lucide = 'plus';
   fabIcon.setAttribute('aria-hidden', 'true');
   fab.appendChild(fabIcon);
   return fab;
+}
+
+/**
+ * DAS NEU-MENUE. Der Anlegeknopf oeffnet es: tippen (das Formular, wie bisher)
+ * oder importieren (der Weg durchs Modell, `openLlmImportModal`). Das Panel
+ * haelt dieselben Eintraege wie jedes Ueberlaufmenue (`data-action`,
+ * Icon + Text); Position, Schliessen und `aria-expanded` uebernimmt
+ * `installPopoverMenus` an der Seitenwurzel, und der Ausloeser darf wandern -
+ * der Router hebt den FAB in die Shell, das Menue bleibt in der Seite, und
+ * `popovertarget` findet sich dokumentweit.
+ */
+function recipeNewMenuHtml() {
+  return `
+    <div class="popover-menu" id="recipe-new-menu" popover role="menu">
+      <button type="button" role="menuitem" class="popover-menu__item" data-action="new-recipe">
+        <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
+        <span>${esc(t('recipes.addRecipe'))}</span>
+      </button>
+      <button type="button" role="menuitem" class="popover-menu__item" data-action="llm-import">
+        <i data-lucide="sparkles" class="icon-md" aria-hidden="true"></i>
+        <span>${esc(t('recipes.llmImportOption'))}</span>
+      </button>
+    </div>`;
 }
 
 export async function render(container, { signal } = {}) {
@@ -528,6 +561,9 @@ export async function render(container, { signal } = {}) {
   }));
 
   page.append(...[title, toolbar, split, fab].filter(Boolean));
+  // Das Neu-Menue nur dort, wo auch sein Ausloeser steht (fabEl bei `read`
+  // null): ein Panel ohne Ausloeser waere totes Markup.
+  if (fab) page.insertAdjacentHTML('beforeend', recipeNewMenuHtml());
   container.replaceChildren(page);
   renderKitchenTabsBar(container, '/recipes');
   // Positionierung und Schliessen der Zeilen-Ueberlaufmenues. Idempotent, haengt an
@@ -557,9 +593,18 @@ export async function render(container, { signal } = {}) {
   // Rezept aus dem eigenen Haus.
   openRecipeFromQuery();
 
-  // Bei `read` gibt es keinen FAB (fabEl). Der Riegel selbst sitzt in
-  // openRecipeModal() - dort muenden alle Anlege- und Bearbeitungswege.
-  fab?.addEventListener('click', () => openRecipeModal('create'));
+  // Bei `read` gibt es keinen FAB und kein Neu-Menue (fabEl). Die Riegel selbst
+  // sitzen in openRecipeModal() und openLlmImportModal() - dort muenden alle
+  // Anlege- und Importwege, auch der Leerzustand und der `n`-Kurzbefehl
+  // erreichen sie nur ueber diesen Knopf.
+  if (fab) {
+    page.querySelector('#recipe-new-menu')?.addEventListener('click', (event) => {
+      const item = event.target?.closest?.('[data-action]');
+      if (!item) return;
+      if (item.dataset.action === 'new-recipe') openRecipeModal('create');
+      else if (item.dataset.action === 'llm-import') openLlmImportModal();
+    });
+  }
 
   // Handle im Modul halten: der Zurücksetzen-Pfad des Suchtreffer-Leerzustands
   // braucht `clear()`, nicht nur `input.value = ''` - sonst bliebe der
@@ -2027,6 +2072,246 @@ async function saveRecipe(panel, mode, recipe) {
   }
 }
 
+/* ── Der Import aus einem Modell (Einstellung: Einstellungen › Module & Küche) ─
+ *
+ * ZWEI SCHRITTE, EIN REZEPT. `Analyze` fragt das Modell (preview) und zeigt,
+ * was es gemacht hat; `Speichern` uebernimmt GENAU das Gezeigte, ohne das
+ * Modell erneut zu fragen (routes/recipes.js: `{ confirmed: true, recipe }`).
+ * Die Vorschau kommt als fertiges Rezept der App zurueck (Titel, Notizblock,
+ * Zutaten mit Menge als Satz) — die Schritte wohnen im Notizblock hinter der
+ * "Zubereitung:"-Zeile, und `llmPreviewParts` holt sie fuer die Anzeige und
+ * fuer die Bestaetigung aus ihm heraus. Die Bestaetigung sendet das Modell-
+ * format (`amount`/`unit`, `instructions`): die Route fuehrt es durch
+ * dieselbe Ueberfuehrung — so geht auf dem Weg nichts verloren, was die
+ * Vorschau gezeigt hat.
+ *
+ * Fehler sagt `errorSentence`: jeder Grund der Route (`llm_import_*`) hat
+ * seinen Satz in utils/friendly-error.js — nie der Text des Servers.
+ */
+
+/* Kuerzer als das ist kein Rezept, sondern ein Stichwort — dieselbe Grenze
+ * wie auf dem Server (LLM_IMPORT_MIN_TEXT_LENGTH). */
+const LLM_IMPORT_MIN_TEXT = 40;
+
+/**
+ * Die Stuecke der Vorschau: Titel, Zutaten als Zeilen ("500 g Mehl"), die
+ * Schritte aus dem Notizblock (die "Zubereitung:"-Zeile und die Zahl davor
+ * sind Marke, kein Text), dazu Beschreibung und Zeit fuer die Bestaetigung.
+ * Reine Funktion — die UI zeichnet daraus, die Bestaetigung baut daraus.
+ */
+function llmPreviewParts(recipe) {
+  const steps = [];
+  let prepMinutes = null;
+  const rest = [];
+  for (const block of String(recipe?.notes ?? '').split(/\n{2,}/)) {
+    const text = block.trim();
+    if (!text) continue;
+    if (text.startsWith('Zubereitung:')) {
+      for (const line of text.split('\n').slice(1)) {
+        const step = line.replace(/^\s*\d+\.\s*/, '').trim();
+        if (step) steps.push(step);
+      }
+    } else if (/^Zeit: \d+ Min\.$/.test(text)) {
+      prepMinutes = Number(text.match(/^Zeit: (\d+) Min\.$/)[1]);
+    } else {
+      rest.push(text);
+    }
+  }
+  const ingredients = (Array.isArray(recipe?.ingredients) ? recipe.ingredients : [])
+    .filter((ing) => ing && String(ing.name ?? '').trim())
+    .map((ing) => {
+      const quantity = String(ing.quantity ?? '').trim();
+      const name = String(ing.name).trim();
+      return { name, quantity, line: quantity ? `${quantity} ${name}` : name };
+    });
+  return {
+    title: String(recipe?.title ?? '').trim(),
+    description: rest.join('\n\n'),
+    ingredients,
+    steps,
+    prepMinutes,
+  };
+}
+
+/**
+ * Die Vorschau zurueck ins Modell-Format: Menge als Zahl plus Einheit
+ * ("1,5 kg" → 1.5 und "kg"; ein Wort wie "nach Geschmack" bleibt die
+ * Einheit, denn die Ueberfuehrung der Route schreibt sie unveraendert als
+ * Satz zurueck), Schritte als Liste, Zeit als Zahl. Damit ist die
+ * Bestaetigung dasselbe Rezept, das die Vorschau zeigte.
+ */
+function llmConfirmedRecipe(recipe) {
+  const parts = llmPreviewParts(recipe);
+  const servings = Number(recipe?.servings ?? 0);
+  return {
+    title: parts.title,
+    description: parts.description,
+    ingredients: parts.ingredients.map((ing) => {
+      const match = ing.quantity.match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/);
+      if (match) {
+        const amount = Number(match[1].replace(',', '.'));
+        return { name: ing.name, amount: Number.isFinite(amount) ? amount : null, unit: match[2].trim() || null };
+      }
+      return { name: ing.name, amount: null, unit: ing.quantity || null };
+    }),
+    instructions: parts.steps,
+    servings: Number.isFinite(servings) && servings >= 1 ? Math.round(servings) : null,
+    prep_time_minutes: parts.prepMinutes,
+  };
+}
+
+function openLlmImportModal() {
+  // Der Riegel steht vor jeder Vorbereitung, wie im Anlegeformular.
+  if (readOnly()) return;
+  // Die Vorschau, die gezeigt wurde — die Bestaetigung speichert genau sie.
+  let preview = null;
+
+  openSharedModal({
+    title: t('recipes.llmImportTitle'),
+    size: 'md',
+    content: `
+      <div class="form-group">
+        <span class="form-label" id="llm-import-source-label">${t('recipes.llmImportSourceLabel')}</span>
+        <div class="llm-import-source" role="group" aria-labelledby="llm-import-source-label">
+          <button type="button" class="filter-chip" data-llm-source="url" aria-pressed="true">${esc(t('recipes.llmImportSourceUrl'))}</button>
+          <button type="button" class="filter-chip" data-llm-source="text" aria-pressed="false">${esc(t('recipes.llmImportSourceText'))}</button>
+        </div>
+      </div>
+      <div class="form-group" id="llm-import-url-group">
+        <label class="form-label" for="llm-import-url">${t('recipes.llmImportSourceUrl')}</label>
+        <input id="llm-import-url" class="form-input" type="url" autocomplete="off"
+               placeholder="${esc(t('recipes.llmImportUrlPlaceholder'))}">
+      </div>
+      <div class="form-group" id="llm-import-text-group" hidden>
+        <label class="form-label" for="llm-import-text">${t('recipes.llmImportSourceText')}</label>
+        <textarea id="llm-import-text" class="form-input" rows="6"
+                  placeholder="${esc(t('recipes.llmImportTextPlaceholder'))}"></textarea>
+      </div>
+      <section class="llm-import-preview" id="llm-import-preview" hidden>
+        <p class="form-label">${t('recipes.llmImportPreviewTitle')}</p>
+        <p class="form-label" id="llm-import-preview-title"></p>
+        <p class="form-label">${t('recipes.llmImportIngredientsHeading')}</p>
+        <ul id="llm-import-preview-ingredients" class="llm-import-preview__list"></ul>
+        <p class="form-label">${t('recipes.llmImportStepsHeading')}</p>
+        <ol id="llm-import-preview-steps" class="llm-import-preview__list"></ol>
+      </section>
+      <div id="llm-import-error" class="form-error" role="alert" hidden></div>
+      <div class="modal-panel__footer modal-panel__footer--plain">
+        <button type="button" class="btn btn--secondary" id="llm-import-cancel">${t('common.cancel')}</button>
+        <button type="button" class="btn btn--secondary" id="llm-import-analyze">${t('recipes.llmImportAnalyze')}</button>
+        <button type="button" class="btn btn--primary" id="llm-import-save" disabled>${t('recipes.llmImportSave')}</button>
+      </div>
+    `,
+    onSave(panel) {
+      const errorEl = panel.querySelector('#llm-import-error');
+      const urlInput = panel.querySelector('#llm-import-url');
+      const textInput = panel.querySelector('#llm-import-text');
+      const urlGroup = panel.querySelector('#llm-import-url-group');
+      const textGroup = panel.querySelector('#llm-import-text-group');
+      const chips = [...(panel.querySelectorAll('.llm-import-source [data-llm-source]') ?? [])];
+      const analyzeBtn = panel.querySelector('#llm-import-analyze');
+      const saveBtn = panel.querySelector('#llm-import-save');
+      panel.querySelector('#llm-import-cancel')?.addEventListener('click', () => closeSharedModal({ force: true }));
+
+      const showError = (sentence) => {
+        errorEl.textContent = sentence;
+        errorEl.hidden = false;
+      };
+      const clearError = () => { errorEl.hidden = true; };
+
+      let source = 'url';
+      panel.querySelector('.llm-import-source')?.addEventListener('click', (event) => {
+        const chip = event.target?.closest?.('[data-llm-source]');
+        if (!chip) return;
+        source = chip.dataset.llmSource === 'text' ? 'text' : 'url';
+        chips.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.llmSource === source)));
+        urlGroup.hidden = source !== 'url';
+        textGroup.hidden = source !== 'text';
+        clearError();
+      });
+
+      analyzeBtn?.addEventListener('click', async () => {
+        clearError();
+        preview = null;
+        saveBtn.disabled = true;
+        const url = (urlInput?.value ?? '').trim();
+        const text = (textInput?.value ?? '').trim();
+        let payload;
+        if (source === 'url') {
+          if (!url) { showError(t('friendlyError.reasons.llmImportSourceRequired')); return; }
+          payload = { source_url: url };
+        } else {
+          // Dieselbe Grenze wie auf dem Server — der Satz ist derselbe.
+          if (text.length < LLM_IMPORT_MIN_TEXT) { showError(t('friendlyError.reasons.llmImportSourceRequired')); return; }
+          payload = { text };
+        }
+        analyzeBtn.disabled = true;
+        // Der Satz, der waehrend des Laufs steht: das Modell antwortet langsam.
+        window.yuvomi?.showToast(t('recipes.llmImportAnalyzing'));
+        const dialog = captureModalContext();
+        try {
+          const res = await api.post('/recipes/llm-import', { preview: true, ...payload });
+          if (!isModalContextCurrent(dialog)) return;
+          const recipe = res?.data?.recipe ?? null;
+          if (!recipe || !String(recipe.title ?? '').trim()) {
+            showError(t('friendlyError.reasons.llmImportBadResponse'));
+            return;
+          }
+          preview = recipe;
+          const parts = llmPreviewParts(recipe);
+          panel.querySelector('#llm-import-preview').hidden = false;
+          panel.querySelector('#llm-import-preview-title').textContent = parts.title;
+          // Zeilen als Knoten, nicht als Markup: die Worter kommen aus dem
+          // Modell (Fremdquelle) - textContent ist hier die einzige Haut.
+          const listItems = (values) => values.map((value) => {
+            const li = document.createElement('li');
+            li.textContent = value;
+            return li;
+          });
+          panel.querySelector('#llm-import-preview-ingredients')
+            .replaceChildren(...listItems(parts.ingredients.map((ing) => ing.line)));
+          panel.querySelector('#llm-import-preview-steps')
+            .replaceChildren(...listItems(parts.steps));
+          saveBtn.disabled = false;
+        } catch (err) {
+          if (!isModalContextCurrent(dialog)) return;
+          showError(errorSentence(err));
+        } finally {
+          analyzeBtn.disabled = false;
+        }
+      });
+
+      saveBtn?.addEventListener('click', async () => {
+        if (!preview) return;
+        // Kein zweiter Weg ins Formular: die Rechte koennen sich geaendert
+        // haben, waehrend der Dialog offen stand.
+        if (readOnly()) { closeSharedModal({ force: true }); return; }
+        saveBtn.disabled = true;
+        const dialog = captureModalContext();
+        try {
+          await api.post('/recipes/llm-import', { confirmed: true, recipe: llmConfirmedRecipe(preview) });
+        } catch (err) {
+          saveBtn.disabled = false;
+          if (isModalContextCurrent(dialog)) showError(errorSentence(err));
+          return;
+        }
+        // Angekommen = gespeichert (#2069): das Nachladen haelt nicht mehr als
+        // Fehler gelten, als waere das Rezept nicht angelegt - es wuerde sonst
+        // ein zweites Speichern nahelegen, das doppelt anlegen koennte.
+        closeSharedModal({ force: true, context: dialog });
+        window.yuvomi?.showToast(t('recipes.llmImportToast'), 'success');
+        // Nachladen, nicht voranstellen: die Antwort nennt nur ID und Titel,
+        // die Liste zeichnet das Rezept aus dem, was der Server haelt.
+        await reloadAfterSave(async () => {
+          await loadRecipes();
+          renderRecipeList({ repaint: true });
+          refocusAfterRender();
+        });
+      });
+    },
+  });
+}
+
 // --------------------------------------------------------
 // Zutaten → Einkaufsliste
 // --------------------------------------------------------
@@ -2336,6 +2621,12 @@ export const __test = {
   READ_SAFE_ACTIONS,
   SPLIT_ACTIONS,
   fabEl,
+  // Der Neu-Menue-Weg: das Panel-Markup und der Importdialog als Programm
+  // (test-recipes-llm-import-ui.js).
+  recipeNewMenuHtml,
+  openLlmImportModal,
+  llmPreviewParts,
+  llmConfirmedRecipe,
   emptyListOptions,
   buildRecipeList,
   setContainerForTest(container) { _container = container; },

@@ -1913,7 +1913,16 @@ test('module-specific settings leaves only reference their owned preferences and
   const ownership = {
     '../public/settings/pages/modules-kitchen.js': {
       endpoints: ['/preferences'],
-      preferences: ['meal_type_names', 'visible_meal_types'],
+      preferences: [
+        'meal_type_names',
+        'visible_meal_types',
+        // Der Import aus dem Modell (Karte nur fuer Fuehrungskraft; der
+        // Schluessel selbst wird hier nie gelesen, nur geschrieben).
+        'llm_import_enabled',
+        'llm_base_url',
+        'llm_model',
+        'has_llm_api_key',
+      ],
     },
     '../public/settings/pages/modules-calendar.js': {
       endpoints: [

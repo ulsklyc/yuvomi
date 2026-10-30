@@ -287,9 +287,11 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     for (const [reason, key] of CASE_MESSAGES) {
       assert.equal(REFUSAL_MESSAGES.has(reason), false, `${reason} steht in beiden Listen`);
       assert.ok(routes.includes(`reason: '${reason}'`), `${reason}: kein Server nennt diesen Fall`);
-      const [section, leaf] = key.split('.');
+      const path = key.split('.');
       for (const name of files) {
-        const text = JSON.parse(readFileSync(new URL(name, dir), 'utf8'))[section]?.[leaf];
+        // Der Pfad kann beliebig tief stehen (`friendlyError.reasons.x`) -
+        // dieselbe Lesart wie der Pruefstand in test:api.
+        const text = path.reduce((node, part) => node?.[part], JSON.parse(readFileSync(new URL(name, dir), 'utf8')));
         assert.equal(typeof text, 'string', `${name}: ${key} fehlt`);
         assert.doesNotMatch(text, /[\u2013\u2014]/, `${name}: ${key} traegt einen Gedankenstrich`);
       }
@@ -512,8 +514,10 @@ test('die Platzhalter jedes Satzes sind in jeder Sprache genau die freigegebenen
   for (const name of files) {
     const locale = JSON.parse(readFileSync(new URL(name, dir), 'utf8'));
     for (const [reason, key] of CASE_MESSAGES) {
-      const [section, leaf] = key.split('.');
-      const text = locale[section][leaf];
+      // Der Pfad kann beliebig tief stehen (`friendlyError.reasons.x`) -
+      // derselbe Lesart wie oben und im Pruefstand von test:api.
+      const path = key.split('.');
+      const text = path.reduce((node, part) => node?.[part], locale);
       const used = [...text.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]).sort();
       assert.deepEqual(used, [...(CASE_PARAMS.get(reason) ?? [])].sort(), `${name}: ${key} (${reason})`);
       // Die Zahl kommt vom Server, nie ein zweites Mal als Ziffern im Satz -

@@ -110,7 +110,7 @@ export async function persistMealTypeSelection(
   return checkedMealTypes;
 }
 
-function renderPage(container, preferences) {
+function renderPage(container, preferences, { isAdmin = false } = {}) {
   const visibleMealTypes = Array.isArray(preferences.visible_meal_types)
     ? preferences.visible_meal_types
     : MEAL_TYPES;
@@ -166,6 +166,47 @@ function renderPage(container, preferences) {
         </div>
       </div>
     </section>
+    ${/* DER IMPORT AUS EINEM MODELL — NUR FUEHRUNGSKRAFT. Derselbe Riegel wie
+         auf dem Server (routes/preferences.js antwortet 403, wenn ein Mitglied
+         diese Felder setzt): die Karte zeigt, was nur eine Administration
+         ändern darf. Der Schluessel ist write-only — die Antwort nennt nur, ob
+         einer hinterlegt ist (`has_llm_api_key`), und die Karte sagt es. */ ''}
+    ${isAdmin ? `
+    <section class="settings-section" id="llm-import-section">
+      <h2 class="settings-section__title">${t('settings.llmImportLabel')}</h2>
+      <div class="settings-card">
+        <p class="settings-card-description">${t('settings.llmImportHint')}</p>
+        <form class="settings-form settings-form--compact" id="llm-import-form" novalidate autocomplete="off">
+          ${settingSwitchRowHtml({
+            label: t('settings.llmImportLabel'),
+            checked: preferences.llm_import_enabled === true,
+            attrs: { id: 'llm-import-enabled' },
+          })}
+          ${settingRowHtml({
+            label: t('settings.llmImportBaseUrlLabel'), labelFor: 'llm-base-url', field: true,
+            control: `<input class="form-input" type="url" id="llm-base-url" autocomplete="off"
+                      placeholder="https://llm.example.com/v1" value="${esc(preferences.llm_base_url ?? '')}">`,
+          })}
+          ${settingRowHtml({
+            label: t('settings.llmImportApiKeyLabel'), labelFor: 'llm-api-key', field: true,
+            extra: preferences.has_llm_api_key
+              ? `<p class="form-hint" id="llm-api-key-set" role="status">${esc(t('settings.llmImportApiKeySet'))}</p>`
+              : '',
+            control: '<input class="form-input" type="password" id="llm-api-key" autocomplete="new-password" />',
+          })}
+          ${settingRowHtml({
+            label: t('settings.llmImportModelLabel'), labelFor: 'llm-model', field: true,
+            control: `<input class="form-input" type="text" id="llm-model" autocomplete="off"
+                      value="${esc(preferences.llm_model ?? '')}">`,
+          })}
+          <div id="llm-import-error" class="form-error" role="alert" hidden></div>
+          <div class="settings-form-actions">
+            <button type="submit" class="btn btn--primary">${t('common.save')}</button>
+          </div>
+        </form>
+      </div>
+    </section>
+    ` : ''}
   `);
 }
 
@@ -533,12 +574,49 @@ function bindEvents(container) {
   });
 }
 
+/* DER IMPORT AUS EINEM MODELL (Fuehrungskraft). Der Schalter und die drei
+ * Felder gehen als EIN Speichern weg - der Server prueft jeden Wert fuer sich
+ * (routes/preferences.js), ein leerer Schluessel loescht dort den
+ * hinterlegten nicht, und genau deshalb bleibt das Feld leer, wenn der
+ * Nutzer ihn nicht antasten will: leeres Feld heisst "unveraendert", das
+ * Feld wird dann gar nicht erst mitgeschickt. */
+function bindLlmImportEvents(container, user) {
+  const form = container.querySelector('#llm-import-form');
+  if (!form) return;
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const errorElement = container.querySelector('#llm-import-error');
+    errorElement.hidden = true;
+    const patch = {
+      llm_import_enabled: container.querySelector('#llm-import-enabled')?.checked === true,
+      llm_base_url: (container.querySelector('#llm-base-url')?.value ?? '').trim(),
+      llm_model: (container.querySelector('#llm-model')?.value ?? '').trim(),
+    };
+    const apiKey = (container.querySelector('#llm-api-key')?.value ?? '').trim();
+    if (apiKey) patch.llm_api_key = apiKey;
+    const submitBtn = form.querySelector('button[type=submit]');
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      await savePreferences(patch);
+      window.yuvomi?.showToast(t('settings.llmImportSaved'), 'success');
+      // Nachladen, was der Server wirklich hält: die Zeile "Schluessel
+      // hinterlegt" kommt aus `has_llm_api_key`, nicht aus dem Formular.
+      await render(container, { user });
+    } catch (error) {
+      errorElement.textContent = errorSentence(error, 'settings.preferenceSaveFailed');
+      errorElement.hidden = false;
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+}
+
 export async function render(container, { user }) {
-  void user;
   const preferences = await getPreferences();
-  renderPage(container, preferences);
+  renderPage(container, preferences, { isAdmin: user?.role === 'admin' });
   bindEvents(container);
   bindProviderAddButton(container);
+  bindLlmImportEvents(container, user);
   await loadProviderAccounts(container);
 }
 

@@ -37,6 +37,12 @@ export const REFUSAL_MESSAGES = new Map([
   ['not_owner', 'common.errorNotOwner'],
   // Die Handordnung der Aufgaben ohne `tasks_reorder_family` (R23, D15).
   ['reorder_not_allowed', 'tasks.errorReorderNotAllowed'],
+  // Rezeptimport aus dem Modell (POST /recipes/llm-import): Schalter aus,
+  // Konfiguration unvollstaendig. Beides Absagen, die nichts mit "du darfst
+  // nicht" zu tun haben - sie nennen ihren Fall, und der Fall hat seinen Satz
+  // unter `friendlyError.reasons.*`.
+  ['llm_import_disabled', 'friendlyError.reasons.llmImportDisabled'],
+  ['llm_import_not_configured', 'friendlyError.reasons.llmImportNotConfigured'],
 ]);
 
 /**
@@ -194,6 +200,15 @@ export const CASE_MESSAGES = new Map([
   ['recipes_ingredients_changed', 'recipes.errorIngredientsChanged'],
   // Eine Mahlzeit aus einem Rezept, das es nicht mehr gibt (server/routes/meals.js).
   ['meals_selected_recipe_not_found', 'recipes.errorRecipeGone'],
+  // Rezeptimport aus dem Modell (server/routes/recipes.js, POST /llm-import):
+  // Quelle, Adresse, Antwort des Modells, Bremse. Kein "gibt es nicht mehr" -
+  // es fehlt nichts, die Eingabe oder die Antwort taugt nicht.
+  ['llm_import_source_required', 'friendlyError.reasons.llmImportSourceRequired'],
+  ['llm_import_url_invalid', 'friendlyError.reasons.llmImportUrlInvalid'],
+  ['llm_import_url_blocked', 'friendlyError.reasons.llmImportUrlBlocked'],
+  ['llm_import_url_empty', 'friendlyError.reasons.llmImportUrlEmpty'],
+  ['llm_import_bad_response', 'friendlyError.reasons.llmImportBadResponse'],
+  ['llm_import_rate_limited', 'friendlyError.reasons.llmImportRateLimited'],
   // Abos (#1909). Die "gibt es nicht mehr" stehen auch in GONE_REASONS. Die
   // 404 eines Abos heisst nur "geloescht": die Schreibrouten lesen es ohne
   // Sichtbarkeitsfilter, ein fremdes privates Abo endet mit 403. Ein Loeschen
