@@ -4361,3 +4361,32 @@ test('der Ausschnitt-Guard erkennt den Schaden, gegen den er gebaut ist', () => 
   // Der Stand vor S3: keine Ausschnitte.
   assert.deepEqual(cropFindings(read('index.html').replace(/data-crop=/g, 'data-x='), build, all), ['keine Ausschnitte (data-crop) auf der Seite - Muster veraltet?']);
 });
+
+// ── (28) Messbefunde und Bedienelemente (S4, Critique 2026-10-30) ─────────────
+/**
+ * Das LCP-Bild wird auf JEDER Breite vorgeladen. Bis S4 nur am breiten
+ * Schirm (`if (!n)`): am Telefon war damals der Text das LCP-Element. Seit S3
+ * ist es dort die Uebersicht im Telefonrahmen, und ohne Preload wartete sie
+ * auf das Inline-Skript am Bild - Slow 4G, CPU 4x: 2.895 ms, davon 1.712 ms
+ * Ladeverzoegerung; mit Preload 2.395 ms / 627 ms (gleiche Laufart).
+ */
+function heroPreloadEverywhereFindings(html) {
+  const head = heroHeadScript(html);
+  if (!/rel = 'preload'/.test(head)) return ['kein Preload im Kopfskript'];
+  const before = head.slice(0, head.indexOf("rel = 'preload'"));
+  const open = (before.match(/\{/g) || []).length - (before.match(/\}/g) || []).length;
+  // Das Kopfskript steht in function + try: zwei offene Bloecke. Jeder weitere ist eine Bedingung.
+  return open > 2 ? ['der Hero-Preload steht in einer Bedingung (nur eine Breite?) - am Telefon ist die Aufnahme das LCP-Element'] : [];
+}
+
+test('index.html: das Hero-Bild wird auf jeder Breite vorgeladen', () => {
+  assert.deepEqual(heroPreloadEverywhereFindings(read('index.html')), []);
+});
+
+test('der Preload-Breiten-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const narrowOnly = html.replace("        k.rel = 'preload'; k.as = 'image';", "        if (!n) {\n        k.rel = 'preload'; k.as = 'image';")
+    .replace("        document.head.appendChild(k);\n", "        document.head.appendChild(k);\n        }\n");
+  assert.notEqual(narrowOnly, html);
+  assert.equal(heroPreloadEverywhereFindings(narrowOnly).length, 1);
+});

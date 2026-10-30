@@ -80,8 +80,8 @@
          <img> (S7). Dort steht es bei Byte ~91.000, rund 30 KB komprimiert
          hinter dem Anfang - so spaet sah es weder der Preload-Scanner (es hat
          bewusst kein src, Begruendung am Bild) noch irgendwer sonst. Theme,
-         Sprache und Breite sind hier schon bekannt, also startet (am breiten
-         Schirm, s.u.) ein Preload mit genau dem srcset und sizes, die das
+         Sprache und Breite sind hier schon bekannt, also startet (seit S4
+         auf jeder Breite, s.u.) ein Preload mit genau dem srcset und sizes, die das
          Inline-Skript am Bild danach setzt: dieselbe Auswahl, eine Datei,
          kein zweiter Download. Breiten
          wie scripts/build-screenshot-webp.mjs (web-lead 700/1400/2400,
@@ -104,16 +104,18 @@
               + (w[2] ? ', ' + p.replace(/\.png$/, '@2400.webp') + ' ' + w[2] + 'w' : '') },
           k = document.createElement('link');
         window.YuvomiHero = hero;
-        /* Nur am breiten Schirm, wo die Aufnahme das LCP-Element ist. Am
-           Telefon ist es der Text (.hero-sub), und ein frueher 75-KB-Preload
-           nahm Stylesheet und Schrift auf Fast 4G die Leitung weg: LCP
-           gemessen 924 -> 1196 ms. Dort holt das Inline-Skript am Bild die
-           Datei wie bisher. */
-        if (!n) {
-          k.rel = 'preload'; k.as = 'image';
-          k.setAttribute('imagesrcset', hero.srcset); k.setAttribute('imagesizes', hero.sizes); k.setAttribute('fetchpriority', 'high');
-          document.head.appendChild(k);
-        }
+        /* Auf jeder Breite (S4, Critique 2026-10-30). Bis dahin nur am
+           breiten Schirm: am Telefon war der Text (.hero-sub) das LCP-Element,
+           und ein frueher Preload nahm Stylesheet und Schrift die Leitung
+           (LCP 924 -> 1196 ms). Seit S3 steht die Uebersicht dort als Telefon
+           mit 70 % der Buehne und IST das LCP-Element - ohne Preload wartete
+           sie auf das Inline-Skript bei Byte ~91.000: Slow 4G, CPU 4x
+           gemessen 2.895 ms, davon 1.712 ms Ladeverzoegerung. Kein <picture>:
+           ein <source media> kennt weder das gespeicherte Theme noch die
+           Sprache, und eine falsche erste Datei waere ein zweiter Download. */
+        k.rel = 'preload'; k.as = 'image';
+        k.setAttribute('imagesrcset', hero.srcset); k.setAttribute('imagesizes', hero.sizes); k.setAttribute('fetchpriority', 'high');
+        document.head.appendChild(k);
       } catch (e) {}
     })(document.documentElement);
   </script>
