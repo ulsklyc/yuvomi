@@ -2443,7 +2443,7 @@ test('der Hero-Schaerfe-Guard erkennt den Schaden, gegen den er gebaut ist', () 
   assert.ok(heroDeliveryFindings(old).some((f) => /uebernimmt srcset\/sizes/.test(f)));
   const noHead = html.replace(/window\.YuvomiHero = hero;/, '').replace(/YuvomiHero/g, 'Other');
   assert.deepEqual(heroDeliveryFindings(noHead), ['kein Kopfskript waehlt die Hero-Aufnahme (window.YuvomiHero)']);
-  const drift = html.replace('data-sizes="(max-width: 467px)', 'data-sizes="(max-width: 468px)');
+  const drift = html.replace('data-sizes="(max-width: 569px)', 'data-sizes="(max-width: 570px)');
   assert.notEqual(drift, html);
   assert.ok(heroDeliveryFindings(drift).some((f) => /weichen ab/.test(f)));
   const renamed = html.replace('data-dark-m="screenshots/dashboard-dark-mobile.png"', 'data-dark-m="screenshots/home-dark-mobile.png"');
@@ -3853,7 +3853,7 @@ test('der Rhythmus-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const hit = (list, re) => list.some((l) => re.test(l));
   const swap = (page, from, to) => pages.map(([p, h]) => [p, p === page ? h.replace(from, to) : h]);
   // Die alte Galerie mit festem Desktop-Wert.
-  const fixed = swap('index.html', '.gallery { padding: var(--sec-m) 0; }', '.gallery { padding: 88px 0; }');
+  const fixed = swap('index.html', '.gallery { padding: var(--sec-s) 0; }', '.gallery { padding: 88px 0; }');
   assert.notDeepEqual(fixed, pages);
   assert.ok(hit(rhythmFindings(fixed, css, js), /index\.html: \.gallery \{ padding: 88px 0 \} - eigene Pixel/));
   // install.html mit der alten Telefon-Ueberschreibung.
@@ -4132,7 +4132,7 @@ test('index.html: die 2400er-Stufe erreicht nur Retina-Schirme, nach Breite gewa
 test('der Retina-Stufen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const html = read('index.html');
   // Ohne sizes-Grenze (100vw) wuerde ein 1920er-Schirm bei DPR 1 die 2400er-Datei ziehen.
-  const wide = html.replace('data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw"', 'data-sizes="100vw"');
+  const wide = html.replace('data-sizes="(max-width: 860px) 300px, (min-width: 1200px) 960px, 80vw"', 'data-sizes="100vw"');
   assert.notEqual(wide, html);
   assert.match(retinaTierFindings(wide, BUILD_WEBP()).join(), /bei DPR 1 laedt das die 2400er-Stufe/);
   // Dichte- statt Breiten-Deskriptor.
@@ -4302,4 +4302,62 @@ test('der CardDAV-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const install = read(INSTALL).replace('multi-account CalDAV (iCloud, Nextcloud, Radicale), contacts read in over CardDAV,', 'multi-account CalDAV/CardDAV (iCloud, Nextcloud, Radicale),');
   assert.notEqual(install, read(INSTALL));
   assert.match(carddavTwoWayFindings({ [INSTALL]: install }).join(), /pt_cal_desc \(en\)/);
+});
+
+// ── (27) Ausschnitte der Verbindungen (S3, Website-Critique 2026-10-30) ─────
+//
+// "Alles greift ineinander" zeigt je Verbindung zwei Ausschnitte aus
+// Telefonaufnahmen, gebaut von scripts/build-screenshot-crops.mjs nach
+// docs/screenshots[/<locale>]/crops/. Sie laufen nicht durch die Aufnahme-
+// Pipeline der Seite (data-light/PNG-Rueckfall), also haelt sie hier ein
+// eigener Guard: jeder Ausschnitt, den die Seite nennt, steht in der Tabelle
+// des Build-Skripts (sonst baut ihn nach dem naechsten Screenshot-Lauf
+// niemand neu und er zeigt still den alten Stand), und es gibt ihn in jedem
+// Sprachordner in beiden Themes und beiden Breiten - ein fehlender faellt im
+// Browser auf den englischen zurueck, der Fehler bliebe unsichtbar. Das
+// Markup traegt die englische helle Fassung mit Breiten-Deskriptoren.
+function cropFindings(html, build, exists) {
+  const found = [];
+  const table = new Set([...build.matchAll(/\{\s*name:\s*'([a-z0-9-]+)',\s*from:/g)].map((m) => m[1]));
+  const tags = [...maskNonMarkup(html).matchAll(/<img\b[^>]*\bdata-crop="([^"]+)"[^>]*>/g)];
+  if (!tags.length) return ['keine Ausschnitte (data-crop) auf der Seite - Muster veraltet?'];
+  for (const [tag, name] of tags) {
+    if (!table.has(name)) found.push(`${name}: steht nicht in CROPS (scripts/build-screenshot-crops.mjs)`);
+    const b = `screenshots/crops/${name}-light`;
+    if (!tag.includes(`src="${b}.webp"`) || !tag.includes(`srcset="${b}@1x.webp 320w, ${b}.webp 640w"`)) found.push(`${name}: src/srcset nicht die englische helle Fassung mit 320w/640w`);
+    if (!/\bloading="lazy"/.test(tag)) found.push(`${name}: nicht lazy - mit src im Markup holte der Browser die englische helle Fassung vor dem Tausch`);
+    for (const dir of localeDirs()) {
+      for (const theme of ['light', 'dark']) {
+        for (const suffix of ['.webp', '@1x.webp']) {
+          const rel = `${dir ? `${dir}/` : ''}crops/${name}-${theme}${suffix}`;
+          if (!exists(rel)) found.push(`screenshots/${rel} fehlt`);
+        }
+      }
+    }
+  }
+  return found;
+}
+
+const CROPS_BUILD = () => readFileSync(resolve(ROOT, 'scripts/build-screenshot-crops.mjs'), 'utf8');
+
+test('index.html: jeder Ausschnitt der Verbindungen ist gebaut, in jeder Sprache und jedem Theme', () => {
+  assert.deepEqual(cropFindings(read('index.html'), CROPS_BUILD(), (rel) => existsSync(resolve(SHOTS, rel))), []);
+});
+
+test('der Ausschnitt-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
+  const html = read('index.html');
+  const build = CROPS_BUILD();
+  const all = () => true;
+  // Eine Datei fehlt im deutschen Ordner.
+  assert.match(cropFindings(html, build, (rel) => rel !== 'de/crops/handoff-budget-dark@1x.webp').join(), /de\/crops\/handoff-budget-dark@1x\.webp fehlt/);
+  // Der Ausschnitt steht nicht mehr in der Tabelle des Build-Skripts.
+  const gone = build.replace("{ name: 'handoff-pantry',", "{ name: 'handoff-larder',");
+  assert.notEqual(gone, build);
+  assert.match(cropFindings(html, gone, all).join(), /handoff-pantry: steht nicht in CROPS/);
+  // Ohne lazy.
+  const eager = html.replace(/(data-crop="handoff-meals"[^>]*?) loading="lazy"/, '$1');
+  assert.notEqual(eager, html);
+  assert.match(cropFindings(eager, build, all).join(), /handoff-meals: nicht lazy/);
+  // Der Stand vor S3: keine Ausschnitte.
+  assert.deepEqual(cropFindings(read('index.html').replace(/data-crop=/g, 'data-x='), build, all), ['keine Ausschnitte (data-crop) auf der Seite - Muster veraltet?']);
 });

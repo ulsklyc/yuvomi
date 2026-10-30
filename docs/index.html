@@ -88,7 +88,10 @@
          mobile-lead 510/1020; die 2400er-Stufe nur per w-Deskriptor, damit ein
          DPR-1-Schirm bei 1400 bleibt und erst DPR 2 sie zieht); sizes misst den Rahmen (.hero-frame): bis 860px die
          Telefonspalte, hoechstens 418px, darueber die volle Spalte bis 1150px,
-         je mit 25px Rand. data-sizes am Bild sagt dasselbe (test:docs-landing). */
+         je mit 25px Rand. Seit S3 (Critique 2026-10-30) steht die Aufnahme in
+         einer Geraete-Buehne: am Schirm 72 % der Spalte (hoechstens 828px),
+         am Telefon 70 % einer hoechstens 520px breiten Buehne (364px).
+         data-sizes am Bild sagt dasselbe (test:docs-landing). */
       try {
         var n = matchMedia('(max-width: 860px)').matches,
           d = t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches),
@@ -96,7 +99,7 @@
           p = l === 'en' ? base : base.replace('screenshots/', 'screenshots/' + l + '/'),
           w = n ? [510, 1020] : [700, 1400, 2400],
           hero = { base: base, src: p.replace(/\.png$/, '.webp'),
-            sizes: '(max-width: 467px) calc(100vw - 50px), (max-width: 860px) 418px, (max-width: 1199px) calc(100vw - 50px), 1150px',
+            sizes: '(max-width: 569px) 70vw, (max-width: 860px) 364px, (max-width: 1199px) 68vw, 828px',
             srcset: p.replace(/\.png$/, '@1x.webp') + ' ' + w[0] + 'w, ' + p.replace(/\.png$/, '.webp') + ' ' + w[1] + 'w'
               + (w[2] ? ', ' + p.replace(/\.png$/, '@2400.webp') + ' ' + w[2] + 'w' : '') },
           k = document.createElement('link');
@@ -162,6 +165,14 @@
       --m-read: 780px;    /* Sektionskopf mit Fliesstextkoerper */
       --m-narrow: 640px;  /* zentrierter Kopf ohne Koerper */
       --m-prose: 52ch;    /* jeder Fliesstextabsatz - gemessen hoechstens 78 Zeichen, s.o. */
+      /* Geraeterahmen der Aufnahmen (S3, Critique 2026-10-30): der Label-Ton
+         der App (#1D1B17, tokens.css --neutral-900), in beiden Themes gleich -
+         ein Telefon wird im Dunkeln nicht hell. */
+      --bezel: #1D1B17;
+      /* Das Telefon als oberer Ausschnitt (Hero und Tagesablauf am Telefon):
+         dieselbe Breite wie --ar-phone, zwei Drittel der Hoehe, unten
+         ausgeblendet. Der volle Bildschirm stand dort 650-900px hoch. */
+      --ar-phone-peek: 1320 / 1900;
     }
 
     /* scroll-padding-bottom (was per Tab fokussiert wird, scrollt ueber das
@@ -342,25 +353,27 @@
     .cv-kept { content-visibility: visible; }
     /* Die Platzhalterhoehe gilt dem Inhalt, die Polsterung kommt dazu - also
        gemessene Hoehe minus beide Sektionsabstaende. */
-    .handoff { contain-intrinsic-block-size: auto calc(1250px - 2 * var(--sec-m)); }
-    /* S7 neu gemessen: Handoff ab 1100px 2x2 (949/1030), Katalog zugeklappt
-       (1208/1206, mobil 1556/1574). */
-    .showcase { contain-intrinsic-block-size: auto calc(1210px - 2px - 2 * var(--sec-s)); }
+    .handoff { contain-intrinsic-block-size: auto calc(1500px - 2 * var(--sec-s)); }
+    /* S3 neu gemessen (1440 / 390, en/de gemittelt): Verbindungen als Karten
+       mit Ausschnitten 1.051 (zwei Spalten am Tablet rund 1.500, Wischreihe
+       am Telefon 1.124), Katalog zugeklappt 1.119 / 1.467, Gehoert euch
+       815 / 1.334, Fragen als Zeilen 922 / 1.425, Einrichten 808 / 1.043,
+       Schluss 635 / 694. */
+    .showcase { contain-intrinsic-block-size: auto calc(1119px - 2px - 2 * var(--sec-s)); }
     @media (min-width: 1100px) {
-      .handoff { contain-intrinsic-block-size: auto calc(990px - 2 * var(--sec-m)); }
+      .handoff { contain-intrinsic-block-size: auto calc(1051px - 2 * var(--sec-s)); }
     }
-    /* S1 gemessen (1440, en/de gemittelt): Gehoert euch 810/837, Fragen als
-       Akkordeon 1.116, Einrichten verdichtet 828/882. */
-    .yours { contain-intrinsic-block-size: auto calc(825px - 2 * var(--sec-m)); }
-    .longevity { contain-intrinsic-block-size: auto calc(1115px - 2 * var(--sec-m)); }
-    .platforms { contain-intrinsic-block-size: auto calc(855px - 2 * var(--sec-m)); }
-    .cta { contain-intrinsic-block-size: auto calc(750px - 2 * var(--sec-l)); }
+    .yours { contain-intrinsic-block-size: auto calc(815px - 2 * var(--sec-s)); }
+    .longevity { contain-intrinsic-block-size: auto calc(922px - 2 * var(--sec-s)); }
+    .platforms { contain-intrinsic-block-size: auto calc(808px - 2 * var(--sec-s)); }
+    .cta { contain-intrinsic-block-size: auto calc(635px - 2 * var(--sec-m)); }
     @media (max-width: 860px) {
-      .handoff { contain-intrinsic-block-size: auto calc(1600px - 2 * var(--sec-m)); }
-      .showcase { contain-intrinsic-block-size: auto calc(1565px - 2px - 2 * var(--sec-s)); }
-      .yours { contain-intrinsic-block-size: auto calc(1275px - 2 * var(--sec-m)); }
-      .longevity { contain-intrinsic-block-size: auto calc(1725px - 2 * var(--sec-m)); }
-      .platforms { contain-intrinsic-block-size: auto calc(1075px - 2 * var(--sec-m)); }
+      .handoff { contain-intrinsic-block-size: auto calc(1124px - 2 * var(--sec-s)); }
+      .showcase { contain-intrinsic-block-size: auto calc(1467px - 2px - 2 * var(--sec-s)); }
+      .yours { contain-intrinsic-block-size: auto calc(1334px - 2 * var(--sec-s)); }
+      .longevity { contain-intrinsic-block-size: auto calc(1425px - 2 * var(--sec-s)); }
+      .platforms { contain-intrinsic-block-size: auto calc(1043px - 2 * var(--sec-s)); }
+      .cta { contain-intrinsic-block-size: auto calc(694px - 2 * var(--sec-m)); }
     }
 
     .eyebrow {
@@ -398,6 +411,21 @@
        zum Tag und zur Familie) und das Einrichten (Weg zum Schluss). */
     .sec-head.lead { max-width: var(--m-read); }
     .sec-head.lead .sec-title { font-size: clamp(2.3rem, 5.2vw, 3.9rem); }
+    /* Geteilter Kopf (S3, Critique 2026-10-30): am Schirm Titel links, Absatz
+       rechts auf der Grundlinie des Titels - wie die Kapitel der
+       Produktseiten. Untereinander kosteten Titel und Absatz rund 120px je
+       Kapitel, waehrend die rechte Haelfte der Spalte leer stand. */
+    @media (min-width: 961px) {
+      .sec-head.split { max-width: none; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+        column-gap: 56px; align-items: end; }
+      .sec-head.split .eyebrow { grid-column: 1; justify-self: start; }
+      .sec-head.split .sec-title { grid-column: 1; margin-bottom: 0; }
+      .sec-head.split .sec-desc { grid-column: 2; grid-row: 1 / span 2; }
+      /* Auch die zentrierten Koepfe (Problemblock, Katalog) teilen sich am
+         Schirm; geteilt steht alles buendig links, wie die Liste darunter. */
+      .sec-head.center.split { margin: 0; text-align: left; }
+      .sec-head.center.split .sec-desc { margin: 0; }
+    }
 
     /* ===== HERO ===== */
     /* Oben: Leiste plus ein Kapitelabstand (--sec-m, site.css). */
@@ -453,8 +481,6 @@
        Band - der Hero stapelte vorher sieben Elemente vor dem Produkt. */
     .hero-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
       gap: 6px 28px; margin-top: 18px; font-size: var(--fs-small); color: var(--text-2); }
-    /* Am Schirm ragt das Telefon (.hero-float) 28px unter die Aufnahme. */
-    @media (min-width: 861px) { .hero-note { margin-top: 44px; } }
     .hero-house { display: inline-flex; align-items: center; gap: 9px; text-align: left;
       font-weight: 500; line-height: 1.45; color: var(--text-1); }
     .hero-house .house-mark { width: 22px; height: 22px; }
@@ -462,51 +488,54 @@
     .house-mark circle:nth-child(2) { fill-opacity: 0.62; }
     .house-mark circle:nth-child(3) { fill-opacity: 0.44; }
 
-    /* Hero visual. Flach: die 3D-Kippung (rotateY/rotateX, beim Hover
-       geradegezogen) verzerrte ausgerechnet den Beleg, den das Bild liefern
-       soll, und bewegte sich unter dem Mauszeiger ohne Anlass. */
-    .hero-visual { position: relative; width: 100%; }
+    /* Drei Geraete, ein Zuhause (S3, Critique 2026-10-30). Vorher eine flache
+       1150px-Aufnahme (862px hoch) mit einem 220px-Telefon auf der
+       Seitenleiste; die Wand kam erst drei Sektionen spaeter. Jetzt die
+       Komposition einer Produktseite: hinten in der Mitte der Schirm (16:10 -
+       die Aufnahme ist 4:3 und verliert unten nur die Kartenreihe), davor
+       links das Wandtablet, rechts das Telefon, beide im Geraeterahmen
+       (--bezel) und ueber die Unterkante des Schirms hinaus. Das Telefon hat
+       24 % der Breite (bei 1152px 276px), damit eine Listenzeile der App
+       lesbar bleibt; die Buehne ist rund 600px hoch statt 890px. Flach, ohne
+       Kippung: die 3D-Kippung frueherer Runden verzerrte den Beleg. */
+    .hero-visual { position: relative; width: 100%; max-width: 1150px; padding-bottom: 7%; }
     .hero-frame {
+      position: relative; z-index: 1; width: 72%; margin: 0 auto; aspect-ratio: 16 / 10;
       border-radius: var(--r-xl); overflow: hidden; border: 1px solid var(--border);
-      box-shadow: var(--shadow-hero);
+      box-shadow: var(--shadow-hero); background: var(--surface);
     }
     /* Der Platz steht, bevor das Bild da ist: das LCP-Bild hat kein `src` im
        Markup (das Inline-Skript waehlt Theme, Sprache und Breite), die
        Attribute 1400x1050 sind das 4:3 der Desktopaufnahme. Unter 860px tauscht
        das Skript auf die Hochformat-Aufnahme; dort gilt --ar-phone (Regel
-       unten). Vorher standen 900x675 fuer beide, und das Telefon rechnete bis
-       zum Laden mit einem Querformat. */
+       unten). */
     .hero-frame img { width: 100%; height: auto; display: block; }
-    /* Mit der Aufnahme waechst das Telefon (bei 1.152px rund 220px statt 150px):
-       ein Fuenftel der Breite, damit es neben dem Dashboard ein zweites
-       Geraet bleibt und keine Briefmarke wird.
-       Links unten statt rechts (S6): rechts lag es genau auf der
-       Belohnungen-Karte des Dashboards, links liegt es auf dem unteren Teil
-       der Seitenleiste - Navigation, die schon oben zu sehen ist - und laesst
-       Familie, Geburtstage und Belohnungen frei. */
-    .hero-float {
-      position: absolute; bottom: -28px; left: -22px; width: clamp(150px, 19%, 230px);
-      border-radius: var(--r-phone); border: 4px solid var(--surface); box-shadow: var(--shadow-xl);
-      z-index: 2; overflow: hidden; background: var(--surface);
-    }
-    .hero-float img { width: 100%; display: block; aspect-ratio: var(--ar-phone); }
-    /* Der eine Signaturmoment der Seite (S3): die zwei Geraete der Collage
-       trennen sich, sobald der Hero den Bildschirm verlaesst. Das Dashboard
-       bleibt zurueck (+40px, ein Hauch kleiner), das Telefon davor zieht
-       schneller nach oben (-32px) - dieselbe Familie, zwei Bildschirme,
-       zwei Ebenen. Gebunden an die Scrollposition (view-timeline auf dem
-       unbewegten .hero-visual, Bereich `exit`), also beim Laden in Ruhe: das
-       LCP-Bild malt unbewegt. Nur `translate`/`scale`, nur ab 1025px
-       (darunter faellt das Telefon weg, und das Hochformat-Dashboard steht
-       knapp ueber dem Hero-Rand, den overflow:clip schneidet). Ohne scroll-getriebene Animationen steht
-       die Collage still - Schmuck bekommt keinen Ersatz per Skript. */
+    .hero-wall, .hero-float { position: absolute; bottom: 0; z-index: 2; overflow: hidden;
+      background: var(--bezel); border: 0 solid var(--bezel); box-shadow: var(--shadow-xl); }
+    /* Das Wandtablet zeigt nur seinen Inhalt: 16:10 von oben, die leere
+       untere Flaeche des Wand-Modus (gut ein Viertel) faellt weg. */
+    .hero-wall { left: 0; width: 34%; border-width: 9px; border-radius: 22px; }
+    .hero-wall img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top left; border-radius: 13px; }
+    .hero-float { right: 0; width: 24%; border-width: 7px; border-radius: var(--r-phone); }
+    .hero-float img { width: 100%; display: block; aspect-ratio: var(--ar-phone); border-radius: var(--r-phone-inset); }
+    /* Der eine Signaturmoment der Seite (S3 der Kette vom 24.10.): die
+       Geraete trennen sich, sobald der Hero den Bildschirm verlaesst. Der
+       Schirm bleibt zurueck (+40px, ein Hauch kleiner), Telefon und Tablet
+       ziehen verschieden schnell nach oben - dieselbe Familie, drei
+       Bildschirme, drei Ebenen. Gebunden an die Scrollposition (view-timeline
+       auf dem unbewegten .hero-visual, Bereich `exit`), also beim Laden in
+       Ruhe: das LCP-Bild malt unbewegt. Nur `translate`/`scale`, nur ab
+       1025px. Ohne scroll-getriebene Animationen steht die Buehne still -
+       Schmuck bekommt keinen Ersatz per Skript. */
     @media (prefers-reduced-motion: no-preference) and (min-width: 1025px) {
       @supports ((animation-timeline: view()) and (animation-range: entry)) {
         @keyframes hero-stay { to { translate: 0 40px; scale: 0.985; } }
         @keyframes hero-lift { to { translate: 0 -32px; } }
+        @keyframes hero-lift-s { to { translate: 0 -14px; } }
         .hero-visual { view-timeline: --hero-shot; }
-        .hero-frame, .hero-float { animation: hero-stay linear both; animation-timeline: --hero-shot; animation-range: exit 0% exit 100%; }
+        .hero-frame, .hero-float, .hero-wall { animation: hero-stay linear both; animation-timeline: --hero-shot; animation-range: exit 0% exit 100%; }
         .hero-float { animation-name: hero-lift; }
+        .hero-wall { animation-name: hero-lift-s; }
       }
     }
 
@@ -537,8 +566,11 @@
        caption does the selling, and the first readable screen lands inside the
        first 1500px instead of at 71% scroll depth. */
     /* Sektionsabstaende: die Skala --sec-s/-m/-l in site.css, fliessend vom
-       Telefon zum Schirm - keine Sektion schreibt mehr eigene Pixel. */
-    .gallery { padding: var(--sec-m) 0; }
+       Telefon zum Schirm - keine Sektion schreibt mehr eigene Pixel. Seit S3
+       (Critique 2026-10-30) stehen die Kapitel auf --sec-s und der Schluss
+       auf --sec-m: zehn Sektionen mit je zweimal 96px waren rund zwei
+       Bildschirme Leerraum, bei einem Ziel von neun Bildschirmen insgesamt. */
+    .gallery { padding: var(--sec-s) 0; }
     .gal-list { display: flex; flex-direction: column; gap: 56px; margin-top: 44px; }
     .gal-item { position: relative; }
     .gal-cap { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -561,15 +593,20 @@
       background: radial-gradient(closest-side, color-mix(in srgb, var(--m) 22%, transparent), transparent 72%);
       filter: blur(46px); opacity: 0.75;
     }
-    .gal-frame img {
-      width: 100%; aspect-ratio: 4 / 3; border-radius: var(--r-xl);
-      border: 1px solid var(--border); box-shadow: var(--shadow-xl);
+    /* Ein Ausschnitt statt der flachen Vollaufnahme (S3, Critique 2026-10-30):
+       der Rahmen ist 16:9, das Bild darin um 1,2 vergroessert und um die
+       Seitenleiste der App (knapp 17 % der Aufnahmebreite) nach links geschoben -
+       zu sehen ist die Arbeitsflaeche, ein Fuenftel groesser als vorher,
+       ohne die Navigation, die der Hero schon zeigt. */
+    .gal-crop { display: block; overflow: hidden; aspect-ratio: 16 / 9; border-radius: var(--r-xl);
+      border: 1px solid var(--border); box-shadow: var(--shadow-xl); background: var(--surface); }
+    .gal-frame img { display: block; width: 120%; max-width: none; height: auto; aspect-ratio: 4 / 3; translate: -16.8% 0; }
+    /* Am Schirm: Unterschrift links, Ausschnitt rechts - vorher stand die
+       Unterschrift darueber und das Bild 648px hoch in voller Spalte. */
+    @media (min-width: 861px) {
+      .gal-item { display: grid; grid-template-columns: minmax(0, 17rem) minmax(0, 1fr); gap: 44px; align-items: center; }
+      .gal-cap { flex-direction: column; align-items: flex-start; gap: 12px; margin: 0; }
     }
-    /* Der Wochenplan endet nach vier Mahlzeitenreihen bei rund 62 % der
-       Aufnahmehoehe; im 4:3-Rahmen war der Rest leere Flaeche. 16:9 von oben
-       zeigt dieselbe Woche ohne das leere Drittel (S6). Unter 860px gilt der
-       Telefonrahmen unten, dort ist die Hochkant-Aufnahme voll. */
-    .gal-frame--crop img { aspect-ratio: 16 / 9; object-fit: cover; object-position: top left; }
 
     /* ===== Ein Tag zu Hause (S1, 2026-10-30) =====
        Die segmentierte Steuerung der App (public/styles/panel.css .segmented):
@@ -636,9 +673,14 @@
     @media (max-width: 960px) {
       .swap-list { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
     }
+    /* Am Telefon bleiben es zwei Spalten (S3): der Halbsatz bricht in seiner
+       Spalte um, das Paar bleibt zweizeilig, und sechs Zeilen werden drei. */
     @media (max-width: 560px) {
-      .swap-list { grid-template-columns: minmax(0, 1fr); }
+      .swap-list { column-gap: 20px; }
       .swap-row { padding: 12px 2px; }
+    }
+    @media (max-width: 340px) {
+      .swap-list { grid-template-columns: minmax(0, 1fr); }
     }
 
     /* ===== Feature showcase (alternating) ===== */
@@ -647,85 +689,73 @@
        direction carries the meaning. The two module accents per row are the
        app's own colour vocabulary used literally - the module that produces the
        data on the left, the one that consumes it on the right. */
-    .handoff { padding: var(--sec-m) 0; }
+    .handoff { padding: var(--sec-s) 0; }
     /* Flush left, not centred: the head above it is a left-aligned chapter mark,
        and a centred 900px list under a 0-offset head reads as a 126px misprint. */
-    .ho-list { list-style: none; margin: 56px 0 0; max-width: var(--m-list); display: grid; gap: 0; }
-    .ho-row { padding: 30px 0; border-top: 1px solid var(--border); }
-    .ho-row:last-child { border-bottom: 1px solid var(--border); }
-    .ho-flow { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
-    .ho-step { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
-    .ho-ico { width: 42px; height: 42px; flex-shrink: 0; border-radius: var(--r-md); display: grid; place-items: center;
+    /* Karten ohne Kartenflaeche (S3, Critique 2026-10-30): jede Verbindung
+       ist eine Spalte - oben der Ausschnitt, wo etwas passiert, darunter der
+       Pfeil, dann der Ausschnitt, wo es ankommt, und die Erklaerung. Vorher
+       Wortpaare ohne Bild: die Philosophie stand nur im Satz. Vier Spalten am
+       Schirm, zwei am Tablet, am Telefon eine Wischreihe, in der die naechste
+       Karte anschneidet (untereinander waren es dort 1.600px). */
+    .ho-list { list-style: none; margin: 40px 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; }
+    .ho-row { padding-top: 22px; border-top: 1px solid var(--border); }
+    .ho-flow { display: flex; flex-direction: column; align-items: stretch; }
+    .ho-step { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .ho-shot { display: block; overflow: hidden; border-radius: var(--r-md); background: var(--surface);
+      border: 1px solid var(--border); box-shadow: var(--shadow-md); }
+    .ho-shot img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; }
+    .ho-cap { display: flex; align-items: center; gap: 10px; }
+    .ho-ico { width: 32px; height: 32px; flex-shrink: 0; border-radius: var(--r-sm); display: grid; place-items: center;
       color: var(--m); background: color-mix(in srgb, var(--m) 12%, transparent);
       border: 1px solid color-mix(in srgb, var(--m) 26%, transparent); }
-    .ho-ico svg { width: 21px; height: 21px; }
-    .ho-label { font-size: var(--fs-lead); font-weight: 650; letter-spacing: -0.015em;
+    .ho-ico svg { width: 17px; height: 17px; }
+    .ho-label { font-size: var(--fs-body); font-weight: 650; letter-spacing: -0.01em; line-height: 1.3;
       color: color-mix(in srgb, var(--m) var(--tint-ink), var(--text-1)); text-wrap: balance; }
-    .ho-arrow { color: var(--text-3, var(--text-2)); flex-shrink: 0; opacity: 0.55; }
-    .ho-arrow svg { width: 26px; height: 26px; display: block; }
-    /* Bildpaar je Verbindung (S1 vorbereitet, S3 fuellt): eine Zeile mit
-       <figure class="ho-media"> als letztem Kind wird zweispaltig, Text links,
-       zwei Ausschnitte rechts. Ohne Bildpaar bleibt alles wie es ist. */
-    .ho-row:has(> .ho-media) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 40px; align-items: center; }
-    .ho-row:has(> .ho-media) > .ho-media { grid-column: 2; grid-row: 1 / span 2; }
-    .ho-media { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; }
-    @media (max-width: 860px) {
-      .ho-row:has(> .ho-media) { grid-template-columns: minmax(0, 1fr); }
-      .ho-row:has(> .ho-media) > .ho-media { grid-column: auto; grid-row: auto; margin-top: 18px; }
+    .ho-arrow { align-self: center; color: var(--text-3, var(--text-2)); flex-shrink: 0; opacity: 0.55; margin: 8px 0 10px; }
+    .ho-arrow svg { width: 24px; height: 24px; display: block; rotate: 90deg; }
+    .ho-note { margin-top: 14px; font-size: var(--fs-small); color: var(--text-2); line-height: 1.55; max-width: var(--m-prose); }
+    @media (max-width: 1099px) {
+      .ho-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px 28px; }
     }
-    .ho-note { margin-top: 14px; margin-left: 54px; font-size: var(--fs-body); color: var(--text-2); line-height: 1.6; max-width: 62ch; }
-    /* Breiter Schirm (S7): die vier Zeilen als 2x2 ueber die volle Spalte.
-       Mit --m-list endete die Liste bei 1440px an x=1044, und rechts daneben
-       standen rund 400px leer unter einem Kopf, der die ganze Breite
-       ankuendigt. Jede Zeile bleibt eine gerichtete Folge von links nach
-       rechts; die Labels brechen dafuer in ihrer Spalte um, statt dass die
-       Folge auf zwei Zeilen faellt (die Bahn der Bewegung bliebe dann am
-       Pfeil haengen). Die Haarlinie unter der letzten Reihe tragen beide
-       Zellen. */
-    @media (min-width: 1100px) {
-      .ho-list { max-width: none; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 56px; }
-      .ho-row:nth-last-child(-n + 2) { border-bottom: 1px solid var(--border); }
-      .ho-flow { flex-wrap: nowrap; }
-      .ho-step { flex: 1 1 0; }
+    /* Die Wischreihe laeuft bis an den Bildschirmrand (die Spalte hat 24px
+       Polster), damit die angeschnittene Karte als "da geht es weiter" liest. */
+    @media (max-width: 700px) {
+      .ho-list { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: min(80%, 320px); gap: 16px;
+        overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: 24px;
+        margin: 32px -24px 0; padding: 0 24px 14px; scrollbar-width: thin; }
+      .ho-row { scroll-snap-align: start; }
     }
     /* Die eine erzaehlende Bewegung der Seite (Critique 2026-09-29): wird eine
-       Zeile zum ersten Mal sichtbar, wandert ein Punkt in der Farbe des
-       liefernden Moduls vom ersten zum zweiten Symbol, und das empfangende
-       Symbol nimmt ihn kurz auf - genau die Aussage der Zeile, als Weg statt als
-       Pfeil. Einmal je Zeile (ihr Observer gibt sie danach frei), nur
-       transform und opacity. Ohne JS, im Druck und bei reduzierter Bewegung
-       gibt es den Punkt nicht; die Zeile sagt dasselbe dann statisch.
-       Die Bahn liegt seit Runde 2 nur ueber dem Pfeil: vom Pfeilanfang bis
-       zur Mitte des empfangenden Symbols (steht das Ziel nach einem Umbruch
-       nicht auf der Pfeilachse, bis zur Pfeilspitze). Vorher lief der Punkt
-       von Symbol zu Symbol und damit quer ueber den ersten Labeltext. Start
-       (--ho-x/--ho-y, relativ zu .ho-flow) und Strecke (--ho-dx/--ho-dy)
-       misst das Skript beim Ausloesen; mobil laeuft sie senkrecht. */
+       Verbindung zum ersten Mal sichtbar, faehrt ein Punkt in der Farbe des
+       liefernden Moduls ueber den Pfeil zum zweiten Ausschnitt, und der nimmt
+       ihn kurz auf - die Aussage der Karte als Weg. Einmal je Karte (ihr
+       Observer gibt sie danach frei), nur transform und opacity. Ohne JS, im
+       Druck und bei reduzierter Bewegung gibt es den Punkt nicht; die Karte
+       sagt dasselbe dann statisch. Die Bahn beginnt am Pfeil und endet an der
+       Kante des empfangenden Ausschnitts - nie ueber einem Labeltext (bis
+       Runde 2 lief er quer durch das erste Label). Start (--ho-x/--ho-y,
+       relativ zu .ho-flow) und Strecke (--ho-dx/--ho-dy) misst das Skript
+       beim Ausloesen. */
     .ho-flow { position: relative; }
     .ho-token { display: none; }
     html.js .ho-token { display: block; position: absolute; left: var(--ho-x, 0px); top: var(--ho-y, 0px); z-index: 2;
       width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; pointer-events: none;
       background: var(--m); box-shadow: 0 0 0 3px color-mix(in srgb, var(--m) 24%, transparent); opacity: 0; }
     .ho-row.go .ho-token { animation: ho-travel .7s cubic-bezier(0.65, 0, 0.35, 1) calc(.25s + var(--ho-delay, 0s)) both; }
-    .ho-row.go .ho-step--to .ho-ico { animation: ho-receive .5s var(--ease-out) calc(.85s + var(--ho-delay, 0s)) both; }
+    .ho-row.go .ho-step--to .ho-shot { animation: ho-receive .6s var(--ease-out) calc(.85s + var(--ho-delay, 0s)) both; }
     @keyframes ho-travel {
       0%   { opacity: 0; transform: translate(0, 0) scale(.5); }
       16%  { opacity: 1; transform: translate(calc(var(--ho-dx, 0px) * .06), calc(var(--ho-dy, 0px) * .06)) scale(1); }
       84%  { opacity: 1; transform: translate(calc(var(--ho-dx, 0px) * .95), calc(var(--ho-dy, 0px) * .95)) scale(1); }
       100% { opacity: 0; transform: translate(var(--ho-dx, 0px), var(--ho-dy, 0px)) scale(.4); }
     }
+    /* Ankommen: der Ausschnitt hebt sich einen Hauch und traegt kurz einen
+       Ring in der Farbe des empfangenden Moduls. */
     @keyframes ho-receive {
-      0%   { transform: scale(1); }
-      40%  { transform: scale(1.14); }
-      100% { transform: scale(1); }
-    }
-    @media (max-width: 700px) {
-      .ho-list { margin-top: 36px; }
-      .ho-row { padding: 22px 0; }
-      .ho-flow { flex-direction: column; align-items: flex-start; gap: 10px; }
-      .ho-arrow { transform: rotate(90deg); margin-left: 8px; }
-      .ho-label { font-size: var(--fs-body); }
-      .ho-note { margin-left: 0; }
+      0%   { scale: 1; box-shadow: var(--shadow-md), 0 0 0 0 color-mix(in srgb, var(--m) 0%, transparent); }
+      40%  { scale: 1.02; box-shadow: var(--shadow-md), 0 0 0 4px color-mix(in srgb, var(--m) 32%, transparent); }
+      100% { scale: 1; box-shadow: var(--shadow-md), 0 0 0 0 color-mix(in srgb, var(--m) 0%, transparent); }
     }
 
     /* ===== Fuer die Familie =====
@@ -733,22 +763,11 @@
        Kapitelmarke wie Galerie, Handoffs und Longevity (Eyebrow, kursiver
        Titelteil); das Markenzeichen steht klein neben dem Kopf, die drei
        Momente darunter nebeneinander - drei gleichrangige Szenen, keine Liste. */
-    .family { padding: var(--sec-m) 0; }
-    .fam-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-      grid-template-areas: "head shot" "list list" "invite invite"; gap: 48px 56px; align-items: center; }
-    /* Rahmen wie die Galerie (Radius, Kante, Schatten, Hof in der Akzentfarbe),
-       aber OHNE deren Telefon-Tausch unter 860px: es gibt keine Telefon-
-       Variante, das Tablet bleibt quer. */
-    .fam-shot { grid-area: shot; position: relative; }
-    .fam-shot::before {
-      content: ''; position: absolute; inset: -8% 4%; z-index: -1; border-radius: 50%;
-      background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 20%, transparent), transparent 72%);
-      filter: blur(46px); opacity: 0.75;
-    }
-    .fam-shot img {
-      display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; border-radius: var(--r-xl);
-      border: 1px solid var(--border); box-shadow: var(--shadow-xl);
-    }
+    .family { padding: var(--sec-s) 0; }
+    /* Ohne eigenes Bild seit S3: das Wandtablet steht im Hero. Kopf, die drei
+       Momente, der Weg der Eingeladenen - untereinander, ohne Leerspalte. */
+    .fam-grid { display: grid; grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: "head" "list" "invite"; gap: 36px; }
     .fam-head { grid-area: head; }
     .fam-list { grid-area: list; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px;
       padding-top: 36px; border-top: 1px solid var(--border); }
@@ -777,13 +796,16 @@
       .fam-invited { grid-template-columns: minmax(0, 1fr); }
       .fam-steps { grid-template-columns: minmax(0, 1fr); gap: 12px; }
     }
-    @media (max-width: 860px) {
-      .fam-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "shot" "list" "invite"; gap: 32px; }
-      .fam-shot { max-width: 640px; }
+    /* Am Telefon eine Wischreihe wie die Verbindungen (S3): drei Momente
+       untereinander waren dort rund 750px. */
+    @media (max-width: 700px) {
+      .fam-list { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: min(82%, 320px); gap: 24px;
+        overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: 24px;
+        margin-inline: -24px; padding: 26px 24px 14px; scrollbar-width: thin; }
+      .fam-item { scroll-snap-align: start; }
     }
     @media (max-width: 600px) {
       .fam-grid { gap: 28px; }
-      .fam-shot img { border-radius: var(--r-lg); }
       .fam-item { grid-template-columns: 38px minmax(0, 1fr); gap: 13px; }
       .fam-ico { width: 38px; height: 38px; }
       .fam-ico svg { width: 19px; height: 19px; }
@@ -933,6 +955,13 @@
       html.js .mod-groups:not(.expanded) .mod-group-head { margin-bottom: 10px; }
       html.js .mod-groups.mod-groups:not(.expanded), html.js .mod-groups:not(.expanded) .mod-pair { gap: 28px 32px; }
     }
+    /* Zugeklappt am Telefon dichter (S3): die Namen sind keine Ziele, zwei
+       Spalten mit 52px-Zeilen machten den Katalog dort fast zwei Bildschirme. */
+    @media screen and (max-width: 600px) {
+      html.js .mod-groups:not(.expanded) .mod-group-body { row-gap: 0; }
+      html.js .mod-groups:not(.expanded) .feat-kicker, html.js .mod-groups:not(.expanded) .mod-card { padding: 4px 0; }
+      html.js .mod-groups.mod-groups:not(.expanded), html.js .mod-groups:not(.expanded) .mod-pair { gap: 20px 32px; }
+    }
     /* display: flex (nicht inline-flex): nur ein Block-Level-Element laesst
        sich mit margin: auto auf der Zeile zentrieren. */
     html.js .mod-toggle { display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -968,7 +997,7 @@
 
 
     /* ===== Platform / Install anywhere ===== */
-    .platforms { padding: var(--sec-m) 0; }
+    .platforms { padding: var(--sec-s) 0; }
         /* 190px liessen bei 1.152px nur fuenf Karten in die Reihe, die sechste stand
        allein darunter. 168px bringen alle sechs unter, auch bei 1.152px:
        6x168 + 5x16 = 1.088. */
@@ -1128,8 +1157,8 @@
        aussen). Das Padding stand noch auf
        `30px 0 8px` aus der Absatz-Fassung und gab der Sektion, die die Seite
        selbst als Entscheidungspunkt fuehrt, acht Pixel Luft nach unten. */
-    .longevity { padding: var(--sec-m) 0; }
-    .long-list { margin-top: 44px; display: grid; gap: 20px; }
+    .longevity { padding: var(--sec-s) 0; }
+    .long-list { margin-top: 32px; display: grid; gap: 0 48px; border-bottom: 1px solid var(--border); }
     /* Vier Karten untereinander liefen am Schirm ~1.450px; zwei mal zwei
        halbieren das, und jede Spalte liegt mit ~60 Zeichen im Lesemass.
        Darunter bleibt es die eine buendige Spalte (Regel darunter). */
@@ -1141,8 +1170,10 @@
        Karten 1152px, waehrend ihr dd bei --m-prose endet - dreimal gestapelt
        ~40% leere Flaeche rechts, ausgerechnet im emotionalen Kernmoment der
        Seite. Buendig unter der Kapitelmarke liest die Spalte als EIN Lauf. */
-    .long-item { max-width: var(--m-read); padding: 26px 28px; border-radius: var(--r-lg); background: var(--surface);
-      border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+    /* Zeilen statt Karten (S3, Critique 2026-10-30): Frage und Kernsatz
+       zwischen Haarlinien, wie die Liste in "Gehoert euch". Acht Karten mit
+       Flaeche, Kante und Schatten waren mobil zwei Bildschirme. */
+    .long-item { max-width: var(--m-read); padding: 18px 0 12px; border-top: 1px solid var(--border); }
     .long-item dt { font-size: var(--fs-lead); font-weight: 700; letter-spacing: -0.01em; margin-bottom: 9px; color: var(--text-1); }
     .long-item dd { margin: 0; max-width: var(--m-prose); font-size: var(--fs-body); color: var(--text-2); line-height: 1.65; }
     .long-item dd b { color: var(--text-1); font-weight: 650; }
@@ -1166,8 +1197,7 @@
       }
     }
     @media (max-width: 600px) {
-      .long-list { gap: 12px; }
-      .long-item { padding: 20px; }
+      .long-item { padding: 16px 0 10px; }
     }
 
 
@@ -1175,7 +1205,7 @@
        Kein Kartenraster: links die Kapitelmarke mit dem Lebenszeichen (Version,
        Datum, Changelog), rechts vier Aussagen als Liste mit Haarlinien - wie
        die Uebergaben, nicht wie ein Feature-Raster. */
-    .yours { padding: var(--sec-m) 0; }
+    .yours { padding: var(--sec-s) 0; }
     .yours-grid { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: 32px 72px; align-items: start; }
     .yours-list { display: grid; margin-top: 8px; }
     /* Am Schirm bleibt die Kapitelmarke stehen, waehrend die vier Aussagen
@@ -1194,7 +1224,7 @@
     }
 
     /* ===== CTA ===== */
-    .cta { padding: var(--sec-l) 0; }
+    .cta { padding: var(--sec-m) 0; }
     /* Was a full-bleed violet gradient covering 40% of the viewport (50% on a
        phone) on a page whose design system caps violet at 10%. Drenching the
        plate also forced its own text and button palette - white ink, a white
@@ -1211,14 +1241,14 @@
          (51.2px gegen 48px). Gegen die vier Kapitelmarken bleibt sie bewusst
          darunter (62.4px): die schliessen Kapitel, der CTA schliesst die Seite,
          und zwei Groessen fuer zwei Rollen sind eine Hierarchie. */
-    .cta-box { position: relative; overflow: hidden; text-align: center; border-radius: var(--r-2xl); padding: 68px 40px;
+    .cta-box { position: relative; overflow: hidden; text-align: center; border-radius: var(--r-2xl); padding: 52px 40px;
       background: color-mix(in srgb, var(--accent) 10%, var(--surface));
       border: 1px solid color-mix(in srgb, var(--accent) 80%, var(--border));
       box-shadow: var(--shadow-lg); }
     .cta-box::before { content: ''; position: absolute; inset: 0; pointer-events: none;
       background: radial-gradient(70% 100% at 50% -20%, var(--accent-glow), transparent 65%); }
     .cta-box > * { position: relative; z-index: 1; }
-    .cta-box .house-mark { display: block; width: 58px; height: 58px; margin: 0 auto 22px; }
+    .cta-box .house-mark { display: block; width: 48px; height: 48px; margin: 0 auto 18px; }
     .cta-box h2 { font-size: clamp(2.1rem, 4.6vw, 3.2rem); font-weight: 700; line-height: 1.08; letter-spacing: -0.035em; color: var(--text-1); margin-bottom: 14px; text-wrap: balance; }
     .cta-box h2 em { font-style: italic; font-weight: 600; color: var(--accent); }
     .cta-box p { color: var(--text-2); font-size: var(--fs-lead); max-width: 44ch; margin: 0 auto 32px; }
@@ -1259,30 +1289,34 @@
       .gal-list { gap: 44px; }
       .gal-cap { gap: 10px; margin-bottom: 12px; }
       /* applyShots() swaps in the phone capture at this width, so the frame has
-         to follow it: portrait ratio, phone-sized, and centred in the column. */
+         to follow it: a phone, top part only (--ar-phone-peek, S3), fading
+         into the page. The full capture stood 652px tall per moment. */
       /* object-fit gehoert zur erzwungenen Ratio dazu: die Regel unterstellt die
          Hochkant-Aufnahme, aber der JS-Tausch liefert sie erst nach dem Laden -
          bis dahin (oder wenn eine -m-Variante fehlt) steckt die 4:3-Aufnahme im
-         1320/2867-Rahmen und `fill` verzerrt sie auf 300x652. `cover` zeigt in
-         dem Fall den oberen Ausschnitt statt eines Zerrbilds. */
-      .gal-frame img { aspect-ratio: var(--ar-phone); max-width: 300px; margin: 0 auto;
-        object-fit: cover; object-position: top center;
-        border-radius: var(--r-phone); border-width: 4px; border-color: var(--surface); }
+         Telefonrahmen und `fill` verzerrt sie. `cover` zeigt in dem Fall den
+         oberen Ausschnitt statt eines Zerrbilds. */
+      .gal-crop { aspect-ratio: var(--ar-phone-peek); max-width: 300px; margin: 0 auto;
+        border: 6px solid var(--bezel); border-bottom: 0; border-radius: var(--r-phone) var(--r-phone) 0 0;
+        -webkit-mask-image: linear-gradient(#000 76%, transparent); mask-image: linear-gradient(#000 76%, transparent); }
+      .gal-frame img { width: 100%; translate: none; aspect-ratio: var(--ar-phone); object-fit: cover; object-position: top center; }
       .gal-frame::before { inset: -4% 14%; }
       /* Gleiche Schwelle wie der Bildtausch im Inline-Skript des Hero
          (max-width:860px). `cover` wie am Galerierahmen: kommt ohne JS die
          Querformat-PNG aus <noscript>, zeigt der Rahmen ihren oberen
          Ausschnitt statt eines Zerrbilds. */
       .hero-frame img { aspect-ratio: var(--ar-phone); object-fit: cover; object-position: top center; }
-      /* Hochformat: auf Telefonbreite gedeckelt, sonst liefe die Aufnahme am
-         Tablet ueber zwei Bildschirme. */
-      .hero-visual { max-width: 420px; }
-      /* Das Handy-Float verdeckte bei 390px rund 40% der Dashboard-Aufnahme,
-         und an der 420px-Hochformataufnahme (601-860px) lag es auf der
-         Familienkarte, egal auf welcher Seite. Neben einer Hochformat-
-         Aufnahme ist der eine Beweis mehr wert als die Collage. (Es zeigt
-         seit Runde 2 die Einkaufsliste; die Aufgaben-Ansicht traegt allein
-         die Planen-Karte.) */
+      /* Am Telefon (S3): die Uebersicht als Telefon rechts, oberer Ausschnitt
+         (--ar-phone-peek), unten in die Seite ausgeblendet; dahinter links
+         das Wandtablet. Vorher stand die volle Hochformat-Aufnahme 907px
+         hoch, fast der ganze erste Bildschirm. Das Einkaufs-Telefon faellt
+         weg - neben einem Telefon ist ein zweites keine Aussage. */
+      .hero-visual { max-width: 520px; padding-bottom: 0; }
+      .hero-frame { width: 70%; margin: 0 0 0 auto; aspect-ratio: var(--ar-phone-peek);
+        border: 7px solid var(--bezel); border-bottom: 0; border-radius: var(--r-phone) var(--r-phone) 0 0; box-shadow: var(--shadow-xl);
+        -webkit-mask-image: linear-gradient(#000 74%, transparent); mask-image: linear-gradient(#000 74%, transparent); }
+      .hero-wall { top: 15%; bottom: auto; width: 62%; z-index: 0; border-width: 6px; border-radius: 15px; }
+      .hero-wall img { border-radius: 9px; }
       .hero-float { display: none; }
     }
     @media (max-width: 600px) {
@@ -1355,7 +1389,7 @@
       /* Die Handoff-Bewegung ist Ortswechsel, also genau das, was hier
          wegfaellt: kein Wandern, kein Ankommen. Die Zeilen stehen statisch. */
       .ho-token { display: none !important; }
-      .ho-row.go .ho-step--to .ho-ico { animation: none !important; }
+      .ho-row.go .ho-step--to .ho-shot { animation: none !important; }
     }
 
     /* Print. Without this the page printed the reveal state it happened to be
@@ -1379,7 +1413,6 @@
       .hero, section { padding: 20px 0 !important; }
       .gal-item, .feat-row, .mod-card, .swap-row, .plat-card, .ho-row, .fam-item, .fam-invited { break-inside: avoid; }
       .mod-group-head { break-after: avoid; }
-      .fam-shot { break-inside: avoid; }
       /* Paper has no hover and no href, so external targets go inline. Internal
          anchors stay bare - "(#screens)" tells a reader nothing. */
       a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; word-break: break-all; }
@@ -1474,9 +1507,17 @@
              statt Dichte-Deskriptoren: mit "1x, 2x" nahm ein DPR-1-Schirm die
              700px-Datei fuer den 1150px-Rahmen, gemessen 0,61 der noetigen
              Pixel - genau der Fehler, den die Galerie schon behoben hatte. -->
-        <img class="sc" data-shot-profile="lead" data-light="screenshots/dashboard-light-web.png" data-dark="screenshots/dashboard-dark-web.png" data-light-m="screenshots/dashboard-light-mobile.png" data-dark-m="screenshots/dashboard-dark-mobile.png" data-sizes="(max-width: 467px) calc(100vw - 50px), (max-width: 860px) 418px, (max-width: 1199px) calc(100vw - 50px), 1150px" alt="Yuvomi overview showing what is on today for the whole family, with the family, birthday and reward cards below" data-alt-t="alt_hero" width="1400" height="1050" loading="eager" fetchpriority="high" decoding="async" id="heroShot">
+        <img class="sc" data-shot-profile="lead" data-light="screenshots/dashboard-light-web.png" data-dark="screenshots/dashboard-dark-web.png" data-light-m="screenshots/dashboard-light-mobile.png" data-dark-m="screenshots/dashboard-dark-mobile.png" data-sizes="(max-width: 569px) 70vw, (max-width: 860px) 364px, (max-width: 1199px) 68vw, 828px" alt="Yuvomi overview showing what is on today for the whole family, with the family, birthday and reward cards below" data-alt-t="alt_hero" width="1400" height="1050" loading="eager" fetchpriority="high" decoding="async" id="heroShot">
         <script>(function(i,H){if(!i)return;if(!H){i.src=i.dataset.light;return;}i.onerror=function(){i.onerror=null;i.srcset='';i.src=H.base;};i.sizes=H.sizes;i.srcset=H.srcset;i.src=H.src;})(document.getElementById('heroShot'),window.YuvomiHero);</script>
-        <noscript><img class="sc" src="screenshots/dashboard-light-web.png" srcset="screenshots/dashboard-light-web@1x.webp 700w, screenshots/dashboard-light-web.webp 1400w, screenshots/dashboard-light-web@2400.webp 2400w" sizes="(max-width: 1199px) calc(100vw - 50px), 1150px" alt="Yuvomi overview showing what is on today for the whole family, with the family, birthday and reward cards below" width="1400" height="1050"></noscript>
+        <noscript><img class="sc" src="screenshots/dashboard-light-web.png" srcset="screenshots/dashboard-light-web@1x.webp 700w, screenshots/dashboard-light-web.webp 1400w, screenshots/dashboard-light-web@2400.webp 2400w" sizes="(max-width: 1199px) 68vw, 828px" alt="Yuvomi overview showing what is on today for the whole family, with the family, birthday and reward cards below" width="1400" height="1050"></noscript>
+      </div>
+      <!-- Das Wandtablet (S3, Critique 2026-10-30): bis dahin das Bild der
+           Familien-Sektion, jetzt das dritte Geraet der Buehne. Jedes Motiv
+           einmal (test:docs-landing) - die Familie erzaehlt die Wand seitdem
+           in Worten, der Hero zeigt sie. -->
+      <div class="hero-wall">
+        <img class="sc" data-light="screenshots/dashboard-wall-light-web.png" data-dark="screenshots/dashboard-wall-dark-web.png" data-sizes="(max-width: 860px) 330px, 400px" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" data-alt-t="alt_fam_wall" loading="lazy" decoding="async" width="1400" height="1050">
+        <noscript><img class="sc" src="screenshots/dashboard-wall-light-web.png" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" loading="lazy" decoding="async" width="1400" height="1050"></noscript>
       </div>
       <!-- Einkaufsliste statt Aufgaben: dieselbe Aufgaben-Aufnahme traegt die
            Planen-Karte weiter unten, dort in lesbarer Groesse (Critique Runde 2).
@@ -1661,6 +1702,7 @@
       /* S1 (2026-10-30): Tagesablauf, Gehoert-euch-Block, Einrichten verdichtet. */
       jump_yours:'Yours to keep',
       day_aria:'Time of day', day_morning:'Morning', day_midday:'Midday', day_evening:'Evening',
+      ho_list_aria:'Four connections between the modules', fam_list_aria:'Three moments at home',
       gal_rew_k:'Rewards', gal_rew_c:'<b>Chores done, points earned, and everyone sees what they are saving for.</b> A parent approves each request, and the history shows who did what.',
       alt_gal_rew:'Yuvomi rewards with requests waiting for a parent’s approval, pocket money, each child’s points and a history of completed tasks',
       yours_eyebrow:'Yours to keep', yours_title:'It belongs to you, <em>not to us.</em>',
@@ -1795,6 +1837,7 @@
       /* S1 (2026-10-30): Tagesablauf, Gehoert-euch-Block, Einrichten verdichtet. */
       jump_yours:'Gehört euch',
       day_aria:'Tageszeit', day_morning:'Morgen', day_midday:'Mittag', day_evening:'Abend',
+      ho_list_aria:'Vier Verbindungen zwischen den Modulen', fam_list_aria:'Drei Momente zu Hause',
       gal_rew_k:'Belohnungen', gal_rew_c:'<b>Aufgaben erledigt, Punkte verdient, und alle sehen, worauf sie sparen.</b> Ein Elternteil gibt jede Anfrage frei, und der Verlauf zeigt, wer was gemacht hat.',
       alt_gal_rew:'Yuvomi-Belohnungen mit Anfragen, die auf die Freigabe der Eltern warten, Taschengeld, dem Punktestand jedes Kindes und dem Verlauf erledigter Aufgaben',
       yours_eyebrow:'Gehört euch', yours_title:'Es gehört euch, <em>nicht uns.</em>',
@@ -1940,7 +1983,7 @@
      Sektion. -->
 <section class="swap" id="swap">
   <div class="wrap">
-    <div class="sec-head center reveal">
+    <div class="sec-head center split reveal">
       <h2 class="sec-title" data-t="swap_title">Six apps, <em>and one person who remembers it all.</em></h2>
       <p class="sec-desc" data-t="swap_desc">Each with its own account and its own copy of your life on someone else’s server, and none knows what the others know. So someone at home keeps the connections in their head. Yuvomi takes that on, and every line below works today.</p>
     </div>
@@ -1958,28 +2001,30 @@
 
 <!-- ALLES GREIFT INEINANDER - seit S1 (Critique 2026-10-30) direkt hinter dem
      Problemblock: das Kernargument der Seite kam vorher als fuenfte Sektion,
-     hinter Galerie und Familie. Bildpaare je Verbindung: eine Zeile darf ein
-     <figure class="ho-media"> als letztes Kind tragen (zwei Ausschnitte, vorher
-     und nachher); die Zeile wird dann zweispaltig (CSS .ho-row:has(.ho-media)).
-     Gefuellt wird das in S3 aus den vorhandenen Aufnahmen. -->
+     hinter Galerie und Familie. Seit S3 traegt jede Verbindung zwei echte
+     Ausschnitte (.ho-shot): wo etwas passiert und wo es ankommt, gebaut von
+     scripts/build-screenshot-crops.mjs aus den Telefonaufnahmen. Alt-Text
+     leer: die Beschriftung darunter sagt, was der Ausschnitt zeigt. Am
+     Telefon eine Wischreihe; die Liste ist dafuer fokussierbar (tabindex),
+     damit sie auch per Tastatur scrollt. -->
 <section class="handoff" id="handoff">
   <div class="wrap">
-    <div class="sec-head lead reveal">
+    <div class="sec-head lead split reveal">
       <span class="eyebrow" data-t="ho_eyebrow">Why one app</span>
       <h2 class="sec-title" data-t="ho_title">Everything in it <em>works together.</em></h2>
       <p class="sec-desc" data-t="ho_desc">Separate apps cannot do this. What happens in one place shows up where it is needed next, with no retyping and nothing to remember. And one search finds it, in any module.</p>
     </div>
-    <ol class="ho-list">
+    <ol class="ho-list" tabindex="0" aria-label="Four connections between the modules" data-t-aria="ho_list_aria">
       <li class="ho-row reveal">
         <div class="ho-flow">
           <span class="ho-step" style="--m: var(--m-meals)">
-            <span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V2"/><line x1="5.5" y1="11" x2="5.5" y2="22"/><path d="M17 2a4 4 0 0 0-3 3.9V13h3v9"/></svg></span>
-            <span class="ho-label" data-t="ho_1_a">Meal plan for the week</span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-meals" src="screenshots/crops/handoff-meals-light.webp" srcset="screenshots/crops/handoff-meals-light@1x.webp 320w, screenshots/crops/handoff-meals-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-cap"><span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V2"/><line x1="5.5" y1="11" x2="5.5" y2="22"/><path d="M17 2a4 4 0 0 0-3 3.9V13h3v9"/></svg></span><span class="ho-label" data-t="ho_1_a">Meal plan for the week</span></span>
           </span>
           <span class="ho-arrow" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="14 7 19 12 14 17"/></svg></span>
           <span class="ho-step ho-step--to" style="--m: var(--m-shopping)">
-            <span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
-            <span class="ho-label" data-t="ho_1_b">Ingredients on the shopping list</span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-shopping-produce" src="screenshots/crops/handoff-shopping-produce-light.webp" srcset="screenshots/crops/handoff-shopping-produce-light@1x.webp 320w, screenshots/crops/handoff-shopping-produce-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-cap"><span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span><span class="ho-label" data-t="ho_1_b">Ingredients on the shopping list</span></span>
           </span>
         </div>
         <p class="ho-note" data-t="ho_1_d">One import sends every ingredient from the week's plan to the shared list, sorted by aisle, with the next seven days pre-selected. Nobody transcribes a recipe into a notes app again.</p>
@@ -1987,13 +2032,13 @@
       <li class="ho-row reveal">
         <div class="ho-flow">
           <span class="ho-step" style="--m: var(--m-tasks)">
-            <span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
-            <span class="ho-label" data-t="ho_2_a">A chore gets ticked off</span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-tasks" src="screenshots/crops/handoff-tasks-light.webp" srcset="screenshots/crops/handoff-tasks-light@1x.webp 320w, screenshots/crops/handoff-tasks-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-cap"><span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="ho-label" data-t="ho_2_a">A chore gets ticked off</span></span>
           </span>
           <span class="ho-arrow" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="14 7 19 12 14 17"/></svg></span>
           <span class="ho-step ho-step--to" style="--m: var(--m-rewards)">
-            <span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg></span>
-            <span class="ho-label" data-t="ho_2_b">Points land on your kid's balance</span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-rewards" src="screenshots/crops/handoff-rewards-light.webp" srcset="screenshots/crops/handoff-rewards-light@1x.webp 320w, screenshots/crops/handoff-rewards-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-cap"><span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg></span><span class="ho-label" data-t="ho_2_b">Points land on your kid's balance</span></span>
           </span>
         </div>
         <p class="ho-note" data-t="ho_2_d">Any task can carry points. They go to whoever did it - the assignee, or the person picked when it is ticked off - and buy rewards from a catalog you control.</p>
@@ -2001,13 +2046,13 @@
       <li class="ho-row reveal">
         <div class="ho-flow">
           <span class="ho-step" style="--m: var(--m-documents)">
-            <span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
-            <span class="ho-label" data-t="ho_3_a">A receipt gets filed</span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-documents" src="screenshots/crops/handoff-documents-light.webp" srcset="screenshots/crops/handoff-documents-light@1x.webp 320w, screenshots/crops/handoff-documents-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-cap"><span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span><span class="ho-label" data-t="ho_3_a">A receipt gets filed</span></span>
           </span>
           <span class="ho-arrow" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="14 7 19 12 14 17"/></svg></span>
           <span class="ho-step ho-step--to" style="--m: var(--m-budget)">
-            <span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></span>
-            <span class="ho-label" data-t="ho_3_b">It’s attached to the expense</span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-budget" src="screenshots/crops/handoff-budget-light.webp" srcset="screenshots/crops/handoff-budget-light@1x.webp 320w, screenshots/crops/handoff-budget-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-cap"><span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></span><span class="ho-label" data-t="ho_3_b">It’s attached to the expense</span></span>
           </span>
         </div>
         <p class="ho-note" data-t="ho_3_d">Attach it to the budget entry from the documents you already keep, or upload it on the spot. Filed once, findable from both sides.</p>
@@ -2019,13 +2064,13 @@
       <li class="ho-row reveal">
         <div class="ho-flow">
           <span class="ho-step" style="--m: var(--m-pantry)">
-            <span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3"/><path d="M4 8h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><line x1="10" y1="13" x2="14" y2="13"/></svg></span>
-            <span class="ho-label" data-t="ho_4_a">The last jar goes out of the pantry</span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-pantry" src="screenshots/crops/handoff-pantry-light.webp" srcset="screenshots/crops/handoff-pantry-light@1x.webp 320w, screenshots/crops/handoff-pantry-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-cap"><span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3"/><path d="M4 8h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><line x1="10" y1="13" x2="14" y2="13"/></svg></span><span class="ho-label" data-t="ho_4_a">The last jar goes out of the pantry</span></span>
           </span>
           <span class="ho-arrow" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="14 7 19 12 14 17"/></svg></span>
           <span class="ho-step ho-step--to" style="--m: var(--m-shopping)">
-            <span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
-            <span class="ho-label" data-t="ho_4_b">One tap puts it on the shopping list</span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-shopping-bakery" src="screenshots/crops/handoff-shopping-bakery-light.webp" srcset="screenshots/crops/handoff-shopping-bakery-light@1x.webp 320w, screenshots/crops/handoff-shopping-bakery-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-cap"><span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span><span class="ho-label" data-t="ho_4_b">One tap puts it on the shopping list</span></span>
           </span>
         </div>
         <p class="ho-note" data-t="ho_4_d">Pantry keeps amounts and best-before dates, and reminds you before something expires. What runs low or runs out goes onto the shared list from its row, and buying it books it back into stock. Household of five or household of one, the loop is the same.</p>
@@ -2048,12 +2093,13 @@
      (tablist/tab/tabpanel, Pfeiltasten, Pos1/Ende) und verbirgt die anderen
      Momente mit hidden="until-found", damit die Suche im Browser sie findet und
      aufklappt (beforematch); wo der Browser das nicht kennt, mit hidden.
-     Die drei Aufnahmen sind gleich geschnitten (16:9, .gal-frame--crop), damit
-     der Wechsel die Seite nicht verschiebt. Jedes Motiv steht nur hier
+     Die drei Aufnahmen sind gleich geschnitten (16:9, .gal-crop), damit
+     der Wechsel die Seite nicht verschiebt; am Schirm steht die Unterschrift
+     links daneben, am Telefon zeigt ein Telefonrahmen den oberen Teil. Jedes Motiv steht nur hier
      (test:docs-landing, "jedes Motiv einmal"). -->
 <section class="gallery" id="screens">
   <div class="wrap">
-    <div class="sec-head lead reveal">
+    <div class="sec-head lead split reveal">
       <span class="eyebrow" data-t="gal_eyebrow">A day at home</span>
       <h2 class="sec-title" data-t="gal_title">From breakfast to bedtime, <em>one plan.</em></h2>
       <p class="sec-desc" data-t="gal_desc">Real screens, no demo account. In the morning who has to be where, at midday what is on the table, in the evening who did what.</p>
@@ -2073,9 +2119,9 @@
           <span class="gal-kicker" data-t="gal_cal_k">Calendar</span>
           <p data-t="gal_cal_c"><b>Who has to be where, before anyone asks.</b> Google, iCloud and Nextcloud calendars in one view, synced both ways, and the whole day on a single timeline.</p>
         </figcaption>
-        <div class="gal-frame gal-frame--crop">
-          <img class="sc" data-shot-profile="lead" data-light="screenshots/calendar-light-web.png" data-light-m="screenshots/calendar-light-mobile.png" data-dark-m="screenshots/calendar-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/calendar-dark-web.png" alt="Yuvomi calendar showing appointments, tasks and birthdays for the whole household" data-alt-t="alt_c_cal" loading="lazy" decoding="async" width="900" height="675">
-          <noscript><img class="sc" src="screenshots/calendar-light-web.png" alt="Yuvomi calendar showing appointments, tasks and birthdays for the whole household" loading="lazy" decoding="async" width="900" height="675"></noscript>
+        <div class="gal-frame">
+          <span class="gal-crop"><img class="sc" data-shot-profile="lead" data-light="screenshots/calendar-light-web.png" data-light-m="screenshots/calendar-light-mobile.png" data-dark-m="screenshots/calendar-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1200px) 960px, 80vw" data-dark="screenshots/calendar-dark-web.png" alt="Yuvomi calendar showing appointments, tasks and birthdays for the whole household" data-alt-t="alt_c_cal" loading="lazy" decoding="async" width="900" height="675">
+          <noscript><img class="sc" src="screenshots/calendar-light-web.png" alt="Yuvomi calendar showing appointments, tasks and birthdays for the whole household" loading="lazy" decoding="async" width="900" height="675"></noscript></span>
         </div>
       </figure>
       </div>
@@ -2086,9 +2132,9 @@
           <span class="gal-kicker" data-t="gal_meals_k">Meals</span>
           <p data-t="gal_meals_c"><b>What is for dinner is already decided.</b> The whole week from breakfast to snacks, dragged into place and there for everyone at home.</p>
         </figcaption>
-        <div class="gal-frame gal-frame--crop">
-          <img class="sc" data-shot-profile="lead" data-light="screenshots/meals-light-web.png" data-light-m="screenshots/meals-light-mobile.png" data-dark-m="screenshots/meals-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/meals-dark-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" data-alt-t="alt_gal_meals" loading="lazy" decoding="async" width="900" height="675">
-          <noscript><img class="sc" src="screenshots/meals-light-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" loading="lazy" decoding="async" width="900" height="675"></noscript>
+        <div class="gal-frame">
+          <span class="gal-crop"><img class="sc" data-shot-profile="lead" data-light="screenshots/meals-light-web.png" data-light-m="screenshots/meals-light-mobile.png" data-dark-m="screenshots/meals-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1200px) 960px, 80vw" data-dark="screenshots/meals-dark-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" data-alt-t="alt_gal_meals" loading="lazy" decoding="async" width="900" height="675">
+          <noscript><img class="sc" src="screenshots/meals-light-web.png" alt="Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks" loading="lazy" decoding="async" width="900" height="675"></noscript></span>
         </div>
       </figure>
       </div>
@@ -2099,9 +2145,9 @@
           <span class="gal-kicker" data-t="gal_rew_k">Rewards</span>
           <p data-t="gal_rew_c"><b>Chores done, points earned, and everyone sees what they are saving for.</b> A parent approves each request, and the history shows who did what.</p>
         </figcaption>
-        <div class="gal-frame gal-frame--crop">
-          <img class="sc" data-shot-profile="lead" data-light="screenshots/rewards-light-web.png" data-light-m="screenshots/rewards-light-mobile.png" data-dark-m="screenshots/rewards-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1248px) 1152px, 92vw" data-dark="screenshots/rewards-dark-web.png" alt="Yuvomi rewards with requests waiting for a parent’s approval, pocket money, each child’s points and a history of completed tasks" data-alt-t="alt_gal_rew" loading="lazy" decoding="async" width="900" height="675">
-          <noscript><img class="sc" src="screenshots/rewards-light-web.png" alt="Yuvomi rewards with requests waiting for a parent’s approval, pocket money, each child’s points and a history of completed tasks" loading="lazy" decoding="async" width="900" height="675"></noscript>
+        <div class="gal-frame">
+          <span class="gal-crop"><img class="sc" data-shot-profile="lead" data-light="screenshots/rewards-light-web.png" data-light-m="screenshots/rewards-light-mobile.png" data-dark-m="screenshots/rewards-dark-mobile.png" data-sizes="(max-width: 860px) 300px, (min-width: 1200px) 960px, 80vw" data-dark="screenshots/rewards-dark-web.png" alt="Yuvomi rewards with requests waiting for a parent’s approval, pocket money, each child’s points and a history of completed tasks" data-alt-t="alt_gal_rew" loading="lazy" decoding="async" width="900" height="675">
+          <noscript><img class="sc" src="screenshots/rewards-light-web.png" alt="Yuvomi rewards with requests waiting for a parent’s approval, pocket money, each child’s points and a history of completed tasks" loading="lazy" decoding="async" width="900" height="675"></noscript></span>
         </div>
       </figure>
       </div>
@@ -2137,20 +2183,12 @@
 <section class="family" id="family">
   <div class="wrap">
     <div class="fam-grid">
-      <!-- Der Wand-Modus selbst, seit v2.70.0 aus der Aufnahme-Pipeline
-           (dashboard-wall-*-web, Tablet quer). Er ersetzt die Kreis-Grafik, die
-           bis dahin den Platz hielt. Nur eine Web-Variante: das Motiv IST das
-           Tablet, am Telefon bleibt es quer und stapelt unter dem Kopf. -->
-      <div class="fam-shot reveal">
-        <img class="sc" data-light="screenshots/dashboard-wall-light-web.png" data-dark="screenshots/dashboard-wall-dark-web.png" data-sizes="(max-width: 860px) 92vw, (min-width: 1248px) 600px, 50vw" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" data-alt-t="alt_fam_wall" loading="lazy" decoding="async" width="1400" height="1050">
-        <noscript><img class="sc" src="screenshots/dashboard-wall-light-web.png" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" loading="lazy" decoding="async" width="1400" height="1050"></noscript>
-      </div>
-      <div class="sec-head lead fam-head reveal">
+      <div class="sec-head lead split fam-head reveal">
         <span class="eyebrow" data-t="fam_eyebrow">For the family</span>
         <h2 class="sec-title" data-t="fam_title">On the kitchen wall, in every pocket, <em>for every age.</em></h2>
         <p class="sec-desc" data-t="fam_desc">Everyone at home gets their own account from a link and the app on their phone. Only the person who sets it up ever sees a server.</p>
       </div>
-      <ul class="fam-list">
+      <ul class="fam-list" tabindex="0" aria-label="Three moments at home" data-t-aria="fam_list_aria">
         <li class="fam-item reveal">
           <span class="fam-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="4.5" rx="2"/><line x1="18" x2="18.01" y1="12" y2="12"/></svg></span>
           <div class="fam-text">
@@ -2200,7 +2238,7 @@
 <!-- FEATURE SHOWCASE -->
 <section class="showcase" id="modules">
   <div class="wrap">
-    <div class="sec-head center reveal">
+    <div class="sec-head center split reveal">
       <h2 class="sec-title" data-t="feat_title">All of it, <em>and only what you use.</em></h2>
       <p class="sec-desc" data-t="feat_desc">Grouped the way the app groups them. Whatever your household does not need, an admin switches off for everyone, and it disappears from the menu. Missing something? Extension modules can be added.</p>
     </div>
@@ -2742,7 +2780,25 @@
       shotSrc(img, lang !== 'en' ? base.replace('screenshots/', 'screenshots/' + lang + '/') : base, base);
     });
   }
+  /* Ausschnitte (S3): eigene Dateien unter screenshots[/<lang>]/crops/,
+     WebP in 320/640px, gebaut von scripts/build-screenshot-crops.mjs. Das
+     Markup traegt die englische helle Fassung als src (lazy, also erst
+     geladen, wenn die Karte naht - bis dahin hat dieses Skript getauscht);
+     fehlt eine Sprachfassung, faellt sie auf die englische zurueck. */
+  function cropSrc(img, path, en){
+    img.onerror = function(){ img.onerror = null; if (path !== en) cropSrc(img, en, en); };
+    img.srcset = path + '@1x.webp 320w, ' + path + '.webp 640w';
+    img.src = path + '.webp';
+  }
+  function applyCrops(){
+    var t = isDark() ? 'dark' : 'light';
+    document.querySelectorAll('img[data-crop]').forEach(function(img){
+      var en = 'screenshots/crops/' + img.dataset.crop + '-' + t;
+      cropSrc(img, lang !== 'en' ? en.replace('screenshots/', 'screenshots/' + lang + '/') : en, en);
+    });
+  }
   narrowShots.addEventListener('change', applyShots);
+  document.addEventListener('yuvomi:theme', applyCrops);
   document.addEventListener('yuvomi:theme', applyShots);
   function applyLang(){
     document.documentElement.lang = lang;
@@ -2751,28 +2807,27 @@
     /* Fusszeile und "Gehoert euch" (S1) tragen dasselbe Datum. */
     [].forEach.call(document.querySelectorAll('[data-released]'), function(rel){ var rp = (rel.getAttribute('data-released') || '').split('-'); if (rp[0]) { rel.textContent = new Date(+rp[0], (+rp[1] || 1) - 1, +rp[2] || 1).toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }); } });
     applyShots();
+    applyCrops();
     /* Die deutsche Fassung ist laenger: alles, was Positionen cacht (Scroll-Spy),
        misst auf dieses Signal neu. */
     document.dispatchEvent(new Event('yuvomi:layout'));
   }
   document.getElementById('langBtn').onclick = function(){ lang = lang === 'en' ? 'de' : 'en'; lsSet('lang', lang); applyLang(); };
   /* Die Klasse `js` setzt das Kopfskript, vor dem ersten Bild. */
-  /* Bahn fuer die Handoff-Bewegung: vom Anfang des Pfeils zur Mitte des
-     empfangenden Symbols - nie ueber einen Labeltext (Runde 2: von Symbol zu
-     Symbol fuhr der Punkt quer durch das erste Label). Steht das Ziel nach
-     einem Umbruch nicht auf der Pfeilachse, endet die Bahn an der
-     Pfeilspitze. Gemessen im Moment des Reveals, weil die Lage an der
-     Sprache und am Umbruch haengt; die Reveal-Verschiebung trifft alle drei
-     Rechtecke gleich und faellt aus den Differenzen. */
+  /* Bahn fuer die Handoff-Bewegung (S3): vom Anfang des Pfeils bis an die
+     Kante des empfangenden Ausschnitts - nie ueber einen Labeltext (Runde 2:
+     von Symbol zu Symbol fuhr der Punkt quer durch das erste Label). Die
+     Karte steht senkrecht (Pfeil nach unten); stuende sie waagerecht, liefe
+     die Bahn auf der Pfeilachse. Gemessen im Moment des Reveals, weil die
+     Lage an der Sprache und am Umbruch haengt; die Reveal-Verschiebung trifft
+     alle Rechtecke gleich und faellt aus den Differenzen. */
   function measureHandoff(row){
-    var flow = row.querySelector('.ho-flow'), arrow = row.querySelector('.ho-flow > .ho-arrow'), to = row.querySelector('.ho-step--to .ho-ico');
+    var flow = row.querySelector('.ho-flow'), arrow = row.querySelector('.ho-flow > .ho-arrow'), to = row.querySelector('.ho-step--to .ho-shot');
     if (!flow || !arrow || !to) return;
     var f = flow.getBoundingClientRect(), a = arrow.getBoundingClientRect(), b = to.getBoundingClientRect();
     var down = getComputedStyle(flow).flexDirection === 'column';
     var x0 = down ? a.left + a.width / 2 : a.left, y0 = down ? a.top : a.top + a.height / 2;
-    var bx = b.left + b.width / 2, by = b.top + b.height / 2;
-    var onAxis = down ? Math.abs(bx - x0) < 4 : Math.abs(by - y0) < 4;
-    var x1 = onAxis ? bx : (down ? x0 : a.right), y1 = onAxis ? by : (down ? a.bottom : y0);
+    var x1 = down ? x0 : b.left + 4, y1 = down ? b.top + 4 : y0;
     row.style.setProperty('--ho-x', Math.round(x0 - f.left) + 'px');
     row.style.setProperty('--ho-y', Math.round(y0 - f.top) + 'px');
     row.style.setProperty('--ho-dx', Math.round(x1 - x0) + 'px');

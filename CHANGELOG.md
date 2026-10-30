@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   away, and the questions worth asking first open one answer at a time. The text is plainer in
   English and German, technical terms are explained where they appear, and the list of outbound
   connections now also names Gravatar profile pictures and installing extension modules from GitHub.
+  The screens are staged instead of pasted in: the top of the page shows the desktop, the kitchen
+  wall tablet and a phone together, each connection between two parts shows both ends as real
+  excerpts from the app, the day at home shows each moment as a focused crop, and the overview,
+  wall and health screenshots are current again. On a phone the page is nearly a third shorter.
 
 ### Fixed
 - **The website no longer says contacts sync both ways.** Contacts come in over CardDAV and are
