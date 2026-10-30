@@ -4131,7 +4131,12 @@
         "viewerNextNamed": "Next document: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" is empty",
         "viewerImageFallbackHint": "This image could not be displayed. Download it to open it.",
-        "moreDetailsHint": "Description and status"
+        "moreDetailsHint": "Description and status",
+        "subjectLabel": "About",
+        "subjectHint": "Doesn't change who can see the document.",
+        "subjectNoAccess": "{{name}} can't open this document and won't get a reminder for it.",
+        "personFilterLabel": "Person",
+        "personFilterAll": "All people"
     },
     "housekeeping": {
         "title": "Housekeeping",

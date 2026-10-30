@@ -4381,7 +4381,12 @@
         "viewerNextNamed": "Następny dokument: {{name}}",
         "emptyFolderTitle": "Folder „{{name}}” jest pusty",
         "viewerImageFallbackHint": "Nie udało się wyświetlić tego obrazu. Pobierz go, aby go otworzyć.",
-        "moreDetailsHint": "Opis i status"
+        "moreDetailsHint": "Opis i status",
+        "subjectLabel": "Dotyczy",
+        "subjectHint": "Nie zmienia, kto widzi dokument.",
+        "subjectNoAccess": "{{name}} nie może otworzyć tego dokumentu i nie otrzyma przypomnienia.",
+        "personFilterLabel": "Osoba",
+        "personFilterAll": "Wszystkie osoby"
     },
     "userMultiSelect": {
         "nobody": "Nikt",

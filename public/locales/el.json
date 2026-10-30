@@ -4069,7 +4069,12 @@
         "viewerNextNamed": "Επόμενο έγγραφο: {{name}}",
         "emptyFolderTitle": "Το «{{name}}» είναι κενό",
         "viewerImageFallbackHint": "Δεν ήταν δυνατή η προβολή αυτής της εικόνας. Κατεβάστε την για να την ανοίξετε.",
-        "moreDetailsHint": "Περιγραφή και κατάσταση"
+        "moreDetailsHint": "Περιγραφή και κατάσταση",
+        "subjectLabel": "Αφορά",
+        "subjectHint": "Δεν αλλάζει ποιος βλέπει το έγγραφο.",
+        "subjectNoAccess": "Ο/Η {{name}} δεν μπορεί να ανοίξει αυτό το έγγραφο και δεν θα λάβει υπενθύμιση.",
+        "personFilterLabel": "Άτομο",
+        "personFilterAll": "Όλα τα άτομα"
     },
     "shortcuts": {
         "goKitchen": "Κουζίνα",

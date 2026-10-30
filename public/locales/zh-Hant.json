@@ -4069,7 +4069,12 @@
         "viewerNextNamed": "下一個文件：{{name}}",
         "emptyFolderTitle": "「{{name}}」是空的",
         "viewerImageFallbackHint": "無法顯示此圖片。請下載後開啟。",
-        "moreDetailsHint": "說明與狀態"
+        "moreDetailsHint": "說明與狀態",
+        "subjectLabel": "涉及",
+        "subjectHint": "不會變更可查看文件的人。",
+        "subjectNoAccess": "{{name}} 無法開啟此文件，也不會收到提醒。",
+        "personFilterLabel": "人員",
+        "personFilterAll": "所有人員"
     },
     "shortcuts": {
         "goKitchen": "廚房",

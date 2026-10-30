@@ -4069,7 +4069,12 @@
         "viewerNextNamed": "अगला दस्तावेज़: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" खाली है",
         "viewerImageFallbackHint": "यह छवि प्रदर्शित नहीं की जा सकी। इसे खोलने के लिए डाउनलोड करें।",
-        "moreDetailsHint": "विवरण और स्थिति"
+        "moreDetailsHint": "विवरण और स्थिति",
+        "subjectLabel": "किसके बारे में",
+        "subjectHint": "इससे यह नहीं बदलता कि दस्तावेज़ कौन देख सकता है।",
+        "subjectNoAccess": "{{name}} यह दस्तावेज़ नहीं खोल सकते और उन्हें इसका अनुस्मारक नहीं मिलेगा।",
+        "personFilterLabel": "व्यक्ति",
+        "personFilterAll": "सभी लोग"
     },
     "shortcuts": {
         "goKitchen": "रसोई",

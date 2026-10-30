@@ -4131,7 +4131,12 @@
         "viewerNextNamed": "Tài liệu tiếp theo: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" đang trống",
         "viewerImageFallbackHint": "Không thể hiển thị hình ảnh này. Hãy tải xuống để mở.",
-        "moreDetailsHint": "Mô tả và trạng thái"
+        "moreDetailsHint": "Mô tả và trạng thái",
+        "subjectLabel": "Liên quan đến",
+        "subjectHint": "Không thay đổi người có thể xem tài liệu.",
+        "subjectNoAccess": "{{name}} không thể mở tài liệu này và sẽ không nhận được lời nhắc.",
+        "personFilterLabel": "Người",
+        "personFilterAll": "Tất cả mọi người"
     },
     "housekeeping": {
         "title": "Dọn dẹp",

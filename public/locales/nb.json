@@ -4131,7 +4131,12 @@
         "viewerNextNamed": "Neste dokument: {{name}}",
         "emptyFolderTitle": "«{{name}}» er tom",
         "viewerImageFallbackHint": "Dette bildet kunne ikke vises. Last det ned for å åpne det.",
-        "moreDetailsHint": "Beskrivelse og status"
+        "moreDetailsHint": "Beskrivelse og status",
+        "subjectLabel": "Gjelder",
+        "subjectHint": "Endrer ikke hvem som kan se dokumentet.",
+        "subjectNoAccess": "{{name}} kan ikke åpne dette dokumentet og får ingen påminnelse om det.",
+        "personFilterLabel": "Person",
+        "personFilterAll": "Alle personer"
     },
     "housekeeping": {
         "title": "Husarbeid",

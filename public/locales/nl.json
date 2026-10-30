@@ -4131,7 +4131,12 @@
         "viewerNextNamed": "Volgend document: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" is leeg",
         "viewerImageFallbackHint": "Deze afbeelding kon niet worden weergegeven. Download hem om hem te openen.",
-        "moreDetailsHint": "Beschrijving en status"
+        "moreDetailsHint": "Beschrijving en status",
+        "subjectLabel": "Betreft",
+        "subjectHint": "Verandert niet wie het document kan zien.",
+        "subjectNoAccess": "{{name}} kan dit document niet openen en krijgt er geen herinnering voor.",
+        "personFilterLabel": "Persoon",
+        "personFilterAll": "Alle personen"
     },
     "housekeeping": {
         "title": "Huishouden",

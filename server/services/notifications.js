@@ -504,7 +504,7 @@ export async function processDueNotifications({
   }
 
   const dueRows = activeDb.prepare(`
-    SELECT r.id, r.created_by, r.entity_type, r.entity_id, r.assigned_from,
+    SELECT r.id, r.created_by, r.entity_type, r.entity_id, r.remind_at, r.assigned_from,
       -- Sieht JEDER das Ziel dieser Zeile? Davon haengt ab, ob sie in einen
       -- Kanal des ganzen Haushalts darf (siehe die Kanalwahl in der Schleife).
       CASE WHEN ${reminderTargetPublicSql(activeDb, 'r')} THEN 1 ELSE 0 END AS target_public,
@@ -660,6 +660,25 @@ export async function processDueNotifications({
     }
   }
 
+  // EINE FRIST, EINE MELDUNG IM HAUSHALTSKANAL (#1705). Ein Dokument erinnert
+  // die Ablegende und die Person, um die es geht, mit je einer Zeile; beide
+  // Zeilen sehen denselben Haushaltskanal, und der hoerte die Frist doppelt.
+  // Gefragt wird nach den Zustellungen und nicht nur innerhalb dieses Laufs:
+  // eine Zeile kann spaeter dran sein, etwa nach der Rueckgabe eines Modulrechts.
+  function householdChannelHeardDocument(reminder, channel) {
+    if (reminder.entity_type !== 'document_expiry') return false;
+    return Boolean(activeDb.prepare(`
+      SELECT 1 FROM notification_deliveries nd
+      JOIN reminders sibling ON sibling.id = nd.reminder_id
+      WHERE nd.target_key = ?
+        AND sibling.entity_type = 'document_expiry'
+        AND sibling.entity_id = ?
+        AND sibling.remind_at = ?
+        AND sibling.id != ?
+      LIMIT 1
+    `).get(`channel:${channel.id}`, reminder.entity_id, reminder.remind_at, reminder.id));
+  }
+
   for (const reminder of due) {
     reminder.cycle_owner_name = cycleOwnerName(reminder);
     if (reminder.entity_type === 'shopping_move_returned') {
@@ -684,7 +703,8 @@ export async function processDueNotifications({
       // Allowlist: fuer eine nicht oeffentliche Zeile zaehlt nur ein Kanal, der
       // ausdruecklich der Person gehoert - ein Kanal ohne oder mit unbekanntem
       // `scope` gilt als Haushaltskanal.
-      .filter((channel) => reminder.target_public || channel.scope === 'user');
+      .filter((channel) => reminder.target_public || channel.scope === 'user')
+      .filter((channel) => channel.scope === 'user' || !householdChannelHeardDocument(reminder, channel));
     const pushCount = activeDb.prepare('SELECT COUNT(*) AS c FROM push_subscriptions WHERE user_id = ?').get(reminder.created_by).c;
     const targets = [];
     if (pushCount > 0) {

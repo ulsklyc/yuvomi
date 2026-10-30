@@ -4069,7 +4069,12 @@
         "viewerNextNamed": "Documento successivo: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" è vuota",
         "viewerImageFallbackHint": "Impossibile visualizzare questa immagine. Scaricala per aprirla.",
-        "moreDetailsHint": "Descrizione e stato"
+        "moreDetailsHint": "Descrizione e stato",
+        "subjectLabel": "Riguarda",
+        "subjectHint": "Non cambia chi può vedere il documento.",
+        "subjectNoAccess": "{{name}} non può aprire questo documento e non riceverà alcun promemoria.",
+        "personFilterLabel": "Persona",
+        "personFilterAll": "Tutte le persone"
     },
     "shortcuts": {
         "goKitchen": "Cucina",

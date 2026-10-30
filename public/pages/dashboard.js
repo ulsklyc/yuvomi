@@ -913,6 +913,11 @@ function setWeatherAvailability(res, prefs) {
   weatherAvailable = weatherAvailableFrom(res, prefs);
 }
 
+// Das Gegenstück zu `COUNTDOWN_SOURCES` in services/countdowns.js: die Herkunft
+// einer Zeile und das Modul, dem sie gehört. Daran hängen der Filter hier und
+// der Modulton der Zeile.
+const COUNTDOWN_MODULE = { event: 'calendar', task: 'tasks', document: 'documents' };
+
 // Aus welchem Modul ein Countdown stammt, entscheidet über ihn: wer den
 // Kalender abgeschaltet hat, soll dessen Einträge auch hier nicht sehen. Die
 // Kachel als Ganzes gehört keinem Modul (siehe PERMISSION_WIDGETS), ihre
@@ -926,10 +931,7 @@ function setWeatherAvailability(res, prefs) {
 // Stehen bleibt der Filter für den Fall, dass ein Modul umgeschaltet wird,
 // ohne dass das Dashboard neu lädt.
 function visibleCountdowns(items) {
-  return (Array.isArray(items) ? items : []).filter((c) => {
-    const mod = c.source === 'task' ? 'tasks' : 'calendar';
-    return !window.yuvomi?.isModuleDisabled(mod);
-  });
+  return (Array.isArray(items) ? items : []).filter((c) => !window.yuvomi?.isModuleDisabled(COUNTDOWN_MODULE[c.source]));
 }
 
 function isWidgetModuleEnabled(id) {
@@ -2343,29 +2345,34 @@ function renderCountdowns(allItems, size, total = null) {
     // Sagt der Zaehler rechts schon „Heute"/„Morgen", traegt die Zeile kein
     // zweites (#1454).
     const when = relativeDateLabel(c.date);
-    const meta = when && when !== label ? `<div class="list-row__meta countdown-item__meta">${esc(when)}</div>` : '';
+    // Die Person trennt zwei Reisepässe im Haushalt (#1705); sie steht mit dem
+    // Datum in der einen Metazeile, die feste Zeilenhöhe bleibt.
+    const metaText = [when && when !== label ? when : '', c.person_name || ''].filter(Boolean).join(' · ');
+    const meta = metaText ? `<div class="list-row__meta countdown-item__meta">${esc(metaText)}</div>` : '';
     // Die Farbe des Termins trägt die Zeile als schmale Marke - dieselbe
-    // Zuordnung, die er im Kalender hat. Eine Aufgabe hat keine, sie bekommt
-    // den Modulton.
+    // Zuordnung, die er im Kalender hat. Aufgaben und Dokumente haben keine, sie
+    // bekommen den Modulton.
     const accent = c.color
       ? ` style="--countdown-accent:${esc(c.color)}"`
-      : ` style="--countdown-accent:var(--module-${c.source === 'task' ? 'tasks' : 'calendar'}, var(--color-accent))"`;
+      : ` style="--countdown-accent:var(--module-${COUNTDOWN_MODULE[c.source]}, var(--color-accent))"`;
     /* DIE ZEILE TRIFFT IHR OBJEKT, nicht sein Modul - wie jede andere Zeile des
      * Dashboards. Sie führte auf `/tasks` bzw. `/calendar`, und damit landete
      * „Führerschein verlängern, ca. 3 Jahre" in einer ungefilterten Liste, in
      * der ein Eintrag von 2029 praktisch unauffindbar ist: die Zeile versprach
      * ein Objekt und lieferte ein Modul.
      *
-     * Zwei Wege, weil die beiden Quellen zwei Wege HABEN und keinen dritten
-     * brauchen: die Aufgabe hängt sich an denselben Quick-Action-Griff wie die
-     * Zeilen des Aufgaben-Widgets (`data-task-id`, ausgewertet in `wireLinks`),
-     * der Termin an dieselbe Deep-Link-Route wie die Zeilen des
-     * Kalender-Widgets. Wichtig ist dabei das Datum: `c.date` ist das NÄCHSTE
+     * Die Aufgabe hängt sich an denselben Quick-Action-Griff wie die Zeilen des
+     * Aufgaben-Widgets (`data-task-id`, ausgewertet in `wireLinks`), der Termin
+     * an dieselbe Deep-Link-Route wie die Zeilen des Kalender-Widgets, das
+     * Dokument an den Betrachter seiner Seite. Wichtig ist beim Termin das Datum: `c.date` ist das NÄCHSTE
      * Vorkommen, nicht der Serienstart - ohne es öffnete eine jährliche
      * Verlängerung ihr Blatt Jahre in der Vergangenheit. */
+    const route = c.source === 'document'
+      ? `/documents?open=${encodeURIComponent(String(c.id))}`
+      : `/calendar?open=${encodeURIComponent(String(c.id))}&date=${encodeURIComponent(c.date)}`;
     const anchor = c.source === 'task'
       ? ` data-task-id="${esc(String(c.id))}" data-task-title="${esc(c.title)}"`
-      : ` data-route="/calendar?open=${encodeURIComponent(String(c.id))}&date=${encodeURIComponent(c.date)}"`;
+      : ` data-route="${esc(route)}"`;
     return `
       <div class="list-row countdown-item" role="button" tabindex="0"${anchor}${accent}${fillRowAttr(index, cap)}>
         <span class="list-row__lead countdown-item__icon" aria-hidden="true">
@@ -2387,8 +2394,8 @@ function renderCountdowns(allItems, size, total = null) {
    * zurückfiel. Genau der Fehler, den der `sealSlug`-Parameter verhindern soll -
    * er war gesetzt, die Gegenseite im Stylesheet fehlte.
    *
-   * `dashboard` und nicht `calendar`, weil die Kachel zwei Quellen hat und
-   * keiner von beiden gehört; in der Messung kamen drei von fünf Zeilen aus den
+   * `dashboard` und nicht `calendar`, weil die Kachel mehrere Quellen hat und
+   * keiner von ihnen gehört; in der Messung kamen drei von fünf Zeilen aus den
    * Aufgaben. Dieselbe Antwort wie beim Wetter, das aus demselben Grund
    * `--module-dashboard` trägt: eine Kachel ohne Modul gehört der Seite. */
   /* WAS NICHT PASST, WIRD GENANNT. Die Kachel schnitt still ab - zweimal sogar:

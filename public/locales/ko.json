@@ -4131,7 +4131,12 @@
         "viewerNextNamed": "다음 문서: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" 폴더가 비어 있습니다",
         "viewerImageFallbackHint": "이 이미지를 표시할 수 없습니다. 다운로드하여 여세요.",
-        "moreDetailsHint": "설명 및 상태"
+        "moreDetailsHint": "설명 및 상태",
+        "subjectLabel": "대상",
+        "subjectHint": "문서를 볼 수 있는 사람은 바뀌지 않습니다.",
+        "subjectNoAccess": "{{name}}님은 이 문서를 열 수 없으므로 알림을 받지 않습니다.",
+        "personFilterLabel": "사람",
+        "personFilterAll": "모든 사람"
     },
     "userMultiSelect": {
         "nobody": "없음",

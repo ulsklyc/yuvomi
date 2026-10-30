@@ -4069,7 +4069,12 @@
         "viewerNextNamed": "次のドキュメント: {{name}}",
         "emptyFolderTitle": "「{{name}}」は空です",
         "viewerImageFallbackHint": "この画像を表示できませんでした。ダウンロードして開いてください。",
-        "moreDetailsHint": "説明とステータス"
+        "moreDetailsHint": "説明とステータス",
+        "subjectLabel": "対象者",
+        "subjectHint": "ドキュメントを閲覧できる人は変わりません。",
+        "subjectNoAccess": "{{name}}さんはこのドキュメントを開けないため、リマインダーは届きません。",
+        "personFilterLabel": "人",
+        "personFilterAll": "すべての人"
     },
     "shortcuts": {
         "goKitchen": "キッチン",

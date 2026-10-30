@@ -4319,7 +4319,12 @@
         "viewerNextNamed": "Наступний документ: {{name}}",
         "emptyFolderTitle": "Тека «{{name}}» порожня",
         "viewerImageFallbackHint": "Не вдалося показати це зображення. Завантажте його, щоб відкрити.",
-        "moreDetailsHint": "Опис і статус"
+        "moreDetailsHint": "Опис і статус",
+        "subjectLabel": "Стосується",
+        "subjectHint": "Не змінює, хто бачить документ.",
+        "subjectNoAccess": "{{name}} не може відкрити цей документ і не отримає нагадування.",
+        "personFilterLabel": "Особа",
+        "personFilterAll": "Усі особи"
     },
     "shortcuts": {
         "goKitchen": "Кухня",

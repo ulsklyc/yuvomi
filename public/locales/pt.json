@@ -4069,7 +4069,12 @@
         "viewerNextNamed": "Documento seguinte: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" está vazia",
         "viewerImageFallbackHint": "Não foi possível mostrar esta imagem. Transfira-a para a abrir.",
-        "moreDetailsHint": "Descrição e estado"
+        "moreDetailsHint": "Descrição e estado",
+        "subjectLabel": "Refere-se a",
+        "subjectHint": "Não altera quem pode ver o documento.",
+        "subjectNoAccess": "{{name}} não pode abrir este documento e não receberá um lembrete.",
+        "personFilterLabel": "Pessoa",
+        "personFilterAll": "Todas as pessoas"
     },
     "shortcuts": {
         "goKitchen": "Cozinha",

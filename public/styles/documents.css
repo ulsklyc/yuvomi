@@ -130,6 +130,13 @@
   border-inline-end: 1px solid var(--color-border);
 }
 
+/* Steht keine Frist daneben, traegt der Personenfilter die Haarlinie zu den
+ * Kategorien selbst. */
+.documents-filter-chips--person:not(:empty):has(+ .documents-filter-chips--deadlines:empty) {
+  padding-inline-end: var(--space-2);
+  border-inline-end: 1px solid var(--color-border);
+}
+
 /* Rand-Fade für horizontal scrollende Leisten (Kategorie-Chips + Ordner-Chips):
  * geteilte has-fade-*-Masken aus filter-chip.css, verdrahtet via wireScrollFade
  * (utils/ux.js, Audit F-06) — die frühere lokale is-scrollable/is-at-end-
@@ -1158,10 +1165,26 @@
   margin-top: var(--space-3);
 }
 
+.document-subject-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.document-subject-mark__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .document-form__hint {
   margin-top: var(--space-1);
   color: var(--color-text-tertiary);
   font-size: var(--type-caption);
+}
+
+.document-form__hint.form-hint--warning {
+  color: var(--color-warning-ink);
 }
 
 /* Folder upload stays within one form: the drop zone picks files, a secondary
@@ -1441,7 +1464,7 @@
     display: flex;
   }
 
-  .documents-folder-chip {
+  .documents-filters__chips .documents-folder-chip {
     flex-shrink: 0;
     max-inline-size: 16rem;
   }
@@ -2392,6 +2415,20 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* Die Person fiele neben dem Ablauf-Chip als ganzer Eintrag in die unsichtbare
+   * zweite Zeile, und zwei Reisepaesse saehen gleich aus. Sie steht deshalb mit
+   * einer kleinen Basis in Zeile eins und kuerzt ihren Namen; ihre Scheibe
+   * bleibt immer ganz zu sehen. */
+  .document-row__meta > .doc-badge + .document-subject-mark {
+    flex: 1 1 var(--space-6);
+  }
+}
+
+@container document-card (max-width: 20rem) {
+  .document-card__meta > .doc-badge + .document-subject-mark {
+    flex: 1 1 var(--space-6);
   }
 }
 

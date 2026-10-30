@@ -4131,7 +4131,12 @@
         "viewerNextNamed": "سند بعدی: {{name}}",
         "emptyFolderTitle": "«{{name}}» خالی است",
         "viewerImageFallbackHint": "نمایش این تصویر ممکن نشد. برای باز کردن، آن را دانلود کنید.",
-        "moreDetailsHint": "توضیحات و وضعیت"
+        "moreDetailsHint": "توضیحات و وضعیت",
+        "subjectLabel": "مربوط به",
+        "subjectHint": "تغییری در اینکه چه کسی سند را می‌بیند ایجاد نمی‌کند.",
+        "subjectNoAccess": "{{name}} نمی‌تواند این سند را باز کند و یادآوری برای آن دریافت نمی‌کند.",
+        "personFilterLabel": "شخص",
+        "personFilterAll": "همه افراد"
     },
     "userMultiSelect": {
         "nobody": "هیچ‌کس",

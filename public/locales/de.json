@@ -4131,7 +4131,12 @@
         "viewerNextNamed": "Nächstes Dokument: {{name}}",
         "emptyFolderTitle": "„{{name}}“ ist leer",
         "viewerImageFallbackHint": "Dieses Bild konnte nicht angezeigt werden. Lade es herunter, um es zu öffnen.",
-        "moreDetailsHint": "Beschreibung und Status"
+        "moreDetailsHint": "Beschreibung und Status",
+        "subjectLabel": "Betrifft",
+        "subjectHint": "Ändert nicht, wer das Dokument sieht.",
+        "subjectNoAccess": "{{name}} kann dieses Dokument nicht öffnen und bekommt keine Erinnerung dazu.",
+        "personFilterLabel": "Person",
+        "personFilterAll": "Alle Personen"
     },
     "userMultiSelect": {
         "nobody": "Niemand",

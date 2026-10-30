@@ -26,14 +26,15 @@ import { rowActionHtml } from '/utils/row-action.js';
 // dann nicht (utils/household.js). Das Feld bleibt im DOM und behaelt seinen
 // Wert, es ist nur `hidden`: der Absende-Pfad liest es unveraendert, und kommt
 // ein zweites Mitglied dazu, steht es wieder da.
-import { hidesPrivacyControls } from '/utils/household.js';
+import { hidesPrivacyControls, isSoloHousehold } from '/utils/household.js';
 import { withChosenPeople } from '/utils/people-picker.js';
+import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { maxUploadBytes } from '/utils/upload-limit.js';
 import { holdDocumentAttachStyle } from '/components/document-attach.js';
 import { mountEmptyState, mountSearchEmpty } from '/utils/empty-state.js';
 import { subtreeIds, folderPath, flattenFolderTree } from '/utils/folder-tree.js';
 import { dateStatus } from '/utils/date-status.js';
-import { expiryChipSpec, expiryViewerSpec } from '/utils/document-expiry.js';
+import { documentExpiryStatus, expiryChipSpec, expiryViewerSpec } from '/utils/document-expiry.js';
 import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { createPageController } from '/utils/page-lifecycle.js';
@@ -79,6 +80,9 @@ import {
   scheduleFolderDeleteWithUndo,
 } from '/utils/document-folder-delete.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+
+// Das Eingabefeld der Personenauswahl im Dialog (#1705).
+const SUBJECT_INPUT = 'document_subject';
 
 // Warum Teilen fuer ein Dokument nicht geht - je Antwort von fileShareSupport()
 // genau EIN Satz, der die zutreffende Ursache nennt (Re-Critique 2026-09-25).
@@ -274,6 +278,8 @@ let state = {
   // wie Kategorie/Ordner, rein clientseitig ueber state.allDocuments, kein
   // eigener Roundtrip.
   expiringSoon: false,
+  // Die Person, nach der gefiltert wird (#1705): eine id oder ''.
+  personId: '',
   folderId: '',
   // `query` ist die Vergleichsform (normalizeDocumentQuery), `queryText` die
   // Eingabe, wie sie getippt wurde - die Leermeldung zitiert die Eingabe.
@@ -443,6 +449,7 @@ export async function render(container, context = {}) {
             <span class="documents-folder-chip__facet" id="documents-folder-chip-facet"></span>
             <i data-lucide="chevron-down" aria-hidden="true" class="icon-sm documents-folder-browser__chevron"></i>
           </button>
+          <div class="documents-filter-chips documents-filter-chips--person" id="documents-person-filter"></div>
           <div class="documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterGroupLabel')}"></div>
           <div class="documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryFilterLabel')}"></div>
         </div>
@@ -515,14 +522,31 @@ export async function render(container, context = {}) {
   bindPageEvents();
   renderCategoryChips();
   renderExpiringChip();
+  renderPersonChip();
   renderFolderBrowser();
   renderCategoryBrowser();
   renderDocuments();
+  openLinkedDocument();
+}
+
+/**
+ * Deep-Link `?open=<id>`: die Zeile eines Dokuments in der Kachel Stichtage
+ * nennt ein Objekt, also trifft sie dieses Objekt und nicht das Modul (#1705,
+ * dieselbe Regel wie bei Terminen und Aufgaben dort). Geladen ist der aktive
+ * Bestand, und nur der steht in der Kachel. Ein Dokument, das es nicht (mehr)
+ * gibt oder das fremd ist, oeffnet still nichts: die Seite steht ohnehin da.
+ */
+function openLinkedDocument() {
+  const id = Number(new URLSearchParams(window.location.search).get('open'));
+  if (!id) return;
+  const doc = state.allDocuments.find((entry) => entry.id === id);
+  if (doc) openDocumentViewer(doc);
 }
 
 // Alle abhängigen Flächen nach einer Datenänderung neu zeichnen. Die Facetten-
 // Zähler (Kategorie + Ordner) hängen voneinander ab, deshalb nie einzeln aufrufen.
 function renderAll({ motion = false } = {}) {
+  renderPersonChip();
   renderCategoryChips();
   renderExpiringChip();
   renderFolderBrowser();
@@ -670,8 +694,17 @@ function matchesFolder(doc) {
 
 /** Laeuft der Ablauf bald ab oder ist er schon vorbei? Kein Ablaufdatum heisst nein. */
 function isExpiringOrOverdue(doc) {
-  const status = dateStatus(doc.expires_at);
+  const status = expiryStatusOf(doc);
   return !!status && status.state !== 'valid';
+}
+
+/** Der Ablauf-Status mit dem Vorlauf dieses Dokuments: ein Tag fuer Chip, Filter, Erinnerung und Kachel. */
+function expiryStatusOf(doc) {
+  return documentExpiryStatus(dateStatus(doc.expires_at), doc);
+}
+
+function matchesPerson(doc) {
+  return !state.personId || doc.subject_user_id === state.personId;
 }
 
 function matchesExpiringSoon(doc) {
@@ -679,7 +712,7 @@ function matchesExpiringSoon(doc) {
 }
 
 function expiringCount() {
-  return state.allDocuments.filter((doc) => matchesCategory(doc) && matchesFolder(doc)
+  return state.allDocuments.filter((doc) => matchesCategory(doc) && matchesFolder(doc) && matchesPerson(doc)
     && matchesDocumentQuery(doc, state.query) && isExpiringOrOverdue(doc)).length;
 }
 
@@ -689,7 +722,7 @@ function sortDocuments(docs) {
 
 function applyFilters() {
   state.documents = sortDocuments(
-    state.allDocuments.filter((doc) => matchesCategory(doc) && matchesFolder(doc) && matchesExpiringSoon(doc)),
+    state.allDocuments.filter((doc) => matchesCategory(doc) && matchesFolder(doc) && matchesPerson(doc) && matchesExpiringSoon(doc)),
   );
 }
 
@@ -876,6 +909,7 @@ function bindToolsMenu() {
  * Chips, und ohne sie blieben ihre Zahlen beim Suchen stehen (Codex zu #2142).
  */
 function renderFacets() {
+  renderPersonChip();
   renderCategoryChips();
   renderExpiringChip();
   renderFolderBrowser();
@@ -925,6 +959,15 @@ function bindPageEvents() {
     state.expiringSoon = !state.expiringSoon;
     applyFilters();
     renderAll();
+  });
+  _container.querySelector('#documents-person-filter')?.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-person-choice]');
+    if (!item) return;
+    state.personId = Number(item.dataset.personChoice) || '';
+    applyFilters();
+    renderAll();
+    // Der Ausloeser wurde neu gezeichnet; das Menue gaebe den Fokus sonst an nichts zurueck.
+    _container.querySelector('#documents-person-filter .filter-chip')?.focus();
   });
   // Rand-Fade der Chip-Spur: geteiltes Utility (Audit F-06), deckt auch Resize
   // und Re-Render ab.
@@ -1087,6 +1130,7 @@ function resetFilters() {
   state.category = '';
   state.folderId = '';
   state.expiringSoon = false;
+  state.personId = '';
   applyFilters();
   renderAll();
 }
@@ -1129,7 +1173,7 @@ function showDocumentsLoading() {
 }
 
 function hasActiveFilter() {
-  return Boolean(state.category) || Boolean(state.folderId) || state.expiringSoon;
+  return Boolean(state.category) || Boolean(state.folderId) || state.expiringSoon || Boolean(state.personId);
 }
 
 // Vier unterscheidbare Leerzustände statt einem. Der alte Einheitszustand
@@ -1199,7 +1243,7 @@ function emptyStateFor() {
   // ab") ist ein Ort: er ist leer, und der Weg ist das Hochladen hierher
   // (openDocumentModal waehlt den offenen Ordner vor). Sekundaer, denn der
   // FAB daneben ist die Primaeraktion (Komponenten-Kanon D5).
-  const folderOnly = Number(state.folderId) > 0 && !state.category && !state.expiringSoon;
+  const folderOnly = Number(state.folderId) > 0 && !state.category && !state.expiringSoon && !state.personId;
   if (folderOnly) {
     const folder = state.folders.find((f) => Number(f.id) === Number(state.folderId));
     return {
@@ -1487,12 +1531,68 @@ function renderExpiringChip() {
   const count = expiringCount();
   host.replaceChildren();
   // Sichtbar nach Bestand, gezaehlt unter der Suche - wie die Kategorien.
-  const present = state.allDocuments.some((doc) => matchesCategory(doc) && matchesFolder(doc) && isExpiringOrOverdue(doc));
+  const present = state.allDocuments.some((doc) => matchesCategory(doc) && matchesFolder(doc) && matchesPerson(doc) && isExpiringOrOverdue(doc));
   if (!present && !state.expiringSoon) return;
   host.insertAdjacentHTML('beforeend', `
     <button type="button" class="filter-chip filter-chip--sm${state.expiringSoon ? ' filter-chip--active' : ''}" data-expiring-toggle aria-pressed="${state.expiringSoon}" title="${t('documents.expiringFilterGroupLabel')}">
       <i data-lucide="calendar-clock" class="icon-md" aria-hidden="true"></i>${t('documents.expiringFilterLabel')}<span class="filter-chip__count">${count}</span>
     </button>
+  `);
+  if (window.lucide) lucide.createIcons({ el: host });
+}
+
+/** Die Personen, die im geladenen Bestand vorkommen, in der Haushaltsreihenfolge. */
+function subjectPeople() {
+  const people = new Map();
+  for (const doc of state.allDocuments) {
+    const person = documentSubject(doc);
+    if (person && !people.has(person.id)) people.set(person.id, person);
+  }
+  const rank = (person) => {
+    const index = state.members.findIndex((member) => member.id === person.id);
+    return index === -1 ? state.members.length : index;
+  };
+  return [...people.values()].sort((a, b) => rank(a) - rank(b));
+}
+
+/**
+ * Der Personenfilter (#1705): EIN Chip mit Menue statt je Person ein Chip. Mit
+ * fuenf Personen liefe die Spur auf dem Telefon sonst aus dem Bild, bevor die
+ * erste Kategorie kommt. Sichtbar nach Bestand, wie Fristen und Kategorien; die
+ * gewaehlte Person bleibt stehen, auch wenn sie im Archiv nicht vorkommt, sonst
+ * gaebe es keinen Weg zurueck.
+ */
+function renderPersonChip() {
+  const host = _container?.querySelector('#documents-person-filter');
+  if (!host) return;
+  host.replaceChildren();
+  const people = subjectPeople();
+  if (!people.length && !state.personId) return;
+  if (state.personId && !people.some((person) => person.id === state.personId)) {
+    const member = state.members.find((person) => person.id === state.personId);
+    if (member) people.push(member);
+  }
+  const chosen = people.find((person) => person.id === state.personId) ?? null;
+  const label = t('documents.personFilterLabel');
+  const check = (on) => `<i data-lucide="check" class="icon-md popover-menu__item-check${on ? '' : ' popover-menu__item-check--hidden'}" aria-hidden="true"></i>`;
+  const item = (id, text, on) => `
+    <button type="button" role="menuitemradio" aria-checked="${on}" class="popover-menu__item" data-person-choice="${id}">
+      ${check(on)}<span>${esc(text)}</span>
+    </button>`;
+  host.insertAdjacentHTML('beforeend', `
+    <button type="button" class="filter-chip filter-chip--sm popover-menu__trigger${chosen ? ' filter-chip--active' : ''}"
+            popovertarget="documents-person-menu" aria-haspopup="menu" aria-expanded="false"
+            aria-label="${esc(chosen ? `${label}: ${chosen.display_name}` : label)}">
+      ${chosen
+        ? `<span aria-hidden="true">${renderAvatarStack([chosen], { size: 20, maxVisible: 1 })}</span>`
+        : '<i data-lucide="user-round" class="icon-md" aria-hidden="true"></i>'}
+      <span>${esc(chosen?.display_name ?? label)}</span>
+      <i data-lucide="chevron-down" class="icon-sm" aria-hidden="true"></i>
+    </button>
+    <div class="popover-menu" id="documents-person-menu" popover role="menu" aria-label="${esc(label)}">
+      ${item('', t('documents.personFilterAll'), !chosen)}
+      ${people.map((person) => item(person.id, person.display_name, person.id === state.personId)).join('')}
+    </div>
   `);
   if (window.lucide) lucide.createIcons({ el: host });
 }
@@ -2018,9 +2118,11 @@ function renderMeta(doc, { showSize = true, stats = '' } = {}) {
   // .document-row__meta) - als letztes Element war "Laeuft in 5 Tagen ab"
   // bei 375px 0px sichtbar, genau die Angabe, die Handeln verlangt. Die
   // Reihenfolge ist damit die Rangfolge: Ablauf, Art, Ablageort, Sichtbarkeit -
-  // letztere nur, wenn sie vom Standard abweicht (showsVisibility).
+  // letztere nur, wenn sie vom Standard abweicht (showsVisibility). Die Person
+  // (#1705) folgt dem Ablauf: "Reisepass, John" ist die Angabe, die Zeilen trennt.
   return `
     ${expiryChipHtml(doc)}
+    ${subjectMetaHtml(doc)}
     ${stats}
     <span><i data-lucide="${CATEGORY_ICONS[doc.category] || 'folder'}" aria-hidden="true"></i>${categoryLabel}</span>
     ${folderChip ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
@@ -2186,7 +2288,7 @@ function uploadTargetIcon(backend) {
  * fuer Screenreader im Text und fuer den Zeiger im title (documents.css,
  * .doc-badge__full). */
 function expiryChipHtml(doc) {
-  const spec = expiryChipSpec(dateStatus(doc.expires_at));
+  const spec = expiryChipSpec(expiryStatusOf(doc));
   if (!spec) return '';
   const full = esc(t(spec.key, spec.params));
   const short = esc(t(spec.shortKey, spec.params));
@@ -2202,13 +2304,34 @@ function expiryChipHtml(doc) {
  * nach Zone auf den Vortag kippt; das Jahr steht nur ausserhalb des laufenden.
  */
 function expiryViewerHtml(doc) {
-  const spec = expiryViewerSpec(dateStatus(doc.expires_at));
+  const spec = expiryViewerSpec(expiryStatusOf(doc));
   if (!spec) return '';
   const text = esc(t(spec.key, { date: dateText(spec.dateKey) }));
   const icon = '<i data-lucide="calendar-clock" aria-hidden="true"></i>';
   return spec.tone
     ? `<span class="doc-badge doc-badge--${spec.tone}">${icon}${text}</span>`
     : `<span>${icon}${text}</span>`;
+}
+
+/**
+ * Die Person, um die es geht (#1705), flach an der Dokumentzeile. Die Scheibe
+ * ist die Identitaetsfarbe, der Name steht daneben: die Angabe traegt auch ohne
+ * Farbe. Sagt nichts darueber, wer das Dokument sieht.
+ */
+function documentSubject(doc) {
+  if (!doc?.subject_user_id) return null;
+  return {
+    id: doc.subject_user_id,
+    display_name: doc.subject_name ?? '',
+    color: doc.subject_color ?? null,
+    avatar_data: state.members.find((member) => member.id === doc.subject_user_id)?.avatar_data ?? null,
+  };
+}
+
+function subjectMetaHtml(doc) {
+  const person = documentSubject(doc);
+  if (!person) return '';
+  return `<span class="document-subject-mark"><span aria-hidden="true">${renderAvatarStack([person], { size: 16, maxVisible: 1 })}</span><span class="document-subject-mark__name">${esc(person.display_name)}</span></span>`;
 }
 
 /* ORTSETIKETTEN SPRECHEN NEUTRAL, NICHT MIT EINER STATUSSTIMME (Critique
@@ -2682,6 +2805,43 @@ function memberOptions(selected = []) {
 }
 
 /** Das Sichtbarkeitsfeld des Dokument-Dialogs. */
+function subjectPickerHtml(doc) {
+  const person = documentSubject(doc);
+  const people = withChosenPeople(state.members, person ? [person] : []);
+  // Im Solo-Haushalt fragt die Auswahl nach etwas mit einer einzigen Antwort;
+  // verborgen, nicht entfernt, dieselbe Regel wie "Wer kocht".
+  const hidden = isSoloHousehold() && people.length <= 1;
+  return `
+    <div class="form-group document-subject"${hidden ? ' hidden' : ''}>
+      ${renderUserMultiSelect(people, person ? [person.id] : [], SUBJECT_INPUT, 'documents.subjectLabel', 'userMultiSelect.nobody')}
+      <p class="document-form__hint">${esc(t('documents.subjectHint'))}</p>
+      <p class="document-form__hint form-hint--warning" id="document-subject-access" role="status" hidden></p>
+    </div>`;
+}
+
+/**
+ * Sagt im Dialog, wenn die gewaehlte Person das Dokument nicht oeffnen darf.
+ * Die Person erweitert die Sichtbarkeit nie (DECISIONS 1), also bliebe sie sonst
+ * still ohne Erinnerung, und das fiele erst beim verpassten Ablauf auf. Dieselben
+ * drei Zweige wie `documentVisibleSql()`, nur als Vorschau: entschieden wird auf
+ * dem Server bei der Zustellung.
+ */
+function syncSubjectAccess(panel, doc) {
+  const note = panel.querySelector('#document-subject-access');
+  if (!note) return;
+  const form = panel.querySelector('#document-form');
+  const personId = getSelectedUserIds(form, SUBJECT_INPUT)[0] ?? null;
+  const visibility = form.querySelector('#document-visibility').value;
+  const granted = visibility === 'restricted'
+    && [...form.querySelectorAll('.document-member-picker input:checked')].some((input) => Number(input.value) === personId);
+  const mayOpen = !personId || personId === (doc?.created_by ?? state.currentUserId) || visibility === 'family' || granted;
+  note.hidden = mayOpen;
+  if (mayOpen) return;
+  const name = withChosenPeople(state.members, doc ? [documentSubject(doc)].filter(Boolean) : [])
+    .find((member) => member.id === personId)?.display_name ?? '';
+  note.textContent = t('documents.subjectNoAccess', { name });
+}
+
 function documentVisibilityFieldHtml(doc) {
   return `<div class="form-group"${hidesPrivacyControls('documents') ? ' hidden' : ''}>
             <label class="label" for="document-visibility">${t('documents.visibilityLabel')}</label>
@@ -2861,6 +3021,7 @@ function openDocumentModal(doc = null) {
           <div class="label">${t('documents.allowedMembersLabel')}</div>
           <div class="document-member-picker__grid">${memberOptions(doc?.allowed_member_ids || [])}</div>
         </div>
+        ${subjectPickerHtml(doc)}
         ${expiryFieldsHtml}
         ${advancedSection(advancedFieldsHtml, { open: advancedOpen, hint: t('documents.moreDetailsHint') })}
         <div id="document-error" class="form-error" role="alert" hidden></div>
@@ -2884,6 +3045,9 @@ function openDocumentModal(doc = null) {
       const syncVisibility = () => { picker.hidden = visibility.value !== 'restricted'; };
       visibility.addEventListener('change', syncVisibility);
       syncVisibility();
+      bindUserMultiSelect(panel, SUBJECT_INPUT, { single: true });
+      form.addEventListener('change', () => syncSubjectAccess(panel, doc));
+      syncSubjectAccess(panel, doc);
       bindDropzone(panel);
       bindFolderUpload(panel);
       form.addEventListener('submit', (event) => saveDocument(event, doc, panel));
@@ -3537,6 +3701,7 @@ async function saveDocument(event, doc, panel) {
       expiry_reminder_days: expiresAt && form.querySelector('#document-expiry-reminder-days').value !== ''
         ? Number(form.querySelector('#document-expiry-reminder-days').value)
         : null,
+      subject_user_id: getSelectedUserIds(form, SUBJECT_INPUT)[0] ?? null,
       allowed_member_ids: visibility === 'restricted'
         ? Array.from(form.querySelectorAll('.document-member-picker input:checked')).map((input) => Number(input.value))
         : [],
@@ -4247,6 +4412,7 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
           ${doc.folder_name && !folderRepeatsCategory(doc.folder_name, categoryLabel) ? `<span><i data-lucide="folder" aria-hidden="true"></i>${esc(doc.folder_name)}</span>` : ''}
           <span>${formatFileSize(doc.file_size)}</span>
           ${expiryViewerHtml(doc)}
+          ${subjectMetaHtml(doc)}
           ${/* DAS PAAR STEHT ALS PAAR (R22, D11). Am Rand der Liste hielt eine
                 leere Luecke die Stelle des fehlenden Pfeils; mobil brach die
                 Leiste unter den Kategorie-Knopf, und dort stand "  >" allein

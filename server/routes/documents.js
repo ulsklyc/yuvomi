@@ -15,7 +15,7 @@ import { icsSubscriptionVisibleWhere, visibilityWhere } from '../services/visibi
 import { budgetDetailsVisibleWhere, resolveBudgetMode } from '../services/budget-visibility.js';
 import { reminderDateBefore, reminderIsInThePast } from '../utils/reminder-schedule.js';
 import { canManageDocument, documentVisibleSql } from '../services/document-access.js';
-import { newNonMembers, nonMemberMessage } from '../services/household-members.js';
+import { isHouseholdMember, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import {
   DocumentDeletionInProgressError,
   documentDeleteIsActive,
@@ -199,11 +199,36 @@ function vExpiryReminderDays(value) {
 }
 
 /**
+ * Die Person, um die es geht (#1705): eine aus der einen Mitgliederliste
+ * (DECISIONS 4). `stored` bleibt gueltig, auch wenn die Person inzwischen kein
+ * Mitglied mehr ist - sonst liesse sich das Dokument nicht mehr speichern, ohne
+ * sie zu entfernen. Anders als `newNonMembers()` lehnt das auch ein Konto ab,
+ * das es nicht gibt: der Fremdschluessel machte daraus sonst eine 500.
+ */
+function vSubjectUserId(value, stored = null) {
+  if (value === undefined) return { value: undefined, error: null };
+  if (value === null || value === '') return { value: null, error: null };
+  const parsed = validateId(value, 'subject_user_id');
+  if (parsed.error) return parsed;
+  if (parsed.value !== stored && !isHouseholdMember(parsed.value)) {
+    return { value: null, error: nonMemberMessage([parsed.value]) };
+  }
+  return parsed;
+}
+
+/**
  * Erinnerungs-Sync fuer den Ablauf eines Dokuments, identisches Muster wie
  * server/routes/inventory/items.js#syncReminder: bei jedem Schreiben erst
  * loeschen, dann - falls die Bedingungen greifen - neu anlegen. Eigentuemer ist
  * `created_by` (der Anlegende), nicht die gerade schreibende Person - gleiche
  * Regel wie bei den Inventar-Fristen.
+ *
+ * JE EMPFAENGER EINE ZEILE, BEI DERSELBEN PERSON EINE (#1705): die Ablegende und
+ * die Person, um die es geht. Geschrieben wird ohne Blick auf die Sichtbarkeit.
+ * Ob jemand das Dokument oeffnen darf, aendert sich auch ohne diesen Weg (der
+ * Kalender gleicht Anhang-Rechte ab, ein Modulrecht faellt weg), also fragen
+ * Zustellung und `/pending` (reminderTargetVisibleSql(), Modulrecht): eine
+ * verborgene Zeile wartet, statt verloren zu gehen.
  */
 function syncDocumentExpiryReminder(document) {
   const database = db.get();
@@ -216,10 +241,12 @@ function syncDocumentExpiryReminder(document) {
   const remindAt = reminderDateBefore(document.expires_at, document.expiry_reminder_days);
   if (reminderIsInThePast(remindAt)) return;
 
-  database.prepare(`
+  const insert = database.prepare(`
     INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
     VALUES ('document_expiry', ?, ?, ?)
-  `).run(document.id, remindAt, document.created_by);
+  `);
+  const recipients = new Set([document.created_by, document.subject_user_id].filter(Boolean));
+  for (const recipient of recipients) insert.run(document.id, remindAt, recipient);
 }
 
 /**
@@ -268,14 +295,16 @@ function documentSelect() {
            d.original_name, d.mime_type, d.file_size, d.storage_provider,
            d.storage_backend, d.storage_key, d.dms_account_id, d.external_url,
            d.external_meta, d.folder_id, d.created_by, d.created_at, d.updated_at,
-           d.expires_at, d.expiry_reminder_days,
+           d.expires_at, d.expiry_reminder_days, d.subject_user_id,
            f.name AS folder_name,
            u.display_name AS creator_name, u.avatar_color AS creator_color,
+           subject.display_name AS subject_name, subject.avatar_color AS subject_color,
            da.provider AS dms_provider,
            GROUP_CONCAT(a.user_id) AS allowed_member_ids
     FROM family_documents d
     LEFT JOIN family_document_folders f ON f.id = d.folder_id
     LEFT JOIN users u ON u.id = d.created_by
+    LEFT JOIN users subject ON subject.id = d.subject_user_id
     LEFT JOIN dms_accounts da ON da.id = d.dms_account_id
     LEFT JOIN family_document_access a ON a.document_id = d.id
   `;
@@ -292,7 +321,7 @@ function normalizeDocument(row) {
 }
 
 function getVisibleDocument(id, req, includeContent = false) {
-  const columns = includeContent ? 'd.*' : 'd.id, d.created_by, d.visibility, d.description, d.folder_id, d.status, d.expires_at, d.expiry_reminder_days';
+  const columns = includeContent ? 'd.*' : 'd.id, d.created_by, d.visibility, d.description, d.folder_id, d.status, d.expires_at, d.expiry_reminder_days, d.subject_user_id';
   return db.get().prepare(`
     SELECT ${columns}
     FROM family_documents d
@@ -1192,6 +1221,13 @@ router.get('/', (req, res) => {
       ? Number(req.query.expiring)
       : null;
     const expiringWithinDays = Number.isInteger(expiringDays) && expiringDays >= 0 ? expiringDays : null;
+    // Ein Filter ueber die sichtbaren Dokumente, kein Weg an ihnen vorbei: er
+    // steht in derselben Abfrage wie `canSeeSql`. Nur fuer eine API-Anfrage; die
+    // Seite filtert ihre geladene Liste im Browser (`matchesPerson`).
+    const vSubject = req.query.subject_user_id !== undefined
+      ? validateId(req.query.subject_user_id, 'subject_user_id')
+      : { value: null, error: null };
+    if (vSubject.error) return res.status(400).json({ error: vSubject.error, code: 400 });
 
     /* EIN ORDNER ZEIGT AUCH, WAS UNTER IHM LIEGT (#785).
      *
@@ -1220,7 +1256,7 @@ router.get('/', (req, res) => {
       ? `AND d.folder_id IN (${subtree.map((_v, i) => `@f${i}`).join(',')})`
       : '';
     const params = {
-      userId: userId(req), status, category, expiringWithinDays,
+      userId: userId(req), status, category, expiringWithinDays, subjectUserId: vSubject.value,
       // `expires_at` ist ein lokal eingegebener Kalendertag, kein Instant -
       // `date('now')` waere der UTC-Tag und oestlich von UTC am fruehen Abend,
       // westlich davon am fruehen Morgen der falsche (server/services/
@@ -1237,6 +1273,7 @@ router.get('/', (req, res) => {
       WHERE ${canSeeSql('d')}
         AND d.status = @status
         AND (@category IS NULL OR d.category = @category)
+        AND (@subjectUserId IS NULL OR d.subject_user_id = @subjectUserId)
         ${folderClause}
         ${expiringClause}
       GROUP BY d.id
@@ -1258,7 +1295,8 @@ router.post('/', async (req, res) => {
     const vFolderName = str(req.body.folder_name, 'Folder name', { max: MAX_TITLE, required: false });
     const vExpiresAtField = vExpiresAt(req.body.expires_at);
     const vExpiryReminderDaysField = vExpiryReminderDays(req.body.expiry_reminder_days);
-    const errors = collectErrors([vName, vDescription, vOriginalName, vFolderName, vExpiresAtField, vExpiryReminderDaysField]);
+    const vSubjectField = vSubjectUserId(req.body.subject_user_id);
+    const errors = collectErrors([vName, vDescription, vOriginalName, vFolderName, vExpiresAtField, vExpiryReminderDaysField, vSubjectField]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     // `folder_key` benennt den Systemordner eines Moduls, `folder_name` nur
@@ -1302,12 +1340,13 @@ router.post('/', async (req, res) => {
       const folderId = vFolderId.value ?? ensureFolder(folderKey, vFolderName.value, userId(req));
       const expiresAt = vExpiresAtField.value ?? null;
       const expiryReminderDays = vExpiryReminderDaysField.value ?? null;
+      const subjectUserId = vSubjectField.value ?? null;
       const result = database.prepare(`
         INSERT INTO family_documents (
           name, description, category, visibility, folder_id, original_name,
           mime_type, file_size, content_data, storage_provider, storage_backend,
-          storage_key, created_by, expires_at, expiry_reminder_days
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          storage_key, created_by, expires_at, expiry_reminder_days, subject_user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         vName.value,
         vDescription.value,
@@ -1323,7 +1362,8 @@ router.post('/', async (req, res) => {
         stagedUpload.storage_key,
         userId(req),
         expiresAt,
-        expiryReminderDays
+        expiryReminderDays,
+        subjectUserId
       );
       if (visibility === 'restricted') replaceAccess(result.lastInsertRowid, allowedIds);
       syncDocumentExpiryReminder({
@@ -1331,6 +1371,7 @@ router.post('/', async (req, res) => {
         expires_at: expiresAt,
         expiry_reminder_days: expiryReminderDays,
         created_by: userId(req),
+        subject_user_id: subjectUserId,
       });
       return database.prepare(`
         ${documentSelect()}
@@ -1375,7 +1416,8 @@ router.put('/:id', (req, res) => {
     const vDescription = req.body.description !== undefined ? str(req.body.description, 'Description', { max: MAX_TEXT, required: false }) : { value: null };
     const vExpiresAtField = vExpiresAt(req.body.expires_at);
     const vExpiryReminderDaysField = vExpiryReminderDays(req.body.expiry_reminder_days);
-    const errors = collectErrors([vName, vDescription, vExpiresAtField, vExpiryReminderDaysField]);
+    const vSubjectField = vSubjectUserId(req.body.subject_user_id, existing.subject_user_id);
+    const errors = collectErrors([vName, vDescription, vExpiresAtField, vExpiryReminderDaysField, vSubjectField]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const category = req.body.category !== undefined && CATEGORIES.includes(req.body.category) ? req.body.category : null;
@@ -1400,6 +1442,7 @@ router.put('/:id', (req, res) => {
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
     const expiresAt = req.body.expires_at !== undefined ? vExpiresAtField.value : existing.expires_at;
     const expiryReminderDays = req.body.expiry_reminder_days !== undefined ? vExpiryReminderDaysField.value : existing.expiry_reminder_days;
+    const subjectUserId = req.body.subject_user_id !== undefined ? vSubjectField.value : existing.subject_user_id;
     db.get().prepare(`
       UPDATE family_documents
       SET name = COALESCE(?, name),
@@ -1409,7 +1452,8 @@ router.put('/:id', (req, res) => {
           status = COALESCE(?, status),
           folder_id = ?,
           expires_at = ?,
-          expiry_reminder_days = ?
+          expiry_reminder_days = ?,
+          subject_user_id = ?
       WHERE id = ?
     `).run(
       req.body.name !== undefined ? vName.value : null,
@@ -1420,6 +1464,7 @@ router.put('/:id', (req, res) => {
       req.body.folder_id !== undefined ? vFolderId.value : existing.folder_id,
       expiresAt,
       expiryReminderDays,
+      subjectUserId,
       id
     );
     replaceAccess(id, allowedIds);
@@ -1430,7 +1475,9 @@ router.put('/:id', (req, res) => {
     if (finalStatus === 'archived') {
       removeDocumentExpiryReminder(id);
     } else {
-      syncDocumentExpiryReminder({ id, expires_at: expiresAt, expiry_reminder_days: expiryReminderDays, created_by: existing.created_by });
+      syncDocumentExpiryReminder({
+        id, expires_at: expiresAt, expiry_reminder_days: expiryReminderDays, created_by: existing.created_by, subject_user_id: subjectUserId,
+      });
     }
 
     const row = db.get().prepare(`${documentSelect()} WHERE d.id = ? GROUP BY d.id`).get(id);
@@ -1457,7 +1504,11 @@ router.patch('/:id/archive', (req, res) => {
       removeDocumentExpiryReminder(id);
     } else {
       syncDocumentExpiryReminder({
-        id, expires_at: existing.expires_at, expiry_reminder_days: existing.expiry_reminder_days, created_by: existing.created_by,
+        id,
+        expires_at: existing.expires_at,
+        expiry_reminder_days: existing.expiry_reminder_days,
+        created_by: existing.created_by,
+        subject_user_id: existing.subject_user_id,
       });
     }
     res.json({ data: { id, status } });

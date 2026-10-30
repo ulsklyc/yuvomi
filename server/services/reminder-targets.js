@@ -70,6 +70,13 @@ const TARGETS = Object.freeze({
 /** Herkuenfte, deren Ziel diese Datei beurteilt - fuer den Guard im Test. */
 export const TARGET_ENTITY_TYPES = Object.freeze(Object.keys(TARGETS));
 
+// `documentVisibleSql` nimmt den Namen eines Bind-Parameters; hier steht an
+// seiner Stelle ein Spaltenausdruck oder NULL, damit die Regel der Dokumente
+// woertlich dieselbe bleibt.
+function documentVisibleFor(viewer) {
+  return documentVisibleSql('x', NOBODY).replaceAll(`@${NOBODY}`, viewer);
+}
+
 /**
  * Gibt es die Zeile, und sieht `userId` sie?
  *
@@ -129,6 +136,14 @@ export function reminderTargetVisibleSql(database, alias = 'r', viewer = `${alia
       SELECT 1 FROM ${TARGETS[type].table} x
       WHERE x.id = ${alias}.entity_id
         AND COALESCE(${TARGETS[type].visible(viewer, database)}, 0) = 0
+    ))`);
+  // Dokumente stehen nicht in TARGETS, weil sie niemand von Hand setzt. Seit
+  // eine Ablauf-Erinnerung auch an die Person geht, um die es geht (#1705),
+  // kann ihr Empfaenger aber ein Dokument treffen, das er nicht oeffnen darf.
+  hidden.push(`(${alias}.entity_type = 'document_expiry' AND EXISTS (
+      SELECT 1 FROM family_documents x
+      WHERE x.id = ${alias}.entity_id
+        AND COALESCE(${documentVisibleFor(viewer)}, 0) = 0
     ))`);
   return `NOT (
     ${hidden.join('\n    OR ')}
@@ -209,16 +224,13 @@ export function reminderTargetPublicSql(database, alias = 'r') {
   const quoted = (policy) => Object.keys(HOUSEHOLD_CHANNEL_POLICY)
     .filter((type) => HOUSEHOLD_CHANNEL_POLICY[type] === policy)
     .map((type) => `'${type}'`).join(', ');
-  // `documentVisibleSql` nimmt den Namen eines Bind-Parameters; hier steht an
-  // seiner Stelle NULL, damit die Regel der Dokumente woertlich dieselbe bleibt.
-  const documentForAll = documentVisibleSql('x', NOBODY).replaceAll(`@${NOBODY}`, 'NULL');
   return `(CASE
     WHEN ${alias}.entity_type IN (${Object.keys(TARGETS).map((type) => `'${type}'`).join(', ')})
       THEN ${reminderTargetVisibleSql(database, alias, 'NULL')}
     WHEN ${alias}.entity_type = 'document_expiry'
       THEN EXISTS (
         SELECT 1 FROM family_documents x
-        WHERE x.id = ${alias}.entity_id AND COALESCE(${documentForAll}, 0) = 1
+        WHERE x.id = ${alias}.entity_id AND COALESCE(${documentVisibleFor('NULL')}, 0) = 1
       )
     WHEN ${alias}.entity_type IN (${quoted('household')}) THEN 1
     ELSE 0

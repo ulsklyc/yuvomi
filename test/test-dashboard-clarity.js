@@ -1170,6 +1170,29 @@ test('#1454: Countdown-Zeilen folgen derselben Stufung und sagen „Heute" nicht
   }
 });
 
+test('#1705: die Zeile eines Dokuments nennt die Person, trifft das Dokument und folgt seinem Modul', () => {
+  const prevWindow = global.window;
+  const off = new Set();
+  global.window = { yuvomi: { isModuleDisabled: (module) => off.has(module) } };
+  try { at(CRITIQUE_NOW, 'Europe/Berlin', () => {
+    globalThis.__locale = 'de';
+    const rows = [
+      { id: 7, source: 'document', title: 'Reisepass', date: '2026-10-15', days_until: 22, icon: 'file-text', person_name: 'John' },
+      { id: 8, source: 'document', title: 'Heute', date: '2026-09-23', days_until: 0, icon: 'file-text', person_name: 'Mira' },
+      { id: 9, source: 'document', title: 'Ohne Person', date: '2026-10-16', days_until: 23, icon: 'file-text', person_name: null },
+    ];
+    const html = __test.renderCountdowns(rows, '1x2', 3);
+    assert.deepEqual(metaOf(html, 'countdown-item__meta'), ['DM:2026-10-15 · John', 'Mira', 'DM:2026-10-16']);
+    assert.match(html, /data-route="\/documents\?open=7"/);
+    assert.match(html, /--countdown-accent:var\(--module-documents,/);
+    assert.doesNotMatch(html, /--module-calendar/, 'ein Dokument traegt nicht den Ton des Kalenders');
+    off.add('documents');
+    assert.equal(__test.renderCountdowns(rows, '1x2', 3), '', 'ein umgeschaltetes Modul fliegt auch ohne neuen Ladevorgang heraus');
+  }); } finally {
+    global.window = prevWindow;
+  }
+});
+
 test('#1454: der letzte Besuch liest rueckwaerts, ohne Jahr', () => {
   const prevWindow = global.window;
   global.window = { yuvomi: { isModuleDisabled: () => false } };

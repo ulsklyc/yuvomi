@@ -4131,7 +4131,12 @@
         "viewerNextNamed": "Susunod na dokumento: {{name}}",
         "emptyFolderTitle": "Walang laman ang \"{{name}}\"",
         "viewerImageFallbackHint": "Hindi maipakita ang larawang ito. I-download ito para mabuksan.",
-        "moreDetailsHint": "Paglalarawan at katayuan"
+        "moreDetailsHint": "Paglalarawan at katayuan",
+        "subjectLabel": "Tungkol kay",
+        "subjectHint": "Hindi nito binabago kung sino ang nakakakita ng dokumento.",
+        "subjectNoAccess": "Hindi mabubuksan ni {{name}} ang dokumentong ito at hindi siya makakatanggap ng paalala.",
+        "personFilterLabel": "Tao",
+        "personFilterAll": "Lahat ng tao"
     },
     "userMultiSelect": {
         "nobody": "Wala",

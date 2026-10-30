@@ -4069,7 +4069,12 @@
         "viewerNextNamed": "Nästa dokument: {{name}}",
         "emptyFolderTitle": "”{{name}}” är tom",
         "viewerImageFallbackHint": "Det gick inte att visa denna bild. Ladda ner den för att öppna den.",
-        "moreDetailsHint": "Beskrivning och status"
+        "moreDetailsHint": "Beskrivning och status",
+        "subjectLabel": "Gäller",
+        "subjectHint": "Ändrar inte vem som kan se dokumentet.",
+        "subjectNoAccess": "{{name}} kan inte öppna det här dokumentet och får ingen påminnelse om det.",
+        "personFilterLabel": "Person",
+        "personFilterAll": "Alla personer"
     },
     "shortcuts": {
         "goKitchen": "Kök",

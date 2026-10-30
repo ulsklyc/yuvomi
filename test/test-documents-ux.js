@@ -908,7 +908,7 @@ test('der Viewer nennt das Ablaufdatum in seiner Meta-Zeile', () => {
   const viewer = page.slice(page.indexOf('<div class="document-viewer__meta">'), page.indexOf('<span class="document-viewer__actions">'));
   assert.match(viewer, /\$\{expiryViewerHtml\(doc\)\}/);
   const fn = page.slice(page.indexOf('function expiryViewerHtml('), page.indexOf('function storageBadgeHtml'));
-  assert.match(fn, /expiryViewerSpec\(dateStatus\(doc\.expires_at\)\)/);
+  assert.match(fn, /expiryViewerSpec\(expiryStatusOf\(doc\)\)/);
   // Das Datum ist ein Tagesschluessel: dateText() liest ihn als Schluessel,
   // ein Umweg ueber new Date()/toISOString() kippte je nach Zone auf den Vortag.
   assert.match(fn, /dateText\(spec\.dateKey\)/);
@@ -2071,6 +2071,58 @@ test('R21 S9b: am Telefon stehen die Kategorien in der Auswahl des Ordner-Chips'
  * fuer beide Seiten: jede Facette, die renderAll() zeichnet, zeichnet auch
  * renderFacets(); eine morgen ergaenzte Facette faellt hier ebenso auf.
  */
+// #1705: die Person, um die es geht.
+test('#1705: der Dialog fragt nach der Person vor dem Ablaufdatum, eine oder niemand', () => {
+  const form = page.slice(page.indexOf('function openDocumentModal('), page.indexOf('function bindDropzone('));
+  assert.ok(form.indexOf('${subjectPickerHtml(doc)}') > -1, 'das Feld steht im Hauptbereich');
+  assert.ok(form.indexOf('${subjectPickerHtml(doc)}') < form.indexOf('${expiryFieldsHtml}'), 'direkt vor dem Ablaufdatum');
+  assert.ok(form.indexOf('${subjectPickerHtml(doc)}') < form.indexOf('${advancedSection('), 'nicht hinter "Mehr Details"');
+  assert.match(form, /bindUserMultiSelect\(panel, SUBJECT_INPUT, \{ single: true \}\)/);
+  assert.match(page, /subject_user_id: getSelectedUserIds\(form, SUBJECT_INPUT\)\[0\] \?\? null/);
+});
+
+test('#1705: die Auswahl kommt aus der Mitgliederliste, eine gespeicherte Person bleibt darin', () => {
+  const fn = page.slice(page.indexOf('function subjectPickerHtml('), page.indexOf('function syncSubjectAccess('));
+  assert.match(fn, /withChosenPeople\(state\.members, person \? \[person\] : \[\]\)/);
+  assert.match(fn, /isSoloHousehold\(\)/, 'im Solo-Haushalt verborgen wie "Wer kocht"');
+});
+
+test('#1705: der Hinweis folgt Sichtbarkeit, Freigabe und Person, nicht nur dem Oeffnen des Dialogs', () => {
+  const form = page.slice(page.indexOf('function openDocumentModal('), page.indexOf('function bindDropzone('));
+  assert.match(form, /form\.addEventListener\('change', \(\) => syncSubjectAccess\(panel, doc\)\)/);
+  const fn = page.slice(page.indexOf('function syncSubjectAccess('), page.indexOf('function documentVisibilityFieldHtml('));
+  assert.match(fn, /visibility === 'family'/);
+  assert.match(fn, /doc\?\.created_by \?\? state\.currentUserId/);
+  assert.match(fn, /t\('documents\.subjectNoAccess'/);
+});
+
+test('#1705: der Personenfilter gilt fuer Liste und Fristen-Zaehler und kommt beim Zuruecksetzen mit', () => {
+  const apply = page.slice(page.indexOf('function applyFilters('), page.indexOf('function documentsToolsMenuHtml('));
+  assert.match(apply, /matchesPerson\(doc\)/);
+  assert.match(page.slice(page.indexOf('function expiringCount('), page.indexOf('function sortDocuments(')), /matchesPerson\(doc\)/);
+  assert.match(page.slice(page.indexOf('function resetFilters('), page.indexOf('function filteredDocuments(')), /state\.personId = ''/);
+  assert.match(page.slice(page.indexOf('function hasActiveFilter('), page.indexOf('function emptyStateFor(')), /state\.personId/);
+});
+
+test('#1705: der Personenfilter ist EIN Chip mit Menue und steht nach Bestand', () => {
+  const fn = page.slice(page.indexOf('function renderPersonChip('), page.indexOf('function renderFolderBrowser('));
+  assert.match(fn, /popovertarget="documents-person-menu"/);
+  assert.match(fn, /role="menuitemradio"/);
+  assert.match(fn, /if \(!people\.length && !state\.personId\) return;/);
+});
+
+test('#1705: Chip, Filter und Betrachter lesen den Ablauf ueber den Vorlauf des Dokuments', () => {
+  assert.match(page.slice(page.indexOf('function isExpiringOrOverdue('), page.indexOf('function matchesPerson(')), /documentExpiryStatus\(dateStatus\(doc\.expires_at\), doc\)/);
+  assert.match(page.slice(page.indexOf('function expiryChipHtml('), page.indexOf('function expiryViewerHtml(')), /expiryChipSpec\(expiryStatusOf\(doc\)\)/);
+  assert.equal([...page.matchAll(/dateStatus\(doc/g)].length, 1, 'ein zweiter Leser von dateStatus() faende an der Regel vorbei');
+});
+
+test('#1705: ?open= oeffnet das Dokument aus der Kachel im Betrachter', () => {
+  const fn = page.slice(page.indexOf('function openLinkedDocument('), page.indexOf('function renderAll('));
+  assert.match(fn, /URLSearchParams\(window\.location\.search\)\.get\('open'\)/);
+  assert.match(fn, /openDocumentViewer\(doc\)/);
+});
+
 test('R21 S9b: die Suche frischt die Zaehler der Kategorie-Gruppe mit auf', () => {
   const calls = (body) => new Set([...body.matchAll(/^\s*(render\w+)\(/gm)].map((m) => m[1]));
   const facetsOfAll = [...calls(fnBody('renderAll', 'renderBreadcrumb'))]

@@ -4069,7 +4069,12 @@
         "viewerNextNamed": "Document suivant : {{name}}",
         "emptyFolderTitle": "« {{name}} » est vide",
         "viewerImageFallbackHint": "Cette image n'a pas pu être affichée. Téléchargez-la pour l'ouvrir.",
-        "moreDetailsHint": "Description et statut"
+        "moreDetailsHint": "Description et statut",
+        "subjectLabel": "Concerne",
+        "subjectHint": "Ne change pas qui peut voir le document.",
+        "subjectNoAccess": "{{name}} ne peut pas ouvrir ce document et ne recevra pas de rappel.",
+        "personFilterLabel": "Personne",
+        "personFilterAll": "Toutes les personnes"
     },
     "shortcuts": {
         "goKitchen": "Cuisine",

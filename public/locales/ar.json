@@ -4445,7 +4445,12 @@
         "viewerNextNamed": "المستند التالي: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" فارغ",
         "viewerImageFallbackHint": "تعذّر عرض هذه الصورة. نزّلها لفتحها.",
-        "moreDetailsHint": "الوصف والحالة"
+        "moreDetailsHint": "الوصف والحالة",
+        "subjectLabel": "يخص",
+        "subjectHint": "لا يغيّر من يمكنه رؤية المستند.",
+        "subjectNoAccess": "لا يمكن لـ {{name}} فتح هذا المستند ولن يتلقى تذكيرًا بشأنه.",
+        "personFilterLabel": "الشخص",
+        "personFilterAll": "كل الأشخاص"
     },
     "shortcuts": {
         "goKitchen": "المطبخ",

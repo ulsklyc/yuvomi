@@ -4319,7 +4319,12 @@
         "viewerNextNamed": "Следующий документ: {{name}}",
         "emptyFolderTitle": "Папка «{{name}}» пуста",
         "viewerImageFallbackHint": "Не удалось показать это изображение. Скачайте его, чтобы открыть.",
-        "moreDetailsHint": "Описание и статус"
+        "moreDetailsHint": "Описание и статус",
+        "subjectLabel": "Относится к",
+        "subjectHint": "Не меняет, кто видит документ.",
+        "subjectNoAccess": "{{name}} не может открыть этот документ и не получит напоминание.",
+        "personFilterLabel": "Человек",
+        "personFilterAll": "Все люди"
     },
     "shortcuts": {
         "goKitchen": "Кухня",

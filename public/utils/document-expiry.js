@@ -5,7 +5,53 @@
  *        test:documents-ux sie als Programm prueft. Die Seite setzt Text,
  *        Datum und Escaping ein (documents.js, expiryChipHtml/expiryViewerHtml).
  * Abhängigkeiten: keine (der Status kommt aus public/utils/date-status.js)
+ *
+ * EIN TAG FUER ALLE DREI (#1036, #1705). Ab wann eine Frist "bald" ist, stand an
+ * zwei Stellen: die Erinnerung folgte dem Vorlauf am Dokument, Chip und Filter
+ * "Fristen" festen 30 Tagen. Mit 90 Tagen Vorlauf kam die Meldung zwei Monate,
+ * bevor irgendetwas sichtbar markiert war, und keiner der beiden Tage erklaerte
+ * den anderen. Jetzt folgen Erinnerung, Chip, Filter und die Kachel "Stichtage"
+ * demselben Tag. Importfrei, damit auch der Server (services/countdowns.js)
+ * diese Datei liest statt die Regel nachzubauen.
  */
+
+/**
+ * Ohne eigenen Vorlauf gilt die Schwelle aus date-status.js
+ * (`DATE_STATUS_ALERT_DAYS`). Dort nicht importierbar, weil sie ueber den
+ * Browser-Pfad /utils/date.js laedt; test:document-person haelt beide gleich.
+ */
+export const DEFAULT_EXPIRY_LEAD_DAYS = 30;
+
+/**
+ * Der Vorlauf eines Dokuments in Tagen. Ein explizites `0` bleibt `0`: "am Tag
+ * selbst" ist eine Wahl, keine Luecke.
+ * @param {{ expiry_reminder_days?: number|null }} doc
+ * @returns {number}
+ */
+export function expiryLeadDays(doc) {
+  return Number.isInteger(doc?.expiry_reminder_days) ? doc.expiry_reminder_days : DEFAULT_EXPIRY_LEAD_DAYS;
+}
+
+/**
+ * Ist diese Frist "bald"? Auch vergangene Tage zaehlen: die Nachfrist und die
+ * Anzeige "abgelaufen" entscheiden die Aufrufer.
+ * @param {number} daysUntil
+ * @param {{ expiry_reminder_days?: number|null }} doc
+ * @returns {boolean}
+ */
+export function expiryDueSoon(daysUntil, doc) {
+  return daysUntil <= expiryLeadDays(doc);
+}
+
+/**
+ * dateStatus() mit dem Vorlauf dieses Dokuments statt der festen Schwelle.
+ * @param {{ state: 'valid'|'expiring'|'expired', endDateKey: string, days: number } | null} status
+ * @param {{ expiry_reminder_days?: number|null }} doc
+ */
+export function documentExpiryStatus(status, doc) {
+  if (!status || status.state === 'expired') return status;
+  return { ...status, state: expiryDueSoon(status.days, doc) ? 'expiring' : 'valid' };
+}
 
 /**
  * Chip auf Zeile und Karte: bewusst nur bei "bald ab" oder "abgelaufen" - ein

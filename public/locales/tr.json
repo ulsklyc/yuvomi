@@ -4069,7 +4069,12 @@
         "viewerNextNamed": "Sonraki belge: {{name}}",
         "emptyFolderTitle": "\"{{name}}\" boş",
         "viewerImageFallbackHint": "Bu görsel görüntülenemedi. Açmak için indirin.",
-        "moreDetailsHint": "Açıklama ve durum"
+        "moreDetailsHint": "Açıklama ve durum",
+        "subjectLabel": "İlgili kişi",
+        "subjectHint": "Belgeyi kimin görebileceğini değiştirmez.",
+        "subjectNoAccess": "{{name}} bu belgeyi açamaz ve bunun için hatırlatma almaz.",
+        "personFilterLabel": "Kişi",
+        "personFilterAll": "Tüm kişiler"
     },
     "shortcuts": {
         "goKitchen": "Mutfak",

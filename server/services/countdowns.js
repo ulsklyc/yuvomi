@@ -1,9 +1,10 @@
 /**
  * Modul: Countdowns (#647)
- * Zweck: Die als Countdown markierten Termine und Aufgaben zu EINER nach
- *        Nähe sortierten Liste zusammenführen - die Datenseite des
- *        Übersichts-Widgets.
- * Abhängigkeiten: server/services/calendar-events.js, server/services/visibility.js
+ * Zweck: Die als Countdown markierten Termine und Aufgaben und die bald
+ *        ablaufenden Dokumente zu EINER nach Nähe sortierten Liste
+ *        zusammenführen - die Datenseite des Übersichts-Widgets.
+ * Abhängigkeiten: server/services/calendar-events.js, server/services/visibility.js,
+ *                 server/services/document-access.js
  *
  * WARUM ZWEI QUELLEN UND NICHT EINE TABELLE. Der Thread zu #647 ist genau an
  * dieser Frage entlanggegangen und bei zwei Quellen gelandet: @Kyrodan zählt bis
@@ -26,7 +27,15 @@
  * gesetzt hat - am Vortag steht „Morgen", am Tag danach steht nichts mehr, und
  * niemand sagt ihm, dass er es verpasst hat.
  *
- * Die Nachfrist gilt für BEIDE Quellen, obwohl das Aufgaben-Argument von oben
+ * WARUM DOKUMENTE DIE DRITTE QUELLE SIND UND KEIN MARKER TRAGEN (#1705). Termine
+ * und Aufgaben stehen hier, weil jemand sie markiert hat. Ein Dokument hat mit
+ * seinem Ablaufdatum schon gesagt, dass es einen Stichtag hat; ein Häkchen wäre
+ * eine zweite Angabe derselben Sache. Dafür steht es erst ab seinem Vorlauf hier
+ * (`expiryDueSoon()` in public/utils/document-expiry.js), demselben Tag, an dem
+ * Erinnerung und Chip kommen (#1036). Sonst stünde jeder Pass zehn Jahre lang in
+ * einer Kachel, die eine kurze Liste sein soll.
+ *
+ * Die Nachfrist gilt für ALLE Quellen, obwohl das Aufgaben-Argument von oben
  * dort weiter gilt. Zwei Regeln in einer Kachel wären teurer als die
  * Wiederholung: diese Liste enthält nur ausdrücklich Markiertes, also eine
  * kleine kuratierte Menge, und dort ist „seit 3 Tagen abgelaufen" keine vierte
@@ -42,11 +51,13 @@ import { expandRecurringEvents, loadEventExceptions, MAX_EXPANSION_ITERATIONS } 
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
+import { documentVisibleSql } from './document-access.js';
 import { hasExplicitZone, householdTimeZone, storedToWall, utcToWall } from '../utils/timezone.js';
 // Dieselbe Rangfolge wie im Kalender und auf der Uebersicht - eine Regel, eine
 // Datei. Der Server importiert oefter aus `public/utils/` (date, folder-tree,
 // currency-codes, ...), immer fuer abhaengigkeitsfreie geteilte Regeln.
 import { resolveEventColorOrNull } from '../../public/utils/event-color.js';
+import { expiryDueSoon } from '../../public/utils/document-expiry.js';
 
 // So viele Countdowns liefert der Server. Die Kachel entscheidet wie überall
 // selbst, wie viele davon sie zeigt (`listRowCap` in pages/dashboard.js) - der
@@ -216,6 +227,17 @@ function overdueGraceDays(d) {
 }
 
 /**
+ * Die Quellen der Kachel: das Modul, dem ihre Zeilen gehören, und wie sie
+ * gelesen werden. `getCountdowns()` fragt Schalter und Rechte einmal vor allen
+ * Quellen, eine neue Quelle bringt deshalb nur ihren Leser und ihr Modul mit.
+ */
+const COUNTDOWN_SOURCES = [
+  { module: 'calendar', read: eventCountdowns },
+  { module: 'tasks', read: taskCountdowns },
+  { module: 'documents', read: documentCountdowns },
+];
+
+/**
  * Alle für `userId` sichtbaren Countdowns, nach Nähe sortiert.
  *
  * @param {object} d            Offene DB-Verbindung
@@ -226,9 +248,10 @@ function overdueGraceDays(d) {
  *        entzogen sind (`access_permissions`, #467) - eine andere Achse als die
  *        haushaltweite Abschaltung unten, die dieselbe Antwort verdient.
  * @param {number} [opts.limit]
- * @returns {{items: Array<{source: 'event'|'task', id: number, title: string,
+ * @returns {{items: Array<{source: 'event'|'task'|'document', id: number, title: string,
  *                  date: string, days_until: number, icon: string|null,
- *                  color: string|null, recurring: boolean}>, total: number}}
+ *                  color: string|null, recurring: boolean,
+ *                  person_name?: string|null}>, total: number}}
  */
 export function getCountdowns(d, {
   userId = null, todayKey, hiddenModules = null, limit = DEFAULT_LIMIT,
@@ -261,14 +284,9 @@ export function getCountdowns(d, {
    * Unterschied wäre sonst wieder `total`: zwei Schnitte, zwei Wahrheiten. */
   const hidden = modulesLeftOut(d, hiddenModules);
   const graceDays = overdueGraceDays(d);
-  const items = [
-    ...(hidden.has('calendar') ? [] : eventCountdowns(d, userId, todayKey, graceDays, {
-      // Ein Geburtstagstermin kann als Countdown markiert sein. Er steht in
-      // `calendar_events`, gehoert aber dem Schalter `birthdays` (#1660).
-      withBirthdays: !hidden.has('birthdays'),
-    })),
-    ...(hidden.has('tasks') ? [] : taskCountdowns(d, userId, todayKey, graceDays)),
-  ];
+  const items = COUNTDOWN_SOURCES
+    .filter((source) => !hidden.has(source.module))
+    .flatMap((source) => source.read(d, { userId, todayKey, graceDays, hidden }));
 
   const sorted = items
     // Nächstes zuerst - überfällige also ganz oben, weil ihre Tageszahl negativ
@@ -290,7 +308,10 @@ export function getCountdowns(d, {
   return { items: sorted.slice(0, limit), total: sorted.length };
 }
 
-function eventCountdowns(d, userId, todayKey, graceDays, { withBirthdays = true } = {}) {
+function eventCountdowns(d, { userId, todayKey, graceDays, hidden }) {
+  // Ein Geburtstagstermin kann als Countdown markiert sein. Er steht in
+  // `calendar_events`, gehoert aber dem Schalter `birthdays` (#1660).
+  const withBirthdays = !hidden.has('birthdays');
   // Einmal je Lauf statt je Termin: die Zone steht in sync_config und aendert
   // sich innerhalb eines Requests nicht.
   const tz = householdTimeZone(d);
@@ -382,7 +403,7 @@ function eventCountdowns(d, userId, todayKey, graceDays, { withBirthdays = true 
   return out;
 }
 
-function taskCountdowns(d, userId, todayKey, graceDays) {
+function taskCountdowns(d, { userId, todayKey, graceDays }) {
   // Eine erledigte oder abgelegte Aufgabe zählt nicht mehr herunter: bei einer
   // wiederkehrenden hat das Abhaken die NÄCHSTE Instanz schon erzeugt (die dann
   // ihrerseits hier steht), und eine abgelegte ist aus dem Lauf genommen -
@@ -417,6 +438,41 @@ function taskCountdowns(d, userId, todayKey, graceDays) {
       icon: 'check-square',
       color: null,
       recurring: Boolean(row.is_recurring),
+    });
+  }
+  return out;
+}
+
+function documentCountdowns(d, { userId, todayKey, graceDays }) {
+  // Dieselbe Untergrenze wie bei den Aufgaben. Die Obergrenze steht unten und
+  // nicht in der Abfrage: sie ist je Dokument eine andere, und ihre Regel lebt
+  // in `expiryDueSoon()`, die auch der Chip der Dokumentseite fragt.
+  const floor = shiftKey(todayKey, -graceDays) ?? todayKey;
+  const rows = d.prepare(`
+    SELECT x.id, x.name, x.expires_at, x.expiry_reminder_days,
+           subject.display_name AS person_name
+    FROM family_documents x
+    LEFT JOIN users subject ON subject.id = x.subject_user_id
+    WHERE x.status = 'active'
+      AND x.expires_at IS NOT NULL
+      AND x.expires_at >= @floor
+      AND ${documentVisibleSql('x', 'me')}
+  `).all({ floor, me: userId });
+
+  const out = [];
+  for (const row of rows) {
+    const days = daysBetween(todayKey, row.expires_at);
+    if (days === null || days < -graceDays || !expiryDueSoon(days, row)) continue;
+    out.push({
+      source: 'document',
+      id: row.id,
+      title: row.name,
+      date: row.expires_at.slice(0, 10),
+      days_until: days,
+      icon: 'file-text',
+      color: null,
+      recurring: false,
+      person_name: row.person_name,
     });
   }
   return out;
