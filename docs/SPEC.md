@@ -3244,14 +3244,16 @@ the list, anyone else answers 400. It is a label and a reminder recipient, and n
 see the document (entry 1). Whether a recipient may open the document is asked at delivery and in
 `GET /reminders/pending` (`reminderTargetVisibleSql()`, `server/services/reminder-targets.js`), not
 when the row is written, so a later change of visibility or sharing holds in both directions; a row
-for someone who may not open it is skipped, not deleted. The dialog says so as you choose: a person
+for someone who may not open it is skipped, not deleted, and `GET /reminders` and `GET /reminders/all`
+leave it out as well, because the row names the document and its date. The dialog says so as you choose: a person
 who cannot open the document under the current visibility gets a warning instead of a silent
 reminder that never arrives. A household channel hears such a deadline once, although two rows
 reach it (`householdChannelHeardDocument()` in `server/services/notifications.js`, counted over
 `notification_deliveries`, since the second row may be due in a later run); a channel of the person's
 own is asked per recipient. `GET /documents?subject_user_id=<id>` filters by person, and the page has
 one chip with a menu for it, listing only the people who have documents; it is hidden in a
-single-person household, like the field.
+single-person household, like the field. The category and folder counts count under the chosen
+person, like the list.
 
 ### Family Document Access
 Allowlist for `visibility = 'restricted'` documents — only listed users can see the document.

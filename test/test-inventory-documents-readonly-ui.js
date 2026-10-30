@@ -587,6 +587,24 @@ const ORDNER = [
   { id: 6, name: 'Keller', parent_id: 3 },
 ];
 
+test('#1705: Kategorie- und Ordnerzaehler meinen die gewaehlte Person', async () => {
+  const docs = [
+    dokument({ id: 21, category: 'insurance', folder_id: 3, subject_user_id: ANDERE }),
+    dokument({ id: 22, category: 'travel', folder_id: null, subject_user_id: ICH }),
+  ];
+  await mitDokumenten({ allDocuments: docs, personId: ANDERE }, () => {
+    assert.equal(documents.categoryCounts().get('travel') ?? 0, 0, 'ein Zaehler fuehrt nicht ins Leere');
+    assert.equal(documents.categoryCounts().get('insurance'), 1);
+    assert.equal(documents.presentCategories().has('travel'), false, 'kein Chip ohne Treffer');
+    assert.equal(documents.folderCounts().get('__none'), 0);
+    assert.equal(documents.folderCounts().get('3'), 1);
+  });
+  await mitDokumenten({ allDocuments: docs, personId: '' }, () => {
+    assert.equal(documents.categoryCounts().get(''), 2, 'ohne Person zaehlt alles');
+    assert.equal(documents.folderCounts().get('__none'), 1);
+  });
+});
+
 /** Die Seite mit gesetztem Archiv zeichnen: der Modulzustand ueberlebt den Seitenwechsel. */
 async function archivSeite(search) {
   const zuvor = globalThis.location;

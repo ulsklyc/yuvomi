@@ -75,8 +75,9 @@ test('Kategorie und Ordner zählen sich gegenseitig heraus (echte Facetten)', ()
   // anderen, aber nicht unter sich selbst.
   // Seit 2026-09-25 rechnet utils/document-facets.js; die Seite reicht die
   // jeweils andere Achse als `inScope` hinein.
-  assert.match(page, /function folderCounts\(\)[\s\S]{0,200}inScope: matchesCategory/);
-  assert.match(page, /function categoryCounts\(\)[\s\S]{0,200}inScope: matchesFolder/);
+  assert.match(page, /function folderCounts\(\)[\s\S]{0,200}inScope: \(doc\) => matchesCategory\(doc\)/);
+  assert.match(page, /function inCategoryScope\(doc\) \{\s+return matchesFolder\(doc\)/);
+  assert.match(page, /function categoryCounts\(\)[\s\S]{0,200}inScope: inCategoryScope/);
 });
 
 test('der Kategoriefilter läuft client-seitig ohne Netzwerk-Roundtrip', () => {
@@ -718,9 +719,9 @@ test('die Facetten-Zaehler zaehlen unter der aktiven Suche (als Programm)', () =
 test('die Seite zaehlt Kategorie, Ordner und Ablauf unter der Suche und zeichnet sie beim Tippen neu', () => {
   assert.match(page, /from '\/utils\/document-facets\.js'/);
   const cat = page.slice(page.indexOf('function categoryCounts()'), page.indexOf('function renderCategoryChips'));
-  assert.match(cat, /categoryFacetCounts\(state\.allDocuments, \{ query: state\.query, inScope: matchesFolder \}\)/);
+  assert.match(cat, /categoryFacetCounts\(state\.allDocuments, \{ query: state\.query, inScope: inCategoryScope \}\)/);
   const fold = page.slice(page.indexOf('function folderCounts()'), page.indexOf('function categoryCounts()'));
-  assert.match(fold, /folderFacetCounts\(state\.allDocuments, state\.folders, \{[^}]*query: state\.query[^}]*inScope: matchesCategory/);
+  assert.match(fold, /folderFacetCounts\(state\.allDocuments, state\.folders, \{[^}]*query: state\.query[^}]*inScope: \(doc\) => matchesCategory\(doc\)/);
   const exp = page.slice(page.indexOf('function expiringCount()'), page.indexOf('function applyFilters'));
   assert.match(exp, /matchesDocumentQuery\(doc, state\.query\)/);
   // Die Liste nutzt dieselbe Suchregel wie die Zaehler - EINE Regel, zwei Leser.

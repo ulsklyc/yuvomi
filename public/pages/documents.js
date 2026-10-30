@@ -1421,24 +1421,30 @@ function folderSubtree(folderId) {
 
 /* Beide Achsen zaehlen auch unter der Suche (Critique 2026-09-25, P2): bei
  * "Keine Treffer" standen links weiter die vollen Zahlen. Die Rechnung selbst
- * wohnt in utils/document-facets.js und laeuft dort als Programm. */
+ * wohnt in utils/document-facets.js und laeuft dort als Programm. Die Person
+ * gehoert zum Geltungsbereich beider Achsen (#1705), sonst fuehrt ein Zaehler ins
+ * Leere. */
 function folderCounts() {
   return folderFacetCounts(state.allDocuments, state.folders, {
     query: state.query,
-    inScope: matchesCategory,
+    inScope: (doc) => matchesCategory(doc) && matchesPerson(doc),
     subtreeOf: folderSubtree,
   });
 }
 
+function inCategoryScope(doc) {
+  return matchesFolder(doc) && matchesPerson(doc);
+}
+
 function categoryCounts() {
-  return categoryFacetCounts(state.allDocuments, { query: state.query, inScope: matchesFolder });
+  return categoryFacetCounts(state.allDocuments, { query: state.query, inScope: inCategoryScope });
 }
 
 /* WELCHE Chips stehen, entscheidet der Bestand, nicht die Suche: sonst sprangen
  * die Chips bei jedem Tastendruck heraus und herein, und die Zeile unter dem
  * Finger ordnete sich neu. Die ZAHL daran folgt der Suche (categoryCounts). */
 function presentCategories() {
-  return categoryFacetCounts(state.allDocuments, { inScope: matchesFolder });
+  return categoryFacetCounts(state.allDocuments, { inScope: inCategoryScope });
 }
 
 // Nur belegte Kategorien werden zu Chips — 15 permanent sichtbare Filter, von
@@ -2869,6 +2875,7 @@ export const __test = {
   memberOptions, loadMembers, documentVisibilityFieldHtml, openDocumentViewer,
   // R8 H14: der Auswahlkreis als Programm (Markup und Tipp).
   state, renderSelectBox, toggleDocumentSelection,
+  categoryCounts, folderCounts, presentCategories,
   setContainerForTest(container, { built = false } = {}) {
     _container = container;
     if (built) _built = container;

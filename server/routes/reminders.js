@@ -371,9 +371,10 @@ router.get('/all', (req, res) => {
     }
 
     const rows = db.get().prepare(`
-      SELECT * FROM reminders
-      WHERE entity_type = ? AND entity_id = ? AND created_by = ? AND dismissed = 0
-      ORDER BY remind_at ASC
+      SELECT r.* FROM reminders r
+      WHERE r.entity_type = ? AND r.entity_id = ? AND r.created_by = ? AND r.dismissed = 0
+        AND ${reminderTargetVisibleSql(db.get(), 'r')}
+      ORDER BY r.remind_at ASC
     `).all(entityType, entityId, userId);
 
     res.json({ data: rows });
@@ -402,9 +403,10 @@ router.get('/', (req, res) => {
     }
 
     const row = db.get().prepare(`
-      SELECT * FROM reminders
-      WHERE entity_type = ? AND entity_id = ? AND created_by = ? AND dismissed = 0
-      ORDER BY created_at DESC LIMIT 1
+      SELECT r.* FROM reminders r
+      WHERE r.entity_type = ? AND r.entity_id = ? AND r.created_by = ? AND r.dismissed = 0
+        AND ${reminderTargetVisibleSql(db.get(), 'r')}
+      ORDER BY r.created_at DESC LIMIT 1
     `).get(entityType, entityId, userId);
 
     res.json({ data: row || null });

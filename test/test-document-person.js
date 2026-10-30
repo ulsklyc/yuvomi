@@ -316,6 +316,23 @@ test('/pending: die Person sieht die Meldung nur, solange sie das Dokument oeffn
   assert.equal((await rows()).length, 1, 'ausdruecklich freigegeben');
 });
 
+test('GET /reminders und /all: wer das Dokument nicht oeffnen darf, liest auch die Erinnerung nicht', async () => {
+  const doc = await fileDocument(withExpiry({ subject_user_id: JOHN, visibility: 'private' }));
+  const query = `entity_type=document_expiry&entity_id=${doc.id}`;
+  const read = async () => ({
+    one: (await asUser(JOHN, (h) => h.reminders('GET', `/?${query}`))).body.data,
+    all: (await asUser(JOHN, (h) => h.reminders('GET', `/all?${query}`))).body.data,
+  });
+  assert.deepEqual(await read(), { one: null, all: [] }, 'Dokument-ID und Termin bleiben verborgen');
+  const owner = await asUser(OWNER, (h) => h.reminders('GET', `/?${query}`));
+  assert.equal(owner.body.data?.entity_id, doc.id, 'die Ablegende liest ihre Zeile weiter');
+
+  await asUser(OWNER, (h) => h.call('PUT', `/${doc.id}`, { visibility: 'restricted', allowed_member_ids: [JOHN] }));
+  const shared = await read();
+  assert.equal(shared.one?.entity_id, doc.id, 'nach der Freigabe sichtbar');
+  assert.equal(shared.all.length, 1);
+});
+
 async function deliver() {
   const push = [];
   const channel = [];
