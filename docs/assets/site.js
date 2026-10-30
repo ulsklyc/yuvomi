@@ -20,11 +20,12 @@
    reads before the first paint. A page that draws theme-dependent images
    (index.html's screenshots) listens for the "yuvomi:theme" event.
 
-   LANGUAGE BUTTON. On the translated pages (index, install) the page switches
-   the language itself and then fires "yuvomi:lang"; this script rewrites the
-   button: visible text is the target language, the name starts with it
-   (SC 2.5.3). The legal pages' language control is a plain link with static
-   text and is left alone. The theme button's name follows the same event.
+   LANGUAGE SEGMENT. On the translated pages (index, install) the page switches
+   the language itself and then fires "yuvomi:lang"; this script moves
+   aria-pressed to the segment of the language now read (#langSeg, two
+   buttons since S7). Text, name and lang of each segment never change. The
+   legal pages' segment is a link plus plain text and is left alone. The
+   theme button's name follows the same event.
 
    Since S2 it also switches the one back-to-top link and sizes the room the
    code plates keep for their copy button (both at the end), since S3 it
@@ -43,7 +44,6 @@
     de: { mode: { system: 'System', light: 'Hell', dark: 'Dunkel' }, label: 'Design: {cur} - zu {next} wechseln',
       shown: { system: 'System', light: 'Hell', dark: 'Dunkel' } }
   };
-  var LANG_NAME = { de: 'DE - Auf Deutsch lesen', en: 'EN - Read in English' };
 
   var root = document.documentElement;
   var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
@@ -79,18 +79,9 @@
       var shown = btn.querySelector('.nav-theme-label');
       if (shown) shown.textContent = s.shown[mode];
     }
-    var lb = document.getElementById('langBtn');
-    if (lb && lb.tagName === 'BUTTON') {
-      var target = pageLang() === 'de' ? 'en' : 'de';
-      var lbl = lb.querySelector('.nav-lang-label');
-      if (lbl) lbl.textContent = target.toUpperCase();
-      /* The segment you are reading in (S4): EN | DE with the current one
-         raised, drawn by site.css from data-cur - outside the name, which
-         says where the button goes. */
-      lb.setAttribute('data-cur', pageLang().toUpperCase());
-      lb.setAttribute('lang', target);
-      lb.setAttribute('aria-label', LANG_NAME[target]);
-      lb.setAttribute('title', LANG_NAME[target]);
+    var seg = document.querySelectorAll('#langSeg > button[data-lang]');
+    for (var i = 0; i < seg.length; i++) {
+      seg[i].setAttribute('aria-pressed', String(seg[i].getAttribute('data-lang') === pageLang()));
     }
   }
 

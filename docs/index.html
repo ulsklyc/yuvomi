@@ -171,13 +171,12 @@
          der App (#1D1B17, tokens.css --neutral-900), in beiden Themes gleich -
          ein Telefon wird im Dunkeln nicht hell. */
       --bezel: #1D1B17;
+      /* Seine Kante (--bezel-edge, site.css): im Dunkeln eine Haarlinie und
+         ein Glanz oben, sonst verschwand der Rahmen im Grund (S7). */
       /* Das Telefon als oberer Ausschnitt (Hero und Tagesablauf am Telefon):
          dieselbe Breite wie --ar-phone, zwei Drittel der Hoehe, unten
          ausgeblendet. Der volle Bildschirm stand dort 650-900px hoch. */
       --ar-phone-peek: 1320 / 1900;
-      /* Noch kuerzer: nur Kopfzeile und die ersten Eintraege (S4, die
-         Pinnwand der Familie am Telefon). */
-      --ar-phone-glance: 1320 / 1560;
     }
 
     /* scroll-padding-bottom (was per Tab fokussiert wird, scrollt ueber das
@@ -431,7 +430,11 @@
        Seit S1 (2026-10-30) fuenf von zehn: Warum eine App, Ein Tag zu Hause,
        Familie, Gehoert euch, Bevor ihr euch festlegt. Zentriert bleiben der
        Problemblock (Einleitung zu "Warum eine App"), der Modulkatalog (Beleg
-       zum Tag und zur Familie) und das Einrichten (Weg zum Schluss). */
+       zum Tag und zur Familie) und das Einrichten (Weg zum Schluss).
+       Seit S7 drei von zehn: sechs gleiche Koepfe (Eyebrow, Titel, Absatz
+       rechts) waren wieder eine Liste (Re-Critique A). "Gehoert euch" ist
+       jetzt ein Satz in Ausstellungsgroesse (.yours-statement), die Fragen
+       ein schlichter Titel ohne Marke (.long-head). */
     .sec-head.lead { max-width: var(--m-read); }
     .sec-head.lead .sec-title { font-size: clamp(2.3rem, 5.2vw, 3.9rem); }
     /* Geteilter Kopf (S3, Critique 2026-10-30): am Schirm Titel links, Absatz
@@ -534,7 +537,7 @@
        unten). */
     .hero-frame img { width: 100%; height: auto; display: block; }
     .hero-wall, .hero-float { position: absolute; bottom: 0; z-index: 2; overflow: hidden;
-      background: var(--bezel); border: 0 solid var(--bezel); box-shadow: var(--shadow-xl); }
+      background: var(--bezel); border: 0 solid var(--bezel); box-shadow: var(--shadow-xl), var(--bezel-edge); }
     /* Das Wandtablet zeigt nur seinen Inhalt: 16:10 von oben, die leere
        untere Flaeche des Wand-Modus (gut ein Viertel) faellt weg. */
     .hero-wall { left: 0; width: 34%; border-width: 9px; border-radius: 22px; }
@@ -642,7 +645,9 @@
     /* Am Schirm: Unterschrift links, Ausschnitt rechts - vorher stand die
        Unterschrift darueber und das Bild 648px hoch in voller Spalte. */
     @media (min-width: 861px) {
-      .gal-item { display: grid; grid-template-columns: minmax(0, 17rem) minmax(0, 1fr); gap: 44px; align-items: center; }
+      /* Oben buendig (S7): mittig stand die Unterschrift unter rund 200px
+         Leere neben dem Bild (Re-Critique A). */
+      .gal-item { display: grid; grid-template-columns: minmax(0, 17rem) minmax(0, 1fr); gap: 44px; align-items: start; }
       .gal-cap { flex-direction: column; align-items: flex-start; gap: 12px; margin: 0; }
     }
 
@@ -802,27 +807,40 @@
        Titelteil); das Markenzeichen steht klein neben dem Kopf, die drei
        Momente darunter nebeneinander - drei gleichrangige Szenen, keine Liste. */
     .family { padding: var(--sec-s) 0; }
-    /* Ohne eigenes Bild seit S3: das Wandtablet steht im Hero. Kopf, die drei
-       Momente, der Weg der Eingeladenen - untereinander, ohne Leerspalte. */
+    /* Kopf und Buehne (S7): am Schirm der Kopf links, die Wand mit der
+       Pinnwand rechts; darunter die drei Momente und der Weg der
+       Eingeladenen ueber die volle Breite. Am Telefon untereinander. */
     .fam-grid { display: grid; grid-template-columns: minmax(0, 1fr);
-      grid-template-areas: "head" "phone" "list" "invite"; gap: 36px; }
-    /* Am Schirm steht die Pinnwand rechts neben dem Kopf (S4), so hoch wie
-       er - die Zeile kostet damit kaum mehr als der Kopf allein (+0,08
-       Bildschirme statt +0,28 neben den untereinander gestellten Momenten,
-       gemessen 1440). Momente und der Weg der Eingeladenen bleiben ueber die
-       volle Breite. */
+      grid-template-areas: "head" "stage" "list" "invite"; gap: 36px; }
     @media (min-width: 861px) {
-      .fam-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 15.5rem); column-gap: 64px;
-        grid-template-areas: "head phone" "list list" "invite invite"; }
+      .fam-grid { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); column-gap: 56px;
+        grid-template-areas: "head stage" "list list" "invite invite"; }
       .fam-grid .fam-head { align-self: center; }
       .fam-grid .sec-head.split { display: block; }
-      .fam-phone { margin: 0 0 -36px; }
     }
-    .fam-phone { grid-area: phone; position: relative; width: min(100%, 15.5rem); margin: 0 auto;
-      aspect-ratio: var(--ar-phone-peek); overflow: hidden;
-      border: 7px solid var(--bezel); border-bottom: 0; border-radius: var(--r-phone) var(--r-phone) 0 0; box-shadow: var(--shadow-xl);
-      -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
-    .fam-phone img { width: 100%; aspect-ratio: var(--ar-phone); object-fit: cover; object-position: top center; border-radius: var(--r-phone-inset) var(--r-phone-inset) 0 0; }
+    /* Titel und Absatz: der geteilte Kopf setzt die Unterkante des Titels auf
+       0, weil der Absatz daneben steht. Hier steht er darunter, und am
+       Schirm klebten beide (0px, Re-Critique A). */
+    .fam-grid .sec-head.split .sec-title { margin-bottom: 16px; }
+    /* Die Buehne: das Tablet nimmt 88 % der Breite, das Telefon steht rechts
+       unten davor und laeuft unten in die Seite aus wie im Hero. Beide im
+       Geraeterahmen (--bezel, Kante siehe .hero-wall). */
+    .fam-stage { grid-area: stage; position: relative; margin: 0; padding-bottom: 44px; }
+    .fam-wall { display: block; width: 88%; overflow: hidden; background: var(--bezel);
+      border: 10px solid var(--bezel); border-radius: 24px; box-shadow: var(--shadow-xl), var(--bezel-edge); }
+    .fam-wall img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top left; border-radius: 14px; }
+    .fam-phone { position: absolute; right: 0; bottom: 0; width: 25%; overflow: hidden;
+      aspect-ratio: var(--ar-phone-peek); background: var(--bezel);
+      border: 6px solid var(--bezel); border-bottom: 0; border-radius: var(--r-phone) var(--r-phone) 0 0;
+      box-shadow: var(--shadow-xl), var(--bezel-edge);
+      -webkit-mask-image: linear-gradient(#000 80%, transparent); mask-image: linear-gradient(#000 80%, transparent); }
+    .fam-phone img { display: block; width: 100%; aspect-ratio: var(--ar-phone); object-fit: cover; object-position: top center; border-radius: var(--r-phone-inset) var(--r-phone-inset) 0 0; }
+    @media (max-width: 600px) {
+      .fam-stage { padding-bottom: 28px; }
+      .fam-wall { border-width: 6px; border-radius: 15px; }
+      .fam-wall img { border-radius: 9px; }
+      .fam-phone { width: 27%; border-width: 4px; }
+    }
     .fam-head { grid-area: head; }
     .fam-list { grid-area: list; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px;
       padding-top: 36px; border-top: 1px solid var(--border); }
@@ -858,11 +876,6 @@
         overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: 24px;
         margin-inline: -24px; padding: 26px 24px 14px; scrollbar-width: thin; }
       .fam-item { scroll-snap-align: start; }
-    }
-    /* Am Telefon ein kurzer Blick (S4): Kopfzeile und zwei Notizen reichen
-       als Beleg, und die Sektion war dort schon 1,4 Bildschirme lang. */
-    @media (max-width: 700px) {
-      .fam-phone { width: min(48%, 11rem); aspect-ratio: var(--ar-phone-glance); }
     }
     @media (max-width: 600px) {
       .fam-grid { gap: 28px; }
@@ -1167,8 +1180,19 @@
     /* Seit S4 (Critique 2026-10-30) in der rechten Spalte unter den Katalogen:
        dort stand neben der Docker-Karte rund 150px leer, waehrend Knopf und
        Satz eine eigene Zeile darunter belegten. */
-    .plat-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; margin-top: 28px; }
-    .plat-cta .plat-more { margin-top: 0; flex: 1 1 22rem; }
+    /* "Weitere Wege" (S7): dieselbe ruhige Klappe wie der Steckbrief darunter. */
+    .plat-ways { margin-top: 20px; }
+    .plat-ways > summary { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; list-style: none;
+      font-size: var(--fs-small); font-weight: 600; color: var(--accent-deep); }
+    .plat-ways > summary::-webkit-details-marker { display: none; }
+    .plat-ways > summary:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .plat-ways > summary svg { width: 14px; height: 14px; transition: transform var(--dur-turn) var(--ease-out); }
+    .plat-ways[open] > summary svg { transform: rotate(180deg); }
+    .plat-ways .plat-more { margin-top: 6px; }
+    .plat-guide { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 4px;
+      font-size: var(--fs-small); font-weight: 700; color: var(--accent-deep); }
+    .plat-guide svg { width: 15px; height: 15px; transition: transform .2s var(--ease-out); }
+    .plat-guide:hover svg, .plat-guide:focus-visible svg { transform: translateX(3px); }
     /* What the reader is actually deciding before they install on the machine
        that will hold their family's health records: what runs, how big it is,
        what it opens, and whether it talks to anyone. All of it lived
@@ -1225,7 +1249,12 @@
        aussen). Das Padding stand noch auf
        `30px 0 8px` aus der Absatz-Fassung und gab der Sektion, die die Seite
        selbst als Entscheidungspunkt fuehrt, acht Pixel Luft nach unten. */
-    .longevity { padding: var(--sec-s) 0; }
+    /* Unten ein halber Rand (S7): die Fragen schliessen an Einrichten an, mit
+       zwei vollen Raendern standen 160px Leere zwischen beiden. */
+    .longevity { padding: var(--sec-s) 0 calc(var(--sec-s) * 0.5); }
+    /* Der schlichte Kopf (S7) laeuft ueber die Breite: als Kapitelmarke stand
+       er zweizeilig in der schmalen Kopfspalte. */
+    .long-head { max-width: none; }
     .long-list { margin-top: 32px; display: grid; gap: 0 48px; border-bottom: 1px solid var(--border); }
     /* Vier Karten untereinander liefen am Schirm ~1.450px; zwei mal zwei
        halbieren das, und jede Spalte liegt mit ~60 Zeichen im Lesemass.
@@ -1274,21 +1303,29 @@
        Datum, Changelog), rechts vier Aussagen als Liste mit Haarlinien - wie
        die Uebergaben, nicht wie ein Feature-Raster. */
     .yours { padding: var(--sec-s) 0; }
-    .yours-grid { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: 32px 72px; align-items: start; }
-    .yours-list { display: grid; margin-top: 8px; }
-    /* Am Schirm bleibt die Kapitelmarke stehen, waehrend die vier Aussagen
-       daneben vorbeiziehen - die linke Spalte war sonst ab der Haelfte leer. */
-    @media (min-width: 961px) { .yours-head { position: sticky; top: calc(var(--bar-h) + 32px); } }
+    /* Seit S7: der Satz in Ausstellungsgroesse (groesser als jede Kapitel-
+       ueberschrift, einmal auf der Seite), darunter Absatz und Lebenszeichen,
+       dann die vier Aussagen zwei mal zwei. */
+    .yours-grid { display: grid; gap: 36px; }
+    .yours-statement { max-width: none; }
+    .yours-statement .sec-title { font-size: clamp(2.6rem, 6.2vw, 4.75rem); line-height: 1.02; letter-spacing: -0.04em; margin: 0; max-width: 18ch; }
+    .yours-sub { display: grid; gap: 14px 56px; margin-top: 20px; }
+    .yours-list { display: grid; column-gap: 56px; border-bottom: 1px solid var(--border); }
+    @media (min-width: 961px) {
+      .yours-sub { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: end; }
+      .yours-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+      .yours-ver { justify-content: flex-end; }
+    }
     .yours-item { padding: 20px 0; border-top: 1px solid var(--border); }
-    .yours-item:last-child { border-bottom: 1px solid var(--border); }
     .yours-item dt { font-size: var(--fs-lead); font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; color: var(--text-1); margin-bottom: 6px; }
     .yours-item dd { margin: 0; max-width: var(--m-prose); font-size: var(--fs-body); color: var(--text-2); line-height: 1.6; }
-    .yours-ver { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 24px;
+    .yours-ver { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px;
       font-size: var(--fs-small); color: var(--text-2); }
     .yours-ver b { color: var(--text-1); font-variant-numeric: tabular-nums; }
-    .yours-ver a { color: var(--accent-deep); font-weight: 600; padding-block: 4px; }
+    /* 44px Ziel (S7): als Textlink war er 31px hoch (Re-Critique B). */
+    .yours-ver a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent-deep); font-weight: 600; }
     @media (max-width: 960px) {
-      .yours-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+      .yours-grid { gap: 24px; }
     }
 
     /* ===== CTA ===== */
@@ -1368,7 +1405,7 @@
          Telefonrahmen und `fill` verzerrt sie. `cover` zeigt in dem Fall den
          oberen Ausschnitt statt eines Zerrbilds. */
       .gal-crop { aspect-ratio: var(--ar-phone-peek); max-width: 300px; margin: 0 auto;
-        border: 6px solid var(--bezel); border-bottom: 0; border-radius: var(--r-phone) var(--r-phone) 0 0;
+        border: 6px solid var(--bezel); border-bottom: 0; border-radius: var(--r-phone) var(--r-phone) 0 0; box-shadow: var(--shadow-xl), var(--bezel-edge);
         -webkit-mask-image: linear-gradient(#000 76%, transparent); mask-image: linear-gradient(#000 76%, transparent); }
       .gal-frame img { width: 100%; translate: none; aspect-ratio: var(--ar-phone); object-fit: cover; object-position: top center; }
       .gal-frame::before { inset: -4% 14%; }
@@ -1384,7 +1421,7 @@
          weg - neben einem Telefon ist ein zweites keine Aussage. */
       .hero-visual { max-width: 520px; padding-bottom: 0; }
       .hero-frame { width: 70%; margin: 0 0 0 auto; aspect-ratio: var(--ar-phone-peek);
-        border: 7px solid var(--bezel); border-bottom: 0; border-radius: var(--r-phone) var(--r-phone) 0 0; box-shadow: var(--shadow-xl);
+        border: 7px solid var(--bezel); border-bottom: 0; border-radius: var(--r-phone) var(--r-phone) 0 0; box-shadow: var(--shadow-xl), var(--bezel-edge);
         -webkit-mask-image: linear-gradient(#000 74%, transparent); mask-image: linear-gradient(#000 74%, transparent); }
       .hero-wall { top: 15%; bottom: auto; width: 62%; z-index: 0; border-width: 6px; border-radius: 15px; }
       .hero-wall img { border-radius: 9px; }
@@ -1426,21 +1463,21 @@
          Fokus-Scrollen dasselbe Band (scroll-padding-bottom, site.css). Der
          Nach-oben-Knopf stand bis S2 als zweite Pille darueber; unter 700px
          gibt es nur noch diese eine (site.css, "Back to top"). */
-      /* Die Pille bleibt beim Lesen stehen (Critique 2026-09-29). Bis dahin
-         raeumte sie bei JEDER Abwaertsbewegung das Feld (`nav-down`) - wer
-         liest, scrollt abwaerts, also war sie an 0 von 41 Messpunkten zu
-         sehen, und unter 700px gibt es keinen anderen Installieren-Knopf.
-         Sie weicht jetzt nur dort, wo sie wirklich etwas verdeckt, das man
-         bedienen will: solange eine Codeplatte (Befehl und Kopierknopf) oder
-         die Knoepfe des Schluss-CTA durch das untere Band laufen, und solange
-         das Sprungmenue offen ist. Das entscheidet die Lage, nicht ein Timer:
-         keine Wiederkehr nach X ms Stillstand, die beim langsamen Lesen
-         flackert und beim schnellen nie kommt. Fliesstext darf unter ihr
-         durchlaufen; `body { padding-bottom }` haelt das Seitenende frei. */
+      /* Wann die Pille geht (S7, Re-Critique 2026-10-30): beim
+         Runterscrollen (html.pill-away, Skript am Dateiende), ueber ihren
+         Besitzern (Hero, Einrichten, Schlusskarte, Fuss - dort fehlt .show)
+         und solange das Sprungmenue offen ist (cta-yield). Beim Hochscrollen
+         kommt sie wieder, wie die Leiste von Safari auf dem iPhone.
+         Geschichte: 2026-09-29 blieb sie beim Lesen stehen, weil sie bei
+         jeder Abwaertsbewegung ging und unter 700px der einzige
+         Installieren-Knopf ist; die Re-Critique fand sie dann ueber
+         Ueberschriften, Modulnamen und Fragen in EN und DE. Der Weg zurueck
+         ist eine Daumenbewegung nach oben, und die Leiste traegt das Ziel
+         ohnehin (Logo, Sprungmenue). */
       /* Die Pille muss `html.js .mobile-cta.show` (0,3,1) schlagen, sonst bleibt
          sie sichtbar - genau das war der erste Versuch, und die Messung hat es
          gezeigt: die Klasse stand, die Deckkraft blieb 1. */
-      html.js.cta-yield .mobile-cta.show {
+      html.js.pill-away .mobile-cta.show, html.js.cta-yield .mobile-cta.show {
         transform: translateX(-50%) translateY(150%); opacity: 0;
         visibility: hidden; pointer-events: none;
       }
@@ -1457,6 +1494,8 @@
       }
       .plat-card:hover, .plat-card:active, .nav-jump summary:active, html.js .mod-toggle:active, .day-tab:active, .plat-cap:active { transform: none; }
       .mobile-cta:active, html.js .mobile-cta:not(.show) { transform: translateX(-50%); }
+      /* Ohne Gleiten: sie blendet nur aus (S7). */
+      html.js.pill-away .mobile-cta.show, html.js.cta-yield .mobile-cta.show { transform: translateX(-50%); }
       /* Die Handoff-Bewegung ist Ortswechsel, also genau das, was hier
          wegfaellt: kein Wandern, kein Ankommen. Die Zeilen stehen statisch. */
       .ho-token { display: none !important; }
@@ -1469,7 +1508,7 @@
     @media print {
       html { scroll-behavior: auto; }
       body { background: #fff; color: #000; }
-      .site-bar, .hero-glow, .ho-token, .mod-toggle, .day-tabs, .long-more > summary, .plat-sheet > summary { display: none !important; }
+      .site-bar, .hero-glow, .ho-token, .mod-toggle, .day-tabs, .long-more > summary, .plat-sheet > summary, .plat-ways > summary { display: none !important; }
       .day.is-tabs .day-when { display: block; }
       .handoff, .showcase, .yours, .longevity, .platforms, .cta { content-visibility: visible; }
       /* Papier hat keinen Aufklapp-Knopf: jede Modulbeschreibung steht da. */
@@ -1522,7 +1561,7 @@
             <li><a href="#install" data-t="jump_install">Where it runs</a></li>
           </ul>
         </details>
-        <button class="nav-btn nav-lang" id="langBtn" type="button" lang="de" aria-label="DE - Auf Deutsch lesen" title="DE - Auf Deutsch lesen" data-cur="EN"><span class="nav-lang-label">DE</span></button>
+        <div class="nav-lang" id="langSeg" role="group" aria-label="Language" data-t-aria="lang_aria"><button class="nav-btn" type="button" lang="en" data-lang="en" aria-pressed="true" title="Read in English">EN</button><button class="nav-btn" type="button" lang="de" data-lang="de" aria-pressed="false" title="Auf Deutsch lesen">DE</button></div>
         <button class="nav-btn nav-theme" id="themeBtn" type="button" data-mode="system" aria-label="Theme: system - switch to light" title="Theme: system - switch to light"><svg class="ico-system" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><svg class="ico-light" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg class="ico-dark" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><span class="nav-theme-label">System</span></button>
       </div>
       <a href="https://github.com/ulsklyc/yuvomi" class="nav-btn nav-gh" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg><span class="nav-gh-label" data-t="nav_gh">GitHub</span></a>
@@ -1584,13 +1623,14 @@
         <script>(function(i,H){if(!i)return;if(!H){i.src=i.dataset.light;return;}i.onerror=function(){i.onerror=null;i.srcset='';i.src=H.base;};i.sizes=H.sizes;i.srcset=H.srcset;i.src=H.src;})(document.getElementById('heroShot'),window.YuvomiHero);</script>
         <noscript><img class="sc" src="screenshots/dashboard-light-web.png" srcset="screenshots/dashboard-light-web@1x.webp 700w, screenshots/dashboard-light-web.webp 1400w, screenshots/dashboard-light-web@2400.webp 2400w" sizes="(max-width: 1199px) 68vw, 828px" alt="Yuvomi overview showing what is on today for the whole family, with the family, birthday and reward cards below" width="1400" height="1050"></noscript>
       </div>
-      <!-- Das Wandtablet (S3, Critique 2026-10-30): bis dahin das Bild der
-           Familien-Sektion, jetzt das dritte Geraet der Buehne. Jedes Motiv
-           einmal (test:docs-landing) - die Familie erzaehlt die Wand seitdem
-           in Worten, der Hero zeigt sie. -->
+      <!-- Das Wandtablet (S3, Critique 2026-10-30), das dritte Geraet der
+           Buehne. Seit S7 ein Ausschnitt (crops/hero-wall, 16:10 von oben
+           links, 320/640/960px): hier steht es 200-373px breit, und die volle
+           1400px-Aufnahme lud rund 50 KB, die niemand sah. Gross und lesbar
+           zeigt dieselbe Wand die Familien-Sektion - hier ist sie die
+           Silhouette, die "auch an der Wand" sagt, dort der Beleg. -->
       <div class="hero-wall">
-        <img class="sc" data-light="screenshots/dashboard-wall-light-web.png" data-dark="screenshots/dashboard-wall-dark-web.png" data-sizes="(max-width: 860px) 330px, 400px" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" data-alt-t="alt_fam_wall" loading="lazy" decoding="async" width="1400" height="1050">
-        <noscript><img class="sc" src="screenshots/dashboard-wall-light-web.png" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers" loading="lazy" decoding="async" width="1400" height="1050"></noscript>
+        <img data-crop="hero-wall" src="screenshots/crops/hero-wall-light.webp" srcset="screenshots/crops/hero-wall-light@1x.webp 320w, screenshots/crops/hero-wall-light.webp 640w, screenshots/crops/hero-wall-light@3x.webp 960w" sizes="(max-width: 569px) calc(62vw - 32px), (max-width: 860px) 310px, (max-width: 1199px) 30vw, 373px" alt="The same plan in wall mode on a tablet in the kitchen" data-alt-t="alt_hero_wall" loading="lazy" decoding="async" width="640" height="400">
       </div>
       <!-- Einkaufsliste statt Aufgaben: dieselbe Aufgaben-Aufnahme traegt die
            Planen-Karte weiter unten, dort in lesbarer Groesse (Critique Runde 2).
@@ -1709,12 +1749,12 @@
       alt_f_tasks_m:"Tasks on mobile",
       alt_f_recipes_m:"Recipes on mobile",
       alt_f_budget_m:"Budget on mobile",
-      nav_main:'Main', foot_nav:'Footer',
+      nav_main:'Main', foot_nav:'Footer', lang_aria:'Language',
       nav_gh:'GitHub', nav_install:'Install',
       meta_desc:'Self-hosted planner for families, couples and one-person households: calendar, tasks, meals, shopping and budget in one app on your own hardware. No subscription, no ads, no trackers.',
       hero_h1_pre:'One home', hero_h1_em:'instead of many subscriptions.',
       hero_sub:'Calendar, tasks, meals, shopping and money in one app whose parts work together. It runs on your own computer at home - for a family, a couple, or just you.',
-      long_eyebrow:'Before you commit', tb_image_k:'Image', tb_image_v:'about 500 MB, for amd64 and arm64 - Raspberry\u00a0Pi\u00a04\u00a0and\u00a05 included',
+      tb_image_k:'Image', tb_image_v:'about 500 MB, for amd64 and arm64 - Raspberry\u00a0Pi\u00a04\u00a0and\u00a05 included',
       tb_needs_k:'Needs', tb_needs_v:'256 MB RAM and one port, 3000 by default.',
       tb_writes_k:'Writes', tb_writes_v:'Four volumes you own: data, backups, modules, documents.',
       tb_out_k:'Outbound', tb_out_v:'Out of the box, one update check against the GitHub releases API. Block it and nothing breaks. Everything else reaches out only when you use or switch on a feature that needs it.',
@@ -1727,7 +1767,8 @@
       gal_meals_k:'Meals', gal_meals_c:'<b>What is for dinner is already decided.</b> The whole week from breakfast to snacks, dragged into place and there for everyone at home.',
       alt_gal_meals:'Yuvomi meal planner showing a week of breakfasts, lunches, dinners and snacks',
       alt_fam_notes:"The shared notes board on a phone: pinned notes with emergency numbers, the children's activities and school details, and a holiday checklist",
-      alt_fam_wall:"Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today, the weather and one-tap kitchen timers",
+      alt_fam_wall:"Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today and the weather",
+      alt_hero_wall:"The same plan in wall mode on a tablet in the kitchen",
       gal_cal_k:'Calendar', gal_cal_c:'<b>Who has to be where, before anyone asks.</b> Google, iCloud and Nextcloud calendars in one view, synced both ways, and the whole day on a single timeline.',
       proof_modules:'modules', proof_langs:'languages', proof_telemetry:'trackers', proof_mit:'MIT licensed', feat_title:'All of it, and only what you use.',
       /* "for families" war die eine Stelle, die die Solo-Zusage des Heros
@@ -1761,7 +1802,7 @@
       plat_desc:"Yuvomi comes as a Docker container: one packaged program that runs the same on any home server or NAS.",
       plat_docker:'Pre-built image, one <code>compose</code> command - or rootless with Podman on RHEL, Fedora and CentOS Stream.',
       tb_out_proof:'What the site itself stores', tb_out_code:'The update check in the source',
-      plat_more:'On Proxmox it runs in a <a href="install.html#proxmox">Debian container or a VM</a>. Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.', plat_start:'Start here', plat_guide_docker:'Docker guide', plat_cta:'Open the install guide', to_top:'Back to top',
+      plat_more:'On Proxmox it runs in a <a href="install.html#proxmox">Debian container or a VM</a>. Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.', plat_start:'Start here', plat_guide_docker:'Docker guide', plat_cta:'Every way, step by step: the install guide', plat_ways:'More ways to install', to_top:'Back to top',
       cta_title:'Set it up once. <em>Then the whole family plans with it.</em>', cta_desc:'After that it belongs to the household: on every phone and on the kitchen wall, with no account with us, no subscription and nothing of ours in between.',
       /* "Get started" brach als einziger CTA die Installieren-Verbfamilie
          (nav, hero, Sprungmenue sagen alle "Install") - gleiches Ziel, gleiches
@@ -1770,7 +1811,7 @@
       footer_heart:'Made with care for households that keep their data at home.',
       foot_product:'Product', foot_screens:'Screenshots', foot_install:'Install', foot_docs:'Docs & spec',
       foot_guide:'User guide (community)',
-      foot_project:'Project', foot_contrib:'Contributing', foot_changelog:'Changelog',
+      foot_project:'Project', foot_contrib:'Contributing', foot_changelog:'Changelog', foot_license:'MIT License',
       foot_legal:'Legal', foot_impressum:'Imprint (DE)', foot_privacy:'Privacy',
       foot_madewith:'Self-hosted · No trackers · Open source',
       /* S1 (2026-10-30): Tagesablauf, Gehoert-euch-Block, Einrichten verdichtet. */
@@ -1779,7 +1820,7 @@
       ho_list_aria:'Four connections between the modules', fam_list_aria:'Three moments at home',
       gal_rew_k:'Rewards', gal_rew_c:'<b>Chores done, points earned, and everyone sees what they are saving for.</b> A parent approves each request, and the history shows who did what.',
       alt_gal_rew:'Yuvomi rewards with requests waiting for a parent’s approval, pocket money, each child’s points and a history of completed tasks',
-      yours_eyebrow:'Yours to keep', yours_title:'It belongs to you, not to us.',
+      yours_title:'It belongs to you, not to us.',
       yours_desc:'No account with us, no subscription, no ads and no premium tier that locks half the app away. It runs on a computer in your home and keeps running there.',
       yours_1_t:'Free, and it stays that way.', yours_1_d:'Open source under the MIT license. Every module is included, nothing waits behind a paywall, and anyone can read, keep and run the code.',
       yours_2_t:'On your own disk, encrypted if you want.', yours_2_d:'Everything lives in one database file on your own server, health records and budget included. Switch on encryption (AES-256) and nobody can read that file without your key; the guided installer creates the key for you.',
@@ -1851,12 +1892,12 @@
       alt_f_tasks_m:"Aufgaben auf dem Handy",
       alt_f_recipes_m:"Rezepte auf dem Handy",
       alt_f_budget_m:"Budget auf dem Handy",
-      nav_main:'Hauptnavigation', foot_nav:'Fußzeile',
+      nav_main:'Hauptnavigation', foot_nav:'Fußzeile', lang_aria:'Sprache',
       nav_gh:'GitHub', nav_install:'Installieren',
       meta_desc:'Selbst gehosteter Planer für Familien, Paare und Alleinlebende: Kalender, Aufgaben, Essen, Einkauf und Budget in einer App auf eurer eigenen Hardware. Ohne Abo, ohne Werbung, ohne Tracker.',
       hero_h1_pre:'Ein Zuhause', hero_h1_em:'statt vieler Abos.',
       hero_sub:'Kalender, Aufgaben, Essen, Einkauf und Geld in einer App, deren Teile zusammenarbeiten. Sie läuft bei euch zu Hause, für die Familie, zu zweit oder allein.',
-      long_eyebrow:'Bevor ihr euch festlegt', tb_image_k:'Image', tb_image_v:'rund 500 MB, für amd64 und arm64 - auch Raspberry\u00a0Pi\u00a04\u00a0und\u00a05',
+      tb_image_k:'Image', tb_image_v:'rund 500 MB, für amd64 und arm64 - auch Raspberry\u00a0Pi\u00a04\u00a0und\u00a05',
       tb_needs_k:'Braucht', tb_needs_v:'256 MB RAM und einen Port, standardmäßig 3000.',
       tb_writes_k:'Legt an', tb_writes_v:'Vier Volumes, die euch gehören: Daten, Backups, Module, Dokumente.',
       tb_out_k:'Nach außen', tb_out_v:'Ab Werk nur eine Update-Abfrage an die GitHub-Releases-API. Blockiert ihr sie, geht nichts kaputt. Alles andere geht erst nach außen, wenn ihr eine Funktion nutzt oder einschaltet, die es braucht.',
@@ -1869,7 +1910,8 @@
       gal_meals_k:'Mahlzeiten', gal_meals_c:'<b>Was es heute gibt, steht schon fest.</b> Die ganze Woche vom Frühstück bis zum Snack, per Ziehen verteilt und für alle zu Hause da.',
       alt_gal_meals:'Yuvomi-Essensplaner mit einer Woche Frühstück, Mittag- und Abendessen und Snacks',
       alt_fam_notes:'Die gemeinsame Pinnwand am Handy: angeheftete Notizen mit Notfallnummern, den Terminen und Schulinfos der Kinder und einer Checkliste für den Urlaub',
-      alt_fam_wall:'Yuvomi im Wand-Modus auf einem Tablet im Querformat: die Uhrzeit in großer Schrift, Termine, Aufgaben und Einkauf des Tages, wer heute dran ist, das Wetter und Küchentimer auf Fingertipp',
+      alt_fam_wall:'Yuvomi im Wand-Modus auf einem Tablet im Querformat: die Uhrzeit in großer Schrift, Termine, Aufgaben und Einkauf des Tages, wer heute dran ist und das Wetter',
+      alt_hero_wall:'Derselbe Plan im Wand-Modus auf einem Tablet in der Küche',
       gal_cal_k:'Kalender', gal_cal_c:'<b>Wer wann wo sein muss, bevor jemand fragt.</b> Google-, iCloud- und Nextcloud-Kalender in einer Ansicht, in beide Richtungen abgeglichen, und der ganze Tag auf einer Zeitleiste.',
       proof_modules:'Module', proof_langs:'Sprachen', proof_telemetry:'Tracker', proof_mit:'MIT-lizenziert', feat_title:'Alles drin, und nur, was ihr nutzt.',
       feat_desc:'Gegliedert wie in der App. Was euer Haushalt nicht braucht, schaltet ein Admin für alle ab, und es verschwindet aus dem Menü. Fehlt etwas, lassen sich Erweiterungsmodule dazuholen.',
@@ -1900,13 +1942,13 @@
       plat_desc:'Yuvomi kommt als Docker-Container: ein fertig verpacktes Programm, das auf jedem Heimserver und jedem NAS gleich läuft.',
       plat_docker:'Fertiges Image, ein <code>compose</code>-Befehl - oder rootless mit Podman auf RHEL, Fedora und CentOS Stream.',
       tb_out_proof:'Was die Website selbst speichert', tb_out_code:'Die Versionsprüfung im Quelltext',
-      plat_more:'Auf Proxmox läuft es in einem <a href="install.html#proxmox">Debian-Container oder einer VM</a>. Zwei weitere Wege brauchen keine eigene Plattform: der <a href="install.html#installer">geführte Web-Installer</a> und die <a href="install.html#source">Installation aus dem Quelltext</a>.', plat_start:'Hier starten', plat_guide_docker:'Docker-Anleitung', plat_cta:'Zur Installationsanleitung', to_top:'Nach oben',
+      plat_more:'Auf Proxmox läuft es in einem <a href="install.html#proxmox">Debian-Container oder einer VM</a>. Zwei weitere Wege brauchen keine eigene Plattform: der <a href="install.html#installer">geführte Web-Installer</a> und die <a href="install.html#source">Installation aus dem Quelltext</a>.', plat_start:'Hier starten', plat_guide_docker:'Docker-Anleitung', plat_cta:'Jeder Weg Schritt für Schritt: die Installationsanleitung', plat_ways:'Weitere Wege', to_top:'Nach oben',
       cta_title:'Einmal einrichten. <em>Dann plant die ganze Familie mit.</em>', cta_desc:'Danach gehört es dem Haushalt: auf jedem Handy und an der Küchenwand, ohne Konto bei uns, ohne Abo und ohne etwas von uns dazwischen.',
       cta_install:'Yuvomi installieren', cta_family:'Was die Familie davon hat',
       footer_heart:'Mit Sorgfalt gemacht für Haushalte, die ihre Daten zu Hause behalten.',
       foot_product:'Produkt', foot_screens:'Screenshots', foot_install:'Installieren', foot_docs:'Doku und Spezifikation',
       foot_guide:'Nutzerhandbuch (Community)',
-      foot_project:'Projekt', foot_contrib:'Mitmachen', foot_changelog:'Changelog',
+      foot_project:'Projekt', foot_contrib:'Mitmachen', foot_changelog:'Changelog', foot_license:'MIT-Lizenz',
       foot_legal:'Rechtliches', foot_impressum:'Impressum', foot_privacy:'Datenschutz',
       foot_madewith:'Selbst gehostet · Ohne Tracker · Open Source',
       /* S1 (2026-10-30): Tagesablauf, Gehoert-euch-Block, Einrichten verdichtet. */
@@ -1915,11 +1957,11 @@
       ho_list_aria:'Vier Verbindungen zwischen den Modulen', fam_list_aria:'Drei Momente zu Hause',
       gal_rew_k:'Belohnungen', gal_rew_c:'<b>Aufgaben erledigt, Punkte verdient, und alle sehen, worauf sie sparen.</b> Ein Elternteil gibt jede Anfrage frei, und der Verlauf zeigt, wer was gemacht hat.',
       alt_gal_rew:'Yuvomi-Belohnungen mit Anfragen, die auf die Freigabe der Eltern warten, Taschengeld, dem Punktestand jedes Kindes und dem Verlauf erledigter Aufgaben',
-      yours_eyebrow:'Gehört euch', yours_title:'Es gehört euch, nicht uns.',
+      yours_title:'Es gehört euch, nicht uns.',
       yours_desc:'Kein Konto bei uns, kein Abo, keine Werbung und keine Premium-Stufe, die die halbe App wegsperrt. Es läuft auf einem Rechner bei euch zu Hause und bleibt dort.',
       yours_1_t:'Kostenlos, und das bleibt so.', yours_1_d:'Open Source unter der MIT-Lizenz. Jedes Modul ist dabei, nichts wartet hinter einer Bezahlschranke, und jeder kann den Code lesen, behalten und betreiben.',
       yours_2_t:'Auf eurer Platte, auf Wunsch verschlüsselt.', yours_2_d:'Alles liegt in einer Datenbankdatei auf eurem eigenen Server, Gesundheitsdaten und Budget eingeschlossen. Mit eingeschalteter Verschlüsselung (AES-256) kann diese Datei ohne euren Schlüssel niemand lesen; den Schlüssel legt der geführte Installer für euch an.',
-      yours_3_t:'Ein einziger Ruf nach draußen, und ihr könnt ihn prüfen.',
+      yours_3_t:'Nur eine Verbindung nach draußen, und ihr könnt sie prüfen.',
       yours_4_t:'Offen gepflegt, und von anderen gelistet.', yours_4_d:'TrueNAS, Umbrel und Unraid führen es in ihren App-Katalogen, und jede Änderung steht im öffentlichen Changelog.',
       yours_latest:'Neueste Version', yours_changelog:'Was sich geändert hat',
       long_more:'Die ganze Antwort',
@@ -2093,12 +2135,12 @@
       <li class="ho-row reveal">
         <div class="ho-flow">
           <span class="ho-step" style="--m: var(--m-meals)">
-            <span class="ho-shot"><img class="ho-img" data-crop="handoff-meals" src="screenshots/crops/handoff-meals-light.webp" srcset="screenshots/crops/handoff-meals-light@1x.webp 320w, screenshots/crops/handoff-meals-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-meals" src="screenshots/crops/handoff-meals-light.webp" srcset="screenshots/crops/handoff-meals-light@1x.webp 320w, screenshots/crops/handoff-meals-light.webp 640w, screenshots/crops/handoff-meals-light@3x.webp 960w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
             <span class="ho-cap"><span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V2"/><line x1="5.5" y1="11" x2="5.5" y2="22"/><path d="M17 2a4 4 0 0 0-3 3.9V13h3v9"/></svg></span><span class="ho-label" data-t="ho_1_a">Meal plan for the week</span></span>
           </span>
           <span class="ho-arrow" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="14 7 19 12 14 17"/></svg></span>
           <span class="ho-step ho-step--to" style="--m: var(--m-shopping)">
-            <span class="ho-shot"><img class="ho-img" data-crop="handoff-shopping-produce" src="screenshots/crops/handoff-shopping-produce-light.webp" srcset="screenshots/crops/handoff-shopping-produce-light@1x.webp 320w, screenshots/crops/handoff-shopping-produce-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-shopping-produce" src="screenshots/crops/handoff-shopping-produce-light.webp" srcset="screenshots/crops/handoff-shopping-produce-light@1x.webp 320w, screenshots/crops/handoff-shopping-produce-light.webp 640w, screenshots/crops/handoff-shopping-produce-light@3x.webp 960w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
             <span class="ho-cap"><span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span><span class="ho-label" data-t="ho_1_b">Ingredients on the shopping list</span></span>
           </span>
         </div>
@@ -2107,12 +2149,12 @@
       <li class="ho-row reveal">
         <div class="ho-flow">
           <span class="ho-step" style="--m: var(--m-tasks)">
-            <span class="ho-shot"><img class="ho-img" data-crop="handoff-tasks" src="screenshots/crops/handoff-tasks-light.webp" srcset="screenshots/crops/handoff-tasks-light@1x.webp 320w, screenshots/crops/handoff-tasks-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-tasks" src="screenshots/crops/handoff-tasks-light.webp" srcset="screenshots/crops/handoff-tasks-light@1x.webp 320w, screenshots/crops/handoff-tasks-light.webp 640w, screenshots/crops/handoff-tasks-light@3x.webp 960w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
             <span class="ho-cap"><span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="ho-label" data-t="ho_2_a">A chore gets ticked off</span></span>
           </span>
           <span class="ho-arrow" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="14 7 19 12 14 17"/></svg></span>
           <span class="ho-step ho-step--to" style="--m: var(--m-rewards)">
-            <span class="ho-shot"><img class="ho-img" data-crop="handoff-rewards" src="screenshots/crops/handoff-rewards-light.webp" srcset="screenshots/crops/handoff-rewards-light@1x.webp 320w, screenshots/crops/handoff-rewards-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-rewards" src="screenshots/crops/handoff-rewards-light.webp" srcset="screenshots/crops/handoff-rewards-light@1x.webp 320w, screenshots/crops/handoff-rewards-light.webp 640w, screenshots/crops/handoff-rewards-light@3x.webp 960w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
             <span class="ho-cap"><span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg></span><span class="ho-label" data-t="ho_2_b">Points land on your kid's balance</span></span>
           </span>
         </div>
@@ -2121,12 +2163,12 @@
       <li class="ho-row reveal">
         <div class="ho-flow">
           <span class="ho-step" style="--m: var(--m-documents)">
-            <span class="ho-shot"><img class="ho-img" data-crop="handoff-documents" src="screenshots/crops/handoff-documents-light.webp" srcset="screenshots/crops/handoff-documents-light@1x.webp 320w, screenshots/crops/handoff-documents-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-documents" src="screenshots/crops/handoff-documents-light.webp" srcset="screenshots/crops/handoff-documents-light@1x.webp 320w, screenshots/crops/handoff-documents-light.webp 640w, screenshots/crops/handoff-documents-light@3x.webp 960w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
             <span class="ho-cap"><span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span><span class="ho-label" data-t="ho_3_a">A receipt gets filed</span></span>
           </span>
           <span class="ho-arrow" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="14 7 19 12 14 17"/></svg></span>
           <span class="ho-step ho-step--to" style="--m: var(--m-budget)">
-            <span class="ho-shot"><img class="ho-img" data-crop="handoff-budget" src="screenshots/crops/handoff-budget-light.webp" srcset="screenshots/crops/handoff-budget-light@1x.webp 320w, screenshots/crops/handoff-budget-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-budget" src="screenshots/crops/handoff-budget-light.webp" srcset="screenshots/crops/handoff-budget-light@1x.webp 320w, screenshots/crops/handoff-budget-light.webp 640w, screenshots/crops/handoff-budget-light@3x.webp 960w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
             <span class="ho-cap"><span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></span><span class="ho-label" data-t="ho_3_b">It’s attached to the expense</span></span>
           </span>
         </div>
@@ -2139,12 +2181,12 @@
       <li class="ho-row reveal">
         <div class="ho-flow">
           <span class="ho-step" style="--m: var(--m-pantry)">
-            <span class="ho-shot"><img class="ho-img" data-crop="handoff-pantry" src="screenshots/crops/handoff-pantry-light.webp" srcset="screenshots/crops/handoff-pantry-light@1x.webp 320w, screenshots/crops/handoff-pantry-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-pantry" src="screenshots/crops/handoff-pantry-light.webp" srcset="screenshots/crops/handoff-pantry-light@1x.webp 320w, screenshots/crops/handoff-pantry-light.webp 640w, screenshots/crops/handoff-pantry-light@3x.webp 960w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
             <span class="ho-cap"><span class="ho-ico"><span class="ho-token" aria-hidden="true"></span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3"/><path d="M4 8h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><line x1="10" y1="13" x2="14" y2="13"/></svg></span><span class="ho-label" data-t="ho_4_a">The last jar goes out of the pantry</span></span>
           </span>
           <span class="ho-arrow" aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="19" y2="12"/><polyline points="14 7 19 12 14 17"/></svg></span>
           <span class="ho-step ho-step--to" style="--m: var(--m-shopping)">
-            <span class="ho-shot"><img class="ho-img" data-crop="handoff-shopping-bakery" src="screenshots/crops/handoff-shopping-bakery-light.webp" srcset="screenshots/crops/handoff-shopping-bakery-light@1x.webp 320w, screenshots/crops/handoff-shopping-bakery-light.webp 640w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
+            <span class="ho-shot"><img class="ho-img" data-crop="handoff-shopping-bakery" src="screenshots/crops/handoff-shopping-bakery-light.webp" srcset="screenshots/crops/handoff-shopping-bakery-light@1x.webp 320w, screenshots/crops/handoff-shopping-bakery-light.webp 640w, screenshots/crops/handoff-shopping-bakery-light@3x.webp 960w" sizes="(max-width: 700px) 300px, (max-width: 1099px) 46vw, 270px" alt="" loading="lazy" decoding="async" width="640" height="400"></span>
             <span class="ho-cap"><span class="ho-ico"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span><span class="ho-label" data-t="ho_4_b">One tap puts it on the shopping list</span></span>
           </span>
         </div>
@@ -2263,15 +2305,19 @@
         <h2 class="sec-title" data-t="fam_title">On the kitchen wall, in every pocket, for every age.</h2>
         <p class="sec-desc" data-t="fam_desc">Everyone at home gets their own account from a link and the app on their phone. Only the person who sets it up ever sees a server.</p>
       </div>
-      <!-- Ein eigenes Bild fuer die Familie (S4, Critique 2026-10-30): seit
-           S3 steht die Wand im Hero, und die Sektion war Text. Die gemeinsame
-           Pinnwand am Handy zeigt, was "fuer jedes Alter" heisst - Termine und
-           Schulinfos der Kinder neben den Notfallnummern, von zwei Eltern
-           angeheftet. Jedes Motiv einmal (test:docs-landing): notes steht
-           sonst nirgends. Oberer Ausschnitt im Telefonrahmen wie im Hero. -->
-      <figure class="fam-phone reveal">
-        <img class="sc" data-light="screenshots/notes-light-mobile.png" data-dark="screenshots/notes-dark-mobile.png" data-sizes="(max-width: 700px) 176px, 248px" alt="The shared notes board on a phone: pinned notes with emergency numbers, the children's activities and school details, and a holiday checklist" data-alt-t="alt_fam_notes" loading="lazy" decoding="async" width="1320" height="2867">
-        <noscript><img class="sc" src="screenshots/notes-light-mobile.png" alt="The shared notes board on a phone: pinned notes with emergency numbers, the children's activities and school details, and a holiday checklist" loading="lazy" decoding="async" width="1320" height="2867"></noscript>
+      <!-- Die Buehne der Familie (S7, Re-Critique 2026-10-30): der Titel
+           verspricht die Kuechenwand, also steht sie hier gross und lesbar -
+           das Wandtablet im Querformat, oben beschnitten auf seinen Inhalt
+           (16:10, die Kuechentimer am unteren Rand fallen weg), davor die
+           gemeinsame Pinnwand am Handy. Im Hero steht dieselbe Wand als
+           kleiner Ausschnitt (crops/hero-wall): dort die Silhouette, hier
+           der Beleg. Bis S7 zeigte die Sektion nur die Pinnwand, und die
+           Wand lebte 200px breit im Hero (Re-Critique A, P1). -->
+      <figure class="fam-stage reveal">
+        <span class="fam-wall"><img class="sc" data-light="screenshots/dashboard-wall-light-web.png" data-dark="screenshots/dashboard-wall-dark-web.png" data-sizes="(max-width: 860px) 88vw, (max-width: 1199px) 52vw, 570px" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today and the weather" data-alt-t="alt_fam_wall" loading="lazy" decoding="async" width="1400" height="1050">
+        <noscript><img class="sc" src="screenshots/dashboard-wall-light-web.png" alt="Yuvomi wall mode on a landscape tablet: the time in large type, today's events, tasks and shopping, who is up today and the weather" loading="lazy" decoding="async" width="1400" height="1050"></noscript></span>
+        <span class="fam-phone"><img class="sc" data-light="screenshots/notes-light-mobile.png" data-dark="screenshots/notes-dark-mobile.png" data-sizes="(max-width: 860px) 24vw, 156px" alt="The shared notes board on a phone: pinned notes with emergency numbers, the children's activities and school details, and a holiday checklist" data-alt-t="alt_fam_notes" loading="lazy" decoding="async" width="1320" height="2867">
+        <noscript><img class="sc" src="screenshots/notes-light-mobile.png" alt="The shared notes board on a phone: pinned notes with emergency numbers, the children's activities and school details, and a holiday checklist" loading="lazy" decoding="async" width="1320" height="2867"></noscript></span>
       </figure>
       <ul class="fam-list" tabindex="0" aria-label="Three moments at home" data-t-aria="fam_list_aria">
         <li class="fam-item reveal">
@@ -2537,14 +2583,21 @@
      (release-prep greift die alte Versionsnummer woertlich). -->
 <section class="yours" id="yours">
   <div class="wrap">
+    <!-- Seit S7 (Re-Critique 2026-10-30) ohne Kapitelmarke und anders gebaut
+         als die Koepfe davor: EIN Satz in Ausstellungsgroesse ueber die volle
+         Breite, darunter Absatz und Lebenszeichen nebeneinander, die vier
+         Aussagen als Raster zwei mal zwei. Vorher Eyebrow + Titel links und
+         die Liste rechts - der sechste gleiche Kopf, und links standen unter
+         der Version rund 300px leer. -->
     <div class="yours-grid">
       <div class="yours-head">
-        <div class="sec-head lead reveal">
-          <span class="eyebrow" data-t="yours_eyebrow">Yours to keep</span>
+        <div class="sec-head yours-statement reveal">
           <h2 class="sec-title" data-t="yours_title">It belongs to you, not to us.</h2>
-          <p class="sec-desc" data-t="yours_desc">No account with us, no subscription, no ads and no premium tier that locks half the app away. It runs on a computer in your home and keeps running there.</p>
         </div>
-        <p class="yours-ver reveal"><span data-t="yours_latest">Latest release</span> <b>v2.83.0</b><span class="yours-date" data-released="2026-10-29">29 October 2026</span><a href="https://github.com/ulsklyc/yuvomi/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-t="yours_changelog">What changed</a></p>
+        <div class="yours-sub reveal">
+        <p class="sec-desc" data-t="yours_desc">No account with us, no subscription, no ads and no premium tier that locks half the app away. It runs on a computer in your home and keeps running there.</p>
+        <p class="yours-ver"><span data-t="yours_latest">Latest release</span> <b>v2.83.0</b><span class="yours-date" data-released="2026-10-29">29 October 2026</span><a href="https://github.com/ulsklyc/yuvomi/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-t="yours_changelog">What changed</a></p>
+        </div>
       </div>
       <dl class="yours-list">
         <div class="yours-item reveal">
@@ -2571,8 +2624,10 @@
 <!-- LONGEVITY -->
 <section class="longevity" id="longevity">
   <div class="wrap">
-    <div class="sec-head lead reveal">
-      <span class="eyebrow" data-t="long_eyebrow">Before you commit</span>
+    <!-- Ohne Kapitelmarke seit S7: die Fragen sind kein neues Kapitel, sie
+         schliessen "Gehoert euch" ab - der Titel steht in Kapitelgroesse
+         ohne Eyebrow, und die Fragen beginnen eine Zeile darunter. -->
+    <div class="sec-head long-head reveal">
       <h2 class="sec-title" data-t="long_title">The questions worth asking first</h2>
     </div>
     <!-- Diese Sektion bekam 384px von 15.000 und beantwortet die Fragen, an denen
@@ -2686,10 +2741,17 @@
           <li><a class="plat-cap" style="--pc:#5351FB" href="install.html#umbrel"><span class="plat-logo plat-logo--sm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.853 8.302c2.628-.05 4.698.656 6.303 2.05 1.166 1.01 2.14 2.43 2.895 4.305a7.584 7.584 0 0 0-1.818-.21c-1.345 0-2.552.31-3.558.987-1.127-.687-2.339-1.049-3.623-1.049-1.313 0-2.573.378-3.77 1.087-1.154-.726-2.456-1.087-3.875-1.087-.513 0-1.003.048-1.466.147.678-1.724 1.575-3.054 2.664-4.028 1.557-1.393 3.607-2.15 6.248-2.202zM1.842 17.616c.04-.037.078-.076.112-.119.48-.557 1.233-.91 2.453-.91 1.151 0 2.139.32 3.002.952l.035.025c.469.35 1.108.364 1.592.036 1.032-.698 2.032-1.014 3.017-1.014.967 0 1.906.304 2.836.965l.02.014a1.376 1.376 0 0 0 1.699-.078c.614-.53 1.455-.84 2.625-.84 1.232 0 2.186.344 2.94.98a1.092 1.092 0 0 0 .435.235 1.095 1.095 0 0 0 .806-.087 1.103 1.103 0 0 0 .547-1.267c-.873-3.383-2.3-6.03-4.363-7.82-2.084-1.808-4.712-2.646-7.787-2.588-3.063.06-5.653.955-7.673 2.762-2.003 1.793-3.344 4.39-4.104 7.67a1.1 1.1 0 0 0 1.807 1.083z"/></svg></span><span>Umbrel</span></a></li>
           <li><a class="plat-cap" style="--pc:#FF8C2F" href="install.html#unraid"><span class="plat-logo plat-logo--sm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.406 8.528h1.17v6.926h-1.17zM1.17 15.454H0V8.528h1.17zm4.534.828h1.17v2.645h-1.17zm-2.86-2.969h1.169v4.282h-1.17zm5.703 0h1.17v4.282h-1.17zM22.83 8.528H24v6.926h-1.17zm-4.534-.81h-1.17V5.073h1.17zm2.86 2.95h-1.169V6.406h1.17zm-5.72 0h-1.17V6.406h1.17z"/></svg></span><span>Unraid</span></a></li>
         </ul>
-        <div class="plat-cta">
-          <a href="install.html" class="btn btn-secondary"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span data-t="plat_cta">Open the install guide</span></a>
+        <!-- Ein Weg sichtbar, der Rest dahinter (S7, Re-Critique 2026-10-30):
+             sichtbar standen acht Wege gleichzeitig - Docker-Karte, drei
+             Kataloge, Anleitung, Proxmox, Web-Installer, Quelltext. Die
+             Kataloge bleiben als Kapseln (ein Klick fuer NAS-Besitzer), Proxmox,
+             Web-Installer, Quelltext und die ganze Anleitung stehen hinter
+             "Weitere Wege". install.html bleibt die vollstaendige Quelle. -->
+        <details class="plat-ways">
+          <summary><span data-t="plat_ways">More ways to install</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary>
           <p class="plat-more" data-t="plat_more">On Proxmox it runs in a <a href="install.html#proxmox">Debian container or a VM</a>. Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.</p>
-        </div>
+          <a class="plat-guide" href="install.html"><span data-t="plat_cta">Every way, step by step: the install guide</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+        </details>
       </div>
     </div>
     <details class="plat-sheet reveal">
@@ -2756,7 +2818,7 @@
           <a href="https://github.com/ulsklyc/yuvomi" target="_blank" rel="noopener">GitHub</a>
           <a href="https://github.com/ulsklyc/yuvomi/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener" data-t="foot_contrib">Contributing</a>
           <a href="https://github.com/ulsklyc/yuvomi/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-t="foot_changelog">Changelog</a>
-          <a href="https://github.com/ulsklyc/yuvomi/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+          <a href="https://github.com/ulsklyc/yuvomi/blob/main/LICENSE" target="_blank" rel="noopener" data-t="foot_license">MIT License</a>
         </div>
         <div class="foot-col">
           <h2 data-t="foot_legal">Legal</h2>
@@ -2849,13 +2911,14 @@
     });
   }
   /* Ausschnitte (S3): eigene Dateien unter screenshots[/<lang>]/crops/,
-     WebP in 320/640px, gebaut von scripts/build-screenshot-crops.mjs. Das
+     WebP in 320/640/960px (die dritte Stufe seit S7: am Telefon mit DPR 3
+     war die 640er weich), gebaut von scripts/build-screenshot-crops.mjs. Das
      Markup traegt die englische helle Fassung als src (lazy, also erst
      geladen, wenn die Karte naht - bis dahin hat dieses Skript getauscht);
      fehlt eine Sprachfassung, faellt sie auf die englische zurueck. */
   function cropSrc(img, path, en){
     img.onerror = function(){ img.onerror = null; if (path !== en) cropSrc(img, en, en); };
-    img.srcset = path + '@1x.webp 320w, ' + path + '.webp 640w';
+    img.srcset = path + '@1x.webp 320w, ' + path + '.webp 640w, ' + path + '@3x.webp 960w';
     img.src = path + '.webp';
   }
   function applyCrops(){
@@ -2880,7 +2943,11 @@
        misst auf dieses Signal neu. */
     document.dispatchEvent(new Event('yuvomi:layout'));
   }
-  document.getElementById('langBtn').onclick = function(){ lang = lang === 'en' ? 'de' : 'en'; lsSet('lang', lang); applyLang(); };
+  /* Sprachsegment (S7, Re-Critique 2026-10-30): zwei Knoepfe statt eines
+     Umschalters im Segment-Kostuem. Die gelesene Sprache ist gedrueckt und
+     tut beim erneuten Druck nichts - vorher schaltete ein Klick auf das
+     erhabene "EN" nach Deutsch. aria-pressed zieht site.js nach. */
+  document.getElementById('langSeg').addEventListener('click', function(e){ var b = e.target.closest('button[data-lang]'); if (!b || b.getAttribute('data-lang') === lang) return; lang = b.getAttribute('data-lang'); lsSet('lang', lang); applyLang(); });
   /* Die Klasse `js` setzt das Kopfskript, vor dem ersten Bild. */
   /* Bahn fuer die Handoff-Bewegung (S3): vom Anfang des Pfeils bis an die
      Kante des empfangenden Ausschnitts - nie ueber einen Labeltext (Runde 2:
@@ -2951,35 +3018,27 @@
       }, { rootMargin: '-70px 0px 0px 0px' });
       owners.forEach(function(el){ pObs.observe(el); });
     } else { pill.classList.add('show'); }
-    /* Weichen nach Lage statt nach Scrollrichtung (Begruendung am CSS unter
-       700px): `cta-yield` steht, solange der Knopf zur Anleitung (.plat-cta)
-       das untere Band schneiden, in dem die Pille sitzt (16px + 53px, mit
-       Luft 96px), oder solange das Sprungmenue offen ist. Das
-       Band ist ein Observer mit oben weggeschnittener Wurzel; seine Hoehe haengt
-       an innerHeight, also wird er bei resize neu gebaut. */
+    /* Richtung (S7, Re-Critique 2026-10-30): wer nach unten liest, hat die
+       Pille nicht vor dem Text - sie geht beim Runterscrollen weg und kommt
+       beim Hochscrollen wieder, wie die Leiste von Safari auf dem iPhone.
+       Bis S7 stand sie beim Lesen still ueber Ueberschriften, Modulnamen und
+       Fragen (gemessen in EN und DE). Die Besitzer oben (Hero, Einrichten,
+       Schlusskarte, Fuss) bleiben: dort ist sie ohnehin weg. Eine Schwelle
+       von 12px, damit ein Zittern des Daumens sie nicht blinken laesst; das
+       offene Sprungmenue raeumt das Band ebenfalls (cta-yield). */
     var root = document.documentElement;
     var jump = document.getElementById('navJump');
-    var zones = document.querySelectorAll('.plat-cta .btn');
-    var BAND = 96, inBand = [], zObs = null;
-    function update(){ root.classList.toggle('cta-yield', inBand.length > 0 || !!(jump && jump.open)); }
-    function watch(){
-      if (!('IntersectionObserver' in window) || !zones.length) return;
-      if (zObs) zObs.disconnect();
-      inBand = [];
-      zObs = new IntersectionObserver(function(entries){
-        entries.forEach(function(e){
-          var i = inBand.indexOf(e.target);
-          if (e.isIntersecting && i < 0) inBand.push(e.target);
-          else if (!e.isIntersecting && i >= 0) inBand.splice(i, 1);
-        });
-        update();
-      }, { rootMargin: '-' + Math.max(0, innerHeight - BAND) + 'px 0px 0px 0px' });
-      zones.forEach(function(el){ zObs.observe(el); });
+    var lastY = scrollY, ticking = false;
+    function direction(){
+      ticking = false;
+      var y = scrollY, d = y - lastY;
+      if (Math.abs(d) < 12) return;
+      root.classList.toggle('pill-away', d > 0);
+      lastY = y;
     }
-    var rz = 0;
-    addEventListener('resize', function(){ cancelAnimationFrame(rz); rz = requestAnimationFrame(watch); });
+    addEventListener('scroll', function(){ if (!ticking) { ticking = true; requestAnimationFrame(direction); } }, { passive: true });
+    function update(){ root.classList.toggle('cta-yield', !!(jump && jump.open)); }
     if (jump) jump.addEventListener('toggle', update);
-    watch();
   })();
   /* Fortschritt = gescrollte Strecke von der scrollbaren Gesamtstrecke. Auf
      `scroll` passiv, damit es das Scrollen nicht bremst. */
@@ -3020,7 +3079,7 @@
   })();
   /* Papier klappt nichts auf: die Outbound-Liste, die Antworten und der
      Steckbrief gehoeren auf den Ausdruck. */
-  addEventListener('beforeprint', function(){ document.querySelectorAll('details.tb-more, details.long-more, details.plat-sheet').forEach(function(d){ d.open = true; }); });
+  addEventListener('beforeprint', function(){ document.querySelectorAll('details.tb-more, details.long-more, details.plat-sheet, details.plat-ways').forEach(function(d){ d.open = true; }); });
   /* Ein Tag zu Hause (S1, 2026-10-30): aus drei untereinander stehenden
      Momenten werden Tabs nach dem ARIA-Muster - tablist/tab/tabpanel,
      automatische Auswahl, Pfeiltasten links/rechts (umlaufend), Pos1/Ende, nur

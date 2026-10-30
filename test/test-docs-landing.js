@@ -1236,19 +1236,22 @@ test('der Kapitelmarken-Guard erkennt den Schaden, gegen den er gebaut ist', () 
   assert.equal(sectionHeads(alleLead).filter((h) => h.lead).length, 6, 'Vorbedingung: sechs Kapitelmarken');
   assert.ok(6 * 2 > sectionCount(alleLead), 'der Guard muss hier anschlagen');
 
-  // Der echte Stand ist still - und zwar KNAPP: eine fuenfte Kapitelmarke laesst
-  // die Regel fallen, und das ist die Absicht. Bis 2026-09-29 stand hier "vier
-  // von acht, exakt auf der Grenze"; mit .family kam eine neunte Sektion dazu,
-  // die bewusst KEINE Kapitelmarke ist. Die Zusicherung bleibt dieselbe - kein
-  // Spielraum fuer eine weitere Marke -, nur ueber eine ungerade Grundmenge
-  // formuliert: mit einer Marke mehr kippte die Haelfte.
+  // Der echte Stand ist still. Bis S6 (2026-10-30) lag er KNAPP an der Grenze
+  // (fuenf von zehn), und dieser Test hielt das fest. Seit S7 sind es drei:
+  // die Re-Critique fand sechs gleich gebaute Koepfe, und "Gehoert euch" und
+  // die Fragen sind seitdem bewusst anders komponiert. Die Zusicherung ist
+  // dieselbe: die Haelfte bleibt die Grenze. Zurueck auf Kapitelmarke gestellt
+  // und um eine weitere Kapitelsektion ergaenzt (sechs von elf), schlaegt sie an.
   const html = read('index.html');
   const lead = sectionHeads(html).filter((h) => h.lead).length;
   const sections = sectionCount(html);
   assert.ok(lead * 2 <= sections, 'Vorbedingung: der echte Stand haelt die Regel');
-  assert.ok((lead + 1) * 2 > sections,
-    `${lead} Kapitelmarken bei ${sections} Sektionen: eine weitere passte noch hinein - `
-    + 'der Stand liegt nicht mehr an der Grenze, die dieser Test festhaelt');
+  const back = html.replace('<div class="sec-head yours-statement reveal">', '<div class="sec-head lead reveal"><span class="eyebrow">x</span>')
+    .replace('<div class="sec-head long-head reveal">', '<div class="sec-head lead reveal"><span class="eyebrow">y</span>')
+    .replace('</main>', '<section><div class="sec-head lead"><span class="eyebrow">z</span></div></section></main>');
+  assert.notEqual(back, html);
+  const leadBack = sectionHeads(back).filter((h) => h.lead).length;
+  assert.ok(leadBack * 2 > sectionCount(back), `${leadBack} Kapitelmarken bei ${sectionCount(back)} Sektionen haette der Guard durchgelassen`);
 });
 
 // ── (7) Ein Telefonrahmen hat die Proportion eines Telefons ──────────────────
@@ -3352,6 +3355,11 @@ function pngSrcFindings(page, html) {
  * zweite "Beleg" wiederholte den ersten. Gezaehlt wird das Modul der Aufnahme
  * (`meals-light-web` und `meals-light-mobile` sind dasselbe Motiv).
  */
+// Gezaehlt werden ganze Aufnahmen (.sc mit data-light). Ein Ausschnitt
+// (data-crop, scripts/build-screenshot-crops.mjs) ist ein Detail und darf ein
+// Motiv wiederholen: seit S7 steht die Wand klein als Ausschnitt im Hero und
+// gross als Aufnahme in #family - Silhouette und Beleg, nicht zweimal dasselbe
+// Bild (catalogFamilyFindings haelt die grosse Fassung in #family).
 function motifFindings(html) {
   const seen = new Map();
   const found = [];
@@ -3608,7 +3616,7 @@ test('die Guards aus (17) erkennen den Schaden, gegen den sie gebaut sind', () =
   const pages = PAGES.map((p) => [p, read(p)]);
   const oldHead = pages.map(([p, h]) => [p, p === 'privacy.html' ? h.replace('<header class="site-bar">', '<header class="top">') : h]);
   assert.ok(hit(sharedBarFindings(oldHead, read('assets/site.css'), read('assets/legal.css')), /privacy\.html: 0x <header class="site-bar">/));
-  const oldBtn = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace('class="nav-btn nav-lang" id="langBtn" hreflang="en"', 'class="lang-link" id="langBtn" hreflang="en"') : h]);
+  const oldBtn = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace('<a href="privacy.html" class="nav-btn" hreflang="en"', '<a href="privacy.html" class="lang-link" hreflang="en"') : h]);
   assert.notDeepEqual(oldBtn, pages, 'Vorbedingung: datenschutz.html traegt den Sprachlink als .nav-btn');
   assert.ok(hit(sharedBarFindings(oldBtn, read('assets/site.css'), read('assets/legal.css')), /datenschutz\.html: <a class="lang-link"> in der Leiste ist keine \.nav-btn/));
   const legalOld = read('assets/legal.css') + '\nheader.top { background: var(--surface); padding: 18px 0; }\n.nav-logo { font-size: 18px; }\n';
@@ -3676,7 +3684,7 @@ function shellSkeleton(block) {
     .replace(/<div class="nav-progress"[\s\S]*?<\/div>\s*/, '')
     .replace(/<details class="nav-jump"[\s\S]*?<\/details>\s*/, '')
     .replace(/<a href="install\.html" class="mobile-cta"[\s\S]*?<\/a>\s*/, '')
-    .replace(/<(a|button)\b[^>]*\bid="langBtn"[\s\S]*?<\/\1>\s*/, '')
+    .replace(/<div class="nav-lang" id="langSeg"[\s\S]*?<\/div>\s*/, '')
     .replace(/<span class="foot-meta">[\s\S]*?<\/span>(?=\s*<span data-t="foot_madewith")/, '<span class="foot-meta"></span>')
     .replace(/>[^<]*</g, '><')
     .replace(/\s(?:aria-label|title|lang|hreflang|data-href-en|data-href-de|aria-current)="[^"]*"/g, '')
@@ -3685,6 +3693,53 @@ function shellSkeleton(block) {
     .replace(/datenschutz\.html/g, 'privacy.html')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Das Sprachsegment einer Leiste: EN links, DE rechts, je ein eigenes
+ * Element mit lang und sichtbarem Kuerzel; genau eins ist die gelesene
+ * Sprache (aria-pressed="true" auf den uebersetzten Seiten, aria-current an
+ * Text auf den Rechtsseiten), das andere schaltet (Knopf mit
+ * aria-pressed="false" oder Link mit hreflang). Ein Name, wenn es einen gibt,
+ * beginnt mit dem Sichtbaren (SC 2.5.3).
+ */
+function langSegmentFindings(page, head) {
+  const found = [];
+  const seg = head.match(/<div class="nav-lang" id="langSeg"([^>]*)>([\s\S]*?)<\/div>/);
+  if (!seg) { if (!LANG_OPTIONAL.includes(page)) found.push(`${page}: Leiste ohne Sprachsegment (#langSeg)`); return found; }
+  if (!/\brole="group"/.test(seg[1]) || !/\baria-label="[^"]+"/.test(seg[1])) found.push(`${page}: Sprachsegment ohne role="group" und Namen`);
+  const opts = [...seg[2].matchAll(/<(a|button|span)\b([^>]*)>([^<]*)<\/\1>/g)];
+  if (opts.length !== 2) { found.push(`${page}: Sprachsegment mit ${opts.length} statt zwei Elementen`); return found; }
+  if (opts.map((o) => o[3].trim()).join('|') !== 'EN|DE') found.push(`${page}: Sprachsegment zeigt nicht EN|DE (${opts.map((o) => o[3].trim()).join('|')})`);
+  let current = 0;
+  for (const [, tag, attrs, text] of opts) {
+    if (!/\bclass="nav-btn"/.test(attrs)) found.push(`${page}: Segment ${text.trim()} ohne class="nav-btn"`);
+    if (!new RegExp(`\\blang="${text.trim().toLowerCase()}"`).test(attrs)) found.push(`${page}: Segment ${text.trim()} nennt seine Sprache nicht (lang)`);
+    const name = (attrs.match(/aria-label="([^"]*)"/) || [])[1];
+    if (name !== undefined && !name.startsWith(text.trim())) found.push(`${page}: Name "${name}" beginnt nicht mit dem sichtbaren "${text.trim()}" (SC 2.5.3)`);
+    const isCur = /aria-pressed="true"/.test(attrs) || /aria-current="(?:true|page)"/.test(attrs);
+    if (isCur) current += 1;
+    if (tag === 'button' && !/\btype="button"/.test(attrs)) found.push(`${page}: Segment ${text.trim()} ohne type="button"`);
+    if (tag === 'button' && !/aria-pressed="(?:true|false)"/.test(attrs)) found.push(`${page}: Segment ${text.trim()} ohne aria-pressed`);
+    if (tag === 'a' && !/\bhreflang="/.test(attrs)) found.push(`${page}: Segment-Link ${text.trim()} ohne hreflang`);
+    if (tag === 'span' && !isCur) found.push(`${page}: Segment ${text.trim()} ist Text, aber nicht die gelesene Sprache`);
+  }
+  if (current !== 1) found.push(`${page}: Sprachsegment mit ${current} gelesenen Sprachen statt einer`);
+  return found;
+}
+
+/**
+ * Die Seite schaltet die Sprache nur, wenn eine ANDERE gewaehlt wurde: der
+ * Klick auf das gedrueckte Segment tut nichts.
+ */
+function langSwitchFindings(page, html) {
+  const body = stripComments(html);
+  if (!/id="langSeg"[^>]*>\s*<button/.test(body)) return [];
+  const h = (body.match(/getElementById\('langSeg'\)\.addEventListener\('click',[^\n]*/) || [''])[0];
+  if (!h) return [`${page}: kein Klick-Handler am Sprachsegment`];
+  if (!/getAttribute\('data-lang'\) === lang\) return/.test(h)) return [`${page}: der Klick auf die gelesene Sprache schaltet trotzdem`];
+  if (/lang === 'en' \? 'de' : 'en'/.test(h)) return [`${page}: das Segment schaltet wie ein Umschalter hin und her`];
+  return [];
 }
 
 function siteShellFindings(pages, siteCss, siteJs) {
@@ -3698,17 +3753,10 @@ function siteShellFindings(pages, siteCss, siteJs) {
     if (foot.length !== 1) { found.push(`${page}: ${foot.length}x <footer class="site-foot"> statt einmal`); continue; }
     if (/<footer(?![^>]*class="site-foot")/.test(masked)) found.push(`${page}: eine zweite Fusszeile neben .site-foot`);
     sk[page] = { head: shellSkeleton(head[0]), foot: shellSkeleton(foot[0]) };
-    // Sprachknopf: eine ID, eine Klasse, der Name beginnt mit dem Sichtbaren.
-    const lb = head[0].match(/<(a|button)\b([^>]*\bid="langBtn"[^>]*)>([\s\S]*?)<\/\1>/);
-    if (!lb) { if (!LANG_OPTIONAL.includes(page)) found.push(`${page}: Leiste ohne #langBtn`); }
-    else {
-      if (!/class="nav-btn nav-lang"/.test(lb[2])) found.push(`${page}: #langBtn ohne class="nav-btn nav-lang"`);
-      const vis = (lb[3].match(/<span class="nav-lang-label">([^<]*)<\/span>/) || [])[1];
-      const name = (lb[2].match(/aria-label="([^"]*)"/) || [])[1];
-      if (!vis) found.push(`${page}: #langBtn ohne .nav-lang-label`);
-      else if (name !== undefined && !name.startsWith(vis.trim())) found.push(`${page}: Name "${name}" beginnt nicht mit dem sichtbaren "${vis.trim()}" (SC 2.5.3)`);
-      if (!/\blang="(?:de|en)"/.test(lb[2])) found.push(`${page}: #langBtn nennt seine Sprache nicht (lang)`);
-    }
+    // Sprache: ein Segment aus ZWEI Bedienelementen (S7). Bis dahin war es
+    // EIN Knopf im Segment-Kostuem, und der Klick auf die erhabene, gelesene
+    // Sprache schaltete um (Re-Critique 2026-10-30, P1).
+    for (const f of langSegmentFindings(page, head[0])) found.push(f);
     // Ein Label, ein Ziel: "Install" der Leiste fuehrt nach install.html, und
     // das Sprungmenue traegt keinen zweiten Install-Eintrag.
     const inst = head[0].match(/<a href="([^"]*)" class="nav-btn nav-install"/);
@@ -3722,7 +3770,17 @@ function siteShellFindings(pages, siteCss, siteJs) {
     else if (!/<script src="assets\/site\.js" defer><\/script>/.test(masked)) found.push(`${page}: laedt assets/site.js ohne defer (blockiert den Parser)`);
     if (/lsSet\('theme'|setItem\('yuvomi-theme'/.test(masked)) found.push(`${page}: schreibt das Theme selbst statt ueber assets/site.js`);
     if (!/id="themeBtn"[^>]*data-mode="system"/.test(head[0])) found.push(`${page}: Theme-Knopf ohne data-mode="system"`);
+    for (const f of langSwitchFindings(page, html)) found.push(f);
   }
+  // Derselbe Install-Knopf auf jeder Seite (S7): aria-current="page" auf
+  // install.html ist Semantik, kein eigenes Aussehen - die Toenung aus S8
+  // machte die Leiste dort zur einzigen abweichenden.
+  for (const r of eachRule(siteCss)) {
+    if (/aria-current/.test(r.selector) && /\.nav-(?:btn|install)\b/.test(r.selector) && !/\.nav-lang/.test(r.selector) && /background/.test(r.body)) {
+      found.push(`site.css: ${r.selector} gibt der Leiste der aktuellen Seite ein eigenes Aussehen`);
+    }
+  }
+  if (!/aria-pressed/.test(siteJs) || !/#langSeg/.test(siteJs)) found.push('site.js: zieht aria-pressed des Sprachsegments nicht nach');
   const ref = sk['index.html'];
   for (const [page] of pages) {
     if (!sk[page] || !ref || page === 'index.html') continue;
@@ -3753,13 +3811,26 @@ test('der Rahmen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   // Die alte Fusszeile der Rechtsseiten.
   const oldFoot = swap('privacy.html', '<footer class="site-foot">', '<footer class="bot">');
   assert.ok(hit(siteShellFindings(oldFoot, css, js), /privacy\.html: 0x <footer class="site-foot">/));
-  // Der alte Sprachknopfname (2.5.3) und der fehlende Sprachknopf.
-  const oldName = swap('index.html', 'aria-label="DE - Auf Deutsch lesen"', 'aria-label="Auf Deutsch umschalten"');
+  // Ein Name, der nicht mit dem Sichtbaren beginnt (2.5.3), und das fehlende Segment.
+  const oldName = swap('index.html', 'title="Auf Deutsch lesen">DE</button>', 'title="Auf Deutsch lesen" aria-label="Auf Deutsch umschalten">DE</button>');
   assert.notDeepEqual(oldName, pages);
   assert.ok(hit(siteShellFindings(oldName, css, js), /index\.html: Name "Auf Deutsch umschalten" beginnt nicht mit dem sichtbaren "DE"/));
-  const noLang = swap('privacy.html', /<a href="datenschutz\.html" class="nav-btn nav-lang"[\s\S]*?<\/a>\s*/, '');
+  const noLang = swap('privacy.html', /<div class="nav-lang" id="langSeg"[\s\S]*?<\/div>\s*/, '');
   assert.notDeepEqual(noLang, pages);
-  assert.ok(hit(siteShellFindings(noLang, css, js), /privacy\.html: Leiste ohne #langBtn/));
+  assert.ok(hit(siteShellFindings(noLang, css, js), /privacy\.html: Leiste ohne Sprachsegment/));
+  // Der Stand vor S7: EIN Knopf im Segment-Kostuem, der hin und her schaltet,
+  // und die Toenung des Install-Knopfs auf install.html.
+  const toggle = swap('index.html', /<div class="nav-lang" id="langSeg"[\s\S]*?<\/div>/, '<div class="nav-lang" id="langSeg" role="group" aria-label="Language"><button class="nav-btn" type="button" lang="de" data-lang="de" aria-pressed="false">DE</button></div>');
+  assert.notDeepEqual(toggle, pages);
+  assert.ok(hit(siteShellFindings(toggle, css, js), /index\.html: Sprachsegment mit 1 statt zwei Elementen/));
+  const both = swap('install.html', 'data-lang="de" aria-pressed="false"', 'data-lang="de" aria-pressed="true"');
+  assert.notDeepEqual(both, pages);
+  assert.ok(hit(siteShellFindings(both, css, js), /install\.html: Sprachsegment mit 2 gelesenen Sprachen/));
+  const flip = swap('index.html', "if (!b || b.getAttribute('data-lang') === lang) return; lang = b.getAttribute('data-lang');", "if (!b) return; lang = lang === 'en' ? 'de' : 'en';");
+  assert.notDeepEqual(flip, pages);
+  assert.ok(hit(siteShellFindings(flip, css, js), /index\.html: der Klick auf die gelesene Sprache schaltet trotzdem/));
+  const tint = css + '\n.nav-btn[aria-current="page"], .nav-btn[aria-current="page"]:hover {\n  background: var(--accent-soft); color: var(--accent-on-soft); }\n';
+  assert.ok(hit(siteShellFindings(pages, tint, js), /gibt der Leiste der aktuellen Seite ein eigenes Aussehen/));
   // Install mit zwei Zielen: der alte Sprungmenue-Eintrag.
   const twoInstall = swap('index.html', 'data-t="jump_install">Where it runs<', 'data-t="jump_install">Install it<');
   assert.notDeepEqual(twoInstall, pages);
@@ -4325,11 +4396,11 @@ function cropFindings(html, build, exists) {
   for (const [tag, name] of tags) {
     if (!table.has(name)) found.push(`${name}: steht nicht in CROPS (scripts/build-screenshot-crops.mjs)`);
     const b = `screenshots/crops/${name}-light`;
-    if (!tag.includes(`src="${b}.webp"`) || !tag.includes(`srcset="${b}@1x.webp 320w, ${b}.webp 640w"`)) found.push(`${name}: src/srcset nicht die englische helle Fassung mit 320w/640w`);
+    if (!tag.includes(`src="${b}.webp"`) || !tag.includes(`srcset="${b}@1x.webp 320w, ${b}.webp 640w, ${b}@3x.webp 960w"`)) found.push(`${name}: src/srcset nicht die englische helle Fassung mit 320w/640w/960w`);
     if (!/\bloading="lazy"/.test(tag)) found.push(`${name}: nicht lazy - mit src im Markup holte der Browser die englische helle Fassung vor dem Tausch`);
     for (const dir of localeDirs()) {
       for (const theme of ['light', 'dark']) {
-        for (const suffix of ['.webp', '@1x.webp']) {
+        for (const suffix of ['.webp', '@1x.webp', '@3x.webp']) {
           const rel = `${dir ? `${dir}/` : ''}crops/${name}-${theme}${suffix}`;
           if (!exists(rel)) found.push(`screenshots/${rel} fehlt`);
         }
@@ -4359,6 +4430,11 @@ test('der Ausschnitt-Guard erkennt den Schaden, gegen den er gebaut ist', () => 
   const eager = html.replace(/(data-crop="handoff-meals"[^>]*?) loading="lazy"/, '$1');
   assert.notEqual(eager, html);
   assert.match(cropFindings(eager, build, all).join(), /handoff-meals: nicht lazy/);
+  // Der Stand vor S7: zwei Stufen - am Telefon mit DPR 3 weich (0,79).
+  assert.match(cropFindings(html, build, (rel) => !rel.endsWith('@3x.webp')).join(), /handoff-meals-light@3x\.webp fehlt/);
+  const two = html.replace(', screenshots/crops/handoff-meals-light@3x.webp 960w', '');
+  assert.notEqual(two, html);
+  assert.match(cropFindings(two, build, all).join(), /handoff-meals: src\/srcset nicht die englische helle Fassung mit 320w\/640w\/960w/);
   // Der Stand vor S3: keine Ausschnitte.
   assert.deepEqual(cropFindings(read('index.html').replace(/data-crop=/g, 'data-x='), build, all), ['keine Ausschnitte (data-crop) auf der Seite - Muster veraltet?']);
 });
@@ -4435,9 +4511,8 @@ test('der Preload-Breiten-Guard erkennt den Schaden, gegen den er gebaut ist', (
 
 /**
  * Die Leiste: Sprung, Sprache und Theme sind EINE Glasgruppe (.nav-group),
- * Sprache ein Segment mit der gelesenen Sprache als erhabenem Inset
- * (data-cur, gezeichnet als ::before mit leerem Alternativtext - als <span>,
- * auch aria-hidden, zaehlte axe "ENDE" als sichtbares Label), Theme mit
+ * Sprache ein Segment aus zwei Elementen (seit S7, langSegmentFindings im
+ * Rahmen-Guard; bis dahin ein Knopf mit data-cur als ::before), Theme mit
  * sichtbarem Zustand (.nav-theme-label), GitHub auf jeder Breite nur Symbol.
  * Auf allen Seiten, die den Knopf tragen.
  */
@@ -4448,11 +4523,10 @@ function barGroupFindings(pages, siteCss) {
     const group = (head.match(/<div class="nav-group">([\s\S]*?)\n\s*<\/div>/) || [])[1];
     if (!group) { found.push(`${page}: keine .nav-group in der Leiste`); continue; }
     if (!/id="themeBtn"/.test(group)) found.push(`${page}: Theme-Knopf ausserhalb der Gruppe`);
-    if (/id="langBtn"/.test(head) && !/id="langBtn"/.test(group)) found.push(`${page}: Sprachknopf ausserhalb der Gruppe`);
+    if (/id="langSeg"/.test(head) && !/id="langSeg"/.test(group)) found.push(`${page}: Sprachsegment ausserhalb der Gruppe`);
     if (/id="navJump"/.test(head) && !/id="navJump"/.test(group)) found.push(`${page}: Sprungmenue ausserhalb der Gruppe`);
     if (/nav-gh|nav-install/.test(group)) found.push(`${page}: GitHub oder Installieren in der Gruppe`);
-    const lb = (group.match(/<(?:a|button)\b[^>]*id="langBtn"[^>]*>/) || [])[0];
-    if (lb !== undefined && !/\bdata-cur="(?:EN|DE)"/.test(lb)) found.push(`${page}: Sprachsegment ohne data-cur (die gelesene Sprache)`);
+    if (/id="langBtn"/.test(head)) found.push(`${page}: der alte Sprach-Umschalter (#langBtn) steht wieder in der Leiste`);
     if (!/<span class="nav-theme-label">/.test(group)) found.push(`${page}: Theme ohne sichtbaren Zustand (.nav-theme-label)`);
   }
   const top = [...eachRule(siteCss)].find((r) => r.selector === '.nav-gh-label' && !r.at.length);
@@ -4470,9 +4544,9 @@ test('der Glasgruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () =>
   const flat = pages.map(([p, h]) => [p, p === 'install.html' ? h.replace('<div class="nav-group">\n', '').replace(/(<button class="nav-btn nav-theme"[\s\S]*?<\/button>)\n\s*<\/div>\n/, '$1\n') : h]);
   assert.notDeepEqual(flat, pages);
   assert.deepEqual(barGroupFindings(flat, css), ['install.html: keine .nav-group in der Leiste']);
-  const noSeg = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace(' data-cur="DE"', '') : h]);
-  assert.notDeepEqual(noSeg, pages);
-  assert.deepEqual(barGroupFindings(noSeg, css), ['datenschutz.html: Sprachsegment ohne data-cur (die gelesene Sprache)']);
+  const oldSeg = pages.map(([p, h]) => [p, p === 'datenschutz.html' ? h.replace('<div class="nav-lang" id="langSeg"', '<div class="nav-lang" id="langBtn"') : h]);
+  assert.notDeepEqual(oldSeg, pages);
+  assert.deepEqual(barGroupFindings(oldSeg, css), ['datenschutz.html: der alte Sprach-Umschalter (#langBtn) steht wieder in der Leiste']);
   const ghWord = css.replace('\n.nav-gh-label { position: absolute;', '\n@media (max-width: 700px) {\n.nav-gh-label { position: absolute;').replace('white-space: nowrap; }\n/* Phones.', 'white-space: nowrap; }\n}\n/* Phones.');
   assert.notEqual(ghWord, css);
   assert.deepEqual(barGroupFindings(pages, ghWord), ['site.css: .nav-gh-label nicht auf jeder Breite nur fuer Screenreader']);
@@ -4484,10 +4558,21 @@ test('der Glasgruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () =>
  * auf Deutsch blieb sie vorher am Seitenende stehen (B, 98 %). "Nach oben"
  * kommt erst nach der halben Seite (site.js), am Telefon erst mit der
  * Fusszeile (html.pill-end), deren Band frei ist.
+ *
+ * Seit S7 (Re-Critique 2026-10-30) geht sie beim Runterscrollen weg und kommt
+ * beim Hochscrollen wieder (html.pill-away nach der Scrollrichtung, mit
+ * Schwelle); vorher stand sie beim Lesen ueber Ueberschriften und Fragen.
+ * Unter reduzierter Bewegung blendet sie nur, ohne zu gleiten.
  */
 function floatingPillFindings(html, siteJs) {
   const found = [];
   const body = stripComments(html);
+  if (!/classList\.toggle\('pill-away', d > 0\)/.test(body)) found.push('Install-Pille: kein html.pill-away nach der Scrollrichtung - sie steht beim Lesen ueber dem Text');
+  else if (!/Math\.abs\(d\) < \d+\) return/.test(body)) found.push('Install-Pille: Scrollrichtung ohne Schwelle - jedes Zittern laesst sie blinken');
+  const rules = inlineStyles(html).flatMap((css) => [...eachRule(css)]);
+  const away = rules.filter((r) => /html\.js\.pill-away \.mobile-cta\.show/.test(r.selector));
+  if (!away.some((r) => r.at.some((a) => /max-width:\s*700px/.test(a)) && /visibility:\s*hidden/.test(r.body) && /opacity:\s*0/.test(r.body))) found.push('Install-Pille: html.pill-away blendet sie am Telefon nicht aus');
+  if (!away.some((r) => r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a)) && /transform:\s*translateX\(-50%\)\s*;?\s*$/.test(r.body.trim()))) found.push('Install-Pille: gleitet auch unter reduzierter Bewegung');
   const owners = (body.match(/var owners = \[([^\]]*)\]/) || [])[1] || '';
   if (!/getElementById\('install'\)/.test(owners)) found.push('Install-Pille: #install ist kein Besitzer - sie schwebt ueber dem eigenen Ziel');
   const end = (body.match(/classList\.toggle\('pill-end',[^\n]*/) || [''])[0];
@@ -4510,6 +4595,16 @@ test('der Pillen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const early = js.replace('document.documentElement.scrollHeight * 0.5', 'innerHeight');
   assert.notEqual(early, js);
   assert.deepEqual(floatingPillFindings(html, early), ['site.js: "Nach oben" kommt nicht erst nach der halben Seite']);
+  // S7: ohne Richtung (der Stand bis S6), ohne Schwelle, und gleitend unter reduzierter Bewegung.
+  const still = html.replace("root.classList.toggle('pill-away', d > 0);", '');
+  assert.notEqual(still, html);
+  assert.deepEqual(floatingPillFindings(still, js), ['Install-Pille: kein html.pill-away nach der Scrollrichtung - sie steht beim Lesen ueber dem Text']);
+  const jitter = html.replace('if (Math.abs(d) < 12) return;', '');
+  assert.notEqual(jitter, html);
+  assert.deepEqual(floatingPillFindings(jitter, js), ['Install-Pille: Scrollrichtung ohne Schwelle - jedes Zittern laesst sie blinken']);
+  const slide = html.replace('      html.js.pill-away .mobile-cta.show, html.js.cta-yield .mobile-cta.show { transform: translateX(-50%); }\n', '');
+  assert.notEqual(slide, html);
+  assert.deepEqual(floatingPillFindings(slide, js), ['Install-Pille: gleitet auch unter reduzierter Bewegung']);
 });
 
 /**
@@ -4526,6 +4621,9 @@ function catalogFamilyFindings(html) {
   if (!cards) found.push('kein Modul traegt sein Symbol in der h4');
   const fam = (body.match(/<section class="family" id="family">[\s\S]*?<\/section>/) || [''])[0];
   if (!/<img class="sc"[^>]*data-light="screenshots\//.test(fam)) found.push('#family ohne eigene Aufnahme');
+  // Der Titel verspricht die Kuechenwand (S7): die volle Wandaufnahme steht
+  // hier, nicht nur als Ausschnitt im Hero.
+  else if (!/<img class="sc"[^>]*data-light="screenshots\/dashboard-wall-light-web\.png"/.test(fam)) found.push('#family zeigt die Kuechenwand nicht, die ihr Titel verspricht');
   return found;
 }
 
@@ -4538,7 +4636,11 @@ test('der Katalog-und-Familie-Guard erkennt den Schaden, gegen den er gebaut ist
   const tile = html.replace('<h4><span class="mod-ico">', '<div class="mod-ico"></div><h4><span class="x">');
   assert.notEqual(tile, html);
   assert.deepEqual(catalogFamilyFindings(tile), ['1x .mod-ico als eigene Kachel vor der Ueberschrift']);
-  const bare = html.replace(/<figure class="fam-phone[\s\S]*?<\/figure>/, '');
+  const bare = html.replace(/<figure class="fam-stage[\s\S]*?<\/figure>/, '');
   assert.notEqual(bare, html);
   assert.deepEqual(catalogFamilyFindings(bare), ['#family ohne eigene Aufnahme']);
+  // Der Stand bis S6: nur die Pinnwand am Handy.
+  const notesOnly = html.replace(/<span class="fam-wall">[\s\S]*?<\/noscript><\/span>/, '');
+  assert.notEqual(notesOnly, html);
+  assert.deepEqual(catalogFamilyFindings(notesOnly), ['#family zeigt die Kuechenwand nicht, die ihr Titel verspricht']);
 });

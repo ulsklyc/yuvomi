@@ -13,20 +13,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in their head - then shows how the parts work together, a day at home from morning to evening,
   what the family gets, and why it stays yours: no subscription, your data on your own disk and
   encrypted if you want, and one update check as the only call out of the box. Setup comes last,
-  with one main route, the NAS app stores as one-click options and the technical details folded
-  away, and the questions worth asking first open one answer at a time. The text is plainer in
+  with one main route, the NAS app stores as one-click options, the other ways behind "More ways
+  to install" and the technical details folded away, and the questions worth asking first open one
+  answer at a time. The text is plainer in
   English and German, technical terms are explained where they appear, and the list of outbound
   connections now also names Gravatar profile pictures and installing extension modules from GitHub.
   The screens are staged instead of pasted in: the top of the page shows the desktop, the kitchen
   wall tablet and a phone together, each connection between two parts shows both ends as real
   excerpts from the app, the day at home shows each moment as a focused crop, and the overview,
   wall and health screenshots are current again. On a phone the page is nearly a third shorter.
-  The top bar groups the jump menu, language and theme in one glass control: the language is a
-  segment showing EN and DE with the current one raised, the theme names its mode on wide screens,
-  and GitHub is a single icon. The jump menu marks the section you are in. The floating Install
-  button on phones steps aside over the setup section and at the end of the page in both languages,
-  "Back to top" appears only after half the page, and the family section shows the shared notes
-  board on a phone. The overview image at the top now starts loading right away on phones too.
+  The top bar is the same on every page of the site and groups the jump menu, language and theme in
+  one glass control: EN and DE are two buttons, and pressing the language you are already reading
+  no longer switches to the other one; the theme names its mode on wide screens, and GitHub is a
+  single icon. The jump menu marks the section you are in. The floating Install button on phones
+  gets out of the way while you scroll down and comes back when you scroll up, and stays away over
+  the setup section and at the end of the page; "Back to top" appears only after half the page.
+  The family section shows the kitchen wall tablet large, with the shared notes board on a phone in
+  front, device frames stay visible in dark mode, and the excerpts are sharp on high-density phone
+  screens. The overview image at the top now starts loading right away on phones too, and the
+  footer says "MIT-Lizenz" on the German pages.
 
 ### Fixed
 - **The website no longer says contacts sync both ways.** Contacts come in over CardDAV and are
