@@ -854,8 +854,8 @@ async function mountExtensionWidgets(shell, cfg, user) {
 /* DER COUNTDOWN IST EIN WIDGET, DAS ES ERST GIBT, WENN JEMAND ETWAS MARKIERT
  * HAT (#647). Er hat keine eigene Seite und keinen eigenen Bestand: seine
  * Kachel zeigt Termine und Aufgaben, die jemand ausdrücklich dafür markiert
- * hat, und in einem Haushalt, der das noch nie getan hat, gibt es nichts zu
- * zeigen und nichts einzurichten.
+ * hat, und Dokumente kurz vor ihrem Ablauf (#1705). In einem Haushalt ohne beides
+ * gibt es nichts zu zeigen und nichts einzurichten.
  *
  * ER RENDERT DESHALB NICHT LEER, SONDERN IST DANN NICHT VERFUEGBAR - das ist
  * genau der Unterschied, den das Familien-Widget unten schon einmal gekostet
@@ -1272,10 +1272,10 @@ function widgetHeader(widgetId, title, count, linkHref, linkLabel, sealSlug = nu
     ? `<span class="sr-only">${esc(t('dashboard.badgeCount', { count: numericCount }))}</span>`
     : '';
   // OHNE ZIEL KEIN LINK. Jede Kachel bis #647 gehoerte genau einer Seite, und
-  // „Alle" fuehrte dorthin. Der Countdown gehoert zweien: seine Zeilen kommen
-  // aus dem Kalender UND aus den Aufgaben, und jede fuehrt selbst an ihren Ort.
-  // Ein Kopf-Link muesste sich fuer eine der beiden entscheiden und waere fuer
-  // die andere Haelfte der Liste falsch. `href="null"` waere die schlechtere
+  // „Alle" fuehrte dorthin. Der Countdown gehoert mehreren: seine Zeilen kommen
+  // aus Kalender, Aufgaben und Dokumenten, und jede fuehrt selbst an ihren Ort.
+  // Ein Kopf-Link muesste sich fuer eine Quelle entscheiden und waere fuer
+  // den Rest der Liste falsch. `href="null"` waere die schlechtere
   // Antwort auf dieselbe Frage gewesen.
   const link = linkHref
     ? `<a href="${linkHref}" data-route="${linkHref}" class="widget__link"

@@ -537,7 +537,7 @@ export async function render(container, context = {}) {
  * gibt oder das fremd ist, oeffnet still nichts: die Seite steht ohnehin da.
  */
 function openLinkedDocument() {
-  const id = Number(new URLSearchParams(window.location.search).get('open'));
+  const id = Number(new URLSearchParams(globalThis.location?.search ?? '').get('open'));
   if (!id) return;
   const doc = state.allDocuments.find((entry) => entry.id === id);
   if (doc) openDocumentViewer(doc);

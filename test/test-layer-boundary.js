@@ -37,6 +37,8 @@ const SHARED_ISOMORPHIC = new Set([
   'public/utils/budget-chart-category.js',
   // One recurrence maximum for the API validation and both budget dialogs; pure constant only.
   'public/utils/budget-recurrence.js',
+  // #1705: One day for "expiring soon" on the document chip and the Key dates tile.
+  'public/utils/document-expiry.js',
   // Notes category identity must match in the API and duplicate-name picker.
   // This pure Unicode normalization has no browser or server dependencies.
   'public/utils/note-category-name.js',

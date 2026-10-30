@@ -2119,7 +2119,7 @@ test('#1705: Chip, Filter und Betrachter lesen den Ablauf ueber den Vorlauf des 
 
 test('#1705: ?open= oeffnet das Dokument aus der Kachel im Betrachter', () => {
   const fn = page.slice(page.indexOf('function openLinkedDocument('), page.indexOf('function renderAll('));
-  assert.match(fn, /URLSearchParams\(window\.location\.search\)\.get\('open'\)/);
+  assert.match(fn, /URLSearchParams\(globalThis\.location\?\.search \?\? ''\)\.get\('open'\)/);
   assert.match(fn, /openDocumentViewer\(doc\)/);
 });
 

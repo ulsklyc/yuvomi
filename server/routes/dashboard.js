@@ -339,7 +339,7 @@ const router = express.Router();
  *   memberTodayTasks: {user_id, open_count}[], // Heute fällige/überfällige offene Aufgaben je Mitglied
  *   tasksDoneToday: number,            // Heute fällige, bereits erledigte Aufgaben
  *   wallTasks:      {user_id, open_count, done_count, open: {id,title,due_date}[], done: {id,title}[]}[], // Haushaltssichtbare Aufgaben von heute je Mitglied (#1817)
- *   countdowns:     Countdown[]        // Als Countdown markierte Termine + Aufgaben (#647)
+ *   countdowns:     Countdown[]        // Markierte Termine + Aufgaben, bald ablaufende Dokumente (#647, #1705)
  *   quicklinks:      QuickLink[]        // Haushaltslinks der Kachelreihe (#469)
  * }
  */
@@ -993,8 +993,8 @@ router.get('/', (req, res) => {
     result.birthdaySoonCount = 0;
   }
 
-  // Countdowns (#647): Termine und Aufgaben, die jemand als Countdown markiert
-  // hat, in EINER nach Nähe sortierten Liste. `todayLocalKey` und nicht der
+  // Countdowns (#647): markierte Termine und Aufgaben und bald ablaufende
+  // Dokumente (#1705) in EINER nach Nähe sortierten Liste. `todayLocalKey` und nicht der
   // UTC-Tag: „noch 1 Tag" gegenüber „heute" entscheidet sich am Kalendertag des
   // Betrachters, und westlich von UTC ist der ein anderer.
   //

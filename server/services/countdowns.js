@@ -261,7 +261,7 @@ export function getCountdowns(d, {
    * Bis hierher fragte der Server beide Quellen ab, deckelte auf fünf und
    * überliess das Aussortieren dem Browser. Das ging bei jeder anderen Kachel
    * gut, weil dort die KACHEL einem Modul gehört und mit ihm verschwindet -
-   * diese gehört zweien, und ihre blosse Existenz hängt an der gefilterten
+   * diese gehört mehreren, und ihre blosse Existenz hängt an der gefilterten
    * Menge (`countdownAvailable` in pages/dashboard.js).
    *
    * Der Fall: Kalender abgeschaltet, die fünf nächsten Countdowns sind Termine,

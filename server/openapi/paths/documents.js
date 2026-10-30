@@ -256,12 +256,20 @@ export function documentsPaths() {
             description: 'Only documents whose expires_at is within the next N days or already past. An invalid value is silently skipped (no filter applied), same as an invalid status/category.',
             schema: { type: 'integer', minimum: 0 },
           },
+          {
+            name: 'subject_user_id',
+            in: 'query',
+            required: false,
+            description: 'Only documents about this household member. Filters the documents the caller can see and widens nothing. An invalid value answers 400.',
+            schema: { type: 'integer', minimum: 1 },
+          },
         ],
         responses: {
           200: {
             description: 'Visible family documents',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/FamilyDocumentsResponse' } } },
           },
+          400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
@@ -270,7 +278,7 @@ export function documentsPaths() {
         summary: 'Upload family document',
         tag: 'Documents',
         stateChanging: true,
-        description: 'Stores a document using the active upload backend (`local`, `webdav`, or `google_drive`) with family, restricted, or private visibility. File content is sent as a base64 data URL in `content_data`. An environment-managed local folder may override the selected destination. Filing: `folder_id` targets an existing folder; `folder_key` names the system folder a module files its receipts in (`budget`, `tasks`, `splitExpenses`, `inventory`, `housekeeping`, `calendarItems`) and is what identifies it, while `folder_name` is only the label used if that folder still has to be created. Sending `folder_name` alone still works and matches on the name, which is what two clients in different languages used to file into two separate folders.',
+        description: 'Stores a document using the active upload backend (`local`, `webdav`, or `google_drive`) with family, restricted, or private visibility. File content is sent as a base64 data URL in `content_data`. An environment-managed local folder may override the selected destination. Filing: `folder_id` targets an existing folder; `folder_key` names the system folder a module files its receipts in (`budget`, `tasks`, `splitExpenses`, `inventory`, `housekeeping`, `calendarItems`) and is what identifies it, while `folder_name` is only the label used if that folder still has to be created. Sending `folder_name` alone still works and matches on the name, which is what two clients in different languages used to file into two separate folders. `subject_user_id` names the household member the document is about.',
         requestBody: jsonBody(null),
         responses: {
           201: {
@@ -290,7 +298,7 @@ export function documentsPaths() {
         tag: 'Documents',
         params: [idParam()],
         stateChanging: true,
-        description: 'Updates name, description, category, status, visibility and allowed member IDs. Only the owner or an admin can update a document.',
+        description: 'Updates name, description, category, status, visibility, allowed member IDs and the member the document is about (`subject_user_id`, `null` clears it). Only the owner or an admin can update a document.',
         requestBody: jsonBody(null),
         responses: {
           200: {
