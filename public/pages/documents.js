@@ -382,6 +382,13 @@ export async function render(container, context = {}) {
     _thumbObserver?.disconnect();
     _thumbObserver = null;
   }, { once: true });
+  // Der Modulzustand ueberlebt den Seitenwechsel, also auch das gewaehlte Archiv.
+  // Vor dem ersten Zeichnen, damit das Segment zeigt, was geladen wird.
+  if (linkedDocumentId() && state.status !== 'active') {
+    state.status = 'active';
+    state.selectMode = false;
+    state.selected.clear();
+  }
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <div class="documents-page app-page app-page--full" data-composition="full">
@@ -532,15 +539,20 @@ export async function render(container, context = {}) {
 /**
  * Deep-Link `?open=<id>`: die Zeile eines Dokuments in der Kachel Stichtage
  * nennt ein Objekt, also trifft sie dieses Objekt und nicht das Modul (#1705,
- * dieselbe Regel wie bei Terminen und Aufgaben dort). Geladen ist der aktive
- * Bestand, und nur der steht in der Kachel. Ein Dokument, das es nicht (mehr)
- * gibt oder das fremd ist, oeffnet still nichts: die Seite steht ohnehin da.
+ * dieselbe Regel wie bei Terminen und Aufgaben dort). In der Kachel steht nur
+ * der aktive Bestand, und `render()` laedt fuer so einen Link genau den. Ein
+ * Dokument, das es nicht (mehr) gibt oder das fremd ist, oeffnet still nichts:
+ * die Seite steht ohnehin da.
  */
 function openLinkedDocument() {
-  const id = Number(new URLSearchParams(globalThis.location?.search ?? '').get('open'));
+  const id = linkedDocumentId();
   if (!id) return;
   const doc = state.allDocuments.find((entry) => entry.id === id);
   if (doc) openDocumentViewer(doc);
+}
+
+function linkedDocumentId() {
+  return Number(new URLSearchParams(globalThis.location?.search ?? '').get('open')) || null;
 }
 
 // Alle abhängigen Flächen nach einer Datenänderung neu zeichnen. Die Facetten-

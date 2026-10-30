@@ -587,6 +587,42 @@ const ORDNER = [
   { id: 6, name: 'Keller', parent_id: 3 },
 ];
 
+/** Die Seite mit gesetztem Archiv zeichnen: der Modulzustand ueberlebt den Seitenwechsel. */
+async function archivSeite(search) {
+  const zuvor = globalThis.location;
+  globalThis.location = { search };
+  try {
+    return await mitDokumenten({ status: 'archived', selectMode: true, selected: new Set([7]), allDocuments: [], documents: [] }, async () => {
+      const ende = new AbortController();
+      try {
+        const liste = await aufrufe(() => renderDocuments(seite(), { user: { id: ICH }, signal: ende.signal }));
+        return {
+          liste, status: documents.state.status, auswahl: documents.state.selectMode, gewaehlt: documents.state.selected.size,
+        };
+      } finally {
+        ende.abort();
+      }
+    });
+  } finally {
+    globalThis.location = zuvor;
+  }
+}
+
+test('#1705: ?open= laedt den aktiven Bestand, auch wenn zuletzt das Archiv gewaehlt war', async () => {
+  const { liste, status, auswahl, gewaehlt } = await archivSeite('?open=9999');
+  assert.ok(liste.includes('GET /documents?status=active'), `geladen: ${liste.join(', ')}`);
+  assert.ok(!liste.includes('GET /documents?status=archived'));
+  assert.equal(status, 'active', 'das Segment zeigt, was geladen ist');
+  assert.equal(auswahl, false, 'eine Auswahl aus dem Archiv gilt im aktiven Bestand nicht');
+  assert.equal(gewaehlt, 0);
+});
+
+test('#1705: ohne ?open= bleibt das gewaehlte Archiv stehen', async () => {
+  const { liste, status } = await archivSeite('');
+  assert.ok(liste.includes('GET /documents?status=archived'), `geladen: ${liste.join(', ')}`);
+  assert.equal(status, 'archived');
+});
+
 /**
  * Die Dokumentenseite wirklich zeichnen: `render()` mit seinem Kontext, die
  * Daten aus den Antworten des Servers. `currentUserId` steht vorher auf null -
