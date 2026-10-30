@@ -140,10 +140,10 @@
   transition-duration: var(--duration-2xs);
 }
 
-/* Aktiv = erhabene Surface-Pille, Modulton nur in der Tinte - die eine
- * Segment-Sprache der Shell (Rezept: tokens.css, Abschnitt 6c; Muster
- * .group-toggle__btn--active in tasks.css, .cal-toolbar__view-btn--active im
- * Kalender, .segmented__item.is-active in panel.css).
+/* Aktiv = getönte Kapsel im Modulton, NICHT die Surface-Pille des Segments
+ * (seit R24 E3, Begründung unten; die Pille behalten .segmented__item.is-active
+ * in panel.css und .group-toggle__btn--active in tasks.css, Rezept tokens.css
+ * Abschnitt 6c).
  *
  * Hier stand bis 2026-08-12 die GEFÜLLTE Fassung samt ihrer Begründung
  * („Modul-Akzent als TEXT erreicht auf Hell nur ~3.5:1"). Die Messung ist mit

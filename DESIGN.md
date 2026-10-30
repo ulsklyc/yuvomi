@@ -182,12 +182,16 @@ components:
     size: "44px"
   # Erhabene Surface-Pille, Modulton NUR in der Tinte (seit 2026-08-12; die
   # gefuellte Fassung ist zurueckgenommen, Rezept in tokens.css Abschnitt 6c).
-  # rounded.full gilt fuer die Shell-Pille (.sub-tab); rounded.sm nur fuer das
-  # konzentrisch eingesetzte .segmented__item im radius-md-Traeger.
+  # Traeger ist das .segmented__item (auch die Ansichtswahl des Kalenders),
+  # konzentrisch im radius-md-Well, daher rounded.sm; .group-toggle__btn--active
+  # rechnet dieselbe Konzentrik (radius-sm - 2px). Der aktive Reiter (.sub-tab,
+  # .list-tab) traegt diese Pille seit R24 E3 NICHT mehr, sondern eine getoente
+  # Kapsel (siehe „Ein Reiter ist kein Segment"); bis dahin stand hier
+  # rounded.full fuer ihn.
   segment-active:
     backgroundColor: "var(--seg-active-bg)"
     textColor: "color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-ink), var(--color-text-primary))"
-    rounded: "{rounded.full}"
+    rounded: "{rounded.sm}"
   # Die ANDERE Haelfte von „eine Behandlung pro Kontrolltyp" (siehe „Chips"): der
   # aktive Filter-Chip ist eine getoente FLAECHE, ausdruecklich NICHT die
   # gefuellte Segment-Pille darueber. Drei Stufen derselben Farbe, alle drei aus

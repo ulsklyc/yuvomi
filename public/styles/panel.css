@@ -128,8 +128,10 @@
 }
 
 /* Aktiv = erhabene Surface-Pille im Well, Modulton nur in der Tinte - die eine
- * Segment-Sprache der Shell (Rezept: tokens.css, Abschnitt 6c; Muster
- * .sub-tab--active / .group-toggle__btn--active / .cal-toolbar__view-btn--active).
+ * Segment-Sprache der Shell (Rezept: tokens.css, Abschnitt 6c; Schwester
+ * .group-toggle__btn--active; die Ansichtswahl des Kalenders ist selbst ein
+ * .segmented__item, der aktive Reiter .sub-tab--active seit R24 E3 eine
+ * getönte Kapsel).
  *
  * Die Unterscheidung zum Primärbutton daneben trägt weiter die FORM, wie schon
  * unter der gefüllten Fassung: der Primärbutton ist ein Rechteck mit Schatten

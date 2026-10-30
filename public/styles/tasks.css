@@ -236,7 +236,7 @@
 }
 
 /* Aktiv = erhabene Surface-Pille im Well, Modulton nur in der Tinte - dieselbe
- * Segment-Sprache wie .cal-toolbar__view-btn--active und .segmented__item
+ * Segment-Sprache wie .segmented__item.is-active
  * (Rezept: tokens.css, Abschnitt 6c). */
 .group-toggle__btn--active {
   background-color: var(--seg-active-bg);
