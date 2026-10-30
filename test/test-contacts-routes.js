@@ -564,6 +564,50 @@ try {
     const one = (await jget(`${base}/${linked.body.data.id}`)).body.data;
     assert(one.birthday_id === Number(bid), `Detail: birthday_id ${one.birthday_id}`);
   });
+  // ------------------------------------------------------------------
+  // #2128: Kontakt-Fotos.
+  // Vor diesem Fix: CONTACT_SELECT enthielt contacts.photo in jeder
+  // Listen-Antwort; POST/PUT ignorierten das Feld; GET /:id/photo
+  // existierte nicht; vCard-4-PHOTO wurde beim CardDAV-Sync fallen gelassen.
+  // ------------------------------------------------------------------
+  await asyncTest('GET / liefert has_photo, aber kein photo-Feld (#2128)', async () => {
+    const PHOTO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const created = await jsend(base, 'POST', { name: 'Foto-Kontakt', photo: PHOTO });
+    const id = created.body.data.id;
+    const list = (await jget(base)).body.data;
+    const item = list.find((c) => c.id === id);
+    assert(item?.has_photo === 1, `Liste: has_photo sollte 1 sein, ist ${item?.has_photo}`);
+    assert(!('photo' in (item ?? {})), `Liste: photo darf nicht im Payload stehen`);
+    const detail = (await jget(`${base}/${id}`)).body.data;
+    assert(detail.photo === PHOTO, `Detail: photo fehlt oder falsch`);
+  });
+
+  await asyncTest('GET /:id/photo liefert Bild-Bytes mit ETag (#2128)', async () => {
+    const PHOTO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const created = await jsend(base, 'POST', { name: 'Foto-Endpoint', photo: PHOTO });
+    const id = created.body.data.id;
+    const res = await fetch(`${base}/${id}/photo`);
+    assert(res.status === 200, `Status ${res.status}`);
+    assert(res.headers.get('content-type')?.startsWith('image/png'), `Content-Type: ${res.headers.get('content-type')}`);
+    assert(res.headers.get('etag'), `ETag fehlt`);
+    const buf = await res.arrayBuffer();
+    assert(buf.byteLength > 0, `Kein Inhalt`);
+  });
+
+  await asyncTest('PUT /:id kann photo setzen und entfernen (#2128)', async () => {
+    const PHOTO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const created = await jsend(base, 'POST', { name: 'Foto-PUT' });
+    const id = created.body.data.id;
+    const withPhoto = await jsend(`${base}/${id}`, 'PUT', { photo: PHOTO });
+    assert(withPhoto.body.data.photo === PHOTO, `nach PUT: photo fehlt`);
+    const removed = await jsend(`${base}/${id}`, 'PUT', { photo: null });
+    assert(removed.body.data.photo === null, `nach Entfernen: photo sollte null sein, ist ${removed.body.data.photo}`);
+  });
+
+  await asyncTest('POST / mit ungültigem Foto → 400 (#2128)', async () => {
+    const { status } = await jsend(base, 'POST', { name: 'Foto-Invalid', photo: 'not-a-data-url' });
+    assert(status === 400, `Status ${status}`);
+  });
 } finally {
   server.close();
   try { fs.unlinkSync(process.env.DB_PATH); } catch { /* egal */ }

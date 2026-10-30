@@ -244,9 +244,13 @@ function parseVCard(vCardText) {
       }
 
       case 'PHOTO':
-        // Handle base64 encoded photos
+        // vCard 3: ENCODING=BASE64 → normalise to data URL (type unknown, assume jpeg).
         if (params.some(p => p.toUpperCase().includes('ENCODING=BASE64') || p.toUpperCase().includes('ENCODING=B'))) {
-          // Photo might span multiple lines in old vCard format
+          const typeParam = params.find(p => /^TYPE=/i.test(p));
+          const mime = typeParam ? `image/${typeParam.replace(/^TYPE=/i, '').toLowerCase()}` : 'image/jpeg';
+          vcard.photo = `data:${mime};base64,${value}`;
+        } else if (/^data:image\/[a-z]+;base64,/i.test(value)) {
+          // vCard 4: PHOTO:data:image/jpeg;base64,…
           vcard.photo = value;
         }
         break;

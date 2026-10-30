@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A contact synced from an address book now shows its photo (#2128).** The list and the card show the contact's picture; a contact without one keeps its initials, and a household member still shows their avatar. The list answer no longer carries the raw photo bytes of every contact – it sends a `has_photo` flag and the browser loads the image lazily from `GET /api/v1/contacts/:id/photo`. POST and PUT accept a `photo` field (data URL, max 5 MB; null removes it). The CardDAV sync now also reads vCard 4 `PHOTO:data:image/…` lines, not only the old `ENCODING=BASE64` form.
+
 ### Fixed
 - **Running the web installer again keeps your settings.** On an existing installation the advanced
   setup now fills its fields with the values from your `.env` - port, public address, reverse-proxy
