@@ -56,6 +56,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin sets up, in line with how private entries already work.
 
 ### Fixed
+- **Repeating tasks keep their time on CalDAV servers across clock changes.** A repeating task with
+  a time now goes out in the household's time zone, so a daily 07:00 task stays at 07:00 after the
+  clocks change, and a weekday repeat near midnight stays on its day. Its start now lies before its
+  due time, which strict servers require. Yuvomi fixes a task already on the server the next time
+  you change it. If another app added a reminder or skipped a date there, the task keeps its old
+  timing until you tick it off, so those still line up.
 - **Vitals take the units Yuvomi can convert, and impossible values no longer slip past in them**
   (#2375). The API took any text as a unit, so 9,000,000 g went past the limits that stop 9,000 kg,
   and a typo like `kgs` was drawn unconverted next to kilograms. `POST` and `PATCH
