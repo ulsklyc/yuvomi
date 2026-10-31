@@ -295,6 +295,17 @@ export function vitalPlausibility({ type, unit, value_num: v1, value_num2: v2, v
   return { hard, soft };
 }
 
+/**
+ * Aendert dieser PATCH-Body die Messung selbst? Der Dialog schickt die Werte immer
+ * mit; nur wenn sie vom Bestand abweichen, zaehlen die harten Grenzen, wie am Server
+ * (#2375). Eine Altzeile mit 9.000.000 g nimmt so weiter eine Notiz an. Die Einheit
+ * steht nur im Body, wenn sie sich geaendert hat (vitalPatchBody).
+ */
+export function vitalMeasureChanged(row, patch) {
+  if (patch.unit !== undefined) return true;
+  return ['value_num', 'value_num2', 'value_num3'].some((key) => (patch[key] ?? null) !== (row[key] ?? null));
+}
+
 /** Stunden + Minuten in Dezimalstunden. Umkehrung von splitDuration(). */
 export function durationToHours(hours, minutes) {
   const h = Number(hours) || 0;

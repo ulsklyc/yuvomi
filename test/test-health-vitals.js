@@ -967,6 +967,19 @@ test('#2375: Formular und Server halten eine umgerechnete Einheit an denselben R
   assert.deepEqual(client.vitalPlausibility({ type: 'weight', unit: 'g', value_num: 1000 }).soft, [{ channel: 'value', issue: 'low' }]);
 });
 
+test('#2375: der Dialog haelt eine Altzeile nur an, wenn sich die Messung aendert', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { vitalMeasureChanged } = await import('../public/utils/health-vitals.js');
+  const row = { value_num: 9000000, value_num2: null, value_num3: null, unit: 'g' };
+  const notiz = { value_num: 9000000, value_num2: null, value_num3: null, note: 'Bestand' };
+  assert.equal(vitalMeasureChanged(row, notiz), false);
+  assert.equal(vitalMeasureChanged(row, { ...notiz, value_num: 8000000 }), true);
+  assert.equal(vitalMeasureChanged(row, { ...notiz, value_num3: 60 }), true);
+  assert.equal(vitalMeasureChanged(row, { ...notiz, unit: 'kg' }), true);
+  const page = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(page, /const judged = !isEdit \|\| vitalMeasureChanged\(row, patch\);\s+if \(judged && reportFieldErrors\(vitalPlausibility\(body\)/);
+});
+
 test('#2375: stone rechnet in den Verlauf um', async () => {
   const { computeVitalSeries } = await import('../public/utils/health-vitals.js');
   const s = computeVitalSeries([
@@ -1004,7 +1017,7 @@ test('die harten Grenzen von Formular und Server sind dieselben, und weich liegt
 
 test('der Vitalwerte-Dialog haelt Unmoegliches an und zeigt Ungewoehnliches als Hinweis', () => {
   const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
-  assert.match(src, /if \(reportFieldErrors\(vitalPlausibility\(body\)\.hard\.map\(/, 'Speichern prueft die harten Grenzen nicht');
+  assert.match(src, /if \(judged && reportFieldErrors\(vitalPlausibility\(body\)\.hard\.map\(/, 'Speichern prueft die harten Grenzen nicht');
   assert.match(src, /<p class="form-hint form-hint--warning" id="vital-plausibility" role="status" hidden><\/p>/);
   // Seit der R19-Nachlese beim Abschluss des Feldes (change), siehe unten.
   assert.match(src, /fieldsHost\.addEventListener\('change', updatePlausibility\)/, 'der Hinweis folgt der Eingabe nicht');
@@ -1021,7 +1034,7 @@ test('Re-Kritik: steht ein harter Fehler am Feld, schweigt der Plausibilitaets-H
     'der Hinweis fragt, ob ein Wertefeld seinen Fehler selbst traegt');
   assert.match(update, /vitalPlausibility\(values\)\.hard\.length && fieldCarriesError\(\) \? null : vitalPlausibilityText\(values\)/,
     'Hartes nur, solange kein Feld es traegt - Ungewoehnliches immer');
-  const submitHard = src.slice(src.indexOf('if (reportFieldErrors(vitalPlausibility(body).hard.map('), src.indexOf('submitBtn.disabled = true;', src.indexOf('if (reportFieldErrors(vitalPlausibility(body).hard.map(')));
+  const submitHard = src.slice(src.indexOf('if (judged && reportFieldErrors(vitalPlausibility(body).hard.map('), src.indexOf('submitBtn.disabled = true;', src.indexOf('if (judged && reportFieldErrors(vitalPlausibility(body).hard.map(')));
   assert.match(submitHard, /updatePlausibility\(\);\s*return;/, 'nach dem Melden am Feld zieht der Hinweis nach');
 });
 
