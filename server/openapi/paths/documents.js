@@ -565,6 +565,10 @@ const CASE_REASONS = {
   '/api/v1/documents/storage/test': { post: STORAGE_FAILED },
   '/api/v1/documents/{id}/preview': { get: STORAGE_FAILED },
   '/api/v1/documents/{id}/download': { get: STORAGE_FAILED },
+  '/api/v1/documents/dms/accounts/{id}': { delete: '`dms_account_not_found` (404)' },
+  '/api/v1/documents/dms/accounts/{id}/test': { post: '`dms_account_not_found` (404)' },
+  '/api/v1/documents/dms/search': { get: '`dms_account_not_found` (404)' },
+  '/api/v1/documents/dms/thumbnail': { get: '`dms_account_not_found` (404)' },
   '/api/v1/documents/dms/link': {
     post: '`dms_account_not_found` (404), `dms_document_not_found` (404, gone in the DMS), `dms_document_already_linked` (409), `dms_unreachable` (502)',
   },
