@@ -59,6 +59,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bottom menu and sprang back out of reach when you let go. The list now ends above the menu, and
   the bounce at the end of a list no longer brings the search row back. The same holds for the other
   kitchen lists.
+- **A meal stays on the wall until the next planned meal.** Since 2.83.0 "Today at a glance" dropped
+  a meal the moment its slot began, so breakfast was gone at 08:00 and dinner at 18:30. A meal now
+  stays until the next meal planned for today starts, and the last one until the end of the day.
+  The smaller Today sheet on phones and tablets follows the same rule, and the timeline dot is
+  unchanged.
 - **Vietnamese counts show the real number.** In browsers with current language data, Vietnamese
   picks the singular wording for 0 as well as for 1, so eleven messages such as the active filter
   count said "1" when nothing was selected. They now show the actual count.

@@ -1292,7 +1292,7 @@ for (const stage of ['compact', 'phone']) {
     assert.match(text, /today-cockpit-card__value">Filmabend</, 'der Filmabend aus der Familienliste ist als Text erreichbar');
     assert.match(text, /today-cockpit-card__value">Apfelschnitze</, 'der Snack um 15:30 steht als Zeile');
     assert.match(text, /today-cockpit-card__value">Ofengemuese</, 'das Abendessen um 18:30 steht als Zeile');
-    assert.ok(!text.includes('Linsensuppe'), 'das Mittagessen um 12:30 ist vorbei');
+    assert.match(text, /today-cockpit-card__value">Linsensuppe</, 'das Mittagessen um 12:30 steht noch - erst der Snack um 15:30 loest es ab');
     assert.ok(!text.includes('data-object-kind="shift"'), 'die Fruehschicht endete um 14:00');
     assert.ok(!text.includes('Zahnarzt'), 'der beendete Termin bleibt Bild');
     assert.match(text, /today-cockpit-card__value">Ausflug</, 'das Ganztaegige bleibt Zeile');
@@ -1326,10 +1326,78 @@ test('D1: breit bleibt es - getimte Termine nur in der Leiste, der Kopf zaehlt, 
 }));
 
 test('D1: verstreicht die Zeit einer Mahlzeit, baut der Minutentakt neu', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
-  const data = { upcomingEvents: [], familyEvents: [], todayMeals: [{ id: 63, meal_type: 'dinner', title: 'Ofengemuese' }] };
+  const data = { upcomingEvents: [], familyEvents: [], todayMeals: [
+    { id: 61, meal_type: 'lunch', title: 'Linsensuppe' },
+    { id: 63, meal_type: 'dinner', title: 'Ofengemuese' },
+  ] };
   const before = dash.todayFingerprint(data, [], new Date('2026-09-24T16:29:00Z'));
   const after = dash.todayFingerprint(data, [], new Date('2026-09-24T16:31:00Z'));
-  assert.notEqual(before, after, 'um 18:30 verlaesst das Abendessen die Zeilen der Kurzfassung');
+  assert.notEqual(before, after, 'um 18:30 loest das Abendessen das Mittagessen in den Zeilen ab');
+}));
+
+// DIE MAHLZEIT BLEIBT, BIS DIE NAECHSTE DRAN IST (#2393). Seit die Wand ihre
+// Zeilen aus der Leiste nimmt, galt eine Mahlzeit als vorbei, sobald ihre Zeit
+// da war: das Fruehstueck verschwand um 08:00, das Abendessen um 18:30. Der
+// Punkt auf der Leiste bleibt ein Punkt, die ZEILE lebt bis zur naechsten
+// GEPLANTEN Mahlzeit - ein leerer Slot loest nichts ab. Die Grenze liest die
+// Wanduhr des HAUSHALTS, wie Leiste und Punkt (householdMinuteOf).
+const MEAL_BY_TYPE = {
+  breakfast: { id: 71, title: 'Muesli' },
+  lunch: { id: 72, title: 'Linsensuppe' },
+  snack: { id: 73, title: 'Apfelschnitze' },
+  dinner: { id: 74, title: 'Ofengemuese' },
+};
+const plannedMeals = (types) => types.map((meal_type) => ({ ...MEAL_BY_TYPE[meal_type], meal_type }));
+const berlinClock = (clock) => new Date(`2026-09-24T${clock}:00+02:00`);
+// Geplant, in der Reihenfolge des Tages: welche Mahlzeiten stehen als Zeile an der Wand?
+const wallMealsAt = (now, todayMeals) => {
+  const html = dash.renderWallSurface({ todayMeals, upcomingEvents: [], familyEvents: [], urgentTasks: [], users: [] }, null, { now });
+  return todayMeals.map((meal) => meal.title).filter((title) => html.includes(title));
+};
+const [MUESLI, SUPPE, APFEL, AUFLAUF] = ['breakfast', 'lunch', 'snack', 'dinner'].map((type) => MEAL_BY_TYPE[type].title);
+
+test('#2393: an der Wand bleibt eine Mahlzeit bis zur naechsten geplanten, nicht bis zu ihrem Beginn', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  const day = plannedMeals(['breakfast', 'lunch', 'dinner']);
+  const expected = {
+    '07:59': [MUESLI, SUPPE, AUFLAUF],
+    '08:00': [MUESLI, SUPPE, AUFLAUF], // der Moment aus dem Bericht
+    '08:12': [MUESLI, SUPPE, AUFLAUF],
+    '12:29': [MUESLI, SUPPE, AUFLAUF],
+    '12:30': [SUPPE, AUFLAUF],
+    '15:30': [SUPPE, AUFLAUF], // kein Snack geplant: der leere Slot loest nichts ab
+    '18:29': [SUPPE, AUFLAUF],
+    '18:30': [AUFLAUF],
+    '23:59': [AUFLAUF],
+  };
+  for (const [clock, meals] of Object.entries(expected)) {
+    assert.deepEqual(wallMealsAt(berlinClock(clock), day), meals, `um ${clock}`);
+  }
+}));
+
+test('#2393: ein geplanter Snack loest das Mittagessen ab, und zwei Mahlzeiten im selben Slot gehen gemeinsam', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  const day = plannedMeals(['lunch', 'snack', 'dinner']);
+  assert.deepEqual(wallMealsAt(berlinClock('15:29'), day), [SUPPE, APFEL, AUFLAUF]);
+  assert.deepEqual(wallMealsAt(berlinClock('15:30'), day), [APFEL, AUFLAUF]);
+
+  const twoLunches = [...plannedMeals(['lunch', 'dinner']), { id: 75, meal_type: 'lunch', title: 'Kinderteller' }];
+  assert.deepEqual(wallMealsAt(berlinClock('14:30'), twoLunches), [SUPPE, AUFLAUF, 'Kinderteller'], 'keine loest die andere ab');
+  assert.deepEqual(wallMealsAt(berlinClock('18:30'), twoLunches), [AUFLAUF]);
+}));
+
+for (const device of ['America/New_York', 'Asia/Tokyo']) {
+  test(`#2393: die Grenze ist die Uhr des Haushalts, nicht die des Geraets (${device})`,
+    inProcessZone(device, inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+      // 14:30 in Berlin ist in New York 08:30 und in Tokio 21:30: dort stuende
+      // das Fruehstueck noch, hier waere das Mittagessen schon weg.
+      assert.deepEqual(wallMealsAt(new Date(), plannedMeals(['breakfast', 'lunch', 'dinner'])), [SUPPE, AUFLAUF]);
+    })));
+}
+
+test('#2393: der Punkt auf der Leiste bleibt ein Punkt - nur die Zeile lebt laenger', inBrowser(THU_1430_BERLIN, 'Europe/Berlin', () => {
+  const data = { todayMeals: plannedMeals(['lunch', 'dinner']), upcomingEvents: [], familyEvents: [], urgentTasks: [], users: [] };
+  const sheet = dash.renderTodayCockpit(data, [], false, { stage: 'compact', moreOpen: true });
+  assert.match(reachableText(sheet), new RegExp(`today-cockpit-card__value">${SUPPE}<`), 'die Zeile steht');
+  assert.equal(sheet.match(/today-timeline__bar--past/g)?.length, 1, 'die Kurzfassung zeigt das Mittagessen als vergangen, das Abendessen nicht');
 }));
 
 
