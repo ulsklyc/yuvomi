@@ -590,6 +590,7 @@ router.put('/:id/series', (req, res) => {
     if (req.body.recurrence_interval !== undefined) checks.push(['entry_recurrence_invalid', oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Interval')]);
     if (req.body.recurrence_interval_count !== undefined) checks.push(['entry_interval_count_invalid', intervalCountCheck(req.body.recurrence_interval_count)]);
     if (req.body.start_date !== undefined) checks.push(['entry_start_date_invalid', validateDate(req.body.start_date, 'start_date', true)]);
+    if (req.body.end_date   !== undefined && req.body.end_date !== null) checks.push(['entry_end_date_invalid', validateDate(req.body.end_date, 'end_date', true)]);
     const errors = checks.flatMap(([reason, result]) => refusals(reason, [result]));
     if (errors.length) return refuse(res, errors);
     // EINE SERIEN-AENDERUNG BEENDET DIE SERIE NICHT (#1546).
@@ -723,6 +724,11 @@ router.put('/:id/series', (req, res) => {
     const currentStart = series?.start_date ?? parent.date;
     const finalStart   = req.body.start_date !== undefined ? req.body.start_date : currentStart;
     const startChanged = finalStart !== currentStart;
+    // end_date: undefined → keep existing; null/'' → clear; date string → set.
+    const endDateProvided = req.body.end_date !== undefined;
+    const finalEndDate = endDateProvided
+      ? (req.body.end_date || null)
+      : (series?.end_date ?? null);
     // NICHT VOR DEN MONAT DER GEBUCHTEN ERSTEN BUCHUNG. Der Monatsaufruf laesst
     // nur den Monat des Starttags aus - er gehoert der ersten Buchung. Laege
     // der Starttag einen Monat frueher, entstuende in ihrem Monat ein zweites
@@ -801,10 +807,13 @@ router.put('/:id/series', (req, res) => {
           visibility  = COALESCE(?, visibility),
           account_id  = CASE WHEN ? = 1 THEN ? ELSE account_id END,
           start_date  = ?,
+          end_date    = CASE WHEN ? = 1 THEN ? ELSE end_date END,
           updated_at  = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
         WHERE anchor_id = ?
       `).run(finalTitle, storeAmount, finalFull, finalCategory, finalSubcat, nextVisibility,
-             accountProvided ? 1 : 0, accountValue, finalStart, parentId);
+             accountProvided ? 1 : 0, accountValue, finalStart,
+             endDateProvided ? 1 : 0, finalEndDate,
+             parentId);
 
       // 4. Die vorhandenen Instanzen ab heute.
       //
@@ -863,6 +872,15 @@ router.put('/:id/series', (req, res) => {
           UPDATE budget_entries SET visibility = ? WHERE recurrence_parent_id = ?
         `).run(nextVisibility, parentId);
       }
+
+      // 6. Enddatum: kuenftige, nicht gebuchte Vorkommen nach dem Enddatum loeschen.
+      //    Bestaetigte Buchungen werden nie entfernt.
+      if (endDateProvided && finalEndDate) {
+        db.get().prepare(`
+          DELETE FROM budget_entries
+           WHERE recurrence_parent_id = ? AND date > ? AND is_pending = 1
+        `).run(parentId, finalEndDate);
+      }
     })();
 
     // Belege bleiben hier bewusst unberuehrt (#583): sie gehoeren zur einzelnen
@@ -897,7 +915,7 @@ router.put('/:id/series', (req, res) => {
 
     const updated = entryWithLoanMeta(parentId);
     const definition = db.get().prepare(`
-      SELECT title, amount, full_amount, category, subcategory, account_id, visibility, start_date
+      SELECT title, amount, full_amount, category, subcategory, account_id, visibility, start_date, end_date
         FROM budget_series WHERE anchor_id = ?
     `).get(parentId) ?? null;
     res.json({ data: {
