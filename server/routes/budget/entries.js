@@ -24,6 +24,7 @@ import {
   entryWithLoanMeta, refreshLoanStatus, loanEntryRate, bookingFor,
   RESPONSIBLE_USERS_SQL, replaceResponsibles, withResponsibles, responsibleNonMembers,
   replaceSeriesResponsibles, seedSeriesResponsibles, materializeSeriesStart, freezeSeriesPast,
+  requestLang, localizedSubcategory, localizedCategory,
   refusal, refusals, refuse,
 } from './helpers.js';
 import { nonMemberMessage } from '../../services/household-members.js';
@@ -491,8 +492,22 @@ router.post('/', (req, res) => {
     const strangers = responsibleNonMembers(null, req.body.responsible_user_ids);
     if (strangers.length) return refuse(res, [refusal('entry_responsible_invalid', nonMemberMessage(strangers))]);
 
-    // Blank title falls back to subcategory, then category (#2403).
-    const effectiveTitle = vTitle.value || subcategory || vCat.value || fallbackCategory;
+    // Blank title falls back to the localized subcategory or category name (#2403).
+    // API callers without a title get the household-language label, matching what
+    // the dialog sends when the field is left blank.
+    let effectiveTitle = vTitle.value;
+    if (!effectiveTitle) {
+      const lang = requestLang(req.query.lang);
+      const catKey = vCat.value || fallbackCategory;
+      if (subcategory) {
+        const subRow = db.get().prepare('SELECT key, name FROM budget_subcategories WHERE key = ?').get(subcategory);
+        effectiveTitle = subRow ? localizedSubcategory(subRow, lang).label : subcategory;
+      }
+      if (!effectiveTitle) {
+        const catRow = db.get().prepare('SELECT key, name FROM budget_categories WHERE key = ?').get(catKey);
+        effectiveTitle = catRow ? localizedCategory(catRow, lang).label : catKey;
+      }
+    }
 
     // Intervall + virtuelles Budget nur für wiederkehrende Einträge.
     const isRecurring = req.body.is_recurring ? 1 : 0;
@@ -623,7 +638,7 @@ router.put('/:id/series', (req, res) => {
     if (strangers.length) return refuse(res, [refusal('entry_responsible_invalid', nonMemberMessage(strangers))]);
 
     const { title, amount, category, subcategory: requestedSubcategory, is_recurring, recurrence_rule } = req.body;
-    const finalTitle    = title     !== undefined ? title.trim()                        : base.title;
+    const finalTitle    = title?.trim() || base.title;
     const finalAmount   = amount    !== undefined ? Number(amount)                     : base.amount;
     const finalCategory = category  !== undefined ? category                           : base.category;
     const finalSubcat   = requestedSubcategory !== undefined
@@ -1129,7 +1144,7 @@ router.put('/:id', (req, res) => {
             account_id             = CASE WHEN ? = 1 THEN ? ELSE account_id END
         WHERE id = ?
       `).run(
-        title?.trim() ?? null,
+        title?.trim() || null,
         nextAmount,
         category ?? null,
         subcategory !== undefined ? subcategory : null,

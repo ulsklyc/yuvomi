@@ -1783,27 +1783,49 @@ test('#1668: jede Absage von Buchung, Serie, Konto, Kategorie und Rate nennt ihr
 
 // ── #2403: blank title falls back to subcategory or category ────────────────
 
-test('#2403: blank title falls back to subcategory when one is given', async () => {
+test('#2403: blank title falls back to localized subcategory label when one is given', async () => {
   const r = await call('POST', '/', { body: { title: '', amount: -5, category: 'food', subcategory: 'groceries', date: '2099-01-01' } });
   assert.equal(r.status, 201, 'created');
-  assert.equal(r.body.data.title, 'groceries');
+  assert.equal(r.body.data.title, 'Groceries'); // en locale label, not the key
 });
 
-test('#2403: blank title falls back to default subcategory when no subcategory is given', async () => {
-  // food's default subcategory is 'groceries'; when no title is given that wins over the category key.
+test('#2403: blank title falls back to default subcategory label when no subcategory is given', async () => {
+  // food's default subcategory is 'groceries'; blank title uses its localized label.
   const r = await call('POST', '/', { body: { title: '', amount: -5, category: 'food', date: '2099-01-02' } });
   assert.equal(r.status, 201, 'created');
-  assert.equal(r.body.data.title, 'groceries');
+  assert.equal(r.body.data.title, 'Groceries');
 });
 
-test('#2403: omitted title falls back to subcategory', async () => {
+test('#2403: omitted title falls back to localized subcategory label', async () => {
   const r = await call('POST', '/', { body: { amount: -5, category: 'food', subcategory: 'groceries', date: '2099-01-03' } });
   assert.equal(r.status, 201, 'created');
-  assert.equal(r.body.data.title, 'groceries');
+  assert.equal(r.body.data.title, 'Groceries');
 });
 
 test('#2403: a provided title is stored as-is and not replaced by subcategory', async () => {
   const r = await call('POST', '/', { body: { title: 'Mein Titel', amount: -5, category: 'food', subcategory: 'groceries', date: '2099-01-04' } });
   assert.equal(r.status, 201, 'created');
   assert.equal(r.body.data.title, 'Mein Titel');
+});
+
+test('#2403: whitespace-only title falls back to localized subcategory label', async () => {
+  const r = await call('POST', '/', { body: { title: '   ', amount: -5, category: 'food', subcategory: 'groceries', date: '2099-01-05' } });
+  assert.equal(r.status, 201, 'created');
+  assert.equal(r.body.data.title, 'Groceries');
+});
+
+test('#2403: blank title on PUT keeps the stored title unchanged', async () => {
+  const { body: { data: created } } = await call('POST', '/', { body: { title: 'Lohn', amount: -5, category: 'food', subcategory: 'groceries', date: '2099-02-01' } });
+  assert.equal(created?.id != null, true, 'entry created');
+  const r = await call('PUT', `/${created.id}`, { body: { title: '' } });
+  assert.equal(r.status, 200, 'updated');
+  assert.equal(r.body.data.title, 'Lohn', 'stored title must not be overwritten by blank');
+});
+
+test('#2403: blank title on PUT /:id/series keeps the stored series title unchanged', async () => {
+  const { body: { data: created } } = await call('POST', '/', { body: { title: 'Miete', amount: -900, category: 'housing', subcategory: 'rent_mortgage', date: '2099-03-01', is_recurring: true, recurrence_interval: 'monthly' } });
+  assert.equal(created?.id != null, true, 'entry created');
+  const r = await call('PUT', `/${created.id}/series`, { body: { title: '' } });
+  assert.equal(r.status, 200, 'series updated');
+  assert.equal(r.body.data.title, 'Miete', 'series title must not be overwritten by blank');
 });
