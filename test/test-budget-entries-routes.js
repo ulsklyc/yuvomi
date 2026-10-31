@@ -1606,7 +1606,7 @@ test('#1668: jede Absage von Buchung, Serie, Konto, Kategorie und Rate nennt ihr
   setMode('shared');
   const ADM = { id: ADMIN, role: 'admin' };
   const EXPECTED = {
-    'e-title': { status: 400, reason: 'entry_title_invalid', error: 'Title is required.' },
+    'e-title': { status: 400, reason: 'entry_title_invalid', error: 'Title may be at most 200 characters long.' },
     'e-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Amount is required.' },
     'e-category': { status: 400, reason: 'entry_category_invalid', error: 'Category must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
     'e-date': { status: 400, reason: 'entry_date_invalid', error: 'Date must be in YYYY-MM-DD format.' },
@@ -1615,7 +1615,7 @@ test('#1668: jede Absage von Buchung, Serie, Konto, Kategorie und Rate nennt ihr
     'e-sub': { status: 400, reason: 'entry_subcategory_invalid', error: 'Invalid subcategory.' },
     'e-account': { status: 400, reason: 'entry_account_invalid', error: 'Account not found.' },
     'e-account-nan': { status: 400, reason: 'entry_account_invalid', error: 'account_id must be a valid account id.' },
-    'e-two': { status: 400, reason: 'entry_title_invalid', error: 'Title is required. Amount is required. Date must be in YYYY-MM-DD format.' },
+    'e-two': { status: 400, reason: 'entry_amount_invalid', error: 'Amount is required. Date must be in YYYY-MM-DD format.' },
     'p-title': { status: 400, reason: 'entry_title_invalid', error: 'Title may be at most 200 characters long.' },
     'p-amount': { status: 400, reason: 'entry_amount_invalid', error: 'Amount must be a valid number.' },
     'p-category': { status: 400, reason: 'entry_category_invalid', error: 'Category must be one of: Erwerbseinkommen, Geschenke & Transfers, Kapitalerträge, Sonstiges Einkommen, Sozialleistungen, education, financial_other, food, housing, leisure, personal_health, shopping_clothing, subscriptions, transport.' },
@@ -1686,7 +1686,7 @@ test('#1668: jede Absage von Buchung, Serie, Konto, Kategorie und Rate nennt ihr
   };
   const ok = { title: 'T', amount: -5, date: '2030-01-10' };
   const long = 'x'.repeat(300);
-  await run('e-title', 'POST', '/', { amount: -5, date: '2030-01-10' });
+  await run('e-title', 'POST', '/', { title: long, amount: -5, date: '2030-01-10' });
   await run('e-amount', 'POST', '/', { title: 'T', date: '2030-01-10' });
   await run('e-category', 'POST', '/', { ...ok, category: 'nope' });
   await run('e-date', 'POST', '/', { ...ok, date: 'nope' });
@@ -1779,4 +1779,31 @@ test('#1668: jede Absage von Buchung, Serie, Konto, Kategorie und Rate nennt ihr
     }, `${method} ${route}`);
   }
   assert.deepEqual(seen.sort(), Object.keys(EXPECTED).sort(), 'jeder gefuehrte Fall wurde gefahren');
+});
+
+// ── #2403: blank title falls back to subcategory or category ────────────────
+
+test('#2403: blank title falls back to subcategory when one is given', async () => {
+  const r = await call('POST', '/', { body: { title: '', amount: -5, category: 'food', subcategory: 'groceries', date: '2099-01-01' } });
+  assert.equal(r.status, 201, 'created');
+  assert.equal(r.body.data.title, 'groceries');
+});
+
+test('#2403: blank title falls back to default subcategory when no subcategory is given', async () => {
+  // food's default subcategory is 'groceries'; when no title is given that wins over the category key.
+  const r = await call('POST', '/', { body: { title: '', amount: -5, category: 'food', date: '2099-01-02' } });
+  assert.equal(r.status, 201, 'created');
+  assert.equal(r.body.data.title, 'groceries');
+});
+
+test('#2403: omitted title falls back to subcategory', async () => {
+  const r = await call('POST', '/', { body: { amount: -5, category: 'food', subcategory: 'groceries', date: '2099-01-03' } });
+  assert.equal(r.status, 201, 'created');
+  assert.equal(r.body.data.title, 'groceries');
+});
+
+test('#2403: a provided title is stored as-is and not replaced by subcategory', async () => {
+  const r = await call('POST', '/', { body: { title: 'Mein Titel', amount: -5, category: 'food', subcategory: 'groceries', date: '2099-01-04' } });
+  assert.equal(r.status, 201, 'created');
+  assert.equal(r.body.data.title, 'Mein Titel');
 });
