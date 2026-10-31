@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "File hanya berisi baris judul tanpa menstruasi.",
         "errorCycleImportTooManyRows": "Satu impor boleh berisi paling banyak {{limit}} menstruasi. Bagi file-nya.",
         "errorVitalImpossible": "Nilai ini tidak mungkin. Periksa kembali isianmu.",
-        "errorVitalBpOrder": "Nilai sistolik harus lebih tinggi daripada diastolik."
+        "errorVitalBpOrder": "Nilai sistolik harus lebih tinggi daripada diastolik.",
+        "errorVitalUnit": "Satuan ini tidak cocok untuk pengukuran ini."
     },
     "waste": {
         "title": "Pengumpulan sampah",

@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "Filen har bare en overskriftsrad og ingen mens.",
         "errorCycleImportTooManyRows": "En import kan inneholde høyst {{limit}} menser. Del opp filen.",
         "errorVitalImpossible": "Denne verdien er ikke mulig. Sjekk det du skrev inn.",
-        "errorVitalBpOrder": "Den systoliske verdien må være høyere enn den diastoliske."
+        "errorVitalBpOrder": "Den systoliske verdien må være høyere enn den diastoliske.",
+        "errorVitalUnit": "Denne enheten passer ikke til denne målingen."
     },
     "waste": {
         "title": "Avfallshåndtering",

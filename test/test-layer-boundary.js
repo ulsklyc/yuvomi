@@ -58,6 +58,11 @@ const SHARED_ISOMORPHIC = new Set([
   // Fehler. Rein: trim, Leerraum, toLowerCase, kein DOM und kein Node.
   'public/utils/ingredient-match-key.js',
   'public/utils/contact-name.js',
+  // #2375: Welche Einheit eine Messart fuehrt und was sich umrechnen laesst. Das
+  // Diagramm rechnet damit, die Route nimmt genau das an und prueft die harten
+  // Grenzen am umgerechneten Wert. Zwei Fassungen liefen bei der naechsten
+  // Einheit auseinander. Rein: Tabellen und Rechnung, kein DOM und kein Node.
+  'public/utils/vital-units.js',
   // #1748: der Schritt einer Serie (`addInterval`, `nextRunNotBefore`). Der
   // Dialog der geteilten Ausgaben nennt vor dem Speichern, wie viele Termine
   // der Server bei `missed: skip` ueberspringt und auf welchem er landet; eine

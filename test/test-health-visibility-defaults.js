@@ -74,7 +74,7 @@ const asB = () => { session = { userId: userB, role: 'member' }; };
 /** Ein Vitalwert des angemeldeten Nutzers, ohne Angabe zur Sichtbarkeit. */
 async function postVital(type, extra = {}) {
   const res = await call('POST', '/vitals', {
-    type, value_num: 120, unit: 'x', measured_at: '2026-06-01T08:00', ...extra,
+    type, value_num: 120, measured_at: '2026-06-01T08:00', ...extra,
   });
   assert.equal(res.status, 201, `POST /vitals fehlgeschlagen: ${JSON.stringify(res.body)}`);
   return res.body.data;
@@ -187,7 +187,7 @@ test('traegt eine betreuende Person ein, gilt die Wahl der betreuten', async () 
   await call('PUT', '/visibility-defaults', { defaults: { 'vital:temp': 'family' } });
   asA();
   const res = await call('POST', '/vitals', {
-    user_id: userB, type: 'temp', value_num: 38.5, unit: 'C', measured_at: '2026-06-02T08:00',
+    user_id: userB, type: 'temp', value_num: 38.5, unit: '°C', measured_at: '2026-06-02T08:00',
   });
   assert.equal(res.status, 201);
   assert.equal(res.body.data.user_id, userB);

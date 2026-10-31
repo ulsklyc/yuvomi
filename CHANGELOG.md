@@ -60,6 +60,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to three buttons and read "Aufgab…" at 360px. There the filter now moves into the "..." menu, and
   the number of active filters stands on the "..." button and in the menu entry. From 390px up
   nothing changes.
+- **Vitals take the units Yuvomi can convert, and impossible values no longer slip past in them**
+  (#2375). The API took any text as a unit, so 9,000,000 g went past the limits that stop 9,000 kg,
+  and a typo like `kgs` was drawn unconverted next to kilograms. `POST` and `PATCH
+  /api/v1/health/vitals` now accept the units a measurement lists plus those the chart can convert,
+  in any capitalisation (weight also `g`, `lbs` and `stone`, height and head circumference also `m`
+  and `mm`, temperature also `C` and `F`), and check the limits on the converted value: 700,001 g
+  is refused like 700.001 kg. Any other unit is refused with 400 and the reason
+  `health_vital_unit_invalid`, and the message names the ones that work. Weights in stone now also
+  convert in the chart. `unit` stays optional, stored readings stay as they were sent, and older
+  readings in any unit can still be edited.
 - **The container starts with `no-new-privileges`.** Hardened setups (Podman Quadlet
   `NoNewPrivileges=true`, `--security-opt no-new-privileges`, Compose `security_opt`) never got
   past the entrypoint: `gosu` hung as root at 100 % CPU before it switched to the `node` user, so

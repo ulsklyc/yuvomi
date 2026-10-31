@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "Het bestand bevat alleen een kopregel en geen menstruaties.",
         "errorCycleImportTooManyRows": "Eén import mag hoogstens {{limit}} menstruaties bevatten. Splits het bestand.",
         "errorVitalImpossible": "Deze waarde is niet mogelijk. Controleer je invoer.",
-        "errorVitalBpOrder": "De systolische waarde moet hoger zijn dan de diastolische."
+        "errorVitalBpOrder": "De systolische waarde moet hoger zijn dan de diastolische.",
+        "errorVitalUnit": "Deze eenheid past niet bij deze meting."
     },
     "waste": {
         "title": "Afvalinzameling",

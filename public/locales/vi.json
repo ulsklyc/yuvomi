@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "Tệp chỉ có dòng tiêu đề và không có kỳ kinh nào.",
         "errorCycleImportTooManyRows": "Mỗi lần nhập chỉ được tối đa {{limit}} kỳ kinh. Hãy chia nhỏ tệp.",
         "errorVitalImpossible": "Giá trị này không thể có. Vui lòng kiểm tra lại.",
-        "errorVitalBpOrder": "Huyết áp tâm thu phải cao hơn tâm trương."
+        "errorVitalBpOrder": "Huyết áp tâm thu phải cao hơn tâm trương.",
+        "errorVitalUnit": "Đơn vị này không phù hợp với phép đo này."
     },
     "waste": {
         "title": "Thu gom rác",

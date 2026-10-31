@@ -6099,7 +6099,8 @@
         "errorCycleImportNoRows": "Plik zawiera tylko wiersz nagłówka i żadnej miesiączki.",
         "errorCycleImportTooManyRows": "Jeden import może zawierać najwyżej {{limit}} miesiączek. Podziel plik.",
         "errorVitalImpossible": "Ta wartość jest niemożliwa. Sprawdź wprowadzone dane.",
-        "errorVitalBpOrder": "Wartość skurczowa musi być wyższa niż rozkurczowa."
+        "errorVitalBpOrder": "Wartość skurczowa musi być wyższa niż rozkurczowa.",
+        "errorVitalUnit": "Ta jednostka nie pasuje do tego pomiaru."
     },
     "waste": {
         "title": "Odbiór odpadów",

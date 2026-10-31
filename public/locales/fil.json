@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "Header row lang ang laman ng file at walang regla.",
         "errorCycleImportTooManyRows": "Hanggang {{limit}} regla lang ang kaya ng isang import. Hatiin ang file.",
         "errorVitalImpossible": "Hindi posible ang halagang ito. Pakisuri ang inilagay mo.",
-        "errorVitalBpOrder": "Dapat mas mataas ang systolic kaysa sa diastolic."
+        "errorVitalBpOrder": "Dapat mas mataas ang systolic kaysa sa diastolic.",
+        "errorVitalUnit": "Hindi tugma ang yunit na ito sa sukat na ito."
     },
     "waste": {
         "title": "Koleksyon ng basura",
