@@ -6187,7 +6187,22 @@ function renderCustomizeScopeActions({ followsDefault = true, canPublish = false
  * Unter dem Raster beantwortet er dieselbe Frage ("gilt das fuer alle?") vor
  * dem Tipp auf "Fertig", ohne das Bearbeitete wegzuschieben. Sichtbar nur auf
  * schmaler Buehne (dashboard.css) - breit steht er im Kopf. */
-function renderCustomizeFootnote({ followsDefault = true, canPublish = false } = {}) {
+function renderCustomizeFootnote({ followsDefault = true, canPublish = false, phoneCustomize = false, followsPhoneDefault = true } = {}) {
+  if (phoneCustomize) {
+    // Im Telefon-Anpassen-Modus: eigener Hinweis und "Wie Desktop"-Knopf (#2109).
+    const resetBtn = !followsPhoneDefault ? `
+        <div class="dashboard-customize-footnote__actions">
+          <button class="btn btn--ghost dashboard-customize-scope-action" data-customize-phone-reset>
+            <i data-lucide="monitor" class="icon-sm" aria-hidden="true"></i>
+            ${t('dashboard.customizePhoneReset')}
+          </button>
+        </div>` : '';
+    return `
+    <section class="dashboard-customize-footnote" aria-label="${esc(t('dashboard.customizePhoneTitle'))}">
+      <p>${t('dashboard.customizePhoneScopeHint')}</p>
+      ${resetBtn}
+    </section>`;
+  }
   const actions = renderCustomizeScopeActions({ followsDefault, canPublish });
   return `
     <section class="dashboard-customize-footnote" aria-label="${esc(t('dashboard.customizeTitle'))}">
@@ -6203,7 +6218,8 @@ function renderCustomizeFootnote({ followsDefault = true, canPublish = false } =
  * aktuelle Stand kommt (die Vorgabe des Haushalts), steht hinter "Mehr dazu" -
  * dasselbe native `<details>` wie die Erklaerungen der Einstellungen
  * (hintFoldHtml, R22 D13). Ohne Vorgabe gibt es nichts aufzuklappen. */
-function renderCustomizeScopeHint(followsDefault) {
+function renderCustomizeScopeHint(followsDefault, { phoneCustomize = false } = {}) {
+  if (phoneCustomize) return `<p>${t('dashboard.customizePhoneScopeHint')}</p>`;
   const more = followsDefault ? `
       <details class="dashboard-customize-scope__more">
         <summary class="dashboard-customize-scope__summary">${esc(t('settings.hintMore'))}<i data-lucide="chevron-down" class="dashboard-customize-scope__icon" aria-hidden="true"></i></summary>
@@ -6233,7 +6249,7 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
   // setzen darf, ist Admin (#827).
   // `offerNew: false` im Fehlerzustand: wie der Speed-Dial dort (#634-Kommentar
   // bei initFab) kein Anlegen in Module, deren Daten nicht geladen sind.
-  const { followsDefault = true, canPublish = false, offerNew = true, weatherCard = false } = scope;
+  const { followsDefault = true, canPublish = false, offerNew = true, weatherCard = false, phoneCustomize = false } = scope;
   const dateLabel = mastheadDateLabel();
   // EIN WANDTABLETT BEKOMMT ZWEI KNOEPFE NICHT, WEIL BEIDE NUR SCHEITERN
   // KOENNEN (#1808). "Anpassen" endet in `PUT /preferences`, und ein Display
@@ -6263,7 +6279,7 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
                2026-08-16). Ein Satz im Anpassen-Modus beantwortet sie im
                richtigen Moment. -->
           <div class="dashboard-customize-scope">
-            ${renderCustomizeScopeHint(followsDefault)}
+            ${renderCustomizeScopeHint(followsDefault, { phoneCustomize })}
           </div>
           <!-- MOBIL EINE ZEILE: [Abbrechen] Titel [Fertig] (R9 M7, iOS-Muster).
                Der Titel ist nur dort sichtbar (dashboard.css); am Desktop steht
@@ -6272,8 +6288,8 @@ function renderDashboardOverview(user, editing = false, weather = null, scope = 
                Raster (renderCustomizeFootnote) - hier bleiben sie fuer die
                breite Buehne. -->
           <div class="dashboard-customize-toolbar" role="toolbar" aria-label="${t('dashboard.customizeTitle')}">
-            ${renderCustomizeScopeActions({ followsDefault, canPublish, id: true })}
-            <span class="dashboard-customize-toolbar__title" aria-hidden="true">${esc(t('dashboard.customizeTitle'))}</span>
+            ${phoneCustomize ? '' : renderCustomizeScopeActions({ followsDefault, canPublish, id: true })}
+            <span class="dashboard-customize-toolbar__title" aria-hidden="true">${esc(t(phoneCustomize ? 'dashboard.customizePhoneTitle' : 'dashboard.customizeTitle'))}</span>
             <button class="btn btn--secondary" id="dashboard-customize-cancel">${t('common.cancel')}</button>
             <button class="btn btn--primary" id="dashboard-customize-save">${esc(t('dashboard.customizeDone'))}</button>
           </div>` : ''}
@@ -7283,9 +7299,24 @@ function attachSizeIndicators(root, signal) {
 function sizeLabelParts(label) {
   const match = /^(.*\S)\s*(\([^()]*\))$/u.exec(label);
   return match ? { name: match[1], dims: match[2] } : { name: label, dims: '' };
+
+function renderWidgetSizeControls(w, sizeButtons) {
+  return `<div class="widget-edit-controls__size" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
+        ${sizeButtons}
+      </div>
+      ${renderWidgetSizeMenu(w.id, nearestPreset(w.size))}`;
 }
 
-function renderWidgetCustomizeControls(w, index = 0, total = 1) {
+function renderWidgetOptionsButton(w) {
+  return `<button type="button" class="widget-edit-controls__options" data-widget-options="${esc(w.id)}"
+              aria-label="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}"
+              title="${esc(t('dashboard.optionsFor', { widget: widgetLabel(w.id) }))}">
+        <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+      </button>`;
+}
+}
+
+function renderWidgetCustomizeControls(w, index = 0, total = 1, { phoneCustomize = false } = {}) {
   const isFirst = index === 0;
   const isLast = index === total - 1;
   const activeSize = nearestPreset(w.size);
@@ -7316,12 +7347,13 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
   // Finger - und der Tastaturweg (Pfeil hoch/runter). Die Handlungen stehen
   // als EINE Gruppe hinter dem Segment: reicht die Breite nicht, bricht die
   // Gruppe als Ganzes in die zweite Zeile, statt den Griff allein zu lassen.
+  const sizeGroupAriaLabel = esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }));
   return `
     <div class="widget-edit-controls" role="group" aria-label="${esc(widgetLabel(w.id))}" data-widget-controls>
       <span class="widget-edit-controls__caption" aria-hidden="true">${esc(widgetLabel(w.id))}</span>
-      <div class="widget-edit-controls__size segmented" role="group" aria-label="${esc(t('dashboard.customizeSizeFor', { widget: widgetLabel(w.id) }))}">
+      ${phoneCustomize ? '' : `<div class="widget-edit-controls__size segmented" role="group" aria-label="${sizeGroupAriaLabel}">
         ${sizeButtons}
-      </div>
+      </div>`}
       <div class="widget-edit-controls__actions">
         <div class="widget-edit-controls__move">
           <button type="button" class="widget-edit-controls__move-btn" data-widget-move="up" data-widget-id="${esc(w.id)}"
@@ -7333,9 +7365,9 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
             <i data-lucide="chevron-down" aria-hidden="true"></i>
           </button>
         </div>
-        ${renderWidgetSizeMenu(w.id, activeSize)}
-        ${renderWidgetOptionsButton(w)}
-        ${renderWidgetTileMenu(w, index, total)}
+        ${phoneCustomize ? '' : renderWidgetSizeMenu(w.id, activeSize)}
+        ${(!phoneCustomize && widgetHasOptions(w.id)) ? renderWidgetOptionsButton(w) : ''}
+        ${renderWidgetTileMenu(w, index, total, { phoneCustomize })}
         <button type="button" class="widget-edit-controls__hide" data-widget-hide="${esc(w.id)}" aria-label="${esc(t('dashboard.customizeHide', { widget: widgetLabel(w.id) }))}">
           <i data-lucide="eye-off" aria-hidden="true"></i>
         </button>
@@ -7344,7 +7376,7 @@ function renderWidgetCustomizeControls(w, index = 0, total = 1) {
           <i data-lucide="grip-vertical" aria-hidden="true"></i>
         </button>
       </div>
-    </div>
+  </div>
   `;
 }
 
@@ -7376,9 +7408,9 @@ function renderWidgetOptionsButton(w) {
     </button>`;
 }
 
-function renderWidgetTileMenu(w, index = 0, total = 1) {
+function renderWidgetTileMenu(w, index = 0, total = 1, { phoneCustomize = false } = {}) {
   const label = widgetLabel(w.id);
-  const hasOptions = widgetHasOptions(w.id);
+  const hasOptions = !phoneCustomize && widgetHasOptions(w.id);
   const items = [
     { action: 'widget-move', icon: 'chevron-up', label: t('dashboard.customizeMoveForward'), disabled: index === 0,
       attrs: { 'data-widget-move': 'up', 'data-widget-id': w.id } },
@@ -7497,6 +7529,13 @@ function renderHiddenWidgetsTray(cfg, glanceHidden = false) {
   `;
 }
 
+function mergePhoneDisplayCfg(desktopCfg, phoneCfg) {
+  return phoneCfg.map((p) => {
+    const desk = desktopCfg.find((w) => w.id === p.id);
+    return desk ? { ...desk, visible: p.visible, order: p.order } : p;
+  });
+}
+
 /* DIE KACHELN EINZELN ZEICHENBAR (DW-P2-1). Das Raster zeichnet sie alle, eine
  * Anpassen-Geste nur die, die sie aendert (patchCustomize in render()) - aus
  * DENSELBEN drei Teilen, damit Geste und Aufbau nie zwei Fassungen einer Kachel
@@ -7563,15 +7602,15 @@ function renderWidgetBody(w, renderers) {
 /** Der Rahmen um den Koerper: Groesse, Id, im Anpassen-Modus die Leiste.
  *  Kein `draggable="true"` (DW-P2-3): gezogen wird ueber SortableJS am Griff,
  *  und das DOM-Attribut schaltete natives Ziehen ein, das ihm die Geste nimmt. */
-function renderWidgetWrapper(w, html, { editing = false, index = 0, total = 1 } = {}) {
+function renderWidgetWrapper(w, html, { editing = false, index = 0, total = 1, phoneCustomize = false } = {}) {
   return `<div class="widget-wrapper ${widgetSizeClass(w.size)} ${editing ? 'widget-wrapper--editing' : ''}"
                    data-widget-id="${esc(w.id)}"${tileSpanWrapperAttrs(html)}>
-        ${editing ? renderWidgetCustomizeControls(w, index, total) : ''}
+        ${editing ? renderWidgetCustomizeControls(w, index, total, { phoneCustomize }) : ''}
         ${html}
       </div>`;
 }
 
-function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null, drawn = null, bodies = null } = {}) {
+function renderDashboardLayout(cfg, data, weather, currency, { editing = false, visibleMealTypes = MEAL_ORDER, glanceHidden = false, familyManage = null, drawn = null, bodies = null, phoneCustomize = false } = {}) {
   const widgetById = dashboardTileRenderers(cfg, data, weather, currency, { visibleMealTypes, glanceHidden, familyManage });
 
   const tiles = cfg
@@ -7585,7 +7624,7 @@ function renderDashboardLayout(cfg, data, weather, currency, { editing = false, 
       drawnSpanRows.set(w.id, tileSpanOf(html)?.rows ?? 0);
       // Und was die naechste Geste nicht neu zeichnen muss (patchCustomize).
       bodies?.set(w.id, html);
-      return renderWidgetWrapper(w, html, { editing, index, total: arr.length });
+      return renderWidgetWrapper(w, html, { editing, index, total: arr.length, phoneCustomize });
     })
     .join('');
 
@@ -9846,6 +9885,12 @@ export async function render(container, { user, signal: routeSignal = null } = {
   // Folge ich der Vorgabe des Haushalts, habe ich nichts Eigenes gespeichert -
   // dann gibt es auch nichts zurueckzusetzen (#827).
   let followsDefault = true;
+  // Telefonansicht (#2109): eigene Reihenfolge, null heisst "wie Desktop".
+  // desktopWidgetConfig ist nur waehrend des Telefon-Anpassens gesetzt.
+  let phoneWidgetConfig = null;
+  let savedPhoneWidgetConfig = null;
+  let desktopWidgetConfig = null;
+  let followsPhoneDefault = true;
   const canPublish = user?.role === 'admin';
   // Die Wand fragt die Haushaltsfassung der Uebersicht ab (#1817,
   // `dashboardRequest`). JEDER Abruf dieser Seite geht hier durch - auch der
@@ -9945,8 +9990,25 @@ export async function render(container, { user, signal: routeSignal = null } = {
     glanceVisible = prefsRes.data?.dashboard_today_glance !== false;
     savedGlanceVisible = glanceVisible;
     followsDefault = prefsRes.data?.dashboard_follows_default !== false;
+    // Telefonansicht (#2109): eigene Anordnung laden, null bleibt null ("folgt Desktop").
+    const ownPhoneWidgets = prefsRes.data?.dashboard_widgets_phone;
+    if (Array.isArray(ownPhoneWidgets)) {
+      phoneWidgetConfig = normalizeDashboardConfigWithExtensions(ownPhoneWidgets);
+      savedPhoneWidgetConfig = phoneWidgetConfig.map((w) => ({ ...w }));
+      followsPhoneDefault = false;
+    }
     // Das Skelett des NAECHSTEN Aufrufs lernt hier seine Kachelform.
-    rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
+    // Auf dem Telefon mit eigener Anordnung die Telefon-Kacheln merken (#2109),
+    // damit das Skelett den Phone-Aufriss voraussagt statt den Desktop-Aufriss.
+    if (phoneWidgetConfig !== null && onPhoneStage()) {
+      rememberLayoutHint(
+        mergePhoneDisplayCfg(widgetConfig, phoneWidgetConfig),
+        dashboardQuery(widgetConfig),
+        drawnSpanOf,
+      );
+    } else {
+      rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
+    }
     screensaverEnabled = Boolean(prefsRes.data?.screensaver_enabled);
     currency     = prefsRes.data?.currency ?? 'EUR';
     visibleMealTypes = normalizeVisibleMealTypes(prefsRes.data?.visible_meal_types);
@@ -10031,14 +10093,15 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
 
   // Nur wenn die opt-in-Kachel sichtbar ist — die Mehrheit ohne aktivierte Kachel
-  // löst keinen Request aus.
-  if (!loadFailed && widgetConfig.some((w) => w.id === 'cycle' && w.visible)) {
+  // löst keinen Request aus. Auf dem Telefon zählt die eigene Anordnung (#2109).
+  const phoneVisibleIds = new Set((phoneWidgetConfig ?? []).filter((w) => w.visible).map((w) => w.id));
+  if (!loadFailed && (widgetConfig.some((w) => w.id === 'cycle' && w.visible) || phoneVisibleIds.has('cycle'))) {
     await ensureCycleSlice();
   }
-  if (!loadFailed && widgetConfig.some((w) => w.id === 'schedule' && w.visible)) {
+  if (!loadFailed && (widgetConfig.some((w) => w.id === 'schedule' && w.visible) || phoneVisibleIds.has('schedule'))) {
     await ensureScheduleSlice();
   }
-  if (!loadFailed && widgetConfig.some((w) => w.id === 'waste' && w.visible)) {
+  if (!loadFailed && (widgetConfig.some((w) => w.id === 'waste' && w.visible) || phoneVisibleIds.has('waste'))) {
     await ensureWasteSlice();
   }
   // Auch die Nachlade-Runden koennen von einem Verlassen oder Neuaufbau
@@ -10087,6 +10150,40 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const previousQuery = dashboardQuery(savedWidgetConfig);
     widgetConfig = nextConfig.map((w) => ({ ...w }));
     const previousGlance = savedGlanceVisible;
+
+    // Telefon-Anpassen-Modus (#2109): phone arrangement speichern und Desktop-
+    // Config wiederherstellen. Kein layoutHint (Query haengt vom Desktop ab).
+    // Kacheln, die nur auf dem Telefon sichtbar sind, benoetigen ihren Slice.
+    if (desktopWidgetConfig !== null) {
+      const phoneSlim = widgetConfig.map(({ id, visible, order }) => ({ id, visible, order }));
+      await api.put('/preferences', { dashboard_widgets_phone: phoneSlim, dashboard_today_glance: glanceVisible });
+      phoneWidgetConfig = normalizeDashboardConfigWithExtensions(phoneSlim);
+      savedPhoneWidgetConfig = phoneWidgetConfig.map((w) => ({ ...w }));
+      followsPhoneDefault = false;
+      widgetConfig = desktopWidgetConfig.map((w) => ({ ...w }));
+      savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
+      desktopWidgetConfig = null;
+      isCustomizing = false;
+      // Slices fuer Kacheln nachladen, die auf dem Telefon sichtbar sind, aber
+      // auf dem Desktop nicht - sonst zeigen sie dauerhaft den Leer-Zustand.
+      const phoneSaved = new Set(phoneWidgetConfig.filter((w) => w.visible).map((w) => w.id));
+      const desktopVisible = new Set(widgetConfig.filter((w) => w.visible).map((w) => w.id));
+      if (phoneSaved.has('cycle') && !desktopVisible.has('cycle')) await ensureCycleSlice();
+      if (phoneSaved.has('schedule') && !desktopVisible.has('schedule')) await ensureScheduleSlice();
+      if (phoneSaved.has('waste') && !desktopVisible.has('waste')) await ensureWasteSlice();
+      // Skelett-Vorhersage fuer den naechsten Kaltstart (#2109).
+      if (onPhoneStage()) {
+        rememberLayoutHint(
+          mergePhoneDisplayCfg(widgetConfig, phoneWidgetConfig),
+          dashboardQuery(widgetConfig),
+          drawnSpanOf,
+        );
+      }
+      rebuildDashboard(widgetConfig);
+      window.yuvomi?.showToast(t('dashboard.customizeSaved'), 'success', 1500, null);
+      return;
+    }
+
     await api.put('/preferences', { dashboard_widgets: widgetConfig, dashboard_today_glance: glanceVisible });
     savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
     savedGlanceVisible = glanceVisible;
@@ -10146,10 +10243,45 @@ export async function render(container, { user, signal: routeSignal = null } = {
   }
 
   function cancelDashboardConfig() {
-    widgetConfig = savedWidgetConfig.map((w) => ({ ...w }));
     glanceVisible = savedGlanceVisible;
+    if (desktopWidgetConfig !== null) {
+      // Telefon-Anpassen-Modus: Desktop-Config wiederherstellen.
+      widgetConfig = desktopWidgetConfig.map((w) => ({ ...w }));
+      savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
+      desktopWidgetConfig = null;
+    } else {
+      widgetConfig = savedWidgetConfig.map((w) => ({ ...w }));
+    }
     isCustomizing = false;
     rebuildDashboard(widgetConfig);
+  }
+
+  // Telefon-Arrangement zuruecksetzen auf "wie Desktop" (#2109).
+  async function resetPhoneConfig() {
+    const confirmed = await confirmModal(t('dashboard.customizePhoneResetConfirm'), {
+      confirmLabel: t('dashboard.customizePhoneReset'),
+    });
+    if (!confirmed) return;
+    try {
+      await api.put('/preferences', { dashboard_widgets_phone: null, dashboard_today_glance: glanceVisible });
+    } catch {
+      window.yuvomi?.showToast(t('common.errorGeneric'), 'danger');
+      return;
+    }
+    phoneWidgetConfig = null;
+    savedPhoneWidgetConfig = null;
+    followsPhoneDefault = true;
+    if (desktopWidgetConfig !== null) {
+      widgetConfig = desktopWidgetConfig.map((w) => ({ ...w }));
+      savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
+      desktopWidgetConfig = null;
+    }
+    // Skelett-Vorhersage zurueck auf Desktop (#2109).
+    if (onPhoneStage()) rememberLayoutHint(widgetConfig, dashboardQuery(widgetConfig), drawnSpanOf);
+    isCustomizing = false;
+    focusAfterRebuild = ['#dashboard-customize-btn'];
+    rebuildDashboard(widgetConfig);
+    window.yuvomi?.showToast(t('dashboard.customizePhoneResetDone'), 'success', 1500, null);
   }
 
   /* ABBRECHEN FRAGT, SOBALD ES ETWAS ZU VERLIEREN GIBT (Re-Critique
@@ -10463,7 +10595,11 @@ export async function render(container, { user, signal: routeSignal = null } = {
     const early = focus.length ? focusTarget(container, focus) : null;
     if (early && early !== document.activeElement) early.focus({ preventScroll: true });
     const active = document.activeElement;
-    const cfg = widgetConfig;
+    // Im Telefon-Anpassen-Modus: dieselbe merged cfg wie der erste Aufbau (#1115
+    // Blocker: tileDrawKey sah sonst bei jeder Geste eine Aenderung weil
+    // patchCustomize die bare phone-cfg las, der Aufbau aber die merged cfg).
+    const phoneCustomize = desktopWidgetConfig !== null;
+    const cfg = phoneCustomize ? mergePhoneDisplayCfg(desktopWidgetConfig, widgetConfig) : widgetConfig;
     // Kein Echo: das Heute-Blatt spricht fuer die Domaenen ohne Kachel - und
     // nur eine geaenderte Sichtbarkeit (oder Option) aendert, was es sagt.
     // Gezeichnet VOR dem ersten Schreiben: es liest die Breite seiner Buehne
@@ -10492,7 +10628,7 @@ export async function render(container, { user, signal: routeSignal = null } = {
       if (!body) continue;
       listed.push(w);
       if (!old) {
-        const [el] = elementsFromHtml(renderWidgetWrapper(w, body, { editing: true }));
+        const [el] = elementsFromHtml(renderWidgetWrapper(w, body, { editing: true, phoneCustomize }));
         nodes.push(el);
         fresh.push(el);
       } else {
@@ -10889,29 +11025,29 @@ export async function render(container, { user, signal: routeSignal = null } = {
   let drawnBodies = new Map();
   let drawnCockpit = '';
   let drawnVisibility = '';
-  function dashboardShellHtml(cfg) {
+  function dashboardShellHtml(displayCfg, { phoneCustomize = false, followsPhoneDefault = true } = {}) {
     // Signature-„Heute"-Masthead: Begrüßung und Glance-Cockpit teilen sich EIN
     // erhöhtes Material-Band (statt zweier gestapelter gerahmter Kästen). Die
     // inneren Sections sind entrahmt; das Band trägt Rahmen/Schatten/Tönung.
     // Fehlt das Cockpit (alle Domänen als Widgets sichtbar → kein Glance-Inhalt),
     // kollabiert das Band per --slim auf eine schlanke Gruß-Leiste statt ein
     // großes leeres Rechteck zu zeigen (Critique R3 P1).
-    const cockpitHtml = (glanceVisible || isCustomizing) ? renderTodayCockpit(data, cfg, isCustomizing) : '';
+    const cockpitHtml = (glanceVisible || isCustomizing) ? renderTodayCockpit(data, displayCfg, isCustomizing) : '';
     drawnCockpit = cockpitHtml;
-    drawnVisibility = visibilityKey(cfg, glanceVisible);
+    drawnVisibility = visibilityKey(displayCfg, glanceVisible);
     const mastheadSlim = cockpitHtml ? '' : ' dashboard-masthead--slim';
     // Kein Wetter-Echo: die Masthead-Zeile spricht nur, wenn die Wetter-Karte
     // nicht ohnehin im Raster sichtbar ist (Opt-in fürs Wandtablet).
-    // Eine nicht verfuegbare Karte steht nicht im Raster, spricht also auch
+    // Eine nicht verfuegbare Karte steht nicht im Raster, spricht auch auch
     // nicht fuer die Zeile.
-    const weatherCardShown = cfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
+    const weatherCardShown = displayCfg.some((w) => w.id === 'weather' && w.visible) && isWidgetModuleEnabled('weather');
     return `
       <section class="dashboard-masthead dashboard-masthead--${greetingPeriod()}${mastheadSlim}">
-        ${renderDashboardOverview(user, isCustomizing, weather, { followsDefault, canPublish, weatherCard: weatherCardShown })}
+        ${renderDashboardOverview(user, isCustomizing, weather, { followsDefault, canPublish, weatherCard: weatherCardShown, phoneCustomize })}
         ${cockpitHtml}
       </section>
-      ${renderDashboardLayout(cfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user), drawn: (drawnTiles = []), bodies: (drawnBodies = new Map()) })}
-      ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish }) : ''}
+      ${renderDashboardLayout(displayCfg, data, weather, currency, { editing: isCustomizing, visibleMealTypes, glanceHidden: !glanceVisible, familyManage: familyManageHref(user), drawn: (drawnTiles = []), bodies: (drawnBodies = new Map()), phoneCustomize })}
+      ${isCustomizing ? renderCustomizeFootnote({ followsDefault, canPublish, phoneCustomize, followsPhoneDefault }) : ''}
     `;
   }
   function rebuildDashboard(cfg) {
@@ -10940,11 +11076,18 @@ export async function render(container, { user, signal: routeSignal = null } = {
       container.querySelector('#dashboard-retry')?.addEventListener('click', rerender, { signal: signal });
       return;
     }
-    const html = dashboardShellHtml(cfg);
+    const phoneCustomize = desktopWidgetConfig !== null;
+    // Im Telefon-Anpassen-Modus: Desktop-Optionen mit Phone-Anordnung zeigen,
+    // damit Filter, Kalender-Limit usw. waehrend des Anpassens sichtbar sind.
+    // Im Display-Modus auf dem Telefon: eigene Phone-Anordnung (#2109).
+    const displayCfg = phoneCustomize
+      ? mergePhoneDisplayCfg(desktopWidgetConfig, cfg)
+      : (!isCustomizing && onPhoneStage() && phoneWidgetConfig !== null)
+        ? mergePhoneDisplayCfg(cfg, phoneWidgetConfig)
+        : cfg;
+    const html = dashboardShellHtml(displayCfg, { phoneCustomize, followsPhoneDefault });
     // Vor dem Zeichnen, solange nichts Neues auszulegen ist (carryTileSizes).
-    const viewportWidth = window.innerWidth;
-    // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr
-    // (captureRebuildFocus / restoreFocusAfterRebuild).
+    const viewportWidth = window.innerWidth;    // Wer hatte den Fokus? Nach dem setHtml gibt es sein Element nicht mehr    // (captureRebuildFocus / restoreFocusAfterRebuild).
     const { key: keepFocus, had: hadFocus } = captureRebuildFocus(shell, document.activeElement, document.body);
     const todayFallback = hadFocus ? todayFocusFallbacks(document.activeElement) : [];
     const modeChanged = renderedCustomizing !== null && renderedCustomizing !== isCustomizing;
@@ -10999,18 +11142,17 @@ export async function render(container, { user, signal: routeSignal = null } = {
       // Messungen, legte der Browser die Flaeche zweimal aus - einmal ohne,
       // einmal mit rund 600 Zeichen-Knoten (gemessen 19 ms bei 4x CPU im
       // Seitenwechsel). Und das Blatt misst so die Zeilen, die man sieht.
-      createPendingIcons(shell);
-      // Telefon: das Blatt fuellt den ersten Schirm (D5). Gemessen im selben
+      createPendingIcons(shell);      // Telefon: das Blatt fuellt den ersten Schirm (D5). Gemessen im selben
       // Task wie das Zeichnen, also bevor der Browser ein Bild davon malt.
       const fitted = measurePhoneProgram(shell);
       if (fitted) {
-        replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: fitted }));
+        replaceProgramSheet(shell, renderTodayCockpit(data, displayCfg, isCustomizing, { cap: fitted }));
         createPendingIcons(shell);
         // Zweiter Blick, nur nach unten: der Rest unter den Zeilen hat gewechselt.
         const tighter = measurePhoneProgram(shell, { shrinkOnly: true });
-        if (tighter) replaceProgramSheet(shell, renderTodayCockpit(data, cfg, isCustomizing, { cap: tighter }));
+        if (tighter) replaceProgramSheet(shell, renderTodayCockpit(data, displayCfg, isCustomizing, { cap: tighter }));
       }
-      refitTodayStage(shell, () => renderTodayCockpit(data, cfg, isCustomizing));
+      refitTodayStage(shell, () => renderTodayCockpit(data, displayCfg, isCustomizing));
     }, { animate: fromSkeleton });
     // Die Packung liest, solange das Layout vom Zeichnen noch sauber ist -
     // nach den Verdrahtungen darunter (Kategorie-Ueberlauf der Notizen)
@@ -11060,6 +11202,13 @@ export async function render(container, { user, signal: routeSignal = null } = {
       // Nur noch der Einstieg: im Anpassen-Modus gibt es diesen Knopf nicht.
       // Der Fokus geht in die Leiste, die ihn abloest.
       isCustomizing = true;
+      if (onPhoneStage()) {
+        // Auf dem Telefon: eigene Phone-Anordnung bearbeiten (#2109).
+        // Desktop-Config sichern, Phone-Config (oder Desktop als Startpunkt) laden.
+        desktopWidgetConfig = widgetConfig.map((w) => ({ ...w }));
+        widgetConfig = (phoneWidgetConfig ?? desktopWidgetConfig).map((w) => ({ ...w }));
+        savedWidgetConfig = widgetConfig.map((w) => ({ ...w }));
+      }
       focusAfterRebuild = ['#dashboard-customize-cancel'];
       rebuildDashboard(widgetConfig);
     }, { signal: signal });
@@ -11087,8 +11236,10 @@ export async function render(container, { user, signal: routeSignal = null } = {
     // Zwei Orte je Knopf (Leiste breit, Fussnote schmal), ein Handler.
     container.querySelectorAll('[data-customize-reset]').forEach((btn) => btn.addEventListener('click', resetDashboardConfig, { signal: signal }));
     container.querySelectorAll('[data-customize-publish]').forEach((btn) => btn.addEventListener('click', publishHouseholdDefault, { signal: signal }));
+    // Telefon-Arrangement zuruecksetzen ("Wie Desktop") (#2109).
+    container.querySelectorAll('[data-customize-phone-reset]').forEach((btn) => btn.addEventListener('click', resetPhoneConfig, { signal: signal }));
     wireDashboardEditMode();
-    void mountExtensionWidgets(shell, cfg, user);
+    void mountExtensionWidgets(shell, displayCfg, user);
 
     /* DER FOKUS UEBERLEBT DEN NEUAUFBAU. Ein Moduswechsel baut die Flaeche neu
      * (die Gesten darin patchen seit DW-P2-1 und behalten ihre Knoten) - und
@@ -11212,19 +11363,20 @@ export async function render(container, { user, signal: routeSignal = null } = {
       // Weg, den ein frisch eingeblendetes Widget in persistWidgetConfig()
       // schon nimmt. Das heilt nebenbei auch einen zuvor gescheiterten Slice
       // (M-6b) beim naechsten stillen Takt, statt auf den Retry-Knopf zu warten.
-      if (widgetConfig.some((w) => w.id === 'cycle' && w.visible)) {
+      const refreshPhoneIds = new Set((phoneWidgetConfig ?? []).filter((w) => w.visible).map((w) => w.id));
+      if (widgetConfig.some((w) => w.id === 'cycle' && w.visible) || refreshPhoneIds.has('cycle')) {
         data.cycle = undefined;
         await ensureCycleSlice();
         if (signal.aborted) return;
       }
       fresh.cycle = data.cycle;
-      if (widgetConfig.some((w) => w.id === 'schedule' && w.visible)) {
+      if (widgetConfig.some((w) => w.id === 'schedule' && w.visible) || refreshPhoneIds.has('schedule')) {
         data.schedule = undefined;
         await ensureScheduleSlice();
         if (signal.aborted) return;
       }
       fresh.schedule = data.schedule;
-      if (widgetConfig.some((w) => w.id === 'waste' && w.visible)) {
+      if (widgetConfig.some((w) => w.id === 'waste' && w.visible) || refreshPhoneIds.has('waste')) {
         data.waste = undefined;
         await ensureWasteSlice();
         if (signal.aborted) return;
@@ -11461,9 +11613,8 @@ async function loadScheduleSlice(day) {
 }
 
 export const __test = {
-  onboardingCardPlacement,
-  usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,
-  getOverviewMemo: () => _overviewMemo,
+mergePhoneDisplayCfg, onboardingCardPlacement,
+  usableOverviewMemo, overviewMemoKey, overviewSignature, watchOverviewWrites,  getOverviewMemo: () => _overviewMemo,
   setOverviewMemo: (memo) => { _overviewMemo = memo; },
   childDefaultFor, taskForOthersOnly, customizeLeaveAllowed, setCustomizeFabHidden, renderCalendarWidget, renderRewardsWidget, loadScheduleSlice, renderUrgentTasks, renderUpcomingEvents, buildTodayHighlights, buildTodayProgram, buildTodayCockpitModel, renderTodayCockpit, renderPinnedNotes, renderScheduleWidget, renderWasteWidget, renderPantryWidget, renderFamilyWidget, formatDueDate, normalizeVisibleMealTypes, renderTodayMeals, calendarEventRoute, eventOccurrenceDateKey, eventStartDate, renderWallSurface, renderWallWho, planWallWhoLines, fitWallWho, createWallFit, rebuildWall, shedWallProgram, WALL_WHO_LADDER, renderDashboardOverview, selectMetricTiles, METRIC_TILE_ORDER, PROGRAM_ROW_CAP, WALL_ROW_CAP, weatherToneKey, weatherMotionAttr, weatherTempBand, weatherSpanModel, weatherDayLabel, weatherTodayRange, renderWeatherWidget, renderWeatherUnavailable, weatherAvailableFrom, renderWallWeather, relativeDateLabel, listRowCap, calendarRowCap, calendarTileModel, tileSpanOf, renderDashboardSkeleton, rememberGridHint, carryTileSizes, watchTileSizes, createPendingIcons, openWidgetOptions, renderFab, widgetHeader, renderDashboardLayout, renderMetricTiles, renderGridHint, captureTileRects, playTileFlip, measureTileFlip, startTileFlip, playGridShift, arrangeChildren, placeBefore, focusTarget, nearestScrollDelta, tileDrawKey, dashboardTileRenderers, dashboardTileListed, renderWidgetBody, renderWidgetWrapper, familyManageHref, customizeHasChanges, focusKeyOf, captureRebuildFocus, restoreFocusAfterRebuild, shoppingSoleListRoute, todayMoreRoute, wireTodayMore, wireTodayOverdue, renderWidgetSizeMenu, renderNewPill, FAB_ACTIONS, FAB_NEW_BTN, NEW_SHEETS, wireNewMenu, initFab, rowsArriving, shownRowKeys, renderCustomizeFootnote, applyRowFill, gridHoleSuggestion, programRowsThatFit, PROGRAM_ROW_CAP_PHONE, createPhoneProgramFit, renderWidgetError, renderWidgetCustomizeControls, renderWidgetTileMenu, syncCustomizeControls, wireLinks, renderFastingWidget, renderNutritionWidget, renderWasteWidget, renderQuickLinks, renderShoppingLists };
 

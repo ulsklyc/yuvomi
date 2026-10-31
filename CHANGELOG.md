@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   overview tile next to your events and tasks, with the person's name, and opens directly in the
   viewer. Archived documents stay out, and the tile follows the Documents module switch and your
   rights.
+- **The Overview has its own tile arrangement on the phone.** On a phone, tapping Customize shows
+  a "Phone tiles" mode that lets you reorder and show or hide tiles independently of the desktop
+  layout. Options (calendar limit, task filters, shopping-list selection, etc.) follow the desktop
+  arrangement, so only the order and visibility are separate. "Same as desktop" removes the phone
+  arrangement and goes back to following the desktop. (#2109)
 
 ### Changed
 - **A document's lead time now also decides when it shows as expiring.** The "expiring" chip and
