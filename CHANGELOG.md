@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Late completion decay (opt-in).** Households can have late completions pay less: administrators
+  switch it on in the rewards settings, off by default. A task ticked off after its due day earns one
+  point less for each day it is past due, and always at least one point - finishing still pays. What a
+  completion earned stands with the booking: later changes of the due date, the point value or the
+  setting never rewrite booked amounts, and for every late earning the ledger shows the base it came
+  from and how many days it was late.
 - **Stock: the minimum belongs to the product, and running low is read over all its batches**
   (part 3 of #1448). Toothpaste with 1 in the bathroom, 8 in the attic and a minimum of 3 no
   longer reads as running low: the household has 9. Milk with 1 l, 1 l and 2 l against a minimum
@@ -400,7 +406,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   characters instead of 90, spacing follows the app's scale, a failed copy shows its note on its own
   line instead of breaking around the button, and the "taking longer than usual" note no longer
   touches the line above it.
-
 ## [2.83.0] - 2026-10-29
 
 ### Added
