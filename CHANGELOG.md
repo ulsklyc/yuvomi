@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   footer says "MIT-Lizenz" on the German pages.
 
 ### Fixed
+- **The Podman Quadlet health check passes.** The `HealthCmd` in `tools/quadlet/oikos.container`
+  reached Podman as a shell command with a missing closing quote, so every check failed with
+  `Syntax error: Unterminated quoted string` and the container stayed `unhealthy` although the app
+  was running. The quotes are swapped - single quotes around the `node -e` argument, double quotes
+  inside the JavaScript.
 - **The end of a long recipe list stays reachable on the iPhone.** The last recipes used to sit behind the
   bottom menu and sprang back out of reach when you let go. The list now ends above the menu, and
   the bounce at the end of a list no longer brings the search row back. The same holds for the other
