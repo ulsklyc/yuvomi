@@ -13,6 +13,11 @@ import { sendDocumentDeletionConflict } from '../services/document-deletion-lock
 import { assertDocumentLinkTargetsAvailable, documentViewer, sendDocumentLinkRefusal } from '../services/document-links.js';
 import { nextDueAfterCompletion } from '../services/recurrence.js';
 import { syncTaskRewards, seriesOfTask } from '../services/rewards.js';
+import {
+  isRotationMode, pickRotationTarget, nextRotationEntry, setRotation, carryRotation,
+  rotationPoolRows, mergeRotationPool,
+} from '../services/task-rotation.js';
+import { activeAccountSql } from '../services/account-state.js';
 import { completionFeed, seriesHistory, syncTaskCompletion } from '../services/task-completions.js';
 import { normalizeCategoryFilter, taskCategoryWhere, taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { normalizeVisibility, visibilityWhere } from '../services/visibility.js';
@@ -257,6 +262,45 @@ function attachTags(tasks) {
   return tasks;
 }
 
+/**
+ * Rotation-Pool anhaengen: Modus und die beiden Zeiger-Felder stehen als
+ * Spalten schon an jeder Zeile (t.*), nur der Pool braucht eine Abfrage - eine
+ * fuer die ganze Liste, aus demselben Grund wie attachTags. Null, wenn keine
+ * Rotation laeuft: "nicht gesagt" statt leerer Liste. `rotation_next_user` ist
+ * dieselbe Rechnung wie pickRotationTarget (task-rotation.js) - der Server
+ * loest sie auf, damit die Leseansicht den naechsten Kopf nennt, ohne eine
+ * zweite Quelle der Wahrheit zu besitzen.
+ */
+function attachRotation(tasks) {
+  if (!tasks.length) return tasks;
+  const ids = tasks.map((t) => t.id);
+  const rows = db.get().prepare(`
+    SELECT p.task_id, p.user_id, p.position, ${activeAccountSql('u')} AS active
+    FROM task_rotation_pool p
+    JOIN users u ON u.id = p.user_id
+    WHERE p.task_id IN (${ids.map(() => '?').join(',')})
+    ORDER BY p.task_id, p.position ASC
+  `).all(...ids);
+  const byTask = new Map();
+  for (const r of rows) {
+    if (!byTask.has(r.task_id)) byTask.set(r.task_id, []);
+    byTask.get(r.task_id).push(r);
+  }
+  for (const task of tasks) {
+    const pool = byTask.get(task.id) ?? [];
+    task.rotation_pool = pool.length ? pool.map((r) => r.user_id) : null;
+    const entry = task.rotation_mode
+      ? nextRotationEntry(pool, {
+        pointer: task.rotation_last_position ?? null,
+        assignee: task.assigned_to ?? null,
+        lastUser: task.rotation_last_user ?? null,
+      })
+      : null;
+    task.rotation_next_user = entry ? entry.user_id : null;
+  }
+  return tasks;
+}
+
 function parseAssignedTo(val) {
   if (Array.isArray(val)) return val.map(Number).filter(Boolean);
   if (val !== null && val !== undefined && val !== '') return [Number(val)].filter(Boolean);
@@ -267,6 +311,64 @@ function setAssignments(d, taskId, userIds) {
   d.prepare('DELETE FROM task_assignments WHERE task_id = ?').run(taskId);
   const ins = d.prepare('INSERT OR IGNORE INTO task_assignments (task_id, user_id) VALUES (?, ?)');
   for (const uid of userIds) ins.run(taskId, uid);
+}
+
+/**
+ * Rotation aus dem Request-Body lesen. Rotation ist an eine Serie gebunden:
+ * ohne Regel macht ein Pool keinen Sinn (kein zweites Vorkommen, das verteilt
+ * wuerde) - also 400 statt stillschweigendem Verwerfen, damit der Dialog den
+ * Fehler zeigen kann.
+ *
+ * `existingRows` (PUT): die Pool-Zeilen des Bestands. Der Dialog sendet den
+ * Pool bei jedem Speichern mit, aber er zeigt nur die aktiven Koepfe - also
+ * fuehrt mergeRotationPool Request und Bestand zusammen: die Reihenfolge des
+ * Requests ist ausdruecklich gemeint (Hoch/Runter), ein abgewaehlter aktiver
+ * Kopf geht raus, ein deaktivierter bleibt an seinem Rang (er ist im Dialog
+ * nicht zu sehen, seine Abwahl ist keine Aussage). Ein normaler Save
+ * (nur Titel) kommt deshalb unveraendert als Bestand zurueck.
+ * Zurueck: { ok, mode, pool } | { ok: false, error }.
+ */
+function parseRotationInput(body, { isRecurring, assignedUserIds = [], existingRows = null }) {
+  const modePresent = body.rotation_mode !== undefined;
+  const poolPresent = body.rotation_pool !== undefined;
+  if (!modePresent && !poolPresent) return { ok: true, mode: undefined, pool: undefined };
+  const mode = body.rotation_mode ?? null;
+  if (mode !== null && !isRotationMode(mode)) {
+    return { ok: false, error: 'Invalid rotation_mode.' };
+  }
+  let pool = null;
+  if (poolPresent) {
+    if (!Array.isArray(body.rotation_pool) || body.rotation_pool.some((x) => !Number.isInteger(Number(x)) || Number(x) <= 0)) {
+      return { ok: false, error: 'rotation_pool must be an array of user ids.' };
+    }
+    const requested = [...new Set(body.rotation_pool.map(Number))];
+    pool = existingRows ? mergeRotationPool(existingRows, requested) : requested;
+    if (pool.length > 10) return { ok: false, error: 'rotation_pool allows at most 10 members.' };
+  }
+  // Ein Modus braucht einen Pool mit mindestens zwei Koepfen - sonst waere
+  // "Rotation" die alte Zuordnung in anderem Kostuem.
+  if (mode !== null) {
+    if (!isRecurring) return { ok: false, error: 'rotation_mode requires a recurring task.' };
+    if (!pool || pool.length < 2) return { ok: false, error: 'rotation_mode requires a pool of at least 2 members.' };
+  }
+  // Zuweisen darf der Rotation nur, was auch einer Aufgabe zuweisbar waere
+  // (#1207): Haushaltsmitglieder. newNonMembers meldet fehlende Konten bewusst
+  // nicht (eigene 404-Wege der Routes) - der Pool hat keinen, also prueft der
+  // Bestand hier selbst: sonst landete eine unbekannte id als FK-500.
+  if (pool) {
+    const exists = db.get().prepare('SELECT 1 FROM users WHERE id = ?');
+    const missing = pool.filter((id) => !exists.get(id));
+    if (missing.length) return { ok: false, error: `Unknown user in rotation_pool: ${missing.join(', ')}.` };
+    // "Schon gespeichert" ist hier der Pool-Bestand, nicht die Zuweisung: ein
+    // Client, der ein GET (rotation_pool inklusive deaktiviertem Mitglied)
+    // unveraendert zurueckschickt, darf nicht an der Deaktivierung des
+    // Mitglieds scheitern - der Bestand wird behalten, nicht neu gewaehlt.
+    const strangers = newNonMembers(pool, {
+      stored: [...assignedUserIds, ...(existingRows ?? []).map((r) => r.user_id)],
+    });
+    if (strangers.length) return { ok: false, error: nonMemberMessage(strangers) };
+  }
+  return { ok: true, mode: modePresent ? mode : undefined, pool: poolPresent ? pool : undefined };
 }
 
 function syncHousekeepingPaymentStatus(d, taskId, status) {
@@ -403,7 +505,7 @@ function loadSubtasks(taskId, me) {
   // bekommen sie welche, ohne dass jemand sie hier vergibt. Ohne das Anhängen
   // wären sie in der Antwort einfach nicht da, und ein PUT auf Basis dieser
   // Zeile schriebe sie still weg.
-  return attachTags(rows);
+  return attachRotation(attachTags(rows));
 }
 
 /**
@@ -1075,7 +1177,7 @@ router.get('/', (req, res) => {
     `;
 
     const rows = db.get().prepare(sql).all(...params).map(task => ({ ...task, subtasks: JSON.parse(task.subtasks || '[]') })).map(addAssignedUsers);
-    res.json({ data: attachTags(attachDocumentCounts(rows, documentViewer(req))) });
+    res.json({ data: attachRotation(attachTags(attachDocumentCounts(rows, documentViewer(req)))) });
   } catch (err) {
     log.error('GET / error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -1113,6 +1215,7 @@ router.get('/:id', (req, res) => {
     // Sichtbarkeitsprüfung - und ohne Dokumentenrecht `null` (#1358).
     task.documents = loadTaskDocuments(task.id, viewer);
     attachTags([task]);
+    attachRotation([task]);
     res.json({ data: task });
   } catch (err) {
     log.error('GET /:id error:', err);
@@ -1196,6 +1299,14 @@ router.post('/', (req, res) => {
     const strangers = newNonMembers(userIds);
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
 
+    // Rotation (migration 274). Erst nach der Mitgliederpruefung der regulaeren
+    // Zuweisung: fuer den Pool gilt dieselbe Liste, und der Fehler soll den
+    // selben Weg nehmen wie bei assigned_to.
+    const rotationIn = parseRotationInput(req.body, {
+      isRecurring: !!is_recurring, assignedUserIds: userIds,
+    });
+    if (!rotationIn.ok) return res.status(400).json({ error: rotationIn.error, code: 400 });
+
     // Sync-Ziel (#695). Unteraufgaben bekommen keines: sie gehören zu ihrer
     // Elternaufgabe, und als eigenständiges VTODO stünden sie gleichrangig
     // daneben. Ein mitgeschicktes Ziel wird dort still verworfen statt
@@ -1239,6 +1350,9 @@ router.post('/', (req, res) => {
         countdown ? 1 : 0, req.body.locked ? 1 : 0
       );
       setAssignments(db.get(), result.lastInsertRowid, userIds);
+      if (rotationIn.mode !== undefined || rotationIn.pool !== undefined) {
+        setRotation(db.get(), result.lastInsertRowid, { mode: rotationIn.mode ?? null, pool: rotationIn.pool ?? null });
+      }
       if (req.body.tags !== undefined) setTags(db.get(), result.lastInsertRowid, req.body.tags);
       if (syncTarget) {
         db.get().prepare(
@@ -1279,6 +1393,7 @@ router.post('/', (req, res) => {
 
     addAssignedUsers(task);
     attachTags([task]);
+    attachRotation([task]);
     res.status(201).json({ data: task });
     if (syncTarget) pushToCalDAV('Neue Aufgabe');
   } catch (err) {
@@ -1353,6 +1468,16 @@ router.put('/:id', (req, res) => {
     const strangers = newNonMembers(userIds, { stored: assignedBefore });
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
 
+    // Rotation (migration 274). Der Pool darf nur, was auch die Aufgabe selbst duerfte
+    // (#1207) - dieselbe Pruefung, dieselbe Fehlermeldung. Der Pool-Bestand
+    // reist als existingRows mit: der Merge haelt Positionen und deaktivierte
+    // Mitglieder durch Saves durch, die den Pool nicht anfassen (#1763).
+    const rotationRows = rotationPoolRows(db.get(), task.id);
+    const rotationIn = parseRotationInput(req.body, {
+      isRecurring: !!is_recurring, assignedUserIds: userIds, existingRows: rotationRows,
+    });
+    if (!rotationIn.ok) return res.status(400).json({ error: rotationIn.error, code: 400 });
+
     // Sperre der Aufgabe (#830). Nicht mitgeschickt heisst "nicht angefasst".
     const lockedRequested = req.body.locked !== undefined ? (req.body.locked ? 1 : 0) : null;
     const locked = lockedRequested ?? task.locked;
@@ -1406,6 +1531,18 @@ router.put('/:id', (req, res) => {
       // wuerde, der sie umgehen will.
       if (lockedRequested !== null && lockedRequested !== task.locked) touchesDefinition = true;
 
+      // Rotation ist Definition (#830): Modus und Ablieferungsreihenfolge sind
+      // genau das, was ein Kind sonst ueber die Sperre hebt - dieselbe
+      // Vergleichsart wie bei Punkten und Faelligkeit: das aufgeloeste
+      // Ergebnis gegen den Bestand, nicht die blosse Anwesenheit des Feldes.
+      // Der gemergte Pool zaehlt: ein Dialog, der den Pool nur mitschickt,
+      // bleibt mit dem Bestand identisch und toucht nichts.
+      const modeAfter = rotationIn.mode !== undefined ? rotationIn.mode : task.rotation_mode;
+      const storedPool = rotationRows.map((r) => r.user_id).join(',');
+      const poolAfter = rotationIn.pool !== undefined ? rotationIn.pool.join(',') : storedPool;
+      if (modeAfter !== task.rotation_mode) touchesDefinition = true;
+      if (poolAfter !== storedPool) touchesDefinition = true;
+
       // Die EIGENE Zuweisung ist Interaktion - eine offene Aufgabe an sich zu
       // nehmen oder wieder abzugeben. Die FREMDE ist Definition: sonst schoebe
       // ein Kind die Aufgabe einfach seinem Geschwister zu, und die Sperre
@@ -1448,6 +1585,24 @@ router.put('/:id', (req, res) => {
              category,
              req.params.id);
       setAssignments(db.get(), task.id, userIds);
+      // Rotation nur bei ausdruecklichem Feld schreiben (#647: nicht
+      // mitgeschickt heisst nicht angefasst); null loescht Modus und Pool.
+      if (rotationIn.mode !== undefined || rotationIn.pool !== undefined) {
+        // Nicht mitgeschicktes Feld heisst "behalten" (#647): ein Dialog, der
+        // nur den Pool tauscht, darf den Modus nicht loeschen - und ein
+        // Moduswechsel beginnt die Runde neu (beide Zeiger-Felder auf null).
+        // Ein reiner Pool-Tausch laesst die Zeiger dagegen stehen: die
+        // Positionen werden neu zugeteilt und der Zeiger laeuft auf der
+        // Position weiter, auf der er steht (#1763, offene Frage zwei).
+        const mode = rotationIn.mode !== undefined ? rotationIn.mode : task.rotation_mode;
+        const sameMode = mode === task.rotation_mode;
+        setRotation(db.get(), task.id, {
+          mode,
+          pool: rotationIn.pool ?? null,
+          lastUser: sameMode ? task.rotation_last_user : null,
+          lastPosition: sameMode ? task.rotation_last_position : null,
+        });
+      }
       if (req.body.tags !== undefined) setTags(db.get(), task.id, req.body.tags);
       if (syncTarget !== undefined) {
         db.get().prepare(
@@ -1482,6 +1637,7 @@ router.put('/:id', (req, res) => {
         WHERE t.id = ?
       `).get(req.params.id);
       attachTags([updated]);
+      attachRotation([updated]);
 
       // Änderung an einer gespiegelten Aufgabe auf dem CalDAV-Server nachziehen (#617).
       // Die Tags reisen als kanonischer Schlüssel mit, weil sie in einer eigenen
@@ -1762,6 +1918,14 @@ function spawnRecurrenceFollowup(task) {
   // Das Ziel erbt nur die Aufgabe selbst. Unteraufgaben gehen nie als eigenes
   // VTODO hinaus (pendingCreations), ihre Kopien unten nehmen keines mit.
   const syncTarget = recurrenceFollowupTarget(task);
+  // Rotation (migration 274): eine Serie mit Pool verteilt die naechste
+  // Instanz an das naechste Mitglied, statt dieselbe Person auf Dauer zu
+  // belasten. Der Zeiger ist eine Position im Pool und ueberlebt Abgaenge
+  // (task-rotation.js); deaktivierten Koepfen faellt nichts zu (#1381). Ohne
+  // Modus ist das null und alles bleibt exakt beim heutigen Verhalten -
+  // Assignment-Kopie wie zuvor. Wer abhakt, zaehlt nicht: der Zeiger folgt der
+  // Serie.
+  const rotation = pickRotationTarget(db.get(), task);
 
   db.get().transaction(() => {
     const newTask = db.get().prepare(`
@@ -1773,7 +1937,7 @@ function spawnRecurrenceFollowup(task) {
     `).run(
       task.title, task.description, task.category, task.priority,
       shiftedStartDate(task.start_date, task.due_date, nextDate),
-      nextDate, task.due_time, task.assigned_to, task.created_by,
+      nextDate, task.due_time, rotation ? rotation.userId : task.assigned_to, task.created_by,
       task.recurrence_rule, task.points, task.visibility,
       // Ohne das Mitnehmen fiele die Serie ab der zweiten Instanz auf die
       // Fälligkeitsrechnung zurück - lautlos, weil die Folgeinstanz sonst
@@ -1806,7 +1970,17 @@ function spawnRecurrenceFollowup(task) {
       // Aufgaben sind die, die man ordnet.
       task.sort_order ?? null
     );
-    setAssignments(db.get(), newTask.lastInsertRowid, existingAssignments);
+    // Rotation: das neue Vorkommen traegt genau den einen Empfaenger, nicht die
+    // kopierte Alt-Zuordnung - und der Zeiger wandert mit, damit round_robin
+    // beim naechsten Abhaken an der richtigen Position weiterschaltet. Der
+    // Pool reist samt seiner Positionen (carryRotation): der Zeiger zeigt auf
+    // eine davon. Ohne Rotation: wie heute.
+    setAssignments(db.get(), newTask.lastInsertRowid, rotation ? [rotation.userId] : existingAssignments);
+    carryRotation(db.get(), task, newTask.lastInsertRowid);
+    if (rotation !== null) {
+      db.get().prepare('UPDATE tasks SET rotation_last_user = ?, rotation_last_position = ? WHERE id = ?')
+        .run(rotation.userId, rotation.position, newTask.lastInsertRowid);
+    }
     setTags(db.get(), newTask.lastInsertRowid, existingTags);
 
     for (const sub of existingSubtasks) {

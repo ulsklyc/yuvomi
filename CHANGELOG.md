@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   overview tile next to your events and tasks, with the person's name, and opens directly in the
   viewer. Archived documents stay out, and the tile follows the Documents module switch and your
   rights.
+- **A recurring task can hand itself along.** A series like "take out the bin" used to hang on the
+  same person forever; a rotation pool of at least two people now gives each follow-up instance to
+  the next member in a fixed order (#1763, migration 274). The order chosen in the pool is the order
+  the task is handed along in. The series remembers a position, not a person: a member who leaves the
+  pool does not restart it at the first person - Kevin's round stays Kevin's, then Max, then Kevin
+  again - and a deactivated account (#1381) is skipped while it cannot sign in. If the running
+  instance already belongs to the first member, the first hand-over goes to the second one (Kevin,
+  Anna, Max - not Kevin, Kevin). The detail view names the next member up from the same calculation
+  that hands out the next instance, and a task without rotation behaves exactly as before.
 
 ### Changed
 - **A document's lead time now also decides when it shows as expiring.** The "expiring" chip and

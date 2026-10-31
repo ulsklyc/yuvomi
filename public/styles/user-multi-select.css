@@ -139,3 +139,38 @@
   color: var(--color-text-primary);
   white-space: nowrap;
 }
+
+/* Pool-Editor der Rotation (tasks.js, renderRotationPool): dieselben Bausteine
+ * wie die Personen-Mehrfachauswahl, aber als nummerierte Liste - die
+ * Zeilenreihenfolge IST die Ablieferungsreihenfolge. Pro Zeile die Schritte
+ * hoch/runter (geteilte .row-action-Optik) rechtsbuerig neben der Trefferflaeche. */
+.rotation-pool__list {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.rotation-pool__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.rotation-pool__pick {
+  flex: 1;
+  min-width: 0;
+}
+
+.rotation-pool__pick .user-ms__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rotation-pool__moves {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
