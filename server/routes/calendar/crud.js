@@ -1905,7 +1905,7 @@ router.post('/:id/reset', (req, res) => {
           WHERE id = ?
         `).run(
           feed.title ?? event.title, feed.description ?? null, startDt, feed.end_datetime ?? null,
-          feed.all_day ? 1 : 0, feed.location ?? null, feed.color ?? event.color, id,
+          feed.all_day ? 1 : 0, feed.location ?? null, feed.color ?? null, id,
         );
         // Ein verlegter Start zieht die Erinnerungen mit, wie beim Abgleich (#1377).
         if (startDt !== event.start_datetime)

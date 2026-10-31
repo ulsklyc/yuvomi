@@ -2092,6 +2092,19 @@ test('POST /:id/reset stellt den Feed-Stand aus feed_original offline her', asyn
   assert.deepEqual({ ...row }, { title: 'Feed-Titel', description: 'Feed-Text', s: '2042-02-03T10:00', e: '2042-02-03T11:00', location: 'Feed-Ort', color: '#112233', m: 0, c: 0 });
 });
 
+// Ein Feed ohne COLOR speichert color null, die Farbe kommt dann vom Kalender
+// (cal_color). Der Reset nimmt die lokale Farbe zurück, statt sie zu behalten.
+test('POST /:id/reset nimmt die lokale Farbe zurück, wenn der Feed keine trägt', async () => {
+  const subId = db.prepare("INSERT INTO ics_subscriptions (name, url, color, created_by, shared) VALUES ('NoColorSub','https://x/nocolor.ics','#ABCDEF',2,1)").run().lastInsertRowid;
+  const feed = { title: 'Feed-Titel', description: null, start_datetime: '2042-02-05T10:00', end_datetime: null, all_day: 0, location: null, color: null };
+  const ev = insertEvent({ title: 'LOKAL', start_datetime: '2042-02-05T10:00', color: '#445566', external_source: 'ics', subscription_id: subId, created_by: MARIA.id, user_modified: 1 });
+  db.prepare('UPDATE calendar_events SET color_modified = 1, feed_original = ? WHERE id = ?').run(JSON.stringify(feed), ev);
+  const ok = await call('POST', `/${ev}/reset`, { actor: MARIA });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.data.restored, true);
+  assert.equal(db.prepare('SELECT color FROM calendar_events WHERE id = ?').get(ev).color, null);
+});
+
 // Altbestand ohne feed_original: der Reset nimmt das Flag zurück wie bisher,
 // meldet aber restored false, damit die Oberfläche den Hinweis zeigt.
 test('POST /:id/reset ohne feed_original (Altbestand): restored false, Flag geht auf 0', async () => {
