@@ -461,7 +461,7 @@ function searchEntries(req, res) {
 router.post('/', (req, res) => {
   try {
     if (req.body.transfer_entry_id !== undefined) return refuse(res, [refusal('transfer_invalid', 'Create transfers through /budget/transfers.')]);
-    const vTitle  = str(req.body.title,    'Title',  { max: MAX_TITLE });
+    const vTitle  = str(req.body.title,    'Title',  { max: MAX_TITLE, required: false });
     const vAmount = num(req.body.amount,  'Amount', { required: true });
     const fallbackCategory = defaultCategory(Number(req.body.amount) < 0 ? 'expense' : 'income');
     const vCat    = oneOf(req.body.category || fallbackCategory, validCategoryKeys(), 'Category');
@@ -491,6 +491,9 @@ router.post('/', (req, res) => {
     const strangers = responsibleNonMembers(null, req.body.responsible_user_ids);
     if (strangers.length) return refuse(res, [refusal('entry_responsible_invalid', nonMemberMessage(strangers))]);
 
+    // Blank title falls back to subcategory, then category (#2403).
+    const effectiveTitle = vTitle.value || subcategory || vCat.value || fallbackCategory;
+
     // Intervall + virtuelles Budget nur für wiederkehrende Einträge.
     const isRecurring = req.body.is_recurring ? 1 : 0;
     const interval    = isRecurring ? vInterval.value : 'monthly';
@@ -518,7 +521,7 @@ router.post('/', (req, res) => {
          recurrence_confirm, recurrence_full_amount, account_id, created_by, owner_id, visibility)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      vTitle.value, storeAmount, vCat.value || fallbackCategory, subcategory, vDate.value,
+      effectiveTitle, storeAmount, vCat.value || fallbackCategory, subcategory, vDate.value,
       isRecurring, vRrule.value,
       interval, intervalCount, isVirtual, confirmFirst, fullAmount, accountRef.value,
       me, me, visibility
