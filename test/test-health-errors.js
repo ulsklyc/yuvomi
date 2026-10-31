@@ -147,7 +147,7 @@ test('Server: ein unmoeglicher Vitalwert nennt seinen Fall, Status 400', async (
   assert.deepEqual([r.status, r.body?.reason], [400, 'health_vital_bp_order']);
   r = await call('POST', '/vitals', { type: 'spo2', value_num: 101, unit: '%', measured_at: at });
   assert.deepEqual([r.status, r.body?.reason], [400, 'health_vital_out_of_range']);
-  r = await call('POST', '/vitals', { type: 'weight', value_num: 90, unit: 'stone', measured_at: at });
+  r = await call('POST', '/vitals', { type: 'weight', value_num: 90, unit: 'furlong', measured_at: at });
   assert.deepEqual([r.status, r.body?.reason], [400, 'health_vital_unit_invalid']);
 });
 

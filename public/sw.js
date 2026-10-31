@@ -391,6 +391,7 @@ const APP_SHELL = [
   '/utils/health-prevention.js',
   '/utils/health-tabs.js',
   '/utils/health-vitals.js',
+  '/utils/vital-units.js',
   '/utils/help.js',
   '/utils/household-zone-hint.js',
   '/utils/first-steps.js',

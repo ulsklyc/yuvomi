@@ -50,15 +50,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   footer says "MIT-Lizenz" on the German pages.
 
 ### Fixed
-- **Vitals only accept the units their measurement offers** (#2375). The API took any text as a
-  unit, so a weight in `g` slipped past the limits on impossible values, and a weight in `stone`
-  was drawn unconverted next to kilograms. `POST` and `PATCH /api/v1/health/vitals` now refuse a
-  unit the measurement does not list with 400 and the reason `health_vital_unit_invalid`, and the
-  message names the ones it takes. **This changes the API:** a script sending `g`, `lbs`, `KG` or
-  `C` has to convert to the listed unit first (weight kg or lb, height and head circumference cm
-  or in, temperature °C or °F, blood sugar mg/dL or mmol/L). `unit` stays optional. Readings
-  already stored in another unit stay as they are, keep converting in the chart where they did,
-  and can still be edited.
+- **Vitals take the units Yuvomi can convert, and impossible values no longer slip past in them**
+  (#2375). The API took any text as a unit, so 9,000,000 g went past the limits that stop 9,000 kg,
+  and a typo like `kgs` was drawn unconverted next to kilograms. `POST` and `PATCH
+  /api/v1/health/vitals` now accept the units a measurement lists plus those the chart can convert,
+  in any capitalisation (weight also `g`, `lbs` and `stone`, height and head circumference also `m`
+  and `mm`, temperature also `C` and `F`), and check the limits on the converted value: 700,001 g
+  is refused like 700.001 kg. Any other unit is refused with 400 and the reason
+  `health_vital_unit_invalid`, and the message names the ones that work. Weights in stone now also
+  convert in the chart. `unit` stays optional, stored readings stay as they were sent, and older
+  readings in any unit can still be edited.
+- **The container starts with `no-new-privileges`.** Hardened setups (Podman Quadlet
+  `NoNewPrivileges=true`, `--security-opt no-new-privileges`, Compose `security_opt`) never got
+  past the entrypoint: `gosu` hung as root at 100 % CPU before it switched to the `node` user, so
+  the server did not start (#2380). The entrypoint now drops to `node` with `setpriv` from
+  util-linux, which is already in the base image, and sets `HOME` to node's home as `gosu` did.
+  The `gosu` package is gone from the image. Starting as root without the option, or directly as
+  `node`, works as before.
 - **Reset to original restores a subscribed event at once.** Resetting a changed event from an ICS
   subscription only cleared the edit mark, so the changed text stayed until the next sync. Each sync
   now keeps the feed's values, and the reset restores them straight away, without a network call.

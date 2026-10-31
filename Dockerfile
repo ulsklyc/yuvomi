@@ -33,9 +33,11 @@ RUN node scripts/check-runtime-deps.mjs
 # ---- Runtime stage ----
 FROM node:24-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205
 
-RUN apt-get update && apt-get install -y \
-    gosu \
-    && rm -rf /var/lib/apt/lists/*
+# Der Entrypoint wechselt mit setpriv (util-linux, im Basis-Image enthalten) zum
+# node-User. Kein eigenes Paket mehr wie früher gosu - aber falls ein neues
+# Basis-Image setpriv nicht mehr mitbringt, bricht der Build hier ab statt erst
+# der Start des Containers.
+RUN setpriv --version
 
 WORKDIR /app
 

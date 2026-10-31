@@ -132,8 +132,8 @@ export const CASE_MESSAGES = new Map([
   // oder einem aelteren Tab an ihm vorbei schreibt.
   ['health_vital_out_of_range', 'health.errorVitalImpossible'],
   ['health_vital_bp_order', 'health.errorVitalBpOrder'],
-  // #2375: ein aelterer Tab oder ein Client an der API; der Dialog bietet nur
-  // die Einheiten der Metrik an.
+  // #2375: eine Einheit, die niemand umrechnen kann. Der Dialog bietet sie nicht
+  // an, den Satz sieht also, wer an ihm vorbei schreibt.
   ['health_vital_unit_invalid', 'health.errorVitalUnit'],
   ['health_medication_not_found', 'health.errorMedicationGone'],
   ['health_schedule_not_found', 'health.errorScheduleGone'],
