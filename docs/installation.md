@@ -228,7 +228,7 @@ second row from this table, so a change to the floor changes the guard with it.
 
 ## Step-by-Step Installation
 
-There are seven ways to get Yuvomi running. **Option A** (web installer) is recommended for most users — it walks you through every step in your browser. **Option B** (pre-built image) is a quick manual alternative. **Option C** (build from source) is for contributors or custom builds. **Options D–F** install directly from a NAS/home-server app store with no terminal required: **Option D** (TrueNAS SCALE), **Option E** (Umbrel), and **Option F** (Unraid). **Option G** covers Portainer, whether you paste the stack or let it follow this repository via Git.
+There are eight ways to get Yuvomi running. **Option A** (web installer) is recommended for most users — it walks you through every step in your browser. **Option B** (pre-built image) is a quick manual alternative. **Option C** (build from source) is for contributors or custom builds. **Options D–F** install directly from a NAS/home-server app store with no terminal required: **Option D** (TrueNAS SCALE), **Option E** (Umbrel), and **Option F** (Unraid). **Option G** covers Portainer, whether you paste the stack or let it follow this repository via Git. **Option H** runs Yuvomi as a Home Assistant app (community package).
 
 ---
 
@@ -515,6 +515,18 @@ Add the same environment variables as above. Auto-update then follows `main` on 
 Yuvomi is in the community catalog [Lissy93/portainer-templates](https://github.com/Lissy93/portainer-templates). Under **Settings → App Templates**, set the URL to `https://raw.githubusercontent.com/Lissy93/portainer-templates/main/templates.json`, then pick **Yuvomi** under **App Templates**. The form asks for `SESSION_SECRET` and `DB_ENCRYPTION_KEY` (generated as above), the host port and `BASE_URL`; everything else keeps the default of [`docker-compose.portainer.yml`](docker-compose.portainer.yml), which the template deploys.
 
 > **Do not point a Git stack at the repository's `docker-compose.yml`.** That file is written for a local clone with a generated `.env` beside it, so it passes most of its configuration through `env_file` — and Portainer clones the repository without one. The deploy then fails on the missing file, and even if it did not, the container would start without `SESSION_SECRET` and exit (issues #698, #765).
+
+---
+
+### Option H — Home Assistant (community app)
+
+On Home Assistant OS or Supervised, Yuvomi can run as a Home Assistant app (formerly "add-on"). [Phillipxh/ha-yuvomi](https://github.com/Phillipxh/ha-yuvomi) is a community package of the official image. It is maintained outside this project.
+
+1. In Home Assistant, open **Settings → Apps → App store → ⋮ → Repositories** and add `https://github.com/Phillipxh/ha-yuvomi`.
+2. Install **Yuvomi** and start it. `SESSION_SECRET` and `DB_ENCRYPTION_KEY` are generated on the first start and stored in the app's data folder, so every Home Assistant backup contains them.
+3. Open `http://<home-assistant>:3000` and create the first admin account.
+
+Options such as `BASE_URL`, the reverse proxy and the weather location are set on the app's **Configuration** tab. Any other variable from this guide goes in as `KEY=VALUE` under `env_vars`. Questions about the packaging belong to that repository.
 
 ---
 
