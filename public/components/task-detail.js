@@ -40,6 +40,7 @@ import { rowActionEl } from '/utils/row-action.js';
 import { renderMarkdownLight } from '/utils/html.js';
 import { splitKeepingLineEndings } from '/utils/markdown-checklist.js';
 import { errorSentence, isAlreadyDeleted } from '/utils/friendly-error.js';
+import { prerequisiteBlockSentence } from '/utils/task-prerequisites.js';
 import { splitMentions, applyMention } from '/utils/mentions.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
@@ -236,6 +237,50 @@ function chipListNode(items, toLabel) {
 /** Tags als Chips. In der Leseansicht benennen sie, sie filtern nicht. */
 function tagChipsNode(tags) {
   return chipListNode(normalizeTagList(tags), (tag) => tag);
+}
+
+/**
+ * Die Vorbedingungen einer Aufgabe mit ihrem Stand - dasselbe Zeilenbild wie
+ * `subtaskListNode` (Ring mit Haken, erledigt durchgestrichen), aber als
+ * reines Zustandszeichen: Abhaken gehoert an die Zeile der Liste, und die
+ * Absage dort nennt offene Vorbedingungen beim Namen
+ * (utils/task-prerequisites.js). Ohne Vorbedingungen faellt die Zeile ganz
+ * weg - eine Zeile "nichts blockiert" an jeder Aufgabe waere Rauschen.
+ */
+function prerequisitesNode(prereqs) {
+  if (!Array.isArray(prereqs) || !prereqs.length) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'detail-prereqs';
+  for (const p of prereqs) {
+    const done = p?.done === true || p?.status === 'done';
+    const title = String(p?.title ?? '');
+    const row = document.createElement('span');
+    row.className = `detail-prereq${done ? ' detail-prereq--done' : ''}`;
+    row.setAttribute('role', 'img');
+    row.setAttribute('aria-label', `${title}: ${done ? t('tasks.statusDone') : t('tasks.statusOpen')}`);
+    const ring = document.createElement('span');
+    ring.className = ['detail-prereq__ring', 'check-ring', 'check-ring--sm', 'check-ring--static',
+      done ? 'check-ring--done' : ''].filter(Boolean).join(' ');
+    ring.setAttribute('aria-hidden', 'true');
+    const icon = document.createElement('i');
+    icon.dataset.lucide = 'check';
+    icon.className = 'check-ring__check';
+    icon.setAttribute('aria-hidden', 'true');
+    ring.appendChild(icon);
+    const label = document.createElement('span');
+    label.className = 'detail-prereq__title';
+    label.textContent = title;
+    row.append(ring, label);
+    if (p?.assigned_name) {
+      const who = document.createElement('span');
+      who.className = 'detail-prereq__who';
+      who.textContent = String(p.assigned_name);
+      row.appendChild(who);
+    }
+    wrap.appendChild(row);
+    if (window.lucide) window.lucide.createIcons({ el: row });
+  }
+  return wrap;
 }
 
 /** Teilaufgaben mit ihrem Stand - die Liste führt sie, also führt die Ansicht sie auch. */
@@ -979,6 +1024,7 @@ function renderTaskDetail(task, reminders = [], ctx) {
     { icon: 'award', label: t('tasks.pointsLabel'), value: task.points ? String(task.points) : '' },
     { icon: 'tag', label: t('tasks.tagsLabel'), node: tagChipsNode(task.tags) },
     { icon: 'list-checks', label: t('tasks.subtasksLabel'), node: subtaskListNode(task, ctx) },
+    { icon: 'link', label: t('tasks.blockedByLabel'), node: prerequisitesNode(task.prerequisites) },
     { icon: 'paperclip', label: t('tasks.documentsLabel'), node: documentListNode(task.documents) },
     { icon: 'bell', label: t('reminders.sectionTitle'), value: taskReminderSummary(reminders) },
     visibilityRow(task.visibility),
@@ -1506,7 +1552,9 @@ async function advanceTaskStatus(task, status, button, ctx, close = closeDetailV
  * Umgebung kommt frisch, wie nach einem Erfolg.
  */
 async function sayWriteFailed(err, ctx, close) {
-  window.yuvomi.showToast(errorSentence(err), 'danger');
+  // Vorbedingungen offen (Abhakversuch aus der Leseansicht): der Satz nennt die
+  // offenen beim Namen, sonst der allgemeine Satz (utils/task-prerequisites.js).
+  window.yuvomi.showToast(prerequisiteBlockSentence(err) ?? errorSentence(err), 'danger');
   if (isAlreadyDeleted(err, 'tasks_task_not_found')) await afterConfirmedWrite(ctx, close);
 }
 
@@ -1635,4 +1683,4 @@ function seriesHistoryNode(task) {
  * der sich die Nur-lesen-Regel (#467) an dieser Ansicht MESSEN laesst - alles
  * andere hier haengt an `openDetailView` und damit am echten DOM.
  */
-export const __test = { subtaskListNode, descriptionNode, documentListNode, doerChoices, wireDetailDoerMenu, wireDetailMoreMenu, DOER_BUTTON_ID, completeFor, advanceTaskStatus, toggleTaskArchive, toggleDescriptionCheck, commentRowNode, startCommentEdit };
+export const __test = { subtaskListNode, descriptionNode, documentListNode, prerequisitesNode, doerChoices, wireDetailDoerMenu, wireDetailMoreMenu, DOER_BUTTON_ID, completeFor, advanceTaskStatus, toggleTaskArchive, toggleDescriptionCheck, commentRowNode, startCommentEdit };

@@ -52,6 +52,7 @@ import {
 } from '/components/task-detail.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { errorSentence, isAlreadyDeleted, loadErrorSentence } from '/utils/friendly-error.js';
+import { prerequisiteBlockSentence } from '/utils/task-prerequisites.js';
 
 /**
  * "GIBT ES NICHT MEHR" (#1909): ein anderes Haushaltsmitglied hat die Aufgabe
@@ -478,6 +479,20 @@ function renderLockedBadge(task) {
 }
 
 /**
+ * Die Anzahl offener Vorbedingungen an der Zeile - dieselbe Bauart wie das
+ * Schloss und der Anexoehnger: `role="img"` mit dem Zahltext im Label. Sie
+ * steht an der Zeile, weil der Abhakweg dort liegt: wer eine blockierte
+ * Aufgabe anfasst, sieht vorher, dass eine Absage kommt - und der abgelehnte
+ * Haken nennt die offenen danach beim Namen (utils/task-prerequisites.js).
+ */
+function renderBlockedBadge(task) {
+  const count = Number(task.open_prerequisite_count) || 0;
+  if (count <= 0) return '';
+  const label = esc(t('tasks.blockedByBadge', { count }));
+  return `<span class="due-date task-card__blocked" role="img" aria-label="${label}" title="${label}"><i data-lucide="link" class="icon-sm" aria-hidden="true"></i></span>`;
+}
+
+/**
  * EINE Metazeile, und sie bricht nicht um.
  *
  * Die Zeile trug bis zu acht Elemente mit `flex-wrap: wrap` und wurde damit je
@@ -663,6 +678,7 @@ function renderTaskCard(task, opts = {}) {
             ${task.is_recurring ? `<span class="due-date" role="img" aria-label="${esc(t('tasks.recurring'))}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>` : ''}
             ${task.document_count > 0 ? `<span class="due-date task-card__docs" role="img" aria-label="${esc(t('tasks.documentsCount', { count: task.document_count }))}"><i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i></span>` : ''}
             ${renderLockedBadge(task)}
+            ${renderBlockedBadge(task)}
             ${renderVisibilityBadge(task.visibility)}
             ${showCategory && task.category !== FALLBACK_CATEGORY ? `<span class="due-date task-card__category">${esc(catLabel(task.category))}</span>` : ''}
             ${renderTagBadges(task.tags, ROW_TAG_BADGES_VISIBLE, task.priority)}
@@ -900,6 +916,12 @@ function renderTaskGroups(tasks, groupMode, rowsHtml = (items, render) => items.
 // Working-Set des offenen Bearbeiten-Dialogs, analog zu den verknüpften
 // Dokumenten. Wird beim Öffnen aus der Aufgabe gefüllt und beim Speichern gelesen.
 let modalTags = [];
+// Die Auswahl des Abschnitts "Blockiert durch" (Vorheraufgaben) im selben
+// Dialog: Replace-Set fuer den Server. `touched` ist die Zusicherung des
+// Absendepfads - ein Dialog, der den Abschnitt nie geoeffnet hat und keine
+// Vorbedingungen hat, schickt den Schluessel gar nicht erst.
+let modalPrereqIds = [];
+let modalPrereqTouched = false;
 /** Zeichnet die Chips des Tag-Editors neu. */
 function renderTagChips(container) {
   const wrap = container.querySelector('#task-tags-chips');
@@ -1118,6 +1140,143 @@ function taskAdvancedTopics({ privacy = true, recurrence = false, reminder = fal
   } catch {
     return topics.join(', ');
   }
+}
+
+/**
+ * Eine Zeile der "Blockiert durch"-Auswahl: Kaestchen mit Titel. Der Wert ist
+ * die Aufgaben-Id - der Absendepfad liest nur die Auswahlmenge, nicht den Weg.
+ */
+function prereqOptionHtml(option, selected) {
+  const checked = selected.has(String(option.id));
+  return `<label class="task-prereqs__row"><input class="task-prereqs__check" type="checkbox" value="${Number(option.id)}"${checked ? ' checked' : ''}><span class="task-prereqs__title">${esc(option.title)}</span></label>`;
+}
+
+/**
+ * Die Auswahlreihen als Markup. Eigene Funktion, weil sie dieselbe Zeilen
+ * fuer zwei Zustände bauen muss: den Erstaufbau (nur die gespeicherte Auswahl,
+ * Kandidaten kommen nach) und jeden Suchlauf. Die eigene Aufgabe faellt raus -
+ * der Server wuerde sie mit `task_prerequisite_self` zurueckweisen, und ein
+ * Kaestchen, das nie gilt, ist eine Fehlanzeige.
+ */
+function prereqRowsHtml(options, selectedIds = [], selfId = null) {
+  const selected = new Set(selectedIds.map(String));
+  const rows = (options ?? [])
+    .filter((o) => o && Number.isInteger(Number(o.id)) && String(o.id) !== String(selfId ?? ''))
+    .map((o) => prereqOptionHtml(o, selected));
+  return rows.length ? rows.join('') : `<p class="task-field-hint" data-prereqs-empty>${t('tasks.blockedByEmpty')}</p>`;
+}
+
+/**
+ * Der Abschnitt "Blockiert durch" (Vorheraufgaben) im Aufgaben-Dialog.
+ *
+ * HINTER DEM KLAPPTEXT, solange nichts gesetzt ist - dieselbe Regel wie bei
+ * Wiederholung und Erinnerung (R16): die meisten Aufgaben tragen keine
+ * Vorbedingung, und die Liste der Kandidaten kommt erst mit dem Oeffnen. Eine
+ * GESETZTE Auswahl bleibt offen: beim Bearbeiten darf nichts Gesetztes
+ * versteckt sein. Das Oeffnen ist zugleich die Marke fuer den Absendepfad -
+ * ein Dialog, der den Abschnitt nie geoeffnet hat und keine Vorbedingungen
+ * hat, schickt den Schluessel gar nicht (siehe handleFormSubmit).
+ */
+function prereqsSectionHtml(task) {
+  const has = Array.isArray(task?.prerequisites) && task.prerequisites.length > 0;
+  return `
+      <div class="form-group">
+        <details class="task-prereqs" id="task-prereqs"${has ? ' open' : ''}>
+          <summary class="task-prereqs__summary">
+            <i data-lucide="link" class="icon-sm" aria-hidden="true"></i>
+            <span class="task-prereqs__label">${t('tasks.blockedByLabel')}</span>
+          </summary>
+          <p class="task-field-hint">${t('tasks.blockedByHint')}</p>
+          <input class="input task-prereqs__search" type="search" id="task-prereqs-search"
+                 autocomplete="off" placeholder="${t('tasks.blockedBySearchPlaceholder')}"
+                 aria-label="${t('tasks.blockedBySearchPlaceholder')}">
+          <div class="task-prereqs__list" id="task-prereqs-list"></div>
+        </details>
+      </div>`;
+}
+
+/**
+ * Verdrahtet den Abschnitt: Kandidaten kommen mit dem ersten Oeffnen von
+ * `/tasks` (offene Aufgaben, nach Titel; dasselbe Muster wie `wireSyncTarget` -
+ * ohne Antwort bleibt die Liste leer statt den Speicherpfad zu blockieren),
+ * die Auswahl liegt in `modalPrereqIds`. Gespeicherte Vorbedingungen, die
+ * nicht mehr offen sind, bleiben als Zeile stehen - sonst verschwoge eine
+ * Auswahl, nur weil sie erledigt ist.
+ */
+function wirePrerequisitePicker(panel, task) {
+  const details = panel.querySelector('#task-prereqs');
+  const listEl = details?.querySelector('#task-prereqs-list');
+  const searchEl = details?.querySelector('#task-prereqs-search');
+  if (!details || !listEl) return;
+
+  let candidates = null;
+  let loading = null;
+  const knownTitle = new Map(
+    (Array.isArray(task?.prerequisites) ? task.prerequisites : [])
+      .filter((p) => Number.isInteger(Number(p?.id)))
+      .map((p) => [String(Number(p.id)), String(p.title ?? '')]),
+  );
+
+  const draw = () => {
+    const query = (searchEl?.value || '').trim().toLowerCase();
+    const pool = (candidates ?? [])
+      .filter((o) => String(o.id) !== String(task?.id ?? ''))
+      .filter((o) => !query || String(o.title).toLowerCase().includes(query));
+    const inPool = new Set(pool.map((o) => String(o.id)));
+    const extra = modalPrereqIds
+      .map((id) => String(id))
+      .filter((id) => !inPool.has(id))
+      .map((id) => ({ id: Number(id), title: knownTitle.get(id) ?? '' }))
+      .filter((o) => o.title && (!query || o.title.toLowerCase().includes(query)));
+    listEl.replaceChildren();
+    listEl.insertAdjacentHTML('beforeend', prereqRowsHtml([...pool, ...extra], modalPrereqIds, task?.id));
+  };
+
+  const ensureLoaded = () => {
+    if (candidates || loading) return;
+    loading = api.get('/tasks')
+      .then((res) => {
+        const rows = Array.isArray(res?.data) ? res.data : [];
+        candidates = rows
+          .filter((r) => r && r.status !== 'done' && !isArchived(r))
+          .map((r) => ({ id: Number(r.id), title: String(r.title ?? '') }))
+          .sort((a, b) => a.title.localeCompare(b.title, getLocale(), { sensitivity: 'base' }));
+      })
+      .catch((err) => {
+        console.warn('[Tasks] Vorbedingungen-Kandidaten nicht ladbar:', err);
+        candidates = [];
+      })
+      .finally(() => {
+        loading = null;
+        draw();
+      });
+  };
+
+  details.addEventListener('toggle', () => {
+    if (!details.open) return;
+    // Geoeffnet = der Nutzer hat den Abschnitt gesehen: von hier an geht die
+    // aktuelle Auswahl mit jedem Speichern mit, auch eine unveraenderte.
+    modalPrereqTouched = true;
+    ensureLoaded();
+  });
+  searchEl?.addEventListener('input', () => { ensureLoaded(); draw(); });
+  listEl.addEventListener('change', (e) => {
+    const box = e.target?.closest?.('input.task-prereqs__check') ?? null;
+    if (!box) return;
+    const id = Number(box.value);
+    if (!Number.isInteger(id)) return;
+    const set = new Set(modalPrereqIds);
+    if (box.checked) set.add(id); else set.delete(id);
+    modalPrereqIds = [...set];
+    modalPrereqTouched = true;
+    // Nachgezeichnet wird nur, wenn eine Zeile ihren Anlass verliert (eine
+    // abgehakte gespeicherte Vorbedingung, die abgewaehlt wurde). Sonst steht
+    // das Kaestchen schon richtig, und ein Neuzeichnen wuerfe den Fokus weg.
+    if (!box.checked && !candidates?.some((o) => String(o.id) === String(id))) draw();
+  });
+
+  draw();
+  if (details.open) ensureLoaded();
 }
 
 function renderModalContent({ task = null, users = [], reminder = null } = {}) {
@@ -1434,6 +1593,8 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
                  >${esc(task?.description)}</textarea>
         <small class="form-hint">${t('tasks.descriptionMarkdownHint')}</small>
       </div>
+
+      ${prereqsSectionHtml(task)}
 
       ${advancedSection(advancedFieldsHtml, { label: advancedLabel, hint: advancedHint })}
 
@@ -2477,6 +2638,14 @@ function wireTaskForm(panel, { task = null, container = null, onChanged = () => 
   renderTagChips(panel);
   wireTagEditor(panel);
 
+  // "Blockiert durch" (Vorheraufgaben): die Auswahl startet bei dem, was die
+  // Aufgabe hat; der Absendepfad liest sie beim Speichern (modalPrereqIds).
+  modalPrereqIds = (Array.isArray(task?.prerequisites) ? task.prerequisites : [])
+    .map((p) => Number(p?.id))
+    .filter((id) => Number.isInteger(id));
+  modalPrereqTouched = false;
+  wirePrerequisitePicker(panel, task);
+
   // Formatierungsleiste ueber der Notiz (#731). Die Leseansicht rendert sie
   // seit v2.7.0 als Markdown, geschrieben werden musste sie aber von Hand -
   // dieselbe Leiste, die die Notizen seit jeher haben, dieselbe Datei.
@@ -2786,6 +2955,12 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   // das Fehlen als "auf lokal zurücksetzen" (#695).
   const syncTargetField = form.querySelector('#task-sync-target');
   if (syncTargetField) body.sync_target = syncTargetField.value;
+  // "Blockiert durch" (Vorheraufgaben): der Server ersetzt damit die ganze
+  // Menge. Ungewaehlt UND leer wird der Schluessel weggelassen - ein PUT ohne
+  // Schluessel laesst die Menge in Ruhe, eine leere Liste loescht sie, und beides
+  // waere hier eine unerwuenschte Nebenwirkung. Eine gesetzte Auswahl geht auch
+  // ohne Beruehrung mit: sie ist der gespeicherte Stand, kein Auftrag zum Loeschen.
+  if (modalPrereqTouched || modalPrereqIds.length) body.prerequisites = [...modalPrereqIds];
   const dueTimeRaw = form.due_time?.value || '';
   const dueTime = parseTimeInput(dueTimeRaw);
   const resetSubmit = (msg) => {
@@ -3118,7 +3293,7 @@ async function runColumnMove(task, column, container) {
     const response = await moveTaskToColumn(before, column);
     if (column === 'done') seriesText = seriesDoneText(response, { title: task.title });
   } catch (err) {
-    window.yuvomi.showToast(errorSentence(err), 'danger');
+    window.yuvomi.showToast(prerequisiteBlockSentence(err) ?? errorSentence(err), 'danger');
   }
   await loadTasks(container);
   // NACH dem Neuladen, wie in der Liste: die Karte liegt in „Erledigt", und in
@@ -3183,6 +3358,7 @@ function renderKanbanCard(task) {
         ${renderPriorityBadge(task.priority)}
         ${due ? `<span class="due-date ${due.cls}"><i data-lucide="clock" class="icon-sm" aria-hidden="true"></i> ${due.label}</span>` : ''}
         ${renderLockedBadge(task)}
+        ${renderBlockedBadge(task)}
         ${renderTagBadges(task.tags, TAG_BADGES_VISIBLE, task.priority)}
       </div>
       <div class="kanban-card__footer">
@@ -5627,7 +5803,7 @@ async function completeTaskFor(container, taskId, userId) {
       { scope },
     );
   } catch (err) {
-    window.yuvomi.showToast(errorSentence(err), 'danger');
+    window.yuvomi.showToast(prerequisiteBlockSentence(err) ?? errorSentence(err), 'danger');
     await loadTasks(container);
   }
 }
@@ -5825,7 +6001,11 @@ function wireTaskList(container) {
         await settled;
         await reloadWithRowMotion(container, id, { holdUntil });
       } catch (err) {
-        window.yuvomi.showToast(toggleFailedSentence(err, id, nextStatus), 'danger');
+        // Vorbedingungen offen: der Satz nennt die offenen beim Namen statt der
+        // allgemeinen Absage (utils/task-prerequisites.js). Der Haken bleibt
+        // nicht umgeschaltet stehen: das Neuzeichnen darunter malt ihn aus dem
+        // Serverstand zurueck.
+        window.yuvomi.showToast(prerequisiteBlockSentence(err) ?? toggleFailedSentence(err, id, nextStatus), 'danger');
         await loadTasks(container);
       }
     }
@@ -6795,6 +6975,13 @@ export const __test = {
   restoreGroupMode, setGroupMode, wireGroupMode,
   // Der Aufgaben-Dialog als Markup: welche Felder er zeigt und wen er anbietet.
   renderModalContent,
+  // "Blockiert durch" (Vorheraufgaben): Abschnitt und Reihen als Markup, die
+  // Picker-Verdrahtung als echter Klickweg, das Zahlzeichen an der Zeile und
+  // die Verdrahtung der Liste fuer den Abhakfehler (test:
+  // test-task-prerequisites-ui.js). `setModalPrereqs` entspricht dem, was ein
+  // Klick im Picker aendert - der Absendepfad wird davon getrennt gemessen.
+  prereqsSectionHtml, prereqRowsHtml, wirePrerequisitePicker, renderBlockedBadge, wireTaskList,
+  setModalPrereqs: (ids, touched = true) => { modalPrereqIds = ids.map(Number); modalPrereqTouched = touched; },
   // Der Erinnerungs-Abschnitt einzeln, weil er einen Zustand zu BENENNEN hat,
   // den seine Auswahlliste nicht abbildet: eine Erinnerung nach der
   // Faelligkeit. Was der Abschnitt dabei sagt, ist der halbe Fix - die andere

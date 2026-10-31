@@ -425,6 +425,55 @@
   border-color: var(--color-success);
 }
 
+/* --------------------------------------------------------
+ * Vorbedingungen (Vorheraufgaben) - Zustandszeichen, kein Bedienelement
+ *
+ * Dasselbe Zeilenbild wie die Teilaufgaben darueber (Ring mit Haken, erledigt
+ * durchgestrichen), aber ohne Klickweg: abgehakt wird an der Zeile der Liste,
+ * und die Absage dort nennt die offenen beim Namen
+ * (public/utils/task-prerequisites.js).
+ * -------------------------------------------------------- */
+.detail-prereqs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-self: stretch;
+}
+
+.detail-prereq {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-primary);
+}
+
+.detail-prereq--done {
+  color: var(--color-text-tertiary);
+}
+
+.detail-prereq--done .detail-prereq__title {
+  text-decoration: line-through;
+}
+
+.detail-prereq__ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--space-5);
+  height: var(--space-5);
+}
+
+.detail-prereq--done .detail-prereq__ring::after {
+  border-color: var(--color-success);
+}
+
+.detail-prereq__who {
+  color: var(--color-text-tertiary);
+  font-size: var(--type-caption);
+}
+
 /* Der Einstieg steht IN der Liste, nicht daneben: die Karte blendet ihre
    Inline-Aktionen unter 640px aus, und ohne diesen Knopf gab es auf dem
    Telefon keinen Weg zur ersten Teilaufgabe (#925).

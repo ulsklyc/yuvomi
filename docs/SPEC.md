@@ -318,6 +318,26 @@ Join table for multi-person task assignment (migration v32). Existing `assigned_
 | user_id | INTEGER | FK → Users (CASCADE delete), NOT NULL |
 | PRIMARY KEY | | (task_id, user_id) |
 
+### Task Prerequisites (migration v272)
+Join table for blocking prerequisites ("Vorheraufgaben"): a task is tickable only
+when every prerequisite is `done`. Own relation on purpose - neither subtask
+(`parent_task_id`) nor series instance (`recurrence_origin_id`), and a deleted
+prerequisite falls away with CASCADE: a condition that no longer exists blocks
+nothing. Cycles and self-reference are refused when set (400, whole list
+rejected). Enforcement runs at the tick-off on every path (PATCH /status and
+PUT, wall display included); un-ticking is never blocked and cascades nothing.
+A recurring task's follow-up instance copies its prerequisites, subtask copies
+included. `GET /tasks/:id` answers `prerequisites` (id, title, status, done,
+assigned_name) even for a prerequisite the caller cannot see - the title is the
+mildest disclosure, without it the block is inexplicable. `GET /tasks` carries
+`open_prerequisite_count` per row (count only) for badges.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| task_id | INTEGER | FK → Tasks (CASCADE delete), NOT NULL |
+| prerequisite_task_id | INTEGER | FK → Tasks (CASCADE delete), NOT NULL |
+| PRIMARY KEY | | (task_id, prerequisite_task_id) |
+
 ### Task Documents (migration v86)
 Join table linking documents from the Documents module to a task, so the information needed to complete a task (manuals, policies, service instructions) lives alongside the task itself. Managed from the task modal; linked documents show as chips (opening the document preview/download) and the task card carries a paperclip badge with the count. Both foreign keys cascade on delete — removing either the task or the document drops the link, the other side is untouched. Document visibility from the Documents module is enforced: only documents the current user may see are listed or linkable (no admin bypass), and a replace-set update leaves links to documents the user cannot see intact. **The Documents right applies on top (#1358):** without read access to the Documents module (member right `documents: none`, or an API token without `documents:read`, judged by `mayReadDocuments()` in `server/services/document-links.js`) `document_count` and `documents` are `null` - the task says neither which nor how many - `GET /tasks/:id/documents` answers 403 once the task is found, and `PUT` refuses any non-empty `document_ids` with the same 403 for every id while an empty list changes nothing.
 

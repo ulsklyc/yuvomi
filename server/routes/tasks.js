@@ -13,6 +13,10 @@ import { sendDocumentDeletionConflict } from '../services/document-deletion-lock
 import { assertDocumentLinkTargetsAvailable, documentViewer, sendDocumentLinkRefusal } from '../services/document-links.js';
 import { nextDueAfterCompletion } from '../services/recurrence.js';
 import { syncTaskRewards, seriesOfTask } from '../services/rewards.js';
+import {
+  prerequisitesOf, unmetPrerequisites, openPrerequisiteCountSql,
+  setPrerequisites, copyPrerequisites,
+} from '../services/task-prerequisites.js';
 import { completionFeed, seriesHistory, syncTaskCompletion } from '../services/task-completions.js';
 import { normalizeCategoryFilter, taskCategoryWhere, taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { normalizeVisibility, visibilityWhere } from '../services/visibility.js';
@@ -964,6 +968,7 @@ router.get('/', (req, res) => {
            AND ${visibilityWhere('s', 'task_assignments', 'task_id')})                         AS subtask_total,
         (SELECT COUNT(*) FROM tasks s WHERE s.parent_task_id = t.id AND s.status = 'done'
            AND ${visibilityWhere('s', 'task_assignments', 'task_id')})                         AS subtask_done,
+        ${openPrerequisiteCountSql('t')},
         (SELECT json_group_array(json_object('id', s.id, 'title', s.title, 'status', s.status))
            FROM (SELECT s.id, s.title, s.status FROM tasks s WHERE s.parent_task_id = t.id
                    AND ${visibilityWhere('s', 'task_assignments', 'task_id')}
@@ -1103,6 +1108,11 @@ router.get('/:id', (req, res) => {
 
     addAssignedUsers(task);
     task.subtasks = loadSubtasks(task.id, me);
+    // Vorheraufgaben gehören an die Detailantwort, auch wenn die Vorhersage
+    // selbst unsichtbar ist: ohne Titel koennte niemand verstehen, warum die
+    // Aufgabe sich nicht abhaken laesst. Mildere Abgabe als bei Unteraufgaben
+    // am Elternobjekt - ein Titel ist kein Geheimnis-Format.
+    task.prerequisites = prerequisitesOf(db.get(), task.id);
     const viewer = documentViewer(req);
     attachDocumentCounts([task], viewer);
     // Die verknüpften Dokumente beim Namen, nicht nur gezählt (#733). Die
@@ -1240,6 +1250,9 @@ router.post('/', (req, res) => {
       );
       setAssignments(db.get(), result.lastInsertRowid, userIds);
       if (req.body.tags !== undefined) setTags(db.get(), result.lastInsertRowid, req.body.tags);
+      if (Array.isArray(req.body.prerequisites)) {
+        setPrerequisites(db.get(), result.lastInsertRowid, req.body.prerequisites);
+      }
       if (syncTarget) {
         db.get().prepare(
           'UPDATE tasks SET target_caldav_account_id = ?, target_caldav_list_url = ? WHERE id = ?'
@@ -1282,6 +1295,11 @@ router.post('/', (req, res) => {
     res.status(201).json({ data: task });
     if (syncTarget) pushToCalDAV('Neue Aufgabe');
   } catch (err) {
+    if (err && typeof err.code === 'string' && err.code.startsWith('prerequisite_')) {
+      // Transaktion warfen (Selbstbezug, unbekannte id, Zyklus) - es wurde
+      // nichts angelegt, also ist die Antwort eine 400, kein halber Stand.
+      return res.status(400).json({ error: 'Invalid prerequisites.', code: 400, reason: `task_${err.code}` });
+    }
     log.error('POST / error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
@@ -1406,6 +1424,15 @@ router.put('/:id', (req, res) => {
       // wuerde, der sie umgehen will.
       if (lockedRequested !== null && lockedRequested !== task.locked) touchesDefinition = true;
 
+      // Die Vorheraufgaben sind Teil der Definition: wer eine gesperrte Aufgabe
+      // nicht umschreiben darf, darf auch nicht ihre Bedingungen umhaengen.
+      if (Array.isArray(req.body.prerequisites)) {
+        const before = prerequisitesOf(db.get(), task.id).map((p) => p.id).sort((a, b) => a - b);
+        const after = [...new Set(req.body.prerequisites.map(Number))]
+          .filter(Number.isInteger).sort((a, b) => a - b);
+        if (before.length !== after.length || before.some((v, i) => v !== after[i])) touchesDefinition = true;
+      }
+
       // Die EIGENE Zuweisung ist Interaktion - eine offene Aufgabe an sich zu
       // nehmen oder wieder abzugeben. Die FREMDE ist Definition: sonst schoebe
       // ein Kind die Aufgabe einfach seinem Geschwister zu, und die Sperre
@@ -1417,6 +1444,21 @@ router.put('/:id', (req, res) => {
           || othersBefore.some((id) => !othersAfter.includes(id))) touchesDefinition = true;
 
       if (touchesDefinition) return res.status(403).json(LOCKED_ERROR);
+    }
+
+    // Vorheraufgaben blockieren dieselbe Schwelle wie in PATCH /status: PUT
+    // schreibt den Status mit, also gilt die Regel hier genauso - sonst ist
+    // der Umweg ueber den Bearbeiten-Dialog die offene Hintertuer.
+    if (status === 'done' && task.status !== 'done') {
+      const open = unmetPrerequisites(db.get(), task.id);
+      if (open.length) {
+        return res.status(409).json({
+          error: 'Task has unfinished prerequisites.',
+          code: 409,
+          reason: 'tasks_prerequisite_open',
+          open_prerequisites: open.map((p) => ({ id: p.id, title: p.title, assigned_name: p.assigned_name })),
+        });
+      }
     }
 
     // Wie in PATCH umfasst die Transaktion auch die Serien-Bewegung: eine
@@ -1449,6 +1491,9 @@ router.put('/:id', (req, res) => {
              req.params.id);
       setAssignments(db.get(), task.id, userIds);
       if (req.body.tags !== undefined) setTags(db.get(), task.id, req.body.tags);
+      if (Array.isArray(req.body.prerequisites)) {
+        setPrerequisites(db.get(), task.id, req.body.prerequisites);
+      }
       if (syncTarget !== undefined) {
         db.get().prepare(
           'UPDATE tasks SET target_caldav_account_id = ?, target_caldav_list_url = ? WHERE id = ?'
@@ -1509,6 +1554,9 @@ router.put('/:id', (req, res) => {
 
     if (pending || undone || syncTarget || spawned) pushToCalDAV('Änderung');
   } catch (err) {
+    if (err && typeof err.code === 'string' && err.code.startsWith('prerequisite_')) {
+      return res.status(400).json({ error: 'Invalid prerequisites.', code: 400, reason: `task_${err.code}` });
+    }
     log.error('PUT /:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
@@ -1808,6 +1856,10 @@ function spawnRecurrenceFollowup(task) {
     );
     setAssignments(db.get(), newTask.lastInsertRowid, existingAssignments);
     setTags(db.get(), newTask.lastInsertRowid, existingTags);
+    // Und die Vorheraufgaben: ohne Mitnehmen waere die Folgeinstanz plotzlich
+    // unblockiert - dieselbe stille Verhaltensaenderung, die bei `locked` und
+    // `countdown` schon Pflicht war.
+    copyPrerequisites(db.get(), task.id, newTask.lastInsertRowid);
 
     for (const sub of existingSubtasks) {
       const subAssignments = db.get()
@@ -1840,6 +1892,7 @@ function spawnRecurrenceFollowup(task) {
       );
       setAssignments(db.get(), newSub.lastInsertRowid, subAssignments);
       setTags(db.get(), newSub.lastInsertRowid, subTags);
+      copyPrerequisites(db.get(), sub.id, newSub.lastInsertRowid);
     }
   })();
   return !!syncTarget;
@@ -1960,6 +2013,21 @@ router.patch('/:id/status', (req, res) => {
 
     if (reopensSettledVisit(db.get(), prev.id, prev.status, status) && !isAdminRequest(req)) {
       return res.status(403).json({ error: 'Permission denied.', code: 403 });
+    }
+
+    // Vorheraufgaben blockieren das Abhaken auf JEDEM Weg - auch dem des
+    // Wandtablets: die Bedingung gehoert zur Aufgabe, nicht zum Client.
+    // Zuruecknehmen ist nie blockiert (es macht nichts falsch, es macht offen).
+    if (status === 'done' && prev.status !== 'done') {
+      const open = unmetPrerequisites(db.get(), prev.id);
+      if (open.length) {
+        return res.status(409).json({
+          error: 'Task has unfinished prerequisites.',
+          code: 409,
+          reason: 'tasks_prerequisite_open',
+          open_prerequisites: open.map((p) => ({ id: p.id, title: p.title, assigned_name: p.assigned_name })),
+        });
+      }
     }
 
     // Benannt werden koennen nur Haushaltsmitglieder (#1207, DECISIONS 4) -

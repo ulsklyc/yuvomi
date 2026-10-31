@@ -177,6 +177,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   characters instead of 90, spacing follows the app's scale, a failed copy shows its note on its own
   line instead of breaking around the button, and the "taking longer than usual" note no longer
   touches the line above it.
+- **Blocking prerequisites (Vorheraufgaben).** A task can name one or more tasks that
+  must be done before it can be ticked off - wash the pavilion sides first, fold the
+  pavilion away after. Set `prerequisites: [ids]` on create or edit (self-reference,
+  unknown ids and cycles are refused whole); the tick-off then answers 409 with
+  `open_prerequisites` while any of them is open, on every path including the wall
+  display. Un-ticking a prerequisite never opens anything by itself - it just blocks
+  again. The detail view names the open prerequisites, the list carries their count,
+  and a recurring task's next instance keeps the conditions.
+
 
 ## [2.83.0] - 2026-10-29
 

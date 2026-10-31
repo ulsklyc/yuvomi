@@ -2114,6 +2114,50 @@
   color: var(--color-text-tertiary);
 }
 
+/* "Blockiert durch" (Vorheraufgaben) im Aufgaben-Dialog. Der Abschnitt steht
+ * hinter dem Klapptext, solange nichts gesetzt ist (prereqsSectionHtml); die
+ * Zeilen sind Kaestchenreihen wie im Rest des Formulars, die Suche darueber.
+ * Der Klapptext liest sich wie ein Feldlabel, die Box wie ein Feld. */
+.task-prereqs {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+}
+
+.task-prereqs__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target-base);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.task-prereqs__search {
+  margin-block: var(--space-2) var(--space-1);
+}
+
+.task-prereqs__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.task-prereqs__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target-base);
+  cursor: pointer;
+}
+
+.task-prereqs__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Verknüpfte Dokumente in der LESEANSICHT (#503, #733).
  *
  * Im Formular steht seit #733 das geteilte Beleg-Feld (document-attach.css) -

@@ -11777,6 +11777,25 @@ const MIGRATIONS = [
       database.exec('UPDATE ics_subscriptions SET etag = NULL, last_modified = NULL');
     },
   },
+  {
+    version: 274,
+    description: 'tasks: blocking prerequisites (Vorheraufgaben)',
+    // Eine Aufgabe kann Vorheraufgaben haben: sie ist erst abhakbar, wenn alle
+    // davon erledigt sind (Beispiel: erst die Pavillon-Seitenteile waschen,
+    // dann den Pavillon einraeumen). Eigene Tabelle - die Beziehung ist weder
+    // Unter- noch Folgeinstanz (parent_task_id, recurrence_origin_id) und kann
+    // deshalb nicht dort mitlaufen. Geloeschte Vorheraufgaben fallen mit
+    // (CASCADE): eine Bedingung, die nicht mehr existiert, darf nichts blockieren.
+    up: (database) => {
+      database.exec(`
+        CREATE TABLE task_prerequisites (
+          task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          prerequisite_task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          PRIMARY KEY (task_id, prerequisite_task_id)
+        )
+      `);
+    },
+  },
 ];
 
 /**

@@ -33,7 +33,7 @@ export function tasksPaths() {
           { name: 'include_future', in: 'query', required: false, schema: { type: 'string' }, description: 'Any non-empty value also returns tasks whose start date lies in the future.' },
         ],
       }),
-      post: op({ summary: 'Create task', tag: 'Tasks', stateChanging: true, requestBody: jsonBody(null), description: 'Body accepts `locked: true` to close the task definition to everyone but its creator and administrators (#830). A subtask under a locked parent inherits the lock, and adding one requires the same rights. `status` may be set on creation (#807); it runs through the same transition handling as PUT and PATCH, so creating a task as `done` books its points and writes its completion entry. `null`, an empty string and `archived` all fall back to `open` - filing a task away is a separate axis and not something a creation can do.' }),
+      post: op({ summary: 'Create task', tag: 'Tasks', stateChanging: true, requestBody: jsonBody(null), description: 'Body accepts `locked: true` to close the task definition to everyone but its creator and administrators (#830). A subtask under a locked parent inherits the lock, and adding one requires the same rights. `status` may be set on creation (#807); it runs through the same transition handling as PUT and PATCH, so creating a task as `done` books its points and writes its completion entry. `null`, an empty string and `archived` all fall back to `open` - filing a task away is a separate axis and not something a creation can do. The body may carry `prerequisites: [taskIds]` - tasks that must be done before this one can be ticked off; a self-reference, an unknown id or a cycle rejects the whole creation (400).' }),
     },
     '/api/v1/tasks/meta/options': { get: op({ summary: 'Get task metadata', tag: 'Tasks' }) },
     '/api/v1/tasks/completions': {
@@ -94,7 +94,7 @@ export function tasksPaths() {
     },
     '/api/v1/tasks/{id}': {
       get: op({ summary: 'Get task', tag: 'Tasks', params: [idParam()], description: TASK_DOCUMENTS_NOTE }),
-      put: op({ summary: 'Update task', tag: 'Tasks', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'On a locked task (`locked: 1`) only the creator and administrators may change the definition - title, description, category, priority, dates, recurrence, points, visibility, tags, sync target, the lock itself, and assigning other members. Everyone else may still send the full body as long as the outcome differs only in `status` or in their own entry in `assigned_to`; anything else answers 403. The comparison is against the stored values, not against which fields were sent. Returns `{ data: Task }`; the task additionally carries `next_due_date` (YYYY-MM-DD) under the same rule as PATCH /tasks/{id}/status: the due date of the next occurrence still pending and visible to the caller when this call moved a recurring task into `done`, and `null` in every other case - no status change, a change that is not a transition into `done`, a task without recurrence, a series that has ended, or a next occurrence the caller cannot see.' }),
+      put: op({ summary: 'Update task', tag: 'Tasks', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'On a locked task (`locked: 1`) only the creator and administrators may change the definition - title, description, category, priority, dates, recurrence, points, visibility, tags, sync target, the lock itself, the prerequisites list, and assigning other members. Everyone else may still send the full body as long as the outcome differs only in `status` or in their own entry in `assigned_to`; anything else answers 403. The comparison is against the stored values, not against which fields were sent. Returns `{ data: Task }`; the task additionally carries `next_due_date` (YYYY-MM-DD) under the same rule as PATCH /tasks/{id}/status: the due date of the next occurrence still pending and visible to the caller when this call moved a recurring task into `done`, and `null` in every other case - no status change, a change that is not a transition into `done`, a task without recurrence, a series that has ended, or a next occurrence the caller cannot see. The body may carry `prerequisites: [taskIds]`, replacing the blocking prerequisites whole - a rejected list (self-reference, unknown id, cycle) leaves the old one in place. Moving the task into `done` is blocked while any prerequisite is unfinished (409, `open_prerequisites`).' }),
       delete: op({ summary: 'Delete task', tag: 'Tasks', params: [idParam()], stateChanging: true, description: 'On a locked task, the creator and administrators only (403 otherwise).' }),
     },
     '/api/v1/tasks/{id}/status': {
@@ -150,11 +150,15 @@ const REORDER_DENIED = '`reorder_not_allowed` (403, the caller lacks `tasks_reor
 const CAT_EXISTS = '`category_exists` (409, a category with this name already exists)';
 const CAT_DELETE = '`category_in_use` (409, tasks still use the category; `count` carries how many), `category_last` (409, the last category cannot be deleted)';
 const CASE_REASONS = {
-  '/api/v1/tasks': { post: PARENT_GONE },
+  '/api/v1/tasks': { post: `${PARENT_GONE}, \`task_prerequisite_self\`, \`task_prerequisite_not_found\`, \`task_prerequisite_cycle\` (400, the prerequisites list is rejected whole - nothing is created)` },
   '/api/v1/tasks/reorder': { patch: `${TASK_GONE}, ${REORDER_DENIED}` },
   '/api/v1/tasks/reorder/reset': { post: `${TASK_GONE}, ${REORDER_DENIED}` },
-  '/api/v1/tasks/{id}': { get: TASK_GONE, put: TASK_GONE, delete: TASK_GONE },
-  '/api/v1/tasks/{id}/status': { patch: `${TASK_GONE}, \`display_action\` (403, a paired display can only tick a task off)` },
+  '/api/v1/tasks/{id}': {
+    get: TASK_GONE,
+    put: `${TASK_GONE}, \`task_prerequisite_self\`, \`task_prerequisite_not_found\`, \`task_prerequisite_cycle\` (400, the prerequisites list is rejected whole - the task keeps the old one), \`tasks_prerequisite_open\` (409, an unfinished prerequisite blocks the transition to \`done\`; the answer lists them as \`open_prerequisites\`)`,
+    delete: TASK_GONE,
+  },
+  '/api/v1/tasks/{id}/status': { patch: `${TASK_GONE}, \`tasks_prerequisite_open\` (409, an unfinished prerequisite blocks the tick-off on every path, the wall display included; the answer lists them as \`open_prerequisites\`), \`display_action\` (403, a paired display can only tick a task off)` },
   '/api/v1/tasks/{id}/archive': { patch: TASK_GONE },
   '/api/v1/tasks/{id}/check': { patch: TASK_GONE },
   '/api/v1/tasks/{id}/documents': {
