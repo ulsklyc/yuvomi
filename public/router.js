@@ -1016,6 +1016,26 @@ function applyStartPreferences(res) {
   if (Array.isArray(res?.data?.mobile_nav_order)) {
     _mobileNavOrder = res.data.mobile_nav_order;
   }
+  // Per-user module colour overrides (#1115): inject a <style> block into
+  // <head> so --module-X tokens on :root reflect the chosen colour.
+  applyModuleColorOverrides(res?.data?.module_colors);
+}
+
+function applyModuleColorOverrides(colors) {
+  const existing = document.getElementById('module-color-overrides');
+  if (!colors || typeof colors !== 'object' || !Object.keys(colors).length) {
+    if (existing) existing.remove();
+    return;
+  }
+  const declarations = Object.entries(colors)
+    .filter(([, v]) => /^#[0-9a-fA-F]{6}$/.test(v))
+    .map(([id, color]) => `  --module-${id}: ${color};`)
+    .join('\n');
+  if (!declarations) { if (existing) existing.remove(); return; }
+  const style = existing ?? document.createElement('style');
+  style.id = 'module-color-overrides';
+  style.textContent = `:root {\n${declarations}\n}`;
+  if (!existing) document.head.appendChild(style);
 }
 
 async function syncThirdPartyModules({ forceLocales = false } = {}) {

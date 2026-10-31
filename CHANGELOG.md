@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Each person can choose their own accent colour for any module.** Open Settings
+  → Appearance to pick a custom `#RRGGBB` colour for one or more modules (tasks, calendar,
+  budget, …). The choice is stored per user and applied at login via a `<style>` override on
+  `:root`, so it never affects other household members. Setting a colour back to empty restores
+  the household default. (`module_colors` field in `GET/PUT /api/v1/preferences`)
 - **A document can name who it is about.** The document dialog has a new "About" field for one
   household member, and the Documents page can filter by person. The person also gets the expiry
   reminder, along with whoever filed the document, and once if that is the same person. This never
