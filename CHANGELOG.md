@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   footer says "MIT-Lizenz" on the German pages.
 
 ### Fixed
+- **Reset to original restores a subscribed event at once.** Resetting a changed event from an ICS
+  subscription only cleared the edit mark, so the changed text stayed until the next sync. Each sync
+  now keeps the feed's values, and the reset restores them straight away, without a network call.
+  Subscriptions synced before this update have no stored values yet: their reset clears the mark
+  and says so, and the next sync fills them in (Refs D#2330).
 - **Tasks remember how you group them.** Grouping the list by due date instead of category now
   stays after a reload, on that device, like the choice between list, board and history.
 - **The Podman Quadlet health check passes.** The `HealthCmd` in `tools/quadlet/oikos.container`

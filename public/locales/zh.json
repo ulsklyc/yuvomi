@@ -1025,7 +1025,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "重置为原始",
-            "resetToast": "更改已重置。"
+            "resetToast": "更改已重置。",
+            "resetPendingToast": "已重置。原始内容将在下次同步时恢复。"
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "搜索图标",

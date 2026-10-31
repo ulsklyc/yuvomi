@@ -8105,14 +8105,20 @@ async function openEventDetail(ev, anchor = null, { pane = null, formReady: form
       more: true,
       onClick: async ({ close }) => {
         try {
-          await api.post(`/calendar/${ev.id}/reset`, {});
+          const res = await api.post(`/calendar/${ev.id}/reset`, {});
           // Der Schreibvorgang ist durch - ohne force fragte der Dirty-Guard
           // nach dem Verwerfen von Änderungen, die der Reset ohnehin
           // zurückgenommen hat (#625).
           await close({ force: true });
           if (hostedHere()) await reloadAfterSave(() => reloadForView());
           else await notifyAwayChanged();
-          window.yuvomi?.showToast(t('calendar.ics.resetToast'), 'success');
+          // D#2330: ohne gespeicherten Feed-Stand (Altbestand) stellt der Reset
+          // erst beim nächsten Abgleich den Originaltext her. Das sagt der Hinweis.
+          const pending = res?.data?.restored === false;
+          window.yuvomi?.showToast(
+            t(pending ? 'calendar.ics.resetPendingToast' : 'calendar.ics.resetToast'),
+            'success',
+          );
         } catch (err) {
           // Der Satz der App, nie der Text des Servers (#1909). Gibt es den
           // Termin nicht mehr, schliesst die Ansicht und der Kalender laedt nach.

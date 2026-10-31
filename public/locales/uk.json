@@ -1181,7 +1181,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Скинути до оригіналу",
-            "resetToast": "Зміни скинуто."
+            "resetToast": "Зміни скинуто.",
+            "resetPendingToast": "Скинуто. Вихідний текст повернеться під час наступної синхронізації."
         },
         "iconLabel": "Значок",
         "iconSearchPlaceholder": "Пошук іконки",

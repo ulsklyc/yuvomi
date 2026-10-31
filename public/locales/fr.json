@@ -1025,7 +1025,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Réinitialiser",
-            "resetToast": "Modifications annulées."
+            "resetToast": "Modifications annulées.",
+            "resetPendingToast": "Réinitialisé. Le texte d'origine reviendra à la prochaine synchronisation."
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "Rechercher une icône",

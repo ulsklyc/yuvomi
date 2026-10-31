@@ -2077,6 +2077,32 @@ test('POST /:id/reset — 400/404/400-nicht-ics/403/Happy', async () => {
   assert.equal(zurueckgesetzt.c, 0);
 });
 
+// D#2330 (Variante A): der Reset stellt den Feed-Stand aus feed_original
+// sofort und ohne Netz her - der Titel kommt zurück, ohne auf den Abruf zu warten.
+test('POST /:id/reset stellt den Feed-Stand aus feed_original offline her', async () => {
+  const subId = db.prepare("INSERT INTO ics_subscriptions (name, url, color, created_by, shared) VALUES ('RestoreSub','https://x/restore.ics','#ABCDEF',2,1)").run().lastInsertRowid;
+  const feed = { title: 'Feed-Titel', description: 'Feed-Text', start_datetime: '2042-02-03T10:00', end_datetime: '2042-02-03T11:00', all_day: 0, location: 'Feed-Ort', color: '#112233' };
+  // insertEvent verwirft unbekannte Felder, daher feed_original per UPDATE.
+  const ev = insertEvent({ title: 'LOKAL', description: 'lokal', start_datetime: '2042-02-03T12:00', end_datetime: '2042-02-03T13:00', location: 'lokal-ort', color: '#445566', external_source: 'ics', subscription_id: subId, created_by: MARIA.id, user_modified: 1 });
+  db.prepare('UPDATE calendar_events SET color_modified = 1, feed_original = ? WHERE id = ?').run(JSON.stringify(feed), ev);
+  const ok = await call('POST', `/${ev}/reset`, { actor: MARIA });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.data.restored, true, 'mit gespeichertem Feed-Stand muss restored true sein');
+  const row = db.prepare('SELECT title, description, start_datetime AS s, end_datetime AS e, location, color, user_modified AS m, color_modified AS c FROM calendar_events WHERE id = ?').get(ev);
+  assert.deepEqual({ ...row }, { title: 'Feed-Titel', description: 'Feed-Text', s: '2042-02-03T10:00', e: '2042-02-03T11:00', location: 'Feed-Ort', color: '#112233', m: 0, c: 0 });
+});
+
+// Altbestand ohne feed_original: der Reset nimmt das Flag zurück wie bisher,
+// meldet aber restored false, damit die Oberfläche den Hinweis zeigt.
+test('POST /:id/reset ohne feed_original (Altbestand): restored false, Flag geht auf 0', async () => {
+  const subId = db.prepare("INSERT INTO ics_subscriptions (name, url, color, created_by, shared) VALUES ('AltSub','https://x/alt.ics','#ABCDEF',2,1)").run().lastInsertRowid;
+  const ev = insertEvent({ title: 'ALT-LOKAL', start_datetime: '2042-02-04T09:00', external_source: 'ics', subscription_id: subId, created_by: MARIA.id, user_modified: 1 });
+  const ok = await call('POST', `/${ev}/reset`, { actor: MARIA });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.data.restored, false);
+  assert.equal(db.prepare('SELECT user_modified AS m FROM calendar_events WHERE id = ?').get(ev).m, 0);
+});
+
 // ════════════════════════════════════════════════════════════════════════════════
 // POST /:id/exceptions (EXDATE, #489)
 // ════════════════════════════════════════════════════════════════════════════════

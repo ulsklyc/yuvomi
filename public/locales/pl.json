@@ -1209,7 +1209,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Przywróć oryginał",
-            "resetToast": "Zmiany zostały cofnięte."
+            "resetToast": "Zmiany zostały cofnięte.",
+            "resetPendingToast": "Przywrócono. Oryginalny tekst wróci przy następnej synchronizacji."
         },
         "iconLabel": "Ikona",
         "iconSearchPlaceholder": "Szukaj ikony",

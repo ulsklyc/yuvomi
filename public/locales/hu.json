@@ -1025,7 +1025,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Visszaállítás az eredetire",
-            "resetToast": "Változtatások visszaállítva."
+            "resetToast": "Változtatások visszaállítva.",
+            "resetPendingToast": "Visszaállítva. Az eredeti szöveg a következő szinkronnal tér vissza."
         },
         "iconLabel": "Ikon",
         "iconSearchPlaceholder": "Ikon keresése",

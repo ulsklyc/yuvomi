@@ -1025,7 +1025,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Tilbakestill til original",
-            "resetToast": "Endringer tilbakestilt."
+            "resetToast": "Endringer tilbakestilt.",
+            "resetPendingToast": "Tilbakestilt. Originalteksten kommer tilbake ved neste synkronisering."
         },
         "iconLabel": "Ikon",
         "iconSearchPlaceholder": "Søkeikon",

@@ -1023,7 +1023,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Restaurar original",
-            "resetToast": "Alterações restauradas."
+            "resetToast": "Alterações restauradas.",
+            "resetPendingToast": "Redefinido. O texto original volta na próxima sincronização."
         },
         "iconLabel": "Ícone",
         "iconSearchPlaceholder": "Pesquisar ícone",

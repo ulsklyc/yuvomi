@@ -1106,7 +1106,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Obnovit původní",
-            "resetToast": "Změny byly vráceny."
+            "resetToast": "Změny byly vráceny.",
+            "resetPendingToast": "Vráceno. Původní text se vrátí až při příští synchronizaci."
         },
         "iconLabel": "Ikona",
         "iconSearchPlaceholder": "Hledat ikonu",

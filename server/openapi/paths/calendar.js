@@ -465,7 +465,7 @@ export function calendarPaths() {
       }),
     },
     '/api/v1/calendar/{id}/reset': {
-      post: op({ summary: 'Reset external calendar event to source state', tag: 'Calendar', params: [idParam()], stateChanging: true }),
+      post: op({ summary: 'Reset external calendar event to source state', tag: 'Calendar', params: [idParam()], stateChanging: true, description: 'Response: { data: { reset: true, restored } }. `restored` is true when the event was put back from the feed values kept at the last sync (offline, at once). It is false for an event synced before those values were kept: the edit mark is cleared, and the original text comes with the next sync (D#2330).' }),
     },
     '/api/v1/calendar/{id}/exceptions': {
       post: op({ summary: 'Exclude a single occurrence of a recurring event (EXDATE)', tag: 'Calendar', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { recurrence_id } - the occurrence as the calendar reads return it (see the `recurrenceId` path parameter of the occurrence routes for the three forms). The former body { date: `YYYY-MM-DD` } is still accepted with its earlier meaning. The exact key of the matched occurrence is stored and returned as `exception_date` and `recurrence_id`. A key that names no occurrence of the series answers 400 with reason `invalid_recurrence_id`; a date that matches two occurrences (the night of a clock change) answers 409 with reason `ambiguous_recurrence_id`. Up to v2.78.0 any well-formed date was stored unchecked.' }),

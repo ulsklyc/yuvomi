@@ -1053,7 +1053,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Kembalikan ke asli",
-            "resetToast": "Perubahan diatur ulang."
+            "resetToast": "Perubahan diatur ulang.",
+            "resetPendingToast": "Diatur ulang. Teks asli kembali pada sinkronisasi berikutnya."
         },
         "iconLabel": "Ikon",
         "iconSearchPlaceholder": "Cari ikon",
