@@ -5760,6 +5760,7 @@ const BUDGET_REFUSALS = new Map([
   ['entry_subcategory_invalid', ['#bm-subcategory', 'budget.subcategoryRequired']],
   ['entry_date_invalid', ['#bm-date, #cb-date', 'calendar.invalidDate']],
   ['entry_start_date_invalid', ['#bm-date', 'calendar.invalidDate']],
+  ['entry_end_date_invalid', [null, 'calendar.invalidDate']],
   ['entry_account_invalid', ['#bm-account', 'budget.accountNotFound']],
   ['entry_responsible_invalid', [null, 'budget.responsibleNotMember']],
   ['series_start_too_early', ['#bm-date', 'budget.seriesStartTooEarly']],

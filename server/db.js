@@ -11757,6 +11757,16 @@ const MIGRATIONS = [
       database.exec('CREATE INDEX IF NOT EXISTS idx_family_documents_subject ON family_documents(subject_user_id)');
     },
   },
+  {
+    version: 273,
+    description: 'Budget series: optional end date (#1742)',
+    up(database) {
+      const cols = database.prepare('PRAGMA table_info(budget_series)').all();
+      if (!cols.some((c) => c.name === 'end_date')) {
+        database.exec('ALTER TABLE budget_series ADD COLUMN end_date TEXT');
+      }
+    },
+  },
 ];
 
 /**

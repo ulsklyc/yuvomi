@@ -108,6 +108,7 @@ test('jede laufende Serie bekommt genau eine Definition mit den Werten ihres Ori
     category: 'housing', subcategory: 'rent_mortgage', account_id: giro, visibility: 'shared',
     start_date: '2020-01-05', // v229 (#1545), aus dem Datum des Originals
     grid_from: null, // v229: keine Rasteraenderung, keine Grenze
+    end_date: null, // v273 (#1742): optionales Enddatum, Altdaten NULL
   });
   const policy = definition(db, ids.policy);
   assert.equal(policy.amount, -100, 'virtuell: der geglaettete Monatsanteil, wie am Original');

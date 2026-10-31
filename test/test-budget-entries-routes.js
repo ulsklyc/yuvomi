@@ -1780,3 +1780,39 @@ test('#1668: jede Absage von Buchung, Serie, Konto, Kategorie und Rate nennt ihr
   }
   assert.deepEqual(seen.sort(), Object.keys(EXPECTED).sort(), 'jeder gefuehrte Fall wurde gefahren');
 });
+
+// ── #1742: optional end date on a recurring series ──────────────────────────
+
+test('#1742: PUT /:id/series stores end_date and returns it in series definition', async () => {
+  const pid = insertEntry({ title: 'sub', amount: -30, category: 'subscriptions', date: '2099-02-01', is_recurring: 1 });
+  const r = await call('PUT', `/${pid}/series`, { body: { end_date: '2099-12-01' } });
+  assert.equal(r.status, 200, 'ok');
+  assert.equal(r.body.data.series?.end_date, '2099-12-01', 'end_date in response');
+  const row = db.prepare('SELECT end_date FROM budget_series WHERE anchor_id = ?').get(pid);
+  assert.equal(row.end_date, '2099-12-01', 'end_date stored in DB');
+});
+
+test('#1742: PUT /:id/series with end_date = null clears it', async () => {
+  const pid = insertEntry({ title: 'sub2', amount: -30, category: 'subscriptions', date: '2099-02-02', is_recurring: 1 });
+  db.prepare('UPDATE budget_series SET end_date = ? WHERE anchor_id = ?').run('2099-12-01', pid);
+  const r = await call('PUT', `/${pid}/series`, { body: { end_date: null } });
+  assert.equal(r.status, 200, 'ok');
+  assert.equal(r.body.data.series?.end_date, null, 'end_date cleared');
+  const row = db.prepare('SELECT end_date FROM budget_series WHERE anchor_id = ?').get(pid);
+  assert.equal(row.end_date, null, 'cleared in DB');
+});
+
+test('#1742: PUT /:id/series with invalid end_date → 400', async () => {
+  const pid = insertEntry({ title: 'sub3', amount: -30, category: 'subscriptions', date: '2099-02-03', is_recurring: 1 });
+  const r = await call('PUT', `/${pid}/series`, { body: { end_date: 'not-a-date' } });
+  assert.equal(r.status, 400, 'validation error');
+  assert.equal(r.body.reason, 'entry_end_date_invalid');
+});
+
+test('#1742: omitting end_date in PUT /:id/series leaves it unchanged', async () => {
+  const pid = insertEntry({ title: 'sub4', amount: -30, category: 'subscriptions', date: '2099-02-04', is_recurring: 1 });
+  db.prepare('UPDATE budget_series SET end_date = ? WHERE anchor_id = ?').run('2099-11-01', pid);
+  const r = await call('PUT', `/${pid}/series`, { body: { title: 'Updated' } });
+  assert.equal(r.status, 200, 'ok');
+  assert.equal(r.body.data.series?.end_date, '2099-11-01', 'end_date unchanged');
+});
