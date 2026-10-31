@@ -49,12 +49,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screens. The overview image at the top now starts loading right away on phones too, and the
   footer says "MIT-Lizenz" on the German pages.
 
+### Security
+- **Channel routes only manage household channels.** The admin routes for notification channels now
+  always create a household channel, and a personal channel cannot be pointed at a member through
+  the admin API or changed by it. A member's private reminders stay out of reach of anything an
+  admin sets up, in line with how private entries already work.
+
 ### Fixed
 - **Repeating tasks keep their time on CalDAV servers across clock changes.** A repeating task with
   a time now goes out in the household's time zone, so a daily 07:00 task stays at 07:00 after the
   clocks change, and a weekday repeat near midnight stays on its day. Its start now lies before its
   due time, which strict servers require. Yuvomi fixes a task already on the server the next time
   you change it.
+- **The container starts with `no-new-privileges`.** Hardened setups (Podman Quadlet
+  `NoNewPrivileges=true`, `--security-opt no-new-privileges`, Compose `security_opt`) never got
+  past the entrypoint: `gosu` hung as root at 100 % CPU before it switched to the `node` user, so
+  the server did not start (#2380). The entrypoint now drops to `node` with `setpriv` from
+  util-linux, which is already in the base image, and sets `HOME` to node's home as `gosu` did.
+  The `gosu` package is gone from the image. Starting as root without the option, or directly as
+  `node`, works as before.
 - **Reset to original restores a subscribed event at once.** Resetting a changed event from an ICS
   subscription only cleared the edit mark, so the changed text stayed until the next sync. Each sync
   now keeps the feed's values, and the reset restores them straight away, without a network call.

@@ -1226,6 +1226,109 @@ test('admin notification routes manage channels and test sends', async () => {
 });
 
 /* ------------------------------------------------------------------ *
+ * Die Kanal-Routen verwalten nur Haushaltskanaele
+ *
+ * Sie sind Admin-Routen, und ein Haushaltskanal hoert nur, was jeder sehen
+ * darf. Ein Kanal mit `scope = 'user'` hoert dagegen auch die privaten
+ * Erinnerungen seiner Person; ueber diese Routen duerfte ein Admin also lesen,
+ * was `private` gerade vor ihm verbirgt (DECISIONS 1). Zugesichert wird die
+ * Wirkung am Erinnerungslauf, nicht nur die gespeicherte Spalte.
+ * ------------------------------------------------------------------ */
+
+function channelRouteHarness(store, db, buildRouter) {
+  const router = buildRouter({ database: db, channelStore: store, notificationService: { providers: {} } });
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
+  app.use('/notifications', router);
+  return app;
+}
+
+// Bobs private Aufgabe wird faellig; geliefert wird nur, was dabei an einen
+// Kanal ginge. Die Attrappe ersetzt den Anbieter, es geht nichts ins Netz.
+async function channelsHearingPrivateReminder(db, store) {
+  const { processDueNotifications } = await import('../server/services/notifications.js');
+  const task = db.prepare("INSERT INTO tasks (title, created_by, visibility) VALUES ('Privat', 2, 'private')").run();
+  db.prepare("INSERT INTO reminders (entity_type, entity_id, remind_at, created_by) VALUES ('task', ?, ?, 2)")
+    .run(task.lastInsertRowid, pastIso());
+  const heard = [];
+  await processDueNotifications({
+    database: db,
+    channelStore: store,
+    pushService: { sendPushToUser: async () => 0 },
+    providers: { ntfy: { id: 'ntfy', send: async ({ channel }) => { heard.push(channel.name); return { ok: true, status: 200 }; } } },
+  });
+  return heard;
+}
+
+const NTFY_CHANNEL = { provider: 'ntfy', name: 'Kanal', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} };
+
+for (const [label, owner] of [
+  ['scope + userId', { scope: 'user', userId: 2 }],
+  ['scope + user_id', { scope: 'user', user_id: 2 }],
+]) {
+  test(`POST legt immer einen Haushaltskanal an, auch mit ${label} im Body`, async () => {
+    const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+    const { buildRouter } = await import('../server/routes/notifications.js');
+    const db = makeDb();
+    const store = createNotificationChannelStore({ db });
+    const app = channelRouteHarness(store, db, buildRouter);
+
+    const created = await call(app, 'POST', '/notifications/channels', { ...NTFY_CHANNEL, ...owner });
+
+    assert.equal(created.status, 201);
+    assert.equal(created.json.data.scope, 'household');
+    assert.equal(created.json.data.userId, null);
+    assert.deepEqual(await channelsHearingPrivateReminder(db, store), [],
+      'Ein ueber die Route angelegter Kanal hoert keine private Erinnerung.');
+  });
+
+  test(`PUT haengt einen Haushaltskanal nicht um, auch nicht mit ${label} im Body`, async () => {
+    const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+    const { buildRouter } = await import('../server/routes/notifications.js');
+    const db = makeDb();
+    const store = createNotificationChannelStore({ db });
+    const app = channelRouteHarness(store, db, buildRouter);
+    const channel = store.createChannel(NTFY_CHANNEL);
+
+    const updated = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { name: 'Neu', ...owner });
+
+    assert.equal(updated.status, 200);
+    assert.equal(updated.json.data.name, 'Neu', 'Der Rest des Bodys wirkt weiter.');
+    assert.equal(updated.json.data.scope, 'household');
+    assert.equal(updated.json.data.userId, null);
+    assert.deepEqual(await channelsHearingPrivateReminder(db, store), []);
+  });
+}
+
+test('PUT aendert keinen persoenlichen Kanal: sein Ziel bleibt, wo es ist', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = channelRouteHarness(store, db, buildRouter);
+  const channel = store.createChannel({ ...NTFY_CHANNEL, name: 'bobs', scope: 'user', userId: 2 });
+
+  const refused = await call(app, 'PUT', `/notifications/channels/${channel.id}`, {
+    config: { baseUrl: 'https://anderes-ziel.test' },
+    enabled: false,
+  });
+
+  assert.equal(refused.status, 409);
+  const stored = store.getChannel(channel.id);
+  assert.equal(stored.config.baseUrl, 'https://ntfy.test');
+  assert.equal(stored.enabled, true);
+  assert.equal(stored.scope, 'user');
+  assert.equal(stored.userId, 2);
+
+  // Die Grenze liegt an der Route: der eigene Kanal der Person stellt weiter zu.
+  assert.deepEqual(await channelsHearingPrivateReminder(db, store), ['bobs']);
+
+  // Und ein Admin wird so eine Zeile weiterhin los.
+  assert.equal((await call(app, 'DELETE', `/notifications/channels/${channel.id}`)).status, 200);
+});
+
+/* ------------------------------------------------------------------ *
  * E-Mail als vierter Kanal (#944)
  *
  * Der Kanal traegt NUR sein Ziel. Der SMTP-Zugang steht app-weit in

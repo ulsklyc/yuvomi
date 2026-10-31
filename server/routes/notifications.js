@@ -17,6 +17,17 @@ function parseId(value) {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
+// Diese Routen verwalten nur Haushaltskanaele. Ein Kanal mit `scope = 'user'`
+// hoert auch die privaten Erinnerungen seiner Person, und vor dem Admin verbirgt
+// `private` sie gerade (DECISIONS 1, services/notifications.js). Deshalb kommt
+// aus dem Body nur durch, was ein Haushaltskanal braucht: eine Allowlist, damit
+// keine Schreibweise von Besitzer oder Reichweite den Store erreicht. Die
+// Zustellung an persoenliche Kanaele bleibt davon unberuehrt.
+function householdChannelInput(body) {
+  const { provider, name, enabled, config, secrets, clearSecrets } = body || {};
+  return { provider, name, enabled, config, secrets, clearSecrets };
+}
+
 export function buildRouter({
   database,
   channelStore,
@@ -74,7 +85,7 @@ export function buildRouter({
 
   router.post('/channels', (req, res) => {
     try {
-      const channel = store.createChannel(req.body || {});
+      const channel = store.createChannel(householdChannelInput(req.body));
       res.status(201).json({ data: channel });
     } catch (err) {
       res.status(400).json({ error: err.message || 'Invalid notification channel.', code: 400 });
@@ -85,8 +96,14 @@ export function buildRouter({
     try {
       const id = parseId(req.params.id);
       if (!id) return res.status(400).json({ error: 'Invalid channel id.', code: 400 });
-      const channel = store.updateChannel(id, req.body || {});
-      if (!channel) return res.status(404).json({ error: 'Notification channel not found.', code: 404 });
+      const existing = store.getChannel(id);
+      if (!existing) return res.status(404).json({ error: 'Notification channel not found.', code: 404 });
+      // Neue Daten fuer einen persoenlichen Kanal hiessen: ein Admin bestimmt, wohin
+      // die privaten Erinnerungen dieser Person gehen. Loeschen bleibt moeglich.
+      if (existing.scope !== 'household') {
+        return res.status(409).json({ error: 'Only household notification channels can be changed here.', code: 409 });
+      }
+      const channel = store.updateChannel(id, householdChannelInput(req.body));
       res.json({ data: channel });
     } catch (err) {
       res.status(400).json({ error: err.message || 'Invalid notification channel.', code: 400 });

@@ -91,7 +91,7 @@ dort war der Abstand zu Upstream am 2026-09-14 null.
   deshalb nicht; das steht auch in `MODULES.md` und `docs/installation.md` (Option E).
   Beim `diff` gegen Upstream also keine Drift, die zu beheben wäre.
 - **Kein `user:`-Override** - der Entrypoint läuft nur zum Chown als root und wechselt
-  per gosu auf den unprivilegierten `node`-User. Der Linter meldet das als Info.
+  auf den unprivilegierten `node`-User. Der Linter meldet das als Info.
 - **`SESSION_SECURE=false`** - Umbrel liefert Apps im LAN über einfaches HTTP aus.
 - **`gallery`** ist im veröffentlichten Manifest gefüllt (`1.webp` … `5.webp`). Leer
   bleiben musste sie nur für die Ersteinreichung.
