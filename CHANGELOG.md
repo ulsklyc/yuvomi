@@ -55,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now keeps the feed's values, and the reset restores them straight away, without a network call.
   Subscriptions synced before this update have no stored values yet: their reset clears the mark
   and says so, and the next sync fills them in (Refs D#2330).
+- **Calendar responses no longer carry internal sync state.** The event data sent to the app
+  included the snapshots Yuvomi keeps to match calendar syncs. The app never reads them, so they
+  are gone from the responses now; nothing you see changes.
 - **Tasks remember how you group them.** Grouping the list by due date instead of category now
   stays after a reload, on that device, like the choice between list, board and history.
 - **The Podman Quadlet health check passes.** The `HealthCmd` in `tools/quadlet/oikos.container`
