@@ -2103,6 +2103,22 @@ test('POST /:id/reset ohne feed_original (Altbestand): restored false, Flag geht
   assert.equal(db.prepare('SELECT user_modified AS m FROM calendar_events WHERE id = ?').get(ev).m, 0);
 });
 
+// feed_original ist der Rohstand für den Reset, kein Feld der Antwort: die
+// Lese-Routen (SELECT e.*) dürfen ihn nicht an den Client geben.
+test('GET / und GET /:id liefern feed_original nicht aus', async () => {
+  const subId = db.prepare("INSERT INTO ics_subscriptions (name, url, color, created_by, shared) VALUES ('LeakSub','https://x/leak.ics','#ABCDEF',2,1)").run().lastInsertRowid;
+  const ev = insertEvent({ title: 'LEAK-LISTE', start_datetime: '2036-04-10T09:00', end_datetime: '2036-04-10T10:00', external_source: 'ics', subscription_id: subId, created_by: MARIA.id });
+  db.prepare('UPDATE calendar_events SET feed_original = ? WHERE id = ?').run(JSON.stringify({ title: 'LEAK-FEED' }), ev);
+  const list = await call('GET', '/?from=2036-04-01&to=2036-04-30', { actor: MARIA });
+  assert.equal(list.status, 200);
+  const item = list.body.data.find((e) => e.id === ev);
+  assert.ok(item, 'Termin in der Liste');
+  assert.equal('feed_original' in item, false, 'GET / darf feed_original nicht enthalten');
+  const one = await call('GET', `/${ev}`, { actor: MARIA });
+  assert.equal(one.status, 200);
+  assert.equal('feed_original' in one.body.data, false, 'GET /:id darf feed_original nicht enthalten');
+});
+
 // ════════════════════════════════════════════════════════════════════════════════
 // POST /:id/exceptions (EXDATE, #489)
 // ════════════════════════════════════════════════════════════════════════════════

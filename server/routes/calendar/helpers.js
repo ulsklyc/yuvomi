@@ -529,6 +529,8 @@ export function serializeEvent(event, context = null) {
     recurrence_id,
     recurrence_identity,
     overridden_fields,
+    // Rohstand des Abos für den Reset (D#2330). Kein Feld der Antwort.
+    feed_original,
     ...rest
   } = event;
   // DER ANHANG IST EIN DOKUMENT UND FOLGT DEM DOKUMENTENRECHT (#1358). Seit
