@@ -53,7 +53,7 @@ const OBJ_URL  = `${LIST_URL}todo-1.ics`;
 // ── Fixtures ────────────────────────────────────────────────────────────────────
 
 /** Realistisches Serverobjekt: VTODO mit Alarm und Apple-Eigenheiten. */
-function serverTodo({ uid = 'todo-1@test', completed = false, extra = [] } = {}) {
+function serverTodo({ uid = 'todo-1@test', completed = false, extra = [], alarm = 'TRIGGER:-PT15M', after = [] } = {}) {
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -68,11 +68,9 @@ function serverTodo({ uid = 'todo-1@test', completed = false, extra = [] } = {})
       ? ['STATUS:COMPLETED', 'COMPLETED:20260701T090000Z', 'PERCENT-COMPLETE:100']
       : ['STATUS:NEEDS-ACTION']),
     ...extra,
-    'BEGIN:VALARM',
-    'ACTION:DISPLAY',
-    'TRIGGER:-PT15M',
-    'END:VALARM',
+    ...(alarm ? ['BEGIN:VALARM', 'ACTION:DISPLAY', alarm, 'END:VALARM'] : []),
     'END:VTODO',
+    ...after,
     'END:VCALENDAR',
   ].join('\r\n');
 }
@@ -1521,7 +1519,7 @@ test('Eine Serie ohne Uhrzeit ankert auf DUE, ohne DTSTART und ohne Zone (#2374)
   assert.ok(!created.includes('BEGIN:VTIMEZONE'));
 
   // Ein schon hinausgegangenes Objekt verliert das ungueltige DTSTART beim Push.
-  const legacy = serverTodo({ uid, extra: ['DUE;VALUE=DATE:20261102', 'DTSTART;VALUE=DATE:20261102', 'RRULE:FREQ=WEEKLY;BYDAY=MO'] });
+  const legacy = serverTodo({ uid, alarm: null, extra: ['DUE;VALUE=DATE:20261102', 'DTSTART;VALUE=DATE:20261102', 'RRULE:FREQ=WEEKLY;BYDAY=MO'] });
   db.prepare('UPDATE tasks SET outbound_dirty = 1 WHERE id = ?').run(task.id);
   const client = fakeClient();
   await processPendingUpdates(client, accountId, 'tasks', indexOf(uid, legacy));
@@ -1601,7 +1599,7 @@ test('An einem fremden Objekt tritt der zonierte Anker an die Stelle des alten (
   const accountId = reset();
   const task = insertTask({ accountId, title: 'Blumen giessen', due_date: '2026-11-02', due_time: '07:00' });
   db.prepare("UPDATE tasks SET is_recurring = 1, recurrence_rule = 'FREQ=WEEKLY', outbound_dirty = 1 WHERE id = ?").run(task.id);
-  const foreign = serverTodo({ extra: ['DTSTART:20261101T060000Z', 'DUE:20261102T060000Z'] });
+  const foreign = serverTodo({ alarm: 'TRIGGER;RELATED=END:-PT15M', extra: ['DTSTART:20261101T060000Z', 'DUE:20261102T060000Z'] });
   const client = fakeClient();
   await processPendingUpdates(client, accountId, 'tasks', indexOf('todo-1@test', foreign));
   const data = client.calls.updated[0].data;
@@ -1609,4 +1607,102 @@ test('An einem fremden Objekt tritt der zonierte Anker an die Stelle des alten (
   assert.deepStrictEqual(todoLines(data, 'DUE'), ['DUE;TZID=Europe/Berlin:20261102T070000']);
   assert.match(data, /X-APPLE-SORT-ORDER:12/, 'alles Fremde bleibt stehen');
   assert.match(data, /BEGIN:VALARM/);
+});
+
+// Review auf #2420: am Anker haengen Daten anderer Clients. Ein START-relativer
+// Alarm rechnet von DTSTART, EXDATE und RECURRENCE-ID nennen Vorkommen ueber den
+// Zeitwert. Rueckte eine unbeteiligte Bearbeitung DTSTART auf Mitternacht, fiele
+// der Alarm auf den Vorabend und ein gestrichenes Vorkommen kaeme zurueck. Solche
+// Objekte behalten ihren Anker, solange die Faelligkeit gleich bleibt.
+
+const OLD_ANCHOR = ['DTSTART:20261102T060000Z', 'DUE:20261102T060000Z', 'RRULE:FREQ=DAILY'];
+
+/** Patcht `server` nach einer unbeteiligten Bearbeitung; liefert das PUT-Objekt. */
+async function pushAfterEdit(accountId, task, uid, server, change = "title = 'Neu'") {
+  db.prepare(`UPDATE tasks SET ${change}, outbound_dirty = 1 WHERE id = ?`).run(task.id);
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf(uid, server));
+  return client.calls.updated[0].data;
+}
+
+test('Ein START-relativer Alarm haelt den Anker fest (Review auf #2420)', async () => {
+  for (const alarm of ['TRIGGER:-PT15M', 'TRIGGER;RELATED=START:-PT15M']) {
+    const accountId = reset();
+    const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+    const data = await pushAfterEdit(accountId, task, uid, serverTodo({ uid, alarm, extra: OLD_ANCHOR }));
+    assert.ok(data.includes('SUMMARY:Neu'), 'die Bearbeitung geht trotzdem hinaus');
+    assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART:20261102T060000Z'], alarm);
+    assert.deepStrictEqual(todoLines(data, 'DUE'), ['DUE:20261102T060000Z'], alarm);
+  }
+});
+
+test('EXDATE und Ueberschreibungen eines anderen Clients halten den Anker fest (Review auf #2420)', async () => {
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+
+  let data = await pushAfterEdit(accountId, task, uid,
+    serverTodo({ uid, alarm: null, extra: [...OLD_ANCHOR, 'EXDATE:20261103T060000Z'] }));
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART:20261102T060000Z']);
+
+  const override = ['BEGIN:VTODO', `UID:${uid}`, 'DTSTAMP:20261001T000000Z', 'RECURRENCE-ID:20261104T060000Z',
+    'DTSTART:20261104T090000Z', 'DUE:20261104T090000Z', 'SUMMARY:Einmal spaeter', 'END:VTODO'];
+  data = await pushAfterEdit(accountId, task, uid, serverTodo({ uid, alarm: null, extra: OLD_ANCHOR, after: override }));
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART:20261102T060000Z']);
+  assert.ok(data.includes('RECURRENCE-ID:20261104T060000Z'));
+});
+
+test('Ein START-Alarm verliert sein DTSTART nicht, an Datum und 00:00 (RFC 5545 §3.8.6.3)', async () => {
+  // Der Alarm verlangt DTSTART. Ohne Bindung fiele es hier weg (`seriesAnchor`).
+  const accountId = reset();
+  const dated = insertOwnRecurringTask(accountId, 'FREQ=WEEKLY', { due_date: '2026-11-02' });
+  let data = await pushAfterEdit(accountId, dated.task, dated.uid, serverTodo({
+    uid: dated.uid, extra: ['DTSTART;VALUE=DATE:20261102', 'DUE;VALUE=DATE:20261102', 'RRULE:FREQ=WEEKLY'],
+  }));
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART;VALUE=DATE:20261102']);
+
+  const midnight = insertOwnRecurringTask(reset(), 'FREQ=WEEKLY', { due_date: '2026-11-02', due_time: '00:00' });
+  const accountOfMidnight = reloadTask(midnight.task.id).external_account_id;
+  data = await pushAfterEdit(accountOfMidnight, midnight.task, midnight.uid, serverTodo({
+    uid: midnight.uid, extra: ['DTSTART:20261101T230000Z', 'DUE:20261101T230000Z', 'RRULE:FREQ=WEEKLY'],
+  }));
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART:20261101T230000Z']);
+});
+
+test('Was nicht am Beginn haengt, haelt den Anker nicht fest (Review auf #2420)', async () => {
+  // RELATED=END rechnet von DUE, eine feste Zeit von gar nichts.
+  for (const alarm of ['TRIGGER;RELATED=END:-PT15M', 'TRIGGER;VALUE=DATE-TIME:20261102T050000Z', null]) {
+    const accountId = reset();
+    const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+    const data = await pushAfterEdit(accountId, task, uid, serverTodo({ uid, alarm, extra: OLD_ANCHOR }));
+    assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART;TZID=Europe/Berlin:20261102T000000'], String(alarm));
+  }
+});
+
+test('Ein gehaltener Anker bleibt in seiner Form, auch ein schon zonierter (Review auf #2420)', async () => {
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+  const server = serverTodo({
+    uid,
+    extra: ['DTSTART;TZID=Europe/Berlin:20261102T000000', 'DUE;TZID=Europe/Berlin:20261102T070000', 'RRULE:FREQ=DAILY'],
+  });
+  const data = await pushAfterEdit(accountId, task, uid, server);
+  assert.deepStrictEqual(todoLines(data, 'DUE'), ['DUE;TZID=Europe/Berlin:20261102T070000'], 'DUE kippt nicht zurueck nach UTC');
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART;TZID=Europe/Berlin:20261102T000000']);
+
+  // Die Regel selbst darf sich trotzdem aendern.
+  const ruled = await pushAfterEdit(accountId, task, uid, server, "recurrence_rule = 'FREQ=WEEKLY'");
+  assert.deepStrictEqual(todoLines(ruled, 'RRULE'), ['RRULE:FREQ=WEEKLY']);
+  assert.deepStrictEqual(todoLines(ruled, 'DUE'), ['DUE;TZID=Europe/Berlin:20261102T070000']);
+});
+
+test('Eine verschobene Faelligkeit nimmt den Anker auch an solchen Objekten mit (Review auf #2420)', async () => {
+  // Bewusste Grenze: ohne das stuende DUE vor DTSTART, und das weisen strenge
+  // Server ab. Alarm und Ausnahmen werden nicht umgerechnet.
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+  const data = await pushAfterEdit(accountId, task, uid,
+    serverTodo({ uid, extra: [...OLD_ANCHOR, 'EXDATE:20261103T060000Z'] }), "due_date = '2026-10-26'");
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART;TZID=Europe/Berlin:20261026T000000']);
+  assert.deepStrictEqual(todoLines(data, 'DUE'), ['DUE;TZID=Europe/Berlin:20261026T070000']);
+  assert.ok(data.includes('TRIGGER:-PT15M') && data.includes('EXDATE:20261103T060000Z'), 'Fremdes bleibt Wort fuer Wort');
 });
