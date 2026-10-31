@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   footer says "MIT-Lizenz" on the German pages.
 
 ### Fixed
+- **A new app name reaches installed apps.** After renaming the app in Settings, a browser that
+  had loaded the app before kept the old name for the installed app, even after uninstalling and
+  installing it again: the service worker answered `/manifest.webmanifest` from its cache and only
+  asked the server after the next release. It now asks the server first, like it already did for
+  `manifest.json`, and uses the cached copy only when the network is slow or offline.
 - **The container starts with `no-new-privileges`.** Hardened setups (Podman Quadlet
   `NoNewPrivileges=true`, `--security-opt no-new-privileges`, Compose `security_opt`) never got
   past the entrypoint: `gosu` hung as root at 100 % CPU before it switched to the `node` user, so
