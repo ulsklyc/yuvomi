@@ -450,7 +450,11 @@
         "todayTimelineNext": "härnäst",
         "todayAlsoTitle": "Även i dag",
         "todayNothingPlanned": "Inget planerat än",
-        "todayNothingPlannedSub": "Dagens möten, uppgifter och måltider visas här."
+        "todayNothingPlannedSub": "Dagens möten, uppgifter och måltider visas här.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Sortera automatiskt",

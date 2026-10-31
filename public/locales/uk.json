@@ -542,7 +542,11 @@
         "todayTimelineNext": "далі",
         "todayAlsoTitle": "Також сьогодні",
         "todayNothingPlanned": "Поки нічого не заплановано",
-        "todayNothingPlannedSub": "Тут з'являться сьогоднішні зустрічі, завдання та страви."
+        "todayNothingPlannedSub": "Тут з'являться сьогоднішні зустрічі, завдання та страви.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Сортувати автоматично",

@@ -450,7 +450,11 @@
         "todayTimelineNext": "अगला",
         "todayAlsoTitle": "आज और भी",
         "todayNothingPlanned": "अभी कुछ भी तय नहीं",
-        "todayNothingPlannedSub": "आज के अपॉइंटमेंट, कार्य और भोजन यहाँ दिखाई देंगे।"
+        "todayNothingPlannedSub": "आज के अपॉइंटमेंट, कार्य और भोजन यहाँ दिखाई देंगे।",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "अपने-आप क्रमबद्ध करें",

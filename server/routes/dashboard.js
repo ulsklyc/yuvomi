@@ -25,6 +25,7 @@ import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
 import { FastingError, getFastingDashboardState } from '../services/fasting.js';
 import { openBalancesForUser } from '../services/split-expenses.js';
+import { getAllStatuses } from './availability.js';
 import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition.js';
 import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
 import { finishedVisitsInMonth, latestVisit } from '../services/housekeeping-month.js';
@@ -1446,6 +1447,14 @@ router.get('/', (req, res) => {
   } catch (err) {
     log.error('tasksDoneToday error:', err.message);
     result.tasksDoneToday = 0;
+  }
+
+  // Verfuegbarkeitsstati aller Haushaltsmitglieder (#1591).
+  try {
+    result.familyStatuses = getAllStatuses();
+  } catch (err) {
+    log.error('familyStatuses error:', err.message);
+    result.familyStatuses = [];
   }
 
   // DIE HAUSHALTSFASSUNG (#1817): von der leeren Fassung aus, nur was die Wand

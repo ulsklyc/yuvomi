@@ -450,7 +450,11 @@
         "todayTimelineNext": "sıradaki",
         "todayAlsoTitle": "Bugün ayrıca",
         "todayNothingPlanned": "Henüz bir şey planlanmadı",
-        "todayNothingPlannedSub": "Bugünün randevuları, görevleri ve öğünleri burada görünecek."
+        "todayNothingPlannedSub": "Bugünün randevuları, görevleri ve öğünleri burada görünecek.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Otomatik sırala",

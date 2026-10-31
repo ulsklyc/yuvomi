@@ -450,7 +450,11 @@
         "todayTimelineNext": "下一個",
         "todayAlsoTitle": "今天還有",
         "todayNothingPlanned": "尚無任何安排",
-        "todayNothingPlannedSub": "今天的約會、任務和餐點會顯示在這裡。"
+        "todayNothingPlannedSub": "今天的約會、任務和餐點會顯示在這裡。",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "自動排序",

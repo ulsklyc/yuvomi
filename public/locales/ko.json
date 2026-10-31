@@ -468,7 +468,11 @@
         "todayTimelineNext": "다음 일정",
         "todayAlsoTitle": "오늘의 다른 일",
         "todayNothingPlanned": "아직 계획된 일정이 없습니다",
-        "todayNothingPlannedSub": "오늘의 일정, 할 일, 식사가 여기에 표시됩니다."
+        "todayNothingPlannedSub": "오늘의 일정, 할 일, 식사가 여기에 표시됩니다.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "자동으로 정렬",

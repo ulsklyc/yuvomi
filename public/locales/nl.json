@@ -450,7 +450,11 @@
         "todayTimelineNext": "hierna",
         "todayAlsoTitle": "Verder vandaag",
         "todayNothingPlanned": "Nog niets gepland",
-        "todayNothingPlannedSub": "Afspraken, taken en maaltijden van vandaag verschijnen hier."
+        "todayNothingPlannedSub": "Afspraken, taken en maaltijden van vandaag verschijnen hier.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Automatisch sorteren",

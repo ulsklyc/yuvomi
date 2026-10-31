@@ -2763,6 +2763,12 @@ function renderFamilyWidget(users, data, { manageHref = null, size = '1x2' } = {
     (Array.isArray(data?.memberTodayTasks) ? data.memberTodayTasks : [])
       .map((r) => [r.user_id, Number(r.open_count) || 0])
   );
+  // Verfuegbarkeitsstatus je Mitglied (#1591): nur nicht abgelaufene Eintraege
+  // kommen vom Server; der Client prueft kein Verfallsdatum mehr.
+  const availByUser = new Map(
+    (Array.isArray(data?.familyStatuses) ? data.familyStatuses : [])
+      .map((r) => [r.user_id, r])
+  );
   // Eigene Termine je Mitglied (#1449): die Liste der Kachel ist bei fuenf
   // Kommenden gedeckelt und traegt deren „nur meine". Ein aelterer Server ohne
   // `familyEvents` faellt auf sie zurueck.
@@ -2809,7 +2815,13 @@ function renderFamilyWidget(users, data, { manageHref = null, size = '1x2' } = {
 
   const rows = shown.map((u) => {
     const mine = agenda.byPerson.get(Number(u.id)) ?? { nextToday: null, hadToday: false, sharedToday: false, nextLater: null };
+    const avail = availByUser.get(u.id) ?? null;
     const parts = [];
+    // Verfuegbarkeitsstatus voran, damit er das erste ist, was man liest (#1591).
+    if (avail) {
+      const stateLabel = t(`dashboard.availState_${avail.state}`);
+      parts.push(esc(avail.note ? avail.note : stateLabel));
+    }
     if (mine.nextToday) parts.push(familyEventLabel(mine.nextToday, todayKey));
     const myShift = scheduleEntriesToday.find((entry) => Number(entry.user_id) === Number(u.id) && entry.shift_type);
     if (myShift) {
@@ -2852,7 +2864,7 @@ function renderFamilyWidget(users, data, { manageHref = null, size = '1x2' } = {
     return `
       <div class="list-row family-member">
         <span class="list-row__lead family-member__face">
-          <span class="family-widget-avatar" style="background:${esc(u.avatar_color || AVATAR_FALLBACK_COLOR)};color:${getReadableTextColor(u.avatar_color || AVATAR_FALLBACK_COLOR)}">
+          <span class="family-widget-avatar" style="background:${esc(u.avatar_color || AVATAR_FALLBACK_COLOR)};color:${getReadableTextColor(u.avatar_color || AVATAR_FALLBACK_COLOR)}"${avail ? ` data-avail="${esc(avail.state)}"` : ''}>
             ${u.avatar_data ? `<img src="${esc(u.avatar_data)}" alt="" loading="lazy">` : esc(initials(u.display_name))}
           </span>
           ${/* DIE MARKE NENNT IHRE EINHEIT (Critique R21, clarify): eine nackte

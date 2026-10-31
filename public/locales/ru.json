@@ -542,7 +542,11 @@
         "todayTimelineNext": "далее",
         "todayAlsoTitle": "Также сегодня",
         "todayNothingPlanned": "Пока ничего не запланировано",
-        "todayNothingPlannedSub": "Здесь появятся встречи, задачи и блюда на сегодня."
+        "todayNothingPlannedSub": "Здесь появятся встречи, задачи и блюда на сегодня.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Сортировать автоматически",

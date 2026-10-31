@@ -560,7 +560,11 @@
         "todayTimelineNext": "następne",
         "todayAlsoTitle": "Dziś także",
         "todayNothingPlanned": "Jeszcze nic nie zaplanowano",
-        "todayNothingPlannedSub": "Dzisiejsze terminy, zadania i posiłki pojawią się tutaj."
+        "todayNothingPlannedSub": "Dzisiejsze terminy, zadania i posiłki pojawią się tutaj.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Sortuj automatycznie",

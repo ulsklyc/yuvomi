@@ -450,7 +450,11 @@
         "todayTimelineNext": "επόμενο",
         "todayAlsoTitle": "Επίσης σήμερα",
         "todayNothingPlanned": "Τίποτα προγραμματισμένο ακόμα",
-        "todayNothingPlannedSub": "Τα σημερινά ραντεβού, οι εργασίες και τα γεύματα θα εμφανίζονται εδώ."
+        "todayNothingPlannedSub": "Τα σημερινά ραντεβού, οι εργασίες και τα γεύματα θα εμφανίζονται εδώ.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Αυτόματη ταξινόμηση",

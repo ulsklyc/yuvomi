@@ -498,7 +498,11 @@
         "todayTimelineNext": "jako další",
         "todayAlsoTitle": "Dnes také",
         "todayNothingPlanned": "Zatím nic naplánováno",
-        "todayNothingPlannedSub": "Dnešní události, úkoly a jídla se objeví tady."
+        "todayNothingPlannedSub": "Dnešní události, úkoly a jídla se objeví tady.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Řadit automaticky",

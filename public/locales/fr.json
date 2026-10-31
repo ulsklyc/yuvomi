@@ -450,7 +450,11 @@
         "todayTimelineNext": "à suivre",
         "todayAlsoTitle": "Aussi aujourd’hui",
         "todayNothingPlanned": "Rien de prévu pour l'instant",
-        "todayNothingPlannedSub": "Les rendez-vous, tâches et repas du jour apparaîtront ici."
+        "todayNothingPlannedSub": "Les rendez-vous, tâches et repas du jour apparaîtront ici.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Trier automatiquement",

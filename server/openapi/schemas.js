@@ -2048,4 +2048,24 @@ export const schemas = {
         WasteMappingProfileImportCommitResponse: {
           type: 'object', required: ['data'], properties: { data: { $ref: '#/components/schemas/WasteMappingProfileImportCommitResult' } },
         },
+        AvailabilityStatus: {
+          type: 'object',
+          required: ['user_id', 'state', 'expires_at', 'set_at'],
+          properties: {
+            user_id: { type: 'integer' },
+            state: { type: 'string', enum: ['available', 'busy', 'do_not_disturb', 'away'] },
+            note: { type: 'string', nullable: true, maxLength: 200 },
+            expires_at: { type: 'string', format: 'date-time', description: 'ISO-8601 UTC timestamp' },
+            set_at: { type: 'string', format: 'date-time', description: 'ISO-8601 UTC timestamp' },
+          },
+        },
+        AvailabilityInput: {
+          type: 'object',
+          required: ['state', 'expires_at'],
+          properties: {
+            state: { type: 'string', enum: ['available', 'busy', 'do_not_disturb', 'away'] },
+            note: { type: 'string', nullable: true, maxLength: 200 },
+            expires_at: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$', description: 'ISO-8601 UTC timestamp (YYYY-MM-DDTHH:MM:SSZ), must be in the future' },
+          },
+        },
 };

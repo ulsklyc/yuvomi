@@ -450,7 +450,11 @@
         "todayTimelineNext": "il prossimo",
         "todayAlsoTitle": "Oggi anche",
         "todayNothingPlanned": "Ancora niente in programma",
-        "todayNothingPlannedSub": "Gli appuntamenti, le attività e i pasti di oggi compariranno qui."
+        "todayNothingPlannedSub": "Gli appuntamenti, le attività e i pasti di oggi compariranno qui.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Ordina automaticamente",

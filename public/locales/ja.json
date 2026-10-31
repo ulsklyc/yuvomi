@@ -450,7 +450,11 @@
         "todayTimelineNext": "次の予定",
         "todayAlsoTitle": "今日のほかの予定",
         "todayNothingPlanned": "まだ予定はありません",
-        "todayNothingPlannedSub": "今日の予定、タスク、食事がここに表示されます。"
+        "todayNothingPlannedSub": "今日の予定、タスク、食事がここに表示されます。",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "自動で並べ替え",

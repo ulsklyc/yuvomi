@@ -450,7 +450,11 @@
         "todayTimelineNext": "下一个",
         "todayAlsoTitle": "今天还有",
         "todayNothingPlanned": "尚无任何安排",
-        "todayNothingPlannedSub": "今天的约会、任务和餐食会显示在这里。"
+        "todayNothingPlannedSub": "今天的约会、任务和餐食会显示在这里。",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "自动排序",

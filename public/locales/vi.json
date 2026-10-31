@@ -450,7 +450,11 @@
         "todayTimelineNext": "tiếp theo",
         "todayAlsoTitle": "Hôm nay còn có",
         "todayNothingPlanned": "Chưa có kế hoạch nào",
-        "todayNothingPlannedSub": "Lịch hẹn, công việc và bữa ăn hôm nay sẽ hiển thị ở đây."
+        "todayNothingPlannedSub": "Lịch hẹn, công việc và bữa ăn hôm nay sẽ hiển thị ở đây.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Sắp xếp tự động",

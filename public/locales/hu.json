@@ -450,7 +450,11 @@
         "todayTimelineNext": "következik",
         "todayAlsoTitle": "Ma még",
         "todayNothingPlanned": "Még nincs semmi tervezve",
-        "todayNothingPlannedSub": "A mai időpontok, feladatok és étkezések itt jelennek meg."
+        "todayNothingPlannedSub": "A mai időpontok, feladatok és étkezések itt jelennek meg.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Automatikus rendezés",

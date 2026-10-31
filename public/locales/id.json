@@ -468,7 +468,11 @@
         "todayTimelineNext": "berikutnya",
         "todayAlsoTitle": "Juga hari ini",
         "todayNothingPlanned": "Belum ada rencana",
-        "todayNothingPlannedSub": "Janji, tugas, dan makanan hari ini akan muncul di sini."
+        "todayNothingPlannedSub": "Janji, tugas, dan makanan hari ini akan muncul di sini.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Urutkan otomatis",

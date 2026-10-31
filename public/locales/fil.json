@@ -468,7 +468,11 @@
         "todayTimelineNext": "susunod",
         "todayAlsoTitle": "Ngayong araw din",
         "todayNothingPlanned": "Wala pang nakaplano",
-        "todayNothingPlannedSub": "Lalabas dito ang mga appointment, gawain at pagkain ngayong araw."
+        "todayNothingPlannedSub": "Lalabas dito ang mga appointment, gawain at pagkain ngayong araw.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Awtomatikong ayusin",

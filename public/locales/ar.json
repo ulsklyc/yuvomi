@@ -588,7 +588,11 @@
         "todayTimelineNext": "التالي",
         "todayAlsoTitle": "أيضًا اليوم",
         "todayNothingPlanned": "لم يُخطَّط لشيء بعد",
-        "todayNothingPlannedSub": "ستظهر هنا مواعيد اليوم ومهامه ووجباته."
+        "todayNothingPlannedSub": "ستظهر هنا مواعيد اليوم ومهامه ووجباته.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "الترتيب التلقائي",

@@ -450,7 +450,11 @@
         "todayTimelineNext": "neste",
         "todayAlsoTitle": "Også i dag",
         "todayNothingPlanned": "Ingenting planlagt ennå",
-        "todayNothingPlannedSub": "Dagens avtaler, oppgaver og måltider vises her."
+        "todayNothingPlannedSub": "Dagens avtaler, oppgaver og måltider vises her.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "Sorter automatisk",

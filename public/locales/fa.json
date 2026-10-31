@@ -468,7 +468,11 @@
         "todayTimelineNext": "بعدی",
         "todayAlsoTitle": "همچنین امروز",
         "todayNothingPlanned": "هنوز چیزی برنامه‌ریزی نشده",
-        "todayNothingPlannedSub": "قرارها، کارها و وعده‌های غذایی امروز اینجا نمایش داده می‌شوند."
+        "todayNothingPlannedSub": "قرارها، کارها و وعده‌های غذایی امروز اینجا نمایش داده می‌شوند.",
+        "availState_available": "Available",
+        "availState_busy": "Busy",
+        "availState_do_not_disturb": "Do not disturb",
+        "availState_away": "Away"
     },
     "tasks": {
         "resetOrder": "مرتب‌سازی خودکار",
