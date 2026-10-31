@@ -3464,6 +3464,7 @@
         "hidePassword": "पासवर्ड छिपाएं",
         "version": "v{{version}}",
         "loginWithSso": "SSO से साइन इन करें",
+        "loginWithHomeAssistant": "Home Assistant से साइन इन करें",
         "orDivider": "या",
         "ssoError": "SSO साइन-इन विफल रहा। कृपया पुनः प्रयास करें।",
         "ssoNoAccount": "इस SSO साइन-इन के लिए यहाँ अभी कोई खाता नहीं है। कृपया अपने घर के प्रशासक से संपर्क करें।",

@@ -3482,6 +3482,7 @@
         "hidePassword": "비밀번호 숨기기",
         "version": "v{{version}}",
         "loginWithSso": "SSO로 로그인",
+        "loginWithHomeAssistant": "Home Assistant로 로그인",
         "orDivider": "또는",
         "ssoError": "SSO 로그인에 실패했습니다. 다시 시도해 주세요.",
         "ssoNoAccount": "이 SSO 로그인에 해당하는 계정이 아직 없습니다. 가정의 관리자에게 문의해 주세요.",

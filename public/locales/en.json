@@ -3464,6 +3464,7 @@
         "hidePassword": "Hide password",
         "version": "v{{version}}",
         "loginWithSso": "Sign in with SSO",
+        "loginWithHomeAssistant": "Sign in with Home Assistant",
         "orDivider": "or",
         "ssoError": "SSO sign-in failed. Please try again.",
         "ssoNoAccount": "There is no account here yet for this SSO sign-in. Please contact your household's administrator.",

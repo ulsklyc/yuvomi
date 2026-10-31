@@ -3804,6 +3804,7 @@
         "hidePassword": "إخفاء كلمة المرور",
         "version": "v{{version}}",
         "loginWithSso": "تسجيل الدخول بـ SSO",
+        "loginWithHomeAssistant": "تسجيل الدخول باستخدام Home Assistant",
         "orDivider": "أو",
         "ssoError": "فشل تسجيل الدخول بـ SSO. يرجى المحاولة مرة أخرى.",
         "ssoNoAccount": "لا يوجد حساب هنا بعد لتسجيل الدخول بـ SSO هذا. يرجى التواصل مع مسؤول منزلك.",

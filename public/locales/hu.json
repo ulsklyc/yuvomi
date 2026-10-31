@@ -3464,6 +3464,7 @@
         "hidePassword": "Jelszó elrejtése",
         "version": "v{{version}}",
         "loginWithSso": "Bejelentkezés SSO-val",
+        "loginWithHomeAssistant": "Bejelentkezés a Home Assistanttal",
         "orDivider": "vagy",
         "ssoError": "SSO bejelentkezés sikertelen. Kérjük, próbálja újra.",
         "ssoNoAccount": "Ehhez az SSO bejelentkezéshez itt még nincs fiók. Kérjük, forduljon a háztartás rendszergazdájához.",

@@ -3464,6 +3464,7 @@
         "hidePassword": "Απόκρυψη κωδικού",
         "version": "v{{version}}",
         "loginWithSso": "Σύνδεση με SSO",
+        "loginWithHomeAssistant": "Σύνδεση με Home Assistant",
         "orDivider": "ή",
         "ssoError": "Η σύνδεση SSO απέτυχε. Παρακαλώ δοκιμάστε ξανά.",
         "ssoNoAccount": "Δεν υπάρχει ακόμη λογαριασμός εδώ για αυτή τη σύνδεση SSO. Απευθυνθείτε στον διαχειριστή του νοικοκυριού σας.",

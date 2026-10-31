@@ -6,6 +6,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import * as client from 'openid-client';
+import { getHomeAssistantConfig, isHomeAssistantAuthConfigured } from './homeassistant-auth.js';
 
 let _config = null;
 
@@ -43,12 +44,33 @@ function providerFetch(url, options) {
  * @returns {boolean}
  */
 export function isOidcEnabled() {
+  return isGenericOidcConfigured() || isHomeAssistantAuthConfigured();
+}
+
+/** Sind die vier Variablen eines OpenID-Connect-Anbieters gesetzt? */
+function isGenericOidcConfigured() {
   return !!(
     process.env.OIDC_ISSUER &&
     process.env.OIDC_CLIENT_ID &&
     process.env.OIDC_CLIENT_SECRET &&
     process.env.OIDC_REDIRECT_URI
   );
+}
+
+/**
+ * Welche Quelle den SSO-Ablauf bedient: ein OpenID-Connect-Anbieter (`oidc`),
+ * Home Assistant (`homeassistant`) oder keine (`null`).
+ *
+ * Es gibt genau EINE Quelle, weil ein Konto genau eine SSO-Bindung
+ * (`users.oidc_sub`) hat. Ist beides konfiguriert, gewinnt der OIDC-Anbieter:
+ * er war zuerst da, und eine zusaetzlich gesetzte Variable soll bestehende
+ * Bindungen nicht still auf eine andere Quelle umlenken.
+ * @returns {'oidc'|'homeassistant'|null}
+ */
+export function ssoProvider() {
+  if (isGenericOidcConfigured()) return 'oidc';
+  if (isHomeAssistantAuthConfigured()) return 'homeassistant';
+  return null;
 }
 
 /**
@@ -172,7 +194,11 @@ export function passwordLoginWarning({ hasLinkedSsoAccount = true } = {}) {
  * @returns {Promise<import('openid-client').Configuration|null>}
  */
 export async function getConfig() {
-  if (!isOidcEnabled()) return null;
+  const provider = ssoProvider();
+  if (!provider) return null;
+  // Home Assistant hat keine Discovery; die Konfiguration ist billig und wird
+  // nicht gecacht, damit geaenderte Variablen ohne Neustart greifen (Tests).
+  if (provider === 'homeassistant') return getHomeAssistantConfig();
   if (_config) return _config;
 
   // Vor der Discovery: ein Tippfehler im Schalter soll beim ersten SSO-Klick

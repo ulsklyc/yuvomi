@@ -3464,6 +3464,7 @@
         "hidePassword": "Şifreyi gizle",
         "version": "v{{version}}",
         "loginWithSso": "SSO ile giriş yap",
+        "loginWithHomeAssistant": "Home Assistant ile giriş yap",
         "orDivider": "veya",
         "ssoError": "SSO girişi başarısız oldu. Lütfen tekrar deneyin.",
         "ssoNoAccount": "Bu SSO girişi için burada henüz bir hesap yok. Lütfen hane yöneticinizle iletişime geçin.",

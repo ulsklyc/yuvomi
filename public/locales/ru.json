@@ -3690,6 +3690,7 @@
         "hidePassword": "Скрыть пароль",
         "version": "v{{version}}",
         "loginWithSso": "Войти через SSO",
+        "loginWithHomeAssistant": "Войти через Home Assistant",
         "orDivider": "или",
         "ssoError": "Вход через SSO не удался. Повторите попытку.",
         "ssoNoAccount": "Для этого входа через SSO здесь ещё нет учётной записи. Обратитесь к администратору вашего домохозяйства.",

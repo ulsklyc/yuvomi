@@ -3482,6 +3482,7 @@
         "hidePassword": "Passwort verbergen",
         "version": "v{{version}}",
         "loginWithSso": "Mit SSO anmelden",
+        "loginWithHomeAssistant": "Mit Home Assistant anmelden",
         "orDivider": "oder",
         "ssoError": "SSO-Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
         "ssoNoAccount": "Für diese SSO-Anmeldung gibt es hier noch kein Konto. Wende dich an die Administration deines Haushalts.",
