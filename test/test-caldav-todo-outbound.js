@@ -1695,6 +1695,26 @@ test('Ein gehaltener Anker bleibt in seiner Form, auch ein schon zonierter (Revi
   assert.deepStrictEqual(todoLines(ruled, 'DUE'), ['DUE;TZID=Europe/Berlin:20261102T070000']);
 });
 
+test('Gleiche Faelligkeit heisst derselbe Zeitpunkt, in jeder Schreibweise der DUE-Zeile (Review auf #2420)', async () => {
+  // 07:00 Berlin: als Instant, in fremder Zone und floating. Eine andere Uhrzeit
+  // am selben Tag ist dagegen eine verschobene Faelligkeit.
+  const held = [
+    ['DUE;TZID=America/New_York:20261102T010000', 'DTSTART;TZID=America/New_York:20261102T010000'],
+    ['DUE:20261102T070000', 'DTSTART:20261102T070000'],
+  ];
+  for (const [due, start] of held) {
+    const accountId = reset();
+    const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+    const data = await pushAfterEdit(accountId, task, uid, serverTodo({ uid, extra: [start, due, 'RRULE:FREQ=DAILY'] }));
+    assert.deepStrictEqual(todoLines(data, 'DUE'), [due]);
+    assert.deepStrictEqual(todoLines(data, 'DTSTART'), [start]);
+  }
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '08:00' });
+  const data = await pushAfterEdit(accountId, task, uid, serverTodo({ uid, extra: OLD_ANCHOR }));
+  assert.deepStrictEqual(todoLines(data, 'DUE'), ['DUE;TZID=Europe/Berlin:20261102T080000']);
+});
+
 test('Eine verschobene Faelligkeit nimmt den Anker auch an solchen Objekten mit (Review auf #2420)', async () => {
   // Bewusste Grenze: ohne das stuende DUE vor DTSTART, und das weisen strenge
   // Server ab. Alarm und Ausnahmen werden nicht umgerechnet.

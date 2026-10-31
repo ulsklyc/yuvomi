@@ -60,7 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a time now goes out in the household's time zone, so a daily 07:00 task stays at 07:00 after the
   clocks change, and a weekday repeat near midnight stays on its day. Its start now lies before its
   due time, which strict servers require. Yuvomi fixes a task already on the server the next time
-  you change it.
+  you change it. If another app added a reminder or skipped a date there, the task keeps its old
+  timing until you tick it off, so those still line up.
 - **The container starts with `no-new-privileges`.** Hardened setups (Podman Quadlet
   `NoNewPrivileges=true`, `--security-opt no-new-privileges`, Compose `security_opt`) never got
   past the entrypoint: `gosu` hung as root at 100 % CPU before it switched to the `node` user, so
