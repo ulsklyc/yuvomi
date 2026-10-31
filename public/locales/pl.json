@@ -3694,7 +3694,9 @@
         "reminderListAssigneesTasksOnly": "Osoby można ustawić tylko dla list trafiających do Zadań.",
         "syncAssigneeNotMember": "Tutaj można wybrać tylko członków gospodarstwa domowego.",
         "syncAssigneeUnknown": "Ta osoba już nie istnieje. Odśwież stronę.",
-        "permDetails": "Widżety i dodatkowe uprawnienia"
+        "permDetails": "Widżety i dodatkowe uprawnienia",
+        "rewardsPenaltiesLabel": "Zezwól na konsekwencje",
+        "rewardsPenaltiesHint": "Rodzice mogą odejmować punkty za złe zachowanie (nieposprzątany pokój, krzyki, późne chodzenie spać). Powód jest obowiązkowy i pozostaje widoczny dla dziecka i rodziców; rodzeństwo go nie widzi."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",
@@ -6380,7 +6382,8 @@
             "bonus": "Punkty bonusowe",
             "redeem": "Nagroda wymieniona",
             "adjust": "Korekta",
-            "reversal": "Zwrot"
+            "reversal": "Zwrot",
+            "penalty": "Konsekwencja"
         },
         "emptyLedgerTitle": "Brak wpisów",
         "emptyLedgerBody": "Zdobyte i wymienione punkty pojawią się tutaj.",
@@ -6491,7 +6494,27 @@
         "bonusCredit": "Dodaj",
         "bonusDebit": "Odejmij",
         "notEnoughPoints": "Za mało punktów na tę nagrodę.",
-        "bonusPoints": "Punkty"
+        "bonusPoints": "Punkty",
+        "category": {
+            "noten": "Szkoła i oceny",
+            "zimmer": "Pokój i porządek",
+            "geschrei": "Krzyki i ton",
+            "bettzeit": "Pora snu",
+            "ritual": "Rytuał (marudzenie)",
+            "other": "Inne"
+        },
+        "penaltyAction": "Konsekwencja",
+        "penaltyTitle": "Zarejestruj konsekwencję",
+        "penaltyChild": "Dziecko",
+        "penaltyCategoryLabel": "Kategoria",
+        "penaltyReasonLabel": "Co się stało?",
+        "penaltyReasonPlaceholder": "np. pokój został nieposprzątany",
+        "penaltySubmit": "Zarejestruj",
+        "penaltyToast": "Konsekwencja zarejestrowana",
+        "penaltyRetract": "Cofnij konsekwencję",
+        "penaltyRetractedToast": "Konsekwencja cofnięta",
+        "ledgerPenaltyRetracted": "Konsekwencja cofnięta",
+        "penaltyNoChild": "W tym gospodarstwie nie ma jeszcze dziecka. konsekwencja wymaga dziecka."
     },
     "datepicker": {
         "openCalendar": "Otwórz kalendarz",

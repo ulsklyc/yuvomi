@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "Le persone si impostano solo per liste che finiscono nelle Attività.",
         "syncAssigneeNotMember": "Qui si possono scegliere solo membri della famiglia.",
         "syncAssigneeUnknown": "Questa persona non esiste più. Ricarica la pagina.",
-        "permDetails": "Widget e altri permessi"
+        "permDetails": "Widget e altri permessi",
+        "rewardsPenaltiesLabel": "Consenti conseguenze",
+        "rewardsPenaltiesHint": "I genitori possono sottrarre punti per cattiva condotta (camera in disordine, grida, nanna tardi). Il motivo è obbligatorio e resta visibile al bambino e ai genitori; i fratelli non lo vedono."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",
@@ -6086,7 +6088,8 @@
             "bonus": "Punti bonus",
             "redeem": "Premio riscattato",
             "adjust": "Correzione",
-            "reversal": "Storno"
+            "reversal": "Storno",
+            "penalty": "Conseguenza"
         },
         "emptyLedgerTitle": "Nessun movimento",
         "emptyLedgerBody": "I punti guadagnati e riscattati compaiono qui.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Accredita",
         "bonusDebit": "Detrai",
         "notEnoughPoints": "Punti insufficienti per questo premio.",
-        "bonusPoints": "Punti"
+        "bonusPoints": "Punti",
+        "category": {
+            "noten": "Scuola e voti",
+            "zimmer": "Camera e ordine",
+            "geschrei": "Grida e tono",
+            "bettzeit": "Ora della nanna",
+            "ritual": "Rituale (casino)",
+            "other": "Altro"
+        },
+        "penaltyAction": "Conseguenza",
+        "penaltyTitle": "Registra una conseguenza",
+        "penaltyChild": "Bambino",
+        "penaltyCategoryLabel": "Categoria",
+        "penaltyReasonLabel": "Cosa è successo?",
+        "penaltyReasonPlaceholder": "es. camera rimasta in disordine",
+        "penaltySubmit": "Registra",
+        "penaltyToast": "Conseguenza registrata",
+        "penaltyRetract": "Ritira la conseguenza",
+        "penaltyRetractedToast": "Conseguenza ritirata",
+        "ledgerPenaltyRetracted": "Conseguenza ritirata",
+        "penaltyNoChild": "In questa famiglia non c'è ancora un bambino. la conseguenza richiede un bambino."
     },
     "datepicker": {
         "openCalendar": "Apri calendario",

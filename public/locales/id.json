@@ -3468,7 +3468,9 @@
         "reminderListAssigneesTasksOnly": "Orang hanya bisa diatur untuk daftar yang masuk ke Tugas.",
         "syncAssigneeNotMember": "Hanya anggota rumah tangga yang bisa dipilih di sini.",
         "syncAssigneeUnknown": "Orang ini sudah tidak ada. Muat ulang halaman.",
-        "permDetails": "Widget dan izin lainnya"
+        "permDetails": "Widget dan izin lainnya",
+        "rewardsPenaltiesLabel": "Izinkan konsekuensi",
+        "rewardsPenaltiesHint": "Orang tua dapat mengurangi poin karena perilaku buruk (kamar berantakan, berteriak, tidur terlambat). Alasan wajib dan tetap terlihat oleh anak dan orang tua; saudara tidak melihatnya."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",
@@ -6086,7 +6088,8 @@
             "bonus": "Poin bonus",
             "redeem": "Hadiah ditukar",
             "adjust": "Koreksi",
-            "reversal": "Pengembalian"
+            "reversal": "Pengembalian",
+            "penalty": "Konsekuensi"
         },
         "emptyLedgerTitle": "Belum ada catatan",
         "emptyLedgerBody": "Poin yang diperoleh dan ditukar muncul di sini.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Tambahkan",
         "bonusDebit": "Kurangi",
         "notEnoughPoints": "Poin tidak cukup untuk hadiah ini.",
-        "bonusPoints": "Poin"
+        "bonusPoints": "Poin",
+        "category": {
+            "noten": "Sekolah & nilai",
+            "zimmer": "Kamar & kerapian",
+            "geschrei": "Teriak & nada",
+            "bettzeit": "Waktu tidur",
+            "ritual": "Ritual (ramai-ramai)",
+            "other": "Lainnya"
+        },
+        "penaltyAction": "Konsekuensi",
+        "penaltyTitle": "Catat konsekuensi",
+        "penaltyChild": "Anak",
+        "penaltyCategoryLabel": "Kategori",
+        "penaltyReasonLabel": "Apa yang terjadi?",
+        "penaltyReasonPlaceholder": "mis. kamar tetap berantakan",
+        "penaltySubmit": "Catat",
+        "penaltyToast": "Konsekuensi dicatat",
+        "penaltyRetract": "Tarik konsekuensi",
+        "penaltyRetractedToast": "Konsekuensi ditarik",
+        "ledgerPenaltyRetracted": "Konsekuensi ditarik",
+        "penaltyNoChild": "Belum ada anak di rumah ini. konsekuensi membutuhkan anak sebagai target."
     },
     "datepicker": {
         "openCalendar": "Buka kalender",

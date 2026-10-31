@@ -3468,7 +3468,9 @@
         "reminderListAssigneesTasksOnly": "Maitatakda lang ang mga tao para sa mga listahang napupunta sa Mga Gawain.",
         "syncAssigneeNotMember": "Mga miyembro lang ng sambahayan ang mapipili rito.",
         "syncAssigneeUnknown": "Wala na ang taong ito. I-reload ang pahina.",
-        "permDetails": "Mga widget at iba pang pahintulot"
+        "permDetails": "Mga widget at iba pang pahintulot",
+        "rewardsPenaltiesLabel": "Payagan ang mga parusa",
+        "rewardsPenaltiesHint": "Ang mga magulang ay pwedeng magbawas ng puntos masamang pag-uugali (magulong kwarto, sigawan, late matulog). Kinakailangan ang dahilan at nakikita ng bata at magulang; hindi ito nakikita ng kapatid."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",
@@ -6086,7 +6088,8 @@
             "bonus": "Bonus na puntos",
             "redeem": "Na-redeem na gantimpala",
             "adjust": "Pagwawasto",
-            "reversal": "Refund"
+            "reversal": "Refund",
+            "penalty": "Parusa"
         },
         "emptyLedgerTitle": "Wala pang entry",
         "emptyLedgerBody": "Lalabas dito ang mga kinita at na-redeem na puntos.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Idagdag",
         "bonusDebit": "Ibawas",
         "notEnoughPoints": "Kulang ang puntos para sa gantimpalang ito.",
-        "bonusPoints": "Mga Puntos"
+        "bonusPoints": "Mga Puntos",
+        "category": {
+            "noten": "Eskwelahan at grado",
+            "zimmer": "Kwarto at kaayusan",
+            "geschrei": "Sigaw ug tono",
+            "bettzeit": "Oras ng matulog",
+            "ritual": "Ritwal (gulo)",
+            "other": "Iba pa"
+        },
+        "penaltyAction": "Parusa",
+        "penaltyTitle": "Mag-tala ng parusa",
+        "penaltyChild": "Bata",
+        "penaltyCategoryLabel": "Kategorya",
+        "penaltyReasonLabel": "Ano ang nangyari?",
+        "penaltyReasonPlaceholder": "hal. hindi sinisipayan ang kwarto",
+        "penaltySubmit": "I-tala",
+        "penaltyToast": "Naitala ang parusa",
+        "penaltyRetract": "Bawiin ang parusa",
+        "penaltyRetractedToast": "Nabawi ang parusa",
+        "ledgerPenaltyRetracted": "Nabawi ang parusa",
+        "penaltyNoChild": "Wala pang bata sa sambahayan. ang parusa ay kailangan ng bata ang target."
     },
     "datepicker": {
         "openCalendar": "Buksan ang kalendaryo",

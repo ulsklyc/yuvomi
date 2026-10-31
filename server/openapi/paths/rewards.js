@@ -32,6 +32,42 @@ export function rewardsPaths() {
     '/api/v1/rewards/bonus': {
       post: op({ summary: 'Grant manual bonus / correction points', tag: 'Rewards', admin: true, stateChanging: true, requestBody: jsonBody(null) }),
     },
+    // Konsequenzen: die optionale Gegenseite der Punkte. Eltern ziehen einem
+    // Kind Punkte ab; der Haushaltsschalter `rewards_penalties_enabled`
+    // entscheidet, ob ueberhaupt gebucht wird.
+    '/api/v1/rewards/penalty': {
+      post: op({
+        summary: 'Book a consequence (take points from a child)',
+        tag: 'Rewards',
+        stateChanging: true,
+        requestBody: jsonBody(null),
+        description: 'Body: { user_id, amount, reason, category? }. `amount` is 1..100 points taken from the child, `reason` the visible text (2..200 characters), `category` optional and one of `noten`, `zimmer`, `geschrei`, `bettzeit`, `ritual`, `other` - with a category the ledger line reads "<category>: <reason>". Only a parent or an administrator may do this, and only against a child; anyone else is 403. Answers 201 with { data: { user_id, balance } }. A household that has consequences turned off (the `rewards_penalties_enabled` setting, off by default) is 403 with `reason: "rewards_penalties_disabled"` - nothing is booked, whatever the client asks for. A child who does not take part in rewards is 400 with `reason: "rewards_not_participating"`; so are an amount outside 1..100, a missing or too short reason and an unknown category.',
+        responses: {
+          201: { description: 'Consequence booked' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/rewards/penalty/{id}': {
+      delete: op({
+        summary: 'Retract a consequence',
+        tag: 'Rewards',
+        params: [idParam()],
+        stateChanging: true,
+        description: 'Takes a booked consequence back: the points go to the child again as a counter-entry (a `reversal` that points at the original row), and the consequence itself stays in the ledger - corrected, not erased. Only the parent who booked it or an administrator may do this; anyone else is 403. An id that is not a consequence is 404. A consequence that was retracted already is 409 with `reason: "rewards_penalty_retracted"`. Answers 200 with { data: { user_id, balance } }.',
+        responses: {
+          200: { description: 'Consequence retracted' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'Consequence not found' },
+          409: { description: 'The consequence was retracted already' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
     '/api/v1/rewards/money': {
       get: op({ summary: 'Pocket money accounts the caller may see', tag: 'Rewards', description: 'Answers { currency, minor_unit, accounts, candidates }. An account is { id, display_name, balance_minor, currency, minor_unit, former, closable, plan } with `plan` either null or { amount_minor, currency, minor_unit, frequency, anchor_day, next_run_date, paused }. AN ACCOUNT IS A ROW OF ITS OWN AND HAS EXACTLY ONE CURRENCY: the household currency of the day it was opened. The code is also written on every money entry, every money request and the plan. A later change of the household currency leaves existing accounts as they are - read `currency` and `minor_unit` (decimals per ISO 4217) from the ACCOUNT, not from the top level, which names the household currency a NEW account would be opened in. `closable` is true for an account with no plan, balance zero and nothing pending; only such an account can be closed, and one opened again takes the household currency of then. `former: true` marks the account of a deactivated member that still holds a balance; only administrators get it, it can only be paid out, and it leaves the list at balance zero. WHO SEES WHAT: a member gets their own account or an empty list, an administrator gets every account, a paired display gets none. A scoped API token follows the same rule through its subject and role. Pocket money is separate from points: there is no conversion in either direction. `candidates` lists the members without an account and is filled for administrators only.' }),
     },
@@ -71,6 +107,15 @@ const CASE_REASONS = {
       + '`rewards_redemption_decided` (409, the request was decided already)',
   },
   '/api/v1/rewards/bonus': { post: NOT_PARTICIPATING },
+  // Konsequenzen: der Haushaltsschalter und die Teilnahme, dazu die
+  // Doppelt-Ruecknahme beim Zuruecknehmen.
+  '/api/v1/rewards/penalty': {
+    post: '`rewards_penalties_disabled` (403, the household has consequences turned off), '
+      + NOT_PARTICIPATING,
+  },
+  '/api/v1/rewards/penalty/{id}': {
+    delete: '`rewards_penalty_retracted` (409, the consequence was retracted already)',
+  },
   '/api/v1/rewards/money/accounts/{userId}': { delete: '`rewards_money_account_not_found` (404, there is no account)' },
   '/api/v1/rewards/money/plans/{userId}': { delete: '`rewards_money_plan_not_found` (404, there is no plan)' },
 };

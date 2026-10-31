@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "People can only be set for lists that go to Tasks.",
         "syncAssigneeNotMember": "Only household members can be chosen here.",
         "syncAssigneeUnknown": "This person no longer exists. Reload the page.",
-        "permDetails": "Widgets and more permissions"
+        "permDetails": "Widgets and more permissions",
+        "rewardsPenaltiesLabel": "Allow consequences",
+        "rewardsPenaltiesHint": "Parents can deduct points for misbehaviour (untidy room, yelling, late bedtime). The reason is mandatory and stays visible to the child and parents; siblings do not see it."
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",
@@ -6086,7 +6088,8 @@
             "bonus": "Bonus points",
             "redeem": "Reward redeemed",
             "adjust": "Correction",
-            "reversal": "Refund"
+            "reversal": "Refund",
+            "penalty": "Consequence"
         },
         "emptyLedgerTitle": "No entries yet",
         "emptyLedgerBody": "Earned and redeemed points appear here.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Credit",
         "bonusDebit": "Deduct",
         "notEnoughPoints": "Not enough points for this reward.",
-        "bonusPoints": "Points"
+        "bonusPoints": "Points",
+        "penaltyAction": "Consequence",
+        "penaltyTitle": "Issue consequence",
+        "penaltyChild": "Child",
+        "penaltyCategoryLabel": "Category",
+        "penaltyReasonLabel": "What happened?",
+        "penaltyReasonPlaceholder": "e.g. room stayed untidy despite being asked",
+        "penaltySubmit": "Issue",
+        "penaltyToast": "Consequence issued",
+        "penaltyRetract": "Retract consequence",
+        "penaltyRetractedToast": "Consequence retracted",
+        "ledgerPenaltyRetracted": "Consequence retracted",
+        "category": {
+            "noten": "School & grades",
+            "zimmer": "Room & tidiness",
+            "geschrei": "Yelling & tone",
+            "bettzeit": "Bedtime",
+            "ritual": "Bedtime ritual (rambamba)",
+            "other": "Other"
+        },
+        "penaltyNoChild": "No child exists in this household yet. a consequence needs a child as its target."
     },
     "datepicker": {
         "openCalendar": "Open calendar",

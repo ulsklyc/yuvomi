@@ -29,6 +29,16 @@ function renderPage(container, preferences) {
           descriptionId: 'rewards-require-approval-hint',
           attrs: { id: 'rewards-require-approval', 'aria-describedby': 'rewards-require-approval-hint' },
         })}
+        <!-- KONSEQUENZEN (Default AUS): eine Familie ohne Strafsystem soll die
+             Zeile nie anfassen muessen. Aus ist hier auch 403 am Server, nicht
+             nur eine ausgeblendete Oberflaeche. -->
+        ${settingSwitchRowHtml({
+          label: t('settings.rewardsPenaltiesLabel'),
+          checked: preferences.rewards_penalties_enabled === true,
+          description: t('settings.rewardsPenaltiesHint'),
+          descriptionId: 'rewards-penalties-hint',
+          attrs: { id: 'rewards-penalties-enabled', 'aria-describedby': 'rewards-penalties-hint' },
+        })}
         <!-- EIN SPEICHERMODELL AUF DER SEITE (Re-Critique 2026-09-27, A7 P2-8):
              der Schalter daneben speichert sofort, also tut es das Zahlenfeld
              auch - beim Verlassen und mit Enter. Ein eigener Speichern-Knopf nur
@@ -64,6 +74,21 @@ function bindEvents(container, preferences) {
       window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
     } finally {
       approvalToggle.disabled = false;
+    }
+  });
+
+  const penaltyToggle = container.querySelector('#rewards-penalties-enabled');
+  penaltyToggle?.addEventListener('change', async () => {
+    penaltyToggle.disabled = true;
+    try {
+      await savePreferences({ rewards_penalties_enabled: penaltyToggle.checked });
+      preferences.rewards_penalties_enabled = penaltyToggle.checked;
+      window.yuvomi?.showToast(t('settings.rewardsSaved'), 'success');
+    } catch (error) {
+      penaltyToggle.checked = !penaltyToggle.checked;
+      window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
+    } finally {
+      penaltyToggle.disabled = false;
     }
   });
 

@@ -3468,7 +3468,9 @@
         "reminderListAssigneesTasksOnly": "Personen gibt es nur für Listen, die in Aufgaben landen.",
         "syncAssigneeNotMember": "Nur Haushaltsmitglieder können hier gewählt werden.",
         "syncAssigneeUnknown": "Diese Person gibt es nicht mehr. Lade die Seite neu.",
-        "permDetails": "Widgets und weitere Rechte"
+        "permDetails": "Widgets und weitere Rechte",
+        "rewardsPenaltiesLabel": "Konsequenzen erlauben",
+        "rewardsPenaltiesHint": "Eltern können auf Fehlverhalten Punkte abziehen (schlechtes Zimmer, Geschrei, zu spät ins Bett). Der Grund ist Pflicht und bleibt für das Kind und die Eltern sichtbar; Geschwister sehen ihn nicht."
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",
@@ -6086,7 +6088,8 @@
             "bonus": "Bonuspunkte",
             "redeem": "Prämie eingelöst",
             "adjust": "Korrektur",
-            "reversal": "Rückbuchung"
+            "reversal": "Rückbuchung",
+            "penalty": "Konsequenz"
         },
         "emptyLedgerTitle": "Noch keine Buchungen",
         "emptyLedgerBody": "Verdiente und eingelöste Punkte erscheinen hier.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Gutschreiben",
         "bonusDebit": "Abziehen",
         "notEnoughPoints": "Der Punktestand reicht für diese Prämie nicht.",
-        "bonusPoints": "Punkte"
+        "bonusPoints": "Punkte",
+        "penaltyAction": "Konsequenz",
+        "penaltyTitle": "Konsequenz buchen",
+        "penaltyChild": "Kind",
+        "penaltyCategoryLabel": "Grund (Kategorie)",
+        "penaltyReasonLabel": "Was ist passiert?",
+        "penaltyReasonPlaceholder": "z. B. Zimmer war trotz Aufforderung unordentlich",
+        "penaltySubmit": "Buchen",
+        "penaltyToast": "Konsequenz gebucht",
+        "penaltyRetract": "Konsequenz zurücknehmen",
+        "penaltyRetractedToast": "Konsequenz zurückgenommen",
+        "ledgerPenaltyRetracted": "Konsequenz zurückgenommen",
+        "category": {
+            "noten": "Schule & Noten",
+            "zimmer": "Zimmer & Ordnung",
+            "geschrei": "Geschrei & Ton",
+            "bettzeit": "Bettzeit",
+            "ritual": "Ritual (Ramba Zamba)",
+            "other": "Sonstiges"
+        },
+        "penaltyNoChild": "In diesem Haushalt ist noch kein Kind angelegt. Konsequenzen brauchen ein Kind als Ziel."
     },
     "datepicker": {
         "openCalendar": "Kalender öffnen",

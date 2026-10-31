@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "Personer kan bara anges för listor som går till Uppgifter.",
         "syncAssigneeNotMember": "Bara medlemmar i hushållet kan väljas här.",
         "syncAssigneeUnknown": "Den här personen finns inte längre. Ladda om sidan.",
-        "permDetails": "Widgetar och fler behörigheter"
+        "permDetails": "Widgetar och fler behörigheter",
+        "rewardsPenaltiesLabel": "Tillåt konsekvenser",
+        "rewardsPenaltiesHint": "Föräldrar kan dra ifrån poäng för oönskat beteende (ostädat rum, skrikande, sen läggdags). Anledningen är obligatorisk och syns för barnet och föräldrarna; syskon ser den inte."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",
@@ -6086,7 +6088,8 @@
             "bonus": "Bonuspoäng",
             "redeem": "Belöning inlöst",
             "adjust": "Korrigering",
-            "reversal": "Återföring"
+            "reversal": "Återföring",
+            "penalty": "Konsekvens"
         },
         "emptyLedgerTitle": "Inga poster ännu",
         "emptyLedgerBody": "Intjänade och inlösta poäng visas här.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Lägg till",
         "bonusDebit": "Dra av",
         "notEnoughPoints": "Inte tillräckligt med poäng för den här belöningen.",
-        "bonusPoints": "Poäng"
+        "bonusPoints": "Poäng",
+        "category": {
+            "noten": "Skola och betyg",
+            "zimmer": "Rum och ordning",
+            "geschrei": "Skrik och ton",
+            "bettzeit": "Läggdags",
+            "ritual": "Ritual (bråk)",
+            "other": "Övrigt"
+        },
+        "penaltyAction": "Konsekvens",
+        "penaltyTitle": "Registrera en konsekvens",
+        "penaltyChild": "Barn",
+        "penaltyCategoryLabel": "Kategori",
+        "penaltyReasonLabel": "Vad hände?",
+        "penaltyReasonPlaceholder": "t.ex. rummet förble ostädat",
+        "penaltySubmit": "Registrera",
+        "penaltyToast": "Konsekvens registrerad",
+        "penaltyRetract": "Ångra konsekvens",
+        "penaltyRetractedToast": "Konsekvens ångrad",
+        "ledgerPenaltyRetracted": "Konsekvens ångrad",
+        "penaltyNoChild": "Det finns inget barn i hushållet än. en konsekvens kräver ett barn."
     },
     "datepicker": {
         "openCalendar": "Öppna kalender",

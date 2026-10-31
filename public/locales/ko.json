@@ -3468,7 +3468,9 @@
         "reminderListAssigneesTasksOnly": "사람은 할 일로 가는 목록에만 정할 수 있습니다.",
         "syncAssigneeNotMember": "여기서는 가구 구성원만 고를 수 있습니다.",
         "syncAssigneeUnknown": "이 사람은 더 이상 없습니다. 페이지를 새로 고치세요.",
-        "permDetails": "위젯 및 기타 권한"
+        "permDetails": "위젯 및 기타 권한",
+        "rewardsPenaltiesLabel": "결과 허용",
+        "rewardsPenaltiesHint": "부모는 잘못된 행동(어지러운 방, 고함, 늦은 잠자리)에 포인트를 차감할 수 있습니다. 이유는 필수이며 아이와 부모에게만 보입니다. 형제는 볼 수 없습니다."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",
@@ -6086,7 +6088,8 @@
             "bonus": "보너스 포인트",
             "redeem": "상품 교환",
             "adjust": "보정",
-            "reversal": "환급"
+            "reversal": "환급",
+            "penalty": "결과"
         },
         "emptyLedgerTitle": "아직 내역이 없습니다",
         "emptyLedgerBody": "획득 및 교환한 포인트가 여기에 표시됩니다.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "적립",
         "bonusDebit": "차감",
         "notEnoughPoints": "이 상품에 필요한 포인트가 부족합니다.",
-        "bonusPoints": "포인트"
+        "bonusPoints": "포인트",
+        "category": {
+            "noten": "학교와 성적",
+            "zimmer": "방과 정리",
+            "geschrei": "고성과 태도",
+            "bettzeit": "취침 시간",
+            "ritual": "의식 (몸부림)",
+            "other": "기타"
+        },
+        "penaltyAction": "결과",
+        "penaltyTitle": "결과 기록",
+        "penaltyChild": "아이",
+        "penaltyCategoryLabel": "범주",
+        "penaltyReasonLabel": "무슨 일이 있었나요?",
+        "penaltyReasonPlaceholder": "예: 방이 여전히 어지러움",
+        "penaltySubmit": "기록",
+        "penaltyToast": "결과가 기록되었습니다",
+        "penaltyRetract": "결과 취소",
+        "penaltyRetractedToast": "결과가 취소되었습니다",
+        "ledgerPenaltyRetracted": "결과가 취소되었습니다",
+        "penaltyNoChild": "가정에 아직 아이가 없습니다. 결과는 아동을 대상으로 합니다."
     },
     "datepicker": {
         "openCalendar": "캘린더 열기",

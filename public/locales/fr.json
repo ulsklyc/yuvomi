@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "Les personnes ne se définissent que pour les listes qui vont dans les Tâches.",
         "syncAssigneeNotMember": "Seuls les membres du foyer peuvent être choisis ici.",
         "syncAssigneeUnknown": "Cette personne n’existe plus. Rechargez la page.",
-        "permDetails": "Widgets et autres droits"
+        "permDetails": "Widgets et autres droits",
+        "rewardsPenaltiesLabel": "Autoriser les conséquences",
+        "rewardsPenaltiesHint": "Les parents peuvent retirer des points pour un mauvais comportement (chambre en désordre, cris, coucher tardif). Le motif est obligatoire et reste visible pour l'enfant et les parents ; les frères et sœurs ne le voient pas."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",
@@ -6086,7 +6088,8 @@
             "bonus": "Points bonus",
             "redeem": "Récompense échangée",
             "adjust": "Correction",
-            "reversal": "Remboursement"
+            "reversal": "Remboursement",
+            "penalty": "Conséquence"
         },
         "emptyLedgerTitle": "Aucune écriture",
         "emptyLedgerBody": "Les points gagnés et échangés apparaissent ici.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Créditer",
         "bonusDebit": "Déduire",
         "notEnoughPoints": "Pas assez de points pour cette récompense.",
-        "bonusPoints": "Points"
+        "bonusPoints": "Points",
+        "category": {
+            "noten": "École et notes",
+            "zimmer": "Chambre et rang",
+            "geschrei": "Cris et ton",
+            "bettzeit": "Heure du coucher",
+            "ritual": "Rituel (chahut)",
+            "other": "Autres"
+        },
+        "penaltyAction": "Conséquence",
+        "penaltyTitle": "Enregistrer une conséquence",
+        "penaltyChild": "Enfant",
+        "penaltyCategoryLabel": "Catégorie",
+        "penaltyReasonLabel": "Que s'est-il passé ?",
+        "penaltyReasonPlaceholder": "p. ex. chambre restée en désordre",
+        "penaltySubmit": "Enregistrer",
+        "penaltyToast": "Conséquence enregistrée",
+        "penaltyRetract": "Retirer la conséquence",
+        "penaltyRetractedToast": "Conséquence retirée",
+        "ledgerPenaltyRetracted": "Conséquence retirée",
+        "penaltyNoChild": "Aucun enfant dans ce foyer. une conséquence vise un enfant."
     },
     "datepicker": {
         "openCalendar": "Ouvrir le calendrier",

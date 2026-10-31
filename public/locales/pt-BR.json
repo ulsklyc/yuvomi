@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "Pessoas só podem ser definidas para listas que vão para Tarefas.",
         "syncAssigneeNotMember": "Aqui só podem ser escolhidos membros da casa.",
         "syncAssigneeUnknown": "Esta pessoa não existe mais. Recarregue a página.",
-        "permDetails": "Widgets e mais permissões"
+        "permDetails": "Widgets e mais permissões",
+        "rewardsPenaltiesLabel": "Permitir consequências",
+        "rewardsPenaltiesHint": "Os pais podem descontar pontos por mau comportamento (quarto bagunçado, gritos, dormir tarde). O motivo é obrigatório e continua visível para a criança e os pais; os irmãos não o veem."
     },
     "login": {
         "tagline": "Bem-vindo de volta. Sua casa em um só lugar.",
@@ -6208,7 +6210,8 @@
             "bonus": "Pontos de bônus",
             "redeem": "Prêmio resgatado",
             "adjust": "Ajuste manual",
-            "reversal": "Estorno"
+            "reversal": "Estorno",
+            "penalty": "Consequência"
         },
         "emptyLedgerTitle": "Nenhum registro no histórico",
         "emptyLedgerBody": "Os pontos acumulados e resgatados aparecerão aqui.",
@@ -6319,7 +6322,27 @@
         "bonusCredit": "Creditar",
         "bonusDebit": "Descontar",
         "notEnoughPoints": "Pontos insuficientes para este prêmio.",
-        "bonusPoints": "Pontos"
+        "bonusPoints": "Pontos",
+        "category": {
+            "noten": "Escola e notas",
+            "zimmer": "Quarto e organização",
+            "geschrei": "Gritos e tom",
+            "bettzeit": "Hora de dormir",
+            "ritual": "Ritual (mindinho)",
+            "other": "Outros"
+        },
+        "penaltyAction": "Consequência",
+        "penaltyTitle": "Registrar consequência",
+        "penaltyChild": "Criança",
+        "penaltyCategoryLabel": "Categoria",
+        "penaltyReasonLabel": "O que aconteceu?",
+        "penaltyReasonPlaceholder": "ex.: quarto ficou bagunçado",
+        "penaltySubmit": "Registrar",
+        "penaltyToast": "Consequência registrada",
+        "penaltyRetract": "Retirar consequência",
+        "penaltyRetractedToast": "Consequência retirada",
+        "ledgerPenaltyRetracted": "Consequência retirada",
+        "penaltyNoChild": "Ainda não há criança nesta família. a consequência precisa de uma criança."
     },
     "schedule": {
         "title": "Turnos",

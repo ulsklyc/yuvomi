@@ -3468,7 +3468,9 @@
         "reminderListAssigneesTasksOnly": "افراد را فقط برای فهرست‌هایی می‌توان تعیین کرد که به کارها می‌روند.",
         "syncAssigneeNotMember": "اینجا فقط اعضای خانوار را می‌توان انتخاب کرد.",
         "syncAssigneeUnknown": "این فرد دیگر وجود ندارد. صفحه را دوباره بارگیری کنید.",
-        "permDetails": "ویجت‌ها و مجوزهای بیشتر"
+        "permDetails": "ویجت‌ها و مجوزهای بیشتر",
+        "rewardsPenaltiesLabel": "اجازهٔ پیامدها",
+        "rewardsPenaltiesHint": "والدین می‌توانند به‌خاطر بدرفتاری امتیاز کم کنند (اتاق نامرتب، داد و بیداد، دیر خوابیدن). دلیل الزامی است و برای کودک و والدین دیده می‌شود؛ خواهر و برادر آن را نمی‌بینند."
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",
@@ -6086,7 +6088,8 @@
             "bonus": "امتیاز پاداش",
             "redeem": "جایزه دریافت شد",
             "adjust": "اصلاح",
-            "reversal": "بازگشت"
+            "reversal": "بازگشت",
+            "penalty": "پیامد"
         },
         "emptyLedgerTitle": "هنوز موردی نیست",
         "emptyLedgerBody": "امتیازهای کسب‌شده و دریافت‌شده اینجا نمایش داده می‌شوند.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "افزودن",
         "bonusDebit": "کسر کردن",
         "notEnoughPoints": "امتیاز کافی برای این جایزه وجود ندارد.",
-        "bonusPoints": "امتیازها"
+        "bonusPoints": "امتیازها",
+        "category": {
+            "noten": "مدرسه و نمره",
+            "zimmer": "اتاق و نظم",
+            "geschrei": "داد و بیداد",
+            "bettzeit": "زمان خواب",
+            "ritual": "آیین (شلوغ‌کاری)",
+            "other": "سایر"
+        },
+        "penaltyAction": "پیامد",
+        "penaltyTitle": "ثبت پیامد",
+        "penaltyChild": "کودک",
+        "penaltyCategoryLabel": "دسته",
+        "penaltyReasonLabel": "چه شد؟",
+        "penaltyReasonPlaceholder": "مثلاً اتاق مرتب نشد",
+        "penaltySubmit": "ثبت",
+        "penaltyToast": "پیامد ثبت شد",
+        "penaltyRetract": "بازگرداندن پیامد",
+        "penaltyRetractedToast": "پیامد بازگردانده شد",
+        "ledgerPenaltyRetracted": "پیامد بازگردانده شد",
+        "penaltyNoChild": "هنوز کودکی در این خانه نیست. پیامد به یک کودک به‌عنوان هدف نیاز دارد."
     },
     "datepicker": {
         "openCalendar": "باز کردن تقویم",

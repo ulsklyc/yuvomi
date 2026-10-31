@@ -11777,6 +11777,74 @@ const MIGRATIONS = [
       database.exec('UPDATE ics_subscriptions SET etag = NULL, last_modified = NULL');
     },
   },
+  {
+    version: 274,
+    description: 'rewards: optional consequences (penalty ledger type)',
+    // Eltern koennen auf Fehlverhalten reagieren (schlechtes Zimmer, Geschrei,
+    // zu spaet ins Bett) — als ehrliche Buchung, nicht als zweckentfremdete
+    // 'adjust'-Korrektur: die Antwort auf "warum ist mein Konto minus?" soll
+    // 'Konsequenz: Zimmer unordentlich (-5)' lauten und kein kryptischer
+    // Abzug. Der Typ lebt neben 'earn'/'bonus'/'redeem' im selben Ledger, der
+    // Saldo bleibt eine Summe (Konto darf ins Negative gehen — das ist der
+    // paedagogische Zweck; Einloesen bleibt davon unberuehrt).
+    //
+    // Der type-CHECK sitzt in der Tabelle, ein ALTER kann ihn nicht erweitern —
+    // Rebuild nach dem Muster der fruehen Migrationen (neue Tabelle, Kopie,
+    // umbenennen). Bewacht: enthaelt der gespeicherte CREATE schon 'penalty',
+    // ist alles beim Stand und der Lauf bleibt leer (zweiter Lauf auf
+    // gedrifteter Datenbank scheitert nicht). Alle Spalten der Kette 70 → 262
+    // (series_id, reverses_id, unit, allowance_date, currency) und alle sechs
+    // Indizes reisen mit — dieselbe Zusage, die der Geld-Migration steht:
+    // ein Rebuild muss diese Spalten mitnehmen.
+    up(database) {
+      const row = database
+        .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'reward_ledger'")
+        .get();
+      if (row && /'penalty'/.test(row.sql)) return;
+      database.exec(`
+        CREATE TABLE reward_ledger_new (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          delta         INTEGER NOT NULL,
+          type          TEXT    NOT NULL
+                                    CHECK(type IN ('earn', 'bonus', 'redeem', 'adjust', 'reversal', 'penalty')),
+          reason        TEXT,
+          task_id       INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+          redemption_id INTEGER REFERENCES reward_redemptions(id) ON DELETE SET NULL,
+          created_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          series_id     INTEGER,
+          reverses_id   INTEGER,
+          unit          TEXT    NOT NULL DEFAULT 'points'
+                                    CHECK(unit IN ('points', 'money')),
+          allowance_date TEXT,
+          currency      TEXT
+                                    CHECK((unit = 'money') = (currency IS NOT NULL))
+        );
+        INSERT INTO reward_ledger_new
+          (id, user_id, delta, type, reason, task_id, redemption_id, created_by,
+           created_at, series_id, reverses_id, unit, allowance_date, currency)
+        SELECT id, user_id, delta, type, reason, task_id, redemption_id, created_by,
+               created_at, series_id, reverses_id, unit, allowance_date, currency
+        FROM reward_ledger;
+        DROP TABLE reward_ledger;
+        ALTER TABLE reward_ledger_new RENAME TO reward_ledger;
+        CREATE INDEX IF NOT EXISTS idx_reward_ledger_user ON reward_ledger(user_id);
+        CREATE INDEX IF NOT EXISTS idx_reward_ledger_redemption ON reward_ledger(redemption_id);
+        CREATE INDEX IF NOT EXISTS idx_reward_ledger_task ON reward_ledger(task_id, user_id);
+        CREATE INDEX IF NOT EXISTS idx_reward_ledger_series ON reward_ledger(series_id, user_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_reward_ledger_reverses ON reward_ledger(reverses_id);
+      `);
+      // uniq_reward_earn faellt NICHT zurueck: Migration 230 hat ihn bewusst
+      // entfernt (dasselbe Muster ein zweites Mal vergeben, nachdem die erste
+      // Ruecknahme buchte, und Geldzeilen mit derselben Aufgabe müssen
+      // koexistieren — der Netto-Stand filtert nach unit, nicht der Index).
+      database.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS uniq_reward_allowance_credit
+          ON reward_ledger(user_id, allowance_date) WHERE allowance_date IS NOT NULL;
+      `);
+    },
+  },
 ];
 
 /**

@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "人を設定できるのはタスクに入るリストだけです。",
         "syncAssigneeNotMember": "ここで選べるのは世帯のメンバーだけです。",
         "syncAssigneeUnknown": "この人はもう存在しません。ページを再読み込みしてください。",
-        "permDetails": "ウィジェットとその他の権限"
+        "permDetails": "ウィジェットとその他の権限",
+        "rewardsPenaltiesLabel": "ペナルティを許可",
+        "rewardsPenaltiesHint": "保護者は不正な行動（部屋が散らかっている、怒鳴る、就寝が遅い）で点を減らせます。理由は必須で、子どもと保護者にだけ表示されます。兄弟には表示されません。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",
@@ -6086,7 +6088,8 @@
             "bonus": "ボーナスポイント",
             "redeem": "景品と交換",
             "adjust": "調整",
-            "reversal": "返却"
+            "reversal": "返却",
+            "penalty": "ペナルティ"
         },
         "emptyLedgerTitle": "まだ記録がありません",
         "emptyLedgerBody": "獲得・交換したポイントがここに表示されます。",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "加算する",
         "bonusDebit": "減算する",
         "notEnoughPoints": "この景品にはポイントが足りません。",
-        "bonusPoints": "ポイント"
+        "bonusPoints": "ポイント",
+        "category": {
+            "noten": "学校と成績",
+            "zimmer": "部屋と片付け",
+            "geschrei": "怒鳴ると声",
+            "bettzeit": "就寝時間",
+            "ritual": "儀式（ぐずぐず）",
+            "other": "その他"
+        },
+        "penaltyAction": "ペナルティ",
+        "penaltyTitle": "ペナルティを記録",
+        "penaltyChild": "子ども",
+        "penaltyCategoryLabel": "カテゴリ",
+        "penaltyReasonLabel": "何がありましたか？",
+        "penaltyReasonPlaceholder": "例：部屋が片付いていなかった",
+        "penaltySubmit": "記録",
+        "penaltyToast": "ペナルティを記録しました",
+        "penaltyRetract": "ペナルティを取り消す",
+        "penaltyRetractedToast": "ペナルティを取り消しました",
+        "ledgerPenaltyRetracted": "ペナルティを取り消しました",
+        "penaltyNoChild": "この世帯にまだ子どもがいません. ペナルティには子どもが必要です。"
     },
     "datepicker": {
         "openCalendar": "カレンダーを開く",

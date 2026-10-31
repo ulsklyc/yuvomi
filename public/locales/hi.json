@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "लोग केवल उन सूचियों के लिए तय किए जा सकते हैं जो कार्यों में जाती हैं।",
         "syncAssigneeNotMember": "यहाँ केवल परिवार के सदस्य चुने जा सकते हैं।",
         "syncAssigneeUnknown": "यह व्यक्ति अब मौजूद नहीं है। पेज फिर से लोड करें।",
-        "permDetails": "विजेट और अन्य अनुमतियाँ"
+        "permDetails": "विजेट और अन्य अनुमतियाँ",
+        "rewardsPenaltiesLabel": "परिणाम की अनुमति दें",
+        "rewardsPenaltiesHint": "अभिभावक खराब व्यवहार (बिखरा कमरा, चिल्लाना, देर से सोना) पर घटा सकते हैं। कारण अनिवार्य है और बच्चे व अभिभावकों को दिखता है; भाई-बहन नहीं देखते।"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",
@@ -6086,7 +6088,8 @@
             "bonus": "बोनस अंक",
             "redeem": "इनाम भुनाया गया",
             "adjust": "सुधार",
-            "reversal": "वापसी"
+            "reversal": "वापसी",
+            "penalty": "परिणाम"
         },
         "emptyLedgerTitle": "अभी कोई प्रविष्टि नहीं",
         "emptyLedgerBody": "कमाए और भुनाए गए अंक यहाँ दिखते हैं।",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "जोड़ें",
         "bonusDebit": "घटाएँ",
         "notEnoughPoints": "इस इनाम के लिए पर्याप्त अंक नहीं हैं।",
-        "bonusPoints": "अंक"
+        "bonusPoints": "अंक",
+        "category": {
+            "noten": "स्कूल और नंबर",
+            "zimmer": "कमरा और सफ़ाई",
+            "geschrei": "चिल्लाना और लहज़ा",
+            "bettzeit": "सोने का समय",
+            "ritual": "रिवाज़ (हल्ला)",
+            "other": "अन्य"
+        },
+        "penaltyAction": "परिणाम",
+        "penaltyTitle": "परिणाम दर्ज करें",
+        "penaltyChild": "बच्चा",
+        "penaltyCategoryLabel": "श्रेणी",
+        "penaltyReasonLabel": "क्या हुआ?",
+        "penaltyReasonPlaceholder": "जैसे कमरा बिखरा रहा",
+        "penaltySubmit": "दर्ज करें",
+        "penaltyToast": "परिणाम दर्ज हुआ",
+        "penaltyRetract": "परिणाम वापस लें",
+        "penaltyRetractedToast": "परिणाम वापस लिया गया",
+        "ledgerPenaltyRetracted": "परिणाम वापस लिया गया",
+        "penaltyNoChild": "इस घर में अभी कोई बच्चा नहीं. परिणाम के लिए बच्चा चाहिए।"
     },
     "datepicker": {
         "openCalendar": "कैलेंडर खोलें",

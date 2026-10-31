@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "Personer kan bare settes for lister som går til Oppgaver.",
         "syncAssigneeNotMember": "Bare medlemmer av husstanden kan velges her.",
         "syncAssigneeUnknown": "Denne personen finnes ikke lenger. Last inn siden på nytt.",
-        "permDetails": "Widgeter og flere rettigheter"
+        "permDetails": "Widgeter og flere rettigheter",
+        "rewardsPenaltiesLabel": "Tillat konsekvenser",
+        "rewardsPenaltiesHint": "Foreldre kan trekke poenger for uønsket atferd (urerom, skriking, sengetid for seint). Årsaken er obligatorisk og vises for barnet og foreldrene; søsken ser den ikke."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",
@@ -6086,7 +6088,8 @@
             "bonus": "Bonuspoeng",
             "redeem": "Belønning løst inn",
             "adjust": "Rettelse",
-            "reversal": "Refusjon"
+            "reversal": "Refusjon",
+            "penalty": "Konsekvens"
         },
         "emptyLedgerTitle": "Ingen oppføringer ennå",
         "emptyLedgerBody": "Opptjente og løste poeng vises her.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Legg til",
         "bonusDebit": "Trekk fra",
         "notEnoughPoints": "Ikke nok poeng til denne belønningen.",
-        "bonusPoints": "Poeng"
+        "bonusPoints": "Poeng",
+        "category": {
+            "noten": "Skole og karakterer",
+            "zimmer": "Rom og orden",
+            "geschrei": "Skriking og tone",
+            "bettzeit": "Leggetid",
+            "ritual": "Ritual (bråk)",
+            "other": "Annet"
+        },
+        "penaltyAction": "Konsekvens",
+        "penaltyTitle": "Registrer en konsekvens",
+        "penaltyChild": "Barn",
+        "penaltyCategoryLabel": "Kategori",
+        "penaltyReasonLabel": "Hva skjedde?",
+        "penaltyReasonPlaceholder": "f.eks. rummet forble uredd",
+        "penaltySubmit": "Registrer",
+        "penaltyToast": "Konsekvens registrert",
+        "penaltyRetract": "Trekk tilbake konsekvens",
+        "penaltyRetractedToast": "Konsekvens trukket tilbake",
+        "ledgerPenaltyRetracted": "Konsekvens trukket tilbake",
+        "penaltyNoChild": "Det finnes ingen barn i husstanden ennå. en konsekvens krever et barn som mål."
     },
     "datepicker": {
         "openCalendar": "Åpne kalender",

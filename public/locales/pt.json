@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "As pessoas só podem ser definidas para listas que vão para Tarefas.",
         "syncAssigneeNotMember": "Aqui só podem ser escolhidos membros do agregado.",
         "syncAssigneeUnknown": "Esta pessoa já não existe. Recarregue a página.",
-        "permDetails": "Widgets e mais permissões"
+        "permDetails": "Widgets e mais permissões",
+        "rewardsPenaltiesLabel": "Permitir consequências",
+        "rewardsPenaltiesHint": "Os pais podem retirar pontos por mau comportamento (quarto desarrumado, gritos, deitar tarde). O motivo é obrigatório e continua visível para a criança e os pais; os irmãos não o veem."
     },
     "login": {
         "tagline": "Bem-vindo de volta. A tua casa num só lugar.",
@@ -6086,7 +6088,8 @@
             "bonus": "Pontos de bônus",
             "redeem": "Prêmio resgatado",
             "adjust": "Correção",
-            "reversal": "Estorno"
+            "reversal": "Estorno",
+            "penalty": "Consequência"
         },
         "emptyLedgerTitle": "Ainda não há lançamentos",
         "emptyLedgerBody": "Pontos ganhos e resgatados aparecem aqui.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Creditar",
         "bonusDebit": "Deduzir",
         "notEnoughPoints": "Pontos insuficientes para este prêmio.",
-        "bonusPoints": "Pontos"
+        "bonusPoints": "Pontos",
+        "category": {
+            "noten": "Escola e notas",
+            "zimmer": "Quarto e arrumação",
+            "geschrei": "Gritos e tom",
+            "bettzeit": "Hora de dormir",
+            "ritual": "Ritual (birra)",
+            "other": "Outros"
+        },
+        "penaltyAction": "Consequência",
+        "penaltyTitle": "Registar consequência",
+        "penaltyChild": "Criança",
+        "penaltyCategoryLabel": "Categoria",
+        "penaltyReasonLabel": "O que aconteceu?",
+        "penaltyReasonPlaceholder": "ex.: quarto ficou desarrumado",
+        "penaltySubmit": "Registar",
+        "penaltyToast": "Consequência registada",
+        "penaltyRetract": "Retirar consequência",
+        "penaltyRetractedToast": "Consequência retirada",
+        "ledgerPenaltyRetracted": "Consequência retirada",
+        "penaltyNoChild": "Ainda não há criança neste agregado. a consequência precisa de uma criança."
     },
     "datepicker": {
         "openCalendar": "Abrir calendário",

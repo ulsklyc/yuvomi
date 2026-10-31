@@ -387,6 +387,9 @@ function updateRewardsFab() {
     // und im Verlauf als FAB - zwei Bauformen fuer dieselbe Handlung, und auf
     // "Punkte" fehlte die Kopfpille ganz. Jetzt traegt jeder Reiter fuer Eltern
     // seine Pille; ohne Teilnehmende gibt es niemandem einen Bonus.
+    // KONSEQUENZEN (Schalter an): der Belohnte ist der Regelfall, die
+    // Konsequenz die Ausnahme — der FAB bleibt der Bonus, die Konsequenz
+    // wohnt an der Punktesteuerung und der Kindkarte, nicht als zweite Pille.
     setPageFabAction(fab, { label: t('rewards.grantBonus'), dockLabel: t('newLabel.rewardsBonus'), onClick: () => openBonusModal() });
   } else {
     setPageFabAction(fab, { hidden: true, dockLabel: keepNoun() });
@@ -608,12 +611,16 @@ function renderStandingRow(member) {
           <p class="rw-progress__label" aria-hidden="true">${esc(hint.label)}</p>`
         : `<p class="rw-progress__label rw-progress__label--muted">${esc(t('rewards.noRewardsYet'))}</p>`}
       </div>
-      ${canRedeem ? `
+      ${canRedeem || penaltyTargetable(member) ? `
         <div class="rw-standing__actions">
-          <button class="btn btn--secondary btn--sm rw-redeem-open" type="button" data-member="${member.id}"
+          ${canRedeem ? `<button class="btn btn--secondary btn--sm rw-redeem-open" type="button" data-member="${member.id}"
                   ${affordable ? '' : `disabled aria-label="${esc(`${redeemVerb()}. ${hint?.label ?? ''}`)}"`}>
             <i data-lucide="gift" aria-hidden="true"></i>${esc(redeemVerb())}
-          </button>
+          </button>` : ''}
+          ${penaltyTargetable(member) ? `<button class="btn btn--ghost btn--sm rw-penalty-open" type="button" data-member="${member.id}"
+                  aria-label="${esc(`${t('rewards.penaltyAction')} · ${member.display_name}`)}">
+            <i data-lucide="triangle-alert" aria-hidden="true"></i>${esc(t('rewards.penaltyAction'))}
+          </button>` : ''}
         </div>` : ''}
     </li>`;
 }
@@ -858,6 +865,9 @@ function wireOverview(el) {
   el.querySelectorAll('.rw-standing__id, .rw-own__history').forEach((btn) => {
     btn.addEventListener('click', () => openMemberDetail(Number(btn.dataset.member)));
   });
+  el.querySelectorAll('.rw-penalty-open').forEach((btn) => {
+    btn.addEventListener('click', () => openPenaltyModal(Number(btn.dataset.member)));
+  });
   el.querySelectorAll('[data-setup]').forEach((btn) => {
     btn.addEventListener('click', () => handleSetupStep(btn.dataset.setup));
   });
@@ -965,6 +975,7 @@ function renderCatalog(el) {
 
 const LEDGER_ICON = {
   earn: 'check-circle', bonus: 'sparkles', redeem: 'gift', adjust: 'sliders-horizontal', reversal: 'undo-2',
+  penalty: 'triangle-alert',
 };
 
 /* EINE GEGENBUCHUNG TRAEGT DENSELBEN TITEL WIE IHRE GUTSCHRIFT (#1607) - und
@@ -984,6 +995,9 @@ function ledgerReason(row) {
       ? t('rewards.ledgerTaskReopenedNamed', { task: row.reason })
       : t('rewards.ledgerTaskReopened');
   }
+  // Gegenbuchung einer Konsequenz: der Server bestaetigt die Herkunft
+  // (retracts_penalty), die Zeile nennt nie selbst, welche Konsequenz.
+  if (row.retracts_penalty) return t('rewards.ledgerPenaltyRetracted');
   if (row.reason) return row.reason;
   return t(`rewards.ledgerType.${row.type}`);
 }
@@ -992,8 +1006,13 @@ function ledgerReason(row) {
  * Sie ist eine `.list-row` im `.row-carrier` (list-row.css): Zeichen | Grund +
  * Meta | Punkte. Bis R16 baute rewards.css Traeger, Zeile, Trennlinie und
  * Schnitt als `.rw-ledger*` ein zweites Mal nach. */
-function ledgerRowHtml(row) {
+function ledgerRowHtml(row, withRetract = false) {
   const positive = row.delta > 0;
+  // Die Ruecknahme ist keine zweite Wahrheit: der Server entscheidet pro Zeile
+  // (can_retract: Urheber oder Admin, noch nicht zurueckgenommen), die Zeile
+  // zeigt nur, was er erlaubt.
+  const retract = withRetract && row.can_retract ? `
+        ${rowActionHtml({ icon: 'undo-2', label: t('rewards.penaltyRetract'), attrs: { 'data-retract': row.id, class: 'btn btn--ghost btn--sm rw-penalty-retract' } })}` : '';
   return `
       <li class="list-row rw-ledger-row">
         <span class="rw-ledger-row__icon rw-ledger-row__icon--${esc(row.type)}"><i data-lucide="${LEDGER_ICON[row.type] || 'circle'}" aria-hidden="true"></i></span>
@@ -1001,7 +1020,7 @@ function ledgerRowHtml(row) {
           <p class="list-row__name rw-ledger-row__reason">${esc(ledgerReason(row))}</p>
           <p class="list-row__meta rw-ledger-row__meta">${esc(row.user_name)} · ${esc(dateText(row.created_at))}</p>
         </div>
-        <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
+        <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>${retract}
       </li>`;
 }
 
@@ -1034,7 +1053,7 @@ function renderLedger(el) {
     className: 'page-chip-row rw-chips',
   });
 
-  const rows = state.ledger.map(ledgerRowHtml).join('');
+  const rows = state.ledger.map((r) => ledgerRowHtml(r, true)).join('');
 
   // DER VERLAUF IST EINE EBENE UNTER "PUNKTE" (Critique R24, E8): vorn der
   // Rueckweg mit dem Namen der Ebene darueber, dann der Titel, die Personen,
@@ -1058,6 +1077,9 @@ function renderLedger(el) {
     </div>`);
   el.querySelector('[data-rw-back]')?.addEventListener('click', closeLedgerRoute);
 
+  el.querySelectorAll('[data-retract]').forEach((btn) => {
+    btn.addEventListener('click', () => retractPenalty(Number(btn.dataset.retract), btn));
+  });
   el.querySelectorAll('[data-filter="ledger-member"]').forEach((chip) => chip.addEventListener('click', async () => {
     const val = chip.dataset.value;
     state.ledgerFilter = val === '' ? null : Number(val);
@@ -1351,6 +1373,119 @@ function openBonusModal() {
       });
     },
   });
+}
+
+/* KONSEQUENZEN (optionales Gegengewicht zu Bonus und Einloesung). Der Schalter
+ * ist Haussache (Einstellungen › Belohnungen, Default AUS) und die Antwort, ob
+ * ICH eine buchen darf, kommt vom Server (overview.penalties.canIssue) —
+ * dieselbe Aufloesung wie die Absage der Route, keine zweite Regel hier. Aus ist
+ * 403, nicht nur Blende: auch dieser Knopf erscheint nur, wenn der Schalter an
+ * ist. Ziel ist immer ein Kind; Erwachsene und das eigene Kind-Ich scheiden aus,
+ * weil der Server sie ablehnt — die Liste zeigt sie gar nicht erst. */
+function penaltyChildren() {
+  return (state.overview?.balances || []).filter((b) => b.family_role === 'child');
+}
+
+/** Darf auf DIESES Kind gerade eine Konsequenz gezielt gebucht werden? */
+function penaltyTargetable(member) {
+  return penaltiesUsable() && member.family_role === 'child';
+}
+
+function penaltiesUsable() {
+  return !!state.overview?.penalties?.enabled
+    && !!state.overview?.penalties?.canIssue
+    && !readOnly() && !actingAsDisplay();
+}
+
+const PENALTY_CATEGORIES = ['noten', 'zimmer', 'geschrei', 'bettzeit', 'ritual', 'other'];
+
+function openPenaltyModal(presetMemberId = null) {
+  if (!penaltiesUsable()) return;
+  const kids = penaltyChildren();
+  if (!kids.length) { confirmModal(t('rewards.penaltyNoChild'), { confirmLabel: t('rewards.gotIt') }); return; }
+  const defaultMember = kids.some((k) => k.id === presetMemberId) ? presetMemberId : kids[0].id;
+  const memberField = kids.length > 1
+    ? `<div class="form-group">
+         <label class="label" for="rw-penalty-member">${esc(t('rewards.penaltyChild'))}</label>
+         <select class="input" id="rw-penalty-member">
+           ${kids.map((k) => `<option value="${k.id}" ${k.id === defaultMember ? 'selected' : ''}>${esc(k.display_name)}</option>`).join('')}
+         </select>
+       </div>`
+    : `<input type="hidden" id="rw-penalty-member" value="${defaultMember}">`;
+  const catField = `
+        <div class="form-group">
+          <label class="label" for="rw-penalty-category">${esc(t('rewards.penaltyCategoryLabel'))}</label>
+          <select class="input" id="rw-penalty-category">
+            ${PENALTY_CATEGORIES.map((c) => `<option value="${c}">${esc(t(`rewards.category.${c}`))}</option>`).join('')}
+          </select>
+        </div>`;
+  openModal({
+    staged: true,
+    title: t('rewards.penaltyTitle'),
+    content: `
+      <form id="rw-penalty-form" novalidate>
+        ${memberField}
+        <div class="modal-grid modal-grid--2">
+          <div class="form-group">
+            <label class="label" for="rw-penalty-points">${esc(t('rewards.bonusPoints'))}${REQUIRED_MARK}</label>
+            <input class="input" id="rw-penalty-points" type="number" inputmode="numeric" min="1" max="100" step="1" placeholder="5" required>
+          </div>
+          ${catField}
+        </div>
+        <div class="form-group">
+          <label class="label" for="rw-penalty-reason">${esc(t('rewards.penaltyReasonLabel'))}${REQUIRED_MARK}</label>
+          <input class="input" id="rw-penalty-reason" required minlength="2" maxlength="200" placeholder="${esc(t('rewards.penaltyReasonPlaceholder'))}">
+        </div>
+        <div id="rw-penalty-error" class="form-error" role="alert" hidden></div>
+        <div class="modal-panel__footer modal-panel__footer--plain">
+          <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
+          <button type="submit" class="btn btn--primary" id="rw-penalty-submit">${esc(t('rewards.penaltySubmit'))}</button>
+        </div>
+      </form>`,
+    onSave: (panel) => {
+      const form = panel.querySelector('#rw-penalty-form');
+      const submit = panel.querySelector('#rw-penalty-submit');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = panel.querySelector('#rw-penalty-error');
+        const problems = constraintErrors(form);
+        if (problems.length) { reportFieldErrors(problems); return; }
+        const modalContext = captureModalContext();
+        submit.disabled = true; errEl.hidden = true;
+        try {
+          await api.post('/rewards/penalty', {
+            user_id: Number(panel.querySelector('#rw-penalty-member').value),
+            amount: Math.trunc(Number(panel.querySelector('#rw-penalty-points').value)),
+            category: panel.querySelector('#rw-penalty-category').value || undefined,
+            reason: panel.querySelector('#rw-penalty-reason').value.trim(),
+          });
+          closeModal({ force: true, context: modalContext });
+          toast(t('rewards.penaltyToast'));
+          await reloadAfterSave(() => refreshActiveTab());
+          refocusAfterRender();
+        } catch (err) {
+          errEl.textContent = rewardsErrorSentence(err); errEl.hidden = false; submit.disabled = false;
+        }
+      });
+    },
+  });
+}
+
+async function retractPenalty(ledgerId, btn) {
+  const confirmed = await confirmModal(t('rewards.penaltyRetract'), {
+    confirmLabel: t('rewards.penaltyRetract'), danger: false,
+  });
+  if (!confirmed) return;
+  btn.disabled = true;
+  try {
+    await api.delete(`/rewards/penalty/${ledgerId}`);
+    toast(t('rewards.penaltyRetractedToast'));
+    await reloadAfterSave(() => refreshActiveTab());
+    refocusAfterRender();
+  } catch (err) {
+    btn.disabled = false;
+    toast(rewardsErrorSentence(err), 'danger');
+  }
 }
 
 function openRewardModal(item) {

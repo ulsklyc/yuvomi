@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "只有进入任务的清单才能设置人员。",
         "syncAssigneeNotMember": "这里只能选择家庭成员。",
         "syncAssigneeUnknown": "此人已不存在。请重新加载页面。",
-        "permDetails": "小组件和其他权限"
+        "permDetails": "小组件和其他权限",
+        "rewardsPenaltiesLabel": "允许后果",
+        "rewardsPenaltiesHint": "父母可以因不良行为扣分（房间不整洁、吼叫、晚睡）。原因必填，且仅孩子与父母可见；兄弟姐妹看不到。"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",
@@ -6086,7 +6088,8 @@
             "bonus": "奖励积分",
             "redeem": "奖品已兑换",
             "adjust": "调整",
-            "reversal": "退回"
+            "reversal": "退回",
+            "penalty": "后果"
         },
         "emptyLedgerTitle": "暂无记录",
         "emptyLedgerBody": "获得和兑换的积分会显示在这里。",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "增加",
         "bonusDebit": "扣除",
         "notEnoughPoints": "积分不足，无法兑换此奖品。",
-        "bonusPoints": "积分"
+        "bonusPoints": "积分",
+        "category": {
+            "noten": "学校与成绩",
+            "zimmer": "房间与整洁",
+            "geschrei": "吼叫与语气",
+            "bettzeit": "睡觉时间",
+            "ritual": "睡前闹腾",
+            "other": "其他"
+        },
+        "penaltyAction": "后果",
+        "penaltyTitle": "记录后果",
+        "penaltyChild": "孩子",
+        "penaltyCategoryLabel": "类别",
+        "penaltyReasonLabel": "发生了什么？",
+        "penaltyReasonPlaceholder": "例如：房间没有收拾",
+        "penaltySubmit": "记录",
+        "penaltyToast": "已记录后果",
+        "penaltyRetract": "撤回后果",
+        "penaltyRetractedToast": "后果已撤回",
+        "ledgerPenaltyRetracted": "后果已撤回",
+        "penaltyNoChild": "这个家庭还没有孩子. 后果需要一个孩子作为对象。"
     },
     "datepicker": {
         "openCalendar": "打开日历",

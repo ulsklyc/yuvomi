@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "Kişiler yalnızca Görevler’e giden listeler için ayarlanabilir.",
         "syncAssigneeNotMember": "Burada yalnızca hane üyeleri seçilebilir.",
         "syncAssigneeUnknown": "Bu kişi artık yok. Sayfayı yeniden yükleyin.",
-        "permDetails": "Widget'lar ve diğer izinler"
+        "permDetails": "Widget'lar ve diğer izinler",
+        "rewardsPenaltiesLabel": "Sonuçlara izin ver",
+        "rewardsPenaltiesHint": "Ebeveynler kötü davranış için (dağınık oda, bağırma, geç yatma) puan düşebilir. Neden zorunludur ve çocukla ebeveynlere görünür kalır; kardeşler görmez."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",
@@ -6086,7 +6088,8 @@
             "bonus": "Bonus puan",
             "redeem": "Ödül kullanıldı",
             "adjust": "Düzeltme",
-            "reversal": "İade"
+            "reversal": "İade",
+            "penalty": "Sonuç"
         },
         "emptyLedgerTitle": "Henüz kayıt yok",
         "emptyLedgerBody": "Kazanılan ve kullanılan puanlar burada görünür.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Ekle",
         "bonusDebit": "Düş",
         "notEnoughPoints": "Bu ödül için yeterli puan yok.",
-        "bonusPoints": "Puanlar"
+        "bonusPoints": "Puanlar",
+        "category": {
+            "noten": "Okul ve notlar",
+            "zimmer": "Oda ve düzen",
+            "geschrei": "Bağırma ve ton",
+            "bettzeit": "Yatma saati",
+            "ritual": "Ritüel (kapris)",
+            "other": "Diğer"
+        },
+        "penaltyAction": "Sonuç",
+        "penaltyTitle": "Sonuç kaydet",
+        "penaltyChild": "Çocuk",
+        "penaltyCategoryLabel": "Kategori",
+        "penaltyReasonLabel": "Ne oldu?",
+        "penaltyReasonPlaceholder": "örn. oda dağınık kaldı",
+        "penaltySubmit": "Kaydet",
+        "penaltyToast": "Sonuç kaydedildi",
+        "penaltyRetract": "Sonucu geri al",
+        "penaltyRetractedToast": "Sonuç geri alındı",
+        "ledgerPenaltyRetracted": "Sonuç geri alındı",
+        "penaltyNoChild": "Bu hanede henüz çocuk yok. sonuç bir çocuk gerektirir."
     },
     "datepicker": {
         "openCalendar": "Takvimi aç",

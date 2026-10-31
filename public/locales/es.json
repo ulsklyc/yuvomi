@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "Las personas solo se pueden fijar para listas que van a Tareas.",
         "syncAssigneeNotMember": "Aquí solo se pueden elegir miembros del hogar.",
         "syncAssigneeUnknown": "Esta persona ya no existe. Recarga la página.",
-        "permDetails": "Widgets y más permisos"
+        "permDetails": "Widgets y más permisos",
+        "rewardsPenaltiesLabel": "Permitir consecuencias",
+        "rewardsPenaltiesHint": "Los padres pueden restar puntos por mal comportamiento (cuarto sin orden, gritos, acostarse tarde). El motivo es obligatorio y sigue visible para el niño y los padres; los hermanos no lo ven."
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",
@@ -6086,7 +6088,8 @@
             "bonus": "Puntos de bonus",
             "redeem": "Premio canjeado",
             "adjust": "Corrección",
-            "reversal": "Devolución"
+            "reversal": "Devolución",
+            "penalty": "Consecuencia"
         },
         "emptyLedgerTitle": "Aún no hay movimientos",
         "emptyLedgerBody": "Los puntos ganados y canjeados aparecen aquí.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Abonar",
         "bonusDebit": "Descontar",
         "notEnoughPoints": "No hay puntos suficientes para este premio.",
-        "bonusPoints": "Puntos"
+        "bonusPoints": "Puntos",
+        "category": {
+            "noten": "Escuela y notas",
+            "zimmer": "Cuarto y orden",
+            "geschrei": "Gritos y tono",
+            "bettzeit": "Hora de dormir",
+            "ritual": "Ritual (berrinche)",
+            "other": "Otros"
+        },
+        "penaltyAction": "Consecuencia",
+        "penaltyTitle": "Registrar consecuencia",
+        "penaltyChild": "Niño",
+        "penaltyCategoryLabel": "Categoría",
+        "penaltyReasonLabel": "¿Qué pasó?",
+        "penaltyReasonPlaceholder": "p. ej. la cuarto quedó sin ordenar",
+        "penaltySubmit": "Registrar",
+        "penaltyToast": "Consecuencia registrada",
+        "penaltyRetract": "Retirar consecuencia",
+        "penaltyRetractedToast": "Consecuencia retirada",
+        "ledgerPenaltyRetracted": "Consecuencia retirada",
+        "penaltyNoChild": "Aún no hay ningún niño en este hogar: la consecuencia necesita un niño como destino."
     },
     "datepicker": {
         "openCalendar": "Abrir calendario",

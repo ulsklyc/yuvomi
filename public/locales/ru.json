@@ -3676,7 +3676,9 @@
         "reminderListAssigneesTasksOnly": "Людей можно задать только для списков, которые идут в Задачи.",
         "syncAssigneeNotMember": "Здесь можно выбрать только членов семьи.",
         "syncAssigneeUnknown": "Этого человека больше нет. Перезагрузите страницу.",
-        "permDetails": "Виджеты и другие права"
+        "permDetails": "Виджеты и другие права",
+        "rewardsPenaltiesLabel": "Разрешить последствия",
+        "rewardsPenaltiesHint": "Родители могут снимать баллы за плохое поведение (неубранная комната, крики, поздний отбой). Причина обязательна и остаётся видна ребёнку и родителям; братья и сёстры её не видят."
     },
     "login": {
         "tagline": "С возвращением. Ваш дом - в одном месте.",
@@ -6380,7 +6382,8 @@
             "bonus": "Бонусные баллы",
             "redeem": "Награда обменяна",
             "adjust": "Коррекция",
-            "reversal": "Возврат"
+            "reversal": "Возврат",
+            "penalty": "Последствие"
         },
         "emptyLedgerTitle": "Записей пока нет",
         "emptyLedgerBody": "Заработанные и обменянные баллы появятся здесь.",
@@ -6491,7 +6494,27 @@
         "bonusCredit": "Начислить",
         "bonusDebit": "Списать",
         "notEnoughPoints": "Недостаточно баллов для этой награды.",
-        "bonusPoints": "Баллы"
+        "bonusPoints": "Баллы",
+        "category": {
+            "noten": "Школа и оценки",
+            "zimmer": "Комната и порядок",
+            "geschrei": "Крики и тон",
+            "bettzeit": "Время сна",
+            "ritual": "Ритуал (бунт)",
+            "other": "Прочее"
+        },
+        "penaltyAction": "Последствие",
+        "penaltyTitle": "Записать последствие",
+        "penaltyChild": "Ребёнок",
+        "penaltyCategoryLabel": "Категория",
+        "penaltyReasonLabel": "Что случилось?",
+        "penaltyReasonPlaceholder": "напр. комната осталась неубранной",
+        "penaltySubmit": "Записать",
+        "penaltyToast": "Последствие записано",
+        "penaltyRetract": "Отменить последствие",
+        "penaltyRetractedToast": "Последствие отменено",
+        "ledgerPenaltyRetracted": "Последствие отменено",
+        "penaltyNoChild": "В этом домохозяйстве ещё нет ребёнка. последствие нужно ребёнку."
     },
     "datepicker": {
         "openCalendar": "Открыть календарь",

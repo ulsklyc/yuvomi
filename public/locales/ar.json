@@ -3790,7 +3790,9 @@
         "reminderListAssigneesTasksOnly": "يمكن تحديد الأشخاص فقط للقوائم التي تذهب إلى المهام.",
         "syncAssigneeNotMember": "يمكن اختيار أفراد المنزل فقط هنا.",
         "syncAssigneeUnknown": "هذا الشخص لم يعد موجودًا. أعد تحميل الصفحة.",
-        "permDetails": "الأدوات والصلاحيات الإضافية"
+        "permDetails": "الأدوات والصلاحيات الإضافية",
+        "rewardsPenaltiesLabel": "السماح بالعقوبات",
+        "rewardsPenaltiesHint": "يمكن للوالدين خصم نقاط عند سوء السلوك (غرفة غير مرتبة، صراخ، تأخر النوم). السبب إلزامي ويبقى ظاهرًا للطفل والوالدين؛ لا يراه الإخوة."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",
@@ -6528,7 +6530,8 @@
             "bonus": "نقاط مكافأة",
             "redeem": "تم استبدال الجائزة",
             "adjust": "تصحيح",
-            "reversal": "استرجاع"
+            "reversal": "استرجاع",
+            "penalty": "عقوبة"
         },
         "emptyLedgerTitle": "لا توجد حركات بعد",
         "emptyLedgerBody": "تظهر هنا النقاط المكتسبة والمستبدلة.",
@@ -6639,7 +6642,27 @@
         "bonusCredit": "إضافة",
         "bonusDebit": "خصم",
         "notEnoughPoints": "لا توجد نقاط كافية لهذه الجائزة.",
-        "bonusPoints": "النقاط"
+        "bonusPoints": "النقاط",
+        "category": {
+            "noten": "المدرسة والدرجات",
+            "zimmer": "الغرفة والترتيب",
+            "geschrei": "الصراخ والنبرة",
+            "bettzeit": "وقت النوم",
+            "ritual": "طقس النوم (شغب)",
+            "other": "أخرى"
+        },
+        "penaltyAction": "عقوبة",
+        "penaltyTitle": "تسجيل عقوبة",
+        "penaltyChild": "طفل",
+        "penaltyCategoryLabel": "الفئة",
+        "penaltyReasonLabel": "ماذا حدث؟",
+        "penaltyReasonPlaceholder": "مثلاً: الغرفة بقيت غير مرتبة",
+        "penaltySubmit": "سجل",
+        "penaltyToast": "تم تسجيل العقوبة",
+        "penaltyRetract": "سحب العقوبة",
+        "penaltyRetractedToast": "تم سحب العقوبة",
+        "ledgerPenaltyRetracted": "تم سحب العقوبة",
+        "penaltyNoChild": "لا يوجد طفل في هذا المنزل بعد. العقوبة تحتاج إلى طفل."
     },
     "datepicker": {
         "openCalendar": "فتح التقويم",

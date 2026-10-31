@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "只有進入任務的清單才能設定人員。",
         "syncAssigneeNotMember": "這裡只能選擇家庭成員。",
         "syncAssigneeUnknown": "此人已不存在。請重新載入頁面。",
-        "permDetails": "小工具與其他權限"
+        "permDetails": "小工具與其他權限",
+        "rewardsPenaltiesLabel": "允許後果",
+        "rewardsPenaltiesHint": "父母可以因不良行為扣分（房間不整齊、吼叫、晚睡）。原因必填，且僅小孩與父母可見；兄弟姊妹看不到。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",
@@ -6086,7 +6088,8 @@
             "bonus": "獎勵積分",
             "redeem": "獎品已兌換",
             "adjust": "調整",
-            "reversal": "退回"
+            "reversal": "退回",
+            "penalty": "後果"
         },
         "emptyLedgerTitle": "暫無記錄",
         "emptyLedgerBody": "獲得和兌換的積分會顯示在這裡。",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "增加",
         "bonusDebit": "扣除",
         "notEnoughPoints": "積分不足，無法兌換此獎品。",
-        "bonusPoints": "積分"
+        "bonusPoints": "積分",
+        "category": {
+            "noten": "學校與成績",
+            "zimmer": "房間與整潔",
+            "geschrei": "吼叫與語氣",
+            "bettzeit": "睡覺時間",
+            "ritual": "睡前鬧騰",
+            "other": "其他"
+        },
+        "penaltyAction": "後果",
+        "penaltyTitle": "記錄後果",
+        "penaltyChild": "小孩",
+        "penaltyCategoryLabel": "類別",
+        "penaltyReasonLabel": "發生了什麼事？",
+        "penaltyReasonPlaceholder": "例如：房間沒有整理",
+        "penaltySubmit": "記錄",
+        "penaltyToast": "已記錄後果",
+        "penaltyRetract": "撤回後果",
+        "penaltyRetractedToast": "後果已撤回",
+        "ledgerPenaltyRetracted": "後果已撤回",
+        "penaltyNoChild": "這個家庭還沒有小孩. 後果需要一個小孩作為對象。"
     },
     "datepicker": {
         "openCalendar": "開啟日曆",

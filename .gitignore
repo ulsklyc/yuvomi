@@ -116,6 +116,9 @@ seed-english-demo*.js
 
 # Database backup files
 *.db.backup-*
+# The instance lock the running server holds on <DB_PATH>.lock (server/utils/
+# instance-lock.js) - runtime state, never versioned.
+*.db.lock
 # Working copies that server/db.js leaves next to the database: the one it builds a
 # new database in (<DB_PATH>.creating), the one the encryption pass writes
 # (<DB_PATH>.encrypting) and the plaintext copy it keeps afterwards

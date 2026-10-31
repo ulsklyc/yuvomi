@@ -3568,7 +3568,9 @@
         "reminderListAssigneesTasksOnly": "Osoby lze nastavit jen u seznamů, které jdou do Úkolů.",
         "syncAssigneeNotMember": "Zde lze vybrat pouze členy domácnosti.",
         "syncAssigneeUnknown": "Tato osoba již neexistuje. Načtěte stránku znovu.",
-        "permDetails": "Widgety a další oprávnění"
+        "permDetails": "Widgety a další oprávnění",
+        "rewardsPenaltiesLabel": "Povolit důsledky",
+        "rewardsPenaltiesHint": "Rodiče mohou strhnout body za neposlušnost (nepořádek, křik, pozdě do postele). Důvod je povinný a zůstává viditelný dítěti a rodičům; sourozenci ho nevidí."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",
@@ -6239,7 +6241,8 @@
             "bonus": "Bonusové body",
             "redeem": "Odměna vyměněna",
             "adjust": "Oprava",
-            "reversal": "Vrácení"
+            "reversal": "Vrácení",
+            "penalty": "Důsledek"
         },
         "emptyLedgerTitle": "Zatím žádné záznamy",
         "emptyLedgerBody": "Získané a vyměněné body se zobrazí zde.",
@@ -6350,7 +6353,27 @@
         "bonusCredit": "Připsat",
         "bonusDebit": "Odečíst",
         "notEnoughPoints": "Na tuto odměnu není dost bodů.",
-        "bonusPoints": "Body"
+        "bonusPoints": "Body",
+        "category": {
+            "noten": "Škola a známky",
+            "zimmer": "Pokoj a pořádek",
+            "geschrei": "Křik a tón",
+            "bettzeit": "Čas spánku",
+            "ritual": "Rituál (blázování)",
+            "other": "Ostatní"
+        },
+        "penaltyAction": "Důsledek",
+        "penaltyTitle": "Dát důsledek",
+        "penaltyChild": "Dítě",
+        "penaltyCategoryLabel": "Kategorie",
+        "penaltyReasonLabel": "Co se stalo?",
+        "penaltyReasonPlaceholder": "např. pokoj zůstal neuklizený",
+        "penaltySubmit": "Vydat",
+        "penaltyToast": "Důsledek vydán",
+        "penaltyRetract": "Vzít důsledek zpět",
+        "penaltyRetractedToast": "Důsledek vzat zpět",
+        "ledgerPenaltyRetracted": "Důsledek vzat zpět",
+        "penaltyNoChild": "V domácnosti zatím není žádné dítě. důsledek potřebuje dítě jako cíl."
     },
     "datepicker": {
         "openCalendar": "Otevřít kalendář",

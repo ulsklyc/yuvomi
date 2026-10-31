@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "Personen kunnen alleen worden ingesteld voor lijsten die naar Taken gaan.",
         "syncAssigneeNotMember": "Hier kunnen alleen leden van het huishouden worden gekozen.",
         "syncAssigneeUnknown": "Deze persoon bestaat niet meer. Laad de pagina opnieuw.",
-        "permDetails": "Widgets en meer rechten"
+        "permDetails": "Widgets en meer rechten",
+        "rewardsPenaltiesLabel": "Gevolgen toestaan",
+        "rewardsPenaltiesHint": "Ouders kunnen punten inkorten bij wangedrag (rommelige kamer, geschreeuw, te laat naar bed). De reden is verplicht en blijft zichtbaar voor het kind en de ouders; broers/zussen zien die niet."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",
@@ -6086,7 +6088,8 @@
             "bonus": "Bonuspunten",
             "redeem": "Beloning ingewisseld",
             "adjust": "Correctie",
-            "reversal": "Terugboeking"
+            "reversal": "Terugboeking",
+            "penalty": "Gevolg"
         },
         "emptyLedgerTitle": "Nog geen boekingen",
         "emptyLedgerBody": "Verdiende en ingewisselde punten verschijnen hier.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Bijschrijven",
         "bonusDebit": "Aftrekken",
         "notEnoughPoints": "Niet genoeg punten voor deze beloning.",
-        "bonusPoints": "Punten"
+        "bonusPoints": "Punten",
+        "category": {
+            "noten": "School en cijfers",
+            "zimmer": "Kamer en orde",
+            "geschrei": "Geschreeuw en toon",
+            "bettzeit": "Bedtijd",
+            "ritual": "Ritueel (rompsballetje)",
+            "other": "Overig"
+        },
+        "penaltyAction": "Gevolg",
+        "penaltyTitle": "Gevolg registreren",
+        "penaltyChild": "Kind",
+        "penaltyCategoryLabel": "Categorie",
+        "penaltyReasonLabel": "Wat is er gebeurd?",
+        "penaltyReasonPlaceholder": "bv. kamer bleef rommelig",
+        "penaltySubmit": "Registreren",
+        "penaltyToast": "Gevolg geregistreerd",
+        "penaltyRetract": "Gevolg terugdraaien",
+        "penaltyRetractedToast": "Gevolg teruggedraaid",
+        "ledgerPenaltyRetracted": "Gevolg teruggedraaid",
+        "penaltyNoChild": "Er is nog geen kind in dit huishouden. een gevolg heeft een kind nodig."
     },
     "datepicker": {
         "openCalendar": "Kalender openen",

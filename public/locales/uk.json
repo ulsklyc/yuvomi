@@ -3676,7 +3676,9 @@
         "reminderListAssigneesTasksOnly": "Людей можна задати лише для списків, що йдуть у Завдання.",
         "syncAssigneeNotMember": "Тут можна вибрати лише членів родини.",
         "syncAssigneeUnknown": "Цієї людини більше немає. Перезавантажте сторінку.",
-        "permDetails": "Віджети та інші права"
+        "permDetails": "Віджети та інші права",
+        "rewardsPenaltiesLabel": "Дозволити наслідки",
+        "rewardsPenaltiesHint": "Батьки можуть знімати бали за небажану поведінку (непорядок, крики, пізній відбій). Причина обов'язкова й залишається видною дитині та батькам; брати й сестри її не бачать."
     },
     "login": {
         "tagline": "З поверненням. Ваш дім - в одному місці.",
@@ -6380,7 +6382,8 @@
             "bonus": "Бонусні бали",
             "redeem": "Нагороду обміняно",
             "adjust": "Коригування",
-            "reversal": "Повернення"
+            "reversal": "Повернення",
+            "penalty": "Наслідок"
         },
         "emptyLedgerTitle": "Записів ще немає",
         "emptyLedgerBody": "Зароблені та обміняні бали з’являться тут.",
@@ -6491,7 +6494,27 @@
         "bonusCredit": "Нарахувати",
         "bonusDebit": "Списати",
         "notEnoughPoints": "Недостатньо балів для цієї нагороди.",
-        "bonusPoints": "Бали"
+        "bonusPoints": "Бали",
+        "category": {
+            "noten": "Школа та оцінки",
+            "zimmer": "Кімната та лад",
+            "geschrei": "Крики та тон",
+            "bettzeit": "Час сну",
+            "ritual": "Ритуал (бурління)",
+            "other": "Інше"
+        },
+        "penaltyAction": "Наслідок",
+        "penaltyTitle": "Записати наслідок",
+        "penaltyChild": "Дитина",
+        "penaltyCategoryLabel": "Категорія",
+        "penaltyReasonLabel": "Що сталося?",
+        "penaltyReasonPlaceholder": "напр. кімната лишилася непорядною",
+        "penaltySubmit": "Записати",
+        "penaltyToast": "Наслідок записано",
+        "penaltyRetract": "Скасувати наслідок",
+        "penaltyRetractedToast": "Наслідок скасовано",
+        "ledgerPenaltyRetracted": "Наслідок скасовано",
+        "penaltyNoChild": "У цьому домогосподарстві ще немає дитини. наслідок потребує дитини."
     },
     "datepicker": {
         "openCalendar": "Відкрити календар",

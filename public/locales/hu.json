@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "Személyek csak a Feladatokba kerülő listákhoz állíthatók be.",
         "syncAssigneeNotMember": "Itt csak a háztartás tagjai választhatók.",
         "syncAssigneeUnknown": "Ez a személy már nem létezik. Töltsd újra az oldalt.",
-        "permDetails": "Widgetek és további jogok"
+        "permDetails": "Widgetek és további jogok",
+        "rewardsPenaltiesLabel": "Következmények engedélyezése",
+        "rewardsPenaltiesHint": "A szülők pontokat vonhatnak le rossz viselkedésért (rendetlen szoba, üvöltözés, késő lefekvés). Az ok kötelező, és a gyermek meg a szülők látják; a testvérek nem."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",
@@ -6086,7 +6088,8 @@
             "bonus": "Bónuszpont",
             "redeem": "Jutalom beváltva",
             "adjust": "Korrekció",
-            "reversal": "Visszatérítés"
+            "reversal": "Visszatérítés",
+            "penalty": "Következmény"
         },
         "emptyLedgerTitle": "Még nincsenek tételek",
         "emptyLedgerBody": "A megszerzett és beváltott pontok itt jelennek meg.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Jóváír",
         "bonusDebit": "Levon",
         "notEnoughPoints": "Nincs elég pont ehhez a jutalomhoz.",
-        "bonusPoints": "Pontok"
+        "bonusPoints": "Pontok",
+        "category": {
+            "noten": "Iskola és jegyek",
+            "zimmer": "Szoba és rend",
+            "geschrei": "Üvöltés és hangnem",
+            "bettzeit": "Leprés ideje",
+            "ritual": "Rítus (hancúrozás)",
+            "other": "Egyéb"
+        },
+        "penaltyAction": "Következmény",
+        "penaltyTitle": "Következmény rögzítése",
+        "penaltyChild": "Gyermek",
+        "penaltyCategoryLabel": "Kategória",
+        "penaltyReasonLabel": "Mi történt?",
+        "penaltyReasonPlaceholder": "pl. a szoba rendetlen maradt",
+        "penaltySubmit": "Rögzítés",
+        "penaltyToast": "Következmény rögzítve",
+        "penaltyRetract": "Következmény visszavonása",
+        "penaltyRetractedToast": "Következmény visszavonva",
+        "ledgerPenaltyRetracted": "Következmény visszavonva",
+        "penaltyNoChild": "Ebben a házban még nincs gyermek. a következmény gyermeknek szól."
     },
     "datepicker": {
         "openCalendar": "Naptár megnyitása",

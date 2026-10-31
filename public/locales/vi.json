@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "Chỉ đặt được người cho danh sách đi vào Công việc.",
         "syncAssigneeNotMember": "Ở đây chỉ chọn được thành viên trong gia đình.",
         "syncAssigneeUnknown": "Người này không còn tồn tại. Hãy tải lại trang.",
-        "permDetails": "Tiện ích và quyền khác"
+        "permDetails": "Tiện ích và quyền khác",
+        "rewardsPenaltiesLabel": "Cho phép hệ quả",
+        "rewardsPenaltiesHint": "Cha mẹ có thể trừ điểm vì cư xử chưa tốt (phòng bừa bộn, la hét, đi ngủ muộn). Lý do là bắt buộc và vẫn hiện với trẻ và cha mẹ; anh chị em không thấy."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",
@@ -6086,7 +6088,8 @@
             "bonus": "Điểm thưởng",
             "redeem": "Đã đổi phần thưởng",
             "adjust": "Điều chỉnh",
-            "reversal": "Hoàn lại"
+            "reversal": "Hoàn lại",
+            "penalty": "Hệ quả"
         },
         "emptyLedgerTitle": "Chưa có mục nào",
         "emptyLedgerBody": "Điểm kiếm được và đã đổi sẽ hiển thị ở đây.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Cộng điểm",
         "bonusDebit": "Trừ điểm",
         "notEnoughPoints": "Không đủ điểm cho phần thưởng này.",
-        "bonusPoints": "Điểm"
+        "bonusPoints": "Điểm",
+        "category": {
+            "noten": "Trường và điểm",
+            "zimmer": "Phòng và ngăn nắp",
+            "geschrei": "La hét và giọng",
+            "bettzeit": "Giờ đi ngủ",
+            "ritual": "Nghi thức (làm loạn)",
+            "other": "Khác"
+        },
+        "penaltyAction": "Hệ quả",
+        "penaltyTitle": "Ghi hệ quả",
+        "penaltyChild": "Trẻ",
+        "penaltyCategoryLabel": "Nhóm",
+        "penaltyReasonLabel": "Chuyện gì đã xảy ra?",
+        "penaltyReasonPlaceholder": "vd. phòng vẫn bừa bộn",
+        "penaltySubmit": "Ghi",
+        "penaltyToast": "Đã ghi hệ quả",
+        "penaltyRetract": "Thu hồi hệ quả",
+        "penaltyRetractedToast": "Đã thu hồi hệ quả",
+        "ledgerPenaltyRetracted": "Đã thu hồi hệ quả",
+        "penaltyNoChild": "Nhà này chưa có trẻ. hệ quả cần một trẻ làm đối tượng."
     },
     "datepicker": {
         "openCalendar": "Mở lịch",

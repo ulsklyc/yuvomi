@@ -3450,7 +3450,9 @@
         "reminderListAssigneesTasksOnly": "Άτομα ορίζονται μόνο για λίστες που πηγαίνουν στις Εργασίες.",
         "syncAssigneeNotMember": "Μόνο μέλη του νοικοκυριού μπορούν να επιλεγούν εδώ.",
         "syncAssigneeUnknown": "Αυτό το άτομο δεν υπάρχει πια. Φορτώστε ξανά τη σελίδα.",
-        "permDetails": "Widgets και πρόσθετα δικαιώματα"
+        "permDetails": "Widgets και πρόσθετα δικαιώματα",
+        "rewardsPenaltiesLabel": "Να επιτρέπονται συνέπειες",
+        "rewardsPenaltiesHint": "Οι γονείς μπορούν να αφαιρέσουν πόντους για κακή συμπεριφορά (ατακσία, φωνές, αργός ύπνος). Ο λόγος είναι υποχρεωτικός και μένει ορατός στο παιδί και στους γονείς· τα αδέλφια δεν τον βλέπουν."
     },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά. Το σπίτι σας σε ένα μέρος.",
@@ -6086,7 +6088,8 @@
             "bonus": "Πόντοι μπόνους",
             "redeem": "Το βραβείο εξαργυρώθηκε",
             "adjust": "Διόρθωση",
-            "reversal": "Επιστροφή"
+            "reversal": "Επιστροφή",
+            "penalty": "Συνέπεια"
         },
         "emptyLedgerTitle": "Δεν υπάρχουν ακόμη κινήσεις",
         "emptyLedgerBody": "Οι πόντοι που κερδίσατε και εξαργυρώσατε εμφανίζονται εδώ.",
@@ -6197,7 +6200,27 @@
         "bonusCredit": "Πίστωση",
         "bonusDebit": "Αφαίρεση",
         "notEnoughPoints": "Δεν υπάρχουν αρκετοί πόντοι για αυτό το βραβείο.",
-        "bonusPoints": "Πόντοι"
+        "bonusPoints": "Πόντοι",
+        "category": {
+            "noten": "Σχολείο και βαθμοί",
+            "zimmer": "Δωμάτιο και τάξη",
+            "geschrei": "Φωνές και ύφος",
+            "bettzeit": "Ώρα ύπνου",
+            "ritual": "Τελετή (παζάρι)",
+            "other": "Άλλα"
+        },
+        "penaltyAction": "Συνέπεια",
+        "penaltyTitle": "Καταχώρηση συνέπειας",
+        "penaltyChild": "Παιδί",
+        "penaltyCategoryLabel": "Κατηγορία",
+        "penaltyReasonLabel": "Τι συνέβη;",
+        "penaltyReasonPlaceholder": "π.χ. το δωμάτιο έμεινε ακατάστατο",
+        "penaltySubmit": "Καταχώρηση",
+        "penaltyToast": "Η συνέπεια καταχωρήθηκε",
+        "penaltyRetract": "Αναίρεση συνέπειας",
+        "penaltyRetractedToast": "Η συνέπεια ανακλήθηκε",
+        "ledgerPenaltyRetracted": "Η συνέπεια ανακλήθηκε",
+        "penaltyNoChild": "Δεν υπάρχει παιδί στο νοικοκυριό. η συνέπεια χρειάζεται παιδί ως στόχο."
     },
     "datepicker": {
         "openCalendar": "Άνοιγμα ημερολογίου",

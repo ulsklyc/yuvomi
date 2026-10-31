@@ -127,10 +127,21 @@ router.get('/overview', (req, res) => {
     const participantCount = d.prepare(`SELECT COUNT(*) AS n FROM reward_participants p JOIN users u ON u.id = p.user_id WHERE p.enabled = 1 AND ${MEMBER_FILTER}`).get().n;
     const catalogCount = d.prepare('SELECT COUNT(*) AS n FROM reward_catalog WHERE is_active = 1').get().n;
     const pointedTaskCount = d.prepare('SELECT COUNT(*) AS n FROM tasks WHERE points > 0').get().n;
+    // Konsequenten: Schalter + Frage 'darf ICH eine buchen' kommen von hier,
+    // dieselbe Aufloesung wie die Absage der Route — keine zweite Regel in der
+    // Oberflaeche. canIssue ist enabled UND (Admin oder Elternteil).
+    const penRow = d.prepare("SELECT value FROM sync_config WHERE key = 'rewards_penalties_enabled'").get();
+    const penEnabled = !!penRow && penRow.value === '1';
+    let penCanIssue = false;
+    if (penEnabled) {
+      const meRow = d.prepare('SELECT role, family_role FROM users WHERE id = ?').get(actingUser(req));
+      penCanIssue = !!meRow && (meRow.role === 'admin' || ['dad', 'mom', 'parent'].includes(meRow.family_role));
+    }
     res.json({ data: {
       balances, catalog, pendingCount: pending, moneyPendingCount: moneyPending,
       isAdmin: isAdminRequest(req), me: actingUser(req),
       setup: { participantCount, catalogCount, pointedTaskCount },
+      penalties: { enabled: penEnabled, canIssue: penCanIssue },
     } });
   } catch (err) {
     log.error('GET /overview error:', err);
@@ -360,12 +371,27 @@ router.delete('/catalog/:id', requireAdmin, (req, res) => {
 // NULL) laesst sich nicht mehr fragen, wer sie sah. Der Schnappschuss bleibt
 // dann bei der Person, der die Zeile gehoert - die engere Antwort ist die
 // einzige, die nichts verraten kann.
+function penaltyViewerFlag(req) {
+  // Dieselbe Frage wie penaltyPermissionRefusal, nur lesend: Admin oder
+  // Elternteil sieht Konsequenz-Gruende, Geschwister nicht.
+  const actor = actingUser(req);
+  if (!actor) return 0;
+  const row = db.get().prepare('SELECT role, family_role FROM users WHERE id = ?').get(actor);
+  if (!row) return 0;
+  return row.role === 'admin' || ['dad', 'mom', 'parent'].includes(row.family_role) ? 1 : 0;
+}
+
 const LEDGER_TASK_VISIBLE_SQL = `(
   l.user_id = @me
   OR (l.task_id IS NOT NULL AND EXISTS (
         SELECT 1 FROM tasks t
         WHERE t.id = l.task_id AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}))
   OR (l.task_id IS NULL AND (l.type IN ('bonus', 'adjust', 'redeem') OR l.redemption_id IS NOT NULL))
+  -- Konsequenzen nennen keine Aufgabe, also greift die Allowlist oben nicht.
+  -- Ihr Grund gehoert dem Kind (l.user_id = @me deckt das schon) und den
+  -- Erziehungsberechtigten: Admin oder ein Elternteil mit family_role.
+  -- Geschwister bleiben aussen — die engere Maske ist hier die ganze Idee.
+  OR (l.type = 'penalty' AND @penaltyViewer = 1)
 )`;
 
 router.get('/ledger', (req, res) => {
@@ -377,6 +403,16 @@ router.get('/ledger', (req, res) => {
              CASE WHEN ${LEDGER_TASK_VISIBLE_SQL} THEN l.reason  END AS reason,
              CASE WHEN ${LEDGER_TASK_VISIBLE_SQL} THEN l.task_id END AS task_id,
              l.redemption_id, l.created_at,
+             CASE WHEN l.type = 'penalty'
+                  AND (l.created_by = @me OR @actorIsAdmin = 1)
+                  AND NOT EXISTS (SELECT 1 FROM reward_ledger rv WHERE rv.reverses_id = l.id)
+             THEN 1 ELSE 0 END AS can_retract,
+             -- Eine Rueckbuchung ohne Grundtext: sie traegt ihren Satz aus der
+             -- Locale, aber nur wenn sie nachweislich eine Konsequenz tilgt.
+             CASE WHEN l.type = 'reversal' AND l.reason IS NULL
+                  AND EXISTS (SELECT 1 FROM reward_ledger pv
+                              WHERE pv.id = l.reverses_id AND pv.type = 'penalty')
+             THEN 1 ELSE 0 END AS retracts_penalty,
              u.display_name AS user_name, u.avatar_color AS user_color, u.avatar_data AS user_avatar,
              a.display_name AS actor_name
       FROM reward_ledger l
@@ -386,7 +422,9 @@ router.get('/ledger', (req, res) => {
       ${userId ? 'AND l.user_id = @userId' : ''}
       ORDER BY l.created_at DESC, l.id DESC
       LIMIT @limit
-    `).all({ userId, limit, me: actingUser(req) });
+    `).all({ userId, limit, me: actingUser(req), penaltyViewer: penaltyViewerFlag(req),
+      actorIsAdmin: isAdminRequest(req) ? 1 : 0 });
+
     res.json({ data: rows });
   } catch (err) {
     log.error('GET /ledger error:', err);
@@ -894,6 +932,122 @@ router.post('/bonus', requireAdmin, (req, res) => {
     res.status(201).json({ data: { user_id: userId, balance: getBalance(d, userId) } });
   } catch (err) {
     log.error('POST /bonus error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// Konsequenzen (Migration 272): optionale Gegenseite der Punkte. Eltern
+// ziehen Kindern Punkte ab (schlechtes Zimmer, Geschrei, Zu-spiet-Ins-Bett)
+// — als eigener Typ, damit die Antwort auf "warum ist mein Konto minus?"
+// 'Konsequenz: Zimmer unordentlich' lautet und nicht 'Korrektur'.
+//
+// HAUSHALTS-SCHALTER first: rewards_penalties_enabled (sync_config, Default
+// AUS). Aus ist hier nicht "verstecken", sondern 403 — eine Familie, die
+// keine Konsequenzen will, bekommt keine gebucht, egal welcher Client fragt.
+// --------------------------------------------------------
+const PENALTY_CATEGORIES = ['noten', 'zimmer', 'geschrei', 'bettzeit', 'ritual', 'other'];
+const MAX_PENALTY = 100;
+
+function penaltiesEnabled(d) {
+  const row = d.prepare("SELECT value FROM sync_config WHERE key = 'rewards_penalties_enabled'").get();
+  return !!row && row.value === '1';
+}
+
+/**
+ * Wer darf Konsequenzen verhaengen? Eltern (family_role dad/mom/parent) und
+ * Admin — gegenueber KINDERN. Ein Elternteil bestraft nie einen Erwachsenen
+ * und nie sich selbst; Admin darf alle (erzieht aber auch nur Kinder sinnvoll,
+ * die Zielpruefung laeuft fuer beide gleich).
+ * Zurueck: null wenn erlaubt, sonst die Antwort.
+ */
+function penaltyPermissionRefusal(d, actorId, targetId) {
+  const actor = d.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actorId);
+  const target = d.prepare('SELECT id, role, family_role, deactivated_at FROM users WHERE id = ?').get(targetId);
+  if (!target || target.deactivated_at) return { status: 404, error: 'User not found.' };
+  if (!actor) return { status: 403, error: 'Permission denied.' };
+  const parentLike = ['dad', 'mom', 'parent'].includes(actor.family_role);
+  if (!(actor.role === 'admin' || parentLike)) return { status: 403, error: 'Only parents can issue consequences.' };
+  if (target.family_role !== 'child') return { status: 403, error: 'Consequences apply to children only.' };
+  if (actor.id === target.id) return { status: 403, error: 'A consequence needs a child as target.' };
+  return null;
+}
+
+// POST /penalty — Konsequenz buchen. Schalter an + Elter/Admin gegen Kind.
+router.post('/penalty', (req, res) => {
+  try {
+    const d = db.get();
+    const actor = actingUser(req);
+    if (!actor) return res.status(403).json({ error: 'Permission denied.', code: 403 });
+    if (!penaltiesEnabled(d)) {
+      return res.status(403).json({
+        error: 'Consequences are turned off for this household (Settings › Rewards).',
+        code: 403, reason: 'rewards_penalties_disabled',
+      });
+    }
+    const userId = toInt(req.body?.user_id);
+    if (!Number.isFinite(userId)) return res.status(400).json({ error: 'user_id is required.', code: 400 });
+    const refusal = penaltyPermissionRefusal(d, actor, userId);
+    if (refusal) return res.status(refusal.status).json({ error: refusal.error, code: refusal.status });
+
+    const amount = toInt(req.body?.amount);
+    if (!Number.isFinite(amount) || amount < 1 || amount > MAX_PENALTY) {
+      return res.status(400).json({ error: `amount must be 1..${MAX_PENALTY}.`, code: 400 });
+    }
+    const rawReason = req.body?.reason != null ? String(req.body.reason).trim() : '';
+    if (rawReason.length < 2) {
+      return res.status(400).json({ error: 'reason is required (2..200 characters).', code: 400 });
+    }
+    const reason = rawReason.slice(0, 200);
+    const category = req.body?.category != null && req.body.category !== ''
+      ? String(req.body.category) : null;
+    if (category !== null && !PENALTY_CATEGORIES.includes(category)) {
+      return res.status(400).json({ error: 'Invalid category.', code: 400 });
+    }
+    // Der Grund traegt die Kategorie im Text, wenn sie gesetzt ist: der Ledger
+    // bleibt eine Zeile mit einer lesbaren Antwort, keine Zweigtabelle.
+    const ledgerReason = category && category !== 'other' ? `${category}: ${reason}` : reason;
+    if (!isEnrolled(d, userId)) {
+      return res.status(400).json({ error: 'User does not participate in the reward system.', code: 400, reason: 'rewards_not_participating' });
+    }
+    postLedger(d, { userId, delta: -amount, type: 'penalty', reason: ledgerReason, createdBy: actor });
+    res.status(201).json({ data: { user_id: userId, balance: getBalance(d, userId) } });
+  } catch (err) {
+    log.error('POST /penalty error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// DELETE /penalty/:id — zuruecknehmen. Nur der Urheber oder ein Admin; die
+// Ruecknahme ist eine Gegenbuchung (reversal mit reverses_id), die Konsequenz
+// bleibt als Vorgang sichtbar — korrigiert, nicht weg_radiert.
+router.delete('/penalty/:id', (req, res) => {
+  try {
+    const d = db.get();
+    const actor = actingUser(req);
+    if (!actor) return res.status(403).json({ error: 'Permission denied.', code: 403 });
+    const id = toInt(req.params.id);
+    if (!Number.isFinite(id)) return res.status(404).json({ error: 'Penalty not found.', code: 404 });
+    const row = d.prepare("SELECT * FROM reward_ledger WHERE id = ? AND type = 'penalty'").get(id);
+    if (!row) return res.status(404).json({ error: 'Penalty not found.', code: 404 });
+    const actorRow = d.prepare('SELECT role FROM users WHERE id = ?').get(actor);
+    if (row.created_by !== actor && actorRow?.role !== 'admin') {
+      return res.status(403).json({ error: 'Only the issuing parent or an admin can retract a consequence.', code: 403 });
+    }
+    // Doppelte Ruecknahme verhindern — dieselbe Frage wie bei der
+    // Einloesungs-Ruecknahme: existiert schon ein reversal auf dieser Zeile?
+    const already = d.prepare('SELECT 1 FROM reward_ledger WHERE reverses_id = ?').get(id);
+    if (already) {
+      return res.status(409).json({ error: 'This consequence was already retracted.', code: 409, reason: 'rewards_penalty_retracted' });
+    }
+    // Grund NULL, nicht ein hartkodiertes 'Konsequenz zurueckgenommen': die
+    // Ledger-Zeile uebersetzt die Oberflaeche (type reversal, Vorzeichen +).
+    d.prepare(`INSERT INTO reward_ledger (user_id, delta, type, created_by, reverses_id)
+      VALUES (?, ?, 'reversal', ?, ?)`)
+      .run(row.user_id, -row.delta, actor, id);
+    res.json({ data: { user_id: row.user_id, balance: getBalance(d, row.user_id) } });
+  } catch (err) {
+    log.error('DELETE /penalty/:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
