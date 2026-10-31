@@ -916,6 +916,16 @@ test(`Google [${ZONE}] Bruchteile im eingelesenen Start: das Echo wird erkannt (
   );
 });
 
+test(`Google [${ZONE}] Bruchteile im eingelesenen Start: das Ausrichten laesst sie stehen (#1957.3)`, async () => {
+  const p = provider('Google');
+  p.seedForeign({ start: '2035-01-15T13:00:00.500Z', end: '2035-01-15T14:00:00.250Z', rrule: 'FREQ=MONTHLY' });
+  await p.sync();
+  const imported = db.prepare("SELECT * FROM calendar_events WHERE title = 'Fremd'").get();
+  await editTitle(p, imported.id, { recurrence_rule: LAST_DAY });
+  assert.deepEqual(p.last(), { start: '2035-01-31T13:00:00.500Z', end: '2035-01-31T14:00:00.250Z' },
+    'derselbe Zeitpunkt am ersten Tag der Regel, auf die Millisekunde');
+});
+
 // ── Nur CalDAV und iCloud ───────────────────────────────────────────────────
 
 for (const name of ['CalDAV', 'iCloud']) {

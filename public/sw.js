@@ -1112,10 +1112,20 @@ function isAppRouteNavigation(request) {
   return !/\.[a-z0-9]+$/i.test(pathname);
 }
 
+/**
+ * Was sich ohne neue Version aendern kann, kommt zuerst aus dem Netz.
+ * `/manifest.webmanifest` ist keine Datei, sondern die Route in
+ * server/index.js, die den eingestellten App-Namen einsetzt; die Endung faellt
+ * durch das Muster unten. Lag sie cache-first im SHELL_CACHE, sah ein Browser,
+ * der das Manifest einmal geholt hatte, eine Umbenennung erst nach dem
+ * naechsten Release - auch nach Deinstallieren und Neuinstallieren der App,
+ * denn der Worker und sein Cache bleiben dabei stehen.
+ */
 function isMutableAppResource(pathname) {
   return pathname === '/'
     || pathname === '/index.html'
     || pathname === '/manifest.json'
+    || pathname === '/manifest.webmanifest'
     || /\.(css|js|json|html)$/i.test(pathname);
 }
 
