@@ -433,11 +433,12 @@ test('the three event delete paths: gone is done, any other failure says the app
 // D#2330: der Reset wirkt sofort. Der Zeitraum bleibt gleich, also darf das
 // Nachladen nicht an ihm haengen, und die Ansicht zeichnet den neuen Stand.
 test('resetting an ICS event shows the feed values without a page reload (D#2330)', async () => {
-  const previous = { window: globalThis.window, apiStub: globalThis.__apiStub,
+  const previous = { window: globalThis.window, apiStub: globalThis.__apiStub, document: globalThis.document,
     events: calendar.localCalendarState.events };
   const toasts = [];
   const bodyLookups = [];
   globalThis.window = { yuvomi: { showToast(message, type) { toasts.push([message, type]); } } };
+  globalThis.document = { ...previous.document, body: {}, activeElement: {} };
   calendar.setContainerForTest({ isConnected: true, querySelectorAll: () => [],
     querySelector: (selector) => { if (selector === '#cal-body') bodyLookups.push(selector); return null; } });
   const local = { id: 51, title: 'Lokal', start_datetime: '2035-05-02T15:00', external_source: 'ics', user_modified: 1 };
@@ -465,6 +466,41 @@ test('resetting an ICS event shows the feed values without a page reload (D#2330
     calendar.localCalendarState.events = previous.events;
     calendar.setContainerForTest(null);
     globalThis.window = previous.window;
+    globalThis.document = previous.document;
+    if (previous.apiStub === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = previous.apiStub;
+  }
+});
+
+// D#2330: in der Detailspalte schliesst nichts, es gibt keinen gemerkten
+// Ausloeser. Der Neuaufbau nimmt den fokussierten Menueeintrag mit, die gewaehlte
+// Zeile der Liste bekommt den Fokus statt BODY. Haelt schon etwas den Fokus, bleibt er.
+test('after an ICS reset in the agenda pane the selected row takes the focus (D#2330)', async () => {
+  const previous = { window: globalThis.window, apiStub: globalThis.__apiStub, document: globalThis.document,
+    events: calendar.localCalendarState.events };
+  const local = { id: 52, title: 'Lokal', start_datetime: '2035-05-02T15:00', external_source: 'ics', user_modified: 1 };
+  globalThis.window = { yuvomi: { showToast() {} } };
+  try {
+    for (const [label, holder, expected] of [['body', 'body', 1], ['another element', 'other', 0]]) {
+      let focused = 0;
+      const row = { focus() { focused += 1; } };
+      const body = {};
+      globalThis.document = { ...previous.document, body, activeElement: holder === 'body' ? body : {} };
+      calendar.setContainerForTest({ isConnected: true, querySelectorAll: () => [],
+        querySelector: (selector) => (selector === calendar.AGENDA_SELECTED_ROW ? row : null) });
+      calendar.localCalendarState.events = [{ ...local }];
+      globalThis.__apiStub = {
+        post: async () => ({ data: { reset: true, restored: true } }),
+        getWithSource: async () => ({ data: { data: [] }, fromCache: false }),
+        get: async () => ({ data: [] }),
+      };
+      await calendar.resetIcsEvent(local, async () => {});
+      assert.equal(focused, expected, label);
+    }
+  } finally {
+    calendar.localCalendarState.events = previous.events;
+    calendar.setContainerForTest(null);
+    globalThis.window = previous.window;
+    globalThis.document = previous.document;
     if (previous.apiStub === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = previous.apiStub;
   }
 });

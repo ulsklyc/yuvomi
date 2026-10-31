@@ -6175,6 +6175,9 @@ function handleDayRowActivation(e, { keyboard = false } = {}) {
  * unkodiert, und die id ist eine Zahl. Haushaltshilfe-Besuche bekommen keine
  * - sie oeffnen ihr eigenes Modul, eine Vorwahl darf dorthin nicht fuehren.
  */
+/** Die gewaehlte Zeile der Agenda neben der Detailspalte (utils/master-detail.js). */
+const AGENDA_SELECTED_ROW = '[data-md-id][aria-current="true"], [data-md-id] [aria-current="true"]';
+
 function agendaMdId(ev, day) {
   if (ev?.housekeeping_visit_id) return null;
   return `${ev.id}.${day}`;
@@ -7467,7 +7470,7 @@ export const __test = {
   // #1909: die drei Loeschwege eines Termins, am echten Undo-Ablauf.
   deleteEvent, deleteThisAndFollowing, deleteSingleOccurrence,
   // D#2330: der Reset eines ICS-Termins zeigt den Feed-Stand ohne Reload.
-  resetIcsEvent,
+  resetIcsEvent, AGENDA_SELECTED_ROW,
   hasCurrentAttachment,
   attachmentNode,
   fetchWindow,
@@ -9860,6 +9863,9 @@ async function resetIcsEvent(ev, close) {
       await reloadAfterSave(() => reloadCalendarEventsOnly());
       renderView();
       refocusAfterRender();
+      // In der Detailspalte schliesst nichts, es gibt keinen Merker: der Fokus
+      // stand im Menue der Spalte, das der Neuaufbau mitgenommen hat.
+      if (document.activeElement === document.body) _container.querySelector(AGENDA_SELECTED_ROW)?.focus();
     } else {
       await notifyAwayChanged();
     }
