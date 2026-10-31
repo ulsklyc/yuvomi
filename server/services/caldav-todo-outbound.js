@@ -59,7 +59,9 @@ import {
   noteUploadAttempt, settleUploadAttempt, uploadAttemptsAt,
   hasUploadAttempt, removeLeftoverUploads,
 } from './caldav-upload-attempts.js';
-import { householdTimeZone, localToUTC } from '../utils/timezone.js';
+import { hasExplicitZone, householdTimeZone, localToUTC } from '../utils/timezone.js';
+import { formatICSDate } from './ics-parser.js';
+import { anchorZone } from '../utils/ics-datetime.js';
 import { timedSeriesUntil } from '../utils/rrule-until.js';
 import { rruleValue } from './recurrence.js';
 import { loadTags, tagsKey } from '../utils/task-tags.js';
@@ -162,11 +164,12 @@ export function priorityToVtodo(priority) {
 /**
  * DUE-Property aus Datum und Uhrzeit.
  *
- * Ohne Uhrzeit ein reines Datum (VALUE=DATE), sonst ein UTC-Zeitstempel. Eine
- * Aufgabe trägt keine TZID: `due_date`/`due_time` sind Wanduhr-Werte in der Zone
- * des Haushalts, also muss die Uhrzeit von dort nach UTC (Gegenstück zu
- * splitDue). Ein ungeprüft als UTC verschicktes „14:30" verschöbe die Aufgabe auf
- * dem Server um den Zonenoffset.
+ * Ohne Uhrzeit ein reines Datum (VALUE=DATE), sonst ein UTC-Zeitstempel. Die
+ * Aufgabe speichert keine TZID: `due_date`/`due_time` sind Wanduhr-Werte in der
+ * Zone des Haushalts, also muss die Uhrzeit von dort nach UTC (Gegenstück zu
+ * splitDue; eine Serie ankert stattdessen in der Zone, siehe seriesAnchor). Ein
+ * ungeprüft als UTC verschicktes „14:30" verschöbe die Aufgabe auf dem Server um
+ * den Zonenoffset.
  */
 export function dueField(date, time, tz = householdTimeZone(null)) {
   if (!date) return null; // Property entfernen
@@ -214,22 +217,24 @@ export function icsFieldsForTask(task, hadCompleted = false, tz = householdTimeZ
     ...completionFields(task.status === 'done', task.status === 'in_progress', hadCompleted),
   };
   if (Array.isArray(task.tags)) fields.CATEGORIES = task.tags;
-  Object.assign(fields, recurrenceFields(task, fields.DUE, tz, serverIcs));
+  Object.assign(fields, recurrenceFields(task, tz, serverIcs));
+  if (fields.DUE === KEEP_ON_SERVER) delete fields.DUE;
   return fields;
 }
 
 /** Marke an einem fremden Objekt: die RRULE, die Yuvomi dort geschrieben hat. */
 const YUVOMI_RRULE = 'X-YUVOMI-RRULE';
 
+/** DUE des Serverobjekts bleibt Wort fuer Wort stehen (`anchorStays`). */
+const KEEP_ON_SERVER = Symbol('keep on server');
+
 /**
- * RRULE, DTSTART und Marke einer Aufgabe - nur die Felder, die der Push
- * anfassen darf (#2350). Ein fehlendes Feld laesst die Property auf dem Server
- * stehen, null entfernt sie.
- *
- * DTSTART: RFC 5545 §3.8.2.4 verlangt es in jeder Komponente mit RRULE; DUE
- * ersetzt den Anker nicht. Es traegt Wert und Typ von DUE, so beginnt die Serie
- * an der Faelligkeit, und es zieht mit, wenn sie sich verschiebt. Der Inbound
- * liest DTSTART eines VTODO nicht ein.
+ * RRULE, Anker und Marke einer Aufgabe - nur die Felder, die der Push anfassen
+ * darf (#2350). Ein fehlendes Feld laesst die Property auf dem Server stehen,
+ * null entfernt sie. Eine Serie bringt ihren Anker mit (`seriesAnchor`): DUE und
+ * DTSTART stehen dann in der Zone des Haushalts statt in UTC, ausser am Objekt
+ * haengen Daten anderer Clients (`anchorStays`). Der Inbound liest DTSTART eines
+ * VTODO nicht ein.
  *
  * Ein eigenes Objekt (von Yuvomi angelegt) fuehrt Yuvomi ganz: ohne Regel
  * verschwinden RRULE und DTSTART. An einem fremden Objekt bleibt eine Regel
@@ -242,10 +247,15 @@ const YUVOMI_RRULE = 'X-YUVOMI-RRULE';
  * DTSTART bleibt dabei stehen: an einem fremden Objekt kann es auch vorher ein
  * Beginn gewesen sein.
  */
-function recurrenceFields(task, due, tz, serverIcs) {
+function recurrenceFields(task, tz, serverIcs) {
   const rrule = vtodoRecurrence(task, tz);
   const own = ownsRecurrence(task);
-  if (rrule) return { RRULE: rrule, DTSTART: due, [YUVOMI_RRULE]: own ? null : rrule };
+  if (rrule) {
+    const anchor = anchorStays(task, tz, serverIcs)
+      ? { DUE: KEEP_ON_SERVER }
+      : seriesAnchor(task.due_date, task.due_time, tz);
+    return { RRULE: rrule, ...anchor, [YUVOMI_RRULE]: own ? null : rrule };
+  }
   if (own) return { RRULE: null, DTSTART: null, [YUVOMI_RRULE]: null };
   // Fremd und erledigt oder ohne Faelligkeit: nichts anfassen. Nur die hier
   // abgeschaltete Wiederholung nimmt Yuvomis eigene Regel zurueck.
@@ -258,41 +268,138 @@ function recurrenceFields(task, due, tz, serverIcs) {
 }
 
 /**
- * Rohwert der Property `name` im VTODO mit `uid` ohne RECURRENCE-ID - oder null.
- * Dieselbe Komponente, die der Patcher anfasst: eine VTIMEZONE davor traegt in
- * STANDARD/DAYLIGHT eigene RRULEs, und die erste Fundstelle im ganzen Objekt
- * waere deren Regel statt der der Aufgabe.
+ * DUE und DTSTART einer Serie (#2374).
+ *
+ * Mit Uhrzeit stehen beide als Wanduhr in der Zone des Haushalts: ein UTC-Anker
+ * liesse den Server in UTC rechnen, eine taegliche 07:00-Aufgabe stuende nach der
+ * Zeitumstellung auf 08:00, und ein BYDAY nahe Mitternacht kippte auf den
+ * Nachbartag (RFC 5545 §3.8.5.3). DTSTART ist 00:00 des Faelligkeitstags: §3.8.2.3
+ * verlangt DUE strikt danach, und derselbe Ortstag haelt ihn mit BYDAY und
+ * BYMONTHDAY im Takt. `patchICSTodo` schreibt das VTIMEZONE zur TZID mit.
+ *
+ * Eine Zone, die UTC gleicht, bleibt beim Z (`anchorZone`). Ohne gewaehlte Zone
+ * gilt der Rueckfall von `householdTimeZone`, derselbe, mit dem die Uhrzeit
+ * ohnehin gelesen wird (#1967).
+ *
+ * KEIN DTSTART, wo keiner vor DUE liegen kann, ohne die Regel zu verfaelschen: an
+ * einem reinen Datum und um 00:00. Der Vortag stuende neben BYDAY auf dem falschen
+ * Wochentag, und dann ist die Serie laut §3.8.5.3 undefiniert. §3.8.2.4 nennt
+ * DTSTART zwar Pflicht neben einer RRULE, die VTODO-Clients ankern aber auf DUE,
+ * wenn es fehlt (Thunderbird, Tasks.org, vobject); ein DTSTART gleich DUE dagegen
+ * verletzt §3.8.2.3, und DAVx5/Tasks.org werfen es weg. null nimmt das DTSTART
+ * eines Objekts aus der Zeit vor #2374 wieder heraus.
  */
-function todoPropertyValue(icsText, uid, name) {
-  if (!icsText || !uid) return null;
+function seriesAnchor(date, time, tz) {
+  if (!time) return { DUE: dueField(date, null), DTSTART: null };
+
+  const clock = String(time).slice(0, 5);
+  const startsWithDue = clock === '00:00';
+  const zone = anchorZone(tz);
+  if (!zone) {
+    return { DUE: dueField(date, clock, tz), DTSTART: startsWithDue ? null : dueField(date, '00:00', tz) };
+  }
+
+  const day = String(date).slice(0, 10).replace(/-/g, '');
+  const wall = (hhmm) => ({ value: `${day}T${hhmm.replace(':', '')}00`, params: `;TZID=${zone}` });
+  return { DUE: wall(clock), DTSTART: startsWithDue ? null : wall('00:00') };
+}
+
+/**
+ * Bleibt der Anker dieses Serverobjekts, wie er ist? (Review auf #2420)
+ *
+ * Am Anker haengen Daten anderer Clients, die der Patcher nicht anfasst: ein
+ * START-relativer Alarm rechnet von DTSTART (RFC 5545 §3.8.6.3, ohne RELATED gilt
+ * START), EXDATE und RECURRENCE-ID nennen ein Vorkommen ueber dessen Zeitwert
+ * (§3.8.4.4), ein RDATE-Termin erbt die Dauer von DTSTART bis DUE. Rueckte eine
+ * unbeteiligte Bearbeitung den Anker, fiele der Alarm auf den Vorabend, ein
+ * gestrichenes Vorkommen kaeme zurueck, und ein Zusatztermin fiele spaeter. Solche
+ * Objekte werden deshalb nicht umgerechnet: DUE und DTSTART bleiben stehen, solange die
+ * Faelligkeit gleich ist, auch ein DTSTART = DUE in UTC aus v2.83.0. Das heilt sich
+ * mit dem Abhaken, denn die Folgeinstanz ist ein neues VTODO mit sauberem Anker.
+ *
+ * Verschiebt sich die Faelligkeit, zieht der Anker trotzdem: DUE vor einem
+ * stehengebliebenen DTSTART weisen strenge Server ab. Alarm und Ausnahmen bleiben
+ * dann Wort fuer Wort stehen und zeigen auf den neuen bzw. alten Anker.
+ */
+function anchorStays(task, tz, serverIcs) {
+  if (!serverIcs || !task.external_uid) return false;
+  const blocks = todoBlocks(serverIcs).filter((block) => block.uid === task.external_uid);
+  const master = blocks.find((block) => !block.override);
+  if (!master) return false;
+  const pinned = blocks.length > 1
+    || master.props.some((line) => ['EXDATE', 'RDATE'].includes(propertyName(line)))
+    || master.nested.some(isStartRelativeTrigger);
+  if (!pinned) return false;
+  const due = master.props.find((line) => propertyName(line) === 'DUE');
+  return Boolean(due) && dueLineMeans(due, task.due_date, task.due_time, tz);
+}
+
+/** TRIGGER mit Dauer, die von DTSTART rechnet: ohne RELATED gilt START. */
+function isStartRelativeTrigger(line) {
+  if (propertyName(line) !== 'TRIGGER') return false;
+  const params = line.slice(0, line.indexOf(':')).toUpperCase();
+  return !params.includes('RELATED=END') && !params.includes('VALUE=DATE-TIME');
+}
+
+/** Meint diese DUE-Zeile dieselbe Faelligkeit wie Datum und Uhrzeit der Aufgabe? */
+function dueLineMeans(line, date, time, tz) {
+  const params = line.slice(3, line.indexOf(':'));
+  const value = line.slice(line.indexOf(':') + 1).trim();
+  const dateOnly = /;VALUE=DATE(?![-\w])/i.test(params) || /^\d{8}$/.test(value);
+  const zone = /;TZID=([^;:]+)/i.exec(params)?.[1] ?? null;
+  const onServer = formatICSDate(value, dateOnly, zone);
+  const day = String(date).slice(0, 10);
+  if (!time) return onServer === day;
+  if (dateOnly) return false;
+  const wall = `${day}T${String(time).slice(0, 5)}:00`;
+  if (!hasExplicitZone(onServer)) return onServer === wall; // floating: schon Wanduhr
+  return Date.parse(onServer) === Date.parse(localToUTC(wall, tz));
+}
+
+/** Name einer entfalteten Inhaltszeile, gross geschrieben. */
+function propertyName(line) {
+  const cut = line.search(/[;:]/);
+  return (cut === -1 ? line : line.slice(0, cut)).toUpperCase();
+}
+
+/**
+ * Die VTODO-Komponenten eines Objekts: eigene Zeilen in `props`, die der
+ * Subkomponenten (VALARM) in `nested`. Eine VTIMEZONE davor traegt in
+ * STANDARD/DAYLIGHT eigene RRULEs und bleibt deshalb draussen.
+ */
+function todoBlocks(icsText) {
   const lines = unfoldICS(icsText).split('\n').map((l) => l.replace(/\r$/, ''));
-  const nameOf = (line) => { const cut = line.search(/[;:]/); return (cut === -1 ? line : line.slice(0, cut)).toUpperCase(); };
   const valueOf = (line) => line.slice(line.indexOf(':') + 1).trim();
+  const blocks = [];
   let block = null;
   let depth = 0;
   for (const line of lines) {
     const upper = line.trim().toUpperCase();
     if (!block) {
-      if (upper === 'BEGIN:VTODO') { block = { props: [], uid: null, override: false }; depth = 0; }
+      if (upper === 'BEGIN:VTODO') { block = { props: [], nested: [], uid: null, override: false }; depth = 0; }
       continue;
     }
     if (upper.startsWith('BEGIN:')) { depth++; continue; }
-    if (upper === 'END:VTODO' && depth === 0) {
-      if (block.uid === uid && !block.override) {
-        const hit = block.props.find((l) => nameOf(l) === name);
-        return hit ? valueOf(hit) : null;
-      }
-      block = null;
-      continue;
-    }
+    if (upper === 'END:VTODO' && depth === 0) { blocks.push(block); block = null; continue; }
     if (upper.startsWith('END:')) { depth--; continue; }
-    if (depth > 0) continue; // VALARM & Co.
-    const prop = nameOf(line);
+    if (depth > 0) { block.nested.push(line); continue; }
+    const prop = propertyName(line);
     if (prop === 'UID') block.uid = valueOf(line);
     if (prop === 'RECURRENCE-ID') block.override = true;
     block.props.push(line);
   }
-  return null;
+  return blocks;
+}
+
+/**
+ * Rohwert der Property `name` im VTODO mit `uid` ohne RECURRENCE-ID - oder null.
+ * Dieselbe Komponente, die der Patcher anfasst.
+ */
+function todoPropertyValue(icsText, uid, name) {
+  if (!icsText || !uid) return null;
+  const master = todoBlocks(icsText).find((block) => block.uid === uid && !block.override);
+  const hit = master?.props.find((line) => propertyName(line) === name);
+  return hit ? hit.slice(hit.indexOf(':') + 1).trim() : null;
 }
 
 function unescapeText(value) {
@@ -307,8 +414,8 @@ function sameRule(a, b) {
 /**
  * Die Wiederholung einer Aufgabe als RRULE-Wert (ohne Praefix) - oder null (#2350).
  *
- * Keine Regel ohne DUE: DTSTART, der Anker der Serie, steht auf DUE (siehe
- * recurrenceFields), und eine Aufgabe, die ab Erledigung zaehlt, kann ganz ohne
+ * Keine Regel ohne DUE: der Anker der Serie haengt an der Faelligkeit (siehe
+ * seriesAnchor), und eine Aufgabe, die ab Erledigung zaehlt, kann ganz ohne
  * Faelligkeit wiederkehren. Keine Regel an einer erledigten Aufgabe: das
  * Abhaken legt in Yuvomi eine Folgeinstanz als eigene Zeile und eigenes VTODO
  * an; behielte das erledigte Objekt seine Regel, zeigte ein Client die Serie
@@ -318,8 +425,8 @@ function sameRule(a, b) {
  * UNTIL hat nach RFC 5545 den Werttyp des Ankers: an einem reinen Datum ein
  * Datum (ein altes `T235959Z` aus dem frueheren Formular wird darauf
  * zurueckgeschnitten), an einer Uhrzeit das Ende des Ortstags in UTC (#1974,
- * utils/rrule-until.js) - DUE steht dann ebenfalls in UTC. COUNT bleibt, wie es
- * gespeichert ist.
+ * utils/rrule-until.js) - auch neben einem DTSTART mit TZID verlangt §3.3.10 UTC.
+ * COUNT bleibt, wie es gespeichert ist.
  */
 function vtodoRecurrence(task, tz) {
   if (!task.is_recurring || !task.recurrence_rule || !task.due_date || task.status === 'done') return null;
