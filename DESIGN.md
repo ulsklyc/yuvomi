@@ -3850,7 +3850,9 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Seit D1 (Critique 2026-10-16) traegt auch der Aufgabenkopf seine Werkzeuge in der
    Titelzeile: Lupe, Filter als Icon mit Zaehler (D2) und „...", die Ansicht Liste/Brett
    unter 768px als Einfachauswahl im Menue. Gemessen 390px: Kopf 120 -> 65px, erste
-   Gruppe y 132 -> 78. Drei Icon-Knoepfe lassen „Aufgaben" bei 390px 166px.
+   Gruppe y 132 -> 78. Drei Icon-Knoepfe lassen „Aufgaben" bei 390px 166px; unter 390px
+   reicht das nicht mehr (360px: 136px, das Wort braucht in Roboto 144), dort steht der
+   Filter im „..." (#2425, Regel 3), und der Kopf traegt die zwei Knoepfe dieser Regel.
    **Seit R19 gilt 1a bis 1023px**, also auch auf dem Tablet: bei 834px stand die Suche als
    Feld in einer eigenen Zeile unter dem Titel (Aufgaben, Kontakte, Inventar, Notizen,
    Dokumente 118px). Jetzt teilen Titel (natuerliche Breite, Ellipse), Suchfeld und Werkzeuge
@@ -3868,6 +3870,12 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Element IM Scrollport (scrollt weg) oder hinter „Filter (n)" mit Blatt
    (utils/filter-sheet.js, Vorbild Kalender). Aktive Filter bleiben sichtbar: die Zahl am
    Knopf oder die Chips im Port. Nie beides fuer dieselbe Achse.
+   **Aufgaben unter 390px (#2425, Ulas 2026-10-31):** der Filter steht als beschrifteter
+   Eintrag im „...", die Zahl steht dann am „..." (Modulton, Badge, im Namen) und im Eintrag;
+   ab 390px bleibt der Knopf, je Breite ein Weg. Das ist die einzige Abweichung und kein
+   Muster fuer andere Koepfe: kein anderer Modulkopf traegt neben dem Titel drei Werkzeuge
+   (gemessen 320-375px), und der Kalender behaelt seinen Filter (R20 6c, kompakter Kopf wie
+   Apple Kalender).
    Eine Chipreihe bleibt EINE Reihe, auch am Zeigergeraet (R22, D20; Kontakte brachen bis
    dahin ab 1024px in zwei Reihen um, rund 48px Kopf): sie scrollt waagerecht mit Fade an der
    Kante (`wireScrollFade`), das Mausrad bewegt sie, bis sie am Ende ist, dann die Seite

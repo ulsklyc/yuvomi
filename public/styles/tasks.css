@@ -286,6 +286,42 @@
   }
 }
 
+/* UND EIN WEG ZUM FILTER JE BREITE (#2425; DESIGN.md, Kopfregel mobil, Regel 3).
+ * Drei Knoepfe lassen dem Titel Breite minus 224px: bei 360px 136px, und
+ * "Aufgaben" braucht in Roboto 144, "Feladatok" 146, "Завдання" 152. Unter 390px
+ * steht der Filter deshalb im Werkzeugmenue, die Zahl aktiver Filter am "...",
+ * und die Zeile traegt die zwei Knoepfe der Regel 1a (Titel: Breite minus 172).
+ * Ab 390px bleibt der Knopf. EINE Abfrage schaltet beide Wege: ausserhalb sind
+ * Eintrag und Zahl per Basisregel aus, zwei Abfragen liessen bei 389,5px ein
+ * Loch. Der Kalender faltet seinen Filter bewusst nicht (R20 6c). */
+.tasks-toolbar .popover-menu__item[data-action="open-filters"],
+.tasks-toolbar .tasks-tools-btn__count {
+  display: none;
+}
+
+@media (max-width: 389px) {
+  .tasks-toolbar .tasks-toolbar__filter {
+    display: none;
+  }
+
+  .tasks-toolbar .popover-menu__item[data-action="open-filters"] {
+    display: flex;
+  }
+
+  .tasks-toolbar .tasks-tools-btn__count {
+    display: block;
+  }
+
+  .tasks-toolbar .page-tools-btn {
+    position: relative;
+  }
+
+  /* Dieselbe Sprache wie `.page-filter-btn--active`: Modulton und Zahl. */
+  .tasks-toolbar .page-tools-btn:has(.tasks-tools-btn__count:not([hidden])) {
+    color: var(--module-accent, var(--color-accent));
+  }
+}
+
 /* Der Filterknopf im Verlauf: Platz gehalten, Knopf weg (tasks.js
  * `syncViewChrome`, Critique R24 G2-Aufgaben-P3-3). `visibility` nimmt ihn aus
  * Zeiger, Tab-Folge und Baum, ohne dass Segment und Primaerknopf rutschen. */

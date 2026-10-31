@@ -56,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin sets up, in line with how private entries already work.
 
 ### Fixed
+- **The Tasks title stands in full on narrow phones** (#2425). Below 390px wide the title sat next
+  to three buttons and read "Aufgab…" at 360px. There the filter now moves into the "..." menu, and
+  the number of active filters stands on the "..." button and in the menu entry. From 390px up
+  nothing changes.
 - **The container starts with `no-new-privileges`.** Hardened setups (Podman Quadlet
   `NoNewPrivileges=true`, `--security-opt no-new-privileges`, Compose `security_opt`) never got
   past the entrypoint: `gosu` hung as root at 100 % CPU before it switched to the `node` user, so
