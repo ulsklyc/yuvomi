@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "Le fichier ne contient qu’une ligne d’en-tête et aucune période de règles.",
         "errorCycleImportTooManyRows": "Un import peut contenir au plus {{limit}} périodes de règles. Divise le fichier.",
         "errorVitalImpossible": "Cette valeur n'est pas possible. Vérifiez votre saisie.",
-        "errorVitalBpOrder": "La valeur systolique doit être supérieure à la diastolique."
+        "errorVitalBpOrder": "La valeur systolique doit être supérieure à la diastolique.",
+        "errorVitalUnit": "Cette unité ne convient pas à cette mesure."
     },
     "waste": {
         "title": "Collecte des déchets",

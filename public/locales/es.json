@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "El archivo solo tiene la fila de encabezado y ningún periodo.",
         "errorCycleImportTooManyRows": "Una importación puede tener como máximo {{limit}} periodos. Divide el archivo.",
         "errorVitalImpossible": "Este valor no es posible. Revisa lo que has introducido.",
-        "errorVitalBpOrder": "El valor sistólico debe ser mayor que el diastólico."
+        "errorVitalBpOrder": "El valor sistólico debe ser mayor que el diastólico.",
+        "errorVitalUnit": "Esta unidad no corresponde a esta medición."
     },
     "waste": {
         "title": "Recogida de basura",

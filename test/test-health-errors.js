@@ -147,12 +147,14 @@ test('Server: ein unmoeglicher Vitalwert nennt seinen Fall, Status 400', async (
   assert.deepEqual([r.status, r.body?.reason], [400, 'health_vital_bp_order']);
   r = await call('POST', '/vitals', { type: 'spo2', value_num: 101, unit: '%', measured_at: at });
   assert.deepEqual([r.status, r.body?.reason], [400, 'health_vital_out_of_range']);
+  r = await call('POST', '/vitals', { type: 'weight', value_num: 90, unit: 'furlong', measured_at: at });
+  assert.deepEqual([r.status, r.body?.reason], [400, 'health_vital_unit_invalid']);
 });
 
 test('Server: jeder Gesundheits-Grund hat einen Satz, und jeder "gibt es nicht mehr" laedt nach', () => {
   const reasons = new Set([...SERVER_GONE.map((c) => c[3]), 'health_prevention_selected_type_not_found',
     'health_cycle_import_too_large', 'health_cycle_import_no_rows', 'health_cycle_import_too_many_rows',
-    'health_vital_bp_order', 'health_vital_out_of_range']);
+    'health_vital_bp_order', 'health_vital_out_of_range', 'health_vital_unit_invalid']);
   for (const reason of reasons) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: kein Satz`);
     assert.equal(GONE_REASONS.has(reason), reason.endsWith('_not_found'), reason);

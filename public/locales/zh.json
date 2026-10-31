@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "文件只有标题行没有任何经期。",
         "errorCycleImportTooManyRows": "一次导入最多 {{limit}} 个经期。请拆分文件。",
         "errorVitalImpossible": "这个数值不可能。请检查输入。",
-        "errorVitalBpOrder": "收缩压必须高于舒张压。"
+        "errorVitalBpOrder": "收缩压必须高于舒张压。",
+        "errorVitalUnit": "这个单位不适用于此测量。"
     },
     "waste": {
         "title": "垃圾收集",

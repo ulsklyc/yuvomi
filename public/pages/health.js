@@ -33,7 +33,7 @@ import { personSwitcherMarkup, wireWhoSees } from '/utils/health-person-switcher
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
 import {
   computeVitalSeries, stepVitalAnchor, VITAL_METRICS, vitalMetric,
-  MOOD_SCALE, moodStep, splitDuration, durationToHours, vitalPlausibility, widenToSpan,
+  MOOD_SCALE, moodStep, splitDuration, durationToHours, vitalPlausibility, vitalMeasureChanged, widenToSpan,
 } from '/utils/health-vitals.js';
 import {
   computeDueDoses, computeAdherence, refillState, medicationCountsToday, currentSchedules,
@@ -3039,7 +3039,11 @@ function openVitalModal(opts = {}) {
         }
         // Unmoegliches gar nicht erst senden (Critique R19): dieselben harten
         // Grenzen wie am Server, der Fehler steht am Feld, das ihn traegt.
-        if (reportFieldErrors(vitalPlausibility(body).hard.map(({ channel, issue }) => [
+        // Beim Bearbeiten nur, wenn sich die Messung aendert (#2375): eine Altzeile
+        // ausserhalb der Grenzen nimmt weiter eine Notiz an, wie am Server.
+        const patch = isEdit ? vitalPatchBody(body, { unitEditable, unitBefore }) : null;
+        const judged = !isEdit || vitalMeasureChanged(row, patch);
+        if (judged && reportFieldErrors(vitalPlausibility(body).hard.map(({ channel, issue }) => [
           fieldsHost.querySelector(VITAL_CHANNEL_INPUT[channel]),
           t(issue === 'bpOrder' ? 'health.errorVitalBpOrder' : 'health.errorVitalImpossible'),
         ]))) {
@@ -3054,7 +3058,7 @@ function openVitalModal(opts = {}) {
             // PATCH liest nur genannte Felder. Ein geleertes Puls- oder
             // Notizfeld muss deshalb als null mitgehen, sonst bliebe der
             // alte Wert stehen, obwohl der Dialog ihn nicht mehr zeigt.
-            await api.patch(`/health/vitals/${row.id}`, vitalPatchBody(body, { unitEditable, unitBefore }));
+            await api.patch(`/health/vitals/${row.id}`, patch);
           } else {
             await api.post('/health/vitals', { ...body, ...ownerField(vitals.personId, vitals.meId) });
           }

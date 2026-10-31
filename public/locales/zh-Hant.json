@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "檔案只有標題列，沒有任何經期。",
         "errorCycleImportTooManyRows": "一次匯入最多 {{limit}} 個經期。請分割檔案。",
         "errorVitalImpossible": "這個數值不可能。請檢查輸入。",
-        "errorVitalBpOrder": "收縮壓必須高於舒張壓。"
+        "errorVitalBpOrder": "收縮壓必須高於舒張壓。",
+        "errorVitalUnit": "這個單位不適用於此測量。"
     },
     "waste": {
         "title": "垃圾收集",

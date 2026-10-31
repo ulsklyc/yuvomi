@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "The file only has a header row and no periods.",
         "errorCycleImportTooManyRows": "An import can hold at most {{limit}} periods. Split the file.",
         "errorVitalImpossible": "This value is not possible. Please check what you entered.",
-        "errorVitalBpOrder": "The systolic value must be higher than the diastolic one."
+        "errorVitalBpOrder": "The systolic value must be higher than the diastolic one.",
+        "errorVitalUnit": "This unit does not fit this measurement."
     },
     "waste": {
         "title": "Waste collection",
