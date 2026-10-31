@@ -48,6 +48,12 @@ export function notificationsPaths() {
         stateChanging: true,
         params: [idParam()],
         requestBody: jsonBody('#/components/schemas/NotificationChannelInput'),
+        responses: {
+          200: { description: 'Successful response' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          409: { description: 'Not a household channel; it stays unchanged and can only be deleted here' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
       delete: op({
         summary: 'Delete a household notification channel',
