@@ -683,7 +683,8 @@
         "checkAllSubtasks": "すべて完了にする",
         "subtasksAllDone": "「{{title}}」とすべてのサブタスクを完了しました。",
         "seriesDoneNamed": "「{{title}}」を完了しました - 次回: {{date}}",
-        "kanbanRestore": "復元"
+        "kanbanRestore": "復元",
+        "errorTagGone": "このタグはもう存在しません。"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} 件を削除しました。",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "人を設定できるのはタスクに入るリストだけです。",
         "syncAssigneeNotMember": "ここで選べるのは世帯のメンバーだけです。",
         "syncAssigneeUnknown": "この人はもう存在しません。ページを再読み込みしてください。",
-        "permDetails": "ウィジェットとその他の権限"
+        "permDetails": "ウィジェットとその他の権限",
+        "connectionFailedDetail": "接続に失敗しました: {{error}}",
+        "documentStorageChangeFailed": "変更は適用されませんでした: {{error}}",
+        "apiTokenCopyFailed": "コピーできませんでした。トークンを選択して手動でコピーしてください。",
+        "weatherLocateDenied": "位置情報へのアクセスが許可されていません。ブラウザの設定で許可するか、場所を手動で入力してください。",
+        "weatherLocateFailed": "位置情報を取得できませんでした。場所を手動で入力してください。",
+        "outlookAutoSyncOverrides": "Outlook はリンクされた単一の例外を含むシリーズを同期できません。ここで編集できるよう、対象カレンダーをオフにしてください。例外を削除する必要はありません。",
+        "memberRemoveOwnAccount": "自分のアカウントは削除できません。",
+        "memberRemoveLastAdmin": "管理者が少なくとも1人必要です。",
+        "memberRemoveLastSsoAdmin": "これは SSO にリンクされた最後の管理者です。先に別の管理者をリンクしてください。",
+        "backupWebdavUrlInvalid": "アドレスは http:// または https:// で始める必要があります。",
+        "icsSubscriptionGone": "この購読はもう存在しません。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

@@ -683,7 +683,8 @@
         "checkAllSubtasks": "Bocka av alla",
         "subtasksAllDone": "”{{title}}” och alla deluppgifter klara.",
         "seriesDoneNamed": "”{{title}}” klar - nästa gång: {{date}}",
-        "kanbanRestore": "Återställ"
+        "kanbanRestore": "Återställ",
+        "errorTagGone": "Den här etiketten finns inte längre."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vara borttagen.",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "Personer kan bara anges för listor som går till Uppgifter.",
         "syncAssigneeNotMember": "Bara medlemmar i hushållet kan väljas här.",
         "syncAssigneeUnknown": "Den här personen finns inte längre. Ladda om sidan.",
-        "permDetails": "Widgetar och fler behörigheter"
+        "permDetails": "Widgetar och fler behörigheter",
+        "connectionFailedDetail": "Anslutningen misslyckades: {{error}}",
+        "documentStorageChangeFailed": "Ändringen tillämpades inte: {{error}}",
+        "apiTokenCopyFailed": "Kopieringen misslyckades. Markera token och kopiera den för hand.",
+        "weatherLocateDenied": "Åtkomst till platsen är inte tillåten. Tillåt den i webbläsarens inställningar eller ange platsen för hand.",
+        "weatherLocateFailed": "Platsen kunde inte fastställas. Ange platsen för hand.",
+        "outlookAutoSyncOverrides": "Outlook kan inte synkronisera serier med länkade enskilda undantag. Stäng av deras målkalender så att de förblir redigerbara här. Du behöver inte ta bort några undantag.",
+        "memberRemoveOwnAccount": "Du kan inte ta bort ditt eget konto.",
+        "memberRemoveLastAdmin": "Minst en administratör måste finnas kvar.",
+        "memberRemoveLastSsoAdmin": "Det här är den sista administratören som är länkad till SSO. Länka en annan administratör först.",
+        "backupWebdavUrlInvalid": "Adressen måste börja med http:// eller https://.",
+        "icsSubscriptionGone": "Den här prenumerationen finns inte längre."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

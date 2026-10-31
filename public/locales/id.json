@@ -701,7 +701,8 @@
         "checkAllSubtasks": "Centang semua",
         "subtasksAllDone": "\"{{title}}\" dan semua subtugas selesai.",
         "seriesDoneNamed": "\"{{title}}\" selesai - berikutnya: {{date}}",
-        "kanbanRestore": "Pulihkan"
+        "kanbanRestore": "Pulihkan",
+        "errorTagGone": "Tag ini sudah tidak ada."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item dihapus.",
@@ -3468,7 +3469,18 @@
         "reminderListAssigneesTasksOnly": "Orang hanya bisa diatur untuk daftar yang masuk ke Tugas.",
         "syncAssigneeNotMember": "Hanya anggota rumah tangga yang bisa dipilih di sini.",
         "syncAssigneeUnknown": "Orang ini sudah tidak ada. Muat ulang halaman.",
-        "permDetails": "Widget dan izin lainnya"
+        "permDetails": "Widget dan izin lainnya",
+        "connectionFailedDetail": "Koneksi gagal: {{error}}",
+        "documentStorageChangeFailed": "Perubahan tidak diterapkan: {{error}}",
+        "apiTokenCopyFailed": "Gagal menyalin. Pilih token lalu salin secara manual.",
+        "weatherLocateDenied": "Akses ke lokasi Anda tidak diizinkan. Izinkan di pengaturan browser atau masukkan tempat secara manual.",
+        "weatherLocateFailed": "Lokasi Anda tidak dapat ditentukan. Masukkan tempat secara manual.",
+        "outlookAutoSyncOverrides": "Outlook tidak dapat menyinkronkan seri dengan pengecualian tunggal yang tertaut. Nonaktifkan kalender tujuannya agar tetap dapat diedit di sini. Anda tidak perlu menghapus pengecualian apa pun.",
+        "memberRemoveOwnAccount": "Anda tidak dapat menghapus akun Anda sendiri.",
+        "memberRemoveLastAdmin": "Setidaknya satu administrator harus tetap ada.",
+        "memberRemoveLastSsoAdmin": "Ini administrator terakhir yang tertaut ke SSO. Tautkan administrator lain terlebih dahulu.",
+        "backupWebdavUrlInvalid": "Alamat harus diawali dengan http:// atau https://.",
+        "icsSubscriptionGone": "Langganan ini sudah tidak ada."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

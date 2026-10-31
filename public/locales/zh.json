@@ -683,7 +683,8 @@
         "checkAllSubtasks": "全部勾选",
         "subtasksAllDone": "“{{title}}”及所有子任务已完成。",
         "seriesDoneNamed": "“{{title}}”已完成 - 下次：{{date}}",
-        "kanbanRestore": "恢复"
+        "kanbanRestore": "恢复",
+        "errorTagGone": "此标签已不存在。"
     },
     "shopping": {
         "itemsRemovedToast_one": "已删除 {{count}} 件商品。",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "只有进入任务的清单才能设置人员。",
         "syncAssigneeNotMember": "这里只能选择家庭成员。",
         "syncAssigneeUnknown": "此人已不存在。请重新加载页面。",
-        "permDetails": "小组件和其他权限"
+        "permDetails": "小组件和其他权限",
+        "connectionFailedDetail": "连接失败:{{error}}",
+        "documentStorageChangeFailed": "更改未应用:{{error}}",
+        "apiTokenCopyFailed": "无法复制。请选中令牌并手动复制。",
+        "weatherLocateDenied": "不允许访问您的位置。请在浏览器设置中允许,或手动输入地点。",
+        "weatherLocateFailed": "无法确定您的位置。请手动输入地点。",
+        "outlookAutoSyncOverrides": "Outlook 无法同步带有已关联单个例外的系列。请关闭其目标日历,以便在此继续编辑。您无需删除任何例外。",
+        "memberRemoveOwnAccount": "您无法移除自己的账户。",
+        "memberRemoveLastAdmin": "至少必须保留一名管理员。",
+        "memberRemoveLastSsoAdmin": "这是最后一名关联 SSO 的管理员。请先关联另一名管理员。",
+        "backupWebdavUrlInvalid": "地址必须以 http:// 或 https:// 开头。",
+        "icsSubscriptionGone": "此订阅已不存在。"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",

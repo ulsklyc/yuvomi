@@ -683,7 +683,8 @@
         "checkAllSubtasks": "Tout cocher",
         "subtasksAllDone": "« {{title}} » et toutes ses sous-tâches terminés.",
         "seriesDoneNamed": "« {{title}} » terminé - prochaine fois : {{date}}",
-        "kanbanRestore": "Restaurer"
+        "kanbanRestore": "Restaurer",
+        "errorTagGone": "Cette étiquette n'existe plus."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} article supprimé.",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "Les personnes ne se définissent que pour les listes qui vont dans les Tâches.",
         "syncAssigneeNotMember": "Seuls les membres du foyer peuvent être choisis ici.",
         "syncAssigneeUnknown": "Cette personne n’existe plus. Rechargez la page.",
-        "permDetails": "Widgets et autres droits"
+        "permDetails": "Widgets et autres droits",
+        "connectionFailedDetail": "Échec de la connexion : {{error}}",
+        "documentStorageChangeFailed": "La modification n'a pas été appliquée : {{error}}",
+        "apiTokenCopyFailed": "La copie a échoué. Sélectionnez le jeton et copiez-le à la main.",
+        "weatherLocateDenied": "L'accès à votre position n'est pas autorisé. Autorisez-le dans les réglages du navigateur ou saisissez le lieu à la main.",
+        "weatherLocateFailed": "Votre position n'a pas pu être déterminée. Saisissez le lieu à la main.",
+        "outlookAutoSyncOverrides": "Outlook ne peut pas synchroniser les séries comportant des exceptions individuelles liées. Désactivez leur calendrier cible pour qu'elles restent modifiables ici. Vous n'avez aucune exception à supprimer.",
+        "memberRemoveOwnAccount": "Vous ne pouvez pas supprimer votre propre compte.",
+        "memberRemoveLastAdmin": "Il doit rester au moins un administrateur.",
+        "memberRemoveLastSsoAdmin": "C'est le dernier administrateur lié au SSO. Liez d'abord un autre administrateur.",
+        "backupWebdavUrlInvalid": "L'adresse doit commencer par http:// ou https://.",
+        "icsSubscriptionGone": "Cet abonnement n'existe plus."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

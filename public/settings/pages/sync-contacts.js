@@ -22,6 +22,7 @@ import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 /** Das Pflichtzeichen hinter einem Etikett - Markup, kein Text (aria-hidden). */
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { errorSentence, errorSentenceWithDetail } from '/utils/friendly-error.js';
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -47,14 +48,14 @@ function showToast(message, tone = 'default') {
 
 /**
  * Übersetzt eine Server-Fehlerantwort. Der Server liefert einen stabilen
- * `errorCode`; `err.message` ist nur eine englische Entwickler-Notiz und dient
- * als letzter Fallback - unübersetzt angezeigt wäre sie in 22 von 23 Locales
- * ein Fremdkörper.
+ * `errorCode`; `err.message` ist nur eine englische Entwickler-Notiz -
+ * unübersetzt angezeigt wäre sie in 26 von 27 Locales ein Fremdkörper (#1909).
  *
  * @param {Error & { data?: { errorCode?: string } }} err
+ * @param {string} [fallbackKey] - der allgemeine Satz dieser Stelle
  * @returns {string} übersetzte, anzeigbare Meldung
  */
-function errorMessage(err) {
+function errorMessage(err, fallbackKey = 'common.errorGeneric') {
   const code = err?.data?.errorCode;
   const KEYS = {
     account_duplicate: 'settings.cardavErrorDuplicate',
@@ -64,10 +65,25 @@ function errorMessage(err) {
     internal: 'common.errorGeneric',
     invalid_id: 'common.errorGeneric',
   };
-  // Validierungsfehler tragen die betroffenen Felder im Text - der ist bereits
-  // vom Server zusammengesetzt und wird durchgereicht.
-  if (code && code !== 'validation' && KEYS[code]) return t(KEYS[code]);
-  return err?.message || t('common.errorGeneric');
+  if (KEYS[code]) return t(KEYS[code]);
+  return errorSentence(err, fallbackKey);
+}
+
+/**
+ * Meldung einer Aktion, die den CardDAV-Server fragt: `connection_failed` traegt
+ * seine Antwort, und die braucht der Admin, um den Fehler zu finden.
+ */
+function remoteErrorMessage(err, fallbackKey) {
+  if (err?.data?.errorCode !== 'connection_failed') return errorMessage(err, fallbackKey);
+  return errorSentenceWithDetail(err, 'settings.connectionFailedDetail', fallbackKey);
+}
+
+/**
+ * Meldung im Konto-Formular. Die Feldpruefung des Servers nennt die Felder im
+ * Text (`validation`), und einzelne Saetze gibt es dafuer noch nicht.
+ */
+function formErrorMessage(err) {
+  return err?.data?.errorCode === 'validation' ? err.message : remoteErrorMessage(err);
 }
 
 function renderPage(container, user) {
@@ -258,7 +274,7 @@ function renderAccount(container, account, addressbooks, refresh, user) {
         showToast(t('settings.cardavSyncSuccess'), 'success');
         await reloadAfterSave(() => refresh());
       } catch (err) {
-        showToast(err?.data?.errorCode ? errorMessage(err) : (err.message || t('settings.cardavSyncFailed')), 'danger');
+        showToast(remoteErrorMessage(err, 'settings.cardavSyncFailed'), 'danger');
       }
     }, { loadingClass: 'btn--loading' });
   });
@@ -355,7 +371,7 @@ function renderAccount(container, account, addressbooks, refresh, user) {
       showToast(t('settings.addressbooksRefreshed'), 'success');
       await reloadAfterSave(() => refresh());
     } catch (err) {
-      showToast(errorMessage(err), 'danger');
+      showToast(remoteErrorMessage(err), 'danger');
     }
   }, { loadingClass: 'btn--loading' }));
   actions.appendChild(refreshBtn);
@@ -428,7 +444,7 @@ function buildUnreachableAccount(account, err, reload, user) {
       : [lastSyncDetail(account.lastSync)],
     tone: 'warning',
   }));
-  wrapper.appendChild(createInlineError(errorMessage(err)));
+  wrapper.appendChild(createInlineError(remoteErrorMessage(err)));
 
   const actions = document.createElement('div');
   actions.className = 'caldav-account-actions';
@@ -462,7 +478,7 @@ async function loadAccounts(container, user) {
   } catch (err) {
     listEl.replaceChildren();
     listEl.appendChild(createRetryState({
-      message: err?.data?.errorCode ? errorMessage(err) : (err.message || t('settings.cardavConnectionFailed')),
+      message: errorMessage(err, 'settings.cardavConnectionFailed'),
       onRetry: reload,
     }));
     return;
@@ -608,7 +624,7 @@ function openAccountModal(account, onDone) {
           await onDone();
           refocusAfterRender();
         } catch (err) {
-          errorEl.textContent = errorMessage(err);
+          errorEl.textContent = formErrorMessage(err);
           errorEl.hidden = false;
         }
       });

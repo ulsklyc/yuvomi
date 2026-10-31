@@ -32,7 +32,7 @@ import { USER_COLOR_DEFAULT } from '/utils/color.js';
 import { assigneeIdsOf, buildAssigneeMenu } from '/settings/assignee-menu.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import { rowActionEl } from '/utils/row-action.js';
-import { loadErrorSentence } from '/utils/friendly-error.js';
+import { loadErrorSentence, errorSentence, isAlreadyDeleted } from '/utils/friendly-error.js';
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -231,7 +231,7 @@ function buildIcsActions(container, sub, subs, user) {
       renderIcsList(container, subs, user);
       showToast(t('settings.ics.syncedToast'), 'success');
     } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
+      showToast(errorSentence(err), 'danger');
       syncBtn.disabled = false;
     }
   });
@@ -252,14 +252,17 @@ function buildIcsActions(container, sub, subs, user) {
       detail: t('settings.ics.confirm_delete_detail'),
     })) return;
     try {
-      await api.delete(`/calendar/subscriptions/${sub.id}`);
+      // Schon weg (ein anderer Admin, ein anderes Geraet): das Ziel ist erreicht.
+      await api.delete(`/calendar/subscriptions/${sub.id}`).catch((err) => {
+        if (!isAlreadyDeleted(err, 'calendar_subscription_not_found')) throw err;
+      });
       const idx = subs.findIndex((s) => s.id === sub.id);
       if (idx >= 0) subs.splice(idx, 1);
       renderIcsList(container, subs, user);
       refocusAfterRender();
       showToast(t('settings.ics.deletedToast'), 'default');
     } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
+      showToast(errorSentence(err), 'danger');
     }
   });
   actions.appendChild(delBtn);

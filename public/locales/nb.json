@@ -683,7 +683,8 @@
         "checkAllSubtasks": "Huk av alle",
         "subtasksAllDone": "«{{title}}» og alle deloppgaver utført.",
         "seriesDoneNamed": "«{{title}}» utført - neste gang: {{date}}",
-        "kanbanRestore": "Gjenopprett"
+        "kanbanRestore": "Gjenopprett",
+        "errorTagGone": "Denne etiketten finnes ikke lenger."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vare slettet.",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "Personer kan bare settes for lister som går til Oppgaver.",
         "syncAssigneeNotMember": "Bare medlemmer av husstanden kan velges her.",
         "syncAssigneeUnknown": "Denne personen finnes ikke lenger. Last inn siden på nytt.",
-        "permDetails": "Widgeter og flere rettigheter"
+        "permDetails": "Widgeter og flere rettigheter",
+        "connectionFailedDetail": "Tilkoblingen mislyktes: {{error}}",
+        "documentStorageChangeFailed": "Endringen ble ikke tatt i bruk: {{error}}",
+        "apiTokenCopyFailed": "Kopiering mislyktes. Merk tokenet og kopier det for hånd.",
+        "weatherLocateDenied": "Tilgang til posisjonen er ikke tillatt. Tillat det i nettleserinnstillingene eller skriv inn stedet for hånd.",
+        "weatherLocateFailed": "Posisjonen kunne ikke fastslås. Skriv inn stedet for hånd.",
+        "outlookAutoSyncOverrides": "Outlook kan ikke synkronisere serier med tilknyttede enkeltunntak. Slå av målkalenderen deres slik at de fortsatt kan redigeres her. Du trenger ikke slette noen unntak.",
+        "memberRemoveOwnAccount": "Du kan ikke fjerne din egen konto.",
+        "memberRemoveLastAdmin": "Minst én administrator må bli igjen.",
+        "memberRemoveLastSsoAdmin": "Dette er den siste administratoren knyttet til SSO. Knytt til en annen administrator først.",
+        "backupWebdavUrlInvalid": "Adressen må begynne med http:// eller https://.",
+        "icsSubscriptionGone": "Dette abonnementet finnes ikke lenger."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",

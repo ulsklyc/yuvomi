@@ -56,6 +56,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin sets up, in line with how private entries already work.
 
 ### Fixed
+- **Error messages in Settings speak your language.** Saving, syncing or removing something in
+  Settings could show the server's or browser's raw English sentence in a toast. Now the app says
+  it in your language, and names the cause where it knows one: the last administrator, a tag or
+  subscription that is already gone, an Outlook series with exceptions, or location access turned
+  off in the browser. Only what another server answered, such as a WebDAV or CalDAV server refusing
+  a connection, still appears as its original text, inside a translated sentence, so an admin can
+  fix it.
 - **A new app name reaches installed apps.** After renaming the app in Settings, a browser that
   had loaded the app before kept the old name for the installed app, even after uninstalling and
   installing it again: the service worker answered `/manifest.webmanifest` from its cache and only

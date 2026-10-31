@@ -2566,6 +2566,7 @@ test('Outlook account activation reports linked override conflicts with an exact
     error: response.body.error,
     code: 409,
     conflict: 'outlook_auto_sync_overrides',
+    reason: 'outlook_auto_sync_overrides',
     linked_override_count: existingLinkedCandidateCount + 1,
   });
   assert.ok(response.body.error.length > 0);

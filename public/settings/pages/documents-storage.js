@@ -13,6 +13,7 @@ import {
   settingSwitchRowHtml
 } from "/settings/components.js";
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { errorSentenceWithDetail } from "/utils/friendly-error.js";
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -261,7 +262,7 @@ function bindConnectionForm(container, form, reload) {
       await reloadAfterSave(() => reload());
     } catch (err) {
       if (result) {
-        result.textContent = t("settings.documentStorageTestFailed", { error: err.message });
+        result.textContent = errorSentenceWithDetail(err, "settings.documentStorageTestFailed");
         result.className = "form-hint settings-document-storage-error";
       }
     } finally {
@@ -293,7 +294,7 @@ function bindConnectionForm(container, form, reload) {
       // und das Nachfassen griffe auf den Merker eines frueheren zurueck (#1083).
       if (gefragt) refocusAfterRender();
     } catch (err) {
-      showToast(err.message ?? t("common.errorGeneric"), "danger");
+      showToast(errorSentenceWithDetail(err, "settings.documentStorageChangeFailed"), "danger");
     } finally {
       if (saveBtn) {
         saveBtn.disabled = false;
@@ -350,7 +351,7 @@ function buildDestinationForm(data, reload) {
       showToast(t("settings.documentStorageSaved"), "success");
       await reloadAfterSave(() => reload());
     } catch (error) {
-      showToast(error.message ?? t("common.errorGeneric"), "danger");
+      showToast(errorSentenceWithDetail(error, "settings.documentStorageChangeFailed"), "danger");
     } finally {
       save.disabled = false;
     }
@@ -494,7 +495,7 @@ function buildGoogleDriveProvider(data, reload) {
         showToast(t("settings.documentStorageTestSuccess"), "success");
         await reloadAfterSave(() => reload());
       } catch (error) {
-        showToast(error.message ?? t("common.errorGeneric"), "danger");
+        showToast(errorSentenceWithDetail(error, "settings.documentStorageTestFailed"), "danger");
       } finally {
         testButton.disabled = false;
       }
@@ -522,7 +523,7 @@ function buildGoogleDriveProvider(data, reload) {
         await reload();
         refocusAfterRender();
       } catch (error) {
-        showToast(error.message ?? t("common.errorGeneric"), "danger");
+        showToast(errorSentenceWithDetail(error, "settings.documentStorageChangeFailed"), "danger");
         disconnect.disabled = false;
       }
     });

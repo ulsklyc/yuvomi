@@ -222,6 +222,8 @@ test('PUT /webdav/config: Validierungsfehler → 400', async () => {
     assert.equal(r.status, 400, `Body ${JSON.stringify(c.body)} muss 400 liefern`);
     assert.match(r.body.error, c.rx);
   }
+  const badUrl = await call('PUT', '/webdav/config', { actor: ADM, body: { url: 'ftp://x' } });
+  assert.equal(badUrl.body.errorCode, 'url_invalid', 'die App sagt den Satz, nicht der Server (#1909)');
   // Kein Teil der ungültigen Konfig darf persistiert worden sein.
   const status = await call('GET', '/webdav/config', { actor: ADM });
   assert.equal(status.body.data.configured, false);

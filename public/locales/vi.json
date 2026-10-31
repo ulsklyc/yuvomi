@@ -683,7 +683,8 @@
         "checkAllSubtasks": "Đánh dấu tất cả",
         "subtasksAllDone": "Đã hoàn thành \"{{title}}\" và mọi việc con.",
         "seriesDoneNamed": "Đã hoàn thành \"{{title}}\" - lần tới: {{date}}",
-        "kanbanRestore": "Khôi phục"
+        "kanbanRestore": "Khôi phục",
+        "errorTagGone": "Thẻ này không còn tồn tại."
     },
     "shopping": {
         "itemsRemovedToast_one": "Đã xóa {{count}} mục.",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "Chỉ đặt được người cho danh sách đi vào Công việc.",
         "syncAssigneeNotMember": "Ở đây chỉ chọn được thành viên trong gia đình.",
         "syncAssigneeUnknown": "Người này không còn tồn tại. Hãy tải lại trang.",
-        "permDetails": "Tiện ích và quyền khác"
+        "permDetails": "Tiện ích và quyền khác",
+        "connectionFailedDetail": "Kết nối thất bại: {{error}}",
+        "documentStorageChangeFailed": "Thay đổi chưa được áp dụng: {{error}}",
+        "apiTokenCopyFailed": "Không sao chép được. Hãy chọn token và sao chép thủ công.",
+        "weatherLocateDenied": "Quyền truy cập vị trí chưa được cho phép. Hãy cho phép trong cài đặt trình duyệt hoặc nhập địa điểm thủ công.",
+        "weatherLocateFailed": "Không xác định được vị trí của bạn. Hãy nhập địa điểm thủ công.",
+        "outlookAutoSyncOverrides": "Outlook không thể đồng bộ chuỗi có các ngoại lệ đơn lẻ được liên kết. Hãy tắt lịch đích của chúng để vẫn chỉnh sửa được ở đây. Bạn không cần xóa ngoại lệ nào.",
+        "memberRemoveOwnAccount": "Bạn không thể xóa tài khoản của chính mình.",
+        "memberRemoveLastAdmin": "Phải còn lại ít nhất một quản trị viên.",
+        "memberRemoveLastSsoAdmin": "Đây là quản trị viên cuối cùng được liên kết với SSO. Hãy liên kết một quản trị viên khác trước.",
+        "backupWebdavUrlInvalid": "Địa chỉ phải bắt đầu bằng http:// hoặc https://.",
+        "icsSubscriptionGone": "Đăng ký này không còn tồn tại."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

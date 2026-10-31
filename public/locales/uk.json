@@ -801,7 +801,8 @@
         "doneSubtasksOpen_few": "«{{title}}» виконано - ще відкриті {{count}} підзавдання.",
         "doneSubtasksOpen_many": "«{{title}}» виконано - ще відкрито {{count}} підзавдань.",
         "seriesDoneNamed": "«{{title}}» виконано - наступного разу: {{date}}",
-        "kanbanRestore": "Відновити"
+        "kanbanRestore": "Відновити",
+        "errorTagGone": "Цього тегу більше немає."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} прийоми їжі",
@@ -3676,7 +3677,18 @@
         "reminderListAssigneesTasksOnly": "Людей можна задати лише для списків, що йдуть у Завдання.",
         "syncAssigneeNotMember": "Тут можна вибрати лише членів родини.",
         "syncAssigneeUnknown": "Цієї людини більше немає. Перезавантажте сторінку.",
-        "permDetails": "Віджети та інші права"
+        "permDetails": "Віджети та інші права",
+        "connectionFailedDetail": "Не вдалося підключитися: {{error}}",
+        "documentStorageChangeFailed": "Зміну не застосовано: {{error}}",
+        "apiTokenCopyFailed": "Не вдалося скопіювати. Виділіть токен і скопіюйте його вручну.",
+        "weatherLocateDenied": "Доступ до геолокації заборонено. Дозвольте його в налаштуваннях браузера або введіть місце вручну.",
+        "weatherLocateFailed": "Не вдалося визначити місцезнаходження. Введіть місце вручну.",
+        "outlookAutoSyncOverrides": "Outlook не може синхронізувати серії зі зв’язаними окремими винятками. Вимкніть їхній цільовий календар, щоб вони залишалися доступними для редагування тут. Видаляти винятки не потрібно.",
+        "memberRemoveOwnAccount": "Не можна видалити власний обліковий запис.",
+        "memberRemoveLastAdmin": "Має залишитися принаймні один адміністратор.",
+        "memberRemoveLastSsoAdmin": "Це останній адміністратор, пов’язаний із SSO. Спочатку пов’яжіть іншого адміністратора.",
+        "backupWebdavUrlInvalid": "Адреса має починатися з http:// або https://.",
+        "icsSubscriptionGone": "Цієї підписки більше немає."
     },
     "login": {
         "tagline": "З поверненням. Ваш дім - в одному місці.",

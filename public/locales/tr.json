@@ -683,7 +683,8 @@
         "checkAllSubtasks": "Tümünü işaretle",
         "subtasksAllDone": "\"{{title}}\" ve tüm alt görevler tamamlandı.",
         "seriesDoneNamed": "\"{{title}}\" tamamlandı - sıradaki: {{date}}",
-        "kanbanRestore": "Geri yükle"
+        "kanbanRestore": "Geri yükle",
+        "errorTagGone": "Bu etiket artık yok."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ürün silindi.",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "Kişiler yalnızca Görevler’e giden listeler için ayarlanabilir.",
         "syncAssigneeNotMember": "Burada yalnızca hane üyeleri seçilebilir.",
         "syncAssigneeUnknown": "Bu kişi artık yok. Sayfayı yeniden yükleyin.",
-        "permDetails": "Widget'lar ve diğer izinler"
+        "permDetails": "Widget'lar ve diğer izinler",
+        "connectionFailedDetail": "Bağlantı başarısız: {{error}}",
+        "documentStorageChangeFailed": "Değişiklik uygulanmadı: {{error}}",
+        "apiTokenCopyFailed": "Kopyalanamadı. Belirteci seçip elle kopyalayın.",
+        "weatherLocateDenied": "Konumunuza erişime izin verilmiyor. Tarayıcı ayarlarından izin verin veya yeri elle girin.",
+        "weatherLocateFailed": "Konumunuz belirlenemedi. Yeri elle girin.",
+        "outlookAutoSyncOverrides": "Outlook, bağlı tekil istisnalar içeren serileri eşitleyemez. Burada düzenlenebilir kalmaları için hedef takvimlerini kapatın. Hiçbir istisnayı silmeniz gerekmez.",
+        "memberRemoveOwnAccount": "Kendi hesabınızı kaldıramazsınız.",
+        "memberRemoveLastAdmin": "En az bir yönetici kalmalıdır.",
+        "memberRemoveLastSsoAdmin": "Bu, SSO ile bağlantılı son yönetici. Önce başka bir yöneticiyi bağlayın.",
+        "backupWebdavUrlInvalid": "Adres http:// veya https:// ile başlamalıdır.",
+        "icsSubscriptionGone": "Bu abonelik artık yok."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",
