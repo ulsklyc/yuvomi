@@ -1181,7 +1181,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Сбросить к исходному",
-            "resetToast": "Изменения сброшены."
+            "resetToast": "Изменения сброшены.",
+            "resetPendingToast": "Сброшено. Исходный текст вернётся при следующей синхронизации."
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "Поиск иконки",

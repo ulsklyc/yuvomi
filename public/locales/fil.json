@@ -1053,7 +1053,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Ibalik sa orihinal",
-            "resetToast": "Na-reset ang mga pagbabago."
+            "resetToast": "Na-reset ang mga pagbabago.",
+            "resetPendingToast": "Naibalik. Babalik ang orihinal na teksto sa susunod na pag-sync."
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "Maghanap ng icon",

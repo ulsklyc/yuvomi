@@ -1025,7 +1025,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "मूल पर वापस जाएं",
-            "resetToast": "परिवर्तन रीसेट हो गए।"
+            "resetToast": "परिवर्तन रीसेट हो गए।",
+            "resetPendingToast": "रीसेट हो गया। अगली सिंक के साथ मूल पाठ वापस आएगा।"
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "आइकन खोजें",

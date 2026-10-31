@@ -1025,7 +1025,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Terugzetten naar origineel",
-            "resetToast": "Wijzigingen teruggedraaid."
+            "resetToast": "Wijzigingen teruggedraaid.",
+            "resetPendingToast": "Teruggezet. De oorspronkelijke tekst keert terug bij de volgende synchronisatie."
         },
         "iconLabel": "Pictogram",
         "iconSearchPlaceholder": "Pictogram zoeken",

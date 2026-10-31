@@ -529,6 +529,8 @@ export function serializeEvent(event, context = null) {
     recurrence_id,
     recurrence_identity,
     overridden_fields,
+    // Rohstand des Abos für den Reset (D#2330). Kein Feld der Antwort.
+    feed_original,
     // Interne Sync-Zustände (Abgleich, Echo-Erkennung, Rohstand): kein Feld der Antwort.
     outbound_snapshot,
     seen_on_server,

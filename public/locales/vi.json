@@ -1025,7 +1025,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Đặt lại về ban đầu",
-            "resetToast": "Các thay đổi đã được đặt lại."
+            "resetToast": "Các thay đổi đã được đặt lại.",
+            "resetPendingToast": "Đã đặt lại. Nội dung gốc sẽ trở lại ở lần đồng bộ tiếp theo."
         },
         "iconLabel": "Biểu tượng",
         "iconSearchPlaceholder": "Tìm kiếm biểu tượng",

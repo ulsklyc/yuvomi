@@ -1025,7 +1025,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Reset to original",
-            "resetToast": "Changes reset."
+            "resetToast": "Changes reset.",
+            "resetPendingToast": "Reset. The original text returns with the next sync."
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "Search icon",

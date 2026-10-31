@@ -1259,7 +1259,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "إعادة التعيين للأصل",
-            "resetToast": "تم إعادة تعيين التغييرات."
+            "resetToast": "تم إعادة تعيين التغييرات.",
+            "resetPendingToast": "أُعيد الضبط. يعود النص الأصلي مع المزامنة التالية."
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "البحث عن أيقونة",

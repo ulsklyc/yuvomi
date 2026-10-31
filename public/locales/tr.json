@@ -1025,7 +1025,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Orijinale sıfırla",
-            "resetToast": "Değişiklikler sıfırlandı."
+            "resetToast": "Değişiklikler sıfırlandı.",
+            "resetPendingToast": "Sıfırlandı. Özgün metin bir sonraki eşitlemede geri gelir."
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "Simge ara",

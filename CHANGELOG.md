@@ -55,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   clocks change, and a weekday repeat near midnight stays on its day. Its start now lies before its
   due time, which strict servers require. Yuvomi fixes a task already on the server the next time
   you change it.
+- **Reset to original restores a subscribed event at once.** Resetting a changed event from an ICS
+  subscription only cleared the edit mark, so the changed text stayed until the next sync. Each sync
+  now keeps the feed's values, and the reset restores them straight away, without a network call.
+  Subscriptions synced before this update have no stored values yet: their reset clears the mark
+  and says so, and the next sync fills them in (Refs D#2330).
 - **Calendar responses no longer carry internal sync state.** The event data sent to the app
   included the snapshots Yuvomi keeps to match calendar syncs. The app never reads them, so they
   are gone from the responses now; nothing you see changes.

@@ -47,6 +47,7 @@ import {
   truncateSeries,
   upsertOccurrenceOverride,
   updateSeriesWithOverrides,
+  followInboundStartChange,
 } from '../../services/calendar-occurrence-overrides.js';
 import {
   ASSIGNED_USERS_SQL,
@@ -1881,10 +1882,39 @@ router.post('/:id/reset', (req, res) => {
     if (!isAdmin && event.created_by !== userId && event.sub_created_by !== userId)
       return res.status(403).json({ error: 'Not authorized.', code: 403 });
 
+    // D#2330: der gespeicherte Feed-Stand stellt den Termin sofort her, ohne Netz.
+    // Fehlt er (Altbestand vor Migration 273 oder unlesbar), wird nur das Flag
+    // zurückgenommen und restored=false gemeldet: der nächste Abgleich schreibt
+    // den Stand, bis dahin ist der Reset nicht vollständig.
+    let feed = null;
+    if (event.feed_original) {
+      try { feed = JSON.parse(event.feed_original); } catch { feed = null; }
+    }
+
     // `color_modified` geht mit: Zurücksetzen heisst "der Feed führt diesen
     // Termin wieder", und das schliesst seine Farbe ein (#899).
-    db.get().prepare('UPDATE calendar_events SET user_modified = 0, color_modified = 0 WHERE id = ?').run(id);
-    res.json({ data: { reset: true } });
+    db.get().transaction(() => {
+      if (feed) {
+        // Titel und Start sind NOT NULL: fehlt der Wert im Feed-Stand, bleibt der aktuelle.
+        const startDt = feed.start_datetime ?? event.start_datetime;
+        db.get().prepare(`
+          UPDATE calendar_events
+          SET user_modified = 0, color_modified = 0,
+              title = ?, description = ?, start_datetime = ?, end_datetime = ?,
+              all_day = ?, location = ?, color = ?
+          WHERE id = ?
+        `).run(
+          feed.title ?? event.title, feed.description ?? null, startDt, feed.end_datetime ?? null,
+          feed.all_day ? 1 : 0, feed.location ?? null, feed.color ?? null, id,
+        );
+        // Ein verlegter Start zieht die Erinnerungen mit, wie beim Abgleich (#1377).
+        if (startDt !== event.start_datetime)
+          followInboundStartChange(db.get(), id, event.start_datetime, startDt);
+      } else {
+        db.get().prepare('UPDATE calendar_events SET user_modified = 0, color_modified = 0 WHERE id = ?').run(id);
+      }
+    })();
+    res.json({ data: { reset: true, restored: feed !== null } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Internal error.', code: 500 });
