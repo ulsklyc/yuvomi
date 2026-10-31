@@ -130,10 +130,20 @@ function zonedDateRange(event, zone) {
   const verschoben = (wert) => {
     if (!hasExplicitZone(wert)) return verschiebe(wert, tage);
     const wand = utcToWall(wert, zone);
-    return wand ? localToUTCPrecise(`${shiftDateKey(wand.date, tage)}T${wand.time}`, zone) : wert;
+    return wand ? localToUTCPrecise(`${shiftDateKey(wand.date, tage)}T${wand.time}${bruchteil(wert)}`, zone) : wert;
   };
   const ende = event.end_datetime ?? null;
   return { start_datetime: verschoben(event.start_datetime), end_datetime: ende ? verschoben(ende) : ende };
+}
+
+/**
+ * Der Bruchteil einer Sekunde, als Text zum Anhaengen (`.500`, sonst leer).
+ * `utcToWall` liefert die Wanduhr nur bis zur Sekunde; das Ausrichten verschiebt
+ * um Tage und soll sonst nichts am Zeitpunkt aendern (#1957).
+ */
+function bruchteil(wert) {
+  const ms = new Date(wert).getUTCMilliseconds();
+  return ms ? `.${String(ms).padStart(3, '0')}` : '';
 }
 
 /** Tage zwischen zwei YYYY-MM-DD-Werten (b - a). */
@@ -384,6 +394,12 @@ export function startOrRuleChanged(before, after, zone) {
  * nimmt die Marke. Die Zeile traegt ihn danach selbst.
  * Dasselbe gilt fuer eine andere Schreibweise desselben Beginns oder
  * derselben Regel: was der Abruf hineinschreibt, ist die Form des Anbieters.
+ *
+ * DIE ZONE STEHT NICHT IM VERGLEICH (#1957), und das traegt nur, solange kein
+ * Weg eine markierte Serie in der Schreibweise des Abrufs hinterlaesst: eine in
+ * Yuvomi geschriebene Regel hat nie `RRULE:` (Validator, Datei-Import), ein in
+ * Yuvomi verlegter Start ist Wanduhr, und eine eingelesene Serie traegt keine
+ * Marke. Ein neuer Weg dorthin muss die Zone hier mitvergleichen.
  *
  * Eine Zeile ohne Marke bekommt durch den Abruf nie eine.
  *

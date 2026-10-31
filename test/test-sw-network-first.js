@@ -187,6 +187,23 @@ for (const [label, path, cacheName, mode] of [
   });
 }
 
+test('the web app manifest comes from the network first, so a renamed app reaches installed browsers', async () => {
+  // /manifest.webmanifest setzt den App-Namen aus den Einstellungen ein. Cache-first
+  // bekam ein Browser, der es schon einmal geholt hatte, den alten Namen bis zum
+  // naechsten Release - auch beim Neuinstallieren der PWA.
+  const net = heldFetch();
+  const env = loadSw(net.impl);
+  await seed(env, SHELL, '/manifest.webmanifest', 'Yuvomi');
+
+  const { result } = env.fetchEvent('/manifest.webmanifest');
+  await settle();
+  assert.equal(net.calls.length, 1, 'das Netz wird gefragt, nicht nur der Cache');
+  net.calls[0].resolve(new MockResponse('Planer'));
+
+  assert.equal((await within(result)).body, 'Planer');
+  assert.equal((await env.caches.match(`${ORIGIN}/manifest.webmanifest`)).body, 'Planer');
+});
+
 test('a network that answers in time wins, and its answer goes into the cache', async () => {
   const net = heldFetch();
   const env = loadSw(net.impl);
