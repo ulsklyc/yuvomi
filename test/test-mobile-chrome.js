@@ -471,7 +471,13 @@ test('#2425: unter 390px steht der Aufgabenfilter im Menue, seine Zahl am "..."'
   const tasksPage = read('../public/pages/tasks.js');
   const tasksCss = read('../public/styles/tasks.css');
   const css = rules(tasksCss);
-  const NARROW = /^@media\s*\(max-width:\s*389px\)/;
+  const NARROW = /^@container\s+tasks-page\s*\(width < 390px\)/;
+  // Die Wurzel traegt den Namen in JEDER Ansicht: `module-surface` faellt im
+  // Brett weg (`app-page--list-detail`), und die Abfrage griffe dort ins Leere.
+  assert.ok(css.some((r) => r.selector === '.tasks-page' && /container:\s*tasks-page \/ inline-size/.test(r.body)),
+    'die Seitenwurzel ist in jeder Ansicht der Container der Abfrage');
+  assert.ok(css.some((r) => r.selector === '.tasks-page.app-page--list-detail' && /container-name:\s*module-surface tasks-page/.test(r.body)),
+    'Liste + Detail behaelt seinen Namen neben dem eigenen');
   const narrow = css.filter((r) => r.at.some((a) => NARROW.test(a)));
 
   const button = narrow.find((r) => /\.tasks-toolbar__filter\b/.test(r.selector));
@@ -491,7 +497,8 @@ test('#2425: unter 390px steht der Aufgabenfilter im Menue, seine Zahl am "..."'
   assert.match(tasksPage, /case 'open-filters':\s*openTaskFilters\(container\);/, 'der Eintrag oeffnet dasselbe Blatt');
 
   // Ab 390px gibt es weder Eintrag noch Zahl am "...": Basis aus, nur die eine
-  // Abfrage schaltet sie ein - zwei Abfragen liessen zwischen 389 und 390 ein Loch.
+  // Abfrage schaltet sie ein. Sie fragt die Seitenwurzel, nicht den Viewport
+  // (tokens.css 11c), und JS fragt die Zahl, damit die Schwelle nur einmal steht.
   const ENTRY = '.popover-menu__item[data-action="open-filters"]';
   const COUNT = '.tasks-tools-btn__count';
   for (const part of [ENTRY, COUNT]) {
@@ -509,7 +516,8 @@ test('#2425: unter 390px steht der Aufgabenfilter im Menue, seine Zahl am "..."'
   assert.match(sync, /state\.viewMode === 'history'/, 'im Verlauf gibt es keinen Filter');
   assert.match(tasksPage, /function renderFilters\(container\) \{[\s\S]{0,160}syncFilterMenu\(container\)/,
     'renderFilters zieht das Menue mit');
-  assert.match(tasksPage, /matchMedia\?\.\('\(max-width: 389px\)'\)/, 'der Name folgt derselben Schwelle wie das CSS');
+  assert.doesNotMatch(tasksPage, /matchMedia[^\n]*3[89]\dpx/, 'die Schwelle steht nur in tasks.css');
+  assert.match(sync, /getComputedStyle\(badge\)\.display/, 'der Name folgt der Abfrage aus tasks.css');
 
   const design = read('../DESIGN.md');
   assert.match(design, /Aufgaben unter 390px/, 'DESIGN.md benennt die Ausnahme in Regel 3');

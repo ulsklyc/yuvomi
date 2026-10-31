@@ -4154,8 +4154,8 @@ function toolsMenuItems() {
       { action: 'view-history', label: t('tasks.historyView'), icon: 'history', checked: state.viewMode === 'history', attrs: { 'data-view-choice': 'history' } },
     ],
   }, { separator: true }];
-  // DER FILTER IM MENUE, NUR UNTER 390px (#2425; tasks.css blendet je Breite
-  // EINEN der beiden Wege aus). Dort tragen Titel und drei Knoepfe die Zeile
+  // DER FILTER IM MENUE, NUR IN EINEM MODUL UNTER 390px (#2425; tasks.css blendet
+  // je Breite EINEN der beiden Wege aus). Dort tragen Titel und drei Knoepfe die Zeile
   // nicht: bei 360px bleiben "Aufgaben" 136 von 144px. Er steht vor dem
   // Schreibenden, weil Nur-lesen (#467) ihn genauso braucht.
   items.push({ action: 'open-filters', label: t('common.filters'), icon: 'sliders-horizontal' });
@@ -4355,10 +4355,11 @@ function renderFilters(container) {
  *
  * Aktive Filter bleiben sichtbar (Kopfregel mobil, Regel 3): unter 390px steht
  * die Zahl am Menueknopf statt am Filterknopf und im Namen beider. Welcher Weg
- * sichtbar ist, entscheidet tasks.css; nur der zugaengliche Name haengt in JS
- * an der Breite, sonst nennte das "..." ab 390px die Zahl des Knopfs daneben
- * ein zweites Mal. Im Verlauf gibt es keinen Filter (`syncViewChrome`), also
- * auch keinen Eintrag und keine Zahl.
+ * sichtbar ist, entscheidet allein die Abfrage in tasks.css; der zugaengliche
+ * Name fragt deshalb, ob die Zahl steht, statt die Schwelle zu wiederholen -
+ * sonst nennte das "..." ab 390px die Zahl des Knopfs daneben ein zweites Mal.
+ * Im Verlauf gibt es keinen Filter (`syncViewChrome`), also auch keinen Eintrag
+ * und keine Zahl.
  */
 function syncFilterMenu(container) {
   const toolbar = container?.querySelector?.('.tasks-toolbar');
@@ -4381,13 +4382,11 @@ function syncFilterMenu(container) {
   badge.hidden = count === 0;
   badge.textContent = count ? String(count) : '';
 
+  const shown = count > 0 && getComputedStyle(badge).display !== 'none';
+  trigger.classList.toggle('tasks-tools-btn--active', count > 0);
   const label = t('common.moreActions');
-  trigger.setAttribute('aria-label', count && filterInMenu()?.matches ? `${label}, ${active}` : label);
-}
-
-/** Die Schwelle aus tasks.css: darunter steht der Filter im Menue (#2425). */
-function filterInMenu() {
-  return window.matchMedia?.('(max-width: 389px)') ?? null;
+  const name = shown ? `${label}, ${active}` : label;
+  if (trigger.getAttribute('aria-label') !== name) trigger.setAttribute('aria-label', name);
 }
 
 /**
@@ -5344,8 +5343,11 @@ function wireToolbar(container) {
   // Die Zahl am "..." steht von Anfang an, und eine Drehung ueber die Schwelle
   // zieht ihren Namen nach (#2425).
   syncFilterMenu(container);
-  filterInMenu()?.addEventListener('change', () => syncFilterMenu(container),
-    pageSignal ? { signal: pageSignal } : undefined);
+  if (typeof ResizeObserver === 'function') {
+    const resize = new ResizeObserver(() => syncFilterMenu(container));
+    resize.observe(toolbar);
+    pageSignal?.addEventListener('abort', () => resize.disconnect(), { once: true });
+  }
 }
 
 function wireNewTaskBtn(container) {
