@@ -1276,6 +1276,11 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
   // zurueck - ein Scroll „nach oben" ohne Finger, der die Zeile sofort
   // zurueckholte und so pendelte. Aendert sich die Hoehe des Ports oder
   // gleitet der Kopf noch, setzt das nur den Wendepunkt neu.
+  // DAS GUMMIBAND IST KEINE RICHTUNG (#2346). Hinter dem Listenende meldet
+  // iOS mehr als die Reserve, und das Rueckfedern las sich als Weg nach oben:
+  // die Zeile kam zurueck, der Port schrumpfte, das Listenende rutschte hinter
+  // die Kapsel, und der naechste Wisch begann von vorn. `foldByDirection`
+  // bekommt deshalb den auf die Reserve geklemmten Stand (`onInnerScroll`).
   // Die 65-px-Koepfe der uebrigen Module bleiben bei der Lage-Regel unten.
   const FOLD_DOWN_PX = 24;
   const REVEAL_UP_PX = 40;
@@ -1386,7 +1391,7 @@ export function wireCollapsingHeader(toolbar, opts = {}) {
     }
     // Ab hier nur noch der Nutzer (siehe `gestureTarget` oben).
     if (!byUser) return;
-    const top = port.scrollTop;
+    const top = Math.min(port.scrollTop, Math.max(0, reserve));
     if (fold) {
       foldByDirection(port, top);
       return;

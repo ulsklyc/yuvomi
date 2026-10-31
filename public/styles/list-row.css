@@ -75,6 +75,15 @@
   display: grid;
   gap: var(--space-5);
   align-content: start;
+  /* DIE SPUR MISST DEN INHALT (#2346). Ein Kind mit `overflow: hidden` - jeder
+   * `.row-carrier` - hat die automatische Mindesthoehe 0, eine `auto`-Spur
+   * bliebe auf der Hoehe des Ports stehen, und das Kind liefe ueber sie hinaus.
+   * Der Nachlauf von `.page-scrollport` haengt aber am Ende der SPUR: er zaehlte
+   * nicht, und die letzte Rezeptzeile lag am Scrollende hinter der Kapsel
+   * (14 Rezepte: Scrollhoehe 925 statt 1005px, Safari und Chrome gleich).
+   * Zwei Traeger nebeneinander laegen sogar uebereinander.
+   * Guard: test:list-scroller-tail-browser. */
+  grid-auto-rows: max-content;
   /* KEIN max-width hier (mehr). Der Scroller selbst muss die volle verfügbare
    * Breite einnehmen, sonst reicht sein eigener Trefferbereich für
    * Mausrad-Scrollen nur bis zur Lesespalten-Kante - rechts davon (auf einem
