@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "A fájlban csak fejlécsor van, menstruáció nincs.",
         "errorCycleImportTooManyRows": "Egy importálás legfeljebb {{limit}} menstruációt tartalmazhat. Oszd fel a fájlt.",
         "errorVitalImpossible": "Ez az érték nem lehetséges. Ellenőrizd a bevitelt.",
-        "errorVitalBpOrder": "A szisztolés értéknek nagyobbnak kell lennie a diasztolésnál."
+        "errorVitalBpOrder": "A szisztolés értéknek nagyobbnak kell lennie a diasztolésnál.",
+        "errorVitalUnit": "Ez a mértékegység nem illik ehhez a méréshez."
     },
     "waste": {
         "title": "Hulladékgyűjtés",

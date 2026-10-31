@@ -7,7 +7,7 @@ import express from 'express';
 import * as db from '../../db.js';
 import * as v from '../../middleware/validate.js';
 import { defaultVisibilityFor, vitalScopeKey } from './visibility-defaults.js';
-import { vitalLimitError, refuseImpossibleVital } from './vital-limits.js';
+import { vitalLimitError, refuseImpossibleVital, vitalUnitError, refuseVitalUnit } from './vital-limits.js';
 import {
   log, VISIBILITIES, MAX_UNIT,
   viewerId, careAwareClause, applyUpdate, badRequest,
@@ -53,6 +53,9 @@ router.post('/vitals', (req, res) => {
 
     const errors = v.collectErrors([type, valueNum, valueNum2, valueNum3, unit, measuredAt, note, visibility]);
     if (errors.length) return badRequest(res, errors);
+
+    const allowedUnits = vitalUnitError({ type: type.value, unit: unit.value });
+    if (allowedUnits) return refuseVitalUnit(res, allowedUnits);
 
     // Unmoegliches gar nicht erst speichern (Critique R19, vital-limits.js).
     const impossible = vitalLimitError({
@@ -109,9 +112,18 @@ router.patch('/vitals/:id', (req, res) => {
     const errors = v.collectErrors(checks);
     if (errors.length) return badRequest(res, errors);
 
+    // Die Einheit nur, wenn dieser Aufruf sie oder den Typ aendert: eine Altzeile
+    // in "g" oder "stone" (#2375) bleibt bearbeitbar, auch wenn ein Client die
+    // ganze Zeile zurueckschickt.
+    const next = { ...existing, ...fields };
+    if (next.unit !== existing.unit || next.type !== existing.type) {
+      const allowedUnits = vitalUnitError(next);
+      if (allowedUnits) return refuseVitalUnit(res, allowedUnits);
+    }
+
     // Geprueft wird die Messung, wie sie NACH dem Speichern stuende: eine
     // Diastole, die einzeln ueber die Systole gehoben wird, ist derselbe Fehler.
-    const impossible = vitalLimitError({ ...existing, ...fields });
+    const impossible = vitalLimitError(next);
     if (impossible) return refuseImpossibleVital(res, impossible);
 
     applyUpdate('health_vitals', id, fields);

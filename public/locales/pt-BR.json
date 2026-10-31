@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "O arquivo tem só a linha de cabeçalho e nenhum período.",
         "errorCycleImportTooManyRows": "Uma importação pode ter no máximo {{limit}} períodos. Divida o arquivo.",
         "errorVitalImpossible": "Este valor não é possível. Verifique o que foi digitado.",
-        "errorVitalBpOrder": "O valor sistólico deve ser maior que o diastólico."
+        "errorVitalBpOrder": "O valor sistólico deve ser maior que o diastólico.",
+        "errorVitalUnit": "Esta unidade não corresponde a esta medição."
     },
     "datepicker": {
         "openCalendar": "Abrir calendário",

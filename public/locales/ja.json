@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "ファイルには見出し行しかなく生理期間がありません。",
         "errorCycleImportTooManyRows": "一度にインポートできる生理期間は最大{{limit}}件です。ファイルを分けてください。",
         "errorVitalImpossible": "この値はありえません。入力内容を確認してください。",
-        "errorVitalBpOrder": "収縮期の値は拡張期の値より大きくなければなりません。"
+        "errorVitalBpOrder": "収縮期の値は拡張期の値より大きくなければなりません。",
+        "errorVitalUnit": "この単位はこの測定には使えません。"
     },
     "waste": {
         "title": "ゴミ収集",

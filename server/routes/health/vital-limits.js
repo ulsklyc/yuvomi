@@ -28,10 +28,31 @@
  *   - Koerpertemperatur: 10-46 °C bzw. 50-115 °F. Ueberlebte Unterkuehlung bis
  *     13,7 °C, Hitzschlag bis rund 46,5 °C.
  *
- * Eine Einheit, die hier nicht steht (per API oder Import erfasst, etwa
- * "stone" oder "kPa"), hat keine Zahlenraender - nur die Regeln, die ohne
- * Einheit gelten (SpO2 zwischen 1 und 100, systolisch ueber diastolisch).
+ * Eine Einheit, die hier nicht steht (eine Altzeile aus der Zeit, als die API
+ * jeden Text annahm, etwa "g", "stone" oder "kPa"), hat keine Zahlenraender -
+ * nur die Regeln, die ohne Einheit gelten (SpO2 zwischen 1 und 100, systolisch
+ * ueber diastolisch). Neu geschrieben wird so eine Einheit nicht mehr, siehe
+ * VITAL_UNITS (#2375).
  */
+
+/**
+ * Typ -> Einheiten, die geschrieben werden duerfen. Dieselbe Liste wie
+ * `metric.units` im Dialog (public/utils/health-vitals.js, das der Server wegen
+ * seiner Browser-Importe nicht laden kann); test:health-vitals haelt beide
+ * gleich. Exakte Schreibweise: die Grenzen oben sind nach ihr verschluesselt,
+ * "KG" liefe sonst an ihnen vorbei wie "g".
+ */
+export const VITAL_UNITS = Object.freeze({
+  bp: Object.freeze(['mmHg']),
+  glucose: Object.freeze(['mg/dL', 'mmol/L']),
+  weight: Object.freeze(['kg', 'lb']),
+  height: Object.freeze(['cm', 'in']),
+  head_circumference: Object.freeze(['cm', 'in']),
+  spo2: Object.freeze(['%']),
+  temp: Object.freeze(['°C', '°F']),
+  sleep: Object.freeze(['h']),
+  mood: Object.freeze([]),
+});
 
 /** Typ -> Einheit -> [min, max] fuer value_num (inklusive Raender). */
 export const VITAL_HARD_LIMITS = Object.freeze({
@@ -73,6 +94,31 @@ export function vitalLimitError({ type, unit, value_num: v1, value_num2: v2, val
   if (type === 'spo2' && !within(v1, VITAL_HARD_LIMITS.spo2['%'])) return 'out_of_range';
   const range = own(own(VITAL_HARD_LIMITS, type), unit);
   return range && !within(v1, range) ? 'out_of_range' : null;
+}
+
+/**
+ * Passt die Einheit zur Metrik? Ohne Einheit ist nichts zu pruefen (`unit` ist
+ * optional), und ein Typ ohne Metrik hat keine Liste: `type` ist freier Text.
+ *
+ * @param {{type: string, unit?: string|null}} m
+ * @returns {null|readonly string[]} null, wenn sie passt; sonst die erlaubten
+ */
+export function vitalUnitError({ type, unit }) {
+  if (unit === null || unit === undefined) return null;
+  const allowed = own(VITAL_UNITS, type);
+  return !allowed || allowed.includes(unit) ? null : allowed;
+}
+
+/**
+ * Lehnt eine Einheit ab, die die Metrik nicht fuehrt (#2375). `error` nennt
+ * API-Nutzern die erlaubten Einheiten, die App zeigt zum `reason` ihren Satz.
+ *
+ * @param {import('express').Response} res
+ * @param {readonly string[]} allowed - aus vitalUnitError
+ */
+export function refuseVitalUnit(res, allowed) {
+  const hint = allowed.length ? `Use one of: ${allowed.join(', ')}.` : 'It takes no unit.';
+  return res.status(400).json({ error: `Unit not accepted for this measurement. ${hint}`, code: 400, reason: 'health_vital_unit_invalid' });
 }
 
 /**

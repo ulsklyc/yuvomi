@@ -922,6 +922,26 @@ test('SpO2 ohne oder mit fremder Einheit haelt beide Raender, in Formular und Se
   }
 });
 
+// #2375: der Server darf public/utils/health-vitals.js nicht importieren
+// (Browser-Pfade), die Einheitenliste liegt deshalb doppelt. Nach beiden Seiten
+// geprueft: eine neue Metrik oder Einheit im Dialog macht diesen Test rot, bevor
+// das Formular etwas sendet, das der Server ablehnt.
+test('#2375: die Einheiten des Servers sind genau die waehlbaren des Dialogs', async () => {
+  const client = await import('../public/utils/health-vitals.js');
+  const server = await import('../server/routes/health/vital-limits.js');
+  assert.deepEqual(
+    Object.fromEntries(client.VITAL_METRICS.map((m) => [m.type, [...m.units]])),
+    Object.fromEntries(Object.entries(server.VITAL_UNITS).map(([type, units]) => [type, [...units]])),
+  );
+  for (const m of client.VITAL_METRICS) {
+    for (const unit of m.units) assert.equal(server.vitalUnitError({ type: m.type, unit }), null, `${m.type} ${unit}`);
+    assert.equal(server.vitalUnitError({ type: m.type, unit: null }), null, `${m.type} ohne Einheit`);
+    assert.deepEqual(server.vitalUnitError({ type: m.type, unit: 'stone' }), m.units, `${m.type} stone`);
+  }
+  assert.equal(server.vitalUnitError({ type: 'hr', unit: 'bpm' }), null, 'ein Typ ohne Metrik hat keine Liste');
+  assert.equal(server.vitalUnitError({ type: 'constructor', unit: 'bpm' }), null);
+});
+
 test('die harten Grenzen von Formular und Server sind dieselben, und weich liegt innerhalb von hart', async () => {
   const client = await import('../public/utils/health-vitals.js');
   const server = await import('../server/routes/health/vital-limits.js');

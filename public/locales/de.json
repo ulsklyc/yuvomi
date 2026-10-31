@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "Die Datei enthält nur eine Kopfzeile und keine Perioden.",
         "errorCycleImportTooManyRows": "Ein Import darf höchstens {{limit}} Perioden enthalten. Teile die Datei auf.",
         "errorVitalImpossible": "Dieser Wert ist nicht möglich. Bitte prüfe die Eingabe.",
-        "errorVitalBpOrder": "Der systolische Wert muss größer sein als der diastolische."
+        "errorVitalBpOrder": "Der systolische Wert muss größer sein als der diastolische.",
+        "errorVitalUnit": "Diese Einheit passt nicht zu dieser Messung."
     },
     "waste": {
         "title": "Entsorgung",

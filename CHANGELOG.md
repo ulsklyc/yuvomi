@@ -50,6 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   footer says "MIT-Lizenz" on the German pages.
 
 ### Fixed
+- **Vitals only accept the units their measurement offers** (#2375). The API took any text as a
+  unit, so a weight in `g` slipped past the limits on impossible values, and a weight in `stone`
+  was drawn unconverted next to kilograms. `POST` and `PATCH /api/v1/health/vitals` now refuse a
+  unit the measurement does not list with 400 and the reason `health_vital_unit_invalid`, and the
+  message names the ones it takes. **This changes the API:** a script sending `g`, `lbs`, `KG` or
+  `C` has to convert to the listed unit first (weight kg or lb, height and head circumference cm
+  or in, temperature °C or °F, blood sugar mg/dL or mmol/L). `unit` stays optional. Readings
+  already stored in another unit stay as they are, keep converting in the chart where they did,
+  and can still be edited.
 - **Reset to original restores a subscribed event at once.** Resetting a changed event from an ICS
   subscription only cleared the edit mark, so the changed text stayed until the next sync. Each sync
   now keeps the feed's values, and the reset restores them straight away, without a network call.

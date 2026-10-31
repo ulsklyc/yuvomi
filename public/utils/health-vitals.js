@@ -37,7 +37,8 @@ export const MOOD_MAX = MOOD_SCALE[MOOD_SCALE.length - 1].value;
 // `channels` beschreibt die genutzten numerischen Kanäle (value_num,
 // value_num2, value_num3). Blutdruck belegt drei (Systole/Diastole/Puls),
 // alle übrigen Metriken genau einen. `units` listet die im Erfassungs-Dialog
-// wählbaren Einheiten; die erste ist der Default.
+// wählbaren Einheiten; die erste ist der Default. Der Server nimmt genau diese
+// an (VITAL_UNITS in server/routes/health/vital-limits.js, #2375).
 //
 // `format` sagt, wie ein Wert gelesen wird, und steuert damit zugleich das
 // Eingabefeld: 'pair' zeigt zwei Kanäle als 120/80, 'duration' rechnet die in
@@ -319,12 +320,13 @@ export function widenToSpan(lo, hi, span, { ceiling = Infinity } = {}) {
 
 const CHANNEL_KEYS = ['value_num', 'value_num2', 'value_num3'];
 
-// EINE EINHEIT JE SERIE (#2328). `unit` ist freier Text, und die API nimmt
-// auch an, was der Dialog nicht anbietet: 95.400 g neben 95,4 kg zeichneten
-// eine Spitze bei 95400 und eine Aenderung von +95.304,7. Umgerechnet wird
-// beim Lesen, gespeichert bleibt, was kam. Je Messart eine Basis-Einheit und
-// je Einheit (klein geschrieben) die Umrechnung dorthin; Temperatur ist nicht
-// proportional und traegt deshalb Hin- und Rueckweg.
+// EINE EINHEIT JE SERIE (#2328). Die API nahm frueher auch an, was der Dialog
+// nicht anbietet (seit #2375 lehnt sie es ab, die Altzeilen bleiben): 95.400 g
+// neben 95,4 kg zeichneten eine Spitze bei 95400 und eine Aenderung von
+// +95.304,7. Umgerechnet wird beim Lesen, gespeichert bleibt, was kam. Je
+// Messart eine Basis-Einheit und je Einheit (klein geschrieben) die Umrechnung
+// dorthin; Temperatur ist nicht proportional und traegt deshalb Hin- und
+// Rueckweg.
 const linear = (factor) => ({ toBase: (v) => v * factor, fromBase: (v) => v / factor });
 const fahrenheit = { toBase: (v) => (v - 32) * 5 / 9, fromBase: (v) => v * 9 / 5 + 32 };
 const LENGTH_UNITS = { cm: linear(1), mm: linear(0.1), m: linear(100), in: linear(2.54) };

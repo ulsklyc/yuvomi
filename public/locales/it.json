@@ -5817,7 +5817,8 @@
         "errorCycleImportNoRows": "Il file contiene solo la riga di intestazione e nessun ciclo.",
         "errorCycleImportTooManyRows": "Un’importazione può contenere al massimo {{limit}} cicli. Dividi il file.",
         "errorVitalImpossible": "Questo valore non è possibile. Controlla quanto inserito.",
-        "errorVitalBpOrder": "Il valore sistolico deve essere maggiore di quello diastolico."
+        "errorVitalBpOrder": "Il valore sistolico deve essere maggiore di quello diastolico.",
+        "errorVitalUnit": "Questa unità non è adatta a questa misurazione."
     },
     "waste": {
         "title": "Raccolta rifiuti",
