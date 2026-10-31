@@ -8093,7 +8093,10 @@ test('dashboard „Heute wichtig" is one inset-grouped list, not a tile grid', (
   // der Hauptgegenstand der Seite ist -, schlug er auf einen Wechsel an, den er
   // gar nicht bewacht. Gebunden bleibt: die Gruppe rundet über einen TOKEN, und
   // die Zeile rundet gar nicht.
-  assert.match(gridBody, /grid-template-columns:\s*1fr/, 'the group is a single column of rows, not a tile grid');
+  // Eine Spalte, ob als `1fr` oder als `minmax(0, 1fr)`: seit #2297 traegt sie
+  // ihr Minimum ausdruecklich, damit sie nicht ueber die Karte hinaus waechst
+  // (gemessen in test-dashboard-surface-browser.js).
+  assert.match(gridBody, /grid-template-columns:\s*(?:1fr|minmax\(0,\s*1fr\))\s*;/, 'the group is a single column of rows, not a tile grid');
   assert.match(gridBody, /background:\s*var\(--color-surface\)/, 'the group carries one opaque surface');
   assert.match(gridBody, /border-radius:\s*var\(--radius-[a-z0-9]+\)/, 'the group is the rounded container, and it rounds via a token');
   assert.match(gridBody, /overflow:\s*hidden/, 'rows must clip to the group radius');
