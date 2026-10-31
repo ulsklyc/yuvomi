@@ -1545,6 +1545,7 @@
         "intervalMonthly": "Mensual",
         "intervalWeekly": "Semanal",
         "intervalYearly": "Anual",
+        "seriesEndDateLabel": "End on (optional)",
         "confirmFirstLabel": "Registrar solo tras confirmar",
         "confirmFirstHint": "Cada apunte generado espera tu confirmación. Hasta entonces aparece en la lista pero no suma en ningún total; al confirmar puedes ajustar importe y fecha.",
         "pendingBadge": "Previsto",

@@ -1564,6 +1564,7 @@
         "intervalMonthly": "Buwanan",
         "intervalWeekly": "Lingguhan",
         "intervalYearly": "Taunan",
+        "seriesEndDateLabel": "End on (optional)",
         "confirmFirstLabel": "Itala lamang pagkatapos kumpirmahin",
         "confirmFirstHint": "Bawat nabuong tala ay naghihintay ng iyong kumpirmasyon. Hanggang doon ay makikita ito sa listahan ngunit hindi kasama sa anumang kabuuan - maaari mong baguhin ang halaga at petsa kapag kinukumpirma.",
         "pendingBadge": "Inaasahan",

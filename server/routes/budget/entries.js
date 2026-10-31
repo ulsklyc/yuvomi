@@ -471,6 +471,10 @@ router.post('/', (req, res) => {
     const vCount = req.body.recurrence_interval_count !== undefined
       ? intervalCountCheck(req.body.recurrence_interval_count)
       : { value: 1, error: null };
+    const endDateRaw = req.body.end_date;
+    const vEndDate = (endDateRaw !== undefined && endDateRaw !== null && endDateRaw !== '')
+      ? validateDate(endDateRaw, 'end_date', true)
+      : { value: null, error: null };
     const errors  = [
       ...refusals('entry_title_invalid', [vTitle]),
       ...refusals('entry_amount_invalid', [vAmount]),
@@ -478,8 +482,12 @@ router.post('/', (req, res) => {
       ...refusals('entry_date_invalid', [vDate]),
       ...refusals('entry_recurrence_invalid', [vRrule, vInterval]),
       ...refusals('entry_interval_count_invalid', [vCount]),
+      ...refusals('entry_end_date_invalid', [vEndDate]),
     ];
     if (errors.length) return refuse(res, errors);
+    if (vEndDate.value && vDate.value && vEndDate.value < vDate.value) {
+      return refuse(res, [refusal('entry_end_date_invalid', 'The end date cannot be before the start date.')]);
+    }
     const subcategory = validateSubcategory(vCat.value, req.body.subcategory);
     if (subcategory === null) {
       return refuse(res, [refusal('entry_subcategory_invalid', 'Invalid subcategory.')]);
@@ -531,7 +539,13 @@ router.post('/', (req, res) => {
     replaceResponsibles(result.lastInsertRowid, req.body.responsible_user_ids);
     // Eine neue Serie ist ihre eigene Vorlage (#1035): die Werte legt der
     // Trigger aus v228 an, die Zustaendigen kommen erst hier dazu.
-    if (isRecurring) seedSeriesResponsibles(result.lastInsertRowid);
+    if (isRecurring) {
+      seedSeriesResponsibles(result.lastInsertRowid);
+      if (vEndDate.value) {
+        db.get().prepare('UPDATE budget_series SET end_date = ? WHERE anchor_id = ?')
+          .run(vEndDate.value, result.lastInsertRowid);
+      }
+    }
 
     const entry = entryWithLoanMeta(result.lastInsertRowid);
 
@@ -590,7 +604,7 @@ router.put('/:id/series', (req, res) => {
     if (req.body.recurrence_interval !== undefined) checks.push(['entry_recurrence_invalid', oneOf(req.body.recurrence_interval, RECURRENCE_INTERVAL_KEYS, 'Interval')]);
     if (req.body.recurrence_interval_count !== undefined) checks.push(['entry_interval_count_invalid', intervalCountCheck(req.body.recurrence_interval_count)]);
     if (req.body.start_date !== undefined) checks.push(['entry_start_date_invalid', validateDate(req.body.start_date, 'start_date', true)]);
-    if (req.body.end_date   !== undefined && req.body.end_date !== null) checks.push(['entry_end_date_invalid', validateDate(req.body.end_date, 'end_date', true)]);
+    if (req.body.end_date !== undefined && req.body.end_date !== null && req.body.end_date !== '') checks.push(['entry_end_date_invalid', validateDate(req.body.end_date, 'end_date', true)]);
     const errors = checks.flatMap(([reason, result]) => refusals(reason, [result]));
     if (errors.length) return refuse(res, errors);
     // EINE SERIEN-AENDERUNG BEENDET DIE SERIE NICHT (#1546).
@@ -729,6 +743,9 @@ router.put('/:id/series', (req, res) => {
     const finalEndDate = endDateProvided
       ? (req.body.end_date || null)
       : (series?.end_date ?? null);
+    if (endDateProvided && finalEndDate && finalEndDate < finalStart) {
+      return refuse(res, [refusal('series_start_too_early', 'The end date cannot be before the start date.')]);
+    }
     // NICHT VOR DEN MONAT DER GEBUCHTEN ERSTEN BUCHUNG. Der Monatsaufruf laesst
     // nur den Monat des Starttags aus - er gehoert der ersten Buchung. Laege
     // der Starttag einen Monat frueher, entstuende in ihrem Monat ein zweites
@@ -873,13 +890,15 @@ router.put('/:id/series', (req, res) => {
         `).run(nextVisibility, parentId);
       }
 
-      // 6. Enddatum: kuenftige, nicht gebuchte Vorkommen nach dem Enddatum loeschen.
-      //    Bestaetigte Buchungen werden nie entfernt.
+      // 6. Enddatum: Vorkommen nach dem Enddatum loeschen, sofern sie ab heute
+      //    liegen (noch nicht gebucht). Vor heute gebuchte Zeilen bleiben auch
+      //    dann erhalten, wenn das Enddatum hinter ihnen liegt. Ausstehende
+      //    (is_pending = 1) werden unabhaengig von ihrem Datum entfernt.
       if (endDateProvided && finalEndDate) {
         db.get().prepare(`
           DELETE FROM budget_entries
-           WHERE recurrence_parent_id = ? AND date > ? AND is_pending = 1
-        `).run(parentId, finalEndDate);
+           WHERE recurrence_parent_id = ? AND date > ? AND (date >= ? OR is_pending = 1)
+        `).run(parentId, finalEndDate, cutoffDate);
       }
     })();
 

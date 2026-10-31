@@ -1545,6 +1545,7 @@
         "intervalMonthly": "Mensile",
         "intervalWeekly": "Settimanale",
         "intervalYearly": "Annuale",
+        "seriesEndDateLabel": "End on (optional)",
         "confirmFirstLabel": "Registra solo dopo conferma",
         "confirmFirstHint": "Ogni movimento generato attende la tua conferma. Fino ad allora compare nell'elenco ma non conta in nessun totale - importo e data si possono correggere al momento della conferma.",
         "pendingBadge": "Previsto",

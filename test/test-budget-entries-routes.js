@@ -1816,3 +1816,72 @@ test('#1742: omitting end_date in PUT /:id/series leaves it unchanged', async ()
   assert.equal(r.status, 200, 'ok');
   assert.equal(r.body.data.series?.end_date, '2099-11-01', 'end_date unchanged');
 });
+
+test('#1742: PUT /:id/series deletes future non-pending entries past end_date', async () => {
+  // Create a series with 3 future occurrences manually
+  const anchor = insertEntry({ title: 'rent', amount: -900, category: 'housing', subcategory: 'rent_mortgage', date: '2090-01-01', is_recurring: 1, recurrence_interval: 'monthly' });
+  db.prepare('INSERT OR IGNORE INTO budget_series (anchor_id, title, amount, category, subcategory, start_date, visibility) VALUES (?, ?, ?, ?, ?, ?, ?)').run(anchor, 'rent', -900, 'housing', 'rent_mortgage', '2090-01-01', 'shared');
+  const inst1 = insertEntry({ title: 'rent', amount: -900, category: 'housing', subcategory: 'rent_mortgage', date: '2090-02-01', recurrence_parent_id: anchor, is_pending: 0 });
+  const inst2 = insertEntry({ title: 'rent', amount: -900, category: 'housing', subcategory: 'rent_mortgage', date: '2090-03-01', recurrence_parent_id: anchor, is_pending: 0 });
+  const inst3 = insertEntry({ title: 'rent', amount: -900, category: 'housing', subcategory: 'rent_mortgage', date: '2090-04-01', recurrence_parent_id: anchor, is_pending: 1 });
+
+  const r = await call('PUT', `/${anchor}/series`, { body: { end_date: '2090-02-28' } });
+  assert.equal(r.status, 200, 'ok');
+
+  // inst1 (2090-02-01) is before end_date — stays
+  assert.ok(db.prepare('SELECT id FROM budget_entries WHERE id = ?').get(inst1), 'inst1 before end_date stays');
+  // inst2 (2090-03-01) is after end_date and future — removed
+  assert.equal(db.prepare('SELECT id FROM budget_entries WHERE id = ?').get(inst2), undefined, 'inst2 after end_date removed');
+  // inst3 (2090-04-01) is pending — removed
+  assert.equal(db.prepare('SELECT id FROM budget_entries WHERE id = ?').get(inst3), undefined, 'pending inst3 removed');
+});
+
+test('#1742: PUT /:id/series keeps booked entries before today even when past end_date', async () => {
+  const { todayKey: todayKeyT } = await import('../server/utils/timezone.js');
+  const today = todayKeyT(db);
+  // Create a past entry (before today) manually
+  const anchor = insertEntry({ title: 'gym', amount: -50, category: 'personal_health', subcategory: 'gym_sports', date: '2020-01-01', is_recurring: 1, recurrence_interval: 'monthly' });
+  db.prepare('INSERT OR IGNORE INTO budget_series (anchor_id, title, amount, category, subcategory, start_date, visibility) VALUES (?, ?, ?, ?, ?, ?, ?)').run(anchor, 'gym', -50, 'personal_health', 'gym_sports', '2020-01-01', 'shared');
+  // A booked past occurrence — date is in the past, not pending
+  const pastInst = insertEntry({ title: 'gym', amount: -50, category: 'personal_health', subcategory: 'gym_sports', date: '2020-06-01', recurrence_parent_id: anchor, is_pending: 0 });
+  // A future occurrence
+  const futureInst = insertEntry({ title: 'gym', amount: -50, category: 'personal_health', subcategory: 'gym_sports', date: '2099-01-01', recurrence_parent_id: anchor, is_pending: 0 });
+
+  // Set end_date to 2020-05-31 — after start but before the past booked entry's month
+  const r = await call('PUT', `/${anchor}/series`, { body: { end_date: '2020-05-31' } });
+  assert.equal(r.status, 200, 'ok');
+
+  // Past booked entry (2020-06-01) before today stays even though it is past end_date
+  assert.ok(db.prepare('SELECT id FROM budget_entries WHERE id = ?').get(pastInst), 'past booked entry stays');
+  // Future entry (2099-01-01) past end_date and >= today is removed
+  assert.equal(db.prepare('SELECT id FROM budget_entries WHERE id = ?').get(futureInst), undefined, 'future entry removed');
+});
+
+test('#1742: POST /budget with end_date creates series with that end_date', async () => {
+  const r = await call('POST', '/', { body: { title: 'sub', amount: -20, category: 'food', subcategory: 'groceries', date: '2099-05-01', is_recurring: true, recurrence_interval: 'monthly', end_date: '2099-12-31' } });
+  assert.equal(r.status, 201, 'created');
+  const row = db.prepare('SELECT end_date FROM budget_series WHERE anchor_id = ?').get(r.body.data.id);
+  assert.equal(row?.end_date, '2099-12-31', 'end_date stored in budget_series');
+});
+
+test('#1742: PUT /:id/series with end_date = "" clears it', async () => {
+  const pid = insertEntry({ title: 'sub5', amount: -30, category: 'subscriptions', date: '2099-03-01', is_recurring: 1 });
+  db.prepare('UPDATE budget_series SET end_date = ? WHERE anchor_id = ?').run('2099-12-01', pid);
+  const r = await call('PUT', `/${pid}/series`, { body: { end_date: '' } });
+  assert.equal(r.status, 200, 'ok');
+  const row = db.prepare('SELECT end_date FROM budget_series WHERE anchor_id = ?').get(pid);
+  assert.equal(row.end_date, null, 'cleared by empty string');
+});
+
+test('#1742: PUT /:id/series refuses end_date before start_date', async () => {
+  const pid = insertEntry({ title: 'sub6', amount: -30, category: 'subscriptions', date: '2099-06-01', is_recurring: 1 });
+  const r = await call('PUT', `/${pid}/series`, { body: { end_date: '2099-05-31' } });
+  assert.equal(r.status, 400, 'refused');
+  assert.equal(r.body.reason, 'series_start_too_early');
+});
+
+test('#1742: POST /budget refuses end_date before start date', async () => {
+  const r = await call('POST', '/', { body: { title: 'x', amount: -5, category: 'food', date: '2099-07-01', is_recurring: true, recurrence_interval: 'monthly', end_date: '2099-06-30' } });
+  assert.equal(r.status, 400, 'refused');
+  assert.equal(r.body.reason, 'entry_end_date_invalid');
+});

@@ -1545,6 +1545,7 @@
         "intervalMonthly": "Mensuel",
         "intervalWeekly": "Hebdomadaire",
         "intervalYearly": "Annuel",
+        "seriesEndDateLabel": "End on (optional)",
         "confirmFirstLabel": "Comptabiliser après confirmation",
         "confirmFirstHint": "Chaque écriture générée attend votre confirmation. Jusque-là elle figure dans la liste sans compter dans aucun total - vous pouvez ajuster le montant et la date au moment de confirmer.",
         "pendingBadge": "Attendu",
