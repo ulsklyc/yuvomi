@@ -430,6 +430,45 @@ test('the three event delete paths: gone is done, any other failure says the app
   }
 });
 
+// D#2330: der Reset wirkt sofort. Der Zeitraum bleibt gleich, also darf das
+// Nachladen nicht an ihm haengen, und die Ansicht zeichnet den neuen Stand.
+test('resetting an ICS event shows the feed values without a page reload (D#2330)', async () => {
+  const previous = { window: globalThis.window, apiStub: globalThis.__apiStub,
+    events: calendar.localCalendarState.events };
+  const toasts = [];
+  const bodyLookups = [];
+  globalThis.window = { yuvomi: { showToast(message, type) { toasts.push([message, type]); } } };
+  calendar.setContainerForTest({ isConnected: true, querySelectorAll: () => [],
+    querySelector: (selector) => { if (selector === '#cal-body') bodyLookups.push(selector); return null; } });
+  const local = { id: 51, title: 'Lokal', start_datetime: '2035-05-02T15:00', external_source: 'ics', user_modified: 1 };
+  const feed = { ...local, title: 'Feed', start_datetime: '2035-05-02T09:00', user_modified: 0 };
+  try {
+    for (const restored of [true, false]) {
+      toasts.length = 0;
+      bodyLookups.length = 0;
+      let reloads = 0;
+      let closed = 0;
+      calendar.localCalendarState.events = [{ ...local }];
+      globalThis.__apiStub = {
+        post: async () => ({ data: { reset: true, restored } }),
+        getWithSource: async () => { reloads += 1; return { data: { data: [feed] }, fromCache: false }; },
+        get: async () => ({ data: [] }),
+      };
+      await calendar.resetIcsEvent(local, async () => { closed += 1; });
+      assert.equal(closed, 1, 'the detail view closes');
+      assert.equal(reloads, 1, 'the unchanged range is fetched again');
+      assert.equal(calendar.localCalendarState.events[0].title, 'Feed', 'the state holds the feed values');
+      assert.equal(bodyLookups.length > 0, true, 'the view is drawn again');
+      assert.deepEqual(toasts, [[restored ? 'calendar.ics.resetToast' : 'calendar.ics.resetPendingToast', 'success']]);
+    }
+  } finally {
+    calendar.localCalendarState.events = previous.events;
+    calendar.setContainerForTest(null);
+    globalThis.window = previous.window;
+    if (previous.apiStub === undefined) delete globalThis.__apiStub; else globalThis.__apiStub = previous.apiStub;
+  }
+});
+
 // #1927: die Hilfezeile unter der Kalenderwahl nennt den iCloud-Upload, sobald
 // der gewaehlte Kalender hochlaedt - ohne Rueckfrage beim Speichern und ohne
 // Zeile, solange keiner hochlaedt.
