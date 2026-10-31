@@ -1651,6 +1651,18 @@ test('EXDATE und Ueberschreibungen eines anderen Clients halten den Anker fest (
   assert.ok(data.includes('RECURRENCE-ID:20261104T060000Z'));
 });
 
+test('RDATE eines anderen Clients haelt den Anker fest (Review auf #2420)', async () => {
+  // Ein Zusatztermin erbt die Dauer DTSTART bis DUE. Mit dem Anker auf 00:00 wuerde
+  // aus einem Termin um 07:00 einer um 14:00.
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+
+  const data = await pushAfterEdit(accountId, task, uid,
+    serverTodo({ uid, alarm: null, extra: [...OLD_ANCHOR, 'RDATE:20261104T060000Z'] }));
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART:20261102T060000Z']);
+  assert.ok(data.includes('RDATE:20261104T060000Z'));
+});
+
 test('Ein START-Alarm verliert sein DTSTART nicht, an Datum und 00:00 (RFC 5545 §3.8.6.3)', async () => {
   // Der Alarm verlangt DTSTART. Ohne Bindung fiele es hier weg (`seriesAnchor`).
   const accountId = reset();
