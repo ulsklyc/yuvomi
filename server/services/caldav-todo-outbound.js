@@ -310,10 +310,10 @@ function seriesAnchor(date, time, tz) {
  * Am Anker haengen Daten anderer Clients, die der Patcher nicht anfasst: ein
  * START-relativer Alarm rechnet von DTSTART (RFC 5545 §3.8.6.3, ohne RELATED gilt
  * START), EXDATE und RECURRENCE-ID nennen ein Vorkommen ueber dessen Zeitwert
- * (§3.8.4.4), ein RDATE-Termin erbt die Dauer von DTSTART bis DUE. Rueckte eine unbeteiligte Bearbeitung den Anker, fiele der Alarm auf
- * den Vorabend, ein gestrichenes Vorkommen kaeme zurueck, und ein Zusatztermin
- * fiele spaeter. Solche Objekte werden
- * deshalb nicht umgerechnet: DUE und DTSTART bleiben stehen, solange die
+ * (§3.8.4.4), ein RDATE-Termin erbt die Dauer von DTSTART bis DUE. Rueckte eine
+ * unbeteiligte Bearbeitung den Anker, fiele der Alarm auf den Vorabend, ein
+ * gestrichenes Vorkommen kaeme zurueck, und ein Zusatztermin fiele spaeter. Solche
+ * Objekte werden deshalb nicht umgerechnet: DUE und DTSTART bleiben stehen, solange die
  * Faelligkeit gleich ist, auch ein DTSTART = DUE in UTC aus v2.83.0. Das heilt sich
  * mit dem Abhaken, denn die Folgeinstanz ist ein neues VTODO mit sauberem Anker.
  *
