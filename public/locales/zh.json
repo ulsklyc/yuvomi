@@ -3464,6 +3464,7 @@
         "hidePassword": "隐藏密码",
         "version": "v{{version}}",
         "loginWithSso": "通过SSO登录",
+        "loginWithHomeAssistant": "使用 Home Assistant 登录",
         "orDivider": "或",
         "ssoError": "SSO登录失败，请重试。",
         "ssoNoAccount": "此SSO登录尚无对应账户，请联系您家庭的管理员。",

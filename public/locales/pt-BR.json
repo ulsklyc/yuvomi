@@ -3464,6 +3464,7 @@
         "hidePassword": "Ocultar senha",
         "version": "v{{version}}",
         "loginWithSso": "Entrar com SSO",
+        "loginWithHomeAssistant": "Entrar com o Home Assistant",
         "orDivider": "ou",
         "ssoError": "O login SSO falhou. Por favor, tente novamente.",
         "ssoNoAccount": "Ainda não existe uma conta aqui para este login SSO. Contate o administrador do seu grupo familiar.",

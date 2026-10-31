@@ -42,7 +42,12 @@ import {
   getConfig as getOidcConfig,
   exchangeAuthorizationCode,
   describeOidcError,
+  ssoProvider,
 } from './services/oidc.js';
+import {
+  buildHomeAssistantAuthorizationUrl,
+  completeHomeAssistantLogin,
+} from './services/homeassistant-auth.js';
 import { emailService as defaultEmailService } from './services/email.js';
 import { passwordResetService as defaultResetService } from './services/password-reset.js';
 import { inviteService as defaultInviteService } from './services/invites.js';
@@ -2373,6 +2378,9 @@ router.get('/oidc/config', (_req, res) => {
   const passwordLoginEnabled = isPasswordLoginEnabled();
   res.json({
     enabled: isOidcEnabled(),
+    // Welche Quelle hinter „Mit SSO anmelden" steht, damit die Anmeldeseite den
+    // Knopf benennen kann (`oidc`, `homeassistant` oder null).
+    provider: ssoProvider(),
     password_login_enabled: passwordLoginEnabled,
     guest_password_login_enabled: !passwordLoginEnabled && hasSplitExpenseGuests(),
   });
@@ -2392,6 +2400,8 @@ router.get('/oidc/config', (_req, res) => {
  * @param {object} extra  zusätzliche Session-Felder, z. B. { linkUserId }
  */
 async function beginOidcFlow(req, config, extra = {}) {
+  if (config.homeassistant) return beginHomeAssistantFlow(req, config, extra);
+
   const state         = oidcClient.randomState();
   const nonce         = oidcClient.randomNonce();
   const codeVerifier  = oidcClient.randomPKCECodeVerifier();
@@ -2416,6 +2426,26 @@ async function beginOidcFlow(req, config, extra = {}) {
     code_challenge:        codeChallenge,
     code_challenge_method: 'S256',
   }).href;
+}
+
+/**
+ * Gegenstueck von `beginOidcFlow` fuer Home Assistant: dieselben Schutzwerte
+ * (state gegen Login-CSRF, PKCE gegen Code-Injection) in derselben Session-
+ * Ablage. Eine nonce gibt es nicht - Home Assistant stellt kein ID-Token aus.
+ */
+async function beginHomeAssistantFlow(req, config, extra = {}) {
+  const state         = oidcClient.randomState();
+  const codeVerifier  = oidcClient.randomPKCECodeVerifier();
+  const codeChallenge = await oidcClient.calculatePKCECodeChallenge(codeVerifier);
+  const redirectUri   = config.redirectUri;
+
+  req.session.oidc = { state, codeVerifier, redirectUri, provider: 'homeassistant', ...extra };
+
+  await new Promise((resolve, reject) =>
+    req.session.save(err => (err ? reject(err) : resolve()))
+  );
+
+  return buildHomeAssistantAuthorizationUrl(config, { redirectUri, state, codeChallenge });
 }
 
 router.get('/oidc/start', refuseWhileRestoring, async (req, res) => {
@@ -2532,24 +2562,50 @@ router.get('/oidc/callback', refuseWhileRestoring, async (req, res) => {
       return res.redirect('/login?error=oidc_state_mismatch');
     }
 
-    // Der Tausch sendet die redirect_uri der Authorize-Anfrage woertlich; von
-    // der eingehenden Anfrage kommt nur die Query (code, state, ...), weder
-    // Pfad noch Host oder Schema (#1768). Er validiert state, tauscht den Code
-    // gegen Tokens und prüft Signatur, iss, aud, exp sowie nonce am ID-Token.
     const queryStart = req.originalUrl.indexOf('?');
-    const tokens = await exchangeAuthorizationCode(config, {
-      redirectUri: stored.redirectUri,
-      query:       queryStart === -1 ? '' : req.originalUrl.slice(queryStart),
-      checks: {
-        expectedState:    stored.state,
-        expectedNonce:    stored.nonce,
-        pkceCodeVerifier: stored.codeVerifier,
-      },
-    });
+    const query = queryStart === -1 ? '' : req.originalUrl.slice(queryStart);
 
-    // Identität aus dem validierten ID-Token; fetchUserInfo erzwingt sub-Abgleich
-    const claims   = tokens.claims();
-    const userinfo = await oidcClient.fetchUserInfo(config, tokens.access_token, claims.sub);
+    // Ein Lauf, der bei der einen Quelle begann, endet nicht bei der anderen
+    // (Konfiguration zwischen Start und Rueckweg geaendert).
+    if ((stored.provider === 'homeassistant') !== !!config.homeassistant) {
+      log.warn('OIDC callback: Lauf mit einer anderen SSO-Quelle begonnen');
+      return res.redirect('/login?error=oidc_state_mismatch');
+    }
+
+    let claims;
+    let userinfo;
+    if (config.homeassistant) {
+      // Home Assistant: state pruefen, Code tauschen, Benutzer ueber die
+      // WebSocket-API erfragen, Token widerrufen (services/homeassistant-auth.js).
+      try {
+        claims = await completeHomeAssistantLogin(config, new URLSearchParams(query), stored, log);
+      } catch (err) {
+        if (err.code === 'state_mismatch') {
+          log.warn('Home Assistant callback: state mismatch');
+          return res.redirect('/login?error=oidc_state_mismatch');
+        }
+        throw err;
+      }
+      userinfo = { name: claims.name };
+    } else {
+      // Der Tausch sendet die redirect_uri der Authorize-Anfrage woertlich; von
+      // der eingehenden Anfrage kommt nur die Query (code, state, ...), weder
+      // Pfad noch Host oder Schema (#1768). Er validiert state, tauscht den Code
+      // gegen Tokens und prüft Signatur, iss, aud, exp sowie nonce am ID-Token.
+      const tokens = await exchangeAuthorizationCode(config, {
+        redirectUri: stored.redirectUri,
+        query,
+        checks: {
+          expectedState:    stored.state,
+          expectedNonce:    stored.nonce,
+          pkceCodeVerifier: stored.codeVerifier,
+        },
+      });
+
+      // Identität aus dem validierten ID-Token; fetchUserInfo erzwingt sub-Abgleich
+      claims   = tokens.claims();
+      userinfo = await oidcClient.fetchUserInfo(config, tokens.access_token, claims.sub);
+    }
 
     // Verknüpfungs-Lauf (#832): der Nutzer ist bereits angemeldet und bindet
     // sein OIDC-Konto an genau dieses Konto. Kein Anlegen, kein Zuordnen über

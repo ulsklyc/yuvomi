@@ -3464,6 +3464,7 @@
         "hidePassword": "Ẩn mật khẩu",
         "version": "v{{version}}",
         "loginWithSso": "Đăng nhập với SSO",
+        "loginWithHomeAssistant": "Đăng nhập bằng Home Assistant",
         "orDivider": "hoặc",
         "ssoError": "Đăng nhập SSO thất bại. Vui lòng thử lại.",
         "ssoNoAccount": "Chưa có tài khoản nào ở đây cho lần đăng nhập SSO này. Vui lòng liên hệ quản trị viên hộ gia đình của bạn.",
