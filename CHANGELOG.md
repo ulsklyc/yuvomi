@@ -66,6 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `health_vital_unit_invalid`, and the message names the ones that work. Weights in stone now also
   convert in the chart. `unit` stays optional, stored readings stay as they were sent, and older
   readings in any unit can still be edited.
+- **A calendar series that gets a new first date on its way out keeps its exact time.** When Yuvomi
+  moves the start of a series like "last day of the month" onto the first day the rule hits, fractions of a
+  second that came from the calendar provider were dropped from the start and end. They now stay.
 - **The container starts with `no-new-privileges`.** Hardened setups (Podman Quadlet
   `NoNewPrivileges=true`, `--security-opt no-new-privileges`, Compose `security_opt`) never got
   past the entrypoint: `gosu` hung as root at 100 % CPU before it switched to the `node` user, so
