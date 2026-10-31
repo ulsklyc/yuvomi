@@ -1590,6 +1590,13 @@ test('Ein zonierter Anker kommt unveraendert zurueck, ohne dass die Aufgabe als 
   }
 });
 
+test('Eine TZID ausserhalb der Haushaltszone wird als Zeitpunkt gelesen, nicht als Ziffern (#2374)', () => {
+  // Der Fall nach einem Wechsel der Haushaltszone: das Objekt traegt noch die alte
+  // Zone. Dieselbe Aufgabe, also derselbe Zeitpunkt auf der Uhr von jetzt.
+  const old = serverTodo({ extra: ['DUE;TZID=America/New_York:20261102T070000'] });
+  assert.deepStrictEqual(splitDue(parseVTODO(old)[0].due, 'Europe/Berlin'), { date: '2026-11-02', time: '13:00' });
+});
+
 test('An einem fremden Objekt tritt der zonierte Anker an die Stelle des alten (#2374)', async () => {
   const accountId = reset();
   const task = insertTask({ accountId, title: 'Blumen giessen', due_date: '2026-11-02', due_time: '07:00' });
