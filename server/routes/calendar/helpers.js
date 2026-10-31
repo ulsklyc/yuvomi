@@ -529,6 +529,9 @@ export function serializeEvent(event, context = null) {
     recurrence_id,
     recurrence_identity,
     overridden_fields,
+    // Interne Sync-Zustände (Abgleich, Echo-Erkennung, Rohstand): kein Feld der Antwort.
+    outbound_snapshot,
+    seen_on_server,
     ...rest
   } = event;
   // DER ANHANG IST EIN DOKUMENT UND FOLGT DEM DOKUMENTENRECHT (#1358). Seit

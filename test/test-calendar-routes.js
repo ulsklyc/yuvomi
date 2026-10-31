@@ -5455,3 +5455,22 @@ test('die Termin-Faelle tragen einen reason und einen englischen Text (#1909)', 
     db.prepare("DELETE FROM calendar_events WHERE title IN ('GRUND-EINZEL', 'GRUND-SERIE')").run();
   }
 });
+
+// Interne Sync-Spalten gehören nicht in die Antwort: outbound_snapshot und
+// seen_on_server laufen wie feed_original durch SELECT e.* in serializeEvent.
+test('GET / und GET /:id liefern outbound_snapshot und seen_on_server nicht aus', async () => {
+  const ev = insertEvent({ title: 'LEAK-SYNC', start_datetime: '2036-05-10T09:00', end_datetime: '2036-05-10T10:00', created_by: MARIA.id });
+  db.prepare('UPDATE calendar_events SET outbound_snapshot = ?, seen_on_server = 1 WHERE id = ?').run('{"raw":true}', ev);
+  const list = await call('GET', '/?from=2036-05-01&to=2036-05-31', { actor: MARIA });
+  assert.equal(list.status, 200);
+  const item = list.body.data.find((e) => e.id === ev);
+  assert.ok(item, 'Termin in der Liste');
+  for (const key of ['outbound_snapshot', 'seen_on_server']) {
+    assert.equal(key in item, false, `GET / darf ${key} nicht enthalten`);
+  }
+  const one = await call('GET', `/${ev}`, { actor: MARIA });
+  assert.equal(one.status, 200);
+  for (const key of ['outbound_snapshot', 'seen_on_server']) {
+    assert.equal(key in one.body.data, false, `GET /:id darf ${key} nicht enthalten`);
+  }
+});
