@@ -4369,20 +4369,21 @@ function openTaskFilters(container) {
   if (!panel) return null;
   state.filterSheet = panel;
   panel.addEventListener('click', (e) => onFilterSheetClick(e, container));
-  const groupMode = panel.querySelector('#group-mode-toggle');
-  if (groupMode) {
-    wireTablist(groupMode, {
-      activeId: state.groupMode,
-      activeClass: 'is-active',
-      mode: 'select',
-      onChange: (mode) => {
-        state.groupMode = mode;
-        renderTaskList(container);
-      },
-    });
-    attachSegmentIndicator(groupMode);
-  }
+  wireGroupMode(panel, container);
   return panel;
+}
+
+/** Der Umschalter „Gruppieren nach" im Blatt. */
+function wireGroupMode(panel, container) {
+  const groupMode = panel.querySelector('#group-mode-toggle');
+  if (!groupMode) return;
+  wireTablist(groupMode, {
+    activeId: state.groupMode,
+    activeClass: 'is-active',
+    mode: 'select',
+    onChange: (mode) => setGroupMode(container, mode),
+  });
+  attachSegmentIndicator(groupMode);
 }
 
 /** Schalter im Blatt (Checkboxen der toggle-rows). */
@@ -4478,6 +4479,22 @@ const COLLAPSED_GROUPS_KEY = 'yuvomi:taskCollapsedGroups';
 const COLLAPSED_KANBAN_KEY = 'yuvomi:taskCollapsedKanbanCols';
 const SHOW_FUTURE_KEY = 'yuvomi:taskShowFuture';
 const ASSIGNED_TO_ME_KEY = 'yuvomi:taskAssignedToMe';
+const GROUP_MODE_KEY = 'yuvomi-tasks-group';
+const GROUP_MODES = ['category', 'due'];
+
+// Die Gruppierung gehoert wie die Ansicht (`yuvomi-tasks-view`) dem Geraet, nicht
+// dem Konto (D#2397). Ein unbekannter Wert faellt auf den Standard zurueck.
+function restoreGroupMode() {
+  let saved = null;
+  try { saved = localStorage.getItem(GROUP_MODE_KEY); } catch {}
+  state.groupMode = GROUP_MODES.includes(saved) ? saved : 'category';
+}
+
+function setGroupMode(container, mode) {
+  state.groupMode = mode;
+  try { localStorage.setItem(GROUP_MODE_KEY, mode); } catch {}
+  renderTaskList(container);
+}
 
 // „Mir zugewiesen" ist ein Schnellzugriff auf den assigned_to-Filter mit der
 // eigenen User-ID. Wird pro Gerät gemerkt und beim Laden aus dem gespeicherten
@@ -6512,6 +6529,7 @@ export async function render(container, { user, signal } = {}) {
   state.isAdmin = user?.role === 'admin';
 
   restoreAssignedToMe();
+  restoreGroupMode();
 
   // View-Mode: URL-Parameter > localStorage > Default 'list'
   const urlView = new URLSearchParams(window.location.search).get('view');
@@ -6774,6 +6792,7 @@ export const __test = {
   // #1808: ein Display hat kein „mir" - der gespeicherte Schalter wird dort
   // beim Lesen uebergangen.
   restoreAssignedToMe, persistAssignedToMe,
+  restoreGroupMode, setGroupMode, wireGroupMode,
   // Der Aufgaben-Dialog als Markup: welche Felder er zeigt und wen er anbietet.
   renderModalContent,
   // Der Erinnerungs-Abschnitt einzeln, weil er einen Zustand zu BENENNEN hat,

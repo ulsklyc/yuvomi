@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   footer says "MIT-Lizenz" on the German pages.
 
 ### Fixed
+- **Tasks remember how you group them.** Grouping the list by due date instead of category now
+  stays after a reload, on that device, like the choice between list, board and history.
 - **The Podman Quadlet health check passes.** The `HealthCmd` in `tools/quadlet/oikos.container`
   reached Podman as a shell command with a missing closing quote, so every check failed with
   `Syntax error: Unterminated quoted string` and the container stayed `unhealthy` although the app

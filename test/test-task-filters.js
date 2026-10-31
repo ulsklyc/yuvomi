@@ -1203,3 +1203,81 @@ test('am Display: kein Schalter „Mir zugewiesen", und ein gespeicherter Wert w
     store.clear();
   }
 });
+
+// --------------------------------------------------------
+// Die Gruppierung bleibt pro Geraet stehen (D#2397)
+// --------------------------------------------------------
+// Wie `yuvomi-tasks-view`: die Wahl gehoert dem Geraet, nicht dem Konto. Der
+// Aufruf des Lesers im Seitenaufbau steht in test:display-task-entry-points.
+const GROUP_KEY = 'yuvomi-tasks-group';
+
+test('die Gruppierung im Blatt wird gemerkt und nach einem Neuladen wiederhergestellt', () => {
+  const button = (tabId) => {
+    const b = new SheetEl({ dataset: { tabId } });
+    b.closest = () => b;
+    return b;
+  };
+  try {
+    baseState();
+    store.clear();
+    tasks.state.groupMode = 'category';
+    const buttons = [button('category'), button('due')];
+    const heard = {};
+    // Die Leiste traegt schon eine Kapsel: attachSegmentIndicator kehrt dann
+    // mit ihr zurueck, gemessen wird nur die Verdrahtung des Umschalters.
+    const bar = {
+      querySelectorAll: () => buttons,
+      querySelector: () => ({ _segHandle: {} }),
+      addEventListener: (type, fn) => { heard[type] = fn; },
+      getBoundingClientRect: () => ({ left: 0, right: 0 }),
+    };
+    const panel = { querySelector: (sel) => (sel === '#group-mode-toggle' ? bar : null) };
+    const container = { querySelector: () => null, querySelectorAll: () => [] };
+
+    tasks.wireGroupMode(panel, container);
+    heard.click({ target: buttons[1] });
+    assert.equal(tasks.state.groupMode, 'due', 'die Wahl gilt sofort');
+    assert.equal(store.get(GROUP_KEY), 'due', 'und steht im Speicher dieses Geraets');
+
+    tasks.state.groupMode = 'category';
+    tasks.restoreGroupMode();
+    assert.equal(tasks.state.groupMode, 'due', 'der naechste Aufbau startet mit ihr');
+  } finally {
+    tasks.state.groupMode = 'category';
+    store.clear();
+  }
+});
+
+test('ein ungueltiger oder fehlender Wert faellt auf „Kategorie" zurueck', () => {
+  try {
+    for (const wert of ['bogus', '', 'constructor', null]) {
+      store.clear();
+      if (wert !== null) store.set(GROUP_KEY, wert);
+      tasks.state.groupMode = 'due';
+      tasks.restoreGroupMode();
+      assert.equal(tasks.state.groupMode, 'category', `gespeichert: ${JSON.stringify(wert)}`);
+    }
+  } finally {
+    tasks.state.groupMode = 'category';
+    store.clear();
+  }
+});
+
+test('ein gesperrter Speicher bricht weder das Merken noch das Wiederherstellen', () => {
+  const echt = globalThis.localStorage;
+  globalThis.localStorage = {
+    getItem() { throw new Error('blocked'); },
+    setItem() { throw new Error('blocked'); },
+  };
+  try {
+    tasks.state.groupMode = 'due';
+    assert.doesNotThrow(() => tasks.restoreGroupMode());
+    assert.equal(tasks.state.groupMode, 'category', 'ohne Speicher gilt der Standard');
+    assert.doesNotThrow(() => tasks.setGroupMode(
+      { querySelector: () => null, querySelectorAll: () => [] }, 'due'));
+    assert.equal(tasks.state.groupMode, 'due', 'die Wahl gilt trotzdem in dieser Sitzung');
+  } finally {
+    globalThis.localStorage = echt;
+    tasks.state.groupMode = 'category';
+  }
+});

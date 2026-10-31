@@ -272,6 +272,14 @@ test('der Seitenaufbau von Aufgaben und Kalender uebergeht am Display ein gespei
       assert.equal(tasks.state.currentUserId, user.id, 'Vorbedingung: der Aufbau hat dieses Konto uebernommen');
       assert.deepEqual(tasks.state.filters.assigned_to, erwartet, `Aufgaben: ${text}`);
     }
+    // Die Gruppierung (D#2397): der Aufbau liest sie, sonst startet jede
+    // Sitzung wieder bei „Kategorie". Der Leser selbst steht in test:task-filters.
+    store.clear();
+    store.set('yuvomi-tasks-group', 'due');
+    tasks.state.groupMode = 'category';
+    await aufbauen(tasksPage, MENSCH);
+    assert.equal(tasks.state.groupMode, 'due', 'Aufgaben: der Aufbau stellt die gemerkte Gruppierung wieder her');
+    tasks.state.groupMode = 'category';
     // Kalender: der Schluessel wird zum Zustand `assignedToMe`.
     for (const [user, erwartet, text] of [
       [MENSCH, true, 'Gegenfall: beim Menschen stellt der Aufbau die Wahl wieder her'],
