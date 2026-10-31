@@ -63,6 +63,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   off in the browser. Only what another server answered, such as a WebDAV or CalDAV server refusing
   a connection, still appears as its original text, inside a translated sentence, so an admin can
   fix it.
+- **Repeating tasks keep their time on CalDAV servers across clock changes.** A repeating task with
+  a time now goes out in the household's time zone, so a daily 07:00 task stays at 07:00 after the
+  clocks change, and a weekday repeat near midnight stays on its day. Its start now lies before its
+  due time, which strict servers require. Yuvomi fixes a task already on the server the next time
+  you change it. If another app added a reminder or skipped a date there, the task keeps its old
+  timing until you tick it off, so those still line up.
 - **A new app name reaches installed apps.** After renaming the app in Settings, a browser that
   had loaded the app before kept the old name for the installed app, even after uninstalling and
   installing it again: the service worker answered `/manifest.webmanifest` from its cache and only
