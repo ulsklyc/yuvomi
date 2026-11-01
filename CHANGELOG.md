@@ -56,6 +56,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin sets up, in line with how private entries already work.
 
 ### Fixed
+- **"Today at a glance" fits narrow phones again.** On a phone, the summary next to the title
+  ("2 events left · 1 task overdue") was not allowed to wrap. When it did not fit - in German
+  already on a 375px screen - the card's content became wider than the card and every row was cut
+  off at the right edge, including "All day" and "Overdue". The summary now moves below the title,
+  right-aligned, when there is no room beside it, and the card's column never grows past the card
+  (#2297).
 - **The Tasks title stands in full on narrow phones** (#2425). Below 390px wide the title sat next
   to three buttons and read "Aufgab…" at 360px. There the filter now moves into the "..." menu, and
   the number of active filters stands on the "..." button and in the menu entry. From 390px up
