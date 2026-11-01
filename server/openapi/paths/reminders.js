@@ -1,4 +1,5 @@
 import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
+import { ORIGIN_MODULE } from '../../services/reminder-origins.js';
 
 /**
  * Gilt fuer alle vier schreibenden Wege unten, deshalb einmal statt viermal:
@@ -26,6 +27,23 @@ const REMIND_AT_INPUT = ' `remind_at` is stored as UTC without a zone suffix, al
   + '`2026-09-22T16:00:00`. Up to v2.68.0 values were stored as sent; rows with an offset from then are still '
   + 'read as the instant they name and fire on time.';
 
+const WINDOW_EDGE = ' Without `Z` or an offset the value is UTC, as in `remind_at`; a date alone is midnight UTC; fractions of a '
+  + 'second are dropped. Percent-encode a `+` in an offset (`%2B`): unencoded it reads as a space and answers 400.';
+
+const UPCOMING = 'The caller\'s own reminders that are not due yet, for a client that schedules them on the device. '
+  + 'Both edges of the window count, and it spans at most 14 days. Only what lies after the current moment comes back, also when '
+  + '`from` is in the past: a reminder is in `GET /reminders/pending` from the moment it is due and in this list until then, never in '
+  + 'both. Sorted by the moment the reminder fires, at most 200 rows, counted after everything the caller may not see is left out. The '
+  + 'list is a snapshot: the server keeps rebuilding derived types, and it does not know what a client scheduled.\n\n'
+  + 'The rules of `GET /reminders/pending` apply: own, non-dismissed rows only, nothing whose entity is hidden from the caller, no task '
+  + 'or event that is gone, nothing from a module the household switched off, and only origins the caller may read. On top of them, a '
+  + 'task that is done or archived is left out, and comes back when it is reopened: what a client schedules fires without asking again. '
+  + 'A client still has to cancel its own notification when a task is checked off, because this list only changes at the next fetch. '
+  + 'An API token needs `calendar:read` '
+  + 'to reach this route and a read scope of the module behind each origin for its rows, for example `tasks:read` for `task`; a row the '
+  + 'caller may not read is left out, not refused.\n\n'
+  + 'Use `fires_at`, not `remind_at`, to schedule: `remind_at` is UTC without a suffix, and rows written up to v2.68.0 may carry an offset.';
+
 export function remindersPaths() {
   return withCaseReasons('reminders', CASE_REASONS, {
     '/api/v1/reminders/pending': {
@@ -40,6 +58,51 @@ export function remindersPaths() {
           description: '`household` asks for the version for a shared surface; it carries no reminders. Anything else means the personal version.',
           schema: { type: 'string', enum: ['household'] },
         }],
+      }),
+    },
+    '/api/v1/reminders/upcoming': {
+      get: op({
+        summary: 'List upcoming reminders',
+        operationId: 'listUpcomingReminders',
+        tag: 'Reminders',
+        description: UPCOMING,
+        params: [{
+          name: 'from',
+          in: 'query',
+          required: true,
+          description: `Start of the window, included.${WINDOW_EDGE}`,
+          schema: { type: 'string', format: 'date-time' },
+        }, {
+          name: 'to',
+          in: 'query',
+          required: true,
+          description: `End of the window, included. At most 14 days after \`from\`.${WINDOW_EDGE}`,
+          schema: { type: 'string', format: 'date-time' },
+        }, {
+          name: 'types',
+          in: 'query',
+          required: false,
+          description: 'Comma-separated origins to keep, for example `task,event`. It only narrows: an origin the caller may not read stays out, and an unknown value answers 400. Without it, every origin the caller may read comes back.',
+          style: 'form',
+          explode: false,
+          schema: { type: 'array', minItems: 1, items: { type: 'string', enum: Object.keys(ORIGIN_MODULE) } },
+        }, {
+          name: 'audience',
+          in: 'query',
+          required: false,
+          description: '`household` asks for the version for a shared surface; it carries no reminders, as in `GET /reminders/pending`.',
+          schema: { type: 'string', enum: ['household'] },
+        }],
+        responses: {
+          200: {
+            description: 'The upcoming reminders, earliest first',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/UpcomingReminderList' } } },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/reminders/all': { get: op({ summary: 'List all reminders for an entity', tag: 'Reminders', description: 'Returns every non-dismissed reminder for the given entity (calendar events support multiple reminders).' }) },
