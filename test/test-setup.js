@@ -59,6 +59,17 @@ test('GET /api/v1/version: setup_required is true when no users exist', async ()
   assert.equal(data.version, undefined);
 });
 
+test('GET /api/v1/version: names the product and the client contract without a credential', async () => {
+  const res = await fetch(`${BASE}/api/v1/version`);
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  // `app_name` taugt nicht als Erkennung: ein Haushalt kann ihn umbenennen.
+  assert.equal(data.product, 'yuvomi');
+  assert.ok(Number.isInteger(data.client_api) && data.client_api >= 0, 'client_api is a whole number');
+  assert.equal(data.version, undefined, 'the exact version stays behind sign-in');
+  assert.equal(data.max_upload_bytes, undefined);
+});
+
 test('GET /sw.js injects the build revision and forbids intermediary caching', async () => {
   const res = await fetch(`${BASE}/sw.js`);
   const body = await res.text();
@@ -133,6 +144,8 @@ test('GET /api/v1/version: includes version for authenticated session', async ()
   const data = await res.json();
   assert.equal(typeof data.version, 'string');
   assert.equal(data.setup_required, false);
+  assert.equal(data.product, 'yuvomi', 'the same fields for a signed-in caller');
+  assert.ok(Number.isInteger(data.client_api));
 });
 
 test('POST /api/v1/auth/setup: 403 when users already exist', async () => {

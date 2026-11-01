@@ -135,6 +135,14 @@ const getServiceWorkerResponse = createServiceWorkerResponseLoader(
 getServiceWorkerResponse();
 const DEFAULT_APP_NAME = 'Yuvomi';
 
+// Der Vertrag fuer native Clients, als eine Zahl, die jeder vor der Anmeldung
+// lesen darf. Sie steigt nur, wenn ein Client ohne die Aenderung nicht mehr
+// arbeiten kann - nicht mit jedem Release. Ein Client vergleicht sie, statt die
+// genaue Version zu kennen: die bleibt hinter der Anmeldung, und ein zu alter
+// Server faellt auf, bevor jemand ein Passwort eintippt.
+// 0 heisst: noch kein Vertrag.
+const CLIENT_API_VERSION = 0;
+
 const app  = express();
 const PORT = process.env.PORT || 3000;
 // Leer = alle Interfaces, wie vor der Variable. Ein Container braucht genau das,
@@ -430,6 +438,9 @@ function buildVersionPayload(includeVersion = false) {
   }
   return {
     ...(includeVersion ? { version: APP_VERSION } : {}),
+    // Fest, anders als `app_name`, den ein Haushalt umbenennen kann.
+    product: 'yuvomi',
+    client_api: CLIENT_API_VERSION,
     app_name: appName,
     setup_required: setupRequired,
     password_reset_enabled: passwordResetEnabled,

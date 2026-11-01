@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`GET /api/v1/version` now says what it is talking about.** Two new public fields: `product` identifies a
+  Yuvomi instance, and `client_api` is a whole number for the contract a native client relies on. A client can
+  recognise a server and tell whether it is new enough before anyone signs in. The exact version stays
+  behind sign-in.
 - **A document can name who it is about.** The document dialog has a new "About" field for one
   household member, and the Documents page can filter by person. The person also gets the expiry
   reminder, along with whoever filed the document, and once if that is the same person. This never

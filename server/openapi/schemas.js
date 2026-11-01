@@ -835,6 +835,18 @@ export const schemas = {
           type: 'object',
           properties: {
             version: { type: 'string' },
+            product: {
+              type: 'string',
+              enum: ['yuvomi'],
+              description: 'Identifies a Yuvomi instance. `app_name` cannot do that: a household can rename it.',
+            },
+            client_api: {
+              type: 'integer',
+              minimum: 0,
+              description: 'The contract a native client relies on. It rises only when a client cannot work '
+                + 'without the change, not with every release, so a client can tell a server that is too old '
+                + 'before anyone signs in. 0 means no contract yet.',
+            },
             app_name: { type: 'string' },
             setup_required: { type: 'boolean' },
             password_reset_enabled: {
@@ -845,7 +857,7 @@ export const schemas = {
                 + '"forgot password" link on this flag so it is never a dead end.',
             },
           },
-          required: ['app_name', 'setup_required', 'password_reset_enabled'],
+          required: ['product', 'client_api', 'app_name', 'setup_required', 'password_reset_enabled'],
         },
         User: {
           type: 'object',

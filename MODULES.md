@@ -429,7 +429,7 @@ Nothing found that way has been tested or is recommended by this project: every 
 
 Two endpoints help, though they answer at different times:
 
-- `GET /api/v1/version` returns the running Yuvomi version to any caller holding a session or an API token. Without a credential the response still describes the instance, but omits the version.
+- `GET /api/v1/version` returns the running Yuvomi version to any caller holding a session or an API token. Without a credential the response still describes the instance, including `product` and `client_api`, but omits the version.
 - `GET /api/v1/openapi.json` describes the operations that version actually serves. It is admin-only, so treat it as a check you run while developing and against a new release before shipping, not as something every module instance can call at startup.
 
 Compare the operations the module requires - method, path, and the response fields it reads - against that document while building, and again when a Yuvomi release moves. At runtime, where the document is usually out of reach, watch the version instead and read the failure: a `404` or `405` on an endpoint that worked before means the operation moved, and that is the point to degrade rather than retry. Three outcomes cover the realistic cases: run normally; keep stored data, review and export readable while blocking writes; or show a dependency error with a retry control. Refusing a write is better than issuing it against an endpoint whose meaning has changed.
