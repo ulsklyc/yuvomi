@@ -520,9 +520,9 @@ Yuvomi is in the community catalog [Lissy93/portainer-templates](https://github.
 
 ### Option H — Home Assistant (community app)
 
-On Home Assistant OS or Supervised, Yuvomi can run as a Home Assistant app (formerly "add-on"). [phjay-lab/ha-yuvomi](https://github.com/phjay-lab/ha-yuvomi) is a community package of the official image. It is maintained outside this project.
+On Home Assistant OS or Supervised, Yuvomi can run as a Home Assistant app (formerly "add-on"). [littleopa/ha-yuvomi](https://github.com/littleopa/ha-yuvomi) is a community package based on the official image. It currently adds the Home Assistant sign-in from [#2428](https://github.com/ulsklyc/yuvomi/pull/2428) as a patch, which stays off unless `homeassistant_login` is enabled. It is maintained outside this project.
 
-1. In Home Assistant, open **Settings → Apps → App store → ⋮ → Repositories** and add `https://github.com/phjay-lab/ha-yuvomi`.
+1. In Home Assistant, open **Settings → Apps → App store → ⋮ → Repositories** and add `https://github.com/littleopa/ha-yuvomi`.
 2. Install **Yuvomi** and start it. `SESSION_SECRET` and `DB_ENCRYPTION_KEY` are generated on the first start and stored in the app's data folder, so every Home Assistant backup contains them.
 3. Open `http://<home-assistant>:3000` and create the first admin account.
 
