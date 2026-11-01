@@ -17,6 +17,14 @@
  * 3.1 entfallen) und `required` auf ein Feld, das es nicht gibt. Felder, die der
  * Client bewusst nicht liest, stehen in CLIENT_OPAQUE_FIELDS mit Begruendung.
  *
+ * NULL GEHOERT IN DEN `type`, NICHT IN EINEN ZWEIG. Der Swift OpenAPI Generator
+ * 1.14.3 kennt `{ type: 'null' }` nicht als Zweig von `oneOf` oder `anyOf` und
+ * laesst dann die GANZE Eigenschaft weg. Es gibt nur eine Warnung, der Code
+ * kompiliert, und die Antwort dekodiert, weil das Feld nie gelesen wird: so fehlte
+ * das Ende jedes Termins. Eine `$ref` traegt null ueber ihr Ziel, die Generator-Doku
+ * nennt das so. Aus demselben Grund darf eine Typ-Liste neben `null` nur einen Typ
+ * nennen: aus `['integer', 'array']` wird `Int`, die Liste geht verloren.
+ *
  * GEGENPROBE: `operationId` an einer Operation entfernen oder ein Schema durch
  * `{ type: 'object' }` ersetzen macht den ersten Test rot und nennt die Operation.
  *
@@ -31,6 +39,15 @@ import { CLIENT_OPERATIONS } from './openapi-client-operations.js';
 // Der Client liest diese Felder bewusst nicht, ein Schema waere reine Pflege.
 // Schluessel: `<METHOD> <Pfad>#<Feldpfad>`.
 const CLIENT_OPAQUE_FIELDS = new Map([]);
+
+// Bodies, die der Client von Hand schreibt (`typeOverrides`), weil er `null` senden
+// muss und eine Einzahl von einer Liste trennt. Der Generator liest sie nie.
+const CLIENT_HAND_WRITTEN_BODIES = new Set([
+  'TaskCreateInput',
+  'TaskUpdateInput',
+  'CalendarEventCreateInput',
+  'CalendarEventUpdateInput',
+]);
 
 const spec = buildOpenApiSpec({ protocol: 'http', get: () => 'localhost' }, '0.0.0');
 
@@ -100,6 +117,32 @@ function opaquePaths(schema, path, out, seen = new Set()) {
   return out;
 }
 
+/** Sammelt die Stellen, die ein Generator verliert, siehe Kopf der Datei. */
+function lostByGenerator(schema, path, out, seen = new Set()) {
+  if (schema?.$ref) {
+    if (seen.has(schema.$ref)) return out;
+    seen.add(schema.$ref);
+  }
+  const node = resolve(schema);
+  if (!node || typeof node !== 'object') return out;
+  const types = [node.type].flat().filter((type) => type !== undefined && type !== 'null');
+  if (types.length > 1) out.push(`${path} (mehrere Typen: ${types.join(', ')})`);
+  for (const key of ['allOf', 'oneOf', 'anyOf']) {
+    (node[key] ?? []).forEach((part, i) => {
+      if (key !== 'allOf' && resolve(part)?.type === 'null') out.push(`${path}.${key}[${i}] (null als Zweig)`);
+      lostByGenerator(part, `${path}.${key}[${i}]`, out, new Set(seen));
+    });
+  }
+  for (const [name, property] of Object.entries(node.properties ?? {})) {
+    lostByGenerator(property, `${path}.${name}`, out, new Set(seen));
+  }
+  if (node.items) lostByGenerator(node.items, `${path}[]`, out, new Set(seen));
+  if (node.additionalProperties && typeof node.additionalProperties === 'object') {
+    lostByGenerator(node.additionalProperties, `${path}.*`, out, new Set(seen));
+  }
+  return out;
+}
+
 function jsonSchema(holder) {
   return resolve(holder)?.content?.['application/json']?.schema ?? null;
 }
@@ -152,6 +195,27 @@ test('jede Client-Operation hat operationId, typisierte Antwort und typisierten 
       return !rest || !CLIENT_OPAQUE_FIELDS.has(`${label}#${rest}`);
     });
   assert.deepEqual(problems, [], `\n${problems.join('\n')}\n`);
+});
+
+test('kein Feld einer Client-Operation geht im Generator verloren', () => {
+  const problems = CLIENT_OPERATIONS.flatMap(([method, path]) => {
+    const label = `${method.toUpperCase()} ${path}`;
+    const operation = spec.paths[path][method];
+    const responses = Object.entries(operation.responses ?? {}).filter(([code]) => /^2/.test(code))
+      .flatMap(([, success]) => lostByGenerator(jsonSchema(success), 'response', []));
+    const body = jsonSchema(operation.requestBody);
+    const handWritten = CLIENT_HAND_WRITTEN_BODIES.has(body?.$ref?.split('/').pop());
+    const bodies = body && !handWritten ? lostByGenerator(body, 'body', []) : [];
+    return [...responses, ...bodies].map((problem) => `${label}: ${problem}`);
+  });
+  assert.deepEqual(problems, [], `\n${problems.join('\n')}\n`);
+});
+
+test('CLIENT_HAND_WRITTEN_BODIES nennt nur Bodies, die es noetig haben', () => {
+  const bodies = new Set(CLIENT_OPERATIONS.map(([method, path]) => jsonSchema(spec.paths[path][method].requestBody)?.$ref?.split('/').pop()));
+  const stale = [...CLIENT_HAND_WRITTEN_BODIES].filter((name) => !bodies.has(name)
+    || lostByGenerator({ $ref: `#/components/schemas/${name}` }, name, []).length === 0);
+  assert.deepEqual(stale, []);
 });
 
 test('die operationId ist in der ganzen Spec eindeutig', () => {

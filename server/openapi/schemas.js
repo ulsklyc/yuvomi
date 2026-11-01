@@ -1170,12 +1170,12 @@ export const schemas = {
             title: { type: 'string' },
             description: { type: ['string', 'null'] },
             start_datetime: { $ref: '#/components/schemas/CalendarDateOrDateTime' },
+            // Die drei Formen von CalendarDateOrDateTime als ein Muster: `null` als
+            // Zweig liesse ein Generator samt Feld fallen (test:openapi-client-contract).
             end_datetime: {
-              oneOf: [
-                { $ref: '#/components/schemas/CalendarDateOrDateTime' },
-                { type: 'null' },
-              ],
-              description: 'Inclusive last day for an all-day event, the end for a timed one. Null without an end.',
+              type: ['string', 'null'],
+              pattern: '^\\d{4}-\\d{2}-\\d{2}(?:T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?(?:Z|[+-]\\d{2}:?\\d{2})?)?$',
+              description: 'Inclusive last day for an all-day event, the end for a timed one, in the forms of `CalendarDateOrDateTime`. Null without an end.',
             },
             all_day: flag('1 for an all-day event, in the form 0 or 1. Start and end are then normally `YYYY-MM-DD`.'),
             tzid: { type: ['string', 'null'], description: 'IANA zone an imported or synchronized event was written in; its start and end then usually are instants with `Z`. Null for an event carrying household wall-clock time.' },
@@ -2477,8 +2477,8 @@ export const schemas = {
           required: ['energy_kcal', 'fat_g', 'saturated_fat_g', 'carbs_g', 'sugar_g', 'protein_g', 'salt_g', 'fiber_g'],
         },
         DashboardNutrientTarget: {
-          type: 'object',
-          description: 'Null in a field means no target for this nutrient, which is another statement than a target of 0.',
+          type: ['object', 'null'],
+          description: 'Null without targets. Null in a field means no target for this nutrient, which is another statement than a target of 0.',
           properties: {
             energy_kcal: { type: ['number', 'null'] },
             fat_g: { type: ['number', 'null'] },
@@ -2494,7 +2494,7 @@ export const schemas = {
           type: 'object',
           properties: {
             date: { type: ['string', 'null'], format: 'date', description: 'Null without access to the module.' },
-            target: { oneOf: [{ $ref: '#/components/schemas/DashboardNutrientTarget' }, { type: 'null' }] },
+            target: { $ref: '#/components/schemas/DashboardNutrientTarget' },
             totals: { $ref: '#/components/schemas/DashboardNutrientTotals' },
             entryCount: { type: 'integer' },
           },
@@ -2554,7 +2554,7 @@ export const schemas = {
           required: ['date_key', 'source', 'crosses_midnight', 'shift_type'],
         },
         DashboardPantryExpiring: {
-          type: 'object',
+          type: ['object', 'null'],
           properties: {
             items: {
               type: 'array',
@@ -2632,7 +2632,7 @@ export const schemas = {
             wastePickups: { type: 'array', items: { $ref: '#/components/schemas/DashboardWastePickup' } },
             myShiftsToday: { type: 'array', items: { $ref: '#/components/schemas/DashboardShift' } },
             pantryExpiring: {
-              oneOf: [{ $ref: '#/components/schemas/DashboardPantryExpiring' }, { type: 'null' }],
+              $ref: '#/components/schemas/DashboardPantryExpiring',
               description: 'Null when the read failed, which is not the same as nothing expiring.',
             },
           },
