@@ -364,6 +364,7 @@ const SECRET_COLUMNS = {
   'user_totp.secret': 'kept: nur /auth/2fa/verify (canSignIn vor der Pruefung) und 2FA-Routen hinter requireAuth',
   'user_recovery_codes.code_hash': 'ended: geloescht',
   'display_pairing_codes.code_hash': 'ended: offene Codes des Kontos verbraucht (auch beim Loeschen)',
+  'device_pairing_codes.code_hash': 'ended: offene Codes des Kontos verbraucht (auch beim Loeschen)',
   'display_devices.token_hash': 'kept: das Geheimnis hat nur das gekoppelte Geraet, nie der Aussteller des Codes',
   'outlook_accounts.access_token': 'household: Zugang zu Microsoft; das Konto verliert nur seinen Eigentuemer',
   'outlook_accounts.refresh_token': 'household: wie access_token',

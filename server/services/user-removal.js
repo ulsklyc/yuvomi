@@ -50,6 +50,7 @@
 import { dropDefaultAssignee } from './default-assignees.js';
 import { deleteBirthdayArtifacts } from './birthdays.js';
 import { closeFormerMoney } from './reward-money.js';
+import { endDevicePairingCodes } from './device-pairing.js';
 
 /**
  * Spalten, die auf `users(id)` zeigen und trotzdem keine Spur in geteilten
@@ -83,6 +84,7 @@ export const PRIVATE_USER_COLUMNS = new Set([
   'display_devices.user_id',
   'display_pairing_codes.user_id',
   'display_pairing_codes.created_by',
+  'device_pairing_codes.user_id',
   // Die eigene Karteikarte: Kontakt und Geburtstag der Person selbst.
   'contacts.family_user_id',
   'birthdays.family_user_id',
@@ -266,6 +268,9 @@ function endPairingCodes(database, userId, now) {
   database.prepare(`
     UPDATE display_pairing_codes SET used_at = ? WHERE created_by = ? AND used_at IS NULL
   `).run(now, userId);
+  // Die Pruefung beim Einloesen faengt das Konto auch ab; die SPEC verlangt aber,
+  // dass offene Codes im selben Zuge verfallen, nicht erst beim Versuch.
+  endDevicePairingCodes(database, userId);
 }
 
 function isoNow() {
