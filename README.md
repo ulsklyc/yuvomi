@@ -303,3 +303,5 @@ the sources above disagree, the ones above are right.
   <br>
   <sub>MIT licensed, see <a href="LICENSE">LICENSE</a>. More at <a href="https://yuvomi.cloud/">yuvomi.cloud</a>.</sub>
 </div>
+
+Native [passkey sign-in](docs/passkeys.md) is available for existing accounts on a trusted HTTPS address, without an external identity provider.

@@ -6777,5 +6777,33 @@
         "custom": "Saját szín",
         "chooseCustom": "Saját szín választása",
         "standard": "Alapértelmezett szín"
+    },
+    "passkeys": {
+        "title": "Jelkulcsok",
+        "hint": "Jelentkezz be ujjlenyomattal, arcfelismeréssel vagy az eszköz PIN-kódjával. Tartsd meg a jelszót vagy az SSO-t tartalékként.",
+        "needsHttps": "A jelkulcsokhoz állandó HTTPS-cím szükséges a BASE_URL beállításban.",
+        "unsupported": "Ez a böngésző vagy kapcsolat nem támogatja a jelkulcsokat. Használj megfelelő böngészőt HTTPS-en.",
+        "policy": "A közvetlen bejelentkezés ki van kapcsolva. Használd az SSO-t.",
+        "used": "Utolsó használat: {{date}}",
+        "unused": "Még nem használt",
+        "removeNamed": "{{name}} jelkulcs eltávolítása",
+        "remove": "Jelkulcs eltávolítása",
+        "empty": "Még nincsenek jelkulcsok.",
+        "name": "A jelkulcs neve (például a telefonom)",
+        "add": "Jelkulcs hozzáadása",
+        "waiting": "Kövesd az eszköz utasításait.",
+        "added": "Jelkulcs hozzáadva.",
+        "cancelled": "A kérés megszakadt vagy lejárt. Próbáld újra, amikor készen állsz.",
+        "alreadyRegistered": "Ez a jelkulcs már regisztrálva van. Válassz másik hitelesítőt.",
+        "reauthenticate": "Jelentkezz ki, majd vissza. Ezután öt percen belül módosítsd a jelkulcsokat.",
+        "lastMethod": "Az utolsó jelkulcs eltávolítása előtt tarts meg másik bejelentkezési módot.",
+        "failed": "A jelkulcs ellenőrzése sikertelen. Próbáld újra vagy válassz másik módot.",
+        "tooManyAttempts": "Túl sok próbálkozás. Próbáld később.",
+        "removeConfirm": "Eltávolítod ezt a jelkulcsot? Másik módon bejelentkezve újra hozzáadhatod.",
+        "signIn": "Bejelentkezés jelkulccsal",
+        "reauthTitle": "Személyazonosság megerősítése",
+        "reauthLead": "A folytatáshoz erősítsd meg jelszóval vagy meglévő hozzáférési kulccsal. Ha a kétlépcsős hitelesítés aktív, add meg a kódját is.",
+        "reauthFailed": "A megerősítés sikertelen. Ellenőrizd a jelszavad vagy a hozzáférési kulcsod és szükség esetén a második faktor kódját.",
+        "confirmWithPasskey": "Megerősítés hozzáférési kulccsal"
     }
 }

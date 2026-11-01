@@ -6777,5 +6777,33 @@
         "custom": "自定义颜色",
         "chooseCustom": "选择自定义颜色",
         "standard": "默认颜色"
+    },
+    "passkeys": {
+        "title": "通行密钥",
+        "hint": "使用指纹、面容或设备PIN登录。请保留密码或SSO作为恢复方式。",
+        "needsHttps": "通行密钥需要在BASE_URL中设置固定的HTTPS地址。",
+        "unsupported": "此浏览器或连接不支持通行密钥。请通过HTTPS使用兼容的浏览器。",
+        "policy": "已禁用直接登录。请使用SSO。",
+        "used": "上次使用：{{date}}",
+        "unused": "尚未使用",
+        "removeNamed": "移除通行密钥{{name}}",
+        "remove": "移除通行密钥",
+        "empty": "尚未添加通行密钥。",
+        "name": "通行密钥名称（例如：我的手机）",
+        "add": "添加通行密钥",
+        "waiting": "请按照设备提示操作。",
+        "added": "已添加通行密钥。",
+        "cancelled": "请求已取消或超时。准备好后可以重试。",
+        "alreadyRegistered": "此通行密钥已注册。请选择其他身份验证器。",
+        "reauthenticate": "请退出并重新登录，然后在五分钟内更改通行密钥。",
+        "lastMethod": "移除最后一个通行密钥前，请保留其他登录方式。",
+        "failed": "无法验证通行密钥。请重试或使用其他登录方式。",
+        "tooManyAttempts": "尝试次数过多。请稍后重试。",
+        "removeConfirm": "移除此通行密钥？使用其他方式登录后，可以重新添加。",
+        "signIn": "使用通行密钥登录",
+        "reauthTitle": "确认身份",
+        "reauthLead": "使用密码或已有的通行密钥确认后，即可在此继续。如果已启用双重验证，请同时输入验证码。",
+        "reauthFailed": "确认失败。请检查密码或通行密钥，并在需要时检查双重验证码。",
+        "confirmWithPasskey": "使用通行密钥确认"
     }
 }

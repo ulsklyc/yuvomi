@@ -6777,5 +6777,33 @@
         "custom": "Warna sendiri",
         "chooseCustom": "Pilih warna sendiri",
         "standard": "Warna bawaan"
+    },
+    "passkeys": {
+        "title": "Kunci sandi",
+        "hint": "Masuk dengan sidik jari, wajah, atau PIN perangkat. Simpan kata sandi atau SSO sebagai cadangan.",
+        "needsHttps": "Kunci sandi memerlukan alamat HTTPS tetap di BASE_URL.",
+        "unsupported": "Peramban atau koneksi ini tidak mendukung kunci sandi. Gunakan peramban yang sesuai melalui HTTPS.",
+        "policy": "Masuk langsung dinonaktifkan. Gunakan SSO.",
+        "used": "Terakhir digunakan: {{date}}",
+        "unused": "Belum digunakan",
+        "removeNamed": "Hapus kunci {{name}}",
+        "remove": "Hapus kunci sandi",
+        "empty": "Belum ada kunci sandi.",
+        "name": "Nama kunci (misalnya ponsel saya)",
+        "add": "Tambahkan kunci sandi",
+        "waiting": "Ikuti petunjuk perangkat.",
+        "added": "Kunci sandi ditambahkan.",
+        "cancelled": "Permintaan dibatalkan atau kedaluwarsa. Silakan coba lagi.",
+        "alreadyRegistered": "Kunci ini sudah terdaftar. Pilih autentikator lain.",
+        "reauthenticate": "Keluar lalu masuk lagi. Kemudian ubah kunci dalam lima menit.",
+        "lastMethod": "Pertahankan metode masuk lain sebelum menghapus kunci terakhir.",
+        "failed": "Kunci tidak dapat diverifikasi. Coba lagi atau gunakan metode lain.",
+        "tooManyAttempts": "Terlalu banyak percobaan. Coba lagi nanti.",
+        "removeConfirm": "Hapus kunci ini? Anda dapat menambahkannya lagi setelah masuk dengan metode lain.",
+        "signIn": "Masuk dengan kunci sandi",
+        "reauthTitle": "Konfirmasi identitasmu",
+        "reauthLead": "Konfirmasi dengan kata sandi atau kunci sandi yang sudah ada untuk melanjutkan di sini. Jika autentikasi dua faktor aktif, masukkan juga kodenya.",
+        "reauthFailed": "Konfirmasi gagal. Periksa kata sandi atau kunci sandi dan, jika diperlukan, kode faktor kedua.",
+        "confirmWithPasskey": "Konfirmasi dengan kunci sandi"
     }
 }

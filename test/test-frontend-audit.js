@@ -23187,6 +23187,7 @@ test('Zugangsdaten fremder Dienste bekommen kein Anmelde-Autofill', () => {
     'pages/login.js', 'pages/setup.js', 'pages/join.js', 'pages/reset-password.js',
     'pages/forgot-password.js', 'pages/split-expenses.js',
     'settings/pages/personal-account.js', 'settings/pages/admin-family.js',
+    'settings/passkeys.js', // Current Yuvomi password for inline reauthentication.
   ]);
   const root = fileURLToPath(new URL('../public/', import.meta.url));
   const offenders = [];

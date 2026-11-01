@@ -2,6 +2,65 @@ import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 export function authPaths() {
   return withCaseReasons('auth', CASE_REASONS, {
+    '/api/v1/auth/passkeys/config': {
+      get: op({ summary: 'Read passkey availability', tag: 'Auth', auth: false, stateChanging: false,
+        description: 'Requires a configured trusted BASE_URL origin. `passkey_unavailable` (409), `passkey_failed` (400 or 403), `browser_session_required` (403), `passkey_reauth_required` (403), `passkey_policy` (403), `passkey_last_method` (409), `account_cannot_sign_in` (403).',
+        responses: { 200: { description: 'Passkey result or options' }, 400: { description: 'Invalid passkey or request' }, 401: { description: 'Not signed in' }, 403: { description: 'Origin, session, account or policy refuses this operation' }, 404: { description: 'Passkey not found' }, 409: { description: 'Unavailable or last sign-in method' }, 429: { description: 'Too many attempts' } },
+      }),
+    },
+    '/api/v1/auth/passkeys': {
+      get: op({ summary: 'List your own passkeys', tag: 'Auth', auth: true, stateChanging: false,
+        description: 'Returns enabled, enrollment_allowed, second_factor_required and the account’s passkeys in data. Requires a configured trusted BASE_URL origin. `passkey_unavailable` (409), `passkey_failed` (400 or 403), `browser_session_required` (403), `passkey_reauth_required` (403), `passkey_policy` (403), `passkey_last_method` (409), `account_cannot_sign_in` (403).',
+        responses: { 200: { description: 'Passkey result or options' }, 400: { description: 'Invalid passkey or request' }, 401: { description: 'Not signed in' }, 403: { description: 'Origin, session, account or policy refuses this operation' }, 404: { description: 'Passkey not found' }, 409: { description: 'Unavailable or last sign-in method' }, 429: { description: 'Too many attempts' } },
+      }),
+    },
+    '/api/v1/auth/passkeys/reauth/options': {
+      post: op({ summary: 'Begin passkey confirmation for the signed-in account', tag: 'Auth', stateChanging: true,
+        description: 'Requires a browser session, CSRF and the configured BASE_URL Origin. Returns user-verified authentication options restricted to the current account. The single-use five-minute challenge is bound to this session and user; it cannot complete anonymous sign-in. Refusal reasons: `browser_session_required` (403), `passkey_policy` (403), `passkey_unavailable` (409), `passkey_failed` (400 or 403).',
+        requestBody: jsonBody(null, 'Empty object.'),
+        responses: { 200: { description: 'WebAuthn request options in data' }, 400: { description: 'No usable credential or invalid request' }, 401: { description: 'Not signed in' }, 403: { description: 'Invalid origin, browser session, account or policy' }, 409: { description: 'Passkeys unavailable' }, 429: { description: 'Too many attempts' } },
+      }),
+    },
+    '/api/v1/auth/passkeys/reauth/verify': {
+      post: op({ summary: 'Confirm identity without leaving account settings', tag: 'Auth', stateChanging: true,
+        description: 'Requires a browser session, CSRF and the configured BASE_URL Origin. Refreshes only authenticatedAt, preserving identity, session ID and CSRF token. Accepts the current account password or its own passkey assertion; enabled TOTP always requires a fresh TOTP or unused recovery code as well. SSO-only policy is enforced before and after verification. Refusal reasons: `browser_session_required` (403), `passkey_policy` (403), `passkey_unavailable` (409), `passkey_failed` (400 or 403; generic proof failure).',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['method'], properties: {
+          method: { type: 'string', enum: ['password', 'passkey'] }, password: { type: 'string', maxLength: 1024 },
+          credential: { type: 'object', additionalProperties: true }, code: { type: 'string', maxLength: 128 },
+        } } } } },
+        responses: { 200: { description: 'Confirmation accepted: data.ok is true' }, 400: { description: 'Invalid password, passkey or required second factor' }, 401: { description: 'Not signed in' }, 403: { description: 'Invalid origin, browser session, account or policy' }, 409: { description: 'Passkeys unavailable' }, 429: { description: 'Too many attempts' } },
+      }),
+    },
+    '/api/v1/auth/passkeys/register/options': {
+      post: op({ summary: 'Begin passkey registration', tag: 'Auth', auth: true, stateChanging: true,
+        description: 'Requires a configured trusted BASE_URL origin. `passkey_unavailable` (409), `passkey_failed` (400 or 403), `browser_session_required` (403), `passkey_reauth_required` (403), `passkey_policy` (403), `passkey_last_method` (409), `account_cannot_sign_in` (403). Requires a browser session authenticated within the last five minutes and CSRF protection.', requestBody: jsonBody(null, 'Registration verification accepts credential (WebAuthn response) and name (1-80 characters); sign-in verification accepts credential. Options requests use an empty object.'),
+        responses: { 200: { description: 'Passkey result or options' }, 400: { description: 'Invalid passkey or request' }, 401: { description: 'Not signed in' }, 403: { description: 'Origin, session, account or policy refuses this operation' }, 404: { description: 'Passkey not found' }, 409: { description: 'Unavailable or last sign-in method' }, 429: { description: 'Too many attempts' } },
+      }),
+    },
+    '/api/v1/auth/passkeys/register/verify': {
+      post: op({ summary: 'Verify and store a passkey', tag: 'Auth', auth: true, stateChanging: true,
+        description: 'Requires a configured trusted BASE_URL origin. `passkey_unavailable` (409), `passkey_failed` (400 or 403), `browser_session_required` (403), `passkey_reauth_required` (403), `passkey_policy` (403), `passkey_last_method` (409), `account_cannot_sign_in` (403). Requires a browser session authenticated within the last five minutes and CSRF protection.', requestBody: jsonBody(null, 'Registration verification accepts credential (WebAuthn response) and name (1-80 characters); sign-in verification accepts credential. Options requests use an empty object.'),
+        responses: { 200: { description: 'Passkey result or options' }, 400: { description: 'Invalid passkey or request' }, 401: { description: 'Not signed in' }, 403: { description: 'Origin, session, account or policy refuses this operation' }, 404: { description: 'Passkey not found' }, 409: { description: 'Unavailable or last sign-in method' }, 429: { description: 'Too many attempts' } },
+      }),
+    },
+    '/api/v1/auth/passkeys/{id}': {
+      delete: op({ summary: 'Remove your own passkey', tag: 'Auth', auth: true, stateChanging: true, params: [idParam()],
+        description: 'Requires a configured trusted BASE_URL origin. `passkey_unavailable` (409), `passkey_failed` (400 or 403), `browser_session_required` (403), `passkey_reauth_required` (403), `passkey_policy` (403), `passkey_last_method` (409), `account_cannot_sign_in` (403). Requires a browser session authenticated within the last five minutes and CSRF protection.',
+        responses: { 200: { description: 'Passkey result or options' }, 400: { description: 'Invalid passkey or request' }, 401: { description: 'Not signed in' }, 403: { description: 'Origin, session, account or policy refuses this operation' }, 404: { description: 'Passkey not found' }, 409: { description: 'Unavailable or last sign-in method' }, 429: { description: 'Too many attempts' } },
+      }),
+    },
+    '/api/v1/auth/passkeys/login/options': {
+      post: op({ summary: 'Begin username-less passkey sign-in', tag: 'Auth', auth: false, stateChanging: false,
+        description: 'Requires a configured trusted BASE_URL origin. `passkey_unavailable` (409), `passkey_failed` (400 or 403), `browser_session_required` (403), `passkey_reauth_required` (403), `passkey_policy` (403), `passkey_last_method` (409), `account_cannot_sign_in` (403).', requestBody: jsonBody(null, 'Registration verification accepts credential (WebAuthn response) and name (1-80 characters); sign-in verification accepts credential. Options requests use an empty object.'),
+        responses: { 200: { description: 'Passkey result or options' }, 400: { description: 'Invalid passkey or request' }, 401: { description: 'Not signed in' }, 403: { description: 'Origin, session, account or policy refuses this operation' }, 404: { description: 'Passkey not found' }, 409: { description: 'Unavailable or last sign-in method' }, 429: { description: 'Too many attempts' } },
+      }),
+    },
+    '/api/v1/auth/passkeys/login/verify': {
+      post: op({ summary: 'Verify passkey sign-in', tag: 'Auth', auth: false, stateChanging: false,
+        description: 'Requires a configured trusted BASE_URL origin. `passkey_unavailable` (409), `passkey_failed` (400 or 403), `browser_session_required` (403), `passkey_reauth_required` (403), `passkey_policy` (403), `passkey_last_method` (409), `account_cannot_sign_in` (403). Returns the usual LoginResponse or twoFactorRequired; a pending second factor grants no authenticated session.', requestBody: jsonBody(null, 'Registration verification accepts credential (WebAuthn response) and name (1-80 characters); sign-in verification accepts credential. Options requests use an empty object.'),
+        responses: { 200: { description: 'Passkey result or options' }, 400: { description: 'Invalid passkey or request' }, 401: { description: 'Not signed in' }, 403: { description: 'Origin, session, account or policy refuses this operation' }, 404: { description: 'Passkey not found' }, 409: { description: 'Unavailable or last sign-in method' }, 429: { description: 'Too many attempts' } },
+      }),
+    },
     '/api/v1/auth/login': {
       post: op({
         summary: 'Login with username and password',

@@ -6777,5 +6777,33 @@
         "custom": "Couleur personnalisée",
         "chooseCustom": "Choisir une couleur personnalisée",
         "standard": "Couleur par défaut"
+    },
+    "passkeys": {
+        "title": "Clés d'accès",
+        "hint": "Connectez-vous avec votre empreinte, votre visage ou le code de l'appareil. Gardez le mot de passe ou le SSO comme secours.",
+        "needsHttps": "Les clés d'accès nécessitent une adresse HTTPS stable définie dans BASE_URL.",
+        "unsupported": "Ce navigateur ou cette connexion ne prend pas en charge les clés d'accès. Utilisez un navigateur compatible en HTTPS.",
+        "policy": "La connexion directe est désactivée. Utilisez le SSO.",
+        "used": "Dernière utilisation : {{date}}",
+        "unused": "Pas encore utilisée",
+        "removeNamed": "Retirer la clé d'accès {{name}}",
+        "remove": "Retirer la clé d'accès",
+        "empty": "Aucune clé d'accès ajoutée.",
+        "name": "Nom de la clé (par exemple, mon téléphone)",
+        "add": "Ajouter une clé d'accès",
+        "waiting": "Suivez les instructions de votre appareil.",
+        "added": "Clé d'accès ajoutée.",
+        "cancelled": "Demande annulée ou expirée. Réessayez lorsque vous êtes prêt.",
+        "alreadyRegistered": "Cette clé est déjà enregistrée. Choisissez un autre authentificateur.",
+        "reauthenticate": "Déconnectez-vous puis reconnectez-vous. Modifiez ensuite les clés dans les cinq minutes.",
+        "lastMethod": "Conservez un autre moyen de connexion avant de retirer la dernière clé.",
+        "failed": "Impossible de vérifier la clé. Réessayez ou utilisez un autre moyen de connexion.",
+        "tooManyAttempts": "Trop de tentatives. Réessayez plus tard.",
+        "removeConfirm": "Retirer cette clé ? Vous pourrez la rajouter après une connexion par un autre moyen.",
+        "signIn": "Se connecter avec une clé d'accès",
+        "reauthTitle": "Confirmer votre identité",
+        "reauthLead": "Confirmez avec votre mot de passe ou une clé d’accès existante pour continuer ici. Si la double authentification est activée, saisissez aussi son code.",
+        "reauthFailed": "Échec de la confirmation. Vérifiez votre mot de passe ou votre clé d’accès et, si nécessaire, le code du second facteur.",
+        "confirmWithPasskey": "Confirmer avec une clé d’accès"
     }
 }

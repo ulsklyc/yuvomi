@@ -6777,5 +6777,33 @@
         "custom": "Colore personalizzato",
         "chooseCustom": "Scegli un colore personalizzato",
         "standard": "Colore predefinito"
+    },
+    "passkeys": {
+        "title": "Chiavi di accesso",
+        "hint": "Accedi con impronta, riconoscimento del volto o PIN del dispositivo. Mantieni la password o il SSO come alternativa.",
+        "needsHttps": "Le chiavi di accesso richiedono un indirizzo HTTPS stabile in BASE_URL.",
+        "unsupported": "Questo browser o questa connessione non supporta le chiavi di accesso. Usa un browser compatibile tramite HTTPS.",
+        "policy": "L'accesso diretto è disattivato. Usa il SSO.",
+        "used": "Ultimo utilizzo: {{date}}",
+        "unused": "Non ancora utilizzata",
+        "removeNamed": "Rimuovi la chiave {{name}}",
+        "remove": "Rimuovi chiave di accesso",
+        "empty": "Nessuna chiave di accesso aggiunta.",
+        "name": "Nome della chiave (ad esempio, il mio telefono)",
+        "add": "Aggiungi chiave di accesso",
+        "waiting": "Segui le istruzioni del dispositivo.",
+        "added": "Chiave di accesso aggiunta.",
+        "cancelled": "Richiesta annullata o scaduta. Puoi riprovare.",
+        "alreadyRegistered": "Questa chiave è già registrata. Scegli un altro autenticatore.",
+        "reauthenticate": "Esci e accedi di nuovo, poi modifica le chiavi entro cinque minuti.",
+        "lastMethod": "Mantieni un altro metodo di accesso prima di rimuovere l'ultima chiave.",
+        "failed": "Impossibile verificare la chiave. Riprova o usa un altro metodo.",
+        "tooManyAttempts": "Troppi tentativi. Riprova più tardi.",
+        "removeConfirm": "Rimuovere questa chiave? Potrai aggiungerla nuovamente dopo l'accesso con un altro metodo.",
+        "signIn": "Accedi con una chiave di accesso",
+        "reauthTitle": "Conferma la tua identità",
+        "reauthLead": "Conferma con la password o una passkey esistente per continuare qui. Se hai attivato l’autenticazione a due fattori, inserisci anche il codice.",
+        "reauthFailed": "Conferma non riuscita. Controlla la password o la passkey e, se richiesto, il codice del secondo fattore.",
+        "confirmWithPasskey": "Conferma con una passkey"
     }
 }

@@ -6777,5 +6777,33 @@
         "custom": "Egen färg",
         "chooseCustom": "Välj egen färg",
         "standard": "Standardfärg"
+    },
+    "passkeys": {
+        "title": "Nycklar för inloggning",
+        "hint": "Logga in med fingeravtryck, ansikte eller enhetens PIN-kod. Behåll lösenord eller SSO som reserv.",
+        "needsHttps": "Nycklar kräver en fast HTTPS-adress i BASE_URL.",
+        "unsupported": "Den här webbläsaren eller anslutningen stöder inte nycklar. Använd en kompatibel webbläsare över HTTPS.",
+        "policy": "Direkt inloggning är avstängd. Använd SSO.",
+        "used": "Senast använd: {{date}}",
+        "unused": "Inte använd ännu",
+        "removeNamed": "Ta bort nyckeln {{name}}",
+        "remove": "Ta bort nyckel",
+        "empty": "Inga nycklar har lagts till.",
+        "name": "Nyckelns namn (till exempel min telefon)",
+        "add": "Lägg till nyckel",
+        "waiting": "Följ anvisningarna på din enhet.",
+        "added": "Nyckel tillagd.",
+        "cancelled": "Begäran avbröts eller gick ut. Försök igen när du är redo.",
+        "alreadyRegistered": "Nyckeln är redan registrerad. Välj en annan autentiserare.",
+        "reauthenticate": "Logga ut och in igen. Ändra sedan nycklarna inom fem minuter.",
+        "lastMethod": "Behåll ett annat inloggningssätt innan du tar bort den sista nyckeln.",
+        "failed": "Nyckeln kunde inte verifieras. Försök igen eller använd ett annat sätt.",
+        "tooManyAttempts": "För många försök. Försök igen senare.",
+        "removeConfirm": "Ta bort nyckeln? Du kan lägga till den igen efter inloggning på annat sätt.",
+        "signIn": "Logga in med en nyckel",
+        "reauthTitle": "Bekräfta din identitet",
+        "reauthLead": "Bekräfta med ditt lösenord eller en befintlig åtkomstnyckel för att fortsätta här. Om tvåfaktorsautentisering är aktiverad anger du även dess kod.",
+        "reauthFailed": "Bekräftelsen misslyckades. Kontrollera lösenordet eller åtkomstnyckeln och vid behov koden för den andra faktorn.",
+        "confirmWithPasskey": "Bekräfta med en åtkomstnyckel"
     }
 }

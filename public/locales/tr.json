@@ -6777,5 +6777,33 @@
         "custom": "Özel renk",
         "chooseCustom": "Özel renk seç",
         "standard": "Varsayılan renk"
+    },
+    "passkeys": {
+        "title": "Geçiş anahtarları",
+        "hint": "Parmak izi, yüz veya cihaz PIN'i ile giriş yapın. Kurtarma için parolanızı ya da SSO'yu koruyun.",
+        "needsHttps": "Geçiş anahtarları BASE_URL içinde sabit bir HTTPS adresi gerektirir.",
+        "unsupported": "Bu tarayıcı veya bağlantı geçiş anahtarlarını desteklemiyor. HTTPS üzerinden uyumlu bir tarayıcı kullanın.",
+        "policy": "Doğrudan giriş kapalı. SSO kullanın.",
+        "used": "Son kullanım: {{date}}",
+        "unused": "Henüz kullanılmadı",
+        "removeNamed": "{{name}} anahtarını kaldır",
+        "remove": "Geçiş anahtarını kaldır",
+        "empty": "Henüz geçiş anahtarı eklenmedi.",
+        "name": "Anahtar adı (örneğin telefonum)",
+        "add": "Geçiş anahtarı ekle",
+        "waiting": "Cihazınızın talimatlarını izleyin.",
+        "added": "Geçiş anahtarı eklendi.",
+        "cancelled": "İstek iptal edildi veya süresi doldu. Hazır olduğunuzda yeniden deneyin.",
+        "alreadyRegistered": "Bu anahtar zaten kayıtlı. Başka bir doğrulayıcı seçin.",
+        "reauthenticate": "Çıkış yapıp yeniden giriş yapın. Ardından beş dakika içinde anahtarları değiştirin.",
+        "lastMethod": "Son anahtarı kaldırmadan önce başka bir giriş yöntemini koruyun.",
+        "failed": "Anahtar doğrulanamadı. Yeniden deneyin veya başka bir yöntem kullanın.",
+        "tooManyAttempts": "Çok fazla deneme. Daha sonra yeniden deneyin.",
+        "removeConfirm": "Bu anahtar kaldırılsın mı? Başka yöntemle giriş yaptıktan sonra yeniden ekleyebilirsiniz.",
+        "signIn": "Geçiş anahtarı ile giriş yap",
+        "reauthTitle": "Kimliğini doğrula",
+        "reauthLead": "Burada devam etmek için parolanla veya mevcut bir geçiş anahtarıyla doğrula. İki faktörlü kimlik doğrulama açıksa kodunu da gir.",
+        "reauthFailed": "Doğrulama başarısız. Parolanı veya geçiş anahtarını ve gerekiyorsa ikinci faktör kodunu kontrol et.",
+        "confirmWithPasskey": "Geçiş anahtarıyla doğrula"
     }
 }

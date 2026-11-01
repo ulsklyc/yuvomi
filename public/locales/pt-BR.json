@@ -6777,5 +6777,33 @@
         "custom": "Cor personalizada",
         "chooseCustom": "Escolher cor personalizada",
         "standard": "Cor padrão"
+    },
+    "passkeys": {
+        "title": "Chaves de acesso",
+        "hint": "Entre com a impressão digital, o rosto ou o PIN do dispositivo. Mantenha a senha ou o SSO como alternativa.",
+        "needsHttps": "As chaves de acesso exigem um endereço HTTPS estável em BASE_URL.",
+        "unsupported": "Este navegador ou conexão não oferece suporte a chaves de acesso. Use um navegador compatível via HTTPS.",
+        "policy": "O acesso direto está desativado. Use o SSO.",
+        "used": "Último uso: {{date}}",
+        "unused": "Ainda não usada",
+        "removeNamed": "Remover a chave {{name}}",
+        "remove": "Remover chave de acesso",
+        "empty": "Nenhuma chave de acesso adicionada.",
+        "name": "Nome da chave (por exemplo, meu celular)",
+        "add": "Adicionar chave de acesso",
+        "waiting": "Siga as instruções do dispositivo.",
+        "added": "Chave de acesso adicionada.",
+        "cancelled": "Solicitação cancelada ou expirada. Tente novamente quando quiser.",
+        "alreadyRegistered": "Esta chave já está cadastrada. Escolha outro autenticador.",
+        "reauthenticate": "Saia e entre novamente. Depois altere as chaves dentro de cinco minutos.",
+        "lastMethod": "Mantenha outra forma de acesso antes de remover a última chave.",
+        "failed": "Não foi possível verificar a chave. Tente novamente ou use outro método.",
+        "tooManyAttempts": "Muitas tentativas. Tente novamente mais tarde.",
+        "removeConfirm": "Remover esta chave? Você poderá adicioná-la novamente após entrar por outro método.",
+        "signIn": "Entrar com uma chave de acesso",
+        "reauthTitle": "Confirme sua identidade",
+        "reauthLead": "Confirme com sua senha ou uma chave de acesso existente para continuar aqui. Se a autenticação de dois fatores estiver ativa, digite também o código.",
+        "reauthFailed": "A confirmação falhou. Verifique a senha ou a chave de acesso e, se necessário, o código do segundo fator.",
+        "confirmWithPasskey": "Confirmar com uma chave de acesso"
     }
 }

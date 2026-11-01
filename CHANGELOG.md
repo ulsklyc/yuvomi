@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Household members can sign in with passkeys without an external identity provider.**
+  Add and name multiple passkeys in account settings, then sign in without a username.
+  Managing passkeys requires a recent browser sign-in; existing SSO-only and second-factor
+  policies still apply. An inline password or passkey confirmation dialog continues
+  a pending change without leaving account settings, including enabled second factors.
+  Password and SSO recovery paths remain available.
 - **A document can name who it is about.** The document dialog has a new "About" field for one
   household member, and the Documents page can filter by person. The person also gets the expiry
   reminder, along with whoever filed the document, and once if that is the same person. This never
