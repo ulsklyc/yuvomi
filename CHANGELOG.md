@@ -56,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin sets up, in line with how private entries already work.
 
 ### Fixed
+- **A shared event reminds a household channel once.** An event assigned to several people sent the
+  same reminder to a household notification channel once per person. The channel now hears it once,
+  and a reminder someone set for a different time still arrives on its own. Each person's Web Push
+  and personal channels are unchanged.
 - **The Budget title stands in full on narrow phones** (#2440). Below 390px wide the title sat next
   to the month stepper and read "Bud..." at 360px. There the month now takes a row of its own under
   the title, with the arrows at the ends of the row, and the title keeps its size. The tabs without
