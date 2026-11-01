@@ -4,8 +4,8 @@
  *          reminder creation, idempotent no-op on an unchanged target,
  *          cleanup of a moved/skipped/re-mapped-away occurrence, per-user
  *          isolation, module-disabled/permission-denial drop, archived-type
- *          exclusion, coalesced-occurrence dedup, and DST-aware delivery
- *          time computation.
+ *          exclusion, coalesced-occurrence dedup, DST-aware delivery time
+ *          computation, and one message per pickup in a household channel.
  * Ausführen: npm run test:waste-reminders
  */
 import assert from 'node:assert/strict';
@@ -19,6 +19,8 @@ process.env.SESSION_SECRET = 'waste-reminders-test-secret';
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const store = await import('../server/services/waste-store.js');
 const { syncWasteRemindersForUser, syncAllWasteReminders, __test } = await import('../server/services/waste-reminders.js');
+const { processDueNotifications } = await import('../server/services/notifications.js');
+const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
 
 const moduleDatabase = get();
 const suiteDatabase = buildMigratedDatabase(MIGRATIONS);
@@ -287,4 +289,119 @@ test('syncAllWasteReminders: syncs every user with an enabled setting, and a use
   syncAllWasteReminders(get(), NOW);
   assert.equal(reminderFor(BOB, type.id, '2026-09-07'), undefined);
   assert.ok(reminderFor(ALICE, type.id, '2026-09-07'), "Bob's own cleanup pass must not touch Alice's reminder");
+});
+
+// -------------------------------------------------------------------------
+// Delivery: one row per person, one message in a household channel
+// -------------------------------------------------------------------------
+
+// Monday 2026-09-07 with the default lead of one day at 08:00.
+const PICKUP = '2026-09-07';
+const BEFORE_REMINDER = new Date('2026-09-01T00:00:00Z');
+const AFTER_REMINDER = new Date('2026-09-06T09:00:00Z');
+
+function householdChannel(name) {
+  const channels = createNotificationChannelStore({ db: get() });
+  const channel = channels.createChannel({
+    provider: 'ntfy', name, enabled: true,
+    config: { baseUrl: 'https://ntfy.test', topic: name }, secrets: {},
+  });
+  return { remove: () => channels.deleteChannel(channel.id) };
+}
+
+// Everything the suite left pending would otherwise answer in this delivery.
+const settleEverything = () => get()
+  .prepare("UPDATE reminders SET pushed_at = '2000-01-01T00:00:00Z' WHERE pushed_at IS NULL").run();
+
+async function deliver({ send = async () => {} } = {}) {
+  const heard = [];
+  await processDueNotifications({
+    database: get(),
+    channelStore: createNotificationChannelStore({ db: get() }),
+    pushService: { sendPushToUser: async () => 0 },
+    providers: {
+      ntfy: {
+        id: 'ntfy',
+        send: async ({ payload }) => {
+          await send();
+          heard.push(payload.body);
+        },
+      },
+    },
+    now: AFTER_REMINDER,
+  });
+  return heard;
+}
+
+/** Fresh people and a fresh type, so no earlier test's settings can answer here. */
+function twoMembersRemindedOf(type, settings = [{}, {}]) {
+  seedWeeklySchedule(type.id);
+  const people = settings.map((setting) => {
+    const userId = seedUser('member');
+    setSetting(userId, type.id, setting);
+    syncWasteRemindersForUser(get(), userId, BEFORE_REMINDER);
+    return userId;
+  });
+  assert.equal(reminderFor(people[0], type.id, PICKUP).created_by, people[0]);
+  assert.equal(reminderFor(people[1], type.id, PICKUP).created_by, people[1]);
+  return people;
+}
+
+test('delivery: a household channel hears one pickup once, not once per member', async () => {
+  const channel = householdChannel('waste-one');
+  try {
+    settleEverything();
+    const type = seedType();
+    const [first, second] = twoMembersRemindedOf(type);
+    assert.notEqual(reminderFor(first, type.id, PICKUP).entity_id, reminderFor(second, type.id, PICKUP).entity_id,
+      'the premise: each person has an anchor of their own');
+    assert.equal(reminderFor(first, type.id, PICKUP).remind_at, reminderFor(second, type.id, PICKUP).remind_at);
+
+    assert.deepEqual(await deliver(), [`${type.name} - ${PICKUP}`]);
+    assert.deepEqual(await deliver(), [], 'and the next run reports nothing late');
+    assert.ok(reminderFor(second, type.id, PICKUP).pushed_at, 'the silent row is still finished');
+  } finally {
+    channel.remove();
+  }
+});
+
+test('delivery: a member with a different lead time keeps a message of their own', async () => {
+  const channel = householdChannel('waste-two');
+  try {
+    settleEverything();
+    twoMembersRemindedOf(seedType(), [{ offsetDays: 1 }, { offsetDays: 2 }]);
+    assert.equal((await deliver()).length, 2, 'two instants are two messages');
+  } finally {
+    channel.remove();
+  }
+});
+
+test('delivery: two types collected on the same day stay two messages', async () => {
+  const channel = householdChannel('waste-three');
+  try {
+    settleEverything();
+    const paper = seedType();
+    const glass = seedType();
+    twoMembersRemindedOf(paper);
+    twoMembersRemindedOf(glass);
+    assert.deepEqual((await deliver()).sort(),
+      [`${paper.name} - ${PICKUP}`, `${glass.name} - ${PICKUP}`].sort());
+  } finally {
+    channel.remove();
+  }
+});
+
+test('delivery: a failed first attempt does not swallow the message', async () => {
+  const channel = householdChannel('waste-four');
+  try {
+    settleEverything();
+    twoMembersRemindedOf(seedType());
+    let down = true;
+    const send = async () => { if (down) { down = false; throw new Error('channel briefly gone'); } };
+    assert.equal((await deliver({ send })).length, 1, 'the second row catches the outage');
+    get().prepare("UPDATE notification_deliveries SET next_attempt_at = '2000-01-01T00:00:00Z' WHERE status = 'failed'").run();
+    assert.equal((await deliver()).length, 0, 'and the retry of the first does not repeat it');
+  } finally {
+    channel.remove();
+  }
 });
