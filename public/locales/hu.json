@@ -683,7 +683,8 @@
         "checkAllSubtasks": "Összes kipipálása",
         "subtasksAllDone": "„{{title}}” és minden részfeladat kész.",
         "seriesDoneNamed": "„{{title}}” kész - legközelebb: {{date}}",
-        "kanbanRestore": "Visszaállítás"
+        "kanbanRestore": "Visszaállítás",
+        "errorTagGone": "Ez a címke már nem létezik."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} elem törölve.",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "Személyek csak a Feladatokba kerülő listákhoz állíthatók be.",
         "syncAssigneeNotMember": "Itt csak a háztartás tagjai választhatók.",
         "syncAssigneeUnknown": "Ez a személy már nem létezik. Töltsd újra az oldalt.",
-        "permDetails": "Widgetek és további jogok"
+        "permDetails": "Widgetek és további jogok",
+        "connectionFailedDetail": "A kapcsolódás sikertelen: {{error}}",
+        "documentStorageChangeFailed": "A módosítás nem lépett érvénybe: {{error}}",
+        "apiTokenCopyFailed": "A másolás nem sikerült. Jelölje ki a tokent, és másolja kézzel.",
+        "weatherLocateDenied": "A helyadatokhoz való hozzáférés nem engedélyezett. Engedélyezze a böngésző beállításaiban, vagy adja meg a helyet kézzel.",
+        "weatherLocateFailed": "A helyzetét nem sikerült meghatározni. Adja meg a helyet kézzel.",
+        "outlookAutoSyncOverrides": "Az Outlook nem tudja szinkronizálni a kapcsolt egyedi kivételekkel rendelkező sorozatokat. Kapcsolja ki a célnaptárukat, hogy itt szerkeszthetők maradjanak. Kivételeket nem kell törölnie.",
+        "memberRemoveOwnAccount": "A saját fiókját nem távolíthatja el.",
+        "memberRemoveLastAdmin": "Legalább egy rendszergazdának maradnia kell.",
+        "memberRemoveLastSsoAdmin": "Ez az utolsó SSO-hoz kapcsolt rendszergazda. Először kapcsoljon egy másik rendszergazdát.",
+        "backupWebdavUrlInvalid": "A címnek http:// vagy https:// előtaggal kell kezdődnie.",
+        "icsSubscriptionGone": "Ez az előfizetés már nem létezik."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

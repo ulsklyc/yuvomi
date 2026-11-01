@@ -45,6 +45,7 @@ import { esc } from '/utils/html.js';
 import { confirmModal } from '/components/modal.js';
 import { createInlineError, settingSwitchRowHtml, toggleRowHtml } from '/settings/components.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 function showToast(message, tone = 'default') {
   window.yuvomi?.showToast(message, tone);
@@ -282,7 +283,7 @@ async function loadFeed(host, part) {
     } catch (err) {
       input.checked = !next;
       input.disabled = false;
-      showToast(err.message || t('common.errorGeneric'), 'danger');
+      showToast(errorSentence(err), 'danger');
     }
   });
 
@@ -292,8 +293,8 @@ async function loadFeed(host, part) {
     try {
       await navigator.clipboard?.writeText(data.url);
       showToast(feed.text.copied(), 'success');
-    } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
+    } catch {
+      showToast(t('settings.invites.copyFailed'), 'danger');
     }
   });
   host.querySelector('[data-feed-regen]')?.addEventListener('click', async () => {
@@ -302,7 +303,7 @@ async function loadFeed(host, part) {
       await api.post(`${feed.path}/regenerate`);
       await reloadAfterSave(() => reload());
     } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
+      showToast(errorSentence(err), 'danger');
     }
   });
   host.querySelector('#feed-show-assignees')?.addEventListener('change', async (e) => {
@@ -314,7 +315,7 @@ async function loadFeed(host, part) {
       showToast(t('settings.feedExportSaved'), 'success');
     } catch (err) {
       input.checked = !next; // Fehlschlag → visuellen Zustand zurücksetzen
-      showToast(err.message || t('common.errorGeneric'), 'danger');
+      showToast(errorSentence(err), 'danger');
     } finally {
       input.disabled = false;
     }
@@ -328,7 +329,7 @@ async function loadFeed(host, part) {
       showToast(t('settings.feedExportSaved'), 'success');
     } catch (err) {
       input.checked = !next;
-      showToast(err.message || t('common.errorGeneric'), 'danger');
+      showToast(errorSentence(err), 'danger');
     } finally {
       input.disabled = false;
     }
@@ -350,7 +351,7 @@ async function loadFeed(host, part) {
       showToast(t('settings.wasteFeedSaved'), 'success');
     } catch (err) {
       input.checked = !input.checked;
-      showToast(err.message || t('common.errorGeneric'), 'danger');
+      showToast(errorSentence(err), 'danger');
     } finally {
       input.disabled = false;
     }

@@ -691,7 +691,7 @@ router.put('/tags/:tag', (req, res) => {
 
     const me = req.authUserId || req.session.userId;
     if (!taskIdsWithTag(db.get(), req.params.tag, me).length)
-      return res.status(404).json({ error: 'Tag not found.', code: 404 });
+      return res.status(404).json({ error: 'Tag not found.', code: 404, reason: 'tasks_tag_not_found' });
 
     // Umbenennen fasst jede Aufgabe an, die den Tag traegt - auch die
     // gesperrten. Die bleiben aussen vor (#830); der alte Name haelt sich dort
@@ -722,7 +722,7 @@ router.delete('/tags/:tag', (req, res) => {
     const me = req.authUserId || req.session.userId;
     const affected = taskIdsWithTag(db.get(), req.params.tag, me);
     if (!affected.length)
-      return res.status(404).json({ error: 'Tag not found.', code: 404 });
+      return res.status(404).json({ error: 'Tag not found.', code: 404, reason: 'tasks_tag_not_found' });
 
     // Wie beim Umbenennen: an gesperrten Aufgaben bleibt der Tag haengen (#830).
     const allowed = editableTaskIds(affected, req);

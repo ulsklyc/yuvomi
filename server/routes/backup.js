@@ -188,7 +188,7 @@ router.put('/webdav/config', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'url must be a string.', code: 400 });
     }
     if (url && !/^https?:\/\/.+/.test(url.trim())) {
-      return res.status(400).json({ error: 'url must start with http:// or https://.', code: 400 });
+      return res.status(400).json({ error: 'url must start with http:// or https://.', errorCode: 'url_invalid', code: 400 });
     }
     if (keep !== undefined && (typeof keep !== 'number' || keep < 1)) {
       return res.status(400).json({ error: 'keep must be a positive integer.', code: 400 });

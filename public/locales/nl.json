@@ -683,7 +683,8 @@
         "checkAllSubtasks": "Alles afvinken",
         "subtasksAllDone": "‘{{title}}’ en alle subtaken klaar.",
         "seriesDoneNamed": "‘{{title}}’ klaar - volgende keer: {{date}}",
-        "kanbanRestore": "Herstellen"
+        "kanbanRestore": "Herstellen",
+        "errorTagGone": "Dit label bestaat niet meer."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} artikel verwijderd.",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "Personen kunnen alleen worden ingesteld voor lijsten die naar Taken gaan.",
         "syncAssigneeNotMember": "Hier kunnen alleen leden van het huishouden worden gekozen.",
         "syncAssigneeUnknown": "Deze persoon bestaat niet meer. Laad de pagina opnieuw.",
-        "permDetails": "Widgets en meer rechten"
+        "permDetails": "Widgets en meer rechten",
+        "connectionFailedDetail": "Verbinding mislukt: {{error}}",
+        "documentStorageChangeFailed": "De wijziging is niet doorgevoerd: {{error}}",
+        "apiTokenCopyFailed": "Kopiëren is niet gelukt. Selecteer het token en kopieer het handmatig.",
+        "weatherLocateDenied": "Toegang tot je locatie is niet toegestaan. Sta deze toe in de browserinstellingen of vul de plaats handmatig in.",
+        "weatherLocateFailed": "Je locatie kon niet worden bepaald. Vul de plaats handmatig in.",
+        "outlookAutoSyncOverrides": "Outlook kan reeksen met gekoppelde losse uitzonderingen niet synchroniseren. Schakel hun doelagenda uit zodat ze hier bewerkbaar blijven. Je hoeft geen uitzonderingen te verwijderen.",
+        "memberRemoveOwnAccount": "Je kunt je eigen account niet verwijderen.",
+        "memberRemoveLastAdmin": "Er moet minstens één beheerder overblijven.",
+        "memberRemoveLastSsoAdmin": "Dit is de laatste beheerder die aan SSO is gekoppeld. Koppel eerst een andere beheerder.",
+        "backupWebdavUrlInvalid": "Het adres moet beginnen met http:// of https://.",
+        "icsSubscriptionGone": "Dit abonnement bestaat niet meer."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

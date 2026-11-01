@@ -527,6 +527,7 @@ test('Outlook account activation documents its exact linked-override conflict', 
     error: { type: 'string' },
     code: { type: 'integer', const: 409 },
     conflict: { type: 'string', const: 'outlook_auto_sync_overrides' },
+    reason: { type: 'string', const: 'outlook_auto_sync_overrides' },
     linked_override_count: { type: 'integer', minimum: 1 },
   });
 });

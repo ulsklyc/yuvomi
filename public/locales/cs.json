@@ -745,7 +745,8 @@
         "doneSubtasksOpen_few": "„{{title}}“ hotovo - stále jsou otevřené {{count}} dílčí úkoly.",
         "doneSubtasksOpen_many": "„{{title}}“ hotovo - stále otevřených dílčích úkolů: {{count}}.",
         "seriesDoneNamed": "„{{title}}“ hotovo - příště: {{date}}",
-        "kanbanRestore": "Obnovit"
+        "kanbanRestore": "Obnovit",
+        "errorTagGone": "Tento štítek už neexistuje."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} jídla",
@@ -3568,7 +3569,18 @@
         "reminderListAssigneesTasksOnly": "Osoby lze nastavit jen u seznamů, které jdou do Úkolů.",
         "syncAssigneeNotMember": "Zde lze vybrat pouze členy domácnosti.",
         "syncAssigneeUnknown": "Tato osoba již neexistuje. Načtěte stránku znovu.",
-        "permDetails": "Widgety a další oprávnění"
+        "permDetails": "Widgety a další oprávnění",
+        "connectionFailedDetail": "Připojení se nezdařilo: {{error}}",
+        "documentStorageChangeFailed": "Změna nebyla použita: {{error}}",
+        "apiTokenCopyFailed": "Kopírování se nezdařilo. Označte token a zkopírujte ho ručně.",
+        "weatherLocateDenied": "Přístup k poloze není povolen. Povolte ho v nastavení prohlížeče nebo zadejte místo ručně.",
+        "weatherLocateFailed": "Polohu se nepodařilo zjistit. Zadejte místo ručně.",
+        "outlookAutoSyncOverrides": "Outlook neumí synchronizovat série s propojenými jednotlivými výjimkami. Vypněte jejich cílový kalendář, aby zůstaly upravitelné zde. Výjimky mazat nemusíte.",
+        "memberRemoveOwnAccount": "Vlastní účet nemůžete odebrat.",
+        "memberRemoveLastAdmin": "Musí zůstat alespoň jeden správce.",
+        "memberRemoveLastSsoAdmin": "Toto je poslední správce propojený se SSO. Nejprve propojte dalšího správce.",
+        "backupWebdavUrlInvalid": "Adresa musí začínat http:// nebo https://.",
+        "icsSubscriptionGone": "Toto předplatné už neexistuje."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

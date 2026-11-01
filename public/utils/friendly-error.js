@@ -390,6 +390,17 @@ export const CASE_MESSAGES = new Map([
   ['calendar_assignee_not_member', 'settings.syncAssigneeNotMember'],
   ['calendar_assignee_unknown', 'settings.syncAssigneeUnknown'],
   ['reminder_list_assignee_not_tasks', 'settings.reminderListAssigneesTasksOnly'],
+  // Einstellungen (#1909), was ueber einen Toast erreichbar ist. Die Quelle
+  // geloescht, waehrend das Blatt offen stand; Outlook kann die Serie mit
+  // Einzelausnahmen nicht uebernehmen.
+  ['calendar_subscription_not_found', 'settings.icsSubscriptionGone'],
+  ['outlook_auto_sync_overrides', 'settings.outlookAutoSyncOverrides'],
+  // Mitglied entfernen: die Riegel in server/auth.js.
+  ['own_account', 'settings.memberRemoveOwnAccount'],
+  ['last_admin', 'settings.memberRemoveLastAdmin'],
+  ['last_sso_admin', 'settings.memberRemoveLastSsoAdmin'],
+  // Stichwort einer Aufgabe, von einem anderen Geraet umbenannt oder geloescht.
+  ['tasks_tag_not_found', 'tasks.errorTagGone'],
   // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909). Die drei
   // Eingaben, die der Server beim Speichern abweist, und was der
   // Verbindungstest von Immich zurueckbekommt: ein abgelehnter API-Schluessel
@@ -445,6 +456,9 @@ export const CASE_PARAMS = new Map([
 ]);
 
 const PARAM_MAX = 1_000_000_000;
+
+// Die feste Antwort eines gefangenen 500: sagt dem Admin nichts.
+const NO_DETAIL = 'Internal server error.';
 
 /**
  * Die erlaubten Zahlen aus `params`, oder null, wenn eine fehlt oder keine ist.
@@ -551,6 +565,8 @@ export const GONE_REASONS = new Set([
   'calendar_calendar_not_found',
   'calendar_event_not_found',
   'calendar_selected_calendar_not_found',
+  'calendar_subscription_not_found',
+  'tasks_tag_not_found',
 ]);
 
 /**
@@ -651,6 +667,35 @@ function knownSentence(err) {
  */
 export function errorSentence(err, fallbackKey = 'common.errorGeneric', params = undefined) {
   return knownSentence(err) ?? (params ? t(fallbackKey, params) : t(fallbackKey));
+}
+
+/**
+ * DIE AUSNAHME VON errorSentence (#1909): der Satz fuer den Admin, wenn ein
+ * FREMDER Dienst etwas abgelehnt hat - WebDAV, CalDAV, CardDAV, Outlook, iCloud,
+ * Google Drive. Die App kennt dessen Faelle nicht, und der Allgemeinsatz nimmt
+ * dem Admin genau die Angabe, mit der er den Fehler findet. Der Text des Servers
+ * steht deshalb in einem uebersetzten Rahmen (`{{error}}` in `frameKey`), wie
+ * `bad_manifest` beim Modul-Laden.
+ *
+ * Nur fuer solche Stellen: test:frontend-audit fuehrt jede mit ihrem Grund in
+ * TECHNICAL_DETAIL_SITES. Alles andere nimmt errorSentence.
+ *
+ * Offline, Absage, Bremse und Wiederherstellung sind keine Antwort des Dienstes
+ * und behalten ihren Satz. Ein Fall aus CASE_MESSAGES sagt hier weniger als die
+ * Angabe ("der Speicher hat nicht mitgespielt") und steht nur ohne sie.
+ *
+ * @param {unknown} err
+ * @param {string} frameKey - Satz mit `{{error}}`
+ * @param {string} [fallbackKey] - der Satz, wenn der Server nichts Konkretes sagt
+ * @returns {string} uebersetzter Satz
+ */
+export function errorSentenceWithDetail(err, frameKey, fallbackKey = 'common.errorGeneric') {
+  if (isServiceWorkerOffline(err)) return t('common.errorOffline');
+  const known = knownSentence(err);
+  if (known && !CASE_MESSAGES.has(err?.data?.reason)) return known;
+  const detail = typeof err?.data?.error === 'string' ? err.data.error.trim() : '';
+  if (detail && detail !== NO_DETAIL) return t(frameKey, { error: detail });
+  return known ?? t(fallbackKey);
 }
 
 /**

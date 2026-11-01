@@ -19,6 +19,7 @@
  *   - dispatcht nach jeder Mutation `tag-manager-changed` mit der frischen Liste
  */
 import { api } from '/api.js';
+import { errorSentence, isGone } from '/utils/friendly-error.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { rowMenuHtml } from '/utils/row-action.js';
@@ -281,8 +282,15 @@ class TagManagerElement extends HTMLElement {
       this._renderList();
       this.dispatchEvent(new CustomEvent('tag-manager-changed', { detail: { tags: this._tags } }));
     } catch (err) {
-      window.yuvomi?.showToast?.(err.message ?? t('common.errorGeneric'), 'danger');
+      this._reportError(err);
     }
+  }
+
+  // Der Stichwort-Eintrag kann weg sein (ein anderes Geraet hat ihn umbenannt
+  // oder geloescht): die Liste holt sich den Stand vom Server.
+  _reportError(err) {
+    window.yuvomi?.showToast?.(errorSentence(err), 'danger');
+    if (isGone(err)) this.load();
   }
 
   async _delete(tag) {
@@ -299,7 +307,7 @@ class TagManagerElement extends HTMLElement {
       this._renderList();
       this.dispatchEvent(new CustomEvent('tag-manager-changed', { detail: { tags: this._tags } }));
     } catch (err) {
-      window.yuvomi?.showToast?.(err.message ?? t('common.errorGeneric'), 'danger');
+      this._reportError(err);
     }
   }
 }
