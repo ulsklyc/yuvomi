@@ -5059,6 +5059,51 @@ test('R19: eingeklappt teilen Reiter und Zeitraum eine Zeile, der Titel weicht a
   assert.match(hides, /> \.budget-scope/, 'ebenso die Wippe Mein Budget / Haushalt');
 });
 
+/* #2440: DER STEPPER RUTSCHT UNTER DEN TITEL, WENN DIE ZEILE BEIDE NICHT TRAEGT.
+ * Neben dem 192px breiten Stepper bleiben dem Large Title Breite minus 264px:
+ * bei 360px 96px, "Budget" braucht in Roboto 106, in SF Pro 112, und stand als
+ * "Bud...". Der Titel bleibt gross (Ulas 2026-11-01), unter 390px bekommt der
+ * Zeitraum eine eigene Zeile; ab 390px aendert sich nichts. Die Abfrage steht
+ * an der Seitenwurzel, nicht am Viewport (tokens.css 11c, Vorlage #2425), und
+ * sie braucht einen eigenen Namen: `budget-page` traegt `#budget-body`, ein
+ * Geschwister des Kopfs, das der Kopf nicht fragen kann. */
+test('#2440: unter 390px steht der Zeitraum in einer eigenen Zeile unter dem Titel', () => {
+  const NARROW = /^@container\s+budget-root\s*\(width < 390px\)/;
+  const css = [...eachRule(budgetCss)].map((r) => ({ ...r, selector: r.selector.trim() }));
+  assert.ok(css.some((r) => r.selector === '.budget-page' && !r.at.length && /container:\s*budget-root \/ inline-size/.test(r.body)),
+    'die Seitenwurzel ist der Container, sie umschliesst den Kopf');
+  const narrow = css.filter((r) => r.at.some((a) => NARROW.test(a)));
+
+  const slot = narrow.find((r) => r.selector.endsWith('> .budget-nav__month:has(> :not([hidden]))'));
+  assert.ok(slot, 'die eigene Zeile fehlt');
+  assert.match(slot.body, /flex:\s*1 1 100%/, 'der Slot nimmt die ganze Zeile, Titel und Stepper brechen auseinander');
+  assert.match(slot.body, /inline-size:\s*auto/, 'auch die Notiz der Reiter ohne Zeitraum: sie erbt sonst die Stepperbreite');
+  assert.match(slot.body, /margin-inline:\s*0/, 'kein Rechtsschub aus der Titelzeile');
+  // Eingeklappt bleibt der Kopf EINE Zeile (R19), und wo der Slot nichts traegt
+  // (Aufteilung), steht keine leere Zeile.
+  assert.match(slot.selector, /:not\(\.is-collapsed\)/, 'eingeklappt teilen Reiter und Stepper weiter eine Zeile');
+
+  const label = narrow.find((r) => r.selector.endsWith(' .budget-nav__label'));
+  assert.match(label?.body ?? '', /flex:\s*1 1 0/, 'die Pfeile stehen an den Zeilenenden, ihre Lage haengt nicht am Monat');
+  assert.match(label?.selector ?? '', /:not\(\.is-collapsed\)/, 'eingeklappt bleibt die feste Breite der Regel R16');
+  const note = narrow.find((r) => r.selector.endsWith(' .budget-nav__note:not([hidden])'));
+  assert.match(note?.body ?? '', /text-align:\s*start/, 'die Notiz steht unter dem Titel, nicht rechts davon');
+
+  // Der Titel bleibt, wie er ist: kein Modul schrumpft ihn auf dem Telefon.
+  assert.ok(!narrow.some((r) => /page-toolbar__title/.test(r.selector)), 'die Abfrage fasst den Titel nicht an');
+  assert.doesNotMatch(budgetCss, /@media[^{]*(max-width:\s*3[89]\dpx|width < 390px)/, 'kein Viewport-Breakpoint fuer einen Umbruch des Bauteils');
+
+  // Nur das Budget traegt den Stepper auf dem Telefon NEBEN dem Titel: der
+  // Schichtplan fuehrt `--period-inline` erst ab 768px, darunter steht seine
+  // Zeile schon fuer sich. Wer das Muster uebernimmt, muss hier vorbei.
+  const carriers = readdirSync(new URL('../public/pages/', import.meta.url)).filter((f) => f.endsWith('.js')
+    && /<(?:div|header) class="[^"]*\bpage-toolbar--period-inline\b/.test(read(`../public/pages/${f}`)));
+  assert.deepEqual(carriers.sort(), ['budget.js', 'schedule.js'], 'ein neuer Traeger braucht seine eigene Antwort unter 390px');
+  const schedule = [...eachRule(read('../public/styles/schedule.css'))].find((r) => r.at.some((a) => /max-width:\s*767px/.test(a))
+    && r.selector.trim().endsWith('> .page-toolbar__center.schedule-nav'));
+  assert.match(schedule?.body ?? '', /flex:\s*1 1 100%/, 'der Schichtplan bleibt unter 768px eine eigene Zeile');
+});
+
 test('R16: formatMonthYear kennt die Kurzform des Monats', async () => {
   const i18n = await import('../public/i18n.js');
   const long = i18n.formatMonthYear(2026, 9);

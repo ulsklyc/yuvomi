@@ -4962,7 +4962,10 @@ html.fab-steady .page-fab {
  *
  * EINGEKLAPPT GEHT DER TITEL (R19, bis dahin blieb er stehen und hielt Zeile 1
  * offen): die Reiter ruecken in die Zeile des Zeitraums - Regel am Ende dieses
- * Blocks. Bis 1023px, seit R19 auch auf dem Tablet (834px: 174 -> 129px). */
+ * Blocks. Bis 1023px, seit R19 auch auf dem Tablet (834px: 174 -> 129px).
+ *
+ * UNTER 390px TRAEGT DIE ZEILE BEIDE NICHT: dort steht der Zeitraum in einer
+ * eigenen Zeile unter dem Titel (#2440, budget.css). */
 @media (max-width: 1023px) {
   .page-toolbar.page-toolbar--period-inline:not(.page-toolbar--in-group) > .page-toolbar__title {
     flex: 1 1 0;

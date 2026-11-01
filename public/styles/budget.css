@@ -27,6 +27,9 @@
    * einer eigenen Formel, die --nav-bottom-height nicht mitzählte und mobil
    * deshalb zu klein war. Er kommt jetzt als Marge an .app-content
    * (layout.css) und gilt damit bei jedem Scrollstand statt nur am Listenende. */
+  /* Der Container fuer den Kopf (#2440, unten). Nicht `budget-page`: den Namen
+   * traegt `#budget-body`, und ein Geschwister kann der Kopf nicht fragen. */
+  container: budget-root / inline-size;
 }
 
 /* Inhaltsfläche unter der Monats-Nav.
@@ -282,6 +285,48 @@
 @media (max-width: 767px) {
   .page-toolbar.page-toolbar--period-inline.page-toolbar--wrap:not(.page-toolbar--in-group) > .budget-nav__month:has(.budget-nav__note:not([hidden])) {
     inline-size: calc(var(--target-base) * 2 + var(--space-12) * 2);
+  }
+}
+
+/* DER ZEITRAUM BEKOMMT EINE EIGENE ZEILE, WENN DIE TITELZEILE BEIDE NICHT TRAEGT
+ * (#2440; DESIGN.md, Kopfregel mobil). Neben dem 192px breiten Stepper bleiben
+ * dem Large Title Breite minus 264px: bei 360px 96px, und "Budget" braucht in
+ * Roboto 106, in SF Pro 112 - dort stand "Bud...". Der Titel bleibt gross (Ulas
+ * 2026-11-01, in keinem Modul ein kleinerer Titel), also weicht der Stepper:
+ * unter 390px steht er in voller Breite unter dem Titel, die Pfeile an den
+ * Zeilenenden wie im Schichtplan, das Label mittig dazwischen. Ab 390px bleibt
+ * die eine Zeile.
+ *
+ * Eine Abfrage an der Seitenwurzel, kein Viewport-Breakpoint: das ist ein
+ * Umbruch dieses Bauteils (tokens.css 11c, Vorlage #2425 in tasks.css). Sie
+ * steht hier und nicht bei `--period-inline` in layout.css, weil das Budget der
+ * einzige Traeger ist, der auf dem Telefon Titel und Stepper in einer Zeile
+ * fuehrt: der Schichtplan tut das erst ab 768px (schedule.css), der Kalender
+ * und die Haushaltshilfe sind andere Koepfe. `test:budget-ui` haelt die Liste.
+ *
+ * DIE ZEILE STEHT AUF JEDEM REITER MIT INHALT, die Notiz der Reiter ohne
+ * Zeitraum nimmt sie genauso, und der Slot haelt seine 48px (oben): der Kopf
+ * misst dann 169px, ob Stepper oder Notiz, der Monatswechsel bewegt nichts
+ * (das Label fuellt die Zeile, die Pfeile haengen nicht an seiner Laenge). Nur
+ * die Aufteilung traegt im Slot nichts (`:has(> :not([hidden]))`) und bleibt
+ * ohne leere Zeile bei 117px.
+ *
+ * EINGEKLAPPT BLEIBT ALLES WIE ES WAR (R19): der Titel geht, Reiter und Stepper
+ * teilen die eine Zeile (169 -> 65px); deshalb `:not(.is-collapsed)`. */
+@container budget-root (width < 390px) {
+  .page-toolbar.page-toolbar--period-inline.page-toolbar--wrap.budget-nav:not(.page-toolbar--in-group):not(.is-collapsed) > .budget-nav__month:has(> :not([hidden])) {
+    flex: 1 1 100%;
+    inline-size: auto;
+    margin-inline: 0;
+  }
+
+  .budget-nav:not(.is-collapsed) .budget-nav__label {
+    flex: 1 1 0;
+    inline-size: auto;
+  }
+
+  .budget-nav:not(.is-collapsed) .budget-nav__note:not([hidden]) {
+    text-align: start;
   }
 }
 

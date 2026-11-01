@@ -3875,7 +3875,8 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    ab 390px bleibt der Knopf, je Breite ein Weg. Das ist die einzige Abweichung und kein
    Muster fuer andere Koepfe: kein anderer Modulkopf traegt neben dem Titel drei Werkzeuge
    (gemessen 320-375px), und der Kalender behaelt seinen Filter (R20 6c, kompakter Kopf wie
-   Apple Kalender).
+   Apple Kalender). Der Stepper kann nicht ins Menue, er ist die Hauptsteuerung des Reiters: das
+   Budget loest dieselbe Enge mit einer eigenen Zeile (#2440, „Sub-Tabs + Zeitraum").
    Eine Chipreihe bleibt EINE Reihe, auch am Zeigergeraet (R22, D20; Kontakte brachen bis
    dahin ab 1024px in zwei Reihen um, rund 48px Kopf): sie scrollt waagerecht mit Fade an der
    Kante (`wireScrollFade`), das Mausrad bewegt sie, bis sie am Ende ist, dann die Seite
@@ -3973,6 +3974,20 @@ Die Haushaltshilfe-Berichte (170px) bleiben in der Dreizeilen-Form, gemessen und
 Stepper selbst ist der geteilte Baustein (utils/period-stepper.js). Ein drittes Element (Werkzeugzeile, Chipreihe) wandert weiter ins Menue oder
 in den Port. `test:budget-ui` haelt Klasse, nachgebende Titelbasis und den Center-Slot ohne
 eigene Zeile.
+**Unter 390px steht der Zeitraum in einer eigenen Zeile (#2440, Ulas 2026-11-01).** Neben dem
+192px-Stepper bleiben dem Large Title Breite minus 264px: bei 360px 96px, „Budget" braucht in
+Roboto 106, in SF Pro 112, und stand als „Bud...". Der Titel bleibt in jedem Modul gleich gross,
+also weicht der Stepper: unter 390px Modulbreite (`@container budget-root`, Seitenwurzel, kein
+Viewport-Breakpoint) steht er in voller Breite unter dem Titel, die Pfeile an den Zeilenenden wie
+im Schichtplan, die Kurzform mittig; die Notiz der Reiter ohne Zeitraum nimmt dieselbe Zeile,
+am Zeilenanfang unter dem Titel. Gemessen 360px: Kopf 117 -> 169px, auf den Notiz-Reitern schon vorher
+169px, jetzt auf allen sechs Reitern mit Slot dasselbe (die Reiter sprangen um 52px); nur die
+Aufteilung traegt im Slot nichts und bleibt bei 117px. Der Monatswechsel bewegt nichts, die Pfeile
+haengen nicht am Label. Eingeklappt gilt R19 unveraendert (169 -> 65px), ab 390px bleibt alles
+wie es war (Kopf und Slots identisch gemessen). Mit der Wippe „Mein Budget / Haushalt" sind es
+vier Zeilen, 221px (vorher 169px); eingeklappt weicht sie wie bisher. Das ist die Kopfhoehe, die der Titel kostet, und
+nur unter 390px: das Budget ist der einzige Kopf, der auf dem Telefon Titel und Stepper in einer
+Zeile fuehrt (gemessen, der Schichtplan erst ab 768px), die Abfrage steht deshalb in budget.css.
 
 **Verwaltung steht mobil nicht vor dem Inhalt (R16, 2026-10-05).** Der Kopf war nur die
 halbe Rechnung: in vier Flaechen stand unter ihm eine eigene Bedienflaeche, die den Inhalt

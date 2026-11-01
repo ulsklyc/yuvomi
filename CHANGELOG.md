@@ -56,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin sets up, in line with how private entries already work.
 
 ### Fixed
+- **The Budget title stands in full on narrow phones** (#2440). Below 390px wide the title sat next
+  to the month stepper and read "Bud..." at 360px. There the month now takes a row of its own under
+  the title, with the arrows at the ends of the row, and the title keeps its size. The tabs without
+  a month use the same row for their note, so the tab bar stays put between these tabs, and paging
+  through the months moves nothing. From 390px up nothing changes.
 - **Error messages in Settings speak your language.** Saving, syncing or removing something in
   Settings could show the server's or browser's raw English sentence in a toast. Now the app says
   it in your language, and names the cause where it knows one: the last administrator, a tag or
