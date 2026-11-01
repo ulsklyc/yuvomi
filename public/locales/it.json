@@ -3325,6 +3325,8 @@
         "displayIssueCode": "Genera codice di associazione",
         "displayScreensaverLabel": "Mostra il salvaschermo con le foto",
         "displayScreensaverHint": "Quando nessuno tocca questo tablet per un po', mostra foto da Immich sopra la schermata a parete. Disattivato finché non lo attivi qui. Funziona quando Immich è collegato.",
+        "displayDeviceSettingsHint": "Queste scelte valgono solo per questo tablet. Online cerca modifiche ogni 30 secondi; orologio e riempimento delle foto si applicano al prossimo avvio del salvaschermo.",
+        "displayDeviceSettingsLocal": "Non ancora salvato qui. Il tablet mantiene le impostazioni locali fino al salvataggio.",
         "displayScreensaverOn": "{{name}} mostra il salvaschermo con le foto.",
         "displayScreensaverOff": "{{name}} non mostra più il salvaschermo con le foto.",
         "displayDelete": "Elimina",

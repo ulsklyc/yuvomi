@@ -3325,6 +3325,8 @@
         "displayIssueCode": "Générer un code d'appairage",
         "displayScreensaverLabel": "Afficher l'économiseur d'écran photo",
         "displayScreensaverHint": "Quand personne ne touche cette tablette pendant un moment, elle affiche des photos d'Immich par-dessus l'affichage mural. Désactivé jusqu'à ce que vous l'activiez ici. Fonctionne une fois Immich connecté.",
+        "displayDeviceSettingsHint": "Ces choix concernent uniquement cette tablette. En ligne, elle vérifie les changements toutes les 30 secondes ; l’horloge et le cadrage s’appliquent au prochain démarrage de l’économiseur.",
+        "displayDeviceSettingsLocal": "Pas encore enregistré ici. La tablette garde ses réglages locaux jusqu’à l’enregistrement.",
         "displayScreensaverOn": "{{name}} affiche l'économiseur d'écran photo.",
         "displayScreensaverOff": "{{name}} n'affiche plus l'économiseur d'écran photo.",
         "displayDelete": "Supprimer",

@@ -685,6 +685,7 @@ router.get('/', (req, res) => {
     // Budget-Betriebsart, Zyklus-Einstellungen, Sync-Ziele -, und sie steht dem
     // Display nur offen, weil die App ohne sie nicht startet. Was uebrig
     // bleibt, ist eine Allowlist in display-scopes.js.
+    if (req.authMethod === 'display') data.display_device_settings = req.displayDeviceSettings ?? null;
     res.json({ data: req.authMethod === 'display' ? pickDisplayPreferences(data) : data });
   } catch (err) {
     log.error('GET /', err);

@@ -3325,6 +3325,8 @@
         "displayIssueCode": "Generer paringskode",
         "displayScreensaverLabel": "Vis fotoskjermspareren",
         "displayScreensaverHint": "Når ingen har rørt nettbrettet på en stund, viser det bilder fra Immich over veggvisningen. Av til du slår den på her. Gjelder når Immich er koblet til.",
+        "displayDeviceSettingsHint": "Disse valgene gjelder bare dette nettbrettet. På nett ser det etter endringer hvert 30. sekund; klokken og bildefyllingen gjelder neste gang skjermspareren starter.",
+        "displayDeviceSettingsLocal": "Ikke lagret her ennå. Nettbrettet beholder lokale innstillinger til du lagrer.",
         "displayScreensaverOn": "{{name}} viser fotoskjermspareren.",
         "displayScreensaverOff": "{{name}} viser ikke lenger fotoskjermspareren.",
         "displayDelete": "Slett",

@@ -204,7 +204,7 @@ export const DISPLAY_PREFERENCE_KEYS = Object.freeze([
   'dashboard_widgets', 'dashboard_today_glance',
   'tasks_subtasks_expanded',
   'holiday_show_public', 'holiday_show_school', 'holiday_public_color', 'holiday_school_color',
-  'screensaver_enabled',
+  'screensaver_enabled', 'display_device_settings',
 ]);
 
 /** Die Antwort auf das, was ein Display sehen darf - Reihenfolge egal. */

@@ -18,6 +18,7 @@
  * und es ist der einzige Aufrufer, den sie hat.
  */
 
+import { normalizeDisplayDeviceSettings, parseDisplayDeviceSettings } from '../../public/utils/display-device-settings.js';
 import crypto from 'node:crypto';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -241,7 +242,7 @@ router.use(requireAdmin);
 router.get('/', (_req, res) => {
   try {
     const rows = db.get().prepare(`
-      SELECT u.id, u.display_name, u.avatar_color, da.created_at, da.show_screensaver
+      SELECT u.id, u.display_name, u.avatar_color, da.created_at, da.show_screensaver, da.device_settings
         FROM users u
         JOIN display_accounts da ON da.user_id = u.id
        ORDER BY u.display_name
@@ -249,6 +250,7 @@ router.get('/', (_req, res) => {
     const data = rows.map((row) => ({
       ...row,
       show_screensaver: row.show_screensaver === 1,
+      device_settings: parseDisplayDeviceSettings(row.device_settings),
       devices: listDisplayDevices(row.id),
     }));
     // `area_modules` steht NEBEN der Liste, nicht in jedem Eintrag: es ist eine
@@ -303,7 +305,7 @@ router.post('/', (req, res) => {
         .run(userId, req.authUserId || null);
     })();
 
-    return res.status(201).json({ data: { id: userId, display_name: displayName, show_screensaver: false, devices: [] } });
+    return res.status(201).json({ data: { id: userId, display_name: displayName, show_screensaver: false, device_settings: null, devices: [] } });
   } catch (err) {
     log.error('POST / error:', err);
     return res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -311,8 +313,8 @@ router.post('/', (req, res) => {
 });
 
 /**
- * Ob dieses Display den Foto-Bildschirmschoner zeigt (#1766, Migration 244).
- * Body: { show_screensaver: boolean }
+ * Central display options (#1766, #2436).
+ * Body: { show_screensaver?: boolean, device_settings?: { night_from, night_until, idle_seconds, show_clock, cover_photo } }
  *
  * DIE WAHL TRIFFT EIN ADMINISTRATOR, NICHT DAS TABLETT. Ein Display aendert
  * keine Einstellungen; diese Route liegt hinter `requireAdmin` wie alles hier,
@@ -325,14 +327,24 @@ router.patch('/:id', (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
-    const value = req.body?.show_screensaver;
-    if (typeof value !== 'boolean') {
-      return res.status(400).json({ error: 'show_screensaver must be a boolean.', code: 400 });
+    const body = req.body || {};
+    const hasScreensaver = Object.hasOwn(body, 'show_screensaver');
+    const hasSettings = Object.hasOwn(body, 'device_settings');
+    const settings = hasSettings ? normalizeDisplayDeviceSettings(body.device_settings) : null;
+    if ((!hasScreensaver && !hasSettings) || (hasScreensaver && typeof body.show_screensaver !== 'boolean') || (hasSettings && !settings)) {
+      return res.status(400).json({ error: 'Invalid display settings.', code: 400 });
     }
-    const result = db.get().prepare('UPDATE display_accounts SET show_screensaver = ? WHERE user_id = ?')
-      .run(value ? 1 : 0, id);
+    const fields = []; const values = []; const data = { id };
+    if (hasScreensaver) {
+      fields.push('show_screensaver = ?'); values.push(body.show_screensaver ? 1 : 0);
+      data.show_screensaver = body.show_screensaver;
+    }
+    if (hasSettings) {
+      fields.push('device_settings = ?'); values.push(JSON.stringify(settings)); data.device_settings = settings;
+    }
+    const result = db.get().prepare(`UPDATE display_accounts SET ${fields.join(', ')} WHERE user_id = ?`).run(...values, id);
     if (result.changes === 0) return res.status(404).json({ error: 'Display not found.', code: 404 });
-    return res.json({ data: { id, show_screensaver: value } });
+    return res.json({ data });
   } catch (err) {
     log.error('PATCH /:id error:', err);
     return res.status(500).json({ error: 'Internal server error.', code: 500 });

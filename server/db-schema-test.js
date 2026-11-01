@@ -1581,6 +1581,7 @@ const MIGRATIONS_SQL = {
     ALTER TABLE notes ADD COLUMN locked INTEGER NOT NULL DEFAULT 0
       CHECK (locked IN (0, 1));
   `,
+  274: `ALTER TABLE display_accounts ADD COLUMN device_settings TEXT CHECK(device_settings IS NULL OR json_valid(device_settings));`,
 };
 
 export { MIGRATIONS_SQL };

@@ -3325,6 +3325,8 @@
         "displayIssueCode": "Generar código de vinculación",
         "displayScreensaverLabel": "Mostrar el salvapantallas de fotos",
         "displayScreensaverHint": "Cuando nadie toca esta tableta durante un rato, muestra fotos de Immich sobre la pantalla de pared. Desactivado hasta que lo actives aquí. Funciona una vez que Immich esté conectado.",
+        "displayDeviceSettingsHint": "Estas opciones solo afectan a esta tableta. Busca cambios cada 30 segundos en línea; el reloj y el ajuste de las fotos se aplican al volver a iniciar el salvapantallas.",
+        "displayDeviceSettingsLocal": "Aún no se ha guardado aquí. La tableta mantiene sus ajustes locales hasta que guardes.",
         "displayScreensaverOn": "{{name}} muestra el salvapantallas de fotos.",
         "displayScreensaverOff": "{{name}} ya no muestra el salvapantallas de fotos.",
         "displayDelete": "Eliminar",

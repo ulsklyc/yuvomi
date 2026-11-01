@@ -3343,6 +3343,8 @@
         "displayIssueCode": "페어링 코드 생성",
         "displayScreensaverLabel": "사진 화면 보호기 표시",
         "displayScreensaverHint": "한동안 아무도 이 태블릿을 만지지 않으면 벽 디스플레이 위에 Immich 사진을 보여 줍니다. 여기에서 켜기 전까지는 꺼져 있습니다. Immich가 연결되면 적용됩니다.",
+        "displayDeviceSettingsHint": "이 설정은 이 태블릿에만 적용됩니다. 온라인 상태에서 30초마다 변경을 확인하며, 시계와 사진 채우기는 화면 보호기가 다음에 시작될 때 적용됩니다.",
+        "displayDeviceSettingsLocal": "아직 여기에 저장하지 않았습니다. 저장할 때까지 태블릿의 로컬 설정이 유지됩니다.",
         "displayScreensaverOn": "{{name}}에서 사진 화면 보호기를 표시합니다.",
         "displayScreensaverOff": "{{name}}에서 더 이상 사진 화면 보호기를 표시하지 않습니다.",
         "displayDelete": "삭제",

@@ -150,3 +150,58 @@ test('a failed request puts the switch back and says why', async () => {
     patchResult = () => Promise.resolve({ data: {} });
   }
 });
+
+const remoteSettings = {night_from:21, night_until:7, idle_seconds:60, show_clock:false, cover_photo:true};
+function settingsForm() {
+  const fields = Object.fromEntries(Object.entries(remoteSettings).map(([key,value]) => [key, {value:String(value), checked:value, disabled:false}]));
+  const status = {textContent:''}; const button = {disabled:false};
+  const form = {
+    dataset:{displayDeviceSettings:'7',name:'Kitchen'},
+    querySelector: selector => selector === '[data-display-settings-status]' ? status
+      : selector.startsWith('[name=') ? fields[selector.slice(7,-2)] : null,
+    querySelectorAll: () => [...Object.values(fields),button],
+  };
+  return {form, fields, status, button};
+}
+async function saveSettings(list, form) {
+  const event = {target:{closest:selector => selector === '[data-display-device-settings]' ? form : null}, preventDefault(){}};
+  await Promise.all(list.handlers.submit.map(fn=>fn(event)));
+}
+
+test('the card renders remote values in distinct accessible controls for each tablet', () => {
+  const html = page.renderDisplay({id:7, display_name:'Kitchen', device_settings:remoteSettings});
+  assert.match(html, /data-display-device-settings="7"/);
+  assert.match(html, /value="21" selected/); assert.match(html, /value="7" selected/);
+  assert.match(html, /value="60" selected/);
+  assert.match(html, /id="display-options-7-clock"/); assert.match(html, /id="display-options-7-cover"/);
+  assert.doesNotMatch(html, /data-display-local-hint/);
+  const local = page.renderDisplay({id:8, display_name:'Hall', device_settings:null});
+  assert.match(local, /data-display-local-hint/); assert.match(local, /value="22" selected/);
+});
+
+test('saving the real display form sends all five choices to that display only', async () => {
+  patchResult = () => Promise.resolve({data:{device_settings:remoteSettings}}); patches.length = 0;
+  const list = makeList(); page.bindDisplayDeviceSettings(list);
+  const ui = settingsForm(); await saveSettings(list, ui.form);
+  assert.deepEqual(patches, [{path:'/displays/7',body:{device_settings:remoteSettings}}]);
+  assert.match(ui.status.textContent, /common.savedNamed/); assert.equal(ui.button.disabled,false);
+});
+
+test('failed saves keep the choices editable and concurrent submits cannot race', async () => {
+  let reject;
+  patchResult = () => new Promise((_, fail)=>{reject=fail;}); patches.length = 0;
+  const list = makeList(); page.bindDisplayDeviceSettings(list);
+  const ui = settingsForm(); const pending = saveSettings(list,ui.form);
+  assert.equal(ui.button.disabled,true); await saveSettings(list,ui.form); assert.equal(patches.length,1);
+  reject(Object.assign(new Error('server'),{status:500})); await pending;
+  assert.equal(ui.button.disabled,false); assert.equal(ui.fields.night_from.value,'21');
+  assert.ok(ui.status.textContent); assert.equal(ui.form.dataset.saving,'false');
+  patchResult = () => Promise.resolve({data:{}});
+});
+
+test('an invalid night window is rejected before an API request', async () => {
+  patches.length = 0;
+  const list = makeList(); page.bindDisplayDeviceSettings(list);
+  const ui = settingsForm(); ui.fields.night_until.value = '21';
+  await saveSettings(list,ui.form); assert.equal(patches.length,0); assert.equal(ui.status.textContent,'common.invalidInput');
+});

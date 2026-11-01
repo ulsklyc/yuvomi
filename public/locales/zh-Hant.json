@@ -3329,6 +3329,8 @@
         "displayIssueCode": "生成配對碼",
         "displayScreensaverLabel": "顯示照片螢幕保護",
         "displayScreensaverHint": "當一段時間無人觸碰這台平板時，它會在壁掛顯示上方展示來自 Immich 的照片。在此開啟前保持關閉。Immich 連線後才會生效。",
+        "displayDeviceSettingsHint": "這些選項僅適用於此平板。連線時每30秒檢查一次變更；時鐘和照片填滿方式在螢幕保護程式下次啟動時生效。",
+        "displayDeviceSettingsLocal": "尚未在此儲存。儲存前，平板會繼續使用本機設定。",
         "displayScreensaverOn": "{{name}} 會顯示照片螢幕保護。",
         "displayScreensaverOff": "{{name}} 不再顯示照片螢幕保護。",
         "displayDelete": "刪除",

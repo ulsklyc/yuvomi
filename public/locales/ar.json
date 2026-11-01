@@ -3650,6 +3650,8 @@
         "displayIssueCode": "إنشاء رمز اقتران",
         "displayScreensaverLabel": "عرض شاشة توقف الصور",
         "displayScreensaverHint": "عندما لا يلمس أحد هذا الجهاز اللوحي لفترة، يعرض صوراً من Immich فوق عرض الحائط. متوقف حتى تشغّله هنا. يعمل بعد ربط Immich.",
+        "displayDeviceSettingsHint": "تنطبق هذه الخيارات على هذا الجهاز اللوحي فقط. يتحقق من التغييرات كل 30 ثانية أثناء الاتصال؛ تُطبّق الساعة وملء الصور عند بدء شاشة التوقف مجددًا.",
+        "displayDeviceSettingsLocal": "لم تُحفظ هنا بعد. يحتفظ الجهاز بإعداداته المحلية حتى تحفظها.",
         "displayScreensaverOn": "يعرض {{name}} شاشة توقف الصور.",
         "displayScreensaverOff": "لم يعد {{name}} يعرض شاشة توقف الصور.",
         "displayDelete": "حذف",

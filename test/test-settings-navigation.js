@@ -1218,6 +1218,7 @@ test('Feiertage: die Ebenen-Schalter speichern sofort, ein Fehler legt zurueck (
  * als Programm gemessen), und das Formular steht hier mit Grund. Ein neues
  * Formular mit Schalter muss sich fuer eine der beiden Antworten entscheiden. */
 const GUARDED_SWITCH_FORMS = new Map([
+  ['admin-displays.js#${prefix}-form', 'Complete per-tablet configuration: the first save replaces otherwise unknown local options; shared leaf dirty guard protects the pending form'],
   ['admin-api.js#api-token-form', 'Anlegen: der Schalter ist ein Merkmal des neuen Tokens'],
   ['admin-backup.js#backup-webdav-form', 'Aktivieren ohne Adresse und Zugang waere ein Sicherungsauftrag ins Leere'],
   ['admin-family.js#add-member-form', 'Anlegen eines Mitglieds'],

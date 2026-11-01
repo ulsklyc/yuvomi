@@ -1037,6 +1037,7 @@ function requireAuth(req, res, next) {
       req.authScopes = [...DISPLAY_SCOPES];
       req.displayDeviceId = device.deviceId;
       req.displayShowsScreensaver = device.showScreensaver === true;
+      req.displayDeviceSettings = device.deviceSettings;
       // DIE OFFLINE-FRIST RUECKT MIT JEDEM KONTAKT VOR (Folge von #2293). Der
       // Service Worker legt sie neben die gecachten Listen; `/auth/me` nennt
       // denselben Wert als `sessionExpiresAt`. Begruendung und Dauer bei

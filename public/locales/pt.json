@@ -3325,6 +3325,8 @@
         "displayIssueCode": "Gerar código de emparelhamento",
         "displayScreensaverLabel": "Mostrar a proteção de ecrã de fotografias",
         "displayScreensaverHint": "Quando ninguém toca neste tablet durante algum tempo, mostra fotografias do Immich sobre o ecrã de parede. Desligado até o ativar aqui. Funciona depois de o Immich estar ligado.",
+        "displayDeviceSettingsHint": "Estas opções aplicam-se apenas a este tablet. Online procura alterações a cada 30 segundos; o relógio e o preenchimento das fotos aplicam-se no próximo início da proteção de ecrã.",
+        "displayDeviceSettingsLocal": "Ainda não foi guardado aqui. O tablet mantém as definições locais até guardares.",
         "displayScreensaverOn": "{{name}} mostra a proteção de ecrã de fotografias.",
         "displayScreensaverOff": "{{name}} já não mostra a proteção de ecrã de fotografias.",
         "displayDelete": "Eliminar",

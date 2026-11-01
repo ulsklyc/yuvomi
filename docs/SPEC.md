@@ -2997,12 +2997,27 @@ than on a member device: a random selection from the configured album or, withou
 everything the key can read, with date, city and country, and `/screensaver/photos/{id}` proxies
 any asset id without checking the album. `/screensaver/config` and `/screensaver/test` stay refused.
 
+**Remote device choices (#2436).** Administrators save `device_settings` with
+`PATCH /api/v1/displays/{id}`: `night_from` and `night_until` are distinct integer
+hours 0-23 in household time, `idle_seconds` is 60/120/300/600/900, `show_clock`
+and `cover_photo` are booleans. The complete object is validated before any field
+is changed, including a simultaneous `show_screensaver` update. Migration 274 adds
+a nullable JSON column on `display_accounts`; NULL preserves existing tablet-local
+choices until the administrator saves. Re-pairing the display keeps its configuration.
+Only that display receives it in `/preferences` as `display_device_settings`; member
+preferences contain no override. The scoped tablet gets no new write permission.
+The visible online display refreshes every 30 seconds and on resume/reconnection,
+retaining its last configuration while offline. Night/idle apply without reload;
+clock and photo fill apply at the next screensaver start. Overrides live in the
+browser session, never over a member’s localStorage; ending the session clears them.
+
 Visibility needs no special case. A display creates nothing and is assigned nothing, so
 `visibilityWhere()` leaves it exactly the rows marked `all`.
 
 | Table | Column | Type | Constraint |
 |-------|--------|------|-----------|
 | display_accounts | user_id | INTEGER | PRIMARY KEY, FK → Users (CASCADE delete) |
+| display_accounts | device_settings | TEXT | Nullable validated JSON, per-display night/screensaver options (#2436) |
 | display_accounts | created_by | INTEGER | FK → Users (SET NULL on delete), nullable |
 | display_pairing_codes | code_hash | TEXT | NOT NULL UNIQUE (SHA-256) |
 | display_pairing_codes | expires_at | TEXT | ISO 8601 NOT NULL (15 minutes) |

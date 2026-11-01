@@ -464,6 +464,8 @@ const APP_SHELL = [
   '/utils/schedule-reminder-offset.js',
   '/utils/servings-stepper.js',
   '/utils/screensaver-idle.js',
+  '/utils/display-device-settings.js',
+  '/utils/display-settings-sync.js',
   '/utils/scroll-restore.js',
   '/utils/seal-pair.js',
   '/utils/session-unreachable.js',

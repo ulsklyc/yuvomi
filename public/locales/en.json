@@ -3325,6 +3325,8 @@
         "displayIssueCode": "Generate pairing code",
         "displayScreensaverLabel": "Show the photo screensaver",
         "displayScreensaverHint": "When nobody has touched this tablet for a while, it shows photos from Immich over the wall display. Off until you switch it on here. Takes effect once Immich is connected.",
+        "displayDeviceSettingsHint": "These choices apply only to this tablet. It checks for changes every 30 seconds online; the clock and photo layout apply when the screensaver next starts.",
+        "displayDeviceSettingsLocal": "Not saved here yet. The tablet keeps its local settings until you save.",
         "displayScreensaverOn": "{{name}} shows the photo screensaver.",
         "displayScreensaverOff": "{{name}} no longer shows the photo screensaver.",
         "displayDelete": "Delete",
