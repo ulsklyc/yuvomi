@@ -56,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin sets up, in line with how private entries already work.
 
 ### Fixed
+- **Task defaults follow the new-task dialog in a one-person household.** Visibility and
+  editing-lock defaults stay out of the way when nobody else can read tasks. Saved choices
+  remain intact and reappear when needed. The editing-lock switch and its hint no longer
+  overlap. The defaults description also uses the same form of address as its neighbouring
+  hints (#2366).
 - **The Budget title stands in full on narrow phones** (#2440). Below 390px wide the title sat next
   to the month stepper and read "Bud..." at 360px. There the month now takes a row of its own under
   the title, with the arrows at the ends of the row, and the title keeps its size. The tabs without
