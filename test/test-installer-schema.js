@@ -116,6 +116,7 @@ const TOTAL_KEYS = ORIGINAL_KEYS.length + GOOGLE_DRIVE_KEYS.length + OUTLOOK_KEY
 // erzwingt damit eine Entscheidung, statt still zu driften.
 
 const INTENTIONALLY_NOT_IN_INSTALLER = {
+  PASSKEYS_ENABLED: 'Optional runtime policy for an existing HTTPS installation; no additional installer step is needed to enable passkeys. Administrators can disable them in .env.',
   // Setzt jeder Container-Descriptor selbst; im Installer wäre der Wert eine
   // zweite Wahrheit, die der Descriptor überschreibt.
   NODE_ENV: 'Vom Image gesetzt (production).',
