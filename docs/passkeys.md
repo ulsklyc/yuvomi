@@ -29,8 +29,9 @@ and last-use dates, and lets you remove your own keys after a recent sign-in.
 `AUTH_ALLOW_PASSWORD_LOGIN=false` is the existing SSO-only policy. While it is
 effective, native passkey sign-in and enrollment are disabled for household members,
 just as native password sign-in is; the existing external-expense guest exception
-still applies. A passkey does not bypass account deactivation, access restrictions
-or the existing two-factor gate. Scoped API tokens and paired displays cannot
+still applies. Accounts explicitly configured as SSO-only also cannot enroll or
+use native passkeys, independently of the household-wide switch. A passkey does not
+bypass account deactivation, access restrictions or the existing two-factor gate. Scoped API tokens and paired displays cannot
 manage passkeys, nor can an unscoped API token enroll a key on someone's behalf.
 `PASSKEYS_ENABLED=false` disables the feature on an installation.
 
