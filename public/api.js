@@ -103,7 +103,7 @@ async function apiFetch(path, options = {}, _retried = false) {
     // Für den zweiten Faktor gilt dasselbe: dort heißt 401 "falscher Code" oder
     // "der Wartezustand ist abgelaufen" - beides gehört auf die Anmeldeseite
     // gesagt und nicht in einen Sitzungsabbruch übersetzt (#672).
-    if (path !== '/auth/login' && path !== '/auth/2fa/verify') {
+    if (path !== '/auth/login' && path !== '/auth/2fa/verify' && path !== '/auth/passkeys/login/verify') {
       // Der Wurf traegt seinen Status in BEIDEN Faellen (Critique R19): nur
       // ein 401 schickt den Auth-Guard in navigate() zur Anmeldung, jeder
       // andere Fehler der Sitzungspruefung zeigt den Fehlerzustand der Shell.
@@ -369,6 +369,14 @@ const api = {
 // --------------------------------------------------------
 
 const auth = {
+  loginWithPasskey: async (credential) => {
+    const res = await api.post('/auth/passkeys/login/verify', { credential });
+    setPermissions(res?.permissions);
+    setHouseholdSize(res?.householdSize);
+    setOtherReaders(res?.othersCanRead);
+    setInitialsRoster(res?.initialsRoster);
+    return res;
+  },
   login: async (username, password) => {
     const res = await api.post('/auth/login', { username, password });
     setPermissions(res?.permissions);
