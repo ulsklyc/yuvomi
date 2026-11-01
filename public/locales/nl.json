@@ -3281,6 +3281,8 @@
         "memberSsoOnlyLabel": "Alleen SSO-aanmelding",
         "memberSsoOnlyHint": "Het account krijgt geen wachtwoord. Het lid kan zich alleen via SSO aanmelden.",
         "memberSsoOnlyEditHint": "Staat de schakelaar aan, dan verliest het account zijn wachtwoord en komt het alleen nog via SSO binnen. Uitschakelen vereist een nieuw wachtwoord.",
+        "memberHomeAssistantUserIdLabel": "Home Assistant-gebruikers-ID",
+        "memberHomeAssistantUserIdHint": "Koppelt dit account aan een Home Assistant-gebruiker, zodat inloggen met Home Assistant het vindt. De ID staat in Home Assistant onder Instellingen > Personen > Gebruikers (geavanceerde modus). Laat leeg om de koppeling te verwijderen.",
         "healthPreventionNotifyCaregiversLabel": "Verzorgers op de hoogte stellen",
         "healthPreventionNotifyCaregiversHint": "Een verzorger ziet al wat er verschuldigd is zodra de app wordt geopend. Deze instelling stuurt daarnaast een pushmelding met jouw naam - standaard uit, want zorgtoegang alleen betekent nog geen melding.",
         "healthPreventionNotifyCaregiversSaved": "Meldingsinstelling opgeslagen.",

@@ -3281,6 +3281,8 @@
         "memberSsoOnlyLabel": "Csak SSO-bejelentkezés",
         "memberSsoOnlyHint": "A fiók nem kap jelszót. A tag csak SSO-val tud bejelentkezni.",
         "memberSsoOnlyEditHint": "Bekapcsolt kapcsolóval a fiók elveszíti a jelszavát, és csak SSO-val jut be. A kikapcsoláshoz új jelszót kell megadni.",
+        "memberHomeAssistantUserIdLabel": "Home Assistant felhasználói azonosító",
+        "memberHomeAssistantUserIdHint": "Ezt a fiókot egy Home Assistant-felhasználóhoz köti, így a Home Assistant-bejelentkezés megtalálja. Az azonosító a Home Assistantban a Beállítások > Személyek > Felhasználók alatt látható (haladó mód). Hagyd üresen a kötés megszüntetéséhez.",
         "healthPreventionNotifyCaregiversLabel": "Gondozók értesítése",
         "healthPreventionNotifyCaregiversHint": "A gondozó már az alkalmazás megnyitásakor látja, mi esedékes. Ez a beállítás emellett push-értesítést is küld neki a nevével - alapértelmezetten kikapcsolva, mert a gondozási jogosultság önmagában nem jelent értesítést.",
         "healthPreventionNotifyCaregiversSaved": "Az értesítési beállítás mentve.",

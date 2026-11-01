@@ -3285,6 +3285,8 @@
         "memberSsoOnlyLabel": "僅透過 SSO 登入",
         "memberSsoOnlyHint": "該帳戶不會設定密碼，成員只能透過 SSO 登入。",
         "memberSsoOnlyEditHint": "開關開啟時，帳戶將失去密碼，只能透過 SSO 進入。關閉時必須設定新密碼。",
+        "memberHomeAssistantUserIdLabel": "Home Assistant 使用者 ID",
+        "memberHomeAssistantUserIdHint": "將此帳號綁定到一位 Home Assistant 使用者，讓透過 Home Assistant 登入時能找到它。ID 可在 Home Assistant 的 設定 > 人員 > 使用者（進階模式）中找到。留空即可解除綁定。",
         "healthPreventionNotifyCaregiversLabel": "通知我的照護者",
         "healthPreventionNotifyCaregiversHint": "照護者開啟應用程式後已經可以看到到期項目。開啟此設定還會向其發送包含您姓名的推播通知 - 預設關閉，因為僅有照護權限並不代表會收到通知。",
         "healthPreventionNotifyCaregiversSaved": "通知設定已儲存。",

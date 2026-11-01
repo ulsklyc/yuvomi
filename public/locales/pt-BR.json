@@ -3280,6 +3280,8 @@
         "memberSsoOnlyLabel": "Somente login com SSO",
         "memberSsoOnlyHint": "A conta não recebe senha. O membro só pode fazer login com SSO.",
         "memberSsoOnlyEditHint": "Com o interruptor ligado, a conta perde a sua senha e só entra através de SSO. Para desligá-lo é preciso definir uma nova senha.",
+        "memberHomeAssistantUserIdLabel": "ID de usuário do Home Assistant",
+        "memberHomeAssistantUserIdHint": "Vincula esta conta a um usuário do Home Assistant, para que o login com o Home Assistant a encontre. O ID fica no Home Assistant em Configurações > Pessoas > Usuários (modo avançado). Deixe vazio para remover o vínculo.",
         "healthPreventionNotifyCaregiversLabel": "Avisar meus cuidadores",
         "healthPreventionNotifyCaregiversHint": "Quem cuida de você já vê o que está pendente ao abrir o app. Esta opção também envia uma notificação push com seu nome - desativada por padrão, já que a permissão de cuidado sozinha não implica notificação.",
         "healthPreventionNotifyCaregiversSaved": "Configuração de notificação salva.",

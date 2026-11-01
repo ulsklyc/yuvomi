@@ -206,7 +206,11 @@ export async function revokeHomeAssistantToken(config, refreshToken) {
  * @param {URLSearchParams} query  Query der Callback-Anfrage
  * @param {{state: string, codeVerifier: string}} stored  Session-State des Laufs
  * @param {{warn: Function}} [log]
- * @returns {Promise<{sub: string, iss: string, name: string, is_admin: boolean}>}
+ * Die Admin-Rolle in Home Assistant wird bewusst NICHT weitergegeben: wer HA
+ * verwaltet, verwaltet nicht automatisch den Haushalt. Neue Konten starten wie
+ * bei jedem SSO-Anbieter als `member`.
+ *
+ * @returns {Promise<{sub: string, iss: string, name?: string, preferred_username?: string}>}
  */
 export async function completeHomeAssistantLogin(config, query, stored, log) {
   if (query.get('error')) {
@@ -227,11 +231,14 @@ export async function completeHomeAssistantLogin(config, query, stored, log) {
   const tokens = await exchangeHomeAssistantCode(config, { code, codeVerifier: stored.codeVerifier });
   try {
     const user = await fetchHomeAssistantUser(config, tokens.access_token);
+    const name = typeof user.name === 'string' && user.name.trim() ? user.name.trim() : undefined;
     return {
       sub: String(user.id),
       iss: config.url,
-      name: typeof user.name === 'string' ? user.name : undefined,
-      is_admin: !!(user.is_admin || user.is_owner),
+      name,
+      // HA kennt keinen Benutzernamen-Claim; ohne ihn hiesse ein neues Konto wie
+      // die 32-stellige HA-ID. Bereinigung und `-1`-Suffix macht findOrCreateOidcUser.
+      preferred_username: name,
     };
   } finally {
     // Abgewartet statt nebenher gestartet: der Aufruf ist kurz (lokal, mit

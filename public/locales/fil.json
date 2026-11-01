@@ -3299,6 +3299,8 @@
         "memberSsoOnlyLabel": "Pag-sign in sa SSO lamang",
         "memberSsoOnlyHint": "Walang password na makukuha ang account. Makakapag-sign in lang ang miyembro sa pamamagitan ng SSO.",
         "memberSsoOnlyEditHint": "Kapag naka-on ito, mawawala ang password ng account at sa SSO na lang ito papasok. Para i-off, kailangang magtakda ng bagong password.",
+        "memberHomeAssistantUserIdLabel": "User ID sa Home Assistant",
+        "memberHomeAssistantUserIdHint": "Ikinakabit ang account na ito sa isang Home Assistant user para mahanap ito ng pag-sign in gamit ang Home Assistant. Makikita ang ID sa Home Assistant sa Settings > People > Users (advanced mode). Iwanang blangko para alisin ang pagkakabit.",
         "healthPreventionNotifyCaregiversLabel": "Abisuhan ang mga tagapag-alaga",
         "healthPreventionNotifyCaregiversHint": "Nakikita na ng tagapag-alaga kung ano ang due sa pagbukas ng app. Ang pagbukas nito ay magpapadala rin sa kanila ng push notification na may pangalan mo - naka-off bilang default, dahil ang access ng pag-aalaga lang ay hindi awtomatikong nangangahulugan ng notification.",
         "healthPreventionNotifyCaregiversSaved": "Na-save ang setting ng notification.",

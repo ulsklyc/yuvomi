@@ -24,7 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with Home Assistant", and everything that applies to SSO applies here too: linking under
   Settings > Account, `OIDC_ALLOW_SIGNUP`, SSO-only accounts and `AUTH_ALLOW_PASSWORD_LOGIN`.
   Yuvomi only asks Home Assistant who signed in and revokes the token right away. A configured
-  OIDC provider still takes precedence.
+  OIDC provider still takes precedence. Home Assistant sends no email address, so an administrator
+  can bind a member to a Home Assistant user ID in the member dialog, also for an account without a
+  password. New accounts take the Home Assistant display name as username and always start as
+  members: a Home Assistant administrator is not automatically a household administrator.
 - **SSO works from an embedded Yuvomi.** Sign-in pages of SSO providers refuse to load inside a
   frame, so the SSO button did nothing when Yuvomi was embedded, for example in a Home Assistant
   dashboard. Inside a frame the button now opens the sign-in in a new window, and the embedded page

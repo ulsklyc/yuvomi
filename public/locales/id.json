@@ -3299,6 +3299,8 @@
         "memberSsoOnlyLabel": "Hanya masuk dengan SSO",
         "memberSsoOnlyHint": "Akun tidak mendapatkan kata sandi. Anggota hanya dapat masuk melalui SSO.",
         "memberSsoOnlyEditHint": "Jika sakelar aktif, akun kehilangan kata sandinya dan hanya masuk melalui SSO. Untuk mematikannya, kata sandi baru harus ditetapkan.",
+        "memberHomeAssistantUserIdLabel": "ID pengguna Home Assistant",
+        "memberHomeAssistantUserIdHint": "Menautkan akun ini ke pengguna Home Assistant agar masuk dengan Home Assistant dapat menemukannya. ID ada di Home Assistant pada Pengaturan > Orang > Pengguna (mode lanjutan). Kosongkan untuk menghapus tautan.",
         "healthPreventionNotifyCaregiversLabel": "Beri tahu pengasuh",
         "healthPreventionNotifyCaregiversHint": "Pengasuh sudah bisa melihat apa yang jatuh tempo saat membuka aplikasi. Mengaktifkan ini juga mengirim notifikasi push dengan nama Anda - nonaktif secara default, karena akses pengasuhan saja tidak berarti notifikasi.",
         "healthPreventionNotifyCaregiversSaved": "Pengaturan notifikasi disimpan.",

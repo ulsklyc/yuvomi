@@ -3281,6 +3281,8 @@
         "memberSsoOnlyLabel": "SSO sign-in only",
         "memberSsoOnlyHint": "The account gets no password. The member can only sign in through SSO.",
         "memberSsoOnlyEditHint": "With this on, the account loses its password and only gets in through SSO. Turning it off requires setting a new password.",
+        "memberHomeAssistantUserIdLabel": "Home Assistant user ID",
+        "memberHomeAssistantUserIdHint": "Binds this account to a Home Assistant user, so signing in with Home Assistant finds it. You can find the ID in Home Assistant under Settings > People > Users (advanced mode). Leave empty to remove the binding.",
         "healthPreventionNotifyCaregiversLabel": "Notify caregivers when something is due",
         "healthPreventionNotifyCaregiversHint": "A caregiver can already see what's due when they open the app. Turning this on also sends them a push notification naming you - off by default, since caregiving access alone does not mean a notification.",
         "healthPreventionNotifyCaregiversSaved": "Notification setting saved.",

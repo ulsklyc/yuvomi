@@ -3513,6 +3513,8 @@
         "memberSsoOnlyLabel": "Tylko logowanie przez SSO",
         "memberSsoOnlyHint": "Konto nie otrzyma hasła. Członek może zalogować się wyłącznie przez SSO.",
         "memberSsoOnlyEditHint": "Przy włączonym przełączniku konto traci hasło i wchodzi już tylko przez SSO. Aby go wyłączyć, trzeba ustawić nowe hasło.",
+        "memberHomeAssistantUserIdLabel": "ID użytkownika Home Assistant",
+        "memberHomeAssistantUserIdHint": "Wiąże to konto z użytkownikiem Home Assistant, aby logowanie przez Home Assistant je odnalazło. ID znajdziesz w Home Assistant w Ustawienia > Osoby > Użytkownicy (tryb zaawansowany). Pozostaw puste, aby usunąć powiązanie.",
         "healthPreventionNotifyCaregiversLabel": "Powiadamiaj opiekunów",
         "healthPreventionNotifyCaregiversHint": "Opiekun widzi już, co jest wymagane, otwierając aplikację. To ustawienie dodatkowo wysyła mu powiadomienie push z Twoim imieniem - domyślnie wyłączone, ponieważ samo uprawnienie opieki nie oznacza powiadomienia.",
         "healthPreventionNotifyCaregiversSaved": "Zapisano ustawienie powiadomień.",

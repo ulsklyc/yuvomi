@@ -3299,6 +3299,8 @@
         "memberSsoOnlyLabel": "فقط ورود با SSO",
         "memberSsoOnlyHint": "این حساب رمز عبوری دریافت نمی‌کند. عضو تنها می‌تواند از طریق SSO وارد شود.",
         "memberSsoOnlyEditHint": "با روشن بودن این کلید، حساب رمز عبور خود را از دست می‌دهد و فقط از طریق SSO وارد می‌شود. برای خاموش کردن باید رمز عبور جدیدی تعیین شود.",
+        "memberHomeAssistantUserIdLabel": "شناسه کاربر Home Assistant",
+        "memberHomeAssistantUserIdHint": "این حساب را به یک کاربر Home Assistant پیوند می‌دهد تا ورود با Home Assistant آن را پیدا کند. شناسه را در Home Assistant در تنظیمات > افراد > کاربران (حالت پیشرفته) می‌یابید. برای حذف پیوند خالی بگذارید.",
         "healthPreventionNotifyCaregiversLabel": "اطلاع‌رسانی به مراقبان",
         "healthPreventionNotifyCaregiversHint": "مراقب شما هنگام باز کردن برنامه از قبل می‌بیند چه چیزی سررسیده است. این گزینه علاوه بر آن یک اعلان فوری با نام شما ارسال می‌کند - به‌طور پیش‌فرض خاموش است، زیرا مجوز مراقبت به‌تنهایی به معنای اعلان نیست.",
         "healthPreventionNotifyCaregiversSaved": "تنظیم اعلان ذخیره شد.",

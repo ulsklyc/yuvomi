@@ -3281,6 +3281,8 @@
         "memberSsoOnlyLabel": "仅通过 SSO 登录",
         "memberSsoOnlyHint": "该账户不会设置密码，成员只能通过 SSO 登录。",
         "memberSsoOnlyEditHint": "开关打开时，账户将失去密码，只能通过 SSO 进入。关闭时必须设置新密码。",
+        "memberHomeAssistantUserIdLabel": "Home Assistant 用户 ID",
+        "memberHomeAssistantUserIdHint": "将此帐户绑定到一个 Home Assistant 用户，使通过 Home Assistant 登录时能找到它。ID 可在 Home Assistant 的 设置 > 人员 > 用户（高级模式）中找到。留空即可解除绑定。",
         "healthPreventionNotifyCaregiversLabel": "通知我的照护者",
         "healthPreventionNotifyCaregiversHint": "照护者打开应用后已经可以看到到期项目。开启此设置还会向其发送包含您姓名的推送通知 - 默认关闭,因为仅有照护权限并不意味着会收到通知。",
         "healthPreventionNotifyCaregiversSaved": "通知设置已保存。",

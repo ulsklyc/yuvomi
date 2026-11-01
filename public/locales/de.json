@@ -3299,6 +3299,8 @@
         "memberSsoOnlyLabel": "Nur SSO-Anmeldung",
         "memberSsoOnlyHint": "Das Konto bekommt kein Passwort. Anmelden kann sich das Mitglied nur über SSO.",
         "memberSsoOnlyEditHint": "Ist der Schalter an, verliert das Konto sein Passwort und kommt nur noch über SSO herein. Zum Ausschalten muss ein neues Passwort gesetzt werden.",
+        "memberHomeAssistantUserIdLabel": "Home-Assistant-Benutzer-ID",
+        "memberHomeAssistantUserIdHint": "Bindet dieses Konto an einen Home-Assistant-Benutzer, damit die Anmeldung mit Home Assistant es findet. Die ID steht in Home Assistant unter Einstellungen > Personen > Benutzer (erweiterter Modus). Leer lassen, um die Bindung zu entfernen.",
         "healthPreventionNotifyCaregiversLabel": "Betreuende Personen benachrichtigen",
         "healthPreventionNotifyCaregiversHint": "Eine betreuende Person sieht bereits beim Öffnen der App, was fällig ist. Diese Einstellung schickt ihr zusätzlich eine Push-Benachrichtigung mit deinem Namen - standardmäßig aus, denn die Betreuungs-Zusage allein bedeutet noch keine Benachrichtigung.",
         "healthPreventionNotifyCaregiversSaved": "Benachrichtigungs-Einstellung gespeichert.",

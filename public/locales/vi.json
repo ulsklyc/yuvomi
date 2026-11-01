@@ -3281,6 +3281,8 @@
         "memberSsoOnlyLabel": "Chỉ đăng nhập bằng SSO",
         "memberSsoOnlyHint": "Tài khoản không nhận mật khẩu. Thành viên chỉ có thể đăng nhập qua SSO.",
         "memberSsoOnlyEditHint": "Khi bật, tài khoản mất mật khẩu và chỉ vào được qua SSO. Để tắt, cần đặt một mật khẩu mới.",
+        "memberHomeAssistantUserIdLabel": "ID người dùng Home Assistant",
+        "memberHomeAssistantUserIdHint": "Gắn tài khoản này với một người dùng Home Assistant để đăng nhập bằng Home Assistant tìm thấy nó. ID nằm trong Home Assistant tại Cài đặt > Mọi người > Người dùng (chế độ nâng cao). Để trống để gỡ liên kết.",
         "healthPreventionNotifyCaregiversLabel": "Thông báo cho người chăm sóc",
         "healthPreventionNotifyCaregiversHint": "Người chăm sóc đã có thể thấy mục nào đến hạn khi mở ứng dụng. Bật tùy chọn này sẽ gửi thêm thông báo đẩy có tên của bạn - mặc định tắt, vì quyền chăm sóc không tự động nghĩa là có thông báo.",
         "healthPreventionNotifyCaregiversSaved": "Đã lưu cài đặt thông báo.",
