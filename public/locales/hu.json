@@ -450,7 +450,19 @@
         "todayTimelineNext": "következik",
         "todayAlsoTitle": "Ma még",
         "todayNothingPlanned": "Még nincs semmi tervezve",
-        "todayNothingPlannedSub": "A mai időpontok, feladatok és étkezések itt jelennek meg."
+        "todayNothingPlannedSub": "A mai időpontok, feladatok és étkezések itt jelennek meg.",
+        "availState_available": "Elérhető",
+        "availState_busy": "Elfoglalt",
+        "availState_do_not_disturb": "Ne zavarj",
+        "availState_away": "Távol",
+        "availTitle": "Állapot beállítása",
+        "availNoteLabel": "Megjegyzés (opcionális)",
+        "availClear": "Állapot törlése",
+        "avail1h": "1 óra",
+        "avail4h": "4 óra",
+        "availEndOfDay": "Éjfélig",
+        "availTomorrow": "Holnap reggel 8:00-ig",
+        "avail1w": "1 hét"
     },
     "tasks": {
         "resetOrder": "Automatikus rendezés",

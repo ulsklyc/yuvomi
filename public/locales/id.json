@@ -468,7 +468,19 @@
         "todayTimelineNext": "berikutnya",
         "todayAlsoTitle": "Juga hari ini",
         "todayNothingPlanned": "Belum ada rencana",
-        "todayNothingPlannedSub": "Janji, tugas, dan makanan hari ini akan muncul di sini."
+        "todayNothingPlannedSub": "Janji, tugas, dan makanan hari ini akan muncul di sini.",
+        "availState_available": "Tersedia",
+        "availState_busy": "Sibuk",
+        "availState_do_not_disturb": "Jangan Ganggu",
+        "availState_away": "Tidak Ada",
+        "availTitle": "Atur status",
+        "availNoteLabel": "Catatan (opsional)",
+        "availClear": "Hapus status",
+        "avail1h": "1 jam",
+        "avail4h": "4 jam",
+        "availEndOfDay": "Sampai tengah malam",
+        "availTomorrow": "Sampai besok 8:00",
+        "avail1w": "1 minggu"
     },
     "tasks": {
         "resetOrder": "Urutkan otomatis",

@@ -542,7 +542,19 @@
         "todayTimelineNext": "далі",
         "todayAlsoTitle": "Також сьогодні",
         "todayNothingPlanned": "Поки нічого не заплановано",
-        "todayNothingPlannedSub": "Тут з'являться сьогоднішні зустрічі, завдання та страви."
+        "todayNothingPlannedSub": "Тут з'являться сьогоднішні зустрічі, завдання та страви.",
+        "availState_available": "Доступний",
+        "availState_busy": "Зайнятий",
+        "availState_do_not_disturb": "Не турбувати",
+        "availState_away": "Відсутній",
+        "availTitle": "Встановити статус",
+        "availNoteLabel": "Нотатка (необов'язково)",
+        "availClear": "Очистити статус",
+        "avail1h": "1 година",
+        "avail4h": "4 години",
+        "availEndOfDay": "До опівночі",
+        "availTomorrow": "До завтра 8:00",
+        "avail1w": "1 тиждень"
     },
     "tasks": {
         "resetOrder": "Сортувати автоматично",

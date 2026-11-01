@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Family members can share their availability status.** Each member can set a status
+  (available, busy, do not disturb, or away) with an optional short note and an expiry time.
+  The status appears on the Family widget as a coloured dot on the avatar and as the first line of
+  the member's status text. The status expires automatically — no manual clearing needed.
+  (`PUT /api/v1/availability`, `DELETE /api/v1/availability`)
 - **A document can name who it is about.** The document dialog has a new "About" field for one
   household member, and the Documents page can filter by person. The person also gets the expiry
   reminder, along with whoever filed the document, and once if that is the same person. This never

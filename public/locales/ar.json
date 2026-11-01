@@ -588,7 +588,19 @@
         "todayTimelineNext": "التالي",
         "todayAlsoTitle": "أيضًا اليوم",
         "todayNothingPlanned": "لم يُخطَّط لشيء بعد",
-        "todayNothingPlannedSub": "ستظهر هنا مواعيد اليوم ومهامه ووجباته."
+        "todayNothingPlannedSub": "ستظهر هنا مواعيد اليوم ومهامه ووجباته.",
+        "availState_available": "متاح",
+        "availState_busy": "مشغول",
+        "availState_do_not_disturb": "ممنوع الإزعاج",
+        "availState_away": "غائب",
+        "availTitle": "تعيين الحالة",
+        "availNoteLabel": "ملاحظة (اختياري)",
+        "availClear": "مسح الحالة",
+        "avail1h": "ساعة واحدة",
+        "avail4h": "4 ساعات",
+        "availEndOfDay": "حتى منتصف الليل",
+        "availTomorrow": "حتى غد الساعة 8:00",
+        "avail1w": "أسبوع واحد"
     },
     "tasks": {
         "resetOrder": "الترتيب التلقائي",

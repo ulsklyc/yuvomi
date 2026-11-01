@@ -169,6 +169,42 @@ never reached the screen. `/api/v1/changelog` therefore carries `entries` (`{ le
 beside the unchanged `items`, additively: a promised surface does not change shape because the UI
 wants a nicer one. Long gaps are capped at twelve lines with the remainder counted out loud.
 
+### User Availability Status (migration v274, #1591)
+
+Each household member can share their current availability with the rest of the household. The status
+is always time-bounded: it carries an `expires_at` timestamp (UTC, max 30 days out) and disappears
+automatically when that time passes — there is no manual "clear" required, though `DELETE /api/v1/availability`
+removes it early.
+
+`user_availability` — one row per user (UNIQUE on `user_id`), UPSERT on PUT.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| user_id | INTEGER | NOT NULL, REFERENCES users(id) ON DELETE CASCADE, UNIQUE |
+| state | TEXT | NOT NULL, CHECK IN ('available', 'busy', 'do_not_disturb', 'away') |
+| note | TEXT | Nullable, max 200 chars (validated in route, not DB). **Never sent in the household-audience response** — the wall may be visible to guests; notes stay personal. |
+| expires_at | TEXT | NOT NULL, ISO-8601 UTC without milliseconds (`YYYY-MM-DDTHH:MM:SSZ`). Must be in the future (validated at write time) and ≤ 30 days away. |
+| set_at | TEXT | NOT NULL, DEFAULT strftime('%Y-%m-%dT%H:%M:%SZ', 'now') |
+| created_at | TEXT | Nullable (migration v275); backfilled from `set_at` |
+
+The `expires_at > strftime('now')` filter is applied in the SELECT, so expired rows stay in the table
+until the next write by that user (UPSERT replaces them) or until `DELETE` is called. No scheduled
+cleanup is needed.
+
+**Routes** (`server/routes/availability.js`):
+- `GET /api/v1/availability` — returns all non-expired statuses for household members (joins `users`
+  through `householdMemberSql()`). Any authenticated member may call this.
+- `PUT /api/v1/availability` — body `{ state, note?, expires_at }`. Sets or replaces the caller's
+  own status. Read-only family-module members may still call this (availability is not a family-module
+  write).
+- `DELETE /api/v1/availability` — removes the caller's own status. Always 200, even if no row existed.
+
+**Dashboard integration** (`familyStatuses` in `GET /`): `getAllStatuses()` is called unconditionally
+and the result attached to `result.familyStatuses`. In the household-audience response the `note` field
+is stripped — the wall is visible to everyone including guests. `familyStatuses` is in the
+`HOUSEHOLD_AUDIENCE_SHOWS` allowlist so the key passes through `householdAudienceAnswer`.
+
 ### Two-Factor Authentication (migration v159, #672)
 
 Optional TOTP as a second factor, opt-in per user. Two tables instead of columns on `users`, because

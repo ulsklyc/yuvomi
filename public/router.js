@@ -1252,6 +1252,7 @@ function sidebarAccountEl({ isDisplayShell = false } = {}) {
     return btn;
   };
   menu.append(
+    item('set-status', 'circle-dot', 'dashboard.availTitle', 'nav-account__set-status'),
     item('help', 'circle-help', 'nav.help', 'nav-account__help'),
     // `nav-item--changelog` traegt den Update-Hinweis im Namen (applyUpdateBadge).
     item('changelog', 'history', 'nav.changelog', 'nav-item--changelog'),
@@ -1266,9 +1267,18 @@ function sidebarAccountEl({ isDisplayShell = false } = {}) {
     sep.setAttribute('role', 'separator');
     menu.append(sep, item('logout', 'log-out', 'settings.logout', 'nav-account__logout'));
   }
-  menu.addEventListener('click', (event) => {
+  menu.addEventListener('click', async (event) => {
     const action = event.target.closest?.('.popover-menu__item')?.dataset.action;
-    if (action === 'help') showHelpModal();
+    if (action === 'set-status') {
+      // Aktuellen Status lesen, dann Dialog oeffnen (#1591).
+      try {
+        const res = await api.get('/availability');
+        const selfId = routerState.currentUser?.id;
+        const self = Array.isArray(res?.data) ? res.data.find((r) => r.user_id === selfId) : null;
+        const { openAvailabilityModal } = await import('/pages/dashboard.js');
+        openAvailabilityModal(selfId, self ?? null, null);
+      } catch { /* import oder API-Fehler: Dialog ohne aktuellen Status */ }
+    } else if (action === 'help') showHelpModal();
     else if (action === 'changelog') showChangelogModal();
     else if (action === 'logout') confirmAndLogout();
   });

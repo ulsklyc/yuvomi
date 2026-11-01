@@ -25,6 +25,7 @@ import { documentViewer } from '../services/document-links.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql } from '../services/household-members.js';
 import { FastingError, getFastingDashboardState } from '../services/fasting.js';
 import { openBalancesForUser } from '../services/split-expenses.js';
+import { getAllStatuses } from './availability.js';
 import { NUTRIENT_KEYS, nutritionSummaryFor } from '../services/health-nutrition.js';
 import { emptyPantryExpiring, pantryExpiringSlice } from '../services/pantry-expiring.js';
 import { finishedVisitsInMonth, latestVisit } from '../services/housekeeping-month.js';
@@ -1448,9 +1449,21 @@ router.get('/', (req, res) => {
     result.tasksDoneToday = 0;
   }
 
+  // Verfuegbarkeitsstati aller Haushaltsmitglieder (#1591).
+  try {
+    result.familyStatuses = getAllStatuses();
+  } catch (err) {
+    log.error('familyStatuses error:', err.message);
+    result.familyStatuses = [];
+  }
+
   // DIE HAUSHALTSFASSUNG (#1817): von der leeren Fassung aus, nur was die Wand
   // zeichnet. Hier, hinter jeder Abfrage - ein Block, den jemand oben ergaenzt,
   // erreicht die Wand erst ueber die Allowlist.
+  // Verfuegbarkeitsnotizen bleiben privat: die Wand zeigt nur den State (#1591).
+  if (householdAudience && Array.isArray(result.familyStatuses)) {
+    result.familyStatuses = result.familyStatuses.map(({ note: _note, ...r }) => r);
+  }
   res.json(householdAudience ? householdAudienceAnswer(result, emptyAnswer({ month: currentMonth })) : result);
   } catch (err) {
     log.error('Critical error:', err.message);

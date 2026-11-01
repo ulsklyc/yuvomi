@@ -450,7 +450,19 @@
         "todayTimelineNext": "lo siguiente",
         "todayAlsoTitle": "También hoy",
         "todayNothingPlanned": "Nada planificado todavía",
-        "todayNothingPlannedSub": "Las citas, tareas y comidas de hoy aparecerán aquí."
+        "todayNothingPlannedSub": "Las citas, tareas y comidas de hoy aparecerán aquí.",
+        "availState_available": "Disponible",
+        "availState_busy": "Ocupado",
+        "availState_do_not_disturb": "No molestar",
+        "availState_away": "Ausente",
+        "availTitle": "Establecer estado",
+        "availNoteLabel": "Nota (opcional)",
+        "availClear": "Borrar estado",
+        "avail1h": "1 hora",
+        "avail4h": "4 horas",
+        "availEndOfDay": "Hasta medianoche",
+        "availTomorrow": "Hasta mañana 8:00",
+        "avail1w": "1 semana"
     },
     "tasks": {
         "resetOrder": "Ordenar automáticamente",

@@ -468,7 +468,19 @@
         "todayTimelineNext": "بعدی",
         "todayAlsoTitle": "همچنین امروز",
         "todayNothingPlanned": "هنوز چیزی برنامه‌ریزی نشده",
-        "todayNothingPlannedSub": "قرارها، کارها و وعده‌های غذایی امروز اینجا نمایش داده می‌شوند."
+        "todayNothingPlannedSub": "قرارها، کارها و وعده‌های غذایی امروز اینجا نمایش داده می‌شوند.",
+        "availState_available": "در دسترس",
+        "availState_busy": "مشغول",
+        "availState_do_not_disturb": "مزاحم نشوید",
+        "availState_away": "غایب",
+        "availTitle": "تنظیم وضعیت",
+        "availNoteLabel": "یادداشت (اختیاری)",
+        "availClear": "پاک کردن وضعیت",
+        "avail1h": "۱ ساعت",
+        "avail4h": "۴ ساعت",
+        "availEndOfDay": "تا نیمه شب",
+        "availTomorrow": "تا فردا ساعت ۸:۰۰",
+        "avail1w": "۱ هفته"
     },
     "tasks": {
         "resetOrder": "مرتب‌سازی خودکار",

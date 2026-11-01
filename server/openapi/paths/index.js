@@ -35,6 +35,7 @@ import { quickLinksPaths } from './quicklinks.js';
 import { screensaverPaths } from './screensaver.js';
 import { recipeProvidersPaths } from './recipeproviders.js';
 import { permissionsPaths } from './permissions.js';
+import { availabilityPaths } from './availability.js';
 
 export function buildPaths() {
   return {
@@ -42,6 +43,7 @@ export function buildPaths() {
     ...authPaths(),
     ...emailPaths(),
     ...familyPaths(),
+    ...availabilityPaths(),
     ...displaysPaths(),
     ...backupPaths(),
     ...dashboardPaths(),

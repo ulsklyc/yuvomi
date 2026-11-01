@@ -450,7 +450,19 @@
         "todayTimelineNext": "tiếp theo",
         "todayAlsoTitle": "Hôm nay còn có",
         "todayNothingPlanned": "Chưa có kế hoạch nào",
-        "todayNothingPlannedSub": "Lịch hẹn, công việc và bữa ăn hôm nay sẽ hiển thị ở đây."
+        "todayNothingPlannedSub": "Lịch hẹn, công việc và bữa ăn hôm nay sẽ hiển thị ở đây.",
+        "availState_available": "Sẵn sàng",
+        "availState_busy": "Bận",
+        "availState_do_not_disturb": "Không làm phiền",
+        "availState_away": "Vắng mặt",
+        "availTitle": "Đặt trạng thái",
+        "availNoteLabel": "Ghi chú (tùy chọn)",
+        "availClear": "Xóa trạng thái",
+        "avail1h": "1 giờ",
+        "avail4h": "4 giờ",
+        "availEndOfDay": "Đến nửa đêm",
+        "availTomorrow": "Đến 8:00 sáng mai",
+        "avail1w": "1 tuần"
     },
     "tasks": {
         "resetOrder": "Sắp xếp tự động",

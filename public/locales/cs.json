@@ -498,7 +498,19 @@
         "todayTimelineNext": "jako další",
         "todayAlsoTitle": "Dnes také",
         "todayNothingPlanned": "Zatím nic naplánováno",
-        "todayNothingPlannedSub": "Dnešní události, úkoly a jídla se objeví tady."
+        "todayNothingPlannedSub": "Dnešní události, úkoly a jídla se objeví tady.",
+        "availState_available": "Dostupný",
+        "availState_busy": "Zaneprázdněný",
+        "availState_do_not_disturb": "Nerušit",
+        "availState_away": "Pryč",
+        "availTitle": "Nastavit stav",
+        "availNoteLabel": "Poznámka (nepovinná)",
+        "availClear": "Zrušit stav",
+        "avail1h": "1 hodina",
+        "avail4h": "4 hodiny",
+        "availEndOfDay": "Do půlnoci",
+        "availTomorrow": "Do zítra 8:00",
+        "avail1w": "1 týden"
     },
     "tasks": {
         "resetOrder": "Řadit automaticky",

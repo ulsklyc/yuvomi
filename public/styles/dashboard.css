@@ -5570,6 +5570,24 @@ button.today-cockpit__more--link {
   color: var(--color-text-secondary);
 }
 
+/* Verfuegbarkeitspunkt (#1591): ein kleiner Kreis unten rechts am Gesicht, der
+ * den Status-State als Farbe traegt. Vier Werte, vier semantische Toene:
+ * available = Gruen, busy = Amber, do_not_disturb = Rot, away = Grau. */
+.family-widget-avatar[data-avail]::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--color-surface);
+}
+.family-widget-avatar[data-avail="available"]::after    { background: var(--color-success); }
+.family-widget-avatar[data-avail="busy"]::after         { background: var(--color-warning); }
+.family-widget-avatar[data-avail="do_not_disturb"]::after { background: var(--color-danger); }
+.family-widget-avatar[data-avail="away"]::after         { background: var(--color-text-tertiary); }
+
 .family-widget-avatar--group svg {
   width: var(--icon-lg);
   height: var(--icon-lg);

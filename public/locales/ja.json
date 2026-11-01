@@ -450,7 +450,19 @@
         "todayTimelineNext": "次の予定",
         "todayAlsoTitle": "今日のほかの予定",
         "todayNothingPlanned": "まだ予定はありません",
-        "todayNothingPlannedSub": "今日の予定、タスク、食事がここに表示されます。"
+        "todayNothingPlannedSub": "今日の予定、タスク、食事がここに表示されます。",
+        "availState_available": "在席",
+        "availState_busy": "取込中",
+        "availState_do_not_disturb": "通知オフ",
+        "availState_away": "離席",
+        "availTitle": "ステータス設定",
+        "availNoteLabel": "メモ（任意）",
+        "availClear": "ステータス削除",
+        "avail1h": "1時間",
+        "avail4h": "4時間",
+        "availEndOfDay": "深夜まで",
+        "availTomorrow": "明日8時まで",
+        "avail1w": "1週間"
     },
     "tasks": {
         "resetOrder": "自動で並べ替え",

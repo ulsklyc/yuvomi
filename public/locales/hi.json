@@ -450,7 +450,19 @@
         "todayTimelineNext": "अगला",
         "todayAlsoTitle": "आज और भी",
         "todayNothingPlanned": "अभी कुछ भी तय नहीं",
-        "todayNothingPlannedSub": "आज के अपॉइंटमेंट, कार्य और भोजन यहाँ दिखाई देंगे।"
+        "todayNothingPlannedSub": "आज के अपॉइंटमेंट, कार्य और भोजन यहाँ दिखाई देंगे।",
+        "availState_available": "उपलब्ध",
+        "availState_busy": "व्यस्त",
+        "availState_do_not_disturb": "परेशान न करें",
+        "availState_away": "अनुपस्थित",
+        "availTitle": "स्थिति सेट करें",
+        "availNoteLabel": "नोट (वैकल्पिक)",
+        "availClear": "स्थिति साफ़ करें",
+        "avail1h": "1 घंटा",
+        "avail4h": "4 घंटे",
+        "availEndOfDay": "मध्यरात्रि तक",
+        "availTomorrow": "कल सुबह 8:00 तक",
+        "avail1w": "1 सप्ताह"
     },
     "tasks": {
         "resetOrder": "अपने-आप क्रमबद्ध करें",

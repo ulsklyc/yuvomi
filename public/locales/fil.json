@@ -468,7 +468,19 @@
         "todayTimelineNext": "susunod",
         "todayAlsoTitle": "Ngayong araw din",
         "todayNothingPlanned": "Wala pang nakaplano",
-        "todayNothingPlannedSub": "Lalabas dito ang mga appointment, gawain at pagkain ngayong araw."
+        "todayNothingPlannedSub": "Lalabas dito ang mga appointment, gawain at pagkain ngayong araw.",
+        "availState_available": "Available",
+        "availState_busy": "Abala",
+        "availState_do_not_disturb": "Huwag Abalahin",
+        "availState_away": "Wala",
+        "availTitle": "I-set ang status",
+        "availNoteLabel": "Tala (opsyonal)",
+        "availClear": "Alisin ang status",
+        "avail1h": "1 oras",
+        "avail4h": "4 oras",
+        "availEndOfDay": "Hanggang hatinggabi",
+        "availTomorrow": "Hanggang bukas 8:00",
+        "avail1w": "1 linggo"
     },
     "tasks": {
         "resetOrder": "Awtomatikong ayusin",

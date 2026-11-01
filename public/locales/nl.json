@@ -450,7 +450,19 @@
         "todayTimelineNext": "hierna",
         "todayAlsoTitle": "Verder vandaag",
         "todayNothingPlanned": "Nog niets gepland",
-        "todayNothingPlannedSub": "Afspraken, taken en maaltijden van vandaag verschijnen hier."
+        "todayNothingPlannedSub": "Afspraken, taken en maaltijden van vandaag verschijnen hier.",
+        "availState_available": "Beschikbaar",
+        "availState_busy": "Bezet",
+        "availState_do_not_disturb": "Niet storen",
+        "availState_away": "Afwezig",
+        "availTitle": "Status instellen",
+        "availNoteLabel": "Notitie (optioneel)",
+        "availClear": "Status wissen",
+        "avail1h": "1 uur",
+        "avail4h": "4 uur",
+        "availEndOfDay": "Tot middernacht",
+        "availTomorrow": "Tot morgen 8:00",
+        "avail1w": "1 week"
     },
     "tasks": {
         "resetOrder": "Automatisch sorteren",

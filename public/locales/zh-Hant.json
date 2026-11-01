@@ -450,7 +450,19 @@
         "todayTimelineNext": "下一個",
         "todayAlsoTitle": "今天還有",
         "todayNothingPlanned": "尚無任何安排",
-        "todayNothingPlannedSub": "今天的約會、任務和餐點會顯示在這裡。"
+        "todayNothingPlannedSub": "今天的約會、任務和餐點會顯示在這裡。",
+        "availState_available": "在線",
+        "availState_busy": "忙碌",
+        "availState_do_not_disturb": "請勿打擾",
+        "availState_away": "不在",
+        "availTitle": "設定狀態",
+        "availNoteLabel": "備註（選填）",
+        "availClear": "清除狀態",
+        "avail1h": "1小時",
+        "avail4h": "4小時",
+        "availEndOfDay": "到午夜",
+        "availTomorrow": "到明天8:00",
+        "avail1w": "1週"
     },
     "tasks": {
         "resetOrder": "自動排序",

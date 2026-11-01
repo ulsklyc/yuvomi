@@ -450,7 +450,19 @@
         "todayTimelineNext": "à suivre",
         "todayAlsoTitle": "Aussi aujourd’hui",
         "todayNothingPlanned": "Rien de prévu pour l'instant",
-        "todayNothingPlannedSub": "Les rendez-vous, tâches et repas du jour apparaîtront ici."
+        "todayNothingPlannedSub": "Les rendez-vous, tâches et repas du jour apparaîtront ici.",
+        "availState_available": "Disponible",
+        "availState_busy": "Occupé",
+        "availState_do_not_disturb": "Ne pas déranger",
+        "availState_away": "Absent",
+        "availTitle": "Définir un statut",
+        "availNoteLabel": "Note (optionnelle)",
+        "availClear": "Effacer le statut",
+        "avail1h": "1 heure",
+        "avail4h": "4 heures",
+        "availEndOfDay": "Jusqu'à minuit",
+        "availTomorrow": "Jusqu'à demain 8h",
+        "avail1w": "1 semaine"
     },
     "tasks": {
         "resetOrder": "Trier automatiquement",

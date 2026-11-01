@@ -450,7 +450,19 @@
         "todayTimelineNext": "sıradaki",
         "todayAlsoTitle": "Bugün ayrıca",
         "todayNothingPlanned": "Henüz bir şey planlanmadı",
-        "todayNothingPlannedSub": "Bugünün randevuları, görevleri ve öğünleri burada görünecek."
+        "todayNothingPlannedSub": "Bugünün randevuları, görevleri ve öğünleri burada görünecek.",
+        "availState_available": "Müsait",
+        "availState_busy": "Meşgul",
+        "availState_do_not_disturb": "Rahatsız Etme",
+        "availState_away": "Uzakta",
+        "availTitle": "Durum ayarla",
+        "availNoteLabel": "Not (isteğe bağlı)",
+        "availClear": "Durumu temizle",
+        "avail1h": "1 saat",
+        "avail4h": "4 saat",
+        "availEndOfDay": "Gece yarısına kadar",
+        "availTomorrow": "Yarın sabah 8:00",
+        "avail1w": "1 hafta"
     },
     "tasks": {
         "resetOrder": "Otomatik sırala",

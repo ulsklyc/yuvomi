@@ -450,7 +450,19 @@
         "todayTimelineNext": "下一个",
         "todayAlsoTitle": "今天还有",
         "todayNothingPlanned": "尚无任何安排",
-        "todayNothingPlannedSub": "今天的约会、任务和餐食会显示在这里。"
+        "todayNothingPlannedSub": "今天的约会、任务和餐食会显示在这里。",
+        "availState_available": "在线",
+        "availState_busy": "忙碌",
+        "availState_do_not_disturb": "请勿打扰",
+        "availState_away": "不在",
+        "availTitle": "设置状态",
+        "availNoteLabel": "备注（可选）",
+        "availClear": "清除状态",
+        "avail1h": "1小时",
+        "avail4h": "4小时",
+        "availEndOfDay": "到午夜",
+        "availTomorrow": "到明天8:00",
+        "avail1w": "1周"
     },
     "tasks": {
         "resetOrder": "自动排序",

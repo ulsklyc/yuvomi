@@ -450,7 +450,19 @@
         "todayTimelineNext": "härnäst",
         "todayAlsoTitle": "Även i dag",
         "todayNothingPlanned": "Inget planerat än",
-        "todayNothingPlannedSub": "Dagens möten, uppgifter och måltider visas här."
+        "todayNothingPlannedSub": "Dagens möten, uppgifter och måltider visas här.",
+        "availState_available": "Tillgänglig",
+        "availState_busy": "Upptagen",
+        "availState_do_not_disturb": "Stör ej",
+        "availState_away": "Frånvarande",
+        "availTitle": "Sätt status",
+        "availNoteLabel": "Anteckning (valfri)",
+        "availClear": "Rensa status",
+        "avail1h": "1 timme",
+        "avail4h": "4 timmar",
+        "availEndOfDay": "Till midnatt",
+        "availTomorrow": "Till imorgon 8:00",
+        "avail1w": "1 vecka"
     },
     "tasks": {
         "resetOrder": "Sortera automatiskt",

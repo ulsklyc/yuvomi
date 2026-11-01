@@ -542,7 +542,19 @@
         "todayTimelineNext": "далее",
         "todayAlsoTitle": "Также сегодня",
         "todayNothingPlanned": "Пока ничего не запланировано",
-        "todayNothingPlannedSub": "Здесь появятся встречи, задачи и блюда на сегодня."
+        "todayNothingPlannedSub": "Здесь появятся встречи, задачи и блюда на сегодня.",
+        "availState_available": "Доступен",
+        "availState_busy": "Занят",
+        "availState_do_not_disturb": "Не беспокоить",
+        "availState_away": "Отсутствую",
+        "availTitle": "Установить статус",
+        "availNoteLabel": "Заметка (необязательно)",
+        "availClear": "Очистить статус",
+        "avail1h": "1 час",
+        "avail4h": "4 часа",
+        "availEndOfDay": "До полуночи",
+        "availTomorrow": "До завтра 8:00",
+        "avail1w": "1 неделя"
     },
     "tasks": {
         "resetOrder": "Сортировать автоматически",

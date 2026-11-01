@@ -468,7 +468,19 @@
         "todayTimelineNext": "다음 일정",
         "todayAlsoTitle": "오늘의 다른 일",
         "todayNothingPlanned": "아직 계획된 일정이 없습니다",
-        "todayNothingPlannedSub": "오늘의 일정, 할 일, 식사가 여기에 표시됩니다."
+        "todayNothingPlannedSub": "오늘의 일정, 할 일, 식사가 여기에 표시됩니다.",
+        "availState_available": "연락 가능",
+        "availState_busy": "바쁨",
+        "availState_do_not_disturb": "방해 금지",
+        "availState_away": "자리 비움",
+        "availTitle": "상태 설정",
+        "availNoteLabel": "메모 (선택)",
+        "availClear": "상태 삭제",
+        "avail1h": "1시간",
+        "avail4h": "4시간",
+        "availEndOfDay": "자정까지",
+        "availTomorrow": "내일 오전 8시까지",
+        "avail1w": "1주일"
     },
     "tasks": {
         "resetOrder": "자동으로 정렬",

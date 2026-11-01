@@ -75,6 +75,7 @@ import screensaverRouter from './routes/screensaver.js';
 import remindersRouter from './routes/reminders.js';
 import searchRouter from './routes/search.js';
 import familyRouter from './routes/family.js';
+import availabilityRouter from './routes/availability.js';
 import personAvatarsRouter from './routes/people.js';
 import { isPersonAvatarRead, inlineAvatarUrls } from './services/person-avatar.js';
 // ZWEI IMPORTZEILEN FUER EINE DATEI, ABSICHTLICH. `test:openapi-coverage`
@@ -816,6 +817,7 @@ app.use('/api/v1/screensaver', screensaverRouter);
 app.use('/api/v1/reminders', remindersRouter);
 app.use('/api/v1/search', searchRouter);
 app.use('/api/v1/family', familyRouter);
+app.use('/api/v1/availability', availabilityRouter);
 app.use('/api/v1/people', personAvatarsRouter);
 // Die Personenliste fuer den Picker eines Tabletts (#1209) haengt VOR dem
 // Administrator-Router: der traegt `requireAdmin` auf dem ganzen Router, und ein
