@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   can bind a member to a Home Assistant user ID in the member dialog, also for an account without a
   password. New accounts take the Home Assistant display name as username and always start as
   members: a Home Assistant administrator is not automatically a household administrator.
+- **SSO no longer creates the first account.** Before setup, an SSO sign-in that would create an
+  account goes to the setup page instead. Before, an SSO member could become the first account,
+  which locked setup and left the household without an administrator.
 - **SSO works from an embedded Yuvomi.** Sign-in pages of SSO providers refuse to load inside a
   frame, so the SSO button did nothing when Yuvomi was embedded, for example in a Home Assistant
   dashboard. Inside a frame the button now opens the sign-in in a new window, and the embedded page

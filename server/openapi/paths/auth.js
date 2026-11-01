@@ -184,6 +184,7 @@ export function authPaths() {
           + 'Two or more matching accounts redirect to /login?error=oidc_email_ambiguous; a single matching member account that has a password redirects to /login?error=oidc_link_required, and that member links SSO while signed in (POST /api/v1/auth/oidc/link/start). '
           + 'Neither case creates or links an account, whatever OIDC_ALLOW_SIGNUP says. '
           + 'With OIDC_ALLOW_SIGNUP=false an identity that matches no existing account is redirected to /login?error=oidc_signup_disabled instead of being provisioned. '
+          + 'Before setup (no account exists yet) no account is provisioned either, and the callback redirects to /setup, so the first account stays the administrator created there. '
           + 'A link run started while signed in (POST /api/v1/auth/oidc/link/start) redirects to /settings/personal/account?oidc_linked=1, or on refusal to /settings/personal/account?oidc_link_error=<reason>: `user_gone` (the account no longer exists or can no longer sign in), `already_linked` (the account is linked to another identity), `sub_taken` (the identity is linked to another account).',
         responses: {
           302: { description: 'Redirect to app or login error page' },

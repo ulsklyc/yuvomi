@@ -1454,6 +1454,7 @@ function ssoLinkCandidates(database, address, { excludeUserId = null } = {}) {
  * @param {import('better-sqlite3-multiple-ciphers').Database} database
  * @param {{ sub: string, iss?: string, email?: string, email_verified?: boolean, name?: string, preferred_username?: string, username?: string }} claims
  * @returns {{ id: number, role: string, [key: string]: any }|{ refused: string, accountIds: number[] }|null}
+ *   `{ refused: 'setup_required' }`, solange es noch gar kein Konto gibt.
  *   `null`, wenn das Konto neu wäre und die automatische Kontoerstellung
  *   abgeschaltet ist; `{ refused }` mit dem Redirect-Grund, wenn die Adresse
  *   kein Konto eindeutig und sicher benennt.
@@ -1530,6 +1531,14 @@ export function findOrCreateOidcUser(database, claims) {
   //    verknuepftes oder von Hand angelegtes Konto ist eine Entscheidung, die
   //    jemand getroffen hat, und die soll der Schalter nicht zuruecknehmen.
   if (!isOidcSignupAllowed()) return null;
+
+  //    Vor der Einrichtung legt SSO KEIN Konto an: das erste Konto ist der
+  //    Administrator aus /setup, und sobald irgendein Konto existiert, ist
+  //    /setup gesperrt. Ein per SSO angelegtes Mitglied waere sonst das erste
+  //    Konto, und der Haushalt stuende ohne jeden Administrator da.
+  if (!database.prepare('SELECT 1 FROM users LIMIT 1').get()) {
+    return { refused: 'setup_required', accountIds: [] };
+  }
 
   // 4. Eindeutigen username ableiten (Kollision mit bestehenden Usernamen vermeiden).
   //    Reihenfolge: preferred_username (Standard-Claim) → username (non-standard,
@@ -2720,6 +2729,10 @@ router.get('/oidc/callback', refuseWhileRestoring, async (req, res) => {
     // Kein Konto angelegt, keins verknuepft; der Grund steht im Redirect, und
     // das Log sagt dem Admin, welche Konten er ansehen muss. Die Adresse selbst
     // steht nicht im Log, die Konto-IDs genuegen.
+    if (user.refused === 'setup_required') {
+      log.warn(`OIDC sign-in before setup: no account is created until the first administrator exists. sub=${claims.sub}`);
+      return res.redirect('/setup');
+    }
     if (user.refused) {
       const ids = user.accountIds.join(', ');
       if (user.refused === 'oidc_email_ambiguous') {
