@@ -163,6 +163,18 @@ deletions cannot be learned at all. Tracked as #1002.
   the Apple half: a HealthKit bridge has to run on Apple's platform and keep working across
   iOS releases, so living outside this repository moves that maintenance rather than
   removing it.
+- **A native app** - the web app stays the complete product, and it goes on a phone without a
+  store, an account or a build step. A Flutter rewrite to replace or sit beside it stays a "not
+  this way" (#255): a second implementation of every feature is a second project, on a
+  maintainer count of one. A native iOS client is the same shape as every other bridge. It
+  lives in its own repository, talks only to `/api/v1`, needs no Yuvomi cloud and no account
+  with anyone but the household's own server, and does what a browser cannot do on an iPhone:
+  widgets, Shortcuts, NFC, HealthKit. It covers what is useful on a phone and links to the
+  browser for the rest. What it does not remove is the store dependency #255 named, and that
+  cost is taken on knowingly: the review, the yearly fee and the release cycle sit with the
+  client and never with the server. Android has no gap of this kind today, because the web app
+  already installs and receives push there, so there is no native Android client on the table;
+  the API a client needs is kept free of platform-specific routes either way.
 - **Another finance app's cloud** - Wallet by BudgetBakers (#959) is the worked example.
   Its REST API takes a personal token per user, so a sidecar holding that token is a route
   that works today, and the Akahu plugin in #746 is the same shape. Both that API and
