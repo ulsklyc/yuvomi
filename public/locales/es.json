@@ -6777,5 +6777,29 @@
         "custom": "Color personalizado",
         "chooseCustom": "Elegir un color personalizado",
         "standard": "Color predeterminado"
+    },
+    "passkeys": {
+        "title": "Claves de acceso",
+        "hint": "Inicia sesión con tu huella, rostro o PIN del dispositivo. Conserva la contraseña o el SSO como alternativa.",
+        "needsHttps": "Las claves de acceso requieren una dirección HTTPS estable en BASE_URL.",
+        "unsupported": "Este navegador o conexión no admite claves de acceso. Usa un navegador compatible mediante HTTPS.",
+        "policy": "El inicio de sesión directo está desactivado para este hogar. Usa el SSO.",
+        "used": "Último uso: {{date}}",
+        "unused": "Todavía no se ha usado",
+        "removeNamed": "Eliminar la clave {{name}}",
+        "remove": "Eliminar clave de acceso",
+        "empty": "Aún no hay claves de acceso.",
+        "name": "Nombre de la clave (por ejemplo, mi teléfono)",
+        "add": "Añadir clave de acceso",
+        "waiting": "Sigue las instrucciones de tu dispositivo.",
+        "added": "Clave de acceso añadida.",
+        "cancelled": "La solicitud se canceló o caducó. Puedes volver a intentarlo.",
+        "alreadyRegistered": "Esta clave ya está registrada. Elige otro autenticador.",
+        "reauthenticate": "Cierra sesión y vuelve a entrar. Después modifica las claves en un plazo de cinco minutos.",
+        "lastMethod": "Conserva otro método de acceso antes de eliminar la última clave.",
+        "failed": "No se pudo verificar la clave. Reinténtalo o usa otro método de acceso.",
+        "tooManyAttempts": "Demasiados intentos. Vuelve a intentarlo más tarde.",
+        "removeConfirm": "¿Eliminar esta clave? Podrás añadirla de nuevo tras entrar con otro método.",
+        "signIn": "Entrar con una clave de acceso"
     }
 }

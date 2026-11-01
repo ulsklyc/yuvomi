@@ -6777,5 +6777,29 @@
         "custom": "Egen farge",
         "chooseCustom": "Velg egen farge",
         "standard": "Standardfarge"
+    },
+    "passkeys": {
+        "title": "Tilgangsnøkler",
+        "hint": "Logg inn med fingeravtrykk, ansikt eller enhetens PIN-kode. Behold passord eller SSO som reserve.",
+        "needsHttps": "Tilgangsnøkler krever en fast HTTPS-adresse i BASE_URL.",
+        "unsupported": "Denne nettleseren eller forbindelsen støtter ikke tilgangsnøkler. Bruk en støttet nettleser over HTTPS.",
+        "policy": "Direkte innlogging er deaktivert for denne husstanden. Bruk SSO.",
+        "used": "Sist brukt: {{date}}",
+        "unused": "Ikke brukt ennå",
+        "removeNamed": "Fjern tilgangsnøkkelen {{name}}",
+        "remove": "Fjern tilgangsnøkkel",
+        "empty": "Ingen tilgangsnøkler er lagt til.",
+        "name": "Navn på nøkkelen (for eksempel min telefon)",
+        "add": "Legg til tilgangsnøkkel",
+        "waiting": "Følg instruksjonene på enheten.",
+        "added": "Tilgangsnøkkel lagt til.",
+        "cancelled": "Forespørselen ble avbrutt eller utløp. Prøv igjen når du er klar.",
+        "alreadyRegistered": "Denne nøkkelen er allerede registrert. Velg en annen autentikator.",
+        "reauthenticate": "Logg ut og inn igjen. Endre deretter nøklene innen fem minutter.",
+        "lastMethod": "Behold en annen innloggingsmåte før du fjerner den siste nøkkelen.",
+        "failed": "Nøkkelen kunne ikke bekreftes. Prøv igjen eller bruk en annen innloggingsmåte.",
+        "tooManyAttempts": "For mange forsøk. Prøv igjen senere.",
+        "removeConfirm": "Fjerne denne nøkkelen? Du kan legge den til igjen etter innlogging på en annen måte.",
+        "signIn": "Logg inn med en tilgangsnøkkel"
     }
 }

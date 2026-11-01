@@ -602,6 +602,8 @@ const PAGE_MODULES = [
   // (Avatare, Geburtstage, Vorrat, Rezepte, Haushaltshilfe, Schnellzugriff).
   // Der Precache-Guard las dynamische Importe bis dahin nicht.
   '/utils/auth-ui.js',
+  '/utils/passkeys.js',
+  '/settings/passkeys.js',
   '/utils/brand-mark.js',
   '/utils/avatar-crop.js',
   '/utils/lucide-icons.js',

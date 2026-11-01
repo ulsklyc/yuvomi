@@ -6777,5 +6777,29 @@
         "custom": "Eigene Farbe",
         "chooseCustom": "Eigene Farbe wählen",
         "standard": "Standardfarbe"
+    },
+    "passkeys": {
+        "title": "Passkeys",
+        "hint": "Melde dich mit Fingerabdruck, Gesichtserkennung oder Geräte-PIN an. Behalte dein Passwort oder SSO als Rückweg.",
+        "needsHttps": "Passkeys benötigen eine feste HTTPS-Adresse als BASE_URL.",
+        "unsupported": "Dieser Browser oder diese Verbindung unterstützt keine Passkeys. Nutze einen unterstützten Browser über HTTPS.",
+        "policy": "Die direkte Anmeldung ist für diesen Haushalt deaktiviert. Nutze weiterhin SSO.",
+        "used": "Zuletzt verwendet: {{date}}",
+        "unused": "Noch nicht verwendet",
+        "removeNamed": "Passkey {{name}} entfernen",
+        "remove": "Passkey entfernen",
+        "empty": "Noch keine Passkeys hinterlegt.",
+        "name": "Name des Passkeys (zum Beispiel: Mein Handy)",
+        "add": "Passkey hinzufügen",
+        "waiting": "Folge den Anweisungen deines Geräts.",
+        "added": "Passkey hinzugefügt.",
+        "cancelled": "Die Passkey-Anfrage wurde abgebrochen oder ist abgelaufen. Du kannst es erneut versuchen.",
+        "alreadyRegistered": "Dieser Passkey ist bereits hinterlegt. Wähle einen anderen Authenticator.",
+        "reauthenticate": "Melde dich ab und erneut an. Danach kannst du deine Passkeys innerhalb von fünf Minuten ändern.",
+        "lastMethod": "Behalte einen anderen funktionierenden Anmeldeweg, bevor du deinen letzten Passkey entfernst.",
+        "failed": "Der Passkey konnte nicht geprüft werden. Versuche es erneut oder nutze einen anderen Anmeldeweg.",
+        "tooManyAttempts": "Zu viele Versuche. Bitte versuche es später erneut.",
+        "removeConfirm": "Diesen Passkey entfernen? Nach der Anmeldung über einen anderen Weg kannst du ihn erneut hinzufügen.",
+        "signIn": "Mit Passkey anmelden"
     }
 }

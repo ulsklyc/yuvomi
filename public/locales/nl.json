@@ -6777,5 +6777,29 @@
         "custom": "Eigen kleur",
         "chooseCustom": "Eigen kleur kiezen",
         "standard": "Standaardkleur"
+    },
+    "passkeys": {
+        "title": "Passkeys",
+        "hint": "Meld je aan met je vingerafdruk, gezicht of apparaatpincode. Bewaar je wachtwoord of SSO als hersteloptie.",
+        "needsHttps": "Passkeys vereisen een vast HTTPS-adres in BASE_URL.",
+        "unsupported": "Deze browser of verbinding ondersteunt geen passkeys. Gebruik een geschikte browser via HTTPS.",
+        "policy": "Direct aanmelden is voor dit huishouden uitgeschakeld. Gebruik SSO.",
+        "used": "Laatst gebruikt: {{date}}",
+        "unused": "Nog niet gebruikt",
+        "removeNamed": "Passkey {{name}} verwijderen",
+        "remove": "Passkey verwijderen",
+        "empty": "Er zijn nog geen passkeys toegevoegd.",
+        "name": "Naam van de passkey (bijvoorbeeld mijn telefoon)",
+        "add": "Passkey toevoegen",
+        "waiting": "Volg de aanwijzingen op je apparaat.",
+        "added": "Passkey toegevoegd.",
+        "cancelled": "De aanvraag is geannuleerd of verlopen. Probeer het opnieuw wanneer je klaar bent.",
+        "alreadyRegistered": "Deze passkey is al geregistreerd. Kies een andere authenticator.",
+        "reauthenticate": "Meld je af en weer aan. Wijzig daarna je passkeys binnen vijf minuten.",
+        "lastMethod": "Behoud een andere aanmeldmethode voordat je de laatste passkey verwijdert.",
+        "failed": "De passkey kon niet worden gecontroleerd. Probeer opnieuw of gebruik een andere methode.",
+        "tooManyAttempts": "Te veel pogingen. Probeer het later opnieuw.",
+        "removeConfirm": "Deze passkey verwijderen? Je kunt hem opnieuw toevoegen na aanmelding via een andere methode.",
+        "signIn": "Aanmelden met een passkey"
     }
 }

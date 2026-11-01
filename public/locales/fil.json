@@ -6777,5 +6777,29 @@
         "custom": "Sariling kulay",
         "chooseCustom": "Pumili ng sariling kulay",
         "standard": "Default na kulay"
+    },
+    "passkeys": {
+        "title": "Mga passkey",
+        "hint": "Mag-sign in gamit ang fingerprint, mukha, o PIN ng device. Panatilihin ang password o SSO bilang reserba.",
+        "needsHttps": "Kailangan ng passkey ng permanenteng HTTPS address sa BASE_URL.",
+        "unsupported": "Hindi sinusuportahan ng browser o koneksiyong ito ang passkey. Gumamit ng angkop na browser sa HTTPS.",
+        "policy": "Naka-off ang direktang pag-sign in para sa tahanang ito. Gamitin ang SSO.",
+        "used": "Huling ginamit: {{date}}",
+        "unused": "Hindi pa nagamit",
+        "removeNamed": "Alisin ang passkey na {{name}}",
+        "remove": "Alisin ang passkey",
+        "empty": "Wala pang naidaragdag na passkey.",
+        "name": "Pangalan ng passkey (halimbawa, aking telepono)",
+        "add": "Magdagdag ng passkey",
+        "waiting": "Sundin ang mga tagubilin ng device.",
+        "added": "Naidagdag ang passkey.",
+        "cancelled": "Kinansela o nag-expire ang kahilingan. Maaari mong subukang muli.",
+        "alreadyRegistered": "Nakarehistro na ang passkey na ito. Pumili ng ibang authenticator.",
+        "reauthenticate": "Mag-sign out at mag-sign in muli. Pagkatapos, baguhin ang mga passkey sa loob ng limang minuto.",
+        "lastMethod": "Panatilihin ang ibang paraan ng pag-sign in bago alisin ang huling passkey.",
+        "failed": "Hindi ma-verify ang passkey. Subukang muli o gumamit ng ibang paraan.",
+        "tooManyAttempts": "Masyadong maraming pagsubok. Subukan ulit mamaya.",
+        "removeConfirm": "Alisin ang passkey na ito? Maaari itong idagdag muli matapos mag-sign in sa ibang paraan.",
+        "signIn": "Mag-sign in gamit ang passkey"
     }
 }

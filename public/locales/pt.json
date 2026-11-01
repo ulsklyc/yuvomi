@@ -6777,5 +6777,29 @@
         "custom": "Cor personalizada",
         "chooseCustom": "Escolher cor personalizada",
         "standard": "Cor predefinida"
+    },
+    "passkeys": {
+        "title": "Chaves de acesso",
+        "hint": "Entre com a impressão digital, o rosto ou o PIN do dispositivo. Mantenha a palavra-passe ou o SSO como alternativa.",
+        "needsHttps": "As chaves de acesso exigem um endereço HTTPS estável em BASE_URL.",
+        "unsupported": "Este navegador ou ligação não suporta chaves de acesso. Utilize um navegador compatível por HTTPS.",
+        "policy": "O acesso direto está desativado para esta família. Utilize o SSO.",
+        "used": "Última utilização: {{date}}",
+        "unused": "Ainda não utilizada",
+        "removeNamed": "Remover a chave {{name}}",
+        "remove": "Remover chave de acesso",
+        "empty": "Ainda não foram adicionadas chaves.",
+        "name": "Nome da chave (por exemplo, o meu telefone)",
+        "add": "Adicionar chave de acesso",
+        "waiting": "Siga as instruções do dispositivo.",
+        "added": "Chave de acesso adicionada.",
+        "cancelled": "Pedido cancelado ou expirado. Pode tentar novamente.",
+        "alreadyRegistered": "Esta chave já está registada. Escolha outro autenticador.",
+        "reauthenticate": "Termine a sessão e volte a entrar. Depois altere as chaves em cinco minutos.",
+        "lastMethod": "Mantenha outra forma de acesso antes de remover a última chave.",
+        "failed": "Não foi possível verificar a chave. Tente novamente ou utilize outro método.",
+        "tooManyAttempts": "Demasiadas tentativas. Tente mais tarde.",
+        "removeConfirm": "Remover esta chave? Poderá adicioná-la novamente depois de entrar por outro método.",
+        "signIn": "Entrar com uma chave de acesso"
     }
 }

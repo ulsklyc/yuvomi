@@ -307,3 +307,5 @@ zurückliegen; wo sie und die Quellen oben sich widersprechen, gelten die oben.
   <br>
   <sub>MIT-lizenziert, siehe <a href="LICENSE">LICENSE</a>. Mehr auf <a href="https://yuvomi.cloud/">yuvomi.cloud</a>.</sub>
 </div>
+
+Mit einer vertrauenswürdigen HTTPS-Adresse können bestehende Konten auch [Passkeys zur Anmeldung](docs/passkeys.md) verwenden, ohne externen Identitätsanbieter (englische Anleitung).

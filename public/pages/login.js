@@ -4,7 +4,8 @@
  * Abhängigkeiten: /api.js
  */
 
-import { auth } from '/api.js';
+import { api, auth } from '/api.js';
+import { usePasskey, passkeyErrorText, passkeysSupported } from '/utils/passkeys.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { authHeroHtml, authErrorHtml, wirePasswordToggle, showAuthError } from '/utils/auth-ui.js';
@@ -123,6 +124,33 @@ export async function render(container) {
     history.replaceState(null, '', location.pathname);
     renderSecondFactor(container, { recoveryAvailable: true });
     return;
+  }
+
+  // Separate from the password form: username-less sign-in never validates its fields.
+  if (passkeysSupported()) {
+    try {
+      const { data: state } = await api.get('/auth/passkeys/config');
+      if (state?.enabled && state?.login_enabled) {
+        const card = container.querySelector('.auth-card');
+        card.insertAdjacentHTML('afterbegin', `<div class="auth-form">
+          <button type="button" class="btn btn--secondary auth-form__submit" id="passkey-login">${esc(t('passkeys.signIn'))}</button>
+          ${authErrorHtml('passkey-login-error')}
+        </div>`);
+        const button = card.querySelector('#passkey-login');
+        button.addEventListener('click', async () => {
+          const error = card.querySelector('#passkey-login-error');
+          error.hidden = true; button.disabled = true;
+          try {
+            const { data: options } = await api.post('/auth/passkeys/login/options', {});
+            const credential = await usePasskey(options);
+            const result = await auth.loginWithPasskey(credential);
+            if (result.twoFactorRequired) renderSecondFactor(container, { recoveryAvailable: result.recoveryAvailable === true });
+            else window.yuvomi.navigate('/', result.user);
+          } catch (failure) { showAuthError(error, passkeyErrorText(failure)); }
+          finally { button.disabled = false; }
+        });
+      }
+    } catch { /* Password and SSO remain usable if the capability request fails. */ }
   }
 
   const form = container.querySelector('#auth-form');

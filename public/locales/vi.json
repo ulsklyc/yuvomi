@@ -6777,5 +6777,29 @@
         "custom": "Màu tùy chỉnh",
         "chooseCustom": "Chọn màu tùy chỉnh",
         "standard": "Màu mặc định"
+    },
+    "passkeys": {
+        "title": "Khóa truy cập",
+        "hint": "Đăng nhập bằng vân tay, khuôn mặt hoặc mã PIN thiết bị. Giữ mật khẩu hoặc SSO để khôi phục.",
+        "needsHttps": "Khóa truy cập cần địa chỉ HTTPS cố định trong BASE_URL.",
+        "unsupported": "Trình duyệt hoặc kết nối này không hỗ trợ khóa truy cập. Hãy dùng trình duyệt phù hợp qua HTTPS.",
+        "policy": "Đăng nhập trực tiếp đã bị tắt cho gia đình này. Hãy dùng SSO.",
+        "used": "Dùng lần cuối: {{date}}",
+        "unused": "Chưa sử dụng",
+        "removeNamed": "Xóa khóa {{name}}",
+        "remove": "Xóa khóa truy cập",
+        "empty": "Chưa thêm khóa truy cập nào.",
+        "name": "Tên khóa (ví dụ: điện thoại của tôi)",
+        "add": "Thêm khóa truy cập",
+        "waiting": "Làm theo hướng dẫn trên thiết bị.",
+        "added": "Đã thêm khóa truy cập.",
+        "cancelled": "Yêu cầu đã bị hủy hoặc hết hạn. Bạn có thể thử lại.",
+        "alreadyRegistered": "Khóa này đã được đăng ký. Hãy chọn bộ xác thực khác.",
+        "reauthenticate": "Đăng xuất rồi đăng nhập lại. Sau đó thay đổi khóa trong vòng năm phút.",
+        "lastMethod": "Giữ một cách đăng nhập khác trước khi xóa khóa cuối cùng.",
+        "failed": "Không thể xác minh khóa. Hãy thử lại hoặc dùng cách khác.",
+        "tooManyAttempts": "Thử quá nhiều lần. Vui lòng thử lại sau.",
+        "removeConfirm": "Xóa khóa này? Bạn có thể thêm lại sau khi đăng nhập bằng cách khác.",
+        "signIn": "Đăng nhập bằng khóa truy cập"
     }
 }

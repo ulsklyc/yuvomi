@@ -6777,5 +6777,29 @@
         "custom": "自訂顏色",
         "chooseCustom": "選擇自訂顏色",
         "standard": "預設顏色"
+    },
+    "passkeys": {
+        "title": "通行金鑰",
+        "hint": "使用指紋、臉部辨識或裝置PIN登入。請保留密碼或SSO作為復原方式。",
+        "needsHttps": "通行金鑰需要在BASE_URL中設定固定的HTTPS位址。",
+        "unsupported": "此瀏覽器或連線不支援通行金鑰。請透過HTTPS使用相容的瀏覽器。",
+        "policy": "此家庭已停用直接登入。請使用SSO。",
+        "used": "上次使用：{{date}}",
+        "unused": "尚未使用",
+        "removeNamed": "移除通行金鑰{{name}}",
+        "remove": "移除通行金鑰",
+        "empty": "尚未新增通行金鑰。",
+        "name": "通行金鑰名稱（例如：我的手機）",
+        "add": "新增通行金鑰",
+        "waiting": "請依照裝置指示操作。",
+        "added": "已新增通行金鑰。",
+        "cancelled": "要求已取消或逾時。準備好後可以重試。",
+        "alreadyRegistered": "此通行金鑰已註冊。請選擇其他驗證器。",
+        "reauthenticate": "請登出並重新登入，然後在五分鐘內變更通行金鑰。",
+        "lastMethod": "移除最後一個通行金鑰前，請保留其他登入方式。",
+        "failed": "無法驗證通行金鑰。請重試或使用其他登入方式。",
+        "tooManyAttempts": "嘗試次數過多。請稍後重試。",
+        "removeConfirm": "移除此通行金鑰？使用其他方式登入後，可以重新新增。",
+        "signIn": "使用通行金鑰登入"
     }
 }

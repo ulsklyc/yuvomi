@@ -7117,5 +7117,29 @@
         "custom": "Własny kolor",
         "chooseCustom": "Wybierz własny kolor",
         "standard": "Kolor domyślny"
+    },
+    "passkeys": {
+        "title": "Klucze dostępu",
+        "hint": "Zaloguj się odciskiem palca, twarzą lub kodem PIN urządzenia. Zachowaj hasło albo SSO jako metodę awaryjną.",
+        "needsHttps": "Klucze dostępu wymagają stałego adresu HTTPS w BASE_URL.",
+        "unsupported": "Ta przeglądarka lub połączenie nie obsługuje kluczy dostępu. Użyj zgodnej przeglądarki przez HTTPS.",
+        "policy": "Logowanie bezpośrednie jest wyłączone w tym gospodarstwie. Użyj SSO.",
+        "used": "Ostatnie użycie: {{date}}",
+        "unused": "Jeszcze nie użyto",
+        "removeNamed": "Usuń klucz {{name}}",
+        "remove": "Usuń klucz dostępu",
+        "empty": "Nie dodano jeszcze kluczy dostępu.",
+        "name": "Nazwa klucza (np. mój telefon)",
+        "add": "Dodaj klucz dostępu",
+        "waiting": "Postępuj zgodnie z instrukcjami urządzenia.",
+        "added": "Dodano klucz dostępu.",
+        "cancelled": "Żądanie anulowano lub wygasło. Spróbuj ponownie, gdy zechcesz.",
+        "alreadyRegistered": "Ten klucz jest już zarejestrowany. Wybierz inny uwierzytelniacz.",
+        "reauthenticate": "Wyloguj się i zaloguj ponownie. Następnie zmień klucze w ciągu pięciu minut.",
+        "lastMethod": "Zachowaj inną metodę logowania przed usunięciem ostatniego klucza.",
+        "failed": "Nie udało się zweryfikować klucza. Spróbuj ponownie lub użyj innej metody.",
+        "tooManyAttempts": "Zbyt wiele prób. Spróbuj ponownie później.",
+        "removeConfirm": "Usunąć ten klucz? Po zalogowaniu inną metodą możesz dodać go ponownie.",
+        "signIn": "Zaloguj się kluczem dostępu"
     }
 }
