@@ -3343,6 +3343,8 @@
         "displayIssueCode": "Kopplungscode erzeugen",
         "displayScreensaverLabel": "Foto-Bildschirmschoner zeigen",
         "displayScreensaverHint": "Wenn eine Weile niemand dieses Tablett berührt, zeigt es Fotos aus Immich über der Wandanzeige. Aus, bis du es hier einschaltest. Wirkt erst, wenn Immich verbunden ist.",
+        "displayDeviceSettingsHint": "Diese Auswahl gilt nur für dieses Tablett. Online prüft es alle 30 Sekunden auf Änderungen; Uhr und Bildfüllung gelten beim nächsten Start des Bildschirmschoners.",
+        "displayDeviceSettingsLocal": "Hier noch nicht gespeichert. Bis zum Speichern behält das Tablett seine lokalen Einstellungen.",
         "displayScreensaverOn": "{{name}} zeigt den Foto-Bildschirmschoner.",
         "displayScreensaverOff": "{{name}} zeigt den Foto-Bildschirmschoner nicht mehr.",
         "displayDelete": "Löschen",

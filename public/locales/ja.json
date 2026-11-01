@@ -3325,6 +3325,8 @@
         "displayIssueCode": "ペアリングコードを発行",
         "displayScreensaverLabel": "写真スクリーンセーバーを表示",
         "displayScreensaverHint": "このタブレットにしばらく誰も触れないと、壁表示の上に Immich の写真を表示します。ここでオンにするまではオフです。Immich が接続されると有効になります。",
+        "displayDeviceSettingsHint": "この設定はこのタブレットだけに適用されます。オンライン時は30秒ごとに変更を確認します。時計と写真の表示方法は、次回スクリーンセーバーが起動するときに反映されます。",
+        "displayDeviceSettingsLocal": "ここではまだ保存されていません。保存するまではタブレットのローカル設定が使われます。",
         "displayScreensaverOn": "{{name}} は写真スクリーンセーバーを表示します。",
         "displayScreensaverOff": "{{name}} は写真スクリーンセーバーを表示しなくなりました。",
         "displayDelete": "削除",

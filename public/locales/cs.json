@@ -3436,6 +3436,8 @@
         "displayIssueCode": "Vygenerovat párovací kód",
         "displayScreensaverLabel": "Zobrazovat spořič s fotkami",
         "displayScreensaverHint": "Když se tohoto tabletu chvíli nikdo nedotkne, zobrazí přes nástěnné zobrazení fotky z Immich. Vypnuto, dokud to tady nezapnete. Funguje po připojení Immich.",
+        "displayDeviceSettingsHint": "Tato nastavení platí jen pro tento tablet. Online kontroluje změny každých 30 sekund; hodiny a vyplnění fotek se použijí při příštím spuštění spořiče.",
+        "displayDeviceSettingsLocal": "Zde ještě neuloženo. Tablet zachová místní nastavení, dokud je neuložíš.",
         "displayScreensaverOn": "{{name}} zobrazuje spořič s fotkami.",
         "displayScreensaverOff": "{{name}} už nezobrazuje spořič s fotkami.",
         "displayDelete": "Odstranit",

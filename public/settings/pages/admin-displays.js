@@ -12,11 +12,13 @@
  */
 
 import { api, auth } from '/api.js';
-import { getLocale, t } from '/i18n.js';
+import { formatTime, formatUnit, getLocale, t } from '/i18n.js';
 import { dateTimeText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { hintFoldHtml, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
+import { DISPLAY_DEVICE_DEFAULTS, DISPLAY_IDLE_STEPS, normalizeDisplayDeviceSettings } from '/utils/display-device-settings.js';
+import { errorSentence } from '/utils/friendly-error.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 function formatSeen(value) {
@@ -76,6 +78,74 @@ function renderDevice(display, device) {
     </li>`;
 }
 
+function hourOptions(selected, other) {
+  return Array.from({ length:24 }, (_, hour) => `<option value="${hour}"${hour === selected ? ' selected' : ''}${hour === other ? ' disabled' : ''}>${esc(formatTime(`${String(hour).padStart(2, '0')}:00`))}</option>`).join('');
+}
+
+function renderDeviceSettings(display) {
+  const settings = normalizeDisplayDeviceSettings(display.device_settings) ?? DISPLAY_DEVICE_DEFAULTS;
+  const prefix = `display-options-${display.id}`;
+  return `<form class="settings-form" id="${prefix}-form" data-display-device-settings="${display.id}" data-name="${esc(display.display_name)}" novalidate>
+    <p class="form-hint">${esc(t('settings.displayDeviceSettingsHint'))}</p>
+    ${!display.device_settings ? `<p class="form-hint" data-display-local-hint>${esc(t('settings.displayDeviceSettingsLocal'))}</p>` : ''}
+    <div class="row-divided settings-group">
+      ${settingRowHtml({ label:t('settings.nightHoursLabel'), labelId:`${prefix}-night-label`,
+        control:`<span class="form-composite" role="group" aria-labelledby="${prefix}-night-label">
+          <select class="form-input" name="night_from" aria-label="${esc(t('settings.nightHoursFrom'))}">${hourOptions(settings.night_from, settings.night_until)}</select>
+          <span class="form-composite__sep" aria-hidden="true">-</span>
+          <select class="form-input" name="night_until" aria-label="${esc(t('settings.nightHoursUntil'))}">${hourOptions(settings.night_until, settings.night_from)}</select>
+        </span>` })}
+      ${settingRowHtml({ label:t('settings.screensaverIdleLabel'), labelFor:`${prefix}-idle`,
+        control:`<select class="form-input" id="${prefix}-idle" name="idle_seconds">${DISPLAY_IDLE_STEPS.map(seconds => `<option value="${seconds}"${seconds === settings.idle_seconds ? ' selected' : ''}>${esc(formatUnit(seconds / 60, 'minute', { unitDisplay:'long' }))}</option>`).join('')}</select>` })}
+      ${settingSwitchRowHtml({ label:t('settings.screensaverClockLabel'), checked:settings.show_clock,
+        attrs:{id:`${prefix}-clock`, name:'show_clock'} })}
+      ${settingSwitchRowHtml({ label:t('settings.screensaverCoverLabel'), checked:settings.cover_photo,
+        attrs:{id:`${prefix}-cover`, name:'cover_photo'} })}
+    </div>
+    <p class="form-hint" role="status" aria-live="polite" data-display-settings-status></p>
+    <div class="settings-form-actions"><button class="btn btn--primary" type="submit">${esc(t('common.save'))}</button></div>
+  </form>`;
+}
+
+/** The two night boundaries cannot select the same hour. */
+function syncNightOptions(form) {
+  const from = form.querySelector('[name="night_from"]');
+  const until = form.querySelector('[name="night_until"]');
+  if (!from || !until) return;
+  for (const [select, other] of [[from, until], [until, from]]) {
+    for (const option of select.options) option.disabled = option.value === other.value;
+  }
+}
+
+export function bindDisplayDeviceSettings(list) {
+  list.addEventListener('submit', async event => {
+    const form = event.target.closest?.('[data-display-device-settings]');
+    if (!form) return;
+    event.preventDefault();
+    if (form.dataset.saving === 'true' || reportFieldErrors(constraintErrors(form))) return;
+    const field = name => form.querySelector(`[name="${name}"]`);
+    const settings = normalizeDisplayDeviceSettings({
+      night_from:Number(field('night_from').value), night_until:Number(field('night_until').value),
+      idle_seconds:Number(field('idle_seconds').value), show_clock:field('show_clock').checked, cover_photo:field('cover_photo').checked,
+    });
+    const status = form.querySelector('[data-display-settings-status]');
+    if (!settings) { status.textContent = t('common.invalidInput'); return; }
+    const controls = form.querySelectorAll('input, select, button');
+    form.dataset.saving = 'true';
+    for (const control of controls) control.disabled = true;
+    status.textContent = '';
+    try {
+      await api.patch(`/displays/${form.dataset.displayDeviceSettings}`, {device_settings:settings});
+      form.querySelector('[data-display-local-hint]')?.remove();
+      status.textContent = t('common.savedNamed', {name:form.dataset.name});
+    } catch (error) { status.textContent = errorSentence(error); }
+    finally {
+      form.dataset.saving = 'false';
+      for (const control of controls) control.disabled = false;
+    }
+  });
+}
+
 // Exported so test:display-screensaver-switch can read the real card.
 export function renderDisplay(display) {
   const active = (display.devices || []).filter((d) => !d.revoked_at);
@@ -111,6 +181,7 @@ export function renderDisplay(display) {
         },
       })}
       </div>
+      ${renderDeviceSettings(display)}
       <div class="settings-token-output" data-display-code="${display.id}" hidden>
         <p class="form-label">${esc(t('settings.displayPairingCodeLabel'))}</p>
         <p class="settings-token-output__row"><code data-display-code-value="${display.id}"></code></p>
@@ -245,6 +316,8 @@ const pairTickets = new Map();
  */
 export function bindDisplayScreensaverSwitches(list, errorEl) {
   list.addEventListener('change', async (event) => {
+    const form = event.target.closest?.('[data-display-device-settings]');
+    if (form) { syncNightOptions(form); return; }
     const toggle = event.target.closest?.('[data-display-screensaver]');
     if (!toggle) return;
     clearError(errorEl);
@@ -302,6 +375,7 @@ function bindEvents(container) {
   });
 
   bindDisplayScreensaverSwitches(list, errorEl);
+  bindDisplayDeviceSettings(list);
 
   list.addEventListener('click', async (event) => {
     const pair = event.target.closest('[data-display-pair]');

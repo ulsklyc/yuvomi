@@ -3343,6 +3343,8 @@
         "displayIssueCode": "Gumawa ng pairing code",
         "displayScreensaverLabel": "Ipakita ang photo screensaver",
         "displayScreensaverHint": "Kapag walang humawak sa tablet na ito nang ilang sandali, nagpapakita ito ng mga larawan mula sa Immich sa ibabaw ng wall display. Naka-off hangga't hindi mo ito binubuksan dito. Gagana kapag nakakonekta na ang Immich.",
+        "displayDeviceSettingsHint": "Para lang sa tablet na ito ang mga pagpili. Kapag online, sinusuri nito ang mga pagbabago bawat 30 segundo; ilalapat ang orasan at pagpuno ng larawan sa susunod na pagsisimula ng screensaver.",
+        "displayDeviceSettingsLocal": "Hindi pa naka-save dito. Pananatilihin ng tablet ang lokal na mga setting hanggang mag-save ka.",
         "displayScreensaverOn": "Ipinapakita ng {{name}} ang photo screensaver.",
         "displayScreensaverOff": "Hindi na ipinapakita ng {{name}} ang photo screensaver.",
         "displayDelete": "Burahin",

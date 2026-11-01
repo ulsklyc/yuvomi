@@ -1385,6 +1385,39 @@ test('das Display-Dashboard liefert Einkauf, Haushaltshilfe, Abfuhr und Vorrat f
 // --------------------------------------------------------
 // Der Limiter - absichtlich zuletzt, weil er das Budget aufbraucht
 // --------------------------------------------------------
+test('an admin manages this display’s night hours and screensaver without changing household preferences (#2436)', async () => {
+  const created = await admin('POST', '/displays', { display_name: 'Remote settings probe' });
+  const id = created.body.data.id;
+  const issued = await admin('POST', `/displays/${id}/pairing-code`, {});
+  const device = asDisplay((await pair(issued.body.data.code)).token);
+  const settings = { night_from:21, night_until:7, idle_seconds:60, show_clock:false, cover_photo:true };
+  assert.equal((await device('GET', '/preferences')).body.data.display_device_settings, null, 'existing local choices remain in use until configured');
+  assert.equal((await admin('PATCH', `/displays/${id}`, {device_settings:settings})).status, 200);
+  assert.deepEqual((await device('GET', '/preferences')).body.data.display_device_settings, settings);
+  assert.deepEqual((await admin('GET', '/displays')).body.data.find(d => d.id === id).device_settings, settings);
+  assert.equal((await admin('GET', '/preferences')).body.data.display_device_settings, undefined, 'a member gets no display override');
+  assert.equal((await device('PATCH', `/displays/${id}`, {device_settings:{...settings, idle_seconds:300}})).status, 403);
+  for (const invalid of [{...settings, night_from:7}, {...settings, night_until:24}, {...settings, idle_seconds:61}, {...settings, show_clock:'false'}, {...settings, cover_photo:1}, {night_from:21}, {...settings, unknown:true}, null]) {
+    assert.equal((await admin('PATCH', `/displays/${id}`, {device_settings:invalid, show_screensaver:true})).status, 400, JSON.stringify(invalid));
+  }
+  const listed = (await admin('GET', '/displays')).body.data.find(d => d.id === id);
+  assert.deepEqual(listed.device_settings, settings); assert.equal(listed.show_screensaver, false, 'invalid changes are atomic');
+  const other = (await admin('POST', '/displays', { display_name:'Other display' })).body.data;
+  assert.equal((await admin('GET', '/displays')).body.data.find(d => d.id === other.id).device_settings, null);
+});
+
+test('display-settings migration preserves existing displays and rejects invalid JSON (#2436)', async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const legacy = new DatabaseSync(':memory:');
+  try {
+    legacy.exec("CREATE TABLE display_accounts (user_id INTEGER PRIMARY KEY, show_screensaver INTEGER NOT NULL DEFAULT 0); INSERT INTO display_accounts VALUES (7, 1)");
+    const migration = dbmod.MIGRATIONS.find(m => m.version === 274);
+    legacy.exec(migration.up);
+    assert.deepEqual({...legacy.prepare('SELECT * FROM display_accounts').get()}, {user_id:7, show_screensaver:1, device_settings:null});
+    assert.throws(() => legacy.prepare('UPDATE display_accounts SET device_settings = ?').run('not json'));
+  } finally {legacy.close();}
+});
+
 test('geratene Kopplungscodes laufen in die Versuchsgrenze', async () => {
   // Zehn Stellen aus 25 Zeichen sind rund 46 Bit, aber Entropie allein ist
   // keine Sperre: ohne Grenze waere die Viertelstunde Gueltigkeit das einzige

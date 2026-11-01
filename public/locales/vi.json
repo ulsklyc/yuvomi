@@ -3325,6 +3325,8 @@
         "displayIssueCode": "Tạo mã ghép nối",
         "displayScreensaverLabel": "Hiển thị trình bảo vệ màn hình ảnh",
         "displayScreensaverHint": "Khi không ai chạm vào máy tính bảng này một lúc, nó hiển thị ảnh từ Immich trên màn hình treo tường. Tắt cho đến khi bạn bật ở đây. Có hiệu lực khi Immich đã được kết nối.",
+        "displayDeviceSettingsHint": "Các lựa chọn này chỉ áp dụng cho máy tính bảng này. Khi trực tuyến, máy kiểm tra thay đổi mỗi 30 giây; đồng hồ và cách lấp đầy ảnh áp dụng khi trình bảo vệ màn hình khởi động lại.",
+        "displayDeviceSettingsLocal": "Chưa lưu tại đây. Máy tính bảng giữ cài đặt cục bộ cho đến khi bạn lưu.",
         "displayScreensaverOn": "{{name}} hiển thị trình bảo vệ màn hình ảnh.",
         "displayScreensaverOff": "{{name}} không còn hiển thị trình bảo vệ màn hình ảnh.",
         "displayDelete": "Xóa",

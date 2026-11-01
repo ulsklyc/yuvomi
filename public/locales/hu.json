@@ -3325,6 +3325,8 @@
         "displayIssueCode": "Párosítókód létrehozása",
         "displayScreensaverLabel": "Fotós képernyővédő megjelenítése",
         "displayScreensaverHint": "Ha egy ideig senki sem érinti meg ezt a táblagépet, Immich-fotókat mutat a fali kijelző fölött. Kikapcsolva, amíg itt be nem kapcsolod. Az Immich csatlakoztatása után működik.",
+        "displayDeviceSettingsHint": "Ezek a beállítások csak erre a táblagépre érvényesek. Online 30 másodpercenként keres változásokat; az óra és a képek kitöltése a képernyőkímélő következő indításakor lép életbe.",
+        "displayDeviceSettingsLocal": "Itt még nincs mentve. A táblagép a mentésig megtartja a helyi beállításait.",
         "displayScreensaverOn": "{{name}} megjeleníti a fotós képernyővédőt.",
         "displayScreensaverOff": "{{name}} már nem jeleníti meg a fotós képernyővédőt.",
         "displayDelete": "Törlés",

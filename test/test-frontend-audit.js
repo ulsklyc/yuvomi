@@ -3150,7 +3150,7 @@ test('die Display-Leiste filtert haushaltweit abgeschaltete Module', () => {
   // ein abgeschalteter Kalender in der Leiste und schickte beim Antippen auf
   // die Uebersicht zurueck, weil `navigate()` ihn ohnehin abweist.
   const source = read('../public/router.js');
-  const zweig = source.match(/access_scope === 'display'\)\s*\{[\s\S]*?\n  \}/);
+  const zweig = source.slice(source.indexOf('function navItems(')).match(/access_scope === 'display'\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(zweig, 'der Display-Zweig in navItems() steht noch da');
   assert.match(zweig[0], /_disabledModules\.has\(/, 'er filtert die abgeschalteten Module');
   // Das Dashboard ist die Startseite und laesst sich nicht abschalten - es darf
@@ -17305,7 +17305,7 @@ test('die Nacht hat EINE Rechnung: theme-init.js und isWallNight fragen /night-h
   assert.ok(sw.includes("'/utils/night-hours.js',"));
 });
 
-test('the early screensaver delay in theme-init.js does not drift from utils/screensaver-idle.js (#885)', () => {
+test('the early screensaver delay in theme-init.js does not drift from utils/screensaver-idle.js (#885)', async () => {
   // Same seam as wall mode above: theme-init.js runs as a classic <script>
   // before any module and carries the key and the steps as literals. The
   // source of truth is utils/screensaver-idle.js.
@@ -17316,12 +17316,12 @@ test('the early screensaver delay in theme-init.js does not drift from utils/scr
   assert.equal(modKey, 'yuvomi-screensaver-idle', 'the key lives in screensaver-idle.js');
   assert.ok(init.includes(`'${modKey}'`), `theme-init.js reads the same key (${modKey})`);
 
-  const modSteps = mod.match(/export const SCREENSAVER_IDLE_STEPS = \[([^\]]+)\]/)?.[1];
-  assert.ok(modSteps, 'the steps live in screensaver-idle.js');
+  const { DISPLAY_IDLE_STEPS: modSteps } = await import('../public/utils/display-device-settings.js');
+  assert.match(mod, /export const SCREENSAVER_IDLE_STEPS = DISPLAY_IDLE_STEPS/, 'the device reader uses the shared display steps');
   const initSteps = init.match(/\[([\d,\s]+)\]\.indexOf\(Number\(idle\)\)/)?.[1];
   assert.ok(initSteps, 'theme-init.js checks the stored value against a list of steps');
   const list = (s) => s.split(',').map((n) => Number(n.trim()));
-  assert.deepEqual(list(initSteps), list(modSteps), 'the same steps as screensaver-idle.js');
+  assert.deepEqual(list(initSteps), modSteps, 'the same steps as screensaver-idle.js');
 
   // And the attribute: the one the component reads.
   assert.ok(init.includes("'data-screensaver-idle'"), 'theme-init.js sets the attribute');

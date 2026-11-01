@@ -3559,6 +3559,8 @@
         "displayIssueCode": "Wygeneruj kod parowania",
         "displayScreensaverLabel": "Pokazuj wygaszacz ze zdjęciami",
         "displayScreensaverHint": "Gdy nikt przez chwilę nie dotyka tego tabletu, pokazuje zdjęcia z Immich na ekranie ściennym. Wyłączone, dopóki nie włączysz tutaj. Działa po połączeniu Immich.",
+        "displayDeviceSettingsHint": "Te ustawienia dotyczą tylko tego tabletu. W sieci sprawdza zmiany co 30 sekund; zegar i wypełnienie zdjęć działają od następnego uruchomienia wygaszacza.",
+        "displayDeviceSettingsLocal": "Jeszcze tu nie zapisano. Tablet zachowa ustawienia lokalne do czasu zapisania.",
         "displayScreensaverOn": "{{name}} pokazuje wygaszacz ze zdjęciami.",
         "displayScreensaverOff": "{{name}} nie pokazuje już wygaszacza ze zdjęciami.",
         "displayDelete": "Usuń",

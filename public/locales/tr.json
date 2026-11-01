@@ -3325,6 +3325,8 @@
         "displayIssueCode": "Eşleştirme kodu oluştur",
         "displayScreensaverLabel": "Fotoğraf ekran koruyucusunu göster",
         "displayScreensaverHint": "Bu tablete bir süre kimse dokunmazsa duvar ekranının üzerinde Immich'ten fotoğraflar gösterir. Buradan açana kadar kapalıdır. Immich bağlandığında geçerli olur.",
+        "displayDeviceSettingsHint": "Bu seçimler yalnızca bu tablet için geçerlidir. Çevrimiçiyken değişiklikleri 30 saniyede bir denetler; saat ve fotoğraf dolgusu ekran koruyucu sonraki açıldığında uygulanır.",
+        "displayDeviceSettingsLocal": "Burada henüz kaydedilmedi. Kaydedene kadar tablet yerel ayarlarını korur.",
         "displayScreensaverOn": "{{name}} fotoğraf ekran koruyucusunu gösteriyor.",
         "displayScreensaverOff": "{{name}} artık fotoğraf ekran koruyucusunu göstermiyor.",
         "displayDelete": "Sil",

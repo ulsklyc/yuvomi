@@ -1,3 +1,4 @@
+import { getDisplayDeviceSettings, DISPLAY_IDLE_STEPS } from './display-device-settings.js';
 /**
  * How long a device stays idle before the photo screensaver starts (#885).
  *
@@ -20,7 +21,7 @@
 export const SCREENSAVER_IDLE_KEY = 'yuvomi-screensaver-idle';
 
 /** The choices offered, in seconds. */
-export const SCREENSAVER_IDLE_STEPS = [60, 120, 300, 600, 900];
+export const SCREENSAVER_IDLE_STEPS = DISPLAY_IDLE_STEPS;
 
 /** Unchanged from before the setting existed: five minutes. */
 export const SCREENSAVER_IDLE_DEFAULT = 300;
@@ -42,6 +43,8 @@ export function normalizeScreensaverIdle(value) {
 
 /** The delay chosen on THIS device, in seconds. */
 export function getScreensaverIdleSeconds() {
+  const display = getDisplayDeviceSettings();
+  if (display) return display.idle_seconds;
   try {
     return normalizeScreensaverIdle(localStorage.getItem(SCREENSAVER_IDLE_KEY));
   } catch {
@@ -120,7 +123,7 @@ function writeFlag(key, value) {
 
 /** The current time on the screensaver - on unless switched off here. */
 export function isScreensaverClockOn() {
-  return readFlag(SCREENSAVER_CLOCK_KEY) !== '0';
+  return getDisplayDeviceSettings()?.show_clock ?? (readFlag(SCREENSAVER_CLOCK_KEY) !== '0');
 }
 
 /** @param {boolean} on @returns {boolean} the value stored */
@@ -134,7 +137,7 @@ export function setScreensaverClockOn(on) {
  * `cover` crops a portrait photo hard on a landscape screen.
  */
 export function isScreensaverCoverOn() {
-  return readFlag(SCREENSAVER_COVER_KEY) === '1';
+  return getDisplayDeviceSettings()?.cover_photo ?? (readFlag(SCREENSAVER_COVER_KEY) === '1');
 }
 
 /** @param {boolean} on @returns {boolean} the value stored */

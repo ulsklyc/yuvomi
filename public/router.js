@@ -78,6 +78,7 @@ import {
   noteRestoringScroll,
 } from '/utils/scroll-restore.js';
 import { openModal, confirmModal, closeModal } from '/components/modal.js';
+import { createDisplaySettingsSync } from '/utils/display-settings-sync.js';
 import { armScreensaver, disarmScreensaver } from '/components/photo-screensaver.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { placeSidebarNavItems, splitPinnedNavItems } from '/utils/sidebar-pinned.js';
@@ -983,6 +984,8 @@ function applyStartPreferences(res) {
   // der nichts darueber aussagt, wo dieser Haushalt lebt. Ohne getroffene
   // Wahl bleibt die Anzeige also beim Browser, so wie bisher.
   setDisplayTimeZone(res?.data?.timezone ?? null);
+  displaySettingsSync.apply(routerState.currentUser?.access_scope === 'display' ? res?.data?.display_device_settings : null);
+
   // Der Zonen-Hinweis der Uebersicht (#1607) liest genau diese Antwort: sie
   // ist da, bevor die erste Seite zeichnet, also steht er schon neben dem
   // Skelett und schiebt nichts nach.
@@ -1041,7 +1044,10 @@ function moduleSnapshot() {
   })));
 }
 
+const displaySettingsSync = createDisplaySettingsSync();
+
 function startThirdPartyModulePolling() {
+  if (routerState.currentUser?.access_scope === 'display') { displaySettingsSync.start(); return; }
   if (_moduleRefreshTimer || ['split_guest', 'display'].includes(routerState.currentUser?.access_scope)) return;
   _moduleRefreshTimer = setInterval(async () => {
     // Ein verborgener Tab fragt nicht ab: niemand sieht die Navigation, und
@@ -5410,6 +5416,7 @@ function forgetSessionState() {
   // Anmeldeseite stehen.
   closeAllOverlays();
   stopThirdPartyModulePolling();
+  displaySettingsSync.stop();
   stopReminders();
   stopPush();
   // Die zuletzt geoeffneten Orte der Palette (R19): Ziele eines Kontos

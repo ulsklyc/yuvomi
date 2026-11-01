@@ -3325,6 +3325,8 @@
         "displayIssueCode": "Koppelcode genereren",
         "displayScreensaverLabel": "Fotoschermbeveiliging tonen",
         "displayScreensaverHint": "Als niemand deze tablet een tijdje aanraakt, toont hij foto's uit Immich over de wandweergave. Uit totdat je het hier aanzet. Werkt zodra Immich is verbonden.",
+        "displayDeviceSettingsHint": "Deze keuzes gelden alleen voor deze tablet. Online controleert hij elke 30 seconden op wijzigingen; klok en fotovulling gelden bij de volgende start van de schermbeveiliging.",
+        "displayDeviceSettingsLocal": "Hier nog niet opgeslagen. De tablet behoudt zijn lokale instellingen totdat je opslaat.",
         "displayScreensaverOn": "{{name}} toont de fotoschermbeveiliging.",
         "displayScreensaverOff": "{{name}} toont de fotoschermbeveiliging niet meer.",
         "displayDelete": "Verwijderen",
