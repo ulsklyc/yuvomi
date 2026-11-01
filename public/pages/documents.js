@@ -777,6 +777,9 @@ function documentsToolsMenuHtml() {
       <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
     </button>
     <div class="popover-menu documents-tools-menu" id="documents-tools-menu" popover role="menu" aria-label="${esc(label)}">
+      <button type="button" role="menuitem" class="popover-menu__item" data-page-search-target="documents-search">
+        <i data-lucide="search" class="icon-md" aria-hidden="true"></i><span>${esc(t('documents.searchPlaceholder'))}</span>
+      </button>
       ${/* ANSICHT IM MENUE, NUR UNTER 768px (R16, Kopfregel mobil 1a). Der
            Ansichts-Umschalter ist ein Segment und hielt damit eine eigene
            Werkzeugzeile; als Einfachauswahl im Menue (wie die Ansichtswahl

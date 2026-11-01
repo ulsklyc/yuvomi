@@ -161,9 +161,10 @@ export function expandPopoverMenu(panel) {
  * @param {string} opts.id     Eindeutige Panel-ID, z.B. `tasks-tools-menu`.
  * @param {string} opts.label  Zugaenglicher Name, meist t('common.moreActions').
  * @param {Array}  opts.items  Eintraege wie bei popoverMenuHtml.
+ * @param {{id: string, label: string}|null} [opts.search] Existing field offered in the menu below 390px.
  * @returns {string}
  */
-export function pageToolsMenuHtml({ id, label, items = [] }) {
+export function pageToolsMenuHtml({ id, label, items = [], search = null }) {
   // EIN EINTRAG IST EIN KNOPF, KEIN MENUE (Critique 2026-10-05, R16; DESIGN.md
   // Kopfregel). Der Vorrat fuehrte "..." mit genau einem Eintrag ("Lagerorte
   // verwalten"): zwei Tipps und ein Auslassungszeichen fuer eine Handlung.
@@ -172,6 +173,19 @@ export function pageToolsMenuHtml({ id, label, items = [] }) {
   // `data-action`, auf das der delegierte Handler der Seite schon hoert. Ein
   // Schalter (`checked`) bleibt im Menue: sein Zustand braucht den Haken.
   const real = items.flatMap((item) => (item?.group ? item.items ?? [] : [item])).filter((item) => item && !item.separator);
+  if (search && real.length) {
+    const menu = popoverMenuHtml({
+      id, label,
+      items: [
+        { action: 'open-page-search', label: search.label, icon: 'search', attrs: { 'data-page-search-target': search.id } },
+        ...items,
+      ],
+      triggerClass: `btn btn--secondary btn--icon page-tools-btn${real.length === 1 && typeof real[0].checked !== 'boolean' ? ' page-tools-btn--narrow-menu' : ''}`,
+    });
+    const direct = real.length === 1 && typeof real[0].checked !== 'boolean'
+      ? `<span class="page-tools-wide-direct">${pageToolsMenuHtml({ id, label, items })}</span>` : '';
+    return direct + menu;
+  }
   if (real.length === 1 && typeof real[0].checked !== 'boolean') {
     const [item] = real;
     return `
@@ -343,13 +357,19 @@ function watchScroll(panel, trigger) {
     try { panel.hidePopover?.(); } catch { /* war schon zu */ }
   };
   document.addEventListener('scroll', onScroll, { capture: true, passive: true });
-  scrollWatchers.set(panel, onScroll);
+  // A narrow-only trigger can disappear on rotation without any scroll event.
+  const observer = trigger.matches?.('.page-tools-btn--narrow-menu') && typeof ResizeObserver === 'function'
+    ? new ResizeObserver(onScroll) : null;
+  observer?.observe(trigger);
+  scrollWatchers.set(panel, { onScroll, observer });
 }
 
 function unwatchScroll(panel) {
-  const onScroll = scrollWatchers.get(panel);
-  if (!onScroll) return;
+  const watcher = scrollWatchers.get(panel);
+  if (!watcher) return;
+  const { onScroll, observer } = watcher;
   scrollWatchers.delete(panel);
+  observer?.disconnect();
   if (typeof document.removeEventListener === 'function') {
     document.removeEventListener('scroll', onScroll, { capture: true });
   }

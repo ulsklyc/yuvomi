@@ -657,7 +657,7 @@ function wireBirthdaySwipe(host) {
 function importActionHtml() {
   if (readOnly() || moduleAccess('contacts') === 'none') return '';
   return pageToolsMenuHtml({
-    id: 'birthdays-tools-menu',
+    id: 'birthdays-tools-menu', search: { id: 'birthdays-search', label: t('birthdays.searchPlaceholder') },
     label: t('common.moreActions'),
     items: [
       // `user-plus` statt `download` (Critique R22, D7): der Eintrag holt
