@@ -55,6 +55,7 @@ import {
   resolvePermissions, buildSessionModuleAccess, clientPermissions,
   invitePresetPermissions, isValidInvitePreset, writeSubjectPermissions,
   applyChildStartPermissions, INVITE_PRESET_DEFAULT,
+  userForRequest,
 } from './permissions.js';
 import { isAdminRequest, requireAdmin } from './middleware/require-admin.js';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';
@@ -1046,7 +1047,7 @@ function applyRoleModuleAccess(req) {
       .get(req.authUserId);
     if (user) {
       req.sessionModuleAccess = buildSessionModuleAccess(
-        resolvePermissions(db.get(), user, { isDisplay: req.authMethod === 'display' }),
+        resolvePermissions(db.get(), userForRequest(req, user), { isDisplay: req.authMethod === 'display' }),
       );
     }
   } catch (err) {
@@ -2858,7 +2859,7 @@ router.get('/me', requireAuth, (req, res) => {
     if (req.authMethod === 'api_token') {
       return res.json({
         user: publicUser(user),
-        permissions: clientPermissions(db.get(), user),
+        permissions: clientPermissions(db.get(), userForRequest(req, user)),
         householdSize: householdSize(db.get()),
         initialsRoster: initialsRoster(db.get(), user.id),
         othersCanRead: othersCanRead(db.get(), user.id),
@@ -3229,6 +3230,21 @@ router.put('/2fa/require', requireAuth, requireAdmin, csrfMiddleware, (req, res)
  * Listet alle Familienmitglieder (für Zuweisung in Kalender, Tasks etc.).
  * Response: { data: User[] }
  */
+/**
+ * Die eigenen Geraete gehoeren der Person selbst, und ein API-Token ist das
+ * nicht: ein Admin kann eines mit dem `subject_user_id` eines Mitglieds
+ * ausstellen und handelte damit als dieses Mitglied. Die Geraeteliste wuerde so
+ * doch zur Auskunft, die `POST /users/:id/devices/sign-out` bewusst nicht gibt.
+ */
+function refuseIntegrationToken(req, res, next) {
+  if (req.authMethod === 'api_token' && req.authDeviceId == null) {
+    return res.status(403).json({
+      error: 'An API token cannot manage signed-in devices.', code: 403, reason: 'session_required',
+    });
+  }
+  next();
+}
+
 /** Was eine Person ueber ein eigenes Geraet erfaehrt. Nie das Geheimnis. */
 function publicDevice(row, currentId = null) {
   return {
@@ -3309,7 +3325,7 @@ router.post('/devices', requireAuth, csrfMiddleware, (req, res) => {
  * Die eigenen angemeldeten Geraete, nie die einer anderen Person: wann jemand
  * welches Telefon benutzt, geht auch den Admin nichts an (DECISIONS Eintrag 1).
  */
-router.get('/devices', requireAuth, (req, res) => {
+router.get('/devices', requireAuth, refuseIntegrationToken, (req, res) => {
   try {
     const rows = db.get().prepare(`
       SELECT t.* FROM api_tokens t
@@ -3355,7 +3371,7 @@ router.delete('/devices/current', requireAuth, csrfMiddleware, (req, res) => {
  * 404 fuer "gibt es nicht" und "gehoert dir nicht": der Unterschied waere die
  * Auskunft, die diese Route nicht gibt.
  */
-router.delete('/devices/:id', requireAuth, csrfMiddleware, (req, res) => {
+router.delete('/devices/:id', requireAuth, refuseIntegrationToken, csrfMiddleware, (req, res) => {
   try {
     const id = /^\d+$/.test(req.params.id) ? Number(req.params.id) : NaN;
     if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid device ID.', code: 400 });

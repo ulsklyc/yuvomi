@@ -750,7 +750,11 @@ const CASE_REASONS = {
   '/api/v1/auth/setup': { post: '`setup_completed` (403, setup has already been completed)' },
   '/api/v1/auth/users/{id}': { patch: '`account_deactivated` (400, a deactivated account cannot become an administrator)' },
   '/api/v1/auth/api-tokens': { post: DEACTIVATED_SUBJECT },
-  '/api/v1/auth/devices': { post: '`device_credential` (403, a device cannot add another device), `session_required` (403, an API token cannot add a device), `not_a_household_member` (403, the account is no household member)' },
+  '/api/v1/auth/devices': {
+    get: '`session_required` (403, an API token cannot read a person\'s devices)',
+    post: '`device_credential` (403, a device cannot add another device), `session_required` (403, an API token cannot add a device), `not_a_household_member` (403, the account is no household member)',
+  },
+  '/api/v1/auth/devices/{id}': { delete: '`session_required` (403, an API token cannot manage a person\'s devices)' },
   '/api/v1/auth/devices/current': { delete: '`device_credential_required` (403, only a signed-in device can sign itself out here)' },
   '/api/v1/auth/users/{id}/devices/sign-out': { post: '`browser_session_required` (403, only a signed-in browser session can do this)' },
 };

@@ -256,6 +256,47 @@ test('Deaktivieren und Loeschen beenden die Geraete', async () => {
   assert.equal(await meStatus(credential), 401);
 });
 
+test('ein Admin ist auf dem Geraet auch in der Rechte-Aufloesung ein Mitglied', async () => {
+  const fresh = await login('admin', 'adminpass123');
+  const { credential } = await device(fresh);
+  const me = await (await fetch(`${API}/auth/me`, { headers: bearer(credential) })).json();
+  assert.equal(me.permissions.admin, false, 'die App bekommt kein Admin-Rechtebild');
+  assert.equal(me.user.role, 'admin', 'die Person selbst bleibt, was sie ist');
+
+  const body = JSON.stringify({ name: 'Haushalt', scope: 'household' });
+  const session = await fetch(`${API}/notes/categories`, { method: 'POST', headers: sessionHeaders(fresh), body });
+  assert.equal(session.status, 201, 'die Sitzung darf die Haushalts-Kategorie');
+  const phone = await fetch(`${API}/notes/categories`, { method: 'POST', headers: bearer(credential), body });
+  assert.equal(phone.status, 403, 'canManageHousehold liest die Rolle aus users');
+
+  const { requestHasCapability } = await import('../server/permissions.js');
+  const key = 'notes_manage_household_categories';
+  const asAdmin = { authUserId: me.user.id, authRole: 'admin' };
+  assert.equal(requestHasCapability(db, asAdmin, key), true, 'die Sitzung des Admins');
+  assert.equal(
+    requestHasCapability(db, { authUserId: me.user.id, authRole: 'member', authDeviceId: 1 }, key),
+    false,
+    'userHasCapability liest die Rolle aus users',
+  );
+});
+
+test('ein API-Token handelt nie als Geraet-Inhaber: die Geraeteliste bleibt zu', async () => {
+  const target = await member();
+  const { data } = await device(target.session, { name: 'Privates Telefon' });
+  const token = integrationToken(target.id);
+
+  const list = await fetch(`${API}/auth/devices`, { headers: bearer(token) });
+  assert.equal(list.status, 403);
+  assert.equal((await list.json()).reason, 'session_required');
+  const revoke = await fetch(`${API}/auth/devices/${data.id}`, { method: 'DELETE', headers: bearer(token) });
+  assert.equal(revoke.status, 403);
+  assert.equal(
+    (await (await fetch(`${API}/auth/devices`, { headers: sessionHeaders(target.session) })).json()).data.length,
+    1,
+    'das Geraet steht noch',
+  );
+});
+
 test('ein Admin ist auf dem Geraet ein Mitglied: keine Admin-Route, weder hier noch dort', async () => {
   const { credential } = await device(admin);
   assert.equal((await fetch(`${API}/displays`, { headers: sessionHeaders(admin) })).status, 200, 'die Sitzung darf');
