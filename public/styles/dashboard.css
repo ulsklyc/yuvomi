@@ -3836,7 +3836,10 @@ svg.weather-forecast__icon {
  * Chrome" gilt, das Blatt ist Inhalt. */
 .today-cockpit__grid {
   display: grid;
-  grid-template-columns: 1fr;
+  /* minmax(0, ...) statt 1fr (#2297): `1fr` waechst bis zur Min-Content-Breite
+   * seines breitesten Kindes, und `overflow: hidden` schnitt dann jede Zeile
+   * rechts ab. Die Spalte ist so breit wie die Karte, nie breiter. */
+  grid-template-columns: minmax(0, 1fr);
   background: var(--color-surface);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
@@ -6783,14 +6786,16 @@ button.today-cockpit__more--link {
     height: calc(var(--space-6) + var(--space-0h));
   }
 
-  .today-cockpit__heading {
-    flex-wrap: nowrap;
-  }
-
+  /* DIE SUMME BRICHT UNTER DEN TITEL, WENN SIE NICHT DANEBEN PASST (#2297).
+   * Sie stand `nowrap` in einer Zeile, die nicht umbrechen durfte: auf Deutsch
+   * („noch 2 Termine · 1 Aufgabe ueberfaellig") reichten dafuer 375px nicht,
+   * der Titel brach zweizeilig um, und der Kopf war breiter als die Karte.
+   * Passt sie, steht sie wie im Entwurf rechts neben dem Titel; sonst rutscht
+   * sie rechtsbuendig in die Zeile darunter. */
   .today-cockpit__summary {
     margin-inline-start: auto;
     font-size: var(--type-caption);
-    white-space: nowrap;
+    text-align: end;
   }
 
   .today-timeline--mini {

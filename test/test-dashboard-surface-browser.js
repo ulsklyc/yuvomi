@@ -283,6 +283,45 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 375, height: 812 }
   });
 }
 
+/* DIE SUMME DES HEUTE-BLATTS BRICHT UM, STATT DIE KARTE ZU VERBREITERN (#2297).
+ * Mobil stand sie `nowrap` neben dem Titel. Reichte die Zeile nicht, wuchs die
+ * eine Spalte des Blatts (`1fr` hat als Minimum die Min-Content-Breite des
+ * Kopfes) ueber die Karte hinaus, und `overflow: hidden` schnitt jede Zeile
+ * rechts ab - „Ganztaegig" und „Ueberfaellig" waren weg. Auf Deutsch reichte
+ * dafuer ein Telefon mit 375px und „noch 2 Termine · 1 Aufgabe ueberfaellig".
+ * Die Summe ist gesetzt statt aus dem Seed gezaehlt: die Sonde misst die
+ * laengste Zeile, nicht die des Tages. */
+for (const width of [375, 320]) {
+  test(`Heute-Blatt ${width}px: eine lange Summe macht die Karte nicht breiter, sie bricht unter den Titel`, async () => {
+    const page = await openPage(harness, { device: 'mobile' });
+    await page.setViewport({ width, height: 812, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    await gotoRoute(page, '/');
+    await freeze(page);
+    const m = await page.evaluate(() => {
+      const grid = document.querySelector('.today-cockpit__grid');
+      const heading = grid?.querySelector('.today-cockpit__heading');
+      if (!heading) return null;
+      if (!heading.querySelector('.today-cockpit__summary')) {
+        heading.insertAdjacentHTML('beforeend', '<p class="today-cockpit__summary"></p>');
+      }
+      heading.querySelector('.today-cockpit__summary').textContent = 'noch 12 Termine · 13 Aufgaben überfällig';
+      const edge = grid.getBoundingClientRect().right;
+      const over = [...grid.querySelectorAll('.today-cockpit__header, .today-cockpit-card')]
+        .map((el) => ({ who: el.className.split(' ')[0], by: Math.round(el.getBoundingClientRect().right - edge) }))
+        .filter((o) => o.by > 0);
+      const title = heading.querySelector('h2');
+      const cs = getComputedStyle(title);
+      const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
+      return { over, titleLines: Math.round(title.getBoundingClientRect().height / lh) };
+    });
+    await page.close();
+
+    assert.ok(m, 'Reichweite: der Seed zeigt das Heute-Blatt mit Kopf');
+    assert.deepEqual(m.over, [], `Ueber die Karte hinaus: ${m.over.map((o) => `${o.who} +${o.by}px`).join(', ')}`);
+    assert.equal(m.titleLines, 1, `„Heute wichtig" bricht in ${m.titleLines} Zeilen um`);
+  });
+}
+
 test('Kopf desktop: nicht hoeher als vorher, Werkzeuge rechts auf Hoehe des Datums', async () => {
   const page = await openPage(harness, { device: 'desktop' });
   await gotoRoute(page, '/');
