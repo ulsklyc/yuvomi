@@ -20,7 +20,7 @@ export function corePaths() {
         summary: 'Get application version',
         tag: 'System',
         auth: false,
-        description: 'Public bootstrap metadata for login/setup. When a valid session or API token is supplied, the response also includes the exact app version.',
+        description: 'Public bootstrap metadata for login/setup, including `product` and `client_api`, which let a client recognise an instance and tell whether it is new enough before anyone signs in. When a valid session or API token is supplied, the response also includes the exact app version. A client probing an instance sends no credential: an invalid one answers 401.',
         responses: {
           200: {
             description: 'Application version',
