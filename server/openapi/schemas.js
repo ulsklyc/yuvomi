@@ -1280,6 +1280,55 @@ export const schemas = {
           },
           required: ['code', 'name', 'platform', 'device_id'],
         },
+        UpcomingReminder: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            entity_type: { type: 'string', description: 'The origin of the reminder, for example `task` or `event`.' },
+            entity_id: { type: 'integer' },
+            entity_title: {
+              type: ['string', 'null'],
+              description: 'Title of the entity, as far as the origin has one.',
+            },
+            remind_at: {
+              type: 'string',
+              description: 'As stored: UTC without a zone suffix, on rows from up to v2.68.0 possibly with an offset. Schedule from `fires_at` instead.',
+            },
+            fires_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'The moment the reminder fires, in UTC with `Z`, whole seconds.',
+            },
+            dismissed: { type: 'integer', enum: [0] },
+            pushed_at: { type: ['string', 'null'] },
+            assigned_from: {
+              type: ['integer', 'null'],
+              description: 'Set on a reminder inherited from the person who created the entity.',
+            },
+            created_by: { type: 'integer' },
+            created_at: { type: 'string', format: 'date-time' },
+            cycle_anchor_kind: {
+              type: ['string', 'null'],
+              description: 'On `cycle_period`: whether this is the caller\'s own cycle or one passed on to a partner.',
+            },
+            cycle_owner_name: { type: 'string', description: 'Only on a `partner_period` row.' },
+            prevention_subject_name: { type: 'string', description: 'Only on an inherited `health_prevention_due` row.' },
+            move_notice: {
+              type: 'object',
+              additionalProperties: true,
+              description: 'Only on `shopping_move_returned`.',
+            },
+            target_url: { type: 'string', description: 'Only on `shopping_move_returned`.' },
+          },
+          required: ['id', 'entity_type', 'entity_id', 'remind_at', 'fires_at', 'created_by'],
+        },
+        UpcomingReminderList: {
+          type: 'object',
+          properties: {
+            data: { type: 'array', maxItems: 200, items: { $ref: '#/components/schemas/UpcomingReminder' } },
+          },
+          required: ['data'],
+        },
         DmsAccount: {
           type: 'object',
           description: 'A configured DMS account. The api_token is never returned; use has_token to check whether one is stored.',

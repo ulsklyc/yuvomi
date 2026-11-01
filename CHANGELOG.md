@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Yuvomi instance, and `client_api` is a whole number for the contract a native client relies on. A client can
   recognise a server and tell whether it is new enough before anyone signs in. The exact version stays
   behind sign-in.
+- **Upcoming reminders for a native client.** `GET /api/v1/reminders/upcoming` lists your reminders that
+  are not due yet within a window of up to 14 days, so an app can schedule them on the device. Each row says
+  exactly when it fires in `fires_at`, in UTC, also for older reminders stored with an offset. `types` can
+  narrow the list, for example to tasks and events, and it follows the same rules as the reminders you
+  already see: nothing private, nothing from a module that is switched off. A task that is done or archived
+  stays out of the list.
 - **Signed-in devices, the groundwork for a native client.** New routes under `/api/v1/auth/devices` let a
   household member exchange a sign-in for a device credential, list their own devices and sign one out. A
   device acts as the person with less reach than a browser session: an administrator is an ordinary member

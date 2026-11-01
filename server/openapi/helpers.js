@@ -82,6 +82,7 @@ function jsonBody(schemaRef, description = 'JSON request body') {
 
 function op({
   summary,
+  operationId,
   tag,
   description,
   auth = true,
@@ -96,6 +97,7 @@ function op({
   const operation = {
     tags: [tag],
     summary,
+    ...(operationId ? { operationId } : {}),
     responses: responses ?? {
       200: { description: 'Successful response' },
       401: { $ref: '#/components/responses/Unauthorized' },
