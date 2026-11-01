@@ -329,7 +329,7 @@ export async function render(container, { user, signal }) {
         <div class="page-toolbar__actions">
           ${readOnly() ? '' : `
           <div class="notes-manage-categories notes-toolbar__tools">
-            ${pageToolsMenuHtml({ id: 'notes-tools-menu', label: t('common.moreActions'), items: [
+            ${pageToolsMenuHtml({ id: 'notes-tools-menu', search: { id: 'notes-search', label: t('notes.searchPlaceholder') }, label: t('common.moreActions'), items: [
               { action: 'manage-categories', label: t('category.manageTitle'), icon: 'tags' },
             ] })}
           </div>`}

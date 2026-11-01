@@ -635,3 +635,68 @@ test('R22: ohne Panel oeffnet nichts, und ein Punkt ohne Zahl faellt auf den Aus
   showPopoverMenuAt(panel, { x: Number.NaN, y: 4 });
   assert.equal(panel.style.left, '100px');
 });
+
+test('#2443: a single direct tool gains a search menu for narrow headers', () => {
+  const html = pageToolsMenuHtml({ id: 'birthdays-tools', label: 'More',
+    search: { id: 'birthday-search', label: 'Search <birthdays>' },
+    items: [{ action: 'import-contacts', label: 'Import', icon: 'book-user' }],
+  });
+  assert.match(html, /class="page-tools-wide-direct"/);
+  assert.match(html, /page-tools-btn--narrow-menu/);
+  assert.match(html, /popovertarget="birthdays-tools"/);
+  assert.match(html, /data-page-search-target="birthday-search"/);
+  assert.match(html, /Search &lt;birthdays&gt;/);
+  assert.equal((html.match(/data-action="import-contacts"/g) ?? []).length, 2, 'same action in the wide button and narrow menu');
+});
+
+test('#2443: an existing multi-tool menu keeps its state and gains only one search entry', () => {
+  const html = pageToolsMenuHtml({ id: 'tools', label: 'More', search: { id: 's', label: 'Search' },
+    items: [{ action: 'view', label: 'List', icon: 'list', checked: true }, { action: 'export', label: 'Export', icon: 'download' }],
+  });
+  assert.doesNotMatch(html, /page-tools-wide-direct|page-tools-btn--narrow-menu/);
+  assert.equal((html.match(/data-page-search-target=/g) ?? []).length, 1);
+  assert.match(html, /aria-checked="true"/);
+});
+
+test('#2443: the menu reveals the existing search before focusing and preserves query handling', async () => {
+  const { wirePageSearch } = await import('../public/utils/page-search.js');
+  const classes = new Set(); const queries = []; const listeners = {};
+  const root = { classList: { add: c => classes.add(c), remove: c => classes.delete(c), toggle: (c,on) => on ? classes.add(c) : classes.delete(c) } };
+  const entry = { dataset: { pageSearchTarget: 's' }, addEventListener: (type,fn) => { listeners.menu = fn; } };
+  const other = { dataset: { pageSearchTarget: 'other' }, addEventListener: () => assert.fail('another field must not be wired') };
+  let focused = false;
+  const input = { value: '', closest: sel => sel === '.page-search' ? root : null,
+    addEventListener: (type,fn) => { listeners[type] = fn; },
+    focus: () => { assert.ok(classes.has('is-revealed'), 'hidden fields cannot receive focus'); focused = true; },
+  };
+  const handle = wirePageSearch({ querySelector: () => input, querySelectorAll: () => [entry,other] }, { id:'s', delay:0, onQuery: q => queries.push(q) });
+  assert.equal(typeof listeners.menu, 'function');
+  listeners.menu();
+  assert.equal(focused, true); assert.equal(classes.has('is-revealed'), false);
+  input.value = 'Alex'; listeners.input();
+  assert.deepEqual(queries, ['Alex']); assert.equal(classes.has('is-filled'), true);
+  handle.clear(); assert.equal(input.value, ''); assert.equal(classes.has('is-filled'), false);
+});
+
+test('#2443: a narrow-only menu closes and releases its observer when its trigger disappears', () => {
+  const previous = globalThis.ResizeObserver;
+  let resize; let disconnected = false;
+  globalThis.ResizeObserver = class {
+    constructor(callback) { resize = callback; }
+    observe() {}
+    disconnect() { disconnected = true; }
+  };
+  try {
+    withScrollProbe(({ doc, moving, root, panel }) => {
+      moving.matches = selector => selector === '.page-tools-btn--narrow-menu';
+      open(root, panel);
+      assert.equal(typeof resize, 'function');
+      resize(); assert.equal(panel.closedCount, 0);
+      moving.getBoundingClientRect = () => ({top:0,bottom:0,left:0,right:0});
+      resize();
+      assert.equal(panel.closedCount, 1);
+      assert.equal(disconnected, true);
+      assert.equal(doc.scrollListeners().length, 0);
+    });
+  } finally { globalThis.ResizeObserver = previous; }
+});

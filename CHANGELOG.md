@@ -56,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin sets up, in line with how private entries already work.
 
 ### Fixed
+- **Search leaves more room for list-page titles on narrow phones.** Below 390px of
+  page width, Birthdays, Contacts, Documents, Inventory and Notes offer search in the
+  tools menu. A filled search stays visible, and existing direct actions return at
+  wider widths. Titles retain their size and the header stays on one row (#2443).
 - **The Budget title stands in full on narrow phones** (#2440). Below 390px wide the title sat next
   to the month stepper and read "Bud..." at 360px. There the month now takes a row of its own under
   the title, with the arrows at the ends of the row, and the title keeps its size. The tabs without

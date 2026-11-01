@@ -184,7 +184,7 @@ function toolbarActionsHtml() {
   return `${readOnly() ? '' : `
           <button type="button" class="btn btn--secondary" id="contacts-select-cancel" hidden>${esc(t('common.cancel'))}</button>
           ${pageToolsMenuHtml({
-            id: 'contacts-tools-menu',
+            id: 'contacts-tools-menu', search: { id: 'contacts-search', label: t('contacts.searchPlaceholder') },
             label: t('common.moreActions'),
             items: [
               { action: 'select-mode', label: t('contacts.selectButton'), icon: 'list-checks' },

@@ -12433,3 +12433,29 @@ p.field-hint--warn svg {
   display: grid;
   gap: var(--space-2);
 }
+
+/* #2443: the page root measures the title row, including its inline padding.
+ * Keep module-surface available to list/detail layouts. */
+:is(.birthdays-page, .contacts-page, .documents-page, .inventory-page, .notes-page) {
+  container: page-title-root / inline-size;
+}
+.app-page--list-detail:is(.birthdays-page, .contacts-page, .documents-page, .inventory-page, .notes-page) {
+  container-name: module-surface page-title-root;
+}
+.page-toolbar [data-page-search-target],
+.page-toolbar .page-tools-btn--narrow-menu {
+  display: none;
+}
+.page-tools-wide-direct { display: contents; }
+
+@media (max-width: 1023px) {
+  @container page-title-root (width < 390px) {
+    .page-toolbar [data-page-search-target] { display: flex; }
+    .page-toolbar .page-tools-btn--narrow-menu { display: inline-flex; }
+    .page-toolbar .page-tools-wide-direct { display: none; }
+    html:not([data-module-readonly]) .page-toolbar.page-toolbar--title-tools:has([data-page-search-target]) > .page-search:not(:focus-within):not(.is-filled):not(.is-revealed),
+    .documents-page .page-toolbar.page-toolbar--title-tools:has([data-page-search-target]) > .page-search:not(:focus-within):not(.is-filled):not(.is-revealed) {
+      display: none;
+    }
+  }
+}

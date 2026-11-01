@@ -65,6 +65,15 @@ export function wirePageSearch(container, { id, onQuery, delay = 200 } = {}) {
   const control = input.closest('.page-search__control');
   const clearBtn = control?.querySelector('[data-page-search-clear]');
   const root = input.closest('.page-search');
+  for (const entry of container.querySelectorAll?.('[data-page-search-target]') ?? []) {
+    if (entry.dataset.pageSearchTarget !== id) continue;
+    entry.addEventListener('click', () => {
+      // Reveal before focusing: a field hidden by the container query cannot receive focus.
+      root?.classList.add('is-revealed');
+      input.focus();
+      root?.classList.remove('is-revealed');
+    });
+  }
   const syncClear = () => {
     if (clearBtn) clearBtn.hidden = !input.value;
     root?.classList.toggle('is-filled', Boolean(input.value));

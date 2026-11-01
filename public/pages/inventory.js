@@ -2381,7 +2381,7 @@ function inventoryToolsHtml() {
   return `
     <div class="page-toolbar__actions">
       ${pageToolsMenuHtml({
-        id: 'inventory-tools-menu',
+        id: 'inventory-tools-menu', search: { id: 'inventory-search', label: t('inventory.searchPlaceholder') },
         label: t('common.moreActions'),
         items: [
           { action: 'manage-locations', label: t('inventory.manageLocations'), icon: 'map-pin' },

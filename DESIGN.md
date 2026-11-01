@@ -3863,6 +3863,12 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    schon bis 65px vor die Kante (R14 P7 bleibt, die Zeile faltet beim Scrollen, R17 K1).
    `test:mobile-chrome` haelt Traegerliste, Geltung nur unter 768px und „nie neben einer
    Bar-Zeile".
+   **Narrow list titles (#2443):** below 390px of page-root width, Birthdays, Contacts,
+   Documents, Inventory and Notes fold their empty search into the tools menu. A
+   single direct tool and search become one menu at that width; the direct tool returns
+   above it. Search with focus or a query keeps the existing field and reveals it before
+   programmatic focus. Read-only pages without a tools menu keep their search icon.
+   The module seal, title size, filter counts and calendar filter are preserved.
 2. **Keine losen Verwaltungs-Icons oder Textknoepfe im Kopf.** Kategorien, Tags, Lagerorte,
    Mehrfachauswahl, Import, Verlauf stehen im Werkzeugmenue - mit Icon UND Text; ein
    Ansichts-Schalter dort ist ein `menuitemcheckbox` mit Haken.
