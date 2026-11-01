@@ -5,6 +5,7 @@ import { isoCBOR } from '@simplewebauthn/server/helpers';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'passkey-test-session-secret';
+process.env.RATE_LIMIT_MAX_ATTEMPTS = '1000';
 process.env.BASE_URL = 'https://planner.example.test';
 delete process.env.AUTH_ALLOW_PASSWORD_LOGIN;
 
@@ -121,14 +122,14 @@ test('origin configuration is explicit and never taken from a request Host', () 
   process.env.BASE_URL = saved;
 });
 
-test('HTTP enrollment and sign-in preserve CSRF, session, policy, account and 2FA gates', async () => {
+async function httpFixture() {
   const { default: express } = await import('express');
   const { router, sessionMiddleware } = await import('../server/auth.js');
-  const { hashPassword } = await import('../server/utils/password.js');
   const app = express(); app.use(express.json()); app.use(sessionMiddleware);
   app.post('/__test/stale', (req, res) => { req.session.authenticatedAt = 0; res.json({ ok: true }); });
+  app.get('/__test/proof', (req, res) => res.json({ userId: req.session.userId, authenticatedAt: req.session.authenticatedAt, sessionId: req.sessionID, csrf: req.session.csrfToken }));
   app.use('/api/v1/auth', router);
-  const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+  const server = await new Promise((resolve, reject) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); s.on('error', reject); });
   const base = `http://127.0.0.1:${server.address().port}`;
   const cookies = new Map(); let csrf = '';
   async function call(path, method = 'GET', body, headers = {}) {
@@ -139,6 +140,12 @@ test('HTTP enrollment and sign-in preserve CSRF, session, policy, account and 2F
     return { status:response.status, data };
   }
   const route = (p, method, body, headers) => call('/api/v1/auth' + p, method, body, headers);
+  return { route, call, cookies, close: async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); } };
+}
+
+test('HTTP enrollment and sign-in preserve CSRF, session, policy, account and 2FA gates', async () => {
+  const { route, call, cookies, close } = await httpFixture();
+  const { hashPassword } = await import('../server/utils/password.js');
   const person = user(); const password = 'Test-only-password-123!';
   database.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await hashPassword(password), person.id);
   try {
@@ -200,7 +207,7 @@ test('HTTP enrollment and sign-in preserve CSRF, session, policy, account and 2F
   } finally {
     delete process.env.AUTH_ALLOW_PASSWORD_LOGIN;
     for (const key of ['OIDC_ISSUER','OIDC_CLIENT_ID','OIDC_CLIENT_SECRET','OIDC_REDIRECT_URI']) delete process.env[key];
-    server.closeAllConnections(); await new Promise(resolve=>server.close(resolve));
+    await close();
   }
 });
 
@@ -216,4 +223,81 @@ test('registration checks eligibility again after asynchronous cryptographic ver
   const options = await passkeys.beginRegistration(database, person, 'changed-policy');
   await assert.rejects(passkeys.finishRegistration(database, person.id, 'changed-policy', registration(options, device), 'Phone', () => false));
   assert.equal(passkeys.list(database, person.id).length, 0);
+});
+
+
+test('reauthentication binds challenges to the current account and separates anonymous sign-in', async () => {
+  const person = user(); const other = user();
+  const own = await enroll(person); const foreign = await enroll(other);
+  const session = 'reauth-session';
+  let options = await passkeys.beginAuthentication(database, session, person.id);
+  assert.deepEqual(options.allowCredentials.map(c => c.id), [own.device.id]);
+  await assert.rejects(passkeys.finishAuthentication(database, session, assertion(options, foreign.device, foreign.handle), person.id));
+  await assert.rejects(passkeys.finishAuthentication(database, session, assertion(options, own.device, own.handle), person.id), 'failed proof consumes the challenge');
+  options = await passkeys.beginAuthentication(database, session);
+  await assert.rejects(passkeys.finishAuthentication(database, session, assertion(options, own.device, own.handle), person.id), 'sign-in challenge cannot reauthenticate');
+  options = await passkeys.beginAuthentication(database, session, person.id);
+  await assert.rejects(passkeys.finishAuthentication(database, session, assertion(options, own.device, own.handle)), 'reauth challenge cannot sign in');
+  options = await passkeys.beginAuthentication(database, session, person.id);
+  assert.equal((await passkeys.finishAuthentication(database, session, assertion(options, own.device, null), person.id)).userId, person.id, 'allowCredentials may omit the handle');
+});
+
+test('HTTP inline reauth refreshes only after correct proof and preserves identity, CSRF, 2FA and policy', async () => {
+  const { route, call, close } = await httpFixture();
+  const { hashPassword } = await import('../server/utils/password.js');
+  const { generateCode } = await import('../server/utils/totp.js');
+  const { regenerateRecoveryCodes } = await import('../server/services/two-factor.js');
+  const person = user(); const password = 'Reauth-test-only-123!';
+  const hash = await hashPassword(password);
+  database.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, person.id);
+  const own = await enroll(person);
+  const secret = 'JBSWY3DPEHPK3PXP';
+  try {
+    assert.equal((await route('/passkeys/reauth/verify', 'POST', { method:'password', password })).status, 401);
+    await route('/login', 'POST', {username:person.username, password});
+    await call('/__test/stale', 'POST', {});
+    const before = (await call('/__test/proof')).data;
+    const checkStale = async () => assert.equal((await route('/passkeys/register/options', 'POST', {})).data.reason, 'passkey_reauth_required');
+    await checkStale();
+    assert.equal((await route('/passkeys/reauth/verify', 'POST', {method:'password', password:'wrong'})).status, 400);
+    assert.equal((await route('/passkeys/reauth/verify', 'POST', {method:'password', password}, {'X-CSRF-Token':''})).status, 403);
+    assert.equal((await route('/passkeys/reauth/options', 'POST', {}, {Origin:'https://evil.example.test'})).status, 403);
+    await checkStale();
+    assert.equal((await route('/passkeys/reauth/verify', 'POST', {method:'password', password})).status, 200);
+    assert.ok((await route('/passkeys/register/options', 'POST', {})).data.data.challenge);
+    let after = (await call('/__test/proof')).data;
+    assert.equal(after.userId, before.userId); assert.equal(after.sessionId, before.sessionId); assert.equal(after.csrf, before.csrf);
+    assert.ok(after.authenticatedAt > before.authenticatedAt);
+    await call('/__test/stale', 'POST', {});
+    database.prepare("INSERT INTO user_totp (user_id, secret, confirmed_at) VALUES (?, ?, '2026-01-01')").run(person.id, secret);
+    assert.equal((await route('/passkeys')).data.data.second_factor_required, true);
+    assert.equal((await route('/passkeys/reauth/verify', 'POST', {method:'password', password})).status, 400);
+    const code = generateCode(secret, Date.now());
+    assert.equal((await route('/passkeys/reauth/verify', 'POST', {method:'password', password:'wrong', code})).status, 400);
+    assert.equal(database.prepare('SELECT last_step FROM user_totp WHERE user_id = ?').get(person.id).last_step, null, 'wrong password does not consume TOTP');
+    await checkStale();
+    assert.equal((await route('/passkeys/reauth/verify', 'POST', {method:'password', password, code})).status, 200);
+    await call('/__test/stale', 'POST', {});
+    assert.equal((await route('/passkeys/reauth/verify', 'POST', {method:'password', password, code})).status, 400, 'TOTP cannot be replayed');
+    let options = (await route('/passkeys/reauth/options', 'POST', {})).data.data;
+    assert.equal((await route('/passkeys/reauth/verify', 'POST', {method:'passkey', credential:assertion(options, own.device, own.handle)})).status, 400, 'passkey also requires the configured second factor');
+    await checkStale();
+    const recovery = regenerateRecoveryCodes(database, person.id).recovery_codes[0];
+    options = (await route('/passkeys/reauth/options', 'POST', {})).data.data;
+    assert.equal((await route('/passkeys/reauth/verify', 'POST', {method:'passkey', credential:assertion(options, own.device, null, {counter:2}), code:recovery})).status, 200);
+    after = (await call('/__test/proof')).data;
+    assert.equal(after.sessionId, before.sessionId); assert.equal(after.userId, person.id);
+    assert.ok((await route('/passkeys/register/options', 'POST', {})).data.data.challenge);
+    await call('/__test/stale', 'POST', {});
+    database.prepare("UPDATE users SET password_hash = '$oidc$' WHERE id = ?").run(person.id);
+    assert.equal((await route('/passkeys/reauth/options', 'POST', {})).data.reason, 'passkey_policy');
+    assert.equal((await route('/passkeys/reauth/verify', 'POST', {method:'password', password})).data.reason, 'passkey_policy');
+    database.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, person.id);
+    await checkStale();
+    const token = 'yuvomi_reauth_api_test';
+    database.prepare('INSERT INTO api_tokens (name, token_hash, token_prefix, created_by) VALUES (?, ?, ?, ?)').run('Reauth token', digest(token).toString('hex'), 'yuvomi_test', person.id);
+    for (const path of ['/passkeys/reauth/options', '/passkeys/reauth/verify']) {
+      assert.equal((await route(path, 'POST', {method:'password', password}, {Authorization:`Bearer ${token}`})).data.reason, 'browser_session_required');
+    }
+  } finally { await close(); }
 });

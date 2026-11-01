@@ -407,7 +407,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Household members can sign in with passkeys without an external identity provider.**
   Add and name multiple passkeys in account settings, then sign in without a username.
   Managing passkeys requires a recent browser sign-in; existing SSO-only and second-factor
-  policies still apply. Password and SSO recovery paths remain available.
+  policies still apply. An inline password or passkey confirmation dialog continues
+  a pending change without leaving account settings, including enabled second factors.
+  Password and SSO recovery paths remain available.
 - **Late completion decay (opt-in).** Households can have late completions pay less: administrators
   switch it on in the rewards settings, off by default. A task ticked off after its due day earns one
   point less for each day it is past due, and always at least one point - finishing still pays. What a
