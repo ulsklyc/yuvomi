@@ -6980,6 +6980,10 @@
         "failed": "Klíč se nepodařilo ověřit. Zkuste to znovu nebo použijte jiný způsob.",
         "tooManyAttempts": "Příliš mnoho pokusů. Zkuste to později.",
         "removeConfirm": "Odebrat tento klíč? Po přihlášení jiným způsobem jej můžete znovu přidat.",
-        "signIn": "Přihlásit se přístupovým klíčem"
+        "signIn": "Přihlásit se přístupovým klíčem",
+        "reauthTitle": "Potvrď svou totožnost",
+        "reauthLead": "Pro pokračování potvrď heslem nebo existujícím přístupovým klíčem. Pokud máš zapnuté dvoufázové ověření, zadej také jeho kód.",
+        "reauthFailed": "Potvrzení se nezdařilo. Zkontroluj heslo nebo přístupový klíč a případný kód druhého faktoru.",
+        "confirmWithPasskey": "Potvrdit přístupovým klíčem"
     }
 }

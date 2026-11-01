@@ -6800,6 +6800,10 @@
         "failed": "Anahtar doğrulanamadı. Yeniden deneyin veya başka bir yöntem kullanın.",
         "tooManyAttempts": "Çok fazla deneme. Daha sonra yeniden deneyin.",
         "removeConfirm": "Bu anahtar kaldırılsın mı? Başka yöntemle giriş yaptıktan sonra yeniden ekleyebilirsiniz.",
-        "signIn": "Geçiş anahtarı ile giriş yap"
+        "signIn": "Geçiş anahtarı ile giriş yap",
+        "reauthTitle": "Kimliğini doğrula",
+        "reauthLead": "Burada devam etmek için parolanla veya mevcut bir geçiş anahtarıyla doğrula. İki faktörlü kimlik doğrulama açıksa kodunu da gir.",
+        "reauthFailed": "Doğrulama başarısız. Parolanı veya geçiş anahtarını ve gerekiyorsa ikinci faktör kodunu kontrol et.",
+        "confirmWithPasskey": "Geçiş anahtarıyla doğrula"
     }
 }

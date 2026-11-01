@@ -1695,6 +1695,10 @@ function passkeyOrigin(req, res, next) {
   if (req.get('origin') !== cfg.origin) return res.status(403).json({ error: 'Invalid passkey origin.', code: 403, reason: 'passkey_failed' });
   next();
 }
+function passkeyBrowserSession(req, res, next) {
+  if (req.authMethod !== 'session') return res.status(403).json({ error: 'Use a signed-in browser session.', code: 403, reason: 'browser_session_required' });
+  next();
+}
 function recentPasskeySession(req, res, next) {
   if (req.authMethod !== 'session') return res.status(403).json({ error: 'Use a signed-in browser session.', code: 403, reason: 'browser_session_required' });
   const age = Date.now() - req.session.authenticatedAt;
@@ -1716,8 +1720,48 @@ router.get('/passkeys', requireAuth, (req, res) => {
   try {
     if (req.authMethod !== 'session') return res.status(403).json({ error: 'Use a browser session.', code: 403, reason: 'browser_session_required' });
     const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(req.authUserId);
-    res.json({ data: { enabled: !!passkeys.configuration(), enrollment_allowed: !!user && nativePasskeysAllowed(user), passkeys: passkeys.list(db.get(), req.authUserId) } });
+    res.json({ data: { enabled: !!passkeys.configuration(), enrollment_allowed: !!user && nativePasskeysAllowed(user), second_factor_required: twoFactor.isEnabled(db.get(), req.authUserId), passkeys: passkeys.list(db.get(), req.authUserId) } });
   } catch { res.status(500).json({ error: 'Could not read passkeys.', code: 500 }); }
+});
+// Reauthentication refreshes only the proof timestamp of this browser identity.
+// It never signs in another user or completes a pending anonymous sign-in.
+function passkeyReauthUser(req, res) {
+  const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(req.authUserId);
+  if (!user || !canSignIn(db.get(), user.id) || !nativePasskeysAllowed(user)) {
+    res.status(403).json({ error: 'Native sign-in is not allowed for this account.', code: 403, reason: 'passkey_policy' });
+    return null;
+  }
+  return user;
+}
+router.post('/passkeys/reauth/options', requireAuth, csrfMiddleware, passkeyBrowserSession, loginLimiter, passkeyOrigin, async (req, res) => {
+  try {
+    const user = passkeyReauthUser(req, res);
+    if (!user) return;
+    res.json({ data: await passkeys.beginAuthentication(db.get(), req.sessionID, user.id) });
+  } catch { passkeyError(res); }
+});
+router.post('/passkeys/reauth/verify', requireAuth, csrfMiddleware, passkeyBrowserSession, loginLimiter, passkeyOrigin, async (req, res) => {
+  try {
+    const user = passkeyReauthUser(req, res);
+    if (!user) return;
+    if (req.body?.method === 'passkey') {
+      await passkeys.finishAuthentication(db.get(), req.sessionID, req.body.credential, user.id);
+    } else if (req.body?.method === 'password') {
+      const password = req.body.password;
+      if (typeof password !== 'string' || !password || password.length > 1024) return passkeyError(res);
+      const { valid } = await verifyPassword(password, user.password_hash);
+      if (!valid) return passkeyError(res);
+    } else return passkeyError(res);
+    const current = passkeyReauthUser(req, res);
+    if (!current) return;
+    if (current.password_hash !== user.password_hash) return passkeyError(res);
+    if (twoFactor.isEnabled(db.get(), user.id)) {
+      if (typeof req.body.code !== 'string' || req.body.code.length > 128
+          || !twoFactor.verifySecondFactor(db.get(), user.id, req.body.code).valid) return passkeyError(res);
+    }
+    req.session.authenticatedAt = Date.now();
+    res.json({ data: { ok: true } });
+  } catch { passkeyError(res); }
 });
 router.post('/passkeys/register/options', requireAuth, csrfMiddleware, recentPasskeySession, passkeyOrigin, async (req, res) => {
   try {

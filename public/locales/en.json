@@ -6800,6 +6800,10 @@
         "failed": "The passkey could not be verified. Start again or use another sign-in method.",
         "tooManyAttempts": "Too many attempts. Please try again later.",
         "removeConfirm": "Remove this passkey? You can add it again after signing in with another method.",
-        "signIn": "Sign in with a passkey"
+        "signIn": "Sign in with a passkey",
+        "reauthTitle": "Confirm your identity",
+        "reauthLead": "Confirm with your password or an existing passkey to continue here. If two-factor authentication is enabled, enter its code too.",
+        "reauthFailed": "Confirmation failed. Check your password or passkey and, if required, your second-factor code.",
+        "confirmWithPasskey": "Confirm with a passkey"
     }
 }

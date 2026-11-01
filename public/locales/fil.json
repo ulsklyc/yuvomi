@@ -6800,6 +6800,10 @@
         "failed": "Hindi ma-verify ang passkey. Subukang muli o gumamit ng ibang paraan.",
         "tooManyAttempts": "Masyadong maraming pagsubok. Subukan ulit mamaya.",
         "removeConfirm": "Alisin ang passkey na ito? Maaari itong idagdag muli matapos mag-sign in sa ibang paraan.",
-        "signIn": "Mag-sign in gamit ang passkey"
+        "signIn": "Mag-sign in gamit ang passkey",
+        "reauthTitle": "Kumpirmahin ang iyong pagkakakilanlan",
+        "reauthLead": "Kumpirmahin gamit ang password o kasalukuyang passkey para magpatuloy dito. Kung naka-enable ang two-factor authentication, ilagay din ang code nito.",
+        "reauthFailed": "Hindi nakumpirma. Suriin ang password o passkey at, kung kailangan, ang code ng ikalawang hakbang.",
+        "confirmWithPasskey": "Kumpirmahin gamit ang passkey"
     }
 }

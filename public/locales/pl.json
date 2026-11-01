@@ -7140,6 +7140,10 @@
         "failed": "Nie udało się zweryfikować klucza. Spróbuj ponownie lub użyj innej metody.",
         "tooManyAttempts": "Zbyt wiele prób. Spróbuj ponownie później.",
         "removeConfirm": "Usunąć ten klucz? Po zalogowaniu inną metodą możesz dodać go ponownie.",
-        "signIn": "Zaloguj się kluczem dostępu"
+        "signIn": "Zaloguj się kluczem dostępu",
+        "reauthTitle": "Potwierdź swoją tożsamość",
+        "reauthLead": "Potwierdź hasłem lub istniejącym kluczem dostępu, aby kontynuować tutaj. Jeśli uwierzytelnianie dwuskładnikowe jest włączone, wpisz także jego kod.",
+        "reauthFailed": "Potwierdzenie nie powiodło się. Sprawdź hasło lub klucz dostępu oraz wymagany kod drugiego składnika.",
+        "confirmWithPasskey": "Potwierdź kluczem dostępu"
     }
 }

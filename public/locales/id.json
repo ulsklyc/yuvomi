@@ -6800,6 +6800,10 @@
         "failed": "Kunci tidak dapat diverifikasi. Coba lagi atau gunakan metode lain.",
         "tooManyAttempts": "Terlalu banyak percobaan. Coba lagi nanti.",
         "removeConfirm": "Hapus kunci ini? Anda dapat menambahkannya lagi setelah masuk dengan metode lain.",
-        "signIn": "Masuk dengan kunci sandi"
+        "signIn": "Masuk dengan kunci sandi",
+        "reauthTitle": "Konfirmasi identitasmu",
+        "reauthLead": "Konfirmasi dengan kata sandi atau kunci sandi yang sudah ada untuk melanjutkan di sini. Jika autentikasi dua faktor aktif, masukkan juga kodenya.",
+        "reauthFailed": "Konfirmasi gagal. Periksa kata sandi atau kunci sandi dan, jika diperlukan, kode faktor kedua.",
+        "confirmWithPasskey": "Konfirmasi dengan kunci sandi"
     }
 }

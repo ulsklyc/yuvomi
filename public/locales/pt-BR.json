@@ -6800,6 +6800,10 @@
         "failed": "Não foi possível verificar a chave. Tente novamente ou use outro método.",
         "tooManyAttempts": "Muitas tentativas. Tente novamente mais tarde.",
         "removeConfirm": "Remover esta chave? Você poderá adicioná-la novamente após entrar por outro método.",
-        "signIn": "Entrar com uma chave de acesso"
+        "signIn": "Entrar com uma chave de acesso",
+        "reauthTitle": "Confirme sua identidade",
+        "reauthLead": "Confirme com sua senha ou uma chave de acesso existente para continuar aqui. Se a autenticação de dois fatores estiver ativa, digite também o código.",
+        "reauthFailed": "A confirmação falhou. Verifique a senha ou a chave de acesso e, se necessário, o código do segundo fator.",
+        "confirmWithPasskey": "Confirmar com uma chave de acesso"
     }
 }

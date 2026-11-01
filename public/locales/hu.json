@@ -6800,6 +6800,10 @@
         "failed": "A jelkulcs ellenőrzése sikertelen. Próbáld újra vagy válassz másik módot.",
         "tooManyAttempts": "Túl sok próbálkozás. Próbáld később.",
         "removeConfirm": "Eltávolítod ezt a jelkulcsot? Másik módon bejelentkezve újra hozzáadhatod.",
-        "signIn": "Bejelentkezés jelkulccsal"
+        "signIn": "Bejelentkezés jelkulccsal",
+        "reauthTitle": "Személyazonosság megerősítése",
+        "reauthLead": "A folytatáshoz erősítsd meg jelszóval vagy meglévő hozzáférési kulccsal. Ha a kétlépcsős hitelesítés aktív, add meg a kódját is.",
+        "reauthFailed": "A megerősítés sikertelen. Ellenőrizd a jelszavad vagy a hozzáférési kulcsod és szükség esetén a második faktor kódját.",
+        "confirmWithPasskey": "Megerősítés hozzáférési kulccsal"
     }
 }

@@ -6800,6 +6800,10 @@
         "failed": "Nøkkelen kunne ikke bekreftes. Prøv igjen eller bruk en annen innloggingsmåte.",
         "tooManyAttempts": "For mange forsøk. Prøv igjen senere.",
         "removeConfirm": "Fjerne denne nøkkelen? Du kan legge den til igjen etter innlogging på en annen måte.",
-        "signIn": "Logg inn med en tilgangsnøkkel"
+        "signIn": "Logg inn med en tilgangsnøkkel",
+        "reauthTitle": "Bekreft identiteten din",
+        "reauthLead": "Bekreft med passordet ditt eller en eksisterende tilgangsnøkkel for å fortsette her. Hvis tofaktorautentisering er aktivert, oppgir du også koden.",
+        "reauthFailed": "Bekreftelsen mislyktes. Sjekk passordet eller tilgangsnøkkelen og om nødvendig koden for den andre faktoren.",
+        "confirmWithPasskey": "Bekreft med en tilgangsnøkkel"
     }
 }

@@ -6800,6 +6800,10 @@
         "failed": "Impossible de vérifier la clé. Réessayez ou utilisez un autre moyen de connexion.",
         "tooManyAttempts": "Trop de tentatives. Réessayez plus tard.",
         "removeConfirm": "Retirer cette clé ? Vous pourrez la rajouter après une connexion par un autre moyen.",
-        "signIn": "Se connecter avec une clé d'accès"
+        "signIn": "Se connecter avec une clé d'accès",
+        "reauthTitle": "Confirmer votre identité",
+        "reauthLead": "Confirmez avec votre mot de passe ou une clé d’accès existante pour continuer ici. Si la double authentification est activée, saisissez aussi son code.",
+        "reauthFailed": "Échec de la confirmation. Vérifiez votre mot de passe ou votre clé d’accès et, si nécessaire, le code du second facteur.",
+        "confirmWithPasskey": "Confirmer avec une clé d’accès"
     }
 }

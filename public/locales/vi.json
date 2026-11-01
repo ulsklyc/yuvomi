@@ -6800,6 +6800,10 @@
         "failed": "Không thể xác minh khóa. Hãy thử lại hoặc dùng cách khác.",
         "tooManyAttempts": "Thử quá nhiều lần. Vui lòng thử lại sau.",
         "removeConfirm": "Xóa khóa này? Bạn có thể thêm lại sau khi đăng nhập bằng cách khác.",
-        "signIn": "Đăng nhập bằng khóa truy cập"
+        "signIn": "Đăng nhập bằng khóa truy cập",
+        "reauthTitle": "Xác nhận danh tính",
+        "reauthLead": "Xác nhận bằng mật khẩu hoặc khóa truy cập hiện có để tiếp tục tại đây. Nếu đã bật xác thực hai yếu tố, hãy nhập cả mã xác thực.",
+        "reauthFailed": "Xác nhận không thành công. Kiểm tra mật khẩu hoặc khóa truy cập và mã yếu tố thứ hai nếu được yêu cầu.",
+        "confirmWithPasskey": "Xác nhận bằng khóa truy cập"
     }
 }

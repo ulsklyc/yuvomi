@@ -6800,6 +6800,10 @@
         "failed": "Nyckeln kunde inte verifieras. Försök igen eller använd ett annat sätt.",
         "tooManyAttempts": "För många försök. Försök igen senare.",
         "removeConfirm": "Ta bort nyckeln? Du kan lägga till den igen efter inloggning på annat sätt.",
-        "signIn": "Logga in med en nyckel"
+        "signIn": "Logga in med en nyckel",
+        "reauthTitle": "Bekräfta din identitet",
+        "reauthLead": "Bekräfta med ditt lösenord eller en befintlig åtkomstnyckel för att fortsätta här. Om tvåfaktorsautentisering är aktiverad anger du även dess kod.",
+        "reauthFailed": "Bekräftelsen misslyckades. Kontrollera lösenordet eller åtkomstnyckeln och vid behov koden för den andra faktorn.",
+        "confirmWithPasskey": "Bekräfta med en åtkomstnyckel"
     }
 }

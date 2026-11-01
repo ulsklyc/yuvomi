@@ -6800,6 +6800,10 @@
         "failed": "De passkey kon niet worden gecontroleerd. Probeer opnieuw of gebruik een andere methode.",
         "tooManyAttempts": "Te veel pogingen. Probeer het later opnieuw.",
         "removeConfirm": "Deze passkey verwijderen? Je kunt hem opnieuw toevoegen na aanmelding via een andere methode.",
-        "signIn": "Aanmelden met een passkey"
+        "signIn": "Aanmelden met een passkey",
+        "reauthTitle": "Bevestig je identiteit",
+        "reauthLead": "Bevestig met je wachtwoord of een bestaande toegangssleutel om hier verder te gaan. Voer bij tweestapsverificatie ook de code in.",
+        "reauthFailed": "Bevestigen mislukt. Controleer je wachtwoord of toegangssleutel en zo nodig de code voor de tweede factor.",
+        "confirmWithPasskey": "Bevestigen met een toegangssleutel"
     }
 }
