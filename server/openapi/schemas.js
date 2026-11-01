@@ -1239,6 +1239,12 @@ export const schemas = {
           },
           required: ['data', 'credential'],
         },
+        OkResponse: {
+          type: 'object',
+          description: 'The answer of a write that has nothing else to say.',
+          properties: { ok: { type: 'boolean', enum: [true] } },
+          required: ['ok'],
+        },
         DevicePairingRequest: {
           type: 'object',
           properties: {
