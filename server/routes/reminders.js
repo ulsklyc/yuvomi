@@ -194,6 +194,184 @@ const TARGET_NOT_FOUND = { error: 'Entity not found.', code: 404 };
 // Obergrenze für mehrere Erinnerungen je Entität (z. B. Kalender-Termin, #436).
 const MAX_REMINDERS_PER_ENTITY = 5;
 
+// `remind_at` als Zeitpunkt, nie als Text der Spalte (#1364).
+const REMIND_AT_KEY = remindAtUtcSql('r.remind_at');
+
+// Eine lokal geplante Benachrichtigung feuert, auch wenn niemand mehr nachfragt.
+// Wer eine Aufgabe erledigt oder ablegt, soll vom Telefon nichts mehr dazu hoeren.
+// Uebersprungen, nicht geloescht: Wiederoeffnen bringt die Erinnerung zurueck.
+const OPEN_TASK_REMINDER_SQL = `
+      AND (
+        r.entity_type != 'task'
+        OR EXISTS (
+          SELECT 1 FROM tasks
+          WHERE id = r.entity_id AND status != 'done' AND archived_at IS NULL
+        )
+      )`;
+
+/**
+ * Die Erinnerungen des Aufrufers in einem Zeitraum: EINE Abfrage fuer `/pending`
+ * und `/upcoming`, damit die Riegel keine zweite Fassung bekommen. Herkunft,
+ * Sichtbarkeit, Waisen, abgeschaltete Module, Titel und Haushaltsansicht stehen
+ * nur hier; die Routen sagen nur noch, welchen Zeitraum sie wollen.
+ *
+ * `limit` greift NACH `withoutSwitchedOffModules()`, also nicht als SQL-`LIMIT`:
+ * der Haushaltsschalter filtert in JavaScript, und eine Zeile eines abgeschalteten
+ * Moduls duerfte sonst einen Platz wegnehmen, den der Aufrufer nie zu sehen bekommt.
+ *
+ * @param {object} req
+ * @param {object} query
+ * @param {{ sql: string, params: string[] }} query.window  Zeit-Bedingung mit ihren Werten
+ * @param {Set<string>|null} [query.types]  Herkuenfte einengen, nie erweitern
+ * @param {string} [query.columns]  Weitere Spalten, mit fuehrendem Komma
+ * @param {string} [query.orderBy]  Sortierung als SQL - nie Nutzereingabe
+ * @param {boolean} [query.openTasksOnly]  Erledigte und abgelegte Aufgaben auslassen
+ * @param {number} [query.limit]
+ * @returns {object[]}
+ */
+function callerReminders(req, {
+  window, types = null, columns = '', orderBy = 'r.remind_at ASC', limit = Infinity,
+  openTasksOnly = false,
+}) {
+  if (asksHouseholdAudience(req.query)) return [];
+  const userId = req.authUserId || req.session.userId;
+  syncAllBirthdayReminders(db.get(), userId, new Date());
+
+  // Nur die Herkünfte, die dieser Aufrufer sehen darf - der Pfad-Guard fragt
+  // für den ganzen Router nach `calendar` und deckt die anderen fünf nicht.
+  const origins = readableOrigins(req).filter((type) => !types || types.has(type));
+  if (!origins.length) return [];
+
+  const found = db.get().prepare(`
+    SELECT
+      r.*,
+      CASE r.entity_type
+        WHEN 'task'  THEN (SELECT title FROM tasks           WHERE id = r.entity_id)
+        WHEN 'event' THEN (SELECT title FROM calendar_events WHERE id = r.entity_id)
+        WHEN 'subscription' THEN (SELECT name FROM budget_subscriptions WHERE id = r.entity_id)
+        WHEN 'inventory_item' THEN (SELECT name FROM inventory_items WHERE id = r.entity_id)
+        WHEN 'inventory_tracked_date' THEN (
+          SELECT ii.name || ' · ' || d.label
+          FROM inventory_item_dates d JOIN inventory_items ii ON ii.id = d.item_id
+          WHERE d.id = r.entity_id
+        )
+        WHEN 'pantry_item' THEN (SELECT name FROM pantry_items WHERE id = r.entity_id)
+        WHEN 'cycle_period' THEN (SELECT anchor_date FROM cycle_reminder_anchors WHERE id = r.entity_id)
+        WHEN 'cycle_log_nudge' THEN (SELECT anchor_date FROM cycle_reminder_anchors WHERE id = r.entity_id)
+        WHEN 'schedule_entry' THEN (
+          SELECT t.name FROM schedule_reminder_entries e JOIN schedule_shift_types t ON t.id = e.shift_type_id
+          WHERE e.id = r.entity_id
+        )
+        WHEN 'schedule_extra_entry' THEN (
+          SELECT t.name FROM schedule_extra_shifts e JOIN schedule_shift_types t ON t.id = e.shift_type_id
+          WHERE e.id = r.entity_id
+        )
+        WHEN 'waste_pickup' THEN (
+          SELECT t.name FROM waste_reminder_entries e JOIN waste_types t ON t.id = e.type_id
+          WHERE e.id = r.entity_id
+        )
+        WHEN 'document_expiry' THEN (SELECT name FROM family_documents WHERE id = r.entity_id)
+        WHEN 'health_prevention_due' THEN (
+          SELECT COALESCE(t.name, pr.name) FROM health_prevention_records pr
+          LEFT JOIN health_prevention_types t ON t.id = pr.type_id
+          WHERE pr.id = r.entity_id
+        )
+      END AS entity_title,
+      -- Unterscheidet die eigene Perioden-Erinnerung von einer an eine
+      -- Partnerperson weitergereichten (gleicher entity_type 'cycle_period',
+      -- siehe cycle-reminders.js#syncPartnerReminder) - ohne das läse der
+      -- Partner-Toast "Nächste Periode - <Datum>" als wäre es die eigene.
+      -- cycle_owner_name wird bewusst NICHT hier mitgeholt (kein JOIN auf
+      -- users in dieser Sammelabfrage für sieben Herkünfte), sondern weiter
+      -- unten verzögert und nur für tatsächliche 'partner_period'-Zeilen
+      -- geholt - gleiche Form wie notifications.js.
+      CASE WHEN r.entity_type = 'cycle_period'
+        THEN (SELECT kind FROM cycle_reminder_anchors WHERE id = r.entity_id) END AS cycle_anchor_kind
+      ${columns}
+    FROM reminders r
+    WHERE r.created_by  = ?
+      AND r.dismissed   = 0
+      AND ${window.sql}
+      AND r.entity_type IN (${origins.map(() => '?').join(', ')})
+      -- Der Titel wird nur fuer eine Zeile aufgeloest, die der Aufrufer
+      -- sieht (services/reminder-targets.js). Das Modulrecht darueber sagt
+      -- nichts ueber die einzelne Aufgabe, und die Sichtbarkeit aendert sich
+      -- nach dem Anlegen. Uebersprungen, nicht geloescht.
+      AND ${reminderTargetVisibleSql(db.get(), 'r')}
+      -- Eine 'cycle_period'/'cycle_log_nudge'-Zeile, deren Anker bereits
+      -- geloescht wurde (Eigentuemer geloescht, Einstellung geaendert, o.ae.),
+      -- aber deren periodischer Sync noch nicht wieder gelaufen ist, darf
+      -- hier nicht auftauchen - ohne Anker fehlt cycle_anchor_kind, und die
+      -- Zeile faellt im Client auf die eigene "naechste Periode"-Darstellung
+      -- zurueck (Falschzuordnung an eine Partnerperson, schlimmer als vorher).
+      -- Lieber kurz gar nicht zeigen, bis der Sync sie ohnehin loescht.
+      AND (
+        r.entity_type NOT IN ('cycle_period', 'cycle_log_nudge')
+        OR EXISTS (SELECT 1 FROM cycle_reminder_anchors WHERE id = r.entity_id)
+      )
+      -- Dasselbe fuer Aufgaben und Termine, aus einem anderen Grund: seit
+      -- Migration v217 raeumen zwei AFTER-DELETE-Trigger die Erinnerungen
+      -- einer geloeschten Aufgabe/eines geloeschten Termins mit ab, es sollte
+      -- hier also gar keine verwaiste Zeile mehr geben. Der Verweis bleibt
+      -- aber ein WEICHER (kein Fremdschluessel auf tasks/calendar_events),
+      -- und was ohne Fremdschluessel haelt, haelt nur, solange niemand einen
+      -- Weg daran vorbei baut - ein Tabellen-Rebuild, der den Trigger nicht
+      -- wieder anlegt, reicht schon. Was hier durchkaeme, waere eine Zeile
+      -- ohne entity_title: im Toast eine leere Zeile, in der
+      -- Push-Benachrichtigung ein leerer Text (services/notifications.js
+      -- traegt denselben Riegel). Nichts zu zeigen ist besser.
+      AND (
+        r.entity_type != 'task'
+        OR EXISTS (SELECT 1 FROM tasks WHERE id = r.entity_id)
+      )
+      AND (
+        r.entity_type != 'event'
+        OR EXISTS (SELECT 1 FROM calendar_events WHERE id = r.entity_id)
+      )
+      ${openTasksOnly ? OPEN_TASK_REMINDER_SQL : ''}
+    ORDER BY ${orderBy}
+  `).all(userId, ...window.params, ...origins);
+
+  // Die dritte Achse neben Token-Scopes und Mitgliedsrechten: ein Modul, das
+  // der Haushalt abgeschaltet hat, gibt es hier nicht - auch nicht als
+  // Toast (#1279). Übersprungen, nicht gelöscht: siehe
+  // withoutSwitchedOffModules() für den Grund.
+  const rows = withoutSwitchedOffModules(db.get(), found).slice(0, limit);
+
+  // Nur für die tatsächlichen Partner-Zeilen geholt (rar) - siehe Kommentar
+  // an cycle_anchor_kind oben. Bleibt bei jeder anderen Zeile `undefined`
+  // und damit aus der JSON-Antwort draußen, statt als `null` zu erscheinen.
+  for (const row of rows) {
+    if (row.cycle_anchor_kind === 'partner_period') {
+      row.cycle_owner_name = cycleOwnerName(row.entity_id);
+    }
+    // Gleiche Lage wie oben, fuer D6: nur die geerbte Zeile (assigned_from
+    // gesetzt) nennt die betreute Person - server/services/notifications.js
+    // #preventionDueBody haelt denselben Riegel fuer die Push-Benachrichtigung,
+    // hier fuer den In-App-Toast (Review #1256: die eine Stelle folgte der
+    // anderen nicht).
+    // Die Meldung "Umzug zurueckgenommen" (#1912) traegt ihre Namen selbst:
+    // verzoegert geholt wie oben, nur fuer ihre Zeilen.
+    if (row.entity_type === 'shopping_move_returned') {
+      const notice = moveNoticeFields(db.get(), row.entity_id);
+      if (notice) {
+        row.entity_title = notice.item_name;
+        row.move_notice = notice;
+        if (notice.back_list_id) row.target_url = `/shopping?list=${notice.back_list_id}`;
+      }
+    }
+    if (row.entity_type === 'health_prevention_due' && row.assigned_from != null) {
+      row.prevention_subject_name = db.get().prepare(`
+        SELECT u.display_name FROM health_prevention_records pr
+        JOIN users u ON u.id = pr.user_id
+        WHERE pr.id = ?
+      `).get(row.entity_id)?.display_name;
+    }
+  }
+
+  return rows;
+}
+
 // --------------------------------------------------------
 // GET /api/v1/reminders/pending
 // Gibt alle fälligen, nicht-verworfenen Erinnerungen des aktuellen Nutzers zurück.
@@ -208,144 +386,90 @@ const MAX_REMINDERS_PER_ENTITY = 5;
 // --------------------------------------------------------
 router.get('/pending', (req, res) => {
   try {
-    if (asksHouseholdAudience(req.query)) return res.json({ data: [] });
-    const userId = req.authUserId || req.session.userId;
-    const now    = new Date().toISOString();
-    syncAllBirthdayReminders(db.get(), userId, new Date());
-
-    // Nur die Herkünfte, die dieser Aufrufer sehen darf - der Pfad-Guard fragt
-    // für den ganzen Router nach `calendar` und deckt die anderen fünf nicht.
-    const origins = readableOrigins(req);
-    if (!origins.length) return res.json({ data: [] });
-
-    const dueRows = db.get().prepare(`
-      SELECT
-        r.*,
-        CASE r.entity_type
-          WHEN 'task'  THEN (SELECT title FROM tasks           WHERE id = r.entity_id)
-          WHEN 'event' THEN (SELECT title FROM calendar_events WHERE id = r.entity_id)
-          WHEN 'subscription' THEN (SELECT name FROM budget_subscriptions WHERE id = r.entity_id)
-          WHEN 'inventory_item' THEN (SELECT name FROM inventory_items WHERE id = r.entity_id)
-          WHEN 'inventory_tracked_date' THEN (
-            SELECT ii.name || ' · ' || d.label
-            FROM inventory_item_dates d JOIN inventory_items ii ON ii.id = d.item_id
-            WHERE d.id = r.entity_id
-          )
-          WHEN 'pantry_item' THEN (SELECT name FROM pantry_items WHERE id = r.entity_id)
-          WHEN 'cycle_period' THEN (SELECT anchor_date FROM cycle_reminder_anchors WHERE id = r.entity_id)
-          WHEN 'cycle_log_nudge' THEN (SELECT anchor_date FROM cycle_reminder_anchors WHERE id = r.entity_id)
-          WHEN 'schedule_entry' THEN (
-            SELECT t.name FROM schedule_reminder_entries e JOIN schedule_shift_types t ON t.id = e.shift_type_id
-            WHERE e.id = r.entity_id
-          )
-          WHEN 'schedule_extra_entry' THEN (
-            SELECT t.name FROM schedule_extra_shifts e JOIN schedule_shift_types t ON t.id = e.shift_type_id
-            WHERE e.id = r.entity_id
-          )
-          WHEN 'waste_pickup' THEN (
-            SELECT t.name FROM waste_reminder_entries e JOIN waste_types t ON t.id = e.type_id
-            WHERE e.id = r.entity_id
-          )
-          WHEN 'document_expiry' THEN (SELECT name FROM family_documents WHERE id = r.entity_id)
-          WHEN 'health_prevention_due' THEN (
-            SELECT COALESCE(t.name, pr.name) FROM health_prevention_records pr
-            LEFT JOIN health_prevention_types t ON t.id = pr.type_id
-            WHERE pr.id = r.entity_id
-          )
-        END AS entity_title,
-        -- Unterscheidet die eigene Perioden-Erinnerung von einer an eine
-        -- Partnerperson weitergereichten (gleicher entity_type 'cycle_period',
-        -- siehe cycle-reminders.js#syncPartnerReminder) - ohne das läse der
-        -- Partner-Toast "Nächste Periode - <Datum>" als wäre es die eigene.
-        -- cycle_owner_name wird bewusst NICHT hier mitgeholt (kein JOIN auf
-        -- users in dieser Sammelabfrage für sieben Herkünfte), sondern weiter
-        -- unten verzögert und nur für tatsächliche 'partner_period'-Zeilen
-        -- geholt - gleiche Form wie notifications.js.
-        CASE WHEN r.entity_type = 'cycle_period'
-          THEN (SELECT kind FROM cycle_reminder_anchors WHERE id = r.entity_id) END AS cycle_anchor_kind
-      FROM reminders r
-      WHERE r.created_by  = ?
-        AND r.dismissed   = 0
-        AND ${remindAtUtcSql('r.remind_at')} <= ?
-        AND r.entity_type IN (${origins.map(() => '?').join(', ')})
-        -- Der Titel wird nur fuer eine Zeile aufgeloest, die der Aufrufer
-        -- sieht (services/reminder-targets.js). Das Modulrecht darueber sagt
-        -- nichts ueber die einzelne Aufgabe, und die Sichtbarkeit aendert sich
-        -- nach dem Anlegen. Uebersprungen, nicht geloescht.
-        AND ${reminderTargetVisibleSql(db.get(), 'r')}
-        -- Eine 'cycle_period'/'cycle_log_nudge'-Zeile, deren Anker bereits
-        -- geloescht wurde (Eigentuemer geloescht, Einstellung geaendert, o.ae.),
-        -- aber deren periodischer Sync noch nicht wieder gelaufen ist, darf
-        -- hier nicht auftauchen - ohne Anker fehlt cycle_anchor_kind, und die
-        -- Zeile faellt im Client auf die eigene "naechste Periode"-Darstellung
-        -- zurueck (Falschzuordnung an eine Partnerperson, schlimmer als vorher).
-        -- Lieber kurz gar nicht zeigen, bis der Sync sie ohnehin loescht.
-        AND (
-          r.entity_type NOT IN ('cycle_period', 'cycle_log_nudge')
-          OR EXISTS (SELECT 1 FROM cycle_reminder_anchors WHERE id = r.entity_id)
-        )
-        -- Dasselbe fuer Aufgaben und Termine, aus einem anderen Grund: seit
-        -- Migration v217 raeumen zwei AFTER-DELETE-Trigger die Erinnerungen
-        -- einer geloeschten Aufgabe/eines geloeschten Termins mit ab, es sollte
-        -- hier also gar keine verwaiste Zeile mehr geben. Der Verweis bleibt
-        -- aber ein WEICHER (kein Fremdschluessel auf tasks/calendar_events),
-        -- und was ohne Fremdschluessel haelt, haelt nur, solange niemand einen
-        -- Weg daran vorbei baut - ein Tabellen-Rebuild, der den Trigger nicht
-        -- wieder anlegt, reicht schon. Was hier durchkaeme, waere eine Zeile
-        -- ohne entity_title: im Toast eine leere Zeile, in der
-        -- Push-Benachrichtigung ein leerer Text (services/notifications.js
-        -- traegt denselben Riegel). Nichts zu zeigen ist besser.
-        AND (
-          r.entity_type != 'task'
-          OR EXISTS (SELECT 1 FROM tasks WHERE id = r.entity_id)
-        )
-        AND (
-          r.entity_type != 'event'
-          OR EXISTS (SELECT 1 FROM calendar_events WHERE id = r.entity_id)
-        )
-      ORDER BY r.remind_at ASC
-    `).all(userId, remindAtCompareKey(now), ...origins);
-
-    // Die dritte Achse neben Token-Scopes und Mitgliedsrechten: ein Modul, das
-    // der Haushalt abgeschaltet hat, gibt es hier nicht - auch nicht als
-    // Toast (#1279). Übersprungen, nicht gelöscht: siehe
-    // withoutSwitchedOffModules() für den Grund.
-    const rows = withoutSwitchedOffModules(db.get(), dueRows);
-
-    // Nur für die tatsächlichen Partner-Zeilen geholt (rar) - siehe Kommentar
-    // an cycle_anchor_kind oben. Bleibt bei jeder anderen Zeile `undefined`
-    // und damit aus der JSON-Antwort draußen, statt als `null` zu erscheinen.
-    for (const row of rows) {
-      if (row.cycle_anchor_kind === 'partner_period') {
-        row.cycle_owner_name = cycleOwnerName(row.entity_id);
-      }
-      // Gleiche Lage wie oben, fuer D6: nur die geerbte Zeile (assigned_from
-      // gesetzt) nennt die betreute Person - server/services/notifications.js
-      // #preventionDueBody haelt denselben Riegel fuer die Push-Benachrichtigung,
-      // hier fuer den In-App-Toast (Review #1256: die eine Stelle folgte der
-      // anderen nicht).
-      // Die Meldung "Umzug zurueckgenommen" (#1912) traegt ihre Namen selbst:
-      // verzoegert geholt wie oben, nur fuer ihre Zeilen.
-      if (row.entity_type === 'shopping_move_returned') {
-        const notice = moveNoticeFields(db.get(), row.entity_id);
-        if (notice) {
-          row.entity_title = notice.item_name;
-          row.move_notice = notice;
-          if (notice.back_list_id) row.target_url = `/shopping?list=${notice.back_list_id}`;
-        }
-      }
-      if (row.entity_type === 'health_prevention_due' && row.assigned_from != null) {
-        row.prevention_subject_name = db.get().prepare(`
-          SELECT u.display_name FROM health_prevention_records pr
-          JOIN users u ON u.id = pr.user_id
-          WHERE pr.id = ?
-        `).get(row.entity_id)?.display_name;
-      }
-    }
-
-    res.json({ data: rows });
+    const now = remindAtCompareKey(new Date().toISOString());
+    res.json({ data: callerReminders(req, { window: { sql: `${REMIND_AT_KEY} <= ?`, params: [now] } }) });
   } catch (err) {
     log.error('Error loading due reminders:', err.message);
+    res.status(500).json({ error: 'Internal error.', code: 500 });
+  }
+});
+
+const UPCOMING_MAX_DAYS = 14;
+const UPCOMING_MAX_ROWS = 200;
+
+/**
+ * Ein Fensterrand als Zeitpunkt. Ohne Zone ist er UTC, wie die Spalte: `v.datetime`
+ * bringt ihn in dieselbe Form wie einen geschriebenen `remind_at`-Wert, das `Z`
+ * hier verhindert, dass `Date` ihn als Ortszeit des Servers liest.
+ *
+ * Der Vergleich mit der Rueckrichtung faengt, was das Format durchlaesst und
+ * `Date` still weiterzaehlt: der 31. Februar waere sonst der 3. Maerz.
+ */
+function windowEdge(value, field) {
+  const checked = v.datetime(value, field, true, { to: 'utc' });
+  if (checked.error) return checked;
+  const ms = Date.parse(`${checked.value}Z`);
+  if (Number.isNaN(ms) || new Date(ms).toISOString().slice(0, 19) !== checked.value) {
+    return { value: null, error: `${field} must be a valid date and time.` };
+  }
+  return { value: remindAtCompareKey(ms), ms, error: null };
+}
+
+/** `types=task,event` als Menge; ohne Parameter `null`, also keine Einengung. */
+function originFilter(value) {
+  if (value === undefined) return { value: null, error: null };
+  const types = typeof value === 'string' ? value.split(',') : [];
+  if (!types.length || !types.every((type) => VALID_ENTITY_TYPES.includes(type))) {
+    return { value: null, error: `types must be a comma-separated list of: ${VALID_ENTITY_TYPES.join(', ')}.` };
+  }
+  return { value: new Set(types), error: null };
+}
+
+// --------------------------------------------------------
+// GET /api/v1/reminders/upcoming?from=<iso>&to=<iso>&types=task,event
+// Die noch nicht faelligen Erinnerungen des aktuellen Nutzers in einem Fenster,
+// fuer einen Client, der sie lokal einplant. Beide Raender zaehlen. Das Fenster
+// schliesst an `/pending` an: dort `<= jetzt`, hier `> jetzt`, auch wenn `from`
+// in der Vergangenheit liegt.
+// Sortierung und Fenster lesen den Zeitpunkt, nicht den Text: eine alte Zeile mit
+// Offset stuende sonst an der falschen Stelle und fiele am Limit falsch heraus.
+// `fires_at` kommt nur hier dazu, `/pending` bleibt, wie es war.
+// Response: { data: UpcomingReminder[] }
+// --------------------------------------------------------
+router.get('/upcoming', (req, res) => {
+  try {
+    const from  = windowEdge(req.query.from, 'from');
+    const to    = windowEdge(req.query.to, 'to');
+    const types = originFilter(req.query.types);
+    const errors = v.collectErrors([from, to, types]);
+    if (!errors.length && to.ms < from.ms) {
+      errors.push('to must not be before from.');
+    }
+    if (!errors.length && to.ms - from.ms > UPCOMING_MAX_DAYS * 24 * 60 * 60 * 1000) {
+      errors.push(`The window may span at most ${UPCOMING_MAX_DAYS} days.`);
+    }
+    if (errors.length) {
+      return res.status(400).json({ error: errors.join(' '), code: 400 });
+    }
+
+    const now = remindAtCompareKey(new Date());
+    res.json({
+      data: callerReminders(req, {
+        window: {
+          sql: `${REMIND_AT_KEY} > ? AND ${REMIND_AT_KEY} >= ? AND ${REMIND_AT_KEY} <= ?`,
+          params: [now, from.value, to.value],
+        },
+        types: types.value,
+        // Sekunden mit `Z` wie `created_at` und Co.: `.iso8601` in Swift liest
+        // keine Sekundenbruchteile.
+        columns: `, substr(${REMIND_AT_KEY}, 1, 19) || 'Z' AS fires_at`,
+        orderBy: `${REMIND_AT_KEY} ASC, r.id ASC`,
+        limit: UPCOMING_MAX_ROWS,
+        openTasksOnly: true,
+      }),
+    });
+  } catch (err) {
+    log.error('Error loading upcoming reminders:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
