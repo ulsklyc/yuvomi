@@ -1,4 +1,5 @@
 import { api, auth } from '/api.js';
+import { renderPasskeyCard } from '/settings/passkeys.js';
 import {
   isDateInputValid,
   parseDateInput,
@@ -764,6 +765,8 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
 
       ${passwordCardHtml(user)}
 
+      <div id="passkeys-card"></div>
+
       ${twoFactorCardHtml(twoFactorState)}
 
       ${oidcCardHtml(oidcState, oidcNotice)}
@@ -1129,6 +1132,7 @@ export async function render(container, { user }) {
     container.querySelector('#account-retry')?.addEventListener('click', () => {
       render(container, { user: currentUser });
     });
+    await renderPasskeyCard(container.querySelector('#passkeys-card'));
     window.lucide?.createIcons({ el: container });
   } catch (error) {
     container.replaceChildren();
