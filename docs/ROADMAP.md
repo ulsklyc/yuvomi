@@ -99,6 +99,21 @@ A week is not seven equal days for everyone: week views in blocks (#435), a week
   side-by-side view of several members' timetables is an Overview tab in Schedule rather
   than a mode in the calendar.
 
+## A native client on iOS
+
+The things people keep asking a browser to do on an iPhone - a widget for today, a shopping
+list from Shortcuts, tapping an NFC tag, Apple Health - cannot be done from a browser (#255,
+#639, #914). The answer in [SCOPE.md](SCOPE.md#where-the-line-falls-in-practice) is a client
+next to Yuvomi, not a second Yuvomi.
+
+- **Decided.** SwiftUI in its own repository, against `/api/v1` only, with the web app as the
+  complete product. A device signs in with a password or pairs through a QR code from the web
+  app, so a household that only uses SSO is not left out. The first version has no push relay:
+  reminders are scheduled on the phone itself, and nothing leaves the household.
+- **Open.** The server work a client needs: a device credential for every member, pairing, a
+  way to read upcoming reminders. A push relay would be a hosted service, and that is a
+  separate decision that has not been made.
+
 ---
 
 ## Later

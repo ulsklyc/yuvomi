@@ -1,6 +1,6 @@
 # Yuvomi - Product Specification
 
-Self-hosted family planner web app for a single household (2–6 people). No app store, no public access. Deployment via Docker or Podman (rootless, SELinux-ready) on a private Linux server behind an Nginx reverse proxy with SSL.
+Self-hosted family planner web app for a single household (2–6 people). The web app is the complete product and needs no app store; an optional native iOS client lives in its own repository and talks to the same `/api/v1` (see [SCOPE.md](SCOPE.md#where-the-line-falls-in-practice)). No public access. Deployment via Docker or Podman (rootless, SELinux-ready) on a private Linux server behind an Nginx reverse proxy with SSL.
 
 > **See also:** [Architecture — God-Nodes: Constraint-Brücken vs. organische Hubs](architecture-hubs.md) — warum `esc()` und `toLocalDateKey()` die zentralsten Frontend-Utilities sind (erzwungen durch das `innerHTML`- bzw. UTC-Slice-Verbot).
 
