@@ -12,8 +12,10 @@
  *
  * "OPAK" HEISST: ein Objekt ohne `properties` und ohne Schema in
  * `additionalProperties`, oder ein Array ohne `items`. Die Pruefung geht durch
- * `$ref`, `allOf`, `oneOf` und `anyOf` bis in jedes Feld. Felder, die der Client
- * bewusst nicht liest, stehen in CLIENT_OPAQUE_FIELDS mit Begruendung.
+ * `$ref`, `allOf`, `oneOf` und `anyOf` bis in jedes Feld und jede 2xx-Antwort.
+ * Dazu zaehlen ein kaputter `$ref`, ein unbekannter `type`, `nullable` (in OpenAPI
+ * 3.1 entfallen) und `required` auf ein Feld, das es nicht gibt. Felder, die der
+ * Client bewusst nicht liest, stehen in CLIENT_OPAQUE_FIELDS mit Begruendung.
  *
  * GEGENPROBE: `operationId` an einer Operation entfernen oder ein Schema durch
  * `{ type: 'object' }` ersetzen macht den ersten Test rot und nennt die Operation.
@@ -24,56 +26,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildOpenApiSpec } from '../server/openapi.js';
-
-const CLIENT_OPERATIONS = [
-  // Instanz
-  ['get', '/api/v1/version'],
-  // Anmeldung
-  ['post', '/api/v1/auth/login'],
-  ['post', '/api/v1/auth/2fa/verify'],
-  ['get', '/api/v1/auth/me'],
-  ['get', '/api/v1/auth/oidc/config'],
-  // Geraete
-  ['post', '/api/v1/auth/devices'],
-  ['get', '/api/v1/auth/devices'],
-  ['delete', '/api/v1/auth/devices/current'],
-  ['delete', '/api/v1/auth/devices/{id}'],
-  ['post', '/api/v1/auth/devices/pair/redeem'],
-  // Uebersicht
-  ['get', '/api/v1/dashboard'],
-  // Aufgaben
-  ['get', '/api/v1/tasks'],
-  ['post', '/api/v1/tasks'],
-  ['get', '/api/v1/tasks/meta/options'],
-  ['get', '/api/v1/tasks/{id}'],
-  ['put', '/api/v1/tasks/{id}'],
-  ['delete', '/api/v1/tasks/{id}'],
-  ['patch', '/api/v1/tasks/{id}/status'],
-  ['patch', '/api/v1/tasks/{id}/check'],
-  // Einkauf
-  ['get', '/api/v1/shopping'],
-  ['post', '/api/v1/shopping'],
-  ['get', '/api/v1/shopping/versions'],
-  ['get', '/api/v1/shopping/suggestions'],
-  ['get', '/api/v1/shopping/categories'],
-  ['get', '/api/v1/shopping/{listId}/items'],
-  ['post', '/api/v1/shopping/{listId}/items'],
-  ['patch', '/api/v1/shopping/items/{itemId}'],
-  ['delete', '/api/v1/shopping/items/{itemId}'],
-  ['delete', '/api/v1/shopping/{listId}/items/checked'],
-  // Kalender
-  ['get', '/api/v1/calendar'],
-  ['post', '/api/v1/calendar'],
-  ['get', '/api/v1/calendar/upcoming'],
-  ['get', '/api/v1/calendar/calendars'],
-  ['get', '/api/v1/calendar/{id}'],
-  ['put', '/api/v1/calendar/{id}'],
-  ['delete', '/api/v1/calendar/{id}'],
-  // Erinnerungen
-  ['get', '/api/v1/reminders/upcoming'],
-  ['get', '/api/v1/reminders/pending'],
-  ['patch', '/api/v1/reminders/{id}/dismiss'],
-];
+import { CLIENT_OPERATIONS } from './openapi-client-operations.js';
 
 // Der Client liest diese Felder bewusst nicht, ein Schema waere reine Pflege.
 // Schluessel: `<METHOD> <Pfad>#<Feldpfad>`.
@@ -91,6 +44,8 @@ function resolve(schema) {
   return current;
 }
 
+const SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'object', 'array', 'null']);
+
 /** Sammelt die Pfade der Stellen, an denen ein Generator nur "irgendetwas" sieht. */
 function opaquePaths(schema, path, out, seen = new Set()) {
   if (schema?.$ref) {
@@ -98,12 +53,29 @@ function opaquePaths(schema, path, out, seen = new Set()) {
     seen.add(schema.$ref);
   }
   const node = resolve(schema);
-  if (!node) return out.concat(`${path} (Ziel fehlt)`);
+  if (!node) {
+    out.push(`${path} (Ziel fehlt)`);
+    return out;
+  }
+  // `nullable` gibt es in OpenAPI 3.1 nicht mehr, ein Generator liest es nicht.
+  if ('nullable' in node) out.push(`${path} (nullable statt null im type)`);
+  const unknown = [node.type].flat().filter((type) => type !== undefined && !SCHEMA_TYPES.has(type));
+  if (unknown.length) out.push(`${path} (unbekannter type ${unknown.join(', ')})`);
+
+  const missing = (node.required ?? []).filter((name) => !(name in (node.properties ?? {})));
+  if (node.properties && missing.length) out.push(`${path} (required ohne Feld: ${missing.join(', ')})`);
+
   for (const key of ['allOf', 'oneOf', 'anyOf']) {
-    if (node[key]) {
-      node[key].forEach((part, i) => opaquePaths(part, `${path}.${key}[${i}]`, out, new Set(seen)));
-      return out;
+    if (!node[key]) continue;
+    if (node[key].length === 0) out.push(`${path}.${key} (leer)`);
+    node[key].forEach((part, i) => opaquePaths(part, `${path}.${key}[${i}]`, out, new Set(seen)));
+    // Felder neben `allOf` gehoeren zum selben Objekt und zaehlen mit.
+    if (key === 'allOf' && node.properties) {
+      for (const [name, property] of Object.entries(node.properties)) {
+        opaquePaths(property, `${path}.${name}`, out, new Set(seen));
+      }
     }
+    return out;
   }
   const types = [node.type].flat();
   if (types.includes('array')) {
@@ -113,7 +85,8 @@ function opaquePaths(schema, path, out, seen = new Set()) {
   }
   if (types.includes('object') || node.properties) {
     const extra = node.additionalProperties;
-    if (!node.properties && !(extra && typeof extra === 'object')) {
+    const named = Object.keys(node.properties ?? {}).length > 0;
+    if (!named && !(extra && typeof extra === 'object')) {
       out.push(path);
       return out;
     }
@@ -123,7 +96,7 @@ function opaquePaths(schema, path, out, seen = new Set()) {
     if (extra && typeof extra === 'object') opaquePaths(extra, `${path}.*`, out, new Set(seen));
     return out;
   }
-  if (!node.type && !node.enum && !node.const) out.push(path);
+  if (!node.type && !node.enum && !('const' in node)) out.push(path);
   return out;
 }
 
@@ -137,14 +110,25 @@ function problemsOf(method, path) {
   if (!operation) return [`${label}: fehlt in der Spec`];
   const problems = [];
   if (!operation.operationId) problems.push(`${label}: keine operationId`);
+  else if (!/^[a-z][A-Za-z0-9]+$/.test(operation.operationId)) problems.push(`${label}: operationId nicht camelCase`);
 
-  const [status, success] = Object.entries(operation.responses ?? {}).find(([code]) => /^2/.test(code)) ?? [];
-  if (!success) {
-    problems.push(`${label}: keine 2xx-Antwort`);
-  } else if (status !== '204') {
+  const declared = new Set((operation.parameters ?? []).map((param) => resolve(param)).filter((param) => param?.in === 'path')
+    .map((param) => param.name));
+  for (const [, name] of path.matchAll(/\{(\w+)\}/g)) {
+    if (!declared.has(name)) problems.push(`${label}: Pfadparameter ${name} nicht deklariert`);
+  }
+
+  const successes = Object.entries(operation.responses ?? {}).filter(([code]) => /^2/.test(code));
+  if (!successes.length) problems.push(`${label}: keine 2xx-Antwort`);
+  for (const [status, success] of successes) {
     const schema = jsonSchema(success);
-    if (!schema) problems.push(`${label}: ${status} ohne JSON-Schema`);
-    else opaquePaths(schema, 'response', []).forEach((p) => problems.push(`${label}: opak ${p}`));
+    if (status === '204') {
+      if (resolve(success)?.content) problems.push(`${label}: 204 mit Inhalt`);
+    } else if (!schema) {
+      problems.push(`${label}: ${status} ohne JSON-Schema`);
+    } else {
+      opaquePaths(schema, 'response', []).forEach((p) => problems.push(`${label}: opak ${p}`));
+    }
   }
 
   if (operation.requestBody) {

@@ -5,14 +5,16 @@
  *        stimmt. Ein erzeugtes Modell, das am ersten echten Datensatz scheitert,
  *        ist schlimmer als keines. Diese Suite faehrt jede Lese- und Schreib-
  *        Operation des Vertrags gegen einen echten Server und haelt die Antwort
- *        gegen die Spec. Felder, die das Schema nicht nennt, sind rot.
+ *        gegen die Spec, in Typ, Format, Muster und `oneOf`-Zweig. Felder, die das
+ *        Schema nicht nennt, sind rot. Bodies und Fehlerantworten prueft sie nicht.
  *
  * Ausfuehren: npm run test:openapi-client-responses
  */
-import { test } from 'node:test';
+import { before, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { startTestServer, cookieHeader } from './server-ready.js';
+import { CLIENT_OPERATIONS } from './openapi-client-operations.js';
 import { schemaProblems } from './openapi-schema-check.js';
 import { buildOpenApiSpec } from '../server/openapi.js';
 import { toLocalDateKey } from '../public/utils/date.js';
@@ -36,6 +38,8 @@ const cookie = cookieHeader(loginRes.headers.get('set-cookie'));
 const { csrfToken } = await (await fetch(`${API}/auth/me`, { headers: { Cookie: cookie } })).json();
 const session = { ...json, Cookie: cookie, 'X-CSRF-Token': csrfToken };
 
+const driven = new Set();
+
 /**
  * Ruft eine Operation auf und prueft die Antwort gegen ihr Schema.
  * @param {string} method klein, wie in der Spec
@@ -45,6 +49,7 @@ const session = { ...json, Cookie: cookie, 'X-CSRF-Token': csrfToken };
  */
 async function call(method, template, { params = {}, query = '', body, headers = session, ignore = [] } = {}) {
   const label = `${method.toUpperCase()} ${template}`;
+  driven.add(`${method} ${template}`);
   const path = template.replace(/\{(\w+)\}/g, (_, name) => params[name]);
   const res = await fetch(`${BASE}${path}${query}`, {
     method: method.toUpperCase(), headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
@@ -455,11 +460,17 @@ async function tokenHeaders(scopes) {
   return { ...json, Authorization: `Bearer ${token}` };
 }
 
-const member = await fixture('POST', '/auth/users', {
-  username: 'aufgaben-kalender', display_name: 'Mia', password: 'memberpass123', family_role: 'parent', avatar_data: PIXEL_PNG,
+// In `before` und nicht auf oberster Ebene: Sind die Tests darueber fertig, schliesst
+// `after()` den Server, und ein spaeteres `await` hier liefe ins Leere.
+let memberId;
+let me;
+before(async () => {
+  const member = await fixture('POST', '/auth/users', {
+    username: 'aufgaben-kalender', display_name: 'Mia', password: 'memberpass123', family_role: 'parent', avatar_data: PIXEL_PNG,
+  });
+  memberId = member.user.id;
+  ({ user: me } = await (await fetch(`${API}/auth/me`, { headers: session })).json());
 });
-const memberId = member.user.id;
-const { user: me } = await (await fetch(`${API}/auth/me`, { headers: session })).json();
 
 test('Aufgaben: jede Operation mit vollen Daten', async () => {
   const LIST = '/api/v1/tasks';
@@ -628,7 +639,7 @@ test('Kalender: jede Operation mit vollen Daten', async () => {
 
   // Geburtstag und Namenstag erzeugen ihre Termine selbst.
   const birthday = inDays(8);
-  await fixture('POST', '/birthdays', { name: 'Oma', birth_date: `1950${birthday.slice(4)}`, name_day: inDays(9).slice(5) });
+  await fixture('POST', '/birthdays', { name: 'Oma', birth_date: `1952${birthday.slice(4)}`, name_day: inDays(9).slice(5) });
   await fixture('POST', '/birthdays', { name: 'Opa', birth_date: `2000${birthday.slice(4)}`, year_unknown: true });
 
   // Ein Import mit eigener Zone landet als Instant in der Zeile, nicht als Wanduhrzeit.
@@ -899,4 +910,9 @@ test('Einkauf: gespiegelte, nur lesbare Liste mit Etiketten und Sync-Feldern', a
   );
 });
 
-test('die Spec ist geladen', () => assert.ok(spec.paths['/api/v1/tasks']));
+// Der letzte Fall, und er zaehlt alle davor: eine Operation auf der Liste, die
+// niemand faehrt, waere ein Schema ohne Beleg.
+test('jede Operation des Vertrags ist gefahren', () => {
+  const missing = CLIENT_OPERATIONS.map(([method, path]) => `${method} ${path}`).filter((key) => !driven.has(key));
+  assert.deepEqual(missing, []);
+});
