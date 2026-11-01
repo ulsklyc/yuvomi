@@ -657,6 +657,43 @@ export function authPaths() {
         },
       }),
     },
+    '/api/v1/auth/devices/pair': {
+      post: op({
+        summary: 'Create a pairing code',
+        description: 'Creates a short code that signs a device in as the caller, for a household without passwords or a person who prefers not to type one. The code holds for five minutes and once, and a new code ends the previous one. The same code comes back three ways: plain to type, as a `yuvomi://pair` link for this device and as a QR code of that link for a second device. Only from a browser session.',
+        tag: 'Auth',
+        stateChanging: true,
+        requestBody: jsonBody('#/components/schemas/DevicePairingRequest'),
+        responses: {
+          201: {
+            description: 'Code created. It is returned only once.',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/DevicePairingResponse' } } },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/auth/devices/pair/redeem': {
+      post: op({
+        summary: 'Redeem a pairing code',
+        description: 'Exchanges a pairing code for a device credential. Public, the code is the proof. Send no `Authorization` header: a valid device credential is refused here. Unknown, expired and used codes answer alike, and so does the code of an account that can no longer have a device. Attempts are limited.',
+        tag: 'Auth',
+        auth: false,
+        requestBody: jsonBody('#/components/schemas/DevicePairingRedeemRequest'),
+        responses: {
+          201: {
+            description: 'Device added. The plaintext credential is returned only once.',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SignedInDeviceCreateResponse' } } },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          429: { description: 'Too many attempts' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
     '/api/v1/auth/devices/current': {
       delete: op({
         summary: 'Sign this device out',
@@ -753,6 +790,12 @@ const CASE_REASONS = {
   '/api/v1/auth/devices': {
     get: '`session_required` (403, an API token cannot read a person\'s devices)',
     post: '`device_credential` (403, a device cannot add another device), `session_required` (403, an API token cannot add a device), `not_a_household_member` (403, the account is no household member)',
+  },
+  '/api/v1/auth/devices/pair': {
+    post: '`device_credential` (403, a device cannot create a pairing code), `session_required` (403, an API token cannot create one), `not_a_household_member` (403, the account is no household member)',
+  },
+  '/api/v1/auth/devices/pair/redeem': {
+    post: '`invalid_pairing_code` (400, the code is unknown, expired, used, or its account can no longer have a device), `device_credential` (403, the request carried a valid device credential)',
   },
   '/api/v1/auth/devices/{id}': { delete: '`session_required` (403, an API token cannot manage a person\'s devices)' },
   '/api/v1/auth/devices/current': { delete: '`device_credential_required` (403, only a signed-in device can sign itself out here)' },

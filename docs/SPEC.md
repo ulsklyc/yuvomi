@@ -2963,6 +2963,19 @@ A device has less reach than a browser session. An administrator is an ordinary 
 
 It ends after 90 days without use, the same number as a session, and with the same acts: every caller of `invalidateUserSessions()` (password change, password reset, administrator password, turning on two-factor, "sign out other devices") and deactivating or deleting the account. Integration tokens stay. A person lists and signs out their own devices, from a session or a device but not with an API token, which an administrator can issue for a member. An administrator cannot see them, and has one action for the emergency: `POST /api/v1/auth/users/{id}/devices/sign-out` ends all of a member's devices and browser sessions and answers without saying what ended. It is not a paired display, which is an account of its own.
 
+**Pairing a device (migration v275):** a household that only uses SSO has no password to type into an app, so a browser session can create a code instead. `POST /api/v1/auth/devices/pair` answers with the code to type, a `yuvomi://pair?server=<origin>&code=<code>` link for the same device and a QR code of that link for a second one, so nobody with a single phone is left out. `server` is the page's own origin, as with display pairing. `POST /api/v1/auth/devices/pair/redeem` is public, limited like the display route, and exchanges the code for a device credential. The code holds for five minutes instead of a display's 15, because it opens a personal account, and only once. A new code ends the previous one. Redeeming checks again that the person may have a device, and unknown, expired and used codes answer alike. Only a session creates a code, so a device still cannot issue another.
+
+| Table | Column | Type | Constraints |
+|---|---|---|---|
+| device_pairing_codes | id | INTEGER | PRIMARY KEY |
+| device_pairing_codes | user_id | INTEGER | NOT NULL, FK users, CASCADE |
+| device_pairing_codes | code_hash | TEXT | NOT NULL UNIQUE (SHA-256) |
+| device_pairing_codes | expires_at | TEXT | ISO 8601 NOT NULL (5 minutes) |
+| device_pairing_codes | used_at | TEXT | ISO 8601, nullable - spent rather than deleted |
+| device_pairing_codes | created_at | TEXT | ISO 8601 |
+
+This is a table of its own and not `display_pairing_codes`: that route asks no purpose when it redeems, so a personal code there would create a display device. Signing out, every act that ends a person's sessions and removing the account also end open codes.
+
 ### Display Accounts (migration v215, #1208, decided in #913)
 
 A wall tablet gets an account only a **paired device** can use. A display is a `users` row of its own

@@ -1239,6 +1239,47 @@ export const schemas = {
           },
           required: ['data', 'credential'],
         },
+        DevicePairingRequest: {
+          type: 'object',
+          properties: {
+            server: {
+              type: 'string',
+              description: 'The http(s) origin of this page, without a path. It goes into the link a client opens, and may take up to 170 characters once percent-encoded, so that the link still fits a QR code.',
+              example: 'https://yuvomi.example.org',
+            },
+          },
+          required: ['server'],
+        },
+        DevicePairingResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                code: { type: 'string', description: 'The code to type, shown once.' },
+                expires_at: { type: 'string', format: 'date-time' },
+                link: { type: 'string', description: 'Opens the app on this device: `yuvomi://pair?server=<origin>&code=<code>`.' },
+                qr: { type: 'string', description: 'The same link as a QR code, an SVG data URL.' },
+              },
+              required: ['code', 'expires_at', 'link', 'qr'],
+            },
+          },
+          required: ['data'],
+        },
+        DevicePairingRedeemRequest: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', description: 'Case, spaces and hyphens do not matter.' },
+            name: { type: 'string', minLength: 1, maxLength: 100 },
+            platform: { type: 'string', pattern: '^[a-z][a-z0-9-]{1,19}$' },
+            device_id: {
+              type: 'string',
+              pattern: '^[A-Za-z0-9._-]{8,128}$',
+              description: 'Chosen by the client and stable per installation. Sending the same value again replaces the earlier credential.',
+            },
+          },
+          required: ['code', 'name', 'platform', 'device_id'],
+        },
         UpcomingReminder: {
           type: 'object',
           properties: {

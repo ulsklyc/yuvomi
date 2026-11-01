@@ -29,6 +29,10 @@ import {
   displayMayRead, displayOfflineExpiresAt, displayTokenFromRequest, isDisplayAccount,
   markDisplayCookieRefreshed, OFFLINE_EXPIRES_HEADER,
 } from './services/display-accounts.js';
+import {
+  devicePairingLink, endDevicePairingCodes, isInstanceOrigin, issueDevicePairingCode, spendDevicePairingCode,
+} from './services/device-pairing.js';
+import { qrToDataUrl } from './utils/qrcode.js';
 import { birthDateInput, deleteBirthdayArtifacts, placeholderBirthDate, syncBirthdayArtifacts, validateYearUnknown } from './services/birthdays.js';
 import { syncFastingRemindersForUser } from './services/fasting-reminders.js';
 import { revokePaymentTasksForUsers } from './services/payment-task-audience.js';
@@ -466,6 +470,17 @@ const twoFactorLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Zu viele Versuche. Bitte warte kurz.', code: 429 },
+});
+
+// Eigener Limiter fuer das Einloesen eines Kopplungscodes, wie `pairingLimiter`
+// beim Display: Der Code ist kurz genug zum Abtippen, also kurz genug zum Raten,
+// und jeder Versuch zaehlt. Die Route ist oeffentlich, gezaehlt wird je Adresse.
+const devicePairingLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60_000,
+  max: parseInt(process.env.RATE_LIMIT_MAX_ATTEMPTS) || 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many pairing attempts. Please wait a moment.', code: 429 },
 });
 
 // Eigener Limiter fuer "Auf anderen Geraeten abmelden" (#1354). Zaehlt alle
@@ -956,6 +971,10 @@ function invalidateUserSessions(userId, exceptSid, database = db.get()) {
     UPDATE api_tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
      WHERE kind = 'device' AND subject_user_id = ? AND revoked_at IS NULL
   `).run(userId).changes;
+  // Ein offener Kopplungscode ist ein Geraet, das nur noch nicht eingeloest ist.
+  // Ohne diese Zeile laege er nach "Auf anderen Geraeten abmelden" noch bis zu
+  // fuenf Minuten in der Welt. Er zaehlt nicht mit: `ended` nennt, was lief.
+  endDevicePairingCodes(database, userId);
   return ended;
 }
 
@@ -2376,6 +2395,9 @@ router.post('/logout', requireAuth, csrfMiddleware, (req, res) => {
   if (req.authMethod === 'api_token') {
     return res.json({ ok: true });
   }
+  // Am gemeinsamen Rechner bliebe der offene Kopplungscode sonst nach dem
+  // Abmelden noch bis zu fuenf Minuten ein Weg in dieses Konto.
+  endDevicePairingCodes(db.get(), req.authUserId);
   req.session.destroy((err) => {
     if (err) {
       log.error('Logout error:', err);
@@ -3258,6 +3280,49 @@ function publicDevice(row, currentId = null) {
 }
 
 /**
+ * Die Angaben eines Geraets, fuer die Anmeldung und fuer die Kopplung.
+ * @returns {{ name: string, platform: string, deviceId: string }|{ error: string }}
+ */
+function readDeviceFields(body) {
+  const name = typeof body?.name === 'string' ? body.name.trim() : '';
+  const platform = body?.platform;
+  const deviceId = body?.device_id;
+  if (!name || name.length > 100) return { error: 'name must be between 1 and 100 characters.' };
+  if (typeof platform !== 'string' || !/^[a-z][a-z0-9-]{1,19}$/.test(platform)) {
+    return { error: 'platform must be a short lowercase name.' };
+  }
+  if (typeof deviceId !== 'string' || !/^[A-Za-z0-9._-]{8,128}$/.test(deviceId)) {
+    return { error: 'device_id must be between 8 and 128 plain characters.' };
+  }
+  return { name, platform, deviceId };
+}
+
+/** Darf diese Person ein Geraet haben? Eine `users`-Zeile ist noch kein Mitglied. */
+function mayHaveDevice(userId) {
+  return canSignIn(db.get(), userId) && isHouseholdMember(userId, { db: db.get() });
+}
+
+/**
+ * Stellt ein Credential aus und ersetzt ein aktives mit derselben `device_id`.
+ * Laeuft in der Transaktion des Aufrufers.
+ * @returns {{ id: number, credential: string }} der Klartext, genau einmal
+ */
+function issueDeviceCredential(userId, { name, platform, deviceId }) {
+  const credential = API_TOKEN_PREFIX + crypto.randomBytes(32).toString('base64url');
+  db.get().prepare(`
+    UPDATE api_tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+     WHERE kind = 'device' AND subject_user_id = ? AND device_id = ? AND revoked_at IS NULL
+  `).run(userId, deviceId);
+  const id = db.get().prepare(`
+    INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, subject_user_id, kind, platform, device_id)
+    VALUES (?, ?, ?, ?, ?, 'device', ?, ?)
+  `).run(
+    name, hashApiToken(credential), credential.slice(0, 12), userId, userId, platform, deviceId,
+  ).lastInsertRowid;
+  return { id, credential };
+}
+
+/**
  * POST /api/v1/auth/devices
  * Tauscht eine Browser- oder App-Sitzung gegen ein Device Credential. Der
  * Klartext steht genau einmal in dieser Antwort.
@@ -3277,45 +3342,97 @@ router.post('/devices', requireAuth, csrfMiddleware, (req, res) => {
     });
   }
   try {
-    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
-    const platform = req.body?.platform;
-    const deviceId = req.body?.device_id;
-    if (!name || name.length > 100) {
-      return res.status(400).json({ error: 'name must be between 1 and 100 characters.', code: 400 });
-    }
-    if (typeof platform !== 'string' || !/^[a-z][a-z0-9-]{1,19}$/.test(platform)) {
-      return res.status(400).json({ error: 'platform must be a short lowercase name.', code: 400 });
-    }
-    if (typeof deviceId !== 'string' || !/^[A-Za-z0-9._-]{8,128}$/.test(deviceId)) {
-      return res.status(400).json({ error: 'device_id must be between 8 and 128 plain characters.', code: 400 });
-    }
-    // Eine `users`-Zeile ist kein Mitglied: ein Ausgaben-Gast meldet sich an,
-    // bekommt aber aus demselben Grund wie beim API-Token kein Credential.
-    if (!canSignIn(db.get(), req.authUserId) || !isHouseholdMember(req.authUserId, { db: db.get() })) {
+    const fields = readDeviceFields(req.body);
+    if (fields.error) return res.status(400).json({ error: fields.error, code: 400 });
+    // Ein Ausgaben-Gast meldet sich an, bekommt aber aus demselben Grund wie beim
+    // API-Token kein Credential.
+    if (!mayHaveDevice(req.authUserId)) {
       return res.status(403).json({
         error: 'Only household members can add a signed-in device.', code: 403, reason: 'not_a_household_member',
       });
     }
 
-    const credential = API_TOKEN_PREFIX + crypto.randomBytes(32).toString('base64url');
-    let id = null;
+    let issued = null;
     db.transaction(() => {
-      db.get().prepare(`
-        UPDATE api_tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-         WHERE kind = 'device' AND subject_user_id = ? AND device_id = ? AND revoked_at IS NULL
-      `).run(req.authUserId, deviceId);
-      id = db.get().prepare(`
-        INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, subject_user_id, kind, platform, device_id)
-        VALUES (?, ?, ?, ?, ?, 'device', ?, ?)
-      `).run(
-        name, hashApiToken(credential), credential.slice(0, 12), req.authUserId, req.authUserId, platform, deviceId,
-      ).lastInsertRowid;
+      issued = issueDeviceCredential(req.authUserId, fields);
     });
 
+    const { id, credential } = issued;
     const row = db.get().prepare('SELECT * FROM api_tokens WHERE id = ?').get(id);
     res.status(201).json({ data: publicDevice(row), credential });
   } catch (err) {
     log.error('Signed-in device creation error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * POST /api/v1/auth/devices/pair
+ * Stellt den Code aus, mit dem die App sich anmeldet, wo kein Passwort hilft.
+ * Body: { server } - `window.location.origin` der Seite, wie beim Display (#2294).
+ * Der Server kennt seine oeffentliche Adresse hinter einem Proxy nicht verlaesslich.
+ * Die Herkunft fliesst nur in die Antwort an dieselbe angemeldete Person.
+ *
+ * NUR AUS EINER SITZUNG, wie `POST /devices`: Ein Geraet stellt kein weiteres aus.
+ */
+router.post('/devices/pair', requireAuth, csrfMiddleware, (req, res) => {
+  if (req.authMethod !== 'session') {
+    return res.status(403).json({
+      error: 'A pairing code can only be created from a sign-in.', code: 403, reason: 'session_required',
+    });
+  }
+  try {
+    const server = req.body?.server;
+    if (!isInstanceOrigin(server)) {
+      return res.status(400).json({ error: 'server must be the http(s) origin of this page.', code: 400 });
+    }
+    if (!mayHaveDevice(req.authUserId)) {
+      return res.status(403).json({
+        error: 'Only household members can add a signed-in device.', code: 403, reason: 'not_a_household_member',
+      });
+    }
+    const { code, expiresAt } = issueDevicePairingCode(db.get(), req.authUserId);
+    const link = devicePairingLink(server, code);
+    res.status(201).json({
+      data: { code, expires_at: expiresAt, link, qr: qrToDataUrl(link, { moduleSize: 6 }) },
+    });
+  } catch (err) {
+    log.error('Device pairing code error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * POST /api/v1/auth/devices/pair/redeem
+ * Tauscht einen Kopplungscode gegen ein Device Credential. Oeffentlich: die App
+ * hat noch nichts, womit sie sich ausweisen koennte, der Code ist der Ausweis.
+ * Body: { code, name, platform, device_id }
+ *
+ * Die Angaben werden VOR dem Code geprueft: ein Tippfehler der App verbraucht ihn
+ * nicht. Ist der Code gut, gehoert er aber jemandem, der kein Geraet mehr haben
+ * darf, klingt die Absage wie bei einem falschen Code.
+ */
+router.post('/devices/pair/redeem', devicePairingLimiter, (req, res) => {
+  try {
+    const fields = readDeviceFields(req.body);
+    if (fields.error) return res.status(400).json({ error: fields.error, code: 400 });
+
+    let issued = null;
+    db.transaction(() => {
+      const userId = spendDevicePairingCode(db.get(), req.body?.code);
+      if (userId == null || !mayHaveDevice(userId)) return;
+      issued = issueDeviceCredential(userId, fields);
+    });
+    if (!issued) {
+      return res.status(400).json({
+        error: 'This pairing code is not valid.', code: 400, reason: 'invalid_pairing_code',
+      });
+    }
+
+    const row = db.get().prepare('SELECT * FROM api_tokens WHERE id = ?').get(issued.id);
+    res.status(201).json({ data: publicDevice(row), credential: issued.credential });
+  } catch (err) {
+    log.error('Device pairing redemption error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

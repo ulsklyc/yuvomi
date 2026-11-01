@@ -245,6 +245,16 @@ const MIGRATIONS_SQL = {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_api_tokens_active_device
       ON api_tokens (subject_user_id, device_id)
       WHERE kind = 'device' AND revoked_at IS NULL;
+    CREATE TABLE IF NOT EXISTS device_pairing_codes (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      code_hash  TEXT    NOT NULL UNIQUE,
+      expires_at TEXT    NOT NULL,
+      used_at    TEXT,
+      created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_device_pairing_codes_user
+      ON device_pairing_codes(user_id);
     CREATE TRIGGER IF NOT EXISTS trg_users_updated_at
       AFTER UPDATE ON users FOR EACH ROW
       BEGIN UPDATE users SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;

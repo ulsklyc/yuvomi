@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and with everything that ends a session, so "sign out other devices" now counts these too. An
   administrator cannot see a member's devices, but can sign a member out of all of them with
   `POST /api/v1/auth/users/{id}/devices/sign-out`. Nothing changes for browsers or existing API tokens.
+- **Pairing a device, for households without passwords.** `POST /api/v1/auth/devices/pair` creates a
+  short code from a browser session, and `POST /api/v1/auth/devices/pair/redeem` exchanges it for a device
+  credential. The code holds for five minutes and once, and comes back as text, as a `yuvomi://pair` link
+  and as a QR code. It cannot open a wall display, and a display code cannot sign in a device.
 - **A document can name who it is about.** The document dialog has a new "About" field for one
   household member, and the Documents page can filter by person. The person also gets the expiry
   reminder, along with whoever filed the document, and once if that is the same person. This never
