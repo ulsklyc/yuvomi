@@ -63,6 +63,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   off in the browser. Only what another server answered, such as a WebDAV or CalDAV server refusing
   a connection, still appears as its original text, inside a translated sentence, so an admin can
   fix it.
+- **The Tasks title stands in full on narrow phones** (#2425). Below 390px wide the title sat next
+  to three buttons and read "Aufgab…" at 360px. There the filter now moves into the "..." menu, and
+  the number of active filters stands on the "..." button and in the menu entry. From 390px up
+  nothing changes.
 - **Repeating tasks keep their time on CalDAV servers across clock changes.** A repeating task with
   a time now goes out in the household's time zone, so a daily 07:00 task stays at 07:00 after the
   clocks change, and a weekday repeat near midnight stays on its day. Its start now lies before its

@@ -286,6 +286,56 @@
   }
 }
 
+/* UND EIN WEG ZUM FILTER JE BREITE (#2425; DESIGN.md, Kopfregel mobil, Regel 3).
+ * Drei Knoepfe lassen dem Titel Breite minus 224px: bei 360px 136px, und
+ * "Aufgaben" braucht in Roboto 144, "Feladatok" 146, "Завдання" 152. Ist der
+ * Modul schmaler als 390px, steht der Filter deshalb im Werkzeugmenue, die Zahl
+ * aktiver Filter am "...", und die Zeile traegt die zwei Knoepfe der Regel 1a
+ * (Titel: Breite minus 172). Ab 390px bleibt der Knopf.
+ *
+ * Eine Abfrage an der Seitenwurzel, kein Viewport-Breakpoint: das ist ein Umbruch
+ * dieses Bauteils (tokens.css 11c). Nicht am Kopf selbst, dessen Innenmass ist
+ * 32px kleiner, und nicht an `module-surface`: den Namen traegt die Wurzel nur
+ * in Liste und Verlauf, das Brett braucht die Faltung genauso. Darum beide Namen
+ * (wie calendar.css). Sie schaltet beide Wege: ausserhalb sind Eintrag und Zahl per
+ * Basisregel aus, und tasks.js fragt nur, ob die Zahl steht. Der Kalender
+ * faltet seinen Filter bewusst nicht (R20 6c). */
+.tasks-page {
+  container: tasks-page / inline-size;
+}
+
+.tasks-page.app-page--list-detail {
+  container-name: module-surface tasks-page;
+}
+
+.tasks-toolbar .popover-menu__item[data-action="open-filters"],
+.tasks-toolbar .tasks-tools-btn__count {
+  display: none;
+}
+
+@container tasks-page (width < 390px) {
+  .tasks-toolbar .tasks-toolbar__filter {
+    display: none;
+  }
+
+  .tasks-toolbar .popover-menu__item[data-action="open-filters"] {
+    display: flex;
+  }
+
+  .tasks-toolbar .tasks-tools-btn__count {
+    display: block;
+  }
+
+  .tasks-toolbar .page-tools-btn {
+    position: relative;
+  }
+
+  /* Dieselbe Sprache wie `.page-filter-btn--active`: Modulton und Zahl. */
+  .tasks-toolbar .tasks-tools-btn--active {
+    color: var(--module-accent, var(--color-accent));
+  }
+}
+
 /* Der Filterknopf im Verlauf: Platz gehalten, Knopf weg (tasks.js
  * `syncViewChrome`, Critique R24 G2-Aufgaben-P3-3). `visibility` nimmt ihn aus
  * Zeiger, Tab-Folge und Baum, ohne dass Segment und Primaerknopf rutschen. */

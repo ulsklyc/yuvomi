@@ -4154,6 +4154,11 @@ function toolsMenuItems() {
       { action: 'view-history', label: t('tasks.historyView'), icon: 'history', checked: state.viewMode === 'history', attrs: { 'data-view-choice': 'history' } },
     ],
   }, { separator: true }];
+  // DER FILTER IM MENUE, NUR IN EINEM MODUL UNTER 390px (#2425; tasks.css blendet
+  // je Breite EINEN der beiden Wege aus). Dort tragen Titel und drei Knoepfe die Zeile
+  // nicht: bei 360px bleiben "Aufgaben" 136 von 144px. Er steht vor dem
+  // Schreibenden, weil Nur-lesen (#467) ihn genauso braucht.
+  items.push({ action: 'open-filters', label: t('common.filters'), icon: 'sliders-horizontal' });
   if (!readOnly()) {
     items.push({ action: 'bulk-select', label: t('tasks.bulkSelect'), icon: 'list-checks',
       checked: state.bulkSelectMode, disabled: !isList });
@@ -4340,8 +4345,48 @@ function syncFilterSheet(panel) {
  */
 function renderFilters(container) {
   syncFilterButton(container?.querySelector?.('#tasks-filter-btn'), activeFilterCount());
+  syncFilterMenu(container);
   if (state.filterSheet && !state.filterSheet.isConnected) state.filterSheet = null;
   syncFilterSheet(state.filterSheet);
+}
+
+/**
+ * Der Filter im Werkzeugmenue (#2425): Eintrag und Zahl am "...".
+ *
+ * Aktive Filter bleiben sichtbar (Kopfregel mobil, Regel 3): unter 390px steht
+ * die Zahl am Menueknopf statt am Filterknopf und im Namen beider. Welcher Weg
+ * sichtbar ist, entscheidet allein die Abfrage in tasks.css; der zugaengliche
+ * Name fragt deshalb, ob die Zahl steht, statt die Schwelle zu wiederholen -
+ * sonst nennte das "..." ab 390px die Zahl des Knopfs daneben ein zweites Mal.
+ * Im Verlauf gibt es keinen Filter (`syncViewChrome`), also auch keinen Eintrag
+ * und keine Zahl.
+ */
+function syncFilterMenu(container) {
+  const toolbar = container?.querySelector?.('.tasks-toolbar');
+  const trigger = toolbar?.querySelector('.page-tools-btn');
+  if (!trigger) return;
+  const isHistory = state.viewMode === 'history';
+  const count = isHistory ? 0 : activeFilterCount();
+  const active = count ? t('common.filtersActive', { count }) : '';
+
+  const entry = toolbar.querySelector('.popover-menu__item[data-action="open-filters"]');
+  if (entry) {
+    entry.hidden = isHistory;
+    entry.querySelector('span').textContent = active || t('common.filters');
+  }
+
+  if (!trigger.querySelector('.tasks-tools-btn__count')) {
+    trigger.insertAdjacentHTML('beforeend', '<span class="page-filter-btn__count tasks-tools-btn__count" aria-hidden="true" hidden></span>');
+  }
+  const badge = trigger.querySelector('.tasks-tools-btn__count');
+  badge.hidden = count === 0;
+  badge.textContent = count ? String(count) : '';
+
+  const shown = count > 0 && getComputedStyle(badge).display !== 'none';
+  trigger.classList.toggle('tasks-tools-btn--active', count > 0);
+  const label = t('common.moreActions');
+  const name = shown ? `${label}, ${active}` : label;
+  if (trigger.getAttribute('aria-label') !== name) trigger.setAttribute('aria-label', name);
 }
 
 /**
@@ -5116,6 +5161,7 @@ function syncViewChrome(container) {
     filterBtn.disabled = false;
     filterBtn.classList.toggle('is-vacant', isHistory);
   }
+  syncFilterMenu(container);
   if (!isList) {
     state.bulkSelectMode = false;
     state.selectedTaskIds.clear();
@@ -5282,6 +5328,9 @@ function wireToolbar(container) {
       case 'bulk-tag-remove':
         runBulkAction('tag-remove', container);
         break;
+      case 'open-filters':
+        openTaskFilters(container);
+        break;
       case 'manage-categories':
         if (!readOnly()) openTaskCategoryManager(container);
         break;
@@ -5291,6 +5340,14 @@ function wireToolbar(container) {
       default:
     }
   });
+  // Die Zahl am "..." steht von Anfang an, und eine Drehung ueber die Schwelle
+  // zieht ihren Namen nach (#2425).
+  syncFilterMenu(container);
+  if (typeof ResizeObserver === 'function') {
+    const resize = new ResizeObserver(() => syncFilterMenu(container));
+    resize.observe(toolbar);
+    pageSignal?.addEventListener('abort', () => resize.disconnect(), { once: true });
+  }
 }
 
 function wireNewTaskBtn(container) {
@@ -6581,7 +6638,8 @@ export async function render(container, { user, signal } = {}) {
                 eigenen `.group-toggle`. Unter 768px steht sie als Einfachauswahl
                 im Werkzeugmenue (wie in den Dokumenten): Lupe, Filter und Menue
                 passen dann neben den Large Title, und die zweite Kopfzeile
-                entfaellt (Kopfregel mobil 1a). */ ''}
+                entfaellt (Kopfregel mobil 1a). Unter 390px passen nur noch
+                zwei Knoepfe, der Filter steht dort ebenfalls im Menue (#2425). */ ''}
           <div class="segmented segmented--icons tasks-view-toggle" id="view-toggle" role="group" aria-label="${t('tasks.viewToggleLabel')}">
             <button type="button" class="segmented__item${isKanban || isHistory ? '' : ' is-active'}" data-view="list"
                     title="${t('tasks.listView')}" aria-label="${t('tasks.listView')}" aria-pressed="${!isKanban && !isHistory}">
