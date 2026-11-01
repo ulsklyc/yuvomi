@@ -42,6 +42,26 @@ const randomAvatarColor = () => USER_COLORS[Math.floor(Math.random() * USER_COLO
  * und keine Angabe zu einem einzelnen Mitglied.
  */
 let ssoAvailable = false;
+/**
+ * Ob Home Assistant die SSO-Quelle ist. Dann bekommt jedes Konto ein Feld fuer
+ * die HA-Benutzer-ID: HA liefert keine E-Mail-Adresse, also ist die Bindung
+ * durch den Administrator der einzige Weg, ein Konto ohne Passwort zu fuehren.
+ */
+let homeAssistantSso = false;
+
+/**
+ * Formularzeile fuer die Home-Assistant-Benutzer-ID. Leer, wenn HA nicht die
+ * SSO-Quelle ist.
+ */
+function homeAssistantUserIdRowHtml(id, value = '') {
+  if (!homeAssistantSso) return '';
+  return formRowHtml({
+    label: t('settings.memberHomeAssistantUserIdLabel'), labelFor: id, field: true,
+    description: t('settings.memberHomeAssistantUserIdHint'), descriptionId: `${id}-hint`,
+    control: `<input class="form-input" type="text" id="${id}" value="${esc(value || '')}" `
+      + `pattern="[0-9a-fA-F]{32}" maxlength="32" autocomplete="off" spellcheck="false" aria-describedby="${id}-hint" />`,
+  });
+}
 
 /**
  * Rechte-Katalog fuer die Startrechte einer Einladung (#869).
@@ -300,6 +320,7 @@ function addMemberFormHtml() {
             ssoAvailable ? switchRowHtml({
               id: 'new-member-sso-only', label: t('settings.memberSsoOnlyLabel'), hint: t('settings.memberSsoOnlyHint'),
             }) : '',
+            homeAssistantUserIdRowHtml('new-member-ha-user-id'),
             formRowHtml({
               label: t('settings.memberPasswordLabel'), labelFor: 'new-member-password', labelExtra: REQUIRED_MARK, field: true,
               attrs: { id: 'new-member-password-group' },
@@ -1096,6 +1117,7 @@ async function openEditMemberModal(member, currentUser, users, container) {
             id: 'edit-member-sso-only', label: t('settings.memberSsoOnlyLabel'),
             hint: t('settings.memberSsoOnlyEditHint'), checked: member.sso_only === true,
           }) : '',
+          homeAssistantUserIdRowHtml('edit-member-ha-user-id', member.homeassistant_user_id),
           formRowHtml({
             label: t('settings.resetPasswordLabel'), labelFor: 'edit-member-password', field: true,
             attrs: { id: 'edit-member-password-group' },
@@ -1210,6 +1232,11 @@ async function openEditMemberModal(member, currentUser, users, container) {
             birth_year_unknown: birth.yearUnknown,
             ...(newPassword ? { password: newPassword } : {}),
             ...(ssoToggle ? { sso_only: ssoToggle.checked } : {}),
+            // Nur ein geaenderter Wert: sonst loeste ein leeres Feld eine
+            // Bindung, die der Server hier gar nicht anzeigt.
+            ...(haUserIdChanged(panel, member) ? {
+              homeassistant_user_id: panel.querySelector('#edit-member-ha-user-id').value.trim() || null,
+            } : {}),
           });
           // Betreuung getrennt speichern: sie lebt im Gesundheitsmodul, nicht am
           // Nutzerdatensatz (#584).
@@ -1257,8 +1284,16 @@ function syncSsoOnlyField(container) {
   // Ohne Passwort ist die E-Mail der einzige Weg, auf dem die erste
   // SSO-Anmeldung dieses Konto findet - ein gleicher Benutzername verknuepft
   // bewusst nicht. Der Server weist es sonst ab; das hier sagt es vorher.
+  // Ausser der Administrator bindet das Konto gleich an einen HA-Benutzer.
   const email = container.querySelector('#new-member-email');
-  if (email) email.required = on;
+  const haUserId = container.querySelector('#new-member-ha-user-id')?.value.trim();
+  if (email) email.required = on && !haUserId;
+}
+
+function haUserIdChanged(panel, member) {
+  const field = panel.querySelector('#edit-member-ha-user-id');
+  if (!field) return false;
+  return field.value.trim().toLowerCase() !== (member.homeassistant_user_id || '');
 }
 
 function openAddMemberModal(container, currentUser, users) {
@@ -1271,6 +1306,8 @@ function openAddMemberModal(container, currentUser, users) {
       const form = panel.querySelector('#add-member-form');
       form.querySelector('#new-member-sso-only')
         ?.addEventListener('change', () => syncSsoOnlyField(panel));
+      form.querySelector('#new-member-ha-user-id')
+        ?.addEventListener('input', () => syncSsoOnlyField(panel));
       syncSsoOnlyField(panel);
       bindChildStartHint(panel, 'new-family-role', 'new-member-child-hint');
       panel.querySelector('#cancel-add-member')?.addEventListener('click', () => closeModal());
@@ -1301,6 +1338,8 @@ function openAddMemberModal(container, currentUser, users) {
           email: panel.querySelector('#new-member-email')?.value.trim() || null,
           birth_date: parseDateInput(birthDateRaw) || null,
         };
+        const haUserId = panel.querySelector('#new-member-ha-user-id')?.value.trim();
+        if (haUserId) data.homeassistant_user_id = haUserId;
 
         const btn = panel.querySelector('[type=submit]');
         const modalContext = captureModalContext();
@@ -1420,9 +1459,12 @@ export async function render(container, { user } = {}) {
   // Ein Ausfall dieser Abfrage darf die Verwaltung nicht kosten: ohne Antwort
   // bleibt es beim bisherigen Formular mit Pflicht-Passwort.
   try {
-    ssoAvailable = (await api.get('/auth/oidc/config'))?.enabled === true;
+    const ssoConfig = await api.get('/auth/oidc/config');
+    ssoAvailable = ssoConfig?.enabled === true;
+    homeAssistantSso = ssoAvailable && ssoConfig?.provider === 'homeassistant';
   } catch {
     ssoAvailable = false;
+    homeAssistantSso = false;
   }
   // Derselbe Grundsatz wie darueber: faellt der Katalog aus, bleibt der Hinweis
   // unter den Startrechten ohne Modulnamen, aber das Formular funktioniert.

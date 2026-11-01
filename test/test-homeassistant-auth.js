@@ -236,8 +236,9 @@ test('Rueckweg: unbekannter HA-Benutzer bekommt ein Konto (Signup erlaubt), Toke
   await new Promise((r) => setTimeout(r, 50));
   assert.deepEqual(revoked, ['refresh-1'], 'das Refresh-Token wird in Home Assistant widerrufen');
 
-  const row = database.prepare('SELECT display_name, oidc_sub, oidc_provider, role FROM users WHERE oidc_sub = ?').get('ha-user-new');
+  const row = database.prepare('SELECT username, display_name, oidc_sub, oidc_provider, role FROM users WHERE oidc_sub = ?').get('ha-user-new');
   assert.equal(row.display_name, 'Lea');
+  assert.equal(row.username, 'Lea', 'der HA-Anzeigename wird zum Benutzernamen, nicht die HA-ID');
   assert.equal(row.oidc_provider, 'https://ha.example.test');
   assert.equal(row.role, 'member', 'HA-Admin-Rechte werden nicht uebernommen');
 
@@ -312,4 +313,74 @@ test('Verknuepfen: ein angemeldetes Konto bindet seinen HA-Benutzer und meldet s
   assert.equal(cb2.headers.get('location'), '/');
   const who = await (await fetch(`${base}/__test/whoami`, { headers: { cookie: cookiesOf(cb2, fresh) } })).json();
   assert.equal(who.userId, MEMBER);
+});
+
+// ---------------------------------------------------------------------------
+// Bindung durch den Administrator: HA liefert keine E-Mail, also findet die
+// erste Anmeldung ein vorbereitetes Konto nur ueber eine eingetragene ID.
+// ---------------------------------------------------------------------------
+
+async function adminRequest(method, path, body) {
+  const signIn = await fetch(`${base}/__test/sign-in`, { method: 'POST' });
+  return fetch(`${base}/api/v1/auth${path}`, {
+    method,
+    headers: { cookie: cookiesOf(signIn), 'content-type': 'application/json', 'x-csrf-token': CSRF },
+    body: JSON.stringify(body),
+  });
+}
+
+const HA_ID_MIA = 'a'.repeat(32);
+
+test('Admin legt ein Konto ohne Passwort fuer einen HA-Benutzer an; die HA-Anmeldung landet darin', async () => {
+  process.env.OIDC_ALLOW_SIGNUP = 'false';
+  const res = await adminRequest('POST', '/users', {
+    username: 'mia', display_name: 'Mia', sso_only: true, homeassistant_user_id: HA_ID_MIA.toUpperCase(),
+  });
+  assert.equal(res.status, 201, 'ohne E-Mail, weil die HA-ID das Konto erreichbar macht');
+  const { user } = await res.json();
+  assert.equal(user.homeassistant_user_id, HA_ID_MIA, 'gespeichert in Kleinbuchstaben');
+  const row = database.prepare('SELECT oidc_sub, oidc_provider FROM users WHERE id = ?').get(user.id);
+  assert.deepEqual({ ...row }, { oidc_sub: HA_ID_MIA, oidc_provider: 'https://ha.example.test' });
+
+  haUser = { id: HA_ID_MIA, name: 'Mia', is_owner: false, is_admin: false };
+  const start = await fetch(`${base}/api/v1/auth/oidc/start`, { redirect: 'manual' });
+  const cookie = cookiesOf(start);
+  const authorize = new URL(start.headers.get('location'));
+  const code = haIssuesCode(authorize);
+  const cb = await fetch(`${base}/api/v1/auth/oidc/callback?code=${code}&state=${authorize.searchParams.get('state')}`, {
+    redirect: 'manual', headers: { cookie },
+  });
+  assert.equal(cb.headers.get('location'), '/');
+  const who = await (await fetch(`${base}/__test/whoami`, { headers: { cookie: cookiesOf(cb, cookie) } })).json();
+  assert.equal(who.userId, user.id);
+});
+
+test('Admin-Bindung: ungueltige ID 400, vergebene ID 409, ohne Passwort nicht loesbar', async () => {
+  const bad = await adminRequest('POST', '/users', {
+    username: 'kim', display_name: 'Kim', password: 'geheim1234', homeassistant_user_id: 'kein-hex',
+  });
+  assert.equal(bad.status, 400);
+
+  const taken = await adminRequest('POST', '/users', {
+    username: 'kim', display_name: 'Kim', password: 'geheim1234', homeassistant_user_id: HA_ID_MIA,
+  });
+  assert.equal(taken.status, 409);
+
+  const mia = database.prepare("SELECT id FROM users WHERE username = 'mia'").get().id;
+  // Unveraendert mitgeschickt ist kein Wechsel und kein Fehler.
+  const same = await adminRequest('PATCH', `/users/${mia}`, { homeassistant_user_id: HA_ID_MIA, sso_only: true });
+  assert.equal(same.status, 200);
+
+  const unlink = await adminRequest('PATCH', `/users/${mia}`, { homeassistant_user_id: '' });
+  assert.equal(unlink.status, 400);
+  assert.equal((await unlink.json()).reason, 'no_password');
+  assert.equal(database.prepare('SELECT oidc_sub FROM users WHERE id = ?').get(mia).oidc_sub, HA_ID_MIA);
+
+  // Mit neuem Passwort darf die Bindung gehen.
+  const withPassword = await adminRequest('PATCH', `/users/${mia}`, {
+    homeassistant_user_id: null, sso_only: false, password: 'geheim1234',
+  });
+  assert.equal(withPassword.status, 200);
+  assert.equal((await withPassword.json()).user.homeassistant_user_id, null);
+  assert.equal(database.prepare('SELECT oidc_sub FROM users WHERE id = ?').get(mia).oidc_sub, null);
 });
