@@ -236,7 +236,7 @@ function bindVisibilityEvents(container) {
       } catch (error) {
         select.value = saved;
         hideApply();
-        window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+        window.yuvomi?.showToast(errorSentence(error), 'danger');
       } finally {
         if (select.isConnected) select.disabled = false;
       }
@@ -252,7 +252,7 @@ function bindVisibilityEvents(container) {
       window.yuvomi?.showToast(t('settings.healthVisibilityApplied', { count: updated }), 'success');
       hideApply();
     } catch (error) {
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(error), 'danger');
     } finally {
       applyBtn.disabled = false;
     }

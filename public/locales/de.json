@@ -701,7 +701,8 @@
         "checkAllSubtasks": "Alle abhaken",
         "subtasksAllDone": "„{{title}}“ und alle Teilaufgaben erledigt.",
         "seriesDoneNamed": "„{{title}}“ erledigt - nächstes Mal am {{date}}",
-        "kanbanRestore": "Wiederherstellen"
+        "kanbanRestore": "Wiederherstellen",
+        "errorTagGone": "Dieses Stichwort gibt es nicht mehr."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} Artikel gelöscht.",
@@ -3468,7 +3469,18 @@
         "reminderListAssigneesTasksOnly": "Personen gibt es nur für Listen, die in Aufgaben landen.",
         "syncAssigneeNotMember": "Nur Haushaltsmitglieder können hier gewählt werden.",
         "syncAssigneeUnknown": "Diese Person gibt es nicht mehr. Lade die Seite neu.",
-        "permDetails": "Widgets und weitere Rechte"
+        "permDetails": "Widgets und weitere Rechte",
+        "connectionFailedDetail": "Verbindung fehlgeschlagen: {{error}}",
+        "documentStorageChangeFailed": "Die Änderung wurde nicht übernommen: {{error}}",
+        "apiTokenCopyFailed": "Kopieren hat nicht geklappt. Markiere das Token und kopiere es von Hand.",
+        "weatherLocateDenied": "Der Zugriff auf den Standort ist nicht erlaubt. Gib ihn in den Browser-Einstellungen frei oder trage den Ort von Hand ein.",
+        "weatherLocateFailed": "Der Standort ließ sich nicht ermitteln. Trage den Ort von Hand ein.",
+        "outlookAutoSyncOverrides": "Outlook kann Serien mit verknüpften Einzelausnahmen nicht synchronisieren. Deaktiviere ihren Zielkalender, damit sie lokal bearbeitbar bleiben. Du musst keine Einzelausnahmen löschen.",
+        "memberRemoveOwnAccount": "Dein eigenes Konto kannst du nicht entfernen.",
+        "memberRemoveLastAdmin": "Mindestens ein Administrator muss bleiben.",
+        "memberRemoveLastSsoAdmin": "Das ist der letzte Administrator mit SSO-Verknüpfung. Verknüpfe zuerst einen weiteren Administrator.",
+        "backupWebdavUrlInvalid": "Die Adresse muss mit http:// oder https:// beginnen.",
+        "icsSubscriptionGone": "Dieses Abonnement gibt es nicht mehr."
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",

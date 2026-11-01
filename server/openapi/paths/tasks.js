@@ -149,7 +149,10 @@ const COMMENT_GONE = `${TASK_GONE}, \`tasks_comment_not_found\` (404, the task i
 const REORDER_DENIED = '`reorder_not_allowed` (403, the caller lacks `tasks_reorder_family` - the hand order belongs to the household, R23)';
 const CAT_EXISTS = '`category_exists` (409, a category with this name already exists)';
 const CAT_DELETE = '`category_in_use` (409, tasks still use the category; `count` carries how many), `category_last` (409, the last category cannot be deleted)';
+const TAG_GONE = '`tasks_tag_not_found` (404, renamed or removed in the meantime)';
+
 const CASE_REASONS = {
+  '/api/v1/tasks/tags/{tag}': { put: TAG_GONE, delete: TAG_GONE },
   '/api/v1/tasks': { post: PARENT_GONE },
   '/api/v1/tasks/reorder': { patch: `${TASK_GONE}, ${REORDER_DENIED}` },
   '/api/v1/tasks/reorder/reset': { post: `${TASK_GONE}, ${REORDER_DENIED}` },

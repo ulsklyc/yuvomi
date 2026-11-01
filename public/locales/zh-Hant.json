@@ -683,7 +683,8 @@
         "checkAllSubtasks": "全部勾選",
         "subtasksAllDone": "「{{title}}」及所有子任務已完成。",
         "seriesDoneNamed": "「{{title}}」已完成 - 下次到期：{{date}}",
-        "kanbanRestore": "恢復"
+        "kanbanRestore": "恢復",
+        "errorTagGone": "此標籤已不存在。"
     },
     "shopping": {
         "itemsRemovedToast_one": "已刪除 {{count}} 件商品。",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "只有進入任務的清單才能設定人員。",
         "syncAssigneeNotMember": "這裡只能選擇家庭成員。",
         "syncAssigneeUnknown": "此人已不存在。請重新載入頁面。",
-        "permDetails": "小工具與其他權限"
+        "permDetails": "小工具與其他權限",
+        "connectionFailedDetail": "連線失敗:{{error}}",
+        "documentStorageChangeFailed": "變更未套用:{{error}}",
+        "apiTokenCopyFailed": "無法複製。請選取權杖並手動複製。",
+        "weatherLocateDenied": "不允許存取您的位置。請在瀏覽器設定中允許,或手動輸入地點。",
+        "weatherLocateFailed": "無法判定您的位置。請手動輸入地點。",
+        "outlookAutoSyncOverrides": "Outlook 無法同步含有已連結單一例外的系列。請關閉其目標行事曆,以便在此繼續編輯。您不需要刪除任何例外。",
+        "memberRemoveOwnAccount": "您無法移除自己的帳號。",
+        "memberRemoveLastAdmin": "至少必須保留一位管理員。",
+        "memberRemoveLastSsoAdmin": "這是最後一位連結 SSO 的管理員。請先連結另一位管理員。",
+        "backupWebdavUrlInvalid": "位址必須以 http:// 或 https:// 開頭。",
+        "icsSubscriptionGone": "此訂閱已不存在。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

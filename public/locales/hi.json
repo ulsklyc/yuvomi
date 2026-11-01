@@ -683,7 +683,8 @@
         "checkAllSubtasks": "सभी पर निशान लगाएं",
         "subtasksAllDone": "\"{{title}}\" और सभी उपकार्य पूर्ण।",
         "seriesDoneNamed": "\"{{title}}\" पूर्ण - अगली बार: {{date}}",
-        "kanbanRestore": "पुनर्स्थापित करें"
+        "kanbanRestore": "पुनर्स्थापित करें",
+        "errorTagGone": "यह टैग अब मौजूद नहीं है।"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} आइटम हटाया गया।",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "लोग केवल उन सूचियों के लिए तय किए जा सकते हैं जो कार्यों में जाती हैं।",
         "syncAssigneeNotMember": "यहाँ केवल परिवार के सदस्य चुने जा सकते हैं।",
         "syncAssigneeUnknown": "यह व्यक्ति अब मौजूद नहीं है। पेज फिर से लोड करें।",
-        "permDetails": "विजेट और अन्य अनुमतियाँ"
+        "permDetails": "विजेट और अन्य अनुमतियाँ",
+        "connectionFailedDetail": "कनेक्शन विफल: {{error}}",
+        "documentStorageChangeFailed": "बदलाव लागू नहीं हुआ: {{error}}",
+        "apiTokenCopyFailed": "कॉपी नहीं हो सका। टोकन चुनें और हाथ से कॉपी करें।",
+        "weatherLocateDenied": "आपके स्थान की अनुमति नहीं है। इसे ब्राउज़र सेटिंग में चालू करें या जगह हाथ से भरें।",
+        "weatherLocateFailed": "आपका स्थान पता नहीं चल सका। जगह हाथ से भरें।",
+        "outlookAutoSyncOverrides": "Outlook जुड़े हुए एकल अपवादों वाली शृंखलाएँ सिंक नहीं कर सकता। उनका लक्ष्य कैलेंडर बंद करें ताकि वे यहाँ संपादन योग्य रहें। किसी अपवाद को हटाने की ज़रूरत नहीं है।",
+        "memberRemoveOwnAccount": "आप अपना खाता नहीं हटा सकते।",
+        "memberRemoveLastAdmin": "कम से कम एक व्यवस्थापक रहना चाहिए।",
+        "memberRemoveLastSsoAdmin": "यह SSO से जुड़ा अंतिम व्यवस्थापक है। पहले किसी दूसरे व्यवस्थापक को जोड़ें।",
+        "backupWebdavUrlInvalid": "पता http:// या https:// से शुरू होना चाहिए।",
+        "icsSubscriptionGone": "यह सदस्यता अब मौजूद नहीं है।"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",

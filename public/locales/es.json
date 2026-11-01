@@ -683,7 +683,8 @@
         "checkAllSubtasks": "Marcar todas",
         "subtasksAllDone": "«{{title}}» y todas sus subtareas hechas.",
         "seriesDoneNamed": "«{{title}}» hecho - próxima vez: {{date}}",
-        "kanbanRestore": "Restaurar"
+        "kanbanRestore": "Restaurar",
+        "errorTagGone": "Esta etiqueta ya no existe."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} artículo eliminado.",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "Las personas solo se pueden fijar para listas que van a Tareas.",
         "syncAssigneeNotMember": "Aquí solo se pueden elegir miembros del hogar.",
         "syncAssigneeUnknown": "Esta persona ya no existe. Recarga la página.",
-        "permDetails": "Widgets y más permisos"
+        "permDetails": "Widgets y más permisos",
+        "connectionFailedDetail": "Error de conexión: {{error}}",
+        "documentStorageChangeFailed": "El cambio no se aplicó: {{error}}",
+        "apiTokenCopyFailed": "No se pudo copiar. Selecciona el token y cópialo a mano.",
+        "weatherLocateDenied": "El acceso a tu ubicación no está permitido. Actívalo en los ajustes del navegador o escribe el lugar a mano.",
+        "weatherLocateFailed": "No se pudo determinar tu ubicación. Escribe el lugar a mano.",
+        "outlookAutoSyncOverrides": "Outlook no puede sincronizar series con excepciones individuales vinculadas. Desactiva su calendario de destino para que sigan siendo editables aquí. No hace falta eliminar ninguna excepción.",
+        "memberRemoveOwnAccount": "No puedes eliminar tu propia cuenta.",
+        "memberRemoveLastAdmin": "Debe quedar al menos un administrador.",
+        "memberRemoveLastSsoAdmin": "Este es el último administrador vinculado a SSO. Vincula antes a otro administrador.",
+        "backupWebdavUrlInvalid": "La dirección debe empezar por http:// o https://.",
+        "icsSubscriptionGone": "Esta suscripción ya no existe."
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",

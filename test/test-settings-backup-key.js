@@ -401,11 +401,13 @@ test('Sperre: waehrend des Requests loest ein zweiter Klick keinen zweiten Resto
 
 test('WebDAV: password_required wird uebersetzt, andere Fehler behalten den Servertext', async () => {
   // Neuer Server oder Benutzer ohne neues Passwort (server/routes/backup.js):
-  // die englische Entwicklernotiz des Servers darf nicht im Formular landen.
+  // die englische Entwicklernotiz des Servers darf nicht im Formular landen,
+  // und jeder andere Text des Servers auch nicht (#1909).
   const { webdavErrorMessage } = await import('../public/settings/pages/admin-backup.js');
   assert.equal(
     webdavErrorMessage({ message: 'A new server or username needs the password again.', data: { errorCode: 'password_required' } }),
     'settings.backupWebdavPasswordRequired',
   );
-  assert.equal(webdavErrorMessage({ message: 'Authentication failed (401).', data: { code: 400 } }), 'Authentication failed (401).');
+  assert.equal(webdavErrorMessage({ message: 'Authentication failed (401).', data: { code: 400 } }), 'common.errorGeneric');
+  assert.equal(webdavErrorMessage({ message: 'url must start with http:// or https://.', data: { errorCode: 'url_invalid' } }), 'settings.backupWebdavUrlInvalid');
 });

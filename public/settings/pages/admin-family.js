@@ -20,6 +20,7 @@ import { createRetryState, formSwitchRowHtml, settingSwitchRowHtml } from '/sett
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import { birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { mediaPickerBadgeHtml } from '/utils/media-picker.js';
+import { errorSentence } from '/utils/friendly-error.js';
 import {
   renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect,
 } from '/components/user-multi-select.js';
@@ -935,7 +936,7 @@ function bindInviteEvents(container, initialInvites) {
       refocusAfterRender();
       window.yuvomi?.showToast(t('settings.invites.revoked'), 'default');
     } catch (err) {
-      window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(errorSentence(err), 'danger');
     }
   });
 }
@@ -995,7 +996,7 @@ function bindDeleteButtons(container, currentUser, users) {
         // weggerendert worden.
         refocusAfterRender();
       } catch (err) {
-        window.yuvomi?.showToast(err.message, 'danger');
+        window.yuvomi?.showToast(errorSentence(err), 'danger');
       }
     });
   });

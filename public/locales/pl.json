@@ -819,7 +819,8 @@
         "doneSubtasksOpen_few": "„{{title}}” zrobione - wciąż otwarte {{count}} podzadania.",
         "doneSubtasksOpen_many": "„{{title}}” zrobione - wciąż otwartych {{count}} podzadań.",
         "seriesDoneNamed": "„{{title}}” zrobione - następny raz: {{date}}",
-        "kanbanRestore": "Przywróć"
+        "kanbanRestore": "Przywróć",
+        "errorTagGone": "Ten tag już nie istnieje."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} posiłki",
@@ -3694,7 +3695,18 @@
         "reminderListAssigneesTasksOnly": "Osoby można ustawić tylko dla list trafiających do Zadań.",
         "syncAssigneeNotMember": "Tutaj można wybrać tylko członków gospodarstwa domowego.",
         "syncAssigneeUnknown": "Ta osoba już nie istnieje. Odśwież stronę.",
-        "permDetails": "Widżety i dodatkowe uprawnienia"
+        "permDetails": "Widżety i dodatkowe uprawnienia",
+        "connectionFailedDetail": "Połączenie nie powiodło się: {{error}}",
+        "documentStorageChangeFailed": "Zmiana nie została zastosowana: {{error}}",
+        "apiTokenCopyFailed": "Kopiowanie nie powiodło się. Zaznacz token i skopiuj go ręcznie.",
+        "weatherLocateDenied": "Dostęp do lokalizacji jest niedozwolony. Zezwól na niego w ustawieniach przeglądarki lub wpisz miejsce ręcznie.",
+        "weatherLocateFailed": "Nie udało się ustalić lokalizacji. Wpisz miejsce ręcznie.",
+        "outlookAutoSyncOverrides": "Outlook nie może synchronizować serii z powiązanymi pojedynczymi wyjątkami. Wyłącz ich kalendarz docelowy, aby można je było nadal edytować tutaj. Nie musisz usuwać żadnych wyjątków.",
+        "memberRemoveOwnAccount": "Nie możesz usunąć własnego konta.",
+        "memberRemoveLastAdmin": "Musi pozostać co najmniej jeden administrator.",
+        "memberRemoveLastSsoAdmin": "To ostatni administrator powiązany z SSO. Najpierw powiąż innego administratora.",
+        "backupWebdavUrlInvalid": "Adres musi zaczynać się od http:// lub https://.",
+        "icsSubscriptionGone": "Ta subskrypcja już nie istnieje."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

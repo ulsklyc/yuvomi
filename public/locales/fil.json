@@ -701,7 +701,8 @@
         "checkAllSubtasks": "Markahan lahat",
         "subtasksAllDone": "Tapos na ang \"{{title}}\" at lahat ng subtask.",
         "seriesDoneNamed": "Tapos na ang \"{{title}}\" - susunod: {{date}}",
-        "kanbanRestore": "I-restore"
+        "kanbanRestore": "I-restore",
+        "errorTagGone": "Wala na ang tag na ito."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ang item na natanggal.",
@@ -3468,7 +3469,18 @@
         "reminderListAssigneesTasksOnly": "Maitatakda lang ang mga tao para sa mga listahang napupunta sa Mga Gawain.",
         "syncAssigneeNotMember": "Mga miyembro lang ng sambahayan ang mapipili rito.",
         "syncAssigneeUnknown": "Wala na ang taong ito. I-reload ang pahina.",
-        "permDetails": "Mga widget at iba pang pahintulot"
+        "permDetails": "Mga widget at iba pang pahintulot",
+        "connectionFailedDetail": "Nabigo ang koneksyon: {{error}}",
+        "documentStorageChangeFailed": "Hindi nailapat ang pagbabago: {{error}}",
+        "apiTokenCopyFailed": "Hindi nakopya. Piliin ang token at kopyahin ito nang mano-mano.",
+        "weatherLocateDenied": "Hindi pinapayagan ang access sa iyong lokasyon. Payagan ito sa mga setting ng browser o ilagay ang lugar nang mano-mano.",
+        "weatherLocateFailed": "Hindi matukoy ang iyong lokasyon. Ilagay ang lugar nang mano-mano.",
+        "outlookAutoSyncOverrides": "Hindi ma-sync ng Outlook ang mga serye na may naka-link na mga iisang eksepsyon. I-off ang target na kalendaryo ng mga ito para manatiling nae-edit dito. Hindi mo kailangang magbura ng mga eksepsyon.",
+        "memberRemoveOwnAccount": "Hindi mo maaaring alisin ang sarili mong account.",
+        "memberRemoveLastAdmin": "Kailangang may matirang kahit isang administrator.",
+        "memberRemoveLastSsoAdmin": "Ito ang huling administrator na naka-link sa SSO. Mag-link muna ng isa pang administrator.",
+        "backupWebdavUrlInvalid": "Dapat magsimula ang address sa http:// o https://.",
+        "icsSubscriptionGone": "Wala na ang subscription na ito."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

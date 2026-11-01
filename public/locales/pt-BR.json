@@ -683,7 +683,8 @@
         "checkAllSubtasks": "Marcar todas",
         "subtasksAllDone": "\"{{title}}\" e todas as subtarefas concluídos.",
         "seriesDoneNamed": "\"{{title}}\" concluído - próxima vez: {{date}}",
-        "kanbanRestore": "Restaurar"
+        "kanbanRestore": "Restaurar",
+        "errorTagGone": "Esta etiqueta não existe mais."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item excluído.",
@@ -3450,7 +3451,18 @@
         "reminderListAssigneesTasksOnly": "Pessoas só podem ser definidas para listas que vão para Tarefas.",
         "syncAssigneeNotMember": "Aqui só podem ser escolhidos membros da casa.",
         "syncAssigneeUnknown": "Esta pessoa não existe mais. Recarregue a página.",
-        "permDetails": "Widgets e mais permissões"
+        "permDetails": "Widgets e mais permissões",
+        "connectionFailedDetail": "Falha na conexão: {{error}}",
+        "documentStorageChangeFailed": "A alteração não foi aplicada: {{error}}",
+        "apiTokenCopyFailed": "Não foi possível copiar. Selecione o token e copie manualmente.",
+        "weatherLocateDenied": "O acesso à sua localização não é permitido. Permita nas configurações do navegador ou digite o local manualmente.",
+        "weatherLocateFailed": "Não foi possível determinar sua localização. Digite o local manualmente.",
+        "outlookAutoSyncOverrides": "O Outlook não consegue sincronizar séries com exceções individuais vinculadas. Desative o calendário de destino delas para que continuem editáveis aqui. Você não precisa excluir nenhuma exceção.",
+        "memberRemoveOwnAccount": "Você não pode remover sua própria conta.",
+        "memberRemoveLastAdmin": "Pelo menos um administrador deve permanecer.",
+        "memberRemoveLastSsoAdmin": "Este é o último administrador vinculado ao SSO. Vincule outro administrador primeiro.",
+        "backupWebdavUrlInvalid": "O endereço deve começar com http:// ou https://.",
+        "icsSubscriptionGone": "Esta assinatura não existe mais."
     },
     "login": {
         "tagline": "Bem-vindo de volta. Sua casa em um só lugar.",

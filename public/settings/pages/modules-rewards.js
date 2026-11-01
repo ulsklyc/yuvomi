@@ -191,7 +191,7 @@ async function offerRebase(from, to, context) {
     const updated = Number(res?.data?.updated) || 0;
     window.yuvomi?.showToast(t('settings.rewardsDefaultPointsRebased', { count: updated }), 'success');
   } catch (error) {
-    window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(errorSentence(error), 'danger');
   }
 }
 

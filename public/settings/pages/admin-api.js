@@ -7,6 +7,7 @@ import { confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors }
 import { createRetryState, hintFoldHtml, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getExtensionModules } from '/utils/extension-widgets.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 // Core scope keys — extension modules are appended from /permissions/catalog at render time.
 const CORE_SCOPE_MODULE_KEYS = [
@@ -413,8 +414,8 @@ function bindEvents(container, initialTokens, users, currentUserId) {
     try {
       await navigator.clipboard?.writeText(value);
       window.yuvomi?.showToast(t('settings.apiTokenCopied'), 'success');
-    } catch (err) {
-      window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
+    } catch {
+      window.yuvomi?.showToast(t('settings.apiTokenCopyFailed'), 'danger');
     }
   });
 
@@ -437,7 +438,7 @@ function bindEvents(container, initialTokens, users, currentUserId) {
       refocusAfterRender();
       window.yuvomi?.showToast(t('settings.apiTokenRevokedToast'), 'default');
     } catch (err) {
-      window.yuvomi?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(errorSentence(err), 'danger');
     }
   });
 
@@ -464,14 +465,14 @@ function bindEvents(container, initialTokens, users, currentUserId) {
         // geht vor, oder die Liste ist alt): sein Satz statt des englischen,
         // und die Liste neu vom Server, damit die Zeile wieder richtig steht.
         const active = err?.status === 409 && err.data?.reason === 'api_token_active';
-        window.yuvomi?.showToast(active ? t('settings.apiTokenRemoveActive') : err.message, 'danger');
+        window.yuvomi?.showToast(active ? t('settings.apiTokenRemoveActive') : errorSentence(err), 'danger');
         if (active) {
           try {
             tokens = (await api.get('/auth/api-tokens')).data ?? tokens;
             renderApiTokenList(container, tokens);
             refocusAfterRender();
           } catch (reloadErr) {
-            window.yuvomi?.showToast(reloadErr.message, 'danger');
+            window.yuvomi?.showToast(errorSentence(reloadErr), 'danger');
           }
         }
         return;

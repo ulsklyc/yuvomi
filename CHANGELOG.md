@@ -61,6 +61,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the title, with the arrows at the ends of the row, and the title keeps its size. The tabs without
   a month use the same row for their note, so the tab bar stays put between these tabs, and paging
   through the months moves nothing. From 390px up nothing changes.
+- **Error messages in Settings speak your language.** Saving, syncing or removing something in
+  Settings could show the server's or browser's raw English sentence in a toast. Now the app says
+  it in your language, and names the cause where it knows one: the last administrator, a tag or
+  subscription that is already gone, an Outlook series with exceptions, or location access turned
+  off in the browser. Only what another server answered, such as a WebDAV or CalDAV server refusing
+  a connection, still appears as its original text, inside a translated sentence, so an admin can
+  fix it.
 - **"Today at a glance" fits narrow phones again.** On a phone, the summary next to the title
   ("2 events left · 1 task overdue") was not allowed to wrap. When it did not fit - in German
   already on a 375px screen - the card's content became wider than the card and every row was cut
