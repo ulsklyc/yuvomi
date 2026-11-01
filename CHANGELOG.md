@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A new Docker installation can manage HTTPS automatically.** An optional Caddy
+  deployment obtains and renews Let's Encrypt certificates, keeps certificate data
+  across container updates and leaves the app port on the container network.
 - **A document can name who it is about.** The document dialog has a new "About" field for one
   household member, and the Documents page can filter by person. The person also gets the expiry
   reminder, along with whoever filed the document, and once if that is the same person. This never

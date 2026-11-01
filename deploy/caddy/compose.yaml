@@ -1,0 +1,49 @@
+# Run from the repository root; see README.md in this directory.
+services:
+  yuvomi:
+    image: ghcr.io/ulsklyc/yuvomi:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DB_PATH: /data/yuvomi.db
+      BACKUP_DIR: /backups
+      MODULES_DIR: /app/modules
+      BASE_URL: https://${YUVOMI_DOMAIN:?Set YUVOMI_DOMAIN to your public hostname}
+      SESSION_SECURE: "true"
+      TRUST_PROXY: "1"
+      DOCUMENT_STORAGE_LOCAL_ENABLED: ${DOCUMENT_STORAGE_LOCAL_ENABLED:-false}
+      DOCUMENT_STORAGE_LOCAL_PATH: ${DOCUMENT_STORAGE_LOCAL_PATH:-/documents}
+    volumes:
+      - ${DATA_DIR:-./data}:/data
+      - ${BACKUP_DIR:-./backups}:/backups
+      - ${MODULES_DIR:-./modules}:/app/modules
+      - ${DOCUMENT_STORAGE_LOCAL_DIR:-./documents}:${DOCUMENT_STORAGE_LOCAL_PATH:-/documents}
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - yuvomi
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      YUVOMI_DOMAIN: ${YUVOMI_DOMAIN:?Set YUVOMI_DOMAIN to your public hostname}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL to your certificate contact address}
+      ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
