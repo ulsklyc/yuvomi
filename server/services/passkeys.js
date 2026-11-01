@@ -96,20 +96,29 @@ export async function finishRegistration(database, userId, sessionId, response, 
   })();
 }
 
-export async function beginAuthentication(database, sessionId) {
+export async function beginAuthentication(database, sessionId, userId = null) {
   const cfg = config();
-  const options = await generateAuthenticationOptions({ rpID: cfg.rpID, userVerification: 'required', timeout: WINDOW_MS });
-  remember(database, sessionId, 'authenticate', options.challenge);
+  const credentials = userId === null ? null : database.prepare('SELECT credential_id, transports FROM user_passkeys WHERE user_id = ?').all(userId);
+  if (credentials && !credentials.length) throw fail();
+  const options = await generateAuthenticationOptions({ rpID: cfg.rpID, userVerification: 'required', timeout: WINDOW_MS,
+    ...(credentials ? { allowCredentials: credentials.map(row => ({ id: row.credential_id, transports: JSON.parse(row.transports) })) } : {}),
+  });
+  // A non-null user binding distinguishes reauthentication from anonymous sign-in.
+  remember(database, sessionId, 'authenticate', options.challenge, userId);
   return options;
 }
 
-export async function finishAuthentication(database, sessionId, response) {
+export async function finishAuthentication(database, sessionId, response, userId = null) {
   const cfg = config();
-  const challenge = consume(database, sessionId, 'authenticate');
+  const challenge = consume(database, sessionId, 'authenticate', userId);
   if (typeof response?.id !== 'string' || response.id.length > 2048) throw fail();
   const row = database.prepare(`SELECT p.*, h.user_handle FROM user_passkeys p
     JOIN user_passkey_handles h ON h.user_id = p.user_id WHERE p.credential_id = ?`).get(response.id);
-  if (!row || response.response?.userHandle !== row.user_handle) throw fail();
+  if (!row || (userId !== null && row.user_id !== userId)) throw fail();
+  // With allowCredentials the authenticator may omit the handle; ownership is
+  // then bound by both the challenge and credential row to the signed-in user.
+  const receivedHandle = response.response?.userHandle;
+  if (receivedHandle !== row.user_handle && !(userId !== null && receivedHandle == null)) throw fail();
   const result = await verifyAuthenticationResponse({
     response, expectedChallenge: challenge, expectedOrigin: cfg.origin, expectedRPID: cfg.rpID,
     credential: { id: row.credential_id, publicKey: new Uint8Array(row.public_key), counter: row.counter, transports: JSON.parse(row.transports) },
