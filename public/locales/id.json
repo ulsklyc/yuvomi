@@ -3494,6 +3494,7 @@
         "hidePassword": "Sembunyikan kata sandi",
         "version": "v{{version}}",
         "loginWithSso": "Masuk dengan SSO",
+        "loginWithHomeAssistant": "Masuk dengan Home Assistant",
         "orDivider": "atau",
         "ssoError": "Masuk SSO gagal. Silakan coba lagi.",
         "ssoNoAccount": "Belum ada akun di sini untuk masuk SSO ini. Silakan hubungi administrator rumah tangga Anda.",

@@ -3476,6 +3476,7 @@
         "hidePassword": "Skjul passord",
         "version": "v{{version}}",
         "loginWithSso": "Logg inn med SSO",
+        "loginWithHomeAssistant": "Logg inn med Home Assistant",
         "orDivider": "eller",
         "ssoError": "SSO-innlogging mislyktes. Vennligst prøv igjen.",
         "ssoNoAccount": "Det finnes ingen konto her ennå for denne SSO-innloggingen. Vennligst kontakt administratoren for husholdningen din.",

@@ -3476,6 +3476,7 @@
         "hidePassword": "Masquer le mot de passe",
         "version": "v{{version}}",
         "loginWithSso": "Se connecter avec SSO",
+        "loginWithHomeAssistant": "Se connecter avec Home Assistant",
         "orDivider": "ou",
         "ssoError": "La connexion SSO a échoué. Veuillez réessayer.",
         "ssoNoAccount": "Aucun compte n'existe encore ici pour cette connexion SSO. Contactez l'administrateur de votre foyer.",

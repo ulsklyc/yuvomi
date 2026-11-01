@@ -3494,6 +3494,7 @@
         "hidePassword": "پنهان‌سازی رمز عبور",
         "version": "v{{version}}",
         "loginWithSso": "ورود با SSO",
+        "loginWithHomeAssistant": "ورود با Home Assistant",
         "orDivider": "یا",
         "ssoError": "ورود با SSO ناموفق بود. لطفاً دوباره تلاش کنید.",
         "ssoNoAccount": "هنوز برای این ورود با SSO حسابی در اینجا وجود ندارد. لطفاً با مدیر خانوار خود تماس بگیرید.",

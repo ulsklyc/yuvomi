@@ -3494,6 +3494,7 @@
         "hidePassword": "Itago ang password",
         "version": "v{{version}}",
         "loginWithSso": "Mag-sign in gamit ang SSO",
+        "loginWithHomeAssistant": "Mag-sign in gamit ang Home Assistant",
         "orDivider": "o",
         "ssoError": "Nabigo ang pag-sign in gamit ang SSO. Pakisubukang muli.",
         "ssoNoAccount": "Wala pang account dito para sa pag-sign in na ito gamit ang SSO. Makipag-ugnayan sa administrador ng iyong sambahayan.",

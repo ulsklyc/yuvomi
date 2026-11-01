@@ -3720,6 +3720,7 @@
         "hidePassword": "Ukryj hasło",
         "version": "v{{version}}",
         "loginWithSso": "Zaloguj się przez SSO",
+        "loginWithHomeAssistant": "Zaloguj się przez Home Assistant",
         "orDivider": "lub",
         "ssoError": "Logowanie SSO nie powiodło się. Spróbuj ponownie.",
         "ssoNoAccount": "Dla tego logowania SSO nie ma tu jeszcze konta. Skontaktuj się z administratorem swojego gospodarstwa domowego.",

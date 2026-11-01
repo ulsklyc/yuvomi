@@ -3476,6 +3476,7 @@
         "hidePassword": "隱藏密碼",
         "version": "v{{version}}",
         "loginWithSso": "透過SSO登入",
+        "loginWithHomeAssistant": "使用 Home Assistant 登入",
         "orDivider": "或",
         "ssoError": "SSO登入失敗，請重試。",
         "ssoNoAccount": "此SSO登入尚無對應帳戶，請聯絡您家庭的管理員。",

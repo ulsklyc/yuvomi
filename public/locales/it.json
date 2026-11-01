@@ -3476,6 +3476,7 @@
         "hidePassword": "Nascondi password",
         "version": "v{{version}}",
         "loginWithSso": "Accedi con SSO",
+        "loginWithHomeAssistant": "Accedi con Home Assistant",
         "orDivider": "o",
         "ssoError": "Accesso SSO non riuscito. Riprova.",
         "ssoNoAccount": "Non esiste ancora un account qui per questo accesso SSO. Contatta l'amministratore della tua famiglia.",

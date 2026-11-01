@@ -3476,6 +3476,7 @@
         "hidePassword": "Ocultar contraseña",
         "version": "v{{version}}",
         "loginWithSso": "Iniciar sesión con SSO",
+        "loginWithHomeAssistant": "Iniciar sesión con Home Assistant",
         "orDivider": "o",
         "ssoError": "Error al iniciar sesión con SSO. Inténtalo de nuevo.",
         "ssoNoAccount": "Todavía no hay ninguna cuenta aquí para este inicio de sesión con SSO. Ponte en contacto con la administración de tu hogar.",

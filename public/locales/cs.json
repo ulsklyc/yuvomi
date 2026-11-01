@@ -3594,6 +3594,7 @@
         "hidePassword": "Skrýt heslo",
         "version": "v{{version}}",
         "loginWithSso": "Přihlásit se přes SSO",
+        "loginWithHomeAssistant": "Přihlásit se přes Home Assistant",
         "orDivider": "nebo",
         "ssoError": "Přihlášení přes SSO selhalo. Zkuste to prosím znovu.",
         "ssoNoAccount": "Pro toto přihlášení přes SSO zde zatím není žádný účet. Obraťte se na správce vaší domácnosti.",
