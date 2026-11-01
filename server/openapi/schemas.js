@@ -1199,6 +1199,46 @@ export const schemas = {
           },
           required: ['data', 'token'],
         },
+        SignedInDevice: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string' },
+            platform: { type: 'string', description: 'A short lowercase name, for example `ios`.' },
+            last_used_at: { type: ['string', 'null'], format: 'date-time' },
+            created_at: { type: 'string', format: 'date-time' },
+            current: { type: 'boolean', description: 'Whether this device made the request.' },
+          },
+          required: ['id', 'name', 'platform', 'created_at', 'current'],
+        },
+        SignedInDeviceList: {
+          type: 'object',
+          properties: {
+            data: { type: 'array', items: { $ref: '#/components/schemas/SignedInDevice' } },
+          },
+          required: ['data'],
+        },
+        SignedInDeviceCreateRequest: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 100 },
+            platform: { type: 'string', pattern: '^[a-z][a-z0-9-]{1,19}$' },
+            device_id: {
+              type: 'string',
+              pattern: '^[A-Za-z0-9._-]{8,128}$',
+              description: 'Chosen by the client and stable per installation. Sending the same value again replaces the earlier credential.',
+            },
+          },
+          required: ['name', 'platform', 'device_id'],
+        },
+        SignedInDeviceCreateResponse: {
+          type: 'object',
+          properties: {
+            data: { $ref: '#/components/schemas/SignedInDevice' },
+            credential: { type: 'string', description: 'The device credential, shown once. Send it as a Bearer token.' },
+          },
+          required: ['data', 'credential'],
+        },
         DmsAccount: {
           type: 'object',
           description: 'A configured DMS account. The api_token is never returned; use has_token to check whether one is stored.',

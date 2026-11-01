@@ -628,6 +628,62 @@ export function authPaths() {
         },
       }),
     },
+    '/api/v1/auth/devices': {
+      get: op({
+        summary: 'List your signed-in devices',
+        description: 'The caller\'s own devices that still count. No administrator can read another member\'s list. The device credential is never returned here.',
+        tag: 'Auth',
+        responses: {
+          200: {
+            description: 'The caller\'s signed-in devices',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SignedInDeviceList' } } },
+          },
+        },
+      }),
+      post: op({
+        summary: 'Add a signed-in device',
+        description: 'Exchanges a sign-in for a device credential, the bearer a native client uses from then on. A device acts as the person, with less reach than a browser session: an administrator is an ordinary member on it, and of `/api/v1/auth` it reaches only `GET /me`, `GET /users`, `GET /oidc/config`, `POST /logout`, `GET /devices` and `DELETE /devices/{id}`; anything else answers 403 with `reason: device_credential`. It ends after 90 days without use, and with everything that ends a session. The same `device_id` replaces the earlier credential.',
+        tag: 'Auth',
+        stateChanging: true,
+        requestBody: jsonBody('#/components/schemas/SignedInDeviceCreateRequest'),
+        responses: {
+          201: {
+            description: 'Device added. The plaintext credential is returned only once.',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SignedInDeviceCreateResponse' } } },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/auth/devices/current': {
+      delete: op({
+        summary: 'Sign this device out',
+        description: 'Ends the device credential that made the request.',
+        tag: 'Auth',
+        stateChanging: true,
+      }),
+    },
+    '/api/v1/auth/devices/{id}': {
+      delete: op({
+        summary: 'Sign out one of your devices',
+        description: 'Answers 404 for a device that does not exist and for one that belongs to somebody else.',
+        tag: 'Auth',
+        params: [idParam()],
+        stateChanging: true,
+      }),
+    },
+    '/api/v1/auth/users/{id}/devices/sign-out': {
+      post: op({
+        summary: 'Sign a member out of all devices',
+        description: 'Ends the member\'s signed-in devices and browser sessions, for example after a lost phone in a household without passwords. The answer says nothing about what ended: how many devices somebody has stays their own. Integration tokens stay. An administrator signing out themselves keeps the current session.',
+        tag: 'Auth',
+        admin: true,
+        params: [idParam()],
+        stateChanging: true,
+      }),
+    },
     '/api/v1/auth/api-tokens': {
       get: op({ summary: 'List API tokens', tag: 'Auth', admin: true }),
       post: op({
@@ -694,4 +750,7 @@ const CASE_REASONS = {
   '/api/v1/auth/setup': { post: '`setup_completed` (403, setup has already been completed)' },
   '/api/v1/auth/users/{id}': { patch: '`account_deactivated` (400, a deactivated account cannot become an administrator)' },
   '/api/v1/auth/api-tokens': { post: DEACTIVATED_SUBJECT },
+  '/api/v1/auth/devices': { post: '`device_credential` (403, a device cannot add another device), `session_required` (403, an API token cannot add a device), `not_a_household_member` (403, the account is no household member)' },
+  '/api/v1/auth/devices/current': { delete: '`device_credential_required` (403, only a signed-in device can sign itself out here)' },
+  '/api/v1/auth/users/{id}/devices/sign-out': { post: '`browser_session_required` (403, only a signed-in browser session can do this)' },
 };
