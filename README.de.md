@@ -194,6 +194,9 @@ docker compose up -d
 Fehlersuche Schritt für Schritt: die [Installationsanleitung auf yuvomi.cloud](https://yuvomi.cloud/install.html)
 und die [Installationsanleitung im Repository](docs/installation.md).
 
+Für eine neue Docker-Installation mit automatischen Let's-Encrypt-Zertifikaten gibt
+es das optionale [Caddy-HTTPS-Setup](deploy/caddy/README.md) (englische Anleitung).
+
 <details>
 <summary><b>Podman, Proxmox, die geführte Einrichtung und der Schlüssel</b></summary>
 

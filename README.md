@@ -191,6 +191,9 @@ Open `http://localhost:3000` and create your admin account. Podman, Proxmox, HTT
 troubleshooting, step by step: the [install guide on yuvomi.cloud](https://yuvomi.cloud/install.html)
 and the [installation guide](docs/installation.md).
 
+For a new Docker deployment with automatic Let's Encrypt certificates, see the
+optional [Caddy HTTPS setup](deploy/caddy/README.md).
+
 <details>
 <summary><b>Podman, Proxmox, the guided setup and the encryption key</b></summary>
 
