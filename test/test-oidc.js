@@ -140,7 +140,7 @@ _setTestDatabase(sessionDb);
 
 const { findOrCreateOidcUser, assertSsoOnlyAllowed } = await import('../server/auth.js');
 
-function buildOidcTestDb() {
+function buildOidcTestDb({ withAdmin = false } = {}) {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON;');
   // Minimales Schema für findOrCreateOidcUser-Tests
@@ -213,6 +213,10 @@ function buildOidcTestDb() {
       throw err;
     }
   };
+  // Der Administrator aus /setup: vor ihm legt SSO kein Konto an.
+  if (withAdmin) {
+    db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('setup-admin', 'Setup Admin', 'x', 'admin')").run();
+  }
   return db;
 }
 
@@ -232,7 +236,7 @@ function addLocalUserWithEmail(db, username, email, { password = false } = {}) {
 }
 
 test('legt neuen Nutzer aus OIDC-Userinfo an', () => {
-  const db = buildOidcTestDb();
+  const db = buildOidcTestDb({ withAdmin: true });
   const userinfo = { sub: 'new-sub-001', email: 'alice@example.com', name: 'Alice', preferred_username: 'alice' };
   const user = findOrCreateOidcUser(db, userinfo);
   assert(user.oidc_sub === 'new-sub-001', `Falscher oidc_sub: ${user.oidc_sub}`);
@@ -541,7 +545,7 @@ test('vergibt eindeutigen username bei Kollision', () => {
 });
 
 test('legt Nutzer ohne Name mit preferred_username als display_name an', () => {
-  const db = buildOidcTestDb();
+  const db = buildOidcTestDb({ withAdmin: true });
   const userinfo = { sub: 'no-name-sub', preferred_username: 'dana', email: 'dana@example.com' };
   const user = findOrCreateOidcUser(db, userinfo);
   assert(user.display_name === 'dana', `Falscher display_name: ${user.display_name}`);
@@ -660,7 +664,7 @@ test('der OIDC-Bereiniger laesst genau die Zeichen durch, die das Format erlaubt
 });
 
 test('nutzt die E-Mail NICHT als username-Fallback', () => {
-  const db = buildOidcTestDb();
+  const db = buildOidcTestDb({ withAdmin: true });
   const userinfo = { sub: 'synology-user-01', email: 'familie@example.com', name: 'Kind Eins' };
   const user = findOrCreateOidcUser(db, userinfo);
   assert(!user.username.includes('@'), `E-Mail als username übernommen: ${user.username}`);
@@ -668,7 +672,7 @@ test('nutzt die E-Mail NICHT als username-Fallback', () => {
 });
 
 test('geteilte Familien-E-Mail erzeugt getrennte, eindeutige Usernamen', () => {
-  const db = buildOidcTestDb();
+  const db = buildOidcTestDb({ withAdmin: true });
   const shared = 'familie@example.com';
   const first  = findOrCreateOidcUser(db, { sub: 'kind-eins', email: shared, name: 'Kind Eins' });
   const second = findOrCreateOidcUser(db, { sub: 'kind-zwei', email: shared, name: 'Kind Zwei' });
@@ -678,13 +682,13 @@ test('geteilte Familien-E-Mail erzeugt getrennte, eindeutige Usernamen', () => {
 });
 
 test('sub dient ohne oidc--Präfix als Fallback', () => {
-  const db = buildOidcTestDb();
+  const db = buildOidcTestDb({ withAdmin: true });
   const user = findOrCreateOidcUser(db, { sub: '550e8400-e29b-41d4-a716-446655440000' });
   assert(user.username === '550e8400-e29b-41d4-a716-446655440000', `Falscher username: ${user.username}`);
 });
 
 test('nutzt den non-standard username-Claim vor dem sub', () => {
-  const db = buildOidcTestDb();
+  const db = buildOidcTestDb({ withAdmin: true });
   const userinfo = { sub: 'daniel@LDAP-Domain', username: 'daniel', email: 'daniel@example.com' };
   const user = findOrCreateOidcUser(db, userinfo);
   assert(user.username === 'daniel', `Falscher username: ${user.username}`);
@@ -709,7 +713,7 @@ test('abgeleiteter username erfüllt immer das app-weite Format', () => {
 });
 
 test('transliteriert Diakritika statt sie zu Bindestrichen zu machen', () => {
-  const db = buildOidcTestDb();
+  const db = buildOidcTestDb({ withAdmin: true });
   const user = findOrCreateOidcUser(db, { sub: 'umlaut-sub', preferred_username: 'Björn Müller' });
   assert(user.username === 'Bjorn-Muller', `Falscher username: ${user.username}`);
 });
@@ -717,7 +721,7 @@ test('transliteriert Diakritika statt sie zu Bindestrichen zu machen', () => {
 // ─── oidc_provider aus dem iss-Claim (#653) ───────────────────────────────────
 
 test('speichert den iss-Claim als oidc_provider', () => {
-  const db = buildOidcTestDb();
+  const db = buildOidcTestDb({ withAdmin: true });
   process.env.OIDC_ISSUER = 'https://cname.example.com/';
   const user = findOrCreateOidcUser(db, { sub: 'iss-sub-01', iss: 'https://real-idp.example.com/', preferred_username: 'ida' });
   delete process.env.OIDC_ISSUER;
@@ -725,7 +729,7 @@ test('speichert den iss-Claim als oidc_provider', () => {
 });
 
 test('fällt ohne iss-Claim auf OIDC_ISSUER zurück', () => {
-  const db = buildOidcTestDb();
+  const db = buildOidcTestDb({ withAdmin: true });
   process.env.OIDC_ISSUER = 'https://idp.example.com/';
   const user = findOrCreateOidcUser(db, { sub: 'iss-sub-02', preferred_username: 'ivo' });
   delete process.env.OIDC_ISSUER;
@@ -766,10 +770,19 @@ function withSignup(value, fn) {
 test('ohne Schalter legt eine unbekannte Identitaet weiterhin ein Konto an', () => {
   // Der Default entscheidet ueber jede bestehende Installation: waere er
   // umgekehrt, spaerrte ein Update jeden SSO-Nutzer aus, der noch kein Konto hat.
-  const db = buildOidcTestDb();
+  const db = buildOidcTestDb({ withAdmin: true });
   const user = withSignup(undefined, () => findOrCreateOidcUser(db, { sub: 'default-on', preferred_username: 'dana' }));
   assert(user !== null, 'Der Default muss anlegen, sonst ist das Update ein Ausschluss');
   assert(user.oidc_sub === 'default-on', 'Und zwar mit dem validierten sub');
+});
+
+test('vor der Einrichtung legt SSO kein Konto an (der erste Account ist der Admin aus /setup)', () => {
+  // Sonst waere ein SSO-Mitglied das erste Konto, /setup gesperrt und der
+  // Haushalt ohne Administrator.
+  const db = buildOidcTestDb();
+  const user = withSignup(undefined, () => findOrCreateOidcUser(db, { sub: 'too-early', preferred_username: 'frank' }));
+  assert(user?.refused === 'setup_required', 'Der Callback braucht den Grund, um nach /setup zu leiten');
+  assert(db.prepare('SELECT count(*) AS n FROM users').get().n === 0, 'Es darf kein Konto entstehen');
 });
 
 test('OIDC_ALLOW_SIGNUP=false legt kein Konto fuer eine unbekannte Identitaet an', () => {
@@ -947,7 +960,7 @@ test('loest eine Verknuepfung, wenn ein Passwort gesetzt ist', () => {
 test('ein per SSO angelegtes Konto darf sich nicht aussperren', () => {
   // Es traegt kein Passwort, sondern den Platzhalter - ohne OIDC kaeme dort
   // niemand mehr hinein.
-  const db = buildOidcTestDb();
+  const db = buildOidcTestDb({ withAdmin: true });
   const user = findOrCreateOidcUser(db, { sub: 'sso-only', preferred_username: 'ssouser' });
   assert(user.password_hash === '$oidc$', 'Vorbedingung: kein echtes Passwort');
 

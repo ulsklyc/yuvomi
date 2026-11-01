@@ -184,6 +184,7 @@ export function authPaths() {
           + 'Two or more matching accounts redirect to /login?error=oidc_email_ambiguous; a single matching member account that has a password redirects to /login?error=oidc_link_required, and that member links SSO while signed in (POST /api/v1/auth/oidc/link/start). '
           + 'Neither case creates or links an account, whatever OIDC_ALLOW_SIGNUP says. '
           + 'With OIDC_ALLOW_SIGNUP=false an identity that matches no existing account is redirected to /login?error=oidc_signup_disabled instead of being provisioned. '
+          + 'Before setup (no account exists yet) no account is provisioned either, and the callback redirects to /setup, so the first account stays the administrator created there. '
           + 'A link run started while signed in (POST /api/v1/auth/oidc/link/start) redirects to /settings/personal/account?oidc_linked=1, or on refusal to /settings/personal/account?oidc_link_error=<reason>: `user_gone` (the account no longer exists or can no longer sign in), `already_linked` (the account is linked to another identity), `sub_taken` (the identity is linked to another account).',
         responses: {
           302: { description: 'Redirect to app or login error page' },
@@ -738,6 +739,7 @@ export function authPaths() {
 // #2267: die Gruende, die die Anmelde- und Kontorouten neben `error` senden.
 const INVALID_CODE = '`invalid_code` (400, the code is wrong or expired)';
 const NOT_ENABLED = '`not_enabled` (409, two-factor authentication is not turned on)';
+const HA_SUB_TAKEN = '`sub_taken` (409, this Home Assistant user is already bound to another member)';
 const DEACTIVATED_SUBJECT = '`account_deactivated` (400, the chosen account is deactivated)';
 const CASE_REASONS = {
   '/api/v1/auth/login': {
@@ -748,7 +750,13 @@ const CASE_REASONS = {
   '/api/v1/auth/2fa/recovery-codes': { post: `${INVALID_CODE}, ${NOT_ENABLED}` },
   '/api/v1/auth/logout-others': { post: '`browser_session_required` (403, only a signed-in browser session can sign out the other sessions, not an API token)' },
   '/api/v1/auth/setup': { post: '`setup_completed` (403, setup has already been completed)' },
-  '/api/v1/auth/users/{id}': { patch: '`account_deactivated` (400, a deactivated account cannot become an administrator)' },
+  '/api/v1/auth/users': { post: HA_SUB_TAKEN },
+  '/api/v1/auth/users/{id}': {
+    patch: '`account_deactivated` (400, a deactivated account cannot become an administrator), '
+      + `${HA_SUB_TAKEN}, \`no_password\` (400, removing the Home Assistant binding would leave an account without a `
+      + 'password with no way in), `last_sso_admin` (400, removing the binding of the last administrator linked to SSO '
+      + 'would switch password login back on)',
+  },
   '/api/v1/auth/api-tokens': { post: DEACTIVATED_SUBJECT },
   '/api/v1/auth/devices': {
     get: '`session_required` (403, an API token cannot read a person\'s devices)',

@@ -42,7 +42,13 @@ import {
   getConfig as getOidcConfig,
   exchangeAuthorizationCode,
   describeOidcError,
+  ssoProvider,
 } from './services/oidc.js';
+import {
+  buildHomeAssistantAuthorizationUrl,
+  completeHomeAssistantLogin,
+  getHomeAssistantConfig,
+} from './services/homeassistant-auth.js';
 import { emailService as defaultEmailService } from './services/email.js';
 import { passwordResetService as defaultResetService } from './services/password-reset.js';
 import { inviteService as defaultInviteService } from './services/invites.js';
@@ -701,6 +707,9 @@ function publicUser(row) {
     // 2FA-Uebersicht, die aus demselben Grund nicht an /auth/users haengt.
     // Ueber sich selbst erfaehrt es jedes Konto aus GET /me (#1703).
     ...(row.sso_only !== undefined && { sso_only: Boolean(row.sso_only) }),
+    // Die Home-Assistant-Benutzer-ID, an die ein Administrator das Konto
+    // gebunden hat - nur in den Admin-Abfragen, die sie mitselektieren.
+    ...(row.homeassistant_user_id !== undefined && { homeassistant_user_id: row.homeassistant_user_id ?? null }),
   };
 }
 
@@ -1445,6 +1454,7 @@ function ssoLinkCandidates(database, address, { excludeUserId = null } = {}) {
  * @param {import('better-sqlite3-multiple-ciphers').Database} database
  * @param {{ sub: string, iss?: string, email?: string, email_verified?: boolean, name?: string, preferred_username?: string, username?: string }} claims
  * @returns {{ id: number, role: string, [key: string]: any }|{ refused: string, accountIds: number[] }|null}
+ *   `{ refused: 'setup_required' }`, solange es noch gar kein Konto gibt.
  *   `null`, wenn das Konto neu wäre und die automatische Kontoerstellung
  *   abgeschaltet ist; `{ refused }` mit dem Redirect-Grund, wenn die Adresse
  *   kein Konto eindeutig und sicher benennt.
@@ -1521,6 +1531,14 @@ export function findOrCreateOidcUser(database, claims) {
   //    verknuepftes oder von Hand angelegtes Konto ist eine Entscheidung, die
   //    jemand getroffen hat, und die soll der Schalter nicht zuruecknehmen.
   if (!isOidcSignupAllowed()) return null;
+
+  //    Vor der Einrichtung legt SSO KEIN Konto an: das erste Konto ist der
+  //    Administrator aus /setup, und sobald irgendein Konto existiert, ist
+  //    /setup gesperrt. Ein per SSO angelegtes Mitglied waere sonst das erste
+  //    Konto, und der Haushalt stuende ohne jeden Administrator da.
+  if (!database.prepare('SELECT 1 FROM users LIMIT 1').get()) {
+    return { refused: 'setup_required', accountIds: [] };
+  }
 
   // 4. Eindeutigen username ableiten (Kollision mit bestehenden Usernamen vermeiden).
   //    Reihenfolge: preferred_username (Standard-Claim) → username (non-standard,
@@ -2433,6 +2451,9 @@ router.get('/oidc/config', (_req, res) => {
   const passwordLoginEnabled = isPasswordLoginEnabled();
   res.json({
     enabled: isOidcEnabled(),
+    // Welche Quelle hinter „Mit SSO anmelden" steht, damit die Anmeldeseite den
+    // Knopf benennen kann (`oidc`, `homeassistant` oder null).
+    provider: ssoProvider(),
     password_login_enabled: passwordLoginEnabled,
     guest_password_login_enabled: !passwordLoginEnabled && hasSplitExpenseGuests(),
   });
@@ -2452,6 +2473,8 @@ router.get('/oidc/config', (_req, res) => {
  * @param {object} extra  zusätzliche Session-Felder, z. B. { linkUserId }
  */
 async function beginOidcFlow(req, config, extra = {}) {
+  if (config.homeassistant) return beginHomeAssistantFlow(req, config, extra);
+
   const state         = oidcClient.randomState();
   const nonce         = oidcClient.randomNonce();
   const codeVerifier  = oidcClient.randomPKCECodeVerifier();
@@ -2476,6 +2499,26 @@ async function beginOidcFlow(req, config, extra = {}) {
     code_challenge:        codeChallenge,
     code_challenge_method: 'S256',
   }).href;
+}
+
+/**
+ * Gegenstueck von `beginOidcFlow` fuer Home Assistant: dieselben Schutzwerte
+ * (state gegen Login-CSRF, PKCE gegen Code-Injection) in derselben Session-
+ * Ablage. Eine nonce gibt es nicht - Home Assistant stellt kein ID-Token aus.
+ */
+async function beginHomeAssistantFlow(req, config, extra = {}) {
+  const state         = oidcClient.randomState();
+  const codeVerifier  = oidcClient.randomPKCECodeVerifier();
+  const codeChallenge = await oidcClient.calculatePKCECodeChallenge(codeVerifier);
+  const redirectUri   = config.redirectUri;
+
+  req.session.oidc = { state, codeVerifier, redirectUri, provider: 'homeassistant', ...extra };
+
+  await new Promise((resolve, reject) =>
+    req.session.save(err => (err ? reject(err) : resolve()))
+  );
+
+  return buildHomeAssistantAuthorizationUrl(config, { redirectUri, state, codeChallenge });
 }
 
 router.get('/oidc/start', refuseWhileRestoring, async (req, res) => {
@@ -2592,24 +2635,50 @@ router.get('/oidc/callback', refuseWhileRestoring, async (req, res) => {
       return res.redirect('/login?error=oidc_state_mismatch');
     }
 
-    // Der Tausch sendet die redirect_uri der Authorize-Anfrage woertlich; von
-    // der eingehenden Anfrage kommt nur die Query (code, state, ...), weder
-    // Pfad noch Host oder Schema (#1768). Er validiert state, tauscht den Code
-    // gegen Tokens und prüft Signatur, iss, aud, exp sowie nonce am ID-Token.
     const queryStart = req.originalUrl.indexOf('?');
-    const tokens = await exchangeAuthorizationCode(config, {
-      redirectUri: stored.redirectUri,
-      query:       queryStart === -1 ? '' : req.originalUrl.slice(queryStart),
-      checks: {
-        expectedState:    stored.state,
-        expectedNonce:    stored.nonce,
-        pkceCodeVerifier: stored.codeVerifier,
-      },
-    });
+    const query = queryStart === -1 ? '' : req.originalUrl.slice(queryStart);
 
-    // Identität aus dem validierten ID-Token; fetchUserInfo erzwingt sub-Abgleich
-    const claims   = tokens.claims();
-    const userinfo = await oidcClient.fetchUserInfo(config, tokens.access_token, claims.sub);
+    // Ein Lauf, der bei der einen Quelle begann, endet nicht bei der anderen
+    // (Konfiguration zwischen Start und Rueckweg geaendert).
+    if ((stored.provider === 'homeassistant') !== !!config.homeassistant) {
+      log.warn('OIDC callback: Lauf mit einer anderen SSO-Quelle begonnen');
+      return res.redirect('/login?error=oidc_state_mismatch');
+    }
+
+    let claims;
+    let userinfo;
+    if (config.homeassistant) {
+      // Home Assistant: state pruefen, Code tauschen, Benutzer ueber die
+      // WebSocket-API erfragen, Token widerrufen (services/homeassistant-auth.js).
+      try {
+        claims = await completeHomeAssistantLogin(config, new URLSearchParams(query), stored, log);
+      } catch (err) {
+        if (err.code === 'state_mismatch') {
+          log.warn('Home Assistant callback: state mismatch');
+          return res.redirect('/login?error=oidc_state_mismatch');
+        }
+        throw err;
+      }
+      userinfo = { name: claims.name, preferred_username: claims.preferred_username };
+    } else {
+      // Der Tausch sendet die redirect_uri der Authorize-Anfrage woertlich; von
+      // der eingehenden Anfrage kommt nur die Query (code, state, ...), weder
+      // Pfad noch Host oder Schema (#1768). Er validiert state, tauscht den Code
+      // gegen Tokens und prüft Signatur, iss, aud, exp sowie nonce am ID-Token.
+      const tokens = await exchangeAuthorizationCode(config, {
+        redirectUri: stored.redirectUri,
+        query,
+        checks: {
+          expectedState:    stored.state,
+          expectedNonce:    stored.nonce,
+          pkceCodeVerifier: stored.codeVerifier,
+        },
+      });
+
+      // Identität aus dem validierten ID-Token; fetchUserInfo erzwingt sub-Abgleich
+      claims   = tokens.claims();
+      userinfo = await oidcClient.fetchUserInfo(config, tokens.access_token, claims.sub);
+    }
 
     // Verknüpfungs-Lauf (#832): der Nutzer ist bereits angemeldet und bindet
     // sein OIDC-Konto an genau dieses Konto. Kein Anlegen, kein Zuordnen über
@@ -2660,6 +2729,10 @@ router.get('/oidc/callback', refuseWhileRestoring, async (req, res) => {
     // Kein Konto angelegt, keins verknuepft; der Grund steht im Redirect, und
     // das Log sagt dem Admin, welche Konten er ansehen muss. Die Adresse selbst
     // steht nicht im Log, die Konto-IDs genuegen.
+    if (user.refused === 'setup_required') {
+      log.warn(`OIDC sign-in before setup: no account is created until the first administrator exists. sub=${claims.sub}`);
+      return res.redirect('/setup');
+    }
     if (user.refused) {
       const ids = user.accountIds.join(', ');
       if (user.refused === 'oidc_email_ambiguous') {
@@ -3453,11 +3526,12 @@ router.get('/users', requireAuth, (req, res) => {
       ? db.get().prepare(`
           SELECT ${USER_PUBLIC_COLUMNS},
                  EXISTS(SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id) AS is_worker,
-                 (password_hash = ?) AS sso_only
+                 (password_hash = ?) AS sso_only,
+                 (CASE WHEN oidc_provider = ? THEN oidc_sub END) AS homeassistant_user_id
           FROM users
           WHERE NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = users.id)
           ORDER BY ${activeAccountSql('users')} DESC, ${memberOrderSql('users')}
-        `).all(OIDC_PASSWORD_SENTINEL)
+        `).all(OIDC_PASSWORD_SENTINEL, homeAssistantProviderKey())
       : db.get().prepare(`
           SELECT ${USER_PUBLIC_COLUMNS},
                  EXISTS(SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id) AS is_worker
@@ -3679,8 +3753,54 @@ router.post('/api-tokens/:id/remove', requireAuth, requireAdmin, csrfMiddleware,
  */
 function adminUserRow(userId) {
   return db.get()
-    .prepare(`SELECT ${USER_PUBLIC_COLUMNS}, (password_hash = ?) AS sso_only FROM users WHERE id = ?`)
-    .get(OIDC_PASSWORD_SENTINEL, userId);
+    .prepare(`SELECT ${USER_PUBLIC_COLUMNS}, (password_hash = ?) AS sso_only,
+              (CASE WHEN oidc_provider = ? THEN oidc_sub END) AS homeassistant_user_id FROM users WHERE id = ?`)
+    .get(OIDC_PASSWORD_SENTINEL, homeAssistantProviderKey(), userId);
+}
+
+/**
+ * Unter welchem `oidc_provider` die Home-Assistant-Anmeldung ihre Konten
+ * ablegt: der `iss`, den completeHomeAssistantLogin liefert. `null`, wenn
+ * Home Assistant nicht die SSO-Quelle ist - dann zeigt die Verwaltung keine ID.
+ */
+function homeAssistantProviderKey() {
+  return ssoProvider() === 'homeassistant' ? getHomeAssistantConfig().url : null;
+}
+
+/**
+ * Liest `homeassistant_user_id` aus einem Admin-Request.
+ *
+ * Home Assistant hat keinen E-Mail-Claim, also findet die erste Anmeldung ein
+ * bestehendes Konto nie von selbst, und Verknuepfen unter Einstellungen > Konto
+ * setzt eine Passwort-Anmeldung voraus. Ein Konto ohne Passwort liesse sich so
+ * nie an einen HA-Benutzer binden. Der Administrator traegt die ID deshalb
+ * selbst ein (HA: Einstellungen > Personen > Benutzer, erweiterter Modus).
+ *
+ * Nur fuer Home Assistant: dort ist die ID eine feste, ablesbare 32-stellige
+ * Hex-Kennung. Ein `sub` beliebiger OIDC-Anbieter bleibt beim Verknuepfen
+ * durch den Nutzer selbst, der ihn mit seiner Anmeldung belegt.
+ *
+ * @returns {{ value: undefined|null|string, error?: string }}
+ *   `undefined` = unveraendert, `null` = Bindung loesen, sonst die ID.
+ */
+function parseHomeAssistantUserId(body) {
+  if (body.homeassistant_user_id === undefined) return { value: undefined };
+  const raw = body.homeassistant_user_id === null ? '' : String(body.homeassistant_user_id).trim().toLowerCase();
+  if (ssoProvider() !== 'homeassistant') {
+    // Leer mitgeschickt ist folgenlos; eine ID ohne HA-Anmeldung waere tot.
+    if (!raw) return { value: undefined };
+    return { error: 'A Home Assistant user ID requires sign-in with Home Assistant (HOMEASSISTANT_URL).' };
+  }
+  if (!raw) return { value: null };
+  if (!/^[0-9a-f]{32}$/.test(raw)) {
+    return { error: 'A Home Assistant user ID is 32 hexadecimal characters.' };
+  }
+  return { value: raw };
+}
+
+/** Ist die HA-ID schon an ein ANDERES Konto gebunden? */
+function homeAssistantUserIdTaken(sub, excludeUserId = null) {
+  return !!db.get().prepare('SELECT 1 FROM users WHERE oidc_sub = ? AND id IS NOT ?').get(sub, excludeUserId);
 }
 
 /**
@@ -3795,7 +3915,18 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
 
     // Erst hier, weil die Pruefung die E-Mail braucht: ein neues Konto ist noch
     // mit nichts verknuepft, also ist die Adresse sein einziger Weg hinein.
-    const ssoOnlyError = assertSsoOnlyAllowed(ssoOnly, password, { email: memberFields.values.email });
+    const haUserId = parseHomeAssistantUserId(req.body);
+    if (haUserId.error) return res.status(400).json({ error: haUserId.error, code: 400 });
+    if (haUserId.value && homeAssistantUserIdTaken(haUserId.value)) {
+      return res.status(409).json({
+        error: 'This Home Assistant user is already linked to another member.', code: 409, reason: 'sub_taken',
+      });
+    }
+
+    const ssoOnlyError = assertSsoOnlyAllowed(ssoOnly, password, {
+      linked: !!haUserId.value,
+      email: memberFields.values.email,
+    });
     if (ssoOnlyError) return res.status(400).json({ error: ssoOnlyError, code: 400 });
 
     const hash = ssoOnly ? OIDC_PASSWORD_SENTINEL : await hashPassword(password);
@@ -3807,6 +3938,10 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
           VALUES (?, ?, ?, ?, ?, ?, ?)
         `)
         .run(username, display_name, hash, avatar_color, normalizedAvatarData ?? null, role, family_role);
+      if (haUserId.value) {
+        db.get().prepare('UPDATE users SET oidc_sub = ?, oidc_provider = ? WHERE id = ?')
+          .run(haUserId.value, homeAssistantProviderKey(), created.lastInsertRowid);
+      }
       // Kinder-Startrechte (R20): in derselben Transaktion wie das Konto, damit
       // es nie einen Moment mit Budget und Haushaltshilfe-Loehnen gibt.
       applyChildStartPermissions(db.get(), {
@@ -3915,11 +4050,28 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     // Ein bereits verknuepftes Konto braucht keine E-Mail mehr - sein `sub`
     // findet es. Sonst zaehlt die Adresse, die nach diesem Aufruf gilt.
     const linkedRow = db.get().prepare('SELECT oidc_sub FROM users WHERE id = ?').get(userId);
+    const haUserId = parseHomeAssistantUserId(req.body);
+    if (haUserId.error) return res.status(400).json({ error: haUserId.error, code: 400 });
+    // Nur ein echter Wechsel zaehlt; die Verwaltung schickt das Feld bei jeder
+    // Speicherung mit.
+    // Verglichen wird mit der ID, die die Verwaltung SIEHT: eine Bindung an
+    // einen frueheren OIDC-Anbieter zeigt sie leer an, und ein leer
+    // zurueckgeschicktes Feld darf die nicht stillschweigend loesen.
+    const currentHaUserId = adminUserRow(userId)?.homeassistant_user_id ?? null;
+    const haLinkChange = haUserId.value !== undefined && haUserId.value !== currentHaUserId
+      ? haUserId.value
+      : undefined;
+    if (haLinkChange && homeAssistantUserIdTaken(haLinkChange, userId)) {
+      return res.status(409).json({
+        error: 'This Home Assistant user is already linked to another member.', code: 409, reason: 'sub_taken',
+      });
+    }
+    const linkedAfter = haLinkChange === undefined ? !!linkedRow?.oidc_sub : !!haLinkChange;
     const effectiveEmail = memberFields.values.email !== undefined
       ? memberFields.values.email
       : existing.email;
     const ssoOnlyError = assertSsoOnlyAllowed(ssoOnly === true, newPassword, {
-      linked: !!linkedRow?.oidc_sub,
+      linked: linkedAfter,
       email: effectiveEmail,
       excludeUserId: userId,
     });
@@ -3931,6 +4083,18 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     const existingHash = db.get().prepare('SELECT password_hash FROM users WHERE id = ?').get(userId)?.password_hash;
     if (ssoOnly === false && isSsoOnlyAccount(existingHash) && !newPassword) {
       return res.status(400).json({ error: 'Turning off SSO-only requires setting a password.', code: 400 });
+    }
+    // Loesen kostet ein Konto ohne Passwort den einzigen Zugang - wie bei
+    // unlinkOidcAccount. Wer zugleich ein Passwort setzt, darf.
+    if (haLinkChange === null) {
+      const staysSsoOnly = ssoOnly === true || (ssoOnly === null && isSsoOnlyAccount(existingHash));
+      if (staysSsoOnly && !newPassword) {
+        return res.status(400).json({
+          error: 'An account without a password cannot be unlinked. Set a password first.', code: 400, reason: 'no_password',
+        });
+      }
+      const lastSsoAdminError = assertSsoAdminWouldRemain(userId, 'member');
+      if (lastSsoAdminError) return res.status(400).json({ error: lastSsoAdminError, code: 400, reason: 'last_sso_admin' });
     }
 
     // Ein Ehemaliger wird nicht Administrator (#1381): er kaeme nie an
@@ -3969,6 +4133,10 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
 
       if (newPasswordHash) {
         db.get().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newPasswordHash, userId);
+      }
+      if (haLinkChange !== undefined) {
+        db.get().prepare('UPDATE users SET oidc_sub = ?, oidc_provider = ? WHERE id = ?')
+          .run(haLinkChange, haLinkChange ? homeAssistantProviderKey() : null, userId);
       }
 
       syncFamilyMemberArtifacts(db.get(), userId, {

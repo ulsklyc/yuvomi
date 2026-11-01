@@ -19,6 +19,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and with everything that ends a session, so "sign out other devices" now counts these too. An
   administrator cannot see a member's devices, but can sign a member out of all of them with
   `POST /api/v1/auth/users/{id}/devices/sign-out`. Nothing changes for browsers or existing API tokens.
+- **Sign in with Home Assistant.** Home Assistant speaks OAuth but not OpenID Connect, so it could
+  not be used as an SSO provider. With `HOMEASSISTANT_URL` set, the sign-in button reads "Sign in
+  with Home Assistant", and everything that applies to SSO applies here too: linking under
+  Settings > Account, `OIDC_ALLOW_SIGNUP`, SSO-only accounts and `AUTH_ALLOW_PASSWORD_LOGIN`.
+  Yuvomi only asks Home Assistant who signed in and revokes the token right away. A configured
+  OIDC provider still takes precedence. Home Assistant sends no email address, so an administrator
+  can bind a member to a Home Assistant user ID in the member dialog, also for an account without a
+  password. New accounts take the Home Assistant display name as username and always start as
+  members: a Home Assistant administrator is not automatically a household administrator.
+- **SSO no longer creates the first account.** Before setup, an SSO sign-in that would create an
+  account goes to the setup page instead. Before, an SSO member could become the first account,
+  which locked setup and left the household without an administrator.
+- **SSO works from an embedded Yuvomi.** Sign-in pages of SSO providers refuse to load inside a
+  frame, so the SSO button did nothing when Yuvomi was embedded, for example in a Home Assistant
+  dashboard. Inside a frame the button now opens the sign-in in a new window, and the embedded page
+  reloads by itself once you are signed in.
 - **A document can name who it is about.** The document dialog has a new "About" field for one
   household member, and the Documents page can filter by person. The person also gets the expiry
   reminder, along with whoever filed the document, and once if that is the same person. This never
