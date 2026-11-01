@@ -5573,8 +5573,8 @@ button.today-cockpit__more--link {
 .family-widget-avatar[data-avail]::after {
   content: '';
   position: absolute;
-  bottom: -1px;
-  right: -1px;
+  inset-block-end: -1px;
+  inset-inline-end: -1px;
   width: 10px;
   height: 10px;
   border-radius: 50%;
