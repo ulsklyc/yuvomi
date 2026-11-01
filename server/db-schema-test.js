@@ -237,8 +237,14 @@ const MIGRATIONS_SQL = {
       expires_at   TEXT,
       revoked_at   TEXT,
       last_used_at TEXT,
-      created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      kind         TEXT    NOT NULL DEFAULT 'integration',
+      platform     TEXT,
+      device_id    TEXT
     );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_api_tokens_active_device
+      ON api_tokens (subject_user_id, device_id)
+      WHERE kind = 'device' AND revoked_at IS NULL;
     CREATE TRIGGER IF NOT EXISTS trg_users_updated_at
       AFTER UPDATE ON users FOR EACH ROW
       BEGIN UPDATE users SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;

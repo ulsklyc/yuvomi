@@ -845,6 +845,9 @@ const REASONS_WITHOUT_SENTENCE = new Set([
   // per Muster (login.js: "password login is disabled").
   'account_cannot_sign_in', 'password_login_disabled', 'setup_completed', 'required',
   'browser_session_required',
+  // Angemeldete Geraete: der native Client liest den Grund selbst, die Web-App
+  // sieht ihn nie, weil sie mit einer Sitzung arbeitet.
+  'device_credential', 'device_credential_required', 'session_required',
   // Wandtablett und Gastkonto: aus der Oberflaeche dieser Konten nicht erreichbar.
   'display_account', 'display_only', 'display_action', 'acting_person_no_access', 'split_guest_scope',
   // Taschengeld am Wandtablett (#1734): die Seite fragt dort gar nicht erst nach Geld.

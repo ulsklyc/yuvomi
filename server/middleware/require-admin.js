@@ -17,10 +17,17 @@ export function isAdminRequest(req) {
   return req.authRole === 'admin';
 }
 
-/** Lässt nur Admins durch; alle anderen erhalten 403. */
+/**
+ * Lässt nur Admins durch; alle anderen erhalten 403. Ein angemeldetes Gerät
+ * bekommt seinen eigenen Grund: die Person mag Admin sein, nur eben nicht von
+ * diesem Gerät aus (siehe `requireAuth` in server/auth.js).
+ */
 export function requireAdmin(req, res, next) {
   if (isAdminRequest(req)) {
     return next();
+  }
+  if (req.authDeviceId != null) {
+    return res.status(403).json({ error: 'This is not available on a signed-in device.', code: 403, reason: 'device_credential' });
   }
   res.status(403).json({ error: 'Permission denied.', code: 403 });
 }

@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Yuvomi instance, and `client_api` is a whole number for the contract a native client relies on. A client can
   recognise a server and tell whether it is new enough before anyone signs in. The exact version stays
   behind sign-in.
+- **Signed-in devices, the groundwork for a native client.** New routes under `/api/v1/auth/devices` let a
+  household member exchange a sign-in for a device credential, list their own devices and sign one out. A
+  device acts as the person with less reach than a browser session: an administrator is an ordinary member
+  on it, and it can change neither password nor email nor second factor. It ends after 90 days without use
+  and with everything that ends a session, so "sign out other devices" now counts these too. An
+  administrator cannot see a member's devices, but can sign a member out of all of them with
+  `POST /api/v1/auth/users/{id}/devices/sign-out`. Nothing changes for browsers or existing API tokens.
 - **A document can name who it is about.** The document dialog has a new "About" field for one
   household member, and the Documents page can filter by person. The person also gets the expiry
   reminder, along with whoever filed the document, and once if that is the same person. This never

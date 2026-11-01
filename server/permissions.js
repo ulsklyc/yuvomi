@@ -814,7 +814,21 @@ export function requestHasCapability(database, req, key) {
   if (isAdminRequest(req)) return true;
   const id = req.authUserId ?? req.session?.userId;
   if (id == null) return false;
-  return userHasCapability(database, id, key, { isDisplay: req.authMethod === 'display' });
+  return userHasCapability(database, id, key, {
+    isDisplay: req.authMethod === 'display',
+    actingAsMember: req.authDeviceId != null,
+  });
+}
+
+/**
+ * Die Rolle, mit der ein Konto in DIESER Anfrage aufgeloest wird. Ein Admin ist
+ * auf einem angemeldeten Geraet ein Mitglied (server/auth.js, `requireAuth`) -
+ * auch dort, wo eine Regel die Zeile aus `users` liest statt `req.authRole`.
+ * Sonst behielte ein verlorenes Telefon ueber die Rechte-Aufloesung, was ihm
+ * `isAdminRequest()` eben genommen hat.
+ */
+export function userForRequest(req, user) {
+  return req?.authDeviceId != null && user ? { ...user, role: 'member' } : user;
 }
 
 /**
@@ -825,10 +839,11 @@ export function requestHasCapability(database, req, key) {
  * services/payment-task-audience.js). Eine Migration ruft sie NIE auf: die
  * friert ihre Regel ein (Migration 250 in server/db.js).
  */
-export function userHasCapability(database, userId, key, { isDisplay = false } = {}) {
+export function userHasCapability(database, userId, key, { isDisplay = false, actingAsMember = false } = {}) {
   if (userId == null) return false;
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  if (!user) return false;
+  const row = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
+  if (!row) return false;
+  const user = actingAsMember ? { ...row, role: 'member' } : row;
   if (user.role === 'admin') return true;
   return resolvePermissions(database, user, { isDisplay }).capabilities[key] === 'allow';
 }

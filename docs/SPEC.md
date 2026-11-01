@@ -2930,7 +2930,7 @@ in the mixed calendar feed. Local-calendar feeds continue to exclude generated e
 keeps its existing birthday layer filter and reminder-based visibility.
 
 ### API Tokens
-Named Bearer / X-API-Key tokens for non-interactive external integrations. Admin-only creation and revocation. Token values are SHA-256-hashed at rest; the plaintext is shown only once after creation.
+Named Bearer / X-API-Key tokens. An integration token (`kind = 'integration'`) serves a non-interactive external integration; creating and revoking one is admin-only. A device credential (`kind = 'device'`) belongs to a signed-in device, see below, and never appears in the token list. Token values are SHA-256-hashed at rest; the plaintext is shown only once after creation.
 
 **Revoking keeps the row, removing drops it (D#1672):** `DELETE /api/v1/auth/api-tokens/:id` sets `revoked_at` and nothing else, so a revocation stays on record; that meaning is part of the promised `/api/v1` surface. `POST /api/v1/auth/api-tokens/:id/remove` deletes the row, and only of a token that no longer works - revoked, or past `expires_at`. A token that still works answers 409 with `reason: "api_token_active"`; "still works" is the same SQL predicate the token sign-in uses (`apiTokenUsableSql()` in `server/auth.js`), so a row can never be removed while its credential is accepted. Same guards as revoking (admin, CSRF for sessions, no scoped token). Nothing references `api_tokens.id`, so removing leaves no orphan. Token responses carry `active` (the same predicate, judged by the server clock), and the settings page splits its list by that field rather than by the browser clock: a device whose clock runs ahead would otherwise offer only "Remove" for a token that still works, get the 409, and have no way to revoke it. Settings → Household → API access shows two lists: active tokens with "Revoke", and "Revoked or expired" (only when there are any) with "Remove", behind a confirmation - there is no undo, the hash is gone.
 
@@ -2949,10 +2949,19 @@ Tokens can optionally be **scoped** to individual modules and access levels — 
 | revoked_at | TEXT | ISO 8601, nullable |
 | last_used_at | TEXT | ISO 8601, nullable |
 | created_at | TEXT | ISO 8601 NOT NULL |
+| kind | TEXT | NOT NULL, default `integration` (migration v274); `device` for a device credential |
+| platform | TEXT | Nullable (migration v274) - a short lowercase name such as `ios`, set for a device |
+| device_id | TEXT | Nullable (migration v274) - stable per installation, chosen by the client; unique among the valid credentials of one person |
 
 **Subject vs. creator (v2.4.0 · migration v135):** only an admin can mint a token, so without a subject every request it makes is the admin's - and `budget_entries.owner_id` is fixed to whoever creates the entry (see [Budget Entries](#budget-entries), migration v88). A bank-import connector could therefore only ever file transactions under the administrator, never under the household member they belong to. The two roles are now separate: `created_by` stays with the admin who is accountable for the credential and is what the token list shows for audit, while `subject_user_id` supplies the identity, role, ownership and module permissions of the requests. Making `owner_id` settable per request would have been the alternative and is the weaker one - it lets any caller claim any ownership on every call, where the subject is fixed once by an admin and not selectable afterwards.
 
 The subject can only narrow, never widen: module permissions (#467) are resolved for the subject on every request, a non-admin subject cannot reach admin-only routes, and token scopes remain an additional allow-list on top. A split-expense guest cannot be a subject (the household guard would refuse its requests anyway). Deleting either user removes the token via `ON DELETE CASCADE`, and existing tokens keep behaving as before because the migration backfills `subject_user_id = created_by`.
+
+**Signed-in device (migration v274):** a person's own phone running a native client. Its secret is the device credential, never called a device token, which on Apple platforms means something else. It is issued only from a sign-in, `POST /api/v1/auth/devices`, to a household member, and the plaintext appears once. The same `device_id` replaces the earlier credential.
+
+A device has less reach than a browser session. An administrator is an ordinary member on it, in permission resolution too, so nothing behind `requireAdmin` answers and no capability comes from the stored role. Of `/api/v1/auth` it reaches an allowlist (`GET /me`, `GET /users`, `GET /oidc/config`, `POST /logout`, `GET /devices`, `DELETE /devices/{id}`), so a stolen credential changes neither password nor email nor second factor, and it cannot issue another credential. Anything else answers 403 with `reason: device_credential`.
+
+It ends after 90 days without use, the same number as a session, and with the same acts: every caller of `invalidateUserSessions()` (password change, password reset, administrator password, turning on two-factor, "sign out other devices") and deactivating or deleting the account. Integration tokens stay. A person lists and signs out their own devices, from a session or a device but not with an API token, which an administrator can issue for a member. An administrator cannot see them, and has one action for the emergency: `POST /api/v1/auth/users/{id}/devices/sign-out` ends all of a member's devices and browser sessions and answers without saying what ended. It is not a paired display, which is an account of its own.
 
 ### Display Accounts (migration v215, #1208, decided in #913)
 
