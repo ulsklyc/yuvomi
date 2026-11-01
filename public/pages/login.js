@@ -37,6 +37,8 @@ export async function render(container) {
   // Passwort-Login nie blockiert – dann wird ohne SSO gerendert.
   const oidc = await fetchOidcConfig();
   const ssoEnabled = oidc?.enabled === true;
+  // Steht Home Assistant hinter dem SSO-Ablauf, sagt der Knopf das auch.
+  const ssoLabel = oidc?.provider === 'homeassistant' ? t('login.loginWithHomeAssistant') : t('login.loginWithSso');
   // SSO als einziger Weg hinein (#847). Bewusst an `ssoEnabled` gekoppelt: eine
   // Anmeldeseite ganz ohne Weg hinein waere schlimmer als eine mit einem zu
   // viel. Der Server haelt dieselbe Regel, hier ist sie nur die Anzeige davon -
@@ -57,7 +59,7 @@ export async function render(container) {
         ${!passwordLoginEnabled ? `
         <div class="auth-form" id="sso-only-block">
           <p class="auth-form__sso-only">${esc(t('login.ssoOnlyHint'))}</p>
-          <a href="/api/v1/auth/oidc/start" class="btn btn--primary auth-form__submit">${esc(t('login.loginWithSso'))}</a>
+          <a href="/api/v1/auth/oidc/start" class="btn btn--primary auth-form__submit">${esc(ssoLabel)}</a>
           ${guestPasswordLoginEnabled ? `
           <p class="auth-form__forgot">
             <button type="button" class="auth-linkish" id="show-password-form">${esc(t('login.guestPasswordLogin'))}</button>
@@ -103,7 +105,7 @@ export async function render(container) {
           </button>
           ${ssoEnabled && passwordLoginEnabled ? `
           <div class="auth-divider">${esc(t('login.orDivider'))}</div>
-          <a href="/api/v1/auth/oidc/start" class="btn btn--secondary auth-form__submit">${esc(t('login.loginWithSso'))}</a>
+          <a href="/api/v1/auth/oidc/start" class="btn btn--secondary auth-form__submit">${esc(ssoLabel)}</a>
           ` : ''}
           <p class="auth-form__forgot" hidden>
             <a href="/forgot-password" data-link>${esc(t('login.forgotPassword'))}</a>
@@ -131,6 +133,8 @@ export async function render(container) {
 
   container.querySelectorAll('a[data-link]').forEach((a) =>
     a.addEventListener('click', (e) => { e.preventDefault(); window.yuvomi.navigate(a.getAttribute('href')); }));
+
+  if (ssoEnabled) wireFramedSso(container);
 
   // OIDC-Fehlermeldung aus URL-Parameter anzeigen (z.B. ?error=oidc_failed nach gescheitertem Callback)
   const urlParams = new URLSearchParams(window.location.search);
@@ -414,6 +418,47 @@ function renderSecondFactor(container, { recoveryAvailable }) {
       label.textContent = t('login.twoFactorSubmit');
       spinner.remove();
     }
+  });
+}
+
+/**
+ * SSO aus einer eingebetteten Yuvomi (z. B. als Panel in Home Assistant oder
+ * als Webseiten-Karte in einem Dashboard).
+ *
+ * Anmeldeanbieter verbieten fast immer, dass ihre Login-Seite in einem fremden
+ * Frame steht (`X-Frame-Options`/`frame-ancestors`) - der Klick auf „Mit SSO
+ * anmelden" endete im Frame deshalb auf einer leeren, blockierten Seite. Im
+ * Frame oeffnet der Knopf den Ablauf daher in einem eigenen Fenster. Das
+ * Sitzungs-Cookie, das der Rueckweg dort setzt, gilt fuer denselben Ursprung,
+ * also auch fuer den Frame: der Frame fragt in kurzen Abstaenden nach, ob die
+ * Sitzung steht, und laedt dann neu. Ohne Frame bleibt alles, wie es war.
+ */
+function wireFramedSso(container) {
+  let framed;
+  try { framed = window.self !== window.top; } catch { framed = true; }
+  if (!framed) return;
+
+  const POLL_MS = 2000;
+  const POLL_LIMIT_MS = 10 * 60 * 1000;
+  let timer = null;
+
+  const poll = (startedAt) => {
+    if (!container.isConnected || Date.now() - startedAt > POLL_LIMIT_MS) return;
+    fetch('/api/v1/auth/me', { cache: 'no-store', credentials: 'same-origin' })
+      .then((res) => {
+        if (res.ok) { window.location.replace('/'); return; }
+        timer = setTimeout(() => poll(startedAt), POLL_MS);
+      })
+      .catch(() => { timer = setTimeout(() => poll(startedAt), POLL_MS); });
+  };
+
+  container.querySelectorAll('a[href="/api/v1/auth/oidc/start"]').forEach((a) => {
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.addEventListener('click', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => poll(Date.now()), POLL_MS);
+    });
   });
 }
 

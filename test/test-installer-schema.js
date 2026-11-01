@@ -116,6 +116,13 @@ const TOTAL_KEYS = ORIGINAL_KEYS.length + GOOGLE_DRIVE_KEYS.length + OUTLOOK_KEY
 // erzwingt damit eine Entscheidung, statt still zu driften.
 
 const INTENTIONALLY_NOT_IN_INSTALLER = {
+  HOMEASSISTANT_URL:
+    'Anmeldung mit Home Assistant ist eine Alternative zu den vier OIDC-Werten, die der Wizard '
+    + 'abfragt. Wer Yuvomi neben Home Assistant betreibt, setzt die Zeile in der Regel spaeter, '
+    + 'wenn beide laufen; im Wizard waere sie eine zweite SSO-Frage, die die erste verwirrt.',
+  HOMEASSISTANT_INTERNAL_URL:
+    'Nur noetig, wenn der Server Home Assistant unter einer anderen Adresse erreicht als der '
+    + 'Browser (gemeinsames Docker-Netz). Haengt an HOMEASSISTANT_URL, siehe dort.',
   // Setzt jeder Container-Descriptor selbst; im Installer wäre der Wert eine
   // zweite Wahrheit, die der Descriptor überschreibt.
   NODE_ENV: 'Vom Image gesetzt (production).',
