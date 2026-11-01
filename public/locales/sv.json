@@ -6783,7 +6783,7 @@
         "hint": "Logga in med fingeravtryck, ansikte eller enhetens PIN-kod. Behåll lösenord eller SSO som reserv.",
         "needsHttps": "Nycklar kräver en fast HTTPS-adress i BASE_URL.",
         "unsupported": "Den här webbläsaren eller anslutningen stöder inte nycklar. Använd en kompatibel webbläsare över HTTPS.",
-        "policy": "Direkt inloggning är avstängd för hushållet. Använd SSO.",
+        "policy": "Direkt inloggning är avstängd. Använd SSO.",
         "used": "Senast använd: {{date}}",
         "unused": "Inte använd ännu",
         "removeNamed": "Ta bort nyckeln {{name}}",

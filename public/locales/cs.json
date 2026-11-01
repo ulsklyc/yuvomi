@@ -6963,7 +6963,7 @@
         "hint": "Přihlaste se otiskem prstu, obličejem nebo kódem PIN zařízení. Heslo nebo SSO si ponechte jako zálohu.",
         "needsHttps": "Přístupové klíče vyžadují stálou adresu HTTPS v BASE_URL.",
         "unsupported": "Tento prohlížeč nebo připojení nepodporuje přístupové klíče. Použijte podporovaný prohlížeč přes HTTPS.",
-        "policy": "Přímé přihlášení je pro tuto domácnost vypnuté. Použijte SSO.",
+        "policy": "Přímé přihlášení je vypnuté. Použijte SSO.",
         "used": "Naposledy použito: {{date}}",
         "unused": "Zatím nepoužito",
         "removeNamed": "Odebrat klíč {{name}}",

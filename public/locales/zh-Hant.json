@@ -6783,7 +6783,7 @@
         "hint": "使用指紋、臉部辨識或裝置PIN登入。請保留密碼或SSO作為復原方式。",
         "needsHttps": "通行金鑰需要在BASE_URL中設定固定的HTTPS位址。",
         "unsupported": "此瀏覽器或連線不支援通行金鑰。請透過HTTPS使用相容的瀏覽器。",
-        "policy": "此家庭已停用直接登入。請使用SSO。",
+        "policy": "已停用直接登入。請使用SSO。",
         "used": "上次使用：{{date}}",
         "unused": "尚未使用",
         "removeNamed": "移除通行金鑰{{name}}",

@@ -6783,7 +6783,7 @@
         "hint": "Đăng nhập bằng vân tay, khuôn mặt hoặc mã PIN thiết bị. Giữ mật khẩu hoặc SSO để khôi phục.",
         "needsHttps": "Khóa truy cập cần địa chỉ HTTPS cố định trong BASE_URL.",
         "unsupported": "Trình duyệt hoặc kết nối này không hỗ trợ khóa truy cập. Hãy dùng trình duyệt phù hợp qua HTTPS.",
-        "policy": "Đăng nhập trực tiếp đã bị tắt cho gia đình này. Hãy dùng SSO.",
+        "policy": "Đăng nhập trực tiếp đã bị tắt. Hãy dùng SSO.",
         "used": "Dùng lần cuối: {{date}}",
         "unused": "Chưa sử dụng",
         "removeNamed": "Xóa khóa {{name}}",

@@ -6783,7 +6783,7 @@
         "hint": "Connectez-vous avec votre empreinte, votre visage ou le code de l'appareil. Gardez le mot de passe ou le SSO comme secours.",
         "needsHttps": "Les clés d'accès nécessitent une adresse HTTPS stable définie dans BASE_URL.",
         "unsupported": "Ce navigateur ou cette connexion ne prend pas en charge les clés d'accès. Utilisez un navigateur compatible en HTTPS.",
-        "policy": "La connexion directe est désactivée pour ce foyer. Utilisez le SSO.",
+        "policy": "La connexion directe est désactivée. Utilisez le SSO.",
         "used": "Dernière utilisation : {{date}}",
         "unused": "Pas encore utilisée",
         "removeNamed": "Retirer la clé d'accès {{name}}",

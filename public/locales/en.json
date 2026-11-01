@@ -6783,7 +6783,7 @@
         "hint": "Sign in with your fingerprint, face or device PIN. Keep your password or SSO as a recovery option.",
         "needsHttps": "Passkeys need a stable HTTPS address configured as BASE_URL.",
         "unsupported": "This browser or connection does not support passkeys. Use a supported browser over HTTPS.",
-        "policy": "Native sign-in is disabled by the household. Continue using SSO.",
+        "policy": "Native sign-in is disabled. Continue using SSO.",
         "used": "Last used: {{date}}",
         "unused": "Not used yet",
         "removeNamed": "Remove passkey {{name}}",

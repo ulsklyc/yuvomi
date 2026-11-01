@@ -6783,7 +6783,7 @@
         "hint": "Accedi con impronta, riconoscimento del volto o PIN del dispositivo. Mantieni la password o il SSO come alternativa.",
         "needsHttps": "Le chiavi di accesso richiedono un indirizzo HTTPS stabile in BASE_URL.",
         "unsupported": "Questo browser o questa connessione non supporta le chiavi di accesso. Usa un browser compatibile tramite HTTPS.",
-        "policy": "L'accesso diretto è disattivato per questa famiglia. Usa il SSO.",
+        "policy": "L'accesso diretto è disattivato. Usa il SSO.",
         "used": "Ultimo utilizzo: {{date}}",
         "unused": "Non ancora utilizzata",
         "removeNamed": "Rimuovi la chiave {{name}}",

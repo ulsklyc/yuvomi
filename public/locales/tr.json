@@ -6783,7 +6783,7 @@
         "hint": "Parmak izi, yüz veya cihaz PIN'i ile giriş yapın. Kurtarma için parolanızı ya da SSO'yu koruyun.",
         "needsHttps": "Geçiş anahtarları BASE_URL içinde sabit bir HTTPS adresi gerektirir.",
         "unsupported": "Bu tarayıcı veya bağlantı geçiş anahtarlarını desteklemiyor. HTTPS üzerinden uyumlu bir tarayıcı kullanın.",
-        "policy": "Bu hanede doğrudan giriş kapalı. SSO kullanın.",
+        "policy": "Doğrudan giriş kapalı. SSO kullanın.",
         "used": "Son kullanım: {{date}}",
         "unused": "Henüz kullanılmadı",
         "removeNamed": "{{name}} anahtarını kaldır",

@@ -6783,7 +6783,7 @@
         "hint": "Inicia sesión con tu huella, rostro o PIN del dispositivo. Conserva la contraseña o el SSO como alternativa.",
         "needsHttps": "Las claves de acceso requieren una dirección HTTPS estable en BASE_URL.",
         "unsupported": "Este navegador o conexión no admite claves de acceso. Usa un navegador compatible mediante HTTPS.",
-        "policy": "El inicio de sesión directo está desactivado para este hogar. Usa el SSO.",
+        "policy": "El inicio de sesión directo está desactivado. Usa el SSO.",
         "used": "Último uso: {{date}}",
         "unused": "Todavía no se ha usado",
         "removeNamed": "Eliminar la clave {{name}}",

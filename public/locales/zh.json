@@ -6783,7 +6783,7 @@
         "hint": "使用指纹、面容或设备PIN登录。请保留密码或SSO作为恢复方式。",
         "needsHttps": "通行密钥需要在BASE_URL中设置固定的HTTPS地址。",
         "unsupported": "此浏览器或连接不支持通行密钥。请通过HTTPS使用兼容的浏览器。",
-        "policy": "此家庭已禁用直接登录。请使用SSO。",
+        "policy": "已禁用直接登录。请使用SSO。",
         "used": "上次使用：{{date}}",
         "unused": "尚未使用",
         "removeNamed": "移除通行密钥{{name}}",

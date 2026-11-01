@@ -6783,7 +6783,7 @@
         "hint": "Melde dich mit Fingerabdruck, Gesichtserkennung oder Geräte-PIN an. Behalte dein Passwort oder SSO als Rückweg.",
         "needsHttps": "Passkeys benötigen eine feste HTTPS-Adresse als BASE_URL.",
         "unsupported": "Dieser Browser oder diese Verbindung unterstützt keine Passkeys. Nutze einen unterstützten Browser über HTTPS.",
-        "policy": "Die direkte Anmeldung ist für diesen Haushalt deaktiviert. Nutze weiterhin SSO.",
+        "policy": "Die direkte Anmeldung ist deaktiviert. Nutze weiterhin SSO.",
         "used": "Zuletzt verwendet: {{date}}",
         "unused": "Noch nicht verwendet",
         "removeNamed": "Passkey {{name}} entfernen",

@@ -6783,7 +6783,7 @@
         "hint": "Meld je aan met je vingerafdruk, gezicht of apparaatpincode. Bewaar je wachtwoord of SSO als hersteloptie.",
         "needsHttps": "Passkeys vereisen een vast HTTPS-adres in BASE_URL.",
         "unsupported": "Deze browser of verbinding ondersteunt geen passkeys. Gebruik een geschikte browser via HTTPS.",
-        "policy": "Direct aanmelden is voor dit huishouden uitgeschakeld. Gebruik SSO.",
+        "policy": "Direct aanmelden is uitgeschakeld. Gebruik SSO.",
         "used": "Laatst gebruikt: {{date}}",
         "unused": "Nog niet gebruikt",
         "removeNamed": "Passkey {{name}} verwijderen",

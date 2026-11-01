@@ -1702,7 +1702,7 @@ function recentPasskeySession(req, res, next) {
   next();
 }
 function nativePasskeysAllowed(user) {
-  return isPasswordLoginEnabled() || isSplitExpenseGuest(user.id);
+  return !isSsoOnlyAccount(user.password_hash) && (isPasswordLoginEnabled() || isSplitExpenseGuest(user.id));
 }
 function passkeyError(res) {
   return res.status(400).json({ error: 'Passkey verification failed. Try again.', code: 400, reason: 'passkey_failed' });

@@ -6783,7 +6783,7 @@
         "hint": "Masuk dengan sidik jari, wajah, atau PIN perangkat. Simpan kata sandi atau SSO sebagai cadangan.",
         "needsHttps": "Kunci sandi memerlukan alamat HTTPS tetap di BASE_URL.",
         "unsupported": "Peramban atau koneksi ini tidak mendukung kunci sandi. Gunakan peramban yang sesuai melalui HTTPS.",
-        "policy": "Masuk langsung dinonaktifkan untuk keluarga ini. Gunakan SSO.",
+        "policy": "Masuk langsung dinonaktifkan. Gunakan SSO.",
         "used": "Terakhir digunakan: {{date}}",
         "unused": "Belum digunakan",
         "removeNamed": "Hapus kunci {{name}}",

@@ -7123,7 +7123,7 @@
         "hint": "Zaloguj się odciskiem palca, twarzą lub kodem PIN urządzenia. Zachowaj hasło albo SSO jako metodę awaryjną.",
         "needsHttps": "Klucze dostępu wymagają stałego adresu HTTPS w BASE_URL.",
         "unsupported": "Ta przeglądarka lub połączenie nie obsługuje kluczy dostępu. Użyj zgodnej przeglądarki przez HTTPS.",
-        "policy": "Logowanie bezpośrednie jest wyłączone w tym gospodarstwie. Użyj SSO.",
+        "policy": "Logowanie bezpośrednie jest wyłączone. Użyj SSO.",
         "used": "Ostatnie użycie: {{date}}",
         "unused": "Jeszcze nie użyto",
         "removeNamed": "Usuń klucz {{name}}",

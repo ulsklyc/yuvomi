@@ -184,6 +184,13 @@ test('HTTP enrollment and sign-in preserve CSRF, session, policy, account and 2F
     assert.equal(response.data.reason,'account_cannot_sign_in');
     assert.equal((await route('/me')).status,401);
     database.prepare('UPDATE users SET deactivated_at = NULL WHERE id = ?').run(person.id);
+    // The per-account SSO-only flag is independent of the household-wide policy.
+    const oldHash = database.prepare('SELECT password_hash FROM users WHERE id = ?').get(person.id).password_hash;
+    database.prepare("UPDATE users SET password_hash = '$oidc$' WHERE id = ?").run(person.id);
+    next = (await route('/passkeys/login/options','POST',{})).data.data;
+    response = await route('/passkeys/login/verify','POST',{credential:assertion(next,device,options.user.id,{counter:4})});
+    assert.equal(response.data.reason,'passkey_policy');
+    database.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(oldHash, person.id);
     // Once SSO-only policy is effective, native passkeys cannot bypass it.
     process.env.OIDC_ISSUER='https://idp.example.test'; process.env.OIDC_CLIENT_ID='test'; process.env.OIDC_CLIENT_SECRET='test'; process.env.OIDC_REDIRECT_URI='https://planner.example.test/callback';
     database.prepare("UPDATE users SET role = 'admin', oidc_sub = 'linked-admin' WHERE id = ?").run(person.id);

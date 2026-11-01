@@ -6783,7 +6783,7 @@
         "hint": "Mag-sign in gamit ang fingerprint, mukha, o PIN ng device. Panatilihin ang password o SSO bilang reserba.",
         "needsHttps": "Kailangan ng passkey ng permanenteng HTTPS address sa BASE_URL.",
         "unsupported": "Hindi sinusuportahan ng browser o koneksiyong ito ang passkey. Gumamit ng angkop na browser sa HTTPS.",
-        "policy": "Naka-off ang direktang pag-sign in para sa tahanang ito. Gamitin ang SSO.",
+        "policy": "Naka-off ang direktang pag-sign in. Gamitin ang SSO.",
         "used": "Huling ginamit: {{date}}",
         "unused": "Hindi pa nagamit",
         "removeNamed": "Alisin ang passkey na {{name}}",
