@@ -60,6 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same reminder to a household notification channel once per person. The channel now hears it once,
   and a reminder someone set for a different time still arrives on its own. Each person's Web Push
   and personal channels are unchanged.
+- **A waste pickup reminds a household channel once.** Everyone who turned on a reminder for the
+  same waste type sent the same pickup to a household notification channel once per person. The
+  channel now hears it once, and someone with a different lead time still gets their own message.
+  Each person's Web Push and personal channels are unchanged.
 - **The Budget title stands in full on narrow phones** (#2440). Below 390px wide the title sat next
   to the month stepper and read "Bud..." at 360px. There the month now takes a row of its own under
   the title, with the arrows at the ends of the row, and the title keeps its size. The tabs without
