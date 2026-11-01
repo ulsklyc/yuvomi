@@ -373,9 +373,9 @@ test('JEDER Weg in eine Sitzung prueft den zweiten Faktor - auch SSO', () => {
   // Eine leere Liste ist fuer sich keine Zusicherung: sie waere auch leer,
   // wenn der Suchbegriff nicht mehr passte. Deshalb die Gegenprobe, dass
   // ueberhaupt die erwarteten Wege gefunden wurden.
-  assert.equal(callers.length, 4, `erwartet werden vier Anmeldewege, gefunden: ${callers.join(' | ')}`);
+  assert.equal(callers.length, 4, `expected four sign-in paths, found: ${callers.join(' | ')}`);
   assert.ok(callers.some((c) => c.includes("'/login'")), 'der Passwort-Login wurde nicht gefunden');
-  assert.ok(callers.some((c) => c.includes("'/passkeys/login/verify'")), 'der Passkey-Login wurde nicht gefunden');
+  assert.ok(callers.some((c) => c.includes("'/passkeys/login/verify'")), 'passkey sign-in route was not found');
   assert.ok(callers.some((c) => c.includes("'/oidc/callback'")), 'der OIDC-Callback wurde nicht gefunden');
   assert.ok(callers.some((c) => c.includes("'/2fa/verify'")), 'die Verify-Route wurde nicht gefunden');
 
