@@ -18,14 +18,16 @@ export function corePaths() {
     '/api/v1/version': {
       get: op({
         summary: 'Get application version',
+        operationId: 'getVersion',
         tag: 'System',
         auth: false,
-        description: 'Public bootstrap metadata for login/setup, including `product` and `client_api`, which let a client recognise an instance and tell whether it is new enough before anyone signs in. When a valid session or API token is supplied, the response also includes the exact app version. A client probing an instance sends no credential: an invalid one answers 401.',
+        description: 'Public bootstrap metadata for login/setup, including `product` and `client_api`, which let a client recognise an instance and tell whether it is new enough before anyone signs in. When a valid session or API token is supplied, the response also includes the exact app version and `max_upload_bytes`. A client probing an instance sends no credential: an invalid one answers 401.',
         responses: {
           200: {
             description: 'Application version',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/VersionResponse' } } },
           },
+          401: { $ref: '#/components/responses/Unauthorized' },
         },
       }),
     },

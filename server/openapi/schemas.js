@@ -71,6 +71,53 @@ const birthdayInputProperties = {
   },
 };
 
+// `GET /reminders/pending` und `/upcoming` lesen dieselbe Abfrage, nur `fires_at` kommt bei `/upcoming` dazu.
+// Was jede Antwort ueber das angemeldete Konto mitbringt (Login, 2FA, /auth/me).
+const accountContextProperties = {
+  permissions: { $ref: '#/components/schemas/ClientPermissions' },
+  householdSize: { type: 'integer', description: 'How many household members there are.' },
+  initialsRoster: {
+    type: 'array',
+    items: { type: 'string' },
+    description: 'The names a client resolves equal initials against. Empty for a split-expense guest.',
+  },
+  othersCanRead: {
+    type: 'array',
+    items: { type: 'string' },
+    description: 'Modules another account can read too, which is when a privacy control means something.',
+  },
+};
+
+const reminderProperties = {
+  id: { type: 'integer' },
+  entity_type: { type: 'string', description: 'The origin of the reminder, for example `task` or `event`.' },
+  entity_id: { type: 'integer' },
+  entity_title: {
+    type: ['string', 'null'],
+    description: 'Title of the entity, as far as the origin has one.',
+  },
+  remind_at: {
+    type: 'string',
+    description: 'As stored, and the form depends on who wrote the row: UTC without a zone suffix for a reminder set through this API, on rows from up to v2.68.0 possibly with an offset, and on derived types also `YYYY-MM-DDTHH:MM` or a UTC value with `Z` and possibly milliseconds. Parse it leniently; `GET /reminders/upcoming` has `fires_at` for scheduling.',
+  },
+  dismissed: { type: 'integer', enum: [0] },
+  pushed_at: { type: ['string', 'null'] },
+  assigned_from: {
+    type: ['integer', 'null'],
+    description: 'Set on a reminder inherited from the person who created the entity.',
+  },
+  created_by: { type: 'integer' },
+  created_at: { type: 'string', format: 'date-time' },
+  cycle_anchor_kind: {
+    type: ['string', 'null'],
+    description: 'On `cycle_period`: whether this is the caller\'s own cycle or one passed on to a partner.',
+  },
+  cycle_owner_name: { type: 'string', description: 'Only on a `partner_period` row.' },
+  prevention_subject_name: { type: 'string', description: 'Only on an inherited `health_prevention_due` row.' },
+  move_notice: { $ref: '#/components/schemas/ReminderMoveNotice', description: 'Only on `shopping_move_returned`.' },
+  target_url: { type: 'string', description: 'Only on `shopping_move_returned`, while the list still exists.' },
+};
+
 const calendarOccurrenceProperties = {
   series_id: { type: 'integer', minimum: 1 },
   recurrence_id: {
@@ -138,6 +185,147 @@ const calendarProviderTargetProperties = {
   target_caldav_calendar_url: { type: ['string', 'null'], maxLength: 2048 },
   target_outlook_account_id: { type: ['integer', 'null'], minimum: 1 },
   target_outlook_calendar_id: { type: ['string', 'null'], maxLength: 2048 },
+};
+
+// Was POST und PUT /calendar nehmen: die Felder eines Vorkommens ohne die
+// Erinnerungen, die eine eigene Route haben, dazu Regel und Ziele.
+const { reminder_offsets: _occurrenceOnly, ...calendarEventMutationProperties } = {
+  ...calendarOccurrenceMutationProperties,
+  ...calendarProviderTargetProperties,
+  icon: {
+    type: 'string',
+    description: 'One of the icon names of the event editor; an unknown name answers 400. Omitted, empty or blank means `calendar` on create and leaves it untouched on update.',
+  },
+  attachment_name: { type: ['string', 'null'], description: 'File name for a new attachment; falls back to `Attachment`. MIME type and size are read from `attachment_data`.' },
+  attachment_data: {
+    type: ['string', 'null'],
+    description: 'A base64 data URL (`data:<mime>;base64,<bytes>`) for a new attachment. PNG, JPEG, WebP, GIF, PDF, plain text, Word and Excel files; the bytes have to match the type.',
+  },
+  recurrence_rule: {
+    type: ['string', 'null'],
+    maxLength: 300,
+    description: 'RRULE without the `RRULE:` prefix: `FREQ=DAILY|WEEKLY|MONTHLY|YEARLY`, optional `INTERVAL`, `BYDAY`, for MONTHLY `BYMONTHDAY=-1`, and either `UNTIL` or `COUNT`. Null or empty ends the repetition. A value equal to the stored rule is accepted unchecked, so an imported series that carries more stays editable.',
+  },
+};
+
+const isoDay = (description) => ({ type: ['string', 'null'], format: 'date', description });
+const utcStamp = (description) => ({ type: 'string', format: 'date-time', description });
+const flag = (description) => ({ type: 'integer', enum: [0, 1], description });
+const SYNC_BOOKKEEPING = 'Bookkeeping of the sync; says nothing a client acts on.';
+
+const taskPriority = { type: 'string', enum: ['none', 'low', 'medium', 'high', 'urgent'] };
+const taskVisibility = { type: 'string', enum: ['all', 'assignees', 'private'] };
+
+const avatarField = (description) => ({
+  type: ['string', 'null'],
+  description: `${description} A cookie session gets a path (\`/api/v1/people/{id}/avatar?v=...\`), an API token or a device credential a data URL. Null without a picture.`,
+});
+
+// Eine Aufgabe, wie sie die Routen liefern: `t.*`, die Namen der Person und die
+// Tags (server/routes/tasks.js). Flach und nicht ueber `allOf`, damit ein
+// erzeugtes Modell keine verschachtelten Teile bekommt.
+const taskProperties = {
+  id: { type: 'integer' },
+  title: { type: 'string' },
+  description: { type: ['string', 'null'], description: 'Free text. Lines in the form `- [ ]` and `- [x]` are a checklist, see `PATCH /tasks/{id}/check`.' },
+  category: { type: 'string', description: 'Key of a task category, see `GET /tasks/meta/options`. Categories are managed per household, so this is not a fixed list.' },
+  priority: taskPriority,
+  status: {
+    type: 'string',
+    enum: ['open', 'in_progress', 'done'],
+    description: 'The state of the task. `archived` is not a status here: filing away is the separate axis `archived_at`.',
+  },
+  start_date: isoDay('`YYYY-MM-DD`, a plain calendar day without a time zone.'),
+  due_date: isoDay('`YYYY-MM-DD`, a plain calendar day without a time zone.'),
+  due_time: { type: ['string', 'null'], pattern: '^\\d{2}:\\d{2}$', description: '`HH:MM`, wall-clock time of the household.' },
+  assigned_to: { type: ['integer', 'null'], description: 'The primary assignee, the first of `assigned_users`.' },
+  created_by: { type: 'integer' },
+  parent_task_id: { type: ['integer', 'null'], description: 'Set on a subtask. There are at most two levels.' },
+  is_recurring: flag('1 when the task repeats, in the form 0 or 1.'),
+  recurrence_rule: { type: ['string', 'null'], description: 'RRULE of the series. A task synced over CalDAV may carry more than the vocabulary the API accepts.' },
+  recurrence_from_completion: flag('1 when the next occurrence counts from the day of completion instead of the due date.'),
+  recurrence_origin_id: { type: ['integer', 'null'], description: 'The task this one followed in its series.' },
+  recurrence_series_id: { type: ['integer', 'null'] },
+  points: { type: 'integer', minimum: 0, maximum: 10000 },
+  visibility: taskVisibility,
+  countdown: flag('1 when the task shows as a countdown.'),
+  locked: flag('1 when the definition of the task is closed to everyone but its creator and administrators (#830).'),
+  sort_order: { type: ['integer', 'null'], description: 'Rank in the hand order of the category, null without a rank.' },
+  archived_at: { type: ['string', 'null'], format: 'date-time', description: 'UTC instant with `Z`, null while the task is not filed away.' },
+  created_at: utcStamp('UTC instant with `Z`, to the second.'),
+  updated_at: utcStamp('UTC instant with `Z`, to the second.'),
+  external_source: { type: 'string', enum: ['local', 'caldav'], description: '`caldav` for a task that lives on a CalDAV reminder list.' },
+  external_uid: { type: ['string', 'null'] },
+  external_account_id: { type: ['integer', 'null'] },
+  external_object_url: { type: ['string', 'null'] },
+  target_caldav_account_id: { type: ['integer', 'null'], description: 'The reminder list a local task is sent to.' },
+  target_caldav_list_url: { type: ['string', 'null'] },
+  outbound_dirty: flag(SYNC_BOOKKEEPING),
+  outbound_attempts: { type: 'integer', minimum: 0, description: SYNC_BOOKKEEPING },
+  seen_on_server: flag(SYNC_BOOKKEEPING),
+  assigned_name: { type: ['string', 'null'], description: 'Name of `assigned_to`.' },
+  assigned_color: { type: ['string', 'null'], description: 'Colour of `assigned_to`.' },
+  assigned_avatar: avatarField('Picture of `assigned_to`.'),
+  assigned_users: { type: 'array', items: { $ref: '#/components/schemas/AssignedPerson' } },
+  tags: { type: 'array', items: { type: 'string' }, description: 'Free-form labels, distinct from the single `category`.' },
+};
+
+const taskRequired = [
+  'id', 'title', 'description', 'category', 'priority', 'status', 'start_date', 'due_date', 'due_time',
+  'assigned_to', 'created_by', 'parent_task_id', 'is_recurring', 'recurrence_rule', 'points', 'visibility',
+  'countdown', 'locked', 'archived_at', 'created_at', 'updated_at', 'external_source',
+  'assigned_name', 'assigned_color', 'assigned_avatar', 'assigned_users', 'tags',
+];
+
+// `urgentTasks` der Uebersicht liest `t.*` mit den Zugewiesenen, ohne Bild und Tags.
+const { assigned_avatar: _assignedAvatar, tags: _tags, ...dashboardTaskProperties } = taskProperties;
+
+const DOCUMENT_COUNT_FIELD = {
+  type: ['integer', 'null'],
+  minimum: 0,
+  description: 'Linked documents the caller may see. Null without access to the Documents module: not told, which is not the same as 0.',
+};
+
+const taskInputProperties = {
+  title: { type: 'string', minLength: 1, maxLength: 200 },
+  description: { type: ['string', 'null'], maxLength: 5000 },
+  category: { type: 'string', description: 'Key of a category of the household, see `GET /tasks/meta/options`; anything else answers 400. Defaults to `misc` on create.' },
+  priority: { ...taskPriority, description: 'Defaults to `none` on create.' },
+  start_date: isoDay('`YYYY-MM-DD`; has to be a real calendar day.'),
+  due_date: isoDay('`YYYY-MM-DD`; has to be a real calendar day.'),
+  due_time: { type: ['string', 'null'], pattern: '^([01]\\d|2[0-3]):[0-5]\\d$', description: '`HH:MM` wall-clock time of the household.' },
+  assigned_to: {
+    description: 'One user id, a list with the primary assignee first, or null for nobody. New assignees have to be household members (400 otherwise).',
+    ...calendarOccurrenceMutationProperties.assigned_to,
+  },
+  tags: {
+    description: 'A list, or one string with the tags separated by commas. At most 32 tags of 64 characters; more is cut off without an error, and tags differing only in case collapse. Omitted on update, the tags stay; an empty list removes them.',
+    oneOf: [
+      { type: 'array', items: { type: 'string' } },
+      { type: 'string' },
+      { type: 'null' },
+    ],
+  },
+  is_recurring: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
+  recurrence_rule: {
+    type: ['string', 'null'],
+    maxLength: 300,
+    description: 'RRULE without the `RRULE:` prefix: `FREQ=DAILY|WEEKLY|MONTHLY|YEARLY`, optional `INTERVAL`, `BYDAY`, for MONTHLY `BYMONTHDAY=-1`, and either `UNTIL` or `COUNT`. A value equal to the stored rule is accepted unchecked on update.',
+  },
+  recurrence_from_completion: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
+  points: {
+    type: ['integer', 'null'],
+    minimum: 0,
+    maximum: 10000,
+    description: 'Cut to a whole number from 0 to 10000 rather than refused. Omitted on create, a top-level task takes the default of the household (`default_points`), a subtask 0.',
+  },
+  visibility: { ...taskVisibility, description: 'An unknown value falls back to `all` on create and keeps the stored one on update, without an error.' },
+  countdown: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
+  locked: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
+  sync_target: {
+    type: ['string', 'null'],
+    description: '`caldav:<accountId>|<listUrl>` from `GET /tasks/sync-targets`, or null or empty for local only. Ignored on a subtask, and on update once the task is on the server.',
+  },
 };
 
 export const schemas = {
@@ -706,12 +894,332 @@ export const schemas = {
             },
           ],
         },
+        AssignedPerson: {
+          type: 'object',
+          description: 'A person assigned to a task or an event.',
+          required: ['id', 'display_name', 'color', 'avatar_data'],
+          properties: {
+            id: { type: 'integer' },
+            display_name: { type: 'string' },
+            color: { type: 'string', description: 'Avatar colour as #RRGGBB.' },
+            avatar_data: avatarField('Picture of the person.'),
+          },
+        },
+        Task: {
+          type: 'object',
+          description: 'A task as `POST /tasks` returns it, and each entry of `subtasks` in the single-task answers.',
+          required: taskRequired,
+          properties: taskProperties,
+        },
+        TaskSubtaskSummary: {
+          type: 'object',
+          description: 'The short form of a subtask in the list.',
+          required: ['id', 'title', 'status'],
+          properties: {
+            id: { type: 'integer' },
+            title: { type: 'string' },
+            status: taskProperties.status,
+          },
+        },
+        TaskListItem: {
+          type: 'object',
+          description: 'A top-level task in `GET /tasks`. Subtasks the caller may not see count nowhere.',
+          required: [...taskRequired, 'subtask_total', 'subtask_done', 'subtasks', 'document_count'],
+          properties: {
+            ...taskProperties,
+            subtask_total: { type: 'integer', minimum: 0 },
+            subtask_done: { type: 'integer', minimum: 0 },
+            subtasks: { type: 'array', items: { $ref: '#/components/schemas/TaskSubtaskSummary' } },
+            document_count: DOCUMENT_COUNT_FIELD,
+          },
+        },
+        TaskLinkedDocument: {
+          type: 'object',
+          description: 'A document linked to a task that the caller may see.',
+          required: ['id', 'name', 'category', 'original_name', 'mime_type', 'file_size', 'storage_backend', 'linked_at'],
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string' },
+            category: { type: 'string' },
+            original_name: { type: 'string' },
+            mime_type: { type: 'string' },
+            file_size: { type: 'integer', minimum: 0 },
+            storage_backend: { type: 'string' },
+            linked_at: utcStamp('UTC instant with `Z`, to the second.'),
+          },
+        },
+        TaskDetail: {
+          type: 'object',
+          description: 'A top-level task in `GET /tasks/{id}`, with full subtasks and its documents.',
+          required: [...taskRequired, 'subtasks', 'document_count', 'documents'],
+          properties: {
+            ...taskProperties,
+            subtasks: { type: 'array', items: { $ref: '#/components/schemas/Task' } },
+            document_count: DOCUMENT_COUNT_FIELD,
+            documents: {
+              type: ['array', 'null'],
+              items: { $ref: '#/components/schemas/TaskLinkedDocument' },
+              description: 'Null without access to the Documents module: not told, which is not the same as an empty list.',
+            },
+          },
+        },
+        TaskUpdated: {
+          type: 'object',
+          description: 'A task after `PUT /tasks/{id}`. Documents are not part of this answer.',
+          required: [...taskRequired, 'subtasks', 'next_due_date'],
+          properties: {
+            ...taskProperties,
+            subtasks: { type: 'array', items: { $ref: '#/components/schemas/Task' } },
+            next_due_date: isoDay('`YYYY-MM-DD` of the next occurrence the caller can see when this call moved a recurring task into `done`, null in every other case.'),
+          },
+        },
+        TaskResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { $ref: '#/components/schemas/Task' } },
+        },
+        TaskListResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { type: 'array', items: { $ref: '#/components/schemas/TaskListItem' } } },
+        },
+        TaskDetailResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { $ref: '#/components/schemas/TaskDetail' } },
+        },
+        TaskUpdatedResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: { data: { $ref: '#/components/schemas/TaskUpdated' } },
+        },
+        TaskStatusResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: {
+            data: {
+              type: 'object',
+              required: ['id', 'status', 'archived_at'],
+              properties: {
+                id: { type: 'integer' },
+                status: taskProperties.status,
+                archived_at: taskProperties.archived_at,
+                next_due_date: isoDay('`YYYY-MM-DD`. Left out after sending `archived`.'),
+              },
+            },
+          },
+        },
+        TaskCheckResponse: {
+          type: 'object',
+          required: ['data'],
+          properties: {
+            data: {
+              type: 'object',
+              required: ['id', 'description'],
+              properties: {
+                id: { type: 'integer' },
+                description: { type: 'string', description: 'The whole description after the change.' },
+              },
+            },
+          },
+        },
+        TaskCategory: {
+          type: 'object',
+          description: 'A task category. A built-in one has `label_key` and no `name`; one the household created or renamed has `name` and no `label_key`.',
+          required: ['key', 'name', 'label_key', 'sort_order'],
+          properties: {
+            key: { type: 'string' },
+            name: { type: ['string', 'null'] },
+            label_key: { type: ['string', 'null'], description: 'Translation key of a built-in category.' },
+            sort_order: { type: 'integer' },
+          },
+        },
+        TaskOptionsResponse: {
+          type: 'object',
+          description: 'The values of the task editor and its filters. Unlike the other task answers this one has no `data` wrapper.',
+          required: ['users', 'priorities', 'statuses', 'categories', 'tags', 'default_points'],
+          properties: {
+            users: {
+              type: 'array',
+              description: 'Household members, in their order.',
+              items: {
+                type: 'object',
+                required: ['id', 'display_name', 'avatar_color', 'sort_order'],
+                properties: {
+                  id: { type: 'integer' },
+                  display_name: { type: 'string' },
+                  avatar_color: { type: 'string' },
+                  sort_order: { type: ['integer', 'null'], description: 'Position among the household members, null for an unplaced member.' },
+                },
+              },
+            },
+            priorities: { type: 'array', items: taskPriority },
+            statuses: {
+              type: 'array',
+              description: 'What the `status` filter and input take. `archived` stands for the archive here; a task never reads back with it.',
+              items: { type: 'string', enum: ['open', 'in_progress', 'done', 'archived'] },
+            },
+            categories: { type: 'array', items: { $ref: '#/components/schemas/TaskCategory' } },
+            tags: {
+              type: 'array',
+              description: 'Tags on tasks the caller can see, most used first.',
+              items: {
+                type: 'object',
+                required: ['tag', 'count'],
+                properties: {
+                  tag: { type: 'string' },
+                  count: { type: 'integer', minimum: 1 },
+                },
+              },
+            },
+            default_points: { type: 'integer', minimum: 0, maximum: 10000, description: 'Points a new top-level task takes when the request names none. 0 means no default.' },
+          },
+        },
+        TaskCreateInput: {
+          type: 'object',
+          required: ['title'],
+          properties: {
+            ...taskInputProperties,
+            status: {
+              type: ['string', 'null'],
+              enum: ['open', 'in_progress', 'done', 'archived', null],
+              description: 'Defaults to `open`. `archived` and null fall back to `open`, see the operation.',
+            },
+            parent_task_id: { type: ['integer', 'null'], minimum: 1, description: 'Creates a subtask. Its parent must be a top-level task the caller can see.' },
+          },
+        },
+        TaskUpdateInput: {
+          type: 'object',
+          description: 'Every field is optional: what is left out stays as stored.',
+          properties: {
+            ...taskInputProperties,
+            status: {
+              type: 'string',
+              enum: ['open', 'in_progress', 'done', 'archived'],
+              description: '`archived` files the task away and leaves the status as it is.',
+            },
+          },
+        },
+        TaskStatusInput: {
+          type: 'object',
+          required: ['status'],
+          properties: {
+            status: { type: 'string', enum: ['open', 'in_progress', 'done', 'archived'] },
+            done_by_user_id: {
+              type: ['integer', 'null'],
+              minimum: 1,
+              description: 'Who did the task, see the operation. Read only on the transition into `done`.',
+            },
+          },
+        },
+        TaskCheckInput: {
+          type: 'object',
+          required: ['line', 'checked'],
+          properties: {
+            line: { type: 'integer', minimum: 0, description: 'Line of the description, counted from 0.' },
+            checked: { type: 'boolean' },
+            expect: { type: ['string', 'null'], description: 'The line as the caller saw it, including `- [ ]`. A different line answers 409 with reason `stale`.' },
+          },
+        },
+        CalendarEventCreateInput: {
+          type: 'object',
+          required: ['title', 'start_datetime'],
+          properties: {
+            ...calendarEventMutationProperties,
+            local_calendar_id: {
+              type: ['integer', 'null'],
+              minimum: 1,
+              description: 'A local calendar of the household. Omit or send null for the default calendar. Not together with a sync target (400).',
+            },
+          },
+        },
+        CalendarEventUpdateInput: {
+          type: 'object',
+          description: 'Every field is optional: what is left out stays as stored. Null in `end_datetime`, `description` or `location` clears the field, null in `color` clears the event\'s own colour.',
+          properties: {
+            ...calendarEventMutationProperties,
+            local_calendar_id: {
+              type: 'integer',
+              minimum: 1,
+              description: 'Moves a local event to another local calendar. Null answers 400, and so does an event that is no local one.',
+            },
+            remove_attachment: { type: 'boolean', description: 'Unlinks the attachment; the document stays in the library.' },
+            confirmed_orphan_count: { type: 'integer', minimum: 0, description: 'The count from a 409 with `calendar_override_orphans`, see the operation.' },
+          },
+        },
+        LocalCalendarListItem: {
+          type: 'object',
+          required: ['id', 'name', 'color', 'is_default', 'sort_order', 'feed_token', 'feed_url', 'event_count', 'uploads_to_icloud'],
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string' },
+            color: { type: 'string', description: 'Colour as #RRGGBB.' },
+            is_default: { type: 'boolean' },
+            sort_order: { type: 'integer', minimum: 0 },
+            feed_token: { type: ['string', 'null'], description: 'Null without an active feed, and always for anyone but an administrator.' },
+            feed_url: { type: ['string', 'null'], description: 'Null without an active feed, and always for anyone but an administrator.' },
+            event_count: { type: 'integer', minimum: 0, description: 'Events of this calendar the caller can see.' },
+            uploads_to_icloud: { type: 'boolean' },
+          },
+        },
         CalendarEvent: {
           type: 'object',
           description: 'Calendar event. New attachments use document URLs; attachment_data remains available for legacy stored blobs.',
           properties: {
             id: { type: 'integer' },
             title: { type: 'string' },
+            description: { type: ['string', 'null'] },
+            start_datetime: { $ref: '#/components/schemas/CalendarDateOrDateTime' },
+            end_datetime: {
+              oneOf: [
+                { $ref: '#/components/schemas/CalendarDateOrDateTime' },
+                { type: 'null' },
+              ],
+              description: 'Inclusive last day for an all-day event, the end for a timed one. Null without an end.',
+            },
+            all_day: flag('1 for an all-day event, in the form 0 or 1. Start and end are then normally `YYYY-MM-DD`.'),
+            tzid: { type: ['string', 'null'], description: 'IANA zone an imported or synchronized event was written in; its start and end then usually are instants with `Z`. Null for an event carrying household wall-clock time.' },
+            location: { type: ['string', 'null'], description: 'May run over several lines for a place chosen through a map search.' },
+            icon: { type: 'string', description: 'Icon name of the event editor.' },
+            recurrence_rule: { type: ['string', 'null'], description: 'RRULE of the series, null for a single event. On an expanded occurrence the rule of its series. A synchronized series may carry more than the vocabulary the API accepts.' },
+            visibility: taskVisibility,
+            countdown: flag('1 when the event shows as a countdown.'),
+            assigned_to: { type: ['integer', 'null'], description: 'The primary assignee.' },
+            assigned_name: { type: ['string', 'null'], description: 'Name of `assigned_to`.' },
+            assigned_color: { type: ['string', 'null'], description: 'Colour of `assigned_to`.' },
+            assigned_users: { type: 'array', items: { $ref: '#/components/schemas/AssignedPerson' } },
+            created_by: { type: 'integer' },
+            creator_name: { type: ['string', 'null'], description: 'Name of `created_by`. Not part of `GET /calendar/upcoming`.' },
+            created_at: utcStamp('UTC instant with `Z`, to the second.'),
+            updated_at: utcStamp('UTC instant with `Z`, to the second.'),
+            external_source: {
+              type: 'string',
+              enum: ['local', 'google', 'apple', 'ics', 'caldav'],
+              description: 'Where the event lives. `local` also for one sent to a provider that has not come back from the sync yet, and for an imported one.',
+            },
+            external_calendar_id: { type: ['string', 'null'] },
+            external_object_url: { type: ['string', 'null'] },
+            subscription_id: { type: ['integer', 'null'], description: 'The ICS subscription the event came from.' },
+            calendar_ref_id: { type: ['integer', 'null'], description: 'The synced calendar the event came from.' },
+            caldav_account_id: { type: ['integer', 'null'] },
+            cal_name: { type: ['string', 'null'], description: 'Name of the synced calendar or ICS subscription.' },
+            source_calendar_ref_id: { type: ['integer', 'null'], description: 'The synced calendar, also for an event still waiting for its upload.' },
+            source_calendar_name: { type: ['string', 'null'] },
+            source_calendar_color: { type: ['string', 'null'] },
+            ...calendarProviderTargetProperties,
+            user_modified: flag('1 once a synced event was edited in Yuvomi.'),
+            color_modified: flag(SYNC_BOOKKEEPING),
+            series_authored: flag(SYNC_BOOKKEEPING),
+            outbound_dirty: flag(SYNC_BOOKKEEPING),
+            outbound_attempts: { type: 'integer', minimum: 0, description: SYNC_BOOKKEEPING },
+            outbound_move_to: { type: ['string', 'null'], description: SYNC_BOOKKEEPING },
+            housekeeping_visit_id: { type: ['integer', 'null'], description: 'The housekeeping visit behind the event. `GET /calendar/{id}` fills it, the other answers carry null.' },
+            birthday_name: { type: 'string', description: 'Only on an event generated from the birthdays module.' },
+            birthday_date: { type: ['string', 'null'], format: 'date', description: 'Only on a generated event. Null when the year of birth is unknown.' },
+            birthday_event_kind: { type: 'string', enum: ['birthday', 'name_day'], description: 'Only on a generated event.' },
+            name_day: { type: ['string', 'null'], pattern: '^\\d{2}-\\d{2}$', description: '`MM-DD`, only on a generated event.' },
+            is_recurring_instance: flag('Present on a row expanded from a series: 0 on the first slot of the series, 1 on every later one.'),
+            is_series_start: flag('Present on a row expanded from a series: 1 for its first occurrence.'),
             color: {
               type: ['string', 'null'],
               description: 'The event\'s own colour as #RRGGBB, or null when it has none. Null is the normal state for an event nobody picked a colour for: it then borrows the colour of the first assigned member, and failing that cal_color. On PUT the field distinguishes two cases - omit it to leave the colour untouched, send null to deliberately clear it.',
@@ -754,12 +1262,14 @@ export const schemas = {
           required: [
             'id',
             'title',
+            'start_datetime',
+            'end_datetime',
+            'all_day',
             'attachment_document_id',
             'attachment_preview_url',
             'attachment_download_url',
             'attachment_data',
           ],
-          additionalProperties: true,
         },
         CalendarEventResponse: {
           type: 'object',
@@ -856,8 +1366,264 @@ export const schemas = {
                 + '(AUTH_ALLOW_PASSWORD_LOGIN not switched off). The login page gates the '
                 + '"forgot password" link on this flag so it is never a dead end.',
             },
+            max_upload_bytes: {
+              type: 'integer',
+              minimum: 0,
+              description: 'The largest upload this server accepts. Only with a valid credential, like `version`: '
+                + 'before sign-in there is nothing to upload.',
+            },
           },
           required: ['product', 'client_api', 'app_name', 'setup_required', 'password_reset_enabled'],
+        },
+        ShoppingList: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string' },
+            created_by: { type: 'integer' },
+            created_at: { type: 'string', format: 'date-time' },
+            updated_at: { type: 'string', format: 'date-time' },
+          },
+          required: ['id', 'name', 'created_by', 'created_at', 'updated_at'],
+        },
+        ShoppingListSummary: {
+          description: 'A list with its counters, as `GET /shopping` carries it.',
+          allOf: [
+            { $ref: '#/components/schemas/ShoppingList' },
+            {
+              type: 'object',
+              properties: {
+                item_total: { type: 'integer', minimum: 0 },
+                item_checked: { type: 'integer', minimum: 0 },
+                accepts_new_items: {
+                  type: 'integer',
+                  enum: [0, 1],
+                  description: '0 on a list that mirrors a CalDAV reminder list which is read-only for its account.',
+                },
+              },
+              required: ['item_total', 'item_checked', 'accepts_new_items'],
+            },
+          ],
+        },
+        ShoppingListCreateInput: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 200, description: 'Trimmed before it is stored.' },
+          },
+          required: ['name'],
+        },
+        ShoppingListResponse: {
+          type: 'object',
+          properties: { data: { $ref: '#/components/schemas/ShoppingList' } },
+          required: ['data'],
+        },
+        ShoppingListsResponse: {
+          type: 'object',
+          properties: { data: { type: 'array', items: { $ref: '#/components/schemas/ShoppingListSummary' } } },
+          required: ['data'],
+        },
+        ShoppingListVersion: {
+          type: 'object',
+          properties: {
+            list_id: { type: 'integer' },
+            version: { type: 'integer', minimum: 0 },
+          },
+          required: ['list_id', 'version'],
+        },
+        ShoppingListVersionsResponse: {
+          type: 'object',
+          properties: { data: { type: 'array', items: { $ref: '#/components/schemas/ShoppingListVersion' } } },
+          required: ['data'],
+        },
+        ShoppingListChange: {
+          type: 'object',
+          description: 'The change counter of a list around one write. When `before` equals the state a client holds, everything up to `after` is its own write. One write can move the counter by more than 1.',
+          properties: {
+            list_id: { type: 'integer' },
+            before: { type: 'integer', minimum: 0 },
+            after: { type: 'integer', minimum: 0 },
+          },
+          required: ['list_id', 'before', 'after'],
+        },
+        ShoppingCategory: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string' },
+            icon: { type: 'string' },
+            sort_order: { type: 'integer' },
+            created_at: { type: 'string', format: 'date-time' },
+          },
+          required: ['id', 'name', 'icon', 'sort_order', 'created_at'],
+        },
+        ShoppingCategoriesResponse: {
+          type: 'object',
+          properties: { data: { type: 'array', items: { $ref: '#/components/schemas/ShoppingCategory' } } },
+          required: ['data'],
+        },
+        ShoppingSuggestion: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            category: { type: 'string' },
+            quantity: { type: ['string', 'null'] },
+          },
+          required: ['name', 'category', 'quantity'],
+        },
+        ShoppingSuggestionsResponse: {
+          type: 'object',
+          properties: { data: { type: 'array', maxItems: 8, items: { $ref: '#/components/schemas/ShoppingSuggestion' } } },
+          required: ['data'],
+        },
+        ShoppingItem: {
+          type: 'object',
+          description: 'The fields from `external_uid` on are the bookkeeping of the CalDAV sync. They come with every item and a client has no use for them, so they are not required.',
+          properties: {
+            id: { type: 'integer' },
+            list_id: { type: 'integer' },
+            name: { type: 'string' },
+            quantity: { type: ['string', 'null'], description: 'Free text, there is no separate unit.' },
+            category: { type: 'string', description: 'The name of a shopping category.' },
+            is_checked: { type: 'integer', enum: [0, 1] },
+            notes: { type: ['string', 'null'] },
+            url: { type: ['string', 'null'] },
+            price_cents: { type: ['integer', 'null'], description: 'What was paid, in whole cents.' },
+            store_id: { type: ['integer', 'null'] },
+            sort_order: { type: 'integer', description: 'Rank within the category of this list.' },
+            added_from_meal: { type: ['integer', 'null'], description: 'The meal the item was transferred from.' },
+            created_at: { type: 'string', format: 'date-time' },
+            updated_at: { type: 'string', format: 'date-time' },
+            external_uid: { type: ['string', 'null'] },
+            external_source: { type: 'string', description: '`local`, or `caldav` on an item mirrored from a CalDAV list.' },
+            external_account_id: { type: ['integer', 'null'] },
+            external_object_url: { type: ['string', 'null'] },
+            outbound_dirty: { type: 'integer' },
+            outbound_attempts: { type: 'integer' },
+            outbound_move: { type: 'integer' },
+            outbound_move_attempts: { type: 'integer' },
+            outbound_move_since: { type: ['string', 'null'], description: 'UTC as `YYYY-MM-DD HH:MM:SS`.' },
+            outbound_move_by: { type: ['integer', 'null'] },
+            seen_on_server: { type: 'integer' },
+          },
+          required: [
+            'id', 'list_id', 'name', 'quantity', 'category', 'is_checked', 'notes', 'url', 'price_cents', 'store_id',
+            'sort_order', 'added_from_meal', 'created_at', 'updated_at',
+          ],
+        },
+        ShoppingListItem: {
+          description: 'An item as a list delivers it. Only reading a list adds `tags`, the answers of the item writes do not carry them.',
+          allOf: [
+            { $ref: '#/components/schemas/ShoppingItem' },
+            {
+              type: 'object',
+              properties: {
+                tags: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'The CATEGORIES of the mirrored CalDAV object, separate from `category`. Empty on a local item.',
+                },
+              },
+              required: ['tags'],
+            },
+          ],
+        },
+        ShoppingItemsResponse: {
+          type: 'object',
+          properties: {
+            data: { type: 'array', items: { $ref: '#/components/schemas/ShoppingListItem' } },
+            list: { $ref: '#/components/schemas/ShoppingList' },
+            categories: { type: 'array', items: { $ref: '#/components/schemas/ShoppingCategory' } },
+            version: { type: 'integer', minimum: 0, description: 'The change counter that belongs to exactly these items.' },
+          },
+          required: ['data', 'list', 'categories', 'version'],
+        },
+        ShoppingItemCreateInput: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 200, description: 'Trimmed before it is stored.' },
+            quantity: { type: ['string', 'null'], maxLength: 100, description: 'Free text. Empty means none.' },
+            category: {
+              type: ['string', 'null'],
+              description: 'The name of an existing category, otherwise 400. Without it, `Sonstiges` while the household has that category, else the last one in shop order.',
+            },
+            notes: { type: ['string', 'null'], maxLength: 5000 },
+            url: { type: ['string', 'null'], format: 'uri', maxLength: 2000, description: 'http or https only.' },
+          },
+          required: ['name'],
+        },
+        ShoppingItemUpdateInput: {
+          type: 'object',
+          description: 'Every field is optional, and one that is not sent stays as it is. Unlike creating an item, this route checks no length on `name` and `quantity`: the limits of `ShoppingItemCreateInput` are the ones to keep to.',
+          properties: {
+            is_checked: { type: 'boolean', description: 'Read as true or false by truthiness, so 0 and 1 work as well. Responses carry 0 or 1.' },
+            name: { type: 'string', minLength: 1 },
+            quantity: { type: ['string', 'null'] },
+            category: { type: 'string', minLength: 1, description: 'The name of an existing category. It cannot be cleared.' },
+            notes: { type: ['string', 'null'], maxLength: 5000 },
+            url: { type: ['string', 'null'], format: 'uri', maxLength: 2000, description: 'http or https only.' },
+            price_cents: {
+              type: ['integer', 'null'],
+              minimum: 0,
+              maximum: 100000000,
+              description: 'Whole cents. `null` or an empty string clears it, a string of digits is read as a number.',
+            },
+            store_id: {
+              type: ['integer', 'null'],
+              minimum: 1,
+              description: '`null` or an empty string clears it, a string of digits is read as a number.',
+            },
+            list_id: {
+              type: ['integer', 'null'],
+              minimum: 1,
+              description: 'Moves the item to this list. `null` or the list it is on means no move, a string of digits is read as a number.',
+            },
+          },
+        },
+        ShoppingItemResponse: {
+          type: 'object',
+          properties: {
+            data: { $ref: '#/components/schemas/ShoppingItem' },
+            list_change: { $ref: '#/components/schemas/ShoppingListChange' },
+          },
+          required: ['data', 'list_change'],
+        },
+        ShoppingItemDeleteResponse: {
+          allOf: [
+            { $ref: '#/components/schemas/OkResponse' },
+            {
+              type: 'object',
+              properties: { list_change: { $ref: '#/components/schemas/ShoppingListChange' } },
+              required: ['list_change'],
+            },
+          ],
+        },
+        ShoppingCheckedDeleteInput: {
+          type: 'object',
+          properties: {
+            ids: {
+              type: 'array',
+              minItems: 1,
+              items: { type: 'integer', minimum: 1 },
+              description: 'Leaving the field out means every checked item. An empty array is refused with 400, not read as "all of them".',
+            },
+          },
+        },
+        ShoppingCheckedDeleteResponse: {
+          type: 'object',
+          properties: {
+            deleted: { type: 'integer', minimum: 0 },
+            list_change: {
+              type: 'object',
+              description: 'As in `ShoppingListChange`. `before` and `after` are null when the list does not exist.',
+              properties: {
+                list_id: { type: 'integer' },
+                before: { type: ['integer', 'null'], minimum: 0 },
+                after: { type: ['integer', 'null'], minimum: 0 },
+              },
+              required: ['list_id', 'before', 'after'],
+            },
+          },
+          required: ['deleted', 'list_change'],
         },
         User: {
           type: 'object',
@@ -869,6 +1635,25 @@ export const schemas = {
             avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL.' },
             role: { type: 'string', enum: ['admin', 'member'] },
             family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
+            access_scope: {
+              type: 'string',
+              description: 'What kind of account this is, for example `family`, `split_guest` or `display`.',
+            },
+            created_at: { type: 'string', format: 'date-time' },
+            deactivated_at: {
+              type: ['string', 'null'],
+              format: 'date-time',
+              description: 'Since when the account is deactivated, null for an active one.',
+            },
+            changelog_seen: {
+              type: 'object',
+              description: 'What the account last looked at in the changelog. Null means it never looked, which is another state than having seen everything.',
+              properties: {
+                version: { type: ['string', 'null'], description: 'The installed version at that moment.' },
+                latest: { type: ['string', 'null'], description: 'The last published version known at that moment.' },
+              },
+              required: ['version', 'latest'],
+            },
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
             birth_date: { type: ['string', 'null'], format: 'date' },
@@ -881,8 +1666,8 @@ export const schemas = {
             },
             sso_only: {
               type: 'boolean',
-              description: 'Only present on GET /auth/users for administrators: the account carries no '
-                + 'password and can only be entered through SSO.',
+              description: 'Only present on GET /auth/users for administrators, and on GET /auth/me about '
+                + 'the own account: the account carries no password and can only be entered through SSO.',
             },
             sort_order: {
               type: ['integer', 'null'],
@@ -954,15 +1739,21 @@ export const schemas = {
           type: 'object',
           properties: {
             user: { $ref: '#/components/schemas/User' },
+            ...accountContextProperties,
             csrfToken: { type: 'string' },
           },
-          required: ['user', 'csrfToken'],
+          required: ['user', 'permissions', 'householdSize', 'initialsRoster', 'othersCanRead', 'csrfToken'],
         },
         MeResponse: {
           type: 'object',
           properties: {
             user: { $ref: '#/components/schemas/User' },
-            csrfToken: { type: 'string' },
+            ...accountContextProperties,
+            csrfToken: { type: 'string', description: 'Absent with a Bearer credential, which needs none.' },
+            sessionExpiresAt: {
+              type: ['integer', 'null'],
+              description: 'When this browser session ends without further use, in milliseconds since the epoch. Absent with a Bearer credential.',
+            },
             gravatarAvailable: {
               type: 'boolean',
               description: 'Whether the calling account may use the one-time Gravatar import '
@@ -977,7 +1768,7 @@ export const schemas = {
                 + 'and `null` when the configured value is not a valid public https URL.',
             },
           },
-          required: ['user'],
+          required: ['user', 'permissions', 'householdSize', 'initialsRoster', 'othersCanRead', 'gravatarAvailable', 'gravatarHost'],
         },
         SetupRequest: {
           type: 'object',
@@ -1239,6 +2030,617 @@ export const schemas = {
           },
           required: ['data', 'credential'],
         },
+        ClientPermissions: {
+          type: 'object',
+          description: 'The resolved rights of the account, for hiding what it cannot reach. The server enforces them either way. A device is an ordinary member here, also for an administrator.',
+          properties: {
+            admin: { type: 'boolean' },
+            modules: {
+              type: 'object',
+              description: 'Per module key. Extension modules bring their own keys.',
+              additionalProperties: { type: 'string', enum: ['none', 'read', 'write'] },
+            },
+            widgets: {
+              type: 'object',
+              description: 'Per dashboard widget id.',
+              additionalProperties: { type: 'string', enum: ['none', 'allow'] },
+            },
+            capabilities: {
+              type: 'object',
+              description: 'Per capability key.',
+              additionalProperties: { type: 'string', enum: ['none', 'allow'] },
+            },
+          },
+          required: ['admin', 'modules', 'widgets', 'capabilities'],
+        },
+        TwoFactorChallengeResponse: {
+          type: 'object',
+          description: 'The password was right, but no session exists yet. Continue with POST /auth/2fa/verify in the same cookie session.',
+          properties: {
+            twoFactorRequired: { type: 'boolean', enum: [true] },
+            recoveryAvailable: { type: 'boolean', description: 'Whether unused recovery codes are left.' },
+          },
+          required: ['twoFactorRequired', 'recoveryAvailable'],
+        },
+        TwoFactorVerifyRequest: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', maxLength: 64, description: 'The six-digit TOTP code or a recovery code.' },
+          },
+          required: ['code'],
+        },
+        TwoFactorVerifyResponse: {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/components/schemas/User' },
+            ...accountContextProperties,
+            csrfToken: { type: 'string' },
+            twoFactorMethod: { type: 'string', enum: ['totp', 'recovery'] },
+            recoveryRemaining: { type: 'integer', minimum: 0 },
+          },
+          required: ['user', 'permissions', 'householdSize', 'initialsRoster', 'othersCanRead', 'csrfToken',
+            'twoFactorMethod', 'recoveryRemaining'],
+        },
+        OidcConfigResponse: {
+          type: 'object',
+          properties: {
+            enabled: { type: 'boolean', description: 'OIDC is configured and enabled.' },
+            password_login_enabled: { type: 'boolean' },
+            guest_password_login_enabled: {
+              type: 'boolean',
+              description: 'True only where password login is off and split-expense guests exist, who are exempt from the switch.',
+            },
+          },
+          required: ['enabled', 'password_login_enabled', 'guest_password_login_enabled'],
+        },
+        ReminderMoveNotice: {
+          type: 'object',
+          description: 'A move of a shopping item that was taken back. The names are a snapshot of the moment.',
+          properties: {
+            item_name: { type: 'string' },
+            back_list_id: { type: ['integer', 'null'], description: 'Null once the list is gone.' },
+            back_list_name: { type: 'string' },
+            target_list_name: { type: 'string' },
+            reason: { type: 'string', enum: ['refused', 'waited'] },
+          },
+          required: ['item_name', 'back_list_id', 'back_list_name', 'target_list_name', 'reason'],
+        },
+        PendingReminder: {
+          type: 'object',
+          properties: reminderProperties,
+          required: ['id', 'entity_type', 'entity_id', 'remind_at', 'created_by'],
+        },
+        PendingReminderList: {
+          type: 'object',
+          properties: {
+            data: { type: 'array', items: { $ref: '#/components/schemas/PendingReminder' } },
+          },
+          required: ['data'],
+        },
+        ReminderDismissResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: { id: { type: 'integer' } },
+              required: ['id'],
+            },
+          },
+          required: ['data'],
+        },
+        DashboardWeekPerson: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            display_name: { type: 'string' },
+            color: { type: 'string' },
+          },
+          required: ['id', 'display_name', 'color'],
+        },
+        DashboardUser: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            display_name: { type: 'string' },
+            avatar_color: { type: 'string' },
+            avatar_data: { type: ['string', 'null'] },
+            sort_order: { type: ['integer', 'null'] },
+          },
+          required: ['id', 'display_name', 'avatar_color', 'avatar_data', 'sort_order'],
+        },
+        DashboardWeekEvent: {
+          type: 'object',
+          description: 'An appointment in the compact shape of the week strip.',
+          properties: {
+            id: { type: 'integer' },
+            title: { type: 'string' },
+            start_datetime: { type: 'string', description: 'A date alone for an all-day appointment.' },
+            end_datetime: { type: ['string', 'null'] },
+            all_day: { type: 'integer', enum: [0, 1] },
+            color: { type: ['string', 'null'] },
+            cal_color: { type: ['string', 'null'] },
+            assigned_to: { type: ['integer', 'null'] },
+            assigned_users: { type: 'array', items: { $ref: '#/components/schemas/DashboardWeekPerson' } },
+            birthday_name: { type: ['string', 'null'] },
+            birthday_date: { type: ['string', 'null'] },
+            birthday_event_kind: { type: ['string', 'null'] },
+          },
+          required: ['id', 'title', 'start_datetime', 'end_datetime', 'all_day', 'color', 'cal_color', 'assigned_to',
+            'assigned_users', 'birthday_name', 'birthday_date', 'birthday_event_kind'],
+        },
+        DashboardTask: {
+          type: 'object',
+          description: 'A task of `urgentTasks`: the fields of `Task` without the picture of `assigned_to` and the tags.',
+          properties: dashboardTaskProperties,
+          required: taskRequired.filter((field) => field in dashboardTaskProperties),
+        },
+        DashboardMemberTaskCount: {
+          type: 'object',
+          properties: {
+            user_id: { type: 'integer' },
+            open_count: { type: 'integer' },
+          },
+          required: ['user_id', 'open_count'],
+        },
+        DashboardWallTasks: {
+          type: 'object',
+          properties: {
+            user_id: { type: 'integer' },
+            open_count: { type: 'integer' },
+            done_count: { type: 'integer' },
+            open: {
+              type: 'array',
+              maxItems: 6,
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'integer' },
+                  title: { type: 'string' },
+                  due_date: { type: 'string', format: 'date' },
+                },
+                required: ['id', 'title', 'due_date'],
+              },
+            },
+            done: {
+              type: 'array',
+              maxItems: 6,
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'integer' },
+                  title: { type: 'string' },
+                },
+                required: ['id', 'title'],
+              },
+            },
+          },
+          required: ['user_id', 'open_count', 'done_count', 'open', 'done'],
+        },
+        DashboardMeal: {
+          type: 'object',
+          description: 'A paired wall display reads with `audience=household` and gets only the required fields.',
+          properties: {
+            id: { type: 'integer' },
+            date: { type: 'string', format: 'date' },
+            meal_type: { type: 'string' },
+            title: { type: 'string' },
+            notes: { type: ['string', 'null'] },
+            recipe_url: { type: ['string', 'null'] },
+            recipe_id: { type: ['integer', 'null'] },
+            recurrence_template_id: { type: ['integer', 'null'] },
+            cook_user_id: { type: ['integer', 'null'] },
+            cook_name: { type: ['string', 'null'] },
+            cook_color: { type: ['string', 'null'] },
+            recipe_has_image: { type: ['integer', 'null'] },
+            recipe_has_own_image: { type: ['integer', 'null'] },
+            recipe_image_version: { type: ['string', 'null'] },
+            created_by: { type: ['integer', 'null'] },
+            created_at: { type: 'string' },
+            updated_at: { type: 'string' },
+          },
+          required: ['id', 'date', 'meal_type', 'title', 'recipe_id', 'cook_user_id', 'cook_name', 'cook_color',
+            'recipe_has_image', 'recipe_has_own_image'],
+        },
+        DashboardNote: {
+          type: 'object',
+          required: ['id', 'content', 'pinned', 'categories'],
+          properties: {
+            id: { type: 'integer' },
+            title: { type: ['string', 'null'] },
+            content: { type: 'string' },
+            color: { type: 'string' },
+            pinned: { type: 'integer', enum: [0, 1] },
+            visibility: { type: 'string', enum: ['all', 'private'] },
+            locked: { type: 'integer', enum: [0, 1] },
+            created_by: { type: ['integer', 'null'] },
+            author_name: { type: ['string', 'null'] },
+            author_color: { type: ['string', 'null'] },
+            created_at: { type: 'string' },
+            updated_at: { type: 'string' },
+            categories: { type: 'array', items: { $ref: '#/components/schemas/NoteCategory' } },
+          },
+        },
+        DashboardShoppingItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string' },
+            quantity: { type: ['string', 'null'] },
+            is_checked: { type: 'integer', enum: [0] },
+          },
+          required: ['id', 'name', 'quantity', 'is_checked'],
+        },
+        DashboardShoppingList: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string' },
+            open_count: { type: 'integer' },
+            total_count: { type: 'integer' },
+            items: {
+              type: 'array',
+              maxItems: 6,
+              items: { $ref: '#/components/schemas/DashboardShoppingItem' },
+            },
+          },
+          required: ['id', 'name', 'open_count', 'total_count', 'items'],
+        },
+        DashboardShoppingTile: {
+          type: 'object',
+          properties: {
+            lists: { type: 'array', maxItems: 3, items: { $ref: '#/components/schemas/DashboardShoppingList' } },
+            openCount: { type: 'integer' },
+            listCount: { type: 'integer', description: 'Every selected list that exists, also beyond the three in `lists`.' },
+          },
+          required: ['lists', 'openCount', 'listCount'],
+        },
+        DashboardBirthday: {
+          type: 'object',
+          description: 'One occasion: a person with a birthday and a name day has two rows.',
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string' },
+            kind: { type: 'string', enum: ['birthday', 'name_day'] },
+            next_date: { type: 'string', format: 'date' },
+            days_until: { type: 'integer' },
+            birth_date: { type: 'string', format: 'date' },
+            year_unknown: { type: 'integer', enum: [0, 1] },
+            name_day: { type: ['string', 'null'], description: '`MM-DD`.' },
+            next_birthday: { type: 'string', format: 'date' },
+            next_age: { type: ['integer', 'null'], description: 'Null on a name day and when the year is unknown.' },
+            next_name_day: { type: ['string', 'null'], format: 'date' },
+            name_day_days_until: { type: ['integer', 'null'] },
+            notes: { type: ['string', 'null'] },
+            photo_data: { type: ['string', 'null'] },
+            family_user_id: { type: ['integer', 'null'] },
+            family_user_color: { type: ['string', 'null'] },
+            contact_id: { type: ['integer', 'null'] },
+            calendar_event_id: { type: ['integer', 'null'] },
+            name_day_calendar_event_id: { type: ['integer', 'null'] },
+            reminder_offset: { type: ['string', 'null'] },
+            reminder_custom_amount: { type: ['integer', 'null'] },
+            reminder_custom_unit: { type: ['string', 'null'] },
+            created_by: { type: ['integer', 'null'] },
+            created_at: { type: 'string' },
+            updated_at: { type: 'string' },
+          },
+          required: ['id', 'name', 'kind', 'next_date', 'days_until', 'birth_date'],
+        },
+        DashboardCountdown: {
+          type: 'object',
+          properties: {
+            source: { type: 'string', enum: ['event', 'task', 'document'] },
+            id: { type: 'integer' },
+            title: { type: 'string' },
+            date: { type: 'string', format: 'date' },
+            days_until: { type: 'integer', description: 'Negative within the grace period after the date.' },
+            icon: { type: ['string', 'null'] },
+            color: { type: ['string', 'null'] },
+            recurring: { type: 'boolean' },
+            person_name: { type: ['string', 'null'], description: 'Only on `document`.' },
+            series_id: { type: ['integer', 'null'], description: 'Only on an appointment that replaces one occurrence.' },
+            recurrence_id: { type: ['string', 'null'], description: 'Only on an appointment that replaces one occurrence.' },
+            is_occurrence_override: { type: 'boolean', description: 'Only on an appointment that replaces one occurrence.' },
+            assignment_owner_id: { type: ['integer', 'null'], description: 'Only on an appointment that replaces one occurrence.' },
+            attachment_owner_id: { type: ['integer', 'null'], description: 'Only on an appointment that replaces one occurrence.' },
+            reminder_owner_id: { type: ['integer', 'null'], description: 'Only on an appointment that replaces one occurrence.' },
+            reminder_anchor_start: { type: ['string', 'null'], description: 'Only on an appointment that replaces one occurrence.' },
+          },
+          required: ['source', 'id', 'title', 'date', 'days_until', 'icon', 'color', 'recurring'],
+        },
+        DashboardQuickLink: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string' },
+            url: { type: 'string' },
+            icon_data: { type: ['string', 'null'] },
+            icon_name: { type: ['string', 'null'] },
+            color: { type: ['string', 'null'] },
+            visibility: { type: 'string' },
+            created_by: { type: ['integer', 'null'] },
+            position: { type: 'integer' },
+            created_at: { type: 'string' },
+            updated_at: { type: 'string' },
+            can_edit: { type: 'boolean' },
+          },
+          required: ['id', 'name', 'url', 'can_edit'],
+        },
+        DashboardSplitBalance: {
+          type: 'object',
+          properties: {
+            net: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  currency: { type: 'string' },
+                  netMinor: { type: 'integer', description: 'In minor units, negative when the caller owes.' },
+                  amount: { type: 'string', description: 'The same value as a decimal string.' },
+                },
+                required: ['currency', 'netMinor', 'amount'],
+              },
+            },
+            positions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  direction: { type: 'string', enum: ['owe', 'owed'] },
+                  userId: { type: 'integer' },
+                  name: { type: 'string' },
+                  groupId: { type: 'integer' },
+                  groupName: { type: 'string' },
+                  currency: { type: 'string' },
+                  amountMinor: { type: 'integer' },
+                  amount: { type: 'string', description: 'The same value as a decimal string.' },
+                },
+                required: ['direction', 'userId', 'name', 'groupId', 'groupName', 'currency', 'amountMinor', 'amount'],
+              },
+            },
+          },
+          required: ['net', 'positions'],
+        },
+        DashboardRewards: {
+          type: 'object',
+          properties: {
+            view: {
+              type: ['string', 'null'],
+              enum: ['approver', 'self', 'family', null],
+              description: '`approver` sees every participant and all open requests, `self` only the own row and requests, `family` everybody by name without requests. Null without access to the module.',
+            },
+            me: { type: 'integer', description: 'The caller. Missing without access to the module.' },
+            standings: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'integer' },
+                  display_name: { type: 'string' },
+                  avatar_color: { type: 'string' },
+                  avatar_data: { type: ['string', 'null'] },
+                  family_role: { type: 'string' },
+                  sort_order: { type: ['integer', 'null'] },
+                  balance: { type: 'integer' },
+                },
+                required: ['id', 'display_name', 'avatar_color', 'avatar_data', 'family_role', 'sort_order', 'balance'],
+              },
+            },
+            participantCount: { type: 'integer' },
+            pending: { type: 'integer', description: 'Open requests for rewards.' },
+            moneyPending: { type: 'integer', description: 'Open requests for money.' },
+            catalog: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'integer' },
+                  name: { type: 'string' },
+                  cost: { type: 'integer' },
+                  remaining: { type: ['integer', 'null'], description: 'Null when the reward has no limit.' },
+                },
+                required: ['id', 'name', 'cost', 'remaining'],
+              },
+            },
+            recent: {
+              type: 'array',
+              maxItems: 3,
+              items: {
+                type: 'object',
+                properties: {
+                  delta: { type: 'integer' },
+                  type: { type: 'string', enum: ['earn', 'bonus'] },
+                  reason: { type: ['string', 'null'] },
+                  created_at: { type: 'string', format: 'date-time' },
+                },
+                required: ['delta', 'type', 'reason', 'created_at'],
+              },
+            },
+          },
+          required: ['view', 'standings', 'participantCount', 'pending', 'moneyPending', 'catalog', 'recent'],
+        },
+        DashboardNutrientTotals: {
+          type: 'object',
+          properties: {
+            energy_kcal: { type: 'number' },
+            fat_g: { type: 'number' },
+            saturated_fat_g: { type: 'number' },
+            carbs_g: { type: 'number' },
+            sugar_g: { type: 'number' },
+            protein_g: { type: 'number' },
+            salt_g: { type: 'number' },
+            fiber_g: { type: 'number' },
+          },
+          required: ['energy_kcal', 'fat_g', 'saturated_fat_g', 'carbs_g', 'sugar_g', 'protein_g', 'salt_g', 'fiber_g'],
+        },
+        DashboardNutrientTarget: {
+          type: 'object',
+          description: 'Null in a field means no target for this nutrient, which is another statement than a target of 0.',
+          properties: {
+            energy_kcal: { type: ['number', 'null'] },
+            fat_g: { type: ['number', 'null'] },
+            saturated_fat_g: { type: ['number', 'null'] },
+            carbs_g: { type: ['number', 'null'] },
+            sugar_g: { type: ['number', 'null'] },
+            protein_g: { type: ['number', 'null'] },
+            salt_g: { type: ['number', 'null'] },
+            fiber_g: { type: ['number', 'null'] },
+          },
+        },
+        DashboardNutrition: {
+          type: 'object',
+          properties: {
+            date: { type: ['string', 'null'], format: 'date', description: 'Null without access to the module.' },
+            target: { oneOf: [{ $ref: '#/components/schemas/DashboardNutrientTarget' }, { type: 'null' }] },
+            totals: { $ref: '#/components/schemas/DashboardNutrientTotals' },
+            entryCount: { type: 'integer' },
+          },
+          required: ['date', 'target', 'totals', 'entryCount'],
+        },
+        DashboardHousekeeping: {
+          type: 'object',
+          properties: {
+            configured: { type: 'boolean' },
+            present: { type: 'boolean' },
+            presentSince: {
+              type: ['string', 'null'],
+              format: 'date-time',
+              description: 'A check-in as stored, with milliseconds.',
+            },
+            workerName: { type: ['string', 'null'] },
+            visitsThisMonth: { type: 'integer' },
+            unpaidAmount: { type: ['number', 'null'], description: 'Null for a caller who may not see amounts.' },
+            lastVisit: {
+              type: ['string', 'null'],
+              format: 'date-time',
+              description: 'A check-in as stored, with milliseconds.',
+            },
+          },
+          required: ['configured', 'present', 'presentSince', 'workerName', 'visitsThisMonth', 'unpaidAmount', 'lastVisit'],
+        },
+        DashboardWastePickup: {
+          type: 'object',
+          properties: {
+            date_key: { type: 'string', format: 'date' },
+            type_id: { type: 'integer' },
+            type_name: { type: 'string' },
+            type_icon: { type: ['string', 'null'] },
+            type_color: { type: ['string', 'null'] },
+            deep_link: { type: 'string' },
+          },
+          required: ['date_key', 'type_id', 'type_name', 'type_icon', 'type_color', 'deep_link'],
+        },
+        DashboardShift: {
+          type: 'object',
+          properties: {
+            date_key: { type: 'string', format: 'date' },
+            source: { type: 'string', enum: ['pattern', 'override', 'extra'] },
+            crosses_midnight: { type: 'boolean' },
+            shift_type: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer' },
+                name: { type: 'string' },
+                short_code: { type: ['string', 'null'] },
+                start_time: { type: ['string', 'null'] },
+                end_time: { type: ['string', 'null'] },
+                color: { type: ['string', 'null'] },
+                icon: { type: ['string', 'null'] },
+              },
+              required: ['id', 'name', 'short_code', 'start_time', 'end_time', 'color', 'icon'],
+            },
+          },
+          required: ['date_key', 'source', 'crosses_midnight', 'shift_type'],
+        },
+        DashboardPantryExpiring: {
+          type: 'object',
+          properties: {
+            items: {
+              type: 'array',
+              maxItems: 5,
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'integer' },
+                  name: { type: 'string' },
+                  quantity: { type: 'number' },
+                  unit: { type: ['string', 'null'] },
+                  expires_on: { type: 'string', format: 'date' },
+                  days_left: { type: 'integer', description: 'Negative for what has expired.' },
+                  location_name: { type: ['string', 'null'] },
+                  location_icon: { type: ['string', 'null'] },
+                },
+                required: ['id', 'name', 'quantity', 'unit', 'expires_on', 'days_left', 'location_name', 'location_icon'],
+              },
+            },
+            todayItems: {
+              type: 'array',
+              maxItems: 5,
+              description: 'What expires today. A paired wall display gets the names only.',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'integer' },
+                  name: { type: 'string' },
+                  quantity: { type: 'number' },
+                  unit: { type: ['string', 'null'] },
+                },
+                required: ['name'],
+              },
+            },
+            total: { type: 'integer' },
+            expiredCount: { type: 'integer' },
+            todayCount: { type: 'integer' },
+          },
+          required: ['items', 'todayItems', 'total', 'expiredCount', 'todayCount'],
+        },
+        DashboardResponse: {
+          type: 'object',
+          description: 'Every field listed here stays in the response without access to its module, in its empty form; only `shoppingTile` comes and goes. Depending on module access the response can carry further fields that are not listed here (at the moment `budget`, `health` and `fasting`): they are no part of this contract, and a client ignores what it does not know.',
+          additionalProperties: true,
+          properties: {
+            users: { type: 'array', items: { $ref: '#/components/schemas/DashboardUser' } },
+            upcomingEvents: { type: 'array', items: { $ref: '#/components/schemas/CalendarEvent' } },
+            familyEvents: { type: 'array', items: { $ref: '#/components/schemas/CalendarEvent' } },
+            weekEvents: { type: 'array', items: { $ref: '#/components/schemas/DashboardWeekEvent' } },
+            birthdays: { type: 'array', maxItems: 8, items: { $ref: '#/components/schemas/DashboardBirthday' } },
+            birthdayCount: { type: 'integer', description: 'Persons, whereas `birthdayTotal` counts occasions.' },
+            birthdayTotal: { type: 'integer' },
+            birthdaySoonCount: { type: 'integer', description: 'Occasions within three days, uncapped.' },
+            urgentTasks: { type: 'array', maxItems: 5, items: { $ref: '#/components/schemas/DashboardTask' } },
+            openTaskCount: { type: ['integer', 'null'], description: 'Null when the count failed, which is not the same as none.' },
+            overdueTaskCount: { type: ['integer', 'null'], description: 'Null when the count failed, which is not the same as none.' },
+            memberTodayTasks: { type: 'array', items: { $ref: '#/components/schemas/DashboardMemberTaskCount' } },
+            tasksDoneToday: { type: 'integer' },
+            wallTasks: { type: 'array', items: { $ref: '#/components/schemas/DashboardWallTasks' } },
+            todayMeals: { type: 'array', items: { $ref: '#/components/schemas/DashboardMeal' } },
+            pinnedNotes: { type: 'array', maxItems: 5, items: { $ref: '#/components/schemas/DashboardNote' } },
+            pinnedNotesCount: { type: 'integer' },
+            notesTotal: { type: 'integer' },
+            shoppingLists: { type: 'array', maxItems: 3, items: { $ref: '#/components/schemas/DashboardShoppingList' } },
+            shoppingOpenCount: { type: ['integer', 'null'], description: 'Null when the count failed, which is not the same as none.' },
+            shoppingOpenLists: { type: 'integer' },
+            shoppingTile: { $ref: '#/components/schemas/DashboardShoppingTile' },
+            countdowns: { type: 'array', items: { $ref: '#/components/schemas/DashboardCountdown' } },
+            countdownTotal: { type: 'integer' },
+            quicklinks: { type: 'array', items: { $ref: '#/components/schemas/DashboardQuickLink' } },
+            splitBalance: { $ref: '#/components/schemas/DashboardSplitBalance' },
+            rewards: { $ref: '#/components/schemas/DashboardRewards' },
+            nutrition: { $ref: '#/components/schemas/DashboardNutrition' },
+            housekeeping: { $ref: '#/components/schemas/DashboardHousekeeping' },
+            wastePickups: { type: 'array', items: { $ref: '#/components/schemas/DashboardWastePickup' } },
+            myShiftsToday: { type: 'array', items: { $ref: '#/components/schemas/DashboardShift' } },
+            pantryExpiring: {
+              oneOf: [{ $ref: '#/components/schemas/DashboardPantryExpiring' }, { type: 'null' }],
+              description: 'Null when the read failed, which is not the same as nothing expiring.',
+            },
+          },
+          required: ['users', 'upcomingEvents', 'familyEvents', 'weekEvents', 'birthdays', 'birthdayCount', 'birthdayTotal',
+            'birthdaySoonCount', 'urgentTasks', 'openTaskCount', 'overdueTaskCount', 'memberTodayTasks', 'tasksDoneToday',
+            'wallTasks', 'todayMeals', 'pinnedNotes', 'pinnedNotesCount', 'notesTotal', 'shoppingLists', 'shoppingOpenCount',
+            'shoppingOpenLists', 'countdowns', 'countdownTotal', 'quicklinks', 'splitBalance', 'rewards', 'nutrition',
+            'housekeeping', 'wastePickups', 'myShiftsToday', 'pantryExpiring'],
+        },
         OkResponse: {
           type: 'object',
           description: 'The answer of a write that has nothing else to say.',
@@ -1289,42 +2691,12 @@ export const schemas = {
         UpcomingReminder: {
           type: 'object',
           properties: {
-            id: { type: 'integer' },
-            entity_type: { type: 'string', description: 'The origin of the reminder, for example `task` or `event`.' },
-            entity_id: { type: 'integer' },
-            entity_title: {
-              type: ['string', 'null'],
-              description: 'Title of the entity, as far as the origin has one.',
-            },
-            remind_at: {
-              type: 'string',
-              description: 'As stored: UTC without a zone suffix, on rows from up to v2.68.0 possibly with an offset. Schedule from `fires_at` instead.',
-            },
+            ...reminderProperties,
             fires_at: {
               type: 'string',
               format: 'date-time',
               description: 'The moment the reminder fires, in UTC with `Z`, whole seconds.',
             },
-            dismissed: { type: 'integer', enum: [0] },
-            pushed_at: { type: ['string', 'null'] },
-            assigned_from: {
-              type: ['integer', 'null'],
-              description: 'Set on a reminder inherited from the person who created the entity.',
-            },
-            created_by: { type: 'integer' },
-            created_at: { type: 'string', format: 'date-time' },
-            cycle_anchor_kind: {
-              type: ['string', 'null'],
-              description: 'On `cycle_period`: whether this is the caller\'s own cycle or one passed on to a partner.',
-            },
-            cycle_owner_name: { type: 'string', description: 'Only on a `partner_period` row.' },
-            prevention_subject_name: { type: 'string', description: 'Only on an inherited `health_prevention_due` row.' },
-            move_notice: {
-              type: 'object',
-              additionalProperties: true,
-              description: 'Only on `shopping_move_returned`.',
-            },
-            target_url: { type: 'string', description: 'Only on `shopping_move_returned`.' },
           },
           required: ['id', 'entity_type', 'entity_id', 'remind_at', 'fires_at', 'created_by'],
         },

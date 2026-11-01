@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and with everything that ends a session, so "sign out other devices" now counts these too. An
   administrator cannot see a member's devices, but can sign a member out of all of them with
   `POST /api/v1/auth/users/{id}/devices/sign-out`. Nothing changes for browsers or existing API tokens.
+- **The API spec now holds for the operations a native client is built from.** 39 operations have an
+  `operationId`, a typed response and a typed body, checked by `test:openapi-client-contract`. A second
+  suite, `test:openapi-client-responses`, holds real responses against these schemas. This corrected
+  the spec where it was wrong: `POST /tasks`, `POST /shopping` and `POST /shopping/{listId}/items` answer
+  201, `DELETE /calendar/{id}` answers 204, `POST /auth/login` has a second answer shape for two-factor
+  sign-in, and `CalendarEvent` names its fields instead of allowing anything. The API itself did not
+  change.
 - **Pairing a device, for households without passwords.** `POST /api/v1/auth/devices/pair` creates a
   short code from a browser session, and `POST /api/v1/auth/devices/pair/redeem` exchanges it for a device
   credential. The code holds for five minutes and once, and comes back as text, as a `yuvomi://pair` link

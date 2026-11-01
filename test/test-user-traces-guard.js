@@ -461,6 +461,8 @@ const COLUMN_HOMES = new Map([
   ['server/auth.js', 2],
   // Die Beschreibung desselben Felds an GET /auth/users.
   ['server/openapi/paths/auth.js', 1],
+  // Dasselbe Feld im Schema `User`.
+  ['server/openapi/schemas.js', 1],
 ]);
 
 function sourceFiles(dir) {
