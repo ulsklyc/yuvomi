@@ -85,6 +85,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin sets up, in line with how private entries already work.
 
 ### Fixed
+- **Saving a recurring event no longer moves its reminders.** In the calendar view, every occurrence named
+  the last occurrence in view as the start of its series. The event dialog then showed a lead time weeks
+  too long, and saving wrote that lead time back, so a reminder could fire weeks early. Saving a series
+  from an external calendar also moved reminders nobody had changed onto the opened occurrence. Reminders
+  already moved by this stay as they are: if one looks wrong, set it again.
 - **A shared event reminds a household channel once.** An event assigned to several people sent the
   same reminder to a household notification channel once per person. The channel now hears it once,
   and a reminder someone set for a different time still arrives on its own. Each person's Web Push
