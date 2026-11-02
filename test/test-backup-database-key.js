@@ -33,6 +33,10 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { tempDir } from './tmp-dir.js';
+// Statisch, nicht per await import(): test:db-isolation erkennt den Helfer, der
+// DB_PATH setzt, nur als statischen Import. server-ready.js laedt selbst nichts
+// beim Import, der Server startet erst im Aufruf unten - nach dem Mitschreiben.
+import { startTestServer, cookieHeader } from './server-ready.js';
 
 const PRIVATE_TMP = tempDir('yuvomi-backup-database-key-');
 process.env.TMPDIR = PRIVATE_TMP;
@@ -48,7 +52,6 @@ for (const level of ['log', 'info', 'warn', 'error']) {
 const originalWrite = process.stdout.write.bind(process.stdout);
 process.stdout.write = (chunk, ...rest) => { logged.push(String(chunk)); return originalWrite(chunk, ...rest); };
 
-const { startTestServer, cookieHeader } = await import('./server-ready.js');
 const { baseUrl, dbPath } = await startTestServer({
   name: 'backup-database-key',
   env: { SESSION_SECRET: 'test-backup-database-key-secret-32chars', DB_ENCRYPTION_AUTO_KEY: 'true' },
