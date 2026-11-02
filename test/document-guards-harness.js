@@ -213,6 +213,9 @@ function startServer(dbPath, port) {
       BIND_ADDRESS: '127.0.0.1',
       BASE_URL: `http://127.0.0.1:${port}`,
       SESSION_SECRET: 'document-guards-secret-0123456789abcdef',
+      // Kein beim Start erzeugter Schluessel fuer die Harness-DB
+      // (server/utils/auto-secrets.js): die Suite misst Oberflaeche.
+      DB_ENCRYPTION_AUTO_KEY: 'false',
       // Der Login-Limiter laesst fuenf Versuche pro Minute zu. Das ist fuer die
       // App richtig und fuer eine Suite, die mehrfach hintereinander laeuft,
       // eine Fehlerquelle, die wie ein fehlender Seed aussieht.
