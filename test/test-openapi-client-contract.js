@@ -21,9 +21,11 @@
  * 1.14.3 kennt `{ type: 'null' }` nicht als Zweig von `oneOf` oder `anyOf` und
  * laesst dann die GANZE Eigenschaft weg. Es gibt nur eine Warnung, der Code
  * kompiliert, und die Antwort dekodiert, weil das Feld nie gelesen wird: so fehlte
- * das Ende jedes Termins. Eine `$ref` traegt null ueber ihr Ziel, die Generator-Doku
- * nennt das so. Aus demselben Grund darf eine Typ-Liste neben `null` nur einen Typ
- * nennen: aus `['integer', 'array']` wird `Int`, die Liste geht verloren.
+ * das Ende jedes Termins. Dasselbe gilt fuer `{ type: 'null' }` an jeder anderen
+ * Stelle und fuer `not`. Eine `$ref` traegt null ueber ihr Ziel, die Generator-Doku
+ * nennt das so. Eine Typ-Liste darf neben `null` nur einen Typ nennen: aus
+ * `['integer', 'array']` wird `Int`, die Liste geht verloren. Gesehen wird alles,
+ * was der Generator liest: Parameter, Bodies und Antworten jedes Status.
  *
  * GEGENPROBE: `operationId` an einer Operation entfernen oder ein Schema durch
  * `{ type: 'object' }` ersetzen macht den ersten Test rot und nennt die Operation.
@@ -40,8 +42,9 @@ import { CLIENT_OPERATIONS } from './openapi-client-operations.js';
 // Schluessel: `<METHOD> <Pfad>#<Feldpfad>`.
 const CLIENT_OPAQUE_FIELDS = new Map([]);
 
-// Bodies, die der Client von Hand schreibt (`typeOverrides`), weil er `null` senden
-// muss und eine Einzahl von einer Liste trennt. Der Generator liest sie nie.
+// Bodies, die dieser Guard auslaesst: der Client schreibt sie von Hand
+// (`typeOverrides`), der Generator liest sie nie. Er schreibt mehr von Hand, hier
+// stehen nur die, an denen der Guard sonst anschluege.
 const CLIENT_HAND_WRITTEN_BODIES = new Set([
   'TaskCreateInput',
   'TaskUpdateInput',
@@ -126,12 +129,11 @@ function lostByGenerator(schema, path, out, seen = new Set()) {
   const node = resolve(schema);
   if (!node || typeof node !== 'object') return out;
   const types = [node.type].flat().filter((type) => type !== undefined && type !== 'null');
+  if (node.type !== undefined && types.length === 0) out.push(`${path} (null als eigener Typ)`);
   if (types.length > 1) out.push(`${path} (mehrere Typen: ${types.join(', ')})`);
+  if ('not' in node) out.push(`${path} (not)`);
   for (const key of ['allOf', 'oneOf', 'anyOf']) {
-    (node[key] ?? []).forEach((part, i) => {
-      if (key !== 'allOf' && resolve(part)?.type === 'null') out.push(`${path}.${key}[${i}] (null als Zweig)`);
-      lostByGenerator(part, `${path}.${key}[${i}]`, out, new Set(seen));
-    });
+    (node[key] ?? []).forEach((part, i) => lostByGenerator(part, `${path}.${key}[${i}]`, out, new Set(seen)));
   }
   for (const [name, property] of Object.entries(node.properties ?? {})) {
     lostByGenerator(property, `${path}.${name}`, out, new Set(seen));
@@ -201,12 +203,14 @@ test('kein Feld einer Client-Operation geht im Generator verloren', () => {
   const problems = CLIENT_OPERATIONS.flatMap(([method, path]) => {
     const label = `${method.toUpperCase()} ${path}`;
     const operation = spec.paths[path][method];
-    const responses = Object.entries(operation.responses ?? {}).filter(([code]) => /^2/.test(code))
-      .flatMap(([, success]) => lostByGenerator(jsonSchema(success), 'response', []));
+    const responses = Object.entries(operation.responses ?? {})
+      .flatMap(([status, response]) => lostByGenerator(jsonSchema(response) ?? {}, `response ${status}`, []));
+    const parameters = (operation.parameters ?? []).map((parameter) => resolve(parameter))
+      .flatMap((parameter) => lostByGenerator(parameter.schema ?? {}, `parameter ${parameter.name}`, []));
     const body = jsonSchema(operation.requestBody);
     const handWritten = CLIENT_HAND_WRITTEN_BODIES.has(body?.$ref?.split('/').pop());
     const bodies = body && !handWritten ? lostByGenerator(body, 'body', []) : [];
-    return [...responses, ...bodies].map((problem) => `${label}: ${problem}`);
+    return [...responses, ...parameters, ...bodies].map((problem) => `${label}: ${problem}`);
   });
   assert.deepEqual(problems, [], `\n${problems.join('\n')}\n`);
 });

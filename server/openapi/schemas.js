@@ -1172,6 +1172,8 @@ export const schemas = {
             start_datetime: { $ref: '#/components/schemas/CalendarDateOrDateTime' },
             // Die drei Formen von CalendarDateOrDateTime als ein Muster: `null` als
             // Zweig liesse ein Generator samt Feld fallen (test:openapi-client-contract).
+            // `format: date` passt zu zwei der drei Formen nicht und entfaellt, ein
+            // unmoeglicher Tag wie der 30.02. faellt hier also nicht auf.
             end_datetime: {
               type: ['string', 'null'],
               pattern: '^\\d{4}-\\d{2}-\\d{2}(?:T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d+)?)?(?:Z|[+-]\\d{2}:?\\d{2})?)?$',
