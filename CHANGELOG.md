@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Renaming a shopping category also renames it in recipes, meals and stock.** Until now only the items on
+  the shopping lists followed the new name. Recipe ingredients, meal ingredients, recurring meals and stock
+  kept the old one, so their ingredients landed under a name that no longer exists: at the bottom of the
+  list, and ticking them off failed with "Invalid category". Deleting a category now moves these rows to the
+  same fallback category as the shopping items.
+
 ## [2.84.0] - 2026-11-02
 
 ### Added
