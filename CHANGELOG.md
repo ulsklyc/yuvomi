@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Stopping the container no longer takes ten seconds and a hard kill.** Inside the image the server runs as
+  process 1, which ignores a stop signal it has no handler for, so `docker stop` and `podman stop` waited out
+  their timeout and then killed it in the middle of requests, syncs and backups. The server now handles
+  SIGTERM and SIGINT: it stops taking connections, lets running requests, syncs and backups finish for up to
+  eight seconds, closes the database (the write-ahead log is folded back in) and exits with code 0. A second
+  signal exits at once.
+
 ## [2.84.0] - 2026-11-02
 
 ### Added

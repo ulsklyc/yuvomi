@@ -170,10 +170,12 @@ let db;
  *
  * Der zweite Absatz ist bewusst BEDINGT formuliert, und das ist der Kern seiner
  * Fassung: ein `-wal` neben der Datenbank ist KEIN Hinweis auf einen Dateitausch.
- * `journal_mode = WAL` steht dauerhaft, und es gibt nirgends einen SIGTERM- oder
- * SIGINT-Handler, der die Verbindung vor dem Stoppen schließt - SQLite räumt das
- * Journal aber nur beim sauberen Schließen weg. Nach einem gewöhnlichen
- * Container-Stop liegt es also da, und zwar als EIGENES Journal dieser Datenbank.
+ * `journal_mode = WAL` steht dauerhaft, und SQLite räumt das Journal nur beim
+ * sauberen Schließen weg. Das tut der Server auf SIGTERM und SIGINT
+ * (`closeForShutdown()`), aber nicht nach SIGKILL, Absturz, OOM oder bei einer
+ * Version vor diesem Handler, die als PID 1 im Container jedes Signal
+ * ignorierte. Nach so einem Stopp liegt es also da, und zwar als EIGENES
+ * Journal dieser Datenbank.
  * Ein unbedingtes „lösch es" würde hier bestätigte, nur noch nicht
  * gecheckpointete Transaktionen verwerfen und den eigentlichen Schlüsselfehler
  * nicht einmal berühren - derselbe Fehlertyp, gegen den dieser ganze Vorgang
@@ -12945,6 +12947,30 @@ async function waitForQuietOrGiveUp() {
   );
 }
 
+/**
+ * Die Verbindung zum Prozessende schliessen (SIGTERM/SIGINT, server/index.js).
+ *
+ * Wartet wie der Restore auf laufende Backups, Jobs und zugelassene Anfragen,
+ * hoechstens bis `deadline`, checkpointet das Journal und schliesst. Erst das
+ * Schliessen raeumt `-wal` und `-shm` weg. Ein Job, der die Frist reisst, wird
+ * mit dem Prozess abgebrochen wie zuvor beim SIGKILL - seine Transaktionen sind
+ * synchron und damit schon ganz geschrieben oder gar nicht.
+ *
+ * Waehrend eines Restores bleibt die Verbindung, wie sie ist: der Restore haelt
+ * sie selbst, und ein Abbruch mittendrin ist mit Arbeitsdatei und Rollback-Kopie
+ * schon abgefangen (#1431).
+ * @param {number} deadline Zeitpunkt in ms
+ * @returns {Promise<boolean>} `true`, wenn nichts mehr lief und die Verbindung zu ist
+ */
+async function closeForShutdown(deadline) {
+  const quiet = await waitUntilIdle(() => [...activeBackups, ...activeWriters()], deadline);
+  if (restoreRunning || !db) return false;
+  try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
+  db.close();
+  db = null;
+  return quiet;
+}
+
 /** Laeuft gerade ein Restore? Fuer `restoreWriteGate`. */
 function isRestoreRunning() {
   return restoreRunning;
@@ -13533,4 +13559,4 @@ if (globalThis[CHECK_ONLY_HANDSHAKE] !== true) {
   }
 }
 
-export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, checkBackupFile, isRestoreRunning, isDatabaseOpen, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, adoptOrphanPantryBatches, _setTestDatabase, _resetTestDatabase };
+export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, checkBackupFile, isRestoreRunning, isDatabaseOpen, closeForShutdown, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, adoptOrphanPantryBatches, _setTestDatabase, _resetTestDatabase };

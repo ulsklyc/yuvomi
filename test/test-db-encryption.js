@@ -638,9 +638,9 @@ test('das eigene Journal nach einem unsauberen Stopp wird NICHT zum Loeschen emp
   const KEY_EIGEN = 'schluessel-dieser-instanz-0123456';
 
   // Der Fall, den die erste Fassung dieses Fixes uebersehen hat (Review-Befund
-  // auf PR #1275): `journal_mode = WAL` steht dauerhaft, und es gibt nirgends
-  // einen SIGTERM-Handler, der die Verbindung schliesst. Nach einem gewoehnlichen
-  // Container-Stopp liegt das Journal also da - als EIGENES Journal dieser
+  // auf PR #1275): `journal_mode = WAL` steht dauerhaft, und nach einem Stopp
+  // ohne Schliessen (SIGKILL, Absturz, ein Container-Stopp vor dem
+  // SIGTERM-Handler) liegt das Journal da - als EIGENES Journal dieser
   // Datenbank, mit bestaetigten Transaktionen, die noch nicht in der Hauptdatei
   // stehen. Wer hier „loesch es" liest, wirft sie weg und hat den Schluessel
   // trotzdem nicht repariert.
@@ -650,7 +650,7 @@ test('das eigene Journal nach einem unsauberen Stopp wird NICHT zum Loeschen emp
   laufend.pragma('journal_mode = WAL');
   laufend.exec('CREATE TABLE eigener_marker (a INTEGER)');
   laufend.prepare('INSERT INTO eigener_marker VALUES (1)').run();
-  // Kein close(): genau das unterlaesst auch ein `docker stop`.
+  // Kein close(): genau das unterlaesst auch ein SIGKILL.
   assert.ok(existsSync(`${eigene}-wal`), 'Vorbedingung: das eigene Journal liegt da');
 
   await assert.rejects(
