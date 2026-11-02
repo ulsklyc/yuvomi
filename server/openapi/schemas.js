@@ -1558,11 +1558,11 @@ export const schemas = {
         },
         ShoppingItemUpdateInput: {
           type: 'object',
-          description: 'Every field is optional, and one that is not sent stays as it is. Unlike creating an item, this route checks no length on `name` and `quantity`: the limits of `ShoppingItemCreateInput` are the ones to keep to.',
+          description: 'Every field is optional, and one that is not sent stays as it is. `name` and `quantity` have the limits of `ShoppingItemCreateInput`.',
           properties: {
-            is_checked: { type: 'boolean', description: 'Read as true or false by truthiness, so 0 and 1 work as well. Responses carry 0 or 1.' },
-            name: { type: 'string', minLength: 1 },
-            quantity: { type: ['string', 'null'] },
+            is_checked: { type: 'boolean', description: 'true or false; 0 and 1 work as well, anything else answers 400. Responses carry 0 or 1.' },
+            name: { type: 'string', minLength: 1, maxLength: 200 },
+            quantity: { type: ['string', 'null'], maxLength: 100 },
             category: { type: 'string', minLength: 1, description: 'The name of an existing category. It cannot be cleared.' },
             notes: { type: ['string', 'null'], maxLength: 5000 },
             url: { type: ['string', 'null'], format: 'uri', maxLength: 2000, description: 'http or https only.' },

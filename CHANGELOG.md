@@ -85,6 +85,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin sets up, in line with how private entries already work.
 
 ### Fixed
+- **A reminder you have already seen stays seen when its event is saved again.** Saving the reminders of an
+  event replaced all of them, so one that had already fired came back unread with a new id and showed up
+  again. A time that stays in the set now keeps its row, its read state and its push state; only new times
+  are added.
+- **Tasks starting today show up on the household's today.** The task list and the MCP `list_tasks` tool
+  hid tasks by start date using the server's own day instead of the household time zone, so near midnight a
+  task could appear a day early or late.
+- **The API refuses malformed task, shopping and calendar input with 400.** A number as a title or item name,
+  `null` as a task category or priority, or `null` as a category when editing an item ended in a server error.
+  Numbers in text fields were stored as text such as "5.0", an empty title was saved when editing a task or
+  event, editing an item checked no lengths, `is_checked: "false"` ticked an item off, and empty date fields
+  of a task were stored as empty text instead of no date. These now answer 400 or are stored as no value;
+  `is_checked` still accepts 0 and 1. Clearing checked items of a list that does not exist answers 404
+  instead of 200.
 - **Saving a recurring event no longer moves its reminders.** In the calendar view, every occurrence named
   the last occurrence in view as the start of its series. The event dialog then showed a lead time weeks
   too long, and saving wrote that lead time back, so a reminder could fire weeks early. Saving a series

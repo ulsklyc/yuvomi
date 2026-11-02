@@ -5593,3 +5593,27 @@ test('GET / und GET /:id liefern outbound_snapshot und seen_on_server nicht aus'
     assert.equal(key in one.body.data, false, `GET /:id darf ${key} nicht enthalten`);
   }
 });
+
+// Vorher: Zahlen in Titel, Beschreibung und Ort landeten als Text, eine Zahl als
+// Titel im PUT lief auf einen 500, ein leerer Titel im PUT wurde gespeichert.
+test('POST/PUT: Titel, Beschreibung und Ort muessen Text sein, ein mitgeschickter Titel darf nicht leer sein', async () => {
+  const base = { title: 'Formen', start_datetime: '2040-02-01T09:00' };
+  for (const extra of [{ title: 5 }, { description: 5 }, { location: 5 }]) {
+    assert.equal((await call('POST', '/', { body: { ...base, ...extra } })).status, 400, `POST ${JSON.stringify(extra)}`);
+  }
+
+  const created = await call('POST', '/', { body: { ...base, description: 'Text', location: 'Ort' } });
+  assert.equal(created.status, 201);
+  const id = created.body.data.id;
+  for (const body of [{ title: 5 }, { title: '' }, { title: null }, { description: 5 }, { location: 5 }]) {
+    assert.equal((await call('PUT', `/${id}`, { body })).status, 400, `PUT ${JSON.stringify(body)}`);
+  }
+  const row = db.prepare('SELECT title, description, location FROM calendar_events WHERE id = ?').get(id);
+  assert.deepEqual({ ...row }, { title: 'Formen', description: 'Text', location: 'Ort' });
+
+  // Was die PWA schickt, geht weiter: null leert, ein PUT ohne Titel kuerzt eine Serie.
+  const cleared = await call('PUT', `/${id}`, { body: { description: null, location: null } });
+  assert.equal(cleared.status, 200);
+  assert.deepEqual([cleared.body.data.description, cleared.body.data.location], [null, null]);
+  assert.equal((await call('PUT', `/${id}`, { body: { recurrence_rule: null } })).status, 200);
+});
