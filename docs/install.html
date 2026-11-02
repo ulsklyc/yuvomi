@@ -362,12 +362,6 @@
     .env-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 24px; box-shadow: var(--shadow-sm); }
     .env-name { font-family: var(--ff-mono); font-size: var(--fs-small); font-weight: 600; color: var(--accent); margin-bottom: 10px; word-break: break-all; }
     .env-label { font-size: var(--fs-body); font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .env-req { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--r-full);
-      /* Beide Kanaele aus DEMSELBEN Token, und zwar aus der lesbaren Stufe
-         (--danger-ink = --color-danger-ink der App) statt der Signalfarbe: die
-         misst auf dieser hellen Flaeche nur 3.89:1 und faellt fuer
-         0.7rem-Versalien unter AA. Das Token ist themengeschaltet (site.css). */
-      background: color-mix(in srgb, var(--danger-ink) 14%, transparent); color: var(--danger-ink); }
     /* DB_ENCRYPTION_KEY is optional in fact - server/db.js runs an unencrypted
        SQLite file when the value is empty - but irreversible once set. Wearing the
        same red "Required" badge as SESSION_SECRET said the wrong thing twice:
@@ -379,7 +373,10 @@
        literal copy-paste encrypts the database with a published constant rather
        than leaving it off. Second, "one claim now" was only true here: the
        app-store panels still said "recommended". Every surface says optional and
-       irreversible, and the quick start on index.html now names the placeholder. */
+       irreversible, and the quick start on index.html now names the placeholder.
+       Since the secrets are generated on the first start SESSION_SECRET is no
+       longer required either, so its badge is gone; the store forms that still
+       ask for it say so in their own steps. */
     .env-irrev { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--r-full);
       background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warn-ink); }
     .env-desc { font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; }
@@ -849,10 +846,10 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         optional_where:'You set them in the same <code>.env</code> file, then restart:',
         optional_where_store:'On TrueNAS and Unraid you add them in the app\'s configuration screen and restart it.',
         optional_where_umbrel:'On Umbrel they need an override in the app\'s compose file.',
-        env_title:'Two settings decide your security', env_desc:'One is mandatory, one is optional but permanent. Everything below this section can be changed later; the second of these two cannot.',
+        env_title:'Two settings decide your security', env_desc:'A new installation can leave both unset: Yuvomi generates them on the first start. Everything below this section can be changed later; the database key, once set, cannot.',
         env_session_label:'Session Secret', env_session_desc:'Signs and verifies login cookies. Use <code>openssl rand -hex 32</code> to generate a secure value, or leave it unset and Yuvomi generates one on the first start.',
         env_db_label:'Database Key', env_db_desc:'Optional, and strongly recommended if the household will keep health or financial records. Encrypts the whole database with AES-256; generate with <code>openssl rand -hex 32</code>. Leave it unset and a new installation generates one on its first start, next to the database in <code>.secrets/</code> (an admin sees it under Settings → Household → Backup and restore); <code>DB_ENCRYPTION_AUTO_KEY=false</code> keeps a new database unencrypted. Set it and there is no way back: lose the value and the data can never be opened again, not by you and not by us.',
-        env_required:'Required', env_irreversible:'Irreversible',
+        env_irreversible:'Irreversible',
         optional_title:'Go further', optional_desc:'Once Yuvomi is running, you can set up these extras. All of them are environment variables.',
         opt_https_title:'HTTPS & network access', opt_https_desc:"Reach Yuvomi from other devices or the internet: set up Nginx as a reverse proxy with a free Let's Encrypt certificate.",
         opt_guide:'Guide →',
@@ -968,10 +965,10 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         optional_where:'Ihr setzt sie in derselben <code>.env</code>-Datei und startet dann neu:',
         optional_where_store:'Bei TrueNAS und Unraid tragt ihr sie im Konfigurationsbildschirm der App ein und startet sie neu.',
         optional_where_umbrel:'Bei Umbrel braucht es dafür ein Override in der Compose-Datei der App.',
-        env_title:'Zwei Einstellungen entscheiden über eure Sicherheit', env_desc:'Eine ist Pflicht, eine ist optional, aber endgültig. Alles unterhalb dieses Abschnitts lässt sich später ändern; die zweite dieser beiden nicht.',
+        env_title:'Zwei Einstellungen entscheiden über eure Sicherheit', env_desc:'Eine neue Installation kann beide leer lassen: Yuvomi erzeugt sie beim ersten Start. Alles unterhalb dieses Abschnitts lässt sich später ändern; der Datenbank-Schlüssel nicht mehr, sobald er gesetzt ist.',
         env_session_label:'Session-Secret', env_session_desc:'Signiert und verifiziert Anmelde-Cookies. Mit <code>openssl rand -hex 32</code> einen sicheren Wert generieren, oder leer lassen, dann erzeugt Yuvomi beim ersten Start einen.',
         env_db_label:'Datenbank-Schlüssel', env_db_desc:'Optional, und dringend empfohlen, sobald im Haushalt Gesundheits- oder Finanzdaten liegen. Verschlüsselt die gesamte Datenbank mit AES-256; mit <code>openssl rand -hex 32</code> generieren. Lasst ihr ihn leer, erzeugt eine neue Installation beim ersten Start einen, neben der Datenbank in <code>.secrets/</code> (ein Admin sieht ihn unter Einstellungen → Haushalt → Backup und Wiederherstellung); <code>DB_ENCRYPTION_AUTO_KEY=false</code> lässt eine neue Datenbank unverschlüsselt. Setzt ihr es, gibt es keinen Weg zurück: Ist der Wert weg, lässt sich die Datenbank nie wieder öffnen, weder von euch noch von uns.',
-        env_required:'Pflicht', env_irreversible:'Unwiderruflich',
+        env_irreversible:'Unwiderruflich',
         optional_title:'Mehr entdecken', optional_desc:'Sobald Yuvomi läuft, könnt ihr diese Extras einrichten. Alle sind Umgebungsvariablen.',
         opt_https_title:'HTTPS & Netzwerkzugang', opt_https_desc:"Yuvomi von anderen Geräten oder aus dem Internet erreichbar machen: Nginx als Reverse Proxy mit kostenlosem Let's-Encrypt-Zertifikat einrichten.",
         opt_guide:'Anleitung →',
@@ -1307,7 +1304,7 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
   <section id="env">
     <div class="container">
       <h2 class="section-title reveal" data-t="env_title">Two settings decide your security</h2>
-      <p class="section-desc reveal" data-t="env_desc">One is mandatory, one is optional but permanent. Everything below this section can be changed later; the second of these two cannot.</p>
+      <p class="section-desc reveal" data-t="env_desc">A new installation can leave both unset: Yuvomi generates them on the first start. Everything below this section can be changed later; the database key, once set, cannot.</p>
       <!-- No .reveal on scoped nodes: a display:none element never intersects,
            so the observer would leave it at opacity 0 when it is shown later. -->
       <p class="section-desc scope" data-scope="terminal installer proxmox" data-t="env_where">Both live in the <code>.env</code> file you created next to your compose file.</p>
@@ -1320,7 +1317,7 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
       <div class="env-grid">
         <div class="env-card reveal">
           <div class="env-name">SESSION_SECRET</div>
-          <div class="env-label"><span data-t="env_session_label">Session Secret</span> <span class="env-req" data-t="env_required">Required</span></div>
+          <div class="env-label"><span data-t="env_session_label">Session Secret</span></div>
           <div class="env-desc" data-t="env_session_desc">Signs and verifies login cookies. Use <code>openssl rand -hex 32</code> to generate a secure value, or leave it unset and Yuvomi generates one on the first start.</div>
         </div>
         <div class="env-card reveal">
