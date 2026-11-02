@@ -643,6 +643,53 @@ test('ganze Serie: der gespeicherte Zeitpunkt geht unveraendert an den Serienkop
   assert.deepEqual(put?.body, { remind_ats: ['2026-09-25T06:00:00', '2026-09-17T07:00:00'] });
 });
 
+// Eine Serie aus einem fremden Kalender speichert ohne Reichweiten-Frage und ohne
+// Master-Abruf. Bleiben die Zeiten unberuehrt, bleibt ihr Beginn in der Zeile, und
+// ein Vorlauf gehoert an DIESEN Beginn, nicht an das geoeffnete Vorkommen.
+const EXTERNAL_OCCURRENCE = {
+  ...SERIES_OCCURRENCE,
+  id: 55,
+  series_id: 55,
+  reminder_owner_id: 55,
+  is_local_recurring_series: false,
+  can_override_occurrence: false,
+  external_source: 'caldav',
+};
+
+test('externe Serie, nur der Titel geaendert: die Erinnerung bleibt am Serienbeginn', async () => {
+  const reminders = [DAY_BEFORE];
+  const panel = openDialog({ event: EXTERNAL_OCCURRENCE, reminders });
+  userSets(panel.querySelector('#modal-title'), 'Training (Halle 2)', 'input');
+  const { calls } = await save(panel, { event: EXTERNAL_OCCURRENCE, reminders });
+  const seriesPut = calls.find((c) => c.method === 'put' && c.path === '/calendar/55');
+  assert.ok(seriesPut, 'die Serie wurde gespeichert');
+  assert.equal('start_datetime' in seriesPut.body, false, 'ihr Beginn bleibt in der Zeile');
+  assert.deepEqual(reminderPut(calls)?.body, { remind_ats: ['2026-09-17T07:00:00'] });
+});
+
+test('externe Serie, Zeile neu gesetzt: sie rechnet vom geoeffneten Vorkommen, nicht vom Serienbeginn', async () => {
+  // Am Serienbeginn laege „1 Stunde vorher" Wochen oder Jahre in der Vergangenheit
+  // und wuerde sofort faellig. Die Zeile daneben hat niemand angefasst, sie bleibt.
+  const reminders = [DAY_BEFORE, { remind_at: '2026-09-18T06:00:00' }];
+  const panel = openDialog({ event: EXTERNAL_OCCURRENCE, reminders });
+  userSets(offsetOf(rowsOf(panel)[1]), '15');
+  const { calls } = await save(panel, { event: EXTERNAL_OCCURRENCE, reminders });
+  assert.deepEqual(reminderPut(calls)?.body, {
+    remind_ats: ['2026-09-17T07:00:00', '2026-10-02T06:45:00'],
+  });
+});
+
+test('externe Serie, Beginn verschoben: die Route setzt ihn, die Erinnerung folgt dem neuen', async () => {
+  const reminders = [DAY_BEFORE];
+  const panel = openDialog({ event: EXTERNAL_OCCURRENCE, reminders });
+  userSets(panel.querySelector('#modal-start-time'), '09:30', 'input');
+  const { calls } = await save(panel, { event: EXTERNAL_OCCURRENCE, reminders });
+  const seriesPut = calls.find((c) => c.method === 'put' && c.path === '/calendar/55');
+  assert.ok(seriesPut, 'die Serie wurde gespeichert');
+  assert.equal(seriesPut.body.start_datetime.slice(0, 16), '2026-10-02T09:30');
+  assert.deepEqual(reminderPut(calls)?.body, { remind_ats: ['2026-10-01T07:30:00'] });
+});
+
 test('nur dieser, nichts an den Erinnerungen geaendert: das Speichern fasst sie nicht an', async () => {
   const reminders = [AFTER, DAY_BEFORE];
   const panel = openDialog({ event: SERIES_OCCURRENCE, reminders });
