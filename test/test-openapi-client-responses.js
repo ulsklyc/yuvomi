@@ -867,10 +867,8 @@ test('Einkauf: abgehakte Artikel loeschen, mit und ohne `ids`', async () => {
 
   const left = (await call('get', SHOPPING_ITEMS, { params })).data;
   assert.deepEqual(left.map((item) => item.id), [open.id]);
-
-  // Die Route schlaegt die Liste nicht nach, daher `null` in `before` und `after`.
-  const missing = await call('delete', SHOPPING_CHECKED, { params: { listId: 999999 } });
-  assert.deepEqual(missing, { deleted: 0, list_change: { list_id: 999999, before: null, after: null } });
+  // Eine unbekannte Liste ist 404, geprueft in test:shopping-routes; diese
+  // Suite faehrt nur Antworten unter 300.
 });
 
 test('Einkauf: gespiegelte, nur lesbare Liste mit Etiketten und Sync-Feldern', async () => {

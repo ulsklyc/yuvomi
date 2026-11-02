@@ -20,7 +20,6 @@ import {
   flushOutbound, markTodoOutbound, queueTodoDeletion, recurrenceFollowupTarget,
 } from '../services/caldav-todo-outbound.js';
 import { uniqueKey } from '../utils/category-slug.js';
-import { toLocalDateKey } from '../../public/utils/date.js';
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
 import { mentionedUserIds } from '../../public/utils/mentions.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
@@ -419,6 +418,17 @@ function validateTags(value) {
 }
 
 /**
+ * Ein leerer String in einem Tagesfeld heisst "kein Wert". Die Validatoren
+ * lassen '' durch, und die Zeile trug danach '' statt NULL, gegen
+ * `format: date` in der Spec und gegen jede Abfrage auf `IS NULL`.
+ */
+function blankDayFieldsToNull(body) {
+  for (const field of ['start_date', 'due_date', 'due_time']) {
+    if (body?.[field] === '') body[field] = null;
+  }
+}
+
+/**
  * Eingabe-Validierung für Task-Felder (zentralisiert über validate.js).
  *
  * `currentRule` ist die gespeicherte Wiederholungsregel beim Aktualisieren. Kommt
@@ -432,8 +442,15 @@ function validateTaskInput(body, isCreate = true, currentRule = undefined) {
   const ruleUnchanged = !isCreate
     && body.recurrence_rule !== undefined
     && body.recurrence_rule === currentRule;
+  // Die Form vor dem Inhalt: Eine Zahl als Titel lief sonst in `.trim()` auf
+  // einen 500, `null` in Kategorie oder Priorität an NOT NULL. Ein mitgeschickter
+  // Titel darf auch beim Aktualisieren nicht leer sein; fehlt er, bleibt der alte.
   return v.collectErrors([
-    v.str(body.title,       'title',       { required: isCreate }),
+    v.textShape(body.title,       'title'),
+    v.textShape(body.description, 'description', { nullable: true }),
+    v.textShape(body.priority,    'priority'),
+    v.textShape(body.category,    'category'),
+    v.str(body.title,       'title',       { required: isCreate || typeof body.title === 'string' }),
     v.str(body.description, 'description', { required: false, max: v.MAX_TEXT }),
     v.oneOf(body.priority,  VALID_PRIORITIES, 'priority'),
     v.oneOf(body.status,    VALID_STATUSES,   'status'),
@@ -977,7 +994,7 @@ router.get('/', (req, res) => {
     // DER TAGESSCHLÜSSEL MUSS ALS ERSTER PARAMETER STEHEN: das Scope-Fragment
     // sitzt am Anfang der WHERE-Klausel, also vor jedem Filter unten. Die
     // SELECT-Klausel bindet ihre sechs `me` erst am Ende per unshift davor.
-    if (taskScopeNeedsToday({ includeFuture: !!include_future })) params.push(toLocalDateKey());
+    if (taskScopeNeedsToday({ includeFuture: !!include_future })) params.push(todayInHouseholdZone());
 
     // Status, Priorität und Person nehmen mehrere Werte entgegen und verknüpfen
     // sie ODER (#671). Anders als bei den Tags unten ist das keine Geschmacks-
@@ -1129,6 +1146,7 @@ router.get('/:id', (req, res) => {
 // --------------------------------------------------------
 router.post('/', (req, res) => {
   try {
+    blankDayFieldsToNull(req.body);
     const errors = validateTaskInput(req.body, true);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -1307,6 +1325,7 @@ router.put('/:id', (req, res) => {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
 
+    blankDayFieldsToNull(req.body);
     const errors = validateTaskInput(req.body, false, task.recurrence_rule);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 

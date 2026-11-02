@@ -188,13 +188,12 @@ export function shoppingPaths() {
         description: 'Without a body, every item that is checked when the request arrives. With `{ ids }`, only those '
           + 'ids, and of them only the ones that are checked and belong to this list - a client that removed rows '
           + 'optimistically names exactly what it removed, so a row someone else ticked in the meantime stays. '
-          + '`deleted` reports what actually went. The route does not look the list up: an id without a list answers 200 '
-          + 'with `deleted: 0` and null in `before` and `after`.',
+          + '`deleted` reports what actually went.',
         tag: 'Shopping',
         params: [idParam('listId', 'List ID')],
         stateChanging: true,
         requestBody: { ...jsonBody('#/components/schemas/ShoppingCheckedDeleteInput', 'Optional: `{ ids: number[] }`'), required: false },
-        responses: typed(200, 'ShoppingCheckedDeleteResponse', { 400: BAD_REQUEST }),
+        responses: typed(200, 'ShoppingCheckedDeleteResponse', { 400: BAD_REQUEST, 404: LIST_NOT_FOUND }),
       }),
     },
     '/api/v1/shopping/{listId}/items/reorder': {
@@ -227,6 +226,7 @@ const CASE_REASONS = {
   '/api/v1/shopping/{listId}': { put: LIST_GONE, delete: LIST_GONE },
   '/api/v1/shopping/{listId}/duplicate': { post: LIST_GONE },
   '/api/v1/shopping/{listId}/items': { get: LIST_GONE, post: LIST_GONE },
+  '/api/v1/shopping/{listId}/items/checked': { delete: LIST_GONE },
   '/api/v1/shopping/{listId}/items/reorder': { patch: LIST_GONE },
   '/api/v1/shopping/{listId}/import-meal-plan': { post: `${LIST_GONE}, ${MEALS_WRITE_REQUIRED}` },
   '/api/v1/shopping/{listId}/import-pantry': { post: `${LIST_GONE}, ${PANTRY_READ_REQUIRED}` },

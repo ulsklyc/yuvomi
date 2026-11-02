@@ -652,18 +652,34 @@ router.put('/', (req, res) => {
       return res.status(400).json({ error: `At most ${MAX_REMINDERS_PER_ENTITY} reminders per entity.`, code: 400 });
     }
 
+    // Ersetzen heisst nicht Neuanlegen: eine eigene Zeile, deren Zeitpunkt in
+    // der neuen Menge wieder vorkommt, bleibt samt ID, `dismissed` und
+    // `pushed_at` stehen. Vorher wurde alles geloescht und neu geschrieben,
+    // und eine gelesene, vergangene Erinnerung meldete sich nach jedem
+    // Speichern derselben Menge erneut. Geerbte Zeilen (`assigned_from`)
+    // weichen wie bisher der eigenen Menge.
     const replace = db.get().transaction((values) => {
-      db.get().prepare(`
-        DELETE FROM reminders
+      const existing = db.get().prepare(`
+        SELECT id, remind_at, assigned_from FROM reminders
         WHERE entity_type = ? AND entity_id = ? AND created_by = ?
-      `).run(entityType, entityId, userId);
+      `).all(entityType, entityId, userId);
+
+      const kept = new Set();
+      const drop = db.get().prepare('DELETE FROM reminders WHERE id = ?');
+      for (const row of existing) {
+        if (row.assigned_from === null && values.includes(row.remind_at) && !kept.has(row.remind_at)) {
+          kept.add(row.remind_at);
+        } else {
+          drop.run(row.id);
+        }
+      }
 
       const insert = db.get().prepare(`
         INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
         VALUES (?, ?, ?, ?)
       `);
       for (const remindAt of values) {
-        insert.run(entityType, entityId, remindAt, userId);
+        if (!kept.has(remindAt)) insert.run(entityType, entityId, remindAt, userId);
       }
     });
     replace(unique);
