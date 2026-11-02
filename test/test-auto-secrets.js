@@ -27,6 +27,9 @@
  *          - kein Secret-Wert in stdout oder stderr eines echten Serverstarts
  *          - server/check-backup.js liest die gespeicherte Datei (env > _FILE >
  *            gespeichert) und legt nie etwas an
+ *          - der Backup-Befehl aus Admin -> Backups und docs/installation.md
+ *            (beide gleich, aus der Quelle gelesen) findet den gespeicherten
+ *            Schluessel und `_FILE` und legt nie einen an
  * Ausführen: node --test test/test-auto-secrets.js
  */
 import test from 'node:test';
@@ -237,6 +240,24 @@ test('ein Platzhalter bricht weiter ab, auch neben einer gespeicherten Datei', (
   assert.equal(existsSync(join(fresh, '.secrets', 'DB_ENCRYPTION_KEY')), false, 'kein Schluessel neben dem Platzhalter');
 });
 
+test('der Rat der Platzhalter-Meldung traegt: Zeile weg verschluesselt, der Schalter nicht', () => {
+  // Bis zu den Auto-Secrets hiess es "clear the line to run without encryption" -
+  // seitdem erzeugt genau das auf einer Neuinstallation einen Schluessel.
+  const fresh = tempDir('yuvomi-auto-secrets-');
+  const key = start(fresh, { DB_PATH: join(fresh, 'yuvomi.db'), DB_ENCRYPTION_KEY: 'REPLACE_WITH_A_STRONG_ENCRYPTION_KEY' });
+  assert.notEqual(key.status, 0);
+  assert.doesNotMatch(key.output, /clear the line entirely to run without encryption/);
+  assert.match(key.output, /delete the line/);
+  assert.match(key.output, /DB_ENCRYPTION_AUTO_KEY=false/);
+
+  // Beide Wege befolgt, je auf einem leeren Stand.
+  started(start(fresh, { DB_PATH: join(fresh, 'yuvomi.db') }));
+  assert.ok(!isPlaintext(join(fresh, 'yuvomi.db')), 'Zeile geloescht: die neue Datenbank ist verschluesselt');
+  const plain = tempDir('yuvomi-auto-secrets-');
+  started(start(plain, { DB_PATH: join(plain, 'yuvomi.db'), DB_ENCRYPTION_AUTO_KEY: 'false' }));
+  assert.ok(isPlaintext(join(plain, 'yuvomi.db')), 'mit DB_ENCRYPTION_AUTO_KEY=false bleibt sie Klartext');
+});
+
 test('eine leere gespeicherte Datei bricht ab, statt still neu zu erzeugen', () => {
   for (const name of NAMES) {
     const dir = tempDir('yuvomi-auto-secrets-');
@@ -332,6 +353,75 @@ test('check-backup erzeugt nie etwas: kein .secrets, kein Schluessel, keine Date
   const run = checkBackup(empty, backupPath, { DB_PATH: join(empty, 'yuvomi.db') });
   assert.notEqual(run.status, 0, 'ohne Schluessel ist das verschluesselte Backup nicht lesbar');
   assert.deepEqual(readdirSync(empty), [], `nichts angelegt: ${readdirSync(empty).join(', ')}`);
+});
+
+/**
+ * Der Backup-Befehl, den Admin -> Backups und docs/installation.md zeigen
+ * (`docker compose exec yuvomi node ...`), als `node ...`-Teil. Beide Stellen
+ * muessen denselben Befehl zeigen; gelesen wird er aus der Quelle, nicht
+ * abgeschrieben, sonst bliebe der Test gruen ueber einem kaputten Snippet.
+ */
+function documentedBackupCommand() {
+  const pick = (text, where) => {
+    const line = text.split('\n')
+      .find((l) => l.startsWith('docker compose exec yuvomi node ') && l.includes('backupToFile'));
+    assert.ok(line, `${where}: kein Backup-Befehl gefunden`);
+    return line.replace('docker compose exec yuvomi ', '').replaceAll('&gt;', '>');
+  };
+  const ui = pick(readFileSync(join(ROOT, 'public/settings/pages/admin-backup.js'), 'utf8')
+    .replace(/^.*<code>/gm, ''), 'admin-backup.js');
+  const doc = pick(readFileSync(join(ROOT, 'docs/installation.md'), 'utf8'), 'docs/installation.md');
+  assert.equal(ui, doc, 'UI und Doku zeigen denselben Backup-Befehl');
+  return ui;
+}
+
+/** Der Befehl in einer Shell wie im Container (cwd = App-Verzeichnis), Ziel umgebogen. */
+function runBackupCommand(target, env) {
+  const cmd = documentedBackupCommand()
+    .replace(/^node /, `${JSON.stringify(process.execPath)} `)
+    .replace('/data/yuvomi-backup.db', target);
+  const run = spawnSync('sh', ['-c', cmd], {
+    cwd: ROOT, env: cleanEnv(env), encoding: 'utf8', timeout: 60_000,
+  });
+  return { status: run.status, output: `${run.stdout}${run.stderr}` };
+}
+
+test('der dokumentierte Backup-Befehl findet den gespeicherten Schluessel', () => {
+  const dir = tempDir('yuvomi-auto-secrets-');
+  const dbPath = join(dir, 'yuvomi.db');
+  started(start(dir, { DB_PATH: dbPath }));
+  const target = join(tempDir('yuvomi-auto-secrets-backup-'), 'backup.db');
+
+  const run = runBackupCommand(target, { DB_PATH: dbPath, LOG_LEVEL: 'warn' });
+  assert.equal(run.status, 0, run.output);
+  assert.ok(existsSync(target), 'das Backup liegt da');
+  assert.ok(!isPlaintext(target), 'das Backup ist verschluesselt');
+  assert.ok(!run.output.includes(stored(dir, 'DB_ENCRYPTION_KEY')), 'kein Wert in der Ausgabe');
+  const check = checkBackup(dir, target, { DB_PATH: dbPath });
+  assert.equal(check.status, 0, `mit dem gespeicherten Schluessel lesbar: ${check.output}`);
+});
+
+test('der dokumentierte Backup-Befehl liest DB_ENCRYPTION_KEY_FILE', () => {
+  const dir = tempDir('yuvomi-auto-secrets-');
+  const dbPath = join(dir, 'yuvomi.db');
+  const keyFile = join(tempDir('yuvomi-auto-secrets-key-'), 'key');
+  writeFileSync(keyFile, `${'a'.repeat(64)}\n`, { mode: 0o400 });
+  const env = { DB_PATH: dbPath, DB_ENCRYPTION_KEY_FILE: keyFile, SESSION_SECRET: 'b'.repeat(64) };
+  started(start(dir, env));
+  const target = join(tempDir('yuvomi-auto-secrets-backup-'), 'backup.db');
+
+  const run = runBackupCommand(target, { ...env, LOG_LEVEL: 'warn' });
+  assert.equal(run.status, 0, run.output);
+  assert.ok(!isPlaintext(target), 'das Backup ist verschluesselt');
+});
+
+test('der dokumentierte Backup-Befehl erzeugt nie einen Schluessel', () => {
+  // Leeres Volume (falsch eingehaengt): der volle Handschlag gaebe ihm jetzt
+  // einen Schluessel, und das Backup truege einen, den niemand kennt.
+  const empty = tempDir('yuvomi-auto-secrets-');
+  const target = join(tempDir('yuvomi-auto-secrets-backup-'), 'backup.db');
+  runBackupCommand(target, { DB_PATH: join(empty, 'yuvomi.db'), LOG_LEVEL: 'warn' });
+  assert.equal(existsSync(join(empty, '.secrets')), false, 'kein .secrets angelegt');
 });
 
 test('zwei gleichzeitige Erststarts einigen sich auf dieselben Werte', async () => {

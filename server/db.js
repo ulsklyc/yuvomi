@@ -543,7 +543,9 @@ function assertKeyIsNotPlaceholder() {
       '[DB] DB_ENCRYPTION_KEY is still the placeholder from .env.example ' +
       `(${DB_KEY}). That value is published in this repository, so it protects ` +
       'nothing. Generate a real one with `openssl rand -hex 32` and put it in ' +
-      '.env, or clear the line entirely to run without encryption.'
+      '.env, or delete the line: a new installation then generates its own key on ' +
+      'the first start. To run without encryption, delete the line and set ' +
+      'DB_ENCRYPTION_AUTO_KEY=false.'
     );
   }
 

@@ -246,7 +246,7 @@ export function applyAutoSecrets({
       `Generated DB_ENCRYPTION_KEY for this new installation and stored it in ${storedPath}. ` +
       'It lies on the same volume as the database, so it protects a database file or backup that ' +
       'leaves this machine, not a stolen volume. Keep a copy of it somewhere else (Settings > ' +
-      'Admin > Backups shows it): without it, your backups cannot be opened once this volume is ' +
+      'Household > Backup and restore shows it): without it, your backups cannot be opened once this volume is ' +
       'lost. A key of your own through DB_ENCRYPTION_KEY or DB_ENCRYPTION_KEY_FILE is stronger.'
     );
   }

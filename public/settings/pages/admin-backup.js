@@ -193,7 +193,7 @@ docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro" --entrypoint sh "
 docker compose up -d "$SERVICE"</code></pre>
     <p class="form-hint">${t('settings.backupCliForeignKeyHint')}</p>
     <p class="form-hint">${t('settings.backupCliBackupHint')}</p>
-    <pre class="settings-code-block"><code>docker compose exec yuvomi node -e "import('./server/db.js').then(async db =&gt; { await db.backupToFile('/data/yuvomi-backup.db'); process.exit(0); })"
+    <pre class="settings-code-block"><code>docker compose exec yuvomi node --import ./server/utils/load-secrets-readonly.js -e "import('./server/db.js').then(async db =&gt; { await db.backupToFile('/data/yuvomi-backup.db'); process.exit(0); })"
 docker cp yuvomi:/data/yuvomi-backup.db ./yuvomi-backup.db</code></pre>
   `);
   return wrap;
