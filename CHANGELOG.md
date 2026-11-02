@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.84.0] - 2026-11-02
+
 ### Added
 - **`GET /api/v1/version` now says what it is talking about.** Two new public fields: `product` identifies a
   Yuvomi instance, and `client_api` is a whole number for the contract a native client relies on. A client can
