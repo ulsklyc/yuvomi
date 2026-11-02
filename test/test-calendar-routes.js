@@ -201,6 +201,69 @@ test('GET / — source-Filter grenzt auf external_source ein', async () => {
   assert.ok(!titles(google.body.data).includes('SRC-LOCAL'), 'source=google blendet lokale aus');
 });
 
+test('GET / und /upcoming - die Erinnerungen einer Serie haengen an ihrem Beginn, nicht am letzten Vorkommen', async () => {
+  const seriesStart = '2035-02-01T09:00:00';
+  const masterId = Number(insertEvent({
+    title: 'Anker Qzxanker',
+    start_datetime: seriesStart,
+    end_datetime: '2035-02-01T10:00:00',
+    recurrence_rule: 'FREQ=WEEKLY',
+  }));
+  const overrideId = Number(insertEvent({
+    title: 'Anker Qzxanker verschoben',
+    start_datetime: '2035-03-16T11:00:00',
+    end_datetime: '2035-03-16T12:00:00',
+    recurrence_parent_id: masterId,
+    recurrence_id: '2035-03-15T09:00:00',
+    overridden_fields: '["title","start_datetime","end_datetime"]',
+  }));
+  db.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)')
+    .run(masterId, '2035-03-15T09:00:00');
+
+  // Das Fenster beginnt NACH dem Beginn der Serie: der erste Platz steht nicht in
+  // der Antwort, und mehrere Vorkommen liegen darin.
+  const range = await call('GET', '/?from=2035-03-01&to=2035-03-31');
+  assert.equal(range.status, 200);
+  const rows = range.body.data.filter((event) => event.series_id === masterId);
+  assert.ok(rows.filter((event) => event.id === masterId).length >= 3, 'mehrere Vorkommen im Fenster');
+  assert.ok(rows.some((event) => event.id === overrideId), 'Override ohne eigene Erinnerungen im Fenster');
+  for (const event of rows) {
+    assert.equal(event.reminder_anchor_start, seriesStart, event.start_datetime);
+    assert.equal(event.reminder_owner_id, masterId, event.start_datetime);
+  }
+
+  const upcomingId = Number(insertEvent({
+    title: 'Anker Qzxkommend',
+    start_datetime: '2000-01-05T09:00:00',
+    end_datetime: '2000-01-05T10:00:00',
+    recurrence_rule: 'FREQ=WEEKLY',
+  }));
+  const upcoming = await call('GET', '/upcoming?limit=20');
+  assert.equal(upcoming.status, 200);
+  const coming = upcoming.body.data.filter((event) => event.id === upcomingId);
+  assert.ok(coming.length > 0, 'die Serie steht in der Antwort');
+  for (const event of coming) {
+    assert.notEqual(event.start_datetime, '2000-01-05T09:00:00');
+    assert.equal(event.reminder_anchor_start, '2000-01-05T09:00:00', event.start_datetime);
+  }
+
+  // Die Suche nennt das naechste Vorkommen ab heute, also ein expandiertes.
+  const past = new Date();
+  past.setUTCDate(past.getUTCDate() - 60);
+  const searchStart = `${past.toISOString().slice(0, 10)}T09:00:00`;
+  const searchId = Number(insertEvent({
+    title: 'Anker Qzxsuche',
+    start_datetime: searchStart,
+    recurrence_rule: 'FREQ=WEEKLY',
+  }));
+  const search = await call('GET', '/search?q=Qzxsuche');
+  assert.equal(search.status, 200);
+  const found = search.body.data.find((event) => event.id === searchId);
+  assert.ok(found, 'die Serie steht im Suchergebnis');
+  assert.notEqual(found.start_datetime, searchStart);
+  assert.equal(found.reminder_anchor_start, searchStart);
+});
+
 test('GET / — wiederkehrende Serie wird in Instanzen expandiert', async () => {
   insertEvent({ title: 'SERIE-DAILY', start_datetime: '2035-03-05T09:00', recurrence_rule: 'FREQ=DAILY;COUNT=3' });
   const res = await call('GET', '/?from=2035-03-01&to=2035-03-31', { actor: ADMIN });
