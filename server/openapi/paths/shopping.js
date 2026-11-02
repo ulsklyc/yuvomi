@@ -1,13 +1,30 @@
 import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
+const schema = (name) => ({ 'application/json': { schema: { $ref: `#/components/schemas/${name}` } } });
+const apiError = (description) => ({ description, content: schema('ApiError') });
+const BAD_REQUEST = { $ref: '#/components/responses/BadRequest' };
+const LIST_NOT_FOUND = apiError('The list does not exist.');
+const ITEM_NOT_FOUND = apiError('The item does not exist.');
+
+/** Die Antworten einer Operation des Client-Vertrags: Erfolg mit Schema, dazu die Absagen. */
+function typed(status, name, refusals = {}) {
+  return {
+    [status]: { description: status === 201 ? 'Created' : 'Successful response', content: schema(name) },
+    ...refusals,
+    401: { $ref: '#/components/responses/Unauthorized' },
+    403: { $ref: '#/components/responses/Forbidden' },
+    500: { $ref: '#/components/responses/InternalServerError' },
+  };
+}
+
 export function shoppingPaths() {
   return withCaseReasons('shopping', CASE_REASONS, {
     '/api/v1/shopping': {
-      get: op({ summary: 'List shopping lists', tag: 'Shopping', description: 'Each list carries `item_total`, `item_checked` and `accepts_new_items` (1 or 0). `accepts_new_items` is 0 when the list mirrors a CalDAV reminder list that is read-only for its account: such a list is not offered as the target of a move, and moving an item there is refused.' }),
-      post: op({ summary: 'Create shopping list', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
+      get: op({ summary: 'List shopping lists', operationId: 'listShoppingLists', tag: 'Shopping', responses: typed(200, 'ShoppingListsResponse'), description: 'Each list carries `item_total`, `item_checked` and `accepts_new_items` (1 or 0). `accepts_new_items` is 0 when the list mirrors a CalDAV reminder list that is read-only for its account: such a list is not offered as the target of a move, and moving an item there is refused.' }),
+      post: op({ summary: 'Create shopping list', operationId: 'createShoppingList', tag: 'Shopping', stateChanging: true, requestBody: jsonBody('#/components/schemas/ShoppingListCreateInput'), responses: typed(201, 'ShoppingListResponse', { 400: BAD_REQUEST }) }),
     },
     '/api/v1/shopping/categories': {
-      get: op({ summary: 'List shopping categories', tag: 'Shopping' }),
+      get: op({ summary: 'List shopping categories', operationId: 'listShoppingCategories', tag: 'Shopping', description: 'In shop order, the order of `sort_order`.', responses: typed(200, 'ShoppingCategoriesResponse') }),
       post: op({ summary: 'Create shopping category', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name }. A name that is already taken is refused with 409 and `reason: "category_exists"`.' }),
     },
     '/api/v1/shopping/stores': {
@@ -28,16 +45,26 @@ export function shoppingPaths() {
     '/api/v1/shopping/suggestions': {
       get: op({
         summary: 'Get shopping suggestions',
+        operationId: 'listShoppingSuggestions',
         description: 'Contract change (#1103): response items are now objects { name, category, quantity } instead of '
           + 'plain name strings (string[] before), and the list is ordered by most recently used first instead of alphabetically. '
           + 'Category and quantity come from the most recent item row with that name - the latest statement about '
           + 'how the household files the article today.',
         tag: 'Shopping',
+        params: [{
+          name: 'q',
+          in: 'query',
+          required: false,
+          description: 'The start of the name, without regard to case for ASCII letters. At most 8 names come back. Without it, or with nothing but spaces, the list is empty.',
+          schema: { type: 'string' },
+        }],
+        responses: typed(200, 'ShoppingSuggestionsResponse'),
       }),
     },
     '/api/v1/shopping/versions': {
       get: op({
         summary: 'Change counter of every shopping list',
+        operationId: 'listShoppingListVersions',
         description: 'One `{ list_id, version }` per list. The counter says *that* a list changed, never *what*: '
           + 'it moves whenever the list was renamed or its items were inserted, updated, moved or deleted by anyone '
           + '- a household member, a meal-plan import, the CalDAV sync - and the row disappears with the list. '
@@ -45,6 +72,7 @@ export function shoppingPaths() {
           + 'open and reloads a list through the same items request it used to open it; the write routes on items '
           + 'return `list_change: { list_id, before, after }` so the writer can tell its own change apart.',
         tag: 'Shopping',
+        responses: typed(200, 'ShoppingListVersionsResponse'),
       }),
     },
     '/api/v1/shopping/items/undo-transfer': {
@@ -65,6 +93,7 @@ export function shoppingPaths() {
     '/api/v1/shopping/items/{itemId}': {
       patch: op({
         summary: 'Update shopping item',
+        operationId: 'updateShoppingItem',
         description: 'Body: { is_checked?, name?, quantity?, category?, notes?, url?, price_cents?, store_id?, list_id? } - '
           + 'a field that is not sent stays as it is. `list_id` moves the item to another list: it keeps its name, quantity, '
           + 'category, note, link, price and shop, and goes to the end of its category on the list it lands on. `list_id` and '
@@ -80,9 +109,10 @@ export function shoppingPaths() {
         tag: 'Shopping',
         params: [idParam('itemId', 'Item ID')],
         stateChanging: true,
-        requestBody: jsonBody(null),
+        requestBody: jsonBody('#/components/schemas/ShoppingItemUpdateInput'),
+        responses: typed(200, 'ShoppingItemResponse', { 400: BAD_REQUEST, 404: ITEM_NOT_FOUND }),
       }),
-      delete: op({ summary: 'Delete shopping item', tag: 'Shopping', params: [idParam('itemId', 'Item ID')], stateChanging: true }),
+      delete: op({ summary: 'Delete shopping item', operationId: 'deleteShoppingItem', tag: 'Shopping', params: [idParam('itemId', 'Item ID')], stateChanging: true, responses: typed(200, 'ShoppingItemDeleteResponse', { 404: ITEM_NOT_FOUND }) }),
     },
     '/api/v1/shopping/{listId}': {
       put: op({ summary: 'Rename shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody(null) }),
@@ -105,12 +135,14 @@ export function shoppingPaths() {
     '/api/v1/shopping/{listId}/items': {
       get: op({
         summary: 'List items in shopping list',
+        operationId: 'listShoppingItems',
         description: 'Returns the items with the list, the categories and `version`, the list\'s change counter read in the same '
           + 'synchronous step as the items, so a client that polls `/shopping/versions` knows exactly which state it holds.',
         tag: 'Shopping',
         params: [idParam('listId', 'List ID')],
+        responses: typed(200, 'ShoppingItemsResponse', { 404: LIST_NOT_FOUND }),
       }),
-      post: op({ summary: 'Add item to shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Add item to shopping list', operationId: 'createShoppingItem', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody('#/components/schemas/ShoppingItemCreateInput'), responses: typed(201, 'ShoppingItemResponse', { 400: BAD_REQUEST, 404: LIST_NOT_FOUND }) }),
     },
     '/api/v1/shopping/{listId}/import-pantry': {
       post: op({
@@ -152,14 +184,17 @@ export function shoppingPaths() {
     '/api/v1/shopping/{listId}/items/checked': {
       delete: op({
         summary: 'Delete checked shopping items',
+        operationId: 'deleteCheckedShoppingItems',
         description: 'Without a body, every item that is checked when the request arrives. With `{ ids }`, only those '
           + 'ids, and of them only the ones that are checked and belong to this list - a client that removed rows '
           + 'optimistically names exactly what it removed, so a row someone else ticked in the meantime stays. '
-          + '`deleted` reports what actually went.',
+          + '`deleted` reports what actually went. The route does not look the list up: an id without a list answers 200 '
+          + 'with `deleted: 0` and null in `before` and `after`.',
         tag: 'Shopping',
         params: [idParam('listId', 'List ID')],
         stateChanging: true,
-        requestBody: { ...jsonBody(null, 'Optional: `{ ids: number[] }`'), required: false },
+        requestBody: { ...jsonBody('#/components/schemas/ShoppingCheckedDeleteInput', 'Optional: `{ ids: number[] }`'), required: false },
+        responses: typed(200, 'ShoppingCheckedDeleteResponse', { 400: BAD_REQUEST }),
       }),
     },
     '/api/v1/shopping/{listId}/items/reorder': {

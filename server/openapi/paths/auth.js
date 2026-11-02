@@ -5,35 +5,53 @@ export function authPaths() {
     '/api/v1/auth/login': {
       post: op({
         summary: 'Login with username and password',
+        operationId: 'signInWithPassword',
         tag: 'Auth',
         auth: false,
+        description: 'With two-factor authentication turned on, a right password opens no session yet: the response is `{ twoFactorRequired, recoveryAvailable }`, and POST /auth/2fa/verify completes the sign-in.',
         requestBody: jsonBody('#/components/schemas/LoginRequest'),
         responses: {
           200: {
-            description: 'Authenticated user and CSRF token',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginResponse' } } },
+            description: 'Authenticated user and CSRF token, or the request for a second factor',
+            content: {
+              'application/json': {
+                schema: {
+                  oneOf: [
+                    { $ref: '#/components/schemas/LoginResponse' },
+                    { $ref: '#/components/schemas/TwoFactorChallengeResponse' },
+                  ],
+                },
+              },
+            },
           },
+          400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          429: { description: 'Too many attempts' },
+          500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
     },
     '/api/v1/auth/2fa/verify': {
       post: op({
         summary: 'Complete sign-in with a second factor',
+        operationId: 'verifySecondFactor',
         tag: 'Auth',
         auth: false,
-        stateChanging: true,
         description: 'Second step after POST /auth/login answered with `twoFactorRequired`. '
           + 'Accepts either the six-digit TOTP code or one of the recovery codes; '
           + 'the response says which one was used. The pending sign-in expires after five minutes.',
+        requestBody: jsonBody('#/components/schemas/TwoFactorVerifyRequest'),
         responses: {
           200: {
             description: 'Authenticated user and CSRF token',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginResponse' } } },
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/TwoFactorVerifyResponse' } } },
           },
+          400: { description: 'The code is longer than 64 characters' },
           401: { description: 'Invalid code, or no pending sign-in' },
           403: { description: 'The account may no longer sign in, for example because it was deactivated in the meantime (`reason: "account_cannot_sign_in"`). No recovery code is spent.' },
           429: { description: 'Too many attempts' },
+          500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
     },
@@ -147,6 +165,7 @@ export function authPaths() {
     '/api/v1/auth/oidc/config': {
       get: op({
         summary: 'Get sign-in availability',
+        operationId: 'getSignInOptions',
         tag: 'Auth',
         auth: false,
         description: 'Public login-page bootstrap endpoint. Returns which ways in this server offers: '
@@ -158,6 +177,12 @@ export function authPaths() {
           + 'external people with no account in the household identity provider. It is one bit and says '
           + 'nothing about who or how many; where password login is open the question is moot and the '
           + 'field is false.',
+        responses: {
+          200: {
+            description: 'The ways in this server offers',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/OidcConfigResponse' } } },
+          },
+        },
       }),
     },
     '/api/v1/auth/oidc/start': {
@@ -417,6 +442,7 @@ export function authPaths() {
     '/api/v1/auth/me': {
       get: op({
         summary: 'Get current authenticated user',
+        operationId: 'getCurrentUser',
         tag: 'Auth',
         responses: {
           200: {
@@ -424,6 +450,7 @@ export function authPaths() {
             content: { 'application/json': { schema: { $ref: '#/components/schemas/MeResponse' } } },
           },
           401: { $ref: '#/components/responses/Unauthorized' },
+          500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
     },
@@ -631,6 +658,7 @@ export function authPaths() {
     '/api/v1/auth/devices': {
       get: op({
         summary: 'List your signed-in devices',
+        operationId: 'listSignedInDevices',
         description: 'The caller\'s own devices that still count. No administrator can read another member\'s list. The device credential is never returned here.',
         tag: 'Auth',
         responses: {
@@ -638,10 +666,14 @@ export function authPaths() {
             description: 'The caller\'s signed-in devices',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/SignedInDeviceList' } } },
           },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
       post: op({
         summary: 'Add a signed-in device',
+        operationId: 'addSignedInDevice',
         description: 'Exchanges a sign-in for a device credential, the bearer a native client uses from then on. A device acts as the person, with less reach than a browser session: an administrator is an ordinary member on it, and of `/api/v1/auth` it reaches only `GET /me`, `GET /users`, `GET /oidc/config`, `POST /logout`, `GET /devices` and `DELETE /devices/{id}`; anything else answers 403 with `reason: device_credential`. It ends after 90 days without use, and with everything that ends a session. The same `device_id` replaces the earlier credential.',
         tag: 'Auth',
         stateChanging: true,
@@ -678,6 +710,7 @@ export function authPaths() {
     '/api/v1/auth/devices/pair/redeem': {
       post: op({
         summary: 'Redeem a pairing code',
+        operationId: 'redeemPairingCode',
         description: 'Exchanges a pairing code for a device credential. Public, the code is the proof. Send no `Authorization` header: a valid device credential is refused here. Unknown, expired and used codes answer alike, and so does the code of an account that can no longer have a device. Attempts are limited.',
         tag: 'Auth',
         auth: false,
@@ -697,18 +730,40 @@ export function authPaths() {
     '/api/v1/auth/devices/current': {
       delete: op({
         summary: 'Sign this device out',
+        operationId: 'signOutCurrentDevice',
         description: 'Ends the device credential that made the request.',
         tag: 'Auth',
         stateChanging: true,
+        responses: {
+          200: {
+            description: 'The credential no longer works',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/OkResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/auth/devices/{id}': {
       delete: op({
         summary: 'Sign out one of your devices',
+        operationId: 'signOutDevice',
         description: 'Answers 404 for a device that does not exist and for one that belongs to somebody else.',
         tag: 'Auth',
         params: [idParam()],
         stateChanging: true,
+        responses: {
+          200: {
+            description: 'The device no longer works',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/OkResponse' } } },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'No such device of the caller' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/auth/users/{id}/devices/sign-out': {

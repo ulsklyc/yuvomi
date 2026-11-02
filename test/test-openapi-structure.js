@@ -512,6 +512,21 @@ test('calendar datetime schema distinguishes dates, local wall-clock values, and
   assert.ok(!stored.includes('converted'), stored);
 });
 
+test('CalendarEvent.end_datetime liest dieselben Formen wie CalendarDateOrDateTime', () => {
+  const spec = buildOpenApiSpec({}, 'test');
+  const end = spec.components.schemas.CalendarEvent.properties.end_datetime;
+  assert.deepEqual(end.type, ['string', 'null']);
+  const single = new RegExp(end.pattern);
+  const variants = spec.components.schemas.CalendarDateOrDateTime.oneOf.map((variant) => new RegExp(variant.pattern));
+  for (const value of [
+    '2035-03-24', '2035-03-24T23:30', '2035-03-24T23:30:15', '2035-03-24T23:30:15.25',
+    '2035-03-24T23:30Z', '2035-03-24T23:30:15Z', '2035-03-24T23:30:15.25+01:00', '2035-03-24T23:30:15-0530',
+    '24.03.2035', '2035-03-24T23', '2035-03-24Z', '2035-03-24T23:30:15+01', '2035-03-24 23:30', '',
+  ]) {
+    assert.equal(single.test(value), variants.some((variant) => variant.test(value)), value);
+  }
+});
+
 test('Outlook account activation documents its exact linked-override conflict', () => {
   const spec = buildOpenApiSpec({}, 'test');
   const update = spec.paths['/api/v1/calendar/outlook/accounts/{id}'].put;

@@ -49,6 +49,7 @@ export function remindersPaths() {
     '/api/v1/reminders/pending': {
       get: op({
         summary: 'List pending reminders',
+        operationId: 'listPendingReminders',
         tag: 'Reminders',
         description: 'The caller\'s own due reminders. With `audience=household` - the version for a shared surface (wall mode), as in `GET /dashboard` - the list is always empty: a reminder belongs to the person who asked for it, never to the household. The bell of the app sends the parameter while a wall is shown, so no toast and no browser notification appears above it.',
         params: [{
@@ -58,6 +59,15 @@ export function remindersPaths() {
           description: '`household` asks for the version for a shared surface; it carries no reminders. Anything else means the personal version.',
           schema: { type: 'string', enum: ['household'] },
         }],
+        responses: {
+          200: {
+            description: 'The due reminders',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/PendingReminderList' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/reminders/upcoming': {
@@ -113,7 +123,24 @@ export function remindersPaths() {
       delete: op({ summary: 'Delete reminders by filter', tag: 'Reminders', stateChanging: true, description: '`pantry_item` is rejected with 400 - the notification run recreates the row every pass. Dismiss it instead.' + EVENT_FANOUT }),
     },
     '/api/v1/reminders/{id}/dismiss': {
-      patch: op({ summary: 'Dismiss reminder', tag: 'Reminders', params: [idParam()], stateChanging: true }),
+      patch: op({
+        summary: 'Dismiss reminder',
+        operationId: 'dismissReminder',
+        tag: 'Reminders',
+        params: [idParam()],
+        stateChanging: true,
+        responses: {
+          200: {
+            description: 'The reminder is dismissed; the answer repeats its id',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ReminderDismissResponse' } } },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'No such reminder of the caller' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
     },
     '/api/v1/reminders/{id}': {
       delete: op({ summary: 'Delete reminder', tag: 'Reminders', params: [idParam()], stateChanging: true, description: '`pantry_item` is rejected with 400 - the notification run recreates the row every pass. Dismiss it instead.' + EVENT_FANOUT }),
