@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A new installation generates its own session secret and database key.** Leave `SESSION_SECRET`
+  and `DB_ENCRYPTION_KEY` unset and the first start creates both and keeps them in `.secrets/` next to
+  the database (`/data/.secrets/` in the container, readable only by the user Yuvomi runs as). Every
+  later start reads the same files, so nobody has to run `openssl` before the first start, and app
+  stores and NAS catalogs no longer need to ask for the secrets or build them in. A value you set
+  yourself, directly or through `_FILE`, still wins. **Existing installations do not change:** a
+  database that runs without a key today keeps running without one, because a key now would encrypt it
+  without anyone having asked. The generated key lies on the same volume as the database, so it
+  protects a database file or backup that leaves the machine, not a stolen volume; a key of your own
+  kept elsewhere is stronger. To start a new installation unencrypted on purpose, set
+  `DB_ENCRYPTION_AUTO_KEY=false`; deleting the `DB_ENCRYPTION_KEY` line no longer does that.
+- **Admins can see the generated database key to keep a copy.** Settings → Household → Backup and
+  restore shows it on request, because without it your backups cannot be opened once the server's
+  storage is lost. The key appears only after a click and is not cached; viewing it is logged without
+  the value. A key from your own configuration is never shown - the page says where it comes from -
+  and a signed-in device of the native app cannot read it.
+
+### Fixed
+- **The command-line backup check and backup command find a key Yuvomi stored itself.** The restore
+  check (`node server/check-backup.js`) and the Docker Compose backup command shown on the backup page
+  and in the installation guide now read the key the same way the server does: from
+  `DB_ENCRYPTION_KEY`, from `DB_ENCRYPTION_KEY_FILE`, or from `.secrets/`. Before, both stopped on an
+  installation whose key came from a file. Neither ever creates a key. If you copied the backup command
+  into a cron job, copy it again from the installation guide.
+- **The message about the `DB_ENCRYPTION_KEY` placeholder no longer suggests clearing the line to run
+  unencrypted.** On a new installation that now generates a key. It names `DB_ENCRYPTION_AUTO_KEY=false`
+  instead.
+
 ## [2.84.0] - 2026-11-02
 
 ### Added
