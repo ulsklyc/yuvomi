@@ -25,6 +25,8 @@
  *            Datei wird trotzdem gelesen
  *          - verschlüsselte Datenbank ohne Schlüssel: Abbruch, der den Pfad nennt
  *          - kein Secret-Wert in stdout oder stderr eines echten Serverstarts
+ *          - server/check-backup.js liest die gespeicherte Datei (env > _FILE >
+ *            gespeichert) und legt nie etwas an
  * Ausführen: node --test test/test-auto-secrets.js
  */
 import test from 'node:test';
@@ -291,6 +293,45 @@ test('verschluesselte Datenbank ohne Schluessel: klarer Abbruch mit dem .secrets
   assert.ok(run.output.includes(keyPath), 'die Meldung nennt den Pfad der gespeicherten Datei');
   assert.equal(existsSync(keyPath), false, 'es entsteht kein neuer Schluessel');
   assert.ok(!isPlaintext(dbPath), 'die Datenbank bleibt unberuehrt');
+});
+
+/** `node server/check-backup.js <backup>` wie im dokumentierten Compose-Restore. */
+function checkBackup(cwd, backupPath, env) {
+  const run = spawnSync(process.execPath, [join(ROOT, 'server/check-backup.js'), backupPath], {
+    cwd, env: cleanEnv(env), encoding: 'utf8', timeout: 60_000,
+  });
+  return { status: run.status, output: `${run.stdout}${run.stderr}` };
+}
+
+test('check-backup liest den gespeicherten Schluessel, wie der Server ihn liest', () => {
+  const dir = tempDir('yuvomi-auto-secrets-');
+  const dbPath = join(dir, 'yuvomi.db');
+  started(start(dir, { DB_PATH: dbPath }));
+  const backupPath = join(tempDir('yuvomi-auto-secrets-backup-'), 'backup.db');
+  writeFileSync(backupPath, readFileSync(dbPath));
+  assert.ok(!isPlaintext(backupPath), 'das Backup traegt den erzeugten Schluessel');
+
+  const run = checkBackup(dir, backupPath, { DB_PATH: dbPath });
+  assert.equal(run.status, 0, run.output);
+  assert.match(run.output, /Backup check passed/);
+  assert.ok(!run.output.includes(stored(dir, 'DB_ENCRYPTION_KEY')), 'kein Wert in der Ausgabe');
+
+  // Ein ausdruecklicher Schluessel schlaegt die Datei auch hier.
+  const wrong = checkBackup(dir, backupPath, { DB_PATH: dbPath, DB_ENCRYPTION_KEY: 'f'.repeat(64) });
+  assert.notEqual(wrong.status, 0, wrong.output);
+});
+
+test('check-backup erzeugt nie etwas: kein .secrets, kein Schluessel, keine Datenbank', () => {
+  const source = tempDir('yuvomi-auto-secrets-');
+  started(start(source, { DB_PATH: join(source, 'yuvomi.db') }));
+  const backupPath = join(tempDir('yuvomi-auto-secrets-backup-'), 'backup.db');
+  writeFileSync(backupPath, readFileSync(join(source, 'yuvomi.db')));
+
+  // Ein leeres Volume: der Handschlag des Servers gaebe ihm jetzt einen Schluessel.
+  const empty = tempDir('yuvomi-auto-secrets-');
+  const run = checkBackup(empty, backupPath, { DB_PATH: join(empty, 'yuvomi.db') });
+  assert.notEqual(run.status, 0, 'ohne Schluessel ist das verschluesselte Backup nicht lesbar');
+  assert.deepEqual(readdirSync(empty), [], `nichts angelegt: ${readdirSync(empty).join(', ')}`);
 });
 
 test('zwei gleichzeitige Erststarts einigen sich auf dieselben Werte', async () => {

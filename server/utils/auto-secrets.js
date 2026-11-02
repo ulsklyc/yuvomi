@@ -179,6 +179,10 @@ function isSet(env, name) {
  * @param {{ info: Function, warn: Function }} options.log
  * @param {() => string} [options.generate]  für Tests austauschbar
  * @param {(p: string) => string} [options.read]  für Tests austauschbar
+ * @param {boolean} [options.create]  `false`: nur lesen, nie erzeugen und nie
+ *   eine Datei oder ein Verzeichnis anlegen - für Werkzeuge neben dem Server
+ *   (server/check-backup.js), die einen vorhandenen Schlüssel brauchen, aber
+ *   kein Erststart sind
  * @throws {Error} bei unlesbarer/leerer gespeicherter Datei oder wenn ein
  *   erzeugter Wert nicht gespeichert werden kann
  */
@@ -188,6 +192,7 @@ export function applyAutoSecrets({
   log,
   generate = generateSecretValue,
   read = (p) => readFileSync(p, 'utf8'),
+  create = true,
 }) {
   const { dbPath, legacyPath } = resolveDbPath(env);
   for (const name of AUTO_SECRET_VARS) {
@@ -213,6 +218,8 @@ export function applyAutoSecrets({
         continue;
       }
     }
+
+    if (!create) continue;
 
     if (name === 'SESSION_SECRET') {
       if (!storedPath) {
