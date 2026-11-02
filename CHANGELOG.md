@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Stock: the minimum belongs to the product, and running low is read over all its batches**
+  (part 3 of #1448). Toothpaste with 1 in the bathroom, 8 in the attic and a minimum of 3 no
+  longer reads as running low: the household has 9. Milk with 1 l, 1 l and 2 l against a minimum
+  of 5 is running low once, as one product. Existing minimums move to their product once on
+  update; where batches of one product had different ones, the highest is kept, which warns early
+  rather than late. The minimum in the item dialog now sets it for the product with all its
+  batches, and a new batch leaves it alone unless you change the field. A product with several
+  batches shows "Running low" or "Out of stock" with a cart that puts the shortfall over all
+  batches on the shopping list; its batches keep their expiry but no longer say "Running low"
+  each. A product whose last batch is used up shows its minimum and counts as out of stock only
+  when it has one; without a minimum it is listed plainly and adds nothing to the number on the
+  pantry tab. Renaming an item, or changing its unit, takes its minimum along, unless the new name
+  already has one of its own; the old name, left without items, keeps none, so a rename does not
+  change the number on the pantry tab. The running low filter lists products, and "Add all to
+  shopping list" adds each product once. The number on the pantry tab counts a product once, also
+  when it is running low and has an expired batch. For API clients, `products` in
+  `GET /api/v1/pantry` additionally returns `min_quantity` and `total_quantity`, `import-pantry`
+  takes a `quantity` with `pantry_product_id`, and `GET /api/v1/kitchen/summary` counts `low` and `out`
+  per product.
+
+### Deprecated
+- **`min_quantity` on a pantry item (`/api/v1/pantry`) is deprecated and will be removed in the
+  first minor release on or after 2027-03-01** (part 3 of #1448), at least 90 days after this
+  release, as MODULES.md promises for `/api/v1`. The minimum belongs to the product now. Until the
+  field goes, it returns the minimum of the item's product, and writing it on an item (create with
+  a number, replace or partial update when the field is sent, null clears) sets the minimum of the
+  product for all its batches, so a client that worked yesterday keeps working. A replace or create
+  without the field no longer clears it. Read the minimum from `products` in `GET /api/v1/pantry`;
+  writing it on the product itself comes with a later part of #1448, before the field goes.
+
 ## [2.84.0] - 2026-11-02
 
 ### Added

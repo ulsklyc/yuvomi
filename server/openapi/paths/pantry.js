@@ -1,5 +1,14 @@
 import { op, jsonBody, idParam } from '../helpers.js';
 
+/**
+ * `min_quantity` on a pantry item since #1448, step 3: the product's value,
+ * written through to the product. Deprecated; the CHANGELOG names the version
+ * in which the batch field goes.
+ */
+const MIN_QUANTITY_MIRROR = '`min_quantity` on a pantry item is deprecated: it returns the minimum of the product the item belongs to, and a write of it on a batch '
+  + '(create with a number, replace or partial update when the field is sent; null clears) is written through to the product, so it applies to all its batches. '
+  + 'A replace or create without the field leaves the minimum of the product alone. Read the minimum from `products` instead.';
+
 export function pantryPaths() {
   return {
     '/api/v1/pantry': {
@@ -9,10 +18,12 @@ export function pantryPaths() {
           + 'batches with the same name, compared trimmed, case-insensitive and with collapsed whitespace, and the same unit share one product. '
           + 'The server sets it on every write that changes the name, unit or category, and moves the batch to another product when the name or unit no longer matches; '
           + 'a `product_id` in a request body is ignored. Every pantry item response carries it. '
-          + '`products` lists the household products (`id`, `name`, `unit`, `category`, `batch_count`), including products whose last batch is gone (`batch_count` 0).',
+          + '`products` lists the household products (`id`, `name`, `unit`, `category`, `min_quantity`, `batch_count`, `total_quantity`), including products whose last batch is gone (`batch_count` 0, `total_quantity` 0). '
+          + 'The minimum belongs to the product: a product is out of stock when `total_quantity` is 0 and running low when it is at or below `min_quantity`. '
+          + MIN_QUANTITY_MIRROR,
         tag: 'Pantry',
       }),
-      post: op({ summary: 'Create pantry item', tag: 'Pantry', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create pantry item', description: MIN_QUANTITY_MIRROR, tag: 'Pantry', stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/pantry/locations': {
       get: op({ summary: 'List storage locations', tag: 'Pantry' }),
@@ -71,8 +82,8 @@ export function pantryPaths() {
       }),
     },
     '/api/v1/pantry/{itemId}': {
-      put: op({ summary: 'Replace pantry item', tag: 'Pantry', params: [idParam('itemId', 'Item ID')], stateChanging: true, requestBody: jsonBody(null) }),
-      patch: op({ summary: 'Partially update pantry item', tag: 'Pantry', params: [idParam('itemId', 'Item ID')], stateChanging: true, requestBody: jsonBody(null) }),
+      put: op({ summary: 'Replace pantry item', description: MIN_QUANTITY_MIRROR, tag: 'Pantry', params: [idParam('itemId', 'Item ID')], stateChanging: true, requestBody: jsonBody(null) }),
+      patch: op({ summary: 'Partially update pantry item', description: MIN_QUANTITY_MIRROR, tag: 'Pantry', params: [idParam('itemId', 'Item ID')], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete pantry item', tag: 'Pantry', params: [idParam('itemId', 'Item ID')], stateChanging: true }),
     },
   };
