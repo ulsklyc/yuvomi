@@ -10,10 +10,10 @@
   <meta name="robots" content="index, follow">
   <meta name="color-scheme" content="light dark">
   <title>Install Yuvomi - Self-Hosted Family Planner</title>
-  <meta name="description" content="Step-by-step installation guide for Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid or the guided web installer. Your self-hosted family planner runs in about 10 minutes.">
+  <meta name="description" content="Step-by-step installation guide for Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid, Home Assistant or the guided web installer. Your self-hosted family planner runs in about 10 minutes.">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Install Yuvomi - Self-Hosted Family Planner">
-  <meta property="og:description" content="Get Yuvomi running in about 10 minutes: guided web installer, Docker, Podman, Proxmox, TrueNAS, Umbrel or Unraid.">
+  <meta property="og:description" content="Get Yuvomi running in about 10 minutes: guided web installer, Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid or Home Assistant.">
   <meta property="og:image" content="https://yuvomi.cloud/og-image.png">
   <meta property="og:url" content="https://yuvomi.cloud/install.html">
   <meta property="og:site_name" content="Yuvomi">
@@ -22,7 +22,7 @@
   <meta property="og:image:alt" content="Yuvomi - one home instead of many subscriptions, beside the overview of the self-hosted family planner in a browser window">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Install Yuvomi - Self-Hosted Family Planner">
-  <meta name="twitter:description" content="Get Yuvomi running in about 10 minutes: guided web installer, Docker, Podman, Proxmox, TrueNAS, Umbrel or Unraid.">
+  <meta name="twitter:description" content="Get Yuvomi running in about 10 minutes: guided web installer, Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid or Home Assistant.">
   <meta name="twitter:image" content="https://yuvomi.cloud/twitter-image.png">
   <meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)">
@@ -171,7 +171,7 @@
 
     /* Tabs */
     .tab-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
-    /* Full-width caption forces a flex line break, splitting the seven options
+    /* Full-width caption forces a flex line break, splitting the eight options
        into two graspable clusters (terminal vs one-click). aria-hidden: the JS
        tablist still owns only the .tab-btn elements. */
     .tab-group { flex-basis: 100%; display: flex; align-items: center; gap: 12px; margin: 2px 2px 0;
@@ -587,7 +587,7 @@
   <header class="hero">
     <div class="container">
       <h1 class="reveal"><span data-t="hero_title_pre">Install Yuvomi</span> <em data-t="hero_title_em">your way.</em></h1>
-      <p class="hero-desc reveal" data-t="hero_desc">Seven ways to install, one result: your own private Yuvomi in about ten minutes.</p>
+      <p class="hero-desc reveal" data-t="hero_desc">Eight ways to install, one result: your own private Yuvomi in about ten minutes.</p>
     </div>
   </header>
 
@@ -624,6 +624,9 @@
         </button>
         <button class="tab-btn" role="tab" aria-selected="false" aria-describedby="tabgrp-store" aria-controls="panel-unraid" id="tab-unraid" type="button" style="--pc:#FF8C2F">
           <span class="tb-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.406 8.528h1.17v6.926h-1.17zM1.17 15.454H0V8.528h1.17zm4.534.828h1.17v2.645h-1.17zm-2.86-2.969h1.169v4.282h-1.17zm5.703 0h1.17v4.282h-1.17zM22.83 8.528H24v6.926h-1.17zm-4.534-.81h-1.17V5.073h1.17zm2.86 2.95h-1.169V6.406h1.17zm-5.72 0h-1.17V6.406h1.17z"/></svg></span><span data-t="tab_unraid">Unraid</span> <span class="tb-one" data-t="tab_one">1-click</span>
+        </button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-describedby="tabgrp-store" aria-controls="panel-homeassistant" id="tab-homeassistant" type="button" style="--pc:#18BCF2">
+          <span class="tb-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22.939 10.627 13.061.749a1.505 1.505 0 0 0-2.121 0l-9.879 9.878C.478 11.21 0 12.363 0 13.187v9c0 .826.675 1.5 1.5 1.5h9.227l-4.063-4.062a2.034 2.034 0 0 1-.664.113c-1.13 0-2.05-.92-2.05-2.05s.92-2.05 2.05-2.05 2.05.92 2.05 2.05c0 .233-.041.456-.113.665l3.163 3.163V9.928a2.05 2.05 0 0 1-1.15-1.84c0-1.13.92-2.05 2.05-2.05s2.05.92 2.05 2.05a2.05 2.05 0 0 1-1.15 1.84v8.127l3.146-3.146A2.051 2.051 0 0 1 18 12.239c1.13 0 2.05.92 2.05 2.05s-.92 2.05-2.05 2.05c-.25 0-.488-.047-.709-.13L12.9 20.602v3.088h9.6c.825 0 1.5-.675 1.5-1.5v-9c0-.825-.477-1.977-1.061-2.561z"/></svg></span><span data-t="tab_homeassistant">Home Assistant</span>
         </button>
       </div>
 
@@ -767,7 +770,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
     var T = {
       en: {
         hero_title_pre:'Install Yuvomi', hero_title_em:'your way.',
-        hero_desc:'Seven ways to install, one result: your own private Yuvomi in about ten minutes.',
+        hero_desc:'Eight ways to install, one result: your own private Yuvomi in about ten minutes.',
         nav_main:'Main', foot_nav:'Footer', lang_aria:'Language', nav_gh:'GitHub', nav_install:'Install', tablist_label:'Installation options', code_label:'Command block',
         prereq_title:'What you need', prereq_gist:'Docker or Podman, a terminal, 256 MB RAM',
         prereq_desc:'Yuvomi runs as a Docker or Podman container, so there is no Node.js or other runtime to install. App-store installs bring even the container engine along; only the guided web installer also needs Git and Node.js.',
@@ -820,6 +823,14 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         step_ur1_title:'Open Community Applications', step_ur1_desc:'In Unraid, open the Apps tab (the Community Applications plugin) and search for Yuvomi.',
         step_ur2_title:'Configure the template', step_ur2_desc:'Click Install. Set SESSION_SECRET (required) and DB_ENCRYPTION_KEY (optional, but irreversible once set - back it up). Adjust the WebUI port and the appdata path if needed.',
         step_ur3_title:'Apply and open', step_ur3_desc:'Click Apply. Once the container is running, click the Yuvomi icon → WebUI. The first visit walks you through creating your admin account.',
+        tab_homeassistant:'Home Assistant',
+        opt_ha_info:'No terminal required. Yuvomi runs as an app next to Home Assistant, on Home Assistant OS or a Supervised installation (amd64 or aarch64, such as a Raspberry Pi 4/5 or Home Assistant Green). It is Yuvomi itself, not an integration: it adds no entities.',
+        step_ha1_title:'Add the repository', step_ha1_desc:'In Home Assistant, go to Settings → Apps → Install app, open the menu at the top right, choose Repositories and add this address:',
+        step_ha2_title:'Install and start', step_ha2_desc:'Search for Yuvomi, install it and start it. The app generates the session secret itself; database encryption is an option on its Configuration tab.',
+        step_ha3_title:'Open the Web UI', step_ha3_desc:'Select Open Web UI on the app\'s page. The first visit walks you through creating your admin account.',
+        success_desc_ha:'Select Open Web UI on the app\'s page in Home Assistant. Yuvomi answers on port 3000 of your Home Assistant host, for example <code>http://homeassistant.local:3000</code>, which is also the address for the family\'s phones. The first visit walks you through creating your admin account.',
+        env_where_ha:'In Home Assistant the app generates the session secret itself, so there is nothing to fill in. The database key is the Encrypt database option on the app\'s Configuration tab: leave the key field empty and the app creates one and writes a copy to <code>db_encryption_key.txt</code> in its config folder. Keep that copy outside Home Assistant.',
+        optional_where_ha:'In Home Assistant you add them under Additional environment variables on the app\'s Configuration tab, then restart the app.',
         path_now:'You are installing on', path_change:'Change',
         success_title:'Open Yuvomi', success_desc:'Open this address in your browser. The first visit walks you through creating your admin account.',
         scope_terminal:'Docker, Podman or from source',
@@ -874,12 +885,12 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         foot_legal:'Legal', foot_impressum:'Imprint (DE)', foot_privacy:'Privacy',
         foot_madewith:'Self-hosted · Privacy-first · Open source',
         to_top:'Back to top',
-        meta_desc:'Step-by-step installation guide for Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid or the guided web installer. Your self-hosted family planner runs in about 10 minutes.',
+        meta_desc:'Step-by-step installation guide for Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid, Home Assistant or the guided web installer. Your self-hosted family planner runs in about 10 minutes.',
         skip_link:'Skip to content', copy:'Copy', copied:'Copied!', copyfail:'Copy failed'
       },
       de: {
         hero_title_pre:'Yuvomi installieren\u00a0-', hero_title_em:'euer Weg.',
-        hero_desc:'Sieben Wege, ein Ergebnis: euer eigenes, privates Yuvomi in rund zehn Minuten.',
+        hero_desc:'Acht Wege, ein Ergebnis: euer eigenes, privates Yuvomi in rund zehn Minuten.',
         nav_main:'Hauptnavigation', foot_nav:'Fußzeile', lang_aria:'Sprache', nav_gh:'GitHub', nav_install:'Installieren', tablist_label:'Installationswege', code_label:'Befehlsblock',
         prereq_title:'Was ihr braucht', prereq_gist:'Docker oder Podman, ein Terminal, 256 MB RAM',
         prereq_desc:'Yuvomi läuft als Docker- oder Podman-Container, Node.js oder eine andere Laufzeit müsst ihr also nicht installieren. App-Store-Installationen bringen sogar die Container-Engine mit; nur der geführte Web-Installer braucht zusätzlich Git und Node.js.',
@@ -931,6 +942,14 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         step_ur1_title:'Community Applications öffnen', step_ur1_desc:'In Unraid den Apps-Tab (das Community-Applications-Plugin) öffnen und nach Yuvomi suchen.',
         step_ur2_title:'Template konfigurieren', step_ur2_desc:'Auf Installieren klicken. SESSION_SECRET (erforderlich) und DB_ENCRYPTION_KEY (optional, aber einmal gesetzt unwiderruflich - sichern) setzen. WebUI-Port und appdata-Pfad bei Bedarf anpassen.',
         step_ur3_title:'Anwenden und öffnen', step_ur3_desc:'Auf Anwenden klicken. Sobald der Container läuft, auf das Yuvomi-Icon → WebUI klicken. Beim ersten Aufruf führt Yuvomi durch die Erstellung des Admin-Kontos.',
+        tab_homeassistant:'Home Assistant',
+        opt_ha_info:'Kein Terminal erforderlich. Yuvomi läuft als App neben Home Assistant, auf Home Assistant OS oder einer Supervised-Installation (amd64 oder aarch64, etwa Raspberry Pi 4/5 oder Home Assistant Green). Das ist Yuvomi selbst, keine Integration: Es legt keine Entitäten an.',
+        step_ha1_title:'Repository hinzufügen', step_ha1_desc:'In Home Assistant unter Einstellungen → Apps → App installieren oben rechts das Menü öffnen, Repositories wählen und diese Adresse hinzufügen:',
+        step_ha2_title:'Installieren und starten', step_ha2_desc:'Nach Yuvomi suchen, installieren und starten. Das Sitzungsgeheimnis erzeugt die App selbst; die Datenbankverschlüsselung ist eine Option im Reiter Konfiguration.',
+        step_ha3_title:'Web-Oberfläche öffnen', step_ha3_desc:'Auf der Seite der App die Weboberfläche öffnen (Open Web UI). Beim ersten Aufruf legt ihr dort euer Admin-Konto an.',
+        success_desc_ha:'Öffnet auf der Seite der App in Home Assistant die Weboberfläche (Open Web UI). Yuvomi antwortet auf Port 3000 eures Home-Assistant-Hosts, etwa <code>http://homeassistant.local:3000</code>; das ist auch die Adresse für die Handys der Familie. Beim ersten Aufruf legt ihr dort euer Admin-Konto an.',
+        env_where_ha:'In Home Assistant erzeugt die App das Sitzungsgeheimnis selbst, es gibt nichts auszufüllen. Der Datenbankschlüssel ist die Option „Datenbank verschlüsseln“ im Reiter Konfiguration der App: Lasst ihr das Schlüsselfeld leer, erzeugt die App einen und legt eine Kopie als <code>db_encryption_key.txt</code> in ihren Konfigurationsordner. Bewahrt diese Kopie außerhalb von Home Assistant auf.',
+        optional_where_ha:'In Home Assistant tragt ihr sie unter „Weitere Umgebungsvariablen“ im Reiter Konfiguration der App ein und startet die App neu.',
         path_now:'Ihr installiert auf', path_change:'Ändern',
         success_title:'Yuvomi öffnen', success_desc:'Öffnet diese Adresse im Browser. Beim ersten Aufruf legt ihr dort euer Admin-Konto an.',
         scope_terminal:'Docker, Podman oder aus Quellcode',
@@ -985,7 +1004,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         foot_legal:'Rechtliches', foot_impressum:'Impressum', foot_privacy:'Datenschutz',
         foot_madewith:'Selbst gehostet · Privacy-First · Open Source',
         to_top:'Nach oben',
-        meta_desc:'Schritt-für-Schritt-Anleitung zur Installation von Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid oder der geführte Web-Installer. Euer selbst gehosteter Familienplaner läuft in etwa 10 Minuten.',
+        meta_desc:'Schritt-für-Schritt-Anleitung zur Installation von Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid, Home Assistant oder der geführte Web-Installer. Euer selbst gehosteter Familienplaner läuft in etwa 10 Minuten.',
         skip_link:'Zum Inhalt springen', copy:'Kopieren', copied:'Kopiert!', copyfail:'Nicht kopiert'
       }
     };
@@ -1265,6 +1284,22 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
         <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_ur2_title">Configure the template</h3><p class="step-desc" data-t="step_ur2_desc">Click Install. Set SESSION_SECRET (required) and DB_ENCRYPTION_KEY (optional, but irreversible once set - back it up). Adjust the WebUI port and the appdata path if needed.</p></div></div>
         <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_ur3_title">Apply and open</h3><p class="step-desc" data-t="step_ur3_desc">Click Apply. Once the container is running, click the Yuvomi icon → WebUI. The first visit walks you through creating your admin account.</p></div></div>
       </div>
+
+      <!-- Home Assistant: the app from ulsklyc/yuvomi-home-assistant runs the
+           published image next to Home Assistant. It is not an integration and
+           adds no entities. Its launcher generates the session secret and
+           keeps encryption as an option (yuvomi/config.yaml, DOCS.md there). -->
+      <div class="tab-panel" id="panel-homeassistant" role="tabpanel" tabindex="0" aria-labelledby="tab-homeassistant">
+        <h3 class="panel-head" style="--pc:#18BCF2" data-t="tab_homeassistant">Home Assistant</h3>
+        <div class="callout callout-success">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span data-t="opt_ha_info">No terminal required. Yuvomi runs as an app next to Home Assistant, on Home Assistant OS or a Supervised installation (amd64 or aarch64, such as a Raspberry Pi 4/5 or Home Assistant Green). It is Yuvomi itself, not an integration: it adds no entities.</span>
+        </div>
+        <div class="step"><div class="step-num">1</div><div class="step-content"><h3 class="step-title" data-t="step_ha1_title">Add the repository</h3><p class="step-desc" data-t="step_ha1_desc">In Home Assistant, go to Settings → Apps → Install app, open the menu at the top right, choose Repositories and add this address:</p>
+          <div class="code-wrap"><div class="code-block"><span class="cmd">https://github.com/ulsklyc/yuvomi-home-assistant</span></div><button class="copy-btn" data-copy="https://github.com/ulsklyc/yuvomi-home-assistant" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_ha2_title">Install and start</h3><p class="step-desc" data-t="step_ha2_desc">Search for Yuvomi, install it and start it. The app generates the session secret itself; database encryption is an option on its Configuration tab.</p></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_ha3_title">Open the Web UI</h3><p class="step-desc" data-t="step_ha3_desc">Select Open Web UI on the app's page. The first visit walks you through creating your admin account.</p></div></div>
+      </div>
     </div>
   </section>
 
@@ -1281,6 +1316,7 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
            asked for both" was only true for TrueNAS and Unraid. -->
       <p class="section-desc scope" data-scope="store" data-t="env_where_store">On TrueNAS and Unraid both sit in the form you filled in at install, so there is no <code>.env</code> file to edit. You find them again in the app's configuration screen - but the database key, once set, stays as it is.</p>
       <p class="section-desc scope" data-scope="umbrel" data-t="env_where_umbrel">Umbrel sets both itself at install, from a secret it keeps for each app: there is nothing to fill in and no <code>.env</code> file to edit, and the database is encrypted from the first start.</p>
+      <p class="section-desc scope" data-scope="homeassistant" data-t="env_where_ha">In Home Assistant the app generates the session secret itself, so there is nothing to fill in. The database key is the Encrypt database option on the app's Configuration tab: leave the key field empty and the app creates one and writes a copy to <code>db_encryption_key.txt</code> in its config folder. Keep that copy outside Home Assistant.</p>
       <div class="env-grid">
         <div class="env-card reveal">
           <div class="env-name">SESSION_SECRET</div>
@@ -1331,6 +1367,10 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
         <div class="scope" data-scope="store umbrel">
           <p class="scope-head">TrueNAS, Umbrel, Unraid</p>
           <p data-t="success_desc_store">Open Yuvomi the way your app store offers it: the WebUI button on TrueNAS and Unraid, the Yuvomi tile on your Umbrel home screen. The address is your server's, not this machine's - <code>localhost</code> only works if you are sitting at the box itself. The first visit walks you through creating your admin account.</p>
+        </div>
+        <div class="scope" data-scope="homeassistant">
+          <p class="scope-head" data-t="tab_homeassistant">Home Assistant</p>
+          <p data-t="success_desc_ha">Select Open Web UI on the app's page in Home Assistant. Yuvomi answers on port 3000 of your Home Assistant host, for example <code>http://homeassistant.local:3000</code>, which is also the address for the family's phones. The first visit walks you through creating your admin account.</p>
         </div>
         <p style="font-size:var(--fs-small)" data-t="success_hint">Once you are in, invite the rest of the family by link from the Settings page, so everyone chooses their own password.</p>
         <!-- No primary button: the accent went to "GitHub", which is not the next
@@ -1406,6 +1446,7 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
       <div class="scope opt-restart" data-scope="terminal installer proxmox"><div class="eng-docker"><p class="eng-head">Docker</p><div class="code-wrap"><div class="code-block"><span class="cmd">docker compose up -d</span></div><button class="copy-btn" data-copy="docker compose up -d" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div><div class="eng-podman"><p class="eng-head">Podman</p><div class="code-wrap"><div class="code-block"><span class="cmd">podman compose -f podman-compose.yml up -d</span></div><button class="copy-btn" data-copy="podman compose -f podman-compose.yml up -d" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div></div>
       <p class="section-desc scope" data-scope="store" data-t="optional_where_store">On TrueNAS and Unraid you add them in the app's configuration screen and restart it.</p>
       <p class="section-desc scope" data-scope="umbrel" data-t="optional_where_umbrel">On Umbrel they need an override in the app's compose file.</p>
+      <p class="section-desc scope" data-scope="homeassistant" data-t="optional_where_ha">In Home Assistant you add them under Additional environment variables on the app's Configuration tab, then restart the app.</p>
       <div class="opt-grid">
         <div class="opt-card reveal"><h3 data-t="opt_https_title">HTTPS &amp; network access</h3><p data-t="opt_https_desc">Reach Yuvomi from other devices or the internet: set up Nginx as a reverse proxy with a free Let's Encrypt certificate.</p><a class="opt-guide" href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#https--reverse-proxy-nginx" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></div>
         <div class="opt-card reveal"><h3 data-t="opt_weather_title">Weather widget</h3><p data-t="opt_weather_desc">Show local weather on the dashboard via Open-Meteo, no API key. Set <code>WEATHER_LAT</code> and <code>WEATHER_LON</code> to your coordinates.</p></div>
@@ -1577,7 +1618,7 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
          are scopes of their own. A node lists every scope it serves
          (data-scope="terminal installer proxmox"), which keeps the shared
          .env paragraphs single. */
-      var SCOPE_OF = { truenas: 'store', umbrel: 'umbrel', unraid: 'store', proxmox: 'proxmox', installer: 'installer' };
+      var SCOPE_OF = { truenas: 'store', umbrel: 'umbrel', unraid: 'store', homeassistant: 'homeassistant', proxmox: 'proxmox', installer: 'installer' };
       var currentSlug = 'docker';
       function applyPathScope(slug){
         currentSlug = slug;

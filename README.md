@@ -167,6 +167,10 @@ and your data*.
 [Umbrel](https://yuvomi.cloud/install.html#umbrel) or [Unraid](https://yuvomi.cloud/install.html#unraid):
 search for Yuvomi in the catalog and install, no terminal.
 
+**In Home Assistant** on Home Assistant OS: add the repository
+[ulsklyc/yuvomi-home-assistant](https://github.com/ulsklyc/yuvomi-home-assistant) under Settings → Apps
+and install Yuvomi as an app ([steps](https://yuvomi.cloud/install.html#homeassistant)).
+
 **With Docker** on any server. The image `ghcr.io/ulsklyc/yuvomi:latest` is about 500 MB and runs
 on amd64 and arm64 (Raspberry Pi 4/5); Yuvomi needs one port, 3000 by default.
 
