@@ -65,7 +65,8 @@ test('GET /api/v1/version: names the product and the client contract without a c
   const data = await res.json();
   // `app_name` taugt nicht als Erkennung: ein Haushalt kann ihn umbenennen.
   assert.equal(data.product, 'yuvomi');
-  assert.ok(Number.isInteger(data.client_api) && data.client_api >= 0, 'client_api is a whole number');
+  // 1: Geraete, Kopplung, kommende Erinnerungen und die 39 Client-Operationen.
+  assert.equal(data.client_api, 1, 'client_api names the contract this server holds');
   assert.equal(data.version, undefined, 'the exact version stays behind sign-in');
   assert.equal(data.max_upload_bytes, undefined);
 });

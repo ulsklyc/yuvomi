@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`GET /api/v1/version` now says what it is talking about.** Two new public fields: `product` identifies a
   Yuvomi instance, and `client_api` is a whole number for the contract a native client relies on. A client can
   recognise a server and tell whether it is new enough before anyone signs in. The exact version stays
-  behind sign-in.
+  behind sign-in. This release sets `client_api` to 1: signed-in devices and pairing, upcoming reminders,
+  and the API operations a native client is built from.
 - **Upcoming reminders for a native client.** `GET /api/v1/reminders/upcoming` lists your reminders that
   are not due yet within a window of up to 14 days, so an app can schedule them on the device. Each row says
   exactly when it fires in `fires_at`, in UTC, also for older reminders stored with an offset. `types` can

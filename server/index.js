@@ -140,8 +140,10 @@ const DEFAULT_APP_NAME = 'Yuvomi';
 // arbeiten kann - nicht mit jedem Release. Ein Client vergleicht sie, statt die
 // genaue Version zu kennen: die bleibt hinter der Anmeldung, und ein zu alter
 // Server faellt auf, bevor jemand ein Passwort eintippt.
-// 0 heisst: noch kein Vertrag.
-const CLIENT_API_VERSION = 0;
+// 0 heisst: noch kein Vertrag. 1 umfasst die angemeldeten Geraete samt
+// Kopplung (`/auth/devices`), `GET /reminders/upcoming` mit `fires_at` und die
+// 39 Operationen, die test:openapi-client-contract festhaelt.
+const CLIENT_API_VERSION = 1;
 
 const app  = express();
 const PORT = process.env.PORT || 3000;

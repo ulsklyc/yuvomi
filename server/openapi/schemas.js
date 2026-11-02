@@ -1360,7 +1360,8 @@ export const schemas = {
               minimum: 0,
               description: 'The contract a native client relies on. It rises only when a client cannot work '
                 + 'without the change, not with every release, so a client can tell a server that is too old '
-                + 'before anyone signs in. 0 means no contract yet.',
+                + 'before anyone signs in. 0 means no contract yet. 1 covers signed-in devices and pairing, '
+                + '`GET /reminders/upcoming` with `fires_at`, and the operations a native client is built from.',
             },
             app_name: { type: 'string' },
             setup_required: { type: 'boolean' },
