@@ -3462,7 +3462,17 @@
         "memberRemoveLastAdmin": "कम से कम एक व्यवस्थापक रहना चाहिए।",
         "memberRemoveLastSsoAdmin": "यह SSO से जुड़ा अंतिम व्यवस्थापक है। पहले किसी दूसरे व्यवस्थापक को जोड़ें।",
         "backupWebdavUrlInvalid": "पता http:// या https:// से शुरू होना चाहिए।",
-        "icsSubscriptionGone": "यह सदस्यता अब मौजूद नहीं है।"
+        "icsSubscriptionGone": "यह सदस्यता अब मौजूद नहीं है।",
+        "backupDbKeyTitle": "डेटाबेस कुंजी",
+        "backupDbKeyGeneratedHint": "Yuvomi ने इसे पहली बार शुरू होने पर बनाया। इसकी एक कॉपी इस सर्वर से अलग कहीं रखें: इसके बिना, स्टोरेज खो जाने पर आपके बैकअप नहीं खुलेंगे।",
+        "backupDbKeyShow": "कुंजी दिखाएँ",
+        "backupDbKeyHide": "छिपाएँ",
+        "backupDbKeyCopy": "कॉपी करें",
+        "backupDbKeyCopied": "कुंजी कॉपी हो गई",
+        "backupDbKeyCopyFailed": "कॉपी नहीं हो सका। कुंजी चुनी हुई है, इसे हाथ से कॉपी करें।",
+        "backupDbKeyStoredAt": "सर्वर पर {{path}} में सहेजी गई",
+        "backupDbKeyConfigHint": "कुंजी आपके कॉन्फ़िगरेशन से आती है। इसे वहाँ सुरक्षित रखें: इसके बिना आपके बैकअप नहीं खुलेंगे।",
+        "backupDbKeyPlainHint": "डेटाबेस एन्क्रिप्टेड नहीं है, इसलिए बैकअप में आपका डेटा पढ़ने योग्य रूप में है। अपनी DB_ENCRYPTION_KEY के साथ, Yuvomi अगली बार शुरू होने पर इसे एन्क्रिप्ट करता है।"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",

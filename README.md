@@ -185,7 +185,8 @@ openssl rand -hex 32   # DB_ENCRYPTION_KEY
 > **Now open `.env` and replace both `REPLACE_WITH_…` placeholders** with the two values, in that
 > order, and write the second one down: it is the database key, and a lost or changed key never
 > opens the database again, not by you and not by us. With a placeholder left in, Yuvomi refuses
-> to start. To run without encryption, clear the `DB_ENCRYPTION_KEY` line instead of filling it.
+> to start. Or delete both lines, and Yuvomi generates them on the first start. To run without
+> encryption, delete the `DB_ENCRYPTION_KEY` line and set `DB_ENCRYPTION_AUTO_KEY=false`.
 
 ```bash
 docker compose up -d
@@ -206,8 +207,9 @@ and the [installation guide](docs/installation.md).
   [troubleshooting guide](docs/installation.md#troubleshooting) covers the common ones.
 - **Proxmox** - the same steps run inside a small Debian LXC: see the
   [Proxmox guide on yuvomi.cloud](https://yuvomi.cloud/install.html#proxmox).
-- **Encryption key** - optional, but there is no way back. The guided setup and Umbrel generate
-  one for you; with Compose, TrueNAS or Unraid you set it yourself, so write it down.
+- **Encryption key** - optional, but there is no way back. Left unset, a new installation
+  generates one on its first start; an admin finds it under Settings → Household → Backup and
+  restore. Write it down either way: without it, backups cannot be opened.
 - **Guided setup** - a localized setup wizard in your browser. It detects Docker or Podman, sets
   up single sign-on and scheduled backups, prepares Yuvomi for an HTTPS reverse proxy (the
   certificate stays with your proxy), then starts the container and creates your admin account.

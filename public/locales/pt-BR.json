@@ -3462,7 +3462,17 @@
         "memberRemoveLastAdmin": "Pelo menos um administrador deve permanecer.",
         "memberRemoveLastSsoAdmin": "Este é o último administrador vinculado ao SSO. Vincule outro administrador primeiro.",
         "backupWebdavUrlInvalid": "O endereço deve começar com http:// ou https://.",
-        "icsSubscriptionGone": "Esta assinatura não existe mais."
+        "icsSubscriptionGone": "Esta assinatura não existe mais.",
+        "backupDbKeyTitle": "Chave do banco de dados",
+        "backupDbKeyGeneratedHint": "O Yuvomi gerou a chave na primeira inicialização. Guarde uma cópia fora deste servidor: sem ela, seus backups não poderão ser abertos se o armazenamento for perdido.",
+        "backupDbKeyShow": "Mostrar chave",
+        "backupDbKeyHide": "Ocultar",
+        "backupDbKeyCopy": "Copiar",
+        "backupDbKeyCopied": "Chave copiada",
+        "backupDbKeyCopyFailed": "Não foi possível copiar. A chave está selecionada, copie-a manualmente.",
+        "backupDbKeyStoredAt": "Salva no servidor em {{path}}",
+        "backupDbKeyConfigHint": "A chave vem da sua configuração. Guarde-a lá com segurança: sem ela, seus backups não podem ser abertos.",
+        "backupDbKeyPlainHint": "O banco de dados não está criptografado, então os backups contêm seus dados de forma legível. Com uma DB_ENCRYPTION_KEY própria, o Yuvomi o criptografa na próxima inicialização."
     },
     "login": {
         "tagline": "Bem-vindo de volta. Sua casa em um só lugar.",

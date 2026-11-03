@@ -3580,7 +3580,17 @@
         "memberRemoveLastAdmin": "Musí zůstat alespoň jeden správce.",
         "memberRemoveLastSsoAdmin": "Toto je poslední správce propojený se SSO. Nejprve propojte dalšího správce.",
         "backupWebdavUrlInvalid": "Adresa musí začínat http:// nebo https://.",
-        "icsSubscriptionGone": "Toto předplatné už neexistuje."
+        "icsSubscriptionGone": "Toto předplatné už neexistuje.",
+        "backupDbKeyTitle": "Klíč databáze",
+        "backupDbKeyGeneratedHint": "Yuvomi ho vytvořil při prvním spuštění. Uschovej si kopii mimo tento server: bez něj nepůjde otevřít tvé zálohy, pokud přijdeš o úložiště.",
+        "backupDbKeyShow": "Zobrazit klíč",
+        "backupDbKeyHide": "Skrýt",
+        "backupDbKeyCopy": "Kopírovat",
+        "backupDbKeyCopied": "Klíč zkopírován",
+        "backupDbKeyCopyFailed": "Kopírování se nepovedlo. Klíč je označený, zkopíruj ho ručně.",
+        "backupDbKeyStoredAt": "Uloženo na serveru v {{path}}",
+        "backupDbKeyConfigHint": "Klíč pochází z tvé konfigurace. Uchovej ho tam v bezpečí: bez něj nepůjde tvé zálohy otevřít.",
+        "backupDbKeyPlainHint": "Databáze není šifrovaná, takže zálohy obsahují tvá data v čitelné podobě. S vlastním DB_ENCRYPTION_KEY ji Yuvomi při příštím spuštění zašifruje."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",
