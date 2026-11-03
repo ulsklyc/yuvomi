@@ -6130,7 +6130,7 @@
         "errorVitalUnit": "Ця одиниця не підходить для цього вимірювання."
     },
     "waste": {
-        "title": "Вивезення сміття",
+        "title": "Сміття",
         "overlay": "Вивезення сміття",
         "upcomingSectionTitle": "Найближчі вивезення",
         "typesSectionTitle": "Види та графіки",
