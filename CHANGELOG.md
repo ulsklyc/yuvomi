@@ -80,6 +80,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writing it on the product itself comes with a later part of #1448, before the field goes.
 
 ### Fixed
+- **The weather tile no longer shows your coordinates as the place name.** With coordinates but no
+  place name set, the tile and the API showed the raw position in full precision
+  (`54.31665773950043, 10.116079422296027`), the exact location of the home for everyone who sees
+  the overview. Without a name the tile now shows none, and `city` in `/api/v1/weather` is `null`.
+  Reported for the Home Assistant app in ulsklyc/yuvomi-home-assistant#4.
 - **The Budget title stands in full next to the month in every language.** From 390px up the title
   was cut off in eleven languages ("Presupues..." in Spanish even at 430px), because the month only
   moved to a row of its own below 390px. The head now measures: whenever the title would be cut off
