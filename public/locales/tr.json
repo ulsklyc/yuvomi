@@ -3224,7 +3224,7 @@
         "pageHealthPersonal": "Sağlık",
         "pageHealthPersonalDescription": "Sizde hangi sağlık görünümlerinin çıkacağını seçin.",
         "tasksDefaultsTitle": "Yeni görevler için varsayılan değerler",
-        "tasksDefaultsDescription": "Yeni görev iletişim kutusunu kendi tercihlerinizle önceden doldurun: görünürlük, kilit ve CalDAV hatırlatıcı listesi. Her ayrı görev yine de farklı değerler kullanabilir.",
+        "tasksDefaultsDescription": "Yeni görev iletişim kutusunu kendi tercihlerinle önceden doldur: görünürlük, kilit ve CalDAV hatırlatıcı listesi. Her ayrı görev yine de farklı değerler kullanabilir.",
         "tasksDefaultTargetLabel": "Varsayılan anımsatıcı listesi",
         "tasksDefaultTargetHint": "Yeni görevler bu listeye atanır. Oluştururken her seferinde başka bir hedef seçebilirsin.",
         "tasksDefaultTargetUnavailable": "Daha önce seçilen liste (artık kullanılamıyor)",

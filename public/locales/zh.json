@@ -3224,7 +3224,7 @@
         "pageHealthPersonal": "健康",
         "pageHealthPersonalDescription": "选择在你这里显示哪些健康视图。",
         "tasksDefaultsTitle": "新任务的默认设置",
-        "tasksDefaultsDescription": "使用您的选择预先填写新任务对话框：可见性、锁定和 CalDAV 提醒列表。每个单独的任务仍然可以使用不同的值。",
+        "tasksDefaultsDescription": "使用你的选择预先填写新任务对话框：可见性、锁定和 CalDAV 提醒列表。每个单独的任务仍然可以使用不同的值。",
         "tasksDefaultTargetLabel": "默认提醒列表",
         "tasksDefaultTargetHint": "新任务将归入此列表。创建时你仍可每次选择其他目标。",
         "tasksDefaultTargetUnavailable": "先前选择的列表（已不可用）",

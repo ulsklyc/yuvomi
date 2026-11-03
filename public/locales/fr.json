@@ -3224,7 +3224,7 @@
         "pageHealthPersonal": "Santé",
         "pageHealthPersonalDescription": "Choisissez les vues de santé qui apparaissent pour vous.",
         "tasksDefaultsTitle": "Paramètres par défaut pour les nouvelles tâches",
-        "tasksDefaultsDescription": "Préremplis le formulaire de nouvelle tâche avec tes propres choix : visibilité, verrouillage et liste de rappels CalDAV. Chaque tâche individuelle peut toujours utiliser des valeurs différentes.",
+        "tasksDefaultsDescription": "Préremplissez le formulaire de nouvelle tâche avec vos propres choix : visibilité, verrouillage et liste de rappels CalDAV. Chaque tâche individuelle peut toujours utiliser des valeurs différentes.",
         "tasksDefaultTargetLabel": "Liste de rappels par défaut",
         "tasksDefaultTargetHint": "Les nouvelles tâches sont affectées à cette liste. Vous pouvez choisir une autre cible à chaque création.",
         "tasksDefaultTargetUnavailable": "Liste sélectionnée précédemment (plus disponible)",

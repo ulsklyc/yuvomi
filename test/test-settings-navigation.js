@@ -2734,20 +2734,24 @@ function fakeDocument() {
       focus() {},
     };
   };
-  return { createElement };
+  return { createElement, documentElement: { classList: { toggle() {}, remove() {} } } };
 }
 
 const walkNodes = (nodes) => nodes.flatMap((node) => [node, ...walkNodes(node.children ?? [])]);
 
-async function withTasksDefaults({ preferences = {}, syncTargets }, run) {
+async function withTasksDefaults({ preferences = {}, syncTargets, householdSize = 2, otherReaders = [] }, run) {
   const { render } = await import('/settings/pages/personal-tasks.js');
   const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
+  const { setHouseholdSize, setOtherReaders, clearHouseholdSize } = await import('/utils/household.js');
   const prev = { window: globalThis.window, document: globalThis.document, error: console.error };
   const navigations = [];
   const puts = [];
   const toasts = [];
   globalThis.window = { yuvomi: { showToast: (...args) => toasts.push(args), navigate: (href) => navigations.push(href) } };
   globalThis.document = fakeDocument();
+  clearHouseholdSize();
+  setHouseholdSize(householdSize);
+  setOtherReaders(otherReaders);
   console.error = () => {};
   const state = { syncTargets };
   globalThis.__apiStub = {
@@ -2765,6 +2769,7 @@ async function withTasksDefaults({ preferences = {}, syncTargets }, run) {
   try {
     await run({ render, state, navigations, puts, toasts });
   } finally {
+    clearHouseholdSize();
     delete globalThis.__apiStub;
     globalThis.window = prev.window;
     globalThis.document = prev.document;
@@ -2837,7 +2842,7 @@ test('Standard-Erinnerungsliste: eine gescheiterte Abfrage ist ein Fehler mit Au
   });
 });
 
-test('Aufgaben-Standardwerte: Sichtbarkeit und Sperre erscheinen immer, gespeicherter Wert wird vorbelegt (#2125)', async () => {
+test('task defaults show saved visibility and lock when other members exist (#2125, #2366)', async () => {
   await withTasksDefaults({
     preferences: { tasks_default_visibility: 'assignees', tasks_default_locked: true },
     syncTargets: [],
@@ -2848,6 +2853,46 @@ test('Aufgaben-Standardwerte: Sichtbarkeit und Sperre erscheinen immer, gespeich
     assert.match(host.html, /id="tasks-default-locked"/, 'Sperrfeld fehlt');
     assert.match(host.html, /value="assignees" selected/, 'gespeicherter Wert "assignees" ist nicht vorbelegt');
     assert.match(host.html, / checked/, 'gespeicherter Wert "locked" ist nicht angehakt');
+  });
+});
+
+test('solo task defaults hide privacy controls and keep saved values when changing the reminder list (#2366)', async () => {
+  await withTasksDefaults({
+    preferences: { tasks_default_visibility: 'private', tasks_default_locked: true },
+    syncTargets: [LIST], householdSize: 1,
+  }, async ({ render, puts }) => {
+    const host = tasksDefaultsSheet();
+    await render(host, { user: { role: 'member' } });
+    assert.doesNotMatch(host.html, /id="tasks-default-(?:visibility|locked)"/);
+    const target = host.querySelector('#tasks-default-target');
+    assert.ok(target, 'reminder list remains available');
+    target.value = `caldav:${LIST.accountId}|${LIST.listUrl}`;
+    await target.fire('change');
+    assert.deepEqual(puts, [['/preferences', { tasks_default_target: target.value }]], 'hidden defaults are never reset');
+
+    const { setHouseholdSize } = await import('/utils/household.js');
+    setHouseholdSize(2);
+    await render(host, { user: { role: 'member' } });
+    assert.match(host.html, /value="private" selected/, 'saved visibility returns with another member');
+    assert.match(host.html, /id="tasks-default-locked"[^>]*checked/, 'saved lock returns with another member');
+  });
+});
+
+test('solo task defaults keep privacy controls when another account can read tasks (#2366)', async () => {
+  await withTasksDefaults({ syncTargets: [], householdSize: 1, otherReaders: ['tasks'] }, async ({ render }) => {
+    const host = tasksDefaultsSheet();
+    await render(host);
+    assert.match(host.html, /id="tasks-default-visibility"/);
+    assert.match(host.html, /id="tasks-default-locked"/);
+  });
+});
+
+test('task defaults keep privacy controls when household size is unknown (#2366)', async () => {
+  await withTasksDefaults({ syncTargets: [], householdSize: null }, async ({ render }) => {
+    const host = tasksDefaultsSheet();
+    await render(host);
+    assert.match(host.html, /id="tasks-default-visibility"/);
+    assert.match(host.html, /id="tasks-default-locked"/);
   });
 });
 

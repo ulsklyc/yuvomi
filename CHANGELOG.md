@@ -56,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kept the old one, so their ingredients landed under a name that no longer exists: at the bottom of the
   list, and ticking them off failed with "Invalid category". Deleting a category now moves these rows to the
   same fallback category as the shopping items.
+- **Task defaults follow the new-task dialog in a one-person household.** Visibility and
+  editing-lock defaults stay out of the way when nobody else can read tasks. Saved choices
+  remain intact and reappear when needed. The editing-lock switch and its hint no longer
+  overlap. The defaults description also uses the same form of address as its neighbouring
+  hints (#2366).
 
 ## [2.84.0] - 2026-11-02
 

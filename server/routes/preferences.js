@@ -22,6 +22,7 @@ import { syncPreventionRemindersForSubject } from '../services/prevention-remind
 import { syncAllFastingReminders } from '../services/fasting-reminders.js';
 import { isScreensaverEnabled } from './screensaver.js';
 import { rekeyForHouseholdZoneChange } from '../services/calendar-occurrence-overrides.js';
+import { VISIBILITY_VALUES } from '../services/visibility.js';
 // Geteilte isomorphe Util (#620, Allowlist in test/test-layer-boundary.js):
 // dasselbe Kennungsformat, das Event-Modal und Einstellungen verwenden.
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
@@ -1128,7 +1129,7 @@ router.put('/', (req, res) => {
 
     // Sichtbarkeit und Sperre als persoenliche Vorbelegung (#2125).
     if (tasks_default_visibility !== undefined) {
-      if (!['all', 'assignees', 'private'].includes(tasks_default_visibility)) {
+      if (!VISIBILITY_VALUES.includes(tasks_default_visibility)) {
         return res.status(400).json({ error: 'tasks_default_visibility must be "all", "assignees" or "private".', code: 400 });
       }
       cfgUserSet('tasks_default_visibility', req.authUserId, tasks_default_visibility);
