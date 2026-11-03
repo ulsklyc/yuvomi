@@ -574,6 +574,85 @@ test('install.sh fragt erst nach Generierung, wenn kein Schlüssel existiert', (
   assert.match(secrets, /continue/, 'bei bestehendem Wert muss die Abfrage übersprungen werden');
 });
 
+// Führt configure_secrets und preserve_unmanaged aus install.sh echt aus, gegen
+// eine .env aus `lines`; nur die Ausgabe-Helfer sind Stubs. Die Ausgabe nennt je
+// Secret Länge und Merker, nie den Wert.
+function runConfigureSecrets(lines) {
+  const src = installShSource();
+  const helpers = src.slice(src.indexOf('read_existing_env_value() {'), src.indexOf('on_interrupt()'));
+  const secrets = src.slice(src.indexOf('configure_secrets() {'), src.indexOf('# ── Step 3'));
+  const preserve = src.slice(src.indexOf('MANAGED_KEYS=('), src.indexOf('# ── Step 6'));
+  assert.ok(helpers && secrets && preserve, 'Funktionen in install.sh nicht gefunden');
+  const inArray = src.match(/^in_array\(\) \{.*\}$/m);
+  assert.ok(inArray, 'in_array fehlt');
+
+  const stubs = [
+    't() { printf "%s" "$1"; }', 'step() { :; }', 'info() { :; }', 'warn() { :; }',
+    'success() { printf "SUCCESS:%s\\n" "$1"; }', 'ask() { printf "ASK:%s\\n" "$1"; }',
+    'is_manual() { return 1; }', 'generate_secret() { printf "erzeugt"; }',
+  ].join('\n');
+  // Nur Länge und Merker ausgeben, nie den Wert.
+  const probe = [
+    'configure_secrets',
+    'for v in SESSION_SECRET DB_ENCRYPTION_KEY; do',
+    '  r="${v}_REUSED"; val="${!v}"; printf "%s:len=%s:reused=%s\\n" "$v" "${#val}" "${!r}"',
+    'done',
+    'preserve_unmanaged .env',
+  ].join('\n');
+
+  const dir = mkdtempSync(join(tmpdir(), 'oikos-env-'));
+  try {
+    writeFileSync(join(dir, '.env'), `${lines.join('\n')}\n`);
+    // Als Datei, nicht über stdin: configure_secrets liest mit `read` von
+    // stdin und würde bei `bash -s` den Rest des Skripts als Antwort schlucken.
+    writeFileSync(join(dir, 'probe.sh'), `${inArray[0]}\n${stubs}\n${helpers}\n${secrets}\n${preserve}\n${probe}\n`);
+    return execFileSync('bash', ['probe.sh'], { cwd: dir, encoding: 'utf8', input: '' });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('install.sh übernimmt SESSION_SECRET_FILE und DB_ENCRYPTION_KEY_FILE statt einen zweiten Wert zu schreiben', () => {
+  // configure_secrets kannte nur `<NAME>=` und die gespeicherte Datei. Mit
+  // `<NAME>_FILE` fragte der Rerun nach einem Wert oder erzeugte einen und
+  // schrieb ihn neben die _FILE-Zeile - applyFileSecrets() bricht den Start mit
+  // beiden Quellen ab, und ein neuer DB-Schlüssel passt nicht zur Datenbank.
+  const lines = [
+    'SESSION_SECRET_FILE=/run/secrets/session_secret',
+    'DB_ENCRYPTION_KEY_FILE=/run/secrets/db_key',
+  ];
+  const out = runConfigureSecrets(lines);
+  {
+    assert.doesNotMatch(out, /^ASK:/m, 'der Rerun fragt trotz <NAME>_FILE nach einem Wert');
+    assert.doesNotMatch(out, /secrets\.generated/, 'der Rerun erzeugt trotz <NAME>_FILE einen Wert');
+    assert.equal((out.match(/^SUCCESS:secrets\.reused$/gm) || []).length, 2,
+      'beide Secrets müssen als übernommen gemeldet werden');
+    for (const key of ['SESSION_SECRET', 'DB_ENCRYPTION_KEY']) {
+      assert.match(out, new RegExp(`^${key}:len=0:reused=yes$`, 'm'),
+        `${key} bekommt einen Wert neben ${key}_FILE - der App-Start bricht dann ab`);
+    }
+    // Die _FILE-Zeile selbst schreibt der Dialog nicht; sie muss über
+    // preserve_unmanaged in die neue .env kommen, sonst startet die App ohne
+    // Secret bzw. legt eine neue Datenbank an.
+    for (const line of lines) assert.ok(out.split('\n').includes(line), `Zeile geht beim Neuschreiben verloren: ${line}`);
+  }
+});
+
+test('install.sh hält eine leere _FILE-Zeile in einfachen Anführungszeichen nicht für eine Quelle', () => {
+  // Compose liest `<NAME>_FILE=''` als leer. read_existing_env_value() nimmt nur
+  // doppelte Anführungszeichen ab, also sah der Rerun einen Pfad `''`, leerte den
+  // daneben stehenden echten Wert, und die App stand ohne DB-Schlüssel da
+  // (Codex-Review zu #2490).
+  const out = runConfigureSecrets([
+    'SESSION_SECRET=abc',
+    "SESSION_SECRET_FILE=''",
+    'DB_ENCRYPTION_KEY=defg',
+    "DB_ENCRYPTION_KEY_FILE=''",
+  ]);
+  assert.match(out, /^SESSION_SECRET:len=3:reused=yes$/m, 'SESSION_SECRET geht neben leerem _FILE verloren');
+  assert.match(out, /^DB_ENCRYPTION_KEY:len=4:reused=yes$/m, 'DB_ENCRYPTION_KEY geht neben leerem _FILE verloren');
+});
+
 test('PRESERVED_KEYS deckt beide Startschlüssel ab', () => {
   assert.deepEqual([...PRESERVED_KEYS].sort(), ['DB_ENCRYPTION_KEY', 'SESSION_SECRET']);
 });
