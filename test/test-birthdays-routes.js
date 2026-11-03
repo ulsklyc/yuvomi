@@ -47,6 +47,7 @@ const dbmod = await import('../server/db.js');
 const { default: birthdaysRouter } = await import('../server/routes/birthdays.js');
 const {
   daysUntilBirthday,
+  BIRTHDAY_COLOR,
   deleteBirthdayArtifacts,
   hydrateBirthday,
   nextBirthdayAge,
@@ -310,6 +311,29 @@ test('GET /: syncAllBirthdayReminders materialisiert Kalender-Event für roh ein
   assert.equal(r.status, 200);
   // GET hat den Sync ausgelöst → Event ist jetzt verknüpft.
   assert.ok(db.prepare('SELECT calendar_event_id FROM birthdays WHERE id = ?').get(id).calendar_event_id);
+});
+
+test('GET /: eine im Kalender gewaehlte Farbe uebersteht den Abgleich, bei jedem Geburtstag', async () => {
+  // Gemeldet per Mail: zwei Geburtstage im Kalender auf dieselbe Farbe gestellt,
+  // und der erste verlor sie wieder. Der Abgleich schrieb BIRTHDAY_COLOR bei
+  // jedem Lauf zurueck, also hielt nur der zuletzt gespeicherte Termin seine Wahl.
+  const a = await call('POST', '/', { name: 'Farbe A', birth_date: '1980-03-03' });
+  const b = await call('POST', '/', { name: 'Farbe B', birth_date: '1981-04-04' });
+  const eventOf = (id) => db.prepare('SELECT calendar_event_id FROM birthdays WHERE id = ?').get(id).calendar_event_id;
+  const colorOf = (id) => db.prepare('SELECT color FROM calendar_events WHERE id = ?').get(eventOf(id)).color;
+  assert.equal(colorOf(a.body.data.id), BIRTHDAY_COLOR, 'ein neuer Termin bekommt die Geburtstagsfarbe');
+
+  db.prepare('UPDATE calendar_events SET color = ? WHERE id = ?').run('#2563EB', eventOf(a.body.data.id));
+  await call('GET', '/');
+  db.prepare('UPDATE calendar_events SET color = ? WHERE id = ?').run('#2563EB', eventOf(b.body.data.id));
+  await call('GET', '/');
+
+  assert.equal(colorOf(a.body.data.id), '#2563EB');
+  assert.equal(colorOf(b.body.data.id), '#2563EB');
+
+  // Bearbeiten des Geburtstags selbst nimmt die Wahl ebenfalls nicht weg.
+  await call('PUT', `/${a.body.data.id}`, { notes: 'neu' });
+  assert.equal(colorOf(a.body.data.id), '#2563EB');
 });
 
 test('GET /?q=: filtert nach Name (LIKE)', async () => {

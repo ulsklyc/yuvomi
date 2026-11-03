@@ -80,6 +80,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writing it on the product itself comes with a later part of #1448, before the field goes.
 
 ### Fixed
+- **A birthday keeps the color you give it in the calendar.** The birthday sync wrote its own red
+  back onto every birthday event each time it ran, which is on every visit to Birthdays and every
+  reminder check. Giving several birthdays the same color looked as if a color could be used only
+  once: the one changed last kept it, the earlier ones fell back to red. New birthdays still start
+  in red; after that the color is the calendar's. Reported by email.
 - **The weather tile no longer shows your coordinates as the place name.** With coordinates but no
   place name set, the tile and the API showed the raw position in full precision
   (`54.31665773950043, 10.116079422296027`), the exact location of the home for everyone who sees
