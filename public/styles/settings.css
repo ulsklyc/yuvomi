@@ -3880,11 +3880,6 @@
   margin-top: var(--space-3);
 }
 
-.settings-pairing[hidden],
-.settings-pairing__body[hidden] {
-  display: none;
-}
-
 .settings-pairing p {
   margin: 0;
 }
