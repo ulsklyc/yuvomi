@@ -13,6 +13,7 @@ import { settingRowHtml } from '/settings/components.js';
 import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
 import { birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { mediaPickerBadgeHtml } from '/utils/media-picker.js';
+import { bindSignedInDevices, signedInDevicesCardHtml } from '/settings/signed-in-devices.js';
 
 function avatarHtml(user, className = 'settings-avatar') {
   const safeName = esc(user?.display_name || '');
@@ -759,6 +760,9 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
 
       ${oidcCardHtml(oidcState, oidcNotice)}
 
+      ${/* Ein Ausgaben-Gast bekommt kein Geraet (mayHaveDevice, server/auth.js). */ ''}
+      ${user?.access_scope === 'split_guest' ? '' : signedInDevicesCardHtml()}
+
       ${otherSessionsCardHtml()}
     </section>
 
@@ -1106,6 +1110,7 @@ export async function render(container, { user }) {
       avatarData: currentUser?.avatar_data ?? null,
     }, { gravatarHost });
     bindTwoFactorEvents(container, () => render(container, { user: currentUser }));
+    bindSignedInDevices(container);
     container.querySelector('#account-retry')?.addEventListener('click', () => {
       render(container, { user: currentUser });
     });
