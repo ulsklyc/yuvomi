@@ -611,6 +611,9 @@ function bindSetupForm(card, reload) {
     button.disabled = true;
     try {
       const { data } = await auth.enableTwoFactor(code);
+      // Neu gezeichnet wird erst, wenn die Wiederherstellungscodes zu sind; die
+      // Geraete hat der Server schon jetzt abgemeldet.
+      form.dispatchEvent(new CustomEvent('other-sessions-ended', { bubbles: true }));
       renderRecoveryCodes(card, data.recovery_codes, () => { reload(); });
     } catch (err) {
       button.disabled = false;
@@ -1002,6 +1005,9 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
         new_password: newPassword,
       });
       passwordForm.reset();
+      // Wie "Auf anderen Geraeten abmelden": der Server beendet die
+      // angemeldeten Geraete und den offenen Kopplungscode mit.
+      passwordForm.dispatchEvent(new CustomEvent('other-sessions-ended', { bubbles: true }));
       window.yuvomi?.showToast(t('settings.passwordSavedToast'), 'success');
     } catch (error) {
       // Ein falsches aktuelles Passwort ist ein 400 mit Grund (server/auth.js),

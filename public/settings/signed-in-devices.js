@@ -303,9 +303,10 @@ export function bindSignedInDevices(container) {
     if (document.visibilityState === 'visible') (pairing ? tick() : load());
     return undefined;
   };
-  // "Auf anderen Geraeten abmelden" widerruft alle Geraete und entwertet den
-  // offenen Code (`invalidateUserSessions()` in server/auth.js): der Code
-  // verschwindet, die Liste kommt neu.
+  // "Auf anderen Geraeten abmelden", ein neues Passwort und das Einschalten der
+  // Zwei-Faktor-Anmeldung widerrufen alle Geraete und entwerten den offenen Code
+  // (`invalidateUserSessions()` in server/auth.js): der Code verschwindet, die
+  // Liste kommt neu.
   const onOtherSessionsEnded = () => {
     if (!card.isConnected) return detach();
     stopPairing();
