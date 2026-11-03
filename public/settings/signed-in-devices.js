@@ -239,7 +239,8 @@ export function bindSignedInDevices(container) {
     try {
       // Erst die Liste: ein Geraet, das sich seit dem letzten Takt angemeldet
       // hat, gehoert zum alten Code und darf nicht als Antwort auf den neuen gelten.
-      stopPairing();
+      // Der alte Takt laeuft weiter, bis der neue Code da ist: scheitert die
+      // Anfrage, bleibt der alte Code sichtbar und muss weiter ablaufen koennen.
       await load();
       const { data } = await api.post('/auth/devices/pair', { server: window.location.origin });
       stopPairing();
