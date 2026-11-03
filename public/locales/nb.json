@@ -5843,7 +5843,7 @@
         "errorVitalUnit": "Denne enheten passer ikke til denne målingen."
     },
     "waste": {
-        "title": "Avfallshåndtering",
+        "title": "Avfall",
         "overlay": "Avfallshåndtering",
         "upcomingSectionTitle": "Kommende hentinger",
         "typesSectionTitle": "Typer & tidsplaner",

@@ -5843,7 +5843,7 @@
         "errorVitalUnit": "Cette unité ne convient pas à cette mesure."
     },
     "waste": {
-        "title": "Collecte des déchets",
+        "title": "Déchets",
         "overlay": "Collecte des déchets",
         "upcomingSectionTitle": "Prochaines collectes",
         "typesSectionTitle": "Types et calendriers",

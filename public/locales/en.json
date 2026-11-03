@@ -5843,7 +5843,7 @@
         "errorVitalUnit": "This unit does not fit this measurement."
     },
     "waste": {
-        "title": "Waste collection",
+        "title": "Waste",
         "overlay": "Waste collection",
         "upcomingSectionTitle": "Upcoming pickups",
         "typesSectionTitle": "Types & schedules",

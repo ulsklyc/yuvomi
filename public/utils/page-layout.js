@@ -122,6 +122,7 @@ export function renderPageHeader({
   capped = false,
   stacked = false,
   titleTools = false,
+  foldSearch = false,
 } = {}) {
   const classes = [
     'page-toolbar',
@@ -130,6 +131,8 @@ export function renderPageHeader({
     // Werkzeugzeile hoechstens zwei Icon-Knoepfe traegt (DESIGN.md, Kopfregel
     // mobil 1a; layout.css `.page-toolbar--title-tools`).
     titleTools && 'page-toolbar--title-tools',
+    // Die Lupe faltet unter 390px ins "..." (#2443, layout.css).
+    foldSearch && 'page-toolbar--fold-search',
     narrow && 'page-toolbar--narrow',
     inGroup && 'page-toolbar--in-group',
     capped && 'page-toolbar--capped',

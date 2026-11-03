@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a signed-in device of the native app cannot read it.
 
 ### Fixed
+- **Long page titles stand in full next to search and a tool on phones.** Below 390px the search
+  button and the one tool beside the title (the import in Birthdays, categories in Notes) move into
+  a "..." menu, and in Documents the search joins the menu that is already there, so the head stays
+  on one row and the title is no longer cut off. "Search" is the first entry and opens the same
+  search field; a search term you entered keeps the field visible. The Waste page title is shorter
+  in every width ("Waste" instead of "Waste collection"), the navigation keeps the full name.
 - **Copying a new API token or a calendar feed link over plain HTTP no longer claims success.** On an
   installation reached without HTTPS the browser offers no clipboard, yet both copy buttons said
   "copied". They now say that copying did not work and select the value, so you can copy it by hand -

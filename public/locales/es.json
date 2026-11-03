@@ -5843,7 +5843,7 @@
         "errorVitalUnit": "Esta unidad no corresponde a esta medición."
     },
     "waste": {
-        "title": "Recogida de basura",
+        "title": "Basura",
         "overlay": "Recogida de basura",
         "upcomingSectionTitle": "Próximas recogidas",
         "typesSectionTitle": "Tipos y horarios",

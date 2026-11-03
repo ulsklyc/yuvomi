@@ -6125,7 +6125,7 @@
         "errorVitalUnit": "Ta jednostka nie pasuje do tego pomiaru."
     },
     "waste": {
-        "title": "Odbiór odpadów",
+        "title": "Odpady",
         "overlay": "Odbiór odpadów",
         "upcomingSectionTitle": "Nadchodzące odbiory",
         "typesSectionTitle": "Rodzaje i harmonogramy",

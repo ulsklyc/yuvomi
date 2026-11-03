@@ -5843,7 +5843,7 @@
         "errorVitalUnit": "Satuan ini tidak cocok untuk pengukuran ini."
     },
     "waste": {
-        "title": "Pengumpulan sampah",
+        "title": "Sampah",
         "overlay": "Pengumpulan sampah",
         "upcomingSectionTitle": "Pengambilan mendatang",
         "typesSectionTitle": "Jenis & jadwal",
