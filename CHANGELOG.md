@@ -47,6 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   storage is lost. The key appears only after a click and is not cached; viewing it is logged without
   the value. A key from your own configuration is never shown - the page says where it comes from -
   and a signed-in device of the native app cannot read it.
+- **Settings → Account lists the phones signed in with the native app and pairs a new one.** Each
+  signed-in device shows its name, platform and when it was last used, and can be signed out after a
+  confirmation. "Pair a device" shows a code that is valid for five minutes and once: as a QR code for a
+  second device, behind "Open in app" for the phone the page is open on, and as text to type. A household
+  that signs in only with single sign-on has no password to type into an app, and this is its way in.
+  While a code is open, the page names a device that has just signed in, so a phone you do not recognise
+  stands out and can be signed out on the spot.
 - **The Overview has its own tile arrangement on the phone.** On a phone, tapping Customize shows
   a "Phone tiles" mode that lets you reorder and show or hide tiles independently of the desktop
   layout. Options (calendar limit, task filters, shopping-list selection, etc.) follow the desktop
@@ -73,6 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writing it on the product itself comes with a later part of #1448, before the field goes.
 
 ### Fixed
+- **"Sign out on other devices" says that it signs out the native app too.** The server already
+  ended signed-in devices along with the other sessions; the hint under the button did not mention it.
 - **Deleting the first occurrence of a recurring event also stops its reminder.** A reminder on a series
   belongs to its first occurrence, and after that occurrence was deleted it still showed in the bell and
   arrived as a notification, also for a deleted first occurrence coming from an imported calendar (ICS,
