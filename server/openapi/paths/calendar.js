@@ -53,28 +53,42 @@ const DEFAULT_ASSIGNEES_INPUT = 'Optional `default_assignee_user_ids`: household
   + 'subscription is assigned to (#1897), the first one primary; or the earlier form `default_assignee_user_id` with one person '
   + 'or null. The answer carries both, the single field holding the first person.';
 
+/** Filter von `GET /calendar` (routes/calendar/read.js). */
+const EVENT_LIST_PARAMS = [
+  { name: 'from', in: 'query', required: false, schema: { type: 'string', format: 'date' }, description: '`YYYY-MM-DD`, first day of the range. Defaults to the first day of the current month in the household.' },
+  { name: 'to', in: 'query', required: false, schema: { type: 'string', format: 'date' }, description: '`YYYY-MM-DD`, last day of the range. Defaults to the last day of the current month in the household.' },
+  { name: 'assigned_to', in: 'query', required: false, schema: { type: 'integer' }, description: 'Only events this member is assigned to.' },
+  { name: 'source', in: 'query', required: false, schema: { type: 'string', enum: ['local', 'google', 'apple', 'ics'] }, description: 'Only events with this `external_source`. Any other value is ignored, `caldav` included.' },
+];
+
+const EVENT_LIST_SHAPE = ' A series comes as one row per occurrence in the range, all with the `id` of the series; `series_id` and `recurrence_id` tell them apart.';
+
 export function calendarPaths() {
   return withCaseReasons('calendar', CASE_REASONS, {
     '/api/v1/calendar': {
       get: op({
         summary: 'List calendar events',
+        operationId: 'listCalendarEvents',
         tag: 'Calendar',
-        description: 'Events generated from the birthdays module carry `birthday_name` and `birthday_date` (null for a birthday whose year is unknown, `year_unknown` on the birthday). Their `title` is stored in the household data language (see `language` in `/preferences`), so API consumers, the ICS feed and calendar sync all read the same wording; clients that display in a different language can re-render the title from `birthday_name`. While the household has the birthdays module switched off (`disabled_modules` in `/preferences`), these events are left out of this list, of `/calendar/upcoming`, of `/calendar/search` and of the ICS feed; a single one stays reachable by id, and the birthdays routes keep answering.',
+        params: EVENT_LIST_PARAMS,
+        description: 'Events generated from the birthdays module carry `birthday_name` and `birthday_date` (null for a birthday whose year is unknown, `year_unknown` on the birthday). Their `title` is stored in the household data language (see `language` in `/preferences`), so API consumers, the ICS feed and calendar sync all read the same wording; clients that display in a different language can re-render the title from `birthday_name`. While the household has the birthdays module switched off (`disabled_modules` in `/preferences`), these events are left out of this list, of `/calendar/upcoming`, of `/calendar/search` and of the ICS feed; a single one stays reachable by id, and the birthdays routes keep answering.' + EVENT_LIST_SHAPE,
         responses: {
           200: {
             description: 'Calendar events',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/CalendarEventsResponse' } } },
           },
+          400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
       post: op({
         summary: 'Create calendar event',
+        operationId: 'createCalendarEvent',
         tag: 'Calendar',
         stateChanging: true,
         description: 'Supports optional document-storage attachments via `attachment_name`, `attachment_mime`, `attachment_size`, and `attachment_data` (base64 data URL). New attachments are linked through `attachment_document_id`; legacy events may still return `attachment_data`. Set `target_caldav_account_id` and `target_caldav_calendar_url` to push the event to a CalDAV calendar (omit or null for a local-only event).' + ATTACHMENT_RIGHTS + DATETIME_INPUT + SERIES_END_INPUT,
-        requestBody: jsonBody(null),
+        requestBody: jsonBody('#/components/schemas/CalendarEventCreateInput'),
         responses: {
           201: {
             description: 'Calendar event created',
@@ -87,7 +101,23 @@ export function calendarPaths() {
         },
       }),
     },
-    '/api/v1/calendar/upcoming': { get: op({ summary: 'List upcoming events', tag: 'Calendar' }) },
+    '/api/v1/calendar/upcoming': {
+      get: op({
+        summary: 'List upcoming events',
+        operationId: 'listUpcomingCalendarEvents',
+        tag: 'Calendar',
+        description: 'The next events from now on, looking 90 days ahead, oldest first.' + EVENT_LIST_SHAPE + ' Without `from` and `to`, unlike `GET /calendar`, and without `creator_name`.',
+        params: [{ name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 20, default: 5 }, description: 'At most 20; a larger value is cut to 20 without an error.' }],
+        responses: {
+          200: {
+            description: 'Upcoming calendar events',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/CalendarEventsResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
     '/api/v1/calendar/search': { get: op({ summary: 'Search events by title, location, or notes', tag: 'Calendar', description: 'Diacritic-insensitive full-text search across all family-visible calendar events (`q`, min 2 chars). Returns `{ data: Event[], total }` sorted chronologically; recurring matches resolve to their next occurrence. Backs the calendar toolbar search (#471).' }) },
     '/api/v1/calendar/holidays': { get: op({ summary: 'List public & school holidays in a date range', tag: 'Calendar', description: 'Reads cached OpenHolidays entries that overlap `from`/`to` (both `YYYY-MM-DD`, required). Returns `{ data: [{ id, type (`public`|`school`), start_date, end_date, name, color }] }`. Empty when no holiday country is configured.' }) },
     '/api/v1/calendar/google/auth': { get: op({ summary: 'Start Google Calendar OAuth', tag: 'Calendar', admin: true }) },
@@ -137,6 +167,7 @@ export function calendarPaths() {
     '/api/v1/calendar/calendars': {
       get: op({
         summary: 'List local calendars',
+        operationId: 'listLocalCalendars',
         tag: 'Calendar',
         description: 'Feed URLs and tokens are included only for administrators. `uploads_to_icloud` is true on the default calendar while the legacy Apple Calendar connection is configured: its events upload to iCloud, events in other local calendars stay local. Beside `data` (the local calendars) the answer carries `sources`: every calendar the caller can pick for the calendar tile of the overview, under the keys `GET /dashboard` takes as `events_calendar` - own calendars first in their managed order, then synced calendars that hold an appointment the caller may see and the ICS subscriptions the caller sees (shared or own), sorted by name.',
         responses: {
@@ -148,7 +179,7 @@ export function calendarPaths() {
                   type: 'object',
                   required: ['data', 'sources'],
                   properties: {
-                    data: { type: 'array', items: { type: 'object', additionalProperties: true } },
+                    data: { type: 'array', items: { $ref: '#/components/schemas/LocalCalendarListItem' } },
                     sources: {
                       type: 'array',
                       items: {
@@ -421,6 +452,7 @@ export function calendarPaths() {
     '/api/v1/calendar/{id}': {
       get: op({
         summary: 'Get calendar event',
+        operationId: 'getCalendarEvent',
         tag: 'Calendar',
         params: [idParam()],
         responses: {
@@ -435,11 +467,12 @@ export function calendarPaths() {
       }),
       put: op({
         summary: 'Update calendar event',
+        operationId: 'updateCalendarEvent',
         tag: 'Calendar',
         params: [idParam()],
         stateChanging: true,
         description: 'Supports document-storage attachments. Omit attachment fields to preserve the current attachment, send new `attachment_data` to create and link a document, or set `remove_attachment` to true to unlink it without deleting the library document. Legacy events may still return `attachment_data`. A recurrence-rule or anchor change that would orphan linked replacements returns 409 with `calendar_override_orphans` and the exact `orphaned_override_count`; retry with the same value in `confirmed_orphan_count` to preserve those replacements as standalone events. The same confirmation is required before assigning an outbound target to a series with linked replacements. Changing a mirrored field (title, description, location, color, all-day, start/end, recurrence) of an event synced to Google pushes the change there, and switching `target_google_calendar_id` moves it to the other Google calendar. The remote call runs after the response and is retried by the next sync run if it fails. PUT stores the validated start and end, exactly as POST does; up to v2.68.0 it wrote the raw request value. `start_datetime` may be omitted to keep it, but an empty or null start is rejected with 400; an empty or null `end_datetime` clears the end.' + ATTACHMENT_RIGHTS + DATETIME_INPUT + SERIES_END_INPUT,
-        requestBody: jsonBody(null),
+        requestBody: jsonBody('#/components/schemas/CalendarEventUpdateInput'),
         responses: {
           200: {
             description: 'Calendar event updated',
@@ -458,10 +491,19 @@ export function calendarPaths() {
       }),
       delete: op({
         summary: 'Delete calendar event',
+        operationId: 'deleteCalendarEvent',
         tag: 'Calendar',
         params: [idParam()],
         stateChanging: true,
         description: 'An event mirrored to Google Calendar is deleted there as well. The remote call runs after the response; if it fails, the next sync run retries it.',
+        responses: {
+          204: { description: 'Calendar event deleted' },
+          400: apiError('A linked occurrence of a series; it goes through the occurrence routes (reason `calendar_occurrence_route_required`).'),
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: apiError('Calendar event not found'),
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/calendar/{id}/reset': {

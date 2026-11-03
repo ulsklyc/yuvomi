@@ -358,6 +358,11 @@
         "customizeResetDetail": "Your own arrangement is deleted. You see the household default again - including any later change to it.",
         "customizeDiscardDetail": "Your changes to the arrangement will be lost. The last saved layout stays.",
         "customizeScopeHint": "What you change here applies to you only.",
+        "customizePhoneScopeHint": "Just this phone. Changes here affect only your phone's tile order.",
+        "customizePhoneTitle": "Phone tiles",
+        "customizePhoneReset": "Same as desktop",
+        "customizePhoneResetDone": "Phone arrangement reset.",
+        "customizePhoneResetConfirm": "Reset to same as desktop?",
         "customizeFollowsDefault": "Your overview follows the household default.",
         "customizeSetDefault": "Set as household default",
         "customizeSetDefaultConfirm": "Make this arrangement the household default?",
@@ -3462,7 +3467,17 @@
         "memberRemoveLastAdmin": "At least one administrator must remain.",
         "memberRemoveLastSsoAdmin": "This is the last administrator linked to SSO. Link another administrator first.",
         "backupWebdavUrlInvalid": "The address must start with http:// or https://.",
-        "icsSubscriptionGone": "This subscription no longer exists."
+        "icsSubscriptionGone": "This subscription no longer exists.",
+        "backupDbKeyTitle": "Database key",
+        "backupDbKeyGeneratedHint": "Yuvomi generated it on first start. Keep a copy somewhere other than this server: without it, your backups cannot be opened if the storage is lost.",
+        "backupDbKeyShow": "Show key",
+        "backupDbKeyHide": "Hide",
+        "backupDbKeyCopy": "Copy",
+        "backupDbKeyCopied": "Key copied",
+        "backupDbKeyCopyFailed": "Copying did not work. The key is selected, copy it by hand.",
+        "backupDbKeyStoredAt": "Stored on the server in {{path}}",
+        "backupDbKeyConfigHint": "The key comes from your configuration. Keep it safe there: without it, your backups cannot be opened.",
+        "backupDbKeyPlainHint": "The database is not encrypted, so backups contain your data in readable form. With a DB_ENCRYPTION_KEY of your own, Yuvomi encrypts it on the next start."
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",
@@ -5833,7 +5848,7 @@
         "errorVitalUnit": "This unit does not fit this measurement."
     },
     "waste": {
-        "title": "Waste collection",
+        "title": "Waste",
         "overlay": "Waste collection",
         "upcomingSectionTitle": "Upcoming pickups",
         "typesSectionTitle": "Types & schedules",

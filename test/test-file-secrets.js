@@ -130,7 +130,9 @@ test('der Start-Handschlag lädt das Secret und beendet sich bei einem Fehler mi
   const loader = fileURLToPath(new URL('../server/utils/load-file-secrets.js', import.meta.url));
   const probe = `await import(${JSON.stringify(loader)}); process.stdout.write(process.env.SESSION_SECRET ?? '');`;
   const run = (env) => spawnSync(process.execPath, ['--input-type=module', '-e', probe], {
-    env: { PATH: process.env.PATH, LOG_LEVEL: 'error', ...env },
+    // DB_PATH: ohne landete ein beim Start erzeugter Schluessel in
+    // `.secrets/` im Arbeitsbaum (server/utils/auto-secrets.js).
+    env: { PATH: process.env.PATH, LOG_LEVEL: 'error', DB_PATH: ':memory:', ...env },
     encoding: 'utf8',
   });
 
@@ -178,7 +180,7 @@ test('der Start-Handschlag warnt bei 0644 und startet trotzdem', () => {
   const p = secretFile('i', 'locker\n');
   chmodSync(p, 0o644);
   const res = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(loader)});`], {
-    env: { PATH: process.env.PATH, LOG_LEVEL: 'warn', SESSION_SECRET_FILE: p },
+    env: { PATH: process.env.PATH, LOG_LEVEL: 'warn', DB_PATH: ':memory:', SESSION_SECRET_FILE: p },
     encoding: 'utf8',
   });
   assert.equal(res.status, 0);

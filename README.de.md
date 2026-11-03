@@ -169,6 +169,10 @@ unter *Voraussetzungen, Netzwerk und eure Daten*.
 [Umbrel](https://yuvomi.cloud/install.html#umbrel) oder [Unraid](https://yuvomi.cloud/install.html#unraid):
 im Katalog nach Yuvomi suchen und installieren, ganz ohne Terminal.
 
+**In Home Assistant** auf Home Assistant OS: das Repository
+[ulsklyc/yuvomi-home-assistant](https://github.com/ulsklyc/yuvomi-home-assistant) unter Einstellungen → Apps
+hinzufügen und Yuvomi als App installieren ([Schritte](https://yuvomi.cloud/install.html#homeassistant)).
+
 **Mit Docker** auf jedem Server. Das Image `ghcr.io/ulsklyc/yuvomi:latest` ist rund 500 MB groß und
 läuft auf amd64 und arm64 (Raspberry Pi 4/5); Yuvomi braucht einen Port, standardmäßig 3000.
 
@@ -183,8 +187,9 @@ openssl rand -hex 32   # DB_ENCRYPTION_KEY
 > **Öffnet jetzt `.env` und ersetzt beide `REPLACE_WITH_…`-Platzhalter** durch die zwei Werte, in
 > dieser Reihenfolge, und schreibt den zweiten auf: er ist der Datenbankschlüssel, und ein
 > verlorener oder geänderter Schlüssel öffnet die Datenbank nie wieder, weder für euch noch für
-> uns. Bleibt ein Platzhalter stehen, startet Yuvomi nicht. Ohne Verschlüsselung: die Zeile
-> `DB_ENCRYPTION_KEY` leeren statt sie zu füllen.
+> uns. Bleibt ein Platzhalter stehen, startet Yuvomi nicht. Oder löscht beide Zeilen, dann erzeugt
+> Yuvomi sie beim ersten Start. Ohne Verschlüsselung: die Zeile `DB_ENCRYPTION_KEY` löschen und
+> `DB_ENCRYPTION_AUTO_KEY=false` setzen.
 
 ```bash
 docker compose up -d
@@ -193,9 +198,6 @@ docker compose up -d
 Öffnet `http://localhost:3000` und legt euer Admin-Konto an. Podman, Proxmox, HTTPS, Backups und
 Fehlersuche Schritt für Schritt: die [Installationsanleitung auf yuvomi.cloud](https://yuvomi.cloud/install.html)
 und die [Installationsanleitung im Repository](docs/installation.md).
-
-Für eine neue Docker-Installation mit automatischen Let's-Encrypt-Zertifikaten gibt
-es das optionale [Caddy-HTTPS-Setup](deploy/caddy/README.md) (englische Anleitung).
 
 <details>
 <summary><b>Podman, Proxmox, die geführte Einrichtung und der Schlüssel</b></summary>
@@ -208,8 +210,9 @@ es das optionale [Caddy-HTTPS-Setup](deploy/caddy/README.md) (englische Anleitun
   [Fehlersuche](docs/installation.md#troubleshooting) deckt die häufigen Fälle ab.
 - **Proxmox** - dieselben Schritte laufen in einem kleinen Debian-LXC: siehe die
   [Proxmox-Anleitung auf yuvomi.cloud](https://yuvomi.cloud/install.html#proxmox).
-- **Schlüssel** - optional, aber ohne Weg zurück. Die geführte Einrichtung und Umbrel erzeugen ihn
-  für euch; mit Compose, TrueNAS oder Unraid setzt ihr ihn selbst, also schreibt ihn auf.
+- **Schlüssel** - optional, aber ohne Weg zurück. Bleibt er leer, erzeugt eine neue Installation
+  ihn beim ersten Start; ein Admin findet ihn unter Einstellungen → Haushalt → Backup und
+  Wiederherstellung. Schreibt ihn in jedem Fall auf: ohne ihn lassen sich Backups nicht öffnen.
 - **Geführte Einrichtung** - ein lokalisierter Einrichtungsassistent im Browser. Er erkennt Docker
   oder Podman, richtet Single Sign-on und geplante Backups ein, bereitet Yuvomi auf einen
   HTTPS-Reverse-Proxy vor (das Zertifikat bleibt Sache des Proxys), startet dann den Container und

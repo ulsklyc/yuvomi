@@ -7,6 +7,7 @@ export function backupPaths() {
         summary: 'Get backup status',
         tag: 'Backup',
         admin: true,
+        description: '`database_key` (see DatabaseKeyStatus) says where the database key comes from, never its value; `GET /api/v1/backup/database-key` returns a generated one.',
       }),
     },
     '/api/v1/backup/database': {
@@ -25,6 +26,25 @@ export function backupPaths() {
           },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/backup/database-key': {
+      get: op({
+        summary: 'Show the generated database key',
+        operationId: 'getDatabaseKey',
+        tag: 'Backup',
+        admin: true,
+        description: 'Returns the DB_ENCRYPTION_KEY that Yuvomi generated on the first start of a new installation and stores in `.secrets/DB_ENCRYPTION_KEY` next to the database (`origin` `stored` or `generated`), so the administrator can keep a copy with the backups: without it, no backup opens once that volume is lost. A key from DB_ENCRYPTION_KEY or DB_ENCRYPTION_KEY_FILE is never returned, it is already in the configuration; then only `origin` and `encrypted` come back. Not available on a signed-in device (403, reason `device_credential`). Every response is `Cache-Control: no-store`, each view is logged with the administrator\'s id and never the key, and an administrator gets 10 views per 10 minutes.',
+        responses: {
+          200: {
+            description: 'Origin of the key, and the key itself when Yuvomi generated it',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/DatabaseKeyResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          429: { description: 'More than 10 views in 10 minutes' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),

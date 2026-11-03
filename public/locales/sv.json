@@ -358,6 +358,11 @@
         "customizeResetDetail": "Din egen placering tas bort. Du ser hushållets standard igen - även senare ändringar av den.",
         "customizeDiscardDetail": "Dina ändringar av placeringen går förlorade. Den senast sparade placeringen finns kvar.",
         "customizeScopeHint": "Det du ändrar här gäller bara dig.",
+        "customizePhoneScopeHint": "Bara den här telefonen. Ändringar här påverkar bara ordningen på brickor på din telefon.",
+        "customizePhoneTitle": "Telefonbrickor",
+        "customizePhoneReset": "Samma som skrivbordet",
+        "customizePhoneResetDone": "Telefonordning återställd.",
+        "customizePhoneResetConfirm": "Återställa till samma som skrivbordet?",
         "customizeFollowsDefault": "Din översikt följer hushållets standard.",
         "customizeSetDefault": "Ange som hushållets standard",
         "customizeSetDefaultConfirm": "Göra den här placeringen till hushållets standard?",
@@ -3462,7 +3467,17 @@
         "memberRemoveLastAdmin": "Minst en administratör måste finnas kvar.",
         "memberRemoveLastSsoAdmin": "Det här är den sista administratören som är länkad till SSO. Länka en annan administratör först.",
         "backupWebdavUrlInvalid": "Adressen måste börja med http:// eller https://.",
-        "icsSubscriptionGone": "Den här prenumerationen finns inte längre."
+        "icsSubscriptionGone": "Den här prenumerationen finns inte längre.",
+        "backupDbKeyTitle": "Databasnyckel",
+        "backupDbKeyGeneratedHint": "Yuvomi skapade den vid första starten. Spara en kopia någon annanstans än på den här servern: utan den går dina säkerhetskopior inte att öppna om lagringen går förlorad.",
+        "backupDbKeyShow": "Visa nyckel",
+        "backupDbKeyHide": "Dölj",
+        "backupDbKeyCopy": "Kopiera",
+        "backupDbKeyCopied": "Nyckeln kopierad",
+        "backupDbKeyCopyFailed": "Kopieringen fungerade inte. Nyckeln är markerad, kopiera den för hand.",
+        "backupDbKeyStoredAt": "Sparad på servern i {{path}}",
+        "backupDbKeyConfigHint": "Nyckeln kommer från din konfiguration. Förvara den säkert där: utan den går dina säkerhetskopior inte att öppna.",
+        "backupDbKeyPlainHint": "Databasen är inte krypterad, så säkerhetskopiorna innehåller dina data i läsbar form. Med en egen DB_ENCRYPTION_KEY krypterar Yuvomi den vid nästa start."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",
@@ -5833,7 +5848,7 @@
         "errorVitalUnit": "Den här enheten passar inte till mätningen."
     },
     "waste": {
-        "title": "Avfallshämtning",
+        "title": "Avfall",
         "overlay": "Avfallshämtning",
         "upcomingSectionTitle": "Kommande hämtningar",
         "typesSectionTitle": "Typer och scheman",

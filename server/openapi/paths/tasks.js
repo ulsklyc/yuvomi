@@ -4,6 +4,27 @@ import { op, jsonBody, idParam, stringPathParam, DOCUMENT_LINK_REFUSAL, withCase
 const TASK_DOCUMENTS_NOTE = '`document_count` counts the linked documents the caller may see; `GET /api/v1/tasks/{id}` also carries them as `documents`. '
   + 'Without access to the Documents module (for API tokens a `documents:read` scope) both are `null` - not told, which is not the same as `0` or an empty list.';
 
+const apiError = (description) => ({
+  description,
+  content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
+});
+
+/** Die getypten Antworten einer Client-Operation (#255), die Absagen je Aufruf dazu. */
+const typedResponses = (status, description, schema, refusals = {}) => ({
+  [status]: { description, content: { 'application/json': { schema: { $ref: `#/components/schemas/${schema}` } } } },
+  401: { $ref: '#/components/responses/Unauthorized' },
+  ...refusals,
+  500: { $ref: '#/components/responses/InternalServerError' },
+});
+
+const BAD_REQUEST = { $ref: '#/components/responses/BadRequest' };
+const LOCKED = apiError('The task is locked and the caller is neither its creator nor an administrator (reason `task_locked`), or there is no write access to tasks.');
+const NO_TASK = apiError('The task does not exist or is not visible to the caller.');
+
+// GET /tasks/{id} liest nur Hauptaufgaben, PUT, DELETE und die PATCH-Routen nehmen auch
+// Unteraufgaben.
+const TOP_LEVEL_ONLY = ' Only a top-level task is found here: a subtask answers 404 and is read through `subtasks` of its parent.';
+
 export function tasksPaths() {
   return withCaseReasons('tasks', CASE_REASONS, {
     '/api/v1/tasks': {
@@ -13,7 +34,9 @@ export function tasksPaths() {
       // Wiederhol-Form, weil sich daraus die Serialisierung ergibt.
       get: op({
         summary: 'List tasks',
+        operationId: 'listTasks',
         tag: 'Tasks',
+        responses: typedResponses(200, 'Top-level tasks, sorted by status, priority and due date', 'TaskListResponse'),
         description: 'Several tags narrow the result: a task must carry all of them. Tag matching ignores case, including non-ASCII letters. Archived tasks are omitted unless asked for. ' + TASK_DOCUMENTS_NOTE,
         params: [
           { name: 'status',      in: 'query', required: false, schema: { type: 'string', enum: ['open', 'in_progress', 'done', 'archived'] }, description: 'Repeatable; several values are OR-ed. "archived" is not a status but the separate archive axis and behaves like the `archived` parameter.' },
@@ -33,9 +56,16 @@ export function tasksPaths() {
           { name: 'include_future', in: 'query', required: false, schema: { type: 'string' }, description: 'Any non-empty value also returns tasks whose start date lies in the future.' },
         ],
       }),
-      post: op({ summary: 'Create task', tag: 'Tasks', stateChanging: true, requestBody: jsonBody(null), description: 'Body accepts `locked: true` to close the task definition to everyone but its creator and administrators (#830). A subtask under a locked parent inherits the lock, and adding one requires the same rights. `status` may be set on creation (#807); it runs through the same transition handling as PUT and PATCH, so creating a task as `done` books its points and writes its completion entry. `null`, an empty string and `archived` all fall back to `open` - filing a task away is a separate axis and not something a creation can do.' }),
+      post: op({ summary: 'Create task', operationId: 'createTask', tag: 'Tasks', stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskCreateInput'), responses: typedResponses(201, 'Task created', 'TaskResponse', { 400: BAD_REQUEST, 403: LOCKED, 404: apiError('`parent_task_id` names a task that does not exist or is not visible to the caller.') }), description: 'Body accepts `locked: true` to close the task definition to everyone but its creator and administrators (#830). A subtask under a locked parent inherits the lock, and adding one requires the same rights. `status` may be set on creation (#807); it runs through the same transition handling as PUT and PATCH, so creating a task as `done` books its points and writes its completion entry. `null`, an empty string and `archived` all fall back to `open` - filing a task away is a separate axis and not something a creation can do.' }),
     },
-    '/api/v1/tasks/meta/options': { get: op({ summary: 'Get task metadata', tag: 'Tasks' }) },
+    '/api/v1/tasks/meta/options': {
+      get: op({
+        summary: 'Get task metadata',
+        operationId: 'getTaskOptions',
+        tag: 'Tasks',
+        responses: typedResponses(200, 'Values for the task editor and its filters', 'TaskOptionsResponse'),
+      }),
+    },
     '/api/v1/tasks/completions': {
       get: op({
         summary: 'List completed tasks, newest first',
@@ -93,12 +123,12 @@ export function tasksPaths() {
       delete: op({ summary: 'Remove a task tag everywhere', tag: 'Tasks', params: [stringPathParam('tag', 'Tag name')], stateChanging: true, description: 'Detaches the tag from every task the caller can see. The tasks themselves stay. Locked tasks the caller may not edit keep the tag and are counted in `skipped`. Unlike categories there is no in-use guard: a tag is nothing but its uses.' }),
     },
     '/api/v1/tasks/{id}': {
-      get: op({ summary: 'Get task', tag: 'Tasks', params: [idParam()], description: TASK_DOCUMENTS_NOTE }),
-      put: op({ summary: 'Update task', tag: 'Tasks', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'On a locked task (`locked: 1`) only the creator and administrators may change the definition - title, description, category, priority, dates, recurrence, points, visibility, tags, sync target, the lock itself, and assigning other members. Everyone else may still send the full body as long as the outcome differs only in `status` or in their own entry in `assigned_to`; anything else answers 403. The comparison is against the stored values, not against which fields were sent. Returns `{ data: Task }`; the task additionally carries `next_due_date` (YYYY-MM-DD) under the same rule as PATCH /tasks/{id}/status: the due date of the next occurrence still pending and visible to the caller when this call moved a recurring task into `done`, and `null` in every other case - no status change, a change that is not a transition into `done`, a task without recurrence, a series that has ended, or a next occurrence the caller cannot see.' }),
-      delete: op({ summary: 'Delete task', tag: 'Tasks', params: [idParam()], stateChanging: true, description: 'On a locked task, the creator and administrators only (403 otherwise).' }),
+      get: op({ summary: 'Get task', operationId: 'getTask', tag: 'Tasks', params: [idParam()], responses: typedResponses(200, 'Task with full subtasks and documents', 'TaskDetailResponse', { 404: NO_TASK }), description: TASK_DOCUMENTS_NOTE + TOP_LEVEL_ONLY }),
+      put: op({ summary: 'Update task', operationId: 'updateTask', tag: 'Tasks', params: [idParam()], stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskUpdateInput'), responses: typedResponses(200, 'Task updated', 'TaskUpdatedResponse', { 400: BAD_REQUEST, 403: LOCKED, 404: NO_TASK }), description: 'On a locked task (`locked: 1`) only the creator and administrators may change the definition - title, description, category, priority, dates, recurrence, points, visibility, tags, sync target, the lock itself, and assigning other members. Everyone else may still send the full body as long as the outcome differs only in `status` or in their own entry in `assigned_to`; anything else answers 403. The comparison is against the stored values, not against which fields were sent. Returns `{ data: Task }`; the task additionally carries `next_due_date` (YYYY-MM-DD) under the same rule as PATCH /tasks/{id}/status: the due date of the next occurrence still pending and visible to the caller when this call moved a recurring task into `done`, and `null` in every other case - no status change, a change that is not a transition into `done`, a task without recurrence, a series that has ended, or a next occurrence the caller cannot see.' }),
+      delete: op({ summary: 'Delete task', operationId: 'deleteTask', tag: 'Tasks', params: [idParam()], stateChanging: true, responses: typedResponses(200, 'Task deleted', 'OkResponse', { 403: LOCKED, 404: NO_TASK }), description: 'On a locked task, the creator and administrators only (403 otherwise).' }),
     },
     '/api/v1/tasks/{id}/status': {
-      patch: op({ summary: 'Update task status', tag: 'Tasks', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { status, done_by_user_id? }. Sending `archived` files the task away without touching its status - use PATCH /archive instead. Deliberately open on a locked task: ticking one off is the interaction the lock exists to preserve. `done_by_user_id` names who actually did the task (#1205), which is not necessarily the caller - on a shared tablet it rarely is. It has to be a household member (400 otherwise), it only applies to the transition into `done` and is ignored on any other status change, and it decides where the points go: a named member who takes part in rewards receives them instead of the assignees, a named member who does not take part means no points at all rather than crediting someone who did not do it. Omit it and nothing changes: the history shows the caller and the assignees rule applies. The naming is as idempotent as the completion itself - correcting it means reopening the task and ticking it off again. A paired wall display reaches this route too, and only this one of the writing routes (#1209): for it the field is required rather than optional, only the transition into `done` is allowed, and the task has to be visible to the whole household, which answers 404 rather than 403 so an invisible task is not confirmed to exist. Returns `{ data: { id, status, archived_at, next_due_date } }`. `next_due_date` (YYYY-MM-DD) is the due date of the next occurrence still pending - not done and not archived, so one that is `in_progress` counts - when this call completed a recurring task, and `null` in every other case: a task without recurrence, a series that has ended, a status change that is not a transition into `done`, and the `archived` shortcut, which omits the field.' }),
+      patch: op({ summary: 'Update task status', operationId: 'updateTaskStatus', tag: 'Tasks', params: [idParam()], stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskStatusInput'), responses: typedResponses(200, 'Status changed', 'TaskStatusResponse', { 400: BAD_REQUEST, 403: { $ref: '#/components/responses/Forbidden' }, 404: NO_TASK }), description: 'Body: { status, done_by_user_id? }. Sending `archived` files the task away without touching its status - use PATCH /archive instead. Deliberately open on a locked task: ticking one off is the interaction the lock exists to preserve. `done_by_user_id` names who actually did the task (#1205), which is not necessarily the caller - on a shared tablet it rarely is. It has to be a household member (400 otherwise), it only applies to the transition into `done` and is ignored on any other status change, and it decides where the points go: a named member who takes part in rewards receives them instead of the assignees, a named member who does not take part means no points at all rather than crediting someone who did not do it. Omit it and nothing changes: the history shows the caller and the assignees rule applies. The naming is as idempotent as the completion itself - correcting it means reopening the task and ticking it off again. A paired wall display reaches this route too, and only this one of the writing routes (#1209): for it the field is required rather than optional, only the transition into `done` is allowed, and the task has to be visible to the whole household, which answers 404 rather than 403 so an invisible task is not confirmed to exist. Returns `{ data: { id, status, archived_at, next_due_date } }`. `next_due_date` (YYYY-MM-DD) is the due date of the next occurrence still pending - not done and not archived, so one that is `in_progress` counts - when this call completed a recurring task, and `null` in every other case: a task without recurrence, a series that has ended, a status change that is not a transition into `done`, and the `archived` shortcut, which omits the field.' }),
     },
     '/api/v1/tasks/{id}/archive': {
       patch: op({ summary: 'Archive or restore a task', tag: 'Tasks', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Archives the task by default. Send `{ "archived": false }` to bring it back. The status is left untouched: a task that was done stays done, and no reward booking changes. Filing a task removes it from everyone\'s view, so on a locked task this is the creator and administrators only.' }),
@@ -106,10 +136,16 @@ export function tasksPaths() {
     '/api/v1/tasks/{id}/check': {
       patch: op({
         summary: 'Tick one checklist item in the description, addressed by its source line',
+        operationId: 'checkTaskItem',
         tag: 'Tasks',
         params: [idParam()],
         stateChanging: true,
-        requestBody: jsonBody(null),
+        requestBody: jsonBody('#/components/schemas/TaskCheckInput'),
+        responses: typedResponses(200, 'The description after the change', 'TaskCheckResponse', {
+          400: BAD_REQUEST,
+          404: NO_TASK,
+          409: apiError('The line cannot be ticked, reason `out_of_range`, `not_a_checklist_line` or `stale`.'),
+        }),
         description: 'Body: { line, checked, expect? }. Rewrites exactly the one `- [ ]` / `- [x]` line at '
           + '`line` in the description and leaves the rest of the text byte for byte, so two members ticking '
           + 'different items at the same time do not overwrite each other - which PUT would do. `expect` is the '

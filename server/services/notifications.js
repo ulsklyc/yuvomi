@@ -39,6 +39,9 @@ const MAX_ATTEMPTS = 3;
 // Staffelung ist die Zusicherung, nicht der einzelne Wert.
 export const PROVIDER_TIMEOUT_MS = 8_000;
 
+// Herkuenfte, deren eine Erinnerung als je eine Zeile pro Person gespeichert ist.
+const PER_PERSON_ROW_TYPES = new Set(['document_expiry', 'event', 'waste_pickup']);
+
 export const defaultProviders = {
   gotify: gotifyProvider,
   ntfy: ntfyProvider,
@@ -660,23 +663,36 @@ export async function processDueNotifications({
     }
   }
 
-  // EINE FRIST, EINE MELDUNG IM HAUSHALTSKANAL (#1705). Ein Dokument erinnert
-  // die Ablegende und die Person, um die es geht, mit je einer Zeile; beide
-  // Zeilen sehen denselben Haushaltskanal, und der hoerte die Frist doppelt.
+  // EINE ERINNERUNG, EINE MELDUNG IM HAUSHALTSKANAL (#1705). Ein Dokument erinnert
+  // die Ablegende und die Person, um die es geht, ein Termin jede zugewiesene
+  // Person, eine Abholung jede Person mit eingeschalteter Erinnerung an den Typ,
+  // mit je einer Zeile; alle Zeilen sehen denselben Haushaltskanal, und
+  // der hoerte dieselbe Sache mehrfach. Ein anderer `remind_at` ist eine eigene
+  // Auskunft und meldet sich weiter.
   // Gefragt wird nach den Zustellungen und nicht nur innerhalb dieses Laufs:
   // eine Zeile kann spaeter dran sein, etwa nach der Rueckgabe eines Modulrechts.
-  function householdChannelHeardDocument(reminder, channel) {
-    if (reminder.entity_type !== 'document_expiry') return false;
+  // Es zaehlt nur eine angekommene Meldung: ein Fehlschlag darf nicht reichen,
+  // sonst schalten sich zwei Zeilen in der Wiederholung gegenseitig stumm.
+  // Eine Abholung hat je Person einen eigenen Anker (waste_reminder_entries),
+  // dieselbe Sache ist dort also Typ + Tag, nicht die entity_id.
+  function householdChannelHeardReminder(reminder, channel) {
+    if (!PER_PERSON_ROW_TYPES.has(reminder.entity_type)) return false;
+    const isWaste = reminder.entity_type === 'waste_pickup';
+    const sameTarget = isWaste
+      ? 'sibling.entity_id IN (SELECT id FROM waste_reminder_entries WHERE type_id = ? AND date_key = ?)'
+      : 'sibling.entity_id = ?';
+    const targetParams = isWaste ? [reminder.waste_type_id, reminder.waste_date_key] : [reminder.entity_id];
     return Boolean(activeDb.prepare(`
       SELECT 1 FROM notification_deliveries nd
       JOIN reminders sibling ON sibling.id = nd.reminder_id
       WHERE nd.target_key = ?
-        AND sibling.entity_type = 'document_expiry'
-        AND sibling.entity_id = ?
+        AND nd.status = 'sent'
+        AND sibling.entity_type = ?
+        AND ${sameTarget}
         AND sibling.remind_at = ?
         AND sibling.id != ?
       LIMIT 1
-    `).get(`channel:${channel.id}`, reminder.entity_id, reminder.remind_at, reminder.id));
+    `).get(`channel:${channel.id}`, reminder.entity_type, ...targetParams, reminder.remind_at, reminder.id));
   }
 
   for (const reminder of due) {
@@ -704,7 +720,7 @@ export async function processDueNotifications({
       // ausdruecklich der Person gehoert - ein Kanal ohne oder mit unbekanntem
       // `scope` gilt als Haushaltskanal.
       .filter((channel) => reminder.target_public || channel.scope === 'user')
-      .filter((channel) => channel.scope === 'user' || !householdChannelHeardDocument(reminder, channel));
+      .filter((channel) => channel.scope === 'user' || !householdChannelHeardReminder(reminder, channel));
     const pushCount = activeDb.prepare('SELECT COUNT(*) AS c FROM push_subscriptions WHERE user_id = ?').get(reminder.created_by).c;
     const targets = [];
     if (pushCount > 0) {

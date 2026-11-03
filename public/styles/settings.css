@@ -2296,6 +2296,23 @@
   min-width: 0;
 }
 
+/* Datenbankschluessel: der Wert ist Daten, keine Prosa - Monospace und
+ * gleiche Zeichenbreite, damit sich 64 Hex-Zeichen beim Abgleich lesen lassen. */
+.settings-db-key {
+  margin-top: var(--space-3);
+}
+
+.settings-db-key__value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+}
+
+.settings-db-key__path {
+  margin: var(--space-2) 0 0;
+  overflow-wrap: anywhere;
+}
+
 .settings-backup-dropzone {
   display: flex;
   flex-direction: column;

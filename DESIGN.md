@@ -3892,6 +3892,20 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    einem Wrapper-Slot, und ein Slot, der nur die Suche traegt, schrumpft mit ihr. Der
    bevorzugte Weg bleibt, die Suche selbst zum Slot zu machen (`className: '...
    page-toolbar__center'`).
+   **Lupe und Werkzeug unter 390px (#2443, Ulas 2026-11-01):** zwei Knoepfe lassen dem Large
+   Title Breite minus 172px, bei 360px also 188px - zu wenig fuer „Geburtstage" (SF 195) und
+   lange Sprachen (Roboto uk 256, ru 231, hu 220). Wo der Kopf neben dem Titel nur Lupe und
+   EIN Werkzeug traegt, falten beide unter 390px Modulbreite in ein „..." (Geburtstage,
+   Notizen), bei den Dokumenten die Lupe in das schon stehende „..."; der Kopf bleibt
+   einzeilig, der Titel gross. Der Eintrag „Suchen" steht oben und gibt dem EINEN Suchfeld im
+   Kopf den Fokus, es geht wie immer ueber `:focus-within` auf; die Suche verlaesst nur das
+   Bild, nicht den Baum (die Tastatur erreicht sie weiter), und ein stehender Begriff haelt
+   das Feld sichtbar. Ab 390px bleiben Lupe und Direktknopf (je Breite ein Weg). Eine
+   Container-Abfrage an der Seitenwurzel (`.app-page--fold-head`,
+   `pageToolsMenuHtml({ foldSearch })`), kein Viewport-Breakpoint. Kontakte und Inventar
+   brauchen es gemessen nicht; Nur-lesen hat kein Werkzeug, dort bleibt die Lupe stehen. Die
+   Entsorgung hat ausser dem „..." nichts zu falten: ihr Titel ist in allen Breiten kurz
+   („Waste"), die Navigation behaelt „Waste collection".
 5. **Der Inhalt laeuft unter die Glas-Kapsel.** `.nav-bottom` liegt absolut an der Unterkante
    der Shell, nicht im Flex-Fluss; der Scrollport reicht bis zum Rand, und das Glas zeigt,
    was darunter scrollt. Die Zone der Kapsel ist der vierte Summand des Nachlaufs

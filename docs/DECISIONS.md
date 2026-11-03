@@ -1141,3 +1141,41 @@ The page scrolling through the hours of either grid again; a period stepper or v
 week grid placed in a sticky content row instead of the head; a second alignment rule beside
 `scrollGridToNow`; a shift title pinned by script instead of `position: sticky` in the port; a
 head that is docked or folded by the alignment rather than by the user's scroll.
+
+---
+
+## 18. A native client is a client, not a second app
+
+**Anything native lives outside this repository and talks only to `/api/v1`. The web app stays the
+complete product, and no server feature exists for one platform alone.**
+
+The question came up as a Flutter app beside the web app (#255), as a bridge to Apple Health (#639)
+and as tapping an NFC tag (#914), and the answer came out the same each time: the API is the
+contract, the bridge is a client. A native iOS client is that shape at full size. It is allowed to be
+useful without being complete, so a new feature is never owed twice, and it can go away without
+taking anything with it.
+
+What this rules out on the server is the slow version of a second app: a route only the client can
+use, a field shaped for one screen, or a credential with powers the web app does not have. A
+signed-in device is a person on their own device, with less reach than a browser session rather than
+more. Its device credential expires after 90 days without use, like a session, ends with the same
+acts that end a session, cannot issue another credential, cannot pass `requireAdmin` and reaches
+only an allowlist of `/api/v1/auth`, so a lost phone never reaches the running of the household or
+the account itself. An administrator can sign a member out of all devices, but not see which devices
+they use or when ([entry 1](#1-privacy-beats-admin-convenience)). Platform is a value in a field, not
+a code path.
+
+### Where the rule lives
+
+- `server/auth.js`: `POST /api/v1/auth/devices`, `DEVICE_AUTH_ROUTES`, and `requireAuth`, where a
+  device becomes a member whatever the person's role.
+- `apiTokenUsableSql()`: the one place that says when a credential still counts.
+- `invalidateUserSessions()`: the one way a session ends also ends the devices.
+- `test:signed-in-devices`.
+
+### What would reopen it
+
+A need that cannot be met through `/api/v1` at all. A hosted push relay does not reopen this entry;
+it is a decision about running a service, and it is made in its own thread. Admin features in a
+native client do not reopen it either: each one opens with a fresh sign-in, not by widening what a
+device can do on its own.

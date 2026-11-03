@@ -358,6 +358,11 @@
         "customizeResetDetail": "Ta propre disposition est supprimée. Tu revois celle par défaut du foyer, y compris ses modifications ultérieures.",
         "customizeDiscardDetail": "Tes modifications de la disposition seront perdues. La dernière version enregistrée reste.",
         "customizeScopeHint": "Ce que tu changes ici ne vaut que pour toi.",
+        "customizePhoneScopeHint": "Seulement ce téléphone. Les modifications ici n'affectent que l'ordre des tuiles sur votre téléphone.",
+        "customizePhoneTitle": "Tuiles du téléphone",
+        "customizePhoneReset": "Identique au bureau",
+        "customizePhoneResetDone": "Disposition du téléphone réinitialisée.",
+        "customizePhoneResetConfirm": "Réinitialiser comme le bureau ?",
         "customizeFollowsDefault": "Ton aperçu suit le réglage par défaut du foyer.",
         "customizeSetDefault": "Définir par défaut pour le foyer",
         "customizeSetDefaultConfirm": "Définir cette disposition comme celle par défaut du foyer ?",
@@ -3224,7 +3229,7 @@
         "pageHealthPersonal": "Santé",
         "pageHealthPersonalDescription": "Choisissez les vues de santé qui apparaissent pour vous.",
         "tasksDefaultsTitle": "Paramètres par défaut pour les nouvelles tâches",
-        "tasksDefaultsDescription": "Préremplis le formulaire de nouvelle tâche avec tes propres choix : visibilité, verrouillage et liste de rappels CalDAV. Chaque tâche individuelle peut toujours utiliser des valeurs différentes.",
+        "tasksDefaultsDescription": "Préremplissez le formulaire de nouvelle tâche avec vos propres choix : visibilité, verrouillage et liste de rappels CalDAV. Chaque tâche individuelle peut toujours utiliser des valeurs différentes.",
         "tasksDefaultTargetLabel": "Liste de rappels par défaut",
         "tasksDefaultTargetHint": "Les nouvelles tâches sont affectées à cette liste. Vous pouvez choisir une autre cible à chaque création.",
         "tasksDefaultTargetUnavailable": "Liste sélectionnée précédemment (plus disponible)",
@@ -3462,7 +3467,17 @@
         "memberRemoveLastAdmin": "Il doit rester au moins un administrateur.",
         "memberRemoveLastSsoAdmin": "C'est le dernier administrateur lié au SSO. Liez d'abord un autre administrateur.",
         "backupWebdavUrlInvalid": "L'adresse doit commencer par http:// ou https://.",
-        "icsSubscriptionGone": "Cet abonnement n'existe plus."
+        "icsSubscriptionGone": "Cet abonnement n'existe plus.",
+        "backupDbKeyTitle": "Clé de la base de données",
+        "backupDbKeyGeneratedHint": "Yuvomi l'a générée au premier démarrage. Conserve une copie ailleurs que sur ce serveur : sans elle, tes sauvegardes ne pourront pas être ouvertes si le stockage est perdu.",
+        "backupDbKeyShow": "Afficher la clé",
+        "backupDbKeyHide": "Masquer",
+        "backupDbKeyCopy": "Copier",
+        "backupDbKeyCopied": "Clé copiée",
+        "backupDbKeyCopyFailed": "La copie n'a pas fonctionné. La clé est sélectionnée, copie-la à la main.",
+        "backupDbKeyStoredAt": "Enregistrée sur le serveur dans {{path}}",
+        "backupDbKeyConfigHint": "La clé provient de ta configuration. Garde-la en sécurité : sans elle, tes sauvegardes ne peuvent pas être ouvertes.",
+        "backupDbKeyPlainHint": "La base de données n'est pas chiffrée, les sauvegardes contiennent donc tes données en clair. Avec ta propre DB_ENCRYPTION_KEY, Yuvomi la chiffre au prochain démarrage."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",
@@ -5833,7 +5848,7 @@
         "errorVitalUnit": "Cette unité ne convient pas à cette mesure."
     },
     "waste": {
-        "title": "Collecte des déchets",
+        "title": "Déchets",
         "overlay": "Collecte des déchets",
         "upcomingSectionTitle": "Prochaines collectes",
         "typesSectionTitle": "Types et calendriers",

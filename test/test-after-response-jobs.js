@@ -52,6 +52,9 @@ const SERVER = join(ROOT, 'server');
  * trifft, ist selbst ein Befund.
  */
 const AUSNAHMEN = new Map([
+  ['server/index.js|shutdown', {
+    anzahl: 2, grund: 'Signal-Handler fuer SIGTERM/SIGINT: shutdown wartet selbst per closeForShutdown/waitUntilIdle auf alle Jobs und schliesst dann die DB; als Job registriert wuerde er auf sich selbst warten',
+  }],
   ['server/utils/restore-state.js|tracked.catch', {
     anzahl: 1, grund: 'in runExternalJob selbst: der Job ist schon registriert, der Fehler gehoert dem Aufrufer',
   }],

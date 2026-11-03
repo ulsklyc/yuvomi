@@ -1,4 +1,9 @@
-# Yuvomi with automatic HTTPS
+# Yuvomi with automatic HTTPS (Caddy example)
+
+> **Example, not tested in CI.** Like `nginx.conf.example`, this directory is a
+> starting point you adapt to your own setup. The project's tests do not start it,
+> issue a certificate or check it against new Caddy releases. Dependabot keeps the
+> pinned Caddy image current.
 
 This optional Docker Compose deployment runs Yuvomi behind Caddy. Caddy obtains a
 Let's Encrypt certificate, redirects HTTP to HTTPS and renews the certificate
@@ -30,11 +35,11 @@ Do not put a broad DNS management token into Yuvomi's `.env` for this example.
 
 Run every command below **from the repository root**, not this directory.
 
-1. Copy `.env.example` to `.env` for a new installation and set a strong, unique
-   `SESSION_SECRET`. Set `DB_ENCRYPTION_KEY` to a real private key if you want
-   database encryption, or clear its placeholder for an unencrypted database.
-   Keep the encryption key with your recoverable backups. Restrict `.env` to the
-   account administering this installation (`chmod 600 .env` on Unix).
+1. Copy `.env.example` to `.env` for a new installation. Delete the
+   `SESSION_SECRET` and `DB_ENCRYPTION_KEY` placeholder lines and the first start
+   generates both into `.secrets/` inside the data directory, or set values of your
+   own. Keep the encryption key with your recoverable backups. Restrict `.env` to
+   the account administering this installation (`chmod 600 .env` on Unix).
 2. Add these two values to `.env`, using your own domain and contact address:
 
    ```dotenv

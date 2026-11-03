@@ -358,6 +358,11 @@
         "customizeResetDetail": "Se elimina tu propia disposición. Vuelves a ver la predeterminada del hogar, incluidos los cambios que se hagan más adelante.",
         "customizeDiscardDetail": "Se perderán tus cambios en la disposición. Se mantiene la última versión guardada.",
         "customizeScopeHint": "Lo que cambies aquí vale solo para ti.",
+        "customizePhoneScopeHint": "Solo este teléfono. Los cambios aquí afectan únicamente el orden de mosaicos en tu teléfono.",
+        "customizePhoneTitle": "Mosaicos del teléfono",
+        "customizePhoneReset": "Igual que el escritorio",
+        "customizePhoneResetDone": "Disposición del teléfono restablecida.",
+        "customizePhoneResetConfirm": "¿Restablecer igual que el escritorio?",
         "customizeFollowsDefault": "Tu panel sigue la configuración predeterminada del hogar.",
         "customizeSetDefault": "Fijar como predeterminado del hogar",
         "customizeSetDefaultConfirm": "¿Convertir esta disposición en la predeterminada del hogar?",
@@ -3462,7 +3467,17 @@
         "memberRemoveLastAdmin": "Debe quedar al menos un administrador.",
         "memberRemoveLastSsoAdmin": "Este es el último administrador vinculado a SSO. Vincula antes a otro administrador.",
         "backupWebdavUrlInvalid": "La dirección debe empezar por http:// o https://.",
-        "icsSubscriptionGone": "Esta suscripción ya no existe."
+        "icsSubscriptionGone": "Esta suscripción ya no existe.",
+        "backupDbKeyTitle": "Clave de la base de datos",
+        "backupDbKeyGeneratedHint": "Yuvomi la generó en el primer inicio. Guarda una copia fuera de este servidor: sin ella, tus copias de seguridad no se podrán abrir si se pierde el almacenamiento.",
+        "backupDbKeyShow": "Mostrar clave",
+        "backupDbKeyHide": "Ocultar",
+        "backupDbKeyCopy": "Copiar",
+        "backupDbKeyCopied": "Clave copiada",
+        "backupDbKeyCopyFailed": "No se pudo copiar. La clave está seleccionada, cópiala a mano.",
+        "backupDbKeyStoredAt": "Guardada en el servidor en {{path}}",
+        "backupDbKeyConfigHint": "La clave viene de tu configuración. Guárdala bien allí: sin ella, tus copias de seguridad no se pueden abrir.",
+        "backupDbKeyPlainHint": "La base de datos no está cifrada, así que las copias de seguridad contienen tus datos de forma legible. Con una DB_ENCRYPTION_KEY propia, Yuvomi la cifra en el próximo inicio."
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",
@@ -5833,7 +5848,7 @@
         "errorVitalUnit": "Esta unidad no corresponde a esta medición."
     },
     "waste": {
-        "title": "Recogida de basura",
+        "title": "Basura",
         "overlay": "Recogida de basura",
         "upcomingSectionTitle": "Próximas recogidas",
         "typesSectionTitle": "Tipos y horarios",

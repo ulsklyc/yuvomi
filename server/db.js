@@ -24,6 +24,7 @@ import fs from 'node:fs/promises';
 import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync, readdirSync, constants as fsConstants } from 'node:fs';
 import { createLogger } from './logger.js';
 import { acquireInstanceLock } from './utils/instance-lock.js';
+import { resolveDbPath, secretsDirFor } from './utils/db-path.js';
 import { RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON } from './utils/restore-messages.js';
 import { setRestoreRunning, activeWriters, restoreWaitTimeoutMs, waitUntilIdle } from './utils/restore-state.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
@@ -40,30 +41,10 @@ const DB_KEY = process.env.DB_ENCRYPTION_KEY;
 // Pfad-Auflösung (Legacy-Migration oikos.db → yuvomi.db)
 // --------------------------------------------------------
 //
-// Yuvomi hieß früher „Oikos". Die DB-Datei lag standardmäßig unter `oikos.db`
-// (bzw. `/data/oikos.db` in allen ausgelieferten Docker-Templates). Damit
-// Bestands-Nutzer beim Update NICHTS von Hand ändern müssen, leiten wir den
-// effektiven Pfad ab:
-//   - kein DB_PATH gesetzt              → <root>/yuvomi.db
-//   - DB_PATH endet auf oikos.db        → <dir>/yuvomi.db  (Legacy-Default erkannt)
-//   - DB_PATH endet auf yuvomi.db       → <dir>/yuvomi.db  (neuer Default)
-//   - beliebiger anderer DB_PATH        → unverändert (Custom-Pfad wird respektiert)
-// In allen „managed" Fällen wird eine vorhandene `oikos.db` beim Start einmalig
-// nach `yuvomi.db` migriert. Dass auch der NEUE Default `yuvomi.db` als managed
-// gilt, ist bewusst: aktualisiert ein Bestands-User seine Compose-Datei auf den
-// neuen Default, läge die Daten weiter in `oikos.db` — die Migration greift trotzdem.
-let DB_PATH;
-let LEGACY_DB_PATH; // null außer bei „managed" Layout
-{
-  const configured = process.env.DB_PATH;
-  const baseDir = configured
-    ? path.dirname(configured)
-    : path.join(import.meta.dirname, '..');
-  const base = configured ? path.basename(configured) : null;
-  const isManagedLayout = !configured || base === 'oikos.db' || base === 'yuvomi.db';
-  DB_PATH = isManagedLayout ? path.join(baseDir, 'yuvomi.db') : configured;
-  LEGACY_DB_PATH = isManagedLayout ? path.join(baseDir, 'oikos.db') : null;
-}
+// Die Regeln stehen in server/utils/db-path.js, damit der Secret-Handschlag vor
+// diesem Modul dieselbe Datei sieht (auto-secrets.js). `let`: scheitert die
+// Legacy-Migration, läuft die Instanz auf `oikos.db` weiter (siehe unten).
+let { dbPath: DB_PATH, legacyPath: LEGACY_DB_PATH } = resolveDbPath(); // LEGACY_DB_PATH: null außer bei „managed" Layout
 
 /**
  * Einmalige, idempotente Migration der Legacy-Datenbankdatei `oikos.db` → `yuvomi.db`.
@@ -170,10 +151,12 @@ let db;
  *
  * Der zweite Absatz ist bewusst BEDINGT formuliert, und das ist der Kern seiner
  * Fassung: ein `-wal` neben der Datenbank ist KEIN Hinweis auf einen Dateitausch.
- * `journal_mode = WAL` steht dauerhaft, und es gibt nirgends einen SIGTERM- oder
- * SIGINT-Handler, der die Verbindung vor dem Stoppen schließt - SQLite räumt das
- * Journal aber nur beim sauberen Schließen weg. Nach einem gewöhnlichen
- * Container-Stop liegt es also da, und zwar als EIGENES Journal dieser Datenbank.
+ * `journal_mode = WAL` steht dauerhaft, und SQLite räumt das Journal nur beim
+ * sauberen Schließen weg. Das tut der Server auf SIGTERM und SIGINT
+ * (`closeForShutdown()`), aber nicht nach SIGKILL, Absturz, OOM oder bei einer
+ * Version vor diesem Handler, die als PID 1 im Container jedes Signal
+ * ignorierte. Nach so einem Stopp liegt es also da, und zwar als EIGENES
+ * Journal dieser Datenbank.
  * Ein unbedingtes „lösch es" würde hier bestätigte, nur noch nicht
  * gecheckpointete Transaktionen verwerfen und den eigentlichen Schlüsselfehler
  * nicht einmal berühren - derselbe Fehlertyp, gegen den dieser ganze Vorgang
@@ -451,6 +434,9 @@ function init({ plaintextBackup = true } = {}) {
   // Vor allem anderen: eine leere Datei würde ab hier still zur frischen
   // Instanz, und ein Journal daneben ginge dabei verloren (#1282).
   assertDatabaseFileNotEmpty();
+  // Ebenfalls vor der Legacy-Migration: die öffnet eine `oikos.db` sonst schon
+  // und scheitert dort mit „file is not a database".
+  assertKeyForEncryptedDatabase();
   mkdirSync(path.dirname(DB_PATH), { recursive: true });
   migrateLegacyDbFile();
   // Scheitert die Umbenennung einer Legacy-oikos.db, faellt DB_PATH auf sie
@@ -559,7 +545,9 @@ function assertKeyIsNotPlaceholder() {
       '[DB] DB_ENCRYPTION_KEY is still the placeholder from .env.example ' +
       `(${DB_KEY}). That value is published in this repository, so it protects ` +
       'nothing. Generate a real one with `openssl rand -hex 32` and put it in ' +
-      '.env, or clear the line entirely to run without encryption.'
+      '.env, or delete the line: a new installation then generates its own key on ' +
+      'the first start. To run without encryption, delete the line and set ' +
+      'DB_ENCRYPTION_AUTO_KEY=false.'
     );
   }
 
@@ -619,20 +607,59 @@ function assertCipherSupport() {
 /** Header jeder unverschlüsselten SQLite-Datei. Verschlüsselt ist er Zufallsrauschen. */
 const SQLITE_PLAINTEXT_HEADER = Buffer.from('SQLite format 3\0', 'binary');
 
-function isPlaintextDatabase(filePath) {
+/** Die ersten Bytes der Datei in Headerlänge, `null` wenn sie sich nicht lesen lässt. */
+function readDatabaseHeader(filePath) {
   let fd;
   try {
     fd = openSync(filePath, 'r');
     const head = Buffer.alloc(SQLITE_PLAINTEXT_HEADER.length);
     const bytesRead = readSync(fd, head, 0, head.length, 0);
-    return bytesRead === head.length && head.equals(SQLITE_PLAINTEXT_HEADER);
+    return head.subarray(0, bytesRead);
   } catch {
-    return false;
+    return null;
   } finally {
     if (fd !== undefined) {
       try { closeSync(fd); } catch { /* Datei ist ohnehin gleich zu */ }
     }
   }
+}
+
+function isPlaintextDatabase(filePath) {
+  return readDatabaseHeader(filePath)?.equals(SQLITE_PLAINTEXT_HEADER) ?? false;
+}
+
+/**
+ * Bricht ab, wenn die Datei, die gleich geöffnet wird, verschlüsselt ist, aber
+ * kein Schlüssel gesetzt ist.
+ *
+ * Ohne diese Prüfung öffnete SQLite die Datei und scheiterte erst am ersten
+ * Pragma mit `file is not a database` - ein Satz, der nach kaputter Datei
+ * klingt. Seit der Schlüssel einer Neuinstallation von selbst entsteht
+ * (server/utils/auto-secrets.js) ist der häufigste Grund ein anderer: die
+ * Datei `.secrets/DB_ENCRYPTION_KEY` neben der Datenbank ist weg, etwa weil
+ * nur die Datenbank auf ein neues Volume kopiert wurde. Deshalb nennt die
+ * Meldung diesen Pfad. Neu erzeugt wird dort nichts - der Handschlag legt nur
+ * einen Schlüssel an, solange es keine Datenbank gibt.
+ *
+ * Nur mit vollständig gelesenem Header: eine unlesbare oder zu kurze Datei
+ * ist kein Beleg für Verschlüsselung und behält die Meldung von SQLite.
+ */
+function assertKeyForEncryptedDatabase() {
+  if (DB_KEY) return;
+  const filePath = databaseFileAboutToOpen();
+  if (!filePath) return;
+  const head = readDatabaseHeader(filePath);
+  if (!head || head.length < SQLITE_PLAINTEXT_HEADER.length || head.equals(SQLITE_PLAINTEXT_HEADER)) return;
+  const stored = path.join(secretsDirFor(filePath), 'DB_ENCRYPTION_KEY');
+  throw new Error(
+    `[DB] ${filePath} is encrypted, but no DB_ENCRYPTION_KEY is set - not in the environment, not ` +
+    `through DB_ENCRYPTION_KEY_FILE and not in ${stored}, where Yuvomi keeps a key it generated ` +
+    'itself. The database opens only with the key it was created with, so Yuvomi refuses to start ' +
+    'instead of creating a new one. Put that key back, either as DB_ENCRYPTION_KEY, through ' +
+    `DB_ENCRYPTION_KEY_FILE or as the file ${stored} (mode 600), and start again. If ${filePath} ` +
+    'is not a Yuvomi database at all - it has no plain SQLite header, so it may also be something ' +
+    'else - replace it with the right file.'
+  );
 }
 
 /**
@@ -11777,6 +11804,52 @@ const MIGRATIONS = [
       database.exec('UPDATE ics_subscriptions SET etag = NULL, last_modified = NULL');
     },
   },
+  {
+    version: 274,
+    description: 'api_tokens: kind, platform, device_id for signed-in devices',
+    // Ein Telefon mit nativem Client ist ein angemeldetes Geraet: eine Person mit
+    // einem Device Credential. Es liegt in `api_tokens`, damit Widerruf beim
+    // Deaktivieren, die CSRF-Ausnahme und jede Pruefung auf `authMethod` von
+    // selbst gelten. `kind` trennt es von den Integrationen, die der Admin
+    // verwaltet. Der Index haelt: ein Telefon, ein gueltiges Credential.
+    up(database) {
+      const cols = database.prepare('PRAGMA table_info(api_tokens)').all();
+      if (!cols.some((col) => col.name === 'kind')) {
+        database.exec("ALTER TABLE api_tokens ADD COLUMN kind TEXT NOT NULL DEFAULT 'integration'");
+      }
+      if (!cols.some((col) => col.name === 'platform')) {
+        database.exec('ALTER TABLE api_tokens ADD COLUMN platform TEXT');
+      }
+      if (!cols.some((col) => col.name === 'device_id')) {
+        database.exec('ALTER TABLE api_tokens ADD COLUMN device_id TEXT');
+      }
+      database.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_api_tokens_active_device
+          ON api_tokens (subject_user_id, device_id)
+          WHERE kind = 'device' AND revoked_at IS NULL
+      `);
+    },
+  },
+  {
+    version: 275,
+    description: 'device_pairing_codes: pairing a signed-in device',
+    // Der Code, mit dem eine Browser-Sitzung ein Telefon anmeldet. Eine eigene
+    // Tabelle: `display_pairing_codes` fragt beim Einloesen nicht nach dem Zweck,
+    // ein Personen-Code dort oeffnete `POST /displays/pair`. Gehasht und mit
+    // `used_at` statt Loeschen, aus denselben Gruenden wie dort.
+    up: `
+      CREATE TABLE IF NOT EXISTS device_pairing_codes (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        code_hash  TEXT    NOT NULL UNIQUE,
+        expires_at TEXT    NOT NULL,
+        used_at    TEXT,
+        created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_device_pairing_codes_user
+        ON device_pairing_codes(user_id);
+    `,
+  },
 ];
 
 /**
@@ -12899,6 +12972,30 @@ async function waitForQuietOrGiveUp() {
   );
 }
 
+/**
+ * Die Verbindung zum Prozessende schliessen (SIGTERM/SIGINT, server/index.js).
+ *
+ * Wartet wie der Restore auf laufende Backups, Jobs und zugelassene Anfragen,
+ * hoechstens bis `deadline`, checkpointet das Journal und schliesst. Erst das
+ * Schliessen raeumt `-wal` und `-shm` weg. Ein Job, der die Frist reisst, wird
+ * mit dem Prozess abgebrochen wie zuvor beim SIGKILL - seine Transaktionen sind
+ * synchron und damit schon ganz geschrieben oder gar nicht.
+ *
+ * Waehrend eines Restores bleibt die Verbindung, wie sie ist: der Restore haelt
+ * sie selbst, und ein Abbruch mittendrin ist mit Arbeitsdatei und Rollback-Kopie
+ * schon abgefangen (#1431).
+ * @param {number} deadline Zeitpunkt in ms
+ * @returns {Promise<boolean>} `true`, wenn nichts mehr lief und die Verbindung zu ist
+ */
+async function closeForShutdown(deadline) {
+  const quiet = await waitUntilIdle(() => [...activeBackups, ...activeWriters()], deadline);
+  if (restoreRunning || !db) return false;
+  try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
+  db.close();
+  db = null;
+  return quiet;
+}
+
 /** Laeuft gerade ein Restore? Fuer `restoreWriteGate`. */
 function isRestoreRunning() {
   return restoreRunning;
@@ -13487,4 +13584,4 @@ if (globalThis[CHECK_ONLY_HANDSHAKE] !== true) {
   }
 }
 
-export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, checkBackupFile, isRestoreRunning, isDatabaseOpen, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, adoptOrphanPantryBatches, _setTestDatabase, _resetTestDatabase };
+export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, checkBackupFile, isRestoreRunning, isDatabaseOpen, closeForShutdown, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, adoptOrphanPantryBatches, _setTestDatabase, _resetTestDatabase };
