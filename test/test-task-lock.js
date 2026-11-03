@@ -560,3 +560,34 @@ test('Bestand: wer eine offene Aufgabe sperrt, sperrt sich selbst nicht aus, wen
   });
   assert.equal(again.status, 200);
 });
+
+// --------------------------------------------------------
+// Rotation (#830 an der #1763-Serie): Modus und Poolreihenfolge sind Definition
+// --------------------------------------------------------
+
+test('PUT: ein Kind kann Modus und Ablieferungsordnung einer gesperrten Serie nicht umschreiben', async () => {
+  const task = await lockedTask('Muell Dienstplan', { is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY' });
+  db.prepare("UPDATE tasks SET rotation_mode = 'round_robin', rotation_last_position = 1, rotation_last_user = ? WHERE id = ?")
+    .run(CHILD, task.id);
+  const ins = db.prepare('INSERT INTO task_rotation_pool (task_id, user_id, position) VALUES (?, ?, ?)');
+  ins.run(task.id, CHILD, 0);
+  ins.run(task.id, SIBLING, 1);
+  // Die Ablieferungsreihenfolge tauschen ist die Rotation selbst - Definition
+  // wie Punkte und Faelligkeit. Vor dem Fix fehlten die Felder im
+  // `wanted`-Vergleich und das Kind hob die Sperre mit einem Pool-Tausch.
+  const swap = await call('PUT', `/${task.id}`, {
+    as: asChild, body: fullUpdate(task, { rotation_pool: [SIBLING, CHILD] }),
+  });
+  assert.equal(swap.status, 403);
+  assert.equal(swap.body.reason, 'task_locked');
+  const off = await call('PUT', `/${task.id}`, {
+    as: asChild, body: fullUpdate(task, { rotation_mode: null }),
+  });
+  assert.equal(off.status, 403, 'den Modus abzustellen geht genauso wenig');
+  // Der Dialog-Rumpf mit dem unveraenderten Pool (Echo des Bestands) ist
+  // keine Aenderung: Abhaken aus dem Bearbeiten-Formular bleibt moeglich.
+  const echo = await call('PUT', `/${task.id}`, {
+    as: asChild, body: fullUpdate(task, { rotation_pool: [CHILD, SIBLING] }),
+  });
+  assert.equal(echo.status, 200, 'das Echo des gespeicherten Pools toucht die Definition nicht');
+});
