@@ -290,10 +290,16 @@ async function loadFeed(host, part) {
   if (!data) return;
 
   host.querySelector('[data-feed-copy]')?.addEventListener('click', async () => {
+    // Ohne HTTPS gibt es navigator.clipboard nicht - dann waere "kopiert"
+    // gelogen. Das Feld steht markiert zum Kopieren von Hand (#2487).
     try {
-      await navigator.clipboard?.writeText(data.url);
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(data.url);
       showToast(feed.text.copied(), 'success');
     } catch {
+      const field = host.querySelector(`#${part}-feed-url`);
+      field?.focus();
+      field?.select();
       showToast(t('settings.invites.copyFailed'), 'danger');
     }
   });
