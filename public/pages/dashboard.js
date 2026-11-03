@@ -8204,7 +8204,7 @@ function renderWeatherWidget(weather, size = '2x1') {
             <div class="weather-widget__temp">${esc(current.temp)}${unitSymbol}</div>
             ${weatherTodayRange(weather, 'weather-widget__range')}
             <div class="weather-widget__desc">${esc(descText(current.desc))}</div>
-            <div class="weather-widget__city">${esc(city)}</div>
+            ${city ? `<div class="weather-widget__city">${esc(city)}</div>` : ''}
             <div class="weather-widget__meta">
               ${t('dashboard.weatherFeelsLike', { temp: current.feels_like, humidity: current.humidity, wind: current.wind_speed, windUnit })}
             </div>
@@ -9757,8 +9757,8 @@ export async function maybeUpdateAutoLocation({ autoLocateEnabled, geolocation, 
       weather_user: {
         lat: position.coords.latitude.toFixed(4),
         lon: position.coords.longitude.toFixed(4),
-        // Stadt-Label gehört zu den alten Koordinaten — Override löschen, damit das Widget
-        // auf die "lat, lon"-Anzeige zurückfällt statt einen veralteten Namen zu zeigen.
+        // Stadt-Label gehört zu den alten Koordinaten - Override löschen, damit das Widget
+        // keinen veralteten Namen zeigt; ohne Namen bleibt die Ortszeile leer.
         city: null,
       },
     });
