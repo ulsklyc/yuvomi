@@ -611,34 +611,35 @@ function deviceMayUseAuthRoute(method, path) {
 }
 
 /**
- * Als welches Konto wuerde `requireAuth` diese Anfrage fuehren? Fuer das Tor
- * unten, das VOR `requireAuth` steht und deshalb selbst nachsehen muss - ohne
- * dessen Nebenwirkungen (`last_used_at`, Cookie-Auffrischung, 401).
+ * Jedes Konto, als das `requireAuth` diese Anfrage fuehren KOENNTE. Fuer das
+ * Tor unten, das VOR `requireAuth` steht und deshalb selbst nachsehen muss -
+ * ohne dessen Nebenwirkungen (`last_used_at`, Cookie-Auffrischung, 401).
  *
- * Dieselbe Reihenfolge wie dort: ein gueltiges Token gewinnt, sonst die
- * Sitzung. Ein Display-Cookie wird hier nicht aufgeloest - ein Display ist nie
- * ein Ausgaben-Gast, und das Tor hat fuer Displays seinen eigenen Riegel. Ist
- * das Cookie ungueltig, antwortet `requireAuth` mit 401 statt auf die Sitzung
- * zurueckzufallen; hier die Sitzung zu nehmen ist die engere Antwort.
+ * BEWUSST NICHT "das eine Konto, das `requireAuth` waehlen wird". Diese Wahl
+ * hier nachzubauen hiesse, jede ihrer Bedingungen (Widerruf, Ablauf, Leerlauf,
+ * ehemaliger Aussteller oder Subjekt) ein zweites Mal zu fuehren, und die
+ * Fassung, die zurueckbleibt, oeffnet eine Luecke: haelt das Tor ein Token fuer
+ * gueltig, das `requireAuth` verwirft, sieht es den Token-Inhaber, und
+ * `requireAuth` faellt danach auf die Sitzung eines Gasts zurueck (Review zu
+ * GHSA-q7gc-2cc9-w8fj, gemessen). Deshalb zaehlen hier die Sitzung UND jede
+ * Token-Zeile zum mitgeschickten Wert, ob brauchbar oder nicht. Ist eines
+ * davon ein Gast, sperrt das Tor - die engere Antwort.
  *
- * Ein Ausgaben-Gast bekommt kein Device Credential (`POST /devices` und die
- * Kopplung nehmen nur Haushaltsmitglieder) und kein Integrations-Token als
- * Subjekt. Der Token-Zweig steht trotzdem da: eine Zeile, die aus einer
- * Sicherung oder einer frueheren Version kommt, soll an diesem Tor nicht
- * vorbeikommen, nur weil sie keine Sitzung ist.
- * @returns {number|null}
+ * Ein Display-Cookie wird nicht aufgeloest: ein Display ist nie ein
+ * Ausgaben-Gast, und das Tor hat fuer Displays seinen eigenen Riegel.
+ * @returns {number[]}
  */
-function requestPrincipalUserId(req) {
+function requestCandidateUserIds(req) {
+  const ids = [];
+  if (req.session?.userId != null) ids.push(req.session.userId);
   const token = extractApiToken(req);
   if (token) {
     const row = db.get().prepare(`
-      SELECT COALESCE(t.subject_user_id, t.created_by) AS user_id
-      FROM api_tokens t
-      WHERE t.token_hash = ? AND ${apiTokenUsableSql('t')}
+      SELECT t.subject_user_id, t.created_by FROM api_tokens t WHERE t.token_hash = ?
     `).get(hashApiToken(token));
-    if (row) return row.user_id;
+    if (row) ids.push(row.subject_user_id ?? row.created_by);
   }
-  return req.session?.userId ?? null;
+  return ids;
 }
 
 // Sicherheits-Gate (GHSA-xcv5-6w6x-x5q2): Der Auth-Router ist in server/index.js
@@ -670,7 +671,7 @@ router.use((req, res, next) => {
   // beim Display unten: die Liste ist `/api/v1`-relativ gefuehrt. 403 und
   // derselbe Grund wie im Gast-Gate, damit der Client nur eine Absage kennt.
   if (!splitGuestMayReach(req.method, `/auth${req.path}`)
-    && isSplitGuestAccount(db.get(), requestPrincipalUserId(req))) {
+    && requestCandidateUserIds(req).some((id) => isSplitGuestAccount(db.get(), id))) {
     return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403, reason: 'split_guest_scope' });
   }
   // DASSELBE FUER EIN GEKOPPELTES DISPLAY (#1208). Es traegt ebenfalls Scopes

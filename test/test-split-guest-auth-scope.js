@@ -25,6 +25,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { startTestServer, cookieHeader } from './server-ready.js';
@@ -34,6 +35,7 @@ const { baseUrl: BASE } = await startTestServer({
   env: { SESSION_SECRET: 'test-split-guest-auth-scope-secret-min32' },
 });
 const { SPLIT_GUEST_AUTH_ROUTES, splitGuestMayReach } = await import('../server/split-guest-scope.js');
+const db = (await import('../server/db.js')).get();
 
 const API = `${BASE}/api/v1`;
 const json = { 'Content-Type': 'application/json' };
@@ -188,6 +190,58 @@ test('Verankerung: `/api/v1`-relativ, exakt, mit Methode', () => {
   assert.equal(splitGuestMayReach('GET', '/split-expenses'), true);
   assert.equal(splitGuestMayReach('GET', '/split-expensesx'), false);
   assert.equal(splitGuestMayReach('GET', '/version'), false, 'liegt vor dem Gate, kein Eintrag');
+});
+
+/**
+ * Ein Token-Zeile direkt in der Datenbank. `createdBy` ist der Aussteller,
+ * `subject` das Konto, als das es handelt.
+ */
+function insertToken(createdBy, subject = null) {
+  const token = `yuvomi_guestscope_${crypto.randomUUID()}`;
+  db.prepare(`
+    INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, subject_user_id)
+    VALUES ('Gegenprobe', ?, 'yuvomi_gs', ?, ?)
+  `).run(crypto.createHash('sha256').update(token).digest('hex'), createdBy, subject);
+  return token;
+}
+
+test('ein mitgeschicktes Token versteckt die Gast-Sitzung nicht', async () => {
+  // Das Tor muss die Anfrage so sehen wie `requireAuth`. Ein Token, das das
+  // Tor fuer gueltig hielte, `requireAuth` aber nicht (hier: der Aussteller
+  // ist ehemalig), liesse das Tor ein Mitglied sehen und `requireAuth` danach
+  // auf die Gast-Sitzung zurueckfallen - die Kontoliste ginge an den Gast.
+  const fresh = await login('guest1', 'guestpass1234');
+  const formerRes = await fetch(`${API}/auth/users`, {
+    method: 'POST',
+    headers: sessionHeaders(admin),
+    body: JSON.stringify({ username: 'former1', display_name: 'Former', password: 'former1pass1234' }),
+  });
+  assert.equal(formerRes.status, 201);
+  const formerId = (await formerRes.json()).data?.id ?? db.prepare("SELECT id FROM users WHERE username = 'former1'").get().id;
+  const memberId = db.prepare("SELECT id FROM users WHERE username = 'member1'").get().id;
+  const deadCreator = insertToken(formerId, memberId);
+  db.prepare("UPDATE users SET deactivated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(formerId);
+  const unusable = insertToken(memberId);
+  db.prepare("UPDATE api_tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE token_hash = ?")
+    .run(crypto.createHash('sha256').update(unusable).digest('hex'));
+
+  for (const [label, token] of [['Aussteller ehemalig', deadCreator], ['widerrufen', unusable], ['Unsinn', 'yuvomi_nonsense']]) {
+    const res = await fetch(`${API}/auth/users`, {
+      headers: { Cookie: fresh.cookie, Authorization: `Bearer ${token}` },
+    });
+    const body = await res.json().catch(() => null);
+    assert.equal(res.status, 403, `${label}: ${res.status}`);
+    assert.equal(body?.data, undefined, `${label}: keine Zeilen`);
+  }
+
+  // Gegenrichtung: ein gueltiges Mitglieds-Token neben der Gast-Sitzung.
+  // `requireAuth` nimmt das Token; das Tor sperrt trotzdem, weil die Sitzung
+  // im selben Request einem Gast gehoert - die engere Antwort.
+  const valid = insertToken(memberId);
+  const res = await fetch(`${API}/auth/users`, {
+    headers: { Cookie: fresh.cookie, Authorization: `Bearer ${valid}` },
+  });
+  assert.equal(res.status, 403, 'gueltiges Token neben Gast-Sitzung');
 });
 
 test('Logout bleibt offen und beendet die Sitzung', async () => {
