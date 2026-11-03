@@ -6,12 +6,14 @@
 
 import { untrackWriteRequest } from '../utils/restore-state.js';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { backupToFile, currentVersion, restoreFromFile } from '../db.js';
 import { requireAdmin } from '../auth.js';
 import { createLogger } from '../logger.js';
+import { secretOrigin, storedSecretPath } from '../utils/auto-secrets.js';
 import { createLocalBackup, getStatus as getSchedulerStatus, triggerBackup } from '../services/backup-scheduler.js';
 import * as webdavBackup from '../services/backup-webdav.js';
 
@@ -58,6 +60,46 @@ function backupFileName() {
   return `yuvomi-backup-${stamp}.db`;
 }
 
+/**
+ * Was die Admin-Karte ueber den Datenbankschluessel wissen darf, OHNE den Wert:
+ * woher er kommt und ob die Datenbank ueberhaupt verschluesselt ist.
+ *
+ * Einen Wert gibt es nur fuer 'stored' und 'generated' - den hat Yuvomi selbst
+ * erzeugt, und der Betreiber kennt ihn sonst nirgends. Ein Wert aus Env oder
+ * `_FILE` gehoert dem Betreiber und steht schon in dessen Konfiguration; ihn
+ * hier zu zeigen verdoppelte nur die Stellen, an denen er abgreifbar ist.
+ * `origin: null` mit Schluessel heisst: der Handschlag lief in diesem Prozess
+ * nicht (server/utils/auto-secrets.js) - dann ist die Herkunft unbekannt, und
+ * Unbekanntes wird nicht gezeigt.
+ */
+function databaseKeyStatus() {
+  const encrypted = Boolean(process.env.DB_ENCRYPTION_KEY);
+  const origin = encrypted ? secretOrigin('DB_ENCRYPTION_KEY') : null;
+  return { origin, encrypted };
+}
+
+function databaseKeyIsRevealable({ origin, encrypted }) {
+  return encrypted && (origin === 'stored' || origin === 'generated')
+    && storedSecretPath('DB_ENCRYPTION_KEY') !== null;
+}
+
+/**
+ * Schranke fuer die Schluesselanzeige. Ein ehrlicher Admin braucht sie einmal,
+ * zum Sichern; zehn in zehn Minuten lassen Platz fuer Vertipper beim Kopieren
+ * und halten ein Skript mit einer gekaperten Sitzung davon ab, den Wert im
+ * Takt abzuholen. Je Konto gezaehlt, wie der Gravatar-Limiter in auth.js:
+ * hinter einem Proxy ohne `trust proxy` teilt der Haushalt eine IP. Steht
+ * HINTER `requireAdmin`, ein Mitglied verbraucht also nichts.
+ */
+const databaseKeyLimiter = rateLimit({
+  windowMs: 10 * 60_000,
+  max: 10,
+  keyGenerator: (req) => `user:${req.authUserId}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests for the database key. Please wait a few minutes.', code: 429 },
+});
+
 router.get('/status', requireAdmin, (req, res) => {
   const schedulerStatus = getSchedulerStatus();
   res.json({
@@ -65,6 +107,36 @@ router.get('/status', requireAdmin, (req, res) => {
       schema_version: currentVersion(),
       restore_upload_limit: RESTORE_LIMIT,
       scheduler: schedulerStatus,
+      // Nur die Herkunft, nie der Wert: der Status wird bei jedem Oeffnen der
+      // Seite geladen, der Schluessel nur auf ausdruecklichen Klick.
+      database_key: databaseKeyStatus(),
+    },
+  });
+});
+
+/**
+ * GET /api/v1/backup/database-key
+ * Der Datenbankschluessel, den Yuvomi beim ersten Start selbst erzeugt hat -
+ * damit der Admin ihn neben seine Backups legen kann. Ohne ihn oeffnet sich
+ * nach dem Verlust des Volumes kein Backup mehr.
+ *
+ * Gleiche Schwelle wie `GET /database` (keine erneute Anmeldung): wer die
+ * Datenbank herunterladen darf, hat ihren Inhalt ohnehin. Ein Geraet kommt
+ * nicht durch - `requireAuth` macht einen Admin dort zum Mitglied.
+ */
+router.get('/database-key', requireAdmin, databaseKeyLimiter, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const status = databaseKeyStatus();
+  if (!databaseKeyIsRevealable(status)) {
+    return res.json({ data: status });
+  }
+  // Wer, nicht was: der Wert gehoert nie ins Log.
+  log.info(`admin ${req.authUserId} viewed the database key`);
+  res.json({
+    data: {
+      ...status,
+      key: process.env.DB_ENCRYPTION_KEY,
+      path: storedSecretPath('DB_ENCRYPTION_KEY'),
     },
   });
 });

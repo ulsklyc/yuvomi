@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  mkdtempSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync,
+  mkdtempSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, mkdirSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -459,6 +459,65 @@ test('GET /api/preflight meldet die Namen bewahrter Schlüssel, nie deren Werte'
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('GET /api/preflight bewahrt einen Schlüssel, den die App beim ersten Start gespeichert hat', async () => {
+  // Ohne SESSION_SECRET/DB_ENCRYPTION_KEY in der .env legt die App beide unter
+  // <DATA_DIR>/.secrets/ ab (server/utils/auto-secrets.js). Sah der Preflight
+  // nur die .env, erzeugte der Wizard beim Rerun einen neuen DB-Schlüssel, der
+  // den gespeicherten überstimmt - die verschlüsselte Datenbank öffnete nicht mehr.
+  const dir = mkdtempSync(join(tmpdir(), 'oikos-env-'));
+  try {
+    mkdirSync(join(dir, 'data', '.secrets'), { recursive: true });
+    writeFileSync(join(dir, 'data', '.secrets', 'DB_ENCRYPTION_KEY'), 'gespeichert-db\n');
+    await withServer(dir, async base => {
+      let d = await (await fetch(`${base}/api/preflight`)).json();
+      assert.deepEqual(d.preservedKeys, ['DB_ENCRYPTION_KEY'], 'Standard-DATA_DIR ./data');
+      assert.ok(!JSON.stringify(d).includes('gespeichert-db'), 'kein Wert in der Antwort');
+
+      // Ein eigener DATA_DIR verschiebt die Ablage mit.
+      mkdirSync(join(dir, 'store', '.secrets'), { recursive: true });
+      writeFileSync(join(dir, 'store', '.secrets', 'SESSION_SECRET'), 'gespeichert-s\n');
+      writeFileSync(join(dir, '.env'), 'DATA_DIR=./store\n');
+      d = await (await fetch(`${base}/api/preflight`)).json();
+      assert.deepEqual(d.preservedKeys, ['SESSION_SECRET']);
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('install.sh erkennt einen beim ersten Start gespeicherten Schlüssel', () => {
+  const src = readFileSync(new URL('../install.sh', import.meta.url), 'utf8');
+  const start = src.indexOf('read_existing_env_value() {');
+  const end = src.indexOf('on_interrupt()');
+  const fn = src.slice(start, end);
+  assert.match(fn, /stored_secret_exists\(\) \{/, 'stored_secret_exists fehlt in install.sh');
+
+  const dir = mkdtempSync(join(tmpdir(), 'oikos-env-'));
+  try {
+    const run = key => execFileSync('bash', ['-s'], {
+      cwd: dir, encoding: 'utf8',
+      input: `${fn}\nstored_secret_exists ${key} && printf yes || printf no`,
+    });
+    assert.equal(run('DB_ENCRYPTION_KEY'), 'no', 'ohne Datei nichts');
+    mkdirSync(join(dir, 'data', '.secrets'), { recursive: true });
+    writeFileSync(join(dir, 'data', '.secrets', 'DB_ENCRYPTION_KEY'), 'gespeichert\n');
+    assert.equal(run('DB_ENCRYPTION_KEY'), 'yes', 'Standard-DATA_DIR ./data');
+    assert.equal(run('SESSION_SECRET'), 'no');
+    writeFileSync(join(dir, '.env'), 'DATA_DIR=./store\n');
+    assert.equal(run('DB_ENCRYPTION_KEY'), 'no', 'DATA_DIR aus der .env gilt');
+    mkdirSync(join(dir, 'store', '.secrets'), { recursive: true });
+    writeFileSync(join(dir, 'store', '.secrets', 'DB_ENCRYPTION_KEY'), 'gespeichert\n');
+    assert.equal(run('DB_ENCRYPTION_KEY'), 'yes');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  const secrets = src.slice(src.indexOf('configure_secrets() {'), src.indexOf('# ── Step 3'));
+  const storedIdx = secrets.indexOf('stored_secret_exists');
+  assert.ok(storedIdx !== -1 && storedIdx < secrets.indexOf('generate_secret'),
+    'configure_secrets muss den gespeicherten Schlüssel vor der Generierung prüfen');
 });
 
 test('install.html erzeugt für bewahrte Schlüssel keinen neuen Wert', () => {

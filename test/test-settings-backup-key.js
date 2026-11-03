@@ -411,3 +411,97 @@ test('WebDAV: password_required wird uebersetzt, andere Fehler behalten den Serv
   assert.equal(webdavErrorMessage({ message: 'Authentication failed (401).', data: { code: 400 } }), 'common.errorGeneric');
   assert.equal(webdavErrorMessage({ message: 'url must start with http:// or https://.', data: { errorCode: 'url_invalid' } }), 'settings.backupWebdavUrlInvalid');
 });
+
+// --------------------------------------------------------
+// Karte "Datenbankschluessel" (renderDatabaseKeyCard)
+// --------------------------------------------------------
+//
+// Der Wert steht nur nach dem Klick im DOM und nach "Ausblenden" nicht mehr;
+// einen Knopf gibt es nur fuer den Schluessel, den Yuvomi selbst erzeugt hat.
+// Attrappen wie oben, dazu genug Element-API fuer den Ausgabeblock.
+
+class FakeNode extends FakeEl {
+  constructor(doc, tag) {
+    super(doc, null);
+    this.tag = tag;
+    this.children = [];
+    this.dataset = {};
+  }
+  append(...nodes) { this.children.push(...nodes); }
+  replaceChildren(...nodes) { this.children = [...nodes]; }
+  select() {}
+}
+
+function keyCard() {
+  const doc = { activeElement: null };
+  doc.createElement = (tag) => new FakeNode(doc, tag);
+  doc.createDocumentFragment = () => new FakeNode(doc, '#fragment');
+  doc.createTextNode = (text) => ({ textContent: text });
+  const els = {};
+  for (const id of ['backup-db-key-card', 'backup-db-key-hint', 'backup-db-key-actions', 'backup-db-key-output', 'backup-db-key-toggle']) {
+    els[id] = new FakeNode(doc, 'div');
+  }
+  els['backup-db-key-card'].hidden = true;
+  els['backup-db-key-actions'].hidden = true;
+  els['backup-db-key-output'].hidden = true;
+  els['backup-db-key-toggle'].setAttribute('aria-expanded', 'false');
+  const query = (sel) => els[sel.replace(/^#/, '')] ?? null;
+  els['backup-db-key-card'].querySelector = query;
+  globalThis.window = { location: { protocol: 'https:' }, yuvomi: { showToast() {} } };
+  globalThis.document = doc;
+  return { els, container: { querySelector: query } };
+}
+
+/** Alle Texte und Werte unterhalb eines Knotens - wo der Schluessel stuende. */
+function textsBelow(node) {
+  if (!node) return [];
+  return [node.textContent, node.value, ...(node.children ?? []).flatMap(textsBelow)].filter(Boolean);
+}
+
+const { renderDatabaseKeyCard } = await import('../public/settings/pages/admin-backup.js');
+const KEY = 'a'.repeat(64);
+
+test('Datenbankschluessel: erzeugt - Knopf da, Wert erst nach dem Klick, nach Ausblenden aus dem DOM', async () => {
+  const c = keyCard();
+  let calls = 0;
+  globalThis.__apiStub = { get: async (route) => { calls += 1; assert.equal(route, '/backup/database-key'); return { data: { origin: 'generated', encrypted: true, key: KEY, path: '/data/.secrets/DB_ENCRYPTION_KEY' } }; } };
+  renderDatabaseKeyCard(c.container, { origin: 'generated', encrypted: true });
+  assert.equal(c.els['backup-db-key-card'].hidden, false);
+  assert.equal(c.els['backup-db-key-actions'].hidden, false);
+  assert.equal(calls, 0, 'kein Abruf ohne Klick');
+  assert.ok(!textsBelow(c.els['backup-db-key-output']).includes(KEY));
+
+  await c.els['backup-db-key-toggle'].dispatch('click');
+  assert.equal(calls, 1);
+  assert.equal(c.els['backup-db-key-output'].hidden, false);
+  assert.ok(textsBelow(c.els['backup-db-key-output']).includes(KEY), 'Wert sichtbar');
+  assert.equal(c.els['backup-db-key-toggle'].getAttribute('aria-expanded'), 'true');
+
+  await c.els['backup-db-key-toggle'].dispatch('click');
+  assert.equal(calls, 1, 'Ausblenden fragt nicht nach');
+  assert.deepEqual(c.els['backup-db-key-output'].children, [], 'der Wert ist aus dem DOM');
+  assert.equal(c.els['backup-db-key-output'].hidden, true);
+  globalThis.__apiStub = undefined;
+});
+
+for (const [label, status] of [
+  ['aus der Konfiguration (env)', { origin: 'env', encrypted: true }],
+  ['aus der Konfiguration (file)', { origin: 'file', encrypted: true }],
+  ['Herkunft unbekannt', { origin: null, encrypted: true }],
+  ['unverschluesselt', { origin: null, encrypted: false }],
+]) {
+  test(`Datenbankschluessel: ${label} - Hinweis, kein Knopf`, () => {
+    const c = keyCard();
+    renderDatabaseKeyCard(c.container, status);
+    assert.equal(c.els['backup-db-key-card'].hidden, false);
+    assert.equal(c.els['backup-db-key-actions'].hidden, true);
+    assert.ok(c.els['backup-db-key-hint'].textContent.length > 0, 'ein Satz steht da');
+    assert.equal(c.els['backup-db-key-toggle'].listeners.click, undefined, 'nichts zum Klicken gebunden');
+  });
+}
+
+test('Datenbankschluessel: ohne Status bleibt die Karte versteckt', () => {
+  const c = keyCard();
+  renderDatabaseKeyCard(c.container, undefined);
+  assert.equal(c.els['backup-db-key-card'].hidden, true);
+});

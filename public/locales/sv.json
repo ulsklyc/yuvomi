@@ -3462,7 +3462,17 @@
         "memberRemoveLastAdmin": "Minst en administratör måste finnas kvar.",
         "memberRemoveLastSsoAdmin": "Det här är den sista administratören som är länkad till SSO. Länka en annan administratör först.",
         "backupWebdavUrlInvalid": "Adressen måste börja med http:// eller https://.",
-        "icsSubscriptionGone": "Den här prenumerationen finns inte längre."
+        "icsSubscriptionGone": "Den här prenumerationen finns inte längre.",
+        "backupDbKeyTitle": "Databasnyckel",
+        "backupDbKeyGeneratedHint": "Yuvomi skapade den vid första starten. Spara en kopia någon annanstans än på den här servern: utan den går dina säkerhetskopior inte att öppna om lagringen går förlorad.",
+        "backupDbKeyShow": "Visa nyckel",
+        "backupDbKeyHide": "Dölj",
+        "backupDbKeyCopy": "Kopiera",
+        "backupDbKeyCopied": "Nyckeln kopierad",
+        "backupDbKeyCopyFailed": "Kopieringen fungerade inte. Nyckeln är markerad, kopiera den för hand.",
+        "backupDbKeyStoredAt": "Sparad på servern i {{path}}",
+        "backupDbKeyConfigHint": "Nyckeln kommer från din konfiguration. Förvara den säkert där: utan den går dina säkerhetskopior inte att öppna.",
+        "backupDbKeyPlainHint": "Databasen är inte krypterad, så säkerhetskopiorna innehåller dina data i läsbar form. Med en egen DB_ENCRYPTION_KEY krypterar Yuvomi den vid nästa start."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",
