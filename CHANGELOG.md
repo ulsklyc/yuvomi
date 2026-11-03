@@ -121,6 +121,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   overlap. The defaults description also uses the same form of address as its neighbouring
   hints (#2366).
 
+### Security
+- **Document storage names no longer use a regular expression that slows down on long runs of
+  dashes.** Trimming the dashes around the folder and file part of a stored document's name used a
+  pattern CodeQL flags as polynomial. The step before it already collapsed every run into one dash,
+  so uploads were not slowed down in practice; the name stays exactly the same.
+
 ## [2.84.0] - 2026-11-02
 
 ### Added
