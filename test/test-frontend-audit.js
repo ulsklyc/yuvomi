@@ -12243,7 +12243,7 @@ test('kein Kopier-Aufruf verschluckt die fehlende Zwischenablage per optionaler 
   for (const file of files) {
     const lines = withoutCommentsKeepingLines(read(file)).split('\n');
     lines.forEach((line, i) => {
-      if (silent.test(line)) offenders.push(`${file.replace('../', '')}:${i + 1}`);
+      if (silent.test(line)) offenders.push(`${file.replace(/^\.\.\//, '')}:${i + 1}`);
     });
   }
   assert.deepEqual(offenders, [], 'writeText ohne Zwischenablage meldet sonst Erfolg');
