@@ -409,12 +409,19 @@ function bindEvents(container, initialTokens, users, currentUserId) {
   // Token ist genau einmal sichtbar und stand in einem readonly Input, aus dem
   // es von Hand markiert werden musste (Critique 2026-07-27).
   container.querySelector('#api-token-copy')?.addEventListener('click', async () => {
-    const value = container.querySelector('#api-token-created-value')?.value;
+    const field = container.querySelector('#api-token-created-value');
+    const value = field?.value;
     if (!value) return;
+    // Ohne HTTPS gibt es navigator.clipboard nicht - dann waere "kopiert"
+    // gelogen, und das Token ist nur dieses eine Mal sichtbar. Markieren hilft
+    // weiter (dasselbe Muster wie admin-backup.js, #2487).
     try {
-      await navigator.clipboard?.writeText(value);
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(value);
       window.yuvomi?.showToast(t('settings.apiTokenCopied'), 'success');
     } catch {
+      field.focus();
+      field.select();
       window.yuvomi?.showToast(t('settings.apiTokenCopyFailed'), 'danger');
     }
   });

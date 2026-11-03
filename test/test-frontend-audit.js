@@ -12215,12 +12215,38 @@ test('das einmalig sichtbare API-Token laesst sich kopieren', () => {
   const source = read('../public/settings/pages/admin-api.js');
   assert.match(source, /id="api-token-copy"/);
   assert.match(source, /settings\.apiTokenCopy/);
-  assert.match(source, /navigator\.clipboard\?\.writeText\(value\)/);
+  assert.match(source, /navigator\.clipboard\.writeText\(value\)/);
   assert.match(source, /settings\.apiTokenCopied/);
+  // Ohne Zwischenablage (http im LAN) markiert der Fehlschlag das Feld, damit
+  // das einmalige Token von Hand kopiert werden kann (#2487).
+  assert.match(source, /settings\.apiTokenCopyFailed/);
   // Der Lucide-Platzhalter im erst spaeter eingeblendeten Block braucht seinen
   // eigenen createIcons-Aufruf.
   assert.match(source, /window\.lucide\?\.createIcons\(\{ el: output \}\)/);
   assertKeysExistInEveryLocale(['settings.apiTokenCopy', 'settings.apiTokenCopied', 'email.saveFailed']);
+});
+
+// Ueber http im Heimnetz gibt es `navigator.clipboard` nicht. Ein Aufruf
+// `await navigator.clipboard?.writeText(x)` wirft dann nicht, sondern liefert
+// still `undefined` - und gleich danach stand der Erfolgs-Toast, obwohl nichts
+// kopiert war (#2487: API-Token und Feed-URL). Der Guard misst den Aufruf
+// selbst: eine optionale Kette direkt vor dem Aufruf von writeText ist immer
+// dieser Fehler; die Pruefung `if (navigator.clipboard?.writeText)` davor ist
+// erlaubt, weil dort keine Klammer folgt.
+test('kein Kopier-Aufruf verschluckt die fehlende Zwischenablage per optionaler Kette', () => {
+  const silent = /clipboard\?\.writeText\s*\(|writeText\?\.\s*\(/;
+  const files = [
+    ...walkFrontendFiles('../public/').filter((f) => !f.startsWith('../public/vendor/')),
+    ...walkFrontendFiles('../tools/installer/'),
+  ];
+  const offenders = [];
+  for (const file of files) {
+    const lines = withoutCommentsKeepingLines(read(file)).split('\n');
+    lines.forEach((line, i) => {
+      if (silent.test(line)) offenders.push(`${file.replace('../', '')}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(offenders, [], 'writeText ohne Zwischenablage meldet sonst Erfolg');
 });
 
 // `housekeeping.deleteTaskConfirm` schrieb `{name}` statt `{{name}}` - in allen

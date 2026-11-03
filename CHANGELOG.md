@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a signed-in device of the native app cannot read it.
 
 ### Fixed
+- **Copying a new API token or a calendar feed link over plain HTTP no longer claims success.** On an
+  installation reached without HTTPS the browser offers no clipboard, yet both copy buttons said
+  "copied". They now say that copying did not work and select the value, so you can copy it by hand -
+  which matters most for an API token, since it is shown only once.
 - **The command-line backup check and backup command find a key Yuvomi stored itself.** The restore
   check (`node server/check-backup.js`) and the Docker Compose backup command shown on the backup page
   and in the installation guide now read the key the same way the server does: from
