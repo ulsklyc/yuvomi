@@ -3462,7 +3462,17 @@
         "memberRemoveLastAdmin": "Deve restare almeno un amministratore.",
         "memberRemoveLastSsoAdmin": "Questo è l'ultimo amministratore collegato a SSO. Collega prima un altro amministratore.",
         "backupWebdavUrlInvalid": "L'indirizzo deve iniziare con http:// o https://.",
-        "icsSubscriptionGone": "Questo abbonamento non esiste più."
+        "icsSubscriptionGone": "Questo abbonamento non esiste più.",
+        "backupDbKeyTitle": "Chiave del database",
+        "backupDbKeyGeneratedHint": "Yuvomi l'ha generata al primo avvio. Conservane una copia lontano da questo server: senza di essa, i tuoi backup non si possono aprire se lo spazio di archiviazione va perso.",
+        "backupDbKeyShow": "Mostra chiave",
+        "backupDbKeyHide": "Nascondi",
+        "backupDbKeyCopy": "Copia",
+        "backupDbKeyCopied": "Chiave copiata",
+        "backupDbKeyCopyFailed": "La copia non è riuscita. La chiave è selezionata, copiala a mano.",
+        "backupDbKeyStoredAt": "Salvata sul server in {{path}}",
+        "backupDbKeyConfigHint": "La chiave proviene dalla tua configurazione. Conservala lì al sicuro: senza di essa, i tuoi backup non si possono aprire.",
+        "backupDbKeyPlainHint": "Il database non è cifrato, quindi i backup contengono i tuoi dati in forma leggibile. Con una DB_ENCRYPTION_KEY tua, Yuvomi lo cifra al prossimo avvio."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",

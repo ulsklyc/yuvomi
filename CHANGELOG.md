@@ -8,6 +8,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A new installation generates its own session secret and database key.** Leave `SESSION_SECRET`
+  and `DB_ENCRYPTION_KEY` unset and the first start creates both and keeps them in `.secrets/` next to
+  the database (`/data/.secrets/` in the container, readable only by the user Yuvomi runs as). Every
+  later start reads the same files, so nobody has to run `openssl` before the first start, and app
+  stores and NAS catalogs no longer need to ask for the secrets or build them in. A value you set
+  yourself, directly or through `_FILE`, still wins. **Existing installations do not change:** a
+  database that runs without a key today keeps running without one, because a key now would encrypt it
+  without anyone having asked. The generated key lies on the same volume as the database, so it
+  protects a database file or backup that leaves the machine, not a stolen volume; a key of your own
+  kept elsewhere is stronger. To start a new installation unencrypted on purpose, set
+  `DB_ENCRYPTION_AUTO_KEY=false`; deleting the `DB_ENCRYPTION_KEY` line no longer does that.
+- **Admins can see the generated database key to keep a copy.** Settings → Household → Backup and
+  restore shows it on request, because without it your backups cannot be opened once the server's
+  storage is lost. The key appears only after a click and is not cached; viewing it is logged without
+  the value. A key from your own configuration is never shown - the page says where it comes from -
+  and a signed-in device of the native app cannot read it.
+
+### Fixed
+- **Copying a new API token or a calendar feed link over plain HTTP no longer claims success.** On an
+  installation reached without HTTPS the browser offers no clipboard, yet both copy buttons said
+  "copied". They now say that copying did not work and select the value, so you can copy it by hand -
+  which matters most for an API token, since it is shown only once.
+- **The command-line backup check and backup command find a key Yuvomi stored itself.** The restore
+  check (`node server/check-backup.js`) and the Docker Compose backup command shown on the backup page
+  and in the installation guide now read the key the same way the server does: from
+  `DB_ENCRYPTION_KEY`, from `DB_ENCRYPTION_KEY_FILE`, or from `.secrets/`. Before, both stopped on an
+  installation whose key came from a file. Neither ever creates a key. If you copied the backup command
+  into a cron job, copy it again from the installation guide.
+- **The message about the `DB_ENCRYPTION_KEY` placeholder no longer suggests clearing the line to run
+  unencrypted.** On a new installation that now generates a key. It names `DB_ENCRYPTION_AUTO_KEY=false`
+  instead.
+- **Running `install.sh` again keeps a session secret or database key that comes from a file.** With
+  `SESSION_SECRET_FILE` or `DB_ENCRYPTION_KEY_FILE` in `.env`, a rerun asked for a new value or
+  generated one and wrote it next to the `_FILE` line. Yuvomi then refused to start because both were
+  set, and a new database key would not have opened the existing database anyway. The installer now
+  keeps the `_FILE` line, writes no second value and says the secret is reused. The web installer
+  already did this.
+- **Task defaults follow the new-task dialog in a one-person household.** Visibility and
+  editing-lock defaults stay out of the way when nobody else can read tasks. Saved choices
+  remain intact and reappear when needed. The editing-lock switch and its hint no longer
+  overlap. The defaults description also uses the same form of address as its neighbouring
+  hints (#2366).
+
+## [2.84.0] - 2026-11-02
+
+### Added
+- **`GET /api/v1/version` now says what it is talking about.** Two new public fields: `product` identifies a
+  Yuvomi instance, and `client_api` is a whole number for the contract a native client relies on. A client can
+  recognise a server and tell whether it is new enough before anyone signs in. The exact version stays
+  behind sign-in. This release sets `client_api` to 1: signed-in devices and pairing, upcoming reminders,
+  and the API operations a native client is built from.
+- **Upcoming reminders for a native client.** `GET /api/v1/reminders/upcoming` lists your reminders that
+  are not due yet within a window of up to 14 days, so an app can schedule them on the device. Each row says
+  exactly when it fires in `fires_at`, in UTC, also for older reminders stored with an offset. `types` can
+  narrow the list, for example to tasks and events, and it follows the same rules as the reminders you
+  already see: nothing private, nothing from a module that is switched off. A task that is done or archived
+  stays out of the list.
+- **Signed-in devices, the groundwork for a native client.** New routes under `/api/v1/auth/devices` let a
+  household member exchange a sign-in for a device credential, list their own devices and sign one out. A
+  device acts as the person with less reach than a browser session: an administrator is an ordinary member
+  on it, and it can change neither password nor email nor second factor. It ends after 90 days without use
+  and with everything that ends a session, so "sign out other devices" now counts these too. An
+  administrator cannot see a member's devices, but can sign a member out of all of them with
+  `POST /api/v1/auth/users/{id}/devices/sign-out`. Nothing changes for browsers or existing API tokens.
+- **The API spec now holds for the operations a native client is built from.** 39 operations have an
+  `operationId`, a typed response and a typed body, checked by `test:openapi-client-contract`. A second
+  suite, `test:openapi-client-responses`, holds real responses against these schemas. This corrected
+  the spec where it was wrong: `POST /tasks`, `POST /shopping` and `POST /shopping/{listId}/items` answer
+  201, `DELETE /calendar/{id}` answers 204, `POST /auth/login` has a second answer shape for two-factor
+  sign-in, and `CalendarEvent` names its fields instead of allowing anything. Three nullable response
+  fields now carry `null` in their type rather than in a `oneOf` branch, which the Swift generator
+  dropped together with the field. The API itself did not change.
+- **Pairing a device, for households without passwords.** `POST /api/v1/auth/devices/pair` creates a
+  short code from a browser session, and `POST /api/v1/auth/devices/pair/redeem` exchanges it for a device
+  credential. The code holds for five minutes and once, and comes back as text, as a `yuvomi://pair` link
+  and as a QR code. It cannot open a wall display, and a display code cannot sign in a device.
 - **A document can name who it is about.** The document dialog has a new "About" field for one
   household member, and the Documents page can filter by person. The person also gets the expiry
   reminder, along with whoever filed the document, and once if that is the same person. This never
@@ -56,11 +132,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin sets up, in line with how private entries already work.
 
 ### Fixed
-- **Task defaults follow the new-task dialog in a one-person household.** Visibility and
-  editing-lock defaults stay out of the way when nobody else can read tasks. Saved choices
-  remain intact and reappear when needed. The editing-lock switch and its hint no longer
-  overlap. The defaults description also uses the same form of address as its neighbouring
-  hints (#2366).
+- **A reminder you have already seen stays seen when its event is saved again.** Saving the reminders of an
+  event replaced all of them, so one that had already fired came back unread with a new id and showed up
+  again. A time that stays in the set now keeps its row, its read state and its push state; only new times
+  are added.
+- **Tasks starting today show up on the household's today.** The task list and the MCP `list_tasks` tool
+  hid tasks by start date using the server's own day instead of the household time zone, so near midnight a
+  task could appear a day early or late.
+- **The API refuses malformed task, shopping and calendar input with 400.** A number as a title or item name,
+  `null` as a task category or priority, or `null` as a category when editing an item ended in a server error.
+  Numbers in text fields were stored as text such as "5.0", an empty title was saved when editing a task or
+  event, editing an item checked no lengths, `is_checked: "false"` ticked an item off, and empty date fields
+  of a task were stored as empty text instead of no date. These now answer 400 or are stored as no value;
+  `is_checked` still accepts 0 and 1. Clearing checked items of a list that does not exist answers 404
+  instead of 200.
+- **Saving a recurring event no longer moves its reminders.** In the calendar view, every occurrence named
+  the last occurrence in view as the start of its series. The event dialog then showed a lead time weeks
+  too long, and saving wrote that lead time back, so a reminder could fire weeks early. Saving a series
+  from an external calendar also moved reminders nobody had changed onto the opened occurrence. Reminders
+  already moved by this stay as they are: if one looks wrong, set it again.
+- **A shared event reminds a household channel once.** An event assigned to several people sent the
+  same reminder to a household notification channel once per person. The channel now hears it once,
+  and a reminder someone set for a different time still arrives on its own. Each person's Web Push
+  and personal channels are unchanged.
+- **A waste pickup reminds a household channel once.** Everyone who turned on a reminder for the
+  same waste type sent the same pickup to a household notification channel once per person. The
+  channel now hears it once, and someone with a different lead time still gets their own message.
+  Each person's Web Push and personal channels are unchanged.
 - **The Budget title stands in full on narrow phones** (#2440). Below 390px wide the title sat next
   to the month stepper and read "Bud..." at 360px. There the month now takes a row of its own under
   the title, with the arrows at the ends of the row, and the title keeps its size. The tabs without

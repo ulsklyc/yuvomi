@@ -10,7 +10,7 @@ import * as db from '../db.js';
 import { str, color, collectErrors, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
-import { mayChangeRecord, resolvePermissions, sendNotOwner } from '../permissions.js';
+import { mayChangeRecord, resolvePermissions, userForRequest, sendNotOwner } from '../permissions.js';
 import {
   categoryNameKey,
   hydrateNotesWithCategories,
@@ -40,7 +40,7 @@ function actorId(req) {
 function canManageHousehold(req) {
   if (isAdminRequest(req)) return true;
   const user = db.get().prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actorId(req));
-  return resolvePermissions(db.get(), user).capabilities.notes_manage_household_categories === 'allow';
+  return resolvePermissions(db.get(), userForRequest(req, user)).capabilities.notes_manage_household_categories === 'allow';
 }
 
 // FREMDE NOTIZEN NUR LESEN (R23, D5). Ohne `notes_edit_others` bearbeitet,

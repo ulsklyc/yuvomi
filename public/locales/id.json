@@ -3480,7 +3480,17 @@
         "memberRemoveLastAdmin": "Setidaknya satu administrator harus tetap ada.",
         "memberRemoveLastSsoAdmin": "Ini administrator terakhir yang tertaut ke SSO. Tautkan administrator lain terlebih dahulu.",
         "backupWebdavUrlInvalid": "Alamat harus diawali dengan http:// atau https://.",
-        "icsSubscriptionGone": "Langganan ini sudah tidak ada."
+        "icsSubscriptionGone": "Langganan ini sudah tidak ada.",
+        "backupDbKeyTitle": "Kunci basis data",
+        "backupDbKeyGeneratedHint": "Yuvomi membuatnya saat pertama kali dijalankan. Simpan salinannya di tempat lain selain server ini: tanpanya, cadanganmu tidak bisa dibuka jika penyimpanan hilang.",
+        "backupDbKeyShow": "Tampilkan kunci",
+        "backupDbKeyHide": "Sembunyikan",
+        "backupDbKeyCopy": "Salin",
+        "backupDbKeyCopied": "Kunci disalin",
+        "backupDbKeyCopyFailed": "Penyalinan tidak berhasil. Kunci sudah dipilih, salin secara manual.",
+        "backupDbKeyStoredAt": "Disimpan di server di {{path}}",
+        "backupDbKeyConfigHint": "Kunci berasal dari konfigurasimu. Simpan dengan aman di sana: tanpanya, cadanganmu tidak bisa dibuka.",
+        "backupDbKeyPlainHint": "Basis data tidak dienkripsi, jadi cadangan berisi datamu dalam bentuk yang bisa dibaca. Dengan DB_ENCRYPTION_KEY milikmu sendiri, Yuvomi mengenkripsinya saat dijalankan berikutnya."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

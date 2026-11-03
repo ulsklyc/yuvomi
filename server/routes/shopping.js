@@ -10,7 +10,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import { str, oneOf, url, date, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } from '../middleware/validate.js';
+import { str, oneOf, url, date, textShape, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } from '../middleware/validate.js';
 import { handOverToShoppingList, mealPlanSource, previewHandover } from '../services/kitchen-handover.js';
 import { loadItemTagsFor } from '../utils/task-tags.js';
 import {
@@ -534,6 +534,24 @@ router.patch('/items/:itemId', (req, res) => {
       .prepare('SELECT * FROM shopping_items WHERE id = ?')
       .get(req.params.itemId);
     if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'shopping_item_not_found' });
+
+    // Form und Laenge wie beim Anlegen. Vorher lief eine Zahl als `name` in
+    // `.trim()` auf einen 500, `category: null` an NOT NULL, eine Zahl als
+    // Menge landete als "5.0", und `is_checked: 'false'` hakte ab, weil nur die
+    // Wahrheit des Werts zaehlte. Die PWA schickt 0 und 1, deshalb bleiben die.
+    const body = req.body ?? {};
+    if (body.is_checked !== undefined && ![true, false, 0, 1].includes(body.is_checked)) {
+      return res.status(400).json({ error: 'is_checked must be true, false, 0 or 1.', code: 400 });
+    }
+    const shapeErrors = collectErrors([
+      textShape(body.name,     'name'),
+      textShape(body.quantity, 'quantity', { nullable: true }),
+      textShape(body.category, 'category'),
+      textShape(body.notes,    'notes',    { nullable: true }),
+      body.name !== undefined ? str(body.name, 'name', { max: MAX_TITLE }) : {},
+      str(body.quantity, 'quantity', { max: MAX_SHORT, required: false }),
+    ]);
+    if (shapeErrors.length) return res.status(400).json({ error: shapeErrors.join(' '), code: 400 });
 
     const {
       is_checked = item.is_checked,
@@ -1137,7 +1155,13 @@ router.post('/:listId/items', (req, res) => {
     const vCat   = oneOf(requestedCat, validNames, 'category');
     const vNotes = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
     const vUrl   = url(req.body.url, 'URL');
-    const errors = collectErrors([vName, vQty, vCat, vNotes, vUrl]);
+    const errors = collectErrors([
+      // Die Form vor dem Inhalt, wie bei PATCH: `str()` machte aus 5 den Namen "5".
+      textShape(req.body.name, 'name'),
+      textShape(req.body.quantity, 'quantity', { nullable: true }),
+      textShape(req.body.notes, 'notes', { nullable: true }),
+      vName, vQty, vCat, vNotes, vUrl,
+    ]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const { result, list_change } = withListChange(req.params.listId, () => db.get().prepare(`
@@ -1426,6 +1450,11 @@ router.post('/:listId/import-pantry', (req, res) => {
 // --------------------------------------------------------
 router.delete('/:listId/items/checked', (req, res) => {
   try {
+    const list = db.get()
+      .prepare('SELECT id FROM shopping_lists WHERE id = ?')
+      .get(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
+
     // Ohne Body: alles, was beim Eintreffen abgehakt ist. Mit `{ ids }`: nur
     // diese - und auch davon nur, was abgehakt ist und zu dieser Liste
     // gehoert. Der Zettel schickt die IDs, die er selbst entfernt hat: im

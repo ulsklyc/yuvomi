@@ -3462,7 +3462,17 @@
         "memberRemoveLastAdmin": "En az bir yönetici kalmalıdır.",
         "memberRemoveLastSsoAdmin": "Bu, SSO ile bağlantılı son yönetici. Önce başka bir yöneticiyi bağlayın.",
         "backupWebdavUrlInvalid": "Adres http:// veya https:// ile başlamalıdır.",
-        "icsSubscriptionGone": "Bu abonelik artık yok."
+        "icsSubscriptionGone": "Bu abonelik artık yok.",
+        "backupDbKeyTitle": "Veritabanı anahtarı",
+        "backupDbKeyGeneratedHint": "Yuvomi bunu ilk başlatmada oluşturdu. Bir kopyasını bu sunucudan ayrı bir yerde sakla: o olmadan, depolama kaybolursa yedeklerin açılamaz.",
+        "backupDbKeyShow": "Anahtarı göster",
+        "backupDbKeyHide": "Gizle",
+        "backupDbKeyCopy": "Kopyala",
+        "backupDbKeyCopied": "Anahtar kopyalandı",
+        "backupDbKeyCopyFailed": "Kopyalama işe yaramadı. Anahtar seçili, elle kopyala.",
+        "backupDbKeyStoredAt": "Sunucuda şurada saklanıyor: {{path}}",
+        "backupDbKeyConfigHint": "Anahtar yapılandırmandan geliyor. Orada güvenle sakla: o olmadan yedeklerin açılamaz.",
+        "backupDbKeyPlainHint": "Veritabanı şifreli değil, bu yüzden yedekler verilerini okunabilir biçimde içerir. Kendi DB_ENCRYPTION_KEY değerinle Yuvomi onu bir sonraki başlatmada şifreler."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

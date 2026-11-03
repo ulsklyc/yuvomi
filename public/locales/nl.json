@@ -3462,7 +3462,17 @@
         "memberRemoveLastAdmin": "Er moet minstens één beheerder overblijven.",
         "memberRemoveLastSsoAdmin": "Dit is de laatste beheerder die aan SSO is gekoppeld. Koppel eerst een andere beheerder.",
         "backupWebdavUrlInvalid": "Het adres moet beginnen met http:// of https://.",
-        "icsSubscriptionGone": "Dit abonnement bestaat niet meer."
+        "icsSubscriptionGone": "Dit abonnement bestaat niet meer.",
+        "backupDbKeyTitle": "Databasesleutel",
+        "backupDbKeyGeneratedHint": "Yuvomi heeft hem bij de eerste start aangemaakt. Bewaar een kopie ergens anders dan op deze server: zonder hem kunnen je back-ups niet worden geopend als de opslag verloren gaat.",
+        "backupDbKeyShow": "Sleutel tonen",
+        "backupDbKeyHide": "Verbergen",
+        "backupDbKeyCopy": "Kopiëren",
+        "backupDbKeyCopied": "Sleutel gekopieerd",
+        "backupDbKeyCopyFailed": "Kopiëren is niet gelukt. De sleutel is geselecteerd, kopieer hem met de hand.",
+        "backupDbKeyStoredAt": "Op de server opgeslagen in {{path}}",
+        "backupDbKeyConfigHint": "De sleutel komt uit je configuratie. Bewaar hem daar veilig: zonder hem kunnen je back-ups niet worden geopend.",
+        "backupDbKeyPlainHint": "De database is niet versleuteld, dus back-ups bevatten je gegevens leesbaar. Met een eigen DB_ENCRYPTION_KEY versleutelt Yuvomi hem bij de volgende start."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

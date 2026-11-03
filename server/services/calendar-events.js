@@ -643,6 +643,11 @@ export function expandRecurringEvents(
           ...event,
           start_datetime:       newStart,
           end_datetime:         newEnd,
+          // Erinnerungen haengen am Beginn der SERIE, und nur hier kennt ein
+          // Vorkommen ihn noch: `...event` ist der Master, die Zeile danach nicht
+          // mehr. Wer sie als Master liest (buildRecurrenceCapabilityMap), hielt
+          // sonst das letzte Vorkommen im Fenster fuer den Serienbeginn.
+          reminder_anchor_start: event.start_datetime,
           // DIE IDENTITAET EINES VORKOMMENS IST SEIN UTC-TAG - und das ist keine
           // Aenderung an #975, sondern dessen Uebersetzung auf den Stand nach #985.
           //

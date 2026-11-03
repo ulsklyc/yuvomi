@@ -591,6 +591,49 @@ test('DELETE /:listId/items/checked: ein leeres oder unbrauchbares ids ist 400, 
   assert.equal(db.prepare('SELECT COUNT(*) c FROM shopping_items WHERE list_id = ?').get(list).c, 1, 'nichts geloescht');
 });
 
+test('DELETE /:listId/items/checked: unbekannte Liste ist 404', async () => {
+  const r = await call('DELETE', '/999999/items/checked');
+  assert.equal(r.status, 404);
+  assert.equal(r.body.reason, 'shopping_list_not_found');
+});
+
+// Vorher: 500 bei Zahl als Name und bei category null, "5.0" als Menge,
+// `is_checked: 'false'` hakte ab, und PATCH pruefte keine Laengen.
+test('PATCH /items/:id: falsche Formen sind 400, der Artikel bleibt unveraendert', async () => {
+  const list = await newList('Patch-Formen');
+  for (const body of [{ name: 5 }, { name: 'X', quantity: 5 }, { name: 'X', notes: 5 }]) {
+    assert.equal((await call('POST', `/${list}/items`, body)).status, 400, `POST ${JSON.stringify(body)}`);
+  }
+  const item = (await call('POST', `/${list}/items`, { name: 'Milch', quantity: '1 l' })).body.data;
+  const bad = [
+    { name: 5 },
+    { name: null },
+    { name: 'a'.repeat(201) },
+    { quantity: 5 },
+    { quantity: 'q'.repeat(101) },
+    { notes: 5 },
+    { category: null },
+    { is_checked: 'false' },
+    { is_checked: 2 },
+  ];
+  for (const body of bad) {
+    const r = await call('PATCH', `/items/${item.id}`, body);
+    assert.equal(r.status, 400, JSON.stringify(body));
+  }
+  const row = db.prepare('SELECT name, quantity, is_checked, notes, category FROM shopping_items WHERE id = ?').get(item.id);
+  assert.deepEqual(
+    { name: row.name, quantity: row.quantity, is_checked: row.is_checked, notes: row.notes, category: row.category },
+    { name: 'Milch', quantity: '1 l', is_checked: 0, notes: item.notes, category: item.category },
+  );
+
+  // Was die PWA schickt, geht weiter: 0 und 1, null in Menge und Notizen.
+  assert.equal((await call('PATCH', `/items/${item.id}`, { is_checked: 1 })).body.data.is_checked, 1);
+  assert.equal((await call('PATCH', `/items/${item.id}`, { is_checked: 0 })).body.data.is_checked, 0);
+  const cleared = await call('PATCH', `/items/${item.id}`, { quantity: null, notes: null });
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.body.data.quantity, null);
+});
+
 // --------------------------------------------------------------------------
 // Essensplan-Import
 // --------------------------------------------------------------------------
