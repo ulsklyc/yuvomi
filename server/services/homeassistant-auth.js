@@ -179,6 +179,13 @@ export function fetchHomeAssistantUser(config, accessToken) {
 }
 
 /**
+ * Fester `oidc_provider` fuer Konten, die an Home Assistant gebunden sind.
+ * Bewusst nicht die URL: zieht Home Assistant auf eine andere Adresse um,
+ * bleiben die Bindungen in der Mitgliederverwaltung sichtbar.
+ */
+export const HOMEASSISTANT_PROVIDER_KEY = 'homeassistant';
+
+/**
  * Widerruft das Refresh-Token (und damit alle daraus erzeugten Access-Tokens).
  * Fehler meldet der Aufrufer nur: die Anmeldung bei Yuvomi haengt nicht davon ab.
  */
@@ -186,13 +193,15 @@ export async function revokeHomeAssistantToken(config, refreshToken) {
   if (!refreshToken) return;
   const t = withTimeout(REQUEST_TIMEOUT_MS);
   try {
-    await fetch(`${config.internalUrl}/auth/revoke`, {
+    const res = await fetch(`${config.internalUrl}/auth/revoke`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ token: refreshToken }),
       signal: t.signal,
       redirect: 'error',
     });
+    // Ein HTTP-Fehler liesse sonst still ein Refresh-Token in HA zurueck.
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } finally {
     t.done();
   }
@@ -234,7 +243,7 @@ export async function completeHomeAssistantLogin(config, query, stored, log) {
     const name = typeof user.name === 'string' && user.name.trim() ? user.name.trim() : undefined;
     return {
       sub: String(user.id),
-      iss: config.url,
+      iss: HOMEASSISTANT_PROVIDER_KEY,
       name,
       // HA kennt keinen Benutzernamen-Claim; ohne ihn hiesse ein neues Konto wie
       // die 32-stellige HA-ID. Bereinigung und `-1`-Suffix macht findOrCreateOidcUser.

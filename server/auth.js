@@ -52,6 +52,7 @@ import {
   buildHomeAssistantAuthorizationUrl,
   completeHomeAssistantLogin,
   getHomeAssistantConfig,
+  HOMEASSISTANT_PROVIDER_KEY,
 } from './services/homeassistant-auth.js';
 import { emailService as defaultEmailService } from './services/email.js';
 import { passwordResetService as defaultResetService } from './services/password-reset.js';
@@ -3922,11 +3923,13 @@ function adminUserRow(userId) {
 
 /**
  * Unter welchem `oidc_provider` die Home-Assistant-Anmeldung ihre Konten
- * ablegt: der `iss`, den completeHomeAssistantLogin liefert. `null`, wenn
- * Home Assistant nicht die SSO-Quelle ist - dann zeigt die Verwaltung keine ID.
+ * ablegt: der feste `iss`, den completeHomeAssistantLogin liefert (nicht die
+ * URL, damit ein Umzug von Home Assistant die Bindungen nicht versteckt).
+ * `null`, wenn Home Assistant nicht die SSO-Quelle ist - dann zeigt die
+ * Verwaltung keine ID.
  */
 function homeAssistantProviderKey() {
-  return ssoProvider() === 'homeassistant' ? getHomeAssistantConfig().url : null;
+  return ssoProvider() === 'homeassistant' ? HOMEASSISTANT_PROVIDER_KEY : null;
 }
 
 /**
@@ -4075,6 +4078,11 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
       return res.status(400).json({ error: memberFields.errors.join(' '), code: 400 });
     }
 
+    // Hashen vor allen Pruefungen gegen den DB-Zustand: zwischen Pruefung und
+    // Schreiben darf kein `await` liegen, sonst kann ein paralleler Request den
+    // Zustand dazwischen aendern (CONTRIBUTING: keine Checks vor einem await).
+    const hash = ssoOnly ? OIDC_PASSWORD_SENTINEL : await hashPassword(password);
+
     // Erst hier, weil die Pruefung die E-Mail braucht: ein neues Konto ist noch
     // mit nichts verknuepft, also ist die Adresse sein einziger Weg hinein.
     const haUserId = parseHomeAssistantUserId(req.body);
@@ -4090,8 +4098,6 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
       email: memberFields.values.email,
     });
     if (ssoOnlyError) return res.status(400).json({ error: ssoOnlyError, code: 400 });
-
-    const hash = ssoOnly ? OIDC_PASSWORD_SENTINEL : await hashPassword(password);
 
     const result = db.transaction(() => {
       const created = db.get()
@@ -4152,6 +4158,16 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     const userId = parseInt(req.params.id, 10);
     if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
 
+    const newPassword = req.body.password !== undefined ? String(req.body.password) : '';
+    if (newPassword && normalizePassword(newPassword).length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
+    }
+    // Hashen VOR dem ersten Lesen aus der DB: alle Pruefungen darunter
+    // (Rollen, `sub_taken`, `no_password`, `last_sso_admin`) laufen dann ohne
+    // `await` bis zum Schreiben durch, ein paralleler Request kann den Zustand
+    // dazwischen nicht aendern (CONTRIBUTING: keine Checks vor einem await).
+    const hashedNewPassword = newPassword ? await hashPassword(newPassword) : null;
+
     const existing = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(userId);
     if (!existing) return res.status(404).json({ error: 'User not found.', code: 404 });
     // EIN DISPLAY IST KEIN MITGLIED, ALSO AUCH HIER NICHT (#1208). Die Liste
@@ -4198,11 +4214,6 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     const memberFields = validateMemberProfileFields(req.body);
     if (memberFields.errors.length) {
       return res.status(400).json({ error: memberFields.errors.join(' '), code: 400 });
-    }
-
-    const newPassword = req.body.password !== undefined ? String(req.body.password) : '';
-    if (newPassword && normalizePassword(newPassword).length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
     }
 
     // undefined = unveraendert; nur ein mitgesendetes Feld schaltet um.
@@ -4284,7 +4295,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     const alreadySsoOnly = isSsoOnlyAccount(existingHash);
     const newPasswordHash = (ssoOnly === true && !alreadySsoOnly)
       ? OIDC_PASSWORD_SENTINEL
-      : (newPassword ? await hashPassword(newPassword) : null);
+      : hashedNewPassword;
 
     db.transaction(() => {
       db.get().prepare(`
@@ -4318,7 +4329,11 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       }
     });
 
-    if (newPasswordHash) {
+    // Eine geaenderte oder geloeste Bindung beendet die Sitzungen, die ueber
+    // die alte geoeffnet wurden - sonst behielte z. B. das Kind, dessen ID
+    // versehentlich beim Elternteil stand, nach der Korrektur dessen Sitzung.
+    const bindingReplaced = haLinkChange !== undefined && !!linkedRow?.oidc_sub;
+    if (newPasswordHash || bindingReplaced) {
       invalidateUserSessions(userId, req.sessionID);
     }
 

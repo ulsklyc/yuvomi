@@ -34,6 +34,7 @@ const HA_USER = { id: 'ha-user-1', name: 'Phillip', is_owner: true, is_admin: tr
 let haUser = HA_USER;
 let tokenRequests = [];
 let revoked = [];
+let revokeStatus = 200;
 let wsAuthTokens = [];
 /** Code -> PKCE-Challenge, wie sie die Authorize-Anfrage trug. */
 const issuedCodes = new Map();
@@ -60,7 +61,7 @@ const ha = http.createServer(async (req, res) => {
   }
   if (req.url === '/auth/revoke' && req.method === 'POST') {
     revoked.push(form.get('token'));
-    res.writeHead(200);
+    res.writeHead(revokeStatus);
     return res.end();
   }
   res.writeHead(404);
@@ -177,6 +178,7 @@ function haIssuesCode(authorize) {
 test.beforeEach(() => {
   tokenRequests = [];
   revoked = [];
+  revokeStatus = 200;
   wsAuthTokens = [];
   haUser = HA_USER;
   delete process.env.OIDC_ALLOW_SIGNUP;
@@ -219,7 +221,8 @@ test('/oidc/start leitet zur Home-Assistant-Anmeldung mit client_id, redirect_ur
 });
 
 test('Rueckweg: unbekannter HA-Benutzer bekommt ein Konto (Signup erlaubt), Token wird widerrufen', async () => {
-  haUser = { id: 'ha-user-new', name: 'Lea', is_owner: false, is_admin: false };
+  // Owner UND Admin in Home Assistant: die Rolle darf trotzdem nicht durchgereicht werden.
+  haUser = { id: 'ha-user-new', name: 'Lea', is_owner: true, is_admin: true };
   const start = await fetch(`${base}/api/v1/auth/oidc/start`, { redirect: 'manual' });
   const cookie = cookiesOf(start);
   const authorize = new URL(start.headers.get('location'));
@@ -239,7 +242,7 @@ test('Rueckweg: unbekannter HA-Benutzer bekommt ein Konto (Signup erlaubt), Toke
   const row = database.prepare('SELECT username, display_name, oidc_sub, oidc_provider, role FROM users WHERE oidc_sub = ?').get('ha-user-new');
   assert.equal(row.display_name, 'Lea');
   assert.equal(row.username, 'Lea', 'der HA-Anzeigename wird zum Benutzernamen, nicht die HA-ID');
-  assert.equal(row.oidc_provider, 'https://ha.example.test');
+  assert.equal(row.oidc_provider, 'homeassistant', 'fester Schluessel, nicht die HA-URL');
   assert.equal(row.role, 'member', 'HA-Admin-Rechte werden nicht uebernommen');
 
   const who = await (await fetch(`${base}/__test/whoami`, { headers: { cookie: cookiesOf(cb, cookie) } })).json();
@@ -340,7 +343,7 @@ test('Admin legt ein Konto ohne Passwort fuer einen HA-Benutzer an; die HA-Anmel
   const { user } = await res.json();
   assert.equal(user.homeassistant_user_id, HA_ID_MIA, 'gespeichert in Kleinbuchstaben');
   const row = database.prepare('SELECT oidc_sub, oidc_provider FROM users WHERE id = ?').get(user.id);
-  assert.deepEqual({ ...row }, { oidc_sub: HA_ID_MIA, oidc_provider: 'https://ha.example.test' });
+  assert.deepEqual({ ...row }, { oidc_sub: HA_ID_MIA, oidc_provider: 'homeassistant' });
 
   haUser = { id: HA_ID_MIA, name: 'Mia', is_owner: false, is_admin: false };
   const start = await fetch(`${base}/api/v1/auth/oidc/start`, { redirect: 'manual' });
@@ -383,4 +386,65 @@ test('Admin-Bindung: ungueltige ID 400, vergebene ID 409, ohne Passwort nicht lo
   assert.equal(withPassword.status, 200);
   assert.equal((await withPassword.json()).user.homeassistant_user_id, null);
   assert.equal(database.prepare('SELECT oidc_sub FROM users WHERE id = ?').get(mia).oidc_sub, null);
+});
+
+/** Meldet einen HA-Benutzer ueber den kompletten Rueckweg an; liefert das Cookie. */
+async function signInWithHomeAssistant(user) {
+  haUser = user;
+  const start = await fetch(`${base}/api/v1/auth/oidc/start`, { redirect: 'manual' });
+  const cookie = cookiesOf(start);
+  const authorize = new URL(start.headers.get('location'));
+  const code = haIssuesCode(authorize);
+  const cb = await fetch(`${base}/api/v1/auth/oidc/callback?code=${code}&state=${authorize.searchParams.get('state')}`, {
+    redirect: 'manual', headers: { cookie },
+  });
+  return cookiesOf(cb, cookie);
+}
+
+test('Admin-Bindung: eine geaenderte oder geloeste HA-ID beendet die Sitzungen der alten Bindung', async () => {
+  const HA_ID_NOAH = 'b'.repeat(32);
+  const HA_ID_ELLA = 'c'.repeat(32);
+  const created = await adminRequest('POST', '/users', {
+    username: 'noah', display_name: 'Noah', password: 'geheim1234', homeassistant_user_id: HA_ID_NOAH,
+  });
+  assert.equal(created.status, 201);
+  const noah = (await created.json()).user.id;
+
+  const whoami = async (cookie) => (await (await fetch(`${base}/__test/whoami`, { headers: { cookie } })).json()).userId;
+
+  // Falsche ID korrigiert: wer ueber die alte Bindung angemeldet war, fliegt raus.
+  const viaOld = await signInWithHomeAssistant({ id: HA_ID_NOAH, name: 'Noah', is_owner: false, is_admin: false });
+  assert.equal(await whoami(viaOld), noah);
+  const changed = await adminRequest('PATCH', `/users/${noah}`, { homeassistant_user_id: HA_ID_ELLA });
+  assert.equal(changed.status, 200);
+  assert.equal(await whoami(viaOld), null, 'die Sitzung der alten Bindung ist beendet');
+
+  // Unveraendert mitgeschickt laesst die Sitzung stehen.
+  const viaNew = await signInWithHomeAssistant({ id: HA_ID_ELLA, name: 'Ella', is_owner: false, is_admin: false });
+  assert.equal(await whoami(viaNew), noah);
+  const same = await adminRequest('PATCH', `/users/${noah}`, { homeassistant_user_id: HA_ID_ELLA });
+  assert.equal(same.status, 200);
+  assert.equal(await whoami(viaNew), noah, 'ohne Wechsel bleibt die Sitzung');
+
+  // Geloest (das Konto hat ein Passwort): ebenfalls abgemeldet.
+  const unlinked = await adminRequest('PATCH', `/users/${noah}`, { homeassistant_user_id: null });
+  assert.equal(unlinked.status, 200);
+  assert.equal(await whoami(viaNew), null, 'die Sitzung der geloesten Bindung ist beendet');
+});
+
+test('Ein fehlgeschlagener Widerruf in Home Assistant wird gemeldet, die Anmeldung klappt trotzdem', async () => {
+  revokeStatus = 500;
+  const warnings = [];
+  const { warn } = console;
+  console.warn = (...args) => warnings.push(args.join(' '));
+  let cookie;
+  try {
+    cookie = await signInWithHomeAssistant(HA_USER);
+  } finally {
+    console.warn = warn;
+  }
+  assert.deepEqual(revoked, ['refresh-1']);
+  assert.ok(warnings.some((w) => w.includes('revoke failed') && w.includes('500')), `Warnung erwartet, war: ${warnings.join(' | ')}`);
+  const who = await (await fetch(`${base}/__test/whoami`, { headers: { cookie } })).json();
+  assert.ok(who.userId);
 });

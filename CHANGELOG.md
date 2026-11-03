@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Purchases match by item name, case-insensitively, and remain after the item is cleared.
   The item details sheet displays the last purchase for known items. CalDAV completion sync
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
+- **Sign in with Home Assistant.** Home Assistant speaks OAuth but not OpenID Connect, so it could
+  not be used as an SSO provider. With `HOMEASSISTANT_URL` set, the sign-in button reads "Sign in
+  with Home Assistant", and everything that applies to SSO applies here too: linking under
+  Settings > Account, `OIDC_ALLOW_SIGNUP`, SSO-only accounts and `AUTH_ALLOW_PASSWORD_LOGIN`.
+  Yuvomi only asks Home Assistant who signed in and revokes the token right away. A configured
+  OIDC provider still takes precedence. Home Assistant sends no email address, so an administrator
+  can bind a member to a Home Assistant user ID in the member dialog, also for an account without a
+  password. New accounts take the Home Assistant display name as username and always start as
+  members: a Home Assistant administrator is not automatically a household administrator.
 
 ### Fixed
 - **Contacts synced from Nextcloud or another CardDAV server no longer merge into one** (#2513).
@@ -41,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The app added to the iPhone Home Screen reaches the bottom edge again** (refs #2417). On iOS 27
   the installed app ended a status bar's height above the bottom of the screen, with an empty strip
   below the tab bar. It now takes the full screen height; Yuvomi in a Safari tab is unchanged.
+- **SSO no longer creates the first account.** Before setup, an SSO sign-in that would create an
+  account goes to the setup page instead. Before, an SSO member could become the first account,
+  which locked setup and left the household without an administrator.
 
 ## [2.85.0] - 2026-11-04
 
@@ -229,18 +241,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   short code from a browser session, and `POST /api/v1/auth/devices/pair/redeem` exchanges it for a device
   credential. The code holds for five minutes and once, and comes back as text, as a `yuvomi://pair` link
   and as a QR code. It cannot open a wall display, and a display code cannot sign in a device.
-- **Sign in with Home Assistant.** Home Assistant speaks OAuth but not OpenID Connect, so it could
-  not be used as an SSO provider. With `HOMEASSISTANT_URL` set, the sign-in button reads "Sign in
-  with Home Assistant", and everything that applies to SSO applies here too: linking under
-  Settings > Account, `OIDC_ALLOW_SIGNUP`, SSO-only accounts and `AUTH_ALLOW_PASSWORD_LOGIN`.
-  Yuvomi only asks Home Assistant who signed in and revokes the token right away. A configured
-  OIDC provider still takes precedence. Home Assistant sends no email address, so an administrator
-  can bind a member to a Home Assistant user ID in the member dialog, also for an account without a
-  password. New accounts take the Home Assistant display name as username and always start as
-  members: a Home Assistant administrator is not automatically a household administrator.
-- **SSO no longer creates the first account.** Before setup, an SSO sign-in that would create an
-  account goes to the setup page instead. Before, an SSO member could become the first account,
-  which locked setup and left the household without an administrator.
 - **A document can name who it is about.** The document dialog has a new "About" field for one
   household member, and the Documents page can filter by person. The person also gets the expiry
   reminder, along with whoever filed the document, and once if that is the same person. This never
