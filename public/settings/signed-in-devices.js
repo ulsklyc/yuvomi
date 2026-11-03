@@ -191,38 +191,43 @@ export function bindSignedInDevices(container) {
     pairing = null;
   };
 
-  // Ein Takt: ist der Code abgelaufen, und hat sich inzwischen ein Geraet
-  // angemeldet? Fehler beim Nachsehen bleiben still, der naechste Takt fragt neu.
+  const joinedSentence = (device) => t('settings.devicesPairJoined', {
+    name: device.name, platform: PLATFORM_LABELS[device.platform] ?? device.platform,
+  });
+
+  // Ein Takt: hat sich ein Geraet angemeldet, und ist der Code abgelaufen?
+  // Ein neues Geraet beweist nicht, dass DIESER Code verbraucht ist (es kann sich
+  // auch mit Passwort angemeldet haben): die Meldung nennt es, der Code bleibt
+  // bis zu seinem Ende stehen. Vor "abgelaufen" fragt der Takt die Liste noch
+  // einmal, sonst fehlte ein Geraet, das nach dem letzten Takt kam oder waehrend
+  // die Seite im Hintergrund schlief. Fehler beim Nachsehen bleiben still, der
+  // naechste Takt fragt neu.
   const tick = async () => {
     if (!card.isConnected) return stopPairing();
     if (!pairing || ticking) return undefined;
-    if (Date.now() >= pairing.deadline) {
-      stopPairing();
-      body.hidden = true;
-      status.textContent = t('settings.devicesPairExpired');
-      pairButton.textContent = t('settings.devicesPairNewCode');
-      return undefined;
-    }
+    const current = pairing;
     let items;
     ticking = true;
     try {
       items = await fetchDevices();
     } catch {
-      return undefined;
+      items = null;
     } finally {
       ticking = false;
     }
-    if (!pairing) return undefined;
-    const joined = known ? newDevices(known, items) : [];
-    fill(items);
-    if (joined.length) {
+    if (pairing !== current) return undefined;
+    if (items) {
+      const joined = known ? newDevices(known, items) : [];
+      fill(items);
+      if (joined.length) current.joined = joinedSentence(joined[0]);
+    }
+    if (Date.now() >= current.deadline) {
       stopPairing();
       body.hidden = true;
-      const [device] = joined;
-      status.textContent = t('settings.devicesPairJoined', {
-        name: device.name, platform: PLATFORM_LABELS[device.platform] ?? device.platform,
-      });
-      pairButton.textContent = t('settings.devicesPair');
+      status.textContent = [current.joined, t('settings.devicesPairExpired')].filter(Boolean).join(' ');
+      pairButton.textContent = t('settings.devicesPairNewCode');
+    } else if (current.joined) {
+      status.textContent = current.joined;
     }
     return undefined;
   };
@@ -232,6 +237,10 @@ export function bindSignedInDevices(container) {
     pairButton.setAttribute('aria-disabled', 'true');
     errorBox.hidden = true;
     try {
+      // Erst die Liste: ein Geraet, das sich seit dem letzten Takt angemeldet
+      // hat, gehoert zum alten Code und darf nicht als Antwort auf den neuen gelten.
+      stopPairing();
+      await load();
       const { data } = await api.post('/auth/devices/pair', { server: window.location.origin });
       stopPairing();
       const deadline = pairingDeadline(Date.now());
