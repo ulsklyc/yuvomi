@@ -1040,6 +1040,9 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
     if (status) status.textContent = '';
     try {
       const { ended = 0 } = await auth.logoutOthers() ?? {};
+      // Der Server beendet dabei auch die angemeldeten Geraete und offene
+      // Kopplungscodes: die Karte darueber muss das erfahren.
+      logoutOthersButton.dispatchEvent(new CustomEvent('other-sessions-ended', { bubbles: true }));
       if (status) {
         status.textContent = ended > 0
           ? t('settings.otherSessionsEnded', { count: ended })

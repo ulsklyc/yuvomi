@@ -303,13 +303,28 @@ export function bindSignedInDevices(container) {
     if (document.visibilityState === 'visible') (pairing ? tick() : load());
     return undefined;
   };
+  // "Auf anderen Geraeten abmelden" widerruft alle Geraete und entwertet den
+  // offenen Code (`invalidateUserSessions()` in server/auth.js): der Code
+  // verschwindet, die Liste kommt neu.
+  const onOtherSessionsEnded = () => {
+    if (!card.isConnected) return detach();
+    stopPairing();
+    panel.hidden = true;
+    body.hidden = true;
+    status.textContent = '';
+    pairButton.textContent = t('settings.devicesPair');
+    load();
+    return undefined;
+  };
   const detach = () => {
     stopPairing();
     document.removeEventListener('visibilitychange', onVisible);
+    document.removeEventListener('other-sessions-ended', onOtherSessionsEnded);
   };
   detachPrevious?.();
   detachPrevious = detach;
   document.addEventListener('visibilitychange', onVisible);
+  document.addEventListener('other-sessions-ended', onOtherSessionsEnded);
 
   load();
 }
