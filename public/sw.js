@@ -628,6 +628,7 @@ const PAGE_MODULES = [
   '/settings/family-users.js',
   '/settings/assignee-menu.js',
   '/settings/module-install-errors.js',
+  '/settings/signed-in-devices.js',
   '/settings/pages/personal-account.js',
   '/settings/pages/personal-schedule.js',
   '/settings/pages/admin-email.js',
