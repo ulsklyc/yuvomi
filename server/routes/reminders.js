@@ -14,6 +14,7 @@ import { deniedModules } from '../permissions.js';
 import { tokenAllows } from '../scopes.js';
 import { ORIGIN_MODULE, withoutSwitchedOffModules } from '../services/reminder-origins.js';
 import { reminderTargetVisible, reminderTargetVisibleSql } from '../services/reminder-targets.js';
+import { withoutDeletedFirstOccurrence } from '../services/reminder-deleted-occurrence.js';
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 import { asksHouseholdAudience } from '../services/visibility.js';
 import { moveNoticeFields } from '../services/shopping-move-notices.js';
@@ -336,7 +337,14 @@ function callerReminders(req, {
   // der Haushalt abgeschaltet hat, gibt es hier nicht - auch nicht als
   // Toast (#1279). Übersprungen, nicht gelöscht: siehe
   // withoutSwitchedOffModules() für den Grund.
-  const rows = withoutSwitchedOffModules(db.get(), found).slice(0, limit);
+  //
+  // Ein geloeschtes erstes Vorkommen einer Serie meldet sich ebenfalls nicht
+  // (#2470, services/reminder-deleted-occurrence.js) - vor dem Limit, damit
+  // eine solche Zeile keine sichtbare aus `/upcoming` verdraengt.
+  const rows = withoutDeletedFirstOccurrence(
+    db.get(),
+    withoutSwitchedOffModules(db.get(), found),
+  ).slice(0, limit);
 
   // Nur für die tatsächlichen Partner-Zeilen geholt (rar) - siehe Kommentar
   // an cycle_anchor_kind oben. Bleibt bei jeder anderen Zeile `undefined`
