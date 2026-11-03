@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   storage is lost. The key appears only after a click and is not cached; viewing it is logged without
   the value. A key from your own configuration is never shown - the page says where it comes from -
   and a signed-in device of the native app cannot read it.
+- **The Overview has its own tile arrangement on the phone.** On a phone, tapping Customize shows
+  a "Phone tiles" mode that lets you reorder and show or hide tiles independently of the desktop
+  layout. Options (calendar limit, task filters, shopping-list selection, etc.) follow the desktop
+  arrangement, so only the order and visibility are separate. "Same as desktop" removes the phone
+  arrangement and goes back to following the desktop. (#2109)
 
 ### Fixed
 - **Copying a new API token or a calendar feed link over plain HTTP no longer claims success.** On an
