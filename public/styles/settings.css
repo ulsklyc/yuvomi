@@ -3903,7 +3903,12 @@
   gap: var(--space-2) var(--space-4);
 }
 
-.settings-pairing__body > p {
+/* Warnung und Schritte als eigener Block ueber die volle Zeile: einzeln hielt
+ * die Hinweisbreite sie schmal, und auf breiten Schirmen rutschte der QR neben
+ * die Schritte (Lauf am 03.11.2026). */
+.settings-pairing__intro {
+  display: grid;
+  gap: var(--space-2);
   flex-basis: 100%;
 }
 

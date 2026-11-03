@@ -105,8 +105,10 @@ export function signedInDevicesCardHtml() {
         <div id="devices-error" class="form-error" role="alert" hidden></div>
         <div class="settings-token-output settings-pairing" id="device-pairing" hidden>
           <div class="settings-pairing__body" id="device-pairing-body">
-            <p class="settings-pairing__warning">${t('settings.devicesPairWarning')}</p>
-            <p class="form-hint">${t('settings.devicesPairSteps')}</p>
+            <div class="settings-pairing__intro">
+              <p class="settings-pairing__warning">${t('settings.devicesPairWarning')}</p>
+              <p class="form-hint">${t('settings.devicesPairSteps')}</p>
+            </div>
             <div class="settings-pairing__qr" id="device-pairing-qr"></div>
             <div class="settings-pairing__code-block">
               <p class="form-label" id="device-pairing-code-label">${t('settings.devicesPairCodeLabel')}</p>
