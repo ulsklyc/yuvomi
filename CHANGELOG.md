@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The message about the `DB_ENCRYPTION_KEY` placeholder no longer suggests clearing the line to run
   unencrypted.** On a new installation that now generates a key. It names `DB_ENCRYPTION_AUTO_KEY=false`
   instead.
+- **Running `install.sh` again keeps a session secret or database key that comes from a file.** With
+  `SESSION_SECRET_FILE` or `DB_ENCRYPTION_KEY_FILE` in `.env`, a rerun asked for a new value or
+  generated one and wrote it next to the `_FILE` line. Yuvomi then refused to start because both were
+  set, and a new database key would not have opened the existing database anyway. The installer now
+  keeps the `_FILE` line, writes no second value and says the secret is reused. The web installer
+  already did this.
 
 ## [2.84.0] - 2026-11-02
 
