@@ -4,6 +4,7 @@ import { dateTimeText } from '/utils/date-format.js';
 import { confirmModal, whenModalClosed } from '/components/modal.js';
 import { formatCronSchedule } from '/settings/cron-label.js';
 import { wirePasswordToggle } from '/utils/auth-ui.js';
+import { errorSentenceWithDetail, errorSentence } from '/utils/friendly-error.js';
 import {
   backupKeyFieldHtml,
   encodeBackupKey,
@@ -71,6 +72,24 @@ function renderPage(container) {
           <p class="form-hint">${t('settings.backupDownloadHint')}</p>
           <div class="settings-form-actions">
             <a class="btn btn--primary" href="/api/v1/backup/database" download>${t('settings.backupDownloadButton')}</a>
+          </div>
+        </div>
+      </div>
+
+      ${/* Der Datenbankschluessel gehoert neben das Backup, das ohne ihn nicht
+           aufgeht. Versteckt, bis der Status sagt, woher er kommt - eine Karte
+           ohne Aussage laese sich als "kein Schluessel". */ ''}
+      <div class="settings-card settings-backup-card" id="backup-db-key-card" hidden>
+        <div class="settings-backup-card__icon">
+          <i data-lucide="key-round" aria-hidden="true"></i>
+        </div>
+        <div class="settings-backup-card__body">
+          <h3 class="settings-card__title" id="backup-db-key-title">${t('settings.backupDbKeyTitle')}</h3>
+          <p class="form-hint" id="backup-db-key-hint"></p>
+          <div class="settings-token-output settings-db-key" id="backup-db-key-output" hidden></div>
+          <div class="settings-form-actions" id="backup-db-key-actions" hidden>
+            <button type="button" class="btn btn--secondary" id="backup-db-key-toggle"
+              aria-expanded="false" aria-controls="backup-db-key-output">${t('settings.backupDbKeyShow')}</button>
           </div>
         </div>
       </div>
@@ -174,7 +193,7 @@ docker compose run --rm -v "$BACKUP:/tmp/yuvomi-restore.db:ro" --entrypoint sh "
 docker compose up -d "$SERVICE"</code></pre>
     <p class="form-hint">${t('settings.backupCliForeignKeyHint')}</p>
     <p class="form-hint">${t('settings.backupCliBackupHint')}</p>
-    <pre class="settings-code-block"><code>docker compose exec yuvomi node -e "import('./server/db.js').then(async db =&gt; { await db.backupToFile('/data/yuvomi-backup.db'); process.exit(0); })"
+    <pre class="settings-code-block"><code>docker compose exec yuvomi node --import ./server/utils/load-secrets-readonly.js -e "import('./server/db.js').then(async db =&gt; { await db.backupToFile('/data/yuvomi-backup.db'); process.exit(0); })"
 docker cp yuvomi:/data/yuvomi-backup.db ./yuvomi-backup.db</code></pre>
   `);
   return wrap;
@@ -223,6 +242,7 @@ async function loadBackupSchedulerStatus(container) {
       return;
     }
 
+    renderDatabaseKeyCard(container, res.data?.database_key);
     const { enabled, schedule, keepCount, lastBackup } = scheduler;
 
     let lastBackupText = t('settings.backupSchedulerNever');
@@ -272,7 +292,7 @@ async function loadBackupSchedulerStatus(container) {
           window.yuvomi?.showToast(t('settings.backupSchedulerTriggeredToast'), 'success');
           loadBackupSchedulerStatus(container);
         } catch (err) {
-          window.yuvomi?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+          window.yuvomi?.showToast(errorSentence(err), 'danger');
           triggerBtn.disabled = false;
           triggerBtn.textContent = t('settings.backupSchedulerTrigger');
         }
@@ -281,6 +301,107 @@ async function loadBackupSchedulerStatus(container) {
   } catch (err) {
     failWithRetry(err);
   }
+}
+
+/**
+ * Karte "Datenbankschluessel" aus `database_key` des Status (nur Herkunft, nie
+ * der Wert). Den Wert holt erst der Klick auf "Anzeigen" ueber eine eigene
+ * Route, die jeden Abruf protokolliert; "Ausblenden" nimmt ihn wieder aus dem
+ * DOM, statt ihn nur zu verstecken. Einen Wert gibt es nur fuer den Schluessel,
+ * den Yuvomi selbst erzeugt hat - einer aus Env oder `_FILE` steht schon in der
+ * Konfiguration des Betreibers.
+ * Exportiert fuer Tests.
+ */
+export function renderDatabaseKeyCard(container, status) {
+  const card = container.querySelector('#backup-db-key-card');
+  if (!card || !status) return;
+  const hint = card.querySelector('#backup-db-key-hint');
+  const actions = card.querySelector('#backup-db-key-actions');
+  const output = card.querySelector('#backup-db-key-output');
+  const toggle = card.querySelector('#backup-db-key-toggle');
+
+  const generated = status.encrypted && (status.origin === 'generated' || status.origin === 'stored');
+  hint.textContent = !status.encrypted
+    ? t('settings.backupDbKeyPlainHint')
+    : generated ? t('settings.backupDbKeyGeneratedHint') : t('settings.backupDbKeyConfigHint');
+  actions.hidden = !generated;
+  card.hidden = false;
+  if (!generated || toggle.dataset.bound) return;
+  toggle.dataset.bound = 'true';
+
+  const hide = () => {
+    output.replaceChildren();
+    output.hidden = true;
+    toggle.textContent = t('settings.backupDbKeyShow');
+    toggle.setAttribute('aria-expanded', 'false');
+  };
+
+  toggle.addEventListener('click', async () => {
+    if (toggle.getAttribute('aria-expanded') === 'true') { hide(); return; }
+    toggle.disabled = true;
+    try {
+      const res = await api.get('/backup/database-key');
+      const { key, path } = res.data ?? {};
+      if (!key) {
+        // Die Herkunft hat sich seit dem Laden geaendert (Neustart mit Env-Key).
+        renderDatabaseKeyCard(container, res.data);
+        return;
+      }
+      output.replaceChildren(buildDatabaseKeyOutput(key, path));
+      output.hidden = false;
+      toggle.textContent = t('settings.backupDbKeyHide');
+      toggle.setAttribute('aria-expanded', 'true');
+      window.lucide?.createIcons({ el: output });
+    } catch (err) {
+      window.yuvomi?.showToast(errorSentence(err), 'danger');
+    } finally {
+      toggle.disabled = false;
+    }
+  });
+}
+
+function buildDatabaseKeyOutput(key, path) {
+  const fragment = document.createDocumentFragment();
+  const row = document.createElement('div');
+  row.className = 'settings-token-output__row';
+  const input = document.createElement('input');
+  input.className = 'form-input settings-db-key__value';
+  input.type = 'text';
+  input.readOnly = true;
+  input.value = key;
+  input.spellcheck = false;
+  input.autocomplete = 'off';
+  input.setAttribute('aria-labelledby', 'backup-db-key-title');
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'btn btn--secondary btn--sm';
+  const icon = document.createElement('i');
+  icon.dataset.lucide = 'copy';
+  icon.className = 'icon-sm';
+  icon.setAttribute('aria-hidden', 'true');
+  copy.append(icon, document.createTextNode(` ${t('settings.backupDbKeyCopy')}`));
+  copy.addEventListener('click', async () => {
+    // Ohne HTTPS gibt es navigator.clipboard nicht - auf einer Heim-Instanz im
+    // LAN der Normalfall. Dann ist "kopiert" gelogen; markieren hilft weiter.
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(input.value);
+      window.yuvomi?.showToast(t('settings.backupDbKeyCopied'), 'success');
+    } catch {
+      input.focus();
+      input.select();
+      window.yuvomi?.showToast(t('settings.backupDbKeyCopyFailed'), 'danger');
+    }
+  });
+  row.append(input, copy);
+  fragment.append(row);
+  if (path) {
+    const where = document.createElement('p');
+    where.className = 'form-hint settings-db-key__path';
+    where.textContent = t('settings.backupDbKeyStoredAt', { path });
+    fragment.append(where);
+  }
+  return fragment;
 }
 
 function renderWebdavStatus(grid, container, d) {
@@ -333,7 +454,7 @@ function renderWebdavStatus(grid, container, d) {
         window.yuvomi?.showToast(t('settings.backupWebdavTriggeredToast'), 'success');
         loadWebdavConfig(container);
       } catch (err) {
-        window.yuvomi?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+        window.yuvomi?.showToast(errorSentenceWithDetail(err, 'settings.connectionFailedDetail'), 'danger');
         const icon = document.createElement('i');
         icon.dataset.lucide = 'upload-cloud';
         icon.setAttribute('aria-hidden', 'true');
@@ -410,12 +531,14 @@ async function loadWebdavConfig(container) {
 
 /**
  * Fehlermeldung einer WebDAV-Anfrage: `password_required` (neuer Server oder
- * Benutzer ohne neues Passwort) uebersetzt, sonst der Text des Servers.
+ * Benutzer ohne neues Passwort) und `url_invalid` uebersetzt, sonst der Satz
+ * der App (#1909). Nur Speichern: das Testen zeigt die Antwort des Servers.
  * Exportiert fuer test/test-settings-backup-key.js.
  */
 export function webdavErrorMessage(err) {
   if (err?.data?.errorCode === 'password_required') return t('settings.backupWebdavPasswordRequired');
-  return err?.message ?? t('common.errorGeneric');
+  if (err?.data?.errorCode === 'url_invalid') return t('settings.backupWebdavUrlInvalid');
+  return errorSentence(err);
 }
 
 function bindWebdavBackupEvents(container) {
@@ -453,7 +576,7 @@ function bindWebdavBackupEvents(container) {
       if (resultEl) {
         resultEl.textContent = err?.data?.errorCode === 'password_required'
           ? webdavErrorMessage(err)
-          : t('settings.backupWebdavTestFailed', { error: err.message });
+          : errorSentenceWithDetail(err, 'settings.backupWebdavTestFailed');
         resultEl.className = 'form-hint form-hint--danger';
       }
     } finally {

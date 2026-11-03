@@ -462,6 +462,139 @@ test('R16: Werkzeuge in der Titelzeile - nur markiert, nur mobil, nie neben eine
   assert.ok(design.includes(TITLE_TOOLS), 'und nennt ihre Kennklasse');
 });
 
+// #2425: DREI KNOEPFE LASSEN DEM TITEL BEI 360px 136px, "Aufgaben" braucht in
+// Roboto 144 (Box = Breite - 224: Raender 32, Siegel 32 + 4, Knoepfe 152, Luecke
+// 4). Unter 390px traegt der Aufgabenkopf deshalb die zwei Knoepfe der Regel 1a:
+// der Filter steht im "...", seine Zahl am "..." (Regel 3). Ab 390px bleibt der
+// Knopf. JE BREITE EIN WEG: dieselbe eine Abfrage schaltet beide.
+test('#2425: unter 390px steht der Aufgabenfilter im Menue, seine Zahl am "..."', () => {
+  const tasksPage = read('../public/pages/tasks.js');
+  const tasksCss = read('../public/styles/tasks.css');
+  const css = rules(tasksCss);
+  const NARROW = /^@container\s+tasks-page\s*\(width < 390px\)/;
+  // Die Wurzel traegt den Namen in JEDER Ansicht: `module-surface` faellt im
+  // Brett weg (`app-page--list-detail`), und die Abfrage griffe dort ins Leere.
+  assert.ok(css.some((r) => r.selector === '.tasks-page' && /container:\s*tasks-page \/ inline-size/.test(r.body)),
+    'die Seitenwurzel ist in jeder Ansicht der Container der Abfrage');
+  assert.ok(css.some((r) => r.selector === '.tasks-page.app-page--list-detail' && /container-name:\s*module-surface tasks-page/.test(r.body)),
+    'Liste + Detail behaelt seinen Namen neben dem eigenen');
+  const narrow = css.filter((r) => r.at.some((a) => NARROW.test(a)));
+
+  const button = narrow.find((r) => /\.tasks-toolbar__filter\b/.test(r.selector));
+  assert.equal(decl(button?.body ?? '', 'display'), 'none', 'unter 390px verlaesst der Filterknopf den Kopf');
+
+  // Die Faltung gehoert allein den Aufgaben: der Kalender behaelt seinen Filter
+  // (R20 6c), und kein anderes Blatt faltet ueber diese Schwelle.
+  for (const { file, css: sheet } of sheets) {
+    if (file === 'tasks.css') continue;
+    assert.ok(!rules(sheet).some((r) => r.at.some((a) => NARROW.test(a)) && /page-filter-btn|filter-btn/.test(r.selector)),
+      `${file}: die Faltung gilt nur im Aufgabenkopf`);
+  }
+
+  // Der Eintrag: dasselbe Zeichen, derselbe Name, derselbe Weg zum Blatt.
+  assert.match(tasksPage, /action: 'open-filters', label: t\('common\.filters'\), icon: 'sliders-horizontal'/,
+    'das Menue bietet den Filter an, mit dem Zeichen des Knopfs');
+  assert.match(tasksPage, /case 'open-filters':\s*openTaskFilters\(container\);/, 'der Eintrag oeffnet dasselbe Blatt');
+
+  // Ab 390px gibt es weder Eintrag noch Zahl am "...": Basis aus, nur die eine
+  // Abfrage schaltet sie ein. Sie fragt die Seitenwurzel, nicht den Viewport
+  // (tokens.css 11c), und JS fragt die Zahl, damit die Schwelle nur einmal steht.
+  const ENTRY = '.popover-menu__item[data-action="open-filters"]';
+  const COUNT = '.tasks-tools-btn__count';
+  for (const part of [ENTRY, COUNT]) {
+    const base = css.find((r) => r.at.length === 0 && r.selector.includes(part));
+    assert.equal(decl(base?.body ?? '', 'display'), 'none', `${part} ist ausserhalb der Abfrage aus`);
+    const on = narrow.find((r) => r.selector.includes(part));
+    assert.notEqual(decl(on?.body ?? '', 'display') ?? 'none', 'none', `${part} steht unter 390px`);
+  }
+
+  // Regel 3: die Zahl bleibt sichtbar und im Namen, sie zieht bei jeder
+  // Aenderung mit, und im Verlauf gibt es keinen Filter und damit keine Zahl.
+  const sync = tasksPage.match(/function syncFilterMenu\(container\) \{[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(sync, 'syncFilterMenu fehlt');
+  assert.match(sync, /common\.filtersActive/, 'Eintrag und "..." nennen die Zahl');
+  assert.match(sync, /state\.viewMode === 'history'/, 'im Verlauf gibt es keinen Filter');
+  assert.match(tasksPage, /function renderFilters\(container\) \{[\s\S]{0,160}syncFilterMenu\(container\)/,
+    'renderFilters zieht das Menue mit');
+  assert.doesNotMatch(tasksPage, /matchMedia[^\n]*3[89]\dpx/, 'die Schwelle steht nur in tasks.css');
+  assert.match(sync, /getComputedStyle\(badge\)\.display/, 'der Name folgt der Abfrage aus tasks.css');
+
+  const design = read('../DESIGN.md');
+  assert.match(design, /Aufgaben unter 390px/, 'DESIGN.md benennt die Ausnahme in Regel 3');
+});
+
+// #2443: LUPE UND WERKZEUG LASSEN DEM TITEL BEI 360px 188px, und das reicht in
+// langen Sprachen nicht (Roboto, Geburtstage: uk 256, ru 231, hu 220;
+// in SF schon "Geburtstage" 195). Unter 390px falten die Koepfe mit dieser
+// Enge die Lupe ins "...", wo es keins gibt, entsteht es: EIN Knopf, Titel
+// Breite minus 120. JE BREITE EIN WEG, EINE Abfrage an der Seitenwurzel schaltet
+// beide, und die Suche bleibt fokussierbar, ein stehender Begriff bleibt sichtbar.
+test('#2443: unter 390px falten Lupe und Werkzeug ins "...", eine Abfrage an der Seitenwurzel', () => {
+  const css = rules(layoutCss);
+  const NARROW = /^@container\s+page-head\s*\(width < 390px\)/;
+  assert.ok(css.some((r) => r.selector === '.app-page--fold-head' && /container:\s*page-head \/ inline-size/.test(r.body)),
+    'die Seitenwurzel ist der Container der Abfrage');
+  assert.ok(css.some((r) => r.selector === '.app-page--list-detail.app-page--fold-head' && /container-name:\s*module-surface page-head/.test(r.body)),
+    'Liste + Detail behaelt seinen Namen neben dem eigenen');
+  const narrow = css.filter((r) => r.at.some((a) => NARROW.test(a)));
+
+  // Die Suche geht aus dem Bild, nicht aus dem Baum: `display: none` nimmt ihr den
+  // Fokus, und der Eintrag im Menue oeffnet sie genau darueber.
+  const search = narrow.find((r) => /--fold-search[^,]*> \.page-search/.test(r.selector));
+  assert.ok(search, 'die Lupe faltet nicht');
+  assert.notEqual(decl(search.body, 'display'), 'none', 'die Suche bleibt fokussierbar');
+  assert.match(search.body, /clip-path:\s*inset\(50%\)/, 'sie geht nur aus dem Bild');
+  assert.match(search.selector, /:not\(:focus-within\)/, 'offen steht sie im Kopf');
+  assert.match(search.selector, /:not\(\.is-filled\)/, 'ein stehender Begriff bleibt sichtbar');
+  assert.match(search.selector, /:has\(\[data-fold-search\]\)/, 'nur wo das Menue den Eintrag traegt');
+
+  // Je Breite ein Weg: Basis aus, nur die Abfrage schaltet um.
+  for (const part of ['.page-tools-btn--fold-only', '.popover-menu__item[data-fold-search]']) {
+    const base = css.find((r) => r.at.length === 0 && r.selector.includes(part));
+    assert.equal(decl(base?.body ?? '', 'display'), 'none', `${part} ist ausserhalb der Abfrage aus`);
+    const on = narrow.find((r) => r.selector.includes(part));
+    assert.notEqual(decl(on?.body ?? 'display: none', 'display'), 'none', `${part} steht unter 390px`);
+  }
+  // `.btn` (display: inline-flex) laedt spaeter: mit EINER Klasse gewann es, und
+  // unter 390px standen Direktknopf und "..." nebeneinander (Sonde 360px).
+  for (const r of [...narrow, ...css.filter((x) => x.at.length === 0)].filter((x) => /--(fold|wide)-only/.test(x.selector))) {
+    assert.match(r.selector, /\.page-tools-btn\.page-tools-btn--(fold|wide)-only/, `${r.selector} schlaegt .btn nur mit zwei Klassen`);
+  }
+  const direct = narrow.find((r) => r.selector.includes('.page-tools-btn--wide-only'));
+  assert.equal(decl(direct?.body ?? '', 'display'), 'none', 'der Direktknopf weicht unter 390px');
+
+  // Die drei Koepfe, die es gemessen brauchen. Nur-lesen hat kein Werkzeug, also
+  // nichts zu falten: dort bleibt die Lupe.
+  const birthdays = read('../public/pages/birthdays.js');
+  const notes = read('../public/pages/notes.js');
+  const documents = read('../public/pages/documents.js');
+  assert.match(birthdays, /app-page--fold-head/, 'Geburtstage: Seitenwurzel');
+  assert.match(birthdays, /foldSearch: Boolean\(tools\)/, 'Geburtstage: faltet nur mit Werkzeug');
+  assert.match(birthdays, /foldSearch: \{ input: 'birthdays-search'/, 'Geburtstage: Eintrag');
+  assert.match(notes, /notes-page app-page app-page--full app-page--fold-head/, 'Notizen: Seitenwurzel');
+  assert.match(notes, /foldSearch: \{ input: 'notes-search'/, 'Notizen: Eintrag');
+  assert.match(documents, /documents-page app-page app-page--full app-page--fold-head/, 'Dokumente: Seitenwurzel');
+  assert.match(documents, /foldSearchItem\(\{ input: 'documents-search'/, 'Dokumente: Eintrag');
+  assert.ok(![...sheets].some(({ css: sheet }) => /@media[^{]*(max-width:\s*389px|width < 390px)/.test(sheet)),
+    'kein Viewport-Breakpoint fuer einen Umbruch des Bauteils');
+
+  const design = read('../DESIGN.md');
+  assert.match(design, /Lupe und Werkzeug unter 390px/, 'DESIGN.md benennt die Faltung');
+});
+
+// #2443: DER TITEL DER ENTSORGUNG TRAEGT DIE ZEILE. Sein einziges Werkzeug ist das
+// "...", es bleibt also nichts zum Falten: bei 360px stehen 240px bereit, "Waste
+// collection" braucht in Roboto 245. Der Kurztitel gilt in allen Breiten, nur in
+// den Sprachen, die ihn brauchen; die Navigation behaelt den langen Namen.
+test('#2443: der Entsorgungstitel kuerzt nur, wo er nicht passt', () => {
+  const titles = Object.fromEntries(readdirSync(new URL('../public/locales/', import.meta.url))
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => [f.replace('.json', ''), JSON.parse(read(`../public/locales/${f}`)).waste.title]));
+  assert.deepEqual({ de: titles.de, en: titles.en, es: titles.es, fil: titles.fil, fr: titles.fr, id: titles.id, nb: titles.nb, pl: titles.pl, sv: titles.sv, uk: titles.uk, el: titles.el },
+    { de: 'Entsorgung', en: 'Waste', es: 'Basura', fil: 'Basura', fr: 'D\u00e9chets', id: 'Sampah', nb: 'Avfall', pl: 'Odpady', sv: 'Avfall', uk: '\u0421\u043c\u0456\u0442\u0442\u044f', el: '\u0391\u03c0\u03bf\u03c1\u03c1\u03af\u03bc\u03bc\u03b1\u03c4\u03b1' });
+  assert.equal(JSON.parse(read('../public/locales/en.json')).nav.waste, 'Waste collection', 'die Navigation behaelt den langen Namen');
+});
+
 // R16 (Critique 2026-10-05, P1 mobil): KENNZAHLEN ALS KURZZEILE. Inventar trug
 // 136px Kacheln vor der Liste (eine fuer „0"), die Haushaltshilfe ein 2x2-
 // Raster vor den Besuchen. Beide nutzen mobil die Kurzzeile des Budgets

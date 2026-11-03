@@ -345,8 +345,25 @@ function bool(val, field) {
   return { value: val, error: null };
 }
 
+/**
+ * Prüft nur die Form eines Textfelds, vor `str()`: `str()` wandelt per
+ * `String(val)` um, und eine Zahl landete so als Text oder lief später in
+ * `.trim()` auf einen 500. Ein fehlendes Feld ist immer in Ordnung, `null`
+ * nur mit `nullable`.
+ * @param {any}    val
+ * @param {string} field
+ * @param {object} [opts]
+ * @param {boolean}[opts.nullable=false]
+ * @returns {{ value: null, error: string|null }}
+ */
+function textShape(val, field, { nullable = false } = {}) {
+  if (val === undefined || typeof val === 'string') return { value: null, error: null };
+  if (val === null && nullable) return { value: null, error: null };
+  return { value: null, error: `${field} must be text${nullable ? ' or null' : ''}.` };
+}
+
 export {
-  str, oneOf, date, time, datetime, month, num, color, url, rrule, id, bool, collectErrors,
+  str, oneOf, date, time, datetime, month, num, color, url, rrule, id, bool, textShape, collectErrors,
   MAX_TITLE, MAX_TEXT, MAX_SHORT, MAX_RRULE, MAX_URL,
   DATE_RE, TIME_RE, DATETIME_RE, COLOR_RE, MONTH_RE, RRULE_RE,
 };

@@ -304,6 +304,23 @@ export function secretInEnv(existingEnv, key) {
 }
 
 /**
+ * Hat die App diesen Schlüssel beim ersten Start selbst gespeichert?
+ * Ohne Wert in der .env legt sie ihn unter `<Verzeichnis von DB_PATH>/.secrets/`
+ * ab (server/utils/auto-secrets.js); auf dem Host ist das DATA_DIR (Compose
+ * mountet es nach /data). Ohne diese Probe erzeugte der Wizard beim Rerun einen
+ * neuen DB-Schlüssel, der den gespeicherten überstimmt, und die verschlüsselte
+ * Datenbank öffnete nicht mehr. Ein DB_PATH ausserhalb von /data kennt der Host
+ * nicht; dann bleibt es bei der .env.
+ */
+export function storedSecretOnHost(existingEnv, key, root = projectRoot()) {
+  if (!PRESERVED_KEYS.includes(key)) return false;
+  const containerDir = dirname(existingEnv.DB_PATH || '/data/yuvomi.db');
+  if (containerDir !== '/data' && !containerDir.startsWith('/data/')) return false;
+  const hostDir = resolve(root, existingEnv.DATA_DIR || './data', `.${containerDir.slice('/data'.length)}`);
+  return existsSync(resolve(hostDir, '.secrets', key));
+}
+
+/**
  * Schnittstellen, über die ein Handy im Heimnetz den Host NICHT erreicht:
  * Container-Bridges (Docker, Podman, libvirt, LXC, Kubernetes-CNI), VMs und
  * VPN-Tunnel. Deren Adressen sind oft ebenfalls RFC 1918 (docker0 172.17.0.1,
@@ -843,7 +860,8 @@ async function route(req, res, server) {
       const envExists = existsSync(resolve(projectRoot(), '.env'));
       // Nur die NAMEN der vorhandenen Schlüssel - die Werte bleiben auf dem
       // Server. Das Frontend erzeugt für diese keinen neuen Wert mehr.
-      const preservedKeys = PRESERVED_KEYS.filter(key => secretInEnv(existingEnv, key));
+      const preservedKeys = PRESERVED_KEYS.filter(key => secretInEnv(existingEnv, key)
+        || storedSecretOnHost(existingEnv, key));
       // Die nicht geheimen Werte (Allowlist) für die Vorbelegung, von den
       // Secrets nur die Namen - siehe rerunSnapshot().
       const { rerunValues, keptSecrets } = rerunSnapshot(existingEnv);

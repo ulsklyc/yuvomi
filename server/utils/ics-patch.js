@@ -362,10 +362,18 @@ export function patchICSEvent(icsText, uid, fields = {}, { tzid = null } = {}) {
 
 /**
  * Ersetzt die verwalteten Properties eines VTODO (#617).
+ *
+ * Nennt DUE eine Zone, kommt ihr VTIMEZONE mit (#2374): die Zone steht schon im
+ * Feld, und ein TZID ohne Block ist ein ungueltiges Objekt (#938). DTSTART traegt
+ * dieselbe Zone wie DUE (`seriesAnchor`).
+ *
  * @param {object} fields { SUMMARY, DESCRIPTION, DUE, PRIORITY, STATUS, COMPLETED, PERCENT-COMPLETE }
  */
 export function patchICSTodo(icsText, uid, fields = {}) {
-  return patchICSComponent(icsText, uid, fields, 'VTODO', MANAGED_VTODO);
+  const patched = patchICSComponent(icsText, uid, fields, 'VTODO', MANAGED_VTODO);
+  const tzid = /;TZID=([^;:]+)/.exec(fields?.DUE?.params ?? '')?.[1];
+  if (patched === null || !tzid) return patched;
+  return ensureVTimezone(patched, tzid, Number.parseInt(fields.DUE.value.slice(0, 4), 10));
 }
 
 /** Zählt die VEVENT-Blöcke eines Objekts (Master + Overrides). */

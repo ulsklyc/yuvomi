@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 // `panel instanceof HTMLElement` steht als Typwaechter in onToggle.
 global.HTMLElement = class HTMLElement {};
 
-const { installPopoverMenus, pageToolsMenuHtml, popoverMenuHtml, showPopoverMenuAt } = await import('../public/utils/popover-menu.js');
+const { foldSearchItem, installPopoverMenus, pageToolsMenuHtml, popoverMenuHtml, showPopoverMenuAt } = await import('../public/utils/popover-menu.js');
 
 /** Kleinstes Element, das die Selektorwege des Moduls bedient. */
 function el(selector, attrs = {}) {
@@ -634,4 +634,53 @@ test('R22: ohne Panel oeffnet nichts, und ein Punkt ohne Zahl faellt auf den Aus
   panel.showPopover = () => open(root, panel);
   showPopoverMenuAt(panel, { x: Number.NaN, y: 4 });
   assert.equal(panel.style.left, '100px');
+});
+
+/**
+ * #2443: EIN KOPF OHNE "..." BEKOMMT ES UNTER 390px. Ein einzelnes Werkzeug bleibt
+ * ein Knopf (R16), aber wo die Lupe mitfaltet, stehen zwei Eintraege an. Beide
+ * Wege stehen im Markup, layout.css zeigt je Breite einen; derselbe `data-action`
+ * laeuft in denselben Handler (`pageToolsActionEl`).
+ */
+test('#2443: ein einzelnes Werkzeug mit Faltung traegt Knopf UND Menue', () => {
+  const html = pageToolsMenuHtml({
+    id: 'x-menu', label: 'Mehr',
+    foldSearch: { input: 'x-search', label: 'Suchen' },
+    items: [{ action: 'import', label: 'Import', icon: 'upload' }],
+  });
+  assert.match(html, /page-tools-btn--direct page-tools-btn--wide-only"[\s\S]*data-action="import"/);
+  assert.match(html, /page-tools-btn page-tools-btn--fold-only popover-menu__trigger/);
+  assert.match(html, /role="menuitem"[\s\S]*data-action="fold-search" data-fold-search="x-search"/);
+  assert.equal((html.match(/data-action="import"/g) ?? []).length, 2, 'beide Wege, eine Aktion');
+});
+
+test('#2443: ohne Faltung bleibt das einzelne Werkzeug nur ein Knopf', () => {
+  const html = pageToolsMenuHtml({ id: 'x-menu', label: 'Mehr', items: [{ action: 'import', label: 'Import', icon: 'upload' }] });
+  assert.doesNotMatch(html, /popover-menu__trigger|fold-only|wide-only/);
+});
+
+test('#2443: mit zwei Werkzeugen steht die Suche als erster Eintrag im Menue', () => {
+  const html = pageToolsMenuHtml({
+    id: 'x-menu', label: 'Mehr',
+    foldSearch: { input: 'x-search', label: 'Suchen' },
+    items: [{ action: 'a', label: 'A', icon: 'tag' }, { action: 'b', label: 'B', icon: 'tag' }],
+  });
+  assert.ok(html.indexOf('data-fold-search') < html.indexOf('data-action="a"'));
+  assert.doesNotMatch(html, /wide-only|fold-only/, 'das Menue steht in jeder Breite');
+  assert.equal(foldSearchItem({ input: 'x', label: 'S' }).attrs['data-fold-search'], 'x');
+});
+
+test('#2443: der Eintrag schliesst das Menue und gibt der Suche den Fokus', () => {
+  const root = makeRoot();
+  const panel = makeMenu({ count: 1 });
+  const order = [];
+  panel.hidePopover = () => order.push('hide');
+  const [item] = panel.children;
+  item.setAttribute('data-fold-search', 'x-search');
+  const input = { focus: () => order.push('focus') };
+  const before = global.document;
+  global.document = { ...before, getElementById: (id) => (id === 'x-search' ? input : null) };
+  root.fire('click', { target: item });
+  global.document = before;
+  assert.deepEqual(order, ['hide', 'focus'], 'erst schliessen: das Popover gibt den Fokus sonst an den Ausloeser zurueck');
 });

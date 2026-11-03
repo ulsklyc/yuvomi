@@ -659,6 +659,7 @@ function importActionHtml() {
   return pageToolsMenuHtml({
     id: 'birthdays-tools-menu',
     label: t('common.moreActions'),
+    foldSearch: { input: 'birthdays-search', label: t('birthdays.searchPlaceholder') },
     items: [
       // `user-plus` statt `download` (Critique R22, D7): der Eintrag holt
       // Menschen aus dem Adressbuch, er laedt keine Datei herunter. Seit R23
@@ -673,16 +674,19 @@ function renderPage() {
   // Reference page for PAGE-COMPOSITION.md: geometry only via page-layout helpers.
   // Header and body sections share --layout-reading (PAGE-002).
   _container.replaceChildren();
+  const tools = importActionHtml();
   _container.insertAdjacentHTML('beforeend', renderAppPage({
     mode: 'reading',
     // Liste + Detail (R10 L5, A2): am Desktop liessen die Geburtstage rechts
     // 436px leer. Die Seitenwurzel ist der Container der Schwelle.
-    className: 'birthdays-page app-page--list-detail',
+    className: 'birthdays-page app-page--list-detail app-page--fold-head',
     legacyAlias: false,
     header: renderPageHeader({
       wrap: true,
       narrow: true,
       titleTools: true,
+      // Ohne Werkzeug gibt es kein "...", die Lupe bleibt dann stehen (#2443).
+      foldSearch: Boolean(tools),
       className: 'birthdays-toolbar',
       title: renderPageTitle(t('birthdays.title')),
       center: renderPageSearch({
@@ -696,7 +700,7 @@ function renderPage() {
       // Actions slot: Import + desktop-docked primary (dockFabIntoToolbar).
       // Welche zwei Rechte der Import-Knopf braucht, steht an
       // `importActionHtml()`; die Durchsetzung bleibt serverseitig.
-      actions: renderPageActions(importActionHtml()),
+      actions: renderPageActions(tools),
     }),
     body: renderPageBody({
       content: [

@@ -25,7 +25,6 @@ import {
   flushOutbound, markTodoOutbound, queueTodoDeletion, recurrenceFollowupTarget,
 } from '../services/caldav-todo-outbound.js';
 import { uniqueKey } from '../utils/category-slug.js';
-import { toLocalDateKey } from '../../public/utils/date.js';
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
 import { mentionedUserIds } from '../../public/utils/mentions.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
@@ -521,6 +520,17 @@ function validateTags(value) {
 }
 
 /**
+ * Ein leerer String in einem Tagesfeld heisst "kein Wert". Die Validatoren
+ * lassen '' durch, und die Zeile trug danach '' statt NULL, gegen
+ * `format: date` in der Spec und gegen jede Abfrage auf `IS NULL`.
+ */
+function blankDayFieldsToNull(body) {
+  for (const field of ['start_date', 'due_date', 'due_time']) {
+    if (body?.[field] === '') body[field] = null;
+  }
+}
+
+/**
  * Eingabe-Validierung für Task-Felder (zentralisiert über validate.js).
  *
  * `currentRule` ist die gespeicherte Wiederholungsregel beim Aktualisieren. Kommt
@@ -534,8 +544,15 @@ function validateTaskInput(body, isCreate = true, currentRule = undefined) {
   const ruleUnchanged = !isCreate
     && body.recurrence_rule !== undefined
     && body.recurrence_rule === currentRule;
+  // Die Form vor dem Inhalt: Eine Zahl als Titel lief sonst in `.trim()` auf
+  // einen 500, `null` in Kategorie oder Priorität an NOT NULL. Ein mitgeschickter
+  // Titel darf auch beim Aktualisieren nicht leer sein; fehlt er, bleibt der alte.
   return v.collectErrors([
-    v.str(body.title,       'title',       { required: isCreate }),
+    v.textShape(body.title,       'title'),
+    v.textShape(body.description, 'description', { nullable: true }),
+    v.textShape(body.priority,    'priority'),
+    v.textShape(body.category,    'category'),
+    v.str(body.title,       'title',       { required: isCreate || typeof body.title === 'string' }),
     v.str(body.description, 'description', { required: false, max: v.MAX_TEXT }),
     v.oneOf(body.priority,  VALID_PRIORITIES, 'priority'),
     v.oneOf(body.status,    VALID_STATUSES,   'status'),
@@ -793,7 +810,7 @@ router.put('/tags/:tag', (req, res) => {
 
     const me = req.authUserId || req.session.userId;
     if (!taskIdsWithTag(db.get(), req.params.tag, me).length)
-      return res.status(404).json({ error: 'Tag not found.', code: 404 });
+      return res.status(404).json({ error: 'Tag not found.', code: 404, reason: 'tasks_tag_not_found' });
 
     // Umbenennen fasst jede Aufgabe an, die den Tag traegt - auch die
     // gesperrten. Die bleiben aussen vor (#830); der alte Name haelt sich dort
@@ -824,7 +841,7 @@ router.delete('/tags/:tag', (req, res) => {
     const me = req.authUserId || req.session.userId;
     const affected = taskIdsWithTag(db.get(), req.params.tag, me);
     if (!affected.length)
-      return res.status(404).json({ error: 'Tag not found.', code: 404 });
+      return res.status(404).json({ error: 'Tag not found.', code: 404, reason: 'tasks_tag_not_found' });
 
     // Wie beim Umbenennen: an gesperrten Aufgaben bleibt der Tag haengen (#830).
     const allowed = editableTaskIds(affected, req);
@@ -1079,7 +1096,7 @@ router.get('/', (req, res) => {
     // DER TAGESSCHLÜSSEL MUSS ALS ERSTER PARAMETER STEHEN: das Scope-Fragment
     // sitzt am Anfang der WHERE-Klausel, also vor jedem Filter unten. Die
     // SELECT-Klausel bindet ihre sechs `me` erst am Ende per unshift davor.
-    if (taskScopeNeedsToday({ includeFuture: !!include_future })) params.push(toLocalDateKey());
+    if (taskScopeNeedsToday({ includeFuture: !!include_future })) params.push(todayInHouseholdZone());
 
     // Status, Priorität und Person nehmen mehrere Werte entgegen und verknüpfen
     // sie ODER (#671). Anders als bei den Tags unten ist das keine Geschmacks-
@@ -1232,6 +1249,7 @@ router.get('/:id', (req, res) => {
 // --------------------------------------------------------
 router.post('/', (req, res) => {
   try {
+    blankDayFieldsToNull(req.body);
     const errors = validateTaskInput(req.body, true);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -1299,7 +1317,7 @@ router.post('/', (req, res) => {
     const strangers = newNonMembers(userIds);
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
 
-    // Rotation (migration 274). Erst nach der Mitgliederpruefung der regulaeren
+    // Rotation (migration 277). Erst nach der Mitgliederpruefung der regulaeren
     // Zuweisung: fuer den Pool gilt dieselbe Liste, und der Fehler soll den
     // selben Weg nehmen wie bei assigned_to.
     const rotationIn = parseRotationInput(req.body, {
@@ -1422,6 +1440,7 @@ router.put('/:id', (req, res) => {
       return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'tasks_task_not_found' });
     }
 
+    blankDayFieldsToNull(req.body);
     const errors = validateTaskInput(req.body, false, task.recurrence_rule);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -1468,7 +1487,7 @@ router.put('/:id', (req, res) => {
     const strangers = newNonMembers(userIds, { stored: assignedBefore });
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
 
-    // Rotation (migration 274). Der Pool darf nur, was auch die Aufgabe selbst duerfte
+    // Rotation (migration 277). Der Pool darf nur, was auch die Aufgabe selbst duerfte
     // (#1207) - dieselbe Pruefung, dieselbe Fehlermeldung. Der Pool-Bestand
     // reist als existingRows mit: der Merge haelt Positionen und deaktivierte
     // Mitglieder durch Saves durch, die den Pool nicht anfassen (#1763).
@@ -1918,7 +1937,7 @@ function spawnRecurrenceFollowup(task) {
   // Das Ziel erbt nur die Aufgabe selbst. Unteraufgaben gehen nie als eigenes
   // VTODO hinaus (pendingCreations), ihre Kopien unten nehmen keines mit.
   const syncTarget = recurrenceFollowupTarget(task);
-  // Rotation (migration 274): eine Serie mit Pool verteilt die naechste
+  // Rotation (migration 277): eine Serie mit Pool verteilt die naechste
   // Instanz an das naechste Mitglied, statt dieselbe Person auf Dauer zu
   // belasten. Der Zeiger ist eine Position im Pool und ueberlebt Abgaenge
   // (task-rotation.js); deaktivierten Koepfen faellt nichts zu (#1381). Ohne

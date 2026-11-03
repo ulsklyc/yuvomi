@@ -53,7 +53,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { computeLoanSchedule } from '../server/services/loan-amortization.js';
 import { buildDemoPdf } from './seed-demo-pdf.js';
-import { assignPantryProduct } from '../server/services/pantry-products.js';
+import { assignPantryProduct, writeMinimumThrough } from '../server/services/pantry-products.js';
 import { applyChildStartPermissions } from '../server/permissions.js';
 import { recordCompletion } from '../server/services/task-completions.js';
 
@@ -781,6 +781,8 @@ const insertPantry = db.prepare(`
     expiresInDays === null ? null : daysFromNow(expiresInDays), min, note, alexId);
   // Jede Charge gehoert einem Produkt, wie auf jedem Schreibweg der App.
   assignPantryProduct(db, lastInsertRowid, { userId: alexId });
+  // The minimum is the product's (#1448, step 3), as the create route writes it.
+  if (min != null) writeMinimumThrough(db, lastInsertRowid, min);
 });
 
 // ── Contacts ─────────────────────────────────────────────────────────────────

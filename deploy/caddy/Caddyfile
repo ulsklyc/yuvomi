@@ -1,0 +1,8 @@
+{
+	email {$ACME_EMAIL}
+	acme_ca {$ACME_CA}
+}
+
+{$YUVOMI_DOMAIN} {
+	reverse_proxy yuvomi:3000
+}

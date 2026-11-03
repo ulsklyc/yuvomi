@@ -396,6 +396,22 @@
   text-overflow: ellipsis;
 }
 
+/* The product row takes the batch row's narrow rule (R24, above): since step 3
+ * of #1448 it can carry two statuses ("Expired yesterday · Running low") and
+ * the cart, and at 375px the second status was cut off. With a status the
+ * places move to a line of their own; the rule above hides their separator. */
+@container list-rows (max-width: 26rem) {
+  .pantry-product__row .pantry-row__meta:has(.pantry-badge) {
+    white-space: normal;
+  }
+
+  /* The total stays one piece ("2 l in all"); a status that does not fit
+   * beside it moves down whole, its separator with it. */
+  .pantry-product__row .pantry-row__meta:has(.pantry-badge) > .pantry-product__total {
+    white-space: nowrap;
+  }
+}
+
 .pantry-product__total {
   font-weight: var(--font-weight-medium);
   font-variant-numeric: tabular-nums;
@@ -403,6 +419,15 @@
 }
 
 .pantry-product__badges:empty {
+  display: none;
+}
+
+/* The cart of a product row (#1448, step 3) stands beside the toggle, not
+ * inside it. Without a cart (the product is neither low nor out) the empty
+ * actions zone takes no room, unless it carries the more button of a product
+ * without batches: without a minimum that row has no cart (#2118) but must
+ * keep its delete. */
+.pantry-product__actions:not(:has(.pantry-row__cart, .row-action--more)) {
   display: none;
 }
 

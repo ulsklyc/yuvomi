@@ -16,6 +16,14 @@ import {
   startOfLocalWeekKey,
   todayKey,
 } from '/utils/date.js';
+import {
+  VITAL_UNITS,
+  convertVitalValue,
+  isConvertibleVitalUnit,
+  vitalLimitReading,
+} from '/utils/vital-units.js';
+
+export { convertVitalValue };
 
 // --------------------------------------------------------
 // Metrik-Definitionen
@@ -37,7 +45,8 @@ export const MOOD_MAX = MOOD_SCALE[MOOD_SCALE.length - 1].value;
 // `channels` beschreibt die genutzten numerischen Kanäle (value_num,
 // value_num2, value_num3). Blutdruck belegt drei (Systole/Diastole/Puls),
 // alle übrigen Metriken genau einen. `units` listet die im Erfassungs-Dialog
-// wählbaren Einheiten; die erste ist der Default.
+// wählbaren Einheiten; die erste ist der Default (utils/vital-units.js, die
+// Quelle auch für den Server, #2375).
 //
 // `format` sagt, wie ein Wert gelesen wird, und steuert damit zugleich das
 // Eingabefeld: 'pair' zeigt zwei Kanäle als 120/80, 'duration' rechnet die in
@@ -65,7 +74,7 @@ export const VITAL_METRICS = Object.freeze([
       'health.vitals.channel.diastolic',
       'health.vitals.channel.pulse',
     ],
-    units: ['mmHg'],
+    units: VITAL_UNITS.bp,
     format: 'pair',
     minSpan: { mmHg: 40 },
     axes: [
@@ -79,7 +88,7 @@ export const VITAL_METRICS = Object.freeze([
     labelKey: 'health.vitals.metric.glucose',
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.glucose'],
-    units: ['mg/dL', 'mmol/L'],
+    units: VITAL_UNITS.glucose,
     minSpan: { 'mg/dL': 40, 'mmol/L': 2 },
   },
   {
@@ -88,7 +97,7 @@ export const VITAL_METRICS = Object.freeze([
     labelKey: 'health.vitals.metric.weight',
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.weight'],
-    units: ['kg', 'lb'],
+    units: VITAL_UNITS.weight,
     minSpan: { kg: 5, lb: 10 },
   },
   // Körpermaße (#683). Stehen bewusst neben dem Gewicht: bei einem Säugling
@@ -102,7 +111,7 @@ export const VITAL_METRICS = Object.freeze([
     labelKey: 'health.vitals.metric.height',
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.height'],
-    units: ['cm', 'in'],
+    units: VITAL_UNITS.height,
     minSpan: { cm: 10, in: 4 },
   },
   {
@@ -111,7 +120,7 @@ export const VITAL_METRICS = Object.freeze([
     labelKey: 'health.vitals.metric.headCircumference',
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.headCircumference'],
-    units: ['cm', 'in'],
+    units: VITAL_UNITS.head_circumference,
     minSpan: { cm: 4, in: 2 },
   },
   {
@@ -120,7 +129,7 @@ export const VITAL_METRICS = Object.freeze([
     labelKey: 'health.vitals.metric.spo2',
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.spo2'],
-    units: ['%'],
+    units: VITAL_UNITS.spo2,
     minSpan: { '%': 10 },
     ceiling: 100,
   },
@@ -130,7 +139,7 @@ export const VITAL_METRICS = Object.freeze([
     labelKey: 'health.vitals.metric.temp',
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.temp'],
-    units: ['°C', '°F'],
+    units: VITAL_UNITS.temp,
     minSpan: { '°C': 2, '°F': 4 },
   },
   // Schlafdauer einer Nacht (#609). Gespeichert werden Dezimalstunden, damit
@@ -145,7 +154,7 @@ export const VITAL_METRICS = Object.freeze([
     labelKey: 'health.vitals.metric.sleep',
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.sleep'],
-    units: ['h'],
+    units: VITAL_UNITS.sleep,
     format: 'duration',
     minSpan: { h: 4 },
   },
@@ -165,7 +174,7 @@ export const VITAL_METRICS = Object.freeze([
     labelKey: 'health.vitals.metric.mood',
     channels: ['value_num'],
     channelLabelKeys: ['health.vitals.metric.mood'],
-    units: [],
+    units: VITAL_UNITS.mood,
     format: 'scale',
     domain: { min: MOOD_MIN, max: MOOD_MAX },
   },
@@ -265,8 +274,9 @@ export function vitalPlausibility({ type, unit, value_num: v1, value_num2: v2, v
     else if (softRange && value > softRange[1]) soft.push({ channel, issue: 'high' });
   };
   if (type === 'bp') {
-    const hardBp = ownEntry(VITAL_HARD_LIMITS.bp, unit ?? 'mmHg');
-    const softBp = ownEntry(VITAL_SOFT_RANGES.bp, unit ?? 'mmHg');
+    const bpUnit = vitalLimitReading('bp', unit ?? 'mmHg').unit;
+    const hardBp = ownEntry(VITAL_HARD_LIMITS.bp, bpUnit);
+    const softBp = ownEntry(VITAL_SOFT_RANGES.bp, bpUnit);
     check('sys', v1, hardBp?.sys, softBp?.sys);
     check('dia', v2, hardBp?.dia, softBp?.dia);
     // Systolisch ueber diastolisch gilt ohne Einheit - am unteren Feld, weil
@@ -277,9 +287,23 @@ export function vitalPlausibility({ type, unit, value_num: v1, value_num2: v2, v
   }
   // Eine Saettigung liegt in jeder Schreibweise in [1, 100], auch ohne oder mit
   // fremder Einheit - beide Raender, wie der Server (vital-limits.js).
-  const hardRange = type === 'spo2' ? VITAL_HARD_LIMITS.spo2['%'] : ownEntry(ownEntry(VITAL_HARD_LIMITS, type), unit);
-  check('value', v1, hardRange, ownEntry(ownEntry(VITAL_SOFT_RANGES, type), unit));
+  // Wie am Server gilt die umgerechnete Messung (#2375): eine Altzeile in Gramm
+  // haelt im Dialog an denselben Raendern an wie an der API.
+  const reading = vitalLimitReading(type, unit, v1);
+  const hardRange = type === 'spo2' ? VITAL_HARD_LIMITS.spo2['%'] : ownEntry(ownEntry(VITAL_HARD_LIMITS, type), reading.unit);
+  check('value', reading.value, hardRange, ownEntry(ownEntry(VITAL_SOFT_RANGES, type), reading.unit));
   return { hard, soft };
+}
+
+/**
+ * Aendert dieser PATCH-Body die Messung selbst? Der Dialog schickt die Werte immer
+ * mit; nur wenn sie vom Bestand abweichen, zaehlen die harten Grenzen, wie am Server
+ * (#2375). Eine Altzeile mit 9.000.000 g nimmt so weiter eine Notiz an. Die Einheit
+ * steht nur im Body, wenn sie sich geaendert hat (vitalPatchBody).
+ */
+export function vitalMeasureChanged(row, patch) {
+  if (patch.unit !== undefined) return true;
+  return ['value_num', 'value_num2', 'value_num3'].some((key) => (patch[key] ?? null) !== (row[key] ?? null));
 }
 
 /** Stunden + Minuten in Dezimalstunden. Umkehrung von splitDuration(). */
@@ -319,28 +343,10 @@ export function widenToSpan(lo, hi, span, { ceiling = Infinity } = {}) {
 
 const CHANNEL_KEYS = ['value_num', 'value_num2', 'value_num3'];
 
-// EINE EINHEIT JE SERIE (#2328). `unit` ist freier Text, und die API nimmt
-// auch an, was der Dialog nicht anbietet: 95.400 g neben 95,4 kg zeichneten
-// eine Spitze bei 95400 und eine Aenderung von +95.304,7. Umgerechnet wird
-// beim Lesen, gespeichert bleibt, was kam. Je Messart eine Basis-Einheit und
-// je Einheit (klein geschrieben) die Umrechnung dorthin; Temperatur ist nicht
-// proportional und traegt deshalb Hin- und Rueckweg.
-const linear = (factor) => ({ toBase: (v) => v * factor, fromBase: (v) => v / factor });
-const fahrenheit = { toBase: (v) => (v - 32) * 5 / 9, fromBase: (v) => v * 9 / 5 + 32 };
-const LENGTH_UNITS = { cm: linear(1), mm: linear(0.1), m: linear(100), in: linear(2.54) };
-const UNIT_CONVERSIONS = Object.freeze({
-  weight: { kg: linear(1), g: linear(0.001), lb: linear(0.45359237), lbs: linear(0.45359237) },
-  height: LENGTH_UNITS,
-  head_circumference: LENGTH_UNITS,
-  // 1 mmol/L Glukose = 18,0182 mg/dL (molare Masse 180,182 g/mol).
-  glucose: { 'mg/dl': linear(1), 'mmol/l': linear(18.0182) },
-  temp: { '°c': linear(1), c: linear(1), '°f': fahrenheit, f: fahrenheit },
-});
-
-function unitConversion(type, unit) {
-  if (unit === null || unit === undefined) return undefined;
-  return ownEntry(ownEntry(UNIT_CONVERSIONS, type), String(unit).trim().toLowerCase());
-}
+// EINE EINHEIT JE SERIE (#2328). Altzeilen und die API bringen auch Einheiten,
+// die der Dialog nicht anbietet: 95.400 g neben 95,4 kg zeichneten eine Spitze
+// bei 95400 und eine Aenderung von +95.304,7. Umgerechnet wird beim Lesen,
+// gespeichert bleibt, was kam (Tabelle: utils/vital-units.js).
 
 /**
  * Die Einheit, in der eine Messart gezeigt wird: die haeufigste der im Dialog
@@ -360,23 +366,9 @@ function vitalDisplayUnit(metric, rows) {
   return best;
 }
 
-/**
- * Rechnet einen Wert zwischen zwei Einheiten derselben Messart um. Ohne
- * bekannte Umrechnung (fremde Einheit, Einheit fehlt) kommt der Wert
- * unveraendert zurueck - raten waere schlimmer als stehen lassen.
- */
-export function convertVitalValue(type, value, fromUnit, toUnit) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return value;
-  const from = unitConversion(type, fromUnit);
-  const to = unitConversion(type, toUnit);
-  if (!from || !to || from === to) return value;
-  // Auf 1e-6 gerundet: 95400 * 0,001 ist sonst 95,39999999999999.
-  return Math.round(to.fromBase(from.toBase(value)) * 1e6) / 1e6;
-}
-
 /** Kopie einer Zeile in der Anzeige-Einheit; ohne Umrechnung die Zeile selbst. */
 function toDisplayUnit(row, type, unit) {
-  if (!unit || !unitConversion(type, row.unit) || !unitConversion(type, unit)) return row;
+  if (!unit || !isConvertibleVitalUnit(type, row.unit) || !isConvertibleVitalUnit(type, unit)) return row;
   const out = { ...row, unit };
   for (const key of CHANNEL_KEYS) {
     const val = toFiniteOrNull(row[key]);

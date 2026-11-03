@@ -25,7 +25,9 @@ jobs:
     # Die Kette brauchte am 8.10.2026 auf main 19:40 bis 19:53 Minuten. Bei 20
     # brach das Limit jeden PR ab, der eine Suite hinzufuegte - ein abgebrochener
     # Lauf sieht aus wie ein roter, sagt aber nichts ueber die Tests.
-    timeout-minutes: 30
+    # Am 3.11.2026 lag 22.x bei 27 bis 30 Minuten und brach zweimal am Limit 30
+    # ab (PR #2482, main). 45 gibt Luft, bis #1814 die Kette aufteilt.
+    timeout-minutes: 45
 
     strategy:
       matrix:

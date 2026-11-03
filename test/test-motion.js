@@ -2935,7 +2935,7 @@ test('R19: die Uebersicht blendet vom Skelett zum Inhalt ueber swapContent', () 
   // (measurePhoneProgram) - im selben Rueckruf, also unter derselben Blende.
   // Seit DW-P1-2 kommt das Markup aus dashboardShellHtml() (der stille Abgleich
   // liest daraus voraus, welche Zeilen gehen) - gezeichnet wird es hier.
-  assert.match(src, /const html = dashboardShellHtml\(cfg\);/);
+  assert.match(src, /const html = dashboardShellHtml\(displayCfg,/);
   assert.match(src, /swapContent\(shell, \(\) => \{\s*setHtml\(shell, html\);[\s\S]{0,1600}?\}, \{ animate: fromSkeleton \}\);/);
 });
 

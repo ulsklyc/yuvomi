@@ -29,6 +29,10 @@ import {
   displayMayRead, displayOfflineExpiresAt, displayTokenFromRequest, isDisplayAccount,
   markDisplayCookieRefreshed, OFFLINE_EXPIRES_HEADER,
 } from './services/display-accounts.js';
+import {
+  devicePairingLink, endDevicePairingCodes, isInstanceOrigin, issueDevicePairingCode, spendDevicePairingCode,
+} from './services/device-pairing.js';
+import { qrToDataUrl } from './utils/qrcode.js';
 import { birthDateInput, deleteBirthdayArtifacts, placeholderBirthDate, syncBirthdayArtifacts, validateYearUnknown } from './services/birthdays.js';
 import { syncFastingRemindersForUser } from './services/fasting-reminders.js';
 import { revokePaymentTasksForUsers } from './services/payment-task-audience.js';
@@ -55,6 +59,7 @@ import {
   resolvePermissions, buildSessionModuleAccess, clientPermissions,
   invitePresetPermissions, isValidInvitePreset, writeSubjectPermissions,
   applyChildStartPermissions, INVITE_PRESET_DEFAULT,
+  userForRequest,
 } from './permissions.js';
 import { isAdminRequest, requireAdmin } from './middleware/require-admin.js';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';
@@ -73,6 +78,8 @@ const { version: APP_VERSION } = JSON.parse(
 // Präfix für NEUE API-Tokens. Bereits ausgegebene `oikos_`-Tokens bleiben gültig:
 // validiert wird über den Hash des gesamten Tokens, nicht über den Präfix.
 const API_TOKEN_PREFIX = 'yuvomi_';
+// Ein angemeldetes Geraet laeuft ab wie eine Sitzung, dieselbe Zahl.
+const DEVICE_IDLE_DAYS = Math.round(SESSION_MAX_AGE_MS / (24 * 60 * 60 * 1000));
 const FAMILY_ROLES = ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'];
 // Platzhalter-Hash für den Timing-Attack-Schutz beim Login unbekannter Benutzer.
 const DUMMY_PASSWORD_HASH = '$2b$12$invalidhashfortimingprotection000000000000000000000';
@@ -465,6 +472,17 @@ const twoFactorLimiter = rateLimit({
   message: { error: 'Zu viele Versuche. Bitte warte kurz.', code: 429 },
 });
 
+// Eigener Limiter fuer das Einloesen eines Kopplungscodes, wie `pairingLimiter`
+// beim Display: Der Code ist kurz genug zum Abtippen, also kurz genug zum Raten,
+// und jeder Versuch zaehlt. Die Route ist oeffentlich, gezaehlt wird je Adresse.
+const devicePairingLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60_000,
+  max: parseInt(process.env.RATE_LIMIT_MAX_ATTEMPTS) || 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many pairing attempts. Please wait a moment.', code: 429 },
+});
+
 // Eigener Limiter fuer "Auf anderen Geraeten abmelden" (#1354). Zaehlt alle
 // Antworten wie der Reset-Limiter: jeder Aufruf liest die ganze Sitzungstabelle.
 // Gezaehlt wird JE MITGLIED, nicht je Adresse: hinter einem Proxy ohne
@@ -557,6 +575,40 @@ function requestTokenScopes(req) {
   return parseScopes(row.scopes);
 }
 
+/**
+ * Traegt die Anfrage ein gueltiges Device Credential? Fuer das Tor unten, das
+ * vor `requireAuth` steht und deshalb selbst nachsehen muss. Ein abgelaufenes
+ * zaehlt nicht: es soll seine 401 von `requireAuth` bekommen, nicht eine 403,
+ * die "du darfst das nicht" sagt, wo "melde dich an" stimmt.
+ */
+function requestHasDeviceCredential(req) {
+  const token = extractApiToken(req);
+  if (!token) return false;
+  return Boolean(db.get().prepare(`
+    SELECT 1 FROM api_tokens t
+    WHERE t.token_hash = ? AND t.kind = 'device' AND ${apiTokenUsableSql('t')}
+  `).get(hashApiToken(token)));
+}
+
+/**
+ * Was ein angemeldetes Geraet von `/auth` erreicht. Eine Allowlist: eine neue
+ * Konto-Route ist fuer ein Geraet zu, bis jemand sie hier eintraegt. Ein
+ * gestohlenes Credential aendert weder Passwort noch E-Mail noch den zweiten
+ * Faktor. Die Pfade sind relativ zum Mount, wie `req.path` hier.
+ */
+const DEVICE_AUTH_ROUTES = [
+  ['GET', /^\/me$/],
+  ['GET', /^\/users$/],
+  ['GET', /^\/oidc\/config$/],
+  ['POST', /^\/logout$/],
+  ['GET', /^\/devices$/],
+  ['DELETE', /^\/devices\/[^/]+$/],
+];
+
+function deviceMayUseAuthRoute(method, path) {
+  return DEVICE_AUTH_ROUTES.some(([allowed, pattern]) => allowed === method && pattern.test(path));
+}
+
 // Sicherheits-Gate (GHSA-xcv5-6w6x-x5q2): Der Auth-Router ist in server/index.js
 // bewusst VOR den globalen Scope-/Guest-/Modul-Gates gemountet, damit oeffentliche
 // Routen (login, setup, oidc, 2fa/verify) ohne Authentifizierung erreichbar sind.
@@ -572,6 +624,11 @@ router.use((req, res, next) => {
   const scopes = requestTokenScopes(req);
   if (scopes != null) {
     return res.status(403).json({ error: 'Token scope does not permit this operation.', code: 403 });
+  }
+  // Ein Device Credential ist ungescopt, damit `GET /auth/me` geht, und kaeme
+  // deshalb oben durch. Es bekommt die Allowlist statt der ganzen Konto-Routen.
+  if (!deviceMayUseAuthRoute(req.method, req.path) && requestHasDeviceCredential(req)) {
+    return res.status(403).json({ error: 'This is not available on a signed-in device.', code: 403, reason: 'device_credential' });
   }
   // DASSELBE FUER EIN GEKOPPELTES DISPLAY (#1208). Es traegt ebenfalls Scopes
   // und wuerde vom globalen Gate ebenso verworfen - und kommt hier ebenso wenig
@@ -887,8 +944,11 @@ function updateUserRoleSessions(userId, role) {
  * Beendet alle Sitzungen eines Mitglieds ausser `exceptSid` und meldet, wie
  * viele es waren. Der eine Weg fuer Passwortwechsel, 2FA, Admin-Passwort,
  * Passwort-Reset, Loeschen und "Auf anderen Geraeten abmelden" (#1354).
- * API-Tokens und Wandtabletts sind keine Zeilen dieser Tabelle und bleiben
- * unberuehrt. `database` nur fuer die per DI gebauten Reset-Routen.
+ * Angemeldete Geraete enden mit: wer "ueberall abmelden" sagt oder sein Passwort
+ * aendert, meint das Telefon mit. Sie zaehlen in der Antwort mit, damit die
+ * Seite nicht "0 beendet" meldet, wo eben ein Telefon abgemeldet wurde.
+ * Integrations-Tokens und Wandtabletts sind keine Sitzung einer Person und
+ * bleiben unberuehrt. `database` nur fuer die per DI gebauten Reset-Routen.
  */
 function invalidateUserSessions(userId, exceptSid, database = db.get()) {
   const allSessions = database.prepare('SELECT sid, sess, expired_at FROM sessions').all();
@@ -907,11 +967,21 @@ function invalidateUserSessions(userId, exceptSid, database = db.get()) {
       }
     } catch { /* ignore malformed session */ }
   }
+  ended += database.prepare(`
+    UPDATE api_tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+     WHERE kind = 'device' AND subject_user_id = ? AND revoked_at IS NULL
+  `).run(userId).changes;
+  // Ein offener Kopplungscode ist ein Geraet, das nur noch nicht eingeloest ist.
+  // Ohne diese Zeile laege er nach "Auf anderen Geraeten abmelden" noch bis zu
+  // fuenf Minuten in der Welt. Er zaehlt nicht mit: `ended` nennt, was lief.
+  endDevicePairingCodes(database, userId);
   return ended;
 }
 
 /**
- * Wann ein API-Token noch gilt: nicht widerrufen und nicht abgelaufen.
+ * Wann ein API-Token noch gilt: nicht widerrufen und nicht abgelaufen. Ein
+ * angemeldetes Geraet laeuft wie eine Sitzung nach 90 Tagen ohne Benutzung ab,
+ * dieselbe Zahl aus derselben Quelle.
  *
  * EINE Schreibweise fuer zwei Stellen (D#1672): die Anmeldung laesst genau
  * diese Tokens durch, und `POST /api-tokens/:id/remove` loescht genau die
@@ -922,7 +992,10 @@ function invalidateUserSessions(userId, exceptSid, database = db.get()) {
  */
 function apiTokenUsableSql(alias) {
   return `(${alias}.revoked_at IS NULL
-      AND (${alias}.expires_at IS NULL OR ${alias}.expires_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now')))`;
+      AND (${alias}.expires_at IS NULL OR ${alias}.expires_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      AND (${alias}.kind != 'device'
+        OR COALESCE(${alias}.last_used_at, ${alias}.created_at)
+          > strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-${DEVICE_IDLE_DAYS} days')))`;
 }
 
 function authenticateApiToken(req) {
@@ -993,7 +1066,7 @@ function applyRoleModuleAccess(req) {
       .get(req.authUserId);
     if (user) {
       req.sessionModuleAccess = buildSessionModuleAccess(
-        resolvePermissions(db.get(), user, { isDisplay: req.authMethod === 'display' }),
+        resolvePermissions(db.get(), userForRequest(req, user), { isDisplay: req.authMethod === 'display' }),
       );
     }
   } catch (err) {
@@ -1010,7 +1083,13 @@ function requireAuth(req, res, next) {
   if (apiToken) {
     req.authMethod = 'api_token';
     req.authUserId = apiToken.effective_subject_user_id ?? apiToken.subject_user_id ?? apiToken.created_by;
-    req.authRole = apiToken.role;
+    // EIN ADMIN IST AUF DEM GERAET EIN MITGLIED. Hier und nicht in
+    // `requireAdmin`, weil `isAdminRequest()` und `authRole` an rund hundert
+    // Stellen gefragt werden, auch fuer Leseregeln: eine Stelle, die alle haelt.
+    // Ein verlorenes Telefon erreicht so keine Haushaltsverwaltung. Spaetere
+    // Admin-Funktionen in der App oeffnen das mit erneuter Anmeldung, nicht hier.
+    req.authDeviceId = apiToken.kind === 'device' ? apiToken.id : null;
+    req.authRole = apiToken.kind === 'device' ? 'member' : apiToken.role;
     // null = kein Scoping (voller rollenbasierter Zugriff, Legacy-Token).
     req.authScopes = parseScopes(apiToken.scopes);
     applyRoleModuleAccess(req);
@@ -2316,6 +2395,9 @@ router.post('/logout', requireAuth, csrfMiddleware, (req, res) => {
   if (req.authMethod === 'api_token') {
     return res.json({ ok: true });
   }
+  // Am gemeinsamen Rechner bliebe der offene Kopplungscode sonst nach dem
+  // Abmelden noch bis zu fuenf Minuten ein Weg in dieses Konto.
+  endDevicePairingCodes(db.get(), req.authUserId);
   req.session.destroy((err) => {
     if (err) {
       log.error('Logout error:', err);
@@ -2799,7 +2881,7 @@ router.get('/me', requireAuth, (req, res) => {
     if (req.authMethod === 'api_token') {
       return res.json({
         user: publicUser(user),
-        permissions: clientPermissions(db.get(), user),
+        permissions: clientPermissions(db.get(), userForRequest(req, user)),
         householdSize: householdSize(db.get()),
         initialsRoster: initialsRoster(db.get(), user.id),
         othersCanRead: othersCanRead(db.get(), user.id),
@@ -3170,6 +3252,286 @@ router.put('/2fa/require', requireAuth, requireAdmin, csrfMiddleware, (req, res)
  * Listet alle Familienmitglieder (für Zuweisung in Kalender, Tasks etc.).
  * Response: { data: User[] }
  */
+/**
+ * Die eigenen Geraete gehoeren der Person selbst, und ein API-Token ist das
+ * nicht: ein Admin kann eines mit dem `subject_user_id` eines Mitglieds
+ * ausstellen und handelte damit als dieses Mitglied. Die Geraeteliste wuerde so
+ * doch zur Auskunft, die `POST /users/:id/devices/sign-out` bewusst nicht gibt.
+ */
+function refuseIntegrationToken(req, res, next) {
+  if (req.authMethod === 'api_token' && req.authDeviceId == null) {
+    return res.status(403).json({
+      error: 'An API token cannot manage signed-in devices.', code: 403, reason: 'session_required',
+    });
+  }
+  next();
+}
+
+/** Was eine Person ueber ein eigenes Geraet erfaehrt. Nie das Geheimnis. */
+function publicDevice(row, currentId = null) {
+  return {
+    id: row.id,
+    name: row.name,
+    platform: row.platform,
+    last_used_at: row.last_used_at,
+    created_at: row.created_at,
+    current: row.id === currentId,
+  };
+}
+
+/**
+ * Die Angaben eines Geraets, fuer die Anmeldung und fuer die Kopplung.
+ * @returns {{ name: string, platform: string, deviceId: string }|{ error: string }}
+ */
+function readDeviceFields(body) {
+  const name = typeof body?.name === 'string' ? body.name.trim() : '';
+  const platform = body?.platform;
+  const deviceId = body?.device_id;
+  if (!name || name.length > 100) return { error: 'name must be between 1 and 100 characters.' };
+  if (typeof platform !== 'string' || !/^[a-z][a-z0-9-]{1,19}$/.test(platform)) {
+    return { error: 'platform must be a short lowercase name.' };
+  }
+  if (typeof deviceId !== 'string' || !/^[A-Za-z0-9._-]{8,128}$/.test(deviceId)) {
+    return { error: 'device_id must be between 8 and 128 plain characters.' };
+  }
+  return { name, platform, deviceId };
+}
+
+/** Darf diese Person ein Geraet haben? Eine `users`-Zeile ist noch kein Mitglied. */
+function mayHaveDevice(userId) {
+  return canSignIn(db.get(), userId) && isHouseholdMember(userId, { db: db.get() });
+}
+
+/**
+ * Stellt ein Credential aus und ersetzt ein aktives mit derselben `device_id`.
+ * Laeuft in der Transaktion des Aufrufers.
+ * @returns {{ id: number, credential: string }} der Klartext, genau einmal
+ */
+function issueDeviceCredential(userId, { name, platform, deviceId }) {
+  const credential = API_TOKEN_PREFIX + crypto.randomBytes(32).toString('base64url');
+  db.get().prepare(`
+    UPDATE api_tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+     WHERE kind = 'device' AND subject_user_id = ? AND device_id = ? AND revoked_at IS NULL
+  `).run(userId, deviceId);
+  const id = db.get().prepare(`
+    INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, subject_user_id, kind, platform, device_id)
+    VALUES (?, ?, ?, ?, ?, 'device', ?, ?)
+  `).run(
+    name, hashApiToken(credential), credential.slice(0, 12), userId, userId, platform, deviceId,
+  ).lastInsertRowid;
+  return { id, credential };
+}
+
+/**
+ * POST /api/v1/auth/devices
+ * Tauscht eine Browser- oder App-Sitzung gegen ein Device Credential. Der
+ * Klartext steht genau einmal in dieser Antwort.
+ * Body: { name, platform, device_id }
+ *
+ * NUR AUS EINER SITZUNG. So laufen Rate-Limit, zweiter Faktor und `canSignIn`
+ * ueber die vorhandenen Wege, und ein verlorenes Telefon stellt kein weiteres
+ * Credential aus: ein Widerruf bliebe sonst wirkungslos.
+ *
+ * DIESELBE `device_id` ERSETZT. Eine Neuanmeldung auf demselben Telefon laesst
+ * kein zweites gueltiges Credential zurueck.
+ */
+router.post('/devices', requireAuth, csrfMiddleware, (req, res) => {
+  if (req.authMethod !== 'session') {
+    return res.status(403).json({
+      error: 'A signed-in device can only be added from a sign-in.', code: 403, reason: 'session_required',
+    });
+  }
+  try {
+    const fields = readDeviceFields(req.body);
+    if (fields.error) return res.status(400).json({ error: fields.error, code: 400 });
+    // Ein Ausgaben-Gast meldet sich an, bekommt aber aus demselben Grund wie beim
+    // API-Token kein Credential.
+    if (!mayHaveDevice(req.authUserId)) {
+      return res.status(403).json({
+        error: 'Only household members can add a signed-in device.', code: 403, reason: 'not_a_household_member',
+      });
+    }
+
+    let issued = null;
+    db.transaction(() => {
+      issued = issueDeviceCredential(req.authUserId, fields);
+    });
+
+    const { id, credential } = issued;
+    const row = db.get().prepare('SELECT * FROM api_tokens WHERE id = ?').get(id);
+    res.status(201).json({ data: publicDevice(row), credential });
+  } catch (err) {
+    log.error('Signed-in device creation error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * POST /api/v1/auth/devices/pair
+ * Stellt den Code aus, mit dem die App sich anmeldet, wo kein Passwort hilft.
+ * Body: { server } - `window.location.origin` der Seite, wie beim Display (#2294).
+ * Der Server kennt seine oeffentliche Adresse hinter einem Proxy nicht verlaesslich.
+ * Die Herkunft fliesst nur in die Antwort an dieselbe angemeldete Person.
+ *
+ * NUR AUS EINER SITZUNG, wie `POST /devices`: Ein Geraet stellt kein weiteres aus.
+ */
+router.post('/devices/pair', requireAuth, csrfMiddleware, (req, res) => {
+  if (req.authMethod !== 'session') {
+    return res.status(403).json({
+      error: 'A pairing code can only be created from a sign-in.', code: 403, reason: 'session_required',
+    });
+  }
+  try {
+    const server = req.body?.server;
+    if (!isInstanceOrigin(server)) {
+      return res.status(400).json({ error: 'server must be the http(s) origin of this page.', code: 400 });
+    }
+    if (!mayHaveDevice(req.authUserId)) {
+      return res.status(403).json({
+        error: 'Only household members can add a signed-in device.', code: 403, reason: 'not_a_household_member',
+      });
+    }
+    const { code, expiresAt } = issueDevicePairingCode(db.get(), req.authUserId);
+    const link = devicePairingLink(server, code);
+    res.status(201).json({
+      data: { code, expires_at: expiresAt, link, qr: qrToDataUrl(link, { moduleSize: 6 }) },
+    });
+  } catch (err) {
+    log.error('Device pairing code error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * POST /api/v1/auth/devices/pair/redeem
+ * Tauscht einen Kopplungscode gegen ein Device Credential. Oeffentlich: die App
+ * hat noch nichts, womit sie sich ausweisen koennte, der Code ist der Ausweis.
+ * Body: { code, name, platform, device_id }
+ *
+ * Die Angaben werden VOR dem Code geprueft: ein Tippfehler der App verbraucht ihn
+ * nicht. Ist der Code gut, gehoert er aber jemandem, der kein Geraet mehr haben
+ * darf, klingt die Absage wie bei einem falschen Code.
+ */
+router.post('/devices/pair/redeem', devicePairingLimiter, (req, res) => {
+  try {
+    const fields = readDeviceFields(req.body);
+    if (fields.error) return res.status(400).json({ error: fields.error, code: 400 });
+
+    let issued = null;
+    db.transaction(() => {
+      const userId = spendDevicePairingCode(db.get(), req.body?.code);
+      if (userId == null || !mayHaveDevice(userId)) return;
+      issued = issueDeviceCredential(userId, fields);
+    });
+    if (!issued) {
+      return res.status(400).json({
+        error: 'This pairing code is not valid.', code: 400, reason: 'invalid_pairing_code',
+      });
+    }
+
+    const row = db.get().prepare('SELECT * FROM api_tokens WHERE id = ?').get(issued.id);
+    res.status(201).json({ data: publicDevice(row), credential: issued.credential });
+  } catch (err) {
+    log.error('Device pairing redemption error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * GET /api/v1/auth/devices
+ * Die eigenen angemeldeten Geraete, nie die einer anderen Person: wann jemand
+ * welches Telefon benutzt, geht auch den Admin nichts an (DECISIONS Eintrag 1).
+ */
+router.get('/devices', requireAuth, refuseIntegrationToken, (req, res) => {
+  try {
+    const rows = db.get().prepare(`
+      SELECT t.* FROM api_tokens t
+      WHERE t.kind = 'device' AND t.subject_user_id = ? AND ${apiTokenUsableSql('t')}
+      ORDER BY COALESCE(t.last_used_at, t.created_at) DESC
+    `).all(req.authUserId);
+    res.json({ data: rows.map((row) => publicDevice(row, req.authDeviceId ?? null)) });
+  } catch (err) {
+    log.error('Signed-in device list error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/** Setzt `revoked_at` auf einem eigenen, noch gueltigen Geraet. */
+function revokeOwnDevice(userId, id) {
+  return db.get().prepare(`
+    UPDATE api_tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+     WHERE id = ? AND kind = 'device' AND subject_user_id = ? AND revoked_at IS NULL
+  `).run(id, userId).changes;
+}
+
+/**
+ * DELETE /api/v1/auth/devices/current
+ * Das Abmelden in der App. Steht vor `/:id`, sonst waere `current` eine Id.
+ */
+router.delete('/devices/current', requireAuth, csrfMiddleware, (req, res) => {
+  if (req.authDeviceId == null) {
+    return res.status(403).json({
+      error: 'Only a signed-in device can sign itself out here.', code: 403, reason: 'device_credential_required',
+    });
+  }
+  try {
+    revokeOwnDevice(req.authUserId, req.authDeviceId);
+    res.json({ ok: true });
+  } catch (err) {
+    log.error('Signed-in device sign-out error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * DELETE /api/v1/auth/devices/:id
+ * 404 fuer "gibt es nicht" und "gehoert dir nicht": der Unterschied waere die
+ * Auskunft, die diese Route nicht gibt.
+ */
+router.delete('/devices/:id', requireAuth, refuseIntegrationToken, csrfMiddleware, (req, res) => {
+  try {
+    const id = /^\d+$/.test(req.params.id) ? Number(req.params.id) : NaN;
+    if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid device ID.', code: 400 });
+    if (revokeOwnDevice(req.authUserId, id) === 0) {
+      return res.status(404).json({ error: 'Device not found.', code: 404 });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    log.error('Signed-in device revocation error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * POST /api/v1/auth/users/:id/devices/sign-out
+ * Der Notfall: das Handy eines Kindes ist weg, und im reinen SSO-Haushalt gibt
+ * es kein Passwort, das ein Admin zuruecksetzen koennte. Bis hierher blieb nur
+ * das Deaktivieren. Die Route endet alles, was ein Telefon tragen kann, auch die
+ * Browser-Sitzungen, und antwortet bewusst ohne Zahl: wie viele Geraete jemand
+ * hat, ist dieselbe Auskunft, die `GET /auth/devices` einem Admin verweigert.
+ * Nur aus einer Sitzung; die eigene bleibt stehen, wenn ein Admin sich selbst
+ * meint.
+ */
+router.post('/users/:id/devices/sign-out', requireAuth, requireAdmin, csrfMiddleware, sessionRevokeLimiter, (req, res) => {
+  if (req.authMethod !== 'session') {
+    return res.status(403).json({
+      error: 'Only a signed-in browser session can sign out a member.', code: 403, reason: 'browser_session_required',
+    });
+  }
+  try {
+    const id = /^\d+$/.test(req.params.id) ? Number(req.params.id) : NaN;
+    if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
+    if (!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(id)) {
+      return res.status(404).json({ error: 'User not found.', code: 404 });
+    }
+    invalidateUserSessions(id, id === req.authUserId ? req.sessionID : null);
+    res.json({ ok: true });
+  } catch (err) {
+    log.error('Sign out member error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
 router.get('/users', requireAuth, (req, res) => {
   try {
     // is_worker markiert Konten der Haushaltshilfe (housekeeping_workers),
@@ -3237,6 +3599,7 @@ router.get('/api-tokens', requireAuth, requireAdmin, (req, res) => {
       FROM api_tokens t
       LEFT JOIN users creator ON creator.id = t.created_by
       LEFT JOIN users subject ON subject.id = COALESCE(t.subject_user_id, t.created_by)
+      WHERE t.kind = 'integration'
       ORDER BY t.created_at DESC
     `).all();
     // KONTEN, keine Mitgliederliste (#1207): ein Admin stellt ein Token fuer
@@ -3362,7 +3725,7 @@ router.delete('/api-tokens/:id', requireAuth, requireAdmin, csrfMiddleware, (req
     const result = db.get().prepare(`
       UPDATE api_tokens
       SET revoked_at = COALESCE(revoked_at, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-      WHERE id = ?
+      WHERE id = ? AND kind = 'integration'
     `).run(id);
 
     if (result.changes === 0) return res.status(404).json({ error: 'API token not found.', code: 404 });
@@ -3397,11 +3760,11 @@ router.post('/api-tokens/:id/remove', requireAuth, requireAdmin, csrfMiddleware,
     if (!Number.isSafeInteger(id)) return res.status(400).json({ error: 'Invalid token ID.', code: 400 });
 
     const result = db.get().prepare(`
-      DELETE FROM api_tokens WHERE id = ? AND NOT ${apiTokenUsableSql('api_tokens')}
+      DELETE FROM api_tokens WHERE id = ? AND kind = 'integration' AND NOT ${apiTokenUsableSql('api_tokens')}
     `).run(id);
     if (result.changes > 0) return res.json({ ok: true });
 
-    const exists = db.get().prepare('SELECT 1 FROM api_tokens WHERE id = ?').get(id);
+    const exists = db.get().prepare("SELECT 1 FROM api_tokens WHERE id = ? AND kind = 'integration'").get(id);
     if (!exists) return res.status(404).json({ error: 'API token not found.', code: 404 });
     return res.status(409).json({
       error: 'An active API token cannot be removed. Revoke it first.',

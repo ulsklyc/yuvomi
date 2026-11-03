@@ -1580,7 +1580,7 @@ test('R24 E7: die Wetterzeile steht im Masthead auch neben der Karte, in jeder B
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../public/styles/dashboard.css', import.meta.url), 'utf8');
-  assert.match(src, /renderDashboardOverview\(user, isCustomizing, weather, \{ followsDefault, canPublish, weatherCard: weatherCardShown \}\)/,
+  assert.match(src, /renderDashboardOverview\(user, isCustomizing, weather, \{ followsDefault, canPublish, weatherCard: weatherCardShown, phoneCustomize \}\)/,
     'das Wetter geht immer in den Kopf, die Karte nur als Merkmal');
   const weather = { current: { temp: 18, desc: 'Sonnig', icon: '01d' }, units: 'metric' };
   const head = __test.renderDashboardOverview({ display_name: 'Linda' }, false, weather, { weatherCard: true });

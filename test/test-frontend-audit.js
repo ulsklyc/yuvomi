@@ -6269,11 +6269,40 @@ test('die Küchen-Tab-Leiste trägt den Zustand des Kreislaufs', () => {
   // die Leiste eine andere Zahl als die Filter-Chips daneben.
   const status = read('../public/utils/pantry-status.js');
   assert.match(status, /const out = quantity <= 0/);
-  assert.match(route, /quantity <= 0/, 'leer: dieselbe Bedingung wie pantryItemStatus');
+  assert.match(route, /quantity <= 0/, 'leer: dieselbe Bedingung wie pantryStockStatus');
   assert.match(route, /min_quantity IS NOT NULL AND quantity <= min_quantity/,
-    'fast leer: dieselbe Bedingung wie pantryItemStatus');
-  assert.match(route, /expires_on IS NOT NULL AND expires_on < \?/,
+    'fast leer: dieselbe Bedingung wie pantryStockStatus');
+  assert.match(route, /expires_on IS NOT NULL AND (pi\.)?expires_on < \?/,
     'abgelaufen: reiner Stringvergleich wie im Client (YYYY-MM-DD ist lexikografisch chronologisch)');
+  // #1448, step 3: low and out are a PRODUCT's, read over the sum of its
+  // batches against the product's minimum, on both sides. The route builds one
+  // row per product (a product without batches included, total 0) and rounds
+  // the sum as normalizePantryQuantity does; the client sums per product key.
+  assert.match(route, /FROM pantry_products p\s+LEFT JOIN pantry_items pi ON pi\.product_id = p\.id\s+GROUP BY p\.id/,
+    'die Leiste zaehlt knapp und leer je Produkt, nicht je Charge');
+  assert.match(route, /ROUND\(COALESCE\(SUM\(pi\.quantity\), 0\), 2\) AS quantity/,
+    'die Summe gerundet wie normalizePantryQuantity');
+  assert.match(route, /p\.min_quantity AS min_quantity/, 'das Minimum des Produkts, nicht der Charge');
+  assert.match(status, /export function pantryProductStock[\s\S]*?normalizePantryQuantity\(sum, \{ fallback: 0 \}\)[\s\S]*?pantryStockStatus\(entry\.total, entry\.min\)/,
+    'der Client liest knapp und leer ueber die gerundete Summe des Produkts');
+  // "One item needing attention, not two": attention counts the product rows.
+  assert.match(route, /WHEN expired > 0 OR is_out OR is_low/, 'attention: ein Produkt einmal, abgelaufen oder knapp oder leer');
+  // #2118, point 3: a product without batches is out only when it has a
+  // minimum above 0, on both sides; a batch at 0 is out with or without one.
+  assert.match(route, /CASE WHEN batches > 0 THEN quantity <= 0 ELSE COALESCE\(min_quantity > 0, 0\) END AS is_out/,
+    'leer ohne Charge: nur mit Minimum ueber 0, wie hasPantryMinimum');
+  assert.match(status, /export function hasPantryMinimum[\s\S]*?return Number\.isFinite\(min\) && min > 0;/,
+    'der Client: ein Minimum ist nicht null und ueber 0');
+  assert.match(status, /entry\.batches\.length\s*\? pantryStockStatus\(entry\.total, entry\.min\)\s*: \{ out: hasPantryMinimum\(entry\.min\), low: false \}/,
+    'der Client: ein Produkt ohne Charge ist nur mit Minimum leer und nie knapp');
+  assert.match(status, /for \(const entry of pantryProductStock\(items, products\)\.values\(\)\) \{\s*if \(entry\.low \|\| entry\.out\) counts\.low \+= 1;/,
+    'der Chip "Fast leer" zaehlt Produkte wie die Leiste');
+  // The third place: the empty product row shows its minimum by the same
+  // function, not by a copy of the rule (review of #2118).
+  const pantryPage = read('../public/pages/pantry.js');
+  assert.match(pantryPage, /function emptyProductEl\([\s\S]*?if \(hasPantryMinimum\(product\.minQuantity\)\)/,
+    'die leere Produktzeile fragt hasPantryMinimum()');
+  assert.doesNotMatch(pantryPage, /Number\(product\.minQuantity\) > 0/, 'keine zweite Fassung der Regel');
 
   // Kein Badge auf dem aktiven Tab: dort sagt die Seite es vollständiger, und eine
   // Zahl dort müsste nach jeder Mutation nachgezogen werden.
@@ -7017,7 +7046,7 @@ test('responsive adaptation uses tablet space without crowding module toolbars',
   // (Titel + Suche + Aktionen brechen bei Bedarf um), die Filter leben in einer
   // eigenen Zeile darunter — kein in die Kopfzeile gequetschter Filter-Block (#506).
   const documentsPageSrc = read('../public/pages/documents.js');
-  assert.match(documentsPageSrc, /class="page-toolbar page-toolbar--wrap(?: page-toolbar--title-tools)? documents-toolbar"/);
+  assert.match(documentsPageSrc, /class="page-toolbar page-toolbar--wrap(?: page-toolbar--title-tools)?(?: page-toolbar--fold-search)? documents-toolbar"/);
   assert.match(documentsPageSrc, /<div class="documents-filters">/);
   assert.match(
     documents,
@@ -8093,7 +8122,10 @@ test('dashboard „Heute wichtig" is one inset-grouped list, not a tile grid', (
   // der Hauptgegenstand der Seite ist -, schlug er auf einen Wechsel an, den er
   // gar nicht bewacht. Gebunden bleibt: die Gruppe rundet über einen TOKEN, und
   // die Zeile rundet gar nicht.
-  assert.match(gridBody, /grid-template-columns:\s*1fr/, 'the group is a single column of rows, not a tile grid');
+  // Eine Spalte, ob als `1fr` oder als `minmax(0, 1fr)`: seit #2297 traegt sie
+  // ihr Minimum ausdruecklich, damit sie nicht ueber die Karte hinaus waechst
+  // (gemessen in test-dashboard-surface-browser.js).
+  assert.match(gridBody, /grid-template-columns:\s*(?:1fr|minmax\(0,\s*1fr\))\s*;/, 'the group is a single column of rows, not a tile grid');
   assert.match(gridBody, /background:\s*var\(--color-surface\)/, 'the group carries one opaque surface');
   assert.match(gridBody, /border-radius:\s*var\(--radius-[a-z0-9]+\)/, 'the group is the rounded container, and it rounds via a token');
   assert.match(gridBody, /overflow:\s*hidden/, 'rows must clip to the group radius');
@@ -12212,12 +12244,38 @@ test('das einmalig sichtbare API-Token laesst sich kopieren', () => {
   const source = read('../public/settings/pages/admin-api.js');
   assert.match(source, /id="api-token-copy"/);
   assert.match(source, /settings\.apiTokenCopy/);
-  assert.match(source, /navigator\.clipboard\?\.writeText\(value\)/);
+  assert.match(source, /navigator\.clipboard\.writeText\(value\)/);
   assert.match(source, /settings\.apiTokenCopied/);
+  // Ohne Zwischenablage (http im LAN) markiert der Fehlschlag das Feld, damit
+  // das einmalige Token von Hand kopiert werden kann (#2487).
+  assert.match(source, /settings\.apiTokenCopyFailed/);
   // Der Lucide-Platzhalter im erst spaeter eingeblendeten Block braucht seinen
   // eigenen createIcons-Aufruf.
   assert.match(source, /window\.lucide\?\.createIcons\(\{ el: output \}\)/);
   assertKeysExistInEveryLocale(['settings.apiTokenCopy', 'settings.apiTokenCopied', 'email.saveFailed']);
+});
+
+// Ueber http im Heimnetz gibt es `navigator.clipboard` nicht. Ein Aufruf
+// `await navigator.clipboard?.writeText(x)` wirft dann nicht, sondern liefert
+// still `undefined` - und gleich danach stand der Erfolgs-Toast, obwohl nichts
+// kopiert war (#2487: API-Token und Feed-URL). Der Guard misst den Aufruf
+// selbst: eine optionale Kette direkt vor dem Aufruf von writeText ist immer
+// dieser Fehler; die Pruefung `if (navigator.clipboard?.writeText)` davor ist
+// erlaubt, weil dort keine Klammer folgt.
+test('kein Kopier-Aufruf verschluckt die fehlende Zwischenablage per optionaler Kette', () => {
+  const silent = /clipboard\?\.writeText\s*\(|writeText\?\.\s*\(/;
+  const files = [
+    ...walkFrontendFiles('../public/').filter((f) => !f.startsWith('../public/vendor/')),
+    ...walkFrontendFiles('../tools/installer/'),
+  ];
+  const offenders = [];
+  for (const file of files) {
+    const lines = withoutCommentsKeepingLines(read(file)).split('\n');
+    lines.forEach((line, i) => {
+      if (silent.test(line)) offenders.push(`${file.replace(/^\.\.\//, '')}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(offenders, [], 'writeText ohne Zwischenablage meldet sonst Erfolg');
 });
 
 // `housekeeping.deleteTaskConfirm` schrieb `{name}` statt `{{name}}` - in allen
@@ -22201,8 +22259,8 @@ test('R18: die Formularzeile haelt in RTL den Platz des Datumsknopfs und die Rei
  * Liste steht, steht auf 0. Der Einkauf (pages/shopping.js,
  * utils/kitchen-transfer.js) ist die erste Seite auf 0.
  *
- * GRENZE: `err.message` traegt bei einem ApiError denselben Text und wird hier
- * nicht gezaehlt - dieselbe Eigenschaft tragen auch die Wuerfe der App selbst.
+ * GRENZE: `err.message` traegt bei einem ApiError denselben Text; das misst die
+ * zweite Regel darunter.
  */
 const SERVER_TEXT_READS = [
   /\bdata\s*(?:\?\.|\.)\s*error\b(?!\s*[:(])/g,
@@ -22321,67 +22379,134 @@ test('keine Seite zeigt den Text des Servers ohne Zuordnung, die offenen stehen 
  *
  * api.js setzt `message` des ApiError auf denselben Text wie `data.error`, und
  * ein Netz- oder Ladefehler traegt dort den Satz des Browsers - beides
- * unuebersetzt. Der Leser darueber sieht nur `data.error`. Fuer die Module,
- * deren Scheibe abgeschlossen ist, gilt deshalb auch: kein `.message` eines
- * gefangenen Fehlers. Ein Modul kommt mit seiner Scheibe auf diese Liste.
+ * unuebersetzt. Der Leser darueber sieht nur `data.error`.
+ *
+ * EINE REGEL UEBER ALLE DATEIEN unter public/, keine Liste der fertigen Module:
+ * - Ein Toast zeigt nie den Text eines Fehlers: nicht direkt, nicht ueber eine
+ *   Hilfsfunktion derselben Datei. Dafuer gibt es keine Ausnahme und keine Zahl.
+ * - Jedes andere Lesen (Fehlerzeile im Formular, Ladefehler) ist ein Ratchet:
+ *   die offenen Dateien stehen mit ihrer Zahl in ERROR_MESSAGE_OPEN, eine Datei,
+ *   die nicht in der Liste steht, steht auf 0.
+ * - Wo der Text des Servers fuer den Admin bewusst sichtbar bleibt, geht er
+ *   durch errorSentenceWithDetail, und jede Datei steht mit Grund in
+ *   TECHNICAL_DETAIL_SITES.
  */
 function countErrorMessageReads(source) {
   const code = withoutCommentsKeepingLines(source, { blankLiterals: true });
-  return [...code.matchAll(/\b(?:err|error|e|ex|reason)\s*(?:\?\.|\.)\s*message\b/g)].length;
+  // Ein Vergleich mit einem eigenen Wurf zeigt nichts an.
+  return [...code.matchAll(/\b(?:[\w$]*[eE]rr(?:or)?|e|ex|reason)\s*(?:\?\.|\.)\s*message\b(?!\s*[!=]==)/g)].length;
 }
 
-const ERROR_MESSAGE_CLEAN = [
-  'pages/health.js',
-  'pages/health-fasting.js',
-  'settings/pages/modules-health.js',
-  'pages/documents.js',
-  'utils/document-folder-delete.js',
-  'pages/recipes.js',
-  'pages/subscriptions.js',
-  'pages/inventory.js',
-  'pages/notes.js',
-  'pages/contacts.js',
-  'pages/birthdays.js',
-  'pages/tasks.js',
-  'components/task-detail.js',
-  'components/modal.js',
-  'pages/schedule.js',
-  'settings/module-install-errors.js',
-  'pages/housekeeping.js',
-  'pages/rewards.js',
-  'pages/budget.js',
-  'pages/waste.js',
-  'pages/shopping.js',
-  'components/quick-links-manager.js',
-  'settings/pages/modules-kitchen.js',
-  'pages/calendar.js',
-  'settings/pages/admin-immich.js',
-  'pages/dashboard.js',
-  // Die Preferences-Scheibe von #1695: der Server spricht dort Englisch, die
-  // Blaetter sagen ihren eigenen Satz (settings.preferenceSaveFailed).
-  'settings/components.js',
-  'settings/pages/admin-weather.js',
-  'settings/pages/modules-active.js',
-  'settings/pages/modules-calendar.js',
-  'settings/pages/modules-countdowns.js',
-  'settings/pages/modules-navigation.js',
-  'settings/pages/modules-options.js',
-  'settings/pages/personal-appearance.js',
-  'settings/pages/personal-calendar.js',
-  'settings/pages/personal-tasks.js',
-  'settings/pages/personal-weather.js',
-  'utils/household-zone-hint.js',
-  // Die Kuechen-Scheibe von #1695: Essensplan und Vorrat zeigen nie mehr den
-  // Satz des Servers, der dort jetzt Englisch spricht.
-  'pages/meals.js',
-  'pages/pantry.js',
-];
+// Ende der Klammer, die bei `open` aufgeht. Der Text kommt mit geleerten Literalen.
+function closingIndex(code, open) {
+  const pairs = { '(': ')', '{': '}' };
+  const close = pairs[code[open]];
+  let depth = 0;
+  for (let i = open; i < code.length; i += 1) {
+    if (code[i] === code[open]) depth += 1;
+    else if (code[i] === close && --depth === 0) return i;
+  }
+  return code.length;
+}
 
-test('der Leser fuer err.message sieht beide Schreibweisen und keinen Kommentar (#1909)', () => {
+// Funktionen derselben Datei, die den Text eines Fehlers zurueckgeben koennten.
+function errorTextHelpers(code) {
+  const names = new Set();
+  const declarations = /\bfunction\s+([\w$]+)\s*\(|\b(?:const|let)\s+([\w$]+)\s*=\s*(?:async\s*)?(?:\([^()]*\)|[\w$]+)\s*=>\s*/g;
+  for (const hit of code.matchAll(declarations)) {
+    const after = hit.index + hit[0].length;
+    let body;
+    if (hit[1]) {
+      const params = closingIndex(code, after - 1);
+      const open = code.indexOf('{', params);
+      body = code.slice(open, closingIndex(code, open) + 1);
+    } else if (code[after] === '{') {
+      body = code.slice(after, closingIndex(code, after) + 1);
+    } else {
+      body = code.slice(after, code.indexOf('\n', after));
+    }
+    if (countErrorMessageReads(body) > 0 || countServerTextReads(body) > 0) names.add(hit[1] ?? hit[2]);
+  }
+  return names;
+}
+
+function rawToasts(source) {
+  const code = withoutCommentsKeepingLines(source, { blankLiterals: true });
+  const helpers = errorTextHelpers(code);
+  const raw = [];
+  for (const hit of code.matchAll(/\b(?:showToast|toast)\s*(?:\?\.\s*)?\(/g)) {
+    const open = hit.index + hit[0].length - 1;
+    const args = code.slice(open, closingIndex(code, open) + 1);
+    const viaHelper = [...helpers].some((name) => new RegExp(`(?<![\\w$.])${name.replaceAll('$', '\\$')}\\s*\\(`).test(args));
+    if (/(?:\?\.|\.)\s*message\b/.test(args) || countServerTextReads(args) > 0 || viaHelper) {
+      raw.push(args.replace(/\s+/g, ' ').trim());
+    }
+  }
+  return raw;
+}
+
+// Wer den Fehlertext als Diagnose liest, nicht als Satz fuer den Nutzer.
+const ERROR_MESSAGE_OWNERS = new Set([
+  'utils/friendly-error.js',      // erkennt am Text des Browsers den Netzfehler
+  'router.js',                    // aufklappbare Details und Konsole
+  'utils/empty-state.js',         // aufklappbare Details des Fehlerzustands
+  'utils/session-unreachable.js', // Diagnosezeile der Anmeldeseite
+]);
+
+// Datei -> Zahl der Stellen, die den Fehlertext noch ausserhalb eines Toasts
+// lesen. Nur senken. Die meisten sind Fehlerzeilen in Formularen, an denen die
+// Pruefung des Servers die Ursache nennt: dort braucht der Server erst einen
+// `reason` (dieselbe Arbeit wie bei den Scheiben davor), ein blindes
+// errorSentence nimmt dem Nutzer die Ursache.
+const ERROR_MESSAGE_OPEN = new Map([
+  ['components/category-manager.js', 1],
+  ['pages/login.js', 3],
+  ['settings/backup-key.js', 1],
+  ['settings/pages/admin-api.js', 2],
+  ['settings/pages/admin-backup.js', 2],
+  ['settings/pages/admin-displays.js', 7],
+  ['settings/pages/admin-family.js', 8],
+  ['settings/pages/admin-permissions.js', 1],
+  ['settings/pages/admin-system.js', 1],
+  ['settings/pages/documents-dms.js', 2],
+  ['settings/pages/documents-storage.js', 1],
+  ['settings/pages/modules-install.js', 1],
+  ['settings/pages/personal-account.js', 5],
+  ['settings/pages/personal-calendar-subscriptions.js', 3],
+  ['settings/pages/personal-device.js', 1],
+  ['settings/pages/personal-feeds.js', 1],
+  ['settings/pages/sync-calendar.js', 5],
+  ['settings/pages/sync-contacts.js', 1],
+  ['settings/pages/sync-reminders.js', 2],
+  ['utils/folder-upload.js', 2],
+]);
+
+// Datei -> Stellen, an denen der Admin den Text des Servers im Rahmen eines
+// uebersetzten Satzes sieht, und warum. Alle sprechen mit einem FREMDEN Dienst,
+// den nur der Admin einrichtet und reparieren kann: der Allgemeinsatz nimmt ihm
+// genau die Angabe, mit der er den Fehler findet ("401 Unauthorized", "507",
+// "Insufficient permissions"). Solche Texte kommen vom fremden Dienst oder
+// nennen die Einstellung und haben keine endliche Liste von Faellen.
+const TECHNICAL_DETAIL_SITES = new Map([
+  ['settings/pages/admin-backup.js', [2, 'Verbindungstest und Handlauf des WebDAV-Backups: Antwort des fremden Servers']],
+  ['settings/pages/documents-storage.js', [5, 'WebDAV/Google Drive: Verbindungstest, Speichern und Trennen pruefen gegen den fremden Speicher und bestehende Dokumente']],
+  ['settings/pages/sync-calendar.js', [4, 'Aktualisieren und Abgleich von CalDAV, Outlook, Apple: Antwort des fremden Servers']],
+  ['settings/pages/sync-contacts.js', [1, 'CardDAV-Abgleich und Aktualisieren: connection_failed traegt die Antwort des fremden Servers']],
+  ['settings/pages/sync-reminders.js', [1, 'Aktualisieren der Erinnerungslisten: Antwort des fremden Servers']],
+]);
+
+function countTechnicalDetailCalls(source) {
+  const code = withoutCommentsKeepingLines(source, { blankLiterals: true });
+  return [...code.matchAll(/\berrorSentenceWithDetail\s*\(/g)].length;
+}
+
+test('der Leser fuer err.message sieht jede Schreibweise und keinen Kommentar (#1909)', () => {
   for (const [source, expected] of [
     ["el.textContent = error?.message || '';", 1],
     ['showToast(err.message);', 1],
     ['showToast(e?.message ?? fallback); log(ex.message);', 2],
+    ['showToast(reloadErr.message);', 1],
+    ["if (error?.message === 'FASTING_OFFLINE') return t('x');", 0],
     ['// showToast(err.message)', 0],
     ["const hint = 'err.message';", 0],
     ['const { message } = t;', 0],
@@ -22391,11 +22516,87 @@ test('der Leser fuer err.message sieht beide Schreibweisen und keinen Kommentar 
   }
 });
 
-test('die umgestellten Module lesen auch err.message nicht (#1909)', () => {
-  for (const name of ERROR_MESSAGE_CLEAN) {
-    const count = countErrorMessageReads(read(`../public/${name}`));
-    assert.equal(count, 0, `${name} liest ${count}x \`.message\` eines Fehlers - errorSentence(err, fallbackKey) nehmen`);
+test('der Toast-Leser sieht den Fehlertext in jeder Form und keinen Satz der App (#1909)', () => {
+  for (const [source, expected] of [
+    ["showToast(err.message || t('common.errorGeneric'), 'danger');", 1],
+    ["window.yuvomi?.showToast(err.message, 'danger');", 1],
+    ["window.yuvomi?.showToast?.(err.message ?? t('common.errorGeneric'), 'danger');", 1],
+    ["toast(active ? t('x') : err.message, 'danger');", 1],
+    ['showToast(`Fehler: ${err.message}`, "danger");', 1],
+    ["showToast(\n  err?.message,\n  'danger',\n);", 1],
+    ["const fail = (error) => showToast(error?.message || t('x'), 'danger');", 1],
+    ["showToast(result.message);", 1],
+    ["showToast(err.data?.error ?? t('x'));", 1],
+    // Ueber eine Hilfsfunktion derselben Datei.
+    ["function text(err) { return err?.message || t('x'); }\nshowToast(text(err), 'danger');", 1],
+    ["const text = (err) => err.message;\nshowToast(text(err));", 1],
+    ["const text = (err) => {\n  return err.data.error;\n};\nshowToast(text(err));", 1],
+    // Kein roher Text:
+    ["showToast(errorSentence(err), 'danger');", 0],
+    ["showToast(errorSentence(err, 'settings.x'), 'danger');", 0],
+    ["showToast(errorSentenceWithDetail(err, 'settings.x'), 'danger');", 0],
+    ["showToast(t('settings.saved'), 'success');", 0],
+    ["showToast('err.message');", 0],
+    ["// showToast(err.message)", 0],
+    ["function text(err) { return errorSentence(err); }\nshowToast(text(err));", 0],
+    ["function text(err) { return err.message; }\nshowToast(myText(err));", 0],
+    ["function showToast(message, tone) { window.yuvomi?.showToast(message, tone); }", 0],
+    ["showToast(message, 'danger');", 0],
+  ]) {
+    assert.equal(rawToasts(source).length, expected, source);
   }
+});
+
+test('kein Toast zeigt den Text eines Fehlers, in keiner Datei (#1909)', () => {
+  const raw = [];
+  let toasts = 0;
+  for (const path of walkJsFiles('../public/')) {
+    const name = path.slice('../public/'.length);
+    if (name.startsWith('vendor/')) continue;
+    const source = read(path);
+    toasts += source.match(/\bshowToast\b/g)?.length ?? 0;
+    for (const args of rawToasts(source)) raw.push(`${name}: ${args}`);
+  }
+  assert.ok(toasts > 400, `nur ${toasts} Toasts gesehen - der Scan greift nicht mehr`);
+  assert.deepEqual(raw, [],
+    'Ein Toast zeigt den Text eines Fehlers: englisch vom Server oder vom Browser, in keiner Sprache des Nutzers. '
+    + 'errorSentence(err, fallbackKey) aus utils/friendly-error.js nehmen; ein Fall, den ein Nutzer erreicht, '
+    + 'bekommt am Server einen `reason` und in CASE_MESSAGES einen Schluessel.');
+});
+
+test('err.message wird nur noch dort gelesen, wo die Liste es sagt (#1909)', () => {
+  const counts = new Map();
+  for (const path of walkJsFiles('../public/')) {
+    const name = path.slice('../public/'.length);
+    if (name.startsWith('vendor/') || ERROR_MESSAGE_OWNERS.has(name)) continue;
+    const count = countErrorMessageReads(read(path));
+    if (count) counts.set(name, count);
+  }
+  const grown = [...counts]
+    .filter(([name, count]) => count > (ERROR_MESSAGE_OPEN.get(name) ?? 0))
+    .map(([name, count]) => `${name}: ${count} (erlaubt ${ERROR_MESSAGE_OPEN.get(name) ?? 0})`);
+  const shrunk = [...ERROR_MESSAGE_OPEN]
+    .filter(([name, allowed]) => (counts.get(name) ?? 0) < allowed)
+    .map(([name, allowed]) => `${name}: ${counts.get(name) ?? 0} (Liste sagt ${allowed})`);
+  assert.deepEqual(grown, [],
+    'Eine Stelle liest `.message` eines Fehlers - errorSentence(err, fallbackKey) nehmen.');
+  assert.deepEqual(shrunk, [],
+    'Eine Datei liest `.message` seltener als die Liste sagt - ERROR_MESSAGE_OPEN senken '
+    + '(bei 0 den Eintrag streichen), sonst darf die Zahl unbemerkt wieder steigen.');
+});
+
+test('der Text des Servers bleibt nur dort technisch, wo ein Grund steht (#1909)', () => {
+  const counts = new Map();
+  for (const path of walkJsFiles('../public/')) {
+    const name = path.slice('../public/'.length);
+    if (name.startsWith('vendor/') || name === 'utils/friendly-error.js') continue;
+    const count = countTechnicalDetailCalls(read(path));
+    if (count) counts.set(name, count);
+  }
+  assert.deepEqual(Object.fromEntries(counts),
+    Object.fromEntries([...TECHNICAL_DETAIL_SITES].map(([name, [count]]) => [name, count])),
+    'errorSentenceWithDetail zeigt Text des Servers: nur fuer die Antwort eines fremden Dienstes an den Admin, '
+    + 'mit Grund in TECHNICAL_DETAIL_SITES. Alles andere nimmt errorSentence.');
 });
 
 /* DER GESPEICHERTE FEHLERTEXT EINER ABFUHR-QUELLE (#1909, dritte Abfuhr-Scheibe).

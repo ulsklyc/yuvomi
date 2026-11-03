@@ -210,6 +210,9 @@ function runProgram(args, { napi, dbPath, preloads = [] }) {
     PORT: '0',
     BIND_ADDRESS: '127.0.0.1',
     BACKUP_ENABLED: 'false',
+    // Sonst legte der Secret-Handschlag vor der Node-API-Pruefung einen
+    // Schluessel neben DB_PATH an (server/utils/auto-secrets.js).
+    DB_ENCRYPTION_AUTO_KEY: 'false',
     YUVOMI_TEST_FAKE_NAPI: String(napi),
     YUVOMI_TEST_DRIVER: DRIVER,
     YUVOMI_TEST_DRIVER_BROKEN: DRIVER_BROKEN,

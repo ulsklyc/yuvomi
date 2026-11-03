@@ -358,6 +358,11 @@
         "customizeResetDetail": "A tua disposição é eliminada. Voltas a ver a predefinição da casa, incluindo as alterações futuras.",
         "customizeDiscardDetail": "As tuas alterações à disposição serão perdidas. Fica a última versão guardada.",
         "customizeScopeHint": "O que você muda aqui vale só para você.",
+        "customizePhoneScopeHint": "Apenas este telefone. As alterações aqui afetam apenas a ordem dos mosaicos no seu telefone.",
+        "customizePhoneTitle": "Mosaicos do telefone",
+        "customizePhoneReset": "Igual ao computador",
+        "customizePhoneResetDone": "Disposição do telemóvel reposta.",
+        "customizePhoneResetConfirm": "Repor igual ao computador?",
         "customizeFollowsDefault": "A tua vista geral segue a predefinição da casa.",
         "customizeSetDefault": "Definir como predefinição da casa",
         "customizeSetDefaultConfirm": "Tornar esta disposição a predefinição da casa?",
@@ -694,7 +699,8 @@
         "checkAllSubtasks": "Marcar todas",
         "subtasksAllDone": "«{{title}}» e todas as subtarefas concluídos.",
         "seriesDoneNamed": "«{{title}}» concluído - próxima vez: {{date}}",
-        "kanbanRestore": "Restaurar"
+        "kanbanRestore": "Restaurar",
+        "errorTagGone": "Esta etiqueta já não existe."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item excluído.",
@@ -3461,7 +3467,28 @@
         "reminderListAssigneesTasksOnly": "As pessoas só podem ser definidas para listas que vão para Tarefas.",
         "syncAssigneeNotMember": "Aqui só podem ser escolhidos membros do agregado.",
         "syncAssigneeUnknown": "Esta pessoa já não existe. Recarregue a página.",
-        "permDetails": "Widgets e mais permissões"
+        "permDetails": "Widgets e mais permissões",
+        "connectionFailedDetail": "Falha na ligação: {{error}}",
+        "documentStorageChangeFailed": "A alteração não foi aplicada: {{error}}",
+        "apiTokenCopyFailed": "Não foi possível copiar. Selecione o token e copie-o manualmente.",
+        "weatherLocateDenied": "O acesso à sua localização não é permitido. Permita-o nas definições do navegador ou introduza o local manualmente.",
+        "weatherLocateFailed": "Não foi possível determinar a sua localização. Introduza o local manualmente.",
+        "outlookAutoSyncOverrides": "O Outlook não consegue sincronizar séries com exceções individuais associadas. Desative o calendário de destino delas para que continuem editáveis aqui. Não precisa de eliminar nenhuma exceção.",
+        "memberRemoveOwnAccount": "Não pode remover a sua própria conta.",
+        "memberRemoveLastAdmin": "Tem de ficar pelo menos um administrador.",
+        "memberRemoveLastSsoAdmin": "Este é o último administrador associado ao SSO. Associe primeiro outro administrador.",
+        "backupWebdavUrlInvalid": "O endereço tem de começar por http:// ou https://.",
+        "icsSubscriptionGone": "Esta subscrição já não existe.",
+        "backupDbKeyTitle": "Chave da base de dados",
+        "backupDbKeyGeneratedHint": "O Yuvomi gerou-a no primeiro arranque. Guarda uma cópia fora deste servidor: sem ela, as tuas cópias de segurança não podem ser abertas se o armazenamento se perder.",
+        "backupDbKeyShow": "Mostrar chave",
+        "backupDbKeyHide": "Ocultar",
+        "backupDbKeyCopy": "Copiar",
+        "backupDbKeyCopied": "Chave copiada",
+        "backupDbKeyCopyFailed": "Não foi possível copiar. A chave está selecionada, copia-a manualmente.",
+        "backupDbKeyStoredAt": "Guardada no servidor em {{path}}",
+        "backupDbKeyConfigHint": "A chave vem da tua configuração. Guarda-a lá em segurança: sem ela, as tuas cópias de segurança não podem ser abertas.",
+        "backupDbKeyPlainHint": "A base de dados não está encriptada, por isso as cópias de segurança contêm os teus dados de forma legível. Com uma DB_ENCRYPTION_KEY própria, o Yuvomi encripta-a no próximo arranque."
     },
     "login": {
         "tagline": "Bem-vindo de volta. A tua casa num só lugar.",
@@ -5828,7 +5855,8 @@
         "errorCycleImportNoRows": "O ficheiro tem só a linha de cabeçalho e nenhum período.",
         "errorCycleImportTooManyRows": "Uma importação pode ter no máximo {{limit}} períodos. Divide o ficheiro.",
         "errorVitalImpossible": "Este valor não é possível. Verifique o que introduziu.",
-        "errorVitalBpOrder": "O valor sistólico tem de ser superior ao diastólico."
+        "errorVitalBpOrder": "O valor sistólico tem de ser superior ao diastólico.",
+        "errorVitalUnit": "Esta unidade não corresponde a esta medição."
     },
     "waste": {
         "title": "Recolha de lixo",
@@ -6239,7 +6267,7 @@
         "expiresLabel": "Consumir de preferência antes de",
         "expiresHint": "Deixe vazio para artigos que não expiram.",
         "minQuantityLabel": "Stock mínimo",
-        "minQuantityHint": "A partir desta quantidade o artigo conta como quase esgotado.",
+        "minQuantityHint": "Aplica-se ao produto no seu todo: quando todos os seus lotes juntos somam esta quantidade ou menos, conta como quase esgotado.",
         "notesLabel": "Nota",
         "notesPlaceholder": "p. ex. já aberto",
         "created": "Artigo adicionado.",
@@ -6265,6 +6293,7 @@
         "noBestBefore": "Sem data de validade",
         "errorProductHasStock": "Este produto voltou a estar em stock e não foi eliminado.",
         "productTotal": "{{quantity}} no total",
+        "minimumShort": "mín. {{quantity}}",
         "productPlaces": "{{count}} locais",
         "productPlaces_one": "{{count}} local",
         "productBatches": "{{count}} lotes",

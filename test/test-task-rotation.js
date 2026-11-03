@@ -1,6 +1,6 @@
 /**
  * Modul: Tasks-Rotation-Test
- * Zweck: Rotation fuer wiederkehrende Serien (migration 274, upstream #1763).
+ * Zweck: Rotation fuer wiederkehrende Serien (migration 277, upstream #1763).
  * Nur die feste Reihenfolge: Modus, Pool, und ein Zeiger, der eine POSITION
  * im Pool ist - kein Kopf. Die Zusicherungen:
  * - Der Zeiger ueberlebt Abgaenge. Anna geht nach Kevins Runde; die

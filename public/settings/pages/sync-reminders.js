@@ -8,7 +8,7 @@ import {
   createStatusSummary,
 } from '/settings/components.js';
 import { withBusy } from '/utils/ux.js';
-import { errorSentence } from '/utils/friendly-error.js';
+import { errorSentence, errorSentenceWithDetail } from '/utils/friendly-error.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { buildAssigneeMenu } from '/settings/assignee-menu.js';
 
@@ -128,7 +128,7 @@ function buildTargetSelect(account, list) {
       showToast(t('settings.reminderMapUpdated'), 'success');
     } catch (err) {
       select.value = previous ?? 'tasks';
-      showToast(err.message || t('common.errorGeneric'), 'danger');
+      showToast(errorSentence(err), 'danger');
     } finally {
       select.disabled = false;
     }
@@ -164,7 +164,7 @@ function buildReminderRow(account, list) {
         );
       } catch (err) {
         toggle.checked = !enabled;
-        showToast(err.message || t('common.errorGeneric'), 'danger');
+        showToast(errorSentence(err), 'danger');
       }
     });
   });
@@ -251,7 +251,7 @@ function renderAccount(container, account, reminderLists, refresh) {
       showToast(t('settings.reminderListsRefreshed'), 'success');
       await refresh();
     } catch (err) {
-      showToast(err.message || t('common.errorGeneric'), 'danger');
+      showToast(errorSentenceWithDetail(err, 'settings.connectionFailedDetail'), 'danger');
       refreshBtn.disabled = false;
     }
   });
@@ -320,7 +320,7 @@ function bindSyncButton(container) {
       showToast(t('settings.reminderSyncSuccess'), 'success');
       await reloadAfterSave(() => loadAccounts(container));
     } catch (err) {
-      showToast(err.message || t('settings.reminderSyncFailed'), 'danger');
+      showToast(errorSentence(err, 'settings.reminderSyncFailed'), 'danger');
     } finally {
       syncBtn.disabled = false;
     }

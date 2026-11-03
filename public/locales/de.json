@@ -376,6 +376,11 @@
         "customizeResetDetail": "Deine eigene Anordnung wird gelöscht. Du siehst wieder die Vorgabe des Haushalts - auch dann, wenn sie später geändert wird.",
         "customizeDiscardDetail": "Deine Änderungen an der Anordnung gehen verloren. Es bleibt der zuletzt gespeicherte Stand.",
         "customizeScopeHint": "Was du hier änderst, gilt nur für dich.",
+        "customizePhoneScopeHint": "Nur dieses Telefon. Änderungen hier betreffen nur die Kachelreihenfolge auf deinem Telefon.",
+        "customizePhoneTitle": "Telefon-Kacheln",
+        "customizePhoneReset": "Wie auf dem Desktop",
+        "customizePhoneResetDone": "Telefon-Anordnung zurückgesetzt.",
+        "customizePhoneResetConfirm": "Wie auf dem Desktop zurücksetzen?",
         "customizeFollowsDefault": "Deine Übersicht folgt der Vorgabe des Haushalts.",
         "customizeSetDefault": "Als Vorgabe für alle",
         "customizeSetDefaultConfirm": "Diese Anordnung als Vorgabe des Haushalts festlegen?",
@@ -712,7 +717,8 @@
         "checkAllSubtasks": "Alle abhaken",
         "subtasksAllDone": "„{{title}}“ und alle Teilaufgaben erledigt.",
         "seriesDoneNamed": "„{{title}}“ erledigt - nächstes Mal am {{date}}",
-        "kanbanRestore": "Wiederherstellen"
+        "kanbanRestore": "Wiederherstellen",
+        "errorTagGone": "Dieses Stichwort gibt es nicht mehr."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} Artikel gelöscht.",
@@ -3479,7 +3485,28 @@
         "reminderListAssigneesTasksOnly": "Personen gibt es nur für Listen, die in Aufgaben landen.",
         "syncAssigneeNotMember": "Nur Haushaltsmitglieder können hier gewählt werden.",
         "syncAssigneeUnknown": "Diese Person gibt es nicht mehr. Lade die Seite neu.",
-        "permDetails": "Widgets und weitere Rechte"
+        "permDetails": "Widgets und weitere Rechte",
+        "connectionFailedDetail": "Verbindung fehlgeschlagen: {{error}}",
+        "documentStorageChangeFailed": "Die Änderung wurde nicht übernommen: {{error}}",
+        "apiTokenCopyFailed": "Kopieren hat nicht geklappt. Markiere das Token und kopiere es von Hand.",
+        "weatherLocateDenied": "Der Zugriff auf den Standort ist nicht erlaubt. Gib ihn in den Browser-Einstellungen frei oder trage den Ort von Hand ein.",
+        "weatherLocateFailed": "Der Standort ließ sich nicht ermitteln. Trage den Ort von Hand ein.",
+        "outlookAutoSyncOverrides": "Outlook kann Serien mit verknüpften Einzelausnahmen nicht synchronisieren. Deaktiviere ihren Zielkalender, damit sie lokal bearbeitbar bleiben. Du musst keine Einzelausnahmen löschen.",
+        "memberRemoveOwnAccount": "Dein eigenes Konto kannst du nicht entfernen.",
+        "memberRemoveLastAdmin": "Mindestens ein Administrator muss bleiben.",
+        "memberRemoveLastSsoAdmin": "Das ist der letzte Administrator mit SSO-Verknüpfung. Verknüpfe zuerst einen weiteren Administrator.",
+        "backupWebdavUrlInvalid": "Die Adresse muss mit http:// oder https:// beginnen.",
+        "icsSubscriptionGone": "Dieses Abonnement gibt es nicht mehr.",
+        "backupDbKeyTitle": "Datenbankschlüssel",
+        "backupDbKeyGeneratedHint": "Yuvomi hat ihn beim ersten Start erzeugt. Bewahre eine Kopie getrennt von diesem Server auf: ohne ihn lassen sich deine Backups nach Verlust des Speichers nicht öffnen.",
+        "backupDbKeyShow": "Schlüssel anzeigen",
+        "backupDbKeyHide": "Ausblenden",
+        "backupDbKeyCopy": "Kopieren",
+        "backupDbKeyCopied": "Schlüssel kopiert",
+        "backupDbKeyCopyFailed": "Kopieren hat nicht geklappt. Der Schlüssel ist markiert, kopiere ihn von Hand.",
+        "backupDbKeyStoredAt": "Auf dem Server gespeichert in {{path}}",
+        "backupDbKeyConfigHint": "Der Schlüssel kommt aus deiner Konfiguration. Bewahre ihn dort sicher auf: ohne ihn lassen sich deine Backups nicht öffnen.",
+        "backupDbKeyPlainHint": "Die Datenbank ist nicht verschlüsselt, Backups enthalten deine Daten also lesbar. Mit einem eigenen DB_ENCRYPTION_KEY verschlüsselt Yuvomi sie beim nächsten Start."
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",
@@ -5828,7 +5855,8 @@
         "errorCycleImportNoRows": "Die Datei enthält nur eine Kopfzeile und keine Perioden.",
         "errorCycleImportTooManyRows": "Ein Import darf höchstens {{limit}} Perioden enthalten. Teile die Datei auf.",
         "errorVitalImpossible": "Dieser Wert ist nicht möglich. Bitte prüfe die Eingabe.",
-        "errorVitalBpOrder": "Der systolische Wert muss größer sein als der diastolische."
+        "errorVitalBpOrder": "Der systolische Wert muss größer sein als der diastolische.",
+        "errorVitalUnit": "Diese Einheit passt nicht zu dieser Messung."
     },
     "waste": {
         "title": "Entsorgung",
@@ -6239,7 +6267,7 @@
         "expiresLabel": "Mindestens haltbar bis",
         "expiresHint": "Leer lassen, wenn der Artikel unbegrenzt haltbar ist.",
         "minQuantityLabel": "Mindestbestand",
-        "minQuantityHint": "Ab dieser Menge gilt der Artikel als fast leer.",
+        "minQuantityHint": "Gilt für das Produkt als Ganzes: Ergeben alle seine Chargen zusammen diese Menge oder weniger, gilt es als fast leer.",
         "notesLabel": "Notiz",
         "notesPlaceholder": "z. B. angebrochen",
         "created": "Artikel hinzugefügt.",
@@ -6265,6 +6293,7 @@
         "noBestBefore": "Ohne MHD",
         "errorProductHasStock": "Dieses Produkt ist wieder vorrätig und wurde nicht gelöscht.",
         "productTotal": "{{quantity}} insgesamt",
+        "minimumShort": "mind. {{quantity}}",
         "productPlaces": "{{count}} Orte",
         "productPlaces_one": "{{count}} Ort",
         "productBatches": "{{count}} Chargen",

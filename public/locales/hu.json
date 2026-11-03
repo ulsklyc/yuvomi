@@ -358,6 +358,11 @@
         "customizeResetDetail": "A saját elrendezésed törlődik. Újra a háztartás alapértelmezését látod - a későbbi módosításaival együtt.",
         "customizeDiscardDetail": "Az elrendezésen végzett módosításaid elvesznek. A legutóbb mentett állapot marad.",
         "customizeScopeHint": "Amit itt módosítasz, csak rád vonatkozik.",
+        "customizePhoneScopeHint": "Csak ez a telefon. Az itt végrehajtott változtatások csak a telefon csempe-sorrendjét érintik.",
+        "customizePhoneTitle": "Telefonos csempék",
+        "customizePhoneReset": "Ugyanaz mint az asztalon",
+        "customizePhoneResetDone": "Telefonelrendezés visszaállítva.",
+        "customizePhoneResetConfirm": "Visszaállítás ugyanolyanra mint az asztalon?",
         "customizeFollowsDefault": "Az áttekintésed a háztartás alapértelmezését követi.",
         "customizeSetDefault": "Beállítás alapértelmezettként",
         "customizeSetDefaultConfirm": "Legyen ez az elrendezés a háztartás alapértelmezése?",
@@ -694,7 +699,8 @@
         "checkAllSubtasks": "Összes kipipálása",
         "subtasksAllDone": "„{{title}}” és minden részfeladat kész.",
         "seriesDoneNamed": "„{{title}}” kész - legközelebb: {{date}}",
-        "kanbanRestore": "Visszaállítás"
+        "kanbanRestore": "Visszaállítás",
+        "errorTagGone": "Ez a címke már nem létezik."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} elem törölve.",
@@ -3461,7 +3467,28 @@
         "reminderListAssigneesTasksOnly": "Személyek csak a Feladatokba kerülő listákhoz állíthatók be.",
         "syncAssigneeNotMember": "Itt csak a háztartás tagjai választhatók.",
         "syncAssigneeUnknown": "Ez a személy már nem létezik. Töltsd újra az oldalt.",
-        "permDetails": "Widgetek és további jogok"
+        "permDetails": "Widgetek és további jogok",
+        "connectionFailedDetail": "A kapcsolódás sikertelen: {{error}}",
+        "documentStorageChangeFailed": "A módosítás nem lépett érvénybe: {{error}}",
+        "apiTokenCopyFailed": "A másolás nem sikerült. Jelölje ki a tokent, és másolja kézzel.",
+        "weatherLocateDenied": "A helyadatokhoz való hozzáférés nem engedélyezett. Engedélyezze a böngésző beállításaiban, vagy adja meg a helyet kézzel.",
+        "weatherLocateFailed": "A helyzetét nem sikerült meghatározni. Adja meg a helyet kézzel.",
+        "outlookAutoSyncOverrides": "Az Outlook nem tudja szinkronizálni a kapcsolt egyedi kivételekkel rendelkező sorozatokat. Kapcsolja ki a célnaptárukat, hogy itt szerkeszthetők maradjanak. Kivételeket nem kell törölnie.",
+        "memberRemoveOwnAccount": "A saját fiókját nem távolíthatja el.",
+        "memberRemoveLastAdmin": "Legalább egy rendszergazdának maradnia kell.",
+        "memberRemoveLastSsoAdmin": "Ez az utolsó SSO-hoz kapcsolt rendszergazda. Először kapcsoljon egy másik rendszergazdát.",
+        "backupWebdavUrlInvalid": "A címnek http:// vagy https:// előtaggal kell kezdődnie.",
+        "icsSubscriptionGone": "Ez az előfizetés már nem létezik.",
+        "backupDbKeyTitle": "Adatbáziskulcs",
+        "backupDbKeyGeneratedHint": "A Yuvomi az első indításkor hozta létre. Tarts egy másolatot ezen a szerveren kívül: nélküle a mentéseid nem nyithatók meg, ha a tároló elvész.",
+        "backupDbKeyShow": "Kulcs megjelenítése",
+        "backupDbKeyHide": "Elrejtés",
+        "backupDbKeyCopy": "Másolás",
+        "backupDbKeyCopied": "Kulcs másolva",
+        "backupDbKeyCopyFailed": "A másolás nem sikerült. A kulcs ki van jelölve, másold kézzel.",
+        "backupDbKeyStoredAt": "A szerveren tárolva itt: {{path}}",
+        "backupDbKeyConfigHint": "A kulcs a konfigurációdból származik. Őrizd ott biztonságban: nélküle a mentéseid nem nyithatók meg.",
+        "backupDbKeyPlainHint": "Az adatbázis nincs titkosítva, így a mentések olvasható formában tartalmazzák az adataidat. Saját DB_ENCRYPTION_KEY esetén a Yuvomi a következő indításkor titkosítja."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",
@@ -5828,7 +5855,8 @@
         "errorCycleImportNoRows": "A fájlban csak fejlécsor van, menstruáció nincs.",
         "errorCycleImportTooManyRows": "Egy importálás legfeljebb {{limit}} menstruációt tartalmazhat. Oszd fel a fájlt.",
         "errorVitalImpossible": "Ez az érték nem lehetséges. Ellenőrizd a bevitelt.",
-        "errorVitalBpOrder": "A szisztolés értéknek nagyobbnak kell lennie a diasztolésnál."
+        "errorVitalBpOrder": "A szisztolés értéknek nagyobbnak kell lennie a diasztolésnál.",
+        "errorVitalUnit": "Ez a mértékegység nem illik ehhez a méréshez."
     },
     "waste": {
         "title": "Hulladékgyűjtés",
@@ -6239,7 +6267,7 @@
         "expiresLabel": "Minőségét megőrzi",
         "expiresHint": "Hagyd üresen a nem romlandó tételeknél.",
         "minQuantityLabel": "Minimális készlet",
-        "minQuantityHint": "Ettől a mennyiségtől a tétel majdnem elfogyottnak számít.",
+        "minQuantityHint": "A termék egészére vonatkozik: ha az összes tétele együtt ennyi vagy kevesebb, majdnem elfogyottnak számít.",
         "notesLabel": "Jegyzet",
         "notesPlaceholder": "pl. felbontva",
         "created": "Tétel hozzáadva.",
@@ -6265,6 +6293,7 @@
         "noBestBefore": "MMD nélkül",
         "errorProductHasStock": "Ez a termék ismét készleten van, ezért nem lett törölve.",
         "productTotal": "összesen {{quantity}}",
+        "minimumShort": "min. készlet {{quantity}}",
         "productPlaces": "{{count}} hely",
         "productPlaces_one": "{{count}} hely",
         "productBatches": "{{count}} adag",

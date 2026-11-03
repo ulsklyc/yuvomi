@@ -38,7 +38,7 @@ const {
   fetchObjectsByUrl,
 } = await import('../server/services/caldav-todo-outbound.js');
 const { patchICSTodo } = await import('../server/utils/ics-patch.js');
-const { mapVtodoPriority, mapVtodoStatus, splitDue, sync } =
+const { mapVtodoPriority, mapVtodoStatus, splitDue, sync, upsertTask } =
   await import('../server/services/caldav-reminders-sync.js');
 const { deleteAccount } = await import('../server/services/caldav-sync.js');
 const { parseVTODO } = await import('../server/services/ics-parser.js');
@@ -53,7 +53,7 @@ const OBJ_URL  = `${LIST_URL}todo-1.ics`;
 // ── Fixtures ────────────────────────────────────────────────────────────────────
 
 /** Realistisches Serverobjekt: VTODO mit Alarm und Apple-Eigenheiten. */
-function serverTodo({ uid = 'todo-1@test', completed = false, extra = [] } = {}) {
+function serverTodo({ uid = 'todo-1@test', completed = false, extra = [], alarm = 'TRIGGER:-PT15M', after = [] } = {}) {
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -68,11 +68,9 @@ function serverTodo({ uid = 'todo-1@test', completed = false, extra = [] } = {})
       ? ['STATUS:COMPLETED', 'COMPLETED:20260701T090000Z', 'PERCENT-COMPLETE:100']
       : ['STATUS:NEEDS-ACTION']),
     ...extra,
-    'BEGIN:VALARM',
-    'ACTION:DISPLAY',
-    'TRIGGER:-PT15M',
-    'END:VALARM',
+    ...(alarm ? ['BEGIN:VALARM', 'ACTION:DISPLAY', alarm, 'END:VALARM'] : []),
     'END:VTODO',
+    ...after,
     'END:VCALENDAR',
   ].join('\r\n');
 }
@@ -1333,7 +1331,6 @@ test('Mit Uhrzeit wird UNTIL das Ende des Ortstags in UTC (#2350)', () => {
     title: 'Muell', status: 'open', due_date: '2026-11-02', due_time: '07:00',
     is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY;UNTIL=20261231',
   }, false, 'Europe/Berlin');
-  assert.strictEqual(fields.DUE.params, '');
   assert.strictEqual(fields.RRULE, 'FREQ=WEEKLY;UNTIL=20261231T225959Z');
 });
 
@@ -1392,26 +1389,18 @@ test('Die Regel eines fremden Eintrags bleibt stehen, solange Yuvomi keine eigen
   assert.match(client.calls.updated[0].data, /\r\nRRULE:FREQ=DAILY;INTERVAL=3\r\n/);
 });
 
-// RFC 5545 §3.8.2.4: DTSTART ist in jeder Komponente mit RRULE Pflicht - DUE
-// ersetzt den Anker nicht (Codex-Befund auf #2370). Gleicher Wert und Typ wie DUE.
-test('Eine wiederkehrende Aufgabe traegt DTSTART im Wert und Typ von DUE (#2350)', async () => {
-  const dated = icsFieldsForTask({ title: 'x', status: 'open', due_date: '2026-11-02', is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY' });
-  assert.deepStrictEqual(dated.DTSTART, dated.DUE);
-  assert.strictEqual(dated.DTSTART.params, ';VALUE=DATE');
-  const timed = icsFieldsForTask({ title: 'x', status: 'open', due_date: '2026-11-02', due_time: '07:00', is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY' }, false, 'Europe/Berlin');
-  assert.deepStrictEqual(timed.DTSTART, { value: '20261102T060000Z', params: '' });
-
+// DTSTART zieht mit der Faelligkeit, statt alt stehen zu bleiben: DUE vor einem
+// stehengebliebenen DTSTART weisen strenge Server zurueck.
+test('Eine verschobene Faelligkeit nimmt DTSTART der Serie mit (#2350)', async () => {
   const accountId = reset();
-  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=WEEKLY', { due_date: '2026-11-02' });
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=WEEKLY', { due_date: '2026-11-02', due_time: '07:00' });
   const created = buildTodoICS('tasks', task, uid);
-  assert.match(created, /\r\nDTSTART;VALUE=DATE:20261102\r\n/);
-  // Spaeter verschobene Faelligkeit: DTSTART zieht mit, statt alt stehen zu bleiben.
-  db.prepare("UPDATE tasks SET due_date = '2026-11-09', outbound_dirty = 1 WHERE id = ?").run(task.id);
+  db.prepare("UPDATE tasks SET due_date = '2026-10-26', outbound_dirty = 1 WHERE id = ?").run(task.id);
   const client = fakeClient();
   await processPendingUpdates(client, accountId, 'tasks', indexOf(uid, created));
   const data = client.calls.updated[0].data;
-  assert.strictEqual(data.match(/^DTSTART[;:]/gm)?.length, 1);
-  assert.match(data, /\r\nDTSTART;VALUE=DATE:20261109\r\n/);
+  assert.strictEqual(data.match(/^DTSTART;TZID/gm)?.length, 1);
+  assert.match(data, /\r\nDTSTART;TZID=Europe\/Berlin:20261026T000000\r\n/);
 });
 
 // Codex-Befund auf #2370: an einem fremden Eintrag schrieb das Einschalten eine
@@ -1459,4 +1448,293 @@ test('Marke und Regel werden aus dem VTODO gelesen, nicht aus der VTIMEZONE davo
   const data = client.calls.updated[0].data;
   assert.ok(!/RRULE:FREQ=WEEKLY\r\n/.test(data), 'Yuvomis Regel blieb am VTODO stehen');
   assert.match(data, /RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU/, 'die Zonenregel bleibt unberuehrt');
+});
+
+// ── Gueltiger, zonierter Anker der Serie (#2374) ────────────────────────────────
+//
+// Seit #2370 geht eine Serie mit RRULE hinaus, verankert mit DTSTART = DUE in
+// UTC. Zwei Fehler: RFC 5545 §3.8.2.3 verlangt DUE strikt nach DTSTART, und ein
+// UTC-Anker laesst den Server in UTC rechnen - eine taegliche 07:00-Aufgabe
+// stuende nach der Zeitumstellung auf 08:00, ein BYDAY nahe Mitternacht kippte
+// auf den Nachbartag. Yuvomi selbst haelt die Wanduhr (`spawnRecurrenceFollowup`).
+
+const ZONED_DAILY = {
+  title: 'Tablette', status: 'open', due_date: '2026-11-02', due_time: '07:00',
+  is_recurring: 1, recurrence_rule: 'FREQ=DAILY',
+};
+
+/** Die Zeilen eines Namens innerhalb des VTODO, ohne die der VTIMEZONE davor. */
+function todoLines(ics, name) {
+  const block = ics.slice(ics.indexOf('BEGIN:VTODO'), ics.indexOf('END:VTODO'));
+  return block.split('\r\n').filter((l) => new RegExp(`^${name}[;:]`).test(l));
+}
+
+test('Eine getimte Serie verankert sich in der Haushaltszone, DTSTART vor DUE (#2374)', () => {
+  const f = icsFieldsForTask(ZONED_DAILY, false, 'Europe/Berlin');
+  assert.deepStrictEqual(f.DUE, { value: '20261102T070000', params: ';TZID=Europe/Berlin' });
+  assert.deepStrictEqual(f.DTSTART, { value: '20261102T000000', params: ';TZID=Europe/Berlin' });
+  // Eine andere Haushaltszone: dieselben Ziffern, ihre Zone. Ziffern = Wanduhr.
+  const ny = icsFieldsForTask(ZONED_DAILY, false, 'America/New_York');
+  assert.deepStrictEqual(ny.DUE, { value: '20261102T070000', params: ';TZID=America/New_York' });
+});
+
+test('Der Anker bleibt derselbe Ortstag wie die Faelligkeit, auch kurz vor Mitternacht (#2374)', () => {
+  // 23:30 in Berlin ist in UTC noch derselbe Tag, 00:30 in Tokio aber der Vortag:
+  // ein BYDAY auf UTC-Ziffern kippte genau hier.
+  const f = icsFieldsForTask({ ...ZONED_DAILY, due_time: '00:30', recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO' }, false, 'Asia/Tokyo');
+  assert.deepStrictEqual(f.DTSTART, { value: '20261102T000000', params: ';TZID=Asia/Tokyo' });
+  assert.deepStrictEqual(f.DUE, { value: '20261102T003000', params: ';TZID=Asia/Tokyo' });
+});
+
+test('Zur TZID gehoert genau ein VTIMEZONE, vor dem VTODO und aus dem Jahr der Aufgabe (#2374)', async () => {
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+  const created = buildTodoICS('tasks', task, uid);
+  assert.strictEqual(created.match(/^BEGIN:VTIMEZONE/gm)?.length, 1, 'RFC 5545 §3.2.19: TZID braucht seinen Block');
+  assert.match(created, /^TZID:Europe\/Berlin\r$/m);
+  assert.ok(created.indexOf('BEGIN:VTIMEZONE') < created.indexOf('BEGIN:VTODO'));
+  assert.match(created, /^BEGIN:DAYLIGHT\r$/m, 'ein 2026er Block kennt die Sommerzeit');
+
+  // Der naechste Push findet den Block vor und legt keinen zweiten daneben.
+  db.prepare("UPDATE tasks SET title = 'Vitamin', outbound_dirty = 1 WHERE id = ?").run(task.id);
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf(uid, created));
+  const data = client.calls.updated[0].data;
+  assert.strictEqual(data.match(/^BEGIN:VTIMEZONE/gm)?.length, 1);
+  assert.strictEqual(todoLines(data, 'DUE').length, 1);
+  assert.strictEqual(todoLines(data, 'DTSTART').length, 1);
+});
+
+test('Eine Serie ohne Uhrzeit ankert auf DUE, ohne DTSTART und ohne Zone (#2374)', async () => {
+  // Ein Datum hat keine Zone. Ein DTSTART davor waere der Vortag: gegen ein BYDAY
+  // falsch, und RFC 5545 §3.8.5.3 laesst die Serie dann undefiniert.
+  const f = icsFieldsForTask({ ...ZONED_DAILY, due_time: null, recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO' }, false, 'Europe/Berlin');
+  assert.deepStrictEqual(f.DUE, { value: '20261102', params: ';VALUE=DATE' });
+  assert.strictEqual(f.DTSTART, null, 'null nimmt ein DTSTART = DUE aus der Zeit vor #2374 wieder weg');
+
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=WEEKLY;BYDAY=MO', { due_date: '2026-11-02' });
+  const created = buildTodoICS('tasks', task, uid);
+  assert.deepStrictEqual(todoLines(created, 'DTSTART'), []);
+  assert.ok(!created.includes('BEGIN:VTIMEZONE'));
+
+  // Ein schon hinausgegangenes Objekt verliert das ungueltige DTSTART beim Push.
+  const legacy = serverTodo({ uid, alarm: null, extra: ['DUE;VALUE=DATE:20261102', 'DTSTART;VALUE=DATE:20261102', 'RRULE:FREQ=WEEKLY;BYDAY=MO'] });
+  db.prepare('UPDATE tasks SET outbound_dirty = 1 WHERE id = ?').run(task.id);
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf(uid, legacy));
+  assert.deepStrictEqual(todoLines(client.calls.updated[0].data, 'DTSTART'), []);
+});
+
+test('Faellig um Mitternacht: kein DTSTART, das nicht vor DUE laege (#2374)', () => {
+  // 00:00 des Tages ist hier DUE selbst, und ein Beginn am Vortag stuende neben
+  // BYDAY auf dem falschen Wochentag. Es bleibt der Anker auf DUE, wie beim Datum.
+  const f = icsFieldsForTask({ ...ZONED_DAILY, due_time: '00:00' }, false, 'Europe/Berlin');
+  assert.deepStrictEqual(f.DUE, { value: '20261102T000000', params: ';TZID=Europe/Berlin' });
+  assert.strictEqual(f.DTSTART, null);
+  const utc = icsFieldsForTask({ ...ZONED_DAILY, due_time: '00:00' }, false, 'UTC');
+  assert.deepStrictEqual(utc.DUE, { value: '20261102T000000Z', params: '' });
+  assert.strictEqual(utc.DTSTART, null);
+});
+
+test('Eine UTC-Zone oder eine ungesetzte Haushaltszone bleibt eindeutig (#1967, #2374)', () => {
+  // UTC hat keine Umstellung, und ein VTIMEZONE ueber 'Etc/UTC' fuehrt nicht jeder
+  // Client (`anchorZone`, #938): Z-Werte, aber DTSTART weiterhin vor DUE.
+  for (const zone of ['UTC', 'Etc/UTC', 'GMT']) {
+    const f = icsFieldsForTask(ZONED_DAILY, false, zone);
+    assert.deepStrictEqual(f.DUE, { value: '20261102T070000Z', params: '' }, zone);
+    assert.deepStrictEqual(f.DTSTART, { value: '20261102T000000Z', params: '' }, zone);
+  }
+  // Ohne gewaehlte Zone gilt derselbe Rueckfall, mit dem `due_time` gelesen wird
+  // (`householdTimeZone`: TZ der Suite). Eine eigene Annahme gaebe es hier nicht.
+  const accountId = reset();
+  db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+  assert.deepStrictEqual(todoLines(buildTodoICS('tasks', task, uid), 'DUE'), ['DUE;TZID=Europe/Berlin:20261102T070000']);
+});
+
+test('Ohne Serie bleibt DUE ein UTC-Zeitpunkt, ohne Zone im Objekt (#2374)', async () => {
+  const single = icsFieldsForTask({ ...ZONED_DAILY, is_recurring: 0, recurrence_rule: null }, false, 'Europe/Berlin');
+  assert.deepStrictEqual(single.DUE, { value: '20261102T060000Z', params: '' });
+  assert.strictEqual(single.DTSTART, null);
+
+  // Abgehakt: Regel und Anker gehen weg, die Fortsetzung ist ein eigenes VTODO.
+  const done = icsFieldsForTask({ ...ZONED_DAILY, status: 'done' }, false, 'Europe/Berlin');
+  assert.deepStrictEqual(done.DUE, { value: '20261102T060000Z', params: '' });
+  assert.strictEqual(done.DTSTART, null);
+
+  const accountId = reset();
+  const task = insertTask({ accountId, uid: null, due_date: '2026-11-02', due_time: '07:00' });
+  const ics = buildTodoICS('tasks', task, todoUidFor('tasks', task.id));
+  assert.ok(!ics.includes('BEGIN:VTIMEZONE'));
+});
+
+test('Ein zonierter Anker kommt unveraendert zurueck, ohne dass die Aufgabe als geaendert gilt (#2374)', () => {
+  const accountId = reset();
+  // Winter, Sommer und die doppelte Stunde der Umstellung: die Wanduhr bleibt.
+  for (const [dueDate, dueTime] of [['2026-11-02', '07:00'], ['2026-07-15', '23:30'], ['2026-10-25', '02:30']]) {
+    db.prepare('DELETE FROM tasks').run();
+    const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=WEEKLY', { due_date: dueDate, due_time: dueTime });
+    const [todo] = parseVTODO(buildTodoICS('tasks', task, uid));
+
+    assert.deepStrictEqual(splitDue(todo.due), { date: dueDate, time: dueTime });
+    upsertTask(todo, accountId, task.created_by, OBJ_URL);
+
+    const after = reloadTask(task.id);
+    assert.strictEqual(after.due_date, dueDate);
+    assert.strictEqual(after.due_time, dueTime);
+    assert.strictEqual(after.is_recurring, 1, 'der Inbound liest keine Regel und nimmt auch keine weg');
+    assert.strictEqual(after.outbound_dirty, 0, 'ein Rueckweg ist keine Bearbeitung');
+  }
+});
+
+test('Eine TZID ausserhalb der Haushaltszone wird als Zeitpunkt gelesen, nicht als Ziffern (#2374)', () => {
+  // Der Fall nach einem Wechsel der Haushaltszone: das Objekt traegt noch die alte
+  // Zone. Dieselbe Aufgabe, also derselbe Zeitpunkt auf der Uhr von jetzt.
+  const old = serverTodo({ extra: ['DUE;TZID=America/New_York:20261102T070000'] });
+  assert.deepStrictEqual(splitDue(parseVTODO(old)[0].due, 'Europe/Berlin'), { date: '2026-11-02', time: '13:00' });
+});
+
+test('An einem fremden Objekt tritt der zonierte Anker an die Stelle des alten (#2374)', async () => {
+  const accountId = reset();
+  const task = insertTask({ accountId, title: 'Blumen giessen', due_date: '2026-11-02', due_time: '07:00' });
+  db.prepare("UPDATE tasks SET is_recurring = 1, recurrence_rule = 'FREQ=WEEKLY', outbound_dirty = 1 WHERE id = ?").run(task.id);
+  const foreign = serverTodo({ alarm: 'TRIGGER;RELATED=END:-PT15M', extra: ['DTSTART:20261101T060000Z', 'DUE:20261102T060000Z'] });
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf('todo-1@test', foreign));
+  const data = client.calls.updated[0].data;
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART;TZID=Europe/Berlin:20261102T000000']);
+  assert.deepStrictEqual(todoLines(data, 'DUE'), ['DUE;TZID=Europe/Berlin:20261102T070000']);
+  assert.match(data, /X-APPLE-SORT-ORDER:12/, 'alles Fremde bleibt stehen');
+  assert.match(data, /BEGIN:VALARM/);
+});
+
+// Review auf #2420: am Anker haengen Daten anderer Clients. Ein START-relativer
+// Alarm rechnet von DTSTART, EXDATE und RECURRENCE-ID nennen Vorkommen ueber den
+// Zeitwert. Rueckte eine unbeteiligte Bearbeitung DTSTART auf Mitternacht, fiele
+// der Alarm auf den Vorabend und ein gestrichenes Vorkommen kaeme zurueck. Solche
+// Objekte behalten ihren Anker, solange die Faelligkeit gleich bleibt.
+
+const OLD_ANCHOR = ['DTSTART:20261102T060000Z', 'DUE:20261102T060000Z', 'RRULE:FREQ=DAILY'];
+
+/** Patcht `server` nach einer unbeteiligten Bearbeitung; liefert das PUT-Objekt. */
+async function pushAfterEdit(accountId, task, uid, server, change = "title = 'Neu'") {
+  db.prepare(`UPDATE tasks SET ${change}, outbound_dirty = 1 WHERE id = ?`).run(task.id);
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf(uid, server));
+  return client.calls.updated[0].data;
+}
+
+test('Ein START-relativer Alarm haelt den Anker fest (Review auf #2420)', async () => {
+  for (const alarm of ['TRIGGER:-PT15M', 'TRIGGER;RELATED=START:-PT15M']) {
+    const accountId = reset();
+    const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+    const data = await pushAfterEdit(accountId, task, uid, serverTodo({ uid, alarm, extra: OLD_ANCHOR }));
+    assert.ok(data.includes('SUMMARY:Neu'), 'die Bearbeitung geht trotzdem hinaus');
+    assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART:20261102T060000Z'], alarm);
+    assert.deepStrictEqual(todoLines(data, 'DUE'), ['DUE:20261102T060000Z'], alarm);
+  }
+});
+
+test('EXDATE und Ueberschreibungen eines anderen Clients halten den Anker fest (Review auf #2420)', async () => {
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+
+  let data = await pushAfterEdit(accountId, task, uid,
+    serverTodo({ uid, alarm: null, extra: [...OLD_ANCHOR, 'EXDATE:20261103T060000Z'] }));
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART:20261102T060000Z']);
+
+  const override = ['BEGIN:VTODO', `UID:${uid}`, 'DTSTAMP:20261001T000000Z', 'RECURRENCE-ID:20261104T060000Z',
+    'DTSTART:20261104T090000Z', 'DUE:20261104T090000Z', 'SUMMARY:Einmal spaeter', 'END:VTODO'];
+  data = await pushAfterEdit(accountId, task, uid, serverTodo({ uid, alarm: null, extra: OLD_ANCHOR, after: override }));
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART:20261102T060000Z']);
+  assert.ok(data.includes('RECURRENCE-ID:20261104T060000Z'));
+});
+
+test('RDATE eines anderen Clients haelt den Anker fest (Review auf #2420)', async () => {
+  // Ein Zusatztermin erbt die Dauer DTSTART bis DUE. Mit dem Anker auf 00:00 wuerde
+  // aus einem Termin um 07:00 einer um 14:00.
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+
+  const data = await pushAfterEdit(accountId, task, uid,
+    serverTodo({ uid, alarm: null, extra: [...OLD_ANCHOR, 'RDATE:20261104T060000Z'] }));
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART:20261102T060000Z']);
+  assert.ok(data.includes('RDATE:20261104T060000Z'));
+});
+
+test('Ein START-Alarm verliert sein DTSTART nicht, an Datum und 00:00 (RFC 5545 §3.8.6.3)', async () => {
+  // Der Alarm verlangt DTSTART. Ohne Bindung fiele es hier weg (`seriesAnchor`).
+  const accountId = reset();
+  const dated = insertOwnRecurringTask(accountId, 'FREQ=WEEKLY', { due_date: '2026-11-02' });
+  let data = await pushAfterEdit(accountId, dated.task, dated.uid, serverTodo({
+    uid: dated.uid, extra: ['DTSTART;VALUE=DATE:20261102', 'DUE;VALUE=DATE:20261102', 'RRULE:FREQ=WEEKLY'],
+  }));
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART;VALUE=DATE:20261102']);
+
+  const midnight = insertOwnRecurringTask(reset(), 'FREQ=WEEKLY', { due_date: '2026-11-02', due_time: '00:00' });
+  const accountOfMidnight = reloadTask(midnight.task.id).external_account_id;
+  data = await pushAfterEdit(accountOfMidnight, midnight.task, midnight.uid, serverTodo({
+    uid: midnight.uid, extra: ['DTSTART:20261101T230000Z', 'DUE:20261101T230000Z', 'RRULE:FREQ=WEEKLY'],
+  }));
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART:20261101T230000Z']);
+});
+
+test('Was nicht am Beginn haengt, haelt den Anker nicht fest (Review auf #2420)', async () => {
+  // RELATED=END rechnet von DUE, eine feste Zeit von gar nichts.
+  for (const alarm of ['TRIGGER;RELATED=END:-PT15M', 'TRIGGER;VALUE=DATE-TIME:20261102T050000Z', null]) {
+    const accountId = reset();
+    const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+    const data = await pushAfterEdit(accountId, task, uid, serverTodo({ uid, alarm, extra: OLD_ANCHOR }));
+    assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART;TZID=Europe/Berlin:20261102T000000'], String(alarm));
+  }
+});
+
+test('Ein gehaltener Anker bleibt in seiner Form, auch ein schon zonierter (Review auf #2420)', async () => {
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+  const server = serverTodo({
+    uid,
+    extra: ['DTSTART;TZID=Europe/Berlin:20261102T000000', 'DUE;TZID=Europe/Berlin:20261102T070000', 'RRULE:FREQ=DAILY'],
+  });
+  const data = await pushAfterEdit(accountId, task, uid, server);
+  assert.deepStrictEqual(todoLines(data, 'DUE'), ['DUE;TZID=Europe/Berlin:20261102T070000'], 'DUE kippt nicht zurueck nach UTC');
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART;TZID=Europe/Berlin:20261102T000000']);
+
+  // Die Regel selbst darf sich trotzdem aendern.
+  const ruled = await pushAfterEdit(accountId, task, uid, server, "recurrence_rule = 'FREQ=WEEKLY'");
+  assert.deepStrictEqual(todoLines(ruled, 'RRULE'), ['RRULE:FREQ=WEEKLY']);
+  assert.deepStrictEqual(todoLines(ruled, 'DUE'), ['DUE;TZID=Europe/Berlin:20261102T070000']);
+});
+
+test('Gleiche Faelligkeit heisst derselbe Zeitpunkt, in jeder Schreibweise der DUE-Zeile (Review auf #2420)', async () => {
+  // 07:00 Berlin: als Instant, in fremder Zone und floating. Eine andere Uhrzeit
+  // am selben Tag ist dagegen eine verschobene Faelligkeit.
+  const held = [
+    ['DUE;TZID=America/New_York:20261102T010000', 'DTSTART;TZID=America/New_York:20261102T010000'],
+    ['DUE:20261102T070000', 'DTSTART:20261102T070000'],
+  ];
+  for (const [due, start] of held) {
+    const accountId = reset();
+    const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+    const data = await pushAfterEdit(accountId, task, uid, serverTodo({ uid, extra: [start, due, 'RRULE:FREQ=DAILY'] }));
+    assert.deepStrictEqual(todoLines(data, 'DUE'), [due]);
+    assert.deepStrictEqual(todoLines(data, 'DTSTART'), [start]);
+  }
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '08:00' });
+  const data = await pushAfterEdit(accountId, task, uid, serverTodo({ uid, extra: OLD_ANCHOR }));
+  assert.deepStrictEqual(todoLines(data, 'DUE'), ['DUE;TZID=Europe/Berlin:20261102T080000']);
+});
+
+test('Eine verschobene Faelligkeit nimmt den Anker auch an solchen Objekten mit (Review auf #2420)', async () => {
+  // Bewusste Grenze: ohne das stuende DUE vor DTSTART, und das weisen strenge
+  // Server ab. Alarm und Ausnahmen werden nicht umgerechnet.
+  const accountId = reset();
+  const { task, uid } = insertOwnRecurringTask(accountId, 'FREQ=DAILY', { due_date: '2026-11-02', due_time: '07:00' });
+  const data = await pushAfterEdit(accountId, task, uid,
+    serverTodo({ uid, extra: [...OLD_ANCHOR, 'EXDATE:20261103T060000Z'] }), "due_date = '2026-10-26'");
+  assert.deepStrictEqual(todoLines(data, 'DTSTART'), ['DTSTART;TZID=Europe/Berlin:20261026T000000']);
+  assert.deepStrictEqual(todoLines(data, 'DUE'), ['DUE;TZID=Europe/Berlin:20261026T070000']);
+  assert.ok(data.includes('TRIGGER:-PT15M') && data.includes('EXDATE:20261103T060000Z'), 'Fremdes bleibt Wort fuer Wort');
 });

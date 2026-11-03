@@ -28,10 +28,14 @@
  *   - Koerpertemperatur: 10-46 °C bzw. 50-115 °F. Ueberlebte Unterkuehlung bis
  *     13,7 °C, Hitzschlag bis rund 46,5 °C.
  *
- * Eine Einheit, die hier nicht steht (per API oder Import erfasst, etwa
- * "stone" oder "kPa"), hat keine Zahlenraender - nur die Regeln, die ohne
- * Einheit gelten (SpO2 zwischen 1 und 100, systolisch ueber diastolisch).
+ * Geprueft wird in der Einheit dieser Tabelle: "lbs" und "LB" zaehlen als lb,
+ * "g" und "stone" werden nach kg umgerechnet (public/utils/vital-units.js, #2375).
+ * Eine Einheit, die auch dort niemand kennt, gibt es nur noch als Altzeile. Sie
+ * hat keine Zahlenraender, nur die Regeln, die ohne Einheit gelten (SpO2 zwischen
+ * 1 und 100, systolisch ueber diastolisch).
  */
+
+import { acceptedVitalUnits, isAcceptedVitalUnit, vitalLimitReading } from '../../../public/utils/vital-units.js';
 
 /** Typ -> Einheit -> [min, max] fuer value_num (inklusive Raender). */
 export const VITAL_HARD_LIMITS = Object.freeze({
@@ -62,7 +66,7 @@ const isNum = (value) => typeof value === 'number' && Number.isFinite(value);
 export function vitalLimitError({ type, unit, value_num: v1, value_num2: v2, value_num3: v3 }) {
   if (type === 'bp') {
     if (isNum(v1) && isNum(v2) && v1 <= v2) return 'bp_order';
-    const limits = own(VITAL_HARD_LIMITS.bp, unit ?? 'mmHg');
+    const limits = own(VITAL_HARD_LIMITS.bp, vitalLimitReading('bp', unit ?? 'mmHg').unit);
     if (limits && ((isNum(v1) && !within(v1, limits.sys)) || (isNum(v2) && !within(v2, limits.dia)))) return 'out_of_range';
     if (isNum(v3) && !within(v3, PULSE_HARD_LIMITS)) return 'out_of_range';
     return null;
@@ -71,8 +75,33 @@ export function vitalLimitError({ type, unit, value_num: v1, value_num2: v2, val
   // Eine Saettigung liegt in jeder Schreibweise in [1, 100], auch ohne oder
   // mit fremder Einheit - beide Raender (Review #2049: -10 und 0 gingen durch).
   if (type === 'spo2' && !within(v1, VITAL_HARD_LIMITS.spo2['%'])) return 'out_of_range';
-  const range = own(own(VITAL_HARD_LIMITS, type), unit);
-  return range && !within(v1, range) ? 'out_of_range' : null;
+  const reading = vitalLimitReading(type, unit, v1);
+  const range = own(own(VITAL_HARD_LIMITS, type), reading.unit);
+  return range && !within(reading.value, range) ? 'out_of_range' : null;
+}
+
+/**
+ * Passt die Einheit zur Metrik? Ohne Einheit ist nichts zu pruefen (`unit` ist
+ * optional), und ein Typ ohne Metrik hat keine Liste: `type` ist freier Text.
+ *
+ * @param {{type: string, unit?: string|null}} m
+ * @returns {null|string[]} null, wenn sie passt; sonst die angenommenen
+ */
+export function vitalUnitError({ type, unit }) {
+  if (unit === null || unit === undefined || isAcceptedVitalUnit(type, unit)) return null;
+  return acceptedVitalUnits(type);
+}
+
+/**
+ * Lehnt eine Einheit ab, die niemand kennt (#2375). `error` nennt API-Nutzern
+ * die angenommenen Einheiten, die App zeigt zum `reason` ihren Satz.
+ *
+ * @param {import('express').Response} res
+ * @param {string[]} accepted - aus vitalUnitError
+ */
+export function refuseVitalUnit(res, accepted) {
+  const hint = accepted.length ? `Use one of: ${accepted.join(', ')}.` : 'It takes no unit.';
+  return res.status(400).json({ error: `Unit not accepted for this measurement. ${hint}`, code: 400, reason: 'health_vital_unit_invalid' });
 }
 
 /**

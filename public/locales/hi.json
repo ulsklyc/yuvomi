@@ -358,6 +358,11 @@
         "customizeResetDetail": "आपकी अपनी व्यवस्था हट जाएगी। आपको फिर से घर का डिफ़ॉल्ट दिखेगा - बाद के बदलावों के साथ भी।",
         "customizeDiscardDetail": "व्यवस्था में आपके बदलाव खो जाएँगे। आखिरी बार सहेजी गई व्यवस्था बनी रहेगी।",
         "customizeScopeHint": "यहाँ आपका बदलाव केवल आपके लिए है।",
+        "customizePhoneScopeHint": "केवल यह फ़ोन। यहां परिवर्तन केवल आपके फ़ोन के टाइल क्रम को प्रभावित करते हैं।",
+        "customizePhoneTitle": "फ़ोन टाइलें",
+        "customizePhoneReset": "डेस्कटॉप जैसा",
+        "customizePhoneResetDone": "फ़ोन व्यवस्था रीसेट हो गई।",
+        "customizePhoneResetConfirm": "डेस्कटॉप जैसा रीसेट करें?",
         "customizeFollowsDefault": "आपका डैशबोर्ड घर के डिफ़ॉल्ट का अनुसरण करता है।",
         "customizeSetDefault": "घर का डिफ़ॉल्ट बनाएँ",
         "customizeSetDefaultConfirm": "इस व्यवस्था को घर का डिफ़ॉल्ट बनाएँ?",
@@ -694,7 +699,8 @@
         "checkAllSubtasks": "सभी पर निशान लगाएं",
         "subtasksAllDone": "\"{{title}}\" और सभी उपकार्य पूर्ण।",
         "seriesDoneNamed": "\"{{title}}\" पूर्ण - अगली बार: {{date}}",
-        "kanbanRestore": "पुनर्स्थापित करें"
+        "kanbanRestore": "पुनर्स्थापित करें",
+        "errorTagGone": "यह टैग अब मौजूद नहीं है।"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} आइटम हटाया गया।",
@@ -3461,7 +3467,28 @@
         "reminderListAssigneesTasksOnly": "लोग केवल उन सूचियों के लिए तय किए जा सकते हैं जो कार्यों में जाती हैं।",
         "syncAssigneeNotMember": "यहाँ केवल परिवार के सदस्य चुने जा सकते हैं।",
         "syncAssigneeUnknown": "यह व्यक्ति अब मौजूद नहीं है। पेज फिर से लोड करें।",
-        "permDetails": "विजेट और अन्य अनुमतियाँ"
+        "permDetails": "विजेट और अन्य अनुमतियाँ",
+        "connectionFailedDetail": "कनेक्शन विफल: {{error}}",
+        "documentStorageChangeFailed": "बदलाव लागू नहीं हुआ: {{error}}",
+        "apiTokenCopyFailed": "कॉपी नहीं हो सका। टोकन चुनें और हाथ से कॉपी करें।",
+        "weatherLocateDenied": "आपके स्थान की अनुमति नहीं है। इसे ब्राउज़र सेटिंग में चालू करें या जगह हाथ से भरें।",
+        "weatherLocateFailed": "आपका स्थान पता नहीं चल सका। जगह हाथ से भरें।",
+        "outlookAutoSyncOverrides": "Outlook जुड़े हुए एकल अपवादों वाली शृंखलाएँ सिंक नहीं कर सकता। उनका लक्ष्य कैलेंडर बंद करें ताकि वे यहाँ संपादन योग्य रहें। किसी अपवाद को हटाने की ज़रूरत नहीं है।",
+        "memberRemoveOwnAccount": "आप अपना खाता नहीं हटा सकते।",
+        "memberRemoveLastAdmin": "कम से कम एक व्यवस्थापक रहना चाहिए।",
+        "memberRemoveLastSsoAdmin": "यह SSO से जुड़ा अंतिम व्यवस्थापक है। पहले किसी दूसरे व्यवस्थापक को जोड़ें।",
+        "backupWebdavUrlInvalid": "पता http:// या https:// से शुरू होना चाहिए।",
+        "icsSubscriptionGone": "यह सदस्यता अब मौजूद नहीं है।",
+        "backupDbKeyTitle": "डेटाबेस कुंजी",
+        "backupDbKeyGeneratedHint": "Yuvomi ने इसे पहली बार शुरू होने पर बनाया। इसकी एक कॉपी इस सर्वर से अलग कहीं रखें: इसके बिना, स्टोरेज खो जाने पर आपके बैकअप नहीं खुलेंगे।",
+        "backupDbKeyShow": "कुंजी दिखाएँ",
+        "backupDbKeyHide": "छिपाएँ",
+        "backupDbKeyCopy": "कॉपी करें",
+        "backupDbKeyCopied": "कुंजी कॉपी हो गई",
+        "backupDbKeyCopyFailed": "कॉपी नहीं हो सका। कुंजी चुनी हुई है, इसे हाथ से कॉपी करें।",
+        "backupDbKeyStoredAt": "सर्वर पर {{path}} में सहेजी गई",
+        "backupDbKeyConfigHint": "कुंजी आपके कॉन्फ़िगरेशन से आती है। इसे वहाँ सुरक्षित रखें: इसके बिना आपके बैकअप नहीं खुलेंगे।",
+        "backupDbKeyPlainHint": "डेटाबेस एन्क्रिप्टेड नहीं है, इसलिए बैकअप में आपका डेटा पढ़ने योग्य रूप में है। अपनी DB_ENCRYPTION_KEY के साथ, Yuvomi अगली बार शुरू होने पर इसे एन्क्रिप्ट करता है।"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",
@@ -5828,7 +5855,8 @@
         "errorCycleImportNoRows": "फ़ाइल में केवल हेडर पंक्ति है और कोई माहवारी नहीं।",
         "errorCycleImportTooManyRows": "एक आयात में अधिकतम {{limit}} माहवारी हो सकती हैं। फ़ाइल को बाँटें।",
         "errorVitalImpossible": "यह मान संभव नहीं है। कृपया अपनी प्रविष्टि जाँचें।",
-        "errorVitalBpOrder": "सिस्टोलिक मान डायस्टोलिक से अधिक होना चाहिए।"
+        "errorVitalBpOrder": "सिस्टोलिक मान डायस्टोलिक से अधिक होना चाहिए।",
+        "errorVitalUnit": "यह इकाई इस माप के लिए उपयुक्त नहीं है।"
     },
     "waste": {
         "title": "कचरा संग्रहण",
@@ -6239,7 +6267,7 @@
         "expiresLabel": "सर्वोत्तम उपयोग तिथि",
         "expiresHint": "जो वस्तुएँ खराब नहीं होतीं, उनके लिए खाली छोड़ें।",
         "minQuantityLabel": "न्यूनतम स्टॉक",
-        "minQuantityHint": "इस मात्रा या उससे कम पर वस्तु लगभग समाप्त मानी जाती है।",
+        "minQuantityHint": "पूरे उत्पाद पर लागू होता है: जब इसके सभी बैच मिलकर इस मात्रा या उससे कम हों, तो इसे लगभग समाप्त माना जाता है।",
         "notesLabel": "टिप्पणी",
         "notesPlaceholder": "जैसे खोला हुआ",
         "created": "वस्तु जोड़ी गई।",
@@ -6265,6 +6293,7 @@
         "noBestBefore": "बिना उपयोग तिथि",
         "errorProductHasStock": "यह उत्पाद फिर से स्टॉक में है और हटाया नहीं गया।",
         "productTotal": "कुल {{quantity}}",
+        "minimumShort": "न्यूनतम {{quantity}}",
         "productPlaces": "{{count}} जगहें",
         "productPlaces_one": "{{count}} जगह",
         "productBatches": "{{count}} खेपें",
