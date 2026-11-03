@@ -73,6 +73,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writing it on the product itself comes with a later part of #1448, before the field goes.
 
 ### Fixed
+- **Deleting the first occurrence of a recurring event also stops its reminder.** A reminder on a series
+  belongs to its first occurrence, and after that occurrence was deleted it still showed in the bell and
+  arrived as a notification, also for a deleted first occurrence coming from an imported calendar (ICS,
+  CalDAV, Apple, Google). The reminder now stays silent and returns if the occurrence is restored.
+  Reminders of later occurrences and of a first occurrence that was moved rather than deleted are
+  unchanged.
 - **Long page titles stand in full next to search and a tool on phones.** Below 390px the search
   button and the one tool beside the title (the import in Birthdays, categories in Notes) move into
   a "..." menu, and in Documents the search joins the menu that is already there, so the head stays
