@@ -865,7 +865,8 @@
         "doneSubtasksOpen_few": "تم إنجاز «{{title}}» - لا تزال {{count}} مهام فرعية مفتوحة.",
         "doneSubtasksOpen_many": "تم إنجاز «{{title}}» - لا تزال {{count}} مهمة فرعية مفتوحة.",
         "seriesDoneNamed": "تم إنجاز «{{title}}» - المرة القادمة: {{date}}",
-        "kanbanRestore": "استعادة"
+        "kanbanRestore": "استعادة",
+        "errorTagGone": "هذا الوسم لم يعد موجودًا."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وجبات",
@@ -1264,7 +1265,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "إعادة التعيين للأصل",
-            "resetToast": "تم إعادة تعيين التغييرات."
+            "resetToast": "تم إعادة تعيين التغييرات.",
+            "resetPendingToast": "أُعيد الضبط. يعود النص الأصلي مع المزامنة التالية."
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "البحث عن أيقونة",
@@ -3794,7 +3796,28 @@
         "reminderListAssigneesTasksOnly": "يمكن تحديد الأشخاص فقط للقوائم التي تذهب إلى المهام.",
         "syncAssigneeNotMember": "يمكن اختيار أفراد المنزل فقط هنا.",
         "syncAssigneeUnknown": "هذا الشخص لم يعد موجودًا. أعد تحميل الصفحة.",
-        "permDetails": "الأدوات والصلاحيات الإضافية"
+        "permDetails": "الأدوات والصلاحيات الإضافية",
+        "connectionFailedDetail": "فشل الاتصال: {{error}}",
+        "documentStorageChangeFailed": "لم يتم تطبيق التغيير: {{error}}",
+        "apiTokenCopyFailed": "تعذر النسخ. حدد الرمز وانسخه يدويًا.",
+        "weatherLocateDenied": "الوصول إلى موقعك غير مسموح. اسمح به في إعدادات المتصفح أو أدخل المكان يدويًا.",
+        "weatherLocateFailed": "تعذر تحديد موقعك. أدخل المكان يدويًا.",
+        "outlookAutoSyncOverrides": "لا يمكن لـ Outlook مزامنة السلاسل التي ترتبط بها استثناءات فردية. أوقف تقويمها الهدف لتبقى قابلة للتعديل هنا. لا حاجة إلى حذف أي استثناءات.",
+        "memberRemoveOwnAccount": "لا يمكنك إزالة حسابك الخاص.",
+        "memberRemoveLastAdmin": "يجب أن يبقى مسؤول واحد على الأقل.",
+        "memberRemoveLastSsoAdmin": "هذا آخر مسؤول مرتبط بـ SSO. اربط مسؤولًا آخر أولًا.",
+        "backupWebdavUrlInvalid": "يجب أن يبدأ العنوان بـ http:// أو https://.",
+        "icsSubscriptionGone": "هذا الاشتراك لم يعد موجودًا.",
+        "backupDbKeyTitle": "مفتاح قاعدة البيانات",
+        "backupDbKeyGeneratedHint": "أنشأه Yuvomi عند التشغيل الأول. احتفظ بنسخة منه بعيدًا عن هذا الخادم: بدونه لا يمكن فتح نسخك الاحتياطية إذا فُقدت وحدة التخزين.",
+        "backupDbKeyShow": "إظهار المفتاح",
+        "backupDbKeyHide": "إخفاء",
+        "backupDbKeyCopy": "نسخ",
+        "backupDbKeyCopied": "تم نسخ المفتاح",
+        "backupDbKeyCopyFailed": "لم ينجح النسخ. المفتاح محدد، انسخه يدويًا.",
+        "backupDbKeyStoredAt": "محفوظ على الخادم في {{path}}",
+        "backupDbKeyConfigHint": "يأتي المفتاح من إعداداتك. احفظه هناك بأمان: بدونه لا يمكن فتح نسخك الاحتياطية.",
+        "backupDbKeyPlainHint": "قاعدة البيانات غير مشفرة، لذا تحتوي النسخ الاحتياطية على بياناتك بشكل مقروء. مع DB_ENCRYPTION_KEY خاص بك، يشفرها Yuvomi عند التشغيل التالي."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",
@@ -6245,7 +6268,8 @@
         "errorCycleImportNoRows": "يحتوي الملف على سطر العناوين فقط ولا يحتوي على دورات.",
         "errorCycleImportTooManyRows": "يمكن أن يحتوي الاستيراد على {{limit}} دورة كحد أقصى. قسّم الملف.",
         "errorVitalImpossible": "هذه القيمة غير ممكنة. يرجى التحقق من الإدخال.",
-        "errorVitalBpOrder": "يجب أن تكون القيمة الانقباضية أعلى من الانبساطية."
+        "errorVitalBpOrder": "يجب أن تكون القيمة الانقباضية أعلى من الانبساطية.",
+        "errorVitalUnit": "هذه الوحدة لا تناسب هذا القياس."
     },
     "waste": {
         "title": "جمع النفايات",

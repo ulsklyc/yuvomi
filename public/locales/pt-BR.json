@@ -688,7 +688,8 @@
         "checkAllSubtasks": "Marcar todas",
         "subtasksAllDone": "\"{{title}}\" e todas as subtarefas concluídos.",
         "seriesDoneNamed": "\"{{title}}\" concluído - próxima vez: {{date}}",
-        "kanbanRestore": "Restaurar"
+        "kanbanRestore": "Restaurar",
+        "errorTagGone": "Esta etiqueta não existe mais."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item excluído.",
@@ -1028,7 +1029,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Restaurar original",
-            "resetToast": "Alterações restauradas."
+            "resetToast": "Alterações restauradas.",
+            "resetPendingToast": "Redefinido. O texto original volta na próxima sincronização."
         },
         "iconLabel": "Ícone",
         "iconSearchPlaceholder": "Pesquisar ícone",
@@ -3454,7 +3456,28 @@
         "reminderListAssigneesTasksOnly": "Pessoas só podem ser definidas para listas que vão para Tarefas.",
         "syncAssigneeNotMember": "Aqui só podem ser escolhidos membros da casa.",
         "syncAssigneeUnknown": "Esta pessoa não existe mais. Recarregue a página.",
-        "permDetails": "Widgets e mais permissões"
+        "permDetails": "Widgets e mais permissões",
+        "connectionFailedDetail": "Falha na conexão: {{error}}",
+        "documentStorageChangeFailed": "A alteração não foi aplicada: {{error}}",
+        "apiTokenCopyFailed": "Não foi possível copiar. Selecione o token e copie manualmente.",
+        "weatherLocateDenied": "O acesso à sua localização não é permitido. Permita nas configurações do navegador ou digite o local manualmente.",
+        "weatherLocateFailed": "Não foi possível determinar sua localização. Digite o local manualmente.",
+        "outlookAutoSyncOverrides": "O Outlook não consegue sincronizar séries com exceções individuais vinculadas. Desative o calendário de destino delas para que continuem editáveis aqui. Você não precisa excluir nenhuma exceção.",
+        "memberRemoveOwnAccount": "Você não pode remover sua própria conta.",
+        "memberRemoveLastAdmin": "Pelo menos um administrador deve permanecer.",
+        "memberRemoveLastSsoAdmin": "Este é o último administrador vinculado ao SSO. Vincule outro administrador primeiro.",
+        "backupWebdavUrlInvalid": "O endereço deve começar com http:// ou https://.",
+        "icsSubscriptionGone": "Esta assinatura não existe mais.",
+        "backupDbKeyTitle": "Chave do banco de dados",
+        "backupDbKeyGeneratedHint": "O Yuvomi gerou a chave na primeira inicialização. Guarde uma cópia fora deste servidor: sem ela, seus backups não poderão ser abertos se o armazenamento for perdido.",
+        "backupDbKeyShow": "Mostrar chave",
+        "backupDbKeyHide": "Ocultar",
+        "backupDbKeyCopy": "Copiar",
+        "backupDbKeyCopied": "Chave copiada",
+        "backupDbKeyCopyFailed": "Não foi possível copiar. A chave está selecionada, copie-a manualmente.",
+        "backupDbKeyStoredAt": "Salva no servidor em {{path}}",
+        "backupDbKeyConfigHint": "A chave vem da sua configuração. Guarde-a lá com segurança: sem ela, seus backups não podem ser abertos.",
+        "backupDbKeyPlainHint": "O banco de dados não está criptografado, então os backups contêm seus dados de forma legível. Com uma DB_ENCRYPTION_KEY própria, o Yuvomi o criptografa na próxima inicialização."
     },
     "login": {
         "tagline": "Bem-vindo de volta. Sua casa em um só lugar.",
@@ -5821,7 +5844,8 @@
         "errorCycleImportNoRows": "O arquivo tem só a linha de cabeçalho e nenhum período.",
         "errorCycleImportTooManyRows": "Uma importação pode ter no máximo {{limit}} períodos. Divida o arquivo.",
         "errorVitalImpossible": "Este valor não é possível. Verifique o que foi digitado.",
-        "errorVitalBpOrder": "O valor sistólico deve ser maior que o diastólico."
+        "errorVitalBpOrder": "O valor sistólico deve ser maior que o diastólico.",
+        "errorVitalUnit": "Esta unidade não corresponde a esta medição."
     },
     "datepicker": {
         "openCalendar": "Abrir calendário",

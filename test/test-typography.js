@@ -786,6 +786,9 @@ const BREAKS_WITHOUT_HYPHENS = {
   '.fasting-hero__timer': 'NO_SYLLABLES',
   '.inventory-detail-list__link': 'NO_SYLLABLES',
   '.caldav-calendar-source': 'NO_SYLLABLES',
+  // Satz + Dateipfad (.secrets/DB_ENCRYPTION_KEY): der Satz bricht an Leerstellen,
+  // `anywhere` greift nur am Pfad, und ein Strich darin waere Teil des Pfads.
+  '.settings-db-key__path': 'NO_SYLLABLES',
   '.item-details__link': 'NO_SYLLABLES',
   '.note-md-link': 'NO_SYLLABLES',
   // list-row.css: „NUR HIER, NICHT AN DER METAZEILE" - hyphens: auto wuerde dort

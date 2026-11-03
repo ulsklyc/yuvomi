@@ -824,7 +824,8 @@
         "doneSubtasksOpen_few": "„{{title}}” zrobione - wciąż otwarte {{count}} podzadania.",
         "doneSubtasksOpen_many": "„{{title}}” zrobione - wciąż otwartych {{count}} podzadań.",
         "seriesDoneNamed": "„{{title}}” zrobione - następny raz: {{date}}",
-        "kanbanRestore": "Przywróć"
+        "kanbanRestore": "Przywróć",
+        "errorTagGone": "Ten tag już nie istnieje."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} posiłki",
@@ -1214,7 +1215,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Przywróć oryginał",
-            "resetToast": "Zmiany zostały cofnięte."
+            "resetToast": "Zmiany zostały cofnięte.",
+            "resetPendingToast": "Przywrócono. Oryginalny tekst wróci przy następnej synchronizacji."
         },
         "iconLabel": "Ikona",
         "iconSearchPlaceholder": "Szukaj ikony",
@@ -3698,7 +3700,28 @@
         "reminderListAssigneesTasksOnly": "Osoby można ustawić tylko dla list trafiających do Zadań.",
         "syncAssigneeNotMember": "Tutaj można wybrać tylko członków gospodarstwa domowego.",
         "syncAssigneeUnknown": "Ta osoba już nie istnieje. Odśwież stronę.",
-        "permDetails": "Widżety i dodatkowe uprawnienia"
+        "permDetails": "Widżety i dodatkowe uprawnienia",
+        "connectionFailedDetail": "Połączenie nie powiodło się: {{error}}",
+        "documentStorageChangeFailed": "Zmiana nie została zastosowana: {{error}}",
+        "apiTokenCopyFailed": "Kopiowanie nie powiodło się. Zaznacz token i skopiuj go ręcznie.",
+        "weatherLocateDenied": "Dostęp do lokalizacji jest niedozwolony. Zezwól na niego w ustawieniach przeglądarki lub wpisz miejsce ręcznie.",
+        "weatherLocateFailed": "Nie udało się ustalić lokalizacji. Wpisz miejsce ręcznie.",
+        "outlookAutoSyncOverrides": "Outlook nie może synchronizować serii z powiązanymi pojedynczymi wyjątkami. Wyłącz ich kalendarz docelowy, aby można je było nadal edytować tutaj. Nie musisz usuwać żadnych wyjątków.",
+        "memberRemoveOwnAccount": "Nie możesz usunąć własnego konta.",
+        "memberRemoveLastAdmin": "Musi pozostać co najmniej jeden administrator.",
+        "memberRemoveLastSsoAdmin": "To ostatni administrator powiązany z SSO. Najpierw powiąż innego administratora.",
+        "backupWebdavUrlInvalid": "Adres musi zaczynać się od http:// lub https://.",
+        "icsSubscriptionGone": "Ta subskrypcja już nie istnieje.",
+        "backupDbKeyTitle": "Klucz bazy danych",
+        "backupDbKeyGeneratedHint": "Yuvomi wygenerował go przy pierwszym uruchomieniu. Przechowuj kopię poza tym serwerem: bez niego nie otworzysz kopii zapasowych, jeśli utracisz magazyn danych.",
+        "backupDbKeyShow": "Pokaż klucz",
+        "backupDbKeyHide": "Ukryj",
+        "backupDbKeyCopy": "Kopiuj",
+        "backupDbKeyCopied": "Klucz skopiowany",
+        "backupDbKeyCopyFailed": "Kopiowanie nie powiodło się. Klucz jest zaznaczony, skopiuj go ręcznie.",
+        "backupDbKeyStoredAt": "Zapisany na serwerze w {{path}}",
+        "backupDbKeyConfigHint": "Klucz pochodzi z Twojej konfiguracji. Przechowuj go tam bezpiecznie: bez niego nie otworzysz kopii zapasowych.",
+        "backupDbKeyPlainHint": "Baza danych nie jest zaszyfrowana, więc kopie zapasowe zawierają Twoje dane w czytelnej postaci. Z własnym DB_ENCRYPTION_KEY Yuvomi zaszyfruje ją przy następnym uruchomieniu."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",
@@ -6103,7 +6126,8 @@
         "errorCycleImportNoRows": "Plik zawiera tylko wiersz nagłówka i żadnej miesiączki.",
         "errorCycleImportTooManyRows": "Jeden import może zawierać najwyżej {{limit}} miesiączek. Podziel plik.",
         "errorVitalImpossible": "Ta wartość jest niemożliwa. Sprawdź wprowadzone dane.",
-        "errorVitalBpOrder": "Wartość skurczowa musi być wyższa niż rozkurczowa."
+        "errorVitalBpOrder": "Wartość skurczowa musi być wyższa niż rozkurczowa.",
+        "errorVitalUnit": "Ta jednostka nie pasuje do tego pomiaru."
     },
     "waste": {
         "title": "Odbiór odpadów",

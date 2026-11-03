@@ -688,7 +688,8 @@
         "checkAllSubtasks": "Tümünü işaretle",
         "subtasksAllDone": "\"{{title}}\" ve tüm alt görevler tamamlandı.",
         "seriesDoneNamed": "\"{{title}}\" tamamlandı - sıradaki: {{date}}",
-        "kanbanRestore": "Geri yükle"
+        "kanbanRestore": "Geri yükle",
+        "errorTagGone": "Bu etiket artık yok."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ürün silindi.",
@@ -1030,7 +1031,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Orijinale sıfırla",
-            "resetToast": "Değişiklikler sıfırlandı."
+            "resetToast": "Değişiklikler sıfırlandı.",
+            "resetPendingToast": "Sıfırlandı. Özgün metin bir sonraki eşitlemede geri gelir."
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "Simge ara",
@@ -3454,7 +3456,28 @@
         "reminderListAssigneesTasksOnly": "Kişiler yalnızca Görevler’e giden listeler için ayarlanabilir.",
         "syncAssigneeNotMember": "Burada yalnızca hane üyeleri seçilebilir.",
         "syncAssigneeUnknown": "Bu kişi artık yok. Sayfayı yeniden yükleyin.",
-        "permDetails": "Widget'lar ve diğer izinler"
+        "permDetails": "Widget'lar ve diğer izinler",
+        "connectionFailedDetail": "Bağlantı başarısız: {{error}}",
+        "documentStorageChangeFailed": "Değişiklik uygulanmadı: {{error}}",
+        "apiTokenCopyFailed": "Kopyalanamadı. Belirteci seçip elle kopyalayın.",
+        "weatherLocateDenied": "Konumunuza erişime izin verilmiyor. Tarayıcı ayarlarından izin verin veya yeri elle girin.",
+        "weatherLocateFailed": "Konumunuz belirlenemedi. Yeri elle girin.",
+        "outlookAutoSyncOverrides": "Outlook, bağlı tekil istisnalar içeren serileri eşitleyemez. Burada düzenlenebilir kalmaları için hedef takvimlerini kapatın. Hiçbir istisnayı silmeniz gerekmez.",
+        "memberRemoveOwnAccount": "Kendi hesabınızı kaldıramazsınız.",
+        "memberRemoveLastAdmin": "En az bir yönetici kalmalıdır.",
+        "memberRemoveLastSsoAdmin": "Bu, SSO ile bağlantılı son yönetici. Önce başka bir yöneticiyi bağlayın.",
+        "backupWebdavUrlInvalid": "Adres http:// veya https:// ile başlamalıdır.",
+        "icsSubscriptionGone": "Bu abonelik artık yok.",
+        "backupDbKeyTitle": "Veritabanı anahtarı",
+        "backupDbKeyGeneratedHint": "Yuvomi bunu ilk başlatmada oluşturdu. Bir kopyasını bu sunucudan ayrı bir yerde sakla: o olmadan, depolama kaybolursa yedeklerin açılamaz.",
+        "backupDbKeyShow": "Anahtarı göster",
+        "backupDbKeyHide": "Gizle",
+        "backupDbKeyCopy": "Kopyala",
+        "backupDbKeyCopied": "Anahtar kopyalandı",
+        "backupDbKeyCopyFailed": "Kopyalama işe yaramadı. Anahtar seçili, elle kopyala.",
+        "backupDbKeyStoredAt": "Sunucuda şurada saklanıyor: {{path}}",
+        "backupDbKeyConfigHint": "Anahtar yapılandırmandan geliyor. Orada güvenle sakla: o olmadan yedeklerin açılamaz.",
+        "backupDbKeyPlainHint": "Veritabanı şifreli değil, bu yüzden yedekler verilerini okunabilir biçimde içerir. Kendi DB_ENCRYPTION_KEY değerinle Yuvomi onu bir sonraki başlatmada şifreler."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",
@@ -5821,7 +5844,8 @@
         "errorCycleImportNoRows": "Dosyada yalnızca başlık satırı var ve hiç adet dönemi yok.",
         "errorCycleImportTooManyRows": "Bir içe aktarma en fazla {{limit}} adet dönemi içerebilir. Dosyayı böl.",
         "errorVitalImpossible": "Bu değer mümkün değil. Lütfen girdiğini kontrol et.",
-        "errorVitalBpOrder": "Sistolik değer diyastolikten büyük olmalı."
+        "errorVitalBpOrder": "Sistolik değer diyastolikten büyük olmalı.",
+        "errorVitalUnit": "Bu birim bu ölçüme uymuyor."
     },
     "waste": {
         "title": "Atık toplama",

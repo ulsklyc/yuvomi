@@ -922,6 +922,75 @@ test('SpO2 ohne oder mit fremder Einheit haelt beide Raender, in Formular und Se
   }
 });
 
+// #2375: EINE Quelle fuer Browser und Server. Geprueft wird die Wirkung an beiden
+// Seiten, nicht dass die Datei existiert.
+test('#2375: Server, Dialog und Umrechnung lesen dieselbe Einheitenliste', async () => {
+  const client = await import('../public/utils/health-vitals.js');
+  const units = await import('../public/utils/vital-units.js');
+  const server = await import('../server/routes/health/vital-limits.js');
+  assert.deepEqual(
+    Object.fromEntries(client.VITAL_METRICS.map((m) => [m.type, m.units])),
+    { ...units.VITAL_UNITS },
+  );
+  for (const m of client.VITAL_METRICS) {
+    for (const unit of [...units.acceptedVitalUnits(m.type), null]) {
+      assert.equal(server.vitalUnitError({ type: m.type, unit }), null, `${m.type} ${unit}`);
+    }
+    assert.deepEqual(server.vitalUnitError({ type: m.type, unit: 'furlong' }), units.acceptedVitalUnits(m.type), m.type);
+    // Jede Einheit der Umrechnung kommt im Diagramm auch an.
+    for (const unit of units.acceptedVitalUnits(m.type)) {
+      const s = client.computeVitalSeries(
+        [{ id: 1, type: m.type, value_num: 1, unit, measured_at: '2026-06-12T08:00' }],
+        { type: m.type, range: 'month', anchor: '2026-06-15', today: '2026-06-15' },
+      );
+      if (m.units.length > 1) assert.ok(m.units.includes(s.latest.unit), `${m.type} ${unit} -> ${s.latest.unit}`);
+    }
+  }
+  assert.equal(server.vitalUnitError({ type: 'hr', unit: 'bpm' }), null, 'ein Typ ohne Metrik hat keine Liste');
+  assert.equal(server.vitalUnitError({ type: 'constructor', unit: 'bpm' }), null);
+});
+
+test('#2375: Formular und Server halten eine umgerechnete Einheit an denselben Raendern an', async () => {
+  const client = await import('../public/utils/health-vitals.js');
+  const server = await import('../server/routes/health/vital-limits.js');
+  for (const m of [
+    { type: 'weight', unit: 'g', value_num: 700001 }, { type: 'weight', unit: 'g', value_num: 700000 },
+    { type: 'weight', unit: 'stone', value_num: 111 }, { type: 'weight', unit: 'stone', value_num: 110 },
+    { type: 'weight', unit: 'lbs', value_num: 1551 }, { type: 'weight', unit: 'lbs', value_num: 1550 },
+    { type: 'temp', unit: 'c', value_num: 47 }, { type: 'temp', unit: 'F', value_num: 115 },
+    { type: 'bp', unit: 'MMHG', value_num: 400, value_num2: 80 },
+  ]) {
+    assert.equal(client.vitalPlausibility(m).hard.length > 0, server.vitalLimitError(m) !== null, JSON.stringify(m));
+  }
+  assert.equal(server.vitalLimitError({ type: 'weight', unit: 'g', value_num: 700001 }), 'out_of_range');
+  assert.equal(server.vitalLimitError({ type: 'weight', unit: 'g', value_num: 700000 }), null);
+  assert.deepEqual(client.vitalPlausibility({ type: 'weight', unit: 'g', value_num: 1000 }).soft, [{ channel: 'value', issue: 'low' }]);
+});
+
+test('#2375: der Dialog haelt eine Altzeile nur an, wenn sich die Messung aendert', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { vitalMeasureChanged } = await import('../public/utils/health-vitals.js');
+  const row = { value_num: 9000000, value_num2: null, value_num3: null, unit: 'g' };
+  const notiz = { value_num: 9000000, value_num2: null, value_num3: null, note: 'Bestand' };
+  assert.equal(vitalMeasureChanged(row, notiz), false);
+  assert.equal(vitalMeasureChanged(row, { ...notiz, value_num: 8000000 }), true);
+  assert.equal(vitalMeasureChanged(row, { ...notiz, value_num3: 60 }), true);
+  assert.equal(vitalMeasureChanged(row, { ...notiz, unit: 'kg' }), true);
+  const page = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  assert.match(page, /const judged = !isEdit \|\| vitalMeasureChanged\(row, patch\);\s+if \(judged && reportFieldErrors\(vitalPlausibility\(body\)/);
+});
+
+test('#2375: stone rechnet in den Verlauf um', async () => {
+  const { computeVitalSeries } = await import('../public/utils/health-vitals.js');
+  const s = computeVitalSeries([
+    { id: 1, type: 'weight', value_num: 80, unit: 'kg', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'weight', value_num: 80, unit: 'kg', measured_at: '2026-06-11T08:00' },
+    { id: 3, type: 'weight', value_num: 13, unit: 'stone', measured_at: '2026-06-12T08:00' },
+  ], { type: 'weight', range: 'month', anchor: '2026-06-15', today: '2026-06-15' });
+  assert.equal(s.unit, 'kg');
+  assert.equal(s.latest.value_num, 82.553811);
+});
+
 test('die harten Grenzen von Formular und Server sind dieselben, und weich liegt innerhalb von hart', async () => {
   const client = await import('../public/utils/health-vitals.js');
   const server = await import('../server/routes/health/vital-limits.js');
@@ -948,7 +1017,7 @@ test('die harten Grenzen von Formular und Server sind dieselben, und weich liegt
 
 test('der Vitalwerte-Dialog haelt Unmoegliches an und zeigt Ungewoehnliches als Hinweis', () => {
   const src = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
-  assert.match(src, /if \(reportFieldErrors\(vitalPlausibility\(body\)\.hard\.map\(/, 'Speichern prueft die harten Grenzen nicht');
+  assert.match(src, /if \(judged && reportFieldErrors\(vitalPlausibility\(body\)\.hard\.map\(/, 'Speichern prueft die harten Grenzen nicht');
   assert.match(src, /<p class="form-hint form-hint--warning" id="vital-plausibility" role="status" hidden><\/p>/);
   // Seit der R19-Nachlese beim Abschluss des Feldes (change), siehe unten.
   assert.match(src, /fieldsHost\.addEventListener\('change', updatePlausibility\)/, 'der Hinweis folgt der Eingabe nicht');
@@ -965,7 +1034,7 @@ test('Re-Kritik: steht ein harter Fehler am Feld, schweigt der Plausibilitaets-H
     'der Hinweis fragt, ob ein Wertefeld seinen Fehler selbst traegt');
   assert.match(update, /vitalPlausibility\(values\)\.hard\.length && fieldCarriesError\(\) \? null : vitalPlausibilityText\(values\)/,
     'Hartes nur, solange kein Feld es traegt - Ungewoehnliches immer');
-  const submitHard = src.slice(src.indexOf('if (reportFieldErrors(vitalPlausibility(body).hard.map('), src.indexOf('submitBtn.disabled = true;', src.indexOf('if (reportFieldErrors(vitalPlausibility(body).hard.map(')));
+  const submitHard = src.slice(src.indexOf('if (judged && reportFieldErrors(vitalPlausibility(body).hard.map('), src.indexOf('submitBtn.disabled = true;', src.indexOf('if (judged && reportFieldErrors(vitalPlausibility(body).hard.map(')));
   assert.match(submitHard, /updatePlausibility\(\);\s*return;/, 'nach dem Melden am Feld zieht der Hinweis nach');
 });
 
@@ -1296,11 +1365,11 @@ test('#2328: Laenge, Temperatur und Blutzucker rechnen genauso um', () => {
 
 test('#2328: unbekannte oder fehlende Einheit bleibt unangetastet', () => {
   const rows = [
-    { id: 1, type: 'weight', value_num: 15, unit: 'stone', measured_at: '2026-06-10T08:00' },
+    { id: 1, type: 'weight', value_num: 15, unit: 'furlong', measured_at: '2026-06-10T08:00' },
     { id: 2, type: 'weight', value_num: 95, unit: null, measured_at: '2026-06-11T08:00' },
   ];
   const s = computeVitalSeries(rows, { type: 'weight', range: 'month', anchor: '2026-06-15', today: '2026-06-15' });
   assert.equal(s.latest.value_num, 95);
   assert.equal(s.previous.value_num, 15);
-  assert.equal(s.previous.unit, 'stone');
+  assert.equal(s.previous.unit, 'furlong');
 });

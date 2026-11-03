@@ -7,6 +7,7 @@ import { confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors }
 import { createRetryState, hintFoldHtml, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getExtensionModules } from '/utils/extension-widgets.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 // Core scope keys — extension modules are appended from /permissions/catalog at render time.
 const CORE_SCOPE_MODULE_KEYS = [
@@ -408,13 +409,20 @@ function bindEvents(container, initialTokens, users, currentUserId) {
   // Token ist genau einmal sichtbar und stand in einem readonly Input, aus dem
   // es von Hand markiert werden musste (Critique 2026-07-27).
   container.querySelector('#api-token-copy')?.addEventListener('click', async () => {
-    const value = container.querySelector('#api-token-created-value')?.value;
+    const field = container.querySelector('#api-token-created-value');
+    const value = field?.value;
     if (!value) return;
+    // Ohne HTTPS gibt es navigator.clipboard nicht - dann waere "kopiert"
+    // gelogen, und das Token ist nur dieses eine Mal sichtbar. Markieren hilft
+    // weiter (dasselbe Muster wie admin-backup.js, #2487).
     try {
-      await navigator.clipboard?.writeText(value);
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(value);
       window.yuvomi?.showToast(t('settings.apiTokenCopied'), 'success');
-    } catch (err) {
-      window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
+    } catch {
+      field.focus();
+      field.select();
+      window.yuvomi?.showToast(t('settings.apiTokenCopyFailed'), 'danger');
     }
   });
 
@@ -437,7 +445,7 @@ function bindEvents(container, initialTokens, users, currentUserId) {
       refocusAfterRender();
       window.yuvomi?.showToast(t('settings.apiTokenRevokedToast'), 'default');
     } catch (err) {
-      window.yuvomi?.showToast(err.message, 'danger');
+      window.yuvomi?.showToast(errorSentence(err), 'danger');
     }
   });
 
@@ -464,14 +472,14 @@ function bindEvents(container, initialTokens, users, currentUserId) {
         // geht vor, oder die Liste ist alt): sein Satz statt des englischen,
         // und die Liste neu vom Server, damit die Zeile wieder richtig steht.
         const active = err?.status === 409 && err.data?.reason === 'api_token_active';
-        window.yuvomi?.showToast(active ? t('settings.apiTokenRemoveActive') : err.message, 'danger');
+        window.yuvomi?.showToast(active ? t('settings.apiTokenRemoveActive') : errorSentence(err), 'danger');
         if (active) {
           try {
             tokens = (await api.get('/auth/api-tokens')).data ?? tokens;
             renderApiTokenList(container, tokens);
             refocusAfterRender();
           } catch (reloadErr) {
-            window.yuvomi?.showToast(reloadErr.message, 'danger');
+            window.yuvomi?.showToast(errorSentence(reloadErr), 'danger');
           }
         }
         return;

@@ -362,6 +362,49 @@ await (async () => {
       ).get(subId);
       assert(row.title === 'Zahnarzt (verschoben)', `Titel blieb "${row.title}"`);
     });
+
+    // D#2330 (Variante A): der Feed-Stand liegt in feed_original. Jeder Sync
+    // schreibt ihn, auch an einen lokal geänderten Termin, dessen Felder der
+    // Sync nicht anfasst. Sonst stünde beim Zurücksetzen ein veralteter Wert da.
+    await atest('Sync schreibt feed_original auch an lokal geänderte Termine', async () => {
+      syncDb.prepare("UPDATE calendar_events SET title = 'Lokal', user_modified = 1 WHERE subscription_id = ?").run(subId);
+      body = icsWith('Zahnarzt (Feed neu)');
+      await sync(subId);
+      const row = syncDb.prepare(
+        'SELECT title, feed_original FROM calendar_events WHERE subscription_id = ?'
+      ).get(subId);
+      assert(row.title === 'Lokal', `lokale Änderung ging verloren: "${row.title}"`);
+      assert(row.feed_original, 'feed_original blieb leer');
+      assert(JSON.parse(row.feed_original).title === 'Zahnarzt (Feed neu)',
+        `feed_original hält "${JSON.parse(row.feed_original).title}"`);
+    });
+
+    // Altbestand: vor der Migration gesyncte Zeilen haben kein feed_original.
+    // Der nächste Sync füllt es nach, ohne den lokalen Stand zu verwerfen.
+    await atest('Sync füllt feed_original für Altbestand nach', async () => {
+      syncDb.prepare("UPDATE calendar_events SET feed_original = NULL WHERE subscription_id = ?").run(subId);
+      await sync(subId);
+      const row = syncDb.prepare(
+        'SELECT title, feed_original FROM calendar_events WHERE subscription_id = ?'
+      ).get(subId);
+      assert(row.feed_original, 'feed_original wurde nicht nachgefüllt');
+      assert(row.title === 'Lokal', `lokale Änderung ging verloren: "${row.title}"`);
+    });
+
+    // Migration 273: Altbestand bekommt ein leeres ETag und Last-Modified, damit
+    // der nächste Abruf den vollen Feed (200) statt 304 liefert.
+    await atest('Migration 273 leert ETag und Last-Modified der Abos', async () => {
+      const m = MIGRATIONS.find((x) => x.version === 273);
+      assert(m, 'Migration 273 fehlt');
+      const altId = syncDb.prepare(`
+        INSERT INTO ics_subscriptions (name, url, color, created_by, etag, last_modified)
+        VALUES ('Alt', 'https://x.com/alt.ics', '#000000', 1, '"abc"', 'Wed, 01 Jan 2026 00:00:00 GMT')
+      `).run().lastInsertRowid;
+      m.up(syncDb);
+      const r = syncDb.prepare('SELECT etag, last_modified FROM ics_subscriptions WHERE id = ?').get(altId);
+      assert(r.etag === null && r.last_modified === null,
+        `ETag blieb: ${JSON.stringify(r)}`);
+    });
   } finally {
     dbModule._resetTestDatabase();
     delete process.env[ENV_FLAG];

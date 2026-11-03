@@ -86,6 +86,14 @@ test('POST /accounts: Admin legt Account an, Token wird NICHT zurückgegeben', a
   assert.equal(res.body.data.api_token, undefined);
 });
 
+test('ein Konto, das es nicht mehr gibt, nennt dms_account_not_found (#1909)', async () => {
+  for (const [method, path] of [['DELETE', '/accounts/999999'], ['POST', '/accounts/999999/test']]) {
+    const res = await call(method, path);
+    assert.equal(res.status, 404, JSON.stringify(res.body));
+    assert.equal(res.body.reason, 'dms_account_not_found', path);
+  }
+});
+
 test('GET /accounts: listet ohne Token', async () => {
   const res = await call('GET', '/accounts');
   assert.equal(res.status, 200);

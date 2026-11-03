@@ -187,7 +187,6 @@ test('Vitals: unmoegliche Werte -> 400 mit Grund, moegliche Extremwerte gehen du
     [{ type: 'spo2', value_num: 101 }, 'health_vital_out_of_range'],
     // Review #2049: ohne oder mit fremder Einheit galt nur der obere Rand.
     [{ type: 'spo2', value_num: -10 }, 'health_vital_out_of_range'],
-    [{ type: 'spo2', value_num: 0, unit: 'percent' }, 'health_vital_out_of_range'],
     [{ type: 'temp', value_num: 60, unit: '°C' }, 'health_vital_out_of_range'],
     [{ type: 'glucose', value_num: 5000, unit: 'mg/dL' }, 'health_vital_out_of_range'],
     [{ type: 'glucose', value_num: 150, unit: 'mmol/L' }, 'health_vital_out_of_range'],
@@ -203,15 +202,160 @@ test('Vitals: unmoegliche Werte -> 400 mit Grund, moegliche Extremwerte gehen du
     { type: 'glucose', value_num: 600, unit: 'mg/dL' },
     { type: 'spo2', value_num: 100, unit: '%' },
     { type: 'bp', value_num: 220, value_num2: 130, value_num3: 180, unit: 'mmHg' },
-    // Eine fremde Einheit hat keine Zahlenraender.
-    { type: 'weight', value_num: 90, unit: 'stone' },
-    // Review #2049: ein Einheitsname wie eine Objekt-Eigenschaft warf vorher 500.
-    { type: 'weight', value_num: 70, unit: 'constructor' },
-    { type: 'bp', value_num: 120, value_num2: 80, unit: 'toString' },
   ]) {
     const res = await call('POST', '/vitals', { ...body, measured_at: at });
     assert.equal(res.status, 201, JSON.stringify(body));
   }
+});
+
+// #2375: `unit` war freier Text. "g" entging den harten Grenzen, eine Einheit
+// ohne Umrechnung stand unumgerechnet neben kg. Angenommen wird, was die Metrik
+// listet oder die Umrechnung kennt; geprueft wird der umgerechnete Wert.
+test('#2375: POST lehnt eine Einheit ab, die niemand umrechnen kann', async () => {
+  asA();
+  const at = '2026-06-05T08:00';
+  const before = db.prepare('SELECT COUNT(*) AS n FROM health_vitals').get().n;
+  for (const body of [
+    { type: 'weight', value_num: 90, unit: 'furlong' },
+    { type: 'weight', value_num: 80, unit: 'kgs' },
+    { type: 'height', value_num: 70, unit: 'ft' },
+    { type: 'temp', value_num: 300, unit: 'K' },
+    { type: 'glucose', value_num: 90, unit: 'g/L' },
+    { type: 'spo2', value_num: 97, unit: 'percent' },
+    { type: 'sleep', value_num: 420, unit: 'min' },
+    { type: 'bp', value_num: 16, value_num2: 10, unit: 'kPa' },
+    // Die Einheit einer anderen Messart ist hier keine.
+    { type: 'height', value_num: 80, unit: 'kg' },
+    { type: 'weight', value_num: 80, unit: 'cm' },
+    // Die Stimmung ist eine Stufe und fuehrt gar keine Einheit.
+    { type: 'mood', value_num: 3, unit: 'kg' },
+    // Review #2049: ein Einheitsname wie eine Objekt-Eigenschaft warf vorher 500.
+    { type: 'weight', value_num: 70, unit: 'constructor' },
+    { type: 'bp', value_num: 120, value_num2: 80, unit: 'toString' },
+    { type: 'weight', value_num: 70, unit: '__proto__' },
+  ]) {
+    const res = await call('POST', '/vitals', { ...body, measured_at: at });
+    assert.equal(res.status, 400, JSON.stringify(body));
+    assert.equal(res.body.reason, 'health_vital_unit_invalid', JSON.stringify(body));
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM health_vitals').get().n, before, 'nichts geschrieben');
+  const named = await call('POST', '/vitals', { type: 'weight', value_num: 90, unit: 'furlong', measured_at: at });
+  assert.match(named.body.error, /kg, lb, g, lbs, stone/, 'API-Nutzer erfahren, was geht');
+});
+
+test('#2375: was die Metrik listet oder die Umrechnung kennt, geht durch und bleibt, wie es kam', async () => {
+  asA();
+  const at = '2026-06-05T08:00';
+  for (const body of [
+    { type: 'weight', value_num: 80, unit: 'kg' }, { type: 'weight', value_num: 180, unit: 'lb' },
+    { type: 'weight', value_num: 95400, unit: 'g' }, { type: 'weight', value_num: 180, unit: 'lbs' },
+    { type: 'weight', value_num: 15, unit: 'stone' }, { type: 'weight', value_num: 80, unit: 'KG' },
+    { type: 'height', value_num: 180, unit: 'cm' }, { type: 'height', value_num: 70, unit: 'in' },
+    { type: 'height', value_num: 1.8, unit: 'm' }, { type: 'head_circumference', value_num: 400, unit: 'mm' },
+    { type: 'head_circumference', value_num: 40, unit: 'cm' }, { type: 'head_circumference', value_num: 16, unit: 'in' },
+    { type: 'glucose', value_num: 90, unit: 'mg/dL' }, { type: 'glucose', value_num: 5, unit: 'mmol/L' },
+    { type: 'glucose', value_num: 90, unit: 'mg/dl' },
+    { type: 'temp', value_num: 37, unit: '°C' }, { type: 'temp', value_num: 98, unit: '°F' },
+    { type: 'temp', value_num: 37, unit: 'C' }, { type: 'temp', value_num: 98, unit: 'f' },
+    { type: 'spo2', value_num: 97, unit: '%' }, { type: 'sleep', value_num: 7.5, unit: 'h' },
+    { type: 'bp', value_num: 120, value_num2: 80, unit: 'mmHg' }, { type: 'bp', value_num: 120, value_num2: 80, unit: 'MMHG' },
+    // `unit` bleibt optional, und ein Typ ohne Metrik hat keine Einheitenliste.
+    { type: 'mood', value_num: 3 }, { type: 'weight', value_num: 80 },
+    { type: 'hr', value_num: 60, unit: 'bpm' },
+  ]) {
+    const res = await call('POST', '/vitals', { ...body, measured_at: at });
+    assert.equal(res.status, 201, JSON.stringify(body));
+    assert.equal(res.body.data.unit, body.unit ?? null, 'gespeichert wie gesendet');
+    assert.equal(res.body.data.value_num, body.value_num, 'nichts umgeschrieben');
+  }
+});
+
+test('#2375: die harten Grenzen gelten am umgerechneten Wert', async () => {
+  asA();
+  const at = '2026-06-05T08:00';
+  for (const body of [
+    { type: 'weight', value_num: 700001, unit: 'g' },
+    { type: 'weight', value_num: 150, unit: 'g' },
+    { type: 'weight', value_num: 111, unit: 'stone' },
+    { type: 'weight', value_num: 1551, unit: 'lbs' },
+    { type: 'weight', value_num: 701, unit: 'KG' },
+    { type: 'temp', value_num: 60, unit: 'C' },
+    { type: 'temp', value_num: 116, unit: 'f' },
+    { type: 'glucose', value_num: 5000, unit: 'mg/dl' },
+    { type: 'bp', value_num: 400, value_num2: 80, unit: 'MMHG' },
+  ]) {
+    const res = await call('POST', '/vitals', { ...body, measured_at: at });
+    assert.deepEqual([res.status, res.body.reason], [400, 'health_vital_out_of_range'], JSON.stringify(body));
+  }
+  for (const body of [
+    { type: 'weight', value_num: 700000, unit: 'g' }, { type: 'weight', value_num: 200, unit: 'g' },
+    { type: 'weight', value_num: 110, unit: 'stone' }, { type: 'weight', value_num: 1550, unit: 'lbs' },
+    { type: 'temp', value_num: 115, unit: 'f' },
+  ]) {
+    const res = await call('POST', '/vitals', { ...body, measured_at: at });
+    assert.equal(res.status, 201, JSON.stringify(body));
+  }
+});
+
+test('#2375: eine Altzeile bleibt bearbeitbar, auch mit fremder Einheit oder unmoeglichem Wert', async () => {
+  asA();
+  const legacy = (type, value, unit) => db.prepare(`
+    INSERT INTO health_vitals (user_id, type, value_num, unit, measured_at) VALUES (?, ?, ?, ?, '2020-03-01T08:00')
+  `).run(userA, type, value, unit).lastInsertRowid;
+
+  const id = legacy('weight', 90, 'furlong');
+  let res = await call('PATCH', `/vitals/${id}`, { note: 'nur eine Notiz' });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  res = await call('PATCH', `/vitals/${id}`, { value_num: 91, measured_at: '2020-03-02T08:00' });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(res.body.data.unit, 'furlong', 'die Einheit bleibt, wie sie gespeichert ist');
+  // Ein Client, der die ganze Zeile zurueckschickt, aendert die Einheit nicht.
+  res = await call('PATCH', `/vitals/${id}`, { type: 'weight', unit: 'furlong', value_num: 92 });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+
+  res = await call('PATCH', `/vitals/${id}`, { unit: 'parsec' });
+  assert.deepEqual([res.status, res.body.reason], [400, 'health_vital_unit_invalid']);
+  res = await call('PATCH', `/vitals/${id}`, { type: 'height' });
+  assert.deepEqual([res.status, res.body.reason], [400, 'health_vital_unit_invalid'], 'furlong bleibt unbekannt');
+  assert.equal(db.prepare('SELECT unit FROM health_vitals WHERE id = ?').get(id).unit, 'furlong');
+
+  // Umstellen auf eine bekannte Einheit ist der Weg heraus.
+  res = await call('PATCH', `/vitals/${id}`, { unit: 'kg', value_num: 95.6 });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(res.body.data.unit, 'kg');
+
+  // Die Umrechnung macht aus einer harmlosen Altzeile keine gesperrte: 9.000.000 g
+  // war gespeichert, bevor Gramm eine Grenze hatte. Der Dialog schickt die Werte
+  // unveraendert mit; erst ein neuer unmoeglicher Wert wird abgelehnt.
+  const heavy = legacy('weight', 9000000, 'g');
+  res = await call('PATCH', `/vitals/${heavy}`, { value_num: 9000000, value_num2: null, value_num3: null, note: 'Bestand' });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  res = await call('PATCH', `/vitals/${heavy}`, { value_num: 8000000 });
+  assert.deepEqual([res.status, res.body.reason], [400, 'health_vital_out_of_range']);
+  res = await call('PATCH', `/vitals/${heavy}`, { value_num: 90000 });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+
+  const bp = db.prepare(`
+    INSERT INTO health_vitals (user_id, type, value_num, value_num2, unit, measured_at)
+    VALUES (?, 'bp', 16, 10, 'kPa', '2020-03-01T08:00')
+  `).run(userA).lastInsertRowid;
+  res = await call('PATCH', `/vitals/${bp}`, { note: 'Bestand', value_num: 17 });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(res.body.data.unit, 'kPa');
+});
+
+test('#2375: PATCH auf einer gueltigen Zeile prueft die Einheit und den Typwechsel', async () => {
+  asA();
+  const created = await call('POST', '/vitals', { type: 'weight', value_num: 80, unit: 'kg', measured_at: '2026-06-05T08:00' });
+  const id = created.body.data.id;
+  let res = await call('PATCH', `/vitals/${id}`, { unit: 'furlong' });
+  assert.deepEqual([res.status, res.body.reason], [400, 'health_vital_unit_invalid']);
+  res = await call('PATCH', `/vitals/${id}`, { unit: 'g' });
+  assert.deepEqual([res.status, res.body.reason], [400, 'health_vital_out_of_range'], '80 g ist kein Gewicht');
+  res = await call('PATCH', `/vitals/${id}`, { type: 'temp' });
+  assert.deepEqual([res.status, res.body.reason], [400, 'health_vital_unit_invalid'], 'kg ist keine Temperatur');
+  res = await call('PATCH', `/vitals/${id}`, { type: 'temp', unit: '°C', value_num: 37 });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
 });
 
 test('Vitals: PATCH prueft die Messung, wie sie danach stuende', async () => {
@@ -1800,6 +1944,14 @@ test('Betreuung: Betreuer trägt einen Vitalwert für die betreute Person ein', 
   });
   assert.equal(res.status, 201);
   assert.equal(res.body.data.user_id, userC, 'der Eintrag gehört dem Kind, nicht dem Elternteil');
+});
+
+test('#2375: auch fuer die betreute Person gilt die Einheit der Metrik', async () => {
+  asA();
+  const res = await call('POST', '/vitals', {
+    type: 'weight', value_num: 12, unit: 'furlong', measured_at: '2026-08-01T20:00', user_id: userC,
+  });
+  assert.deepEqual([res.status, res.body.reason], [400, 'health_vital_unit_invalid']);
 });
 
 // Der Kern des Wunsches: ohne Lesezugriff waere der eben eingetragene Wert fuer

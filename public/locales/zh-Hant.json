@@ -688,7 +688,8 @@
         "checkAllSubtasks": "全部勾選",
         "subtasksAllDone": "「{{title}}」及所有子任務已完成。",
         "seriesDoneNamed": "「{{title}}」已完成 - 下次到期：{{date}}",
-        "kanbanRestore": "恢復"
+        "kanbanRestore": "恢復",
+        "errorTagGone": "此標籤已不存在。"
     },
     "shopping": {
         "itemsRemovedToast_one": "已刪除 {{count}} 件商品。",
@@ -1030,7 +1031,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "重置為原始",
-            "resetToast": "更改已重置。"
+            "resetToast": "更改已重置。",
+            "resetPendingToast": "已重設。原始內容將在下次同步時恢復。"
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "搜尋圖示",
@@ -3454,7 +3456,28 @@
         "reminderListAssigneesTasksOnly": "只有進入任務的清單才能設定人員。",
         "syncAssigneeNotMember": "這裡只能選擇家庭成員。",
         "syncAssigneeUnknown": "此人已不存在。請重新載入頁面。",
-        "permDetails": "小工具與其他權限"
+        "permDetails": "小工具與其他權限",
+        "connectionFailedDetail": "連線失敗:{{error}}",
+        "documentStorageChangeFailed": "變更未套用:{{error}}",
+        "apiTokenCopyFailed": "無法複製。請選取權杖並手動複製。",
+        "weatherLocateDenied": "不允許存取您的位置。請在瀏覽器設定中允許,或手動輸入地點。",
+        "weatherLocateFailed": "無法判定您的位置。請手動輸入地點。",
+        "outlookAutoSyncOverrides": "Outlook 無法同步含有已連結單一例外的系列。請關閉其目標行事曆,以便在此繼續編輯。您不需要刪除任何例外。",
+        "memberRemoveOwnAccount": "您無法移除自己的帳號。",
+        "memberRemoveLastAdmin": "至少必須保留一位管理員。",
+        "memberRemoveLastSsoAdmin": "這是最後一位連結 SSO 的管理員。請先連結另一位管理員。",
+        "backupWebdavUrlInvalid": "位址必須以 http:// 或 https:// 開頭。",
+        "icsSubscriptionGone": "此訂閱已不存在。",
+        "backupDbKeyTitle": "資料庫金鑰",
+        "backupDbKeyGeneratedHint": "Yuvomi 在首次啟動時產生了它。請在這台伺服器以外保存一份副本：沒有它，儲存空間遺失後你的備份將無法開啟。",
+        "backupDbKeyShow": "顯示金鑰",
+        "backupDbKeyHide": "隱藏",
+        "backupDbKeyCopy": "複製",
+        "backupDbKeyCopied": "金鑰已複製",
+        "backupDbKeyCopyFailed": "複製失敗。金鑰已選取，請手動複製。",
+        "backupDbKeyStoredAt": "已儲存在伺服器上的 {{path}}",
+        "backupDbKeyConfigHint": "金鑰來自你的設定。請在那裡妥善保管：沒有它，你的備份將無法開啟。",
+        "backupDbKeyPlainHint": "資料庫未加密，因此備份中的資料是可讀的。設定你自己的 DB_ENCRYPTION_KEY 後，Yuvomi 會在下次啟動時將其加密。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",
@@ -5821,7 +5844,8 @@
         "errorCycleImportNoRows": "檔案只有標題列，沒有任何經期。",
         "errorCycleImportTooManyRows": "一次匯入最多 {{limit}} 個經期。請分割檔案。",
         "errorVitalImpossible": "這個數值不可能。請檢查輸入。",
-        "errorVitalBpOrder": "收縮壓必須高於舒張壓。"
+        "errorVitalBpOrder": "收縮壓必須高於舒張壓。",
+        "errorVitalUnit": "這個單位不適用於此測量。"
     },
     "waste": {
         "title": "垃圾收集",

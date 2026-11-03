@@ -251,6 +251,31 @@ test('ausgerichtet wird in der Zone, in der der Empfaenger die Serie rechnet', (
   assert.equal(outboundDateRange(naiv, { zone: 'America/New_York' }).start_datetime, '2035-01-31T23:30');
 });
 
+test('Bruchteile einer Sekunde ueberstehen das Ausrichten, Start und Ende je fuer sich (#1957)', () => {
+  const zeile = (start, ende) => ({
+    start_datetime: start, end_datetime: ende, tzid: 'Europe/Berlin',
+    recurrence_rule: MONATSLETZTER, series_authored: 1,
+  });
+  assert.deepEqual(outboundDateRange(zeile('2035-01-15T13:00:00.500Z', '2035-01-15T14:00:00.250Z')), {
+    start_datetime: '2035-01-31T13:00:00.500Z', end_datetime: '2035-01-31T14:00:00.250Z',
+  });
+  // Versatz im Wert: derselbe Zeitpunkt, heraus kommt `Z`. Ohne Bruchteil
+  // bleibt die Form wie bisher, ohne `.000`.
+  assert.deepEqual(outboundDateRange(zeile('2035-01-15T14:00:00.075+01:00', '2035-01-15T15:00:00+01:00')), {
+    start_datetime: '2035-01-31T13:00:00.075Z', end_datetime: '2035-01-31T14:00:00Z',
+  });
+  // Ueber die Umstellung: dieselbe Wanduhr, derselbe Bruchteil.
+  assert.equal(
+    outboundStartDatetime({ ...zeile('2035-03-15T13:00:00.500Z', null) }),
+    '2035-03-31T12:00:00.500Z',
+  );
+  // Zonenlose Ziffern neben einer `tzid` (#1993) laufen durch denselben Zweig.
+  assert.equal(
+    outboundStartDatetime(zeile('2035-01-15T14:00:00.500', null), { householdZone: 'Europe/Berlin' }),
+    '2035-01-31T13:00:00.500Z',
+  );
+});
+
 test('ein Zeitpunkt mit Zone bleibt ohne die Marke stehen (#756)', () => {
   const ev = {
     start_datetime: '2035-01-15T13:00:00Z', end_datetime: '2035-01-15T14:00:00Z', tzid: 'Europe/Berlin',

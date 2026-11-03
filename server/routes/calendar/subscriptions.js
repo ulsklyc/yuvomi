@@ -104,7 +104,7 @@ router.patch('/subscriptions/:id', (req, res) => {
     if (assignees.present) fields.default_assignee_user_ids = assignees.ids;
 
     const updated = icsSubscription.update(getUserId(req), subId, fields, isAdmin);
-    if (!updated) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
+    if (!updated) return res.status(404).json({ error: 'Subscription not found.', code: 404, reason: 'calendar_subscription_not_found' });
     res.json({ data: updated });
   } catch (err) {
     // icsSubscription wirft 'Not authorized.' (englisch) — ohne diese Angleichung
@@ -121,7 +121,7 @@ router.delete('/subscriptions/:id', (req, res) => {
     if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     const isAdmin = isAdminUser(req);
     const ok      = icsSubscription.remove(getUserId(req), subId, isAdmin);
-    if (!ok) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
+    if (!ok) return res.status(404).json({ error: 'Subscription not found.', code: 404, reason: 'calendar_subscription_not_found' });
     res.status(204).end();
   } catch (err) {
     // icsSubscription wirft 'Not authorized.' (englisch) — Angleichung wie oben,
@@ -138,7 +138,7 @@ router.post('/subscriptions/:id/sync', async (req, res) => {
     if (!Number.isFinite(subId)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     const isAdmin = isAdminUser(req);
     const sub     = db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId);
-    if (!sub) return res.status(404).json({ error: 'Subscription not found.', code: 404 });
+    if (!sub) return res.status(404).json({ error: 'Subscription not found.', code: 404, reason: 'calendar_subscription_not_found' });
     if (!isAdmin && sub.created_by !== getUserId(req))
       return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
     await icsSubscription.sync(subId);

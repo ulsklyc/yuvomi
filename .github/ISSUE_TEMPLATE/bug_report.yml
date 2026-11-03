@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for taking the time to report a bug! The version and deployment
-        fields below decide where we look first - Yuvomi ships to seven
+        fields below decide where we look first - Yuvomi ships to eight
         deployment targets and they fail in different ways.
   - type: input
     id: version
@@ -31,6 +31,7 @@ body:
         - TrueNAS SCALE (catalog app)
         - Umbrel
         - Unraid (Community Applications)
+        - Proxmox VE
         - Portainer stack
         - Bare metal / from source
         - Other (describe below)

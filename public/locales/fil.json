@@ -706,7 +706,8 @@
         "checkAllSubtasks": "Markahan lahat",
         "subtasksAllDone": "Tapos na ang \"{{title}}\" at lahat ng subtask.",
         "seriesDoneNamed": "Tapos na ang \"{{title}}\" - susunod: {{date}}",
-        "kanbanRestore": "I-restore"
+        "kanbanRestore": "I-restore",
+        "errorTagGone": "Wala na ang tag na ito."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ang item na natanggal.",
@@ -1058,7 +1059,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "Ibalik sa orihinal",
-            "resetToast": "Na-reset ang mga pagbabago."
+            "resetToast": "Na-reset ang mga pagbabago.",
+            "resetPendingToast": "Naibalik. Babalik ang orihinal na teksto sa susunod na pag-sync."
         },
         "iconLabel": "Icon",
         "iconSearchPlaceholder": "Maghanap ng icon",
@@ -3472,7 +3474,28 @@
         "reminderListAssigneesTasksOnly": "Maitatakda lang ang mga tao para sa mga listahang napupunta sa Mga Gawain.",
         "syncAssigneeNotMember": "Mga miyembro lang ng sambahayan ang mapipili rito.",
         "syncAssigneeUnknown": "Wala na ang taong ito. I-reload ang pahina.",
-        "permDetails": "Mga widget at iba pang pahintulot"
+        "permDetails": "Mga widget at iba pang pahintulot",
+        "connectionFailedDetail": "Nabigo ang koneksyon: {{error}}",
+        "documentStorageChangeFailed": "Hindi nailapat ang pagbabago: {{error}}",
+        "apiTokenCopyFailed": "Hindi nakopya. Piliin ang token at kopyahin ito nang mano-mano.",
+        "weatherLocateDenied": "Hindi pinapayagan ang access sa iyong lokasyon. Payagan ito sa mga setting ng browser o ilagay ang lugar nang mano-mano.",
+        "weatherLocateFailed": "Hindi matukoy ang iyong lokasyon. Ilagay ang lugar nang mano-mano.",
+        "outlookAutoSyncOverrides": "Hindi ma-sync ng Outlook ang mga serye na may naka-link na mga iisang eksepsyon. I-off ang target na kalendaryo ng mga ito para manatiling nae-edit dito. Hindi mo kailangang magbura ng mga eksepsyon.",
+        "memberRemoveOwnAccount": "Hindi mo maaaring alisin ang sarili mong account.",
+        "memberRemoveLastAdmin": "Kailangang may matirang kahit isang administrator.",
+        "memberRemoveLastSsoAdmin": "Ito ang huling administrator na naka-link sa SSO. Mag-link muna ng isa pang administrator.",
+        "backupWebdavUrlInvalid": "Dapat magsimula ang address sa http:// o https://.",
+        "icsSubscriptionGone": "Wala na ang subscription na ito.",
+        "backupDbKeyTitle": "Susi ng database",
+        "backupDbKeyGeneratedHint": "Ginawa ito ng Yuvomi sa unang pagsisimula. Magtabi ng kopya sa ibang lugar bukod sa server na ito: kung wala ito, hindi mabubuksan ang mga backup mo kapag nawala ang storage.",
+        "backupDbKeyShow": "Ipakita ang susi",
+        "backupDbKeyHide": "Itago",
+        "backupDbKeyCopy": "Kopyahin",
+        "backupDbKeyCopied": "Nakopya ang susi",
+        "backupDbKeyCopyFailed": "Hindi gumana ang pagkopya. Naka-select ang susi, kopyahin ito nang mano-mano.",
+        "backupDbKeyStoredAt": "Naka-save sa server sa {{path}}",
+        "backupDbKeyConfigHint": "Galing sa iyong configuration ang susi. Itago ito roon nang ligtas: kung wala ito, hindi mabubuksan ang mga backup mo.",
+        "backupDbKeyPlainHint": "Hindi naka-encrypt ang database, kaya nababasa ang data mo sa mga backup. Gamit ang sarili mong DB_ENCRYPTION_KEY, ie-encrypt ito ng Yuvomi sa susunod na pagsisimula."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",
@@ -5821,7 +5844,8 @@
         "errorCycleImportNoRows": "Header row lang ang laman ng file at walang regla.",
         "errorCycleImportTooManyRows": "Hanggang {{limit}} regla lang ang kaya ng isang import. Hatiin ang file.",
         "errorVitalImpossible": "Hindi posible ang halagang ito. Pakisuri ang inilagay mo.",
-        "errorVitalBpOrder": "Dapat mas mataas ang systolic kaysa sa diastolic."
+        "errorVitalBpOrder": "Dapat mas mataas ang systolic kaysa sa diastolic.",
+        "errorVitalUnit": "Hindi tugma ang yunit na ito sa sukat na ito."
     },
     "waste": {
         "title": "Koleksyon ng basura",

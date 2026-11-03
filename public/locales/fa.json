@@ -706,7 +706,8 @@
         "checkAllSubtasks": "علامت زدن همه",
         "subtasksAllDone": "«{{title}}» و همه زیرکارها انجام شد.",
         "seriesDoneNamed": "«{{title}}» انجام شد - دفعهٔ بعد: {{date}}",
-        "kanbanRestore": "بازیابی"
+        "kanbanRestore": "بازیابی",
+        "errorTagGone": "این برچسب دیگر وجود ندارد."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} مورد حذف شد.",
@@ -1058,7 +1059,8 @@
         "timeSuffix": "",
         "ics": {
             "reset": "بازگرداندن به حالت اصلی",
-            "resetToast": "تغییرات بازنشانی شد."
+            "resetToast": "تغییرات بازنشانی شد.",
+            "resetPendingToast": "بازنشانی شد. متن اصلی با همگام‌سازی بعدی برمی‌گردد."
         },
         "iconLabel": "نماد",
         "iconSearchPlaceholder": "جستجوی نماد",
@@ -3472,7 +3474,28 @@
         "reminderListAssigneesTasksOnly": "افراد را فقط برای فهرست‌هایی می‌توان تعیین کرد که به کارها می‌روند.",
         "syncAssigneeNotMember": "اینجا فقط اعضای خانوار را می‌توان انتخاب کرد.",
         "syncAssigneeUnknown": "این فرد دیگر وجود ندارد. صفحه را دوباره بارگیری کنید.",
-        "permDetails": "ویجت‌ها و مجوزهای بیشتر"
+        "permDetails": "ویجت‌ها و مجوزهای بیشتر",
+        "connectionFailedDetail": "اتصال ناموفق بود: {{error}}",
+        "documentStorageChangeFailed": "تغییر اعمال نشد: {{error}}",
+        "apiTokenCopyFailed": "کپی انجام نشد. توکن را انتخاب کنید و دستی کپی کنید.",
+        "weatherLocateDenied": "دسترسی به موقعیت مکانی مجاز نیست. آن را در تنظیمات مرورگر مجاز کنید یا مکان را دستی وارد کنید.",
+        "weatherLocateFailed": "موقعیت مکانی شما مشخص نشد. مکان را دستی وارد کنید.",
+        "outlookAutoSyncOverrides": "Outlook نمی‌تواند سری‌هایی را که استثناهای تکی پیوندخورده دارند همگام کند. تقویم مقصد آن‌ها را غیرفعال کنید تا اینجا قابل ویرایش بمانند. نیازی به حذف استثناها نیست.",
+        "memberRemoveOwnAccount": "نمی‌توانید حساب خودتان را حذف کنید.",
+        "memberRemoveLastAdmin": "حداقل یک مدیر باید باقی بماند.",
+        "memberRemoveLastSsoAdmin": "این آخرین مدیر متصل به SSO است. ابتدا مدیر دیگری را متصل کنید.",
+        "backupWebdavUrlInvalid": "نشانی باید با http:// یا https:// شروع شود.",
+        "icsSubscriptionGone": "این اشتراک دیگر وجود ندارد.",
+        "backupDbKeyTitle": "کلید پایگاه داده",
+        "backupDbKeyGeneratedHint": "Yuvomi آن را در اولین اجرا ساخت. یک نسخه از آن را جایی جدا از این سرور نگه دار: بدون آن، اگر فضای ذخیره‌سازی از دست برود، پشتیبان‌هایت باز نمی‌شوند.",
+        "backupDbKeyShow": "نمایش کلید",
+        "backupDbKeyHide": "پنهان کردن",
+        "backupDbKeyCopy": "کپی",
+        "backupDbKeyCopied": "کلید کپی شد",
+        "backupDbKeyCopyFailed": "کپی انجام نشد. کلید انتخاب شده است، آن را دستی کپی کن.",
+        "backupDbKeyStoredAt": "روی سرور در {{path}} ذخیره شده",
+        "backupDbKeyConfigHint": "کلید از پیکربندی تو می‌آید. آن را همان‌جا امن نگه دار: بدون آن، پشتیبان‌هایت باز نمی‌شوند.",
+        "backupDbKeyPlainHint": "پایگاه داده رمزگذاری نشده است، پس پشتیبان‌ها داده‌هایت را به‌صورت خوانا دارند. با یک DB_ENCRYPTION_KEY از خودت، Yuvomi آن را در اجرای بعدی رمزگذاری می‌کند."
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",
@@ -5821,7 +5844,8 @@
         "errorCycleImportNoRows": "فایل فقط سطر عنوان دارد و هیچ دوره‌ای ندارد.",
         "errorCycleImportTooManyRows": "هر درون‌ریزی حداکثر {{limit}} دوره می‌تواند داشته باشد. فایل را تقسیم کنید.",
         "errorVitalImpossible": "این مقدار ممکن نیست. لطفاً ورودی را بررسی کنید.",
-        "errorVitalBpOrder": "مقدار سیستولیک باید بیشتر از دیاستولیک باشد."
+        "errorVitalBpOrder": "مقدار سیستولیک باید بیشتر از دیاستولیک باشد.",
+        "errorVitalUnit": "این واحد با این اندازه‌گیری سازگار نیست."
     },
     "waste": {
         "title": "جمع‌آوری زباله",

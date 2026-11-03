@@ -26,6 +26,8 @@ const dbmod = await import('../server/db.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
 const { setEventAssignments } = await import('../server/routes/calendar/helpers.js');
 const { fanOutEventReminders } = await import('../server/services/event-reminder-fanout.js');
+const { processDueNotifications } = await import('../server/services/notifications.js');
+const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
 const database = dbmod.get();
 
 const mkUser = (name) => database
@@ -302,4 +304,154 @@ test('assigned_from steht auf NULL, wo niemand geerbt hat', () => {
     "SELECT assigned_from FROM reminders WHERE entity_type='task'"
   ).all();
   for (const r of rows) assert.equal(r.assigned_from, null);
+});
+
+// --------------------------------------------------------------------------
+// Die Zustellung: je Person eine Zeile, im Haushaltskanal eine Meldung
+// --------------------------------------------------------------------------
+
+const DUE_AT = '2026-08-31T10:00:00';
+const CHANNEL_NOW = new Date('2026-09-01T00:00:00Z');
+
+function householdChannel(name) {
+  const store = createNotificationChannelStore({ db: database });
+  const channel = store.createChannel({
+    provider: 'ntfy', name, enabled: true,
+    config: { baseUrl: 'https://ntfy.test', topic: name }, secrets: {},
+  });
+  return { id: channel.id, remove: () => store.deleteChannel(channel.id) };
+}
+
+const settleEverything = () => database
+  .prepare("UPDATE reminders SET pushed_at = '2000-01-01T00:00:00Z' WHERE pushed_at IS NULL").run();
+
+async function deliver({ send = async () => {} } = {}) {
+  const heard = [];
+  await processDueNotifications({
+    database,
+    channelStore: createNotificationChannelStore({ db: database }),
+    pushService: { sendPushToUser: async () => 0 },
+    providers: {
+      ntfy: {
+        id: 'ntfy',
+        send: async ({ channel, payload }) => {
+          await send();
+          heard.push({ scope: channel.scope, body: payload.body });
+        },
+      },
+    },
+    now: CHANNEL_NOW,
+  });
+  return heard;
+}
+
+test('der Haushaltskanal hoert einen Termin einmal, nicht je Zugewiesenem', async () => {
+  const channel = householdChannel('termin-eins');
+  try {
+    settleEverything();
+    const id = newEvent([ANNA, BEN, CLEO]);
+    actingUser = ANNA;
+    await setReminders(id, [DUE_AT]);
+    assert.equal(database.prepare("SELECT COUNT(*) n FROM reminders WHERE entity_type='event' AND entity_id=?").get(id).n,
+      3, 'die Vorlage: drei Zeilen fuer dieselbe Erinnerung');
+
+    assert.equal((await deliver()).length, 1, 'drei Zeilen duerfen im Haushaltskanal nicht drei Meldungen werden');
+    assert.equal((await deliver()).length, 0, 'und der naechste Lauf meldet nichts nach');
+  } finally {
+    channel.remove();
+  }
+});
+
+test('eine spaet faellige zweite Zeile meldet sich dort nicht noch einmal', async () => {
+  const channel = householdChannel('termin-zwei');
+  try {
+    settleEverything();
+    const id = newEvent([ANNA, BEN]);
+    actingUser = ANNA;
+    await setReminders(id, [DUE_AT]);
+    database.prepare("UPDATE reminders SET remind_at = '2099-01-01T00:00:00' WHERE entity_type='event' AND entity_id=? AND created_by=?")
+      .run(id, BEN);
+    assert.equal((await deliver()).length, 1);
+
+    // Dieselbe Zeit wie die der anderen, nur erst jetzt an der Reihe.
+    database.prepare("UPDATE reminders SET remind_at = ? WHERE entity_type='event' AND entity_id=? AND created_by=?")
+      .run(DUE_AT, id, BEN);
+    assert.equal((await deliver()).length, 0, 'derselbe Zeitpunkt kam ein zweites Mal in den Kanal');
+  } finally {
+    channel.remove();
+  }
+});
+
+test('eine absichtlich andere Uhrzeit bleibt eine eigene Meldung', async () => {
+  const channel = householdChannel('termin-drei');
+  try {
+    settleEverything();
+    const id = newEvent([ANNA, BEN]);
+    actingUser = BEN;
+    await setReminders(id, ['2026-08-30T06:00:00']);
+    actingUser = ANNA;
+    await setReminders(id, [DUE_AT]);
+    assert.equal(remindersOf(id, BEN).length, 1, 'Bens eigene Zeit steht neben der von Anna');
+
+    assert.equal((await deliver()).length, 2, 'zwei Zeitpunkte sind zwei Auskuenfte');
+  } finally {
+    channel.remove();
+  }
+});
+
+test('ein Fehlschlag der ersten Zeile verschluckt die Meldung nicht', async () => {
+  const channel = householdChannel('termin-vier');
+  try {
+    settleEverything();
+    const id = newEvent([ANNA, BEN]);
+    actingUser = ANNA;
+    await setReminders(id, [DUE_AT]);
+
+    let down = true;
+    const send = async () => { if (down) { down = false; throw new Error('kanal kurz weg'); } };
+    assert.equal((await deliver({ send })).length, 1, 'die zweite Zeile faengt den Ausfall auf');
+    database.prepare("UPDATE notification_deliveries SET next_attempt_at = '2000-01-01T00:00:00Z' WHERE status = 'failed'").run();
+    assert.equal((await deliver()).length, 0, 'und die Wiederholung der ersten meldet nicht doppelt');
+  } finally {
+    channel.remove();
+  }
+});
+
+test('stehen beide Zeilen auf Wiederholung, kommt die Meldung genau einmal', async () => {
+  // Zustand aus der Zeit vor dem Riegel: der Kanal fiel aus, beide Zeilen haben
+  // dort eine fehlgeschlagene Zustellung. Keine darf die andere stummschalten.
+  const channel = householdChannel('termin-fuenf');
+  try {
+    settleEverything();
+    const id = newEvent([ANNA, BEN]);
+    actingUser = ANNA;
+    await setReminders(id, [DUE_AT]);
+    const rows = database.prepare("SELECT id FROM reminders WHERE entity_type='event' AND entity_id=?").all(id);
+    for (const row of rows) {
+      database.prepare(`
+        INSERT INTO notification_deliveries
+          (reminder_id, provider, channel_id, target_key, status, attempt_count, next_attempt_at, created_at, updated_at)
+        VALUES (?, 'ntfy', ?, ?, 'failed', 1, '2000-01-01T00:00:00Z', '2000-01-01T00:00:00Z', '2000-01-01T00:00:00Z')
+      `).run(row.id, channel.id, `channel:${channel.id}`);
+    }
+
+    assert.equal((await deliver()).length, 1);
+    assert.equal((await deliver()).length, 0);
+  } finally {
+    channel.remove();
+  }
+});
+
+test('ein Termin nur fuer die Zugewiesenen bleibt aus dem Haushaltskanal', async () => {
+  const channel = householdChannel('termin-sechs');
+  try {
+    settleEverything();
+    const id = newEvent([ANNA, BEN]);
+    database.prepare("UPDATE calendar_events SET visibility = 'private' WHERE id = ?").run(id);
+    actingUser = ANNA;
+    await setReminders(id, [DUE_AT]);
+    assert.equal((await deliver()).length, 0);
+  } finally {
+    channel.remove();
+  }
 });

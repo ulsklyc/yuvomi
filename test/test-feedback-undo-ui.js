@@ -37,7 +37,7 @@ test('Aufgaben: die Quittung liest den Titel VOR dem Neuladen und nennt offene T
   // An beiden Gesten (Haken, Wisch) steht der Schnappschuss vor dem Statuswechsel -
   // und seit R24 (G0-Shell-P1-2) die Quittung auch VOR dem ersten `await`: sie
   // bekommt die laufende Anfrage, nicht deren Antwort.
-  const sites = [...src.matchAll(/const before = taskSnapshot\((\w+)\);(?:\s*\/\/[^\n]*)*\s*const pending = toggleTaskStatus\(\w+, \w+\);\s*acknowledgeStatusToggle\(container, \1, nextStatus, pending, before\);\s*try \{\s*await pending;/g)];
+  const sites = [...src.matchAll(/const before = taskSnapshot\((\w+)\);(?:\s*\/\/[^\n]*(?=\n))*\s*const pending = toggleTaskStatus\(\w+, \w+\);\s*acknowledgeStatusToggle\(container, \1, nextStatus, pending, before\);\s*try \{\s*await pending;/g)];
   assert.equal(sites.length, 2, 'Haken und Wisch quittieren im Tipp, mit Titel und Teilaufgaben von vor dem Wechsel');
   assert.equal((src.match(/acknowledgeStatusToggle\(container, \w+, nextStatus, \w+, before\)/g) ?? []).length, 2);
   const ack = body(src, 'function acknowledgeStatusToggle(');

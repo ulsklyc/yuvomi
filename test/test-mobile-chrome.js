@@ -462,6 +462,67 @@ test('R16: Werkzeuge in der Titelzeile - nur markiert, nur mobil, nie neben eine
   assert.ok(design.includes(TITLE_TOOLS), 'und nennt ihre Kennklasse');
 });
 
+// #2425: DREI KNOEPFE LASSEN DEM TITEL BEI 360px 136px, "Aufgaben" braucht in
+// Roboto 144 (Box = Breite - 224: Raender 32, Siegel 32 + 4, Knoepfe 152, Luecke
+// 4). Unter 390px traegt der Aufgabenkopf deshalb die zwei Knoepfe der Regel 1a:
+// der Filter steht im "...", seine Zahl am "..." (Regel 3). Ab 390px bleibt der
+// Knopf. JE BREITE EIN WEG: dieselbe eine Abfrage schaltet beide.
+test('#2425: unter 390px steht der Aufgabenfilter im Menue, seine Zahl am "..."', () => {
+  const tasksPage = read('../public/pages/tasks.js');
+  const tasksCss = read('../public/styles/tasks.css');
+  const css = rules(tasksCss);
+  const NARROW = /^@container\s+tasks-page\s*\(width < 390px\)/;
+  // Die Wurzel traegt den Namen in JEDER Ansicht: `module-surface` faellt im
+  // Brett weg (`app-page--list-detail`), und die Abfrage griffe dort ins Leere.
+  assert.ok(css.some((r) => r.selector === '.tasks-page' && /container:\s*tasks-page \/ inline-size/.test(r.body)),
+    'die Seitenwurzel ist in jeder Ansicht der Container der Abfrage');
+  assert.ok(css.some((r) => r.selector === '.tasks-page.app-page--list-detail' && /container-name:\s*module-surface tasks-page/.test(r.body)),
+    'Liste + Detail behaelt seinen Namen neben dem eigenen');
+  const narrow = css.filter((r) => r.at.some((a) => NARROW.test(a)));
+
+  const button = narrow.find((r) => /\.tasks-toolbar__filter\b/.test(r.selector));
+  assert.equal(decl(button?.body ?? '', 'display'), 'none', 'unter 390px verlaesst der Filterknopf den Kopf');
+
+  // Die Faltung gehoert allein den Aufgaben: der Kalender behaelt seinen Filter
+  // (R20 6c), und kein anderes Blatt faltet ueber diese Schwelle.
+  for (const { file, css: sheet } of sheets) {
+    if (file === 'tasks.css') continue;
+    assert.ok(!rules(sheet).some((r) => r.at.some((a) => NARROW.test(a)) && /page-filter-btn|filter-btn/.test(r.selector)),
+      `${file}: die Faltung gilt nur im Aufgabenkopf`);
+  }
+
+  // Der Eintrag: dasselbe Zeichen, derselbe Name, derselbe Weg zum Blatt.
+  assert.match(tasksPage, /action: 'open-filters', label: t\('common\.filters'\), icon: 'sliders-horizontal'/,
+    'das Menue bietet den Filter an, mit dem Zeichen des Knopfs');
+  assert.match(tasksPage, /case 'open-filters':\s*openTaskFilters\(container\);/, 'der Eintrag oeffnet dasselbe Blatt');
+
+  // Ab 390px gibt es weder Eintrag noch Zahl am "...": Basis aus, nur die eine
+  // Abfrage schaltet sie ein. Sie fragt die Seitenwurzel, nicht den Viewport
+  // (tokens.css 11c), und JS fragt die Zahl, damit die Schwelle nur einmal steht.
+  const ENTRY = '.popover-menu__item[data-action="open-filters"]';
+  const COUNT = '.tasks-tools-btn__count';
+  for (const part of [ENTRY, COUNT]) {
+    const base = css.find((r) => r.at.length === 0 && r.selector.includes(part));
+    assert.equal(decl(base?.body ?? '', 'display'), 'none', `${part} ist ausserhalb der Abfrage aus`);
+    const on = narrow.find((r) => r.selector.includes(part));
+    assert.notEqual(decl(on?.body ?? '', 'display') ?? 'none', 'none', `${part} steht unter 390px`);
+  }
+
+  // Regel 3: die Zahl bleibt sichtbar und im Namen, sie zieht bei jeder
+  // Aenderung mit, und im Verlauf gibt es keinen Filter und damit keine Zahl.
+  const sync = tasksPage.match(/function syncFilterMenu\(container\) \{[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(sync, 'syncFilterMenu fehlt');
+  assert.match(sync, /common\.filtersActive/, 'Eintrag und "..." nennen die Zahl');
+  assert.match(sync, /state\.viewMode === 'history'/, 'im Verlauf gibt es keinen Filter');
+  assert.match(tasksPage, /function renderFilters\(container\) \{[\s\S]{0,160}syncFilterMenu\(container\)/,
+    'renderFilters zieht das Menue mit');
+  assert.doesNotMatch(tasksPage, /matchMedia[^\n]*3[89]\dpx/, 'die Schwelle steht nur in tasks.css');
+  assert.match(sync, /getComputedStyle\(badge\)\.display/, 'der Name folgt der Abfrage aus tasks.css');
+
+  const design = read('../DESIGN.md');
+  assert.match(design, /Aufgaben unter 390px/, 'DESIGN.md benennt die Ausnahme in Regel 3');
+});
+
 // R16 (Critique 2026-10-05, P1 mobil): KENNZAHLEN ALS KURZZEILE. Inventar trug
 // 136px Kacheln vor der Liste (eine fuer „0"), die Haushaltshilfe ein 2x2-
 // Raster vor den Besuchen. Beide nutzen mobil die Kurzzeile des Budgets

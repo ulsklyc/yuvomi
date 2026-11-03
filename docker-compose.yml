@@ -25,9 +25,10 @@ services:
     # "services.yuvomi.env_file.0 must be a string", also noch vor dem ersten
     # Start. Die Langform stand hier für Git-/GitOps-Stacks ohne .env (#698);
     # dieser Weg geht seitdem über docs/docker-compose.portainer.yml, das jede
-    # Variable einzeln aufführt. Sie hier zu behalten kaufte nichts: ohne .env
-    # fehlt SESSION_SECRET, und der Container beendet sich beim Start - der
-    # Deploy scheitert also so oder so, nur eine Stufe später.
+    # Variable einzeln aufführt. Seit die Secrets beim ersten Start entstehen,
+    # liefe ein Stack ohne .env mit der Langform zwar an; die Kurzform bleibt
+    # trotzdem, weil sie auf jeder Compose-Version liest, und ohne .env bricht
+    # sie mit "env file not found" ab, bevor etwas startet.
     env_file:
       - .env
     environment:

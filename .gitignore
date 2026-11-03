@@ -7,6 +7,8 @@ modules/*
 
 # Environment variables (NEVER commit)
 .env
+# Secrets the app generates on first start, next to the database (server/utils/auto-secrets.js)
+.secrets/
 
 # Database
 *.db

@@ -410,6 +410,41 @@ test('PUT / lehnt ungültige entity-Parameter ab (400)', async () => {
   assert.equal(res.status, 400);
 });
 
+// Ersetzen hiess vorher Loeschen und Neuanlegen: eine gelesene, vergangene
+// Erinnerung kam nach jedem Speichern derselben Menge ungelesen und mit neuer
+// ID zurueck und meldete sich in /pending erneut (PWA-Dialog einer Serie,
+// /reminders/upcoming eines nativen Clients).
+test('PUT / behält unveränderte Zeitpunkte samt ID, Gelesen- und Push-Status', async () => {
+  const owner = freshUser();
+  currentUid = owner;
+  const taskId = makeTask(owner);
+  const path = `/?entity_type=task&entity_id=${taskId}`;
+
+  const first = await call('PUT', path, { remind_ats: [PAST, at(9, 0)] });
+  assert.equal(first.status, 200);
+  const kept = db.prepare(`SELECT id FROM reminders WHERE entity_type = 'task' AND entity_id = ? AND remind_at = ?`)
+    .get(taskId, PAST).id;
+  assert.equal((await call('PATCH', `/${kept}/dismiss`)).status, 200);
+  db.prepare(`UPDATE reminders SET pushed_at = '2000-01-01 00:00:05' WHERE id = ?`).run(kept);
+
+  const second = await call('PUT', path, { remind_ats: [PAST, at(10, 0)] });
+  assert.equal(second.status, 200);
+
+  const rows = db.prepare(`
+    SELECT id, remind_at, dismissed, pushed_at FROM reminders
+    WHERE entity_type = 'task' AND entity_id = ? ORDER BY remind_at
+  `).all(taskId);
+  assert.deepEqual(rows.map((r) => r.remind_at), [PAST, at(10, 0)]);
+  assert.equal(rows[0].id, kept);
+  assert.equal(rows[0].dismissed, 1);
+  assert.equal(rows[0].pushed_at, '2000-01-01 00:00:05');
+  assert.equal(rows[1].dismissed, 0);
+  assert.deepEqual(second.body.data.map((r) => r.remind_at), [at(10, 0)]);
+
+  const pending = await call('GET', '/pending');
+  assert.ok(!pending.body.data.some((r) => r.id === kept), 'gelesene Erinnerung meldet sich nicht erneut');
+});
+
 // --------------------------------------------------------
 // PATCH /:id/dismiss - Zustandsübergang + Isolation
 // --------------------------------------------------------

@@ -1665,6 +1665,30 @@ test('R22 D15: die Faltzeile kommt beim Hochscrollen zurueck, ein Zittern und ei
   } finally { s.restore(); }
 });
 
+// #2346: auf iOS meldet `scrollTop` im Gummiband mehr als die Reserve. Gemessen in
+// Safari: Reserve 268, Finger los bei 369, das Federn endet bei 268. Der Wendepunkt
+// stand bei 369, die 101px Rueckfedern lasen sich als „aufwaerts" - die Zeile kam
+// zurueck, der Port schrumpfte, und das Listenende rutschte hinter die Kapsel.
+test('#2346: das Rueckfedern am Listenende holt die Faltzeile nicht zurueck, ein echter Rueckweg schon', () => {
+  const s = kitchenFoldStub();
+  try {
+    wireCollapsingHeader(s.toolbar);
+    s.fire('touchstart', s.row);
+    s.scrollTo(600);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true, 'abwaerts faltet sie');
+    s.port.clientHeight += 64;
+    s.scrollTo(610);
+    const end = s.port.scrollHeight - s.port.clientHeight;
+    s.scrollTo(end);
+    for (const over of [40, 101, 75, 30, 8, 0]) s.scrollTo(end + over);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), true,
+      'das Gummiband ist keine Richtung: die Zeile bleibt gefaltet, das Listenende bleibt stehen');
+    s.scrollTo(end - 45);
+    assert.equal(s.toolbar.classList.contains('is-collapsed'), false,
+      '45px Rueckweg ab dem Listenende holen sie weiter zurueck');
+  } finally { s.restore(); }
+});
+
 // R17 Schritt 5 (Critique 2026-10-07): bis dahin blieben Wochenstepper
 // (Mahlzeiten) und Listen-Kapseln (Einkauf) stehen - 121px Kopf in jedem
 // Scrollstand, der Vorrat daneben 56. Jede Zeile unter der Leiste faltet.

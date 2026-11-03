@@ -51,8 +51,8 @@ const router = express.Router();
 // spaeter erweiterte Presets, ohne eine Endlos-Liste durchzulassen.
 const MAX_SYMPTOMS_COUNT = 40;
 
-// Anders als health_vitals.unit (freier Text, viele Metriken) macht fuer eine
-// Basaltemperatur nur eine von zwei Einheiten Sinn - und detectTemperatureShift()
+// Enger als health_vitals.unit (Liste je Metrik, utils/vital-units.js): fuer eine
+// Basaltemperatur macht nur eine von zwei Einheiten Sinn - und detectTemperatureShift()
 // muss beide zuverlaessig in Celsius umrechnen koennen, ein freies Textfeld
 // waere dafuer die falsche Grundlage. Plausibilitaets-Grenzen sind grosszuegige
 // Koerpertemperatur-Baender, keine medizinische Norm.

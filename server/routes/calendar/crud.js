@@ -6,7 +6,7 @@
 import { createLogger } from '../../logger.js';
 import express from 'express';
 import * as db from '../../db.js';
-import { str, color, datetime, rrule, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../middleware/validate.js';
+import { str, color, datetime, rrule, textShape, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../middleware/validate.js';
 import { icsSubscriptionVisibleWhere, normalizeVisibility, visibilityWhere } from '../../services/visibility.js';
 import { hasAnyOccurrence, endsBeforeStart } from '../../services/recurrence.js';
 import { startOrRuleChanged } from '../../services/outbound-dtstart.js';
@@ -47,6 +47,7 @@ import {
   truncateSeries,
   upsertOccurrenceOverride,
   updateSeriesWithOverrides,
+  followInboundStartChange,
 } from '../../services/calendar-occurrence-overrides.js';
 import {
   ASSIGNED_USERS_SQL,
@@ -580,7 +581,13 @@ router.post('/', async (req, res) => {
     const vGoogle = googleTarget(req.body);
     const vOutlook = outlookTarget(req.body);
     const vLocalCalendar = validateCalendarId(db.get(), req.body.local_calendar_id);
-    const checks = [vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook, vLocalCalendar];
+    // Die Form vor dem Inhalt: `str()` machte aus einer Zahl Text ("5").
+    const shapes = [
+      textShape(req.body.title, 'title'),
+      textShape(req.body.description, 'description', { nullable: true }),
+      textShape(req.body.location, 'location', { nullable: true }),
+    ];
+    const checks = [...shapes, vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook, vLocalCalendar];
     if (collectErrors(checks).length) return sendValidationErrors(res, checks);
     if (req.body.local_calendar_id !== undefined
         && ((req.body.external_source && req.body.external_source !== 'local')
@@ -876,7 +883,15 @@ router.put('/:id', async (req, res) => {
       ? datetime(req.body.start_datetime, 'start_datetime', true, zoneOpts) : null;
     const vEnd = req.body.end_datetime !== undefined
       ? datetime(req.body.end_datetime, 'end_datetime', false, zoneOpts) : null;
-    if (req.body.title          !== undefined) checks.push(str(req.body.title, 'title', { max: MAX_TITLE, required: false }));
+    // Ein mitgeschickter Titel muss Text sein und darf nicht leer sein: eine Zahl
+    // lief in `.trim()` auf einen 500, '' wurde gespeichert, und `null` blieb
+    // still ohne Wirkung. Fehlt er, bleibt der alte (Kuerzen einer Serie).
+    checks.push(
+      textShape(req.body.title, 'title'),
+      textShape(req.body.description, 'description', { nullable: true }),
+      textShape(req.body.location, 'location', { nullable: true }),
+    );
+    if (req.body.title          !== undefined) checks.push(str(req.body.title, 'title', { max: MAX_TITLE, required: typeof req.body.title === 'string' }));
     if (req.body.description    !== undefined) checks.push(str(req.body.description, 'description', { max: MAX_TEXT, required: false }));
     if (vStart) checks.push(vStart);
     if (vEnd)   checks.push(vEnd);
@@ -1881,10 +1896,39 @@ router.post('/:id/reset', (req, res) => {
     if (!isAdmin && event.created_by !== userId && event.sub_created_by !== userId)
       return res.status(403).json({ error: 'Not authorized.', code: 403 });
 
+    // D#2330: der gespeicherte Feed-Stand stellt den Termin sofort her, ohne Netz.
+    // Fehlt er (Altbestand vor Migration 273 oder unlesbar), wird nur das Flag
+    // zurückgenommen und restored=false gemeldet: der nächste Abgleich schreibt
+    // den Stand, bis dahin ist der Reset nicht vollständig.
+    let feed = null;
+    if (event.feed_original) {
+      try { feed = JSON.parse(event.feed_original); } catch { feed = null; }
+    }
+
     // `color_modified` geht mit: Zurücksetzen heisst "der Feed führt diesen
     // Termin wieder", und das schliesst seine Farbe ein (#899).
-    db.get().prepare('UPDATE calendar_events SET user_modified = 0, color_modified = 0 WHERE id = ?').run(id);
-    res.json({ data: { reset: true } });
+    db.get().transaction(() => {
+      if (feed) {
+        // Titel und Start sind NOT NULL: fehlt der Wert im Feed-Stand, bleibt der aktuelle.
+        const startDt = feed.start_datetime ?? event.start_datetime;
+        db.get().prepare(`
+          UPDATE calendar_events
+          SET user_modified = 0, color_modified = 0,
+              title = ?, description = ?, start_datetime = ?, end_datetime = ?,
+              all_day = ?, location = ?, color = ?
+          WHERE id = ?
+        `).run(
+          feed.title ?? event.title, feed.description ?? null, startDt, feed.end_datetime ?? null,
+          feed.all_day ? 1 : 0, feed.location ?? null, feed.color ?? null, id,
+        );
+        // Ein verlegter Start zieht die Erinnerungen mit, wie beim Abgleich (#1377).
+        if (startDt !== event.start_datetime)
+          followInboundStartChange(db.get(), id, event.start_datetime, startDt);
+      } else {
+        db.get().prepare('UPDATE calendar_events SET user_modified = 0, color_modified = 0 WHERE id = ?').run(id);
+      }
+    })();
+    res.json({ data: { reset: true, restored: feed !== null } });
   } catch (err) {
     log.error('', err);
     res.status(500).json({ error: 'Internal error.', code: 500 });

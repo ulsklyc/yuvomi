@@ -434,6 +434,18 @@ describe('Routen', () => {
     assert.deepEqual(assignmentsOf(id), sorted([ANNA, BEN]));
   });
 
+  it('subscriptions: a gone subscription names calendar_subscription_not_found (#1909)', async () => {
+    for (const [method, path, body] of [
+      ['PATCH', '/subscriptions/999999', { name: 'x' }],
+      ['DELETE', '/subscriptions/999999', undefined],
+      ['POST', '/subscriptions/999999/sync', {}],
+    ]) {
+      const res = await call(method, path, body);
+      assert.equal(res.status, 404, JSON.stringify(res.body));
+      assert.equal(res.body.reason, 'calendar_subscription_not_found', path);
+    }
+  });
+
   it('subscriptions: PATCH stores a list and GET returns it', async () => {
     const subId = Number(db.prepare(`INSERT INTO ics_subscriptions (name, url, color, created_by, shared)
       VALUES ('S', 'https://x/s.ics', '#FF0000', ?, 1) RETURNING id`).get(OWNER).id);

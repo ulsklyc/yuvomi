@@ -206,7 +206,7 @@ function requestLocation(container, scope, locateButton) {
       if (!isConnectedWeatherControl(locateButton, container)) return;
 
       locateButton.disabled = false;
-      window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(t(geolocationErrorKey(error)), 'danger');
     },
     { enableHighAccuracy: true, timeout: 8000 },
   );
@@ -217,6 +217,14 @@ function setPlaceCurrent(container, scope) {
   if (!line) return;
   const text = weatherPlaceText(readWeatherLocation(container, scope));
   line.textContent = text ? t('settings.weatherPlaceCurrent', { place: text }) : t('settings.weatherPlaceNone');
+}
+
+/**
+ * Der Fehlersatz zur Standortabfrage. Der Browser nennt den Fall als Zahl
+ * (1 = abgelehnt); sein `message` ist Diagnose und spricht seine Sprache.
+ */
+export function geolocationErrorKey(error) {
+  return error?.code === 1 ? 'settings.weatherLocateDenied' : 'settings.weatherLocateFailed';
 }
 
 /** Der Fehlersatz zu einer gescheiterten Suche - am Feld, uebersetzt. */

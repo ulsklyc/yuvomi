@@ -194,8 +194,17 @@ async function syncOne(sub) {
     const insertEvent = db.get().prepare(`
       INSERT INTO calendar_events
         (title, description, start_datetime, end_datetime, all_day, location,
-         color, external_calendar_id, external_source, subscription_id, recurrence_rule, user_modified, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ics', ?, ?, 0, ?)
+         color, external_calendar_id, external_source, subscription_id, recurrence_rule, user_modified, created_by,
+         feed_original)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ics', ?, ?, 0, ?, ?)
+    `);
+
+    // D#2330: der Feed-Stand (Reset-Vorlage). Jeder Sync schreibt ihn, auch an
+    // lokal geänderte Termine (user_modified = 1), deren Felder updateEvent nicht
+    // anfasst. Der Vergleich hält unveränderte Läufe ohne Schreibvorgang.
+    const updateFeedOriginal = db.get().prepare(`
+      UPDATE calendar_events SET feed_original = ?
+      WHERE id = ? AND feed_original IS NOT ?
     `);
 
     // Der Wertvergleich hält Schreibvorgänge ab, die nichts ändern: liefert ein
@@ -240,6 +249,16 @@ async function syncOne(sub) {
           // Lesepfad liefert sie als cal_color aus ics_subscriptions nach.
           const color    = ev.color ?? null;
           const existing = findExisting.get(sub.id, ev.uid);
+          // Der Feed-Stand in genau der Form, die der Reset zurückschreibt.
+          const feedOriginal = JSON.stringify({
+            title:          ev.summary     ?? null,
+            description:    ev.description ?? null,
+            start_datetime: ev.dtstart     ?? null,
+            end_datetime:   ev.dtend       ?? null,
+            all_day:        ev.allDay ? 1 : 0,
+            location:       ev.location    ?? null,
+            color,
+          });
           if (existing) {
             // Dieselben Werte binden die SET-Liste und den Vergleich.
             const values = [
@@ -248,13 +267,14 @@ async function syncOne(sub) {
             ];
             const updated = updateEvent.run(...values, existing.id, ...values).changes;
             changedEvents += updated;
+            updateFeedOriginal.run(feedOriginal, existing.id, feedOriginal);
             // Im Feed verschoben (#1377): die Erinnerungen ziehen mit. Nur wenn
             // das UPDATE griff - eine lokal bearbeitete Zeile (user_modified)
             // behaelt ihren Start und damit auch ihre Erinnerungen.
             if (updated) followInboundStartChange(db.get(), existing.id, existing.start_datetime, ev.dtstart);
           } else {
             insertEvent.run(ev.summary, ev.description, ev.dtstart, ev.dtend,
-              ev.allDay ? 1 : 0, ev.location, color, ev.uid, sub.id, ev.rrule, createdBy);
+              ev.allDay ? 1 : 0, ev.location, color, ev.uid, sub.id, ev.rrule, createdBy, feedOriginal);
             changedEvents++;
           }
         } catch (err) { log.error(`Upsert UID ${ev.uid}: ${err.message}`); }

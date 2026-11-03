@@ -7,7 +7,7 @@ import express from 'express';
 import * as db from '../../db.js';
 import * as v from '../../middleware/validate.js';
 import { defaultVisibilityFor, vitalScopeKey } from './visibility-defaults.js';
-import { vitalLimitError, refuseImpossibleVital } from './vital-limits.js';
+import { vitalLimitError, refuseImpossibleVital, vitalUnitError, refuseVitalUnit } from './vital-limits.js';
 import {
   log, VISIBILITIES, MAX_UNIT,
   viewerId, careAwareClause, applyUpdate, badRequest,
@@ -53,6 +53,9 @@ router.post('/vitals', (req, res) => {
 
     const errors = v.collectErrors([type, valueNum, valueNum2, valueNum3, unit, measuredAt, note, visibility]);
     if (errors.length) return badRequest(res, errors);
+
+    const accepted = vitalUnitError({ type: type.value, unit: unit.value });
+    if (accepted) return refuseVitalUnit(res, accepted);
 
     // Unmoegliches gar nicht erst speichern (Critique R19, vital-limits.js).
     const impossible = vitalLimitError({
@@ -109,10 +112,23 @@ router.patch('/vitals/:id', (req, res) => {
     const errors = v.collectErrors(checks);
     if (errors.length) return badRequest(res, errors);
 
+    // Bestand bleibt bearbeitbar (#2375): die Einheit zaehlt nur, wenn dieser
+    // Aufruf sie oder den Typ aendert, die Grenzen nur, wenn er die Messung
+    // aendert. Eine Altzeile in "furlong" oder mit 9.000.000 g nimmt so weiter
+    // eine Notiz an, auch wenn der Dialog alle Werte unveraendert mitschickt.
+    const next = { ...existing, ...fields };
+    const changed = (key) => next[key] !== existing[key];
+    if (changed('unit') || changed('type')) {
+      const accepted = vitalUnitError(next);
+      if (accepted) return refuseVitalUnit(res, accepted);
+    }
+
     // Geprueft wird die Messung, wie sie NACH dem Speichern stuende: eine
     // Diastole, die einzeln ueber die Systole gehoben wird, ist derselbe Fehler.
-    const impossible = vitalLimitError({ ...existing, ...fields });
-    if (impossible) return refuseImpossibleVital(res, impossible);
+    if (['type', 'unit', 'value_num', 'value_num2', 'value_num3'].some(changed)) {
+      const impossible = vitalLimitError(next);
+      if (impossible) return refuseImpossibleVital(res, impossible);
+    }
 
     applyUpdate('health_vitals', id, fields);
     res.json({ data: db.get().prepare('SELECT * FROM health_vitals WHERE id = ?').get(id) });

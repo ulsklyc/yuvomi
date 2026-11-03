@@ -201,6 +201,69 @@ test('GET / — source-Filter grenzt auf external_source ein', async () => {
   assert.ok(!titles(google.body.data).includes('SRC-LOCAL'), 'source=google blendet lokale aus');
 });
 
+test('GET / und /upcoming - die Erinnerungen einer Serie haengen an ihrem Beginn, nicht am letzten Vorkommen', async () => {
+  const seriesStart = '2035-02-01T09:00:00';
+  const masterId = Number(insertEvent({
+    title: 'Anker Qzxanker',
+    start_datetime: seriesStart,
+    end_datetime: '2035-02-01T10:00:00',
+    recurrence_rule: 'FREQ=WEEKLY',
+  }));
+  const overrideId = Number(insertEvent({
+    title: 'Anker Qzxanker verschoben',
+    start_datetime: '2035-03-16T11:00:00',
+    end_datetime: '2035-03-16T12:00:00',
+    recurrence_parent_id: masterId,
+    recurrence_id: '2035-03-15T09:00:00',
+    overridden_fields: '["title","start_datetime","end_datetime"]',
+  }));
+  db.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)')
+    .run(masterId, '2035-03-15T09:00:00');
+
+  // Das Fenster beginnt NACH dem Beginn der Serie: der erste Platz steht nicht in
+  // der Antwort, und mehrere Vorkommen liegen darin.
+  const range = await call('GET', '/?from=2035-03-01&to=2035-03-31');
+  assert.equal(range.status, 200);
+  const rows = range.body.data.filter((event) => event.series_id === masterId);
+  assert.ok(rows.filter((event) => event.id === masterId).length >= 3, 'mehrere Vorkommen im Fenster');
+  assert.ok(rows.some((event) => event.id === overrideId), 'Override ohne eigene Erinnerungen im Fenster');
+  for (const event of rows) {
+    assert.equal(event.reminder_anchor_start, seriesStart, event.start_datetime);
+    assert.equal(event.reminder_owner_id, masterId, event.start_datetime);
+  }
+
+  const upcomingId = Number(insertEvent({
+    title: 'Anker Qzxkommend',
+    start_datetime: '2000-01-05T09:00:00',
+    end_datetime: '2000-01-05T10:00:00',
+    recurrence_rule: 'FREQ=WEEKLY',
+  }));
+  const upcoming = await call('GET', '/upcoming?limit=20');
+  assert.equal(upcoming.status, 200);
+  const coming = upcoming.body.data.filter((event) => event.id === upcomingId);
+  assert.ok(coming.length > 0, 'die Serie steht in der Antwort');
+  for (const event of coming) {
+    assert.notEqual(event.start_datetime, '2000-01-05T09:00:00');
+    assert.equal(event.reminder_anchor_start, '2000-01-05T09:00:00', event.start_datetime);
+  }
+
+  // Die Suche nennt das naechste Vorkommen ab heute, also ein expandiertes.
+  const past = new Date();
+  past.setUTCDate(past.getUTCDate() - 60);
+  const searchStart = `${past.toISOString().slice(0, 10)}T09:00:00`;
+  const searchId = Number(insertEvent({
+    title: 'Anker Qzxsuche',
+    start_datetime: searchStart,
+    recurrence_rule: 'FREQ=WEEKLY',
+  }));
+  const search = await call('GET', '/search?q=Qzxsuche');
+  assert.equal(search.status, 200);
+  const found = search.body.data.find((event) => event.id === searchId);
+  assert.ok(found, 'die Serie steht im Suchergebnis');
+  assert.notEqual(found.start_datetime, searchStart);
+  assert.equal(found.reminder_anchor_start, searchStart);
+});
+
 test('GET / — wiederkehrende Serie wird in Instanzen expandiert', async () => {
   insertEvent({ title: 'SERIE-DAILY', start_datetime: '2035-03-05T09:00', recurrence_rule: 'FREQ=DAILY;COUNT=3' });
   const res = await call('GET', '/?from=2035-03-01&to=2035-03-31', { actor: ADMIN });
@@ -2077,6 +2140,61 @@ test('POST /:id/reset — 400/404/400-nicht-ics/403/Happy', async () => {
   assert.equal(zurueckgesetzt.c, 0);
 });
 
+// D#2330 (Variante A): der Reset stellt den Feed-Stand aus feed_original
+// sofort und ohne Netz her - der Titel kommt zurück, ohne auf den Abruf zu warten.
+test('POST /:id/reset stellt den Feed-Stand aus feed_original offline her', async () => {
+  const subId = db.prepare("INSERT INTO ics_subscriptions (name, url, color, created_by, shared) VALUES ('RestoreSub','https://x/restore.ics','#ABCDEF',2,1)").run().lastInsertRowid;
+  const feed = { title: 'Feed-Titel', description: 'Feed-Text', start_datetime: '2042-02-03T10:00', end_datetime: '2042-02-03T11:00', all_day: 0, location: 'Feed-Ort', color: '#112233' };
+  // insertEvent verwirft unbekannte Felder, daher feed_original per UPDATE.
+  const ev = insertEvent({ title: 'LOKAL', description: 'lokal', start_datetime: '2042-02-03T12:00', end_datetime: '2042-02-03T13:00', location: 'lokal-ort', color: '#445566', external_source: 'ics', subscription_id: subId, created_by: MARIA.id, user_modified: 1 });
+  db.prepare('UPDATE calendar_events SET color_modified = 1, feed_original = ? WHERE id = ?').run(JSON.stringify(feed), ev);
+  const ok = await call('POST', `/${ev}/reset`, { actor: MARIA });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.data.restored, true, 'mit gespeichertem Feed-Stand muss restored true sein');
+  const row = db.prepare('SELECT title, description, start_datetime AS s, end_datetime AS e, location, color, user_modified AS m, color_modified AS c FROM calendar_events WHERE id = ?').get(ev);
+  assert.deepEqual({ ...row }, { title: 'Feed-Titel', description: 'Feed-Text', s: '2042-02-03T10:00', e: '2042-02-03T11:00', location: 'Feed-Ort', color: '#112233', m: 0, c: 0 });
+});
+
+// Ein Feed ohne COLOR speichert color null, die Farbe kommt dann vom Kalender
+// (cal_color). Der Reset nimmt die lokale Farbe zurück, statt sie zu behalten.
+test('POST /:id/reset nimmt die lokale Farbe zurück, wenn der Feed keine trägt', async () => {
+  const subId = db.prepare("INSERT INTO ics_subscriptions (name, url, color, created_by, shared) VALUES ('NoColorSub','https://x/nocolor.ics','#ABCDEF',2,1)").run().lastInsertRowid;
+  const feed = { title: 'Feed-Titel', description: null, start_datetime: '2042-02-05T10:00', end_datetime: null, all_day: 0, location: null, color: null };
+  const ev = insertEvent({ title: 'LOKAL', start_datetime: '2042-02-05T10:00', color: '#445566', external_source: 'ics', subscription_id: subId, created_by: MARIA.id, user_modified: 1 });
+  db.prepare('UPDATE calendar_events SET color_modified = 1, feed_original = ? WHERE id = ?').run(JSON.stringify(feed), ev);
+  const ok = await call('POST', `/${ev}/reset`, { actor: MARIA });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.data.restored, true);
+  assert.equal(db.prepare('SELECT color FROM calendar_events WHERE id = ?').get(ev).color, null);
+});
+
+// Altbestand ohne feed_original: der Reset nimmt das Flag zurück wie bisher,
+// meldet aber restored false, damit die Oberfläche den Hinweis zeigt.
+test('POST /:id/reset ohne feed_original (Altbestand): restored false, Flag geht auf 0', async () => {
+  const subId = db.prepare("INSERT INTO ics_subscriptions (name, url, color, created_by, shared) VALUES ('AltSub','https://x/alt.ics','#ABCDEF',2,1)").run().lastInsertRowid;
+  const ev = insertEvent({ title: 'ALT-LOKAL', start_datetime: '2042-02-04T09:00', external_source: 'ics', subscription_id: subId, created_by: MARIA.id, user_modified: 1 });
+  const ok = await call('POST', `/${ev}/reset`, { actor: MARIA });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.data.restored, false);
+  assert.equal(db.prepare('SELECT user_modified AS m FROM calendar_events WHERE id = ?').get(ev).m, 0);
+});
+
+// feed_original ist der Rohstand für den Reset, kein Feld der Antwort: die
+// Lese-Routen (SELECT e.*) dürfen ihn nicht an den Client geben.
+test('GET / und GET /:id liefern feed_original nicht aus', async () => {
+  const subId = db.prepare("INSERT INTO ics_subscriptions (name, url, color, created_by, shared) VALUES ('LeakSub','https://x/leak.ics','#ABCDEF',2,1)").run().lastInsertRowid;
+  const ev = insertEvent({ title: 'LEAK-LISTE', start_datetime: '2036-04-10T09:00', end_datetime: '2036-04-10T10:00', external_source: 'ics', subscription_id: subId, created_by: MARIA.id });
+  db.prepare('UPDATE calendar_events SET feed_original = ? WHERE id = ?').run(JSON.stringify({ title: 'LEAK-FEED' }), ev);
+  const list = await call('GET', '/?from=2036-04-01&to=2036-04-30', { actor: MARIA });
+  assert.equal(list.status, 200);
+  const item = list.body.data.find((e) => e.id === ev);
+  assert.ok(item, 'Termin in der Liste');
+  assert.equal('feed_original' in item, false, 'GET / darf feed_original nicht enthalten');
+  const one = await call('GET', `/${ev}`, { actor: MARIA });
+  assert.equal(one.status, 200);
+  assert.equal('feed_original' in one.body.data, false, 'GET /:id darf feed_original nicht enthalten');
+});
+
 // ════════════════════════════════════════════════════════════════════════════════
 // POST /:id/exceptions (EXDATE, #489)
 // ════════════════════════════════════════════════════════════════════════════════
@@ -2511,6 +2629,7 @@ test('Outlook account activation reports linked override conflicts with an exact
     error: response.body.error,
     code: 409,
     conflict: 'outlook_auto_sync_overrides',
+    reason: 'outlook_auto_sync_overrides',
     linked_override_count: existingLinkedCandidateCount + 1,
   });
   assert.ok(response.body.error.length > 0);
@@ -5454,4 +5573,47 @@ test('die Termin-Faelle tragen einen reason und einen englischen Text (#1909)', 
   } finally {
     db.prepare("DELETE FROM calendar_events WHERE title IN ('GRUND-EINZEL', 'GRUND-SERIE')").run();
   }
+});
+
+// Interne Sync-Spalten gehören nicht in die Antwort: outbound_snapshot und
+// seen_on_server laufen wie feed_original durch SELECT e.* in serializeEvent.
+test('GET / und GET /:id liefern outbound_snapshot und seen_on_server nicht aus', async () => {
+  const ev = insertEvent({ title: 'LEAK-SYNC', start_datetime: '2036-05-10T09:00', end_datetime: '2036-05-10T10:00', created_by: MARIA.id });
+  db.prepare('UPDATE calendar_events SET outbound_snapshot = ?, seen_on_server = 1 WHERE id = ?').run('{"raw":true}', ev);
+  const list = await call('GET', '/?from=2036-05-01&to=2036-05-31', { actor: MARIA });
+  assert.equal(list.status, 200);
+  const item = list.body.data.find((e) => e.id === ev);
+  assert.ok(item, 'Termin in der Liste');
+  for (const key of ['outbound_snapshot', 'seen_on_server']) {
+    assert.equal(key in item, false, `GET / darf ${key} nicht enthalten`);
+  }
+  const one = await call('GET', `/${ev}`, { actor: MARIA });
+  assert.equal(one.status, 200);
+  for (const key of ['outbound_snapshot', 'seen_on_server']) {
+    assert.equal(key in one.body.data, false, `GET /:id darf ${key} nicht enthalten`);
+  }
+});
+
+// Vorher: Zahlen in Titel, Beschreibung und Ort landeten als Text, eine Zahl als
+// Titel im PUT lief auf einen 500, ein leerer Titel im PUT wurde gespeichert.
+test('POST/PUT: Titel, Beschreibung und Ort muessen Text sein, ein mitgeschickter Titel darf nicht leer sein', async () => {
+  const base = { title: 'Formen', start_datetime: '2040-02-01T09:00' };
+  for (const extra of [{ title: 5 }, { description: 5 }, { location: 5 }]) {
+    assert.equal((await call('POST', '/', { body: { ...base, ...extra } })).status, 400, `POST ${JSON.stringify(extra)}`);
+  }
+
+  const created = await call('POST', '/', { body: { ...base, description: 'Text', location: 'Ort' } });
+  assert.equal(created.status, 201);
+  const id = created.body.data.id;
+  for (const body of [{ title: 5 }, { title: '' }, { title: null }, { description: 5 }, { location: 5 }]) {
+    assert.equal((await call('PUT', `/${id}`, { body })).status, 400, `PUT ${JSON.stringify(body)}`);
+  }
+  const row = db.prepare('SELECT title, description, location FROM calendar_events WHERE id = ?').get(id);
+  assert.deepEqual({ ...row }, { title: 'Formen', description: 'Text', location: 'Ort' });
+
+  // Was die PWA schickt, geht weiter: null leert, ein PUT ohne Titel kuerzt eine Serie.
+  const cleared = await call('PUT', `/${id}`, { body: { description: null, location: null } });
+  assert.equal(cleared.status, 200);
+  assert.deepEqual([cleared.body.data.description, cleared.body.data.location], [null, null]);
+  assert.equal((await call('PUT', `/${id}`, { body: { recurrence_rule: null } })).status, 200);
 });

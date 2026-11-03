@@ -606,7 +606,9 @@ test('synced calendars: a stored Outlook account owner stays saveable, a new non
 
   const kept = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { name: 'Arbeit neu', ownerUserId: CLARA } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
-  assertRejectsNonMember(await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: DORA } }), 'guest as owner');
+  const guestOwner = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: DORA } });
+  assertRejectsNonMember(guestOwner, 'guest as owner');
+  assert.equal(guestOwner.body.reason, 'calendar_assignee_not_member', 'die App sagt den Satz (#1909)');
   assert.equal(owner(), CLARA, 'a rejected PUT writes nothing');
   const member = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: BEN } });
   assert.equal(member.status, 200, JSON.stringify(member.body));

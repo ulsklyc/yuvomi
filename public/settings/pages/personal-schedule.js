@@ -3,6 +3,7 @@ import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { reminderOffsetOptions, pickCustomReminderOffset } from '/utils/schedule-reminder-offset.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 /**
  * Schichtplan-Einstellungen, die nur fuer MICH gelten: Erinnerung vor der
@@ -69,7 +70,7 @@ async function save(patch) {
 // lassen.
 export function bindScheduleSettings(container, preferences = {}) {
   let persisted = { ...preferences };
-  const fail = (error) => window.yuvomi?.showToast(error?.message || t('common.errorGeneric'), 'danger');
+  const fail = (error) => window.yuvomi?.showToast(errorSentence(error), 'danger');
   const reminderToggle = container.querySelector('#schedule-reminder-toggle');
   const offsetSelect = container.querySelector('#schedule-reminder-offset');
   const overtimeToggle = container.querySelector('#schedule-overtime-toggle');
