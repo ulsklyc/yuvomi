@@ -3940,7 +3940,7 @@
 .settings-pairing__code {
   font-family: var(--font-mono);
   font-size: var(--text-lg);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-label);
   color: var(--color-text-primary);
   /* Der Code wird abgetippt und markiert - nie mitten in einer Gruppe umbrechen. */
   white-space: nowrap;
