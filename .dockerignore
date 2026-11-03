@@ -21,6 +21,12 @@ graphify-out
 *.db
 *.db-shm
 *.db-wal
+# Secrets the app generates on its first start (server/utils/auto-secrets.js):
+# next to the database, so in the project root without DB_PATH and in data/
+# with Compose. `**/` because Docker's globs do not cross a slash. data/ is the
+# Compose default DATA_DIR and holds the live database itself.
+**/.secrets
+data/
 .nvmrc
 .gitignore
 .dockerignore

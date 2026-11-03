@@ -209,6 +209,11 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
     + 'mit invalid_client beantwortet (#2144). Leer ist fuer jede neue Installation richtig, und '
     + 'der Wizard kennt den Anbieter nicht: ein Feld waere eine Frage, die niemand vor der ersten '
     + 'Anmeldung beantworten kann. Ein Schema-Eintrag ohne Feld verbietet der Guard weiter unten.',
+  DB_ENCRYPTION_AUTO_KEY:
+    'Schaltet nur das Erzeugen eines Schluessels beim ersten Start ab (server/utils/auto-secrets.js). '
+    + 'Der Wizard schreibt DB_ENCRYPTION_KEY immer selbst in die .env, dort erzeugt die App also nie '
+    + 'einen - der Schalter haette in jeder Wizard-Installation keine Wirkung, und ein Feld dafuer '
+    + 'waere eine Frage ohne Folge. Er ist fuer Installationen ohne Wizard (Kataloge, Compose von Hand).',
   DB_ALLOW_NEWER_SCHEMA:
     'Notfallschalter, keine Installationsentscheidung: laesst eine aeltere App auf einer '
     + 'neueren Datenbank starten, obwohl das dabei Geschriebene beim naechsten Update verloren '

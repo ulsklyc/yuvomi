@@ -2036,6 +2036,36 @@ export const schemas = {
           },
           required: ['data', 'credential'],
         },
+        DatabaseKeyStatus: {
+          type: 'object',
+          description: 'Where this installation\'s DB_ENCRYPTION_KEY comes from, without its value.',
+          properties: {
+            origin: {
+              type: ['string', 'null'],
+              enum: ['env', 'file', 'stored', 'generated', null],
+              description: '`env`: DB_ENCRYPTION_KEY is set. `file`: read through DB_ENCRYPTION_KEY_FILE. `stored`: read from `.secrets/DB_ENCRYPTION_KEY` next to the database. `generated`: created there on this start. `null`: no key, or the origin is not known.',
+            },
+            encrypted: { type: 'boolean', description: 'Whether the database is encrypted with a key.' },
+          },
+          required: ['origin', 'encrypted'],
+        },
+        DatabaseKey: {
+          type: 'object',
+          properties: {
+            origin: { type: ['string', 'null'], enum: ['env', 'file', 'stored', 'generated', null], description: 'As in DatabaseKeyStatus.' },
+            encrypted: { type: 'boolean' },
+            key: { type: 'string', description: 'The key itself. Only for `stored` and `generated`, the keys Yuvomi created on its own.' },
+            path: { type: 'string', description: 'The file the key is stored in. Only together with `key`.' },
+          },
+          required: ['origin', 'encrypted'],
+        },
+        DatabaseKeyResponse: {
+          type: 'object',
+          properties: {
+            data: { $ref: '#/components/schemas/DatabaseKey' },
+          },
+          required: ['data'],
+        },
         ClientPermissions: {
           type: 'object',
           description: 'The resolved rights of the account, for hiding what it cannot reach. The server enforces them either way. A device is an ordinary member here, also for an administrator.',
