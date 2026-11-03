@@ -5107,6 +5107,64 @@ html.fab-steady .page-fab {
   }
 }
 
+/* LUPE UND WERKZEUG FALTEN UNTER 390px INS "..." (#2443, DESIGN.md Kopfregel mobil,
+ * Regel 4, Ulas 2026-11-01). Zwei Knoepfe lassen dem Large Title Breite minus 172:
+ * bei 360px 188px, "Geburtstage" braucht in SF 195, und in Roboto stehen uk 256,
+ * ru 231, hu 220 gekuerzt. Der Kopf bleibt einzeilig und der Titel gross, also
+ * steht unter 390px EIN Knopf (Breite minus 120), wo noetig entsteht das "..."
+ * neu (`pageToolsMenuHtml({ foldSearch })`). Die Geburtstage, Notizen und
+ * Dokumente brauchen es, Kontakte und Inventar nicht (alle Sprachen gemessen).
+ *
+ * Eine Abfrage an der Seitenwurzel, kein Viewport-Breakpoint (tokens.css 11c,
+ * Vorlage #2425 in tasks.css). `.app-page--list-detail` traegt schon einen Namen,
+ * deshalb zwei.
+ *
+ * DIE SUCHE GEHT AUS DEM BILD, NICHT AUS DEM BAUM: der Menue-Eintrag oeffnet sie
+ * per Fokus, und die Tastatur erreicht sie weiter. Offen oder mit Begriff steht
+ * sie wie immer im Kopf (ein Suchbegriff bleibt sichtbar). Nimmt die Shell den
+ * Verwaltungsweg weg (`data-module-readonly`), bleibt die Lupe stehen. */
+.app-page--fold-head {
+  container: page-head / inline-size;
+}
+
+.app-page--list-detail.app-page--fold-head {
+  container-name: module-surface page-head;
+}
+
+/* Zwei Klassen, nicht eine: `.btn` setzt `display: inline-flex` und steht in einer
+ * spaeter geladenen Datei, bei gleicher Spezifitaet gewann es und beide Knoepfe
+ * standen (Sonde 360px, #2443). */
+.page-tools-btn.page-tools-btn--fold-only,
+.popover-menu__item[data-fold-search] {
+  display: none;
+}
+
+@container page-head (width < 390px) {
+  html:not([data-module-readonly]) .page-toolbar.page-toolbar--fold-search:not(.page-toolbar--in-group):has([data-fold-search]) > .page-search:not(:focus-within):not(.is-filled):not(:has(input:not(:placeholder-shown))) {
+    position: absolute;
+    flex: none;
+    width: 1px;
+    min-width: 0;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .page-tools-btn.page-tools-btn--wide-only {
+    display: none;
+  }
+
+  .page-tools-btn.page-tools-btn--fold-only {
+    display: inline-flex;
+  }
+
+  html:not([data-module-readonly]) .popover-menu__item[data-fold-search] {
+    display: flex;
+  }
+}
+
 /* AUF DEM TABLET GIBT DIE SUCHE NACH, NICHT DER TITEL (Re-Kritik 2026-10-17).
  * Mit Basis 0 teilte sich der Titel die Zeile mit dem Suchfeld: bei 834px
  * stand "Aufgab..." (150 > 141px) und "Geburtsta..." neben einem 386px breiten

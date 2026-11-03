@@ -310,8 +310,8 @@ export async function render(container, { user, signal }) {
   // waehrend das Raster daneben weiterlaeuft, oder das Raster auf zwei bis drei
   // Spalten stutzen. Kopf und Koerper enden deshalb beide an der Nutzbreite.
   container.insertAdjacentHTML('beforeend', `
-    <div class="notes-page app-page app-page--full" data-composition="full">
-      <div class="page-toolbar page-toolbar--title-tools notes-toolbar">
+    <div class="notes-page app-page app-page--full app-page--fold-head" data-composition="full">
+      <div class="page-toolbar page-toolbar--title-tools page-toolbar--fold-search notes-toolbar">
         <h1 class="page-toolbar__title">${t('notes.title')}</h1>
         ${renderPageSearch({ id: 'notes-search', label: t('notes.searchPlaceholder'), placeholder: t('notes.searchPlaceholder'), value: state.filterQuery, clearLabel: t('common.searchClear'), className: 'notes-toolbar__search page-toolbar__center' })}
         ${/* KATEGORIEN VERWALTEN STEHT IM WERKZEUGMENUE (Kopfregel mobil,
@@ -329,7 +329,7 @@ export async function render(container, { user, signal }) {
         <div class="page-toolbar__actions">
           ${readOnly() ? '' : `
           <div class="notes-manage-categories notes-toolbar__tools">
-            ${pageToolsMenuHtml({ id: 'notes-tools-menu', label: t('common.moreActions'), items: [
+            ${pageToolsMenuHtml({ id: 'notes-tools-menu', label: t('common.moreActions'), foldSearch: { input: 'notes-search', label: t('notes.searchPlaceholder') }, items: [
               { action: 'manage-categories', label: t('category.manageTitle'), icon: 'tags' },
             ] })}
           </div>`}

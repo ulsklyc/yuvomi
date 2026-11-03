@@ -430,6 +430,11 @@
         "customizeResetDetail": "Твоє власне розташування буде видалено. Ти знову побачиш типове - разом із його пізнішими змінами.",
         "customizeDiscardDetail": "Твої зміни розташування буде втрачено. Залишиться останнє збережене.",
         "customizeScopeHint": "Те, що ти змінюєш тут, стосується лише тебе.",
+        "customizePhoneScopeHint": "Тільки цей телефон. Зміни тут впливають лише на порядок плиток на вашому телефоні.",
+        "customizePhoneTitle": "Плитки телефону",
+        "customizePhoneReset": "Як на робочому столі",
+        "customizePhoneResetDone": "Розташування телефону скинуто.",
+        "customizePhoneResetConfirm": "Скинути як на робочому столі?",
         "customizeFollowsDefault": "Твій огляд використовує типове налаштування домогосподарства.",
         "customizeSetDefault": "Зробити типовим для всіх",
         "customizeSetDefaultConfirm": "Зробити це розташування типовим для домогосподарства?",
@@ -6149,7 +6154,7 @@
         "errorVitalUnit": "Ця одиниця не підходить для цього вимірювання."
     },
     "waste": {
-        "title": "Вивезення сміття",
+        "title": "Сміття",
         "overlay": "Вивезення сміття",
         "upcomingSectionTitle": "Найближчі вивезення",
         "typesSectionTitle": "Види та графіки",

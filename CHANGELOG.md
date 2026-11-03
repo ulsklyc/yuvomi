@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A Caddy example for automatic HTTPS.** `deploy/caddy/` holds an example Compose deployment
+  that puts Yuvomi behind Caddy, which obtains and renews Let's Encrypt certificates and keeps the
+  app port off the host. It is an example next to `nginx.conf.example`, not tested in CI; the Caddy
+  image is pinned by version and digest and Dependabot keeps it current. (#2445)
 - **A new installation generates its own session secret and database key.** Leave `SESSION_SECRET`
   and `DB_ENCRYPTION_KEY` unset and the first start creates both and keeps them in `.secrets/` next to
   the database (`/data/.secrets/` in the container, readable only by the user Yuvomi runs as). Every
@@ -31,10 +35,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that signs in only with single sign-on has no password to type into an app, and this is its way in.
   While a code is open, the page names a device that has just signed in, so a phone you do not recognise
   stands out and can be signed out on the spot.
+- **The Overview has its own tile arrangement on the phone.** On a phone, tapping Customize shows
+  a "Phone tiles" mode that lets you reorder and show or hide tiles independently of the desktop
+  layout. Options (calendar limit, task filters, shopping-list selection, etc.) follow the desktop
+  arrangement, so only the order and visibility are separate. "Same as desktop" removes the phone
+  arrangement and goes back to following the desktop. (#2109)
 
 ### Fixed
 - **"Sign out on other devices" says that it signs out the native app too.** The server already
   ended signed-in devices along with the other sessions; the hint under the button did not mention it.
+- **Long page titles stand in full next to search and a tool on phones.** Below 390px the search
+  button and the one tool beside the title (the import in Birthdays, categories in Notes) move into
+  a "..." menu, and in Documents the search joins the menu that is already there, so the head stays
+  on one row and the title is no longer cut off. "Search" is the first entry and opens the same
+  search field; a search term you entered keeps the field visible. The Waste page title is shorter
+  in every width ("Waste" instead of "Waste collection"), the navigation keeps the full name.
 - **Copying a new API token or a calendar feed link over plain HTTP no longer claims success.** On an
   installation reached without HTTPS the browser offers no clipboard, yet both copy buttons said
   "copied". They now say that copying did not work and select the value, so you can copy it by hand -
