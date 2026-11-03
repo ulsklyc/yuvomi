@@ -3988,20 +3988,29 @@ Die Haushaltshilfe-Berichte (170px) bleiben in der Dreizeilen-Form, gemessen und
 Stepper selbst ist der geteilte Baustein (utils/period-stepper.js). Ein drittes Element (Werkzeugzeile, Chipreihe) wandert weiter ins Menue oder
 in den Port. `test:budget-ui` haelt Klasse, nachgebende Titelbasis und den Center-Slot ohne
 eigene Zeile.
-**Unter 390px steht der Zeitraum in einer eigenen Zeile (#2440, Ulas 2026-11-01).** Neben dem
-192px-Stepper bleiben dem Large Title Breite minus 264px: bei 360px 96px, „Budget" braucht in
-Roboto 106, in SF Pro 112, und stand als „Bud...". Der Titel bleibt in jedem Modul gleich gross,
-also weicht der Stepper: unter 390px Modulbreite (`@container budget-root`, Seitenwurzel, kein
-Viewport-Breakpoint) steht er in voller Breite unter dem Titel, die Pfeile an den Zeilenenden wie
-im Schichtplan, die Kurzform mittig; die Notiz der Reiter ohne Zeitraum nimmt dieselbe Zeile,
-am Zeilenanfang unter dem Titel. Gemessen 360px: Kopf 117 -> 169px, auf den Notiz-Reitern schon vorher
-169px, jetzt auf allen sechs Reitern mit Slot dasselbe (die Reiter sprangen um 52px); nur die
-Aufteilung traegt im Slot nichts und bleibt bei 117px. Der Monatswechsel bewegt nichts, die Pfeile
-haengen nicht am Label. Eingeklappt gilt R19 unveraendert (169 -> 65px), ab 390px bleibt alles
-wie es war (Kopf und Slots identisch gemessen). Mit der Wippe „Mein Budget / Haushalt" sind es
-vier Zeilen, 221px (vorher 169px); eingeklappt weicht sie wie bisher. Das ist die Kopfhoehe, die der Titel kostet, und
-nur unter 390px: das Budget ist der einzige Kopf, der auf dem Telefon Titel und Stepper in einer
-Zeile fuehrt (gemessen, der Schichtplan erst ab 768px), die Abfrage steht deshalb in budget.css.
+**Steht der Titel neben dem Stepper nicht ganz, bekommt der Zeitraum eine eigene Zeile (#2440,
+Ulas 2026-11-01; nach Messung seit #2443).** Neben dem 192px-Stepper bleiben dem Large Title
+Breite minus 264px: bei 360px 96px, „Budget" braucht in Roboto 106, in SF Pro 112, und stand als
+„Bud...". Der Titel bleibt in jedem Modul gleich gross, also weicht der Stepper: er steht in voller
+Breite unter dem Titel, die Pfeile an den Zeilenenden wie im Schichtplan, die Kurzform mittig; die
+Notiz der Reiter ohne Zeitraum nimmt dieselbe Zeile, am Zeilenanfang unter dem Titel. #2440
+schaltete fest unter 390px Modulbreite um, gerechnet an de und en - ab 390px stand der Titel in
+elf Sprachen gekuerzt („Presupuesto" 195px in 126px bei 390, in 166px bei 430), und unter 390px
+wich der Stepper auch neben einem kurzen Titel (ja „家計"). Seit #2443 misst der Kopf
+(`watchHeadFit` in pages/budget.js, Klasse `budget-nav--period-own-row`): gemessen wird der Titel
+in der EINEN Zeile, nicht im gezeigten Zustand - die Klasse geht fuer die Messung kurz ab, im
+selben Rueckruf vor dem Bild -, sonst schaltete die eigene Zeile, in der jeder Titel passt, sofort
+zurueck. Die feste Abfrage ist in diese Regel aufgegangen: zwei Ausloeser fuer dieselbe Zeile
+waeren zwei Antworten auf eine Frage. Gemessen 360px: Kopf 117 -> 169px, auf allen sechs Reitern mit
+Slot dasselbe; nur die Aufteilung traegt im Slot nichts und bleibt bei 117px. Der Monatswechsel
+bewegt nichts, die Pfeile haengen nicht am Label, und das Label hat in der Zeile des Titels eine
+feste Breite. Eingeklappt gilt R19 unveraendert (169 -> 65px) und wird nicht gemessen. Mit der
+Wippe „Mein Budget / Haushalt" sind es vier Zeilen, 221px; eingeklappt weicht sie wie bisher. Der
+griechische Titel kuerzte selbst in der eigenen Zeile (320px: 271px in 252px); der Budget-Kopf
+traegt dort „Οικονομικά", die Navigation behaelt „Προϋπολογισμός" (`budget.title` gegen
+`nav.budget`, wie die Entsorgung, #2492). Das Budget ist der einzige Kopf, der auf dem Telefon
+Titel und Stepper in einer Zeile fuehrt (gemessen, der Schichtplan erst ab 768px), die Regel steht
+deshalb in budget.css.
 
 **Verwaltung steht mobil nicht vor dem Inhalt (R16, 2026-10-05).** Der Kopf war nur die
 halbe Rechnung: in vier Flaechen stand unter ihm eine eigene Bedienflaeche, die den Inhalt
