@@ -88,6 +88,7 @@ import displaysRouter from './routes/displays.js';
 import { pairingRouter } from './routes/displays.js';
 import { peopleRouter } from './routes/displays.js';
 import { displayMayAct } from './display-scopes.js';
+import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
 import { DISPLAY_PASSWORD_SENTINEL } from './services/display-accounts.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
@@ -664,13 +665,12 @@ app.use('/api/v1', trackAdmittedWrite);
 app.use('/api/v1/changelog', changelogRouter);
 app.use('/api/v1', (req, res, next) => {
   try {
-    const guest = db.get().prepare('SELECT 1 FROM split_expense_guest_users WHERE user_id = ?').get(req.authUserId);
-    if (!guest) return next();
-    const allowed = req.path.startsWith('/split-expenses')
-      || req.path === '/auth/me'
-      || req.path === '/auth/logout'
-      || req.path === '/version';
-    if (allowed) return next();
+    if (!isSplitGuestAccount(db.get(), req.authUserId)) return next();
+    // Die Liste steht in server/split-guest-scope.js, weil der Auth-Router sie
+    // ebenso fragt (GHSA-q7gc-2cc9-w8fj): er haengt vor diesem Gate, eine
+    // `/auth`-Anfrage kommt hier nie an. Die frueheren Eintraege fuer
+    // `/auth/me`, `/auth/logout` und `/version` waren aus demselben Grund tot.
+    if (splitGuestMayReach(req.method, req.path)) return next();
     return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403, reason: 'split_guest_scope' });
   } catch {
     return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403, reason: 'split_guest_scope' });

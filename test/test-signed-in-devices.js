@@ -173,7 +173,10 @@ test('nur Mitglieder: Personal und Ausgaben-Gaeste bekommen kein Geraet', async 
   db.prepare('INSERT INTO split_expense_guest_users (user_id) VALUES (?)').run(guest.id);
   const refusedGuest = await register(guest.session, { name: 'T', platform: 'ios', device_id: 'guest-device' });
   assert.equal(refusedGuest.status, 403);
-  assert.equal((await refusedGuest.json()).reason, 'not_a_household_member');
+  // Den Gast haelt schon das Gate am Eingang des Auth-Routers an
+  // (GHSA-q7gc-2cc9-w8fj, test:split-guest-auth-scope); die Mitgliedspruefung
+  // der Route bleibt dahinter die zweite Linie.
+  assert.equal((await refusedGuest.json()).reason, 'split_guest_scope');
 });
 
 test('dieselbe device_id ersetzt das Credential, statt ein zweites danebenzustellen', async () => {

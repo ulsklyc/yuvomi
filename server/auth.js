@@ -64,6 +64,7 @@ import {
 import { isAdminRequest, requireAdmin } from './middleware/require-admin.js';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';
 import * as twoFactor from './services/two-factor.js';
+import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
 
 const log = createLogger('Auth');
 const router = express.Router();
@@ -609,6 +610,37 @@ function deviceMayUseAuthRoute(method, path) {
   return DEVICE_AUTH_ROUTES.some(([allowed, pattern]) => allowed === method && pattern.test(path));
 }
 
+/**
+ * Als welches Konto wuerde `requireAuth` diese Anfrage fuehren? Fuer das Tor
+ * unten, das VOR `requireAuth` steht und deshalb selbst nachsehen muss - ohne
+ * dessen Nebenwirkungen (`last_used_at`, Cookie-Auffrischung, 401).
+ *
+ * Dieselbe Reihenfolge wie dort: ein gueltiges Token gewinnt, sonst die
+ * Sitzung. Ein Display-Cookie wird hier nicht aufgeloest - ein Display ist nie
+ * ein Ausgaben-Gast, und das Tor hat fuer Displays seinen eigenen Riegel. Ist
+ * das Cookie ungueltig, antwortet `requireAuth` mit 401 statt auf die Sitzung
+ * zurueckzufallen; hier die Sitzung zu nehmen ist die engere Antwort.
+ *
+ * Ein Ausgaben-Gast bekommt kein Device Credential (`POST /devices` und die
+ * Kopplung nehmen nur Haushaltsmitglieder) und kein Integrations-Token als
+ * Subjekt. Der Token-Zweig steht trotzdem da: eine Zeile, die aus einer
+ * Sicherung oder einer frueheren Version kommt, soll an diesem Tor nicht
+ * vorbeikommen, nur weil sie keine Sitzung ist.
+ * @returns {number|null}
+ */
+function requestPrincipalUserId(req) {
+  const token = extractApiToken(req);
+  if (token) {
+    const row = db.get().prepare(`
+      SELECT COALESCE(t.subject_user_id, t.created_by) AS user_id
+      FROM api_tokens t
+      WHERE t.token_hash = ? AND ${apiTokenUsableSql('t')}
+    `).get(hashApiToken(token));
+    if (row) return row.user_id;
+  }
+  return req.session?.userId ?? null;
+}
+
 // Sicherheits-Gate (GHSA-xcv5-6w6x-x5q2): Der Auth-Router ist in server/index.js
 // bewusst VOR den globalen Scope-/Guest-/Modul-Gates gemountet, damit oeffentliche
 // Routen (login, setup, oidc, 2fa/verify) ohne Authentifizierung erreichbar sind.
@@ -629,6 +661,17 @@ router.use((req, res, next) => {
   // deshalb oben durch. Es bekommt die Allowlist statt der ganzen Konto-Routen.
   if (!deviceMayUseAuthRoute(req.method, req.path) && requestHasDeviceCredential(req)) {
     return res.status(403).json({ error: 'This is not available on a signed-in device.', code: 403, reason: 'device_credential' });
+  }
+  // DER AUSGABEN-GAST (GHSA-q7gc-2cc9-w8fj), die dritte eingeschraenkte Art
+  // von Konto. Das Gast-Gate in server/index.js sieht keine `/auth`-Anfrage,
+  // weil dieser Router vor ihm haengt - ein Gast las so ueber `GET /users` die
+  // ganze Kontoliste samt Kontaktdaten. Er bekommt hier dieselbe Liste wie
+  // dort (server/split-guest-scope.js), `/auth` davor aus demselben Grund wie
+  // beim Display unten: die Liste ist `/api/v1`-relativ gefuehrt. 403 und
+  // derselbe Grund wie im Gast-Gate, damit der Client nur eine Absage kennt.
+  if (!splitGuestMayReach(req.method, `/auth${req.path}`)
+    && isSplitGuestAccount(db.get(), requestPrincipalUserId(req))) {
+    return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403, reason: 'split_guest_scope' });
   }
   // DASSELBE FUER EIN GEKOPPELTES DISPLAY (#1208). Es traegt ebenfalls Scopes
   // und wuerde vom globalen Gate ebenso verworfen - und kommt hier ebenso wenig

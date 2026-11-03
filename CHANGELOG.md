@@ -147,6 +147,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dashes.** Trimming the dashes around the folder and file part of a stored document's name used a
   pattern CodeQL flags as polynomial. The step before it already collapsed every run into one dash,
   so uploads were not slowed down in practice; the name stays exactly the same.
+- **A shared-expense guest only reaches its own account routes (GHSA-q7gc-2cc9-w8fj).** A guest
+  account is meant to see Shared expenses and nothing else, and every other module already refused
+  it. The account routes did not: they answer before that check, so a signed-in guest could read the
+  household's account list with the members' contact details. The account routes now ask the same
+  list as the rest of the API. A guest keeps signing in and out, its own account details and the
+  changelog; everything else there is refused, and members notice nothing.
 
 ## [2.84.0] - 2026-11-02
 
