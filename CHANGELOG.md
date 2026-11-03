@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A Caddy example for automatic HTTPS.** `deploy/caddy/` holds an example Compose deployment
+  that puts Yuvomi behind Caddy, which obtains and renews Let's Encrypt certificates and keeps the
+  app port off the host. It is an example next to `nginx.conf.example`, not tested in CI; the Caddy
+  image is pinned by version and digest and Dependabot keeps it current. (#2445)
 - **A new installation generates its own session secret and database key.** Leave `SESSION_SECRET`
   and `DB_ENCRYPTION_KEY` unset and the first start creates both and keeps them in `.secrets/` next to
   the database (`/data/.secrets/` in the container, readable only by the user Yuvomi runs as). Every

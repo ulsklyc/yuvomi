@@ -1308,6 +1308,10 @@ yuvomi.example.com {
 
 Set `SESSION_SECURE=true` and `TRUST_PROXY=1` in `.env` as above, then reload Caddy.
 
+For a new installation where Caddy runs in Docker next to Yuvomi, [`deploy/caddy/`](../deploy/caddy/README.md)
+has an example Compose deployment with automatic Let's Encrypt certificates. Like
+`nginx.conf.example`, it is an example and not tested in CI.
+
 ---
 
 ## Podman & systemd Autostart (rootless)
