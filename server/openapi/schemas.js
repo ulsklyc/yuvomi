@@ -2152,13 +2152,18 @@ export const schemas = {
           type: 'object',
           properties: {
             enabled: { type: 'boolean', description: 'OIDC is configured and enabled.' },
+            provider: {
+              type: ['string', 'null'],
+              enum: ['oidc', 'homeassistant', null],
+              description: 'Which source is behind the SSO button: a generic OIDC provider, Home Assistant, or null without SSO.',
+            },
             password_login_enabled: { type: 'boolean' },
             guest_password_login_enabled: {
               type: 'boolean',
               description: 'True only where password login is off and split-expense guests exist, who are exempt from the switch.',
             },
           },
-          required: ['enabled', 'password_login_enabled', 'guest_password_login_enabled'],
+          required: ['enabled', 'provider', 'password_login_enabled', 'guest_password_login_enabled'],
         },
         ReminderMoveNotice: {
           type: 'object',
