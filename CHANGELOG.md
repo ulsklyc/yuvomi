@@ -80,6 +80,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writing it on the product itself comes with a later part of #1448, before the field goes.
 
 ### Fixed
+- **The Budget title stands in full next to the month in every language.** From 390px up the title
+  was cut off in eleven languages ("Presupues..." in Spanish even at 430px), because the month only
+  moved to a row of its own below 390px. The head now measures: whenever the title would be cut off
+  next to the month, the month takes the row below it, at any width; a short title such as Japanese
+  keeps the month beside it also on a narrow phone. Paging through the months and scrolling the head
+  away behave as before. The Greek Budget page title is shorter ("Οικονομικά"), the navigation keeps
+  the full name. (#2443)
 - **"Sign out on other devices" says that it signs out the native app too.** The server already
   ended signed-in devices along with the other sessions; the hint under the button did not mention it.
 - **Deleting the first occurrence of a recurring event also stops its reminder.** A reminder on a series
