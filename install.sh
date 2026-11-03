@@ -163,6 +163,25 @@ read_existing_env_value() {
   printf '%s' "$raw"
 }
 
+# Hat die App diesen Schlüssel beim ersten Start selbst gespeichert? Ohne Wert
+# in der .env legt sie ihn unter <Verzeichnis von DB_PATH>/.secrets/ ab, auf dem
+# Host also in DATA_DIR (Compose mountet es nach /data). Ohne diese Probe
+# erzeugte ein Rerun einen neuen DB-Schlüssel, der den gespeicherten überstimmt -
+# die verschlüsselte Datenbank öffnete danach nicht mehr. Siehe auch
+# storedSecretOnHost() in tools/installer/install-server.js.
+stored_secret_exists() {
+  local data_dir db_path db_dir
+  data_dir=$(read_existing_env_value DATA_DIR) || data_dir='./data'
+  db_path=$(read_existing_env_value DB_PATH) || db_path='/data/yuvomi.db'
+  db_dir=$(dirname "$db_path")
+  case "$db_dir" in
+    /data) ;;
+    /data/*) data_dir="${data_dir}${db_dir#/data}" ;;
+    *) return 1 ;;
+  esac
+  [ -f "${data_dir}/.secrets/$1" ]
+}
+
 # Gegenstück beim Schreiben - spiegelt encodeEnvValue() aus
 # tools/installer/install-server.js: `$` wird zu `$$` (Compose-Literal),
 # riskante Werte (Whitespace, #, Quotes, Backtick, `\`) werden doppelt
@@ -325,6 +344,14 @@ configure_secrets() {
     local existing
     if existing=$(read_existing_env_value "$varname"); then
       printf -v "$varname" '%s' "$existing"
+      printf -v "${varname}_REUSED" '%s' 'yes'
+      success "$(t secrets.reused)"
+      continue
+    fi
+    # Leer schreiben, nicht neu erzeugen: leer heisst für die App "nicht
+    # gesetzt", sie liest dann weiter ihre gespeicherte Datei.
+    if stored_secret_exists "$varname"; then
+      printf -v "$varname" '%s' ''
       printf -v "${varname}_REUSED" '%s' 'yes'
       success "$(t secrets.reused)"
       continue
