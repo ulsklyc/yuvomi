@@ -121,11 +121,12 @@ function readStored(name, filePath, read) {
  * der scheitert mit EEXIST, wenn ein zweiter Prozess gleichzeitig gewonnen hat,
  * statt dessen Wert zu überschreiben - wie bei `.creating` in db.js. Dann gilt
  * der Wert des anderen. Kennt das Dateisystem keine harten Links (manche
- * Netzfreigaben), fällt es auf `rename()` zurück, mit Probe auf das Ziel.
+ * Netzfreigaben), fällt es auf `rename()` zurück, mit Probe auf das Ziel
+ * unter einer Sperre `<Datei>.lock`.
  *
  * @returns {string} der Wert, der danach in der Datei steht
  */
-function writeStored(name, filePath, value, read) {
+function writeStored(name, filePath, value, read, link = linkSync) {
   const dir = path.dirname(filePath);
   mkdirSync(path.dirname(dir), { recursive: true });
   try {
@@ -142,17 +143,33 @@ function writeStored(name, filePath, value, read) {
     closeSync(fd);
   }
   try {
-    linkSync(tmp, filePath);
+    link(tmp, filePath);
   } catch (err) {
     if (err?.code === 'EEXIST') {
       rmSync(tmp, { force: true });
       return readStored(name, filePath, read);
     }
-    if (entryExists(filePath)) {
+    // Ohne harte Links: rename() ersetzt ein vorhandenes Ziel still, Probe und
+    // rename allein liessen zwei gleichzeitige Erststarts beide gewinnen. Ein
+    // Sperrverzeichnis (mkdir ist unteilbar) macht beides zu einem Schritt; wer
+    // es nicht bekommt, wartet, bis der Gewinner fertig ist, und liest dessen Wert.
+    const lock = `${filePath}.lock`;
+    try {
+      mkdirSync(lock);
+    } catch (lockErr) {
       rmSync(tmp, { force: true });
-      return readStored(name, filePath, read);
+      if (lockErr?.code !== 'EEXIST') throw lockErr;
+      return waitForStored(name, filePath, lock, read);
     }
-    renameSync(tmp, filePath);
+    try {
+      if (entryExists(filePath)) {
+        rmSync(tmp, { force: true });
+        return readStored(name, filePath, read);
+      }
+      renameSync(tmp, filePath);
+    } finally {
+      rmSync(lock, { recursive: true, force: true });
+    }
   }
   rmSync(tmp, { force: true });
   // Verzeichniseintrag auf die Platte, best effort: manche Dateisysteme können
@@ -161,6 +178,34 @@ function writeStored(name, filePath, value, read) {
     const dirFd = openSync(dir, 'r');
     try { fsyncSync(dirFd); } finally { closeSync(dirFd); }
   } catch { /* der Eintrag ist trotzdem da, nur nicht sofort dauerhaft */ }
+  return value;
+}
+
+/** So lange wartet ein Verlierer auf die Sperre des Gewinners (writeStored). */
+const LOCK_WAIT_MS = 10_000;
+
+/**
+ * Wartet, bis ein anderer Prozess seine Sperre aufgibt, und liest dessen Wert.
+ * Synchron (Atomics.wait), weil der ganze Handschlag vor db.js synchron läuft.
+ * Bleibt die Sperre stehen (Absturz mitten im Schreiben), bricht der Start mit
+ * ihrem Pfad ab, statt einen zweiten Wert zu erzeugen.
+ */
+function waitForStored(name, filePath, lock, read) {
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  const pause = new Int32Array(new SharedArrayBuffer(4));
+  while (entryExists(lock)) {
+    if (Date.now() > deadline) {
+      throw new Error(
+        `Another start is still writing ${name} (${lock} exists). If no other Yuvomi ` +
+        `process is running, delete ${lock} and start again.`
+      );
+    }
+    Atomics.wait(pause, 0, 0, 50);
+  }
+  const value = readStored(name, filePath, read);
+  if (value === null) {
+    throw new Error(`Another start was writing ${name} to ${filePath} and gave up. Start again.`);
+  }
   return value;
 }
 
@@ -289,6 +334,11 @@ export function secretOrigin(name) {
  */
 export function storedSecretPath(name) {
   return state.get(name)?.storedPath ?? null;
+}
+
+/** NUR FÜR TESTS: writeStored() mit austauschbarem link(), für Dateisysteme ohne harte Links. */
+export function _writeStoredForTest(name, filePath, value, read, link) {
+  return writeStored(name, filePath, value, read, link);
 }
 
 /** NUR FÜR TESTS: gemerkte Herkunft vergessen. */

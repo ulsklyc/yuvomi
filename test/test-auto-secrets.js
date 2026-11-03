@@ -42,7 +42,9 @@ import {
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3-multiple-ciphers';
+import { once } from 'node:events';
 import { tempDir } from './tmp-dir.js';
+import { _writeStoredForTest } from '../server/utils/auto-secrets.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const url = (rel) => JSON.stringify(pathToFileURL(join(ROOT, rel)).href);
@@ -377,11 +379,16 @@ function documentedBackupCommand() {
 
 /** Der Befehl in einer Shell wie im Container (cwd = App-Verzeichnis), Ziel umgebogen. */
 function runBackupCommand(target, env) {
+  // Node und Ziel kommen als Umgebungsvariablen in die Shell, nicht in den
+  // Befehlstext: ein Pfad mit Leerzeichen oder Quote zerlegte ihn sonst.
   const cmd = documentedBackupCommand()
-    .replace(/^node /, `${JSON.stringify(process.execPath)} `)
-    .replace('/data/yuvomi-backup.db', target);
+    .replace(/^node /, '"$NODE_BIN" ')
+    .replace("'/data/yuvomi-backup.db'", 'process.env.BACKUP_TARGET');
   const run = spawnSync('sh', ['-c', cmd], {
-    cwd: ROOT, env: cleanEnv(env), encoding: 'utf8', timeout: 60_000,
+    cwd: ROOT,
+    env: cleanEnv({ ...env, NODE_BIN: process.execPath, BACKUP_TARGET: target }),
+    encoding: 'utf8',
+    timeout: 60_000,
   });
   return { status: run.status, output: `${run.stdout}${run.stderr}` };
 }
@@ -480,4 +487,49 @@ test('ein echter Serverstart schreibt keinen Secret-Wert nach stdout oder stderr
     assert.ok(!output.includes(value), `${name} steht im Log`);
     assert.ok(!output.includes(value.slice(0, 16)), `ein Teil von ${name} steht im Log`);
   }
+});
+
+// Ohne harte Links (manche Netzfreigaben) faellt writeStored() auf rename()
+// zurueck, und rename() ueberschreibt ein Ziel still. Probe-dann-rename liess
+// zwei gleichzeitige Erststarts beide durch: der zweite ersetzte den Schluessel
+// des ersten, der mit seinem Wert schon die Datenbank anlegen konnte.
+const noLink = () => { throw Object.assign(new Error('link not supported'), { code: 'EPERM' }); };
+const readText = (p) => readFileSync(p, 'utf8');
+
+test('ohne harte Links ueberschreibt ein gleichzeitiger Erststart den Schluessel nicht', async () => {
+  const secrets = join(tempDir('yuvomi-auto-secrets-race-'), '.secrets');
+  mkdirSync(secrets, { mode: 0o700 });
+  const file = join(secrets, 'DB_ENCRYPTION_KEY');
+  // Der andere Prozess haelt die Sperre und legt seinen Wert gleich ab.
+  mkdirSync(`${file}.lock`);
+  const other = spawn(process.execPath, ['-e', `setTimeout(() => {
+    const fs = require('node:fs');
+    fs.writeFileSync(${JSON.stringify(`${file}.other`)}, 'anderer\\n');
+    fs.renameSync(${JSON.stringify(`${file}.other`)}, ${JSON.stringify(file)});
+    fs.rmdirSync(${JSON.stringify(`${file}.lock`)});
+  }, 300)`]);
+  const exited = once(other, 'exit');
+  const value = _writeStoredForTest('DB_ENCRYPTION_KEY', file, 'meiner', readText, noLink);
+  await exited;
+  assert.equal(value, 'anderer', 'der Verlierer uebernimmt den Wert des Gewinners');
+  assert.equal(readText(file), 'anderer\n', 'die Datei des Gewinners bleibt');
+  assert.deepEqual(readdirSync(secrets), ['DB_ENCRYPTION_KEY'], 'keine Arbeitsdatei bleibt liegen');
+});
+
+test('ohne harte Links legt ein einzelner Erststart den Schluessel per rename ab', () => {
+  const secrets = join(tempDir('yuvomi-auto-secrets-rename-'), '.secrets');
+  const file = join(secrets, 'SESSION_SECRET');
+  const value = _writeStoredForTest('SESSION_SECRET', file, 'meiner', readText, noLink);
+  assert.equal(value, 'meiner');
+  assert.equal(readText(file), 'meiner\n');
+  assert.deepEqual(readdirSync(secrets), ['SESSION_SECRET'], 'Sperre und Arbeitsdatei sind weg');
+});
+
+// Ohne DB_PATH liegt .secrets/ in der Projektwurzel, mit Compose unter
+// DATA_DIR (./data). Das Dockerfile kopiert den ganzen Build-Kontext: ein Image
+// aus einer solchen Arbeitskopie trug sonst Sitzungs-Secret und DB-Schluessel.
+test('der Docker-Build-Kontext laesst gespeicherte Secrets und das Datenverzeichnis draussen', () => {
+  const lines = readFileSync(join(ROOT, '.dockerignore'), 'utf8').split('\n').map((l) => l.trim());
+  assert.ok(lines.includes('**/.secrets'), '.dockerignore schliesst .secrets/ in jeder Tiefe aus');
+  assert.ok(lines.includes('data/'), '.dockerignore schliesst das Compose-Datenverzeichnis aus');
 });
