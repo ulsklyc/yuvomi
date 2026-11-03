@@ -126,6 +126,7 @@ test('requireAdmin: Nicht-Admin bekommt 403 auf allen Routen', async () => {
   const routes = [
     ['GET', '/status'],
     ['GET', '/database'],
+    ['GET', '/database-key'],
     ['POST', '/trigger'],
     ['GET', '/webdav/config'],
     ['PUT', '/webdav/config'],

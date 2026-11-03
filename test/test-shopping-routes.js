@@ -739,6 +739,45 @@ test('PUT /categories/:catId: Umbenennen kaskadiert auf shopping_items', async (
   assert.equal(item.category, 'KaskKat2', 'Artikel-Kategorie mitumbenannt');
 });
 
+// Rezepte, Mahlzeiten, Serien und Vorrat speichern den Kategorie-NAMEN als Text
+// und reichen ihn beim Uebertragen unveraendert an die Liste weiter. Vorher zog
+// das Umbenennen nur shopping_items mit: die Zutaten eines Rezepts landeten
+// danach unter dem alten Namen ganz unten, und PATCH lehnte das Abhaken mit
+// "Invalid category" ab.
+function kuechenZeilenMit(kategorie) {
+  const recipe = db.prepare(`INSERT INTO recipes (title, created_by) VALUES ('Bolognese', ?)`).run(U).lastInsertRowid;
+  db.prepare(`INSERT INTO recipe_ingredients (recipe_id, name, category) VALUES (?, 'Hackfleisch', ?)`).run(recipe, kategorie);
+  const meal = db.prepare(`INSERT INTO meals (date, meal_type, title, created_by) VALUES ('2026-08-03','dinner','M',?)`).run(U).lastInsertRowid;
+  db.prepare(`INSERT INTO meal_ingredients (meal_id, name, category) VALUES (?, 'Karotten', ?)`).run(meal, kategorie);
+  const tpl = db.prepare(`INSERT INTO meal_recurrence_templates (start_date, weekday, meal_type, title, created_by) VALUES ('2026-08-03', 1, 'dinner', 'S', ?)`).run(U).lastInsertRowid;
+  db.prepare(`INSERT INTO meal_recurrence_ingredients (template_id, name, category) VALUES (?, 'Sellerie', ?)`).run(tpl, kategorie);
+  db.prepare(`INSERT INTO pantry_items (name, category) VALUES ('Passata', ?)`).run(kategorie);
+  db.prepare(`INSERT INTO pantry_products (name, unit, category) VALUES ('Passata', 'pcs', ?)`).run(kategorie);
+  return { recipe, meal };
+}
+const KUECHEN_TABELLEN = ['recipe_ingredients', 'meal_ingredients', 'meal_recurrence_ingredients', 'pantry_items', 'pantry_products'];
+const kategorienIn = (name) => Object.fromEntries(KUECHEN_TABELLEN.map((t) => [
+  t, db.prepare(`SELECT COUNT(*) c FROM ${t} WHERE category = ?`).get(name).c,
+]));
+
+test('PUT /categories/:catId: Umbenennen kaskadiert auf Rezepte, Mahlzeiten und Vorrat', async () => {
+  const cat = (await call('POST', '/categories', { name: 'Fleischtheke' })).body.data;
+  const { recipe } = kuechenZeilenMit('Fleischtheke');
+  db.prepare(`INSERT INTO meals (date, meal_type, title, recipe_id, created_by) VALUES ('2026-08-04','dinner','Bolognese',?,?)`).run(recipe, U);
+
+  assert.equal((await call('PUT', `/categories/${cat.id}`, { name: 'Metzger' })).status, 200);
+  const alle = Object.fromEntries(KUECHEN_TABELLEN.map((t) => [t, 1]));
+  assert.deepEqual(kategorienIn('Metzger'), alle, 'jede Kuechen-Tabelle traegt den neuen Namen');
+  assert.deepEqual(kategorienIn('Fleischtheke'), Object.fromEntries(KUECHEN_TABELLEN.map((t) => [t, 0])));
+
+  // Der Weg, auf dem es auffiel: das Rezept auf die Liste, dann abhaken.
+  const list = await newList('Bolognese');
+  assert.equal((await call('POST', `/${list}/import-meal-plan`, { from: '2026-08-04', to: '2026-08-04' })).status, 200);
+  const hack = db.prepare(`SELECT id, category FROM shopping_items WHERE list_id = ? AND name = 'Hackfleisch'`).get(list);
+  assert.equal(hack.category, 'Metzger', 'die Zutat steht in ihrer Gruppe, nicht unter dem alten Namen');
+  assert.equal((await call('PATCH', `/items/${hack.id}`, { is_checked: 1 })).status, 200, 'abhaken geht');
+});
+
 test('DELETE /categories/:catId: unbekannt → 404', async () => {
   const r = await call('DELETE', '/categories/999999');
   assert.equal(r.status, 404);
@@ -754,6 +793,16 @@ test('DELETE /categories/:catId: verschiebt Artikel auf Fallback + löscht', asy
   assert.equal(db.prepare('SELECT COUNT(*) c FROM shopping_categories WHERE id = ?').get(cat.id).c, 0);
   const item = db.prepare(`SELECT category FROM shopping_items WHERE list_id = ? AND name = 'DelWare'`).get(list);
   assert.equal(item.category, 'Obst & Gemüse', 'auf erste verbleibende Kategorie (sort_order) verschoben');
+});
+
+test('DELETE /categories/:catId: Rezepte, Mahlzeiten und Vorrat ziehen auf den Fallback um', async () => {
+  const cat = (await call('POST', '/categories', { name: 'Feinkost' })).body.data;
+  kuechenZeilenMit('Feinkost');
+  const vorher = kategorienIn('Obst & Gemüse');
+  assert.equal((await call('DELETE', `/categories/${cat.id}`)).status, 200);
+  assert.deepEqual(kategorienIn('Feinkost'), Object.fromEntries(KUECHEN_TABELLEN.map((t) => [t, 0])), 'kein Verweis auf die geloeschte Kategorie');
+  const nachher = kategorienIn('Obst & Gemüse');
+  for (const t of KUECHEN_TABELLEN) assert.equal(nachher[t], vorher[t] + 1, `${t} auf den Fallback`);
 });
 
 test('PATCH /categories/reorder: leeres/kein Array → 400', async () => {

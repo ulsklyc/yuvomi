@@ -96,6 +96,26 @@ function validCategoryNames() {
 }
 
 /**
+ * Die Küche speichert den Kategorie-NAMEN als Text und reicht ihn beim
+ * Übertragen unverändert an die Liste weiter (services/kitchen-handover.js).
+ * Umbenennen und Löschen einer Kategorie ziehen diese Tabellen mit, sonst
+ * landet die Zutat unter einem Namen, den es nicht mehr gibt: ganz unten in der
+ * Liste, und PATCH /items/:id lehnt schon das Abhaken mit "Invalid category" ab.
+ *
+ * Gespiegelte Rezepte (Mealie, Tandoor) zählen mit: ihre Kategorie ist geraten
+ * (recipe-providers/categorize.js), kein Feld des Providers.
+ */
+const KITCHEN_CATEGORY_TABLES = [
+  'recipe_ingredients', 'meal_ingredients', 'meal_recurrence_ingredients', 'pantry_items', 'pantry_products',
+];
+
+function renameKitchenCategory(from, to) {
+  for (const table of KITCHEN_CATEGORY_TABLES) {
+    db.get().prepare(`UPDATE ${table} SET category = ? WHERE category = ?`).run(to, from);
+  }
+}
+
+/**
  * Artikel einer Liste in Anzeigereihenfolge: Kategorie in Gang-Reihenfolge,
  * abgehaktes ans Ende, davor die Handsortierung (#678), zuletzt die
  * Eingabereihenfolge als Gleichstand-Entscheider.
@@ -244,11 +264,12 @@ router.put('/categories/:catId', (req, res) => {
       .get(vName.value, cat.id);
     if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
-    // Artikel, die die alte Kategorie nutzen, mitumbenennen
+    // Artikel und Küche, die die alte Kategorie nutzen, mitumbenennen
     db.get().transaction(() => {
       db.get()
         .prepare('UPDATE shopping_items SET category = ? WHERE category = ?')
         .run(vName.value, cat.name);
+      renameKitchenCategory(cat.name, vName.value);
       db.get()
         .prepare('UPDATE shopping_categories SET name = ? WHERE id = ?')
         .run(vName.value, cat.id);
@@ -310,6 +331,7 @@ router.delete('/categories/:catId', (req, res) => {
       for (const { list_id: listId } of listen) {
         move.run(fallback.name, maxIn.get(listId, fallback.name).m, cat.name, listId);
       }
+      renameKitchenCategory(cat.name, fallback.name);
       db.get()
         .prepare('DELETE FROM shopping_categories WHERE id = ?')
         .run(cat.id);

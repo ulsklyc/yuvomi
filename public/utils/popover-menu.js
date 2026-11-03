@@ -161,9 +161,11 @@ export function expandPopoverMenu(panel) {
  * @param {string} opts.id     Eindeutige Panel-ID, z.B. `tasks-tools-menu`.
  * @param {string} opts.label  Zugaenglicher Name, meist t('common.moreActions').
  * @param {Array}  opts.items  Eintraege wie bei popoverMenuHtml.
+ * @param {{input: string, label: string}} [opts.foldSearch]  Die Lupe faltet unter
+ *   390px Modulbreite in dieses Menue (#2443, layout.css `.app-page--fold-head`).
  * @returns {string}
  */
-export function pageToolsMenuHtml({ id, label, items = [] }) {
+export function pageToolsMenuHtml({ id, label, items = [], foldSearch = null }) {
   // EIN EINTRAG IST EIN KNOPF, KEIN MENUE (Critique 2026-10-05, R16; DESIGN.md
   // Kopfregel). Der Vorrat fuehrte "..." mit genau einem Eintrag ("Lagerorte
   // verwalten"): zwei Tipps und ein Auslassungszeichen fuer eine Handlung.
@@ -172,22 +174,46 @@ export function pageToolsMenuHtml({ id, label, items = [] }) {
   // `data-action`, auf das der delegierte Handler der Seite schon hoert. Ein
   // Schalter (`checked`) bleibt im Menue: sein Zustand braucht den Haken.
   const real = items.flatMap((item) => (item?.group ? item.items ?? [] : [item])).filter((item) => item && !item.separator);
+  const fold = foldSearch ? foldSearchItem(foldSearch) : null;
   if (real.length === 1 && typeof real[0].checked !== 'boolean') {
     const [item] = real;
+    // MIT FALTUNG STEHEN BEIDE WEGE IM MARKUP (#2443): ab 390px bleibt der Knopf
+    // (siehe oben), darunter sind es mit der Lupe zwei Eintraege und damit ein
+    // Menue. layout.css zeigt je Breite einen; derselbe `data-action` laeuft in
+    // denselben Handler (`pageToolsActionEl` fragt beide Bauarten).
+    const menu = fold ? popoverMenuHtml({
+      id,
+      label,
+      items: [fold, ...items],
+      triggerClass: 'btn btn--secondary btn--icon page-tools-btn page-tools-btn--fold-only',
+      icon: 'ellipsis',
+    }) : '';
     return `
-    <button type="button" class="btn btn--secondary btn--icon page-tools-btn page-tools-btn--direct"
+    <button type="button" class="btn btn--secondary btn--icon page-tools-btn page-tools-btn--direct${fold ? ' page-tools-btn--wide-only' : ''}"
             data-action="${esc(item.action)}"${item.id == null ? '' : ` data-id="${esc(String(item.id))}"`}${item.disabled ? ' disabled' : ''}
             aria-label="${esc(item.label)}" title="${esc(item.label)}">
       <i data-lucide="${esc(item.icon)}" class="icon-md" aria-hidden="true"></i>
-    </button>`;
+    </button>${menu}`;
   }
   return popoverMenuHtml({
     id,
     label,
-    items,
+    items: fold ? [fold, ...items] : items,
     triggerClass: 'btn btn--secondary btn--icon page-tools-btn',
     icon: 'ellipsis',
   });
+}
+
+/**
+ * Der Menue-Eintrag der gefalteten Lupe (#2443). Er sucht nicht selbst: die
+ * Suche bleibt das EINE Feld im Kopf, der Eintrag gibt ihm nur den Fokus
+ * (`onItemClick`), und das Feld geht wie immer ueber `:focus-within` auf.
+ *
+ * @param {{input: string, label: string}} opts  ID des Suchfelds und Name.
+ * @returns {object} Eintrag fuer `items`
+ */
+export function foldSearchItem({ input, label }) {
+  return { action: 'fold-search', label, icon: 'search', attrs: { 'data-fold-search': input } };
 }
 
 /**
@@ -513,6 +539,10 @@ function onItemClick(event) {
   const item = event.target?.closest?.('.popover-menu__item');
   if (!item) return;
   item.closest('.popover-menu')?.hidePopover?.();
+  // ERST SCHLIESSEN, DANN FOKUS (#2443): das Popover gibt den Fokus beim Schliessen
+  // an den Ausloeser zurueck. Noch im Klick, sonst oeffnet iOS keine Tastatur.
+  const input = item.getAttribute?.('data-fold-search');
+  if (input) document.getElementById(input)?.focus();
 }
 
 /**

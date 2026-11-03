@@ -448,6 +448,11 @@
         "customizeResetDetail": "Twój własny układ zostanie usunięty. Znów zobaczysz układ domyślny domu - także po jego późniejszych zmianach.",
         "customizeDiscardDetail": "Twoje zmiany układu zostaną utracone. Zostaje ostatnio zapisany układ.",
         "customizeScopeHint": "To, co tu zmienisz, dotyczy tylko ciebie.",
+        "customizePhoneScopeHint": "Tylko ten telefon. Zmiany tutaj wpływają tylko na kolejność kafelków na twoim telefonie.",
+        "customizePhoneTitle": "Kafelki telefonu",
+        "customizePhoneReset": "Tak samo jak pulpit",
+        "customizePhoneResetDone": "Układ telefonu zresetowany.",
+        "customizePhoneResetConfirm": "Zresetować tak samo jak pulpit?",
         "customizeFollowsDefault": "Twój przegląd korzysta z domyślnego układu domu.",
         "customizeSetDefault": "Ustaw jako domyślny",
         "customizeSetDefaultConfirm": "Ustawić ten układ jako domyślny dla domu?",
@@ -3706,7 +3711,17 @@
         "memberRemoveLastAdmin": "Musi pozostać co najmniej jeden administrator.",
         "memberRemoveLastSsoAdmin": "To ostatni administrator powiązany z SSO. Najpierw powiąż innego administratora.",
         "backupWebdavUrlInvalid": "Adres musi zaczynać się od http:// lub https://.",
-        "icsSubscriptionGone": "Ta subskrypcja już nie istnieje."
+        "icsSubscriptionGone": "Ta subskrypcja już nie istnieje.",
+        "backupDbKeyTitle": "Klucz bazy danych",
+        "backupDbKeyGeneratedHint": "Yuvomi wygenerował go przy pierwszym uruchomieniu. Przechowuj kopię poza tym serwerem: bez niego nie otworzysz kopii zapasowych, jeśli utracisz magazyn danych.",
+        "backupDbKeyShow": "Pokaż klucz",
+        "backupDbKeyHide": "Ukryj",
+        "backupDbKeyCopy": "Kopiuj",
+        "backupDbKeyCopied": "Klucz skopiowany",
+        "backupDbKeyCopyFailed": "Kopiowanie nie powiodło się. Klucz jest zaznaczony, skopiuj go ręcznie.",
+        "backupDbKeyStoredAt": "Zapisany na serwerze w {{path}}",
+        "backupDbKeyConfigHint": "Klucz pochodzi z Twojej konfiguracji. Przechowuj go tam bezpiecznie: bez niego nie otworzysz kopii zapasowych.",
+        "backupDbKeyPlainHint": "Baza danych nie jest zaszyfrowana, więc kopie zapasowe zawierają Twoje dane w czytelnej postaci. Z własnym DB_ENCRYPTION_KEY Yuvomi zaszyfruje ją przy następnym uruchomieniu."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",
@@ -6115,7 +6130,7 @@
         "errorVitalUnit": "Ta jednostka nie pasuje do tego pomiaru."
     },
     "waste": {
-        "title": "Odbiór odpadów",
+        "title": "Odpady",
         "overlay": "Odbiór odpadów",
         "upcomingSectionTitle": "Nadchodzące odbiory",
         "typesSectionTitle": "Rodzaje i harmonogramy",

@@ -62,6 +62,11 @@ export async function startTestServer({ name, env = {} } = {}) {
   // Der Backup-Cron traegt zu keiner dieser Suiten etwas bei, laesst sich aber
   // nicht unref()en; er muesste sonst einzeln gestoppt werden.
   process.env.BACKUP_ENABLED = 'false';
+  // Jede Test-DB ist eine Neuinstallation, und der Handschlag gaebe ihr einen
+  // eigenen Schluessel unter <tmpdir>/.secrets - geteilt von allen Suiten und
+  // ueber den Lauf hinaus liegend (server/utils/auto-secrets.js). Die Suiten
+  // hier messen den Server, nicht die Verschluesselung; die hat test:auto-secrets.
+  process.env.DB_ENCRYPTION_AUTO_KEY = 'false';
   for (const [key, value] of Object.entries(env)) process.env[key] = String(value);
 
   const { default: app, server } = await import('../server/index.js');

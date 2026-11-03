@@ -38,3 +38,12 @@ updates:
       - dependency-name: node
         update-types:
           - version-update:semver-major
+  # Das Caddy-Beispiel unter deploy/caddy/ pinnt sein Image auf Version und Digest;
+  # Compose-Dateien liest nur das docker-compose-Oekosystem, nicht docker.
+  - package-ecosystem: docker-compose
+    directory: /deploy/caddy
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies

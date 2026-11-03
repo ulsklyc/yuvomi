@@ -204,7 +204,7 @@ test('Liste + Detail: die Spalte nennt wann und wie alt, Datum, Notiz - und fueh
 
 test('Liste + Detail: Seite, Markup, Klickweg und die klebende Spalte', () => {
   const src = readFileSync(new URL('../public/pages/birthdays.js', import.meta.url), 'utf8');
-  assert.match(src, /className: 'birthdays-page app-page--list-detail'/, 'die Seitenwurzel ist der Container der Schwelle');
+  assert.match(src, /className: 'birthdays-page app-page--list-detail(?: app-page--fold-head)?'/, 'die Seitenwurzel ist der Container der Schwelle');
   assert.match(src, /<div class="split-view birthdays-split">/);
   assert.match(src, /splitViewDetailHtml\(\{\s*id: 'birthdays'/);
   assert.match(src, /if \(_md\) \{ _md\.open\(open\.dataset\.open, open\); return; \}/, 'der Tipp geht durch den Baustein');

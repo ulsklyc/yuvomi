@@ -27,6 +27,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GET /api/v1/pantry` additionally returns `min_quantity` and `total_quantity`, `import-pantry`
   takes a `quantity` with `pantry_product_id`, and `GET /api/v1/kitchen/summary` counts `low` and `out`
   per product.
+- **A Caddy example for automatic HTTPS.** `deploy/caddy/` holds an example Compose deployment
+  that puts Yuvomi behind Caddy, which obtains and renews Let's Encrypt certificates and keeps the
+  app port off the host. It is an example next to `nginx.conf.example`, not tested in CI; the Caddy
+  image is pinned by version and digest and Dependabot keeps it current. (#2445)
+- **A new installation generates its own session secret and database key.** Leave `SESSION_SECRET`
+  and `DB_ENCRYPTION_KEY` unset and the first start creates both and keeps them in `.secrets/` next to
+  the database (`/data/.secrets/` in the container, readable only by the user Yuvomi runs as). Every
+  later start reads the same files, so nobody has to run `openssl` before the first start, and app
+  stores and NAS catalogs no longer need to ask for the secrets or build them in. A value you set
+  yourself, directly or through `_FILE`, still wins. **Existing installations do not change:** a
+  database that runs without a key today keeps running without one, because a key now would encrypt it
+  without anyone having asked. The generated key lies on the same volume as the database, so it
+  protects a database file or backup that leaves the machine, not a stolen volume; a key of your own
+  kept elsewhere is stronger. To start a new installation unencrypted on purpose, set
+  `DB_ENCRYPTION_AUTO_KEY=false`; deleting the `DB_ENCRYPTION_KEY` line no longer does that.
+- **Admins can see the generated database key to keep a copy.** Settings → Household → Backup and
+  restore shows it on request, because without it your backups cannot be opened once the server's
+  storage is lost. The key appears only after a click and is not cached; viewing it is logged without
+  the value. A key from your own configuration is never shown - the page says where it comes from -
+  and a signed-in device of the native app cannot read it.
+- **The Overview has its own tile arrangement on the phone.** On a phone, tapping Customize shows
+  a "Phone tiles" mode that lets you reorder and show or hide tiles independently of the desktop
+  layout. Options (calendar limit, task filters, shopping-list selection, etc.) follow the desktop
+  arrangement, so only the order and visibility are separate. "Same as desktop" removes the phone
+  arrangement and goes back to following the desktop. (#2109)
 
 ### Deprecated
 - **`min_quantity` on a pantry item (`/api/v1/pantry`) is deprecated and will be removed in the
@@ -37,6 +62,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   product for all its batches, so a client that worked yesterday keeps working. A replace or create
   without the field no longer clears it. Read the minimum from `products` in `GET /api/v1/pantry`;
   writing it on the product itself comes with a later part of #1448, before the field goes.
+
+### Fixed
+- **Long page titles stand in full next to search and a tool on phones.** Below 390px the search
+  button and the one tool beside the title (the import in Birthdays, categories in Notes) move into
+  a "..." menu, and in Documents the search joins the menu that is already there, so the head stays
+  on one row and the title is no longer cut off. "Search" is the first entry and opens the same
+  search field; a search term you entered keeps the field visible. The Waste page title is shorter
+  in every width ("Waste" instead of "Waste collection"), the navigation keeps the full name.
+- **Copying a new API token or a calendar feed link over plain HTTP no longer claims success.** On an
+  installation reached without HTTPS the browser offers no clipboard, yet both copy buttons said
+  "copied". They now say that copying did not work and select the value, so you can copy it by hand -
+  which matters most for an API token, since it is shown only once.
+- **The command-line backup check and backup command find a key Yuvomi stored itself.** The restore
+  check (`node server/check-backup.js`) and the Docker Compose backup command shown on the backup page
+  and in the installation guide now read the key the same way the server does: from
+  `DB_ENCRYPTION_KEY`, from `DB_ENCRYPTION_KEY_FILE`, or from `.secrets/`. Before, both stopped on an
+  installation whose key came from a file. Neither ever creates a key. If you copied the backup command
+  into a cron job, copy it again from the installation guide.
+- **The message about the `DB_ENCRYPTION_KEY` placeholder no longer suggests clearing the line to run
+  unencrypted.** On a new installation that now generates a key. It names `DB_ENCRYPTION_AUTO_KEY=false`
+  instead.
+- **Running `install.sh` again keeps a session secret or database key that comes from a file.** With
+  `SESSION_SECRET_FILE` or `DB_ENCRYPTION_KEY_FILE` in `.env`, a rerun asked for a new value or
+  generated one and wrote it next to the `_FILE` line. Yuvomi then refused to start because both were
+  set, and a new database key would not have opened the existing database anyway. The installer now
+  keeps the `_FILE` line, writes no second value and says the secret is reused. The web installer
+  already did this.
+- **Stopping the container no longer takes ten seconds and a hard kill.** Inside the image the server runs as
+  process 1, which ignores a stop signal it has no handler for, so `docker stop` and `podman stop` waited out
+  their timeout and then killed it in the middle of requests, syncs and backups. The server now handles
+  SIGTERM and SIGINT: it stops taking connections, lets running requests, syncs and backups finish for up to
+  eight seconds, closes the database (the write-ahead log is folded back in) and exits with code 0. A second
+  signal exits at once.
+- **Renaming a shopping category also renames it in recipes, meals and stock.** Until now only the items on
+  the shopping lists followed the new name. Recipe ingredients, meal ingredients, recurring meals and stock
+  kept the old one, so their ingredients landed under a name that no longer exists: at the bottom of the
+  list, and ticking them off failed with "Invalid category". Deleting a category now moves these rows to the
+  same fallback category as the shopping items.
+- **Task defaults follow the new-task dialog in a one-person household.** Visibility and
+  editing-lock defaults stay out of the way when nobody else can read tasks. Saved choices
+  remain intact and reappear when needed. The editing-lock switch and its hint no longer
+  overlap. The defaults description also uses the same form of address as its neighbouring
+  hints (#2366).
 
 ## [2.84.0] - 2026-11-02
 
