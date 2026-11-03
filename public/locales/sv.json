@@ -838,7 +838,12 @@
             "waited": "”{{item}}” flyttades inte till ”{{target}}”: synkroniseringen av ”{{back}}” har varit avstängd i över en vecka. Varan dyker upp på ”{{back}}” igen när listan slås på."
         },
         "moreDetailsHint": "Pris, butik, länk, anteckning",
-        "toPantryAllToPlaceholder": "Välj en plats …"
+        "toPantryAllToPlaceholder": "Välj en plats …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediens",
@@ -3512,7 +3517,10 @@
         "backupDbKeyCopyFailed": "Kopieringen fungerade inte. Nyckeln är markerad, kopiera den för hand.",
         "backupDbKeyStoredAt": "Sparad på servern i {{path}}",
         "backupDbKeyConfigHint": "Nyckeln kommer från din konfiguration. Förvara den säkert där: utan den går dina säkerhetskopior inte att öppna.",
-        "backupDbKeyPlainHint": "Databasen är inte krypterad, så säkerhetskopiorna innehåller dina data i läsbar form. Med en egen DB_ENCRYPTION_KEY krypterar Yuvomi den vid nästa start."
+        "backupDbKeyPlainHint": "Databasen är inte krypterad, så säkerhetskopiorna innehåller dina data i läsbar form. Med en egen DB_ENCRYPTION_KEY krypterar Yuvomi den vid nästa start.",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

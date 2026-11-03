@@ -951,6 +951,9 @@ function listToolsItems() {
       ? [{ action: 'import-meals', label: t('shopping.importMeals'), icon: 'utensils' }]
       : []),
     { action: 'send-list', label: t('shopping.sendList'), icon: 'mail' },
+    ...(state.shoppingWebhookUrl
+      ? [{ action: 'send-webhook', label: t('shopping.sendWebhook'), icon: 'webhook' }]
+      : []),
     { separator: true },
     // Nur am Finger (layout.css): holt die Griffe der Handsortierung zurueck,
     // die dort sonst neben dem Mehr-Knopf an der Daumenkante lagen (R23, D13,
@@ -3932,7 +3935,10 @@ async function loadStores({ keepOnError = false } = {}) {
   const [stores, prefs] = await Promise.allSettled([api.get('/shopping/stores'), api.get('/preferences')]);
   if (stores.status === 'fulfilled') state.stores = stores.value.data ?? [];
   else if (!keepOnError) state.stores = [];
-  if (prefs.status === 'fulfilled') state.currency = prefs.value.data?.currency ?? 'EUR';
+  if (prefs.status === 'fulfilled') {
+    state.currency = prefs.value.data?.currency ?? 'EUR';
+    state.shoppingWebhookUrl = prefs.value.data?.shopping_webhook_url ?? null;
+  }
 }
 
 /**
@@ -4607,6 +4613,19 @@ function wireListContentEvents(container) {
 
     if (action === 'send-list') {
       await openSendListDialog(container);
+    }
+
+    if (action === 'send-webhook') {
+      try {
+        const result = await api.post(`/shopping/${state.activeListId}/send-webhook`, {});
+        window.yuvomi.showToast(t('shopping.sendWebhookSent', { count: result.data?.items ?? 0 }), 'info');
+      } catch (err) {
+        const reason = err?.body?.reason;
+        const key = reason === 'nothing_open' ? 'shopping.sendListEmpty'
+          : reason === 'shopping_webhook_unconfigured' ? 'shopping.sendWebhookUnconfigured'
+          : 'shopping.sendWebhookError';
+        window.yuvomi.showToast(t(key), 'warning');
+      }
     }
 
     // ---- Liste duplizieren (#1103) ----

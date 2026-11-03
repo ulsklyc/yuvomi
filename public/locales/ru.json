@@ -978,7 +978,12 @@
             "waited": "«{{item}}» не перемещён в список «{{target}}»: синхронизация списка «{{back}}» выключена больше недели. Товар снова появится в списке «{{back}}», как только вы его включите."
         },
         "moreDetailsHint": "Цена, магазин, ссылка, заметка",
-        "toPantryAllToPlaceholder": "Выберите место …"
+        "toPantryAllToPlaceholder": "Выберите место …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "randomizeSuccess_few": "Запланировано {{count}} приёма пищи.",
@@ -3738,7 +3743,10 @@
         "backupDbKeyCopyFailed": "Скопировать не получилось. Ключ выделен, скопируй его вручную.",
         "backupDbKeyStoredAt": "Хранится на сервере в {{path}}",
         "backupDbKeyConfigHint": "Ключ берётся из твоей конфигурации. Храни его там надёжно: без него твои резервные копии не открыть.",
-        "backupDbKeyPlainHint": "База данных не зашифрована, поэтому резервные копии содержат твои данные в читаемом виде. С собственным DB_ENCRYPTION_KEY Yuvomi зашифрует её при следующем запуске."
+        "backupDbKeyPlainHint": "База данных не зашифрована, поэтому резервные копии содержат твои данные в читаемом виде. С собственным DB_ENCRYPTION_KEY Yuvomi зашифрует её при следующем запуске.",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "С возвращением. Ваш дом - в одном месте.",

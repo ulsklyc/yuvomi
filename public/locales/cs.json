@@ -911,7 +911,12 @@
             "waited": "Položka „{{item}}“ nebyla přesunuta do seznamu „{{target}}“: synchronizace seznamu „{{back}}“ je přes týden vypnutá. Položka se v seznamu „{{back}}“ znovu objeví, jakmile ho zapnete."
         },
         "moreDetailsHint": "Cena, obchod, odkaz, poznámka",
-        "toPantryAllToPlaceholder": "Vyberte místo …"
+        "toPantryAllToPlaceholder": "Vyberte místo …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "randomizeSuccess_few": "Naplánována {{count}} jídla.",
@@ -3630,7 +3635,10 @@
         "backupDbKeyCopyFailed": "Kopírování se nepovedlo. Klíč je označený, zkopíruj ho ručně.",
         "backupDbKeyStoredAt": "Uloženo na serveru v {{path}}",
         "backupDbKeyConfigHint": "Klíč pochází z tvé konfigurace. Uchovej ho tam v bezpečí: bez něj nepůjde tvé zálohy otevřít.",
-        "backupDbKeyPlainHint": "Databáze není šifrovaná, takže zálohy obsahují tvá data v čitelné podobě. S vlastním DB_ENCRYPTION_KEY ji Yuvomi při příštím spuštění zašifruje."
+        "backupDbKeyPlainHint": "Databáze není šifrovaná, takže zálohy obsahují tvá data v čitelné podobě. S vlastním DB_ENCRYPTION_KEY ji Yuvomi při příštím spuštění zašifruje.",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

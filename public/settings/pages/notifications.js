@@ -103,6 +103,21 @@ function renderPage(container, user) {
       </div>
     </section>
     <section class="settings-section" id="notification-channels-section"></section>
+    ${user?.role === 'admin' ? `
+    <section class="settings-section" id="shopping-webhook-section">
+      <h2 class="settings-section__title">${t('settings.shoppingWebhookTitle')}</h2>
+      <p class="form-hint">${t('settings.shoppingWebhookDescription')}</p>
+      <form id="shopping-webhook-form" novalidate>
+        <div class="settings-setting-row settings-setting-row--stacked">
+          <label class="settings-setting-row__label form-label" for="shopping-webhook-url">${t('settings.shoppingWebhookUrl')}</label>
+          <div class="settings-setting-row__control settings-form-actions">
+            <input type="url" id="shopping-webhook-url" class="form-input" placeholder="https://n8n.example.com/webhook/…" autocomplete="off">
+            <button type="submit" class="btn btn--primary">${t('common.save')}</button>
+          </div>
+          <p class="form-hint" id="shopping-webhook-status" role="status" aria-live="polite"></p>
+        </div>
+      </form>
+    </section>` : ''}
   `);
   renderChannelShell(container, user);
 }
@@ -556,6 +571,27 @@ export async function render(container, { user } = {}) {
         testBtn.disabled = false;
       }
     });
+    // Shopping webhook (admin only)
+    const webhookForm = container.querySelector('#shopping-webhook-form');
+    if (webhookForm) {
+      try {
+        const prefs = await api.get('/preferences');
+        const urlInput = webhookForm.querySelector('#shopping-webhook-url');
+        const statusEl = webhookForm.querySelector('#shopping-webhook-status');
+        urlInput.value = prefs.data?.shopping_webhook_url ?? '';
+        webhookForm.addEventListener('submit', async (ev) => {
+          ev.preventDefault();
+          statusEl.textContent = '';
+          try {
+            await api.put('/preferences', { shopping_webhook_url: urlInput.value.trim() || null });
+            statusEl.textContent = t('common.saved');
+          } catch (err) {
+            const msg = err?.body?.error || t('common.error');
+            statusEl.textContent = msg;
+          }
+        });
+      } catch { /* non-critical */ }
+    }
   } catch (error) {
     container.replaceChildren();
     throw error;

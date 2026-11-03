@@ -1048,7 +1048,12 @@
             "waited": "لم يُنقل «{{item}}» إلى «{{target}}»: مزامنة «{{back}}» متوقفة منذ أكثر من أسبوع. سيظهر العنصر في «{{back}}» مجددًا بمجرد تشغيل القائمة."
         },
         "moreDetailsHint": "السعر، المتجر، الرابط، ملاحظة",
-        "toPantryAllToPlaceholder": "اختر مكانًا …"
+        "toPantryAllToPlaceholder": "اختر مكانًا …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "randomizeSuccess_few": "تم تخطيط {{count}} وجبات.",
@@ -3852,7 +3857,10 @@
         "backupDbKeyCopyFailed": "لم ينجح النسخ. المفتاح محدد، انسخه يدويًا.",
         "backupDbKeyStoredAt": "محفوظ على الخادم في {{path}}",
         "backupDbKeyConfigHint": "يأتي المفتاح من إعداداتك. احفظه هناك بأمان: بدونه لا يمكن فتح نسخك الاحتياطية.",
-        "backupDbKeyPlainHint": "قاعدة البيانات غير مشفرة، لذا تحتوي النسخ الاحتياطية على بياناتك بشكل مقروء. مع DB_ENCRYPTION_KEY خاص بك، يشفرها Yuvomi عند التشغيل التالي."
+        "backupDbKeyPlainHint": "قاعدة البيانات غير مشفرة، لذا تحتوي النسخ الاحتياطية على بياناتك بشكل مقروء. مع DB_ENCRYPTION_KEY خاص بك، يشفرها Yuvomi عند التشغيل التالي.",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",

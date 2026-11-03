@@ -838,7 +838,12 @@
             "waited": "„{{item}}”, „{{target}}” listesine taşınmadı: „{{back}}” listesinin eşitlemesi bir haftadan uzun süredir kapalı. Liste açıldığında ürün „{{back}}” listesinde yeniden görünecek."
         },
         "moreDetailsHint": "Fiyat, mağaza, bağlantı, not",
-        "toPantryAllToPlaceholder": "Bir yer seç …"
+        "toPantryAllToPlaceholder": "Bir yer seç …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "ingredientCount_one": "{{count}} malzeme",
@@ -3512,7 +3517,10 @@
         "backupDbKeyCopyFailed": "Kopyalama işe yaramadı. Anahtar seçili, elle kopyala.",
         "backupDbKeyStoredAt": "Sunucuda şurada saklanıyor: {{path}}",
         "backupDbKeyConfigHint": "Anahtar yapılandırmandan geliyor. Orada güvenle sakla: o olmadan yedeklerin açılamaz.",
-        "backupDbKeyPlainHint": "Veritabanı şifreli değil, bu yüzden yedekler verilerini okunabilir biçimde içerir. Kendi DB_ENCRYPTION_KEY değerinle Yuvomi onu bir sonraki başlatmada şifreler."
+        "backupDbKeyPlainHint": "Veritabanı şifreli değil, bu yüzden yedekler verilerini okunabilir biçimde içerir. Kendi DB_ENCRYPTION_KEY değerinle Yuvomi onu bir sonraki başlatmada şifreler.",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

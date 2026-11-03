@@ -856,7 +856,12 @@
             "waited": "«{{item}}» به «{{target}}» منتقل نشد: همگام‌سازی «{{back}}» بیش از یک هفته است که خاموش است. مورد به محض روشن شدن این فهرست دوباره در «{{back}}» نمایش داده می‌شود."
         },
         "moreDetailsHint": "قیمت، فروشگاه، پیوند، یادداشت",
-        "toPantryAllToPlaceholder": "یک مکان انتخاب کنید …"
+        "toPantryAllToPlaceholder": "یک مکان انتخاب کنید …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "ingredientCount_one": "{{count}} مادهٔ لازم",
@@ -3530,7 +3535,10 @@
         "backupDbKeyCopyFailed": "کپی انجام نشد. کلید انتخاب شده است، آن را دستی کپی کن.",
         "backupDbKeyStoredAt": "روی سرور در {{path}} ذخیره شده",
         "backupDbKeyConfigHint": "کلید از پیکربندی تو می‌آید. آن را همان‌جا امن نگه دار: بدون آن، پشتیبان‌هایت باز نمی‌شوند.",
-        "backupDbKeyPlainHint": "پایگاه داده رمزگذاری نشده است، پس پشتیبان‌ها داده‌هایت را به‌صورت خوانا دارند. با یک DB_ENCRYPTION_KEY از خودت، Yuvomi آن را در اجرای بعدی رمزگذاری می‌کند."
+        "backupDbKeyPlainHint": "پایگاه داده رمزگذاری نشده است، پس پشتیبان‌ها داده‌هایت را به‌صورت خوانا دارند. با یک DB_ENCRYPTION_KEY از خودت، Yuvomi آن را در اجرای بعدی رمزگذاری می‌کند.",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",

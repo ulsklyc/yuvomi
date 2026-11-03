@@ -838,7 +838,12 @@
             "waited": "„{{item}}” nem került át ide: „{{target}}”. A(z) „{{back}}” szinkronizálása több mint egy hete ki van kapcsolva. A tétel újra megjelenik itt: „{{back}}”, amint bekapcsolod a listát."
         },
         "moreDetailsHint": "Ár, bolt, hivatkozás, jegyzet",
-        "toPantryAllToPlaceholder": "Válassz helyet …"
+        "toPantryAllToPlaceholder": "Válassz helyet …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "ingredientCount_one": "{{count}} hozzávaló",
@@ -3512,7 +3517,10 @@
         "backupDbKeyCopyFailed": "A másolás nem sikerült. A kulcs ki van jelölve, másold kézzel.",
         "backupDbKeyStoredAt": "A szerveren tárolva itt: {{path}}",
         "backupDbKeyConfigHint": "A kulcs a konfigurációdból származik. Őrizd ott biztonságban: nélküle a mentéseid nem nyithatók meg.",
-        "backupDbKeyPlainHint": "Az adatbázis nincs titkosítva, így a mentések olvasható formában tartalmazzák az adataidat. Saját DB_ENCRYPTION_KEY esetén a Yuvomi a következő indításkor titkosítja."
+        "backupDbKeyPlainHint": "Az adatbázis nincs titkosítva, így a mentések olvasható formában tartalmazzák az adataidat. Saját DB_ENCRYPTION_KEY esetén a Yuvomi a következő indításkor titkosítja.",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

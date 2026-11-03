@@ -996,7 +996,12 @@
             "waited": "„{{item}}” nie został przeniesiony na listę „{{target}}”: synchronizacja listy „{{back}}” jest wyłączona od ponad tygodnia. Produkt pojawi się znowu na liście „{{back}}”, gdy ją włączysz."
         },
         "moreDetailsHint": "Cena, sklep, link, notatka",
-        "toPantryAllToPlaceholder": "Wybierz miejsce …"
+        "toPantryAllToPlaceholder": "Wybierz miejsce …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "randomizeSuccess_few": "Zaplanowano {{count}} posiłki.",
@@ -3756,7 +3761,10 @@
         "backupDbKeyCopyFailed": "Kopiowanie nie powiodło się. Klucz jest zaznaczony, skopiuj go ręcznie.",
         "backupDbKeyStoredAt": "Zapisany na serwerze w {{path}}",
         "backupDbKeyConfigHint": "Klucz pochodzi z Twojej konfiguracji. Przechowuj go tam bezpiecznie: bez niego nie otworzysz kopii zapasowych.",
-        "backupDbKeyPlainHint": "Baza danych nie jest zaszyfrowana, więc kopie zapasowe zawierają Twoje dane w czytelnej postaci. Z własnym DB_ENCRYPTION_KEY Yuvomi zaszyfruje ją przy następnym uruchomieniu."
+        "backupDbKeyPlainHint": "Baza danych nie jest zaszyfrowana, więc kopie zapasowe zawierają Twoje dane w czytelnej postaci. Z własnym DB_ENCRYPTION_KEY Yuvomi zaszyfruje ją przy następnym uruchomieniu.",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

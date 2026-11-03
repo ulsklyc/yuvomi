@@ -838,7 +838,12 @@
             "waited": "Το «{{item}}» δεν μεταφέρθηκε στη λίστα «{{target}}»: ο συγχρονισμός της λίστας «{{back}}» είναι απενεργοποιημένος πάνω από μία εβδομάδα. Το είδος θα εμφανιστεί ξανά στη λίστα «{{back}}» μόλις την ενεργοποιήσετε."
         },
         "moreDetailsHint": "Τιμή, κατάστημα, σύνδεσμος, σημείωση",
-        "toPantryAllToPlaceholder": "Επιλέξτε θέση …"
+        "toPantryAllToPlaceholder": "Επιλέξτε θέση …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "ingredientCount_one": "{{count}} υλικό",
@@ -3512,7 +3517,10 @@
         "backupDbKeyCopyFailed": "Η αντιγραφή δεν πέτυχε. Το κλειδί είναι επιλεγμένο, αντίγραψέ το χειροκίνητα.",
         "backupDbKeyStoredAt": "Αποθηκευμένο στον διακομιστή στο {{path}}",
         "backupDbKeyConfigHint": "Το κλειδί προέρχεται από τη διαμόρφωσή σου. Φύλαξέ το εκεί με ασφάλεια: χωρίς αυτό, τα αντίγραφα ασφαλείας σου δεν ανοίγουν.",
-        "backupDbKeyPlainHint": "Η βάση δεδομένων δεν είναι κρυπτογραφημένη, οπότε τα αντίγραφα ασφαλείας περιέχουν τα δεδομένα σου σε αναγνώσιμη μορφή. Με δικό σου DB_ENCRYPTION_KEY, το Yuvomi την κρυπτογραφεί στην επόμενη εκκίνηση."
+        "backupDbKeyPlainHint": "Η βάση δεδομένων δεν είναι κρυπτογραφημένη, οπότε τα αντίγραφα ασφαλείας περιέχουν τα δεδομένα σου σε αναγνώσιμη μορφή. Με δικό σου DB_ENCRYPTION_KEY, το Yuvomi την κρυπτογραφεί στην επόμενη εκκίνηση.",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά. Το σπίτι σας σε ένα μέρος.",

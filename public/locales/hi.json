@@ -838,7 +838,12 @@
             "waited": "“{{item}}” को “{{target}}” में नहीं ले जाया गया: “{{back}}” का सिंक एक हफ़्ते से ज़्यादा समय से बंद है। सूची चालू होते ही आइटम फिर से “{{back}}” में दिखेगा।"
         },
         "moreDetailsHint": "कीमत, दुकान, लिंक, नोट",
-        "toPantryAllToPlaceholder": "जगह चुनें …"
+        "toPantryAllToPlaceholder": "जगह चुनें …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "ingredientCount_one": "{{count}} सामग्री",
@@ -3512,7 +3517,10 @@
         "backupDbKeyCopyFailed": "कॉपी नहीं हो सका। कुंजी चुनी हुई है, इसे हाथ से कॉपी करें।",
         "backupDbKeyStoredAt": "सर्वर पर {{path}} में सहेजी गई",
         "backupDbKeyConfigHint": "कुंजी आपके कॉन्फ़िगरेशन से आती है। इसे वहाँ सुरक्षित रखें: इसके बिना आपके बैकअप नहीं खुलेंगे।",
-        "backupDbKeyPlainHint": "डेटाबेस एन्क्रिप्टेड नहीं है, इसलिए बैकअप में आपका डेटा पढ़ने योग्य रूप में है। अपनी DB_ENCRYPTION_KEY के साथ, Yuvomi अगली बार शुरू होने पर इसे एन्क्रिप्ट करता है।"
+        "backupDbKeyPlainHint": "डेटाबेस एन्क्रिप्टेड नहीं है, इसलिए बैकअप में आपका डेटा पढ़ने योग्य रूप में है। अपनी DB_ENCRYPTION_KEY के साथ, Yuvomi अगली बार शुरू होने पर इसे एन्क्रिप्ट करता है।",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",

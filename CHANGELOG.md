@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.85.0] - 2026-11-04
 
 ### Added
+- **A shopping list can send its open items to a webhook.** An admin sets a household-wide webhook URL under Settings → Notifications. Once a URL is set, the list menu shows "Send open items": a single tap posts the list name and all unchecked items — name, amount, unit and category — as JSON to that URL. Useful for Bring!, n8n, Home Assistant and any other webhook consumer. (#2502)
 - **Stock: the minimum belongs to the product, and running low is read over all its batches**
   (part 3 of #1448). Toothpaste with 1 in the bathroom, 8 in the attic and a minimum of 3 no
   longer reads as running low: the household has 9. Milk with 1 l, 1 l and 2 l against a minimum

@@ -838,7 +838,12 @@
             "waited": "「{{item}}」は「{{target}}」に移動されませんでした。「{{back}}」の同期が1週間以上オフになっています。リストをオンにすると、「{{back}}」に再び表示されます。"
         },
         "moreDetailsHint": "価格・店舗・リンク・メモ",
-        "toPantryAllToPlaceholder": "場所を選択 …"
+        "toPantryAllToPlaceholder": "場所を選択 …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "ingredientCount_one": "{{count}} 品の材料",
@@ -3512,7 +3517,10 @@
         "backupDbKeyCopyFailed": "コピーできませんでした。キーを選択済みなので、手動でコピーしてください。",
         "backupDbKeyStoredAt": "サーバー上の {{path}} に保存されています",
         "backupDbKeyConfigHint": "キーは設定から読み込まれています。そこで安全に保管してください。キーがなければバックアップを開けません。",
-        "backupDbKeyPlainHint": "データベースは暗号化されていないため、バックアップにはデータが読める形で含まれます。独自の DB_ENCRYPTION_KEY を設定すると、Yuvomi は次回の起動時に暗号化します。"
+        "backupDbKeyPlainHint": "データベースは暗号化されていないため、バックアップにはデータが読める形で含まれます。独自の DB_ENCRYPTION_KEY を設定すると、Yuvomi は次回の起動時に暗号化します。",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

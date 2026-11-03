@@ -23,6 +23,7 @@ import { isHouseholdMember } from '../services/household-members.js';
 import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../permissions.js';
+import { guardedFetch } from '../services/notification-providers/guarded-fetch.js';
 
 const log = createLogger('Shopping');
 
@@ -1308,6 +1309,62 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
   } catch (err) {
     log.error('POST /:listId/send error:', err.message);
     res.status(502).json({ error: 'The email could not be sent.', code: 502 });
+  }
+});
+
+// --------------------------------------------------------
+// POST /api/v1/shopping/:listId/send-webhook
+// Sendet die offenen Artikel einer Liste als JSON an eine haushaltweite
+// Webhook-URL, die ein Admin unter PUT /api/v1/preferences gesetzt hat.
+// Payload: { list: { id, name }, items: [{name, amount, unit, category}], sentAt }
+// Response: { data: { sent: true, items: count } }
+// --------------------------------------------------------
+router.post('/:listId/send-webhook', sendListLimiter, async (req, res) => {
+  try {
+    const list = db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
+
+    const webhookUrl = db.get().prepare("SELECT value FROM sync_config WHERE key = 'shopping_webhook_url'").get()?.value ?? null;
+    if (!webhookUrl) {
+      return res.status(422).json({ error: 'No shopping webhook URL configured.', code: 422, reason: 'shopping_webhook_unconfigured' });
+    }
+
+    const openItems = db.get().prepare(`
+      SELECT name, amount, unit, category FROM shopping_items
+      WHERE list_id = ? AND is_checked = 0
+      ORDER BY sort_order ASC, created_at ASC
+    `).all(req.params.listId);
+
+    if (openItems.length === 0) {
+      return res.status(422).json({ error: 'Nothing to send: the list has no open items.', code: 422, reason: 'nothing_open' });
+    }
+
+    const sentAt = new Date().toISOString();
+    const body = JSON.stringify({
+      list: { id: list.id, name: list.name },
+      items: openItems.map((item) => ({
+        name: item.name,
+        amount: item.amount ?? null,
+        unit: item.unit ?? null,
+        category: item.category ?? null,
+      })),
+      sentAt,
+    });
+
+    const response = await guardedFetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+    });
+    if (!response.ok) {
+      log.error(`POST /:listId/send-webhook: webhook returned HTTP ${response.status}`);
+      return res.status(502).json({ error: `Webhook returned HTTP ${response.status}.`, code: 502 });
+    }
+
+    res.json({ data: { sent: true, items: openItems.length } });
+  } catch (err) {
+    log.error('POST /:listId/send-webhook error:', err.message);
+    res.status(502).json({ error: 'The webhook could not be reached.', code: 502 });
   }
 });
 

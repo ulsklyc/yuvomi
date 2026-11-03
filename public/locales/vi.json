@@ -838,7 +838,12 @@
             "waited": "“{{item}}” chưa được chuyển sang “{{target}}”: đồng bộ của “{{back}}” đã tắt hơn một tuần. Mục này sẽ xuất hiện lại trong “{{back}}” khi danh sách đó được bật."
         },
         "moreDetailsHint": "Giá, cửa hàng, liên kết, ghi chú",
-        "toPantryAllToPlaceholder": "Chọn nơi …"
+        "toPantryAllToPlaceholder": "Chọn nơi …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "ingredientCount_one": "{{count}} nguyên liệu",
@@ -3512,7 +3517,10 @@
         "backupDbKeyCopyFailed": "Không sao chép được. Khóa đã được chọn, hãy sao chép thủ công.",
         "backupDbKeyStoredAt": "Lưu trên máy chủ tại {{path}}",
         "backupDbKeyConfigHint": "Khóa đến từ cấu hình của bạn. Hãy giữ nó an toàn ở đó: nếu không có nó, các bản sao lưu của bạn không thể mở được.",
-        "backupDbKeyPlainHint": "Cơ sở dữ liệu chưa được mã hóa, nên các bản sao lưu chứa dữ liệu của bạn ở dạng đọc được. Với DB_ENCRYPTION_KEY của riêng bạn, Yuvomi sẽ mã hóa nó ở lần khởi động tiếp theo."
+        "backupDbKeyPlainHint": "Cơ sở dữ liệu chưa được mã hóa, nên các bản sao lưu chứa dữ liệu của bạn ở dạng đọc được. Với DB_ENCRYPTION_KEY của riêng bạn, Yuvomi sẽ mã hóa nó ở lần khởi động tiếp theo.",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

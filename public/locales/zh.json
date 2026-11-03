@@ -838,7 +838,12 @@
             "waited": "“{{item}}”未移到“{{target}}”：“{{back}}”的同步已关闭超过一周。开启该清单后，项目会重新出现在“{{back}}”。"
         },
         "moreDetailsHint": "价格、商店、链接、备注",
-        "toPantryAllToPlaceholder": "选择位置 …"
+        "toPantryAllToPlaceholder": "选择位置 …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "ingredientCount_one": "{{count}} 种食材",
@@ -3512,7 +3517,10 @@
         "backupDbKeyCopyFailed": "复制失败。密钥已选中，请手动复制。",
         "backupDbKeyStoredAt": "已保存在服务器上的 {{path}}",
         "backupDbKeyConfigHint": "密钥来自你的配置。请在那里妥善保管：没有它，你的备份将无法打开。",
-        "backupDbKeyPlainHint": "数据库未加密，因此备份中的数据是可读的。设置你自己的 DB_ENCRYPTION_KEY 后，Yuvomi 会在下次启动时对其加密。"
+        "backupDbKeyPlainHint": "数据库未加密，因此备份中的数据是可读的。设置你自己的 DB_ENCRYPTION_KEY 后，Yuvomi 会在下次启动时对其加密。",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",

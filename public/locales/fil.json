@@ -856,7 +856,12 @@
             "waited": "Hindi nailipat ang \"{{item}}\" sa \"{{target}}\": mahigit isang linggo nang naka-off ang pag-sync ng \"{{back}}\". Lalabas ulit ang item sa \"{{back}}\" kapag binuksan ang listahang iyon."
         },
         "moreDetailsHint": "Presyo, tindahan, link, tala",
-        "toPantryAllToPlaceholder": "Pumili ng lugar …"
+        "toPantryAllToPlaceholder": "Pumili ng lugar …",
+        "sendWebhook": "Send open items",
+        "sendWebhookSent": "{{count}} items sent.",
+        "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookUnconfigured": "No webhook target configured.",
+        "sendWebhookError": "Could not send to webhook."
     },
     "meals": {
         "ingredientCount_one": "{{count}} sangkap",
@@ -3530,7 +3535,10 @@
         "backupDbKeyCopyFailed": "Hindi gumana ang pagkopya. Naka-select ang susi, kopyahin ito nang mano-mano.",
         "backupDbKeyStoredAt": "Naka-save sa server sa {{path}}",
         "backupDbKeyConfigHint": "Galing sa iyong configuration ang susi. Itago ito roon nang ligtas: kung wala ito, hindi mabubuksan ang mga backup mo.",
-        "backupDbKeyPlainHint": "Hindi naka-encrypt ang database, kaya nababasa ang data mo sa mga backup. Gamit ang sarili mong DB_ENCRYPTION_KEY, ie-encrypt ito ng Yuvomi sa susunod na pagsisimula."
+        "backupDbKeyPlainHint": "Hindi naka-encrypt ang database, kaya nababasa ang data mo sa mga backup. Gamit ang sarili mong DB_ENCRYPTION_KEY, ie-encrypt ito ng Yuvomi sa susunod na pagsisimula.",
+        "shoppingWebhookTitle": "Shopping list webhook",
+        "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
+        "shoppingWebhookUrl": "Webhook URL"
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",
