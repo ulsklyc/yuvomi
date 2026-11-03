@@ -50,6 +50,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set, and a new database key would not have opened the existing database anyway. The installer now
   keeps the `_FILE` line, writes no second value and says the secret is reused. The web installer
   already did this.
+- **Stopping the container no longer takes ten seconds and a hard kill.** Inside the image the server runs as
+  process 1, which ignores a stop signal it has no handler for, so `docker stop` and `podman stop` waited out
+  their timeout and then killed it in the middle of requests, syncs and backups. The server now handles
+  SIGTERM and SIGINT: it stops taking connections, lets running requests, syncs and backups finish for up to
+  eight seconds, closes the database (the write-ahead log is folded back in) and exits with code 0. A second
+  signal exits at once.
+- **Renaming a shopping category also renames it in recipes, meals and stock.** Until now only the items on
+  the shopping lists followed the new name. Recipe ingredients, meal ingredients, recurring meals and stock
+  kept the old one, so their ingredients landed under a name that no longer exists: at the bottom of the
+  list, and ticking them off failed with "Invalid category". Deleting a category now moves these rows to the
+  same fallback category as the shopping items.
+- **Task defaults follow the new-task dialog in a one-person household.** Visibility and
+  editing-lock defaults stay out of the way when nobody else can read tasks. Saved choices
+  remain intact and reappear when needed. The editing-lock switch and its hint no longer
+  overlap. The defaults description also uses the same form of address as its neighbouring
+  hints (#2366).
 
 ## [2.84.0] - 2026-11-02
 
