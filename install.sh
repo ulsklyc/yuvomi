@@ -163,6 +163,15 @@ read_existing_env_value() {
   printf '%s' "$raw"
 }
 
+# Steht `<NAME>_FILE` mit einem echten Pfad in der .env? read_existing_env_value()
+# nimmt nur doppelte Anführungszeichen ab; Compose liest auch `''` als leer. Ohne
+# diese Probe galt `''` als Pfad, und der Rerun leerte den echten Wert daneben.
+env_file_source_set() {
+  local path
+  path=$(read_existing_env_value "$1_FILE") || return 1
+  [ "$path" != "''" ]
+}
+
 # Hat die App diesen Schlüssel beim ersten Start selbst gespeichert? Ohne Wert
 # in der .env legt sie ihn unter <Verzeichnis von DB_PATH>/.secrets/ ab, auf dem
 # Host also in DATA_DIR (Compose mountet es nach /data). Ohne diese Probe
@@ -345,7 +354,7 @@ configure_secrets() {
     # nicht zur Datenbank. Darum leer schreiben; die _FILE-Zeile selbst trägt
     # preserve_unmanaged() in die neue .env. Steht zusätzlich ein Wert in der
     # alten .env, startete die App so schon vorher nicht - die Datei gewinnt.
-    if read_existing_env_value "${varname}_FILE" >/dev/null; then
+    if env_file_source_set "$varname"; then
       printf -v "$varname" '%s' ''
       printf -v "${varname}_REUSED" '%s' 'yes'
       success "$(t secrets.reused)"
