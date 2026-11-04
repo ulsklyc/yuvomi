@@ -6,7 +6,7 @@ import {
 } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
-import { confirmModal, reportFieldError, reportFieldErrors } from '/components/modal.js';
+import { confirmModal, promptModal, reportFieldError, reportFieldErrors } from '/components/modal.js';
 import { errorSentence } from '/utils/friendly-error.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { settingRowHtml } from '/settings/components.js';
@@ -489,8 +489,8 @@ function renderPasskeyList(listEl, passkeysArr) {
           <span class="settings-passkey-row__meta form-hint">${esc(meta)}</span>
         </div>
         <div class="settings-passkey-row__actions">
-          <button type="button" class="btn btn--ghost btn--small passkey-rename-btn" data-passkey-id="${p.id}">${t('settings.passkeyRenameLabel')}</button>
-          <button type="button" class="btn btn--ghost btn--small passkey-delete-btn" aria-label="Remove ${esc(p.name)}" data-passkey-id="${p.id}"><i data-lucide="trash-2" aria-hidden="true"></i></button>
+          <button type="button" class="btn btn--ghost btn--sm passkey-rename-btn" data-passkey-id="${p.id}">${t('settings.passkeyRenameLabel')}</button>
+          <button type="button" class="btn btn--ghost btn--sm passkey-delete-btn" aria-label="Remove ${esc(p.name)}" data-passkey-id="${p.id}"><i data-lucide="trash-2" aria-hidden="true"></i></button>
         </div>
       </div>`;
   }).join('');
@@ -1162,9 +1162,8 @@ function bindPasskeyEvents(container, onReload) {
       return;
     }
     clearErr();
-    const name = window.prompt(t('settings.passkeyNameLabel'), '');
+    const name = await promptModal(t('settings.passkeyNameLabel'), '');
     if (name === null) return;
-    if (!name.trim()) { showErr(t('settings.passkeyNameMissing')); return; }
 
     try {
       const { data: options } = await auth.beginPasskeyRegistration();
@@ -1205,8 +1204,8 @@ function bindPasskeyEvents(container, onReload) {
       const id = Number(renameBtn.dataset.passkeyId);
       const row = card.querySelector(`.settings-passkey-row[data-passkey-id="${id}"]`);
       const currentName = row?.querySelector('.settings-passkey-row__name')?.textContent ?? '';
-      const newName = window.prompt(t('settings.passkeyNameLabel'), currentName);
-      if (newName === null || !newName.trim()) return;
+      const newName = await promptModal(t('settings.passkeyNameLabel'), currentName);
+      if (newName === null) return;
       try {
         await auth.renamePasskey(id, newName.trim());
         window.yuvomi?.showToast(t('settings.passkeyRenamed'), 'success');
