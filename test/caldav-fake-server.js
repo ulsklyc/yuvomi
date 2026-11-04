@@ -127,14 +127,20 @@ export async function startFakeDavServer() {
       if (pathname === homePath) {
         return sendXml(multistatus([
           propResponse(homePath, '<d:resourcetype><d:collection/></d:resourcetype>'),
-          ...[...collections].map(([path, col]) => propResponse(path, collectionProps(col))),
+          // Nur, was im Home-Ordner liegt: ein echter Server nennt an dieser
+          // Stelle keine Collection aus einem fremden Pfad (#2529).
+          ...[...collections].filter(([path]) => path.startsWith(homePath))
+            .map(([path, col]) => propResponse(path, collectionProps(col))),
         ]));
       }
       const col = collections.get(pathname);
       if (col) {
         const members = req.headers.depth === '1'
           ? [...col.objects].map(([filename, obj]) => propResponse(
-            `${pathname}${encodeSegment(filename)}`, etagProp(obj) || '<d:getcontenttype>text/calendar</d:getcontenttype>'))
+            `${pathname}${encodeSegment(filename)}`,
+            // Wie sabre/dav: auch eine Datei traegt einen (leeren) resourcetype -
+            // tsdavs Discovery-Absicherung verlangt ihn an JEDEM Eintrag.
+            '<d:resourcetype/>' + (etagProp(obj) || '<d:getcontenttype>text/calendar</d:getcontenttype>')))
           : [];
         return sendXml(multistatus([propResponse(pathname, collectionProps(col)), ...members]));
       }
@@ -233,6 +239,14 @@ export async function startFakeDavServer() {
       const path = `${homePath}${slug}/`;
       collections.set(path, { name, kind, components, privileges, objects: new Map() });
       return `${origin}${path}`;
+    },
+    /** Legt eine Collection an einem beliebigen Pfad an - etwa eine öffentliche
+     *  Collection ausserhalb des Home-Ordners des Benutzers (#2529) - und gibt
+     *  ihre absolute URL zurück. */
+    addCollectionAt(path, { name = path, kind = 'calendar', components = ['VEVENT'], privileges = null } = {}) {
+      const normalized = path.endsWith('/') ? path : `${path}/`;
+      collections.set(normalized, { name, kind, components, privileges, objects: new Map() });
+      return `${origin}${normalized}`;
     },
     /** Legt ein Objekt direkt ab (als hätte es ein anderer Client geschrieben). */
     putObject(collectionUrl, filename, data) {
