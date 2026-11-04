@@ -33,6 +33,8 @@ const SERVER_DIR = path.join(ROOT, 'server');
  * aus `public/` importieren darf. Reine Funktionen, front- und backend-identisch.
  */
 const SHARED_ISOMORPHIC = new Set([
+  // #2436: The API and tablet agree on the five display options; no DOM or storage.
+  'public/utils/display-device-settings.js',
   // The Savings chart bucket must identify the same stored category/subcategory in API and UI.
   'public/utils/budget-chart-category.js',
   // One recurrence maximum for the API validation and both budget dialogs; pure constant only.

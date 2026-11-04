@@ -31,6 +31,7 @@
  * in der Antwort, die ihn erzeugt hat.
  */
 
+import { parseDisplayDeviceSettings } from '../../public/utils/display-device-settings.js';
 import crypto from 'node:crypto';
 import * as dbModule from '../db.js';
 
@@ -367,7 +368,7 @@ export function authenticateDisplayDevice(token, { db } = {}) {
   if (!token || typeof token !== 'string') return null;
   const database = db || dbModule.get();
   const row = database.prepare(`
-    SELECT d.id, d.user_id, d.cookie_refreshed_at, da.show_screensaver
+    SELECT d.id, d.user_id, d.cookie_refreshed_at, da.show_screensaver, da.device_settings
       FROM display_devices d
       JOIN display_accounts da ON da.user_id = d.user_id
      WHERE d.token_hash = ? AND d.revoked_at IS NULL
@@ -395,10 +396,11 @@ export function authenticateDisplayDevice(token, { db } = {}) {
   // (#1766, Migration 244); die Gates in server/index.js lassen die Fotos des
   // Bildschirmschoners nur damit durch.
   const showScreensaver = row.show_screensaver === 1;
-  if (dbModule.isRestoreRunning()) return { userId: row.user_id, deviceId: row.id, refreshCookie: false, showScreensaver };
+  const deviceSettings = parseDisplayDeviceSettings(row.device_settings);
+  if (dbModule.isRestoreRunning()) return { userId: row.user_id, deviceId: row.id, refreshCookie: false, showScreensaver, deviceSettings };
   const refreshCookie = cookieRefreshDue(row.cookie_refreshed_at, seen);
   database.prepare('UPDATE display_devices SET last_seen_at = ? WHERE id = ?').run(seen, row.id);
-  return { userId: row.user_id, deviceId: row.id, refreshCookie, showScreensaver };
+  return { userId: row.user_id, deviceId: row.id, refreshCookie, showScreensaver, deviceSettings };
 }
 
 /**

@@ -43,7 +43,7 @@ export const NAVIGATE_DEPS = Object.freeze([
   // Verlassen-Schutz und Overlay-History
   'hasLeaveGuard', 'mayLeave', 'whenHistorySettled', 'consumeOverlayMarker',
   // Sitzung
-  'auth', 'syncPreferencesOnce', 'startThirdPartyModulePolling', 'loadReminderStyles', 'initReminders', 'initPush',
+  'auth', 'syncPreferencesOnce', 'startSessionPolling', 'loadReminderStyles', 'initReminders', 'initPush',
   'armScreensaver', 'showSessionUnreachable', 'forgetSessionState', 'holdOfflineSession',
   // Seite
   'rememberScrollPosition', 'scrollPositionFor', 'renderPage', 'adoptPageFab', 'updateNav', 'topLevelSection',
@@ -205,7 +205,7 @@ export function createNavigate(state, deps) {
     ROUTES, allRoutes, unknownPathDetour, publicPathDetour, detourPaths, canAccessNavModule,
     location, history, window, document,
     hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
-    auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush,
+    auth, syncPreferencesOnce, startSessionPolling, loadReminderStyles, initReminders, initPush,
     armScreensaver, showSessionUnreachable, forgetSessionState, holdOfflineSession,
     rememberScrollPosition, scrollPositionFor, renderPage, adoptPageFab, updateNav, topLevelSection,
     syncWallMode, applyModuleAccentForRoute, updateThemeColorForRoute, updateBranding,
@@ -361,7 +361,7 @@ export function createNavigate(state, deps) {
         // `auth:expired` ihn wieder. Fuer jedes Konto, auch Gast und Display.
         armScreensaver();
         await syncPreferencesOnce();
-        startThirdPartyModulePolling();
+        startSessionPolling();
         // currentUser kann während des await oben auf null gesetzt worden sein
         // (auth:expired bei 401 von /preferences), daher Guard gegen null.
         if (state.currentUser && !['split_guest', 'display'].includes(state.currentUser.access_scope)) {
@@ -470,7 +470,7 @@ export function createNavigate(state, deps) {
           if (result?.offlineSnapshot === true) {
             if (state.currentUser) holdOfflineSession();
           } else {
-            startThirdPartyModulePolling();
+            startSessionPolling();
             // currentUser kann während des await oben auf null gesetzt worden sein
             // (auth:expired bei 401 von /preferences), daher Guard gegen null.
             if (state.currentUser && !['split_guest', 'display'].includes(state.currentUser.access_scope)) {
