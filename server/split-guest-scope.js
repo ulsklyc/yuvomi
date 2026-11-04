@@ -69,6 +69,9 @@ const SPLIT_GUEST_SESSION_ROUTES = [
  */
 const AUTH_PUBLIC_ROUTES = [
   ['POST', '/auth/login'],
+  ['GET', '/auth/passkeys/config'],
+  ['POST', '/auth/passkeys/login/options'],
+  ['POST', '/auth/passkeys/login/verify'],
   ['POST', '/auth/2fa/verify'],
   ['POST', '/auth/setup'],
   ['GET', '/auth/oidc/config'],
