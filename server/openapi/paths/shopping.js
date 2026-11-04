@@ -250,6 +250,10 @@ const CASE_REASONS = {
       + '`recipient_no_email` (422, the chosen member has no email address on their contact), '
       + '`smtp_unconfigured` (422, email is not set up for this instance)',
   },
+  '/api/v1/shopping/{listId}/send-webhook': {
+    post: `${LIST_GONE}, \`nothing_open\` (422, the list has no open items), `
+      + '`shopping_webhook_unconfigured` (422, no webhook URL set in household preferences)',
+  },
   '/api/v1/shopping/items/{itemId}': { delete: '`shopping_item_not_found` (404, the item does not exist - deleted)' },
   '/api/v1/shopping/items/undo-transfer': { post: `${MEALS_WRITE_REQUIRED}, when the undo touches meal ingredients` },
 };
