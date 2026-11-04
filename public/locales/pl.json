@@ -836,7 +836,10 @@
         "doneSubtasksOpen_many": "„{{title}}” zrobione - wciąż otwartych {{count}} podzadań.",
         "seriesDoneNamed": "„{{title}}” zrobione - następny raz: {{date}}",
         "kanbanRestore": "Przywróć",
-        "errorTagGone": "Ten tag już nie istnieje."
+        "errorTagGone": "Ten tag już nie istnieje.",
+        "foreignSeries": "Powtarza się w innej aplikacji",
+        "foreignSeriesDetail": "Odhacz je tam, aby seria trwała dalej",
+        "errorForeignSeries": "To zadanie powtarza się w innej aplikacji. Odhacz je tam, aby seria trwała dalej."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} posiłki",

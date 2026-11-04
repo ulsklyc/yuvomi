@@ -818,7 +818,10 @@
         "doneSubtasksOpen_many": "«{{title}}» виконано - ще відкрито {{count}} підзавдань.",
         "seriesDoneNamed": "«{{title}}» виконано - наступного разу: {{date}}",
         "kanbanRestore": "Відновити",
-        "errorTagGone": "Цього тегу більше немає."
+        "errorTagGone": "Цього тегу більше немає.",
+        "foreignSeries": "Повторюється в іншому застосунку",
+        "foreignSeriesDetail": "Позначте її там, щоб серія тривала",
+        "errorForeignSeries": "Це завдання повторюється в іншому застосунку. Позначте його виконаним там, щоб серія тривала."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} прийоми їжі",

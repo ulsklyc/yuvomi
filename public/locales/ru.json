@@ -818,7 +818,10 @@
         "doneSubtasksOpen_many": "«{{title}}» выполнено - ещё открыто {{count}} подзадач.",
         "seriesDoneNamed": "«{{title}}» выполнено - следующий раз: {{date}}",
         "kanbanRestore": "Восстановить",
-        "errorTagGone": "Этого тега больше нет."
+        "errorTagGone": "Этого тега больше нет.",
+        "foreignSeries": "Повторяется в другом приложении",
+        "foreignSeriesDetail": "Отметьте её там, чтобы серия продолжилась",
+        "errorForeignSeries": "Эта задача повторяется в другом приложении. Отметьте её выполненной там, чтобы серия продолжилась."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} приёма пищи",

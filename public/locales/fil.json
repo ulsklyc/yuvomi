@@ -718,7 +718,10 @@
         "subtasksAllDone": "Tapos na ang \"{{title}}\" at lahat ng subtask.",
         "seriesDoneNamed": "Tapos na ang \"{{title}}\" - susunod: {{date}}",
         "kanbanRestore": "I-restore",
-        "errorTagGone": "Wala na ang tag na ito."
+        "errorTagGone": "Wala na ang tag na ito.",
+        "foreignSeries": "Umuulit sa ibang app",
+        "foreignSeriesDetail": "I-tsek ito roon para magpatuloy ang serye",
+        "errorForeignSeries": "Umuulit ang gawaing ito sa ibang app. I-tsek ito roon para magpatuloy ang serye."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ang item na natanggal.",

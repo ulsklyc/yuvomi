@@ -700,7 +700,10 @@
         "subtasksAllDone": "„{{title}}” és minden részfeladat kész.",
         "seriesDoneNamed": "„{{title}}” kész - legközelebb: {{date}}",
         "kanbanRestore": "Visszaállítás",
-        "errorTagGone": "Ez a címke már nem létezik."
+        "errorTagGone": "Ez a címke már nem létezik.",
+        "foreignSeries": "Egy másik alkalmazásban ismétlődik",
+        "foreignSeriesDetail": "Ott pipáld ki, hogy a sorozat folytatódjon",
+        "errorForeignSeries": "Ez a feladat egy másik alkalmazásban ismétlődik. Ott pipáld ki, hogy a sorozat folytatódjon."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} elem törölve.",

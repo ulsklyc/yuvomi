@@ -700,7 +700,10 @@
         "subtasksAllDone": "「{{title}}」及所有子任務已完成。",
         "seriesDoneNamed": "「{{title}}」已完成 - 下次到期：{{date}}",
         "kanbanRestore": "恢復",
-        "errorTagGone": "此標籤已不存在。"
+        "errorTagGone": "此標籤已不存在。",
+        "foreignSeries": "在其他 App 中重複",
+        "foreignSeriesDetail": "請在該 App 中勾選完成，系列才會繼續",
+        "errorForeignSeries": "此任務在其他 App 中重複。請在該 App 中勾選完成，系列才會繼續。"
     },
     "shopping": {
         "itemsRemovedToast_one": "已刪除 {{count}} 件商品。",

@@ -700,7 +700,10 @@
         "subtasksAllDone": "«{{title}}» e tutte le sottoattività fatte.",
         "seriesDoneNamed": "«{{title}}» fatto - prossima volta: {{date}}",
         "kanbanRestore": "Ripristina",
-        "errorTagGone": "Questa etichetta non esiste più."
+        "errorTagGone": "Questa etichetta non esiste più.",
+        "foreignSeries": "Si ripete in un'altra app",
+        "foreignSeriesDetail": "Spuntala lì perché la serie continui",
+        "errorForeignSeries": "Questa attività si ripete in un'altra app. Spuntala lì perché la serie continui."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} articolo eliminato.",

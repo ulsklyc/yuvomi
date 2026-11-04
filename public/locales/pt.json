@@ -700,7 +700,10 @@
         "subtasksAllDone": "«{{title}}» e todas as subtarefas concluídos.",
         "seriesDoneNamed": "«{{title}}» concluído - próxima vez: {{date}}",
         "kanbanRestore": "Restaurar",
-        "errorTagGone": "Esta etiqueta já não existe."
+        "errorTagGone": "Esta etiqueta já não existe.",
+        "foreignSeries": "Repete-se noutra app",
+        "foreignSeriesDetail": "Marque-a como feita lá para a série continuar",
+        "errorForeignSeries": "Esta tarefa repete-se noutra app. Marque-a como feita lá para a série continuar."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item excluído.",
