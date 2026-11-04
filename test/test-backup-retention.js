@@ -12,15 +12,13 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
+import { tempDir } from './tmp-dir.js';
 
 // ── Isolated temp dir per process ────────────────────────────────────────────
-const TEST_ROOT = mkdtempSync(path.join(os.tmpdir(), 'yuvomi-backup-retention-'));
+const TEST_ROOT = tempDir('yuvomi-backup-retention-');
 const TEST_DIR  = path.join(TEST_ROOT, 'store');
-
-process.on('exit', () => rmSync(TEST_ROOT, { recursive: true, force: true }));
 
 // ── Environment (set before first module import) ──────────────────────────────
 process.env.BACKUP_ENABLED      = 'false';
