@@ -196,6 +196,22 @@ test('Open-Meteo via env: provider + city + cloud-sun icon + wmo desc + forecast
   } finally { await close(); }
 });
 
+// ulsklyc/yuvomi-home-assistant#4: ohne Ortsnamen stand im Feld `city` der
+// Koordinaten-String in voller Genauigkeit (`lat, lon`) - die Wohnposition auf
+// jeder Kachel, die jemand sieht. Ohne Namen ist `city` jetzt `null`.
+test('Open-Meteo without a city name: city is null, never the coordinates', async () => {
+  const { baseUrl, close } = await startApp({
+    env: { WEATHER_LAT: '54.31665773950043', WEATHER_LON: '10.116079422296027' },
+    fetchFn: OM_FETCH,
+  });
+  try {
+    const { body } = await getJson(baseUrl);
+    assert.equal(body.data.provider, 'open-meteo');
+    assert.equal(body.data.city, null);
+    assert.ok(!JSON.stringify(body).includes('54.3166'), 'the coordinates must not appear in the response');
+  } finally { await close(); }
+});
+
 test('DB provider=open-meteo overrides env OPENWEATHER_API_KEY; night → moon', async () => {
   const { baseUrl, close } = await startApp({
     env: { OPENWEATHER_API_KEY: 'old-key' },

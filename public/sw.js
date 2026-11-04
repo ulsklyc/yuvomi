@@ -21,7 +21,7 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const APP_RELEASE        = '2.84.0';
+const APP_RELEASE        = '2.85.0';
 const APP_BUILD_REVISION = '__YUVOMI_BUILD_REVISION__';
 const CACHE_RELEASE      = `${APP_RELEASE}-${APP_BUILD_REVISION}`;
 const SHELL_CACHE        = `yuvomi-shell-${CACHE_RELEASE}`;
@@ -464,6 +464,9 @@ const APP_SHELL = [
   '/utils/schedule-reminder-offset.js',
   '/utils/servings-stepper.js',
   '/utils/screensaver-idle.js',
+  '/utils/display-device-settings.js',
+  '/utils/display-device-state.js',
+  '/utils/display-settings-sync.js',
   '/utils/scroll-restore.js',
   '/utils/seal-pair.js',
   '/utils/session-unreachable.js',
@@ -623,11 +626,13 @@ const PAGE_MODULES = [
   '/settings/backup-key.js',
   '/settings/currency.js',
   '/settings/preferences-cache.js',
+  '/settings/night-hour-options.js',
   '/settings/region-presets.js',
   '/settings/weather-location.js',
   '/settings/family-users.js',
   '/settings/assignee-menu.js',
   '/settings/module-install-errors.js',
+  '/settings/signed-in-devices.js',
   '/settings/pages/personal-account.js',
   '/settings/pages/personal-schedule.js',
   '/settings/pages/admin-email.js',

@@ -1057,6 +1057,37 @@ test('buildStorageKey uses UUIDs and preserves sanitized category, name and exte
   assert.equal(first.includes('..'), false);
 });
 
+test('buildStorageKey trims separators the same way for typical and hostile names', () => {
+  const key = (category, originalName) =>
+    storage.buildStorageKey({ category, originalName }).replace(/[0-9a-f-]{36}-/, '');
+
+  assert.equal(key('--Family  Photos!!', '__Summer 2026__.JPG'), 'family-photos/summer-2026.jpg');
+  assert.equal(key(' Über Größe! ', '  Rechnung #12 .pdf'), 'uber-gro-e/rechnung-12.pdf');
+  assert.equal(key('', ''), 'documents/document');
+  assert.equal(key('!!!', '!!!.pdf'), 'documents/document.pdf');
+  assert.equal(key('-', '-a-.txt'), 'documents/a.txt');
+});
+
+test('buildStorageKey handles long separator runs in linear time (CodeQL js/polynomial-redos)', () => {
+  const started = performance.now();
+  assert.equal(
+    storage.buildStorageKey({ category: '-'.repeat(50000) + 'a!', originalName: 'x.pdf' })
+      .split('/')[0],
+    'a'
+  );
+  assert.match(
+    storage.buildStorageKey({ category: 'docs', originalName: 'a' + '-'.repeat(100000) + '!.pdf' }),
+    /-a\.pdf$/
+  );
+  assert.ok(performance.now() - started < 200, 'slug must not backtrack on long dash runs');
+
+  const source = readFileSync(
+    new URL('../server/services/document-storage.js', import.meta.url),
+    'utf8'
+  );
+  assert.equal(source.includes('-+$/'), false, 'trailing -+$ is quadratic on dash runs');
+});
+
 test('stageDocumentUpload returns local data when disabled', async () => {
   const result = await storage.stageDocumentUpload({
     buffer: Buffer.from('local bytes'),

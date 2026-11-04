@@ -64,6 +64,7 @@ import {
 import { isAdminRequest, requireAdmin } from './middleware/require-admin.js';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';
 import * as twoFactor from './services/two-factor.js';
+import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
 
 const log = createLogger('Auth');
 const router = express.Router();
@@ -609,6 +610,38 @@ function deviceMayUseAuthRoute(method, path) {
   return DEVICE_AUTH_ROUTES.some(([allowed, pattern]) => allowed === method && pattern.test(path));
 }
 
+/**
+ * Jedes Konto, als das `requireAuth` diese Anfrage fuehren KOENNTE. Fuer das
+ * Tor unten, das VOR `requireAuth` steht und deshalb selbst nachsehen muss -
+ * ohne dessen Nebenwirkungen (`last_used_at`, Cookie-Auffrischung, 401).
+ *
+ * BEWUSST NICHT "das eine Konto, das `requireAuth` waehlen wird". Diese Wahl
+ * hier nachzubauen hiesse, jede ihrer Bedingungen (Widerruf, Ablauf, Leerlauf,
+ * ehemaliger Aussteller oder Subjekt) ein zweites Mal zu fuehren, und die
+ * Fassung, die zurueckbleibt, oeffnet eine Luecke: haelt das Tor ein Token fuer
+ * gueltig, das `requireAuth` verwirft, sieht es den Token-Inhaber, und
+ * `requireAuth` faellt danach auf die Sitzung eines Gasts zurueck (Review zu
+ * GHSA-q7gc-2cc9-w8fj, gemessen). Deshalb zaehlen hier die Sitzung UND jede
+ * Token-Zeile zum mitgeschickten Wert, ob brauchbar oder nicht. Ist eines
+ * davon ein Gast, sperrt das Tor - die engere Antwort.
+ *
+ * Ein Display-Cookie wird nicht aufgeloest: ein Display ist nie ein
+ * Ausgaben-Gast, und das Tor hat fuer Displays seinen eigenen Riegel.
+ * @returns {number[]}
+ */
+function requestCandidateUserIds(req) {
+  const ids = [];
+  if (req.session?.userId != null) ids.push(req.session.userId);
+  const token = extractApiToken(req);
+  if (token) {
+    const row = db.get().prepare(`
+      SELECT t.subject_user_id, t.created_by FROM api_tokens t WHERE t.token_hash = ?
+    `).get(hashApiToken(token));
+    if (row) ids.push(row.subject_user_id ?? row.created_by);
+  }
+  return ids;
+}
+
 // Sicherheits-Gate (GHSA-xcv5-6w6x-x5q2): Der Auth-Router ist in server/index.js
 // bewusst VOR den globalen Scope-/Guest-/Modul-Gates gemountet, damit oeffentliche
 // Routen (login, setup, oidc, 2fa/verify) ohne Authentifizierung erreichbar sind.
@@ -629,6 +662,17 @@ router.use((req, res, next) => {
   // deshalb oben durch. Es bekommt die Allowlist statt der ganzen Konto-Routen.
   if (!deviceMayUseAuthRoute(req.method, req.path) && requestHasDeviceCredential(req)) {
     return res.status(403).json({ error: 'This is not available on a signed-in device.', code: 403, reason: 'device_credential' });
+  }
+  // DER AUSGABEN-GAST (GHSA-q7gc-2cc9-w8fj), die dritte eingeschraenkte Art
+  // von Konto. Das Gast-Gate in server/index.js sieht keine `/auth`-Anfrage,
+  // weil dieser Router vor ihm haengt - ein Gast las so ueber `GET /users` die
+  // ganze Kontoliste samt Kontaktdaten. Er bekommt hier dieselbe Liste wie
+  // dort (server/split-guest-scope.js), `/auth` davor aus demselben Grund wie
+  // beim Display unten: die Liste ist `/api/v1`-relativ gefuehrt. 403 und
+  // derselbe Grund wie im Gast-Gate, damit der Client nur eine Absage kennt.
+  if (!splitGuestMayReach(req.method, `/auth${req.path}`)
+    && requestCandidateUserIds(req).some((id) => isSplitGuestAccount(db.get(), id))) {
+    return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403, reason: 'split_guest_scope' });
   }
   // DASSELBE FUER EIN GEKOPPELTES DISPLAY (#1208). Es traegt ebenfalls Scopes
   // und wuerde vom globalen Gate ebenso verworfen - und kommt hier ebenso wenig
@@ -1116,6 +1160,7 @@ function requireAuth(req, res, next) {
       req.authScopes = [...DISPLAY_SCOPES];
       req.displayDeviceId = device.deviceId;
       req.displayShowsScreensaver = device.showScreensaver === true;
+      req.displayDeviceSettings = device.deviceSettings;
       // DIE OFFLINE-FRIST RUECKT MIT JEDEM KONTAKT VOR (Folge von #2293). Der
       // Service Worker legt sie neben die gecachten Listen; `/auth/me` nennt
       // denselben Wert als `sessionExpiresAt`. Begruendung und Dauer bei

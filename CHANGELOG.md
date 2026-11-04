@@ -8,12 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Administrators set night hours and screensaver options for each wall tablet.**
+  Settings > Wall tablets offers each tablet's night window, idle delay, clock and photo
+  fill. Online tablets pick up changes automatically; existing local choices stay in use
+  until an administrator saves, and personal browser preferences are preserved (#2436).
 - **Shopping: purchase price history** (part 1 of #1003). Ticking off or clearing a priced
   shopping item records the purchase: item name, price paid in cents, the shop, and the date.
   Purchases match by item name, case-insensitively, and remain after the item is cleared.
   The item details sheet displays the last purchase for known items. CalDAV completion sync
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
+## [2.85.0] - 2026-11-04
+
+### Added
 - **Stock: the minimum belongs to the product, and running low is read over all its batches**
   (part 3 of #1448). Toothpaste with 1 in the bathroom, 8 in the attic and a minimum of 3 no
   longer reads as running low: the household has 9. Milk with 1 l, 1 l and 2 l against a minimum
@@ -53,6 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   storage is lost. The key appears only after a click and is not cached; viewing it is logged without
   the value. A key from your own configuration is never shown - the page says where it comes from -
   and a signed-in device of the native app cannot read it.
+- **Settings → Account lists the phones signed in with the native app and pairs a new one.** Each
+  signed-in device shows its name, platform and when it was last used, and can be signed out after a
+  confirmation. "Pair a device" shows a code that is valid for five minutes and once: as a QR code for a
+  second device, behind "Open in app" for the phone the page is open on, and as text to type. A household
+  that signs in only with single sign-on has no password to type into an app, and this is its way in.
+  While a code is open, the page names a device that has just signed in, so a phone you do not recognise
+  stands out and can be signed out on the spot.
 - **The Overview has its own tile arrangement on the phone.** On a phone, tapping Customize shows
   a "Phone tiles" mode that lets you reorder and show or hide tiles independently of the desktop
   layout. Options (calendar limit, task filters, shopping-list selection, etc.) follow the desktop
@@ -79,6 +93,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writing it on the product itself comes with a later part of #1448, before the field goes.
 
 ### Fixed
+- **A birthday keeps the color you give it in the calendar.** The birthday sync wrote its own red
+  back onto every birthday event each time it ran, which is on every visit to Birthdays and every
+  reminder check. Giving several birthdays the same color looked as if a color could be used only
+  once: the one changed last kept it, the earlier ones fell back to red. New birthdays still start
+  in red; after that the color is the calendar's. Reported by email.
+- **The weather tile no longer shows your coordinates as the place name.** With coordinates but no
+  place name set, the tile and the API showed the raw position in full precision
+  (`54.31665773950043, 10.116079422296027`), the exact location of the home for everyone who sees
+  the overview. Without a name the tile now shows none, and `city` in `/api/v1/weather` is `null`.
+  Reported for the Home Assistant app in ulsklyc/yuvomi-home-assistant#4.
+- **The Budget title stands in full next to the month in every language.** From 390px up the title
+  was cut off in eleven languages ("Presupues..." in Spanish even at 430px), because the month only
+  moved to a row of its own below 390px. The head now measures: whenever the title would be cut off
+  next to the month, the month takes the row below it, at any width; a short title such as Japanese
+  keeps the month beside it also on a narrow phone. Paging through the months and scrolling the head
+  away behave as before. The Greek Budget page title is shorter ("Οικονομικά"), the navigation keeps
+  the full name. (#2443)
+- **"Sign out on other devices" says that it signs out the native app too.** The server already
+  ended signed-in devices along with the other sessions; the hint under the button did not mention it.
 - **Deleting the first occurrence of a recurring event also stops its reminder.** A reminder on a series
   belongs to its first occurrence, and after that occurrence was deleted it still showed in the bell and
   arrived as a notification, also for a deleted first occurrence coming from an imported calendar (ICS,
@@ -126,6 +159,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   remain intact and reappear when needed. The editing-lock switch and its hint no longer
   overlap. The defaults description also uses the same form of address as its neighbouring
   hints (#2366).
+
+### Security
+- **Document storage names no longer use a regular expression that slows down on long runs of
+  dashes.** Trimming the dashes around the folder and file part of a stored document's name used a
+  pattern CodeQL flags as polynomial. The step before it already collapsed every run into one dash,
+  so uploads were not slowed down in practice; the name stays exactly the same.
+- **A shared-expense guest only reaches its own account routes (GHSA-q7gc-2cc9-w8fj).** A guest
+  account is meant to see Shared expenses and nothing else, and every other module already refused
+  it. The account routes did not: they answer before that check, so a signed-in guest could read the
+  household's account list with the members' contact details. The account routes now ask the same
+  list as the rest of the API. A guest keeps signing in and out, its own account details and the
+  changelog; everything else there is refused, and members notice nothing.
 
 ## [2.84.0] - 2026-11-02
 

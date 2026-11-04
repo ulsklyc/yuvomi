@@ -314,9 +314,9 @@ docker compose up -d
 Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no Node.js installation needed.
 
 > **Pinning a version.** Every release is also published under immutable tags:
-> `2.84.0` (exact version), `2.84` (latest patch of that minor), plus a moving `main`
+> `2.85.0` (exact version), `2.85` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
-> set `image: ghcr.io/ulsklyc/yuvomi:2.84.0` in your compose file and bump it
+> set `image: ghcr.io/ulsklyc/yuvomi:2.85.0` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
 
 > **Verifying what you pull.** Every image the publish workflow builds is signed at build
@@ -325,7 +325,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > image you are about to run is one GitHub built from a release tag of this repository:
 >
 > ```bash
-> cosign verify ghcr.io/ulsklyc/yuvomi:2.84.0 \
+> cosign verify ghcr.io/ulsklyc/yuvomi:2.85.0 \
 >   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 >   --certificate-identity-regexp '^https://github.com/ulsklyc/yuvomi/.github/workflows/docker-publish.yml@refs/tags/v'
 > ```
@@ -334,7 +334,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > anything else means the image is not one this repository released. The `main` tag is
 > signed too, under `refs/heads/main`, which the pattern above deliberately excludes. Tags
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
-> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.84.0 --format '{{ json .Provenance }}'`.
+> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.85.0 --format '{{ json .Provenance }}'`.
 
 Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 
@@ -379,7 +379,7 @@ docker compose logs -f
 You should see output like:
 
 ```
-yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.84.0
+yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.85.0
 yuvomi  | [Yuvomi] Environment: production
 yuvomi  | [Sync] Auto-sync active every 15 minutes.
 ```
@@ -533,7 +533,7 @@ Search for **Yuvomi**, install it and start it. The app generates `SESSION_SECRE
 
 #### 3. Open Yuvomi
 
-Select **Open Web UI**. Yuvomi answers on port 3000 of the Home Assistant host, for example `http://homeassistant.local:3000`. The first visit guides you through creating your admin account in the browser.
+Select **Open Web UI**. Yuvomi answers on port 3880 of the Home Assistant host, for example `http://homeassistant.local:3880` (another port is set on the app's **Configuration** tab under **Network**). The first visit guides you through creating your admin account in the browser.
 
 Further environment variables go under **Additional environment variables** on the **Configuration** tab; paths, the session secret and the database key stay with the app. Every option is described on the app's **Documentation** tab.
 

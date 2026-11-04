@@ -11929,6 +11929,12 @@ const MIGRATIONS = [
   },
   {
     version: 278,
+    description: 'Wall displays: centrally managed night hours and screensaver options (#2436)',
+    // NULL preserves existing device-local choices until an administrator saves.
+    up: `ALTER TABLE display_accounts ADD COLUMN device_settings TEXT CHECK(device_settings IS NULL OR json_valid(device_settings));`,
+  },
+  {
+    version: 279,
     description: 'Shopping: purchase price history (#1003)',
     // A PURCHASE HISTORY IS A RECORD OF FACTS (#1003). When a priced item is
     // ticked off or cleared, a purchase entry is written with the item name,

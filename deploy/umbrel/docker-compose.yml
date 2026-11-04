@@ -11,7 +11,7 @@ services:
     restart: on-failure
     stop_grace_period: 1m
     # No `user:` override: the image entrypoint starts as root only to chown the
-    # app data and backup volumes, then drops to the unprivileged `node` user via gosu.
+    # app data and backup volumes, then drops to the unprivileged `node` user via setpriv.
     volumes:
       - ${APP_DATA_DIR}/data/app:/data
       - ${APP_DATA_DIR}/data/backups:/backups
