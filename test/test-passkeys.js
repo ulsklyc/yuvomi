@@ -143,6 +143,86 @@ async function httpFixture() {
   return { route, call, cookies, close: async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); } };
 }
 
+const managementRoutes = [
+  ['GET', '/passkeys'],
+  ['POST', '/passkeys/register/options'],
+  ['POST', '/passkeys/register/verify'],
+  ['POST', '/passkeys/reauth/options'],
+  ['POST', '/passkeys/reauth/verify'],
+  ['DELETE', '/passkeys/1'],
+];
+const publicPasskeyRoutes = [
+  ['GET', '/passkeys/config'],
+  ['POST', '/passkeys/login/options'],
+  ['POST', '/passkeys/login/verify'],
+];
+
+test('a guest session cannot manage passkeys but can sign in as a household member with credential proof', async () => {
+  const { route, call, close } = await httpFixture();
+  const { hashPassword } = await import('../server/utils/password.js');
+  const guest = user(); const member = user(); const own = await enroll(member);
+  const password = 'Guest-test-password-123!';
+  database.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await hashPassword(password), guest.id);
+  database.prepare('INSERT INTO split_expense_guest_users (user_id) VALUES (?)').run(guest.id);
+  try {
+    assert.equal((await route('/login', 'POST', {username:guest.username, password})).status, 200);
+    const before = (await call('/__test/proof')).data;
+    const challengeCount = database.prepare('SELECT count(*) AS n FROM passkey_challenges').get().n;
+    for (const [method, path] of managementRoutes) {
+      const response = await route(path, method, method === 'GET' ? undefined : {});
+      assert.equal(response.status, 403, `${method} ${path}`);
+      assert.equal(response.data.reason, 'split_guest_scope');
+    }
+    assert.equal(database.prepare('SELECT count(*) AS n FROM passkey_challenges').get().n, challengeCount);
+    assert.equal(passkeys.list(database, guest.id).length, 0);
+    assert.equal((await route('/passkeys/config')).status, 200);
+    const options = await route('/passkeys/login/options', 'POST', {});
+    assert.equal(options.status, 200);
+    const response = await route('/passkeys/login/verify', 'POST', {credential:assertion(options.data.data, own.device, own.handle)});
+    assert.equal(response.status, 200, JSON.stringify(response.data));
+    assert.equal(response.data.user.id, member.id);
+    const after = (await call('/__test/proof')).data;
+    assert.equal(after.userId, member.id);
+    assert.notEqual(after.sessionId, before.sessionId);
+    assert.equal((await route('/passkeys')).status, 200);
+  } finally {
+    await close();
+    database.prepare('DELETE FROM users WHERE id = ?').run(guest.id);
+  }
+});
+
+test('device credentials, scoped tokens and paired displays cannot reach any passkey route', async () => {
+  const { route, close } = await httpFixture();
+  const person = user();
+  const { issuePairingCode, redeemPairingCode } = await import('../server/services/display-accounts.js');
+  const display = user();
+  database.prepare("UPDATE users SET password_hash = '$display$' WHERE id = ?").run(display.id);
+  database.prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)').run(display.id, person.id);
+  const paired = redeemPairingCode(issuePairingCode(display.id, person.id, {db:database}).code, {db:database});
+  const deviceToken = 'yuvomi_passkey_device_boundary';
+  const scopedToken = 'yuvomi_passkey_scoped_boundary';
+  database.prepare("INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, subject_user_id, kind, platform, device_id) VALUES (?, ?, ?, ?, ?, 'device', 'test', 'passkey-boundary')")
+    .run('Passkey device boundary', digest(deviceToken).toString('hex'), 'yuvomi_test', person.id, person.id);
+  database.prepare('INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, scopes) VALUES (?, ?, ?, ?, ?)')
+    .run('Passkey scoped boundary', digest(scopedToken).toString('hex'), 'yuvomi_test', person.id, JSON.stringify(['notes:read']));
+  const challengeCount = database.prepare('SELECT count(*) AS n FROM passkey_challenges').get().n;
+  try {
+    for (const [headers, reason] of [
+      [{Authorization:`Bearer ${deviceToken}`}, 'device_credential'],
+      [{Authorization:`Bearer ${scopedToken}`}, undefined],
+      [{Cookie:`yuvomi.display=${paired.token}`}, 'display_account'],
+    ]) {
+      for (const [method, path] of [...managementRoutes, ...publicPasskeyRoutes]) {
+        const response = await route(path, method, method === 'GET' ? undefined : {}, headers);
+        assert.equal(response.status, 403, `${reason ?? 'scoped token'}: ${method} ${path}`);
+        if (reason) assert.equal(response.data.reason, reason);
+      }
+    }
+    assert.equal(database.prepare('SELECT count(*) AS n FROM passkey_challenges').get().n, challengeCount);
+    assert.equal(passkeys.list(database, person.id).length, 0);
+  } finally { await close(); }
+});
+
 test('HTTP enrollment and sign-in preserve CSRF, session, policy, account and 2FA gates', async () => {
   const { route, call, cookies, close } = await httpFixture();
   const { hashPassword } = await import('../server/utils/password.js');

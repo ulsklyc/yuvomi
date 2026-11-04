@@ -34,8 +34,12 @@ effective, native passkey sign-in and enrollment are disabled for household memb
 just as native password sign-in is; the existing external-expense guest exception
 still applies. Accounts explicitly configured as SSO-only also cannot enroll or
 use native passkeys, independently of the household-wide switch. A passkey does not
-bypass account deactivation, access restrictions or the existing two-factor gate. Scoped API tokens and paired displays cannot
-manage passkeys, nor can an unscoped API token enroll a key on someone's behalf.
+bypass account deactivation, access restrictions or the existing two-factor gate.
+Shared-expense guests cannot manage passkeys. A browser with an existing guest
+session can still start a fresh passkey sign-in, which requires valid credential
+proof before changing the signed-in identity. Native device credentials, scoped
+API tokens and paired displays cannot use the passkey routes; an unscoped API
+token cannot enroll a key on someone's behalf.
 `PASSKEYS_ENABLED=false` disables the feature on an installation.
 
 ## Addresses and recovery
