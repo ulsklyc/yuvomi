@@ -9,6 +9,7 @@ import { esc } from '/utils/html.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { getPwaInstallState } from '/utils/pwa-install.js';
 import { toggleRowHtml, settingSwitchRowHtml } from '/settings/components.js';
+import { getPreferences, savePreferences } from '/settings/preferences-cache.js';
 
 const DEFAULT_PROVIDERS = [
   { id: 'gotify', name: 'Gotify' },
@@ -575,15 +576,15 @@ export async function render(container, { user } = {}) {
     const webhookForm = container.querySelector('#shopping-webhook-form');
     if (webhookForm) {
       try {
-        const prefs = await api.get('/preferences');
+        const prefs = await getPreferences();
         const urlInput = webhookForm.querySelector('#shopping-webhook-url');
         const statusEl = webhookForm.querySelector('#shopping-webhook-status');
-        urlInput.value = prefs.data?.shopping_webhook_url ?? '';
+        urlInput.value = prefs?.shopping_webhook_url ?? '';
         webhookForm.addEventListener('submit', async (ev) => {
           ev.preventDefault();
           statusEl.textContent = '';
           try {
-            await api.put('/preferences', { shopping_webhook_url: urlInput.value.trim() || null });
+            await savePreferences({ shopping_webhook_url: urlInput.value.trim() || null });
             statusEl.textContent = t('settings.shoppingWebhookSaved');
           } catch (err) {
             const msg = err?.body?.error || t('common.error');
