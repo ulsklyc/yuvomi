@@ -10,8 +10,9 @@
  *      nur fuer Haushaltsmitglieder. Dieselbe `device_id` ersetzt.
  *   2. 90 Tage ohne Benutzung beenden ein Credential, Benutzung verlaengert.
  *   3. Was eine Sitzung beendet, beendet auch die Geraete: Passwort, Admin-
- *      Passwort, "Auf anderen Geraeten abmelden", Deaktivieren und Loeschen.
- *      Integrations-Tokens bleiben dabei stehen.
+ *      Passwort, Passwort-Reset, 2FA einschalten, "Auf anderen Geraeten
+ *      abmelden", Deaktivieren und Loeschen. Integrations-Tokens bleiben dabei
+ *      stehen.
  *   4. Kein Weg in die Verwaltung: Ein Admin ist auf dem Geraet ein Mitglied,
  *      und von `/auth` erreicht ein Credential nur eine Allowlist.
  *   5. Ein Admin sieht fremde Geraete nicht und kann ein Mitglied nur pauschal
@@ -94,6 +95,8 @@ async function member() {
 }
 
 const db = (await import('../server/db.js')).get();
+const { passwordResetService } = await import('../server/services/password-reset.js');
+const { generateCode } = await import('../server/utils/totp.js');
 
 function integrationToken(userId) {
   const token = `yuvomi_integration_${crypto.randomUUID()}`;
@@ -249,6 +252,47 @@ test('das Admin-Passwort beendet die Geraete des Mitglieds', async () => {
   });
   assert.equal(res.status, 200);
   assert.equal(await meStatus(credential), 401);
+});
+
+test('der Passwort-Reset beendet Sitzung und Geraete, die Integration bleibt', async () => {
+  // Die Route ruft das Beenden in einem try/catch, das jeden Fehler schluckt.
+  // Darum belegt der Test die Wirkung am Credential, nicht nur den Aufruf.
+  const { id, username, session } = await member();
+  const { credential } = await device(session);
+  const token = integrationToken(id);
+  const { token: resetToken } = passwordResetService.createToken(id);
+
+  const res = await fetch(`${API}/auth/reset-password`, {
+    method: 'POST',
+    headers: json,
+    body: JSON.stringify({ token: resetToken, password: 'perresetgesetzt1234' }),
+  });
+  assert.equal(res.status, 200);
+  await login(username, 'perresetgesetzt1234');
+  const old = await fetch(`${API}/auth/me`, { headers: { Cookie: session.cookie } });
+  assert.equal(old.status, 401, 'der Reset beendet auch die alte Browser-Sitzung');
+  assert.equal(await meStatus(credential), 401);
+  assert.equal(await meStatus(token), 200, 'eine Integration ist kein Geraet');
+});
+
+test('2FA einschalten beendet die Geraete, die eigene Sitzung und die Integration bleiben', async () => {
+  const { id, session } = await member();
+  const { credential } = await device(session);
+  const token = integrationToken(id);
+
+  const setup = await fetch(`${API}/auth/2fa/setup`, { method: 'POST', headers: sessionHeaders(session) });
+  assert.equal(setup.status, 200);
+  const { secret } = (await setup.json()).data;
+  const res = await fetch(`${API}/auth/2fa/enable`, {
+    method: 'POST',
+    headers: sessionHeaders(session),
+    body: JSON.stringify({ code: generateCode(secret) }),
+  });
+  assert.equal(res.status, 200);
+  assert.equal(await meStatus(credential), 401);
+  assert.equal(await meStatus(token), 200, 'eine Integration ist kein Geraet');
+  const own = await fetch(`${API}/auth/me`, { headers: { Cookie: session.cookie } });
+  assert.equal(own.status, 200, 'die Sitzung, die 2FA eingeschaltet hat, bleibt');
 });
 
 test('Deaktivieren und Loeschen beenden die Geraete', async () => {
