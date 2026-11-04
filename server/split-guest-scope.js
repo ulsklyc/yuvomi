@@ -80,6 +80,8 @@ const AUTH_PUBLIC_ROUTES = [
   ['GET', '/auth/invites/preview'],
   ['POST', '/auth/invites/accept'],
   ['POST', '/auth/devices/pair/redeem'],
+  ['POST', '/auth/passkey/authenticate/begin'],
+  ['POST', '/auth/passkey/authenticate/complete'],
 ];
 
 export const SPLIT_GUEST_AUTH_ROUTES = Object.freeze(
