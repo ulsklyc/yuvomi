@@ -1938,7 +1938,7 @@ test('module-specific settings leaves only reference their owned preferences and
     },
     '../public/settings/pages/modules-options.js': {
       endpoints: ['/preferences'],
-      preferences: ['budget_mode', 'health_cycle_enabled', 'housekeeping_payment_tasks', 'tasks_subtasks_expanded', 'schedule_hidden_templates'],
+      preferences: ['budget_mode', 'health_cycle_enabled', 'housekeeping_payment_tasks', 'tasks_subtasks_expanded', 'tasks_show_creator', 'schedule_hidden_templates'],
     },
   };
 

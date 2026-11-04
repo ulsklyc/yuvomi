@@ -14,6 +14,7 @@ import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
 import { birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { mediaPickerBadgeHtml } from '/utils/media-picker.js';
 import { bindSignedInDevices, signedInDevicesCardHtml } from '/settings/signed-in-devices.js';
+import { dateText } from '/utils/date-format.js';
 
 function avatarHtml(user, className = 'settings-avatar') {
   const safeName = esc(user?.display_name || '');
