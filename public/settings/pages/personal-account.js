@@ -476,8 +476,8 @@ function renderPasskeyList(listEl, passkeysArr) {
     return;
   }
   const rows = passkeysArr.map((p) => {
-    const addedDate = p.created_at ? new Date(p.created_at).toLocaleDateString() : '';
-    const usedDate  = p.last_used_at ? new Date(p.last_used_at).toLocaleDateString() : null;
+    const addedDate = p.created_at ? dateText(p.created_at) : '';
+    const usedDate  = p.last_used_at ? dateText(p.last_used_at) : null;
     const meta = [
       t('settings.passkeyAddedAt', { date: addedDate }),
       usedDate ? t('settings.passkeyLastUsed', { date: usedDate }) : null,
