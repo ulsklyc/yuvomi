@@ -22,7 +22,147 @@ export async function createCalDAVClient(account) {
     authMethod:         'Basic',
     defaultAccountType: 'caldav',
   });
-  return withHttpRefusalsAsErrors(withCalendarObjectUrlFilter(withWritePrivileges(client)));
+  return withHttpRefusalsAsErrors(withCalendarObjectUrlFilter(withConfiguredCalendar(withWritePrivileges(client), account)));
+}
+
+/** Pfadvergleich ohne Rücksicht auf den Schlusstrich, wie überall hier. */
+function sameDavPath(a, b) {
+  try {
+    const x = new URL(a);
+    const y = new URL(b);
+    return x.origin === y.origin
+      && x.pathname.replace(/\/?$/, '/') === y.pathname.replace(/\/?$/, '/');
+  } catch {
+    return a === b;
+  }
+}
+
+/**
+ * Die eingetragene Adresse selbst ist ein Kalender (#2529).
+ *
+ * tsdavs Auflistung folgt der Discovery: aktueller Principal, dessen
+ * `calendar-home-set`, und nur was DORT liegt, wird genannt. Zeigt die
+ * eingetragene `caldav_url` dagegen direkt auf eine Collection - einen
+ * öffentlichen oder geteilten Kalender etwa, der unter
+ * `.../calendars/public/<Name>/` liegt statt im Wurzelordner des
+ * angemeldeten Benutzers -, kommt sie in der Auflistung nie vor: das Konto
+ * las und schrieb still den Benutzerordner, und ein eingeschalteter
+ * Kalender unter der eingetragenen Adresse galt beim Abgleich als
+ * verschwunden und wurde abgeschaltet.
+ *
+ * Deshalb fragt die Auflistung die eingetragene Adresse zusätzlich selbst
+ * ab, als wäre sie ein Home-Ordner: eine Calendar-Collection nennt sich
+ * darin selbst, ein Ordner seine Kalender, und was weder noch ist (Server-
+ * Wurzel, Principal, Home-Ordner), liefert nichts Neues und wird über die
+ * URL dedupliziert. Eine Absage der Zusatzabfrage ändert nichts - die
+ * Auflistung der Discovery bleibt, wie sie ist. Nennt die Tiefenantwort die
+ * Adresse nicht, wird sie noch flach gefragt (Depth: 0, ohne ihre Objekte).
+ *
+ * @param {object} client
+ * @param {{caldav_url: string, username: string, password: string}} account
+ */
+export function withConfiguredCalendar(client, account) {
+  if (typeof client?.fetchCalendars !== 'function') return client;
+  const configuredUrl = account?.caldav_url ? String(account.caldav_url) : '';
+  let configuredPath = '';
+  try { configuredPath = new URL(configuredUrl).pathname; } catch { /* keine URL, keine Zusatzabfrage */ }
+  if (!configuredPath || configuredPath === '/') return client;
+  const fetchCalendars = client.fetchCalendars.bind(client);
+  return Object.create(Object.getPrototypeOf(client), {
+    ...Object.getOwnPropertyDescriptors(client),
+    fetchCalendars: {
+      value: async (params = {}) => {
+        const calendars = await fetchCalendars(params);
+        if (!Array.isArray(calendars)) return calendars;
+        if (calendars.some((cal) => cal?.url && sameDavPath(cal.url, configuredUrl))) return calendars;
+        const extra = [];
+        try {
+          const probed = await fetchCalendars({
+            ...params,
+            account: {
+              accountType: 'caldav',
+              serverUrl:   configuredUrl,
+              credentials: { username: account.username, password: account.password },
+              rootUrl:     new URL(configuredUrl).origin + '/',
+              homeUrl:     configuredUrl,
+            },
+          });
+          if (Array.isArray(probed)) {
+            extra.push(...probed.filter((cal) => cal?.url
+              && !calendars.some((known) => known?.url && sameDavPath(known.url, cal.url))));
+          }
+        } catch { /* die Tiefenabfrage unten versucht es ohne Mitglieder */ }
+        if (!extra.some((cal) => sameDavPath(cal.url, configuredUrl))) {
+          // Die Abfrage als Home-Ordner scheiterte oder nannte die Adresse
+          // nicht: tsdav verlangt an JEDEM Eintrag der Tiefenantwort einen
+          // resourcetype, und nicht jeder Server nennt einen an den Objekten
+          // in der Collection. Die Adresse selbst, flach gefragt, braucht
+          // keinen dieser Eintraege.
+          const direct = await configuredCalendarDirect(client, configuredUrl).catch(() => null);
+          if (direct) extra.push(direct);
+        }
+        return extra.length ? [...calendars, ...extra] : calendars;
+      },
+      writable: true, enumerable: true, configurable: true,
+    },
+  });
+}
+
+/** Textwert eines geparsten DAV-Props: Zeichenkette oder CDATA-Objekt. */
+function davText(value) {
+  if (typeof value === 'string') return value;
+  if (typeof value?._cdata === 'string') return value._cdata;
+  return '';
+}
+
+/**
+ * Die eingetragene Adresse flach (Depth: 0) als Kalender lesen, in der Form,
+ * die `fetchCalendars` liefert. null, wenn sie keine Calendar-Collection ist
+ * oder der Server sie nicht nennt.
+ *
+ * @param {object} client  tsdav-Client (mit `propfind`)
+ * @param {string} configuredUrl
+ */
+async function configuredCalendarDirect(client, configuredUrl) {
+  if (typeof client?.propfind !== 'function') return null;
+  const responses = await client.propfind({
+    url: configuredUrl,
+    depth: '0',
+    props: {
+      'd:resourcetype': {},
+      'd:displayname': {},
+      'd:current-user-privilege-set': {},
+      'ca:calendar-color': {},
+      'cs:getctag': {},
+      'd:sync-token': {},
+      'c:calendar-description': {},
+      'c:calendar-timezone': {},
+      'c:supported-calendar-component-set': {},
+    },
+  });
+  const response = (responses || []).find((r) => r?.href && sameDavPath(
+    new URL(r.href, new URL(configuredUrl).origin + '/').href, configuredUrl));
+  const props = response?.props;
+  if (!props || !Object.keys(props.resourcetype ?? {}).includes('calendar')) return null;
+  const comp = props.supportedCalendarComponentSet?.comp;
+  const components = [comp].flat().filter(Boolean)
+    .map((entry) => entry?._attributes?.name).filter(Boolean);
+  const cal = {
+    description: davText(props.calendarDescription),
+    timezone:    davText(props.calendarTimezone),
+    url:         new URL(response.href, new URL(configuredUrl).origin + '/').href,
+    ctag:        davText(props.getctag),
+    calendarColor: props.calendarColor,
+    displayName: davText(props.displayname),
+    components,
+    resourcetype: Object.keys(props.resourcetype ?? {}),
+    syncToken:   davText(props.syncToken),
+    writable:    collectionWritable(props.currentUserPrivilegeSet),
+  };
+  if (typeof client.supportedReportSet === 'function') {
+    cal.reports = await client.supportedReportSet({ collection: cal }).catch(() => undefined);
+  }
+  return cal;
 }
 
 /**
