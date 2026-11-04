@@ -533,7 +533,7 @@ Search for **Yuvomi**, install it and start it. The app generates `SESSION_SECRE
 
 #### 3. Open Yuvomi
 
-Select **Open Web UI**. Yuvomi answers on port 3000 of the Home Assistant host, for example `http://homeassistant.local:3000`. The first visit guides you through creating your admin account in the browser.
+Select **Open Web UI**. Yuvomi answers on port 3880 of the Home Assistant host, for example `http://homeassistant.local:3880` (another port is set on the app's **Configuration** tab under **Network**). The first visit guides you through creating your admin account in the browser.
 
 Further environment variables go under **Additional environment variables** on the **Configuration** tab; paths, the session secret and the database key stay with the app. Every option is described on the app's **Documentation** tab.
 
