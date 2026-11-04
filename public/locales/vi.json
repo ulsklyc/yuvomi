@@ -3520,7 +3520,8 @@
         "backupDbKeyPlainHint": "Cơ sở dữ liệu chưa được mã hóa, nên các bản sao lưu chứa dữ liệu của bạn ở dạng đọc được. Với DB_ENCRYPTION_KEY của riêng bạn, Yuvomi sẽ mã hóa nó ở lần khởi động tiếp theo.",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

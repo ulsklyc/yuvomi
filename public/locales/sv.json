@@ -3520,7 +3520,8 @@
         "backupDbKeyPlainHint": "Databasen är inte krypterad, så säkerhetskopiorna innehåller dina data i läsbar form. Med en egen DB_ENCRYPTION_KEY krypterar Yuvomi den vid nästa start.",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

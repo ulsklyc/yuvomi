@@ -3129,6 +3129,7 @@
         "shoppingWebhookTitle": "Einkaufslisten-Webhook",
         "shoppingWebhookDescription": "Sendet die offenen Artikel einer Liste als JSON an diese URL. Nur Admins können das Ziel setzen; jedes Mitglied kann dann über das Listenmenü senden.",
         "shoppingWebhookUrl": "Webhook-URL",
+        "shoppingWebhookSaved": "Webhook gespeichert.",
         "notificationChannelsDescription": "Admins können Kanäle hinzufügen, die Erinnerungen zusätzlich zu Web Push erhalten.",
         "notificationChannelAdd": "Kanal hinzufügen",
         "notificationChannelProvider": "Anbieter",

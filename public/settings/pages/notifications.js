@@ -584,7 +584,7 @@ export async function render(container, { user } = {}) {
           statusEl.textContent = '';
           try {
             await api.put('/preferences', { shopping_webhook_url: urlInput.value.trim() || null });
-            statusEl.textContent = t('common.saved');
+            statusEl.textContent = t('settings.shoppingWebhookSaved');
           } catch (err) {
             const msg = err?.body?.error || t('common.error');
             statusEl.textContent = msg;

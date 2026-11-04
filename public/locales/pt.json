@@ -3520,7 +3520,8 @@
         "backupDbKeyPlainHint": "A base de dados não está encriptada, por isso as cópias de segurança contêm os teus dados de forma legível. Com uma DB_ENCRYPTION_KEY própria, o Yuvomi encripta-a no próximo arranque.",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "Bem-vindo de volta. A tua casa num só lugar.",

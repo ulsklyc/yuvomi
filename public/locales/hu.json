@@ -3520,7 +3520,8 @@
         "backupDbKeyPlainHint": "Az adatbázis nincs titkosítva, így a mentések olvasható formában tartalmazzák az adataidat. Saját DB_ENCRYPTION_KEY esetén a Yuvomi a következő indításkor titkosítja.",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

@@ -3520,7 +3520,8 @@
         "backupDbKeyPlainHint": "डेटाबेस एन्क्रिप्टेड नहीं है, इसलिए बैकअप में आपका डेटा पढ़ने योग्य रूप में है। अपनी DB_ENCRYPTION_KEY के साथ, Yuvomi अगली बार शुरू होने पर इसे एन्क्रिप्ट करता है।",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",

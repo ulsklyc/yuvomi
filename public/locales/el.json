@@ -3520,7 +3520,8 @@
         "backupDbKeyPlainHint": "Η βάση δεδομένων δεν είναι κρυπτογραφημένη, οπότε τα αντίγραφα ασφαλείας περιέχουν τα δεδομένα σου σε αναγνώσιμη μορφή. Με δικό σου DB_ENCRYPTION_KEY, το Yuvomi την κρυπτογραφεί στην επόμενη εκκίνηση.",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά. Το σπίτι σας σε ένα μέρος.",

@@ -3520,7 +3520,8 @@
         "backupDbKeyPlainHint": "De database is niet versleuteld, dus back-ups bevatten je gegevens leesbaar. Met een eigen DB_ENCRYPTION_KEY versleutelt Yuvomi hem bij de volgende start.",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

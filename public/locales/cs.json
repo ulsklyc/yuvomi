@@ -3638,7 +3638,8 @@
         "backupDbKeyPlainHint": "Databáze není šifrovaná, takže zálohy obsahují tvá data v čitelné podobě. S vlastním DB_ENCRYPTION_KEY ji Yuvomi při příštím spuštění zašifruje.",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

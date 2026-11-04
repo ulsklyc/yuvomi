@@ -3520,7 +3520,8 @@
         "backupDbKeyPlainHint": "資料庫未加密，因此備份中的資料是可讀的。設定你自己的 DB_ENCRYPTION_KEY 後，Yuvomi 會在下次啟動時將其加密。",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

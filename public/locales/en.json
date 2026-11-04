@@ -3111,6 +3111,7 @@
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
         "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved.",
         "notificationChannelsDescription": "Admins can add channels that receive reminders in addition to Web Push.",
         "notificationChannelAdd": "Add channel",
         "notificationChannelProvider": "Provider",

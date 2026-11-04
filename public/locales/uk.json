@@ -3746,7 +3746,8 @@
         "backupDbKeyPlainHint": "База даних не зашифрована, тож резервні копії містять твої дані в читабельному вигляді. З власним DB_ENCRYPTION_KEY Yuvomi зашифрує її під час наступного запуску.",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "З поверненням. Ваш дім - в одному місці.",

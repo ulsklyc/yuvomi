@@ -3538,7 +3538,8 @@
         "backupDbKeyPlainHint": "Hindi naka-encrypt ang database, kaya nababasa ang data mo sa mga backup. Gamit ang sarili mong DB_ENCRYPTION_KEY, ie-encrypt ito ng Yuvomi sa susunod na pagsisimula.",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

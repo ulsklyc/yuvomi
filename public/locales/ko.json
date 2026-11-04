@@ -3538,7 +3538,8 @@
         "backupDbKeyPlainHint": "데이터베이스가 암호화되어 있지 않아 백업에 데이터가 읽을 수 있는 형태로 들어 있습니다. 자체 DB_ENCRYPTION_KEY를 설정하면 Yuvomi가 다음 시작 시 암호화합니다.",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",

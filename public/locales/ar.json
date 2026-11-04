@@ -3860,7 +3860,8 @@
         "backupDbKeyPlainHint": "قاعدة البيانات غير مشفرة، لذا تحتوي النسخ الاحتياطية على بياناتك بشكل مقروء. مع DB_ENCRYPTION_KEY خاص بك، يشفرها Yuvomi عند التشغيل التالي.",
         "shoppingWebhookTitle": "Shopping list webhook",
         "shoppingWebhookDescription": "Sends the open items of a list as JSON to this URL. Only admins can set the target; any household member can then send from the list menu.",
-        "shoppingWebhookUrl": "Webhook URL"
+        "shoppingWebhookUrl": "Webhook URL",
+        "shoppingWebhookSaved": "Saved."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",
