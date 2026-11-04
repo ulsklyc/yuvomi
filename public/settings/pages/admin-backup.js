@@ -283,7 +283,7 @@ async function loadBackupSchedulerStatus(container) {
       if (lastError) {
         rows.push(createInfoRow({
           label: t('settings.backupSchedulerLastError'),
-          value: `${dateTimeText(lastError.timestamp)}: ${lastError.message}`,
+          value: `${dateTimeText(lastError.timestamp)}: ${errorSentence(lastError)}`,
           tone: 'danger',
         }));
       }
