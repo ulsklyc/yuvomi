@@ -2809,7 +2809,7 @@ function itemReadHtml(item) {
         ${readRowHtml({ icon: 'tag', label: t('shopping.categoryLabel'), value: item.category ? categoryLabel(item.category) : '' })}
         ${readRowHtml({ icon: 'receipt', label: t('shopping.priceLabel'), value: priceReadText(item.price_cents) })}
         ${readRowHtml({ icon: 'store', label: t('shopping.storeLabel'), value: storeName(item) })}
-        <div id="item-details-read-last-purchased"></div>
+        <div id="item-details-read-last-purchased" hidden></div>
         ${readRowHtml({ icon: 'link', label: t('shopping.urlLabel'), valueHtml: link })}
         ${readRowHtml({ icon: 'align-left', label: t('shopping.notesLabel'), value: item.notes || '', multiline: true })}
       </div>
@@ -2827,7 +2827,8 @@ function openItemReadModal(item) {
       if (target) {
         api.get(`/shopping/price-history?name=${encodeURIComponent(item.name)}&exclude_item_id=${item.id}&limit=1`).then((res) => {
           const last = res.data?.[0];
-          if (!last) return;
+          // Ohne Kauf faellt der Platzhalter weg, der Zeilenabstand bleibt wie vorher.
+          if (!last) { target.remove(); return; }
           const date = formatDate(last.purchased_at);
           const price = priceReadText(last.price_cents);
           const line = last.store_name
@@ -2836,7 +2837,7 @@ function openItemReadModal(item) {
           target.insertAdjacentHTML('beforebegin', readRowHtml({ icon: 'history', label: t('shopping.lastPurchased'), value: line }));
           target.remove();
           window.lucide?.createIcons({ el: panel });
-        }).catch(() => {});
+        }).catch(() => target.remove());
       }
     },
   });
