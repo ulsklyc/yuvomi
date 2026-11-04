@@ -3321,7 +3321,7 @@
         "twoFactorCopyFailed": "Hindi makopya - i-save nang manu-mano.",
         "twoFactorHouseholdHint": "Sino sa sambahayan ang nakapag-set up na ng pangalawang factor - at kung kailangan ito ng lahat.",
         "passkeyTitle": "Passkeys",
-        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key — no password needed.",
+        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key. No password needed.",
         "passkeyAddButton": "Add passkey",
         "passkeyNameLabel": "Name this passkey",
         "passkeyNamePlaceholder": "e.g. MacBook, iPhone",

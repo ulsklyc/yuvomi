@@ -3303,7 +3303,7 @@
         "twoFactorCopyFailed": "Kopiëren lukt niet - sla ze handmatig op.",
         "twoFactorHouseholdHint": "Wie in het huishouden al een tweede factor heeft ingesteld - en of het voor iedereen verplicht is.",
         "passkeyTitle": "Passkeys",
-        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key — no password needed.",
+        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key. No password needed.",
         "passkeyAddButton": "Add passkey",
         "passkeyNameLabel": "Name this passkey",
         "passkeyNamePlaceholder": "e.g. MacBook, iPhone",

@@ -3321,7 +3321,7 @@
         "twoFactorCopyFailed": "복사할 수 없습니다. 직접 저장하세요.",
         "twoFactorHouseholdHint": "가정의 누가 이미 2단계 인증을 설정했는지, 그리고 모두에게 필수인지 여부입니다.",
         "passkeyTitle": "Passkeys",
-        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key — no password needed.",
+        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key. No password needed.",
         "passkeyAddButton": "Add passkey",
         "passkeyNameLabel": "Name this passkey",
         "passkeyNamePlaceholder": "e.g. MacBook, iPhone",

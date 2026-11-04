@@ -3303,7 +3303,7 @@
         "twoFactorCopyFailed": "Copia non riuscita - salvali manualmente.",
         "twoFactorHouseholdHint": "Chi in famiglia ha già configurato un secondo fattore - e se è obbligatorio per tutti.",
         "passkeyTitle": "Passkeys",
-        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key — no password needed.",
+        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key. No password needed.",
         "passkeyAddButton": "Add passkey",
         "passkeyNameLabel": "Name this passkey",
         "passkeyNamePlaceholder": "e.g. MacBook, iPhone",

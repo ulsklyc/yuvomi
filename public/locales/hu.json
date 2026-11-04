@@ -3303,7 +3303,7 @@
         "twoFactorCopyFailed": "A másolás nem sikerült - mentsd el kézzel.",
         "twoFactorHouseholdHint": "Ki állított be már második lépcsőt a háztartásban - és hogy mindenkinek kötelező-e.",
         "passkeyTitle": "Passkeys",
-        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key — no password needed.",
+        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key. No password needed.",
         "passkeyAddButton": "Add passkey",
         "passkeyNameLabel": "Name this passkey",
         "passkeyNamePlaceholder": "e.g. MacBook, iPhone",

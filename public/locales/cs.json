@@ -3414,7 +3414,7 @@
         "twoFactorCopyFailed": "Kopírování se nezdařilo - ulož si je ručně.",
         "twoFactorHouseholdHint": "Kdo v domácnosti už má nastavený druhý faktor - a jestli je povinný pro všechny.",
         "passkeyTitle": "Passkeys",
-        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key — no password needed.",
+        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key. No password needed.",
         "passkeyAddButton": "Add passkey",
         "passkeyNameLabel": "Name this passkey",
         "passkeyNamePlaceholder": "e.g. MacBook, iPhone",

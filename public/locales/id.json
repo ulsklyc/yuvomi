@@ -3321,7 +3321,7 @@
         "twoFactorCopyFailed": "Tidak bisa menyalin - simpan secara manual.",
         "twoFactorHouseholdHint": "Siapa di rumah tangga yang sudah menyiapkan faktor kedua - dan apakah wajib untuk semua.",
         "passkeyTitle": "Passkeys",
-        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key — no password needed.",
+        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key. No password needed.",
         "passkeyAddButton": "Add passkey",
         "passkeyNameLabel": "Name this passkey",
         "passkeyNamePlaceholder": "e.g. MacBook, iPhone",

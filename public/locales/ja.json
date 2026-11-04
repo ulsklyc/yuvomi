@@ -3303,7 +3303,7 @@
         "twoFactorCopyFailed": "コピーできませんでした。手動で保存してください。",
         "twoFactorHouseholdHint": "世帯の誰が二要素認証をすでに設定しているか、そして全員に必須かどうか。",
         "passkeyTitle": "Passkeys",
-        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key — no password needed.",
+        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key. No password needed.",
         "passkeyAddButton": "Add passkey",
         "passkeyNameLabel": "Name this passkey",
         "passkeyNamePlaceholder": "e.g. MacBook, iPhone",

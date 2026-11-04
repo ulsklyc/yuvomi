@@ -3303,7 +3303,7 @@
         "twoFactorCopyFailed": "कॉपी नहीं हो सका - कृपया हाथ से सहेजें।",
         "twoFactorHouseholdHint": "परिवार में किसने पहले ही दूसरा चरण सेट किया है - और क्या यह सभी के लिए अनिवार्य है।",
         "passkeyTitle": "Passkeys",
-        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key — no password needed.",
+        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key. No password needed.",
         "passkeyAddButton": "Add passkey",
         "passkeyNameLabel": "Name this passkey",
         "passkeyNamePlaceholder": "e.g. MacBook, iPhone",

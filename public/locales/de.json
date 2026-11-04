@@ -3325,7 +3325,7 @@
         "twoFactorCopyFailed": "Kopieren nicht möglich - bitte von Hand sichern.",
         "twoFactorHouseholdHint": "Wer im Haushalt bereits einen zweiten Faktor eingerichtet hat - und ob er für alle Pflicht ist.",
         "passkeyTitle": "Passkeys",
-        "passkeyHint": "Mit Face ID, Fingerabdruck oder einem Sicherheitsschlüssel anmelden – kein Passwort nötig.",
+        "passkeyHint": "Mit Face ID, Fingerabdruck oder einem Sicherheitsschlüssel anmelden. Kein Passwort nötig.",
         "passkeyAddButton": "Passkey hinzufügen",
         "passkeyNameLabel": "Name für diesen Passkey",
         "passkeyNamePlaceholder": "z. B. MacBook, iPhone",

@@ -3321,7 +3321,7 @@
         "twoFactorCopyFailed": "کپی نشد - لطفاً دستی ذخیره کنید.",
         "twoFactorHouseholdHint": "چه کسانی در خانه عامل دوم را تنظیم کرده‌اند - و آیا برای همه الزامی است.",
         "passkeyTitle": "Passkeys",
-        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key — no password needed.",
+        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key. No password needed.",
         "passkeyAddButton": "Add passkey",
         "passkeyNameLabel": "Name this passkey",
         "passkeyNamePlaceholder": "e.g. MacBook, iPhone",

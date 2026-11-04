@@ -3303,7 +3303,7 @@
         "twoFactorCopyFailed": "Không sao chép được - hãy lưu thủ công.",
         "twoFactorHouseholdHint": "Ai trong gia đình đã thiết lập yếu tố thứ hai - và có bắt buộc với mọi người hay không.",
         "passkeyTitle": "Passkeys",
-        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key — no password needed.",
+        "passkeyHint": "Sign in with Face ID, fingerprint, or a security key. No password needed.",
         "passkeyAddButton": "Add passkey",
         "passkeyNameLabel": "Name this passkey",
         "passkeyNamePlaceholder": "e.g. MacBook, iPhone",
