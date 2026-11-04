@@ -2615,6 +2615,7 @@
         "backupSchedulerKeepCount_one": "{{count}} záloha",
         "backupSchedulerKeepWithDays": "{{count}} backups, max {{days}} days",
         "backupSchedulerKeepWithDays_one": "{{count}} backup, max {{days}} days",
+        "backupSchedulerKeepWithDays_few": "{{count}} backups, max {{days}} days",
         "backupSchedulerKeepGenerational": "{{daily}} daily / {{weekly}} weekly / {{monthly}} monthly",
         "backupSchedulerLastError": "Last error",
         "backupSchedulerKeepCount_few": "{{count}} zálohy",
