@@ -176,6 +176,10 @@ const ALLOWLIST = [
     file: 'server/routes/health/caregivers.js', site: 'PUT /caregivers/:subjectId', lists: 1, deactivated: 'unaffected',
     reason: 'Existence check for the ids the request names, not a list offered to anyone.',
   },
+  {
+    file: 'server/services/backup-scheduler.js', site: 'notifyAdminsOfFailure', lists: 1, deactivated: 'excluded',
+    reason: 'Background push notification to all admin accounts on backup failure: a backup failure is a system-wide event, not scoped to household membership; the notification must reach admin accounts regardless of whether they are household members (staff admins, display admins). Shows no one; returns account ids only. Already excludes deactivated accounts via deactivated_at IS NULL.',
+  },
 ];
 
 // --------------------------------------------------------------------------
@@ -1112,12 +1116,22 @@ test('every allowlisted list says what it does with a deactivated account, and d
  * Sie nennt dieselben Konten wie `GET /users` und geht an dieselben Leser;
  * ein Gast geteilter Ausgaben bekommt sie leer.
  *
+ * Am 04.11.2026 fuer #2526 auf 18 gehoben - fuer genau einen Eintrag:
+ * `notifyAdminsOfFailure` in server/services/backup-scheduler.js, die
+ * Administratoren, die eine Push-Benachrichtigung ueber Backup-Fehler
+ * erhalten sollen.
+ *
+ * Warum der Fall keine Aufweichung ist: Backup-Fehler sind systemweite
+ * Ereignisse und muessen alle Admin-Konten erreichen, unabhaengig von der
+ * Haushaltsmitgliedschaft (z. B. Anzeige-Admins). Die Abfrage zeigt niemanden,
+ * sie liefert nur IDs fuer Push-Benachrichtigungen.
+ *
  * Wer die naechste Zahl hebt, schreibt hier wieder hin, welcher Eintrag es war
  * und warum er keine Personenliste ist. Steht das nicht dabei, ist die Antwort
  * nein - dann gehoert die Liste auf das Praedikat.
  */
 test('the allowlist stays short and every entry names a reason', () => {
-  assert.ok(ALLOWLIST.length <= 17, 'a long allowlist is a second predicate - move lists onto the predicate instead');
+  assert.ok(ALLOWLIST.length <= 18, 'a long allowlist is a second predicate - move lists onto the predicate instead');
   for (const entry of ALLOWLIST) {
     assert.ok(entry.reason && entry.reason.length > 20, `${entry.file} :: ${entry.site} needs a reason`);
   }

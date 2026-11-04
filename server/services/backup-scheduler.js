@@ -7,6 +7,7 @@
  */
 
 import { runExternalJob } from '../utils/restore-state.js';
+import { activeAccountSql } from './account-state.js';
 import cron from 'node-cron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -251,7 +252,7 @@ async function notifyAdminsOfFailure(message) {
   try {
     const db = getDb();
     const admins = db.prepare(
-      "SELECT id FROM users WHERE role = 'admin' AND deactivated_at IS NULL"
+      `SELECT id FROM users WHERE role = 'admin' AND ${activeAccountSql('users')}`
     ).all();
     const payload = {
       title: 'Yuvomi backup failed',
