@@ -373,10 +373,11 @@ test('JEDER Weg in eine Sitzung prueft den zweiten Faktor - auch SSO', () => {
   // Eine leere Liste ist fuer sich keine Zusicherung: sie waere auch leer,
   // wenn der Suchbegriff nicht mehr passte. Deshalb die Gegenprobe, dass
   // ueberhaupt die erwarteten Wege gefunden wurden.
-  assert.equal(callers.length, 3, `erwartet werden drei Anmeldewege, gefunden: ${callers.join(' | ')}`);
+  assert.equal(callers.length, 4, `erwartet werden vier Anmeldewege, gefunden: ${callers.join(' | ')}`);
   assert.ok(callers.some((c) => c.includes("'/login'")), 'der Passwort-Login wurde nicht gefunden');
   assert.ok(callers.some((c) => c.includes("'/oidc/callback'")), 'der OIDC-Callback wurde nicht gefunden');
   assert.ok(callers.some((c) => c.includes("'/2fa/verify'")), 'die Verify-Route wurde nicht gefunden');
+  assert.ok(callers.some((c) => c.includes("'/passkey/authenticate/complete'")), 'die Passkey-Anmeldung wurde nicht gefunden');
 
   // Und ausdruecklich fuer den Weg, an dem es wirklich fehlte.
   const callback = source.slice(source.indexOf("router.get('/oidc/callback'"), source.indexOf("router.post('/setup'"));
