@@ -825,7 +825,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         step_ha1_title:'Add the repository', step_ha1_desc:'In Home Assistant, go to Settings → Apps → Install app, open the menu at the top right, choose Repositories and add this address:',
         step_ha2_title:'Install and start', step_ha2_desc:'Search for Yuvomi, install it and start it. The app generates the session secret itself; database encryption is an option on its Configuration tab.',
         step_ha3_title:'Open the Web UI', step_ha3_desc:'Select Open Web UI on the app\'s page. The first visit walks you through creating your admin account.',
-        success_desc_ha:'Select Open Web UI on the app\'s page in Home Assistant. Yuvomi answers on port 3000 of your Home Assistant host, for example <code>http://homeassistant.local:3000</code>, which is also the address for the family\'s phones. The first visit walks you through creating your admin account.',
+        success_desc_ha:'Select Open Web UI on the app\'s page in Home Assistant. Yuvomi answers on port 3880 of your Home Assistant host, for example <code>http://homeassistant.local:3880</code>, which is also the address for the family\'s phones. The first visit walks you through creating your admin account.',
         env_where_ha:'In Home Assistant the app generates the session secret itself, so there is nothing to fill in. The database key is the Encrypt database option on the app\'s Configuration tab: leave the key field empty and the app creates one and writes a copy to <code>db_encryption_key.txt</code> in its config folder. Keep that copy outside Home Assistant.',
         optional_where_ha:'In Home Assistant you add them under Additional environment variables on the app\'s Configuration tab, then restart the app.',
         path_now:'You are installing on', path_change:'Change',
@@ -944,7 +944,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         step_ha1_title:'Repository hinzufügen', step_ha1_desc:'In Home Assistant unter Einstellungen → Apps → App installieren oben rechts das Menü öffnen, Repositories wählen und diese Adresse hinzufügen:',
         step_ha2_title:'Installieren und starten', step_ha2_desc:'Nach Yuvomi suchen, installieren und starten. Das Sitzungsgeheimnis erzeugt die App selbst; die Datenbankverschlüsselung ist eine Option im Reiter Konfiguration.',
         step_ha3_title:'Web-Oberfläche öffnen', step_ha3_desc:'Auf der Seite der App die Weboberfläche öffnen (Open Web UI). Beim ersten Aufruf legt ihr dort euer Admin-Konto an.',
-        success_desc_ha:'Öffnet auf der Seite der App in Home Assistant die Weboberfläche (Open Web UI). Yuvomi antwortet auf Port 3000 eures Home-Assistant-Hosts, etwa <code>http://homeassistant.local:3000</code>; das ist auch die Adresse für die Handys der Familie. Beim ersten Aufruf legt ihr dort euer Admin-Konto an.',
+        success_desc_ha:'Öffnet auf der Seite der App in Home Assistant die Weboberfläche (Open Web UI). Yuvomi antwortet auf Port 3880 eures Home-Assistant-Hosts, etwa <code>http://homeassistant.local:3880</code>; das ist auch die Adresse für die Handys der Familie. Beim ersten Aufruf legt ihr dort euer Admin-Konto an.',
         env_where_ha:'In Home Assistant erzeugt die App das Sitzungsgeheimnis selbst, es gibt nichts auszufüllen. Der Datenbankschlüssel ist die Option „Datenbank verschlüsseln“ im Reiter Konfiguration der App: Lasst ihr das Schlüsselfeld leer, erzeugt die App einen und legt eine Kopie als <code>db_encryption_key.txt</code> in ihren Konfigurationsordner. Bewahrt diese Kopie außerhalb von Home Assistant auf.',
         optional_where_ha:'In Home Assistant tragt ihr sie unter „Weitere Umgebungsvariablen“ im Reiter Konfiguration der App ein und startet die App neu.',
         path_now:'Ihr installiert auf', path_change:'Ändern',
@@ -1367,7 +1367,7 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
         </div>
         <div class="scope" data-scope="homeassistant">
           <p class="scope-head" data-t="tab_homeassistant">Home Assistant</p>
-          <p data-t="success_desc_ha">Select Open Web UI on the app's page in Home Assistant. Yuvomi answers on port 3000 of your Home Assistant host, for example <code>http://homeassistant.local:3000</code>, which is also the address for the family's phones. The first visit walks you through creating your admin account.</p>
+          <p data-t="success_desc_ha">Select Open Web UI on the app's page in Home Assistant. Yuvomi answers on port 3880 of your Home Assistant host, for example <code>http://homeassistant.local:3880</code>, which is also the address for the family's phones. The first visit walks you through creating your admin account.</p>
         </div>
         <p style="font-size:var(--fs-small)" data-t="success_hint">Once you are in, invite the rest of the family by link from the Settings page, so everyone chooses their own password.</p>
         <!-- No primary button: the accent went to "GitHub", which is not the next
