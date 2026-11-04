@@ -1165,6 +1165,14 @@ the account itself. An administrator can sign a member out of all devices, but n
 they use or when ([entry 1](#1-privacy-beats-admin-convenience)). Platform is a value in a field, not
 a code path.
 
+**The client contract only grows.** `client_api` states what a server can do at the least: it keeps
+a new app away from an old server, and it does nothing for an old app talking to a server that took
+something away. So an operation in `CLIENT_OPERATIONS`, a required field of one of its 2xx responses
+or a value of one of their enums is removed or given a new meaning only once the current app release
+(TestFlight or App Store) no longer uses it, and the server PR names that app version. Adding is
+deliberate too: an installed app shows a new enum value as an unknown value, so the recorded list
+moves in the same PR as the value.
+
 ### Where the rule lives
 
 - `server/auth.js`: `POST /api/v1/auth/devices`, `DEVICE_AUTH_ROUTES`, and `requireAuth`, where a
@@ -1172,6 +1180,9 @@ a code path.
 - `apiTokenUsableSql()`: the one place that says when a credential still counts.
 - `invalidateUserSessions()`: the one way a session ends also ends the devices.
 - `test:signed-in-devices`.
+- `test:openapi-client-contract`: `test/openapi-client-contract.json` records the operations,
+  required fields and enum values of the client's 2xx responses; anything that disappears or appears
+  turns it red.
 
 ### What would reopen it
 
