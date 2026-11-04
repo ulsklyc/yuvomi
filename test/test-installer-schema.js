@@ -204,6 +204,18 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
   BACKUP_UPLOAD_LIMIT:
     'Betriebs-Feinjustage: Body-Limit fuer den Restore-Upload im Admin-UI, nur beim '
     + 'Zurueckspielen einer ueberdimensionierten Datenbank relevant.',
+  BACKUP_KEEP_DAYS:
+    'Betriebs-Feinjustage: altersbasierte Nachbereinigung nach der Rotation. Default 0 '
+    + '(aus). Fuer Betreiber, die Backups nach einer festen Anzahl von Tagen loeschen wollen.',
+  BACKUP_GENERATIONS:
+    'Betriebs-Feinjustage: GFS-Aufbewahrung (Grossvater-Vater-Sohn). Default false. '
+    + 'Fuer erfahrene Betreiber, die mehrere Aufbewahrungsstufen benoetigen.',
+  BACKUP_KEEP_WEEKLY:
+    'Betriebs-Feinjustage: Anzahl woechentlicher GFS-Vertreter (nur wenn BACKUP_GENERATIONS=true). '
+    + 'Default 4.',
+  BACKUP_KEEP_MONTHLY:
+    'Betriebs-Feinjustage: Anzahl monatlicher GFS-Vertreter (nur wenn BACKUP_GENERATIONS=true). '
+    + 'Default 3.',
   OIDC_TOKEN_AUTH_METHOD:
     'Interop-Ausweg fuer einen Anbieter, der die automatische Wahl der Client-Authentifizierung '
     + 'mit invalid_client beantwortet (#2144). Leer ist fuer jede neue Installation richtig, und '
