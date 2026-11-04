@@ -1000,6 +1000,8 @@
         "sendWebhook": "Send open items",
         "sendWebhookSent": "{{count}} items sent.",
         "sendWebhookSent_one": "{{count}} item sent.",
+        "sendWebhookSent_few": "{{count}} items sent.",
+        "sendWebhookSent_many": "{{count}} items sent.",
         "sendWebhookUnconfigured": "No webhook target configured.",
         "sendWebhookError": "Could not send to webhook."
     },
