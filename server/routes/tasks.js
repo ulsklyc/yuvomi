@@ -462,6 +462,27 @@ function mayEditTaskDefinition(task, req) {
 const LOCKED_ERROR = { error: 'This task is locked; only its creator and administrators can change it.', code: 403, reason: 'task_locked' };
 
 /**
+ * Abhaken einer Serie, deren Regel eine andere App fuehrt (#2506, #2515).
+ *
+ * iOS Erinnerungen und Tasks.org beenden eine Serie, sobald ihr Master
+ * COMPLETED traegt - sie selbst ruecken beim Abhaken nur das naechste
+ * Vorkommen nach. Yuvomi bildet die fremde Regel (noch) nicht ab, also bleibt
+ * das Abhaken bei der besitzenden App. 409 statt 403: es fehlt kein Recht, die
+ * Aufgabe steht nur woanders unter Verwaltung. Gilt fuer jeden Uebergang nach
+ * 'done', auch am Wandtablett; alles andere (in Arbeit, Ablage, Bearbeiten)
+ * bleibt erlaubt.
+ */
+const FOREIGN_SERIES_ERROR = {
+  error: 'This task repeats in another app; tick it off there so the series continues.',
+  code: 409,
+  reason: 'task_foreign_series',
+};
+
+function completesForeignSeries(task, nextStatus) {
+  return nextStatus === 'done' && task.status !== 'done' && Boolean(task.external_rrule);
+}
+
+/**
  * Aufgaben-IDs, deren Definition diese Person anfassen darf - fuer die
  * Sammeloperationen, die nicht eine Aufgabe meinen, sondern viele (#830).
  *
@@ -1472,6 +1493,7 @@ router.put('/:id', (req, res) => {
     const status = (req.body.status === undefined || archiveRequested)
       ? task.status
       : req.body.status;
+    if (completesForeignSeries(task, status)) return res.status(409).json(FOREIGN_SERIES_ERROR);
     if (reopensSettledVisit(db.get(), task.id, task.status, status) && !isAdminRequest(req)) {
       return res.status(403).json({ error: 'Permission denied.', code: 403 });
     }
@@ -2150,6 +2172,8 @@ router.patch('/:id/status', (req, res) => {
       const archivedAt = setArchived(req.params.id, true);
       return res.json({ data: { id: Number(req.params.id), status: prev.status, archived_at: archivedAt } });
     }
+
+    if (completesForeignSeries(prev, status)) return res.status(409).json(FOREIGN_SERIES_ERROR);
 
     if (reopensSettledVisit(db.get(), prev.id, prev.status, status) && !isAdminRequest(req)) {
       return res.status(403).json({ error: 'Permission denied.', code: 403 });

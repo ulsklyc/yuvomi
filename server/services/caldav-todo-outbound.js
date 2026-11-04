@@ -219,7 +219,36 @@ export function icsFieldsForTask(task, hadCompleted = false, tz = householdTimeZ
   if (Array.isArray(task.tags)) fields.CATEGORIES = task.tags;
   Object.assign(fields, recurrenceFields(task, tz, serverIcs));
   if (fields.DUE === KEEP_ON_SERVER) delete fields.DUE;
+  // NIE COMPLETED AUF DEN MASTER EINER FREMDEN SERIE (#2506). Die besitzende App
+  // (iOS Erinnerungen, Tasks.org) beendete damit die ganze Serie. Die Routen
+  // sperren das Abhaken schon (`task_foreign_series`); das hier ist die zweite
+  // Linie fuer jeden Weg an ihnen vorbei. Gelesen wird am frisch geholten
+  // Objekt, nicht an der Zeile: es zaehlt, was jetzt auf dem Server steht.
+  if (task.status === 'done' && !ownsRecurrence(task)
+    && foreignRecurrenceRule(todoPropertyValue(serverIcs, task.external_uid, 'RRULE'),
+      todoPropertyValue(serverIcs, task.external_uid, YUVOMI_RRULE))) {
+    delete fields.STATUS;
+    delete fields.COMPLETED;
+    delete fields['PERCENT-COMPLETE'];
+  }
   return fields;
+}
+
+/**
+ * Die RRULE eines fremden VTODO, die einer anderen App gehoert - oder null
+ * (#2506). Nicht fremd ist eine Regel, die noch genau Yuvomis Marke
+ * X-YUVOMI-RRULE entspricht (#2350): die hat Yuvomi selbst geschrieben. Ob das
+ * Objekt ueberhaupt fremd ist (`ownsRecurrence`), fragt der Aufrufer.
+ *
+ * @param {string|null} rule - Rohwert der RRULE des Masters
+ * @param {string|null} mark - Rohwert von X-YUVOMI-RRULE
+ * @returns {string|null}
+ */
+export function foreignRecurrenceRule(rule, mark) {
+  const value = rule ? String(rule).trim() : '';
+  if (!value) return null;
+  if (mark && sameRule(value, unescapeText(mark))) return null;
+  return value;
 }
 
 /** Marke an einem fremden Objekt: die RRULE, die Yuvomi dort geschrieben hat. */
