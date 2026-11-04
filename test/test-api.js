@@ -844,7 +844,7 @@ const REASONS_WITHOUT_SENTENCE = new Set([
   // Anmeldung und Einrichtung: die Seiten zeigen den Servertext oder lesen ihn
   // per Muster (login.js: "password login is disabled").
   'account_cannot_sign_in', 'password_login_disabled', 'setup_completed', 'required',
-  'browser_session_required',
+  'browser_session_required', 'sign_in_refused',
   // Angemeldete Geraete: der native Client liest den Grund selbst, die Web-App
   // sieht ihn nie, weil sie mit einer Sitzung arbeitet.
   'device_credential', 'device_credential_required', 'session_required',
@@ -907,7 +907,7 @@ const REASONS_PASSED_THROUGH = new Map([
   // und 409 (gravatar_stale) stehen als Literal an der Stelle, die des
   // Wandtabletts kommt mit Literal vom Riegel.
   // Die zweite Stelle ist die Logzeile daneben, keine Antwort.
-  ['auth.js: err.reason', { sites: 2, at403: [], why: 'Gravatar-Import: 400/404/413/415/502 oder 500, nie 403' }],
+  ['auth.js: err.reason', { sites: 4, at403: [], why: 'Gravatar-Import: 400/404/413/415/502 oder 500, nie 403; Passkey-Registrierung/-Authentifizierung: feste 400 oder 409, nie 403' }],
   ['routes/notes.js: result.reason', { sites: 1, at403: [], why: 'feste 409' }],
   ['routes/calendar/local-calendars.js: withReason.reason', { sites: 1, at403: [],
     why: 'sendValidationErrors: feste 400 (calendar_name_invalid)' }],
@@ -1152,7 +1152,7 @@ test('die drei Absagen aus #1640 haben ihren Satz, und jeder Satz steht in jeder
 // Saetze ohne Grund: sie sagen nur, DASS die Berechtigung fehlt.
 const PLAIN_REFUSALS = new Set([
   'Admin access required.', 'Not authorized.', 'Permission denied.', 'Forbidden.', 'Not allowed.',
-  'Nicht autorisiert.', 'Keine Berechtigung', 'You cannot view this target.',
+  'Nicht autorisiert.', 'Keine Berechtigung', 'You cannot view this target.', 'User not found.',
   'You cannot record entries for this person.',
   'You cannot modify this entry.', 'You cannot modify this loan.', 'You cannot modify this subscription.',
   'You cannot change a receipt you may not see.', 'Household category management is not allowed.',
