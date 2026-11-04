@@ -111,6 +111,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keep it busy by requesting one after another. Further downloads in the same hour are refused;
   other administrators are not affected, and members still get no download at all.
 
+### Changed
+- **The app stores and catalogs no longer ask for a session secret.** Since 2.85.0 a new
+  installation generates `SESSION_SECRET` and `DB_ENCRYPTION_KEY` on its first start, but three
+  deploy descriptors still demanded one: the Portainer stack stopped the deploy outright
+  (`${SESSION_SECRET:?...}`), the Portainer app template and the Unraid template labelled the
+  field "required", and the TrueNAS form refused to install without it. All four now offer both
+  secrets as optional fields with an empty default, and say that Yuvomi generates them and keeps
+  them in `.secrets/` next to the database; setting your own still wins. A Portainer stack, an
+  Unraid container and a TrueNAS app can therefore be installed without running `openssl` first,
+  which is what the 2.85.0 note already promised. Umbrel keeps `${APP_SEED}` for both: it asks
+  nobody for anything, and an existing database is encrypted with that value
+  (`deploy/umbrel/README.md` records the decision). The TrueNAS change needs a pull request
+  upstream before it reaches the catalog (`deploy/truenas/MAINTAINING.md`). (#2507)
+
 ## [2.85.0] - 2026-11-04
 
 ### Added

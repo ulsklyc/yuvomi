@@ -47,6 +47,26 @@ Nachprüfen je Datei:
 gh api repos/truenas/apps/contents/ix-dev/community/yuvomi/questions.yaml --jq .content | base64 -d | diff - deploy/truenas/questions.yaml
 ```
 
+### Offen gegen Upstream: die optionalen Secrets (#2507)
+
+Seit v2.85.0 erzeugt der Server `SESSION_SECRET` und `DB_ENCRYPTION_KEY` beim
+ersten Start selbst, wenn beide leer sind. `questions.yaml` verlangte
+`session_secret` aber weiter (`required: true`), fragte also nach etwas, das
+niemand mehr setzen muss. Hier geändert am 2026-11-04:
+
+- `session_secret`: `required: true` → `default: ""`, Beschreibung wie die von
+  `db_encryption_key`.
+- `templates/docker-compose.yaml`: `SESSION_SECRET` wird nur noch gesetzt, wenn
+  ein Wert da ist (`{% if %}`, genau wie `db_encryption_key` eine Zeile darunter).
+  Ein leerer Wert gilt dem Server zwar als ungesetzt (Test in
+  `test/test-auto-secrets.js`), aber die Variable gar nicht zu setzen ist das,
+  was `db_encryption_key` schon tut.
+
+**Beides braucht einen Upstream-PR, bis dahin zeigt der `diff` genau diese
+Abweichung.** Eine `app_migrations.yaml` ist nicht nötig: Name und Pfad der Frage
+bleiben, Bestandsinstallationen behalten ihren gesetzten Wert, es entfällt nur die
+Pflichtprüfung des Formulars.
+
 ## Namensraum: `yuvomi`, nicht `oikos`
 
 Anders als beim ghcr-Image, dem Quadlet und der Datenbank ist der TrueNAS-Eintrag

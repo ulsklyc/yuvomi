@@ -428,8 +428,8 @@ In your TrueNAS SCALE web UI, go to **Apps → Discover Apps** and search for **
 
 Click **Install**. Fill in the configuration form:
 
-- **Session Secret** (required) — use a long random string
-- **Database Encryption Key** (recommended) — generate with `openssl rand -hex 32`; back it up, it cannot be recovered or changed on an existing database
+- **Session Secret** (optional) — leave empty and Yuvomi generates one on the first start, kept in `.secrets/` next to the database (see [Secrets generated on first start](#secrets-generated-on-first-start)); or set a long random string of your own
+- **Database Encryption Key** (optional) — same: left empty on a new installation, Yuvomi generates one. Set your own with `openssl rand -hex 32` to keep it under your control. Either way back it up — **Settings → Household → Backup and restore** shows it — it cannot be recovered or changed on an existing database
 - Adjust port and storage paths as needed
 
 Click **Install** to start the container.
@@ -474,7 +474,7 @@ In Unraid, open the **Apps** tab (the Community Applications plugin) and search 
 
 Click **Install**. In the template, set:
 
-- **SESSION_SECRET** (required) — a long random string
+- **SESSION_SECRET** (optional) — a long random string. Left empty, Yuvomi generates one on the first start and keeps it in `.secrets/` in the appdata folder (see [Secrets generated on first start](#secrets-generated-on-first-start))
 - **DB_ENCRYPTION_KEY** (recommended) — generate with `openssl rand -hex 32`; back it up, it cannot be recovered or changed on an existing database. Left empty on a new installation, Yuvomi generates one on the first start and keeps it in `.secrets/` in the appdata folder (see [Secrets generated on first start](#secrets-generated-on-first-start)). If you are upgrading an installation whose database is still unencrypted, it is encrypted once on the next start and the untouched original is kept as `<DB_PATH>.plaintext-backup`; delete that copy once you have verified the app starts and your data is complete
 - Adjust the WebUI port and the appdata path if needed
 
@@ -494,7 +494,9 @@ Portainer never places a `.env` file next to the compose file. Whatever you type
 
 #### Web editor stack
 
-**Stacks → Add stack → Web editor**, paste the contents of [`docker-compose.portainer.yml`](docker-compose.portainer.yml), then add at least these two under **Environment variables**:
+**Stacks → Add stack → Web editor**, paste the contents of [`docker-compose.portainer.yml`](docker-compose.portainer.yml) and deploy. No **Environment variables** are required: Yuvomi generates `SESSION_SECRET` and `DB_ENCRYPTION_KEY` on its first start and keeps them in `.secrets/` next to the database, on the `oikos_data` volume (see [Secrets generated on first start](#secrets-generated-on-first-start)). Keep a copy of the database key somewhere else — **Settings → Household → Backup and restore** shows it — because a backup only opens with it.
+
+To keep the two values under your own control instead, add them under **Environment variables**:
 
 - `SESSION_SECRET` — a long random string (`openssl rand -hex 32`)
 - `DB_ENCRYPTION_KEY` — same generator; back it up, it cannot be recovered or changed on an existing database
@@ -509,13 +511,13 @@ Every other variable is optional and falls back to the default shown in the file
 docs/docker-compose.portainer.yml
 ```
 
-Add the same environment variables as above. Auto-update then follows `main` on its own.
+Leave **Environment variables** empty, or add the same ones as above to keep your own values. Auto-update then follows `main` on its own.
 
 #### App template
 
-Yuvomi is in the community catalog [Lissy93/portainer-templates](https://github.com/Lissy93/portainer-templates). Under **Settings → App Templates**, set the URL to `https://raw.githubusercontent.com/Lissy93/portainer-templates/main/templates.json`, then pick **Yuvomi** under **App Templates**. The form asks for `SESSION_SECRET` and `DB_ENCRYPTION_KEY` (generated as above), the host port and `BASE_URL`; everything else keeps the default of [`docker-compose.portainer.yml`](docker-compose.portainer.yml), which the template deploys.
+Yuvomi is in the community catalog [Lissy93/portainer-templates](https://github.com/Lissy93/portainer-templates). Under **Settings → App Templates**, set the URL to `https://raw.githubusercontent.com/Lissy93/portainer-templates/main/templates.json`, then pick **Yuvomi** under **App Templates**. The form offers `SESSION_SECRET` and `DB_ENCRYPTION_KEY` — leave both empty and Yuvomi generates them on its first start — plus the host port and `BASE_URL`; everything else keeps the default of [`docker-compose.portainer.yml`](docker-compose.portainer.yml), which the template deploys.
 
-> **Do not point a Git stack at the repository's `docker-compose.yml`.** That file is written for a local clone with a generated `.env` beside it, so it passes most of its configuration through `env_file` — and Portainer clones the repository without one. The deploy then fails on the missing file, and even if it did not, the container would start without `SESSION_SECRET` and exit (issues #698, #765).
+> **Do not point a Git stack at the repository's `docker-compose.yml`.** That file is written for a local clone with a generated `.env` beside it, so it passes most of its configuration through `env_file` — and Portainer clones the repository without one. The deploy then fails on the missing file, and even if it did not, the container would come up without the variables that file expects to find in the `.env` (issues #698, #765).
 
 ---
 

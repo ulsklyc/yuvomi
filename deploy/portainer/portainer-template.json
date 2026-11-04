@@ -12,13 +12,13 @@
   "env": [
     {
       "name": "SESSION_SECRET",
-      "label": "Session secret (required)",
-      "description": "At least 32 random characters. Generate one with: openssl rand -hex 32. Changing it later signs everyone out once."
+      "label": "Session secret (optional)",
+      "description": "Leave empty and Yuvomi generates one on its first start, kept in .secrets/ next to the database. To set your own: at least 32 random characters, e.g. openssl rand -hex 32. Changing it later signs everyone out once."
     },
     {
       "name": "DB_ENCRYPTION_KEY",
-      "label": "Database encryption key (required)",
-      "description": "At least 32 random characters. Generate one with: openssl rand -hex 32. Keep a copy: the database and its backups only open with exactly this key."
+      "label": "Database encryption key (optional)",
+      "description": "Leave empty and Yuvomi generates one on its first start, kept in .secrets/ next to the database; Settings > Household > Backup and restore shows it, and a backup only opens with it. To set your own: at least 32 random characters, e.g. openssl rand -hex 32. Keep a copy either way."
     },
     {
       "name": "OIKOS_HTTP_PORT",
