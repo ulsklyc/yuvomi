@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for taking the time to report a bug! The version and deployment
-        fields below decide where we look first - Yuvomi ships to eight
+        fields below decide where we look first - Yuvomi ships to many
         deployment targets and they fail in different ways.
   - type: input
     id: version
@@ -32,6 +32,8 @@ body:
         - Umbrel
         - Unraid (Community Applications)
         - Proxmox VE
+        - Home Assistant app
+        - YunoHost package
         - Portainer stack
         - Bare metal / from source
         - Other (describe below)
