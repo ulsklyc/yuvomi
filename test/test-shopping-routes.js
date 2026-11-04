@@ -1065,6 +1065,31 @@ test('Kaufhistorie: abgehakter Artikel mit Preis traegt sich ein (#1003)', async
   assert.equal(hist.body.data.length, 0, 'einzeln geloescht = Kauf verworfen');
 });
 
+test('Kaufhistorie: exclude_item_id blendet nur den eigenen Kauf aus, aeltere bleiben (#1003)', async () => {
+  const list = (await call('POST', '/', { name: 'Ausblendliste' })).body.data;
+
+  // Ein aelterer Kauf, abgehakt und von der Liste geraeumt
+  const old = (await call('POST', `/${list.id}/items`, { name: 'Dinkelmehl' })).body.data;
+  await call('PATCH', `/items/${old.id}`, { price_cents: 189, is_checked: 1 });
+  assert.equal((await call('DELETE', `/${list.id}/items/checked`)).status, 200);
+
+  // Derselbe Artikel liegt erneut auf der Liste und ist abgehakt
+  const current = (await call('POST', `/${list.id}/items`, { name: 'Dinkelmehl' })).body.data;
+  await call('PATCH', `/items/${current.id}`, { price_cents: 209, is_checked: 1 });
+  assert.equal((await call('GET', '/price-history?name=Dinkelmehl')).body.data.length, 2);
+
+  const r = await call('GET', `/price-history?name=Dinkelmehl&exclude_item_id=${current.id}`);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.data.map((p) => p.price_cents), [189], 'nur der aeltere Kauf bleibt');
+});
+
+test('Kaufhistorie: exclude_item_id ohne gueltige ID ist ein 400 (#1003)', async () => {
+  for (const raw of ['abc', '0', '-3', '1.5']) {
+    const r = await call('GET', `/price-history?name=Dinkelmehl&exclude_item_id=${encodeURIComponent(raw)}`);
+    assert.equal(r.status, 400, `exclude_item_id=${raw}`);
+  }
+});
+
 test('Kaufhistorie: "Abgehakte loeschen" erfasst noch nicht registrierte abgehakte Artikel (#1003)', async () => {
   const store = (await call('POST', '/stores', { name: 'Edeka' })).body.data;
   const list = (await call('POST', '/', { name: 'CalDAV-Liste' })).body.data;

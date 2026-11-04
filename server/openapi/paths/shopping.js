@@ -66,7 +66,7 @@ export function shoppingPaths() {
             name: 'exclude_item_id',
             in: 'query',
             required: false,
-            description: 'Optional shopping item ID to exclude its current purchase from results.',
+            description: 'Optional shopping item ID to exclude its current purchase from results. A value that is not a positive integer is a 400.',
             schema: { type: 'integer', minimum: 1 },
           },
         ],

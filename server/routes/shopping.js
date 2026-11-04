@@ -580,7 +580,16 @@ router.get('/price-history', (req, res) => {
       return res.json({ data: [] });
     }
     const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
-    const excludeItemId = req.query.exclude_item_id ? Number(req.query.exclude_item_id) : null;
+    // Ohne Pruefung wuerde "abc" zu NaN, das SQLite als NULL bindet - und
+    // "shopping_item_id IS NOT NULL" blendete dann jeden geraeumten Kauf aus.
+    const rawExclude = req.query.exclude_item_id;
+    let excludeItemId = null;
+    if (rawExclude !== undefined && rawExclude !== '') {
+      excludeItemId = bodyId(rawExclude);
+      if (excludeItemId === null) {
+        return res.status(400).json({ error: 'exclude_item_id must be an item id.', code: 400 });
+      }
+    }
 
     const sql = `
       SELECT p.id, p.item_name, p.price_cents, p.store_id, p.purchased_at,
