@@ -393,6 +393,14 @@ const auth = {
   enableTwoFactor: (code) => api.post('/auth/2fa/enable', { code }),
   disableTwoFactor: (code) => api.post('/auth/2fa/disable', { code }),
   regenerateRecoveryCodes: (code) => api.post('/auth/2fa/recovery-codes', { code }),
+  // Passkeys (WebAuthn, #2444).
+  listPasskeys: () => api.get('/auth/passkey'),
+  beginPasskeyRegistration: () => api.post('/auth/passkey/register/begin', {}),
+  completePasskeyRegistration: (response, name) => api.post('/auth/passkey/register/complete', { response, name }),
+  beginPasskeyAuthentication: () => api.post('/auth/passkey/authenticate/begin', {}),
+  completePasskeyAuthentication: (response) => api.post('/auth/passkey/authenticate/complete', { response }),
+  renamePasskey: (id, name) => api.patch(`/auth/passkey/${id}`, { name }),
+  deletePasskey: (id) => api.delete(`/auth/passkey/${id}`),
   // Beendet jede andere Sitzung des Kontos, diese bleibt (#1354). Antwort: { ok, ended }.
   logoutOthers: () => api.post('/auth/logout-others', {}),
   logout: async () => {

@@ -105,6 +105,8 @@ export async function render(container) {
           <div class="auth-divider">${esc(t('login.orDivider'))}</div>
           <a href="/api/v1/auth/oidc/start" class="btn btn--secondary auth-form__submit">${esc(t('login.loginWithSso'))}</a>
           ` : ''}
+          <div class="auth-divider" id="passkey-divider" hidden>${esc(t('login.orDivider'))}</div>
+          <button type="button" class="btn btn--secondary auth-form__submit" id="passkey-btn" hidden>${esc(t('login.loginWithPasskey'))}</button>
           <p class="auth-form__forgot" hidden>
             <a href="/forgot-password" data-link>${esc(t('login.forgotPassword'))}</a>
           </p>
@@ -312,6 +314,58 @@ export async function render(container) {
     e.currentTarget.closest('.form-group').classList.remove('form-group--error');
     e.currentTarget.removeAttribute('aria-invalid');
   });
+
+  // Passkey-Schaltfläche einblenden, wenn der Browser WebAuthn unterstützt.
+  if (window.PublicKeyCredential) {
+    const passkeyBtn     = form.querySelector('#passkey-btn');
+    const passkeyDivider = form.querySelector('#passkey-divider');
+    if (passkeyBtn) {
+      passkeyBtn.hidden     = false;
+      passkeyDivider.hidden = false;
+    }
+    passkeyBtn?.addEventListener('click', async () => {
+      passkeyBtn.disabled = true;
+      passkeyBtn.textContent = t('login.passkeyChecking');
+      try {
+        const { data: options } = await auth.beginPasskeyAuthentication();
+        const assertion = await navigator.credentials.get({ publicKey: {
+          ...options,
+          challenge: Uint8Array.from(atob(options.challenge.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)),
+          allowCredentials: (options.allowCredentials || []).map((c) => ({
+            ...c,
+            id: Uint8Array.from(atob(c.id.replace(/-/g, '+').replace(/_/g, '/')), (c2) => c2.charCodeAt(0)),
+          })),
+        }});
+        if (!assertion) return;
+
+        const response = {
+          id: assertion.id,
+          rawId: btoa(String.fromCharCode(...new Uint8Array(assertion.rawId))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, ''),
+          type: assertion.type,
+          response: {
+            clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(assertion.response.clientDataJSON))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, ''),
+            authenticatorData: btoa(String.fromCharCode(...new Uint8Array(assertion.response.authenticatorData))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, ''),
+            signature: btoa(String.fromCharCode(...new Uint8Array(assertion.response.signature))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, ''),
+            userHandle: assertion.response.userHandle
+              ? btoa(String.fromCharCode(...new Uint8Array(assertion.response.userHandle))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+              : null,
+          },
+          clientExtensionResults: assertion.getClientExtensionResults?.() ?? {},
+        };
+
+        const result = await auth.completePasskeyAuthentication(response);
+        if (result.twoFactorRequired) {
+          renderSecondFactor(container, { recoveryAvailable: result.recoveryAvailable });
+        } else {
+          window.yuvomi?.onSignIn(result);
+        }
+      } catch {
+        passkeyBtn.disabled = false;
+        passkeyBtn.textContent = t('login.loginWithPasskey');
+        showAuthError(errorEl, t('login.passkeyFailed'), null);
+      }
+    });
+  }
 }
 
 /**

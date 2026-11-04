@@ -64,6 +64,7 @@ import {
 import { isAdminRequest, requireAdmin } from './middleware/require-admin.js';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';
 import * as twoFactor from './services/two-factor.js';
+import * as passkeys from './services/passkeys.js';
 import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
 
 const log = createLogger('Auth');
@@ -3287,6 +3288,220 @@ router.put('/2fa/require', requireAuth, requireAdmin, csrfMiddleware, (req, res)
     res.json({ data: { required: twoFactor.isRequiredForHousehold(db.get()) } });
   } catch (err) {
     log.error('2FA requirement error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// Passkeys (WebAuthn) (#2444)
+// --------------------------------------------------------
+
+const passkeyLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
+ * GET /api/v1/auth/passkey
+ * Listet die eigenen Passkeys.
+ */
+router.get('/passkey', requireAuth, (req, res) => {
+  try {
+    const list = passkeys.listPasskeys(db.get(), req.authUserId);
+    const config = passkeys.getWebAuthnConfig();
+    res.json({ data: list, available: config !== null });
+  } catch (err) {
+    log.error('List passkeys error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * POST /api/v1/auth/passkey/register/begin
+ * Startet die Passkey-Registrierung. Erfordert aktive Sitzung.
+ */
+router.post('/passkey/register/begin', requireAuth, csrfMiddleware, passkeyLimiter, async (req, res) => {
+  try {
+    const config = passkeys.getWebAuthnConfig();
+    if (!config) {
+      return res.status(503).json({ error: 'Passkeys require BASE_URL to be configured.', code: 503, reason: 'passkeys_unavailable' });
+    }
+    const user = db.get().prepare(
+      'SELECT id, username, display_name FROM users WHERE id = ?'
+    ).get(req.authUserId);
+    if (!user) return res.status(403).json({ error: 'User not found.', code: 403 });
+
+    const options = await passkeys.beginRegistration(db.get(), user, config, req.session);
+    res.json({ data: options });
+  } catch (err) {
+    log.error('Begin passkey registration error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * POST /api/v1/auth/passkey/register/complete
+ * Body: { response: RegistrationResponseJSON, name: string }
+ * Schließt die Registrierung ab und speichert den Passkey.
+ */
+router.post('/passkey/register/complete', requireAuth, csrfMiddleware, passkeyLimiter, async (req, res) => {
+  try {
+    const config = passkeys.getWebAuthnConfig();
+    if (!config) {
+      return res.status(503).json({ error: 'Passkeys require BASE_URL to be configured.', code: 503, reason: 'passkeys_unavailable' });
+    }
+    const { response: registrationResponse, name } = req.body ?? {};
+    if (!registrationResponse || typeof registrationResponse !== 'object') {
+      return res.status(400).json({ error: 'Missing registration response.', code: 400 });
+    }
+    const safeName = String(name ?? '').trim().slice(0, 100) || 'Passkey';
+
+    const passkey = await passkeys.completeRegistration(
+      db.get(), req.authUserId, registrationResponse, req.session, config, safeName
+    );
+    log.info('Passkey registered', { userId: req.authUserId, passkeyId: passkey.id });
+    res.status(201).json({ data: passkey });
+  } catch (err) {
+    if (err.code === 400 || err.code === 409) {
+      return res.status(err.code).json({ error: err.message, code: err.code, reason: err.reason });
+    }
+    log.error('Complete passkey registration error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * POST /api/v1/auth/passkey/authenticate/begin
+ * Oeffentlich – startet den Passkey-Login (discoverable credential flow).
+ */
+router.post('/passkey/authenticate/begin', passkeyLimiter, async (req, res) => {
+  try {
+    const config = passkeys.getWebAuthnConfig();
+    if (!config) {
+      return res.status(503).json({ error: 'Passkeys require BASE_URL to be configured.', code: 503, reason: 'passkeys_unavailable' });
+    }
+    const options = await passkeys.beginAuthentication(config, req.session);
+    res.json({ data: options });
+  } catch (err) {
+    log.error('Begin passkey authentication error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * POST /api/v1/auth/passkey/authenticate/complete
+ * Body: { response: AuthenticationResponseJSON }
+ * Prüft die Antwort, legt die Sitzung an (wie password login, inkl. 2FA-Weiterleitung).
+ */
+router.post('/passkey/authenticate/complete', passkeyLimiter, async (req, res) => {
+  try {
+    const config = passkeys.getWebAuthnConfig();
+    if (!config) {
+      return res.status(503).json({ error: 'Passkeys require BASE_URL to be configured.', code: 503, reason: 'passkeys_unavailable' });
+    }
+    const { response: authResponse } = req.body ?? {};
+    if (!authResponse || typeof authResponse !== 'object') {
+      return res.status(400).json({ error: 'Missing authentication response.', code: 400 });
+    }
+
+    let userId;
+    try {
+      userId = await passkeys.completeAuthentication(db.get(), authResponse, req.session, config);
+    } catch (err) {
+      if (err.code === 400) {
+        return res.status(400).json({ error: err.message, code: 400, reason: err.reason });
+      }
+      throw err;
+    }
+
+    const user = db.get().prepare(`
+      SELECT id, username, display_name, role, password_hash
+      FROM users WHERE id = ?
+    `).get(userId);
+
+    if (!user || !canSignIn(db.get(), user.id)) {
+      return res.status(403).json({ error: 'Sign-in not allowed.', code: 403, reason: 'sign_in_refused' });
+    }
+
+    // Zweiter Faktor: wie beim Passwort-Login.
+    if (twoFactor.isEnabled(db.get(), user.id)) {
+      req.session.pendingTwoFactor = { userId: user.id, expiresAt: Date.now() + TWO_FACTOR_WINDOW_MS };
+      return res.json({
+        twoFactorRequired: true,
+        recoveryAvailable: twoFactor.getStatus(db.get(), user.id).recovery_remaining > 0,
+      });
+    }
+
+    try {
+      await setupAuthSession(req, res, user);
+      res.json(loginPayload(req, user));
+    } catch (sessionErr) {
+      log.error('Session regeneration failed after passkey auth:', sessionErr);
+      res.status(500).json({ error: 'Internal server error.', code: 500 });
+    }
+  } catch (err) {
+    log.error('Complete passkey authentication error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * PATCH /api/v1/auth/passkey/:id
+ * Body: { name: string }
+ * Umbenennen.
+ */
+router.patch('/passkey/:id', requireAuth, csrfMiddleware, (req, res) => {
+  try {
+    const passkeyId = Number(req.params.id);
+    if (!Number.isInteger(passkeyId) || passkeyId <= 0) {
+      return res.status(400).json({ error: 'Invalid passkey id.', code: 400 });
+    }
+    const name = String(req.body?.name ?? '').trim().slice(0, 100);
+    if (!name) return res.status(400).json({ error: 'Name is required.', code: 400 });
+
+    const updated = passkeys.renamePasskey(db.get(), passkeyId, req.authUserId, name);
+    if (!updated) return res.status(404).json({ error: 'Passkey not found.', code: 404 });
+    res.json({ data: { id: passkeyId, name } });
+  } catch (err) {
+    log.error('Rename passkey error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+/**
+ * DELETE /api/v1/auth/passkey/:id
+ * Löscht einen Passkey. Verweigert, wenn es der letzte Anmeldeweg wäre.
+ */
+router.delete('/passkey/:id', requireAuth, csrfMiddleware, (req, res) => {
+  try {
+    const passkeyId = Number(req.params.id);
+    if (!Number.isInteger(passkeyId) || passkeyId <= 0) {
+      return res.status(400).json({ error: 'Invalid passkey id.', code: 400 });
+    }
+
+    const user = db.get().prepare('SELECT password_hash, oidc_sub FROM users WHERE id = ?').get(req.authUserId);
+    if (!user) return res.status(403).json({ error: 'User not found.', code: 403 });
+
+    const hasPassword = !isSsoOnlyAccount(user.password_hash);
+    const hasOidc     = !!user.oidc_sub;
+    const count       = passkeys.countPasskeys(db.get(), req.authUserId);
+
+    if (!hasPassword && !hasOidc && count <= 1) {
+      return res.status(409).json({
+        error: 'Cannot remove the last sign-in method.',
+        code: 409,
+        reason: 'last_sign_in_method',
+      });
+    }
+
+    const deleted = passkeys.deletePasskey(db.get(), passkeyId, req.authUserId);
+    if (!deleted) return res.status(404).json({ error: 'Passkey not found.', code: 404 });
+    log.info('Passkey removed', { userId: req.authUserId, passkeyId });
+    res.status(204).end();
+  } catch (err) {
+    log.error('Delete passkey error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

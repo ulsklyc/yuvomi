@@ -389,6 +389,7 @@
     "test:openapi-client-responses": "node --experimental-sqlite --test test/test-openapi-client-responses.js",
     "test:openapi-reasons": "node --test test/test-openapi-reasons.js",
     "test:auth-userid": "node --test test/test-auth-userid.js",
+    "test:passkeys": "node --test test/test-passkeys.js",
     "test:onboarding-version": "node --experimental-sqlite --test test/test-onboarding-version.js",
     "test:setup": "node test/test-setup.js",
     "test:setup-language": "node test/test-setup-language.js",
@@ -631,6 +632,7 @@
     "test:cycle-ics": "node --experimental-sqlite --test test/test-cycle-ics.js"
   },
   "dependencies": {
+    "@simplewebauthn/server": "^13.3.3",
     "bcrypt": "^6.0.0",
     "better-sqlite3-multiple-ciphers": "^13.0.3",
     "compression": "^1.8.2",

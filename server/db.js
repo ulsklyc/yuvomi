@@ -11927,6 +11927,29 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    version: 278,
+    description: 'passkeys: WebAuthn credential store (#2444)',
+    // Ein Passkey ist ein oeffentlicher Schluessel, der auf einem Geraet des
+    // Nutzers liegt. Der Server speichert nur den oeffentlichen Teil (public_key
+    // als COSE-Bytes), die naechste Zaehlung (counter) zur Replay-Erkennung,
+    // und die Transport-Hints fuer den Browser. credential_id identifiziert
+    // den Schluessel weltweit eindeutig.
+    up: `
+      CREATE TABLE IF NOT EXISTS user_passkeys (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        credential_id TEXT    NOT NULL UNIQUE,
+        public_key    BLOB    NOT NULL,
+        counter       INTEGER NOT NULL DEFAULT 0,
+        transports    TEXT,
+        name          TEXT    NOT NULL,
+        created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        last_used_at  TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_passkeys_user ON user_passkeys(user_id);
+    `,
+  },
 ];
 
 /**

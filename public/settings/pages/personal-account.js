@@ -453,6 +453,51 @@ function askForCode(card, texts, onConfirm, onCancel) {
 }
 
 /**
+ * Passkeys-Karte (WebAuthn, #2444).
+ * @returns {string}
+ */
+export function passkeyCardHtml() {
+  return `
+    <div class="settings-card" id="passkey-card">
+      <h3 class="settings-card__title">${t('settings.passkeyTitle')}</h3>
+      <p class="form-hint">${t('settings.passkeyHint')}</p>
+      <div id="passkey-list" aria-live="polite"></div>
+      <div id="passkey-error" class="form-error" role="alert" hidden></div>
+      <div class="settings-form-actions">
+        <button type="button" class="btn btn--secondary" id="passkey-add-btn">${t('settings.passkeyAddButton')}</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderPasskeyList(listEl, passkeysArr) {
+  if (!passkeysArr.length) {
+    listEl.innerHTML = `<p class="form-hint settings-passkey-empty">${t('settings.passkeyEmpty')}</p>`;
+    return;
+  }
+  const rows = passkeysArr.map((p) => {
+    const addedDate = p.created_at ? new Date(p.created_at).toLocaleDateString() : '';
+    const usedDate  = p.last_used_at ? new Date(p.last_used_at).toLocaleDateString() : null;
+    const meta = [
+      t('settings.passkeyAddedAt', { date: addedDate }),
+      usedDate ? t('settings.passkeyLastUsed', { date: usedDate }) : null,
+    ].filter(Boolean).join(' · ');
+    return `
+      <div class="settings-passkey-row" data-passkey-id="${p.id}">
+        <div class="settings-passkey-row__info">
+          <span class="settings-passkey-row__name">${esc(p.name)}</span>
+          <span class="settings-passkey-row__meta form-hint">${esc(meta)}</span>
+        </div>
+        <div class="settings-passkey-row__actions">
+          <button type="button" class="btn btn--ghost btn--small passkey-rename-btn" data-passkey-id="${p.id}">${t('settings.passkeyRenameLabel')}</button>
+          <button type="button" class="btn btn--ghost btn--small passkey-delete-btn" aria-label="Remove ${esc(p.name)}" data-passkey-id="${p.id}"><i data-lucide="trash-2" aria-hidden="true"></i></button>
+        </div>
+      </div>`;
+  }).join('');
+  listEl.innerHTML = rows;
+}
+
+/**
  * Karte "Auf anderen Geraeten abmelden" (#1354, #1423). Hinweis, Status und
  * Knopfreihe tragen eigene Klassen fuer ihren Abstand (settings.css): ohne ihn
  * las sich der Status als vierte Zeile des Hinweises, und der Fokusring des
@@ -761,6 +806,8 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
       ${passwordCardHtml(user)}
 
       ${twoFactorCardHtml(twoFactorState)}
+
+      ${passkeyCardHtml()}
 
       ${oidcCardHtml(oidcState, oidcNotice)}
 
@@ -1074,6 +1121,117 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
   });
 }
 
+/**
+ * Bindet die Passkeys-Karte (#2444).
+ * Laedt die Liste beim Einhaengen, behandelt Hinzufuegen, Umbenennen und Loeschen.
+ */
+function bindPasskeyEvents(container, onReload) {
+  const card   = container.querySelector('#passkey-card');
+  if (!card) return;
+  const listEl = card.querySelector('#passkey-list');
+  const errEl  = card.querySelector('#passkey-error');
+
+  function showErr(msg) {
+    errEl.textContent = msg;
+    errEl.hidden = false;
+  }
+  function clearErr() { errEl.hidden = true; errEl.textContent = ''; }
+
+  async function loadList() {
+    listEl.innerHTML = '';
+    clearErr();
+    try {
+      const { data, available } = await auth.listPasskeys();
+      if (!available) {
+        listEl.innerHTML = `<p class="form-hint">${t('settings.passkeyUnavailable')}</p>`;
+        card.querySelector('#passkey-add-btn')?.remove();
+        return;
+      }
+      renderPasskeyList(listEl, data ?? []);
+      window.lucide?.createIcons({ el: listEl });
+    } catch {
+      showErr(t('settings.passkeyAddFailed'));
+    }
+  }
+
+  loadList();
+
+  card.querySelector('#passkey-add-btn')?.addEventListener('click', async () => {
+    if (!window.PublicKeyCredential) {
+      showErr(t('settings.passkeyNotSupported'));
+      return;
+    }
+    clearErr();
+    const name = window.prompt(t('settings.passkeyNameLabel'), '');
+    if (name === null) return;
+    if (!name.trim()) { showErr(t('settings.passkeyNameMissing')); return; }
+
+    try {
+      const { data: options } = await auth.beginPasskeyRegistration();
+      const credential = await navigator.credentials.create({ publicKey: {
+        ...options,
+        challenge: Uint8Array.from(atob(options.challenge.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)),
+        user: { ...options.user, id: Uint8Array.from(atob(options.user.id.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)) },
+        excludeCredentials: (options.excludeCredentials || []).map((c) => ({
+          ...c,
+          id: Uint8Array.from(atob(c.id.replace(/-/g, '+').replace(/_/g, '/')), (c2) => c2.charCodeAt(0)),
+        })),
+      }});
+      if (!credential) { showErr(t('settings.passkeyAddFailed')); return; }
+
+      const response = {
+        id: credential.id,
+        rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, ''),
+        type: credential.type,
+        response: {
+          clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, ''),
+          attestationObject: btoa(String.fromCharCode(...new Uint8Array(credential.response.attestationObject))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, ''),
+          transports: credential.response.getTransports?.() ?? [],
+        },
+        clientExtensionResults: credential.getClientExtensionResults?.() ?? {},
+      };
+
+      await auth.completePasskeyRegistration(response, name.trim());
+      window.yuvomi?.showToast(t('settings.passkeyAdded'), 'success');
+      loadList();
+    } catch {
+      showErr(t('settings.passkeyAddFailed'));
+    }
+  });
+
+  card.addEventListener('click', async (e) => {
+    const renameBtn = e.target.closest('.passkey-rename-btn');
+    if (renameBtn) {
+      const id = Number(renameBtn.dataset.passkeyId);
+      const row = card.querySelector(`.settings-passkey-row[data-passkey-id="${id}"]`);
+      const currentName = row?.querySelector('.settings-passkey-row__name')?.textContent ?? '';
+      const newName = window.prompt(t('settings.passkeyNameLabel'), currentName);
+      if (newName === null || !newName.trim()) return;
+      try {
+        await auth.renamePasskey(id, newName.trim());
+        window.yuvomi?.showToast(t('settings.passkeyRenamed'), 'success');
+        loadList();
+      } catch { showErr(t('settings.passkeyRenameFailed')); }
+      return;
+    }
+
+    const deleteBtn = e.target.closest('.passkey-delete-btn');
+    if (deleteBtn) {
+      const id = Number(deleteBtn.dataset.passkeyId);
+      clearErr();
+      try {
+        await auth.deletePasskey(id);
+        window.yuvomi?.showToast(t('settings.passkeyDeleted'), 'success');
+        loadList();
+      } catch (err) {
+        const reason = err?.reason ?? err?.body?.reason;
+        if (reason === 'last_sign_in_method') showErr(t('settings.passkeyLastMethodWarning'));
+        else showErr(t('settings.passkeyDeleteFailed'));
+      }
+    }
+  });
+}
+
 export async function render(container, { user }) {
   let currentUser = user || {};
   let refreshFailed = false;
@@ -1120,6 +1278,7 @@ export async function render(container, { user }) {
       avatarData: currentUser?.avatar_data ?? null,
     }, { gravatarHost });
     bindTwoFactorEvents(container, () => render(container, { user: currentUser }));
+    bindPasskeyEvents(container, () => render(container, { user: currentUser }));
     bindSignedInDevices(container);
     container.querySelector('#account-retry')?.addEventListener('click', () => {
       render(container, { user: currentUser });

@@ -129,6 +129,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
       { key: 'settings.contactDetailsLegend', also: ['settings.memberPhoneLabel', 'settings.memberEmailLabel', 'settings.memberBirthDateLabel'] },
       { key: 'settings.changePassword', synonyms: 'settingsSynonyms.password' },
       { key: 'settings.twoFactorTitle', terms: ['2FA', 'TOTP'] },
+      { key: 'settings.passkeyTitle', terms: ['WebAuthn', 'FIDO', 'biometric', 'fingerprint', 'Face ID'] },
       'settings.otherSessionsTitle',
       { key: 'settings.oidcLinkTitle', terms: ['SSO', 'OIDC'] },
     ],
