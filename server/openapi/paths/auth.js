@@ -824,6 +824,121 @@ export function authPaths() {
         },
       }),
     },
+    '/api/v1/auth/passkey': {
+      get: op({
+        summary: 'List own passkeys',
+        tag: 'Auth',
+        description: 'Returns the passkeys registered for the authenticated account and whether passkeys are available on this instance (`available: false` when `BASE_URL` is not configured).',
+        responses: {
+          200: { description: 'Passkey list and availability flag', content: { 'application/json': { schema: { type: 'object' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/auth/passkey/register/begin': {
+      post: op({
+        summary: 'Begin passkey registration',
+        tag: 'Auth',
+        stateChanging: true,
+        description: 'Starts the WebAuthn registration ceremony for the authenticated account. Returns a `PublicKeyCredentialCreationOptionsJSON` challenge to pass to `navigator.credentials.create()`. Requires `BASE_URL` to be configured; returns 503 with `reason: "passkeys_unavailable"` otherwise.',
+        responses: {
+          200: { description: 'Registration challenge', content: { 'application/json': { schema: { type: 'object' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          503: { description: 'Passkeys unavailable — `BASE_URL` is not configured. `reason: "passkeys_unavailable"`.' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/auth/passkey/register/complete': {
+      post: op({
+        summary: 'Complete passkey registration',
+        tag: 'Auth',
+        stateChanging: true,
+        description: 'Finishes the WebAuthn registration ceremony. Body: `{ response: RegistrationResponseJSON, name?: string }`. On success returns 201 with the new passkey record. The optional `name` is trimmed to 100 characters; it defaults to `"Passkey"`. Requires `BASE_URL` to be configured.',
+        requestBody: jsonBody(null),
+        responses: {
+          201: { description: 'Passkey registered', content: { 'application/json': { schema: { type: 'object' } } } },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          409: { description: 'The registration challenge was not found, was already used, or the credential is already registered.' },
+          503: { description: 'Passkeys unavailable — `BASE_URL` is not configured. `reason: "passkeys_unavailable"`.' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/auth/passkey/authenticate/begin': {
+      post: op({
+        summary: 'Begin passkey sign-in',
+        tag: 'Auth',
+        auth: false,
+        stateChanging: true,
+        description: 'Starts the WebAuthn authentication ceremony (discoverable credential flow, no username needed). Returns a `PublicKeyCredentialRequestOptionsJSON` challenge to pass to `navigator.credentials.get()`. Requires `BASE_URL` to be configured; returns 503 with `reason: "passkeys_unavailable"` otherwise.',
+        responses: {
+          200: { description: 'Authentication challenge', content: { 'application/json': { schema: { type: 'object' } } } },
+          503: { description: 'Passkeys unavailable — `BASE_URL` is not configured. `reason: "passkeys_unavailable"`.' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/auth/passkey/authenticate/complete': {
+      post: op({
+        summary: 'Complete passkey sign-in',
+        tag: 'Auth',
+        auth: false,
+        stateChanging: true,
+        description: 'Finishes the WebAuthn authentication ceremony and opens a session, like POST /auth/login. Body: `{ response: AuthenticationResponseJSON }`. When two-factor authentication is required, the response is `{ twoFactorRequired, recoveryAvailable }` and POST /auth/2fa/verify completes the sign-in.',
+        requestBody: jsonBody(null),
+        responses: {
+          200: {
+            description: 'Authenticated user and CSRF token, or the request for a second factor',
+            content: {
+              'application/json': {
+                schema: { oneOf: [{ $ref: '#/components/schemas/LoginResponse' }, { $ref: '#/components/schemas/TwoFactorChallengeResponse' }] },
+              },
+            },
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          403: { description: 'The user account is not allowed to sign in. `reason: "sign_in_refused"`.' },
+          503: { description: 'Passkeys unavailable — `BASE_URL` is not configured. `reason: "passkeys_unavailable"`.' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
+    '/api/v1/auth/passkey/{id}': {
+      patch: op({
+        summary: 'Rename a passkey',
+        tag: 'Auth',
+        stateChanging: true,
+        description: 'Sets a new display name (1–100 characters) for a passkey belonging to the authenticated account.',
+        params: [idParam('id', 'Passkey ID')],
+        requestBody: jsonBody(null),
+        responses: {
+          200: { description: 'Updated name', content: { 'application/json': { schema: { type: 'object' } } } },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { description: 'Passkey not found or belongs to another account' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+      delete: op({
+        summary: 'Remove a passkey',
+        tag: 'Auth',
+        stateChanging: true,
+        description: 'Deletes a passkey belonging to the authenticated account. Refused with 409 (`reason: "last_sign_in_method"`) when the passkey is the only remaining sign-in method (no password and no OIDC).',
+        params: [idParam('id', 'Passkey ID')],
+        responses: {
+          204: { description: 'Passkey removed' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'Passkey not found or belongs to another account' },
+          409: { description: 'The passkey is the last sign-in method. `reason: "last_sign_in_method"`.' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
+      }),
+    },
   });
 }
 
@@ -855,4 +970,10 @@ const CASE_REASONS = {
   '/api/v1/auth/devices/{id}': { delete: '`session_required` (403, an API token cannot manage a person\'s devices)' },
   '/api/v1/auth/devices/current': { delete: '`device_credential_required` (403, only a signed-in device can sign itself out here)' },
   '/api/v1/auth/users/{id}/devices/sign-out': { post: '`browser_session_required` (403, only a signed-in browser session can do this)' },
+  '/api/v1/auth/passkey/authenticate/complete': {
+    post: '`sign_in_refused` (403, the account is not allowed to sign in)',
+  },
+  '/api/v1/auth/passkey/{id}': {
+    delete: '`last_sign_in_method` (409, the passkey is the only remaining sign-in method)',
+  },
 };
