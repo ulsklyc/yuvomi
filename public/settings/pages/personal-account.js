@@ -472,7 +472,8 @@ export function passkeyCardHtml() {
 
 function renderPasskeyList(listEl, passkeysArr) {
   if (!passkeysArr.length) {
-    listEl.innerHTML = `<p class="form-hint settings-passkey-empty">${t('settings.passkeyEmpty')}</p>`;
+    listEl.replaceChildren();
+    listEl.insertAdjacentHTML('beforeend', `<p class="form-hint settings-passkey-empty">${t('settings.passkeyEmpty')}</p>`);
     return;
   }
   const rows = passkeysArr.map((p) => {
@@ -494,7 +495,8 @@ function renderPasskeyList(listEl, passkeysArr) {
         </div>
       </div>`;
   }).join('');
-  listEl.innerHTML = rows;
+  listEl.replaceChildren();
+  listEl.insertAdjacentHTML('beforeend', rows);
 }
 
 /**
@@ -1138,12 +1140,12 @@ function bindPasskeyEvents(container, onReload) {
   function clearErr() { errEl.hidden = true; errEl.textContent = ''; }
 
   async function loadList() {
-    listEl.innerHTML = '';
+    listEl.replaceChildren();
     clearErr();
     try {
       const { data, available } = await auth.listPasskeys();
       if (!available) {
-        listEl.innerHTML = `<p class="form-hint">${t('settings.passkeyUnavailable')}</p>`;
+        listEl.insertAdjacentHTML('beforeend', `<p class="form-hint">${t('settings.passkeyUnavailable')}</p>`);
         card.querySelector('#passkey-add-btn')?.remove();
         return;
       }
