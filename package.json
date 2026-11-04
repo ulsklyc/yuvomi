@@ -404,6 +404,7 @@
     "test:own-series-echo": "node scripts/with-env.mjs TZ=UTC node --experimental-sqlite --test test/test-own-series-echo.js && node scripts/with-env.mjs TZ=Europe/Berlin node --experimental-sqlite --test test/test-own-series-echo.js",
     "test:ics-import": "node --test test/test-ics-import.js",
     "test:backup-scheduler": "node scripts/with-env.mjs DB_PATH=:memory: node --experimental-sqlite test/test-backup-scheduler.js",
+    "test:backup-retention": "node scripts/with-env.mjs DB_PATH=:memory: node --experimental-sqlite --test test/test-backup-retention.js",
     "test:backup-webdav": "node scripts/with-env.mjs DB_PATH=:memory: node --experimental-sqlite test/test-backup-webdav.js",
     "test:backup-routes": "node --experimental-sqlite --test test/test-backup-routes.js",
     "test:backup-database-key": "node --experimental-sqlite --test test/test-backup-database-key.js",

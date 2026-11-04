@@ -38,6 +38,7 @@ import * as outlookCalendar from './services/outlook-calendar.js';
 import * as carddavSync from './services/cardav-sync.js';
 import * as holidays from './services/holidays.js';
 import { startScheduler as startBackupScheduler, stopScheduler as stopBackupScheduler } from './services/backup-scheduler.js';
+import { pushService } from './services/push.js';
 import { startScheduler as startSplitExpenseScheduler } from './services/split-expenses-scheduler.js';
 import { startRewardMoneyScheduler } from './services/reward-money-scheduler.js';
 import { startScheduler as startPushScheduler } from './services/push-scheduler.js';
@@ -1007,7 +1008,7 @@ const server = app.listen(PORT, BIND_ADDRESS, () => {
     .catch((err) => log.error('Document storage check failed:', err.message));
 
   // Backup-Scheduler starten
-  startBackupScheduler();
+  startBackupScheduler({ pushService });
   startSplitExpenseScheduler();
   startRewardMoneyScheduler();
   startPushScheduler();

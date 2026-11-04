@@ -243,7 +243,7 @@ async function loadBackupSchedulerStatus(container) {
     }
 
     renderDatabaseKeyCard(container, res.data?.database_key);
-    const { enabled, schedule, keepCount, lastBackup } = scheduler;
+    const { enabled, schedule, keepCount, keepDays, generations, lastBackup, lastError } = scheduler;
 
     let lastBackupText = t('settings.backupSchedulerNever');
     if (lastBackup?.timestamp) {
@@ -263,11 +263,30 @@ async function loadBackupSchedulerStatus(container) {
 
     if (enabled) {
       rows.push(createInfoRow({ label: t('settings.backupSchedulerSchedule'), ...scheduleValue(schedule) }));
-      rows.push(createInfoRow({
-        label: t('settings.backupSchedulerKeep'),
-        value: t('settings.backupSchedulerKeepCount', { count: keepCount }),
-      }));
+
+      let retentionValue;
+      if (generations) {
+        retentionValue = t('settings.backupSchedulerKeepGenerational', {
+          daily: keepCount,
+          weekly: generations.weekly,
+          monthly: generations.monthly,
+        });
+      } else if (keepDays) {
+        retentionValue = t('settings.backupSchedulerKeepWithDays', { count: keepCount, days: keepDays });
+      } else {
+        retentionValue = t('settings.backupSchedulerKeepCount', { count: keepCount });
+      }
+      rows.push(createInfoRow({ label: t('settings.backupSchedulerKeep'), value: retentionValue }));
+
       rows.push(createInfoRow({ label: t('settings.backupSchedulerLastBackup'), value: lastBackupText }));
+
+      if (lastError) {
+        rows.push(createInfoRow({
+          label: t('settings.backupSchedulerLastError'),
+          value: `${dateTimeText(lastError.timestamp)}: ${lastError.message}`,
+          tone: 'danger',
+        }));
+      }
 
       const actions = document.createElement('div');
       actions.className = 'settings-form-actions';
