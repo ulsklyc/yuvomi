@@ -15,7 +15,8 @@ import { birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { mediaPickerBadgeHtml } from '/utils/media-picker.js';
 import { bindSignedInDevices, signedInDevicesCardHtml } from '/settings/signed-in-devices.js';
 import { dateText } from '/utils/date-format.js';
-import { rowActionHtml } from '/utils/row-action.js';
+import { rowMenuHtml } from '/utils/row-action.js';
+import { installPopoverMenus } from '/utils/popover-menu.js';
 
 function avatarHtml(user, className = 'settings-avatar') {
   const safeName = esc(user?.display_name || '');
@@ -492,7 +493,7 @@ function renderPasskeyList(listEl, passkeysArr) {
         </div>
         <div class="settings-passkey-row__actions">
           <button type="button" class="btn btn--ghost btn--sm passkey-rename-btn" data-passkey-id="${p.id}">${t('settings.passkeyRenameLabel')}</button>
-          ${rowActionHtml({ icon: 'trash-2', label: t('common.removeNamed', { name: p.name }), tone: 'danger', className: 'passkey-delete-btn', attrs: { 'data-passkey-id': p.id } })}
+          ${rowMenuHtml({ id: `passkey-menu-${p.id}`, label: t('common.moreActionsNamed', { name: p.name }), items: [{ action: 'delete-passkey', icon: 'trash-2', danger: true, label: t('common.removeNamed', { name: p.name }), attrs: { 'data-passkey-id': p.id } }] })}
         </div>
       </div>`;
   }).join('');
@@ -1151,6 +1152,7 @@ function bindPasskeyEvents(container, onReload) {
         return;
       }
       renderPasskeyList(listEl, data ?? []);
+      installPopoverMenus(listEl);
       window.lucide?.createIcons({ el: listEl });
     } catch {
       showErr(t('settings.passkeyAddFailed'));
@@ -1217,7 +1219,7 @@ function bindPasskeyEvents(container, onReload) {
       return;
     }
 
-    const deleteBtn = e.target.closest('.passkey-delete-btn');
+    const deleteBtn = e.target.closest('[data-action="delete-passkey"]');
     if (deleteBtn) {
       const id = Number(deleteBtn.dataset.passkeyId);
       clearErr();
