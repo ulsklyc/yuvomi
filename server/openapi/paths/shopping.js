@@ -181,6 +181,21 @@ export function shoppingPaths() {
         requestBody: jsonBody(null),
       }),
     },
+    '/api/v1/shopping/{listId}/send-webhook': {
+      post: op({
+        summary: 'Send the open items of a list to the household webhook',
+        description: 'Posts all unchecked items of the list as JSON to the webhook URL set in household preferences. '
+          + 'The URL is set by an admin under Settings → Notifications; any household member may trigger a send. '
+          + 'Payload: `{ list: { id, name }, items: [{ name, amount, unit, category }], sentAt }`. '
+          + 'Rate limited to 10 requests per minute per IP. '
+          + 'Fails with 422 when no webhook URL is configured or the list has no open items. '
+          + 'Fails with 502 when the webhook returns a non-2xx status or is unreachable.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
+    },
     '/api/v1/shopping/{listId}/items/checked': {
       delete: op({
         summary: 'Delete checked shopping items',
