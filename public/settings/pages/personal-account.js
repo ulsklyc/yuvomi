@@ -15,6 +15,7 @@ import { birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { mediaPickerBadgeHtml } from '/utils/media-picker.js';
 import { bindSignedInDevices, signedInDevicesCardHtml } from '/settings/signed-in-devices.js';
 import { dateText } from '/utils/date-format.js';
+import { rowActionHtml } from '/utils/row-action.js';
 
 function avatarHtml(user, className = 'settings-avatar') {
   const safeName = esc(user?.display_name || '');
@@ -491,7 +492,7 @@ function renderPasskeyList(listEl, passkeysArr) {
         </div>
         <div class="settings-passkey-row__actions">
           <button type="button" class="btn btn--ghost btn--sm passkey-rename-btn" data-passkey-id="${p.id}">${t('settings.passkeyRenameLabel')}</button>
-          <button type="button" class="btn btn--ghost btn--sm passkey-delete-btn" aria-label="Remove ${esc(p.name)}" data-passkey-id="${p.id}"><i data-lucide="trash-2" aria-hidden="true"></i></button>
+          ${rowActionHtml({ icon: 'trash-2', label: t('common.removeNamed', { name: p.name }), tone: 'danger', className: 'passkey-delete-btn', attrs: { 'data-passkey-id': p.id } })}
         </div>
       </div>`;
   }).join('');
