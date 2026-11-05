@@ -862,7 +862,13 @@
             "waited": "„{{item}}“ wurde nicht nach „{{target}}“ verschoben: Der Abgleich von „{{back}}“ ist seit über einer Woche aus. Der Artikel erscheint wieder auf „{{back}}“, sobald die Liste eingeschaltet wird."
         },
         "moreDetailsHint": "Preis, Laden, Link, Notiz",
-        "toPantryAllToPlaceholder": "Ort wählen …"
+        "toPantryAllToPlaceholder": "Ort wählen …",
+        "summaryRemaining": "Noch zu kaufen",
+        "summaryPurchased": "Im Einkaufswagen",
+        "summaryTotal": "Geschätzte Summe",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "ungefähr {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} Zutat",

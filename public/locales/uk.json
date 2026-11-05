@@ -984,7 +984,13 @@
             "waited": "«{{item}}» не переміщено до списку «{{target}}»: синхронізація списку «{{back}}» вимкнена понад тиждень. Товар знову з’явиться у списку «{{back}}», щойно ви його увімкнете."
         },
         "moreDetailsHint": "Ціна, магазин, посилання, нотатка",
-        "toPantryAllToPlaceholder": "Виберіть місце …"
+        "toPantryAllToPlaceholder": "Виберіть місце …",
+        "summaryRemaining": "До покупки",
+        "summaryPurchased": "У кошику",
+        "summaryTotal": "Орієнтовна сума",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "приблизно {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "randomizeSuccess_few": "Заплановано {{count}} прийоми їжі.",

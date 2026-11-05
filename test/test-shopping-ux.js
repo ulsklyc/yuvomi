@@ -2596,3 +2596,122 @@ test('R22 D22: der Wisch-Hinweis liest den Viewport per Medienabfrage und zeigt 
     global.location = location0;
   }
 });
+
+// --------------------------------------------------------
+// Preisschätzung und Summenzeile (#1003)
+// --------------------------------------------------------
+function makeSummaryContainer() {
+  const pendingEl = { textContent: '' };
+  const purchasedEl = { textContent: '' };
+  const totalEl = {
+    textContent: '',
+    ariaLabel: null,
+    setAttribute(k, v) { if (k === 'aria-label') this.ariaLabel = v; },
+    removeAttribute(k) { if (k === 'aria-label') this.ariaLabel = null; },
+  };
+  const summaryRoot = {
+    hidden: false,
+    querySelector(sel) {
+      if (sel === '[data-summary="pending"]') return pendingEl;
+      if (sel === '[data-summary="purchased"]') return purchasedEl;
+      if (sel === '[data-summary="total"]') return totalEl;
+      return null;
+    },
+  };
+  return {
+    pendingEl,
+    purchasedEl,
+    totalEl,
+    summaryRoot,
+    querySelector(sel) {
+      if (sel === '#shopping-price-summary') return summaryRoot;
+      return null;
+    },
+  };
+}
+
+test('#1003: Summenzeile bleibt ausgeblendet (hidden), solange kein Artikel einen Preis oder Schätzpreis hat', () => {
+  resetShoppingState();
+  const c = makeSummaryContainer();
+
+  // Liste ohne Artikel
+  __test.state.items = [];
+  __test.renderShoppingSummary(c);
+  assert.equal(c.summaryRoot.hidden, true, 'ohne Artikel bleibt die Summenzeile verborgen');
+
+  // Artikel ohne Preis und ohne Schätzpreis
+  __test.state.items = [
+    { id: 1, name: 'Brot', quantity: '1', price_cents: null, estimated_price_cents: null },
+    { id: 2, name: 'Milch', quantity: '2', price_cents: null, estimated_price_cents: null },
+  ];
+  __test.renderShoppingSummary(c);
+  assert.equal(c.summaryRoot.hidden, true, 'ohne Preise bleibt die Summenzeile verborgen');
+
+  // Artikel mit Preis oder Schätzpreis
+  __test.state.items[0].price_cents = 250;
+  __test.renderShoppingSummary(c);
+  assert.equal(c.summaryRoot.hidden, false, 'mit Preis wird die Summenzeile sichtbar');
+});
+
+test('#1003: Summen wandern beim Abhaken/Wiedereröffnen zwischen Ausstehend und Gekauft', () => {
+  resetShoppingState();
+  const c = makeSummaryContainer();
+
+  __test.state.items = [
+    { id: 10, name: 'Kaffee', quantity: '1', price_cents: 600, is_checked: 0 },
+    { id: 11, name: 'Tee', quantity: '1', price_cents: 400, is_checked: 0 },
+  ];
+
+  // Beide offen
+  __test.renderShoppingSummary(c);
+  assert.equal(c.summaryRoot.hidden, false);
+  assert.match(c.pendingEl.textContent, /10[,.]00/);
+  assert.match(c.purchasedEl.textContent, /0[,.]00/);
+  assert.match(c.totalEl.textContent, /10[,.]00/);
+
+  // Kaffee abgehakt (über checkedOf / intents mit value = 1)
+  __test.intents.set(10, { value: 1 });
+  __test.renderShoppingSummary(c);
+  assert.match(c.pendingEl.textContent, /4[,.]00/);
+  assert.match(c.purchasedEl.textContent, /6[,.]00/);
+  assert.match(c.totalEl.textContent, /10[,.]00/);
+
+  // Kaffee wieder geöffnet
+  __test.intents.delete(10);
+  __test.renderShoppingSummary(c);
+  assert.match(c.pendingEl.textContent, /10[,.]00/);
+  assert.match(c.purchasedEl.textContent, /0[,.]00/);
+  assert.match(c.totalEl.textContent, /10[,.]00/);
+});
+
+test('#1003: Eingetippter Preis sticht den Schätzpreis', () => {
+  resetShoppingState();
+  globalThis.__tDict = {
+    ...(globalThis.__tDict || {}),
+    'shopping.estimatedPrice': '~ {{price}}',
+    'shopping.estimatedPriceAria': 'about {{price}}',
+  };
+  const itemBoth = { id: 20, name: 'Butter', price_cents: 299, estimated_price_cents: 199 };
+  assert.equal(__test.itemPriceCents(itemBoth), 299, 'der tatsächliche Preis hat immer Vorrang');
+
+  const metaHtml = __test.renderItemDetailsMeta(itemBoth);
+  assert.doesNotMatch(metaHtml, /shopping-item__price--estimated/, 'keine Schätzpreis-Klasse, wenn ein echter Preis existiert');
+  assert.doesNotMatch(metaHtml, /~/, 'kein Tilde-Symbol, wenn ein echter Preis existiert');
+
+  const itemEstOnly = { id: 21, name: 'Butter', price_cents: null, estimated_price_cents: 199 };
+  assert.equal(__test.itemPriceCents(itemEstOnly), 199, 'fehlt der Preis, gilt der Schätzpreis');
+  const metaEstHtml = __test.renderItemDetailsMeta(itemEstOnly);
+  assert.match(metaEstHtml, /shopping-item__price--estimated/, 'Schätzpreis-Klasse vorhanden');
+  assert.match(metaEstHtml, /~/, 'Tilde-Präfix vorhanden');
+});
+
+test('#1003: Keine Mengenmultiplikation - Zeilenpreis bleibt wie eingetippt', () => {
+  resetShoppingState();
+  const itemWithQty = { id: 30, name: 'Äpfel', quantity: '3 kg', price_cents: 500 };
+  assert.equal(__test.itemPriceCents(itemWithQty), 500, 'itemPriceCents multipliziert nicht mit Menge');
+
+  const metaHtml = __test.renderItemDetailsMeta(itemWithQty);
+  assert.match(metaHtml, /<span class="shopping-item__quantity">3 kg<\/span>/, 'Menge bleibt im Original erhalten');
+  assert.match(metaHtml, /5[,.]00/, 'Preisanzeige entspricht dem Einzel-/Zeilenpreis ohne Multiplikation');
+  assert.doesNotMatch(metaHtml, /15[,.]00/, 'keine 3x-Multiplikation im Markup');
+});
