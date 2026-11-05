@@ -1435,7 +1435,8 @@
         "syncTargetNoCalendarForPeople": "Ни у одного календаря назначение по умолчанию не совпадает ровно с этими людьми, поэтому назначение не выбирает календарь. Вместо этого: {{target}}.",
         "localCalendarEdit": "Редактировать календарь",
         "localCalendarNew": "Новый календарь",
-        "manageSubscriptionsLink": "Подписки и синхронизация"
+        "manageSubscriptionsLink": "Подписки и синхронизация",
+        "cancelled": "Отменено"
     },
     "noteCategories": {
         "categories": "Категории",

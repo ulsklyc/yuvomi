@@ -1271,7 +1271,8 @@
         "syncTargetNoCalendarForPeople": "Hiçbir takvimin varsayılan ataması tam olarak bu kişiler değil, bu yüzden atama bir takvim seçmez. Bunun yerine: {{target}}.",
         "localCalendarEdit": "Takvimi düzenle",
         "localCalendarNew": "Yeni takvim",
-        "manageSubscriptionsLink": "Abonelikler ve eşitleme"
+        "manageSubscriptionsLink": "Abonelikler ve eşitleme",
+        "cancelled": "İptal edildi"
     },
     "noteCategories": {
         "categories": "Kategoriler",

@@ -1435,7 +1435,8 @@
         "syncTargetNoCalendarForPeople": "Жоден календар не має саме цих людей як призначення за замовчуванням, тож призначення не вибирає календар. Натомість: {{target}}.",
         "localCalendarEdit": "Редагувати календар",
         "localCalendarNew": "Новий календар",
-        "manageSubscriptionsLink": "Підписки та синхронізація"
+        "manageSubscriptionsLink": "Підписки та синхронізація",
+        "cancelled": "Скасовано"
     },
     "noteCategories": {
         "categories": "Категорії",

@@ -1599,6 +1599,7 @@ const MIGRATIONS_SQL = {
   `,
   278: `ALTER TABLE display_accounts ADD COLUMN device_settings TEXT CHECK(device_settings IS NULL OR json_valid(device_settings));`,
   279: `ALTER TABLE tasks ADD COLUMN external_rrule TEXT;`,
+  281: `ALTER TABLE calendar_events ADD COLUMN provider_status TEXT CHECK(provider_status IS NULL OR provider_status IN ('TENTATIVE', 'CONFIRMED', 'CANCELLED'));`,
 };
 
 export { MIGRATIONS_SQL };

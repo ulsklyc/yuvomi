@@ -1289,7 +1289,8 @@
         "syncTargetNoCalendarForPeople": "هیچ تقویمی دقیقاً این افراد را به‌عنوان واگذاری پیش‌فرض ندارد، پس واگذاری تقویمی انتخاب نمی‌کند. به‌جای آن: {{target}}.",
         "localCalendarEdit": "ویرایش تقویم",
         "localCalendarNew": "تقویم جدید",
-        "manageSubscriptionsLink": "اشتراک‌ها و همگام‌سازی"
+        "manageSubscriptionsLink": "اشتراک‌ها و همگام‌سازی",
+        "cancelled": "لغو شد"
     },
     "noteCategories": {
         "categories": "دسته‌بندی‌ها",

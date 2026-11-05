@@ -1518,7 +1518,8 @@
         "syncTargetNoCalendarForPeople": "لا يوجد تقويم إسناده الافتراضي هؤلاء الأشخاص تمامًا، لذلك لا يختار الإسناد تقويمًا. المستخدم بدلًا من ذلك: {{target}}.",
         "localCalendarEdit": "تعديل التقويم",
         "localCalendarNew": "تقويم جديد",
-        "manageSubscriptionsLink": "الاشتراكات والمزامنة"
+        "manageSubscriptionsLink": "الاشتراكات والمزامنة",
+        "cancelled": "أُلغي"
     },
     "noteCategories": {
         "categories": "الفئات",

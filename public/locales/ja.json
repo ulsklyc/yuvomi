@@ -1271,7 +1271,8 @@
         "syncTargetNoCalendarForPeople": "ちょうどこれらの人を既定の割り当て先にしているカレンダーがないため、割り当てからはカレンダーを選びません。代わりに使用: {{target}}。",
         "localCalendarEdit": "カレンダーを編集",
         "localCalendarNew": "新しいカレンダー",
-        "manageSubscriptionsLink": "購読と同期"
+        "manageSubscriptionsLink": "購読と同期",
+        "cancelled": "キャンセル済み"
     },
     "noteCategories": {
         "categories": "カテゴリー",

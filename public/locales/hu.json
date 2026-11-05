@@ -1271,7 +1271,8 @@
         "syncTargetNoCalendarForPeople": "Egyik naptár alapértelmezett hozzárendelése sem pontosan ezek a személyek, ezért a hozzárendelés nem választ naptárt. Helyette: {{target}}.",
         "localCalendarEdit": "Naptár szerkesztése",
         "localCalendarNew": "Új naptár",
-        "manageSubscriptionsLink": "Feliratkozások és szinkronizálás"
+        "manageSubscriptionsLink": "Feliratkozások és szinkronizálás",
+        "cancelled": "Lemondva"
     },
     "noteCategories": {
         "categories": "Kategóriák",

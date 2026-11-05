@@ -1271,7 +1271,8 @@
         "syncTargetNoCalendarForPeople": "No calendar has exactly these people as its default assignees, so the assignment does not pick one. Used instead: {{target}}.",
         "localCalendarEdit": "Edit calendar",
         "localCalendarNew": "New calendar",
-        "manageSubscriptionsLink": "Subscriptions and sync"
+        "manageSubscriptionsLink": "Subscriptions and sync",
+        "cancelled": "Cancelled"
     },
     "noteCategories": {
         "categories": "Categories",

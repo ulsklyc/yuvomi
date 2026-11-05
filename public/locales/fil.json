@@ -1289,7 +1289,8 @@
         "syncTargetNoCalendarForPeople": "Walang kalendaryong may eksaktong mga taong ito bilang default na naaatasan, kaya walang pinipili ang pag-aatas. Ginagamit sa halip: {{target}}.",
         "localCalendarEdit": "I-edit ang kalendaryo",
         "localCalendarNew": "Bagong kalendaryo",
-        "manageSubscriptionsLink": "Mga subscription at sync"
+        "manageSubscriptionsLink": "Mga subscription at sync",
+        "cancelled": "Kinansela"
     },
     "noteCategories": {
         "categories": "Mga kategorya",

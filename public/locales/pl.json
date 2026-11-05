@@ -1453,7 +1453,8 @@
         "syncTargetNoCalendarForPeople": "Żaden kalendarz nie ma dokładnie tych osób jako domyślnego przypisania, więc przypisanie nie wybiera kalendarza. Zamiast tego: {{target}}.",
         "localCalendarEdit": "Edytuj kalendarz",
         "localCalendarNew": "Nowy kalendarz",
-        "manageSubscriptionsLink": "Subskrypcje i synchronizacja"
+        "manageSubscriptionsLink": "Subskrypcje i synchronizacja",
+        "cancelled": "Odwołane"
     },
     "noteCategories": {
         "categories": "Kategorie",

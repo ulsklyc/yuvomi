@@ -1289,7 +1289,8 @@
         "syncTargetNoCalendarForPeople": "Kein Kalender hat genau diese Personen als Standard-Zuweisung, darum wählt die Zuweisung keinen. Stattdessen gilt: {{target}}.",
         "localCalendarEdit": "Kalender bearbeiten",
         "localCalendarNew": "Neuer Kalender",
-        "manageSubscriptionsLink": "Abos und Synchronisation"
+        "manageSubscriptionsLink": "Abos und Synchronisation",
+        "cancelled": "Abgesagt"
     },
     "noteCategories": {
         "categories": "Kategorien",
