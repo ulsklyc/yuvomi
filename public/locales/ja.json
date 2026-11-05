@@ -3521,7 +3521,12 @@
         "backupDbKeyCopyFailed": "コピーできませんでした。キーを選択済みなので、手動でコピーしてください。",
         "backupDbKeyStoredAt": "サーバー上の {{path}} に保存されています",
         "backupDbKeyConfigHint": "キーは設定から読み込まれています。そこで安全に保管してください。キーがなければバックアップを開けません。",
-        "backupDbKeyPlainHint": "データベースは暗号化されていないため、バックアップにはデータが読める形で含まれます。独自の DB_ENCRYPTION_KEY を設定すると、Yuvomi は次回の起動時に暗号化します。"
+        "backupDbKeyPlainHint": "データベースは暗号化されていないため、バックアップにはデータが読める形で含まれます。独自の DB_ENCRYPTION_KEY を設定すると、Yuvomi は次回の起動時に暗号化します。",
+        "memberErrorUsernameInvalid": "ユーザー名は3〜64文字で、アクセント記号のない英字、数字、ピリオド、ハイフン、アンダースコアのみ使用できます。",
+        "memberErrorUsernameTaken": "このユーザー名は別のアカウントが使用しています。",
+        "memberErrorGone": "このメンバーはもう存在しません。",
+        "memberErrorSsoEmailRequired": "SSOのみのアカウントには、最初のSSOサインインで見つけられるようにメールアドレスが必要です。",
+        "memberErrorSsoEmailAmbiguous": "このメールアドレスは別のメンバーが使用しています。SSOではアカウントを区別できません。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

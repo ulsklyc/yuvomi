@@ -3521,7 +3521,12 @@
         "backupDbKeyCopyFailed": "La copie n'a pas fonctionné. La clé est sélectionnée, copie-la à la main.",
         "backupDbKeyStoredAt": "Enregistrée sur le serveur dans {{path}}",
         "backupDbKeyConfigHint": "La clé provient de ta configuration. Garde-la en sécurité : sans elle, tes sauvegardes ne peuvent pas être ouvertes.",
-        "backupDbKeyPlainHint": "La base de données n'est pas chiffrée, les sauvegardes contiennent donc tes données en clair. Avec ta propre DB_ENCRYPTION_KEY, Yuvomi la chiffre au prochain démarrage."
+        "backupDbKeyPlainHint": "La base de données n'est pas chiffrée, les sauvegardes contiennent donc tes données en clair. Avec ta propre DB_ENCRYPTION_KEY, Yuvomi la chiffre au prochain démarrage.",
+        "memberErrorUsernameInvalid": "Le nom d'utilisateur doit comporter de 3 à 64 caractères et ne peut contenir que des lettres sans accents, des chiffres, des points, des tirets et des tirets bas.",
+        "memberErrorUsernameTaken": "Un autre compte utilise déjà ce nom d'utilisateur.",
+        "memberErrorGone": "Ce membre n'existe plus.",
+        "memberErrorSsoEmailRequired": "Un compte uniquement SSO a besoin d'une adresse e-mail pour que la première connexion SSO le trouve.",
+        "memberErrorSsoEmailAmbiguous": "Un autre membre utilise déjà cette adresse e-mail. Le SSO ne pourrait pas distinguer les comptes."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

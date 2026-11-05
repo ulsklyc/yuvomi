@@ -3521,7 +3521,12 @@
         "backupDbKeyCopyFailed": "Kopyalama işe yaramadı. Anahtar seçili, elle kopyala.",
         "backupDbKeyStoredAt": "Sunucuda şurada saklanıyor: {{path}}",
         "backupDbKeyConfigHint": "Anahtar yapılandırmandan geliyor. Orada güvenle sakla: o olmadan yedeklerin açılamaz.",
-        "backupDbKeyPlainHint": "Veritabanı şifreli değil, bu yüzden yedekler verilerini okunabilir biçimde içerir. Kendi DB_ENCRYPTION_KEY değerinle Yuvomi onu bir sonraki başlatmada şifreler."
+        "backupDbKeyPlainHint": "Veritabanı şifreli değil, bu yüzden yedekler verilerini okunabilir biçimde içerir. Kendi DB_ENCRYPTION_KEY değerinle Yuvomi onu bir sonraki başlatmada şifreler.",
+        "memberErrorUsernameInvalid": "Kullanıcı adı 3 ile 64 karakter arasında olmalı ve yalnızca aksansız harfler, rakamlar, nokta, kısa çizgi ve alt çizgi içerebilir.",
+        "memberErrorUsernameTaken": "Bu kullanıcı adı başka bir hesapta zaten var.",
+        "memberErrorGone": "Bu üye artık yok.",
+        "memberErrorSsoEmailRequired": "Yalnızca SSO kullanan bir hesabın, ilk SSO girişinin onu bulabilmesi için bir e-posta adresine ihtiyacı var.",
+        "memberErrorSsoEmailAmbiguous": "Bu e-posta adresi zaten başka bir üyede. SSO hesapları birbirinden ayıramaz."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

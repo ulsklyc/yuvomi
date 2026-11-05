@@ -3639,7 +3639,12 @@
         "backupDbKeyCopyFailed": "Kopírování se nepovedlo. Klíč je označený, zkopíruj ho ručně.",
         "backupDbKeyStoredAt": "Uloženo na serveru v {{path}}",
         "backupDbKeyConfigHint": "Klíč pochází z tvé konfigurace. Uchovej ho tam v bezpečí: bez něj nepůjde tvé zálohy otevřít.",
-        "backupDbKeyPlainHint": "Databáze není šifrovaná, takže zálohy obsahují tvá data v čitelné podobě. S vlastním DB_ENCRYPTION_KEY ji Yuvomi při příštím spuštění zašifruje."
+        "backupDbKeyPlainHint": "Databáze není šifrovaná, takže zálohy obsahují tvá data v čitelné podobě. S vlastním DB_ENCRYPTION_KEY ji Yuvomi při příštím spuštění zašifruje.",
+        "memberErrorUsernameInvalid": "Uživatelské jméno musí mít 3 až 64 znaků a smí obsahovat jen písmena bez diakritiky, číslice, tečky, pomlčky a podtržítka.",
+        "memberErrorUsernameTaken": "Toto uživatelské jméno už má jiný účet.",
+        "memberErrorGone": "Tento člen už neexistuje.",
+        "memberErrorSsoEmailRequired": "Účet jen pro SSO potřebuje e-mailovou adresu, aby ho první přihlášení přes SSO našlo.",
+        "memberErrorSsoEmailAmbiguous": "Tuto e-mailovou adresu už má jiný člen. SSO by účty nedokázalo rozlišit."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

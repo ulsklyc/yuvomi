@@ -831,6 +831,10 @@ export function authPaths() {
 const INVALID_CODE = '`invalid_code` (400, the code is wrong or expired)';
 const NOT_ENABLED = '`not_enabled` (409, two-factor authentication is not turned on)';
 const DEACTIVATED_SUBJECT = '`account_deactivated` (400, the chosen account is deactivated)';
+const USERNAME_INVALID = '`members_username_invalid` (400, 3-64 letters, numbers, dots, hyphens or underscores)';
+const USERNAME_TAKEN = '`members_username_taken` (409, another account has this username)';
+const SSO_ONLY_REASONS = '`members_sso_email_required` (400, an account without a password needs an email address), '
+  + '`members_sso_email_ambiguous` (400, that email address already belongs to another member)';
 const CASE_REASONS = {
   '/api/v1/auth/login': {
     post: '`account_cannot_sign_in` (403, the account is deactivated or may not sign in), `password_login_disabled` (403, password login is turned off for this instance)',
@@ -840,7 +844,16 @@ const CASE_REASONS = {
   '/api/v1/auth/2fa/recovery-codes': { post: `${INVALID_CODE}, ${NOT_ENABLED}` },
   '/api/v1/auth/logout-others': { post: '`browser_session_required` (403, only a signed-in browser session can sign out the other sessions, not an API token)' },
   '/api/v1/auth/setup': { post: '`setup_completed` (403, setup has already been completed)' },
-  '/api/v1/auth/users/{id}': { patch: '`account_deactivated` (400, a deactivated account cannot become an administrator)' },
+  // #1909: was ein Admin beim Anlegen, Bearbeiten und Einladen eines Mitglieds erreicht.
+  '/api/v1/auth/invites': { post: `${USERNAME_INVALID}, ${USERNAME_TAKEN}` },
+  '/api/v1/auth/users': { post: `${USERNAME_INVALID}, ${USERNAME_TAKEN}, ${SSO_ONLY_REASONS}` },
+  '/api/v1/auth/users/{id}': {
+    patch: '`account_deactivated` (400, a deactivated account cannot become an administrator), '
+      + '`members_member_not_found` (404, the member no longer exists), '
+      + `${USERNAME_INVALID}, ${USERNAME_TAKEN}, ${SSO_ONLY_REASONS}, `
+      + '`last_admin` (400, at least one system admin must remain), '
+      + '`last_sso_admin` (400, the last administrator linked to SSO cannot be demoted while password login is off)',
+  },
   '/api/v1/auth/api-tokens': { post: DEACTIVATED_SUBJECT },
   '/api/v1/auth/devices': {
     get: '`session_required` (403, an API token cannot read a person\'s devices)',

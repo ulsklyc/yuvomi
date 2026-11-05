@@ -325,7 +325,7 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'contacts_contact_not_found', 'birthdays_birthday_not_found', 'birthdays_selected_contact_not_found',
     'contacts_selected_category_not_found', 'inventory_location_not_found', 'inventory_category_not_found',
     'tasks_task_not_found', 'tasks_parent_not_found', 'tasks_comment_not_found', 'tasks_tag_not_found',
-    'calendar_subscription_not_found',
+    'calendar_subscription_not_found', 'members_member_not_found',
     'schedule_shift_type_not_found', 'schedule_custom_field_not_found', 'schedule_pattern_not_found',
     'schedule_override_not_found', 'schedule_extra_shift_not_found',
     'schedule_selected_shift_type_not_found', 'schedule_selected_custom_field_not_found',
@@ -577,7 +577,7 @@ test('errorSentenceWithDetail: der Text des Servers nur im Rahmen, und nur als A
 });
 
 test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#1909)', async () => {
-  const { errorSentence, isAlreadyDeleted } = await load();
+  const { errorSentence, isAlreadyDeleted, isGone } = await load();
   for (const [reason, key] of [
     ['own_account', 'settings.memberRemoveOwnAccount'],
     ['last_admin', 'settings.memberRemoveLastAdmin'],
@@ -586,11 +586,19 @@ test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#
     ['calendar_subscription_not_found', 'settings.icsSubscriptionGone'],
     ['tasks_tag_not_found', 'tasks.errorTagGone'],
     ['dms_account_not_found', 'documents.errorDmsAccountGone'],
+    // Familienverwaltung (#1909); die echte Antwort messen test:admin-password-reset
+    // und test:invites.
+    ['members_username_invalid', 'settings.memberErrorUsernameInvalid'],
+    ['members_username_taken', 'settings.memberErrorUsernameTaken'],
+    ['members_member_not_found', 'settings.memberErrorGone'],
+    ['members_sso_email_required', 'settings.memberErrorSsoEmailRequired'],
+    ['members_sso_email_ambiguous', 'settings.memberErrorSsoEmailAmbiguous'],
   ]) {
     assert.equal(errorSentence(answer(400, SERVER_TEXT, reason)), key, reason);
   }
   assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'calendar_subscription_not_found'), 'calendar_subscription_not_found'), true);
   assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'tasks_tag_not_found'), 'tasks_tag_not_found'), true);
+  assert.equal(isGone(answer(404, SERVER_TEXT, 'members_member_not_found')), true);
 });
 
 // DER SATZ FUER DAS, WAS KEINE SEITE SELBST FAENGT (#1909): Fehlerbildschirm
