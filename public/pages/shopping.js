@@ -9,7 +9,8 @@ import { api } from '/api.js';
 import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknowledgeCheck, durationToken, isImeComposing, drawIconsInSightOrder, wireScrollFade } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint, deferredRevealHtml } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
-import { t, formatDate } from '/i18n.js';
+import { t } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formSwitchRowHtml } from '/settings/components.js';
 import { formRowsHtml, formRowHtml } from '/utils/form-row.js';
@@ -2829,7 +2830,7 @@ function openItemReadModal(item) {
           const last = res.data?.[0];
           // Ohne Kauf faellt der Platzhalter weg, der Zeilenabstand bleibt wie vorher.
           if (!last) { target.remove(); return; }
-          const date = formatDate(last.purchased_at);
+          const date = dateText(last.purchased_at);
           const price = priceReadText(last.price_cents);
           const line = last.store_name
             ? t('shopping.lastPurchasedLine', { price, store: last.store_name, date })
@@ -3003,7 +3004,7 @@ function openItemDetails(itemId, container) {
         api.get(`/shopping/price-history?name=${encodeURIComponent(item.name)}&exclude_item_id=${item.id}&limit=1`).then((res) => {
           const last = res.data?.[0];
           if (!last) return;
-          const date = formatDate(last.purchased_at);
+          const date = dateText(last.purchased_at);
           const price = priceReadText(last.price_cents);
           const icon = document.createElement('i');
           icon.setAttribute('data-lucide', 'history');
