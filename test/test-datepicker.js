@@ -66,6 +66,25 @@ test('Der Wochenstart kommt aus i18n.js, nicht aus einer eigenen Abfrage (#2533)
   assert(/getWeekStart/.test(comp), 'Picker muss getWeekStart() aus /i18n.js lesen');
   assert(!/\/preferences/.test(comp), 'Picker laedt die Einstellungen nicht selbst');
 });
+test('Wer week_start frisch vom Server liest, gibt ihn an i18n.js weiter', () => {
+  // Der Picker liest den Wochenstart aus dem Browser (#2533), gesetzt beim
+  // Start der App. Aendert ein anderes Haushaltsmitglied ihn, sieht der Picker
+  // das erst, wenn jemand den frischen Wert weiterreicht: jede Datei, die
+  // `week_start` aus einer Antwort liest, ruft auch setWeekStart().
+  const root = new URL('../public/', import.meta.url);
+  const files = readdirSync(root, { recursive: true })
+    .filter((f) => f.endsWith('.js') && !f.startsWith('vendor/') && f !== 'i18n.js');
+  const readers = [];
+  const silent = [];
+  for (const file of files) {
+    const src = readFileSync(new URL(file, root), 'utf8');
+    if (!/\.week_start\b/.test(src)) continue;
+    readers.push(file);
+    if (!/\bsetWeekStart\s*\(/.test(src)) silent.push(file);
+  }
+  assert(readers.length >= 4, `nur ${readers.length} Leser gefunden - der Scan greift nicht mehr`);
+  assert(silent.length === 0, `liest week_start, ohne setWeekStart() zu rufen: ${silent.join(', ')}`);
+});
 test('Regression #515: UTC-gebaute Label-Daten werden auch in UTC formatiert', () => {
   // monthLabel/weekdayLabels bauen ihre Daten via Date.UTC(); ohne timeZone:'UTC'
   // im Formatter rutscht Intl westlich von UTC auf den Vortag/Vormonat zurück
