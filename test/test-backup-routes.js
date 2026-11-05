@@ -417,6 +417,10 @@ test('POST /restore: Upload über dem Limit → 413', async () => {
   const r = await call('POST', '/restore', { actor: ADM, raw: tooLarge });
   assert.equal(r.status, 413);
   assert.match(r.body.error, /too large/i);
+  // #2564 (Codex): die Seite nennt die Grenze und den Hebel nur, wenn der
+  // Grund und die Grenze strukturiert mitkommen - der englische Text faellt weg.
+  assert.equal(r.body.reason, 'backup_file_too_large');
+  assert.deepEqual(r.body.params, { limit: '4mb' });
 });
 
 // ── POST /restore: echter Roundtrip (re-initialisiert die DB) — als LETZTES ──────

@@ -3663,6 +3663,7 @@
         "backupRestoreErrorFileEmpty": "Vybraný soubor je prázdný. Vyber soubor zálohy, který stáhl Yuvomi. Nic se tu nezměnilo.",
         "backupRestoreErrorNotYuvomi": "Soubor je databáze, ale ne z Yuvomi. Vyber soubor zálohy, který stáhl Yuvomi. Nic se tu nezměnilo.",
         "backupRestoreErrorNewerVersion": "Tato záloha pochází z novější verze Yuvomi. Nejdřív Yuvomi aktualizuj a pak ji obnov. Nic se tu nezměnilo.",
+        "backupRestoreErrorTooLarge": "Soubor je větší než limit nahrávání této instalace ({{limit}}). Zvyšte BACKUP_UPLOAD_LIMIT, restartujte Yuvomi a obnovte zálohu znovu. Nic se zde nezměnilo.",
         "apiTokenErrorNameTooLong": "Název smí mít nejvýše 100 znaků.",
         "apiTokenErrorExpiryPast": "Datum vypršení je v minulosti. Vyber pozdější čas.",
         "apiTokenErrorSubjectDeactivated": "Tento účet je deaktivovaný a nemůže dostat token. Vyber jinou osobu."

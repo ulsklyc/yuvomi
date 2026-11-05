@@ -3545,6 +3545,7 @@
         "backupRestoreErrorFileEmpty": "所选文件是空的。请选择 Yuvomi 下载的备份文件。这里没有任何更改。",
         "backupRestoreErrorNotYuvomi": "该文件是数据库，但不是 Yuvomi 的。请选择 Yuvomi 下载的备份文件。这里没有任何更改。",
         "backupRestoreErrorNewerVersion": "该备份来自更新版本的 Yuvomi。请先更新 Yuvomi，然后再恢复。这里没有任何更改。",
+        "backupRestoreErrorTooLarge": "文件超过此安装的上传上限（{{limit}}）。请提高 BACKUP_UPLOAD_LIMIT，重启 Yuvomi 后再恢复一次。这里没有做任何更改。",
         "apiTokenErrorNameTooLong": "名称最多 100 个字符。",
         "apiTokenErrorExpiryPast": "到期日期已经过去。请选择更晚的时间。",
         "apiTokenErrorSubjectDeactivated": "此账户已停用，无法获得令牌。请选择其他人。"

@@ -358,7 +358,7 @@ router.post('/webdav/trigger', requireAdmin, async (req, res) => {
 
 router.use((err, req, res, next) => {
   if (err?.type === 'entity.too.large') {
-    return res.status(413).json({ error: `Backup file is too large. Maximum upload size is ${RESTORE_LIMIT}.`, code: 413 });
+    return res.status(413).json({ error: `Backup file is too large. Maximum upload size is ${RESTORE_LIMIT}.`, code: 413, reason: 'backup_file_too_large', params: { limit: String(RESTORE_LIMIT) } });
   }
   next(err);
 });

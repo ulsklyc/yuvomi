@@ -3885,6 +3885,7 @@
         "backupRestoreErrorFileEmpty": "الملف المحدد فارغ. اختر ملف النسخة الاحتياطية الذي نزّله Yuvomi. لم يتغير شيء هنا.",
         "backupRestoreErrorNotYuvomi": "الملف قاعدة بيانات، لكنه ليس من Yuvomi. اختر ملف نسخة احتياطية نزّله Yuvomi. لم يتغير شيء هنا.",
         "backupRestoreErrorNewerVersion": "هذه النسخة الاحتياطية من إصدار أحدث من Yuvomi. حدّث Yuvomi أولًا، ثم استعدها. لم يتغير شيء هنا.",
+        "backupRestoreErrorTooLarge": "الملف أكبر من حد الرفع في هذا التثبيت ({{limit}}). ارفع قيمة BACKUP_UPLOAD_LIMIT وأعد تشغيل Yuvomi ثم استعد النسخة مرة أخرى. لم يتغير شيء هنا.",
         "apiTokenErrorNameTooLong": "يجب ألا يزيد الاسم عن 100 حرف.",
         "apiTokenErrorExpiryPast": "تاريخ الانتهاء في الماضي. اختر وقتًا لاحقًا.",
         "apiTokenErrorSubjectDeactivated": "هذا الحساب معطّل ولا يمكن أن يحصل على رمز. اختر شخصًا آخر."

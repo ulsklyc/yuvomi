@@ -3563,6 +3563,7 @@
         "backupRestoreErrorFileEmpty": "Walang laman ang napiling file. Piliin ang backup file na na-download ng Yuvomi. Walang binago rito.",
         "backupRestoreErrorNotYuvomi": "Database ang file, pero hindi galing sa Yuvomi. Pumili ng backup file na na-download ng Yuvomi. Walang binago rito.",
         "backupRestoreErrorNewerVersion": "Galing ang backup na ito sa mas bagong bersyon ng Yuvomi. I-update muna ang Yuvomi, saka ito i-restore. Walang binago rito.",
+        "backupRestoreErrorTooLarge": "Mas malaki ang file kaysa sa upload limit ng installation na ito ({{limit}}). Taasan ang BACKUP_UPLOAD_LIMIT, i-restart ang Yuvomi at i-restore muli. Walang binago rito.",
         "apiTokenErrorNameTooLong": "Hanggang 100 character lang ang pangalan.",
         "apiTokenErrorExpiryPast": "Nasa nakaraan ang petsa ng pag-expire. Pumili ng mas huling oras.",
         "apiTokenErrorSubjectDeactivated": "Naka-deactivate ang account na ito at hindi mabibigyan ng token. Pumili ng ibang tao."

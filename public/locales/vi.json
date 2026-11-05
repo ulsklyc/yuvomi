@@ -3545,6 +3545,7 @@
         "backupRestoreErrorFileEmpty": "Tệp đã chọn trống. Hãy chọn tệp sao lưu mà Yuvomi đã tải xuống. Không có gì thay đổi ở đây.",
         "backupRestoreErrorNotYuvomi": "Tệp này là cơ sở dữ liệu nhưng không phải của Yuvomi. Hãy chọn tệp sao lưu mà Yuvomi đã tải xuống. Không có gì thay đổi ở đây.",
         "backupRestoreErrorNewerVersion": "Bản sao lưu này đến từ phiên bản Yuvomi mới hơn. Hãy cập nhật Yuvomi trước rồi khôi phục. Không có gì thay đổi ở đây.",
+        "backupRestoreErrorTooLarge": "Tệp lớn hơn giới hạn tải lên của bản cài đặt này ({{limit}}). Hãy tăng BACKUP_UPLOAD_LIMIT, khởi động lại Yuvomi rồi khôi phục lại. Không có gì bị thay đổi ở đây.",
         "apiTokenErrorNameTooLong": "Tên chỉ được dài tối đa 100 ký tự.",
         "apiTokenErrorExpiryPast": "Ngày hết hạn đã qua. Hãy chọn thời điểm muộn hơn.",
         "apiTokenErrorSubjectDeactivated": "Tài khoản này đã bị vô hiệu hóa và không thể nhận token. Hãy chọn người khác."

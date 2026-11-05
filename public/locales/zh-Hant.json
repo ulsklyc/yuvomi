@@ -3545,6 +3545,7 @@
         "backupRestoreErrorFileEmpty": "所選檔案是空的。請選擇 Yuvomi 下載的備份檔案。這裡沒有任何變更。",
         "backupRestoreErrorNotYuvomi": "這個檔案是資料庫，但不是 Yuvomi 的。請選擇 Yuvomi 下載的備份檔案。這裡沒有任何變更。",
         "backupRestoreErrorNewerVersion": "這份備份來自較新版本的 Yuvomi。請先更新 Yuvomi，再進行還原。這裡沒有任何變更。",
+        "backupRestoreErrorTooLarge": "檔案超過此安裝的上傳上限（{{limit}}）。請提高 BACKUP_UPLOAD_LIMIT，重新啟動 Yuvomi 後再還原一次。這裡沒有做任何變更。",
         "apiTokenErrorNameTooLong": "名稱最多 100 個字元。",
         "apiTokenErrorExpiryPast": "到期日已經過去。請選擇較晚的時間。",
         "apiTokenErrorSubjectDeactivated": "此帳號已停用，無法取得權杖。請選擇其他人。"

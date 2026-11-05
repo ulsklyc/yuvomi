@@ -3545,6 +3545,7 @@
         "backupRestoreErrorFileEmpty": "O ficheiro selecionado está vazio. Escolhe o ficheiro de cópia de segurança que o Yuvomi transferiu. Nada foi alterado aqui.",
         "backupRestoreErrorNotYuvomi": "O ficheiro é uma base de dados, mas não do Yuvomi. Escolhe um ficheiro de cópia de segurança que o Yuvomi transferiu. Nada foi alterado aqui.",
         "backupRestoreErrorNewerVersion": "Esta cópia de segurança vem de uma versão mais recente do Yuvomi. Atualiza primeiro o Yuvomi e depois restaura-a. Nada foi alterado aqui.",
+        "backupRestoreErrorTooLarge": "O ficheiro é maior do que o limite de envio desta instalação ({{limit}}). Aumente BACKUP_UPLOAD_LIMIT, reinicie o Yuvomi e restaure novamente. Nada foi alterado aqui.",
         "apiTokenErrorNameTooLong": "O nome pode ter no máximo 100 caracteres.",
         "apiTokenErrorExpiryPast": "A data de expiração está no passado. Escolhe um momento posterior.",
         "apiTokenErrorSubjectDeactivated": "Esta conta está desativada e não pode receber um token. Escolhe outra pessoa."

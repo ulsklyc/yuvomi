@@ -3545,6 +3545,7 @@
         "backupRestoreErrorFileEmpty": "Seçilen dosya boş. Yuvomi’nin indirdiği yedek dosyasını seç. Burada hiçbir şey değiştirilmedi.",
         "backupRestoreErrorNotYuvomi": "Dosya bir veritabanı, ama Yuvomi’ye ait değil. Yuvomi’nin indirdiği bir yedek dosyası seç. Burada hiçbir şey değiştirilmedi.",
         "backupRestoreErrorNewerVersion": "Bu yedek Yuvomi’nin daha yeni bir sürümünden geliyor. Önce Yuvomi’yi güncelle, sonra geri yükle. Burada hiçbir şey değiştirilmedi.",
+        "backupRestoreErrorTooLarge": "Dosya bu kurulumun yükleme sınırından ({{limit}}) büyük. BACKUP_UPLOAD_LIMIT değerini artırın, Yuvomi'yi yeniden başlatın ve yeniden geri yükleyin. Burada hiçbir şey değişmedi.",
         "apiTokenErrorNameTooLong": "Ad en fazla 100 karakter olabilir.",
         "apiTokenErrorExpiryPast": "Son kullanma tarihi geçmişte. Daha sonraki bir zaman seç.",
         "apiTokenErrorSubjectDeactivated": "Bu hesap devre dışı ve token alamaz. Başka bir kişi seç."

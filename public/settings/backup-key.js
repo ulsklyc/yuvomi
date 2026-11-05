@@ -86,11 +86,22 @@ function sentences(...parts) {
   return parts.reduce((text, part) => (text.endsWith('。') ? text + part : `${text} ${part}`));
 }
 
+/** Die Upload-Grenze aus BACKUP_UPLOAD_LIMIT, nur als Groessenangabe ("100mb"). */
+const UPLOAD_LIMIT = /^\d+(?:\.\d+)?\s?(?:b|kb|mb|gb)$/i;
+
 /**
  * Grund aus server/db.js bzw. server/routes/backup.js -> Text. Die Schluessel
  * stehen ausgeschrieben da, damit die i18n-Guards sie als Aufruf finden.
  */
 export const REASON_TEXT = Object.freeze({
+  // Die Grenze steht in der Env der Installation; ohne lesbare Angabe lieber
+  // der allgemeine Satz als einer mit Luecke.
+  backup_file_too_large: (err) => {
+    const limit = err?.data?.params?.limit;
+    return typeof limit === 'string' && UPLOAD_LIMIT.test(limit)
+      ? t('settings.backupRestoreErrorTooLarge', { limit })
+      : t('settings.backupRestoreErrorGeneric');
+  },
   backup_key_required: () => t('settings.backupRestoreErrorKeyRequired'),
   // Beide Texte nennen auch den ANDEREN Ausgang, wie ihre Servertexte
   // (`nenntSchluesselUndAlternative()` in test-db-encryption.js): ohne
@@ -133,7 +144,7 @@ export const REASON_TEXT = Object.freeze({
  * Ohne bekannten `reason` nie die Servermeldung (#1909): jeder Fall, dessen
  * naechsten Schritt die Seite nennen muss (leere Datei, keine Yuvomi-Datenbank,
  * neuere Version), traegt seinen Grund. Der Rest geht durch errorSentence -
- * offline, Bremse, zu gross haben dort ihren Satz -, sonst der allgemeine
+ * offline und Bremse haben dort ihren Satz -, sonst der allgemeine
  * Restore-Text, der auf das Server-Log zeigt.
  * @param {{ message?: string, data?: { reason?: string } } | undefined} err
  * @returns {string}
@@ -141,7 +152,7 @@ export const REASON_TEXT = Object.freeze({
 export function restoreErrorText(err) {
   const reason = err?.data?.reason;
   return reason && Object.hasOwn(REASON_TEXT, reason)
-    ? REASON_TEXT[reason]()
+    ? REASON_TEXT[reason](err)
     : errorSentence(err, 'settings.backupRestoreErrorGeneric');
 }
 

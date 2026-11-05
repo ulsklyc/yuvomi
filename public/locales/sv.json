@@ -3545,6 +3545,7 @@
         "backupRestoreErrorFileEmpty": "Den valda filen är tom. Välj säkerhetskopian som Yuvomi laddade ner. Inget har ändrats här.",
         "backupRestoreErrorNotYuvomi": "Filen är en databas, men inte från Yuvomi. Välj en säkerhetskopia som Yuvomi laddade ner. Inget har ändrats här.",
         "backupRestoreErrorNewerVersion": "Den här säkerhetskopian kommer från en nyare version av Yuvomi. Uppdatera Yuvomi först och återställ den sedan. Inget har ändrats här.",
+        "backupRestoreErrorTooLarge": "Filen är större än uppladdningsgränsen för den här installationen ({{limit}}). Höj BACKUP_UPLOAD_LIMIT, starta om Yuvomi och återställ igen. Inget ändrades här.",
         "apiTokenErrorNameTooLong": "Namnet får vara högst 100 tecken långt.",
         "apiTokenErrorExpiryPast": "Utgångsdatumet har redan passerat. Välj en senare tidpunkt.",
         "apiTokenErrorSubjectDeactivated": "Det här kontot är inaktiverat och kan inte få en token. Välj en annan person."
