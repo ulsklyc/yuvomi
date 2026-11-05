@@ -5149,7 +5149,8 @@
                 "veryGood": "Nagyon jó"
             },
             "unusualHigh": "Szokatlanul magas. Ellenőrizd az értéket, de így is mentheted.",
-            "unusualLow": "Szokatlanul alacsony. Ellenőrizd az értéket, de így is mentheted."
+            "unusualLow": "Szokatlanul alacsony. Ellenőrizd az értéket, de így is mentheted.",
+            "barKey": "Oszlopok: fent szisztolés, lent diasztolés"
         },
         "meds": {
             "doseQty": "{{count}}×",

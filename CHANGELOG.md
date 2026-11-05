@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **Health: in the month view, the series names no longer cover the bars of the last days** (#2538).
+  "Systolic" and "Diastolic" stood left of the last bar, and "Pulse" above its last dot, hiding the
+  readings underneath when a month is full. A short line above the blood pressure chart now says
+  which end of a bar is which, and the pulse chart is named by its own unit axis.
 - **Adding, editing and inviting family members say what went wrong in your language** (#1909).
   The error line in these dialogs showed the server's English text. It now says in your language
   that the username is invalid or already taken, that an account without a password needs an

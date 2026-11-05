@@ -5419,7 +5419,8 @@
                 "veryGood": "Bardzo dobrze"
             },
             "unusualHigh": "Nietypowo wysoka. Sprawdź wartość; nadal możesz ją zapisać.",
-            "unusualLow": "Nietypowo niska. Sprawdź wartość; nadal możesz ją zapisać."
+            "unusualLow": "Nietypowo niska. Sprawdź wartość; nadal możesz ją zapisać.",
+            "barKey": "Słupki: u góry skurczowe, u dołu rozkurczowe"
         },
         "meds": {
             "doseQty": "{{count}}×",

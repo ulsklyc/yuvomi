@@ -5149,7 +5149,8 @@
                 "veryGood": "Muito bom"
             },
             "unusualHigh": "Invulgarmente alto. Verifique o valor; pode guardá-lo na mesma.",
-            "unusualLow": "Invulgarmente baixo. Verifique o valor; pode guardá-lo na mesma."
+            "unusualLow": "Invulgarmente baixo. Verifique o valor; pode guardá-lo na mesma.",
+            "barKey": "Barras: sistólica em cima, diastólica em baixo"
         },
         "meds": {
             "doseQty": "{{count}}×",

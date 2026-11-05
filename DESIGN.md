@@ -1969,7 +1969,9 @@ Vitalwerte-Seite listet leere Messarten auf jeder Breite in "Weitere Messwerte".
 ablesbar:** Mindestspanne je Messart (`minSpan` in utils/health-vitals.js, z. B. Blutzucker 40 mg/dL -
 drei Werte zwischen 88 und 90 standen vorher auf einer 0,5er-Achse), die Einheit am obersten
 Achsenwert ("120 mmHg", `chartGridMarkup({ unit })`), der Puls auf eigener Achse unter dem Blutdruck
-(`axes`), die Reihen direkt an ihrer Kurve beschriftet statt einer Farblegende. Die Aktivitaetsachse
+(`axes`), keine Farblegende und seit #2538 kein Name im Plot: die Ueberschrift und die Einheit an der
+Achse nennen jede Kurve, ueber den Blutdruck-Balken sagt eine Zeile, welches Ende welches ist
+(`.health-chart-section__caption`). Die Aktivitaetsachse
 nennt Minuten; eine fehlende Bewertung im Laborbefund bleibt eine leere Zelle statt "-".
 Guards: `test:health-vitals` ("R21 D6"), `test:health-nav` (Umzugsplan).
 

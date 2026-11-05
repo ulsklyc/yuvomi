@@ -1166,7 +1166,8 @@ test('R21 D6: Achsen mit Einheit und Mindestspanne, der Puls auf eigener Achse, 
   assert.equal((puls.match(/<polyline/g) ?? []).length, 1, 'der Puls hat seine eigene');
   assert.match(druck, /class="chart__axis-unit"> mmHg</, 'die Einheit steht am obersten Wert');
   assert.match(puls, /class="chart__axis-unit"> \/min</);
-  assert.equal((html.match(/health-chart__series-label/g) ?? []).length, 3, 'jede Kurve traegt ihren Namen');
+  // Seit #2538 nennt die Kopfzeile die Enden des Balkens, nicht ein Name im Plot.
+  assert.equal((html.match(/health-chart__series-label/g) ?? []).length, 0, 'kein Serienname im Plot');
   assert.doesNotMatch(html, /health-chart__legend/, 'keine Farblegende mehr');
   // Blutzucker zwischen 88 und 90: die Achse steht mindestens 40 mg/dL weit.
   const zucker = [88, 90, 89].map((v, i) => ({ id: 10 + i, type: 'glucose', value_num: v, unit: 'mg/dL', measured_at: `2026-10-1${i + 1}T07:00` }));
@@ -1174,6 +1175,42 @@ test('R21 D6: Achsen mit Einheit und Mindestspanne, der Puls auf eigener Achse, 
   const ticks = yTicks(gl);
   assert.ok(Math.max(...ticks) - Math.min(...ticks) >= 40, `Achse ${ticks.join('/')} dramatisiert 2 mg/dL Rauschen`);
   assert.ok(ticks.every((v) => Number.isInteger(v)), `keine halben Schritte: ${ticks.join('/')}`);
+});
+
+test('#2538: kein Serienname ueberdeckt eine Marke - die Kopfzeile nennt die Enden des Balkens', () => {
+  // Ein dichter Monat: 30 Tage Blutdruck mit Puls, wie im Screenshot aus D2448.
+  const dicht = Array.from({ length: 30 }, (_, i) => ({
+    id: 100 + i, type: 'bp', value_num: 118 + (i % 5), value_num2: 76 + (i % 3), value_num3: 66 + (i % 4),
+    unit: 'mmHg', measured_at: `2026-09-${String(i + 1).padStart(2, '0')}T08:00`,
+  }));
+  // Ein Augustwert, damit auch das Jahr zwei Monatsbalken hat.
+  dicht.push({ id: 99, type: 'bp', value_num: 124, value_num2: 80, value_num3: 70, unit: 'mmHg', measured_at: '2026-08-15T08:00' });
+  for (const range of ['month', 'week', 'day', 'year']) {
+    const html = health.chartMarkup(vitalMetric('bp'), computeVitalSeries(dicht, { type: 'bp', range, anchor: '2026-09-30', today: '2026-10-05' }));
+    const plots = html.match(/<svg[\s\S]*?<\/svg>/g) ?? [];
+    assert.ok(plots.length >= 1, `${range}: ein Diagramm`);
+    for (const svg of plots) {
+      // Jeder Text im Plot ist Achsenschrift (Gitter- oder Zeitmarke), kein Name einer Reihe.
+      // Ein Name stand in der Farbe seiner Reihe (`fill`) zwischen den Marken.
+      const namen = (svg.match(/<text[^>]*>/g) ?? []).filter((tag) => /series-label|\sfill=/.test(tag));
+      assert.deepEqual(namen, [], `${range}: Serienname im Plot`);
+    }
+    assert.match(html, /<p class="health-chart-section__caption">health\.vitals\.barKey<\/p>/, `${range}: die Kopfzeile nennt die Enden`);
+    assert.ok(html.indexOf('health.vitals.barKey') < html.indexOf('<svg'), `${range}: die Zeile steht ueber dem Diagramm`);
+    assert.equal((html.match(/health\.vitals\.barKey/g) ?? []).length, 1, `${range}: einmal, nicht je Achse`);
+  }
+  // Ohne Balken keine Zeile: eine einzelne Messung ist der Low-Data-Hinweis, der Blutzucker hat keine Enden.
+  const abraeumen = installMiniDom();
+  let einzeln;
+  try {
+    einzeln = health.chartMarkup(vitalMetric('bp'), computeVitalSeries(dicht.slice(0, 1), { type: 'bp', range: 'month', anchor: '2026-09-30', today: '2026-10-05' }));
+  } finally { abraeumen(); }
+  assert.doesNotMatch(einzeln, /health\.vitals\.barKey/, 'ohne Balken keine Zeile');
+  const zucker = [88, 90, 89].map((v, i) => ({ id: 10 + i, type: 'glucose', value_num: v, unit: 'mg/dL', measured_at: `2026-10-1${i + 1}T07:00` }));
+  assert.doesNotMatch(health.chartMarkup(vitalMetric('glucose'), computeVitalSeries(zucker, { type: 'glucose', range: 'month', anchor: '2026-10-21' })), /health\.vitals\.barKey/);
+  // Der Rand aus #1798 hielt nur die Namen lesbar, die jetzt fehlen.
+  const css = readFileSync(new URL('../public/styles/health.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /health-chart__series-label/, 'kein Halo fuer einen Namen, den es nicht mehr gibt');
 });
 
 test('R21: der Laborbefund zeigt kein "-" fuer eine fehlende Bewertung, die Aktivitaetsachse nennt Minuten', () => {

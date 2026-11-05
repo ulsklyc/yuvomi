@@ -5149,7 +5149,8 @@
                 "veryGood": "Très bonne"
             },
             "unusualHigh": "Inhabituellement élevé. Vérifiez la valeur ; vous pouvez tout de même l'enregistrer.",
-            "unusualLow": "Inhabituellement bas. Vérifiez la valeur ; vous pouvez tout de même l'enregistrer."
+            "unusualLow": "Inhabituellement bas. Vérifiez la valeur ; vous pouvez tout de même l'enregistrer.",
+            "barKey": "Barres : systolique en haut, diastolique en bas"
         },
         "meds": {
             "doseQty": "{{count}}×",

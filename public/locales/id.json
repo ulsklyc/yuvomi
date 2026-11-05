@@ -5149,7 +5149,8 @@
                 "veryGood": "Sangat baik"
             },
             "unusualHigh": "Luar biasa tinggi. Periksa nilainya; kamu tetap bisa menyimpannya.",
-            "unusualLow": "Luar biasa rendah. Periksa nilainya; kamu tetap bisa menyimpannya."
+            "unusualLow": "Luar biasa rendah. Periksa nilainya; kamu tetap bisa menyimpannya.",
+            "barKey": "Batang: sistolik di atas, diastolik di bawah"
         },
         "meds": {
             "doseQty": "{{count}}×",

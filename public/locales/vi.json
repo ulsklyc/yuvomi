@@ -5149,7 +5149,8 @@
                 "veryGood": "Rất tốt"
             },
             "unusualHigh": "Cao bất thường. Hãy kiểm tra giá trị; bạn vẫn có thể lưu.",
-            "unusualLow": "Thấp bất thường. Hãy kiểm tra giá trị; bạn vẫn có thể lưu."
+            "unusualLow": "Thấp bất thường. Hãy kiểm tra giá trị; bạn vẫn có thể lưu.",
+            "barKey": "Cột: tâm thu ở trên, tâm trương ở dưới"
         },
         "meds": {
             "doseQty": "{{count}}×",

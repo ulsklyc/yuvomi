@@ -5149,7 +5149,8 @@
                 "veryGood": "Sehr gut"
             },
             "unusualHigh": "Ungewöhnlich hoch. Bitte prüfe den Wert, speichern kannst du ihn trotzdem.",
-            "unusualLow": "Ungewöhnlich niedrig. Bitte prüfe den Wert, speichern kannst du ihn trotzdem."
+            "unusualLow": "Ungewöhnlich niedrig. Bitte prüfe den Wert, speichern kannst du ihn trotzdem.",
+            "barKey": "Balken: oben systolisch, unten diastolisch"
         },
         "meds": {
             "doseQty": "{{count}}×",
