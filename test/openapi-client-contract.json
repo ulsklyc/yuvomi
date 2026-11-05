@@ -143,9 +143,14 @@
     "required": [
       "response 200.enabled",
       "response 200.guest_password_login_enabled",
-      "response 200.password_login_enabled"
+      "response 200.password_login_enabled",
+      "response 200.provider"
     ],
-    "enums": []
+    "enums": [
+      "response 200.provider = \"homeassistant\"",
+      "response 200.provider = \"oidc\"",
+      "response 200.provider = null"
+    ]
   },
   "POST /api/v1/auth/devices": {
     "required": [

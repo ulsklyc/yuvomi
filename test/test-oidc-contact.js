@@ -52,6 +52,8 @@ mock.module('openid-client', {
 const dbmod = await import('../server/db.js');
 const { router: authRouter, sessionMiddleware } = await import('../server/auth.js');
 const database = dbmod.get();
+// Der Administrator aus /setup: vor ihm legt SSO kein Konto an.
+database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('setup-admin', 'Setup Admin', 'x', 'admin')").run();
 
 const app = express();
 app.use(express.json());

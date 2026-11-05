@@ -1689,6 +1689,11 @@ export const schemas = {
               description: 'Only present on GET /auth/users for administrators, and on GET /auth/me about '
                 + 'the own account: the account carries no password and can only be entered through SSO.',
             },
+            homeassistant_user_id: {
+              type: ['string', 'null'],
+              description: 'Only present for administrators (GET /auth/users and the create/update responses), and only '
+                + 'set while sign-in with Home Assistant is active: the Home Assistant user this account is bound to.',
+            },
             sort_order: {
               type: ['integer', 'null'],
               description: 'Position in the household member order, or null: for a member that has not been '
@@ -1833,6 +1838,12 @@ export const schemas = {
                 + 'Requires OIDC to be configured, and rejects a password sent alongside it. '
                 + 'Deliberately explicit rather than inferred from a missing password.',
             },
+            homeassistant_user_id: {
+              type: ['string', 'null'],
+              description: 'Only with sign-in with Home Assistant (HOMEASSISTANT_URL): bind the account to this Home '
+                + 'Assistant user ID (32 hex characters), so its first Home Assistant sign-in finds it. Home Assistant '
+                + 'sends no email address, so this is the only way to prepare an SSO-only account. Counts as linked for sso_only. 409 if another member has it.',
+            },
             avatar_color: { type: 'string' },
             avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL.' },
             family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
@@ -1855,6 +1866,12 @@ export const schemas = {
               description: 'Switch the account between having a password and entering only through SSO. '
                 + 'true clears the password; false requires a password to be sent with it, otherwise the '
                 + 'account would be left with no way in at all. Omit to leave unchanged.',
+            },
+            homeassistant_user_id: {
+              type: ['string', 'null'],
+              description: 'Only with sign-in with Home Assistant (HOMEASSISTANT_URL): bind the account to this Home '
+                + 'Assistant user ID (32 hex characters), so its first Home Assistant sign-in finds it. Home Assistant '
+                + 'sends no email address, so this is the only way to prepare an SSO-only account. null or empty removes the binding (refused for an account without a password). Omit to leave unchanged.',
             },
             avatar_color: { type: 'string' },
             avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL. Use null to remove.' },
@@ -2135,13 +2152,18 @@ export const schemas = {
           type: 'object',
           properties: {
             enabled: { type: 'boolean', description: 'OIDC is configured and enabled.' },
+            provider: {
+              type: ['string', 'null'],
+              enum: ['oidc', 'homeassistant', null],
+              description: 'Which source is behind the SSO button: a generic OIDC provider, Home Assistant, or null without SSO.',
+            },
             password_login_enabled: { type: 'boolean' },
             guest_password_login_enabled: {
               type: 'boolean',
               description: 'True only where password login is off and split-expense guests exist, who are exempt from the switch.',
             },
           },
-          required: ['enabled', 'password_login_enabled', 'guest_password_login_enabled'],
+          required: ['enabled', 'provider', 'password_login_enabled', 'guest_password_login_enabled'],
         },
         ReminderMoveNotice: {
           type: 'object',
