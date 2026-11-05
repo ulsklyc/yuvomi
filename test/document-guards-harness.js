@@ -471,9 +471,11 @@ async function disableServiceWorker(page) {
  * Oeffnet eine angemeldete Seite in der gewuenschten Groessenklasse, Sprache
  * und Farbwelt.
  */
-export async function openPage(harness, { device = 'mobile', theme = 'light', locale = 'de' } = {}) {
+export async function openPage(harness, { device = 'mobile', theme = 'light', locale = 'de', requestInterceptor = null } = {}) {
   harness.touched = true;
   const page = await harness.context.newPage();
+  // Install optional request isolation before the first app navigation.
+  page.__yuvomiRequestInterceptor = requestInterceptor;
   await page.setViewport(DEVICES[device]);
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }]);
   await disableServiceWorker(page);

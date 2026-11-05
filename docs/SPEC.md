@@ -3213,6 +3213,20 @@ as a series (RRULE reduced to the locally supported subset), and the source UID 
 ### Family Documents
 Upload and manage family files with per-document access control.
 
+- **Paperless view folders (migration 282):** a separate `paperless_view_folders`
+  binding connects an existing DMS account and saved-view ID. Creating admins
+  alone can manage their bindings. Private folders are visible only to the
+  creator; family sharing explicitly delegates read/download of all current and
+  future matches to users who can read Documents. These are root-level virtual
+  folders, separate from the local folder tree, without local document rows.
+  Filters and ordering are loaded per page (50 entries), unknown rules fail
+  closed, and media intersects the current filters with the requested document
+  ID before fetching bytes. Visibility is rechecked after remote requests. No
+  Paperless credentials or response bodies are returned to clients. Responses
+  are `no-store`. Local archive/category/search filters do not apply. See
+  [Paperless view folders](PAPERLESS-VIEW-FOLDERS.md) for installation and limits.
+
+
 | Column | Type | Constraint |
 |--------|------|-----------|
 | name | TEXT | NOT NULL (display name) |

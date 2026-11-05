@@ -46,6 +46,14 @@ Object.defineProperty(global, 'navigator', {
 const { initI18n, setLocale, t } = await import('../public/i18n.js');
 await initI18n();
 
+test('Paperless tag editor interpolates the document name and selected count', async () => {
+  await setLocale('de');
+  assert.equal(t('documents.paperless.tags.title', { name: 'Hausakte' }), 'Tags: Hausakte');
+  assert.equal(t('documents.paperless.tags.selection', { count: 1 }), 'Ausgewählte Tags: 1');
+  await setLocale('en');
+  assert.equal(t('documents.paperless.tags.selection', { count: 2 }), 'Selected tags: 2');
+});
+
 test('Deutsch: Singular und Plural je nach count', async () => {
   await setLocale('de');
   assert.equal(t('settings.enabledReminderListCount', { count: 1 }), '1 Erinnerungsliste aktiviert');
@@ -284,6 +292,7 @@ const PLURAL_EXCEPTIONS = {
   'schedule.overviewPeopleCount': 'PARENTHETICAL',
   // R23 S10: "Freie Tage: 9" - die Notiz der Schicht-Kennzahl.
   'schedule.freeDaysCount': 'PARENTHETICAL',
+  'documents.paperless.tags.selection': 'PARENTHETICAL', // Neutral count after the label.
 
   // --- numerusneutrale Abkuerzung ----------------------------------------
   'settings.calendarDurationMinutes': 'ABBREV',

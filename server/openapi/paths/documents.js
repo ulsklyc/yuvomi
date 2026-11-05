@@ -2,6 +2,8 @@ import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 export function documentsPaths() {
   return withCaseReasons('documents', CASE_REASONS, {
+    ...paperlessFolderPaths(),
+    ...paperlessTagPaths(),
     '/api/v1/documents/meta/options': {
       get: op({
         summary: 'Get family document options',
@@ -576,3 +578,103 @@ const CASE_REASONS = {
     post: `\`dms_account_not_found\` (404), ${DOCUMENT_GONE}, \`dms_document_already_stored\` (400), \`documents_storage_failed\` (502, reading the document failed), \`dms_unreachable\` (502)`,
   },
 };
+
+/** Virtual-folder IDs belong to their own namespace, never family_documents. */
+function paperlessTagPaths() {
+  const root = '/api/v1/documents/dms/paperless';
+  const error = { content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } };
+  const responses = {
+    200: { description: 'Live tag data; Cache-Control: no-store.' },
+    400: { ...error, description: 'paperless_tags_invalid' },
+    401: { $ref: '#/components/responses/Unauthorized' },
+    403: { ...error, description: 'Permission denied or Documents module/scope denied' },
+    404: { ...error, description: 'Document, folder or Paperless account not accessible' },
+    409: { ...error, description: 'paperless_tags_changed or paperless_folder_changed; reload before retrying' },
+    502: { ...error, description: 'paperless_unavailable' },
+    503: { ...error, description: 'restore_in_progress' },
+    500: { $ref: '#/components/responses/InternalServerError' },
+  };
+  const result = {
+    [`${root}/tags`]: { get: op({ summary: 'Browse existing Paperless tags', tag: 'Documents', admin: true,
+      description: 'Requires documents:write. Returns data [{id,name}], meta {page,count,has_more}; 100 tags per page. Never follows absolute pagination URLs.',
+      params: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'integer', minimum: 1 } },
+        { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100000, default: 1 } }], responses }) },
+  };
+  for (const folder of [false, true]) {
+    const path = folder ? `${root}/folders/{id}/documents/{documentId}/tags` : `${root}/documents/{id}/tags`;
+    const params = [idParam(), ...(folder ? [{ name: 'documentId', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } }] : [])];
+    const description = 'Requires Documents read access and a visible Paperless link or current saved-view match. '
+      + 'GET returns data {tags:[{id,name}],tag_ids,can_edit,account_id?}; hidden tag names fall back to #ID. '
+      + 'PUT requires documents:write and an administrator; folders additionally require their creating administrator. '
+      + 'Only tags are changed in Paperless. expected_tags must match the current tag IDs before PATCH; '
+      + 'this check detects intervening edits but is not an atomic compare-and-swap at Paperless. '
+      + 'Tag changes may remove the document from its saved view.';
+    result[path] = {
+      get: op({ summary: 'Read assigned Paperless document tags', tag: 'Documents', params, description, responses }),
+      put: op({ summary: 'Set existing Paperless document tags', tag: 'Documents', admin: true, stateChanging: true, params, description,
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['tags', 'expected_tags'],
+          properties: Object.fromEntries(['tags', 'expected_tags'].map((name) => [name, { type: 'array', maxItems: 1000, items: { type: 'integer', minimum: 1 } }])) } } } }, responses }),
+    };
+  }
+  return result;
+}
+
+function paperlessFolderPaths() {
+  const root = '/api/v1/documents/dms/paperless';
+  const id = idParam();
+  const page = { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100000, default: 1 } };
+  const error = { content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } };
+  const responses = {
+    200: { description: 'Successful response. Lists contain data plus meta {page, count, has_more}; every page has at most 50 items.' },
+    400: { ...error, description: 'paperless_folder_invalid or paperless_share_confirmation' },
+    401: { $ref: '#/components/responses/Unauthorized' },
+    403: { ...error, description: 'Module/scope denied or creating administrator required; generic permission refusal' },
+    404: { ...error, description: 'paperless_folder_not_found, paperless_document_not_found or paperless_account_not_found' },
+    409: { ...error, description: 'paperless_folder_changed while loading' },
+    422: { ...error, description: 'paperless_view_unsupported; unknown filters are never omitted' },
+    502: { ...error, description: 'paperless_unavailable; upstream details are not disclosed' },
+    503: { ...error, description: 'restore_in_progress; retry after the database restore finishes' },
+    500: { $ref: '#/components/responses/InternalServerError' },
+  };
+  const note = 'Requires Documents module access (documents:read for reads, documents:write for mutations). '
+    + 'Private folders are visible only to their creator; family folders delegate read/download of all current and future view matches. '
+    + 'Only the creating administrator may edit or disconnect a binding. No files or local document references are created or deleted. '
+    + 'Responses use Cache-Control: no-store.';
+  const operation = (summary, extra = {}) => op({ summary, tag: 'Documents', description: note, responses: { ...responses }, ...extra });
+  const body = (create) => ({ required: true, content: { 'application/json': { schema: {
+    type: 'object', required: create ? ['name', 'account_id', 'view_id'] : ['name', 'visibility'],
+    properties: {
+      name: { type: 'string', minLength: 1, maxLength: 200 },
+      visibility: { type: 'string', enum: ['private', 'family'], default: 'private' },
+      confirm_share: { type: 'boolean', description: 'Must be true when first sharing with the family.' },
+      ...(create ? { account_id: { type: 'integer', minimum: 1 }, view_id: { type: 'integer', minimum: 1 } } : {}),
+    },
+  } } } });
+  return {
+    [`${root}/saved-views`]: { get: operation('List available saved Paperless views', {
+      admin: true, params: [page, { name: 'account_id', in: 'query', required: true, schema: { type: 'integer', minimum: 1 } }],
+      description: `${note} Admin-only picker; data items contain only {id, name}.`,
+    }) },
+    [`${root}/folders`]: {
+      get: operation('List visible Paperless view folders', { description: `${note} Returns {data: [{id, name, account_id, view_id, visibility, created_by, created_at, updated_at, can_manage}]}.` }),
+      post: operation('Connect a saved Paperless view as a folder', { admin: true, stateChanging: true, requestBody: body(true),
+        responses: { ...Object.fromEntries(Object.entries(responses).filter(([code]) => code !== '200')), 201: { description: 'The new folder in data. Filters are validated before creation.' } } }),
+    },
+    [`${root}/folders/{id}`]: {
+      put: operation('Rename a Paperless folder or change its sharing', { admin: true, stateChanging: true, params: [id], requestBody: body(false) }),
+      delete: operation('Disconnect a Paperless folder without deleting documents', { admin: true, stateChanging: true, params: [id], responses: {
+        204: { description: 'Binding removed; Paperless documents and local Yuvomi links are untouched.' },
+        401: responses[401], 403: responses[403], 404: responses[404],
+      } }),
+    },
+    [`${root}/folders/{id}/documents`]: { get: operation('List a page of the current Paperless view', { params: [id, page],
+      description: `${note} Reads the latest saved filters and source ordering for every request. data contains {id, title, created, filename, url}. Yuvomi category/archive/search filters do not apply.` }) },
+    [`${root}/folders/{id}/documents/{documentId}/{action}`]: { get: operation('Preview, download or thumbnail a current view member', {
+      params: [id, { name: 'documentId', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
+        { name: 'action', in: 'path', required: true, schema: { type: 'string', enum: ['preview', 'download', 'thumbnail'] } }],
+      description: `${note} Intersects current view filters with documentId before fetching bytes and rechecks folder sharing after fetching. No arbitrary DMS document lookup.`,
+      responses: { ...responses, 200: { description: 'File bytes; preview/thumbnail inline only for allowlisted MIME types, download as attachment.' },
+        415: { ...error, description: 'paperless_preview_unsupported; use download instead' } },
+    }) },
+  };
+}
