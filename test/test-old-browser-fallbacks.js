@@ -375,6 +375,73 @@ test('--viewport-height ist 100vh und wird erst in @supports zu 100dvh', () => {
     'Die @supports-Regel muss HINTER dem :root-Block stehen - gleiche Spezifitaet, die spaetere gewinnt');
 });
 
+/**
+ * DIE INSTALLIERTE APP FUELLT DEN BILDSCHIRM (#2417). Auf iOS 27 meldet eine
+ * vom Home-Bildschirm gestartete Web-App mit `viewport-fit=cover` und
+ * `black-translucent` ein `100dvh`, dem genau der obere Inset fehlt (812 statt
+ * 874 auf einem iPhone 17, gemessen im Simulator). Shell und Tab-Leiste
+ * enden um so viel ueber dem Rand, darunter steht ein leerer Streifen.
+ * `100lvh` ist ohne Adressleiste die volle Fensterhoehe; im Standalone gibt
+ * es keine Leiste, die es kleiner machen muesste.
+ *
+ * Der Guard prueft die Wirkung in der Kaskade, nicht nur den Text: die
+ * lvh-Regel steht in `@media (display-mode: standalone)` und einem
+ * `@supports`, das lvh abfragt, und sie kommt in der Ladereihenfolge von
+ * index.html HINTER der letzten Regel, die dieselbe Eigenschaft sonst setzt.
+ * Gleiche Spezifitaet, die spaetere gewinnt - eine lvh-Regel in pwa.css
+ * (laedt vor layout.css) verloere gegen `.app-shell { height: 100dvh }`.
+ */
+const STANDALONE_FILL = [
+  { selector: ':root', property: '--viewport-height', value: '100lvh' },
+  { selector: 'body', property: 'height', value: '100lvh' },
+  { selector: '.app-shell', property: 'height', value: '100lvh' },
+  { selector: '.app-loading', property: 'min-height', value: '100lvh' },
+];
+const inStandalone = (at) => at.some((preamble) => /^@media\b/i.test(preamble)
+  && /display-mode\s*:\s*standalone/i.test(preamble) && !/\bnot\b/i.test(preamble));
+const guardedByLvh = (at) => at.some((preamble) => /^@supports\b/i.test(preamble)
+  && !/\bnot\b/i.test(preamble) && /\d+lvh\b/i.test(preamble));
+
+function indexStylesheets() {
+  const html = withoutHtmlComments(read('public/index.html'));
+  return [...html.matchAll(/<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi)]
+    .map(([tag]) => tag.match(/\bhref=["']\/?([^"']+)["']/i)?.[1])
+    .filter(Boolean)
+    .map((href) => `public/${href}`);
+}
+
+test('die installierte App rechnet ihre Hoehe in lvh, und die Regel gewinnt die Kaskade (#2417)', () => {
+  const files = indexStylesheets();
+  assert.ok(files.includes('public/styles/layout.css'),
+    'Reichweiten-Nachweis: index.html laedt layout.css nicht - liest der Link-Leser noch?');
+  const sequence = files.flatMap((file) => [...eachRule(read(file))].map((rule) => ({ ...rule, file })));
+  const problems = [];
+  for (const { selector, property, value } of STANDALONE_FILL) {
+    const carries = (rule) => rule.selector.split(',').map((s) => s.trim()).includes(selector)
+      && declarations(rule.body).some((d) => d.property === property);
+    let base = -1;
+    let fill = -1;
+    sequence.forEach((rule, index) => {
+      if (!carries(rule)) return;
+      const standalone = inStandalone(rule.at);
+      const lvh = declarations(rule.body).find((d) => d.property === property && norm(d.value) === value);
+      if (standalone && guardedByLvh(rule.at) && lvh) fill = index;
+      else if (!standalone) base = index;
+    });
+    if (base < 0) problems.push(`${selector} { ${property} }: keine Grundregel gelesen (Reichweiten-Nachweis)`);
+    else if (fill < 0) {
+      problems.push(`${selector} { ${property}: ${value} } fehlt in @media (display-mode: standalone) `
+        + '> @supports (height: 100lvh)');
+    } else if (fill < base) {
+      problems.push(`${selector} { ${property}: ${value} } steht in ${sequence[fill].file} VOR der Grundregel `
+        + `in ${sequence[base].file} und verliert die Kaskade`);
+    }
+  }
+  assert.deepEqual(problems, [],
+    'Vom Home-Bildschirm gestartet ist 100dvh auf iOS 27 um den oberen Inset zu kurz, und die App endet '
+    + 'ueber dem Rand (#2417). Im Standalone traegt sie ihre Hoehe deshalb in lvh:\n' + problems.join('\n'));
+});
+
 /* ──────────────────────────────────────────────────────────────────────────
  * Teil 2: der Start bis zum ersten Bild
  * ────────────────────────────────────────────────────────────────────────── */
