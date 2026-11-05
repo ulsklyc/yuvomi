@@ -13,7 +13,7 @@ import { openDetailView, leaveDetailTo, visibilityRow, assignedRow } from '/comp
 import { mountMasterDetail, splitViewDetailHtml, releaseAddressOnClose } from '/utils/master-detail.js';
 import { beginRowFill, drawRowIcons } from '/utils/row-fill.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken, requestHeadCollapse } from '/utils/ux.js';
-import { t, getLocale, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
+import { t, getLocale, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput, setWeekStart } from '/i18n.js';
 import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { swapRegion } from '/utils/content-swap.js';
@@ -1977,6 +1977,8 @@ async function loadUsers() {
 function applyEventFormPreferences(prefs = {}, documentOptions = {}) {
   state.holidayPrefs  = prefs ?? {};
   state.weekStart     = weekStartIndex(prefs?.week_start);
+  // Der frische Wert auch fuer den Datepicker, der ihn aus i18n.js liest (#2533).
+  if (prefs?.week_start) setWeekStart(prefs.week_start);
   state.defaultDuration = Number(prefs?.calendar_default_duration) || 60;
   // Standardwerte für neue Termine (#497/#498).
   state.defaultReminders = Array.isArray(prefs?.calendar_default_reminders)

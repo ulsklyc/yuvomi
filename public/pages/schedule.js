@@ -1,5 +1,5 @@
 import { api } from '/api.js';
-import { t, formatDayMonth, getNumberFormat } from '/i18n.js';
+import { t, formatDayMonth, getNumberFormat, setWeekStart } from '/i18n.js';
 import { shiftTimeText, clockText, dateRangeText, dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
@@ -418,6 +418,8 @@ async function load() {
     hiddenTemplates: Array.isArray(householdPrefs.data?.schedule_hidden_templates) ? householdPrefs.data.schedule_hidden_templates : [],
     weekStartPref: householdPrefs.data?.week_start ?? null,
   };
+  // Der frische Wert auch fuer den Datepicker, der ihn aus i18n.js liest (#2533).
+  if (state.weekStartPref) setWeekStart(state.weekStartPref);
   overview = {
     ...overview,
     people: householdMembers.data ?? [],

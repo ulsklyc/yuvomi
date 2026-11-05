@@ -22,7 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Date pickers start the week on the household week start** (#2533). With Sunday or Saturday
   set as the week start in the calendar settings, the calendar sheet of every date field (events,
   tasks, budget, health and the others) showed Monday-first weeks. Its weekday header and the
-  position of the first of the month now follow the setting, like the calendar views do.
+  position of the first of the month now follow the setting, like the calendar views do. When
+  someone else in the household changes it, the pickers follow as soon as the calendar, the meal
+  plan or Schedule is opened, not only after the app restarts.
 - **Health: in the month view, the series names no longer cover the bars of the last days** (#2538).
   "Systolic" and "Diastolic" stood left of the last bar, and "Pulse" above its last dot, hiding the
   readings underneath when a month is full. A short line above the blood pressure chart now says
