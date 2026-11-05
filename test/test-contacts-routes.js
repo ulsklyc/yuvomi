@@ -579,7 +579,82 @@ try {
     assert(item?.has_photo === 1, `Liste: has_photo sollte 1 sein, ist ${item?.has_photo}`);
     assert(!('photo' in (item ?? {})), `Liste: photo darf nicht im Payload stehen`);
     const detail = (await jget(`${base}/${id}`)).body.data;
-    assert(detail.photo === PHOTO, `Detail: photo fehlt oder falsch`);
+    // AUCH DAS DETAIL FUEHRT DIE BYTES NICHT MEHR (Review zu #2128). Vorher
+    // stand hier `detail.photo === PHOTO`: die Karte setzte den Spaltenwert
+    // direkt in ihr `src`, und bei einer vor #2128 synchronisierten Zeile sind
+    // das nackte Base64-Zeichen - kein Bild. Jede Antwort sagt nur, OB es ein
+    // Foto gibt; das Bild kommt ueber GET /:id/photo.
+    assert(detail.has_photo === 1, `Detail: has_photo sollte 1 sein, ist ${detail.has_photo}`);
+    assert(!('photo' in detail), 'Detail: photo darf nicht im Payload stehen');
+  });
+
+  await asyncTest('ein vor #2128 synchronisiertes Foto (nackte Base64) wird ueberall gelesen', async () => {
+    // DER FALL, DER JEDE BESTANDSINSTALLATION TRIFFT. Bis #2128 schrieb der
+    // CardDAV-Sync `vcard.photo = value`, also die nackten Base64-Zeichen ohne
+    // `data:`-Praefix, und `maybeUpdate()` schreibt eine belegte Spalte nie neu.
+    // Vor dem Fix beantwortete GET /:id/photo genau diese Zeilen mit 500 und die
+    // Karte setzte den Spaltenwert als `src` - also kein Bild.
+    const PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const created = await jsend(base, 'POST', { name: 'Altbestand-Foto' });
+    const id = created.body.data.id;
+    // Am Router vorbei in die Spalte, so wie der alte Sync es hinterliess.
+    db.get().prepare('UPDATE contacts SET photo = ? WHERE id = ?').run(PNG_B64, id);
+
+    const item = (await jget(base)).body.data.find((c) => c.id === id);
+    assert(item?.has_photo === 1, `Liste: has_photo sollte 1 sein, ist ${item?.has_photo}`);
+    assert(!('photo' in (item ?? {})), 'Liste: photo darf nicht im Payload stehen');
+
+    const detail = (await jget(`${base}/${id}`)).body.data;
+    assert(detail.has_photo === 1, `Detail: has_photo sollte 1 sein, ist ${detail.has_photo}`);
+    assert(!('photo' in detail), 'Detail: photo darf nicht im Payload stehen');
+
+    const res = await fetch(`${base}/${id}/photo`);
+    assert(res.status === 200, `Status ${res.status} - eine Bestandszeile muss gelesen werden`);
+    // Der Typ wird an der Signatur ERKANNT: der alte Sync nahm pauschal jpeg an,
+    // die Bytes sind aber ein PNG.
+    assert(res.headers.get('content-type') === 'image/png',
+      `Content-Type: ${res.headers.get('content-type')} - der Typ kommt aus den Bytes, nicht aus einer Annahme`);
+    assert((await res.arrayBuffer()).byteLength > 0, 'Kein Inhalt');
+  });
+
+  await asyncTest('ein Spaltenwert, der kein Bild ist, ist 422 mit Grund - nicht 500', async () => {
+    const created = await jsend(base, 'POST', { name: 'Kaputtes Foto' });
+    const id = created.body.data.id;
+    db.get().prepare('UPDATE contacts SET photo = ? WHERE id = ?').run('nicht-einmal-base64!!!', id);
+    const res = await fetch(`${base}/${id}/photo`);
+    assert(res.status === 422, `Status ${res.status} - ein unlesbarer Spaltenwert ist kein Serverfehler`);
+    const body = await res.json();
+    assert(body.reason === 'contacts_photo_unreadable', `reason: ${body.reason}`);
+    // Und die Liste laeuft weiter, sie faellt nicht mit der einen Zeile.
+    const item = (await jget(base)).body.data.find((c) => c.id === id);
+    assert(item?.has_photo === 1, 'die Liste nennt das Foto weiter - nur das Bild selbst fehlt');
+  });
+
+  await asyncTest('der ETag ist ein Inhalts-Hash, nicht die Laenge (#2128)', async () => {
+    // Vorher war der ETag die Bytelaenge: zwei verschiedene Bilder gleicher
+    // Groesse galten als dasselbe, und `If-None-Match` beantwortete das eine
+    // mit dem anderen. Zwei 1x1-PNGs unterschiedlicher Farbe sind genau so ein Paar.
+    const A = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const B = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAcc5G2wAAAABJRU5ErkJggg==';
+    const a = (await jsend(base, 'POST', { name: 'ETag A', photo: A })).body.data.id;
+    const b = (await jsend(base, 'POST', { name: 'ETag B', photo: B })).body.data.id;
+
+    const resA = await fetch(`${base}/${a}/photo`);
+    const resB = await fetch(`${base}/${b}/photo`);
+    const etagA = resA.headers.get('etag');
+    const etagB = resB.headers.get('etag');
+    assert(etagA && etagB, 'beide Antworten brauchen einen ETag');
+    // Die Vorbedingung der Probe: gleich lang, verschiedener Inhalt.
+    assert(A.length === B.length, 'die Probe braucht zwei gleich lange Bilder');
+    assert(etagA !== etagB, `gleich lange, verschiedene Bilder brauchen verschiedene ETags (${etagA})`);
+
+    // Der bedingte GET trifft noch, und der Kopf sagt nachfragen statt ein Jahr behalten.
+    const again = await fetch(`${base}/${a}/photo`, { headers: { 'If-None-Match': etagA } });
+    assert(again.status === 304, `derselbe Inhalt muss 304 sein, war ${again.status}`);
+    const cc = resA.headers.get('cache-control') ?? '';
+    assert(/no-cache/.test(cc), `Cache-Control muss nachfragen lassen, ist: ${cc}`);
+    assert(!/immutable|max-age=31536000/.test(cc),
+      `eine Adresse, die sich nie aendert, darf nicht ein Jahr unveraenderlich sein: ${cc}`);
   });
 
   await asyncTest('GET /:id/photo liefert Bild-Bytes mit ETag (#2128)', async () => {

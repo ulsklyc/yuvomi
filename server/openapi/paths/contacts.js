@@ -69,7 +69,7 @@ export function contactsPaths() {
       delete: op({ summary: 'Delete contact', tag: 'Contacts', params: [idParam()], stateChanging: true }),
     },
     '/api/v1/contacts/{id}/vcard': { get: op({ summary: 'Download contact as vCard', tag: 'Contacts', description: 'vCard 3.0. A birthday without a year is written the way Apple and sabre/vobject write it in 3.0, `BDAY;X-APPLE-OMIT-YEAR=1604:1604-MM-DD`.', params: [idParam()] }) },
-    '/api/v1/contacts/{id}/photo': { get: op({ summary: 'Get contact photo', tag: 'Contacts', description: 'Returns the raw image bytes with `Content-Type` and an `ETag` for caching (`Cache-Control: private, max-age=31536000, immutable`). Responds 404 when the contact has no photo.', params: [idParam()] }) },
+    '/api/v1/contacts/{id}/photo': { get: op({ summary: 'Get contact photo', tag: 'Contacts', description: 'Returns the raw image bytes with `Content-Type` and an `ETag` for caching. The ETag is a hash of the image CONTENT, and the answer is `Cache-Control: private, no-cache`: the URL never changes, so the client revalidates and gets a 304 while the photo is the same, instead of keeping a replaced photo for a year. Both stored forms are read - a photo synced before 2.86.0 has no `data:` prefix and its type is determined from the image signature. Responds 404 when the contact has no photo, and 422 when the stored value is not a readable image.', params: [idParam()] }) },
   });
 }
 
@@ -81,7 +81,9 @@ const CATEGORY_GONE = '`contacts_selected_category_not_found` (400, the chosen `
 // scheitert, mit der Grenze als Zahl (vor allem der vCard-Import erreicht sie).
 const FIELD_CASES = '`contacts_name_too_long`, `contacts_phone_too_long`, `contacts_email_too_long`, '
   + '`contacts_address_too_long`, `contacts_notes_too_long` (400, the first field that is too long; '
-  + '`params.limit` carries its maximum length), `contacts_birthday_invalid` (400, `birthday` is not a valid date)';
+  + '`params.limit` carries its maximum length), `contacts_birthday_invalid` (400, `birthday` is not a valid date), '
+  + '`contacts_photo_too_large`, `contacts_photo_not_an_image` (400, `photo` is not an image data URL) and '
+  + '`contacts_photo_type_mismatch` (400, the bytes do not match the declared image type)';
 // Die Mehrfachfelder: erst nach den Einzelfeldern geprueft, in der Reihenfolge
 // phones, emails, addresses, und je Liste der ERSTE Eintrag, der scheitert.
 const MULTI_CASES = 'for `phones`, `emails` and `addresses`, checked after the fields above and in this order, '
@@ -110,5 +112,5 @@ const CASE_REASONS = {
     delete: `${CONTACT_GONE}, ${FAMILY_MEMBER}`,
   },
   '/api/v1/contacts/{id}/vcard': { get: CONTACT_GONE },
-  '/api/v1/contacts/{id}/photo': { get: `${CONTACT_GONE}, \`contacts_no_photo\` (404, the contact exists but has no photo)` },
+  '/api/v1/contacts/{id}/photo': { get: `${CONTACT_GONE}, \`contacts_no_photo\` (404, the contact exists but has no photo), \`contacts_photo_unreadable\` (422, the stored value is not a readable image)` },
 };

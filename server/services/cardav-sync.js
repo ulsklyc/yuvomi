@@ -115,6 +115,28 @@ function decodeQuotedPrintable(value, charset) {
  * @param {string} vCardText - Raw vCard data
  * @returns {Object} Parsed vCard object
  */
+/**
+ * DER BILDTYP EINER vCARD-3-PHOTO-ZEILE, GEGEN DIE ALLOWLIST (#2128).
+ *
+ * `TYPE=` kommt in jeder Schreibweise vor, die Exporteure sich gedacht haben:
+ * `TYPE=JPEG`, `TYPE=jpg`, `TYPE=image/jpeg`. Hier stand
+ * `image/${TYPE-Wert}` - aus `TYPE=image/jpeg` wurde damit
+ * `image/image/jpeg`, und das Foto war als data-URL unbrauchbar.
+ *
+ * Ein unbekannter Typ wird NICHT durchgelassen, sondern faellt auf jpeg
+ * zurueck: der Wert wandert in ein `data:`-Praefix, und was dort steht,
+ * bestimmt, wie ein Browser die Bytes liest.
+ *
+ * @param {string[]} params Die Parameter der PHOTO-Zeile
+ * @returns {string} Ein MIME-Typ von der Allowlist
+ */
+function photoMimeFromType(params) {
+  const raw = (params.find(p => /^TYPE=/i.test(p)) || '').replace(/^TYPE=/i, '').trim().toLowerCase();
+  const bare = raw.replace(/^image\//, '');
+  const ALLOWED = { jpeg: 'image/jpeg', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' };
+  return ALLOWED[bare] || 'image/jpeg';
+}
+
 function parseVCard(vCardText) {
   const lines = vCardText.split(/\r?\n/).filter(line => line.trim());
   const vcard = {
@@ -251,11 +273,9 @@ function parseVCard(vCardText) {
       }
 
       case 'PHOTO':
-        // vCard 3: ENCODING=BASE64 → normalise to data URL (type unknown, assume jpeg).
+        // vCard 3: ENCODING=BASE64 → normalise to data URL.
         if (params.some(p => p.toUpperCase().includes('ENCODING=BASE64') || p.toUpperCase().includes('ENCODING=B'))) {
-          const typeParam = params.find(p => /^TYPE=/i.test(p));
-          const mime = typeParam ? `image/${typeParam.replace(/^TYPE=/i, '').toLowerCase()}` : 'image/jpeg';
-          vcard.photo = `data:${mime};base64,${value}`;
+          vcard.photo = `data:${photoMimeFromType(params)};base64,${value}`;
         } else if (/^data:image\/[a-z]+;base64,/i.test(value)) {
           // vCard 4: PHOTO:data:image/jpeg;base64,…
           vcard.photo = value;

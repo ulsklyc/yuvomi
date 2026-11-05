@@ -1493,7 +1493,11 @@
         "errorAddressEntryInvalid": "住所のいずれかが不完全か無効です。",
         "errorAddressesTooMany": "この連絡先の住所が多すぎます。上限は{{limit}}件です。",
         "errorAddressLabelTooLong": "住所のラベルは{{limit}}文字以内にしてください。",
-        "errorAddressPartTooLong": "住所の番地、市区町村、都道府県、郵便番号、国はそれぞれ{{limit}}文字以内にしてください。"
+        "errorAddressPartTooLong": "住所の番地、市区町村、都道府県、郵便番号、国はそれぞれ{{limit}}文字以内にしてください。",
+        "errorPhotoTooLarge": "写真のサイズが大きすぎます。",
+        "errorPhotoNotAnImage": "写真は画像ファイルである必要があります。",
+        "errorPhotoTypeMismatch": "写真が申告された画像形式と一致しません。",
+        "errorPhotoUnreadable": "この写真は読み取れません。"
     },
     "budget": {
         "title": "家計",

@@ -1511,7 +1511,11 @@
         "errorAddressEntryInvalid": "یکی از نشانی‌ها ناقص یا نامعتبر است.",
         "errorAddressesTooMany": "این مخاطب نشانی بیش از حد دارد. حداکثر {{limit}} مجاز است.",
         "errorAddressLabelTooLong": "برچسب نشانی حداکثر می‌تواند {{limit}} نویسه باشد.",
-        "errorAddressPartTooLong": "خیابان، شهر، استان، کد پستی و کشور یک نشانی هر کدام حداکثر می‌توانند {{limit}} نویسه باشند."
+        "errorAddressPartTooLong": "خیابان، شهر، استان، کد پستی و کشور یک نشانی هر کدام حداکثر می‌توانند {{limit}} نویسه باشند.",
+        "errorPhotoTooLarge": "عکس بیش از حد بزرگ است.",
+        "errorPhotoNotAnImage": "عکس باید یک تصویر باشد.",
+        "errorPhotoTypeMismatch": "عکس با نوع تصویری که اعلام کرده مطابقت ندارد.",
+        "errorPhotoUnreadable": "این عکس خوانده نمی‌شود."
     },
     "budget": {
         "title": "بودجه",

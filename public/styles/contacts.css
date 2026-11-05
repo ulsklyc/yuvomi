@@ -310,7 +310,21 @@
   font-weight: var(--font-weight-semibold);
 }
 
-.contact-item__icon--member img {
+/* DAS FOTO BRAUCHT SEINE EIGENE SCHEIBE (#2128, Review-Runde 2).
+ *
+ * Es sass in `--initials`, und die Regel dort setzt nur Flaeche, Farbe und
+ * Schriftgroesse - sie beschneidet nichts und bemisst kein Bild. Ein Foto
+ * beliebigen Seitenverhaeltnisses lief damit aus der runden Scheibe heraus.
+ * Dieselbe Bemessung wie beim Mitglieder-Avatar darueber, denn es ist dieselbe
+ * Scheibe an derselben Stelle; die Groesse selbst kommt aus der Basisregel
+ * `.contact-item__icon` und damit aus den Tokens. */
+.contact-item__icon--photo {
+  overflow: hidden;
+  background-color: var(--color-fill-well);
+}
+
+.contact-item__icon--member img,
+.contact-item__icon--photo img {
   width: 100%;
   height: 100%;
   object-fit: cover;

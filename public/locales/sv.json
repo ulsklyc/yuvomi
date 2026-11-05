@@ -1493,7 +1493,11 @@
         "errorAddressEntryInvalid": "En av adresserna är ofullständig eller ogiltig.",
         "errorAddressesTooMany": "Den här kontakten har för många adresser. Maxantalet är {{limit}}.",
         "errorAddressLabelTooLong": "Etiketten för en adress får vara högst {{limit}} tecken lång.",
-        "errorAddressPartTooLong": "Gata, ort, region, postnummer och land i en adress får var och en vara högst {{limit}} tecken långa."
+        "errorAddressPartTooLong": "Gata, ort, region, postnummer och land i en adress får var och en vara högst {{limit}} tecken långa.",
+        "errorPhotoTooLarge": "Bilden är för stor.",
+        "errorPhotoNotAnImage": "Bilden måste vara en bildfil.",
+        "errorPhotoTypeMismatch": "Bilden stämmer inte med den bildtyp den anger.",
+        "errorPhotoUnreadable": "Den här bilden kan inte läsas."
     },
     "budget": {
         "title": "Budget",

@@ -1580,7 +1580,11 @@
         "errorAddressEntryInvalid": "Jedna z adres je neúplná nebo neplatná.",
         "errorAddressesTooMany": "Tento kontakt má příliš mnoho adres. Maximum je {{limit}}.",
         "errorAddressLabelTooLong": "Označení adresy může mít nejvýše {{limit}} znaků.",
-        "errorAddressPartTooLong": "Ulice, obec, kraj, PSČ a země adresy mohou mít každá nejvýše {{limit}} znaků."
+        "errorAddressPartTooLong": "Ulice, obec, kraj, PSČ a země adresy mohou mít každá nejvýše {{limit}} znaků.",
+        "errorPhotoTooLarge": "Fotka je příliš velká.",
+        "errorPhotoNotAnImage": "Fotka musí být obrázek.",
+        "errorPhotoTypeMismatch": "Fotka neodpovídá typu obrázku, který uvádí.",
+        "errorPhotoUnreadable": "Tuto fotku nelze přečíst."
     },
     "budget": {
         "title": "Rozpočet",

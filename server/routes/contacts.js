@@ -14,7 +14,8 @@ import { CONTACT_PHONE_MAX_LENGTH } from '../../public/utils/contact-limits.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { birthDateInput, placeholderBirthDate, validateYearUnknown, birthdayLinkSuggestion, contactBirthdayMatch } from '../services/birthdays.js';
 import { mayReadModule } from '../permissions.js';
-import { dataUrlContentMatches } from '../utils/file-signature.js';
+import { createHash } from 'node:crypto';
+import { dataUrlContentMatches, contentMatchesMime } from '../utils/file-signature.js';
 import {
   contactActorFromRequest, mayChangeContactEmails, bodyChangesContactEmails,
   emailsTakenByOtherAccounts, EMAIL_IN_USE_MESSAGE,
@@ -77,15 +78,67 @@ function namePartChecks(parts) {
 /** Foto-Validierung (wie Geburtstage): data-URL, Inhalt und Größe stimmt. */
 const MAX_PHOTO_LENGTH = 6_990_507;
 const PHOTO_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+// Dieselbe Liste wie in PHOTO_RE, als Werte: `decodeStoredPhoto()` probiert sie
+// der Reihe nach an der Signatur durch. Reihenfolge nach Haeufigkeit; jeder
+// Eintrag hat eine bekannte Signatur (utils/file-signature.js), sonst wuerde
+// contentMatchesMime() ihn mit "nicht widerlegt" immer bestaetigen.
+const PHOTO_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 function validateContactPhoto(val) {
   if (val === undefined) return { value: undefined, error: null };
   if (val === null || val === '') return { value: null, error: null };
   const s = String(val).trim();
-  if (s.length > MAX_PHOTO_LENGTH) return { value: null, error: 'Contact photo is too large.' };
-  if (!PHOTO_RE.test(s)) return { value: null, error: 'Contact photo must be a valid image data URL.' };
-  if (!dataUrlContentMatches(s)) return { value: null, error: 'Contact photo content does not match its declared image type.' };
+  // JEDE ABSAGE BENENNT IHREN FALL (#1909): die Seite besitzt den Satz, und
+  // "zu gross" braucht einen anderen als "kein Bild".
+  if (s.length > MAX_PHOTO_LENGTH) {
+    return { value: null, error: 'Contact photo is too large.', case: { reason: 'contacts_photo_too_large' } };
+  }
+  if (!PHOTO_RE.test(s)) {
+    return { value: null, error: 'Contact photo must be a valid image data URL.', case: { reason: 'contacts_photo_not_an_image' } };
+  }
+  if (!dataUrlContentMatches(s)) {
+    return { value: null, error: 'Contact photo content does not match its declared image type.', case: { reason: 'contacts_photo_type_mismatch' } };
+  }
   return { value: s, error: null };
+}
+
+/**
+ * DIE ZWEI FORMEN EINES GESPEICHERTEN FOTOS (#2128).
+ *
+ * Bis zu diesem Change schrieb der CardDAV-Sync die nackten Base64-Zeichen in
+ * `contacts.photo` (`vcard.photo = value`, ohne `data:`-Praefix). Jedes Foto,
+ * das vor diesem Change synchronisiert wurde, liegt also OHNE Praefix da -
+ * und `maybeUpdate()` schreibt eine belegte Spalte nie neu, die Zeilen heilen
+ * sich auch beim naechsten Sync nicht. Migration 278 raeumt sie auf; dieser
+ * Leser nimmt trotzdem beide Formen an, denn eine Zeile, deren Typ die
+ * Migration nicht bestimmen konnte, darf die Anzeige nicht mit einem 500
+ * beantworten.
+ *
+ * Fuer die nackte Form wird der Typ an der Signatur ERKANNT, nicht geraten:
+ * der alte Sync nahm pauschal `image/jpeg` an, und ein PNG mit diesem Etikett
+ * ist genau der Fall, den `dataUrlContentMatches()` sonst abweist.
+ *
+ * @param {unknown} stored  Der Spaltenwert
+ * @returns {{ mime: string, buffer: Buffer } | null} null, wenn es kein Bild ist
+ */
+function decodeStoredPhoto(stored) {
+  const s = String(stored ?? '').trim();
+  if (!s) return null;
+
+  const asDataUrl = s.match(/^data:(image\/[a-z+]+);base64,([\s\S]+)$/i);
+  if (asDataUrl) {
+    const mime = asDataUrl[1].toLowerCase();
+    const buffer = Buffer.from(asDataUrl[2].replace(/\s/g, ''), 'base64');
+    if (!buffer.length) return null;
+    return contentMatchesMime(buffer, mime) ? { mime, buffer } : null;
+  }
+
+  // Die nackte Form: nur Base64-Zeichen, und die Bytes muessen ein Bild sein.
+  if (!/^[A-Za-z0-9+/=\s]+$/.test(s)) return null;
+  const buffer = Buffer.from(s.replace(/\s/g, ''), 'base64');
+  if (!buffer.length) return null;
+  const mime = PHOTO_MIMES.find((candidate) => contentMatchesMime(buffer, candidate));
+  return mime ? { mime, buffer } : null;
 }
 
 /** Ein Geburtstag, den der Server als Datum abweist, benennt seinen Fall (#1909). */
@@ -484,6 +537,21 @@ const CONTACT_BIRTHDAY_ORDER = 'ORDER BY (b.contact_id = contacts.id) DESC, b.id
  * wieder den Modulton (`reference_codebase_gotchas`: die Reichweite einer
  * Korrektur ist nicht ihre Datei).
  */
+/**
+ * DIE FOTO-SPALTE VERLAESST DIE ANTWORT NIE (#2128).
+ *
+ * `CONTACT_SELECT` nimmt `contacts.*` und damit die Bytes mit; gebraucht wird
+ * davon nur `has_photo`. Die Liste hat das schon abgezogen, Detail und
+ * PUT-Antwort nicht - dort stand das Foto als Spaltenwert in der Antwort und
+ * landete im `src` der Karte, was bei einer Bestandszeile (nackte Base64) kein
+ * Bild ist. Das Bild selbst kommt ueber GET /contacts/:id/photo.
+ */
+function withoutPhoto(contact) {
+  if (!contact) return contact;
+  const { photo: _photo, ...rest } = contact;
+  return rest;
+}
+
 const CONTACT_SELECT = `
   SELECT contacts.*,
          u.display_name  AS family_display_name,
@@ -578,10 +646,8 @@ router.get('/', (req, res) => {
     // `category` sonst mehrdeutig.
     sql += ' ORDER BY contacts.category ASC, COALESCE(NULLIF(contacts.last_name, \'\'), contacts.name) COLLATE NOCASE ASC, contacts.name COLLATE NOCASE ASC';
 
-    const contacts = db.get().prepare(sql).all(...params).map((c) => {
-      const { photo: _photo, ...rest } = c;
-      return withBirthdayLink(req, rest);
-    });
+    const contacts = db.get().prepare(sql).all(...params)
+      .map((c) => withBirthdayLink(req, withoutPhoto(c)));
     res.json({ data: contacts });
   } catch (err) {
     log.error('', err);
@@ -641,14 +707,19 @@ router.post('/', (req, res) => {
 
     // Insert contact and multi-value fields in a transaction
     const transaction = db.get().transaction(() => {
+      // `photo` STEHT IM INSERT, nicht in einem UPDATE danach (Review zu #2128):
+      // ein Nachtrag hinter dem COMMIT kann scheitern und laesst den Kontakt
+      // dann ohne sein Bild zurueck, obwohl der Aufrufer eine 201 bekam.
+      // `undefined` (Feld nicht geschickt) wird zu NULL, der Spaltenvorgabe.
       const result = db.get().prepare(`
         INSERT INTO contacts (name, category, phone, email, address, notes, birthday, birthday_year_unknown,
-                              first_name, last_name, middle_name, name_prefix, name_suffix)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                              first_name, last_name, middle_name, name_prefix, name_suffix, photo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(vName.value, vCat.value || FALLBACK_CATEGORY, vPhone.value, vEmail.value,
              vAddress.value, vNotes.value, vBirthday.value, vBirthday.value && vYearUnknown.value ? 1 : 0,
              nameParts.parts.firstName, nameParts.parts.lastName, nameParts.parts.middleName,
-             nameParts.parts.namePrefix, nameParts.parts.nameSuffix);
+             nameParts.parts.namePrefix, nameParts.parts.nameSuffix,
+             vPhoto.value ?? null);
 
       const contactId = result.lastInsertRowid;
 
@@ -701,10 +772,6 @@ router.post('/', (req, res) => {
     });
 
     const contactId = transaction();
-
-    if (vPhoto.value !== undefined) {
-      db.get().prepare('UPDATE contacts SET photo = ? WHERE id = ?').run(vPhoto.value, contactId);
-    }
 
     // Query the created contact with multi-value fields
     const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(contactId);
@@ -836,6 +903,15 @@ router.put('/:id', (req, res) => {
 
     // Update contact and multi-value fields in a transaction
     const transaction = db.get().transaction(() => {
+      // DAS FOTO IN DERSELBEN TRANSAKTION (Review zu #2128): es stand hinter dem
+      // COMMIT, also konnte der Kontakt gespeichert sein und sein Bild nicht -
+      // oder das alte Bild stehen bleiben, obwohl der Aufrufer `null` geschickt
+      // hatte und eine 200 bekam. Eigenes Statement, nicht Teil des UPDATE
+      // darunter: nur ein mitgeschicktes Feld darf die Spalte anfassen.
+      if (vPhoto.value !== undefined) {
+        db.get().prepare('UPDATE contacts SET photo = ? WHERE id = ?').run(vPhoto.value, id);
+      }
+
       // Update scalar fields
       db.get().prepare(`
         UPDATE contacts
@@ -924,10 +1000,6 @@ router.put('/:id', (req, res) => {
 
     transaction();
 
-    if (vPhoto.value !== undefined) {
-      db.get().prepare('UPDATE contacts SET photo = ? WHERE id = ?').run(vPhoto.value, id);
-    }
-
     // Query the updated contact with multi-value fields
     const updated = db.get().prepare(`${CONTACT_SELECT} WHERE contacts.id = ?`).get(id);
     const multiValueFields = loadMultiValueFields(id);
@@ -1004,7 +1076,7 @@ router.get('/:id', (req, res) => {
 
     res.json({
       data: {
-        ...withBirthdaySuggestion(req, withBirthdayLink(req, contact)),
+        ...withBirthdaySuggestion(req, withBirthdayLink(req, withoutPhoto(contact))),
         ...multiValueFields
       }
     });
@@ -1027,16 +1099,31 @@ router.get('/:id/photo', (req, res) => {
     if (!row) return res.status(404).json({ error: 'Contact not found.', code: 404, reason: 'contacts_contact_not_found' });
     if (!row.photo) return res.status(404).json({ error: 'Contact has no photo.', code: 404, reason: 'contacts_no_photo' });
 
-    const match = row.photo.match(/^data:(image\/[a-z]+);base64,(.+)$/is);
-    if (!match) return res.status(500).json({ error: 'Stored photo is invalid.', code: 500 });
+    // Beide Formen, nicht nur die mit Praefix: ein vor #2128 synchronisiertes
+    // Foto liegt als nackte Base64-Zeichen da (siehe decodeStoredPhoto).
+    const decoded = decodeStoredPhoto(row.photo);
+    // 422, nicht 500: ein Spaltenwert, der kein Bild ist, ist kein Fehler DIESES
+    // Servers - er benennt den Fall und laesst die Liste weiterlaufen.
+    if (!decoded) {
+      return res.status(422).json({
+        error: 'Stored photo is not a readable image.', code: 422, reason: 'contacts_photo_unreadable',
+      });
+    }
 
-    const [, mime, b64] = match;
-    const buf = Buffer.from(b64, 'base64');
-    const etag = `"${buf.length.toString(16)}"`;
+    const { mime, buffer: buf } = decoded;
+    // DER ETAG IST EIN INHALTS-HASH, KEINE LAENGE. Vorher stand hier die
+    // Bytelaenge: zwei verschiedene Fotos gleicher Groesse galten damit als
+    // dasselbe Bild, und `If-None-Match` beantwortete das eine mit dem anderen.
+    const etag = `"${createHash('sha256').update(buf).digest('hex').slice(0, 32)}"`;
 
     if (req.headers['if-none-match'] === etag) return res.status(304).end();
     res.setHeader('Content-Type', mime);
-    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    // `no-cache` HEISST NICHT "nicht zwischenspeichern", sondern "vor dem
+    // Benutzen nachfragen" - der Browser behaelt das Bild und bekommt auf den
+    // bedingten GET ein 304, solange der Hash gleich bleibt. Vorher stand hier
+    // `max-age=31536000, immutable` auf einer Adresse, die sich NIE aendert:
+    // ein neues Foto desselben Kontakts blieb damit ein Jahr unsichtbar.
+    res.setHeader('Cache-Control', 'private, no-cache');
     res.setHeader('ETag', etag);
     res.send(buf);
   } catch (err) {

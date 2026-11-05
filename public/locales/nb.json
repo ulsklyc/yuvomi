@@ -1493,7 +1493,11 @@
         "errorAddressEntryInvalid": "En av adressene er ufullstendig eller ugyldig.",
         "errorAddressesTooMany": "Denne kontakten har for mange adresser. Maksimum er {{limit}}.",
         "errorAddressLabelTooLong": "Etiketten til en adresse kan være på høyst {{limit}} tegn.",
-        "errorAddressPartTooLong": "Gate, sted, region, postnummer og land i en adresse kan hver være på høyst {{limit}} tegn."
+        "errorAddressPartTooLong": "Gate, sted, region, postnummer og land i en adresse kan hver være på høyst {{limit}} tegn.",
+        "errorPhotoTooLarge": "Bildet er for stort.",
+        "errorPhotoNotAnImage": "Bildet må være et bilde.",
+        "errorPhotoTypeMismatch": "Bildet stemmer ikke med bildetypen det oppgir.",
+        "errorPhotoUnreadable": "Dette bildet kan ikke leses."
     },
     "budget": {
         "title": "Budsjett",
