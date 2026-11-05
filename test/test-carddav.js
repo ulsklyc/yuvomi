@@ -3543,3 +3543,99 @@ describe('Geburtstag ohne Jahr im Sync (#2095)', () => {
     assert.deepStrictEqual({ ...read(id) }, { birthday: '1985-03-15', birthday_year_unknown: 0 });
   });
 });
+
+// ========================================
+// #2513: Karten mit leerer oder geteilter Nummer bleiben getrennt
+// ========================================
+
+describe('Smart-Merge haelt verschiedene Karten auseinander (#2513)', () => {
+  let database;
+  let parseAndMergeContact;
+  let parseVCardFn;
+  let accountId;
+  const abUrl = 'https://dav.example.com/merge-2513/';
+  const vcf = (uid, ...lines) =>
+    ['BEGIN:VCARD', 'VERSION:3.0', `UID:${uid}`, ...lines, 'END:VCARD'].join('\r\n');
+
+  before(async () => {
+    const dbModule = await import('../server/db.js');
+    dbModule.init();
+    database = dbModule.get();
+    ({ parseAndMergeContact, parseVCard: parseVCardFn } = await import('../server/services/cardav-sync.js'));
+    accountId = database.prepare(
+      "INSERT INTO carddav_accounts (name, carddav_url, username, password) VALUES ('m', 'https://merge-2513.example.com', 'u', 'p')"
+    ).run().lastInsertRowid;
+  });
+
+  const contactsOf = (prefix) => database.prepare(
+    'SELECT id, name, carddav_uid FROM contacts WHERE carddav_uid LIKE ? ORDER BY carddav_uid'
+  ).all(`${prefix}%`);
+
+  it('verwirft leere TEL- und EMAIL-Zeilen beim Parsen', () => {
+    const card = parseVCardFn(vcf('e-parse', 'FN:Leer', 'TEL;TYPE=home,voice:', 'TEL;TYPE=CELL:   ',
+      'EMAIL;TYPE=HOME:', 'EMAIL;TYPE=WORK:echt-2513@example.com'));
+    assert.deepStrictEqual(card.phones, []);
+    assert.deepStrictEqual(card.emails.map((e) => e.value), ['echt-2513@example.com']);
+  });
+
+  it('legt vier Karten mit leerer Telefonzeile als vier Kontakte an', async () => {
+    for (const i of [1, 3, 4, 2]) {
+      await parseAndMergeContact(
+        vcf(`empty-${i}`, `FN:user${i}`, `EMAIL;TYPE=HOME:user${i}-2513@nomail.net`, 'TEL;TYPE=home,voice:'),
+        accountId, abUrl
+      );
+    }
+    assert.deepStrictEqual(contactsOf('empty-').map((c) => [c.carddav_uid, c.name]), [
+      ['empty-1', 'user1'], ['empty-2', 'user2'], ['empty-3', 'user3'], ['empty-4', 'user4'],
+    ]);
+    const blank = database.prepare("SELECT COUNT(*) AS n FROM contact_phones WHERE TRIM(value) = ''").get().n;
+    assert.strictEqual(blank, 0, 'keine leere Telefonzeile gespeichert');
+  });
+
+  it('haelt zwei Karten mit verschiedener UID und gleicher Nummer getrennt', async () => {
+    await parseAndMergeContact(vcf('shared-a', 'FN:Anna Haus', 'TEL;TYPE=HOME:+49 30 2513000'), accountId, abUrl);
+    await parseAndMergeContact(vcf('shared-b', 'FN:Bernd Haus', 'TEL;TYPE=HOME:+49 30 2513000'), accountId, abUrl);
+    assert.deepStrictEqual(contactsOf('shared-').map((c) => [c.carddav_uid, c.name]), [
+      ['shared-a', 'Anna Haus'], ['shared-b', 'Bernd Haus'],
+    ]);
+  });
+
+  it('adoptiert weiter einen ungebundenen lokalen Kontakt mit passender E-Mail', async () => {
+    const localId = database.prepare(
+      "INSERT INTO contacts (name, email) VALUES ('Lokal 2513', 'lokal-2513@example.com')"
+    ).run().lastInsertRowid;
+    const id = await parseAndMergeContact(
+      vcf('adopt-2513', 'FN:Lokal 2513', 'EMAIL;TYPE=HOME:lokal-2513@example.com'), accountId, abUrl
+    );
+    assert.strictEqual(id, localId);
+    const c = database.prepare('SELECT carddav_uid, carddav_origin FROM contacts WHERE id = ?').get(localId);
+    assert.deepStrictEqual({ ...c }, { carddav_uid: 'adopt-2513', carddav_origin: 'merged' });
+  });
+
+  it('adoptiert einen Kontakt, dessen Konto geloescht wurde, ueber die passende Nummer', async () => {
+    const orphanId = database.prepare(`
+      INSERT INTO contacts (name, phone, carddav_account_id, carddav_uid, carddav_addressbook_url, carddav_origin)
+      VALUES ('Waise 2513', '+49 30 2513999', NULL, 'gone-uid', 'https://gone.example.com/ab/', 'remote')
+    `).run().lastInsertRowid;
+    const id = await parseAndMergeContact(
+      vcf('orphan-2513', 'FN:Waise 2513', 'TEL;TYPE=HOME:+49 30 2513999'), accountId, abUrl
+    );
+    assert.strictEqual(id, orphanId);
+  });
+
+  it('raeumt eine schon gespeicherte leere Telefonzeile beim naechsten Sync weg', async () => {
+    const id = database.prepare(`
+      INSERT INTO contacts (name, carddav_account_id, carddav_uid, carddav_addressbook_url, carddav_origin)
+      VALUES ('Alt 2513', ?, 'old-blank', ?, 'remote')
+    `).run(accountId, abUrl).lastInsertRowid;
+    database.prepare("INSERT INTO contact_phones (contact_id, label, value, is_primary) VALUES (?, 'home,voice', '', 1)").run(id);
+    database.prepare("INSERT INTO contact_emails (contact_id, label, value, is_primary) VALUES (?, 'home', ' ', 1)").run(id);
+    await parseAndMergeContact(
+      vcf('old-blank', 'FN:Alt 2513', 'TEL;TYPE=CELL:+49 170 2513001', 'TEL;TYPE=home,voice:'), accountId, abUrl
+    );
+    const phones = database.prepare('SELECT value, is_primary FROM contact_phones WHERE contact_id = ?').all(id);
+    assert.deepStrictEqual(phones.map((p) => ({ ...p })), [{ value: '+49 170 2513001', is_primary: 1 }]);
+    const emails = database.prepare('SELECT value FROM contact_emails WHERE contact_id = ?').all(id);
+    assert.deepStrictEqual(emails, []);
+  });
+});

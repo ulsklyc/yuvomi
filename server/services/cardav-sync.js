@@ -197,15 +197,22 @@ function parseVCard(vCardText) {
         break;
       }
 
-      case 'TEL':
-        const phoneType = extractType(params) || 'other';
-        vcard.phones.push({ label: phoneType, value: unescapeVCardValue(value) });
+      // Nextcloud legt leere Standardfelder an (`TEL;TYPE=home,voice:`). Ein
+      // leerer Wert ist keine Nummer und keine Adresse: gespeichert machte er
+      // jede weitere Karte mit leerem Feld zum Treffer im Smart-Merge (#2513).
+      case 'TEL': {
+        const phoneValue = unescapeVCardValue(value).trim();
+        if (!phoneValue) break;
+        vcard.phones.push({ label: extractType(params) || 'other', value: phoneValue });
         break;
+      }
 
-      case 'EMAIL':
-        const emailType = extractType(params) || 'other';
-        vcard.emails.push({ label: emailType, value: unescapeVCardValue(value) });
+      case 'EMAIL': {
+        const emailValue = unescapeVCardValue(value).trim();
+        if (!emailValue) break;
+        vcard.emails.push({ label: extractType(params) || 'other', value: emailValue });
         break;
+      }
 
       case 'ADR':
         // Format: POBox;Extended;Street;City;State;Postal;Country
@@ -1254,14 +1261,23 @@ async function parseAndMergeContact(vCardText, accountId, addressbookUrl) {
  * @returns {Object|null} Contact object or null
  */
 function findContactByEmailOrPhone(emails, phones) {
+  // Nur Kontakte ohne CardDAV-Bindung kommen in Frage: ein Kontakt, der schon
+  // zu einer anderen Karte gehoert, ist ein anderer Mensch, auch wenn er eine
+  // Festnetznummer oder E-Mail mit der neuen Karte teilt. Ohne diese Grenze
+  // adoptierte jede Karte die Zeile der vorigen, und alle fielen zu einem
+  // Kontakt zusammen (#2513). Als ungebunden gilt auch ein Kontakt, dessen
+  // Konto geloescht wurde (carddav_account_id per SET NULL weg, UID steht
+  // noch): ein neu angelegtes Konto findet ihn so wieder. Leere Werte matchen nie.
   // Try email match first
   for (const email of emails) {
+    const value = String(email.value ?? '').trim();
+    if (!value) continue;
     const contact = db.get().prepare(`
       SELECT c.* FROM contacts c
       LEFT JOIN contact_emails ce ON c.id = ce.contact_id
-      WHERE c.email = ? OR ce.value = ?
+      WHERE (c.carddav_uid IS NULL OR c.carddav_account_id IS NULL) AND (c.email = ? OR ce.value = ?)
       LIMIT 1
-    `).get(email.value, email.value);
+    `).get(value, value);
 
     if (contact) return contact;
   }
@@ -1274,14 +1290,17 @@ function findContactByEmailOrPhone(emails, phones) {
   // Rohwert-Vergleich als Fallback wirksam (kein Regress).
   const defaultCountry = defaultCountryFromConfig(db.get());
   for (const phone of phones) {
-    const e164 = toE164(phone.value, defaultCountry);
+    const value = String(phone.value ?? '').trim();
+    if (!value) continue;
+    const e164 = toE164(value, defaultCountry);
     const contact = db.get().prepare(`
       SELECT c.* FROM contacts c
       LEFT JOIN contact_phones cp ON c.id = cp.contact_id
-      WHERE c.phone = ? OR cp.value = ?
-         OR (? IS NOT NULL AND cp.value_e164 IS NOT NULL AND cp.value_e164 = ?)
+      WHERE (c.carddav_uid IS NULL OR c.carddav_account_id IS NULL)
+        AND (c.phone = ? OR cp.value = ?
+             OR (? IS NOT NULL AND cp.value_e164 IS NOT NULL AND cp.value_e164 = ?))
       LIMIT 1
-    `).get(phone.value, phone.value, e164, e164);
+    `).get(value, value, e164, e164);
 
     if (contact) return contact;
   }
@@ -1405,6 +1424,13 @@ function updateContactMultiValues(contactId, vcard) {
   const linked = conn.prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(contactId);
   const emailsLocked = !mayChangeContactEmails(linked, null);
 
+  // Bestand vor #2513: der Parser speicherte leere TEL-/EMAIL-Werte, oft als
+  // primaeren Eintrag, den die Ersetzung unten stehen liesse. Sie fallen hier
+  // weg; danach wird neu geschrieben, damit ein Eintrag aus der Karte primaer wird.
+  const blankPhones = conn.prepare("DELETE FROM contact_phones WHERE contact_id = ? AND TRIM(value) = ''").run(contactId).changes;
+  const blankEmails = conn.prepare("DELETE FROM contact_emails WHERE contact_id = ? AND TRIM(value) = ''").run(contactId).changes;
+  const removedBlanks = blankPhones + blankEmails > 0;
+
   const phones    = conn.prepare('SELECT label, value, is_primary FROM contact_phones WHERE contact_id = ? ORDER BY id').all(contactId);
   const emails    = conn.prepare('SELECT label, value, is_primary FROM contact_emails WHERE contact_id = ? ORDER BY id').all(contactId);
   const addresses = conn.prepare(`SELECT label, street, city, state, postal_code, country, is_primary
@@ -1438,7 +1464,8 @@ function updateContactMultiValues(contactId, vcard) {
     const b = (list ?? []).map(key).sort();
     return a.length === b.length && a.every((v, i) => v === b[i]);
   };
-  if (sameSet(phones,    incoming.phones,    keyOf) &&
+  if (!removedBlanks &&
+      sameSet(phones,    incoming.phones,    keyOf) &&
       sameSet(emails,    incoming.emails,    keyOf) &&
       sameSet(addresses, incoming.addresses, addressKeyOf)) {
     return;

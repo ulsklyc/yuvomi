@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **Contacts synced from Nextcloud or another CardDAV server no longer merge into one** (#2513).
+  Cards with an empty phone or email field, or cards that share a landline or email address,
+  used to collapse into a single Yuvomi contact carrying the name of the last card. Each card now
+  stays its own contact; only a contact that no address book is linked to yet is matched by
+  phone or email. Empty phone and email entries are no longer saved, and ones saved earlier
+  disappear on the next sync. A contact that has already merged keeps its mixed data: delete it
+  in Yuvomi and sync again to get the separate contacts back.
 - **Repeating reminders from iOS Reminders or Tasks.org now repeat in Yuvomi, and ticking one off
   keeps the series running there** (#2506, #2515). Daily, weekly, monthly and yearly reminders,
   also every few days or weeks, every weekday, weekly on chosen weekdays, on the last day of the
