@@ -59,11 +59,12 @@ import {
   noteUploadAttempt, settleUploadAttempt, uploadAttemptsAt,
   hasUploadAttempt, removeLeftoverUploads,
 } from './caldav-upload-attempts.js';
-import { hasExplicitZone, householdTimeZone, localToUTC } from '../utils/timezone.js';
+import { hasExplicitZone, householdTimeZone, localToUTC, todayKey } from '../utils/timezone.js';
 import { formatICSDate } from './ics-parser.js';
 import { anchorZone } from '../utils/ics-datetime.js';
 import { timedSeriesUntil } from '../utils/rrule-until.js';
-import { rruleValue } from './recurrence.js';
+import { rruleValue, nextDueAfterCompletion } from './recurrence.js';
+import { RRULE_RE } from '../middleware/validate.js';
 import { loadTags, tagsKey } from '../utils/task-tags.js';
 import { runSerialized } from '../utils/sync-lock.js';
 import { noteMoveTakenBack } from './shopping-move-notices.js';
@@ -224,7 +225,12 @@ export function icsFieldsForTask(task, hadCompleted = false, tz = householdTimeZ
   // sperren das Abhaken schon (`task_foreign_series`); das hier ist die zweite
   // Linie fuer jeden Weg an ihnen vorbei. Gelesen wird am frisch geholten
   // Objekt, nicht an der Zeile: es zaehlt, was jetzt auf dem Server steht.
+  //
+  // Die eine Ausnahme ist das letzte Vorkommen einer Serie, die Yuvomi
+  // weiterfuehrt (#2506): nach ihm gibt es keins mehr, und dann schliesst auch
+  // die besitzende App den Master ab.
   if (task.status === 'done' && !ownsRecurrence(task)
+    && !foreignSeriesEnded(task, tz)
     && foreignRecurrenceRule(todoPropertyValue(serverIcs, task.external_uid, 'RRULE'),
       todoPropertyValue(serverIcs, task.external_uid, YUVOMI_RRULE))) {
     delete fields.STATUS;
@@ -249,6 +255,77 @@ export function foreignRecurrenceRule(rule, mark) {
   if (!value) return null;
   if (mark && sameRule(value, unescapeText(mark))) return null;
   return value;
+}
+
+/** Reihenfolge der Teile in Yuvomis Regel - dieselbe, die `RRULE_RE` verlangt. */
+const RULE_PARTS = ['FREQ', 'INTERVAL', 'BYDAY', 'BYMONTHDAY', 'UNTIL'];
+const WEEKDAYS = new Set(['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU']);
+
+/**
+ * Eine fremde RRULE in Yuvomis Teilmenge gebracht - oder null, wenn Yuvomi sie
+ * nicht vollstaendig abbilden kann (#2506, #2515).
+ *
+ * Normalisiert wird nur, was an der Bedeutung nichts aendert: die Reihenfolge
+ * der Teile (RFC 5545 legt keine fest, `RRULE_RE` schon), INTERVAL=1 (der
+ * Vorgabewert) und WKST=MO (Yuvomis Wochenbeginn). Alles andere muss so, wie
+ * es dasteht, durch `RRULE_RE`: was der Validator an einer hier angelegten
+ * Serie abwiese, wuerde Yuvomi auch an einer fremden falsch weiterrechnen -
+ * dieselbe Zurueckhaltung wie `parseRRule`, nur strenger, weil hier ein Fehler
+ * die Serie in der anderen App verschoebe.
+ *
+ * NICHT ABBILDBAR ist deshalb unter anderem COUNT (Yuvomi zaehlt an Aufgaben
+ * nicht herunter, die Serie liefe hier endlos), BYMONTHDAY ausser -1, ein
+ * BYDAY mit Ordinalzahl, BYSETPOS, BYMONTH, ein anderer Wochenbeginn und ein
+ * UNTIL ohne Zone. Solche Serien bleiben in der besitzenden App abzuhaken.
+ *
+ * @param {string|null} rule - RRULE-Wert, mit oder ohne `RRULE:`
+ * @returns {string|null}
+ */
+export function mappableForeignRule(rule) {
+  const value = rruleValue(rule).trim().toUpperCase();
+  if (!value) return null;
+  const parts = new Map();
+  for (const part of value.split(';')) {
+    if (!part) continue;
+    const cut = part.indexOf('=');
+    if (cut <= 0) return null;
+    const key = part.slice(0, cut).trim();
+    if (parts.has(key)) return null;
+    parts.set(key, part.slice(cut + 1).trim());
+  }
+  if (parts.get('INTERVAL') === '1') parts.delete('INTERVAL');
+  if (parts.get('WKST') === 'MO') parts.delete('WKST');
+  if ([...parts.keys()].some((key) => !RULE_PARTS.includes(key))) return null;
+  if (parts.has('INTERVAL') && !(Number(parts.get('INTERVAL')) >= 1)) return null;
+  if (parts.has('BYDAY') && !parts.get('BYDAY').split(',').every((day) => WEEKDAYS.has(day))) return null;
+  const normalized = RULE_PARTS.filter((key) => parts.has(key)).map((key) => `${key}=${parts.get(key)}`).join(';');
+  return normalized.startsWith('FREQ=') && RRULE_RE.test(normalized) ? normalized : null;
+}
+
+/**
+ * Fuehrt Yuvomi diese fremde Serie weiter (#2506)? Das tut es, wenn die Regel
+ * der anderen App abbildbar war (der Inbound hat sie dann als Serie
+ * eingelesen) und die Zeile hier noch eine Serie mit Faelligkeit ist. Sonst
+ * bleibt das Abhaken bei der besitzenden App (`task_foreign_series`).
+ */
+export function continuesForeignSeries(task) {
+  return Boolean(task?.external_rrule && task.is_recurring && task.recurrence_rule
+    && task.due_date && !task.parent_task_id);
+}
+
+/**
+ * Ist dieses erledigte Vorkommen einer weitergefuehrten fremden Serie ihr
+ * letztes (UNTIL erreicht)? Dann legte das Abhaken keine Folgeinstanz an, die
+ * den Master uebernaehme, und der Master darf abgeschlossen werden.
+ */
+function foreignSeriesEnded(task, tz) {
+  if (!continuesForeignSeries(task)) return false;
+  return nextDueAfterCompletion({
+    anchorDate: task.due_date,
+    rule: task.recurrence_rule,
+    completedOn: todayKey(db.get()),
+    fromCompletion: !!task.recurrence_from_completion,
+  }) === null;
 }
 
 /** Marke an einem fremden Objekt: die RRULE, die Yuvomi dort geschrieben hat. */
@@ -283,6 +360,7 @@ function recurrenceFields(task, tz, serverIcs) {
     const anchor = anchorStays(task, tz, serverIcs)
       ? { DUE: KEEP_ON_SERVER }
       : seriesAnchor(task.due_date, task.due_time, tz);
+    if (!own && keepsForeignRule(task, serverIcs)) return foreignAnchor(task, anchor, serverIcs);
     return { RRULE: rrule, ...anchor, [YUVOMI_RRULE]: own ? null : rrule };
   }
   if (own) return { RRULE: null, DTSTART: null, [YUVOMI_RRULE]: null };
@@ -294,6 +372,35 @@ function recurrenceFields(task, tz, serverIcs) {
   const current = todoPropertyValue(serverIcs, task.external_uid, 'RRULE');
   if (current && sameRule(current, unescapeText(mark))) return { RRULE: null, [YUVOMI_RRULE]: null };
   return { [YUVOMI_RRULE]: null };
+}
+
+/**
+ * Steht am fremden Objekt schon die Regel, die Yuvomi rechnet (#2506)? Dann
+ * bleibt sie Wort fuer Wort, wie die besitzende App sie geschrieben hat, und
+ * bekommt keine Marke: sie gehoert weiter dieser App. Verglichen wird in
+ * Yuvomis Teilmenge (`mappableForeignRule`), denn so hat der Inbound sie in
+ * die Zeile geschrieben - `FREQ=DAILY;INTERVAL=1` am Server ist dieselbe Serie
+ * wie `FREQ=DAILY` hier. Hat jemand die Regel in Yuvomi geaendert, gilt der
+ * Weg von #2350: die neue Regel geht samt Marke hinaus.
+ */
+function keepsForeignRule(task, serverIcs) {
+  const current = todoPropertyValue(serverIcs, task.external_uid, 'RRULE');
+  const mapped = current ? mappableForeignRule(unescapeText(current)) : null;
+  return Boolean(mapped) && sameRule(mapped, task.recurrence_rule);
+}
+
+/**
+ * Der Anker einer fremden Serie, die Yuvomi weiterrueckt (#2506). Wie bei jeder
+ * Serie (`seriesAnchor`), mit einer Abweichung: wo Yuvomi selbst kein DTSTART
+ * schriebe (reines Datum, 00:00), das Objekt aber eins traegt, rueckt es auf
+ * die neue Faelligkeit mit. Apple Erinnerungen legt DTSTART gleich DUE ab;
+ * fiele es beim Abhaken weg, stuende der Master nach dem ersten Haken in einer
+ * Form da, die die besitzende App selbst nie schreibt.
+ */
+function foreignAnchor(task, anchor, serverIcs) {
+  if (anchor.DTSTART !== null || anchor.DUE === KEEP_ON_SERVER) return anchor;
+  if (!todoPropertyValue(serverIcs, task.external_uid, 'DTSTART')) return anchor;
+  return { ...anchor, DTSTART: anchor.DUE };
 }
 
 /**
@@ -1107,16 +1214,111 @@ export function recurrenceFollowupTarget(task) {
     accountId = task.external_account_id;
     listUrl   = collectionUrlOf(task.external_object_url);
   }
-  if (!accountId || !listUrl) return null;
-
   // Die Schreibweise der Auswahltabelle zurückgeben, nicht die abgeleitete:
   // taskListsOf schlägt die Liste später genau unter diesem Schlüssel nach.
-  const selected = db.get().prepare(`
+  return selectedTaskList(accountId, listUrl);
+}
+
+/**
+ * Die Liste, in der eine Zeile liegt, so wie die Auswahltabelle sie schreibt -
+ * oder null, wenn sie keine eingeschaltete Aufgabenliste des Kontos ist.
+ */
+function selectedTaskList(accountId, listUrl) {
+  if (!accountId || !listUrl) return null;
+  const match = db.get().prepare(`
     SELECT list_url FROM caldav_reminder_selection
      WHERE account_id = ? AND enabled = 1 AND target_module = 'tasks'
-  `).all(accountId).map((r) => r.list_url);
-  const match = selected.find((url) => sameCollection(url, listUrl));
+  `).all(accountId).map((r) => r.list_url).find((url) => sameCollection(url, listUrl));
   return match ? { accountId, listUrl: match } : null;
+}
+
+/**
+ * Haelt diese Zeile den Master einer fremden Serie, den sie beim Abhaken
+ * ihrer Vorgaengerin uebernommen hat (#2506)? Erkennbar ohne eigene Spalte:
+ * eine Folgeinstanz ist sonst immer lokal oder Spiegel ihrer EIGENEN UID.
+ */
+function holdsForeignMaster(row) {
+  return Boolean(row?.external_rrule) && isMirrored(row) && !isOwnUidOfRow(row.external_uid, 'task', row.id);
+}
+
+/**
+ * Das Abhaken einer fremden Serie, wie die besitzende App es tut (#2506).
+ *
+ * iOS Erinnerungen legt beim Abhaken eine erledigte Kopie mit neuer UID ab und
+ * rueckt DUE des Masters auf das naechste Vorkommen; Tasks.org rueckt den
+ * Master ebenso weiter. Gemeinsam ist beiden: der Master mit der RRULE wird nie
+ * COMPLETED, solange es ein naechstes Vorkommen gibt. In Yuvomis Zeilenmodell
+ * (eine Zeile je Vorkommen) heisst das: die Folgeinstanz UEBERNIMMT den Master -
+ * UID, Objekt-URL, Konto und die fremde Regel -, und ihr Push rueckt dort DUE
+ * vor, setzt NEEDS-ACTION und laesst die RRULE stehen (`keepsForeignRule`).
+ *
+ * Die erledigte Zeile wird eine hier angelegte Aufgabe mit der Liste des
+ * Masters als Ziel: sie geht mit ihrer eigenen UID als erledigte Kopie ohne
+ * RRULE hinauf (`processPendingCreations`, `vtodoRecurrence` schreibt an einer
+ * erledigten Aufgabe keine Regel). Verlauf und Punkte bleiben an ihr, und kein
+ * Abruf kann sie mehr ueber den Master zuruecknehmen - der gehoert jetzt der
+ * Folgeinstanz. Ist die Liste nicht mehr ausgewaehlt, bleibt die Kopie lokal.
+ *
+ * Erwartet die schon erledigte Zeile und die eben angelegte Folgeinstanz, in
+ * der Transaktion des Spawns.
+ *
+ * @returns {boolean} true, wenn uebergeben wurde (der Push steht dann an)
+ */
+export function handOverForeignSeries(done, followupId) {
+  if (!continuesForeignSeries(done) || !isMirrored(done)) return false;
+  if (isOwnUidOfRow(done.external_uid, 'task', done.id)) return false;
+  const target = selectedTaskList(done.external_account_id, collectionUrlOf(done.external_object_url));
+  const d = db.get();
+  d.prepare(`
+    UPDATE tasks
+       SET external_source = 'local', external_uid = NULL, external_account_id = NULL,
+           external_object_url = NULL, external_rrule = NULL,
+           outbound_dirty = 0, outbound_attempts = 0, seen_on_server = 0,
+           target_caldav_account_id = ?, target_caldav_list_url = ?
+     WHERE id = ?
+  `).run(target?.accountId ?? null, target?.listUrl ?? null, done.id);
+  d.prepare(`
+    UPDATE tasks
+       SET external_source = 'caldav', external_uid = ?, external_account_id = ?,
+           external_object_url = ?, external_rrule = ?, seen_on_server = ?,
+           outbound_dirty = 1, outbound_attempts = 0,
+           target_caldav_account_id = NULL, target_caldav_list_url = NULL
+     WHERE id = ?
+  `).run(done.external_uid, done.external_account_id, done.external_object_url,
+    done.external_rrule, done.seen_on_server ?? 0, followupId);
+  return true;
+}
+
+/**
+ * Der Rueckweg (#650): ein zurueckgenommenes Abhaken gibt den Master der
+ * fremden Serie an die Zeile zurueck, die ihn vorher hielt (#2506).
+ *
+ * `origin` ist die eben wieder geoeffnete Zeile, `followup` ihre unangetastete
+ * Folgeinstanz, die gleich verschwindet. Liegt die erledigte Kopie schon oben,
+ * wird sie zum Loeschen vorgemerkt; wartet sie noch auf den Upload, faellt nur
+ * das Ziel. Danach ist `origin` wieder Spiegel des Masters und vorgemerkt: ihr
+ * Push setzt DUE zurueck und laesst die Serie offen.
+ *
+ * Muss VOR dem Loeschen der Folgeinstanz gerufen werden, die Zeile kommt ganz.
+ *
+ * @returns {boolean} true, wenn zurueckgegeben wurde
+ */
+export function takeBackForeignSeries(origin, followup) {
+  if (!origin || !holdsForeignMaster(followup)) return false;
+  const d = db.get();
+  if (isMirrored(origin) && isOwnUidOfRow(origin.external_uid, 'task', origin.id)) {
+    queueTodoDeletion('tasks', origin);
+  }
+  d.prepare(`
+    UPDATE tasks
+       SET external_source = 'caldav', external_uid = ?, external_account_id = ?,
+           external_object_url = ?, external_rrule = ?, seen_on_server = ?,
+           outbound_dirty = 1, outbound_attempts = 0,
+           target_caldav_account_id = NULL, target_caldav_list_url = NULL
+     WHERE id = ?
+  `).run(followup.external_uid, followup.external_account_id, followup.external_object_url,
+    followup.external_rrule, followup.seen_on_server ?? 0, origin.id);
+  return true;
 }
 
 /**

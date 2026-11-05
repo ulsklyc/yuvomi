@@ -23,6 +23,7 @@ import { normalizeCategoryFilter, taskCategoryWhere, taskScopeNeedsToday, taskSc
 import { normalizeVisibility, visibilityWhere } from '../services/visibility.js';
 import {
   flushOutbound, markTodoOutbound, queueTodoDeletion, recurrenceFollowupTarget,
+  continuesForeignSeries, handOverForeignSeries, takeBackForeignSeries,
 } from '../services/caldav-todo-outbound.js';
 import { uniqueKey } from '../utils/category-slug.js';
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
@@ -466,11 +467,14 @@ const LOCKED_ERROR = { error: 'This task is locked; only its creator and adminis
  *
  * iOS Erinnerungen und Tasks.org beenden eine Serie, sobald ihr Master
  * COMPLETED traegt - sie selbst ruecken beim Abhaken nur das naechste
- * Vorkommen nach. Yuvomi bildet die fremde Regel (noch) nicht ab, also bleibt
- * das Abhaken bei der besitzenden App. 409 statt 403: es fehlt kein Recht, die
- * Aufgabe steht nur woanders unter Verwaltung. Gilt fuer jeden Uebergang nach
- * 'done', auch am Wandtablett; alles andere (in Arbeit, Ablage, Bearbeiten)
- * bleibt erlaubt.
+ * Vorkommen nach. Eine Regel, die Yuvomi abbilden kann, liest der Inbound als
+ * Serie ein, und das Abhaken folgt dann der besitzenden App
+ * (`handOverForeignSeries`). Gesperrt bleibt nur, was Yuvomi nicht
+ * weiterfuehrt (`continuesForeignSeries`): eine Regel ausserhalb der
+ * Teilmenge, eine hier abgeschaltete Wiederholung, eine Serie ohne
+ * Faelligkeit. 409 statt 403: es fehlt kein Recht, die Aufgabe steht nur
+ * woanders unter Verwaltung. Gilt fuer jeden Uebergang nach 'done', auch am
+ * Wandtablett; alles andere (in Arbeit, Ablage, Bearbeiten) bleibt erlaubt.
  */
 const FOREIGN_SERIES_ERROR = {
   error: 'This task repeats in another app; tick it off there so the series continues.',
@@ -479,7 +483,8 @@ const FOREIGN_SERIES_ERROR = {
 };
 
 function completesForeignSeries(task, nextStatus) {
-  return nextStatus === 'done' && task.status !== 'done' && Boolean(task.external_rrule);
+  return nextStatus === 'done' && task.status !== 'done' && Boolean(task.external_rrule)
+    && !continuesForeignSeries(task);
 }
 
 /**
@@ -1493,7 +1498,11 @@ router.put('/:id', (req, res) => {
     const status = (req.body.status === undefined || archiveRequested)
       ? task.status
       : req.body.status;
-    if (completesForeignSeries(task, status)) return res.status(409).json(FOREIGN_SERIES_ERROR);
+    // Gegen den Stand NACH dieser Anfrage: wer im selben Zug die Wiederholung
+    // abschaltet, fuehrt die Serie hier nicht mehr weiter.
+    if (completesForeignSeries({ ...task, is_recurring, recurrence_rule, due_date }, status)) {
+      return res.status(409).json(FOREIGN_SERIES_ERROR);
+    }
     if (reopensSettledVisit(db.get(), task.id, task.status, status) && !isAdminRequest(req)) {
       return res.status(403).json({ error: 'Permission denied.', code: 403 });
     }
@@ -1882,6 +1891,15 @@ function discardRecurrenceFollowup(taskId) {
 
   if (isFollowupSubtasksTouched(followup) || recurrenceFollowupOf(followup.id)) return 0;
 
+  // Haelt die Folgeinstanz den Master einer fremden Serie (#2506), geht er an
+  // die wieder geoeffnete Zeile zurueck, statt geloescht zu werden: er ist das
+  // Objekt der anderen App, nicht eins, das Yuvomi angelegt hat.
+  const origin = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
+  if (takeBackForeignSeries(origin, followup)) {
+    db.get().prepare('DELETE FROM tasks WHERE id = ?').run(followup.id);
+    return 1;
+  }
+
   // Vor dem DELETE vormerken, wie in DELETE /:id: danach sind UID und Objekt-URL
   // weg. Eine noch nicht hochgeladene Folgeinstanz ist kein Spiegel - auch nicht
   // mit geerbtem Ziel (#1515), das verschwindet mit der Zeile -, dann ist das ein
@@ -1919,7 +1937,9 @@ function shiftedStartDate(startDate, dueDate, nextDue) {
  * Server ein neuer Eintrag, keine Kopie der Vorgängerin - mit deren UID
  * überschriebe der Upload das eben erledigte Vorkommen. Das Sync-Ziel dagegen
  * erbt sie (#1515): eine in eine Erinnerungsliste geschickte Serie blieb sonst
- * ab dem zweiten Vorkommen lokal. Rückgabe: true, wenn die Folgeinstanz damit
+ * ab dem zweiten Vorkommen lokal. Die Ausnahme ist eine Serie, deren Regel
+ * eine andere App fuehrt (#2506): dort uebernimmt die Folgeinstanz den Master,
+ * und die erledigte Zeile geht als eigene Kopie hinauf (handOverForeignSeries). Rückgabe: true, wenn die Folgeinstanz damit
  * auf ihren Upload wartet und der Aufrufer den Sofortversuch anstoßen soll.
  *
  * Beide Aufrufer halten bereits eine Transaktion, die eigene läuft darin als
@@ -1967,6 +1987,7 @@ function spawnRecurrenceFollowup(task) {
   // Assignment-Kopie wie zuvor. Wer abhakt, zaehlt nicht: der Zeiger folgt der
   // Serie.
   const rotation = pickRotationTarget(db.get(), task);
+  let handedOver = false;
 
   db.get().transaction(() => {
     const newTask = db.get().prepare(`
@@ -2023,6 +2044,9 @@ function spawnRecurrenceFollowup(task) {
         .run(rotation.userId, rotation.position, newTask.lastInsertRowid);
     }
     setTags(db.get(), newTask.lastInsertRowid, existingTags);
+    // Eine fremde Serie (#2506): die Folgeinstanz uebernimmt den Master, die
+    // erledigte Zeile geht als eigene Kopie hinauf.
+    handedOver = handOverForeignSeries(task, Number(newTask.lastInsertRowid));
 
     for (const sub of existingSubtasks) {
       const subAssignments = db.get()
@@ -2057,7 +2081,7 @@ function spawnRecurrenceFollowup(task) {
       setTags(db.get(), newSub.lastInsertRowid, subTags);
     }
   })();
-  return !!syncTarget;
+  return !!syncTarget || handedOver;
 }
 
 // --------------------------------------------------------
