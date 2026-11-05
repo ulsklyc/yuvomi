@@ -3544,7 +3544,11 @@
         "memberErrorUsernameTaken": "May ibang account na may ganitong username.",
         "memberErrorGone": "Wala na ang miyembrong ito.",
         "memberErrorSsoEmailRequired": "Kailangan ng email address ang account na SSO lang para mahanap ito ng unang pag-sign in gamit ang SSO.",
-        "memberErrorSsoEmailAmbiguous": "May ibang miyembro nang may ganitong email address. Hindi mapaghihiwalay ng SSO ang mga account."
+        "memberErrorSsoEmailAmbiguous": "May ibang miyembro nang may ganitong email address. Hindi mapaghihiwalay ng SSO ang mga account.",
+        "twoFactorAlreadyEnabled": "Naka-on na ang two-factor authentication. I-reload ang page para makita ang kasalukuyang estado.",
+        "twoFactorSetupExpired": "Nag-expire na ang setup. Kanselahin ito at magsimula ulit.",
+        "oidcLinkErrorNotConfigured": "Hindi na naka-set up ang SSO sa server na ito.",
+        "oidcUnlinkNotLinked": "Hindi na nakaugnay sa SSO ang account na ito. I-reload ang page para makita ang kasalukuyang estado."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

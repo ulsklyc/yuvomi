@@ -3526,7 +3526,11 @@
         "memberErrorUsernameTaken": "Another account already has this username.",
         "memberErrorGone": "This member no longer exists.",
         "memberErrorSsoEmailRequired": "An SSO-only account needs an email address so the first SSO sign-in can find it.",
-        "memberErrorSsoEmailAmbiguous": "Another member already has this email address. SSO could not tell the accounts apart."
+        "memberErrorSsoEmailAmbiguous": "Another member already has this email address. SSO could not tell the accounts apart.",
+        "twoFactorAlreadyEnabled": "Two-factor authentication is already enabled. Reload the page to see the current state.",
+        "twoFactorSetupExpired": "The setup has expired. Cancel and start it again.",
+        "oidcLinkErrorNotConfigured": "SSO is no longer set up on this server.",
+        "oidcUnlinkNotLinked": "This account is no longer linked to SSO. Reload the page to see the current state."
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",

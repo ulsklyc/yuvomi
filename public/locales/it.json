@@ -3526,7 +3526,11 @@
         "memberErrorUsernameTaken": "Un altro account ha già questo nome utente.",
         "memberErrorGone": "Questo membro non esiste più.",
         "memberErrorSsoEmailRequired": "Un account solo SSO ha bisogno di un indirizzo email, così il primo accesso SSO può trovarlo.",
-        "memberErrorSsoEmailAmbiguous": "Un altro membro ha già questo indirizzo email. L'SSO non potrebbe distinguere gli account."
+        "memberErrorSsoEmailAmbiguous": "Un altro membro ha già questo indirizzo email. L'SSO non potrebbe distinguere gli account.",
+        "twoFactorAlreadyEnabled": "L'autenticazione a due fattori è già attiva. Ricarica la pagina per vedere lo stato attuale.",
+        "twoFactorSetupExpired": "La configurazione è scaduta. Annullala e ricomincia.",
+        "oidcLinkErrorNotConfigured": "L'SSO non è più configurato su questo server.",
+        "oidcUnlinkNotLinked": "Questo account non è più collegato all'SSO. Ricarica la pagina per vedere lo stato attuale."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",

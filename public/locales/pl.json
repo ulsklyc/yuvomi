@@ -3770,7 +3770,11 @@
         "memberErrorUsernameTaken": "Inne konto ma już tę nazwę użytkownika.",
         "memberErrorGone": "Ten członek już nie istnieje.",
         "memberErrorSsoEmailRequired": "Konto tylko z SSO potrzebuje adresu e-mail, aby pierwsze logowanie przez SSO mogło je znaleźć.",
-        "memberErrorSsoEmailAmbiguous": "Inny członek ma już ten adres e-mail. SSO nie rozróżniłoby kont."
+        "memberErrorSsoEmailAmbiguous": "Inny członek ma już ten adres e-mail. SSO nie rozróżniłoby kont.",
+        "twoFactorAlreadyEnabled": "Uwierzytelnianie dwuskładnikowe jest już włączone. Odśwież stronę, aby zobaczyć aktualny stan.",
+        "twoFactorSetupExpired": "Konfiguracja wygasła. Anuluj ją i zacznij od nowa.",
+        "oidcLinkErrorNotConfigured": "SSO nie jest już skonfigurowane na tym serwerze.",
+        "oidcUnlinkNotLinked": "To konto nie jest już powiązane z SSO. Odśwież stronę, aby zobaczyć aktualny stan."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

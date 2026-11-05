@@ -593,6 +593,12 @@ test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#
     ['members_member_not_found', 'settings.memberErrorGone'],
     ['members_sso_email_required', 'settings.memberErrorSsoEmailRequired'],
     ['members_sso_email_ambiguous', 'settings.memberErrorSsoEmailAmbiguous'],
+    // SSO-Verknuepfung im Konto-Blatt (#1909); die echte Antwort misst
+    // test:oidc-email-link.
+    ['oidc_not_configured', 'settings.oidcLinkErrorNotConfigured'],
+    ['oidc_already_linked', 'settings.oidcLinkError_already_linked'],
+    ['oidc_not_linked', 'settings.oidcUnlinkNotLinked'],
+    ['oidc_password_required', 'settings.oidcUnlinkNeedsPassword'],
   ]) {
     assert.equal(errorSentence(answer(400, SERVER_TEXT, reason)), key, reason);
   }

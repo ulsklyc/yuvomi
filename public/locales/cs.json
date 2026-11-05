@@ -3644,7 +3644,11 @@
         "memberErrorUsernameTaken": "Toto uživatelské jméno už má jiný účet.",
         "memberErrorGone": "Tento člen už neexistuje.",
         "memberErrorSsoEmailRequired": "Účet jen pro SSO potřebuje e-mailovou adresu, aby ho první přihlášení přes SSO našlo.",
-        "memberErrorSsoEmailAmbiguous": "Tuto e-mailovou adresu už má jiný člen. SSO by účty nedokázalo rozlišit."
+        "memberErrorSsoEmailAmbiguous": "Tuto e-mailovou adresu už má jiný člen. SSO by účty nedokázalo rozlišit.",
+        "twoFactorAlreadyEnabled": "Dvoufázové ověření je už zapnuté. Načti stránku znovu, abys viděl aktuální stav.",
+        "twoFactorSetupExpired": "Nastavení vypršelo. Zruš ho a začni znovu.",
+        "oidcLinkErrorNotConfigured": "SSO už na tomto serveru není nastavené.",
+        "oidcUnlinkNotLinked": "Tento účet už není propojen s SSO. Načti stránku znovu, abys viděl aktuální stav."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

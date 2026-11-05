@@ -3526,7 +3526,11 @@
         "memberErrorUsernameTaken": "このユーザー名は別のアカウントが使用しています。",
         "memberErrorGone": "このメンバーはもう存在しません。",
         "memberErrorSsoEmailRequired": "SSOのみのアカウントには、最初のSSOサインインで見つけられるようにメールアドレスが必要です。",
-        "memberErrorSsoEmailAmbiguous": "このメールアドレスは別のメンバーが使用しています。SSOではアカウントを区別できません。"
+        "memberErrorSsoEmailAmbiguous": "このメールアドレスは別のメンバーが使用しています。SSOではアカウントを区別できません。",
+        "twoFactorAlreadyEnabled": "二要素認証はすでに有効です。ページを再読み込みして現在の状態を確認してください。",
+        "twoFactorSetupExpired": "設定の有効期限が切れました。キャンセルしてやり直してください。",
+        "oidcLinkErrorNotConfigured": "このサーバーでは SSO が設定されていません。",
+        "oidcUnlinkNotLinked": "このアカウントは SSO と連携していません。ページを再読み込みして現在の状態を確認してください。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

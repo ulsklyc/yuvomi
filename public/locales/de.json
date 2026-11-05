@@ -3544,7 +3544,11 @@
         "memberErrorUsernameTaken": "Diesen Benutzernamen hat schon ein anderes Konto.",
         "memberErrorGone": "Dieses Mitglied gibt es nicht mehr.",
         "memberErrorSsoEmailRequired": "Ein Konto nur mit SSO braucht eine E-Mail-Adresse, damit die erste SSO-Anmeldung es findet.",
-        "memberErrorSsoEmailAmbiguous": "Diese E-Mail-Adresse hat schon ein anderes Mitglied. SSO könnte die Konten nicht auseinanderhalten."
+        "memberErrorSsoEmailAmbiguous": "Diese E-Mail-Adresse hat schon ein anderes Mitglied. SSO könnte die Konten nicht auseinanderhalten.",
+        "twoFactorAlreadyEnabled": "Die Zwei-Faktor-Anmeldung ist schon eingeschaltet. Lade die Seite neu, um den aktuellen Stand zu sehen.",
+        "twoFactorSetupExpired": "Die Einrichtung ist abgelaufen. Brich ab und starte sie neu.",
+        "oidcLinkErrorNotConfigured": "SSO ist auf diesem Server nicht mehr eingerichtet.",
+        "oidcUnlinkNotLinked": "Dieses Konto ist nicht mehr mit SSO verknüpft. Lade die Seite neu, um den aktuellen Stand zu sehen."
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",

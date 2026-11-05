@@ -3544,7 +3544,11 @@
         "memberErrorUsernameTaken": "다른 계정이 이미 이 사용자 이름을 사용하고 있습니다.",
         "memberErrorGone": "이 구성원은 더 이상 없습니다.",
         "memberErrorSsoEmailRequired": "SSO 전용 계정에는 첫 SSO 로그인이 찾을 수 있도록 이메일 주소가 필요합니다.",
-        "memberErrorSsoEmailAmbiguous": "다른 구성원이 이미 이 이메일 주소를 사용하고 있습니다. SSO가 계정을 구별할 수 없습니다."
+        "memberErrorSsoEmailAmbiguous": "다른 구성원이 이미 이 이메일 주소를 사용하고 있습니다. SSO가 계정을 구별할 수 없습니다.",
+        "twoFactorAlreadyEnabled": "2단계 인증이 이미 켜져 있습니다. 현재 상태를 보려면 페이지를 새로 고치세요.",
+        "twoFactorSetupExpired": "설정이 만료되었습니다. 취소하고 다시 시작하세요.",
+        "oidcLinkErrorNotConfigured": "이 서버에는 더 이상 SSO가 설정되어 있지 않습니다.",
+        "oidcUnlinkNotLinked": "이 계정은 더 이상 SSO와 연결되어 있지 않습니다. 현재 상태를 보려면 페이지를 새로 고치세요."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",

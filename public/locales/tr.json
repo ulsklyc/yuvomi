@@ -3526,7 +3526,11 @@
         "memberErrorUsernameTaken": "Bu kullanıcı adı başka bir hesapta zaten var.",
         "memberErrorGone": "Bu üye artık yok.",
         "memberErrorSsoEmailRequired": "Yalnızca SSO kullanan bir hesabın, ilk SSO girişinin onu bulabilmesi için bir e-posta adresine ihtiyacı var.",
-        "memberErrorSsoEmailAmbiguous": "Bu e-posta adresi zaten başka bir üyede. SSO hesapları birbirinden ayıramaz."
+        "memberErrorSsoEmailAmbiguous": "Bu e-posta adresi zaten başka bir üyede. SSO hesapları birbirinden ayıramaz.",
+        "twoFactorAlreadyEnabled": "İki adımlı doğrulama zaten etkin. Güncel durumu görmek için sayfayı yeniden yükle.",
+        "twoFactorSetupExpired": "Kurulumun süresi doldu. İptal et ve yeniden başla.",
+        "oidcLinkErrorNotConfigured": "SSO bu sunucuda artık kurulu değil.",
+        "oidcUnlinkNotLinked": "Bu hesap artık SSO ile bağlı değil. Güncel durumu görmek için sayfayı yeniden yükle."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

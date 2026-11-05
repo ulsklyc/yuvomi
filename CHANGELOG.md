@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Systolic" and "Diastolic" stood left of the last bar, and "Pulse" above its last dot, hiding the
   readings underneath when a month is full. A short line above the blood pressure chart now says
   which end of a bar is which, and the pulse chart is named by its own unit axis.
+- **Your account page says what went wrong in your language** (#1909). Linking or unlinking
+  SSO, turning on two-factor authentication and fetching a Gravatar showed the server's English
+  text for some errors. They now say in your language that the account is already linked or no
+  longer linked, that an account without a password cannot unlink, that SSO is no longer set up,
+  or that two-factor authentication is already on or its setup has expired. API clients get the
+  case as `reason`.
 - **Adding, editing and inviting family members say what went wrong in your language** (#1909).
   The error line in these dialogs showed the server's English text. It now says in your language
   that the username is invalid or already taken, that an account without a password needs an
