@@ -454,17 +454,18 @@ function keepsForeignRule(task, serverIcs) {
 }
 
 /**
- * Der Anker einer fremden Serie, die Yuvomi weiterrueckt (#2506). Wie bei jeder
- * Serie (`seriesAnchor`), mit einer Abweichung: wo Yuvomi selbst kein DTSTART
- * schriebe (reines Datum, 00:00), das Objekt aber eins traegt, rueckt es auf
- * die neue Faelligkeit mit. Apple Erinnerungen legt DTSTART gleich DUE ab;
- * fiele es beim Abhaken weg, stuende der Master nach dem ersten Haken in einer
- * Form da, die die besitzende App selbst nie schreibt.
+ * Der Anker einer fremden Serie, die Yuvomi weiterrueckt (#2506). DUE wie bei
+ * jeder Serie (`seriesAnchor`), DTSTART dagegen in der Form der besitzenden
+ * App: Weitergefuehrt wird eine fremde Serie nur, wenn ihr DTSTART fehlt oder
+ * genau DUE ist (`startDiffersFromDue` im Parser, Review auf #2543). Apple
+ * Erinnerungen legt DTSTART gleich DUE ab, also rueckt es genau so mit; ein
+ * Start um 00:00, wie Yuvomi ihn an eigenen Serien schreibt, verschoebe einen
+ * Alarm relativ zum Start und sperrte die Serie beim naechsten Abruf.
  */
 function foreignAnchor(task, anchor, serverIcs) {
-  if (anchor.DTSTART !== null || anchor.DUE === KEEP_ON_SERVER) return anchor;
-  if (!todoPropertyValue(serverIcs, task.external_uid, 'DTSTART')) return anchor;
-  return { ...anchor, DTSTART: anchor.DUE };
+  if (anchor.DUE === KEEP_ON_SERVER) return anchor;
+  const hasStart = Boolean(todoPropertyValue(serverIcs, task.external_uid, 'DTSTART'));
+  return { ...anchor, DTSTART: hasStart ? anchor.DUE : null };
 }
 
 /**

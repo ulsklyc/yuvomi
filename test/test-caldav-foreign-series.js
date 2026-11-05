@@ -613,3 +613,31 @@ test('Der Push ueberspringt eine Vormerkung, deren Zeile den Master inzwischen a
     'COMPLETED ging auf den fremden Master');
   assert.equal(toMaster.length, 0, 'die abgegebene Vormerkung wurde trotzdem gesendet');
 });
+
+test('DTSTART, das nicht genau DUE ist, sperrt; nach dem Abhaken bleibt Start gleich DUE (Review #2543)', async () => {
+  // Start 08:00, faellig 09:00, ein Alarm relativ zum Start: rueckte Yuvomi den
+  // Start auf Mitternacht, kaeme der Alarm am Vorabend.
+  reset();
+  const day = icsDay(dayKey(0));
+  const timed = (uid, start) => appleSeries({ uid, rrule: 'FREQ=DAILY' })
+    .replace(/DTSTART;VALUE=DATE:\d+/, `DTSTART:${day}T${start}Z`)
+    .replace(/DUE;VALUE=DATE:\d+/, `DUE:${day}T090000Z`);
+  dav.putObject(listUrl, FILE, timed(UID, '080000'));
+  dav.putObject(listUrl, 'same.ics', timed('same@phone', '090000'));
+  await remindersSync.sync();
+  assert.equal(rowOf(UID).is_recurring, 0, 'Start 08:00, faellig 09:00 wird weitergefuehrt');
+  assert.equal((await call('PATCH', `/${rowOf(UID).id}/status`, { status: 'done' })).status, 409);
+
+  // Start gleich DUE: abbildbar, und das Abhaken haelt die Form.
+  const same = rowOf('same@phone');
+  assert.equal(same.is_recurring, 1);
+  assert.equal((await call('PATCH', `/${same.id}/status`, { status: 'done' })).status, 200);
+  await settle();
+  const data = dav.getObject(listUrl, 'same.ics').data;
+  const next = icsDay(dayKey(1));
+  assert.deepEqual(todoLines(data, 'DUE').map((l) => l.replace(/^DUE[^:]*:/, '')), [`${next}T090000Z`]);
+  assert.deepEqual(todoLines(data, 'DTSTART').map((l) => l.replace(/^DTSTART[^:]*:/, '')), [`${next}T090000Z`],
+    'der Start steht nach dem Abhaken nicht mehr auf DUE');
+  await remindersSync.sync();
+  assert.equal(rowOf('same@phone').is_recurring, 1, 'nach dem eigenen Push gesperrt');
+});

@@ -361,11 +361,12 @@ function dateLineZone(block, prop) {
 }
 
 /**
- * Steht DTSTART an einem anderen Tag als DUE, oder in einer anderen Schreibweise
- * (Zone, Datum gegen Zeit)? Dann rechnet die Serie von DTSTART aus, und DUE
- * allein beschreibt sie nicht (Review auf #2543). Ohne DTSTART: false.
+ * Weicht DTSTART von DUE ab - in Datum, Uhrzeit oder Schreibweise (Zone, Datum
+ * gegen Zeit)? Dann rechnet die Serie von DTSTART aus, und DUE allein
+ * beschreibt sie nicht; ein Alarm relativ zum Start fiele nach dem Vorruecken
+ * auf eine andere Zeit (Review auf #2543). Ohne DTSTART: false.
  */
-function startLeavesDueDay(block) {
+function startDiffersFromDue(block) {
   const line = (prop) => new RegExp(`^${prop}((?:;[^:;]*)*):(.*)$`, 'im').exec(block);
   const start = line('DTSTART');
   if (!start) return false;
@@ -374,7 +375,7 @@ function startLeavesDueDay(block) {
   const startValue = start[2].trim();
   const dueValue = due[2].trim();
   const dateOnly = (m, v) => /;VALUE=DATE(?![-\w])/i.test(m[1]) || /^\d{8}$/.test(v);
-  return startValue.slice(0, 8) !== dueValue.slice(0, 8)
+  return startValue.toUpperCase() !== dueValue.toUpperCase()
     || dateOnly(start, startValue) !== dateOnly(due, dueValue)
     || dateLineZone(block, 'DTSTART') !== dateLineZone(block, 'DUE');
 }
@@ -418,7 +419,7 @@ function parseVTODO(ics) {
       override: get('RECURRENCE-ID') !== null,
       exceptions: get('EXDATE') !== null || get('RDATE') !== null,
       dueZone: dateLineZone(block, 'DUE'),
-      startShifted: startLeavesDueDay(block),
+      startShifted: startDiffersFromDue(block),
       rrule: get('RRULE'),
       yuvomiRrule: get('X-YUVOMI-RRULE'),
     });
