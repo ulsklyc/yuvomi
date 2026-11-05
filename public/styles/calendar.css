@@ -1268,6 +1268,41 @@
   margin-inline-end: var(--space-0h);
 }
 
+/* VOM ANBIETER ABGESAGT (#2499). Der Termin bleibt im Kalender, damit niemand
+ * fragt, wo er hin ist; alle anderen Flaechen lassen ihn aus. Er tritt zurueck
+ * wie ein erledigter Eintrag in Aufgaben und Einkauf: Titel durchgestrichen,
+ * Sekundaertinte statt `opacity` (gemessen, haelt auf jeder Schichtfarbe), und
+ * die Toenung des Balkens faellt auf die Waschung wie im Nachbarmonat. Die
+ * Marke (calendar.js#calendarCancelledMarkHtml) steht in jeder Bauform vor dem
+ * Titel - der Geschwister-Selektor erreicht ihn ohne eine Klasse an jeder der
+ * acht Chip-Wurzeln. Die Waschung ueber `:has()` ist Verfeinerung; ohne sie
+ * sagen Marke und Strich dasselbe. */
+.calendar-cancelled-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--color-text-secondary);
+}
+
+.calendar-cancelled-mark--word {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--space-px) var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-fill-well);
+}
+
+.calendar-cancelled-mark ~ span {
+  text-decoration: line-through;
+  color: var(--color-text-secondary);
+}
+
+.month-day__event:has(> .calendar-cancelled-mark),
+.allday-event:has(> .calendar-cancelled-mark),
+.week-event:has(.calendar-cancelled-mark) {
+  background: color-mix(in srgb, var(--ev-color) var(--tint-wash), var(--color-surface-work));
+}
+
 /* DIE SERIENMARKE WEICHT DEM TITEL IM SCHMALEN MONAT (R22 S10, a3 Klein).
  * Ab 1024px steht der Monatstitel einzeilig; bei 1280 ist die Zelle 141px,
  * der Balken 132px, und Serienmarke samt Abstand kosteten 18px: 28 von 40

@@ -1271,7 +1271,8 @@
         "syncTargetNoCalendarForPeople": "Không có lịch nào có đúng những người này làm người được giao mặc định, nên việc giao không chọn lịch nào. Thay vào đó dùng: {{target}}.",
         "localCalendarEdit": "Sửa lịch",
         "localCalendarNew": "Lịch mới",
-        "manageSubscriptionsLink": "Đăng ký và đồng bộ"
+        "manageSubscriptionsLink": "Đăng ký và đồng bộ",
+        "cancelled": "Đã hủy"
     },
     "noteCategories": {
         "categories": "Danh mục",

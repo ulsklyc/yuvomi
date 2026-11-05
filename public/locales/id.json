@@ -1289,7 +1289,8 @@
         "syncTargetNoCalendarForPeople": "Tidak ada kalender yang penerima tugas default-nya tepat orang-orang ini, jadi penugasan tidak memilih kalender. Yang dipakai: {{target}}.",
         "localCalendarEdit": "Edit kalender",
         "localCalendarNew": "Kalender baru",
-        "manageSubscriptionsLink": "Langganan dan sinkronisasi"
+        "manageSubscriptionsLink": "Langganan dan sinkronisasi",
+        "cancelled": "Dibatalkan"
     },
     "noteCategories": {
         "categories": "Kategori",

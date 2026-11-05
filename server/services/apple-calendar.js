@@ -22,7 +22,7 @@ import { assignNewOverride, calendarDefaultAssignees, reassignDefaultOnCalendarM
 import { pruneDeletedEvents, countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
 import { readSyncOutcome, withSyncOutcome } from './sync-outcome.js';
 import { runSerialized } from '../utils/sync-lock.js';
-import { unfoldLines, parseICS, formatICSDate, tzLocalToUTC, applyDuration, normalizeRecurrenceOverrides } from './ics-parser.js';
+import { unfoldLines, parseICS, formatICSDate, tzLocalToUTC, applyDuration, normalizeRecurrenceOverrides, providerStatusOf } from './ics-parser.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 import * as outbound from './calendar-outbound.js';
 import { dropUploadAttemptsOf } from './caldav-upload-attempts.js';
@@ -529,7 +529,8 @@ async function runSync({ makeClient } = {}) {
                   color = CASE WHEN color_modified = 0 THEN ? ELSE color END,
                   calendar_ref_id = ?,
                   external_object_url = COALESCE(?, external_object_url),
-                  series_authored = ?
+                  series_authored = ?,
+                  provider_status = ?
               WHERE id = ?
             `).run(
               ev.summary, ev.description, when.dtstart, when.dtend,
@@ -540,6 +541,9 @@ async function runSync({ makeClient } = {}) {
               echo
                 ? existing.series_authored
                 : authoredAfterInbound(existing, { start_datetime: ev.dtstart, recurrence_rule: ev.rrule }),
+              // Die Absage des Anbieters (#2499), bei jedem Abruf, auch zurueck
+              // auf CONFIRMED oder NULL, damit eine Wiederzusage wirkt.
+              providerStatusOf(ev),
               existing.id
             );
             eventId = existing.id;
@@ -557,12 +561,12 @@ async function runSync({ makeClient } = {}) {
               INSERT INTO calendar_events
                 (title, description, start_datetime, end_datetime, all_day,
                  location, color, external_calendar_id, external_source, recurrence_rule, tzid, calendar_ref_id, created_by,
-                 external_object_url)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'apple', ?, ?, ?, ?, ?)
+                 external_object_url, provider_status)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'apple', ?, ?, ?, ?, ?, ?)
             `).run(
               ev.summary, ev.description, ev.dtstart, ev.dtend,
               ev.allDay ? 1 : 0, ev.location, evColor, ev.uid, ev.rrule, ev.tzid ?? null, calRefId, createdBy,
-              obj.url ?? null
+              obj.url ?? null, providerStatusOf(ev)
             );
             eventId = Number(inserted.lastInsertRowid);
             // Standard-Zuweisung dieses Kalenders (#459) auf den neuen Termin;

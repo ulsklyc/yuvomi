@@ -1271,7 +1271,8 @@
         "syncTargetNoCalendarForPeople": "Nessun calendario ha esattamente queste persone come assegnazione predefinita, quindi l’assegnazione non ne sceglie nessuno. Usato invece: {{target}}.",
         "localCalendarEdit": "Modifica calendario",
         "localCalendarNew": "Nuovo calendario",
-        "manageSubscriptionsLink": "Abbonamenti e sincronizzazione"
+        "manageSubscriptionsLink": "Abbonamenti e sincronizzazione",
+        "cancelled": "Annullato"
     },
     "noteCategories": {
         "categories": "Categorie",

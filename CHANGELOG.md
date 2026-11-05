@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **An event the provider cancels no longer reminds anyone** (#2499). When an ICS subscription,
+  a CalDAV calendar or iCloud marks an event as cancelled without deleting it, its reminders stay
+  silent, and the dashboard, the Today sheet, the wall tablet and the countdowns leave it out. The
+  calendar still shows it, struck through and marked "Cancelled", so nobody wonders where it
+  went. If the provider confirms it again, everything comes back. A cancelled single occurrence of
+  a series only affects that occurrence. A one-time ICS import skips cancelled events. Your own
+  calendar feed passes the cancellation on, and API clients find it in `provider_status`.
 - **Contacts synced from Nextcloud or another CardDAV server no longer merge into one** (#2513).
   Cards with an empty phone or email field, or cards that share a landline or email address,
   used to collapse into a single Yuvomi contact carrying the name of the last card. Each card now

@@ -1271,7 +1271,8 @@
         "syncTargetNoCalendarForPeople": "Ingen kalender har exakt dessa personer som standardtilldelning, så tilldelningen väljer ingen. Används i stället: {{target}}.",
         "localCalendarEdit": "Redigera kalender",
         "localCalendarNew": "Ny kalender",
-        "manageSubscriptionsLink": "Prenumerationer och synkronisering"
+        "manageSubscriptionsLink": "Prenumerationer och synkronisering",
+        "cancelled": "Inställt"
     },
     "noteCategories": {
         "categories": "Kategorier",

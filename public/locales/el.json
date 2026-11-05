@@ -1271,7 +1271,8 @@
         "syncTargetNoCalendarForPeople": "Κανένα ημερολόγιο δεν έχει ακριβώς αυτά τα άτομα ως προεπιλεγμένη ανάθεση, οπότε η ανάθεση δεν επιλέγει κανένα. Χρησιμοποιείται αντί αυτού: {{target}}.",
         "localCalendarEdit": "Επεξεργασία ημερολογίου",
         "localCalendarNew": "Νέο ημερολόγιο",
-        "manageSubscriptionsLink": "Συνδρομές και συγχρονισμός"
+        "manageSubscriptionsLink": "Συνδρομές και συγχρονισμός",
+        "cancelled": "Ακυρώθηκε"
     },
     "noteCategories": {
         "categories": "Κατηγορίες",

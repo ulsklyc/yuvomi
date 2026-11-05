@@ -1289,7 +1289,8 @@
         "syncTargetNoCalendarForPeople": "정확히 이 사람들을 기본 담당자로 둔 캘린더가 없어 지정으로 캘린더를 고르지 않습니다. 대신 사용: {{target}}.",
         "localCalendarEdit": "캘린더 편집",
         "localCalendarNew": "새 캘린더",
-        "manageSubscriptionsLink": "구독 및 동기화"
+        "manageSubscriptionsLink": "구독 및 동기화",
+        "cancelled": "취소됨"
     },
     "noteCategories": {
         "categories": "카테고리",

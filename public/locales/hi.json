@@ -1271,7 +1271,8 @@
         "syncTargetNoCalendarForPeople": "किसी कैलेंडर का डिफ़ॉल्ट असाइनमेंट ठीक ये लोग नहीं हैं, इसलिए असाइनमेंट कोई कैलेंडर नहीं चुनता। इसके बजाय: {{target}}।",
         "localCalendarEdit": "कैलेंडर संपादित करें",
         "localCalendarNew": "नया कैलेंडर",
-        "manageSubscriptionsLink": "सदस्यताएँ और सिंक"
+        "manageSubscriptionsLink": "सदस्यताएँ और सिंक",
+        "cancelled": "रद्द"
     },
     "noteCategories": {
         "categories": "श्रेणियाँ",

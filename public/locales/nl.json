@@ -1271,7 +1271,8 @@
         "syncTargetNoCalendarForPeople": "Geen agenda heeft precies deze personen als standaardtoewijzing, dus de toewijzing kiest er geen. In plaats daarvan: {{target}}.",
         "localCalendarEdit": "Agenda bewerken",
         "localCalendarNew": "Nieuwe agenda",
-        "manageSubscriptionsLink": "Abonnementen en synchronisatie"
+        "manageSubscriptionsLink": "Abonnementen en synchronisatie",
+        "cancelled": "Geannuleerd"
     },
     "noteCategories": {
         "categories": "Categorieën",

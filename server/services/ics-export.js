@@ -290,6 +290,8 @@ function buildVEvent(
   lines.push(`SUMMARY:${escapeICSText(summary)}`);
   if (ev.description) lines.push(`DESCRIPTION:${escapeICSText(ev.description)}`);
   if (ev.location) lines.push(`LOCATION:${escapeICSText(ev.location)}`);
+  // Vom Anbieter abgesagt (#2499): der Abonnent erfaehrt es wie Yuvomi.
+  if (ev.provider_status === 'CANCELLED') lines.push('STATUS:CANCELLED');
   // rruleLine statt Handarbeit: eine eingelesene Serie bringt ihr `RRULE:` schon
   // mit, ein blindes Praefix erzeugte `RRULE:RRULE:FREQ=...` und liess strikte
   // Abonnenten das ganze Event verwerfen (#761).

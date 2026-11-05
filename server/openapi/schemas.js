@@ -1215,6 +1215,10 @@ export const schemas = {
             },
             external_calendar_id: { type: ['string', 'null'] },
             external_object_url: { type: ['string', 'null'] },
+            provider_status: {
+              type: ['string', 'null'],
+              description: 'The event status an ICS subscription, CalDAV or iCloud reports: `TENTATIVE`, `CONFIRMED` or `CANCELLED`, null when the provider sends none and for every other event. A `CANCELLED` event stays in the calendar answers but reminds no one and is left out of `GET /calendar/upcoming`, the dashboard and the countdowns.',
+            },
             subscription_id: { type: ['integer', 'null'], description: 'The ICS subscription the event came from.' },
             calendar_ref_id: { type: ['integer', 'null'], description: 'The synced calendar the event came from.' },
             caldav_account_id: { type: ['integer', 'null'] },

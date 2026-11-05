@@ -1271,7 +1271,8 @@
         "syncTargetNoCalendarForPeople": "Nenhum calendário tem exatamente estas pessoas como atribuição padrão, por isso a atribuição não escolhe nenhum. Usado em vez disso: {{target}}.",
         "localCalendarEdit": "Editar calendário",
         "localCalendarNew": "Novo calendário",
-        "manageSubscriptionsLink": "Subscrições e sincronização"
+        "manageSubscriptionsLink": "Subscrições e sincronização",
+        "cancelled": "Cancelado"
     },
     "noteCategories": {
         "categories": "Categorias",

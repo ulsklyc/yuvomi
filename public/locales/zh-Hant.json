@@ -1271,7 +1271,8 @@
         "syncTargetNoCalendarForPeople": "沒有日曆的預設分配恰好是這些人，因此分配不會選擇日曆。改用：{{target}}。",
         "localCalendarEdit": "編輯行事曆",
         "localCalendarNew": "新增行事曆",
-        "manageSubscriptionsLink": "訂閱與同步"
+        "manageSubscriptionsLink": "訂閱與同步",
+        "cancelled": "已取消"
     },
     "noteCategories": {
         "categories": "分類",
