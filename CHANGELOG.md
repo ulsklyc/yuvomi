@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Administrators set night hours and screensaver options for each wall tablet.**
+  Settings > Wall tablets offers each tablet's night window, idle delay, clock and photo
+  fill. Online tablets pick up changes automatically; existing local choices stay in use
+  until an administrator saves, and personal browser preferences are preserved (#2436).
+
 ### Fixed
 - **A repeating reminder from iOS Reminders or Tasks.org no longer ends its series when you tick it
   off in Yuvomi** (part of #2506 and #2515). Yuvomi does not take over such a series yet, so it now

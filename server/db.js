@@ -11929,6 +11929,12 @@ const MIGRATIONS = [
   },
   {
     version: 278,
+    description: 'Wall displays: centrally managed night hours and screensaver options (#2436)',
+    // NULL preserves existing device-local choices until an administrator saves.
+    up: `ALTER TABLE display_accounts ADD COLUMN device_settings TEXT CHECK(device_settings IS NULL OR json_valid(device_settings));`,
+  },
+  {
+    version: 279,
     description: 'tasks: external_rrule keeps the recurrence rule another app owns',
     // #2506/#2515: eine in iOS Erinnerungen oder Tasks.org angelegte Serie kam
     // als Einmal-Aufgabe an. Hakte Yuvomi sie ab, ging STATUS:COMPLETED auf den
@@ -11936,14 +11942,10 @@ const MIGRATIONS = [
     // Die Spalte haelt die fremde Regel woertlich fest (der Inbound schreibt
     // sie bei jedem Abruf, NULL ohne Regel oder bei Yuvomis eigener). Solange
     // sie steht, sperren die Routen das Abhaken und der Push schickt nie
-    // COMPLETED auf diesen Master. Bewacht wie v277, damit ein zweiter Lauf
-    // auf gedrifteter Datenbank nicht scheitert.
-    up(database) {
-      const cols = database.prepare('PRAGMA table_info(tasks)').all();
-      if (!cols.some((c) => c.name === 'external_rrule')) {
-        database.exec('ALTER TABLE tasks ADD COLUMN external_rrule TEXT');
-      }
-    },
+    // COMPLETED auf diesen Master. Reines SQL, damit der Testspiegel
+    // (db-schema-test.js) sie fuehren kann; eine gedriftete Datenbank ohne die
+    // Spalte heilt reconcileCriticalSchema.
+    up: `ALTER TABLE tasks ADD COLUMN external_rrule TEXT;`,
   },
 ];
 
@@ -12320,7 +12322,7 @@ const CRITICAL_COLUMNS = [
   // D#2330: v273 traegt den Feed-Stand nach; ohne die Spalte scheitert jeder
   // ICS-Sync (er schreibt sie) und jeder Reset (er liest sie).
   { table: 'calendar_events', column: 'feed_original', type: 'TEXT' },
-  // #2506: v278 traegt die fremde Serienregel nach; ohne die Spalte scheitert
+  // #2506: v279 traegt die fremde Serienregel nach; ohne die Spalte scheitert
   // jeder VTODO-Abruf (der Upsert schreibt sie). Kein Nachtrag: NULL ist der
   // Stand, mit dem die Migration beginnt, der naechste Abruf fuellt sie.
   { table: 'tasks', column: 'external_rrule', type: 'TEXT' },
