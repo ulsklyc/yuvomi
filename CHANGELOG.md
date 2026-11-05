@@ -49,6 +49,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the installed app ended a status bar's height above the bottom of the screen, with an empty strip
   below the tab bar. It now takes the full screen height; Yuvomi in a Safari tab is unchanged.
 
+### Security
+- **Database backup downloads are limited to ten per hour for each administrator** (#2524). Every
+  download builds a full copy of the database on the server, so a hijacked admin session could
+  keep it busy by requesting one after another. Further downloads in the same hour are refused;
+  other administrators are not affected, and members still get no download at all.
+
 ## [2.85.0] - 2026-11-04
 
 ### Added
