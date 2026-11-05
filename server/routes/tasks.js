@@ -1500,7 +1500,7 @@ router.put('/:id', (req, res) => {
       : req.body.status;
     // Gegen den Stand NACH dieser Anfrage: wer im selben Zug die Wiederholung
     // abschaltet, fuehrt die Serie hier nicht mehr weiter.
-    if (completesForeignSeries({ ...task, is_recurring, recurrence_rule, due_date }, status)) {
+    if (completesForeignSeries({ ...task, is_recurring, recurrence_rule, due_date, due_time }, status)) {
       return res.status(409).json(FOREIGN_SERIES_ERROR);
     }
     if (reopensSettledVisit(db.get(), task.id, task.status, status) && !isAdminRequest(req)) {

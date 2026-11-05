@@ -2838,6 +2838,13 @@ export async function processPendingUpdates(client, accountId, module, objectInd
     // eine weitere Bearbeitung eingetroffen sein kann.
     const fresh = reloadRow(module, row.id);
     if (!fresh) continue; // parallel gelöscht - der Tombstone-Pfad übernimmt
+    // Hat die Zeile ihr Objekt inzwischen abgegeben (#2506: eine abgehakte
+    // fremde Serie reicht den Master an die Folgeinstanz weiter), gehoert die
+    // Vormerkung nicht mehr zu diesem Objekt. Gepatcht mit dem Stand der jetzt
+    // lokalen, erledigten Zeile ginge COMPLETED ohne RRULE auf den fremden
+    // Master (Review auf #2543). Die neue Halterin ist selbst vorgemerkt.
+    if (fresh.external_source !== row.external_source || fresh.external_uid !== row.external_uid
+      || fresh.external_account_id !== row.external_account_id) continue;
 
     const patched = patchICSTodo(
       known.data, row.external_uid, def.icsFields(fresh, hasCompleted(known.data), householdTimeZone(db.get()), known.data)

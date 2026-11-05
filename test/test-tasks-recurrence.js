@@ -1173,3 +1173,18 @@ test('Abbildbare fremde Serie: wer im selben PUT die Wiederholung abschaltet, be
   assert.equal(res.body.reason, 'task_foreign_series');
   assert.equal(db.prepare('SELECT status, is_recurring FROM tasks WHERE id = ?').get(id).is_recurring, 1);
 });
+
+test('Abbildbare fremde Serie: wer im selben PUT eine Uhrzeit setzt und abhakt, bekommt 409 (Review #2543)', async () => {
+  // Ein Ende gilt nur an einer Serie ohne Uhrzeit. Der Guard muss die neue
+  // Uhrzeit sehen, sonst legte der Spawn eine zweite Serie an.
+  const id = insertTask({
+    title: 'Restmuell', status: 'open', due_date: dayKey(1), created_by: uid,
+    external_uid: 'restmuell@phone', external_source: 'caldav',
+    external_rrule: 'FREQ=WEEKLY;UNTIL=20991231', is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY;UNTIL=20991231',
+  });
+  const res = await call('PUT', `/${id}`, { status: 'done', due_time: '08:00' });
+  assert.equal(res.status, 409);
+  const row = db.prepare('SELECT status, due_time FROM tasks WHERE id = ?').get(id);
+  assert.deepEqual({ ...row }, { status: 'open', due_time: null });
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM tasks WHERE recurrence_origin_id = ?').get(id).n, 0);
+});

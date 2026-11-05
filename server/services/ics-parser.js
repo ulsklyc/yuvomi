@@ -346,6 +346,39 @@ function completedInstant(raw) {
   return new Date(at).toISOString().replace(/\.\d{3}Z$/, 'Z') === iso ? iso : null;
 }
 
+/**
+ * Die Zone einer Datumszeile (#2506, Review auf #2543): ihre TZID, `UTC` fuer
+ * einen Wert mit Z, null fuer ein reines Datum oder eine schwebende Zeit.
+ */
+function dateLineZone(block, prop) {
+  const m = new RegExp(`^${prop}((?:;[^:;]*)*):(.*)$`, 'im').exec(block);
+  if (!m) return null;
+  const value = m[2].trim();
+  if (/;VALUE=DATE(?![-\w])/i.test(m[1]) || /^\d{8}$/.test(value)) return null;
+  const tz = /;TZID=([^;:]+)/i.exec(m[1]);
+  if (tz) return tz[1].trim();
+  return /Z$/i.test(value) ? 'UTC' : null;
+}
+
+/**
+ * Steht DTSTART an einem anderen Tag als DUE, oder in einer anderen Schreibweise
+ * (Zone, Datum gegen Zeit)? Dann rechnet die Serie von DTSTART aus, und DUE
+ * allein beschreibt sie nicht (Review auf #2543). Ohne DTSTART: false.
+ */
+function startLeavesDueDay(block) {
+  const line = (prop) => new RegExp(`^${prop}((?:;[^:;]*)*):(.*)$`, 'im').exec(block);
+  const start = line('DTSTART');
+  if (!start) return false;
+  const due = line('DUE');
+  if (!due) return true;
+  const startValue = start[2].trim();
+  const dueValue = due[2].trim();
+  const dateOnly = (m, v) => /;VALUE=DATE(?![-\w])/i.test(m[1]) || /^\d{8}$/.test(v);
+  return startValue.slice(0, 8) !== dueValue.slice(0, 8)
+    || dateOnly(start, startValue) !== dateOnly(due, dueValue)
+    || dateLineZone(block, 'DTSTART') !== dateLineZone(block, 'DUE');
+}
+
 function parseVTODO(ics) {
   const unfolded = unfoldLines(ics);
   const todos    = [];
@@ -384,6 +417,8 @@ function parseVTODO(ics) {
       status, due, priority, tags, parentUid, childUids,
       override: get('RECURRENCE-ID') !== null,
       exceptions: get('EXDATE') !== null || get('RDATE') !== null,
+      dueZone: dateLineZone(block, 'DUE'),
+      startShifted: startLeavesDueDay(block),
       rrule: get('RRULE'),
       yuvomiRrule: get('X-YUVOMI-RRULE'),
     });

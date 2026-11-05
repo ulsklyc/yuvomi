@@ -532,3 +532,84 @@ test('EXDATE, RDATE oder ein geaendertes Vorkommen: die Regel allein reicht nich
     assert.equal(res.status, 409, `${what}: abgehakt`);
   }
 });
+
+// ── Dritte Review-Runde auf #2543 ───────────────────────────────────────────
+
+test('Eine Serie mit Uhrzeit in einer anderen Zone als der Haushalt bleibt gesperrt (Review #2543)', async () => {
+  // Haushalt UTC, Serie Donnerstag 00:30 Berlin, BYDAY=TH: hier steht sie am
+  // Mittwoch 23:30, und der Rechner fuehrte den Wochentag der falschen Zone.
+  reset();
+  const berlin = appleSeries({ rrule: 'FREQ=WEEKLY;BYDAY=TH' })
+    .replace(/DTSTART;VALUE=DATE:\d+\r\n/, '')
+    .replace(/DUE;VALUE=DATE:\d+/, 'DUE;TZID=Europe/Berlin:20261105T003000');
+  dav.putObject(listUrl, FILE, berlin);
+  dav.putObject(listUrl, 'utc.ics', appleSeries({ uid: 'utc@phone', rrule: 'FREQ=WEEKLY;BYDAY=TH' })
+    .replace(/DTSTART;VALUE=DATE:\d+\r\n/, '')
+    .replace(/DUE;VALUE=DATE:\d+/, 'DUE:20261105T083000Z'));
+  dav.putObject(listUrl, 'floating.ics', appleSeries({ uid: 'floating@phone', rrule: 'FREQ=WEEKLY;BYDAY=TH' })
+    .replace(/DTSTART;VALUE=DATE:\d+\r\n/, '')
+    .replace(/DUE;VALUE=DATE:\d+/, 'DUE:20261105T083000'));
+  await remindersSync.sync();
+
+  const row = rowOf(UID);
+  assert.deepEqual([row.due_date, row.due_time], ['2026-11-04', '23:30'], 'Vorbedingung: der Tag kippt');
+  assert.equal(row.is_recurring, 0, 'eine Serie in fremder Zone wird weitergefuehrt');
+  assert.equal((await call('PATCH', `/${row.id}/status`, { status: 'done' })).status, 409);
+  assert.equal(rowOf('utc@phone').is_recurring, 1, 'in der Zone des Haushalts geht es');
+  assert.equal(rowOf('floating@phone').is_recurring, 1, 'schwebend ebenso');
+});
+
+test('DTSTART an einem anderen Tag als DUE: gesperrt (Review #2543)', async () => {
+  // Start Montag, faellig Mittwoch, BYDAY=MO: der Rechner kennt nur DUE und
+  // rueckte auf Montag statt Mittwoch.
+  reset();
+  dav.putObject(listUrl, FILE, appleSeries({ rrule: 'FREQ=WEEKLY;BYDAY=MO', due: '2026-11-04' })
+    .replace(/DTSTART;VALUE=DATE:\d+/, 'DTSTART;VALUE=DATE:20261102'));
+  await remindersSync.sync();
+  const row = rowOf(UID);
+  assert.equal(row.is_recurring, 0);
+  assert.equal((await call('PATCH', `/${row.id}/status`, { status: 'done' })).status, 409);
+});
+
+test('Der Push ueberspringt eine Vormerkung, deren Zeile den Master inzwischen abgegeben hat (Review #2543)', async () => {
+  // Waehrend der Push auf die Antwort einer anderen Aufgabe wartet, wird die
+  // Serie abgehakt: die alte Zeile ist danach die lokale erledigte Kopie. Ihr
+  // Schnappschuss nannte noch UID und Adresse des Masters - mit dem frischen
+  // Stand gepatcht, ginge COMPLETED ohne RRULE auf den fremden Master.
+  reset();
+  dav.putObject(listUrl, FILE, appleSeries());
+  dav.putObject(listUrl, 'other.ics', appleSeries({ uid: 'aaa@phone', rrule: 'FREQ=WEEKLY' }));
+  await remindersSync.sync();
+  const other = rowOf('aaa@phone');
+  const master = rowOf(UID);
+  // Die andere Aufgabe kommt zuerst dran (kleinere id).
+  db.prepare('UPDATE tasks SET id = 1 WHERE id = ?').run(other.id);
+  const masterId = master.id === 1 ? other.id : master.id;
+  db.prepare("UPDATE tasks SET title = 'neu', outbound_dirty = 1 WHERE id IN (1, ?)").run(masterId);
+
+  const index = new Map([
+    ['aaa@phone', { url: `${listUrl}other.ics`, etag: '"x"', data: dav.getObject(listUrl, 'other.ics').data }],
+    [UID, { url: `${listUrl}${FILE}`, etag: '"y"', data: dav.getObject(listUrl, FILE).data }],
+  ]);
+  const updated = [];
+  let first = true;
+  const client = {
+    updateCalendarObject: async ({ calendarObject }) => {
+      updated.push(calendarObject);
+      if (first) {
+        first = false;
+        db.prepare("UPDATE tasks SET status = 'done' WHERE id = ?").run(masterId);
+        const followup = Number(db.prepare(
+          "INSERT INTO tasks (title, created_by, status, due_date, is_recurring, recurrence_rule) VALUES ('neu', ?, 'open', ?, 1, 'FREQ=DAILY')",
+        ).run(ADMIN, dayKey(1)).lastInsertRowid);
+        assert.ok(todoOutbound.handOverForeignSeries(taskOf(masterId), followup), 'Vorbedingung: uebergeben');
+      }
+      return {};
+    },
+  };
+  await todoOutbound.processPendingUpdates(client, accountId, 'tasks', index);
+  const toMaster = updated.filter((obj) => obj.url.endsWith(FILE));
+  assert.ok(toMaster.every((obj) => !todoLines(obj.data, 'STATUS').includes('STATUS:COMPLETED')),
+    'COMPLETED ging auf den fremden Master');
+  assert.equal(toMaster.length, 0, 'die abgegebene Vormerkung wurde trotzdem gesendet');
+});

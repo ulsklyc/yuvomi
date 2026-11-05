@@ -346,12 +346,17 @@ function rowForTodoUid(d, table, columns, uid, accountId) {
  *
  * @returns {{isRecurring: 0|1, rule: string|null}|null}
  */
-function foreignRecurrence(externalRrule, dueDate, dueTime, { ruleRemoved = false, exceptions = false } = {}) {
+function foreignRecurrence(externalRrule, dueDate, dueTime, {
+  ruleRemoved = false, exceptions = false, foreignZone = false, startShifted = false,
+} = {}) {
   if (!externalRrule) return ruleRemoved ? { isRecurring: 0, rule: null } : null;
   // Mit EXDATE, RDATE oder geaenderten Einzelvorkommen beschreibt die Regel die
-  // Serie nicht allein (Review auf #2543): Yuvomi ruckte sonst auf einen Tag,
-  // den die andere App ausgenommen hat.
-  const mapped = exceptions ? null : todoOutbound.mappableForeignRule(externalRrule);
+  // Serie nicht allein (Review auf #2543): Yuvomi rueckte sonst auf einen Tag,
+  // den die andere App ausgenommen hat. Ebenso mit einem DTSTART an einem
+  // anderen Tag als DUE (der Rechner kennt nur DUE) und mit einer Uhrzeit in
+  // einer anderen Zone als der des Haushalts.
+  const unsure = exceptions || foreignZone || startShifted;
+  const mapped = unsure ? null : todoOutbound.mappableForeignRule(externalRrule);
   return mapped && todoOutbound.foreignRuleFitsDue(mapped, dueDate, dueTime)
     ? { isRecurring: 1, rule: mapped }
     : { isRecurring: 0, rule: null };
@@ -386,6 +391,11 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions 
     const recurrence = foreignRecurrence(externalRrule, date, time, {
       ruleRemoved: !ownObject && !todo.rrule && Boolean(existing?.external_rrule),
       exceptions: Boolean(todo.seriesExceptions),
+      // Die Regel rechnet in der Zone ihres Ankers. Mit Uhrzeit liest Yuvomi DUE
+      // in die Zone des Haushalts um; weicht die ab, kippt ein BYDAY auf den
+      // Nachbartag (Review auf #2543). Nur schwebend oder in derselben Zone.
+      foreignZone: Boolean(time && todo.dueZone && todo.dueZone !== householdTimeZone(d)),
+      startShifted: Boolean(todo.startShifted),
     });
 
     let taskId;
