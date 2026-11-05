@@ -8,6 +8,7 @@
 
 import { t } from '/i18n.js';
 import { settingRowHtml } from '/settings/components.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 const HINT_ID = 'backup-restore-key-hint';
 const HTTP_ID = 'backup-restore-key-http';
@@ -114,6 +115,10 @@ export const REASON_TEXT = Object.freeze({
   restore_in_progress: () => t('settings.backupRestoreErrorInProgress'),
   // Noch laufende Arbeit, der Restore hat nach seiner Frist aufgegeben (#1431).
   restore_busy: () => t('settings.backupRestoreErrorBusy'),
+  // #1909: bis dahin nur als englischer Text des Servers.
+  backup_file_empty: () => t('settings.backupRestoreErrorFileEmpty'),
+  backup_not_yuvomi: () => t('settings.backupRestoreErrorNotYuvomi'),
+  backup_newer_version: () => t('settings.backupRestoreErrorNewerVersion'),
 });
 
 /**
@@ -125,19 +130,19 @@ export const REASON_TEXT = Object.freeze({
  * naechsten Schritt, ein unbekannter den allgemeinen. Die Servermeldung wird
  * NICHT angehaengt; sie steht im Server-Log, und die Texte sagen das.
  *
- * Ohne `reason` bleibt es bei der Servermeldung, wie in `twoFactorErrorText()`
- * (personal-account.js): diese Fehler tragen ihren Inhalt nur im Text, etwa
- * „Backup aus einer neueren Yuvomi-Version, erst aktualisieren". Ein
- * allgemeiner Text verloere genau den naechsten Schritt.
+ * Ohne bekannten `reason` nie die Servermeldung (#1909): jeder Fall, dessen
+ * naechsten Schritt die Seite nennen muss (leere Datei, keine Yuvomi-Datenbank,
+ * neuere Version), traegt seinen Grund. Der Rest geht durch errorSentence -
+ * offline, Bremse, zu gross haben dort ihren Satz -, sonst der allgemeine
+ * Restore-Text, der auf das Server-Log zeigt.
  * @param {{ message?: string, data?: { reason?: string } } | undefined} err
  * @returns {string}
  */
 export function restoreErrorText(err) {
   const reason = err?.data?.reason;
-  if (!reason) return err?.message || t('common.errorGeneric');
-  return Object.hasOwn(REASON_TEXT, reason)
+  return reason && Object.hasOwn(REASON_TEXT, reason)
     ? REASON_TEXT[reason]()
-    : t('settings.backupRestoreErrorGeneric');
+    : errorSentence(err, 'settings.backupRestoreErrorGeneric');
 }
 
 /** Base64 der UTF-8-Bytes - so erwartet der Server `X-Backup-Key`. */

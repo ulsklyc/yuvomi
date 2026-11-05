@@ -859,7 +859,14 @@ const CASE_REASONS = {
       + '`last_admin` (400, at least one system admin must remain), '
       + '`last_sso_admin` (400, the last administrator linked to SSO cannot be demoted while password login is off)',
   },
-  '/api/v1/auth/api-tokens': { post: DEACTIVATED_SUBJECT },
+  // #1909: dazu, was das Formular der Seite API-Zugriff erreicht.
+  '/api/v1/auth/api-tokens': {
+    post: `${DEACTIVATED_SUBJECT}, `
+      + '`api_tokens_name_required` (400, the name is empty), '
+      + '`api_tokens_name_too_long` (400, the name is longer than 100 characters), '
+      + '`api_tokens_expiry_past` (400, `expires_at` is not in the future), '
+      + '`api_tokens_subject_unknown` (400, there is no account with `subject_user_id`, for example because it was deleted meanwhile)',
+  },
   '/api/v1/auth/devices': {
     get: '`session_required` (403, an API token cannot read a person\'s devices)',
     post: '`device_credential` (403, a device cannot add another device), `session_required` (403, an API token cannot add a device), `not_a_household_member` (403, the account is no household member)',

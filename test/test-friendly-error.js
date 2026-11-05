@@ -619,6 +619,11 @@ test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#
     ['calendar_ics_url_invalid', 'settings.icsErrorUrlInvalid'],
     ['calendar_ics_url_scheme', 'settings.icsErrorUrlScheme'],
     ['calendar_ics_private_address', 'settings.icsErrorPrivateAddress'],
+    // Seite API-Zugriff (#1909); die echte Antwort misst test:api-token-subject.
+    ['api_tokens_name_required', 'quickLinks.nameRequired'],
+    ['api_tokens_name_too_long', 'settings.apiTokenErrorNameTooLong'],
+    ['api_tokens_expiry_past', 'settings.apiTokenErrorExpiryPast'],
+    ['api_tokens_subject_unknown', 'settings.syncAssigneeUnknown'],
   ]) {
     assert.equal(errorSentence(answer(400, SERVER_TEXT, reason)), key, reason);
   }

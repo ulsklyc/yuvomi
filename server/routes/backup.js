@@ -196,7 +196,7 @@ router.post(
     let backupKey = null;
     try {
       if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-        return res.status(400).json({ error: 'Backup file is required.', code: 400 });
+        return res.status(400).json({ error: 'Backup file is required.', code: 400, reason: 'backup_file_empty' });
       }
       backupKey = backupKeyFromHeader(req);
 

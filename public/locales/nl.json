@@ -3541,7 +3541,13 @@
         "icsErrorUrlScheme": "Het adres moet beginnen met https://.",
         "icsErrorPrivateAddress": "Dit adres ligt in een privénetwerk en wordt om veiligheidsredenen niet opgehaald. Gebruik een openbaar bereikbaar adres.",
         "icsErrorHttpStatus": "Het adres leverde geen kalender (antwoord {{status}}). Controleer het adres of probeer het later opnieuw.",
-        "icsErrorTooLarge": "De kalender op dit adres is groter dan {{limit_mb}} MB en kan niet worden opgehaald."
+        "icsErrorTooLarge": "De kalender op dit adres is groter dan {{limit_mb}} MB en kan niet worden opgehaald.",
+        "backupRestoreErrorFileEmpty": "Het gekozen bestand is leeg. Kies het back-upbestand dat Yuvomi heeft gedownload. Hier is niets gewijzigd.",
+        "backupRestoreErrorNotYuvomi": "Het bestand is een database, maar niet van Yuvomi. Kies een back-upbestand dat Yuvomi heeft gedownload. Hier is niets gewijzigd.",
+        "backupRestoreErrorNewerVersion": "Deze back-up komt uit een nieuwere versie van Yuvomi. Werk Yuvomi eerst bij en zet hem daarna terug. Hier is niets gewijzigd.",
+        "apiTokenErrorNameTooLong": "De naam mag maximaal 100 tekens lang zijn.",
+        "apiTokenErrorExpiryPast": "De vervaldatum ligt in het verleden. Kies een later tijdstip.",
+        "apiTokenErrorSubjectDeactivated": "Dit account is gedeactiveerd en kan geen token krijgen. Kies een andere persoon."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

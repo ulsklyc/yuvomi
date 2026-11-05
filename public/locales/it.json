@@ -3541,7 +3541,13 @@
         "icsErrorUrlScheme": "L’indirizzo deve iniziare con https://.",
         "icsErrorPrivateAddress": "Questo indirizzo si trova in una rete privata e per sicurezza non viene consultato. Usa un indirizzo raggiungibile pubblicamente.",
         "icsErrorHttpStatus": "L’indirizzo non ha fornito un calendario (risposta {{status}}). Controlla l’indirizzo o riprova più tardi.",
-        "icsErrorTooLarge": "Il calendario a questo indirizzo supera {{limit_mb}} MB e non può essere recuperato."
+        "icsErrorTooLarge": "Il calendario a questo indirizzo supera {{limit_mb}} MB e non può essere recuperato.",
+        "backupRestoreErrorFileEmpty": "Il file selezionato è vuoto. Scegli il file di backup scaricato da Yuvomi. Qui non è stato modificato nulla.",
+        "backupRestoreErrorNotYuvomi": "Il file è un database, ma non di Yuvomi. Scegli un file di backup scaricato da Yuvomi. Qui non è stato modificato nulla.",
+        "backupRestoreErrorNewerVersion": "Questo backup proviene da una versione più recente di Yuvomi. Aggiorna prima Yuvomi, poi ripristinalo. Qui non è stato modificato nulla.",
+        "apiTokenErrorNameTooLong": "Il nome può contenere al massimo 100 caratteri.",
+        "apiTokenErrorExpiryPast": "La data di scadenza è nel passato. Scegli un momento successivo.",
+        "apiTokenErrorSubjectDeactivated": "Questo account è disattivato e non può ricevere un token. Scegli un’altra persona."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",

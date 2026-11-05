@@ -189,6 +189,24 @@ test('POST /restore: leerer Body → 400', async () => {
   const r = await call('POST', '/restore', { actor: ADM, raw: Buffer.alloc(0) });
   assert.equal(r.status, 400);
   assert.match(r.body.error, /required/i);
+  // #1909: die Seite sagt den Fall in der Sprache der Oberflaeche.
+  assert.equal(r.body.reason, 'backup_file_empty');
+});
+
+// #1909: eine lesbare SQLite-Datei, die keine Yuvomi-Datenbank ist - die Seite
+// zeigte bisher den englischen Text des Servers.
+test('POST /restore: SQLite ohne Yuvomi-Schema → 400 backup_not_yuvomi, Live-DB unangetastet', async () => {
+  const versionBefore = dbmod.currentVersion();
+  const foreignPath = path.join(TMP_ROOT, 'foreign.db');
+  const { default: Database } = await import('better-sqlite3-multiple-ciphers');
+  const foreign = new Database(foreignPath);
+  foreign.exec('CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT)');
+  foreign.close();
+  const r = await call('POST', '/restore', { actor: ADM, raw: fs.readFileSync(foreignPath) });
+  assert.equal(r.status, 400);
+  assert.match(r.body.error, /not a valid Yuvomi database/);
+  assert.equal(r.body.reason, 'backup_not_yuvomi');
+  assert.equal(dbmod.currentVersion(), versionBefore);
 });
 
 test('POST /restore: kein gültiges SQLite → 400, Live-DB unangetastet', async () => {
@@ -473,6 +491,8 @@ test('POST /restore: Backup aus einer neueren Yuvomi-Version → 400, Live-DB un
   assert.equal(r.status, 400);
   assert.match(r.body.error, /newer Yuvomi/i);
   assert.match(r.body.error, /999999/);
+  // #1909: der naechste Schritt (erst aktualisieren) steht als Fall in der Antwort.
+  assert.equal(r.body.reason, 'backup_newer_version');
   // Nichts kopiert: Version und Nutzbarkeit der Live-DB unveraendert.
   assert.equal(dbmod.currentVersion(), versionBefore);
   assert.deepEqual(dbmod.unknownMigrationVersions(database()), []);

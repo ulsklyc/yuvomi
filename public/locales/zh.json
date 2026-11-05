@@ -3541,7 +3541,13 @@
         "icsErrorUrlScheme": "地址必须以 https:// 开头。",
         "icsErrorPrivateAddress": "该地址位于专用网络中，出于安全原因不会获取。请使用可公开访问的地址。",
         "icsErrorHttpStatus": "该地址没有提供日历（响应 {{status}}）。请检查地址或稍后再试。",
-        "icsErrorTooLarge": "该地址的日历超过 {{limit_mb}} MB，无法获取。"
+        "icsErrorTooLarge": "该地址的日历超过 {{limit_mb}} MB，无法获取。",
+        "backupRestoreErrorFileEmpty": "所选文件是空的。请选择 Yuvomi 下载的备份文件。这里没有任何更改。",
+        "backupRestoreErrorNotYuvomi": "该文件是数据库，但不是 Yuvomi 的。请选择 Yuvomi 下载的备份文件。这里没有任何更改。",
+        "backupRestoreErrorNewerVersion": "该备份来自更新版本的 Yuvomi。请先更新 Yuvomi，然后再恢复。这里没有任何更改。",
+        "apiTokenErrorNameTooLong": "名称最多 100 个字符。",
+        "apiTokenErrorExpiryPast": "到期日期已经过去。请选择更晚的时间。",
+        "apiTokenErrorSubjectDeactivated": "此账户已停用，无法获得令牌。请选择其他人。"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",

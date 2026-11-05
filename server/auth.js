@@ -3676,13 +3676,17 @@ router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res)
     const name = String(req.body.name || '').trim();
     const expiresAt = req.body.expires_at ? String(req.body.expires_at).trim() : null;
 
-    if (!name) return res.status(400).json({ error: 'Token name is required.', code: 400 });
-    if (name.length > 100) return res.status(400).json({ error: 'Token name may be at most 100 characters long.', code: 400 });
+    if (!name) return res.status(400).json({ error: 'Token name is required.', code: 400, reason: 'api_tokens_name_required' });
+    if (name.length > 100) {
+      return res.status(400).json({
+        error: 'Token name may be at most 100 characters long.', code: 400, reason: 'api_tokens_name_too_long',
+      });
+    }
     if (expiresAt && Number.isNaN(Date.parse(expiresAt))) {
       return res.status(400).json({ error: 'expires_at must be a valid ISO date/time.', code: 400 });
     }
     if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
-      return res.status(400).json({ error: 'Expiration date must be in the future.', code: 400 });
+      return res.status(400).json({ error: 'Expiration date must be in the future.', code: 400, reason: 'api_tokens_expiry_past' });
     }
 
     // scopes: fehlend/null → uneingeschränktes Token (Voll-Zugriff, Default wie bisher).
@@ -3719,7 +3723,9 @@ router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res)
         EXISTS(SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id) AS is_split_guest
       FROM users u WHERE u.id = ?
     `).get(subjectUserId);
-    if (!subject) return res.status(400).json({ error: 'Token subject user was not found.', code: 400 });
+    if (!subject) {
+      return res.status(400).json({ error: 'Token subject user was not found.', code: 400, reason: 'api_tokens_subject_unknown' });
+    }
     if (subject.is_split_guest) {
       return res.status(400).json({ error: 'A split-expense guest cannot be an API token subject.', code: 400 });
     }
