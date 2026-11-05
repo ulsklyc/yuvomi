@@ -3546,7 +3546,11 @@
         "memberErrorUsernameTaken": "Akun lain sudah memakai nama pengguna ini.",
         "memberErrorGone": "Anggota ini sudah tidak ada.",
         "memberErrorSsoEmailRequired": "Akun khusus SSO memerlukan alamat email agar masuk pertama lewat SSO dapat menemukannya.",
-        "memberErrorSsoEmailAmbiguous": "Anggota lain sudah memakai alamat email ini. SSO tidak dapat membedakan akun-akun tersebut."
+        "memberErrorSsoEmailAmbiguous": "Anggota lain sudah memakai alamat email ini. SSO tidak dapat membedakan akun-akun tersebut.",
+        "twoFactorAlreadyEnabled": "Autentikasi dua faktor sudah aktif. Muat ulang halaman untuk melihat status terkini.",
+        "twoFactorSetupExpired": "Penyiapan sudah kedaluwarsa. Batalkan dan mulai lagi.",
+        "oidcLinkErrorNotConfigured": "SSO tidak lagi disiapkan di server ini.",
+        "oidcUnlinkNotLinked": "Akun ini tidak lagi tertaut dengan SSO. Muat ulang halaman untuk melihat status terkini."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

@@ -3528,7 +3528,11 @@
         "memberErrorUsernameTaken": "Outra conta já tem este nome de utilizador.",
         "memberErrorGone": "Este membro já não existe.",
         "memberErrorSsoEmailRequired": "Uma conta só com SSO precisa de um endereço de e-mail para que o primeiro início de sessão por SSO a encontre.",
-        "memberErrorSsoEmailAmbiguous": "Outro membro já tem este endereço de e-mail. O SSO não conseguiria distinguir as contas."
+        "memberErrorSsoEmailAmbiguous": "Outro membro já tem este endereço de e-mail. O SSO não conseguiria distinguir as contas.",
+        "twoFactorAlreadyEnabled": "A autenticação de dois fatores já está ativada. Recarrega a página para veres o estado atual.",
+        "twoFactorSetupExpired": "A configuração expirou. Cancela e começa de novo.",
+        "oidcLinkErrorNotConfigured": "O SSO já não está configurado neste servidor.",
+        "oidcUnlinkNotLinked": "Esta conta já não está associada ao SSO. Recarrega a página para veres o estado atual."
     },
     "login": {
         "tagline": "Bem-vindo de volta. A tua casa num só lugar.",

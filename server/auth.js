@@ -2593,11 +2593,11 @@ router.get('/oidc/link', requireAuth, refuseWhileRestoring, (req, res) => {
 router.post('/oidc/link/start', requireAuth, csrfMiddleware, async (req, res) => {
   try {
     const config = await getOidcConfig();
-    if (!config) return res.status(404).json({ error: 'OIDC is not configured.', code: 404 });
+    if (!config) return res.status(404).json({ error: 'OIDC is not configured.', code: 404, reason: 'oidc_not_configured' });
 
     const user = db.get().prepare('SELECT oidc_sub FROM users WHERE id = ?').get(req.authUserId);
     if (user?.oidc_sub) {
-      return res.status(409).json({ error: 'Account is already linked.', code: 409 });
+      return res.status(409).json({ error: 'Account is already linked.', code: 409, reason: 'oidc_already_linked' });
     }
 
     res.json({ url: await beginOidcFlow(req, config, { linkUserId: req.authUserId }) });
@@ -2617,15 +2617,18 @@ router.delete('/oidc/link', requireAuth, csrfMiddleware, (req, res) => {
   if (result.ok) return res.json({ ok: true });
 
   if (result.reason === 'user_gone')   return res.status(404).json({ error: 'User not found.', code: 404 });
-  if (result.reason === 'not_linked')  return res.status(409).json({ error: 'Account is not linked.', code: 409 });
+  // Die Gruende als Literale (#1909): das Konto-Blatt sagt den Satz dazu.
+  if (result.reason === 'not_linked')  return res.status(409).json({ error: 'Account is not linked.', code: 409, reason: 'oidc_not_linked' });
   if (result.reason === 'last_sso_admin') return res.status(409).json({
     error: 'This is the last administrator linked to SSO. Unlinking it would switch password login '
       + 'back on for the whole household. Link another administrator first.',
     code: 409,
+    reason: 'last_sso_admin',
   });
   return res.status(409).json({
     error: 'Set a password before unlinking - it is currently the only way into this account.',
     code:  409,
+    reason: 'oidc_password_required',
   });
 });
 
@@ -3071,7 +3074,9 @@ router.post('/2fa/verify', twoFactorLimiter, async (req, res) => {
   try {
     const pending = consumePendingTwoFactor(req);
     if (!pending) {
-      return res.status(401).json({ error: 'No pending sign-in.', code: 401 });
+      // Der Grund trennt den abgelaufenen Wartezustand vom falschen Code (#1909):
+      // die Anmeldeseite schickt dann zurueck an den Anfang statt zum Code.
+      return res.status(401).json({ error: 'No pending sign-in.', code: 401, reason: 'two_factor_no_pending_sign_in' });
     }
 
     // Zwischen Passwort und Code kann das Konto deaktiviert worden sein
@@ -3144,7 +3149,7 @@ router.post('/2fa/setup', requireAuth, csrfMiddleware, (req, res) => {
     res.json({ data: { secret, uri, qr } });
   } catch (err) {
     if (err.code === 'already_enabled') {
-      return res.status(409).json({ error: err.message, code: 409 });
+      return res.status(409).json({ error: err.message, code: 409, reason: 'already_enabled' });
     }
     log.error('2FA setup error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

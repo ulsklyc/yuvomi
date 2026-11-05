@@ -436,7 +436,7 @@ test('R23: Feldfehler an Einrichtung und Anmeldung stehen am Feld, mit Fokus', a
   assert.doesNotMatch(setup, /setup\.(?:password|confirmPassword)Placeholder/, 'keine Punkte als Platzhalter, die ausgefuellt wirken');
   assert.match(setup, /showAuthError\(errorEl, t\('setup\.errorPasswordMismatch'\), form\.confirm_password\)/);
   const login = read('../public/pages/login.js');
-  assert.match(login, /pendingError = \{ message, field: err\.status === 401 \? passwordInput : null \};/, 'falsche Zugangsdaten: am Passwort');
+  assert.match(login, /pendingError = \{ sentence: message, field: err\.status === 401 \? passwordInput : null \};/, 'falsche Zugangsdaten: am Passwort');
   assert.doesNotMatch(login, /^\s*errorEl\.focus\(\);/m, 'kein Fokus auf den Kasten mehr');
   const de = JSON.parse(read('../public/locales/de.json')).setup;
   assert.doesNotMatch(JSON.stringify(de), /Account/, 'die Einrichtung sagt "Konto"');

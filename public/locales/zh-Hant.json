@@ -3528,7 +3528,11 @@
         "memberErrorUsernameTaken": "其他帳號已使用此使用者名稱。",
         "memberErrorGone": "此成員已不存在。",
         "memberErrorSsoEmailRequired": "僅限 SSO 的帳號需要電子郵件地址，首次 SSO 登入才能找到它。",
-        "memberErrorSsoEmailAmbiguous": "其他成員已使用此電子郵件地址。SSO 無法區分這些帳號。"
+        "memberErrorSsoEmailAmbiguous": "其他成員已使用此電子郵件地址。SSO 無法區分這些帳號。",
+        "twoFactorAlreadyEnabled": "兩步驗證已經啟用。請重新載入頁面查看目前狀態。",
+        "twoFactorSetupExpired": "設定已逾時。請取消後重新開始。",
+        "oidcLinkErrorNotConfigured": "此伺服器已不再設定 SSO。",
+        "oidcUnlinkNotLinked": "此帳戶已不再與 SSO 關聯。請重新載入頁面查看目前狀態。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

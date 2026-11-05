@@ -3528,7 +3528,11 @@
         "memberErrorUsernameTaken": "Ez a felhasználónév már egy másik fiókhoz tartozik.",
         "memberErrorGone": "Ez a tag már nem létezik.",
         "memberErrorSsoEmailRequired": "A csak SSO-s fióknak e-mail-cím kell, hogy az első SSO-bejelentkezés megtalálja.",
-        "memberErrorSsoEmailAmbiguous": "Ez az e-mail-cím már egy másik tagé. Az SSO nem tudná megkülönböztetni a fiókokat."
+        "memberErrorSsoEmailAmbiguous": "Ez az e-mail-cím már egy másik tagé. Az SSO nem tudná megkülönböztetni a fiókokat.",
+        "twoFactorAlreadyEnabled": "A kétlépcsős azonosítás már be van kapcsolva. Töltsd újra az oldalt az aktuális állapotért.",
+        "twoFactorSetupExpired": "A beállítás lejárt. Szakítsd meg, és kezdd újra.",
+        "oidcLinkErrorNotConfigured": "Az SSO már nincs beállítva ezen a szerveren.",
+        "oidcUnlinkNotLinked": "Ez a fiók már nincs összekötve az SSO-val. Töltsd újra az oldalt az aktuális állapotért."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

@@ -3528,7 +3528,11 @@
         "memberErrorUsernameTaken": "Ett annat konto har redan det här användarnamnet.",
         "memberErrorGone": "Den här medlemmen finns inte längre.",
         "memberErrorSsoEmailRequired": "Ett konto med enbart SSO behöver en e-postadress så att den första SSO-inloggningen hittar det.",
-        "memberErrorSsoEmailAmbiguous": "En annan medlem har redan den här e-postadressen. SSO skulle inte kunna skilja kontona åt."
+        "memberErrorSsoEmailAmbiguous": "En annan medlem har redan den här e-postadressen. SSO skulle inte kunna skilja kontona åt.",
+        "twoFactorAlreadyEnabled": "Tvåfaktorsinloggning är redan aktiverad. Ladda om sidan för att se aktuellt läge.",
+        "twoFactorSetupExpired": "Konfigurationen har gått ut. Avbryt och börja om.",
+        "oidcLinkErrorNotConfigured": "SSO är inte längre konfigurerat på den här servern.",
+        "oidcUnlinkNotLinked": "Det här kontot är inte längre kopplat till SSO. Ladda om sidan för att se aktuellt läge."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

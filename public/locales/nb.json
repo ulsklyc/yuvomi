@@ -3528,7 +3528,11 @@
         "memberErrorUsernameTaken": "En annen konto har allerede dette brukernavnet.",
         "memberErrorGone": "Dette medlemmet finnes ikke lenger.",
         "memberErrorSsoEmailRequired": "En konto med bare SSO trenger en e-postadresse, slik at den første SSO-påloggingen finner den.",
-        "memberErrorSsoEmailAmbiguous": "Et annet medlem har allerede denne e-postadressen. SSO kunne ikke skilt kontoene fra hverandre."
+        "memberErrorSsoEmailAmbiguous": "Et annet medlem har allerede denne e-postadressen. SSO kunne ikke skilt kontoene fra hverandre.",
+        "twoFactorAlreadyEnabled": "Tofaktorautentisering er allerede aktivert. Last inn siden på nytt for å se gjeldende status.",
+        "twoFactorSetupExpired": "Oppsettet har utløpt. Avbryt og start på nytt.",
+        "oidcLinkErrorNotConfigured": "SSO er ikke lenger satt opp på denne serveren.",
+        "oidcUnlinkNotLinked": "Denne kontoen er ikke lenger koblet til SSO. Last inn siden på nytt for å se gjeldende status."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",

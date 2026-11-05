@@ -22460,7 +22460,6 @@ const ERROR_MESSAGE_OWNERS = new Set([
 // errorSentence nimmt dem Nutzer die Ursache.
 const ERROR_MESSAGE_OPEN = new Map([
   ['components/category-manager.js', 1],
-  ['pages/login.js', 3],
   ['settings/backup-key.js', 1],
   ['settings/pages/admin-api.js', 2],
   ['settings/pages/admin-backup.js', 2],
@@ -22469,7 +22468,6 @@ const ERROR_MESSAGE_OPEN = new Map([
   ['settings/pages/documents-dms.js', 2],
   ['settings/pages/documents-storage.js', 1],
   ['settings/pages/modules-install.js', 1],
-  ['settings/pages/personal-account.js', 5],
   ['settings/pages/personal-calendar-subscriptions.js', 3],
   ['settings/pages/personal-device.js', 1],
   ['settings/pages/personal-feeds.js', 1],
