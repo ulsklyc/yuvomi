@@ -191,7 +191,7 @@ async function notifyAdminsOfBackupFailure({ database, pushService = defaultPush
     const payload = {
       title: translate(locale, 'settings.backupSchedulerFailedPushTitle'),
       body: translate(locale, 'settings.backupSchedulerFailedPushBody'),
-      url: '/settings/household/backup',
+      url: '/settings/admin/backup',
       // EIN EINTRAG, NICHT EINER JE LAUF: zwei Naechte hintereinander
       // gescheitert soll eine Meldung ersetzen, keine zweite daneben legen.
       tag: 'backup-failure',
