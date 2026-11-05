@@ -844,7 +844,13 @@
             "waited": "«{{item}}» ble ikke flyttet til «{{target}}»: synkroniseringen av «{{back}}» har vært slått av i over en uke. Varen dukker opp igjen på «{{back}}» når listen slås på."
         },
         "moreDetailsHint": "Pris, butikk, lenke, notat",
-        "toPantryAllToPlaceholder": "Velg et sted …"
+        "toPantryAllToPlaceholder": "Velg et sted …",
+        "summaryRemaining": "Gjenstår",
+        "summaryPurchased": "I handlekurven",
+        "summaryTotal": "Beregnet total",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "omtrent {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediens",

@@ -844,7 +844,13 @@
             "waited": "Το «{{item}}» δεν μεταφέρθηκε στη λίστα «{{target}}»: ο συγχρονισμός της λίστας «{{back}}» είναι απενεργοποιημένος πάνω από μία εβδομάδα. Το είδος θα εμφανιστεί ξανά στη λίστα «{{back}}» μόλις την ενεργοποιήσετε."
         },
         "moreDetailsHint": "Τιμή, κατάστημα, σύνδεσμος, σημείωση",
-        "toPantryAllToPlaceholder": "Επιλέξτε θέση …"
+        "toPantryAllToPlaceholder": "Επιλέξτε θέση …",
+        "summaryRemaining": "Προς αγορά",
+        "summaryPurchased": "Στο καλάθι",
+        "summaryTotal": "Εκτιμώμενο σύνολο",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "περίπου {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} υλικό",

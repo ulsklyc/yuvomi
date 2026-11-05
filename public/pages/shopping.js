@@ -1413,6 +1413,23 @@ function mountItems(listEl, container) {
   // kann das nicht - mit begrenzter Hoehe liefe Multicol seitlich ueber.
   // Mobil ist sie `display: contents` und aendert nichts.
   listEl.insertAdjacentHTML('beforeend', `<div class="items-lanes">${renderItems(fill.rows)}</div>`);
+  listEl.insertAdjacentHTML('beforeend', `
+    <div class="shopping-price-summary" id="shopping-price-summary" hidden>
+      <span class="shopping-price-summary__item">
+        <span class="shopping-price-summary__label">${esc(t('shopping.summaryRemaining'))}</span>
+        <span class="shopping-price-summary__value" data-summary="pending"></span>
+      </span>
+      <span class="shopping-price-summary__dot" aria-hidden="true">${esc(t('shopping.metaSeparator'))}</span>
+      <span class="shopping-price-summary__item">
+        <span class="shopping-price-summary__label">${esc(t('shopping.summaryPurchased'))}</span>
+        <span class="shopping-price-summary__value" data-summary="purchased"></span>
+      </span>
+      <span class="shopping-price-summary__dot" aria-hidden="true">${esc(t('shopping.metaSeparator'))}</span>
+      <span class="shopping-price-summary__item">
+        <span class="shopping-price-summary__value" data-summary="total"></span>
+      </span>
+    </div>
+  `);
   // DIE SPALTEN SCHIEBEN AUF, WAS NICHT IN SICHT IST - erst nachdem jede
   // Kategorie einmal ganz gelegt ist und sich ihre Hoehe gemerkt hat
   // (shopping.css, `.items-lanes.is-sized`; Critique R22-F F2.2).
@@ -1680,8 +1697,8 @@ function renderItem(item) {
         ${renderItemCheck(item, isDone)}
         <div class="list-row__main">
           <div class="list-row__name">${esc(item.name)}${renderItemMeta(item)}</div>
-          ${item.quantity || item.tags?.length ? `<div class="list-row__meta">
-            ${item.quantity ? `<span class="shopping-item__quantity">${esc(item.quantity)}</span>` : ''}
+          ${renderItemDetailsMeta(item) || item.tags?.length ? `<div class="list-row__meta">
+            ${renderItemDetailsMeta(item)}
             ${renderItemTags(item.tags)}
           </div>` : ''}
         </div>
@@ -2679,6 +2696,7 @@ function updateItemRow(container, item) {
   const isDone = Boolean(checkedOf(item));
 
   row.dataset.swipeChecked = String(checkedOf(item));
+  renderShoppingSummary(container);
 
   row.querySelector('.shopping-item')?.classList.toggle('shopping-item--checked', isDone);
 
@@ -2742,22 +2760,15 @@ function refreshItemName(container, item) {
    * wenn beides fehlt. */
   const main = card.querySelector('.list-row__main');
   const metaEl = main?.querySelector('.list-row__meta');
-  const hasTags = !!item.tags?.length;
-  if (item.quantity || hasTags) {
+  const detailsMetaHtml = renderItemDetailsMeta(item);
+  const tagsHtml = renderItemTags(item.tags);
+
+  if (detailsMetaHtml || tagsHtml) {
     if (!metaEl) {
-      main?.insertAdjacentHTML('beforeend', `<div class="list-row__meta">
-        ${item.quantity ? `<span class="shopping-item__quantity">${esc(item.quantity)}</span>` : ''}
-        ${renderItemTags(item.tags)}
-      </div>`);
+      main?.insertAdjacentHTML('beforeend', `<div class="list-row__meta">${detailsMetaHtml}${tagsHtml}</div>`);
     } else {
-      const qtyEl = metaEl.querySelector('.shopping-item__quantity');
-      if (item.quantity && qtyEl) {
-        qtyEl.textContent = item.quantity;
-      } else if (item.quantity) {
-        metaEl.insertAdjacentHTML('afterbegin', `<span class="shopping-item__quantity">${esc(item.quantity)}</span>`);
-      } else {
-        qtyEl?.remove();
-      }
+      metaEl.replaceChildren();
+      metaEl.insertAdjacentHTML('beforeend', `${detailsMetaHtml}${tagsHtml}`);
     }
   } else {
     metaEl?.remove();
@@ -2789,6 +2800,94 @@ function refreshItemName(container, item) {
 function priceReadText(cents) {
   if (cents == null) return '';
   return formatMoney(Number(cents) / 10 ** currencyFractionDigits(state.currency), state.currency);
+}
+
+/**
+ * Liefert den maßgeblichen Zeilenpreis eines Artikels in Cents (#1003):
+ * der tatsächliche Preis oder der Schätzpreis aus vorherigen Käufen, wie er ist.
+ */
+function itemPriceCents(item) {
+  const price = item.price_cents ?? item.estimated_price_cents;
+  if (price == null) return null;
+  const cents = Number(price);
+  return Number.isFinite(cents) && cents > 0 ? cents : null;
+}
+
+/**
+ * Baut die kombinierte Metazeile aus Menge und Zeilenpreis (#1003):
+ * z.B. "3 · 30,00 €" in einheitlicher Typografie.
+ */
+function renderItemDetailsMeta(item) {
+  const qtyText = String(item.quantity ?? '').trim();
+  const price = itemPriceCents(item);
+  let priceHtml = '';
+
+  if (price != null) {
+    const isEstimated = item.price_cents == null && item.estimated_price_cents != null;
+    const formatted = priceReadText(price);
+    if (isEstimated) {
+      const display = t('shopping.estimatedPrice', { price: formatted });
+      const aria = t('shopping.estimatedPriceAria', { price: formatted });
+      priceHtml = `<span class="shopping-item__price shopping-item__price--estimated" aria-label="${esc(aria)}">${esc(display)}</span>`;
+    } else {
+      priceHtml = `<span class="shopping-item__price">${esc(formatted)}</span>`;
+    }
+  }
+
+  const parts = [];
+  if (qtyText) {
+    parts.push(`<span class="shopping-item__quantity">${esc(qtyText)}</span>`);
+  }
+  if (priceHtml) {
+    parts.push(priceHtml);
+  }
+
+  if (!parts.length) return '';
+  const separator = `<span class="shopping-item__dot" aria-hidden="true">${esc(t('shopping.metaSeparator'))}</span>`;
+  return `<span class="shopping-item__subtotal-group">${parts.join(separator)}</span>`;
+}
+
+/**
+ * Summenzeile fuer die Einkaufsliste (#1003): Ausstehend, Gekauft und Gesamt.
+ * Bleibt ausgeblendet (hidden), solange kein Artikel einen Preis oder
+ * Schaetzpreis hat, um die Oberflaeche sauber zu halten.
+ */
+function renderShoppingSummary(container) {
+  const root = container.querySelector('#shopping-price-summary');
+  if (!root) return;
+  let pending = 0;
+  let purchased = 0;
+  let hasEstimated = false;
+  for (const item of state.items) {
+    const price = itemPriceCents(item);
+    if (price == null) continue;
+    if (item.price_cents == null && item.estimated_price_cents != null) {
+      hasEstimated = true;
+    }
+    if (checkedOf(item)) purchased += price;
+    else pending += price;
+  }
+  if (pending === 0 && purchased === 0) {
+    root.hidden = true;
+    return;
+  }
+  root.hidden = false;
+  const pendingEl = root.querySelector('[data-summary="pending"]');
+  const purchasedEl = root.querySelector('[data-summary="purchased"]');
+  const totalEl = root.querySelector('[data-summary="total"]');
+  if (pendingEl) pendingEl.textContent = priceReadText(pending);
+  if (purchasedEl) purchasedEl.textContent = priceReadText(purchased);
+  if (totalEl) {
+    const totalFormatted = priceReadText(pending + purchased);
+    totalEl.textContent = hasEstimated
+      ? t('shopping.estimatedPrice', { price: totalFormatted })
+      : totalFormatted;
+    if (hasEstimated) {
+      totalEl.setAttribute('aria-label', t('shopping.estimatedPriceAria', { price: totalFormatted }));
+    } else {
+      totalEl.removeAttribute('aria-label');
+    }
+  }
 }
 
 /**
@@ -3128,6 +3227,7 @@ function openItemDetails(itemId, container) {
           }
           const categoryChanged = data.data.category !== aktuell.category;
           Object.assign(aktuell, data.data);
+          renderShoppingSummary(container);
           // force: der Dirty-Guard vergleicht gegen den Snapshot vom Öffnen und
           // sähe die gerade gespeicherten Felder als ungespeicherte Änderungen.
           // Ohne das fragte Speichern „Änderungen verwerfen?" (Issue #625).
@@ -3204,6 +3304,7 @@ function updateItemsList(container) {
     }
   }
   updateCheckedActions(container);
+  renderShoppingSummary(container);
 }
 
 /**
@@ -5164,6 +5265,9 @@ function revealHighlightedItem(container, id) {
 }
 
 export const __test = {
+  itemPriceCents,
+  renderItemDetailsMeta,
+  renderShoppingSummary,
   revealHighlightedItem,
   shouldIgnoreShoppingRowToggle,
   // Mengen-Zerlegung fuer den Vorrats-Uebertrag: haengt an der Format-Locale,

@@ -844,7 +844,13 @@
             "waited": "「{{item}}」は「{{target}}」に移動されませんでした。「{{back}}」の同期が1週間以上オフになっています。リストをオンにすると、「{{back}}」に再び表示されます。"
         },
         "moreDetailsHint": "価格・店舗・リンク・メモ",
-        "toPantryAllToPlaceholder": "場所を選択 …"
+        "toPantryAllToPlaceholder": "場所を選択 …",
+        "summaryRemaining": "購入予定",
+        "summaryPurchased": "カート内",
+        "summaryTotal": "見積もり合計",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "約{{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} 品の材料",

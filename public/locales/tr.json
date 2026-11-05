@@ -844,7 +844,13 @@
             "waited": "„{{item}}”, „{{target}}” listesine taşınmadı: „{{back}}” listesinin eşitlemesi bir haftadan uzun süredir kapalı. Liste açıldığında ürün „{{back}}” listesinde yeniden görünecek."
         },
         "moreDetailsHint": "Fiyat, mağaza, bağlantı, not",
-        "toPantryAllToPlaceholder": "Bir yer seç …"
+        "toPantryAllToPlaceholder": "Bir yer seç …",
+        "summaryRemaining": "Alınacaklar",
+        "summaryPurchased": "Sepette",
+        "summaryTotal": "Tahmini toplam",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "yaklaşık {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} malzeme",
