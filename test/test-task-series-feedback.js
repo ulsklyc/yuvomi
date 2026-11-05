@@ -401,4 +401,10 @@ test('Fremde Serie: abgehakt wird nur dort, wo Yuvomi sie nicht weiterfuehrt (#2
   assert.equal(repeatsElsewhere({ ...mapped, is_recurring: 0, recurrence_rule: null }), true, 'nicht abbildbar oder hier abgeschaltet');
   assert.equal(repeatsElsewhere({ ...mapped, due_date: null }), true, 'ohne Faelligkeit');
   assert.equal(repeatsElsewhere({ ...mapped, external_rrule: null, is_recurring: 0 }), false, 'keine fremde Regel');
+  // Review auf #2543: am 29. bis 31. klemmt Yuvomi eine Monatsserie, RFC nicht.
+  const monthly = { ...mapped, external_rrule: 'FREQ=MONTHLY', recurrence_rule: 'FREQ=MONTHLY' };
+  assert.equal(repeatsElsewhere({ ...monthly, due_date: '2026-11-28' }), false);
+  assert.equal(repeatsElsewhere({ ...monthly, due_date: '2026-11-30' }), true);
+  assert.equal(repeatsElsewhere({ ...monthly, recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1', due_date: '2026-11-30' }), false);
+  assert.equal(repeatsElsewhere({ ...mapped, recurrence_rule: 'FREQ=YEARLY', due_date: '2028-02-29' }), true);
 });

@@ -331,7 +331,8 @@ function rowForTodoUid(d, table, columns, uid, accountId) {
  * Die Wiederholung, die eine fremde Regel in der Zeile setzt (#2506, #2515) -
  * oder null, wenn der Abruf sie nicht anfasst.
  *
- * Abbildbar (`mappableForeignRule`) und mit Faelligkeit: eine Serie mit der
+ * Abbildbar (`mappableForeignRule`) und mit passender Faelligkeit
+ * (`foreignRuleFitsDue`): eine Serie mit der
  * Regel in Yuvomis Teilmenge, abhakbar wie in der besitzenden App. Sonst KEINE
  * Serie hier: Yuvomi rechnete sie falsch weiter, das Abhaken bleibt dort
  * (`task_foreign_series`) - und eine Regel, die jemand hier gesetzt hatte,
@@ -347,7 +348,9 @@ function rowForTodoUid(d, table, columns, uid, accountId) {
 function foreignRecurrence(externalRrule, dueDate, { ruleRemoved = false } = {}) {
   if (!externalRrule) return ruleRemoved ? { isRecurring: 0, rule: null } : null;
   const mapped = todoOutbound.mappableForeignRule(externalRrule);
-  return mapped && dueDate ? { isRecurring: 1, rule: mapped } : { isRecurring: 0, rule: null };
+  return mapped && todoOutbound.foreignRuleFitsDue(mapped, dueDate)
+    ? { isRecurring: 1, rule: mapped }
+    : { isRecurring: 0, rule: null };
 }
 
 // Die Objekt-URL (obj.url des Abrufs) wandert bei jedem Upsert mit: ohne sie ist

@@ -268,15 +268,15 @@ const WEEKDAYS = new Set(['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU']);
  * Normalisiert wird nur, was an der Bedeutung nichts aendert: die Reihenfolge
  * der Teile (RFC 5545 legt keine fest, `RRULE_RE` schon), INTERVAL=1 (der
  * Vorgabewert) und WKST=MO (Yuvomis Wochenbeginn). Alles andere muss so, wie
- * es dasteht, durch `RRULE_RE`: was der Validator an einer hier angelegten
- * Serie abwiese, wuerde Yuvomi auch an einer fremden falsch weiterrechnen -
- * dieselbe Zurueckhaltung wie `parseRRule`, nur strenger, weil hier ein Fehler
- * die Serie in der anderen App verschoebe.
+ * es dasteht, durch `RRULE_RE` und danach durch `computesExactly`: dass Yuvomi
+ * eine Regel speichern kann, heisst noch nicht, dass es sie richtig
+ * weiterrechnet, und ein Fehler verschoebe hier die Serie in der anderen App.
  *
  * NICHT ABBILDBAR ist deshalb unter anderem COUNT (Yuvomi zaehlt an Aufgaben
  * nicht herunter, die Serie liefe hier endlos), BYMONTHDAY ausser -1, ein
- * BYDAY mit Ordinalzahl, BYSETPOS, BYMONTH, ein anderer Wochenbeginn und ein
- * UNTIL ohne Zone. Solche Serien bleiben in der besitzenden App abzuhaken.
+ * BYDAY mit Ordinalzahl, BYSETPOS, BYMONTH, ein anderer Wochenbeginn, ein
+ * UNTIL ohne Zone, BYDAY unter MONTHLY/YEARLY und DAILY mit INTERVAL und BYDAY
+ * zugleich. Solche Serien bleiben in der besitzenden App abzuhaken.
  *
  * @param {string|null} rule - RRULE-Wert, mit oder ohne `RRULE:`
  * @returns {string|null}
@@ -299,18 +299,66 @@ export function mappableForeignRule(rule) {
   if (parts.has('INTERVAL') && !(Number(parts.get('INTERVAL')) >= 1)) return null;
   if (parts.has('BYDAY') && !parts.get('BYDAY').split(',').every((day) => WEEKDAYS.has(day))) return null;
   const normalized = RULE_PARTS.filter((key) => parts.has(key)).map((key) => `${key}=${parts.get(key)}`).join(';');
-  return normalized.startsWith('FREQ=') && RRULE_RE.test(normalized) ? normalized : null;
+  if (!normalized.startsWith('FREQ=') || !RRULE_RE.test(normalized)) return null;
+  return computesExactly(parts) ? normalized : null;
+}
+
+/**
+ * Rechnet `nextDueAfterCompletion` diese Regel so, wie RFC 5545 sie meint?
+ * (Review auf #2543)
+ *
+ * `RRULE_RE` sagt nur, dass Yuvomi die Regel speichern kann. Eine fremde Serie
+ * rueckt Yuvomi aber in der anderen App weiter, und ein falsch gerechnetes
+ * naechstes Vorkommen landet dort als DUE - schlimmer als die Sperre. Deshalb
+ * eine Positivliste, gemessen an einem RFC-Nachrechner gegen den Rechner
+ * (test/test-caldav-foreign-series.js, jede Kombination aus der Liste ueber
+ * drei Jahre Anker):
+ *   - DAILY mit INTERVAL; mit BYDAY nur ohne INTERVAL ("jeden Werktag").
+ *     Mit beidem zaehlt der Rechner Wochentage statt jeden n-ten Tag;
+ *   - WEEKLY mit INTERVAL und BYDAY (ISO-Woche, daher nur WKST=MO);
+ *   - MONTHLY ohne BYDAY, auch mit BYMONTHDAY=-1. Ein BYDAY unter MONTHLY
+ *     (jeder Montag des Monats) rechnet der Rechner nicht;
+ *   - YEARLY ohne BYDAY.
+ * Was dazu noch am Faelligkeitstag haengt, prueft `foreignRuleFitsDue`.
+ */
+function computesExactly(parts) {
+  const freq = parts.get('FREQ');
+  const byday = parts.has('BYDAY');
+  if (freq === 'DAILY') return !byday || !parts.has('INTERVAL');
+  if (freq === 'WEEKLY') return true;
+  if (freq === 'MONTHLY' || freq === 'YEARLY') return !byday;
+  return false;
+}
+
+/**
+ * Passt der Faelligkeitstag zu einer abbildbaren Regel, ohne dass der Rechner
+ * klemmt? Eine Monatsserie am 29. bis 31. setzt Yuvomi im kurzen Monat auf den
+ * Monatsletzten und bleibt dort, RFC 5545 laesst den Monat aus; eine
+ * Jahresserie am 29. Februar ebenso. Beides waere ein falsches DUE in der
+ * anderen App, also bleibt so eine Serie dort abzuhaken.
+ *
+ * @param {string} rule - normalisierte Regel (`mappableForeignRule`)
+ * @param {string|null} dueDate - YYYY-MM-DD
+ */
+export function foreignRuleFitsDue(rule, dueDate) {
+  if (!rule || !dueDate) return false;
+  const day = String(dueDate).slice(5, 10);
+  const value = rruleValue(rule).toUpperCase();
+  if (/(^|;)FREQ=MONTHLY(;|$)/.test(value) && !/(^|;)BYMONTHDAY=-1(;|$)/.test(value)) return Number(day.slice(3)) <= 28;
+  if (/(^|;)FREQ=YEARLY(;|$)/.test(value)) return day !== '02-29';
+  return true;
 }
 
 /**
  * Fuehrt Yuvomi diese fremde Serie weiter (#2506)? Das tut es, wenn die Regel
  * der anderen App abbildbar war (der Inbound hat sie dann als Serie
- * eingelesen) und die Zeile hier noch eine Serie mit Faelligkeit ist. Sonst
+ * eingelesen) und die Zeile hier noch eine Serie mit passender Faelligkeit
+ * ist (`foreignRuleFitsDue`). Sonst
  * bleibt das Abhaken bei der besitzenden App (`task_foreign_series`).
  */
 export function continuesForeignSeries(task) {
   return Boolean(task?.external_rrule && task.is_recurring && task.recurrence_rule
-    && task.due_date && !task.parent_task_id);
+    && !task.parent_task_id && foreignRuleFitsDue(task.recurrence_rule, task.due_date));
 }
 
 /**
@@ -1312,15 +1360,21 @@ export function takeBackForeignSeries(origin, followup) {
   if (isMirrored(origin) && isOwnUidOfRow(origin.external_uid, 'task', origin.id)) {
     queueTodoDeletion('tasks', origin);
   }
+  // Die Wiederholung kommt mit, wie die Folgeinstanz sie JETZT traegt (Review
+  // auf #2543): hat die andere App die Regel inzwischen weggenommen oder
+  // geaendert, hat der Abruf das dort eingetragen. Behielte `origin` ihren
+  // Stand vom Abhaken, schriebe ihr Push die alte Regel samt Marke zurueck.
   d.prepare(`
     UPDATE tasks
        SET external_source = 'caldav', external_uid = ?, external_account_id = ?,
            external_object_url = ?, external_rrule = ?, seen_on_server = ?,
+           is_recurring = ?, recurrence_rule = ?,
            outbound_dirty = 1, outbound_attempts = 0,
            target_caldav_account_id = NULL, target_caldav_list_url = NULL
      WHERE id = ?
   `).run(followup.external_uid, followup.external_account_id, followup.external_object_url,
-    followup.external_rrule, followup.seen_on_server ?? 0, origin.id);
+    followup.external_rrule, followup.seen_on_server ?? 0,
+    followup.is_recurring ? 1 : 0, followup.recurrence_rule ?? null, origin.id);
   return true;
 }
 

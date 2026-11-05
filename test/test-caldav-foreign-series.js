@@ -169,6 +169,102 @@ test('Normalisierer: COUNT und alles ausserhalb von RRULE_RE ist nicht abbildbar
   ]) assert.equal(norm(rule), null, String(rule));
 });
 
+// Abbildbar heisst: Yuvomi rechnet das naechste Vorkommen so, wie RFC 5545 es
+// meint (Review auf #2543). Ein kleiner Nachrechner nach RFC fuer die Teilmenge
+// steht gegen `nextDueAfterCompletion`, fuer JEDE Kombination, die der
+// Normalisierer annimmt, und jeden Anker ueber drei Jahre, der ein Vorkommen
+// ist und zum Faelligkeitstag passt. Unter den Kandidaten stehen auch die, die
+// der Rechner falsch rechnet: der Normalisierer muss sie abweisen, sonst wird
+// der Vergleich rot.
+const { nextDueAfterCompletion } = await import('../server/services/recurrence.js');
+const WEEKDAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+const msOf = (key) => Date.parse(`${key}T00:00:00Z`);
+const keyOf = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+function ruleParts(rule) {
+  const m = new Map(rule.split(';').map((p) => p.split('=')));
+  return {
+    freq: m.get('FREQ'), interval: Number(m.get('INTERVAL') || 1),
+    byday: m.get('BYDAY')?.split(','), lastDay: m.get('BYMONTHDAY') === '-1',
+    until: m.get('UNTIL')?.slice(0, 8),
+  };
+}
+
+/** Ist `day` nach RFC 5545 ein Vorkommen der Serie mit DTSTART `start`? */
+function rfcOccurs(start, day, rule) {
+  const p = ruleParts(rule);
+  const a = new Date(msOf(start));
+  const b = new Date(msOf(day));
+  if (p.until && day.replace(/-/g, '') > p.until) return false;
+  if (p.byday && !p.byday.includes(WEEKDAY_CODES[b.getUTCDay()])) return false;
+  if (p.freq === 'DAILY') return ((msOf(day) - msOf(start)) / DAY) % p.interval === 0;
+  if (p.freq === 'WEEKLY') {
+    const monday = (d) => d.getTime() - ((d.getUTCDay() + 6) % 7) * DAY;
+    if (Math.round((monday(b) - monday(a)) / (7 * DAY)) % p.interval) return false;
+    return p.byday ? true : b.getUTCDay() === a.getUTCDay();
+  }
+  if (p.freq === 'MONTHLY') {
+    const months = (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + b.getUTCMonth() - a.getUTCMonth();
+    if (months % p.interval) return false;
+    if (p.lastDay) return new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth() + 1, 0)).getUTCDate() === b.getUTCDate();
+    return b.getUTCDate() === a.getUTCDate();
+  }
+  if (p.freq === 'YEARLY') {
+    if ((b.getUTCFullYear() - a.getUTCFullYear()) % p.interval) return false;
+    return b.getUTCMonth() === a.getUTCMonth() && b.getUTCDate() === a.getUTCDate();
+  }
+  return false;
+}
+
+function rfcNext(start, rule) {
+  for (let t = msOf(start) + DAY; t < msOf(start) + 9 * 366 * DAY; t += DAY) {
+    if (rfcOccurs(start, keyOf(t), rule)) return keyOf(t);
+  }
+  return null;
+}
+
+function candidateRules() {
+  const out = [];
+  for (const interval of ['', ';INTERVAL=2', ';INTERVAL=3']) {
+    out.push(`FREQ=DAILY${interval}`, `FREQ=YEARLY${interval}`, `FREQ=MONTHLY${interval}`,
+      `FREQ=MONTHLY${interval};BYMONTHDAY=-1`, `FREQ=WEEKLY${interval}`);
+    for (const days of ['MO', 'MO,WE', 'TU,TH,SA', 'MO,TU,WE,TH,FR', 'SA,SU']) {
+      out.push(`FREQ=WEEKLY${interval};BYDAY=${days}`, `FREQ=DAILY${interval};BYDAY=${days}`,
+        `FREQ=MONTHLY${interval};BYDAY=${days}`, `FREQ=YEARLY${interval};BYDAY=${days}`);
+    }
+    out.push(`FREQ=MONTHLY${interval};BYMONTHDAY=-1;BYDAY=FR`);
+  }
+  out.push('FREQ=DAILY;UNTIL=20270115', 'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;UNTIL=20270301T225959Z',
+    'FREQ=MONTHLY;UNTIL=20270615');
+  return out;
+}
+
+test('Normalisierer: abbildbar ist nur, was der Rechner wie RFC 5545 rechnet (Review #2543)', () => {
+  const { mappableForeignRule: norm, foreignRuleFitsDue: fits } = todoOutbound;
+  // Die beiden Faelle aus dem Review, ausdruecklich.
+  assert.equal(norm('FREQ=MONTHLY;BYDAY=MO'), null);
+  assert.equal(norm('FREQ=DAILY;INTERVAL=2;BYDAY=MO,TU,WE,TH,FR'), null);
+  assert.equal(fits('FREQ=MONTHLY', '2026-01-31'), false, 'der Rechner klemmt auf den Monatsletzten');
+  assert.equal(fits('FREQ=YEARLY', '2028-02-29'), false);
+
+  const wrong = [];
+  let compared = 0;
+  for (const raw of candidateRules()) {
+    const rule = norm(raw);
+    if (!rule) continue;
+    for (let t = msOf('2026-01-01'); t <= msOf('2028-12-31'); t += DAY) {
+      const due = keyOf(t);
+      if (!fits(rule, due) || !rfcOccurs(due, due, rule)) continue;
+      compared++;
+      const got = nextDueAfterCompletion({ anchorDate: due, rule, completedOn: due });
+      const want = rfcNext(due, rule);
+      if (got !== want && wrong.length < 5) wrong.push(`${rule} ab ${due}: ${got}, RFC ${want}`);
+    }
+  }
+  assert.ok(compared > 20000, `zu wenig verglichen: ${compared}`);
+  assert.deepEqual(wrong, [], 'abbildbar, aber falsch gerechnet');
+});
+
 // ── Import ──────────────────────────────────────────────────────────────────
 
 test('Import: eine abbildbare Serie kommt als Serie an, eine nicht abbildbare bleibt gesperrt', async () => {
@@ -329,4 +425,62 @@ test('Zuruecknehmen, nachdem die andere App die Wiederholung weggenommen hat: de
   assert.ok(dav.getObject(listUrl, FILE), 'das Objekt der anderen App wurde geloescht');
   assert.equal(taskOf(master.id).external_uid, UID);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM tasks').get().n, 1);
+  // Review auf #2543: mit dem Master geht sein heutiger Stand zurueck, nicht der
+  // vom Abhaken. Sonst schriebe der Push die alte Regel samt Marke wieder hin.
+  assert.deepEqual([taskOf(master.id).is_recurring, taskOf(master.id).recurrence_rule], [0, null]);
+  const data = dav.getObject(listUrl, FILE).data;
+  assert.deepEqual(todoLines(data, 'RRULE'), [], 'die weggenommene Wiederholung ist zurueck');
+  assert.deepEqual(todoLines(data, 'X-YUVOMI-RRULE'), []);
+});
+
+// ── Unteraufgaben (Review auf #2543) ────────────────────────────────────────
+// Eine Unteraufgabe in der anderen App ist ein eigenes VTODO mit RELATED-TO auf
+// den Master. Haengt der Master um, zeigt RELATED-TO beim naechsten Abruf auf
+// die Folgeinstanz - legte der Spawn daneben noch Kopien an, stuende die
+// Checkliste dort doppelt, und die erledigte Zeile verloere ihre.
+
+function appleSubtask(uid, summary, { done = false } = {}) {
+  return [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Apple Inc.//iOS 18.0//EN',
+    'BEGIN:VTODO', `UID:${uid}`, 'DTSTAMP:20261101T080000Z', `SUMMARY:${summary}`,
+    `RELATED-TO;RELTYPE=PARENT:${UID}`, `STATUS:${done ? 'COMPLETED' : 'NEEDS-ACTION'}`,
+    ...(done ? ['COMPLETED:20261101T090000Z'] : []),
+    'END:VTODO', 'END:VCALENDAR',
+  ].join('\r\n');
+}
+
+const childrenOf = (id) => db.prepare('SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY id').all(id);
+
+test('Unteraufgaben der anderen App gehen mit dem Master, die erledigte Zeile behaelt ihre Liste', async () => {
+  reset();
+  dav.putObject(listUrl, FILE, appleSeries());
+  dav.putObject(listUrl, 'sub-1.ics', appleSubtask('sub-1@phone', 'Gelbe Tonne'));
+  dav.putObject(listUrl, 'sub-2.ics', appleSubtask('sub-2@phone', 'Papier'));
+  await remindersSync.sync();
+  const master = rowOf(UID);
+  assert.equal(childrenOf(master.id).length, 2, 'Vorbedingung: zwei gespiegelte Unteraufgaben');
+  db.prepare(`INSERT INTO tasks (title, created_by, parent_task_id) VALUES ('Nur hier', ?, ?)`).run(ADMIN, master.id);
+
+  assert.equal((await call('PATCH', `/${master.id}/status`, { status: 'done' })).status, 200);
+  await settle();
+  await remindersSync.sync();
+
+  const next = rowOf(UID);
+  const nextKids = childrenOf(next.id);
+  assert.deepEqual(nextKids.map((k) => k.title).sort(), ['Gelbe Tonne', 'Nur hier', 'Papier'], 'keine doppelten Unteraufgaben');
+  assert.deepEqual(nextKids.filter((k) => k.external_source === 'caldav').map((k) => k.external_uid).sort(),
+    ['sub-1@phone', 'sub-2@phone'], 'die gespiegelten gehen mit');
+  assert.deepEqual(childrenOf(master.id).map((k) => k.title).sort(), ['Gelbe Tonne', 'Nur hier', 'Papier'],
+    'die erledigte Zeile verliert ihre Checkliste');
+  assert.ok(childrenOf(master.id).every((k) => k.external_source !== 'caldav'), 'dort nur noch lokale Abbilder');
+
+  // Zuruecknehmen bringt sie zurueck, ohne Abbilder daneben.
+  assert.equal((await call('PATCH', `/${master.id}/status`, { status: 'open' })).status, 200);
+  await settle();
+  await remindersSync.sync();
+  const back = childrenOf(master.id);
+  assert.deepEqual(back.map((k) => k.title).sort(), ['Gelbe Tonne', 'Nur hier', 'Papier']);
+  assert.equal(back.filter((k) => k.external_source === 'caldav').length, 2);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM tasks').get().n, 4, 'Master, zwei gespiegelte, eine lokale');
+  assert.equal(dav.objectNames(listUrl).length, 3, 'nichts geloescht, keine Kopie liegen geblieben');
 });

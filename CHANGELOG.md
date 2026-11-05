@@ -21,11 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Repeating reminders from iOS Reminders or Tasks.org now repeat in Yuvomi, and ticking one off
   keeps the series running there** (#2506, #2515). Daily, weekly, monthly and yearly reminders,
-  also every few days or weeks, on chosen weekdays, on the last day of the month or until an end
-  date, arrive as a Yuvomi series. Ticking one off in Yuvomi or on a wall tablet does what the
+  also every few days or weeks, every weekday, weekly on chosen weekdays, on the last day of the
+  month or until an end date, arrive as a Yuvomi series. Ticking one off in Yuvomi or on a wall tablet does what the
   other app does: the reminder moves on to its next date there, and a completed copy keeps the
   history. Undoing the tick moves it back. A rule Yuvomi cannot follow exactly (a fixed number of
-  times, a fixed day of the month such as the 15th, "every second Tuesday") shows "Repeats in
+  times, a fixed day of the month such as the 15th, "every second Tuesday", a monthly reminder
+  due on the 29th to 31st) shows "Repeats in
   another app" and is ticked off there; Yuvomi never sends a completion that would end such a
   series. For API clients, ticking off one of those through `PATCH /api/v1/tasks/:id/status` or
   `PUT /api/v1/tasks/:id` answers 409 with the reason `task_foreign_series`, and tasks carry the

@@ -1833,12 +1833,20 @@ function nextDueDateAfter(req, taskId, prevStatus, status) {
  */
 function isFollowupSubtasksTouched(followup) {
   const originTaskId = followup.recurrence_origin_id;
+  // Mit dem Master einer fremden Serie weitergezogene Unteraufgaben und ihre
+  // Abbilder an der Vorgaengerin (#2506) sind kein Eingriff: sie stehen beim
+  // Zuruecknehmen fuer sich (returnMirroredSubtasks), was die andere App an
+  // ihnen geaendert hat, gehoert ihr.
+  const carried = originTaskId ? carriedMirroredSubtasks(originTaskId, followup.id) : [];
+  const skip = new Set(carried.flatMap((pair) => [pair.mirror_id, pair.copy_id]));
   const originSubtasks = originTaskId
     ? db.get().prepare('SELECT * FROM tasks WHERE parent_task_id = ?').all(originTaskId)
+      .filter((sub) => !skip.has(sub.id))
     : [];
   const currentSubtasks = db.get()
     .prepare('SELECT * FROM tasks WHERE parent_task_id = ?')
-    .all(followup.id);
+    .all(followup.id)
+    .filter((sub) => !skip.has(sub.id));
 
   if (currentSubtasks.length !== originSubtasks.length) return true;
 
@@ -1896,6 +1904,8 @@ function discardRecurrenceFollowup(taskId) {
   // Objekt der anderen App, nicht eins, das Yuvomi angelegt hat.
   const origin = db.get().prepare('SELECT * FROM tasks WHERE id = ?').get(taskId);
   if (takeBackForeignSeries(origin, followup)) {
+    // Vor dem DELETE: die Folgeinstanz nimmt ihre Unteraufgaben mit (CASCADE).
+    returnMirroredSubtasks(origin.id, followup.id);
     db.get().prepare('DELETE FROM tasks WHERE id = ?').run(followup.id);
     return 1;
   }
@@ -1907,6 +1917,61 @@ function discardRecurrenceFollowup(taskId) {
   const queued = queueTodoDeletion('tasks', followup) ? 1 : 0;
   db.get().prepare('DELETE FROM tasks WHERE id = ?').run(followup.id);
   return queued;
+}
+
+/**
+ * Eine gespiegelte Unteraufgabe geht mit dem Master einer fremden Serie an die
+ * Folgeinstanz (#2506, Review auf #2543). Ihr VTODO zeigt per RELATED-TO auf
+ * den Master, und den haelt ab jetzt die Folgeinstanz.
+ *
+ * Die erledigte Zeile behaelt ein Abbild: eine lokale Unteraufgabe mit Titel,
+ * Status und Zuweisung, die nie hochgeht (Unteraufgaben gehen nie als eigenes
+ * VTODO hinaus) und keine Punkte traegt - gutgeschrieben ist an der
+ * gespiegelten Zeile, die weiterzieht. `recurrence_origin_id` des Abbilds
+ * nennt die gespiegelte Zeile ("Kopie von Y", wie jede Teilaufgabenkopie), so
+ * findet das Zuruecknehmen beide wieder (`returnMirroredSubtasks`).
+ */
+function carryMirroredSubtask(sub, doneId, followupId) {
+  const d = db.get();
+  const copy = d.prepare(`
+    INSERT INTO tasks (title, description, category, priority, status,
+      start_date, due_date, due_time, assigned_to, created_by, parent_task_id,
+      is_recurring, recurrence_rule, points, visibility, locked, recurrence_origin_id,
+      recurrence_series_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 0, ?, ?, ?, ?)
+  `).run(
+    sub.title, sub.description, sub.category, sub.priority, sub.status,
+    sub.start_date, sub.due_date, sub.due_time, sub.assigned_to, sub.created_by, doneId,
+    sub.visibility, sub.locked ? 1 : 0, sub.id, seriesOfTask(d, sub),
+  );
+  // Der Status kommt mit; durch dieselbe Stelle wie jeder Schreiber (#1836).
+  // Eine Teilaufgabe steht nie im Verlauf, der Aufruf bucht hier also nichts.
+  syncTaskCompletion(d, Number(copy.lastInsertRowid), 'open', sub.status, null);
+  setAssignments(d, copy.lastInsertRowid, d.prepare('SELECT user_id FROM task_assignments WHERE task_id = ?')
+    .all(sub.id).map((r) => r.user_id));
+  setTags(d, copy.lastInsertRowid, loadTags(d, sub.id));
+  d.prepare('UPDATE tasks SET parent_task_id = ? WHERE id = ?').run(followupId, sub.id);
+}
+
+/**
+ * Die gespiegelten Unteraufgaben, die `carryMirroredSubtask` an die
+ * Folgeinstanz gegeben hat - je mit ihrem Abbild an der Vorgaengerin.
+ * @returns {{mirror: object, copy: object}[]}
+ */
+function carriedMirroredSubtasks(originId, followupId) {
+  return db.get().prepare(`
+    SELECT m.id AS mirror_id, c.id AS copy_id
+      FROM tasks m JOIN tasks c ON c.recurrence_origin_id = m.id AND c.parent_task_id = ?
+     WHERE m.parent_task_id = ? AND m.external_source = 'caldav'
+  `).all(originId, followupId);
+}
+
+/** Der Rueckweg dazu: gespiegelte zurueck an `originId`, Abbilder fort. */
+function returnMirroredSubtasks(originId, followupId) {
+  for (const { mirror_id: mirrorId, copy_id: copyId } of carriedMirroredSubtasks(originId, followupId)) {
+    db.get().prepare('UPDATE tasks SET parent_task_id = ? WHERE id = ?').run(originId, mirrorId);
+    db.get().prepare('DELETE FROM tasks WHERE id = ?').run(copyId);
+  }
 }
 
 /**
@@ -2049,6 +2114,14 @@ function spawnRecurrenceFollowup(task) {
     handedOver = handOverForeignSeries(task, Number(newTask.lastInsertRowid));
 
     for (const sub of existingSubtasks) {
+      // Eine gespiegelte Unteraufgabe einer fremden Serie haengt per RELATED-TO
+      // am Master (Review auf #2543). Sie geht mit ihm, statt kopiert zu werden:
+      // der naechste Abruf haengte sie ohnehin dorthin, und neben der Kopie
+      // stuende sie doppelt. Die erledigte Zeile behaelt ein lokales Abbild.
+      if (handedOver && sub.external_source === 'caldav') {
+        carryMirroredSubtask(sub, task.id, Number(newTask.lastInsertRowid));
+        continue;
+      }
       const subAssignments = db.get()
         .prepare('SELECT user_id FROM task_assignments WHERE task_id = ?')
         .all(sub.id).map((r) => r.user_id);

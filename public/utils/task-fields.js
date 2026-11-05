@@ -120,7 +120,21 @@ export function canEditTaskDefinition(task, parent = null, viewer = {}) {
  */
 export function repeatsElsewhere(task) {
   if (!task?.external_rrule) return false;
-  return !(task.is_recurring && task.recurrence_rule && task.due_date && !task.parent_task_id);
+  return !(task.is_recurring && task.recurrence_rule && !task.parent_task_id
+    && foreignRuleFitsDue(task.recurrence_rule, task.due_date));
+}
+
+/**
+ * Dieselbe Frage wie `foreignRuleFitsDue` im Server: eine Monatsserie am 29.
+ * bis 31. und eine Jahresserie am 29. Februar klemmt Yuvomi, RFC 5545 nicht.
+ */
+function foreignRuleFitsDue(rule, dueDate) {
+  if (!rule || !dueDate) return false;
+  const day = String(dueDate).slice(5, 10);
+  const value = String(rule).replace(/^RRULE:/i, '').toUpperCase();
+  if (/(^|;)FREQ=MONTHLY(;|$)/.test(value) && !/(^|;)BYMONTHDAY=-1(;|$)/.test(value)) return Number(day.slice(3)) <= 28;
+  if (/(^|;)FREQ=YEARLY(;|$)/.test(value)) return day !== '02-29';
+  return true;
 }
 
 // --------------------------------------------------------
