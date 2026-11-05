@@ -286,8 +286,10 @@ test('Keine Locale hat überschüssige datepicker-Keys', () => {
       Object.assign(picker, { getAttribute: () => null, _dir: () => 'ltr' });
       const el = panel();
       picker._renderCalendar(el, { kind: 'date', trigger: node(), iso: '2026-11-15' });
+      // Das Kuerzel aus genau der Form lesen, die der Picker schreibt; eine
+      // andere Form liefert null und macht den Vergleich rot.
       const labels = el.querySelector('.ydp-cal__weekdays').html
-        .map((h) => h.replace(/<[^>]+>/g, ''));
+        .map((h) => /^<span class="ydp-cal__wd">([^<]*)<\/span>$/.exec(h)?.[1] ?? null);
       const days = el.querySelector('.ydp-cal__days').children.map((b) => b.dataset.iso);
       runs[weekStart] = { labels, days };
     }
