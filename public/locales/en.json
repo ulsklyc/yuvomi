@@ -3532,7 +3532,9 @@
         "twoFactorAlreadyEnabled": "Two-factor authentication is already enabled. Reload the page to see the current state.",
         "twoFactorSetupExpired": "The setup has expired. Cancel and start it again.",
         "oidcLinkErrorNotConfigured": "SSO is no longer set up on this server.",
-        "oidcUnlinkNotLinked": "This account is no longer linked to SSO. Reload the page to see the current state."
+        "oidcUnlinkNotLinked": "This account is no longer linked to SSO. Reload the page to see the current state.",
+        "displayErrorGone": "This wall tablet no longer exists.",
+        "displayDeviceErrorGone": "This device no longer exists."
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",

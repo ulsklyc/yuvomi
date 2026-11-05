@@ -345,7 +345,7 @@ router.patch('/:id', (req, res) => {
       fields.push('device_settings = ?'); values.push(JSON.stringify(settings)); data.device_settings = settings;
     }
     const result = db.get().prepare(`UPDATE display_accounts SET ${fields.join(', ')} WHERE user_id = ?`).run(...values, id);
-    if (result.changes === 0) return res.status(404).json({ error: 'Display not found.', code: 404 });
+    if (result.changes === 0) return res.status(404).json({ error: 'Display not found.', code: 404, reason: 'displays_display_not_found' });
     return res.json({ data });
   } catch (err) {
     log.error('PATCH /:id error:', err);
@@ -360,7 +360,7 @@ router.delete('/:id', (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     const row = db.get().prepare('SELECT 1 FROM display_accounts WHERE user_id = ?').get(id);
-    if (!row) return res.status(404).json({ error: 'Display not found.', code: 404 });
+    if (!row) return res.status(404).json({ error: 'Display not found.', code: 404, reason: 'displays_display_not_found' });
     db.get().prepare('DELETE FROM users WHERE id = ?').run(id);
     return res.json({ data: { id, deleted: true } });
   } catch (err) {
@@ -378,7 +378,7 @@ router.post('/:id/pairing-code', (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     const row = db.get().prepare('SELECT 1 FROM display_accounts WHERE user_id = ?').get(id);
-    if (!row) return res.status(404).json({ error: 'Display not found.', code: 404 });
+    if (!row) return res.status(404).json({ error: 'Display not found.', code: 404, reason: 'displays_display_not_found' });
 
     const { code, expiresAt } = issuePairingCode(id, req.authUserId || null);
     return res.status(201).json({ data: { code, expires_at: expiresAt } });
@@ -403,7 +403,7 @@ router.post('/:id/devices/:deviceId/revoke', (req, res) => {
     // Das Geraet muss zu DIESEM Display gehoeren: sonst waere der Pfad eine
     // Verzierung und die Geraete-ID allein die Autoritaet.
     const device = db.get().prepare('SELECT id FROM display_devices WHERE id = ? AND user_id = ?').get(deviceId, id);
-    if (!device) return res.status(404).json({ error: 'Device not found.', code: 404 });
+    if (!device) return res.status(404).json({ error: 'Device not found.', code: 404, reason: 'displays_device_not_found' });
 
     revokeDisplayDevice(deviceId);
     return res.json({ data: { id: deviceId, revoked: true } });
@@ -429,7 +429,7 @@ router.post('/:id/devices/:deviceId/remove', (req, res) => {
     }
     // Wie beim Widerruf: das Geraet muss zu DIESEM Display gehoeren.
     const device = db.get().prepare('SELECT id FROM display_devices WHERE id = ? AND user_id = ?').get(deviceId, id);
-    if (!device) return res.status(404).json({ error: 'Device not found.', code: 404 });
+    if (!device) return res.status(404).json({ error: 'Device not found.', code: 404, reason: 'displays_device_not_found' });
 
     if (!removeRevokedDisplayDevice(deviceId)) {
       return res.status(409).json({

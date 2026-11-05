@@ -3532,7 +3532,9 @@
         "twoFactorAlreadyEnabled": "La autenticación en dos pasos ya está activada. Recarga la página para ver el estado actual.",
         "twoFactorSetupExpired": "La configuración ha caducado. Cancélala y vuelve a empezar.",
         "oidcLinkErrorNotConfigured": "SSO ya no está configurado en este servidor.",
-        "oidcUnlinkNotLinked": "Esta cuenta ya no está vinculada a SSO. Recarga la página para ver el estado actual."
+        "oidcUnlinkNotLinked": "Esta cuenta ya no está vinculada a SSO. Recarga la página para ver el estado actual.",
+        "displayErrorGone": "Esta tableta de pared ya no existe.",
+        "displayDeviceErrorGone": "Este dispositivo ya no existe."
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",

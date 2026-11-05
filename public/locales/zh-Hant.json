@@ -3532,7 +3532,9 @@
         "twoFactorAlreadyEnabled": "兩步驗證已經啟用。請重新載入頁面查看目前狀態。",
         "twoFactorSetupExpired": "設定已逾時。請取消後重新開始。",
         "oidcLinkErrorNotConfigured": "此伺服器已不再設定 SSO。",
-        "oidcUnlinkNotLinked": "此帳戶已不再與 SSO 關聯。請重新載入頁面查看目前狀態。"
+        "oidcUnlinkNotLinked": "此帳戶已不再與 SSO 關聯。請重新載入頁面查看目前狀態。",
+        "displayErrorGone": "此壁掛平板已不存在。",
+        "displayDeviceErrorGone": "這臺裝置已不存在。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

@@ -3532,7 +3532,9 @@
         "twoFactorAlreadyEnabled": "Tweestapsverificatie is al ingeschakeld. Laad de pagina opnieuw om de huidige stand te zien.",
         "twoFactorSetupExpired": "De instelling is verlopen. Annuleer en begin opnieuw.",
         "oidcLinkErrorNotConfigured": "SSO is niet meer ingesteld op deze server.",
-        "oidcUnlinkNotLinked": "Dit account is niet meer gekoppeld aan SSO. Laad de pagina opnieuw om de huidige stand te zien."
+        "oidcUnlinkNotLinked": "Dit account is niet meer gekoppeld aan SSO. Laad de pagina opnieuw om de huidige stand te zien.",
+        "displayErrorGone": "Deze wandtablet bestaat niet meer.",
+        "displayDeviceErrorGone": "Dit apparaat bestaat niet meer."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

@@ -3532,7 +3532,9 @@
         "twoFactorAlreadyEnabled": "Tvåfaktorsinloggning är redan aktiverad. Ladda om sidan för att se aktuellt läge.",
         "twoFactorSetupExpired": "Konfigurationen har gått ut. Avbryt och börja om.",
         "oidcLinkErrorNotConfigured": "SSO är inte längre konfigurerat på den här servern.",
-        "oidcUnlinkNotLinked": "Det här kontot är inte längre kopplat till SSO. Ladda om sidan för att se aktuellt läge."
+        "oidcUnlinkNotLinked": "Det här kontot är inte längre kopplat till SSO. Ladda om sidan för att se aktuellt läge.",
+        "displayErrorGone": "Den här väggplattan finns inte längre.",
+        "displayDeviceErrorGone": "Den här enheten finns inte längre."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

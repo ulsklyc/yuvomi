@@ -3532,7 +3532,9 @@
         "twoFactorAlreadyEnabled": "Xác thực hai bước đã được bật. Tải lại trang để xem trạng thái hiện tại.",
         "twoFactorSetupExpired": "Phiên thiết lập đã hết hạn. Hãy hủy và bắt đầu lại.",
         "oidcLinkErrorNotConfigured": "SSO không còn được thiết lập trên máy chủ này.",
-        "oidcUnlinkNotLinked": "Tài khoản này không còn liên kết với SSO. Tải lại trang để xem trạng thái hiện tại."
+        "oidcUnlinkNotLinked": "Tài khoản này không còn liên kết với SSO. Tải lại trang để xem trạng thái hiện tại.",
+        "displayErrorGone": "Máy tính bảng gắn tường này không còn nữa.",
+        "displayDeviceErrorGone": "Thiết bị này không còn nữa."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

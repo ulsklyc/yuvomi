@@ -3532,7 +3532,9 @@
         "twoFactorAlreadyEnabled": "L'autenticazione a due fattori è già attiva. Ricarica la pagina per vedere lo stato attuale.",
         "twoFactorSetupExpired": "La configurazione è scaduta. Annullala e ricomincia.",
         "oidcLinkErrorNotConfigured": "L'SSO non è più configurato su questo server.",
-        "oidcUnlinkNotLinked": "Questo account non è più collegato all'SSO. Ricarica la pagina per vedere lo stato attuale."
+        "oidcUnlinkNotLinked": "Questo account non è più collegato all'SSO. Ricarica la pagina per vedere lo stato attuale.",
+        "displayErrorGone": "Questo tablet da parete non esiste più.",
+        "displayDeviceErrorGone": "Questo dispositivo non esiste più."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",
