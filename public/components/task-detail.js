@@ -51,7 +51,7 @@ import { historyDayLabel } from '/utils/day-label.js';
 import {
   FALLBACK_CATEGORY, PRIORITY_LABELS, STATUS_LABELS, statusLabel,
   isArchived, canEditTaskDefinition, catLabel, normalizeTagList,
-  docMime, docHref, docIcon, formatDueDate, seriesDoneText,
+  docMime, docHref, docIcon, formatDueDate, seriesDoneText, repeatsElsewhere,
 } from '/utils/task-fields.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
@@ -1006,7 +1006,9 @@ function renderTaskDetail(task, reminders = [], ctx) {
     recurrenceRow(task.recurrence_rule, { fromCompletion: !!task.recurrence_from_completion }),
     // Eine Serie, deren Regel eine andere App fuehrt (#2506): abhaken nur dort,
     // die Zeile sagt warum, bevor jemand es hier versucht.
-    { icon: 'repeat', label: t('tasks.foreignSeries'), value: task.external_rrule ? t('tasks.foreignSeriesDetail') : '' },
+    // Eine Serie mit abbildbarer Regel fuehrt Yuvomi weiter und hakt sie hier ab
+    // (`repeatsElsewhere`); die Zeile darueber zeigt dann ihre Regel.
+    { icon: 'repeat', label: t('tasks.foreignSeries'), value: repeatsElsewhere(task) ? t('tasks.foreignSeriesDetail') : '' },
     // Rotation direkt unter der Wiederholung, an die sie gehoert: Modus und - 
     // bei Abloesung - der naechste Empfaenger, aus denselben Werten wie der
     // Server (rotationDetailRow erklaert, warum nur dort als Name).

@@ -108,6 +108,21 @@ export function canEditTaskDefinition(task, parent = null, viewer = {}) {
   return Number(lock.created_by) === Number(viewer.currentUserId);
 }
 
+/**
+ * Wird diese Aufgabe nur in einer anderen App abgehakt? (#2506, #2515)
+ *
+ * Spiegelt die Serverregel (`continuesForeignSeries`): eine Serie aus iOS
+ * Erinnerungen oder Tasks.org fuehrt Yuvomi weiter, wenn ihre Regel abbildbar
+ * war (der Abruf hat sie dann als Serie eingelesen) und sie hier noch eine
+ * Serie mit Faelligkeit ist. Sonst antwortet das Abhaken mit
+ * `task_foreign_series`, und die Oberflaeche sagt das, bevor jemand es
+ * versucht.
+ */
+export function repeatsElsewhere(task) {
+  if (!task?.external_rrule) return false;
+  return !(task.is_recurring && task.recurrence_rule && task.due_date && !task.parent_task_id);
+}
+
 // --------------------------------------------------------
 // Kategorien
 // --------------------------------------------------------
