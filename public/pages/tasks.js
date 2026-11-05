@@ -43,7 +43,7 @@ import { zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
   PRIORITIES, PRIO_ORDER, STATUSES, FILTER_STATUSES, PRIORITY_LABELS, STATUS_LABELS, statusLabel,
-  FALLBACK_CATEGORY, isArchived, formatDueDate, normalizeTagList, seriesDoneText,
+  FALLBACK_CATEGORY, isArchived, formatDueDate, normalizeTagList, seriesDoneText, repeatsElsewhere,
   catLabel as catLabelOf, catSortIndex as catSortIndexOf,
   canEditTaskDefinition as canEditTaskDefinitionFor,
 } from '/utils/task-fields.js';
@@ -479,7 +479,7 @@ async function wireSyncTarget(panel, task) {
  * Yuvomi - es IST eine Serie -, das Label sagt, wo sie gefuehrt wird.
  */
 function renderForeignSeriesBadge(task) {
-  if (!task.external_rrule) return '';
+  if (!repeatsElsewhere(task)) return '';
   const label = esc(t('tasks.foreignSeries'));
   return `<span class="due-date" role="img" aria-label="${label}" title="${label}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>`;
 }
@@ -2132,7 +2132,7 @@ function taskSnapshot(taskId) {
   return {
     title: task.title,
     recurring: Boolean(task.is_recurring),
-    foreignSeries: Boolean(task.external_rrule),
+    foreignSeries: repeatsElsewhere(task),
     openSubtaskIds: subs.filter((sub) => sub && sub.status !== 'done' && sub.id != null).map((sub) => sub.id),
   };
 }

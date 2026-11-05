@@ -346,6 +346,40 @@ function completedInstant(raw) {
   return new Date(at).toISOString().replace(/\.\d{3}Z$/, 'Z') === iso ? iso : null;
 }
 
+/**
+ * Die Zone einer Datumszeile (#2506, Review auf #2543): ihre TZID, `UTC` fuer
+ * einen Wert mit Z, null fuer ein reines Datum oder eine schwebende Zeit.
+ */
+function dateLineZone(block, prop) {
+  const m = new RegExp(`^${prop}((?:;[^:;]*)*):(.*)$`, 'im').exec(block);
+  if (!m) return null;
+  const value = m[2].trim();
+  if (/;VALUE=DATE(?![-\w])/i.test(m[1]) || /^\d{8}$/.test(value)) return null;
+  const tz = /;TZID=([^;:]+)/i.exec(m[1]);
+  if (tz) return tz[1].trim();
+  return /Z$/i.test(value) ? 'UTC' : null;
+}
+
+/**
+ * Weicht DTSTART von DUE ab - in Datum, Uhrzeit oder Schreibweise (Zone, Datum
+ * gegen Zeit)? Dann rechnet die Serie von DTSTART aus, und DUE allein
+ * beschreibt sie nicht; ein Alarm relativ zum Start fiele nach dem Vorruecken
+ * auf eine andere Zeit (Review auf #2543). Ohne DTSTART: false.
+ */
+function startDiffersFromDue(block) {
+  const line = (prop) => new RegExp(`^${prop}((?:;[^:;]*)*):(.*)$`, 'im').exec(block);
+  const start = line('DTSTART');
+  if (!start) return false;
+  const due = line('DUE');
+  if (!due) return true;
+  const startValue = start[2].trim();
+  const dueValue = due[2].trim();
+  const dateOnly = (m, v) => /;VALUE=DATE(?![-\w])/i.test(m[1]) || /^\d{8}$/.test(v);
+  return startValue.toUpperCase() !== dueValue.toUpperCase()
+    || dateOnly(start, startValue) !== dateOnly(due, dueValue)
+    || dateLineZone(block, 'DTSTART') !== dateLineZone(block, 'DUE');
+}
+
 function parseVTODO(ics) {
   const unfolded = unfoldLines(ics);
   const todos    = [];
@@ -383,6 +417,9 @@ function parseVTODO(ics) {
       uid, summary, description, completed, completedAt: completedInstant(completedAt),
       status, due, priority, tags, parentUid, childUids,
       override: get('RECURRENCE-ID') !== null,
+      exceptions: get('EXDATE') !== null || get('RDATE') !== null,
+      dueZone: dateLineZone(block, 'DUE'),
+      startShifted: startDiffersFromDue(block),
       rrule: get('RRULE'),
       yuvomiRrule: get('X-YUVOMI-RRULE'),
     });
@@ -391,11 +428,19 @@ function parseVTODO(ics) {
   // (Thunderbird) steht als eigener Block mit derselben UID und ohne RRULE da;
   // landet sie als letzte auf der Zeile, naehme sie der Serie sonst ihre Regel.
   // Jeder Block einer UID traegt deshalb die Regel und Marke ihres Masters.
+  //
+  // EINZELNE TAGE DER SERIE (Review auf #2543): EXDATE nimmt Vorkommen heraus,
+  // RDATE fuegt welche hinzu, ein Block mit RECURRENCE-ID aendert eins. Die RRULE
+  // allein beschreibt die Serie dann nicht mehr; `seriesExceptions` sagt das
+  // dem Inbound, der so eine Serie nicht weiterfuehrt (#2506).
   const masters = new Map(todos.filter((todo) => !todo.override).map((todo) => [todo.uid, todo]));
+  const overridden = new Set(todos.filter((todo) => todo.override).map((todo) => todo.uid));
   for (const todo of todos) {
     const master = masters.get(todo.uid);
     todo.rrule = master?.rrule ?? null;
     todo.yuvomiRrule = master?.yuvomiRrule ?? null;
+    todo.seriesExceptions = Boolean(master?.exceptions) || overridden.has(todo.uid);
+    delete todo.exceptions;
   }
   return todos;
 }

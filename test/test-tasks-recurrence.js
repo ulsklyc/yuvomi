@@ -1147,3 +1147,44 @@ test('Ist das Konto geloescht, gehoert die Serie keiner anderen App mehr: Abhake
   assert.equal(db.prepare('SELECT external_rrule FROM tasks WHERE id = ?').get(id).external_rrule, null);
   assert.equal((await call('PATCH', `/${id}/status`, { status: 'done' })).status, 200);
 });
+
+// Eine abbildbare fremde Regel (#2506, PR 2) liest der Inbound als Serie ein:
+// dann fuehrt Yuvomi sie weiter, und das Abhaken geht. Gesperrt bleibt sie,
+// sobald sie hier keine Serie mehr ist - auch im selben PUT, der abhakt.
+function insertMappedForeignSeries(title) {
+  return insertTask({
+    title, status: 'open', due_date: dayKey(1), created_by: uid,
+    external_uid: `${title}@phone`, external_source: 'caldav',
+    external_rrule: 'FREQ=WEEKLY;INTERVAL=1', is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY',
+  });
+}
+
+test('Abbildbare fremde Serie: PATCH done geht und legt die Folgeinstanz an (#2506)', async () => {
+  const id = insertMappedForeignSeries('Altpapier');
+  const res = await call('PATCH', `/${id}/status`, { status: 'done' });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(res.body.data.next_due_date, dayKey(8));
+});
+
+test('Abbildbare fremde Serie: wer im selben PUT die Wiederholung abschaltet, bekommt 409 (#2506)', async () => {
+  const id = insertMappedForeignSeries('Glas wegbringen');
+  const res = await call('PUT', `/${id}`, { status: 'done', is_recurring: false, recurrence_rule: null });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.reason, 'task_foreign_series');
+  assert.equal(db.prepare('SELECT status, is_recurring FROM tasks WHERE id = ?').get(id).is_recurring, 1);
+});
+
+test('Abbildbare fremde Serie: wer im selben PUT eine Uhrzeit setzt und abhakt, bekommt 409 (Review #2543)', async () => {
+  // Ein Ende gilt nur an einer Serie ohne Uhrzeit. Der Guard muss die neue
+  // Uhrzeit sehen, sonst legte der Spawn eine zweite Serie an.
+  const id = insertTask({
+    title: 'Restmuell', status: 'open', due_date: dayKey(1), created_by: uid,
+    external_uid: 'restmuell@phone', external_source: 'caldav',
+    external_rrule: 'FREQ=WEEKLY;UNTIL=20991231', is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY;UNTIL=20991231',
+  });
+  const res = await call('PUT', `/${id}`, { status: 'done', due_time: '08:00' });
+  assert.equal(res.status, 409);
+  const row = db.prepare('SELECT status, due_time FROM tasks WHERE id = ?').get(id);
+  assert.deepEqual({ ...row }, { status: 'open', due_time: null });
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM tasks WHERE recurrence_origin_id = ?').get(id).n, 0);
+});

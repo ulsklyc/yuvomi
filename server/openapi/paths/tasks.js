@@ -18,7 +18,7 @@ const typedResponses = (status, description, schema, refusals = {}) => ({
 });
 
 const BAD_REQUEST = { $ref: '#/components/responses/BadRequest' };
-const FOREIGN_SERIES_CONFLICT = apiError('The task repeats in another app (reason `task_foreign_series`, rule in `external_rrule`): ticking it off here would end the series there, so it is ticked off in that app (#2506). Other changes stay allowed.');
+const FOREIGN_SERIES_CONFLICT = apiError('The task repeats in another app with a rule Yuvomi cannot follow (reason `task_foreign_series`, rule in `external_rrule`, no `is_recurring` here): ticking it off here would end the series there, so it is ticked off in that app (#2506). Other changes stay allowed.');
 const LOCKED = apiError('The task is locked and the caller is neither its creator nor an administrator (reason `task_locked`), or there is no write access to tasks.');
 const NO_TASK = apiError('The task does not exist or is not visible to the caller.');
 
@@ -188,7 +188,7 @@ const REORDER_DENIED = '`reorder_not_allowed` (403, the caller lacks `tasks_reor
 const CAT_EXISTS = '`category_exists` (409, a category with this name already exists)';
 const CAT_DELETE = '`category_in_use` (409, tasks still use the category; `count` carries how many), `category_last` (409, the last category cannot be deleted)';
 const TAG_GONE = '`tasks_tag_not_found` (404, renamed or removed in the meantime)';
-const FOREIGN_SERIES = '`task_foreign_series` (409, the task repeats in another app - its rule is in `external_rrule` - and is ticked off there, #2506)';
+const FOREIGN_SERIES = '`task_foreign_series` (409, the task repeats in another app with a rule Yuvomi cannot follow - it is in `external_rrule` - and is ticked off there, #2506)';
 
 const CASE_REASONS = {
   '/api/v1/tasks/tags/{tag}': { put: TAG_GONE, delete: TAG_GONE },
