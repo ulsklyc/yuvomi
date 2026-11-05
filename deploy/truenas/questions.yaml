@@ -47,8 +47,11 @@ questions:
           description: |
             SQLCipher key that encrypts the database at rest.</br>
             Leave empty on a new installation and Yuvomi generates one on its
-            first start and keeps it in .secrets/ next to the database; set
-            DB_ENCRYPTION_AUTO_KEY=false below for an unencrypted database.</br>
+            first start and keeps it in .secrets/ next to the database. To store
+            the database unencrypted instead, add DB_ENCRYPTION_AUTO_KEY=false
+            under Additional Environment Variables below.</br>
+            On an installation whose database is already encrypted, an empty
+            field does not generate a replacement - the start is refused.</br>
             WARNING: Store this key permanently - Settings, Household, Backup and
             restore shows it. It cannot be recovered, it cannot be changed on an
             existing database, and losing it means losing access to your data.

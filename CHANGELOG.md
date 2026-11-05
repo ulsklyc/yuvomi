@@ -113,7 +113,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **The app stores and catalogs no longer ask for a session secret.** Since 2.85.0 a new
-  installation generates `SESSION_SECRET` and `DB_ENCRYPTION_KEY` on its first start, but three
+  installation generates `SESSION_SECRET` and `DB_ENCRYPTION_KEY` on its first start, but four
   deploy descriptors still demanded one: the Portainer stack stopped the deploy outright
   (`${SESSION_SECRET:?...}`), the Portainer app template and the Unraid template labelled the
   field "required", and the TrueNAS form refused to install without it. All four now offer both

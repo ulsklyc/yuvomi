@@ -20,10 +20,13 @@
 #   SESSION_SECRET=<random-string-min-32-chars>
 #   DB_ENCRYPTION_KEY=<random-string-min-32-chars>
 #
-# Left empty, Yuvomi generates both on its first start and keeps them in
-# `.secrets/` next to the database, on the oikos_data volume below. Keep a copy
-# of DB_ENCRYPTION_KEY somewhere else (Settings > Household > Backup and restore
-# shows it): without it, a backup cannot be opened once that volume is lost.
+# On a NEW installation, left empty, Yuvomi generates both on its first start
+# and keeps them in `.secrets/` next to the database, on the oikos_data volume
+# below. Keep a copy of DB_ENCRYPTION_KEY somewhere else (Settings > Household >
+# Backup and restore shows it): without it, a backup cannot be opened once that
+# volume is lost. On an installation whose database is ALREADY encrypted, an
+# empty DB_ENCRYPTION_KEY does not generate a fresh key - the start is refused,
+# because a new key would never open the existing database.
 # Set them yourself to keep the values under your own control:
 #   openssl rand -hex 32
 #
