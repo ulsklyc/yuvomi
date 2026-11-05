@@ -19,13 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
-- **A repeating reminder from iOS Reminders or Tasks.org no longer ends its series when you tick it
-  off in Yuvomi** (part of #2506 and #2515). Yuvomi does not take over such a series yet, so it now
-  marks it with "Repeats in another app" and asks you to tick it off there; Yuvomi no longer
-  sends a completion that would end the series in the other app. You can still edit it, set it in
-  progress or archive it. For API clients, ticking off such a task through
-  `PATCH /api/v1/tasks/:id/status` or `PUT /api/v1/tasks/:id` answers 409 with the reason
-  `task_foreign_series`, and tasks carry the other app's rule in `external_rrule`.
+- **Repeating reminders from iOS Reminders or Tasks.org now repeat in Yuvomi, and ticking one off
+  keeps the series running there** (#2506, #2515). Daily, weekly, monthly and yearly reminders,
+  also every few days or weeks, on chosen weekdays, on the last day of the month or until an end
+  date, arrive as a Yuvomi series. Ticking one off in Yuvomi or on a wall tablet does what the
+  other app does: the reminder moves on to its next date there, and a completed copy keeps the
+  history. Undoing the tick moves it back. A rule Yuvomi cannot follow exactly (a fixed number of
+  times, a fixed day of the month such as the 15th, "every second Tuesday") shows "Repeats in
+  another app" and is ticked off there; Yuvomi never sends a completion that would end such a
+  series. For API clients, ticking off one of those through `PATCH /api/v1/tasks/:id/status` or
+  `PUT /api/v1/tasks/:id` answers 409 with the reason `task_foreign_series`, and tasks carry the
+  other app's rule in `external_rrule`.
 
 ## [2.85.0] - 2026-11-04
 
