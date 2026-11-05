@@ -484,3 +484,51 @@ test('Unteraufgaben der anderen App gehen mit dem Master, die erledigte Zeile be
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM tasks').get().n, 4, 'Master, zwei gespiegelte, eine lokale');
   assert.equal(dav.objectNames(listUrl).length, 3, 'nichts geloescht, keine Kopie liegen geblieben');
 });
+
+// ── Zweite Review-Runde auf #2543: unsichere Enden und einzelne Tage ────────
+
+test('Ein Ende mit Uhrzeit oder an einer Serie mit Uhrzeit bleibt gesperrt (Review #2543)', async () => {
+  // Taeglich um 00:30 Berlin, UNTIL=20261105T233000Z: der 6. November gehoert
+  // in Berlin noch dazu, der Rechner vergleicht aber UTC-Tage. Er laege null
+  // vor, und das Abhaken schickte COMPLETED auf den Master.
+  const { foreignRuleFitsDue: fits } = todoOutbound;
+  assert.equal(fits('FREQ=DAILY;UNTIL=20261105T233000Z', '2026-11-05', '00:30'), false);
+  assert.equal(fits('FREQ=DAILY;UNTIL=20261105', '2026-11-05', '00:30'), false, 'auch ein Datum an einer Serie mit Uhrzeit');
+  assert.equal(fits('FREQ=DAILY;UNTIL=20261105T225959Z', '2026-11-05', null), false, 'ein UTC-Ende an einem reinen Datum');
+  assert.equal(fits('FREQ=DAILY;UNTIL=20261105', '2026-11-05', null), true);
+  assert.equal(fits('FREQ=DAILY', '2026-11-05', '00:30'), true, 'ohne Ende zaehlt die Uhrzeit nicht');
+
+  reset();
+  const timed = appleSeries({ rrule: `FREQ=DAILY;UNTIL=${icsDay(dayKey(0))}T233000Z` })
+    .replace(/DTSTART;VALUE=DATE:\d+/, `DTSTART:${icsDay(dayKey(0))}T003000Z`)
+    .replace(/DUE;VALUE=DATE:\d+/, `DUE:${icsDay(dayKey(0))}T003000Z`);
+  dav.putObject(listUrl, FILE, timed);
+  await remindersSync.sync();
+  const row = rowOf(UID);
+  assert.equal(row.due_time, '00:30', 'Vorbedingung: eine Serie mit Uhrzeit');
+  assert.equal(row.is_recurring, 0);
+  const refused = await call('PATCH', `/${row.id}/status`, { status: 'done' });
+  assert.equal(refused.status, 409);
+  assert.equal(refused.body.reason, 'task_foreign_series');
+});
+
+test('EXDATE, RDATE oder ein geaendertes Vorkommen: die Regel allein reicht nicht, gesperrt (Review #2543)', async () => {
+  const override = ['BEGIN:VTODO', `UID:${UID}`, 'DTSTAMP:20261101T080000Z',
+    `RECURRENCE-ID;VALUE=DATE:${icsDay(dayKey(2))}`, `DUE;VALUE=DATE:${icsDay(dayKey(3))}`,
+    'SUMMARY:Muell rausbringen', 'END:VTODO'].join('\r\n');
+  const cases = {
+    EXDATE: appleSeries({ extra: [`EXDATE;VALUE=DATE:${icsDay(dayKey(1))}`] }),
+    RDATE: appleSeries({ extra: [`RDATE;VALUE=DATE:${icsDay(dayKey(10))}`] }),
+    'RECURRENCE-ID': appleSeries().replace('END:VCALENDAR', `${override}\r\nEND:VCALENDAR`),
+  };
+  for (const [what, ics] of Object.entries(cases)) {
+    reset();
+    dav.putObject(listUrl, FILE, ics);
+    await remindersSync.sync();
+    const row = rowOf(UID);
+    assert.equal(row.is_recurring, 0, `${what}: als Serie eingelesen`);
+    assert.equal(row.external_rrule, 'FREQ=DAILY;INTERVAL=1', `${what}: die Sperre fehlt`);
+    const res = await call('PATCH', `/${row.id}/status`, { status: 'done' });
+    assert.equal(res.status, 409, `${what}: abgehakt`);
+  }
+});

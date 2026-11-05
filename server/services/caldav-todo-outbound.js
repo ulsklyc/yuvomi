@@ -337,13 +337,24 @@ function computesExactly(parts) {
  * Jahresserie am 29. Februar ebenso. Beides waere ein falsches DUE in der
  * anderen App, also bleibt so eine Serie dort abzuhaken.
  *
+ * EIN ENDE NUR AN EINEM REINEN DATUM (Review auf #2543). Der Rechner vergleicht
+ * UNTIL als Kalendertag; ein UNTIL mit Uhrzeit ist ein Zeitpunkt in UTC, und
+ * eine Serie mit Uhrzeit endet an einem Ortstag. Taeglich um 00:30 in Berlin
+ * mit UNTIL=20261105T233000Z hat am 6. November noch ein Vorkommen, das der
+ * Rechner nicht sieht - das Abhaken schickte COMPLETED auf den Master und
+ * beendete die Serie dort zu frueh. Ein Ende mit Uhrzeit oder an einer Serie
+ * mit Uhrzeit bleibt deshalb in der anderen App abzuhaken.
+ *
  * @param {string} rule - normalisierte Regel (`mappableForeignRule`)
  * @param {string|null} dueDate - YYYY-MM-DD
+ * @param {string|null} [dueTime] - HH:MM, null an einem reinen Datum
  */
-export function foreignRuleFitsDue(rule, dueDate) {
+export function foreignRuleFitsDue(rule, dueDate, dueTime = null) {
   if (!rule || !dueDate) return false;
   const day = String(dueDate).slice(5, 10);
   const value = rruleValue(rule).toUpperCase();
+  const until = /(?:^|;)UNTIL=([^;]*)/.exec(value)?.[1];
+  if (until !== undefined && (dueTime || !/^\d{8}$/.test(until))) return false;
   if (/(^|;)FREQ=MONTHLY(;|$)/.test(value) && !/(^|;)BYMONTHDAY=-1(;|$)/.test(value)) return Number(day.slice(3)) <= 28;
   if (/(^|;)FREQ=YEARLY(;|$)/.test(value)) return day !== '02-29';
   return true;
@@ -358,13 +369,18 @@ export function foreignRuleFitsDue(rule, dueDate) {
  */
 export function continuesForeignSeries(task) {
   return Boolean(task?.external_rrule && task.is_recurring && task.recurrence_rule
-    && !task.parent_task_id && foreignRuleFitsDue(task.recurrence_rule, task.due_date));
+    && !task.parent_task_id && foreignRuleFitsDue(task.recurrence_rule, task.due_date, task.due_time));
 }
 
 /**
  * Ist dieses erledigte Vorkommen einer weitergefuehrten fremden Serie ihr
  * letztes (UNTIL erreicht)? Dann legte das Abhaken keine Folgeinstanz an, die
  * den Master uebernaehme, und der Master darf abgeschlossen werden.
+ *
+ * Nur, wo das Ende sicher ist: `continuesForeignSeries` laesst ein UNTIL nur
+ * als reines Datum an einer Serie ohne Uhrzeit zu (`foreignRuleFitsDue`), und
+ * das vergleicht der Rechner exakt. Jede andere Serie haelt die Sperre, und
+ * der Master bekommt nie COMPLETED, nur weil der Rechner null liefert.
  */
 function foreignSeriesEnded(task, tz) {
   if (!continuesForeignSeries(task)) return false;

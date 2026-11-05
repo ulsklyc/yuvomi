@@ -407,4 +407,9 @@ test('Fremde Serie: abgehakt wird nur dort, wo Yuvomi sie nicht weiterfuehrt (#2
   assert.equal(repeatsElsewhere({ ...monthly, due_date: '2026-11-30' }), true);
   assert.equal(repeatsElsewhere({ ...monthly, recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1', due_date: '2026-11-30' }), false);
   assert.equal(repeatsElsewhere({ ...mapped, recurrence_rule: 'FREQ=YEARLY', due_date: '2028-02-29' }), true);
+  // Zweite Runde: ein Ende gilt nur als reines Datum an einer Serie ohne Uhrzeit.
+  const ending = { ...mapped, recurrence_rule: 'FREQ=DAILY;UNTIL=20261130' };
+  assert.equal(repeatsElsewhere(ending), false);
+  assert.equal(repeatsElsewhere({ ...ending, due_time: '00:30' }), true);
+  assert.equal(repeatsElsewhere({ ...ending, recurrence_rule: 'FREQ=DAILY;UNTIL=20261130T225959Z' }), true);
 });

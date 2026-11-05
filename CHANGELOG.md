@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   other app does: the reminder moves on to its next date there, and a completed copy keeps the
   history. Undoing the tick moves it back. A rule Yuvomi cannot follow exactly (a fixed number of
   times, a fixed day of the month such as the 15th, "every second Tuesday", a monthly reminder
-  due on the 29th to 31st) shows "Repeats in
+  due on the 29th to 31st, a series with skipped or extra dates) shows "Repeats in
   another app" and is ticked off there; Yuvomi never sends a completion that would end such a
   series. For API clients, ticking off one of those through `PATCH /api/v1/tasks/:id/status` or
   `PUT /api/v1/tasks/:id` answers 409 with the reason `task_foreign_series`, and tasks carry the

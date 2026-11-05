@@ -383,6 +383,7 @@ function parseVTODO(ics) {
       uid, summary, description, completed, completedAt: completedInstant(completedAt),
       status, due, priority, tags, parentUid, childUids,
       override: get('RECURRENCE-ID') !== null,
+      exceptions: get('EXDATE') !== null || get('RDATE') !== null,
       rrule: get('RRULE'),
       yuvomiRrule: get('X-YUVOMI-RRULE'),
     });
@@ -391,11 +392,19 @@ function parseVTODO(ics) {
   // (Thunderbird) steht als eigener Block mit derselben UID und ohne RRULE da;
   // landet sie als letzte auf der Zeile, naehme sie der Serie sonst ihre Regel.
   // Jeder Block einer UID traegt deshalb die Regel und Marke ihres Masters.
+  //
+  // EINZELNE TAGE DER SERIE (Review auf #2543): EXDATE nimmt Vorkommen heraus,
+  // RDATE fuegt welche hinzu, ein Block mit RECURRENCE-ID aendert eins. Die RRULE
+  // allein beschreibt die Serie dann nicht mehr; `seriesExceptions` sagt das
+  // dem Inbound, der so eine Serie nicht weiterfuehrt (#2506).
   const masters = new Map(todos.filter((todo) => !todo.override).map((todo) => [todo.uid, todo]));
+  const overridden = new Set(todos.filter((todo) => todo.override).map((todo) => todo.uid));
   for (const todo of todos) {
     const master = masters.get(todo.uid);
     todo.rrule = master?.rrule ?? null;
     todo.yuvomiRrule = master?.yuvomiRrule ?? null;
+    todo.seriesExceptions = Boolean(master?.exceptions) || overridden.has(todo.uid);
+    delete todo.exceptions;
   }
   return todos;
 }

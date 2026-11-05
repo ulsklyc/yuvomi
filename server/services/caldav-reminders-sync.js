@@ -331,8 +331,9 @@ function rowForTodoUid(d, table, columns, uid, accountId) {
  * Die Wiederholung, die eine fremde Regel in der Zeile setzt (#2506, #2515) -
  * oder null, wenn der Abruf sie nicht anfasst.
  *
- * Abbildbar (`mappableForeignRule`) und mit passender Faelligkeit
- * (`foreignRuleFitsDue`): eine Serie mit der
+ * Abbildbar (`mappableForeignRule`), ohne einzeln ausgenommene oder
+ * hinzugefuegte Tage und mit passender Faelligkeit (`foreignRuleFitsDue`):
+ * eine Serie mit der
  * Regel in Yuvomis Teilmenge, abhakbar wie in der besitzenden App. Sonst KEINE
  * Serie hier: Yuvomi rechnete sie falsch weiter, das Abhaken bleibt dort
  * (`task_foreign_series`) - und eine Regel, die jemand hier gesetzt hatte,
@@ -345,10 +346,13 @@ function rowForTodoUid(d, table, columns, uid, accountId) {
  *
  * @returns {{isRecurring: 0|1, rule: string|null}|null}
  */
-function foreignRecurrence(externalRrule, dueDate, { ruleRemoved = false } = {}) {
+function foreignRecurrence(externalRrule, dueDate, dueTime, { ruleRemoved = false, exceptions = false } = {}) {
   if (!externalRrule) return ruleRemoved ? { isRecurring: 0, rule: null } : null;
-  const mapped = todoOutbound.mappableForeignRule(externalRrule);
-  return mapped && todoOutbound.foreignRuleFitsDue(mapped, dueDate)
+  // Mit EXDATE, RDATE oder geaenderten Einzelvorkommen beschreibt die Regel die
+  // Serie nicht allein (Review auf #2543): Yuvomi ruckte sonst auf einen Tag,
+  // den die andere App ausgenommen hat.
+  const mapped = exceptions ? null : todoOutbound.mappableForeignRule(externalRrule);
+  return mapped && todoOutbound.foreignRuleFitsDue(mapped, dueDate, dueTime)
     ? { isRecurring: 1, rule: mapped }
     : { isRecurring: 0, rule: null };
 }
@@ -379,8 +383,9 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions 
     const externalRrule = ownObject
       ? null
       : todoOutbound.foreignRecurrenceRule(todo.rrule ?? null, todo.yuvomiRrule ?? null);
-    const recurrence = foreignRecurrence(externalRrule, date, {
+    const recurrence = foreignRecurrence(externalRrule, date, time, {
       ruleRemoved: !ownObject && !todo.rrule && Boolean(existing?.external_rrule),
+      exceptions: Boolean(todo.seriesExceptions),
     });
 
     let taskId;
