@@ -430,6 +430,8 @@ test('Kueche mobil: die Leiste passt bei 375px in allen vier Tabs ohne Scrollen 
     if (s === '0') return 0;
     const lit = s.match(/^(-?[\d.]+)px$/);
     if (lit) return Number(lit[1]);
+    const neg = s.match(/^calc\(-1 \* var\(--([\w-]+)\)\)$/);
+    if (neg) return -tok(neg[1]);
     const m = s.match(/^var\(--([\w-]+)\)$/);
     assert.ok(m, `Laenge nicht lesbar: "${s}"`);
     return tok(m[1]);
@@ -602,11 +604,26 @@ test('Trailing-Zone: der geteilte Helfer steckt den Schalter und klappt Zeile 2 
   const helper = src.slice(src.indexOf('export function mountKitchenSearchTrailing('));
   assert.ok(helper.length > 0, 'mountKitchenSearchTrailing ist exportiert');
   assert.match(helper, /setKitchenTabsTrailing\(btn\)/, 'der Helfer setzt den Knopf in die Trailing-Zone');
+  // Die Browser-Probe (test:kitchen-tabs-fit-browser) baut ihr eigenes Markup und
+  // misst die Klasse, nicht diesen Aufrufort: ohne diese Zeile bliebe ein Helfer
+  // ohne `btn--icon-tight` gruen und die Leiste bei 375px wieder zu breit (#2050).
+  assert.match(helper, /btn\.className\s*=\s*`[^`]*\bbtn--icon-tight\b[^`]*`/,
+    'der Suchschalter traegt btn--icon-tight, sonst ist er 48px statt 24px breit');
   assert.match(helper, /MutationObserver/, 'der Helfer beobachtet die Klasse, um Zeile 2 beim Laden einzuklappen');
   assert.match(helper, /is-collapsed/, 'der Helfer ergaenzt is-collapsed sobald --fold-row gesetzt ist');
   assert.match(helper, /mo\.disconnect\(\)/, 'der Observer laeuft nur einmal und haengt sich selbst ab');
   // Kein doppelter Observer auf dem Desktop: matchMedia-Guard muss vorhanden sein
   assert.match(helper, /matchMedia.*639/, 'der Collapse-Observer laeuft nur auf Mobilgeraeten (<= 639px)');
+});
+
+test('Trailing-Zone: der Rand neben dem Suchschalter kommt aus der Abstandsskala', () => {
+  const css = readSrc('../public/styles/kitchen-tabs.css');
+  const margins = [...css.matchAll(/\.kitchen-tabs-bar__trailing\s*\{([^}]*)\}/g)]
+    .map(m => m[1].match(/margin-inline-start:\s*([^;]+);/)?.[1].trim())
+    .filter(Boolean);
+  assert.equal(margins.length, 1, 'genau eine Regel der Zone setzt margin-inline-start (die Telefon-Regel)');
+  assert.equal(margins[0], 'calc(-1 * var(--space-0h))',
+    'der negative Rand ist --space-0h aus tokens.css, kein Pixelwert (#2050)');
 });
 
 test('Trailing-Zone: Tabs sind text-only, kein Werkzeugknopf direkt in renderKitchenTabsBar', () => {

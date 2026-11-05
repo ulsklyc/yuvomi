@@ -194,13 +194,13 @@
    * Leiste brauchte 398px von 375 (Review zu #2043). Ein ::before vergrossert
    * die Trefferflaeche hier wieder auf --target-base in der Hoehe.
    *
-   * Ein negativer Rand (-2px) neben der 24px-Taste deckt den 1,3px-Ueberlauf
-   * bei 375px ab: 16 + 336,3 + (−2 + 24) = 374,3px (<= 375), damit vier Tabs
+   * Ein negativer Rand (--space-0h, 2px) neben der 24px-Taste deckt den 1,3px-Ueberlauf
+   * bei 375px ab: 16 + 336,3 + (-2 + 24) = 374,3px (<= 375), damit vier Tabs
    * mit --space-2 Polster passen. Gemessen wird das in
    * test:kitchen-tabs-fit-browser, nicht an der Deklaration. */
   .kitchen-tabs-bar__trailing {
     padding-inline-start: 0;
-    margin-inline-start: -2px;
+    margin-inline-start: calc(-1 * var(--space-0h));
   }
   .kitchen-tabs-bar__trailing .btn--icon {
     position: relative;
