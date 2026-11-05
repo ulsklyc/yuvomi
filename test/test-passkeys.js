@@ -122,18 +122,30 @@ test('origin configuration is explicit and never taken from a request Host', () 
   process.env.BASE_URL = saved;
 });
 
+let httpSerial = 0;
 async function httpFixture() {
   const { default: express } = await import('express');
   const { router, sessionMiddleware } = await import('../server/auth.js');
-  const app = express(); app.use(express.json()); app.use(sessionMiddleware);
+  const app = express(); app.set('trust proxy', 'loopback'); app.use(express.json()); app.use(sessionMiddleware);
+  const clientIP = `198.51.100.${++httpSerial}`;
   app.post('/__test/stale', (req, res) => { req.session.authenticatedAt = 0; res.json({ ok: true }); });
   app.get('/__test/proof', (req, res) => res.json({ userId: req.session.userId, authenticatedAt: req.session.authenticatedAt, sessionId: req.sessionID, csrf: req.session.csrfToken }));
+  app.use((req, _res, next) => {
+    if (req.headers['x-test-sso-switch'] && req.body?.credential && req.session.userId) {
+      const credentialId = req.body.credential.id;
+      Object.defineProperty(req.body.credential, 'id', { get() {
+        database.prepare("UPDATE users SET password_hash = '$oidc$' WHERE id = ?").run(req.session.userId);
+        return credentialId;
+      } });
+    }
+    next();
+  });
   app.use('/api/v1/auth', router);
   const server = await new Promise((resolve, reject) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); s.on('error', reject); });
   const base = `http://127.0.0.1:${server.address().port}`;
   const cookies = new Map(); let csrf = '';
   async function call(path, method = 'GET', body, headers = {}) {
-    const response = await fetch(base + path, { method, headers: { 'Content-Type':'application/json', Origin:origin,
+    const response = await fetch(base + path, { method, headers: { 'Content-Type':'application/json', Origin:origin, 'X-Forwarded-For':clientIP,
       Cookie:[...cookies].map(([k,v])=>`${k}=${v}`).join('; '), 'X-CSRF-Token':csrf, ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
     for (const cookie of response.headers.getSetCookie()) { const item = cookie.split(';')[0]; const i=item.indexOf('='); cookies.set(item.slice(0,i),item.slice(i+1)); }
     const data = await response.json(); if(data.csrfToken) csrf=data.csrfToken;
@@ -254,6 +266,9 @@ test('HTTP enrollment and sign-in preserve CSRF, session, policy, account and 2F
     assert.equal(response.status,200,JSON.stringify(response.data));
     assert.equal(response.data.user.id,person.id);
     assert.notEqual(JSON.stringify([...cookies]),before,'sign-in regenerates the session');
+    const signedIn = (await call('/__test/proof')).data;
+    const normalSession = JSON.parse(database.prepare('SELECT sess FROM sessions WHERE sid = ?').get(signedIn.sessionId).sess);
+    assert.ok(normalSession.cookie.originalMaxAge > 5 * 60_000, 'successful proof starts the normal session lifetime');
     assert.equal((await route('/me')).data.user.id,person.id);
     const row = passkeys.list(database,person.id)[0];
     // A second factor stays a second step after a successful passkey assertion.
@@ -380,4 +395,128 @@ test('HTTP inline reauth refreshes only after correct proof and preserves identi
       assert.equal((await route(path, 'POST', {method:'password', password}, {Authorization:`Bearer ${token}`})).data.reason, 'browser_session_required');
     }
   } finally { await close(); }
+});
+
+
+test('anonymous options count successful requests and expire sessions within the challenge window', async () => {
+  const { route, cookies, close } = await httpFixture();
+  const previousSessions = new Set(database.prepare('SELECT sid FROM sessions').all().map(row => row.sid));
+  const before = previousSessions.size;
+  const start = Date.now();
+  try {
+    for (let n = 0; n < 20; n++) {
+      cookies.clear();
+      assert.equal((await route('/passkeys/login/options', 'POST', {})).status, 200);
+    }
+    cookies.clear();
+    assert.equal((await route('/passkeys/login/options', 'POST', {})).status, 429);
+    assert.equal(database.prepare('SELECT count(*) AS n FROM sessions').get().n - before, 20);
+    const anonymous = database.prepare('SELECT sid, sess, expired_at FROM sessions').all().filter(row => !previousSessions.has(row.sid));
+    assert.ok(anonymous.length >= 20);
+    for (const row of anonymous) {
+      const session = JSON.parse(row.sess);
+      if (session.userId) continue;
+      assert.ok(session.cookie.originalMaxAge <= 5 * 60_000);
+      assert.ok(row.expired_at <= Date.now() + 5 * 60_000);
+    }
+    assert.ok(Date.now() - start < 60_000, 'the limiter window did not reset during the test');
+    const other = await httpFixture();
+    try { assert.equal((await other.route('/passkeys/login/options', 'POST', {})).status, 200); }
+    finally { await other.close(); }
+  } finally { await close(); }
+});
+
+test('one client can only evict its own anonymous challenges and cannot exhaust a global cap', async () => {
+  const person = user(); const own = await enroll(person);
+  const protectedOptions = await passkeys.beginAuthentication(database, own.session, person.id);
+  const otherOptions = await passkeys.beginAuthentication(database, 'other-client-session', null, 'other-client');
+  for (let n = 0; n < 1020; n++) await passkeys.beginAuthentication(database, `flood-${n}`, null, 'one-client');
+  assert.ok(database.prepare('SELECT count(*) AS n FROM passkey_challenges WHERE client_hash = ? AND user_id IS NULL').get(digest('one-client').toString('hex')).n <= 20);
+  assert.equal((await passkeys.finishAuthentication(database, own.session, assertion(protectedOptions, own.device, null), person.id)).userId, person.id);
+  assert.equal((await passkeys.finishAuthentication(database, 'other-client-session', assertion(otherOptions, own.device, own.handle, {counter:2}))).userId, person.id);
+  const options = await passkeys.beginAuthentication(database, 'after-flood');
+  assert.ok(options.challenge);
+});
+
+test('recovery invalidates registration already in cryptographic verification', async () => {
+  const person = user(); await enroll(person);
+  const options = await passkeys.beginRegistration(database, person, 'recovery-race');
+  const pending = passkeys.finishRegistration(database, person.id, 'recovery-race', registration(options, authenticator()), 'Planted key');
+  passkeys.revokeAll(database, person.id);
+  await assert.rejects(pending);
+  assert.equal(passkeys.list(database, person.id).length, 0);
+});
+
+test('an account SSO-only change during registration is read again after verification', async () => {
+  const { route, close } = await httpFixture();
+  const { hashPassword } = await import('../server/utils/password.js');
+  const person = user(); const password = 'SSO-race-test-password!';
+  database.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await hashPassword(password), person.id);
+  try {
+    await route('/login', 'POST', {username:person.username, password});
+    const options = (await route('/passkeys/register/options', 'POST', {})).data.data;
+    const response = await route('/passkeys/register/verify', 'POST', {credential:registration(options, authenticator()), name:'SSO key'}, {'X-Test-SSO-Switch':'1'});
+    assert.equal(response.status, 400);
+    assert.equal(database.prepare('SELECT password_hash FROM users WHERE id = ?').get(person.id).password_hash, '$oidc$', 'the policy changed inside credential verification');
+    assert.equal(passkeys.list(database, person.id).length, 0);
+  } finally { await close(); }
+});
+
+test('password recovery, admin recovery and enabling 2FA revoke planted passkeys and pending enrollment', async () => {
+  const { hashPassword } = await import('../server/utils/password.js');
+  const { createPasswordResetService } = await import('../server/services/password-reset.js');
+  const { generateCode } = await import('../server/utils/totp.js');
+  const password = 'Recovery-test-password-123!'; const hash = await hashPassword(password);
+  for (const action of ['password-change', 'password-reset', 'admin-password', 'admin-emergency', 'enable-2fa']) {
+    const { route, call, close } = await httpFixture();
+    const person = user(); const actor = action.startsWith('admin') ? user() : person;
+    database.prepare('UPDATE users SET password_hash = ? WHERE id IN (?, ?)').run(hash, person.id, actor.id);
+    if (action.startsWith('admin')) database.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(actor.id);
+    const own = await enroll(person);
+    const other = user(); await enroll(other);
+    await passkeys.beginRegistration(database, person, `pending-${action}`);
+    try {
+      assert.equal((await route('/login', 'POST', {username:actor.username, password})).status, 200);
+      let response;
+      if (action === 'password-change') response = await route('/me/password', 'PATCH', {current_password:password, new_password:'Replacement-password-123!'});
+      if (action === 'password-reset') {
+        const { token } = createPasswordResetService({db:database}).createToken(person.id);
+        response = await route('/reset-password', 'POST', {token, password:'Replacement-password-123!'});
+      }
+      if (action === 'admin-password') response = await route(`/users/${person.id}`, 'PATCH', {password:'Replacement-password-123!'});
+      if (action === 'admin-emergency') response = await route(`/users/${person.id}/devices/sign-out`, 'POST', {});
+      if (action === 'enable-2fa') {
+        await route('/2fa/setup', 'POST', {});
+        const secret = database.prepare('SELECT secret FROM user_totp WHERE user_id = ?').get(person.id).secret;
+        response = await route('/2fa/enable', 'POST', {code:generateCode(secret, Date.now())});
+      }
+      assert.equal(response.status, 200, `${action}: ${JSON.stringify(response.data)}`);
+      assert.equal(passkeys.list(database, person.id).length, 0, action);
+      assert.equal(database.prepare('SELECT count(*) AS n FROM passkey_challenges WHERE user_id = ?').get(person.id).n, 0);
+      assert.equal(passkeys.list(database, other.id).length, 1, 'another member keeps their credential');
+      const options = await passkeys.beginAuthentication(database, `recovered-${action}`);
+      await assert.rejects(passkeys.finishAuthentication(database, `recovered-${action}`, assertion(options, own.device, own.handle)));
+      if (action !== 'password-reset') assert.equal((await call('/__test/proof')).data.userId, actor.id);
+    } finally { await close(); }
+  }
+});
+
+test('removing a passkey ends other sessions while preserving the current session and remaining credentials', async () => {
+  const { hashPassword } = await import('../server/utils/password.js');
+  const person = user(); const password = 'Remove-test-password-123!';
+  database.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await hashPassword(password), person.id);
+  await enroll(person); await enroll(person, 'second-key');
+  const first = await httpFixture(); const second = await httpFixture();
+  try {
+    await first.route('/login', 'POST', {username:person.username, password});
+    await second.route('/login', 'POST', {username:person.username, password});
+    const before = (await first.call('/__test/proof')).data;
+    const response = await first.route(`/passkeys/${passkeys.list(database, person.id)[0].id}`, 'DELETE', {});
+    assert.equal(response.status, 200);
+    assert.equal(response.data.data.ended, 1);
+    assert.equal((await second.route('/me')).status, 401);
+    assert.equal((await first.call('/__test/proof')).data.sessionId, before.sessionId);
+    assert.equal(passkeys.list(database, person.id).length, 1);
+    assert.equal((await first.route(`/passkeys/${passkeys.list(database, person.id)[0].id}`, 'DELETE', {})).status, 200, 'the retained password permits removal of the last passkey');
+  } finally { await first.close(); await second.close(); }
 });

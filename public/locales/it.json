@@ -6961,7 +6961,6 @@
         "cancelled": "Richiesta annullata o scaduta. Puoi riprovare.",
         "alreadyRegistered": "Questa chiave è già registrata. Scegli un altro autenticatore.",
         "reauthenticate": "Esci e accedi di nuovo, poi modifica le chiavi entro cinque minuti.",
-        "lastMethod": "Mantieni un altro metodo di accesso prima di rimuovere l'ultima chiave.",
         "failed": "Impossibile verificare la chiave. Riprova o usa un altro metodo.",
         "tooManyAttempts": "Troppi tentativi. Riprova più tardi.",
         "removeConfirm": "Rimuovere questa chiave? Potrai aggiungerla nuovamente dopo l'accesso con un altro metodo.",

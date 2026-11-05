@@ -6961,7 +6961,6 @@
         "cancelled": "Die Passkey-Anfrage wurde abgebrochen oder ist abgelaufen. Du kannst es erneut versuchen.",
         "alreadyRegistered": "Dieser Passkey ist bereits hinterlegt. Wähle einen anderen Authenticator.",
         "reauthenticate": "Melde dich ab und erneut an. Danach kannst du deine Passkeys innerhalb von fünf Minuten ändern.",
-        "lastMethod": "Behalte einen anderen funktionierenden Anmeldeweg, bevor du deinen letzten Passkey entfernst.",
         "failed": "Der Passkey konnte nicht geprüft werden. Versuche es erneut oder nutze einen anderen Anmeldeweg.",
         "tooManyAttempts": "Zu viele Versuche. Bitte versuche es später erneut.",
         "removeConfirm": "Diesen Passkey entfernen? Nach der Anmeldung über einen anderen Weg kannst du ihn erneut hinzufügen.",

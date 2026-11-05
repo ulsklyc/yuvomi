@@ -38,7 +38,6 @@ export function passkeyErrorText(error) {
   if (error?.name === 'InvalidStateError') return t('passkeys.alreadyRegistered');
   if (error?.data?.reason === 'passkey_reauth_required') return t('passkeys.reauthenticate');
   if (error?.data?.reason === 'passkey_policy') return t('passkeys.policy');
-  if (error?.data?.reason === 'passkey_last_method') return t('passkeys.lastMethod');
   if (error?.status === 429) return t('passkeys.tooManyAttempts');
   return t('passkeys.failed');
 }

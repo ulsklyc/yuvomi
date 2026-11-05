@@ -1635,11 +1635,13 @@ const MIGRATIONS_SQL = {
     CREATE TABLE IF NOT EXISTS passkey_challenges (
       challenge TEXT PRIMARY KEY,
       session_hash TEXT NOT NULL,
+      client_hash TEXT NOT NULL,
       operation TEXT NOT NULL CHECK(operation IN ('register', 'authenticate')),
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       expires_at INTEGER NOT NULL,
       UNIQUE(session_hash, operation)
     );
+    CREATE INDEX IF NOT EXISTS idx_passkey_challenges_client ON passkey_challenges(client_hash, expires_at) WHERE user_id IS NULL;
 `,
 };
 

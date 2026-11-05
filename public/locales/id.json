@@ -6961,7 +6961,6 @@
         "cancelled": "Permintaan dibatalkan atau kedaluwarsa. Silakan coba lagi.",
         "alreadyRegistered": "Kunci ini sudah terdaftar. Pilih autentikator lain.",
         "reauthenticate": "Keluar lalu masuk lagi. Kemudian ubah kunci dalam lima menit.",
-        "lastMethod": "Pertahankan metode masuk lain sebelum menghapus kunci terakhir.",
         "failed": "Kunci tidak dapat diverifikasi. Coba lagi atau gunakan metode lain.",
         "tooManyAttempts": "Terlalu banyak percobaan. Coba lagi nanti.",
         "removeConfirm": "Hapus kunci ini? Anda dapat menambahkannya lagi setelah masuk dengan metode lain.",
