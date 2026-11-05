@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **A calendar subscription that does not deliver says so** (#2566). Adding a subscription whose
+  address answered with an error (not found, too large, a private address) reported "Subscription
+  added", and the refresh button reported "Subscription synced", while no event ever arrived. Adding
+  now warns that the first fetch failed and why, in your language, and the refresh button shows the
+  reason instead of success. Scheduled refreshes stay quiet. API clients get the case as
+  `syncReason` when adding and as `reason` with a `400` when syncing.
 - **Backup, system and API settings say what went wrong in your language** (#1909). Restoring an
   empty file, a database that is not from Yuvomi or a backup from a newer version showed the
   server's English text; it now says what to do next. Creating an API token with a past expiry
