@@ -1002,7 +1002,13 @@
             "waited": "„{{item}}” nie został przeniesiony na listę „{{target}}”: synchronizacja listy „{{back}}” jest wyłączona od ponad tygodnia. Produkt pojawi się znowu na liście „{{back}}”, gdy ją włączysz."
         },
         "moreDetailsHint": "Cena, sklep, link, notatka",
-        "toPantryAllToPlaceholder": "Wybierz miejsce …"
+        "toPantryAllToPlaceholder": "Wybierz miejsce …",
+        "summaryRemaining": "Do kupienia",
+        "summaryPurchased": "W koszyku",
+        "summaryTotal": "Szacowana suma",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "około {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "randomizeSuccess_few": "Zaplanowano {{count}} posiłki.",

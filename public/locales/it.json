@@ -844,7 +844,13 @@
             "waited": "«{{item}}» non è stato spostato in «{{target}}»: la sincronizzazione di «{{back}}» è disattivata da oltre una settimana. L’articolo ricomparirà in «{{back}}» non appena riattivi quella lista."
         },
         "moreDetailsHint": "Prezzo, negozio, link, nota",
-        "toPantryAllToPlaceholder": "Scegli un posto …"
+        "toPantryAllToPlaceholder": "Scegli un posto …",
+        "summaryRemaining": "Da comprare",
+        "summaryPurchased": "Nel carrello",
+        "summaryTotal": "Totale stimato",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "circa {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediente",

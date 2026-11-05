@@ -844,7 +844,13 @@
             "waited": "“{{item}}” chưa được chuyển sang “{{target}}”: đồng bộ của “{{back}}” đã tắt hơn một tuần. Mục này sẽ xuất hiện lại trong “{{back}}” khi danh sách đó được bật."
         },
         "moreDetailsHint": "Giá, cửa hàng, liên kết, ghi chú",
-        "toPantryAllToPlaceholder": "Chọn nơi …"
+        "toPantryAllToPlaceholder": "Chọn nơi …",
+        "summaryRemaining": "Cần mua",
+        "summaryPurchased": "Trong giỏ",
+        "summaryTotal": "Ước tính tổng",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "khoảng {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} nguyên liệu",

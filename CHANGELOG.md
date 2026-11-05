@@ -41,6 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check, and docs/DECISIONS.md records the build step, the Node floor and the position on
   hosting as entries 20 to 22.
 
+### Added
+- **Shopping: price estimation and cost calculator** (part 2 of #1003). Open items inherit
+  price estimates based on previous purchases of the same item name. A subtle summary bar
+  above the shopping list calculates remaining, purchased, and total estimated expenses,
+  updating dynamically as items are ticked off or priced.
+
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
   accepts Node 24.12 and later (24.x and 26 and up) instead of 22.14 and 23.6; the tests run

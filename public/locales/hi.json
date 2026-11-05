@@ -844,7 +844,13 @@
             "waited": "“{{item}}” को “{{target}}” में नहीं ले जाया गया: “{{back}}” का सिंक एक हफ़्ते से ज़्यादा समय से बंद है। सूची चालू होते ही आइटम फिर से “{{back}}” में दिखेगा।"
         },
         "moreDetailsHint": "कीमत, दुकान, लिंक, नोट",
-        "toPantryAllToPlaceholder": "जगह चुनें …"
+        "toPantryAllToPlaceholder": "जगह चुनें …",
+        "summaryRemaining": "खरीदने के लिए",
+        "summaryPurchased": "कार्ट में",
+        "summaryTotal": "अनुमानित कुल",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "लगभग {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} सामग्री",

@@ -984,7 +984,13 @@
             "waited": "«{{item}}» не перемещён в список «{{target}}»: синхронизация списка «{{back}}» выключена больше недели. Товар снова появится в списке «{{back}}», как только вы его включите."
         },
         "moreDetailsHint": "Цена, магазин, ссылка, заметка",
-        "toPantryAllToPlaceholder": "Выберите место …"
+        "toPantryAllToPlaceholder": "Выберите место …",
+        "summaryRemaining": "Купить",
+        "summaryPurchased": "В корзине",
+        "summaryTotal": "Примерная сумма",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "около {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "randomizeSuccess_few": "Запланировано {{count}} приёма пищи.",

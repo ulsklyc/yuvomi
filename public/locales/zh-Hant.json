@@ -844,7 +844,13 @@
             "waited": "「{{item}}」未移到「{{target}}」：「{{back}}」的同步已關閉超過一週。開啟該清單後，項目會重新出現在「{{back}}」。"
         },
         "moreDetailsHint": "價格、商店、連結、備註",
-        "toPantryAllToPlaceholder": "選擇位置 …"
+        "toPantryAllToPlaceholder": "選擇位置 …",
+        "summaryRemaining": "待買",
+        "summaryPurchased": "在購物車",
+        "summaryTotal": "預估總計",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "約 {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} 種食材",

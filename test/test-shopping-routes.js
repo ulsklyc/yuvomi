@@ -1134,3 +1134,26 @@ test('Kaufhistorie: Bearbeiten eines bereits abgehakten Artikels aendert nicht d
   assert.equal(hist.body.data[0].purchased_at, yesterday, 'Kaufdatum bleibt erhalten');
 });
 
+test('Kaufhistorie: estimated_price_cents liefert den zuletzt gezahlten Preis (#1003)', async () => {
+  const list = (await call('POST', '/', { name: 'Schaetzpreisliste' })).body.data;
+
+  // 1. Artikel ohne Kaufhistorie -> estimated_price_cents ist null
+  const neu = (await call('POST', `/${list.id}/items`, { name: 'Kaffee' })).body.data;
+  assert.equal(neu.estimated_price_cents, null);
+
+  // 2. Kauf registrieren (abhaken mit Preis)
+  await call('PATCH', `/items/${neu.id}`, { price_cents: 349, is_checked: 1 });
+
+  // 3. Neuer Artikel mit demselben Namen (auch case-insensitive) erhaelt den Schaetzpreis
+  const zweiter = (await call('POST', `/${list.id}/items`, { name: 'kaffee' })).body.data;
+  assert.equal(zweiter.estimated_price_cents, 349);
+
+  // 4. Auch beim Laden der Liste vorhanden
+  const items = (await call('GET', `/${list.id}/items`)).body.data;
+  const geladen = items.find((i) => i.id === zweiter.id);
+  assert.equal(geladen.estimated_price_cents, 349);
+
+  // 5. Bei PATCH auf den Artikel bleibt/aktualisiert sich estimated_price_cents
+  const gepatcht = (await call('PATCH', `/items/${zweiter.id}`, { quantity: '500g' })).body.data;
+  assert.equal(gepatcht.estimated_price_cents, 349);
+});

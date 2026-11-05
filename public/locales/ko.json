@@ -862,7 +862,13 @@
             "waited": "“{{item}}” 항목이 “{{target}}” 목록으로 옮겨지지 않았습니다. “{{back}}” 목록의 동기화가 일주일 넘게 꺼져 있습니다. 목록을 켜면 “{{back}}”에 다시 나타납니다."
         },
         "moreDetailsHint": "가격, 매장, 링크, 메모",
-        "toPantryAllToPlaceholder": "장소 선택 …"
+        "toPantryAllToPlaceholder": "장소 선택 …",
+        "summaryRemaining": "구매 예정",
+        "summaryPurchased": "장바구니",
+        "summaryTotal": "예상 합계",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "약 {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "재료 {{count}}개",
