@@ -10,9 +10,26 @@ import { color } from '../../middleware/validate.js';
 import { ICS_COLOR_RE, getUserId, isAdminUser } from './helpers.js';
 import { readDefaultAssignees, validateAssigneeIds } from '../../services/default-assignees.js';
 import { validateCalendarId } from '../../services/local-calendars.js';
+import { BlockedAddressError } from '../../utils/ssrf.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
+
+const NAME_INVALID = { reason: 'calendar_subscription_name_invalid' };
+
+/**
+ * Der Fall eines gescheiterten Feed-Abrufs (#1909), den die Seite in ihrer
+ * Sprache sagt - oder null. Der Text des Fehlers bleibt in `error`; ein Status
+ * oder eine Grenze reist als Zahl in `params`, nie als Satz.
+ */
+function icsFetchCase(err) {
+  if (err instanceof BlockedAddressError) return { reason: 'calendar_ics_private_address' };
+  if (err?.code === 'ERR_INVALID_URL') return { reason: 'calendar_ics_url_invalid' };
+  if (err?.code === 'calendar_ics_url_scheme') return { reason: 'calendar_ics_url_scheme' };
+  if (err?.code === 'calendar_ics_http_status') return { reason: 'calendar_ics_http_status', params: { status: err.params.status } };
+  if (err?.code === 'calendar_ics_too_large') return { reason: 'calendar_ics_too_large', params: { limit_mb: err.params.limit_mb } };
+  return null;
+}
 
 // --------------------------------------------------------
 // ICS Subscription-Routen
@@ -45,13 +62,20 @@ router.post('/subscriptions', async (req, res) => {
   try {
     const { name, url, color: colorVal, shared } = req.body;
     if (!name || typeof name !== 'string' || name.trim().length === 0 || name.length > 100)
-      return res.status(400).json({ error: 'name is required and may be at most 100 characters long.', code: 400 });
+      return res.status(400).json({ error: 'name is required and may be at most 100 characters long.', code: 400, ...NAME_INVALID });
     if (!url || typeof url !== 'string')
       return res.status(400).json({ error: 'url is required.', code: 400 });
     const allowPrivate = icsSubscription.isPrivateNetworkAllowed();
     const allowedProtocols = allowPrivate ? ['https:', 'http:'] : ['https:'];
-    try { const u = new URL(url.replace(/^webcal:\/\//i, 'https://')); if (!allowedProtocols.includes(u.protocol)) throw new Error(); }
-    catch { return res.status(400).json({ error: allowPrivate ? 'Only http://, https:// and webcal:// URLs are allowed.' : 'Only https:// and webcal:// URLs are allowed.', code: 400 }); }
+    // Keine Adresse und eine mit falschem Schema sind zwei Faelle (#1909); der
+    // Text bleibt fuer beide derselbe wie vorher.
+    const schemeError = allowPrivate ? 'Only http://, https:// and webcal:// URLs are allowed.' : 'Only https:// and webcal:// URLs are allowed.';
+    let parsed;
+    try { parsed = new URL(url.replace(/^webcal:\/\//i, 'https://')); }
+    catch { return res.status(400).json({ error: schemeError, code: 400, reason: 'calendar_ics_url_invalid' }); }
+    if (!allowedProtocols.includes(parsed.protocol)) {
+      return res.status(400).json({ error: schemeError, code: 400, reason: 'calendar_ics_url_scheme' });
+    }
     if (!colorVal || !ICS_COLOR_RE.test(colorVal))
       return res.status(400).json({ error: 'color is required and must be #RRGGBB.', code: 400 });
     // Die Standard-Zuweisung schon beim Anlegen: create() synchronisiert
@@ -73,8 +97,8 @@ router.post('/subscriptions', async (req, res) => {
     res.status(201).json({ data: sub, syncError: syncError || null });
   } catch (err) {
     log.error('', err);
-    if (err.message?.startsWith('Only ')) return res.status(400).json({ error: err.message, code: 400 });
-    if (err.message?.includes('private IP')) return res.status(400).json({ error: err.message, code: 400 });
+    const fetchCase = icsFetchCase(err);
+    if (fetchCase) return res.status(400).json({ error: err.message, code: 400, ...fetchCase });
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
@@ -87,7 +111,7 @@ router.patch('/subscriptions/:id', (req, res) => {
     const fields  = {};
     if (req.body.name  !== undefined) {
       if (typeof req.body.name !== 'string' || req.body.name.trim().length === 0 || req.body.name.length > 100)
-        return res.status(400).json({ error: 'name must not be empty and may be at most 100 characters long.', code: 400 });
+        return res.status(400).json({ error: 'name must not be empty and may be at most 100 characters long.', code: 400, ...NAME_INVALID });
       fields.name = req.body.name.trim();
     }
     if (req.body.color !== undefined) {
@@ -169,7 +193,13 @@ router.post('/import', async (req, res) => {
       vColorValue = vColor.value;
     }
     const vLocalCalendar = validateCalendarId(db.get(), req.body.local_calendar_id);
-    if (vLocalCalendar.error) return res.status(400).json({ error: vLocalCalendar.error, code: 400 });
+    if (vLocalCalendar.error) {
+      // Der gewaehlte Kalender ist inzwischen geloescht (#1909): wie beim Termin.
+      return res.status(400).json({
+        error: vLocalCalendar.error, code: 400,
+        ...(vLocalCalendar.reason === 'calendar_selected_calendar_not_found' ? { reason: 'calendar_selected_calendar_not_found' } : {}),
+      });
+    }
     // Personen fuer diesen Lauf (#1940): `assignee_user_ids`, oder eine in
     // `assignee_user_id`. Nur Haushaltsmitglieder; gespeichert wird nichts.
     const assignees = validateAssigneeIds(db.get(), req.body, {
@@ -184,7 +214,10 @@ router.post('/import', async (req, res) => {
     res.status(201).json({ data: result });
   } catch (err) {
     // Nutzerorientierte Fehler (SSRF-Block, ungültige URL, HTTP-Status,
-    // Größenlimit) direkt zurückgeben; Rest als generischer Serverfehler.
+    // Größenlimit) direkt zurückgeben, mit ihrem Fall (#1909); Rest als
+    // generischer Serverfehler.
+    const fetchCase = icsFetchCase(err);
+    if (fetchCase) return res.status(400).json({ error: err.message, code: 400, ...fetchCase });
     if (err instanceof TypeError || /URL|https?|private IP|ICS file|HTTP \d|required/i.test(err.message || '')) {
       return res.status(400).json({ error: err.message, code: 400 });
     }

@@ -29,7 +29,8 @@ const log = createLogger('ICS');
 
 const SYNC_WINDOW_PAST_MONTHS   = 6;
 const SYNC_WINDOW_FUTURE_MONTHS = 12;
-const MAX_RESPONSE_BYTES        = 10 * 1024 * 1024;
+const MAX_RESPONSE_MB           = 10;
+const MAX_RESPONSE_BYTES        = MAX_RESPONSE_MB * 1024 * 1024;
 const FETCH_TIMEOUT_MS          = 15_000;
 
 const ENV_ALLOW_PRIVATE_NETWORK = 'ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK';
@@ -46,14 +47,23 @@ function isPrivateNetworkAllowed() {
   return readPrivateNetworkOptIn(ENV_ALLOW_PRIVATE_NETWORK);
 }
 
+/**
+ * Ein Fehler beim Abruf eines Feeds, den die App benennen kann (#1909): der
+ * Text bleibt derselbe (er landet auch als `last_error` am Abo), `code` nennt
+ * den Fall und `params` seine Zahl. Die Route macht daraus den `reason`.
+ */
+function icsFailure(message, code, params) {
+  return Object.assign(new Error(message), { code }, params ? { params } : {});
+}
+
 function normalizeUrl(raw) {
   const allowPrivate = isPrivateNetworkAllowed();
   const url = new URL(raw.replace(/^webcal:\/\//i, 'https://'));
   const allowed = allowPrivate ? ['https:', 'http:'] : ['https:'];
   if (!allowed.includes(url.protocol)) {
-    throw new Error(allowPrivate
+    throw icsFailure(allowPrivate
       ? 'Only http://, https:// and webcal:// URLs are allowed.'
-      : 'Only https:// and webcal:// URLs are allowed.');
+      : 'Only https:// and webcal:// URLs are allowed.', 'calendar_ics_url_scheme');
   }
   return url.href;
 }
@@ -105,15 +115,16 @@ async function fetchAndParse(urlRaw, etag, lastModified) {
   } finally { clearTimeout(timer); }
 
   if (res.status === 304) return { notModified: true };
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw icsFailure(`HTTP ${res.status}`, 'calendar_ics_http_status', { status: res.status });
 
+  const tooLarge = () => icsFailure(`ICS file exceeds the ${MAX_RESPONSE_MB} MB limit.`, 'calendar_ics_too_large', { limit_mb: MAX_RESPONSE_MB });
   const cl = parseInt(res.headers.get('content-length') || '0', 10);
-  if (cl > MAX_RESPONSE_BYTES) throw new Error('ICS file exceeds the 10 MB limit.');
+  if (cl > MAX_RESPONSE_BYTES) throw tooLarge();
 
   let body = '', received = 0;
   for await (const chunk of res.body) {
     received += chunk.length;
-    if (received > MAX_RESPONSE_BYTES) throw new Error('ICS file exceeds the 10 MB limit.');
+    if (received > MAX_RESPONSE_BYTES) throw tooLarge();
     body += chunk.toString();
   }
 

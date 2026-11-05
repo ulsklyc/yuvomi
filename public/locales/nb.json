@@ -3534,7 +3534,9 @@
         "oidcLinkErrorNotConfigured": "SSO er ikke lenger satt opp på denne serveren.",
         "oidcUnlinkNotLinked": "Denne kontoen er ikke lenger koblet til SSO. Last inn siden på nytt for å se gjeldende status.",
         "displayErrorGone": "Dette nettbrettet finnes ikke lenger.",
-        "displayDeviceErrorGone": "Denne enheten finnes ikke lenger."
+        "displayDeviceErrorGone": "Denne enheten finnes ikke lenger.",
+        "caldavErrorNoCalendars": "Tilkoblet, men denne kontoen har ingen kalendere.",
+        "icsErrorNameInvalid": "Skriv inn et navn på maks 100 tegn."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",

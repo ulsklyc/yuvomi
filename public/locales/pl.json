@@ -3778,7 +3778,9 @@
         "oidcLinkErrorNotConfigured": "SSO nie jest już skonfigurowane na tym serwerze.",
         "oidcUnlinkNotLinked": "To konto nie jest już powiązane z SSO. Odśwież stronę, aby zobaczyć aktualny stan.",
         "displayErrorGone": "Ten tablet ścienny już nie istnieje.",
-        "displayDeviceErrorGone": "To urządzenie już nie istnieje."
+        "displayDeviceErrorGone": "To urządzenie już nie istnieje.",
+        "caldavErrorNoCalendars": "Połączono, ale to konto nie ma żadnych kalendarzy.",
+        "icsErrorNameInvalid": "Wpisz nazwę o długości maksymalnie 100 znaków."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

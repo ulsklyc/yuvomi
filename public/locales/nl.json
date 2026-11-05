@@ -3534,7 +3534,9 @@
         "oidcLinkErrorNotConfigured": "SSO is niet meer ingesteld op deze server.",
         "oidcUnlinkNotLinked": "Dit account is niet meer gekoppeld aan SSO. Laad de pagina opnieuw om de huidige stand te zien.",
         "displayErrorGone": "Deze wandtablet bestaat niet meer.",
-        "displayDeviceErrorGone": "Dit apparaat bestaat niet meer."
+        "displayDeviceErrorGone": "Dit apparaat bestaat niet meer.",
+        "caldavErrorNoCalendars": "Verbonden, maar dit account heeft geen agenda’s.",
+        "icsErrorNameInvalid": "Voer een naam in van maximaal 100 tekens."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

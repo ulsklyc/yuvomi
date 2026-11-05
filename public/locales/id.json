@@ -3552,7 +3552,9 @@
         "oidcLinkErrorNotConfigured": "SSO tidak lagi disiapkan di server ini.",
         "oidcUnlinkNotLinked": "Akun ini tidak lagi tertaut dengan SSO. Muat ulang halaman untuk melihat status terkini.",
         "displayErrorGone": "Tablet dinding ini sudah tidak ada.",
-        "displayDeviceErrorGone": "Perangkat ini sudah tidak ada."
+        "displayDeviceErrorGone": "Perangkat ini sudah tidak ada.",
+        "caldavErrorNoCalendars": "Terhubung, tetapi akun ini tidak memiliki kalender.",
+        "icsErrorNameInvalid": "Masukkan nama dengan paling banyak 100 karakter."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

@@ -3874,7 +3874,9 @@
         "oidcLinkErrorNotConfigured": "لم يعد الدخول الموحد مُعدًّا على هذا الخادم.",
         "oidcUnlinkNotLinked": "لم يعد هذا الحساب مرتبطًا بالدخول الموحد. أعد تحميل الصفحة لترى الحالة الحالية.",
         "displayErrorGone": "لم يعد هذا الجهاز اللوحي الجداري موجودًا.",
-        "displayDeviceErrorGone": "لم يعد هذا الجهاز موجودًا."
+        "displayDeviceErrorGone": "لم يعد هذا الجهاز موجودًا.",
+        "caldavErrorNoCalendars": "تم الاتصال، لكن هذا الحساب لا يحتوي على تقويمات.",
+        "icsErrorNameInvalid": "أدخل اسمًا لا يزيد عن 100 حرف."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",

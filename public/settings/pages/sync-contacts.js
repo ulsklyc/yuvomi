@@ -64,6 +64,10 @@ function errorMessage(err, fallbackKey = 'common.errorGeneric') {
     password_required: 'settings.cardavErrorPasswordRequired',
     internal: 'common.errorGeneric',
     invalid_id: 'common.errorGeneric',
+    // Die Feldpruefung des Servers (#1909): das Formular haelt Pflicht und
+    // Laenge selbst (required, maxlength), hierher kommt nur ein Aufruf, der
+    // daran vorbeigeht.
+    validation: 'common.invalidInput',
   };
   if (KEYS[code]) return t(KEYS[code]);
   return errorSentence(err, fallbackKey);
@@ -76,14 +80,6 @@ function errorMessage(err, fallbackKey = 'common.errorGeneric') {
 function remoteErrorMessage(err, fallbackKey) {
   if (err?.data?.errorCode !== 'connection_failed') return errorMessage(err, fallbackKey);
   return errorSentenceWithDetail(err, 'settings.connectionFailedDetail', fallbackKey);
-}
-
-/**
- * Meldung im Konto-Formular. Die Feldpruefung des Servers nennt die Felder im
- * Text (`validation`), und einzelne Saetze gibt es dafuer noch nicht.
- */
-function formErrorMessage(err) {
-  return err?.data?.errorCode === 'validation' ? err.message : remoteErrorMessage(err);
 }
 
 function renderPage(container, user) {
@@ -549,13 +545,13 @@ function openAccountModal(account, onDone) {
           formRowHtml({
             label: t('settings.cardavUrlLabel'), labelFor: 'cardav-url', labelExtra: REQUIRED_MARK, field: true,
             description: t('settings.cardavUrlHint'), descriptionId: 'cardav-url-hint',
-            control: `<input class="form-input" type="url" id="cardav-url" required aria-describedby="cardav-url-hint"
+            control: `<input class="form-input" type="url" id="cardav-url" required maxlength="500" aria-describedby="cardav-url-hint"
                  placeholder="${t('settings.cardavUrlPlaceholder')}"
                  value="${esc(account?.cardavUrl ?? '')}" />`,
           }),
           formRowHtml({
             label: t('settings.cardavUsernameLabel'), labelFor: 'cardav-username', labelExtra: REQUIRED_MARK, field: true,
-            control: `<input class="form-input" type="text" id="cardav-username" required autocomplete="off"
+            control: `<input class="form-input" type="text" id="cardav-username" required maxlength="200" autocomplete="off"
                  value="${esc(account?.username ?? '')}" />`,
           }),
           // aria-describedby verbindet die Hinweise mit dem Feld. Ohne die
@@ -565,7 +561,7 @@ function openAccountModal(account, onDone) {
             label: t('settings.cardavPasswordLabel'), labelFor: 'cardav-password',
             labelExtra: isEdit ? '' : REQUIRED_MARK, field: true,
             control: `<input class="form-input" type="password" id="cardav-password" ${isEdit ? '' : 'required'}
-                 autocomplete="new-password"
+                 maxlength="200" autocomplete="new-password"
                  aria-describedby="${isEdit ? 'cardav-password-keep ' : ''}cardav-password-hint" />`,
             extra: `${isEdit ? `<small class="form-hint" id="cardav-password-keep">${t('settings.cardavPasswordKeepHint')}</small>` : ''}`
               + `<small class="form-hint" id="cardav-password-hint">${t('settings.cardavPasswordHint')}</small>`,
@@ -624,7 +620,7 @@ function openAccountModal(account, onDone) {
           await onDone();
           refocusAfterRender();
         } catch (err) {
-          errorEl.textContent = formErrorMessage(err);
+          errorEl.textContent = remoteErrorMessage(err);
           errorEl.hidden = false;
         }
       });

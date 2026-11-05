@@ -3652,7 +3652,9 @@
         "oidcLinkErrorNotConfigured": "SSO už na tomto serveru není nastavené.",
         "oidcUnlinkNotLinked": "Tento účet už není propojen s SSO. Načti stránku znovu, abys viděl aktuální stav.",
         "displayErrorGone": "Tento nástěnný tablet už neexistuje.",
-        "displayDeviceErrorGone": "Toto zařízení už neexistuje."
+        "displayDeviceErrorGone": "Toto zařízení už neexistuje.",
+        "caldavErrorNoCalendars": "Připojeno, ale tento účet nemá žádné kalendáře.",
+        "icsErrorNameInvalid": "Zadej název o nejvýše 100 znacích."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

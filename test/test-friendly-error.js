@@ -287,6 +287,9 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     '../server/routes/calendar/subscriptions.js', '../server/routes/calendar/outlook.js', '../server/auth.js',
     // Seite Wandtablets (#1909); die echte Antwort misst test:display-account.
     '../server/routes/displays.js',
+    // Kalender-Sync und Kalender-Abos (#1909); die echte Antwort misst
+    // test:sync-form-errors.
+    '../server/routes/calendar/apple.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
@@ -606,6 +609,16 @@ test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#
     // Geraet schon entfernt; die echte Antwort misst test:display-account.
     ['displays_display_not_found', 'settings.displayErrorGone'],
     ['displays_device_not_found', 'settings.displayDeviceErrorGone'],
+    // Kalender-Sync und Kalender-Abos (#1909); die echte Antwort misst
+    // test:sync-form-errors.
+    ['caldav_account_exists', 'settings.cardavErrorDuplicate'],
+    ['caldav_no_calendars', 'settings.caldavErrorNoCalendars'],
+    ['apple_no_calendars', 'settings.caldavErrorNoCalendars'],
+    ['apple_url_invalid', 'waste.errorSourceUrlNotHttps'],
+    ['calendar_subscription_name_invalid', 'settings.icsErrorNameInvalid'],
+    ['calendar_ics_url_invalid', 'waste.errorSourceUrlInvalid'],
+    ['calendar_ics_url_scheme', 'waste.errorSourceUrlNotHttps'],
+    ['calendar_ics_private_address', 'waste.errorSourceFetchBlocked'],
   ]) {
     assert.equal(errorSentence(answer(400, SERVER_TEXT, reason)), key, reason);
   }
@@ -614,6 +627,11 @@ test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#
   assert.equal(isGone(answer(404, SERVER_TEXT, 'members_member_not_found')), true);
   assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'displays_display_not_found'), 'displays_display_not_found'), true);
   assert.equal(isGone(answer(404, SERVER_TEXT, 'displays_device_not_found')), true);
+  // Status und Groesse eines Feeds kommen als Zahl in den Satz, nie als Text.
+  const feed = (reason, params) => Object.assign(new Error(SERVER_TEXT), { status: 400, data: { error: SERVER_TEXT, reason, params } });
+  assert.equal(errorSentence(feed('calendar_ics_http_status', { status: 404 })), 'waste.errorSourceFetchStatus{"status":404}');
+  assert.equal(errorSentence(feed('calendar_ics_too_large', { limit_mb: 10 })), 'waste.errorSourceFetchTooLarge{"limit_mb":10}');
+  assert.equal(errorSentence(feed('calendar_ics_http_status', { status: 'x' }), 'settings.x'), 'settings.x');
 });
 
 // DER SATZ FUER DAS, WAS KEINE SEITE SELBST FAENGT (#1909): Fehlerbildschirm

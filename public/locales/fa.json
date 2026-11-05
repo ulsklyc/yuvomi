@@ -3552,7 +3552,9 @@
         "oidcLinkErrorNotConfigured": "SSO دیگر روی این سرور راه‌اندازی نشده است.",
         "oidcUnlinkNotLinked": "این حساب دیگر به SSO پیوند ندارد. صفحه را دوباره بارگذاری کنید تا وضعیت فعلی را ببینید.",
         "displayErrorGone": "این تبلت دیواری دیگر وجود ندارد.",
-        "displayDeviceErrorGone": "این دستگاه دیگر وجود ندارد."
+        "displayDeviceErrorGone": "این دستگاه دیگر وجود ندارد.",
+        "caldavErrorNoCalendars": "متصل شد، اما این حساب هیچ تقویمی ندارد.",
+        "icsErrorNameInvalid": "نامی با حداکثر ۱۰۰ نویسه وارد کنید."
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",

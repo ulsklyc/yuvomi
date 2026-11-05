@@ -3534,7 +3534,9 @@
         "oidcLinkErrorNotConfigured": "Le SSO n'est plus configuré sur ce serveur.",
         "oidcUnlinkNotLinked": "Ce compte n'est plus associé au SSO. Rechargez la page pour voir l'état actuel.",
         "displayErrorGone": "Cette tablette murale n'existe plus.",
-        "displayDeviceErrorGone": "Cet appareil n'existe plus."
+        "displayDeviceErrorGone": "Cet appareil n'existe plus.",
+        "caldavErrorNoCalendars": "Connecté, mais ce compte n’a aucun calendrier.",
+        "icsErrorNameInvalid": "Saisis un nom de 100 caractères au maximum."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

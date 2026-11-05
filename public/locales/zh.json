@@ -3534,7 +3534,9 @@
         "oidcLinkErrorNotConfigured": "此服务器已不再配置 SSO。",
         "oidcUnlinkNotLinked": "此账户已不再与 SSO 关联。请重新加载页面查看当前状态。",
         "displayErrorGone": "此壁挂平板已不存在。",
-        "displayDeviceErrorGone": "这台设备已不存在。"
+        "displayDeviceErrorGone": "这台设备已不存在。",
+        "caldavErrorNoCalendars": "已连接，但此账户没有任何日历。",
+        "icsErrorNameInvalid": "请输入不超过 100 个字符的名称。"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",

@@ -3534,7 +3534,9 @@
         "oidcLinkErrorNotConfigured": "SSO is no longer set up on this server.",
         "oidcUnlinkNotLinked": "This account is no longer linked to SSO. Reload the page to see the current state.",
         "displayErrorGone": "This wall tablet no longer exists.",
-        "displayDeviceErrorGone": "This device no longer exists."
+        "displayDeviceErrorGone": "This device no longer exists.",
+        "caldavErrorNoCalendars": "Connected, but this account has no calendars.",
+        "icsErrorNameInvalid": "Enter a name of at most 100 characters."
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",

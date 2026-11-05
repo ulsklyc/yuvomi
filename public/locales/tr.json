@@ -3534,7 +3534,9 @@
         "oidcLinkErrorNotConfigured": "SSO bu sunucuda artık kurulu değil.",
         "oidcUnlinkNotLinked": "Bu hesap artık SSO ile bağlı değil. Güncel durumu görmek için sayfayı yeniden yükle.",
         "displayErrorGone": "Bu duvar tableti artık yok.",
-        "displayDeviceErrorGone": "Bu cihaz artık yok."
+        "displayDeviceErrorGone": "Bu cihaz artık yok.",
+        "caldavErrorNoCalendars": "Bağlandı, ancak bu hesapta takvim yok.",
+        "icsErrorNameInvalid": "En fazla 100 karakterlik bir ad gir."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

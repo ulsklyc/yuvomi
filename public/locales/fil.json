@@ -3552,7 +3552,9 @@
         "oidcLinkErrorNotConfigured": "Hindi na naka-set up ang SSO sa server na ito.",
         "oidcUnlinkNotLinked": "Hindi na nakaugnay sa SSO ang account na ito. I-reload ang page para makita ang kasalukuyang estado.",
         "displayErrorGone": "Wala na ang wall tablet na ito.",
-        "displayDeviceErrorGone": "Wala na ang device na ito."
+        "displayDeviceErrorGone": "Wala na ang device na ito.",
+        "caldavErrorNoCalendars": "Nakakonekta, pero walang kalendaryo ang account na ito.",
+        "icsErrorNameInvalid": "Maglagay ng pangalang hindi hihigit sa 100 character."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

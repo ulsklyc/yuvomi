@@ -3534,7 +3534,9 @@
         "oidcLinkErrorNotConfigured": "SSO är inte längre konfigurerat på den här servern.",
         "oidcUnlinkNotLinked": "Det här kontot är inte längre kopplat till SSO. Ladda om sidan för att se aktuellt läge.",
         "displayErrorGone": "Den här väggplattan finns inte längre.",
-        "displayDeviceErrorGone": "Den här enheten finns inte längre."
+        "displayDeviceErrorGone": "Den här enheten finns inte längre.",
+        "caldavErrorNoCalendars": "Ansluten, men det här kontot har inga kalendrar.",
+        "icsErrorNameInvalid": "Ange ett namn på högst 100 tecken."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

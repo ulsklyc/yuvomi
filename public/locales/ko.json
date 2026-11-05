@@ -3552,7 +3552,9 @@
         "oidcLinkErrorNotConfigured": "이 서버에는 더 이상 SSO가 설정되어 있지 않습니다.",
         "oidcUnlinkNotLinked": "이 계정은 더 이상 SSO와 연결되어 있지 않습니다. 현재 상태를 보려면 페이지를 새로 고치세요.",
         "displayErrorGone": "이 벽면 태블릿은 더 이상 없습니다.",
-        "displayDeviceErrorGone": "이 기기는 더 이상 없습니다."
+        "displayDeviceErrorGone": "이 기기는 더 이상 없습니다.",
+        "caldavErrorNoCalendars": "연결되었지만 이 계정에는 캘린더가 없습니다.",
+        "icsErrorNameInvalid": "100자 이하의 이름을 입력하세요."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",

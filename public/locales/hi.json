@@ -3534,7 +3534,9 @@
         "oidcLinkErrorNotConfigured": "इस सर्वर पर SSO अब सेट अप नहीं है।",
         "oidcUnlinkNotLinked": "यह खाता अब SSO से जुड़ा नहीं है। मौजूदा स्थिति देखने के लिए पेज फिर से लोड करें।",
         "displayErrorGone": "यह दीवार टैबलेट अब मौजूद नहीं है।",
-        "displayDeviceErrorGone": "यह डिवाइस अब मौजूद नहीं है।"
+        "displayDeviceErrorGone": "यह डिवाइस अब मौजूद नहीं है।",
+        "caldavErrorNoCalendars": "कनेक्ट हो गया, लेकिन इस खाते में कोई कैलेंडर नहीं है।",
+        "icsErrorNameInvalid": "अधिकतम 100 वर्णों का नाम दर्ज करें।"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",
