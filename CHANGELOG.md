@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Systolic" and "Diastolic" stood left of the last bar, and "Pulse" above its last dot, hiding the
   readings underneath when a month is full. A short line above the blood pressure chart now says
   which end of a bar is which, and the pulse chart is named by its own unit axis.
+- **Calendar and contact sync settings say what went wrong in your language** (#1909).
+  Connecting a CalDAV or Apple account, subscribing to or importing a calendar feed and saving
+  a CardDAV account showed the server's English text for cases the app knows: the account is
+  already connected or has no calendars, the name or address is not valid, the address is on a
+  private network, or the feed answered with an error status or is too large. These now say so
+  in your language; what the remote server itself answers stays visible to administrators as
+  before. API clients get the case as `reason`.
 - **Wall tablet settings say what went wrong in your language** (#1909). When another
   administrator had already deleted a wall tablet or one of its devices, the page showed the
   server's English text. It now says in your language that the tablet or device no longer

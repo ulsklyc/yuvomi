@@ -3534,7 +3534,14 @@
         "oidcLinkErrorNotConfigured": "Le SSO n'est plus configuré sur ce serveur.",
         "oidcUnlinkNotLinked": "Ce compte n'est plus associé au SSO. Rechargez la page pour voir l'état actuel.",
         "displayErrorGone": "Cette tablette murale n'existe plus.",
-        "displayDeviceErrorGone": "Cet appareil n'existe plus."
+        "displayDeviceErrorGone": "Cet appareil n'existe plus.",
+        "caldavErrorNoCalendars": "Connecté, mais ce compte n’a aucun calendrier.",
+        "icsErrorNameInvalid": "Saisis un nom de 100 caractères au maximum.",
+        "icsErrorUrlInvalid": "Saisis l’adresse complète du calendrier. Elle commence par https://.",
+        "icsErrorUrlScheme": "L’adresse doit commencer par https://.",
+        "icsErrorPrivateAddress": "Cette adresse se trouve sur un réseau privé et n’est pas consultée pour des raisons de sécurité. Utilise une adresse accessible publiquement.",
+        "icsErrorHttpStatus": "L’adresse n’a pas fourni de calendrier (réponse {{status}}). Vérifie l’adresse ou réessaie plus tard.",
+        "icsErrorTooLarge": "Le calendrier à cette adresse dépasse {{limit_mb}} Mo et ne peut pas être récupéré."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

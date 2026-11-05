@@ -3534,7 +3534,14 @@
         "oidcLinkErrorNotConfigured": "このサーバーでは SSO が設定されていません。",
         "oidcUnlinkNotLinked": "このアカウントは SSO と連携していません。ページを再読み込みして現在の状態を確認してください。",
         "displayErrorGone": "この壁掛けタブレットはもう存在しません。",
-        "displayDeviceErrorGone": "この端末はもう存在しません。"
+        "displayDeviceErrorGone": "この端末はもう存在しません。",
+        "caldavErrorNoCalendars": "接続しましたが、このアカウントにはカレンダーがありません。",
+        "icsErrorNameInvalid": "100文字以内の名前を入力してください。",
+        "icsErrorUrlInvalid": "カレンダーの完全なアドレスを入力してください。https:// で始まります。",
+        "icsErrorUrlScheme": "アドレスは https:// で始まる必要があります。",
+        "icsErrorPrivateAddress": "このアドレスはプライベートネットワーク内にあるため、安全のため取得しません。公開されているアドレスを使用してください。",
+        "icsErrorHttpStatus": "このアドレスからカレンダーを取得できませんでした（応答 {{status}}）。アドレスを確認するか、後でもう一度お試しください。",
+        "icsErrorTooLarge": "このアドレスのカレンダーは{{limit_mb}}MBを超えているため取得できません。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

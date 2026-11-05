@@ -206,7 +206,11 @@ async function testConnection() {
   const client = await createClient(creds);
 
   const calendars = await client.fetchCalendars();
-  if (!calendars.length) throw new Error('[Apple] Connected, but no calendars found.');
+  if (!calendars.length) {
+    const empty = new Error('[Apple] Connected, but no calendars found.');
+    empty.code = 'apple_no_calendars';
+    throw empty;
+  }
   return { ok: true, calendarCount: calendars.length };
 }
 

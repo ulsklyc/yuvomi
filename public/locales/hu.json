@@ -3534,7 +3534,14 @@
         "oidcLinkErrorNotConfigured": "Az SSO már nincs beállítva ezen a szerveren.",
         "oidcUnlinkNotLinked": "Ez a fiók már nincs összekötve az SSO-val. Töltsd újra az oldalt az aktuális állapotért.",
         "displayErrorGone": "Ez a fali táblagép már nem létezik.",
-        "displayDeviceErrorGone": "Ez az eszköz már nem létezik."
+        "displayDeviceErrorGone": "Ez az eszköz már nem létezik.",
+        "caldavErrorNoCalendars": "Csatlakozva, de ebben a fiókban nincs naptár.",
+        "icsErrorNameInvalid": "Adj meg egy legfeljebb 100 karakteres nevet.",
+        "icsErrorUrlInvalid": "Add meg a naptár teljes címét. https:// előtaggal kezdődik.",
+        "icsErrorUrlScheme": "A címnek https:// előtaggal kell kezdődnie.",
+        "icsErrorPrivateAddress": "Ez a cím magánhálózatban van, ezért biztonsági okból nem kérjük le. Használj nyilvánosan elérhető címet.",
+        "icsErrorHttpStatus": "A cím nem adott naptárt (válasz: {{status}}). Ellenőrizd a címet, vagy próbáld újra később.",
+        "icsErrorTooLarge": "Az ezen a címen található naptár nagyobb, mint {{limit_mb}} MB, ezért nem kérhető le."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

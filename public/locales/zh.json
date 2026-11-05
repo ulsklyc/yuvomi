@@ -3534,7 +3534,14 @@
         "oidcLinkErrorNotConfigured": "此服务器已不再配置 SSO。",
         "oidcUnlinkNotLinked": "此账户已不再与 SSO 关联。请重新加载页面查看当前状态。",
         "displayErrorGone": "此壁挂平板已不存在。",
-        "displayDeviceErrorGone": "这台设备已不存在。"
+        "displayDeviceErrorGone": "这台设备已不存在。",
+        "caldavErrorNoCalendars": "已连接，但此账户没有任何日历。",
+        "icsErrorNameInvalid": "请输入不超过 100 个字符的名称。",
+        "icsErrorUrlInvalid": "请输入日历的完整地址。地址以 https:// 开头。",
+        "icsErrorUrlScheme": "地址必须以 https:// 开头。",
+        "icsErrorPrivateAddress": "该地址位于专用网络中，出于安全原因不会获取。请使用可公开访问的地址。",
+        "icsErrorHttpStatus": "该地址没有提供日历（响应 {{status}}）。请检查地址或稍后再试。",
+        "icsErrorTooLarge": "该地址的日历超过 {{limit_mb}} MB，无法获取。"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",

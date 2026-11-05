@@ -425,6 +425,24 @@ export const CASE_MESSAGES = new Map([
   // die Liste nach.
   ['displays_display_not_found', 'settings.displayErrorGone'],
   ['displays_device_not_found', 'settings.displayDeviceErrorGone'],
+  // Kalender-Sync und Kalender-Abos (#1909): was die App beim Verbinden eines
+  // CalDAV- oder Apple-Kontos selbst kennt. Jede andere Absage ist die Antwort
+  // des fremden Servers und kommt als Angabe (errorSentenceWithDetail). Ein
+  // doppeltes Konto sagt denselben Satz wie bei CardDAV.
+  ['caldav_account_exists', 'settings.cardavErrorDuplicate'],
+  ['caldav_no_calendars', 'settings.caldavErrorNoCalendars'],
+  ['apple_no_calendars', 'settings.caldavErrorNoCalendars'],
+  ['apple_url_invalid', 'settings.icsErrorUrlScheme'],
+  // Abo anlegen und einmaliger Import: der Abruf eines Feeds scheitert an
+  // denselben Stellen wie der einer Abfuhr-Adresse. Die Saetze lauten gleich,
+  // sind aber eigene Schluessel: die waste.*-Saetze gehoeren den waste_*-
+  // Gruenden (test:waste-routes).
+  ['calendar_subscription_name_invalid', 'settings.icsErrorNameInvalid'],
+  ['calendar_ics_url_invalid', 'settings.icsErrorUrlInvalid'],
+  ['calendar_ics_url_scheme', 'settings.icsErrorUrlScheme'],
+  ['calendar_ics_private_address', 'settings.icsErrorPrivateAddress'],
+  ['calendar_ics_http_status', 'settings.icsErrorHttpStatus'],
+  ['calendar_ics_too_large', 'settings.icsErrorTooLarge'],
   // Stichwort einer Aufgabe, von einem anderen Geraet umbenannt oder geloescht.
   ['tasks_tag_not_found', 'tasks.errorTagGone'],
   // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909). Die drei
@@ -479,6 +497,8 @@ export const CASE_PARAMS = new Map([
   ['recipe_providers_sync_http_status', ['status']],
   ['calendar_name_invalid', ['limit']],
   ['immich_http_status', ['status']],
+  ['calendar_ics_http_status', ['status']],
+  ['calendar_ics_too_large', ['limit_mb']],
 ]);
 
 const PARAM_MAX = 1_000_000_000;

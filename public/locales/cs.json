@@ -3652,7 +3652,14 @@
         "oidcLinkErrorNotConfigured": "SSO už na tomto serveru není nastavené.",
         "oidcUnlinkNotLinked": "Tento účet už není propojen s SSO. Načti stránku znovu, abys viděl aktuální stav.",
         "displayErrorGone": "Tento nástěnný tablet už neexistuje.",
-        "displayDeviceErrorGone": "Toto zařízení už neexistuje."
+        "displayDeviceErrorGone": "Toto zařízení už neexistuje.",
+        "caldavErrorNoCalendars": "Připojeno, ale tento účet nemá žádné kalendáře.",
+        "icsErrorNameInvalid": "Zadej název o nejvýše 100 znacích.",
+        "icsErrorUrlInvalid": "Zadej úplnou adresu kalendáře. Začíná na https://.",
+        "icsErrorUrlScheme": "Adresa musí začínat na https://.",
+        "icsErrorPrivateAddress": "Tato adresa leží v soukromé síti a z bezpečnostních důvodů se nenačítá. Použij veřejně dostupnou adresu.",
+        "icsErrorHttpStatus": "Adresa nevrátila kalendář (odpověď {{status}}). Zkontroluj adresu nebo to zkus později znovu.",
+        "icsErrorTooLarge": "Kalendář na této adrese je větší než {{limit_mb}} MB a nelze ho načíst."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",
