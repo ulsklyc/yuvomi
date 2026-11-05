@@ -296,6 +296,9 @@ export const CASE_MESSAGES = new Map([
   // Kommentar, der geaendert oder geloescht werden sollte, ebenso (#1909).
   ['tasks_parent_not_found', 'tasks.errorParentGone'],
   ['tasks_comment_not_found', 'tasks.errorCommentGone'],
+  // Eine Serie, deren Regel eine andere App fuehrt (#2506): abgehakt wird dort.
+  // Alle Wege nach 'done' erreichen ihn (Liste, Wisch, Detail, Tablett, Kanban).
+  ['task_foreign_series', 'tasks.errorForeignSeries'],
   // Dienstplan (#1909). Die "gibt es nicht mehr" stehen auch in GONE_REASONS;
   // die Seite laedt dann nach, ein Loeschen mit einem davon ist ein Erfolg.
   // Abweichung und Zusatzschicht sind fuer den Nutzer beide "ein Eintrag".
@@ -399,6 +402,16 @@ export const CASE_MESSAGES = new Map([
   ['own_account', 'settings.memberRemoveOwnAccount'],
   ['last_admin', 'settings.memberRemoveLastAdmin'],
   ['last_sso_admin', 'settings.memberRemoveLastSsoAdmin'],
+  // Mitglied anlegen, bearbeiten, einladen (#1909). Die beiden Riegel oben
+  // gelten auch beim Herabstufen. Das Formular prueft den Benutzernamen nicht
+  // selbst, und ob er vergeben ist oder eine Adresse schon einem anderen
+  // Mitglied gehoert, weiss nur der Server. Das Mitglied, das ein anderer Admin
+  // inzwischen entfernt hat, steht auch in GONE_REASONS: die Verwaltung laedt nach.
+  ['members_username_invalid', 'settings.memberErrorUsernameInvalid'],
+  ['members_username_taken', 'settings.memberErrorUsernameTaken'],
+  ['members_member_not_found', 'settings.memberErrorGone'],
+  ['members_sso_email_required', 'settings.memberErrorSsoEmailRequired'],
+  ['members_sso_email_ambiguous', 'settings.memberErrorSsoEmailAmbiguous'],
   // Stichwort einer Aufgabe, von einem anderen Geraet umbenannt oder geloescht.
   ['tasks_tag_not_found', 'tasks.errorTagGone'],
   // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909). Die drei
@@ -567,6 +580,7 @@ export const GONE_REASONS = new Set([
   'calendar_selected_calendar_not_found',
   'calendar_subscription_not_found',
   'tasks_tag_not_found',
+  'members_member_not_found',
 ]);
 
 /**

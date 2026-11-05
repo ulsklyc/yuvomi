@@ -62,9 +62,10 @@ nav,
 
 /* ── Standalone-Modus: Status-Bar-Bereich berücksichtigen ── */
 @media (display-mode: standalone) {
-  /* padding-top auf .app-shell (nicht body): So bleibt app-shell exakt 100dvh
-   * hoch und überläuft den Viewport nicht - body-padding hätte .app-shell
-   * nach unten verschoben und Scroll-Bleed verursacht. */
+  /* padding-top auf .app-shell (nicht body): So bleibt app-shell exakt so
+   * hoch wie das Fenster (hier 100lvh, layout.css, #2417) und überläuft den
+   * Viewport nicht - body-padding hätte .app-shell nach unten verschoben und
+   * Scroll-Bleed verursacht. */
   .app-shell {
     padding-top: env(safe-area-inset-top);
   }

@@ -23,7 +23,7 @@ import { syncAllScheduleReminders } from './schedule-reminders.js';
 import { syncAllWasteReminders } from './waste-reminders.js';
 import { withoutModulesDeniedToRecipient, withoutSwitchedOffModules } from './reminder-origins.js';
 import { reminderTargetPublicSql, reminderTargetVisibleSql } from './reminder-targets.js';
-import { withoutDeletedFirstOccurrence } from './reminder-deleted-occurrence.js';
+import { withoutGoneEvents } from './reminder-deleted-occurrence.js';
 import { syncAllPreventionReminders } from './prevention-reminders.js';
 import { syncAllFastingReminders } from './fasting-reminders.js';
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
@@ -639,7 +639,7 @@ export async function processDueNotifications({
   // UND EIN GELOESCHTES ERSTES VORKOMMEN MELDET SICH NICHT (#2470): dieselbe
   // Pruefung wie in `/pending` und `/upcoming`, ebenfalls synchron an dieser
   // Stelle (services/reminder-deleted-occurrence.js).
-  const due = withoutDeletedFirstOccurrence(activeDb, withoutModulesDeniedToRecipient(
+  const due = withoutGoneEvents(activeDb, withoutModulesDeniedToRecipient(
     activeDb,
     withoutSwitchedOffModules(activeDb, dueRows),
   )).filter((row) => !fastingSyncFailed

@@ -60,6 +60,30 @@
   background-repeat: no-repeat;
 }
 
+/* VOM HOME-BILDSCHIRM GESTARTET FUELLT DIE APP DEN BILDSCHIRM (#2417). Auf
+ * iOS 27 meldet die installierte App mit viewport-fit=cover und
+ * black-translucent ein 100dvh, dem genau der obere Inset fehlt (812 statt
+ * 874 auf einem iPhone 17): Shell und Tab-Leiste endeten um die Hoehe der
+ * Statusleiste ueber dem Rand. lvh ist ohne Adressleiste die volle
+ * Fensterhoehe, und eine Adressleiste hat die installierte App nicht - der
+ * Safari-Tab (display-mode: browser) behaelt seine Kette oben.
+ * Steht HIER, hinter der Kette an .app-shell und hinter body in reset.css:
+ * gleiche Spezifitaet, die spaetere Regel gewinnt. In pwa.css (laedt vor
+ * layout.css) verloere sie. @supports, weil ein Browser ohne lvh die Zeile
+ * sonst verwirft (test:old-browser-fallbacks). */
+@media (display-mode: standalone) {
+  @supports (height: 100lvh) {
+    body,
+    .app-shell {
+      height: 100lvh;
+    }
+
+    .app-loading {
+      min-height: 100lvh;
+    }
+  }
+}
+
 /* Label-Farbe statt Akzent (R18): der Schriftzug steht direkt auf dem
  * Lichtfeld, und Violett auf violettem Licht faellt im Kern unter 3:1. Die
  * Tinte haelt ueberall auf dem Feld mindestens 8:1 (hell) - und DESIGN.md
@@ -4964,8 +4988,8 @@ html.fab-steady .page-fab {
  * offen): die Reiter ruecken in die Zeile des Zeitraums - Regel am Ende dieses
  * Blocks. Bis 1023px, seit R19 auch auf dem Tablet (834px: 174 -> 129px).
  *
- * UNTER 390px TRAEGT DIE ZEILE BEIDE NICHT: dort steht der Zeitraum in einer
- * eigenen Zeile unter dem Titel (#2440, budget.css). */
+ * STEHT DER TITEL NEBEN DEM ZEITRAUM NICHT GANZ, steht der Zeitraum in einer
+ * eigenen Zeile unter dem Titel (#2440, #2443, nach Messung: budget.css). */
 @media (max-width: 1023px) {
   .page-toolbar.page-toolbar--period-inline:not(.page-toolbar--in-group) > .page-toolbar__title {
     flex: 1 1 0;

@@ -246,7 +246,10 @@ test('Personal und Gaeste bekommen keinen Code', async () => {
   db.prepare('INSERT INTO split_expense_guest_users (user_id) VALUES (?)').run(guest.id);
   const byGuest = await pair(guest.session);
   assert.equal(byGuest.status, 403, 'Gast');
-  assert.equal((await byGuest.json()).reason, 'not_a_household_member');
+  // Den Gast haelt schon das Gate am Eingang des Auth-Routers an
+  // (GHSA-q7gc-2cc9-w8fj, test:split-guest-auth-scope); die Mitgliedspruefung
+  // der Route bleibt dahinter die zweite Linie.
+  assert.equal((await byGuest.json()).reason, 'split_guest_scope');
 });
 
 test('wer zwischen Ausstellen und Einloesen die Mitgliedschaft verliert, bekommt kein Credential', async () => {

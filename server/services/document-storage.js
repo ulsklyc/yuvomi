@@ -638,7 +638,9 @@ function slug(value, fallback) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    // Runs are already one '-', so a single edge dash is all that can remain;
+    // `-+$` would backtrack quadratically on long dash runs (CodeQL js/polynomial-redos).
+    .replace(/^-|-$/g, '');
   return normalized || fallback;
 }
 

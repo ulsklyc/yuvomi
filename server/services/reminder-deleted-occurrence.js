@@ -1,8 +1,11 @@
 /**
- * Modul: Erinnerungen an ein geloeschtes erstes Vorkommen (#2470)
+ * Modul: Erinnerungen an ein geloeschtes erstes Vorkommen (#2470) und an einen
+ *        vom Anbieter abgesagten Termin (#2499)
  * Zweck: Die eine Pruefung fuer `GET /reminders/pending`, `GET /reminders/upcoming`
  *        und die Zustellung (notifications.js#processDueNotifications), ob eine
- *        Termin-Erinnerung zu einem Vorkommen gehoert, das es nicht mehr gibt.
+ *        Termin-Erinnerung zu einem Vorkommen gehoert, das nicht stattfindet;
+ *        dazu die SQL-Bedingung, mit der die Flaechen fuer anstehende Termine
+ *        einen abgesagten auslassen.
  * Abhaengigkeiten: calendar-events.js (Expansion, Ausnahmen), utils/timezone.js,
  *        utils/reminder-schedule.js
  *
@@ -48,6 +51,20 @@
  *
  * SYNCHRON, wie alles zwischen Lesen und Urteil in der Zustellung: kein Yield-
  * Punkt, an dem eine Ausnahme dazwischenkommt.
+ *
+ * ABGESAGT VOM ANBIETER (#2499). Ein Termin, den ICS-Abo, CalDAV oder iCloud
+ * mit STATUS:CANCELLED liefern, ohne ihn zu loeschen, steht mit
+ * `provider_status = 'CANCELLED'` in der Tabelle. Er findet nicht statt wie ein
+ * geloeschtes Vorkommen, bleibt aber im Kalender sichtbar (durchgestrichen),
+ * damit niemand fragt, wo er hin ist. `withoutGoneEvents` ist deshalb der eine
+ * Check fuer die Erinnerungswege, `notCancelledEventSql` der eine fuer alle
+ * Flaechen, die anstehende Termine zeigen (Uebersicht mit Kachel, Heute-Blatt,
+ * Wochenstreifen, Familienkarte und Wandmodus, /calendar/upcoming, MCP,
+ * Countdowns). Ueberspringen, nicht loeschen: sagt der Anbieter wieder zu,
+ * schreibt der naechste Abruf CONFIRMED oder NULL, und alles meldet sich
+ * wieder. Eine Absage nur eines Vorkommens kommt als eigene Zeile an
+ * (RECURRENCE-ID-Override, ics-parser.js#normalizeRecurrenceOverrides) und
+ * trifft deshalb nur dieses Vorkommen.
  */
 import { createLogger } from '../logger.js';
 import {
@@ -57,6 +74,31 @@ import { householdTimeZone, storedToInstantMsPrecise } from '../utils/timezone.j
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 
 const log = createLogger('Reminders');
+
+const providerStatusColumnCache = new WeakMap();
+
+function hasProviderStatusColumn(database) {
+  let has = providerStatusColumnCache.get(database);
+  if (has === undefined) {
+    has = database.prepare('PRAGMA table_info(calendar_events)').all()
+      .some((column) => column.name === 'provider_status');
+    providerStatusColumnCache.set(database, has);
+  }
+  return has;
+}
+
+/**
+ * SQL-Bedingung "vom Anbieter nicht abgesagt" fuer eine Termin-Zeile (#2499).
+ * Ohne die Spalte (gekuerzte Test-Fixtures, die eventProjectionSql auch
+ * kennt) ist nichts abgesagt.
+ * @param {object} database  better-sqlite3-Connection
+ * @param {string} [alias='e']
+ * @returns {string}
+ */
+export function notCancelledEventSql(database, alias = 'e') {
+  if (!hasProviderStatusColumn(database)) return '1';
+  return `${alias}.provider_status IS NOT 'CANCELLED'`;
+}
 
 /**
  * Das geloeschte erste Vorkommen eines Termins als Zeitpunkt seines Beginns
@@ -123,4 +165,29 @@ export function withoutDeletedFirstOccurrence(database, rows) {
     const key = remindAtKey.get({ value: row.remind_at })?.key;
     return !key || key > start;
   });
+}
+
+/**
+ * Die Zeilen ohne die Termin-Erinnerungen, die vom Anbieter abgesagt sind
+ * (#2499). `rows` braucht `entity_type` und `entity_id`.
+ */
+export function withoutCancelledEvents(database, rows) {
+  if (!hasProviderStatusColumn(database)) return rows;
+  const cancelled = new Map();
+  const stmt = database.prepare(`SELECT provider_status FROM calendar_events WHERE id = ?`);
+  return rows.filter((row) => {
+    if (row.entity_type !== 'event') return true;
+    const id = Number(row.entity_id);
+    if (!cancelled.has(id)) cancelled.set(id, stmt.get(id)?.provider_status === 'CANCELLED');
+    return !cancelled.get(id);
+  });
+}
+
+/**
+ * Der eine Check fuer `GET /reminders/pending`, `GET /reminders/upcoming` und
+ * die Zustellung: ohne die Termin-Erinnerungen, deren Termin nicht stattfindet
+ * - vom Anbieter abgesagt (#2499) oder erstes Vorkommen geloescht (#2470).
+ */
+export function withoutGoneEvents(database, rows) {
+  return withoutDeletedFirstOccurrence(database, withoutCancelledEvents(database, rows));
 }

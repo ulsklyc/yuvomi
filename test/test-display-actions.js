@@ -305,6 +305,18 @@ test('das Tablett hakt ab - es nimmt nichts zurueck und legt nichts ab', async (
   assert.equal(row.archived_at, null, 'und liegt nicht in der Ablage');
 });
 
+test('eine Serie aus einer anderen App hakt auch das Tablett nicht ab (#2506)', async () => {
+  // Die Regel fuehrt iOS Erinnerungen oder Tasks.org. Ein Haken hier schickte
+  // COMPLETED auf den Master, und die andere App beendete die ganze Serie.
+  const id = addTask('Muell (Telefon)');
+  db.prepare("UPDATE tasks SET external_source = 'caldav', external_uid = 'muell@phone', external_rrule = 'FREQ=WEEKLY' WHERE id = ?").run(id);
+  const res = await display('PATCH', `/tasks/${id}/status`, { status: 'done', done_by_user_id: LEA });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.reason, 'task_foreign_series');
+  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get(id).status, 'open');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM reward_ledger WHERE task_id = ?').get(id).n, 0, 'keine Punkte');
+});
+
 test('eine unsichtbare Aufgabe antwortet auf JEDE Nutzlast gleich - und wie eine, die es nie gab', async () => {
   // Die Liste zieht die Sichtbarkeit schon - aber die Liste ist eine Antwort,
   // kein Riegel: diese Route nimmt eine ID aus dem Pfad, und eine ID kann jeder

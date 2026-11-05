@@ -19,6 +19,7 @@ import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { setItemTags, setTags } from '../utils/task-tags.js';
 import { syncTaskCompletion, recordCompletion, revokeCompletion } from './task-completions.js';
 import * as todoOutbound from './caldav-todo-outbound.js';
+import { isOwnUidOfRow } from '../utils/own-uid.js';
 import { createRefusalStop } from './calendar-outbound.js';
 import { runSerialized } from '../utils/sync-lock.js';
 import { calendarDisplayName } from '../utils/calendar-meta.js';
@@ -326,6 +327,41 @@ function rowForTodoUid(d, table, columns, uid, accountId) {
   return { row: free, foreign: false };
 }
 
+/**
+ * Die Wiederholung, die eine fremde Regel in der Zeile setzt (#2506, #2515) -
+ * oder null, wenn der Abruf sie nicht anfasst.
+ *
+ * Abbildbar (`mappableForeignRule`), ohne einzeln ausgenommene oder
+ * hinzugefuegte Tage und mit passender Faelligkeit (`foreignRuleFitsDue`):
+ * eine Serie mit der
+ * Regel in Yuvomis Teilmenge, abhakbar wie in der besitzenden App. Sonst KEINE
+ * Serie hier: Yuvomi rechnete sie falsch weiter, das Abhaken bleibt dort
+ * (`task_foreign_series`) - und eine Regel, die jemand hier gesetzt hatte,
+ * gilt nicht mehr, sobald die andere App ihre eigene schreibt. Nimmt die
+ * andere App die Wiederholung einer Serie weg, die von ihr kam
+ * (`ruleRemoved`), ist es wieder eine einfache Aufgabe.
+ *
+ * Ohne fremde Regel (keine RRULE, Yuvomis eigene Marke, ein hier angelegtes
+ * Objekt) bleibt die Wiederholung, wie Yuvomi sie fuehrt (#2350).
+ *
+ * @returns {{isRecurring: 0|1, rule: string|null}|null}
+ */
+function foreignRecurrence(externalRrule, dueDate, dueTime, {
+  ruleRemoved = false, exceptions = false, foreignZone = false, startShifted = false,
+} = {}) {
+  if (!externalRrule) return ruleRemoved ? { isRecurring: 0, rule: null } : null;
+  // Mit EXDATE, RDATE oder geaenderten Einzelvorkommen beschreibt die Regel die
+  // Serie nicht allein (Review auf #2543): Yuvomi rueckte sonst auf einen Tag,
+  // den die andere App ausgenommen hat. Ebenso mit einem DTSTART an einem
+  // anderen Tag als DUE (der Rechner kennt nur DUE) und mit einer Uhrzeit in
+  // einer anderen Zone als der des Haushalts.
+  const unsure = exceptions || foreignZone || startShifted;
+  const mapped = unsure ? null : todoOutbound.mappableForeignRule(externalRrule);
+  return mapped && todoOutbound.foreignRuleFitsDue(mapped, dueDate, dueTime)
+    ? { isRecurring: 1, rule: mapped }
+    : { isRecurring: 0, rule: null };
+}
+
 // Die Objekt-URL (obj.url des Abrufs) wandert bei jedem Upsert mit: ohne sie ist
 // ein gespiegelter Eintrag für spätere Änderungen und Löschungen unerreichbar
 // (#617). COALESCE, weil ein Abruf ohne URL den gespeicherten Wert nicht
@@ -338,30 +374,52 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions 
   // Zeile gehört nicht dazu: er wird zusammen mit seinem Erledigungseintrag in
   // applySyncedCompletions geschrieben (#1836, siehe unten).
   return d.transaction(() => {
-    const { row: existing, foreign } = rowForTodoUid(d, 'tasks', 'priority, status', todo.uid, accountId);
+    const { row: existing, foreign } = rowForTodoUid(d, 'tasks', 'priority, status, external_rrule', todo.uid, accountId);
     // Ein anderes Konto führt die Aufgabe schon (#1906): nichts anlegen, nichts ändern.
     if (foreign) return null;
 
     const priority = mapVtodoPriority(todo.priority, existing?.priority);
     const status   = mapVtodoStatus(todo, existing?.status);
+    // DIE FREMDE SERIENREGEL (#2506), bei jedem Abruf neu: NULL ohne Regel, bei
+    // Yuvomis eigener Marke und an einem Objekt, das Yuvomi selbst angelegt hat
+    // (das fuehrt Yuvomi ganz, #2350). Solange sie steht, sperren die Routen das
+    // Abhaken - die besitzende App rueckt die Serie weiter, nicht Yuvomi.
+    const ownObject = existing && isOwnUidOfRow(todo.uid, 'task', existing.id);
+    const externalRrule = ownObject
+      ? null
+      : todoOutbound.foreignRecurrenceRule(todo.rrule ?? null, todo.yuvomiRrule ?? null);
+    const recurrence = foreignRecurrence(externalRrule, date, time, {
+      ruleRemoved: !ownObject && !todo.rrule && Boolean(existing?.external_rrule),
+      exceptions: Boolean(todo.seriesExceptions),
+      // Die Regel rechnet in der Zone ihres Ankers. Mit Uhrzeit liest Yuvomi DUE
+      // in die Zone des Haushalts um; weicht die ab, kippt ein BYDAY auf den
+      // Nachbartag (Review auf #2543). Nur schwebend oder in derselben Zone.
+      foreignZone: Boolean(time && todo.dueZone && todo.dueZone !== householdTimeZone(d)),
+      startShifted: Boolean(todo.startShifted),
+    });
 
     let taskId;
     if (existing) {
       d.prepare(`
         UPDATE tasks
         SET title = ?, description = ?, priority = ?, due_date = ?, due_time = ?,
-            external_object_url = COALESCE(?, external_object_url)
+            external_object_url = COALESCE(?, external_object_url), external_rrule = ?,
+            is_recurring = COALESCE(?, is_recurring),
+            recurrence_rule = CASE WHEN ? IS NULL THEN recurrence_rule ELSE ? END
         WHERE id = ?
-      `).run(todo.summary, todo.description, priority, date, time, objectUrl, existing.id);
+      `).run(todo.summary, todo.description, priority, date, time, objectUrl, externalRrule,
+        recurrence?.isRecurring ?? null, recurrence ? 1 : null, recurrence?.rule ?? null, existing.id);
       taskId = existing.id;
     } else {
       // category bleibt beim Spalten-Default 'misc' (v114) - VTODO kennt keine
       // Entsprechung, und CATEGORIES ist die Tag-Liste, nicht die Schublade.
       const row = d.prepare(`
         INSERT INTO tasks
-          (title, description, priority, status, due_date, due_time, created_by, external_uid, external_source, external_account_id, external_object_url)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'caldav', ?, ?)
-      `).run(todo.summary, todo.description, priority, status, date, time, createdBy, todo.uid, accountId, objectUrl);
+          (title, description, priority, status, due_date, due_time, created_by, external_uid, external_source, external_account_id, external_object_url, external_rrule,
+           is_recurring, recurrence_rule)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'caldav', ?, ?, ?, ?, ?)
+      `).run(todo.summary, todo.description, priority, status, date, time, createdBy, todo.uid, accountId, objectUrl, externalRrule,
+        recurrence?.isRecurring ?? 0, recurrence?.rule ?? null);
       taskId = row.lastInsertRowid;
       assignListDefault(d, Number(taskId), defaultAssignees);
     }

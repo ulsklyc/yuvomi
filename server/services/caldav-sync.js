@@ -48,7 +48,8 @@ import {
   formatICSDate,
   tzLocalToUTC,
   applyDuration,
-  normalizeRecurrenceOverrides
+  normalizeRecurrenceOverrides,
+  providerStatusOf
 } from './ics-parser.js';
 
 // Historisch hier beheimatet, inzwischen in utils/ics-format.js - der Re-Export
@@ -1147,8 +1148,15 @@ async function runSync({ createClient } = {}) {
     INSERT INTO calendar_events
       (title, description, start_datetime, end_datetime, all_day,
        location, color, external_calendar_id, external_source, recurrence_rule, tzid, calendar_ref_id, created_by,
-       external_object_url, caldav_account_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'caldav', ?, ?, ?, ?, ?, ?)
+       external_object_url, caldav_account_id, provider_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'caldav', ?, ?, ?, ?, ?, ?, ?)
+  `);
+  // Die Absage des Anbieters (#2499), bei jedem Abruf, auch zurueck auf
+  // CONFIRMED oder NULL - sonst bliebe ein wieder zugesagter Termin stumm.
+  // Der Vergleich haelt unveraenderte Laeufe ohne Schreibvorgang.
+  const updProviderStatus = conn.prepare(`
+    UPDATE calendar_events SET provider_status = ?
+    WHERE id = ? AND provider_status IS NOT ?
   `);
   // Die Serie einer neu angelegten Ausnahme (#2202), im selben Konto.
   const selSeriesRow = conn.prepare(`
@@ -1461,6 +1469,8 @@ async function runSync({ createClient } = {}) {
                 eventId = existing.id;
                 // Auf dem Server verschoben (#1377): die Erinnerungen ziehen mit.
                 if (changed) followInboundStartChange(conn, eventId, existing.start_datetime, when.dtstart);
+                const providerStatus = providerStatusOf(ev);
+                if (updProviderStatus.run(providerStatus, existing.id, providerStatus).changes > 0) changed = true;
                 // Von einem Kalender in einen anderen verschoben (#1270): die
                 // unangetastete Standard-Zuweisung zieht mit um.
                 reassignDefaultOnCalendarMove(db.get(), eventId, {
@@ -1473,7 +1483,7 @@ async function runSync({ createClient } = {}) {
                 const inserted = insEvent.run(
                   ev.summary, ev.description, ev.dtstart, ev.dtend,
                   ev.allDay ? 1 : 0, ev.location, evColor, ev.uid, ev.rrule, ev.tzid ?? null, calRefId, createdBy,
-                  obj.url ?? null, account.id
+                  obj.url ?? null, account.id, providerStatusOf(ev)
                 );
                 eventId = Number(inserted.lastInsertRowid);
                 changed = true;

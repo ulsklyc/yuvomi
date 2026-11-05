@@ -303,10 +303,14 @@ function syncBirthdayCalendarEvent(database, birthday, kind = 'birthday') {
         const authoredChanged = AUTHORED_FIELDS.some((f) => existing[f] !== payload[f]);
         if (authoredChanged) markInlineOutbound(database, existing);
       } else {
+        // Die Farbe faellt nur beim Anlegen auf BIRTHDAY_COLOR, danach gehoert
+        // sie dem Kalender. Dieser Abgleich laeuft an jedem GET /birthdays und
+        // jeder Erinnerungsabfrage; schrieb er die Farbe mit, hielt nur der
+        // zuletzt umgefaerbte Geburtstag seine Wahl bis zum naechsten Lauf.
         database.prepare(`
           UPDATE calendar_events
           SET title = ?, description = ?, start_datetime = ?, end_datetime = ?, all_day = ?,
-              location = ?, color = ?, icon = ?, assigned_to = ?, recurrence_rule = ?, created_by = ?
+              location = ?, icon = ?, assigned_to = ?, recurrence_rule = ?, created_by = ?
           WHERE id = ?
         `).run(
           payload.title,
@@ -315,7 +319,6 @@ function syncBirthdayCalendarEvent(database, birthday, kind = 'birthday') {
           payload.end_datetime,
           payload.all_day,
           payload.location,
-          payload.color,
           payload.icon,
           payload.assigned_to,
           payload.recurrence_rule,

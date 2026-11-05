@@ -174,15 +174,27 @@ describe('CardDAV-Matching mit value_e164', () => {
     return { db, accId, ab: 'https://d.example/dav/ab/' };
   }
 
+  // Lokal angelegter, noch an keine Karte gebundener Kontakt. Nur solche
+  // adoptiert der Smart-Merge; eine Karte mit eigener UID verschmilzt nie mit
+  // dem Kontakt einer anderen Karte (#2513).
+  const localContact = (db, value, e164) => {
+    const id = db.prepare("INSERT INTO contacts (name) VALUES ('Max Muster')").run().lastInsertRowid;
+    db.prepare(
+      "INSERT INTO contact_phones (contact_id, label, value, is_primary, value_e164) VALUES (?, 'cell', ?, 1, ?)"
+    ).run(id, value, e164);
+    return id;
+  };
+
   it('Format-Varianten derselben Nummer verschmelzen (kein Duplikat)', async () => {
     const { db, accId, ab } = setup('de-DE');
-    // Erster Kontakt: internationale Schreibweise.
-    await parseAndMergeContact(vcard('uid-1', '+49 30 12345678'), accId, ab);
-    // Zweiter Import: andere UID, SELBE Nummer in nationaler Schreibweise.
-    await parseAndMergeContact(vcard('uid-2', '030 12345678'), accId, ab);
+    // Lokaler Kontakt: internationale Schreibweise.
+    const localId = localContact(db, '+49 30 12345678', toE164('+49 30 12345678', 'DE'));
+    // Import: SELBE Nummer in nationaler Schreibweise.
+    const id = await parseAndMergeContact(vcard('uid-2', '030 12345678'), accId, ab);
 
     const count = db.prepare('SELECT COUNT(*) AS n FROM contacts').get().n;
     assert.equal(count, 1, 'Format-Varianz darf keinen Zweitkontakt anlegen');
+    assert.equal(id, localId);
     _resetTestDatabase();
     db.close();
   });
@@ -190,7 +202,7 @@ describe('CardDAV-Matching mit value_e164', () => {
   it('NULL value_e164 fällt sauber auf den exakten Rohwert-Vergleich zurück', async () => {
     const { db, accId, ab } = setup(null); // kein Default-Land → nationale Nr. nicht parsebar
     // Nicht parsebare, aber identische Rohwerte → Match über cp.value (Fallback).
-    await parseAndMergeContact(vcard('uid-1', 'Durchwahl-42'), accId, ab);
+    localContact(db, 'Durchwahl-42', null);
     await parseAndMergeContact(vcard('uid-2', 'Durchwahl-42'), accId, ab);
 
     const phones = db.prepare('SELECT value, value_e164 FROM contact_phones').all();

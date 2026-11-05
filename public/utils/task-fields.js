@@ -108,6 +108,38 @@ export function canEditTaskDefinition(task, parent = null, viewer = {}) {
   return Number(lock.created_by) === Number(viewer.currentUserId);
 }
 
+/**
+ * Wird diese Aufgabe nur in einer anderen App abgehakt? (#2506, #2515)
+ *
+ * Spiegelt die Serverregel (`continuesForeignSeries`): eine Serie aus iOS
+ * Erinnerungen oder Tasks.org fuehrt Yuvomi weiter, wenn ihre Regel abbildbar
+ * war (der Abruf hat sie dann als Serie eingelesen) und sie hier noch eine
+ * Serie mit Faelligkeit ist. Sonst antwortet das Abhaken mit
+ * `task_foreign_series`, und die Oberflaeche sagt das, bevor jemand es
+ * versucht.
+ */
+export function repeatsElsewhere(task) {
+  if (!task?.external_rrule) return false;
+  return !(task.is_recurring && task.recurrence_rule && !task.parent_task_id
+    && foreignRuleFitsDue(task.recurrence_rule, task.due_date, task.due_time));
+}
+
+/**
+ * Dieselbe Frage wie `foreignRuleFitsDue` im Server: eine Monatsserie am 29.
+ * bis 31. und eine Jahresserie am 29. Februar klemmt Yuvomi, RFC 5545 nicht;
+ * ein Ende gilt nur als reines Datum an einer Serie ohne Uhrzeit.
+ */
+function foreignRuleFitsDue(rule, dueDate, dueTime = null) {
+  if (!rule || !dueDate) return false;
+  const day = String(dueDate).slice(5, 10);
+  const value = String(rule).replace(/^RRULE:/i, '').toUpperCase();
+  const until = /(?:^|;)UNTIL=([^;]*)/.exec(value)?.[1];
+  if (until !== undefined && (dueTime || !/^\d{8}$/.test(until))) return false;
+  if (/(^|;)FREQ=MONTHLY(;|$)/.test(value) && !/(^|;)BYMONTHDAY=-1(;|$)/.test(value)) return Number(day.slice(3)) <= 28;
+  if (/(^|;)FREQ=YEARLY(;|$)/.test(value)) return day !== '02-29';
+  return true;
+}
+
 // --------------------------------------------------------
 // Kategorien
 // --------------------------------------------------------

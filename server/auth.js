@@ -64,6 +64,7 @@ import {
 import { isAdminRequest, requireAdmin } from './middleware/require-admin.js';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';
 import * as twoFactor from './services/two-factor.js';
+import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
 
 const log = createLogger('Auth');
 const router = express.Router();
@@ -609,6 +610,38 @@ function deviceMayUseAuthRoute(method, path) {
   return DEVICE_AUTH_ROUTES.some(([allowed, pattern]) => allowed === method && pattern.test(path));
 }
 
+/**
+ * Jedes Konto, als das `requireAuth` diese Anfrage fuehren KOENNTE. Fuer das
+ * Tor unten, das VOR `requireAuth` steht und deshalb selbst nachsehen muss -
+ * ohne dessen Nebenwirkungen (`last_used_at`, Cookie-Auffrischung, 401).
+ *
+ * BEWUSST NICHT "das eine Konto, das `requireAuth` waehlen wird". Diese Wahl
+ * hier nachzubauen hiesse, jede ihrer Bedingungen (Widerruf, Ablauf, Leerlauf,
+ * ehemaliger Aussteller oder Subjekt) ein zweites Mal zu fuehren, und die
+ * Fassung, die zurueckbleibt, oeffnet eine Luecke: haelt das Tor ein Token fuer
+ * gueltig, das `requireAuth` verwirft, sieht es den Token-Inhaber, und
+ * `requireAuth` faellt danach auf die Sitzung eines Gasts zurueck (Review zu
+ * GHSA-q7gc-2cc9-w8fj, gemessen). Deshalb zaehlen hier die Sitzung UND jede
+ * Token-Zeile zum mitgeschickten Wert, ob brauchbar oder nicht. Ist eines
+ * davon ein Gast, sperrt das Tor - die engere Antwort.
+ *
+ * Ein Display-Cookie wird nicht aufgeloest: ein Display ist nie ein
+ * Ausgaben-Gast, und das Tor hat fuer Displays seinen eigenen Riegel.
+ * @returns {number[]}
+ */
+function requestCandidateUserIds(req) {
+  const ids = [];
+  if (req.session?.userId != null) ids.push(req.session.userId);
+  const token = extractApiToken(req);
+  if (token) {
+    const row = db.get().prepare(`
+      SELECT t.subject_user_id, t.created_by FROM api_tokens t WHERE t.token_hash = ?
+    `).get(hashApiToken(token));
+    if (row) ids.push(row.subject_user_id ?? row.created_by);
+  }
+  return ids;
+}
+
 // Sicherheits-Gate (GHSA-xcv5-6w6x-x5q2): Der Auth-Router ist in server/index.js
 // bewusst VOR den globalen Scope-/Guest-/Modul-Gates gemountet, damit oeffentliche
 // Routen (login, setup, oidc, 2fa/verify) ohne Authentifizierung erreichbar sind.
@@ -629,6 +662,17 @@ router.use((req, res, next) => {
   // deshalb oben durch. Es bekommt die Allowlist statt der ganzen Konto-Routen.
   if (!deviceMayUseAuthRoute(req.method, req.path) && requestHasDeviceCredential(req)) {
     return res.status(403).json({ error: 'This is not available on a signed-in device.', code: 403, reason: 'device_credential' });
+  }
+  // DER AUSGABEN-GAST (GHSA-q7gc-2cc9-w8fj), die dritte eingeschraenkte Art
+  // von Konto. Das Gast-Gate in server/index.js sieht keine `/auth`-Anfrage,
+  // weil dieser Router vor ihm haengt - ein Gast las so ueber `GET /users` die
+  // ganze Kontoliste samt Kontaktdaten. Er bekommt hier dieselbe Liste wie
+  // dort (server/split-guest-scope.js), `/auth` davor aus demselben Grund wie
+  // beim Display unten: die Liste ist `/api/v1`-relativ gefuehrt. 403 und
+  // derselbe Grund wie im Gast-Gate, damit der Client nur eine Absage kennt.
+  if (!splitGuestMayReach(req.method, `/auth${req.path}`)
+    && requestCandidateUserIds(req).some((id) => isSplitGuestAccount(db.get(), id))) {
+    return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403, reason: 'split_guest_scope' });
   }
   // DASSELBE FUER EIN GEKOPPELTES DISPLAY (#1208). Es traegt ebenfalls Scopes
   // und wuerde vom globalen Gate ebenso verworfen - und kommt hier ebenso wenig
@@ -1116,6 +1160,7 @@ function requireAuth(req, res, next) {
       req.authScopes = [...DISPLAY_SCOPES];
       req.displayDeviceId = device.deviceId;
       req.displayShowsScreensaver = device.showScreensaver === true;
+      req.displayDeviceSettings = device.deviceSettings;
       // DIE OFFLINE-FRIST RUECKT MIT JEDEM KONTAKT VOR (Folge von #2293). Der
       // Service Worker legt sie neben die gecachten Listen; `/auth/me` nennt
       // denselben Wert als `sessionExpiresAt`. Begruendung und Dauer bei
@@ -2127,7 +2172,7 @@ export function buildInviteRoutes(targetRouter, {
         : String(body.permission_preset || '').trim();
 
       if (username && !/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
-        return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400 });
+        return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'members_username_invalid' });
       }
       if (displayName.length > 128) {
         return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
@@ -2147,7 +2192,7 @@ export function buildInviteRoutes(targetRouter, {
         return res.status(400).json({ error: 'An email address is required to send the invitation.', code: 400 });
       }
       if (username && getDb().prepare('SELECT 1 FROM users WHERE username = ?').get(username)) {
-        return res.status(409).json({ error: 'Username is already taken.', code: 409 });
+        return res.status(409).json({ error: 'Username is already taken.', code: 409, reason: 'members_username_taken' });
       }
 
       // Aufgeloest gespeichert, nicht als Name der Vorlage: massgeblich ist,
@@ -3800,6 +3845,30 @@ function adminUserRow(userId) {
     .get(OIDC_PASSWORD_SENTINEL, userId);
 }
 
+// Die beiden Absagen von `assertSsoOnlyAllowed`, die ein Admin im Formular
+// erreicht (#1909): das Formular kennt weder die Adressen der anderen
+// Mitglieder noch prueft es, ob eine Adresse eingetragen ist.
+const SSO_ONLY_NEEDS_EMAIL = 'An account without a password needs an email address, so the first SSO sign-in can link it.';
+const SSO_ONLY_EMAIL_AMBIGUOUS = 'This email address already belongs to another member, so SSO could not tell the accounts apart.';
+
+/**
+ * Die Absage von `assertSsoOnlyAllowed` als 400, mit dem Grund der beiden
+ * Faelle, die ein Admin erreicht. Die anderen (OIDC nicht eingerichtet,
+ * Passwort und `sso_only` zugleich) schickt nur ein Aufrufer der API: der
+ * Schalter steht nur bei eingerichtetem SSO, und an ihm verschwindet das
+ * Passwortfeld. Die Gruende als Literale: `test:api` fuehrt jede Stelle, an der
+ * ein `reason` durch eine Variable gereicht wird.
+ */
+function refuseSsoOnly(res, message) {
+  if (message === SSO_ONLY_NEEDS_EMAIL) {
+    return res.status(400).json({ error: message, code: 400, reason: 'members_sso_email_required' });
+  }
+  if (message === SSO_ONLY_EMAIL_AMBIGUOUS) {
+    return res.status(400).json({ error: message, code: 400, reason: 'members_sso_email_ambiguous' });
+  }
+  return res.status(400).json({ error: message, code: 400 });
+}
+
 /**
  * Prueft, ob ein Konto ohne Passwort gefuehrt werden darf (#847).
  *
@@ -3833,7 +3902,7 @@ export function assertSsoOnlyAllowed(ssoOnly, password, { linked = false, email 
   if (linked) return null;
   const address = String(email || '').trim();
   if (!address) {
-    return 'An account without a password needs an email address, so the first SSO sign-in can link it.';
+    return SSO_ONLY_NEEDS_EMAIL;
   }
   // Und sie muss dieses eine Konto meinen: `findOrCreateOidcUser` verknuepft
   // nur bei GENAU einem Treffer und laesst zwei Kandidaten unangetastet.
@@ -3847,7 +3916,7 @@ export function assertSsoOnlyAllowed(ssoOnly, password, { linked = false, email 
   // stuende dann ohne Passwort und ohne Verknuepfung da.
   const clash = ssoLinkCandidates(db.get(), address, { excludeUserId }).length > 0;
   if (clash) {
-    return 'This email address already belongs to another member, so SSO could not tell the accounts apart.';
+    return SSO_ONLY_EMAIL_AMBIGUOUS;
   }
   return null;
 }
@@ -3888,7 +3957,7 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
     }
 
     if (!/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
-      return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400 });
+      return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'members_username_invalid' });
     }
 
     if (display_name.length > 128) {
@@ -3913,7 +3982,7 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
     // Erst hier, weil die Pruefung die E-Mail braucht: ein neues Konto ist noch
     // mit nichts verknuepft, also ist die Adresse sein einziger Weg hinein.
     const ssoOnlyError = assertSsoOnlyAllowed(ssoOnly, password, { email: memberFields.values.email });
-    if (ssoOnlyError) return res.status(400).json({ error: ssoOnlyError, code: 400 });
+    if (ssoOnlyError) return refuseSsoOnly(res, ssoOnlyError);
 
     const hash = ssoOnly ? OIDC_PASSWORD_SENTINEL : await hashPassword(password);
 
@@ -3948,7 +4017,7 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
     });
   } catch (err) {
     if (err.message && err.message.includes('UNIQUE constraint')) {
-      return res.status(409).json({ error: 'Username is already taken.', code: 409 });
+      return res.status(409).json({ error: 'Username is already taken.', code: 409, reason: 'members_username_taken' });
     }
     log.error('User creation error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -3973,7 +4042,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
 
     const existing = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(userId);
-    if (!existing) return res.status(404).json({ error: 'User not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'User not found.', code: 404, reason: 'members_member_not_found' });
     // EIN DISPLAY IST KEIN MITGLIED, ALSO AUCH HIER NICHT (#1208). Die Liste
     // darunter kennt es nicht mehr, diese Route kannte es noch: eine Id aus
     // `GET /displays` reichte, um dem Tablett einen Familiennamen, eine Rolle
@@ -3984,7 +4053,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     // herabstufen und den Haushalt ohne jeden Zugang zurueck lassen.
     // Verwaltet wird ein Display unter /displays, sonst nirgends.
     if (isDisplayAccount(userId, { db: db.get() })) {
-      return res.status(404).json({ error: 'User not found.', code: 404 });
+      return res.status(404).json({ error: 'User not found.', code: 404, reason: 'members_member_not_found' });
     }
 
     const username = req.body.username !== undefined ? String(req.body.username || '').trim() : existing.username;
@@ -4002,7 +4071,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       return res.status(400).json({ error: 'Username and display name are required.', code: 400 });
     }
     if (!/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
-      return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400 });
+      return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'members_username_invalid' });
     }
     if (displayName.length > 128) {
       return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
@@ -4040,7 +4109,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       email: effectiveEmail,
       excludeUserId: userId,
     });
-    if (ssoOnlyError) return res.status(400).json({ error: ssoOnlyError, code: 400 });
+    if (ssoOnlyError) return refuseSsoOnly(res, ssoOnlyError);
 
     // Zurueck zu "hat ein Passwort" geht nur MIT einem Passwort: sonst bliebe
     // der Platzhalter stehen und das Konto haette weder SSO-Pflicht noch einen
@@ -4058,13 +4127,15 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       });
     }
 
+    // Dieselben Gruende wie beim Entfernen (#1909): die Verwaltung sagt den
+    // Satz dazu, auch wenn ein Admin sich selbst herabstuft.
     const adminError = assertAdminWouldRemain(userId, nextRole);
-    if (adminError) return res.status(400).json({ error: adminError, code: 400 });
+    if (adminError) return res.status(400).json({ error: adminError, code: 400, reason: 'last_admin' });
 
     // Dieselbe Frage fuer den SSO-Zustand: eine Herabstufung darf den Riegel
     // des Haushalts nicht nebenbei aufmachen (#847).
     const ssoAdminError = assertSsoAdminWouldRemain(userId, nextRole);
-    if (ssoAdminError) return res.status(400).json({ error: ssoAdminError, code: 400 });
+    if (ssoAdminError) return res.status(400).json({ error: ssoAdminError, code: 400, reason: 'last_sso_admin' });
 
     // Nur ein echter UEBERGANG schreibt und meldet ab. Die Verwaltung schickt
     // den Umschalter bei JEDER Speicherung mit, also auch beim Aendern des
@@ -4118,7 +4189,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     res.json({ user: publicUser(updated) });
   } catch (err) {
     if (err.message && err.message.includes('UNIQUE constraint')) {
-      return res.status(409).json({ error: 'Username is already taken.', code: 409 });
+      return res.status(409).json({ error: 'Username is already taken.', code: 409, reason: 'members_username_taken' });
     }
     log.error('User update error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

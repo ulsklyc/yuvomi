@@ -27,8 +27,21 @@
  * `['integer', 'array']` wird `Int`, die Liste geht verloren. Gesehen wird alles,
  * was der Generator liest: Parameter, Bodies und Antworten jedes Status.
  *
+ * DER VERTRAG WAECHST NUR (DECISIONS 18). `openapi-client-contract.json` haelt fest,
+ * was eine installierte App liest: die Operationen, die Pflichtfelder und die
+ * Enum-Werte jeder 2xx-Antwort, durch `$ref`, `allOf`, `oneOf` und `anyOf` hindurch.
+ * `client_api` schuetzt nur eine neue App vor einem alten Server. Verschwindet etwas,
+ * haengt eine alte App daran: entfernt wird erst, wenn das aktuelle App-Release es
+ * nicht mehr nutzt, und der PR nennt die App-Version. Kommt etwas dazu, zeigt die App
+ * einen neuen Enum-Wert als unbekannten Wert; die Liste wird im selben PR nachgezogen
+ * (`node test/openapi-client-contract-snapshot.js --write`).
+ *
  * GEGENPROBE: `operationId` an einer Operation entfernen oder ein Schema durch
  * `{ type: 'object' }` ersetzen macht den ersten Test rot und nennt die Operation.
+ * Einen Wert aus einem Antwort-Enum (etwa `TaskStatus`) streichen macht "nichts
+ * verschwindet" rot, einen hinzufuegen macht "nichts kommt still dazu" rot; ebenso
+ * ein Pflichtfeld streichen oder hinzufuegen. Beide Vergleiche laufen zusaetzlich
+ * gegen eine veraenderte Kopie der Liste, damit sie nicht still blind werden.
  *
  * Ausfuehren: npm run test:openapi-client-contract
  */
@@ -36,7 +49,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildOpenApiSpec } from '../server/openapi.js';
+import { readFileSync } from 'node:fs';
 import { CLIENT_OPERATIONS } from './openapi-client-operations.js';
+import { buildClientContract, SNAPSHOT_FILE } from './openapi-client-contract-snapshot.js';
 
 // Der Client liest diese Felder bewusst nicht, ein Schema waere reine Pflege.
 // Schluessel: `<METHOD> <Pfad>#<Feldpfad>`.
@@ -232,4 +247,57 @@ test('jede Ausnahme in CLIENT_OPAQUE_FIELDS gehoert zu einer Client-Operation', 
   const labels = new Set(CLIENT_OPERATIONS.map(([method, path]) => `${method.toUpperCase()} ${path}`));
   const stale = [...CLIENT_OPAQUE_FIELDS.keys()].filter((key) => !labels.has(key.split('#')[0]));
   assert.deepEqual(stale, []);
+});
+
+// Der Client-Vertrag waechst nur, siehe Kopf der Datei.
+const RECORDED_CONTRACT = JSON.parse(readFileSync(SNAPSHOT_FILE, 'utf8'));
+
+/** Was in `from` steht und in `to` fehlt, je Operation, Pflichtfeld und Enum-Wert. */
+function contractGaps(from, to) {
+  const gaps = [];
+  for (const [operation, entry] of Object.entries(from)) {
+    const other = to[operation];
+    if (!other) {
+      gaps.push(`Operation ${operation}`);
+      continue;
+    }
+    for (const kind of ['required', 'enums']) {
+      const present = new Set(other[kind]);
+      for (const item of entry[kind]) if (!present.has(item)) gaps.push(`${operation}: ${kind === 'required' ? 'Pflichtfeld' : 'Enum-Wert'} ${item}`);
+    }
+  }
+  return gaps;
+}
+
+const REMOVED_MESSAGE = 'Aus dem Client-Vertrag verschwindet etwas, an dem eine installierte App haengt. '
+  + 'Entfernt wird erst, wenn das aktuelle App-Release (TestFlight oder App Store) es nicht mehr nutzt, '
+  + 'und der PR nennt diese App-Version (DECISIONS 18). Danach die Liste nachziehen: '
+  + 'node test/openapi-client-contract-snapshot.js --write';
+const ADDED_MESSAGE = 'Der Client-Vertrag waechst. Einen neuen Enum-Wert zeigt eine installierte App als unbekannten Wert; '
+  + 'ist das gewollt, die Liste im selben PR nachziehen: node test/openapi-client-contract-snapshot.js --write';
+
+test('nichts verschwindet aus dem Client-Vertrag', () => {
+  const gaps = contractGaps(RECORDED_CONTRACT, buildClientContract(spec));
+  assert.deepEqual(gaps, [], `\n${REMOVED_MESSAGE}\n${gaps.join('\n')}\n`);
+});
+
+test('nichts kommt still in den Client-Vertrag dazu', () => {
+  const gaps = contractGaps(buildClientContract(spec), RECORDED_CONTRACT);
+  assert.deepEqual(gaps, [], `\n${ADDED_MESSAGE}\n${gaps.join('\n')}\n`);
+});
+
+test('der Vertragsvergleich sieht Entfernen und Hinzufuegen', () => {
+  const current = buildClientContract(spec);
+  const [operation, entry] = Object.entries(current).find(([key, value]) => key !== 'GET /api/v1/version' && value.enums.length && value.required.length);
+  const withExtra = structuredClone(current);
+  withExtra[operation].enums.push(`${entry.enums[0]}-neu`);
+  withExtra[operation].required.push('response 200.neues_feld');
+  const withMissing = structuredClone(current);
+  withMissing[operation].enums.shift();
+  withMissing[operation].required.shift();
+  delete withMissing['GET /api/v1/version'];
+
+  assert.equal(contractGaps(withExtra, current).length, 2, 'ein neuer Wert und ein neues Pflichtfeld');
+  assert.equal(contractGaps(current, withMissing).length, 3, 'ein Wert, ein Pflichtfeld und eine Operation fehlen');
+  assert.deepEqual(contractGaps(current, current), []);
 });

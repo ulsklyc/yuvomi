@@ -51,6 +51,8 @@ describe('CalDAV Multi-Account Sync', () => {
       CREATE TABLE calendar_events (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
         seen_on_server INTEGER NOT NULL DEFAULT 1,
+        -- Absage des Anbieters (Migration 281, #2499)
+        provider_status TEXT,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -180,6 +182,8 @@ describe('CalDAV Multi-Account Sync', () => {
       CREATE TABLE calendar_events (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
         seen_on_server INTEGER NOT NULL DEFAULT 1,
+        -- Absage des Anbieters (Migration 281, #2499)
+        provider_status TEXT,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -257,6 +261,8 @@ describe('pruneDeletedEvents (#508)', () => {
       CREATE TABLE calendar_events (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
         seen_on_server INTEGER NOT NULL DEFAULT 1,
+        -- Absage des Anbieters (Migration 281, #2499)
+        provider_status TEXT,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
         id                   INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -447,6 +453,8 @@ describe('CalDAV sync yields to the event loop (#519)', () => {
       CREATE TABLE calendar_events (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
         seen_on_server INTEGER NOT NULL DEFAULT 1,
+        -- Absage des Anbieters (Migration 281, #2499)
+        provider_status TEXT,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -626,6 +634,8 @@ describe('CalDAV: RECURRENCE-ID-Overrides killen die Serie nicht (#549)', () => 
       CREATE TABLE calendar_events (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
         seen_on_server INTEGER NOT NULL DEFAULT 1,
+        -- Absage des Anbieters (Migration 281, #2499)
+        provider_status TEXT,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -835,6 +845,8 @@ describe('CalDAV: No-op-Syncs bleiben im Standard-Log-Level still', () => {
       CREATE TABLE calendar_events (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
         seen_on_server INTEGER NOT NULL DEFAULT 1,
+        -- Absage des Anbieters (Migration 281, #2499)
+        provider_status TEXT,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -1097,6 +1109,8 @@ describe('CalDAV: eine Bearbeitung friert die Farbe nicht mehr ein (#899)', () =
       CREATE TABLE calendar_events (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
         seen_on_server INTEGER NOT NULL DEFAULT 1,
+        -- Absage des Anbieters (Migration 281, #2499)
+        provider_status TEXT,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -1306,6 +1320,8 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
       CREATE TABLE calendar_events (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
         seen_on_server INTEGER NOT NULL DEFAULT 1,
+        -- Absage des Anbieters (Migration 281, #2499)
+        provider_status TEXT,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -2265,6 +2281,8 @@ describe('CalDAV: eine Aufgabenliste bleibt kein Terminziel (#617)', () => {
       CREATE TABLE calendar_events (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
         seen_on_server INTEGER NOT NULL DEFAULT 1,
+        -- Absage des Anbieters (Migration 281, #2499)
+        provider_status TEXT,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -2558,6 +2576,8 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
       CREATE TABLE calendar_events (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
         seen_on_server INTEGER NOT NULL DEFAULT 1,
+        -- Absage des Anbieters (Migration 281, #2499)
+        provider_status TEXT,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab
@@ -2605,7 +2625,9 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
         external_account_id INTEGER, external_object_url TEXT,
         outbound_dirty INTEGER NOT NULL DEFAULT 0, outbound_attempts INTEGER NOT NULL DEFAULT 0,
         -- Upload-Ziel lokaler Aufgaben (Migration 136), abgeräumt seit #1885
-        target_caldav_account_id INTEGER, target_caldav_list_url TEXT
+        target_caldav_account_id INTEGER, target_caldav_list_url TEXT,
+        -- Fremde Serienregel (Migration 279, #2506), geleert beim Entkoppeln
+        external_rrule TEXT
       );
       CREATE TABLE shopping_items (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
@@ -2793,6 +2815,8 @@ describe('CalDAV: neue Kalender sind opt-in (#732)', () => {
       CREATE TABLE calendar_events (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).
         seen_on_server INTEGER NOT NULL DEFAULT 1,
+        -- Absage des Anbieters (Migration 281, #2499)
+        provider_status TEXT,
         -- Konto der Zeile (Migration 238, #1860)
         caldav_account_id INTEGER REFERENCES caldav_accounts(id) ON DELETE SET NULL,
         -- die Farb-Heilung (#1270) grenzt nach dem Alter der Zeile ab

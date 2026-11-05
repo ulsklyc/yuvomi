@@ -49,7 +49,7 @@ globalThis.window.yuvomi = {
   },
 };
 
-const { seriesDoneText } = await import('../public/utils/task-fields.js');
+const { seriesDoneText, repeatsElsewhere } = await import('../public/utils/task-fields.js');
 const { nowFields } = await import('../public/utils/timezone.js');
 const { openTaskDetail, __test: detail } = await import('../public/components/task-detail.js');
 const { __test: tasks } = await import('../public/pages/tasks.js');
@@ -391,4 +391,25 @@ test('Formular: das Anlegen einer Aufgabe sagt weiter „angelegt"', async () =>
   const { calls } = await saveInEditForm({ status: null, response: saved(THIS_YEAR), taskId: '' });
   assert.ok(calls.some((c) => c[0] === 'post' && c[1] === '/tasks'));
   assert.deepEqual(toasts.map((x) => x.message), ['tasks.createdToast']);
+});
+
+test('Fremde Serie: abgehakt wird nur dort, wo Yuvomi sie nicht weiterfuehrt (#2506)', () => {
+  // Dieselbe Regel wie der Server (`continuesForeignSeries`): sonst boete die
+  // Liste einen Haken an, der in 409 endet, oder versagte einen, der geht.
+  const mapped = { external_rrule: 'FREQ=DAILY;INTERVAL=1', is_recurring: 1, recurrence_rule: 'FREQ=DAILY', due_date: '2026-11-05' };
+  assert.equal(repeatsElsewhere(mapped), false, 'abbildbar: Yuvomi hakt ab');
+  assert.equal(repeatsElsewhere({ ...mapped, is_recurring: 0, recurrence_rule: null }), true, 'nicht abbildbar oder hier abgeschaltet');
+  assert.equal(repeatsElsewhere({ ...mapped, due_date: null }), true, 'ohne Faelligkeit');
+  assert.equal(repeatsElsewhere({ ...mapped, external_rrule: null, is_recurring: 0 }), false, 'keine fremde Regel');
+  // Review auf #2543: am 29. bis 31. klemmt Yuvomi eine Monatsserie, RFC nicht.
+  const monthly = { ...mapped, external_rrule: 'FREQ=MONTHLY', recurrence_rule: 'FREQ=MONTHLY' };
+  assert.equal(repeatsElsewhere({ ...monthly, due_date: '2026-11-28' }), false);
+  assert.equal(repeatsElsewhere({ ...monthly, due_date: '2026-11-30' }), true);
+  assert.equal(repeatsElsewhere({ ...monthly, recurrence_rule: 'FREQ=MONTHLY;BYMONTHDAY=-1', due_date: '2026-11-30' }), false);
+  assert.equal(repeatsElsewhere({ ...mapped, recurrence_rule: 'FREQ=YEARLY', due_date: '2028-02-29' }), true);
+  // Zweite Runde: ein Ende gilt nur als reines Datum an einer Serie ohne Uhrzeit.
+  const ending = { ...mapped, recurrence_rule: 'FREQ=DAILY;UNTIL=20261130' };
+  assert.equal(repeatsElsewhere(ending), false);
+  assert.equal(repeatsElsewhere({ ...ending, due_time: '00:30' }), true);
+  assert.equal(repeatsElsewhere({ ...ending, recurrence_rule: 'FREQ=DAILY;UNTIL=20261130T225959Z' }), true);
 });

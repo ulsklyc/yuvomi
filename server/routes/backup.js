@@ -100,6 +100,26 @@ const databaseKeyLimiter = rateLimit({
   message: { error: 'Too many requests for the database key. Please wait a few minutes.', code: 429 },
 });
 
+/**
+ * Schranke fuer den Download. Jeder Abruf baut eine volle Kopie der Datenbank
+ * in ein tmp-Verzeichnis - Platte und CPU, so oft man klickt. Ein ehrlicher
+ * Admin laedt ein paar Mal am Tag; zehn in der Stunde halten ein Skript mit
+ * einer gekaperten Sitzung davon ab, den Server damit zuzuschuetten. Je Konto
+ * und HINTER `requireAdmin`, aus denselben Gruenden wie oben (#2524).
+ *
+ * Bewusst in Kauf genommen: die Einstellungen laden per `<a href download>`,
+ * ein 429 endet dort als gescheiterter Download statt als Toast - wie schon
+ * ein 500. Ein fetch mit Blob hielte die ganze Datenbank im Browser.
+ */
+const databaseDownloadLimiter = rateLimit({
+  windowMs: 60 * 60_000,
+  max: 10,
+  keyGenerator: (req) => `user:${req.authUserId}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many backup downloads. Please wait before downloading again.', code: 429 },
+});
+
 router.get('/status', requireAdmin, (req, res) => {
   const schedulerStatus = getSchedulerStatus();
   res.json({
@@ -141,7 +161,7 @@ router.get('/database-key', requireAdmin, databaseKeyLimiter, (req, res) => {
   });
 });
 
-router.get('/database', requireAdmin, async (req, res) => {
+router.get('/database', requireAdmin, databaseDownloadLimiter, async (req, res) => {
   let tmpPath = null;
   try {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-backup-'));

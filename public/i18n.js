@@ -25,6 +25,7 @@ const DEFAULT_LOCALE = 'de';
 const STORAGE_KEY = 'yuvomi-locale';
 const DATE_FORMAT_KEY = 'yuvomi-date-format';
 const TIME_FORMAT_KEY = 'yuvomi-time-format';
+const WEEK_START_KEY = 'yuvomi-week-start';
 const NUMBER_LOCALE_KEY = 'yuvomi-number-locale';
 const DEFAULT_DATE_FORMAT = 'dmy';
 const DEFAULT_TIME_FORMAT = '24h';
@@ -336,6 +337,25 @@ function getTimeFormatPreference() {
 
 export function getTimeFormat() {
   return getTimeFormatPreference();
+}
+
+// Wochenstart des Haushalts (`week_start`), neben Datums- und Zeitformat fuer
+// jede Komponente lesbar (#2533): der Router spiegelt ihn beim Start, die
+// Einstellung beim Speichern. Unbekannt oder ohne Storage gilt Montag, der
+// Default des Servers. In einen getDay()-Index rechnet `weekStartIndex()`
+// aus utils/date.js.
+const VALID_WEEK_STARTS = ['monday', 'sunday', 'saturday'];
+const DEFAULT_WEEK_START = 'monday';
+
+export function getWeekStart() {
+  let stored = null;
+  try { stored = localStorage.getItem(WEEK_START_KEY); } catch { /* Storage gesperrt */ }
+  return VALID_WEEK_STARTS.includes(stored) ? stored : DEFAULT_WEEK_START;
+}
+
+export function setWeekStart(value) {
+  if (!VALID_WEEK_STARTS.includes(value)) return;
+  try { localStorage.setItem(WEEK_START_KEY, value); } catch { /* Storage gesperrt */ }
 }
 
 /**

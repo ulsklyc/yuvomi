@@ -14,6 +14,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   completion earned stands with the booking: later changes of the due date, the point value or the
   setting never rewrite booked amounts, and for every late earning the ledger shows the base it came
   from and how many days it was late.
+- **Administrators set night hours and screensaver options for each wall tablet.**
+  Settings > Wall tablets offers each tablet's night window, idle delay, clock and photo
+  fill. Online tablets pick up changes automatically; existing local choices stay in use
+  until an administrator saves, and personal browser preferences are preserved (#2436).
+- **Shopping: purchase price history** (part 1 of #1003). Ticking off or clearing a priced
+  shopping item records the purchase: item name, price paid in cents, the shop, and the date.
+  Purchases match by item name, case-insensitively, and remain after the item is cleared.
+  The item details sheet displays the last purchase for known items. CalDAV completion sync
+  does not record purchases immediately, but clearing checked items records them dated at the clean-up.
+
+### Fixed
+- **Date pickers start the week on the household week start** (#2533). With Sunday or Saturday
+  set as the week start in the calendar settings, the calendar sheet of every date field (events,
+  tasks, budget, health and the others) showed Monday-first weeks. Its weekday header and the
+  position of the first of the month now follow the setting, like the calendar views do.
+- **Health: in the month view, the series names no longer cover the bars of the last days** (#2538).
+  "Systolic" and "Diastolic" stood left of the last bar, and "Pulse" above its last dot, hiding the
+  readings underneath when a month is full. A short line above the blood pressure chart now says
+  which end of a bar is which, and the pulse chart is named by its own unit axis.
+- **Adding, editing and inviting family members say what went wrong in your language** (#1909).
+  The error line in these dialogs showed the server's English text. It now says in your language
+  that the username is invalid or already taken, that an account without a password needs an
+  email address that no other member has, or that at least one administrator (or the last one
+  linked to SSO) must stay, also when you demote yourself. A member another administrator removed
+  in the meantime closes the dialog and leaves the list. Errors while loading members, invitations,
+  two-factor status and roles and permissions are in your language too. API clients get the case
+  as `reason`.
+- **An event the provider cancels no longer reminds anyone** (#2499). When an ICS subscription,
+  a CalDAV calendar or iCloud marks an event as cancelled without deleting it, its reminders stay
+  silent, and the dashboard, the Today sheet, the wall tablet and the countdowns leave it out. The
+  calendar still shows it, struck through and marked "Cancelled", so nobody wonders where it
+  went. If the provider confirms it again, everything comes back. A cancelled single occurrence of
+  a series only affects that occurrence. A one-time ICS import skips cancelled events. Your own
+  calendar feed passes the cancellation on, and API clients find it in `provider_status`.
+- **Contacts synced from Nextcloud or another CardDAV server no longer merge into one** (#2513).
+  Cards with an empty phone or email field, or cards that share a landline or email address,
+  used to collapse into a single Yuvomi contact carrying the name of the last card. Each card now
+  stays its own contact; only a contact that no address book is linked to yet is matched by
+  phone or email. Empty phone and email entries are no longer saved, and ones saved earlier
+  disappear on the next sync. A contact that has already merged keeps its mixed data: delete it
+  in Yuvomi and sync again to get the separate contacts back.
+- **Repeating reminders from iOS Reminders or Tasks.org now repeat in Yuvomi, and ticking one off
+  keeps the series running there** (#2506, #2515). Daily, weekly, monthly and yearly reminders,
+  also every few days or weeks, every weekday, weekly on chosen weekdays, on the last day of the
+  month or until an end date, arrive as a Yuvomi series. Ticking one off in Yuvomi or on a wall tablet does what the
+  other app does: the reminder moves on to its next date there, and a completed copy keeps the
+  history. Undoing the tick moves it back. A rule Yuvomi cannot follow exactly (a fixed number of
+  times, a fixed day of the month such as the 15th, "every second Tuesday", a monthly reminder
+  due on the 29th to 31st, a series with skipped or extra dates) shows "Repeats in
+  another app" and is ticked off there; Yuvomi never sends a completion that would end such a
+  series. For API clients, ticking off one of those through `PATCH /api/v1/tasks/:id/status` or
+  `PUT /api/v1/tasks/:id` answers 409 with the reason `task_foreign_series`, and tasks carry the
+  other app's rule in `external_rrule`.
+- **The app added to the iPhone Home Screen reaches the bottom edge again** (refs #2417). On iOS 27
+  the installed app ended a status bar's height above the bottom of the screen, with an empty strip
+  below the tab bar. It now takes the full screen height; Yuvomi in a Safari tab is unchanged.
+
+### Security
+- **Database backup downloads are limited to ten per hour for each administrator** (#2524). Every
+  download builds a full copy of the database on the server, so a hijacked admin session could
+  keep it busy by requesting one after another. Further downloads in the same hour are refused;
+  other administrators are not affected, and members still get no download at all.
+
+## [2.85.0] - 2026-11-04
+
+### Added
 - **Stock: the minimum belongs to the product, and running low is read over all its batches**
   (part 3 of #1448). Toothpaste with 1 in the bathroom, 8 in the attic and a minimum of 3 no
   longer reads as running low: the household has 9. Milk with 1 l, 1 l and 2 l against a minimum
@@ -53,11 +119,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   storage is lost. The key appears only after a click and is not cached; viewing it is logged without
   the value. A key from your own configuration is never shown - the page says where it comes from -
   and a signed-in device of the native app cannot read it.
+- **Settings → Account lists the phones signed in with the native app and pairs a new one.** Each
+  signed-in device shows its name, platform and when it was last used, and can be signed out after a
+  confirmation. "Pair a device" shows a code that is valid for five minutes and once: as a QR code for a
+  second device, behind "Open in app" for the phone the page is open on, and as text to type. A household
+  that signs in only with single sign-on has no password to type into an app, and this is its way in.
+  While a code is open, the page names a device that has just signed in, so a phone you do not recognise
+  stands out and can be signed out on the spot.
 - **The Overview has its own tile arrangement on the phone.** On a phone, tapping Customize shows
   a "Phone tiles" mode that lets you reorder and show or hide tiles independently of the desktop
   layout. Options (calendar limit, task filters, shopping-list selection, etc.) follow the desktop
   arrangement, so only the order and visibility are separate. "Same as desktop" removes the phone
   arrangement and goes back to following the desktop. (#2109)
+- **A recurring task can hand itself along.** A series like "take out the bin" used to hang on the
+  same person forever; a rotation pool of at least two people now gives each follow-up instance to
+  the next member in a fixed order (#1763, migration 277). The order chosen in the pool is the order
+  the task is handed along in. The series remembers a position, not a person: a member who leaves the
+  pool does not restart it at the first person - Kevin's round stays Kevin's, then Max, then Kevin
+  again - and a deactivated account (#1381) is skipped while it cannot sign in. If the running
+  instance already belongs to the first member, the first hand-over goes to the second one (Kevin,
+  Anna, Max - not Kevin, Kevin). The detail view names the next member up from the same calculation
+  that hands out the next instance, and a task without rotation behaves exactly as before.
 
 ### Deprecated
 - **`min_quantity` on a pantry item (`/api/v1/pantry`) is deprecated and will be removed in the
@@ -70,6 +152,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writing it on the product itself comes with a later part of #1448, before the field goes.
 
 ### Fixed
+- **A birthday keeps the color you give it in the calendar.** The birthday sync wrote its own red
+  back onto every birthday event each time it ran, which is on every visit to Birthdays and every
+  reminder check. Giving several birthdays the same color looked as if a color could be used only
+  once: the one changed last kept it, the earlier ones fell back to red. New birthdays still start
+  in red; after that the color is the calendar's. Reported by email.
+- **The weather tile no longer shows your coordinates as the place name.** With coordinates but no
+  place name set, the tile and the API showed the raw position in full precision
+  (`54.31665773950043, 10.116079422296027`), the exact location of the home for everyone who sees
+  the overview. Without a name the tile now shows none, and `city` in `/api/v1/weather` is `null`.
+  Reported for the Home Assistant app in ulsklyc/yuvomi-home-assistant#4.
+- **The Budget title stands in full next to the month in every language.** From 390px up the title
+  was cut off in eleven languages ("Presupues..." in Spanish even at 430px), because the month only
+  moved to a row of its own below 390px. The head now measures: whenever the title would be cut off
+  next to the month, the month takes the row below it, at any width; a short title such as Japanese
+  keeps the month beside it also on a narrow phone. Paging through the months and scrolling the head
+  away behave as before. The Greek Budget page title is shorter ("Οικονομικά"), the navigation keeps
+  the full name. (#2443)
+- **"Sign out on other devices" says that it signs out the native app too.** The server already
+  ended signed-in devices along with the other sessions; the hint under the button did not mention it.
 - **Deleting the first occurrence of a recurring event also stops its reminder.** A reminder on a series
   belongs to its first occurrence, and after that occurrence was deleted it still showed in the bell and
   arrived as a notification, also for a deleted first occurrence coming from an imported calendar (ICS,
@@ -117,6 +218,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   remain intact and reappear when needed. The editing-lock switch and its hint no longer
   overlap. The defaults description also uses the same form of address as its neighbouring
   hints (#2366).
+
+### Security
+- **Document storage names no longer use a regular expression that slows down on long runs of
+  dashes.** Trimming the dashes around the folder and file part of a stored document's name used a
+  pattern CodeQL flags as polynomial. The step before it already collapsed every run into one dash,
+  so uploads were not slowed down in practice; the name stays exactly the same.
+- **A shared-expense guest only reaches its own account routes (GHSA-q7gc-2cc9-w8fj).** A guest
+  account is meant to see Shared expenses and nothing else, and every other module already refused
+  it. The account routes did not: they answer before that check, so a signed-in guest could read the
+  household's account list with the members' contact details. The account routes now ask the same
+  list as the rest of the API. A guest keeps signing in and out, its own account details and the
+  changelog; everything else there is refused, and members notice nothing.
 
 ## [2.84.0] - 2026-11-02
 
@@ -406,6 +519,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   characters instead of 90, spacing follows the app's scale, a failed copy shows its note on its own
   line instead of breaking around the button, and the "taking longer than usual" note no longer
   touches the line above it.
+
 ## [2.83.0] - 2026-10-29
 
 ### Added

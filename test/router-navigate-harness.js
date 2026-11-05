@@ -137,7 +137,7 @@ export function createNavigateHarness({
       env._preferencesLoaded = true;
       env._disabledModules = new Set(disabledModules);
     },
-    startThirdPartyModulePolling: () => {},
+    startSessionPolling: () => {},
     armScreensaver: () => { armScreensaver?.(); },
     loadReminderStyles: () => {},
     initReminders: () => { log.reminders += 1; },

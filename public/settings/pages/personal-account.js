@@ -13,6 +13,7 @@ import { settingRowHtml } from '/settings/components.js';
 import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
 import { birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { mediaPickerBadgeHtml } from '/utils/media-picker.js';
+import { bindSignedInDevices, signedInDevicesCardHtml } from '/settings/signed-in-devices.js';
 
 function avatarHtml(user, className = 'settings-avatar') {
   const safeName = esc(user?.display_name || '');
@@ -610,6 +611,9 @@ function bindSetupForm(card, reload) {
     button.disabled = true;
     try {
       const { data } = await auth.enableTwoFactor(code);
+      // Neu gezeichnet wird erst, wenn die Wiederherstellungscodes zu sind; die
+      // Geraete hat der Server schon jetzt abgemeldet.
+      form.dispatchEvent(new CustomEvent('other-sessions-ended', { bubbles: true }));
       renderRecoveryCodes(card, data.recovery_codes, () => { reload(); });
     } catch (err) {
       button.disabled = false;
@@ -758,6 +762,9 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
       ${twoFactorCardHtml(twoFactorState)}
 
       ${oidcCardHtml(oidcState, oidcNotice)}
+
+      ${/* Ein Ausgaben-Gast bekommt kein Geraet (mayHaveDevice, server/auth.js). */ ''}
+      ${user?.access_scope === 'split_guest' ? '' : signedInDevicesCardHtml()}
 
       ${otherSessionsCardHtml()}
     </section>
@@ -998,6 +1005,9 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
         new_password: newPassword,
       });
       passwordForm.reset();
+      // Wie "Auf anderen Geraeten abmelden": der Server beendet die
+      // angemeldeten Geraete und den offenen Kopplungscode mit.
+      passwordForm.dispatchEvent(new CustomEvent('other-sessions-ended', { bubbles: true }));
       window.yuvomi?.showToast(t('settings.passwordSavedToast'), 'success');
     } catch (error) {
       // Ein falsches aktuelles Passwort ist ein 400 mit Grund (server/auth.js),
@@ -1036,6 +1046,9 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
     if (status) status.textContent = '';
     try {
       const { ended = 0 } = await auth.logoutOthers() ?? {};
+      // Der Server beendet dabei auch die angemeldeten Geraete und offene
+      // Kopplungscodes: die Karte darueber muss das erfahren.
+      logoutOthersButton.dispatchEvent(new CustomEvent('other-sessions-ended', { bubbles: true }));
       if (status) {
         status.textContent = ended > 0
           ? t('settings.otherSessionsEnded', { count: ended })
@@ -1106,6 +1119,7 @@ export async function render(container, { user }) {
       avatarData: currentUser?.avatar_data ?? null,
     }, { gravatarHost });
     bindTwoFactorEvents(container, () => render(container, { user: currentUser }));
+    bindSignedInDevices(container);
     container.querySelector('#account-retry')?.addEventListener('click', () => {
       render(container, { user: currentUser });
     });

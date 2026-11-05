@@ -11886,6 +11886,108 @@ const MIGRATIONS = [
   },
   {
     version: 277,
+    description: 'tasks: rotation for recurring series',
+    // Eine Serie "Muell rausbringen" haengt fuer immer an einer Person.
+    // Rotation ist eine reine Zustellungs-Entscheidung an der Folgeinstanz
+    // (die RRULE-Engine bleibt unangetastet): Modus, Pool und der Zeiger.
+    // Der Zeiger ist eine POSITION im Pool, kein Kopf: ein Mitglied, das den
+    // Pool verlaesst, verschiebt den Platz des Zeigers nicht, und die
+    // sichtbare Reihenfolge laeuft weiter (upstream #1763: "A pointer that
+    // survives"). rotation_last_user wandert als Information mit - die
+    // Reihenfolge liest es nie, genau das Lesen hat die Serie frueher beim
+    // Rauswurf still nach vorn zurueckgesetzt. Modus, Pool und Zeiger wandern
+    // als WERT auf jede Folgeinstanz (dasselbe Prinzip wie
+    // recurrence_series_id, #1603): faellt das Ursprungs-Vorkommen, traegt
+    // jede laufende Instanz ihre eigene Zuordnung weiter. Bewacht wie
+    // ueblich, damit ein zweiter Lauf auf gedrifteter Datenbank nicht
+    // scheitert.
+    up(database) {
+      const cols = database.prepare('PRAGMA table_info(tasks)').all();
+      if (!cols.some((c) => c.name === 'rotation_mode')) {
+        database.exec(`
+          ALTER TABLE tasks ADD COLUMN rotation_mode TEXT
+            CHECK (rotation_mode IS NULL OR rotation_mode IN ('round_robin'))
+        `);
+      }
+      if (!cols.some((c) => c.name === 'rotation_last_user')) {
+        database.exec('ALTER TABLE tasks ADD COLUMN rotation_last_user INTEGER REFERENCES users(id) ON DELETE SET NULL');
+      }
+      if (!cols.some((c) => c.name === 'rotation_last_position')) {
+        database.exec('ALTER TABLE tasks ADD COLUMN rotation_last_position INTEGER');
+      }
+      database.exec(`
+        CREATE TABLE IF NOT EXISTS task_rotation_pool (
+          task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          position INTEGER NOT NULL,
+          PRIMARY KEY (task_id, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_task_rotation_pool_order
+          ON task_rotation_pool(task_id, position);
+      `);
+    },
+  },
+  {
+    version: 278,
+    description: 'Wall displays: centrally managed night hours and screensaver options (#2436)',
+    // NULL preserves existing device-local choices until an administrator saves.
+    up: `ALTER TABLE display_accounts ADD COLUMN device_settings TEXT CHECK(device_settings IS NULL OR json_valid(device_settings));`,
+  },
+  {
+    version: 279,
+    description: 'tasks: external_rrule keeps the recurrence rule another app owns',
+    // #2506/#2515: eine in iOS Erinnerungen oder Tasks.org angelegte Serie kam
+    // als Einmal-Aufgabe an. Hakte Yuvomi sie ab, ging STATUS:COMPLETED auf den
+    // Master mit der RRULE, und die besitzende App beendete die ganze Serie.
+    // Die Spalte haelt die fremde Regel woertlich fest (der Inbound schreibt
+    // sie bei jedem Abruf, NULL ohne Regel oder bei Yuvomis eigener). Solange
+    // sie steht, sperren die Routen das Abhaken und der Push schickt nie
+    // COMPLETED auf diesen Master. Reines SQL, damit der Testspiegel
+    // (db-schema-test.js) sie fuehren kann; eine gedriftete Datenbank ohne die
+    // Spalte heilt reconcileCriticalSchema.
+    up: `ALTER TABLE tasks ADD COLUMN external_rrule TEXT;`,
+  },
+  {
+    version: 280,
+    description: 'Shopping: purchase price history (#1003)',
+    // A PURCHASE HISTORY IS A RECORD OF FACTS (#1003). When a priced item is
+    // ticked off or cleared, a purchase entry is written with the item name,
+    // price in cents, shop reference, and date. Names match ignoring case
+    // (COLLATE NOCASE). shopping_item_id keeps uniqueness while on the list
+    // and turns to NULL when cleared, preserving the history row forever.
+    up: `
+      CREATE TABLE IF NOT EXISTS shopping_purchases (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_name        TEXT    NOT NULL,
+        price_cents      INTEGER NOT NULL CHECK(price_cents >= 0),
+        store_id         INTEGER REFERENCES shopping_stores(id) ON DELETE SET NULL,
+        shopping_item_id INTEGER REFERENCES shopping_items(id) ON DELETE SET NULL,
+        purchased_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        created_at       TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_shopping_purchases_name_date
+        ON shopping_purchases(item_name COLLATE NOCASE, purchased_at DESC, id DESC);
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_purchases_item
+        ON shopping_purchases(shopping_item_id)
+        WHERE shopping_item_id IS NOT NULL;
+    `,
+  },
+  {
+    version: 281,
+    description: 'calendar_events: provider_status keeps a cancellation the provider reports',
+    // #2499: ein Termin, den der Anbieter per STATUS:CANCELLED absagt, aber
+    // stehen laesst, kam ueber ICS-Abo, CalDAV und iCloud als normaler Termin
+    // an und erinnerte weiter. Die Spalte gehoert dem Anbieter (der Inbound
+    // schreibt sie bei jedem Abruf, auch zurueck auf CONFIRMED oder NULL);
+    // lokal angelegte Termine bleiben NULL. Reines SQL fuer den Testspiegel
+    // (db-schema-test.js); eine gedriftete Datenbank heilt
+    // reconcileCriticalSchema.
+    up: `ALTER TABLE calendar_events ADD COLUMN provider_status TEXT CHECK(provider_status IS NULL OR provider_status IN ('TENTATIVE', 'CONFIRMED', 'CANCELLED'));`,
+  },
+  {
+    version: 282,
     description: 'rewards: late completion decay audit fields',
     // Spaeterledigung mit Punkteabzug (Haushalt opt-in): ist
     // `tasks_late_decay_enabled` auf '1', verbucht awardForCompletion() pro
@@ -12280,6 +12382,16 @@ const CRITICAL_COLUMNS = [
   // D#2330: v273 traegt den Feed-Stand nach; ohne die Spalte scheitert jeder
   // ICS-Sync (er schreibt sie) und jeder Reset (er liest sie).
   { table: 'calendar_events', column: 'feed_original', type: 'TEXT' },
+  // #2506: v279 traegt die fremde Serienregel nach; ohne die Spalte scheitert
+  // jeder VTODO-Abruf (der Upsert schreibt sie). Kein Nachtrag: NULL ist der
+  // Stand, mit dem die Migration beginnt, der naechste Abruf fuellt sie.
+  { table: 'tasks', column: 'external_rrule', type: 'TEXT' },
+  // #2499: v281 traegt die Absage des Anbieters nach; ohne die Spalte scheitert
+  // jeder Kalender-Abruf (der Upsert schreibt sie) und jede Erinnerung (der
+  // Filter liest sie). Kein Nachtrag: NULL heisst "nicht abgesagt", der
+  // naechste Abruf fuellt sie.
+  { table: 'calendar_events', column: 'provider_status',
+    type: "TEXT CHECK(provider_status IS NULL OR provider_status IN ('TENTATIVE', 'CONFIRMED', 'CANCELLED'))" },
 ];
 
 /**

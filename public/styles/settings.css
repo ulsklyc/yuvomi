@@ -3869,6 +3869,89 @@
 }
 
 /* --------------------------------------------------------
+   ANGEMELDETE GERAETE (Refs #255): Liste wie die API-Tokens, darunter die
+   Kopplung als Mulde wie der neue Token. Der QR steht auf Weiss wie beim
+   zweiten Faktor, sonst liest ihn keine Kamera im dunklen Modus. Neben ihm
+   Code und Knopf; schmal rutschen sie darunter.
+   -------------------------------------------------------- */
+.settings-pairing {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.settings-pairing p {
+  margin: 0;
+}
+
+.settings-pairing__warning {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Warnung, Schritte, QR und Code stehen nur, solange es einen Code gibt. Nach
+ * Ablauf oder Anmeldung bleibt allein die Statuszeile. */
+.settings-pairing__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+/* Warnung und Schritte als eigener Block ueber die volle Zeile: einzeln hielt
+ * die Hinweisbreite sie schmal, und auf breiten Schirmen rutschte der QR neben
+ * die Schritte (Lauf am 03.11.2026). */
+.settings-pairing__intro {
+  display: grid;
+  gap: var(--space-2);
+  flex-basis: 100%;
+}
+
+.settings-pairing__qr {
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+  background: #ffffff;
+  border: var(--space-px) solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.settings-pairing__qr img {
+  display: block;
+  inline-size: 176px;
+  block-size: 176px;
+}
+
+/* Liste und Knopf halten Abstand wie die Nachbarkarten (--space-3 vor der
+ * Aktion): ohne ihn las sich die leere Liste als zweite Zeile des Hinweises. */
+.settings-devices .settings-members {
+  margin-top: var(--space-2);
+}
+
+.settings-devices > .settings-form-actions {
+  margin-top: var(--space-3);
+}
+
+.settings-pairing__code-block {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.settings-pairing__code {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  letter-spacing: var(--tracking-label);
+  color: var(--color-text-primary);
+  /* Der Code wird abgetippt und markiert - nie mitten in einer Gruppe umbrechen. */
+  white-space: nowrap;
+  user-select: all;
+}
+
+.settings-pairing__status:empty {
+  display: none;
+}
+
+/* --------------------------------------------------------
    Zwei-Faktor-Anmeldung (#672)
 
    Der QR-Code steht auf einer eigenen weissen Flaeche, nicht auf der

@@ -792,6 +792,13 @@
   padding-block: var(--space-6);
 }
 
+/* Im Blatt steht die Zeile ueber den Balken (#2538) nicht unter einem Titel,
+ * sondern unter dem Zeitraum: kein Hochziehen, derselbe Abstand zum Diagramm
+ * wie im Abschnitt (dort der Abstand der Spalte). */
+.health-vital-sheet__chart > .health-chart-section__caption {
+  margin: 0 0 var(--space-3);
+}
+
 .health-vital-sheet .health-recent {
   margin-top: 0;
 }
@@ -870,21 +877,6 @@
  * Health-Charts. Bewusst sehr transparent, damit Gitter und Werte durchscheinen. */
 .health-chart__area {
   fill: color-mix(in oklab, var(--module-health) 14%, transparent);
-}
-
-/* DIE REIHEN STEHEN BESCHRIFTET AN IHRER KURVE (R21, Critique 2026-10-21, D6):
- * der Name ueber dem letzten Punkt, in der Farbe der Kurve (`fill` am Element).
- * Hier stand eine Legende aus Farbquadraten unter dem Diagramm - die Zuordnung
- * lief nur ueber die Farbe. Die Schrift ist die feste Achsenschrift
- * (`.chart__axis`), halbfett, damit sie sich vom Gitter abhebt. */
-.health-chart__series-label {
-  font-weight: var(--font-weight-semibold);
-  /* Ein Rand in der Flaechenfarbe (#1798): im dichten Monat liegt der Name
-   * ueber den Balken der Vortage und bliebe sonst nur halb lesbar. */
-  paint-order: stroke;
-  stroke: var(--color-surface);
-  stroke-width: 3px;
-  stroke-linejoin: round;
 }
 
 /* Die zweite Achse einer Messart (der Puls unter dem Blutdruck) folgt direkt;

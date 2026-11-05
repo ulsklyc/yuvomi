@@ -14,7 +14,7 @@ import { deniedModules } from '../permissions.js';
 import { tokenAllows } from '../scopes.js';
 import { ORIGIN_MODULE, withoutSwitchedOffModules } from '../services/reminder-origins.js';
 import { reminderTargetVisible, reminderTargetVisibleSql } from '../services/reminder-targets.js';
-import { withoutDeletedFirstOccurrence } from '../services/reminder-deleted-occurrence.js';
+import { withoutGoneEvents } from '../services/reminder-deleted-occurrence.js';
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 import { asksHouseholdAudience } from '../services/visibility.js';
 import { moveNoticeFields } from '../services/shopping-move-notices.js';
@@ -341,7 +341,7 @@ function callerReminders(req, {
   // Ein geloeschtes erstes Vorkommen einer Serie meldet sich ebenfalls nicht
   // (#2470, services/reminder-deleted-occurrence.js) - vor dem Limit, damit
   // eine solche Zeile keine sichtbare aus `/upcoming` verdraengt.
-  const rows = withoutDeletedFirstOccurrence(
+  const rows = withoutGoneEvents(
     db.get(),
     withoutSwitchedOffModules(db.get(), found),
   ).slice(0, limit);

@@ -823,3 +823,41 @@ test('ein Wert mit Schlusspunkt am Satzende ergibt keinen doppelten Punkt', asyn
     }
   }
 });
+
+// #2533: der Wochenstart des Haushalts liegt neben Datums- und Zeitformat in
+// i18n.js, damit der Datepicker ihn ohne eigene Abfrage lesen kann. Gefahren
+// wird die echte i18n.js; dazu die zwei Stellen, die ihn spiegeln.
+test('getWeekStart/setWeekStart: haushaltsweiter Wochenstart fuer Komponenten (#2533)', async () => {
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const store = new Map();
+  const define = (value) => Object.defineProperty(globalThis, 'localStorage', { value, configurable: true, writable: true });
+  define({
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => { store.set(key, String(value)); },
+    removeItem: (key) => { store.delete(key); },
+  });
+  try {
+    const i18n = await import('../public/i18n.js');
+    assert.equal(i18n.getWeekStart(), 'monday', 'ohne Wert gilt Montag wie auf dem Server');
+    for (const value of ['sunday', 'saturday', 'monday']) {
+      i18n.setWeekStart(value);
+      assert.equal(i18n.getWeekStart(), value);
+    }
+    i18n.setWeekStart('friday');
+    assert.equal(i18n.getWeekStart(), 'monday', 'ein unbekannter Wert wird nicht geschrieben');
+    store.set('yuvomi-week-start', 'tuesday');
+    assert.equal(i18n.getWeekStart(), 'monday', 'ein unbekannter gespeicherter Wert faellt auf Montag');
+    define({ getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } });
+    assert.doesNotThrow(() => i18n.setWeekStart('sunday'), 'gesperrter Storage wirft nicht');
+    assert.equal(i18n.getWeekStart(), 'monday', 'gesperrter Storage liefert den Default');
+  } finally {
+    if (saved) Object.defineProperty(globalThis, 'localStorage', saved);
+    else delete globalThis.localStorage;
+  }
+  const { withoutCommentsKeepingLines } = await import('./source-text.js');
+  const router = withoutCommentsKeepingLines(readFileSync(new URL('../public/router.js', import.meta.url), 'utf8'));
+  const apply = router.slice(router.indexOf('function applyStartPreferences('), router.indexOf('async function syncThirdPartyModules('));
+  assert.match(apply, /setWeekStart\(res\.data\.week_start\)/, 'der Router spiegelt week_start beim Start');
+  const settings = withoutCommentsKeepingLines(readFileSync(new URL('../public/settings/pages/modules-calendar.js', import.meta.url), 'utf8'));
+  assert.match(settings, /savePreferences\(\{ week_start: value \}\);\s*setWeekStart\(value\);/, 'die Einstellung spiegelt nach dem Speichern');
+});

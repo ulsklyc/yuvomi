@@ -258,6 +258,7 @@ const taskProperties = {
   external_uid: { type: ['string', 'null'] },
   external_account_id: { type: ['integer', 'null'] },
   external_object_url: { type: ['string', 'null'] },
+  external_rrule: { type: ['string', 'null'], description: 'RRULE of a series another app owns (iOS Reminders, Tasks.org), as that app wrote it; null otherwise. A rule Yuvomi can follow also arrives as `is_recurring`/`recurrence_rule`, and ticking the task off then moves the series on in that app. Otherwise ticking it off answers 409 `task_foreign_series` (#2506, #2515).' },
   target_caldav_account_id: { type: ['integer', 'null'], description: 'The reminder list a local task is sent to.' },
   target_caldav_list_url: { type: ['string', 'null'] },
   outbound_dirty: flag(SYNC_BOOKKEEPING),
@@ -268,17 +269,28 @@ const taskProperties = {
   assigned_avatar: avatarField('Picture of `assigned_to`.'),
   assigned_users: { type: 'array', items: { $ref: '#/components/schemas/AssignedPerson' } },
   tags: { type: 'array', items: { type: 'string' }, description: 'Free-form labels, distinct from the single `category`.' },
+  rotation_mode: { type: ['string', 'null'], enum: ['round_robin', null], description: 'Rotation of a recurring series (#1763): `round_robin` hands every follow-up instance to the next member of `rotation_pool` in a fixed order, null without rotation.' },
+  rotation_last_user: { type: ['integer', 'null'], description: 'Informational: the member the pointer names. The order reads `rotation_last_position`, never this field.' },
+  rotation_last_position: { type: ['integer', 'null'], minimum: 0, description: 'The pointer: the pool position that received the last occurrence, null before the first hand-over.' },
+  rotation_pool: { type: ['array', 'null'], items: { type: 'integer' }, description: 'Member ids in delivery order, deactivated members included, null when the task does not rotate.' },
+  rotation_next_user: { type: ['integer', 'null'], description: 'The member the next occurrence goes to, by the same rule that hands it out; null when rotation is off or no member can take it.' },
 };
 
 const taskRequired = [
   'id', 'title', 'description', 'category', 'priority', 'status', 'start_date', 'due_date', 'due_time',
   'assigned_to', 'created_by', 'parent_task_id', 'is_recurring', 'recurrence_rule', 'points', 'visibility',
   'countdown', 'locked', 'archived_at', 'created_at', 'updated_at', 'external_source',
+  'rotation_mode', 'rotation_last_user', 'rotation_last_position',
   'assigned_name', 'assigned_color', 'assigned_avatar', 'assigned_users', 'tags',
 ];
 
 // `urgentTasks` der Uebersicht liest `t.*` mit den Zugewiesenen, ohne Bild und Tags.
-const { assigned_avatar: _assignedAvatar, tags: _tags, ...dashboardTaskProperties } = taskProperties;
+const {
+  assigned_avatar: _assignedAvatar, tags: _tags,
+  // Pool und naechster Kopf haengt erst attachRotation an (routes/tasks.js), die Uebersicht nicht.
+  rotation_pool: _rotationPool, rotation_next_user: _rotationNextUser,
+  ...dashboardTaskProperties
+} = taskProperties;
 
 const DOCUMENT_COUNT_FIELD = {
   type: ['integer', 'null'],
@@ -322,6 +334,8 @@ const taskInputProperties = {
   visibility: { ...taskVisibility, description: 'An unknown value falls back to `all` on create and keeps the stored one on update, without an error.' },
   countdown: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
   locked: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
+  rotation_mode: { type: ['string', 'null'], enum: ['round_robin', null], description: 'Requires a recurring task and a pool of at least 2 household members (400 otherwise). Null clears mode, pool and pointer. Omitted on update, the rotation stays.' },
+  rotation_pool: { type: 'array', maxItems: 10, items: { type: 'integer', minimum: 1 }, description: 'Member ids, the list order is the delivery order. On update it is merged with the stored pool: a deactivated member left out keeps its place.' },
   sync_target: {
     type: ['string', 'null'],
     description: '`caldav:<accountId>|<listUrl>` from `GET /tasks/sync-targets`, or null or empty for local only. Ignored on a subtask, and on update once the task is on the server.',
@@ -1201,6 +1215,10 @@ export const schemas = {
             },
             external_calendar_id: { type: ['string', 'null'] },
             external_object_url: { type: ['string', 'null'] },
+            provider_status: {
+              type: ['string', 'null'],
+              description: 'The event status an ICS subscription, CalDAV or iCloud reports: `TENTATIVE`, `CONFIRMED` or `CANCELLED`, null when the provider sends none and for every other event. A `CANCELLED` event stays in the calendar answers but reminds no one and is left out of `GET /calendar/upcoming`, the dashboard and the countdowns.',
+            },
             subscription_id: { type: ['integer', 'null'], description: 'The ICS subscription the event came from.' },
             calendar_ref_id: { type: ['integer', 'null'], description: 'The synced calendar the event came from.' },
             caldav_account_id: { type: ['integer', 'null'] },

@@ -1089,3 +1089,102 @@ test('PUT und PATCH fragen dieselbe Regel: die Route formuliert sie nicht ein zw
   const routeOf = (index) => [...src.slice(0, index).matchAll(/^router\.(\w+)\('([^']+)'/gm)].at(-1).slice(1, 3).join(' ');
   assert.deepEqual(callers.map((m) => routeOf(m.index)).sort(), ['patch /:id/status', 'put /:id']);
 });
+
+// --------------------------------------------------------
+// Fremde Serie (#2506, #2515): abhaken nur in der besitzenden App
+// --------------------------------------------------------
+// Eine Serie aus iOS Erinnerungen oder Tasks.org fuehrt ihre Regel dort
+// (`external_rrule`). Haekte Yuvomi sie ab, ginge COMPLETED auf den Master,
+// und die andere App beendete die ganze Serie. Beide Schreibwege sagen 409.
+
+function insertForeignSeries(title) {
+  return insertTask({
+    title, status: 'open', due_date: dayKey(1), created_by: uid,
+    external_uid: `${title}@phone`, external_source: 'caldav',
+    external_rrule: 'FREQ=MONTHLY;BYMONTHDAY=15',
+  });
+}
+
+test('PATCH done auf einer fremden Serie: 409 task_foreign_series, nichts aendert sich (#2506)', async () => {
+  const id = insertForeignSeries('Miete pruefen');
+  const res = await call('PATCH', `/${id}/status`, { status: 'done' });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.reason, 'task_foreign_series');
+  const row = db.prepare('SELECT status, outbound_dirty FROM tasks WHERE id = ?').get(id);
+  assert.equal(row.status, 'open');
+  assert.equal(row.outbound_dirty, 0, 'nichts wartet auf den Push');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM task_completions WHERE task_id = ?').get(id).n, 0);
+
+  // Alles andere bleibt erlaubt: in Arbeit setzen und ablegen.
+  assert.equal((await call('PATCH', `/${id}/status`, { status: 'in_progress' })).status, 200);
+  assert.equal((await call('PATCH', `/${id}/status`, { status: 'archived' })).status, 200);
+});
+
+test('PUT mit status done auf einer fremden Serie: 409, Titel und Status bleiben (#2506)', async () => {
+  const id = insertForeignSeries('Pflanzen duengen');
+  const res = await call('PUT', `/${id}`, { title: 'Pflanzen duengen!', status: 'done' });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.reason, 'task_foreign_series');
+  const row = db.prepare('SELECT title, status FROM tasks WHERE id = ?').get(id);
+  assert.deepEqual({ ...row }, { title: 'Pflanzen duengen', status: 'open' });
+
+  // Eine Bearbeitung ohne Abhaken geht durch.
+  assert.equal((await call('PUT', `/${id}`, { title: 'Pflanzen duengen!' })).status, 200);
+});
+
+test('Ist das Konto geloescht, gehoert die Serie keiner anderen App mehr: Abhaken geht (#2506)', async () => {
+  // Review auf #2542: deleteAccount() behaelt die Aufgaben und loest sie nur vom
+  // Konto (detachAccountRows). Bliebe external_rrule stehen, waere die Aufgabe
+  // fuer immer gesperrt - es gibt keinen Abruf mehr, der die Regel nachfuehrt.
+  const { deleteAccount } = await import('../server/services/caldav-sync.js');
+  const accountId = Number(db.prepare(`INSERT INTO caldav_accounts (name, caldav_url, username, password)
+    VALUES ('Telefon', 'https://dav.example/', 'u', 'p')`).run().lastInsertRowid);
+  const id = insertForeignSeries('Zaehler ablesen');
+  db.prepare('UPDATE tasks SET external_account_id = ? WHERE id = ?').run(accountId, id);
+  assert.equal((await call('PATCH', `/${id}/status`, { status: 'done' })).status, 409, 'Vorbedingung');
+
+  deleteAccount(accountId);
+  assert.equal(db.prepare('SELECT external_rrule FROM tasks WHERE id = ?').get(id).external_rrule, null);
+  assert.equal((await call('PATCH', `/${id}/status`, { status: 'done' })).status, 200);
+});
+
+// Eine abbildbare fremde Regel (#2506, PR 2) liest der Inbound als Serie ein:
+// dann fuehrt Yuvomi sie weiter, und das Abhaken geht. Gesperrt bleibt sie,
+// sobald sie hier keine Serie mehr ist - auch im selben PUT, der abhakt.
+function insertMappedForeignSeries(title) {
+  return insertTask({
+    title, status: 'open', due_date: dayKey(1), created_by: uid,
+    external_uid: `${title}@phone`, external_source: 'caldav',
+    external_rrule: 'FREQ=WEEKLY;INTERVAL=1', is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY',
+  });
+}
+
+test('Abbildbare fremde Serie: PATCH done geht und legt die Folgeinstanz an (#2506)', async () => {
+  const id = insertMappedForeignSeries('Altpapier');
+  const res = await call('PATCH', `/${id}/status`, { status: 'done' });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(res.body.data.next_due_date, dayKey(8));
+});
+
+test('Abbildbare fremde Serie: wer im selben PUT die Wiederholung abschaltet, bekommt 409 (#2506)', async () => {
+  const id = insertMappedForeignSeries('Glas wegbringen');
+  const res = await call('PUT', `/${id}`, { status: 'done', is_recurring: false, recurrence_rule: null });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.reason, 'task_foreign_series');
+  assert.equal(db.prepare('SELECT status, is_recurring FROM tasks WHERE id = ?').get(id).is_recurring, 1);
+});
+
+test('Abbildbare fremde Serie: wer im selben PUT eine Uhrzeit setzt und abhakt, bekommt 409 (Review #2543)', async () => {
+  // Ein Ende gilt nur an einer Serie ohne Uhrzeit. Der Guard muss die neue
+  // Uhrzeit sehen, sonst legte der Spawn eine zweite Serie an.
+  const id = insertTask({
+    title: 'Restmuell', status: 'open', due_date: dayKey(1), created_by: uid,
+    external_uid: 'restmuell@phone', external_source: 'caldav',
+    external_rrule: 'FREQ=WEEKLY;UNTIL=20991231', is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY;UNTIL=20991231',
+  });
+  const res = await call('PUT', `/${id}`, { status: 'done', due_time: '08:00' });
+  assert.equal(res.status, 409);
+  const row = db.prepare('SELECT status, due_time FROM tasks WHERE id = ?').get(id);
+  assert.deepEqual({ ...row }, { status: 'open', due_time: null });
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM tasks WHERE recurrence_origin_id = ?').get(id).n, 0);
+});

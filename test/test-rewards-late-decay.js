@@ -56,7 +56,7 @@ function earnRows(taskId) {
 // ----------------------------------------------------------
 // Schema
 // ----------------------------------------------------------
-test('Migration 277: reward_ledger hat decay_days und base_points', () => {
+test('Migration 282: reward_ledger hat decay_days und base_points', () => {
   const cols = db.prepare('PRAGMA table_info(reward_ledger)').all().map((c) => c.name);
   assert.ok(cols.includes('decay_days'));
   assert.ok(cols.includes('base_points'));

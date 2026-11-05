@@ -18,6 +18,7 @@ import {
 } from './visibility.js';
 import { birthdaysSwitchedOff, notBirthdayEventSql } from './household-modules.js';
 import { calendarSelectionSql } from './calendar-selection.js';
+import { notCancelledEventSql } from './reminder-deleted-occurrence.js';
 import {
   householdTimeZone, localToUTC, shiftDateKey, storedToInstantMs, todayKey,
 } from '../utils/timezone.js';
@@ -31,6 +32,9 @@ export const RESOLVER_EVENT_COLUMNS = Object.freeze([
   'recurrence_rule', 'visibility', 'countdown', 'attachment_name',
   'attachment_mime', 'attachment_size', 'attachment_document_id', 'tzid',
   'recurrence_parent_id', 'recurrence_id', 'overridden_fields',
+  // Die Absage des Anbieters (#2499): der Kalender zeigt den Termin
+  // durchgestrichen, die Sammelflaechen lassen ihn per SQL aus.
+  'provider_status',
 ]);
 
 export const BODY_FREE_EVENT_COLUMNS = Object.freeze([
@@ -299,6 +303,8 @@ export function getUpcomingEvents(d, {
       (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
     )
     AND ${audience.where}${birthdaySql}${selection.sql}
+    -- Vom Anbieter abgesagt (#2499): steht nur im Kalender, durchgestrichen.
+    AND ${notCancelledEventSql(d)}
     ORDER BY e.start_datetime ASC
   `).all(...singleParams, future, ...audience.params, ...selection.params);
 
@@ -477,6 +483,8 @@ export function getEventsOverlappingDays(d, {
       (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
     )
     AND ${audience.where}${birthdaySql}${selection.sql}
+    -- Vom Anbieter abgesagt (#2499): steht nur im Kalender, durchgestrichen.
+    AND ${notCancelledEventSql(d)}
     ORDER BY e.start_datetime ASC
   `).all(sqlTo, sqlFrom, sqlTo, ...audience.params, ...selection.params);
 
