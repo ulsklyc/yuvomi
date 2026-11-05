@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Late completion decay (opt-in).** Households can have late completions pay less: administrators
+  switch it on in the rewards settings, off by default. A task ticked off after its due day earns one
+  point less for each day it is past due, and always at least one point - finishing still pays. What a
+  completion earned stands with the booking: later changes of the due date, the point value or the
+  setting never rewrite booked amounts, and for every late earning the ledger shows the base it came
+  from and how many days it was late.
 - **Administrators set night hours and screensaver options for each wall tablet.**
   Settings > Wall tablets offers each tablet's night window, idle delay, clock and photo
   fill. Online tablets pick up changes automatically; existing local choices stay in use

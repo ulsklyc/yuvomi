@@ -988,6 +988,29 @@ function ledgerReason(row) {
   return t(`rewards.ledgerType.${row.type}`);
 }
 
+/* SPAETABZUG (tasks_late_decay_enabled): Hat eine Erledigung nach der Faelligkeit
+ * Punkte verloren, traegt die Zeile ihre Erklaerung selbst - der volle Wert steht
+ * durchgestrichen neben dem ausgezahlten, die Meta-Zeile nennt den Grund in
+ * zurueckhaltender Sekundaerfarbe. Ohne `decay_days` (der Regelfall) bleibt die
+ * Zeile unveraendert. */
+function decayDaysOf(row) {
+  const days = Number(row?.decay_days) || 0;
+  return days > 0 ? days : 0;
+}
+function decayBaseHtml(row) {
+  if (!decayDaysOf(row)) return '';
+  // Fuer Sehende durchgestrichen; Screen-Reader kennen kein <s> - der Grundwert
+  // bekommt deshalb eine eigene Ansage ("statt 5") als blendenter Text.
+  const base = Math.abs(Number(row.base_points) || 0);
+  return `<s class="rw-delta__base" aria-hidden="true">${fmtPoints(base)}</s>`
+       + `<span class="sr-only"> ${esc(t('rewards.ledgerLateDecayInsteadOf', { count: base }))}</span> `;
+}
+function decayNoteHtml(row) {
+  const days = decayDaysOf(row);
+  if (!days) return '';
+  return ` · <span class="rw-ledger-row__decay">${esc(t('rewards.ledgerLateDecayNote', { count: days }))}</span>`;
+}
+
 /** Eine Buchungszeile - der Verlauf und die Seitenspalte der Uebersicht teilen sie.
  * Sie ist eine `.list-row` im `.row-carrier` (list-row.css): Zeichen | Grund +
  * Meta | Punkte. Bis R16 baute rewards.css Traeger, Zeile, Trennlinie und
@@ -999,9 +1022,9 @@ function ledgerRowHtml(row) {
         <span class="rw-ledger-row__icon rw-ledger-row__icon--${esc(row.type)}"><i data-lucide="${LEDGER_ICON[row.type] || 'circle'}" aria-hidden="true"></i></span>
         <div class="list-row__main">
           <p class="list-row__name rw-ledger-row__reason">${esc(ledgerReason(row))}</p>
-          <p class="list-row__meta rw-ledger-row__meta">${esc(row.user_name)} · ${esc(dateText(row.created_at))}</p>
+          <p class="list-row__meta rw-ledger-row__meta">${esc(row.user_name)} · ${esc(dateText(row.created_at))}${decayNoteHtml(row)}</p>
         </div>
-        <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
+        <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${decayBaseHtml(row)}${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
       </li>`;
 }
 
@@ -1535,8 +1558,8 @@ async function openMemberDetail(memberId) {
     const positive = row.delta > 0;
     return `<li class="list-row rw-ledger-row rw-ledger-row--compact">
       <span class="rw-ledger-row__icon rw-ledger-row__icon--${esc(row.type)}"><i data-lucide="${LEDGER_ICON[row.type] || 'circle'}" aria-hidden="true"></i></span>
-      <div class="list-row__main"><p class="list-row__name rw-ledger-row__reason">${esc(ledgerReason(row))}</p><p class="list-row__meta rw-ledger-row__meta">${esc(dateText(row.created_at))}</p></div>
-      <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
+      <div class="list-row__main"><p class="list-row__name rw-ledger-row__reason">${esc(ledgerReason(row))}</p><p class="list-row__meta rw-ledger-row__meta">${esc(dateText(row.created_at))}${decayNoteHtml(row)}</p></div>
+      <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${decayBaseHtml(row)}${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
     </li>`;
   }).join('') : `<li class="list-row rw-ledger-row rw-ledger-row--compact"><p class="list-row__meta rw-ledger-row__meta">${esc(t('rewards.emptyLedgerBody'))}</p></li>`;
   const canRedeem = actingAsDisplay()
