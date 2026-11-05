@@ -3881,7 +3881,14 @@
         "icsErrorUrlScheme": "يجب أن يبدأ العنوان بـ https://.",
         "icsErrorPrivateAddress": "هذا العنوان يقع في شبكة خاصة ولا يُجلب لأسباب أمنية. استخدم عنوانًا متاحًا للعموم.",
         "icsErrorHttpStatus": "لم يقدّم العنوان تقويمًا (الاستجابة {{status}}). تحقق من العنوان أو حاول مرة أخرى لاحقًا.",
-        "icsErrorTooLarge": "التقويم في هذا العنوان أكبر من {{limit_mb}} ميغابايت ولا يمكن جلبه."
+        "icsErrorTooLarge": "التقويم في هذا العنوان أكبر من {{limit_mb}} ميغابايت ولا يمكن جلبه.",
+        "backupRestoreErrorFileEmpty": "الملف المحدد فارغ. اختر ملف النسخة الاحتياطية الذي نزّله Yuvomi. لم يتغير شيء هنا.",
+        "backupRestoreErrorNotYuvomi": "الملف قاعدة بيانات، لكنه ليس من Yuvomi. اختر ملف نسخة احتياطية نزّله Yuvomi. لم يتغير شيء هنا.",
+        "backupRestoreErrorNewerVersion": "هذه النسخة الاحتياطية من إصدار أحدث من Yuvomi. حدّث Yuvomi أولًا، ثم استعدها. لم يتغير شيء هنا.",
+        "backupRestoreErrorTooLarge": "الملف أكبر من حد الرفع في هذا التثبيت ({{limit}}). ارفع قيمة BACKUP_UPLOAD_LIMIT وأعد تشغيل Yuvomi ثم استعد النسخة مرة أخرى. لم يتغير شيء هنا.",
+        "apiTokenErrorNameTooLong": "يجب ألا يزيد الاسم عن 100 حرف.",
+        "apiTokenErrorExpiryPast": "تاريخ الانتهاء في الماضي. اختر وقتًا لاحقًا.",
+        "apiTokenErrorSubjectDeactivated": "هذا الحساب معطّل ولا يمكن أن يحصل على رمز. اختر شخصًا آخر."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",

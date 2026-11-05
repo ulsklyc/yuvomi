@@ -3541,7 +3541,14 @@
         "icsErrorUrlScheme": "アドレスは https:// で始まる必要があります。",
         "icsErrorPrivateAddress": "このアドレスはプライベートネットワーク内にあるため、安全のため取得しません。公開されているアドレスを使用してください。",
         "icsErrorHttpStatus": "このアドレスからカレンダーを取得できませんでした（応答 {{status}}）。アドレスを確認するか、後でもう一度お試しください。",
-        "icsErrorTooLarge": "このアドレスのカレンダーは{{limit_mb}}MBを超えているため取得できません。"
+        "icsErrorTooLarge": "このアドレスのカレンダーは{{limit_mb}}MBを超えているため取得できません。",
+        "backupRestoreErrorFileEmpty": "選択したファイルは空です。Yuvomi がダウンロードしたバックアップファイルを選んでください。ここでは何も変更されていません。",
+        "backupRestoreErrorNotYuvomi": "このファイルはデータベースですが、Yuvomi のものではありません。Yuvomi がダウンロードしたバックアップファイルを選んでください。ここでは何も変更されていません。",
+        "backupRestoreErrorNewerVersion": "このバックアップは新しいバージョンの Yuvomi で作成されています。先に Yuvomi を更新してから復元してください。ここでは何も変更されていません。",
+        "backupRestoreErrorTooLarge": "ファイルがこのインストールのアップロード上限（{{limit}}）を超えています。BACKUP_UPLOAD_LIMIT を引き上げて Yuvomi を再起動し、もう一度復元してください。ここでは何も変更されていません。",
+        "apiTokenErrorNameTooLong": "名前は100文字以内にしてください。",
+        "apiTokenErrorExpiryPast": "有効期限が過去になっています。もっと後の日時を選んでください。",
+        "apiTokenErrorSubjectDeactivated": "このアカウントは無効化されているため、トークンを発行できません。別の人を選んでください。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

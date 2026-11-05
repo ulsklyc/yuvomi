@@ -3559,7 +3559,14 @@
         "icsErrorUrlScheme": "Alamat harus diawali https://.",
         "icsErrorPrivateAddress": "Alamat ini berada di jaringan pribadi dan demi keamanan tidak diambil. Gunakan alamat yang dapat diakses publik.",
         "icsErrorHttpStatus": "Alamat tidak memberikan kalender (respons {{status}}). Periksa alamatnya atau coba lagi nanti.",
-        "icsErrorTooLarge": "Kalender di alamat ini lebih besar dari {{limit_mb}} MB dan tidak dapat diambil."
+        "icsErrorTooLarge": "Kalender di alamat ini lebih besar dari {{limit_mb}} MB dan tidak dapat diambil.",
+        "backupRestoreErrorFileEmpty": "File yang dipilih kosong. Pilih file cadangan yang diunduh Yuvomi. Tidak ada yang diubah di sini.",
+        "backupRestoreErrorNotYuvomi": "File ini adalah database, tetapi bukan milik Yuvomi. Pilih file cadangan yang diunduh Yuvomi. Tidak ada yang diubah di sini.",
+        "backupRestoreErrorNewerVersion": "Cadangan ini berasal dari versi Yuvomi yang lebih baru. Perbarui Yuvomi terlebih dahulu, lalu pulihkan. Tidak ada yang diubah di sini.",
+        "backupRestoreErrorTooLarge": "File lebih besar dari batas unggah instalasi ini ({{limit}}). Naikkan BACKUP_UPLOAD_LIMIT, mulai ulang Yuvomi, lalu pulihkan lagi. Tidak ada yang diubah di sini.",
+        "apiTokenErrorNameTooLong": "Nama paling banyak 100 karakter.",
+        "apiTokenErrorExpiryPast": "Tanggal kedaluwarsa sudah lewat. Pilih waktu yang lebih lambat.",
+        "apiTokenErrorSubjectDeactivated": "Akun ini dinonaktifkan dan tidak bisa mendapat token. Pilih orang lain."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

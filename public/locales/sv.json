@@ -3541,7 +3541,14 @@
         "icsErrorUrlScheme": "Adressen måste börja med https://.",
         "icsErrorPrivateAddress": "Den här adressen ligger i ett privat nätverk och hämtas inte av säkerhetsskäl. Använd en offentligt nåbar adress.",
         "icsErrorHttpStatus": "Adressen lämnade ingen kalender (svar {{status}}). Kontrollera adressen eller försök igen senare.",
-        "icsErrorTooLarge": "Kalendern på den här adressen är större än {{limit_mb}} MB och kan inte hämtas."
+        "icsErrorTooLarge": "Kalendern på den här adressen är större än {{limit_mb}} MB och kan inte hämtas.",
+        "backupRestoreErrorFileEmpty": "Den valda filen är tom. Välj säkerhetskopian som Yuvomi laddade ner. Inget har ändrats här.",
+        "backupRestoreErrorNotYuvomi": "Filen är en databas, men inte från Yuvomi. Välj en säkerhetskopia som Yuvomi laddade ner. Inget har ändrats här.",
+        "backupRestoreErrorNewerVersion": "Den här säkerhetskopian kommer från en nyare version av Yuvomi. Uppdatera Yuvomi först och återställ den sedan. Inget har ändrats här.",
+        "backupRestoreErrorTooLarge": "Filen är större än uppladdningsgränsen för den här installationen ({{limit}}). Höj BACKUP_UPLOAD_LIMIT, starta om Yuvomi och återställ igen. Inget ändrades här.",
+        "apiTokenErrorNameTooLong": "Namnet får vara högst 100 tecken långt.",
+        "apiTokenErrorExpiryPast": "Utgångsdatumet har redan passerat. Välj en senare tidpunkt.",
+        "apiTokenErrorSubjectDeactivated": "Det här kontot är inaktiverat och kan inte få en token. Välj en annan person."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

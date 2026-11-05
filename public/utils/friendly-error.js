@@ -420,6 +420,13 @@ export const CASE_MESSAGES = new Map([
   ['oidc_already_linked', 'settings.oidcLinkError_already_linked'],
   ['oidc_not_linked', 'settings.oidcUnlinkNotLinked'],
   ['oidc_password_required', 'settings.oidcUnlinkNeedsPassword'],
+  // Seite API-Zugriff (#1909): was das Formular zum Anlegen eines Tokens
+  // erreicht. Der Name ist `required`, besteht er nur aus Leerzeichen, kommt er
+  // leer an; die Person kann ein anderer Admin inzwischen geloescht haben.
+  ['api_tokens_name_required', 'quickLinks.nameRequired'],
+  ['api_tokens_name_too_long', 'settings.apiTokenErrorNameTooLong'],
+  ['api_tokens_expiry_past', 'settings.apiTokenErrorExpiryPast'],
+  ['api_tokens_subject_unknown', 'settings.syncAssigneeUnknown'],
   // Seite Wandtablets (#1909): ein zweiter Admin hat das Tablett oder sein
   // Geraet schon entfernt. Beide stehen auch in GONE_REASONS: die Seite laedt
   // die Liste nach.

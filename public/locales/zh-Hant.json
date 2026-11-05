@@ -3541,7 +3541,14 @@
         "icsErrorUrlScheme": "網址必須以 https:// 開頭。",
         "icsErrorPrivateAddress": "該網址位於私人網路中，基於安全考量不會取得。請使用可公開存取的網址。",
         "icsErrorHttpStatus": "該網址沒有提供日曆（回應 {{status}}）。請檢查網址或稍後再試。",
-        "icsErrorTooLarge": "該網址的日曆超過 {{limit_mb}} MB，無法取得。"
+        "icsErrorTooLarge": "該網址的日曆超過 {{limit_mb}} MB，無法取得。",
+        "backupRestoreErrorFileEmpty": "所選檔案是空的。請選擇 Yuvomi 下載的備份檔案。這裡沒有任何變更。",
+        "backupRestoreErrorNotYuvomi": "這個檔案是資料庫，但不是 Yuvomi 的。請選擇 Yuvomi 下載的備份檔案。這裡沒有任何變更。",
+        "backupRestoreErrorNewerVersion": "這份備份來自較新版本的 Yuvomi。請先更新 Yuvomi，再進行還原。這裡沒有任何變更。",
+        "backupRestoreErrorTooLarge": "檔案超過此安裝的上傳上限（{{limit}}）。請提高 BACKUP_UPLOAD_LIMIT，重新啟動 Yuvomi 後再還原一次。這裡沒有做任何變更。",
+        "apiTokenErrorNameTooLong": "名稱最多 100 個字元。",
+        "apiTokenErrorExpiryPast": "到期日已經過去。請選擇較晚的時間。",
+        "apiTokenErrorSubjectDeactivated": "此帳號已停用，無法取得權杖。請選擇其他人。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

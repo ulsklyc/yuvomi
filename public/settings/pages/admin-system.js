@@ -8,7 +8,7 @@ import {
   createStatusSummary,
   settingRowHtml,
 } from '/settings/components.js';
-import { errorSentence } from '/utils/friendly-error.js';
+import { errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
 
 const APP_NAME_STORAGE_KEY = 'yuvomi-app-name';
 const DEFAULT_APP_NAME = 'Yuvomi';
@@ -151,7 +151,7 @@ async function loadSystemInfo(container) {
     info = await api.get('/version');
   } catch (err) {
     host.replaceChildren(createRetryState({
-      message: err.message || t('common.errorGeneric'),
+      message: loadErrorSentence(err) ?? t('common.errorGeneric'),
       onRetry: reload,
     }));
     return;

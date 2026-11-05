@@ -3785,7 +3785,14 @@
         "icsErrorUrlScheme": "Adres musi zaczynać się od https://.",
         "icsErrorPrivateAddress": "Ten adres znajduje się w sieci prywatnej i ze względów bezpieczeństwa nie jest pobierany. Użyj adresu dostępnego publicznie.",
         "icsErrorHttpStatus": "Adres nie zwrócił kalendarza (odpowiedź {{status}}). Sprawdź adres lub spróbuj ponownie później.",
-        "icsErrorTooLarge": "Kalendarz pod tym adresem jest większy niż {{limit_mb}} MB i nie można go pobrać."
+        "icsErrorTooLarge": "Kalendarz pod tym adresem jest większy niż {{limit_mb}} MB i nie można go pobrać.",
+        "backupRestoreErrorFileEmpty": "Wybrany plik jest pusty. Wybierz plik kopii zapasowej pobrany przez Yuvomi. Nic tu nie zostało zmienione.",
+        "backupRestoreErrorNotYuvomi": "Plik jest bazą danych, ale nie z Yuvomi. Wybierz plik kopii zapasowej pobrany przez Yuvomi. Nic tu nie zostało zmienione.",
+        "backupRestoreErrorNewerVersion": "Ta kopia zapasowa pochodzi z nowszej wersji Yuvomi. Najpierw zaktualizuj Yuvomi, a potem ją przywróć. Nic tu nie zostało zmienione.",
+        "backupRestoreErrorTooLarge": "Plik jest większy niż limit przesyłania tej instalacji ({{limit}}). Zwiększ BACKUP_UPLOAD_LIMIT, uruchom ponownie Yuvomi i przywróć kopię jeszcze raz. Nic tu nie zostało zmienione.",
+        "apiTokenErrorNameTooLong": "Nazwa może mieć najwyżej 100 znaków.",
+        "apiTokenErrorExpiryPast": "Data wygaśnięcia jest w przeszłości. Wybierz późniejszy termin.",
+        "apiTokenErrorSubjectDeactivated": "To konto jest dezaktywowane i nie może otrzymać tokenu. Wybierz inną osobę."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

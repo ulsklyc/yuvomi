@@ -3541,7 +3541,14 @@
         "icsErrorUrlScheme": "L’adresse doit commencer par https://.",
         "icsErrorPrivateAddress": "Cette adresse se trouve sur un réseau privé et n’est pas consultée pour des raisons de sécurité. Utilise une adresse accessible publiquement.",
         "icsErrorHttpStatus": "L’adresse n’a pas fourni de calendrier (réponse {{status}}). Vérifie l’adresse ou réessaie plus tard.",
-        "icsErrorTooLarge": "Le calendrier à cette adresse dépasse {{limit_mb}} Mo et ne peut pas être récupéré."
+        "icsErrorTooLarge": "Le calendrier à cette adresse dépasse {{limit_mb}} Mo et ne peut pas être récupéré.",
+        "backupRestoreErrorFileEmpty": "Le fichier sélectionné est vide. Choisis le fichier de sauvegarde téléchargé par Yuvomi. Rien n’a été modifié ici.",
+        "backupRestoreErrorNotYuvomi": "Le fichier est une base de données, mais pas une base Yuvomi. Choisis un fichier de sauvegarde téléchargé par Yuvomi. Rien n’a été modifié ici.",
+        "backupRestoreErrorNewerVersion": "Cette sauvegarde provient d’une version plus récente de Yuvomi. Mets d’abord Yuvomi à jour, puis restaure-la. Rien n’a été modifié ici.",
+        "backupRestoreErrorTooLarge": "Le fichier dépasse la limite d'envoi de cette installation ({{limit}}). Augmentez BACKUP_UPLOAD_LIMIT, redémarrez Yuvomi puis relancez la restauration. Rien n'a été modifié ici.",
+        "apiTokenErrorNameTooLong": "Le nom peut comporter au maximum 100 caractères.",
+        "apiTokenErrorExpiryPast": "La date d’expiration est dans le passé. Choisis un moment ultérieur.",
+        "apiTokenErrorSubjectDeactivated": "Ce compte est désactivé et ne peut pas recevoir de jeton. Choisis une autre personne."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

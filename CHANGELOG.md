@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **Backup, system and API settings say what went wrong in your language** (#1909). Restoring an
+  empty file, a database that is not from Yuvomi or a backup from a newer version showed the
+  server's English text; it now says what to do next. Creating an API token with a past expiry
+  date or for a person who no longer exists or was deactivated, and load errors on the three
+  pages, are explained in your language too. API clients get the cases as `reason`.
 - **Date pickers start the week on the household week start** (#2533). With Sunday or Saturday
   set as the week start in the calendar settings, the calendar sheet of every date field (events,
   tasks, budget, health and the others) showed Monday-first weeks. Its weekday header and the

@@ -3541,7 +3541,14 @@
         "icsErrorUrlScheme": "A címnek https:// előtaggal kell kezdődnie.",
         "icsErrorPrivateAddress": "Ez a cím magánhálózatban van, ezért biztonsági okból nem kérjük le. Használj nyilvánosan elérhető címet.",
         "icsErrorHttpStatus": "A cím nem adott naptárt (válasz: {{status}}). Ellenőrizd a címet, vagy próbáld újra később.",
-        "icsErrorTooLarge": "Az ezen a címen található naptár nagyobb, mint {{limit_mb}} MB, ezért nem kérhető le."
+        "icsErrorTooLarge": "Az ezen a címen található naptár nagyobb, mint {{limit_mb}} MB, ezért nem kérhető le.",
+        "backupRestoreErrorFileEmpty": "A kiválasztott fájl üres. Válaszd ki a Yuvomi által letöltött biztonsági mentést. Itt semmi sem változott.",
+        "backupRestoreErrorNotYuvomi": "A fájl adatbázis, de nem a Yuvomié. Válassz egy biztonsági mentést, amelyet a Yuvomi töltött le. Itt semmi sem változott.",
+        "backupRestoreErrorNewerVersion": "Ez a biztonsági mentés a Yuvomi egy újabb verziójából származik. Előbb frissítsd a Yuvomit, aztán állítsd vissza. Itt semmi sem változott.",
+        "backupRestoreErrorTooLarge": "A fájl nagyobb, mint ennek a telepítésnek a feltöltési korlátja ({{limit}}). Növeld a BACKUP_UPLOAD_LIMIT értékét, indítsd újra a Yuvomit, majd állítsd vissza újra. Itt semmi nem változott.",
+        "apiTokenErrorNameTooLong": "A név legfeljebb 100 karakter hosszú lehet.",
+        "apiTokenErrorExpiryPast": "A lejárati dátum a múltban van. Válassz egy későbbi időpontot.",
+        "apiTokenErrorSubjectDeactivated": "Ez a fiók inaktív, és nem kaphat tokent. Válassz másik személyt."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

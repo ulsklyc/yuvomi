@@ -4,7 +4,7 @@ import { dateTimeText } from '/utils/date-format.js';
 import { confirmModal, whenModalClosed } from '/components/modal.js';
 import { formatCronSchedule } from '/settings/cron-label.js';
 import { wirePasswordToggle } from '/utils/auth-ui.js';
-import { errorSentenceWithDetail, errorSentence } from '/utils/friendly-error.js';
+import { errorSentenceWithDetail, errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
 import {
   backupKeyFieldHtml,
   encodeBackupKey,
@@ -227,7 +227,7 @@ async function loadBackupSchedulerStatus(container) {
   const failWithRetry = (error) => {
     console.error('[Settings] Failed to load backup scheduler status:', error);
     infoContainer.replaceChildren(createRetryState({
-      message: error?.message || t('settings.loadError'),
+      message: loadErrorSentence(error) ?? t('settings.loadError'),
       onRetry: () => loadBackupSchedulerStatus(container),
     }));
   };
@@ -478,7 +478,7 @@ async function loadWebdavConfig(container) {
     console.error('[Settings] Failed to load WebDAV config:', error);
     form.hidden = true;
     const state = createRetryState({
-      message: error?.message || t('settings.loadError'),
+      message: loadErrorSentence(error) ?? t('settings.loadError'),
       onRetry: async () => {
         state.remove();
         form.hidden = false;

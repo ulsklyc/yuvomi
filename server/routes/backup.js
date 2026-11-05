@@ -196,7 +196,7 @@ router.post(
     let backupKey = null;
     try {
       if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-        return res.status(400).json({ error: 'Backup file is required.', code: 400 });
+        return res.status(400).json({ error: 'Backup file is required.', code: 400, reason: 'backup_file_empty' });
       }
       backupKey = backupKeyFromHeader(req);
 
@@ -358,7 +358,7 @@ router.post('/webdav/trigger', requireAdmin, async (req, res) => {
 
 router.use((err, req, res, next) => {
   if (err?.type === 'entity.too.large') {
-    return res.status(413).json({ error: `Backup file is too large. Maximum upload size is ${RESTORE_LIMIT}.`, code: 413 });
+    return res.status(413).json({ error: `Backup file is too large. Maximum upload size is ${RESTORE_LIMIT}.`, code: 413, reason: 'backup_file_too_large', params: { limit: String(RESTORE_LIMIT) } });
   }
   next(err);
 });
