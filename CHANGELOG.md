@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   completion earned stands with the booking: later changes of the due date, the point value or the
   setting never rewrite booked amounts, and for every late earning the ledger shows the base it came
   from and how many days it was late.
+- **Kitchen search is now in the tab bar on phones (#2043).** Recipes and Pantry show a search
+  icon at the right end of the kitchen tab bar, keeping the second header row collapsed until you
+  tap it. Meals and Shopping clear the zone so nothing appears there.
 - **Administrators set night hours and screensaver options for each wall tablet.**
   Settings > Wall tablets offers each tablet's night window, idle delay, clock and photo
   fill. Online tablets pick up changes automatically; existing local choices stay in use
