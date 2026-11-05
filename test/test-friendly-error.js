@@ -614,11 +614,11 @@ test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#
     ['caldav_account_exists', 'settings.cardavErrorDuplicate'],
     ['caldav_no_calendars', 'settings.caldavErrorNoCalendars'],
     ['apple_no_calendars', 'settings.caldavErrorNoCalendars'],
-    ['apple_url_invalid', 'waste.errorSourceUrlNotHttps'],
+    ['apple_url_invalid', 'settings.icsErrorUrlScheme'],
     ['calendar_subscription_name_invalid', 'settings.icsErrorNameInvalid'],
-    ['calendar_ics_url_invalid', 'waste.errorSourceUrlInvalid'],
-    ['calendar_ics_url_scheme', 'waste.errorSourceUrlNotHttps'],
-    ['calendar_ics_private_address', 'waste.errorSourceFetchBlocked'],
+    ['calendar_ics_url_invalid', 'settings.icsErrorUrlInvalid'],
+    ['calendar_ics_url_scheme', 'settings.icsErrorUrlScheme'],
+    ['calendar_ics_private_address', 'settings.icsErrorPrivateAddress'],
   ]) {
     assert.equal(errorSentence(answer(400, SERVER_TEXT, reason)), key, reason);
   }
@@ -629,8 +629,8 @@ test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#
   assert.equal(isGone(answer(404, SERVER_TEXT, 'displays_device_not_found')), true);
   // Status und Groesse eines Feeds kommen als Zahl in den Satz, nie als Text.
   const feed = (reason, params) => Object.assign(new Error(SERVER_TEXT), { status: 400, data: { error: SERVER_TEXT, reason, params } });
-  assert.equal(errorSentence(feed('calendar_ics_http_status', { status: 404 })), 'waste.errorSourceFetchStatus{"status":404}');
-  assert.equal(errorSentence(feed('calendar_ics_too_large', { limit_mb: 10 })), 'waste.errorSourceFetchTooLarge{"limit_mb":10}');
+  assert.equal(errorSentence(feed('calendar_ics_http_status', { status: 404 })), 'settings.icsErrorHttpStatus{"status":404}');
+  assert.equal(errorSentence(feed('calendar_ics_too_large', { limit_mb: 10 })), 'settings.icsErrorTooLarge{"limit_mb":10}');
   assert.equal(errorSentence(feed('calendar_ics_http_status', { status: 'x' }), 'settings.x'), 'settings.x');
 });
 

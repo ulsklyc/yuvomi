@@ -432,16 +432,17 @@ export const CASE_MESSAGES = new Map([
   ['caldav_account_exists', 'settings.cardavErrorDuplicate'],
   ['caldav_no_calendars', 'settings.caldavErrorNoCalendars'],
   ['apple_no_calendars', 'settings.caldavErrorNoCalendars'],
-  ['apple_url_invalid', 'waste.errorSourceUrlNotHttps'],
+  ['apple_url_invalid', 'settings.icsErrorUrlScheme'],
   // Abo anlegen und einmaliger Import: der Abruf eines Feeds scheitert an
-  // denselben Stellen wie der einer Abfuhr-Adresse, und deren Saetze sagen es
-  // ohne ein Wort ueber die Abfuhr - sie gelten hier unveraendert.
+  // denselben Stellen wie der einer Abfuhr-Adresse. Die Saetze lauten gleich,
+  // sind aber eigene Schluessel: die waste.*-Saetze gehoeren den waste_*-
+  // Gruenden (test:waste-routes).
   ['calendar_subscription_name_invalid', 'settings.icsErrorNameInvalid'],
-  ['calendar_ics_url_invalid', 'waste.errorSourceUrlInvalid'],
-  ['calendar_ics_url_scheme', 'waste.errorSourceUrlNotHttps'],
-  ['calendar_ics_private_address', 'waste.errorSourceFetchBlocked'],
-  ['calendar_ics_http_status', 'waste.errorSourceFetchStatus'],
-  ['calendar_ics_too_large', 'waste.errorSourceFetchTooLarge'],
+  ['calendar_ics_url_invalid', 'settings.icsErrorUrlInvalid'],
+  ['calendar_ics_url_scheme', 'settings.icsErrorUrlScheme'],
+  ['calendar_ics_private_address', 'settings.icsErrorPrivateAddress'],
+  ['calendar_ics_http_status', 'settings.icsErrorHttpStatus'],
+  ['calendar_ics_too_large', 'settings.icsErrorTooLarge'],
   // Stichwort einer Aufgabe, von einem anderen Geraet umbenannt oder geloescht.
   ['tasks_tag_not_found', 'tasks.errorTagGone'],
   // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909). Die drei

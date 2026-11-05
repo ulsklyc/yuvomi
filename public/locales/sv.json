@@ -3536,7 +3536,12 @@
         "displayErrorGone": "Den här väggplattan finns inte längre.",
         "displayDeviceErrorGone": "Den här enheten finns inte längre.",
         "caldavErrorNoCalendars": "Ansluten, men det här kontot har inga kalendrar.",
-        "icsErrorNameInvalid": "Ange ett namn på högst 100 tecken."
+        "icsErrorNameInvalid": "Ange ett namn på högst 100 tecken.",
+        "icsErrorUrlInvalid": "Ange kalenderns fullständiga adress. Den börjar med https://.",
+        "icsErrorUrlScheme": "Adressen måste börja med https://.",
+        "icsErrorPrivateAddress": "Den här adressen ligger i ett privat nätverk och hämtas inte av säkerhetsskäl. Använd en offentligt nåbar adress.",
+        "icsErrorHttpStatus": "Adressen lämnade ingen kalender (svar {{status}}). Kontrollera adressen eller försök igen senare.",
+        "icsErrorTooLarge": "Kalendern på den här adressen är större än {{limit_mb}} MB och kan inte hämtas."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

@@ -3536,7 +3536,12 @@
         "displayErrorGone": "Bu duvar tableti artık yok.",
         "displayDeviceErrorGone": "Bu cihaz artık yok.",
         "caldavErrorNoCalendars": "Bağlandı, ancak bu hesapta takvim yok.",
-        "icsErrorNameInvalid": "En fazla 100 karakterlik bir ad gir."
+        "icsErrorNameInvalid": "En fazla 100 karakterlik bir ad gir.",
+        "icsErrorUrlInvalid": "Takvimin tam adresini gir. https:// ile başlar.",
+        "icsErrorUrlScheme": "Adres https:// ile başlamalı.",
+        "icsErrorPrivateAddress": "Bu adres özel bir ağda bulunuyor ve güvenlik nedeniyle alınmıyor. Herkese açık bir adres kullan.",
+        "icsErrorHttpStatus": "Adres bir takvim vermedi (yanıt {{status}}). Adresi kontrol et veya daha sonra yeniden dene.",
+        "icsErrorTooLarge": "Bu adresteki takvim {{limit_mb}} MB'tan büyük ve alınamıyor."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

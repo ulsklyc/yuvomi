@@ -3554,7 +3554,12 @@
         "displayErrorGone": "Tablet dinding ini sudah tidak ada.",
         "displayDeviceErrorGone": "Perangkat ini sudah tidak ada.",
         "caldavErrorNoCalendars": "Terhubung, tetapi akun ini tidak memiliki kalender.",
-        "icsErrorNameInvalid": "Masukkan nama dengan paling banyak 100 karakter."
+        "icsErrorNameInvalid": "Masukkan nama dengan paling banyak 100 karakter.",
+        "icsErrorUrlInvalid": "Masukkan alamat lengkap kalender. Alamatnya diawali https://.",
+        "icsErrorUrlScheme": "Alamat harus diawali https://.",
+        "icsErrorPrivateAddress": "Alamat ini berada di jaringan pribadi dan demi keamanan tidak diambil. Gunakan alamat yang dapat diakses publik.",
+        "icsErrorHttpStatus": "Alamat tidak memberikan kalender (respons {{status}}). Periksa alamatnya atau coba lagi nanti.",
+        "icsErrorTooLarge": "Kalender di alamat ini lebih besar dari {{limit_mb}} MB dan tidak dapat diambil."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

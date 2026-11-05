@@ -3554,7 +3554,12 @@
         "displayErrorGone": "이 벽면 태블릿은 더 이상 없습니다.",
         "displayDeviceErrorGone": "이 기기는 더 이상 없습니다.",
         "caldavErrorNoCalendars": "연결되었지만 이 계정에는 캘린더가 없습니다.",
-        "icsErrorNameInvalid": "100자 이하의 이름을 입력하세요."
+        "icsErrorNameInvalid": "100자 이하의 이름을 입력하세요.",
+        "icsErrorUrlInvalid": "캘린더의 전체 주소를 입력하세요. https:// 로 시작합니다.",
+        "icsErrorUrlScheme": "주소는 https:// 로 시작해야 합니다.",
+        "icsErrorPrivateAddress": "이 주소는 사설 네트워크에 있어 보안상 가져오지 않습니다. 공개적으로 접근할 수 있는 주소를 사용하세요.",
+        "icsErrorHttpStatus": "이 주소에서 캘린더를 받지 못했습니다(응답 {{status}}). 주소를 확인하거나 나중에 다시 시도하세요.",
+        "icsErrorTooLarge": "이 주소의 캘린더는 {{limit_mb}}MB보다 커서 가져올 수 없습니다."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",

@@ -3536,7 +3536,12 @@
         "displayErrorGone": "Deze wandtablet bestaat niet meer.",
         "displayDeviceErrorGone": "Dit apparaat bestaat niet meer.",
         "caldavErrorNoCalendars": "Verbonden, maar dit account heeft geen agenda’s.",
-        "icsErrorNameInvalid": "Voer een naam in van maximaal 100 tekens."
+        "icsErrorNameInvalid": "Voer een naam in van maximaal 100 tekens.",
+        "icsErrorUrlInvalid": "Vul het volledige adres van de kalender in. Het begint met https://.",
+        "icsErrorUrlScheme": "Het adres moet beginnen met https://.",
+        "icsErrorPrivateAddress": "Dit adres ligt in een privénetwerk en wordt om veiligheidsredenen niet opgehaald. Gebruik een openbaar bereikbaar adres.",
+        "icsErrorHttpStatus": "Het adres leverde geen kalender (antwoord {{status}}). Controleer het adres of probeer het later opnieuw.",
+        "icsErrorTooLarge": "De kalender op dit adres is groter dan {{limit_mb}} MB en kan niet worden opgehaald."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

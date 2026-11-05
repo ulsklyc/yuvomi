@@ -3536,7 +3536,12 @@
         "displayErrorGone": "This wall tablet no longer exists.",
         "displayDeviceErrorGone": "This device no longer exists.",
         "caldavErrorNoCalendars": "Connected, but this account has no calendars.",
-        "icsErrorNameInvalid": "Enter a name of at most 100 characters."
+        "icsErrorNameInvalid": "Enter a name of at most 100 characters.",
+        "icsErrorUrlInvalid": "Enter the full address of the calendar. It starts with https://.",
+        "icsErrorUrlScheme": "The address must start with https://.",
+        "icsErrorPrivateAddress": "This address is on a private network and is not fetched for security reasons. Use a publicly reachable address.",
+        "icsErrorHttpStatus": "The address did not deliver a calendar (response {{status}}). Check the address or try again later.",
+        "icsErrorTooLarge": "The calendar at this address is larger than {{limit_mb}} MB and cannot be fetched."
     },
     "login": {
         "tagline": "Welcome back. Your home in one place.",

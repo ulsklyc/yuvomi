@@ -3876,7 +3876,12 @@
         "displayErrorGone": "لم يعد هذا الجهاز اللوحي الجداري موجودًا.",
         "displayDeviceErrorGone": "لم يعد هذا الجهاز موجودًا.",
         "caldavErrorNoCalendars": "تم الاتصال، لكن هذا الحساب لا يحتوي على تقويمات.",
-        "icsErrorNameInvalid": "أدخل اسمًا لا يزيد عن 100 حرف."
+        "icsErrorNameInvalid": "أدخل اسمًا لا يزيد عن 100 حرف.",
+        "icsErrorUrlInvalid": "أدخل العنوان الكامل للتقويم. يبدأ بـ https://.",
+        "icsErrorUrlScheme": "يجب أن يبدأ العنوان بـ https://.",
+        "icsErrorPrivateAddress": "هذا العنوان يقع في شبكة خاصة ولا يُجلب لأسباب أمنية. استخدم عنوانًا متاحًا للعموم.",
+        "icsErrorHttpStatus": "لم يقدّم العنوان تقويمًا (الاستجابة {{status}}). تحقق من العنوان أو حاول مرة أخرى لاحقًا.",
+        "icsErrorTooLarge": "التقويم في هذا العنوان أكبر من {{limit_mb}} ميغابايت ولا يمكن جلبه."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",

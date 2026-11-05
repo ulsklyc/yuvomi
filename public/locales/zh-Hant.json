@@ -3536,7 +3536,12 @@
         "displayErrorGone": "此壁掛平板已不存在。",
         "displayDeviceErrorGone": "這臺裝置已不存在。",
         "caldavErrorNoCalendars": "已連線，但此帳號沒有任何行事曆。",
-        "icsErrorNameInvalid": "請輸入最多 100 個字元的名稱。"
+        "icsErrorNameInvalid": "請輸入最多 100 個字元的名稱。",
+        "icsErrorUrlInvalid": "請輸入日曆的完整網址。網址以 https:// 開頭。",
+        "icsErrorUrlScheme": "網址必須以 https:// 開頭。",
+        "icsErrorPrivateAddress": "該網址位於私人網路中，基於安全考量不會取得。請使用可公開存取的網址。",
+        "icsErrorHttpStatus": "該網址沒有提供日曆（回應 {{status}}）。請檢查網址或稍後再試。",
+        "icsErrorTooLarge": "該網址的日曆超過 {{limit_mb}} MB，無法取得。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

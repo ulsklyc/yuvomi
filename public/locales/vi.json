@@ -3536,7 +3536,12 @@
         "displayErrorGone": "Máy tính bảng gắn tường này không còn nữa.",
         "displayDeviceErrorGone": "Thiết bị này không còn nữa.",
         "caldavErrorNoCalendars": "Đã kết nối, nhưng tài khoản này không có lịch nào.",
-        "icsErrorNameInvalid": "Nhập tên tối đa 100 ký tự."
+        "icsErrorNameInvalid": "Nhập tên tối đa 100 ký tự.",
+        "icsErrorUrlInvalid": "Hãy nhập địa chỉ đầy đủ của lịch. Địa chỉ bắt đầu bằng https://.",
+        "icsErrorUrlScheme": "Địa chỉ phải bắt đầu bằng https://.",
+        "icsErrorPrivateAddress": "Địa chỉ này nằm trong mạng riêng và vì lý do bảo mật sẽ không được truy xuất. Hãy dùng địa chỉ truy cập công khai được.",
+        "icsErrorHttpStatus": "Địa chỉ không trả về lịch (phản hồi {{status}}). Hãy kiểm tra địa chỉ hoặc thử lại sau.",
+        "icsErrorTooLarge": "Lịch tại địa chỉ này lớn hơn {{limit_mb}} MB và không thể lấy về."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

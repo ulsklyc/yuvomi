@@ -3536,7 +3536,12 @@
         "displayErrorGone": "Esta tableta de pared ya no existe.",
         "displayDeviceErrorGone": "Este dispositivo ya no existe.",
         "caldavErrorNoCalendars": "Conectado, pero esta cuenta no tiene calendarios.",
-        "icsErrorNameInvalid": "Introduce un nombre de 100 caracteres como máximo."
+        "icsErrorNameInvalid": "Introduce un nombre de 100 caracteres como máximo.",
+        "icsErrorUrlInvalid": "Escribe la dirección completa del calendario. Empieza por https://.",
+        "icsErrorUrlScheme": "La dirección debe empezar por https://.",
+        "icsErrorPrivateAddress": "Esta dirección está en una red privada y por seguridad no se consulta. Usa una dirección accesible públicamente.",
+        "icsErrorHttpStatus": "La dirección no ha devuelto ningún calendario (respuesta {{status}}). Comprueba la dirección o inténtalo de nuevo más tarde.",
+        "icsErrorTooLarge": "El calendario de esta dirección ocupa más de {{limit_mb}} MB y no se puede obtener."
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",

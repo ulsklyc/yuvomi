@@ -3554,7 +3554,12 @@
         "displayErrorGone": "Wala na ang wall tablet na ito.",
         "displayDeviceErrorGone": "Wala na ang device na ito.",
         "caldavErrorNoCalendars": "Nakakonekta, pero walang kalendaryo ang account na ito.",
-        "icsErrorNameInvalid": "Maglagay ng pangalang hindi hihigit sa 100 character."
+        "icsErrorNameInvalid": "Maglagay ng pangalang hindi hihigit sa 100 character.",
+        "icsErrorUrlInvalid": "Ilagay ang buong address ng kalendaryo. Nagsisimula ito sa https://.",
+        "icsErrorUrlScheme": "Dapat magsimula sa https:// ang address.",
+        "icsErrorPrivateAddress": "Nasa pribadong network ang address na ito at hindi kinukuha para sa seguridad. Gumamit ng address na naaabot ng publiko.",
+        "icsErrorHttpStatus": "Walang ibinigay na kalendaryo ang address (sagot {{status}}). Tingnan ang address o subukan muli mamaya.",
+        "icsErrorTooLarge": "Mas malaki sa {{limit_mb}} MB ang kalendaryo sa address na ito at hindi ito makukuha."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

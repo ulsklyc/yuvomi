@@ -3536,7 +3536,12 @@
         "displayErrorGone": "Este tablet de parede não existe mais.",
         "displayDeviceErrorGone": "Este dispositivo não existe mais.",
         "caldavErrorNoCalendars": "Conectado, mas esta conta não tem calendários.",
-        "icsErrorNameInvalid": "Digite um nome com no máximo 100 caracteres."
+        "icsErrorNameInvalid": "Digite um nome com no máximo 100 caracteres.",
+        "icsErrorUrlInvalid": "Digite o endereço completo do calendário. Ele começa com https://.",
+        "icsErrorUrlScheme": "O endereço deve começar com https://.",
+        "icsErrorPrivateAddress": "Este endereço fica em uma rede privada e, por segurança, não é consultado. Use um endereço acessível publicamente.",
+        "icsErrorHttpStatus": "O endereço não entregou um calendário (resposta {{status}}). Verifique o endereço ou tente novamente mais tarde.",
+        "icsErrorTooLarge": "O calendário neste endereço tem mais de {{limit_mb}} MB e não pode ser obtido."
     },
     "login": {
         "tagline": "Bem-vindo de volta. Sua casa em um só lugar.",

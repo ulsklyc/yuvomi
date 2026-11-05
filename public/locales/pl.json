@@ -3780,7 +3780,12 @@
         "displayErrorGone": "Ten tablet ścienny już nie istnieje.",
         "displayDeviceErrorGone": "To urządzenie już nie istnieje.",
         "caldavErrorNoCalendars": "Połączono, ale to konto nie ma żadnych kalendarzy.",
-        "icsErrorNameInvalid": "Wpisz nazwę o długości maksymalnie 100 znaków."
+        "icsErrorNameInvalid": "Wpisz nazwę o długości maksymalnie 100 znaków.",
+        "icsErrorUrlInvalid": "Wpisz pełny adres kalendarza. Zaczyna się od https://.",
+        "icsErrorUrlScheme": "Adres musi zaczynać się od https://.",
+        "icsErrorPrivateAddress": "Ten adres znajduje się w sieci prywatnej i ze względów bezpieczeństwa nie jest pobierany. Użyj adresu dostępnego publicznie.",
+        "icsErrorHttpStatus": "Adres nie zwrócił kalendarza (odpowiedź {{status}}). Sprawdź adres lub spróbuj ponownie później.",
+        "icsErrorTooLarge": "Kalendarz pod tym adresem jest większy niż {{limit_mb}} MB i nie można go pobrać."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

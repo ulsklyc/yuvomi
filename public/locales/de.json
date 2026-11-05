@@ -3554,7 +3554,12 @@
         "displayErrorGone": "Dieses Wandtablett gibt es nicht mehr.",
         "displayDeviceErrorGone": "Dieses Gerät gibt es nicht mehr.",
         "caldavErrorNoCalendars": "Verbunden, aber dieses Konto hat keine Kalender.",
-        "icsErrorNameInvalid": "Gib einen Namen mit höchstens 100 Zeichen ein."
+        "icsErrorNameInvalid": "Gib einen Namen mit höchstens 100 Zeichen ein.",
+        "icsErrorUrlInvalid": "Gib die vollständige Adresse des Kalenders ein. Sie beginnt mit https://.",
+        "icsErrorUrlScheme": "Die Adresse muss mit https:// beginnen.",
+        "icsErrorPrivateAddress": "Diese Adresse liegt in einem privaten Netz und wird aus Sicherheitsgründen nicht abgerufen. Verwende eine öffentlich erreichbare Adresse.",
+        "icsErrorHttpStatus": "Die Adresse hat keinen Kalender geliefert (Antwort {{status}}). Prüfe die Adresse oder versuche es später noch einmal.",
+        "icsErrorTooLarge": "Der Kalender unter dieser Adresse ist größer als {{limit_mb}} MB und kann nicht abgerufen werden."
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",
