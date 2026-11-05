@@ -1131,3 +1131,19 @@ test('PUT mit status done auf einer fremden Serie: 409, Titel und Status bleiben
   // Eine Bearbeitung ohne Abhaken geht durch.
   assert.equal((await call('PUT', `/${id}`, { title: 'Pflanzen duengen!' })).status, 200);
 });
+
+test('Ist das Konto geloescht, gehoert die Serie keiner anderen App mehr: Abhaken geht (#2506)', async () => {
+  // Review auf #2542: deleteAccount() behaelt die Aufgaben und loest sie nur vom
+  // Konto (detachAccountRows). Bliebe external_rrule stehen, waere die Aufgabe
+  // fuer immer gesperrt - es gibt keinen Abruf mehr, der die Regel nachfuehrt.
+  const { deleteAccount } = await import('../server/services/caldav-sync.js');
+  const accountId = Number(db.prepare(`INSERT INTO caldav_accounts (name, caldav_url, username, password)
+    VALUES ('Telefon', 'https://dav.example/', 'u', 'p')`).run().lastInsertRowid);
+  const id = insertForeignSeries('Zaehler ablesen');
+  db.prepare('UPDATE tasks SET external_account_id = ? WHERE id = ?').run(accountId, id);
+  assert.equal((await call('PATCH', `/${id}/status`, { status: 'done' })).status, 409, 'Vorbedingung');
+
+  deleteAccount(accountId);
+  assert.equal(db.prepare('SELECT external_rrule FROM tasks WHERE id = ?').get(id).external_rrule, null);
+  assert.equal((await call('PATCH', `/${id}/status`, { status: 'done' })).status, 200);
+});

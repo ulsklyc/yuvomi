@@ -532,12 +532,17 @@ export function detachAccountRows(accountId) {
              outbound_move          = 0,
              outbound_move_attempts = 0,
              outbound_move_since    = NULL,
-             outbound_move_by       = NULL,` : ''}
+             outbound_move_by       = NULL,` : `
+             external_rrule         = NULL,`}
              outbound_dirty      = 0,
              outbound_attempts   = 0
        WHERE external_source = 'caldav' AND external_account_id = ?
     `).run(accountId).changes;
   }
+  // Die fremde Serienregel geht mit dem Konto (#2506): ohne Abruf fuehrt sie
+  // niemand mehr nach, und die Sperre des Abhakens hinge fuer immer an der
+  // Aufgabe. Uebernimmt ein anderes Konto die UID, liest dessen Abruf sie neu.
+  //
   // Das Upload-Ziel lokaler Aufgaben trägt ebenso keinen Fremdschlüssel
   // (#1885). Ohne Ziel bleibt die Aufgabe lokal und wird nie gesendet - wie
   // jede Zeile ohne Konto. Einkaufsposten tragen kein eigenes Ziel: sie erben
