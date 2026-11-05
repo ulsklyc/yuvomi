@@ -119,12 +119,17 @@ function contactAvatar(c) {
       aria-hidden="true">${inner}</span>`;
   }
   // Kein Haushaltsmitglied: eigenes Foto, falls vorhanden.
-  // In der Liste liefert c.has_photo (boolean) die Auskunft; die Bild-URL wird
-  // vom Browser lazy geladen. In der Detailansicht steht c.photo als data-URL.
-  if (c.photo || c.has_photo) {
-    const src = c.photo ? esc(c.photo) : `/api/v1/contacts/${c.id}/photo`;
-    return `<span class="contact-item__icon contact-item__icon--initials"
-      aria-hidden="true"><img src="${src}" alt="" loading="lazy"></span>`;
+  //
+  // IMMER UEBER DIE ADRESSE, NIE AUS DER SPALTE. Hier stand `c.photo` der
+  // Detailansicht direkt im `src`, und das traf genau die Bestandsdaten: ein
+  // vor #2128 synchronisiertes Foto liegt als nackte Base64-Zeichen in der
+  // Spalte, und die sind als `src` kein Bild. Ueber die Adresse entscheidet der
+  // Server, der beide Formen kennt (decodeStoredPhoto) - und die Antwort traegt
+  // keine Megabyte Base64 mehr durch JSON und DOM. `has_photo` sagt nur, OB es
+  // eins gibt; beide Antworten fuehren das Feld.
+  if (c.has_photo) {
+    return `<span class="contact-item__icon contact-item__icon--photo"
+      aria-hidden="true"><img src="/api/v1/contacts/${c.id}/photo" alt="" loading="lazy"></span>`;
   }
   return `<span class="contact-item__icon contact-item__icon--initials" aria-hidden="true">${esc(initials(c.name, '?'))}</span>`;
 }

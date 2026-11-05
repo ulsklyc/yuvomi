@@ -536,6 +536,57 @@ describe('CardDAV Sync Service', () => {
   // ========================================
 
   describe('parseVCard', () => {
+    // --------------------------------------------------------
+    // PHOTO (#2128): beide vCard-Formen, und der Typ aus TYPE=
+    // --------------------------------------------------------
+    const PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+    it('liest die vCard-4-Form PHOTO:data:image/...;base64,... (#2128)', () => {
+      // Der Weg, den Nextcloud und iCloud heute schreiben. Vor #2128 sah der
+      // Parser nur ENCODING=BASE64 und liess diese Karten ganz ohne Foto.
+      const vCardText = `BEGIN:VCARD
+VERSION:4.0
+UID:urn:uuid:photo-4
+FN:Vier Punkt Null
+PHOTO:data:image/png;base64,${PNG_B64}
+END:VCARD`;
+
+      const result = parseVCard(vCardText);
+      assert.strictEqual(result.photo, `data:image/png;base64,${PNG_B64}`);
+    });
+
+    it('normalisiert die vCard-3-Form ENCODING=BASE64 zu einer data-URL (#2128)', () => {
+      const vCardText = `BEGIN:VCARD
+VERSION:3.0
+UID:urn:uuid:photo-3
+FN:Drei Punkt Null
+PHOTO;ENCODING=BASE64;TYPE=PNG:${PNG_B64}
+END:VCARD`;
+
+      const result = parseVCard(vCardText);
+      assert.strictEqual(result.photo, `data:image/png;base64,${PNG_B64}`);
+    });
+
+    it('nimmt TYPE= in jeder Schreibweise und nie doppelt (#2128)', () => {
+      // `TYPE=image/jpeg` ergab `image/image/jpeg` - der Wert wurde ungeprueft
+      // hinter `image/` gesetzt. Jetzt entscheidet die Allowlist.
+      const card = (typeParam) => `BEGIN:VCARD
+VERSION:3.0
+UID:urn:uuid:photo-type
+FN:Typ-Probe
+PHOTO;ENCODING=BASE64;${typeParam}:${PNG_B64}
+END:VCARD`;
+
+      assert.strictEqual(parseVCard(card('TYPE=image/png')).photo, `data:image/png;base64,${PNG_B64}`,
+        'TYPE=image/png darf nicht zu image/image/png werden');
+      assert.strictEqual(parseVCard(card('TYPE=JPEG')).photo, `data:image/jpeg;base64,${PNG_B64}`);
+      assert.strictEqual(parseVCard(card('TYPE=jpg')).photo, `data:image/jpeg;base64,${PNG_B64}`,
+        'jpg und jpeg sind derselbe Typ');
+      // Ein Typ, den die Allowlist nicht kennt, faellt auf jpeg zurueck statt
+      // in das data-Praefix zu wandern.
+      assert.strictEqual(parseVCard(card('TYPE=heic')).photo, `data:image/jpeg;base64,${PNG_B64}`);
+    });
+
     it('should parse basic vCard with FN and UID', () => {
       const vCardText = `BEGIN:VCARD
 VERSION:3.0
