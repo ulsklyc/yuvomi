@@ -7069,7 +7069,6 @@
         "cancelled": "Požadavek byl zrušen nebo vypršel. Můžete to zkusit znovu.",
         "alreadyRegistered": "Tento klíč je už zaregistrován. Vyberte jiný autentizátor.",
         "reauthenticate": "Odhlaste se a znovu přihlaste. Poté změňte klíče do pěti minut.",
-        "lastMethod": "Před odebráním posledního klíče si ponechte jiný způsob přihlášení.",
         "failed": "Klíč se nepodařilo ověřit. Zkuste to znovu nebo použijte jiný způsob.",
         "tooManyAttempts": "Příliš mnoho pokusů. Zkuste to později.",
         "removeConfirm": "Odebrat tento klíč? Po přihlášení jiným způsobem jej můžete znovu přidat.",

@@ -6887,7 +6887,6 @@
         "cancelled": "La solicitud se canceló o caducó. Puedes volver a intentarlo.",
         "alreadyRegistered": "Esta clave ya está registrada. Elige otro autenticador.",
         "reauthenticate": "Cierra sesión y vuelve a entrar. Después modifica las claves en un plazo de cinco minutos.",
-        "lastMethod": "Conserva otro método de acceso antes de eliminar la última clave.",
         "failed": "No se pudo verificar la clave. Reinténtalo o usa otro método de acceso.",
         "tooManyAttempts": "Demasiados intentos. Vuelve a intentarlo más tarde.",
         "removeConfirm": "¿Eliminar esta clave? Podrás añadirla de nuevo tras entrar con otro método.",

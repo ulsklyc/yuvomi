@@ -6887,7 +6887,6 @@
         "cancelled": "Passkey request cancelled or timed out. Try again when ready.",
         "alreadyRegistered": "This passkey is already registered. Choose another authenticator.",
         "reauthenticate": "Sign out and sign in again, then change your passkeys within five minutes.",
-        "lastMethod": "Keep another working sign-in method before removing your last passkey.",
         "failed": "The passkey could not be verified. Start again or use another sign-in method.",
         "tooManyAttempts": "Too many attempts. Please try again later.",
         "removeConfirm": "Remove this passkey? You can add it again after signing in with another method.",

@@ -449,6 +449,16 @@ const loginLimiter = rateLimit({
   message: { error: 'Zu viele Login-Versuche. Bitte warte kurz.', code: 429 },
 });
 
+// Count every options response, including 200. Even a configured high login
+// allowance cannot let one client fill a five-minute challenge window.
+const passkeyOptionsLimiter = rateLimit({
+  windowMs: 60_000,
+  max: Math.min(parseInt(process.env.RATE_LIMIT_MAX_ATTEMPTS) || 5, 20),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many passkey requests. Please wait.', code: 429 },
+});
+
 // Eigener Limiter für Passwort-Reset: zählt ALLE Antworten (kein
 // skipSuccessfulRequests). /forgot-password antwortet aus Anti-Enumeration-
 // Gründen immer mit 200 — würden erfolgreiche Antworten übersprungen, könnte
@@ -995,7 +1005,8 @@ function updateUserRoleSessions(userId, role) {
  * Integrations-Tokens und Wandtabletts sind keine Sitzung einer Person und
  * bleiben unberuehrt. `database` nur fuer die per DI gebauten Reset-Routen.
  */
-function invalidateUserSessions(userId, exceptSid, database = db.get()) {
+function invalidateUserSessions(userId, exceptSid, database = db.get(), revokePasskeys = false) {
+  if (revokePasskeys) passkeys.revokeAll(database, userId);
   const allSessions = database.prepare('SELECT sid, sess, expired_at FROM sessions').all();
   const now = Date.now();
   let ended = 0;
@@ -1899,25 +1910,28 @@ router.post('/passkeys/register/verify', requireAuth, csrfMiddleware, recentPass
     const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(req.authUserId);
     if (!user || !canSignIn(db.get(), user.id) || !nativePasskeysAllowed(user)) return res.status(403).json({ error: 'Native sign-in is not allowed for this account.', code: 403, reason: 'passkey_policy' });
     await passkeys.finishRegistration(db.get(), user.id, req.sessionID, req.body?.credential, req.body?.name,
-      () => canSignIn(db.get(), user.id) && nativePasskeysAllowed(user));
+      () => {
+        const current = db.get().prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+        return !!current && canSignIn(db.get(), current.id) && nativePasskeysAllowed(current);
+      });
     res.json({ data: { ok: true } });
   } catch { passkeyError(res); }
 });
 router.delete('/passkeys/:id', requireAuth, csrfMiddleware, recentPasskeySession, passkeyOrigin, (req, res) => {
   try {
-    const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(req.authUserId);
-    const fallback = user && ((!isSsoOnlyAccount(user.password_hash) && nativePasskeysAllowed(user)) || (isOidcEnabled() && user.oidc_sub));
-    if (!fallback && passkeys.list(db.get(), req.authUserId).length <= 1) return res.status(409).json({ error: 'Keep another sign-in method before removing your last passkey.', code: 409, reason: 'passkey_last_method' });
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id <= 0 || !passkeys.remove(db.get(), req.authUserId, id)) return res.status(404).json({ error: 'Passkey not found.', code: 404 });
-    res.json({ data: { ok: true } });
+    const ended = invalidateUserSessions(req.authUserId, req.sessionID);
+    res.json({ data: { ok: true, ended } });
   } catch { res.status(500).json({ error: 'Could not remove passkey.', code: 500 }); }
 });
-router.post('/passkeys/login/options', loginLimiter, passkeyOrigin, async (req, res) => {
+router.post('/passkeys/login/options', passkeyOptionsLimiter, passkeyOrigin, async (req, res) => {
   try {
     if (!isPasswordLoginEnabled() && !hasSplitExpenseGuests(db.get())) return res.status(403).json({ error: 'Native sign-in is disabled.', code: 403, reason: 'passkey_policy' });
+    const options = await passkeys.beginAuthentication(db.get(), req.sessionID, null, req.ip);
+    if (!req.session.userId && !req.session.pendingTwoFactor) req.session.cookie.maxAge = passkeys.CHALLENGE_TTL_MS;
     req.session.passkeyFlow = true;
-    res.json({ data: await passkeys.beginAuthentication(db.get(), req.sessionID) });
+    res.json({ data: options });
   } catch { passkeyError(res); }
 });
 router.post('/passkeys/login/verify', loginLimiter, passkeyOrigin, async (req, res) => {
@@ -2246,6 +2260,7 @@ export function buildResetRoutes(targetRouter, {
         return res.status(400).json({ error: 'Invalid or expired token.', code: 400 });
       }
       const hash = await hashPassword(password);
+      passkeys.revokeAll(getDb(), userId);
       getDb().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
       resetService.consumeToken(token);
       // Best-effort: invalidate existing sessions for this user.
@@ -3299,7 +3314,7 @@ router.post('/2fa/enable', requireAuth, csrfMiddleware, twoFactorLimiter, (req, 
 
     // Alle anderen Sitzungen dieses Kontos beenden: wer den zweiten Faktor
     // einschaltet, will nicht, dass eine alte Anmeldung ohne ihn weiterläuft.
-    invalidateUserSessions(req.authUserId, req.sessionID);
+    invalidateUserSessions(req.authUserId, req.sessionID, db.get(), true);
 
     res.json({ data: { recovery_codes: codes } });
   } catch (err) {
@@ -3702,7 +3717,7 @@ router.post('/users/:id/devices/sign-out', requireAuth, requireAdmin, csrfMiddle
     if (!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(id)) {
       return res.status(404).json({ error: 'User not found.', code: 404 });
     }
-    invalidateUserSessions(id, id === req.authUserId ? req.sessionID : null);
+    invalidateUserSessions(id, id === req.authUserId ? req.sessionID : null, db.get(), true);
     res.json({ ok: true });
   } catch (err) {
     log.error('Sign out member error:', err);
@@ -4316,7 +4331,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     });
 
     if (newPasswordHash) {
-      invalidateUserSessions(userId, req.sessionID);
+      invalidateUserSessions(userId, req.sessionID, db.get(), true);
     }
 
     if (nextRole !== existing.role) {
@@ -4604,7 +4619,7 @@ router.patch('/me/password', requireAuth, csrfMiddleware, async (req, res) => {
     const hash = await hashPassword(new_password);
     db.get().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.authUserId);
 
-    invalidateUserSessions(req.authUserId, req.sessionID);
+    invalidateUserSessions(req.authUserId, req.sessionID, db.get(), true);
 
     res.json({ ok: true });
   } catch (err) {

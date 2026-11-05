@@ -17,6 +17,9 @@ function makeDb() {
   db.exec(`
     CREATE TABLE users (deactivated_at TEXT, id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL DEFAULT 'x');
+    CREATE TABLE user_passkeys (user_id INTEGER);
+    CREATE TABLE user_passkey_handles (user_id INTEGER);
+    CREATE TABLE passkey_challenges (user_id INTEGER);
     CREATE TABLE password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

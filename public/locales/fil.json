@@ -6887,7 +6887,6 @@
         "cancelled": "Kinansela o nag-expire ang kahilingan. Maaari mong subukang muli.",
         "alreadyRegistered": "Nakarehistro na ang passkey na ito. Pumili ng ibang authenticator.",
         "reauthenticate": "Mag-sign out at mag-sign in muli. Pagkatapos, baguhin ang mga passkey sa loob ng limang minuto.",
-        "lastMethod": "Panatilihin ang ibang paraan ng pag-sign in bago alisin ang huling passkey.",
         "failed": "Hindi ma-verify ang passkey. Subukang muli o gumamit ng ibang paraan.",
         "tooManyAttempts": "Masyadong maraming pagsubok. Subukan ulit mamaya.",
         "removeConfirm": "Alisin ang passkey na ito? Maaari itong idagdag muli matapos mag-sign in sa ibang paraan.",

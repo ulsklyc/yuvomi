@@ -42,6 +42,7 @@ const STUBS = {
       rawPost: async (...a) => viaStub('rawPost', a, { data: null }),
     };
     export const auth = {
+      login: async (...a) => viaStub('login', a, { user: null }),
       loginWithPasskey: async (...a) => viaStub('loginWithPasskey', a, { user: null }),
       me: async () => ({ user: null }),
       getUsers: async () => ({ data: [] }),

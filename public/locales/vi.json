@@ -6887,7 +6887,6 @@
         "cancelled": "Yêu cầu đã bị hủy hoặc hết hạn. Bạn có thể thử lại.",
         "alreadyRegistered": "Khóa này đã được đăng ký. Hãy chọn bộ xác thực khác.",
         "reauthenticate": "Đăng xuất rồi đăng nhập lại. Sau đó thay đổi khóa trong vòng năm phút.",
-        "lastMethod": "Giữ một cách đăng nhập khác trước khi xóa khóa cuối cùng.",
         "failed": "Không thể xác minh khóa. Hãy thử lại hoặc dùng cách khác.",
         "tooManyAttempts": "Thử quá nhiều lần. Vui lòng thử lại sau.",
         "removeConfirm": "Xóa khóa này? Bạn có thể thêm lại sau khi đăng nhập bằng cách khác.",

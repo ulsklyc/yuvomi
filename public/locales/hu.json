@@ -6887,7 +6887,6 @@
         "cancelled": "A kérés megszakadt vagy lejárt. Próbáld újra, amikor készen állsz.",
         "alreadyRegistered": "Ez a jelkulcs már regisztrálva van. Válassz másik hitelesítőt.",
         "reauthenticate": "Jelentkezz ki, majd vissza. Ezután öt percen belül módosítsd a jelkulcsokat.",
-        "lastMethod": "Az utolsó jelkulcs eltávolítása előtt tarts meg másik bejelentkezési módot.",
         "failed": "A jelkulcs ellenőrzése sikertelen. Próbáld újra vagy válassz másik módot.",
         "tooManyAttempts": "Túl sok próbálkozás. Próbáld később.",
         "removeConfirm": "Eltávolítod ezt a jelkulcsot? Másik módon bejelentkezve újra hozzáadhatod.",

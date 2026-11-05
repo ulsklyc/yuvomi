@@ -6887,7 +6887,6 @@
         "cancelled": "Pedido cancelado ou expirado. Pode tentar novamente.",
         "alreadyRegistered": "Esta chave já está registada. Escolha outro autenticador.",
         "reauthenticate": "Termine a sessão e volte a entrar. Depois altere as chaves em cinco minutos.",
-        "lastMethod": "Mantenha outra forma de acesso antes de remover a última chave.",
         "failed": "Não foi possível verificar a chave. Tente novamente ou utilize outro método.",
         "tooManyAttempts": "Demasiadas tentativas. Tente mais tarde.",
         "removeConfirm": "Remover esta chave? Poderá adicioná-la novamente depois de entrar por outro método.",

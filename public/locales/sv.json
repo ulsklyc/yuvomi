@@ -6887,7 +6887,6 @@
         "cancelled": "Begäran avbröts eller gick ut. Försök igen när du är redo.",
         "alreadyRegistered": "Nyckeln är redan registrerad. Välj en annan autentiserare.",
         "reauthenticate": "Logga ut och in igen. Ändra sedan nycklarna inom fem minuter.",
-        "lastMethod": "Behåll ett annat inloggningssätt innan du tar bort den sista nyckeln.",
         "failed": "Nyckeln kunde inte verifieras. Försök igen eller använd ett annat sätt.",
         "tooManyAttempts": "För många försök. Försök igen senare.",
         "removeConfirm": "Ta bort nyckeln? Du kan lägga till den igen efter inloggning på annat sätt.",

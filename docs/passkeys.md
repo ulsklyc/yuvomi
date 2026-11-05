@@ -42,6 +42,22 @@ API tokens and paired displays cannot use the passkey routes; an unscoped API
 token cannot enroll a key on someone's behalf.
 `PASSKEYS_ENABLED=false` disables the feature on an installation.
 
+## Credential changes and account recovery
+
+Changing or resetting your password, an administrator setting a password, enabling
+two-factor authentication, or the administrator's emergency device sign-out removes
+all your passkeys and pending registrations. Add replacement passkeys after recovery.
+This also blocks a registration already being verified when recovery happens.
+Removing one passkey ends your other browser sessions and native device credentials,
+while keeping the current browser and remaining passkeys. Ordinary “sign out other
+devices” retains passkeys; for a compromised credential use password recovery or ask
+an administrator for the emergency sign-out.
+
+Anonymous sign-in options are limited per IP, including successful responses (at
+most 20/minute). New anonymous sessions and challenges expire after five minutes.
+A client can evict only its own anonymous challenges, not another member's sign-in
+or authenticated confirmation.
+
 ## Addresses and recovery
 
 A passkey belongs to a relying party (the hostname). A hostname change requires

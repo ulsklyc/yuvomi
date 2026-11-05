@@ -6,9 +6,10 @@ import {
   generateAuthenticationOptions, verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 
-const WINDOW_MS = 5 * 60_000;
+export const CHALLENGE_TTL_MS = 5 * 60_000;
+const WINDOW_MS = CHALLENGE_TTL_MS;
 const MAX_PASSKEYS = 10;
-const MAX_CHALLENGES = 1000;
+const MAX_ANONYMOUS_CHALLENGES_PER_CLIENT = 20;
 const sessionHash = id => createHash('sha256').update(String(id)).digest('hex');
 const fail = () => new Error('Passkey verification failed.');
 
@@ -36,13 +37,35 @@ export function remove(database, userId, id) {
   return database.prepare('DELETE FROM user_passkeys WHERE id = ? AND user_id = ?').run(id, userId).changes > 0;
 }
 
-function remember(database, sessionId, operation, challenge, userId = null) {
+export function revokeAll(database, userId) {
+  // Rotating the opaque handle also invalidates registration already verifying.
+  database.exec('SAVEPOINT revoke_passkeys');
+  try {
+    database.prepare('DELETE FROM user_passkeys WHERE user_id = ?').run(userId);
+    database.prepare('DELETE FROM user_passkey_handles WHERE user_id = ?').run(userId);
+    database.prepare('DELETE FROM passkey_challenges WHERE user_id = ?').run(userId);
+    database.exec('RELEASE revoke_passkeys');
+  } catch (error) {
+    database.exec('ROLLBACK TO revoke_passkeys');
+    database.exec('RELEASE revoke_passkeys');
+    throw error;
+  }
+}
+
+function remember(database, sessionId, operation, challenge, userId = null, clientId = sessionId) {
   database.transaction(() => {
     database.prepare('DELETE FROM passkey_challenges WHERE expires_at <= ?').run(Date.now());
     database.prepare('DELETE FROM passkey_challenges WHERE session_hash = ? AND operation = ?').run(sessionHash(sessionId), operation);
-    if (database.prepare('SELECT COUNT(*) AS n FROM passkey_challenges').get().n >= MAX_CHALLENGES) throw fail();
-    database.prepare('INSERT INTO passkey_challenges (challenge, session_hash, operation, user_id, expires_at) VALUES (?, ?, ?, ?, ?)')
-      .run(challenge, sessionHash(sessionId), operation, userId, Date.now() + WINDOW_MS);
+    if (userId === null) {
+      // A client can only evict its own anonymous ceremonies, never another
+      // household member's sign-in or authenticated registration/reauthentication.
+      database.prepare(`DELETE FROM passkey_challenges WHERE rowid IN (
+        SELECT rowid FROM passkey_challenges WHERE user_id IS NULL AND client_hash = ?
+        ORDER BY expires_at DESC, rowid DESC LIMIT -1 OFFSET ?
+      )`).run(sessionHash(clientId), MAX_ANONYMOUS_CHALLENGES_PER_CLIENT - 1);
+    }
+    database.prepare('INSERT INTO passkey_challenges (challenge, session_hash, operation, user_id, expires_at, client_hash) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(challenge, sessionHash(sessionId), operation, userId, Date.now() + WINDOW_MS, sessionHash(clientId));
   })();
 }
 
@@ -65,21 +88,25 @@ export async function beginRegistration(database, user, sessionId) {
   const cfg = config();
   if (list(database, user.id).length >= MAX_PASSKEYS) throw fail();
   const credentials = database.prepare('SELECT credential_id, transports FROM user_passkeys WHERE user_id = ?').all(user.id);
+  const userHandle = handle(database, user.id);
   const options = await generateRegistrationOptions({
     rpName: cfg.rpName, rpID: cfg.rpID, userName: user.username,
-    userDisplayName: user.display_name, userID: Buffer.from(handle(database, user.id), 'base64url'),
+    userDisplayName: user.display_name, userID: Buffer.from(userHandle, 'base64url'),
     attestationType: 'none', timeout: WINDOW_MS,
     supportedAlgorithmIDs: [-7, -257],
     excludeCredentials: credentials.map(row => ({ id: row.credential_id, transports: JSON.parse(row.transports) })),
     authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
   });
+  if (database.prepare('SELECT user_handle FROM user_passkey_handles WHERE user_id = ?').get(user.id)?.user_handle !== userHandle) throw fail();
   remember(database, sessionId, 'register', options.challenge, user.id);
   return options;
 }
 
 export async function finishRegistration(database, userId, sessionId, response, name, isAllowed = () => true) {
   const cfg = config();
+  const userHandle = database.prepare('SELECT user_handle FROM user_passkey_handles WHERE user_id = ?').get(userId)?.user_handle;
   const challenge = consume(database, sessionId, 'register', userId);
+  if (!userHandle) throw fail();
   if (typeof name !== 'string' || !name.trim() || name.trim().length > 80) throw fail();
   const result = await verifyRegistrationResponse({
     response, expectedChallenge: challenge, expectedOrigin: cfg.origin,
@@ -90,13 +117,14 @@ export async function finishRegistration(database, userId, sessionId, response, 
   const { credential } = result.registrationInfo;
   const transports = (response.response.transports ?? []).filter(t => ['ble', 'cable', 'hybrid', 'internal', 'nfc', 'smart-card', 'usb'].includes(t));
   database.transaction(() => {
-    if (!isAllowed() || list(database, userId).length >= MAX_PASSKEYS) throw fail();
+    if (!isAllowed() || database.prepare('SELECT user_handle FROM user_passkey_handles WHERE user_id = ?').get(userId)?.user_handle !== userHandle
+        || list(database, userId).length >= MAX_PASSKEYS) throw fail();
     database.prepare('INSERT INTO user_passkeys (user_id, credential_id, public_key, counter, transports, name) VALUES (?, ?, ?, ?, ?, ?)')
       .run(userId, credential.id, Buffer.from(credential.publicKey), credential.counter, JSON.stringify(transports), name.trim());
   })();
 }
 
-export async function beginAuthentication(database, sessionId, userId = null) {
+export async function beginAuthentication(database, sessionId, userId = null, clientId = sessionId) {
   const cfg = config();
   const credentials = userId === null ? null : database.prepare('SELECT credential_id, transports FROM user_passkeys WHERE user_id = ?').all(userId);
   if (credentials && !credentials.length) throw fail();
@@ -104,7 +132,7 @@ export async function beginAuthentication(database, sessionId, userId = null) {
     ...(credentials ? { allowCredentials: credentials.map(row => ({ id: row.credential_id, transports: JSON.parse(row.transports) })) } : {}),
   });
   // A non-null user binding distinguishes reauthentication from anonymous sign-in.
-  remember(database, sessionId, 'authenticate', options.challenge, userId);
+  remember(database, sessionId, 'authenticate', options.challenge, userId, clientId);
   return options;
 }
 
