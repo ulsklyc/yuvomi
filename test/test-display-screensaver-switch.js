@@ -137,15 +137,38 @@ test('a failed request puts the switch back and says why', async () => {
   const error = errorEl();
   page.bindDisplayScreensaverSwitches(list, error);
   toasts.length = 0;
-  patchResult = () => Promise.reject(new Error('Display not found.'));
+  patchResult = () => Promise.reject(Object.assign(new Error('Something broke.'), { status: 500, data: { error: 'Something broke.' } }));
   try {
     const toggle = makeToggle({ checked: true });
     await fire(list, changeOn(toggle));
     assert.equal(toggle.checked, false, 'back to the state the server still has');
     assert.equal(toggle.disabled, false);
     assert.equal(error.hidden, false);
-    assert.equal(error.textContent, 'Display not found.');
+    // #1909: the sentence of the app, never the server's English text.
+    assert.equal(error.textContent, 'common.errorGeneric');
     assert.equal(toasts.length, 0, 'no confirmation for a change that did not happen');
+  } finally {
+    patchResult = () => Promise.resolve({ data: {} });
+  }
+});
+
+// #1909: another admin deleted the display meanwhile. The page says so in the
+// language of the interface and hands over to its reload, which drops the card.
+const goneAnswer = (reason) => Object.assign(new Error('Display not found.'), { status: 404, data: { error: 'Display not found.', reason } });
+
+test('a display deleted elsewhere says so and reloads the list', async () => {
+  const list = makeList();
+  const error = errorEl();
+  const gone = [];
+  page.bindDisplayScreensaverSwitches(list, error, { onGone: (err) => gone.push(err) });
+  patchResult = () => Promise.reject(goneAnswer('displays_display_not_found'));
+  try {
+    const toggle = makeToggle({ checked: true });
+    await fire(list, changeOn(toggle));
+    assert.equal(toggle.checked, false);
+    assert.equal(gone.length, 1, 'the page reloads');
+    assert.equal(gone[0].data.reason, 'displays_display_not_found');
+    assert.notEqual(error.textContent, 'Display not found.');
   } finally {
     patchResult = () => Promise.resolve({ data: {} });
   }
@@ -204,4 +227,17 @@ test('an invalid night window is rejected before an API request', async () => {
   const list = makeList(); page.bindDisplayDeviceSettings(list);
   const ui = settingsForm(); ui.fields.night_until.value = '21';
   await saveSettings(list,ui.form); assert.equal(patches.length,0); assert.equal(ui.status.textContent,'common.invalidInput');
+});
+
+test('the device settings of a display deleted elsewhere hand over to the reload', async () => {
+  patchResult = () => Promise.reject(goneAnswer('displays_display_not_found'));
+  try {
+    const gone = [];
+    const list = makeList(); page.bindDisplayDeviceSettings(list, { onGone: (err) => gone.push(err) });
+    const ui = settingsForm(); await saveSettings(list, ui.form);
+    assert.equal(gone.length, 1, 'the page reloads');
+    assert.equal(ui.status.textContent, 'settings.displayErrorGone');
+  } finally {
+    patchResult = () => Promise.resolve({ data: {} });
+  }
 });

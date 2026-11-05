@@ -3550,7 +3550,9 @@
         "twoFactorAlreadyEnabled": "Naka-on na ang two-factor authentication. I-reload ang page para makita ang kasalukuyang estado.",
         "twoFactorSetupExpired": "Nag-expire na ang setup. Kanselahin ito at magsimula ulit.",
         "oidcLinkErrorNotConfigured": "Hindi na naka-set up ang SSO sa server na ito.",
-        "oidcUnlinkNotLinked": "Hindi na nakaugnay sa SSO ang account na ito. I-reload ang page para makita ang kasalukuyang estado."
+        "oidcUnlinkNotLinked": "Hindi na nakaugnay sa SSO ang account na ito. I-reload ang page para makita ang kasalukuyang estado.",
+        "displayErrorGone": "Wala na ang wall tablet na ito.",
+        "displayDeviceErrorGone": "Wala na ang device na ito."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

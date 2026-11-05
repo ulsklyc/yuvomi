@@ -3776,7 +3776,9 @@
         "twoFactorAlreadyEnabled": "Uwierzytelnianie dwuskładnikowe jest już włączone. Odśwież stronę, aby zobaczyć aktualny stan.",
         "twoFactorSetupExpired": "Konfiguracja wygasła. Anuluj ją i zacznij od nowa.",
         "oidcLinkErrorNotConfigured": "SSO nie jest już skonfigurowane na tym serwerze.",
-        "oidcUnlinkNotLinked": "To konto nie jest już powiązane z SSO. Odśwież stronę, aby zobaczyć aktualny stan."
+        "oidcUnlinkNotLinked": "To konto nie jest już powiązane z SSO. Odśwież stronę, aby zobaczyć aktualny stan.",
+        "displayErrorGone": "Ten tablet ścienny już nie istnieje.",
+        "displayDeviceErrorGone": "To urządzenie już nie istnieje."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

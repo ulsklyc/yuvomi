@@ -3532,7 +3532,9 @@
         "twoFactorAlreadyEnabled": "二要素認証はすでに有効です。ページを再読み込みして現在の状態を確認してください。",
         "twoFactorSetupExpired": "設定の有効期限が切れました。キャンセルしてやり直してください。",
         "oidcLinkErrorNotConfigured": "このサーバーでは SSO が設定されていません。",
-        "oidcUnlinkNotLinked": "このアカウントは SSO と連携していません。ページを再読み込みして現在の状態を確認してください。"
+        "oidcUnlinkNotLinked": "このアカウントは SSO と連携していません。ページを再読み込みして現在の状態を確認してください。",
+        "displayErrorGone": "この壁掛けタブレットはもう存在しません。",
+        "displayDeviceErrorGone": "この端末はもう存在しません。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

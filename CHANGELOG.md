@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Systolic" and "Diastolic" stood left of the last bar, and "Pulse" above its last dot, hiding the
   readings underneath when a month is full. A short line above the blood pressure chart now says
   which end of a bar is which, and the pulse chart is named by its own unit axis.
+- **Wall tablet settings say what went wrong in your language** (#1909). When another
+  administrator had already deleted a wall tablet or one of its devices, the page showed the
+  server's English text. It now says in your language that the tablet or device no longer
+  exists and refreshes the list; deleting a tablet that is already gone simply counts as done.
+  API clients get the case as `reason`.
 - **Your account page says what went wrong in your language** (#1909). Linking or unlinking
   SSO, turning on two-factor authentication and fetching a Gravatar showed the server's English
   text for some errors. They now say in your language that the account is already linked or no

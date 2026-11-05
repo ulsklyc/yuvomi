@@ -3532,7 +3532,9 @@
         "twoFactorAlreadyEnabled": "İki adımlı doğrulama zaten etkin. Güncel durumu görmek için sayfayı yeniden yükle.",
         "twoFactorSetupExpired": "Kurulumun süresi doldu. İptal et ve yeniden başla.",
         "oidcLinkErrorNotConfigured": "SSO bu sunucuda artık kurulu değil.",
-        "oidcUnlinkNotLinked": "Bu hesap artık SSO ile bağlı değil. Güncel durumu görmek için sayfayı yeniden yükle."
+        "oidcUnlinkNotLinked": "Bu hesap artık SSO ile bağlı değil. Güncel durumu görmek için sayfayı yeniden yükle.",
+        "displayErrorGone": "Bu duvar tableti artık yok.",
+        "displayDeviceErrorGone": "Bu cihaz artık yok."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

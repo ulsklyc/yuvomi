@@ -285,6 +285,8 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // test:sync-default-assignees bzw. test:tasks-errors, Outlook
     // test:calendar-routes, Mitglied entfernen test:user-deactivation.
     '../server/routes/calendar/subscriptions.js', '../server/routes/calendar/outlook.js', '../server/auth.js',
+    // Seite Wandtablets (#1909); die echte Antwort misst test:display-account.
+    '../server/routes/displays.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
@@ -336,6 +338,7 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'quick_links_link_not_found',
     'recipe_providers_account_not_found',
     'calendar_calendar_not_found', 'calendar_event_not_found', 'calendar_selected_calendar_not_found',
+    'displays_display_not_found', 'displays_device_not_found',
   ].sort());
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);
@@ -599,12 +602,18 @@ test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#
     ['oidc_already_linked', 'settings.oidcLinkError_already_linked'],
     ['oidc_not_linked', 'settings.oidcUnlinkNotLinked'],
     ['oidc_password_required', 'settings.oidcUnlinkNeedsPassword'],
+    // Seite Wandtablets (#1909): ein zweiter Admin hat das Tablett oder sein
+    // Geraet schon entfernt; die echte Antwort misst test:display-account.
+    ['displays_display_not_found', 'settings.displayErrorGone'],
+    ['displays_device_not_found', 'settings.displayDeviceErrorGone'],
   ]) {
     assert.equal(errorSentence(answer(400, SERVER_TEXT, reason)), key, reason);
   }
   assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'calendar_subscription_not_found'), 'calendar_subscription_not_found'), true);
   assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'tasks_tag_not_found'), 'tasks_tag_not_found'), true);
   assert.equal(isGone(answer(404, SERVER_TEXT, 'members_member_not_found')), true);
+  assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'displays_display_not_found'), 'displays_display_not_found'), true);
+  assert.equal(isGone(answer(404, SERVER_TEXT, 'displays_device_not_found')), true);
 });
 
 // DER SATZ FUER DAS, WAS KEINE SEITE SELBST FAENGT (#1909): Fehlerbildschirm

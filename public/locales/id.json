@@ -3550,7 +3550,9 @@
         "twoFactorAlreadyEnabled": "Autentikasi dua faktor sudah aktif. Muat ulang halaman untuk melihat status terkini.",
         "twoFactorSetupExpired": "Penyiapan sudah kedaluwarsa. Batalkan dan mulai lagi.",
         "oidcLinkErrorNotConfigured": "SSO tidak lagi disiapkan di server ini.",
-        "oidcUnlinkNotLinked": "Akun ini tidak lagi tertaut dengan SSO. Muat ulang halaman untuk melihat status terkini."
+        "oidcUnlinkNotLinked": "Akun ini tidak lagi tertaut dengan SSO. Muat ulang halaman untuk melihat status terkini.",
+        "displayErrorGone": "Tablet dinding ini sudah tidak ada.",
+        "displayDeviceErrorGone": "Perangkat ini sudah tidak ada."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

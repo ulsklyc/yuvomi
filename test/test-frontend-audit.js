@@ -22463,7 +22463,6 @@ const ERROR_MESSAGE_OPEN = new Map([
   ['settings/backup-key.js', 1],
   ['settings/pages/admin-api.js', 2],
   ['settings/pages/admin-backup.js', 2],
-  ['settings/pages/admin-displays.js', 7],
   ['settings/pages/admin-system.js', 1],
   ['settings/pages/documents-dms.js', 2],
   ['settings/pages/documents-storage.js', 1],
