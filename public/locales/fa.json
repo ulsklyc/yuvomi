@@ -3547,6 +3547,8 @@
         "memberErrorGone": "این عضو دیگر وجود ندارد.",
         "memberErrorSsoEmailRequired": "حسابی که فقط با SSO وارد می‌شود به نشانی ایمیل نیاز دارد تا نخستین ورود با SSO آن را پیدا کند.",
         "memberErrorSsoEmailAmbiguous": "این نشانی ایمیل را عضو دیگری دارد. SSO نمی‌تواند این حساب‌ها را از هم تشخیص دهد.",
+        "backupSchedulerFailedPushTitle": "پشتیبان‌گیری ناموفق بود",
+        "backupSchedulerFailedPushBody": "پشتیبان‌گیری خودکار اجرا نشد. دلیل آن در تنظیمات > خانه > پشتیبان‌گیری آمده است.",
         "twoFactorAlreadyEnabled": "احراز هویت دومرحله‌ای از قبل فعال است. صفحه را دوباره بارگذاری کنید تا وضعیت فعلی را ببینید.",
         "twoFactorSetupExpired": "زمان راه‌اندازی تمام شده است. آن را لغو کنید و دوباره شروع کنید.",
         "oidcLinkErrorNotConfigured": "SSO دیگر روی این سرور راه‌اندازی نشده است.",

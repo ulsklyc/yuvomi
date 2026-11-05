@@ -3529,6 +3529,8 @@
         "memberErrorGone": "Dit lid bestaat niet meer.",
         "memberErrorSsoEmailRequired": "Een account met alleen SSO heeft een e-mailadres nodig, zodat de eerste SSO-aanmelding het kan vinden.",
         "memberErrorSsoEmailAmbiguous": "Een ander lid heeft dit e-mailadres al. SSO zou de accounts niet uit elkaar kunnen houden.",
+        "backupSchedulerFailedPushTitle": "Back-up mislukt",
+        "backupSchedulerFailedPushBody": "De automatische back-up is niet uitgevoerd. De reden staat in Instellingen > Huishouden > Back-up.",
         "twoFactorAlreadyEnabled": "Tweestapsverificatie is al ingeschakeld. Laad de pagina opnieuw om de huidige stand te zien.",
         "twoFactorSetupExpired": "De instelling is verlopen. Annuleer en begin opnieuw.",
         "oidcLinkErrorNotConfigured": "SSO is niet meer ingesteld op deze server.",

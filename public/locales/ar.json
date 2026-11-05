@@ -3869,6 +3869,8 @@
         "memberErrorGone": "لم يعد هذا العضو موجودًا.",
         "memberErrorSsoEmailRequired": "يحتاج الحساب الذي يسجل الدخول عبر SSO فقط إلى عنوان بريد إلكتروني حتى يعثر عليه أول تسجيل دخول عبر SSO.",
         "memberErrorSsoEmailAmbiguous": "عنوان البريد الإلكتروني هذا مستخدم بالفعل لدى عضو آخر. لن يتمكن SSO من التمييز بين الحسابين.",
+        "backupSchedulerFailedPushTitle": "فشل النسخ الاحتياطي",
+        "backupSchedulerFailedPushBody": "لم يتم تشغيل النسخ الاحتياطي التلقائي. افتح الإعدادات > المنزل > النسخ الاحتياطي لمعرفة السبب.",
         "twoFactorAlreadyEnabled": "المصادقة الثنائية مفعّلة بالفعل. أعد تحميل الصفحة لترى الحالة الحالية.",
         "twoFactorSetupExpired": "انتهت صلاحية الإعداد. ألغِه وابدأ من جديد.",
         "oidcLinkErrorNotConfigured": "لم يعد الدخول الموحد مُعدًّا على هذا الخادم.",

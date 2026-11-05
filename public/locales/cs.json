@@ -3647,6 +3647,8 @@
         "memberErrorGone": "Tento člen už neexistuje.",
         "memberErrorSsoEmailRequired": "Účet jen pro SSO potřebuje e-mailovou adresu, aby ho první přihlášení přes SSO našlo.",
         "memberErrorSsoEmailAmbiguous": "Tuto e-mailovou adresu už má jiný člen. SSO by účty nedokázalo rozlišit.",
+        "backupSchedulerFailedPushTitle": "Záloha se nezdařila",
+        "backupSchedulerFailedPushBody": "Automatická záloha neproběhla. Důvod najdete v Nastavení > Domácnost > Záloha.",
         "twoFactorAlreadyEnabled": "Dvoufázové ověření je už zapnuté. Načti stránku znovu, abys viděl aktuální stav.",
         "twoFactorSetupExpired": "Nastavení vypršelo. Zruš ho a začni znovu.",
         "oidcLinkErrorNotConfigured": "SSO už na tomto serveru není nastavené.",

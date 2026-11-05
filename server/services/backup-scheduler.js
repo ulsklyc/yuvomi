@@ -11,6 +11,10 @@ import path from 'node:path';
 import { backupToFile } from '../db.js';
 import { createLogger } from '../logger.js';
 import * as webdav from './backup-webdav.js';
+import { get as getDb } from '../db.js';
+import { pushService as defaultPushService } from './push.js';
+import { householdMemberSql } from './household-members.js';
+import { resolveHouseholdLocale, translate } from '../utils/i18n.js';
 
 const log = createLogger('BackupScheduler');
 
@@ -147,7 +151,63 @@ export async function createLocalBackup() {
 /**
  * Perform automated backup
  */
-async function performBackup() {
+/**
+ * EIN FEHLGESCHLAGENES SICHERUNGSLAUF MELDET SICH BEI DEN ADMINS (#2519).
+ *
+ * Ohne diese Meldung faellt die naechtliche Sicherung still aus: gesehen wird
+ * das erst, wenn jemand Einstellungen > Sicherung aufschlaegt - also meistens
+ * dann, wenn die Sicherung gebraucht wird.
+ *
+ * DER TEXT DES FEHLERS STEHT NICHT IM PUSH. Er gehoert ins Log und in
+ * Einstellungen > Sicherung, wo `lastError` ihn vollstaendig zeigt. Eine
+ * Push-Mitteilung steht auf einem Sperrbildschirm, in der Sprache des
+ * Haushalts, und "EACCES: permission denied, open
+ * '/backups/yuvomi-backup-...'" ist dort kein Satz - sie sagt DASS und WO
+ * nachzusehen ist, der Grund steht in der App.
+ *
+ * DIE ADMINS ALS HAUSHALTSMITGLIEDER (#1207, householdMemberSql): ein
+ * Admin-Konto, das ein Wandtablett oder ein Gast ist, bekommt keine
+ * Sicherungsmeldung auf den Flurbildschirm.
+ *
+ * Best effort: ein Fehler beim Melden wird geloggt und nie weitergeworfen -
+ * er darf den Sicherungslauf nicht zusaetzlich zum Scheitern bringen.
+ *
+ * @param {Object} [opts]
+ * @param {import('better-sqlite3-multiple-ciphers').Database} [opts.database]
+ * @param {Object} [opts.pushService] - { sendPushToUser }
+ * @returns {Promise<number>} Zahl der benachrichtigten Admins
+ */
+async function notifyAdminsOfBackupFailure({ database, pushService = defaultPushService } = {}) {
+  try {
+    const activeDb = database ?? getDb();
+    const admins = activeDb.prepare(`
+      SELECT u.id FROM users u
+      WHERE u.role = 'admin' AND ${householdMemberSql('u')}
+      ORDER BY u.id ASC
+    `).all();
+    if (!admins.length) return 0;
+
+    const locale = resolveHouseholdLocale(activeDb);
+    const payload = {
+      title: translate(locale, 'settings.backupSchedulerFailedPushTitle'),
+      body: translate(locale, 'settings.backupSchedulerFailedPushBody'),
+      url: '/settings/household/backup',
+      // EIN EINTRAG, NICHT EINER JE LAUF: zwei Naechte hintereinander
+      // gescheitert soll eine Meldung ersetzen, keine zweite daneben legen.
+      tag: 'backup-failure',
+      priority: 'default',
+    };
+    const results = await Promise.allSettled(
+      admins.map((u) => pushService.sendPushToUser(u.id, payload)),
+    );
+    return results.filter((r) => r.status === 'fulfilled').length;
+  } catch (err) {
+    log.error('Could not notify the administrators about the failed backup:', err);
+    return 0;
+  }
+}
+
+async function performBackup(opts = {}) {
   try {
     log.info('Starting scheduled backup...');
 
@@ -183,6 +243,9 @@ async function performBackup() {
       success: false,
       error: err.message,
     };
+    // Nach dem Setzen von lastError: die Meldung verweist auf die Seite, die
+    // ihn zeigt, also muss er dort schon stehen.
+    await notifyAdminsOfBackupFailure(opts);
   }
 }
 
@@ -202,7 +265,7 @@ export function startScheduler() {
 
   // Laedt nach WebDAV hoch: waehrend eines Restores beginnt kein Lauf, ein
   // laufender wird abgewartet (Codex-Befund in #1431).
-  scheduledTask = cron.schedule(BACKUP_SCHEDULE, () => runExternalJob(performBackup), {
+  scheduledTask = cron.schedule(BACKUP_SCHEDULE, () => runExternalJob(() => performBackup()), {
     timezone: process.env.TZ || 'UTC',
   });
 
@@ -223,6 +286,9 @@ export function stopScheduler() {
 /**
  * Get scheduler status
  */
+/** Nur fuer die Tests: der Melder allein, ohne einen Sicherungslauf. */
+export const _notifyAdminsOfBackupFailure = notifyAdminsOfBackupFailure;
+
 export function getStatus() {
   return {
     enabled: BACKUP_ENABLED,
@@ -239,7 +305,11 @@ export function getStatus() {
 /**
  * Trigger an immediate backup (for manual/testing purposes)
  */
-export async function triggerBackup() {
-  await performBackup();
+export async function triggerBackup(opts = {}) {
+  // `opts` reicht die Datenbank und den Push-Dienst an den Melder weiter -
+  // sonst waere der Fehlerweg nur ueber den globalen Zustand pruefbar
+  // (derselbe Weg wie processDueMedications, services/medication-scheduler.js).
+  // Die Route ruft ohne Argumente, dann gelten die echten Dienste.
+  await performBackup(opts);
   return lastBackup;
 }
