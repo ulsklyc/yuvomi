@@ -255,7 +255,7 @@ export async function render(container) {
       // Konto der Haushaltshilfe gehoert - das ist eine dauerhafte Absage, und
       // ein Neuzeichnen wuerde sie verschlucken und den Nutzer vor dasselbe
       // Formular stellen, ohne ihm je zu sagen, warum es nicht geht.
-      if (err.status === 403 && /password login is disabled/i.test(err.message || '')) {
+      if (err.status === 403 && err.data?.reason === 'password_login_disabled') {
         return render(container);
       }
 
@@ -290,7 +290,7 @@ export async function render(container) {
       // dem Kasten unter dem Formular. Sperre und Verbindung gehoeren keinem
       // Feld - dort steht die Meldung vor dem Knopf und nimmt den Fokus.
       // `finally` gibt die Felder erst danach wieder frei: der Fokus folgt dort.
-      pendingError = { message, field: err.status === 401 ? passwordInput : null };
+      pendingError = { sentence: message, field: err.status === 401 ? passwordInput : null };
     } finally {
       submitBtn.disabled = false;
       usernameInput.disabled = false;
@@ -298,7 +298,7 @@ export async function render(container) {
       labelEl.textContent = t('login.loginButton');
       spinner.remove();
       if (pendingError) {
-        showAuthError(errorEl, pendingError.message, pendingError.field);
+        showAuthError(errorEl, pendingError.sentence, pendingError.field);
         pendingError.field?.select?.();
       }
     }
@@ -402,7 +402,7 @@ function renderSecondFactor(container, { recoveryAvailable }) {
       // von vorn zu beheben ist.
       let message;
       if (err.status === 429) message = t('login.tooManyAttempts');
-      else if (err.status === 401 && /pending/i.test(err.message || '')) message = t('login.twoFactorExpired');
+      else if (err.status === 401 && err.data?.reason === 'two_factor_no_pending_sign_in') message = t('login.twoFactorExpired');
       else if (err.status === 401) message = t('login.twoFactorInvalid');
       else message = t('login.networkError');
       showError(error, message);

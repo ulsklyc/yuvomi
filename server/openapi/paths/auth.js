@@ -840,6 +840,11 @@ const CASE_REASONS = {
     post: '`account_cannot_sign_in` (403, the account is deactivated or may not sign in), `password_login_disabled` (403, password login is turned off for this instance)',
   },
   '/api/v1/auth/2fa/enable': { post: INVALID_CODE },
+  // #1909: was die Anmeldeseite und das Konto-Blatt unterscheiden.
+  '/api/v1/auth/2fa/verify': { post: '`two_factor_no_pending_sign_in` (401, no sign-in is waiting for a code, or it has expired), `account_cannot_sign_in` (403, the account is deactivated or may not sign in)' },
+  '/api/v1/auth/2fa/setup': { post: '`already_enabled` (409, two-factor authentication is already turned on)' },
+  '/api/v1/auth/oidc/link/start': { post: '`oidc_not_configured` (404, SSO is not set up on this instance), `oidc_already_linked` (409, the account is already linked)' },
+  '/api/v1/auth/oidc/link': { delete: '`oidc_not_linked` (409, the account is not linked), `oidc_password_required` (409, the account has no password, so the link is its only way in), `last_sso_admin` (409, the last administrator linked to SSO cannot unlink while password login is off)' },
   '/api/v1/auth/2fa/disable': { post: `${INVALID_CODE}, ${NOT_ENABLED}` },
   '/api/v1/auth/2fa/recovery-codes': { post: `${INVALID_CODE}, ${NOT_ENABLED}` },
   '/api/v1/auth/logout-others': { post: '`browser_session_required` (403, only a signed-in browser session can sign out the other sessions, not an API token)' },

@@ -1965,6 +1965,8 @@
         "pageCountdownsModuleDescription": "Genel bakışta süresi dolmuş önemli tarihler için ek süreyi ayarlayın.",
         "rewardsApprovalLabel": "Ebeveyn onayı iste",
         "rewardsApprovalHint": "Kullanımların bir yönetici tarafından onaylanması gerekir. Kapalıyken hemen verilir.",
+        "rewardsLateDecayLabel": "Geç tamamlama puan kaybı",
+        "rewardsLateDecayHint": "Geciken her takvim günü için 1 puan eksik, en az 1 puan kalır. Taşınan son tarih, işaretlendiği andan itibaren geçerlidir.",
         "rewardsSaved": "Ödül ayarı kaydedildi.",
         "rewardsDefaultPointsHint": "Yeni görevler otomatik olarak bu puan değeriyle doldurulur. Her görevde değiştirilebilir.",
         "rewardsDefaultPointsLabel": "Yeni görevler için puan",
@@ -3526,7 +3528,13 @@
         "memberErrorUsernameTaken": "Bu kullanıcı adı başka bir hesapta zaten var.",
         "memberErrorGone": "Bu üye artık yok.",
         "memberErrorSsoEmailRequired": "Yalnızca SSO kullanan bir hesabın, ilk SSO girişinin onu bulabilmesi için bir e-posta adresine ihtiyacı var.",
-        "memberErrorSsoEmailAmbiguous": "Bu e-posta adresi zaten başka bir üyede. SSO hesapları birbirinden ayıramaz."
+        "memberErrorSsoEmailAmbiguous": "Bu e-posta adresi zaten başka bir üyede. SSO hesapları birbirinden ayıramaz.",
+        "twoFactorAlreadyEnabled": "İki adımlı doğrulama zaten etkin. Güncel durumu görmek için sayfayı yeniden yükle.",
+        "twoFactorSetupExpired": "Kurulumun süresi doldu. İptal et ve yeniden başla.",
+        "oidcLinkErrorNotConfigured": "SSO bu sunucuda artık kurulu değil.",
+        "oidcUnlinkNotLinked": "Bu hesap artık SSO ile bağlı değil. Güncel durumu görmek için sayfayı yeniden yükle.",
+        "displayErrorGone": "Bu duvar tableti artık yok.",
+        "displayDeviceErrorGone": "Bu cihaz artık yok."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",
@@ -6134,6 +6142,9 @@
         "balanceBelowZeroShort": "Sonraki puanlar bunu kapatır",
         "pendingBalanceBelowZero": "Güncel bakiye: {{points}}",
         "ledgerTaskReopened": "Görev yeniden açıldı",
+        "ledgerLateDecayNote": "{{count}} gün gecikme",
+        "ledgerLateDecayNote_one": "{{count}} gün gecikme",
+        "ledgerLateDecayInsteadOf": "{{count}} yerine",
         "ledgerTaskReopenedNamed": "Yeniden açıldı: {{task}}",
         "progressLabel": "Bir sonraki ödüle ilerleme",
         "noRewardsYet": "Henüz ödül yok",

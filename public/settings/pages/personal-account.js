@@ -508,7 +508,8 @@ export const GRAVATAR_REASON_KEYS = Object.freeze({
 /**
  * Fehlertext fuer den Gravatar-Abruf. Ein 429 ohne `reason` (etwa vom
  * allgemeinen Limit davor) liest sich ebenfalls als "zu oft", nicht als
- * Fehlschlag; alles Unbekannte faellt auf den Servertext zurueck.
+ * Fehlschlag; alles Unbekannte sagt den Satz von errorSentence (#1909), nie
+ * den englischen Servertext.
  * `host` ist der Dienst, den die Saetze nennen (`gravatarHost` aus /auth/me).
  * @param {{ status?: number, data?: { reason?: string }, message?: string }} err
  * @param {string} [host]
@@ -518,7 +519,7 @@ export function gravatarErrorText(err, host = '') {
   const key = GRAVATAR_REASON_KEYS[err?.data?.reason];
   if (key) return host ? t(key, { host }) : t(key);
   if (err?.status === 429) return t('settings.gravatarErrorRateLimited');
-  return err?.message || t('common.errorGeneric');
+  return errorSentence(err);
 }
 
 /**
@@ -533,7 +534,11 @@ function twoFactorErrorText(err) {
   if (reason === 'invalid_code') return t('settings.twoFactorInvalidCode');
   if (reason === 'required')     return t('settings.twoFactorRequiredByHousehold');
   if (reason === 'not_enabled')  return t('settings.twoFactorNotEnabled');
-  return err?.message || t('settings.twoFactorGenericError');
+  // Ein zweiter Tab hat sie inzwischen eingeschaltet, oder die Einrichtung ist
+  // abgelaufen (#1909): beides behebt nur ein neuer Anlauf.
+  if (reason === 'already_enabled')  return t('settings.twoFactorAlreadyEnabled');
+  if (reason === 'no_pending_setup') return t('settings.twoFactorSetupExpired');
+  return errorSentence(err, 'settings.twoFactorGenericError');
 }
 
 /**
@@ -796,7 +801,7 @@ function bindOidcEvents(container) {
       else throw new Error('missing url');
     } catch (err) {
       button.disabled = false;
-      showError(error, err?.message || t('settings.oidcLinkErrorGeneric'));
+      showError(error, errorSentence(err, 'settings.oidcLinkErrorGeneric'));
     }
   });
 
@@ -809,7 +814,7 @@ function bindOidcEvents(container) {
       location.reload();
     } catch (err) {
       button.disabled = false;
-      showError(error, err?.message || t('settings.oidcLinkErrorGeneric'));
+      showError(error, errorSentence(err, 'settings.oidcLinkErrorGeneric'));
     }
   });
 }
@@ -851,7 +856,8 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
       profileState.avatarData = avatarData;
       updatePreview();
     } catch (error) {
-      showError(profileError, error.message);
+      // Die Pruefung des Bildes sagt ihren eigenen, uebersetzten Satz (#1909).
+      showError(profileError, error?.name === 'ImageProblem' && error.sentence ? error.sentence : t('common.errorGeneric'));
     }
   });
 

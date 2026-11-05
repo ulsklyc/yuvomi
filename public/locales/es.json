@@ -1965,6 +1965,8 @@
         "pageCountdownsModuleDescription": "Configura el periodo de gracia para las fechas clave vencidas en el resumen.",
         "rewardsApprovalLabel": "Requerir aprobación de los padres",
         "rewardsApprovalHint": "Los canjes deben ser confirmados por un administrador. Si la opción está desactivada, se aprueban de inmediato.",
+        "rewardsLateDecayLabel": "Descuento por entrega tardía",
+        "rewardsLateDecayHint": "Un punto menos por día natural de retraso, al menos queda 1 punto. Una fecha movida cuenta desde el marcado.",
         "rewardsSaved": "Ajuste de recompensas guardado.",
         "rewardsDefaultPointsHint": "Las tareas nuevas se rellenan automáticamente con este valor. Se puede modificar en cada tarea.",
         "rewardsDefaultPointsLabel": "Puntos para tareas nuevas",
@@ -3526,7 +3528,13 @@
         "memberErrorUsernameTaken": "Otra cuenta ya tiene este nombre de usuario.",
         "memberErrorGone": "Este miembro ya no existe.",
         "memberErrorSsoEmailRequired": "Una cuenta solo con SSO necesita una dirección de correo para que el primer inicio de sesión con SSO la encuentre.",
-        "memberErrorSsoEmailAmbiguous": "Otro miembro ya tiene esta dirección de correo. SSO no podría distinguir las cuentas."
+        "memberErrorSsoEmailAmbiguous": "Otro miembro ya tiene esta dirección de correo. SSO no podría distinguir las cuentas.",
+        "twoFactorAlreadyEnabled": "La autenticación en dos pasos ya está activada. Recarga la página para ver el estado actual.",
+        "twoFactorSetupExpired": "La configuración ha caducado. Cancélala y vuelve a empezar.",
+        "oidcLinkErrorNotConfigured": "SSO ya no está configurado en este servidor.",
+        "oidcUnlinkNotLinked": "Esta cuenta ya no está vinculada a SSO. Recarga la página para ver el estado actual.",
+        "displayErrorGone": "Esta tableta de pared ya no existe.",
+        "displayDeviceErrorGone": "Este dispositivo ya no existe."
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",
@@ -6134,6 +6142,9 @@
         "balanceBelowZeroShort": "Los próximos puntos lo cubren",
         "pendingBalanceBelowZero": "Saldo actual: {{points}}",
         "ledgerTaskReopened": "Tarea reabierta",
+        "ledgerLateDecayNote": "{{count}} días de retraso",
+        "ledgerLateDecayNote_one": "{{count}} día de retraso",
+        "ledgerLateDecayInsteadOf": "en lugar de {{count}}",
         "ledgerTaskReopenedNamed": "Reabierta: {{task}}",
         "progressLabel": "Progreso hacia la próxima recompensa",
         "noRewardsYet": "Aún no hay premios",

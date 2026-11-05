@@ -684,6 +684,10 @@
 .rw-ledger-row__reason,
 .rw-ledger-row__meta { margin: 0; }
 .rw-delta { flex: 0 0 auto; font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
+/* Spaetabzug: der volle Wert bleibt sichtbar, aber zurueckgenommen - der
+ * ausgezahlte Betrag daneben zaehlt (Zeile erklaert sich selbst). */
+.rw-delta__base { color: var(--color-text-secondary); text-decoration: line-through; }
+.rw-ledger-row__decay { color: var(--color-text-secondary); }
 /* Die Richtung der Buchung ist eine WERT-Aussage, keine Modul-Aussage: sie
  * nimmt den Zuwachs-Ton der App (Geld-Vokabular des Budgets), nicht den Ton des
  * Aufgabenmoduls, aus dem der Punkt zufällig stammte. */

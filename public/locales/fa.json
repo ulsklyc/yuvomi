@@ -1983,6 +1983,8 @@
         "pageCountdownsModuleDescription": "دوره مهلت را برای مهلت‌های منقضی‌شده در نمای کلی تنظیم کنید.",
         "rewardsApprovalLabel": "نیاز به تأیید والدین",
         "rewardsApprovalHint": "بازخریدها باید توسط مدیر تأیید شوند. وقتی خاموش باشد، بلافاصله اعطا می‌شوند.",
+        "rewardsLateDecayLabel": "کاهش امتیاز به دلیل تکمیل دیرهنگام",
+        "rewardsLateDecayHint": "یک امتیاز کمتر به ازای هر روز تقویمی تأخیر، دست‌کم ۱ امتیاز می‌ماند. تاریخ منتقل‌شده از لحظه ثبت حساب می‌شود.",
         "rewardsSaved": "تنظیم پاداش‌ها ذخیره شد.",
         "rewardsDefaultPointsHint": "کارهای جدید به‌طور خودکار با این امتیاز پر می‌شوند. برای هر کار قابل تغییر است.",
         "rewardsDefaultPointsLabel": "امتیاز کارهای جدید",
@@ -3544,7 +3546,13 @@
         "memberErrorUsernameTaken": "حساب دیگری این نام کاربری را دارد.",
         "memberErrorGone": "این عضو دیگر وجود ندارد.",
         "memberErrorSsoEmailRequired": "حسابی که فقط با SSO وارد می‌شود به نشانی ایمیل نیاز دارد تا نخستین ورود با SSO آن را پیدا کند.",
-        "memberErrorSsoEmailAmbiguous": "این نشانی ایمیل را عضو دیگری دارد. SSO نمی‌تواند این حساب‌ها را از هم تشخیص دهد."
+        "memberErrorSsoEmailAmbiguous": "این نشانی ایمیل را عضو دیگری دارد. SSO نمی‌تواند این حساب‌ها را از هم تشخیص دهد.",
+        "twoFactorAlreadyEnabled": "احراز هویت دومرحله‌ای از قبل فعال است. صفحه را دوباره بارگذاری کنید تا وضعیت فعلی را ببینید.",
+        "twoFactorSetupExpired": "زمان راه‌اندازی تمام شده است. آن را لغو کنید و دوباره شروع کنید.",
+        "oidcLinkErrorNotConfigured": "SSO دیگر روی این سرور راه‌اندازی نشده است.",
+        "oidcUnlinkNotLinked": "این حساب دیگر به SSO پیوند ندارد. صفحه را دوباره بارگذاری کنید تا وضعیت فعلی را ببینید.",
+        "displayErrorGone": "این تبلت دیواری دیگر وجود ندارد.",
+        "displayDeviceErrorGone": "این دستگاه دیگر وجود ندارد."
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",
@@ -6134,6 +6142,9 @@
         "balanceBelowZeroShort": "امتیازهای بعدی جبرانش می‌کنند",
         "pendingBalanceBelowZero": "موجودی فعلی: {{points}}",
         "ledgerTaskReopened": "کار دوباره باز شد",
+        "ledgerLateDecayNote": "{{count}} روز تأخیر",
+        "ledgerLateDecayNote_one": "{{count}} روز تأخیر",
+        "ledgerLateDecayInsteadOf": "به‌جای {{count}}",
         "ledgerTaskReopenedNamed": "دوباره باز شد: {{task}}",
         "progressLabel": "پیشرفت به سوی پاداش بعدی",
         "noRewardsYet": "هنوز جایزه‌ای نیست",

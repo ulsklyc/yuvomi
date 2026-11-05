@@ -1965,6 +1965,8 @@
         "pageCountdownsModuleDescription": "概要で期限切れになった残り日数の猶予期間を設定します。",
         "rewardsApprovalLabel": "保護者の承認を必須にする",
         "rewardsApprovalHint": "交換は管理者が承認する必要があります。オフの場合はすぐに付与されます。",
+        "rewardsLateDecayLabel": "期限超過の減点",
+        "rewardsLateDecayHint": "期限超過1暦日につき1点減、最低1点は残ります。変更した期限はチェックした時点から数えます。",
         "rewardsSaved": "ごほうびの設定を保存しました。",
         "rewardsDefaultPointsHint": "新しいタスクにこのポイントが自動で入力されます。タスクごとに変更できます。",
         "rewardsDefaultPointsLabel": "新しいタスクのポイント",
@@ -3526,7 +3528,13 @@
         "memberErrorUsernameTaken": "このユーザー名は別のアカウントが使用しています。",
         "memberErrorGone": "このメンバーはもう存在しません。",
         "memberErrorSsoEmailRequired": "SSOのみのアカウントには、最初のSSOサインインで見つけられるようにメールアドレスが必要です。",
-        "memberErrorSsoEmailAmbiguous": "このメールアドレスは別のメンバーが使用しています。SSOではアカウントを区別できません。"
+        "memberErrorSsoEmailAmbiguous": "このメールアドレスは別のメンバーが使用しています。SSOではアカウントを区別できません。",
+        "twoFactorAlreadyEnabled": "二要素認証はすでに有効です。ページを再読み込みして現在の状態を確認してください。",
+        "twoFactorSetupExpired": "設定の有効期限が切れました。キャンセルしてやり直してください。",
+        "oidcLinkErrorNotConfigured": "このサーバーでは SSO が設定されていません。",
+        "oidcUnlinkNotLinked": "このアカウントは SSO と連携していません。ページを再読み込みして現在の状態を確認してください。",
+        "displayErrorGone": "この壁掛けタブレットはもう存在しません。",
+        "displayDeviceErrorGone": "この端末はもう存在しません。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",
@@ -6134,6 +6142,9 @@
         "balanceBelowZeroShort": "次のポイントで埋まります",
         "pendingBalanceBelowZero": "現在の残高: {{points}}",
         "ledgerTaskReopened": "タスクを再開",
+        "ledgerLateDecayNote": "{{count}}日超過",
+        "ledgerLateDecayNote_one": "{{count}}日超過",
+        "ledgerLateDecayInsteadOf": "{{count}} の代わりに",
         "ledgerTaskReopenedNamed": "再開: {{task}}",
         "progressLabel": "次のごほうびへの進捗",
         "noRewardsYet": "景品はまだありません",

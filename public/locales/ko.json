@@ -1983,6 +1983,8 @@
         "pageCountdownsModuleDescription": "개요에서 만료된 남은 기간의 유예 기간을 설정합니다.",
         "rewardsApprovalLabel": "부모 승인 필요",
         "rewardsApprovalHint": "교환은 관리자가 확인해야 합니다. 꺼져 있으면 즉시 승인됩니다.",
+        "rewardsLateDecayLabel": "지연 완료 시 포인트 감산",
+        "rewardsLateDecayHint": "지난일 하루당 1점 감소, 최소 1점은 남습니다. 옮긴 마감일은 체크한 시점부터 계산합니다.",
         "rewardsSaved": "보상 설정이 저장되었습니다.",
         "rewardsDefaultPointsHint": "새 할 일에 이 포인트가 자동으로 입력됩니다. 할 일마다 변경할 수 있습니다.",
         "rewardsDefaultPointsLabel": "새 할 일의 포인트",
@@ -3544,7 +3546,13 @@
         "memberErrorUsernameTaken": "다른 계정이 이미 이 사용자 이름을 사용하고 있습니다.",
         "memberErrorGone": "이 구성원은 더 이상 없습니다.",
         "memberErrorSsoEmailRequired": "SSO 전용 계정에는 첫 SSO 로그인이 찾을 수 있도록 이메일 주소가 필요합니다.",
-        "memberErrorSsoEmailAmbiguous": "다른 구성원이 이미 이 이메일 주소를 사용하고 있습니다. SSO가 계정을 구별할 수 없습니다."
+        "memberErrorSsoEmailAmbiguous": "다른 구성원이 이미 이 이메일 주소를 사용하고 있습니다. SSO가 계정을 구별할 수 없습니다.",
+        "twoFactorAlreadyEnabled": "2단계 인증이 이미 켜져 있습니다. 현재 상태를 보려면 페이지를 새로 고치세요.",
+        "twoFactorSetupExpired": "설정이 만료되었습니다. 취소하고 다시 시작하세요.",
+        "oidcLinkErrorNotConfigured": "이 서버에는 더 이상 SSO가 설정되어 있지 않습니다.",
+        "oidcUnlinkNotLinked": "이 계정은 더 이상 SSO와 연결되어 있지 않습니다. 현재 상태를 보려면 페이지를 새로 고치세요.",
+        "displayErrorGone": "이 벽면 태블릿은 더 이상 없습니다.",
+        "displayDeviceErrorGone": "이 기기는 더 이상 없습니다."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",
@@ -6134,6 +6142,9 @@
         "balanceBelowZeroShort": "다음 포인트로 채워집니다",
         "pendingBalanceBelowZero": "현재 잔액: {{points}}",
         "ledgerTaskReopened": "작업 다시 열림",
+        "ledgerLateDecayNote": "{{count}}일 지연",
+        "ledgerLateDecayNote_one": "{{count}}일 지연",
+        "ledgerLateDecayInsteadOf": "{{count}} 대신",
         "ledgerTaskReopenedNamed": "다시 열림: {{task}}",
         "progressLabel": "다음 보상까지의 진행률",
         "noRewardsYet": "아직 상품이 없습니다",

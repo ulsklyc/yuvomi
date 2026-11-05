@@ -1965,6 +1965,8 @@
         "pageCountdownsModuleDescription": "Ställ in respitperioden för utgångna viktiga datum i översikten.",
         "rewardsApprovalLabel": "Kräv förälders godkännande",
         "rewardsApprovalHint": "Inlösen måste bekräftas av en administratör. När av beviljas de omedelbart.",
+        "rewardsLateDecayLabel": "Poängavdrag för försenat klarande",
+        "rewardsLateDecayHint": "Ett poäng mindre per försenad kalenderdag, minst 1 poäng återstår. En flyttad deadline räknas från bockandet.",
         "rewardsSaved": "Belöningsinställning sparad.",
         "rewardsDefaultPointsHint": "Nya uppgifter fylls automatiskt i med det här poängvärdet. Det kan ändras per uppgift.",
         "rewardsDefaultPointsLabel": "Poäng för nya uppgifter",
@@ -3526,7 +3528,13 @@
         "memberErrorUsernameTaken": "Ett annat konto har redan det här användarnamnet.",
         "memberErrorGone": "Den här medlemmen finns inte längre.",
         "memberErrorSsoEmailRequired": "Ett konto med enbart SSO behöver en e-postadress så att den första SSO-inloggningen hittar det.",
-        "memberErrorSsoEmailAmbiguous": "En annan medlem har redan den här e-postadressen. SSO skulle inte kunna skilja kontona åt."
+        "memberErrorSsoEmailAmbiguous": "En annan medlem har redan den här e-postadressen. SSO skulle inte kunna skilja kontona åt.",
+        "twoFactorAlreadyEnabled": "Tvåfaktorsinloggning är redan aktiverad. Ladda om sidan för att se aktuellt läge.",
+        "twoFactorSetupExpired": "Konfigurationen har gått ut. Avbryt och börja om.",
+        "oidcLinkErrorNotConfigured": "SSO är inte längre konfigurerat på den här servern.",
+        "oidcUnlinkNotLinked": "Det här kontot är inte längre kopplat till SSO. Ladda om sidan för att se aktuellt läge.",
+        "displayErrorGone": "Den här väggplattan finns inte längre.",
+        "displayDeviceErrorGone": "Den här enheten finns inte längre."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",
@@ -6134,6 +6142,9 @@
         "balanceBelowZeroShort": "Nästa poäng jämnar ut det",
         "pendingBalanceBelowZero": "Nuvarande saldo: {{points}}",
         "ledgerTaskReopened": "Uppgift öppnad igen",
+        "ledgerLateDecayNote": "{{count}} dagar försenad",
+        "ledgerLateDecayNote_one": "{{count}} dag försenad",
+        "ledgerLateDecayInsteadOf": "i stället för {{count}}",
         "ledgerTaskReopenedNamed": "Öppnad igen: {{task}}",
         "progressLabel": "Framsteg mot nästa belöning",
         "noRewardsYet": "Inga belöningar ännu",

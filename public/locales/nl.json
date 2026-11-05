@@ -1965,6 +1965,8 @@
         "pageCountdownsModuleDescription": "Stel de respijtperiode in voor verlopen belangrijke data op het overzicht.",
         "rewardsApprovalLabel": "Goedkeuring van ouder vereisen",
         "rewardsApprovalHint": "Inwisselingen moeten door een beheerder worden bevestigd. Wanneer uit, worden ze meteen toegekend.",
+        "rewardsLateDecayLabel": "Puntverlies bij te late afronding",
+        "rewardsLateDecayHint": "Eén punt minder per verlopen kalenderdag, minimaal 1 punt blijft. Een verplaatste datum telt vanaf het afvinken.",
         "rewardsSaved": "Beloningsinstelling opgeslagen.",
         "rewardsDefaultPointsHint": "Nieuwe taken krijgen deze puntwaarde automatisch. Per taak aan te passen.",
         "rewardsDefaultPointsLabel": "Punten voor nieuwe taken",
@@ -3526,7 +3528,13 @@
         "memberErrorUsernameTaken": "Een ander account heeft deze gebruikersnaam al.",
         "memberErrorGone": "Dit lid bestaat niet meer.",
         "memberErrorSsoEmailRequired": "Een account met alleen SSO heeft een e-mailadres nodig, zodat de eerste SSO-aanmelding het kan vinden.",
-        "memberErrorSsoEmailAmbiguous": "Een ander lid heeft dit e-mailadres al. SSO zou de accounts niet uit elkaar kunnen houden."
+        "memberErrorSsoEmailAmbiguous": "Een ander lid heeft dit e-mailadres al. SSO zou de accounts niet uit elkaar kunnen houden.",
+        "twoFactorAlreadyEnabled": "Tweestapsverificatie is al ingeschakeld. Laad de pagina opnieuw om de huidige stand te zien.",
+        "twoFactorSetupExpired": "De instelling is verlopen. Annuleer en begin opnieuw.",
+        "oidcLinkErrorNotConfigured": "SSO is niet meer ingesteld op deze server.",
+        "oidcUnlinkNotLinked": "Dit account is niet meer gekoppeld aan SSO. Laad de pagina opnieuw om de huidige stand te zien.",
+        "displayErrorGone": "Deze wandtablet bestaat niet meer.",
+        "displayDeviceErrorGone": "Dit apparaat bestaat niet meer."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",
@@ -6134,6 +6142,9 @@
         "balanceBelowZeroShort": "Volgende punten maken dit goed",
         "pendingBalanceBelowZero": "Huidig saldo: {{points}}",
         "ledgerTaskReopened": "Taak heropend",
+        "ledgerLateDecayNote": "{{count}} dagen te laat",
+        "ledgerLateDecayNote_one": "{{count}} dag te laat",
+        "ledgerLateDecayInsteadOf": "in plaats van {{count}}",
         "ledgerTaskReopenedNamed": "Heropend: {{task}}",
         "progressLabel": "Voortgang naar de volgende beloning",
         "noRewardsYet": "Nog geen beloningen",

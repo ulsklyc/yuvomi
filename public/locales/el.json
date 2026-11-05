@@ -1965,6 +1965,8 @@
         "pageCountdownsModuleDescription": "Ορίστε την περίοδο χάριτος για ληγμένες προθεσμίες στην επισκόπηση.",
         "rewardsApprovalLabel": "Απαιτείται έγκριση γονέα",
         "rewardsApprovalHint": "Οι εξαργυρώσεις πρέπει να επιβεβαιωθούν από διαχειριστή. Όταν είναι ανενεργό, εγκρίνονται αμέσως.",
+        "rewardsLateDecayLabel": "Μείωση πόντων για εκπρόθεσμη ολοκλήρωση",
+        "rewardsLateDecayHint": "Ένα πόντο λιγότερο ανά ημερολογιακή ημέρα εκπνοής, μένει τουλάχιστον 1. Η μετακινημένη προθεσμία μετρά από την ολοκλήρωση.",
         "rewardsSaved": "Η ρύθμιση επιβραβεύσεων αποθηκεύτηκε.",
         "rewardsDefaultPointsHint": "Οι νέες εργασίες συμπληρώνονται αυτόματα με αυτήν την τιμή. Μπορεί να αλλάξει ανά εργασία.",
         "rewardsDefaultPointsLabel": "Πόντοι για νέες εργασίες",
@@ -3526,7 +3528,13 @@
         "memberErrorUsernameTaken": "Αυτό το όνομα χρήστη το έχει ήδη άλλος λογαριασμός.",
         "memberErrorGone": "Αυτό το μέλος δεν υπάρχει πια.",
         "memberErrorSsoEmailRequired": "Ένας λογαριασμός μόνο με SSO χρειάζεται διεύθυνση email, ώστε να τον βρει η πρώτη σύνδεση μέσω SSO.",
-        "memberErrorSsoEmailAmbiguous": "Αυτή τη διεύθυνση email την έχει ήδη άλλο μέλος. Το SSO δεν θα μπορούσε να ξεχωρίσει τους λογαριασμούς."
+        "memberErrorSsoEmailAmbiguous": "Αυτή τη διεύθυνση email την έχει ήδη άλλο μέλος. Το SSO δεν θα μπορούσε να ξεχωρίσει τους λογαριασμούς.",
+        "twoFactorAlreadyEnabled": "Ο έλεγχος ταυτότητας δύο παραγόντων είναι ήδη ενεργός. Φόρτωσε ξανά τη σελίδα για να δεις την τρέχουσα κατάσταση.",
+        "twoFactorSetupExpired": "Η ρύθμιση έληξε. Ακύρωσέ την και ξεκίνα ξανά.",
+        "oidcLinkErrorNotConfigured": "Το SSO δεν είναι πλέον ρυθμισμένο σε αυτόν τον διακομιστή.",
+        "oidcUnlinkNotLinked": "Αυτός ο λογαριασμός δεν είναι πλέον συνδεδεμένος με SSO. Φόρτωσε ξανά τη σελίδα για να δεις την τρέχουσα κατάσταση.",
+        "displayErrorGone": "Αυτό το επιτοίχιο tablet δεν υπάρχει πια.",
+        "displayDeviceErrorGone": "Αυτή η συσκευή δεν υπάρχει πια."
     },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά. Το σπίτι σας σε ένα μέρος.",
@@ -6134,6 +6142,9 @@
         "balanceBelowZeroShort": "Οι επόμενοι πόντοι το καλύπτουν",
         "pendingBalanceBelowZero": "Τρέχον υπόλοιπο πόντων: {{points}}",
         "ledgerTaskReopened": "Η εργασία άνοιξε ξανά",
+        "ledgerLateDecayNote": "{{count}} ημέρες εκπρόθεσμα",
+        "ledgerLateDecayNote_one": "{{count}} ημέρα εκπρόθεσμα",
+        "ledgerLateDecayInsteadOf": "αντί {{count}}",
         "ledgerTaskReopenedNamed": "Άνοιξε ξανά: {{task}}",
         "progressLabel": "Πρόοδος προς την επόμενη ανταμοιβή",
         "noRewardsYet": "Δεν υπάρχουν ακόμη βραβεία",
