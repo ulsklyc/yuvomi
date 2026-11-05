@@ -3521,7 +3521,12 @@
         "backupDbKeyCopyFailed": "A másolás nem sikerült. A kulcs ki van jelölve, másold kézzel.",
         "backupDbKeyStoredAt": "A szerveren tárolva itt: {{path}}",
         "backupDbKeyConfigHint": "A kulcs a konfigurációdból származik. Őrizd ott biztonságban: nélküle a mentéseid nem nyithatók meg.",
-        "backupDbKeyPlainHint": "Az adatbázis nincs titkosítva, így a mentések olvasható formában tartalmazzák az adataidat. Saját DB_ENCRYPTION_KEY esetén a Yuvomi a következő indításkor titkosítja."
+        "backupDbKeyPlainHint": "Az adatbázis nincs titkosítva, így a mentések olvasható formában tartalmazzák az adataidat. Saját DB_ENCRYPTION_KEY esetén a Yuvomi a következő indításkor titkosítja.",
+        "memberErrorUsernameInvalid": "A felhasználónévnek 3-64 karakterből kell állnia, és csak ékezet nélküli betűket, számjegyeket, pontot, kötőjelet és aláhúzást tartalmazhat.",
+        "memberErrorUsernameTaken": "Ez a felhasználónév már egy másik fiókhoz tartozik.",
+        "memberErrorGone": "Ez a tag már nem létezik.",
+        "memberErrorSsoEmailRequired": "A csak SSO-s fióknak e-mail-cím kell, hogy az első SSO-bejelentkezés megtalálja.",
+        "memberErrorSsoEmailAmbiguous": "Ez az e-mail-cím már egy másik tagé. Az SSO nem tudná megkülönböztetni a fiókokat."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

@@ -3539,7 +3539,12 @@
         "backupDbKeyCopyFailed": "Kopieren hat nicht geklappt. Der Schlüssel ist markiert, kopiere ihn von Hand.",
         "backupDbKeyStoredAt": "Auf dem Server gespeichert in {{path}}",
         "backupDbKeyConfigHint": "Der Schlüssel kommt aus deiner Konfiguration. Bewahre ihn dort sicher auf: ohne ihn lassen sich deine Backups nicht öffnen.",
-        "backupDbKeyPlainHint": "Die Datenbank ist nicht verschlüsselt, Backups enthalten deine Daten also lesbar. Mit einem eigenen DB_ENCRYPTION_KEY verschlüsselt Yuvomi sie beim nächsten Start."
+        "backupDbKeyPlainHint": "Die Datenbank ist nicht verschlüsselt, Backups enthalten deine Daten also lesbar. Mit einem eigenen DB_ENCRYPTION_KEY verschlüsselt Yuvomi sie beim nächsten Start.",
+        "memberErrorUsernameInvalid": "Der Benutzername braucht 3 bis 64 Zeichen und darf nur Buchstaben ohne Umlaute, Ziffern, Punkt, Bindestrich und Unterstrich enthalten.",
+        "memberErrorUsernameTaken": "Diesen Benutzernamen hat schon ein anderes Konto.",
+        "memberErrorGone": "Dieses Mitglied gibt es nicht mehr.",
+        "memberErrorSsoEmailRequired": "Ein Konto nur mit SSO braucht eine E-Mail-Adresse, damit die erste SSO-Anmeldung es findet.",
+        "memberErrorSsoEmailAmbiguous": "Diese E-Mail-Adresse hat schon ein anderes Mitglied. SSO könnte die Konten nicht auseinanderhalten."
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",

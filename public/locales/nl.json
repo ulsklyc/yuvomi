@@ -3521,7 +3521,12 @@
         "backupDbKeyCopyFailed": "Kopiëren is niet gelukt. De sleutel is geselecteerd, kopieer hem met de hand.",
         "backupDbKeyStoredAt": "Op de server opgeslagen in {{path}}",
         "backupDbKeyConfigHint": "De sleutel komt uit je configuratie. Bewaar hem daar veilig: zonder hem kunnen je back-ups niet worden geopend.",
-        "backupDbKeyPlainHint": "De database is niet versleuteld, dus back-ups bevatten je gegevens leesbaar. Met een eigen DB_ENCRYPTION_KEY versleutelt Yuvomi hem bij de volgende start."
+        "backupDbKeyPlainHint": "De database is niet versleuteld, dus back-ups bevatten je gegevens leesbaar. Met een eigen DB_ENCRYPTION_KEY versleutelt Yuvomi hem bij de volgende start.",
+        "memberErrorUsernameInvalid": "De gebruikersnaam moet 3 tot 64 tekens hebben en mag alleen letters zonder accenten, cijfers, punten, koppeltekens en underscores bevatten.",
+        "memberErrorUsernameTaken": "Een ander account heeft deze gebruikersnaam al.",
+        "memberErrorGone": "Dit lid bestaat niet meer.",
+        "memberErrorSsoEmailRequired": "Een account met alleen SSO heeft een e-mailadres nodig, zodat de eerste SSO-aanmelding het kan vinden.",
+        "memberErrorSsoEmailAmbiguous": "Een ander lid heeft dit e-mailadres al. SSO zou de accounts niet uit elkaar kunnen houden."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

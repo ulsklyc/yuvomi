@@ -3539,7 +3539,12 @@
         "backupDbKeyCopyFailed": "Penyalinan tidak berhasil. Kunci sudah dipilih, salin secara manual.",
         "backupDbKeyStoredAt": "Disimpan di server di {{path}}",
         "backupDbKeyConfigHint": "Kunci berasal dari konfigurasimu. Simpan dengan aman di sana: tanpanya, cadanganmu tidak bisa dibuka.",
-        "backupDbKeyPlainHint": "Basis data tidak dienkripsi, jadi cadangan berisi datamu dalam bentuk yang bisa dibaca. Dengan DB_ENCRYPTION_KEY milikmu sendiri, Yuvomi mengenkripsinya saat dijalankan berikutnya."
+        "backupDbKeyPlainHint": "Basis data tidak dienkripsi, jadi cadangan berisi datamu dalam bentuk yang bisa dibaca. Dengan DB_ENCRYPTION_KEY milikmu sendiri, Yuvomi mengenkripsinya saat dijalankan berikutnya.",
+        "memberErrorUsernameInvalid": "Nama pengguna harus 3 sampai 64 karakter dan hanya boleh berisi huruf tanpa aksen, angka, titik, tanda hubung, dan garis bawah.",
+        "memberErrorUsernameTaken": "Akun lain sudah memakai nama pengguna ini.",
+        "memberErrorGone": "Anggota ini sudah tidak ada.",
+        "memberErrorSsoEmailRequired": "Akun khusus SSO memerlukan alamat email agar masuk pertama lewat SSO dapat menemukannya.",
+        "memberErrorSsoEmailAmbiguous": "Anggota lain sudah memakai alamat email ini. SSO tidak dapat membedakan akun-akun tersebut."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

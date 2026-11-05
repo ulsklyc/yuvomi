@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **Adding, editing and inviting family members say what went wrong in your language** (#1909).
+  The error line in these dialogs showed the server's English text. It now says in your language
+  that the username is invalid or already taken, that an account without a password needs an
+  email address that no other member has, or that at least one administrator (or the last one
+  linked to SSO) must stay, also when you demote yourself. A member another administrator removed
+  in the meantime closes the dialog and leaves the list. Errors while loading members, invitations,
+  two-factor status and roles and permissions are in your language too. API clients get the case
+  as `reason`.
 - **An event the provider cancels no longer reminds anyone** (#2499). When an ICS subscription,
   a CalDAV calendar or iCloud marks an event as cancelled without deleting it, its reminders stay
   silent, and the dashboard, the Today sheet, the wall tablet and the countdowns leave it out. The

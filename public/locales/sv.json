@@ -3521,7 +3521,12 @@
         "backupDbKeyCopyFailed": "Kopieringen fungerade inte. Nyckeln är markerad, kopiera den för hand.",
         "backupDbKeyStoredAt": "Sparad på servern i {{path}}",
         "backupDbKeyConfigHint": "Nyckeln kommer från din konfiguration. Förvara den säkert där: utan den går dina säkerhetskopior inte att öppna.",
-        "backupDbKeyPlainHint": "Databasen är inte krypterad, så säkerhetskopiorna innehåller dina data i läsbar form. Med en egen DB_ENCRYPTION_KEY krypterar Yuvomi den vid nästa start."
+        "backupDbKeyPlainHint": "Databasen är inte krypterad, så säkerhetskopiorna innehåller dina data i läsbar form. Med en egen DB_ENCRYPTION_KEY krypterar Yuvomi den vid nästa start.",
+        "memberErrorUsernameInvalid": "Användarnamnet måste ha 3 till 64 tecken och får bara innehålla bokstäver utan accenter, siffror, punkter, bindestreck och understreck.",
+        "memberErrorUsernameTaken": "Ett annat konto har redan det här användarnamnet.",
+        "memberErrorGone": "Den här medlemmen finns inte längre.",
+        "memberErrorSsoEmailRequired": "Ett konto med enbart SSO behöver en e-postadress så att den första SSO-inloggningen hittar det.",
+        "memberErrorSsoEmailAmbiguous": "En annan medlem har redan den här e-postadressen. SSO skulle inte kunna skilja kontona åt."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

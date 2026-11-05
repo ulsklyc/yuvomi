@@ -3521,7 +3521,12 @@
         "backupDbKeyCopyFailed": "复制失败。密钥已选中，请手动复制。",
         "backupDbKeyStoredAt": "已保存在服务器上的 {{path}}",
         "backupDbKeyConfigHint": "密钥来自你的配置。请在那里妥善保管：没有它，你的备份将无法打开。",
-        "backupDbKeyPlainHint": "数据库未加密，因此备份中的数据是可读的。设置你自己的 DB_ENCRYPTION_KEY 后，Yuvomi 会在下次启动时对其加密。"
+        "backupDbKeyPlainHint": "数据库未加密，因此备份中的数据是可读的。设置你自己的 DB_ENCRYPTION_KEY 后，Yuvomi 会在下次启动时对其加密。",
+        "memberErrorUsernameInvalid": "用户名需为 3 到 64 个字符，只能包含不带重音的字母、数字、句点、连字符和下划线。",
+        "memberErrorUsernameTaken": "其他账户已在使用此用户名。",
+        "memberErrorGone": "此成员已不存在。",
+        "memberErrorSsoEmailRequired": "仅限 SSO 的账户需要电子邮件地址，首次 SSO 登录才能找到它。",
+        "memberErrorSsoEmailAmbiguous": "其他成员已在使用此电子邮件地址。SSO 无法区分这些账户。"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",
