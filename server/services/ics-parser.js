@@ -382,7 +382,20 @@ function parseVTODO(ics) {
     todos.push({
       uid, summary, description, completed, completedAt: completedInstant(completedAt),
       status, due, priority, tags, parentUid, childUids,
+      override: get('RECURRENCE-ID') !== null,
+      rrule: get('RRULE'),
+      yuvomiRrule: get('X-YUVOMI-RRULE'),
     });
+  }
+  // DIE REGEL GEHOERT DEM MASTER (#2506). Eine Ausnahme mit RECURRENCE-ID
+  // (Thunderbird) steht als eigener Block mit derselben UID und ohne RRULE da;
+  // landet sie als letzte auf der Zeile, naehme sie der Serie sonst ihre Regel.
+  // Jeder Block einer UID traegt deshalb die Regel und Marke ihres Masters.
+  const masters = new Map(todos.filter((todo) => !todo.override).map((todo) => [todo.uid, todo]));
+  for (const todo of todos) {
+    const master = masters.get(todo.uid);
+    todo.rrule = master?.rrule ?? null;
+    todo.yuvomiRrule = master?.yuvomiRrule ?? null;
   }
   return todos;
 }

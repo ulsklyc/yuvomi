@@ -149,6 +149,13 @@ test('die Gruende haben ihren Satz und sind als "gibt es nicht mehr" bekannt', (
   assert.ok(GONE_REASONS.has('tasks_comment_not_found'));
 });
 
+test('eine Serie aus einer anderen App sagt, wo abgehakt wird (#2506)', () => {
+  // Jeder Weg nach 'done' (Liste, Wisch, Detail, Tablett, Kanban) zeigt den
+  // Satz ueber errorSentence; ohne Eintrag kaeme der allgemeine Fehler.
+  assert.equal(CASE_MESSAGES.get('task_foreign_series'), 'tasks.errorForeignSeries');
+  assert.ok(!GONE_REASONS.has('task_foreign_series'), 'die Aufgabe ist nicht weg');
+});
+
 // ---------------------------------------------------------------------------
 // Ansicht
 // ---------------------------------------------------------------------------

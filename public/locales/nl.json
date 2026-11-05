@@ -700,7 +700,10 @@
         "subtasksAllDone": "‘{{title}}’ en alle subtaken klaar.",
         "seriesDoneNamed": "‘{{title}}’ klaar - volgende keer: {{date}}",
         "kanbanRestore": "Herstellen",
-        "errorTagGone": "Dit label bestaat niet meer."
+        "errorTagGone": "Dit label bestaat niet meer.",
+        "foreignSeries": "Herhaalt zich in een andere app",
+        "foreignSeriesDetail": "Vink hem daar af zodat de reeks doorloopt",
+        "errorForeignSeries": "Deze taak herhaalt zich in een andere app. Vink hem daar af zodat de reeks doorloopt."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} artikel verwijderd.",

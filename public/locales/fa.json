@@ -718,7 +718,10 @@
         "subtasksAllDone": "«{{title}}» و همه زیرکارها انجام شد.",
         "seriesDoneNamed": "«{{title}}» انجام شد - دفعهٔ بعد: {{date}}",
         "kanbanRestore": "بازیابی",
-        "errorTagGone": "این برچسب دیگر وجود ندارد."
+        "errorTagGone": "این برچسب دیگر وجود ندارد.",
+        "foreignSeries": "در برنامه‌ای دیگر تکرار می‌شود",
+        "foreignSeriesDetail": "آن را همان‌جا تیک بزنید تا سری ادامه پیدا کند",
+        "errorForeignSeries": "این کار در برنامه‌ای دیگر تکرار می‌شود. آن را همان‌جا تیک بزنید تا سری ادامه پیدا کند."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} مورد حذف شد.",

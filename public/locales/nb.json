@@ -700,7 +700,10 @@
         "subtasksAllDone": "«{{title}}» og alle deloppgaver utført.",
         "seriesDoneNamed": "«{{title}}» utført - neste gang: {{date}}",
         "kanbanRestore": "Gjenopprett",
-        "errorTagGone": "Denne etiketten finnes ikke lenger."
+        "errorTagGone": "Denne etiketten finnes ikke lenger.",
+        "foreignSeries": "Gjentas i en annen app",
+        "foreignSeriesDetail": "Huk den av der, så fortsetter serien",
+        "errorForeignSeries": "Denne oppgaven gjentas i en annen app. Huk den av der, så fortsetter serien."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vare slettet.",

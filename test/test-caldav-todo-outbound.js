@@ -1738,3 +1738,82 @@ test('Eine verschobene Faelligkeit nimmt den Anker auch an solchen Objekten mit 
   assert.deepStrictEqual(todoLines(data, 'DUE'), ['DUE;TZID=Europe/Berlin:20261026T070000']);
   assert.ok(data.includes('TRIGGER:-PT15M') && data.includes('EXDATE:20261103T060000Z'), 'Fremdes bleibt Wort fuer Wort');
 });
+
+// ── Fremde Serie (#2506, #2515) ─────────────────────────────────────────────────
+// Eine in iOS Erinnerungen oder Tasks.org angelegte Serie kam als Einmal-Aufgabe
+// an. Hakte Yuvomi sie ab, ging STATUS:COMPLETED auf den Master mit der RRULE,
+// und die besitzende App beendete die ganze Serie. Der Inbound merkt sich die
+// fremde Regel (`external_rrule`), und der Push schickt auf einen solchen Master
+// nie COMPLETED - auch dann nicht, wenn ein Weg an den Routen vorbei abhakt.
+
+const FOREIGN_SERIES = ['DUE;VALUE=DATE:20261102', 'RRULE:FREQ=WEEKLY;BYMONTHDAY=15;WKST=SU'];
+
+test('Der Inbound merkt sich die RRULE einer fremden Serie woertlich (#2506)', () => {
+  const accountId = reset();
+  const [todo] = parseVTODO(serverTodo({ extra: FOREIGN_SERIES }));
+  assert.strictEqual(todo.rrule, 'FREQ=WEEKLY;BYMONTHDAY=15;WKST=SU');
+
+  const id = upsertTask(todo, accountId, 1, OBJ_URL);
+  assert.strictEqual(reloadTask(id).external_rrule, 'FREQ=WEEKLY;BYMONTHDAY=15;WKST=SU');
+  assert.strictEqual(reloadTask(id).is_recurring, 0, 'PR 1 importiert keine Regel, er sperrt nur');
+
+  // Nimmt die andere App die Wiederholung weg, ist die Aufgabe wieder eine einfache.
+  upsertTask(parseVTODO(serverTodo({ extra: ['DUE;VALUE=DATE:20261102'] }))[0], accountId, 1, OBJ_URL);
+  assert.strictEqual(reloadTask(id).external_rrule, null);
+});
+
+test('Eine Ueberschreibung mit RECURRENCE-ID nimmt dem Master seine Regel nicht (#2506)', () => {
+  // Thunderbird schreibt Ausnahmen als zweiten VTODO-Block mit derselben UID und
+  // ohne RRULE. Der Parser liefert beide; der letzte gewinnt im Upsert.
+  const accountId = reset();
+  const override = ['BEGIN:VTODO', 'UID:todo-1@test', 'DTSTAMP:20261001T000000Z',
+    'RECURRENCE-ID;VALUE=DATE:20261109', 'DUE;VALUE=DATE:20261110', 'SUMMARY:Milch kaufen', 'END:VTODO'];
+  const todos = parseVTODO(serverTodo({ extra: FOREIGN_SERIES, after: override }));
+  assert.strictEqual(todos.length, 2, 'Vorbedingung: beide Bloecke kommen an');
+  let id;
+  for (const todo of todos) id = upsertTask(todo, accountId, 1, OBJ_URL);
+  assert.strictEqual(reloadTask(id).external_rrule, 'FREQ=WEEKLY;BYMONTHDAY=15;WKST=SU');
+});
+
+test('Eine Regel, die Yuvomi selbst geschrieben hat, ist keine fremde (#2506)', () => {
+  // X-YUVOMI-RRULE markiert die Regel, die Yuvomi an ein fremdes Objekt
+  // geschrieben hat (#2350). Sie gehoert der Serie in Yuvomi.
+  const accountId = reset();
+  const task = insertTask({ accountId, due_date: '2026-11-02' });
+  db.prepare("UPDATE tasks SET is_recurring = 1, recurrence_rule = 'FREQ=WEEKLY' WHERE id = ?").run(task.id);
+  const marked = serverTodo({ extra: ['DUE;VALUE=DATE:20261102', 'RRULE:FREQ=WEEKLY', 'X-YUVOMI-RRULE:FREQ=WEEKLY'] });
+  upsertTask(parseVTODO(marked)[0], accountId, 1, OBJ_URL);
+  assert.strictEqual(reloadTask(task.id).external_rrule, null);
+
+  // Hat die andere App die Regel danach geaendert, gehoert sie ihr.
+  const changed = serverTodo({ extra: ['DUE;VALUE=DATE:20261102', 'RRULE:FREQ=DAILY', 'X-YUVOMI-RRULE:FREQ=WEEKLY'] });
+  upsertTask(parseVTODO(changed)[0], accountId, 1, OBJ_URL);
+  assert.strictEqual(reloadTask(task.id).external_rrule, 'FREQ=DAILY');
+
+  // Ein von Yuvomi angelegtes Objekt fuehrt Yuvomi ganz.
+  const own = insertOwnRecurringTask(accountId, 'FREQ=WEEKLY', { due_date: '2026-11-02' });
+  const ownIcs = serverTodo({ uid: own.uid, extra: ['DUE;VALUE=DATE:20261102', 'RRULE:FREQ=WEEKLY'] });
+  upsertTask(parseVTODO(ownIcs)[0], accountId, 1, OBJ_URL);
+  assert.strictEqual(reloadTask(own.task.id).external_rrule, null);
+});
+
+test('Der Push schickt nie COMPLETED auf den Master einer fremden Serie (#2506)', async () => {
+  const accountId = reset();
+  const task = insertTask({ accountId, due_date: '2026-11-02' });
+  // Ein Weg an den Routen vorbei: die Zeile steht erledigt und wartet auf den Push.
+  db.prepare("UPDATE tasks SET status = 'done', outbound_dirty = 1 WHERE id = ?").run(task.id);
+  const client = fakeClient();
+  await processPendingUpdates(client, accountId, 'tasks', indexOf('todo-1@test', serverTodo({ extra: FOREIGN_SERIES })));
+  const data = client.calls.updated[0]?.data ?? '';
+  assert.deepStrictEqual(todoLines(data, 'STATUS'), ['STATUS:NEEDS-ACTION'], 'die Serie bleibt offen');
+  assert.deepStrictEqual(todoLines(data, 'COMPLETED'), []);
+  assert.deepStrictEqual(todoLines(data, 'RRULE'), ['RRULE:FREQ=WEEKLY;BYMONTHDAY=15;WKST=SU']);
+
+  // Ohne fremde Regel geht das Abhaken wie immer hinaus.
+  const plain = reset();
+  const single = insertTask({ accountId: plain });
+  db.prepare("UPDATE tasks SET status = 'done', outbound_dirty = 1 WHERE id = ?").run(single.id);
+  const second = fakeClient();
+  await processPendingUpdates(second, plain, 'tasks', indexOf('todo-1@test', serverTodo()));
+  assert.deepStrictEqual(todoLines(second.calls.updated[0].data, 'STATUS'), ['STATUS:COMPLETED']);
+});

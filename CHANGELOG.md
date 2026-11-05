@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fill. Online tablets pick up changes automatically; existing local choices stay in use
   until an administrator saves, and personal browser preferences are preserved (#2436).
 
+### Fixed
+- **A repeating reminder from iOS Reminders or Tasks.org no longer ends its series when you tick it
+  off in Yuvomi** (part of #2506 and #2515). Yuvomi does not take over such a series yet, so it now
+  marks it with "Repeats in another app" and asks you to tick it off there; Yuvomi no longer
+  sends a completion that would end the series in the other app. You can still edit it, set it in
+  progress or archive it. For API clients, ticking off such a task through
+  `PATCH /api/v1/tasks/:id/status` or `PUT /api/v1/tasks/:id` answers 409 with the reason
+  `task_foreign_series`, and tasks carry the other app's rule in `external_rrule`.
+
 ## [2.85.0] - 2026-11-04
 
 ### Added
