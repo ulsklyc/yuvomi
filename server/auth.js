@@ -2616,7 +2616,11 @@ router.get('/oidc/link', requireAuth, refuseWhileRestoring, (req, res) => {
   res.json({
     enabled:    isOidcEnabled(),
     linked:     !!user.oidc_sub,
-    provider:   user.oidc_provider ?? null,
+    // Home Assistant legt den festen Schluessel ab, keine URL: fuer die
+    // Kontokarte ("verknuepft mit ...") der lesbare Name.
+    provider:   user.oidc_provider === HOMEASSISTANT_PROVIDER_KEY
+      ? 'Home Assistant'
+      : (user.oidc_provider ?? null),
     // Ein per SSO angelegtes Konto hat kein Passwort - das Lösen nähme ihm den
     // einzigen Zugang. Die Oberfläche erklärt das, statt den Fehler abzuwarten.
     can_unlink: !!user.oidc_sub && !isSsoOnlyAccount(user.password_hash),

@@ -236,7 +236,6 @@ test('Rueckweg: unbekannter HA-Benutzer bekommt ein Konto (Signup erlaubt), Toke
   assert.equal(tokenRequests[0].get('client_id'), 'https://family.example.test/');
   assert.equal(tokenRequests[0].get('grant_type'), 'authorization_code');
   assert.deepEqual(wsAuthTokens, ['access-1']);
-  await new Promise((r) => setTimeout(r, 50));
   assert.deepEqual(revoked, ['refresh-1'], 'das Refresh-Token wird in Home Assistant widerrufen');
 
   const row = database.prepare('SELECT username, display_name, oidc_sub, oidc_provider, role FROM users WHERE oidc_sub = ?').get('ha-user-new');
@@ -247,6 +246,10 @@ test('Rueckweg: unbekannter HA-Benutzer bekommt ein Konto (Signup erlaubt), Toke
 
   const who = await (await fetch(`${base}/__test/whoami`, { headers: { cookie: cookiesOf(cb, cookie) } })).json();
   assert.ok(who.userId, 'die Sitzung ist angemeldet');
+
+  const link = await (await fetch(`${base}/api/v1/auth/oidc/link`, { headers: { cookie: cookiesOf(cb, cookie) } })).json();
+  assert.equal(link.linked, true);
+  assert.equal(link.provider, 'Home Assistant', 'die Kontokarte zeigt den Namen, nicht den Schluessel');
 });
 
 test('Rueckweg mit falschem state wird abgewiesen, ohne Home Assistant zu fragen', async () => {

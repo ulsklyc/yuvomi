@@ -3305,6 +3305,8 @@
         "memberSsoOnlyEditHint": "Med reglaget på förlorar kontot sitt lösenord och kommer bara in via SSO. För att stänga av det måste ett nytt lösenord anges.",
         "memberHomeAssistantUserIdLabel": "Home Assistant-användar-ID",
         "memberHomeAssistantUserIdHint": "Kopplar kontot till en Home Assistant-användare så att inloggning med Home Assistant hittar det. ID:t finns i Home Assistant under Inställningar > Personer > Användare (avancerat läge). Lämna tomt för att ta bort kopplingen.",
+        "memberHomeAssistantUserIdTaken": "Den här Home Assistant-användaren är redan kopplad till en annan medlem.",
+        "memberHomeAssistantUnlinkNoPassword": "Det här kontot har inget lösenord, så dess Home Assistant-användare kan inte tas bort. Ange ett lösenord först.",
         "healthPreventionNotifyCaregiversLabel": "Meddela mina vårdgivare",
         "healthPreventionNotifyCaregiversHint": "Den som hjälper dig ser redan vad som är dags för när appen öppnas. Den här inställningen skickar dessutom en push-notis med ditt namn - avstängd som standard, eftersom omsorgsbehörighet i sig inte innebär en avisering.",
         "healthPreventionNotifyCaregiversSaved": "Aviseringsinställning sparad.",

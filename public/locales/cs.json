@@ -3415,6 +3415,8 @@
         "memberSsoOnlyEditHint": "Je-li přepínač zapnutý, účet ztratí své heslo a dostane se dovnitř jen přes SSO. K vypnutí je nutné nastavit nové heslo.",
         "memberHomeAssistantUserIdLabel": "ID uživatele Home Assistant",
         "memberHomeAssistantUserIdHint": "Propojí tento účet s uživatelem Home Assistant, aby ho přihlášení přes Home Assistant našlo. ID najdete v Home Assistant v Nastavení > Lidé > Uživatelé (rozšířený režim). Ponechte prázdné pro zrušení propojení.",
+        "memberHomeAssistantUserIdTaken": "Tento uživatel Home Assistant je již propojen s jiným členem.",
+        "memberHomeAssistantUnlinkNoPassword": "Tento účet nemá heslo, proto nelze jeho uživatele Home Assistant odebrat. Nejprve nastavte heslo.",
         "healthPreventionNotifyCaregiversLabel": "Upozornit pečovatele",
         "healthPreventionNotifyCaregiversHint": "Pečovatel už při otevření aplikace vidí, co je splatné. Tímto mu navíc pošlete push upozornění s vaším jménem - ve výchozím stavu vypnuto, protože oprávnění k péči samo o sobě upozornění neznamená.",
         "healthPreventionNotifyCaregiversSaved": "Nastavení upozornění uloženo.",

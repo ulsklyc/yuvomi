@@ -402,6 +402,9 @@ export const CASE_MESSAGES = new Map([
   ['own_account', 'settings.memberRemoveOwnAccount'],
   ['last_admin', 'settings.memberRemoveLastAdmin'],
   ['last_sso_admin', 'settings.memberRemoveLastSsoAdmin'],
+  // Home-Assistant-Bindung im Mitglieder-Dialog (PATCH/POST /users).
+  ['sub_taken', 'settings.memberHomeAssistantUserIdTaken'],
+  ['no_password', 'settings.memberHomeAssistantUnlinkNoPassword'],
   // Stichwort einer Aufgabe, von einem anderen Geraet umbenannt oder geloescht.
   ['tasks_tag_not_found', 'tasks.errorTagGone'],
   // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909). Die drei

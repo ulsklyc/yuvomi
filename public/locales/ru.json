@@ -3519,6 +3519,8 @@
         "memberSsoOnlyEditHint": "При включённом переключателе учётная запись теряет свой пароль и входит только через SSO. Чтобы выключить его, нужно задать новый пароль.",
         "memberHomeAssistantUserIdLabel": "ID пользователя Home Assistant",
         "memberHomeAssistantUserIdHint": "Привязывает эту учётную запись к пользователю Home Assistant, чтобы вход через Home Assistant её находил. ID указан в Home Assistant в разделе Настройки > Люди > Пользователи (расширенный режим). Оставьте пустым, чтобы удалить привязку.",
+        "memberHomeAssistantUserIdTaken": "Этот пользователь Home Assistant уже связан с другим участником.",
+        "memberHomeAssistantUnlinkNoPassword": "У этой учётной записи нет пароля, поэтому её пользователя Home Assistant нельзя удалить. Сначала задайте пароль.",
         "healthPreventionNotifyCaregiversLabel": "Уведомлять опекунов",
         "healthPreventionNotifyCaregiversHint": "Опекун уже видит, что подошёл срок, открыв приложение. Эта настройка дополнительно отправляет ему push-уведомление с вашим именем - по умолчанию выключено, так как право опеки само по себе не означает уведомление.",
         "healthPreventionNotifyCaregiversSaved": "Настройка уведомлений сохранена.",
