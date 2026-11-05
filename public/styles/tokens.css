@@ -2269,6 +2269,19 @@
   }
 }
 
+/* Vom Home-Bildschirm gestartet: lvh statt dvh (#2417). Auf iOS 27 fehlt
+ * 100dvh dort genau der obere Inset, die App endet ueber dem Rand. Ohne
+ * Adressleiste ist lvh die volle Fensterhoehe. Dieselbe Weiche fuer body,
+ * Shell und Ladebild steht in layout.css hinter .app-loading. Guard:
+ * test/test-old-browser-fallbacks.js. */
+@media (display-mode: standalone) {
+  @supports (height: 100lvh) {
+    :root {
+      --viewport-height: 100lvh;
+    }
+  }
+}
+
 /* ================================================================
  * Primaerknopf: die Abdunklung, wo der Browser color-mix() kennt (#2184)
  *

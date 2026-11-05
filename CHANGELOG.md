@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   series. For API clients, ticking off one of those through `PATCH /api/v1/tasks/:id/status` or
   `PUT /api/v1/tasks/:id` answers 409 with the reason `task_foreign_series`, and tasks carry the
   other app's rule in `external_rrule`.
+- **The app added to the iPhone Home Screen reaches the bottom edge again** (refs #2417). On iOS 27
+  the installed app ended a status bar's height above the bottom of the screen, with an empty strip
+  below the tab bar. It now takes the full screen height; Yuvomi in a Safari tab is unchanged.
 
 ## [2.85.0] - 2026-11-04
 
