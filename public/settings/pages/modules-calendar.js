@@ -1,5 +1,5 @@
 import { api } from '/api.js';
-import { getLocale, t } from '/i18n.js';
+import { getLocale, setWeekStart, t } from '/i18n.js';
 import { dateTimeText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { weekStartIndex, weekdayOrder } from '/utils/date.js';
@@ -597,6 +597,8 @@ function bindWeekStart(container, preferences) {
       current = value;
       try {
         await savePreferences({ week_start: value });
+        // Der Datepicker liest den Wochenstart aus i18n.js (#2533).
+        setWeekStart(value);
         // Parität zu date-format-changed/time-format-changed: erlaubt offenen
         // Ansichten, den Wochenstart ohne Neuladen zu übernehmen.
         window.dispatchEvent(new CustomEvent('week-start-changed', { detail: { weekStart: value } }));
