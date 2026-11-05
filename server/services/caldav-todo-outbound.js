@@ -1233,12 +1233,15 @@ function selectedTaskList(accountId, listUrl) {
 }
 
 /**
- * Haelt diese Zeile den Master einer fremden Serie, den sie beim Abhaken
- * ihrer Vorgaengerin uebernommen hat (#2506)? Erkennbar ohne eigene Spalte:
- * eine Folgeinstanz ist sonst immer lokal oder Spiegel ihrer EIGENEN UID.
+ * Haelt diese Folgeinstanz den Master einer fremden Serie, den sie beim
+ * Abhaken ihrer Vorgaengerin uebernommen hat (#2506)? Erkennbar ohne eigene
+ * Spalte: eine Folgeinstanz ist sonst immer lokal oder Spiegel ihrer EIGENEN
+ * UID. Bewusst ohne Blick auf `external_rrule`: hat die andere App die
+ * Wiederholung inzwischen weggenommen, ist das Objekt trotzdem ihres, und
+ * das Zuruecknehmen darf es nicht loeschen.
  */
 function holdsForeignMaster(row) {
-  return Boolean(row?.external_rrule) && isMirrored(row) && !isOwnUidOfRow(row.external_uid, 'task', row.id);
+  return isMirrored(row) && !isOwnUidOfRow(row.external_uid, 'task', row.id);
 }
 
 /**

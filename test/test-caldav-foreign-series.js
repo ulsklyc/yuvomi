@@ -309,3 +309,24 @@ test('Zuruecknehmen, bevor etwas oben ist, laesst nichts zurueck', async () => {
   assert.equal(copies().length, 0);
   assert.deepEqual(todoLines(dav.getObject(listUrl, FILE).data, 'DUE'), [`DUE;VALUE=DATE:${icsDay(dayKey(0))}`]);
 });
+
+test('Zuruecknehmen, nachdem die andere App die Wiederholung weggenommen hat: der Master bleibt (#650)', async () => {
+  // Die Folgeinstanz haelt dann ein Objekt ohne Regel. Es gehoert trotzdem der
+  // anderen App: das Zuruecknehmen gibt es zurueck, statt es zu loeschen.
+  reset();
+  dav.putObject(listUrl, FILE, appleSeries());
+  await remindersSync.sync();
+  const master = rowOf(UID);
+  await call('PATCH', `/${master.id}/status`, { status: 'done' });
+  await settle();
+  const advanced = dav.getObject(listUrl, FILE).data;
+  dav.putObject(listUrl, FILE, advanced.replace(/^RRULE:.*\r?\n/m, ''));
+  await remindersSync.sync();
+  assert.equal(rowOf(UID).external_rrule, null, 'Vorbedingung: die Regel ist weg');
+
+  assert.equal((await call('PATCH', `/${master.id}/status`, { status: 'open' })).status, 200);
+  await settle();
+  assert.ok(dav.getObject(listUrl, FILE), 'das Objekt der anderen App wurde geloescht');
+  assert.equal(taskOf(master.id).external_uid, UID);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM tasks').get().n, 1);
+});
