@@ -5149,7 +5149,8 @@
                 "veryGood": "Heel goed"
             },
             "unusualHigh": "Ongewoon hoog. Controleer de waarde; opslaan kan toch.",
-            "unusualLow": "Ongewoon laag. Controleer de waarde; opslaan kan toch."
+            "unusualLow": "Ongewoon laag. Controleer de waarde; opslaan kan toch.",
+            "barKey": "Balken: boven systolisch, onder diastolisch"
         },
         "meds": {
             "doseQty": "{{count}}×",

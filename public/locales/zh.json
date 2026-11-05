@@ -5149,7 +5149,8 @@
                 "veryGood": "很好"
             },
             "unusualHigh": "异常偏高。请检查数值，仍然可以保存。",
-            "unusualLow": "异常偏低。请检查数值，仍然可以保存。"
+            "unusualLow": "异常偏低。请检查数值，仍然可以保存。",
+            "barKey": "柱形：上端为收缩压，下端为舒张压"
         },
         "meds": {
             "doseQty": "{{count}}×",

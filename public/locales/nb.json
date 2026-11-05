@@ -5149,7 +5149,8 @@
                 "veryGood": "Veldig god"
             },
             "unusualHigh": "Uvanlig høy. Sjekk verdien; du kan lagre den likevel.",
-            "unusualLow": "Uvanlig lav. Sjekk verdien; du kan lagre den likevel."
+            "unusualLow": "Uvanlig lav. Sjekk verdien; du kan lagre den likevel.",
+            "barKey": "Søyler: systolisk øverst, diastolisk nederst"
         },
         "meds": {
             "doseQty": "{{count}}×",

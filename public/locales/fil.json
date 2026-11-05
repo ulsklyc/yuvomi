@@ -5149,7 +5149,8 @@
                 "veryGood": "Napakabuti"
             },
             "unusualHigh": "Hindi karaniwang mataas. Pakisuri ang halaga; maaari mo pa rin itong i-save.",
-            "unusualLow": "Hindi karaniwang mababa. Pakisuri ang halaga; maaari mo pa rin itong i-save."
+            "unusualLow": "Hindi karaniwang mababa. Pakisuri ang halaga; maaari mo pa rin itong i-save.",
+            "barKey": "Mga bar: systolic sa itaas, diastolic sa ibaba"
         },
         "meds": {
             "doseQty": "{{count}}×",

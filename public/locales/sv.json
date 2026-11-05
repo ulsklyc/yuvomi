@@ -5149,7 +5149,8 @@
                 "veryGood": "Mycket bra"
             },
             "unusualHigh": "Ovanligt högt. Kontrollera värdet; du kan ändå spara det.",
-            "unusualLow": "Ovanligt lågt. Kontrollera värdet; du kan ändå spara det."
+            "unusualLow": "Ovanligt lågt. Kontrollera värdet; du kan ändå spara det.",
+            "barKey": "Staplar: systoliskt överst, diastoliskt nederst"
         },
         "meds": {
             "doseQty": "{{count}}×",

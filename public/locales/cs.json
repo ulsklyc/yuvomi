@@ -5290,7 +5290,8 @@
                 "veryGood": "Velmi dobrá"
             },
             "unusualHigh": "Neobvykle vysoká hodnota. Zkontrolujte ji, uložit ji přesto můžete.",
-            "unusualLow": "Neobvykle nízká hodnota. Zkontrolujte ji, uložit ji přesto můžete."
+            "unusualLow": "Neobvykle nízká hodnota. Zkontrolujte ji, uložit ji přesto můžete.",
+            "barKey": "Sloupce: nahoře systolický, dole diastolický"
         },
         "meds": {
             "doseQty": "{{count}}×",

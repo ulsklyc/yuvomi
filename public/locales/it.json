@@ -5149,7 +5149,8 @@
                 "veryGood": "Molto bene"
             },
             "unusualHigh": "Insolitamente alto. Controlla il valore; puoi comunque salvarlo.",
-            "unusualLow": "Insolitamente basso. Controlla il valore; puoi comunque salvarlo."
+            "unusualLow": "Insolitamente basso. Controlla il valore; puoi comunque salvarlo.",
+            "barKey": "Barre: sistolica in alto, diastolica in basso"
         },
         "meds": {
             "doseQty": "{{count}}×",
