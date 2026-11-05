@@ -148,3 +148,58 @@ test('existing passkey confirmation sends its assertion and second factor before
   assert.equal(assertionProof.credential.id, encoded); assert.equal(assertionProof.password, undefined);
   assert.equal(creations, 1);
 });
+
+
+test('password submission works while passkey config is pending and the late button stays after the form', async () => {
+  const { render } = await import('../public/pages/login.js');
+  const element = () => ({
+    handlers:{}, value:'', hidden:true, disabled:false, isConnected:true,
+    classList:{toggle(){}, remove(){}, add(){}},
+    addEventListener(name, handler) { this.handlers[name] = handler; },
+    setAttribute(){}, removeAttribute(){}, focus(){}, select(){}, remove(){},
+    closest() { return {classList:this.classList}; },
+    insertBefore(){}, querySelectorAll(){ return []; },
+  });
+  const username = element(); username.value = 'member';
+  const password = element(); password.value = 'private-password';
+  const label = element(); const submit = element(); submit.querySelector = () => label;
+  const form = element(); form.username = username; form.password = password;
+  form.querySelector = key => ({'#username':username, '#password':password}[key] ?? null);
+  const error = element(); const caps = element(); const button = element(); const passkeyError = element();
+  const card = element(); let visible = false;
+  card.classList.remove = name => { if (name === 'auth-passkeys--pending') visible = true; };
+  card.querySelector = key => ({'#passkey-login':button, '#passkey-login-error':passkeyError}[key]);
+  const container = element();
+  let markup = '';
+  container.replaceChildren = () => {}; container.insertAdjacentHTML = (_position, html) => { markup = html; };
+  container.querySelector = key => ({'#auth-form':form, '#auth-btn':submit, '#form-error':error, '#auth-capslock':caps, '#username':username, '.auth-card':card, '#passkey-login-slot':card}[key] ?? null);
+  globalThis.localStorage = {getItem:()=>null};
+  globalThis.location = {search:'', pathname:'/login'};
+  globalThis.document = {querySelector:()=>null, createElement:element};
+  let navigated = false;
+  globalThis.window = {isSecureContext:true, location:globalThis.location, yuvomi:{navigate:()=>{navigated=true;}}};
+  globalThis.PublicKeyCredential = class {};
+  globalThis.fetch = async () => ({json:async()=>({enabled:false})});
+  let resolveConfig; let loginArgs;
+  globalThis.__apiStub = {
+    get:()=>new Promise(resolve=>{resolveConfig=resolve;}),
+    login:async (...args)=>{loginArgs=args; return {user:{id:1}};},
+  };
+  let timer;
+  try {
+    await Promise.race([render(container), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('render waited for passkey config')), 500); })]);
+  } finally { clearTimeout(timer); }
+  assert.equal(typeof form.handlers.submit, 'function', 'the handler is attached without waiting for config');
+  let prevented = false;
+  await form.handlers.submit({preventDefault(){prevented=true;}});
+  assert.equal(prevented, true);
+  assert.deepEqual(loginArgs, ['member','private-password']);
+  assert.equal(navigated, true);
+  resolveConfig({data:{enabled:true, login_enabled:true}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.ok(markup.indexOf('id="passkey-login-slot"') > markup.indexOf('</form>'), 'the reserved slot starts after the password form');
+  assert.equal(visible, true);
+  assert.equal(button.disabled, false);
+  assert.equal(typeof button.handlers.click, 'function');
+  delete globalThis.__apiStub;
+});
