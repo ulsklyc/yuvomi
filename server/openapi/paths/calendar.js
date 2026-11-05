@@ -138,7 +138,7 @@ export function calendarPaths() {
     '/api/v1/calendar/apple/mirrored-events': { delete: op({ summary: 'Delete locally mirrored Apple events', tag: 'Calendar', admin: true, stateChanging: true }) },
     '/api/v1/calendar/subscriptions': {
       get: op({ summary: 'List ICS subscriptions', tag: 'Calendar' }),
-      post: op({ summary: 'Create ICS subscription', tag: 'Calendar', stateChanging: true, requestBody: jsonBody(null), description: DEFAULT_ASSIGNEES_INPUT + ' The subscription is created even when its first fetch fails: the answer is still `201`, with `syncError` (the error text), `syncReason` (the case, for example `calendar_ics_http_status`, or `null` when the app cannot name it) and, where a number matters, `syncParams` (#2566).' }),
+      post: op({ summary: 'Create ICS subscription', tag: 'Calendar', stateChanging: true, requestBody: jsonBody(null), description: DEFAULT_ASSIGNEES_INPUT + ' The subscription is created even when its first fetch fails: the answer is still `201`, with `syncError` (the error text for a named case, otherwise a fixed sentence), `syncReason` (the case, for example `calendar_ics_http_status`, or `null` when the app cannot name it) and, where a number matters, `syncParams` (#2566).' }),
     },
     '/api/v1/calendar/subscriptions/{id}': {
       patch: op({ summary: 'Update ICS subscription', tag: 'Calendar', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: DEFAULT_ASSIGNEES_INPUT }),

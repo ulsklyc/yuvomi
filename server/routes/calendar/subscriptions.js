@@ -96,11 +96,14 @@ router.post('/subscriptions', async (req, res) => {
     });
     // Das Abo steht auch dann, wenn der erste Abruf scheitert (#2566):
     // `syncError` bleibt der Text fuer API-Aufrufer, `syncReason` und
-    // `syncParams` sind der Fall, den die Seite in ihrer Sprache sagt.
+    // `syncParams` sind der Fall, den die Seite in ihrer Sprache sagt. Den
+    // Rohtext gibt es nur zu einem benannten Fall: ein abgelehnter Verbindungs-
+    // aufbau nennt Adresse und Port und waere mit erlaubtem privatem Netz ein
+    // Port-Scanner. Er steht im Log (syncOne).
     const syncCase = syncError ? icsFetchCase(syncError) : null;
     res.status(201).json({
       data: sub,
-      syncError: syncError ? syncError.message : null,
+      syncError: syncError ? (syncCase ? syncError.message : 'The feed could not be fetched.') : null,
       syncReason: syncCase?.reason ?? null,
       ...(syncCase?.params ? { syncParams: syncCase.params } : {}),
     });

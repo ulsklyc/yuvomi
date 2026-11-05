@@ -464,6 +464,24 @@ await (async () => {
           assert(res.status === 400 && json.reason === 'calendar_ics_http_status' && json.params?.status === 404,
             `Antwort: ${res.status} ${JSON.stringify(json)}`);
         });
+        // Ein Abruf ohne benannten Fall (Verbindung abgelehnt, Zeitueberschreitung)
+        // traegt Adresse und Port im Text: mit erlaubtem privatem Netz waere der
+        // Text ein Port-Scanner. Er bleibt im Log (Security-Review an #2568).
+        await atest('POST /subscriptions: ein Abruf ohne Fall gibt keinen Rohtext heraus', async () => {
+          const closed = http.createServer();
+          await new Promise((r) => closed.listen(0, '127.0.0.1', r));
+          const closedPort = closed.address().port;
+          await new Promise((r) => closed.close(r));
+          const res = await fetch(`${base}/subscriptions`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'Zu', url: `http://127.0.0.1:${closedPort}/cal.ics`, color: '#123456' }),
+          });
+          const json = await res.json();
+          assert(res.status === 201 && json.syncReason === null && typeof json.syncError === 'string',
+            `Antwort: ${res.status} ${JSON.stringify(json)}`);
+          assert(!json.syncError.includes(String(closedPort)) && !/ECONNREFUSED/.test(json.syncError),
+            `Rohtext reist mit: ${json.syncError}`);
+        });
       } finally {
         await new Promise((r) => api.close(r));
       }
