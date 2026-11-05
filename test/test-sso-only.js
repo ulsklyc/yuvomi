@@ -589,7 +589,8 @@ test('nur die Absage wegen abgeschalteter Anmeldung zeichnet neu', () => {
   // pauschales Neuzeichnen verschluckte diese dauerhafte Absage und stellte den
   // Nutzer vor dasselbe Formular, ohne ihm je den Grund zu nennen.
   const login = readFileSync(new URL('../public/pages/login.js', import.meta.url), 'utf8');
-  assert.match(login, /err\.status === 403 && \/password login is disabled\/i\.test/);
+  // Erkannt am Grund, nicht am englischen Text (#1909).
+  assert.match(login, /err\.status === 403 && err\.data\?\.reason === 'password_login_disabled'/);
   assert.match(login, /accountCannotSignIn/,
     'die andere 403-Absage braucht eine eigene Meldung, kein "Verbindungsproblem"');
 });
