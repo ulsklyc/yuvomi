@@ -1965,8 +1965,6 @@
         "pageCountdownsModuleDescription": "Imposta il periodo di tolleranza per le scadenze superate nella panoramica.",
         "rewardsApprovalLabel": "Richiedi l’approvazione di un genitore",
         "rewardsApprovalHint": "I riscatti devono essere confermati da un amministratore. Se disattivato, vengono concessi immediatamente.",
-        "rewardsLateDecayLabel": "Decadimento per completamento in ritardo",
-        "rewardsLateDecayHint": "Un punto in meno per giorno solare di ritardo, resta almeno 1 punto. Una scadenza spostata conta dal momento della spunta.",
         "rewardsSaved": "Impostazione delle ricompense salvata.",
         "rewardsDefaultPointsHint": "Le nuove attività vengono precompilate con questo valore. Può essere modificato per ogni attività.",
         "rewardsDefaultPointsLabel": "Punti per le nuove attività",
@@ -3528,13 +3526,7 @@
         "memberErrorUsernameTaken": "Un altro account ha già questo nome utente.",
         "memberErrorGone": "Questo membro non esiste più.",
         "memberErrorSsoEmailRequired": "Un account solo SSO ha bisogno di un indirizzo email, così il primo accesso SSO può trovarlo.",
-        "memberErrorSsoEmailAmbiguous": "Un altro membro ha già questo indirizzo email. L'SSO non potrebbe distinguere gli account.",
-        "twoFactorAlreadyEnabled": "L'autenticazione a due fattori è già attiva. Ricarica la pagina per vedere lo stato attuale.",
-        "twoFactorSetupExpired": "La configurazione è scaduta. Annullala e ricomincia.",
-        "oidcLinkErrorNotConfigured": "L'SSO non è più configurato su questo server.",
-        "oidcUnlinkNotLinked": "Questo account non è più collegato all'SSO. Ricarica la pagina per vedere lo stato attuale.",
-        "displayErrorGone": "Questo tablet da parete non esiste più.",
-        "displayDeviceErrorGone": "Questo dispositivo non esiste più."
+        "memberErrorSsoEmailAmbiguous": "Un altro membro ha già questo indirizzo email. L'SSO non potrebbe distinguere gli account."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",
@@ -6142,9 +6134,6 @@
         "balanceBelowZeroShort": "I prossimi punti lo compensano",
         "pendingBalanceBelowZero": "Saldo attuale: {{points}}",
         "ledgerTaskReopened": "Attività riaperta",
-        "ledgerLateDecayNote": "{{count}} giorni in ritardo",
-        "ledgerLateDecayNote_one": "{{count}} giorno in ritardo",
-        "ledgerLateDecayInsteadOf": "invece di {{count}}",
         "ledgerTaskReopenedNamed": "Riaperta: {{task}}",
         "progressLabel": "Progresso verso il prossimo premio",
         "noRewardsYet": "Nessun premio ancora",

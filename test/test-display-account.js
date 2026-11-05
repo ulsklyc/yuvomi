@@ -1420,31 +1420,6 @@ test('display-settings migration preserves existing displays and rejects invalid
   } finally {legacy.close();}
 });
 
-// #1909: ein zweiter Admin hat das Tablett oder sein Geraet schon entfernt.
-// Die Seite Wandtablets sagt den Fall in der Sprache der Oberflaeche und laedt
-// nach - dafuer muss die Antwort ihn nennen, nicht nur ihr englischer Text.
-test('ein Display oder Geraet, das es nicht mehr gibt, nennt seinen Fall (#1909)', async () => {
-  const created = await admin('POST', '/displays', { display_name: 'Weg' });
-  assert.equal(created.status, 201);
-  const id = created.body.data.id;
-  assert.equal((await admin('DELETE', `/displays/${id}`)).status, 200);
-  for (const [method, path, body] of [
-    ['PATCH', `/displays/${id}`, { show_screensaver: true }],
-    ['PATCH', `/displays/${id}`, { device_settings: { night_from: 22, night_until: 6, idle_seconds: 60, show_clock: true, cover_photo: true } }],
-    ['DELETE', `/displays/${id}`],
-    ['POST', `/displays/${id}/pairing-code`, {}],
-  ]) {
-    const res = await admin(method, path, body);
-    assert.equal(res.status, 404, `${method} ${path}: ${JSON.stringify(res.body)}`);
-    assert.equal(res.body?.reason, 'displays_display_not_found', `${method} ${path}`);
-  }
-  for (const action of ['revoke', 'remove']) {
-    const res = await admin('POST', `/displays/${displayId}/devices/987654/${action}`, {});
-    assert.equal(res.status, 404, action);
-    assert.equal(res.body?.reason, 'displays_device_not_found', action);
-  }
-});
-
 // --------------------------------------------------------
 // Der Limiter - absichtlich zuletzt, weil er das Budget aufbraucht
 // --------------------------------------------------------

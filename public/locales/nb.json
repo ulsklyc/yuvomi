@@ -1965,8 +1965,6 @@
         "pageCountdownsModuleDescription": "Sett utsettelsesperioden for utløpte nøkkedatoer i oversikten.",
         "rewardsApprovalLabel": "Krever foreldrestyring",
         "rewardsApprovalHint": "Innløsninger må bekreftes av en administrator. Når det er av, blir de innvilget umiddelbart.",
-        "rewardsLateDecayLabel": "Poengtrekk ved for sen fullføring",
-        "rewardsLateDecayHint": "Ett poeng mindre per forfalt kalenderdag, minst 1 poeng blir værende. En flyttet frist teller fra avkrysningen.",
         "rewardsSaved": "Belønningsinnstilling lagret.",
         "rewardsDefaultPointsHint": "Nye oppgaver fylles forhåndsutfylt med denne poengverdien. Den kan overstyres per oppgave.",
         "rewardsDefaultPointsLabel": "Poeng for nye oppgaver",
@@ -3528,13 +3526,7 @@
         "memberErrorUsernameTaken": "En annen konto har allerede dette brukernavnet.",
         "memberErrorGone": "Dette medlemmet finnes ikke lenger.",
         "memberErrorSsoEmailRequired": "En konto med bare SSO trenger en e-postadresse, slik at den første SSO-påloggingen finner den.",
-        "memberErrorSsoEmailAmbiguous": "Et annet medlem har allerede denne e-postadressen. SSO kunne ikke skilt kontoene fra hverandre.",
-        "twoFactorAlreadyEnabled": "Tofaktorautentisering er allerede aktivert. Last inn siden på nytt for å se gjeldende status.",
-        "twoFactorSetupExpired": "Oppsettet har utløpt. Avbryt og start på nytt.",
-        "oidcLinkErrorNotConfigured": "SSO er ikke lenger satt opp på denne serveren.",
-        "oidcUnlinkNotLinked": "Denne kontoen er ikke lenger koblet til SSO. Last inn siden på nytt for å se gjeldende status.",
-        "displayErrorGone": "Dette nettbrettet finnes ikke lenger.",
-        "displayDeviceErrorGone": "Denne enheten finnes ikke lenger."
+        "memberErrorSsoEmailAmbiguous": "Et annet medlem har allerede denne e-postadressen. SSO kunne ikke skilt kontoene fra hverandre."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",
@@ -6142,9 +6134,6 @@
         "balanceBelowZeroShort": "De neste poengene jevner det ut",
         "pendingBalanceBelowZero": "Nåværende saldo: {{points}}",
         "ledgerTaskReopened": "Oppgave gjenåpnet",
-        "ledgerLateDecayNote": "{{count}} dager for seint",
-        "ledgerLateDecayNote_one": "{{count}} dag for seint",
-        "ledgerLateDecayInsteadOf": "i stedet for {{count}}",
         "ledgerTaskReopenedNamed": "Gjenåpnet: {{task}}",
         "progressLabel": "Fremgang mot neste belønning",
         "noRewardsYet": "Ingen belønninger ennå",

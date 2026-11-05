@@ -19,7 +19,7 @@ import { esc } from '/utils/html.js';
 import { confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { hintFoldHtml, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { DISPLAY_DEVICE_DEFAULTS, DISPLAY_IDLE_STEPS, normalizeDisplayDeviceSettings } from '/utils/display-device-settings.js';
-import { errorSentence, isAlreadyDeleted, isGone, loadErrorSentence } from '/utils/friendly-error.js';
+import { errorSentence } from '/utils/friendly-error.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 function formatSeen(value) {
@@ -116,12 +116,7 @@ function syncNightOptions(form) {
   }
 }
 
-/**
- * `onGone`: ein zweiter Admin hat das Tablett inzwischen geloescht (#1909).
- * Die Seite laedt dann die Liste nach, statt eine Karte stehen zu lassen, die
- * es nicht mehr gibt.
- */
-export function bindDisplayDeviceSettings(list, { onGone } = {}) {
+export function bindDisplayDeviceSettings(list) {
   list.addEventListener('submit', async event => {
     const form = event.target.closest?.('[data-display-device-settings]');
     if (!form) return;
@@ -142,10 +137,7 @@ export function bindDisplayDeviceSettings(list, { onGone } = {}) {
       await api.patch(`/displays/${form.dataset.displayDeviceSettings}`, {device_settings:settings});
       form.querySelector('[data-display-local-hint]')?.remove();
       status.textContent = t('common.savedNamed', {name:form.dataset.name});
-    } catch (error) {
-      status.textContent = errorSentence(error);
-      if (isGone(error)) onGone?.(error);
-    }
+    } catch (error) { status.textContent = errorSentence(error); }
     finally {
       form.dataset.saving = 'false';
       for (const control of controls) control.disabled = false;
@@ -321,7 +313,7 @@ const pairTickets = new Map();
  * nicht hat. Exported so test:display-screensaver-switch can drive the real
  * handler.
  */
-export function bindDisplayScreensaverSwitches(list, errorEl, { onGone } = {}) {
+export function bindDisplayScreensaverSwitches(list, errorEl) {
   list.addEventListener('change', async (event) => {
     const form = event.target.closest?.('[data-display-device-settings]');
     if (form) { syncNightOptions(form); return; }
@@ -338,8 +330,7 @@ export function bindDisplayScreensaverSwitches(list, errorEl, { onGone } = {}) {
       );
     } catch (err) {
       toggle.checked = !on;
-      showError(errorEl, errorSentence(err));
-      if (isGone(err)) onGone?.(err);
+      showError(errorEl, err.message);
     } finally {
       toggle.disabled = false;
     }
@@ -351,17 +342,6 @@ function bindEvents(container) {
   const list = container.querySelector('#display-list');
   const errorEl = container.querySelector('#display-error');
   if (!form || !list) return;
-
-  // EIN ZWEITER ADMIN WAR SCHNELLER (#1909): das Tablett oder sein Geraet gibt
-  // es nicht mehr. Der Satz steht schon (errorSentence), die Liste zeigt danach
-  // den Stand des Servers - der Satz selbst raet deshalb nicht zum Neuladen.
-  const reloadGone = async () => {
-    try {
-      await reload(container);
-    } catch (err) {
-      showError(errorEl, loadErrorSentence(err));
-    }
-  };
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -387,14 +367,14 @@ function bindEvents(container) {
       input.value = '';
       await reloadAfterSave(() => reload(container));
     } catch (err) {
-      showError(errorEl, errorSentence(err));
+      showError(errorEl, err.message);
     } finally {
       btn.disabled = false;
     }
   });
 
-  bindDisplayScreensaverSwitches(list, errorEl, { onGone: reloadGone });
-  bindDisplayDeviceSettings(list, { onGone: (err) => { showError(errorEl, errorSentence(err)); reloadGone(); } });
+  bindDisplayScreensaverSwitches(list, errorEl);
+  bindDisplayDeviceSettings(list);
 
   list.addEventListener('click', async (event) => {
     const pair = event.target.closest('[data-display-pair]');
@@ -421,10 +401,7 @@ function bindEvents(container) {
           box.hidden = false;
         }
       } catch (err) {
-        if (pairTickets.get(id) === ticket) {
-          showError(errorEl, errorSentence(err));
-          if (isGone(err)) reloadGone();
-        }
+        if (pairTickets.get(id) === ticket) showError(errorEl, err.message);
       } finally {
         // Die Liste wird hier nicht neu gezeichnet, der Knopf von eben ist also
         // noch derselbe - `isConnected` faengt den Fall trotzdem ab, falls ein
@@ -453,8 +430,7 @@ function bindEvents(container) {
         // Dokumentanfang statt an der Stelle, an der gerade gearbeitet wurde.
         refocusAfterRender();
       } catch (err) {
-        showError(errorEl, errorSentence(err));
-        if (isGone(err)) reloadGone();
+        showError(errorEl, err.message);
       }
       return;
     }
@@ -480,14 +456,14 @@ function bindEvents(container) {
         if (err?.status !== 404) {
           showError(errorEl, err?.status === 409 && err.data?.reason === 'display_device_active'
             ? t('settings.displayRemoveDeviceActive')
-            : errorSentence(err));
+            : err.message);
         }
       }
       try {
         await reload(container);
         refocusAfterRender();
       } catch (err) {
-        showError(errorEl, loadErrorSentence(err));
+        showError(errorEl, err.message);
       }
       return;
     }
@@ -509,15 +485,7 @@ function bindEvents(container) {
         await reload(container);
         refocusAfterRender();
       } catch (err) {
-        // Ein zweiter Admin hat es schon geloescht (#1909): erledigt, was
-        // gewollt war - kein Fehler, nur die Liste auf den Stand bringen.
-        if (isAlreadyDeleted(err, 'displays_display_not_found')) {
-          await auth.me().catch(() => {});
-          await reloadGone();
-          refocusAfterRender();
-          return;
-        }
-        showError(errorEl, errorSentence(err));
+        showError(errorEl, err.message);
       }
     }
   });

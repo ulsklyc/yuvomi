@@ -1965,8 +1965,6 @@
         "pageCountdownsModuleDescription": "Defina o prazo de carência para prazos vencidos na visão geral.",
         "rewardsApprovalLabel": "Exigir aprovação dos pais",
         "rewardsApprovalHint": "Os resgates devem ser confirmados por um administrador. Quando desativado, são concedidos imediatamente.",
-        "rewardsLateDecayLabel": "Penalização por conclusão tardia",
-        "rewardsLateDecayHint": "Menos 1 ponto por dia de calendário em atraso, pelo menos 1 ponto fica. Uma data movida conta a partir da marcação.",
         "rewardsSaved": "Configuração de recompensas salva.",
         "rewardsDefaultPointsHint": "Novas tarefas são preenchidas automaticamente com este valor. Pode ser alterado em cada tarefa.",
         "rewardsDefaultPointsLabel": "Pontos para novas tarefas",
@@ -3528,13 +3526,7 @@
         "memberErrorUsernameTaken": "Outra conta já tem este nome de utilizador.",
         "memberErrorGone": "Este membro já não existe.",
         "memberErrorSsoEmailRequired": "Uma conta só com SSO precisa de um endereço de e-mail para que o primeiro início de sessão por SSO a encontre.",
-        "memberErrorSsoEmailAmbiguous": "Outro membro já tem este endereço de e-mail. O SSO não conseguiria distinguir as contas.",
-        "twoFactorAlreadyEnabled": "A autenticação de dois fatores já está ativada. Recarrega a página para veres o estado atual.",
-        "twoFactorSetupExpired": "A configuração expirou. Cancela e começa de novo.",
-        "oidcLinkErrorNotConfigured": "O SSO já não está configurado neste servidor.",
-        "oidcUnlinkNotLinked": "Esta conta já não está associada ao SSO. Recarrega a página para veres o estado atual.",
-        "displayErrorGone": "Este tablet de parede já não existe.",
-        "displayDeviceErrorGone": "Este dispositivo já não existe."
+        "memberErrorSsoEmailAmbiguous": "Outro membro já tem este endereço de e-mail. O SSO não conseguiria distinguir as contas."
     },
     "login": {
         "tagline": "Bem-vindo de volta. A tua casa num só lugar.",
@@ -6142,9 +6134,6 @@
         "balanceBelowZeroShort": "Os próximos pontos compensam",
         "pendingBalanceBelowZero": "Saldo atual: {{points}}",
         "ledgerTaskReopened": "Tarefa reaberta",
-        "ledgerLateDecayNote": "{{count}} dias de atraso",
-        "ledgerLateDecayNote_one": "{{count}} dia de atraso",
-        "ledgerLateDecayInsteadOf": "em vez de {{count}}",
         "ledgerTaskReopenedNamed": "Reaberta: {{task}}",
         "progressLabel": "Progresso para a próxima recompensa",
         "noRewardsYet": "Ainda não há prêmios",

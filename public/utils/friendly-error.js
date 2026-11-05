@@ -412,19 +412,6 @@ export const CASE_MESSAGES = new Map([
   ['members_member_not_found', 'settings.memberErrorGone'],
   ['members_sso_email_required', 'settings.memberErrorSsoEmailRequired'],
   ['members_sso_email_ambiguous', 'settings.memberErrorSsoEmailAmbiguous'],
-  // SSO-Verknuepfung im Konto-Blatt (#1909). Den letzten per SSO verknuepften
-  // Administrator haelt `last_sso_admin` oben auch hier. Den Rest erreicht nur
-  // ein veralteter Stand (ein zweiter Tab hat schon verknuepft oder geloest,
-  // SSO wurde inzwischen abgeschaltet) oder ein Konto ohne Passwort.
-  ['oidc_not_configured', 'settings.oidcLinkErrorNotConfigured'],
-  ['oidc_already_linked', 'settings.oidcLinkError_already_linked'],
-  ['oidc_not_linked', 'settings.oidcUnlinkNotLinked'],
-  ['oidc_password_required', 'settings.oidcUnlinkNeedsPassword'],
-  // Seite Wandtablets (#1909): ein zweiter Admin hat das Tablett oder sein
-  // Geraet schon entfernt. Beide stehen auch in GONE_REASONS: die Seite laedt
-  // die Liste nach.
-  ['displays_display_not_found', 'settings.displayErrorGone'],
-  ['displays_device_not_found', 'settings.displayDeviceErrorGone'],
   // Stichwort einer Aufgabe, von einem anderen Geraet umbenannt oder geloescht.
   ['tasks_tag_not_found', 'tasks.errorTagGone'],
   // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909). Die drei
@@ -594,8 +581,6 @@ export const GONE_REASONS = new Set([
   'calendar_subscription_not_found',
   'tasks_tag_not_found',
   'members_member_not_found',
-  'displays_display_not_found',
-  'displays_device_not_found',
 ]);
 
 /**

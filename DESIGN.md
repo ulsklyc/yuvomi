@@ -3963,10 +3963,21 @@ Gefaltet wird ueber Rand und Verschiebung, nicht ueber die Hoehe: der negative R
 die Leiste, wo die Seite sie abschneidet. Beides gleitet in Safari (eine Hoehe nach `auto`
 braeuchte `interpolate-size`), der Inhalt blendet; reduzierte Bewegung faltet ohne
 Bewegung. Die Zeile bleibt offen, solange sie Fokus, einen Suchbegriff oder ein offenes Menue
-traegt - wer per Tab hineinkommt, bekommt sie zurueck. Die Werkzeuge erreicht man angedockt
-ueber den Rueckweg nach oben, wie die Suche der gedeckelten Koepfe (Kontakte); in der Leiste
-selbst ist fuer sie kein Platz (390px, de: 65-87px frei, zwei 48px-Ziele passen nicht, ohne
-die Zaehler wieder zu Punkten zu machen).
+traegt - wer per Tab hineinkommt, bekommt sie zurueck.
+
+**Suchschalter in der Leiste, Zeile 2 ab Seitenladestart eingeklappt (Issue #2043, 2026-10).**
+Die Leiste traegt rechts eine `.kitchen-tabs-bar__trailing`-Zone (`position: sticky; inset-inline-end: 0`
+in der scrollbaren `<nav>`): die Tabs koennen links durchscrollen, der Schalter klebt am Rand.
+Rezepte und Vorrat fuellen ihn mit einer Lupe (`setKitchenTabsTrailing`); Mahlzeiten und Einkauf
+leeren ihn. Tipp auf die Lupe fokussiert das Suchfeld in Zeile 2; weil die Faltung
+(`:not(:focus-within)`) damit endet, gleitet die Zeile sofort auf. Damit Inhalt nicht erst nach
+dem ersten Scroll auf y 57 startet, setzt ein `MutationObserver` in Rezepte und Vorrat
+`is-collapsed`, sobald `wireCollapsingHeader` `page-toolbar--fold-row` (und damit `--fold-row-h`)
+gesetzt hat. Bis der erste Nutzer-Scroll den Wert verwirft, faengt die Lupe ihn ab. Tab-Icons
+entfallen (D3: Texttabs); 375px de mit Trailing-Zone: ~374px (Symbol-only 24px aus `.btn--icon-tight`,
+Trefferflaeche weiter `--target-base`), passt ohne Scrollen. Gemessen wird die Breite des Schalters in
+`test:kitchen-tabs-fit-browser` - an der Deklaration gelesen war sie 24 und gerendert 48 (`min-width`
+schlaegt `max-width`).
 
 **Sub-Tabs + Zeitraum: der Zeitraum steht in der Titelzeile (Budget, R16 2026-10-05).** Ein
 Modul, dessen Zeile 2 schon die Sub-Tabs traegt und dessen Tab einen Zeitraum blaettert, fuehrt

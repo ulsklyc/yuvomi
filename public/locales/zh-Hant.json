@@ -1965,8 +1965,6 @@
         "pageCountdownsModuleDescription": "為概覽中已過期的重要日期設定寬限期。",
         "rewardsApprovalLabel": "需要家長批准",
         "rewardsApprovalHint": "兌換必須由管理員確認。關閉時將立即發放。",
-        "rewardsLateDecayLabel": "逾期完成扣分",
-        "rewardsLateDecayHint": "每逾期一個日曆日少 1 分，至少保留 1 分。改期從勾選時起算。",
         "rewardsSaved": "獎勵設定已儲存。",
         "rewardsDefaultPointsHint": "新任務會自動填入該積分值，可以針對單個任務修改。",
         "rewardsDefaultPointsLabel": "新任務的積分",
@@ -3528,13 +3526,7 @@
         "memberErrorUsernameTaken": "其他帳號已使用此使用者名稱。",
         "memberErrorGone": "此成員已不存在。",
         "memberErrorSsoEmailRequired": "僅限 SSO 的帳號需要電子郵件地址，首次 SSO 登入才能找到它。",
-        "memberErrorSsoEmailAmbiguous": "其他成員已使用此電子郵件地址。SSO 無法區分這些帳號。",
-        "twoFactorAlreadyEnabled": "兩步驗證已經啟用。請重新載入頁面查看目前狀態。",
-        "twoFactorSetupExpired": "設定已逾時。請取消後重新開始。",
-        "oidcLinkErrorNotConfigured": "此伺服器已不再設定 SSO。",
-        "oidcUnlinkNotLinked": "此帳戶已不再與 SSO 關聯。請重新載入頁面查看目前狀態。",
-        "displayErrorGone": "此壁掛平板已不存在。",
-        "displayDeviceErrorGone": "這臺裝置已不存在。"
+        "memberErrorSsoEmailAmbiguous": "其他成員已使用此電子郵件地址。SSO 無法區分這些帳號。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",
@@ -6142,9 +6134,6 @@
         "balanceBelowZeroShort": "之後獲得的積分會補上",
         "pendingBalanceBelowZero": "目前餘額：{{points}}",
         "ledgerTaskReopened": "任務已重新開啟",
-        "ledgerLateDecayNote": "逾期 {{count}} 天",
-        "ledgerLateDecayNote_one": "逾期 {{count}} 天",
-        "ledgerLateDecayInsteadOf": "而非 {{count}}",
         "ledgerTaskReopenedNamed": "已重新開啟：{{task}}",
         "progressLabel": "距下一個獎勵的進度",
         "noRewardsYet": "暫無獎品",

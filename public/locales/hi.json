@@ -1965,8 +1965,6 @@
         "pageCountdownsModuleDescription": "अवलोकन में समाप्त हो चुकी महत्वपूर्ण तिथियों के लिए छूट अवधि सेट करें।",
         "rewardsApprovalLabel": "माता-पिता की स्वीकृति आवश्यक",
         "rewardsApprovalHint": "रिडेम्पशन की पुष्टि एक प्रशासक द्वारा की जानी चाहिए। बंद होने पर, वे तुरंत स्वीकृत हो जाते हैं।",
-        "rewardsLateDecayLabel": "देर से पूरा करने पर अंकों में कटौती",
-        "rewardsLateDecayHint": "प्रति कैलेंडर दिन देरी पर 1 अंक कम, कम से कम 1 अंक रहता है। स्थानांतरित तिथि टिक करने के क्षण से गिनी जाती है।",
         "rewardsSaved": "पुरस्कार सेटिंग सहेजी गई।",
         "rewardsDefaultPointsHint": "नए कार्यों में यह अंक अपने आप भर जाते हैं. हर कार्य के लिए बदला जा सकता है.",
         "rewardsDefaultPointsLabel": "नए कार्यों के अंक",
@@ -3528,13 +3526,7 @@
         "memberErrorUsernameTaken": "यह उपयोगकर्ता नाम पहले से किसी दूसरे खाते के पास है।",
         "memberErrorGone": "यह सदस्य अब मौजूद नहीं है।",
         "memberErrorSsoEmailRequired": "केवल SSO वाले खाते को ईमेल पते की ज़रूरत है, ताकि पहला SSO साइन-इन उसे ढूँढ सके।",
-        "memberErrorSsoEmailAmbiguous": "यह ईमेल पता पहले से किसी दूसरे सदस्य के पास है। SSO खातों में अंतर नहीं कर पाएगा।",
-        "twoFactorAlreadyEnabled": "दो-चरणीय प्रमाणीकरण पहले से चालू है। मौजूदा स्थिति देखने के लिए पेज फिर से लोड करें।",
-        "twoFactorSetupExpired": "सेटअप की समय-सीमा खत्म हो गई। इसे रद्द करें और फिर से शुरू करें।",
-        "oidcLinkErrorNotConfigured": "इस सर्वर पर SSO अब सेट अप नहीं है।",
-        "oidcUnlinkNotLinked": "यह खाता अब SSO से जुड़ा नहीं है। मौजूदा स्थिति देखने के लिए पेज फिर से लोड करें।",
-        "displayErrorGone": "यह दीवार टैबलेट अब मौजूद नहीं है।",
-        "displayDeviceErrorGone": "यह डिवाइस अब मौजूद नहीं है।"
+        "memberErrorSsoEmailAmbiguous": "यह ईमेल पता पहले से किसी दूसरे सदस्य के पास है। SSO खातों में अंतर नहीं कर पाएगा।"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",
@@ -6142,9 +6134,6 @@
         "balanceBelowZeroShort": "अगले अंक इसे पूरा कर देंगे",
         "pendingBalanceBelowZero": "वर्तमान शेष: {{points}}",
         "ledgerTaskReopened": "कार्य फिर से खोला गया",
-        "ledgerLateDecayNote": "{{count}} दिन देर",
-        "ledgerLateDecayNote_one": "{{count}} दिन देर",
-        "ledgerLateDecayInsteadOf": "{{count}} के बजाय",
         "ledgerTaskReopenedNamed": "फिर से खोला गया: {{task}}",
         "progressLabel": "अगले इनाम की ओर प्रगति",
         "noRewardsYet": "अभी कोई इनाम नहीं",

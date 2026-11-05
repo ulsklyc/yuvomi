@@ -174,19 +174,7 @@ export function displaysPaths() {
   });
 }
 
-const DISPLAY_GONE = '`displays_display_not_found` (404, there is no display with this id, or it has been deleted)';
-const DEVICE_GONE = '`displays_device_not_found` (404, the device does not exist or does not belong to this display)';
-
 // #2267: der Grund, den die Route neben `error` sendet.
 const CASE_REASONS = {
   '/api/v1/displays/people': { get: '`display_only` (403, the route answers only a paired display)' },
-  // #1909: was die Seite Wandtablets unterscheidet - ein zweiter Admin hat das
-  // Tablett oder sein Geraet schon entfernt.
-  '/api/v1/displays/{id}': {
-    patch: DISPLAY_GONE,
-    delete: DISPLAY_GONE,
-  },
-  '/api/v1/displays/{id}/pairing-code': { post: DISPLAY_GONE },
-  '/api/v1/displays/{id}/devices/{deviceId}/revoke': { post: DEVICE_GONE },
-  '/api/v1/displays/{id}/devices/{deviceId}/remove': { post: DEVICE_GONE },
 };

@@ -1965,8 +1965,6 @@
         "pageCountdownsModuleDescription": "Állítsa be a lejárt határidők türelmi idejét az áttekintőben.",
         "rewardsApprovalLabel": "Szülői jóváhagyás szükséges",
         "rewardsApprovalHint": "A beváltásokat egy rendszergazdának kell jóváhagynia. Ha ki van kapcsolva, azonnal jóváíródnak.",
-        "rewardsLateDecayLabel": "Késői elvégzés pontlevonása",
-        "rewardsLateDecayHint": "Naptáronként egy pont kevesebb, legalább 1 pont megmarad. A módosult határidő a pipálás pillanatától számít.",
         "rewardsSaved": "Jutalombeállítás mentve.",
         "rewardsDefaultPointsHint": "Az új feladatok automatikusan ezt a pontértéket kapják. Feladatonként felülírható.",
         "rewardsDefaultPointsLabel": "Pontok új feladatokhoz",
@@ -3528,13 +3526,7 @@
         "memberErrorUsernameTaken": "Ez a felhasználónév már egy másik fiókhoz tartozik.",
         "memberErrorGone": "Ez a tag már nem létezik.",
         "memberErrorSsoEmailRequired": "A csak SSO-s fióknak e-mail-cím kell, hogy az első SSO-bejelentkezés megtalálja.",
-        "memberErrorSsoEmailAmbiguous": "Ez az e-mail-cím már egy másik tagé. Az SSO nem tudná megkülönböztetni a fiókokat.",
-        "twoFactorAlreadyEnabled": "A kétlépcsős azonosítás már be van kapcsolva. Töltsd újra az oldalt az aktuális állapotért.",
-        "twoFactorSetupExpired": "A beállítás lejárt. Szakítsd meg, és kezdd újra.",
-        "oidcLinkErrorNotConfigured": "Az SSO már nincs beállítva ezen a szerveren.",
-        "oidcUnlinkNotLinked": "Ez a fiók már nincs összekötve az SSO-val. Töltsd újra az oldalt az aktuális állapotért.",
-        "displayErrorGone": "Ez a fali táblagép már nem létezik.",
-        "displayDeviceErrorGone": "Ez az eszköz már nem létezik."
+        "memberErrorSsoEmailAmbiguous": "Ez az e-mail-cím már egy másik tagé. Az SSO nem tudná megkülönböztetni a fiókokat."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",
@@ -6142,9 +6134,6 @@
         "balanceBelowZeroShort": "A következő pontok kiegyenlítik",
         "pendingBalanceBelowZero": "Jelenlegi egyenleg: {{points}}",
         "ledgerTaskReopened": "Feladat újranyitva",
-        "ledgerLateDecayNote": "{{count}} nap késés",
-        "ledgerLateDecayNote_one": "{{count}} nap késés",
-        "ledgerLateDecayInsteadOf": "{{count}} helyett",
         "ledgerTaskReopenedNamed": "Újranyitva: {{task}}",
         "progressLabel": "Haladás a következő jutalom felé",
         "noRewardsYet": "Még nincsenek jutalmak",
