@@ -491,3 +491,38 @@ test('unknownMigrationVersions: sieht genau die Nummern, die dieser Build nicht 
   }
   assert.deepEqual(dbmod.unknownMigrationVersions(live), []);
 });
+
+// ── GET /database: Rate-Limit je Konto (#2524) ─────────────────────────────────
+// Jeder Abruf baut eine volle Kopie der Datenbank; eine gekaperte Admin-Sitzung
+// darf das nicht im Takt ausloesen. Eigene Konto-IDs, damit die Abrufe der
+// Faelle oben nicht mitzaehlen.
+test('GET /database: der elfte Download eines Admins in der Stunde bekommt 429, andere Konten nicht (#2524)', async () => {
+  const first = { id: 41, role: 'admin' };
+  const second = { id: 42, role: 'admin' };
+  const member = { id: 43, role: 'member' };
+
+  // Ein Mitglied scheitert am Gate, bevor der Zaehler laeuft: auch nach zwoelf
+  // Versuchen kommt 403, nie 429.
+  for (let i = 0; i < 12; i += 1) {
+    const r = await call('GET', '/database', { actor: member });
+    assert.equal(r.status, 403, `Versuch ${i + 1} des Mitglieds`);
+  }
+
+  for (let i = 0; i < 10; i += 1) {
+    const r = await call('GET', '/database', { actor: first });
+    assert.equal(r.status, 200, `Download ${i + 1} des ersten Admins`);
+  }
+  const blocked = await call('GET', '/database', { actor: first });
+  assert.equal(blocked.status, 429, 'der elfte Download in der Stunde wird abgewiesen');
+  assert.equal(blocked.body?.code, 429);
+  assert.ok(!blocked.buf.subarray(0, 16).toString('latin1').startsWith('SQLite format 3'), 'kein Backup im 429');
+
+  // Ein zweiter Admin hat sein eigenes Budget.
+  assert.equal((await call('GET', '/database', { actor: second })).status, 200);
+
+  // Wird das Mitglied Admin, ist sein Budget unberuehrt: die 403 oben haben nichts verbraucht.
+  for (let i = 0; i < 10; i += 1) {
+    const r = await call('GET', '/database', { actor: { ...member, role: 'admin' } });
+    assert.equal(r.status, 200, `Download ${i + 1} des befoerderten Mitglieds`);
+  }
+});
