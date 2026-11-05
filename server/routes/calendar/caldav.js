@@ -32,6 +32,14 @@ router.post('/caldav/accounts', requireAdmin, async (req, res) => {
     const result = await caldavSync.addAccount(name, caldavUrl, username, password);
     res.json({ data: result });
   } catch (err) {
+    // Die zwei Faelle, die die App selbst kennt (#1909). Alles andere ist die
+    // Antwort des fremden Servers: die Seite zeigt sie dem Admin als Angabe.
+    if (err.code === 'caldav_account_exists') {
+      return res.status(409).json({ error: err.message, code: 409, reason: 'caldav_account_exists' });
+    }
+    if (err.code === 'caldav_no_calendars') {
+      return res.status(400).json({ error: err.message, code: 400, reason: 'caldav_no_calendars' });
+    }
     log.error('CalDAV account creation failed:', err);
     res.status(500).json({ error: err.message || 'Failed to create CalDAV account.', code: 500 });
   }

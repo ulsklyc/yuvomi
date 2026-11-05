@@ -278,3 +278,32 @@ test('Uebersicht und Dashboard nennen keinen verborgenen Titel', async () => {
   assert.ok(JSON.stringify(own.body.rewards?.recent ?? own.body.data?.rewards?.recent ?? []).includes(`${SECRET}-private`),
     'die eigene Gutschrift fehlt in "zuletzt verdient"');
 });
+
+test('Spaetabzug-Details: fuer Fremde maskiert wie Titel und Aufgabe (Review #2413, Punkt 2)', async () => {
+  // Der Abzug erklaert eine Aufgabe: wie viel Punkte weg waren und seit wann.
+  // An einer Aufgabe, die der caller nicht sehen darf, haengt er genau so
+  // unsichtbar wie `reason` und `task_id`.
+  db.prepare("INSERT INTO sync_config (key, value) VALUES ('tasks_late_decay_enabled', '1') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run();
+  try {
+    const created = await owner.call('POST', '/tasks', {
+      title: `${SECRET}-decay-${Math.random().toString(36).slice(2, 8)}`,
+      visibility: 'private', points: 10, due_date: '2026-01-01',
+    });
+    assert.equal(created.status, 201);
+    const ticked = await owner.call('PATCH', `/tasks/${created.body.data.id}/status`, { status: 'done' });
+    assert.equal(ticked.status, 200);
+    const row = db.prepare("SELECT * FROM reward_ledger WHERE task_id = ? AND type = 'earn'").get(created.body.data.id);
+    assert.ok(row && row.decay_days >= 1, 'die Probe braucht einen echten Abzug');
+
+    const foreign = await seenBy(outsider.call, row.id);
+    assert.equal(foreign.decay_days, null, 'fremdes Mitglied sieht keine Ueberfaelligkeitstage');
+    assert.equal(foreign.base_points, null, 'fremdes Mitglied sieht nicht, was der Job wert gewesen waere');
+    assert.equal((await seenBy(admin, row.id)).decay_days, null, 'kein Admin-Bypass, wie bei der Aufgabe selbst');
+
+    const mine = await seenBy(owner.call, row.id);
+    assert.equal(mine.decay_days, row.decay_days, 'der Inhaber sieht die Erklaerung seiner Zeile');
+    assert.equal(mine.base_points, 10);
+  } finally {
+    db.prepare("UPDATE sync_config SET value = '0' WHERE key = 'tasks_late_decay_enabled'").run();
+  }
+});

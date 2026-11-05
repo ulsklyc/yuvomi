@@ -9,7 +9,7 @@
 
 import { householdMemberSql } from './household-members.js';
 import { seriesRootOf } from './task-completions.js';
-import { householdTimeZone, todayKey, utcToWall } from '../utils/timezone.js';
+import { householdTimeZone, todayKey, utcToWall, daysBetweenDateKeys } from '../utils/timezone.js';
 
 const REWARD_TX = `
   INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, redemption_id, created_by, unit, currency)
@@ -273,6 +273,30 @@ export function seriesOfTask(d, task) {
   return task.recurrence_series_id ?? seriesRootOf(d, task.id);
 }
 
+/*
+ * Spaetabzug bei Erledigung (Late-Completion-Decay, Haushalt opt-in): pro
+ * Ueberfaelligkeitstag einen Punkt weniger, mindestens bleibt 1 - eine
+ * Erledigung lohnt immer, sonst wirkt die Spaeterledigung wie ein Abzug
+ * ins Minus. Bemessen an Kalendertagen der Haushalt-Zeitzone zwischen
+ * `due_date` und Erledigungstag; eine spaet gesetzte Faelligkeit oder ein
+ * ungueltiges Datum loest keinen Abzug aus (daysBetweenDateKeys liefert dann
+ * null). Der Abzug wird bei der Buchung festgeschrieben - spaetere Aenderungen
+ * an Faelligkeit, Punktwert oder Setting aendern gebuchte Betraege nicht.
+ * Ohne echten Abzug (delta waere ohnehin der Grundwert) bleiben beide
+ * Audit-Felder NULL: die Oberflaeche zeigt dann kein durchgestrichenen
+ * Grundwert und kein "N Tage spaeter" fuer eine Buchung, die nichts reduziert.
+ */
+function lateDecay(d, task, today) {
+  const enabled = d.prepare("SELECT value FROM sync_config WHERE key = 'tasks_late_decay_enabled'").get()?.value === '1';
+  if (!enabled || !task.due_date) return { days: null, base: null, awarded: task.points };
+  const days = daysBetweenDateKeys(String(task.due_date).slice(0, 10), today);
+  if (days === null || days <= 0) return { days: null, base: null, awarded: task.points };
+  const awarded = Math.max(1, task.points - days);
+  // Kein Abzug gefunden: nichts zu erklaeren (Review #2413, Punkt 1).
+  if (awarded === task.points) return { days: null, base: null, awarded };
+  return { days, base: task.points, awarded };
+}
+
 /**
  * Punkte für eine erledigte Aufgabe gutschreiben. Idempotent über den
  * Netto-Stand: wer für diese Aufgabe schon vergütet ist, bekommt keine zweite
@@ -284,25 +308,26 @@ export function seriesOfTask(d, task) {
  *                             der Tag, an dem der Serien-Deckel misst.
  */
 export function awardForCompletion(d, taskId, actingUserId, doneByUserId = null, { now = new Date() } = {}) {
-  const task = d.prepare('SELECT id, points, title, recurrence_series_id FROM tasks WHERE id = ?').get(taskId);
+  const task = d.prepare('SELECT id, points, title, recurrence_series_id, due_date FROM tasks WHERE id = ?').get(taskId);
   if (!task || !Number.isInteger(task.points) || task.points <= 0) return;
   const targets = rewardTargets(d, taskId, actingUserId, doneByUserId);
   if (!targets.length) return;
   d.transaction(() => {
     const net = d.prepare(TASK_NET);
     const seriesEarns = d.prepare(SERIES_EARNS_SINCE);
-    const ins = d.prepare(`INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, created_by, created_at, series_id)
-      VALUES (?, ?, 'earn', ?, ?, ?, ?, ?)`);
+    const ins = d.prepare(`INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, created_by, created_at, series_id, decay_days, base_points)
+      VALUES (?, ?, 'earn', ?, ?, ?, ?, ?, ?, ?)`);
     const series = seriesOfTask(d, task);
     const zone = householdTimeZone(d);
     const today = todayKey(d, now);
+    const decay = lateDecay(d, task, today);
     const since = ledgerTimestamp(new Date(now.getTime() - SERIES_LOOKBACK_MS));
     for (const uid of new Set(targets)) {
       if (net.get(taskId, uid).net > 0) continue;
       const paidToday = seriesEarns.all({ series, user: uid, task: taskId, since })
         .some((row) => utcToWall(row.created_at, zone)?.date === today);
       if (paidToday) continue;
-      ins.run(uid, task.points, task.title || null, taskId, actingUserId || null, ledgerTimestamp(now), series);
+      ins.run(uid, decay.awarded, task.title || null, taskId, actingUserId || null, ledgerTimestamp(now), series, decay.days, decay.base);
     }
   })();
 }

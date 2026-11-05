@@ -402,6 +402,54 @@ export const CASE_MESSAGES = new Map([
   ['own_account', 'settings.memberRemoveOwnAccount'],
   ['last_admin', 'settings.memberRemoveLastAdmin'],
   ['last_sso_admin', 'settings.memberRemoveLastSsoAdmin'],
+  // Mitglied anlegen, bearbeiten, einladen (#1909). Die beiden Riegel oben
+  // gelten auch beim Herabstufen. Das Formular prueft den Benutzernamen nicht
+  // selbst, und ob er vergeben ist oder eine Adresse schon einem anderen
+  // Mitglied gehoert, weiss nur der Server. Das Mitglied, das ein anderer Admin
+  // inzwischen entfernt hat, steht auch in GONE_REASONS: die Verwaltung laedt nach.
+  ['members_username_invalid', 'settings.memberErrorUsernameInvalid'],
+  ['members_username_taken', 'settings.memberErrorUsernameTaken'],
+  ['members_member_not_found', 'settings.memberErrorGone'],
+  ['members_sso_email_required', 'settings.memberErrorSsoEmailRequired'],
+  ['members_sso_email_ambiguous', 'settings.memberErrorSsoEmailAmbiguous'],
+  // SSO-Verknuepfung im Konto-Blatt (#1909). Den letzten per SSO verknuepften
+  // Administrator haelt `last_sso_admin` oben auch hier. Den Rest erreicht nur
+  // ein veralteter Stand (ein zweiter Tab hat schon verknuepft oder geloest,
+  // SSO wurde inzwischen abgeschaltet) oder ein Konto ohne Passwort.
+  ['oidc_not_configured', 'settings.oidcLinkErrorNotConfigured'],
+  ['oidc_already_linked', 'settings.oidcLinkError_already_linked'],
+  ['oidc_not_linked', 'settings.oidcUnlinkNotLinked'],
+  ['oidc_password_required', 'settings.oidcUnlinkNeedsPassword'],
+  // Seite API-Zugriff (#1909): was das Formular zum Anlegen eines Tokens
+  // erreicht. Der Name ist `required`, besteht er nur aus Leerzeichen, kommt er
+  // leer an; die Person kann ein anderer Admin inzwischen geloescht haben.
+  ['api_tokens_name_required', 'quickLinks.nameRequired'],
+  ['api_tokens_name_too_long', 'settings.apiTokenErrorNameTooLong'],
+  ['api_tokens_expiry_past', 'settings.apiTokenErrorExpiryPast'],
+  ['api_tokens_subject_unknown', 'settings.syncAssigneeUnknown'],
+  // Seite Wandtablets (#1909): ein zweiter Admin hat das Tablett oder sein
+  // Geraet schon entfernt. Beide stehen auch in GONE_REASONS: die Seite laedt
+  // die Liste nach.
+  ['displays_display_not_found', 'settings.displayErrorGone'],
+  ['displays_device_not_found', 'settings.displayDeviceErrorGone'],
+  // Kalender-Sync und Kalender-Abos (#1909): was die App beim Verbinden eines
+  // CalDAV- oder Apple-Kontos selbst kennt. Jede andere Absage ist die Antwort
+  // des fremden Servers und kommt als Angabe (errorSentenceWithDetail). Ein
+  // doppeltes Konto sagt denselben Satz wie bei CardDAV.
+  ['caldav_account_exists', 'settings.cardavErrorDuplicate'],
+  ['caldav_no_calendars', 'settings.caldavErrorNoCalendars'],
+  ['apple_no_calendars', 'settings.caldavErrorNoCalendars'],
+  ['apple_url_invalid', 'settings.icsErrorUrlScheme'],
+  // Abo anlegen und einmaliger Import: der Abruf eines Feeds scheitert an
+  // denselben Stellen wie der einer Abfuhr-Adresse. Die Saetze lauten gleich,
+  // sind aber eigene Schluessel: die waste.*-Saetze gehoeren den waste_*-
+  // Gruenden (test:waste-routes).
+  ['calendar_subscription_name_invalid', 'settings.icsErrorNameInvalid'],
+  ['calendar_ics_url_invalid', 'settings.icsErrorUrlInvalid'],
+  ['calendar_ics_url_scheme', 'settings.icsErrorUrlScheme'],
+  ['calendar_ics_private_address', 'settings.icsErrorPrivateAddress'],
+  ['calendar_ics_http_status', 'settings.icsErrorHttpStatus'],
+  ['calendar_ics_too_large', 'settings.icsErrorTooLarge'],
   // Stichwort einer Aufgabe, von einem anderen Geraet umbenannt oder geloescht.
   ['tasks_tag_not_found', 'tasks.errorTagGone'],
   // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909). Die drei
@@ -456,6 +504,8 @@ export const CASE_PARAMS = new Map([
   ['recipe_providers_sync_http_status', ['status']],
   ['calendar_name_invalid', ['limit']],
   ['immich_http_status', ['status']],
+  ['calendar_ics_http_status', ['status']],
+  ['calendar_ics_too_large', ['limit_mb']],
 ]);
 
 const PARAM_MAX = 1_000_000_000;
@@ -570,6 +620,9 @@ export const GONE_REASONS = new Set([
   'calendar_selected_calendar_not_found',
   'calendar_subscription_not_found',
   'tasks_tag_not_found',
+  'members_member_not_found',
+  'displays_display_not_found',
+  'displays_device_not_found',
 ]);
 
 /**

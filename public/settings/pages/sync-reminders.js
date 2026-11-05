@@ -8,7 +8,7 @@ import {
   createStatusSummary,
 } from '/settings/components.js';
 import { withBusy } from '/utils/ux.js';
-import { errorSentence, errorSentenceWithDetail } from '/utils/friendly-error.js';
+import { errorSentence, errorSentenceWithDetail, loadErrorSentence } from '/utils/friendly-error.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { buildAssigneeMenu } from '/settings/assignee-menu.js';
 
@@ -274,7 +274,7 @@ async function loadAccounts(container) {
     accounts = res.data || [];
   } catch (err) {
     listEl.appendChild(createRetryState({
-      message: err.message || t('settings.caldavConnectionFailed'),
+      message: loadErrorSentence(err) ?? t('settings.caldavConnectionFailed'),
       onRetry: reload,
     }));
     return;
@@ -302,7 +302,10 @@ async function loadAccounts(container) {
         details: [lastSyncDetail(account.lastSync)],
         tone: 'warning',
       }));
-      wrapper.appendChild(createInlineError(err.message || t('common.errorGeneric')));
+      // Der erste Abruf eines Kontos fragt den CalDAV-Server selbst nach seinen
+      // Listen (getReminderLists, #617): eine Absage ist dann seine Antwort,
+      // wie beim Aktualisieren-Knopf (#1909).
+      wrapper.appendChild(createInlineError(errorSentenceWithDetail(err, 'settings.connectionFailedDetail')));
       listEl.appendChild(wrapper);
       continue;
     }

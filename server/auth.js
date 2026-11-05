@@ -2172,7 +2172,7 @@ export function buildInviteRoutes(targetRouter, {
         : String(body.permission_preset || '').trim();
 
       if (username && !/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
-        return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400 });
+        return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'members_username_invalid' });
       }
       if (displayName.length > 128) {
         return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
@@ -2192,7 +2192,7 @@ export function buildInviteRoutes(targetRouter, {
         return res.status(400).json({ error: 'An email address is required to send the invitation.', code: 400 });
       }
       if (username && getDb().prepare('SELECT 1 FROM users WHERE username = ?').get(username)) {
-        return res.status(409).json({ error: 'Username is already taken.', code: 409 });
+        return res.status(409).json({ error: 'Username is already taken.', code: 409, reason: 'members_username_taken' });
       }
 
       // Aufgeloest gespeichert, nicht als Name der Vorlage: massgeblich ist,
@@ -2593,11 +2593,11 @@ router.get('/oidc/link', requireAuth, refuseWhileRestoring, (req, res) => {
 router.post('/oidc/link/start', requireAuth, csrfMiddleware, async (req, res) => {
   try {
     const config = await getOidcConfig();
-    if (!config) return res.status(404).json({ error: 'OIDC is not configured.', code: 404 });
+    if (!config) return res.status(404).json({ error: 'OIDC is not configured.', code: 404, reason: 'oidc_not_configured' });
 
     const user = db.get().prepare('SELECT oidc_sub FROM users WHERE id = ?').get(req.authUserId);
     if (user?.oidc_sub) {
-      return res.status(409).json({ error: 'Account is already linked.', code: 409 });
+      return res.status(409).json({ error: 'Account is already linked.', code: 409, reason: 'oidc_already_linked' });
     }
 
     res.json({ url: await beginOidcFlow(req, config, { linkUserId: req.authUserId }) });
@@ -2617,15 +2617,18 @@ router.delete('/oidc/link', requireAuth, csrfMiddleware, (req, res) => {
   if (result.ok) return res.json({ ok: true });
 
   if (result.reason === 'user_gone')   return res.status(404).json({ error: 'User not found.', code: 404 });
-  if (result.reason === 'not_linked')  return res.status(409).json({ error: 'Account is not linked.', code: 409 });
+  // Die Gruende als Literale (#1909): das Konto-Blatt sagt den Satz dazu.
+  if (result.reason === 'not_linked')  return res.status(409).json({ error: 'Account is not linked.', code: 409, reason: 'oidc_not_linked' });
   if (result.reason === 'last_sso_admin') return res.status(409).json({
     error: 'This is the last administrator linked to SSO. Unlinking it would switch password login '
       + 'back on for the whole household. Link another administrator first.',
     code: 409,
+    reason: 'last_sso_admin',
   });
   return res.status(409).json({
     error: 'Set a password before unlinking - it is currently the only way into this account.',
     code:  409,
+    reason: 'oidc_password_required',
   });
 });
 
@@ -3071,7 +3074,9 @@ router.post('/2fa/verify', twoFactorLimiter, async (req, res) => {
   try {
     const pending = consumePendingTwoFactor(req);
     if (!pending) {
-      return res.status(401).json({ error: 'No pending sign-in.', code: 401 });
+      // Der Grund trennt den abgelaufenen Wartezustand vom falschen Code (#1909):
+      // die Anmeldeseite schickt dann zurueck an den Anfang statt zum Code.
+      return res.status(401).json({ error: 'No pending sign-in.', code: 401, reason: 'two_factor_no_pending_sign_in' });
     }
 
     // Zwischen Passwort und Code kann das Konto deaktiviert worden sein
@@ -3144,7 +3149,7 @@ router.post('/2fa/setup', requireAuth, csrfMiddleware, (req, res) => {
     res.json({ data: { secret, uri, qr } });
   } catch (err) {
     if (err.code === 'already_enabled') {
-      return res.status(409).json({ error: err.message, code: 409 });
+      return res.status(409).json({ error: err.message, code: 409, reason: 'already_enabled' });
     }
     log.error('2FA setup error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -3671,13 +3676,17 @@ router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res)
     const name = String(req.body.name || '').trim();
     const expiresAt = req.body.expires_at ? String(req.body.expires_at).trim() : null;
 
-    if (!name) return res.status(400).json({ error: 'Token name is required.', code: 400 });
-    if (name.length > 100) return res.status(400).json({ error: 'Token name may be at most 100 characters long.', code: 400 });
+    if (!name) return res.status(400).json({ error: 'Token name is required.', code: 400, reason: 'api_tokens_name_required' });
+    if (name.length > 100) {
+      return res.status(400).json({
+        error: 'Token name may be at most 100 characters long.', code: 400, reason: 'api_tokens_name_too_long',
+      });
+    }
     if (expiresAt && Number.isNaN(Date.parse(expiresAt))) {
       return res.status(400).json({ error: 'expires_at must be a valid ISO date/time.', code: 400 });
     }
     if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
-      return res.status(400).json({ error: 'Expiration date must be in the future.', code: 400 });
+      return res.status(400).json({ error: 'Expiration date must be in the future.', code: 400, reason: 'api_tokens_expiry_past' });
     }
 
     // scopes: fehlend/null → uneingeschränktes Token (Voll-Zugriff, Default wie bisher).
@@ -3714,7 +3723,9 @@ router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res)
         EXISTS(SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id) AS is_split_guest
       FROM users u WHERE u.id = ?
     `).get(subjectUserId);
-    if (!subject) return res.status(400).json({ error: 'Token subject user was not found.', code: 400 });
+    if (!subject) {
+      return res.status(400).json({ error: 'Token subject user was not found.', code: 400, reason: 'api_tokens_subject_unknown' });
+    }
     if (subject.is_split_guest) {
       return res.status(400).json({ error: 'A split-expense guest cannot be an API token subject.', code: 400 });
     }
@@ -3845,6 +3856,30 @@ function adminUserRow(userId) {
     .get(OIDC_PASSWORD_SENTINEL, userId);
 }
 
+// Die beiden Absagen von `assertSsoOnlyAllowed`, die ein Admin im Formular
+// erreicht (#1909): das Formular kennt weder die Adressen der anderen
+// Mitglieder noch prueft es, ob eine Adresse eingetragen ist.
+const SSO_ONLY_NEEDS_EMAIL = 'An account without a password needs an email address, so the first SSO sign-in can link it.';
+const SSO_ONLY_EMAIL_AMBIGUOUS = 'This email address already belongs to another member, so SSO could not tell the accounts apart.';
+
+/**
+ * Die Absage von `assertSsoOnlyAllowed` als 400, mit dem Grund der beiden
+ * Faelle, die ein Admin erreicht. Die anderen (OIDC nicht eingerichtet,
+ * Passwort und `sso_only` zugleich) schickt nur ein Aufrufer der API: der
+ * Schalter steht nur bei eingerichtetem SSO, und an ihm verschwindet das
+ * Passwortfeld. Die Gruende als Literale: `test:api` fuehrt jede Stelle, an der
+ * ein `reason` durch eine Variable gereicht wird.
+ */
+function refuseSsoOnly(res, message) {
+  if (message === SSO_ONLY_NEEDS_EMAIL) {
+    return res.status(400).json({ error: message, code: 400, reason: 'members_sso_email_required' });
+  }
+  if (message === SSO_ONLY_EMAIL_AMBIGUOUS) {
+    return res.status(400).json({ error: message, code: 400, reason: 'members_sso_email_ambiguous' });
+  }
+  return res.status(400).json({ error: message, code: 400 });
+}
+
 /**
  * Prueft, ob ein Konto ohne Passwort gefuehrt werden darf (#847).
  *
@@ -3878,7 +3913,7 @@ export function assertSsoOnlyAllowed(ssoOnly, password, { linked = false, email 
   if (linked) return null;
   const address = String(email || '').trim();
   if (!address) {
-    return 'An account without a password needs an email address, so the first SSO sign-in can link it.';
+    return SSO_ONLY_NEEDS_EMAIL;
   }
   // Und sie muss dieses eine Konto meinen: `findOrCreateOidcUser` verknuepft
   // nur bei GENAU einem Treffer und laesst zwei Kandidaten unangetastet.
@@ -3892,7 +3927,7 @@ export function assertSsoOnlyAllowed(ssoOnly, password, { linked = false, email 
   // stuende dann ohne Passwort und ohne Verknuepfung da.
   const clash = ssoLinkCandidates(db.get(), address, { excludeUserId }).length > 0;
   if (clash) {
-    return 'This email address already belongs to another member, so SSO could not tell the accounts apart.';
+    return SSO_ONLY_EMAIL_AMBIGUOUS;
   }
   return null;
 }
@@ -3933,7 +3968,7 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
     }
 
     if (!/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
-      return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400 });
+      return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'members_username_invalid' });
     }
 
     if (display_name.length > 128) {
@@ -3958,7 +3993,7 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
     // Erst hier, weil die Pruefung die E-Mail braucht: ein neues Konto ist noch
     // mit nichts verknuepft, also ist die Adresse sein einziger Weg hinein.
     const ssoOnlyError = assertSsoOnlyAllowed(ssoOnly, password, { email: memberFields.values.email });
-    if (ssoOnlyError) return res.status(400).json({ error: ssoOnlyError, code: 400 });
+    if (ssoOnlyError) return refuseSsoOnly(res, ssoOnlyError);
 
     const hash = ssoOnly ? OIDC_PASSWORD_SENTINEL : await hashPassword(password);
 
@@ -3993,7 +4028,7 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, async (req, res
     });
   } catch (err) {
     if (err.message && err.message.includes('UNIQUE constraint')) {
-      return res.status(409).json({ error: 'Username is already taken.', code: 409 });
+      return res.status(409).json({ error: 'Username is already taken.', code: 409, reason: 'members_username_taken' });
     }
     log.error('User creation error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -4018,7 +4053,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
 
     const existing = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(userId);
-    if (!existing) return res.status(404).json({ error: 'User not found.', code: 404 });
+    if (!existing) return res.status(404).json({ error: 'User not found.', code: 404, reason: 'members_member_not_found' });
     // EIN DISPLAY IST KEIN MITGLIED, ALSO AUCH HIER NICHT (#1208). Die Liste
     // darunter kennt es nicht mehr, diese Route kannte es noch: eine Id aus
     // `GET /displays` reichte, um dem Tablett einen Familiennamen, eine Rolle
@@ -4029,7 +4064,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     // herabstufen und den Haushalt ohne jeden Zugang zurueck lassen.
     // Verwaltet wird ein Display unter /displays, sonst nirgends.
     if (isDisplayAccount(userId, { db: db.get() })) {
-      return res.status(404).json({ error: 'User not found.', code: 404 });
+      return res.status(404).json({ error: 'User not found.', code: 404, reason: 'members_member_not_found' });
     }
 
     const username = req.body.username !== undefined ? String(req.body.username || '').trim() : existing.username;
@@ -4047,7 +4082,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       return res.status(400).json({ error: 'Username and display name are required.', code: 400 });
     }
     if (!/^[a-zA-Z0-9._-]{3,64}$/.test(username)) {
-      return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400 });
+      return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'members_username_invalid' });
     }
     if (displayName.length > 128) {
       return res.status(400).json({ error: 'Display name may be at most 128 characters long.', code: 400 });
@@ -4085,7 +4120,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       email: effectiveEmail,
       excludeUserId: userId,
     });
-    if (ssoOnlyError) return res.status(400).json({ error: ssoOnlyError, code: 400 });
+    if (ssoOnlyError) return refuseSsoOnly(res, ssoOnlyError);
 
     // Zurueck zu "hat ein Passwort" geht nur MIT einem Passwort: sonst bliebe
     // der Platzhalter stehen und das Konto haette weder SSO-Pflicht noch einen
@@ -4103,13 +4138,15 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       });
     }
 
+    // Dieselben Gruende wie beim Entfernen (#1909): die Verwaltung sagt den
+    // Satz dazu, auch wenn ein Admin sich selbst herabstuft.
     const adminError = assertAdminWouldRemain(userId, nextRole);
-    if (adminError) return res.status(400).json({ error: adminError, code: 400 });
+    if (adminError) return res.status(400).json({ error: adminError, code: 400, reason: 'last_admin' });
 
     // Dieselbe Frage fuer den SSO-Zustand: eine Herabstufung darf den Riegel
     // des Haushalts nicht nebenbei aufmachen (#847).
     const ssoAdminError = assertSsoAdminWouldRemain(userId, nextRole);
-    if (ssoAdminError) return res.status(400).json({ error: ssoAdminError, code: 400 });
+    if (ssoAdminError) return res.status(400).json({ error: ssoAdminError, code: 400, reason: 'last_sso_admin' });
 
     // Nur ein echter UEBERGANG schreibt und meldet ab. Die Verwaltung schickt
     // den Umschalter bei JEDER Speicherung mit, also auch beim Aendern des
@@ -4163,7 +4200,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     res.json({ user: publicUser(updated) });
   } catch (err) {
     if (err.message && err.message.includes('UNIQUE constraint')) {
-      return res.status(409).json({ error: 'Username is already taken.', code: 409 });
+      return res.status(409).json({ error: 'Username is already taken.', code: 409, reason: 'members_username_taken' });
     }
     log.error('User update error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

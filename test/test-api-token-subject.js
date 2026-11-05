@@ -125,3 +125,21 @@ test('a split-expense guest cannot be selected as an integration-token subject',
   assert.equal(response.status, 400);
   assert.match(response.body.error, /guest|subject/i);
 });
+
+// #1909: die Seite API-Zugriff zeigte diese Absagen als englischen Text des
+// Servers. Jeder Fall, den das Formular erreicht, nennt seinen Grund: ein Name
+// nur aus Leerzeichen (das Feld ist `required`, die Seite schneidet ihn ab), ein
+// eigenes Ablaufdatum, das inzwischen vorbei ist, und eine Person, die ein
+// anderer Admin zwischen Laden und Anlegen geloescht hat.
+test('the token form refusals name their case (#1909)', async () => {
+  for (const [body, reason] of [
+    [{ name: '' }, 'api_tokens_name_required'],
+    [{ name: 'x'.repeat(101) }, 'api_tokens_name_too_long'],
+    [{ name: 'Past', expires_at: '2020-01-01T00:00:00.000Z' }, 'api_tokens_expiry_past'],
+    [{ name: 'Gone subject', subject_user_id: 987654 }, 'api_tokens_subject_unknown'],
+  ]) {
+    const response = await call('POST', '/auth/api-tokens', adminToken, body);
+    assert.equal(response.status, 400, JSON.stringify(body));
+    assert.equal(response.body.reason, reason, JSON.stringify(response.body));
+  }
+});

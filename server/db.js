@@ -12026,6 +12026,23 @@ const MIGRATIONS = [
         database.exec(pantry.up);
       }
       database.prepare('UPDATE schema_migrations SET description = ? WHERE version = 276').run(pantry.description);
+    description: 'rewards: late completion decay audit fields',
+    // Spaeterledigung mit Punkteabzug (Haushalt opt-in): ist
+    // `tasks_late_decay_enabled` auf '1', verbucht awardForCompletion() pro
+    // Ueberfaelligkeitstag einen Punkt weniger, mindestens bleibt 1 - eine
+    // Erledigung lohnt immer. Die Ledger-Zeile haelt fest, was die Rechnung
+    // war: `decay_days` (Tage ueber der Faelligkeit) und `base_points`
+    // (Punktwert vor dem Abzug), damit die Oberflaeche Grundwert und Abzug
+    // zeigen kann und die Buchung auch bei spaeterer Aenderung von Faelligkeit
+    // oder Punktwert erklaerbar bleibt. Ohne Abzug bleiben beide NULL.
+    up(database) {
+      const cols = database.prepare('PRAGMA table_info(reward_ledger)').all();
+      if (!cols.some((c) => c.name === 'decay_days')) {
+        database.exec('ALTER TABLE reward_ledger ADD COLUMN decay_days INTEGER');
+      }
+      if (!cols.some((c) => c.name === 'base_points')) {
+        database.exec('ALTER TABLE reward_ledger ADD COLUMN base_points INTEGER');
+      }
     },
   },
 ];
@@ -12761,6 +12778,9 @@ function unreadableBackupError(encrypted, cause) {
         cause
       );
     }
+    // Ohne Grund (#1909): die Ursache steht nur im Stack, und den schreibt die
+    // Route nur fuer Fehler ohne `reason` ins Log - die Seite zeigt dazu den
+    // allgemeinen Satz, der auf das Server-Log zeigt.
     return new Error('Backup file is not a valid Yuvomi database.', { cause });
   }
   if (code === 'SQLITE_NOTADB') return undecryptableBackupError(cause);
@@ -12886,16 +12906,17 @@ function validateBackupFile(sourcePath) {
       WHERE type = 'table' AND name = 'schema_migrations'
     `).get();
     if (!row) {
-      throw new Error('Backup file is not a valid Yuvomi database.');
+      throw restoreError('Backup file is not a valid Yuvomi database.', 'backup_not_yuvomi');
     }
     // Backup aus einer neueren Yuvomi-Version: ablehnen, bevor irgendetwas
     // kopiert wird. Eingespielt liefe diese App stumm gegen ein Schema, das
     // sie nicht kennt; der richtige erste Schritt ist das Update.
     const unknown = unknownMigrationVersions(candidate);
     if (unknown.length > 0) {
-      throw new Error(
+      throw restoreError(
         `Backup was written by a newer Yuvomi (schema v${unknown[unknown.length - 1]}; this ` +
-        `version knows up to v${latestKnownVersion()}). Update Yuvomi first, then restore.`
+        `version knows up to v${latestKnownVersion()}). Update Yuvomi first, then restore.`,
+        'backup_newer_version'
       );
     }
     return candidate.prepare('SELECT MAX(version) AS version FROM schema_migrations').get()?.version ?? 0;

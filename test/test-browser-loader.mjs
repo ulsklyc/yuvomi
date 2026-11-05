@@ -143,6 +143,10 @@ const STUBS = {
     // aus public/i18n.js) - dasselbe Muster wie __formatDayMonth.
     export const formatTime = (d) => (globalThis.__formatTime ?? String)(d);
     export const getTimeFormat = () => '24h';
+    // Wochenstart des Haushalts (#2533): wie im Original 'monday', ausser ein
+    // Test setzt globalThis.__weekStart - dasselbe Muster wie __locale.
+    export const getWeekStart = () => globalThis.__weekStart ?? 'monday';
+    export const setWeekStart = (value) => { globalThis.__weekStart = value; };
     // Das Uhrzeit-Suffix der Locale („Uhr"): leer wie in den meisten Sprachen,
     // ausser ein Test setzt globalThis.__timeSuffix - dasselbe Muster wie
     // __locale. So laesst sich pruefen, WO es steht, nicht nur, dass nichts
@@ -525,6 +529,8 @@ const STUBS = {
   '/utils/kitchen-tabs.js': `
     export const renderKitchenTabsBar = () => {};
     export const refreshKitchenBadges = () => {};
+    export const setKitchenTabsTrailing = () => {};
+    export const mountKitchenSearchTrailing = () => {};
   `,
   '/utils/pwa-install.js': `
     export const getPwaInstallState = () => ({

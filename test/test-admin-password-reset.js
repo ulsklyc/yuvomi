@@ -191,3 +191,103 @@ test('PATCH /auth/users/:id rolls a role change back when fasting cleanup fails'
     database.exec('DROP TRIGGER IF EXISTS test_fail_auth_fasting_delete');
   }
 });
+
+// ── #1909: die Faelle der Familienverwaltung tragen einen `reason` ───────────
+// Anlegen und Bearbeiten eines Mitglieds zeigten den englischen `error` des
+// Servers in der Fehlerzeile des Dialogs. Jeder Fall, den ein Admin dort
+// erreicht, nennt jetzt seinen Grund; den Satz besitzt die App (CASE_MESSAGES).
+// Was nur ein Aufrufer der API ausloest (kaputte Kennung, unbekannte Rolle),
+// bleibt ohne Grund.
+
+async function postUser(body) {
+  return fetch(`${BASE}/api/v1/auth/users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Cookie: adminSession.cookie,
+      'X-CSRF-Token': adminSession.csrfToken,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+async function expectReason(response, status, reason) {
+  const body = await response.json();
+  assert.equal(response.status, status, JSON.stringify(body));
+  assert.equal(body.reason, reason);
+  assert.equal(typeof body.error, 'string');
+}
+
+const OIDC_ENV = {
+  OIDC_ISSUER: 'https://idp.example/',
+  OIDC_CLIENT_ID: 'yuvomi',
+  OIDC_CLIENT_SECRET: 'shh',
+  OIDC_REDIRECT_URI: 'https://home.example/api/v1/auth/oidc/callback',
+};
+
+async function withEnv(vars, fn) {
+  const before = Object.fromEntries(Object.keys(vars).map((key) => [key, process.env[key]]));
+  Object.assign(process.env, vars);
+  try {
+    return await fn();
+  } finally {
+    for (const [key, value] of Object.entries(before)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
+const adminId = database.prepare("SELECT id FROM users WHERE username = 'admin'").get().id;
+
+test('#1909: Anlegen und Bearbeiten nennen den Fall des Benutzernamens', async () => {
+  await expectReason(await postUser({ username: 'a b', display_name: 'X', password: 'longEnough1' }),
+    400, 'members_username_invalid');
+  await expectReason(await postUser({ username: 'kid', display_name: 'X', password: 'longEnough1' }),
+    409, 'members_username_taken');
+  await expectReason(await patchUser(kid.id, { username: 'a b' }), 400, 'members_username_invalid');
+  await expectReason(await patchUser(kid.id, { username: 'admin' }), 409, 'members_username_taken');
+  assert.equal(database.prepare('SELECT username FROM users WHERE id = ?').get(kid.id).username, 'kid');
+});
+
+test('#1909: ein inzwischen entferntes Mitglied ist "gibt es nicht mehr"', async () => {
+  await expectReason(await patchUser(999999, { display_name: 'Ghost' }), 404, 'members_member_not_found');
+});
+
+test('#1909: der letzte Administrator bleibt, auch beim Herabstufen', async () => {
+  assert.equal((await patchUser(kid.id, { system_admin: false })).status, 200);
+  await expectReason(await patchUser(adminId, { system_admin: false }), 400, 'last_admin');
+  assert.equal(database.prepare('SELECT role FROM users WHERE id = ?').get(adminId).role, 'admin');
+});
+
+test('#1909: der letzte per SSO verknuepfte Administrator bleibt, auch beim Herabstufen', async () => {
+  assert.equal((await patchUser(kid.id, { system_admin: true })).status, 200);
+  database.prepare("UPDATE users SET oidc_sub = 'sub-admin-1909' WHERE id = ?").run(adminId);
+  try {
+    await withEnv({ ...OIDC_ENV, AUTH_ALLOW_PASSWORD_LOGIN: 'false' }, async () => {
+      await expectReason(await patchUser(adminId, { system_admin: false }), 400, 'last_sso_admin');
+    });
+    assert.equal(database.prepare('SELECT role FROM users WHERE id = ?').get(adminId).role, 'admin');
+  } finally {
+    database.prepare('UPDATE users SET oidc_sub = NULL WHERE id = ?').run(adminId);
+    assert.equal((await patchUser(kid.id, { system_admin: false })).status, 200);
+  }
+});
+
+test('#1909: ein Konto ohne Passwort nennt, woran es scheitert', async () => {
+  await withEnv(OIDC_ENV, async () => {
+    // Ohne Adresse findet die erste SSO-Anmeldung das Konto nicht.
+    await expectReason(await postUser({ username: 'sso-new', display_name: 'Sso', sso_only: true }),
+      400, 'members_sso_email_required');
+    await expectReason(await patchUser(kid.id, { sso_only: true, email: null }),
+      400, 'members_sso_email_required');
+    // Eine Adresse, die schon ein anderes Mitglied traegt, kann SSO nicht zuordnen.
+    assert.equal((await patchUser(adminId, { email: 'shared-1909@example.test' })).status, 200);
+    await expectReason(await postUser({
+      username: 'sso-new', display_name: 'Sso', sso_only: true, email: 'shared-1909@example.test',
+    }), 400, 'members_sso_email_ambiguous');
+    await expectReason(await patchUser(kid.id, { sso_only: true, email: 'shared-1909@example.test' }),
+      400, 'members_sso_email_ambiguous');
+  });
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM users WHERE username = 'sso-new'").get().c, 0);
+});

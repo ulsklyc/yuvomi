@@ -320,6 +320,23 @@ test('POST /invites weist ungültige Eingaben ab', async () => {
   }
 });
 
+// #1909: die beiden Faelle, die ein Admin im Einladungsdialog erreicht (das
+// Feld prueft den Benutzernamen nicht selbst, und ob er vergeben ist, weiss nur
+// der Server), tragen einen `reason`. Die App sagt den Satz dazu
+// (CASE_MESSAGES), nie den englischen `error`.
+test('POST /invites nennt den Fall eines Benutzernamens (#1909)', async () => {
+  for (const [body, status, reason] of [
+    [{ username: 'ab' }, 400, 'members_username_invalid'],
+    [{ username: 'kein leerzeichen' }, 400, 'members_username_invalid'],
+    [{ username: 'admin' }, 409, 'members_username_taken'],
+  ]) {
+    const res = await call('POST', '/auth/invites', { actor: ADM, body });
+    assert.equal(res.status, status, JSON.stringify(body));
+    assert.equal(res.body.reason, reason, JSON.stringify(body));
+    assert.equal(typeof res.body.error, 'string');
+  }
+});
+
 test('POST /invites verschickt die Mail mit BASE_URL-Link und meldet email_sent', async () => {
   sentMails.length = 0;
   const { token, email_sent } = await invite({ email: 'dora@test', send_email: true, username: 'dora' });

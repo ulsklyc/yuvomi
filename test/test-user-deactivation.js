@@ -590,7 +590,11 @@ test('zweiter Faktor: wer zwischen Passwort und Code deaktiviert wird, kommt nic
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE sid = ?').get(waiting[0].sid).n, 0,
     'auch die wartende Sitzung endet, obwohl sie kein `userId` traegt');
   assert.equal(count('SELECT COUNT(*) AS n FROM user_recovery_codes WHERE user_id = ?', u.id), 0, 'die Wiederherstellungscodes sind geloescht');
-  assert.equal((await verify(cookie, codes[1])).status, 401, 'kein wartender Zustand mehr');
+  const gone = await verify(cookie, codes[1]);
+  assert.equal(gone.status, 401, 'kein wartender Zustand mehr');
+  // Die Anmeldeseite erkennt den Fall am Grund, nicht am englischen Text (#1909):
+  // sie schickt zurueck an den Anfang statt "der Code stimmt nicht" zu sagen.
+  assert.equal((await gone.json()).reason, 'two_factor_no_pending_sign_in');
 
   // Auch wenn die wartende Sitzung und ein Code noch dastehen: der Schritt
   // fragt selbst, und zwar BEVOR er einen Code verbraucht.

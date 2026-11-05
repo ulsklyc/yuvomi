@@ -22460,24 +22460,11 @@ const ERROR_MESSAGE_OWNERS = new Set([
 // errorSentence nimmt dem Nutzer die Ursache.
 const ERROR_MESSAGE_OPEN = new Map([
   ['components/category-manager.js', 1],
-  ['pages/login.js', 3],
-  ['settings/backup-key.js', 1],
-  ['settings/pages/admin-api.js', 2],
-  ['settings/pages/admin-backup.js', 2],
-  ['settings/pages/admin-displays.js', 7],
-  ['settings/pages/admin-family.js', 8],
-  ['settings/pages/admin-permissions.js', 1],
-  ['settings/pages/admin-system.js', 1],
   ['settings/pages/documents-dms.js', 2],
   ['settings/pages/documents-storage.js', 1],
   ['settings/pages/modules-install.js', 1],
-  ['settings/pages/personal-account.js', 5],
-  ['settings/pages/personal-calendar-subscriptions.js', 3],
   ['settings/pages/personal-device.js', 1],
   ['settings/pages/personal-feeds.js', 1],
-  ['settings/pages/sync-calendar.js', 5],
-  ['settings/pages/sync-contacts.js', 1],
-  ['settings/pages/sync-reminders.js', 2],
   ['utils/folder-upload.js', 2],
 ]);
 
@@ -22490,9 +22477,9 @@ const ERROR_MESSAGE_OPEN = new Map([
 const TECHNICAL_DETAIL_SITES = new Map([
   ['settings/pages/admin-backup.js', [2, 'Verbindungstest und Handlauf des WebDAV-Backups: Antwort des fremden Servers']],
   ['settings/pages/documents-storage.js', [5, 'WebDAV/Google Drive: Verbindungstest, Speichern und Trennen pruefen gegen den fremden Speicher und bestehende Dokumente']],
-  ['settings/pages/sync-calendar.js', [4, 'Aktualisieren und Abgleich von CalDAV, Outlook, Apple: Antwort des fremden Servers']],
+  ['settings/pages/sync-calendar.js', [5, 'Aktualisieren und Abgleich von CalDAV, Outlook, Apple, dazu das Verbinden eines CalDAV- oder Apple-Kontos (connectErrorSentence, ausser den Faellen aus CASE_MESSAGES): Antwort des fremden Servers']],
   ['settings/pages/sync-contacts.js', [1, 'CardDAV-Abgleich und Aktualisieren: connection_failed traegt die Antwort des fremden Servers']],
-  ['settings/pages/sync-reminders.js', [1, 'Aktualisieren der Erinnerungslisten: Antwort des fremden Servers']],
+  ['settings/pages/sync-reminders.js', [2, 'Aktualisieren der Erinnerungslisten und ihr erster Abruf je Konto (fragt den CalDAV-Server selbst, getReminderLists): Antwort des fremden Servers']],
 ]);
 
 function countTechnicalDetailCalls(source) {

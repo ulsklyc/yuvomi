@@ -26,10 +26,11 @@ import {
   dateInputPlaceholder,
   timeInputPlaceholder,
   getTimeFormat,
+  getWeekStart,
 } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { overlayHost } from '/utils/overlay-host.js';
-import { todayKey } from '/utils/date.js';
+import { todayKey, weekdayOrder, weekStartIndex, startOfLocalWeekKey, parseLocalDateKey } from '/utils/date.js';
 import { swapContent } from '/utils/content-swap.js';
 import { holdUntilStyled, warmStyle } from '/utils/component-style.js';
 
@@ -59,15 +60,17 @@ function todayIso() {
   return todayKey();
 }
 
-// Wochentagskürzel (Montag-first) und Monats-/Jahres-Label rein aus Intl —
-// keine eigenen Locale-Strings für Kalenderbeschriftung nötig.
-function weekdayLabels(locale) {
-  // timeZone:'UTC', weil die Tage per Date.UTC() gebaut werden — ohne das würde
+// Wochentagskürzel und Monats-/Jahres-Label rein aus Intl - keine eigenen
+// Locale-Strings für Kalenderbeschriftung nötig. Die Reihenfolge folgt dem
+// Wochenstart des Haushalts (`weekStart` als getDay()-Index), bis #2533 stand
+// hier fest Montag.
+function weekdayLabels(locale, weekStart) {
+  // timeZone:'UTC', weil die Tage per Date.UTC() gebaut werden - ohne das würde
   // Intl westlich von UTC auf den Vortag zurückrutschen und die Kürzel verschieben.
   const fmt = new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' });
-  // 2024-01-01 war ein Montag → 7 aufeinanderfolgende Tage ab Montag.
-  return Array.from({ length: 7 }, (_, i) =>
-    fmt.format(new Date(Date.UTC(2024, 0, 1 + i))));
+  // 2024-01-07 war ein Sonntag → 7 + getDay()-Index trifft den Tag.
+  return weekdayOrder(weekStart).map((day) =>
+    fmt.format(new Date(Date.UTC(2024, 0, 7 + day))));
 }
 
 function monthLabel(locale, year, month) {
@@ -488,8 +491,11 @@ class YuvomiDatepicker extends HTMLElement {
       </div>`);
 
     const locale = getLocale();
+    // Je Oeffnen gelesen: Kopfzeile und Raster (_paintDays) teilen denselben
+    // Wert, auch wenn der Wochenstart zwischendurch geaendert wurde.
+    this._weekStart = weekStartIndex(getWeekStart());
     const wdRow = el.querySelector('.ydp-cal__weekdays');
-    weekdayLabels(locale).forEach((w) => {
+    weekdayLabels(locale, this._weekStart).forEach((w) => {
       wdRow.insertAdjacentHTML('beforeend', `<span class="ydp-cal__wd">${esc(w)}</span>`);
     });
 
@@ -542,10 +548,9 @@ class YuvomiDatepicker extends HTMLElement {
     const grid = el.querySelector('.ydp-cal__days');
     grid.replaceChildren();
 
-    const first = new Date(this._viewYear, this._viewMonth, 1);
-    let offset = first.getDay() - 1;        // Montag = 0
-    if (offset < 0) offset = 6;
-    const start = new Date(this._viewYear, this._viewMonth, 1 - offset);
+    // Erste Zelle: der Wochenstart des Haushalts am oder vor dem Monatsersten.
+    const start = parseLocalDateKey(
+      startOfLocalWeekKey(isoOf(this._viewYear, this._viewMonth, 1), this._weekStart ?? 1));
 
     const selIso = sub.iso;
     const today = todayIso();

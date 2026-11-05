@@ -8,14 +8,14 @@ import { api } from '/api.js';
 import { openModal as openSharedModal, closeModal as closeSharedModal, selectModal, confirmModal, askOverModal, advancedSection, wireBlurValidation, reportFieldError, reportFieldErrors, refocusAfterRender, swapFieldsKeepingDirtyBase, captureModalContext, isOwnModalOpen } from '/components/modal.js';
 import { stagger, scheduleUndoableDelete, wireScrollFade, isImeComposing } from '/utils/ux.js';
 import { releaseAddressOnClose } from '/utils/master-detail.js';
-import { t, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid } from '/i18n.js';
+import { t, formatDayMonth, formatDateInput, parseDateInput, isDateInputValid, setWeekStart } from '/i18n.js';
 import { dateRangeText, dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK, externalHref } from '/utils/html.js';
 import { formSwitchRowHtml } from '/settings/components.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod, periodArrowKeys, wirePeriodArrowKeys } from '/utils/period-stepper.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
-import { renderKitchenTabsBar } from '/utils/kitchen-tabs.js';
+import { renderKitchenTabsBar, setKitchenTabsTrailing } from '/utils/kitchen-tabs.js';
 import { resolveShoppingTarget, announceTransfer, transferMessage, mountMissingShoppingList, mayTransferMealToShopping } from '/utils/kitchen-transfer.js';
 import { ingredientRowHTML } from '/utils/ingredient-row.js';
 import { addLocalDays, startOfLocalWeekKey, weekStartIndex, todayKey } from '/utils/date.js';
@@ -583,6 +583,8 @@ async function loadPreferences() {
     const res = await api.get('/preferences');
     state.visibleMealTypes = res.data.visible_meal_types ?? state.visibleMealTypes;
     state.weekStart = weekStartIndex(res.data.week_start);
+    // Der frische Wert auch fuer den Datepicker, der ihn aus i18n.js liest (#2533).
+    if (res.data.week_start) setWeekStart(res.data.week_start);
     primeMealTypeNames(res.data);
   } catch {
     // Default beibehalten
@@ -758,6 +760,7 @@ export async function render(container, { user }) {
 
   if (window.lucide) lucide.createIcons({ el: container });
   renderKitchenTabsBar(container, '/meals');
+  setKitchenTabsTrailing(null);
   installPopoverMenus(container.querySelector('.meals-toolbar'));
 
   const today = todayKey();

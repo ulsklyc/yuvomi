@@ -62,8 +62,28 @@ test('Touch bevorzugt das DOM-Popover; natives OS-Sheet nur ohne Popover-API', (
   assert(/coarse\s*&&\s*!this\._supportsPopover\(\)/.test(comp),
     'Native nur auf Touch OHNE Popover-API als Fallback');
 });
-test('Kalenderraster ist Montag-first', () => {
-  assert(/Montag\s*=\s*0/.test(comp) || /getDay\(\)\s*-\s*1/.test(comp), 'Montag-first-Offset nötig');
+test('Der Wochenstart kommt aus i18n.js, nicht aus einer eigenen Abfrage (#2533)', () => {
+  assert(/getWeekStart/.test(comp), 'Picker muss getWeekStart() aus /i18n.js lesen');
+  assert(!/\/preferences/.test(comp), 'Picker laedt die Einstellungen nicht selbst');
+});
+test('Wer week_start frisch vom Server liest, gibt ihn an i18n.js weiter', () => {
+  // Der Picker liest den Wochenstart aus dem Browser (#2533), gesetzt beim
+  // Start der App. Aendert ein anderes Haushaltsmitglied ihn, sieht der Picker
+  // das erst, wenn jemand den frischen Wert weiterreicht: jede Datei, die
+  // `week_start` aus einer Antwort liest, ruft auch setWeekStart().
+  const root = new URL('../public/', import.meta.url);
+  const files = readdirSync(root, { recursive: true })
+    .filter((f) => f.endsWith('.js') && !f.startsWith('vendor/') && f !== 'i18n.js');
+  const readers = [];
+  const silent = [];
+  for (const file of files) {
+    const src = readFileSync(new URL(file, root), 'utf8');
+    if (!/\.week_start\b/.test(src)) continue;
+    readers.push(file);
+    if (!/\bsetWeekStart\s*\(/.test(src)) silent.push(file);
+  }
+  assert(readers.length >= 4, `nur ${readers.length} Leser gefunden - der Scan greift nicht mehr`);
+  assert(silent.length === 0, `liest week_start, ohne setWeekStart() zu rufen: ${silent.join(', ')}`);
 });
 test('Regression #515: UTC-gebaute Label-Daten werden auch in UTC formatiert', () => {
   // monthLabel/weekdayLabels bauen ihre Daten via Date.UTC(); ohne timeZone:'UTC'
@@ -229,6 +249,98 @@ test('Keine Locale hat überschüssige datepicker-Keys', () => {
     assert(result.panel === null, 'ohne Popover-API darf kein Kalenderblatt angelegt werden');
     assert(result.expanded === null, `aria-expanded steht auf ${result.expanded} - ein Dialog, den niemand sieht`);
   });
+}
+
+// ── Wochenstart des Haushalts (#2533) ────────────────────────────────────
+// Kopfzeile und Raster beginnen am eingestellten Wochenstart, nicht fest am
+// Montag. Als Programm: _renderCalendar() laeuft gegen eine Attrappe, die die
+// Wochentagskuerzel und die Tage mitschreibt. November 2026 beginnt an einem
+// Sonntag - so faellt jeder der drei Starts auf eine andere erste Zelle.
+{
+  const saved = {};
+  for (const k of ['HTMLElement', 'customElements', 'document', 'window']) {
+    saved[k] = Object.getOwnPropertyDescriptor(globalThis, k);
+  }
+  const node = () => ({
+    style: {}, dataset: {}, children: [], attrs: {}, html: [], textContent: '',
+    setAttribute(k, v) { this.attrs[k] = String(v); },
+    getAttribute(k) { return this.attrs[k] ?? null; },
+    addEventListener() {}, appendChild(c) { this.children.push(c); return c; },
+    replaceChildren() { this.children = []; },
+    insertAdjacentHTML(_pos, html) { this.html.push(html); },
+    querySelector() { return null; },
+    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+  });
+  const panel = () => {
+    const parts = new Map();
+    const el = node();
+    el.querySelector = (sel) => {
+      if (!parts.has(sel)) {
+        const part = node();
+        if (sel === '.ydp-cal__days') {
+          part.querySelector = (q) => (q === '[tabindex="0"]' ? part.children.find((b) => b.tabIndex === 0) ?? null : null);
+        }
+        parts.set(sel, part);
+      }
+      return parts.get(sel);
+    };
+    return el;
+  };
+  Object.assign(globalThis, {
+    HTMLElement: class {},
+    customElements: { get: () => undefined, define() {} },
+    document: Object.assign(node(), { createElement: () => Object.assign(node(), { tabIndex: -1 }) }),
+    window: { addEventListener() {}, removeEventListener() {}, matchMedia: () => ({ matches: false }) },
+  });
+  const prevLocale = globalThis.__locale;
+  const prevWeekStart = globalThis.__weekStart;
+  const runs = {};
+  let error = null;
+  try {
+    globalThis.__locale = 'en';
+    const { YuvomiDatepicker } = await import('../public/components/datepicker.js');
+    for (const weekStart of ['monday', 'sunday', 'saturday']) {
+      globalThis.__weekStart = weekStart;
+      const picker = new YuvomiDatepicker();
+      Object.assign(picker, { getAttribute: () => null, _dir: () => 'ltr' });
+      const el = panel();
+      picker._renderCalendar(el, { kind: 'date', trigger: node(), iso: '2026-11-15' });
+      // Das Kuerzel aus genau der Form lesen, die der Picker schreibt; eine
+      // andere Form liefert null und macht den Vergleich rot.
+      const labels = el.querySelector('.ydp-cal__weekdays').html
+        .map((h) => /^<span class="ydp-cal__wd">([^<]*)<\/span>$/.exec(h)?.[1] ?? null);
+      const days = el.querySelector('.ydp-cal__days').children.map((b) => b.dataset.iso);
+      runs[weekStart] = { labels, days };
+    }
+  } catch (err) {
+    error = err;
+  } finally {
+    globalThis.__locale = prevLocale;
+    globalThis.__weekStart = prevWeekStart;
+    for (const [k, d] of Object.entries(saved)) {
+      if (d) Object.defineProperty(globalThis, k, d); else delete globalThis[k];
+    }
+  }
+  const short = (utcDay) => new Intl.DateTimeFormat('en', { weekday: 'short', timeZone: 'UTC' })
+    .format(new Date(Date.UTC(2024, 0, utcDay)));
+  // 2024-01-07 war ein Sonntag: short(7 + getDay()-Index) ist das Kuerzel des Tages.
+  const expected = {
+    monday: { first: '2026-10-26', labels: [1, 2, 3, 4, 5, 6, 0] },
+    sunday: { first: '2026-11-01', labels: [0, 1, 2, 3, 4, 5, 6] },
+    saturday: { first: '2026-10-31', labels: [6, 0, 1, 2, 3, 4, 5] },
+  };
+  for (const [weekStart, want] of Object.entries(expected)) {
+    test(`Wochenstart ${weekStart}: Kopfzeile und Raster beginnen am selben Tag (#2533)`, () => {
+      assert(error === null, `_renderCalendar() wirft: ${error}`);
+      const run = runs[weekStart];
+      assert(run.days.length === 42, `42 Zellen erwartet, ${run.days.length} gezeichnet`);
+      assert(run.days[0] === want.first, `erste Zelle ${run.days[0]}, erwartet ${want.first}`);
+      assert(run.days.includes('2026-11-01') && run.days.includes('2026-11-30'), 'der ganze Monat steht im Raster');
+      const wantLabels = want.labels.map((d) => short(7 + d));
+      assert(JSON.stringify(run.labels) === JSON.stringify(wantLabels),
+        `Kopfzeile ${run.labels.join(' ')}, erwartet ${wantLabels.join(' ')}`);
+    });
+  }
 }
 
 console.log(`\n  ${passed} bestanden, ${failed} fehlgeschlagen\n`);
