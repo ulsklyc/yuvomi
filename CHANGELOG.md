@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Settings > Wall tablets offers each tablet's night window, idle delay, clock and photo
   fill. Online tablets pick up changes automatically; existing local choices stay in use
   until an administrator saves, and personal browser preferences are preserved (#2436).
+- **Shopping: purchase price history** (part 1 of #1003). Ticking off or clearing a priced
+  shopping item records the purchase: item name, price paid in cents, the shop, and the date.
+  Purchases match by item name, case-insensitively, and remain after the item is cleared.
+  The item details sheet displays the last purchase for known items. CalDAV completion sync
+  does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
 - **A repeating reminder from iOS Reminders or Tasks.org no longer ends its series when you tick it

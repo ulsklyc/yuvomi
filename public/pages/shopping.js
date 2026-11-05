@@ -10,6 +10,7 @@ import { stagger, vibrate, scheduleUndoableDelete, collapseOut, expandIn, acknow
 import { wireSwipeRows, maybeShowSwipeHint, deferredRevealHtml } from '/utils/swipe-row.js';
 import { flipSnapshot, flipPlay } from '/utils/flip.js';
 import { t } from '/i18n.js';
+import { dateText } from '/utils/date-format.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { formSwitchRowHtml } from '/settings/components.js';
 import { formRowsHtml, formRowHtml } from '/utils/form-row.js';
@@ -2809,6 +2810,7 @@ function itemReadHtml(item) {
         ${readRowHtml({ icon: 'tag', label: t('shopping.categoryLabel'), value: item.category ? categoryLabel(item.category) : '' })}
         ${readRowHtml({ icon: 'receipt', label: t('shopping.priceLabel'), value: priceReadText(item.price_cents) })}
         ${readRowHtml({ icon: 'store', label: t('shopping.storeLabel'), value: storeName(item) })}
+        <div id="item-details-read-last-purchased" hidden></div>
         ${readRowHtml({ icon: 'link', label: t('shopping.urlLabel'), valueHtml: link })}
         ${readRowHtml({ icon: 'align-left', label: t('shopping.notesLabel'), value: item.notes || '', multiline: true })}
       </div>
@@ -2822,6 +2824,22 @@ function openItemReadModal(item) {
     content: itemReadHtml(item),
     onSave(panel) {
       window.lucide?.createIcons({ el: panel });
+      const target = panel.querySelector('#item-details-read-last-purchased');
+      if (target) {
+        api.get(`/shopping/price-history?name=${encodeURIComponent(item.name)}&exclude_item_id=${item.id}&limit=1`).then((res) => {
+          const last = res.data?.[0];
+          // Ohne Kauf faellt der Platzhalter weg, der Zeilenabstand bleibt wie vorher.
+          if (!last) { target.remove(); return; }
+          const date = dateText(last.purchased_at);
+          const price = priceReadText(last.price_cents);
+          const line = last.store_name
+            ? t('shopping.lastPurchasedLine', { price, store: last.store_name, date })
+            : t('shopping.lastPurchasedLineNoStore', { price, date });
+          target.insertAdjacentHTML('beforebegin', readRowHtml({ icon: 'history', label: t('shopping.lastPurchased'), value: line }));
+          target.remove();
+          window.lucide?.createIcons({ el: panel });
+        }).catch(() => target.remove());
+      }
     },
   });
 }
@@ -2848,6 +2866,7 @@ function itemMoreDetailsHtml(item, linkPreview) {
             <input class="form-input" type="text" id="item-details-price" inputmode="decimal"
                    placeholder="${esc(amountPlaceholder(state.currency))}"
                    value="${item.price_cents != null ? esc(centsToAmountInput(item.price_cents, state.currency)) : ''}">
+            <div id="item-details-last-purchased" class="form-hint item-details__last-purchased" hidden></div>
           </div>
           <div class="form-group">
             <label class="form-label" for="item-details-store">${t('shopping.storeLabel')}</label>
@@ -2980,6 +2999,28 @@ function openItemDetails(itemId, container) {
       // `context`: das Nachladen nach "gibt es nicht mehr" schliesst genau
       // diesen Dialog, nicht einen, der inzwischen offen ist (#1997).
       _itemDialog = { id: item.id, panel, context: captureModalContext() };
+      const hint = panel.querySelector('#item-details-last-purchased');
+      if (hint) {
+        api.get(`/shopping/price-history?name=${encodeURIComponent(item.name)}&exclude_item_id=${item.id}&limit=1`).then((res) => {
+          const last = res.data?.[0];
+          if (!last) return;
+          const date = dateText(last.purchased_at);
+          const price = priceReadText(last.price_cents);
+          const icon = document.createElement('i');
+          icon.setAttribute('data-lucide', 'history');
+          icon.className = 'icon-sm';
+          icon.setAttribute('aria-hidden', 'true');
+          const span = document.createElement('span');
+          span.textContent = last.store_name
+            ? t('shopping.lastPurchasedLine', { price, store: last.store_name, date })
+            : t('shopping.lastPurchasedLineNoStore', { price, date });
+          hint.replaceChildren(icon, span);
+          hint.hidden = false;
+          const details = panel.querySelector('.form-advanced');
+          if (details) details.open = true;
+          window.lucide?.createIcons({ el: hint });
+        }).catch(() => {});
+      }
       const form    = panel.querySelector('#item-details-form');
       const nameEl  = panel.querySelector('#item-details-name');
       const qtyEl   = panel.querySelector('#item-details-qty');
