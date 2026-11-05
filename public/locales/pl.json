@@ -7303,7 +7303,6 @@
         "cancelled": "Żądanie anulowano lub wygasło. Spróbuj ponownie, gdy zechcesz.",
         "alreadyRegistered": "Ten klucz jest już zarejestrowany. Wybierz inny uwierzytelniacz.",
         "reauthenticate": "Wyloguj się i zaloguj ponownie. Następnie zmień klucze w ciągu pięciu minut.",
-        "lastMethod": "Zachowaj inną metodę logowania przed usunięciem ostatniego klucza.",
         "failed": "Nie udało się zweryfikować klucza. Spróbuj ponownie lub użyj innej metody.",
         "tooManyAttempts": "Zbyt wiele prób. Spróbuj ponownie później.",
         "removeConfirm": "Usunąć ten klucz? Po zalogowaniu inną metodą możesz dodać go ponownie.",

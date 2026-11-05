@@ -6961,7 +6961,6 @@
         "cancelled": "Forespørselen ble avbrutt eller utløp. Prøv igjen når du er klar.",
         "alreadyRegistered": "Denne nøkkelen er allerede registrert. Velg en annen autentikator.",
         "reauthenticate": "Logg ut og inn igjen. Endre deretter nøklene innen fem minutter.",
-        "lastMethod": "Behold en annen innloggingsmåte før du fjerner den siste nøkkelen.",
         "failed": "Nøkkelen kunne ikke bekreftes. Prøv igjen eller bruk en annen innloggingsmåte.",
         "tooManyAttempts": "For mange forsøk. Prøv igjen senere.",
         "removeConfirm": "Fjerne denne nøkkelen? Du kan legge den til igjen etter innlogging på en annen måte.",

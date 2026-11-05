@@ -169,6 +169,14 @@ never reached the screen. `/api/v1/changelog` therefore carries `entries` (`{ le
 beside the unchanged `items`, additively: a promised surface does not change shape because the UI
 wants a nicer one. Long gaps are capped at twelve lines with the remainder counted out loud.
 
+### Native passkeys (migration 283, #2444)
+
+- `user_passkeys`: `id` INTEGER primary key, `user_id` INTEGER FK to users (cascade delete), unique `credential_id` TEXT, `public_key` BLOB (COSE), `counter` INTEGER, `transports` JSON TEXT, `name` TEXT, `created_at`, `updated_at`, nullable `last_used_at` TEXT timestamps. Only the public key is stored; credentials are never transferred between accounts.
+- `user_passkey_handles`: `user_id` INTEGER primary key/FK to users (cascade delete), unique `user_handle` TEXT (32 random bytes, base64url). Recovery deletes this row so replacement registration rotates the handle. Registration checks the same handle after asynchronous verification, blocking in-flight enrollment after recovery.
+- `passkey_challenges`: `challenge` TEXT primary key, `session_hash` and `client_hash` TEXT (SHA-256), `operation` TEXT (`register` or `authenticate`), nullable `user_id` INTEGER FK to users (cascade delete), `expires_at` INTEGER milliseconds. Unique `(session_hash, operation)`. DELETE RETURNING consumes challenges before verification. Anonymous entries are capped at 20 per hashed client IP with oldest-first eviction restricted to that client's anonymous entries; authenticated ceremonies are never evicted by anonymous traffic. A partial index supports client/expiry lookup. No global hard cap can lock out other members.
+
+A ceremony expires after five minutes. Anonymous options count all responses against a dedicated per-IP limit (the configured login allowance, capped at 20/minute); a new unauthenticated session has the same five-minute lifetime. An existing signed-in session retains its normal lifetime. Successful sign-in regenerates a normal session and still requires enabled TOTP. Removing a passkey ends other sessions/native device credentials and returns `data.ended`, retaining other keys and the current session. Password recovery/change, admin password set, 2FA enable and admin emergency sign-out remove all passkeys, opaque handles and user-bound pending challenges. Ordinary logout-others retains credentials. Recovery paths remain password or linked OIDC; this version does not create passkey-only accounts.
+
 ### Two-Factor Authentication (migration v159, #672)
 
 Optional TOTP as a second factor, opt-in per user. Two tables instead of columns on `users`, because

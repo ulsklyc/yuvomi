@@ -6961,7 +6961,6 @@
         "cancelled": "Demande annulée ou expirée. Réessayez lorsque vous êtes prêt.",
         "alreadyRegistered": "Cette clé est déjà enregistrée. Choisissez un autre authentificateur.",
         "reauthenticate": "Déconnectez-vous puis reconnectez-vous. Modifiez ensuite les clés dans les cinq minutes.",
-        "lastMethod": "Conservez un autre moyen de connexion avant de retirer la dernière clé.",
         "failed": "Impossible de vérifier la clé. Réessayez ou utilisez un autre moyen de connexion.",
         "tooManyAttempts": "Trop de tentatives. Réessayez plus tard.",
         "removeConfirm": "Retirer cette clé ? Vous pourrez la rajouter après une connexion par un autre moyen.",
