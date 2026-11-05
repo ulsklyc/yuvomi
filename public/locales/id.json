@@ -718,7 +718,10 @@
         "subtasksAllDone": "\"{{title}}\" dan semua subtugas selesai.",
         "seriesDoneNamed": "\"{{title}}\" selesai - berikutnya: {{date}}",
         "kanbanRestore": "Pulihkan",
-        "errorTagGone": "Tag ini sudah tidak ada."
+        "errorTagGone": "Tag ini sudah tidak ada.",
+        "foreignSeries": "Berulang di aplikasi lain",
+        "foreignSeriesDetail": "Centang di sana agar seri berlanjut",
+        "errorForeignSeries": "Tugas ini berulang di aplikasi lain. Centang di sana agar seri berlanjut."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item dihapus.",

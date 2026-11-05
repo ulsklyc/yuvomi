@@ -700,7 +700,10 @@
         "subtasksAllDone": "\"{{title}}\" और सभी उपकार्य पूर्ण।",
         "seriesDoneNamed": "\"{{title}}\" पूर्ण - अगली बार: {{date}}",
         "kanbanRestore": "पुनर्स्थापित करें",
-        "errorTagGone": "यह टैग अब मौजूद नहीं है।"
+        "errorTagGone": "यह टैग अब मौजूद नहीं है।",
+        "foreignSeries": "किसी दूसरे ऐप में दोहराता है",
+        "foreignSeriesDetail": "सीरीज़ जारी रखने के लिए इसे वहीं पूरा चिह्नित करें",
+        "errorForeignSeries": "यह कार्य किसी दूसरे ऐप में दोहराता है। सीरीज़ जारी रखने के लिए इसे वहीं पूरा चिह्नित करें।"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} आइटम हटाया गया।",

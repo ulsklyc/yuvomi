@@ -296,6 +296,9 @@ export const CASE_MESSAGES = new Map([
   // Kommentar, der geaendert oder geloescht werden sollte, ebenso (#1909).
   ['tasks_parent_not_found', 'tasks.errorParentGone'],
   ['tasks_comment_not_found', 'tasks.errorCommentGone'],
+  // Eine Serie, deren Regel eine andere App fuehrt (#2506): abgehakt wird dort.
+  // Alle Wege nach 'done' erreichen ihn (Liste, Wisch, Detail, Tablett, Kanban).
+  ['task_foreign_series', 'tasks.errorForeignSeries'],
   // Dienstplan (#1909). Die "gibt es nicht mehr" stehen auch in GONE_REASONS;
   // die Seite laedt dann nach, ein Loeschen mit einem davon ist ein Erfolg.
   // Abweichung und Zusatzschicht sind fuer den Nutzer beide "ein Eintrag".

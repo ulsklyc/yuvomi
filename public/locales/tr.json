@@ -700,7 +700,10 @@
         "subtasksAllDone": "\"{{title}}\" ve tüm alt görevler tamamlandı.",
         "seriesDoneNamed": "\"{{title}}\" tamamlandı - sıradaki: {{date}}",
         "kanbanRestore": "Geri yükle",
-        "errorTagGone": "Bu etiket artık yok."
+        "errorTagGone": "Bu etiket artık yok.",
+        "foreignSeries": "Başka bir uygulamada tekrarlanıyor",
+        "foreignSeriesDetail": "Serinin devam etmesi için orada tamamlandı olarak işaretle",
+        "errorForeignSeries": "Bu görev başka bir uygulamada tekrarlanıyor. Serinin devam etmesi için orada tamamlandı olarak işaretle."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} ürün silindi.",

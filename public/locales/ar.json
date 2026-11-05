@@ -877,7 +877,10 @@
         "doneSubtasksOpen_many": "تم إنجاز «{{title}}» - لا تزال {{count}} مهمة فرعية مفتوحة.",
         "seriesDoneNamed": "تم إنجاز «{{title}}» - المرة القادمة: {{date}}",
         "kanbanRestore": "استعادة",
-        "errorTagGone": "هذا الوسم لم يعد موجودًا."
+        "errorTagGone": "هذا الوسم لم يعد موجودًا.",
+        "foreignSeries": "تتكرر في تطبيق آخر",
+        "foreignSeriesDetail": "ضع علامة الإنجاز هناك لتستمر السلسلة",
+        "errorForeignSeries": "تتكرر هذه المهمة في تطبيق آخر. ضع علامة الإنجاز عليها هناك لتستمر السلسلة."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} وجبات",

@@ -700,7 +700,10 @@
         "subtasksAllDone": "”{{title}}” och alla deluppgifter klara.",
         "seriesDoneNamed": "”{{title}}” klar - nästa gång: {{date}}",
         "kanbanRestore": "Återställ",
-        "errorTagGone": "Den här etiketten finns inte längre."
+        "errorTagGone": "Den här etiketten finns inte längre.",
+        "foreignSeries": "Upprepas i en annan app",
+        "foreignSeriesDetail": "Bocka av den där så fortsätter serien",
+        "errorForeignSeries": "Den här uppgiften upprepas i en annan app. Bocka av den där så fortsätter serien."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} vara borttagen.",

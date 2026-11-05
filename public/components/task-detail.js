@@ -1004,6 +1004,9 @@ function renderTaskDetail(task, reminders = [], ctx) {
     // faellig" als die eine Angabe ueber den Zeilen, die Personen als Avatare.
     { icon: 'calendar-clock', label: t('tasks.startDateLabel'), value: task.start_date ? dateText(task.start_date) : '' },
     recurrenceRow(task.recurrence_rule, { fromCompletion: !!task.recurrence_from_completion }),
+    // Eine Serie, deren Regel eine andere App fuehrt (#2506): abhaken nur dort,
+    // die Zeile sagt warum, bevor jemand es hier versucht.
+    { icon: 'repeat', label: t('tasks.foreignSeries'), value: task.external_rrule ? t('tasks.foreignSeriesDetail') : '' },
     // Rotation direkt unter der Wiederholung, an die sie gehoert: Modus und - 
     // bei Abloesung - der naechste Empfaenger, aus denselben Werten wie der
     // Server (rotationDetailRow erklaert, warum nur dort als Name).

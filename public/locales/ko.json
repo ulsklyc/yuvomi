@@ -718,7 +718,10 @@
         "subtasksAllDone": "'{{title}}'와 모든 하위 작업을 완료했습니다.",
         "seriesDoneNamed": "'{{title}}' 완료 - 다음: {{date}}",
         "kanbanRestore": "복원",
-        "errorTagGone": "이 태그는 더 이상 존재하지 않습니다."
+        "errorTagGone": "이 태그는 더 이상 존재하지 않습니다.",
+        "foreignSeries": "다른 앱에서 반복됨",
+        "foreignSeriesDetail": "시리즈가 이어지도록 그 앱에서 완료하세요",
+        "errorForeignSeries": "이 할 일은 다른 앱에서 반복됩니다. 시리즈가 이어지도록 그 앱에서 완료하세요."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}}개 항목이 삭제되었습니다.",

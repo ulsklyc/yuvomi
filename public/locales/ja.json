@@ -700,7 +700,10 @@
         "subtasksAllDone": "「{{title}}」とすべてのサブタスクを完了しました。",
         "seriesDoneNamed": "「{{title}}」を完了しました - 次回: {{date}}",
         "kanbanRestore": "復元",
-        "errorTagGone": "このタグはもう存在しません。"
+        "errorTagGone": "このタグはもう存在しません。",
+        "foreignSeries": "別のアプリで繰り返し",
+        "foreignSeriesDetail": "シリーズを続けるには、そちらで完了にしてください",
+        "errorForeignSeries": "このタスクは別のアプリで繰り返し設定されています。シリーズを続けるには、そちらで完了にしてください。"
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} 件を削除しました。",

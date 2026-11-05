@@ -700,7 +700,10 @@
         "subtasksAllDone": "Đã hoàn thành \"{{title}}\" và mọi việc con.",
         "seriesDoneNamed": "Đã hoàn thành \"{{title}}\" - lần tới: {{date}}",
         "kanbanRestore": "Khôi phục",
-        "errorTagGone": "Thẻ này không còn tồn tại."
+        "errorTagGone": "Thẻ này không còn tồn tại.",
+        "foreignSeries": "Lặp lại trong ứng dụng khác",
+        "foreignSeriesDetail": "Đánh dấu hoàn thành ở đó để chuỗi tiếp tục",
+        "errorForeignSeries": "Việc này lặp lại trong một ứng dụng khác. Hãy đánh dấu hoàn thành ở đó để chuỗi tiếp tục."
     },
     "shopping": {
         "itemsRemovedToast_one": "Đã xóa {{count}} mục.",

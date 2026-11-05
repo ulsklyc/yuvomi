@@ -762,7 +762,10 @@
         "doneSubtasksOpen_many": "„{{title}}“ hotovo - stále otevřených dílčích úkolů: {{count}}.",
         "seriesDoneNamed": "„{{title}}“ hotovo - příště: {{date}}",
         "kanbanRestore": "Obnovit",
-        "errorTagGone": "Tento štítek už neexistuje."
+        "errorTagGone": "Tento štítek už neexistuje.",
+        "foreignSeries": "Opakuje se v jiné aplikaci",
+        "foreignSeriesDetail": "Odškrtněte ji tam, aby série pokračovala",
+        "errorForeignSeries": "Tento úkol se opakuje v jiné aplikaci. Odškrtněte ho tam, aby série pokračovala."
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} jídla",

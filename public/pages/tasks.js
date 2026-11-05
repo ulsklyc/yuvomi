@@ -472,6 +472,18 @@ async function wireSyncTarget(panel, task) {
  * (#1607: das Brett liess es weg, wer die Ansicht wechselte, erfuhr die Sperre
  * erst am abgelehnten Zug). `role="img"`, damit das `aria-label` gilt.
  */
+/**
+ * Eine Serie, deren Regel eine andere App fuehrt (#2506, #2515): iOS
+ * Erinnerungen oder Tasks.org. Abgehakt wird dort, sonst endete die Serie
+ * (der Server sagt `task_foreign_series`). Dasselbe Zeichen wie eine Serie in
+ * Yuvomi - es IST eine Serie -, das Label sagt, wo sie gefuehrt wird.
+ */
+function renderForeignSeriesBadge(task) {
+  if (!task.external_rrule) return '';
+  const label = esc(t('tasks.foreignSeries'));
+  return `<span class="due-date" role="img" aria-label="${label}" title="${label}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>`;
+}
+
 function renderLockedBadge(task) {
   if (!task.locked) return '';
   const label = esc(t('tasks.lockedBadge'));
@@ -662,6 +674,7 @@ function renderTaskCard(task, opts = {}) {
                 Marke im Budget (budget.js, `.budget-recur-mark`) macht es richtig;
                 hier standen zwei Kopien ohne Rolle (PR-Review #754). */ ''}
             ${task.is_recurring ? `<span class="due-date" role="img" aria-label="${esc(t('tasks.recurring'))}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>` : ''}
+            ${task.is_recurring ? '' : renderForeignSeriesBadge(task)}
             ${task.document_count > 0 ? `<span class="due-date task-card__docs" role="img" aria-label="${esc(t('tasks.documentsCount', { count: task.document_count }))}"><i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i></span>` : ''}
             ${renderLockedBadge(task)}
             ${renderVisibilityBadge(task.visibility)}
@@ -2110,7 +2123,7 @@ function acknowledgeStatusToggle(container, taskId, nextStatus, answer, before =
 /**
  * Was die Quittung von einer Aufgabe braucht, gelesen VOR dem Statuswechsel:
  * Titel und die offenen Teilaufgaben, die man sehen darf.
- * @returns {{ title: string, recurring: boolean, openSubtaskIds: number[] } | null}
+ * @returns {{ title: string, recurring: boolean, foreignSeries: boolean, openSubtaskIds: number[] } | null}
  */
 function taskSnapshot(taskId) {
   const task = state.tasks.find((x) => String(x.id) === String(taskId));
@@ -2119,6 +2132,7 @@ function taskSnapshot(taskId) {
   return {
     title: task.title,
     recurring: Boolean(task.is_recurring),
+    foreignSeries: Boolean(task.external_rrule),
     openSubtaskIds: subs.filter((sub) => sub && sub.status !== 'done' && sub.id != null).map((sub) => sub.id),
   };
 }
@@ -6126,6 +6140,12 @@ function wireTaskList(container) {
     if (action === 'toggle-status') {
       const status = target.dataset.status;
       const nextStatus = status === 'done' ? 'open' : 'done';
+      // Eine fremde Serie hakt die andere App ab (#2506): kein Haken, der beim
+      // Neuladen zurueckspringt, sondern gleich der Satz, wo es geht.
+      if (nextStatus === 'done' && taskSnapshot(id)?.foreignSeries) {
+        window.yuvomi.showToast(t('tasks.errorForeignSeries'), 'default');
+        return;
+      }
       vibrate(15);
       // Beide Zustandsklassen führen, nicht nur die neue anhängen: der Knopf
       // trug sonst `--open` UND `--done` gleichzeitig (gemessen 2026-08-28),

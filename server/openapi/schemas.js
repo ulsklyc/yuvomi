@@ -258,6 +258,7 @@ const taskProperties = {
   external_uid: { type: ['string', 'null'] },
   external_account_id: { type: ['integer', 'null'] },
   external_object_url: { type: ['string', 'null'] },
+  external_rrule: { type: ['string', 'null'], description: 'RRULE of a series another app owns (iOS Reminders, Tasks.org), as that app wrote it; null otherwise. While set, ticking the task off answers 409 `task_foreign_series` (#2506).' },
   target_caldav_account_id: { type: ['integer', 'null'], description: 'The reminder list a local task is sent to.' },
   target_caldav_list_url: { type: ['string', 'null'] },
   outbound_dirty: flag(SYNC_BOOKKEEPING),

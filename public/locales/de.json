@@ -718,7 +718,10 @@
         "subtasksAllDone": "„{{title}}“ und alle Teilaufgaben erledigt.",
         "seriesDoneNamed": "„{{title}}“ erledigt - nächstes Mal am {{date}}",
         "kanbanRestore": "Wiederherstellen",
-        "errorTagGone": "Dieses Stichwort gibt es nicht mehr."
+        "errorTagGone": "Dieses Stichwort gibt es nicht mehr.",
+        "foreignSeries": "Wiederholt sich in einer anderen App",
+        "foreignSeriesDetail": "Dort abhaken, damit die Serie weiterläuft",
+        "errorForeignSeries": "Diese Aufgabe wiederholt sich in einer anderen App. Hake sie dort ab, damit die Serie weiterläuft."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} Artikel gelöscht.",

@@ -219,7 +219,36 @@ export function icsFieldsForTask(task, hadCompleted = false, tz = householdTimeZ
   if (Array.isArray(task.tags)) fields.CATEGORIES = task.tags;
   Object.assign(fields, recurrenceFields(task, tz, serverIcs));
   if (fields.DUE === KEEP_ON_SERVER) delete fields.DUE;
+  // NIE COMPLETED AUF DEN MASTER EINER FREMDEN SERIE (#2506). Die besitzende App
+  // (iOS Erinnerungen, Tasks.org) beendete damit die ganze Serie. Die Routen
+  // sperren das Abhaken schon (`task_foreign_series`); das hier ist die zweite
+  // Linie fuer jeden Weg an ihnen vorbei. Gelesen wird am frisch geholten
+  // Objekt, nicht an der Zeile: es zaehlt, was jetzt auf dem Server steht.
+  if (task.status === 'done' && !ownsRecurrence(task)
+    && foreignRecurrenceRule(todoPropertyValue(serverIcs, task.external_uid, 'RRULE'),
+      todoPropertyValue(serverIcs, task.external_uid, YUVOMI_RRULE))) {
+    delete fields.STATUS;
+    delete fields.COMPLETED;
+    delete fields['PERCENT-COMPLETE'];
+  }
   return fields;
+}
+
+/**
+ * Die RRULE eines fremden VTODO, die einer anderen App gehoert - oder null
+ * (#2506). Nicht fremd ist eine Regel, die noch genau Yuvomis Marke
+ * X-YUVOMI-RRULE entspricht (#2350): die hat Yuvomi selbst geschrieben. Ob das
+ * Objekt ueberhaupt fremd ist (`ownsRecurrence`), fragt der Aufrufer.
+ *
+ * @param {string|null} rule - Rohwert der RRULE des Masters
+ * @param {string|null} mark - Rohwert von X-YUVOMI-RRULE
+ * @returns {string|null}
+ */
+export function foreignRecurrenceRule(rule, mark) {
+  const value = rule ? String(rule).trim() : '';
+  if (!value) return null;
+  if (mark && sameRule(value, unescapeText(mark))) return null;
+  return value;
 }
 
 /** Marke an einem fremden Objekt: die RRULE, die Yuvomi dort geschrieben hat. */
@@ -503,12 +532,17 @@ export function detachAccountRows(accountId) {
              outbound_move          = 0,
              outbound_move_attempts = 0,
              outbound_move_since    = NULL,
-             outbound_move_by       = NULL,` : ''}
+             outbound_move_by       = NULL,` : `
+             external_rrule         = NULL,`}
              outbound_dirty      = 0,
              outbound_attempts   = 0
        WHERE external_source = 'caldav' AND external_account_id = ?
     `).run(accountId).changes;
   }
+  // Die fremde Serienregel geht mit dem Konto (#2506): ohne Abruf fuehrt sie
+  // niemand mehr nach, und die Sperre des Abhakens hinge fuer immer an der
+  // Aufgabe. Uebernimmt ein anderes Konto die UID, liest dessen Abruf sie neu.
+  //
   // Das Upload-Ziel lokaler Aufgaben trägt ebenso keinen Fremdschlüssel
   // (#1885). Ohne Ziel bleibt die Aufgabe lokal und wird nie gesendet - wie
   // jede Zeile ohne Konto. Einkaufsposten tragen kein eigenes Ziel: sie erben

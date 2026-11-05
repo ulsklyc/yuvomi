@@ -2605,7 +2605,9 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
         external_account_id INTEGER, external_object_url TEXT,
         outbound_dirty INTEGER NOT NULL DEFAULT 0, outbound_attempts INTEGER NOT NULL DEFAULT 0,
         -- Upload-Ziel lokaler Aufgaben (Migration 136), abgeräumt seit #1885
-        target_caldav_account_id INTEGER, target_caldav_list_url TEXT
+        target_caldav_account_id INTEGER, target_caldav_list_url TEXT,
+        -- Fremde Serienregel (Migration 279, #2506), geleert beim Entkoppeln
+        external_rrule TEXT
       );
       CREATE TABLE shopping_items (
         -- Zeilen dieser Tests gelten als von einem Abruf gesehen (#1839).

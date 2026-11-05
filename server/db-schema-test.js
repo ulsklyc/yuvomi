@@ -1598,6 +1598,7 @@ const MIGRATIONS_SQL = {
       CHECK (locked IN (0, 1));
   `,
   278: `ALTER TABLE display_accounts ADD COLUMN device_settings TEXT CHECK(device_settings IS NULL OR json_valid(device_settings));`,
+  279: `ALTER TABLE tasks ADD COLUMN external_rrule TEXT;`,
 };
 
 export { MIGRATIONS_SQL };

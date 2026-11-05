@@ -700,7 +700,10 @@
         "subtasksAllDone": "“{{title}}” and all subtasks done.",
         "seriesDoneNamed": "“{{title}}” done - next due {{date}}",
         "kanbanRestore": "Restore",
-        "errorTagGone": "This tag no longer exists."
+        "errorTagGone": "This tag no longer exists.",
+        "foreignSeries": "Repeats in another app",
+        "foreignSeriesDetail": "Tick it off there so the series continues",
+        "errorForeignSeries": "This task repeats in another app. Tick it off there so the series continues."
     },
     "shopping": {
         "itemsRemovedToast_one": "{{count}} item deleted.",
