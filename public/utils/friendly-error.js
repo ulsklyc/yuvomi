@@ -98,6 +98,8 @@ export const CASE_MESSAGES = new Map([
   // (#1795) und Teil der zugesagten API - sie bleiben, wie sie heissen.
   ['waste_import_empty_file', 'waste.errorImportEmpty'],
   ['waste_import_file_too_large', 'waste.errorImportTooLarge'],
+  // Backup-Scheduler (#2525): Backup-Verzeichnis nicht beschreibbar
+  ['backup_dir_not_writable', 'settings.backupSchedulerReasonDirNotWritable'],
   ['waste_import_event_cap_exceeded', 'waste.errorImportTooManyEvents'],
   ['waste_import_instance_cap_exceeded', 'waste.errorImportTooManyPickups'],
   ['waste_import_label_cap_exceeded', 'waste.errorImportTooManyLabels'],
