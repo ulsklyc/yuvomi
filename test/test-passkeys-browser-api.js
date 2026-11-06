@@ -223,7 +223,12 @@ async function removalFixture(confirm = true) {
   const container={replaceChildren(){},insertAdjacentHTML(){},dispatchEvent(event){events.push(event);},
     querySelector:selector=>selector==='#passkey-status'?status:null,
     querySelectorAll:()=>keys.length?[button]:[]};
-  globalThis.__confirmModal=async()=>confirm;
+  globalThis.__confirmModal=async(message,options)=>{
+    assert.equal(message,'passkeys.remove');
+    assert.equal(options.detail,'passkeys.removeConfirm');
+    assert.equal(options.danger,true);
+    return confirm;
+  };
   globalThis.__apiStub={get:async()=>({data:{enabled:true,enrollment_allowed:false,passkeys:keys}}),
     delete:async path=>{requests.push(path);keys=[];return {data:{ok:true,ended:3}};}};
   await renderPasskeyCard(container);

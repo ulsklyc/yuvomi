@@ -143,7 +143,7 @@ export async function renderPasskeyCard(container) {
   });
   for (const button of container.querySelectorAll('[data-remove-passkey]')) {
     button.addEventListener('click', async () => {
-      if (!await confirmModal({ title: t('passkeys.remove'), message: t('passkeys.removeConfirm') })) return;
+      if (!await confirmModal(t('passkeys.remove'), { detail: t('passkeys.removeConfirm'), danger: true, confirmLabel: t('passkeys.remove') })) return;
       button.disabled = true;
       try {
         const result = await withRecentAuthentication(() => api.delete(`/auth/passkeys/${button.dataset.removePasskey}`));
