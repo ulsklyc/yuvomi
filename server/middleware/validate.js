@@ -67,6 +67,7 @@ function str(val, field, { max = MAX_TITLE, required = true } = {}) {
  * Validiert ein Passwort oder Token eines fremden Dienstes (#2575).
  * Anders als `str()` wird NICHT getrimmt: Leerzeichen am Rand gehoeren zum
  * Geheimnis, und ein still gekuerztes Passwort scheitert erst beim Server.
+ * Ein Wert nur aus Leerzeichen gilt trotzdem als leer.
  * @param {any}    val
  * @param {string} field
  * @param {object} opts
@@ -74,7 +75,9 @@ function str(val, field, { max = MAX_TITLE, required = true } = {}) {
  * @returns {{ value: string|null, error: string|null }}
  */
 function secret(val, field, { required = true } = {}) {
-  if (val === undefined || val === null || val === '') {
+  // Nur Leerzeichen zaehlt als fehlend (Pflicht ueber trim), gespeichert wird
+  // aber der ungetrimmte Wert.
+  if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '')) {
     if (required) return { value: null, error: `${field} is required.` };
     return { value: null, error: null };
   }

@@ -259,3 +259,18 @@ test('Passwort ueber der Obergrenze: 400 validation, kein Verbindungsversuch (#2
   assert.equal(add.body.errorCode, 'validation');
   assert.equal(seen.length, 0, 'kein Verbindungsversuch');
 });
+
+// Nachtrag #2575: `secret()` trimmt nicht, die Pflichtpruefung aber schon.
+// Ein Passwort nur aus Leerzeichen gilt beim Anlegen weiter als fehlend -
+// bei CardDAV, CalDAV und Apple gleich, und keiner versucht eine Verbindung.
+test('Passwort nur aus Leerzeichen: Anlegen lehnt es als fehlend ab, ohne Verbindungsversuch (#2575)', async () => {
+  seen.length = 0;
+  const card = await admin('POST', '/contacts/cardav/accounts', { name: 'Leer', cardavUrl: FOREIGN_URL, username: 'u', password: '   ' });
+  assert.equal(card.status, 400, 'CardDAV');
+  assert.equal(card.body.errorCode, 'validation', 'CardDAV');
+  const cal = await admin('POST', '/calendar/caldav/accounts', { name: 'Leer', caldavUrl: FOREIGN_URL, username: 'u', password: '   ' });
+  assert.equal(cal.status, 400, 'CalDAV');
+  const apple = await admin('POST', '/calendar/apple/connect', { url: FOREIGN_URL, username: 'u@example.invalid', password: '   ' });
+  assert.equal(apple.status, 400, 'Apple');
+  assert.equal(seen.length, 0, `der Server sah ${seen.length} Anfragen`);
+});
