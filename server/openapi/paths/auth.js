@@ -5,53 +5,35 @@ export function authPaths() {
     '/api/v1/auth/login': {
       post: op({
         summary: 'Login with username and password',
-        operationId: 'signInWithPassword',
         tag: 'Auth',
         auth: false,
-        description: 'With two-factor authentication turned on, a right password opens no session yet: the response is `{ twoFactorRequired, recoveryAvailable }`, and POST /auth/2fa/verify completes the sign-in.',
         requestBody: jsonBody('#/components/schemas/LoginRequest'),
         responses: {
           200: {
-            description: 'Authenticated user and CSRF token, or the request for a second factor',
-            content: {
-              'application/json': {
-                schema: {
-                  oneOf: [
-                    { $ref: '#/components/schemas/LoginResponse' },
-                    { $ref: '#/components/schemas/TwoFactorChallengeResponse' },
-                  ],
-                },
-              },
-            },
+            description: 'Authenticated user and CSRF token',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginResponse' } } },
           },
-          400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
-          403: { $ref: '#/components/responses/Forbidden' },
-          429: { description: 'Too many attempts' },
-          500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
     },
     '/api/v1/auth/2fa/verify': {
       post: op({
         summary: 'Complete sign-in with a second factor',
-        operationId: 'verifySecondFactor',
         tag: 'Auth',
         auth: false,
+        stateChanging: true,
         description: 'Second step after POST /auth/login answered with `twoFactorRequired`. '
           + 'Accepts either the six-digit TOTP code or one of the recovery codes; '
           + 'the response says which one was used. The pending sign-in expires after five minutes.',
-        requestBody: jsonBody('#/components/schemas/TwoFactorVerifyRequest'),
         responses: {
           200: {
             description: 'Authenticated user and CSRF token',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/TwoFactorVerifyResponse' } } },
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginResponse' } } },
           },
-          400: { description: 'The code is longer than 64 characters' },
           401: { description: 'Invalid code, or no pending sign-in' },
           403: { description: 'The account may no longer sign in, for example because it was deactivated in the meantime (`reason: "account_cannot_sign_in"`). No recovery code is spent.' },
           429: { description: 'Too many attempts' },
-          500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
     },
@@ -165,7 +147,6 @@ export function authPaths() {
     '/api/v1/auth/oidc/config': {
       get: op({
         summary: 'Get sign-in availability',
-        operationId: 'getSignInOptions',
         tag: 'Auth',
         auth: false,
         description: 'Public login-page bootstrap endpoint. Returns which ways in this server offers: '
@@ -177,12 +158,6 @@ export function authPaths() {
           + 'external people with no account in the household identity provider. It is one bit and says '
           + 'nothing about who or how many; where password login is open the question is moot and the '
           + 'field is false.',
-        responses: {
-          200: {
-            description: 'The ways in this server offers',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/OidcConfigResponse' } } },
-          },
-        },
       }),
     },
     '/api/v1/auth/oidc/start': {
@@ -442,7 +417,6 @@ export function authPaths() {
     '/api/v1/auth/me': {
       get: op({
         summary: 'Get current authenticated user',
-        operationId: 'getCurrentUser',
         tag: 'Auth',
         responses: {
           200: {
@@ -450,7 +424,6 @@ export function authPaths() {
             content: { 'application/json': { schema: { $ref: '#/components/schemas/MeResponse' } } },
           },
           401: { $ref: '#/components/responses/Unauthorized' },
-          500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
     },
@@ -655,127 +628,6 @@ export function authPaths() {
         },
       }),
     },
-    '/api/v1/auth/devices': {
-      get: op({
-        summary: 'List your signed-in devices',
-        operationId: 'listSignedInDevices',
-        description: 'The caller\'s own devices that still count. No administrator can read another member\'s list. The device credential is never returned here.',
-        tag: 'Auth',
-        responses: {
-          200: {
-            description: 'The caller\'s signed-in devices',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/SignedInDeviceList' } } },
-          },
-          401: { $ref: '#/components/responses/Unauthorized' },
-          403: { $ref: '#/components/responses/Forbidden' },
-          500: { $ref: '#/components/responses/InternalServerError' },
-        },
-      }),
-      post: op({
-        summary: 'Add a signed-in device',
-        operationId: 'addSignedInDevice',
-        description: 'Exchanges a sign-in for a device credential, the bearer a native client uses from then on. A device acts as the person, with less reach than a browser session: an administrator is an ordinary member on it, and of `/api/v1/auth` it reaches only `GET /me`, `GET /users`, `GET /oidc/config`, `POST /logout`, `GET /devices` and `DELETE /devices/{id}`; anything else answers 403 with `reason: device_credential`. It ends after 90 days without use, and with everything that ends a session. The same `device_id` replaces the earlier credential.',
-        tag: 'Auth',
-        stateChanging: true,
-        requestBody: jsonBody('#/components/schemas/SignedInDeviceCreateRequest'),
-        responses: {
-          201: {
-            description: 'Device added. The plaintext credential is returned only once.',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/SignedInDeviceCreateResponse' } } },
-          },
-          400: { $ref: '#/components/responses/BadRequest' },
-          403: { $ref: '#/components/responses/Forbidden' },
-          500: { $ref: '#/components/responses/InternalServerError' },
-        },
-      }),
-    },
-    '/api/v1/auth/devices/pair': {
-      post: op({
-        summary: 'Create a pairing code',
-        description: 'Creates a short code that signs a device in as the caller, for a household without passwords or a person who prefers not to type one. The code holds for five minutes and once, and a new code ends the previous one. The same code comes back three ways: plain to type, as a `yuvomi://pair` link for this device and as a QR code of that link for a second device. Only from a browser session.',
-        tag: 'Auth',
-        stateChanging: true,
-        requestBody: jsonBody('#/components/schemas/DevicePairingRequest'),
-        responses: {
-          201: {
-            description: 'Code created. It is returned only once.',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/DevicePairingResponse' } } },
-          },
-          400: { $ref: '#/components/responses/BadRequest' },
-          403: { $ref: '#/components/responses/Forbidden' },
-          500: { $ref: '#/components/responses/InternalServerError' },
-        },
-      }),
-    },
-    '/api/v1/auth/devices/pair/redeem': {
-      post: op({
-        summary: 'Redeem a pairing code',
-        operationId: 'redeemPairingCode',
-        description: 'Exchanges a pairing code for a device credential. Public, the code is the proof. Send no `Authorization` header: a valid device credential is refused here. Unknown, expired and used codes answer alike, and so does the code of an account that can no longer have a device. Attempts are limited.',
-        tag: 'Auth',
-        auth: false,
-        requestBody: jsonBody('#/components/schemas/DevicePairingRedeemRequest'),
-        responses: {
-          201: {
-            description: 'Device added. The plaintext credential is returned only once.',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/SignedInDeviceCreateResponse' } } },
-          },
-          400: { $ref: '#/components/responses/BadRequest' },
-          403: { $ref: '#/components/responses/Forbidden' },
-          429: { description: 'Too many attempts' },
-          500: { $ref: '#/components/responses/InternalServerError' },
-        },
-      }),
-    },
-    '/api/v1/auth/devices/current': {
-      delete: op({
-        summary: 'Sign this device out',
-        operationId: 'signOutCurrentDevice',
-        description: 'Ends the device credential that made the request.',
-        tag: 'Auth',
-        stateChanging: true,
-        responses: {
-          200: {
-            description: 'The credential no longer works',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/OkResponse' } } },
-          },
-          401: { $ref: '#/components/responses/Unauthorized' },
-          403: { $ref: '#/components/responses/Forbidden' },
-          500: { $ref: '#/components/responses/InternalServerError' },
-        },
-      }),
-    },
-    '/api/v1/auth/devices/{id}': {
-      delete: op({
-        summary: 'Sign out one of your devices',
-        operationId: 'signOutDevice',
-        description: 'Answers 404 for a device that does not exist and for one that belongs to somebody else.',
-        tag: 'Auth',
-        params: [idParam()],
-        stateChanging: true,
-        responses: {
-          200: {
-            description: 'The device no longer works',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/OkResponse' } } },
-          },
-          400: { $ref: '#/components/responses/BadRequest' },
-          401: { $ref: '#/components/responses/Unauthorized' },
-          403: { $ref: '#/components/responses/Forbidden' },
-          404: { description: 'No such device of the caller' },
-          500: { $ref: '#/components/responses/InternalServerError' },
-        },
-      }),
-    },
-    '/api/v1/auth/users/{id}/devices/sign-out': {
-      post: op({
-        summary: 'Sign a member out of all devices',
-        description: 'Ends the member\'s signed-in devices and browser sessions, for example after a lost phone in a household without passwords. The answer says nothing about what ended: how many devices somebody has stays their own. Integration tokens stay. An administrator signing out themselves keeps the current session.',
-        tag: 'Auth',
-        admin: true,
-        params: [idParam()],
-        stateChanging: true,
-      }),
-    },
     '/api/v1/auth/api-tokens': {
       get: op({ summary: 'List API tokens', tag: 'Auth', admin: true }),
       post: op({
@@ -831,53 +683,15 @@ export function authPaths() {
 const INVALID_CODE = '`invalid_code` (400, the code is wrong or expired)';
 const NOT_ENABLED = '`not_enabled` (409, two-factor authentication is not turned on)';
 const DEACTIVATED_SUBJECT = '`account_deactivated` (400, the chosen account is deactivated)';
-const USERNAME_INVALID = '`members_username_invalid` (400, 3-64 letters, numbers, dots, hyphens or underscores)';
-const USERNAME_TAKEN = '`members_username_taken` (409, another account has this username)';
-const SSO_ONLY_REASONS = '`members_sso_email_required` (400, an account without a password needs an email address), '
-  + '`members_sso_email_ambiguous` (400, that email address already belongs to another member)';
 const CASE_REASONS = {
   '/api/v1/auth/login': {
     post: '`account_cannot_sign_in` (403, the account is deactivated or may not sign in), `password_login_disabled` (403, password login is turned off for this instance)',
   },
   '/api/v1/auth/2fa/enable': { post: INVALID_CODE },
-  // #1909: was die Anmeldeseite und das Konto-Blatt unterscheiden.
-  '/api/v1/auth/2fa/verify': { post: '`two_factor_no_pending_sign_in` (401, no sign-in is waiting for a code, or it has expired), `account_cannot_sign_in` (403, the account is deactivated or may not sign in)' },
-  '/api/v1/auth/2fa/setup': { post: '`already_enabled` (409, two-factor authentication is already turned on)' },
-  '/api/v1/auth/oidc/link/start': { post: '`oidc_not_configured` (404, SSO is not set up on this instance), `oidc_already_linked` (409, the account is already linked)' },
-  '/api/v1/auth/oidc/link': { delete: '`oidc_not_linked` (409, the account is not linked), `oidc_password_required` (409, the account has no password, so the link is its only way in), `last_sso_admin` (409, the last administrator linked to SSO cannot unlink while password login is off)' },
   '/api/v1/auth/2fa/disable': { post: `${INVALID_CODE}, ${NOT_ENABLED}` },
   '/api/v1/auth/2fa/recovery-codes': { post: `${INVALID_CODE}, ${NOT_ENABLED}` },
   '/api/v1/auth/logout-others': { post: '`browser_session_required` (403, only a signed-in browser session can sign out the other sessions, not an API token)' },
   '/api/v1/auth/setup': { post: '`setup_completed` (403, setup has already been completed)' },
-  // #1909: was ein Admin beim Anlegen, Bearbeiten und Einladen eines Mitglieds erreicht.
-  '/api/v1/auth/invites': { post: `${USERNAME_INVALID}, ${USERNAME_TAKEN}` },
-  '/api/v1/auth/users': { post: `${USERNAME_INVALID}, ${USERNAME_TAKEN}, ${SSO_ONLY_REASONS}` },
-  '/api/v1/auth/users/{id}': {
-    patch: '`account_deactivated` (400, a deactivated account cannot become an administrator), '
-      + '`members_member_not_found` (404, the member no longer exists), '
-      + `${USERNAME_INVALID}, ${USERNAME_TAKEN}, ${SSO_ONLY_REASONS}, `
-      + '`last_admin` (400, at least one system admin must remain), '
-      + '`last_sso_admin` (400, the last administrator linked to SSO cannot be demoted while password login is off)',
-  },
-  // #1909: dazu, was das Formular der Seite API-Zugriff erreicht.
-  '/api/v1/auth/api-tokens': {
-    post: `${DEACTIVATED_SUBJECT}, `
-      + '`api_tokens_name_required` (400, the name is empty), '
-      + '`api_tokens_name_too_long` (400, the name is longer than 100 characters), '
-      + '`api_tokens_expiry_past` (400, `expires_at` is not in the future), '
-      + '`api_tokens_subject_unknown` (400, there is no account with `subject_user_id`, for example because it was deleted meanwhile)',
-  },
-  '/api/v1/auth/devices': {
-    get: '`session_required` (403, an API token cannot read a person\'s devices)',
-    post: '`device_credential` (403, a device cannot add another device), `session_required` (403, an API token cannot add a device), `not_a_household_member` (403, the account is no household member)',
-  },
-  '/api/v1/auth/devices/pair': {
-    post: '`device_credential` (403, a device cannot create a pairing code), `session_required` (403, an API token cannot create one), `not_a_household_member` (403, the account is no household member)',
-  },
-  '/api/v1/auth/devices/pair/redeem': {
-    post: '`invalid_pairing_code` (400, the code is unknown, expired, used, or its account can no longer have a device), `device_credential` (403, the request carried a valid device credential)',
-  },
-  '/api/v1/auth/devices/{id}': { delete: '`session_required` (403, an API token cannot manage a person\'s devices)' },
-  '/api/v1/auth/devices/current': { delete: '`device_credential_required` (403, only a signed-in device can sign itself out here)' },
-  '/api/v1/auth/users/{id}/devices/sign-out': { post: '`browser_session_required` (403, only a signed-in browser session can do this)' },
+  '/api/v1/auth/users/{id}': { patch: '`account_deactivated` (400, a deactivated account cannot become an administrator)' },
+  '/api/v1/auth/api-tokens': { post: DEACTIVATED_SUBJECT },
 };

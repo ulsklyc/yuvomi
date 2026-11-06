@@ -1663,3 +1663,33 @@ test('Wand-Display: gleiche Programm-Zeilen und gleicher Ueberlauf wie das Mitgl
     setPermissions({ admin: true, modules: {}, widgets: {}, capabilities: {} });
   })();
 });
+
+test('Availability: die Haushaltsfassung traegt die Note NICHT (#1591)', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
+  // Status mit Notiz fuer Ben setzen. Festes Datum weit in der Zukunft, damit
+  // SQLites strftime('now') (echter Systemtakt) den Eintrag nicht als abgelaufen
+  // behandelt - mock.timers.enable aendert nur Date.now(), nicht SQLite-Zeit.
+  const futureTs = '2099-01-01T00:00:00Z';
+  db.prepare(`
+    INSERT INTO user_availability (user_id, state, note, expires_at, set_at)
+    VALUES (?, 'busy', 'Wichtiges Meeting', ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    ON CONFLICT(user_id) DO UPDATE SET
+      state='busy', note='Wichtiges Meeting', expires_at=excluded.expires_at,
+      set_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')
+  `).run(BEN, futureTs);
+  try {
+    // Haushaltsfassung: note darf nicht vorhanden sein.
+    const wall = await overview(ANNA, '?audience=household');
+    assert.ok(Array.isArray(wall.familyStatuses), 'familyStatuses ist ein Array');
+    const benWall = wall.familyStatuses.find((r) => r.user_id === BEN);
+    assert.ok(benWall, 'Bens Status steht in der Haushaltsfassung');
+    assert.equal(benWall.state, 'busy');
+    assert.ok(!Object.prototype.hasOwnProperty.call(benWall, 'note'), 'note fehlt in der Haushaltsfassung');
+    // Persoenliche Fassung: note ist vorhanden.
+    const personal = await overview(ANNA);
+    const benPersonal = (personal.familyStatuses ?? []).find((r) => r.user_id === BEN);
+    assert.ok(benPersonal, 'Bens Status steht auch in der persoenlichen Fassung');
+    assert.equal(benPersonal.note, 'Wichtiges Meeting', 'note steht in der persoenlichen Fassung');
+  } finally {
+    db.prepare('DELETE FROM user_availability WHERE user_id = ?').run(BEN);
+  }
+}));

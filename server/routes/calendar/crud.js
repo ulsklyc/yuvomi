@@ -6,7 +6,7 @@
 import { createLogger } from '../../logger.js';
 import express from 'express';
 import * as db from '../../db.js';
-import { str, color, datetime, rrule, textShape, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../middleware/validate.js';
+import { str, color, datetime, rrule, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../middleware/validate.js';
 import { icsSubscriptionVisibleWhere, normalizeVisibility, visibilityWhere } from '../../services/visibility.js';
 import { hasAnyOccurrence, endsBeforeStart } from '../../services/recurrence.js';
 import { startOrRuleChanged } from '../../services/outbound-dtstart.js';
@@ -581,13 +581,7 @@ router.post('/', async (req, res) => {
     const vGoogle = googleTarget(req.body);
     const vOutlook = outlookTarget(req.body);
     const vLocalCalendar = validateCalendarId(db.get(), req.body.local_calendar_id);
-    // Die Form vor dem Inhalt: `str()` machte aus einer Zahl Text ("5").
-    const shapes = [
-      textShape(req.body.title, 'title'),
-      textShape(req.body.description, 'description', { nullable: true }),
-      textShape(req.body.location, 'location', { nullable: true }),
-    ];
-    const checks = [...shapes, vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook, vLocalCalendar];
+    const checks = [vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook, vLocalCalendar];
     if (collectErrors(checks).length) return sendValidationErrors(res, checks);
     if (req.body.local_calendar_id !== undefined
         && ((req.body.external_source && req.body.external_source !== 'local')
@@ -883,15 +877,7 @@ router.put('/:id', async (req, res) => {
       ? datetime(req.body.start_datetime, 'start_datetime', true, zoneOpts) : null;
     const vEnd = req.body.end_datetime !== undefined
       ? datetime(req.body.end_datetime, 'end_datetime', false, zoneOpts) : null;
-    // Ein mitgeschickter Titel muss Text sein und darf nicht leer sein: eine Zahl
-    // lief in `.trim()` auf einen 500, '' wurde gespeichert, und `null` blieb
-    // still ohne Wirkung. Fehlt er, bleibt der alte (Kuerzen einer Serie).
-    checks.push(
-      textShape(req.body.title, 'title'),
-      textShape(req.body.description, 'description', { nullable: true }),
-      textShape(req.body.location, 'location', { nullable: true }),
-    );
-    if (req.body.title          !== undefined) checks.push(str(req.body.title, 'title', { max: MAX_TITLE, required: typeof req.body.title === 'string' }));
+    if (req.body.title          !== undefined) checks.push(str(req.body.title, 'title', { max: MAX_TITLE, required: false }));
     if (req.body.description    !== undefined) checks.push(str(req.body.description, 'description', { max: MAX_TEXT, required: false }));
     if (vStart) checks.push(vStart);
     if (vEnd)   checks.push(vEnd);

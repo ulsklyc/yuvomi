@@ -285,52 +285,6 @@
   }
 }
 
-/* DER ZEITRAUM BEKOMMT EINE EIGENE ZEILE, WENN DER TITEL NEBEN IHM NICHT GANZ
- * STEHT (#2440, #2443; DESIGN.md, Kopfregel mobil). Neben dem 192px breiten
- * Stepper bleiben dem Large Title Breite minus 264px: bei 360px 96px, und
- * "Budget" braucht in Roboto 106, in SF Pro 112 - dort stand "Bud...". Der
- * Titel bleibt gross (Ulas 2026-11-01, in keinem Modul ein kleinerer Titel),
- * also weicht der Stepper: er steht in voller Breite unter dem Titel, die
- * Pfeile an den Zeilenenden wie im Schichtplan, das Label mittig dazwischen.
- *
- * DER KOPF MISST, KEINE FESTE BREITE (#2443). #2440 schaltete per
- * `@container (width < 390px)` um, gerechnet an de und en - ab 390px stand der
- * Titel in elf Sprachen gekuerzt (es "Presupues..." noch bei 430px), und unter
- * 390px wich der Stepper auch dort, wo ein kurzer Titel neben ihm passte (ja
- * "家計"). Die Abfrage ist deshalb in diese Regel aufgegangen statt neben ihr
- * zu bleiben: zwei Ausloeser fuer dieselbe Zeile waeren zwei Antworten auf
- * eine Frage, und die feste Grenze waere nur noch die Naeherung der Messung.
- * `budget-nav--period-own-row` setzt pages/budget.js (watchHeadFit), gemessen
- * am Titel in der EINEN Zeile, nicht am gezeigten Zustand - kein Hin und Her.
- * Das Budget ist der einzige Traeger, der auf dem Telefon Titel und Stepper in
- * einer Zeile fuehrt: der Schichtplan tut das erst ab 768px (schedule.css),
- * der Kalender und die Haushaltshilfe sind andere Koepfe. `test:budget-ui`
- * haelt die Liste.
- *
- * DIE ZEILE STEHT AUF JEDEM REITER MIT INHALT, die Notiz der Reiter ohne
- * Zeitraum nimmt sie genauso, und der Slot haelt seine 48px (oben): der Kopf
- * misst dann 169px, ob Stepper oder Notiz, der Monatswechsel bewegt nichts
- * (das Label fuellt die Zeile, die Pfeile haengen nicht an seiner Laenge). Nur
- * die Aufteilung traegt im Slot nichts (`:has(> :not([hidden]))`) und bleibt
- * ohne leere Zeile bei 117px.
- *
- * EINGEKLAPPT BLEIBT ALLES WIE ES WAR (R19): der Titel geht, Reiter und Stepper
- * teilen die eine Zeile (169 -> 65px); deshalb `:not(.is-collapsed)`. */
-.page-toolbar.page-toolbar--period-inline.page-toolbar--wrap.budget-nav.budget-nav--period-own-row:not(.page-toolbar--in-group):not(.is-collapsed) > .budget-nav__month:has(> :not([hidden])) {
-  flex: 1 1 100%;
-  inline-size: auto;
-  margin-inline: 0;
-}
-
-.budget-nav.budget-nav--period-own-row:not(.is-collapsed) .budget-nav__label {
-  flex: 1 1 0;
-  inline-size: auto;
-}
-
-.budget-nav.budget-nav--period-own-row:not(.is-collapsed) .budget-nav__note:not([hidden]) {
-  text-align: start;
-}
-
 /* Die Tab-Leiste ist die Bar-Zeile des Kopfs (.page-toolbar__bar, layout.css,
  * Werkzeugzeilen-Regel 2026-08-27): volle Zeile unter Titel/Monat/Aktionen.
  * Layout, Scrollen, Snap und Scroll-Affordanz kommen komplett aus der Shell

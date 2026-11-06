@@ -302,9 +302,7 @@ export function buildRouter({ cfgGet: cfgGetFn = cfgGet, fetchFn = null, logger 
 
         data = {
           provider: 'open-meteo',
-          // Ohne Ortsnamen kein Ersatz aus den Koordinaten: das waere die
-          // Wohnposition auf jeder Kachel (ulsklyc/yuvomi-home-assistant#4).
-          city: city || null,
+          city: city || `${lat}, ${lon}`,
           units,
           current: {
             temp:       Math.round(cur.temperature_2m),

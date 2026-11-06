@@ -7,7 +7,6 @@ import { confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors }
 import { createRetryState, hintFoldHtml, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getExtensionModules } from '/utils/extension-widgets.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
-import { errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
 
 // Core scope keys — extension modules are appended from /permissions/catalog at render time.
 const CORE_SCOPE_MODULE_KEYS = [
@@ -399,11 +398,7 @@ function bindEvents(container, initialTokens, users, currentUserId) {
       outputValue.select();
       window.yuvomi?.showToast(t('settings.apiTokenCreatedToast'), 'success');
     } catch (err) {
-      // `account_deactivated` schickt auch die Kontoverwaltung, mit anderem
-      // Sinn - deshalb hier und nicht in CASE_MESSAGES (#1909).
-      showError(errorEl, err?.data?.reason === 'account_deactivated'
-        ? t('settings.apiTokenErrorSubjectDeactivated')
-        : errorSentence(err));
+      showError(errorEl, err.message);
     } finally {
       btn.disabled = false;
     }
@@ -413,20 +408,13 @@ function bindEvents(container, initialTokens, users, currentUserId) {
   // Token ist genau einmal sichtbar und stand in einem readonly Input, aus dem
   // es von Hand markiert werden musste (Critique 2026-07-27).
   container.querySelector('#api-token-copy')?.addEventListener('click', async () => {
-    const field = container.querySelector('#api-token-created-value');
-    const value = field?.value;
+    const value = container.querySelector('#api-token-created-value')?.value;
     if (!value) return;
-    // Ohne HTTPS gibt es navigator.clipboard nicht - dann waere "kopiert"
-    // gelogen, und das Token ist nur dieses eine Mal sichtbar. Markieren hilft
-    // weiter (dasselbe Muster wie admin-backup.js, #2487).
     try {
-      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
-      await navigator.clipboard.writeText(value);
+      await navigator.clipboard?.writeText(value);
       window.yuvomi?.showToast(t('settings.apiTokenCopied'), 'success');
-    } catch {
-      field.focus();
-      field.select();
-      window.yuvomi?.showToast(t('settings.apiTokenCopyFailed'), 'danger');
+    } catch (err) {
+      window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
     }
   });
 
@@ -449,7 +437,7 @@ function bindEvents(container, initialTokens, users, currentUserId) {
       refocusAfterRender();
       window.yuvomi?.showToast(t('settings.apiTokenRevokedToast'), 'default');
     } catch (err) {
-      window.yuvomi?.showToast(errorSentence(err), 'danger');
+      window.yuvomi?.showToast(err.message, 'danger');
     }
   });
 
@@ -476,14 +464,14 @@ function bindEvents(container, initialTokens, users, currentUserId) {
         // geht vor, oder die Liste ist alt): sein Satz statt des englischen,
         // und die Liste neu vom Server, damit die Zeile wieder richtig steht.
         const active = err?.status === 409 && err.data?.reason === 'api_token_active';
-        window.yuvomi?.showToast(active ? t('settings.apiTokenRemoveActive') : errorSentence(err), 'danger');
+        window.yuvomi?.showToast(active ? t('settings.apiTokenRemoveActive') : err.message, 'danger');
         if (active) {
           try {
             tokens = (await api.get('/auth/api-tokens')).data ?? tokens;
             renderApiTokenList(container, tokens);
             refocusAfterRender();
           } catch (reloadErr) {
-            window.yuvomi?.showToast(errorSentence(reloadErr), 'danger');
+            window.yuvomi?.showToast(reloadErr.message, 'danger');
           }
         }
         return;
@@ -510,7 +498,7 @@ async function loadTokens(container, currentUserId) {
     users = tokenResponse.subjects ?? [];
   } catch (err) {
     list.replaceChildren(createRetryState({
-      message: loadErrorSentence(err) ?? t('common.errorGeneric'),
+      message: err.message || t('common.errorGeneric'),
       onRetry: reload,
     }));
     return;

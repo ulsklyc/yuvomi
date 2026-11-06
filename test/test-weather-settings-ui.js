@@ -328,11 +328,3 @@ test('Ortssuche: ein erfolgreicher neuer Versuch raeumt den alten Feldfehler', a
     if (hadDocument) globalThis.document = keptDocument; else delete globalThis.document;
   }
 });
-
-test('Standortabfrage: der Satz der App, nie der des Browsers (#1909)', () => {
-  // GeolocationPositionError: 1 abgelehnt, 2 nicht verfuegbar, 3 Zeitueberschreitung.
-  assert.equal(weatherLocation.geolocationErrorKey({ code: 1, message: 'User denied Geolocation' }), 'settings.weatherLocateDenied');
-  for (const code of [2, 3, undefined]) {
-    assert.equal(weatherLocation.geolocationErrorKey({ code, message: 'raw' }), 'settings.weatherLocateFailed');
-  }
-});

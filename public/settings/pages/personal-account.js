@@ -13,7 +13,6 @@ import { settingRowHtml } from '/settings/components.js';
 import { colorPickerHtml, wireColorPicker } from '/utils/color-picker.js';
 import { birthDateControlHtml, wireBirthDateField } from '/utils/birth-date.js';
 import { mediaPickerBadgeHtml } from '/utils/media-picker.js';
-import { bindSignedInDevices, signedInDevicesCardHtml } from '/settings/signed-in-devices.js';
 
 function avatarHtml(user, className = 'settings-avatar') {
   const safeName = esc(user?.display_name || '');
@@ -508,8 +507,7 @@ export const GRAVATAR_REASON_KEYS = Object.freeze({
 /**
  * Fehlertext fuer den Gravatar-Abruf. Ein 429 ohne `reason` (etwa vom
  * allgemeinen Limit davor) liest sich ebenfalls als "zu oft", nicht als
- * Fehlschlag; alles Unbekannte sagt den Satz von errorSentence (#1909), nie
- * den englischen Servertext.
+ * Fehlschlag; alles Unbekannte faellt auf den Servertext zurueck.
  * `host` ist der Dienst, den die Saetze nennen (`gravatarHost` aus /auth/me).
  * @param {{ status?: number, data?: { reason?: string }, message?: string }} err
  * @param {string} [host]
@@ -519,7 +517,7 @@ export function gravatarErrorText(err, host = '') {
   const key = GRAVATAR_REASON_KEYS[err?.data?.reason];
   if (key) return host ? t(key, { host }) : t(key);
   if (err?.status === 429) return t('settings.gravatarErrorRateLimited');
-  return errorSentence(err);
+  return err?.message || t('common.errorGeneric');
 }
 
 /**
@@ -534,11 +532,7 @@ function twoFactorErrorText(err) {
   if (reason === 'invalid_code') return t('settings.twoFactorInvalidCode');
   if (reason === 'required')     return t('settings.twoFactorRequiredByHousehold');
   if (reason === 'not_enabled')  return t('settings.twoFactorNotEnabled');
-  // Ein zweiter Tab hat sie inzwischen eingeschaltet, oder die Einrichtung ist
-  // abgelaufen (#1909): beides behebt nur ein neuer Anlauf.
-  if (reason === 'already_enabled')  return t('settings.twoFactorAlreadyEnabled');
-  if (reason === 'no_pending_setup') return t('settings.twoFactorSetupExpired');
-  return errorSentence(err, 'settings.twoFactorGenericError');
+  return err?.message || t('settings.twoFactorGenericError');
 }
 
 /**
@@ -616,9 +610,6 @@ function bindSetupForm(card, reload) {
     button.disabled = true;
     try {
       const { data } = await auth.enableTwoFactor(code);
-      // Neu gezeichnet wird erst, wenn die Wiederherstellungscodes zu sind; die
-      // Geraete hat der Server schon jetzt abgemeldet.
-      form.dispatchEvent(new CustomEvent('other-sessions-ended', { bubbles: true }));
       renderRecoveryCodes(card, data.recovery_codes, () => { reload(); });
     } catch (err) {
       button.disabled = false;
@@ -768,9 +759,6 @@ function renderPage(container, user, refreshFailed, accessNotice, oidcState, oid
 
       ${oidcCardHtml(oidcState, oidcNotice)}
 
-      ${/* Ein Ausgaben-Gast bekommt kein Geraet (mayHaveDevice, server/auth.js). */ ''}
-      ${user?.access_scope === 'split_guest' ? '' : signedInDevicesCardHtml()}
-
       ${otherSessionsCardHtml()}
     </section>
 
@@ -801,7 +789,7 @@ function bindOidcEvents(container) {
       else throw new Error('missing url');
     } catch (err) {
       button.disabled = false;
-      showError(error, errorSentence(err, 'settings.oidcLinkErrorGeneric'));
+      showError(error, err?.message || t('settings.oidcLinkErrorGeneric'));
     }
   });
 
@@ -814,7 +802,7 @@ function bindOidcEvents(container) {
       location.reload();
     } catch (err) {
       button.disabled = false;
-      showError(error, errorSentence(err, 'settings.oidcLinkErrorGeneric'));
+      showError(error, err?.message || t('settings.oidcLinkErrorGeneric'));
     }
   });
 }
@@ -856,8 +844,7 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
       profileState.avatarData = avatarData;
       updatePreview();
     } catch (error) {
-      // Die Pruefung des Bildes sagt ihren eigenen, uebersetzten Satz (#1909).
-      showError(profileError, error?.name === 'ImageProblem' && error.sentence ? error.sentence : t('common.errorGeneric'));
+      showError(profileError, error.message);
     }
   });
 
@@ -1011,9 +998,6 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
         new_password: newPassword,
       });
       passwordForm.reset();
-      // Wie "Auf anderen Geraeten abmelden": der Server beendet die
-      // angemeldeten Geraete und den offenen Kopplungscode mit.
-      passwordForm.dispatchEvent(new CustomEvent('other-sessions-ended', { bubbles: true }));
       window.yuvomi?.showToast(t('settings.passwordSavedToast'), 'success');
     } catch (error) {
       // Ein falsches aktuelles Passwort ist ein 400 mit Grund (server/auth.js),
@@ -1052,9 +1036,6 @@ function bindEvents(container, user, profileState, { gravatarHost = '' } = {}) {
     if (status) status.textContent = '';
     try {
       const { ended = 0 } = await auth.logoutOthers() ?? {};
-      // Der Server beendet dabei auch die angemeldeten Geraete und offene
-      // Kopplungscodes: die Karte darueber muss das erfahren.
-      logoutOthersButton.dispatchEvent(new CustomEvent('other-sessions-ended', { bubbles: true }));
       if (status) {
         status.textContent = ended > 0
           ? t('settings.otherSessionsEnded', { count: ended })
@@ -1125,7 +1106,6 @@ export async function render(container, { user }) {
       avatarData: currentUser?.avatar_data ?? null,
     }, { gravatarHost });
     bindTwoFactorEvents(container, () => render(container, { user: currentUser }));
-    bindSignedInDevices(container);
     container.querySelector('#account-retry')?.addEventListener('click', () => {
       render(container, { user: currentUser });
     });

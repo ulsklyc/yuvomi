@@ -14,13 +14,6 @@
  *
  * Every write of a batch's name, unit or category puts the batch into its
  * household product in the same transaction (assignPantryProduct, #1448).
- *
- * THE MINIMUM IS THE PRODUCT'S (#1448, step 3). A batch read returns
- * `min_quantity` as its product's value (MIRRORED_MIN), and a batch write that
- * carries `min_quantity` writes it through to the product
- * (writeMinimumThrough), for the deprecation window named in the CHANGELOG:
- * refusing it would break a client that worked yesterday. The batch's own
- * column is still written as before, but nothing reads it any more.
  */
 
 import express from 'express';
@@ -29,7 +22,7 @@ import { createLogger } from '../logger.js';
 import { str, oneOf, num, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
 import { normalizePantryUnit, normalizePantryQuantity, convertPantryQuantity } from '../../public/utils/pantry-units.js';
 import { syncPantryExpiryReminder, resolvePantryAccess } from '../services/pantry-reminders.js';
-import { assignPantryProduct, productKey, writeMinimumThrough } from '../services/pantry-products.js';
+import { assignPantryProduct, productKey } from '../services/pantry-products.js';
 import { todayKey as householdToday } from '../utils/timezone.js';
 import { mayReadModule } from '../permissions.js';
 
@@ -48,16 +41,11 @@ function loadLocations() {
  * The household products with the number of batches each one has (#1448). A
  * product outlives its last batch, so this is the only place a product without
  * batches can be seen: the stock page shows it as out of stock. The batches
- * themselves stay in `data`; this list only names the products, with their
- * minimum and the sum of their batches (`total_quantity`, 0 without a batch),
- * the two numbers low and out are read from (step 3). The status itself is not
- * sent: its rule lives in public/utils/pantry-status.js and in the kitchen
- * count, and a third copy would be one more to keep equal.
+ * themselves stay in `data`; this list only names the products.
  */
 function loadProducts() {
   return db.get().prepare(`
-    SELECT p.id, p.name, p.unit, p.category, p.min_quantity,
-           COUNT(pi.id) AS batch_count, ROUND(COALESCE(SUM(pi.quantity), 0), 2) AS total_quantity
+    SELECT p.id, p.name, p.unit, p.category, COUNT(pi.id) AS batch_count
     FROM pantry_products p
     LEFT JOIN pantry_items pi ON pi.product_id = p.id
     GROUP BY p.id
@@ -73,20 +61,8 @@ function validCategoryNames() {
   return loadCategories().map((c) => c.name);
 }
 
-/**
- * `min_quantity` of a batch as read through the API: its product's minimum
- * (#1448, step 3). Listed after `pi.*`, so it takes the place of the batch's
- * own column. A batch without a product (written by an older version, until the
- * next start adopts it) keeps its own.
- */
-const MIRRORED_MIN = 'CASE WHEN pi.product_id IS NULL THEN pi.min_quantity ELSE pp.min_quantity END AS min_quantity';
-
 function getItem(itemId) {
-  return db.get().prepare(`
-    SELECT pi.*, ${MIRRORED_MIN}
-    FROM pantry_items pi LEFT JOIN pantry_products pp ON pp.id = pi.product_id
-    WHERE pi.id = ?
-  `).get(itemId);
+  return db.get().prepare('SELECT * FROM pantry_items WHERE id = ?').get(itemId);
 }
 
 /**
@@ -109,9 +85,8 @@ function syncReminder(item, access = null, today = null) {
  */
 function loadItems() {
   return db.get().prepare(`
-    SELECT pi.*, ${MIRRORED_MIN}, pl.name AS location_name, pl.icon AS location_icon
+    SELECT pi.*, pl.name AS location_name, pl.icon AS location_icon
     FROM pantry_items pi
-    LEFT JOIN pantry_products pp ON pp.id = pi.product_id
     LEFT JOIN pantry_locations pl ON pl.id = pi.location_id
     ORDER BY
       CASE WHEN pi.location_id IS NULL THEN 1 ELSE 0 END,
@@ -184,11 +159,7 @@ function validateItemFields(body, { partial = false, current = null } = {}) {
     values.expires_on = vExp.value;
   }
 
-  // ONLY WHEN SENT, also on a full update and on create: the minimum is the
-  // product's, so a body without it leaves the product's minimum alone instead
-  // of clearing it for every batch (an older client's PUT without the field, a
-  // new batch of a product that has one). Sent as null or '', it clears.
-  if (body.min_quantity !== undefined) {
+  if (!partial || body.min_quantity !== undefined) {
     if (body.min_quantity === null || body.min_quantity === '' || body.min_quantity === undefined) {
       values.min_quantity = null;
     } else {
@@ -645,14 +616,10 @@ router.post('/', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         values.name, values.quantity, values.unit, values.location_id,
-        values.category, values.expires_on, values.min_quantity ?? null, values.notes,
+        values.category, values.expires_on, values.min_quantity, values.notes,
         req.authUserId || req.session.userId
       );
       assignPantryProduct(db.get(), result.lastInsertRowid, { userId: req.authUserId || req.session.userId });
-      // A new batch sets its product's minimum only with a number: a create
-      // without one (or with an empty field) leaves the minimum of an existing
-      // product alone, it cannot know better than the product.
-      if (values.min_quantity != null) writeMinimumThrough(db.get(), result.lastInsertRowid, values.min_quantity);
       const item = getItem(result.lastInsertRowid);
       syncReminder(item);
       return item;
@@ -680,17 +647,16 @@ router.put('/:itemId', (req, res) => {
 
     const { values, errors } = validateItemFields(req.body, { current: item });
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    const minGiven = 'min_quantity' in values;
 
     const updated = db.get().transaction(() => {
       db.get().prepare(`
         UPDATE pantry_items
         SET name = ?, quantity = ?, unit = ?, location_id = ?, category = ?,
-            expires_on = ?, min_quantity = CASE WHEN ? THEN ? ELSE min_quantity END, notes = ?
+            expires_on = ?, min_quantity = ?, notes = ?
         WHERE id = ?
       `).run(
         values.name, values.quantity, values.unit, values.location_id,
-        values.category, values.expires_on, minGiven ? 1 : 0, values.min_quantity ?? null, values.notes, item.id
+        values.category, values.expires_on, values.min_quantity, values.notes, item.id
       );
       // A changed name or unit moves the batch to the matching product (#1448).
       // The category reaches the product only when this edit changed it: the
@@ -700,8 +666,6 @@ router.put('/:itemId', (req, res) => {
         userId: req.authUserId || req.session.userId,
         syncCategory: values.category !== item.category,
       });
-      // Sent, the minimum goes to the product the batch belongs to now.
-      if (minGiven) writeMinimumThrough(db.get(), item.id, values.min_quantity);
       const fresh = getItem(item.id);
       syncReminder(fresh);
       return fresh;
@@ -750,7 +714,6 @@ router.patch('/:itemId', (req, res) => {
           syncCategory: fields.includes('category') && values.category !== item.category,
         });
       }
-      if (fields.includes('min_quantity')) writeMinimumThrough(db.get(), item.id, values.min_quantity);
 
       // Auch der ±-Stepper landet hier: wer den letzten Joghurt ausbucht, soll
       // nicht in fünf Tagen an sein Ablaufdatum erinnert werden.

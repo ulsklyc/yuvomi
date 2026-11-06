@@ -7,8 +7,6 @@ modules/*
 
 # Environment variables (NEVER commit)
 .env
-# Secrets the app generates on first start, next to the database (server/utils/auto-secrets.js)
-.secrets/
 
 # Database
 *.db
@@ -110,9 +108,6 @@ seed-english-demo*.js
 # Ad-hoc Playwright shooters at the repo root - throwaway, one per audit session.
 .shoot*.mjs
 .measure.mjs
-# Screenshots, snapshots and console logs the Playwright MCP server writes into the
-# working directory during a browser session.
-.playwright-mcp/
 # Leading slash: this is meant for a generator output folder at the repo root.
 # Without it the pattern also matched docs/screenshots/, which IS the website -
 # its PNGs only stayed versioned because they predate this rule, while anything

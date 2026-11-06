@@ -1382,69 +1382,6 @@ test('das Display-Dashboard liefert Einkauf, Haushaltshilfe, Abfuhr und Vorrat f
   assert.ok('pantryExpiring' in res.body, 'pantryExpiring muss vorhanden sein');
 });
 
-test('an admin manages this display’s night hours and screensaver without changing household preferences (#2436)', async () => {
-  const created = await admin('POST', '/displays', { display_name: 'Remote settings probe' });
-  const id = created.body.data.id;
-  const issued = await admin('POST', `/displays/${id}/pairing-code`, {});
-  const device = asDisplay((await pair(issued.body.data.code)).token);
-  const settings = { night_from:21, night_until:7, idle_seconds:60, show_clock:false, cover_photo:true };
-  assert.equal((await device('GET', '/preferences')).body.data.display_device_settings, null, 'existing local choices remain in use until configured');
-  assert.equal((await admin('PATCH', `/displays/${id}`, {device_settings:settings})).status, 200);
-  assert.deepEqual((await device('GET', '/preferences')).body.data.display_device_settings, settings);
-  assert.deepEqual((await admin('GET', '/displays')).body.data.find(d => d.id === id).device_settings, settings);
-  assert.equal((await admin('GET', '/preferences')).body.data.display_device_settings, undefined, 'a member gets no display override');
-  assert.equal((await device('PATCH', `/displays/${id}`, {device_settings:{...settings, idle_seconds:300}})).status, 403);
-  for (const invalid of [{...settings, night_from:7}, {...settings, night_until:24}, {...settings, idle_seconds:61}, {...settings, show_clock:'false'}, {...settings, cover_photo:1}, {night_from:21}, {...settings, unknown:true}, null]) {
-    const rejected = await admin('PATCH', `/displays/${id}`, {device_settings:invalid, show_screensaver:true});
-    assert.equal(rejected.status, 400, JSON.stringify(invalid));
-    assert.match(rejected.body.error, /device_settings/, 'the error names the invalid field');
-  }
-  const rejectedSwitch = await admin('PATCH', `/displays/${id}`, {device_settings:{...settings, idle_seconds:300}, show_screensaver:'false'});
-  assert.equal(rejectedSwitch.status, 400);
-  assert.match(rejectedSwitch.body.error, /show_screensaver/);
-  const listed = (await admin('GET', '/displays')).body.data.find(d => d.id === id);
-  assert.deepEqual(listed.device_settings, settings); assert.equal(listed.show_screensaver, false, 'invalid changes are atomic');
-  const other = (await admin('POST', '/displays', { display_name:'Other display' })).body.data;
-  assert.equal((await admin('GET', '/displays')).body.data.find(d => d.id === other.id).device_settings, null);
-});
-
-test('display-settings migration preserves existing displays and rejects invalid JSON (#2436)', async () => {
-  const { DatabaseSync } = await import('node:sqlite');
-  const legacy = new DatabaseSync(':memory:');
-  try {
-    legacy.exec("CREATE TABLE display_accounts (user_id INTEGER PRIMARY KEY, show_screensaver INTEGER NOT NULL DEFAULT 0); INSERT INTO display_accounts VALUES (7, 1)");
-    const migration = dbmod.MIGRATIONS.find(m => m.description === 'Wall displays: centrally managed night hours and screensaver options (#2436)');
-    legacy.exec(migration.up);
-    assert.deepEqual({...legacy.prepare('SELECT * FROM display_accounts').get()}, {user_id:7, show_screensaver:1, device_settings:null});
-    assert.throws(() => legacy.prepare('UPDATE display_accounts SET device_settings = ?').run('not json'));
-  } finally {legacy.close();}
-});
-
-// #1909: ein zweiter Admin hat das Tablett oder sein Geraet schon entfernt.
-// Die Seite Wandtablets sagt den Fall in der Sprache der Oberflaeche und laedt
-// nach - dafuer muss die Antwort ihn nennen, nicht nur ihr englischer Text.
-test('ein Display oder Geraet, das es nicht mehr gibt, nennt seinen Fall (#1909)', async () => {
-  const created = await admin('POST', '/displays', { display_name: 'Weg' });
-  assert.equal(created.status, 201);
-  const id = created.body.data.id;
-  assert.equal((await admin('DELETE', `/displays/${id}`)).status, 200);
-  for (const [method, path, body] of [
-    ['PATCH', `/displays/${id}`, { show_screensaver: true }],
-    ['PATCH', `/displays/${id}`, { device_settings: { night_from: 22, night_until: 6, idle_seconds: 60, show_clock: true, cover_photo: true } }],
-    ['DELETE', `/displays/${id}`],
-    ['POST', `/displays/${id}/pairing-code`, {}],
-  ]) {
-    const res = await admin(method, path, body);
-    assert.equal(res.status, 404, `${method} ${path}: ${JSON.stringify(res.body)}`);
-    assert.equal(res.body?.reason, 'displays_display_not_found', `${method} ${path}`);
-  }
-  for (const action of ['revoke', 'remove']) {
-    const res = await admin('POST', `/displays/${displayId}/devices/987654/${action}`, {});
-    assert.equal(res.status, 404, action);
-    assert.equal(res.body?.reason, 'displays_device_not_found', action);
-  }
-});
-
 // --------------------------------------------------------
 // Der Limiter - absichtlich zuletzt, weil er das Budget aufbraucht
 // --------------------------------------------------------

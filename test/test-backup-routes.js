@@ -126,7 +126,6 @@ test('requireAdmin: Nicht-Admin bekommt 403 auf allen Routen', async () => {
   const routes = [
     ['GET', '/status'],
     ['GET', '/database'],
-    ['GET', '/database-key'],
     ['POST', '/trigger'],
     ['GET', '/webdav/config'],
     ['PUT', '/webdav/config'],
@@ -189,24 +188,6 @@ test('POST /restore: leerer Body → 400', async () => {
   const r = await call('POST', '/restore', { actor: ADM, raw: Buffer.alloc(0) });
   assert.equal(r.status, 400);
   assert.match(r.body.error, /required/i);
-  // #1909: die Seite sagt den Fall in der Sprache der Oberflaeche.
-  assert.equal(r.body.reason, 'backup_file_empty');
-});
-
-// #1909: eine lesbare SQLite-Datei, die keine Yuvomi-Datenbank ist - die Seite
-// zeigte bisher den englischen Text des Servers.
-test('POST /restore: SQLite ohne Yuvomi-Schema → 400 backup_not_yuvomi, Live-DB unangetastet', async () => {
-  const versionBefore = dbmod.currentVersion();
-  const foreignPath = path.join(TMP_ROOT, 'foreign.db');
-  const { default: Database } = await import('better-sqlite3-multiple-ciphers');
-  const foreign = new Database(foreignPath);
-  foreign.exec('CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT)');
-  foreign.close();
-  const r = await call('POST', '/restore', { actor: ADM, raw: fs.readFileSync(foreignPath) });
-  assert.equal(r.status, 400);
-  assert.match(r.body.error, /not a valid Yuvomi database/);
-  assert.equal(r.body.reason, 'backup_not_yuvomi');
-  assert.equal(dbmod.currentVersion(), versionBefore);
 });
 
 test('POST /restore: kein gültiges SQLite → 400, Live-DB unangetastet', async () => {
@@ -241,8 +222,6 @@ test('PUT /webdav/config: Validierungsfehler → 400', async () => {
     assert.equal(r.status, 400, `Body ${JSON.stringify(c.body)} muss 400 liefern`);
     assert.match(r.body.error, c.rx);
   }
-  const badUrl = await call('PUT', '/webdav/config', { actor: ADM, body: { url: 'ftp://x' } });
-  assert.equal(badUrl.body.errorCode, 'url_invalid', 'die App sagt den Satz, nicht der Server (#1909)');
   // Kein Teil der ungültigen Konfig darf persistiert worden sein.
   const status = await call('GET', '/webdav/config', { actor: ADM });
   assert.equal(status.body.data.configured, false);
@@ -417,10 +396,6 @@ test('POST /restore: Upload über dem Limit → 413', async () => {
   const r = await call('POST', '/restore', { actor: ADM, raw: tooLarge });
   assert.equal(r.status, 413);
   assert.match(r.body.error, /too large/i);
-  // #2564 (Codex): die Seite nennt die Grenze und den Hebel nur, wenn der
-  // Grund und die Grenze strukturiert mitkommen - der englische Text faellt weg.
-  assert.equal(r.body.reason, 'backup_file_too_large');
-  assert.deepEqual(r.body.params, { limit: '4mb' });
 });
 
 // ── POST /restore: echter Roundtrip (re-initialisiert die DB) — als LETZTES ──────
@@ -495,8 +470,6 @@ test('POST /restore: Backup aus einer neueren Yuvomi-Version → 400, Live-DB un
   assert.equal(r.status, 400);
   assert.match(r.body.error, /newer Yuvomi/i);
   assert.match(r.body.error, /999999/);
-  // #1909: der naechste Schritt (erst aktualisieren) steht als Fall in der Antwort.
-  assert.equal(r.body.reason, 'backup_newer_version');
   // Nichts kopiert: Version und Nutzbarkeit der Live-DB unveraendert.
   assert.equal(dbmod.currentVersion(), versionBefore);
   assert.deepEqual(dbmod.unknownMigrationVersions(database()), []);
@@ -514,39 +487,4 @@ test('unknownMigrationVersions: sieht genau die Nummern, die dieser Build nicht 
     live.prepare('DELETE FROM schema_migrations WHERE version = ?').run(999999);
   }
   assert.deepEqual(dbmod.unknownMigrationVersions(live), []);
-});
-
-// ── GET /database: Rate-Limit je Konto (#2524) ─────────────────────────────────
-// Jeder Abruf baut eine volle Kopie der Datenbank; eine gekaperte Admin-Sitzung
-// darf das nicht im Takt ausloesen. Eigene Konto-IDs, damit die Abrufe der
-// Faelle oben nicht mitzaehlen.
-test('GET /database: der elfte Download eines Admins in der Stunde bekommt 429, andere Konten nicht (#2524)', async () => {
-  const first = { id: 41, role: 'admin' };
-  const second = { id: 42, role: 'admin' };
-  const member = { id: 43, role: 'member' };
-
-  // Ein Mitglied scheitert am Gate, bevor der Zaehler laeuft: auch nach zwoelf
-  // Versuchen kommt 403, nie 429.
-  for (let i = 0; i < 12; i += 1) {
-    const r = await call('GET', '/database', { actor: member });
-    assert.equal(r.status, 403, `Versuch ${i + 1} des Mitglieds`);
-  }
-
-  for (let i = 0; i < 10; i += 1) {
-    const r = await call('GET', '/database', { actor: first });
-    assert.equal(r.status, 200, `Download ${i + 1} des ersten Admins`);
-  }
-  const blocked = await call('GET', '/database', { actor: first });
-  assert.equal(blocked.status, 429, 'der elfte Download in der Stunde wird abgewiesen');
-  assert.equal(blocked.body?.code, 429);
-  assert.ok(!blocked.buf.subarray(0, 16).toString('latin1').startsWith('SQLite format 3'), 'kein Backup im 429');
-
-  // Ein zweiter Admin hat sein eigenes Budget.
-  assert.equal((await call('GET', '/database', { actor: second })).status, 200);
-
-  // Wird das Mitglied Admin, ist sein Budget unberuehrt: die 403 oben haben nichts verbraucht.
-  for (let i = 0; i < 10; i += 1) {
-    const r = await call('GET', '/database', { actor: { ...member, role: 'admin' } });
-    assert.equal(r.status, 200, `Download ${i + 1} des befoerderten Mitglieds`);
-  }
 });

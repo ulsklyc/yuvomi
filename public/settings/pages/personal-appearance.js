@@ -8,7 +8,6 @@ import {
 } from '/i18n.js';
 import { api } from '/api.js';
 import { esc } from '/utils/html.js';
-import { nightHourOptions } from '/settings/night-hour-options.js';
 import { currencyName, currencyShortLabel, persistCurrencySelection } from '/settings/currency.js';
 import { CURRENCY_CODES } from '/utils/currency-codes.js';
 import { getPreferences, resetPreferencesCache, savePreferences } from '/settings/preferences-cache.js';
@@ -403,7 +402,10 @@ function nightHourText(hour) {
  * setting does not offer. Exported so test:screensaver-device can check the
  * selects open on the stored value.
  */
-export { nightHourOptions };
+export function nightHourOptions(selected, other) {
+  return Array.from({ length: 24 }, (_, hour) => `
+    <option value="${hour}"${hour === selected ? ' selected' : ''}${hour === other ? ' disabled' : ''}>${esc(nightHourText(hour))}</option>`).join('');
+}
 
 /**
  * Device-local like wall mode (#2234): no server request. Wall and

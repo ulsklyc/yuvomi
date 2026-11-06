@@ -24,7 +24,6 @@ import fs from 'node:fs/promises';
 import { mkdirSync, existsSync, renameSync, linkSync, rmSync, copyFileSync, openSync, readSync, closeSync, statSync, readdirSync, constants as fsConstants } from 'node:fs';
 import { createLogger } from './logger.js';
 import { acquireInstanceLock } from './utils/instance-lock.js';
-import { resolveDbPath, secretsDirFor } from './utils/db-path.js';
 import { RESTORE_IN_PROGRESS_MESSAGE, RESTORE_IN_PROGRESS_REASON } from './utils/restore-messages.js';
 import { setRestoreRunning, activeWriters, restoreWaitTimeoutMs, waitUntilIdle } from './utils/restore-state.js';
 import { decodeHtmlEntities } from './utils/html-entities.js';
@@ -41,10 +40,30 @@ const DB_KEY = process.env.DB_ENCRYPTION_KEY;
 // Pfad-Auflösung (Legacy-Migration oikos.db → yuvomi.db)
 // --------------------------------------------------------
 //
-// Die Regeln stehen in server/utils/db-path.js, damit der Secret-Handschlag vor
-// diesem Modul dieselbe Datei sieht (auto-secrets.js). `let`: scheitert die
-// Legacy-Migration, läuft die Instanz auf `oikos.db` weiter (siehe unten).
-let { dbPath: DB_PATH, legacyPath: LEGACY_DB_PATH } = resolveDbPath(); // LEGACY_DB_PATH: null außer bei „managed" Layout
+// Yuvomi hieß früher „Oikos". Die DB-Datei lag standardmäßig unter `oikos.db`
+// (bzw. `/data/oikos.db` in allen ausgelieferten Docker-Templates). Damit
+// Bestands-Nutzer beim Update NICHTS von Hand ändern müssen, leiten wir den
+// effektiven Pfad ab:
+//   - kein DB_PATH gesetzt              → <root>/yuvomi.db
+//   - DB_PATH endet auf oikos.db        → <dir>/yuvomi.db  (Legacy-Default erkannt)
+//   - DB_PATH endet auf yuvomi.db       → <dir>/yuvomi.db  (neuer Default)
+//   - beliebiger anderer DB_PATH        → unverändert (Custom-Pfad wird respektiert)
+// In allen „managed" Fällen wird eine vorhandene `oikos.db` beim Start einmalig
+// nach `yuvomi.db` migriert. Dass auch der NEUE Default `yuvomi.db` als managed
+// gilt, ist bewusst: aktualisiert ein Bestands-User seine Compose-Datei auf den
+// neuen Default, läge die Daten weiter in `oikos.db` — die Migration greift trotzdem.
+let DB_PATH;
+let LEGACY_DB_PATH; // null außer bei „managed" Layout
+{
+  const configured = process.env.DB_PATH;
+  const baseDir = configured
+    ? path.dirname(configured)
+    : path.join(import.meta.dirname, '..');
+  const base = configured ? path.basename(configured) : null;
+  const isManagedLayout = !configured || base === 'oikos.db' || base === 'yuvomi.db';
+  DB_PATH = isManagedLayout ? path.join(baseDir, 'yuvomi.db') : configured;
+  LEGACY_DB_PATH = isManagedLayout ? path.join(baseDir, 'oikos.db') : null;
+}
 
 /**
  * Einmalige, idempotente Migration der Legacy-Datenbankdatei `oikos.db` → `yuvomi.db`.
@@ -151,12 +170,10 @@ let db;
  *
  * Der zweite Absatz ist bewusst BEDINGT formuliert, und das ist der Kern seiner
  * Fassung: ein `-wal` neben der Datenbank ist KEIN Hinweis auf einen Dateitausch.
- * `journal_mode = WAL` steht dauerhaft, und SQLite räumt das Journal nur beim
- * sauberen Schließen weg. Das tut der Server auf SIGTERM und SIGINT
- * (`closeForShutdown()`), aber nicht nach SIGKILL, Absturz, OOM oder bei einer
- * Version vor diesem Handler, die als PID 1 im Container jedes Signal
- * ignorierte. Nach so einem Stopp liegt es also da, und zwar als EIGENES
- * Journal dieser Datenbank.
+ * `journal_mode = WAL` steht dauerhaft, und es gibt nirgends einen SIGTERM- oder
+ * SIGINT-Handler, der die Verbindung vor dem Stoppen schließt - SQLite räumt das
+ * Journal aber nur beim sauberen Schließen weg. Nach einem gewöhnlichen
+ * Container-Stop liegt es also da, und zwar als EIGENES Journal dieser Datenbank.
  * Ein unbedingtes „lösch es" würde hier bestätigte, nur noch nicht
  * gecheckpointete Transaktionen verwerfen und den eigentlichen Schlüsselfehler
  * nicht einmal berühren - derselbe Fehlertyp, gegen den dieser ganze Vorgang
@@ -434,9 +451,6 @@ function init({ plaintextBackup = true } = {}) {
   // Vor allem anderen: eine leere Datei würde ab hier still zur frischen
   // Instanz, und ein Journal daneben ginge dabei verloren (#1282).
   assertDatabaseFileNotEmpty();
-  // Ebenfalls vor der Legacy-Migration: die öffnet eine `oikos.db` sonst schon
-  // und scheitert dort mit „file is not a database".
-  assertKeyForEncryptedDatabase();
   mkdirSync(path.dirname(DB_PATH), { recursive: true });
   migrateLegacyDbFile();
   // Scheitert die Umbenennung einer Legacy-oikos.db, faellt DB_PATH auf sie
@@ -545,9 +559,7 @@ function assertKeyIsNotPlaceholder() {
       '[DB] DB_ENCRYPTION_KEY is still the placeholder from .env.example ' +
       `(${DB_KEY}). That value is published in this repository, so it protects ` +
       'nothing. Generate a real one with `openssl rand -hex 32` and put it in ' +
-      '.env, or delete the line: a new installation then generates its own key on ' +
-      'the first start. To run without encryption, delete the line and set ' +
-      'DB_ENCRYPTION_AUTO_KEY=false.'
+      '.env, or clear the line entirely to run without encryption.'
     );
   }
 
@@ -607,59 +619,20 @@ function assertCipherSupport() {
 /** Header jeder unverschlüsselten SQLite-Datei. Verschlüsselt ist er Zufallsrauschen. */
 const SQLITE_PLAINTEXT_HEADER = Buffer.from('SQLite format 3\0', 'binary');
 
-/** Die ersten Bytes der Datei in Headerlänge, `null` wenn sie sich nicht lesen lässt. */
-function readDatabaseHeader(filePath) {
+function isPlaintextDatabase(filePath) {
   let fd;
   try {
     fd = openSync(filePath, 'r');
     const head = Buffer.alloc(SQLITE_PLAINTEXT_HEADER.length);
     const bytesRead = readSync(fd, head, 0, head.length, 0);
-    return head.subarray(0, bytesRead);
+    return bytesRead === head.length && head.equals(SQLITE_PLAINTEXT_HEADER);
   } catch {
-    return null;
+    return false;
   } finally {
     if (fd !== undefined) {
       try { closeSync(fd); } catch { /* Datei ist ohnehin gleich zu */ }
     }
   }
-}
-
-function isPlaintextDatabase(filePath) {
-  return readDatabaseHeader(filePath)?.equals(SQLITE_PLAINTEXT_HEADER) ?? false;
-}
-
-/**
- * Bricht ab, wenn die Datei, die gleich geöffnet wird, verschlüsselt ist, aber
- * kein Schlüssel gesetzt ist.
- *
- * Ohne diese Prüfung öffnete SQLite die Datei und scheiterte erst am ersten
- * Pragma mit `file is not a database` - ein Satz, der nach kaputter Datei
- * klingt. Seit der Schlüssel einer Neuinstallation von selbst entsteht
- * (server/utils/auto-secrets.js) ist der häufigste Grund ein anderer: die
- * Datei `.secrets/DB_ENCRYPTION_KEY` neben der Datenbank ist weg, etwa weil
- * nur die Datenbank auf ein neues Volume kopiert wurde. Deshalb nennt die
- * Meldung diesen Pfad. Neu erzeugt wird dort nichts - der Handschlag legt nur
- * einen Schlüssel an, solange es keine Datenbank gibt.
- *
- * Nur mit vollständig gelesenem Header: eine unlesbare oder zu kurze Datei
- * ist kein Beleg für Verschlüsselung und behält die Meldung von SQLite.
- */
-function assertKeyForEncryptedDatabase() {
-  if (DB_KEY) return;
-  const filePath = databaseFileAboutToOpen();
-  if (!filePath) return;
-  const head = readDatabaseHeader(filePath);
-  if (!head || head.length < SQLITE_PLAINTEXT_HEADER.length || head.equals(SQLITE_PLAINTEXT_HEADER)) return;
-  const stored = path.join(secretsDirFor(filePath), 'DB_ENCRYPTION_KEY');
-  throw new Error(
-    `[DB] ${filePath} is encrypted, but no DB_ENCRYPTION_KEY is set - not in the environment, not ` +
-    `through DB_ENCRYPTION_KEY_FILE and not in ${stored}, where Yuvomi keeps a key it generated ` +
-    'itself. The database opens only with the key it was created with, so Yuvomi refuses to start ' +
-    'instead of creating a new one. Put that key back, either as DB_ENCRYPTION_KEY, through ' +
-    `DB_ENCRYPTION_KEY_FILE or as the file ${stored} (mode 600), and start again. If ${filePath} ` +
-    'is not a Yuvomi database at all - it has no plain SQLite header, so it may also be something ' +
-    'else - replace it with the right file.'
-  );
 }
 
 /**
@@ -11806,205 +11779,33 @@ const MIGRATIONS = [
   },
   {
     version: 274,
-    description: 'api_tokens: kind, platform, device_id for signed-in devices',
-    // Ein Telefon mit nativem Client ist ein angemeldetes Geraet: eine Person mit
-    // einem Device Credential. Es liegt in `api_tokens`, damit Widerruf beim
-    // Deaktivieren, die CSRF-Ausnahme und jede Pruefung auf `authMethod` von
-    // selbst gelten. `kind` trennt es von den Integrationen, die der Admin
-    // verwaltet. Der Index haelt: ein Telefon, ein gueltiges Credential.
+    description: 'Family: user availability status with expiry (#1591)',
+    // Ein Mitglied kann den anderen zeigen, ob es gerade erreichbar ist:
+    // available, busy, do_not_disturb oder away. Der Status traegt immer ein
+    // Verfallsdatum (expires_at, UTC) - er erlischt automatisch, kein manuelles
+    // Zuruecksetzen noetig. UPSERT auf user_id: ein Eintrag pro Person.
     up(database) {
-      const cols = database.prepare('PRAGMA table_info(api_tokens)').all();
-      if (!cols.some((col) => col.name === 'kind')) {
-        database.exec("ALTER TABLE api_tokens ADD COLUMN kind TEXT NOT NULL DEFAULT 'integration'");
-      }
-      if (!cols.some((col) => col.name === 'platform')) {
-        database.exec('ALTER TABLE api_tokens ADD COLUMN platform TEXT');
-      }
-      if (!cols.some((col) => col.name === 'device_id')) {
-        database.exec('ALTER TABLE api_tokens ADD COLUMN device_id TEXT');
-      }
       database.exec(`
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_api_tokens_active_device
-          ON api_tokens (subject_user_id, device_id)
-          WHERE kind = 'device' AND revoked_at IS NULL
+        CREATE TABLE IF NOT EXISTS user_availability (
+          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          state      TEXT    NOT NULL CHECK (state IN ('available', 'busy', 'do_not_disturb', 'away')),
+          note       TEXT,
+          expires_at TEXT    NOT NULL,
+          set_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+          UNIQUE (user_id)
+        )
       `);
+      database.exec('CREATE INDEX IF NOT EXISTS idx_user_availability_user ON user_availability(user_id)');
     },
   },
   {
     version: 275,
-    description: 'device_pairing_codes: pairing a signed-in device',
-    // Der Code, mit dem eine Browser-Sitzung ein Telefon anmeldet. Eine eigene
-    // Tabelle: `display_pairing_codes` fragt beim Einloesen nicht nach dem Zweck,
-    // ein Personen-Code dort oeffnete `POST /displays/pair`. Gehasht und mit
-    // `used_at` statt Loeschen, aus denselben Gruenden wie dort.
-    up: `
-      CREATE TABLE IF NOT EXISTS device_pairing_codes (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        code_hash  TEXT    NOT NULL UNIQUE,
-        expires_at TEXT    NOT NULL,
-        used_at    TEXT,
-        created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-      );
-      CREATE INDEX IF NOT EXISTS idx_device_pairing_codes_user
-        ON device_pairing_codes(user_id);
-    `,
-  },
-  {
-    version: 276,
-    description: 'Pantry: the minimum moves to the product, low and out are read over its total (#1448)',
-    // THE MINIMUM IS A STATEMENT ABOUT THE PRODUCT. Toothpaste with 1 in the
-    // bathroom and 8 in the attic and a minimum of 3 on the bathroom row read
-    // as low, although the household has 9. From here on low and out are read
-    // over the product: the sum of its batches against the product's minimum.
-    //
-    // THE BACKFILL TAKES THE HIGHEST MINIMUM OF A PRODUCT'S BATCHES (#1448,
-    // point 1): where batches of one product carry different minimums, the
-    // highest warns early rather than late. MAX() skips NULL, so a product
-    // whose batches carry no minimum, or that has no batch at all, keeps NULL.
-    //
-    // `pantry_items.min_quantity` STAYS. No destructive change: nothing reads it
-    // for low or out any more, the API returns the product's value in its place
-    // and writes a batch's `min_quantity` through to the product for the
-    // deprecation window (#1448, point 4). The previous version, started again
-    // on this database, still finds the column.
-    //
-    // Plain SQL, no runtime code. The trigger of pantry_products rests while the
-    // minimum is filled in and is created again with the wording of v253: a
-    // backfill is not an edit by anybody, so `updated_at` stays.
-    up: `
-      ALTER TABLE pantry_products ADD COLUMN min_quantity REAL;
-
-      DROP TRIGGER IF EXISTS trg_pantry_products_updated_at;
-      UPDATE pantry_products SET min_quantity = (
-        SELECT MAX(pi.min_quantity) FROM pantry_items pi WHERE pi.product_id = pantry_products.id
-      );
-      CREATE TRIGGER IF NOT EXISTS trg_pantry_products_updated_at
-        AFTER UPDATE ON pantry_products FOR EACH ROW
-        BEGIN UPDATE pantry_products SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
-    `,
-  },
-  {
-    version: 277,
-    description: 'tasks: rotation for recurring series',
-    // Eine Serie "Muell rausbringen" haengt fuer immer an einer Person.
-    // Rotation ist eine reine Zustellungs-Entscheidung an der Folgeinstanz
-    // (die RRULE-Engine bleibt unangetastet): Modus, Pool und der Zeiger.
-    // Der Zeiger ist eine POSITION im Pool, kein Kopf: ein Mitglied, das den
-    // Pool verlaesst, verschiebt den Platz des Zeigers nicht, und die
-    // sichtbare Reihenfolge laeuft weiter (upstream #1763: "A pointer that
-    // survives"). rotation_last_user wandert als Information mit - die
-    // Reihenfolge liest es nie, genau das Lesen hat die Serie frueher beim
-    // Rauswurf still nach vorn zurueckgesetzt. Modus, Pool und Zeiger wandern
-    // als WERT auf jede Folgeinstanz (dasselbe Prinzip wie
-    // recurrence_series_id, #1603): faellt das Ursprungs-Vorkommen, traegt
-    // jede laufende Instanz ihre eigene Zuordnung weiter. Bewacht wie
-    // ueblich, damit ein zweiter Lauf auf gedrifteter Datenbank nicht
-    // scheitert.
+    description: 'user_availability: add created_at column, drop redundant user_id index (#1591)',
     up(database) {
-      const cols = database.prepare('PRAGMA table_info(tasks)').all();
-      if (!cols.some((c) => c.name === 'rotation_mode')) {
-        database.exec(`
-          ALTER TABLE tasks ADD COLUMN rotation_mode TEXT
-            CHECK (rotation_mode IS NULL OR rotation_mode IN ('round_robin'))
-        `);
-      }
-      if (!cols.some((c) => c.name === 'rotation_last_user')) {
-        database.exec('ALTER TABLE tasks ADD COLUMN rotation_last_user INTEGER REFERENCES users(id) ON DELETE SET NULL');
-      }
-      if (!cols.some((c) => c.name === 'rotation_last_position')) {
-        database.exec('ALTER TABLE tasks ADD COLUMN rotation_last_position INTEGER');
-      }
-      database.exec(`
-        CREATE TABLE IF NOT EXISTS task_rotation_pool (
-          task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          position INTEGER NOT NULL,
-          PRIMARY KEY (task_id, user_id)
-        );
-        CREATE INDEX IF NOT EXISTS idx_task_rotation_pool_order
-          ON task_rotation_pool(task_id, position);
-      `);
-    },
-  },
-  {
-    version: 278,
-    description: 'Wall displays: centrally managed night hours and screensaver options (#2436)',
-    // NULL preserves existing device-local choices until an administrator saves.
-    up: `ALTER TABLE display_accounts ADD COLUMN device_settings TEXT CHECK(device_settings IS NULL OR json_valid(device_settings));`,
-  },
-  {
-    version: 279,
-    description: 'tasks: external_rrule keeps the recurrence rule another app owns',
-    // #2506/#2515: eine in iOS Erinnerungen oder Tasks.org angelegte Serie kam
-    // als Einmal-Aufgabe an. Hakte Yuvomi sie ab, ging STATUS:COMPLETED auf den
-    // Master mit der RRULE, und die besitzende App beendete die ganze Serie.
-    // Die Spalte haelt die fremde Regel woertlich fest (der Inbound schreibt
-    // sie bei jedem Abruf, NULL ohne Regel oder bei Yuvomis eigener). Solange
-    // sie steht, sperren die Routen das Abhaken und der Push schickt nie
-    // COMPLETED auf diesen Master. Reines SQL, damit der Testspiegel
-    // (db-schema-test.js) sie fuehren kann; eine gedriftete Datenbank ohne die
-    // Spalte heilt reconcileCriticalSchema.
-    up: `ALTER TABLE tasks ADD COLUMN external_rrule TEXT;`,
-  },
-  {
-    version: 280,
-    description: 'Shopping: purchase price history (#1003)',
-    // A PURCHASE HISTORY IS A RECORD OF FACTS (#1003). When a priced item is
-    // ticked off or cleared, a purchase entry is written with the item name,
-    // price in cents, shop reference, and date. Names match ignoring case
-    // (COLLATE NOCASE). shopping_item_id keeps uniqueness while on the list
-    // and turns to NULL when cleared, preserving the history row forever.
-    up: `
-      CREATE TABLE IF NOT EXISTS shopping_purchases (
-        id               INTEGER PRIMARY KEY AUTOINCREMENT,
-        item_name        TEXT    NOT NULL,
-        price_cents      INTEGER NOT NULL CHECK(price_cents >= 0),
-        store_id         INTEGER REFERENCES shopping_stores(id) ON DELETE SET NULL,
-        shopping_item_id INTEGER REFERENCES shopping_items(id) ON DELETE SET NULL,
-        purchased_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-        created_at       TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_shopping_purchases_name_date
-        ON shopping_purchases(item_name COLLATE NOCASE, purchased_at DESC, id DESC);
-
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_purchases_item
-        ON shopping_purchases(shopping_item_id)
-        WHERE shopping_item_id IS NOT NULL;
-    `,
-  },
-  {
-    version: 281,
-    description: 'calendar_events: provider_status keeps a cancellation the provider reports',
-    // #2499: ein Termin, den der Anbieter per STATUS:CANCELLED absagt, aber
-    // stehen laesst, kam ueber ICS-Abo, CalDAV und iCloud als normaler Termin
-    // an und erinnerte weiter. Die Spalte gehoert dem Anbieter (der Inbound
-    // schreibt sie bei jedem Abruf, auch zurueck auf CONFIRMED oder NULL);
-    // lokal angelegte Termine bleiben NULL. Reines SQL fuer den Testspiegel
-    // (db-schema-test.js); eine gedriftete Datenbank heilt
-    // reconcileCriticalSchema.
-    up: `ALTER TABLE calendar_events ADD COLUMN provider_status TEXT CHECK(provider_status IS NULL OR provider_status IN ('TENTATIVE', 'CONFIRMED', 'CANCELLED'));`,
-  },
-  {
-    version: 282,
-    description: 'rewards: late completion decay audit fields',
-    // Spaeterledigung mit Punkteabzug (Haushalt opt-in): ist
-    // `tasks_late_decay_enabled` auf '1', verbucht awardForCompletion() pro
-    // Ueberfaelligkeitstag einen Punkt weniger, mindestens bleibt 1 - eine
-    // Erledigung lohnt immer. Die Ledger-Zeile haelt fest, was die Rechnung
-    // war: `decay_days` (Tage ueber der Faelligkeit) und `base_points`
-    // (Punktwert vor dem Abzug), damit die Oberflaeche Grundwert und Abzug
-    // zeigen kann und die Buchung auch bei spaeterer Aenderung von Faelligkeit
-    // oder Punktwert erklaerbar bleibt. Ohne Abzug bleiben beide NULL.
-    up(database) {
-      const cols = database.prepare('PRAGMA table_info(reward_ledger)').all();
-      if (!cols.some((c) => c.name === 'decay_days')) {
-        database.exec('ALTER TABLE reward_ledger ADD COLUMN decay_days INTEGER');
-      }
-      if (!cols.some((c) => c.name === 'base_points')) {
-        database.exec('ALTER TABLE reward_ledger ADD COLUMN base_points INTEGER');
-      }
+      database.exec(`ALTER TABLE user_availability ADD COLUMN created_at TEXT`);
+      database.exec(`UPDATE user_availability SET created_at = set_at WHERE created_at IS NULL`);
+      database.exec(`DROP INDEX IF EXISTS idx_user_availability_user`);
     },
   },
 ];
@@ -12382,16 +12183,6 @@ const CRITICAL_COLUMNS = [
   // D#2330: v273 traegt den Feed-Stand nach; ohne die Spalte scheitert jeder
   // ICS-Sync (er schreibt sie) und jeder Reset (er liest sie).
   { table: 'calendar_events', column: 'feed_original', type: 'TEXT' },
-  // #2506: v279 traegt die fremde Serienregel nach; ohne die Spalte scheitert
-  // jeder VTODO-Abruf (der Upsert schreibt sie). Kein Nachtrag: NULL ist der
-  // Stand, mit dem die Migration beginnt, der naechste Abruf fuellt sie.
-  { table: 'tasks', column: 'external_rrule', type: 'TEXT' },
-  // #2499: v281 traegt die Absage des Anbieters nach; ohne die Spalte scheitert
-  // jeder Kalender-Abruf (der Upsert schreibt sie) und jede Erinnerung (der
-  // Filter liest sie). Kein Nachtrag: NULL heisst "nicht abgesagt", der
-  // naechste Abruf fuellt sie.
-  { table: 'calendar_events', column: 'provider_status',
-    type: "TEXT CHECK(provider_status IS NULL OR provider_status IN ('TENTATIVE', 'CONFIRMED', 'CANCELLED'))" },
 ];
 
 /**
@@ -12740,9 +12531,6 @@ function unreadableBackupError(encrypted, cause) {
         cause
       );
     }
-    // Ohne Grund (#1909): die Ursache steht nur im Stack, und den schreibt die
-    // Route nur fuer Fehler ohne `reason` ins Log - die Seite zeigt dazu den
-    // allgemeinen Satz, der auf das Server-Log zeigt.
     return new Error('Backup file is not a valid Yuvomi database.', { cause });
   }
   if (code === 'SQLITE_NOTADB') return undecryptableBackupError(cause);
@@ -12868,17 +12656,16 @@ function validateBackupFile(sourcePath) {
       WHERE type = 'table' AND name = 'schema_migrations'
     `).get();
     if (!row) {
-      throw restoreError('Backup file is not a valid Yuvomi database.', 'backup_not_yuvomi');
+      throw new Error('Backup file is not a valid Yuvomi database.');
     }
     // Backup aus einer neueren Yuvomi-Version: ablehnen, bevor irgendetwas
     // kopiert wird. Eingespielt liefe diese App stumm gegen ein Schema, das
     // sie nicht kennt; der richtige erste Schritt ist das Update.
     const unknown = unknownMigrationVersions(candidate);
     if (unknown.length > 0) {
-      throw restoreError(
+      throw new Error(
         `Backup was written by a newer Yuvomi (schema v${unknown[unknown.length - 1]}; this ` +
-        `version knows up to v${latestKnownVersion()}). Update Yuvomi first, then restore.`,
-        'backup_newer_version'
+        `version knows up to v${latestKnownVersion()}). Update Yuvomi first, then restore.`
       );
     }
     return candidate.prepare('SELECT MAX(version) AS version FROM schema_migrations').get()?.version ?? 0;
@@ -13141,30 +12928,6 @@ async function waitForQuietOrGiveUp() {
     + 'so the restore did not start. Nothing on this instance was changed. Try again in a moment.',
     'restore_busy'
   );
-}
-
-/**
- * Die Verbindung zum Prozessende schliessen (SIGTERM/SIGINT, server/index.js).
- *
- * Wartet wie der Restore auf laufende Backups, Jobs und zugelassene Anfragen,
- * hoechstens bis `deadline`, checkpointet das Journal und schliesst. Erst das
- * Schliessen raeumt `-wal` und `-shm` weg. Ein Job, der die Frist reisst, wird
- * mit dem Prozess abgebrochen wie zuvor beim SIGKILL - seine Transaktionen sind
- * synchron und damit schon ganz geschrieben oder gar nicht.
- *
- * Waehrend eines Restores bleibt die Verbindung, wie sie ist: der Restore haelt
- * sie selbst, und ein Abbruch mittendrin ist mit Arbeitsdatei und Rollback-Kopie
- * schon abgefangen (#1431).
- * @param {number} deadline Zeitpunkt in ms
- * @returns {Promise<boolean>} `true`, wenn nichts mehr lief und die Verbindung zu ist
- */
-async function closeForShutdown(deadline) {
-  const quiet = await waitUntilIdle(() => [...activeBackups, ...activeWriters()], deadline);
-  if (restoreRunning || !db) return false;
-  try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
-  db.close();
-  db = null;
-  return quiet;
 }
 
 /** Laeuft gerade ein Restore? Fuer `restoreWriteGate`. */
@@ -13755,4 +13518,4 @@ if (globalThis[CHECK_ONLY_HANDSHAKE] !== true) {
   }
 }
 
-export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, checkBackupFile, isRestoreRunning, isDatabaseOpen, closeForShutdown, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, adoptOrphanPantryBatches, _setTestDatabase, _resetTestDatabase };
+export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, checkBackupFile, isRestoreRunning, isDatabaseOpen, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, adoptOrphanPantryBatches, _setTestDatabase, _resetTestDatabase };

@@ -1699,7 +1699,7 @@
       long_q5:'Is there an app in the store?', long_k5:'No, and you do not need one.', long_a5:'Yuvomi is a web app that installs from the browser: open it on the phone, choose “Add to Home Screen” (on an iPhone from the share menu), and it starts full screen like any other app. Reminders arrive as push notifications even while it is closed; for that your server needs HTTPS. Updates come with the server, so every phone is on the same version without a store review in between.',
       long_q6:'Does it work without signal?', long_k6:'For reading, yes.', long_a6:'Calendar, tasks, the shopping list, contacts and the overview keep the state your phone last loaded, so the list stays readable in the supermarket basement, with a strip at the top saying it is the saved state. Changes need a connection again: ticking something off while offline is refused with a note instead of being lost silently. A device signed out remotely loses offline access once it is back online, at the latest when its session expires. A wall tablet keeps showing its lists for up to 72 hours without contact with your server, also after a restart.',
       long_q7:'Do I still need my CalDAV or Nextcloud server?', long_k7:'Only if you want to keep using it.', long_a7:'Yuvomi keeps everything in its own database and runs fine on its own. It is not a CalDAV server itself, though: it syncs with yours, events both ways, tasks and shopping items through CalDAV reminders, and contacts it fetches over CardDAV. So if you want to keep editing in Apple Calendar or Thunderbird, keep the server and let Yuvomi sync with it; to just see the family calendar elsewhere, its ICS feed is enough. Nextcloud also works as WebDAV storage for documents and backups.',
-      long_q8:'Does it work with Home Assistant?', long_k8:'Yes: it runs as an app in Home Assistant itself and talks to it through open interfaces.', long_a8:'Calendar, waste collection and birthdays come as ICS feeds that Home Assistant’s Remote Calendar reads. Reminders can go to a webhook, and everything else is in the documented REST API, with tokens you can limit to single modules, read or write. On Home Assistant OS, Yuvomi itself installs as an app from its own repository. There is no official integration with entities of its own.',
+      long_q8:'Does it work with Home Assistant?', long_k8:'Yes, through open interfaces rather than a plugin.', long_a8:'Calendar, waste collection and birthdays come as ICS feeds that Home Assistant’s Remote Calendar reads. Reminders can go to a webhook, and everything else is in the documented REST API, with tokens you can limit to single modules, read or write. There is no official integration with entities of its own.',
       long_title:'The questions worth asking first',
       alt_c_cal:'Yuvomi calendar showing appointments, tasks and birthdays for the whole household',
       jump_label:'Jump to', jump_aria:'Jump to a section',
@@ -1802,7 +1802,7 @@
       plat_desc:"Yuvomi comes as a Docker container: one packaged program that runs the same on any home server or NAS.",
       plat_docker:'Pre-built image, one <code>compose</code> command - or rootless with Podman on RHEL, Fedora and CentOS Stream.',
       tb_out_proof:'What the site itself stores', tb_out_code:'The update check in the source',
-      plat_more:'On Proxmox it runs in a <a href="install.html#proxmox">Debian container or a VM</a>, on Home Assistant OS <a href="install.html#homeassistant">as an app next to Home Assistant</a>. Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.', plat_start:'Start here', plat_guide_docker:'Docker guide', plat_cta:'Every way, step by step: the install guide', plat_ways:'More ways to install', to_top:'Back to top',
+      plat_more:'On Proxmox it runs in a <a href="install.html#proxmox">Debian container or a VM</a>. Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.', plat_start:'Start here', plat_guide_docker:'Docker guide', plat_cta:'Every way, step by step: the install guide', plat_ways:'More ways to install', to_top:'Back to top',
       cta_title:'Set it up once. <em>Then the whole family plans with it.</em>', cta_desc:'After that it belongs to the household: on every phone and on the kitchen wall, with no account with us, no subscription and nothing of ours in between.',
       /* "Get started" brach als einziger CTA die Installieren-Verbfamilie
          (nav, hero, Sprungmenue sagen alle "Install") - gleiches Ziel, gleiches
@@ -1842,7 +1842,7 @@
       long_q5:'Gibt es eine App im Store?', long_k5:'Nein, und ihr braucht auch keine.', long_a5:'Yuvomi ist eine Web-App, die sich aus dem Browser installiert: auf dem Handy öffnen, „Zum Home-Bildschirm“ wählen (auf dem iPhone über das Teilen-Menü), dann startet sie im Vollbild wie jede andere App. Erinnerungen kommen als Push-Benachrichtigung, auch wenn sie geschlossen ist; dafür braucht euer Server HTTPS. Updates kommen mit dem Server, jedes Handy ist also auf demselben Stand, ohne Store-Prüfung dazwischen.',
       long_q6:'Funktioniert es ohne Netz?', long_k6:'Zum Lesen ja.', long_a6:'Kalender, Aufgaben, Einkaufsliste, Kontakte und die Übersicht behalten den Stand, den euer Handy zuletzt geladen hat, die Liste bleibt also auch im Supermarktkeller lesbar, mit einem Streifen oben, der sagt, dass es der gespeicherte Stand ist. Änderungen brauchen wieder eine Verbindung: Abhaken ohne Netz lehnt Yuvomi mit einem Hinweis ab, statt es still zu verlieren. Ein aus der Ferne abgemeldetes Gerät verliert den Offline-Zugriff, sobald es wieder online ist, spätestens mit dem Ablauf der Sitzung. Ein Wandtablet zeigt seine Listen bis zu 72 Stunden ohne Kontakt zu eurem Server, auch nach einem Neustart.',
       long_q7:'Braucht es den CalDAV- oder Nextcloud-Server noch?', long_k7:'Nur, wenn ihr ihn weiter nutzen wollt.', long_a7:'Yuvomi hält alles in seiner eigenen Datenbank und läuft auch ganz für sich. Ein CalDAV-Server ist es selbst aber nicht: Es gleicht sich mit eurem ab, Termine in beide Richtungen, Aufgaben und Einkauf über CalDAV-Erinnerungen, Kontakte holt es per CardDAV. Wer also weiter im Apple-Kalender oder in Thunderbird bearbeiten will, behält den Server und lässt Yuvomi abgleichen; um den Familienkalender woanders nur zu sehen, reicht sein ICS-Feed. Nextcloud taugt außerdem als WebDAV-Ablage für Dokumente und Backups.',
-      long_q8:'Funktioniert es mit Home Assistant?', long_k8:'Ja: Es läuft als App in Home Assistant selbst und spricht über offene Schnittstellen mit ihm.', long_a8:'Kalender, Müllabfuhr und Geburtstage gibt es als ICS-Feeds, die der Remote Calendar von Home Assistant liest. Erinnerungen können an einen Webhook gehen, und alles andere steckt in der dokumentierten REST-API, mit Tokens, die sich auf einzelne Module beschränken lassen, lesend oder schreibend. Auf Home Assistant OS installiert sich Yuvomi selbst als App aus einem eigenen Repository. Eine offizielle Integration mit eigenen Entitäten gibt es nicht.',
+      long_q8:'Funktioniert es mit Home Assistant?', long_k8:'Ja, über offene Schnittstellen statt über ein Plugin.', long_a8:'Kalender, Müllabfuhr und Geburtstage gibt es als ICS-Feeds, die der Remote Calendar von Home Assistant liest. Erinnerungen können an einen Webhook gehen, und alles andere steckt in der dokumentierten REST-API, mit Tokens, die sich auf einzelne Module beschränken lassen, lesend oder schreibend. Eine offizielle Integration mit eigenen Entitäten gibt es nicht.',
       long_title:'Die Fragen, die man vorher stellen sollte',
       alt_c_cal:'Yuvomi-Kalender mit Terminen, Aufgaben und Geburtstagen des ganzen Haushalts',
       jump_label:'Springen zu', jump_aria:'Springen zu einem Abschnitt',
@@ -1942,7 +1942,7 @@
       plat_desc:'Yuvomi kommt als Docker-Container: ein fertig verpacktes Programm, das auf jedem Heimserver und jedem NAS gleich läuft.',
       plat_docker:'Fertiges Image, ein <code>compose</code>-Befehl - oder rootless mit Podman auf RHEL, Fedora und CentOS Stream.',
       tb_out_proof:'Was die Website selbst speichert', tb_out_code:'Die Versionsprüfung im Quelltext',
-      plat_more:'Auf Proxmox läuft es in einem <a href="install.html#proxmox">Debian-Container oder einer VM</a>, auf Home Assistant OS <a href="install.html#homeassistant">als App neben Home Assistant</a>. Zwei weitere Wege brauchen keine eigene Plattform: der <a href="install.html#installer">geführte Web-Installer</a> und die <a href="install.html#source">Installation aus dem Quelltext</a>.', plat_start:'Hier starten', plat_guide_docker:'Docker-Anleitung', plat_cta:'Jeder Weg Schritt für Schritt: die Installationsanleitung', plat_ways:'Weitere Wege', to_top:'Nach oben',
+      plat_more:'Auf Proxmox läuft es in einem <a href="install.html#proxmox">Debian-Container oder einer VM</a>. Zwei weitere Wege brauchen keine eigene Plattform: der <a href="install.html#installer">geführte Web-Installer</a> und die <a href="install.html#source">Installation aus dem Quelltext</a>.', plat_start:'Hier starten', plat_guide_docker:'Docker-Anleitung', plat_cta:'Jeder Weg Schritt für Schritt: die Installationsanleitung', plat_ways:'Weitere Wege', to_top:'Nach oben',
       cta_title:'Einmal einrichten. <em>Dann plant die ganze Familie mit.</em>', cta_desc:'Danach gehört es dem Haushalt: auf jedem Handy und an der Küchenwand, ohne Konto bei uns, ohne Abo und ohne etwas von uns dazwischen.',
       cta_install:'Yuvomi installieren', cta_family:'Was die Familie davon hat',
       footer_heart:'Mit Sorgfalt gemacht für Haushalte, die ihre Daten zu Hause behalten.',
@@ -2596,7 +2596,7 @@
         </div>
         <div class="yours-sub reveal">
         <p class="sec-desc" data-t="yours_desc">No account with us, no subscription, no ads and no premium tier that locks half the app away. It runs on a computer in your home and keeps running there.</p>
-        <p class="yours-ver"><span data-t="yours_latest">Latest release</span> <b>v2.85.0</b><span class="yours-date" data-released="2026-11-04">4 November 2026</span><a href="https://github.com/ulsklyc/yuvomi/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-t="yours_changelog">What changed</a></p>
+        <p class="yours-ver"><span data-t="yours_latest">Latest release</span> <b>v2.83.0</b><span class="yours-date" data-released="2026-10-29">29 October 2026</span><a href="https://github.com/ulsklyc/yuvomi/blob/main/CHANGELOG.md" target="_blank" rel="noopener" data-t="yours_changelog">What changed</a></p>
         </div>
       </div>
       <dl class="yours-list">
@@ -2701,8 +2701,8 @@
       <div class="long-item reveal">
         <dt data-t="long_q8">Does it work with Home Assistant?</dt>
         <dd>
-          <p class="long-core" data-t="long_k8">Yes: it runs as an app in Home Assistant itself and talks to it through open interfaces.</p>
-          <details class="long-more"><summary><span data-t="long_more">The full answer</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><p data-t="long_a8">Calendar, waste collection and birthdays come as ICS feeds that Home Assistant’s Remote Calendar reads. Reminders can go to a webhook, and everything else is in the documented REST API, with tokens you can limit to single modules, read or write. On Home Assistant OS, Yuvomi itself installs as an app from its own repository. There is no official integration with entities of its own.</p></details>
+          <p class="long-core" data-t="long_k8">Yes, through open interfaces rather than a plugin.</p>
+          <details class="long-more"><summary><span data-t="long_more">The full answer</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary><p data-t="long_a8">Calendar, waste collection and birthdays come as ICS feeds that Home Assistant’s Remote Calendar reads. Reminders can go to a webhook, and everything else is in the documented REST API, with tokens you can limit to single modules, read or write. There is no official integration with entities of its own.</p></details>
         </dd>
       </div>
     </dl>
@@ -2714,8 +2714,7 @@
      eine Reihe kleiner Kapseln fuer die drei Kataloge mit einem Klick; Proxmox
      ist ein Satz mit Link, weil es dort den Docker-Weg in einer VM oder einem
      LXC faehrt. Zusammen mit dem gefuehrten Installer und dem Quelltext sind es
-     die acht Tabs von install.html (Home Assistant steht im
-     Proxmox-Satz). Der Steckbrief (Image, Bedarf,
+     weiter die sieben Tabs von install.html. Der Steckbrief (Image, Bedarf,
      Volumes, Daten) steht hinter einer Klappe: die Seite soll beim Schluss-CTA
      enden, nicht im Datenblatt. Die Outbound-Zeile wohnt seit S1 in "Gehoert
      euch". Der Satz ueber die eine Person, die einrichtet, beantwortet die
@@ -2750,7 +2749,7 @@
              "Weitere Wege". install.html bleibt die vollstaendige Quelle. -->
         <details class="plat-ways">
           <summary><span data-t="plat_ways">More ways to install</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></summary>
-          <p class="plat-more" data-t="plat_more">On Proxmox it runs in a <a href="install.html#proxmox">Debian container or a VM</a>, on Home Assistant OS <a href="install.html#homeassistant">as an app next to Home Assistant</a>. Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.</p>
+          <p class="plat-more" data-t="plat_more">On Proxmox it runs in a <a href="install.html#proxmox">Debian container or a VM</a>. Two more routes need no platform of their own: the <a href="install.html#installer">guided web installer</a> and <a href="install.html#source">installing from source</a>.</p>
           <a class="plat-guide" href="install.html"><span data-t="plat_cta">Every way, step by step: the install guide</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
         </details>
       </div>
@@ -2829,7 +2828,7 @@
       </nav>
     </div>
     <div class="foot-bottom">
-      <span class="foot-meta"><span id="gh-stars-footer" data-gh-stars>★ 2.1k · </span><b>v2.85.0</b> · <span id="foot-released" data-released="2026-11-04">4 November 2026</span></span>
+      <span class="foot-meta"><span id="gh-stars-footer" data-gh-stars>★ 2.1k · </span><b>v2.83.0</b> · <span id="foot-released" data-released="2026-10-29">29 October 2026</span></span>
       <span data-t="foot_madewith">Self-hosted · No trackers · Open source</span>
     </div>
   </div>

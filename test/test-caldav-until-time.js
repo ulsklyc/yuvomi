@@ -84,9 +84,7 @@ function buildDb() {
       outbound_dirty INTEGER NOT NULL DEFAULT 0,
       outbound_attempts INTEGER NOT NULL DEFAULT 0,
       outbound_move_to TEXT,
-      external_object_url TEXT,
-      -- Absage des Anbieters (Migration 281, #2499)
-      provider_status TEXT
+      external_object_url TEXT
     );
     CREATE TABLE calendar_pending_deletions (
       -- Konto der Zeile (Migration 238, #1860)

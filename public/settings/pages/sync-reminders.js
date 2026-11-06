@@ -8,7 +8,7 @@ import {
   createStatusSummary,
 } from '/settings/components.js';
 import { withBusy } from '/utils/ux.js';
-import { errorSentence, errorSentenceWithDetail, loadErrorSentence } from '/utils/friendly-error.js';
+import { errorSentence } from '/utils/friendly-error.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { buildAssigneeMenu } from '/settings/assignee-menu.js';
 
@@ -128,7 +128,7 @@ function buildTargetSelect(account, list) {
       showToast(t('settings.reminderMapUpdated'), 'success');
     } catch (err) {
       select.value = previous ?? 'tasks';
-      showToast(errorSentence(err), 'danger');
+      showToast(err.message || t('common.errorGeneric'), 'danger');
     } finally {
       select.disabled = false;
     }
@@ -164,7 +164,7 @@ function buildReminderRow(account, list) {
         );
       } catch (err) {
         toggle.checked = !enabled;
-        showToast(errorSentence(err), 'danger');
+        showToast(err.message || t('common.errorGeneric'), 'danger');
       }
     });
   });
@@ -251,7 +251,7 @@ function renderAccount(container, account, reminderLists, refresh) {
       showToast(t('settings.reminderListsRefreshed'), 'success');
       await refresh();
     } catch (err) {
-      showToast(errorSentenceWithDetail(err, 'settings.connectionFailedDetail'), 'danger');
+      showToast(err.message || t('common.errorGeneric'), 'danger');
       refreshBtn.disabled = false;
     }
   });
@@ -274,7 +274,7 @@ async function loadAccounts(container) {
     accounts = res.data || [];
   } catch (err) {
     listEl.appendChild(createRetryState({
-      message: loadErrorSentence(err) ?? t('settings.caldavConnectionFailed'),
+      message: err.message || t('settings.caldavConnectionFailed'),
       onRetry: reload,
     }));
     return;
@@ -302,10 +302,7 @@ async function loadAccounts(container) {
         details: [lastSyncDetail(account.lastSync)],
         tone: 'warning',
       }));
-      // Der erste Abruf eines Kontos fragt den CalDAV-Server selbst nach seinen
-      // Listen (getReminderLists, #617): eine Absage ist dann seine Antwort,
-      // wie beim Aktualisieren-Knopf (#1909).
-      wrapper.appendChild(createInlineError(errorSentenceWithDetail(err, 'settings.connectionFailedDetail')));
+      wrapper.appendChild(createInlineError(err.message || t('common.errorGeneric')));
       listEl.appendChild(wrapper);
       continue;
     }
@@ -323,7 +320,7 @@ function bindSyncButton(container) {
       showToast(t('settings.reminderSyncSuccess'), 'success');
       await reloadAfterSave(() => loadAccounts(container));
     } catch (err) {
-      showToast(errorSentence(err, 'settings.reminderSyncFailed'), 'danger');
+      showToast(err.message || t('settings.reminderSyncFailed'), 'danger');
     } finally {
       syncBtn.disabled = false;
     }

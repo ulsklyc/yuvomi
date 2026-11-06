@@ -48,8 +48,7 @@ import {
   formatICSDate,
   tzLocalToUTC,
   applyDuration,
-  normalizeRecurrenceOverrides,
-  providerStatusOf
+  normalizeRecurrenceOverrides
 } from './ics-parser.js';
 
 // Historisch hier beheimatet, inzwischen in utils/ics-format.js - der Re-Export
@@ -405,20 +404,13 @@ async function testConnection(caldavUrl, username, password, { createClient } = 
 
     const calendars = await client.fetchCalendars();
     if (!calendars.length) {
-      const empty = new Error('Connected, but no calendars found.');
-      empty.code = 'caldav_no_calendars';
-      throw empty;
+      throw new Error('Connected, but no calendars found.');
     }
 
     return { ok: true, calendars };
   } catch (err) {
     log.error('Connection test failed:', err.message);
-    const failed = new Error(`CalDAV connection failed: ${err.message}`);
-    // Der eine Fall, den die App selbst kennt (#1909): der Server hat
-    // geantwortet, das Konto hat nur keine Kalender. Alles andere ist die
-    // Angabe des fremden Servers und bleibt ohne Code.
-    if (err.code === 'caldav_no_calendars') failed.code = err.code;
-    throw failed;
+    throw new Error(`CalDAV connection failed: ${err.message}`);
   }
 }
 
@@ -442,9 +434,7 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
   ).get(caldavUrl, username);
 
   if (existing) {
-    const duplicate = new Error('Account with this URL and username already exists.');
-    duplicate.code = 'caldav_account_exists';
-    throw duplicate;
+    throw new Error('Account with this URL and username already exists.');
   }
 
   // Warn if DB_ENCRYPTION_KEY not set
@@ -1157,15 +1147,8 @@ async function runSync({ createClient } = {}) {
     INSERT INTO calendar_events
       (title, description, start_datetime, end_datetime, all_day,
        location, color, external_calendar_id, external_source, recurrence_rule, tzid, calendar_ref_id, created_by,
-       external_object_url, caldav_account_id, provider_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'caldav', ?, ?, ?, ?, ?, ?, ?)
-  `);
-  // Die Absage des Anbieters (#2499), bei jedem Abruf, auch zurueck auf
-  // CONFIRMED oder NULL - sonst bliebe ein wieder zugesagter Termin stumm.
-  // Der Vergleich haelt unveraenderte Laeufe ohne Schreibvorgang.
-  const updProviderStatus = conn.prepare(`
-    UPDATE calendar_events SET provider_status = ?
-    WHERE id = ? AND provider_status IS NOT ?
+       external_object_url, caldav_account_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'caldav', ?, ?, ?, ?, ?, ?)
   `);
   // Die Serie einer neu angelegten Ausnahme (#2202), im selben Konto.
   const selSeriesRow = conn.prepare(`
@@ -1478,8 +1461,6 @@ async function runSync({ createClient } = {}) {
                 eventId = existing.id;
                 // Auf dem Server verschoben (#1377): die Erinnerungen ziehen mit.
                 if (changed) followInboundStartChange(conn, eventId, existing.start_datetime, when.dtstart);
-                const providerStatus = providerStatusOf(ev);
-                if (updProviderStatus.run(providerStatus, existing.id, providerStatus).changes > 0) changed = true;
                 // Von einem Kalender in einen anderen verschoben (#1270): die
                 // unangetastete Standard-Zuweisung zieht mit um.
                 reassignDefaultOnCalendarMove(db.get(), eventId, {
@@ -1492,7 +1473,7 @@ async function runSync({ createClient } = {}) {
                 const inserted = insEvent.run(
                   ev.summary, ev.description, ev.dtstart, ev.dtend,
                   ev.allDay ? 1 : 0, ev.location, evColor, ev.uid, ev.rrule, ev.tzid ?? null, calRefId, createdBy,
-                  obj.url ?? null, account.id, providerStatusOf(ev)
+                  obj.url ?? null, account.id
                 );
                 eventId = Number(inserted.lastInsertRowid);
                 changed = true;

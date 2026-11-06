@@ -32,7 +32,6 @@ import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
 import { popoverMenuHtml, installPopoverMenus, pageToolsMenuHtml, pageToolsActionEl, syncPopoverMenuItem, showPopoverMenuAt } from '/utils/popover-menu.js';
 import { filterButtonHtml, syncFilterButton, openFilterSheet, filterChipsHtml, personChipsHtml } from '/utils/filter-sheet.js';
 import { initials } from '/utils/initials.js';
-import { getReadableTextColor, safeHexColor } from '/utils/color.js';
 import { toggleRowHtml, formSwitchRowHtml } from '/settings/components.js';
 import { wireTablist } from '/utils/tablist.js';
 import { attachSegmentIndicator } from '/utils/segment-indicator.js';
@@ -43,7 +42,7 @@ import { zonedDateKey, zonedTimeKey } from '/utils/timezone.js';
 import { historyDayLabel } from '/utils/day-label.js';
 import {
   PRIORITIES, PRIO_ORDER, STATUSES, FILTER_STATUSES, PRIORITY_LABELS, STATUS_LABELS, statusLabel,
-  FALLBACK_CATEGORY, isArchived, formatDueDate, normalizeTagList, seriesDoneText, repeatsElsewhere,
+  FALLBACK_CATEGORY, isArchived, formatDueDate, normalizeTagList, seriesDoneText,
   catLabel as catLabelOf, catSortIndex as catSortIndexOf,
   canEditTaskDefinition as canEditTaskDefinitionFor,
 } from '/utils/task-fields.js';
@@ -472,18 +471,6 @@ async function wireSyncTarget(panel, task) {
  * (#1607: das Brett liess es weg, wer die Ansicht wechselte, erfuhr die Sperre
  * erst am abgelehnten Zug). `role="img"`, damit das `aria-label` gilt.
  */
-/**
- * Eine Serie, deren Regel eine andere App fuehrt (#2506, #2515): iOS
- * Erinnerungen oder Tasks.org. Abgehakt wird dort, sonst endete die Serie
- * (der Server sagt `task_foreign_series`). Dasselbe Zeichen wie eine Serie in
- * Yuvomi - es IST eine Serie -, das Label sagt, wo sie gefuehrt wird.
- */
-function renderForeignSeriesBadge(task) {
-  if (!repeatsElsewhere(task)) return '';
-  const label = esc(t('tasks.foreignSeries'));
-  return `<span class="due-date" role="img" aria-label="${label}" title="${label}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>`;
-}
-
 function renderLockedBadge(task) {
   if (!task.locked) return '';
   const label = esc(t('tasks.lockedBadge'));
@@ -674,7 +661,6 @@ function renderTaskCard(task, opts = {}) {
                 Marke im Budget (budget.js, `.budget-recur-mark`) macht es richtig;
                 hier standen zwei Kopien ohne Rolle (PR-Review #754). */ ''}
             ${task.is_recurring ? `<span class="due-date" role="img" aria-label="${esc(t('tasks.recurring'))}"><i data-lucide="repeat" class="icon-sm" aria-hidden="true"></i></span>` : ''}
-            ${task.is_recurring ? '' : renderForeignSeriesBadge(task)}
             ${task.document_count > 0 ? `<span class="due-date task-card__docs" role="img" aria-label="${esc(t('tasks.documentsCount', { count: task.document_count }))}"><i data-lucide="paperclip" class="icon-sm" aria-hidden="true"></i></span>` : ''}
             ${renderLockedBadge(task)}
             ${renderVisibilityBadge(task.visibility)}
@@ -1109,23 +1095,11 @@ function wireTagBadgeFilter(container) {
 }
 
 /**
- * Die Rotationsmodi einer Serie - die Werte sind das Vokabular von
- * server/services/task-rotation.js, und dabei muss es bleiben: ein eigener Name
- * hier waere beim Speichern ein 400 des Servers. Die leere Option („ohne
- * Rotation") steht nicht in dieser Liste - sie ist der Abwaehler des Feldes,
- * kein Modus. Nur die feste Reihenfolge (upstream #1763): Verteilung nach Last
- * oder Gerechtigkeit ist dort ausdruecklich ausserhalb des Rahmens.
- */
-const ROTATION_MODES = [
-  { value: 'round_robin', labelKey: 'tasks.rotationModeRoundRobin' },
-];
-
-/**
  * Was hinter „Weitere Einstellungen" des Aufgabendialogs liegt, als Hinweis
  * unter dem Aufklapper (DESIGN.md: „Weitere Einstellungen nennt, was dahinter
  * liegt"; A3 P1-2). Dieselbe Bauart wie eventAdvancedTopics() im Kalender.
  */
-function taskAdvancedTopics({ privacy = true, recurrence = false, rotation = false, reminder = false, countdown = false } = {}) {
+function taskAdvancedTopics({ privacy = true, recurrence = false, reminder = false, countdown = false } = {}) {
   const topics = [
     t('tasks.startDateLabel'),
     countdown ? t('dashboard.countdownTitle') : null,
@@ -1137,10 +1111,6 @@ function taskAdvancedTopics({ privacy = true, recurrence = false, rotation = fal
     // Nur solange sie leer hinter dem Aufklapper liegen (R16) - der Hinweis
     // nennt, was dahinter IST, nicht was dort sein koennte.
     recurrence ? t('rrule.labelRepeat') : null,
-    // Rotation reist mit der Wiederholung ein und aus (siehe
-    // renderRotationSection) - also nennt der Hinweis sie genau dann, wenn er
-    // die Wiederholung nennt.
-    rotation ? t('tasks.rotationLabel') : null,
     reminder ? t('reminders.sectionTitle') : null,
   ].filter(Boolean);
   try {
@@ -1148,115 +1118,6 @@ function taskAdvancedTopics({ privacy = true, recurrence = false, rotation = fal
   } catch {
     return topics.join(', ');
   }
-}
-
-/**
- * DER ROTATIONS-ABSCHNITT - eine Serien-Angabe, keine Aufgaben-Angabe.
- *
- * Rotation beantworten zwei Zahlen: ein Modus und ein Pool mit mindestens zwei
- * Koepfen (server/services/task-rotation.js: unter zwei Koepfen ist "Rotation"
- * dieselbe Person in anderem Kostuem, der Server antwortet mit 400). Beides
- * haengt an der Wiederholung - ohne zweite Instanz verteilt sich nichts. Der
- * Abschnitt haengt deshalb an der Wiederholungsfrage mit: er ist verborgen,
- * solange das Formular keine Regel zeigt (wireRotationGate loest ihn mit dem
- * Frequenzfeld), und ein GESETZTER Modus holt ihn zurueck - beim Bearbeiten
- * darf nichts Gesetztes versteckt sein (R16, dieselbe Regel wie beim
- * Wiederholungsfeld selbst).
- *
- * Der Pool ist eine Reihung, keine Hakenliste (upstream #1763: "An order, not
- * a set"): renderRotationPool zeigt die gesetzten Koepfe in der gespeicherten
- * Ablieferungsreihenfolge, nicht in der Reihenfolge der Mitgliederliste, und
- * jede Zeile hat die beiden Schritte hoch/runter (dieselbe Zeilenaktion wie in
- * der Kategorieverwaltung). Die Reihenfolge der Zeilen ist die Reihenfolge der
- * naechsten Abloesungen - der Hinweis sagt es, damit sie keine Entdeckung ist.
- * Der zweite Hinweis nennt die Regel, die das Formular selbst nicht zeigt:
- * die Rotation rueckt weiter, auch wenn eine andere Person abhakt (#1763).
- *
- * FEHLT DER KNOTEN GANZ (Ein-Personen-Haushalt), sendet der Absende-Pfad das
- * Feld nicht - und der Server laesst einen etwaig gespeicherten Stand in Ruhe,
- * statt ihn ueber einen nicht bedienbaren Weg zu loeschen. Deaktivierte
- * Mitglieder (#1381) zeigt der Pool nicht - der Server behaelt sie durch
- * jeden Save durch (mergeRotationPool), ihr Loeschen gibt es hier bewusst nicht.
- */
-function renderRotationSection(users = [], task = null) {
-  if (users.length < 2) return '';
-  // Ein Bestandswert ausserhalb der Liste faellt auf „ohne" zurueck - wie das
-  // Statusfeld oben: der Browser wuerde sonst die erste Option zeigen, waehrend
-  // die Zusammenfassung den alten Wert nennt.
-  const mode = ROTATION_MODES.some((m) => m.value === task?.rotation_mode) ? task.rotation_mode : '';
-  const pool = Array.isArray(task?.rotation_pool) ? task.rotation_pool.map(Number) : [];
-  const shown = !!task?.recurrence_rule || !!mode;
-  const modeOptions = [
-    { value: '', label: t('tasks.rotationModeNone') },
-    ...ROTATION_MODES.map((m) => ({ value: m.value, label: t(m.labelKey) })),
-  ].map((o) =>
-    `<option value="${o.value}" ${mode === o.value ? 'selected' : ''}>${o.label}</option>`
-  ).join('');
-  return `
-      <div class="form-group" id="task-rotation-section"${shown ? '' : ' hidden'}>
-        <label class="label" for="task-rotation-mode">${t('tasks.rotationLabel')}</label>
-        <select class="input" id="task-rotation-mode" name="rotation_mode">${modeOptions}</select>
-        <!-- Der Pool steht unter seinem Modus, nicht daneben: ohne Modus ist er
-             unbedienbar (welche Reihenfolge sollte man ohne Rotation schon
-             pflegen?), und ein Feld, das man nicht braucht, ist ein Feld zu viel. -->
-        <div id="task-rotation-pool"${mode ? '' : ' hidden'}>
-          ${renderRotationPool(users, pool)}
-          <p class="task-field-hint">${t('tasks.rotationPoolHint')}</p>
-          <p class="task-field-hint">${t('tasks.rotationAdvancesHint')}</p>
-        </div>
-      </div>`;
-}
-
-/**
- * Der Pool-Editor: gesetzte Koepfe zuerst, in gespeicherter Ablieferungs-
- * reihenfolge, dann die uebrigen Mitglieder. Dieselben Bausteine wie das
- * Personen-Picker-Muster (Scheibe, Kaestchen, `data-ms-input` - der Absende-
- * Pfad liest die Auswahl unveraendert in DOM-Reihenfolge), dazu pro Zeile die
- * zwei Schritte hoch/runter als geteilte Zeilenaktion (`.row-action`, wie in
- * der Kategorieverwaltung). Am oberen und unteren Rand der gesetzten Reihung
- * ist der jeweilige Schritt deaktiviert - es gibt nichts vorbei.
- */
-function renderRotationPool(users = [], pool = []) {
-  const poolIds = [...new Set(pool)];
-  const poolSet = new Set(poolIds);
-  const ordered = [
-    ...poolIds.map((id) => users.find((u) => u.id === id)).filter(Boolean),
-    ...users.filter((u) => !poolSet.has(u.id)),
-  ];
-  const checkedTotal = ordered.filter((u) => poolSet.has(u.id)).length;
-  let checkedSeen = 0;
-  const items = ordered.map((u) => {
-    const checked = poolSet.has(u.id);
-    const ordinal = checked ? checkedSeen++ : -1;
-    const inner = u.avatar_data
-      ? `<img src="${esc(u.avatar_data)}" alt="${esc(u.display_name ?? '')}" loading="lazy">`
-      : esc(initials(u.display_name));
-    const move = (dir, labelKey, disabled) => `
-        <button type="button" class="row-action rotation-pool__move" data-rotation-move="${dir}" data-user-id="${u.id}"
-                aria-label="${esc(t(labelKey, { name: u.display_name ?? '' }))}"${disabled ? ' disabled' : ''}>
-          <i data-lucide="chevron-${dir}" class="icon-md" aria-hidden="true"></i>
-        </button>`;
-    return `
-      <li class="rotation-pool__item" data-rotation-row data-user-id="${u.id}">
-        <label class="user-ms__option rotation-pool__pick">
-          <input type="checkbox" class="user-ms__checkbox" value="${u.id}"${checked ? ' checked' : ''}
-                 data-ms-input="task_rotation">
-          <span class="user-ms__avatar" style="background-color:${safeHexColor(u.avatar_color)};color:${getReadableTextColor(safeHexColor(u.avatar_color))}">
-            ${inner}
-          </span>
-          <span class="user-ms__name">${esc(u.display_name ?? '')}</span>
-        </label>
-        <span class="rotation-pool__moves">
-          ${move('up', 'tasks.rotationMoveUp', !checked || ordinal === 0)}
-          ${move('down', 'tasks.rotationMoveDown', !checked || ordinal === checkedTotal - 1)}
-        </span>
-      </li>`;
-  });
-  return `
-    <div class="user-ms" data-ms-name="task_rotation">
-      <label class="label">${t('tasks.rotationPoolLabel')}</label>
-      <ol class="rotation-pool__list">${items.join('')}</ol>
-    </div>`;
 }
 
 function renderModalContent({ task = null, users = [], reminder = null } = {}) {
@@ -1357,19 +1218,12 @@ function renderModalContent({ task = null, users = [], reminder = null } = {}) {
     expandsFromStart: false,
   });
   const reminderHtml = renderReminderSection(task, reminder);
-  // Rotation und Wiederholung sind ein Paar: derselbe Platz, dasselbe Ein- und
-  // Ausklappen (renderRotationSection erklaert die Regel).
-  const rotationHtml = renderRotationSection(users, task);
   const recurrenceTucked = !task?.recurrence_rule;
   const reminderTucked = !reminder && reminderHtml !== '';
   const advancedHint = taskAdvancedTopics({
     countdown: !task?.countdown,
     privacy: !hidesPrivacyControls('tasks'),
     recurrence: recurrenceTucked,
-    // Nur wenn der Abschnitt wirklich existiert (R16): der Hinweis nennt, was
-    // dahinter IST - im Ein-Personen-Haushalt baut renderRotationSection kein
-    // Feld, also darf die Zeile auch keines versprechen.
-    rotation: recurrenceTucked && rotationHtml !== '',
     reminder: reminderTucked,
   });
 
@@ -1492,7 +1346,7 @@ ${syncTargetFieldHtml(task)}
         label: t('tasks.documentsLabel'),
       })}
 ${countdownTucked ? `<div class="task-form__tucked">${countdownHtml}</div>` : ''}
-${recurrenceTucked ? `<div class="task-form__tucked">${recurrenceHtml}${rotationHtml}</div>` : ''}
+${recurrenceTucked ? `<div class="task-form__tucked">${recurrenceHtml}</div>` : ''}
 ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`;
 
   return `
@@ -1583,7 +1437,7 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
 
       ${advancedSection(advancedFieldsHtml, { label: advancedLabel, hint: advancedHint })}
 
-      ${recurrenceTucked ? '' : `${recurrenceHtml}${rotationHtml}`}
+      ${recurrenceTucked ? '' : recurrenceHtml}
 
       ${reminderTucked ? '' : reminderHtml}
 
@@ -2123,7 +1977,7 @@ function acknowledgeStatusToggle(container, taskId, nextStatus, answer, before =
 /**
  * Was die Quittung von einer Aufgabe braucht, gelesen VOR dem Statuswechsel:
  * Titel und die offenen Teilaufgaben, die man sehen darf.
- * @returns {{ title: string, recurring: boolean, foreignSeries: boolean, openSubtaskIds: number[] } | null}
+ * @returns {{ title: string, recurring: boolean, openSubtaskIds: number[] } | null}
  */
 function taskSnapshot(taskId) {
   const task = state.tasks.find((x) => String(x.id) === String(taskId));
@@ -2132,7 +1986,6 @@ function taskSnapshot(taskId) {
   return {
     title: task.title,
     recurring: Boolean(task.is_recurring),
-    foreignSeries: repeatsElsewhere(task),
     openSubtaskIds: subs.filter((sub) => sub && sub.status !== 'done' && sub.id != null).map((sub) => sub.id),
   };
 }
@@ -2421,27 +2274,19 @@ function reminderRemindAtFromForm(form, { dueDate, dueTime = null } = {}) {
 // - „Nur ich" mit mindestens einer anderen Person als dem Ersteller: die Zugewiesenen sehen den Eintrag
 //   nicht. Die Kombination bleibt erlaubt und die
 //   Zuweisung stehen - Bestandsdaten und API-Clients fuehren sie.
-function wireVisibilityWarning(panel, selectSel, msName, warnSel, privateWarnSel, creatorId = null, poolMsName = null) {
+function wireVisibilityWarning(panel, selectSel, msName, warnSel, privateWarnSel, creatorId = null) {
   const select = panel.querySelector(selectSel);
   const warn   = panel.querySelector(warnSel);
   if (!select || !warn) return;
   const privateWarn = privateWarnSel ? panel.querySelector(privateWarnSel) : null;
   const ms = panel.querySelector(`.user-ms[data-ms-name="${msName}"]`);
-  // #1763: eine Rotation rotiert die naechste Instanz an ein Pool-Mitglied -
-  // bliebe die Warnung an den aktuellen Zustaendigen haengen, warnte sie still
-  // am Fall vorbei: ein privater Plan, der an jemanden rotiert, der ihn nicht
-  // sehen kann, ist der genaue Fehlerfall. Der Pool zaehlt bei der
-  // Privat-Warnung mit; die Zuordnungs-Warnung bleibt pro Instanz (sie meint
-  // die aktuellen Zustaendigen).
-  const poolMs = poolMsName ? panel.querySelector(`.user-ms[data-ms-name="${poolMsName}"]`) : null;
   const update = () => {
     const ids = getSelectedUserIds(panel, msName).map(Number);
     warn.hidden = !(select.value === 'assignees' && ids.length === 0);
     // Wer den Eintrag angelegt hat, sieht ihn auch als „Nur ich": gezaehlt
     // werden nur die anderen. Massgeblich ist `created_by` des Eintrags, nicht
     // wer ihn gerade bearbeitet; ein neuer gehoert dem angemeldeten Konto.
-    const seen = poolMsName ? [...ids, ...getSelectedUserIds(panel, poolMsName).map(Number)] : ids;
-    const others = creatorId == null ? seen : seen.filter((id) => id !== Number(creatorId));
+    const others = creatorId == null ? ids : ids.filter((id) => id !== Number(creatorId));
     if (privateWarn) privateWarn.hidden = !(select.value === 'private' && others.length > 0);
     // Die Sichtbarkeit steht unter „Weitere Einstellungen", die Personen
     // darueber: aufklappen, nie zuklappen.
@@ -2450,7 +2295,6 @@ function wireVisibilityWarning(panel, selectSel, msName, warnSel, privateWarnSel
   };
   select.addEventListener('change', update);
   ms?.addEventListener('click', () => setTimeout(update, 0));
-  poolMs?.addEventListener('click', () => setTimeout(update, 0));
   update();
 }
 
@@ -2612,105 +2456,6 @@ function taskDocumentVisibility(panel) {
 }
 
 /**
- * Die Verdrahtung des Rotationsabschnitts. Der Abschnitt haelt seine
- * Sichtbarkeit nicht selbst - er haelt sie gar nicht, wenn die Aufgabe nie
- * wiederkehren sollte - sondern folgt dem Frequenzfeld desselben Formulars:
- *
- * - Frequenz gewaehlt  => der Abschnitt darf mitreden (noch ohne Pool: erst ein
- * Modus macht die Personenfrage zur Frage).
- * - Frequenz geraeumt  => der Abschnitt verschwindet, aber der Modus bleibt
- * stehen, wenn einer gesetzt ist: ein versehentlicher Wechsel und zurueck
- * verschluckt ihn nicht (dieselbe Regel wie der Wochentags-Haken im
- * RRULE-Baustein). Und solange ein Modus gesetzt ist, bleibt der Abschnitt
- * sichtbar - die Absende-Pruefung meldet die Kombination erst, statt sie
- * still zu loeschen.
- * - Modus gewaehlt     => der Pool tritt hervor.
- *
- * Das Frequenzfeld liegt im geteilten RRULE-Baustein; der Lauscher haengt hier,
- * weil die Frage „gibt es diese Aufgabe zweimal?" nur das Formular beantworten
- * kann, nicht der Baustein.
- */
-function wireRotationGate(panel) {
-  const section = panel.querySelector('#task-rotation-section');
-  if (!section) return;
-  const modeSelect = panel.querySelector('#task-rotation-mode');
-  const poolWrap = panel.querySelector('#task-rotation-pool');
-  // Dasselbe Dokument wie in bindRRuleEvents oben: der Dialog haengt im
-  // Dokument, nicht in einem Shadow-Tree, und das Frequenzfeld kennt nur diese
-  // eine Instanz je Formular.
-  const freqSelect = document.querySelector('#task-rrule-freq');
-  const sync = () => {
-    const hasRule = !!freqSelect?.value;
-    const hasMode = !!modeSelect?.value;
-    section.hidden = !(hasRule || hasMode);
-    if (poolWrap) poolWrap.hidden = !hasMode;
-  };
-  freqSelect?.addEventListener('change', sync);
-  modeSelect?.addEventListener('change', sync);
-  sync();
-}
-
-/** Die gesetzten Zeilen des Pool-Editors, in DOM-Reihenfolge (= Ablieferungsreihenfolge). */
-function rotationCheckedRows(listEl) {
-  return [...listEl.children].filter((li) => li.querySelector('input.user-ms__checkbox')?.checked);
-}
-
-/**
- * Eine Pool-Zeile um `delta` Plaetze innerhalb der gesetzten Reihung verschieben
- * (dieselbe Bauart wie moveTaskRow: Verschieben im DOM, der Absende-Pfad liest
- * die Reihenfolge danach unveraendert aus dem Markup). Ueber die Raender der
- * Reihung hinaus gibt es nichts - false, wenn nichts zu tun war.
- */
-function moveRotationRow(row, delta) {
-  const listEl = row.parentElement;
-  if (!listEl) return false;
-  const checked = rotationCheckedRows(listEl);
-  const idx = checked.indexOf(row);
-  const target = idx + delta;
-  if (idx === -1 || target < 0 || target >= checked.length) return false;
-  if (delta < 0) listEl.insertBefore(row, checked[target]);
-  else listEl.insertBefore(row, checked[target].nextSibling ?? null);
-  return true;
-}
-
-/** Rand-Knoepfe: oben gibt es kein hoch, unten kein runter (wie in der Kategorieverwaltung). */
-function syncRotationPoolButtons(listEl) {
-  const checked = rotationCheckedRows(listEl);
-  for (const li of listEl.children) {
-    const ordinal = checked.indexOf(li);
-    for (const dir of ['up', 'down']) {
-      const btn = li.querySelector(`[data-rotation-move="${dir}"]`);
-      if (!btn) continue;
-      const disabled = ordinal === -1 || ordinal === (dir === 'up' ? 0 : checked.length - 1);
-      if (disabled) btn.setAttribute('disabled', '');
-      else btn.removeAttribute('disabled');
-    }
-  }
-}
-
-/**
- * Die beiden Schritte pro Zeile: Klick delegation, Tausch im DOM, Rand neu.
- * Das Haerkchen aendert die Reihung nicht (Abwahl ist Aussage genug) - nur die
- * Raender wandern mit.
- */
-function wireRotationOrder(panel) {
-  const listEl = panel.querySelector('#task-rotation-pool .rotation-pool__list');
-  if (!listEl) return;
-  listEl.addEventListener('click', (e) => {
-    const btn = e.target?.closest?.('[data-rotation-move]');
-    if (!btn || btn.disabled) return;
-    const row = btn.closest('[data-rotation-row]');
-    if (!row) return;
-    if (moveRotationRow(row, btn.dataset.rotationMove === 'up' ? -1 : 1)) vibrate(15);
-    syncRotationPoolButtons(listEl);
-  });
-  listEl.addEventListener('change', (e) => {
-    if (e.target?.matches?.('.user-ms__checkbox')) syncRotationPoolButtons(listEl);
-  });
-  syncRotationPoolButtons(listEl);
-}
-
-/**
  * @param {HTMLElement} panel
  * @param {{task?: object|null, container?: HTMLElement|null,
  *          onChanged?: () => (void|Promise<void>)}} opts
@@ -2724,14 +2469,8 @@ function wireTaskForm(panel, { task = null, container = null, onChanged = () => 
   // RRULE-Events binden
   bindRRuleEvents(document, 'task');
   bindUserMultiSelect(panel, 'task_assigned');
-  // Der Pool ist dieselbe Personenauswahl wie die Zustaendigen; seine Kaestchen
-  // brauchen keine Bindung - ohne „Niemand"-Chip tut die Checkbox genau das, was
-  // sie zeigt. Die Leere ist hier kein Zustand, sondern der Fehler, den die
-  // Absende-Pruefung nennt.
-  wireRotationGate(panel);
   wireVisibilityWarning(panel, '#task-visibility', 'task_assigned', '#task-visibility-warning', '#task-visibility-private-warning',
-    task?.created_by ?? state.currentUserId, 'task_rotation');
-  wireRotationOrder(panel);
+    task?.created_by ?? state.currentUserId);
   wireCountdownGate(panel);
 
   // Tag-Editor (#586)
@@ -3058,29 +2797,6 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   if (dueTimeRaw && !dueTime) { resetSubmit(t('calendar.invalidDate')); return; }
   body.due_time = dueTime || null;
   if (form.status) body.status = form.status.value;
-
-  /* ROTATION - dieselbe Regel wie auf dem Server (parseRotationInput in
-   * server/routes/tasks.js), vor dem Absenden: ein Modus ohne wiederkehrende
-   * Aufgabe und ein Modus mit einem Pool unter zwei Koepfen sind dort 400.
-   * Der Dialog kennt beide Bedingungen und nennt sie am Feld, das der Nutzer
-   * bedienen kann, statt die Aufgabe gegen die Absage zu schicken und auf
-   * Englisch zu beantworten (dieselbe Lehre wie beim Faelligkeitsdatum der
-   * Erinnerung).
-   *
-   * OHNE KNOTEN sendet dieses Formular nichts: dort, wo der Abschnitt nie
-  * stand (Ein-Personen-Haushalt), bleibt der gespeicherte Stand unangetastet - 
-   * das Fehlen ist keine Abwahl. */
-  const rotationModeEl = form.querySelector('#task-rotation-mode');
-  if (rotationModeEl) {
-    const rotationMode = rotationModeEl.value || null;
-    if (rotationMode && !rrule.is_recurring) { resetSubmit(t('tasks.rotationNeedsRecurring')); return; }
-    body.rotation_mode = rotationMode;
-    if (rotationMode) {
-      const rotationPool = getSelectedUserIds(form, 'task_rotation');
-      if (rotationPool.length < 2) { resetSubmit(t('tasks.rotationNeedsPool')); return; }
-      body.rotation_pool = rotationPool;
-    }
-  }
 
   // Erinnerungs-Vorbedingungen VOR dem Speichern prüfen — verhindert den
   // widersprüchlichen Zustand "Aufgabe gespeichert (Erfolgs-Toast) + roter
@@ -4438,11 +4154,6 @@ function toolsMenuItems() {
       { action: 'view-history', label: t('tasks.historyView'), icon: 'history', checked: state.viewMode === 'history', attrs: { 'data-view-choice': 'history' } },
     ],
   }, { separator: true }];
-  // DER FILTER IM MENUE, NUR IN EINEM MODUL UNTER 390px (#2425; tasks.css blendet
-  // je Breite EINEN der beiden Wege aus). Dort tragen Titel und drei Knoepfe die Zeile
-  // nicht: bei 360px bleiben "Aufgaben" 136 von 144px. Er steht vor dem
-  // Schreibenden, weil Nur-lesen (#467) ihn genauso braucht.
-  items.push({ action: 'open-filters', label: t('common.filters'), icon: 'sliders-horizontal' });
   if (!readOnly()) {
     items.push({ action: 'bulk-select', label: t('tasks.bulkSelect'), icon: 'list-checks',
       checked: state.bulkSelectMode, disabled: !isList });
@@ -4629,48 +4340,8 @@ function syncFilterSheet(panel) {
  */
 function renderFilters(container) {
   syncFilterButton(container?.querySelector?.('#tasks-filter-btn'), activeFilterCount());
-  syncFilterMenu(container);
   if (state.filterSheet && !state.filterSheet.isConnected) state.filterSheet = null;
   syncFilterSheet(state.filterSheet);
-}
-
-/**
- * Der Filter im Werkzeugmenue (#2425): Eintrag und Zahl am "...".
- *
- * Aktive Filter bleiben sichtbar (Kopfregel mobil, Regel 3): unter 390px steht
- * die Zahl am Menueknopf statt am Filterknopf und im Namen beider. Welcher Weg
- * sichtbar ist, entscheidet allein die Abfrage in tasks.css; der zugaengliche
- * Name fragt deshalb, ob die Zahl steht, statt die Schwelle zu wiederholen -
- * sonst nennte das "..." ab 390px die Zahl des Knopfs daneben ein zweites Mal.
- * Im Verlauf gibt es keinen Filter (`syncViewChrome`), also auch keinen Eintrag
- * und keine Zahl.
- */
-function syncFilterMenu(container) {
-  const toolbar = container?.querySelector?.('.tasks-toolbar');
-  const trigger = toolbar?.querySelector('.page-tools-btn');
-  if (!trigger) return;
-  const isHistory = state.viewMode === 'history';
-  const count = isHistory ? 0 : activeFilterCount();
-  const active = count ? t('common.filtersActive', { count }) : '';
-
-  const entry = toolbar.querySelector('.popover-menu__item[data-action="open-filters"]');
-  if (entry) {
-    entry.hidden = isHistory;
-    entry.querySelector('span').textContent = active || t('common.filters');
-  }
-
-  if (!trigger.querySelector('.tasks-tools-btn__count')) {
-    trigger.insertAdjacentHTML('beforeend', '<span class="page-filter-btn__count tasks-tools-btn__count" aria-hidden="true" hidden></span>');
-  }
-  const badge = trigger.querySelector('.tasks-tools-btn__count');
-  badge.hidden = count === 0;
-  badge.textContent = count ? String(count) : '';
-
-  const shown = count > 0 && getComputedStyle(badge).display !== 'none';
-  trigger.classList.toggle('tasks-tools-btn--active', count > 0);
-  const label = t('common.moreActions');
-  const name = shown ? `${label}, ${active}` : label;
-  if (trigger.getAttribute('aria-label') !== name) trigger.setAttribute('aria-label', name);
 }
 
 /**
@@ -5445,7 +5116,6 @@ function syncViewChrome(container) {
     filterBtn.disabled = false;
     filterBtn.classList.toggle('is-vacant', isHistory);
   }
-  syncFilterMenu(container);
   if (!isList) {
     state.bulkSelectMode = false;
     state.selectedTaskIds.clear();
@@ -5612,9 +5282,6 @@ function wireToolbar(container) {
       case 'bulk-tag-remove':
         runBulkAction('tag-remove', container);
         break;
-      case 'open-filters':
-        openTaskFilters(container);
-        break;
       case 'manage-categories':
         if (!readOnly()) openTaskCategoryManager(container);
         break;
@@ -5624,14 +5291,6 @@ function wireToolbar(container) {
       default:
     }
   });
-  // Die Zahl am "..." steht von Anfang an, und eine Drehung ueber die Schwelle
-  // zieht ihren Namen nach (#2425).
-  syncFilterMenu(container);
-  if (typeof ResizeObserver === 'function') {
-    const resize = new ResizeObserver(() => syncFilterMenu(container));
-    resize.observe(toolbar);
-    pageSignal?.addEventListener('abort', () => resize.disconnect(), { once: true });
-  }
 }
 
 function wireNewTaskBtn(container) {
@@ -6140,12 +5799,6 @@ function wireTaskList(container) {
     if (action === 'toggle-status') {
       const status = target.dataset.status;
       const nextStatus = status === 'done' ? 'open' : 'done';
-      // Eine fremde Serie hakt die andere App ab (#2506): kein Haken, der beim
-      // Neuladen zurueckspringt, sondern gleich der Satz, wo es geht.
-      if (nextStatus === 'done' && taskSnapshot(id)?.foreignSeries) {
-        window.yuvomi.showToast(t('tasks.errorForeignSeries'), 'default');
-        return;
-      }
       vibrate(15);
       // Beide Zustandsklassen führen, nicht nur die neue anhängen: der Knopf
       // trug sonst `--open` UND `--done` gleichzeitig (gemessen 2026-08-28),
@@ -6928,8 +6581,7 @@ export async function render(container, { user, signal } = {}) {
                 eigenen `.group-toggle`. Unter 768px steht sie als Einfachauswahl
                 im Werkzeugmenue (wie in den Dokumenten): Lupe, Filter und Menue
                 passen dann neben den Large Title, und die zweite Kopfzeile
-                entfaellt (Kopfregel mobil 1a). Unter 390px passen nur noch
-                zwei Knoepfe, der Filter steht dort ebenfalls im Menue (#2425). */ ''}
+                entfaellt (Kopfregel mobil 1a). */ ''}
           <div class="segmented segmented--icons tasks-view-toggle" id="view-toggle" role="group" aria-label="${t('tasks.viewToggleLabel')}">
             <button type="button" class="segmented__item${isKanban || isHistory ? '' : ' is-active'}" data-view="list"
                     title="${t('tasks.listView')}" aria-label="${t('tasks.listView')}" aria-pressed="${!isKanban && !isHistory}">
@@ -7143,11 +6795,6 @@ export const __test = {
   restoreGroupMode, setGroupMode, wireGroupMode,
   // Der Aufgaben-Dialog als Markup: welche Felder er zeigt und wen er anbietet.
   renderModalContent,
-  // Der Rotationsabschnitt mit seiner Verdrahtung: die Sichtbarkeit ist die
-  // halbe Antwort (nur bei wiederkehrender Aufgabe), die Verdrahtung die andere
-  // - ein Listener, den niemand anhaengt, hat dieselbe Luecke wie keine Regel.
-  renderRotationSection, renderRotationPool, moveRotationRow, wireRotationOrder,
-  wireVisibilityWarning, wireRotationGate, ROTATION_MODES,
   // Der Erinnerungs-Abschnitt einzeln, weil er einen Zustand zu BENENNEN hat,
   // den seine Auswahlliste nicht abbildet: eine Erinnerung nach der
   // Faelligkeit. Was der Abschnitt dabei sagt, ist der halbe Fix - die andere

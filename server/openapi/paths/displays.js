@@ -6,7 +6,7 @@ export function displaysPaths() {
       get: op({
         summary: 'List wall displays and their paired devices',
         tag: 'Displays',
-        description: 'Admin only. A display is a `users` row of its own kind (#1208, DECISIONS entry 4): not a household member, without a password, and unable to sign in with a username and password or through SSO. This list is the exact counterpart of the member predicate - it shows only the accounts every list of people leaves out. Each entry carries `device_settings` (null until saved, otherwise night_from/night_until, idle_seconds, show_clock and cover_photo; #2436), `show_screensaver` (whether the display may show the photo screensaver, #1766) and its devices with "last seen" and, for a revoked one, the moment it was revoked; no secret is ever returned. Beside `data` the answer carries `area_modules`: the modules a paired display reads besides the overview itself, derived from its fixed scope list.',
+        description: 'Admin only. A display is a `users` row of its own kind (#1208, DECISIONS entry 4): not a household member, without a password, and unable to sign in with a username and password or through SSO. This list is the exact counterpart of the member predicate - it shows only the accounts every list of people leaves out. Each entry carries `show_screensaver` (whether the display may show the photo screensaver, #1766) and its devices with "last seen" and, for a revoked one, the moment it was revoked; no secret is ever returned. Beside `data` the answer carries `area_modules`: the modules a paired display reads besides the overview itself, derived from its fixed scope list.',
       }),
       post: op({
         summary: 'Create a wall display',
@@ -79,7 +79,7 @@ export function displaysPaths() {
     },
     '/api/v1/displays/{id}': {
       patch: op({
-        summary: 'Manage a wall display’s night hours and screensaver',
+        summary: 'Switch the photo screensaver on or off for a wall display',
         tag: 'Displays',
         stateChanging: true,
         params: [idParam('id', 'Display ID')],
@@ -90,19 +90,8 @@ export function displaysPaths() {
             'application/json': {
               schema: {
                 type: 'object',
-                minProperties: 1,
-                anyOf: [{ required: ['show_screensaver'] }, { required: ['device_settings'] }],
+                required: ['show_screensaver'],
                 properties: {
-                  device_settings: {
-                    type: 'object', additionalProperties: false,
-                    required: ['night_from', 'night_until', 'idle_seconds', 'show_clock', 'cover_photo'],
-                    properties: {
-                      night_from: { type: 'integer', minimum: 0, maximum: 23, description: 'Start hour in household time. Must differ from night_until.' },
-                      night_until: { type: 'integer', minimum: 0, maximum: 23 },
-                      idle_seconds: { type: 'integer', enum: [60, 120, 300, 600, 900] },
-                      show_clock: { type: 'boolean' }, cover_photo: { type: 'boolean' },
-                    },
-                  },
                   show_screensaver: {
                     type: 'boolean',
                     description: 'Whether this display may show the photo screensaver. Off by default.',
@@ -112,7 +101,7 @@ export function displaysPaths() {
             },
           },
         },
-        description: 'Admin only (#1766, #2436). Supply show_screensaver, a complete device_settings object, or both. Invalid values reject the whole change with 400. Device options are returned by GET /displays and only to that tablet in GET /preferences as display_device_settings. Until first saved, device_settings is null and local tablet choices remain active. An online visible tablet checks every 30 seconds and on resume; night/idle apply then and clock/cover apply on the next screensaver start. A display changes no settings itself, so whether it shows the photo screensaver is chosen here, per display, and off by default. While it is off the display\'s requests to `/screensaver/photos` and `/screensaver/photos/{id}` are refused at the scope gate; the change applies from the tablet\'s next request. Only a real boolean is accepted.',
+        description: 'Admin only (#1766). A display changes no settings itself, so whether it shows the photo screensaver is chosen here, per display, and off by default. While it is off the display\'s requests to `/screensaver/photos` and `/screensaver/photos/{id}` are refused at the scope gate; the change applies from the tablet\'s next request. Only a real boolean is accepted.',
       }),
       delete: op({
         summary: 'Delete a wall display',
@@ -174,19 +163,7 @@ export function displaysPaths() {
   });
 }
 
-const DISPLAY_GONE = '`displays_display_not_found` (404, there is no display with this id, or it has been deleted)';
-const DEVICE_GONE = '`displays_device_not_found` (404, the device does not exist or does not belong to this display)';
-
 // #2267: der Grund, den die Route neben `error` sendet.
 const CASE_REASONS = {
   '/api/v1/displays/people': { get: '`display_only` (403, the route answers only a paired display)' },
-  // #1909: was die Seite Wandtablets unterscheidet - ein zweiter Admin hat das
-  // Tablett oder sein Geraet schon entfernt.
-  '/api/v1/displays/{id}': {
-    patch: DISPLAY_GONE,
-    delete: DISPLAY_GONE,
-  },
-  '/api/v1/displays/{id}/pairing-code': { post: DISPLAY_GONE },
-  '/api/v1/displays/{id}/devices/{deviceId}/revoke': { post: DEVICE_GONE },
-  '/api/v1/displays/{id}/devices/{deviceId}/remove': { post: DEVICE_GONE },
 };

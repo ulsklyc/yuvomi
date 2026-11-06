@@ -237,24 +237,8 @@ const MIGRATIONS_SQL = {
       expires_at   TEXT,
       revoked_at   TEXT,
       last_used_at TEXT,
-      created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-      kind         TEXT    NOT NULL DEFAULT 'integration',
-      platform     TEXT,
-      device_id    TEXT
+      created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_api_tokens_active_device
-      ON api_tokens (subject_user_id, device_id)
-      WHERE kind = 'device' AND revoked_at IS NULL;
-    CREATE TABLE IF NOT EXISTS device_pairing_codes (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      code_hash  TEXT    NOT NULL UNIQUE,
-      expires_at TEXT    NOT NULL,
-      used_at    TEXT,
-      created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_device_pairing_codes_user
-      ON device_pairing_codes(user_id);
     CREATE TRIGGER IF NOT EXISTS trg_users_updated_at
       AFTER UPDATE ON users FOR EACH ROW
       BEGIN UPDATE users SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
@@ -1597,9 +1581,6 @@ const MIGRATIONS_SQL = {
     ALTER TABLE notes ADD COLUMN locked INTEGER NOT NULL DEFAULT 0
       CHECK (locked IN (0, 1));
   `,
-  278: `ALTER TABLE display_accounts ADD COLUMN device_settings TEXT CHECK(device_settings IS NULL OR json_valid(device_settings));`,
-  279: `ALTER TABLE tasks ADD COLUMN external_rrule TEXT;`,
-  281: `ALTER TABLE calendar_events ADD COLUMN provider_status TEXT CHECK(provider_status IS NULL OR provider_status IN ('TENTATIVE', 'CONFIRMED', 'CANCELLED'));`,
 };
 
 export { MIGRATIONS_SQL };

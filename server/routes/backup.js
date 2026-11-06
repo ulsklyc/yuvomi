@@ -6,14 +6,12 @@
 
 import { untrackWriteRequest } from '../utils/restore-state.js';
 import express from 'express';
-import rateLimit from 'express-rate-limit';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { backupToFile, currentVersion, restoreFromFile } from '../db.js';
 import { requireAdmin } from '../auth.js';
 import { createLogger } from '../logger.js';
-import { secretOrigin, storedSecretPath } from '../utils/auto-secrets.js';
 import { createLocalBackup, getStatus as getSchedulerStatus, triggerBackup } from '../services/backup-scheduler.js';
 import * as webdavBackup from '../services/backup-webdav.js';
 
@@ -60,66 +58,6 @@ function backupFileName() {
   return `yuvomi-backup-${stamp}.db`;
 }
 
-/**
- * Was die Admin-Karte ueber den Datenbankschluessel wissen darf, OHNE den Wert:
- * woher er kommt und ob die Datenbank ueberhaupt verschluesselt ist.
- *
- * Einen Wert gibt es nur fuer 'stored' und 'generated' - den hat Yuvomi selbst
- * erzeugt, und der Betreiber kennt ihn sonst nirgends. Ein Wert aus Env oder
- * `_FILE` gehoert dem Betreiber und steht schon in dessen Konfiguration; ihn
- * hier zu zeigen verdoppelte nur die Stellen, an denen er abgreifbar ist.
- * `origin: null` mit Schluessel heisst: der Handschlag lief in diesem Prozess
- * nicht (server/utils/auto-secrets.js) - dann ist die Herkunft unbekannt, und
- * Unbekanntes wird nicht gezeigt.
- */
-function databaseKeyStatus() {
-  const encrypted = Boolean(process.env.DB_ENCRYPTION_KEY);
-  const origin = encrypted ? secretOrigin('DB_ENCRYPTION_KEY') : null;
-  return { origin, encrypted };
-}
-
-function databaseKeyIsRevealable({ origin, encrypted }) {
-  return encrypted && (origin === 'stored' || origin === 'generated')
-    && storedSecretPath('DB_ENCRYPTION_KEY') !== null;
-}
-
-/**
- * Schranke fuer die Schluesselanzeige. Ein ehrlicher Admin braucht sie einmal,
- * zum Sichern; zehn in zehn Minuten lassen Platz fuer Vertipper beim Kopieren
- * und halten ein Skript mit einer gekaperten Sitzung davon ab, den Wert im
- * Takt abzuholen. Je Konto gezaehlt, wie der Gravatar-Limiter in auth.js:
- * hinter einem Proxy ohne `trust proxy` teilt der Haushalt eine IP. Steht
- * HINTER `requireAdmin`, ein Mitglied verbraucht also nichts.
- */
-const databaseKeyLimiter = rateLimit({
-  windowMs: 10 * 60_000,
-  max: 10,
-  keyGenerator: (req) => `user:${req.authUserId}`,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many requests for the database key. Please wait a few minutes.', code: 429 },
-});
-
-/**
- * Schranke fuer den Download. Jeder Abruf baut eine volle Kopie der Datenbank
- * in ein tmp-Verzeichnis - Platte und CPU, so oft man klickt. Ein ehrlicher
- * Admin laedt ein paar Mal am Tag; zehn in der Stunde halten ein Skript mit
- * einer gekaperten Sitzung davon ab, den Server damit zuzuschuetten. Je Konto
- * und HINTER `requireAdmin`, aus denselben Gruenden wie oben (#2524).
- *
- * Bewusst in Kauf genommen: die Einstellungen laden per `<a href download>`,
- * ein 429 endet dort als gescheiterter Download statt als Toast - wie schon
- * ein 500. Ein fetch mit Blob hielte die ganze Datenbank im Browser.
- */
-const databaseDownloadLimiter = rateLimit({
-  windowMs: 60 * 60_000,
-  max: 10,
-  keyGenerator: (req) => `user:${req.authUserId}`,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many backup downloads. Please wait before downloading again.', code: 429 },
-});
-
 router.get('/status', requireAdmin, (req, res) => {
   const schedulerStatus = getSchedulerStatus();
   res.json({
@@ -127,41 +65,11 @@ router.get('/status', requireAdmin, (req, res) => {
       schema_version: currentVersion(),
       restore_upload_limit: RESTORE_LIMIT,
       scheduler: schedulerStatus,
-      // Nur die Herkunft, nie der Wert: der Status wird bei jedem Oeffnen der
-      // Seite geladen, der Schluessel nur auf ausdruecklichen Klick.
-      database_key: databaseKeyStatus(),
     },
   });
 });
 
-/**
- * GET /api/v1/backup/database-key
- * Der Datenbankschluessel, den Yuvomi beim ersten Start selbst erzeugt hat -
- * damit der Admin ihn neben seine Backups legen kann. Ohne ihn oeffnet sich
- * nach dem Verlust des Volumes kein Backup mehr.
- *
- * Gleiche Schwelle wie `GET /database` (keine erneute Anmeldung): wer die
- * Datenbank herunterladen darf, hat ihren Inhalt ohnehin. Ein Geraet kommt
- * nicht durch - `requireAuth` macht einen Admin dort zum Mitglied.
- */
-router.get('/database-key', requireAdmin, databaseKeyLimiter, (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  const status = databaseKeyStatus();
-  if (!databaseKeyIsRevealable(status)) {
-    return res.json({ data: status });
-  }
-  // Wer, nicht was: der Wert gehoert nie ins Log.
-  log.info(`admin ${req.authUserId} viewed the database key`);
-  res.json({
-    data: {
-      ...status,
-      key: process.env.DB_ENCRYPTION_KEY,
-      path: storedSecretPath('DB_ENCRYPTION_KEY'),
-    },
-  });
-});
-
-router.get('/database', requireAdmin, databaseDownloadLimiter, async (req, res) => {
+router.get('/database', requireAdmin, async (req, res) => {
   let tmpPath = null;
   try {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-backup-'));
@@ -196,7 +104,7 @@ router.post(
     let backupKey = null;
     try {
       if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-        return res.status(400).json({ error: 'Backup file is required.', code: 400, reason: 'backup_file_empty' });
+        return res.status(400).json({ error: 'Backup file is required.', code: 400 });
       }
       backupKey = backupKeyFromHeader(req);
 
@@ -280,7 +188,7 @@ router.put('/webdav/config', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'url must be a string.', code: 400 });
     }
     if (url && !/^https?:\/\/.+/.test(url.trim())) {
-      return res.status(400).json({ error: 'url must start with http:// or https://.', errorCode: 'url_invalid', code: 400 });
+      return res.status(400).json({ error: 'url must start with http:// or https://.', code: 400 });
     }
     if (keep !== undefined && (typeof keep !== 'number' || keep < 1)) {
       return res.status(400).json({ error: 'keep must be a positive integer.', code: 400 });
@@ -358,7 +266,7 @@ router.post('/webdav/trigger', requireAdmin, async (req, res) => {
 
 router.use((err, req, res, next) => {
   if (err?.type === 'entity.too.large') {
-    return res.status(413).json({ error: `Backup file is too large. Maximum upload size is ${RESTORE_LIMIT}.`, code: 413, reason: 'backup_file_too_large', params: { limit: String(RESTORE_LIMIT) } });
+    return res.status(413).json({ error: `Backup file is too large. Maximum upload size is ${RESTORE_LIMIT}.`, code: 413 });
   }
   next(err);
 });

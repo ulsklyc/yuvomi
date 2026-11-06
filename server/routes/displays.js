@@ -18,7 +18,6 @@
  * und es ist der einzige Aufrufer, den sie hat.
  */
 
-import { normalizeDisplayDeviceSettings, parseDisplayDeviceSettings } from '../../public/utils/display-device-settings.js';
 import crypto from 'node:crypto';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -242,7 +241,7 @@ router.use(requireAdmin);
 router.get('/', (_req, res) => {
   try {
     const rows = db.get().prepare(`
-      SELECT u.id, u.display_name, u.avatar_color, da.created_at, da.show_screensaver, da.device_settings
+      SELECT u.id, u.display_name, u.avatar_color, da.created_at, da.show_screensaver
         FROM users u
         JOIN display_accounts da ON da.user_id = u.id
        ORDER BY u.display_name
@@ -250,7 +249,6 @@ router.get('/', (_req, res) => {
     const data = rows.map((row) => ({
       ...row,
       show_screensaver: row.show_screensaver === 1,
-      device_settings: parseDisplayDeviceSettings(row.device_settings),
       devices: listDisplayDevices(row.id),
     }));
     // `area_modules` steht NEBEN der Liste, nicht in jedem Eintrag: es ist eine
@@ -305,7 +303,7 @@ router.post('/', (req, res) => {
         .run(userId, req.authUserId || null);
     })();
 
-    return res.status(201).json({ data: { id: userId, display_name: displayName, show_screensaver: false, device_settings: null, devices: [] } });
+    return res.status(201).json({ data: { id: userId, display_name: displayName, show_screensaver: false, devices: [] } });
   } catch (err) {
     log.error('POST / error:', err);
     return res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -313,8 +311,8 @@ router.post('/', (req, res) => {
 });
 
 /**
- * Central display options (#1766, #2436).
- * Body: { show_screensaver?: boolean, device_settings?: { night_from, night_until, idle_seconds, show_clock, cover_photo } }
+ * Ob dieses Display den Foto-Bildschirmschoner zeigt (#1766, Migration 244).
+ * Body: { show_screensaver: boolean }
  *
  * DIE WAHL TRIFFT EIN ADMINISTRATOR, NICHT DAS TABLETT. Ein Display aendert
  * keine Einstellungen; diese Route liegt hinter `requireAdmin` wie alles hier,
@@ -327,26 +325,14 @@ router.patch('/:id', (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
-    const body = req.body || {};
-    const hasScreensaver = Object.hasOwn(body, 'show_screensaver');
-    const hasSettings = Object.hasOwn(body, 'device_settings');
-    const settings = hasSettings ? normalizeDisplayDeviceSettings(body.device_settings) : null;
-    if (!hasScreensaver && !hasSettings) return res.status(400).json({ error: 'Provide show_screensaver or device_settings.', code: 400 });
-    if (hasScreensaver && typeof body.show_screensaver !== 'boolean') {
+    const value = req.body?.show_screensaver;
+    if (typeof value !== 'boolean') {
       return res.status(400).json({ error: 'show_screensaver must be a boolean.', code: 400 });
     }
-    if (hasSettings && !settings) return res.status(400).json({ error: 'Invalid device_settings.', code: 400 });
-    const fields = []; const values = []; const data = { id };
-    if (hasScreensaver) {
-      fields.push('show_screensaver = ?'); values.push(body.show_screensaver ? 1 : 0);
-      data.show_screensaver = body.show_screensaver;
-    }
-    if (hasSettings) {
-      fields.push('device_settings = ?'); values.push(JSON.stringify(settings)); data.device_settings = settings;
-    }
-    const result = db.get().prepare(`UPDATE display_accounts SET ${fields.join(', ')} WHERE user_id = ?`).run(...values, id);
-    if (result.changes === 0) return res.status(404).json({ error: 'Display not found.', code: 404, reason: 'displays_display_not_found' });
-    return res.json({ data });
+    const result = db.get().prepare('UPDATE display_accounts SET show_screensaver = ? WHERE user_id = ?')
+      .run(value ? 1 : 0, id);
+    if (result.changes === 0) return res.status(404).json({ error: 'Display not found.', code: 404 });
+    return res.json({ data: { id, show_screensaver: value } });
   } catch (err) {
     log.error('PATCH /:id error:', err);
     return res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -360,7 +346,7 @@ router.delete('/:id', (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     const row = db.get().prepare('SELECT 1 FROM display_accounts WHERE user_id = ?').get(id);
-    if (!row) return res.status(404).json({ error: 'Display not found.', code: 404, reason: 'displays_display_not_found' });
+    if (!row) return res.status(404).json({ error: 'Display not found.', code: 404 });
     db.get().prepare('DELETE FROM users WHERE id = ?').run(id);
     return res.json({ data: { id, deleted: true } });
   } catch (err) {
@@ -378,7 +364,7 @@ router.post('/:id/pairing-code', (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.', code: 400 });
     const row = db.get().prepare('SELECT 1 FROM display_accounts WHERE user_id = ?').get(id);
-    if (!row) return res.status(404).json({ error: 'Display not found.', code: 404, reason: 'displays_display_not_found' });
+    if (!row) return res.status(404).json({ error: 'Display not found.', code: 404 });
 
     const { code, expiresAt } = issuePairingCode(id, req.authUserId || null);
     return res.status(201).json({ data: { code, expires_at: expiresAt } });
@@ -403,7 +389,7 @@ router.post('/:id/devices/:deviceId/revoke', (req, res) => {
     // Das Geraet muss zu DIESEM Display gehoeren: sonst waere der Pfad eine
     // Verzierung und die Geraete-ID allein die Autoritaet.
     const device = db.get().prepare('SELECT id FROM display_devices WHERE id = ? AND user_id = ?').get(deviceId, id);
-    if (!device) return res.status(404).json({ error: 'Device not found.', code: 404, reason: 'displays_device_not_found' });
+    if (!device) return res.status(404).json({ error: 'Device not found.', code: 404 });
 
     revokeDisplayDevice(deviceId);
     return res.json({ data: { id: deviceId, revoked: true } });
@@ -429,7 +415,7 @@ router.post('/:id/devices/:deviceId/remove', (req, res) => {
     }
     // Wie beim Widerruf: das Geraet muss zu DIESEM Display gehoeren.
     const device = db.get().prepare('SELECT id FROM display_devices WHERE id = ? AND user_id = ?').get(deviceId, id);
-    if (!device) return res.status(404).json({ error: 'Device not found.', code: 404, reason: 'displays_device_not_found' });
+    if (!device) return res.status(404).json({ error: 'Device not found.', code: 404 });
 
     if (!removeRevokedDisplayDevice(deviceId)) {
       return res.status(409).json({

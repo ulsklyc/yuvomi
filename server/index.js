@@ -20,7 +20,7 @@ import { csrfMiddleware } from './middleware/csrf.js';
 import idempotencyMiddleware from './middleware/idempotency.js';
 import { defaultEmptyBody } from './middleware/empty-body.js';
 import { createRestoreWriteGate, trackAdmittedWrite } from './middleware/restore-gate.js';
-import { runExternalJob, waitUntilIdle } from './utils/restore-state.js';
+import { runExternalJob } from './utils/restore-state.js';
 import { createErrorHandler } from './middleware/error-handler.js';
 import { buildOpenApiSpec } from './openapi.js';
 import * as googleCalendar from './services/google-calendar.js';
@@ -37,7 +37,7 @@ import * as caldavSync from './services/caldav-sync.js';
 import * as outlookCalendar from './services/outlook-calendar.js';
 import * as carddavSync from './services/cardav-sync.js';
 import * as holidays from './services/holidays.js';
-import { startScheduler as startBackupScheduler, stopScheduler as stopBackupScheduler } from './services/backup-scheduler.js';
+import { startScheduler as startBackupScheduler } from './services/backup-scheduler.js';
 import { startScheduler as startSplitExpenseScheduler } from './services/split-expenses-scheduler.js';
 import { startRewardMoneyScheduler } from './services/reward-money-scheduler.js';
 import { startScheduler as startPushScheduler } from './services/push-scheduler.js';
@@ -75,6 +75,7 @@ import screensaverRouter from './routes/screensaver.js';
 import remindersRouter from './routes/reminders.js';
 import searchRouter from './routes/search.js';
 import familyRouter from './routes/family.js';
+import availabilityRouter from './routes/availability.js';
 import personAvatarsRouter from './routes/people.js';
 import { isPersonAvatarRead, inlineAvatarUrls } from './services/person-avatar.js';
 // ZWEI IMPORTZEILEN FUER EINE DATEI, ABSICHTLICH. `test:openapi-coverage`
@@ -88,7 +89,6 @@ import displaysRouter from './routes/displays.js';
 import { pairingRouter } from './routes/displays.js';
 import { peopleRouter } from './routes/displays.js';
 import { displayMayAct } from './display-scopes.js';
-import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
 import { DISPLAY_PASSWORD_SENTINEL } from './services/display-accounts.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
@@ -135,16 +135,6 @@ const getServiceWorkerResponse = createServiceWorkerResponseLoader(
 // nach einer sw.js-Änderung dennoch die neue Quelle ohne manuellen Neustart.
 getServiceWorkerResponse();
 const DEFAULT_APP_NAME = 'Yuvomi';
-
-// Der Vertrag fuer native Clients, als eine Zahl, die jeder vor der Anmeldung
-// lesen darf. Sie steigt nur, wenn ein Client ohne die Aenderung nicht mehr
-// arbeiten kann - nicht mit jedem Release. Ein Client vergleicht sie, statt die
-// genaue Version zu kennen: die bleibt hinter der Anmeldung, und ein zu alter
-// Server faellt auf, bevor jemand ein Passwort eintippt.
-// 0 heisst: noch kein Vertrag. 1 umfasst die angemeldeten Geraete samt
-// Kopplung (`/auth/devices`), `GET /reminders/upcoming` mit `fires_at` und die
-// 39 Operationen, die test:openapi-client-contract festhaelt.
-const CLIENT_API_VERSION = 1;
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -441,9 +431,6 @@ function buildVersionPayload(includeVersion = false) {
   }
   return {
     ...(includeVersion ? { version: APP_VERSION } : {}),
-    // Fest, anders als `app_name`, den ein Haushalt umbenennen kann.
-    product: 'yuvomi',
-    client_api: CLIENT_API_VERSION,
     app_name: appName,
     setup_required: setupRequired,
     password_reset_enabled: passwordResetEnabled,
@@ -665,12 +652,13 @@ app.use('/api/v1', trackAdmittedWrite);
 app.use('/api/v1/changelog', changelogRouter);
 app.use('/api/v1', (req, res, next) => {
   try {
-    if (!isSplitGuestAccount(db.get(), req.authUserId)) return next();
-    // Die Liste steht in server/split-guest-scope.js, weil der Auth-Router sie
-    // ebenso fragt (GHSA-q7gc-2cc9-w8fj): er haengt vor diesem Gate, eine
-    // `/auth`-Anfrage kommt hier nie an. Die frueheren Eintraege fuer
-    // `/auth/me`, `/auth/logout` und `/version` waren aus demselben Grund tot.
-    if (splitGuestMayReach(req.method, req.path)) return next();
+    const guest = db.get().prepare('SELECT 1 FROM split_expense_guest_users WHERE user_id = ?').get(req.authUserId);
+    if (!guest) return next();
+    const allowed = req.path.startsWith('/split-expenses')
+      || req.path === '/auth/me'
+      || req.path === '/auth/logout'
+      || req.path === '/version';
+    if (allowed) return next();
     return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403, reason: 'split_guest_scope' });
   } catch {
     return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403, reason: 'split_guest_scope' });
@@ -829,6 +817,7 @@ app.use('/api/v1/screensaver', screensaverRouter);
 app.use('/api/v1/reminders', remindersRouter);
 app.use('/api/v1/search', searchRouter);
 app.use('/api/v1/family', familyRouter);
+app.use('/api/v1/availability', availabilityRouter);
 app.use('/api/v1/people', personAvatarsRouter);
 // Die Personenliste fuer den Picker eines Tabletts (#1209) haengt VOR dem
 // Administrator-Router: der traegt `requireAdmin` auf dem ganzen Router, und ein
@@ -1015,61 +1004,6 @@ const server = app.listen(PORT, BIND_ADDRESS, () => {
   startRecipeProviderScheduler();
   startWasteSourceScheduler();
 });
-
-// --------------------------------------------------------
-// Sauber beenden (SIGTERM, SIGINT)
-// --------------------------------------------------------
-// Im Container laeuft dieser Prozess als PID 1, und fuer PID 1 ignoriert Linux
-// jedes Signal ohne Handler: `docker stop` und `podman stop` warteten ihre zehn
-// Sekunden ab und schickten dann SIGKILL - mitten in Anfragen, Syncs und
-// Backups, und das Journal blieb liegen. Ausserhalb eines Containers endete der
-// Prozess sofort, ebenso ohne die Datenbank zu schliessen.
-//
-// Erst hier registriert, nach dem Oeffnen der Datenbank: solange der Server auf
-// die Instanzsperre wartet (#1530), haengt `init()` synchron, und ein Handler
-// kaeme nie dran. Dort soll ein Signal weiter beenden wie bisher.
-//
-// Die Frist bleibt unter den zehn Sekunden von Docker und Podman, damit das
-// Schliessen der Datenbank auch dann noch drankommt, wenn ein Sync haengt.
-const SHUTDOWN_TIMEOUT_MS = 8_000;
-let shuttingDown = false;
-
-async function shutdown(signal) {
-  if (shuttingDown) {
-    logYuvomi.warn(`${signal} received again - exiting without waiting.`);
-    process.exit(1);
-  }
-  shuttingDown = true;
-  logYuvomi.info(`${signal} received - shutting down.`);
-  const deadline = Date.now() + SHUTDOWN_TIMEOUT_MS;
-
-  stopBackupScheduler();
-
-  // Keine neuen Verbindungen; laufende Anfragen kommen zu Ende. Eine
-  // Keep-alive-Verbindung (jeder Browser haelt eine) hielte `close()` sonst
-  // bis zu ihrem Timeout offen, auch nach ihrer letzten Antwort (gemessen:
-  // fuenf Sekunden) - deshalb wird sie zugemacht, sobald sie ruht.
-  let httpOpen = true;
-  const httpClosed = new Promise((resolve) => server.close(() => { httpOpen = false; resolve(); }));
-  server.closeIdleConnections();
-  const idleSweep = setInterval(() => server.closeIdleConnections(), 250);
-  const requestsDone = await waitUntilIdle(() => (httpOpen ? [httpClosed] : []), deadline);
-  clearInterval(idleSweep);
-  if (!requestsDone) server.closeAllConnections();
-
-  let clean = false;
-  try {
-    clean = (await db.closeForShutdown(deadline)) && requestsDone;
-  } catch (err) {
-    log.error('Closing the database failed:', err.message);
-  }
-  if (clean) logYuvomi.info('Shutdown complete.');
-  else logYuvomi.warn('Shut down before everything had finished - work still running was cut off.');
-  process.exit(0);
-}
-
-process.on('SIGTERM', () => { shutdown('SIGTERM'); });
-process.on('SIGINT', () => { shutdown('SIGINT'); });
 
 export default app;
 
