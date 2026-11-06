@@ -1511,7 +1511,11 @@
         "errorAddressEntryInvalid": "May isang address na kulang o hindi wasto.",
         "errorAddressesTooMany": "Masyadong marami ang address ng kontak na ito. Hanggang {{limit}} lang ang puwede.",
         "errorAddressLabelTooLong": "Hanggang {{limit}} na character lang ang label ng address.",
-        "errorAddressPartTooLong": "Hanggang {{limit}} na character lang ang bawat isa sa kalye, lungsod, rehiyon, postal code at bansa ng address."
+        "errorAddressPartTooLong": "Hanggang {{limit}} na character lang ang bawat isa sa kalye, lungsod, rehiyon, postal code at bansa ng address.",
+        "errorPhotoTooLarge": "Masyadong malaki ang larawan.",
+        "errorPhotoNotAnImage": "Kailangang imahe ang larawan.",
+        "errorPhotoTypeMismatch": "Hindi tugma ang larawan sa uri ng imahe na sinasabi nito.",
+        "errorPhotoUnreadable": "Hindi mabasa ang larawang ito."
     },
     "budget": {
         "title": "Badyet",

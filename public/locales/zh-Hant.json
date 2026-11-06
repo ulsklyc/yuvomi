@@ -1493,7 +1493,11 @@
         "errorAddressEntryInvalid": "其中一個地址不完整或無效。",
         "errorAddressesTooMany": "此聯絡人的地址過多，最多 {{limit}} 個。",
         "errorAddressLabelTooLong": "地址的標籤最多 {{limit}} 個字元。",
-        "errorAddressPartTooLong": "地址中的街道、城市、地區、郵遞區號和國家各自最多 {{limit}} 個字元。"
+        "errorAddressPartTooLong": "地址中的街道、城市、地區、郵遞區號和國家各自最多 {{limit}} 個字元。",
+        "errorPhotoTooLarge": "照片太大。",
+        "errorPhotoNotAnImage": "照片必須是圖片。",
+        "errorPhotoTypeMismatch": "照片與其宣告的圖片類型不符。",
+        "errorPhotoUnreadable": "無法讀取這張照片。"
     },
     "budget": {
         "title": "預算",

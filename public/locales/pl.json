@@ -1679,7 +1679,11 @@
         "errorAddressEntryInvalid": "Jeden z adresów jest niepełny lub nieprawidłowy.",
         "errorAddressesTooMany": "Ten kontakt ma zbyt wiele adresów. Maksimum to {{limit}}.",
         "errorAddressLabelTooLong": "Etykieta adresu może mieć najwyżej {{limit}} znaków.",
-        "errorAddressPartTooLong": "Ulica, miejscowość, region, kod pocztowy i kraj adresu mogą mieć każde najwyżej {{limit}} znaków."
+        "errorAddressPartTooLong": "Ulica, miejscowość, region, kod pocztowy i kraj adresu mogą mieć każde najwyżej {{limit}} znaków.",
+        "errorPhotoTooLarge": "Zdjęcie jest za duże.",
+        "errorPhotoNotAnImage": "Zdjęcie musi być obrazem.",
+        "errorPhotoTypeMismatch": "Zdjęcie nie odpowiada podanemu typowi obrazu.",
+        "errorPhotoUnreadable": "Nie można odczytać tego zdjęcia."
     },
     "budget": {
         "title": "Budżet",

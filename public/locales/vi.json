@@ -1493,7 +1493,11 @@
         "errorAddressEntryInvalid": "Một trong các địa chỉ chưa đầy đủ hoặc không hợp lệ.",
         "errorAddressesTooMany": "Liên hệ này có quá nhiều địa chỉ. Tối đa là {{limit}}.",
         "errorAddressLabelTooLong": "Nhãn của địa chỉ chỉ được dài tối đa {{limit}} ký tự.",
-        "errorAddressPartTooLong": "Đường, thành phố, vùng, mã bưu chính và quốc gia của một địa chỉ, mỗi mục chỉ được dài tối đa {{limit}} ký tự."
+        "errorAddressPartTooLong": "Đường, thành phố, vùng, mã bưu chính và quốc gia của một địa chỉ, mỗi mục chỉ được dài tối đa {{limit}} ký tự.",
+        "errorPhotoTooLarge": "Ảnh quá lớn.",
+        "errorPhotoNotAnImage": "Ảnh phải là một tệp hình ảnh.",
+        "errorPhotoTypeMismatch": "Ảnh không khớp với loại hình ảnh mà nó khai báo.",
+        "errorPhotoUnreadable": "Không thể đọc ảnh này."
     },
     "budget": {
         "title": "Ngân sách",

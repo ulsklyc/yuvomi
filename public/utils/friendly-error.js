@@ -262,6 +262,15 @@ export const CASE_MESSAGES = new Map([
   ['contacts_address_too_long', 'contacts.errorAddressTooLong'],
   ['contacts_notes_too_long', 'contacts.errorNotesTooLong'],
   ['contacts_birthday_invalid', 'contacts.errorBirthdayInvalid'],
+  // Das Foto (#2128): drei Absagen, drei Saetze. "Zu gross" und "kein Bild"
+  // verlangen Verschiedenes vom Absender, und der dritte Fall - Inhalt passt
+  // nicht zum angegebenen Typ - ist der, den ein umbenanntes .heic trifft.
+  // `contacts_photo_unreadable` kommt nicht aus dem Formular, sondern von
+  // GET /:id/photo bei einem Spaltenwert, der kein Bild ist.
+  ['contacts_photo_too_large', 'contacts.errorPhotoTooLarge'],
+  ['contacts_photo_not_an_image', 'contacts.errorPhotoNotAnImage'],
+  ['contacts_photo_type_mismatch', 'contacts.errorPhotoTypeMismatch'],
+  ['contacts_photo_unreadable', 'contacts.errorPhotoUnreadable'],
   // Die Mehrfachfelder des Formulars (phones, emails, addresses): je Fall ein
   // ganzer Satz, der das Feld selbst nennt - nie ein eingesetztes Nomen. Eine
   // zu lange Nummer oder Adresse in der Liste ist derselbe Satz wie im

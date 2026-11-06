@@ -1493,7 +1493,11 @@
         "errorAddressEntryInvalid": "पतों में से एक अधूरा या अमान्य है।",
         "errorAddressesTooMany": "इस संपर्क में बहुत अधिक पते हैं। अधिकतम संख्या {{limit}} है।",
         "errorAddressLabelTooLong": "पते का लेबल अधिकतम {{limit}} वर्णों का हो सकता है।",
-        "errorAddressPartTooLong": "किसी पते की सड़क, शहर, क्षेत्र, पिन कोड और देश में से हर एक अधिकतम {{limit}} वर्णों का हो सकता है।"
+        "errorAddressPartTooLong": "किसी पते की सड़क, शहर, क्षेत्र, पिन कोड और देश में से हर एक अधिकतम {{limit}} वर्णों का हो सकता है।",
+        "errorPhotoTooLarge": "फ़ोटो बहुत बड़ी है।",
+        "errorPhotoNotAnImage": "फ़ोटो एक छवि होनी चाहिए।",
+        "errorPhotoTypeMismatch": "फ़ोटो उस छवि प्रकार से मेल नहीं खाती जो वह बताती है।",
+        "errorPhotoUnreadable": "यह फ़ोटो पढ़ी नहीं जा सकती।"
     },
     "budget": {
         "title": "बजट",

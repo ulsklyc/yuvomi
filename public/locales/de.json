@@ -1511,7 +1511,11 @@
         "errorAddressEntryInvalid": "Eine der Adressen ist unvollständig oder ungültig.",
         "errorAddressesTooMany": "Dieser Kontakt hat zu viele Adressen. Höchstens {{limit}} sind möglich.",
         "errorAddressLabelTooLong": "Die Bezeichnung einer Adresse darf höchstens {{limit}} Zeichen lang sein.",
-        "errorAddressPartTooLong": "Straße, Ort, Region, Postleitzahl und Land einer Adresse dürfen je höchstens {{limit}} Zeichen lang sein."
+        "errorAddressPartTooLong": "Straße, Ort, Region, Postleitzahl und Land einer Adresse dürfen je höchstens {{limit}} Zeichen lang sein.",
+        "errorPhotoTooLarge": "Das Foto ist zu groß.",
+        "errorPhotoNotAnImage": "Das Foto muss ein Bild sein.",
+        "errorPhotoTypeMismatch": "Das Foto passt nicht zu dem Bildtyp, den es angibt.",
+        "errorPhotoUnreadable": "Dieses Foto kann nicht gelesen werden."
     },
     "budget": {
         "title": "Budget",

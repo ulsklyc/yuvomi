@@ -1661,7 +1661,11 @@
         "errorAddressEntryInvalid": "Один из адресов неполный или недействителен.",
         "errorAddressesTooMany": "У этого контакта слишком много адресов. Максимум: {{limit}}.",
         "errorAddressLabelTooLong": "Метка адреса может содержать не более {{limit}} символов.",
-        "errorAddressPartTooLong": "Улица, город, регион, индекс и страна адреса могут содержать не более {{limit}} символов каждое."
+        "errorAddressPartTooLong": "Улица, город, регион, индекс и страна адреса могут содержать не более {{limit}} символов каждое.",
+        "errorPhotoTooLarge": "Фотография слишком большая.",
+        "errorPhotoNotAnImage": "Фотография должна быть изображением.",
+        "errorPhotoTypeMismatch": "Фотография не соответствует указанному типу изображения.",
+        "errorPhotoUnreadable": "Эту фотографию не удалось прочитать."
     },
     "budget": {
         "title": "Бюджет",

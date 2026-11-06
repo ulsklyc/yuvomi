@@ -1493,7 +1493,11 @@
         "errorAddressEntryInvalid": "Een van de adressen is onvolledig of ongeldig.",
         "errorAddressesTooMany": "Dit contact heeft te veel adressen. Het maximum is {{limit}}.",
         "errorAddressLabelTooLong": "Het label van een adres mag maximaal {{limit}} tekens lang zijn.",
-        "errorAddressPartTooLong": "Straat, plaats, regio, postcode en land van een adres mogen elk maximaal {{limit}} tekens lang zijn."
+        "errorAddressPartTooLong": "Straat, plaats, regio, postcode en land van een adres mogen elk maximaal {{limit}} tekens lang zijn.",
+        "errorPhotoTooLarge": "De foto is te groot.",
+        "errorPhotoNotAnImage": "De foto moet een afbeelding zijn.",
+        "errorPhotoTypeMismatch": "De foto past niet bij het opgegeven afbeeldingstype.",
+        "errorPhotoUnreadable": "Deze foto kan niet worden gelezen."
     },
     "budget": {
         "title": "Budget",

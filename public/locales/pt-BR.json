@@ -1493,7 +1493,11 @@
         "errorAddressEntryInvalid": "Um dos endereços está incompleto ou é inválido.",
         "errorAddressesTooMany": "Este contato tem endereços demais. O máximo é {{limit}}.",
         "errorAddressLabelTooLong": "O rótulo de um endereço pode ter no máximo {{limit}} caracteres.",
-        "errorAddressPartTooLong": "Rua, cidade, estado, CEP e país de um endereço podem ter cada um no máximo {{limit}} caracteres."
+        "errorAddressPartTooLong": "Rua, cidade, estado, CEP e país de um endereço podem ter cada um no máximo {{limit}} caracteres.",
+        "errorPhotoTooLarge": "A foto é muito grande.",
+        "errorPhotoNotAnImage": "A foto precisa ser uma imagem.",
+        "errorPhotoTypeMismatch": "A foto não corresponde ao tipo de imagem declarado.",
+        "errorPhotoUnreadable": "Esta foto não pode ser lida."
     },
     "budget": {
         "title": "Orçamento",

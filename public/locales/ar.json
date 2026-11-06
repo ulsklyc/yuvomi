@@ -1746,7 +1746,11 @@
         "errorAddressEntryInvalid": "أحد العناوين غير مكتمل أو غير صالح.",
         "errorAddressesTooMany": "لدى جهة الاتصال هذه عناوين كثيرة جدًا. الحد الأقصى هو {{limit}}.",
         "errorAddressLabelTooLong": "يمكن أن تتكون تسمية العنوان من {{limit}} حرف كحد أقصى.",
-        "errorAddressPartTooLong": "يمكن أن يتكون كل من الشارع والمدينة والمنطقة والرمز البريدي والبلد في العنوان من {{limit}} حرف كحد أقصى."
+        "errorAddressPartTooLong": "يمكن أن يتكون كل من الشارع والمدينة والمنطقة والرمز البريدي والبلد في العنوان من {{limit}} حرف كحد أقصى.",
+        "errorPhotoTooLarge": "الصورة كبيرة جدًا.",
+        "errorPhotoNotAnImage": "يجب أن تكون الصورة ملف صورة.",
+        "errorPhotoTypeMismatch": "الصورة لا تطابق نوع الصورة المُعلن.",
+        "errorPhotoUnreadable": "لا يمكن قراءة هذه الصورة."
     },
     "budget": {
         "title": "الميزانية",
