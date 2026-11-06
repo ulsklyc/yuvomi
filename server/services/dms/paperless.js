@@ -9,6 +9,7 @@
  * Dependencies: global fetch (Node >=22), ./guard.js
  */
 import { assertDmsTargetAllowed } from './guard.js';
+import { savedViewParams, positiveId, PaperlessViewError } from './paperless-views.js';
 
 const REQUEST_TIMEOUT_MS = 8000;
 // Paperless-ngx handelt seine REST-API über einen versionierten Accept-Header aus.
@@ -84,6 +85,47 @@ export class PaperlessAdapter {
     return `${this.base}/documents/${id}`;
   }
 
+  async listSavedViews({ page = 1, pageSize = 50 } = {}) {
+    return this.#viewPage(`/api/saved_views/?page=${positiveId(page) || 1}&page_size=${Math.min(100, positiveId(pageSize) || 50)}`);
+  }
+
+  async getSavedView(id) {
+    if (!positiveId(id)) throw new PaperlessViewError('Invalid saved-view ID.');
+    const view = await (await this.#request(`/api/saved_views/${id}/`)).json();
+    savedViewParams(view); // Never accept an unsupported filter as an unfiltered view.
+    return view;
+  }
+
+  async #viewPage(path) {
+    const body = await (await this.#request(path)).json();
+    if (!Array.isArray(body.results) || !Number.isSafeInteger(body.count) || body.count < 0) {
+      throw new PaperlessViewError('Invalid Paperless pagination.');
+    }
+    // Return a flag, never follow Paperless's absolute next URL with our token.
+    return { results: body.results, count: body.count, has_more: Boolean(body.next) };
+  }
+
+  async listViewDocuments(viewId, { page = 1, pageSize = 50, documentId = null } = {}) {
+    const view = await this.getSavedView(viewId);
+    const params = savedViewParams(view);
+    params.set('page', String(positiveId(page) || 1));
+    params.set('page_size', String(Math.min(100, positiveId(pageSize) || 50)));
+    if (documentId !== null) {
+      if (!positiveId(documentId)) throw new PaperlessViewError('Invalid document ID.');
+      params.set('id', String(documentId));
+    }
+    const result = await this.#viewPage(`/api/documents/?${params}`);
+    return {
+      ...result,
+      results: result.results.map((r) => ({
+        id: String(r.id), title: r.title || r.original_file_name || `#${r.id}`,
+        created: r.created || null,
+        filename: r.archived_file_name || r.original_file_name || `${r.id}.pdf`,
+        url: this.docUrl(r.id),
+      })),
+    };
+  }
+
   // Eine Ergebnisseite holen. `extra` setzt entweder den Volltext- oder den
   // ASN-Filter; ohne beides listet Paperless alle Dokumente (/api/documents/ ohne
   // query liefert die volle Liste) - ermöglicht Durchblättern statt exaktes Raten.
@@ -155,6 +197,29 @@ export class PaperlessAdapter {
       buffer: Buffer.from(arrayBuf),
       mime: res.headers.get('content-type') || 'application/octet-stream',
     };
+  }
+
+  async listTags({ page = 1 } = {}) {
+    const result = await this.#viewPage(`/api/tags/?page=${positiveId(page) || 1}&page_size=100&ordering=name`);
+    return { ...result, results: result.results.filter((tag) => positiveId(tag.id))
+      .map(({ id, name }) => ({ id: Number(id), name: String(name ?? `#${id}`) })) };
+  }
+
+  async getTag(id) {
+    if (!positiveId(id)) throw new PaperlessViewError('Invalid tag ID.');
+    const tag = await (await this.#request(`/api/tags/${encodeURIComponent(id)}/`)).json();
+    return { id: Number(id), name: String(tag.name ?? `#${id}`) };
+  }
+
+  async setDocumentTags(id, tags) {
+    if (!positiveId(id) || !Array.isArray(tags) || tags.some((tag) => !Number.isSafeInteger(tag) || tag < 1)) {
+      throw new PaperlessViewError('Invalid document tags.');
+    }
+    const result = await (await this.#request(`/api/documents/${encodeURIComponent(id)}/`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tags }),
+    })).json();
+    return { tags: result.tags };
   }
 
   // Vorschaubild der ersten Seite (Issue #533). Paperless-ngx rendert für jedes

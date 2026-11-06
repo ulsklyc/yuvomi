@@ -1,0 +1,29 @@
+{
+  "manifestVersion": 1,
+  "id": "paperless-views",
+  "name": "Paperless",
+  "version": "1.0.0",
+  "description": "Saved Paperless views as read-only folders. Requires the Paperless view-folder core extension.",
+  "entry": "index.js",
+  "style": "style.css",
+  "icon": "folder-sync",
+  "menu": {
+    "show": true,
+    "label": "Paperless",
+    "icon": "folder-sync",
+    "order": 110
+  },
+  "page": {
+    "composition": "full",
+    "navigation": "standard",
+    "responsive": "standard"
+  },
+  "capabilities": {
+    "permissions": {
+      "module": {
+        "label": "Paperless",
+        "icon": "folder-sync"
+      }
+    }
+  }
+}

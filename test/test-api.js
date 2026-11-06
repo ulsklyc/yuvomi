@@ -970,6 +970,8 @@ const REASONS_PASSED_THROUGH = new Map([
   ['services/recipe-providers/failure.js: failure?.reason ?? null', { sites: 1, at403: [], why: 'probeFailure: Feld im Ergebnis des Verbindungstests' }],
   ['services/recipe-providers/failure.js: probe.reason', { sites: 1, at403: [], why: 'classifyProbe: reicht den Fall des Adapters weiter' }],
   ['services/document-deletion-lock.js: err.reason', { sites: 1, at403: [], why: 'feste 409' }],
+  ['routes/paperless-tags.js: reason (Kurzform)', { sites: 1, at403: [], why: 'Tag errors are sanitized; all 403 responses return generic Permission denied before this site.' }],
+  ['routes/paperless-folders.js: reason (Kurzform)', { sites: 1, at403: [], why: 'Finite Paperless folder validation/upstream errors; fail() returns generic Permission denied without a reason for every 403 before this site.' }],
   ['middleware/error-handler.js: err.reason', { sites: 1, at403: [], why: 'feste 503' }],
   ['middleware/restore-gate.js: RESTORE_IN_PROGRESS_REASON', { sites: 1, at403: [], why: '503 oder 409' }],
   ['routes/weather.js: WEATHER_REASON.NOT_CONFIGURED', { sites: 1, at403: [], why: 'Antwort 200 ohne Daten' }],

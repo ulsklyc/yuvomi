@@ -80,6 +80,8 @@ import {
   scheduleFolderDeleteWithUndo,
 } from '/utils/document-folder-delete.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { mountPaperlessFolders } from '/components/paperless-folders.js';
+import { openPaperlessTags } from '/components/paperless-tags.js';
 
 // Das Eingabefeld der Personenauswahl im Dialog (#1705).
 const SUBJECT_INPUT = 'document_subject';
@@ -251,6 +253,8 @@ function readStoredSortDirection(sort) {
   return direction === 'asc' || direction === 'desc' ? direction : defaultSortDirection(sort);
 }
 
+let _paperlessFolders = null;
+
 let state = {
   allDocuments: [],
   documents: [],
@@ -374,6 +378,7 @@ function mayManage(doc) {
 
 export async function render(container, context = {}) {
   _container = container;
+  _paperlessFolders = null;
   state.currentUserId = context.user?.id ?? null;
   _pageController?.abort();
   _pageController = createPageController(context.signal);
@@ -484,6 +489,7 @@ export async function render(container, context = {}) {
             </button>`}
           </div>
           <ul class="documents-folder-browser__list row-carrier" id="documents-folder-browser"></ul>
+          <section id="paperless-folder-nav" hidden></section>
           ${/* WO UND WAS IN EINER AUSWAHL (R21 S9b, Critique a4/D7). Am Telefon
                standen drei Filterachsen in einer Zeile - Status, Ordner und
                die Kategorie-Chips -, und von den sechs Kategorien war bei 390px
@@ -506,6 +512,7 @@ export async function render(container, context = {}) {
                ohne Aussage. */''}
           <nav class="documents-breadcrumb" id="documents-breadcrumb" aria-label="${t('documents.folderPathLabel')}" hidden></nav>
           <div id="documents-list" class="${listClasses()}" aria-busy="true">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
+          <section id="paperless-folder-content" class="paperless-folder" hidden></section>
         </div>
       </div>
       ${/* "+" WIE JEDER ANLEGEN-KNOPF (R22, D11): der Pfeil nach oben war der
@@ -533,6 +540,33 @@ export async function render(container, context = {}) {
   renderFolderBrowser();
   renderCategoryBrowser();
   renderDocuments();
+  const paperlessFolders = await mountPaperlessFolders({
+    sidebar: container.querySelector('#paperless-folder-nav'),
+    content: container.querySelector('#paperless-folder-content'),
+    accounts: state.dmsAccounts.filter((a) => a.provider === 'paperless'),
+    canManage: state.isAdmin && !readOnly(),
+    signal: _pageController.signal,
+    onActiveChange(active, folder) {
+      if (!stillShown(container)) return;
+      container.querySelector('.documents-page')?.classList.toggle('documents--paperless-view', active);
+      const fab = findPageFab('fab-new-document');
+      if (fab) fab.hidden = active || readOnly();
+      if (active) {
+        exitSelectMode();
+        closeContextMenu();
+        container.querySelectorAll('#documents-folder-browser [aria-current]').forEach((el) => el.setAttribute('aria-current', 'false'));
+        container.querySelectorAll('#documents-folder-browser .documents-folder-item--active').forEach((el) => el.classList.remove('documents-folder-item--active'));
+        const label = container.querySelector('.documents-folder-browser__toggle-label');
+        if (label) label.textContent = folder.name;
+        container.querySelector('.documents-folder-browser')?.classList.remove('documents-folder-browser--open');
+        container.querySelector('#documents-folder-toggle')?.setAttribute('aria-expanded', 'false');
+      } else {
+        renderFolderBrowser();
+        renderCategoryBrowser();
+      }
+    },
+  });
+  if (stillShown(container)) _paperlessFolders = paperlessFolders;
   openLinkedDocument();
 }
 
@@ -665,6 +699,13 @@ async function loadMetaOptions() {
  */
 function skipToDocuments(event) {
   event.preventDefault();
+  const remote = _container?.querySelector('#paperless-folder-content');
+  if (remote && !remote.hidden) {
+    const target = remote.querySelector('.paperless-folder__title') || remote;
+    target.setAttribute('tabindex', '-1');
+    target.focus();
+    return;
+  }
   const list = _container?.querySelector('#documents-list');
   if (!list) return;
   repairRovingStops(list);
@@ -1104,6 +1145,7 @@ function bindPageEvents() {
  * @param {string} id  Ordner-id als Zeichenkette, `''` = alle, `'__none'` = ohne Ordner
  */
 function selectFolder(id) {
+  _paperlessFolders?.close();
   state.folderId = id;
   /* Wer einen Ordner mit Kindern waehlt, klappt ihn auf: die Ansicht zeigt ab
    * jetzt auch dessen Unterordner, und ein zugeklappter Zweig verschwiege,
@@ -1147,6 +1189,7 @@ function clearSearch() {
 }
 
 function resetFilters() {
+  _paperlessFolders?.close();
   state.category = '';
   state.folderId = '';
   state.expiringSoon = false;
@@ -4356,6 +4399,7 @@ function viewerStepKeys() {
  *   Liste, den der vorige Betrachter weiterreicht
  */
 function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
+  const paperless = documentStorageBackend(doc) === 'dms' && doc.dms_provider === 'paperless';
   const categoryLabel = categoryLabels()[doc.category] || doc.category;
   const previewUrl = `/api/v1/documents/${doc.id}/preview`;
   const downloadUrl = `/api/v1/documents/${doc.id}/download`;
@@ -4453,6 +4497,7 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
             ${nextDoc ? rowActionHtml({ icon: 'chevron-right', action: 'viewer-next', label: t('documents.viewerNextNamed', { name: nextDoc.name }), attrs: { 'aria-keyshortcuts': stepKeys.next, title: t('documents.viewerNextNamed', { name: nextDoc.name }) } }) : '<span class="row-action document-viewer__pager-edge" aria-hidden="true"><i data-lucide="chevron-right" class="icon-md"></i></span>'}
           </span>` : ''}
           <span class="document-viewer__actions">
+            ${paperless ? `<button type="button" class="btn btn--secondary btn--sm document-viewer__action" data-action="paperless-tags"><i data-lucide="tags" class="icon-md" aria-hidden="true"></i><span>${esc(t('documents.paperless.tags.action'))}</span></button>` : ''}
             ${externalUrl ? `
             <a class="btn btn--ghost btn--sm doc-viewer__dms-link" href="${esc(externalUrl)}" target="_blank" rel="noopener noreferrer">
               <i data-lucide="external-link" class="icon-md" aria-hidden="true"></i>
@@ -4494,6 +4539,7 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
             label: t('common.moreActionsNamed', { name: doc.name }),
             triggerClass: 'btn btn--secondary btn--icon document-viewer__more-btn',
             items: [
+              ...(paperless ? [{ action: 'viewer-tags', icon: 'tags', label: t('documents.paperless.tags.action') }] : []),
               ...(externalUrl ? [{ action: 'viewer-dms', icon: 'external-link', label: t('documents.dmsOpenExternal') }] : []),
               ...(previewKind(doc.mime_type) === 'pdf' ? [{ action: 'viewer-open-tab', icon: 'external-link', label: t('documents.viewerOpenInTab') }] : []),
               ...(mayManage(doc) ? [{ action: 'viewer-edit', icon: 'pencil', label: t('common.edit') }] : []),
@@ -4540,11 +4586,17 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
         openDocumentModal(doc);
       });
       wireViewerStage(panel, doc);
+      panel.querySelector('[data-action="paperless-tags"]')?.addEventListener('click', () => {
+        if (opener?.isConnected && opener !== document.body) opener.focus();
+        openPaperlessTags({ path: `/documents/dms/paperless/documents/${doc.id}/tags`, title: doc.name,
+          onSaved: () => openDocumentViewer(doc, { opener }) });
+      });
       // Das Mehr-Menue (schmal) loest die Knoepfe der Leiste aus - ein Weg je
       // Handlung. Synchron im Tipp: Teilen und Herunterladen brauchen die
       // Nutzeraktivierung des Klicks.
       installPopoverMenus(panel);
       const VIEWER_MENU_TARGETS = {
+        'viewer-tags': '[data-action="paperless-tags"]',
         'viewer-dms': '.doc-viewer__dms-link',
         'viewer-open-tab': 'a.document-viewer__action[target="_blank"]',
         'viewer-edit': '[data-action="edit-document"]',
