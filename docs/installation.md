@@ -1,8 +1,8 @@
 ## Quick Install
 
-Three ways to get Yuvomi running from scratch:
+Three quick ways to get Yuvomi running from scratch. Every way, app stores and Home Assistant included, is under [Step-by-Step Installation](#step-by-step-installation), each with its option letter.
 
-### Option A — Web Installer (recommended, all platforms)
+### Web Installer (recommended, all platforms)
 
 ```bash
 git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
@@ -12,7 +12,7 @@ node tools/installer/install-server.js
 
 Requires Node.js 22+ on the host. The browser-based wizard is fully localized (27 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
 
-### Option B — CLI Installer (Linux / macOS)
+### CLI Installer (Linux / macOS)
 
 ```bash
 git clone https://github.com/ulsklyc/yuvomi.git && cd yuvomi
@@ -40,7 +40,7 @@ Non-interactive mode (CI/provisioning — provide your own `.env`):
 bash install.sh --env-file /path/to/.env
 ```
 
-### Option C — Manual (Docker or Podman, no clone required)
+### Manual (Docker or Podman, no clone required)
 
 ```bash
 curl -O https://raw.githubusercontent.com/ulsklyc/yuvomi/main/docker-compose.yml
