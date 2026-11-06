@@ -10,7 +10,7 @@ node tools/installer/install-server.js
 # Open http://localhost:8090
 ```
 
-Requires Node.js 22+ on the host. The browser-based wizard is fully localized (27 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
+Requires Node.js 22.14+ or 23.6+ on the host. The browser-based wizard is fully localized (27 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
 
 ### Option B — CLI Installer (Linux / macOS)
 
@@ -229,13 +229,13 @@ second row from this table, so a change to the floor changes the guard with it.
 
 ## Step-by-Step Installation
 
-There are eight ways to get Yuvomi running. **Option A** (web installer) is recommended for most users — it walks you through every step in your browser. **Option B** (pre-built image) is a quick manual alternative. **Option C** (build from source) is for contributors or custom builds. **Options D–F** install directly from a NAS/home-server app store with no terminal required: **Option D** (TrueNAS SCALE), **Option E** (Umbrel), and **Option F** (Unraid). **Option G** covers Portainer, whether you paste the stack or let it follow this repository via Git. **Option H** runs Yuvomi as an app next to Home Assistant.
+There are nine ways to get Yuvomi running. **Option A** (web installer) is recommended for most users — it walks you through every step in your browser. **Option B** (pre-built image) is a quick manual alternative. **Option C** (build from source) is for contributors or custom builds. **Options D–F** install directly from a NAS/home-server app store with no terminal required: **Option D** (TrueNAS SCALE), **Option E** (Umbrel), and **Option F** (Unraid). **Option G** covers Portainer, whether you paste the stack or let it follow this repository via Git. **Option H** runs Yuvomi as an app next to Home Assistant, **Option I** as a YunoHost app. On Proxmox, a community helper script sets up a container in one command ([Proxmox](#proxmox) below Option I); the other paths run in a Debian LXC as they do on any Linux server.
 
 ---
 
 ### Option A — Web Installer (Recommended)
 
-Requires Node.js 22+ and Docker on the host.
+Requires Node.js 22.14+ or 23.6+ and Docker on the host.
 
 #### 1. Clone the Repository
 
@@ -538,6 +538,38 @@ Search for **Yuvomi**, install it and start it. The app generates `SESSION_SECRE
 Select **Open Web UI**. Yuvomi answers on port 3880 of the Home Assistant host, for example `http://homeassistant.local:3880` (another port is set on the app's **Configuration** tab under **Network**). The first visit guides you through creating your admin account in the browser.
 
 Further environment variables go under **Additional environment variables** on the **Configuration** tab; paths, the session secret and the database key stay with the app. Every option is described on the app's **Documentation** tab.
+
+---
+
+### Option I - YunoHost (Package)
+
+The package from [ulsklyc/yuvomi_ynh](https://github.com/ulsklyc/yuvomi_ynh) installs the official Yuvomi release unchanged, as a systemd service behind YunoHost's nginx, and puts it in every YunoHost backup. It needs YunoHost 12.1.17 or newer on amd64 or arm64. The package is not in the YunoHost catalog yet, so it is installed from its repository.
+
+#### 1. Install the Package
+
+```bash
+sudo yunohost app install https://github.com/ulsklyc/yuvomi_ynh
+```
+
+#### 2. Answer the Install Questions
+
+Pick a domain or subdomain of its own, for example `family.example.com`: Yuvomi cannot run under a sub path yet ([discussion #2231](https://github.com/ulsklyc/yuvomi/discussions/2231)). Then pick the YunoHost user who becomes the Yuvomi administrator and give that account a password; it is separate from the YunoHost password. Keep the app public (visitors), so the installed app on phones, calendar feeds and API tokens work outside the YunoHost portal.
+
+#### 3. Open Yuvomi
+
+Open the domain and sign in with that account. The package generates `SESSION_SECRET` and `DB_ENCRYPTION_KEY` itself; encryption is always on and the key lives in the app settings, so every YunoHost backup carries it. To move by hand instead, `yunohost app setting yuvomi db_encryption_key` prints it. `.env` is rewritten from the app settings on every upgrade, so variables added there do not survive one. Admin notes are in the package's [doc/ADMIN.md](https://github.com/ulsklyc/yuvomi_ynh/blob/main/doc/ADMIN.md).
+
+---
+
+### Proxmox
+
+The [community-scripts](https://community-scripts.org/scripts/yuvomi) project ships a helper script that creates a Debian 13 LXC and installs Yuvomi in it directly with Node.js, without Docker. Run it on the Proxmox host shell:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/yuvomi.sh)"
+```
+
+It is maintained there, not in this repository, so read it before you run it. It enables database encryption and writes both secrets to `/opt/yuvomi/.env` inside the container: copy `DB_ENCRYPTION_KEY` from there and keep it safe. Running the same command inside the container updates Yuvomi. To run the Docker setup instead, create an unprivileged Debian LXC with `nesting=1` (or a VM) and follow Option B inside it; the [Proxmox guide on yuvomi.cloud](https://yuvomi.cloud/install.html#proxmox) has the commands.
 
 ---
 
