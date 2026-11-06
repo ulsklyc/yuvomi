@@ -39,6 +39,21 @@ function decodeEntities(text) {
   });
 }
 
+/**
+ * Ersetzt so lange, bis sich nichts mehr aendert: ein einzelner Durchgang
+ * laesst aus verschachteltem Markup ("<<script>script>") einen neuen Tag
+ * stehen (CodeQL js/incomplete-multi-character-sanitization).
+ */
+function replaceUntilStable(text, pattern, replacement) {
+  let prev;
+  let next = text;
+  do {
+    prev = next;
+    next = prev.replace(pattern, replacement);
+  } while (next !== prev);
+  return next;
+}
+
 function linkText(text, url) {
   const label = text.trim();
   const href = String(url || '').trim();
@@ -55,13 +70,16 @@ export function markupToText(input) {
   let s = String(input ?? '').replace(/\r\n?/g, '\n');
   if (!s.trim()) return '';
 
+  // Markdown-Autolinks ("<https://...>") sind kein Tag: die URL bleibt.
+  s = s.replace(/<(https?:\/\/[^\s<>]+)>/gi, '$1');
+
   // Kommentare und Bilder zuerst - beide tragen nichts Lesbares.
-  s = s.replace(/<!--[\s\S]*?-->/g, '');
-  s = s.replace(/<img\b[^>]*>/gi, '');
+  s = replaceUntilStable(s, /<!--[\s\S]*?-->/g, '');
+  s = replaceUntilStable(s, /<img\b[^>]*>/gi, '');
   s = s.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
 
   // Links: HTML und Markdown.
-  s = s.replace(/<a\b[^>]*?\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi, (_m, _q, href, text) => linkText(text.replace(/<[^>]*>/g, ''), href));
+  s = s.replace(/<a\b[^>]*?\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi, (_m, _q, href, text) => linkText(replaceUntilStable(text, /<[^>]*>/g, ''), href));
   s = s.replace(/\[([^\]]*)\]\(([^)\s]*)(?:\s+"[^"]*")?\)/g, (_m, text, href) => linkText(text, href));
 
   // Blockgrenzen in HTML werden Zeilenumbrueche, Listenpunkte "- ".
@@ -69,7 +87,13 @@ export function markupToText(input) {
   s = s.replace(/<li\b[^>]*>/gi, '\n- ');
   s = s.replace(/<\/?(?:p|div|ul|ol|li|h[1-6]|blockquote|pre|tr|table|section|article)\b[^>]*>/gi, '\n');
   // Restliche Tags weg (nur echte Tags: "<" direkt gefolgt von Buchstabe oder "/").
-  s = s.replace(/<\/?[a-z][^>]*>/gi, '');
+  s = replaceUntilStable(s, /<\/?[a-z][^>]*>/gi, '');
+  // Was danach noch einen Tag oeffnen koennte (ein "<" vor Buchstabe, "/", "!"
+  // oder "?", etwa aus einem nie geschlossenen "<script"), verliert sein "<".
+  // Ein freistehendes "2 < 3" bleibt; kodierte Zeichen ("&lt;b&gt;") werden
+  // erst danach aufgeloest und sind gewollter Text. notes geht im Frontend
+  // ohnehin per textContent hinaus - das hier haelt den Spiegel frei von Markup.
+  s = s.replace(/<(?=[a-z/!?])/gi, '');
 
   // Markdown je Zeile: Ueberschriften, Zitate, Listenmarker, Trennlinien.
   s = s.split('\n').map((line) => line

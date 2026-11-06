@@ -24,6 +24,7 @@ import {
 } from '../server/services/recipe-providers/failure.js';
 import { safeRequest } from '../server/utils/http.js';
 import { BlockedAddressError } from '../server/utils/ssrf.js';
+import { markupToText } from '../server/services/recipe-providers/markup-text.js';
 
 const ENV_FLAG = 'RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK';
 
@@ -228,6 +229,29 @@ test('getRecipe: HTML und Markdown aus Mealie-Schritten werden Klartext, Bilder 
     'Mit Rezeptidee (https://example.com/idee) und frischem Brot.',
   ].join('\n'));
   assert.doesNotMatch(recipe.notes, /<img|api\/media|&amp;|&nbsp;|\*\*/);
+});
+
+// #2558 (Review): ein einzelner Ersetzungsdurchgang laesst aus verschachtelten
+// Tags einen neuen stehen. notes geht per textContent raus, trotzdem soll der
+// Spiegel nie Markup tragen: kein "<script", kein "<!--", kein "<img" im Ergebnis.
+test('markupToText: verschachtelte Tags und Kommentare hinterlassen kein Markup (#2558)', () => {
+  for (const payload of [
+    '<<script>script>alert(1)<</script>/script>',
+    '<scr<script>ipt>alert(1)</script>',
+    '<!<!-- a -->-- b -->Text',
+    '<<img src=x>img src=/api/media/x.webp>',
+    '<a href="https://example.com"><<b>b>fett</b></a>',
+  ]) {
+    const out = markupToText(payload);
+    assert.doesNotMatch(out, /<[a-z!/]/i, `${payload} -> ${out}`);
+  }
+  assert.equal(markupToText('2 < 3 und 5 > 4'), '2 < 3 und 5 > 4');
+  assert.equal(markupToText('&lt;b&gt; bleibt Text'), '<b> bleibt Text');
+});
+
+// #2558 (Review): ein Markdown-Autolink ist kein Tag - die URL bleibt.
+test('markupToText: Markdown-Autolink behaelt die URL (#2558)', () => {
+  assert.equal(markupToText('Follow <https://example.com/technique> before baking.'), 'Follow https://example.com/technique before baking.');
 });
 
 test('getRecipe: Klartext bleibt Klartext - "<" im Text, Escapes, Wort_mit_Unterstrich (#2558)', async () => {
