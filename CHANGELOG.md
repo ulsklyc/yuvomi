@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **CardDAV accepts long app passwords and tokens** (#2575). Saving a CardDAV account refused
+  any password over 200 characters, and the password field cut longer input off without a word, so
+  app tokens such as JWTs could not be used. Passwords for CardDAV, CalDAV and Apple Calendar now
+  share one limit of 4096 characters and are kept exactly as typed, including spaces at the start
+  or end.
 - **Editing a task through the API keeps its primary assignee (#2569).** A `PUT /api/v1/tasks/:id`
   that left out `assigned_to` made the person with the lowest user id the primary assignee. It now
   stays who it was, as it already did for calendar events. `assigned_users` lists the primary

@@ -220,3 +220,57 @@ test('Neuer Server MIT neuem Passwort: wird gespeichert', async () => {
   assert.equal(row.username, 'family2');
   assert.equal(row.password, 'new-secret');
 });
+
+// #2575: App-Passwoerter und Tokens (JWT u. a.) sind oft weit ueber 200
+// Zeichen lang, und ein Passwort darf mit Leerzeichen beginnen oder enden.
+// Die Route pruefte das Passwort gegen die Titelgrenze und trimmte es, die
+// Seite kappte die Eingabe still per maxlength="200". Gemessen wird, was in
+// der Tabelle steht und was der Server im Basic-Header zu sehen bekommt.
+const LONG_SECRET = ` ${'s'.repeat(1198)} `;
+const sentSecrets = () => seen
+  .filter((r) => r.authorization)
+  .map((r) => Buffer.from(r.authorization.replace(/^Basic /, ''), 'base64').toString());
+
+test('Langes Passwort mit Rand-Leerzeichen: Anlegen schickt es unveraendert (#2575)', async () => {
+  seen.length = 0;
+  const add = await admin('POST', '/contacts/cardav/accounts', { name: 'Lang', cardavUrl: FOREIGN_URL, username: 'tokenuser', password: LONG_SECRET });
+  assert.notEqual(add.status, 400, `Validierung lehnte ab: ${add.body?.error}`);
+  assert.ok(sentSecrets().includes(`tokenuser:${LONG_SECRET}`), 'Passwort kam nicht unveraendert beim Server an');
+});
+
+test('Langes Passwort mit Rand-Leerzeichen: Aendern speichert es unveraendert, Test verwendet es (#2575)', async () => {
+  const { id } = seedAccount('admin-long');
+  try {
+    const put = await admin('PUT', `/contacts/cardav/accounts/${id}`, { name: 'Haushalt', cardavUrl: FOREIGN_URL, username: 'family', password: LONG_SECRET });
+    assert.equal(put.status, 200, `PUT: ${put.body?.error}`);
+    assert.equal(accountRow(id).password, LONG_SECRET, 'Passwort gekappt oder getrimmt gespeichert');
+    seen.length = 0;
+    await admin('POST', `/contacts/cardav/accounts/${id}/test`);
+    assert.ok(sentSecrets().includes(`family:${LONG_SECRET}`), 'Test schickte nicht das gespeicherte Passwort');
+  } finally {
+    db.prepare('DELETE FROM carddav_accounts WHERE id = ?').run(id);
+  }
+});
+
+test('Passwort ueber der Obergrenze: 400 validation, kein Verbindungsversuch (#2575)', async () => {
+  seen.length = 0;
+  const add = await admin('POST', '/contacts/cardav/accounts', { name: 'Zu lang', cardavUrl: FOREIGN_URL, username: 'u', password: 'x'.repeat(4097) });
+  assert.equal(add.status, 400);
+  assert.equal(add.body.errorCode, 'validation');
+  assert.equal(seen.length, 0, 'kein Verbindungsversuch');
+});
+
+// Nachtrag #2575: `secret()` trimmt nicht, die Pflichtpruefung aber schon.
+// Ein Passwort nur aus Leerzeichen gilt beim Anlegen weiter als fehlend -
+// bei CardDAV, CalDAV und Apple gleich, und keiner versucht eine Verbindung.
+test('Passwort nur aus Leerzeichen: Anlegen lehnt es als fehlend ab, ohne Verbindungsversuch (#2575)', async () => {
+  seen.length = 0;
+  const card = await admin('POST', '/contacts/cardav/accounts', { name: 'Leer', cardavUrl: FOREIGN_URL, username: 'u', password: '   ' });
+  assert.equal(card.status, 400, 'CardDAV');
+  assert.equal(card.body.errorCode, 'validation', 'CardDAV');
+  const cal = await admin('POST', '/calendar/caldav/accounts', { name: 'Leer', caldavUrl: FOREIGN_URL, username: 'u', password: '   ' });
+  assert.equal(cal.status, 400, 'CalDAV');
+  const apple = await admin('POST', '/calendar/apple/connect', { url: FOREIGN_URL, username: 'u@example.invalid', password: '   ' });
+  assert.equal(apple.status, 400, 'Apple');
+  assert.equal(seen.length, 0, `der Server sah ${seen.length} Anfragen`);
+});
