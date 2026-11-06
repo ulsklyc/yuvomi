@@ -49,8 +49,8 @@ function isPrivateNetworkAllowed() {
 
 /**
  * Ein Fehler beim Abruf eines Feeds, den die App benennen kann (#1909): der
- * Text bleibt derselbe (er landet auch als `last_error` am Abo), `code` nennt
- * den Fall und `params` seine Zahl. Die Route macht daraus den `reason`.
+ * Text bleibt derselbe (er steht im Log), `code` nennt den Fall und `params`
+ * seine Zahl. Die Route macht daraus den `reason`.
  */
 function icsFailure(message, code, params) {
   return Object.assign(new Error(message), { code }, params ? { params } : {});
@@ -143,7 +143,13 @@ function syncWindow() {
   return { windowStart: past.toISOString().slice(0, 10), windowEnd: future.toISOString().slice(0, 10) };
 }
 
-async function syncOne(sub) {
+/**
+ * @param {object} sub - Zeile aus ics_subscriptions
+ * @param {{ rethrowFetch?: boolean }} [opts] - wer auf das Ergebnis wartet (Anlegen,
+ *   Aktualisieren-Knopf), bekommt den Abruffehler geworfen und kann ihn sagen
+ *   (#2566). Der Scheduler laesst ihn weg: dort liest niemand, er steht im Log.
+ */
+async function syncOne(sub, { rethrowFetch = false } = {}) {
   if (syncingNow.has(sub.id)) {
     log.info(`Subscription ${sub.id} is already syncing - skipped.`);
     return;
@@ -154,6 +160,7 @@ async function syncOne(sub) {
     try { result = await fetchAndParse(sub.url, sub.etag, sub.last_modified); }
     catch (err) {
       log.warn(`Subscription ${sub.id} (${sub.name}): fetch failed - ${err.message}`);
+      if (rethrowFetch) throw err;
       return;
     }
 
@@ -333,17 +340,25 @@ async function syncOne(sub) {
  * schriebe er sein Ergebnis in die gerade eingespielte Datenbank (Codex-Befund
  * in #1431, siehe server/utils/restore-state.js).
  */
-function sync(subscriptionId) {
-  return runExternalJob(() => syncUntracked(subscriptionId));
+function sync(subscriptionId, opts = {}) {
+  return runExternalJob(() => syncUntracked(subscriptionId, opts));
 }
 
-async function syncUntracked(subscriptionId) {
+/**
+ * `rethrowFetch` nur mit einer Id (#2566): ein einzelnes Abo, auf das jemand
+ * wartet, wirft seinen Fehler; der Lauf ueber alle faengt ihn je Abo ab.
+ */
+async function syncUntracked(subscriptionId, { rethrowFetch = false } = {}) {
   const subs = subscriptionId
     ? db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').all(subscriptionId)
     : db.get().prepare('SELECT * FROM ics_subscriptions').all();
+  const rethrow = Boolean(subscriptionId) && rethrowFetch;
   for (const sub of subs) {
-    try { await syncOne(sub); }
-    catch (err) { log.error(`Subscription ${sub.id} sync failed: ${err.message}`); }
+    try { await syncOne(sub, { rethrowFetch: rethrow }); }
+    catch (err) {
+      log.error(`Subscription ${sub.id} sync failed: ${err.message}`);
+      if (rethrow) throw err;
+    }
   }
 }
 
@@ -588,8 +603,11 @@ async function create(userId, { name, url, color, shared, default_assignee_user_
     return id;
   })();
   const newSub = db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId);
+  // Das Abo steht; ein gescheiterter erster Abruf ist eine Warnung, kein
+  // Fehlschlag des Anlegens. `syncError` ist der Fehler selbst, die Route
+  // macht daraus Text und Fall (#2566).
   let syncError = null;
-  try { await syncOne(newSub); } catch (err) { syncError = err.message; }
+  try { await syncOne(newSub, { rethrowFetch: true }); } catch (err) { syncError = err; }
   return { sub: withAssignees(newSub), syncError };
 }
 

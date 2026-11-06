@@ -22430,6 +22430,11 @@ function errorTextHelpers(code) {
   return names;
 }
 
+// Felder, in denen der Server den Text eines Fehlers als Wert mitschickt statt
+// als Fehler (#2566): `res.syncError` beim Anlegen eines Kalender-Abos zeigte
+// den englischen Satz im Toast, und der Leser oben sah nur `.message`.
+const ERROR_TEXT_FIELD = /(?:\?\.|\.)\s*(?:syncError|lastError|last_error)\b/;
+
 function rawToasts(source) {
   const code = withoutCommentsKeepingLines(source, { blankLiterals: true });
   const helpers = errorTextHelpers(code);
@@ -22438,7 +22443,7 @@ function rawToasts(source) {
     const open = hit.index + hit[0].length - 1;
     const args = code.slice(open, closingIndex(code, open) + 1);
     const viaHelper = [...helpers].some((name) => new RegExp(`(?<![\\w$.])${name.replaceAll('$', '\\$')}\\s*\\(`).test(args));
-    if (/(?:\?\.|\.)\s*message\b/.test(args) || countServerTextReads(args) > 0 || viaHelper) {
+    if (/(?:\?\.|\.)\s*message\b/.test(args) || ERROR_TEXT_FIELD.test(args) || countServerTextReads(args) > 0 || viaHelper) {
       raw.push(args.replace(/\s+/g, ' ').trim());
     }
   }
@@ -22514,6 +22519,10 @@ test('der Toast-Leser sieht den Fehlertext in jeder Form und keinen Satz der App
     ["const fail = (error) => showToast(error?.message || t('x'), 'danger');", 1],
     ["showToast(result.message);", 1],
     ["showToast(err.data?.error ?? t('x'));", 1],
+    // Fehlertext als Feld einer Antwort (#2566).
+    ["showToast(`${t('x')}: ${res.syncError}`, 'danger');", 1],
+    ["showToast(account?.lastError, 'danger');", 1],
+    ["showToast(drive.last_error);", 1],
     // Ueber eine Hilfsfunktion derselben Datei.
     ["function text(err) { return err?.message || t('x'); }\nshowToast(text(err), 'danger');", 1],
     ["const text = (err) => err.message;\nshowToast(text(err));", 1],
@@ -22529,6 +22538,8 @@ test('der Toast-Leser sieht den Fehlertext in jeder Form und keinen Satz der App
     ["function text(err) { return err.message; }\nshowToast(myText(err));", 0],
     ["function showToast(message, tone) { window.yuvomi?.showToast(message, tone); }", 0],
     ["showToast(message, 'danger');", 0],
+    ["showToast(`${t('x')}: ${sentence}`, 'danger');", 0],
+    ["showToast(t('settings.syncError'), 'danger');", 0],
   ]) {
     assert.equal(rawToasts(source).length, expected, source);
   }

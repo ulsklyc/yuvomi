@@ -94,7 +94,19 @@ router.post('/subscriptions', async (req, res) => {
       name: name.trim(), url, color: colorVal, shared: shared ? 1 : 0,
       default_assignee_user_ids: assignees.present ? assignees.ids : [],
     });
-    res.status(201).json({ data: sub, syncError: syncError || null });
+    // Das Abo steht auch dann, wenn der erste Abruf scheitert (#2566):
+    // `syncError` bleibt der Text fuer API-Aufrufer, `syncReason` und
+    // `syncParams` sind der Fall, den die Seite in ihrer Sprache sagt. Den
+    // Rohtext gibt es nur zu einem benannten Fall: ein abgelehnter Verbindungs-
+    // aufbau nennt Adresse und Port und waere mit erlaubtem privatem Netz ein
+    // Port-Scanner. Er steht im Log (syncOne).
+    const syncCase = syncError ? icsFetchCase(syncError) : null;
+    res.status(201).json({
+      data: sub,
+      syncError: syncError ? (syncCase ? syncError.message : 'The feed could not be fetched.') : null,
+      syncReason: syncCase?.reason ?? null,
+      ...(syncCase?.params ? { syncParams: syncCase.params } : {}),
+    });
   } catch (err) {
     log.error('', err);
     const fetchCase = icsFetchCase(err);
@@ -165,9 +177,13 @@ router.post('/subscriptions/:id/sync', async (req, res) => {
     if (!sub) return res.status(404).json({ error: 'Subscription not found.', code: 404, reason: 'calendar_subscription_not_found' });
     if (!isAdmin && sub.created_by !== getUserId(req))
       return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
-    await icsSubscription.sync(subId);
+    // Ein Feed, der nicht ausliefert, ist kein Erfolg (#2566): der Knopf sagt
+    // den Fall, statt "synchronisiert" zu melden.
+    await icsSubscription.sync(subId, { rethrowFetch: true });
     res.json({ data: icsSubscription.getOne(subId) });
   } catch (err) {
+    const fetchCase = icsFetchCase(err);
+    if (fetchCase) return res.status(400).json({ error: err.message, code: 400, ...fetchCase });
     log.error('', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
