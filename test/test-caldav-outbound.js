@@ -2003,3 +2003,39 @@ test('Sofortversuch: ein nicht angefragtes Objekt wird keiner Zeile zugeordnet, 
   assert.equal(encoded.get('mine@test')?.etag, '"y"', 'dieselbe Adresse mit %40 wurde nicht erkannt');
   assert.equal(encoded.get('mine@test')?.url, 'https://dav.example/cal/family/mine@test.ics', 'geschrieben wird an die angefragte Adresse');
 });
+
+test('Apple-Legacy: ein neuer lokaler Termin geht mit dem Sofortversuch hinauf, nicht erst mit dem Lauf (#2565)', async () => {
+  reset();
+  const set = db.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
+  set.run('apple_caldav_url', 'https://caldav.icloud.com/');
+  set.run('apple_username', 'jemand@example.com');
+  set.run('apple_app_password', 'abcd-efgh');
+  try {
+    const id = Number(db.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, external_source, created_by)
+      VALUES ('Neu für iCloud', '2035-03-10T10:00', '2035-03-10T11:00', 0, 'local', 1)
+    `).run().lastInsertRowid);
+
+    const client = fakeClient();
+    client.fetchCalendars = async () => [{ url: CAL_URL, displayName: 'iCloud' }];
+    const appleCalendar = await import('../server/services/apple-calendar.js');
+    await appleCalendar.flushOutbound({ makeClient: async () => client });
+
+    assert.equal(client.creates.length, 1, 'der Sofortversuch hat den neuen Termin nicht hochgeladen');
+    assert.match(client.creates[0].iCalString, /SUMMARY:Neu für iCloud/);
+    const row = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+    assert.equal(row.external_source, 'apple', 'der Upload wurde nicht gebucht');
+
+    // Ohne Zugangsdaten fragt der Sofortversuch iCloud gar nicht erst.
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'apple_%'").run();
+    db.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, external_source, created_by)
+      VALUES ('Ohne Verbindung', '2035-03-11T10:00', '2035-03-11T11:00', 0, 'local', 1)
+    `).run();
+    let built = 0;
+    await appleCalendar.flushOutbound({ makeClient: async () => { built++; return client; } });
+    assert.equal(built, 0, 'ohne Zugangsdaten wurde ein Client gebaut');
+  } finally {
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'apple_%'").run();
+  }
+});

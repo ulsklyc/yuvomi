@@ -1812,6 +1812,16 @@ items it runs in every pass (run and immediate attempt) before the uploads, only
 switched on, so a row with a new target in the same account normally goes up after its leftover
 is gone. The rule does not depend on which code path removed the row.
 
+**A new event goes up in the immediate attempt as well (#2565).** Until then only edits, moves and
+deletions did, and an event created with a sync target (or given one later) waited for the next
+run. Creating an event, and saving one that waits for its upload, now starts the immediate attempt,
+which runs the same upload loop as the run (CalDAV per account with that account's calendar
+listing for target and write access, iCloud into `icloudUploadTarget`, Google with the read-only
+switch honoured). A failed attempt changes nothing: the event stays local with its target and the
+next run uploads it. Because leftover removal for events stays in the run, an event that changed
+its target within the same account can briefly exist at both places until that run removes the
+leftover.
+
 "Still belongs to that place" is read from the target the row carries, not from whether that
 calendar or list is currently switched on: switching off means "stop syncing", not "clean up on
 the server". A deselected calendar and a switched-off shopping mapping keep the note, and a task

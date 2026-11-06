@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **A new event in a synced calendar reaches CalDAV, iCloud and Google when you save it (#2565).**
+  Edits, moves and deletions were sent right away, but a newly created event waited for the next
+  sync run, up to `SYNC_INTERVAL_MINUTES` later, although the documentation promised an attempt on
+  save. Creating an event with a sync target, or giving an existing local event one, now tries the
+  upload immediately. If the server cannot be reached the event is still saved and the next sync
+  run uploads it, as before.
 - **A calendar subscription that does not deliver says so** (#2566). Adding a subscription whose
   address answered with an error (not found, too large, a private address) reported "Subscription
   added", and the refresh button reported "Subscription synced", while no event ever arrived. Adding

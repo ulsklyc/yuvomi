@@ -45,6 +45,12 @@ const outbound = await import('../server/services/calendar-outbound.js');
 const { createCalDAVClient } = await import('../server/utils/caldav-client.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
 const { retitleBirthdayEvents } = await import('../server/services/birthdays.js');
+const { waitForExternalJobs } = await import('../server/utils/restore-state.js');
+
+// Die Route stösst nach der Antwort einen Sofortversuch an (#2565). Er läuft
+// gegen die Server dieser Suite und darf nicht in den nächsten Test hinein
+// buchen, nachdem der seine Tabellen geleert hat.
+test.afterEach(() => waitForExternalJobs());
 
 const userId = Number(db.prepare(
   "INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')"
@@ -1098,4 +1104,60 @@ test('das Zielkonto eines lokalen Termins wird gelöscht: das Ziel fällt mit, d
   // in keinem Kalender zu stehen.
   const membership = db.prepare(`SELECT ${localCalendarIdSql()} AS id FROM calendar_events e WHERE e.id = ?`).get(id).id;
   assert.equal(membership, db.prepare('SELECT id FROM local_calendars WHERE is_default = 1').get().id);
+});
+
+// ── 8: Sofortversuch für einen neuen Termin (#2565) ─────────────────────────────
+
+test('ein neuer Termin mit CalDAV-Ziel geht beim Speichern hinauf, nicht erst mit dem Lauf (#2565)', async () => {
+  const { a, b } = twoAccounts();
+
+  const res = await api('POST', '', newEvent({ target_caldav_account_id: a.accountId, target_caldav_calendar_url: a.url }));
+  assert.equal(res.status, 201);
+  const id = (await res.json()).data.id;
+  // Kein sync(): nur der Versuch, den die Route anstösst.
+  await waitForExternalJobs();
+
+  const uploads = a.dav.seen('PUT').filter((r) => r.body.includes('SUMMARY:Neu'));
+  assert.equal(uploads.length, 1, `der neue Termin kam nicht beim Server an: ${a.dav.requests.map(describe).join(', ')}`);
+  assert.equal(senderOf(uploads[0]).user, 'user-a', 'hochgeladen über ein anderes Konto');
+  assert.deepEqual(writesAt(b.dav).map(describe), [], 'das andere Konto hat geschrieben');
+  assert.equal(row(id).external_source, 'caldav', 'der Upload wurde nicht gebucht');
+  assert.equal(row(id).caldav_account_id, a.accountId);
+  assert.equal(row(id).external_object_url, `${a.url}${outbound.eventUidFor(id)}.ics`);
+
+  // Der nächste Lauf lädt ihn nicht ein zweites Mal hoch.
+  await caldavSync.sync();
+  assert.equal(a.dav.seen('PUT').filter((r) => r.body.includes('SUMMARY:Neu')).length, 1, 'der Lauf hat den Termin noch einmal hochgeladen');
+});
+
+test('nimmt der Server den neuen Termin nicht an, wird trotzdem gespeichert und der Lauf holt nach (#2565)', async () => {
+  const { a } = twoAccounts();
+  a.dav.refuse({ method: 'PUT', status: 503, once: true });
+
+  const res = await api('POST', '', newEvent({ target_caldav_account_id: a.accountId, target_caldav_calendar_url: a.url }));
+  assert.equal(res.status, 201, 'das Speichern hing am Server');
+  const id = (await res.json()).data.id;
+  await waitForExternalJobs();
+
+  assert.equal(a.dav.seen('PUT').length, 1, 'der Sofortversuch fand nicht statt');
+  assert.equal(row(id).external_source, 'local', 'ein abgelehnter Upload wurde gebucht');
+  assert.equal(row(id).target_caldav_account_id, a.accountId, 'das Ziel ging verloren');
+
+  await caldavSync.sync();
+  assert.equal(row(id).external_source, 'caldav', 'der Lauf hat den wartenden Termin nicht nachgeholt');
+});
+
+test('bekommt ein lokaler Termin beim Bearbeiten ein CalDAV-Ziel, geht er sofort hinauf (#2565)', async () => {
+  const { a } = twoAccounts();
+  const res = await api('POST', '', newEvent({}));
+  const id = (await res.json()).data.id;
+  await waitForExternalJobs();
+  assert.equal(writesAt(a.dav).length, 0, 'ein Termin ohne Ziel wurde gesendet');
+
+  const put = await api('PUT', `/${id}`, { target_caldav_account_id: a.accountId, target_caldav_calendar_url: a.url });
+  assert.equal(put.status, 200);
+  await waitForExternalJobs();
+
+  assert.equal(a.dav.seen('PUT').filter((r) => r.body.includes('SUMMARY:Neu')).length, 1, 'das neue Ziel bekam den Termin erst mit dem Lauf');
+  assert.equal(row(id).external_source, 'caldav');
 });
