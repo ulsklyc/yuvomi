@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **Mirrored Mealie recipes show their preparation steps as readable text (#2558).** A step with
+  an inserted image showed the raw `<img>` tag, and formatting or HTML entities appeared as
+  symbols. Steps now arrive as plain text with their lists and links; images in steps are left
+  out, because they live on the Mealie server. Recipes mirrored from Mealie or Tandoor also bring
+  their serving count, so the servings stepper starts from the right base (#2355). Already
+  mirrored recipes are corrected on the next sync.
 - **A new event in a synced calendar reaches CalDAV, iCloud and Google when you save it (#2565).**
   Edits, moves and deletions were sent right away, but a newly created event waited for the next
   sync run, up to `SYNC_INTERVAL_MINUTES` later, although the documentation promised an attempt on
