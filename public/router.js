@@ -28,6 +28,7 @@ import { BULK_PILL_LAYER, clearBulkPill } from '/utils/bulk-pill.js';
 import { dismissFilterPopovers } from '/utils/filter-sheet.js';
 import { watchToastPlacement } from '/utils/toast-placement.js';
 import { COMPOSITION_MODES } from '/utils/page-layout.js';
+import { applyModuleColorOverrides } from '/utils/module-color-overrides.js';
 import { init as initReminders, stop as stopReminders } from '/reminders.js';
 import { initPush, stopPush, reportWallPauseState } from '/push.js';
 import { numberLocaleFor } from '/settings/region-presets.js';
@@ -1025,23 +1026,6 @@ function applyStartPreferences(res) {
   // Per-user module colour overrides (#1115): inject a <style> block into
   // <head> so --module-X tokens on :root reflect the chosen colour.
   applyModuleColorOverrides(res?.data?.module_colors);
-}
-
-function applyModuleColorOverrides(colors) {
-  const existing = document.getElementById('module-color-overrides');
-  if (!colors || typeof colors !== 'object' || !Object.keys(colors).length) {
-    if (existing) existing.remove();
-    return;
-  }
-  const declarations = Object.entries(colors)
-    .filter(([, v]) => /^#[0-9a-fA-F]{6}$/.test(v))
-    .map(([id, color]) => `  --module-${id}: ${color};`)
-    .join('\n');
-  if (!declarations) { if (existing) existing.remove(); return; }
-  const style = existing ?? document.createElement('style');
-  style.id = 'module-color-overrides';
-  style.textContent = `:root {\n${declarations}\n}`;
-  if (!existing) document.head.appendChild(style);
 }
 
 async function syncThirdPartyModules({ forceLocales = false } = {}) {
@@ -5427,6 +5411,9 @@ function forgetSessionState() {
   // Offline-API-Cache leeren: Session-Ende → keine gecachten Daten zurücklassen,
   // die der nächste Nutzer am selben Gerät offline sehen könnte.
   clearApiCache();
+  // Modulfarben gehoeren der Sitzung: der naechste Nutzer am selben Geraet
+  // soll nicht die Farben des Vorgaengers sehen, bis /preferences antwortet.
+  applyModuleColorOverrides(null);
   // Der Layout-Hinweis des Dashboards gehoert derselben Sitzung: ohne ihn sagt
   // das Skelett am geteilten Tablett das Raster des Vorgaengers voraus.
   forgetLayoutHint();

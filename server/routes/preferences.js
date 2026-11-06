@@ -483,8 +483,11 @@ function parseModuleColors(raw) {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     const result = {};
     for (const [key, val] of Object.entries(parsed)) {
-      if (MODULE_ORDER_RE.test(key) && HEX_COLOR_RE.test(val)) {
-        result[key] = val;
+      if (!MODULE_ORDER_RE.test(key)) continue;
+      if (typeof val === 'object' && val !== null && !Array.isArray(val)
+          && typeof val.light === 'string' && HEX_COLOR_RE.test(val.light)
+          && typeof val.dark === 'string' && HEX_COLOR_RE.test(val.dark)) {
+        result[key] = { light: val.light, dark: val.dark };
       }
     }
     return result;
@@ -1075,10 +1078,16 @@ router.put('/', (req, res) => {
           delete merged[key];
           continue;
         }
-        if (!HEX_COLOR_RE.test(val)) {
-          return res.status(400).json({ error: `module_colors: "${key}" must be a hex color (#RRGGBB) or null.`, code: 400 });
+        if (typeof val !== 'object' || Array.isArray(val) || val === null) {
+          return res.status(400).json({ error: `module_colors: "${key}" must be {light, dark} or null.`, code: 400 });
         }
-        merged[key] = val;
+        if (typeof val.light !== 'string' || !HEX_COLOR_RE.test(val.light)) {
+          return res.status(400).json({ error: `module_colors: "${key}.light" must be a hex color (#RRGGBB).`, code: 400 });
+        }
+        if (typeof val.dark !== 'string' || !HEX_COLOR_RE.test(val.dark)) {
+          return res.status(400).json({ error: `module_colors: "${key}.dark" must be a hex color (#RRGGBB).`, code: 400 });
+        }
+        merged[key] = { light: val.light, dark: val.dark };
       }
       if (Object.keys(merged).length > 30) {
         return res.status(400).json({ error: 'module_colors: at most 30 entries.', code: 400 });

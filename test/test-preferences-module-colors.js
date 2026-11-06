@@ -1,9 +1,10 @@
 /**
  * Test: Preferences – module_colors per-user override (#1115)
  * Zweck: GET gibt module_colors als leeres Objekt zurueck, wenn nichts gesetzt
- *        ist; PUT speichert Farben und gibt sie im Echo zurueck; PUT wirft 400
- *        auf ungueltige Farb-Strings und ungueltige Modul-IDs; null/leerer Wert
- *        entfernt den Eintrag; maximal 30 Eintraege.
+ *        ist; PUT speichert Farben als {light, dark}-Paare und gibt sie im Echo
+ *        zurueck; PUT wirft 400 auf ungueltige Farb-Strings; unbekannte Modul-IDs
+ *        werden still ignoriert; null/leerer Wert entfernt den Eintrag;
+ *        maximal 30 Eintraege.
  * Ausführen: node --experimental-sqlite --test test/test-preferences-module-colors.js
  */
 
@@ -48,48 +49,75 @@ test('GET: module_colors is an empty object by default', async () => {
   assert.deepEqual(json.data.module_colors, {});
 });
 
-test('PUT: valid hex colours are stored and echoed', async () => {
-  const colors = { tasks: '#4f46e5', calendar: '#16a34a' };
+test('PUT: valid {light, dark} pairs are stored and echoed', async () => {
+  const colors = {
+    tasks:    { light: '#4f46e5', dark: '#818cf8' },
+    calendar: { light: '#16a34a', dark: '#4ade80' },
+  };
   const { status, json } = await call('PUT', { module_colors: colors });
   assert.equal(status, 200);
-  assert.equal(json.data.module_colors.tasks, '#4f46e5');
-  assert.equal(json.data.module_colors.calendar, '#16a34a');
+  assert.deepEqual(json.data.module_colors.tasks,    { light: '#4f46e5', dark: '#818cf8' });
+  assert.deepEqual(json.data.module_colors.calendar, { light: '#16a34a', dark: '#4ade80' });
 });
 
 test('GET after PUT: persisted colours are returned', async () => {
   const { json } = await call('GET');
-  assert.equal(json.data.module_colors.tasks, '#4f46e5');
-  assert.equal(json.data.module_colors.calendar, '#16a34a');
+  assert.deepEqual(json.data.module_colors.tasks,    { light: '#4f46e5', dark: '#818cf8' });
+  assert.deepEqual(json.data.module_colors.calendar, { light: '#16a34a', dark: '#4ade80' });
 });
 
 test('PUT: null value removes a colour entry', async () => {
   const { json } = await call('PUT', { module_colors: { tasks: null } });
   assert.equal(json.data.module_colors.tasks, undefined);
-  assert.equal(json.data.module_colors.calendar, '#16a34a');
+  assert.deepEqual(json.data.module_colors.calendar, { light: '#16a34a', dark: '#4ade80' });
 });
 
-test('PUT: 400 on invalid hex string', async () => {
-  const { status } = await call('PUT', { module_colors: { tasks: 'blue' } });
+test('PUT: 400 on flat hex string instead of {light, dark}', async () => {
+  const { status } = await call('PUT', { module_colors: { tasks: '#4f46e5' } });
   assert.equal(status, 400);
 });
 
-test('PUT: 400 on 3-digit hex', async () => {
-  const { status } = await call('PUT', { module_colors: { tasks: '#abc' } });
+test('PUT: 400 when light is missing', async () => {
+  const { status } = await call('PUT', { module_colors: { tasks: { dark: '#818cf8' } } });
+  assert.equal(status, 400);
+});
+
+test('PUT: 400 when dark is missing', async () => {
+  const { status } = await call('PUT', { module_colors: { tasks: { light: '#4f46e5' } } });
+  assert.equal(status, 400);
+});
+
+test('PUT: 400 on invalid hex in light', async () => {
+  const { status } = await call('PUT', { module_colors: { tasks: { light: 'blue', dark: '#818cf8' } } });
+  assert.equal(status, 400);
+});
+
+test('PUT: 400 on 3-digit hex in dark', async () => {
+  const { status } = await call('PUT', { module_colors: { tasks: { light: '#4f46e5', dark: '#abc' } } });
+  assert.equal(status, 400);
+});
+
+test('PUT: array coercion is rejected (typeof check)', async () => {
+  const { status } = await call('PUT', { module_colors: { tasks: { light: ['#4f46e5'], dark: '#818cf8' } } });
   assert.equal(status, 400);
 });
 
 test('PUT: unknown module id is silently ignored', async () => {
-  const { status, json } = await call('PUT', { module_colors: { nonexistent_module: '#ff0000', budget: '#cc0000' } });
+  const { status, json } = await call('PUT', {
+    module_colors: {
+      nonexistent_module: { light: '#ff0000', dark: '#cc0000' },
+      budget:             { light: '#cc0000', dark: '#ff4444' },
+    },
+  });
   assert.equal(status, 200);
   assert.equal(json.data.module_colors.nonexistent_module, undefined);
-  assert.equal(json.data.module_colors.budget, '#cc0000');
+  assert.deepEqual(json.data.module_colors.budget, { light: '#cc0000', dark: '#ff4444' });
 });
 
 test('PUT: 400 when more than 30 entries', async () => {
   const colors = {};
-  // Use valid module IDs by generating third-party ones
   for (let i = 0; i < 31; i++) {
-    colors[`third-party-mod${String(i).padStart(2, '0')}a`] = '#ff0000';
+    colors[`third-party-mod${String(i).padStart(2, '0')}a`] = { light: '#ff0000', dark: '#cc0000' };
   }
   const { status } = await call('PUT', { module_colors: colors });
   assert.equal(status, 400);
@@ -101,10 +129,8 @@ test('PUT: 400 when module_colors is an array', async () => {
 });
 
 test('PUT: empty object is a no-op (PATCH semantics)', async () => {
-  await call('PUT', { module_colors: { budget: '#ff0000' } });
+  await call('PUT', { module_colors: { budget: { light: '#ff0000', dark: '#cc0000' } } });
   const { json } = await call('PUT', { module_colors: {} });
-  // Empty payload changes nothing; previously-set budget colour stays.
-  assert.equal(json.data.module_colors.budget, '#ff0000');
-  // Clean up for future tests: explicitly null it out.
+  assert.deepEqual(json.data.module_colors.budget, { light: '#ff0000', dark: '#cc0000' });
   await call('PUT', { module_colors: { budget: null } });
 });
