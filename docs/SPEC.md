@@ -747,6 +747,27 @@ rejects a grouped "1.000" instead of silently reading it as one.
 `store_id` is `ON DELETE SET NULL`, not `RESTRICT`: deleting a shop keeps every price and only
 clears the assignment. What was once paid stays true.
 
+### Shopping Purchases (migration v280, #1003) (v2.86.0)
+Purchase price history: ticking off or clearing a priced item records one purchase. An item
+without a price or without a name records nothing.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| item_name | TEXT | NOT NULL - the item name at purchase time, matched `COLLATE NOCASE` |
+| price_cents | INTEGER | NOT NULL, CHECK >= 0 - minor units, as in `shopping_items` |
+| store_id | INTEGER | FK → `shopping_stores` (**SET NULL**), nullable |
+| shopping_item_id | INTEGER | FK → `shopping_items` (**SET NULL**), nullable; UNIQUE while not NULL |
+| purchased_at | TEXT | NOT NULL, ISO 8601 |
+| created_at | TEXT | NOT NULL, ISO 8601 |
+
+While the item is still on the list, `shopping_item_id` ties the purchase to it: ticking the same
+item again updates that one row (name, price, shop) instead of adding a second. Unticking it,
+removing its price, or deleting that single item (swipe, "Delete" in the detail sheet) counts as
+not bought and removes the row. Only "Remove checked" keeps it: clearing turns the column to `NULL`
+through `ON DELETE SET NULL`, and from then on the row is permanent history. Index `idx_shopping_purchases_name_date` serves the lookup of
+the last purchase by name, newest first.
+
 ### Shopping List Changes (migration v196)
 One row per list, a counter that says *that* the list or its items changed, never what. Every
 list has a row from the start (backfilled with 0 for existing lists, an insert trigger on
@@ -1169,6 +1190,7 @@ version on a newer database.
 | target_outlook_calendar_id | TEXT | Microsoft Graph calendar ID for the one-way push (migration v134), nullable |
 | visibility | TEXT | NOT NULL DEFAULT `all` — `all` \| `assignees` \| `private`; who may see the event (migration v78, same rule as Tasks) |
 | countdown | INTEGER | NOT NULL DEFAULT 0 (migration v150, #647) — 1 puts the event on the Countdown widget. A Yuvomi-only display setting in the same group as `icon` and `visibility`: it is not in `MIRRORED_FIELDS`, so setting it pushes nothing to Google or CalDAV, and the inbound path writes a fixed column list, so it survives every sync run. For a recurring series the widget counts to the **next** occurrence, skipping any date excluded via [Calendar Event Exceptions](#calendar-event-exceptions) |
+| provider_status | TEXT | nullable, CHECK `TENTATIVE` \| `CONFIRMED` \| `CANCELLED` (migration v281, #2499) (v2.86.0) — the `STATUS` the provider reports. Owned by the inbound path (ICS subscription, CalDAV, iCloud), which rewrites it on every fetch, back to `CONFIRMED` or `NULL` too; local events stay `NULL`. `CANCELLED` silences reminders and keeps the event off dashboard, Today, wall tablet and countdowns; the calendar shows it struck through. The own ICS feed exports `STATUS:CANCELLED` |
 
 The concrete last-day preview is deliberately limited to the recurrence subset the form itself can
 write. Imported rules carrying extra filters (for example `BYDAY`) retain their generic explanation:

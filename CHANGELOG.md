@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.86.0] - 2026-11-07
+
 ### Added
 - **Late completion decay (opt-in).** Households can have late completions pay less: administrators
   switch it on in the rewards settings, off by default. A task ticked off after its due day earns one
