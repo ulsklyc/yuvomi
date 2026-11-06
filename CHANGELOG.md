@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from and how many days it was late.
 - **A failed automatic backup now tells the administrators (#2519).** When the nightly backup
   does not run, every administrator gets a push notification pointing at Settings > Household >
-  Backup, where the reason is shown in full. Until now the failure was silent and only visible to
+  Backup and restore, where the reason is shown in full. Until now the failure was silent and only visible to
   someone who happened to open that page. The notification carries no technical error text - that
   belongs in the log and in the app - and two failed nights replace one notification instead of
   stacking up. A successful run afterwards clears the warning by itself.
