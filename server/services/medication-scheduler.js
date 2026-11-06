@@ -118,7 +118,7 @@ async function processDueMedicationsUntracked({
   const { dateKey, time: nowTime } = householdWallClock(activeDb, now);
 
   const schedules = activeDb.prepare(`
-    SELECT s.*, m.user_id AS owner_id, m.name AS med_name, u.display_name AS owner_name
+    SELECT s.*, m.user_id AS owner_id, m.name AS med_name, m.visibility AS med_visibility, u.display_name AS owner_name
     FROM medication_schedules s
     JOIN medications m ON m.id = s.medication_id
     JOIN users u ON u.id = m.user_id
@@ -154,7 +154,7 @@ async function processDueMedicationsUntracked({
     counters.created += 1;
     newlyDue.push({
       ownerId: s.owner_id, ownerName: s.owner_name, medName: s.med_name,
-      medicationId: s.medication_id, scheduledAt,
+      medicationId: s.medication_id, scheduledAt, isFamily: s.med_visibility === 'family',
     });
   }
 
@@ -196,7 +196,8 @@ async function processDueMedicationsUntracked({
         log.error(`Web Push failed for medication ${dose.medicationId}:`, err?.message || err);
       }
 
-      const channels = store.listEnabledChannelsForUser(recipient.userId);
+      const channels = store.listEnabledChannelsForUser(recipient.userId)
+        .filter((channel) => dose.isFamily || channel.scope === 'user');
       for (const channel of channels) {
         const provider = providers[channel.provider];
         if (!provider) continue;

@@ -153,6 +153,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   download builds a full copy of the database on the server, so a hijacked admin session could
   keep it busy by requesting one after another. Further downloads in the same hour are refused;
   other administrators are not affected, and members still get no download at all.
+- **Private medications no longer show up in household notification channels.** A due dose went
+  to every channel the person could use, so a household channel (ntfy, Gotify, webhook or e-mail)
+  got the name of each medication, private ones included, and another copy for each caregiver with
+  the person's name in front. Reminders for a private medication now go out by push only (and to a
+  channel of the person's own, where one exists). Medications visible to the family reach the
+  household channel as before.
 
 ### Changed
 - **The app stores and catalogs no longer ask for a session secret.** Since 2.85.0 a new
