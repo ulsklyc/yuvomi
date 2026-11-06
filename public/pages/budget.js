@@ -4552,6 +4552,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
   const curInterval = isEdit && entry.recurrence_interval ? entry.recurrence_interval : 'monthly';
   // „Alle N" (#636). Bestandsserien tragen 1, solange niemand etwas anderes wählt.
   const curCount = Math.min(MAX_INTERVAL_COUNT, Math.max(1, Number(isEdit && entry.recurrence_interval_count) || 1));
+  const curEndDate = (isEdit && (entry.series_end_date ?? entry.series?.end_date)) || '';
 
   // KEINE VORBELEGTE KATEGORIE (Re-Critique 2026-09-27, A5 P2-4). Die erste
   // Kategorie stand vorgewaehlt - "Wohnen / Zuhause" mit "Miete / Kreditrate":
@@ -4701,6 +4702,10 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
 
         <div class="form-group" id="bm-recurrence-options" ${isEdit && entry.is_recurring ? '' : 'hidden'}>
           ${budgetIntervalFieldsHtml('bm', curInterval, curCount)}
+          <div class="form-row">
+            <label class="form-label" for="bm-end-date">${t('budget.seriesEndDateLabel')}</label>
+            <input type="date" class="form-input" id="bm-end-date" value="${esc(curEndDate)}">
+          </div>
           ${formSwitchRowHtml({
             label: t('budget.virtualBudgetLabel'), checked: Boolean(isEdit && entry.recurrence_virtual),
             hint: t('budget.virtualBudgetHint'), hintId: 'bm-virtual-hint', attrs: { id: 'bm-virtual' },
@@ -4985,6 +4990,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
         const recurring  = panel.querySelector('#bm-recurring').checked ? 1 : 0;
         const interval   = panel.querySelector('#bm-interval').value;
         const intervalN  = Math.min(MAX_INTERVAL_COUNT, Math.max(1, parseInt(panel.querySelector('#bm-interval-count').value, 10) || 1));
+        const endDate    = panel.querySelector('#bm-end-date')?.value || null;
         const virtual    = recurring && panel.querySelector('#bm-virtual').checked ? 1 : 0;
         const confirmFirst = recurring && panel.querySelector('#bm-confirm-first').checked ? 1 : 0;
         const accountSel = panel.querySelector('#bm-account');
@@ -5015,6 +5021,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
             recurrence_interval_count: intervalN,
             recurrence_virtual: virtual,
             recurrence_confirm: confirmFirst,
+            ...(recurring && endDate !== undefined ? { end_date: endDate } : {}),
           };
           if (accountId !== undefined) body.account_id = accountId;
           // Zustaendige (#1057): nur mitsenden, wenn der Picker ueberhaupt da
@@ -5816,6 +5823,7 @@ const BUDGET_REFUSALS = new Map([
   ['entry_subcategory_invalid', ['#bm-subcategory', 'budget.subcategoryRequired']],
   ['entry_date_invalid', ['#bm-date, #cb-date', 'calendar.invalidDate']],
   ['entry_start_date_invalid', ['#bm-date', 'calendar.invalidDate']],
+  ['entry_end_date_invalid', [null, 'calendar.invalidDate']],
   ['entry_account_invalid', ['#bm-account', 'budget.accountNotFound']],
   ['entry_responsible_invalid', [null, 'budget.responsibleNotMember']],
   ['series_start_too_early', ['#bm-date', 'budget.seriesStartTooEarly']],
@@ -6501,6 +6509,7 @@ function changedSeriesBody(body, entry, { amount, keepRhythm }) {
     account_id: entry.account_id ?? null,
     visibility: entry.visibility,
     responsible_user_ids: (entry.responsible_users ?? []).map((u) => u.id),
+    end_date: entry.series_end_date ?? entry.series?.end_date ?? null,
   };
   const same = (a, b) => (Array.isArray(a) && Array.isArray(b)
     ? a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i])

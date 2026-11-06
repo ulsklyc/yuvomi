@@ -1545,6 +1545,7 @@
         "intervalMonthly": "Månadsvis",
         "intervalWeekly": "Varje vecka",
         "intervalYearly": "Årsvis",
+        "seriesEndDateLabel": "Slutar den (valfritt)",
         "confirmFirstLabel": "Bokför först efter bekräftelse",
         "confirmFirstHint": "Varje skapad post väntar på din bekräftelse. Fram till dess syns den i listan men räknas inte in i någon summa - belopp och datum kan justeras vid bekräftelsen.",
         "pendingBadge": "Förväntad",
