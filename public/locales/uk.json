@@ -3774,7 +3774,9 @@
         "backupRestoreErrorTooLarge": "Файл більший за ліміт завантаження цієї інсталяції ({{limit}}). Збільште BACKUP_UPLOAD_LIMIT, перезапустіть Yuvomi і відновіть ще раз. Тут нічого не змінилося.",
         "apiTokenErrorNameTooLong": "Назва може містити не більше 100 символів.",
         "apiTokenErrorExpiryPast": "Термін дії вже минув. Вибери пізніший час.",
-        "apiTokenErrorSubjectDeactivated": "Цей обліковий запис деактивовано, і він не може отримати токен. Вибери іншу особу."
+        "apiTokenErrorSubjectDeactivated": "Цей обліковий запис деактивовано, і він не може отримати токен. Вибери іншу особу.",
+        "dmsErrorUrlInvalid": "URL сервера має починатися з http:// або https://.",
+        "dmsErrorAccountExists": "З цим URL сервера вже підключено DMS."
     },
     "login": {
         "tagline": "З поверненням. Ваш дім - в одному місці.",
@@ -5023,7 +5025,9 @@
         "colorTeal": "Бірюзовий",
         "colorOrange": "Помаранчевий",
         "colorRed": "Червоний",
-        "colorGrey": "Сірий"
+        "colorGrey": "Сірий",
+        "errorGone": "Цієї категорії більше немає.",
+        "errorSubGone": "Цієї підкатегорії більше немає."
     },
     "subscriptions": {
         "tabLabel": "Підписки",
@@ -6721,7 +6725,10 @@
             "bag_many": "пакетів",
             "bag_other": "пакета"
         },
-        "moreDetailsHint": "Мінімальний запас, нотатки"
+        "moreDetailsHint": "Мінімальний запас, нотатки",
+        "errorLocationGone": "Цього місця зберігання більше немає.",
+        "errorLocationExists": "Таке місце зберігання вже є. Виберіть іншу назву.",
+        "errorLocationLast": "Останнє місце зберігання не можна видалити. Спочатку додайте інше."
     },
     "inventory": {
         "title": "Інвентар",

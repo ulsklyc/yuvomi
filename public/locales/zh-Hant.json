@@ -3548,7 +3548,9 @@
         "backupRestoreErrorTooLarge": "檔案超過此安裝的上傳上限（{{limit}}）。請提高 BACKUP_UPLOAD_LIMIT，重新啟動 Yuvomi 後再還原一次。這裡沒有做任何變更。",
         "apiTokenErrorNameTooLong": "名稱最多 100 個字元。",
         "apiTokenErrorExpiryPast": "到期日已經過去。請選擇較晚的時間。",
-        "apiTokenErrorSubjectDeactivated": "此帳號已停用，無法取得權杖。請選擇其他人。"
+        "apiTokenErrorSubjectDeactivated": "此帳號已停用，無法取得權杖。請選擇其他人。",
+        "dmsErrorUrlInvalid": "伺服器網址必須以 http:// 或 https:// 開頭。",
+        "dmsErrorAccountExists": "已有 DMS 以此伺服器網址連線。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",
@@ -4763,7 +4765,9 @@
         "colorTeal": "青色",
         "colorOrange": "橙色",
         "colorRed": "紅色",
-        "colorGrey": "灰色"
+        "colorGrey": "灰色",
+        "errorGone": "該類別已不存在。",
+        "errorSubGone": "該子類別已不存在。"
     },
     "subscriptions": {
         "tabLabel": "訂閱",
@@ -6399,7 +6403,10 @@
             "bag_one": "袋",
             "bag_other": "袋"
         },
-        "moreDetailsHint": "最低庫存、備註"
+        "moreDetailsHint": "最低庫存、備註",
+        "errorLocationGone": "該存放位置已不存在。",
+        "errorLocationExists": "已有同名存放位置。請換一個名稱。",
+        "errorLocationLast": "最後一個存放位置無法刪除。請先新增另一個。"
     },
     "inventory": {
         "title": "物品",

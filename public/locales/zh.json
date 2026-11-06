@@ -3548,7 +3548,9 @@
         "backupRestoreErrorTooLarge": "文件超过此安装的上传上限（{{limit}}）。请提高 BACKUP_UPLOAD_LIMIT，重启 Yuvomi 后再恢复一次。这里没有做任何更改。",
         "apiTokenErrorNameTooLong": "名称最多 100 个字符。",
         "apiTokenErrorExpiryPast": "到期日期已经过去。请选择更晚的时间。",
-        "apiTokenErrorSubjectDeactivated": "此账户已停用，无法获得令牌。请选择其他人。"
+        "apiTokenErrorSubjectDeactivated": "此账户已停用，无法获得令牌。请选择其他人。",
+        "dmsErrorUrlInvalid": "服务器网址必须以 http:// 或 https:// 开头。",
+        "dmsErrorAccountExists": "已有 DMS 以此服务器网址连接。"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",
@@ -4763,7 +4765,9 @@
         "colorTeal": "青色",
         "colorOrange": "橙色",
         "colorRed": "红色",
-        "colorGrey": "灰色"
+        "colorGrey": "灰色",
+        "errorGone": "该类别已不存在。",
+        "errorSubGone": "该子类别已不存在。"
     },
     "subscriptions": {
         "tabLabel": "订阅",
@@ -6399,7 +6403,10 @@
             "bag_one": "袋",
             "bag_other": "袋"
         },
-        "moreDetailsHint": "最低库存、备注"
+        "moreDetailsHint": "最低库存、备注",
+        "errorLocationGone": "该存放位置已不存在。",
+        "errorLocationExists": "已有同名存放位置。请换一个名称。",
+        "errorLocationLast": "最后一个存放位置无法删除。请先添加另一个。"
     },
     "inventory": {
         "title": "物品",

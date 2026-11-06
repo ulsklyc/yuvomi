@@ -186,6 +186,7 @@ const PARENT_GONE = '`tasks_parent_not_found` (404, `parent_task_id` names a tas
 const COMMENT_GONE = `${TASK_GONE}, \`tasks_comment_not_found\` (404, the task is there, the comment is not - deleted in the meantime)`;
 const REORDER_DENIED = '`reorder_not_allowed` (403, the caller lacks `tasks_reorder_family` - the hand order belongs to the household, R23)';
 const CAT_EXISTS = '`category_exists` (409, a category with this name already exists)';
+const CAT_GONE = '`tasks_category_not_found` (404, the category does not exist - deleted)';
 const CAT_DELETE = '`category_in_use` (409, tasks still use the category; `count` carries how many), `category_last` (409, the last category cannot be deleted)';
 const TAG_GONE = '`tasks_tag_not_found` (404, renamed or removed in the meantime)';
 const FOREIGN_SERIES = '`task_foreign_series` (409, the task repeats in another app with a rule Yuvomi cannot follow - it is in `external_rrule` - and is ticked off there, #2506)';
@@ -205,7 +206,7 @@ const CASE_REASONS = {
   },
   '/api/v1/tasks/sync-targets': { get: '`cross_module_access` (403, the list is only for callers who may write tasks - for API tokens a `tasks:write` scope)' },
   '/api/v1/tasks/categories': { post: CAT_EXISTS },
-  '/api/v1/tasks/categories/{key}': { put: CAT_EXISTS, delete: CAT_DELETE },
+  '/api/v1/tasks/categories/{key}': { put: `${CAT_GONE}, ${CAT_EXISTS}`, delete: `${CAT_GONE}, ${CAT_DELETE}` },
   '/api/v1/tasks/{id}/completions': { get: TASK_GONE },
   '/api/v1/tasks/{id}/comments': { get: TASK_GONE, post: TASK_GONE },
   '/api/v1/tasks/{id}/comments/{commentId}': { patch: COMMENT_GONE, delete: COMMENT_GONE },

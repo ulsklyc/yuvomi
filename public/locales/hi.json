@@ -3548,7 +3548,9 @@
         "backupRestoreErrorTooLarge": "फ़ाइल इस इंस्टॉलेशन की अपलोड सीमा ({{limit}}) से बड़ी है। BACKUP_UPLOAD_LIMIT बढ़ाएँ, Yuvomi को फिर से शुरू करें और दोबारा पुनर्स्थापित करें। यहाँ कुछ नहीं बदला गया।",
         "apiTokenErrorNameTooLong": "नाम अधिकतम 100 अक्षरों का हो सकता है।",
         "apiTokenErrorExpiryPast": "समाप्ति तिथि बीत चुकी है। कोई बाद का समय चुनें।",
-        "apiTokenErrorSubjectDeactivated": "यह खाता निष्क्रिय है और इसे टोकन नहीं मिल सकता। किसी दूसरे व्यक्ति को चुनें।"
+        "apiTokenErrorSubjectDeactivated": "यह खाता निष्क्रिय है और इसे टोकन नहीं मिल सकता। किसी दूसरे व्यक्ति को चुनें।",
+        "dmsErrorUrlInvalid": "सर्वर URL http:// या https:// से शुरू होना चाहिए।",
+        "dmsErrorAccountExists": "इस सर्वर URL से एक DMS पहले से जुड़ा है।"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",
@@ -4763,7 +4765,9 @@
         "colorTeal": "फ़िरोज़ी",
         "colorOrange": "नारंगी",
         "colorRed": "लाल",
-        "colorGrey": "ग्रे"
+        "colorGrey": "ग्रे",
+        "errorGone": "यह श्रेणी अब मौजूद नहीं है।",
+        "errorSubGone": "यह उपश्रेणी अब मौजूद नहीं है।"
     },
     "subscriptions": {
         "tabLabel": "सदस्यताएँ",
@@ -6399,7 +6403,10 @@
             "bag_one": "थैली",
             "bag_other": "थैलियाँ"
         },
-        "moreDetailsHint": "न्यूनतम स्टॉक, नोट"
+        "moreDetailsHint": "न्यूनतम स्टॉक, नोट",
+        "errorLocationGone": "यह भंडारण स्थान अब मौजूद नहीं है।",
+        "errorLocationExists": "यह भंडारण स्थान पहले से मौजूद है। कोई दूसरा नाम चुनें।",
+        "errorLocationLast": "अंतिम भंडारण स्थान हटाया नहीं जा सकता। पहले कोई दूसरा जोड़ें।"
     },
     "inventory": {
         "title": "इन्वेंटरी",

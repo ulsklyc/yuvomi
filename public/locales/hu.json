@@ -3548,7 +3548,9 @@
         "backupRestoreErrorTooLarge": "A fájl nagyobb, mint ennek a telepítésnek a feltöltési korlátja ({{limit}}). Növeld a BACKUP_UPLOAD_LIMIT értékét, indítsd újra a Yuvomit, majd állítsd vissza újra. Itt semmi nem változott.",
         "apiTokenErrorNameTooLong": "A név legfeljebb 100 karakter hosszú lehet.",
         "apiTokenErrorExpiryPast": "A lejárati dátum a múltban van. Válassz egy későbbi időpontot.",
-        "apiTokenErrorSubjectDeactivated": "Ez a fiók inaktív, és nem kaphat tokent. Válassz másik személyt."
+        "apiTokenErrorSubjectDeactivated": "Ez a fiók inaktív, és nem kaphat tokent. Válassz másik személyt.",
+        "dmsErrorUrlInvalid": "A szerver URL-nek http:// vagy https:// előtaggal kell kezdődnie.",
+        "dmsErrorAccountExists": "Ezzel a szerver URL-lel már csatlakozik egy DMS."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",
@@ -4763,7 +4765,9 @@
         "colorTeal": "Türkiz",
         "colorOrange": "Narancs",
         "colorRed": "Piros",
-        "colorGrey": "Szürke"
+        "colorGrey": "Szürke",
+        "errorGone": "Ez a kategória már nem létezik.",
+        "errorSubGone": "Ez az alkategória már nem létezik."
     },
     "subscriptions": {
         "tabLabel": "Előfizetések",
@@ -6399,7 +6403,10 @@
             "bag_one": "tasak",
             "bag_other": "tasak"
         },
-        "moreDetailsHint": "Minimális készlet, jegyzetek"
+        "moreDetailsHint": "Minimális készlet, jegyzetek",
+        "errorLocationGone": "Ez a tárolási hely már nem létezik.",
+        "errorLocationExists": "Ez a tárolási hely már létezik. Válassz másik nevet.",
+        "errorLocationLast": "Az utolsó tárolási hely nem törölhető. Előbb adj hozzá egy másikat."
     },
     "inventory": {
         "title": "Leltár",

@@ -15,9 +15,9 @@
  *     fuer Routen, die ihre Labels auf dem Server uebersetzen (heute nur Budget, #1859)
  *   - Dispatcht nach jeder Mutation `category-manager-changed`
  *   - Zeigt Server-Guard-Fehler (in-use/last) als Toast
- *   - `errorFallbackKey`: der allgemeine Satz fuer einen Fehler ohne bekannten Grund.
- *     Wer ihn setzt, zeigt nie den Text des Servers (#1909, heute der Einkauf); ohne
- *     ihn bleibt der alte Rueckfall auf `err.message`, bis das Modul seine Gruende hat
+ *   - `errorFallbackKey`: der allgemeine Satz fuer einen Fehler ohne bekannten Grund,
+ *     ohne ihn `common.errorGeneric`. Der Text des Servers kommt nie in den Toast
+ *     (#1909): jedes Modul nennt die Faelle seines Verwalters als `reason`
  *   - `alreadyDeletedReason`: der `reason`, mit dem die Route des Aufrufers beim
  *     Loeschen sagt "diese Zeile gibt es nicht mehr" (jemand anderes war schneller).
  *     Wer ihn setzt, bekommt dafuer den Erfolgsweg statt eines Fehlers (#1909, heute
@@ -730,12 +730,9 @@ class CategoryManagerElement extends HTMLElement {
   // Server-Guard-Fehler in die UI-Sprache übersetzen: die Route liefert einen
   // stabilen `reason`-Code (+ optional `count`) in err.data.
   //
-  // Unbekannte Fehler (#1909): hat der Aufrufer `errorFallbackKey` gesetzt,
-  // sagt `errorSentence` den Satz - den eines anderen bekannten Grundes (der
-  // Laden heisst schon so, die Kategorie wurde inzwischen geloescht) oder den
-  // allgemeinen, nie den des Servers. Ohne den Schluessel bleibt der alte
-  // Rueckfall auf die Server-Meldung: die Routen jener Module nennen ihre
-  // Faelle noch nicht, und der allgemeine Satz sagte dort weniger als heute.
+  // Unbekannte Fehler (#1909): `errorSentence` sagt den Satz eines anderen
+  // bekannten Grundes (der Laden heisst schon so, die Kategorie wurde
+  // inzwischen geloescht) oder den allgemeinen der Stelle, nie den des Servers.
   _errMsg(err) {
     const reason = err?.data?.reason;
     const count = err?.data?.count;
@@ -747,9 +744,7 @@ class CategoryManagerElement extends HTMLElement {
       case 'subcategory_last':   return t('category.errorSubLast');
       case 'subcategory_exists': return t('category.errorSubExists');
       default:
-        return this._errorFallbackKey
-          ? errorSentence(err, this._errorFallbackKey)
-          : (err?.message ?? '');
+        return errorSentence(err, this._errorFallbackKey ?? 'common.errorGeneric');
     }
   }
 

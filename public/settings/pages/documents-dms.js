@@ -10,7 +10,7 @@ import {
   settingRowHtml,
 } from '/settings/components.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
-import { errorSentence } from '/utils/friendly-error.js';
+import { errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
 
 function showToast(message, tone = 'default') {
   window.yuvomi?.showToast(message, tone);
@@ -84,7 +84,9 @@ function buildAddForm(container) {
       showToast(t('settings.dmsConnected'), 'success');
       await reloadAfterSave(() => loadDmsAccounts(container));
     } catch (err) {
-      errorHost.replaceChildren(createInlineError(err.message ?? t('common.errorGeneric')));
+      // Leeres Pflichtfeld, Adresse ohne Schema, Adresse schon verbunden: der
+      // Server nennt den Fall (#1909), das Formular prueft selbst nichts.
+      errorHost.replaceChildren(createInlineError(errorSentence(err)));
     }
   });
 
@@ -174,7 +176,7 @@ async function loadDmsAccounts(container) {
     accounts = res.data ?? [];
   } catch (err) {
     listEl.replaceChildren(createRetryState({
-      message: err.message || t('common.errorGeneric'),
+      message: loadErrorSentence(err) ?? t('common.errorGeneric'),
       onRetry: reload,
     }));
     addHost.replaceChildren();

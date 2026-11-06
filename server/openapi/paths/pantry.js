@@ -1,4 +1,4 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 
 /**
  * `min_quantity` on a pantry item since #1448, step 3: the product's value,
@@ -10,7 +10,7 @@ const MIN_QUANTITY_MIRROR = '`min_quantity` on a pantry item is deprecated: it r
   + 'A replace or create without the field leaves the minimum of the product alone. Read the minimum from `products` instead.';
 
 export function pantryPaths() {
-  return {
+  return withCaseReasons('pantry', CASE_REASONS, {
     '/api/v1/pantry': {
       get: op({
         summary: 'List pantry items with storage locations and categories',
@@ -86,5 +86,16 @@ export function pantryPaths() {
       patch: op({ summary: 'Partially update pantry item', description: MIN_QUANTITY_MIRROR, tag: 'Pantry', params: [idParam('itemId', 'Item ID')], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete pantry item', tag: 'Pantry', params: [idParam('itemId', 'Item ID')], stateChanging: true }),
     },
-  };
+  });
 }
+
+// #1909: was der Lagerort-Verwalter erreicht.
+const LOCATION_EXISTS = '`pantry_location_exists` (409, a storage location with this name already exists)';
+const LOCATION_GONE = '`pantry_location_not_found` (404, the storage location does not exist - deleted)';
+const CASE_REASONS = {
+  '/api/v1/pantry/locations': { post: LOCATION_EXISTS },
+  '/api/v1/pantry/locations/{locId}': {
+    put: `${LOCATION_GONE}, ${LOCATION_EXISTS}`,
+    delete: `${LOCATION_GONE}, \`pantry_location_last\` (400, the last storage location cannot be deleted)`,
+  },
+};

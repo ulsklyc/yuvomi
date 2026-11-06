@@ -68,6 +68,8 @@ const NOTE_GONE = '`notes_note_not_found` (404, the note does not exist - delete
 const NOTE_LOCKED = '`note_locked` (403, the note is locked; only its creator and administrators can change it, ticking a checklist line included)';
 const CATEGORY_GONE = '`notes_selected_category_not_found` (400 or 409, a category in `category_ids` does not exist or is not available to you)';
 const NOT_OWNER = '`not_owner` (403, without the module\'s `*_edit_others` capability only notes you created; ticking a checklist line stays open can be changed or deleted - R23)';
+// #1909: eine fremde persoenliche Kategorie antwortet wie eine geloeschte.
+const NOTE_CATEGORY_GONE = '`notes_category_not_found` (404, the category does not exist - deleted, or it is another person\'s personal category)';
 const CASE_REASONS = {
   '/api/v1/notes': { post: CATEGORY_GONE },
   '/api/v1/notes/{id}': { put: `${NOTE_GONE}, ${CATEGORY_GONE}, ${NOTE_LOCKED}, ${NOT_OWNER} (a body with only \`category_ids\` stays open; changing \`visibility\` is the creator's, changing \`locked\` the creator's and administrators')`, delete: `${NOTE_GONE}, ${NOTE_LOCKED}, ${NOT_OWNER}` },
@@ -80,5 +82,9 @@ const CASE_REASONS = {
       + '`not_a_checklist_line` (409, the line is not a checklist item)',
   },
   '/api/v1/notes/categories': { post: '`category_exists` (409, a category with this name already exists)' },
-  '/api/v1/notes/categories/{id}': { put: '`category_exists` (409, a category with this name already exists)' },
+  '/api/v1/notes/categories/reorder': { patch: NOTE_CATEGORY_GONE },
+  '/api/v1/notes/categories/{id}': {
+    put: `${NOTE_CATEGORY_GONE}, \`category_exists\` (409, a category with this name already exists)`,
+    delete: NOTE_CATEGORY_GONE,
+  },
 };
