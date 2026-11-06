@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **Chinese and Japanese questions end in the full-width question mark.** Confirmations such as
+  signing out other devices or replacing a link used the narrow "?", which ran straight into the next
+  sentence.
 - **A damaged backup is no longer handed out as a good one (#2520).** Every backup is now checked
   for integrity right after it is written. One that fails is discarded: the download answers with
   an error instead of the file, a scheduled backup is reported as failed and does not push the
