@@ -6963,11 +6963,13 @@
         "reauthenticate": "Jelentkezz ki, majd vissza. Ezután öt percen belül módosítsd a jelkulcsokat.",
         "failed": "A jelkulcs ellenőrzése sikertelen. Próbáld újra vagy válassz másik módot.",
         "tooManyAttempts": "Túl sok próbálkozás. Próbáld később.",
-        "removeConfirm": "Eltávolítod ezt a jelkulcsot? Másik módon bejelentkezve újra hozzáadhatod.",
+        "removeConfirm": "Eltávolítod ezt a hozzáférési kulcsot, és kijelentkezel a többi eszközödről? Ez az eszköz bejelentkezve marad.",
         "signIn": "Bejelentkezés jelkulccsal",
         "reauthTitle": "Személyazonosság megerősítése",
-        "reauthLead": "A folytatáshoz erősítsd meg jelszóval vagy meglévő hozzáférési kulccsal. Ha a kétlépcsős hitelesítés aktív, add meg a kódját is.",
+        "reauthLead": "Erősítsd meg a jelszavaddal vagy egy meglévő hozzáférési kulccsal. Ha a jelszavadhoz kétlépcsős azonosítást használsz, a kódot is add meg.",
         "reauthFailed": "A megerősítés sikertelen. Ellenőrizd a jelszavad vagy a hozzáférési kulcsod és szükség esetén a második faktor kódját.",
-        "confirmWithPasskey": "Megerősítés hozzáférési kulccsal"
+        "confirmWithPasskey": "Megerősítés hozzáférési kulccsal",
+        "passwordChangeWarning": "A jelszó módosítása eltávolítja az összes hozzáférési kulcsodat. Utána add hozzá őket újra.",
+        "removed": "Hozzáférési kulcs eltávolítva."
     }
 }

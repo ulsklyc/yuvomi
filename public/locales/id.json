@@ -6963,11 +6963,13 @@
         "reauthenticate": "Keluar lalu masuk lagi. Kemudian ubah kunci dalam lima menit.",
         "failed": "Kunci tidak dapat diverifikasi. Coba lagi atau gunakan metode lain.",
         "tooManyAttempts": "Terlalu banyak percobaan. Coba lagi nanti.",
-        "removeConfirm": "Hapus kunci ini? Anda dapat menambahkannya lagi setelah masuk dengan metode lain.",
+        "removeConfirm": "Hapus kunci sandi ini dan keluarkan perangkat lain? Perangkat ini tetap masuk.",
         "signIn": "Masuk dengan kunci sandi",
         "reauthTitle": "Konfirmasi identitasmu",
-        "reauthLead": "Konfirmasi dengan kata sandi atau kunci sandi yang sudah ada untuk melanjutkan di sini. Jika autentikasi dua faktor aktif, masukkan juga kodenya.",
+        "reauthLead": "Konfirmasi dengan kata sandi atau kunci sandi yang ada. Jika menggunakan kata sandi dengan autentikasi dua faktor, masukkan juga kodenya.",
         "reauthFailed": "Konfirmasi gagal. Periksa kata sandi atau kunci sandi dan, jika diperlukan, kode faktor kedua.",
-        "confirmWithPasskey": "Konfirmasi dengan kunci sandi"
+        "confirmWithPasskey": "Konfirmasi dengan kunci sandi",
+        "passwordChangeWarning": "Mengubah kata sandi akan menghapus semua kunci sandi Anda. Tambahkan kembali setelahnya.",
+        "removed": "Kunci sandi dihapus."
     }
 }

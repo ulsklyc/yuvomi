@@ -6963,11 +6963,13 @@
         "reauthenticate": "Sign out and sign in again, then change your passkeys within five minutes.",
         "failed": "The passkey could not be verified. Start again or use another sign-in method.",
         "tooManyAttempts": "Too many attempts. Please try again later.",
-        "removeConfirm": "Remove this passkey? You can add it again after signing in with another method.",
+        "removeConfirm": "Remove this passkey and sign out your other devices? This device stays signed in.",
         "signIn": "Sign in with a passkey",
         "reauthTitle": "Confirm your identity",
-        "reauthLead": "Confirm with your password or an existing passkey to continue here. If two-factor authentication is enabled, enter its code too.",
+        "reauthLead": "Confirm with your password or an existing passkey. If you use your password with two-factor authentication, enter its code too.",
         "reauthFailed": "Confirmation failed. Check your password or passkey and, if required, your second-factor code.",
-        "confirmWithPasskey": "Confirm with a passkey"
+        "confirmWithPasskey": "Confirm with a passkey",
+        "passwordChangeWarning": "Changing your password removes all your passkeys. Add them again afterwards.",
+        "removed": "Passkey removed."
     }
 }

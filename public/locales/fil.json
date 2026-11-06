@@ -6963,11 +6963,13 @@
         "reauthenticate": "Mag-sign out at mag-sign in muli. Pagkatapos, baguhin ang mga passkey sa loob ng limang minuto.",
         "failed": "Hindi ma-verify ang passkey. Subukang muli o gumamit ng ibang paraan.",
         "tooManyAttempts": "Masyadong maraming pagsubok. Subukan ulit mamaya.",
-        "removeConfirm": "Alisin ang passkey na ito? Maaari itong idagdag muli matapos mag-sign in sa ibang paraan.",
+        "removeConfirm": "Alisin ang passkey na ito at mag-sign out sa iba mong device? Mananatiling naka-sign in ang device na ito.",
         "signIn": "Mag-sign in gamit ang passkey",
         "reauthTitle": "Kumpirmahin ang iyong pagkakakilanlan",
-        "reauthLead": "Kumpirmahin gamit ang password o kasalukuyang passkey para magpatuloy dito. Kung naka-enable ang two-factor authentication, ilagay din ang code nito.",
+        "reauthLead": "Kumpirmahin gamit ang password o kasalukuyang passkey. Kung gumagamit ka ng password na may two-factor authentication, ilagay din ang code nito.",
         "reauthFailed": "Hindi nakumpirma. Suriin ang password o passkey at, kung kailangan, ang code ng ikalawang hakbang.",
-        "confirmWithPasskey": "Kumpirmahin gamit ang passkey"
+        "confirmWithPasskey": "Kumpirmahin gamit ang passkey",
+        "passwordChangeWarning": "Aalisin ng pagpapalit ng password ang lahat ng iyong passkey. Idagdag silang muli pagkatapos.",
+        "removed": "Naalis na ang passkey."
     }
 }
