@@ -375,8 +375,12 @@
        app-store panels still said "recommended". Every surface says optional and
        irreversible, and the quick start on index.html now names the placeholder.
        Since the secrets are generated on the first start SESSION_SECRET is no
-       longer required either, so its badge is gone; the store forms that still
-       ask for it say so in their own steps. */
+       longer required either, so its badge is gone. The store forms no longer
+       ask for either secret: every form field is optional and every step says
+       so, which is what #2507 relaxed. The qualifier the steps carry is "on a
+       new installation" - an EXISTING encrypted database whose key field is
+       emptied does not get a fresh key, the start is refused instead
+       (server/db.js:647-660). */
     .env-irrev { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--r-full);
       background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warn-ink); }
     .env-desc { font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; }
@@ -743,7 +747,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         <div class="callout callout-info">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           <span>
-            <span data-t="portainer_info"><b>Using Portainer?</b> Deploy <code>docs/docker-compose.portainer.yml</code> as a stack instead of these steps. Portainer puts no <code>.env</code> next to a stack, so that file lists every variable itself, and <code>SESSION_SECRET</code> and <code>DB_ENCRYPTION_KEY</code> go under the stack's environment variables - both are required there.</span>
+            <span data-t="portainer_info"><b>Using Portainer?</b> Deploy <code>docs/docker-compose.portainer.yml</code> as a stack instead of these steps. Portainer puts no <code>.env</code> next to a stack, so that file lists every variable itself, and <code>SESSION_SECRET</code> and <code>DB_ENCRYPTION_KEY</code> go under the stack's environment variables - both may stay empty on a new installation, and Yuvomi generates them on the first start.</span>
             <span class="callout-links">
               <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/docker-compose.portainer.yml" target="_blank" rel="noopener" class="prereq-link" data-t="portainer_file">Compose file for Portainer</a>
               <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#option-g--portainer-stack-or-gitgitops" target="_blank" rel="noopener" class="prereq-link" data-t="portainer_guide">Portainer guide</a>
@@ -797,7 +801,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         opt_docker_info:'No Git, no build step - two files, a handful of commands and one edit in <code>.env</code>. On Portainer, see the note at the end of this path.',
         engine_label:'Commands for',
         win_note:'<b>On Windows:</b> in PowerShell, type <code>curl.exe</code> instead of <code>curl</code> - Windows PowerShell answers <code>curl</code> with a different command. PowerShell has no <code>openssl</code> for step 2: run these steps in WSL, or let the <a href="#installer">web installer</a> generate both values. <code>notepad .env</code> opens the file for editing.',
-        portainer_info:'<b>Using Portainer?</b> Deploy <code>docs/docker-compose.portainer.yml</code> as a stack instead of these steps. Portainer puts no <code>.env</code> next to a stack, so that file lists every variable itself, and <code>SESSION_SECRET</code> and <code>DB_ENCRYPTION_KEY</code> go under the stack\'s environment variables - both are required there.',
+        portainer_info:'<b>Using Portainer?</b> Deploy <code>docs/docker-compose.portainer.yml</code> as a stack instead of these steps. Portainer puts no <code>.env</code> next to a stack, so that file lists every variable itself, and <code>SESSION_SECRET</code> and <code>DB_ENCRYPTION_KEY</code> go under the stack\'s environment variables - both may stay empty on a new installation, and Yuvomi generates them on the first start.',
         portainer_file:'Compose file for Portainer',
         portainer_guide:'Portainer guide',
         step_a1_title:'Download the configuration files', step_a1_desc:'Run these two commands. They download the compose file and the template for your settings.',
@@ -810,7 +814,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         step_b1_title:'Clone the repository', step_b3_title:'Build and start', step_b3_desc:'The <code>--build</code> flag compiles the Docker image locally. This takes a few minutes the first time.',
         opt_truenas_info:'No terminal required. Yuvomi is in the TrueNAS SCALE Community Apps Catalog - install it directly from the TrueNAS web UI in a few clicks.',
         step_tn1_title:'Open the Apps Catalog', step_tn1_desc:'In your TrueNAS SCALE web UI, go to Apps → Discover Apps and search for Yuvomi.',
-        step_tn2_title:'Configure and install', step_tn2_desc:'Click Install. Set a strong value for Session Secret (required) and Database Encryption Key (optional, but irreversible once set - back it up). Adjust the port and storage paths if needed, then Install.',
+        step_tn2_title:'Configure and install', step_tn2_desc:'Click Install. Both fields are optional on a new installation: leave Session Secret and Database Encryption Key empty and Yuvomi generates them on the first start, next to the database. The encryption key is irreversible once set - back it up. Adjust the port and storage paths if needed, then Install.',
         step_tn3_title:'Open the WebUI', step_tn3_desc:'Once the app status shows Running, click WebUI in the Apps overview. The first visit walks you through creating your admin account directly in the browser.',
         opt_umbrel_info:'No terminal required. Install Yuvomi straight from the Umbrel App Store - everything runs on, and stays on, your Umbrel.',
         step_um1_title:'Open the App Store', step_um1_desc:'In your Umbrel dashboard, open the App Store and search for Yuvomi.',
@@ -818,7 +822,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         step_um3_title:'Open Yuvomi', step_um3_desc:'Launch Yuvomi from your Umbrel home screen. The first visit walks you through creating your admin account directly in the browser.',
         opt_unraid_info:'No terminal required. Yuvomi ships as a Community Applications template - add it straight from the Unraid Apps tab.',
         step_ur1_title:'Open Community Applications', step_ur1_desc:'In Unraid, open the Apps tab (the Community Applications plugin) and search for Yuvomi.',
-        step_ur2_title:'Configure the template', step_ur2_desc:'Click Install. Set SESSION_SECRET (required) and DB_ENCRYPTION_KEY (optional, but irreversible once set - back it up). Adjust the WebUI port and the appdata path if needed.',
+        step_ur2_title:'Configure the template', step_ur2_desc:'Click Install. SESSION_SECRET and DB_ENCRYPTION_KEY are optional on a new installation: leave them empty and Yuvomi generates them on the first start. DB_ENCRYPTION_KEY is irreversible once set - back it up. Adjust the WebUI port and the appdata path if needed.',
         step_ur3_title:'Apply and open', step_ur3_desc:'Click Apply. Once the container is running, click the Yuvomi icon → WebUI. The first visit walks you through creating your admin account.',
         tab_homeassistant:'Home Assistant',
         opt_ha_info:'No terminal required. Yuvomi runs as an app next to Home Assistant, on Home Assistant OS or a Supervised installation (amd64 or aarch64, such as a Raspberry Pi 4/5 or Home Assistant Green). It is Yuvomi itself, not an integration: it adds no entities.',
@@ -916,7 +920,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         opt_docker_info:'Kein Git, kein Build-Schritt - zwei Dateien, eine Handvoll Befehle und eine Änderung in der <code>.env</code>. Für Portainer steht ein Hinweis am Ende dieses Wegs.',
         engine_label:'Befehle für',
         win_note:'<b>Unter Windows:</b> in PowerShell <code>curl.exe</code> statt <code>curl</code> tippen - Windows PowerShell beantwortet <code>curl</code> mit einem anderen Befehl. <code>openssl</code> für Schritt 2 fehlt in PowerShell: führt diese Schritte in WSL aus, oder lasst den <a href="#installer">Web-Installer</a> beide Werte erzeugen. <code>notepad .env</code> öffnet die Datei zum Bearbeiten.',
-        portainer_info:'<b>Mit Portainer?</b> Dann statt dieser Schritte <code>docs/docker-compose.portainer.yml</code> als Stack anlegen. Portainer legt keine <code>.env</code> neben einen Stack, deshalb führt diese Datei jede Variable selbst auf, und <code>SESSION_SECRET</code> und <code>DB_ENCRYPTION_KEY</code> kommen in die Umgebungsvariablen des Stacks - dort sind beide Pflicht.',
+        portainer_info:'<b>Mit Portainer?</b> Dann statt dieser Schritte <code>docs/docker-compose.portainer.yml</code> als Stack anlegen. Portainer legt keine <code>.env</code> neben einen Stack, deshalb führt diese Datei jede Variable selbst auf, und <code>SESSION_SECRET</code> und <code>DB_ENCRYPTION_KEY</code> kommen in die Umgebungsvariablen des Stacks - beide dürfen bei einer neuen Installation leer bleiben, Yuvomi erzeugt sie dann beim ersten Start.',
         portainer_file:'Compose-Datei für Portainer',
         portainer_guide:'Portainer-Anleitung',
         step_a1_title:'Konfigurationsdateien herunterladen', step_a1_desc:'Führt diese zwei Befehle aus. Sie laden die Compose-Datei und die Vorlage für eure Einstellungen herunter.',
@@ -929,7 +933,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         step_b1_title:'Repository klonen', step_b3_title:'Bauen und starten', step_b3_desc:'Das Flag <code>--build</code> kompiliert das Docker-Image lokal. Das dauert beim ersten Mal einige Minuten.',
         opt_truenas_info:'Kein Terminal erforderlich. Yuvomi ist im TrueNAS SCALE Community Apps Catalog - direkt über das TrueNAS-Web-UI in wenigen Klicks installierbar.',
         step_tn1_title:'Apps-Catalog öffnen', step_tn1_desc:'Im TrueNAS SCALE Web-UI zu Apps → Apps entdecken navigieren und nach Yuvomi suchen.',
-        step_tn2_title:'Konfigurieren und installieren', step_tn2_desc:'Auf Installieren klicken. Einen starken Wert für Session-Secret (erforderlich) und Datenbank-Verschlüsselungsschlüssel (optional, aber einmal gesetzt unwiderruflich - sichern) setzen. Port und Speicherpfade nach Bedarf anpassen, dann Installieren.',
+        step_tn2_title:'Konfigurieren und installieren', step_tn2_desc:'Auf Installieren klicken. Beide Felder sind bei einer neuen Installation optional: Session-Secret und Datenbank-Verschlüsselungsschlüssel leer lassen, Yuvomi erzeugt sie beim ersten Start neben der Datenbank. Der Verschlüsselungsschlüssel ist einmal gesetzt unwiderruflich - sichern. Port und Speicherpfade nach Bedarf anpassen, dann Installieren.',
         step_tn3_title:'WebUI öffnen', step_tn3_desc:'Sobald der App-Status Aktiv anzeigt, in der App-Übersicht auf WebUI klicken. Beim ersten Aufruf führt Yuvomi direkt im Browser durch die Erstellung des Admin-Kontos.',
         opt_umbrel_info:'Kein Terminal erforderlich. Installiert Yuvomi direkt aus dem Umbrel App Store - alles läuft auf und bleibt auf eurem Umbrel.',
         step_um1_title:'App Store öffnen', step_um1_desc:'Im Umbrel-Dashboard den App Store öffnen und nach Yuvomi suchen.',
@@ -937,7 +941,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         step_um3_title:'Yuvomi öffnen', step_um3_desc:'Startet Yuvomi über den Umbrel-Startbildschirm. Beim ersten Aufruf führt Yuvomi direkt im Browser durch die Erstellung des Admin-Kontos.',
         opt_unraid_info:'Kein Terminal erforderlich. Yuvomi kommt als Community-Applications-Template - direkt über den Unraid-Apps-Tab hinzufügbar.',
         step_ur1_title:'Community Applications öffnen', step_ur1_desc:'In Unraid den Apps-Tab (das Community-Applications-Plugin) öffnen und nach Yuvomi suchen.',
-        step_ur2_title:'Template konfigurieren', step_ur2_desc:'Auf Installieren klicken. SESSION_SECRET (erforderlich) und DB_ENCRYPTION_KEY (optional, aber einmal gesetzt unwiderruflich - sichern) setzen. WebUI-Port und appdata-Pfad bei Bedarf anpassen.',
+        step_ur2_title:'Template konfigurieren', step_ur2_desc:'Auf Installieren klicken. SESSION_SECRET und DB_ENCRYPTION_KEY sind bei einer neuen Installation optional: leer lassen, Yuvomi erzeugt sie beim ersten Start. DB_ENCRYPTION_KEY ist einmal gesetzt unwiderruflich - sichern. WebUI-Port und appdata-Pfad bei Bedarf anpassen.',
         step_ur3_title:'Anwenden und öffnen', step_ur3_desc:'Auf Anwenden klicken. Sobald der Container läuft, auf das Yuvomi-Icon → WebUI klicken. Beim ersten Aufruf führt Yuvomi durch die Erstellung des Admin-Kontos.',
         tab_homeassistant:'Home Assistant',
         opt_ha_info:'Kein Terminal erforderlich. Yuvomi läuft als App neben Home Assistant, auf Home Assistant OS oder einer Supervised-Installation (amd64 oder aarch64, etwa Raspberry Pi 4/5 oder Home Assistant Green). Das ist Yuvomi selbst, keine Integration: Es legt keine Entitäten an.',
@@ -1254,7 +1258,7 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
           <span data-t="opt_truenas_info">No terminal required. Yuvomi is in the TrueNAS SCALE Community Apps Catalog - install it directly from the TrueNAS web UI in a few clicks.</span>
         </div>
         <div class="step"><div class="step-num">1</div><div class="step-content"><h3 class="step-title" data-t="step_tn1_title">Open the Apps Catalog</h3><p class="step-desc" data-t="step_tn1_desc">In your TrueNAS SCALE web UI, go to Apps → Discover Apps and search for Yuvomi.</p></div></div>
-        <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_tn2_title">Configure and install</h3><p class="step-desc" data-t="step_tn2_desc">Click Install. Set a strong value for Session Secret (required) and Database Encryption Key (optional, but irreversible once set - back it up). Adjust the port and storage paths if needed, then Install.</p></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_tn2_title">Configure and install</h3><p class="step-desc" data-t="step_tn2_desc">Click Install. Both fields are optional on a new installation: leave Session Secret and Database Encryption Key empty and Yuvomi generates them on the first start, next to the database. The encryption key is irreversible once set - back it up. Adjust the port and storage paths if needed, then Install.</p></div></div>
         <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_tn3_title">Open the WebUI</h3><p class="step-desc" data-t="step_tn3_desc">Once the app status shows Running, click WebUI in the Apps overview. The first visit walks you through creating your admin account directly in the browser.</p></div></div>
       </div>
 
@@ -1278,7 +1282,7 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
           <span data-t="opt_unraid_info">No terminal required. Yuvomi ships as a Community Applications template - add it straight from the Unraid Apps tab.</span>
         </div>
         <div class="step"><div class="step-num">1</div><div class="step-content"><h3 class="step-title" data-t="step_ur1_title">Open Community Applications</h3><p class="step-desc" data-t="step_ur1_desc">In Unraid, open the Apps tab (the Community Applications plugin) and search for Yuvomi.</p></div></div>
-        <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_ur2_title">Configure the template</h3><p class="step-desc" data-t="step_ur2_desc">Click Install. Set SESSION_SECRET (required) and DB_ENCRYPTION_KEY (optional, but irreversible once set - back it up). Adjust the WebUI port and the appdata path if needed.</p></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_ur2_title">Configure the template</h3><p class="step-desc" data-t="step_ur2_desc">Click Install. SESSION_SECRET and DB_ENCRYPTION_KEY are optional on a new installation: leave them empty and Yuvomi generates them on the first start. DB_ENCRYPTION_KEY is irreversible once set - back it up. Adjust the WebUI port and the appdata path if needed.</p></div></div>
         <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_ur3_title">Apply and open</h3><p class="step-desc" data-t="step_ur3_desc">Click Apply. Once the container is running, click the Yuvomi icon → WebUI. The first visit walks you through creating your admin account.</p></div></div>
       </div>
 
