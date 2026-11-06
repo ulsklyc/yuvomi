@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **CardDAV accepts long app passwords and tokens** (#2575). Saving a CardDAV account refused
+  any password over 200 characters, and the password field cut longer input off without a word, so
+  app tokens such as JWTs could not be used. Passwords for CardDAV, CalDAV and Apple Calendar now
+  share one limit of 4096 characters and are kept exactly as typed, including spaces at the start
+  or end.
 - **The last settings and managers that showed server text speak your language** (#1909). Managing
   the categories of budget, tasks, contacts and notes, or the storage locations of the pantry,
   showed English server text when someone else had deleted the entry meanwhile, when a storage

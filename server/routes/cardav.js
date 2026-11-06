@@ -8,7 +8,7 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import * as CardDAVSync from '../services/cardav-sync.js';
-import { str, bool, collectErrors, MAX_TITLE } from '../middleware/validate.js';
+import { str, secret, bool, collectErrors, MAX_TITLE } from '../middleware/validate.js';
 import { requireAdmin } from '../middleware/require-admin.js';
 
 const log = createLogger('CardDAV');
@@ -87,7 +87,7 @@ router.post('/accounts', async (req, res) => {
     const vName     = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vUrl      = str(req.body.cardavUrl, 'CardDAV URL', { max: MAX_URL });
     const vUsername = str(req.body.username, 'Username', { max: MAX_TITLE });
-    const vPassword = str(req.body.password, 'Password', { max: MAX_TITLE });
+    const vPassword = secret(req.body.password, 'Password');
     const errors = collectErrors([vName, vUrl, vUsername, vPassword]);
     if (errors.length) return fail(res, 400, 'validation', errors.join(' '));
 
@@ -130,7 +130,7 @@ router.put('/accounts/:id', async (req, res) => {
     const rawPassword = typeof req.body.password === 'string' ? req.body.password : '';
     let password = null;
     if (rawPassword.trim().length > 0) {
-      const vPassword = str(rawPassword, 'Password', { max: MAX_TITLE });
+      const vPassword = secret(rawPassword, 'Password');
       const pwErrors = collectErrors([vPassword]);
       if (pwErrors.length) return fail(res, 400, 'validation', pwErrors.join(' '));
       password = vPassword.value;

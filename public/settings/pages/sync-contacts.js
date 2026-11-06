@@ -561,7 +561,7 @@ function openAccountModal(account, onDone) {
             label: t('settings.cardavPasswordLabel'), labelFor: 'cardav-password',
             labelExtra: isEdit ? '' : REQUIRED_MARK, field: true,
             control: `<input class="form-input" type="password" id="cardav-password" ${isEdit ? '' : 'required'}
-                 maxlength="200" autocomplete="new-password"
+                 maxlength="4096" autocomplete="new-password"
                  aria-describedby="${isEdit ? 'cardav-password-keep ' : ''}cardav-password-hint" />`,
             extra: `${isEdit ? `<small class="form-hint" id="cardav-password-keep">${t('settings.cardavPasswordKeepHint')}</small>` : ''}`
               + `<small class="form-hint" id="cardav-password-hint">${t('settings.cardavPasswordHint')}</small>`,
