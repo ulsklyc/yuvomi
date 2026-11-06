@@ -5704,7 +5704,10 @@ test('Sonde 24 - spaeter Umbenennungskonflikt ersetzt keinen neuen Notizeditor',
   const conflictingCategory = `Sonde 24 conflict ${suffix}`;
   const replacementTitle = `Sonde 24 replacement ${suffix}`;
   const replacementContent = 'A stale rename retry must not replace this unsaved note.';
-  const conflictError = 'Sonde 24 delayed rename conflict';
+  // Seit #2584 kommt der Text des Servers nie in den Toast: die Sonde antwortet
+  // wie die echte Route (`category_exists`) und wartet auf den uebersetzten Satz.
+  const conflictServerText = 'A category with this name already exists.';
+  const conflictError = 'This category already exists.';
   let heldRequest = null;
   let probeError = null;
   try {
@@ -5756,7 +5759,7 @@ test('Sonde 24 - spaeter Umbenennungskonflikt ersetzt keinen neuen Notizeditor',
     await heldRequest.respond({
       status: 409,
       contentType: 'application/json',
-      body: JSON.stringify({ error: conflictError, code: 409 }),
+      body: JSON.stringify({ error: conflictServerText, code: 409, reason: 'category_exists' }),
     });
     heldRequest = null;
     await waitForMatchingToast(page, { tone: 'danger', text: conflictError });
