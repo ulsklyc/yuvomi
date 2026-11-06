@@ -4549,7 +4549,7 @@ function openBudgetModal({ mode, entry = null, initialType = '', period = null }
   const curInterval = isEdit && entry.recurrence_interval ? entry.recurrence_interval : 'monthly';
   // „Alle N" (#636). Bestandsserien tragen 1, solange niemand etwas anderes wählt.
   const curCount = Math.min(MAX_INTERVAL_COUNT, Math.max(1, Number(isEdit && entry.recurrence_interval_count) || 1));
-  const curEndDate = (isEdit && entry.series?.end_date) ? entry.series.end_date : '';
+  const curEndDate = (isEdit && (entry.series_end_date ?? entry.series?.end_date)) || '';
 
   // KEINE VORBELEGTE KATEGORIE (Re-Critique 2026-09-27, A5 P2-4). Die erste
   // Kategorie stand vorgewaehlt - "Wohnen / Zuhause" mit "Miete / Kreditrate":
@@ -6506,7 +6506,7 @@ function changedSeriesBody(body, entry, { amount, keepRhythm }) {
     account_id: entry.account_id ?? null,
     visibility: entry.visibility,
     responsible_user_ids: (entry.responsible_users ?? []).map((u) => u.id),
-    end_date: entry.series?.end_date ?? null,
+    end_date: entry.series_end_date ?? entry.series?.end_date ?? null,
   };
   const same = (a, b) => (Array.isArray(a) && Array.isArray(b)
     ? a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i])

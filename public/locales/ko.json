@@ -1564,7 +1564,7 @@
         "intervalMonthly": "매월",
         "intervalWeekly": "매주",
         "intervalYearly": "매년",
-        "seriesEndDateLabel": "End on (optional)",
+        "seriesEndDateLabel": "종료일 (선택)",
         "confirmFirstLabel": "확인 후에만 기록",
         "confirmFirstHint": "생성된 각 항목은 확인을 기다립니다. 그때까지 목록에는 보이지만 어떤 합계에도 들어가지 않으며, 확인할 때 금액과 날짜를 고칠 수 있습니다.",
         "pendingBadge": "예정",

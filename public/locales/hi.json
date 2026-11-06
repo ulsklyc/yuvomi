@@ -1545,7 +1545,7 @@
         "intervalMonthly": "मासिक",
         "intervalWeekly": "साप्ताहिक",
         "intervalYearly": "वार्षिक",
-        "seriesEndDateLabel": "End on (optional)",
+        "seriesEndDateLabel": "समाप्त होती है (वैकल्पिक)",
         "confirmFirstLabel": "पुष्टि के बाद ही दर्ज करें",
         "confirmFirstHint": "हर बनी हुई प्रविष्टि आपकी पुष्टि की प्रतीक्षा करती है। तब तक वह सूची में दिखती है पर किसी योग में नहीं गिनी जाती - पुष्टि करते समय राशि और तारीख बदली जा सकती है।",
         "pendingBadge": "अपेक्षित",

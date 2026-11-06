@@ -1717,7 +1717,7 @@
         "intervalMonthly": "Ежемесячно",
         "intervalWeekly": "Еженедельно",
         "intervalYearly": "Ежегодно",
-        "seriesEndDateLabel": "End on (optional)",
+        "seriesEndDateLabel": "Заканчивается (необязательно)",
         "confirmFirstLabel": "Проводить только после подтверждения",
         "confirmFirstHint": "Каждая созданная запись ждёт вашего подтверждения. До этого она видна в списке, но не входит ни в одну сумму - при подтверждении можно изменить сумму и дату.",
         "pendingBadge": "Ожидается",

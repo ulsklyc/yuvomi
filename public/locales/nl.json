@@ -1545,7 +1545,7 @@
         "intervalMonthly": "Maandelijks",
         "intervalWeekly": "Wekelijks",
         "intervalYearly": "Jaarlijks",
-        "seriesEndDateLabel": "End on (optional)",
+        "seriesEndDateLabel": "Eindigt op (optioneel)",
         "confirmFirstLabel": "Pas boeken na bevestiging",
         "confirmFirstHint": "Elke aangemaakte boeking wacht op je bevestiging. Tot dan staat ze in de lijst maar telt ze in geen enkel totaal mee - bij het bevestigen kun je bedrag en datum aanpassen.",
         "pendingBadge": "Verwacht",

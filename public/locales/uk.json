@@ -1717,7 +1717,7 @@
         "intervalMonthly": "Щомісяця",
         "intervalWeekly": "Щотижня",
         "intervalYearly": "Щороку",
-        "seriesEndDateLabel": "End on (optional)",
+        "seriesEndDateLabel": "Завершується (необов'язково)",
         "confirmFirstLabel": "Проводити лише після підтвердження",
         "confirmFirstHint": "Кожен створений запис чекає на ваше підтвердження. До того він видимий у списку, але не входить у жодну суму - під час підтвердження можна змінити суму й дату.",
         "pendingBadge": "Очікується",

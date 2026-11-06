@@ -1634,7 +1634,7 @@
         "intervalMonthly": "Měsíčně",
         "intervalWeekly": "Týdně",
         "intervalYearly": "Ročně",
-        "seriesEndDateLabel": "End on (optional)",
+        "seriesEndDateLabel": "Končí dne (volitelné)",
         "confirmFirstLabel": "Zaúčtovat až po potvrzení",
         "confirmFirstHint": "Každá vytvořená položka čeká na vaše potvrzení. Do té doby je v seznamu, ale nezapočítává se do žádného součtu - při potvrzení lze upravit částku i datum.",
         "pendingBadge": "Očekáváno",

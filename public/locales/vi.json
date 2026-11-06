@@ -1545,7 +1545,7 @@
         "intervalMonthly": "Hàng tháng",
         "intervalWeekly": "Hàng tuần",
         "intervalYearly": "Hàng năm",
-        "seriesEndDateLabel": "End on (optional)",
+        "seriesEndDateLabel": "Kết thúc vào (tùy chọn)",
         "confirmFirstLabel": "Chỉ ghi sổ sau khi xác nhận",
         "confirmFirstHint": "Mỗi bút toán được tạo sẽ chờ bạn xác nhận. Đến lúc đó nó vẫn hiện trong danh sách nhưng không tính vào bất kỳ tổng nào - khi xác nhận bạn có thể sửa số tiền và ngày.",
         "pendingBadge": "Dự kiến",

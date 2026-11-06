@@ -1545,7 +1545,7 @@
         "intervalMonthly": "毎月",
         "intervalWeekly": "毎週",
         "intervalYearly": "毎年",
-        "seriesEndDateLabel": "End on (optional)",
+        "seriesEndDateLabel": "終了日（任意）",
         "confirmFirstLabel": "確認してから記帳する",
         "confirmFirstHint": "生成された記帳はあなたの確認を待ちます。それまでは一覧に表示されますが、どの合計にも含まれません。確認時に金額と日付を修正できます。",
         "pendingBadge": "予定",

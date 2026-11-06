@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generating new occurrences; occurrences already booked before that date are kept.
   The end date is also accepted by `PUT /api/v1/budget/{id}/series` and
   `POST /api/v1/budget` for new recurring entries. An empty string clears the date.
-  Refuses end date before start date.
+  (Refs #1742)
 - **Health: in the month view, the series names no longer cover the bars of the last days** (#2538).
   "Systolic" and "Diastolic" stood left of the last bar, and "Pulse" above its last dot, hiding the
   readings underneath when a month is full. A short line above the blood pressure chart now says
@@ -304,11 +304,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   short code from a browser session, and `POST /api/v1/auth/devices/pair/redeem` exchanges it for a device
   credential. The code holds for five minutes and once, and comes back as text, as a `yuvomi://pair` link
   and as a QR code. It cannot open a wall display, and a display code cannot sign in a device.
-- **A recurring budget series can now have an end date.** The recurring-entry dialog
-  has a new "End on (optional)" date field. Once the end date passes, the series stops
-  generating new occurrences; occurrences already booked before that date are kept.
-  The end date is also accepted by `PUT /api/v1/budget/{id}/series` and
-  `POST /api/v1/budget`. (#1742)
 - **A document can name who it is about.** The document dialog has a new "About" field for one
   household member, and the Documents page can filter by person. The person also gets the expiry
   reminder, along with whoever filed the document, and once if that is the same person. This never

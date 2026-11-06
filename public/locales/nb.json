@@ -1545,7 +1545,7 @@
         "intervalMonthly": "Månedlig",
         "intervalWeekly": "Ukentlig",
         "intervalYearly": "Årlig",
-        "seriesEndDateLabel": "End on (optional)",
+        "seriesEndDateLabel": "Slutter den (valgfritt)",
         "confirmFirstLabel": "Book kun etter bekreftelse",
         "confirmFirstHint": "Hver generert booking venter på din bekreftelse. Inntil da vises den i listen, men telles ikke med i totalsummen - du kan justere beløp og dato når du bekrefter.",
         "pendingBadge": "Forventet",

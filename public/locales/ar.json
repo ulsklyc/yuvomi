@@ -1804,7 +1804,7 @@
         "intervalMonthly": "شهري",
         "intervalWeekly": "أسبوعياً",
         "intervalYearly": "سنوي",
-        "seriesEndDateLabel": "End on (optional)",
+        "seriesEndDateLabel": "ينتهي في (اختياري)",
         "confirmFirstLabel": "التسجيل بعد التأكيد فقط",
         "confirmFirstHint": "كل حركة يتم إنشاؤها تنتظر تأكيدك. حتى ذلك الحين تظهر في القائمة لكنها لا تُحتسب في أي مجموع - ويمكنك تعديل المبلغ والتاريخ عند التأكيد.",
         "pendingBadge": "متوقعة",

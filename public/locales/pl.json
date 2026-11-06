@@ -1736,7 +1736,7 @@
         "intervalMonthly": "Miesięcznie",
         "intervalWeekly": "Co tydzień",
         "intervalYearly": "Rocznie",
-        "seriesEndDateLabel": "End on (optional)",
+        "seriesEndDateLabel": "Kończy się (opcjonalne)",
         "confirmFirstLabel": "Księguj dopiero po potwierdzeniu",
         "confirmFirstHint": "Każda utworzona pozycja czeka na Twoje potwierdzenie. Do tego czasu jest na liście, ale nie wlicza się do żadnej sumy - przy potwierdzaniu możesz poprawić kwotę i datę.",
         "pendingBadge": "Oczekiwana",
