@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   app tokens such as JWTs could not be used. Passwords for CardDAV, CalDAV and Apple Calendar now
   share one limit of 4096 characters and are kept exactly as typed, including spaces at the start
   or end.
+- **Editing a task through the API keeps its primary assignee (#2569).** A `PUT /api/v1/tasks/:id`
+  that left out `assigned_to` made the person with the lowest user id the primary assignee. It now
+  stays who it was, as it already did for calendar events. `assigned_users` lists the primary
+  assignee first, as the API reference says, in task lists, details and the dashboard.
 - **The last settings and managers that showed server text speak your language** (#1909). Managing
   the categories of budget, tasks, contacts and notes, or the storage locations of the pantry,
   showed English server text when someone else had deleted the entry meanwhile, when a storage
