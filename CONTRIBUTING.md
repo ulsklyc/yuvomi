@@ -361,7 +361,9 @@ without this repository's private tooling.
 - All UI text via i18n keys (`t('key')`) - never hardcode text in components. German (`de`) is the reference locale.
 - **Adding a new i18n key:** add it to **all** files in `public/locales/` (27 languages; a
   non-German value may start as the English text). The JSON files are 4-space indented
-  and nested - edit them in place, never reserialize a whole file. A key interpolating a
+  and nested - edit them in place, never reserialize a whole file. Save them as UTF-8: an
+  editor or script writing another encoding turns every non-ASCII character into `?`, and
+  `npm run test:i18n` rejects values like "Gesch??tzte" or "????". A key interpolating a
   numeric `count` needs an `_one` singular variant (`{{count}}` placeholder), otherwise
   the UI shows "1 Aufgaben". `npm run test:i18n` and `npm run test:i18n-plural` guard all
   of this and run in CI - a UI change without complete locales will not pass.
