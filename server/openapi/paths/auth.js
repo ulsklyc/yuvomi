@@ -840,11 +840,6 @@ const CASE_REASONS = {
     post: '`account_cannot_sign_in` (403, the account is deactivated or may not sign in), `password_login_disabled` (403, password login is turned off for this instance)',
   },
   '/api/v1/auth/2fa/enable': { post: INVALID_CODE },
-  // #1909: was die Anmeldeseite und das Konto-Blatt unterscheiden.
-  '/api/v1/auth/2fa/verify': { post: '`two_factor_no_pending_sign_in` (401, no sign-in is waiting for a code, or it has expired), `account_cannot_sign_in` (403, the account is deactivated or may not sign in)' },
-  '/api/v1/auth/2fa/setup': { post: '`already_enabled` (409, two-factor authentication is already turned on)' },
-  '/api/v1/auth/oidc/link/start': { post: '`oidc_not_configured` (404, SSO is not set up on this instance), `oidc_already_linked` (409, the account is already linked)' },
-  '/api/v1/auth/oidc/link': { delete: '`oidc_not_linked` (409, the account is not linked), `oidc_password_required` (409, the account has no password, so the link is its only way in), `last_sso_admin` (409, the last administrator linked to SSO cannot unlink while password login is off)' },
   '/api/v1/auth/2fa/disable': { post: `${INVALID_CODE}, ${NOT_ENABLED}` },
   '/api/v1/auth/2fa/recovery-codes': { post: `${INVALID_CODE}, ${NOT_ENABLED}` },
   '/api/v1/auth/logout-others': { post: '`browser_session_required` (403, only a signed-in browser session can sign out the other sessions, not an API token)' },
@@ -859,14 +854,7 @@ const CASE_REASONS = {
       + '`last_admin` (400, at least one system admin must remain), '
       + '`last_sso_admin` (400, the last administrator linked to SSO cannot be demoted while password login is off)',
   },
-  // #1909: dazu, was das Formular der Seite API-Zugriff erreicht.
-  '/api/v1/auth/api-tokens': {
-    post: `${DEACTIVATED_SUBJECT}, `
-      + '`api_tokens_name_required` (400, the name is empty), '
-      + '`api_tokens_name_too_long` (400, the name is longer than 100 characters), '
-      + '`api_tokens_expiry_past` (400, `expires_at` is not in the future), '
-      + '`api_tokens_subject_unknown` (400, there is no account with `subject_user_id`, for example because it was deleted meanwhile)',
-  },
+  '/api/v1/auth/api-tokens': { post: DEACTIVATED_SUBJECT },
   '/api/v1/auth/devices': {
     get: '`session_required` (403, an API token cannot read a person\'s devices)',
     post: '`device_credential` (403, a device cannot add another device), `session_required` (403, an API token cannot add a device), `not_a_household_member` (403, the account is no household member)',

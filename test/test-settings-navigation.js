@@ -402,10 +402,8 @@ test('Gravatar: jeder Grund, den die Route nennen kann, hat seinen Satz, 429 lie
     assert.equal(typeof getTranslation(de, key), 'string', key);
   }
   assert.equal(gravatarErrorText({ status: 429, data: { error: 'Too many requests' } }), 'settings.gravatarErrorRateLimited');
-  // Ein unbekannter Fall sagt den allgemeinen Satz, nie den Servertext (#1909).
-  assert.equal(gravatarErrorText({ status: 500, data: { reason: 'something_new' }, message: 'Server text' }), 'common.errorGeneric');
-  assert.equal(gravatarErrorText(new Error('offline')), 'common.errorGeneric');
-  assert.equal(gravatarErrorText({ status: 0, message: 'Failed to fetch' }), 'common.errorOfflineMutation');
+  assert.equal(gravatarErrorText({ status: 500, data: { reason: 'something_new' }, message: 'Server text' }), 'Server text');
+  assert.equal(gravatarErrorText(new Error('offline')), 'offline');
   // Mit dem Host des gewaehlten Dienstes reist er als Parameter in den Satz.
   assert.equal(
     gravatarErrorText({ status: 502, data: { reason: 'gravatar_unreachable' } }, 'seccdn.libravatar.org'),

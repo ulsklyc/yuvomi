@@ -405,20 +405,13 @@ async function testConnection(caldavUrl, username, password, { createClient } = 
 
     const calendars = await client.fetchCalendars();
     if (!calendars.length) {
-      const empty = new Error('Connected, but no calendars found.');
-      empty.code = 'caldav_no_calendars';
-      throw empty;
+      throw new Error('Connected, but no calendars found.');
     }
 
     return { ok: true, calendars };
   } catch (err) {
     log.error('Connection test failed:', err.message);
-    const failed = new Error(`CalDAV connection failed: ${err.message}`);
-    // Der eine Fall, den die App selbst kennt (#1909): der Server hat
-    // geantwortet, das Konto hat nur keine Kalender. Alles andere ist die
-    // Angabe des fremden Servers und bleibt ohne Code.
-    if (err.code === 'caldav_no_calendars') failed.code = err.code;
-    throw failed;
+    throw new Error(`CalDAV connection failed: ${err.message}`);
   }
 }
 
@@ -442,9 +435,7 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
   ).get(caldavUrl, username);
 
   if (existing) {
-    const duplicate = new Error('Account with this URL and username already exists.');
-    duplicate.code = 'caldav_account_exists';
-    throw duplicate;
+    throw new Error('Account with this URL and username already exists.');
   }
 
   // Warn if DB_ENCRYPTION_KEY not set

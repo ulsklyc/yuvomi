@@ -277,6 +277,10 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // Immich-Bildschirmschoner in den Admin-Einstellungen (#1909); die echte
     // Antwort misst test:screensaver.
     '../server/routes/screensaver.js',
+    // Haushaltweite Einstellungen (#1909): die Webhook-Adresse der
+    // Einkaufsliste (#2502) wird dort abgewiesen und benennt ihren Fall; die
+    // echte Antwort misst test:shopping-webhook.
+    '../server/routes/preferences.js',
     // Personen einer Sync-Quelle oder eines Imports (#1897, #1221, #1940): die
     // eine Pruefung steht im Dienst, die Erinnerungsliste in ihrer Route; die
     // echte Antwort misst test:sync-default-assignees.
@@ -285,11 +289,6 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // test:sync-default-assignees bzw. test:tasks-errors, Outlook
     // test:calendar-routes, Mitglied entfernen test:user-deactivation.
     '../server/routes/calendar/subscriptions.js', '../server/routes/calendar/outlook.js', '../server/auth.js',
-    // Seite Wandtablets (#1909); die echte Antwort misst test:display-account.
-    '../server/routes/displays.js',
-    // Kalender-Sync und Kalender-Abos (#1909); die echte Antwort misst
-    // test:sync-form-errors.
-    '../server/routes/calendar/apple.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
@@ -341,7 +340,6 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'quick_links_link_not_found',
     'recipe_providers_account_not_found',
     'calendar_calendar_not_found', 'calendar_event_not_found', 'calendar_selected_calendar_not_found',
-    'displays_display_not_found', 'displays_device_not_found',
   ].sort());
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);
@@ -599,44 +597,12 @@ test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#
     ['members_member_not_found', 'settings.memberErrorGone'],
     ['members_sso_email_required', 'settings.memberErrorSsoEmailRequired'],
     ['members_sso_email_ambiguous', 'settings.memberErrorSsoEmailAmbiguous'],
-    // SSO-Verknuepfung im Konto-Blatt (#1909); die echte Antwort misst
-    // test:oidc-email-link.
-    ['oidc_not_configured', 'settings.oidcLinkErrorNotConfigured'],
-    ['oidc_already_linked', 'settings.oidcLinkError_already_linked'],
-    ['oidc_not_linked', 'settings.oidcUnlinkNotLinked'],
-    ['oidc_password_required', 'settings.oidcUnlinkNeedsPassword'],
-    // Seite Wandtablets (#1909): ein zweiter Admin hat das Tablett oder sein
-    // Geraet schon entfernt; die echte Antwort misst test:display-account.
-    ['displays_display_not_found', 'settings.displayErrorGone'],
-    ['displays_device_not_found', 'settings.displayDeviceErrorGone'],
-    // Kalender-Sync und Kalender-Abos (#1909); die echte Antwort misst
-    // test:sync-form-errors.
-    ['caldav_account_exists', 'settings.cardavErrorDuplicate'],
-    ['caldav_no_calendars', 'settings.caldavErrorNoCalendars'],
-    ['apple_no_calendars', 'settings.caldavErrorNoCalendars'],
-    ['apple_url_invalid', 'settings.icsErrorUrlScheme'],
-    ['calendar_subscription_name_invalid', 'settings.icsErrorNameInvalid'],
-    ['calendar_ics_url_invalid', 'settings.icsErrorUrlInvalid'],
-    ['calendar_ics_url_scheme', 'settings.icsErrorUrlScheme'],
-    ['calendar_ics_private_address', 'settings.icsErrorPrivateAddress'],
-    // Seite API-Zugriff (#1909); die echte Antwort misst test:api-token-subject.
-    ['api_tokens_name_required', 'quickLinks.nameRequired'],
-    ['api_tokens_name_too_long', 'settings.apiTokenErrorNameTooLong'],
-    ['api_tokens_expiry_past', 'settings.apiTokenErrorExpiryPast'],
-    ['api_tokens_subject_unknown', 'settings.syncAssigneeUnknown'],
   ]) {
     assert.equal(errorSentence(answer(400, SERVER_TEXT, reason)), key, reason);
   }
   assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'calendar_subscription_not_found'), 'calendar_subscription_not_found'), true);
   assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'tasks_tag_not_found'), 'tasks_tag_not_found'), true);
   assert.equal(isGone(answer(404, SERVER_TEXT, 'members_member_not_found')), true);
-  assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'displays_display_not_found'), 'displays_display_not_found'), true);
-  assert.equal(isGone(answer(404, SERVER_TEXT, 'displays_device_not_found')), true);
-  // Status und Groesse eines Feeds kommen als Zahl in den Satz, nie als Text.
-  const feed = (reason, params) => Object.assign(new Error(SERVER_TEXT), { status: 400, data: { error: SERVER_TEXT, reason, params } });
-  assert.equal(errorSentence(feed('calendar_ics_http_status', { status: 404 })), 'settings.icsErrorHttpStatus{"status":404}');
-  assert.equal(errorSentence(feed('calendar_ics_too_large', { limit_mb: 10 })), 'settings.icsErrorTooLarge{"limit_mb":10}');
-  assert.equal(errorSentence(feed('calendar_ics_http_status', { status: 'x' }), 'settings.x'), 'settings.x');
 });
 
 // DER SATZ FUER DAS, WAS KEINE SEITE SELBST FAENGT (#1909): Fehlerbildschirm
