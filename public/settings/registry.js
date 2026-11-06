@@ -549,6 +549,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
     descriptionKey: 'settings.tasksSubtasksExpandedHint',
     options: [
       'settings.tasksSubtasksExpandedLabel',
+      'settings.tasksShowCreatorLabel',
     ],
     adminOnly: true,
     loader: () => import('/settings/pages/modules-options.js'),
@@ -656,7 +657,6 @@ export const SETTINGS_SECTIONS = freezeEntries([
     descriptionKey: 'settings.sheetRewardsDescription',
     options: [
       'settings.rewardsApprovalLabel',
-      'settings.rewardsLateDecayLabel',
       'settings.rewardsDefaultPointsLabel',
     ],
     adminOnly: true,

@@ -7,7 +7,7 @@ import { confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors }
 import { createRetryState, hintFoldHtml, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
 import { getExtensionModules } from '/utils/extension-widgets.js';
 import { moduleDisplayLabel } from '/utils/extension-i18n.js';
-import { errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
+import { errorSentence } from '/utils/friendly-error.js';
 
 // Core scope keys — extension modules are appended from /permissions/catalog at render time.
 const CORE_SCOPE_MODULE_KEYS = [
@@ -399,11 +399,7 @@ function bindEvents(container, initialTokens, users, currentUserId) {
       outputValue.select();
       window.yuvomi?.showToast(t('settings.apiTokenCreatedToast'), 'success');
     } catch (err) {
-      // `account_deactivated` schickt auch die Kontoverwaltung, mit anderem
-      // Sinn - deshalb hier und nicht in CASE_MESSAGES (#1909).
-      showError(errorEl, err?.data?.reason === 'account_deactivated'
-        ? t('settings.apiTokenErrorSubjectDeactivated')
-        : errorSentence(err));
+      showError(errorEl, err.message);
     } finally {
       btn.disabled = false;
     }
@@ -510,7 +506,7 @@ async function loadTokens(container, currentUserId) {
     users = tokenResponse.subjects ?? [];
   } catch (err) {
     list.replaceChildren(createRetryState({
-      message: loadErrorSentence(err) ?? t('common.errorGeneric'),
+      message: err.message || t('common.errorGeneric'),
       onRetry: reload,
     }));
     return;

@@ -679,6 +679,15 @@ function renderTaskCard(task, opts = {}) {
             ${renderLockedBadge(task)}
             ${renderVisibilityBadge(task.visibility)}
             ${showCategory && task.category !== FALLBACK_CATEGORY ? `<span class="due-date task-card__category">${esc(catLabel(task.category))}</span>` : ''}
+            ${/* DER NAME BRAUCHT SEINE ROLLE (Review zu #2451): nackt gelesen
+                  stand hier ein Personenname in einer Zeile, in der sonst die
+                  Zustaende der Aufgabe stehen - er las sich als die
+                  ZUGEWIESENE Person. Das Zeichen und das Etikett sind dieselben,
+                  die die Detailansicht fuer `created_by` fuehrt
+                  (components/task-detail.js: `user-pen` + tasks.createdByLabel),
+                  also kostet die Rolle hier ein Symbol statt ~70px Text in der
+                  engen Metazeile - die Vorlesehilfe hoert das Etikett ganz. */''}
+            ${state.showCreator && task.created_by_name && !isSoloHousehold() ? `<span class="due-date task-card__creator"><i data-lucide="user-pen" class="icon-sm" aria-hidden="true"></i><span class="sr-only">${esc(t('tasks.createdByLabel'))} </span>${esc(task.created_by_name)}</span>` : ''}
             ${renderTagBadges(task.tags, ROW_TAG_BADGES_VISIBLE, task.priority)}
           </div>
         </div>
@@ -1617,7 +1626,7 @@ ${reminderTucked ? `<div class="task-form__tucked">${reminderHtml}</div>` : ''}`
  * einen dritten Zustand mit leerem Status, der auch Erledigtes zeigt.
  */
 const DEFAULT_STATUS_FILTER = Object.freeze(['open']);
-const defaultFilters = () => ({ status: [...DEFAULT_STATUS_FILTER], priority: [], assigned_to: [], category: [], tags: [] });
+const defaultFilters = () => ({ status: [...DEFAULT_STATUS_FILTER], priority: [], assigned_to: [], category: [], tags: [], creator: null });
 
 let state = {
   tasks:           [],
@@ -1670,6 +1679,7 @@ let state = {
   history:         { entries: [], hasMore: false, cursor: null, userId: null, loading: null, error: null },
   showFuture:      false,
   subtasksExpandedByDefault: false,
+  showCreator:     false,
   // Persönliche Standard-Erinnerungsliste für neue Aufgaben (#695), leer = nur
   // lokal. Wird beim Öffnen des Dialogs als Vorauswahl gesetzt.
   defaultSyncTarget: '',
@@ -1784,9 +1794,12 @@ function writeDueTodayToUrl(on) {
  */
 function filteredTasks() {
   const q = state.searchQuery.trim().toLowerCase();
-  const base = state.dueToday
+  let base = state.dueToday
     ? state.tasks.filter((task) => isDueByToday(task))
     : state.tasks;
+  if (state.filters.creator) {
+    base = base.filter((task) => task.created_by === state.filters.creator);
+  }
   if (!q) return base;
   return base.filter((task) =>
     (task.title       || '').toLowerCase().includes(q) ||
@@ -4387,7 +4400,8 @@ function activeFilterCount() {
     + state.filters.category.length
     + state.filters.tags.length
     + (state.showFuture ? 1 : 0)
-    + (state.dueToday ? 1 : 0);
+    + (state.dueToday ? 1 : 0)
+    + (state.filters.creator ? 1 : 0);
 }
 
 /**
@@ -4546,6 +4560,38 @@ function filterSheetGroups() {
         filter: 'assigned_to', label: t('tasks.filterGroupPerson'), people: state.users,
         isActive: (u) => hasFilter('assigned_to', String(u.id)),
       }) });
+    // Ersteller-Filter (#2451): gleicher Baustein wie bei den Notizen, aber
+    // nur wenn mehrere verschiedene Ersteller in der geladenen Liste stehen.
+    const creatorMap = new Map();
+    for (const task of state.tasks) {
+      if (task.created_by && task.created_by_name && !creatorMap.has(task.created_by)) {
+        creatorMap.set(task.created_by, { id: task.created_by, display_name: task.created_by_name, avatar_color: task.created_by_color });
+      }
+    }
+    // DER FILTER DARF SICH NICHT SELBST VERSTECKEN (Review zu #2451). Die
+    // Gruppe stand nur bei >= 2 Erstellern in der GELADENEN Liste. Sobald der
+    // Filter griff, blieb dort genau einer uebrig: die Gruppe verschwand, der
+    // Filter aber nicht - und mit der Gruppe ging der "Alle"-Chip, also der
+    // einzige Weg zurueck. Ist der Filter gesetzt, steht die Gruppe deshalb
+    // immer.
+    if (state.filters.creator && !creatorMap.has(state.filters.creator)) {
+      // Der gefilterte Ersteller steht vielleicht in keiner geladenen Aufgabe
+      // mehr (ein anderer Filter greift, oder die Seite endet vorher): dann
+      // holt ihn die Mitgliederliste. Findet auch die ihn nicht (geloeschtes
+      // Mitglied), bleibt die Gruppe trotzdem stehen - ihr "Alle"-Chip ist der
+      // Weg zurueck, und dafuer braucht es keinen Namen.
+      const u = state.users?.find((x) => x.id === state.filters.creator);
+      if (u) creatorMap.set(u.id, { id: u.id, display_name: u.display_name, avatar_color: u.avatar_color });
+    }
+    if (creatorMap.size >= 2 || state.filters.creator) {
+      groups.push({ heading: t('tasks.filterCreatorLabel'),
+        html: personChipsHtml({
+          filter: 'creator', label: t('tasks.filterCreatorLabel'),
+          people: [...creatorMap.values()],
+          isActive: (u) => state.filters.creator === u.id,
+          all: { label: t('common.all'), active: !state.filters.creator },
+        }) });
+    }
   }
   // KATEGORIE UND TAG SIND EINGEKLAPPT, SOLANGE NICHTS GEWAEHLT IST (Critique
   // 2026-10-05, R16). Das Blatt mass 35 Bedienelemente und 1084px in 591px;
@@ -4597,9 +4643,15 @@ function filterSheetGroups() {
 function syncFilterSheet(panel) {
   if (!panel?.isConnected) return;
   panel.querySelectorAll('[data-filter]').forEach((chip) => {
-    const on = chip.dataset.filter === 'tag'
-      ? hasTagFilter(chip.dataset.value)
-      : hasFilter(chip.dataset.filter, chip.dataset.value);
+    let on;
+    if (chip.dataset.filter === 'tag') {
+      on = hasTagFilter(chip.dataset.value);
+    } else if (chip.dataset.filter === 'creator') {
+      const val = chip.dataset.value;
+      on = val ? state.filters.creator === Number(val) : !state.filters.creator;
+    } else {
+      on = hasFilter(chip.dataset.filter, chip.dataset.value);
+    }
     chip.classList.toggle('filter-chip--active', on);
     chip.setAttribute('aria-pressed', String(on));
     // WAS WIRKT, STEHT OFFEN - auch wenn es NACH dem Oeffnen des Blatts gesetzt
@@ -4759,6 +4811,13 @@ async function onFilterSheetClick(e, container) {
     await toggleTagFilter(chip.dataset.value, container);
     return;
   }
+  if (chip.dataset.filter === 'creator') {
+    const val = chip.dataset.value;
+    state.filters.creator = val ? Number(val) : null;
+    renderFilters(container);
+    renderTaskList(container);
+    return;
+  }
   await toggleValueFilter(chip.dataset.filter, chip.dataset.value, container);
 }
 
@@ -4896,6 +4955,7 @@ function normalizeFilterSet(f = {}) {
     assigned_to: asList(f.assigned_to),
     category:    asList(f.category),
     tags:        asList(Array.isArray(f.tags) ? f.tags : (f.tag ? [f.tag] : [])),
+    creator:     f.creator ? Number(f.creator) : null,
   };
 }
 
@@ -7031,6 +7091,7 @@ export async function render(container, { user, signal } = {}) {
     state.allTags = meta.tags ?? [];
     state.defaultPoints = Number(meta.default_points) || 0;
     state.subtasksExpandedByDefault = preferencesData.data?.tasks_subtasks_expanded === true;
+    state.showCreator = preferencesData.data?.tasks_show_creator === true;
     applyNewTaskDefaults(preferencesData.data);
   } catch (err) {
     console.error('[Tasks] Ladefehler:', err);
@@ -7049,6 +7110,7 @@ export async function render(container, { user, signal } = {}) {
     state.metaStale = { users: false, categories: false, tags: false };
     state.defaultPoints = 0;
     state.subtasksExpandedByDefault = false;
+    state.showCreator = false;
     applyNewTaskDefaults(null);
   }
 

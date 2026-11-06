@@ -2593,11 +2593,11 @@ router.get('/oidc/link', requireAuth, refuseWhileRestoring, (req, res) => {
 router.post('/oidc/link/start', requireAuth, csrfMiddleware, async (req, res) => {
   try {
     const config = await getOidcConfig();
-    if (!config) return res.status(404).json({ error: 'OIDC is not configured.', code: 404, reason: 'oidc_not_configured' });
+    if (!config) return res.status(404).json({ error: 'OIDC is not configured.', code: 404 });
 
     const user = db.get().prepare('SELECT oidc_sub FROM users WHERE id = ?').get(req.authUserId);
     if (user?.oidc_sub) {
-      return res.status(409).json({ error: 'Account is already linked.', code: 409, reason: 'oidc_already_linked' });
+      return res.status(409).json({ error: 'Account is already linked.', code: 409 });
     }
 
     res.json({ url: await beginOidcFlow(req, config, { linkUserId: req.authUserId }) });
@@ -2617,18 +2617,15 @@ router.delete('/oidc/link', requireAuth, csrfMiddleware, (req, res) => {
   if (result.ok) return res.json({ ok: true });
 
   if (result.reason === 'user_gone')   return res.status(404).json({ error: 'User not found.', code: 404 });
-  // Die Gruende als Literale (#1909): das Konto-Blatt sagt den Satz dazu.
-  if (result.reason === 'not_linked')  return res.status(409).json({ error: 'Account is not linked.', code: 409, reason: 'oidc_not_linked' });
+  if (result.reason === 'not_linked')  return res.status(409).json({ error: 'Account is not linked.', code: 409 });
   if (result.reason === 'last_sso_admin') return res.status(409).json({
     error: 'This is the last administrator linked to SSO. Unlinking it would switch password login '
       + 'back on for the whole household. Link another administrator first.',
     code: 409,
-    reason: 'last_sso_admin',
   });
   return res.status(409).json({
     error: 'Set a password before unlinking - it is currently the only way into this account.',
     code:  409,
-    reason: 'oidc_password_required',
   });
 });
 
@@ -3074,9 +3071,7 @@ router.post('/2fa/verify', twoFactorLimiter, async (req, res) => {
   try {
     const pending = consumePendingTwoFactor(req);
     if (!pending) {
-      // Der Grund trennt den abgelaufenen Wartezustand vom falschen Code (#1909):
-      // die Anmeldeseite schickt dann zurueck an den Anfang statt zum Code.
-      return res.status(401).json({ error: 'No pending sign-in.', code: 401, reason: 'two_factor_no_pending_sign_in' });
+      return res.status(401).json({ error: 'No pending sign-in.', code: 401 });
     }
 
     // Zwischen Passwort und Code kann das Konto deaktiviert worden sein
@@ -3149,7 +3144,7 @@ router.post('/2fa/setup', requireAuth, csrfMiddleware, (req, res) => {
     res.json({ data: { secret, uri, qr } });
   } catch (err) {
     if (err.code === 'already_enabled') {
-      return res.status(409).json({ error: err.message, code: 409, reason: 'already_enabled' });
+      return res.status(409).json({ error: err.message, code: 409 });
     }
     log.error('2FA setup error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -3676,17 +3671,13 @@ router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res)
     const name = String(req.body.name || '').trim();
     const expiresAt = req.body.expires_at ? String(req.body.expires_at).trim() : null;
 
-    if (!name) return res.status(400).json({ error: 'Token name is required.', code: 400, reason: 'api_tokens_name_required' });
-    if (name.length > 100) {
-      return res.status(400).json({
-        error: 'Token name may be at most 100 characters long.', code: 400, reason: 'api_tokens_name_too_long',
-      });
-    }
+    if (!name) return res.status(400).json({ error: 'Token name is required.', code: 400 });
+    if (name.length > 100) return res.status(400).json({ error: 'Token name may be at most 100 characters long.', code: 400 });
     if (expiresAt && Number.isNaN(Date.parse(expiresAt))) {
       return res.status(400).json({ error: 'expires_at must be a valid ISO date/time.', code: 400 });
     }
     if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
-      return res.status(400).json({ error: 'Expiration date must be in the future.', code: 400, reason: 'api_tokens_expiry_past' });
+      return res.status(400).json({ error: 'Expiration date must be in the future.', code: 400 });
     }
 
     // scopes: fehlend/null → uneingeschränktes Token (Voll-Zugriff, Default wie bisher).
@@ -3723,9 +3714,7 @@ router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res)
         EXISTS(SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id) AS is_split_guest
       FROM users u WHERE u.id = ?
     `).get(subjectUserId);
-    if (!subject) {
-      return res.status(400).json({ error: 'Token subject user was not found.', code: 400, reason: 'api_tokens_subject_unknown' });
-    }
+    if (!subject) return res.status(400).json({ error: 'Token subject user was not found.', code: 400 });
     if (subject.is_split_guest) {
       return res.status(400).json({ error: 'A split-expense guest cannot be an API token subject.', code: 400 });
     }

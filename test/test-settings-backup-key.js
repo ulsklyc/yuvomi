@@ -66,10 +66,6 @@ test('jeder Grund, den der Server kennt, hat im Dialog eine Regel', () => {
   const known = {
     backup_key_required: 'show', backup_key_wrong: 'show', backup_key_invalid: 'show',
     backup_damaged: 'keep', backup_unreadable: 'keep', backup_corrupt: 'keep', restore_in_progress: 'keep', restore_busy: 'keep', own_key_missing: 'reset',
-    // #1909: die Datei ist das Problem, nicht der Schluessel - wie vorher ohne
-    // Grund setzt das Feld zurueck.
-    backup_file_empty: 'reset', backup_not_yuvomi: 'reset', backup_newer_version: 'reset',
-    backup_file_too_large: 'reset',
   };
   assert.deepEqual([...reasons].sort(), Object.keys(known).sort(), 'Gruende im Server');
   for (const [reason, action] of Object.entries(known)) assert.equal(keyFieldAfterError(reason), action, reason);
@@ -235,23 +231,9 @@ test('Fehlertext: jeder bekannte Grund hat einen eigenen Key, ein unbekannter de
     backup_corrupt: ['settings.backupRestoreErrorCorrupt'],
     restore_in_progress: ['settings.backupRestoreErrorInProgress'],
     restore_busy: ['settings.backupRestoreErrorBusy'],
-    // #1909: bisher nur als englischer Text des Servers.
-    backup_file_empty: ['settings.backupRestoreErrorFileEmpty'],
-    backup_not_yuvomi: ['settings.backupRestoreErrorNotYuvomi'],
-    backup_newer_version: ['settings.backupRestoreErrorNewerVersion'],
-    // #2564 (Codex): 413 trug keinen Grund, errorSentence kennt 413 nicht -
-    // ohne ihn stuende der allgemeine Satz da, und die Grenze nirgends.
-    // Der Stub von t() haengt die Werte an: die Grenze kommt im Satz an.
-    backup_file_too_large: ['settings.backupRestoreErrorTooLarge{"limit":"4mb"}'],
   };
   for (const [reason, keys] of Object.entries(expected)) {
-    assert.equal(restoreErrorText({ message: LONG_ENGLISH, data: { reason, params: { limit: '4mb' } } }), keys.join(' '), reason);
-  }
-  // Die Grenze ist Text aus der Env, also nur eine Groessenangabe durchlassen;
-  // fehlt sie oder ist sie etwas anderes, lieber der allgemeine Satz.
-  for (const params of [undefined, {}, { limit: '<img src=x>' }, { limit: 42 }]) {
-    assert.equal(restoreErrorText({ data: { reason: 'backup_file_too_large', params } }),
-      'settings.backupRestoreErrorGeneric', JSON.stringify(params));
+    assert.equal(restoreErrorText({ message: LONG_ENGLISH, data: { reason } }), keys.join(' '), reason);
   }
   // Jeder Grund aus dem Server steht in der Tabelle - dieselbe Quelle wie oben.
   const db = readFileSync(new URL('../server/db.js', import.meta.url), 'utf8');
@@ -261,20 +243,16 @@ test('Fehlertext: jeder bekannte Grund hat einen eigenen Key, ein unbekannter de
   for (const reason of ['irgendwas_neues', 'toString', '__proto__']) {
     assert.equal(restoreErrorText({ message: LONG_ENGLISH, data: { reason } }), 'settings.backupRestoreErrorGeneric', reason);
   }
-  // Ohne Grund nie der englische Text des Servers (#1909): jeder Fall, den die
-  // Seite unterscheidet, hat einen Grund; der Rest steht im Server-Log.
-  assert.equal(restoreErrorText({ message: 'Update Yuvomi first, then restore.', data: { error: 'Update Yuvomi first, then restore.' } }),
-    'settings.backupRestoreErrorGeneric');
-  assert.equal(restoreErrorText(undefined), 'settings.backupRestoreErrorGeneric');
+  // Ohne Grund traegt nur der Text die Auskunft (etwa ein neueres Schema).
+  assert.equal(restoreErrorText({ message: 'Update Yuvomi first, then restore.' }), 'Update Yuvomi first, then restore.');
+  assert.equal(restoreErrorText(undefined), 'common.errorGeneric');
   // Und jeden Key gibt es in jeder Sprache.
   const locales = new URL('../public/locales/', import.meta.url);
   for (const file of readdirSync(locales).filter((name) => name.endsWith('.json'))) {
     const settings = JSON.parse(readFileSync(new URL(file, locales), 'utf8')).settings;
     for (const key of [...Object.values(expected).flat(), 'settings.backupRestoreErrorGeneric']) {
-      // Werte, die der Stub angehaengt hat, gehoeren nicht zum Key.
-      assert.equal(typeof settings[key.replace('settings.', '').replace(/\{.*\}$/, '')], 'string', `${file}: ${key}`);
+      assert.equal(typeof settings[key.replace('settings.', '')], 'string', `${file}: ${key}`);
     }
-    assert.match(settings.backupRestoreErrorTooLarge, /\{\{limit\}\}/, `${file}: die Grenze steht im Satz`);
   }
 });
 
