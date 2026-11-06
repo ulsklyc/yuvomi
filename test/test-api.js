@@ -879,6 +879,7 @@ const REASONS_WITHOUT_SENTENCE = new Set([
 // Wiederholung oder eine verschwundene macht den Test rot. Was er NICHT prueft:
 // dass `at403` vollstaendig ist - das ist die Zusage dessen, der die Zeile schreibt.
 const REASONS_PASSED_THROUGH = new Map([
+  ['auth.js: error.reason', { sites: 1, at403: [], why: 'Passkey audit metadata only; HTTP proof failures return literal passkey_failed at 400, never this log reason' }],
   ['routes/calendar/crud.js: error.code', { sites: 1, at403: [['not_authorized', 'services/calendar-occurrence-overrides.js']],
     why: 'sendCalendarOccurrenceError: 403 nur bei not_authorized, sonst 400/404/409' }],
   ['routes/calendar/crud.js: eligibility.reason', { sites: 1, at403: [], why: 'feste 400' }],

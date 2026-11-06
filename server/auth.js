@@ -1330,7 +1330,7 @@ function signedSessionCookieValue(req) {
  * @param {{ id: number, role: string }} user
  * @returns {Promise<void>}
  */
-function setupAuthSession(req, res, user) {
+function setupAuthSession(req, res, user, mfaVerified = false) {
   return new Promise((resolve, reject) => {
     // Letzte Linie, nicht die Pruefung selbst: jeder Weg hierher fragt
     // `canSignIn` schon vorher und antwortet mit seinem eigenen Grund. Kommt
@@ -1344,6 +1344,7 @@ function setupAuthSession(req, res, user) {
       if (err) return reject(err);
       req.session.userId    = user.id;
       req.session.authenticatedAt = Date.now();
+      if (mfaVerified) req.session.mfaVerifiedAt = req.session.authenticatedAt;
       req.session.role      = user.role;
       req.session.csrfToken = generateToken();
       res.cookie('csrf-token', req.session.csrfToken, {
@@ -1827,24 +1828,48 @@ export function hasSplitExpenseGuests(database = null) {
 function passkeyOrigin(req, res, next) {
   const cfg = passkeys.configuration();
   if (!cfg) return res.status(409).json({ error: 'Passkeys need a configured HTTPS BASE_URL.', code: 409, reason: 'passkey_unavailable' });
-  if (req.get('origin') !== cfg.origin) return res.status(403).json({ error: 'Invalid passkey origin.', code: 403, reason: 'passkey_failed' });
+  if (req.get('origin') !== cfg.origin) {
+    log.warn('Passkey sign-in failed', { ip: req.ip, reason: 'origin_mismatch', operation: req.path });
+    return res.status(403).json({ error: 'Invalid passkey origin.', code: 403, reason: 'passkey_failed' });
+  }
   next();
 }
 function passkeyBrowserSession(req, res, next) {
   if (req.authMethod !== 'session') return res.status(403).json({ error: 'Use a signed-in browser session.', code: 403, reason: 'browser_session_required' });
   next();
 }
+function recentPasskeyProof(req) {
+  const now = Date.now();
+  const fresh = timestamp => Number.isFinite(timestamp) && now - timestamp >= 0 && now - timestamp <= 5 * 60_000;
+  return fresh(req.session.authenticatedAt)
+    && (!twoFactor.isEnabled(db.get(), req.authUserId) || fresh(req.session.mfaVerifiedAt));
+}
 function recentPasskeySession(req, res, next) {
   if (req.authMethod !== 'session') return res.status(403).json({ error: 'Use a signed-in browser session.', code: 403, reason: 'browser_session_required' });
-  const age = Date.now() - req.session.authenticatedAt;
-  if (!Number.isFinite(age) || age < 0 || age > 5 * 60_000) return res.status(403).json({ error: 'Sign in again before changing passkeys.', code: 403, reason: 'passkey_reauth_required' });
+  if (!recentPasskeyProof(req)) return res.status(403).json({ error: 'Confirm your identity before changing passkeys.', code: 403, reason: 'passkey_reauth_required' });
   next();
+}
+// Enrollment must not finish from a session revoked while verification yielded.
+function currentPasskeySession(req, userId) {
+  const row = db.get().prepare('SELECT sess FROM sessions WHERE sid = ? AND expired_at > ?').get(req.sessionID, Date.now());
+  if (!row) return false;
+  const saved = JSON.parse(row.sess);
+  return saved.userId === userId && saved.authenticatedAt === req.session.authenticatedAt
+    && saved.mfaVerifiedAt === req.session.mfaVerifiedAt;
 }
 function nativePasskeysAllowed(user) {
   return !isSsoOnlyAccount(user.password_hash) && (isPasswordLoginEnabled() || isSplitExpenseGuest(user.id));
 }
 function passkeyError(res) {
   return res.status(400).json({ error: 'Passkey verification failed. Try again.', code: 400, reason: 'passkey_failed' });
+}
+function passkeyAuthFailure(req, res, error, operation) {
+  if (error instanceof passkeys.PasskeyVerificationError) {
+    log.warn('Passkey sign-in failed', { ip: req.ip, reason: error.reason, operation });
+    return passkeyError(res);
+  }
+  log.error('Passkey sign-in error', { ip: req.ip, reason: 'internal_error', operation, error: error?.message });
+  return res.status(500).json({ error: 'Could not complete passkey authentication.', code: 500 });
 }
 router.get('/passkeys/config', (_req, res) => {
   try {
@@ -1863,6 +1888,7 @@ router.get('/passkeys', requireAuth, (req, res) => {
 function passkeyReauthUser(req, res) {
   const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(req.authUserId);
   if (!user || !canSignIn(db.get(), user.id) || !nativePasskeysAllowed(user)) {
+    log.warn('Passkey sign-in failed', { ip: req.ip, reason: 'passkey_policy', operation: 'reauth' });
     res.status(403).json({ error: 'Native sign-in is not allowed for this account.', code: 403, reason: 'passkey_policy' });
     return null;
   }
@@ -1873,7 +1899,7 @@ router.post('/passkeys/reauth/options', requireAuth, csrfMiddleware, passkeyBrow
     const user = passkeyReauthUser(req, res);
     if (!user) return;
     res.json({ data: await passkeys.beginAuthentication(db.get(), req.sessionID, user.id) });
-  } catch { passkeyError(res); }
+  } catch (error) { passkeyAuthFailure(req, res, error, 'reauth'); }
 });
 router.post('/passkeys/reauth/verify', requireAuth, csrfMiddleware, passkeyBrowserSession, loginLimiter, passkeyOrigin, async (req, res) => {
   try {
@@ -1883,27 +1909,29 @@ router.post('/passkeys/reauth/verify', requireAuth, csrfMiddleware, passkeyBrows
       await passkeys.finishAuthentication(db.get(), req.sessionID, req.body.credential, user.id);
     } else if (req.body?.method === 'password') {
       const password = req.body.password;
-      if (typeof password !== 'string' || !password || password.length > 1024) return passkeyError(res);
+      if (typeof password !== 'string' || !password || password.length > 1024) throw new passkeys.PasskeyVerificationError('proof_invalid');
       const { valid } = await verifyPassword(password, user.password_hash);
-      if (!valid) return passkeyError(res);
-    } else return passkeyError(res);
+      if (!valid) throw new passkeys.PasskeyVerificationError('proof_invalid');
+    } else throw new passkeys.PasskeyVerificationError('proof_invalid');
     const current = passkeyReauthUser(req, res);
     if (!current) return;
-    if (current.password_hash !== user.password_hash) return passkeyError(res);
-    if (twoFactor.isEnabled(db.get(), user.id)) {
+    if (current.password_hash !== user.password_hash) throw new passkeys.PasskeyVerificationError('proof_invalid');
+    if (req.body.method === 'password' && twoFactor.isEnabled(db.get(), user.id)) {
       if (typeof req.body.code !== 'string' || req.body.code.length > 128
-          || !twoFactor.verifySecondFactor(db.get(), user.id, req.body.code).valid) return passkeyError(res);
+          || !twoFactor.verifySecondFactor(db.get(), user.id, req.body.code).valid) throw new passkeys.PasskeyVerificationError('proof_invalid');
     }
+    if (!currentPasskeySession(req, user.id)) throw new passkeys.PasskeyVerificationError('session_revoked');
     req.session.authenticatedAt = Date.now();
+    if (req.body.method === 'passkey' || twoFactor.isEnabled(db.get(), user.id)) req.session.mfaVerifiedAt = req.session.authenticatedAt;
     res.json({ data: { ok: true } });
-  } catch { passkeyError(res); }
+  } catch (error) { passkeyAuthFailure(req, res, error, 'reauth'); }
 });
 router.post('/passkeys/register/options', requireAuth, csrfMiddleware, recentPasskeySession, passkeyOrigin, async (req, res) => {
   try {
     const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(req.authUserId);
     if (!user || !canSignIn(db.get(), user.id) || !nativePasskeysAllowed(user)) return res.status(403).json({ error: 'Native sign-in is not allowed for this account.', code: 403, reason: 'passkey_policy' });
     res.json({ data: await passkeys.beginRegistration(db.get(), user, req.sessionID) });
-  } catch { passkeyError(res); }
+  } catch (error) { passkeyAuthFailure(req, res, error, 'registration'); }
 });
 router.post('/passkeys/register/verify', requireAuth, csrfMiddleware, recentPasskeySession, passkeyOrigin, async (req, res) => {
   try {
@@ -1912,10 +1940,11 @@ router.post('/passkeys/register/verify', requireAuth, csrfMiddleware, recentPass
     await passkeys.finishRegistration(db.get(), user.id, req.sessionID, req.body?.credential, req.body?.name,
       () => {
         const current = db.get().prepare('SELECT * FROM users WHERE id = ?').get(user.id);
-        return !!current && canSignIn(db.get(), current.id) && nativePasskeysAllowed(current);
+        return !!current && canSignIn(db.get(), current.id) && nativePasskeysAllowed(current)
+          && currentPasskeySession(req, current.id) && recentPasskeyProof(req);
       });
     res.json({ data: { ok: true } });
-  } catch { passkeyError(res); }
+  } catch (error) { passkeyAuthFailure(req, res, error, 'registration'); }
 });
 router.delete('/passkeys/:id', requireAuth, csrfMiddleware, recentPasskeySession, passkeyOrigin, (req, res) => {
   try {
@@ -1932,23 +1961,23 @@ router.post('/passkeys/login/options', passkeyOptionsLimiter, passkeyOrigin, asy
     if (!req.session.userId && !req.session.pendingTwoFactor) req.session.cookie.maxAge = passkeys.CHALLENGE_TTL_MS;
     req.session.passkeyFlow = true;
     res.json({ data: options });
-  } catch { passkeyError(res); }
+  } catch (error) { passkeyAuthFailure(req, res, error, 'login'); }
 });
 router.post('/passkeys/login/verify', loginLimiter, passkeyOrigin, async (req, res) => {
   try {
     const { userId } = await passkeys.finishAuthentication(db.get(), req.sessionID, req.body?.credential);
     const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(userId);
-    if (!user || !canSignIn(db.get(), userId)) return res.status(403).json({ error: 'This account cannot sign in.', code: 403, reason: 'account_cannot_sign_in' });
-    if (!nativePasskeysAllowed(user)) return res.status(403).json({ error: 'Native sign-in is disabled.', code: 403, reason: 'passkey_policy' });
-    if (twoFactor.isEnabled(db.get(), userId)) {
-      // Never replace an already authenticated identity with a half-login.
-      await new Promise((resolve, reject) => req.session.regenerate(err => err ? reject(err) : resolve()));
-      req.session.pendingTwoFactor = { userId, expiresAt: Date.now() + TWO_FACTOR_WINDOW_MS };
-      return res.json({ twoFactorRequired: true, recoveryAvailable: twoFactor.getStatus(db.get(), userId).recovery_remaining > 0 });
+    if (!user || !canSignIn(db.get(), userId)) {
+      log.warn('Passkey sign-in failed', { ip: req.ip, reason: 'account_cannot_sign_in', operation: 'login' });
+      return res.status(403).json({ error: 'This account cannot sign in.', code: 403, reason: 'account_cannot_sign_in' });
     }
-    await setupAuthSession(req, res, user);
+    if (!nativePasskeysAllowed(user)) {
+      log.warn('Passkey sign-in failed', { ip: req.ip, reason: 'passkey_policy', operation: 'login' });
+      return res.status(403).json({ error: 'Native sign-in is disabled.', code: 403, reason: 'passkey_policy' });
+    }
+    await setupAuthSession(req, res, user, true);
     res.json(loginPayload(req, user));
-  } catch { passkeyError(res); }
+  } catch (error) { passkeyAuthFailure(req, res, error, 'login'); }
 });
 
 router.post('/login', loginLimiter, async (req, res) => {
@@ -3251,7 +3280,7 @@ router.post('/2fa/verify', twoFactorLimiter, async (req, res) => {
     // `regenerate` legt eine neue, leere Session an - der Wartezustand ist
     // danach von selbst fort, und ein vor der Anmeldung untergeschobener
     // Sitzungsschlüssel taugt nichts mehr.
-    await setupAuthSession(req, res, user);
+    await setupAuthSession(req, res, user, true);
     log.info('Second factor accepted', { userId: user.id, method: result.method });
 
     res.json({
@@ -3314,7 +3343,9 @@ router.post('/2fa/enable', requireAuth, csrfMiddleware, twoFactorLimiter, (req, 
 
     // Alle anderen Sitzungen dieses Kontos beenden: wer den zweiten Faktor
     // einschaltet, will nicht, dass eine alte Anmeldung ohne ihn weiterläuft.
-    invalidateUserSessions(req.authUserId, req.sessionID, db.get(), true);
+    invalidateUserSessions(req.authUserId, req.sessionID);
+    req.session.authenticatedAt = Date.now();
+    req.session.mfaVerifiedAt = req.session.authenticatedAt;
 
     res.json({ data: { recovery_codes: codes } });
   } catch (err) {

@@ -6889,11 +6889,13 @@
         "reauthenticate": "Esci e accedi di nuovo, poi modifica le chiavi entro cinque minuti.",
         "failed": "Impossibile verificare la chiave. Riprova o usa un altro metodo.",
         "tooManyAttempts": "Troppi tentativi. Riprova più tardi.",
-        "removeConfirm": "Rimuovere questa chiave? Potrai aggiungerla nuovamente dopo l'accesso con un altro metodo.",
+        "removeConfirm": "Rimuovere questa passkey e disconnettere gli altri dispositivi? Questo dispositivo resta connesso.",
         "signIn": "Accedi con una chiave di accesso",
         "reauthTitle": "Conferma la tua identità",
-        "reauthLead": "Conferma con la password o una passkey esistente per continuare qui. Se hai attivato l’autenticazione a due fattori, inserisci anche il codice.",
+        "reauthLead": "Conferma con la password o una passkey esistente. Se usi la password con l’autenticazione a due fattori, inserisci anche il codice.",
         "reauthFailed": "Conferma non riuscita. Controlla la password o la passkey e, se richiesto, il codice del secondo fattore.",
-        "confirmWithPasskey": "Conferma con una passkey"
+        "confirmWithPasskey": "Conferma con una passkey",
+        "passwordChangeWarning": "Cambiare la password rimuove tutte le tue passkey. Aggiungile di nuovo in seguito.",
+        "removed": "Passkey rimossa."
     }
 }

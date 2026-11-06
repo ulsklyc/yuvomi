@@ -7231,11 +7231,13 @@
         "reauthenticate": "Wyloguj się i zaloguj ponownie. Następnie zmień klucze w ciągu pięciu minut.",
         "failed": "Nie udało się zweryfikować klucza. Spróbuj ponownie lub użyj innej metody.",
         "tooManyAttempts": "Zbyt wiele prób. Spróbuj ponownie później.",
-        "removeConfirm": "Usunąć ten klucz? Po zalogowaniu inną metodą możesz dodać go ponownie.",
+        "removeConfirm": "Usunąć ten klucz dostępu i wylogować inne urządzenia? To urządzenie pozostanie zalogowane.",
         "signIn": "Zaloguj się kluczem dostępu",
         "reauthTitle": "Potwierdź swoją tożsamość",
-        "reauthLead": "Potwierdź hasłem lub istniejącym kluczem dostępu, aby kontynuować tutaj. Jeśli uwierzytelnianie dwuskładnikowe jest włączone, wpisz także jego kod.",
+        "reauthLead": "Potwierdź hasłem lub istniejącym kluczem dostępu. Jeśli używasz hasła z uwierzytelnianiem dwuskładnikowym, podaj też kod.",
         "reauthFailed": "Potwierdzenie nie powiodło się. Sprawdź hasło lub klucz dostępu oraz wymagany kod drugiego składnika.",
-        "confirmWithPasskey": "Potwierdź kluczem dostępu"
+        "confirmWithPasskey": "Potwierdź kluczem dostępu",
+        "passwordChangeWarning": "Zmiana hasła usuwa wszystkie Twoje klucze dostępu. Dodaj je ponownie po zmianie.",
+        "removed": "Klucz dostępu usunięty."
     }
 }
