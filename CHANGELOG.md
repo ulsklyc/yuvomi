@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **A damaged backup is no longer handed out as a good one (#2520).** Every backup is now checked
+  for integrity right after it is written. One that fails is discarded: the download answers with
+  an error instead of the file, a scheduled backup is reported as failed and does not push the
+  oldest good backup out of rotation, and nothing is uploaded to WebDAV. Before, a damaged backup
+  only showed up when you tried to restore it.
 - **Mirrored Mealie recipes show their preparation steps as readable text (#2558).** A step with
   an inserted image showed the raw `<img>` tag, and formatting or HTML entities appeared as
   symbols. Steps now arrive as plain text with their lists and links; images in steps are left

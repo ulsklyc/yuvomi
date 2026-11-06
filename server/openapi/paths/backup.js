@@ -15,6 +15,7 @@ export function backupPaths() {
         summary: 'Download database backup',
         tag: 'Backup',
         admin: true,
+        description: 'The backup is checked for integrity before it is sent. A backup that fails the check is discarded and answered with 500 and reason `backup_verify_failed`.',
         responses: {
           200: {
             description: 'Database backup file',
