@@ -1969,9 +1969,7 @@ Vitalwerte-Seite listet leere Messarten auf jeder Breite in "Weitere Messwerte".
 ablesbar:** Mindestspanne je Messart (`minSpan` in utils/health-vitals.js, z. B. Blutzucker 40 mg/dL -
 drei Werte zwischen 88 und 90 standen vorher auf einer 0,5er-Achse), die Einheit am obersten
 Achsenwert ("120 mmHg", `chartGridMarkup({ unit })`), der Puls auf eigener Achse unter dem Blutdruck
-(`axes`), keine Farblegende und seit #2538 kein Name im Plot: die Ueberschrift und die Einheit an der
-Achse nennen jede Kurve, ueber den Blutdruck-Balken sagt eine Zeile, welches Ende welches ist
-(`.health-chart-section__caption`). Die Aktivitaetsachse
+(`axes`), die Reihen direkt an ihrer Kurve beschriftet statt einer Farblegende. Die Aktivitaetsachse
 nennt Minuten; eine fehlende Bewertung im Laborbefund bleibt eine leere Zelle statt "-".
 Guards: `test:health-vitals` ("R21 D6"), `test:health-nav` (Umzugsplan).
 
@@ -3852,9 +3850,7 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Seit D1 (Critique 2026-10-16) traegt auch der Aufgabenkopf seine Werkzeuge in der
    Titelzeile: Lupe, Filter als Icon mit Zaehler (D2) und „...", die Ansicht Liste/Brett
    unter 768px als Einfachauswahl im Menue. Gemessen 390px: Kopf 120 -> 65px, erste
-   Gruppe y 132 -> 78. Drei Icon-Knoepfe lassen „Aufgaben" bei 390px 166px; unter 390px
-   reicht das nicht mehr (360px: 136px, das Wort braucht in Roboto 144), dort steht der
-   Filter im „..." (#2425, Regel 3), und der Kopf traegt die zwei Knoepfe dieser Regel.
+   Gruppe y 132 -> 78. Drei Icon-Knoepfe lassen „Aufgaben" bei 390px 166px.
    **Seit R19 gilt 1a bis 1023px**, also auch auf dem Tablet: bei 834px stand die Suche als
    Feld in einer eigenen Zeile unter dem Titel (Aufgaben, Kontakte, Inventar, Notizen,
    Dokumente 118px). Jetzt teilen Titel (natuerliche Breite, Ellipse), Suchfeld und Werkzeuge
@@ -3872,13 +3868,6 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    Element IM Scrollport (scrollt weg) oder hinter „Filter (n)" mit Blatt
    (utils/filter-sheet.js, Vorbild Kalender). Aktive Filter bleiben sichtbar: die Zahl am
    Knopf oder die Chips im Port. Nie beides fuer dieselbe Achse.
-   **Aufgaben unter 390px (#2425, Ulas 2026-10-31):** der Filter steht als beschrifteter
-   Eintrag im „...", die Zahl steht dann am „..." (Modulton, Badge, im Namen) und im Eintrag;
-   ab 390px bleibt der Knopf, je Breite ein Weg. Das ist die einzige Abweichung und kein
-   Muster fuer andere Koepfe: kein anderer Modulkopf traegt neben dem Titel drei Werkzeuge
-   (gemessen 320-375px), und der Kalender behaelt seinen Filter (R20 6c, kompakter Kopf wie
-   Apple Kalender). Der Stepper kann nicht ins Menue, er ist die Hauptsteuerung des Reiters: das
-   Budget loest dieselbe Enge mit einer eigenen Zeile (#2440, „Sub-Tabs + Zeitraum").
    Eine Chipreihe bleibt EINE Reihe, auch am Zeigergeraet (R22, D20; Kontakte brachen bis
    dahin ab 1024px in zwei Reihen um, rund 48px Kopf): sie scrollt waagerecht mit Fade an der
    Kante (`wireScrollFade`), das Mausrad bewegt sie, bis sie am Ende ist, dann die Seite
@@ -3894,20 +3883,6 @@ Kontakten und Vorrat (Port erst bei y179), und unter der Glas-Kapsel lief nie In
    einem Wrapper-Slot, und ein Slot, der nur die Suche traegt, schrumpft mit ihr. Der
    bevorzugte Weg bleibt, die Suche selbst zum Slot zu machen (`className: '...
    page-toolbar__center'`).
-   **Lupe und Werkzeug unter 390px (#2443, Ulas 2026-11-01):** zwei Knoepfe lassen dem Large
-   Title Breite minus 172px, bei 360px also 188px - zu wenig fuer „Geburtstage" (SF 195) und
-   lange Sprachen (Roboto uk 256, ru 231, hu 220). Wo der Kopf neben dem Titel nur Lupe und
-   EIN Werkzeug traegt, falten beide unter 390px Modulbreite in ein „..." (Geburtstage,
-   Notizen), bei den Dokumenten die Lupe in das schon stehende „..."; der Kopf bleibt
-   einzeilig, der Titel gross. Der Eintrag „Suchen" steht oben und gibt dem EINEN Suchfeld im
-   Kopf den Fokus, es geht wie immer ueber `:focus-within` auf; die Suche verlaesst nur das
-   Bild, nicht den Baum (die Tastatur erreicht sie weiter), und ein stehender Begriff haelt
-   das Feld sichtbar. Ab 390px bleiben Lupe und Direktknopf (je Breite ein Weg). Eine
-   Container-Abfrage an der Seitenwurzel (`.app-page--fold-head`,
-   `pageToolsMenuHtml({ foldSearch })`), kein Viewport-Breakpoint. Kontakte und Inventar
-   brauchen es gemessen nicht; Nur-lesen hat kein Werkzeug, dort bleibt die Lupe stehen. Die
-   Entsorgung hat ausser dem „..." nichts zu falten: ihr Titel ist in allen Breiten kurz
-   („Waste"), die Navigation behaelt „Waste collection".
 5. **Der Inhalt laeuft unter die Glas-Kapsel.** `.nav-bottom` liegt absolut an der Unterkante
    der Shell, nicht im Flex-Fluss; der Scrollport reicht bis zum Rand, und das Glas zeigt,
    was darunter scrollt. Die Zone der Kapsel ist der vierte Summand des Nachlaufs
@@ -3963,21 +3938,10 @@ Gefaltet wird ueber Rand und Verschiebung, nicht ueber die Hoehe: der negative R
 die Leiste, wo die Seite sie abschneidet. Beides gleitet in Safari (eine Hoehe nach `auto`
 braeuchte `interpolate-size`), der Inhalt blendet; reduzierte Bewegung faltet ohne
 Bewegung. Die Zeile bleibt offen, solange sie Fokus, einen Suchbegriff oder ein offenes Menue
-traegt - wer per Tab hineinkommt, bekommt sie zurueck.
-
-**Suchschalter in der Leiste, Zeile 2 ab Seitenladestart eingeklappt (Issue #2043, 2026-10).**
-Die Leiste traegt rechts eine `.kitchen-tabs-bar__trailing`-Zone (`position: sticky; inset-inline-end: 0`
-in der scrollbaren `<nav>`): die Tabs koennen links durchscrollen, der Schalter klebt am Rand.
-Rezepte und Vorrat fuellen ihn mit einer Lupe (`setKitchenTabsTrailing`); Mahlzeiten und Einkauf
-leeren ihn. Tipp auf die Lupe fokussiert das Suchfeld in Zeile 2; weil die Faltung
-(`:not(:focus-within)`) damit endet, gleitet die Zeile sofort auf. Damit Inhalt nicht erst nach
-dem ersten Scroll auf y 57 startet, setzt ein `MutationObserver` in Rezepte und Vorrat
-`is-collapsed`, sobald `wireCollapsingHeader` `page-toolbar--fold-row` (und damit `--fold-row-h`)
-gesetzt hat. Bis der erste Nutzer-Scroll den Wert verwirft, faengt die Lupe ihn ab. Tab-Icons
-entfallen (D3: Texttabs); 375px de mit Trailing-Zone: ~374px (Symbol-only 24px aus `.btn--icon-tight`,
-Trefferflaeche weiter `--target-base`), passt ohne Scrollen. Gemessen wird die Breite des Schalters in
-`test:kitchen-tabs-fit-browser` - an der Deklaration gelesen war sie 24 und gerendert 48 (`min-width`
-schlaegt `max-width`).
+traegt - wer per Tab hineinkommt, bekommt sie zurueck. Die Werkzeuge erreicht man angedockt
+ueber den Rueckweg nach oben, wie die Suche der gedeckelten Koepfe (Kontakte); in der Leiste
+selbst ist fuer sie kein Platz (390px, de: 65-87px frei, zwei 48px-Ziele passen nicht, ohne
+die Zaehler wieder zu Punkten zu machen).
 
 **Sub-Tabs + Zeitraum: der Zeitraum steht in der Titelzeile (Budget, R16 2026-10-05).** Ein
 Modul, dessen Zeile 2 schon die Sub-Tabs traegt und dessen Tab einen Zeitraum blaettert, fuehrt
@@ -4001,29 +3965,6 @@ Die Haushaltshilfe-Berichte (170px) bleiben in der Dreizeilen-Form, gemessen und
 Stepper selbst ist der geteilte Baustein (utils/period-stepper.js). Ein drittes Element (Werkzeugzeile, Chipreihe) wandert weiter ins Menue oder
 in den Port. `test:budget-ui` haelt Klasse, nachgebende Titelbasis und den Center-Slot ohne
 eigene Zeile.
-**Steht der Titel neben dem Stepper nicht ganz, bekommt der Zeitraum eine eigene Zeile (#2440,
-Ulas 2026-11-01; nach Messung seit #2443).** Neben dem 192px-Stepper bleiben dem Large Title
-Breite minus 264px: bei 360px 96px, „Budget" braucht in Roboto 106, in SF Pro 112, und stand als
-„Bud...". Der Titel bleibt in jedem Modul gleich gross, also weicht der Stepper: er steht in voller
-Breite unter dem Titel, die Pfeile an den Zeilenenden wie im Schichtplan, die Kurzform mittig; die
-Notiz der Reiter ohne Zeitraum nimmt dieselbe Zeile, am Zeilenanfang unter dem Titel. #2440
-schaltete fest unter 390px Modulbreite um, gerechnet an de und en - ab 390px stand der Titel in
-elf Sprachen gekuerzt („Presupuesto" 195px in 126px bei 390, in 166px bei 430), und unter 390px
-wich der Stepper auch neben einem kurzen Titel (ja „家計"). Seit #2443 misst der Kopf
-(`watchHeadFit` in pages/budget.js, Klasse `budget-nav--period-own-row`): gemessen wird der Titel
-in der EINEN Zeile, nicht im gezeigten Zustand - die Klasse geht fuer die Messung kurz ab, im
-selben Rueckruf vor dem Bild -, sonst schaltete die eigene Zeile, in der jeder Titel passt, sofort
-zurueck. Die feste Abfrage ist in diese Regel aufgegangen: zwei Ausloeser fuer dieselbe Zeile
-waeren zwei Antworten auf eine Frage. Gemessen 360px: Kopf 117 -> 169px, auf allen sechs Reitern mit
-Slot dasselbe; nur die Aufteilung traegt im Slot nichts und bleibt bei 117px. Der Monatswechsel
-bewegt nichts, die Pfeile haengen nicht am Label, und das Label hat in der Zeile des Titels eine
-feste Breite. Eingeklappt gilt R19 unveraendert (169 -> 65px) und wird nicht gemessen. Mit der
-Wippe „Mein Budget / Haushalt" sind es vier Zeilen, 221px; eingeklappt weicht sie wie bisher. Der
-griechische Titel kuerzte selbst in der eigenen Zeile (320px: 271px in 252px); der Budget-Kopf
-traegt dort „Οικονομικά", die Navigation behaelt „Προϋπολογισμός" (`budget.title` gegen
-`nav.budget`, wie die Entsorgung, #2492). Das Budget ist der einzige Kopf, der auf dem Telefon
-Titel und Stepper in einer Zeile fuehrt (gemessen, der Schichtplan erst ab 768px), die Regel steht
-deshalb in budget.css.
 
 **Verwaltung steht mobil nicht vor dem Inhalt (R16, 2026-10-05).** Der Kopf war nur die
 halbe Rechnung: in vier Flaechen stand unter ihm eine eigene Bedienflaeche, die den Inhalt

@@ -13,7 +13,7 @@ import { openDetailView, leaveDetailTo, visibilityRow, assignedRow } from '/comp
 import { mountMasterDetail, splitViewDetailHtml, releaseAddressOnClose } from '/utils/master-detail.js';
 import { beginRowFill, drawRowIcons } from '/utils/row-fill.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete, vibrate, durationToken, requestHeadCollapse } from '/utils/ux.js';
-import { t, getLocale, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput, setWeekStart } from '/i18n.js';
+import { t, getLocale, formatDayMonth, formatMonthYear, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc, fmtLocation, REQUIRED_MARK } from '/utils/html.js';
 import { periodStepperHtml, syncPeriodReset, swapPeriod } from '/utils/period-stepper.js';
 import { swapRegion } from '/utils/content-swap.js';
@@ -780,29 +780,7 @@ function eventGlyphsHtml(ev, { compact = true } = {}) {
   const icon = hasEventIcon(ev.icon)
     ? eventIconHtml(ev.icon, compact ? 'event-icon event-icon--compact' : 'event-icon')
     : '';
-  return `${calendarCancelledMarkHtml(ev, { compact })}${icon}${calendarRepeatIconHtml(ev)}`;
-}
-
-/** Vom Anbieter abgesagt (#2499), per STATUS:CANCELLED aus ICS-Abo, CalDAV oder iCloud. */
-function isProviderCancelled(ev) {
-  return ev?.provider_status === 'CANCELLED';
-}
-
-/**
- * DIE ABSAGE STEHT NUR IM KALENDER (#2499): ein Termin, den der Anbieter
- * absagt, aber stehen laesst, bleibt hier sichtbar, damit niemand fragt, wo er
- * hin ist - alle anderen Flaechen lassen ihn aus (Server). Die Marke steht vor
- * den uebrigen Glyphen; der Titel dahinter ist durchgestrichen und tritt in
- * die Sekundaertinte zurueck (calendar.css, Geschwister-Selektor - keine
- * Klasse an jeder der acht Chip-Wurzeln). Im Raster ein Icon mit Namen, in
- * der Listenzeile das Wort: dort ist Platz, und ein Wort braucht keine
- * Legende.
- */
-function calendarCancelledMarkHtml(ev, { compact = true } = {}) {
-  if (!isProviderCancelled(ev)) return '';
-  const label = esc(t('calendar.cancelled'));
-  if (!compact) return `<span class="calendar-cancelled-mark calendar-cancelled-mark--word">${label}</span>`;
-  return `<span class="calendar-cancelled-mark" role="img" aria-label="${label}" title="${label}"><i data-lucide="calendar-x" class="icon-sm" aria-hidden="true"></i></span>`;
+  return `${icon}${calendarRepeatIconHtml(ev)}`;
 }
 
 function eventIconElement(icon, className = 'event-icon') {
@@ -1977,8 +1955,6 @@ async function loadUsers() {
 function applyEventFormPreferences(prefs = {}, documentOptions = {}) {
   state.holidayPrefs  = prefs ?? {};
   state.weekStart     = weekStartIndex(prefs?.week_start);
-  // Der frische Wert auch fuer den Datepicker, der ihn aus i18n.js liest (#2533).
-  if (prefs?.week_start) setWeekStart(prefs.week_start);
   state.defaultDuration = Number(prefs?.calendar_default_duration) || 60;
   // Standardwerte für neue Termine (#497/#498).
   state.defaultReminders = Array.isArray(prefs?.calendar_default_reminders)
@@ -4856,9 +4832,8 @@ const MONTH_DAY_LABEL_TITLES = 3;
 function monthDayAriaLabel(date, total, events = [], { tasks = [], others = [], isToday = false } = {}) {
   const eventTitle = (event) => {
     if (!event?.title) return '';
-    const series = (event.recurrence_rule || event.is_recurring_instance)
+    const title = (event.recurrence_rule || event.is_recurring_instance)
       ? `${t('calendar.recurringEvent')}: ${event.title}` : event.title;
-    const title = isProviderCancelled(event) ? `${t('calendar.cancelled')}: ${series}` : series;
     const position = multiDayPositionText(event, date);
     return position ? `${title} (${position})` : title;
   };
@@ -7663,7 +7638,6 @@ function renderAgendaEvent(ev, dayStr) {
 
 function agendaEventAriaLabel(ev, timeStr, dayText = '') {
   return [
-    isProviderCancelled(ev) ? t('calendar.cancelled') : '',
     (ev.recurrence_rule || ev.is_recurring_instance) ? t('calendar.recurringEvent') : '',
     ev.title,
     timeStr,
@@ -7861,8 +7835,6 @@ function eventDetailHead(ev) {
     dot: resolveEventBackground(ev),
     subtitle: eventWhenRelative(ev),
     subtitleLabel: t('calendar.detailWhen'),
-    // Die Absage im Kopf (#2499): das Erste, was der Dialog sagt.
-    facts: isProviderCancelled(ev) ? [t('calendar.cancelled')] : [],
     people: ev.assigned_users ?? [],
     peopleLabel: t('calendar.assignedLabel'),
   };
@@ -8412,14 +8384,8 @@ function reminderTimesFromOffsets(offsets, anchorStart) {
  * Beginn, der Zeitpunkt bleibt. Jede andere Zeile rechnet wie bisher vom Beginn
  * aus. Doppelte fallen am ZEITPUNKT heraus, nicht am Vorlauf: eine
  * durchgereichte Zeile und eine gerechnete koennen denselben treffen.
- *
- * `untouched` nennt den Beginn, an dem die Vorlaeufe gelesen wurden, wenn er
- * nicht der ist, von dem gerechnet wird (eine fremde Serie, deren Vorkommen
- * offen ist): trifft eine Zeile von dort einen gespeicherten Zeitpunkt, hat sie
- * niemand angefasst, und er bleibt. Vom Serienbeginn zu rechnen waere fuer eine
- * NEUE Zeile falsch: er kann Jahre zurueckliegen, und sie wuerde sofort faellig.
  */
-function reminderTimesFromRows(rows, anchorStart, enabled = true, untouched = null) {
+function reminderTimesFromRows(rows, anchorStart, enabled = true) {
   if (!enabled) return [];
   const times = [];
   for (const row of rows) {
@@ -8429,8 +8395,7 @@ function reminderTimesFromRows(rows, anchorStart, enabled = true, untouched = nu
     } else {
       const [offset] = canonicalReminderOffsets([row]);
       if (offset === undefined) continue;
-      const [kept] = untouched ? reminderTimesFromOffsets([offset], untouched.anchorStart) : [];
-      [at] = untouched?.storedAts.includes(kept) ? [kept] : reminderTimesFromOffsets([offset], anchorStart);
+      [at] = reminderTimesFromOffsets([offset], anchorStart);
     }
     if (!at || times.includes(at)) continue;
     times.push(at);
@@ -10160,7 +10125,6 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     // Start, an dem die Erinnerungs-Offsets ausgerichtet werden. Für „ganze Serie"
     // wird das auf den (evtl. verschobenen) Master-Start umgestellt (#532).
     let reminderBaseStart = start_datetime;
-    let untouchedReminders = null;
     // Serien-Scopes ändern die Expansion (Split/EXDATE): danach den sichtbaren
     // Bereich neu laden, damit der Server korrekt expandiert (#532).
     let reloadAfter = false;
@@ -10252,14 +10216,6 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
           seriesBody = { ...body };
           delete seriesBody.start_datetime;
           delete seriesBody.end_datetime;
-          // Damit bleibt auch der Serienbeginn, wie er ist: eine unveraenderte
-          // Erinnerung darf nicht auf das geoeffnete Vorkommen rutschen.
-          if (event.reminder_anchor_start) {
-            untouchedReminders = {
-              anchorStart: event.reminder_anchor_start,
-              storedAts: reminderList(existingReminder).map((reminder) => naiveUtc(reminder.remind_at)),
-            };
-          }
         }
         const res = localRecurring
           ? await requestCalendarOccurrenceMutation({
@@ -10285,7 +10241,7 @@ async function saveEvent(overlay, mode, event, existingReminder = null, attachme
     // Occurrence- und Split-Endpunkte schreiben die Offsets in derselben
     // Transaktion wie Ersatzzeile, EXDATE und Reparenting.
     if (savedEventId && !remindersHandledAtomically) {
-      const remindAts = reminderTimesFromRows(reminderForm.rows, reminderBaseStart, reminderForm.enabled, untouchedReminders);
+      const remindAts = reminderTimesFromRows(reminderForm.rows, reminderBaseStart, reminderForm.enabled);
       if (remindAts.length) {
         await api.put(`/reminders?entity_type=event&entity_id=${savedEventId}`, { remind_ats: remindAts });
       } else {

@@ -59,12 +59,9 @@ import {
   noteUploadAttempt, settleUploadAttempt, uploadAttemptsAt,
   hasUploadAttempt, removeLeftoverUploads,
 } from './caldav-upload-attempts.js';
-import { hasExplicitZone, householdTimeZone, localToUTC, todayKey } from '../utils/timezone.js';
-import { formatICSDate } from './ics-parser.js';
-import { anchorZone } from '../utils/ics-datetime.js';
+import { householdTimeZone, localToUTC } from '../utils/timezone.js';
 import { timedSeriesUntil } from '../utils/rrule-until.js';
-import { rruleValue, nextDueAfterCompletion } from './recurrence.js';
-import { RRULE_RE } from '../middleware/validate.js';
+import { rruleValue } from './recurrence.js';
 import { loadTags, tagsKey } from '../utils/task-tags.js';
 import { runSerialized } from '../utils/sync-lock.js';
 import { noteMoveTakenBack } from './shopping-move-notices.js';
@@ -165,12 +162,11 @@ export function priorityToVtodo(priority) {
 /**
  * DUE-Property aus Datum und Uhrzeit.
  *
- * Ohne Uhrzeit ein reines Datum (VALUE=DATE), sonst ein UTC-Zeitstempel. Die
- * Aufgabe speichert keine TZID: `due_date`/`due_time` sind Wanduhr-Werte in der
- * Zone des Haushalts, also muss die Uhrzeit von dort nach UTC (Gegenstück zu
- * splitDue; eine Serie ankert stattdessen in der Zone, siehe seriesAnchor). Ein
- * ungeprüft als UTC verschicktes „14:30" verschöbe die Aufgabe auf dem Server um
- * den Zonenoffset.
+ * Ohne Uhrzeit ein reines Datum (VALUE=DATE), sonst ein UTC-Zeitstempel. Eine
+ * Aufgabe trägt keine TZID: `due_date`/`due_time` sind Wanduhr-Werte in der Zone
+ * des Haushalts, also muss die Uhrzeit von dort nach UTC (Gegenstück zu
+ * splitDue). Ein ungeprüft als UTC verschicktes „14:30" verschöbe die Aufgabe auf
+ * dem Server um den Zonenoffset.
  */
 export function dueField(date, time, tz = householdTimeZone(null)) {
   if (!date) return null; // Property entfernen
@@ -218,193 +214,22 @@ export function icsFieldsForTask(task, hadCompleted = false, tz = householdTimeZ
     ...completionFields(task.status === 'done', task.status === 'in_progress', hadCompleted),
   };
   if (Array.isArray(task.tags)) fields.CATEGORIES = task.tags;
-  Object.assign(fields, recurrenceFields(task, tz, serverIcs));
-  if (fields.DUE === KEEP_ON_SERVER) delete fields.DUE;
-  // NIE COMPLETED AUF DEN MASTER EINER FREMDEN SERIE (#2506). Die besitzende App
-  // (iOS Erinnerungen, Tasks.org) beendete damit die ganze Serie. Die Routen
-  // sperren das Abhaken schon (`task_foreign_series`); das hier ist die zweite
-  // Linie fuer jeden Weg an ihnen vorbei. Gelesen wird am frisch geholten
-  // Objekt, nicht an der Zeile: es zaehlt, was jetzt auf dem Server steht.
-  //
-  // Die eine Ausnahme ist das letzte Vorkommen einer Serie, die Yuvomi
-  // weiterfuehrt (#2506): nach ihm gibt es keins mehr, und dann schliesst auch
-  // die besitzende App den Master ab.
-  if (task.status === 'done' && !ownsRecurrence(task)
-    && !foreignSeriesEnded(task, tz)
-    && foreignRecurrenceRule(todoPropertyValue(serverIcs, task.external_uid, 'RRULE'),
-      todoPropertyValue(serverIcs, task.external_uid, YUVOMI_RRULE))) {
-    delete fields.STATUS;
-    delete fields.COMPLETED;
-    delete fields['PERCENT-COMPLETE'];
-  }
+  Object.assign(fields, recurrenceFields(task, fields.DUE, tz, serverIcs));
   return fields;
-}
-
-/**
- * Die RRULE eines fremden VTODO, die einer anderen App gehoert - oder null
- * (#2506). Nicht fremd ist eine Regel, die noch genau Yuvomis Marke
- * X-YUVOMI-RRULE entspricht (#2350): die hat Yuvomi selbst geschrieben. Ob das
- * Objekt ueberhaupt fremd ist (`ownsRecurrence`), fragt der Aufrufer.
- *
- * @param {string|null} rule - Rohwert der RRULE des Masters
- * @param {string|null} mark - Rohwert von X-YUVOMI-RRULE
- * @returns {string|null}
- */
-export function foreignRecurrenceRule(rule, mark) {
-  const value = rule ? String(rule).trim() : '';
-  if (!value) return null;
-  if (mark && sameRule(value, unescapeText(mark))) return null;
-  return value;
-}
-
-/** Reihenfolge der Teile in Yuvomis Regel - dieselbe, die `RRULE_RE` verlangt. */
-const RULE_PARTS = ['FREQ', 'INTERVAL', 'BYDAY', 'BYMONTHDAY', 'UNTIL'];
-const WEEKDAYS = new Set(['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU']);
-
-/**
- * Eine fremde RRULE in Yuvomis Teilmenge gebracht - oder null, wenn Yuvomi sie
- * nicht vollstaendig abbilden kann (#2506, #2515).
- *
- * Normalisiert wird nur, was an der Bedeutung nichts aendert: die Reihenfolge
- * der Teile (RFC 5545 legt keine fest, `RRULE_RE` schon), INTERVAL=1 (der
- * Vorgabewert) und WKST=MO (Yuvomis Wochenbeginn). Alles andere muss so, wie
- * es dasteht, durch `RRULE_RE` und danach durch `computesExactly`: dass Yuvomi
- * eine Regel speichern kann, heisst noch nicht, dass es sie richtig
- * weiterrechnet, und ein Fehler verschoebe hier die Serie in der anderen App.
- *
- * NICHT ABBILDBAR ist deshalb unter anderem COUNT (Yuvomi zaehlt an Aufgaben
- * nicht herunter, die Serie liefe hier endlos), BYMONTHDAY ausser -1, ein
- * BYDAY mit Ordinalzahl, BYSETPOS, BYMONTH, ein anderer Wochenbeginn, ein
- * UNTIL ohne Zone, BYDAY unter MONTHLY/YEARLY und DAILY mit INTERVAL und BYDAY
- * zugleich. Solche Serien bleiben in der besitzenden App abzuhaken.
- *
- * @param {string|null} rule - RRULE-Wert, mit oder ohne `RRULE:`
- * @returns {string|null}
- */
-export function mappableForeignRule(rule) {
-  const value = rruleValue(rule).trim().toUpperCase();
-  if (!value) return null;
-  const parts = new Map();
-  for (const part of value.split(';')) {
-    if (!part) continue;
-    const cut = part.indexOf('=');
-    if (cut <= 0) return null;
-    const key = part.slice(0, cut).trim();
-    if (parts.has(key)) return null;
-    parts.set(key, part.slice(cut + 1).trim());
-  }
-  if (parts.get('INTERVAL') === '1') parts.delete('INTERVAL');
-  if (parts.get('WKST') === 'MO') parts.delete('WKST');
-  if ([...parts.keys()].some((key) => !RULE_PARTS.includes(key))) return null;
-  if (parts.has('INTERVAL') && !(Number(parts.get('INTERVAL')) >= 1)) return null;
-  if (parts.has('BYDAY') && !parts.get('BYDAY').split(',').every((day) => WEEKDAYS.has(day))) return null;
-  const normalized = RULE_PARTS.filter((key) => parts.has(key)).map((key) => `${key}=${parts.get(key)}`).join(';');
-  if (!normalized.startsWith('FREQ=') || !RRULE_RE.test(normalized)) return null;
-  return computesExactly(parts) ? normalized : null;
-}
-
-/**
- * Rechnet `nextDueAfterCompletion` diese Regel so, wie RFC 5545 sie meint?
- * (Review auf #2543)
- *
- * `RRULE_RE` sagt nur, dass Yuvomi die Regel speichern kann. Eine fremde Serie
- * rueckt Yuvomi aber in der anderen App weiter, und ein falsch gerechnetes
- * naechstes Vorkommen landet dort als DUE - schlimmer als die Sperre. Deshalb
- * eine Positivliste, gemessen an einem RFC-Nachrechner gegen den Rechner
- * (test/test-caldav-foreign-series.js, jede Kombination aus der Liste ueber
- * drei Jahre Anker):
- *   - DAILY mit INTERVAL; mit BYDAY nur ohne INTERVAL ("jeden Werktag").
- *     Mit beidem zaehlt der Rechner Wochentage statt jeden n-ten Tag;
- *   - WEEKLY mit INTERVAL und BYDAY (ISO-Woche, daher nur WKST=MO);
- *   - MONTHLY ohne BYDAY, auch mit BYMONTHDAY=-1. Ein BYDAY unter MONTHLY
- *     (jeder Montag des Monats) rechnet der Rechner nicht;
- *   - YEARLY ohne BYDAY.
- * Was dazu noch am Faelligkeitstag haengt, prueft `foreignRuleFitsDue`.
- */
-function computesExactly(parts) {
-  const freq = parts.get('FREQ');
-  const byday = parts.has('BYDAY');
-  if (freq === 'DAILY') return !byday || !parts.has('INTERVAL');
-  if (freq === 'WEEKLY') return true;
-  if (freq === 'MONTHLY' || freq === 'YEARLY') return !byday;
-  return false;
-}
-
-/**
- * Passt der Faelligkeitstag zu einer abbildbaren Regel, ohne dass der Rechner
- * klemmt? Eine Monatsserie am 29. bis 31. setzt Yuvomi im kurzen Monat auf den
- * Monatsletzten und bleibt dort, RFC 5545 laesst den Monat aus; eine
- * Jahresserie am 29. Februar ebenso. Beides waere ein falsches DUE in der
- * anderen App, also bleibt so eine Serie dort abzuhaken.
- *
- * EIN ENDE NUR AN EINEM REINEN DATUM (Review auf #2543). Der Rechner vergleicht
- * UNTIL als Kalendertag; ein UNTIL mit Uhrzeit ist ein Zeitpunkt in UTC, und
- * eine Serie mit Uhrzeit endet an einem Ortstag. Taeglich um 00:30 in Berlin
- * mit UNTIL=20261105T233000Z hat am 6. November noch ein Vorkommen, das der
- * Rechner nicht sieht - das Abhaken schickte COMPLETED auf den Master und
- * beendete die Serie dort zu frueh. Ein Ende mit Uhrzeit oder an einer Serie
- * mit Uhrzeit bleibt deshalb in der anderen App abzuhaken.
- *
- * @param {string} rule - normalisierte Regel (`mappableForeignRule`)
- * @param {string|null} dueDate - YYYY-MM-DD
- * @param {string|null} [dueTime] - HH:MM, null an einem reinen Datum
- */
-export function foreignRuleFitsDue(rule, dueDate, dueTime = null) {
-  if (!rule || !dueDate) return false;
-  const day = String(dueDate).slice(5, 10);
-  const value = rruleValue(rule).toUpperCase();
-  const until = /(?:^|;)UNTIL=([^;]*)/.exec(value)?.[1];
-  if (until !== undefined && (dueTime || !/^\d{8}$/.test(until))) return false;
-  if (/(^|;)FREQ=MONTHLY(;|$)/.test(value) && !/(^|;)BYMONTHDAY=-1(;|$)/.test(value)) return Number(day.slice(3)) <= 28;
-  if (/(^|;)FREQ=YEARLY(;|$)/.test(value)) return day !== '02-29';
-  return true;
-}
-
-/**
- * Fuehrt Yuvomi diese fremde Serie weiter (#2506)? Das tut es, wenn die Regel
- * der anderen App abbildbar war (der Inbound hat sie dann als Serie
- * eingelesen) und die Zeile hier noch eine Serie mit passender Faelligkeit
- * ist (`foreignRuleFitsDue`). Sonst
- * bleibt das Abhaken bei der besitzenden App (`task_foreign_series`).
- */
-export function continuesForeignSeries(task) {
-  return Boolean(task?.external_rrule && task.is_recurring && task.recurrence_rule
-    && !task.parent_task_id && foreignRuleFitsDue(task.recurrence_rule, task.due_date, task.due_time));
-}
-
-/**
- * Ist dieses erledigte Vorkommen einer weitergefuehrten fremden Serie ihr
- * letztes (UNTIL erreicht)? Dann legte das Abhaken keine Folgeinstanz an, die
- * den Master uebernaehme, und der Master darf abgeschlossen werden.
- *
- * Nur, wo das Ende sicher ist: `continuesForeignSeries` laesst ein UNTIL nur
- * als reines Datum an einer Serie ohne Uhrzeit zu (`foreignRuleFitsDue`), und
- * das vergleicht der Rechner exakt. Jede andere Serie haelt die Sperre, und
- * der Master bekommt nie COMPLETED, nur weil der Rechner null liefert.
- */
-function foreignSeriesEnded(task, tz) {
-  if (!continuesForeignSeries(task)) return false;
-  return nextDueAfterCompletion({
-    anchorDate: task.due_date,
-    rule: task.recurrence_rule,
-    completedOn: todayKey(db.get()),
-    fromCompletion: !!task.recurrence_from_completion,
-  }) === null;
 }
 
 /** Marke an einem fremden Objekt: die RRULE, die Yuvomi dort geschrieben hat. */
 const YUVOMI_RRULE = 'X-YUVOMI-RRULE';
 
-/** DUE des Serverobjekts bleibt Wort fuer Wort stehen (`anchorStays`). */
-const KEEP_ON_SERVER = Symbol('keep on server');
-
 /**
- * RRULE, Anker und Marke einer Aufgabe - nur die Felder, die der Push anfassen
- * darf (#2350). Ein fehlendes Feld laesst die Property auf dem Server stehen,
- * null entfernt sie. Eine Serie bringt ihren Anker mit (`seriesAnchor`): DUE und
- * DTSTART stehen dann in der Zone des Haushalts statt in UTC, ausser am Objekt
- * haengen Daten anderer Clients (`anchorStays`). Der Inbound liest DTSTART eines
- * VTODO nicht ein.
+ * RRULE, DTSTART und Marke einer Aufgabe - nur die Felder, die der Push
+ * anfassen darf (#2350). Ein fehlendes Feld laesst die Property auf dem Server
+ * stehen, null entfernt sie.
+ *
+ * DTSTART: RFC 5545 §3.8.2.4 verlangt es in jeder Komponente mit RRULE; DUE
+ * ersetzt den Anker nicht. Es traegt Wert und Typ von DUE, so beginnt die Serie
+ * an der Faelligkeit, und es zieht mit, wenn sie sich verschiebt. Der Inbound
+ * liest DTSTART eines VTODO nicht ein.
  *
  * Ein eigenes Objekt (von Yuvomi angelegt) fuehrt Yuvomi ganz: ohne Regel
  * verschwinden RRULE und DTSTART. An einem fremden Objekt bleibt eine Regel
@@ -417,16 +242,10 @@ const KEEP_ON_SERVER = Symbol('keep on server');
  * DTSTART bleibt dabei stehen: an einem fremden Objekt kann es auch vorher ein
  * Beginn gewesen sein.
  */
-function recurrenceFields(task, tz, serverIcs) {
+function recurrenceFields(task, due, tz, serverIcs) {
   const rrule = vtodoRecurrence(task, tz);
   const own = ownsRecurrence(task);
-  if (rrule) {
-    const anchor = anchorStays(task, tz, serverIcs)
-      ? { DUE: KEEP_ON_SERVER }
-      : seriesAnchor(task.due_date, task.due_time, tz);
-    if (!own && keepsForeignRule(task, serverIcs)) return foreignAnchor(task, anchor, serverIcs);
-    return { RRULE: rrule, ...anchor, [YUVOMI_RRULE]: own ? null : rrule };
-  }
+  if (rrule) return { RRULE: rrule, DTSTART: due, [YUVOMI_RRULE]: own ? null : rrule };
   if (own) return { RRULE: null, DTSTART: null, [YUVOMI_RRULE]: null };
   // Fremd und erledigt oder ohne Faelligkeit: nichts anfassen. Nur die hier
   // abgeschaltete Wiederholung nimmt Yuvomis eigene Regel zurueck.
@@ -439,168 +258,41 @@ function recurrenceFields(task, tz, serverIcs) {
 }
 
 /**
- * Steht am fremden Objekt schon die Regel, die Yuvomi rechnet (#2506)? Dann
- * bleibt sie Wort fuer Wort, wie die besitzende App sie geschrieben hat, und
- * bekommt keine Marke: sie gehoert weiter dieser App. Verglichen wird in
- * Yuvomis Teilmenge (`mappableForeignRule`), denn so hat der Inbound sie in
- * die Zeile geschrieben - `FREQ=DAILY;INTERVAL=1` am Server ist dieselbe Serie
- * wie `FREQ=DAILY` hier. Hat jemand die Regel in Yuvomi geaendert, gilt der
- * Weg von #2350: die neue Regel geht samt Marke hinaus.
+ * Rohwert der Property `name` im VTODO mit `uid` ohne RECURRENCE-ID - oder null.
+ * Dieselbe Komponente, die der Patcher anfasst: eine VTIMEZONE davor traegt in
+ * STANDARD/DAYLIGHT eigene RRULEs, und die erste Fundstelle im ganzen Objekt
+ * waere deren Regel statt der der Aufgabe.
  */
-function keepsForeignRule(task, serverIcs) {
-  const current = todoPropertyValue(serverIcs, task.external_uid, 'RRULE');
-  const mapped = current ? mappableForeignRule(unescapeText(current)) : null;
-  return Boolean(mapped) && sameRule(mapped, task.recurrence_rule);
-}
-
-/**
- * Der Anker einer fremden Serie, die Yuvomi weiterrueckt (#2506). DUE wie bei
- * jeder Serie (`seriesAnchor`), DTSTART dagegen in der Form der besitzenden
- * App: Weitergefuehrt wird eine fremde Serie nur, wenn ihr DTSTART fehlt oder
- * genau DUE ist (`startDiffersFromDue` im Parser, Review auf #2543). Apple
- * Erinnerungen legt DTSTART gleich DUE ab, also rueckt es genau so mit; ein
- * Start um 00:00, wie Yuvomi ihn an eigenen Serien schreibt, verschoebe einen
- * Alarm relativ zum Start und sperrte die Serie beim naechsten Abruf.
- */
-function foreignAnchor(task, anchor, serverIcs) {
-  if (anchor.DUE === KEEP_ON_SERVER) return anchor;
-  const hasStart = Boolean(todoPropertyValue(serverIcs, task.external_uid, 'DTSTART'));
-  return { ...anchor, DTSTART: hasStart ? anchor.DUE : null };
-}
-
-/**
- * DUE und DTSTART einer Serie (#2374).
- *
- * Mit Uhrzeit stehen beide als Wanduhr in der Zone des Haushalts: ein UTC-Anker
- * liesse den Server in UTC rechnen, eine taegliche 07:00-Aufgabe stuende nach der
- * Zeitumstellung auf 08:00, und ein BYDAY nahe Mitternacht kippte auf den
- * Nachbartag (RFC 5545 §3.8.5.3). DTSTART ist 00:00 des Faelligkeitstags: §3.8.2.3
- * verlangt DUE strikt danach, und derselbe Ortstag haelt ihn mit BYDAY und
- * BYMONTHDAY im Takt. `patchICSTodo` schreibt das VTIMEZONE zur TZID mit.
- *
- * Eine Zone, die UTC gleicht, bleibt beim Z (`anchorZone`). Ohne gewaehlte Zone
- * gilt der Rueckfall von `householdTimeZone`, derselbe, mit dem die Uhrzeit
- * ohnehin gelesen wird (#1967).
- *
- * KEIN DTSTART, wo keiner vor DUE liegen kann, ohne die Regel zu verfaelschen: an
- * einem reinen Datum und um 00:00. Der Vortag stuende neben BYDAY auf dem falschen
- * Wochentag, und dann ist die Serie laut §3.8.5.3 undefiniert. §3.8.2.4 nennt
- * DTSTART zwar Pflicht neben einer RRULE, die VTODO-Clients ankern aber auf DUE,
- * wenn es fehlt (Thunderbird, Tasks.org, vobject); ein DTSTART gleich DUE dagegen
- * verletzt §3.8.2.3, und DAVx5/Tasks.org werfen es weg. null nimmt das DTSTART
- * eines Objekts aus der Zeit vor #2374 wieder heraus.
- */
-function seriesAnchor(date, time, tz) {
-  if (!time) return { DUE: dueField(date, null), DTSTART: null };
-
-  const clock = String(time).slice(0, 5);
-  const startsWithDue = clock === '00:00';
-  const zone = anchorZone(tz);
-  if (!zone) {
-    return { DUE: dueField(date, clock, tz), DTSTART: startsWithDue ? null : dueField(date, '00:00', tz) };
-  }
-
-  const day = String(date).slice(0, 10).replace(/-/g, '');
-  const wall = (hhmm) => ({ value: `${day}T${hhmm.replace(':', '')}00`, params: `;TZID=${zone}` });
-  return { DUE: wall(clock), DTSTART: startsWithDue ? null : wall('00:00') };
-}
-
-/**
- * Bleibt der Anker dieses Serverobjekts, wie er ist? (Review auf #2420)
- *
- * Am Anker haengen Daten anderer Clients, die der Patcher nicht anfasst: ein
- * START-relativer Alarm rechnet von DTSTART (RFC 5545 §3.8.6.3, ohne RELATED gilt
- * START), EXDATE und RECURRENCE-ID nennen ein Vorkommen ueber dessen Zeitwert
- * (§3.8.4.4), ein RDATE-Termin erbt die Dauer von DTSTART bis DUE. Rueckte eine
- * unbeteiligte Bearbeitung den Anker, fiele der Alarm auf den Vorabend, ein
- * gestrichenes Vorkommen kaeme zurueck, und ein Zusatztermin fiele spaeter. Solche
- * Objekte werden deshalb nicht umgerechnet: DUE und DTSTART bleiben stehen, solange die
- * Faelligkeit gleich ist, auch ein DTSTART = DUE in UTC aus v2.83.0. Das heilt sich
- * mit dem Abhaken, denn die Folgeinstanz ist ein neues VTODO mit sauberem Anker.
- *
- * Verschiebt sich die Faelligkeit, zieht der Anker trotzdem: DUE vor einem
- * stehengebliebenen DTSTART weisen strenge Server ab. Alarm und Ausnahmen bleiben
- * dann Wort fuer Wort stehen und zeigen auf den neuen bzw. alten Anker.
- */
-function anchorStays(task, tz, serverIcs) {
-  if (!serverIcs || !task.external_uid) return false;
-  const blocks = todoBlocks(serverIcs).filter((block) => block.uid === task.external_uid);
-  const master = blocks.find((block) => !block.override);
-  if (!master) return false;
-  const pinned = blocks.length > 1
-    || master.props.some((line) => ['EXDATE', 'RDATE'].includes(propertyName(line)))
-    || master.nested.some(isStartRelativeTrigger);
-  if (!pinned) return false;
-  const due = master.props.find((line) => propertyName(line) === 'DUE');
-  return Boolean(due) && dueLineMeans(due, task.due_date, task.due_time, tz);
-}
-
-/** TRIGGER mit Dauer, die von DTSTART rechnet: ohne RELATED gilt START. */
-function isStartRelativeTrigger(line) {
-  if (propertyName(line) !== 'TRIGGER') return false;
-  const params = line.slice(0, line.indexOf(':')).toUpperCase();
-  return !params.includes('RELATED=END') && !params.includes('VALUE=DATE-TIME');
-}
-
-/** Meint diese DUE-Zeile dieselbe Faelligkeit wie Datum und Uhrzeit der Aufgabe? */
-function dueLineMeans(line, date, time, tz) {
-  const params = line.slice(3, line.indexOf(':'));
-  const value = line.slice(line.indexOf(':') + 1).trim();
-  const dateOnly = /;VALUE=DATE(?![-\w])/i.test(params) || /^\d{8}$/.test(value);
-  const zone = /;TZID=([^;:]+)/i.exec(params)?.[1] ?? null;
-  const onServer = formatICSDate(value, dateOnly, zone);
-  const day = String(date).slice(0, 10);
-  if (!time) return onServer === day;
-  if (dateOnly) return false;
-  const wall = `${day}T${String(time).slice(0, 5)}:00`;
-  if (!hasExplicitZone(onServer)) return onServer === wall; // floating: schon Wanduhr
-  return Date.parse(onServer) === Date.parse(localToUTC(wall, tz));
-}
-
-/** Name einer entfalteten Inhaltszeile, gross geschrieben. */
-function propertyName(line) {
-  const cut = line.search(/[;:]/);
-  return (cut === -1 ? line : line.slice(0, cut)).toUpperCase();
-}
-
-/**
- * Die VTODO-Komponenten eines Objekts: eigene Zeilen in `props`, die der
- * Subkomponenten (VALARM) in `nested`. Eine VTIMEZONE davor traegt in
- * STANDARD/DAYLIGHT eigene RRULEs und bleibt deshalb draussen.
- */
-function todoBlocks(icsText) {
+function todoPropertyValue(icsText, uid, name) {
+  if (!icsText || !uid) return null;
   const lines = unfoldICS(icsText).split('\n').map((l) => l.replace(/\r$/, ''));
+  const nameOf = (line) => { const cut = line.search(/[;:]/); return (cut === -1 ? line : line.slice(0, cut)).toUpperCase(); };
   const valueOf = (line) => line.slice(line.indexOf(':') + 1).trim();
-  const blocks = [];
   let block = null;
   let depth = 0;
   for (const line of lines) {
     const upper = line.trim().toUpperCase();
     if (!block) {
-      if (upper === 'BEGIN:VTODO') { block = { props: [], nested: [], uid: null, override: false }; depth = 0; }
+      if (upper === 'BEGIN:VTODO') { block = { props: [], uid: null, override: false }; depth = 0; }
       continue;
     }
     if (upper.startsWith('BEGIN:')) { depth++; continue; }
-    if (upper === 'END:VTODO' && depth === 0) { blocks.push(block); block = null; continue; }
+    if (upper === 'END:VTODO' && depth === 0) {
+      if (block.uid === uid && !block.override) {
+        const hit = block.props.find((l) => nameOf(l) === name);
+        return hit ? valueOf(hit) : null;
+      }
+      block = null;
+      continue;
+    }
     if (upper.startsWith('END:')) { depth--; continue; }
-    if (depth > 0) { block.nested.push(line); continue; }
-    const prop = propertyName(line);
+    if (depth > 0) continue; // VALARM & Co.
+    const prop = nameOf(line);
     if (prop === 'UID') block.uid = valueOf(line);
     if (prop === 'RECURRENCE-ID') block.override = true;
     block.props.push(line);
   }
-  return blocks;
-}
-
-/**
- * Rohwert der Property `name` im VTODO mit `uid` ohne RECURRENCE-ID - oder null.
- * Dieselbe Komponente, die der Patcher anfasst.
- */
-function todoPropertyValue(icsText, uid, name) {
-  if (!icsText || !uid) return null;
-  const master = todoBlocks(icsText).find((block) => block.uid === uid && !block.override);
-  const hit = master?.props.find((line) => propertyName(line) === name);
-  return hit ? hit.slice(hit.indexOf(':') + 1).trim() : null;
+  return null;
 }
 
 function unescapeText(value) {
@@ -615,8 +307,8 @@ function sameRule(a, b) {
 /**
  * Die Wiederholung einer Aufgabe als RRULE-Wert (ohne Praefix) - oder null (#2350).
  *
- * Keine Regel ohne DUE: der Anker der Serie haengt an der Faelligkeit (siehe
- * seriesAnchor), und eine Aufgabe, die ab Erledigung zaehlt, kann ganz ohne
+ * Keine Regel ohne DUE: DTSTART, der Anker der Serie, steht auf DUE (siehe
+ * recurrenceFields), und eine Aufgabe, die ab Erledigung zaehlt, kann ganz ohne
  * Faelligkeit wiederkehren. Keine Regel an einer erledigten Aufgabe: das
  * Abhaken legt in Yuvomi eine Folgeinstanz als eigene Zeile und eigenes VTODO
  * an; behielte das erledigte Objekt seine Regel, zeigte ein Client die Serie
@@ -626,8 +318,8 @@ function sameRule(a, b) {
  * UNTIL hat nach RFC 5545 den Werttyp des Ankers: an einem reinen Datum ein
  * Datum (ein altes `T235959Z` aus dem frueheren Formular wird darauf
  * zurueckgeschnitten), an einer Uhrzeit das Ende des Ortstags in UTC (#1974,
- * utils/rrule-until.js) - auch neben einem DTSTART mit TZID verlangt §3.3.10 UTC.
- * COUNT bleibt, wie es gespeichert ist.
+ * utils/rrule-until.js) - DUE steht dann ebenfalls in UTC. COUNT bleibt, wie es
+ * gespeichert ist.
  */
 function vtodoRecurrence(task, tz) {
   if (!task.is_recurring || !task.recurrence_rule || !task.due_date || task.status === 'done') return null;
@@ -704,17 +396,12 @@ export function detachAccountRows(accountId) {
              outbound_move          = 0,
              outbound_move_attempts = 0,
              outbound_move_since    = NULL,
-             outbound_move_by       = NULL,` : `
-             external_rrule         = NULL,`}
+             outbound_move_by       = NULL,` : ''}
              outbound_dirty      = 0,
              outbound_attempts   = 0
        WHERE external_source = 'caldav' AND external_account_id = ?
     `).run(accountId).changes;
   }
-  // Die fremde Serienregel geht mit dem Konto (#2506): ohne Abruf fuehrt sie
-  // niemand mehr nach, und die Sperre des Abhakens hinge fuer immer an der
-  // Aufgabe. Uebernimmt ein anderes Konto die UID, liest dessen Abruf sie neu.
-  //
   // Das Upload-Ziel lokaler Aufgaben trägt ebenso keinen Fremdschlüssel
   // (#1885). Ohne Ziel bleibt die Aufgabe lokal und wird nie gesendet - wie
   // jede Zeile ohne Konto. Einkaufsposten tragen kein eigenes Ziel: sie erben
@@ -1279,120 +966,16 @@ export function recurrenceFollowupTarget(task) {
     accountId = task.external_account_id;
     listUrl   = collectionUrlOf(task.external_object_url);
   }
+  if (!accountId || !listUrl) return null;
+
   // Die Schreibweise der Auswahltabelle zurückgeben, nicht die abgeleitete:
   // taskListsOf schlägt die Liste später genau unter diesem Schlüssel nach.
-  return selectedTaskList(accountId, listUrl);
-}
-
-/**
- * Die Liste, in der eine Zeile liegt, so wie die Auswahltabelle sie schreibt -
- * oder null, wenn sie keine eingeschaltete Aufgabenliste des Kontos ist.
- */
-function selectedTaskList(accountId, listUrl) {
-  if (!accountId || !listUrl) return null;
-  const match = db.get().prepare(`
+  const selected = db.get().prepare(`
     SELECT list_url FROM caldav_reminder_selection
      WHERE account_id = ? AND enabled = 1 AND target_module = 'tasks'
-  `).all(accountId).map((r) => r.list_url).find((url) => sameCollection(url, listUrl));
+  `).all(accountId).map((r) => r.list_url);
+  const match = selected.find((url) => sameCollection(url, listUrl));
   return match ? { accountId, listUrl: match } : null;
-}
-
-/**
- * Haelt diese Folgeinstanz den Master einer fremden Serie, den sie beim
- * Abhaken ihrer Vorgaengerin uebernommen hat (#2506)? Erkennbar ohne eigene
- * Spalte: eine Folgeinstanz ist sonst immer lokal oder Spiegel ihrer EIGENEN
- * UID. Bewusst ohne Blick auf `external_rrule`: hat die andere App die
- * Wiederholung inzwischen weggenommen, ist das Objekt trotzdem ihres, und
- * das Zuruecknehmen darf es nicht loeschen.
- */
-function holdsForeignMaster(row) {
-  return isMirrored(row) && !isOwnUidOfRow(row.external_uid, 'task', row.id);
-}
-
-/**
- * Das Abhaken einer fremden Serie, wie die besitzende App es tut (#2506).
- *
- * iOS Erinnerungen legt beim Abhaken eine erledigte Kopie mit neuer UID ab und
- * rueckt DUE des Masters auf das naechste Vorkommen; Tasks.org rueckt den
- * Master ebenso weiter. Gemeinsam ist beiden: der Master mit der RRULE wird nie
- * COMPLETED, solange es ein naechstes Vorkommen gibt. In Yuvomis Zeilenmodell
- * (eine Zeile je Vorkommen) heisst das: die Folgeinstanz UEBERNIMMT den Master -
- * UID, Objekt-URL, Konto und die fremde Regel -, und ihr Push rueckt dort DUE
- * vor, setzt NEEDS-ACTION und laesst die RRULE stehen (`keepsForeignRule`).
- *
- * Die erledigte Zeile wird eine hier angelegte Aufgabe mit der Liste des
- * Masters als Ziel: sie geht mit ihrer eigenen UID als erledigte Kopie ohne
- * RRULE hinauf (`processPendingCreations`, `vtodoRecurrence` schreibt an einer
- * erledigten Aufgabe keine Regel). Verlauf und Punkte bleiben an ihr, und kein
- * Abruf kann sie mehr ueber den Master zuruecknehmen - der gehoert jetzt der
- * Folgeinstanz. Ist die Liste nicht mehr ausgewaehlt, bleibt die Kopie lokal.
- *
- * Erwartet die schon erledigte Zeile und die eben angelegte Folgeinstanz, in
- * der Transaktion des Spawns.
- *
- * @returns {boolean} true, wenn uebergeben wurde (der Push steht dann an)
- */
-export function handOverForeignSeries(done, followupId) {
-  if (!continuesForeignSeries(done) || !isMirrored(done)) return false;
-  if (isOwnUidOfRow(done.external_uid, 'task', done.id)) return false;
-  const target = selectedTaskList(done.external_account_id, collectionUrlOf(done.external_object_url));
-  const d = db.get();
-  d.prepare(`
-    UPDATE tasks
-       SET external_source = 'local', external_uid = NULL, external_account_id = NULL,
-           external_object_url = NULL, external_rrule = NULL,
-           outbound_dirty = 0, outbound_attempts = 0, seen_on_server = 0,
-           target_caldav_account_id = ?, target_caldav_list_url = ?
-     WHERE id = ?
-  `).run(target?.accountId ?? null, target?.listUrl ?? null, done.id);
-  d.prepare(`
-    UPDATE tasks
-       SET external_source = 'caldav', external_uid = ?, external_account_id = ?,
-           external_object_url = ?, external_rrule = ?, seen_on_server = ?,
-           outbound_dirty = 1, outbound_attempts = 0,
-           target_caldav_account_id = NULL, target_caldav_list_url = NULL
-     WHERE id = ?
-  `).run(done.external_uid, done.external_account_id, done.external_object_url,
-    done.external_rrule, done.seen_on_server ?? 0, followupId);
-  return true;
-}
-
-/**
- * Der Rueckweg (#650): ein zurueckgenommenes Abhaken gibt den Master der
- * fremden Serie an die Zeile zurueck, die ihn vorher hielt (#2506).
- *
- * `origin` ist die eben wieder geoeffnete Zeile, `followup` ihre unangetastete
- * Folgeinstanz, die gleich verschwindet. Liegt die erledigte Kopie schon oben,
- * wird sie zum Loeschen vorgemerkt; wartet sie noch auf den Upload, faellt nur
- * das Ziel. Danach ist `origin` wieder Spiegel des Masters und vorgemerkt: ihr
- * Push setzt DUE zurueck und laesst die Serie offen.
- *
- * Muss VOR dem Loeschen der Folgeinstanz gerufen werden, die Zeile kommt ganz.
- *
- * @returns {boolean} true, wenn zurueckgegeben wurde
- */
-export function takeBackForeignSeries(origin, followup) {
-  if (!origin || !holdsForeignMaster(followup)) return false;
-  const d = db.get();
-  if (isMirrored(origin) && isOwnUidOfRow(origin.external_uid, 'task', origin.id)) {
-    queueTodoDeletion('tasks', origin);
-  }
-  // Die Wiederholung kommt mit, wie die Folgeinstanz sie JETZT traegt (Review
-  // auf #2543): hat die andere App die Regel inzwischen weggenommen oder
-  // geaendert, hat der Abruf das dort eingetragen. Behielte `origin` ihren
-  // Stand vom Abhaken, schriebe ihr Push die alte Regel samt Marke zurueck.
-  d.prepare(`
-    UPDATE tasks
-       SET external_source = 'caldav', external_uid = ?, external_account_id = ?,
-           external_object_url = ?, external_rrule = ?, seen_on_server = ?,
-           is_recurring = ?, recurrence_rule = ?,
-           outbound_dirty = 1, outbound_attempts = 0,
-           target_caldav_account_id = NULL, target_caldav_list_url = NULL
-     WHERE id = ?
-  `).run(followup.external_uid, followup.external_account_id, followup.external_object_url,
-    followup.external_rrule, followup.seen_on_server ?? 0,
-    followup.is_recurring ? 1 : 0, followup.recurrence_rule ?? null, origin.id);
-  return true;
 }
 
 /**
@@ -2839,13 +2422,6 @@ export async function processPendingUpdates(client, accountId, module, objectInd
     // eine weitere Bearbeitung eingetroffen sein kann.
     const fresh = reloadRow(module, row.id);
     if (!fresh) continue; // parallel gelöscht - der Tombstone-Pfad übernimmt
-    // Hat die Zeile ihr Objekt inzwischen abgegeben (#2506: eine abgehakte
-    // fremde Serie reicht den Master an die Folgeinstanz weiter), gehoert die
-    // Vormerkung nicht mehr zu diesem Objekt. Gepatcht mit dem Stand der jetzt
-    // lokalen, erledigten Zeile ginge COMPLETED ohne RRULE auf den fremden
-    // Master (Review auf #2543). Die neue Halterin ist selbst vorgemerkt.
-    if (fresh.external_source !== row.external_source || fresh.external_uid !== row.external_uid
-      || fresh.external_account_id !== row.external_account_id) continue;
 
     const patched = patchICSTodo(
       known.data, row.external_uid, def.icsFields(fresh, hasCompleted(known.data), householdTimeZone(db.get()), known.data)

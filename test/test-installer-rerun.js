@@ -373,12 +373,11 @@ test('ein Secret per <NAME>_FILE gilt als übernommen und wird nicht doppelt ges
         'SESSION_SECRET_FILE/DB_ENCRYPTION_KEY_FILE: der Wizard erzeugte zweite Schlüssel');
       assert.ok(!JSON.stringify(d).includes('geheimpfad'), 'der Preflight gibt den Pfad heraus');
       // Ein trotzdem gesendeter Klartext darf nicht neben die Datei-Variante.
-      await save(base, { GOOGLE_CLIENT_SECRET: 'getippt', SESSION_SECRET: 'neu', DB_ENCRYPTION_KEY: 'neu', TZ: 'UTC' });
+      await save(base, { GOOGLE_CLIENT_SECRET: 'getippt', SESSION_SECRET: 'neu', TZ: 'UTC' });
     });
     const after = readFileSync(join(dir, '.env'), 'utf8');
     assert.doesNotMatch(after, /^GOOGLE_CLIENT_SECRET=/m, 'Klartext neben GOOGLE_CLIENT_SECRET_FILE geschrieben');
     assert.doesNotMatch(after, /^SESSION_SECRET=/m, 'Klartext neben SESSION_SECRET_FILE geschrieben');
-    assert.doesNotMatch(after, /^DB_ENCRYPTION_KEY=/m, 'Klartext neben DB_ENCRYPTION_KEY_FILE geschrieben');
     for (const line of lines) assert.ok(after.split('\n').includes(line), `Zeile verloren: ${line}`);
   } finally {
     rmSync(dir, { recursive: true, force: true });

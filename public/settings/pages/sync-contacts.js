@@ -22,7 +22,6 @@ import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 /** Das Pflichtzeichen hinter einem Etikett - Markup, kein Text (aria-hidden). */
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
-import { errorSentence, errorSentenceWithDetail } from '/utils/friendly-error.js';
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -48,14 +47,14 @@ function showToast(message, tone = 'default') {
 
 /**
  * Übersetzt eine Server-Fehlerantwort. Der Server liefert einen stabilen
- * `errorCode`; `err.message` ist nur eine englische Entwickler-Notiz -
- * unübersetzt angezeigt wäre sie in 26 von 27 Locales ein Fremdkörper (#1909).
+ * `errorCode`; `err.message` ist nur eine englische Entwickler-Notiz und dient
+ * als letzter Fallback - unübersetzt angezeigt wäre sie in 22 von 23 Locales
+ * ein Fremdkörper.
  *
  * @param {Error & { data?: { errorCode?: string } }} err
- * @param {string} [fallbackKey] - der allgemeine Satz dieser Stelle
  * @returns {string} übersetzte, anzeigbare Meldung
  */
-function errorMessage(err, fallbackKey = 'common.errorGeneric') {
+function errorMessage(err) {
   const code = err?.data?.errorCode;
   const KEYS = {
     account_duplicate: 'settings.cardavErrorDuplicate',
@@ -64,22 +63,11 @@ function errorMessage(err, fallbackKey = 'common.errorGeneric') {
     password_required: 'settings.cardavErrorPasswordRequired',
     internal: 'common.errorGeneric',
     invalid_id: 'common.errorGeneric',
-    // Die Feldpruefung des Servers (#1909): das Formular haelt Pflicht und
-    // Laenge selbst (required, maxlength), hierher kommt nur ein Aufruf, der
-    // daran vorbeigeht.
-    validation: 'common.invalidInput',
   };
-  if (KEYS[code]) return t(KEYS[code]);
-  return errorSentence(err, fallbackKey);
-}
-
-/**
- * Meldung einer Aktion, die den CardDAV-Server fragt: `connection_failed` traegt
- * seine Antwort, und die braucht der Admin, um den Fehler zu finden.
- */
-function remoteErrorMessage(err, fallbackKey) {
-  if (err?.data?.errorCode !== 'connection_failed') return errorMessage(err, fallbackKey);
-  return errorSentenceWithDetail(err, 'settings.connectionFailedDetail', fallbackKey);
+  // Validierungsfehler tragen die betroffenen Felder im Text - der ist bereits
+  // vom Server zusammengesetzt und wird durchgereicht.
+  if (code && code !== 'validation' && KEYS[code]) return t(KEYS[code]);
+  return err?.message || t('common.errorGeneric');
 }
 
 function renderPage(container, user) {
@@ -270,7 +258,7 @@ function renderAccount(container, account, addressbooks, refresh, user) {
         showToast(t('settings.cardavSyncSuccess'), 'success');
         await reloadAfterSave(() => refresh());
       } catch (err) {
-        showToast(remoteErrorMessage(err, 'settings.cardavSyncFailed'), 'danger');
+        showToast(err?.data?.errorCode ? errorMessage(err) : (err.message || t('settings.cardavSyncFailed')), 'danger');
       }
     }, { loadingClass: 'btn--loading' });
   });
@@ -367,7 +355,7 @@ function renderAccount(container, account, addressbooks, refresh, user) {
       showToast(t('settings.addressbooksRefreshed'), 'success');
       await reloadAfterSave(() => refresh());
     } catch (err) {
-      showToast(remoteErrorMessage(err), 'danger');
+      showToast(errorMessage(err), 'danger');
     }
   }, { loadingClass: 'btn--loading' }));
   actions.appendChild(refreshBtn);
@@ -440,7 +428,7 @@ function buildUnreachableAccount(account, err, reload, user) {
       : [lastSyncDetail(account.lastSync)],
     tone: 'warning',
   }));
-  wrapper.appendChild(createInlineError(remoteErrorMessage(err)));
+  wrapper.appendChild(createInlineError(errorMessage(err)));
 
   const actions = document.createElement('div');
   actions.className = 'caldav-account-actions';
@@ -474,7 +462,7 @@ async function loadAccounts(container, user) {
   } catch (err) {
     listEl.replaceChildren();
     listEl.appendChild(createRetryState({
-      message: errorMessage(err, 'settings.cardavConnectionFailed'),
+      message: err?.data?.errorCode ? errorMessage(err) : (err.message || t('settings.cardavConnectionFailed')),
       onRetry: reload,
     }));
     return;
@@ -545,13 +533,13 @@ function openAccountModal(account, onDone) {
           formRowHtml({
             label: t('settings.cardavUrlLabel'), labelFor: 'cardav-url', labelExtra: REQUIRED_MARK, field: true,
             description: t('settings.cardavUrlHint'), descriptionId: 'cardav-url-hint',
-            control: `<input class="form-input" type="url" id="cardav-url" required maxlength="500" aria-describedby="cardav-url-hint"
+            control: `<input class="form-input" type="url" id="cardav-url" required aria-describedby="cardav-url-hint"
                  placeholder="${t('settings.cardavUrlPlaceholder')}"
                  value="${esc(account?.cardavUrl ?? '')}" />`,
           }),
           formRowHtml({
             label: t('settings.cardavUsernameLabel'), labelFor: 'cardav-username', labelExtra: REQUIRED_MARK, field: true,
-            control: `<input class="form-input" type="text" id="cardav-username" required maxlength="200" autocomplete="off"
+            control: `<input class="form-input" type="text" id="cardav-username" required autocomplete="off"
                  value="${esc(account?.username ?? '')}" />`,
           }),
           // aria-describedby verbindet die Hinweise mit dem Feld. Ohne die
@@ -561,7 +549,7 @@ function openAccountModal(account, onDone) {
             label: t('settings.cardavPasswordLabel'), labelFor: 'cardav-password',
             labelExtra: isEdit ? '' : REQUIRED_MARK, field: true,
             control: `<input class="form-input" type="password" id="cardav-password" ${isEdit ? '' : 'required'}
-                 maxlength="200" autocomplete="new-password"
+                 autocomplete="new-password"
                  aria-describedby="${isEdit ? 'cardav-password-keep ' : ''}cardav-password-hint" />`,
             extra: `${isEdit ? `<small class="form-hint" id="cardav-password-keep">${t('settings.cardavPasswordKeepHint')}</small>` : ''}`
               + `<small class="form-hint" id="cardav-password-hint">${t('settings.cardavPasswordHint')}</small>`,
@@ -620,7 +608,7 @@ function openAccountModal(account, onDone) {
           await onDone();
           refocusAfterRender();
         } catch (err) {
-          errorEl.textContent = remoteErrorMessage(err);
+          errorEl.textContent = errorMessage(err);
           errorEl.hidden = false;
         }
       });

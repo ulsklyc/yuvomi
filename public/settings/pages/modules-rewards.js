@@ -29,13 +29,6 @@ function renderPage(container, preferences) {
           descriptionId: 'rewards-require-approval-hint',
           attrs: { id: 'rewards-require-approval', 'aria-describedby': 'rewards-require-approval-hint' },
         })}
-        ${settingSwitchRowHtml({
-          label: t('settings.rewardsLateDecayLabel'),
-          checked: preferences.tasks_late_decay_enabled === true,
-          description: t('settings.rewardsLateDecayHint'),
-          descriptionId: 'tasks-late-decay-hint',
-          attrs: { id: 'tasks-late-decay', 'aria-describedby': 'tasks-late-decay-hint' },
-        })}
         <!-- EIN SPEICHERMODELL AUF DER SEITE (Re-Critique 2026-09-27, A7 P2-8):
              der Schalter daneben speichert sofort, also tut es das Zahlenfeld
              auch - beim Verlassen und mit Enter. Ein eigener Speichern-Knopf nur
@@ -71,22 +64,6 @@ function bindEvents(container, preferences) {
       window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
     } finally {
       approvalToggle.disabled = false;
-    }
-  });
-
-  // Spaetabzug ist opt-in (Standard aus) - der Schalter spiegelt den
-  // gespeicherten Wert, `=== true`, damit fehlende Einstellung aus bleibt.
-  const lateDecayToggle = container.querySelector('#tasks-late-decay');
-  lateDecayToggle?.addEventListener('change', async () => {
-    lateDecayToggle.disabled = true;
-    try {
-      await savePreferences({ tasks_late_decay_enabled: lateDecayToggle.checked });
-      window.yuvomi?.showToast(t('settings.rewardsSaved'), 'success');
-    } catch (error) {
-      lateDecayToggle.checked = !lateDecayToggle.checked;
-      window.yuvomi?.showToast(errorSentence(error, 'settings.preferenceSaveFailed'), 'danger');
-    } finally {
-      lateDecayToggle.disabled = false;
     }
   });
 
@@ -214,7 +191,7 @@ async function offerRebase(from, to, context) {
     const updated = Number(res?.data?.updated) || 0;
     window.yuvomi?.showToast(t('settings.rewardsDefaultPointsRebased', { count: updated }), 'success');
   } catch (error) {
-    window.yuvomi?.showToast(errorSentence(error), 'danger');
+    window.yuvomi?.showToast(error.message || t('common.errorGeneric'), 'danger');
   }
 }
 

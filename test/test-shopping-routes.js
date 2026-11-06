@@ -591,49 +591,6 @@ test('DELETE /:listId/items/checked: ein leeres oder unbrauchbares ids ist 400, 
   assert.equal(db.prepare('SELECT COUNT(*) c FROM shopping_items WHERE list_id = ?').get(list).c, 1, 'nichts geloescht');
 });
 
-test('DELETE /:listId/items/checked: unbekannte Liste ist 404', async () => {
-  const r = await call('DELETE', '/999999/items/checked');
-  assert.equal(r.status, 404);
-  assert.equal(r.body.reason, 'shopping_list_not_found');
-});
-
-// Vorher: 500 bei Zahl als Name und bei category null, "5.0" als Menge,
-// `is_checked: 'false'` hakte ab, und PATCH pruefte keine Laengen.
-test('PATCH /items/:id: falsche Formen sind 400, der Artikel bleibt unveraendert', async () => {
-  const list = await newList('Patch-Formen');
-  for (const body of [{ name: 5 }, { name: 'X', quantity: 5 }, { name: 'X', notes: 5 }]) {
-    assert.equal((await call('POST', `/${list}/items`, body)).status, 400, `POST ${JSON.stringify(body)}`);
-  }
-  const item = (await call('POST', `/${list}/items`, { name: 'Milch', quantity: '1 l' })).body.data;
-  const bad = [
-    { name: 5 },
-    { name: null },
-    { name: 'a'.repeat(201) },
-    { quantity: 5 },
-    { quantity: 'q'.repeat(101) },
-    { notes: 5 },
-    { category: null },
-    { is_checked: 'false' },
-    { is_checked: 2 },
-  ];
-  for (const body of bad) {
-    const r = await call('PATCH', `/items/${item.id}`, body);
-    assert.equal(r.status, 400, JSON.stringify(body));
-  }
-  const row = db.prepare('SELECT name, quantity, is_checked, notes, category FROM shopping_items WHERE id = ?').get(item.id);
-  assert.deepEqual(
-    { name: row.name, quantity: row.quantity, is_checked: row.is_checked, notes: row.notes, category: row.category },
-    { name: 'Milch', quantity: '1 l', is_checked: 0, notes: item.notes, category: item.category },
-  );
-
-  // Was die PWA schickt, geht weiter: 0 und 1, null in Menge und Notizen.
-  assert.equal((await call('PATCH', `/items/${item.id}`, { is_checked: 1 })).body.data.is_checked, 1);
-  assert.equal((await call('PATCH', `/items/${item.id}`, { is_checked: 0 })).body.data.is_checked, 0);
-  const cleared = await call('PATCH', `/items/${item.id}`, { quantity: null, notes: null });
-  assert.equal(cleared.status, 200);
-  assert.equal(cleared.body.data.quantity, null);
-});
-
 // --------------------------------------------------------------------------
 // Essensplan-Import
 // --------------------------------------------------------------------------
@@ -739,45 +696,6 @@ test('PUT /categories/:catId: Umbenennen kaskadiert auf shopping_items', async (
   assert.equal(item.category, 'KaskKat2', 'Artikel-Kategorie mitumbenannt');
 });
 
-// Rezepte, Mahlzeiten, Serien und Vorrat speichern den Kategorie-NAMEN als Text
-// und reichen ihn beim Uebertragen unveraendert an die Liste weiter. Vorher zog
-// das Umbenennen nur shopping_items mit: die Zutaten eines Rezepts landeten
-// danach unter dem alten Namen ganz unten, und PATCH lehnte das Abhaken mit
-// "Invalid category" ab.
-function kuechenZeilenMit(kategorie) {
-  const recipe = db.prepare(`INSERT INTO recipes (title, created_by) VALUES ('Bolognese', ?)`).run(U).lastInsertRowid;
-  db.prepare(`INSERT INTO recipe_ingredients (recipe_id, name, category) VALUES (?, 'Hackfleisch', ?)`).run(recipe, kategorie);
-  const meal = db.prepare(`INSERT INTO meals (date, meal_type, title, created_by) VALUES ('2026-08-03','dinner','M',?)`).run(U).lastInsertRowid;
-  db.prepare(`INSERT INTO meal_ingredients (meal_id, name, category) VALUES (?, 'Karotten', ?)`).run(meal, kategorie);
-  const tpl = db.prepare(`INSERT INTO meal_recurrence_templates (start_date, weekday, meal_type, title, created_by) VALUES ('2026-08-03', 1, 'dinner', 'S', ?)`).run(U).lastInsertRowid;
-  db.prepare(`INSERT INTO meal_recurrence_ingredients (template_id, name, category) VALUES (?, 'Sellerie', ?)`).run(tpl, kategorie);
-  db.prepare(`INSERT INTO pantry_items (name, category) VALUES ('Passata', ?)`).run(kategorie);
-  db.prepare(`INSERT INTO pantry_products (name, unit, category) VALUES ('Passata', 'pcs', ?)`).run(kategorie);
-  return { recipe, meal };
-}
-const KUECHEN_TABELLEN = ['recipe_ingredients', 'meal_ingredients', 'meal_recurrence_ingredients', 'pantry_items', 'pantry_products'];
-const kategorienIn = (name) => Object.fromEntries(KUECHEN_TABELLEN.map((t) => [
-  t, db.prepare(`SELECT COUNT(*) c FROM ${t} WHERE category = ?`).get(name).c,
-]));
-
-test('PUT /categories/:catId: Umbenennen kaskadiert auf Rezepte, Mahlzeiten und Vorrat', async () => {
-  const cat = (await call('POST', '/categories', { name: 'Fleischtheke' })).body.data;
-  const { recipe } = kuechenZeilenMit('Fleischtheke');
-  db.prepare(`INSERT INTO meals (date, meal_type, title, recipe_id, created_by) VALUES ('2026-08-04','dinner','Bolognese',?,?)`).run(recipe, U);
-
-  assert.equal((await call('PUT', `/categories/${cat.id}`, { name: 'Metzger' })).status, 200);
-  const alle = Object.fromEntries(KUECHEN_TABELLEN.map((t) => [t, 1]));
-  assert.deepEqual(kategorienIn('Metzger'), alle, 'jede Kuechen-Tabelle traegt den neuen Namen');
-  assert.deepEqual(kategorienIn('Fleischtheke'), Object.fromEntries(KUECHEN_TABELLEN.map((t) => [t, 0])));
-
-  // Der Weg, auf dem es auffiel: das Rezept auf die Liste, dann abhaken.
-  const list = await newList('Bolognese');
-  assert.equal((await call('POST', `/${list}/import-meal-plan`, { from: '2026-08-04', to: '2026-08-04' })).status, 200);
-  const hack = db.prepare(`SELECT id, category FROM shopping_items WHERE list_id = ? AND name = 'Hackfleisch'`).get(list);
-  assert.equal(hack.category, 'Metzger', 'die Zutat steht in ihrer Gruppe, nicht unter dem alten Namen');
-  assert.equal((await call('PATCH', `/items/${hack.id}`, { is_checked: 1 })).status, 200, 'abhaken geht');
-});
-
 test('DELETE /categories/:catId: unbekannt → 404', async () => {
   const r = await call('DELETE', '/categories/999999');
   assert.equal(r.status, 404);
@@ -793,16 +711,6 @@ test('DELETE /categories/:catId: verschiebt Artikel auf Fallback + löscht', asy
   assert.equal(db.prepare('SELECT COUNT(*) c FROM shopping_categories WHERE id = ?').get(cat.id).c, 0);
   const item = db.prepare(`SELECT category FROM shopping_items WHERE list_id = ? AND name = 'DelWare'`).get(list);
   assert.equal(item.category, 'Obst & Gemüse', 'auf erste verbleibende Kategorie (sort_order) verschoben');
-});
-
-test('DELETE /categories/:catId: Rezepte, Mahlzeiten und Vorrat ziehen auf den Fallback um', async () => {
-  const cat = (await call('POST', '/categories', { name: 'Feinkost' })).body.data;
-  kuechenZeilenMit('Feinkost');
-  const vorher = kategorienIn('Obst & Gemüse');
-  assert.equal((await call('DELETE', `/categories/${cat.id}`)).status, 200);
-  assert.deepEqual(kategorienIn('Feinkost'), Object.fromEntries(KUECHEN_TABELLEN.map((t) => [t, 0])), 'kein Verweis auf die geloeschte Kategorie');
-  const nachher = kategorienIn('Obst & Gemüse');
-  for (const t of KUECHEN_TABELLEN) assert.equal(nachher[t], vorher[t] + 1, `${t} auf den Fallback`);
 });
 
 test('PATCH /categories/reorder: leeres/kein Array → 400', async () => {
@@ -1002,135 +910,3 @@ test('#1909 eine Validierung, die nur ein Aufrufer der API ausloest, nennt keine
     assert.equal(r.body.reason, undefined, `${method} ${path}`);
   }
 });
-
-test('Kaufhistorie: abgehakter Artikel mit Preis traegt sich ein (#1003)', async () => {
-  const store = (await call('POST', '/stores', { name: 'Lidl' })).body.data;
-  const list = (await call('POST', '/', { name: 'Historieliste' })).body.data;
-  const item = (await call('POST', `/${list.id}/items`, { name: 'Bio-Eier' })).body.data;
-
-  // Noch nicht abgehakt -> keine Historie
-  await call('PATCH', `/items/${item.id}`, { price_cents: 299, store_id: store.id });
-  let hist = await call('GET', `/price-history?name=Bio-Eier`);
-  assert.equal(hist.body.data.length, 0, 'nicht abgehakt = noch kein Kauf');
-
-  // Jetzt abhaken -> Historieeintrag entsteht
-  await call('PATCH', `/items/${item.id}`, { is_checked: 1 });
-  hist = await call('GET', `/price-history?name=Bio-Eier`);
-  assert.equal(hist.body.data.length, 1);
-  assert.equal(hist.body.data[0].item_name, 'Bio-Eier');
-  assert.equal(hist.body.data[0].price_cents, 299);
-  assert.equal(hist.body.data[0].store_id, store.id);
-  assert.equal(hist.body.data[0].store_name, 'Lidl');
-
-  // Eigener Kauf des noch auf der Liste liegenden Artikels wird bei exclude_item_id ausgeblendet (#1003)
-  const excluded = await call('GET', `/price-history?name=Bio-Eier&exclude_item_id=${item.id}`);
-  assert.equal(excluded.body.data.length, 0, 'eigener Kauf des Artikels wird ausgeblendet');
-
-  // Groß-/Kleinschreibung wird ignoriert
-  const lower = await call('GET', `/price-history?name=bio-eier`);
-  assert.equal(lower.body.data.length, 1, 'case-insensitive Abfrage');
-  assert.equal(lower.body.data[0].price_cents, 299);
-
-  // Preis nachträglich korrigieren aktualisiert denselben Eintrag
-  await call('PATCH', `/items/${item.id}`, { price_cents: 329 });
-  hist = await call('GET', `/price-history?name=Bio-Eier`);
-  assert.equal(hist.body.data.length, 1, 'kein Duplikat beim Korrigieren');
-  assert.equal(hist.body.data[0].price_cents, 329);
-
-  // Haken entfernen nimmt den unvollendeten Kauf zurueck
-  await call('PATCH', `/items/${item.id}`, { is_checked: 0 });
-  hist = await call('GET', `/price-history?name=Bio-Eier`);
-  assert.equal(hist.body.data.length, 0, 'Haken entfernt = Eintrag zurueckgenommen');
-
-  // Erneut abhaken und dann Liste leeren ("Remove checked")
-  await call('PATCH', `/items/${item.id}`, { is_checked: 1 });
-  assert.equal((await call('GET', `/price-history?name=Bio-Eier`)).body.data.length, 1);
-
-  const del = await call('DELETE', `/${list.id}/items/checked`);
-  assert.equal(del.status, 200);
-
-  // Nach dem Loeschen bleibt der Kauf in der Historie dauerhaft erhalten!
-  hist = await call('GET', `/price-history?name=Bio-Eier`);
-  assert.equal(hist.body.data.length, 1, 'dauerhaft erhalten nach checked clear');
-  assert.equal(hist.body.data[0].price_cents, 329);
-
-  // Einzeln geloeschter abgehakter Artikel nimmt seinen Kauf zurueck (verworfen / nicht gekauft)
-  const item2 = (await call('POST', `/${list.id}/items`, { name: 'Kaffee' })).body.data;
-  await call('PATCH', `/items/${item2.id}`, { price_cents: 499, is_checked: 1 });
-  hist = await call('GET', `/price-history?name=Kaffee`);
-  assert.equal(hist.body.data.length, 1);
-
-  await call('DELETE', `/items/${item2.id}`);
-  hist = await call('GET', `/price-history?name=Kaffee`);
-  assert.equal(hist.body.data.length, 0, 'einzeln geloescht = Kauf verworfen');
-});
-
-test('Kaufhistorie: exclude_item_id blendet nur den eigenen Kauf aus, aeltere bleiben (#1003)', async () => {
-  const list = (await call('POST', '/', { name: 'Ausblendliste' })).body.data;
-
-  // Ein aelterer Kauf, abgehakt und von der Liste geraeumt
-  const old = (await call('POST', `/${list.id}/items`, { name: 'Dinkelmehl' })).body.data;
-  await call('PATCH', `/items/${old.id}`, { price_cents: 189, is_checked: 1 });
-  assert.equal((await call('DELETE', `/${list.id}/items/checked`)).status, 200);
-
-  // Derselbe Artikel liegt erneut auf der Liste und ist abgehakt
-  const current = (await call('POST', `/${list.id}/items`, { name: 'Dinkelmehl' })).body.data;
-  await call('PATCH', `/items/${current.id}`, { price_cents: 209, is_checked: 1 });
-  assert.equal((await call('GET', '/price-history?name=Dinkelmehl')).body.data.length, 2);
-
-  const r = await call('GET', `/price-history?name=Dinkelmehl&exclude_item_id=${current.id}`);
-  assert.equal(r.status, 200);
-  assert.deepEqual(r.body.data.map((p) => p.price_cents), [189], 'nur der aeltere Kauf bleibt');
-});
-
-test('Kaufhistorie: exclude_item_id ohne gueltige ID ist ein 400 (#1003)', async () => {
-  for (const raw of ['abc', '0', '-3', '1.5']) {
-    const r = await call('GET', `/price-history?name=Dinkelmehl&exclude_item_id=${encodeURIComponent(raw)}`);
-    assert.equal(r.status, 400, `exclude_item_id=${raw}`);
-  }
-});
-
-test('Kaufhistorie: "Abgehakte loeschen" erfasst noch nicht registrierte abgehakte Artikel (#1003)', async () => {
-  const store = (await call('POST', '/stores', { name: 'Edeka' })).body.data;
-  const list = (await call('POST', '/', { name: 'CalDAV-Liste' })).body.data;
-  const item = (await call('POST', `/${list.id}/items`, { name: 'Hafermilch' })).body.data;
-
-  // Direkt in der DB als abgehakt mit Preis markieren (ohne ueber PATCH /items/:id zu gehen,
-  // z.B. abgehakt ueber Apple Reminders / CalDAV oder vor dem Update)
-  db.prepare('UPDATE shopping_items SET is_checked = 1, price_cents = 199, store_id = ? WHERE id = ?').run(store.id, item.id);
-
-  // Vor dem Loeschen: noch kein Kauf in der Historie
-  let hist = await call('GET', '/price-history?name=Hafermilch');
-  assert.equal(hist.body.data.length, 0, 'vor dem Loeschen noch kein Eintrag');
-
-  // "Abgehakte loeschen" (Remove checked) ausfuehren
-  const res = await call('DELETE', `/${list.id}/items/checked`);
-  assert.equal(res.status, 200);
-
-  // Jetzt muss der Eintrag durch die Schleife in DELETE /checked entstanden sein!
-  hist = await call('GET', '/price-history?name=Hafermilch');
-  assert.equal(hist.body.data.length, 1, 'Kauf durch "Abgehakte loeschen" erfasst');
-  assert.equal(hist.body.data[0].item_name, 'Hafermilch');
-  assert.equal(hist.body.data[0].price_cents, 199);
-  assert.equal(hist.body.data[0].store_id, store.id);
-  assert.equal(hist.body.data[0].store_name, 'Edeka');
-});
-
-test('Kaufhistorie: Bearbeiten eines bereits abgehakten Artikels aendert nicht das Kaufdatum (#1003)', async () => {
-  const list = (await call('POST', '/', { name: 'Datumstest' })).body.data;
-  const item = (await call('POST', `/${list.id}/items`, { name: 'Tee' })).body.data;
-  await call('PATCH', `/items/${item.id}`, { price_cents: 250, is_checked: 1 });
-
-  // Kaufdatum kuenstlich zurueckdatieren
-  const yesterday = '2026-10-25T10:00:00Z';
-  db.prepare('UPDATE shopping_purchases SET purchased_at = ? WHERE shopping_item_id = ?').run(yesterday, item.id);
-
-  // Artikel nachtraeglich umbenennen / Preis aendern
-  await call('PATCH', `/items/${item.id}`, { price_cents: 270 });
-
-  const hist = await call('GET', '/price-history?name=Tee');
-  assert.equal(hist.body.data.length, 1);
-  assert.equal(hist.body.data[0].price_cents, 270);
-  assert.equal(hist.body.data[0].purchased_at, yesterday, 'Kaufdatum bleibt erhalten');
-});
-

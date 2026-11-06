@@ -137,106 +137,15 @@ test('a failed request puts the switch back and says why', async () => {
   const error = errorEl();
   page.bindDisplayScreensaverSwitches(list, error);
   toasts.length = 0;
-  patchResult = () => Promise.reject(Object.assign(new Error('Something broke.'), { status: 500, data: { error: 'Something broke.' } }));
+  patchResult = () => Promise.reject(new Error('Display not found.'));
   try {
     const toggle = makeToggle({ checked: true });
     await fire(list, changeOn(toggle));
     assert.equal(toggle.checked, false, 'back to the state the server still has');
     assert.equal(toggle.disabled, false);
     assert.equal(error.hidden, false);
-    // #1909: the sentence of the app, never the server's English text.
-    assert.equal(error.textContent, 'common.errorGeneric');
+    assert.equal(error.textContent, 'Display not found.');
     assert.equal(toasts.length, 0, 'no confirmation for a change that did not happen');
-  } finally {
-    patchResult = () => Promise.resolve({ data: {} });
-  }
-});
-
-// #1909: another admin deleted the display meanwhile. The page says so in the
-// language of the interface and hands over to its reload, which drops the card.
-const goneAnswer = (reason) => Object.assign(new Error('Display not found.'), { status: 404, data: { error: 'Display not found.', reason } });
-
-test('a display deleted elsewhere says so and reloads the list', async () => {
-  const list = makeList();
-  const error = errorEl();
-  const gone = [];
-  page.bindDisplayScreensaverSwitches(list, error, { onGone: (err) => gone.push(err) });
-  patchResult = () => Promise.reject(goneAnswer('displays_display_not_found'));
-  try {
-    const toggle = makeToggle({ checked: true });
-    await fire(list, changeOn(toggle));
-    assert.equal(toggle.checked, false);
-    assert.equal(gone.length, 1, 'the page reloads');
-    assert.equal(gone[0].data.reason, 'displays_display_not_found');
-    assert.notEqual(error.textContent, 'Display not found.');
-  } finally {
-    patchResult = () => Promise.resolve({ data: {} });
-  }
-});
-
-const remoteSettings = {night_from:21, night_until:7, idle_seconds:60, show_clock:false, cover_photo:true};
-function settingsForm() {
-  const fields = Object.fromEntries(Object.entries(remoteSettings).map(([key,value]) => [key, {value:String(value), checked:value, disabled:false}]));
-  const status = {textContent:''}; const button = {disabled:false};
-  const form = {
-    dataset:{displayDeviceSettings:'7',name:'Kitchen'},
-    querySelector: selector => selector === '[data-display-settings-status]' ? status
-      : selector.startsWith('[name=') ? fields[selector.slice(7,-2)] : null,
-    querySelectorAll: () => [...Object.values(fields),button],
-  };
-  return {form, fields, status, button};
-}
-async function saveSettings(list, form) {
-  const event = {target:{closest:selector => selector === '[data-display-device-settings]' ? form : null}, preventDefault(){}};
-  await Promise.all(list.handlers.submit.map(fn=>fn(event)));
-}
-
-test('the card renders remote values in distinct accessible controls for each tablet', () => {
-  const html = page.renderDisplay({id:7, display_name:'Kitchen', device_settings:remoteSettings});
-  assert.match(html, /data-display-device-settings="7"/);
-  assert.match(html, /value="21" selected/); assert.match(html, /value="7" selected/);
-  assert.match(html, /value="60" selected/);
-  assert.match(html, /id="display-options-7-clock"/); assert.match(html, /id="display-options-7-cover"/);
-  assert.doesNotMatch(html, /data-display-local-hint/);
-  const local = page.renderDisplay({id:8, display_name:'Hall', device_settings:null});
-  assert.match(local, /data-display-local-hint/); assert.match(local, /value="22" selected/);
-});
-
-test('saving the real display form sends all five choices to that display only', async () => {
-  patchResult = () => Promise.resolve({data:{device_settings:remoteSettings}}); patches.length = 0;
-  const list = makeList(); page.bindDisplayDeviceSettings(list);
-  const ui = settingsForm(); await saveSettings(list, ui.form);
-  assert.deepEqual(patches, [{path:'/displays/7',body:{device_settings:remoteSettings}}]);
-  assert.match(ui.status.textContent, /common.savedNamed/); assert.equal(ui.button.disabled,false);
-});
-
-test('failed saves keep the choices editable and concurrent submits cannot race', async () => {
-  let reject;
-  patchResult = () => new Promise((_, fail)=>{reject=fail;}); patches.length = 0;
-  const list = makeList(); page.bindDisplayDeviceSettings(list);
-  const ui = settingsForm(); const pending = saveSettings(list,ui.form);
-  assert.equal(ui.button.disabled,true); await saveSettings(list,ui.form); assert.equal(patches.length,1);
-  reject(Object.assign(new Error('server'),{status:500})); await pending;
-  assert.equal(ui.button.disabled,false); assert.equal(ui.fields.night_from.value,'21');
-  assert.ok(ui.status.textContent); assert.equal(ui.form.dataset.saving,'false');
-  patchResult = () => Promise.resolve({data:{}});
-});
-
-test('an invalid night window is rejected before an API request', async () => {
-  patches.length = 0;
-  const list = makeList(); page.bindDisplayDeviceSettings(list);
-  const ui = settingsForm(); ui.fields.night_until.value = '21';
-  await saveSettings(list,ui.form); assert.equal(patches.length,0); assert.equal(ui.status.textContent,'common.invalidInput');
-});
-
-test('the device settings of a display deleted elsewhere hand over to the reload', async () => {
-  patchResult = () => Promise.reject(goneAnswer('displays_display_not_found'));
-  try {
-    const gone = [];
-    const list = makeList(); page.bindDisplayDeviceSettings(list, { onGone: (err) => gone.push(err) });
-    const ui = settingsForm(); await saveSettings(list, ui.form);
-    assert.equal(gone.length, 1, 'the page reloads');
-    assert.equal(ui.status.textContent, 'settings.displayErrorGone');
   } finally {
     patchResult = () => Promise.resolve({ data: {} });
   }

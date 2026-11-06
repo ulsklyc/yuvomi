@@ -10,7 +10,6 @@ import {
   settingRowHtml,
 } from '/settings/components.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
-import { errorSentence } from '/utils/friendly-error.js';
 
 function showToast(message, tone = 'default') {
   window.yuvomi?.showToast(message, tone);
@@ -110,7 +109,7 @@ function renderAccount(listEl, account, reload) {
         showToast(t('settings.dmsTestFail', { status: result.status }), 'danger');
       }
     } catch (err) {
-      showToast(errorSentence(err), 'danger');
+      showToast(err.message ?? t('common.errorGeneric'), 'danger');
     } finally {
       testBtn.disabled = false;
     }
@@ -129,7 +128,7 @@ function renderAccount(listEl, account, reload) {
       await reload();
       refocusAfterRender();
     } catch (err) {
-      showToast(errorSentence(err), 'danger');
+      showToast(err.message ?? t('common.errorGeneric'), 'danger');
     }
   });
   actions.appendChild(delBtn);

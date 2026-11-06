@@ -50,7 +50,6 @@ import { localCalendarColorSql, localCalendarIdSql } from './local-calendars.js'
 import { expandRecurringEvents, loadEventExceptions, MAX_EXPANSION_ITERATIONS } from './calendar-events.js';
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
-import { notCancelledEventSql } from './reminder-deleted-occurrence.js';
 import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
 import { documentVisibleSql } from './document-access.js';
 import { hasExplicitZone, householdTimeZone, storedToWall, utcToWall } from '../utils/timezone.js';
@@ -350,9 +349,6 @@ function eventCountdowns(d, { userId, todayKey, graceDays, hidden }) {
     LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
     LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
     WHERE e.countdown = 1
-      -- Vom Anbieter abgesagt (#2499): kein Countdown auf einen Termin, der
-      -- nicht stattfindet.
-      AND ${notCancelledEventSql(d)}
       AND ${icsSubscriptionVisibleWhere('e')}
       AND ${visibilityWhere('e', 'event_assignments', 'event_id')}${
         withBirthdays ? '' : ` AND ${notBirthdayEventSql('e')}`}

@@ -10,7 +10,7 @@ import { setExtensionModules, selectThirdPartyModuleList } from '/utils/extensio
 import { initExtensionI18n, moduleDisplayLabel, reloadExtensionLocales } from '/utils/extension-i18n.js';
 import { clearApiCache, onServiceWorkerUpdate, UPDATE_RELOAD_DELAY_MS } from '/sw-register.js';
 import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
-import { initI18n, getLocale, t, formatTime, setWeekStart } from '/i18n.js';
+import { initI18n, getLocale, t, formatTime } from '/i18n.js';
 import { dateText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
@@ -78,7 +78,6 @@ import {
   noteRestoringScroll,
 } from '/utils/scroll-restore.js';
 import { openModal, confirmModal, closeModal } from '/components/modal.js';
-import { createDisplaySettingsSync } from '/utils/display-settings-sync.js';
 import { armScreensaver, disarmScreensaver } from '/components/photo-screensaver.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { placeSidebarNavItems, splitPinnedNavItems } from '/utils/sidebar-pinned.js';
@@ -866,7 +865,7 @@ const offlineSession = createOfflineSession({
     routerState._preferencesLoaded = false;
     await syncPreferencesOnce();
     if (!routerState.currentUser) return;
-    startSessionPolling();
+    startThirdPartyModulePolling();
     if (!['split_guest', 'display'].includes(routerState.currentUser.access_scope)) {
       loadReminderStyles();
       initReminders();
@@ -881,7 +880,7 @@ const navigate = createNavigate(routerState, {
   ROUTES, allRoutes, unknownPathDetour, publicPathDetour, detourPaths, canAccessNavModule,
   location, history, window, document,
   hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
-  auth: startHandoff.auth, syncPreferencesOnce, startSessionPolling, loadReminderStyles, initReminders, initPush: initPushAndReport,
+  auth: startHandoff.auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush: initPushAndReport,
   armScreensaver, forgetSessionState,
   holdOfflineSession: () => offlineSession.start(),
   // Nur ein 401 fuehrt zur Anmeldung; jeder andere Fehler der Sitzungspruefung
@@ -978,17 +977,12 @@ function applyStartPreferences(res) {
   if (timeFormat) {
     localStorage.setItem('yuvomi-time-format', timeFormat);
   }
-  // Der Wochenstart fuer Komponenten ohne eigene Abfrage, allen voran den
-  // Datepicker (#2533). Fehlt er in der Antwort, bleibt der letzte Stand.
-  if (res?.data?.week_start) setWeekStart(res.data.week_start);
   // Die Haushaltszone in die Anzeige spiegeln (#829 Teil 3). Bewusst
   // `timezone` und nicht `timezone_effective`: letzteres ist nie leer und
   // traegt ohne Einstellung die `TZ` des Containers - ein Compose-Schalter,
   // der nichts darueber aussagt, wo dieser Haushalt lebt. Ohne getroffene
   // Wahl bleibt die Anzeige also beim Browser, so wie bisher.
   setDisplayTimeZone(res?.data?.timezone ?? null);
-  displaySettingsSync.apply(routerState.currentUser?.access_scope === 'display' ? res?.data?.display_device_settings : null);
-
   // Der Zonen-Hinweis der Uebersicht (#1607) liest genau diese Antwort: sie
   // ist da, bevor die erste Seite zeichnet, also steht er schon neben dem
   // Skelett und schiebt nichts nach.
@@ -1045,13 +1039,6 @@ function moduleSnapshot() {
     path: module.route?.path,
     label: module.menu?.label,
   })));
-}
-
-const displaySettingsSync = createDisplaySettingsSync();
-
-function startSessionPolling() {
-  if (routerState.currentUser?.access_scope === 'display') displaySettingsSync.start();
-  else startThirdPartyModulePolling();
 }
 
 function startThirdPartyModulePolling() {
@@ -1265,6 +1252,7 @@ function sidebarAccountEl({ isDisplayShell = false } = {}) {
     return btn;
   };
   menu.append(
+    item('set-status', 'circle-dot', 'dashboard.availTitle', 'nav-account__set-status'),
     item('help', 'circle-help', 'nav.help', 'nav-account__help'),
     // `nav-item--changelog` traegt den Update-Hinweis im Namen (applyUpdateBadge).
     item('changelog', 'history', 'nav.changelog', 'nav-item--changelog'),
@@ -1279,9 +1267,18 @@ function sidebarAccountEl({ isDisplayShell = false } = {}) {
     sep.setAttribute('role', 'separator');
     menu.append(sep, item('logout', 'log-out', 'settings.logout', 'nav-account__logout'));
   }
-  menu.addEventListener('click', (event) => {
+  menu.addEventListener('click', async (event) => {
     const action = event.target.closest?.('.popover-menu__item')?.dataset.action;
-    if (action === 'help') showHelpModal();
+    if (action === 'set-status') {
+      // Aktuellen Status lesen, dann Dialog oeffnen (#1591).
+      try {
+        const res = await api.get('/availability');
+        const selfId = routerState.currentUser?.id;
+        const self = Array.isArray(res?.data) ? res.data.find((r) => r.user_id === selfId) : null;
+        const { openAvailabilityModal } = await import('/pages/dashboard.js');
+        openAvailabilityModal(selfId, self ?? null, null);
+      } catch { /* import oder API-Fehler: Dialog ohne aktuellen Status */ }
+    } else if (action === 'help') showHelpModal();
     else if (action === 'changelog') showChangelogModal();
     else if (action === 'logout') confirmAndLogout();
   });
@@ -5423,7 +5420,6 @@ function forgetSessionState() {
   // Anmeldeseite stehen.
   closeAllOverlays();
   stopThirdPartyModulePolling();
-  displaySettingsSync.stop();
   stopReminders();
   stopPush();
   // Die zuletzt geoeffneten Orte der Palette (R19): Ziele eines Kontos

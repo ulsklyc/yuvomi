@@ -94,16 +94,13 @@ router.put('/outlook/accounts/:id', requireAdmin, (req, res) => {
     const result = outlookCalendar.updateAccount(accountId, { name, autoSyncCalendarId, ownerUserId });
     res.json({ data: result });
   } catch (err) {
-    if (err.code === 'not_household_member') {
-      return res.status(400).json({ error: err.message, code: 400, reason: 'calendar_assignee_not_member' });
-    }
+    if (err.code === 'not_household_member') return res.status(400).json({ error: err.message, code: 400 });
     log.error('Outlook account update failed:', err);
     if (err.code === 'outlook_auto_sync_overrides') {
       return res.status(409).json({
         error: err.message,
         code: 409,
         conflict: err.code,
-        reason: 'outlook_auto_sync_overrides',
         linked_override_count: err.linkedOverrideCount,
       });
     }
@@ -170,7 +167,6 @@ router.patch('/outlook/accounts/:id/calendars', requireAdmin, (req, res) => {
         error: err.message,
         code: 409,
         conflict: err.code,
-        reason: 'outlook_auto_sync_overrides',
         linked_override_count: err.linkedOverrideCount,
       });
     }

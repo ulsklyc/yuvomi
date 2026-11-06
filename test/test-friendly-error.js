@@ -281,15 +281,6 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // eine Pruefung steht im Dienst, die Erinnerungsliste in ihrer Route; die
     // echte Antwort misst test:sync-default-assignees.
     '../server/services/default-assignees.js', '../server/routes/calendar/caldav.js',
-    // Toasts der Einstellungen (#1909). Abo-Quelle und Stichwort misst
-    // test:sync-default-assignees bzw. test:tasks-errors, Outlook
-    // test:calendar-routes, Mitglied entfernen test:user-deactivation.
-    '../server/routes/calendar/subscriptions.js', '../server/routes/calendar/outlook.js', '../server/auth.js',
-    // Seite Wandtablets (#1909); die echte Antwort misst test:display-account.
-    '../server/routes/displays.js',
-    // Kalender-Sync und Kalender-Abos (#1909); die echte Antwort misst
-    // test:sync-form-errors.
-    '../server/routes/calendar/apple.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
@@ -329,8 +320,7 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'inventory_booking_not_found', 'notes_note_not_found', 'notes_selected_category_not_found',
     'contacts_contact_not_found', 'birthdays_birthday_not_found', 'birthdays_selected_contact_not_found',
     'contacts_selected_category_not_found', 'inventory_location_not_found', 'inventory_category_not_found',
-    'tasks_task_not_found', 'tasks_parent_not_found', 'tasks_comment_not_found', 'tasks_tag_not_found',
-    'calendar_subscription_not_found', 'members_member_not_found',
+    'tasks_task_not_found', 'tasks_parent_not_found', 'tasks_comment_not_found',
     'schedule_shift_type_not_found', 'schedule_custom_field_not_found', 'schedule_pattern_not_found',
     'schedule_override_not_found', 'schedule_extra_shift_not_found',
     'schedule_selected_shift_type_not_found', 'schedule_selected_custom_field_not_found',
@@ -341,7 +331,6 @@ test('isGone: nur die bekannten "gibt es nicht mehr"-Gruende, nie der blanke Sta
     'quick_links_link_not_found',
     'recipe_providers_account_not_found',
     'calendar_calendar_not_found', 'calendar_event_not_found', 'calendar_selected_calendar_not_found',
-    'displays_display_not_found', 'displays_device_not_found',
   ].sort());
   for (const reason of GONE_REASONS) {
     assert.ok(CASE_MESSAGES.has(reason), `${reason}: ohne Satz`);
@@ -547,96 +536,6 @@ test('errorSentence: der Satz der Stelle bekommt seine Werte, ein bekannter Fall
   assert.equal(errorSentence(unbekannt, 'common.errorCheckRolledBack'), 'common.errorCheckRolledBack', 'ohne Werte wie bisher');
   assert.equal(errorSentence(Object.assign(new Error('x'), { status: 0 }), 'common.errorCheckRolledBack', { name: 'Milch' }),
     'common.errorOfflineMutation', 'offline sagt seinen eigenen Satz');
-});
-
-// DIE AUSNAHME VON errorSentence (#1909): die Antwort eines fremden Dienstes
-// bleibt fuer den Admin lesbar, aber nur im uebersetzten Rahmen. Der Test-Loader
-// haengt die Werte an den Schluessel.
-test('errorSentenceWithDetail: der Text des Servers nur im Rahmen, und nur als Antwort des Dienstes', async () => {
-  const { errorSentenceWithDetail } = await load();
-  const FRAME = 'settings.connectionFailedDetail';
-  const rejected = answer(400, '401 Unauthorized');
-  rejected.data.error = '401 Unauthorized';
-  const sentence = errorSentenceWithDetail(rejected, FRAME);
-  assert.match(sentence, /^settings\.connectionFailedDetail/);
-  assert.match(sentence, /401 Unauthorized/);
-
-  // Ein Fall ohne eigene Angabe bleibt beim Rahmen, wenn der Dienst etwas sagt.
-  const storage = answer(502, 'WebDAV 507', 'documents_storage_failed');
-  storage.data.error = 'WebDAV 507';
-  assert.match(errorSentenceWithDetail(storage, FRAME), /WebDAV 507/);
-  storage.data.error = '';
-  assert.equal(errorSentenceWithDetail(storage, FRAME), 'documents.errorStorageFailed');
-
-  // Nichts Konkretes: der Satz der Stelle, nie ein leerer Rahmen.
-  for (const data of [{ error: 'Internal server error.' }, { error: '   ' }, { error: 42 }, {}, undefined]) {
-    const empty = Object.assign(new Error('raw'), { status: 500, data });
-    assert.equal(errorSentenceWithDetail(empty, FRAME, 'settings.caldavSyncFailed'), 'settings.caldavSyncFailed');
-    assert.equal(errorSentenceWithDetail(empty, FRAME), 'common.errorGeneric');
-  }
-
-  // Das sind keine Antworten des Dienstes.
-  assert.equal(errorSentenceWithDetail(answer(403, 'Admin access required.'), FRAME), 'common.errorNoPermission');
-  assert.equal(errorSentenceWithDetail(answer(429, 'Too many requests.'), FRAME), 'common.errorRateLimited');
-  assert.equal(errorSentenceWithDetail(Object.assign(new Error('x'), { status: 0 }), FRAME), 'common.errorOfflineMutation');
-  assert.equal(errorSentenceWithDetail({ status: 503, data: { error: 'offline' } }, FRAME), 'common.errorOffline');
-});
-
-test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#1909)', async () => {
-  const { errorSentence, isAlreadyDeleted, isGone } = await load();
-  for (const [reason, key] of [
-    ['own_account', 'settings.memberRemoveOwnAccount'],
-    ['last_admin', 'settings.memberRemoveLastAdmin'],
-    ['last_sso_admin', 'settings.memberRemoveLastSsoAdmin'],
-    ['outlook_auto_sync_overrides', 'settings.outlookAutoSyncOverrides'],
-    ['calendar_subscription_not_found', 'settings.icsSubscriptionGone'],
-    ['tasks_tag_not_found', 'tasks.errorTagGone'],
-    ['dms_account_not_found', 'documents.errorDmsAccountGone'],
-    // Familienverwaltung (#1909); die echte Antwort messen test:admin-password-reset
-    // und test:invites.
-    ['members_username_invalid', 'settings.memberErrorUsernameInvalid'],
-    ['members_username_taken', 'settings.memberErrorUsernameTaken'],
-    ['members_member_not_found', 'settings.memberErrorGone'],
-    ['members_sso_email_required', 'settings.memberErrorSsoEmailRequired'],
-    ['members_sso_email_ambiguous', 'settings.memberErrorSsoEmailAmbiguous'],
-    // SSO-Verknuepfung im Konto-Blatt (#1909); die echte Antwort misst
-    // test:oidc-email-link.
-    ['oidc_not_configured', 'settings.oidcLinkErrorNotConfigured'],
-    ['oidc_already_linked', 'settings.oidcLinkError_already_linked'],
-    ['oidc_not_linked', 'settings.oidcUnlinkNotLinked'],
-    ['oidc_password_required', 'settings.oidcUnlinkNeedsPassword'],
-    // Seite Wandtablets (#1909): ein zweiter Admin hat das Tablett oder sein
-    // Geraet schon entfernt; die echte Antwort misst test:display-account.
-    ['displays_display_not_found', 'settings.displayErrorGone'],
-    ['displays_device_not_found', 'settings.displayDeviceErrorGone'],
-    // Kalender-Sync und Kalender-Abos (#1909); die echte Antwort misst
-    // test:sync-form-errors.
-    ['caldav_account_exists', 'settings.cardavErrorDuplicate'],
-    ['caldav_no_calendars', 'settings.caldavErrorNoCalendars'],
-    ['apple_no_calendars', 'settings.caldavErrorNoCalendars'],
-    ['apple_url_invalid', 'settings.icsErrorUrlScheme'],
-    ['calendar_subscription_name_invalid', 'settings.icsErrorNameInvalid'],
-    ['calendar_ics_url_invalid', 'settings.icsErrorUrlInvalid'],
-    ['calendar_ics_url_scheme', 'settings.icsErrorUrlScheme'],
-    ['calendar_ics_private_address', 'settings.icsErrorPrivateAddress'],
-    // Seite API-Zugriff (#1909); die echte Antwort misst test:api-token-subject.
-    ['api_tokens_name_required', 'quickLinks.nameRequired'],
-    ['api_tokens_name_too_long', 'settings.apiTokenErrorNameTooLong'],
-    ['api_tokens_expiry_past', 'settings.apiTokenErrorExpiryPast'],
-    ['api_tokens_subject_unknown', 'settings.syncAssigneeUnknown'],
-  ]) {
-    assert.equal(errorSentence(answer(400, SERVER_TEXT, reason)), key, reason);
-  }
-  assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'calendar_subscription_not_found'), 'calendar_subscription_not_found'), true);
-  assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'tasks_tag_not_found'), 'tasks_tag_not_found'), true);
-  assert.equal(isGone(answer(404, SERVER_TEXT, 'members_member_not_found')), true);
-  assert.equal(isAlreadyDeleted(answer(404, SERVER_TEXT, 'displays_display_not_found'), 'displays_display_not_found'), true);
-  assert.equal(isGone(answer(404, SERVER_TEXT, 'displays_device_not_found')), true);
-  // Status und Groesse eines Feeds kommen als Zahl in den Satz, nie als Text.
-  const feed = (reason, params) => Object.assign(new Error(SERVER_TEXT), { status: 400, data: { error: SERVER_TEXT, reason, params } });
-  assert.equal(errorSentence(feed('calendar_ics_http_status', { status: 404 })), 'settings.icsErrorHttpStatus{"status":404}');
-  assert.equal(errorSentence(feed('calendar_ics_too_large', { limit_mb: 10 })), 'settings.icsErrorTooLarge{"limit_mb":10}');
-  assert.equal(errorSentence(feed('calendar_ics_http_status', { status: 'x' }), 'settings.x'), 'settings.x');
 });
 
 // DER SATZ FUER DAS, WAS KEINE SEITE SELBST FAENGT (#1909): Fehlerbildschirm

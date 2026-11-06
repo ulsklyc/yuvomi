@@ -12,7 +12,6 @@
  */
 
 import '../night-hours.js';
-import { getDisplayDeviceSettings } from './display-device-state.js';
 import { displayTimeZone } from './timezone.js';
 
 const core = globalThis.yuvomiNightHours;
@@ -23,8 +22,6 @@ export const NIGHT_TO_DEFAULT = core.DEFAULT_TO;
 
 /** Die Nachtstunden DIESES Geraets, `{ from, to }` in ganzen Stunden. */
 export function getNightHours() {
-  const display = getDisplayDeviceSettings();
-  if (display) return { from: display.night_from, to: display.night_until };
   let storage = null;
   try { storage = localStorage; } catch { storage = null; }
   return storage ? core.read(storage) : core.parse(null);

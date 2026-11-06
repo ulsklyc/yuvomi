@@ -2574,14 +2574,7 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
 
   let area = '';
   let seriesSvg = '';
-  /* DIE ENDEN DES BALKENS STEHEN UEBER DEM DIAGRAMM, NICHT IM PLOT (#2538).
-   * "Systolisch"/"Diastolisch" standen links der letzten Balkengruppe und
-   * liefen im dichten Monat ueber die Balken der Vortage; der Puls trug seinen
-   * Namen ueber dem letzten Punkt, obwohl er allein auf eigener Achse steht.
-   * Die Schrift ist fest 12px, die Geometrie skaliert - wo ein Name keine
-   * Marke trifft, weiss das Markup nicht. Eine Zeile im Abschnittskopf
-   * (`.health-chart-section__caption`) trifft nie eine. */
-  let barKey = '';
+  const labelled = metric.channels.length > 1;
 
   if (bars) {
     /* Mehrere Messungen eines Tages stehen NEBENEINANDER um ihren Tag, in der
@@ -2593,6 +2586,8 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
     const perBucket = new Map();
     for (const m of marks) perBucket.set(m.index, (perBucket.get(m.index) ?? 0) + 1);
     const seen = new Map();
+    let last = null;
+    const drawn = [];
     const pieces = marks.map((m) => {
       let px = xOf(m);
       const n = hourly ? 1 : perBucket.get(m.index);
@@ -2614,14 +2609,29 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
         // Ein Wert ohne Paar faellt auf einen Punkt zurueck.
         return `<circle class="health-chart__bp-point" cx="${x1}" cy="${y(sys ?? dia).toFixed(1)}" r="3.5" fill="${color}"><title>${esc(title)}</title></circle>`;
       }
+      last = { x: x1, top: y(Math.max(sys, dia)).toFixed(1), bottom: y(Math.min(sys, dia)).toFixed(1) };
+      drawn.push({ index: m.index, x: px, top: y(Math.max(sys, dia)), bottom: y(Math.min(sys, dia)) });
       // Stehen mehrere Balken an einem Tag, werden sie schmaler statt sich zu beruehren.
       const width = n > 1 ? Math.max(2, Math.min(6, gap / 2)) : 6;
-      return `<line class="health-chart__bp" x1="${x1}" x2="${x1}" y1="${y(Math.max(sys, dia)).toFixed(1)}" y2="${y(Math.min(sys, dia)).toFixed(1)}" stroke="${color}" stroke-width="${width.toFixed(1)}"><title>${esc(title)}</title></line>`;
+      return `<line class="health-chart__bp" x1="${x1}" x2="${x1}" y1="${last.top}" y2="${last.bottom}" stroke="${color}" stroke-width="${width.toFixed(1)}"><title>${esc(title)}</title></line>`;
     });
-    if (pieces.some((p) => p.startsWith('<line'))) {
-      barKey = `<p class="health-chart-section__caption">${esc(t('health.vitals.barKey'))}</p>`;
+    const chName = (idx) => t(metric.channelLabelKeys[idx]);
+    // Die Namen stehen am letzten Tag mit Balken, links von seiner Gruppe.
+    if (last && !hourly) {
+      const group = drawn.filter((b) => b.index === drawn[drawn.length - 1].index);
+      last = {
+        x: Math.min(...group.map((b) => b.x)).toFixed(1),
+        top: Math.min(...group.map((b) => b.top)).toFixed(1),
+        bottom: Math.max(...group.map((b) => b.bottom)).toFixed(1),
+      };
     }
-    seriesSvg = pieces.join('');
+    const labels = last
+      // Links neben den Enden des letzten Balkens, auf ihrer Hoehe: ueber oder
+      // unter ihm stiessen sie an Gitter und Plotkante.
+      ? `<text x="${last.x}" y="${last.top}" dx="-0.7em" dy="0.35em" class="chart__axis health-chart__series-label" text-anchor="end" fill="${color}">${esc(chName(0))}</text>
+         <text x="${last.x}" y="${last.bottom}" dx="-0.7em" dy="0.35em" class="chart__axis health-chart__series-label" text-anchor="end" fill="${color}">${esc(chName(1))}</text>`
+      : '';
+    seriesSvg = pieces.join('') + labels;
   } else {
     // Flächenfüllung nur bei Einzelkanal-Metriken (Gewicht, Glukose …) und
     // nicht am Tag: dort sind es einzelne Messungen, keine Verlaufsflaeche.
@@ -2636,9 +2646,10 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
       }
     }
 
-    /* Jede Kurve steht allein auf ihrer Achse (R21, D6: der Puls unter dem
-     * Blutdruck): die Ueberschrift und die Einheit an der Achse nennen sie,
-     * ein Name im Plot verdeckte nur den letzten Tag (#2538). */
+    /* DIE REIHEN SIND DIREKT BESCHRIFTET (R21, D6), nicht nur ueber die Farbe
+     * und eine Legende darunter: der Name steht ueber dem letzten Punkt seiner
+     * Kurve, in ihrer Farbe. Nur bei Messarten mit mehreren Kanaelen - eine
+     * einzelne Kurve nennt schon die Ueberschrift. */
     seriesSvg = channels.map(({ key, idx }, pos) => {
       // Die Farbe zaehlt je ACHSE (R24, G5 P3-2): der Puls steht seit R21 auf
       // eigener Achse und trug als dritter Kanal Amber - eine fremde Farbe fuer
@@ -2648,11 +2659,13 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
       const linePts = [];
       const dots = [];
       const bands = [];
+      let last = null;
       marks.forEach((m) => {
         if (m[key] === null || m[key] === undefined) return;
         const px = xOf(m).toFixed(1);
         const py = y(m[key]).toFixed(1);
         linePts.push(`${px},${py}`);
+        last = { px, py };
         /* DAS TAGESBAND (#1699): vom kleinsten zum groessten Wert des Buckets,
          * das Mittel als Punkt darauf. Bei einer einzigen Messung faellt es
          * auf den Punkt zusammen und entfaellt - das Diagramm sieht dann aus
@@ -2665,6 +2678,9 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
         const valueText = m.bucket ? bucketValueText(metric, m, key) : fmtChannelValue(metric, m[key]);
         dots.push(`<circle cx="${px}" cy="${py}" r="3.5" fill="${color}"><title>${esc(`${chName} · ${labelOf(m)}: ${valueText}`)}</title></circle>`);
       });
+      const label = labelled && last
+        ? `<text x="${last.px}" y="${last.py}" dy="-0.8em" class="chart__axis health-chart__series-label" text-anchor="end" fill="${color}">${esc(chName)}</text>`
+        : '';
       const line = linePts.length >= 2
         ? `<polyline fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"
         stroke-linecap="round" points="${linePts.join(' ')}" />`
@@ -2672,7 +2688,8 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
       return `
       ${bands.join('')}
       ${line}
-      ${dots.join('')}`;
+      ${dots.join('')}
+      ${label}`;
     }).join('');
   }
 
@@ -2694,7 +2711,7 @@ function axisChartMarkup(metric, series, geo, axis, { primary = true } = {}) {
   // Flaeche nennt ihr eigenes Verhaeltnis.
   const ratio = H === CHART.H ? '' : ` style="aspect-ratio: ${W} / ${H}"`;
 
-  return `${barKey}
+  return `
     <svg class="chart health-chart${primary ? '' : ' health-chart--secondary'}" viewBox="0 0 ${W} ${H}" role="img"${ratio}
          aria-label="${esc(caption)}">
       ${grid}

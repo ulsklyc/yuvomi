@@ -22,7 +22,6 @@ import { syncPreventionRemindersForSubject } from '../services/prevention-remind
 import { syncAllFastingReminders } from '../services/fasting-reminders.js';
 import { isScreensaverEnabled } from './screensaver.js';
 import { rekeyForHouseholdZoneChange } from '../services/calendar-occurrence-overrides.js';
-import { VISIBILITY_VALUES } from '../services/visibility.js';
 // Geteilte isomorphe Util (#620, Allowlist in test/test-layer-boundary.js):
 // dasselbe Kennungsformat, das Event-Modal und Einstellungen verwenden.
 import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
@@ -360,7 +359,6 @@ function sanitizeNoteCategoryOptions(config, visibleCategories) {
 
 function dashboardPersonalViews(userId) {
   const ownWidgets = cfgUserGet('dashboard_widgets', userId);
-  const ownPhoneWidgets = cfgUserGet('dashboard_widgets_phone', userId);
   const ownGlance = cfgUserGet('dashboard_today_glance', userId);
   const fallback = dashboardDefaults();
   // Request-local and lazy: no catalog query for absent/empty filters, and one
@@ -381,13 +379,6 @@ function dashboardPersonalViews(userId) {
     // Folge ich der Vorgabe? Nur wer NICHTS Eigenes hinterlegt hat, tut das -
     // und nur fuer den hat "zuruecksetzen" nichts zu tun.
     dashboard_follows_default: ownWidgets === null && ownGlance === null,
-    // Telefonansicht: eigene Anordnung (order + visible, keine size), sonst null
-    // (→ folgt dem Desktop). Gespeichert wie mobile_nav_order – pro Nutzer,
-    // ohne Haushaltsvorgabe. Null signalisiert "kein eigenes Telefon-Layout".
-    dashboard_widgets_phone: ownPhoneWidgets !== null
-      ? parsePhoneWidgetConfig(ownPhoneWidgets)
-      : null,
-    dashboard_follows_phone_default: ownPhoneWidgets === null,
   };
 }
 
@@ -429,19 +420,6 @@ function parseWidgetConfig(raw) {
     return normalizeWidgetConfig(parsed) ?? [];
   } catch {
     return JSON.parse(DEFAULT_WIDGET_CONFIG);
-  }
-}
-
-// Telefon-Anordnung: nur { id, visible, order }, keine size und keine options.
-// Validation ueber normalizeWidgetConfig (kennt alle gueltigen Ids, prueft Duplikate).
-function parsePhoneWidgetConfig(raw) {
-  try {
-    const parsed = JSON.parse(raw);
-    const normalized = normalizeWidgetConfig(parsed);
-    if (!normalized) return [];
-    return normalized.map(({ id, visible, order }) => ({ id, visible, order }));
-  } catch {
-    return [];
   }
 }
 
@@ -672,10 +650,6 @@ router.get('/', (req, res) => {
         tasks_subtasks_expanded: cfgGet('tasks_subtasks_expanded') === '1',
         tasks_default_points: parseTaskDefaultPoints(cfgGet('tasks_default_points')),
         countdown_grace_days: parseCountdownGraceDays(cfgGet('countdown_grace_days')),
-        // Spaetabzug bei Erledigung (Late-Completion-Decay): pro Ueberfaellig-
-        // keitstag 1 Punkt weniger, mindestens 1 - Standard aus, Haushalte
-        // schalten ihn bewusst ein.
-        tasks_late_decay_enabled: cfgGet('tasks_late_decay_enabled') === '1',
         // Standard-Erinnerungsliste fuer neue Aufgaben (per-user, #695) -
         // dieselbe Form wie calendar_default_target, damit beide Dialoge ihr
         // Ziel gleich benennen.
@@ -711,7 +685,6 @@ router.get('/', (req, res) => {
     // Budget-Betriebsart, Zyklus-Einstellungen, Sync-Ziele -, und sie steht dem
     // Display nur offen, weil die App ohne sie nicht startet. Was uebrig
     // bleibt, ist eine Allowlist in display-scopes.js.
-    if (req.authMethod === 'display') data.display_device_settings = req.displayDeviceSettings ?? null;
     res.json({ data: req.authMethod === 'display' ? pickDisplayPreferences(data) : data });
   } catch (err) {
     log.error('GET /', err);
@@ -748,7 +721,8 @@ router.put('/', (req, res) => {
   try {
     database = db.get();
     database.exec('BEGIN');
-    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_phone, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, tasks_default_visibility, tasks_default_locked, tasks_late_decay_enabled, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
+    const { visible_meal_types, meal_type_names, currency, date_format, time_format, week_start, region, timezone, timezone_hint_dismissed, language, app_name, dashboard_widgets, dashboard_today_glance, dashboard_widgets_default, dashboard_today_glance_default, disabled_modules, hidden_modules, module_order, mobile_nav_order, housekeeping_payment_tasks, budget_mode, calendar_default_duration, calendar_default_reminders, calendar_default_assign_me, calendar_default_target, health_cycle_enabled, health_cycle_enabled_user, health_prevention_notify_caregivers, rewards_require_approval, tasks_subtasks_expanded, tasks_default_points, tasks_default_target, tasks_default_visibility, tasks_default_locked, schedule_hidden_templates, countdown_grace_days, weather_provider, weather_lat, weather_lon, weather_city, weather_units, weather_auto_locate, weather_user, holiday_country, holiday_subdivision, holiday_group, holiday_show_public, holiday_show_school, holiday_public_color, holiday_school_color } = req.body;
+
     // Welche Quickstart-Vorlagen der Schichtplan-Schnellstart zeigt - wie
     // disabled_modules haushaltweit und admin-only, nicht wie hidden_modules
     // pro Nutzer: die Vorlagen legen geteilte Schichtarten an. Der Check steht
@@ -977,22 +951,6 @@ router.put('/', (req, res) => {
       }
     }
 
-    if (dashboard_widgets_phone !== undefined) {
-      if (dashboard_widgets_phone === null) {
-        cfgUserDelete('dashboard_widgets_phone', req.authUserId);
-      } else if (!Array.isArray(dashboard_widgets_phone)) {
-        return res.status(400).json({ error: 'dashboard_widgets_phone must be an array.', code: 400 });
-      } else {
-        const normalized = normalizeWidgetConfig(dashboard_widgets_phone);
-        if (normalized === null) {
-          return res.status(400).json({ error: 'dashboard_widgets_phone contains invalid entries.', code: 400 });
-        }
-        cfgUserSet('dashboard_widgets_phone', req.authUserId, JSON.stringify(
-          normalized.map(({ id, visible, order }) => ({ id, visible, order })),
-        ));
-      }
-    }
-
     if (dashboard_today_glance !== undefined) {
       if (dashboard_today_glance === null) {
         cfgUserDelete('dashboard_today_glance', req.authUserId);
@@ -1170,7 +1128,7 @@ router.put('/', (req, res) => {
 
     // Sichtbarkeit und Sperre als persoenliche Vorbelegung (#2125).
     if (tasks_default_visibility !== undefined) {
-      if (!VISIBILITY_VALUES.includes(tasks_default_visibility)) {
+      if (!['all', 'assignees', 'private'].includes(tasks_default_visibility)) {
         return res.status(400).json({ error: 'tasks_default_visibility must be "all", "assignees" or "private".', code: 400 });
       }
       cfgUserSet('tasks_default_visibility', req.authUserId, tasks_default_visibility);
@@ -1256,19 +1214,6 @@ router.put('/', (req, res) => {
         return res.status(400).json({ error: `tasks_default_points must be an integer between 0 and ${MAX_TASK_POINTS}`, code: 400 });
       }
       cfgSet('tasks_default_points', String(points));
-    }
-
-    // Spaetabzug bei Erledigung (Late-Completion-Decay): 1 Punkt weniger pro
-    // Ueberfaelligkeitstag, mindestens 1. Admin-only, Standard aus - bestehende
-    // Haushalte buchen unveraendert weiter, bis jemand es einschaltet.
-    if (tasks_late_decay_enabled !== undefined) {
-      if (!isAdminRequest(req)) {
-        return res.status(403).json({ error: 'Admin access required.', code: 403 });
-      }
-      if (typeof tasks_late_decay_enabled !== 'boolean') {
-        return res.status(400).json({ error: 'tasks_late_decay_enabled must be a boolean', code: 400 });
-      }
-      cfgSet('tasks_late_decay_enabled', tasks_late_decay_enabled ? '1' : '0');
     }
 
     // Nachfrist für abgelaufene Countdowns (#969). 0 = keine Nachfrist.
@@ -1538,10 +1483,6 @@ router.put('/', (req, res) => {
         tasks_subtasks_expanded: cfgGet('tasks_subtasks_expanded') === '1',
         tasks_default_points: parseTaskDefaultPoints(cfgGet('tasks_default_points')),
         countdown_grace_days: parseCountdownGraceDays(cfgGet('countdown_grace_days')),
-        // Spaetabzug bei Erledigung (Late-Completion-Decay): pro Ueberfaellig-
-        // keitstag 1 Punkt weniger, mindestens 1 - Standard aus, Haushalte
-        // schalten ihn bewusst ein.
-        tasks_late_decay_enabled: cfgGet('tasks_late_decay_enabled') === '1',
         // Standard-Erinnerungsliste fuer neue Aufgaben (per-user, #695) -
         // dieselbe Form wie calendar_default_target, damit beide Dialoge ihr
         // Ziel gleich benennen.

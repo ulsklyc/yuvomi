@@ -12,14 +12,11 @@
  */
 
 import { api, auth } from '/api.js';
-import { formatUnit, getLocale, t } from '/i18n.js';
-import { nightHourOptions } from '/settings/night-hour-options.js';
+import { getLocale, t } from '/i18n.js';
 import { dateTimeText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { confirmModal, refocusAfterRender, reportFieldErrors, constraintErrors } from '/components/modal.js';
 import { hintFoldHtml, settingRowHtml, settingSwitchRowHtml } from '/settings/components.js';
-import { DISPLAY_DEVICE_DEFAULTS, DISPLAY_IDLE_STEPS, normalizeDisplayDeviceSettings } from '/utils/display-device-settings.js';
-import { errorSentence, isAlreadyDeleted, isGone, loadErrorSentence } from '/utils/friendly-error.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
 function formatSeen(value) {
@@ -79,80 +76,6 @@ function renderDevice(display, device) {
     </li>`;
 }
 
-
-
-function renderDeviceSettings(display) {
-  const settings = normalizeDisplayDeviceSettings(display.device_settings) ?? DISPLAY_DEVICE_DEFAULTS;
-  const prefix = `display-options-${display.id}`;
-  return `<form class="settings-form" id="${prefix}-form" data-display-device-settings="${display.id}" data-name="${esc(display.display_name)}" novalidate>
-    <p class="form-hint">${esc(t('settings.displayDeviceSettingsHint'))}</p>
-    ${!display.device_settings ? `<p class="form-hint" data-display-local-hint>${esc(t('settings.displayDeviceSettingsLocal'))}</p>` : ''}
-    <div class="row-divided settings-group">
-      ${settingRowHtml({ label:t('settings.nightHoursLabel'), labelId:`${prefix}-night-label`,
-        control:`<span class="form-composite" role="group" aria-labelledby="${prefix}-night-label">
-          <select class="form-input" name="night_from" aria-label="${esc(t('settings.nightHoursFrom'))}">${nightHourOptions(settings.night_from, settings.night_until)}</select>
-          <span class="form-composite__sep" aria-hidden="true">-</span>
-          <select class="form-input" name="night_until" aria-label="${esc(t('settings.nightHoursUntil'))}">${nightHourOptions(settings.night_until, settings.night_from)}</select>
-        </span>` })}
-      ${settingRowHtml({ label:t('settings.screensaverIdleLabel'), labelFor:`${prefix}-idle`,
-        control:`<select class="form-input" id="${prefix}-idle" name="idle_seconds">${DISPLAY_IDLE_STEPS.map(seconds => `<option value="${seconds}"${seconds === settings.idle_seconds ? ' selected' : ''}>${esc(formatUnit(seconds / 60, 'minute', { unitDisplay:'long' }))}</option>`).join('')}</select>` })}
-      ${settingSwitchRowHtml({ label:t('settings.screensaverClockLabel'), checked:settings.show_clock,
-        attrs:{id:`${prefix}-clock`, name:'show_clock'} })}
-      ${settingSwitchRowHtml({ label:t('settings.screensaverCoverLabel'), checked:settings.cover_photo,
-        attrs:{id:`${prefix}-cover`, name:'cover_photo'} })}
-    </div>
-    <p class="form-hint" role="status" aria-live="polite" data-display-settings-status></p>
-    <div class="settings-form-actions"><button class="btn btn--primary" type="submit">${esc(t('common.save'))}</button></div>
-  </form>`;
-}
-
-/** The two night boundaries cannot select the same hour. */
-function syncNightOptions(form) {
-  const from = form.querySelector('[name="night_from"]');
-  const until = form.querySelector('[name="night_until"]');
-  if (!from || !until) return;
-  for (const [select, other] of [[from, until], [until, from]]) {
-    for (const option of select.options) option.disabled = option.value === other.value;
-  }
-}
-
-/**
- * `onGone`: ein zweiter Admin hat das Tablett inzwischen geloescht (#1909).
- * Die Seite laedt dann die Liste nach, statt eine Karte stehen zu lassen, die
- * es nicht mehr gibt.
- */
-export function bindDisplayDeviceSettings(list, { onGone } = {}) {
-  list.addEventListener('submit', async event => {
-    const form = event.target.closest?.('[data-display-device-settings]');
-    if (!form) return;
-    event.preventDefault();
-    if (form.dataset.saving === 'true' || reportFieldErrors(constraintErrors(form))) return;
-    const field = name => form.querySelector(`[name="${name}"]`);
-    const settings = normalizeDisplayDeviceSettings({
-      night_from:Number(field('night_from').value), night_until:Number(field('night_until').value),
-      idle_seconds:Number(field('idle_seconds').value), show_clock:field('show_clock').checked, cover_photo:field('cover_photo').checked,
-    });
-    const status = form.querySelector('[data-display-settings-status]');
-    if (!settings) { status.textContent = t('common.invalidInput'); return; }
-    const controls = form.querySelectorAll('input, select, button');
-    form.dataset.saving = 'true';
-    for (const control of controls) control.disabled = true;
-    status.textContent = '';
-    try {
-      await api.patch(`/displays/${form.dataset.displayDeviceSettings}`, {device_settings:settings});
-      form.querySelector('[data-display-local-hint]')?.remove();
-      status.textContent = t('common.savedNamed', {name:form.dataset.name});
-    } catch (error) {
-      status.textContent = errorSentence(error);
-      if (isGone(error)) onGone?.(error);
-    }
-    finally {
-      form.dataset.saving = 'false';
-      for (const control of controls) control.disabled = false;
-    }
-  });
-}
-
 // Exported so test:display-screensaver-switch can read the real card.
 export function renderDisplay(display) {
   const active = (display.devices || []).filter((d) => !d.revoked_at);
@@ -188,7 +111,6 @@ export function renderDisplay(display) {
         },
       })}
       </div>
-      ${renderDeviceSettings(display)}
       <div class="settings-token-output" data-display-code="${display.id}" hidden>
         <p class="form-label">${esc(t('settings.displayPairingCodeLabel'))}</p>
         <p class="settings-token-output__row"><code data-display-code-value="${display.id}"></code></p>
@@ -321,10 +243,8 @@ const pairTickets = new Map();
  * nicht hat. Exported so test:display-screensaver-switch can drive the real
  * handler.
  */
-export function bindDisplayScreensaverSwitches(list, errorEl, { onGone } = {}) {
+export function bindDisplayScreensaverSwitches(list, errorEl) {
   list.addEventListener('change', async (event) => {
-    const form = event.target.closest?.('[data-display-device-settings]');
-    if (form) { syncNightOptions(form); return; }
     const toggle = event.target.closest?.('[data-display-screensaver]');
     if (!toggle) return;
     clearError(errorEl);
@@ -338,8 +258,7 @@ export function bindDisplayScreensaverSwitches(list, errorEl, { onGone } = {}) {
       );
     } catch (err) {
       toggle.checked = !on;
-      showError(errorEl, errorSentence(err));
-      if (isGone(err)) onGone?.(err);
+      showError(errorEl, err.message);
     } finally {
       toggle.disabled = false;
     }
@@ -351,17 +270,6 @@ function bindEvents(container) {
   const list = container.querySelector('#display-list');
   const errorEl = container.querySelector('#display-error');
   if (!form || !list) return;
-
-  // EIN ZWEITER ADMIN WAR SCHNELLER (#1909): das Tablett oder sein Geraet gibt
-  // es nicht mehr. Der Satz steht schon (errorSentence), die Liste zeigt danach
-  // den Stand des Servers - der Satz selbst raet deshalb nicht zum Neuladen.
-  const reloadGone = async () => {
-    try {
-      await reload(container);
-    } catch (err) {
-      showError(errorEl, loadErrorSentence(err));
-    }
-  };
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -387,14 +295,13 @@ function bindEvents(container) {
       input.value = '';
       await reloadAfterSave(() => reload(container));
     } catch (err) {
-      showError(errorEl, errorSentence(err));
+      showError(errorEl, err.message);
     } finally {
       btn.disabled = false;
     }
   });
 
-  bindDisplayScreensaverSwitches(list, errorEl, { onGone: reloadGone });
-  bindDisplayDeviceSettings(list, { onGone: (err) => { showError(errorEl, errorSentence(err)); reloadGone(); } });
+  bindDisplayScreensaverSwitches(list, errorEl);
 
   list.addEventListener('click', async (event) => {
     const pair = event.target.closest('[data-display-pair]');
@@ -421,10 +328,7 @@ function bindEvents(container) {
           box.hidden = false;
         }
       } catch (err) {
-        if (pairTickets.get(id) === ticket) {
-          showError(errorEl, errorSentence(err));
-          if (isGone(err)) reloadGone();
-        }
+        if (pairTickets.get(id) === ticket) showError(errorEl, err.message);
       } finally {
         // Die Liste wird hier nicht neu gezeichnet, der Knopf von eben ist also
         // noch derselbe - `isConnected` faengt den Fall trotzdem ab, falls ein
@@ -453,8 +357,7 @@ function bindEvents(container) {
         // Dokumentanfang statt an der Stelle, an der gerade gearbeitet wurde.
         refocusAfterRender();
       } catch (err) {
-        showError(errorEl, errorSentence(err));
-        if (isGone(err)) reloadGone();
+        showError(errorEl, err.message);
       }
       return;
     }
@@ -480,14 +383,14 @@ function bindEvents(container) {
         if (err?.status !== 404) {
           showError(errorEl, err?.status === 409 && err.data?.reason === 'display_device_active'
             ? t('settings.displayRemoveDeviceActive')
-            : errorSentence(err));
+            : err.message);
         }
       }
       try {
         await reload(container);
         refocusAfterRender();
       } catch (err) {
-        showError(errorEl, loadErrorSentence(err));
+        showError(errorEl, err.message);
       }
       return;
     }
@@ -509,15 +412,7 @@ function bindEvents(container) {
         await reload(container);
         refocusAfterRender();
       } catch (err) {
-        // Ein zweiter Admin hat es schon geloescht (#1909): erledigt, was
-        // gewollt war - kein Fehler, nur die Liste auf den Stand bringen.
-        if (isAlreadyDeleted(err, 'displays_display_not_found')) {
-          await auth.me().catch(() => {});
-          await reloadGone();
-          refocusAfterRender();
-          return;
-        }
-        showError(errorEl, errorSentence(err));
+        showError(errorEl, err.message);
       }
     }
   });

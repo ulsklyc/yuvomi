@@ -32,7 +32,7 @@ import { USER_COLOR_DEFAULT } from '/utils/color.js';
 import { assigneeIdsOf, buildAssigneeMenu } from '/settings/assignee-menu.js';
 import { formRowHtml, formRowsHtml } from '/utils/form-row.js';
 import { rowActionEl } from '/utils/row-action.js';
-import { loadErrorSentence, errorSentence, isAlreadyDeleted } from '/utils/friendly-error.js';
+import { loadErrorSentence } from '/utils/friendly-error.js';
 
 function formatSyncTime(value) {
   if (!value) return null;
@@ -231,7 +231,7 @@ function buildIcsActions(container, sub, subs, user) {
       renderIcsList(container, subs, user);
       showToast(t('settings.ics.syncedToast'), 'success');
     } catch (err) {
-      showToast(errorSentence(err), 'danger');
+      showToast(err.message || t('common.errorGeneric'), 'danger');
       syncBtn.disabled = false;
     }
   });
@@ -252,17 +252,14 @@ function buildIcsActions(container, sub, subs, user) {
       detail: t('settings.ics.confirm_delete_detail'),
     })) return;
     try {
-      // Schon weg (ein anderer Admin, ein anderes Geraet): das Ziel ist erreicht.
-      await api.delete(`/calendar/subscriptions/${sub.id}`).catch((err) => {
-        if (!isAlreadyDeleted(err, 'calendar_subscription_not_found')) throw err;
-      });
+      await api.delete(`/calendar/subscriptions/${sub.id}`);
       const idx = subs.findIndex((s) => s.id === sub.id);
       if (idx >= 0) subs.splice(idx, 1);
       renderIcsList(container, subs, user);
       refocusAfterRender();
       showToast(t('settings.ics.deletedToast'), 'default');
     } catch (err) {
-      showToast(errorSentence(err), 'danger');
+      showToast(err.message || t('common.errorGeneric'), 'danger');
     }
   });
   actions.appendChild(delBtn);
@@ -336,7 +333,7 @@ function openIcsEditModal(container, sub, subs, user) {
           showToast(t('settings.ics.updatedToast'), 'success');
           closeModal({ force: true, context: modalContext });
         } catch (err) {
-          errEl.textContent = errorSentence(err);
+          errEl.textContent = err.message || t('common.errorGeneric');
           errEl.hidden = false;
           submitBtn.disabled = false;
         }
@@ -398,9 +395,7 @@ function bindIcsEvents(container, subs, user) {
         showToast(t('settings.ics.addedToast'), 'success');
       }
     } catch (err) {
-      // Der Fall des Servers (#1909): Name, Adresse, privates Netz, ein Feed,
-      // der nicht ausgeliefert hat.
-      errorEl.textContent = errorSentence(err);
+      errorEl.textContent = err.message || t('common.errorGeneric');
       errorEl.hidden = false;
     } finally {
       submitBtn.disabled = false;
@@ -533,9 +528,9 @@ function bindCalendarImport(container, calendars = []) {
         }
       }
       // Ein Serverfehler beim Anlegen des Kalenders oder beim Import sagt den
-      // Satz der App (#1695), nie den des Servers; die 400 des Imports nennen
-      // ihre Ursache als Fall (#1909).
-      errorEl.textContent = (err?.status >= 500 && loadErrorSentence(err)) || errorSentence(err);
+      // Satz der App (#1695), nie den des Servers. Die 400 des Imports nennen
+      // weiter ihre Ursache, bis dessen Scheibe kommt.
+      errorEl.textContent = (err?.status >= 500 && loadErrorSentence(err)) || err.message || t('common.errorGeneric');
       errorEl.hidden = false;
     } finally {
       submitBtn.disabled = false;

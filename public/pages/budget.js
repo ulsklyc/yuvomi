@@ -337,7 +337,6 @@ let _user = null;
 let _tablist = null;   // wireTablist-Handle: erlaubt programmatische Tab-Wechsel (sync)
 let _scopeTablist = null;
 let _asideFit = null;  // ResizeObserver der Uebersicht-Seitenleiste (watchAsideFit)
-let _headFit = null;   // ResizeObserver des Kopfs: Stepper in eigener Zeile (watchHeadFit)
 
 // Fähigkeiten je Untertab — EINE Quelle für Monatsnavigation, Toolbar-„+" und FAB.
 // Vorher lagen diese drei Entscheidungen in getrennten Ausschluss-Listen, was sich
@@ -1062,7 +1061,6 @@ export async function render(container, { user }) {
   `);
 
   if (window.lucide) lucide.createIcons({ el: container });
-  watchHeadFit(container.querySelector('.budget-nav'));
   // `#budget-body` bleibt ueber jeden renderBody() hinweg dasselbe Element -
   // nur seine Kinder werden ersetzt -, also genuegt EIN Riegel pro Seitenaufbau.
   container.querySelector('#budget-body')?.addEventListener('click', readOnlyLatch, true);
@@ -1316,57 +1314,6 @@ function watchAsideFit(panel) {
   _asideFit = new ResizeObserver(check);
   _asideFit.observe(panel);
   _asideFit.observe(aside);
-}
-
-// --------------------------------------------------------
-// Kopf: der Stepper weicht, wenn der Titel neben ihm nicht ganz steht
-// --------------------------------------------------------
-
-const HEAD_OWN_ROW = 'budget-nav--period-own-row';
-
-/* DER STEPPER BEKOMMT EINE EIGENE ZEILE, WENN DER TITEL SIE BRAUCHT (#2443).
- * Neben dem 192px-Stepper bleiben dem Large Title Breite minus 264px. #2440
- * legte den Stepper nur unter 390px darunter, und ab 390px stand der Titel in
- * elf Sprachen gekuerzt (es "Presupuesto" 195px in 126px bei 390, in 166px
- * bei 430). Der Titel bleibt gross (DESIGN.md, Kopfregel mobil), also misst
- * der Kopf jetzt den Titel selbst, in jeder Breite und Sprache.
- *
- * GEMESSEN WIRD DIE EINE ZEILE, NICHT DER GERADE GEZEIGTE ZUSTAND (Hysterese):
- * die Klasse geht fuer die Messung kurz ab, der Titel steht dann so, wie er
- * neben dem Stepper stuende, und `scrollWidth > clientWidth` heisst gekuerzt.
- * In der eigenen Zeile passt jeder Titel - wer dort misst, schaltet sofort
- * zurueck und flackert. Beides geschieht im selben Rueckruf vor dem Bild, die
- * Zwischenstellung wird nie gemalt.
- *
- * EINGEKLAPPT WIRD NICHT GEMESSEN (R19): der Titel ist dann aus dem Bild, die
- * Regel in budget.css gilt nur `:not(.is-collapsed)`, und die Klasse haelt den
- * Stand von oben. Beobachtet werden der Kopf (Breite, Einklappen) und der Slot
- * des Zeitraums: auf der Aufteilung traegt er nichts, und der Reiterwechsel
- * aendert seine Breite, nicht die des Kopfs. Der Monatswechsel aendert keine
- * der beiden - das Label hat eine feste Breite (budget.css, R16). */
-function syncHeadFit(nav) {
-  if (!nav?.isConnected || nav.classList.contains('is-collapsed')) return;
-  const title = nav.querySelector(':scope > .page-toolbar__title');
-  if (!title) return;
-  const had = nav.classList.contains(HEAD_OWN_ROW);
-  nav.classList.remove(HEAD_OWN_ROW);
-  // Ein verborgener Kopf (0px) sagt nichts; er meldet sich, sobald er steht.
-  const cut = title.clientWidth > 0 ? title.scrollWidth > title.clientWidth : had;
-  nav.classList.toggle(HEAD_OWN_ROW, cut);
-}
-
-function watchHeadFit(nav) {
-  _headFit?.disconnect();
-  _headFit = null;
-  syncHeadFit(nav);
-  if (!nav || typeof ResizeObserver === 'undefined') return;
-  _headFit = new ResizeObserver(() => {
-    if (!nav.isConnected) { _headFit?.disconnect(); _headFit = null; return; }
-    syncHeadFit(nav);
-  });
-  _headFit.observe(nav);
-  const slot = nav.querySelector(':scope > .budget-nav__month');
-  if (slot) _headFit.observe(slot);
 }
 
 // --------------------------------------------------------
@@ -6595,8 +6542,6 @@ async function deleteEntrySeries(id) {
 // statt Quelltext-Regex.
 export const __test = {
   entryFormErrors,
-  // #2443: der Stepper weicht, wenn der Titel neben ihm nicht ganz steht.
-  syncHeadFit,
   // R24 S10-F3: der Tipp auf ein Konto oeffnet sein Leseblatt (test-budget-readonly-ui.js).
   openAccountReadView,
   // R24 E1: der Tipp auf eine Buchung oeffnet das Leseblatt (test-budget-readonly-ui.js).

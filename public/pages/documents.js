@@ -35,7 +35,7 @@ import { mountEmptyState, mountSearchEmpty } from '/utils/empty-state.js';
 import { subtreeIds, folderPath, flattenFolderTree } from '/utils/folder-tree.js';
 import { dateStatus } from '/utils/date-status.js';
 import { documentExpiryStatus, expiryChipSpec, expiryViewerSpec } from '/utils/document-expiry.js';
-import { foldSearchItem, installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
+import { installPopoverMenus, popoverMenuHtml } from '/utils/popover-menu.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
 import { createPageController } from '/utils/page-lifecycle.js';
 import {
@@ -391,13 +391,13 @@ export async function render(container, context = {}) {
   }
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
-    <div class="documents-page app-page app-page--full app-page--fold-head" data-composition="full">
+    <div class="documents-page app-page app-page--full" data-composition="full">
       ${/* SPRUNGMARKE (Re-Critique 2026-09-25, Sam): 33 Tab-Stopps bis zum
            ersten Dokument, 16 davon in der Ordnerliste. Dasselbe Muster wie
            "Zum Inhalt springen" der Shell (router.js): `.sr-only`, sichtbar
            nur bei Tastaturfokus (layout.css, .sr-only:focus-visible). */ ''}
       <a class="sr-only documents-skip" href="#documents-list" data-documents-skip>${t('documents.skipToDocuments')}</a>
-      <div class="page-toolbar page-toolbar--wrap page-toolbar--title-tools page-toolbar--fold-search documents-toolbar">
+      <div class="page-toolbar page-toolbar--wrap page-toolbar--title-tools documents-toolbar">
         <h1 class="page-toolbar__title">${t('documents.title')}</h1>
         ${renderPageSearch({ id: 'documents-search', label: t('documents.searchPlaceholder'), placeholder: t('documents.searchPlaceholder'), value: state.query, clearLabel: t('common.searchClear'), className: 'documents-toolbar__search page-toolbar__center' })}
         <div class="page-toolbar__actions">
@@ -777,14 +777,6 @@ function documentsToolsMenuHtml() {
       <i data-lucide="ellipsis" class="icon-md" aria-hidden="true"></i>
     </button>
     <div class="popover-menu documents-tools-menu" id="documents-tools-menu" popover role="menu" aria-label="${esc(label)}">
-      ${/* DIE LUPE UNTER 390px (#2443): dieses Menue ist von Hand gebaut, der
-           Eintrag kommt trotzdem aus dem Baustein. */ ''}
-      ${(() => {
-        const fold = foldSearchItem({ input: 'documents-search', label: t('documents.searchPlaceholder') });
-        return `<button type="button" role="menuitem" class="popover-menu__item" data-action="${fold.action}" data-fold-search="${fold.attrs['data-fold-search']}">
-          <i data-lucide="${fold.icon}" class="icon-md" aria-hidden="true"></i><span>${esc(fold.label)}</span>
-        </button>`;
-      })()}
       ${/* ANSICHT IM MENUE, NUR UNTER 768px (R16, Kopfregel mobil 1a). Der
            Ansichts-Umschalter ist ein Segment und hielt damit eine eigene
            Werkzeugzeile; als Einfachauswahl im Menue (wie die Ansichtswahl

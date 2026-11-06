@@ -1,7 +1,7 @@
 # Digest des Multi-Arch-Index von node:24.22.1-slim (bookworm), Stand 26.10.2026.
 # Ein Tag allein ist eine Behauptung, der Digest ist das Image, das gebaut wurde;
 # Dependabot (docker) hebt ihn mit dem Tag. Beide FROM-Zeilen tragen denselben.
-FROM node:24-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS build
+FROM node:24-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS build
 
 # Toolchain als Notnagel für native Module. Seit v13 ist
 # better-sqlite3-multiple-ciphers auf Node-API gebaut und liefert die Binaries
@@ -31,7 +31,7 @@ COPY scripts/check-runtime-deps.mjs ./scripts/
 RUN node scripts/check-runtime-deps.mjs
 
 # ---- Runtime stage ----
-FROM node:24-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c
+FROM node:24-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205
 
 # Der Entrypoint wechselt mit setpriv (util-linux, im Basis-Image enthalten) zum
 # node-User. Kein eigenes Paket mehr wie früher gosu - aber falls ein neues

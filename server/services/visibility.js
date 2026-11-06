@@ -186,6 +186,8 @@ export const HOUSEHOLD_AUDIENCE_SHOWS = Object.freeze({
   wastePickups: true,
   pantryExpiring: Object.freeze(['todayItems', 'todayCount']),
   housekeeping: Object.freeze(['present', 'presentSince', 'workerName']),
+  // Verfuegbarkeitsstatus aller Haushaltsmitglieder (#1591).
+  familyStatuses: true,
 });
 
 /** Traegt die Haushaltsfassung diesen Schluessel der Antwort (ganz oder in Feldern)? */

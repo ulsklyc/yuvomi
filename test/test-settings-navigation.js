@@ -402,10 +402,8 @@ test('Gravatar: jeder Grund, den die Route nennen kann, hat seinen Satz, 429 lie
     assert.equal(typeof getTranslation(de, key), 'string', key);
   }
   assert.equal(gravatarErrorText({ status: 429, data: { error: 'Too many requests' } }), 'settings.gravatarErrorRateLimited');
-  // Ein unbekannter Fall sagt den allgemeinen Satz, nie den Servertext (#1909).
-  assert.equal(gravatarErrorText({ status: 500, data: { reason: 'something_new' }, message: 'Server text' }), 'common.errorGeneric');
-  assert.equal(gravatarErrorText(new Error('offline')), 'common.errorGeneric');
-  assert.equal(gravatarErrorText({ status: 0, message: 'Failed to fetch' }), 'common.errorOfflineMutation');
+  assert.equal(gravatarErrorText({ status: 500, data: { reason: 'something_new' }, message: 'Server text' }), 'Server text');
+  assert.equal(gravatarErrorText(new Error('offline')), 'offline');
   // Mit dem Host des gewaehlten Dienstes reist er als Parameter in den Satz.
   assert.equal(
     gravatarErrorText({ status: 502, data: { reason: 'gravatar_unreachable' } }, 'seccdn.libravatar.org'),
@@ -1220,7 +1218,6 @@ test('Feiertage: die Ebenen-Schalter speichern sofort, ein Fehler legt zurueck (
  * als Programm gemessen), und das Formular steht hier mit Grund. Ein neues
  * Formular mit Schalter muss sich fuer eine der beiden Antworten entscheiden. */
 const GUARDED_SWITCH_FORMS = new Map([
-  ['admin-displays.js#${prefix}-form', 'Complete per-tablet configuration: the first save replaces otherwise unknown local options; shared leaf dirty guard protects the pending form'],
   ['admin-api.js#api-token-form', 'Anlegen: der Schalter ist ein Merkmal des neuen Tokens'],
   ['admin-backup.js#backup-webdav-form', 'Aktivieren ohne Adresse und Zugang waere ein Sicherungsauftrag ins Leere'],
   ['admin-family.js#add-member-form', 'Anlegen eines Mitglieds'],
@@ -2737,24 +2734,20 @@ function fakeDocument() {
       focus() {},
     };
   };
-  return { createElement, documentElement: { classList: { toggle() {}, remove() {} } } };
+  return { createElement };
 }
 
 const walkNodes = (nodes) => nodes.flatMap((node) => [node, ...walkNodes(node.children ?? [])]);
 
-async function withTasksDefaults({ preferences = {}, syncTargets, householdSize = 2, otherReaders = [] }, run) {
+async function withTasksDefaults({ preferences = {}, syncTargets }, run) {
   const { render } = await import('/settings/pages/personal-tasks.js');
   const { resetPreferencesCache } = await import('/settings/preferences-cache.js');
-  const { setHouseholdSize, setOtherReaders, clearHouseholdSize } = await import('/utils/household.js');
   const prev = { window: globalThis.window, document: globalThis.document, error: console.error };
   const navigations = [];
   const puts = [];
   const toasts = [];
   globalThis.window = { yuvomi: { showToast: (...args) => toasts.push(args), navigate: (href) => navigations.push(href) } };
   globalThis.document = fakeDocument();
-  clearHouseholdSize();
-  setHouseholdSize(householdSize);
-  setOtherReaders(otherReaders);
   console.error = () => {};
   const state = { syncTargets };
   globalThis.__apiStub = {
@@ -2772,7 +2765,6 @@ async function withTasksDefaults({ preferences = {}, syncTargets, householdSize 
   try {
     await run({ render, state, navigations, puts, toasts });
   } finally {
-    clearHouseholdSize();
     delete globalThis.__apiStub;
     globalThis.window = prev.window;
     globalThis.document = prev.document;
@@ -2845,7 +2837,7 @@ test('Standard-Erinnerungsliste: eine gescheiterte Abfrage ist ein Fehler mit Au
   });
 });
 
-test('task defaults show saved visibility and lock when other members exist (#2125, #2366)', async () => {
+test('Aufgaben-Standardwerte: Sichtbarkeit und Sperre erscheinen immer, gespeicherter Wert wird vorbelegt (#2125)', async () => {
   await withTasksDefaults({
     preferences: { tasks_default_visibility: 'assignees', tasks_default_locked: true },
     syncTargets: [],
@@ -2856,46 +2848,6 @@ test('task defaults show saved visibility and lock when other members exist (#21
     assert.match(host.html, /id="tasks-default-locked"/, 'Sperrfeld fehlt');
     assert.match(host.html, /value="assignees" selected/, 'gespeicherter Wert "assignees" ist nicht vorbelegt');
     assert.match(host.html, / checked/, 'gespeicherter Wert "locked" ist nicht angehakt');
-  });
-});
-
-test('solo task defaults hide privacy controls and keep saved values when changing the reminder list (#2366)', async () => {
-  await withTasksDefaults({
-    preferences: { tasks_default_visibility: 'private', tasks_default_locked: true },
-    syncTargets: [LIST], householdSize: 1,
-  }, async ({ render, puts }) => {
-    const host = tasksDefaultsSheet();
-    await render(host, { user: { role: 'member' } });
-    assert.doesNotMatch(host.html, /id="tasks-default-(?:visibility|locked)"/);
-    const target = host.querySelector('#tasks-default-target');
-    assert.ok(target, 'reminder list remains available');
-    target.value = `caldav:${LIST.accountId}|${LIST.listUrl}`;
-    await target.fire('change');
-    assert.deepEqual(puts, [['/preferences', { tasks_default_target: target.value }]], 'hidden defaults are never reset');
-
-    const { setHouseholdSize } = await import('/utils/household.js');
-    setHouseholdSize(2);
-    await render(host, { user: { role: 'member' } });
-    assert.match(host.html, /value="private" selected/, 'saved visibility returns with another member');
-    assert.match(host.html, /id="tasks-default-locked"[^>]*checked/, 'saved lock returns with another member');
-  });
-});
-
-test('solo task defaults keep privacy controls when another account can read tasks (#2366)', async () => {
-  await withTasksDefaults({ syncTargets: [], householdSize: 1, otherReaders: ['tasks'] }, async ({ render }) => {
-    const host = tasksDefaultsSheet();
-    await render(host);
-    assert.match(host.html, /id="tasks-default-visibility"/);
-    assert.match(host.html, /id="tasks-default-locked"/);
-  });
-});
-
-test('task defaults keep privacy controls when household size is unknown (#2366)', async () => {
-  await withTasksDefaults({ syncTargets: [], householdSize: null }, async ({ render }) => {
-    const host = tasksDefaultsSheet();
-    await render(host);
-    assert.match(host.html, /id="tasks-default-visibility"/);
-    assert.match(host.html, /id="tasks-default-locked"/);
   });
 });
 

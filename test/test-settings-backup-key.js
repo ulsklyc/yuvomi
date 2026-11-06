@@ -66,10 +66,6 @@ test('jeder Grund, den der Server kennt, hat im Dialog eine Regel', () => {
   const known = {
     backup_key_required: 'show', backup_key_wrong: 'show', backup_key_invalid: 'show',
     backup_damaged: 'keep', backup_unreadable: 'keep', backup_corrupt: 'keep', restore_in_progress: 'keep', restore_busy: 'keep', own_key_missing: 'reset',
-    // #1909: die Datei ist das Problem, nicht der Schluessel - wie vorher ohne
-    // Grund setzt das Feld zurueck.
-    backup_file_empty: 'reset', backup_not_yuvomi: 'reset', backup_newer_version: 'reset',
-    backup_file_too_large: 'reset',
   };
   assert.deepEqual([...reasons].sort(), Object.keys(known).sort(), 'Gruende im Server');
   for (const [reason, action] of Object.entries(known)) assert.equal(keyFieldAfterError(reason), action, reason);
@@ -235,23 +231,9 @@ test('Fehlertext: jeder bekannte Grund hat einen eigenen Key, ein unbekannter de
     backup_corrupt: ['settings.backupRestoreErrorCorrupt'],
     restore_in_progress: ['settings.backupRestoreErrorInProgress'],
     restore_busy: ['settings.backupRestoreErrorBusy'],
-    // #1909: bisher nur als englischer Text des Servers.
-    backup_file_empty: ['settings.backupRestoreErrorFileEmpty'],
-    backup_not_yuvomi: ['settings.backupRestoreErrorNotYuvomi'],
-    backup_newer_version: ['settings.backupRestoreErrorNewerVersion'],
-    // #2564 (Codex): 413 trug keinen Grund, errorSentence kennt 413 nicht -
-    // ohne ihn stuende der allgemeine Satz da, und die Grenze nirgends.
-    // Der Stub von t() haengt die Werte an: die Grenze kommt im Satz an.
-    backup_file_too_large: ['settings.backupRestoreErrorTooLarge{"limit":"4mb"}'],
   };
   for (const [reason, keys] of Object.entries(expected)) {
-    assert.equal(restoreErrorText({ message: LONG_ENGLISH, data: { reason, params: { limit: '4mb' } } }), keys.join(' '), reason);
-  }
-  // Die Grenze ist Text aus der Env, also nur eine Groessenangabe durchlassen;
-  // fehlt sie oder ist sie etwas anderes, lieber der allgemeine Satz.
-  for (const params of [undefined, {}, { limit: '<img src=x>' }, { limit: 42 }]) {
-    assert.equal(restoreErrorText({ data: { reason: 'backup_file_too_large', params } }),
-      'settings.backupRestoreErrorGeneric', JSON.stringify(params));
+    assert.equal(restoreErrorText({ message: LONG_ENGLISH, data: { reason } }), keys.join(' '), reason);
   }
   // Jeder Grund aus dem Server steht in der Tabelle - dieselbe Quelle wie oben.
   const db = readFileSync(new URL('../server/db.js', import.meta.url), 'utf8');
@@ -261,20 +243,16 @@ test('Fehlertext: jeder bekannte Grund hat einen eigenen Key, ein unbekannter de
   for (const reason of ['irgendwas_neues', 'toString', '__proto__']) {
     assert.equal(restoreErrorText({ message: LONG_ENGLISH, data: { reason } }), 'settings.backupRestoreErrorGeneric', reason);
   }
-  // Ohne Grund nie der englische Text des Servers (#1909): jeder Fall, den die
-  // Seite unterscheidet, hat einen Grund; der Rest steht im Server-Log.
-  assert.equal(restoreErrorText({ message: 'Update Yuvomi first, then restore.', data: { error: 'Update Yuvomi first, then restore.' } }),
-    'settings.backupRestoreErrorGeneric');
-  assert.equal(restoreErrorText(undefined), 'settings.backupRestoreErrorGeneric');
+  // Ohne Grund traegt nur der Text die Auskunft (etwa ein neueres Schema).
+  assert.equal(restoreErrorText({ message: 'Update Yuvomi first, then restore.' }), 'Update Yuvomi first, then restore.');
+  assert.equal(restoreErrorText(undefined), 'common.errorGeneric');
   // Und jeden Key gibt es in jeder Sprache.
   const locales = new URL('../public/locales/', import.meta.url);
   for (const file of readdirSync(locales).filter((name) => name.endsWith('.json'))) {
     const settings = JSON.parse(readFileSync(new URL(file, locales), 'utf8')).settings;
     for (const key of [...Object.values(expected).flat(), 'settings.backupRestoreErrorGeneric']) {
-      // Werte, die der Stub angehaengt hat, gehoeren nicht zum Key.
-      assert.equal(typeof settings[key.replace('settings.', '').replace(/\{.*\}$/, '')], 'string', `${file}: ${key}`);
+      assert.equal(typeof settings[key.replace('settings.', '')], 'string', `${file}: ${key}`);
     }
-    assert.match(settings.backupRestoreErrorTooLarge, /\{\{limit\}\}/, `${file}: die Grenze steht im Satz`);
   }
 });
 
@@ -423,107 +401,11 @@ test('Sperre: waehrend des Requests loest ein zweiter Klick keinen zweiten Resto
 
 test('WebDAV: password_required wird uebersetzt, andere Fehler behalten den Servertext', async () => {
   // Neuer Server oder Benutzer ohne neues Passwort (server/routes/backup.js):
-  // die englische Entwicklernotiz des Servers darf nicht im Formular landen,
-  // und jeder andere Text des Servers auch nicht (#1909).
+  // die englische Entwicklernotiz des Servers darf nicht im Formular landen.
   const { webdavErrorMessage } = await import('../public/settings/pages/admin-backup.js');
   assert.equal(
     webdavErrorMessage({ message: 'A new server or username needs the password again.', data: { errorCode: 'password_required' } }),
     'settings.backupWebdavPasswordRequired',
   );
-  assert.equal(webdavErrorMessage({ message: 'Authentication failed (401).', data: { code: 400 } }), 'common.errorGeneric');
-  assert.equal(webdavErrorMessage({ message: 'url must start with http:// or https://.', data: { errorCode: 'url_invalid' } }), 'settings.backupWebdavUrlInvalid');
-});
-
-// --------------------------------------------------------
-// Karte "Datenbankschluessel" (renderDatabaseKeyCard)
-// --------------------------------------------------------
-//
-// Der Wert steht nur nach dem Klick im DOM und nach "Ausblenden" nicht mehr;
-// einen Knopf gibt es nur fuer den Schluessel, den Yuvomi selbst erzeugt hat.
-// Attrappen wie oben, dazu genug Element-API fuer den Ausgabeblock.
-
-class FakeNode extends FakeEl {
-  constructor(doc, tag) {
-    super(doc, null);
-    this.tag = tag;
-    this.children = [];
-    this.dataset = {};
-  }
-  append(...nodes) { this.children.push(...nodes); }
-  replaceChildren(...nodes) { this.children = [...nodes]; }
-  select() {}
-}
-
-function keyCard() {
-  const doc = { activeElement: null };
-  doc.createElement = (tag) => new FakeNode(doc, tag);
-  doc.createDocumentFragment = () => new FakeNode(doc, '#fragment');
-  doc.createTextNode = (text) => ({ textContent: text });
-  const els = {};
-  for (const id of ['backup-db-key-card', 'backup-db-key-hint', 'backup-db-key-actions', 'backup-db-key-output', 'backup-db-key-toggle']) {
-    els[id] = new FakeNode(doc, 'div');
-  }
-  els['backup-db-key-card'].hidden = true;
-  els['backup-db-key-actions'].hidden = true;
-  els['backup-db-key-output'].hidden = true;
-  els['backup-db-key-toggle'].setAttribute('aria-expanded', 'false');
-  const query = (sel) => els[sel.replace(/^#/, '')] ?? null;
-  els['backup-db-key-card'].querySelector = query;
-  globalThis.window = { location: { protocol: 'https:' }, yuvomi: { showToast() {} } };
-  globalThis.document = doc;
-  return { els, container: { querySelector: query } };
-}
-
-/** Alle Texte und Werte unterhalb eines Knotens - wo der Schluessel stuende. */
-function textsBelow(node) {
-  if (!node) return [];
-  return [node.textContent, node.value, ...(node.children ?? []).flatMap(textsBelow)].filter(Boolean);
-}
-
-const { renderDatabaseKeyCard } = await import('../public/settings/pages/admin-backup.js');
-const KEY = 'a'.repeat(64);
-
-test('Datenbankschluessel: erzeugt - Knopf da, Wert erst nach dem Klick, nach Ausblenden aus dem DOM', async () => {
-  const c = keyCard();
-  let calls = 0;
-  globalThis.__apiStub = { get: async (route) => { calls += 1; assert.equal(route, '/backup/database-key'); return { data: { origin: 'generated', encrypted: true, key: KEY, path: '/data/.secrets/DB_ENCRYPTION_KEY' } }; } };
-  renderDatabaseKeyCard(c.container, { origin: 'generated', encrypted: true });
-  assert.equal(c.els['backup-db-key-card'].hidden, false);
-  assert.equal(c.els['backup-db-key-actions'].hidden, false);
-  assert.equal(calls, 0, 'kein Abruf ohne Klick');
-  assert.ok(!textsBelow(c.els['backup-db-key-output']).includes(KEY));
-
-  await c.els['backup-db-key-toggle'].dispatch('click');
-  assert.equal(calls, 1);
-  assert.equal(c.els['backup-db-key-output'].hidden, false);
-  assert.ok(textsBelow(c.els['backup-db-key-output']).includes(KEY), 'Wert sichtbar');
-  assert.equal(c.els['backup-db-key-toggle'].getAttribute('aria-expanded'), 'true');
-
-  await c.els['backup-db-key-toggle'].dispatch('click');
-  assert.equal(calls, 1, 'Ausblenden fragt nicht nach');
-  assert.deepEqual(c.els['backup-db-key-output'].children, [], 'der Wert ist aus dem DOM');
-  assert.equal(c.els['backup-db-key-output'].hidden, true);
-  globalThis.__apiStub = undefined;
-});
-
-for (const [label, status] of [
-  ['aus der Konfiguration (env)', { origin: 'env', encrypted: true }],
-  ['aus der Konfiguration (file)', { origin: 'file', encrypted: true }],
-  ['Herkunft unbekannt', { origin: null, encrypted: true }],
-  ['unverschluesselt', { origin: null, encrypted: false }],
-]) {
-  test(`Datenbankschluessel: ${label} - Hinweis, kein Knopf`, () => {
-    const c = keyCard();
-    renderDatabaseKeyCard(c.container, status);
-    assert.equal(c.els['backup-db-key-card'].hidden, false);
-    assert.equal(c.els['backup-db-key-actions'].hidden, true);
-    assert.ok(c.els['backup-db-key-hint'].textContent.length > 0, 'ein Satz steht da');
-    assert.equal(c.els['backup-db-key-toggle'].listeners.click, undefined, 'nichts zum Klicken gebunden');
-  });
-}
-
-test('Datenbankschluessel: ohne Status bleibt die Karte versteckt', () => {
-  const c = keyCard();
-  renderDatabaseKeyCard(c.container, undefined);
-  assert.equal(c.els['backup-db-key-card'].hidden, true);
+  assert.equal(webdavErrorMessage({ message: 'Authentication failed (401).', data: { code: 400 } }), 'Authentication failed (401).');
 });

@@ -60,30 +60,6 @@
   background-repeat: no-repeat;
 }
 
-/* VOM HOME-BILDSCHIRM GESTARTET FUELLT DIE APP DEN BILDSCHIRM (#2417). Auf
- * iOS 27 meldet die installierte App mit viewport-fit=cover und
- * black-translucent ein 100dvh, dem genau der obere Inset fehlt (812 statt
- * 874 auf einem iPhone 17): Shell und Tab-Leiste endeten um die Hoehe der
- * Statusleiste ueber dem Rand. lvh ist ohne Adressleiste die volle
- * Fensterhoehe, und eine Adressleiste hat die installierte App nicht - der
- * Safari-Tab (display-mode: browser) behaelt seine Kette oben.
- * Steht HIER, hinter der Kette an .app-shell und hinter body in reset.css:
- * gleiche Spezifitaet, die spaetere Regel gewinnt. In pwa.css (laedt vor
- * layout.css) verloere sie. @supports, weil ein Browser ohne lvh die Zeile
- * sonst verwirft (test:old-browser-fallbacks). */
-@media (display-mode: standalone) {
-  @supports (height: 100lvh) {
-    body,
-    .app-shell {
-      height: 100lvh;
-    }
-
-    .app-loading {
-      min-height: 100lvh;
-    }
-  }
-}
-
 /* Label-Farbe statt Akzent (R18): der Schriftzug steht direkt auf dem
  * Lichtfeld, und Violett auf violettem Licht faellt im Kern unter 3:1. Die
  * Tinte haelt ueberall auf dem Feld mindestens 8:1 (hell) - und DESIGN.md
@@ -4986,10 +4962,7 @@ html.fab-steady .page-fab {
  *
  * EINGEKLAPPT GEHT DER TITEL (R19, bis dahin blieb er stehen und hielt Zeile 1
  * offen): die Reiter ruecken in die Zeile des Zeitraums - Regel am Ende dieses
- * Blocks. Bis 1023px, seit R19 auch auf dem Tablet (834px: 174 -> 129px).
- *
- * STEHT DER TITEL NEBEN DEM ZEITRAUM NICHT GANZ, steht der Zeitraum in einer
- * eigenen Zeile unter dem Titel (#2440, #2443, nach Messung: budget.css). */
+ * Blocks. Bis 1023px, seit R19 auch auf dem Tablet (834px: 174 -> 129px). */
 @media (max-width: 1023px) {
   .page-toolbar.page-toolbar--period-inline:not(.page-toolbar--in-group) > .page-toolbar__title {
     flex: 1 1 0;
@@ -5128,64 +5101,6 @@ html.fab-steady .page-fab {
 
   .page-toolbar.page-toolbar--title-tools:not(.page-toolbar--in-group) > .page-toolbar__actions {
     flex: 0 0 auto;
-  }
-}
-
-/* LUPE UND WERKZEUG FALTEN UNTER 390px INS "..." (#2443, DESIGN.md Kopfregel mobil,
- * Regel 4, Ulas 2026-11-01). Zwei Knoepfe lassen dem Large Title Breite minus 172:
- * bei 360px 188px, "Geburtstage" braucht in SF 195, und in Roboto stehen uk 256,
- * ru 231, hu 220 gekuerzt. Der Kopf bleibt einzeilig und der Titel gross, also
- * steht unter 390px EIN Knopf (Breite minus 120), wo noetig entsteht das "..."
- * neu (`pageToolsMenuHtml({ foldSearch })`). Die Geburtstage, Notizen und
- * Dokumente brauchen es, Kontakte und Inventar nicht (alle Sprachen gemessen).
- *
- * Eine Abfrage an der Seitenwurzel, kein Viewport-Breakpoint (tokens.css 11c,
- * Vorlage #2425 in tasks.css). `.app-page--list-detail` traegt schon einen Namen,
- * deshalb zwei.
- *
- * DIE SUCHE GEHT AUS DEM BILD, NICHT AUS DEM BAUM: der Menue-Eintrag oeffnet sie
- * per Fokus, und die Tastatur erreicht sie weiter. Offen oder mit Begriff steht
- * sie wie immer im Kopf (ein Suchbegriff bleibt sichtbar). Nimmt die Shell den
- * Verwaltungsweg weg (`data-module-readonly`), bleibt die Lupe stehen. */
-.app-page--fold-head {
-  container: page-head / inline-size;
-}
-
-.app-page--list-detail.app-page--fold-head {
-  container-name: module-surface page-head;
-}
-
-/* Zwei Klassen, nicht eine: `.btn` setzt `display: inline-flex` und steht in einer
- * spaeter geladenen Datei, bei gleicher Spezifitaet gewann es und beide Knoepfe
- * standen (Sonde 360px, #2443). */
-.page-tools-btn.page-tools-btn--fold-only,
-.popover-menu__item[data-fold-search] {
-  display: none;
-}
-
-@container page-head (width < 390px) {
-  html:not([data-module-readonly]) .page-toolbar.page-toolbar--fold-search:not(.page-toolbar--in-group):has([data-fold-search]) > .page-search:not(:focus-within):not(.is-filled):not(:has(input:not(:placeholder-shown))) {
-    position: absolute;
-    flex: none;
-    width: 1px;
-    min-width: 0;
-    height: 1px;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-
-  .page-tools-btn.page-tools-btn--wide-only {
-    display: none;
-  }
-
-  .page-tools-btn.page-tools-btn--fold-only {
-    display: inline-flex;
-  }
-
-  html:not([data-module-readonly]) .popover-menu__item[data-fold-search] {
-    display: flex;
   }
 }
 
@@ -11809,28 +11724,6 @@ button svg { pointer-events: none; }
   padding: var(--space-1);
   min-height: var(--target-base);
   min-width: var(--target-base);
-}
-
-/* DER SCHMALE ICON-KNOPF IN EINER VOLLEN LEISTE (#2043).
- *
- * `.btn--icon` setzt `min-width` und `min-height` auf --target-base, und in
- * CSS gewinnt `min-width` gegen `max-width`: die Kuechen-Tab-Leiste wollte
- * ihren Suchschalter mit `max-width: 24px` deckeln und bekam weiter die
- * vollen 48px am Finger - die Leiste brauchte 398px von 375. Der Guard
- * „die Groesse des Icon-Knopfs gehoert der Shell" sah das nicht, weil er
- * `width`/`height`/`min-*` prueft und `max-*` keine Zielgroesse setzt.
- *
- * Die Antwort gehoert deshalb hierher und traegt einen eigenen Namen, wie
- * `.btn--icon-sm` darueber. 24px ist der WCAG-2.5.8-Boden, NICHT der
- * Komfortwert: diese Variante darf nur dort stehen, wo die Trefferflaeche
- * ueber ein ::before wieder auf --target-base waechst. Heute ist das die
- * Trailing-Zone der Kuechenleiste, die ab 640px ausgeblendet ist - darum
- * braucht die Variante keine Breiten-Abfrage und macht die Viewport-Breite
- * nicht erneut zum Kriterium. */
-.btn--icon.btn--icon-tight {
-  padding: 0;
-  min-width: var(--space-6);
-  min-height: var(--space-6);
 }
 
 /* Textarea: vertikale Größenänderung ist nutzbar */

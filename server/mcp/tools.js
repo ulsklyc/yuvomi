@@ -26,7 +26,8 @@ import { readFileSync } from 'node:fs';
 import { buildOpenApiSpec } from '../openapi.js';
 import { tokenAllows } from '../scopes.js';
 import { moduleAccessVerdict, MODULE_ACCESS_ALLOW } from '../permissions.js';
-import { householdTimeZone, todayKey } from '../utils/timezone.js';
+import { toLocalDateKey } from '../../public/utils/date.js';
+import { householdTimeZone } from '../utils/timezone.js';
 import { taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { visibilityWhere } from '../services/visibility.js';
 import { getUpcomingEvents } from '../services/calendar-event-reader.js';
@@ -63,7 +64,7 @@ function listTasks(db, actorId, args) {
   // Automatisierung, die andere Aufgaben sieht als das UI, ist der Grund, aus
   // dem hier schon einmal die Sichtbarkeit nachgezogen werden musste.
   const params = { me: actorId };
-  if (taskScopeNeedsToday({ includeFuture: !!args.include_future })) params.today = todayKey(db);
+  if (taskScopeNeedsToday({ includeFuture: !!args.include_future })) params.today = toLocalDateKey();
   // Das Archiv ist seit #688 eine eigene Achse (tasks.archived_at), kein
   // Statuswert mehr. `status: 'archived'` bleibt als Eingabe erlaubt und meint
   // unverändert „zeig mir die Ablage" - nur wird jetzt die Ablage gefragt und

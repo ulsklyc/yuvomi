@@ -18,7 +18,7 @@ import { assignDefaultToEvent, settlePastInheritedReminders } from './sync-assig
 import { assigneeFields, readAllDefaultAssignees, readDefaultAssignees, writeDefaultAssignees } from './default-assignees.js';
 import { setEventAssignments } from '../routes/calendar/helpers.js';
 import { remindAtCompareKey } from '../utils/reminder-schedule.js';
-import { parseICS, expandRRULE, normalizeRecurrenceOverrides, providerStatusOf } from './ics-parser.js';
+import { parseICS, expandRRULE, normalizeRecurrenceOverrides } from './ics-parser.js';
 import { isBlockedAddress, readPrivateNetworkOptIn, createGuardedLookup, BlockedAddressError } from '../utils/ssrf.js';
 import { safeRequest } from '../utils/http.js';
 import { followInboundStartChange } from './calendar-occurrence-overrides.js';
@@ -29,8 +29,7 @@ const log = createLogger('ICS');
 
 const SYNC_WINDOW_PAST_MONTHS   = 6;
 const SYNC_WINDOW_FUTURE_MONTHS = 12;
-const MAX_RESPONSE_MB           = 10;
-const MAX_RESPONSE_BYTES        = MAX_RESPONSE_MB * 1024 * 1024;
+const MAX_RESPONSE_BYTES        = 10 * 1024 * 1024;
 const FETCH_TIMEOUT_MS          = 15_000;
 
 const ENV_ALLOW_PRIVATE_NETWORK = 'ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK';
@@ -47,23 +46,14 @@ function isPrivateNetworkAllowed() {
   return readPrivateNetworkOptIn(ENV_ALLOW_PRIVATE_NETWORK);
 }
 
-/**
- * Ein Fehler beim Abruf eines Feeds, den die App benennen kann (#1909): der
- * Text bleibt derselbe (er landet auch als `last_error` am Abo), `code` nennt
- * den Fall und `params` seine Zahl. Die Route macht daraus den `reason`.
- */
-function icsFailure(message, code, params) {
-  return Object.assign(new Error(message), { code }, params ? { params } : {});
-}
-
 function normalizeUrl(raw) {
   const allowPrivate = isPrivateNetworkAllowed();
   const url = new URL(raw.replace(/^webcal:\/\//i, 'https://'));
   const allowed = allowPrivate ? ['https:', 'http:'] : ['https:'];
   if (!allowed.includes(url.protocol)) {
-    throw icsFailure(allowPrivate
+    throw new Error(allowPrivate
       ? 'Only http://, https:// and webcal:// URLs are allowed.'
-      : 'Only https:// and webcal:// URLs are allowed.', 'calendar_ics_url_scheme');
+      : 'Only https:// and webcal:// URLs are allowed.');
   }
   return url.href;
 }
@@ -115,16 +105,15 @@ async function fetchAndParse(urlRaw, etag, lastModified) {
   } finally { clearTimeout(timer); }
 
   if (res.status === 304) return { notModified: true };
-  if (!res.ok) throw icsFailure(`HTTP ${res.status}`, 'calendar_ics_http_status', { status: res.status });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-  const tooLarge = () => icsFailure(`ICS file exceeds the ${MAX_RESPONSE_MB} MB limit.`, 'calendar_ics_too_large', { limit_mb: MAX_RESPONSE_MB });
   const cl = parseInt(res.headers.get('content-length') || '0', 10);
-  if (cl > MAX_RESPONSE_BYTES) throw tooLarge();
+  if (cl > MAX_RESPONSE_BYTES) throw new Error('ICS file exceeds the 10 MB limit.');
 
   let body = '', received = 0;
   for await (const chunk of res.body) {
     received += chunk.length;
-    if (received > MAX_RESPONSE_BYTES) throw tooLarge();
+    if (received > MAX_RESPONSE_BYTES) throw new Error('ICS file exceeds the 10 MB limit.');
     body += chunk.toString();
   }
 
@@ -206,16 +195,8 @@ async function syncOne(sub) {
       INSERT INTO calendar_events
         (title, description, start_datetime, end_datetime, all_day, location,
          color, external_calendar_id, external_source, subscription_id, recurrence_rule, user_modified, created_by,
-         feed_original, provider_status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ics', ?, ?, 0, ?, ?, ?)
-    `);
-
-    // #2499: die Absage des Anbieters. Wie der Feed-Stand auch an lokal
-    // geaenderten Terminen: sie ist kein Nutzerfeld, und eine Wiederzusage
-    // (CONFIRMED oder kein STATUS) muss sie wieder aufheben.
-    const updateProviderStatus = db.get().prepare(`
-      UPDATE calendar_events SET provider_status = ?
-      WHERE id = ? AND provider_status IS NOT ?
+         feed_original)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ics', ?, ?, 0, ?, ?)
     `);
 
     // D#2330: der Feed-Stand (Reset-Vorlage). Jeder Sync schreibt ihn, auch an
@@ -287,16 +268,13 @@ async function syncOne(sub) {
             const updated = updateEvent.run(...values, existing.id, ...values).changes;
             changedEvents += updated;
             updateFeedOriginal.run(feedOriginal, existing.id, feedOriginal);
-            const providerStatus = providerStatusOf(ev);
-            changedEvents += updateProviderStatus.run(providerStatus, existing.id, providerStatus).changes;
             // Im Feed verschoben (#1377): die Erinnerungen ziehen mit. Nur wenn
             // das UPDATE griff - eine lokal bearbeitete Zeile (user_modified)
             // behaelt ihren Start und damit auch ihre Erinnerungen.
             if (updated) followInboundStartChange(db.get(), existing.id, existing.start_datetime, ev.dtstart);
           } else {
             insertEvent.run(ev.summary, ev.description, ev.dtstart, ev.dtend,
-              ev.allDay ? 1 : 0, ev.location, color, ev.uid, sub.id, ev.rrule, createdBy, feedOriginal,
-              providerStatusOf(ev));
+              ev.allDay ? 1 : 0, ev.location, color, ev.uid, sub.id, ev.rrule, createdBy, feedOriginal);
             changedEvents++;
           }
         } catch (err) { log.error(`Upsert UID ${ev.uid}: ${err.message}`); }
@@ -522,10 +500,6 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
   db.get().transaction(() => {
     for (const ev of rawEvents) {
       if (!ev.dtstart) { skipped++; continue; }
-      // Ein abgesagter Termin wird gar nicht erst uebernommen (#2499): ohne
-      // Sync gibt es keine Wiederzusage, die ihn spaeter zurueckholte, und die
-      // Kopie gehoert danach dem Nutzer - eine Absage darin waere tot.
-      if (providerStatusOf(ev) === 'CANCELLED') { skipped++; continue; }
       if (ev.uid && people.length) {
         const existing = existingAnyCalendar.get(userId, ev.uid);
         if (existing) {

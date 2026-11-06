@@ -824,9 +824,6 @@ const REASONS_READ_BY_A_PAGE = new Map([
   // Mitglied sieht den Abo-Link nicht, die Verwaltung sagt es ihm.
   ['calendar_feed_admin_only', 'pages/calendar.js'],
   ['FOLDER_DOCUMENTS_NOT_MANAGEABLE', 'utils/document-folder-delete.js'],
-  // Die Anmeldeseite zeichnet sich neu, statt ein Formular zu zeigen, das der
-  // Server abweist (#847); bis #1909 las sie dafuer den englischen Text.
-  ['password_login_disabled', 'pages/login.js'],
   // Gravatar-Import (#1791): GRAVATAR_REASON_KEYS auf der Kontoseite. Einen
   // Gast erreicht der Knopf gar nicht (gravatarAvailable), der Satz steht fuer
   // einen Aufruf, der an der Oberflaeche vorbei kommt.
@@ -844,12 +841,10 @@ const REASONS_WITHOUT_SENTENCE = new Set([
   // Je Aufruf ein anderes Modul und ein anderes Recht - ein Satz fuer alle
   // braeuchte den Modulnamen aus der Antwort.
   'cross_module_access',
-  // Anmeldung und Einrichtung: die Seiten sagen ihren eigenen Satz nach dem Status.
-  'account_cannot_sign_in', 'setup_completed', 'required',
+  // Anmeldung und Einrichtung: die Seiten zeigen den Servertext oder lesen ihn
+  // per Muster (login.js: "password login is disabled").
+  'account_cannot_sign_in', 'password_login_disabled', 'setup_completed', 'required',
   'browser_session_required',
-  // Angemeldete Geraete: der native Client liest den Grund selbst, die Web-App
-  // sieht ihn nie, weil sie mit einer Sitzung arbeitet.
-  'device_credential', 'device_credential_required', 'session_required',
   // Wandtablett und Gastkonto: aus der Oberflaeche dieser Konten nicht erreichbar.
   'display_account', 'display_only', 'display_action', 'acting_person_no_access', 'split_guest_scope',
   // Taschengeld am Wandtablett (#1734): die Seite fragt dort gar nicht erst nach Geld.

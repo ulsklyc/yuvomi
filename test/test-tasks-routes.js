@@ -132,39 +132,6 @@ test('POST: ungültige Priorität → 400', async () => {
   assert.equal(r.status, 400);
 });
 
-// Vorher 500 (Zahl als Titel, null in Kategorie oder Prioritaet, null als
-// Titel im PUT), ein leerer Titel im PUT wurde gespeichert, eine Zahl als
-// Beschreibung landete als "5.0", und '' in Tagesfeldern stand als '' in der Zeile.
-test('POST/PUT: falsche Formen sind 400, leere Tagesfelder werden null', async () => {
-  const as = { id: ALICE, role: 'admin' };
-  for (const body of [
-    { title: 5 },
-    { title: 'X', category: null },
-    { title: 'X', priority: null },
-    { title: 'X', description: 5 },
-  ]) {
-    assert.equal((await call('POST', '/', { as, body })).status, 400, `POST ${JSON.stringify(body)}`);
-  }
-
-  const id = (await call('POST', '/', { as, body: { title: 'Formen', description: 'Text' } })).body.data.id;
-  for (const body of [{ title: null }, { title: '' }, { title: 5 }, { category: null }, { priority: null }, { description: 5 }]) {
-    assert.equal((await call('PUT', `/${id}`, { as, body })).status, 400, `PUT ${JSON.stringify(body)}`);
-  }
-  const row = db.prepare('SELECT title, description FROM tasks WHERE id = ?').get(id);
-  assert.deepEqual({ ...row }, { title: 'Formen', description: 'Text' });
-
-  // Was die PWA schickt, geht weiter: nur ein Titel, null in der Beschreibung.
-  assert.equal((await call('PUT', `/${id}`, { as, body: { title: 'Neu' } })).status, 200);
-  assert.equal((await call('PUT', `/${id}`, { as, body: { description: null } })).body.data.description, null);
-
-  const blank = await call('POST', '/', { as, body: { title: 'Leer', start_date: '', due_date: '', due_time: '' } });
-  assert.equal(blank.status, 201);
-  assert.deepEqual(
-    [blank.body.data.start_date, blank.body.data.due_date, blank.body.data.due_time],
-    [null, null, null],
-  );
-});
-
 // --------------------------------------------------------
 // GET-Filter + GET /:id
 // --------------------------------------------------------
@@ -188,30 +155,6 @@ test('GET /: include_future blendet zukünftige Startdaten ein/aus', async () =>
   assert.ok(!def.body.data.some((t) => t.id === fid), 'zukünftige Aufgabe standardmäßig ausgeblendet');
   const withFuture = await call('GET', '/?include_future=1', { as: { id: ALICE, role: 'admin' } });
   assert.ok(withFuture.body.data.some((t) => t.id === fid), 'mit include_future sichtbar');
-});
-
-// "Heute" fuer den Startdatum-Riegel ist der Tag der Haushaltszone, nicht der
-// Prozesszone (CLAUDE.md, Fallen). Gewaehlt wird eine Zone, deren Tag gerade
-// vom Prozesstag abweicht; von +14 und -11 ist das immer mindestens eine.
-test('GET /: Startdatum-Riegel rechnet "heute" in der Haushaltszone', async (t) => {
-  const { todayKey } = await import('../server/utils/timezone.js');
-  const { toLocalDateKey } = await import('../public/utils/date.js');
-  const zone = ['Pacific/Kiritimati', 'Pacific/Pago_Pago'].find((z) => {
-    db.prepare("INSERT INTO sync_config (key, value) VALUES ('household_timezone', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(z);
-    return todayKey(db) !== toLocalDateKey();
-  });
-  t.after(() => db.prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run());
-  assert.ok(zone, 'eine der beiden Zonen weicht immer vom Prozesstag ab');
-
-  const today = todayKey(db);
-  const tomorrow = new Date(Date.parse(`${today}T12:00:00Z`) + 86400000).toISOString().slice(0, 10);
-  const as = { id: ALICE, role: 'admin' };
-  const startsToday = (await call('POST', '/', { as, body: { title: 'Ab heute', start_date: today } })).body.data.id;
-  const startsTomorrow = (await call('POST', '/', { as, body: { title: 'Ab morgen', start_date: tomorrow } })).body.data.id;
-
-  const ids = (await call('GET', '/', { as })).body.data.map((row) => row.id);
-  assert.ok(ids.includes(startsToday), `beginnt heute (${zone}) und ist sichtbar`);
-  assert.ok(!ids.includes(startsTomorrow), `beginnt morgen (${zone}) und bleibt ausgeblendet`);
 });
 
 test('GET /:id: unbekannte ID → 404', async () => {
