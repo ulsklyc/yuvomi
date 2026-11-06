@@ -982,6 +982,8 @@ const REASONS_PASSED_THROUGH = new Map([
   ['services/reward-money.js: err.reason', { sites: 1, at403: [], why: 'Rueckgabe an die Route, dort feste 400' }],
   ['services/ics-parser.js: !uid ? \'missing UID\' : \'missing or unparsable DTSTART\'', { sites: 1, at403: [],
     why: 'onSkip fuers Log, keine Antwort' }],
+  // Scheduled backup: classify dir-not-writable and other failures, send reason to admin push (#2525)
+  ['services/backup-scheduler.js: NOT_WRITABLE.has(err.code) ? \'backup_dir_not_writable\' : null', { sites: 1, at403: [], why: 'Scheduler stores lastError with reason for admin card; only 403 when dir-not-writable, else null' }],
 ]);
 
 /**
