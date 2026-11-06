@@ -308,10 +308,13 @@ export async function fetchObjectsByUrl(client, wanted) {
  * Arbeit wird unten je Konto neu gelesen; ohne es ginge für 'caldav' nichts
  * hinaus. `isSelected`: ist dieser Kalender für das Konto EINGESCHALTET? Ein
  * Löschauftrag für einen anderen bleibt liegen (#1884), siehe
- * `processPendingDeletions`.
+ * `processPendingDeletions`. `stop`: das Stoppsignal des ganzen Versuchs,
+ * geteilt mit seinen Uploads (#2565).
  * @returns {Promise<{deleted:number,updated:number}>}
  */
-export async function flushAccount(client, source, { deletions, updates, needsCalendars, accountId = null, isSelected = null }) {
+export async function flushAccount(client, source, {
+  deletions, updates, needsCalendars, accountId = null, isSelected = null, stop = outbound.createRefusalStop(),
+}) {
   const wanted = updates
     .filter((e) => e.external_object_url)
     .map((e) => ({
@@ -342,8 +345,9 @@ export async function flushAccount(client, source, { deletions, updates, needsCa
   // ownCalendarUrls bewusst nicht gesetzt: ohne vollen Abruf ist "der Server
   // führt das Objekt nicht mehr" nicht belegbar, und ein Tombstone ohne bekannte
   // URL darf hier nicht als erledigt gelten. Er bleibt für den Sync liegen.
-  // Ein Stoppsignal für Löschen und Ändern (#1863).
-  const stop = outbound.createRefusalStop();
+  // Ein Stoppsignal für Löschen und Ändern (#1863). Der Aufrufer reicht es
+  // weiter an die Uploads desselben Versuchs (#2565): eine kontoweite Absage
+  // hier hält auch sie zurück.
   const deleted = deletions.length ? await processPendingDeletions(client, source, objectIndex, null, { accountId, isSelected, stop }) : 0;
   const updated = objectIndex.size ? await processPendingUpdates(client, source, objectIndex, calendarsByUrl, { accountId, stop }) : 0;
   return { deleted, updated };
