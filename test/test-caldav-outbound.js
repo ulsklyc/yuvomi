@@ -2039,3 +2039,42 @@ test('Apple-Legacy: ein neuer lokaler Termin geht mit dem Sofortversuch hinauf, 
     db.prepare("DELETE FROM sync_config WHERE key LIKE 'apple_%'").run();
   }
 });
+
+test('Apple-Legacy: nach einer kontoweiten Absage im Sofortversuch geht kein Upload mehr hinaus (#2565)', async () => {
+  reset();
+  const set = db.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
+  set.run('apple_caldav_url', 'https://caldav.icloud.com/');
+  set.run('apple_username', 'jemand@example.com');
+  set.run('apple_app_password', 'abcd-efgh');
+  try {
+    const calRefId = db.prepare(`
+      INSERT INTO external_calendars (source, external_id, name, color)
+      VALUES ('apple', ?, 'iCloud', '#FC3C44')
+      ON CONFLICT(source, external_id) DO UPDATE SET name = excluded.name
+      RETURNING id
+    `).get(CAL_URL).id;
+    const objectUrl = `${CAL_URL}throttled@t.ics`;
+    const synced = insertSyncedEvent({ uid: 'throttled@t', calRefId, source: 'apple', objectUrl });
+    db.prepare('UPDATE calendar_events SET title = ?, outbound_dirty = 1 WHERE id = ?').run('Bearbeitet', synced.id);
+    const waiting = Number(db.prepare(`
+      INSERT INTO calendar_events (title, start_datetime, end_datetime, all_day, external_source, created_by)
+      VALUES ('Neu für iCloud', '2035-03-10T10:00', '2035-03-10T11:00', 0, 'local', 1)
+    `).run().lastInsertRowid);
+
+    const client = fakeImmediateClient({
+      objects: { [objectUrl]: serverObject('throttled@t') },
+      onUpdate: () => { throw httpError(429); },
+    });
+    let listings = 0;
+    client.fetchCalendars = async () => { listings++; return [{ url: CAL_URL, displayName: 'iCloud' }]; };
+    const appleCalendar = await import('../server/services/apple-calendar.js');
+    await appleCalendar.flushOutbound({ makeClient: async () => client });
+
+    assert.equal(client.updates.length, 1, 'die Bearbeitung ging nicht hinaus');
+    assert.equal(listings, 0, 'nach der Absage wurden die Kalender noch aufgelistet');
+    assert.equal(client.creates.length, 0, 'nach der Absage ging noch ein Upload hinaus');
+    assert.equal(db.prepare('SELECT external_source FROM calendar_events WHERE id = ?').get(waiting).external_source, 'local');
+  } finally {
+    db.prepare("DELETE FROM sync_config WHERE key LIKE 'apple_%'").run();
+  }
+});

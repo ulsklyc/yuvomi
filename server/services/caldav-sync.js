@@ -1788,14 +1788,18 @@ async function runFlushOutbound({ createClient } = {}) {
 
     try {
       const client = withAccountOrigin(await makeClient(account), accountUrls(account));
+      // EIN Stoppsignal für alle Phasen dieses Versuchs (#1863, #2565): nach
+      // einer kontoweiten Absage (429, 5xx, 401) geht nichts mehr an das
+      // Konto, auch kein Upload; die Arbeit wartet auf den nächsten Lauf.
+      const stop = outbound.createRefusalStop();
       if (deletions.length || updates.length) {
         const res = await flushAccount(client, 'caldav', {
-          deletions, updates, needsCalendars, accountId: account.id, isSelected,
+          deletions, updates, needsCalendars, accountId: account.id, isSelected, stop,
         });
         total.deleted += res.deleted;
         total.updated += res.updated;
       }
-      if (waitingUploads) await flushUploads(client, account);
+      if (waitingUploads) await flushUploads(client, account, stop);
     } catch (err) {
       // Unkritisch: alles bleibt vorgemerkt, der nächste Sync-Lauf zieht nach.
       log.warn(`Immediate outbound attempt failed for account ${account.id}: ${err.message}`);
@@ -1810,12 +1814,12 @@ async function runFlushOutbound({ createClient } = {}) {
  * keinen Kalender, ist das eine unvollständige Antwort (siehe runSync), und
  * es geht nichts hinaus; die Termine warten auf den nächsten Lauf.
  */
-async function flushUploads(client, account) {
+async function flushUploads(client, account, stop) {
+  // Hat eine frühere Phase das Konto gesperrt, fragt auch die Auflistung nicht.
+  if (stop.blocks()) return 0;
   const serverCalendars = await client.fetchCalendars();
   if (!serverCalendars?.length) return 0;
-  // Ein Stoppsignal für die Uploads dieses Versuchs (#1863): nach einer
-  // kontoweiten Absage geht nichts mehr an das Konto.
-  return uploadWaitingEvents(client, account, serverCalendars, { stop: outbound.createRefusalStop() });
+  return uploadWaitingEvents(client, account, serverCalendars, { stop });
 }
 
 function getStatus() {

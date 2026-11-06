@@ -343,15 +343,18 @@ async function runFlushOutbound({ makeClient } = {}) {
   try {
     const client = await (makeClient || createClient)(creds);
     // Apple kennt keinen wählbaren Zielkalender, also nie einen Umzug.
+    // EIN Stoppsignal für alle Phasen (#2565): nach einer kontoweiten Absage
+    // geht auch kein Upload und keine Auflistung mehr hinaus.
+    const stop = outbound.createRefusalStop();
     const res = deletions.length || updates.length
-      ? await flushAccount(client, 'apple', { deletions, updates: withCalendar, needsCalendars: false })
+      ? await flushAccount(client, 'apple', { deletions, updates: withCalendar, needsCalendars: false, stop })
       : idle;
-    if (waitingUploads) {
+    if (waitingUploads && !stop.blocks()) {
       // Das Ziel steht erst mit der Auflistung fest (icloudUploadTarget). Eine
       // leere Auflistung sagt nichts; die Termine warten auf den Lauf.
       const calendars = await client.fetchCalendars();
       const defaultCal = calendars?.length ? icloudUploadTarget(calendars) : null;
-      if (defaultCal) await uploadLocalEvents(client, defaultCal, { stop: outbound.createRefusalStop() });
+      if (defaultCal) await uploadLocalEvents(client, defaultCal, { stop });
     }
     return res;
   } catch (err) {

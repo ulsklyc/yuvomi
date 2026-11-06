@@ -1161,3 +1161,27 @@ test('bekommt ein lokaler Termin beim Bearbeiten ein CalDAV-Ziel, geht er sofort
   assert.equal(a.dav.seen('PUT').filter((r) => r.body.includes('SUMMARY:Neu')).length, 1, 'das neue Ziel bekam den Termin erst mit dem Lauf');
   assert.equal(row(id).external_source, 'caldav');
 });
+
+test('drosselt das Konto die Bearbeitung im Sofortversuch, geht auch der neue Termin nicht hinaus (#2565)', async () => {
+  const { a } = twoAccounts();
+  const mirrored = mirror(a, { title: 'Vorher' });
+  edit(mirrored, 'Bearbeitet');
+  const waiting = Number(db.prepare(`
+    INSERT INTO calendar_events
+      (title, start_datetime, end_datetime, all_day, created_by, target_caldav_account_id, target_caldav_calendar_url)
+    VALUES ('Neu', '2035-03-10T10:00', '2035-03-10T11:00', 0, ?, ?, ?)
+  `).run(userId, a.accountId, a.url).lastInsertRowid);
+  a.dav.requests.length = 0;
+  // Die erste schreibende Anfrage wird kontoweit abgelehnt.
+  a.dav.refuse({ method: 'PUT', status: 429 });
+
+  await caldavSync.flushOutbound();
+
+  const refusedAt = a.dav.requests.findIndex((r) => r.method === 'PUT');
+  assert.ok(refusedAt >= 0, `die Bearbeitung ging nicht hinaus: ${a.dav.requests.map(describe).join(', ')}`);
+  assert.deepEqual(a.dav.requests.slice(refusedAt + 1).map(describe), [],
+    'nach der kontoweiten Absage ging noch eine Anfrage an das Konto');
+  assert.equal(row(mirrored).outbound_dirty, 1, 'die abgelehnte Bearbeitung ist nicht mehr vorgemerkt');
+  assert.equal(row(waiting).external_source, 'local', 'der neue Termin wartet nicht mehr auf den Lauf');
+  assert.equal(row(waiting).target_caldav_account_id, a.accountId);
+});
