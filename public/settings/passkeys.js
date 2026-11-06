@@ -39,12 +39,16 @@ async function reauthenticate(state) {
         let busy = false;
         const verify = async method => {
           if (busy || finished) return;
+          const code = panel.querySelector('#passkey-reauth-code');
           password.required = method === 'password';
+          if (code) code.required = method === 'password' && state.second_factor_required;
           const invalid = reportFieldErrors(constraintErrors(form));
           password.required = true;
+          if (code) code.required = state.second_factor_required;
           if (invalid) return;
           busy = true;
-          const proof = { method, code: panel.querySelector('#passkey-reauth-code')?.value.trim() };
+          const proof = { method };
+          if (method === 'password' && code) proof.code = code.value.trim();
           for (const button of buttons) button.disabled = true;
           status.textContent = t('login.twoFactorChecking');
           try {
@@ -141,7 +145,12 @@ export async function renderPasskeyCard(container) {
     button.addEventListener('click', async () => {
       if (!await confirmModal({ title: t('passkeys.remove'), message: t('passkeys.removeConfirm') })) return;
       button.disabled = true;
-      try { await withRecentAuthentication(() => api.delete(`/auth/passkeys/${button.dataset.removePasskey}`)); await renderPasskeyCard(container); }
+      try {
+        const result = await withRecentAuthentication(() => api.delete(`/auth/passkeys/${button.dataset.removePasskey}`));
+        container.dispatchEvent(new CustomEvent('other-sessions-ended', { bubbles: true }));
+        await renderPasskeyCard(container);
+        container.querySelector('#passkey-status').textContent = `${t('passkeys.removed')} ${t('settings.otherSessionsEnded', { count: result?.data?.ended ?? 0 })}`;
+      }
       catch (error) { status.textContent = passkeyErrorText(error); button.disabled = false; }
     });
   }
