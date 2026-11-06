@@ -1682,7 +1682,9 @@ test('personal account leaf preserves self-profile, password, and logout contrac
   assert.match(source, /id: 'profile-birth-date',[\s\S]{0,200}describedBy: 'profile-error'/);
   const birthDateSrc = readFileSync(new URL('../public/utils/birth-date.js', import.meta.url), 'utf8');
   assert.match(birthDateSrc, /<yuvomi-datepicker id="\$\{esc\(id\)\}"[^>]*\$\{described\}/);
-  assert.match(source, /id="current-password"[^>]*aria-describedby="password-error"/);
+  const passwordDescriptions = source.match(/id="current-password"[^>]*aria-describedby="([^"]*)"/)?.[1]?.split(/\s+/) ?? [];
+  assert.ok(passwordDescriptions.includes('password-error'), 'the password field keeps its error association');
+  assert.ok(passwordDescriptions.includes('password-passkeys-hint'), 'the password field announces passkey revocation');
   assert.match(source, /id="new-password"[^>]*aria-describedby="password-error"/);
   assert.match(source, /id="confirm-password"[^>]*aria-describedby="password-error"/);
   assert.match(source, /role="alert"[^>]*>\$\{t\('settings\.loadError'\)\}/);
