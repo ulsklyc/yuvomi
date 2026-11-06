@@ -3530,7 +3530,7 @@
         "memberErrorSsoEmailRequired": "A csak SSO-s fióknak e-mail-cím kell, hogy az első SSO-bejelentkezés megtalálja.",
         "memberErrorSsoEmailAmbiguous": "Ez az e-mail-cím már egy másik tagé. Az SSO nem tudná megkülönböztetni a fiókokat.",
         "backupSchedulerFailedPushTitle": "A biztonsági mentés nem sikerült",
-        "backupSchedulerFailedPushBody": "Az automatikus biztonsági mentés nem futott le. Az okát a Beállítások > Háztartás > Biztonsági mentés alatt találja.",
+        "backupSchedulerFailedPushBody": "Az automatikus biztonsági mentés nem futott le. Az okát a {{path}} alatt találja.",
         "twoFactorAlreadyEnabled": "A kétlépcsős azonosítás már be van kapcsolva. Töltsd újra az oldalt az aktuális állapotért.",
         "twoFactorSetupExpired": "A beállítás lejárt. Szakítsd meg, és kezdd újra.",
         "oidcLinkErrorNotConfigured": "Az SSO már nincs beállítva ezen a szerveren.",

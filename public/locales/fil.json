@@ -3548,7 +3548,7 @@
         "memberErrorSsoEmailRequired": "Kailangan ng email address ang account na SSO lang para mahanap ito ng unang pag-sign in gamit ang SSO.",
         "memberErrorSsoEmailAmbiguous": "May ibang miyembro nang may ganitong email address. Hindi mapaghihiwalay ng SSO ang mga account.",
         "backupSchedulerFailedPushTitle": "Nabigo ang backup",
-        "backupSchedulerFailedPushBody": "Hindi tumakbo ang automatic backup. Buksan ang Mga Setting > Sambahayan > Backup para malaman kung bakit.",
+        "backupSchedulerFailedPushBody": "Hindi tumakbo ang automatic backup. Buksan ang {{path}} para malaman kung bakit.",
         "twoFactorAlreadyEnabled": "Naka-on na ang two-factor authentication. I-reload ang page para makita ang kasalukuyang estado.",
         "twoFactorSetupExpired": "Nag-expire na ang setup. Kanselahin ito at magsimula ulit.",
         "oidcLinkErrorNotConfigured": "Hindi na naka-set up ang SSO sa server na ito.",

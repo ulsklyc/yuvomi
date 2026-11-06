@@ -3530,7 +3530,7 @@
         "memberErrorSsoEmailRequired": "केवल SSO वाले खाते को ईमेल पते की ज़रूरत है, ताकि पहला SSO साइन-इन उसे ढूँढ सके।",
         "memberErrorSsoEmailAmbiguous": "यह ईमेल पता पहले से किसी दूसरे सदस्य के पास है। SSO खातों में अंतर नहीं कर पाएगा।",
         "backupSchedulerFailedPushTitle": "बैकअप विफल",
-        "backupSchedulerFailedPushBody": "स्वचालित बैकअप नहीं चला। कारण देखने के लिए सेटिंग्स > घर > बैकअप खोलें।",
+        "backupSchedulerFailedPushBody": "स्वचालित बैकअप नहीं चला। कारण देखने के लिए {{path}} खोलें।",
         "twoFactorAlreadyEnabled": "दो-चरणीय प्रमाणीकरण पहले से चालू है। मौजूदा स्थिति देखने के लिए पेज फिर से लोड करें।",
         "twoFactorSetupExpired": "सेटअप की समय-सीमा खत्म हो गई। इसे रद्द करें और फिर से शुरू करें।",
         "oidcLinkErrorNotConfigured": "इस सर्वर पर SSO अब सेट अप नहीं है।",

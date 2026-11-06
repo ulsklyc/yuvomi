@@ -188,9 +188,14 @@ async function notifyAdminsOfBackupFailure({ database, pushService = defaultPush
     if (!admins.length) return 0;
 
     const locale = resolveHouseholdLocale(activeDb);
+    const path = [
+      translate(locale, 'settings.title'),
+      translate(locale, 'settings.domainHousehold'),
+      translate(locale, 'settings.pageBackupRestore'),
+    ].join(' > ');
     const payload = {
       title: translate(locale, 'settings.backupSchedulerFailedPushTitle'),
-      body: translate(locale, 'settings.backupSchedulerFailedPushBody'),
+      body: translate(locale, 'settings.backupSchedulerFailedPushBody', { path }),
       url: '/settings/admin/backup',
       // EIN EINTRAG, NICHT EINER JE LAUF: zwei Naechte hintereinander
       // gescheitert soll eine Meldung ersetzen, keine zweite daneben legen.
@@ -244,8 +249,9 @@ async function performBackup(opts = {}) {
       error: err.message,
     };
     // Nach dem Setzen von lastError: die Meldung verweist auf die Seite, die
-    // ihn zeigt, also muss er dort schon stehen.
-    await notifyAdminsOfBackupFailure(opts);
+    // ihn zeigt, also muss er dort schon stehen. Nur automatische Laeufe
+    // benachrichtigen - ein manueller Klick landet sofort auf der Seite.
+    if (opts.notify) await notifyAdminsOfBackupFailure(opts);
   }
 }
 
@@ -265,7 +271,7 @@ export function startScheduler() {
 
   // Laedt nach WebDAV hoch: waehrend eines Restores beginnt kein Lauf, ein
   // laufender wird abgewartet (Codex-Befund in #1431).
-  scheduledTask = cron.schedule(BACKUP_SCHEDULE, () => runExternalJob(() => performBackup()), {
+  scheduledTask = cron.schedule(BACKUP_SCHEDULE, () => runExternalJob(() => performBackup({ notify: true })), {
     timezone: process.env.TZ || 'UTC',
   });
 

@@ -248,7 +248,8 @@ describe('Backup Scheduler', () => {
     // unabhaengig von Benutzer und Betriebssystem.
     await blockBackupDir();
     try {
-      const result = await backupScheduler.triggerBackup({ database: db, pushService: push });
+      // notify: true simuliert den Cron-Weg - manuelle Trigger melden nicht
+      const result = await backupScheduler.triggerBackup({ database: db, pushService: push, notify: true });
       assert.strictEqual(result.success, false, 'die Vorbedingung: der Lauf muss scheitern');
 
       assert.strictEqual(push.sent.length, 2,
@@ -297,16 +298,17 @@ describe('Backup Scheduler', () => {
     const db = dbWithUsers([{ id: 1, username: 'admin-a', role: 'admin' }]);
     const push = recordingPush();
 
-    // Erst scheitern lassen, damit lastError wirklich steht.
+    // Erst scheitern lassen (notify: true = Cron-Weg), damit lastError steht.
     await blockBackupDir();
     try {
-      await backupScheduler.triggerBackup({ database: db, pushService: push });
+      await backupScheduler.triggerBackup({ database: db, pushService: push, notify: true });
     } finally {
       await unblockBackupDir();
     }
     assert.ok(backupScheduler.getStatus().lastError, 'die Vorbedingung: lastError steht');
     const afterFailure = push.sent.length;
 
+    // Erfolgreicher Lauf ohne notify - kein Unterschied fuer die Pruefung
     const ok = await backupScheduler.triggerBackup({ database: db, pushService: push });
     assert.strictEqual(ok.success, true, 'der zweite Lauf muss gelingen');
     assert.strictEqual(backupScheduler.getStatus().lastError, null,
