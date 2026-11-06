@@ -23,8 +23,16 @@ import { isHouseholdMember } from '../services/household-members.js';
 import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../permissions.js';
+import { guardedFetch } from '../services/notification-providers/guarded-fetch.js';
+import { PROVIDER_TIMEOUT_MS } from '../services/notifications.js';
 
 const log = createLogger('Shopping');
+
+/** Haushaltweite Einstellung aus `sync_config` - wie in routes/preferences.js. */
+function cfgGet(key) {
+  const row = db.get().prepare('SELECT value FROM sync_config WHERE key = ?').get(key);
+  return row ? row.value : null;
+}
 
 const router  = express.Router();
 
@@ -1407,6 +1415,87 @@ router.post('/:listId/send', sendListLimiter, async (req, res) => {
   } catch (err) {
     log.error('POST /:listId/send error:', err.message);
     res.status(502).json({ error: 'The email could not be sent.', code: 502 });
+  }
+});
+
+// --------------------------------------------------------
+// POST /api/v1/shopping/:listId/send-webhook
+// Sendet die offenen Artikel einer Liste als JSON an eine haushaltweite
+// Webhook-URL, die ein Admin unter PUT /api/v1/preferences gesetzt hat.
+// Payload: { list: { id, name }, items: [{name, quantity, category}], sentAt }
+// Response: { data: { sent: true, items: count } }
+// --------------------------------------------------------
+router.post('/:listId/send-webhook', sendListLimiter, async (req, res) => {
+  try {
+    const list = db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
+
+    const webhookUrl = cfgGet('shopping_webhook_url');
+    if (!webhookUrl) {
+      return res.status(422).json({ error: 'No shopping webhook URL configured.', code: 422, reason: 'shopping_webhook_unconfigured' });
+    }
+
+    // `quantity`, NICHT `amount`/`unit`: die Spalten gibt es nicht. Bis hier
+    // stand `SELECT name, amount, unit, category`, und damit warf JEDER Versand
+    // "no such column: amount" - gefangen vom catch unten, beantwortet mit 502
+    // "nicht erreichbar". Der Weg hat also nie funktioniert, und der Fehler sah
+    // nach einem Problem beim Ziel aus. `shopping_items.quantity` ist EIN
+    // Textfeld ("2 l"), eine Einheit fuehrt die Tabelle nicht - die Nutzlast
+    // nennt es deshalb so, wie es ist.
+    const openItems = db.get().prepare(`
+      SELECT name, quantity, category FROM shopping_items
+      WHERE list_id = ? AND is_checked = 0
+      ORDER BY sort_order ASC, created_at ASC
+    `).all(req.params.listId);
+
+    if (openItems.length === 0) {
+      return res.status(422).json({ error: 'Nothing to send: the list has no open items.', code: 422, reason: 'nothing_open' });
+    }
+
+    const sentAt = new Date().toISOString();
+    const body = JSON.stringify({
+      list: { id: list.id, name: list.name },
+      items: openItems.map((item) => ({
+        name: item.name,
+        quantity: item.quantity ?? null,
+        category: item.category ?? null,
+      })),
+      sentAt,
+    });
+
+    // EIN ZIEL, DAS NICHT ANTWORTET, HAELT SONST DEN REQUEST (Review zu #2502).
+    // `safeRequest` bringt kein eigenes Zeitlimit mit, und die
+    // Benachrichtigungswege laufen genau deshalb unter `withTimeout` mit
+    // PROVIDER_TIMEOUT_MS - derselbe Wert, dasselbe Ziel: ein Webhook.
+    const response = await guardedFetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      log.error(`POST /:listId/send-webhook: webhook returned HTTP ${response.status}`);
+      return res.status(502).json({ error: `Webhook returned HTTP ${response.status}.`, code: 502 });
+    }
+
+    res.json({ data: { sent: true, items: openItems.length } });
+  } catch (err) {
+    log.error('POST /:listId/send-webhook error:', err.message);
+    // EIN LAN-ZIEL IST DER HAEUFIGSTE FALL, UND ER SAH AUS WIE EIN AUSFALL
+    // (Review zu #2502). Home Assistant und ein eigenes n8n stehen im eigenen
+    // Netz; der SSRF-Schutz weist sie ab, solange
+    // NOTIFICATION_ALLOW_PRIVATE_NETWORK nicht gesetzt ist. Ohne eigenen Grund
+    // bekam die Oberflaeche dafuer "nicht erreichbar" und der Admin suchte den
+    // Fehler beim Ziel. `cause` mitlesen: der Wurf des Lookup-Hooks kommt je
+    // nach Node-Pfad auch verpackt an.
+    if (err?.name === 'BlockedAddressError' || err?.cause?.name === 'BlockedAddressError') {
+      return res.status(422).json({
+        error: 'The webhook target is on a private network. Set NOTIFICATION_ALLOW_PRIVATE_NETWORK=true to allow it.',
+        code: 422,
+        reason: 'shopping_webhook_private_network',
+      });
+    }
+    res.status(502).json({ error: 'The webhook could not be reached.', code: 502 });
   }
 });
 

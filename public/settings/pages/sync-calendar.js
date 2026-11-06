@@ -28,7 +28,7 @@ import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { loadFamilyUsers } from '/settings/family-users.js';
 import { buildAssigneeMenu } from '/settings/assignee-menu.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
-import { CASE_MESSAGES, errorSentence, loadErrorSentence, errorSentenceWithDetail } from '/utils/friendly-error.js';
+import { errorSentence, loadErrorSentence, errorSentenceWithDetail } from '/utils/friendly-error.js';
 
 // Seit R23 ein eigenes Blatt (registry.js, D14; R10-R22 ein Abschnitt im
 // Blatt Kalender). Neu laden heisst, das Blatt neu zu zeichnen - nicht ueber
@@ -624,18 +624,6 @@ function renderCalDAVAccount(container, account, calendars, refresh, user) {
   container.appendChild(card);
 }
 
-/**
- * Meldung beim Verbinden eines CalDAV- oder Apple-Kontos (#1909). Was die App
- * selbst kennt (Konto schon verbunden, keine Kalender, Adresse ohne http(s)),
- * sagt ihren Satz. Alles andere ist die Antwort des fremden Servers - falsches
- * Passwort, nicht erreichbar -, und die braucht der Admin, um den Fehler zu
- * finden.
- */
-function connectErrorSentence(err) {
-  if (CASE_MESSAGES.has(err?.data?.reason)) return errorSentence(err);
-  return errorSentenceWithDetail(err, 'settings.connectionFailedDetail');
-}
-
 async function loadCalDAVAccounts(container, user) {
   const listEl = container.querySelector('#caldav-accounts');
   if (!listEl) return;
@@ -649,7 +637,7 @@ async function loadCalDAVAccounts(container, user) {
     accounts = res.data || [];
   } catch (err) {
     listEl.appendChild(createRetryState({
-      message: loadErrorSentence(err) ?? t('settings.caldavConnectionFailed'),
+      message: err.message || t('settings.caldavConnectionFailed'),
       onRetry: reload,
     }));
     return;
@@ -677,7 +665,7 @@ async function loadCalDAVAccounts(container, user) {
         details: [lastSyncDetail(account.lastSync)],
         tone: 'warning',
       }));
-      wrapper.appendChild(createInlineError(loadErrorSentence(err) ?? t('common.errorGeneric')));
+      wrapper.appendChild(createInlineError(err.message || t('common.errorGeneric')));
       listEl.appendChild(wrapper);
       continue;
     }
@@ -766,7 +754,7 @@ function bindCalDAVAddButton(container, user) {
             await reloadAfterSave(() => loadCalDAVAccounts(container, user));
             refocusAfterRender();
           } catch (err) {
-            errorEl.textContent = connectErrorSentence(err);
+            errorEl.textContent = err.message || t('common.errorGeneric');
             errorEl.hidden = false;
           }
         });
@@ -1525,7 +1513,7 @@ function buildOutlookAccountCard(account, refresh, user) {
       card.appendChild(buildOutlookCalendarList(account, calendars, user));
       window.lucide?.createIcons({ el: card });
     } catch (err) {
-      card.appendChild(createInlineError(loadErrorSentence(err) ?? t('common.errorGeneric')));
+      card.appendChild(createInlineError(err.message || t('common.errorGeneric')));
     }
   })();
 
@@ -1750,7 +1738,7 @@ function buildAppleConnectForm() {
       })}
       ${settingRowHtml({
         label: t('settings.appleIdLabel'), labelFor: 'apple-username', labelExtra: REQUIRED_MARK,
-        control: '<input class="form-input" type="email" id="apple-username" autocomplete="off" maxlength="254" required />',
+        control: '<input class="form-input" type="email" id="apple-username" autocomplete="off" required />',
       })}
       ${settingRowHtml({
         label: t('settings.applePasswordLabel'), labelFor: 'apple-password', labelExtra: REQUIRED_MARK,
@@ -1779,7 +1767,7 @@ function buildAppleConnectForm() {
       showToast(t('settings.appleConnectedToast'), 'success');
       window.yuvomi?.navigate(SYNC_CALENDAR_HREF);
     } catch (err) {
-      errorEl.textContent = connectErrorSentence(err);
+      errorEl.textContent = err.message || t('common.errorGeneric');
       errorEl.hidden = false;
     } finally {
       btn.disabled = false;

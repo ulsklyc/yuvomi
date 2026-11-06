@@ -6306,16 +6306,6 @@ like any module (Settings → Modules → Active modules); disabled → the rout
 gone. The data model, including why the balance is always derived from the ledger, is under
 [Rewards data model](#rewards-migration-v70).
 
-**Late completion decay** (household setting `tasks_late_decay_enabled`, opt-in, off by default): a late
-completion costs one point per full past-due calendar day, and at least 1 point remains - a completion
-always pays, otherwise completing late would read as a penalty into the negative. Measured in calendar
-days of the household timezone between `due_date` and the completion day; a due date set after the
-completion or an invalid date triggers no decay. The deduction is fixed at booking - later edits of the
-due date, the point value or the setting never change booked entries, so a due date moved at the moment
-of ticking counts as on time. `reward_ledger` carries the audit fields `decay_days` and `base_points`,
-both `NULL` when nothing was reduced; `GET /rewards/ledger` returns them under the same visibility rule as `reason` and `task_id` - no decay detail for tasks the caller may not
-see.
-
 - **Three tabs** in the module head (`wireTablist`, arrow keys, roving tabindex): **Overview**
   (balances and pending redemptions), **Catalog** (the rewards on offer), **Ledger** (every booking).
 - **Overview:** one flat row per participating member — avatar, name, balance, and a progress bar

@@ -11811,28 +11811,6 @@ button svg { pointer-events: none; }
   min-width: var(--target-base);
 }
 
-/* DER SCHMALE ICON-KNOPF IN EINER VOLLEN LEISTE (#2043).
- *
- * `.btn--icon` setzt `min-width` und `min-height` auf --target-base, und in
- * CSS gewinnt `min-width` gegen `max-width`: die Kuechen-Tab-Leiste wollte
- * ihren Suchschalter mit `max-width: 24px` deckeln und bekam weiter die
- * vollen 48px am Finger - die Leiste brauchte 398px von 375. Der Guard
- * „die Groesse des Icon-Knopfs gehoert der Shell" sah das nicht, weil er
- * `width`/`height`/`min-*` prueft und `max-*` keine Zielgroesse setzt.
- *
- * Die Antwort gehoert deshalb hierher und traegt einen eigenen Namen, wie
- * `.btn--icon-sm` darueber. 24px ist der WCAG-2.5.8-Boden, NICHT der
- * Komfortwert: diese Variante darf nur dort stehen, wo die Trefferflaeche
- * ueber ein ::before wieder auf --target-base waechst. Heute ist das die
- * Trailing-Zone der Kuechenleiste, die ab 640px ausgeblendet ist - darum
- * braucht die Variante keine Breiten-Abfrage und macht die Viewport-Breite
- * nicht erneut zum Kriterium. */
-.btn--icon.btn--icon-tight {
-  padding: 0;
-  min-width: var(--space-6);
-  min-height: var(--space-6);
-}
-
 /* Textarea: vertikale Größenänderung ist nutzbar */
 textarea.input { resize: vertical; }
 

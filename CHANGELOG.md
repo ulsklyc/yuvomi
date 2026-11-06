@@ -8,15 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Late completion decay (opt-in).** Households can have late completions pay less: administrators
-  switch it on in the rewards settings, off by default. A task ticked off after its due day earns one
-  point less for each day it is past due, and always at least one point - finishing still pays. What a
-  completion earned stands with the booking: later changes of the due date, the point value or the
-  setting never rewrite booked amounts, and for every late earning the ledger shows the base it came
-  from and how many days it was late.
-- **Kitchen search is now in the tab bar on phones (#2043).** Recipes and Pantry show a search
-  icon at the right end of the kitchen tab bar, keeping the second header row collapsed until you
-  tap it. Meals and Shopping clear the zone so nothing appears there.
+- **A shopping list can send its open items to a webhook.** An admin sets a household-wide
+  webhook URL under Settings > Notifications. Once a URL is set, the list menu shows "Send open
+  items": a single tap posts the list name and all unchecked items - name, quantity and
+  category - as JSON to that URL. Useful for n8n, Home Assistant and any other consumer that
+  accepts a JSON POST. A target on your own network only works if the server was started with
+  `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true`; without it the list says so instead of reporting a
+  failure. Only admins can see or set the URL. (#2502)
 - **Administrators set night hours and screensaver options for each wall tablet.**
   Settings > Wall tablets offers each tablet's night window, idle delay, clock and photo
   fill. Online tablets pick up changes automatically; existing local choices stay in use
@@ -28,39 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
-- **Backup, system and API settings say what went wrong in your language** (#1909). Restoring an
-  empty file, a database that is not from Yuvomi or a backup from a newer version showed the
-  server's English text; it now says what to do next. Creating an API token with a past expiry
-  date or for a person who no longer exists or was deactivated, and load errors on the three
-  pages, are explained in your language too. API clients get the cases as `reason`.
-- **Date pickers start the week on the household week start** (#2533). With Sunday or Saturday
-  set as the week start in the calendar settings, the calendar sheet of every date field (events,
-  tasks, budget, health and the others) showed Monday-first weeks. Its weekday header and the
-  position of the first of the month now follow the setting, like the calendar views do. When
-  someone else in the household changes it, the pickers follow as soon as the calendar, the meal
-  plan or Schedule is opened, not only after the app restarts.
 - **Health: in the month view, the series names no longer cover the bars of the last days** (#2538).
   "Systolic" and "Diastolic" stood left of the last bar, and "Pulse" above its last dot, hiding the
   readings underneath when a month is full. A short line above the blood pressure chart now says
   which end of a bar is which, and the pulse chart is named by its own unit axis.
-- **Calendar and contact sync settings say what went wrong in your language** (#1909).
-  Connecting a CalDAV or Apple account, subscribing to or importing a calendar feed and saving
-  a CardDAV account showed the server's English text for cases the app knows: the account is
-  already connected or has no calendars, the name or address is not valid, the address is on a
-  private network, or the feed answered with an error status or is too large. These now say so
-  in your language; what the remote server itself answers stays visible to administrators as
-  before. API clients get the case as `reason`.
-- **Wall tablet settings say what went wrong in your language** (#1909). When another
-  administrator had already deleted a wall tablet or one of its devices, the page showed the
-  server's English text. It now says in your language that the tablet or device no longer
-  exists and refreshes the list; deleting a tablet that is already gone simply counts as done.
-  API clients get the case as `reason`.
-- **Your account page says what went wrong in your language** (#1909). Linking or unlinking
-  SSO, turning on two-factor authentication and fetching a Gravatar showed the server's English
-  text for some errors. They now say in your language that the account is already linked or no
-  longer linked, that an account without a password cannot unlink, that SSO is no longer set up,
-  or that two-factor authentication is already on or its setup has expired. API clients get the
-  case as `reason`.
 - **Adding, editing and inviting family members say what went wrong in your language** (#1909).
   The error line in these dialogs showed the server's English text. It now says in your language
   that the username is invalid or already taken, that an account without a password needs an
