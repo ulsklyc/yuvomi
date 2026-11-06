@@ -3529,6 +3529,8 @@
         "memberErrorGone": "此成員已不存在。",
         "memberErrorSsoEmailRequired": "僅限 SSO 的帳號需要電子郵件地址，首次 SSO 登入才能找到它。",
         "memberErrorSsoEmailAmbiguous": "其他成員已使用此電子郵件地址。SSO 無法區分這些帳號。",
+        "backupSchedulerFailedPushTitle": "備份失敗",
+        "backupSchedulerFailedPushBody": "自動備份未執行。請在{{path}}中查看原因。",
         "twoFactorAlreadyEnabled": "兩步驗證已經啟用。請重新載入頁面查看目前狀態。",
         "twoFactorSetupExpired": "設定已逾時。請取消後重新開始。",
         "oidcLinkErrorNotConfigured": "此伺服器已不再設定 SSO。",

@@ -3529,6 +3529,8 @@
         "memberErrorGone": "Questo membro non esiste più.",
         "memberErrorSsoEmailRequired": "Un account solo SSO ha bisogno di un indirizzo email, così il primo accesso SSO può trovarlo.",
         "memberErrorSsoEmailAmbiguous": "Un altro membro ha già questo indirizzo email. L'SSO non potrebbe distinguere gli account.",
+        "backupSchedulerFailedPushTitle": "Backup non riuscito",
+        "backupSchedulerFailedPushBody": "Il backup automatico non è stato eseguito. Il motivo è in {{path}}.",
         "twoFactorAlreadyEnabled": "L'autenticazione a due fattori è già attiva. Ricarica la pagina per vedere lo stato attuale.",
         "twoFactorSetupExpired": "La configurazione è scaduta. Annullala e ricomincia.",
         "oidcLinkErrorNotConfigured": "L'SSO non è più configurato su questo server.",

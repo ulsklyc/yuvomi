@@ -3547,6 +3547,8 @@
         "memberErrorGone": "이 구성원은 더 이상 없습니다.",
         "memberErrorSsoEmailRequired": "SSO 전용 계정에는 첫 SSO 로그인이 찾을 수 있도록 이메일 주소가 필요합니다.",
         "memberErrorSsoEmailAmbiguous": "다른 구성원이 이미 이 이메일 주소를 사용하고 있습니다. SSO가 계정을 구별할 수 없습니다.",
+        "backupSchedulerFailedPushTitle": "백업 실패",
+        "backupSchedulerFailedPushBody": "자동 백업이 실행되지 않았습니다. 이유는 {{path}}에서 확인하세요.",
         "twoFactorAlreadyEnabled": "2단계 인증이 이미 켜져 있습니다. 현재 상태를 보려면 페이지를 새로 고치세요.",
         "twoFactorSetupExpired": "설정이 만료되었습니다. 취소하고 다시 시작하세요.",
         "oidcLinkErrorNotConfigured": "이 서버에는 더 이상 SSO가 설정되어 있지 않습니다.",
