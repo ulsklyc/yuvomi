@@ -290,12 +290,19 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // Kalender-Sync und Kalender-Abos (#1909); die echte Antwort misst
     // test:sync-form-errors.
     '../server/routes/calendar/apple.js',
+    // Backup-Scheduler (#2525): der Grund des letzten Fehlschlags.
+    '../server/services/backup-scheduler.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
+  // Reason-Namen, die in bedingten Ausdrucken auftauchen (nicht als direkte Zuordnung)
+  const CONDITIONAL_REASONS = new Set(['backup_dir_not_writable']);
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
     for (const [reason, key] of CASE_MESSAGES) {
       assert.equal(REFUSAL_MESSAGES.has(reason), false, `${reason} steht in beiden Listen`);
-      assert.ok(routes.includes(`reason: '${reason}'`), `${reason}: kein Server nennt diesen Fall`);
+      // Prueft, ob der Grund entweder als direkte Zuordnung oder in einem bedingten Ausdruck vorkommt
+      const found = routes.includes(`reason: '${reason}'`)
+        || (CONDITIONAL_REASONS.has(reason) && routes.includes(`'${reason}'`));
+      assert.ok(found, `${reason}: kein Server nennt diesen Fall`);
       const [section, leaf] = key.split('.');
       for (const name of files) {
         const text = JSON.parse(readFileSync(new URL(name, dir), 'utf8'))[section]?.[leaf];
