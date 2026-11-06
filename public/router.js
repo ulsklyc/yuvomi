@@ -10,7 +10,7 @@ import { setExtensionModules, selectThirdPartyModuleList } from '/utils/extensio
 import { initExtensionI18n, moduleDisplayLabel, reloadExtensionLocales } from '/utils/extension-i18n.js';
 import { clearApiCache, onServiceWorkerUpdate, UPDATE_RELOAD_DELAY_MS } from '/sw-register.js';
 import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
-import { initI18n, getLocale, t, formatTime, setWeekStart } from '/i18n.js';
+import { initI18n, getLocale, t, formatTime } from '/i18n.js';
 import { dateText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
@@ -978,9 +978,6 @@ function applyStartPreferences(res) {
   if (timeFormat) {
     localStorage.setItem('yuvomi-time-format', timeFormat);
   }
-  // Der Wochenstart fuer Komponenten ohne eigene Abfrage, allen voran den
-  // Datepicker (#2533). Fehlt er in der Antwort, bleibt der letzte Stand.
-  if (res?.data?.week_start) setWeekStart(res.data.week_start);
   // Die Haushaltszone in die Anzeige spiegeln (#829 Teil 3). Bewusst
   // `timezone` und nicht `timezone_effective`: letzteres ist nie leer und
   // traegt ohne Einstellung die `TZ` des Containers - ein Compose-Schalter,

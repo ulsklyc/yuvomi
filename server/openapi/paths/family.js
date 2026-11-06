@@ -22,7 +22,7 @@ export function familyPaths() {
           },
         ],
         description: 'The image bytes of a profile picture (PNG, JPEG or WebP). List rows that show a person - '
-          + '`assigned_avatar` and `assigned_users[].avatar_data` on tasks and events, `creator_avatar` on notes, '
+          + '`assigned_avatar` and `assigned_users[].avatar_data` on tasks and events, `created_by_avatar` on tasks, `creator_avatar` on notes, '
           + '`worker_avatar_data` on housekeeping visits, `user_avatar`/`person_avatar` in the completion feed and '
           + '`user_avatar` in the money ledger - carry this address (with a `v` query parameter, a random key that changes with '
           + 'every new picture and is required here) instead of a data URL, or `null` when the person has no picture. Requests authenticated '

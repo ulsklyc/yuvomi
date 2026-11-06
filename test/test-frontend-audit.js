@@ -1938,7 +1938,7 @@ test('module-specific settings leaves only reference their owned preferences and
     },
     '../public/settings/pages/modules-options.js': {
       endpoints: ['/preferences'],
-      preferences: ['budget_mode', 'health_cycle_enabled', 'housekeeping_payment_tasks', 'tasks_subtasks_expanded', 'schedule_hidden_templates'],
+      preferences: ['budget_mode', 'health_cycle_enabled', 'housekeeping_payment_tasks', 'tasks_subtasks_expanded', 'tasks_show_creator', 'schedule_hidden_templates'],
     },
   };
 
@@ -2060,7 +2060,7 @@ test('module-specific settings leaves preserve their required controls and behav
   // diesen Schaltern (Aufgaben kam später dazu) und einem einzigen
   // /preferences-Request statt einem pro Schalter.
   const options = read('../public/settings/pages/modules-options.js');
-  for (const id of ['budget-mode-personal', 'health-cycle-enabled', 'housekeeping-payment-tasks', 'tasks-subtasks-expanded']) {
+  for (const id of ['budget-mode-personal', 'health-cycle-enabled', 'housekeeping-payment-tasks', 'tasks-subtasks-expanded', 'tasks-show-creator']) {
     assert.match(options, controlIdPattern(id));
   }
   // Die drei Schichtplan-Vorlagen-Kontrollkaestchen teilen sich EINE
@@ -2075,7 +2075,7 @@ test('module-specific settings leaves preserve their required controls and behav
   // Fundstellen im QUELLTEXT, nicht Aufrufe zur Laufzeit: die drei
   // Schichtplan-Vorlagen teilen sich die eine `.map(...)`-Aufrufstelle oben.
   // Seit R17 (E9) ueber die Schalterzeile der Gruppe (`settingSwitchRowHtml`).
-  assert.equal([...options.matchAll(/settingSwitchRowHtml\(\{/g)].length, 5);
+  assert.equal([...options.matchAll(/settingSwitchRowHtml\(\{/g)].length, 6);
   assert.equal([...options.matchAll(/\btoggleRowHtml\(/g)].length, 0, 'kein Schalter ausserhalb einer gruppierten Zeile');
   assert.equal([...options.matchAll(/<(?:input|select|textarea)\b/g)].length, 0);
   assert.equal([...options.matchAll(/getPreferences\(\)/g)].length, 1);
@@ -22460,11 +22460,22 @@ const ERROR_MESSAGE_OWNERS = new Set([
 // errorSentence nimmt dem Nutzer die Ursache.
 const ERROR_MESSAGE_OPEN = new Map([
   ['components/category-manager.js', 1],
+  ['pages/login.js', 3],
+  ['settings/backup-key.js', 1],
+  ['settings/pages/admin-api.js', 2],
+  ['settings/pages/admin-backup.js', 2],
+  ['settings/pages/admin-displays.js', 7],
+  ['settings/pages/admin-system.js', 1],
   ['settings/pages/documents-dms.js', 2],
   ['settings/pages/documents-storage.js', 1],
   ['settings/pages/modules-install.js', 1],
+  ['settings/pages/personal-account.js', 5],
+  ['settings/pages/personal-calendar-subscriptions.js', 3],
   ['settings/pages/personal-device.js', 1],
   ['settings/pages/personal-feeds.js', 1],
+  ['settings/pages/sync-calendar.js', 5],
+  ['settings/pages/sync-contacts.js', 1],
+  ['settings/pages/sync-reminders.js', 2],
   ['utils/folder-upload.js', 2],
 ]);
 
@@ -22477,9 +22488,9 @@ const ERROR_MESSAGE_OPEN = new Map([
 const TECHNICAL_DETAIL_SITES = new Map([
   ['settings/pages/admin-backup.js', [2, 'Verbindungstest und Handlauf des WebDAV-Backups: Antwort des fremden Servers']],
   ['settings/pages/documents-storage.js', [5, 'WebDAV/Google Drive: Verbindungstest, Speichern und Trennen pruefen gegen den fremden Speicher und bestehende Dokumente']],
-  ['settings/pages/sync-calendar.js', [5, 'Aktualisieren und Abgleich von CalDAV, Outlook, Apple, dazu das Verbinden eines CalDAV- oder Apple-Kontos (connectErrorSentence, ausser den Faellen aus CASE_MESSAGES): Antwort des fremden Servers']],
+  ['settings/pages/sync-calendar.js', [4, 'Aktualisieren und Abgleich von CalDAV, Outlook, Apple: Antwort des fremden Servers']],
   ['settings/pages/sync-contacts.js', [1, 'CardDAV-Abgleich und Aktualisieren: connection_failed traegt die Antwort des fremden Servers']],
-  ['settings/pages/sync-reminders.js', [2, 'Aktualisieren der Erinnerungslisten und ihr erster Abruf je Konto (fragt den CalDAV-Server selbst, getReminderLists): Antwort des fremden Servers']],
+  ['settings/pages/sync-reminders.js', [1, 'Aktualisieren der Erinnerungslisten: Antwort des fremden Servers']],
 ]);
 
 function countTechnicalDetailCalls(source) {
