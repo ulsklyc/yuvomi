@@ -143,11 +143,11 @@ async function syncAccount(account) {
   }
 
   const insRecipe = conn.prepare(`
-    INSERT INTO recipes (title, notes, recipe_url, created_by, provider_account_id, provider_recipe_id, provider_updated_at, provider_slug, provider_has_image, servings)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO recipes (title, notes, recipe_url, created_by, provider_account_id, provider_recipe_id, provider_updated_at, provider_slug, provider_has_image)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const updRecipe = conn.prepare(`
-    UPDATE recipes SET title = ?, notes = ?, recipe_url = ?, provider_updated_at = ?, provider_slug = ?, provider_has_image = ?, servings = ? WHERE id = ?
+    UPDATE recipes SET title = ?, notes = ?, recipe_url = ?, provider_updated_at = ?, provider_slug = ?, provider_has_image = ? WHERE id = ?
   `);
   const updUrl = conn.prepare('UPDATE recipes SET recipe_url = ? WHERE id = ?');
   const delIngredients = conn.prepare('DELETE FROM recipe_ingredients WHERE recipe_id = ?');
@@ -190,17 +190,15 @@ async function syncAccount(account) {
   db.transaction(() => {
     for (const { current, detail, recipeUrl } of toUpsert) {
       const hasImage = detail.hasImage ? 1 : 0;
-      // Portionen der Quelle (#2558, #2355); der Adapter liefert nur 1-99 oder null.
-      const servings = detail.servings ?? null;
       let id;
       if (current) {
-        updRecipe.run(detail.title, detail.notes || null, recipeUrl, syncStamp(adapter, detail.updatedAt), detail.slug, hasImage, servings, current.id);
+        updRecipe.run(detail.title, detail.notes || null, recipeUrl, syncStamp(adapter, detail.updatedAt), detail.slug, hasImage, current.id);
         id = current.id;
         updated++;
       } else {
         const result = insRecipe.run(
           detail.title, detail.notes || null, recipeUrl,
-          account.created_by, account.id, detail.id, syncStamp(adapter, detail.updatedAt), detail.slug, hasImage, servings,
+          account.created_by, account.id, detail.id, syncStamp(adapter, detail.updatedAt), detail.slug, hasImage,
         );
         id = Number(result.lastInsertRowid);
         imported++;

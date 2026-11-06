@@ -2429,6 +2429,7 @@
         "backupSchedulerLastFail": "{{date}} (başarısız)",
         "backupSchedulerLastSuccess": "{{date}} (başarılı)",
         "backupSchedulerNever": "Henüz yedek oluşturulmadı",
+        "backupSchedulerLastError": "Son hata",
         "backupSchedulerSchedule": "Zamanlama",
         "backupSchedulerCronDaily": "Her gün {{time}}",
         "backupSchedulerCronWeekly": "Her {{weekday}} {{time}}",
@@ -3548,7 +3549,8 @@
         "backupRestoreErrorTooLarge": "Dosya bu kurulumun yükleme sınırından ({{limit}}) büyük. BACKUP_UPLOAD_LIMIT değerini artırın, Yuvomi'yi yeniden başlatın ve yeniden geri yükleyin. Burada hiçbir şey değişmedi.",
         "apiTokenErrorNameTooLong": "Ad en fazla 100 karakter olabilir.",
         "apiTokenErrorExpiryPast": "Son kullanma tarihi geçmişte. Daha sonraki bir zaman seç.",
-        "apiTokenErrorSubjectDeactivated": "Bu hesap devre dışı ve token alamaz. Başka bir kişi seç."
+        "apiTokenErrorSubjectDeactivated": "Bu hesap devre dışı ve token alamaz. Başka bir kişi seç.",
+        "backupSchedulerReasonDirNotWritable": "Yedekleme klasörü yazılabilir değil. BACKUP_DIR ayarını ve izinleri kontrol edin."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

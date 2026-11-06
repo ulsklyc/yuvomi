@@ -2441,6 +2441,7 @@
         "backupSchedulerLastFail": "{{date}} (falhou)",
         "backupSchedulerLastSuccess": "{{date}} (bem-sucedida)",
         "backupSchedulerNever": "Ainda não foi criada nenhuma cópia de segurança",
+        "backupSchedulerLastError": "Último erro",
         "backupSchedulerSchedule": "Agendamento",
         "backupSchedulerCronDaily": "Diariamente às {{time}}",
         "backupSchedulerCronWeekly": "Semanalmente: {{weekday}} às {{time}}",
@@ -3548,7 +3549,8 @@
         "backupRestoreErrorTooLarge": "O ficheiro é maior do que o limite de envio desta instalação ({{limit}}). Aumente BACKUP_UPLOAD_LIMIT, reinicie o Yuvomi e restaure novamente. Nada foi alterado aqui.",
         "apiTokenErrorNameTooLong": "O nome pode ter no máximo 100 caracteres.",
         "apiTokenErrorExpiryPast": "A data de expiração está no passado. Escolhe um momento posterior.",
-        "apiTokenErrorSubjectDeactivated": "Esta conta está desativada e não pode receber um token. Escolhe outra pessoa."
+        "apiTokenErrorSubjectDeactivated": "Esta conta está desativada e não pode receber um token. Escolhe outra pessoa.",
+        "backupSchedulerReasonDirNotWritable": "A pasta de cópia de segurança não é gravável. Verifique a definição BACKUP_DIR e as permissões."
     },
     "login": {
         "tagline": "Bem-vindo de volta. A tua casa num só lugar.",

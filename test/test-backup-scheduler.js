@@ -6,7 +6,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { withoutCommentsKeepingLines } from './source-text.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -109,6 +110,10 @@ describe('Backup Scheduler', () => {
     assert.ok(status.lastBackup.timestamp, 'Last backup should have timestamp');
     assert.strictEqual(status.lastBackup.success, true, 'Last backup should be successful');
     assert.ok(status.lastBackup.file, 'Last backup should have filename');
+    // Ein erfolgreicher Lauf LOESCHT den letzten Fehler: sonst zeigte die
+    // Backup-Karte den Grund eines Fehlschlags weiter, obwohl seither ein
+    // Backup gelaufen ist (#2525).
+    assert.strictEqual(status.lastError, null, 'a successful run clears lastError');
   });
 
   it('createLocalBackup() should create a fresh, uniquely named file each call', async () => {
@@ -171,54 +176,64 @@ describe('Backup Scheduler', () => {
       );
       assert.match(result.error, /BACKUP_DIR/, 'error must point at the BACKUP_DIR setting');
       assert.match(result.error, /EACCES|EPERM|EROFS/, 'error must keep the original errno');
+
+      // DER GRUND MUSS AUS DEM STATUS ZU LESEN SEIN (#2525). `lastBackup`
+      // sagt nur "fehlgeschlagen" samt Zeitpunkt; was zu tun ist - volle
+      // Platte, unschreibbares BACKUP_DIR - steht allein in `lastError`.
+      const status = backupScheduler.getStatus();
+      assert.ok(status.lastError, 'a failed run must leave lastError in getStatus()');
+      assert.ok(status.lastError.timestamp, 'lastError carries the time of the failure');
+      assert.strictEqual(status.lastError.message, result.error,
+        'lastError.message is the same sentence the failed run reported');
     } finally {
       await fs.chmod(TEST_BACKUP_ROOT, 0o755);
     }
   });
 
-  it('a backup that fails the integrity check is discarded, older backups are kept (#2520)', async () => {
-    // Die Backup-API kopiert die Seiten der Live-Datenbank, einen kaputten Index
-    // also mit: der Eintrag in sqlite_master zeigt auf eine andere Spalte als
-    // der Index-B-Baum, `integrity_check` meldet "row ... missing from index".
-    // Vor #2520 ging diese Datei als gelungenes Backup durch und rotierte das
-    // aelteste gute weg.
-    const { get } = await import('../server/db.js');
-    const live = get();
-    await backupScheduler.triggerBackup();
-    const before = (await fs.readdir(TEST_BACKUP_DIR)).sort();
-    assert.ok(before.length > 0, 'a good backup must exist before the damaged one');
-
-    live.exec('CREATE TABLE probe_2520 (x INTEGER, y INTEGER); CREATE INDEX probe_2520_x ON probe_2520 (x);');
-    const insert = live.prepare('INSERT INTO probe_2520 VALUES (?, ?)');
-    for (let i = 0; i < 20; i++) insert.run(i, 1000 - i);
-    live.unsafeMode(true);
-    live.pragma('writable_schema = ON');
-    live.prepare("UPDATE sqlite_master SET sql = 'CREATE INDEX probe_2520_x ON probe_2520 (y)' WHERE name = 'probe_2520_x'").run();
-    live.pragma('writable_schema = OFF');
-    live.unsafeMode(false);
-
-    try {
-      for (let i = 0; i < 4; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 5));
-        const result = await backupScheduler.triggerBackup();
-        assert.strictEqual(result.success, false, 'a damaged backup must not count as a success');
-        assert.match(result.error, /integrity check/);
-      }
-      const status = backupScheduler.getStatus();
-      assert.ok(status.lastError, 'the failure must show in the scheduler status');
-      assert.match(status.lastError.message, /integrity check/);
-      assert.deepStrictEqual((await fs.readdir(TEST_BACKUP_DIR)).sort(), before,
-        'no damaged file left behind, no good backup rotated away');
-      await assert.rejects(backupScheduler.createLocalBackup(), { reason: 'backup_verify_failed' },
-        'createLocalBackup (WebDAV "upload now") must refuse before anything is uploaded');
-    } finally {
-      live.exec('DROP INDEX probe_2520_x; DROP TABLE probe_2520;');
-    }
-    assert.strictEqual((await backupScheduler.triggerBackup()).success, true,
-      'a repaired database backs up again');
-  });
-
   it('should cleanup test directory', async () => {
     await fs.rm(TEST_BACKUP_ROOT, { recursive: true, force: true });
+  });
+});
+
+// WARUM EIN QUELLTEXT-GUARD UND KEIN DOM-TEST: der Fehler, den #2525 meldet,
+// war genau diese Luecke - der Scheduler fuehrte `lastError` mit, die Route
+// gab ihn mit heraus, und die Karte las ihn nie. Ein Test, der nur den Status
+// prueft, bleibt dabei gruen. Die Zeile laeuft in `load()` hinter `api.get()`,
+// also liest der Guard die Quelle, mit Kommentaren heraus (ein Kommentar, der
+// den Schluessel nennt, darf nicht als Umsetzung zaehlen).
+describe('Backup-Karte: der Grund des letzten Fehlschlags (#2525)', () => {
+  const source = withoutCommentsKeepingLines(
+    readFileSync(new URL('../public/settings/pages/admin-backup.js', import.meta.url), 'utf8')
+  );
+
+  it('liest lastError aus dem Scheduler-Status und zeichnet ihn als Fehler aus', () => {
+    // lastError direkt entnommen (kein Alias-Rename mehr):
+    assert.match(source, /\{[^{}]*\blastError\b[^{}]*\}\s*=\s*scheduler/,
+      'admin-backup.js muss lastError aus dem Scheduler-Status lesen');
+
+    // createInfoRow mit Label settings.backupSchedulerLastError AND tone 'danger':
+    // beide muessen im selben Aufruf stehen, damit das Entfernen einer der beiden
+    // Zeilen den Guard rot macht.
+    const aufruf = source
+      .split(/(?=createInfoRow)/)
+      .find((s) => s.includes('settings.backupSchedulerLastError'));
+    assert.ok(aufruf, 'kein createInfoRow mit dem Label settings.backupSchedulerLastError');
+    assert.match(aufruf, /tone:\s*'danger'/, 'der Grund eines Fehlschlags ist als Fehler ausgezeichnet');
+
+    // Die rohe Nachricht muss als technisches Detail erscheinen (lastError.message):
+    assert.match(source, /lastError\s*\.\s*message/, 'lastError.message erscheint als technisches Detail');
+  });
+
+  it('jede Locale kennt das Label und den uebersetzten Grund', () => {
+    const dir = new URL('../public/locales/', import.meta.url);
+    const fehltLabel = [];
+    const fehltGrund = [];
+    for (const file of readdirSync(dir).filter((n) => n.endsWith('.json'))) {
+      const json = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
+      if (!json.settings?.backupSchedulerLastError) fehltLabel.push(file);
+      if (!json.settings?.backupSchedulerReasonDirNotWritable) fehltGrund.push(file);
+    }
+    assert.deepEqual(fehltLabel, [], `backupSchedulerLastError fehlt in: ${fehltLabel.join(', ')}`);
+    assert.deepEqual(fehltGrund, [], `backupSchedulerReasonDirNotWritable fehlt in: ${fehltGrund.join(', ')}`);
   });
 });

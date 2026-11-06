@@ -47,41 +47,6 @@ Nachprüfen je Datei:
 gh api repos/truenas/apps/contents/ix-dev/community/yuvomi/questions.yaml --jq .content | base64 -d | diff - deploy/truenas/questions.yaml
 ```
 
-### Offen gegen Upstream: die optionalen Secrets (#2507)
-
-Seit v2.85.0 erzeugt der Server `SESSION_SECRET` und `DB_ENCRYPTION_KEY` beim
-ersten Start selbst, wenn beide leer sind. `questions.yaml` verlangte
-`session_secret` aber weiter (`required: true`), fragte also nach etwas, das
-niemand mehr setzen muss. Hier geändert am 2026-11-04:
-
-- `session_secret`: `required: true` → `default: ""`, Beschreibung wie die von
-  `db_encryption_key`.
-- `templates/docker-compose.yaml`: `SESSION_SECRET` wird nur noch gesetzt, wenn
-  ein Wert da ist (`{% if %}`, genau wie `db_encryption_key` eine Zeile darunter).
-  Ein leerer Wert gilt dem Server zwar als ungesetzt (Test in
-  `test/test-auto-secrets.js`), aber die Variable gar nicht zu setzen ist das,
-  was `db_encryption_key` schon tut.
-- `db_encryption_key`: nur die **Beschreibung** neu formuliert. Sie sagt jetzt,
-  dass der Server bei einer neuen Installation selbst einen Schlüssel erzeugt,
-  dass ein leeres Feld auf einer bereits verschlüsselten Datenbank *keinen*
-  neuen erzeugt (der Start wird abgewiesen, `server/db.js:647-660`), und sie
-  verweist für `DB_ENCRYPTION_AUTO_KEY=false` auf *Additional Environment
-  Variables* statt auf ein Feld „below", das es im Formular nie gab. Label,
-  Name, Pfad und Schema bleiben unverändert.
-
-`min_length: 16` ist bei `session_secret` **absichtlich weggefallen** und nicht
-wieder eingebaut: ob TrueNAS die Prüfung auf den leeren Default anwendet, lässt
-sich von hier aus nicht feststellen, und tut es das, wäre das Feld wieder
-Pflicht - genau das, was dieser Change aufhebt. Damit ist TrueNAS so streng wie
-jeder andere Weg: der Server prüft die Länge nirgends, er weist nur den
-veröffentlichten Platzhalter ab (`server/auth.js:359`). Eine echte Mindestlänge
-gehört serverseitig in einen eigenen Change, nicht in einen Deskriptor.
-
-**Alle drei brauchen einen Upstream-PR, bis dahin zeigt der `diff` genau diese
-Abweichungen.** Eine `app_migrations.yaml` ist nicht nötig: Name und Pfad der Frage
-bleiben, Bestandsinstallationen behalten ihren gesetzten Wert, es entfällt nur die
-Pflichtprüfung des Formulars.
-
 ## Namensraum: `yuvomi`, nicht `oikos`
 
 Anders als beim ghcr-Image, dem Quadlet und der Datenbank ist der TrueNAS-Eintrag

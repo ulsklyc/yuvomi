@@ -2429,6 +2429,7 @@
         "backupSchedulerLastFail": "{{date}} (विफल)",
         "backupSchedulerLastSuccess": "{{date}} (सफल)",
         "backupSchedulerNever": "अभी तक कोई बैकअप नहीं बना",
+        "backupSchedulerLastError": "अंतिम त्रुटि",
         "backupSchedulerSchedule": "समय-सारणी",
         "backupSchedulerCronDaily": "प्रतिदिन {{time}} बजे",
         "backupSchedulerCronWeekly": "हर {{weekday}} को {{time}} बजे",
@@ -3548,7 +3549,8 @@
         "backupRestoreErrorTooLarge": "फ़ाइल इस इंस्टॉलेशन की अपलोड सीमा ({{limit}}) से बड़ी है। BACKUP_UPLOAD_LIMIT बढ़ाएँ, Yuvomi को फिर से शुरू करें और दोबारा पुनर्स्थापित करें। यहाँ कुछ नहीं बदला गया।",
         "apiTokenErrorNameTooLong": "नाम अधिकतम 100 अक्षरों का हो सकता है।",
         "apiTokenErrorExpiryPast": "समाप्ति तिथि बीत चुकी है। कोई बाद का समय चुनें।",
-        "apiTokenErrorSubjectDeactivated": "यह खाता निष्क्रिय है और इसे टोकन नहीं मिल सकता। किसी दूसरे व्यक्ति को चुनें।"
+        "apiTokenErrorSubjectDeactivated": "यह खाता निष्क्रिय है और इसे टोकन नहीं मिल सकता। किसी दूसरे व्यक्ति को चुनें।",
+        "backupSchedulerReasonDirNotWritable": "बैकअप फ़ोल्डर में लिखना संभव नहीं है। BACKUP_DIR सेटिंग और अनुमतियाँ जाँचें।"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",

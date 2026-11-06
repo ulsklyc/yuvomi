@@ -2502,6 +2502,7 @@
         "backupSchedulerLastSuccess": "{{date}} (geslaagd)",
         "backupSchedulerLastFail": "{{date}} (mislukt)",
         "backupSchedulerNever": "Nog geen back-up aangemaakt",
+        "backupSchedulerLastError": "Laatste fout",
         "backupSchedulerTrigger": "Nu back-up aanmaken",
         "backupSchedulerTriggering": "Back-up aanmaken...",
         "backupSchedulerTriggeredToast": "Back-up succesvol aangemaakt.",
@@ -3548,7 +3549,8 @@
         "backupRestoreErrorTooLarge": "Het bestand is groter dan de uploadlimiet van deze installatie ({{limit}}). Verhoog BACKUP_UPLOAD_LIMIT, start Yuvomi opnieuw en herstel opnieuw. Hier is niets gewijzigd.",
         "apiTokenErrorNameTooLong": "De naam mag maximaal 100 tekens lang zijn.",
         "apiTokenErrorExpiryPast": "De vervaldatum ligt in het verleden. Kies een later tijdstip.",
-        "apiTokenErrorSubjectDeactivated": "Dit account is gedeactiveerd en kan geen token krijgen. Kies een andere persoon."
+        "apiTokenErrorSubjectDeactivated": "Dit account is gedeactiveerd en kan geen token krijgen. Kies een andere persoon.",
+        "backupSchedulerReasonDirNotWritable": "De back-upmap is niet beschrijfbaar. Controleer de instelling BACKUP_DIR en de machtigingen."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

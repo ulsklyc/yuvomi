@@ -110,11 +110,9 @@ next to Yuvomi, not a second Yuvomi.
   complete product. A device signs in with a password or pairs through a QR code from the web
   app, so a household that only uses SSO is not left out. The first version has no push relay:
   reminders are scheduled on the phone itself, and nothing leaves the household.
-- **Shipped on the server.** A device credential for every member, pairing by code and a way to
-  read upcoming reminders (v2.84.0), and the list of signed-in phones under Settings → Account
-  (v2.85.0).
-- **Open.** A push relay would be a hosted service, and that is a separate decision that has not
-  been made.
+- **Open.** The server work a client needs: a device credential for every member, pairing, a
+  way to read upcoming reminders. A push relay would be a hosted service, and that is a
+  separate decision that has not been made.
 
 ---
 
@@ -139,7 +137,8 @@ Already tickets, since 2 September 2026: bank export import with a saved mapping
 per-month budget plans (#1001), the health change feed (#1002), a price on a shopping item
 (#1003).
 
-Since 7 October 2026: an owner on a calendar connection (#1761), Google contacts over CardDAV
-(#1764), a picture on a reward (#1755) - and, from threads that were never on this list, the week
+Since 7 October 2026: rotating assignees (#1763), an owner on a calendar connection (#1761),
+Google contacts over CardDAV (#1764), the screensaver's clock, full-bleed photos and manual start
+(#1766), a picture on a reward (#1755) - and, from threads that were never on this list, the week
 in day blocks (#1757), a care grant that ends on its own (#1762) and the calendar feed of the meal
 plan (#1759).

@@ -1259,21 +1259,13 @@ test('das Portainer-App-Template fragt genau ab, was der verlinkte Stack braucht
   assert.deepEqual(unknown, [],
     `Diese Formularfelder interpoliert ${template.repository.stackfile} nicht.`);
 
-  // Seit v2.85.0 (#2507) erzeugt der Server beide Secrets beim ersten Start,
-  // wenn sie leer bleiben. Der Stack darf sie deshalb NICHT mehr per
-  // `${VAR:?...}` erzwingen: ein Deploy ohne sie ist der Normalfall, kein
-  // Fehler. Das Formular bietet sie weiter an - wer eigene Werte halten will,
-  // trägt sie ein -, und ein Default bleibt verboten, weil er für jede
-  // Installation derselbe wäre.
-  const erzwungen = [...stack.matchAll(/\$\{([A-Z0-9_]+):\?/g)].map((m) => m[1]);
-  assert.deepEqual(erzwungen, [],
-    `Diese Variablen brechen den Deploy ab, obwohl der Start sie selbst erzeugt: ${erzwungen.join(', ')}`);
-
-  for (const name of ['SESSION_SECRET', 'DB_ENCRYPTION_KEY']) {
-    assert.match(stack, new RegExp(`\\$\\{${name}:-\\}`),
-      `${name} muss im Stack mit leerem Default stehen (\${${name}:-})`);
+  const required = [...stack.matchAll(/\$\{([A-Z0-9_]+):\?/g)].map((m) => m[1]);
+  assert.ok(required.length >= 2,
+    `Nur ${required.length} Pflichtvariablen im Stack gefunden (gemessen: SESSION_SECRET, `
+    + 'DB_ENCRYPTION_KEY) - die Suche greift nicht mehr.');
+  for (const name of required) {
     const field = env.find((e) => e.name === name);
-    assert.ok(field, `${name} fehlt im Formular - niemand koennte einen eigenen Wert setzen`);
+    assert.ok(field, `${name} ist im Stack Pflicht, fehlt aber im Formular`);
     assert.equal(field.default ?? '', '',
       `${name} darf keinen Default tragen - er waere fuer jede Installation derselbe`);
   }

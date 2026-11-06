@@ -41,8 +41,9 @@ Why Yuvomi:
 
 - Setup -
 
-Nothing has to be filled in: leave SESSION_SECRET and DB_ENCRYPTION_KEY empty and Yuvomi generates both on its first start and keeps them in .secrets/ in the appdata folder. Keep a copy of the database key somewhere else (Settings, Household, Backup and restore shows it) - without it, a backup cannot be opened once that folder is lost.
-OPTIONAL: Set either secret yourself to keep its value under your own control. Generate one with: openssl rand -base64 48
+REQUIRED: Set a long random SESSION_SECRET.
+RECOMMENDED: Set a strong DB_ENCRYPTION_KEY to encrypt the database at rest - without it the database and any synced calendar/contact credentials are stored unencrypted.
+Generate either secret with: openssl rand -base64 48
 
 After the container starts, open the WebUI - the first visit guides you through creating your admin account. (Headless setups can alternatively run node setup.js in the container console.) Then log in - pick the modules you want and invite your family.</Overview>
 
@@ -72,8 +73,8 @@ After the container starts, open the WebUI - the first visit guides you through 
   <Config Name="MODULES_ALLOW_WEB_INSTALL" Target="MODULES_ALLOW_WEB_INSTALL" Default="false" Mode="" Description="Optional. Set to true to let an admin install third-party modules from Settings (ZIP upload or GitHub URL) into the Modules folder above. This puts same-origin script on the server from a browser session, without any file access; a module installed that way stays off until an admin approves it in a browser session, and the web interface deletes only what it installed. Off by default: modules are then copied into the folder by hand." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
   <Config Name="Documents (optional)" Target="/documents" Default="/mnt/user/appdata/yuvomi/documents" Mode="rw" Description="Optional: host folder for local document storage. Only used when DOCUMENT_STORAGE_LOCAL_ENABLED=true. Leave default if unused." Type="Path" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/yuvomi/documents</Config>
 
-  <!-- Optional secret: generated on the first start when left empty -->
-  <Config Name="SESSION_SECRET" Target="SESSION_SECRET" Default="" Mode="" Description="OPTIONAL. A long random string used to sign sessions. Leave empty and Yuvomi generates one on the first start and keeps it in .secrets/ in the appdata folder; every later start reads the same file. Set one yourself to keep the value under your own control - changing it later signs everyone out once. Generate with: openssl rand -base64 48" Type="Variable" Display="always" Required="false" Mask="true"/>
+  <!-- Required secret -->
+  <Config Name="SESSION_SECRET" Target="SESSION_SECRET" Default="" Mode="" Description="REQUIRED. A long random string used to sign sessions. Generate with: openssl rand -base64 48" Type="Variable" Display="always" Required="true" Mask="true"/>
 
   <!-- Recommended secret -->
   <Config Name="DB_ENCRYPTION_KEY" Target="DB_ENCRYPTION_KEY" Default="" Mode="" Description="RECOMMENDED. Strong key to encrypt the database at rest (SQLCipher). Leave empty on a new installation and Yuvomi generates a key on the first start and keeps it in .secrets/ in the appdata folder (Settings, Household, Backup and restore shows it; set DB_ENCRYPTION_AUTO_KEY=false for an unencrypted database). Cannot be changed later without re-encrypting. Generate with: openssl rand -base64 48" Type="Variable" Display="always" Required="false" Mask="true"/>

@@ -139,9 +139,8 @@ test('docs/installation.md: kein Copy-Block legt die .env an und startet', () =>
     + 'Secrets erzeugen, .env von Hand fuellen, dann erst in einem eigenen Block starten.');
   // Ohne diese Vorbedingung waere der Test gruen, weil es gar keinen
   // Kurzweg mehr gibt, den er pruefen koennte.
-  // Seit #2582 ohne Optionsbuchstaben: die zaehlt nur die Schritt-fuer-Schritt-Liste.
-  const quick = md.split(/^### /m).find((s) => /^Manual \(Docker or Podman/.test(s));
-  assert.ok(quick, 'Abschnitt "Manual (Docker or Podman ...)" im Quick Install nicht gefunden - Muster veraltet?');
+  const quick = md.split(/^### /m).find((s) => /^Option C .*Manual/.test(s));
+  assert.ok(quick, 'Abschnitt "Option C - Manual" nicht gefunden - Muster veraltet?');
   assert.match(quick, /openssl rand -hex 32/, 'Der Kurzweg sagt nicht, wie man die Secrets erzeugt.');
   assert.match(quick, /REPLACE_WITH_/, 'Der Kurzweg nennt den Platzhalter nicht, den man ersetzen muss.');
 });

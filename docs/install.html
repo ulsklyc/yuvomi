@@ -10,10 +10,10 @@
   <meta name="robots" content="index, follow">
   <meta name="color-scheme" content="light dark">
   <title>Install Yuvomi - Self-Hosted Family Planner</title>
-  <meta name="description" content="Step-by-step installation guide for Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid, Home Assistant, YunoHost or the guided web installer. Your self-hosted family planner runs in about 10 minutes.">
+  <meta name="description" content="Step-by-step installation guide for Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid, Home Assistant or the guided web installer. Your self-hosted family planner runs in about 10 minutes.">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Install Yuvomi - Self-Hosted Family Planner">
-  <meta property="og:description" content="Get Yuvomi running in about 10 minutes: guided web installer, Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid, Home Assistant or YunoHost.">
+  <meta property="og:description" content="Get Yuvomi running in about 10 minutes: guided web installer, Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid or Home Assistant.">
   <meta property="og:image" content="https://yuvomi.cloud/og-image.png">
   <meta property="og:url" content="https://yuvomi.cloud/install.html">
   <meta property="og:site_name" content="Yuvomi">
@@ -22,7 +22,7 @@
   <meta property="og:image:alt" content="Yuvomi - one home instead of many subscriptions, beside the overview of the self-hosted family planner in a browser window">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Install Yuvomi - Self-Hosted Family Planner">
-  <meta name="twitter:description" content="Get Yuvomi running in about 10 minutes: guided web installer, Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid, Home Assistant or YunoHost.">
+  <meta name="twitter:description" content="Get Yuvomi running in about 10 minutes: guided web installer, Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid or Home Assistant.">
   <meta name="twitter:image" content="https://yuvomi.cloud/twitter-image.png">
   <meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)">
@@ -375,12 +375,8 @@
        app-store panels still said "recommended". Every surface says optional and
        irreversible, and the quick start on index.html now names the placeholder.
        Since the secrets are generated on the first start SESSION_SECRET is no
-       longer required either, so its badge is gone. The store forms no longer
-       ask for either secret: every form field is optional and every step says
-       so, which is what #2507 relaxed. The qualifier the steps carry is "on a
-       new installation" - an EXISTING encrypted database whose key field is
-       emptied does not get a fresh key, the start is refused instead
-       (server/db.js:647-660). */
+       longer required either, so its badge is gone; the store forms that still
+       ask for it say so in their own steps. */
     .env-irrev { font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--r-full);
       background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warn-ink); }
     .env-desc { font-size: var(--fs-small); color: var(--text-2); line-height: 1.6; }
@@ -610,9 +606,6 @@
         <button class="tab-btn" role="tab" aria-selected="false" aria-describedby="tabgrp-terminal" aria-controls="panel-proxmox" id="tab-proxmox" type="button" style="--pc:#E57000">
           <span class="tb-logo"><svg viewBox="0 0 24 24" aria-hidden="true" fill-rule="evenodd" clip-rule="evenodd"><path d="M2.5 4.5A1.5 1.5 0 0 1 4 3h16a1.5 1.5 0 0 1 1.5 1.5v4A1.5 1.5 0 0 1 20 10H4a1.5 1.5 0 0 1-1.5-1.5v-4zM6 5.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2zM2.5 15.5A1.5 1.5 0 0 1 4 14h16a1.5 1.5 0 0 1 1.5 1.5v4A1.5 1.5 0 0 1 20 21H4a1.5 1.5 0 0 1-1.5-1.5v-4zM6 16.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/></svg></span><span data-t="tab_proxmox">Proxmox</span>
         </button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-describedby="tabgrp-terminal" aria-controls="panel-yunohost" id="tab-yunohost" type="button">
-          <span class="tb-logo"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><line x1="7" y1="7.5" x2="7.01" y2="7.5"/><line x1="7" y1="16.5" x2="7.01" y2="16.5"/></svg></span><span data-t="tab_yunohost">YunoHost</span>
-        </button>
         <button class="tab-btn" role="tab" aria-selected="false" aria-describedby="tabgrp-terminal" aria-controls="panel-installer" id="tab-installer" type="button">
           <span class="tb-logo"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span><span data-t="tab_installer">Web Installer</span>
         </button>
@@ -750,7 +743,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         <div class="callout callout-info">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           <span>
-            <span data-t="portainer_info"><b>Using Portainer?</b> Deploy <code>docs/docker-compose.portainer.yml</code> as a stack instead of these steps. Portainer puts no <code>.env</code> next to a stack, so that file lists every variable itself, and <code>SESSION_SECRET</code> and <code>DB_ENCRYPTION_KEY</code> go under the stack's environment variables - both may stay empty on a new installation, and Yuvomi generates them on the first start.</span>
+            <span data-t="portainer_info"><b>Using Portainer?</b> Deploy <code>docs/docker-compose.portainer.yml</code> as a stack instead of these steps. Portainer puts no <code>.env</code> next to a stack, so that file lists every variable itself, and <code>SESSION_SECRET</code> and <code>DB_ENCRYPTION_KEY</code> go under the stack's environment variables - both are required there.</span>
             <span class="callout-links">
               <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/docker-compose.portainer.yml" target="_blank" rel="noopener" class="prereq-link" data-t="portainer_file">Compose file for Portainer</a>
               <a href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#option-g--portainer-stack-or-gitgitops" target="_blank" rel="noopener" class="prereq-link" data-t="portainer_guide">Portainer guide</a>
@@ -787,16 +780,14 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         tab_group_terminal:'In a terminal', tab_group_store:'One-click app store',
         tab_installer:'Web Installer', tab_docker:'Docker / Podman', tab_proxmox:'Proxmox', tab_source:'From source', tab_truenas:'TrueNAS', tab_umbrel:'Umbrel', tab_unraid:'Unraid', tab_one:'1-click',
         opt_installer_info:'A localized browser wizard (27 languages) detects your container engine (Docker or Podman), configures your <code>.env</code> (optional reverse proxy/HTTPS, Single Sign-On, automatic backups), starts the container, and creates your admin account. Want zero terminal? Use a one-click app-store install (TrueNAS, Umbrel, Unraid).',
-        opt_installer_prereq:'This path additionally needs Git and Node.js 22.14+ on the host, because the wizard runs from the repository. Every other path needs only a container engine.',
+        opt_installer_prereq:'This path additionally needs Git and Node.js 22+ on the host, because the wizard runs from the repository. Every other path needs only a container engine.',
         step_inst1_title:'Clone the repository', step_inst1_desc:'Open your terminal and clone Yuvomi to a folder of your choice.',
         step_inst2_title:'Start the installer', step_inst2_desc:'Run this command from the repository root. The installer server starts on port 8090.',
         step_inst3_title:'Open the wizard in your browser', step_inst3_desc:'Navigate to the following address. The wizard guides you through configuration, container startup, and admin account creation.',
         step_inst3_info:'The installer shuts down automatically after setup completes. Your Yuvomi instance keeps running via Docker or Podman.',
         step_inst2_cli:'<b>No browser on the server, or rather stay in the terminal?</b> <code>bash install.sh</code> in the same folder sets Yuvomi up as a dialog there instead (Linux and macOS): it generates the keys, starts the container and creates your admin account.',
         step_inst3_remote:'The installer only answers on the machine itself. From another device, open a tunnel first - <code>ssh -L 8090:localhost:8090 user@server</code> - and then open <code>http://localhost:8090</code> on that device.',
-        opt_proxmox_info:'Two ways onto Proxmox. The short one is the community helper script right below: one command, and Yuvomi runs in a Debian LXC of its own. The long one is steps 1 to 5: a small Debian LXC running the same Docker setup as everywhere else, where steps 1 and 2 build the container and steps 3 to 5 are the Docker path, run inside it.',
-        px_script_desc:'Run this on the Proxmox host shell. It creates a Debian 13 LXC (2 cores, 1 GB RAM, 8 GB disk), installs Yuvomi in it directly with Node.js, without Docker, and prints the address when it is done. Running the same command inside the container later updates Yuvomi.', px_script_note:'The script comes from <a href="https://community-scripts.org/scripts/yuvomi" target="_blank" rel="noopener">community-scripts.org</a>, not from this project, so read it before you run it. It turns on database encryption and writes both secrets to <code>/opt/yuvomi/.env</code> in the container: copy <code>DB_ENCRYPTION_KEY</code> from there and keep it somewhere safe.',
-        px_script_open:'Installed with the helper script? It printed the address at the end, with the IP of the container it created.', px_script_env:'Installed with the helper script? Both are in <code>/opt/yuvomi/.env</code> inside the container, and encryption is already on.', px_script_optional:'Installed with the helper script? Yuvomi runs there as a service, not in Docker: add the settings to <code>/opt/yuvomi/.env</code> inside the container and restart with <code>systemctl restart yuvomi</code>; <code>journalctl -u yuvomi</code> shows its log.', px_script_update:'With the Proxmox helper script, run its command again inside the container instead.',
+        opt_proxmox_info:'There is no Yuvomi entry in a Proxmox catalog. What works is a small Debian LXC running the same Docker setup as everywhere else: steps 1 and 2 build the container, steps 3 to 5 are the Docker path, run inside it.',
         step_px1_title:'Create an unprivileged LXC', step_px1_desc:'Run this on the Proxmox host shell. The first lines refresh the template list and download the newest Debian 13 image, so no version number sits in here to go stale. <code>nesting=1</code> is what lets Docker run inside an unprivileged container; without it the daemon will not start. Adjust the ID, storage and bridge to match your setup.',
         px_tpl_c:'# the newest Debian 13 template from that list',
         step_px1_alt:'Prefer a full VM? That works too and needs no nesting flag: install Debian as usual and continue from step 2.',
@@ -806,7 +797,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         opt_docker_info:'No Git, no build step - two files, a handful of commands and one edit in <code>.env</code>. On Portainer, see the note at the end of this path.',
         engine_label:'Commands for',
         win_note:'<b>On Windows:</b> in PowerShell, type <code>curl.exe</code> instead of <code>curl</code> - Windows PowerShell answers <code>curl</code> with a different command. PowerShell has no <code>openssl</code> for step 2: run these steps in WSL, or let the <a href="#installer">web installer</a> generate both values. <code>notepad .env</code> opens the file for editing.',
-        portainer_info:'<b>Using Portainer?</b> Deploy <code>docs/docker-compose.portainer.yml</code> as a stack instead of these steps. Portainer puts no <code>.env</code> next to a stack, so that file lists every variable itself, and <code>SESSION_SECRET</code> and <code>DB_ENCRYPTION_KEY</code> go under the stack\'s environment variables - both may stay empty on a new installation, and Yuvomi generates them on the first start.',
+        portainer_info:'<b>Using Portainer?</b> Deploy <code>docs/docker-compose.portainer.yml</code> as a stack instead of these steps. Portainer puts no <code>.env</code> next to a stack, so that file lists every variable itself, and <code>SESSION_SECRET</code> and <code>DB_ENCRYPTION_KEY</code> go under the stack\'s environment variables - both are required there.',
         portainer_file:'Compose file for Portainer',
         portainer_guide:'Portainer guide',
         step_a1_title:'Download the configuration files', step_a1_desc:'Run these two commands. They download the compose file and the template for your settings.',
@@ -819,7 +810,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         step_b1_title:'Clone the repository', step_b3_title:'Build and start', step_b3_desc:'The <code>--build</code> flag compiles the Docker image locally. This takes a few minutes the first time.',
         opt_truenas_info:'No terminal required. Yuvomi is in the TrueNAS SCALE Community Apps Catalog - install it directly from the TrueNAS web UI in a few clicks.',
         step_tn1_title:'Open the Apps Catalog', step_tn1_desc:'In your TrueNAS SCALE web UI, go to Apps → Discover Apps and search for Yuvomi.',
-        step_tn2_title:'Configure and install', step_tn2_desc:'Click Install. Both fields are optional on a new installation: leave Session Secret and Database Encryption Key empty and Yuvomi generates them on the first start, next to the database. The encryption key is irreversible once set - back it up. Adjust the port and storage paths if needed, then Install.',
+        step_tn2_title:'Configure and install', step_tn2_desc:'Click Install. Set a strong value for Session Secret (required) and Database Encryption Key (optional, but irreversible once set - back it up). Adjust the port and storage paths if needed, then Install.',
         step_tn3_title:'Open the WebUI', step_tn3_desc:'Once the app status shows Running, click WebUI in the Apps overview. The first visit walks you through creating your admin account directly in the browser.',
         opt_umbrel_info:'No terminal required. Install Yuvomi straight from the Umbrel App Store - everything runs on, and stays on, your Umbrel.',
         step_um1_title:'Open the App Store', step_um1_desc:'In your Umbrel dashboard, open the App Store and search for Yuvomi.',
@@ -827,7 +818,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         step_um3_title:'Open Yuvomi', step_um3_desc:'Launch Yuvomi from your Umbrel home screen. The first visit walks you through creating your admin account directly in the browser.',
         opt_unraid_info:'No terminal required. Yuvomi ships as a Community Applications template - add it straight from the Unraid Apps tab.',
         step_ur1_title:'Open Community Applications', step_ur1_desc:'In Unraid, open the Apps tab (the Community Applications plugin) and search for Yuvomi.',
-        step_ur2_title:'Configure the template', step_ur2_desc:'Click Install. SESSION_SECRET and DB_ENCRYPTION_KEY are optional on a new installation: leave them empty and Yuvomi generates them on the first start. DB_ENCRYPTION_KEY is irreversible once set - back it up. Adjust the WebUI port and the appdata path if needed.',
+        step_ur2_title:'Configure the template', step_ur2_desc:'Click Install. Set SESSION_SECRET (required) and DB_ENCRYPTION_KEY (optional, but irreversible once set - back it up). Adjust the WebUI port and the appdata path if needed.',
         step_ur3_title:'Apply and open', step_ur3_desc:'Click Apply. Once the container is running, click the Yuvomi icon → WebUI. The first visit walks you through creating your admin account.',
         tab_homeassistant:'Home Assistant',
         opt_ha_info:'No terminal required. Yuvomi runs as an app next to Home Assistant, on Home Assistant OS or a Supervised installation (amd64 or aarch64, such as a Raspberry Pi 4/5 or Home Assistant Green). It is Yuvomi itself, not an integration: it adds no entities.',
@@ -837,14 +828,6 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         success_desc_ha:'Select Open Web UI on the app\'s page in Home Assistant. Yuvomi answers on port 3880 of your Home Assistant host, for example <code>http://homeassistant.local:3880</code>, which is also the address for the family\'s phones. The first visit walks you through creating your admin account.',
         env_where_ha:'In Home Assistant the app generates the session secret itself, so there is nothing to fill in. The database key is the Encrypt database option on the app\'s Configuration tab: leave the key field empty and the app creates one and writes a copy to <code>db_encryption_key.txt</code> in its config folder. Keep that copy outside Home Assistant.',
         optional_where_ha:'In Home Assistant you add them under Additional environment variables on the app\'s Configuration tab, then restart the app.',
-        tab_yunohost:'YunoHost',
-        opt_ynh_info:'The package from <a href="https://github.com/ulsklyc/yuvomi_ynh" target="_blank" rel="noopener">ulsklyc/yuvomi_ynh</a> installs the official Yuvomi release unchanged, behind YunoHost\'s nginx and in every YunoHost backup. It is not in the YunoHost catalog yet, so it is installed from its repository. Needs YunoHost 12.1.17 or newer on amd64 or arm64.',
-        step_ynh1_title:'Install the package', step_ynh1_desc:'On the YunoHost server:',
-        step_ynh2_title:'Answer the install questions', step_ynh2_desc:'Pick a domain or subdomain of its own, such as <code>family.example.com</code>: Yuvomi cannot run under a sub path yet. Then pick the YunoHost user who becomes the Yuvomi admin and give that account a password; it is separate from the YunoHost password.',
-        step_ynh3_title:'Keep the app public', step_ynh3_desc:'Leave access at visitors, so the app on the family\'s phones, calendar feeds and API tokens work outside the YunoHost portal. Yuvomi keeps its own accounts and asks for its own sign-in.',
-        success_desc_ynh:'Open the domain you picked, for example <code>https://family.example.com</code>, and sign in with the admin account from the install. It is also the address for the family\'s phones.',
-        env_where_ynh:'On YunoHost the package generates both and keeps them in the app settings, with database encryption always on. Every YunoHost backup of the app carries the key; to move by hand instead, <code>yunohost app setting yuvomi db_encryption_key</code> prints it.',
-        optional_where_ynh:'On YunoHost the package rewrites <code>.env</code> on every upgrade, so a setting added there is gone after the next update. The package cannot set these yet.',
         path_now:'You are installing on', path_change:'Change',
         success_title:'Open Yuvomi', success_desc:'Open this address in your browser. The first visit walks you through creating your admin account.',
         scope_terminal:'Docker, Podman or from source',
@@ -899,7 +882,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         foot_legal:'Legal', foot_impressum:'Imprint (DE)', foot_privacy:'Privacy',
         foot_madewith:'Self-hosted · Privacy-first · Open source',
         to_top:'Back to top',
-        meta_desc:'Step-by-step installation guide for Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid, Home Assistant, YunoHost or the guided web installer. Your self-hosted family planner runs in about 10 minutes.',
+        meta_desc:'Step-by-step installation guide for Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid, Home Assistant or the guided web installer. Your self-hosted family planner runs in about 10 minutes.',
         skip_link:'Skip to content', copy:'Copy', copied:'Copied!', copyfail:'Copy failed'
       },
       de: {
@@ -917,16 +900,14 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         tab_group_terminal:'Im Terminal', tab_group_store:'Per App-Store · 1 Klick',
         tab_installer:'Web-Installer', tab_docker:'Docker / Podman', tab_proxmox:'Proxmox', tab_source:'Aus Quellcode', tab_truenas:'TrueNAS', tab_umbrel:'Umbrel', tab_unraid:'Unraid', tab_one:'1 Klick',
         opt_installer_info:'Ein lokalisierter Browser-Assistent (27 Sprachen) erkennt eure Container-Engine (Docker oder Podman), konfiguriert eure <code>.env</code> (optional Reverse-Proxy/HTTPS, Single Sign-On, automatische Backups), startet den Container und erstellt euer Admin-Konto. Ganz ohne Terminal? Nutzt eine App-Store-Installation mit einem Klick (TrueNAS, Umbrel, Unraid).',
-        opt_installer_prereq:'Dieser Weg braucht zusätzlich Git und Node.js 22.14+ auf dem Host, weil der Assistent aus dem Repository läuft. Alle anderen Wege brauchen nur eine Container-Engine.',
+        opt_installer_prereq:'Dieser Weg braucht zusätzlich Git und Node.js 22+ auf dem Host, weil der Assistent aus dem Repository läuft. Alle anderen Wege brauchen nur eine Container-Engine.',
         step_inst1_title:'Repository klonen', step_inst1_desc:'Öffnet euer Terminal und klont Yuvomi in einen Ordner eurer Wahl.',
         step_inst2_title:'Installer starten', step_inst2_desc:'Führt diesen Befehl vom Projektordner aus. Der Installer-Server startet auf Port 8090.',
         step_inst3_title:'Assistenten im Browser öffnen', step_inst3_desc:'Navigiert zur folgenden Adresse. Der Assistent führt euch durch Konfiguration, Container-Start und Admin-Konto-Erstellung.',
         step_inst3_info:'Der Installer beendet sich automatisch nach Abschluss der Einrichtung. Eure Yuvomi-Instanz läuft weiter über Docker oder Podman.',
         step_inst2_cli:'<b>Kein Browser auf dem Server, oder lieber im Terminal bleiben?</b> <code>bash install.sh</code> im selben Ordner richtet Yuvomi stattdessen als Dialog im Terminal ein (Linux und macOS): Es erzeugt die Schlüssel, startet den Container und legt euer Admin-Konto an.',
         step_inst3_remote:'Der Installer antwortet nur auf dem Rechner selbst. Von einem anderen Gerät aus öffnet ihr zuerst einen Tunnel - <code>ssh -L 8090:localhost:8090 user@server</code> - und dann <code>http://localhost:8090</code> auf diesem Gerät.',
-        opt_proxmox_info:'Zwei Wege auf Proxmox. Der kurze ist das Community-Helferskript gleich darunter: ein Befehl, und Yuvomi läuft in einem eigenen Debian-LXC. Der lange sind Schritt 1 bis 5: ein kleiner Debian-LXC mit demselben Docker-Setup wie überall sonst, Schritt 1 und 2 bauen den Container, Schritt 3 bis 5 sind der Docker-Weg, ausgeführt darin.',
-        px_script_desc:'Das läuft auf der Proxmox-Host-Shell. Es legt einen Debian-13-LXC an (2 Kerne, 1 GB RAM, 8 GB Platte), installiert Yuvomi darin direkt mit Node.js, ohne Docker, und nennt am Ende die Adresse. Derselbe Befehl, später im Container ausgeführt, aktualisiert Yuvomi.', px_script_note:'Das Skript stammt von <a href="https://community-scripts.org/scripts/yuvomi" target="_blank" rel="noopener">community-scripts.org</a>, nicht von diesem Projekt, also lest es, bevor ihr es ausführt. Es schaltet die Datenbankverschlüsselung ein und schreibt beide Geheimnisse nach <code>/opt/yuvomi/.env</code> im Container: Kopiert euch dort <code>DB_ENCRYPTION_KEY</code> heraus und bewahrt ihn sicher auf.',
-        px_script_open:'Mit dem Helferskript installiert? Es hat die Adresse am Ende ausgegeben, mit der IP des Containers, den es angelegt hat.', px_script_env:'Mit dem Helferskript installiert? Beide stehen in <code>/opt/yuvomi/.env</code> im Container, die Verschlüsselung ist schon an.', px_script_optional:'Mit dem Helferskript installiert? Dort läuft Yuvomi als Dienst, nicht in Docker: Tragt die Einstellungen in <code>/opt/yuvomi/.env</code> im Container ein und startet mit <code>systemctl restart yuvomi</code> neu; <code>journalctl -u yuvomi</code> zeigt das Log.', px_script_update:'Mit dem Proxmox-Helferskript führt ihr stattdessen dessen Befehl im Container noch einmal aus.',
+        opt_proxmox_info:'Es gibt keinen Yuvomi-Eintrag in einem Proxmox-Katalog. Was funktioniert, ist ein kleiner Debian-LXC mit demselben Docker-Setup wie überall sonst: Schritt 1 und 2 bauen den Container, Schritt 3 bis 5 sind der Docker-Weg, ausgeführt darin.',
         step_px1_title:'Unprivilegierten LXC anlegen', step_px1_desc:'Das läuft auf der Proxmox-Host-Shell. Die ersten Zeilen aktualisieren die Vorlagenliste und laden das neueste Debian-13-Image, deshalb steht hier keine Versionsnummer, die veralten kann. <code>nesting=1</code> ist das, was Docker in einem unprivilegierten Container überhaupt starten lässt; ohne das Flag kommt der Daemon nicht hoch. ID, Storage und Bridge an euer Setup anpassen.', px_tpl_c:'# das neueste Debian-13-Template aus dieser Liste',
         step_px1_alt:'Lieber eine ganze VM? Geht auch und braucht kein Nesting-Flag: Debian wie gewohnt installieren und ab Schritt 2 weitermachen.',
         step_px2_title:'Docker im Container installieren', step_px2_desc:'Aus Debians eigenen Paketquellen, damit kein Installationsskript in eine Shell gepipet wird. Unter Debian 13 bringt das Paket <code>docker-compose</code> den Befehl <code>docker compose</code> mit, den die nächsten Schritte benutzen.',
@@ -935,7 +916,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         opt_docker_info:'Kein Git, kein Build-Schritt - zwei Dateien, eine Handvoll Befehle und eine Änderung in der <code>.env</code>. Für Portainer steht ein Hinweis am Ende dieses Wegs.',
         engine_label:'Befehle für',
         win_note:'<b>Unter Windows:</b> in PowerShell <code>curl.exe</code> statt <code>curl</code> tippen - Windows PowerShell beantwortet <code>curl</code> mit einem anderen Befehl. <code>openssl</code> für Schritt 2 fehlt in PowerShell: führt diese Schritte in WSL aus, oder lasst den <a href="#installer">Web-Installer</a> beide Werte erzeugen. <code>notepad .env</code> öffnet die Datei zum Bearbeiten.',
-        portainer_info:'<b>Mit Portainer?</b> Dann statt dieser Schritte <code>docs/docker-compose.portainer.yml</code> als Stack anlegen. Portainer legt keine <code>.env</code> neben einen Stack, deshalb führt diese Datei jede Variable selbst auf, und <code>SESSION_SECRET</code> und <code>DB_ENCRYPTION_KEY</code> kommen in die Umgebungsvariablen des Stacks - beide dürfen bei einer neuen Installation leer bleiben, Yuvomi erzeugt sie dann beim ersten Start.',
+        portainer_info:'<b>Mit Portainer?</b> Dann statt dieser Schritte <code>docs/docker-compose.portainer.yml</code> als Stack anlegen. Portainer legt keine <code>.env</code> neben einen Stack, deshalb führt diese Datei jede Variable selbst auf, und <code>SESSION_SECRET</code> und <code>DB_ENCRYPTION_KEY</code> kommen in die Umgebungsvariablen des Stacks - dort sind beide Pflicht.',
         portainer_file:'Compose-Datei für Portainer',
         portainer_guide:'Portainer-Anleitung',
         step_a1_title:'Konfigurationsdateien herunterladen', step_a1_desc:'Führt diese zwei Befehle aus. Sie laden die Compose-Datei und die Vorlage für eure Einstellungen herunter.',
@@ -948,7 +929,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         step_b1_title:'Repository klonen', step_b3_title:'Bauen und starten', step_b3_desc:'Das Flag <code>--build</code> kompiliert das Docker-Image lokal. Das dauert beim ersten Mal einige Minuten.',
         opt_truenas_info:'Kein Terminal erforderlich. Yuvomi ist im TrueNAS SCALE Community Apps Catalog - direkt über das TrueNAS-Web-UI in wenigen Klicks installierbar.',
         step_tn1_title:'Apps-Catalog öffnen', step_tn1_desc:'Im TrueNAS SCALE Web-UI zu Apps → Apps entdecken navigieren und nach Yuvomi suchen.',
-        step_tn2_title:'Konfigurieren und installieren', step_tn2_desc:'Auf Installieren klicken. Beide Felder sind bei einer neuen Installation optional: Session-Secret und Datenbank-Verschlüsselungsschlüssel leer lassen, Yuvomi erzeugt sie beim ersten Start neben der Datenbank. Der Verschlüsselungsschlüssel ist einmal gesetzt unwiderruflich - sichern. Port und Speicherpfade nach Bedarf anpassen, dann Installieren.',
+        step_tn2_title:'Konfigurieren und installieren', step_tn2_desc:'Auf Installieren klicken. Einen starken Wert für Session-Secret (erforderlich) und Datenbank-Verschlüsselungsschlüssel (optional, aber einmal gesetzt unwiderruflich - sichern) setzen. Port und Speicherpfade nach Bedarf anpassen, dann Installieren.',
         step_tn3_title:'WebUI öffnen', step_tn3_desc:'Sobald der App-Status Aktiv anzeigt, in der App-Übersicht auf WebUI klicken. Beim ersten Aufruf führt Yuvomi direkt im Browser durch die Erstellung des Admin-Kontos.',
         opt_umbrel_info:'Kein Terminal erforderlich. Installiert Yuvomi direkt aus dem Umbrel App Store - alles läuft auf und bleibt auf eurem Umbrel.',
         step_um1_title:'App Store öffnen', step_um1_desc:'Im Umbrel-Dashboard den App Store öffnen und nach Yuvomi suchen.',
@@ -956,7 +937,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         step_um3_title:'Yuvomi öffnen', step_um3_desc:'Startet Yuvomi über den Umbrel-Startbildschirm. Beim ersten Aufruf führt Yuvomi direkt im Browser durch die Erstellung des Admin-Kontos.',
         opt_unraid_info:'Kein Terminal erforderlich. Yuvomi kommt als Community-Applications-Template - direkt über den Unraid-Apps-Tab hinzufügbar.',
         step_ur1_title:'Community Applications öffnen', step_ur1_desc:'In Unraid den Apps-Tab (das Community-Applications-Plugin) öffnen und nach Yuvomi suchen.',
-        step_ur2_title:'Template konfigurieren', step_ur2_desc:'Auf Installieren klicken. SESSION_SECRET und DB_ENCRYPTION_KEY sind bei einer neuen Installation optional: leer lassen, Yuvomi erzeugt sie beim ersten Start. DB_ENCRYPTION_KEY ist einmal gesetzt unwiderruflich - sichern. WebUI-Port und appdata-Pfad bei Bedarf anpassen.',
+        step_ur2_title:'Template konfigurieren', step_ur2_desc:'Auf Installieren klicken. SESSION_SECRET (erforderlich) und DB_ENCRYPTION_KEY (optional, aber einmal gesetzt unwiderruflich - sichern) setzen. WebUI-Port und appdata-Pfad bei Bedarf anpassen.',
         step_ur3_title:'Anwenden und öffnen', step_ur3_desc:'Auf Anwenden klicken. Sobald der Container läuft, auf das Yuvomi-Icon → WebUI klicken. Beim ersten Aufruf führt Yuvomi durch die Erstellung des Admin-Kontos.',
         tab_homeassistant:'Home Assistant',
         opt_ha_info:'Kein Terminal erforderlich. Yuvomi läuft als App neben Home Assistant, auf Home Assistant OS oder einer Supervised-Installation (amd64 oder aarch64, etwa Raspberry Pi 4/5 oder Home Assistant Green). Das ist Yuvomi selbst, keine Integration: Es legt keine Entitäten an.',
@@ -966,14 +947,6 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         success_desc_ha:'Öffnet auf der Seite der App in Home Assistant die Weboberfläche (Open Web UI). Yuvomi antwortet auf Port 3880 eures Home-Assistant-Hosts, etwa <code>http://homeassistant.local:3880</code>; das ist auch die Adresse für die Handys der Familie. Beim ersten Aufruf legt ihr dort euer Admin-Konto an.',
         env_where_ha:'In Home Assistant erzeugt die App das Sitzungsgeheimnis selbst, es gibt nichts auszufüllen. Der Datenbankschlüssel ist die Option „Datenbank verschlüsseln“ im Reiter Konfiguration der App: Lasst ihr das Schlüsselfeld leer, erzeugt die App einen und legt eine Kopie als <code>db_encryption_key.txt</code> in ihren Konfigurationsordner. Bewahrt diese Kopie außerhalb von Home Assistant auf.',
         optional_where_ha:'In Home Assistant tragt ihr sie unter „Weitere Umgebungsvariablen“ im Reiter Konfiguration der App ein und startet die App neu.',
-        tab_yunohost:'YunoHost',
-        opt_ynh_info:'Das Paket aus <a href="https://github.com/ulsklyc/yuvomi_ynh" target="_blank" rel="noopener">ulsklyc/yuvomi_ynh</a> installiert das offizielle Yuvomi-Release unverändert, hinter dem nginx von YunoHost und in jedem YunoHost-Backup. Im YunoHost-Katalog steht es noch nicht, deshalb installiert ihr es aus seinem Repository. Braucht YunoHost 12.1.17 oder neuer auf amd64 oder arm64.',
-        step_ynh1_title:'Paket installieren', step_ynh1_desc:'Auf dem YunoHost-Server:',
-        step_ynh2_title:'Installationsfragen beantworten', step_ynh2_desc:'Wählt eine eigene Domain oder Subdomain, etwa <code>familie.example.com</code>: Unter einem Unterpfad läuft Yuvomi noch nicht. Dann wählt ihr den YunoHost-Benutzer, der Yuvomi-Admin wird, und gebt diesem Konto ein Passwort; es ist vom YunoHost-Passwort getrennt.',
-        step_ynh3_title:'App öffentlich lassen', step_ynh3_desc:'Lasst den Zugriff auf „Besucher“, damit die App auf den Handys der Familie, Kalender-Feeds und API-Tokens auch außerhalb des YunoHost-Portals funktionieren. Yuvomi führt eigene Konten und fragt nach seiner eigenen Anmeldung.',
-        success_desc_ynh:'Öffnet die gewählte Domain, etwa <code>https://familie.example.com</code>, und meldet euch mit dem Admin-Konto aus der Installation an. Das ist auch die Adresse für die Handys der Familie.',
-        env_where_ynh:'Auf YunoHost erzeugt das Paket beide selbst und legt sie in den App-Einstellungen ab, die Datenbankverschlüsselung ist immer an. Jedes YunoHost-Backup der App enthält den Schlüssel; wer von Hand umzieht, bekommt ihn mit <code>yunohost app setting yuvomi db_encryption_key</code>.',
-        optional_where_ynh:'Auf YunoHost schreibt das Paket die <code>.env</code> bei jedem Upgrade neu, eine dort ergänzte Einstellung ist nach dem nächsten Update also weg. Setzen kann das Paket sie noch nicht.',
         path_now:'Ihr installiert auf', path_change:'Ändern',
         success_title:'Yuvomi öffnen', success_desc:'Öffnet diese Adresse im Browser. Beim ersten Aufruf legt ihr dort euer Admin-Konto an.',
         scope_terminal:'Docker, Podman oder aus Quellcode',
@@ -1028,7 +1001,7 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         foot_legal:'Rechtliches', foot_impressum:'Impressum', foot_privacy:'Datenschutz',
         foot_madewith:'Selbst gehostet · Privacy-First · Open Source',
         to_top:'Nach oben',
-        meta_desc:'Schritt-für-Schritt-Anleitung zur Installation von Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid, Home Assistant, YunoHost oder der geführte Web-Installer. Euer selbst gehosteter Familienplaner läuft in etwa 10 Minuten.',
+        meta_desc:'Schritt-für-Schritt-Anleitung zur Installation von Yuvomi: Docker, Podman, Proxmox, TrueNAS, Umbrel, Unraid, Home Assistant oder der geführte Web-Installer. Euer selbst gehosteter Familienplaner läuft in etwa 10 Minuten.',
         skip_link:'Zum Inhalt springen', copy:'Kopieren', copied:'Kopiert!', copyfail:'Nicht kopiert'
       }
     };
@@ -1087,9 +1060,8 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
   })(document.documentElement);
       </script>
 
-      <!-- Proxmox. Not a channel of ours: the helper script ct/yuvomi.sh lives in
-           community-scripts/ProxmoxVE (since 14.07.2026) and installs natively
-           with Node.js, so it is shown first and named as theirs. Steps 1-2 build the container,
+      <!-- Proxmox. Not a separate distribution channel: there is no Yuvomi app in
+           any Proxmox catalog and no helper script. Steps 1-2 build the container,
            steps 3-5 are the Docker path run inside it. They used to be a link
            to the Docker tab, which switched the whole page to plain Docker:
            the ending then said localhost:3000 instead of the container's IP.
@@ -1099,11 +1071,8 @@ podman compose -f podman-compose.yml logs -f</div><button class="copy-btn" data-
         <h3 class="panel-head" style="--pc:#E57000" data-t="tab_proxmox">Proxmox</h3>
         <div class="callout callout-info">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span data-t="opt_proxmox_info">Two ways onto Proxmox. The short one is the community helper script right below: one command, and Yuvomi runs in a Debian LXC of its own. The long one is steps 1 to 5: a small Debian LXC running the same Docker setup as everywhere else, where steps 1 and 2 build the container and steps 3 to 5 are the Docker path, run inside it.</span>
+          <span data-t="opt_proxmox_info">There is no Yuvomi entry in a Proxmox catalog. What works is a small Debian LXC running the same Docker setup as everywhere else: steps 1 and 2 build the container, steps 3 to 5 are the Docker path, run inside it.</span>
         </div>
-        <p class="step-desc" data-t="px_script_desc">Run this on the Proxmox host shell. It creates a Debian 13 LXC (2 cores, 1 GB RAM, 8 GB disk), installs Yuvomi in it directly with Node.js, without Docker, and prints the address when it is done. Running the same command inside the container later updates Yuvomi.</p>
-        <div class="code-wrap"><div class="code-block"><span class="cmd">bash -c &quot;$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/yuvomi.sh)&quot;</span></div><button class="copy-btn" data-copy="bash -c &quot;$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/yuvomi.sh)&quot;" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
-        <p class="step-desc" data-t="px_script_note">The script comes from <a href="https://community-scripts.org/scripts/yuvomi" target="_blank" rel="noopener">community-scripts.org</a>, not from this project, so read it before you run it. It turns on database encryption and writes both secrets to <code>/opt/yuvomi/.env</code> in the container: copy <code>DB_ENCRYPTION_KEY</code> from there and keep it somewhere safe.</p>
         <div class="step">
           <div class="step-num">1</div>
           <div class="step-content">
@@ -1186,7 +1155,7 @@ docker compose logs -f</div><button class="copy-btn" data-copy="docker compose u
         <div class="callout callout-info">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           <span>
-            <span data-t="opt_installer_prereq">This path additionally needs Git and Node.js 22.14+ on the host, because the wizard runs from the repository. Every other path needs only a container engine.</span>
+            <span data-t="opt_installer_prereq">This path additionally needs Git and Node.js 22+ on the host, because the wizard runs from the repository. Every other path needs only a container engine.</span>
             <span class="callout-links">
               <a href="https://git-scm.com/downloads" target="_blank" rel="noopener" class="prereq-link">Git</a>
               <a href="https://nodejs.org/en/download" target="_blank" rel="noopener" class="prereq-link">Node.js</a>
@@ -1285,7 +1254,7 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
           <span data-t="opt_truenas_info">No terminal required. Yuvomi is in the TrueNAS SCALE Community Apps Catalog - install it directly from the TrueNAS web UI in a few clicks.</span>
         </div>
         <div class="step"><div class="step-num">1</div><div class="step-content"><h3 class="step-title" data-t="step_tn1_title">Open the Apps Catalog</h3><p class="step-desc" data-t="step_tn1_desc">In your TrueNAS SCALE web UI, go to Apps → Discover Apps and search for Yuvomi.</p></div></div>
-        <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_tn2_title">Configure and install</h3><p class="step-desc" data-t="step_tn2_desc">Click Install. Both fields are optional on a new installation: leave Session Secret and Database Encryption Key empty and Yuvomi generates them on the first start, next to the database. The encryption key is irreversible once set - back it up. Adjust the port and storage paths if needed, then Install.</p></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_tn2_title">Configure and install</h3><p class="step-desc" data-t="step_tn2_desc">Click Install. Set a strong value for Session Secret (required) and Database Encryption Key (optional, but irreversible once set - back it up). Adjust the port and storage paths if needed, then Install.</p></div></div>
         <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_tn3_title">Open the WebUI</h3><p class="step-desc" data-t="step_tn3_desc">Once the app status shows Running, click WebUI in the Apps overview. The first visit walks you through creating your admin account directly in the browser.</p></div></div>
       </div>
 
@@ -1309,7 +1278,7 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
           <span data-t="opt_unraid_info">No terminal required. Yuvomi ships as a Community Applications template - add it straight from the Unraid Apps tab.</span>
         </div>
         <div class="step"><div class="step-num">1</div><div class="step-content"><h3 class="step-title" data-t="step_ur1_title">Open Community Applications</h3><p class="step-desc" data-t="step_ur1_desc">In Unraid, open the Apps tab (the Community Applications plugin) and search for Yuvomi.</p></div></div>
-        <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_ur2_title">Configure the template</h3><p class="step-desc" data-t="step_ur2_desc">Click Install. SESSION_SECRET and DB_ENCRYPTION_KEY are optional on a new installation: leave them empty and Yuvomi generates them on the first start. DB_ENCRYPTION_KEY is irreversible once set - back it up. Adjust the WebUI port and the appdata path if needed.</p></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_ur2_title">Configure the template</h3><p class="step-desc" data-t="step_ur2_desc">Click Install. Set SESSION_SECRET (required) and DB_ENCRYPTION_KEY (optional, but irreversible once set - back it up). Adjust the WebUI port and the appdata path if needed.</p></div></div>
         <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_ur3_title">Apply and open</h3><p class="step-desc" data-t="step_ur3_desc">Click Apply. Once the container is running, click the Yuvomi icon → WebUI. The first visit walks you through creating your admin account.</p></div></div>
       </div>
 
@@ -1328,22 +1297,6 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
         <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_ha2_title">Install and start</h3><p class="step-desc" data-t="step_ha2_desc">Search for Yuvomi, install it and start it. The app generates the session secret itself; database encryption is an option on its Configuration tab.</p></div></div>
         <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_ha3_title">Open the Web UI</h3><p class="step-desc" data-t="step_ha3_desc">Select Open Web UI on the app's page. The first visit walks you through creating your admin account.</p></div></div>
       </div>
-
-      <!-- YunoHost: the package ulsklyc/yuvomi_ynh (ours, beside the HA app)
-           installs the release tarball natively behind YunoHost's nginx. Not in
-           the YunoHost catalog yet: install from the repository. It sets both
-           secrets itself and rewrites .env on upgrade (doc/ADMIN.md there). -->
-      <div class="tab-panel" id="panel-yunohost" role="tabpanel" tabindex="0" aria-labelledby="tab-yunohost">
-        <h3 class="panel-head" data-t="tab_yunohost">YunoHost</h3>
-        <div class="callout callout-info">
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span data-t="opt_ynh_info">The package from <a href="https://github.com/ulsklyc/yuvomi_ynh" target="_blank" rel="noopener">ulsklyc/yuvomi_ynh</a> installs the official Yuvomi release unchanged, behind YunoHost's nginx and in every YunoHost backup. It is not in the YunoHost catalog yet, so it is installed from its repository. Needs YunoHost 12.1.17 or newer on amd64 or arm64.</span>
-        </div>
-        <div class="step"><div class="step-num">1</div><div class="step-content"><h3 class="step-title" data-t="step_ynh1_title">Install the package</h3><p class="step-desc" data-t="step_ynh1_desc">On the YunoHost server:</p>
-          <div class="code-wrap"><div class="code-block"><span class="cmd">sudo yunohost app install https://github.com/ulsklyc/yuvomi_ynh</span></div><button class="copy-btn" data-copy="sudo yunohost app install https://github.com/ulsklyc/yuvomi_ynh" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div></div>
-        <div class="step"><div class="step-num">2</div><div class="step-content"><h3 class="step-title" data-t="step_ynh2_title">Answer the install questions</h3><p class="step-desc" data-t="step_ynh2_desc">Pick a domain or subdomain of its own, such as <code>family.example.com</code>: Yuvomi cannot run under a sub path yet. Then pick the YunoHost user who becomes the Yuvomi admin and give that account a password; it is separate from the YunoHost password.</p></div></div>
-        <div class="step"><div class="step-num">3</div><div class="step-content"><h3 class="step-title" data-t="step_ynh3_title">Keep the app public</h3><p class="step-desc" data-t="step_ynh3_desc">Leave access at visitors, so the app on the family's phones, calendar feeds and API tokens work outside the YunoHost portal. Yuvomi keeps its own accounts and asks for its own sign-in.</p></div></div>
-      </div>
     </div>
   </section>
 
@@ -1355,14 +1308,12 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
       <!-- No .reveal on scoped nodes: a display:none element never intersects,
            so the observer would leave it at opacity 0 when it is shown later. -->
       <p class="section-desc scope" data-scope="terminal installer proxmox" data-t="env_where">Both live in the <code>.env</code> file you created next to your compose file.</p>
-      <p class="section-desc scope" data-scope="proxmox" data-t="px_script_env">Installed with the helper script? Both are in <code>/opt/yuvomi/.env</code> inside the container, and encryption is already on.</p>
       <!-- Umbrel is its own scope: it asks for nothing and derives both keys
            from APP_SEED (deploy/umbrel/docker-compose.yml). "Your app store
            asked for both" was only true for TrueNAS and Unraid. -->
       <p class="section-desc scope" data-scope="store" data-t="env_where_store">On TrueNAS and Unraid both sit in the form you filled in at install, so there is no <code>.env</code> file to edit. You find them again in the app's configuration screen - but the database key, once set, stays as it is.</p>
       <p class="section-desc scope" data-scope="umbrel" data-t="env_where_umbrel">Umbrel sets both itself at install, from a secret it keeps for each app: there is nothing to fill in and no <code>.env</code> file to edit, and the database is encrypted from the first start.</p>
       <p class="section-desc scope" data-scope="homeassistant" data-t="env_where_ha">In Home Assistant the app generates the session secret itself, so there is nothing to fill in. The database key is the Encrypt database option on the app's Configuration tab: leave the key field empty and the app creates one and writes a copy to <code>db_encryption_key.txt</code> in its config folder. Keep that copy outside Home Assistant.</p>
-      <p class="section-desc scope" data-scope="yunohost" data-t="env_where_ynh">On YunoHost the package generates both and keeps them in the app settings, with database encryption always on. Every YunoHost backup of the app carries the key; to move by hand instead, <code>yunohost app setting yuvomi db_encryption_key</code> prints it.</p>
       <div class="env-grid">
         <div class="env-card reveal">
           <div class="env-name">SESSION_SECRET</div>
@@ -1409,7 +1360,6 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
           <div class="success-url"><span>http://<var data-t="px_ip_ph">container-IP</var>:3000</span></div>
           <p class="success-note" data-t="success_px_ip">On the Proxmox host, this prints the IP of container 110 from step 1:</p>
           <div class="code-wrap"><div class="code-block"><span class="cmd">pct exec 110 -- hostname -I</span></div><button class="copy-btn" data-copy="pct exec 110 -- hostname -I" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div>
-          <p class="success-note" data-t="px_script_open">Installed with the helper script? It printed the address at the end, with the IP of the container it created.</p>
         </div>
         <div class="scope" data-scope="store umbrel">
           <p class="scope-head">TrueNAS, Umbrel, Unraid</p>
@@ -1418,10 +1368,6 @@ openssl rand -hex 32</div><button class="copy-btn" data-copy="cp .env.example .e
         <div class="scope" data-scope="homeassistant">
           <p class="scope-head" data-t="tab_homeassistant">Home Assistant</p>
           <p data-t="success_desc_ha">Select Open Web UI on the app's page in Home Assistant. Yuvomi answers on port 3880 of your Home Assistant host, for example <code>http://homeassistant.local:3880</code>, which is also the address for the family's phones. The first visit walks you through creating your admin account.</p>
-        </div>
-        <div class="scope" data-scope="yunohost">
-          <p class="scope-head" data-t="tab_yunohost">YunoHost</p>
-          <p data-t="success_desc_ynh">Open the domain you picked, for example <code>https://family.example.com</code>, and sign in with the admin account from the install. It is also the address for the family's phones.</p>
         </div>
         <p style="font-size:var(--fs-small)" data-t="success_hint">Once you are in, invite the rest of the family by link from the Settings page, so everyone chooses their own password.</p>
         <!-- No primary button: the accent went to "GitHub", which is not the next
@@ -1495,11 +1441,9 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
       <p class="section-desc reveal" data-t="optional_desc">Once Yuvomi is running, you can set up these extras. All of them are environment variables.</p>
       <p class="section-desc scope" data-scope="terminal installer proxmox" data-t="optional_where">You set them in the same <code>.env</code> file, then restart:</p>
       <div class="scope opt-restart" data-scope="terminal installer proxmox"><div class="eng-docker"><p class="eng-head">Docker</p><div class="code-wrap"><div class="code-block"><span class="cmd">docker compose up -d</span></div><button class="copy-btn" data-copy="docker compose up -d" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div><div class="eng-podman"><p class="eng-head">Podman</p><div class="code-wrap"><div class="code-block"><span class="cmd">podman compose -f podman-compose.yml up -d</span></div><button class="copy-btn" data-copy="podman compose -f podman-compose.yml up -d" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div></div>
-      <p class="section-desc scope" data-scope="proxmox" data-t="px_script_optional">Installed with the helper script? Yuvomi runs there as a service, not in Docker: add the settings to <code>/opt/yuvomi/.env</code> inside the container and restart with <code>systemctl restart yuvomi</code>; <code>journalctl -u yuvomi</code> shows its log.</p>
       <p class="section-desc scope" data-scope="store" data-t="optional_where_store">On TrueNAS and Unraid you add them in the app's configuration screen and restart it.</p>
       <p class="section-desc scope" data-scope="umbrel" data-t="optional_where_umbrel">On Umbrel they need an override in the app's compose file.</p>
       <p class="section-desc scope" data-scope="homeassistant" data-t="optional_where_ha">In Home Assistant you add them under Additional environment variables on the app's Configuration tab, then restart the app.</p>
-      <p class="section-desc scope" data-scope="yunohost" data-t="optional_where_ynh">On YunoHost the package rewrites <code>.env</code> on every upgrade, so a setting added there is gone after the next update. The package cannot set these yet.</p>
       <div class="opt-grid">
         <div class="opt-card reveal"><h3 data-t="opt_https_title">HTTPS &amp; network access</h3><p data-t="opt_https_desc">Reach Yuvomi from other devices or the internet: set up Nginx as a reverse proxy with a free Let's Encrypt certificate.</p><a class="opt-guide" href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#https--reverse-proxy-nginx" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></div>
         <div class="opt-card reveal"><h3 data-t="opt_weather_title">Weather widget</h3><p data-t="opt_weather_desc">Show local weather on the dashboard via Open-Meteo, no API key. Set <code>WEATHER_LAT</code> and <code>WEATHER_LON</code> to your coordinates.</p></div>
@@ -1510,7 +1454,7 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
         <div class="opt-card reveal"><h3 data-t="opt_email_title">Email / SMTP</h3><p data-t="opt_email_desc">Configure an outgoing SMTP server and four things become available: the self-service "Forgot password" flow, invitations mailed straight to the new member, email as a household notification channel next to Gotify, ntfy and webhooks, and sending a shopping list to whoever is doing the run. Set the <code>EMAIL_SMTP_*</code> vars and <code>BASE_URL</code> (password-reset and invitation mails are only sent with it; reminder mails without it arrive without a link back into the app), or configure it later in Settings → Household → Email.</p><a class="opt-guide" href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#email--smtp-optional" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></div>
         <div class="opt-card reveal"><h3 data-t="opt_fixer_title">Live currency conversion</h3><p data-t="opt_fixer_desc">Budget → Subscriptions works fully without external services. Set <code>FIXER_API_KEY</code> to convert subscriptions billed in foreign currencies into your household base currency, with a 12-hour rate cache.</p><a class="opt-guide" href="https://github.com/ulsklyc/yuvomi/blob/main/docs/installation.md#subscription-currency-conversion-optional" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></div>
         <div class="opt-card reveal"><h3 data-t="opt_immich_title">Immich photo screensaver</h3><p data-t="opt_immich_desc">Let an idle wall tablet show photos from your own Immich library instead of a fixed dashboard, which burns into the panel over time. Set it up under Settings → Household → Photos and weather → Immich, or preconfigure <code>IMMICH_URL</code> and <code>IMMICH_API_KEY</code>; the key never leaves the server.</p><a class="opt-guide" href="https://github.com/ulsklyc/yuvomi/blob/main/docs/immich-screensaver.md" target="_blank" rel="noopener" data-t="opt_guide">Guide →</a></div>
-        <div class="opt-card reveal"><h3 data-t="opt_update_title">Updates</h3><p data-t="opt_update_desc">Pull the latest image and restart. Your data persists across updates.</p><p class="scope" data-scope="proxmox" data-t="px_script_update">With the Proxmox helper script, run its command again inside the container instead.</p><div class="eng-docker"><p class="eng-head">Docker</p><div class="code-wrap"><div class="code-block">docker compose pull
+        <div class="opt-card reveal"><h3 data-t="opt_update_title">Updates</h3><p data-t="opt_update_desc">Pull the latest image and restart. Your data persists across updates.</p><div class="eng-docker"><p class="eng-head">Docker</p><div class="code-wrap"><div class="code-block">docker compose pull
 <span class="cmd">docker compose up -d</span></div><button class="copy-btn" data-copy="docker compose pull&#10;docker compose up -d" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div><div class="eng-podman"><p class="eng-head">Podman</p><div class="code-wrap"><div class="code-block">podman compose -f podman-compose.yml pull
 <span class="cmd">podman compose -f podman-compose.yml up -d</span></div><button class="copy-btn" data-copy="podman compose -f podman-compose.yml pull&#10;podman compose -f podman-compose.yml up -d" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-t="copy">Copy</span></button></div></div></div>
       </div>
@@ -1671,7 +1615,7 @@ podman compose -f podman-compose.yml logs | grep "Server running"</div></div></d
          are scopes of their own. A node lists every scope it serves
          (data-scope="terminal installer proxmox"), which keeps the shared
          .env paragraphs single. */
-      var SCOPE_OF = { truenas: 'store', umbrel: 'umbrel', unraid: 'store', homeassistant: 'homeassistant', yunohost: 'yunohost', proxmox: 'proxmox', installer: 'installer' };
+      var SCOPE_OF = { truenas: 'store', umbrel: 'umbrel', unraid: 'store', homeassistant: 'homeassistant', proxmox: 'proxmox', installer: 'installer' };
       var currentSlug = 'docker';
       function applyPathScope(slug){
         currentSlug = slug;

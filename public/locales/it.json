@@ -2429,6 +2429,7 @@
         "backupSchedulerLastFail": "{{date}} (fallito)",
         "backupSchedulerLastSuccess": "{{date}} (riuscito)",
         "backupSchedulerNever": "Nessun backup ancora creato",
+        "backupSchedulerLastError": "Ultimo errore",
         "backupSchedulerSchedule": "Pianificazione",
         "backupSchedulerCronDaily": "Ogni giorno alle {{time}}",
         "backupSchedulerCronWeekly": "Ogni {{weekday}} alle {{time}}",
@@ -3548,7 +3549,8 @@
         "backupRestoreErrorTooLarge": "Il file supera il limite di caricamento di questa installazione ({{limit}}). Aumenta BACKUP_UPLOAD_LIMIT, riavvia Yuvomi e ripristina di nuovo. Qui non è stato modificato nulla.",
         "apiTokenErrorNameTooLong": "Il nome può contenere al massimo 100 caratteri.",
         "apiTokenErrorExpiryPast": "La data di scadenza è nel passato. Scegli un momento successivo.",
-        "apiTokenErrorSubjectDeactivated": "Questo account è disattivato e non può ricevere un token. Scegli un’altra persona."
+        "apiTokenErrorSubjectDeactivated": "Questo account è disattivato e non può ricevere un token. Scegli un’altra persona.",
+        "backupSchedulerReasonDirNotWritable": "La cartella di backup non è scrivibile. Controlla l'impostazione BACKUP_DIR e i permessi."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",

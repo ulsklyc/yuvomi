@@ -2502,6 +2502,7 @@
         "backupSchedulerLastSuccess": "{{date}} (thành công)",
         "backupSchedulerLastFail": "{{date}} (thất bại)",
         "backupSchedulerNever": "Chưa tạo bản sao lưu nào",
+        "backupSchedulerLastError": "Lỗi gần nhất",
         "backupSchedulerTrigger": "Tạo bản sao lưu ngay",
         "backupSchedulerTriggering": "Đang tạo sao lưu...",
         "backupSchedulerTriggeredToast": "Sao lưu được tạo thành công.",
@@ -3548,7 +3549,8 @@
         "backupRestoreErrorTooLarge": "Tệp lớn hơn giới hạn tải lên của bản cài đặt này ({{limit}}). Hãy tăng BACKUP_UPLOAD_LIMIT, khởi động lại Yuvomi rồi khôi phục lại. Không có gì bị thay đổi ở đây.",
         "apiTokenErrorNameTooLong": "Tên chỉ được dài tối đa 100 ký tự.",
         "apiTokenErrorExpiryPast": "Ngày hết hạn đã qua. Hãy chọn thời điểm muộn hơn.",
-        "apiTokenErrorSubjectDeactivated": "Tài khoản này đã bị vô hiệu hóa và không thể nhận token. Hãy chọn người khác."
+        "apiTokenErrorSubjectDeactivated": "Tài khoản này đã bị vô hiệu hóa và không thể nhận token. Hãy chọn người khác.",
+        "backupSchedulerReasonDirNotWritable": "Thư mục sao lưu không thể ghi. Kiểm tra cài đặt BACKUP_DIR và quyền truy cập."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

@@ -12589,7 +12589,6 @@ async function backupToFileUntracked(destinationPath) {
     vacuumInto(database, destinationPath);
   }
 
-  await verifyWrittenBackup(destinationPath);
   return destinationPath;
 }
 
@@ -12841,16 +12840,9 @@ function checkBackupFile(sourcePath) {
   return validateBackupFile(sourcePath);
 }
 
-/**
- * Backup-Datei oeffnen und lesen wie vor einem Restore: mit dem eigenen
- * Schluessel, falls sie keinen Klartext-Kopf hat, `sqlite_master` lesbar, jede
- * Seite heil (`assertBackupIntact()`). Liefert die offene Verbindung; wirft
- * mit denselben Gruenden wie der Restore und schliesst sie dann selbst.
- * @param {string} sourcePath
- */
-function openIntactBackup(sourcePath) {
+function validateBackupFile(sourcePath) {
   // Backups, die vor der Verschlüsselungs-Umstellung entstanden sind, liegen im
-  // Klartext vor. Sie müssen einspielbar bleiben - würden wir ihnen den Key
+  // Klartext vor. Sie müssen einspielbar bleiben — würden wir ihnen den Key
   // aufsetzen, läse SQLite sie als verschlüsselt und die Validierung schlüge
   // fehl. Nach dem Restore verschlüsselt init() sie ohnehin.
   const encrypted = !isPlaintextDatabase(sourcePath);
@@ -12870,66 +12862,6 @@ function openIntactBackup(sourcePath) {
       throw unreadableBackupError(encrypted, err);
     }
     assertBackupIntact(candidate, encrypted);
-    return candidate;
-  } catch (err) {
-    candidate.close();
-    throw err;
-  }
-}
-
-/**
- * Ein frisch geschriebenes Backup pruefen, bevor es jemand bekommt (#2520).
- *
- * Ohne Pruefung ging jede Datei als gelungenes Backup durch - zum Download, in
- * die Rotation, nach WebDAV -, und ein Fehler zeigte sich erst beim Restore,
- * wenn die guten alten Backups womoeglich schon wegrotiert waren. Gemessen ist
- * der Fall, den die Backup-API ohne Schluessel mitbringt: sie kopiert die
- * Seiten der Live-Datenbank, einen kaputten Index also mit. Dieselbe Pruefung
- * wie vor dem Restore (`openIntactBackup()`), ohne dessen Schema- und
- * Versionsfragen: ein eigenes Backup traegt das eigene Schema, und eine
- * Instanz auf einer neueren Datenbank (`unknownMigrationVersions()`) soll ihre
- * Backups weiter bekommen.
- *
- * Die kaputte Datei wird geloescht: im Backup-Ordner zaehlte sie sonst bei
- * der naechsten Rotation als eines der aufbewahrten Backups.
- * @param {string} destinationPath
- */
-async function verifyWrittenBackup(destinationPath) {
-  try {
-    openIntactBackup(destinationPath).close();
-  } catch (cause) {
-    await unlinkIfExists(destinationPath);
-    await removeCheckSideFiles(destinationPath);
-    // Nur der erste Satz: der Rest der Restore-Meldung raet zum erneuten
-    // Herunterladen, und das passt nicht zu einem Backup, das hier entsteht.
-    const finding = String(cause?.message ?? cause).split('. ')[0];
-    throw restoreError(
-      `Backup failed its integrity check and was discarded (${finding}). `
-      + 'Older backups were kept. The database this instance runs on may be damaged: check it '
-      + 'with `PRAGMA integrity_check` and check the disk it is stored on.',
-      'backup_verify_failed',
-      cause
-    );
-  }
-  await removeCheckSideFiles(destinationPath);
-}
-
-/**
- * Eine Kopie aus der Backup-API traegt den WAL-Modus der Live-Datenbank, und
- * schon das Oeffnen zum Pruefen legt `-wal` und `-shm` daneben an. Die
- * Verbindung war nur lesend, die beiden Dateien sind also leer - im
- * Backup-Ordner laegen sie sonst neben jedem Backup, und die Rotation raeumt
- * nur `.db`-Dateien.
- * @param {string} destinationPath
- */
-async function removeCheckSideFiles(destinationPath) {
-  await unlinkIfExists(`${destinationPath}-wal`);
-  await unlinkIfExists(`${destinationPath}-shm`);
-}
-
-function validateBackupFile(sourcePath) {
-  const candidate = openIntactBackup(sourcePath);
-  try {
     const row = candidate.prepare(`
       SELECT name
       FROM sqlite_master

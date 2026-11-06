@@ -68,7 +68,7 @@ const chip = (icon, label) => `
   </div>`;
 
 // ── HTML template (rendered at 2× for crisp output) ────────────────────────
-const html = (imgSrc, height) => `<!DOCTYPE html>
+const html = (imgSrc) => `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -81,7 +81,7 @@ const html = (imgSrc, height) => `<!DOCTYPE html>
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
-  width: 1280px; height: ${height}px; overflow: hidden;
+  width: 1280px; height: 640px; overflow: hidden;
   -webkit-font-smoothing: antialiased;
   font-family: 'Jakarta', -apple-system, 'Segoe UI', sans-serif;
 }
@@ -295,12 +295,8 @@ body::after {
 async function render(outPath, finalW, finalH) {
   const browser = await launchBrowser(puppeteer);
   const page = await browser.newPage();
-  // Each format gets a canvas in its own aspect ratio, 1280 wide: cropping one
-  // 2:1 canvas to 16:9 cut 71px off each side, the whole left margin of the
-  // twitter image (and 30px of it on og-image). Both columns centre vertically.
-  const height = Math.round(1280 * finalH / finalW);
-  await page.setViewport({ width: 1280, height, deviceScaleFactor: 2 });
-  await page.setContent(html(screenshotB64, height), { waitUntil: 'load', timeout: 120_000 });
+  await page.setViewport({ width: 1280, height: 640, deviceScaleFactor: 2 });
+  await page.setContent(html(screenshotB64), { waitUntil: 'load', timeout: 120_000 });
   await page.evaluate(async () => {
     await document.fonts.ready;
     const img = document.querySelector('.window img');
@@ -310,8 +306,8 @@ async function render(outPath, finalW, finalH) {
   const raw = await page.screenshot({ type: 'png' });
   await browser.close();
 
-  // The canvas already has the target's aspect ratio; 'cover' only absorbs a
-  // rounding pixel and never squeezes.
+  // 'cover' statt 'fill': das Twitter-Format (16:9) weicht vom 2:1-Canvas ab -
+  // ein leichter Seitenbeschnitt ist unsichtbar, eine Stauchung nicht.
   await sharp(raw)
     .resize(finalW, finalH, { fit: 'cover', position: 'centre' })
     .png({ compressionLevel: 9 })

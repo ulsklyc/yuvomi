@@ -57,11 +57,6 @@ const caldavSync    = await import('../server/services/caldav-sync.js');
 const appleCalendar = await import('../server/services/apple-calendar.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
 const { localToUTCPrecise, storedToInstantMsPrecise, utcToWall } = await import('../server/utils/timezone.js');
-const { waitForExternalJobs } = await import('../server/utils/restore-state.js');
-
-// Die Route stösst nach dem Anlegen und Bearbeiten einen Sofortversuch an
-// (#2565); er darf nicht in den nächsten Test hinein buchen.
-test.afterEach(() => waitForExternalJobs());
 
 db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run();
 
@@ -248,8 +243,6 @@ const PROVIDERS = {
       this.target = { target_google_calendar_id: 'family' };
     },
     sync() { return google.sync({ createCalendar: () => this.calendar }); },
-    /** Der erste Upload. Der Sofortversuch der Route erreicht die Attrappe nicht. */
-    upload() { return this.sync(); },
     push() { return google.flushOutbound({ createCalendar: () => this.calendar }); },
     /** Was der erste Upload trug - und was der letzte Push. */
     first() { return googleWhen(this.calendar.inserts.at(-1).requestBody); },
@@ -304,15 +297,6 @@ const PROVIDERS = {
       await caldavSync.sync();
       // Der erzeugende PUT: was nach dem ersten Lauf mit einem PUT oben liegt.
       if (!this.firstSent && this.puts() > before) this.firstSent = this.onServer();
-    },
-    /**
-     * Der erste Upload: den macht seit #2565 der Sofortversuch der Route, noch
-     * vor jedem Abruf. Eine Bearbeitung danach ist eine VOR dem ersten Abruf.
-     */
-    async upload() {
-      await waitForExternalJobs();
-      assert.ok(this.puts() > 0, 'der Sofortversuch hat den neuen Termin nicht hochgeladen');
-      this.firstSent = this.onServer();
     },
     push() { return caldavSync.flushOutbound(); },
     onServer() {
@@ -374,7 +358,6 @@ const PROVIDERS = {
       await appleCalendar.sync();
       if (!this.firstSent && this.puts() > before) this.firstSent = this.onServer();
     },
-    upload() { return PROVIDERS.CalDAV.upload.call(this); },
     push() { return appleCalendar.flushOutbound(); },
     onServer() { return PROVIDERS.CalDAV.onServer.call(this); },
     first() { return this.firstSent; },
@@ -463,7 +446,7 @@ for (const name of Object.keys(PROVIDERS)) {
       const p = provider(name);
       const event = await post({ title: 'Miete', ...c.entered, ...p.target });
 
-      await p.upload();
+      await p.sync();
       assert.notEqual(row(event.id).external_source, 'local', 'der Termin ist danach gespiegelt');
       assert.deepEqual(p.first(), expected(name, c), 'der erste Upload');
 
@@ -479,7 +462,7 @@ for (const name of Object.keys(PROVIDERS)) {
       const remindAt = addReminder(event.id);
       const remindMs = reminderMs(event.id);
 
-      await p.upload();
+      await p.sync();
       assert.deepEqual(p.first(), expected(name, c), 'der erste Upload');
 
       // Der Abruf liest den eigenen Eintrag zurück. Ist es das Echo des

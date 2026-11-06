@@ -2627,6 +2627,7 @@
         "backupSchedulerLastSuccess": "{{date}} (úspěšně)",
         "backupSchedulerLastFail": "{{date}} (selhalo)",
         "backupSchedulerNever": "Ještě nebyla vytvořena žádná záloha",
+        "backupSchedulerLastError": "Poslední chyba",
         "backupSchedulerTrigger": "Vytvořit zálohu nyní",
         "backupSchedulerTriggering": "Vytváří se záloha...",
         "backupSchedulerTriggeredToast": "Záloha úspěšně vytvořena.",
@@ -3666,7 +3667,8 @@
         "backupRestoreErrorTooLarge": "Soubor je větší než limit nahrávání této instalace ({{limit}}). Zvyšte BACKUP_UPLOAD_LIMIT, restartujte Yuvomi a obnovte zálohu znovu. Nic se zde nezměnilo.",
         "apiTokenErrorNameTooLong": "Název smí mít nejvýše 100 znaků.",
         "apiTokenErrorExpiryPast": "Datum vypršení je v minulosti. Vyber pozdější čas.",
-        "apiTokenErrorSubjectDeactivated": "Tento účet je deaktivovaný a nemůže dostat token. Vyber jinou osobu."
+        "apiTokenErrorSubjectDeactivated": "Tento účet je deaktivovaný a nemůže dostat token. Vyber jinou osobu.",
+        "backupSchedulerReasonDirNotWritable": "Záložní složka není zapisovatelná. Zkontrolujte nastavení BACKUP_DIR a oprávnění."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

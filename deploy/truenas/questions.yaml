@@ -30,31 +30,23 @@ questions:
       type: dict
       attrs:
         - variable: session_secret
-          label: Session Secret (Optional)
+          label: Session Secret
           description: |
             A long random string used to sign session cookies.</br>
-            Leave empty and Yuvomi generates one on its first start and keeps it
-            in .secrets/ next to the database; every later start reads the same
-            file.</br>
-            Set your own to keep the value under your control - changing it later
-            signs everyone out once. Generate one with: openssl rand -base64 48
+            Generate one with: openssl rand -base64 48
           schema:
             type: string
-            default: ""
+            required: true
             private: true
+            min_length: 16
         - variable: db_encryption_key
           label: Database Encryption Key (Optional)
           description: |
-            SQLCipher key that encrypts the database at rest.</br>
-            Leave empty on a new installation and Yuvomi generates one on its
-            first start and keeps it in .secrets/ next to the database. To store
-            the database unencrypted instead, add DB_ENCRYPTION_AUTO_KEY=false
-            under Additional Environment Variables below.</br>
-            On an installation whose database is already encrypted, an empty
-            field does not generate a replacement - the start is refused.</br>
-            WARNING: Store this key permanently - Settings, Household, Backup and
-            restore shows it. It cannot be recovered, it cannot be changed on an
-            existing database, and losing it means losing access to your data.
+            Optional SQLCipher key that encrypts the database at rest.</br>
+            Leave empty to store the database unencrypted.</br>
+            WARNING: Store this key permanently. It cannot be recovered, it cannot
+            be changed on an existing database, and losing it means losing access
+            to your data.
           schema:
             type: string
             default: ""

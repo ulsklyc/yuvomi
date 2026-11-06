@@ -14,20 +14,13 @@
 # container needs is listed explicitly below instead of being pulled in via
 # `env_file` - a Git-managed stack has no file to pull from (issue #698). For a
 # Git/GitOps stack, point the Compose path at `docs/docker-compose.portainer.yml`
-# and leave Portainer's own form empty unless you bring your own secrets.
+# and set the two required variables in Portainer's own form.
 #
-# Secrets - OPTIONAL since v2.85.0:
+# Required .env variables:
 #   SESSION_SECRET=<random-string-min-32-chars>
 #   DB_ENCRYPTION_KEY=<random-string-min-32-chars>
 #
-# On a NEW installation, left empty, Yuvomi generates both on its first start
-# and keeps them in `.secrets/` next to the database, on the oikos_data volume
-# below. Keep a copy of DB_ENCRYPTION_KEY somewhere else (Settings > Household >
-# Backup and restore shows it): without it, a backup cannot be opened once that
-# volume is lost. On an installation whose database is ALREADY encrypted, an
-# empty DB_ENCRYPTION_KEY does not generate a fresh key - the start is refused,
-# because a new key would never open the existing database.
-# Set them yourself to keep the values under your own control:
+# Generate secrets:
 #   openssl rand -hex 32
 #
 # Strongly recommended:
@@ -70,10 +63,8 @@ services:
       # file access needed). Off by default; installed modules stay off until an
       # admin approves them in a browser session.
       - MODULES_ALLOW_WEB_INSTALL=${MODULES_ALLOW_WEB_INSTALL:-false}
-      # Both empty by default: Yuvomi generates them on the first start and
-      # keeps them in .secrets/ next to the database (see the header).
-      - SESSION_SECRET=${SESSION_SECRET:-}
-      - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:-}
+      - SESSION_SECRET=${SESSION_SECRET:?Set SESSION_SECRET in .env}
+      - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:?Set DB_ENCRYPTION_KEY in .env}
       # Set to true when behind a reverse proxy with HTTPS (Caddy, nginx, Traefik)
       - SESSION_SECURE=${SESSION_SECURE:-false}
       # Trust proxy hops (default: 1 for Docker+reverse-proxy setups)

@@ -17,7 +17,6 @@
  *               server/utils/ssrf.js, ./categorize.js
  */
 import { categorizeIngredient } from './categorize.js';
-import { servingsFrom } from './markup-text.js';
 import { safeRequest } from '../../utils/http.js';
 import { createGuardedLookup } from '../../utils/ssrf.js';
 // Opt-in RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK: one place for both adapters and
@@ -88,9 +87,6 @@ function flattenIngredient(ing) {
 export class TandoorAdapter {
   constructor(account) {
     this.provider = 'tandoor';
-    // Stand der Abbildung getRecipe() -> recipes (siehe MealieAdapter): 1 =
-    // Portionen aus `servings` (#2355). Bestandsspiegel holen sie einmal nach.
-    this.mirrorFormat = 1;
     this.base = String(account.base_url || '').replace(/\/+$/, '');
     this.token = account.api_token;
     this.linkBase = String(account.external_url || account.base_url || '').replace(/\/+$/, '');
@@ -165,7 +161,6 @@ export class TandoorAdapter {
       title: detail.name,
       notes: detail.description || null,
       hasImage: Boolean(detail.image),
-      servings: servingsFrom(detail.servings),
       ingredients,
     };
   }

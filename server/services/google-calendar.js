@@ -418,14 +418,6 @@ async function processPendingDeletions(calendar, { stop = outbound.createRefusal
 }
 
 /** Anzahl der Events, die auf einen Push oder Umzug zu Google warten. */
-/** Lokale Termine mit Google-Ziel, die auf ihren Upload warten (#2565). */
-function pendingUploadCount() {
-  return db.get().prepare(`
-    SELECT COUNT(*) AS c FROM calendar_events
-    WHERE external_source = 'local' AND target_google_calendar_id IS NOT NULL
-  `).get().c;
-}
-
 function pendingUpdateCount() {
   return outbound.pendingUpdateCount('google');
 }
@@ -623,12 +615,11 @@ async function runFlushOutbound(createCalendar) {
 
   const hasDeletions = pendingDeletionCount() > 0;
   const hasUpdates   = pendingUpdateCount() > 0;
-  const hasUploads   = pendingUploadCount() > 0;
-  if (!hasDeletions && !hasUpdates && !hasUploads) return idle;
+  if (!hasDeletions && !hasUpdates) return idle;
 
   try {
     return await withReauthGuard((track) =>
-      runFlushWith(() => track(createCalendar()), hasDeletions, hasUpdates, hasUploads));
+      runFlushWith(() => track(createCalendar()), hasDeletions, hasUpdates));
   } catch (err) {
     if (!(err instanceof GoogleConnectionReplacedError)) throw err;
     logSuperseded('Outbound pass');
@@ -636,22 +627,15 @@ async function runFlushOutbound(createCalendar) {
   }
 }
 
-async function runFlushWith(createCalendar, hasDeletions, hasUpdates, hasUploads = false) {
+async function runFlushWith(createCalendar, hasDeletions, hasUpdates) {
   const { calendar } = bindToConnection(createCalendar());
   await ensureAccessToken(calendar);
   // Ein Stoppsignal für Löschen und Ändern (#2136).
   const stop = outbound.createRefusalStop();
-  const metaCache = new Map();
   const deleted = hasDeletions ? await processPendingDeletions(calendar, { stop }) : 0;
-  const colorMap = (hasUpdates || hasUploads) && !stop.blocks() ? await fetchEventColorMap(calendar) : {};
   const updated = hasUpdates && !stop.blocks()
-    ? await processPendingUpdates(calendar, colorMap, metaCache, { stop })
+    ? await processPendingUpdates(calendar, await fetchEventColorMap(calendar), new Map(), { stop })
     : 0;
-  // Neu angelegte Termine (#2565), mit derselben Schleife wie im Lauf. Nach
-  // einer kontoweiten Absage geht auch hier nichts mehr hinaus.
-  if (hasUploads && !stop.blocks()) {
-    await uploadLocalEvents(calendar, enabledCalendarIds(), colorMap, metaCache);
-  }
   return { deleted, updated };
 }
 
@@ -1056,83 +1040,6 @@ async function sync({ createCalendar = authorizedCalendar } = {}) {
   });
 }
 
-/**
- * Lädt die lokalen Termine mit Google-Ziel hoch. EINE Schleife für den
- * Sync-Lauf und den Sofortversuch (#2565): vorher lief sie nur im Lauf, und ein
- * neu angelegter Termin kam erst mit dem nächsten Intervall an, obwohl die Doku
- * den Versuch beim Speichern zusagt. Der Aufrufer prüft vorher den
- * Nur-Lesen-Modus.
- * @returns {Promise<object[]>} die Kandidaten, die die Schleife vorfand
- */
-async function uploadLocalEvents(calendar, calendarIds, eventColorMap, metaCache) {
-  const localEvents = db.get().prepare(`
-    SELECT * FROM calendar_events
-    WHERE external_source = 'local' AND target_google_calendar_id IS NOT NULL
-  `).all();
-
-  const activeIds = new Set(calendarIds);
-  for (const event of localEvents) {
-    const targetId = event.target_google_calendar_id;
-    if (!activeIds.has(targetId)) {
-      log.warn(`Target calendar ${targetId} not active, skipping event ${event.id}.`);
-      continue;
-    }
-    // Metadaten-Abruf fehlgeschlagen (meta === null) zählt als nicht schreibbar.
-    const meta = await loadCalendarMeta(calendar, targetId, metaCache);
-    const role = meta?.role ?? null;
-    if (!isWritableRole(role)) {
-      log.warn(`Target calendar ${targetId} has no writable role (role=${role}), skipping event ${event.id}.`);
-      continue;
-    }
-    try {
-      const { body: gEvent, snapshot } = buildGoogleRequest(event, eventColorMap, outboundTimeZone(meta?.timeZone));
-      const created = await calendar.events.insert({ calendarId: targetId, requestBody: gEvent });
-      // refId aus den Metadaten: trägt Name und Farbe des Kalenders statt der
-      // rohen ID als Notnamen.
-      const calRefId = meta.refId;
-      // `color_modified` mit hoch: die gerade hinausgegangene Farbe ist unsere.
-      // Die elf `colorId`s sind eine verlustbehaftete Abbildung des Hex-Werts -
-      // ohne das Flag holte der nächste Inbound-Lauf die gemappte Farbe zurück
-      // und ersetzte damit die gewählte (#899).
-      // Gebucht wird gegen den Stand NACH dem await (#1926), und zwar in dem
-      // einen Schreibvorgang selbst: Spiegel wird nur die Zeile, die die
-      // Auswahl oben JETZT noch für diesen Kalender nennte. Wer inzwischen
-      // gelöscht wurde, sein Ziel gewechselt oder es für einen lokalen
-      // Kalender aufgegeben hat, bleibt, wie er ist - gebucht verlöre er den
-      // lokalen Kalender und stünde bei Google, obwohl ihn dort niemand mehr
-      // haben will. Der gerade angelegte Termin wird dann zum Löschen
-      // vorgemerkt; die Löschroute tut das für eine lokale Zeile nicht.
-      //
-      // Wer inzwischen BEARBEITET wurde (#1932), wird Spiegel und im selben
-      // Schreibvorgang als geändert vorgemerkt: bei Google liegt der Stand,
-      // aus dem die Anfrage gebaut wurde, und eine lokale Zeile merkt in der
-      // Route nichts vor. Als sauberer Spiegel ginge die Bearbeitung nie
-      // hinaus, und der nächste Inbound überschriebe sie mit dem alten Stand.
-      // Verglichen wird wie bei CalDAV und Apple (`bookEventUpload`) über die
-      // gespiegelten Felder; zwischen Nachlesen und Schreiben liegt kein await.
-      const now    = outbound.reloadEvent(event.id);
-      const edited = now && outbound.mirroredFieldsChanged(event, now) ? 1 : 0;
-      const booked = db.get().prepare(`
-        UPDATE calendar_events
-        SET external_calendar_id = ?, external_source = 'google', local_calendar_id = NULL, calendar_ref_id = ?,
-            color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END,
-            outbound_dirty = CASE WHEN ? = 1 THEN 1 ELSE outbound_dirty END,
-            outbound_attempts = CASE WHEN ? = 1 THEN 0 ELSE outbound_attempts END,
-            outbound_snapshot = ?
-        WHERE id = ? AND external_source = 'local' AND target_google_calendar_id = ?
-      `).run(created.data.id, calRefId, edited, edited, snapshot, event.id, targetId).changes > 0;
-      if (!booked) {
-        outbound.queueDeletion({ source: 'google', calendarExternalId: targetId, eventExternalId: created.data.id });
-        log.info(`Event ${event.id} stopped waiting for its upload to ${targetId} while it was in flight, queued the deletion of the created entry.`);
-      }
-    } catch (err) {
-      passOnRefusal(err);
-      log.error(`Outbound error for event ${event.id}:`, err.message);
-    }
-  }
-  return localEvents;
-}
-
 async function runSync(createCalendar) {
   const { calendar, assertCurrent } = bindToConnection(createCalendar());
   await ensureAccessToken(calendar);
@@ -1216,7 +1123,71 @@ async function runSync(createCalendar) {
   if (isReadonly()) {
     log.debug('Read-only mode – outbound sync skipped.');
   } else {
-    const localEvents = await uploadLocalEvents(calendar, calendarIds, eventColorMap, metaCache);
+    const localEvents = db.get().prepare(`
+      SELECT * FROM calendar_events
+      WHERE external_source = 'local' AND target_google_calendar_id IS NOT NULL
+    `).all();
+
+    const activeIds = new Set(calendarIds);
+    for (const event of localEvents) {
+      const targetId = event.target_google_calendar_id;
+      if (!activeIds.has(targetId)) {
+        log.warn(`Target calendar ${targetId} not active, skipping event ${event.id}.`);
+        continue;
+      }
+      // Metadaten-Abruf fehlgeschlagen (meta === null) zählt als nicht schreibbar.
+      const meta = await loadCalendarMeta(calendar, targetId, metaCache);
+      const role = meta?.role ?? null;
+      if (!isWritableRole(role)) {
+        log.warn(`Target calendar ${targetId} has no writable role (role=${role}), skipping event ${event.id}.`);
+        continue;
+      }
+      try {
+        const { body: gEvent, snapshot } = buildGoogleRequest(event, eventColorMap, outboundTimeZone(meta?.timeZone));
+        const created = await calendar.events.insert({ calendarId: targetId, requestBody: gEvent });
+        // refId aus den Metadaten: trägt Name und Farbe des Kalenders statt der
+        // rohen ID als Notnamen.
+        const calRefId = meta.refId;
+        // `color_modified` mit hoch: die gerade hinausgegangene Farbe ist unsere.
+        // Die elf `colorId`s sind eine verlustbehaftete Abbildung des Hex-Werts -
+        // ohne das Flag holte der nächste Inbound-Lauf die gemappte Farbe zurück
+        // und ersetzte damit die gewählte (#899).
+        // Gebucht wird gegen den Stand NACH dem await (#1926), und zwar in dem
+        // einen Schreibvorgang selbst: Spiegel wird nur die Zeile, die die
+        // Auswahl oben JETZT noch für diesen Kalender nennte. Wer inzwischen
+        // gelöscht wurde, sein Ziel gewechselt oder es für einen lokalen
+        // Kalender aufgegeben hat, bleibt, wie er ist - gebucht verlöre er den
+        // lokalen Kalender und stünde bei Google, obwohl ihn dort niemand mehr
+        // haben will. Der gerade angelegte Termin wird dann zum Löschen
+        // vorgemerkt; die Löschroute tut das für eine lokale Zeile nicht.
+        //
+        // Wer inzwischen BEARBEITET wurde (#1932), wird Spiegel und im selben
+        // Schreibvorgang als geändert vorgemerkt: bei Google liegt der Stand,
+        // aus dem die Anfrage gebaut wurde, und eine lokale Zeile merkt in der
+        // Route nichts vor. Als sauberer Spiegel ginge die Bearbeitung nie
+        // hinaus, und der nächste Inbound überschriebe sie mit dem alten Stand.
+        // Verglichen wird wie bei CalDAV und Apple (`bookEventUpload`) über die
+        // gespiegelten Felder; zwischen Nachlesen und Schreiben liegt kein await.
+        const now    = outbound.reloadEvent(event.id);
+        const edited = now && outbound.mirroredFieldsChanged(event, now) ? 1 : 0;
+        const booked = db.get().prepare(`
+          UPDATE calendar_events
+          SET external_calendar_id = ?, external_source = 'google', local_calendar_id = NULL, calendar_ref_id = ?,
+              color_modified = CASE WHEN color IS NOT NULL THEN 1 ELSE color_modified END,
+              outbound_dirty = CASE WHEN ? = 1 THEN 1 ELSE outbound_dirty END,
+              outbound_attempts = CASE WHEN ? = 1 THEN 0 ELSE outbound_attempts END,
+              outbound_snapshot = ?
+          WHERE id = ? AND external_source = 'local' AND target_google_calendar_id = ?
+        `).run(created.data.id, calRefId, edited, edited, snapshot, event.id, targetId).changes > 0;
+        if (!booked) {
+          outbound.queueDeletion({ source: 'google', calendarExternalId: targetId, eventExternalId: created.data.id });
+          log.info(`Event ${event.id} stopped waiting for its upload to ${targetId} while it was in flight, queued the deletion of the created entry.`);
+        }
+      } catch (err) {
+        passOnRefusal(err);
+        log.error(`Outbound error for event ${event.id}:`, err.message);
+      }
+    }
     // Ohne Kandidaten hat der Outbound nichts getan - das gehört nicht in jeden
     // Scheduler-Tick des Standard-Logs.
     const outboundSummary = `Sync completed - ${localEvents.length} candidate local → Google.`;

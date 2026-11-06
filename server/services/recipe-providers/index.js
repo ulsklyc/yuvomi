@@ -13,14 +13,12 @@
  *                                                     id  = stabiler Provider-Schlüssel (Upsert-Key,
  *                                                           überlebt Umbenennungen)
  *                                                     ref = Schlüssel für den Detail-Abruf via getRecipe()
- *          async getRecipe(ref)                   -> { id, updatedAt, slug, title, notes, hasImage, servings,
+ *          async getRecipe(ref)                   -> { id, updatedAt, slug, title, notes, hasImage,
  *                                                       ingredients: [{ name, quantity, category }] }
  *                                                     slug: opak, adapterdefiniert, wird in
  *                                                     recipes.provider_slug persistiert, damit
  *                                                     recipeUrl()/fetchThumbnail() ohne erneuten
  *                                                     Detail-Abruf rekonstruieren können
- *                                                     notes: Klartext (./markup-text.js), servings:
- *                                                     ganze Zahl 1-99 oder null
  *          recipeUrl(linkContext, { id, slug })   -> string | null   (Deep-Link zum Quell-Rezept)
  *          async fetchThumbnail({ id, slug })     -> { buffer: Buffer, mime: string }
  *          mirrorFormat (optional, Zahl)          Stand der getRecipe()-Abbildung; hochzaehlen

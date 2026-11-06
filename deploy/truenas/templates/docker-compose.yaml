@@ -12,9 +12,7 @@
 {% do c1.environment.add_env("DB_PATH", "/data/yuvomi.db") %}
 {% do c1.environment.add_env("DATA_DIR", "/data") %}
 {% do c1.environment.add_env("BACKUP_DIR", "/backups") %}
-{% if values.yuvomi.session_secret %}
-  {% do c1.environment.add_env("SESSION_SECRET", values.yuvomi.session_secret) %}
-{% endif %}
+{% do c1.environment.add_env("SESSION_SECRET", values.yuvomi.session_secret) %}
 {% if values.yuvomi.db_encryption_key %}
   {% do c1.environment.add_env("DB_ENCRYPTION_KEY", values.yuvomi.db_encryption_key) %}
 {% endif %}

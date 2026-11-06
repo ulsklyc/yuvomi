@@ -2617,6 +2617,7 @@
         "backupSchedulerLastFail": "{{date}} (с ошибкой)",
         "backupSchedulerLastSuccess": "{{date}} (успешно)",
         "backupSchedulerNever": "Резервных копий пока нет",
+        "backupSchedulerLastError": "Последняя ошибка",
         "backupSchedulerSchedule": "Расписание",
         "backupSchedulerCronDaily": "Ежедневно в {{time}}",
         "backupSchedulerCronWeekly": "Еженедельно: {{weekday}}, {{time}}",
@@ -3774,7 +3775,8 @@
         "backupRestoreErrorTooLarge": "Файл больше лимита загрузки этой установки ({{limit}}). Увеличьте BACKUP_UPLOAD_LIMIT, перезапустите Yuvomi и восстановите снова. Здесь ничего не изменилось.",
         "apiTokenErrorNameTooLong": "Название может содержать не более 100 символов.",
         "apiTokenErrorExpiryPast": "Срок действия уже прошёл. Выбери более позднее время.",
-        "apiTokenErrorSubjectDeactivated": "Этот аккаунт деактивирован и не может получить токен. Выбери другого человека."
+        "apiTokenErrorSubjectDeactivated": "Этот аккаунт деактивирован и не может получить токен. Выбери другого человека.",
+        "backupSchedulerReasonDirNotWritable": "Папка для резервных копий недоступна для записи. Проверьте настройку BACKUP_DIR и права доступа."
     },
     "login": {
         "tagline": "С возвращением. Ваш дом - в одном месте.",

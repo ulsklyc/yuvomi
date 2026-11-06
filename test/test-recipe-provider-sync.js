@@ -146,27 +146,6 @@ test('sync(): neues mirrorFormat des Adapters → Bestandsrezept wird einmal neu
   assert.equal(second.updated, 0);
 });
 
-// #2558 / #2355: die Portionen des Quellrezepts landen in recipes.servings,
-// beim Anlegen wie beim Aktualisieren; faellt die Angabe beim Provider weg,
-// wird sie auch hier wieder leer.
-test('sync(): servings des Adapters landet in recipes.servings, bei Insert und Update (#2558)', async () => {
-  const accountId = newAccount('Portionen');
-  const servingsNow = () => conn.prepare('SELECT servings FROM recipes WHERE provider_account_id = ?').get(accountId).servings;
-  const run = async (updatedAt, servings) => {
-    const summaries = [{ id: 'uuid-chili', ref: 'chili', updatedAt }];
-    _setAdapterFactory(fakeAdapter(summaries, { chili: {
-      id: 'uuid-chili', updatedAt, slug: 'chili', title: 'Chili', notes: null, hasImage: false, servings, ingredients: [],
-    } }));
-    await sync.sync();
-  };
-  await run('2026-01-01T00:00:00Z', 5);
-  assert.equal(servingsNow(), 5);
-  await run('2026-01-02T00:00:00Z', 3);
-  assert.equal(servingsNow(), 3);
-  await run('2026-01-03T00:00:00Z', null);
-  assert.equal(servingsNow(), null);
-});
-
 test('sync(): unveränderte updatedAt, aber geänderte external_url → recipe_url wird trotzdem neu gebaut, ohne getRecipe erneut aufzurufen', async () => {
   const accountId = newAccount('LinkWechsel');
   const summaries = [{ id: 'uuid-tarte', ref: 'tarte', updatedAt: '2026-01-01T00:00:00Z' }];

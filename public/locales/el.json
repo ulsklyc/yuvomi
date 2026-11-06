@@ -2429,6 +2429,7 @@
         "backupSchedulerLastFail": "{{date}} (απέτυχε)",
         "backupSchedulerLastSuccess": "{{date}} (επιτυχές)",
         "backupSchedulerNever": "Δεν έχει δημιουργηθεί ακόμη αντίγραφο ασφαλείας",
+        "backupSchedulerLastError": "Τελευταίο σφάλμα",
         "backupSchedulerSchedule": "Χρονοδιάγραμμα",
         "backupSchedulerCronDaily": "Καθημερινά στις {{time}}",
         "backupSchedulerCronWeekly": "Κάθε {{weekday}} στις {{time}}",
@@ -3548,7 +3549,8 @@
         "backupRestoreErrorTooLarge": "Το αρχείο είναι μεγαλύτερο από το όριο μεταφόρτωσης αυτής της εγκατάστασης ({{limit}}). Αυξήστε το BACKUP_UPLOAD_LIMIT, επανεκκινήστε το Yuvomi και κάντε ξανά επαναφορά. Δεν άλλαξε τίποτα εδώ.",
         "apiTokenErrorNameTooLong": "Το όνομα μπορεί να έχει έως 100 χαρακτήρες.",
         "apiTokenErrorExpiryPast": "Η ημερομηνία λήξης είναι στο παρελθόν. Επίλεξε μια μεταγενέστερη ώρα.",
-        "apiTokenErrorSubjectDeactivated": "Αυτός ο λογαριασμός είναι απενεργοποιημένος και δεν μπορεί να πάρει token. Επίλεξε άλλο άτομο."
+        "apiTokenErrorSubjectDeactivated": "Αυτός ο λογαριασμός είναι απενεργοποιημένος και δεν μπορεί να πάρει token. Επίλεξε άλλο άτομο.",
+        "backupSchedulerReasonDirNotWritable": "Ο φάκελος αντιγράφων ασφαλείας δεν είναι εγγράψιμος. Ελέγξτε τη ρύθμιση BACKUP_DIR και τα δικαιώματα."
     },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά. Το σπίτι σας σε ένα μέρος.",

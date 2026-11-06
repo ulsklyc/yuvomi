@@ -24,7 +24,6 @@ import {
 } from '../server/services/recipe-providers/failure.js';
 import { safeRequest } from '../server/utils/http.js';
 import { BlockedAddressError } from '../server/utils/ssrf.js';
-import { markupToText } from '../server/services/recipe-providers/markup-text.js';
 
 const ENV_FLAG = 'RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK';
 
@@ -196,90 +195,6 @@ test('getRecipe: nur Beschreibung, leere oder fehlende Schritte → notes = Besc
 
 test('MealieAdapter nennt ein mirrorFormat, damit Bestandsrezepte die Schritte einmal nachholen (#2363)', () => {
   assert.ok(Number.isInteger(new MealieAdapter(account).mirrorFormat) && new MealieAdapter(account).mirrorFormat >= 2);
-});
-
-// #2558: Mealies Schritte sind Markdown mit eingebettetem HTML (der Editor
-// legt ein eingefuegtes Bild als <img src="/api/media/..."> ab). notes ist
-// Klartext (textContent), also kommt beides als lesbarer Text an: kein Tag,
-// kein Sternchen, keine Entity. Bilder fallen weg - ihre src ist ein Mealie-
-// Pfad, im Browser nicht ladbar; das Rezept verlinkt ohnehin nach Mealie.
-test('getRecipe: HTML und Markdown aus Mealie-Schritten werden Klartext, Bilder fallen weg (#2558)', async () => {
-  mockHandler((req, res) => sendJson(res, mealieDetail({
-    description: 'Omas **Lieblings**gericht &amp; schnell',
-    recipeInstructions: [
-      { title: '', text: 'Zwiebeln **fein** würfeln &amp; anbraten.\n\n<img src="/api/media/recipes/eda6cdde-a444-4622-acab-697b112b2282/assets/3rxf2k-webp.webp" height="100%" width="100%"/>\n\n* Salz\n* Pfeffer' },
-      { title: 'Braten', text: '<p>Hackfleisch zugeben.</p><p>10&nbsp;Minuten braten, bis es &lt;krümelig&gt; ist.<br>Gut rühren.</p><ul><li>Tomaten</li><li>Basilikum</li></ul>' },
-      { text: '## Servieren\nMit [Rezeptidee](https://example.com/idee) und *frischem* Brot. ![Foto](/api/media/recipes/x/assets/foto.webp)' },
-      { text: '<img src="/api/media/recipes/x/assets/nur-bild.webp"/>' },
-    ],
-  })));
-  const recipe = await new MealieAdapter(account).getRecipe('mit-schritten');
-  assert.equal(recipe.notes, [
-    'Omas Lieblingsgericht & schnell',
-    '',
-    '1. Zwiebeln fein würfeln & anbraten.',
-    '- Salz',
-    '- Pfeffer',
-    '2. Braten: Hackfleisch zugeben.',
-    '10 Minuten braten, bis es <krümelig> ist.',
-    'Gut rühren.',
-    '- Tomaten',
-    '- Basilikum',
-    '3. Servieren',
-    'Mit Rezeptidee (https://example.com/idee) und frischem Brot.',
-  ].join('\n'));
-  assert.doesNotMatch(recipe.notes, /<img|api\/media|&amp;|&nbsp;|\*\*/);
-});
-
-// #2558 (Review): ein einzelner Ersetzungsdurchgang laesst aus verschachtelten
-// Tags einen neuen stehen. notes geht per textContent raus, trotzdem soll der
-// Spiegel nie Markup tragen: kein "<script", kein "<!--", kein "<img" im Ergebnis.
-test('markupToText: verschachtelte Tags und Kommentare hinterlassen kein Markup (#2558)', () => {
-  for (const payload of [
-    '<<script>script>alert(1)<</script>/script>',
-    '<scr<script>ipt>alert(1)</script>',
-    '<!<!-- a -->-- b -->Text',
-    '<<img src=x>img src=/api/media/x.webp>',
-    '<a href="https://example.com"><<b>b>fett</b></a>',
-  ]) {
-    const out = markupToText(payload);
-    assert.doesNotMatch(out, /<[a-z!/]/i, `${payload} -> ${out}`);
-  }
-  assert.equal(markupToText('2 < 3 und 5 > 4'), '2 < 3 und 5 > 4');
-  assert.equal(markupToText('&lt;b&gt; bleibt Text'), '<b> bleibt Text');
-});
-
-// #2558 (Review): ein Markdown-Autolink ist kein Tag - die URL bleibt.
-test('markupToText: Markdown-Autolink behaelt die URL (#2558)', () => {
-  assert.equal(markupToText('Follow <https://example.com/technique> before baking.'), 'Follow https://example.com/technique before baking.');
-});
-
-test('getRecipe: Klartext bleibt Klartext - "<" im Text, Escapes, Wort_mit_Unterstrich (#2558)', async () => {
-  mockHandler((req, res) => sendJson(res, mealieDetail({
-    description: null,
-    recipeInstructions: [{ text: '2 < 3 Eier, \\*nicht\\* mehr; vom snake_case_teig 2*3 Stück, 180&deg;C' }],
-  })));
-  const recipe = await new MealieAdapter(account).getRecipe('mit-schritten');
-  assert.equal(recipe.notes, '1. 2 < 3 Eier, *nicht* mehr; vom snake_case_teig 2*3 Stück, 180°C');
-});
-
-// #2558 / #2355: die Portionen des Quellrezepts sind die Basis des Portions-
-// Reglers; ohne sie zeigt Yuvomi "x 1" auf Mengen, die fuer 5 gedacht sind.
-test('getRecipe: recipeServings wird servings, nur als ganze Zahl 1-99 (#2558)', async () => {
-  const servingsOf = async (recipeServings) => {
-    mockHandler((req, res) => sendJson(res, mealieDetail({ recipeServings })));
-    return (await new MealieAdapter(account).getRecipe('mit-schritten')).servings;
-  };
-  assert.equal(await servingsOf(5), 5);
-  assert.equal(await servingsOf(0), null, 'Mealies Default 0 heisst "keine Angabe"');
-  assert.equal(await servingsOf(2.5), null);
-  assert.equal(await servingsOf(120), null);
-  assert.equal(await servingsOf(undefined), null);
-  assert.equal(await servingsOf('4'), null);
-});
-
-test('MealieAdapter: mirrorFormat >= 3, damit Bestandsspiegel Klartext und Portionen einmal nachholen (#2558)', () => {
-  assert.ok(new MealieAdapter(account).mirrorFormat >= 3);
 });
 
 test('getRecipe: HTTP-Fehler wirft mit Statuscode', async () => {

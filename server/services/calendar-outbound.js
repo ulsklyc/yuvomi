@@ -1029,41 +1029,8 @@ export function markEventOutbound(before, after) {
 }
 
 /**
- * Wartet diese Zeile auf ihren ersten Upload zu Google oder einem CalDAV-Konto
- * (#2565)? Ein lokaler Termin mit Sync-Ziel geht erst mit dem Upload in den
- * Provider über; bis dahin ist er weder Änderung noch Löschung, und ohne diese
- * Frage bekam er keinen Sofortversuch. Welches Ziel der Provider annimmt, prüft
- * dessen Upload-Schleife; hier zählt nur, dass eins gesetzt ist.
- */
-export function waitsForUpload(row) {
-  return !!row && row.external_source === 'local'
-    && (row.target_caldav_account_id != null || row.target_google_calendar_id != null);
-}
-
-/**
- * Gibt es für diesen Provider überhaupt einen Termin, der auf seinen Upload
- * wartet? Grob mit Absicht: die genaue Auswahl (eingeschalteter Kalender,
- * Zugangsdaten, Standardkalender bei iCloud) trifft der Provider selbst, und
- * hier entscheidet sich nur, ob er geladen und gefragt wird. Für Apple ist
- * das jeder lokale Termin ohne Provider-Kalender: die Einzelkonto-Verbindung
- * lädt alle hoch, sofern sie Zugangsdaten hat.
- */
-function hasWaitingUploads(source) {
-  const where = {
-    caldav: 'target_caldav_account_id IS NOT NULL',
-    google: 'target_google_calendar_id IS NOT NULL',
-    apple:  'external_calendar_id IS NULL',
-  }[source];
-  if (!where) return false;
-  return !!db.get().prepare(
-    `SELECT 1 FROM calendar_events WHERE external_source = 'local' AND ${where} LIMIT 1`
-  ).get();
-}
-
-/**
- * Sofortiger Best-Effort-Durchlauf direkt nach einer lokalen Änderung, Löschung
- * oder einem neu angelegten Termin mit Sync-Ziel (#2565), damit der Provider
- * nicht erst beim nächsten Sync-Intervall nachzieht.
+ * Sofortiger Best-Effort-Durchlauf direkt nach einer lokalen Änderung oder
+ * Löschung, damit der Provider nicht erst beim nächsten Sync-Intervall nachzieht.
  * Fehler sind unkritisch - die Vormerkung bleibt stehen und der Sync holt nach.
  *
  * Läuft über alle Provider, die gerade offene Arbeit haben. Jeder für sich in
@@ -1092,8 +1059,7 @@ async function flushOutboundUntracked() {
   ];
 
   for (const { source, load } of providers) {
-    if (pendingDeletionCount(source) === 0 && pendingUpdateCount(source) === 0
-      && !hasWaitingUploads(source)) continue;
+    if (pendingDeletionCount(source) === 0 && pendingUpdateCount(source) === 0) continue;
     try {
       const mod = await load();
       const res = await mod.flushOutbound();

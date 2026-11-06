@@ -180,10 +180,7 @@ router.get('/database', requireAdmin, databaseDownloadLimiter, async (req, res) 
     if (tmpPath) {
       try { await fs.rm(path.dirname(tmpPath), { recursive: true, force: true }); } catch { /* best effort */ }
     }
-    // Das Backup hat die Integritaetspruefung nicht bestanden (#2520): fester
-    // Grund statt des Satzes, der Befund steht im Log.
-    const reason = err?.reason === 'backup_verify_failed' ? { reason: 'backup_verify_failed' } : {};
-    res.status(500).json({ error: 'Database backup failed.', code: 500, ...reason });
+    res.status(500).json({ error: 'Database backup failed.', code: 500 });
   }
 });
 

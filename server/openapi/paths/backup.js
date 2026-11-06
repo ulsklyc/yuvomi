@@ -7,7 +7,7 @@ export function backupPaths() {
         summary: 'Get backup status',
         tag: 'Backup',
         admin: true,
-        description: '`database_key` (see DatabaseKeyStatus) says where the database key comes from, never its value; `GET /api/v1/backup/database-key` returns a generated one.',
+        description: '`database_key` (see DatabaseKeyStatus) says where the database key comes from, never its value; `GET /api/v1/backup/database-key` returns a generated one. `scheduler.lastError` is `{ timestamp, message, reason }` for the last failed scheduled run and `null` once a run succeeds again, so a client can tell a stale success from a fresh failure. `reason` is `backup_dir_not_writable` when the directory is inaccessible and `null` for other failures.',
       }),
     },
     '/api/v1/backup/database': {
@@ -15,7 +15,6 @@ export function backupPaths() {
         summary: 'Download database backup',
         tag: 'Backup',
         admin: true,
-        description: 'The backup is checked for integrity before it is sent. A backup that fails the check is discarded and answered with 500 and reason `backup_verify_failed`.',
         responses: {
           200: {
             description: 'Database backup file',

@@ -2546,6 +2546,7 @@
         "backupSchedulerLastSuccess": "{{date}} (성공)",
         "backupSchedulerLastFail": "{{date}} (실패)",
         "backupSchedulerNever": "아직 백업이 생성되지 않음",
+        "backupSchedulerLastError": "마지막 오류",
         "backupSchedulerTrigger": "지금 백업 생성",
         "backupSchedulerTriggering": "백업 생성 중...",
         "backupSchedulerTriggeredToast": "백업이 성공적으로 생성되었습니다.",
@@ -3566,7 +3567,8 @@
         "backupRestoreErrorTooLarge": "파일이 이 설치의 업로드 한도({{limit}})보다 큽니다. BACKUP_UPLOAD_LIMIT을 늘리고 Yuvomi를 다시 시작한 뒤 다시 복원하세요. 여기서는 아무것도 변경되지 않았습니다.",
         "apiTokenErrorNameTooLong": "이름은 최대 100자까지 입력할 수 있습니다.",
         "apiTokenErrorExpiryPast": "만료 날짜가 과거입니다. 더 나중 시각을 선택하세요.",
-        "apiTokenErrorSubjectDeactivated": "이 계정은 비활성화되어 토큰을 받을 수 없습니다. 다른 사람을 선택하세요."
+        "apiTokenErrorSubjectDeactivated": "이 계정은 비활성화되어 토큰을 받을 수 없습니다. 다른 사람을 선택하세요.",
+        "backupSchedulerReasonDirNotWritable": "백업 폴더에 쓸 수 없습니다. BACKUP_DIR 설정과 권한을 확인하세요."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",

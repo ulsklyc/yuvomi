@@ -2583,6 +2583,7 @@
         "backupSchedulerLastSuccess": "{{date}} (erfolgreich)",
         "backupSchedulerLastFail": "{{date}} (fehlgeschlagen)",
         "backupSchedulerNever": "Noch kein Backup erstellt",
+        "backupSchedulerLastError": "Letzter Fehler",
         "backupSchedulerTrigger": "Jetzt Backup erstellen",
         "backupSchedulerTriggering": "Backup wird erstellt...",
         "backupSchedulerTriggeredToast": "Backup erfolgreich erstellt.",
@@ -3566,7 +3567,8 @@
         "backupRestoreErrorTooLarge": "Die Datei ist größer als die Upload-Grenze dieser Installation ({{limit}}). Erhöhe BACKUP_UPLOAD_LIMIT, starte Yuvomi neu und stelle dann erneut wieder her. Hier wurde nichts geändert.",
         "apiTokenErrorNameTooLong": "Der Name darf höchstens 100 Zeichen lang sein.",
         "apiTokenErrorExpiryPast": "Das Ablaufdatum liegt in der Vergangenheit. Wähle einen späteren Zeitpunkt.",
-        "apiTokenErrorSubjectDeactivated": "Dieses Konto ist deaktiviert und kann kein Token bekommen. Wähle eine andere Person."
+        "apiTokenErrorSubjectDeactivated": "Dieses Konto ist deaktiviert und kann kein Token bekommen. Wähle eine andere Person.",
+        "backupSchedulerReasonDirNotWritable": "Der Sicherungsordner ist nicht beschreibbar. BACKUP_DIR-Einstellung und Zugriffsrechte prüfen."
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",

@@ -210,23 +210,6 @@ test('ausdruecklich gesetzt oder per _FILE: keine gespeicherte Datei', () => {
   assert.equal(existsSync(join(dir, 'data', '.secrets')), false);
 });
 
-// DIE VORAUSSETZUNG DER DEPLOY-DESKRIPTOREN (#2507). Portainer, Unraid und
-// TrueNAS reichen ein nicht ausgefuelltes Formularfeld als LEERE Variable
-// weiter, nicht als fehlende - `SESSION_SECRET=` steht dann in der Umgebung.
-// Zaehlte das als gesetzt, liefe der Start mit einem leeren Secret, statt eins
-// zu erzeugen. Erst weil der leere Wert hier als ungesetzt gilt, dürfen die
-// Deskriptoren die beiden Felder optional anbieten.
-test('eine leer gesetzte Variable gilt als ungesetzt: beide Secrets entstehen wie ohne sie', () => {
-  const dir = tempDir('yuvomi-auto-secrets-');
-  const dbPath = join(dir, 'yuvomi.db');
-  const report = started(start(dir, { DB_PATH: dbPath, SESSION_SECRET: '', DB_ENCRYPTION_KEY: '' }));
-  for (const name of NAMES) {
-    assert.equal(report[name].origin, 'generated', name);
-    assert.equal(report[name].hash, sha(stored(dir, name)), `${name}: der erzeugte Wert gilt`);
-  }
-  assert.ok(!isPlaintext(dbPath), 'die neue Datenbank ist verschluesselt');
-});
-
 test('ausdruecklich gesetzt UND gespeicherte Datei: der ausdrueckliche Wert gilt, das Log nennt Name und Pfad', () => {
   const dir = tempDir('yuvomi-auto-secrets-');
   const dbPath = join(dir, 'yuvomi.db');

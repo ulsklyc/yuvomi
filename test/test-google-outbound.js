@@ -2778,38 +2778,3 @@ test('#2136: der Sync-Lauf teilt den Stopp zwischen Löschen und Ändern', async
   assert.equal(calendar.patches.length, 0, 'nach dem 503 geht im selben Lauf keine Änderung hinaus');
   assert.equal(tombstones()[0].attempts, 0);
 });
-
-// ── Sofortversuch für einen neuen Termin (#2565) ────────────────────────────────
-
-test('#2565: ein neuer Termin mit Google-Ziel geht mit dem Sofortversuch hinauf, nicht erst mit dem Lauf', async () => {
-  reset();
-  __test.setCalendarEnabled('family', true, { name: 'Family' });
-  const id = insertLocalEventFor('family');
-
-  const calendar = fakeSyncCalendar('Europe/Berlin');
-  await flushOutbound({ createCalendar: () => calendar });
-
-  assert.equal(calendar.inserts.length, 1, 'der Sofortversuch hat den neuen Termin nicht angelegt');
-  assert.equal(calendar.inserts[0].calendarId, 'family');
-  assert.equal(reload(id).external_source, 'google', 'der Upload wurde nicht gebucht');
-  assert.equal(reload(id).external_calendar_id, 'created-1');
-
-  // Der nächste Lauf legt ihn nicht ein zweites Mal an.
-  await sync({ createCalendar: () => calendar });
-  assert.equal(calendar.inserts.length, 1, 'der Lauf hat den Termin noch einmal angelegt');
-});
-
-test('#2565: im Nur-Lesen-Modus legt auch der Sofortversuch keinen Termin an', async () => {
-  reset();
-  __test.setCalendarEnabled('family', true, { name: 'Family' });
-  const id = insertLocalEventFor('family');
-  __test.setReadonly(true);
-  try {
-    const calendar = fakeSyncCalendar('Europe/Berlin');
-    await flushOutbound({ createCalendar: () => calendar });
-    assert.equal(calendar.inserts.length, 0, 'im Nur-Lesen-Modus ging ein Termin hinaus');
-    assert.equal(reload(id).external_source, 'local');
-  } finally {
-    __test.setReadonly(false);
-  }
-});

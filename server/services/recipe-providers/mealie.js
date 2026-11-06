@@ -16,7 +16,6 @@
  *               server/utils/ssrf.js, ./categorize.js
  */
 import { categorizeIngredient } from './categorize.js';
-import { markupToText, servingsFrom } from './markup-text.js';
 import { safeRequest } from '../../utils/http.js';
 import { createGuardedLookup } from '../../utils/ssrf.js';
 // Opt-in RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK: eine Stelle fuer beide Adapter
@@ -98,23 +97,20 @@ function flattenIngredient(ing) {
  * Beschreibung und Zubereitungsschritte zu einem `notes`-Text (#2363).
  * Yuvomi-Rezepte haben kein Schrittfeld; `notes` ist Klartext und wird im
  * Frontend per textContent mit white-space: pre-wrap gezeigt - Markdown (etwa
- * fette Titel) bliebe dort als Sternchen stehen, HTML als Tag (#2558). Deshalb
- * laeuft jeder Text durch markupToText(), dann: Beschreibung, eine Leerzeile,
- * je Schritt "N. Titel: Text". Leerzeilen INNERHALB eines Schritts fallen weg,
- * damit die Nummern die einzige Gliederung bleiben. Leere Schritte (auch einer,
- * der nur ein Bild war) fallen raus und zählen nicht mit; nichts von beidem
- * ergibt null wie bisher.
+ * fette Titel) bliebe dort als Sternchen stehen. Deshalb: Beschreibung, eine
+ * Leerzeile, dann je Schritt "N. Titel: Text". Leere Schritte fallen raus und
+ * zählen nicht mit; nichts von beidem ergibt null wie bisher.
  */
 function composeNotes(description, instructions) {
   const steps = (Array.isArray(instructions) ? instructions : [])
     .map((step) => {
-      const title = markupToText(step?.title).replace(/\s+/g, ' ');
-      const text = markupToText(step?.text).replace(/\n{2,}/g, '\n');
+      const title = String(step?.title ?? '').trim();
+      const text = String(step?.text ?? '').trim();
       return title && text ? `${title}: ${text}` : title || text;
     })
     .filter(Boolean)
     .map((line, i) => `${i + 1}. ${line}`);
-  const parts = [markupToText(description), steps.join('\n')].filter(Boolean);
+  const parts = [String(description ?? '').trim(), steps.join('\n')].filter(Boolean);
   return parts.length ? parts.join('\n\n') : null;
 }
 
@@ -125,9 +121,8 @@ export class MealieAdapter {
     // ein Feld neu oder anders spiegelt: der Sync haengt die Zahl an
     // provider_updated_at und holt so jedes schon gespiegelte Rezept einmal neu,
     // auch wenn es sich bei Mealie nicht geaendert hat (recipe-provider-sync.js,
-    // syncStamp). 2 = Zubereitungsschritte in notes (#2363), 3 = Schritte als
-    // Klartext statt Markdown/HTML und Portionen aus recipeServings (#2558).
-    this.mirrorFormat = 3;
+    // syncStamp). 2 = Zubereitungsschritte in notes (#2363).
+    this.mirrorFormat = 2;
     this.base = String(account.base_url || '').replace(/\/+$/, '');
     this.token = account.api_token;
     // `base_url` muss vom Server aus erreichbar sein (z. B. ein Docker-internes
@@ -196,9 +191,6 @@ export class MealieAdapter {
       title: detail.name,
       notes: composeNotes(detail.description, detail.recipeInstructions),
       hasImage: Boolean(detail.image),
-      // Mealie 1.x+: recipeServings (Zahl, 0 = keine Angabe). recipeYield ist
-      // freier Text ("1 Laib") und bewusst KEINE Quelle fuer Portionen.
-      servings: servingsFrom(detail.recipeServings),
       ingredients: (detail.recipeIngredient || []).map(flattenIngredient),
     };
   }

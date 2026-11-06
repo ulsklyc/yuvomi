@@ -63,11 +63,6 @@ function collectLocalOutboundEvents(database, id = null) {
   `).all(id, id);
 }
 
-/** Will diese lokale Zeile weiter hinauf? Dieselbe Auswahl wie die Upload-Liste. */
-function stillWaitsForUpload(row) {
-  return collectLocalOutboundEvents(db.get(), row.id).length > 0;
-}
-
 /**
  * Der Kalender, in den lokale Termine hinaufgehen (#1840): der erste der
  * Auflistung, der Termine führt (`VEVENT`) und neue annimmt. Ohne Angabe der
@@ -326,11 +321,9 @@ async function runFlushOutbound({ makeClient } = {}) {
   const idle = { deleted: 0, updated: 0 };
   const deletions = outbound.pendingDeletions('apple').filter((r) => r.object_url);
   const updates   = outbound.pendingUpdates('apple').filter((e) => e.external_object_url);
-  // Neu angelegte Termine (#2565): gefragt nur mit Zugangsdaten, genau wie
-  // der Lauf (uploadsLocalEvents).
+  if (!deletions.length && !updates.length) return idle;
+
   const creds = getCredentials();
-  const waitingUploads = !!creds && collectLocalOutboundEvents(db.get()).length > 0;
-  if (!deletions.length && !updates.length && !waitingUploads) return idle;
   if (!creds) return idle;
 
   const calendarForRef = db.get().prepare(
@@ -343,88 +336,13 @@ async function runFlushOutbound({ makeClient } = {}) {
   try {
     const client = await (makeClient || createClient)(creds);
     // Apple kennt keinen wählbaren Zielkalender, also nie einen Umzug.
-    // EIN Stoppsignal für alle Phasen (#2565): nach einer kontoweiten Absage
-    // geht auch kein Upload und keine Auflistung mehr hinaus.
-    const stop = outbound.createRefusalStop();
-    const res = deletions.length || updates.length
-      ? await flushAccount(client, 'apple', { deletions, updates: withCalendar, needsCalendars: false, stop })
-      : idle;
-    if (waitingUploads && !stop.blocks()) {
-      // Das Ziel steht erst mit der Auflistung fest (icloudUploadTarget). Eine
-      // leere Auflistung sagt nichts; die Termine warten auf den Lauf.
-      const calendars = await client.fetchCalendars();
-      const defaultCal = calendars?.length ? icloudUploadTarget(calendars) : null;
-      if (defaultCal) await uploadLocalEvents(client, defaultCal, { stop });
-    }
-    return res;
+    return await flushAccount(client, 'apple', {
+      deletions, updates: withCalendar, needsCalendars: false,
+    });
   } catch (err) {
     log.warn(`Immediate outbound attempt failed: ${err.message}`);
     return idle;
   }
-}
-
-/**
- * Lädt die lokalen Termine hoch, die auf ihren Upload zu iCloud warten
- * (`collectLocalOutboundEvents`), in `defaultCal`. EINE Schleife für den
- * Sync-Lauf und den Sofortversuch (#2565): vorher lief sie nur im Lauf, und
- * ein neu angelegter Termin kam erst mit dem nächsten Intervall an.
- * @returns {Promise<object[]>} die Kandidaten, die die Schleife vorfand
- */
-async function uploadLocalEvents(client, defaultCal, { stop = null, stillWantsUpload = stillWaitsForUpload } = {}) {
-  const localEvents = collectLocalOutboundEvents(db.get());
-  if (!defaultCal && localEvents.length) {
-    log.warn(`No calendar in this iCloud account accepts new events; `
-      + `${localEvents.length} local event(s) stay local.`);
-  }
-
-  // Einmal je Lauf: die Zone, an der naive Zeiten haengen (#938).
-  const householdZone = householdTimeZone(db.get());
-
-  // Lehnt der Kalender ab (nur lesbar, Konto voll), träfe jeder weitere Termin
-  // dieses Laufs dieselbe Absage: nach der ersten ist Schluss, und es gibt EINE
-  // Zeile mit der Anzahl statt einer je Termin.
-  const uploadGate = createUploadGate(stop);
-  for (const listed of localEvents) {
-    if (!defaultCal || uploadGate.isClosed(defaultCal.url)) continue;
-    // Frisch lesen (#1862): die Liste stammt von vor der Schleife, und jeder
-    // Upload davor war ein await. Wer inzwischen bearbeitet wurde, geht mit
-    // dem Stand von jetzt hinauf; wer gelöscht wurde oder nicht mehr wartet,
-    // gar nicht.
-    const [event] = collectLocalOutboundEvents(db.get(), listed.id);
-    if (!event) continue;
-    try {
-      const icsData = buildICS(event, householdZone);
-      const uid     = outbound.eventUidFor(event.id);
-
-      // Ein 412 auf den eigenen Namen ist der eigene frühere Upload und wird
-      // übernommen (uploadNewEvent).
-      const { objectUrl, adopted } = await outbound.uploadNewEvent(client, defaultCal, uid, icsData, {
-        source: 'apple', eventId: event.id,
-      });
-
-      const calRefId  = upsertExternalCalendar(
-        'apple', defaultCal.url, calendarDisplayName(defaultCal.displayName, 'Apple Calendar'),
-        normalizeCalColor(defaultCal.calendarColor) || APPLE_COLOR
-      );
-      // Gebucht wird gegen den Stand NACH dem await (bookEventUpload) - und
-      // nur, wenn die Auswahl oben den Termin dann noch nennt (#1926): wer
-      // während des Uploads in einen anderen lokalen Kalender verschoben
-      // wurde, bleibt lokal, und sein Objekt wird wieder entfernt.
-      outbound.bookEventUpload(event, {
-        source: 'apple', uid, objectUrl, calRefId, adopted, calendarUrl: defaultCal.url,
-        wantsUploadHere: stillWantsUpload, snapshot: icsSnapshot(event, icsData, uid, householdZone),
-      });
-    } catch (err) {
-      if (!uploadGate.refused(defaultCal.url, err)) {
-        log.error(`Outbound error for event ${event.id}:`, err.message);
-      }
-    }
-  }
-  uploadGate.report((calendarUrl, err, waiting) => log.error(
-    `Calendar ${calendarUrl} is not accepting uploads (${err.message}); `
-    + `${waiting} event(s) stay local and are tried again on the next run.`
-  ));
-  return localEvents;
 }
 
 /**
@@ -473,7 +391,7 @@ async function runSync({ makeClient } = {}) {
   // Auflistung, und die sagt keine Reihenfolge zu. Steht beim nächsten Lauf ein anderer vorn, ist
   // das Objekt im früheren ersten erst dann ein Rest, wenn der Termin woanders
   // angekommen ist - vorher wäre sein Löschen der einzige Stand auf dem Server.
-  const stillWantsUpload = stillWaitsForUpload;
+  const stillWantsUpload = (row) => collectLocalOutboundEvents(db.get(), row.id).length > 0;
 
   let totalObjects = 0;
 
@@ -730,7 +648,59 @@ async function runSync({ makeClient } = {}) {
   // --------------------------------------------------------
   // Outbound: lokal → iCloud (erster beschreibbarer Kalender, `defaultCal`)
   // --------------------------------------------------------
-  const localEvents = await uploadLocalEvents(client, defaultCal, { stop, stillWantsUpload });
+  const localEvents = collectLocalOutboundEvents(db.get());
+  if (!defaultCal && localEvents.length) {
+    log.warn(`No calendar in this iCloud account accepts new events; `
+      + `${localEvents.length} local event(s) stay local.`);
+  }
+
+  // Einmal je Lauf: die Zone, an der naive Zeiten haengen (#938).
+  const householdZone = householdTimeZone(db.get());
+
+  // Lehnt der Kalender ab (nur lesbar, Konto voll), träfe jeder weitere Termin
+  // dieses Laufs dieselbe Absage: nach der ersten ist Schluss, und es gibt EINE
+  // Zeile mit der Anzahl statt einer je Termin.
+  const uploadGate = createUploadGate(stop);
+  for (const listed of localEvents) {
+    if (!defaultCal || uploadGate.isClosed(defaultCal.url)) continue;
+    // Frisch lesen (#1862): die Liste stammt von vor der Schleife, und jeder
+    // Upload davor war ein await. Wer inzwischen bearbeitet wurde, geht mit
+    // dem Stand von jetzt hinauf; wer gelöscht wurde oder nicht mehr wartet,
+    // gar nicht.
+    const [event] = collectLocalOutboundEvents(db.get(), listed.id);
+    if (!event) continue;
+    try {
+      const icsData = buildICS(event, householdZone);
+      const uid     = outbound.eventUidFor(event.id);
+
+      // Ein 412 auf den eigenen Namen ist der eigene frühere Upload und wird
+      // übernommen (uploadNewEvent).
+      const { objectUrl, adopted } = await outbound.uploadNewEvent(client, defaultCal, uid, icsData, {
+        source: 'apple', eventId: event.id,
+      });
+
+      const calRefId  = upsertExternalCalendar(
+        'apple', defaultCal.url, calendarDisplayName(defaultCal.displayName, 'Apple Calendar'),
+        normalizeCalColor(defaultCal.calendarColor) || APPLE_COLOR
+      );
+      // Gebucht wird gegen den Stand NACH dem await (bookEventUpload) - und
+      // nur, wenn die Auswahl oben den Termin dann noch nennt (#1926): wer
+      // während des Uploads in einen anderen lokalen Kalender verschoben
+      // wurde, bleibt lokal, und sein Objekt wird wieder entfernt.
+      outbound.bookEventUpload(event, {
+        source: 'apple', uid, objectUrl, calRefId, adopted, calendarUrl: defaultCal.url,
+        wantsUploadHere: stillWantsUpload, snapshot: icsSnapshot(event, icsData, uid, householdZone),
+      });
+    } catch (err) {
+      if (!uploadGate.refused(defaultCal.url, err)) {
+        log.error(`Outbound error for event ${event.id}:`, err.message);
+      }
+    }
+  }
+  uploadGate.report((calendarUrl, err, waiting) => log.error(
+    `Calendar ${calendarUrl} is not accepting uploads (${err.message}); `
+    + `${waiting} event(s) stay local and are tried again on the next run.`
+  ));
 
   cfgSet('apple_last_sync', new Date().toISOString());
   log.info(

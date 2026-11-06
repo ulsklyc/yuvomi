@@ -57,22 +57,12 @@ test('Gruende: Schluessel gefragt zeigt das Feld, bewiesener Schluessel behaelt 
   }
 });
 
-// Gruende, die nur beim ERSTELLEN eines Backups fallen und den Restore-Dialog
-// nie erreichen: `backup_verify_failed` wirft nur `backupToFile()` (#2520), und
-// das ruft der Restore nicht auf.
-const NOT_RESTORE_REASONS = ['backup_verify_failed'];
-
 test('jeder Grund, den der Server kennt, hat im Dialog eine Regel', () => {
   // Die Liste steht im Server; faellt dort ein neuer Grund dazu, muss er hier
   // bewusst eingeordnet werden, statt still auf „reset" zu fallen.
   const db = readFileSync(new URL('../server/db.js', import.meta.url), 'utf8');
   const route = readFileSync(new URL('../server/routes/backup.js', import.meta.url), 'utf8');
   const reasons = new Set([...`${db}\n${route}`.matchAll(/'((?:backup|own|restore)_[a-z_]+)'/g)].map((m) => m[1]));
-  for (const reason of NOT_RESTORE_REASONS) reasons.delete(reason);
-  // Die Ausnahme haelt nur, solange der Restore kein Backup schreibt.
-  const restoreBody = db.slice(db.indexOf('async function restoreFromFile('), db.indexOf('\n}\n', db.indexOf('async function restoreFromFile(')));
-  assert.ok(restoreBody.length > 100, 'restoreFromFile() gefunden');
-  assert.doesNotMatch(restoreBody, /backupToFile/, 'restoreFromFile() schreibt ein Backup - backup_verify_failed erreicht dann den Dialog');
   const known = {
     backup_key_required: 'show', backup_key_wrong: 'show', backup_key_invalid: 'show',
     backup_damaged: 'keep', backup_unreadable: 'keep', backup_corrupt: 'keep', restore_in_progress: 'keep', restore_busy: 'keep', own_key_missing: 'reset',
@@ -267,7 +257,6 @@ test('Fehlertext: jeder bekannte Grund hat einen eigenen Key, ein unbekannter de
   const db = readFileSync(new URL('../server/db.js', import.meta.url), 'utf8');
   const route = readFileSync(new URL('../server/routes/backup.js', import.meta.url), 'utf8');
   const reasons = new Set([...`${db}\n${route}`.matchAll(/'((?:backup|own|restore)_[a-z_]+)'/g)].map((m) => m[1]));
-  for (const reason of NOT_RESTORE_REASONS) reasons.delete(reason);
   assert.deepEqual([...reasons].sort(), Object.keys(expected).sort());
   for (const reason of ['irgendwas_neues', 'toString', '__proto__']) {
     assert.equal(restoreErrorText({ message: LONG_ENGLISH, data: { reason } }), 'settings.backupRestoreErrorGeneric', reason);

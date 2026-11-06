@@ -3014,10 +3014,7 @@ test('die Guards aus (15) erkennen den Schaden, gegen den sie gebaut sind', () =
   assert.ok(hit(enginePairFindings(engWrong), /sagt etwas anderes/), 'Paar-Guard vergleicht die Befehle nicht');
   // Scope: Umbrel zurueck unter "store", TrueNAS wieder "recommended".
   const scOld = html.replace("umbrel: 'umbrel'", "umbrel: 'store'")
-    // Der Satz sagt seit #2507 "optional on a new installation" statt
-    // "(optional, but irreversible...)"; die Verletzung muss dem Wortlaut
-    // folgen, der Guard selbst bleibt unveraendert.
-    .replaceAll('Both fields are optional on a new installation', 'Both fields are recommended on a new installation');
+    .replaceAll('Database Encryption Key (optional, but irreversible once set - back it up)', 'Database Encryption Key (recommended - back it up, it cannot be recovered)');
   const sc = scopeFindings(scOld);
   for (const re of [/APP_SEED/, /keinen einzigen Knoten|gehoert zu keinem Tab/, /step_tn2_desc \(en\)/]) assert.ok(hit(sc, re), `Scope-Guard blind fuer ${re}: ${sc.join(' | ')}`);
   // Installer ohne Tunnel.

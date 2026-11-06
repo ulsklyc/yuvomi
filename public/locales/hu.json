@@ -2577,6 +2577,7 @@
         "backupSchedulerLastSuccess": "{{date}} (sikeres)",
         "backupSchedulerLastFail": "{{date}} (sikertelen)",
         "backupSchedulerNever": "Még nem történt biztonsági mentés",
+        "backupSchedulerLastError": "Utolsó hiba",
         "backupSchedulerTrigger": "Biztonsági mentés létrehozása most",
         "backupSchedulerTriggering": "Biztonsági mentés létrehozása...",
         "backupSchedulerTriggeredToast": "Biztonsági mentés sikeresen létrehozva.",
@@ -3548,7 +3549,8 @@
         "backupRestoreErrorTooLarge": "A fájl nagyobb, mint ennek a telepítésnek a feltöltési korlátja ({{limit}}). Növeld a BACKUP_UPLOAD_LIMIT értékét, indítsd újra a Yuvomit, majd állítsd vissza újra. Itt semmi nem változott.",
         "apiTokenErrorNameTooLong": "A név legfeljebb 100 karakter hosszú lehet.",
         "apiTokenErrorExpiryPast": "A lejárati dátum a múltban van. Válassz egy későbbi időpontot.",
-        "apiTokenErrorSubjectDeactivated": "Ez a fiók inaktív, és nem kaphat tokent. Válassz másik személyt."
+        "apiTokenErrorSubjectDeactivated": "Ez a fiók inaktív, és nem kaphat tokent. Válassz másik személyt.",
+        "backupSchedulerReasonDirNotWritable": "A biztonsági mentési mappa nem írható. Ellenőrizze a BACKUP_DIR beállítást és az engedélyeket."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

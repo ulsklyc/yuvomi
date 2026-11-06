@@ -28,26 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
-- **Chinese and Japanese questions end in the full-width question mark.** Confirmations such as
-  signing out other devices or replacing a link used the narrow "?", which ran straight into the next
-  sentence.
-- **A damaged backup is no longer handed out as a good one (#2520).** Every backup is now checked
-  for integrity right after it is written. One that fails is discarded: the download answers with
-  an error instead of the file, a scheduled backup is reported as failed and does not push the
-  oldest good backup out of rotation, and nothing is uploaded to WebDAV. Before, a damaged backup
-  only showed up when you tried to restore it.
-- **Mirrored Mealie recipes show their preparation steps as readable text (#2558).** A step with
-  an inserted image showed the raw `<img>` tag, and formatting or HTML entities appeared as
-  symbols. Steps now arrive as plain text with their lists and links; images in steps are left
-  out, because they live on the Mealie server. Recipes mirrored from Mealie or Tandoor also bring
-  their serving count, so the servings stepper starts from the right base (#2355). Already
-  mirrored recipes are corrected on the next sync.
-- **A new event in a synced calendar reaches CalDAV, iCloud and Google when you save it (#2565).**
-  Edits, moves and deletions were sent right away, but a newly created event waited for the next
-  sync run, up to `SYNC_INTERVAL_MINUTES` later, although the documentation promised an attempt on
-  save. Creating an event with a sync target, or giving an existing local event one, now tries the
-  upload immediately. If the server cannot be reached the event is still saved and the next sync
-  run uploads it, as before.
+- **A failed scheduled backup now says why.** The backup card showed the time of the last run and
+  "(failed)", but never the reason, so a full disk and an unwritable `BACKUP_DIR` looked the same -
+  and both need something different done about them. The card now adds a "Last error" row with the
+  message of the last failed run, in red, and the row disappears by itself as soon as a run
+  succeeds again. The scheduler already tracked it and `GET /api/v1/backup/status` already returned
+  it as `scheduler.lastError` (`{ timestamp, message }`, `null` after a success); only the card
+  never read it, which is now covered by a test. (#2525)
 - **A calendar subscription that does not deliver says so** (#2566). Adding a subscription whose
   address answered with an error (not found, too large, a private address) reported "Subscription
   added", and the refresh button reported "Subscription synced", while no event ever arrived. Adding
@@ -131,19 +118,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keep it busy by requesting one after another. Further downloads in the same hour are refused;
   other administrators are not affected, and members still get no download at all.
 
-### Changed
-- **The app stores and catalogs no longer ask for a session secret.** Since 2.85.0 a new
-  installation generates `SESSION_SECRET` and `DB_ENCRYPTION_KEY` on its first start, but four
-  deploy descriptors still demanded one: the Portainer stack stopped the deploy outright
-  (`${SESSION_SECRET:?...}`), the Portainer app template and the Unraid template labelled the
-  field "required", and the TrueNAS form refused to install without it. All four now offer both
-  secrets as optional fields with an empty default, and say that Yuvomi generates them and keeps
-  them in `.secrets/` next to the database; setting your own still wins. A Portainer stack, an
-  Unraid container and a TrueNAS app can therefore be installed without running `openssl` first,
-  which is what the 2.85.0 note already promised. Umbrel keeps `${APP_SEED}` for both: it asks
-  nobody for anything, and an existing database is encrypted with that value
-  (`deploy/umbrel/README.md` records the decision). The TrueNAS change needs a pull request
-  upstream before it reaches the catalog (`deploy/truenas/MAINTAINING.md`). (#2507)
 
 ## [2.85.0] - 2026-11-04
 

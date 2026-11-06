@@ -243,7 +243,7 @@ async function loadBackupSchedulerStatus(container) {
     }
 
     renderDatabaseKeyCard(container, res.data?.database_key);
-    const { enabled, schedule, keepCount, lastBackup } = scheduler;
+    const { enabled, schedule, keepCount, lastBackup, lastError } = scheduler;
 
     let lastBackupText = t('settings.backupSchedulerNever');
     if (lastBackup?.timestamp) {
@@ -268,6 +268,39 @@ async function loadBackupSchedulerStatus(container) {
         value: t('settings.backupSchedulerKeepCount', { count: keepCount }),
       }));
       rows.push(createInfoRow({ label: t('settings.backupSchedulerLastBackup'), value: lastBackupText }));
+
+      // WARUM DER GRUND UND NICHT NUR "fehlgeschlagen": die Zeile oben nennt
+      // den Zeitpunkt, der Admin muss aber wissen, WAS zu tun ist - eine volle
+      // Platte (ENOSPC) und ein unschreibbares BACKUP_DIR verlangen
+      // Verschiedenes. Ein erfolgreicher Lauf setzt lastError auf null, die
+      // Zeile verschwindet also von selbst (#2525).
+      if (lastError?.message) {
+        const REASON_KEYS = { backup_dir_not_writable: 'settings.backupSchedulerReasonDirNotWritable' };
+        const sentenceKey = REASON_KEYS[lastError.reason] || 'common.errorGeneric';
+        const wrapper = document.createElement('span');
+        wrapper.className = 'settings-info-value__stack';
+        const sentenceEl = document.createElement('span');
+        sentenceEl.textContent = t(sentenceKey);
+        const more = document.createElement('details');
+        more.className = 'settings-hint-fold__more';
+        const summary = document.createElement('summary');
+        summary.className = 'settings-hint-fold__summary';
+        summary.textContent = t('settings.hintMore');
+        const chevron = document.createElement('i');
+        chevron.setAttribute('data-lucide', 'chevron-down');
+        chevron.className = 'settings-hint-fold__icon';
+        chevron.setAttribute('aria-hidden', 'true');
+        summary.append(chevron);
+        const msgEl = document.createElement('code');
+        msgEl.textContent = lastError.message;
+        more.append(summary, msgEl);
+        wrapper.append(sentenceEl, more);
+        rows.push(createInfoRow({
+          label: t('settings.backupSchedulerLastError'),
+          value: wrapper,
+          tone: 'danger',
+        }));
+      }
 
       const actions = document.createElement('div');
       actions.className = 'settings-form-actions';

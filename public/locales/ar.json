@@ -2712,6 +2712,7 @@
         "backupSchedulerLastFail": "{{date}} (فاشلة)",
         "backupSchedulerLastSuccess": "{{date}} (ناجحة)",
         "backupSchedulerNever": "لم تُنشأ أي نسخة احتياطية بعد",
+        "backupSchedulerLastError": "آخر خطأ",
         "backupSchedulerSchedule": "الجدول الزمني",
         "backupSchedulerCronDaily": "يوميًا في {{time}}",
         "backupSchedulerCronWeekly": "كل {{weekday}} في {{time}}",
@@ -3888,7 +3889,8 @@
         "backupRestoreErrorTooLarge": "الملف أكبر من حد الرفع في هذا التثبيت ({{limit}}). ارفع قيمة BACKUP_UPLOAD_LIMIT وأعد تشغيل Yuvomi ثم استعد النسخة مرة أخرى. لم يتغير شيء هنا.",
         "apiTokenErrorNameTooLong": "يجب ألا يزيد الاسم عن 100 حرف.",
         "apiTokenErrorExpiryPast": "تاريخ الانتهاء في الماضي. اختر وقتًا لاحقًا.",
-        "apiTokenErrorSubjectDeactivated": "هذا الحساب معطّل ولا يمكن أن يحصل على رمز. اختر شخصًا آخر."
+        "apiTokenErrorSubjectDeactivated": "هذا الحساب معطّل ولا يمكن أن يحصل على رمز. اختر شخصًا آخر.",
+        "backupSchedulerReasonDirNotWritable": "مجلد النسخ الاحتياطي غير قابل للكتابة. تحقق من إعداد BACKUP_DIR والأذونات."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",

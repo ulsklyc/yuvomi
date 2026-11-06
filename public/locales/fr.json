@@ -2429,6 +2429,7 @@
         "backupSchedulerLastFail": "{{date}} (échouée)",
         "backupSchedulerLastSuccess": "{{date}} (réussie)",
         "backupSchedulerNever": "Aucune sauvegarde créée pour l'instant",
+        "backupSchedulerLastError": "Dernière erreur",
         "backupSchedulerSchedule": "Planification",
         "backupSchedulerCronDaily": "Chaque jour à {{time}}",
         "backupSchedulerCronWeekly": "Chaque {{weekday}} à {{time}}",
@@ -3548,7 +3549,8 @@
         "backupRestoreErrorTooLarge": "Le fichier dépasse la limite d'envoi de cette installation ({{limit}}). Augmentez BACKUP_UPLOAD_LIMIT, redémarrez Yuvomi puis relancez la restauration. Rien n'a été modifié ici.",
         "apiTokenErrorNameTooLong": "Le nom peut comporter au maximum 100 caractères.",
         "apiTokenErrorExpiryPast": "La date d’expiration est dans le passé. Choisis un moment ultérieur.",
-        "apiTokenErrorSubjectDeactivated": "Ce compte est désactivé et ne peut pas recevoir de jeton. Choisis une autre personne."
+        "apiTokenErrorSubjectDeactivated": "Ce compte est désactivé et ne peut pas recevoir de jeton. Choisis une autre personne.",
+        "backupSchedulerReasonDirNotWritable": "Le dossier de sauvegarde n'est pas accessible en écriture. Vérifiez le paramètre BACKUP_DIR et ses permissions."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

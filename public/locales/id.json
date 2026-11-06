@@ -2546,6 +2546,7 @@
         "backupSchedulerLastSuccess": "{{date}} (berhasil)",
         "backupSchedulerLastFail": "{{date}} (gagal)",
         "backupSchedulerNever": "Belum ada cadangan dibuat",
+        "backupSchedulerLastError": "Kesalahan terakhir",
         "backupSchedulerTrigger": "Buat cadangan sekarang",
         "backupSchedulerTriggering": "Membuat cadangan...",
         "backupSchedulerTriggeredToast": "Cadangan berhasil dibuat.",
@@ -3566,7 +3567,8 @@
         "backupRestoreErrorTooLarge": "File lebih besar dari batas unggah instalasi ini ({{limit}}). Naikkan BACKUP_UPLOAD_LIMIT, mulai ulang Yuvomi, lalu pulihkan lagi. Tidak ada yang diubah di sini.",
         "apiTokenErrorNameTooLong": "Nama paling banyak 100 karakter.",
         "apiTokenErrorExpiryPast": "Tanggal kedaluwarsa sudah lewat. Pilih waktu yang lebih lambat.",
-        "apiTokenErrorSubjectDeactivated": "Akun ini dinonaktifkan dan tidak bisa mendapat token. Pilih orang lain."
+        "apiTokenErrorSubjectDeactivated": "Akun ini dinonaktifkan dan tidak bisa mendapat token. Pilih orang lain.",
+        "backupSchedulerReasonDirNotWritable": "Folder cadangan tidak bisa ditulis. Periksa pengaturan BACKUP_DIR dan izinnya."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

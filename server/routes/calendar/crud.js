@@ -20,8 +20,7 @@ import {
   readDocumentContent,
   stageDocumentUpload,
 } from '../../services/document-storage.js';
-import { queueEventDeletion, markEventOutbound, flushOutbound, waitsForUpload } from '../../services/calendar-outbound.js';
-import { uploadsLocalEvents } from '../../services/apple-calendar.js';
+import { queueEventDeletion, markEventOutbound, flushOutbound } from '../../services/calendar-outbound.js';
 import {
   isOccurrenceKey, occurrenceSlotOf, SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN,
 } from '../../services/calendar-events.js';
@@ -725,16 +724,6 @@ router.post('/', async (req, res) => {
       isAdmin: isAdminUser(req),
       master: event,
     }) });
-
-    // Ein neuer Termin mit Sync-Ziel geht sofort hinauf (#2565), nicht erst mit
-    // dem nächsten Lauf - wie eine Änderung: antworten, danach best effort.
-    // Scheitert der Versuch, wartet der Termin weiter auf den Lauf. Die
-    // iCloud-Einzelkonto-Verbindung lädt jeden lokalen Termin hoch, daher die
-    // zweite Bedingung.
-    if (waitsForUpload(event) || uploadsLocalEvents()) {
-      flushOutbound()
-        .catch((e) => log.warn('Neuer Termin angelegt, Sofortversuch fehlgeschlagen:', e.message));
-    }
   } catch (err) {
     if (err instanceof StorageError && !stagedUpload) {
       log.error('POST / storage error:', err);
@@ -1403,9 +1392,7 @@ router.put('/:id', async (req, res) => {
       master: updated,
     }) });
 
-    // Ein lokaler Termin, der erst jetzt ein Sync-Ziel bekam oder noch auf
-    // seinen Upload wartet, geht ebenfalls sofort hinauf (#2565).
-    if (pending || waitsForUpload(updated)) {
+    if (pending) {
       flushOutbound()
         .catch((e) => log.warn('Änderung vorgemerkt, Sofortversuch fehlgeschlagen:', e.message));
     }

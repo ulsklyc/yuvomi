@@ -2539,6 +2539,7 @@
         "backupSchedulerLastSuccess": "{{date}} (vellykket)",
         "backupSchedulerLastFail": "{{date}} (feilet)",
         "backupSchedulerNever": "Ingen sikkerhetskopi opprettet ennå",
+        "backupSchedulerLastError": "Siste feil",
         "backupSchedulerTrigger": "Opprett sikkerhetskopi nå",
         "backupSchedulerTriggering": "Oppretter sikkerhetskopi...",
         "backupSchedulerTriggeredToast": "Sikkerhetskopi opprettet vellykket.",
@@ -3548,7 +3549,8 @@
         "backupRestoreErrorTooLarge": "Filen er større enn opplastingsgrensen for denne installasjonen ({{limit}}). Øk BACKUP_UPLOAD_LIMIT, start Yuvomi på nytt og gjenopprett igjen. Ingenting ble endret her.",
         "apiTokenErrorNameTooLong": "Navnet kan være på høyst 100 tegn.",
         "apiTokenErrorExpiryPast": "Utløpsdatoen er passert. Velg et senere tidspunkt.",
-        "apiTokenErrorSubjectDeactivated": "Denne kontoen er deaktivert og kan ikke få et token. Velg en annen person."
+        "apiTokenErrorSubjectDeactivated": "Denne kontoen er deaktivert og kan ikke få et token. Velg en annen person.",
+        "backupSchedulerReasonDirNotWritable": "Sikkerhetskopimappen kan ikke skrives til. Kontroller BACKUP_DIR-innstillingen og tillatelsene."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",
