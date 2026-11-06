@@ -6963,11 +6963,13 @@
         "reauthenticate": "Logga ut och in igen. Ändra sedan nycklarna inom fem minuter.",
         "failed": "Nyckeln kunde inte verifieras. Försök igen eller använd ett annat sätt.",
         "tooManyAttempts": "För många försök. Försök igen senare.",
-        "removeConfirm": "Ta bort nyckeln? Du kan lägga till den igen efter inloggning på annat sätt.",
+        "removeConfirm": "Ta bort denna passkey och logga ut dina andra enheter? Den här enheten förblir inloggad.",
         "signIn": "Logga in med en nyckel",
         "reauthTitle": "Bekräfta din identitet",
-        "reauthLead": "Bekräfta med ditt lösenord eller en befintlig åtkomstnyckel för att fortsätta här. Om tvåfaktorsautentisering är aktiverad anger du även dess kod.",
+        "reauthLead": "Bekräfta med ditt lösenord eller en befintlig passkey. Om du använder lösenord med tvåfaktorsautentisering ska du även ange koden.",
         "reauthFailed": "Bekräftelsen misslyckades. Kontrollera lösenordet eller åtkomstnyckeln och vid behov koden för den andra faktorn.",
-        "confirmWithPasskey": "Bekräfta med en åtkomstnyckel"
+        "confirmWithPasskey": "Bekräfta med en åtkomstnyckel",
+        "passwordChangeWarning": "Om du ändrar ditt lösenord tas alla dina passkeys bort. Lägg till dem igen efteråt.",
+        "removed": "Passkey borttagen."
     }
 }

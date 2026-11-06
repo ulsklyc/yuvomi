@@ -128,7 +128,7 @@ test('wrong confirmation stays in the dialog; closing during verification does n
   assert.equal(creations, 0); assert.equal(ui.name.value, 'My Bitwarden key');
 });
 
-test('existing passkey confirmation sends its assertion and second factor before resuming', async () => {
+test('existing UV passkey confirmation sends its assertion without a second-factor code', async () => {
   let confirmed = false; let assertionProof; let creations = 0;
   navigator.credentials.create = async () => { creations++; return credential; };
   navigator.credentials.get = async () => credential;
@@ -143,8 +143,17 @@ test('existing passkey confirmation sends its assertion and second factor before
   };
   const ui = await inlineFixture(); const pending = ui.submit(); await ui.settle();
   assert.match(ui.modal.content, /passkeys.confirmWithPasskey/);
-  ui.modal.code.value = '123456'; ui.modal.passkey.handlers.click(); await pending;
-  assert.equal(assertionProof.method, 'passkey'); assert.equal(assertionProof.code, '123456');
+  ui.modal.code.value = '';
+  globalThis.__constraintErrors = form => {
+    if (form === ui.modal.form) {
+      assert.equal(ui.modal.code.required, false, 'the TOTP field is optional for UV passkey proof');
+      assert.equal(ui.modal.password.required, false);
+    }
+    return [];
+  };
+  try { ui.modal.passkey.handlers.click(); await pending; }
+  finally { delete globalThis.__constraintErrors; }
+  assert.equal(assertionProof.method, 'passkey'); assert.equal(assertionProof.code, undefined, 'UV confirmation does not send a TOTP code');
   assert.equal(assertionProof.credential.id, encoded); assert.equal(assertionProof.password, undefined);
   assert.equal(creations, 1);
 });
@@ -202,4 +211,73 @@ test('password submission works while passkey config is pending and the late but
   assert.equal(button.disabled, false);
   assert.equal(typeof button.handlers.click, 'function');
   delete globalThis.__apiStub;
+});
+
+
+async function removalFixture(confirm = true) {
+  globalThis.HTMLElement ??= class {};
+  globalThis.customElements ??= {define(){},get(){}};
+  const {installMiniDom}=await import('./mini-dom.js');installMiniDom();
+  const {renderPasskeyCard}=await import('../public/settings/passkeys.js');
+  let keys=[{id:7,name:'Lost phone'}]; const requests=[]; const events=[]; const status=node(); const button=node({dataset:{removePasskey:'7'}});
+  const container={replaceChildren(){},insertAdjacentHTML(){},dispatchEvent(event){events.push(event);},
+    querySelector:selector=>selector==='#passkey-status'?status:null,
+    querySelectorAll:()=>keys.length?[button]:[]};
+  globalThis.__confirmModal=async()=>confirm;
+  globalThis.__apiStub={get:async()=>({data:{enabled:true,enrollment_allowed:false,passkeys:keys}}),
+    delete:async path=>{requests.push(path);keys=[];return {data:{ok:true,ended:3}};}};
+  await renderPasskeyCard(container);
+  await button.handlers.click();
+  return {requests,events,status};
+}
+
+test('passkey removal shows the ended count and notifies the surrounding device cards', async () => {
+  const ui=await removalFixture();
+  assert.deepEqual(ui.requests,['/auth/passkeys/7']);
+  assert.equal(ui.events.length,1);
+  assert.equal(ui.events[0].type,'other-sessions-ended');
+  assert.equal(ui.events[0].bubbles,true);
+  assert.match(ui.status.textContent,/passkeys.removed/);
+  assert.match(ui.status.textContent,/settings.otherSessionsEnded.*"count":3/);
+});
+
+test('cancelling passkey removal does not delete or notify other device cards', async () => {
+  const ui=await removalFixture(false);
+  assert.equal(ui.requests.length,0);assert.equal(ui.events.length,0);
+});
+
+async function passwordFixture(fail = false) {
+  const {installMiniDom}=await import('./mini-dom.js');installMiniDom();
+  const {__test:account}=await import('../public/settings/pages/personal-account.js');
+  const form=node({reset(){this.wasReset=true;},dispatchEvent(event){this.event=event;}});const button=node();
+  form.querySelector=()=>button;
+  const current=node({value:'Current-password!',select(){}});const next=node({value:'Replacement-password!'});const confirm=node({value:next.value});
+  const error=node({hidden:true,replaceChildren(){},classList:{remove(){},add(){}},querySelector:()=>null});
+  const cardStatus=node();let markup='Stale deleted passkey';let refreshed=0;
+  const card={replaceChildren(){markup='';},insertAdjacentHTML(_where,html){markup+=html;},querySelector:selector=>selector==='#passkey-status'?cardStatus:null,querySelectorAll:()=>[]};
+  const fields={'#password-form':form,'#password-error':error,'#current-password':current,'#new-password':next,'#confirm-password':confirm,'#passkeys-card':card};
+  const container={querySelector:selector=>fields[selector]??null,querySelectorAll:()=>[]};
+  globalThis.__apiStub={patch:async()=>{if(fail)throw Object.assign(new Error('wrong'),{status:400,data:{reason:'wrong_password'}});return {ok:true};},
+    get:async()=>{refreshed++;assert.equal(markup,'','stale keys are cleared before the refresh');return {data:{enabled:true,enrollment_allowed:false,passkeys:[]}};}};
+  window.yuvomi={showToast(){}};
+  account.bindEvents(container,{}, {avatarData:null});
+  await form.handlers.submit({preventDefault(){}});
+  return {form,markup,refreshed,html:account.passwordCardHtml({sso_only:false})};
+}
+
+test('password changes warn before saving and immediately clear and reload the passkey card', async () => {
+  const ui=await passwordFixture();
+  assert.match(ui.html,/passkeys.passwordChangeWarning/);
+  assert.equal(ui.form.wasReset,true);
+  assert.equal(ui.form.event.type,'other-sessions-ended');
+  assert.equal(ui.refreshed,1);
+  assert.equal(ui.markup.includes('Stale deleted passkey'),false);
+  assert.match(ui.markup,/passkeys.empty/);
+});
+
+test('a rejected password change keeps the passkey card and emits no device event', async () => {
+  const ui=await passwordFixture(true);
+  assert.equal(ui.refreshed,0);
+  assert.equal(ui.form.event,undefined);
+  assert.equal(ui.markup,'Stale deleted passkey');
 });

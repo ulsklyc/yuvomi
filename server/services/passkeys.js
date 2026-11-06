@@ -11,7 +11,18 @@ const WINDOW_MS = CHALLENGE_TTL_MS;
 const MAX_PASSKEYS = 10;
 const MAX_ANONYMOUS_CHALLENGES_PER_CLIENT = 20;
 const sessionHash = id => createHash('sha256').update(String(id)).digest('hex');
-const fail = () => new Error('Passkey verification failed.');
+export class PasskeyVerificationError extends Error {
+  constructor(reason = 'credential_invalid') {
+    super('Passkey verification failed.');
+    this.name = 'PasskeyVerificationError';
+    this.reason = reason;
+  }
+}
+const fail = reason => new PasskeyVerificationError(reason);
+async function verifyCredential(verify, options) {
+  try { return await verify(options); }
+  catch { throw fail('credential_verification'); }
+}
 
 export function configuration() {
   if (process.env.PASSKEYS_ENABLED === 'false') return null;
@@ -74,7 +85,7 @@ function remember(database, sessionId, operation, challenge, userId = null, clie
 function consume(database, sessionId, operation, userId = null) {
   const row = database.prepare('DELETE FROM passkey_challenges WHERE session_hash = ? AND operation = ? RETURNING *')
     .get(sessionHash(sessionId), operation);
-  if (!row || row.expires_at <= Date.now() || row.user_id !== userId) throw fail();
+  if (!row || row.expires_at <= Date.now() || row.user_id !== userId) throw fail('challenge_invalid');
   return row.challenge;
 }
 
@@ -108,7 +119,7 @@ export async function finishRegistration(database, userId, sessionId, response, 
   const challenge = consume(database, sessionId, 'register', userId);
   if (!userHandle) throw fail();
   if (typeof name !== 'string' || !name.trim() || name.trim().length > 80) throw fail();
-  const result = await verifyRegistrationResponse({
+  const result = await verifyCredential(verifyRegistrationResponse, {
     response, expectedChallenge: challenge, expectedOrigin: cfg.origin,
     expectedRPID: cfg.rpID, requireUserVerification: true,
     supportedAlgorithmIDs: [-7, -257],
@@ -147,7 +158,7 @@ export async function finishAuthentication(database, sessionId, response, userId
   // then bound by both the challenge and credential row to the signed-in user.
   const receivedHandle = response.response?.userHandle;
   if (receivedHandle !== row.user_handle && !(userId !== null && receivedHandle == null)) throw fail();
-  const result = await verifyAuthenticationResponse({
+  const result = await verifyCredential(verifyAuthenticationResponse, {
     response, expectedChallenge: challenge, expectedOrigin: cfg.origin, expectedRPID: cfg.rpID,
     credential: { id: row.credential_id, publicKey: new Uint8Array(row.public_key), counter: row.counter, transports: JSON.parse(row.transports) },
     requireUserVerification: true,

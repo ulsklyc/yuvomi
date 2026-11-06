@@ -405,13 +405,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Household members can sign in with passkeys without an external identity provider.**
-  Add and name multiple passkeys in account settings, then sign in without a username.
-  Managing passkeys requires a recent browser sign-in; existing SSO-only and second-factor
-  policies still apply. An inline password or passkey confirmation dialog continues
-  a pending change without leaving account settings, including enabled second factors.
-  Password and SSO recovery paths remain available. Account recovery revokes passkeys;
-  removing a key ends other devices. Anonymous sign-in options are throttled and
-  use short-lived sessions with challenge limits isolated per client.
+  Add and name passkeys in account settings, then sign in without a username.
+  A passkey verified with your device PIN or biometrics satisfies MFA; password
+  sign-in keeps its configured second step. Confirm passkey changes inline.
+  Changing your password removes all your passkeys and immediately refreshes the
+  list. Removing a passkey signs out other devices and shows how many sessions ended.
+  Password and SSO recovery paths remain available.
 - **Late completion decay (opt-in).** Households can have late completions pay less: administrators
   switch it on in the rewards settings, off by default. A task ticked off after its due day earns one
   point less for each day it is past due, and always at least one point - finishing still pays. What a

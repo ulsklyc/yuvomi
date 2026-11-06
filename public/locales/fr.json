@@ -6963,11 +6963,13 @@
         "reauthenticate": "Déconnectez-vous puis reconnectez-vous. Modifiez ensuite les clés dans les cinq minutes.",
         "failed": "Impossible de vérifier la clé. Réessayez ou utilisez un autre moyen de connexion.",
         "tooManyAttempts": "Trop de tentatives. Réessayez plus tard.",
-        "removeConfirm": "Retirer cette clé ? Vous pourrez la rajouter après une connexion par un autre moyen.",
+        "removeConfirm": "Supprimer cette clé d’accès et déconnecter tes autres appareils ? Cet appareil reste connecté.",
         "signIn": "Se connecter avec une clé d'accès",
         "reauthTitle": "Confirmer votre identité",
-        "reauthLead": "Confirmez avec votre mot de passe ou une clé d’accès existante pour continuer ici. Si la double authentification est activée, saisissez aussi son code.",
+        "reauthLead": "Confirme avec ton mot de passe ou une clé d’accès existante. Si tu utilises ton mot de passe avec la double authentification, saisis aussi le code.",
         "reauthFailed": "Échec de la confirmation. Vérifiez votre mot de passe ou votre clé d’accès et, si nécessaire, le code du second facteur.",
-        "confirmWithPasskey": "Confirmer avec une clé d’accès"
+        "confirmWithPasskey": "Confirmer avec une clé d’accès",
+        "passwordChangeWarning": "Changer ton mot de passe supprime toutes tes clés d’accès. Ajoute-les à nouveau ensuite.",
+        "removed": "Clé d’accès supprimée."
     }
 }
