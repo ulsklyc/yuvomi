@@ -1509,9 +1509,14 @@ router.put('/:id', (req, res) => {
 
     const assignedBefore = db.get().prepare('SELECT user_id FROM task_assignments WHERE task_id = ?')
       .all(task.id).map((r) => r.user_id);
+    // Ohne assigned_to bleibt die Hauptzuweisung, wie sie ist (#2569): die Zeilen
+    // kommen nach Schluessel sortiert, also steht sonst die kleinste ID vorn.
+    const keptAssignees = assignedBefore.includes(task.assigned_to)
+      ? [task.assigned_to, ...assignedBefore.filter((id) => id !== task.assigned_to)]
+      : assignedBefore;
     const userIds  = req.body.assigned_to !== undefined
       ? parseAssignedTo(req.body.assigned_to)
-      : assignedBefore;
+      : keptAssignees;
     const firstUid = userIds[0] ?? null;
     // Neu nur Haushaltsmitglieder (#1207). Wer schon zugewiesen ist, bleibt
     // es - auch eine Haushaltskraft an einer aelteren Aufgabe.

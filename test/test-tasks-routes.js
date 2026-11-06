@@ -247,6 +247,20 @@ test('PUT /:id: ohne assigned_to bleiben bestehende Zuweisungen erhalten', async
   assert.equal(r.body.data.assigned_users.length, 2, 'Zuweisungen unverändert');
 });
 
+test('PUT /:id: ohne assigned_to bleibt die erste Person die Hauptzuweisung (#2569)', async () => {
+  // BOB hat die hoehere ID, ist aber die Hauptzuweisung: ohne ORDER BY gaebe die
+  // Abfrage der Bestandszeilen ALICE (kleinste ID) zurueck.
+  const created = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Haupt-Zuweisung', assigned_to: [BOB, ALICE] } });
+  const id = created.body.data.id;
+  assert.equal(created.body.data.assigned_to, BOB);
+  const r = await call('PUT', `/${id}`, { as: { id: ALICE, role: 'admin' }, body: { title: 'Nur Titel neu' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.assigned_to, BOB, 'assigned_to bleibt die bisherige Hauptzuweisung');
+  assert.equal(r.body.data.assigned_users.length, 2);
+  const again = await call('PUT', `/${id}`, { as: { id: ALICE, role: 'admin' }, body: { priority: 'high' } });
+  assert.equal(again.body.data.assigned_to, BOB, 'auch nach einem zweiten Teil-Update');
+});
+
 test('PUT /:id: unbekannte ID → 404, ungültiger Status → 400', async () => {
   const missing = await call('PUT', '/999999', { as: { id: ALICE, role: 'admin' }, body: { title: 'X' } });
   assert.equal(missing.status, 404);

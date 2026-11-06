@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **Saving a task without `assigned_to` keeps its primary assignee (#2569).** A partial `PUT /api/v1/tasks/:id`
+  that left out `assigned_to` moved the primary assignee to the person with the lowest user id.
+  The stored primary now stays first, so API clients no longer have to resend the assignees with every update.
 - **The last settings and managers that showed server text speak your language** (#1909). Managing
   the categories of budget, tasks, contacts and notes, or the storage locations of the pantry,
   showed English server text when someone else had deleted the entry meanwhile, when a storage
