@@ -594,6 +594,117 @@ test('kein Locale-Wert traegt ein HTML-Tag', () => {
   assert.deepEqual(hits, []);
 });
 
+// VERLORENE ZEICHEN. Ein Editor oder Skript, das die Datei nicht als UTF-8
+// schreibt, ersetzt jedes Nicht-ASCII-Zeichen durch "?" (Byte 0x3F) oder durch
+// U+FFFD. Gefunden an einem Beitrag (#2567): "Gesch??tzte Summe" in de, die neuen
+// Werte in ar/ja/zh/ru nur noch "????" - und die CI war gruen, weil kein Test die
+// Werte selbst liest: Schluessel und Platzhalter stimmen, und der Abgleich gegen
+// Englisch faellt bei "????" nicht an.
+//
+// Erkannt wird das MUSTER des Schadens, nicht jedes Fragezeichen: ein echtes "?"
+// am Satzende, das spanische "¿" und "?" vor einem Leerzeichen bleiben erlaubt.
+//  - U+FFFD, das Ersatzzeichen eines Decoders,
+//  - zwei oder mehr "?" hintereinander (ein Zeichen = ein oder mehrere Bytes),
+//  - ein "?" zwischen zwei Buchstaben (das verschluckte "ä" in "Gesch?tzte"),
+//  - in Sprachen ohne Lateinschrift: ein Wert aus mindestens drei "?" und sonst
+//    nur Leerzeichen, Satzzeichen und Platzhaltern ("? ? ?" faellt durch das
+//    Doppelmuster, ist dort aber genauso ein Text ohne ein einziges Schriftzeichen).
+
+// Sprachen, deren Werte in einer anderen Schrift als Latein stehen. Der Test
+// darunter haelt die Liste am Bestand fest, damit eine neue Sprache nicht still
+// herausfaellt.
+const NON_LATIN_LOCALES = ['ar', 'el', 'fa', 'hi', 'ja', 'ko', 'ru', 'uk', 'zh', 'zh-Hant'];
+
+// "?" zwischen zwei Buchstaben, das KEIN verlorenes Zeichen ist. Chinesisch und
+// Japanisch setzen nach dem Fragezeichen kein Leerzeichen; diese Werte tragen das
+// ASCII-"?" statt des vollbreiten "？", der Text dahinter ist aber unversehrt.
+// Ausnahme je Wert (nicht je Sprache), damit ein neuer Schaden in zh/ja auffaellt.
+const LOST_CHAR_EXCEPTIONS = {
+  ja: {
+    'settings.cycleFeedRegenerateConfirm': '新しいリンクを生成しますか?古いリンクは使えなくなります。',
+    'settings.cycleFeedDisableConfirm': 'フィードを無効にしますか?既存の購読は更新を受け取れなくなります。',
+  },
+  zh: {
+    'settings.cycleFeedRegenerateConfirm': '要生成新链接吗?旧链接将停止工作。',
+    'settings.cycleFeedDisableConfirm': '要停用订阅源吗?现有订阅将不再收到更新。',
+  },
+  'zh-Hant': {
+    'settings.cycleFeedRegenerateConfirm': '要生成新連結嗎?舊連結將停止工作。',
+    'settings.cycleFeedDisableConfirm': '要停用訂閱源嗎?現有訂閱將不再收到更新。',
+  },
+};
+
+/** Gruende, aus denen ein Wert nach verlorenen Zeichen aussieht (leer = in Ordnung). */
+function lostCharacterReasons(value, nonLatin) {
+  const reasons = [];
+  if (value.includes('�')) reasons.push('U+FFFD');
+  if (/\?{2,}/.test(value)) reasons.push('"??"');
+  if (/\p{L}\?\p{L}/u.test(value)) reasons.push('"?" zwischen Buchstaben');
+  if (nonLatin) {
+    const rest = value.replace(/\{\{\s*[\w.]+\s*\}\}/g, '');
+    if ((rest.match(/\?/g) || []).length >= 3 && /^[\s\p{P}\p{S}]*$/u.test(rest)) {
+      reasons.push('nur "?" statt Schrift');
+    }
+  }
+  return reasons;
+}
+
+test('kein Locale-Wert hat Zeichen an ein Fragezeichen oder U+FFFD verloren', () => {
+  const hits = [];
+  for (const locale of LOCALES) {
+    const allowed = LOST_CHAR_EXCEPTIONS[locale] || {};
+    const nonLatin = NON_LATIN_LOCALES.includes(locale);
+    for (const [key, value] of flatten(JSON.parse(readLocale(locale)))) {
+      if (typeof value !== 'string' || allowed[key] === value) continue;
+      const reasons = lostCharacterReasons(value, nonLatin);
+      if (reasons.length) hits.push(`${locale}.json ${key} = ${JSON.stringify(value)} (${reasons.join(', ')})`);
+    }
+  }
+  assert.deepEqual(hits, [], 'Werte mit verlorenen Zeichen - die Datei als UTF-8 speichern '
+    + `und die Zeichen neu eingeben:\n  ${hits.join('\n  ')}`);
+});
+
+test('der Detektor fuer verlorene Zeichen trennt Schaden von echtem Fragezeichen', () => {
+  for (const broken of ['Gesch??tzte Summe', 'Gesch?tzte Summe', 'Gesch�tzte', '????']) {
+    assert.notDeepEqual(lostCharacterReasons(broken, false), [], broken);
+  }
+  assert.notDeepEqual(lostCharacterReasons('? ? ? {{count}}', true), [], 'nur Fragezeichen in ar');
+  for (const fine of ['Wirklich löschen?', '¿Eliminar?', 'Wer? Wann?', 'Ok? {{name}}', 'Удалить?']) {
+    assert.deepEqual(lostCharacterReasons(fine, true), [], fine);
+  }
+});
+
+test('jede Ausnahme fuer verlorene Zeichen trifft ihren Wert noch woertlich', () => {
+  // Sonst ueberlebt eine Ausnahme ihren Anlass und deckt spaeter einen echten Schaden.
+  for (const [locale, keys] of Object.entries(LOST_CHAR_EXCEPTIONS)) {
+    const values = flatten(JSON.parse(readLocale(locale)));
+    for (const [key, value] of Object.entries(keys)) {
+      assert.equal(values.get(key), value, `${locale}: ${key} hat sich geaendert - Ausnahme streichen`);
+    }
+  }
+});
+
+test('die Liste der Sprachen ohne Lateinschrift deckt sich mit dem Bestand', () => {
+  // Gezaehlt werden lateinische gegen andere Buchstaben ueber alle Werte; auf
+  // main liegt der Fremdschrift-Anteil bei 0 oder ueber 0.8.
+  const measured = [];
+  for (const locale of LOCALES) {
+    let latin = 0;
+    let other = 0;
+    for (const value of flatten(JSON.parse(readLocale(locale))).values()) {
+      if (typeof value !== 'string') continue;
+      for (const [ch] of value.matchAll(/\p{L}/gu)) {
+        if (/\p{Script=Latin}/u.test(ch)) latin++;
+        else other++;
+      }
+    }
+    if (other > latin) measured.push(locale);
+  }
+  assert.deepEqual(measured.sort(), [...NON_LATIN_LOCALES].sort(),
+    'NON_LATIN_LOCALES passt nicht zur Schrift der Locale-Dateien - neue Sprache eintragen '
+    + 'oder (fehlt eine bekannte) pruefen, ob ihre Zeichen verloren gingen');
+});
+
 // Dasselbe fuer Texte, die NICHT aus einer Locale kommen: Template- und
 // String-Literale im Frontend-JS (Re-Critique 2026-09-28, F7). Gefunden: der
 // Halbgeviertstrich zwischen "Ueberfaellig" und Datum sowie zwischen "Heute"
