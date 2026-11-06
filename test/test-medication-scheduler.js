@@ -11,6 +11,7 @@ import Database from 'better-sqlite3-multiple-ciphers';
 
 const { MIGRATIONS } = await import('../server/db.js');
 const { processDueMedications } = await import('../server/services/medication-scheduler.js');
+const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
 
 function buildTestDb() {
   const db = new Database(':memory:');
@@ -31,9 +32,9 @@ function seedUser(db, username) {
     VALUES (?, ?, '$2b$12$x', 'member')`).run(username, username).lastInsertRowid;
 }
 
-function seedMed(db, userId, { name = 'Ibuprofen', active = 1 } = {}) {
+function seedMed(db, userId, { name = 'Ibuprofen', active = 1, visibility = 'private' } = {}) {
   return db.prepare(`INSERT INTO medications (user_id, name, active, visibility)
-    VALUES (?, ?, ?, 'private')`).run(userId, name, active).lastInsertRowid;
+    VALUES (?, ?, ?, ?)`).run(userId, name, active, visibility).lastInsertRowid;
 }
 
 function seedSchedule(db, medId, { time = '08:00', daysMask = null, dose = 1, active = 1, startDate = null, endDate = null } = {}) {
@@ -52,7 +53,7 @@ function makeMocks() {
       async sendPushToUser(userId, payload) { pushed.push({ userId, payload }); return 1; },
     },
     channelStore: {
-      listEnabledChannelsForUser() { return [{ id: 7, provider: 'gotify', name: 'Test' }]; },
+      listEnabledChannelsForUser() { return [{ id: 7, provider: 'gotify', name: 'Test', scope: 'user' }]; },
     },
     providers: {
       gotify: { async send({ channel, payload }) { channelSent.push({ channel, payload }); } },
@@ -177,7 +178,7 @@ function makeRecordingChannelStore() {
     asked,
     listEnabledChannelsForUser(userId) {
       asked.push(userId);
-      return [{ id: 100 + userId, provider: 'gotify', name: `Kanal ${userId}` }];
+      return [{ id: 100 + userId, provider: 'gotify', name: `Kanal ${userId}`, scope: 'user' }];
     },
   };
 }
@@ -418,4 +419,20 @@ test('Health wieder eingeschaltet: nur die Dosen von HEUTE kommen, die Tage dazw
   const logs = db.prepare('SELECT scheduled_at FROM medication_logs ORDER BY scheduled_at').all();
   assert.deepEqual(logs.map((l) => l.scheduled_at), ['2026-06-16T08:00', '2026-06-16T11:00']);
   assert.equal(on.pushed.length, 2, 'eine Meldung je heutigem Zeitpunkt, keine Flut');
+});
+
+test('ein Haushaltskanal bekommt nur Medikamente, die die Familie sehen darf', async () => {
+  const db = buildTestDb();
+  const user = seedUser(db, 'alice');
+  seedSchedule(db, seedMed(db, user, { name: 'Sertraline' }), { time: '08:00' });
+  seedSchedule(db, seedMed(db, user, { name: 'Vitamin D', visibility: 'family' }), { time: '08:00' });
+  createNotificationChannelStore({ db }).createChannel({
+    provider: 'ntfy', name: 'Familie', enabled: true,
+    config: { baseUrl: 'https://ntfy.test', topic: 'familie' }, secrets: {},
+  });
+  const { pushService, providers, channelSent } = makeMocks();
+
+  await processDueMedications({ database: db, now: MONDAY_0900, pushService, providers: { ntfy: providers.gotify } });
+
+  assert.deepEqual(channelSent.map((s) => s.payload.body), ['Vitamin D']);
 });
