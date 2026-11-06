@@ -651,11 +651,11 @@ function passwordCardHtml(user) {
     <div class="settings-card">
       <h3 class="settings-card__title">${t('settings.changePassword')}</h3>
       <p class="form-hint" id="password-passkeys-hint">${esc(t('passkeys.passwordChangeWarning'))}</p>
-      <form id="password-form" class="settings-form" aria-describedby="password-passkeys-hint" novalidate>
+      <form id="password-form" class="settings-form" novalidate>
         <div class="row-carrier settings-group">
           ${settingRowHtml({
             label: t('settings.currentPasswordLabel'), labelFor: 'current-password', labelExtra: REQUIRED_MARK, field: true,
-            control: '<input class="form-input" type="password" id="current-password" autocomplete="current-password" aria-describedby="password-error" required>',
+            control: '<input class="form-input" type="password" id="current-password" autocomplete="current-password" aria-describedby="password-error password-passkeys-hint" required>',
           })}
           ${settingRowHtml({
             label: t('settings.newPasswordLabel'), labelFor: 'new-password', labelExtra: REQUIRED_MARK, field: true,
