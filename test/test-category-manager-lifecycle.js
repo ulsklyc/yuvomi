@@ -271,7 +271,8 @@ test('a stale 409 reports the error without reopening rename in a newer modal co
 
     assert.deepEqual(defaults, ['Old']);
     assert.equal(attempts, 1);
-    assert.deepEqual(toasts, [{ message: 'exists', tone: 'danger' }]);
+    // Der Satz der App, nie der Text des Fehlers (#1909).
+    assert.deepEqual(toasts, [{ message: 'common.errorGeneric', tone: 'danger' }]);
     assert.equal(manager._cats[0].name, 'Old');
   } finally {
     api.put = previousPut;
@@ -438,10 +439,25 @@ test('errorFallbackKey: ein Fehler ohne bekannten Grund zeigt den allgemeinen Sa
   assert.equal(manager._errMsg(serverAnswer(400, 'The last category cannot be deleted.', 'category_last')), 'category.errorLast');
 });
 
-test('ohne errorFallbackKey bleibt der Rueckfall der anderen Module unveraendert', () => {
+// Seit der letzten Scheibe von #1909 nennen alle Module ihre Faelle: auch ohne
+// errorFallbackKey kommt der Text des Servers nie mehr in den Toast.
+test('ohne errorFallbackKey sagt der Verwalter den allgemeinen Satz, nie den des Servers', () => {
   const manager = managerWithCategory();
-  assert.equal(manager._errMsg(serverAnswer(400, 'Name ist erforderlich.')), 'Name ist erforderlich.');
+  assert.equal(manager._errMsg(serverAnswer(400, 'Name ist erforderlich.')), 'common.errorGeneric');
+  assert.equal(manager._errMsg(serverAnswer(404, 'Category not found.')), 'common.errorGeneric');
   assert.equal(manager._errMsg(serverAnswer(409, 'Category already exists.', 'category_exists')), 'category.errorExists');
+  for (const [reason, key] of [
+    ['budget_category_not_found', 'category.errorGone'],
+    ['budget_subcategory_not_found', 'category.errorSubGone'],
+    ['tasks_category_not_found', 'category.errorGone'],
+    ['contacts_category_not_found', 'category.errorGone'],
+    ['notes_category_not_found', 'category.errorGone'],
+    ['pantry_location_not_found', 'pantry.errorLocationGone'],
+    ['pantry_location_exists', 'pantry.errorLocationExists'],
+    ['pantry_location_last', 'pantry.errorLocationLast'],
+  ]) {
+    assert.equal(manager._errMsg(serverAnswer(reason.endsWith('_last') ? 400 : 404, 'Server sentence.', reason)), key, reason);
+  }
 });
 
 test('der Einkauf verlangt den allgemeinen Satz an beiden Verwaltern', async () => {
@@ -578,12 +594,12 @@ test('alreadyDeletedReason: a reason outside the allowlist of gone reasons never
   }
 });
 
-test('without alreadyDeletedReason nothing changes for the other modules', async () => {
-  // Die Routen der anderen Module nennen keinen `reason`: eine blanke 404.
-  // Und selbst ein Grund des Einkaufs zaehlt ohne die Option nicht.
+test('without alreadyDeletedReason a failed delete stays a failure', async () => {
+  // Eine blanke 404 ohne Grund, und selbst ein Grund des Einkaufs zaehlt ohne
+  // die Option nicht.
   const base = { basePath: '/notes/categories', errorFallbackKey: undefined };
   const blank = await deleteAnswering(serverAnswer(404, 'Category not found.'), { options: base });
-  assert.deepEqual(blank.toasts, [['Category not found.', 'danger']], 'der alte Rueckfall auf den Servertext');
+  assert.deepEqual(blank.toasts, [['common.errorGeneric', 'danger']], 'nie der Text des Servers (#1909)');
   assert.equal(blank.rows, 1);
   assert.equal(blank.changed, 0);
   const named = await deleteAnswering(serverAnswer(404, 'Store not found.', 'shopping_store_not_found'), { options: base });
@@ -597,7 +613,7 @@ test('without alreadyDeletedReason nothing changes for the other modules', async
   }
 });
 
-test('only shopping and inventory name an alreadyDeletedReason, once per manager', async () => {
+test('every page names the alreadyDeletedReason of its manager, once per manager', async () => {
   const { readFileSync, readdirSync } = await import('node:fs');
   const { withoutCommentsKeepingLines } = await import('./source-text.js');
   const dir = new URL('../public/pages/', import.meta.url);
@@ -607,11 +623,17 @@ test('only shopping and inventory name an alreadyDeletedReason, once per manager
     for (const m of page.matchAll(/alreadyDeletedReason:\s*'([^']+)'/g)) found.push(`${file}: ${m[1]}`);
   }
   assert.deepEqual(found.sort(), [
-    // #1909: die Orte und Kategorien des Inventars nennen ihr "gibt es nicht mehr".
+    // #1909: die Orte und Kategorien des Inventars nennen ihr "gibt es nicht mehr",
+    // seit der letzten Scheibe auch Budget, Aufgaben, Kontakte, Notizen und Vorrat.
+    'budget.js: budget_category_not_found',
+    'contacts.js: contacts_category_not_found',
     'inventory.js: inventory_category_not_found',
     'inventory.js: inventory_location_not_found',
+    'notes.js: notes_category_not_found',
+    'pantry.js: pantry_location_not_found',
     'shopping.js: shopping_category_not_found',
     'shopping.js: shopping_store_not_found',
+    'tasks.js: tasks_category_not_found',
   ]);
 });
 

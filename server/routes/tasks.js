@@ -1042,7 +1042,7 @@ router.post('/reorder/reset', (req, res) => {
 router.put('/categories/:key', (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM task_categories WHERE key = ?').get(req.params.key);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'tasks_category_not_found' });
 
     const vName = v.str(req.body.name, 'name', { max: v.MAX_SHORT });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
@@ -1065,7 +1065,7 @@ router.put('/categories/:key', (req, res) => {
 router.delete('/categories/:key', (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM task_categories WHERE key = ?').get(req.params.key);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'tasks_category_not_found' });
 
     const inUse = taskCategoryInUseCount(cat.key);
     if (inUse > 0) {

@@ -2975,6 +2975,8 @@ function openTaskCategoryManager(container) {
         titleKey: 'tasks.manageCategories',
         hintKey: 'category.manageHint',
         deleteDetailKey: 'category.deleteConfirmDetail',
+        // Schon geloescht ist ein Erfolg (#1909).
+        alreadyDeletedReason: 'tasks_category_not_found',
       });
     },
     // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem

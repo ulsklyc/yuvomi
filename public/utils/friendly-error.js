@@ -285,6 +285,21 @@ export const CASE_MESSAGES = new Map([
   ['inventory_location_exists', 'inventory.errorLocationExists'],
   ['inventory_location_not_found', 'inventory.errorLocationGone'],
   ['inventory_category_not_found', 'inventory.errorCategoryGone'],
+  // Der Kategorie-Verwalter der uebrigen Module (#1909): Budget, Aufgaben,
+  // Kontakte und Notizen sagen "gibt es nicht mehr" mit demselben Satz, der
+  // Vorrat verwaltet Lagerorte.
+  ['budget_category_not_found', 'category.errorGone'],
+  ['budget_subcategory_not_found', 'category.errorSubGone'],
+  ['tasks_category_not_found', 'category.errorGone'],
+  ['contacts_category_not_found', 'category.errorGone'],
+  ['notes_category_not_found', 'category.errorGone'],
+  ['pantry_location_not_found', 'pantry.errorLocationGone'],
+  ['pantry_location_exists', 'pantry.errorLocationExists'],
+  ['pantry_location_last', 'pantry.errorLocationLast'],
+  // Formular "DMS verbinden" (#1909): es prueft selbst nichts.
+  ['dms_field_required', 'common.requiredFields'],
+  ['dms_url_invalid', 'settings.dmsErrorUrlInvalid'],
+  ['dms_account_exists', 'settings.dmsErrorAccountExists'],
   // Vorrat (#1448): ein Produkt ohne Charge wird geloescht, und im
   // Rueckgaengig-Fenster hat jemand wieder eine Charge eingebucht.
   ['pantry_product_has_batches', 'pantry.errorProductHasStock'],
@@ -595,6 +610,12 @@ export const GONE_REASONS = new Set([
   'contacts_selected_category_not_found',
   'inventory_location_not_found',
   'inventory_category_not_found',
+  'budget_category_not_found',
+  'budget_subcategory_not_found',
+  'tasks_category_not_found',
+  'contacts_category_not_found',
+  'notes_category_not_found',
+  'pantry_location_not_found',
   'tasks_task_not_found',
   'tasks_parent_not_found',
   'tasks_comment_not_found',

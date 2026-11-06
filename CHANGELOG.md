@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **The last settings and managers that showed server text speak your language** (#1909). Managing
+  the categories of budget, tasks, contacts and notes, or the storage locations of the pantry,
+  showed English server text when someone else had deleted the entry meanwhile, when a storage
+  location name was taken or when you tried to delete the last one; each case now has its own
+  sentence, and deleting an entry that is already gone simply counts as done. Connecting a DMS
+  explains an empty field, an address without http:// or https:// and an address that is
+  already connected. Load errors on the DMS, document storage, module install and calendar feed
+  pages, a failed app install on the device page and failed steps of a folder upload say what
+  happened in your language. API clients get the cases as `reason`.
 - **Chinese and Japanese questions end in the full-width question mark.** Confirmations such as
   signing out other devices or replacing a link used the narrow "?", which ran straight into the next
   sentence.

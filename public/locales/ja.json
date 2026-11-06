@@ -3548,7 +3548,9 @@
         "backupRestoreErrorTooLarge": "ファイルがこのインストールのアップロード上限（{{limit}}）を超えています。BACKUP_UPLOAD_LIMIT を引き上げて Yuvomi を再起動し、もう一度復元してください。ここでは何も変更されていません。",
         "apiTokenErrorNameTooLong": "名前は100文字以内にしてください。",
         "apiTokenErrorExpiryPast": "有効期限が過去になっています。もっと後の日時を選んでください。",
-        "apiTokenErrorSubjectDeactivated": "このアカウントは無効化されているため、トークンを発行できません。別の人を選んでください。"
+        "apiTokenErrorSubjectDeactivated": "このアカウントは無効化されているため、トークンを発行できません。別の人を選んでください。",
+        "dmsErrorUrlInvalid": "サーバーURLは http:// または https:// で始める必要があります。",
+        "dmsErrorAccountExists": "このサーバーURLの DMS はすでに接続されています。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",
@@ -4763,7 +4765,9 @@
         "colorTeal": "ティール",
         "colorOrange": "オレンジ",
         "colorRed": "赤",
-        "colorGrey": "グレー"
+        "colorGrey": "グレー",
+        "errorGone": "このカテゴリーはもう存在しません。",
+        "errorSubGone": "このサブカテゴリーはもう存在しません。"
     },
     "subscriptions": {
         "tabLabel": "サブスクリプション",
@@ -6399,7 +6403,10 @@
             "bag_one": "袋",
             "bag_other": "袋"
         },
-        "moreDetailsHint": "最低在庫・メモ"
+        "moreDetailsHint": "最低在庫・メモ",
+        "errorLocationGone": "この保管場所はもう存在しません。",
+        "errorLocationExists": "この保管場所はすでにあります。別の名前を選んでください。",
+        "errorLocationLast": "最後の保管場所は削除できません。先に別の保管場所を追加してください。"
     },
     "inventory": {
         "title": "持ち物",

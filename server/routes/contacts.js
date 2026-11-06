@@ -385,7 +385,7 @@ router.patch('/categories/reorder', (req, res) => {
 router.put('/categories/:key', (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM contact_categories WHERE key = ?').get(req.params.key);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'contacts_category_not_found' });
 
     const vColor = normalizeCategoryColor(req.body.color);
     if (vColor.error) return res.status(400).json({ error: vColor.error, code: 400 });
@@ -422,7 +422,7 @@ router.put('/categories/:key', (req, res) => {
 router.delete('/categories/:key', (req, res) => {
   try {
     const cat = db.get().prepare('SELECT * FROM contact_categories WHERE key = ?').get(req.params.key);
-    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404 });
+    if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'contacts_category_not_found' });
 
     const inUse = contactCategoryInUseCount(cat.key);
     if (inUse > 0) {
