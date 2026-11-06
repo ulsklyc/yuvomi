@@ -57,6 +57,13 @@ RUN mkdir -p /data /backups /app/modules /documents
 # überschreiben diesen Wert wie gehabt.
 ENV BACKUP_DIR=/backups
 
+# Container-Default für die Datenbank, aus demselben Grund: ohne DB_PATH läge
+# yuvomi.db unter /app, wo der node-User weder die Datenbank noch die beim ersten
+# Start erzeugten Secrets (.secrets daneben) anlegen darf - der Container beendete
+# sich sofort. Mit diesem Default reicht ein Volume auf /data. Gesetzte Werte
+# (Compose, Quadlet, Kataloge, auch das Legacy-/data/oikos.db) gelten weiter.
+ENV DB_PATH=/data/yuvomi.db
+
 # Entrypoint: korrigiert Volume-Permissions und startet als node-User
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

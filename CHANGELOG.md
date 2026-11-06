@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **The container image starts with just a `/data` volume.** Started without `DB_PATH`, for
+  example with a plain `docker run -v yuvomi:/data`, the container stopped right away: the
+  database and the secrets generated on first start would have gone under `/app`, where the app
+  may not write. The image now defaults to `/data/yuvomi.db`. Setups that set `DB_PATH`
+  themselves, such as the compose files and the app catalogs, are unchanged.
 - **CardDAV accepts long app passwords and tokens** (#2575). Saving a CardDAV account refused
   any password over 200 characters, and the password field cut longer input off without a word, so
   app tokens such as JWTs could not be used. Passwords for CardDAV, CalDAV and Apple Calendar now
