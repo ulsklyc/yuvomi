@@ -3315,7 +3315,9 @@
         "weatherPlaceUnavailable": "A helykeresés most nem érhető el. Próbáld újra kicsit később, vagy add meg kézzel a koordinátákat.",
         "weatherManualTitle": "Koordináták kézzel",
         "backupDropzoneTitleTouch": "Koppintson egy biztonsági mentés kiválasztásához",
-        "installModuleDropzoneTitleTouch": "Koppintson egy ZIP-fájl kiválasztásához"
+        "installModuleDropzoneTitleTouch": "Koppintson egy ZIP-fájl kiválasztásához",
+        "backupSchedulerLastError": "Utolsó hiba",
+        "backupSchedulerReasonDirNotWritable": "A biztonsagi mentesi konyvtar nem iroható. Allitsa a BACKUP_DIR valtozot egy iroható, csatolt utvonalra (Dockerben: /backups) es ellenorizze a host mappa jogosultsagait."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

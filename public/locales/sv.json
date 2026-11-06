@@ -3315,7 +3315,9 @@
         "weatherPlaceUnavailable": "Platssökningen går inte att nå just nu. Försök igen om en stund eller ange koordinaterna för hand.",
         "weatherManualTitle": "Koordinater för hand",
         "backupDropzoneTitleTouch": "Tryck för att välja en säkerhetskopia",
-        "installModuleDropzoneTitleTouch": "Tryck för att välja en ZIP-fil"
+        "installModuleDropzoneTitleTouch": "Tryck för att välja en ZIP-fil",
+        "backupSchedulerLastError": "Senaste fel",
+        "backupSchedulerReasonDirNotWritable": "Backup-katalogen är inte skrivbar. Ställ in BACKUP_DIR på en skrivbar, monterad sökväg (i Docker: /backups) och verifiera ägandet av host-mappen."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

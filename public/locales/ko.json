@@ -3333,7 +3333,9 @@
         "weatherPlaceUnavailable": "지금은 장소 검색에 연결할 수 없습니다. 잠시 후 다시 시도하거나 좌표를 직접 입력하세요.",
         "weatherManualTitle": "좌표 직접 입력",
         "backupDropzoneTitleTouch": "탭하여 백업 파일 선택",
-        "installModuleDropzoneTitleTouch": "탭하여 ZIP 파일 선택"
+        "installModuleDropzoneTitleTouch": "탭하여 ZIP 파일 선택",
+        "backupSchedulerLastError": "마지막 오류",
+        "backupSchedulerReasonDirNotWritable": "백업 디렉터리를 쓸 수 없습니다. BACKUP_DIR을 쓰기 가능한 마운트된 경로(Docker의 경우: /backups)로 설정하고 호스트 폴더의 소유권을 확인하세요."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",

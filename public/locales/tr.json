@@ -3315,7 +3315,9 @@
         "weatherPlaceUnavailable": "Yer arama şu anda erişilemiyor. Birazdan yeniden dene ya da koordinatları elle gir.",
         "weatherManualTitle": "Koordinatları elle gir",
         "backupDropzoneTitleTouch": "Yedek dosyası seçmek için dokunun",
-        "installModuleDropzoneTitleTouch": "ZIP dosyası seçmek için dokunun"
+        "installModuleDropzoneTitleTouch": "ZIP dosyası seçmek için dokunun",
+        "backupSchedulerLastError": "Son hata",
+        "backupSchedulerReasonDirNotWritable": "Yedek dizini yazılamaz. BACKUP_DIR'i yazılabilir, bağlanmış bir yola ayarlayın (Docker'da: /backups) ve ana bilgisayar klasörünün sahipliğini doğrulayın."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

@@ -3315,7 +3315,9 @@
         "weatherPlaceUnavailable": "La ricerca dei luoghi non è raggiungibile ora. Riprova tra poco o inserisci le coordinate a mano.",
         "weatherManualTitle": "Coordinate a mano",
         "backupDropzoneTitleTouch": "Tocca per scegliere un file di backup",
-        "installModuleDropzoneTitleTouch": "Tocca per scegliere un file ZIP"
+        "installModuleDropzoneTitleTouch": "Tocca per scegliere un file ZIP",
+        "backupSchedulerLastError": "Ultimo errore",
+        "backupSchedulerReasonDirNotWritable": "La directory di backup non è scrivibile. Imposta BACKUP_DIR su un percorso montato e scrivibile (in Docker: /backups) e verifica i permessi della cartella host."
     },
     "login": {
         "tagline": "Bentornato. La tua casa in un unico posto.",

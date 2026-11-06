@@ -3519,7 +3519,9 @@
         "weatherPlaceUnavailable": "Поиск мест сейчас недоступен. Попробуй чуть позже или введи координаты вручную.",
         "weatherManualTitle": "Координаты вручную",
         "backupDropzoneTitleTouch": "Нажмите, чтобы выбрать файл резервной копии",
-        "installModuleDropzoneTitleTouch": "Нажмите, чтобы выбрать ZIP-файл"
+        "installModuleDropzoneTitleTouch": "Нажмите, чтобы выбрать ZIP-файл",
+        "backupSchedulerLastError": "Последняя ошибка",
+        "backupSchedulerReasonDirNotWritable": "Каталог резервного копирования недоступен для записи. Установите BACKUP_DIR в записываемый смонтированный путь (в Docker: /backups) и проверьте права владения папки хоста."
     },
     "login": {
         "tagline": "С возвращением. Ваш дом - в одном месте.",

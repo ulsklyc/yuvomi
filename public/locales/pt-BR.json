@@ -3315,7 +3315,9 @@
         "weatherPlaceUnavailable": "A busca de locais está indisponível agora. Tente de novo em instantes ou digite as coordenadas manualmente.",
         "weatherManualTitle": "Coordenadas manualmente",
         "backupDropzoneTitleTouch": "Toque para escolher um arquivo de backup",
-        "installModuleDropzoneTitleTouch": "Toque para escolher um arquivo ZIP"
+        "installModuleDropzoneTitleTouch": "Toque para escolher um arquivo ZIP",
+        "backupSchedulerLastError": "Último erro",
+        "backupSchedulerReasonDirNotWritable": "O diretório de backup não é gravável. Defina BACKUP_DIR como um caminho montado e gravável (no Docker: /backups) e verifique a propriedade da pasta do host."
     },
     "login": {
         "tagline": "Bem-vindo de volta. Sua casa em um só lugar.",

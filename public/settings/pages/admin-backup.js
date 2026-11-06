@@ -1,7 +1,10 @@
 import { api } from '/api.js';
-import { formatDate, formatTime, t } from '/i18n.js';
+import { t } from '/i18n.js';
+import { dateTimeText } from '/utils/date-format.js';
 import { confirmModal, whenModalClosed } from '/components/modal.js';
 import { formatCronSchedule } from '/settings/cron-label.js';
+import { wirePasswordToggle } from '/utils/auth-ui.js';
+import { errorSentenceWithDetail, errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
 import {
   backupKeyFieldHtml,
   encodeBackupKey,
@@ -196,7 +199,7 @@ async function loadBackupSchedulerStatus(container) {
   const failWithRetry = (error) => {
     console.error('[Settings] Failed to load backup scheduler status:', error);
     infoContainer.replaceChildren(createRetryState({
-      message: error?.message || t('settings.loadError'),
+      message: loadErrorSentence(error) ?? t('settings.loadError'),
       onRetry: () => loadBackupSchedulerStatus(container),
     }));
   };
@@ -211,11 +214,11 @@ async function loadBackupSchedulerStatus(container) {
       return;
     }
 
-    const { enabled, schedule, keepCount, lastBackup } = scheduler;
+    const { enabled, schedule, keepCount, lastBackup, lastError } = scheduler;
 
     let lastBackupText = t('settings.backupSchedulerNever');
     if (lastBackup?.timestamp) {
-      const date = `${formatDate(lastBackup.timestamp)} ${formatTime(lastBackup.timestamp)}`;
+      const date = dateTimeText(lastBackup.timestamp);
       lastBackupText = lastBackup.success
         ? t('settings.backupSchedulerLastSuccess', { date })
         : t('settings.backupSchedulerLastFail', { date });
@@ -236,6 +239,39 @@ async function loadBackupSchedulerStatus(container) {
         value: t('settings.backupSchedulerKeepCount', { count: keepCount }),
       }));
       rows.push(createInfoRow({ label: t('settings.backupSchedulerLastBackup'), value: lastBackupText }));
+
+      // WARUM DER GRUND UND NICHT NUR "fehlgeschlagen": die Zeile oben nennt
+      // den Zeitpunkt, der Admin muss aber wissen, WAS zu tun ist - eine volle
+      // Platte (ENOSPC) und ein unschreibbares BACKUP_DIR verlangen
+      // Verschiedenes. Ein erfolgreicher Lauf setzt lastError auf null, die
+      // Zeile verschwindet also von selbst (#2525).
+      if (lastError?.message) {
+        const REASON_KEYS = { backup_dir_not_writable: 'settings.backupSchedulerReasonDirNotWritable' };
+        const sentenceKey = REASON_KEYS[lastError.reason] || 'common.errorGeneric';
+        const wrapper = document.createElement('span');
+        wrapper.className = 'settings-info-value__stack';
+        const sentenceEl = document.createElement('span');
+        sentenceEl.textContent = t(sentenceKey);
+        const more = document.createElement('details');
+        more.className = 'settings-hint-fold__more';
+        const summary = document.createElement('summary');
+        summary.className = 'settings-hint-fold__summary';
+        summary.textContent = t('settings.hintMore');
+        const chevron = document.createElement('i');
+        chevron.setAttribute('data-lucide', 'chevron-down');
+        chevron.className = 'settings-hint-fold__icon';
+        chevron.setAttribute('aria-hidden', 'true');
+        summary.append(chevron);
+        const msgEl = document.createElement('code');
+        msgEl.textContent = lastError.message;
+        more.append(summary, msgEl);
+        wrapper.append(sentenceEl, more);
+        rows.push(createInfoRow({
+          label: t('settings.backupSchedulerLastError'),
+          value: wrapper,
+          tone: 'danger',
+        }));
+      }
 
       const actions = document.createElement('div');
       actions.className = 'settings-form-actions';
@@ -260,7 +296,7 @@ async function loadBackupSchedulerStatus(container) {
           window.yuvomi?.showToast(t('settings.backupSchedulerTriggeredToast'), 'success');
           loadBackupSchedulerStatus(container);
         } catch (err) {
-          window.yuvomi?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+          window.yuvomi?.showToast(errorSentence(err), 'danger');
           triggerBtn.disabled = false;
           triggerBtn.textContent = t('settings.backupSchedulerTrigger');
         }
@@ -321,7 +357,7 @@ function renderWebdavStatus(grid, container, d) {
         window.yuvomi?.showToast(t('settings.backupWebdavTriggeredToast'), 'success');
         loadWebdavConfig(container);
       } catch (err) {
-        window.yuvomi?.showToast(err.message ?? t('common.errorGeneric'), 'danger');
+        window.yuvomi?.showToast(errorSentence(err), 'danger');
         const icon = document.createElement('i');
         icon.dataset.lucide = 'upload-cloud';
         icon.setAttribute('aria-hidden', 'true');
@@ -453,7 +489,7 @@ function bindWebdavBackupEvents(container) {
       if (resultEl) {
         resultEl.textContent = err?.data?.errorCode === 'password_required'
           ? webdavErrorMessage(err)
-          : t('settings.backupWebdavTestFailed', { error: err.message });
+          : errorSentenceWithDetail(err, 'settings.backupWebdavTestFailed');
         resultEl.className = 'form-hint form-hint--danger';
       }
     } finally {

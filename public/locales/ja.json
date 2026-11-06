@@ -3315,7 +3315,9 @@
         "weatherPlaceUnavailable": "現在、場所の検索に接続できません。少し待ってから再試行するか、座標を手動で入力してください。",
         "weatherManualTitle": "座標を手動で入力",
         "backupDropzoneTitleTouch": "タップしてバックアップファイルを選択",
-        "installModuleDropzoneTitleTouch": "タップしてZIPファイルを選択"
+        "installModuleDropzoneTitleTouch": "タップしてZIPファイルを選択",
+        "backupSchedulerLastError": "最終エラー",
+        "backupSchedulerReasonDirNotWritable": "バックアップ ディレクトリが書き込み可能ではありません。BACKUP_DIR を書き込み可能なマウント済みパス (Docker では /backups) に設定し、ホスト フォルダの所有権を確認してください。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

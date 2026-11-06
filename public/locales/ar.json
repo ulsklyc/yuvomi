@@ -3622,7 +3622,9 @@
         "weatherPlaceUnavailable": "البحث عن الأماكن غير متاح حاليًا. حاول مجددًا بعد قليل أو أدخل الإحداثيات يدويًا.",
         "weatherManualTitle": "الإحداثيات يدويًا",
         "backupDropzoneTitleTouch": "اضغط لاختيار ملف نسخة احتياطية",
-        "installModuleDropzoneTitleTouch": "اضغط لاختيار ملف ZIP"
+        "installModuleDropzoneTitleTouch": "اضغط لاختيار ملف ZIP",
+        "backupSchedulerLastError": "آخر خطأ",
+        "backupSchedulerReasonDirNotWritable": "دليل النسخ الاحتياطي غير قابل للكتابة. عيّن BACKUP_DIR على مسار قابل للكتابة ومُركّب (في Docker: /backups) وتحقق من أذونات مجلد المضيف."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",

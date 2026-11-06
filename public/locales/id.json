@@ -3333,7 +3333,9 @@
         "weatherPlaceUnavailable": "Pencarian tempat sedang tidak dapat dijangkau. Coba lagi sebentar lagi atau masukkan koordinat secara manual.",
         "weatherManualTitle": "Koordinat manual",
         "backupDropzoneTitleTouch": "Ketuk untuk memilih file cadangan",
-        "installModuleDropzoneTitleTouch": "Ketuk untuk memilih file ZIP"
+        "installModuleDropzoneTitleTouch": "Ketuk untuk memilih file ZIP",
+        "backupSchedulerLastError": "Kesalahan terakhir",
+        "backupSchedulerReasonDirNotWritable": "Direktori backup tidak dapat ditulis. Tetapkan BACKUP_DIR ke path terpasang yang dapat ditulis (di Docker: /backups) dan verifikasi kepemilikan folder host."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

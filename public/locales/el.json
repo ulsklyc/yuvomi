@@ -3315,7 +3315,9 @@
         "weatherPlaceUnavailable": "Η αναζήτηση τοποθεσίας δεν είναι διαθέσιμη αυτή τη στιγμή. Δοκίμασε ξανά σε λίγο ή συμπλήρωσε τις συντεταγμένες χειροκίνητα.",
         "weatherManualTitle": "Συντεταγμένες χειροκίνητα",
         "backupDropzoneTitleTouch": "Πατήστε για να επιλέξετε αρχείο αντιγράφου ασφαλείας",
-        "installModuleDropzoneTitleTouch": "Πατήστε για να επιλέξετε αρχείο ZIP"
+        "installModuleDropzoneTitleTouch": "Πατήστε για να επιλέξετε αρχείο ZIP",
+        "backupSchedulerLastError": "Τελευταίο σφάλμα",
+        "backupSchedulerReasonDirNotWritable": "Ο κατάλογος αντιγράφων ασφαλείας δεν είναι εγγράψιμος. Ορίστε το BACKUP_DIR σε έναν εγγράψιμο, προσαρτημένο δίσκο (στο Docker: /backups) και επιβεβαιώστε τα δικαιώματα ιδιοκτησίας του φακέλου του host."
     },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά. Το σπίτι σας σε ένα μέρος.",

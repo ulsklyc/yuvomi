@@ -2415,6 +2415,8 @@
         "backupSchedulerTrigger": "Create backup now",
         "backupSchedulerTriggering": "Creating backup...",
         "backupSchedulerTriggeredToast": "Backup created successfully.",
+        "backupSchedulerLastError": "Last error",
+        "backupSchedulerReasonDirNotWritable": "Backup directory is not writable. Set BACKUP_DIR to a writable, mounted path (in Docker: /backups) and verify the ownership of the mounted host folder.",
         "backupWebdavTitle": "WebDAV Backup Target",
         "backupWebdavHint": "Automatically upload backups to a WebDAV server (Nextcloud, ownCloud, Hetzner Storage Box, Infomaniak kDrive, etc.).",
         "backupWebdavEnabled": "Enable WebDAV backups",

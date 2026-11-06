@@ -3315,7 +3315,9 @@
         "weatherPlaceUnavailable": "Het zoeken naar plaatsen is nu niet bereikbaar. Probeer het zo opnieuw of vul de coördinaten met de hand in.",
         "weatherManualTitle": "Coördinaten met de hand",
         "backupDropzoneTitleTouch": "Tik om een back-upbestand te kiezen",
-        "installModuleDropzoneTitleTouch": "Tik om een ZIP-bestand te kiezen"
+        "installModuleDropzoneTitleTouch": "Tik om een ZIP-bestand te kiezen",
+        "backupSchedulerLastError": "Laatste fout",
+        "backupSchedulerReasonDirNotWritable": "De back-upmap is niet beschrijfbaar. Stel BACKUP_DIR in op een beschrijfbaar, aangekoppeld pad (in Docker: /backups) en controleer de eigenaar van de host-map."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

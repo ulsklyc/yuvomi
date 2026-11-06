@@ -3315,7 +3315,9 @@
         "weatherPlaceUnavailable": "La recherche de lieu est injoignable pour le moment. Réessaie dans un instant ou saisis les coordonnées à la main.",
         "weatherManualTitle": "Coordonnées à la main",
         "backupDropzoneTitleTouch": "Touchez pour choisir un fichier de sauvegarde",
-        "installModuleDropzoneTitleTouch": "Touchez pour choisir un fichier ZIP"
+        "installModuleDropzoneTitleTouch": "Touchez pour choisir un fichier ZIP",
+        "backupSchedulerLastError": "Dernière erreur",
+        "backupSchedulerReasonDirNotWritable": "Le repertoire de sauvegarde n'est pas accessible en ecriture. Definissez BACKUP_DIR sur un chemin monte et accessible en ecriture (dans Docker : /backups) et verifiez les permissions du dossier hote."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

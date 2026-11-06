@@ -3417,7 +3417,9 @@
         "weatherPlaceUnavailable": "Vyhledávání míst teď není dostupné. Zkus to za chvíli znovu nebo zadej souřadnice ručně.",
         "weatherManualTitle": "Souřadnice ručně",
         "backupDropzoneTitleTouch": "Klepnutím vyberte soubor zálohy",
-        "installModuleDropzoneTitleTouch": "Klepnutím vyberte soubor ZIP"
+        "installModuleDropzoneTitleTouch": "Klepnutím vyberte soubor ZIP",
+        "backupSchedulerLastError": "Poslední chyba",
+        "backupSchedulerReasonDirNotWritable": "Adresář záloh nelze zapisovat. Nastavte BACKUP_DIR na zapisovatelnou, připojenou cestu (v Dockeru: /backups) a ověřte vlastnictví složky hostitele."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

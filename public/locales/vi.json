@@ -3315,7 +3315,9 @@
         "weatherPlaceUnavailable": "Hiện không thể tìm địa điểm. Hãy thử lại sau ít phút hoặc nhập tọa độ thủ công.",
         "weatherManualTitle": "Nhập tọa độ thủ công",
         "backupDropzoneTitleTouch": "Chạm để chọn tệp sao lưu",
-        "installModuleDropzoneTitleTouch": "Chạm để chọn tệp ZIP"
+        "installModuleDropzoneTitleTouch": "Chạm để chọn tệp ZIP",
+        "backupSchedulerLastError": "Lỗi gần nhất",
+        "backupSchedulerReasonDirNotWritable": "Thư mục backup không thể ghi. Đặt BACKUP_DIR thành đường dẫn đã mount và có thể ghi (trong Docker: /backups) và xác minh quyền sở hữu thư mục host."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

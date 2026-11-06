@@ -174,9 +174,11 @@ async function performBackup() {
     }
   } catch (err) {
     log.error('Scheduled backup failed:', err);
+    const NOT_WRITABLE = new Set(['EACCES', 'EPERM', 'EROFS', 'ENOENT', 'ENOTDIR']);
     lastError = {
       timestamp: new Date().toISOString(),
       message: err.message,
+      reason: NOT_WRITABLE.has(err.code) ? 'backup_dir_not_writable' : null,
     };
     lastBackup = {
       timestamp: new Date().toISOString(),

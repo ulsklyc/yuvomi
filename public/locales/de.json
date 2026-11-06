@@ -2459,6 +2459,8 @@
         "backupSchedulerTrigger": "Jetzt Backup erstellen",
         "backupSchedulerTriggering": "Backup wird erstellt...",
         "backupSchedulerTriggeredToast": "Backup erfolgreich erstellt.",
+        "backupSchedulerLastError": "Letzter Fehler",
+        "backupSchedulerReasonDirNotWritable": "Backup-Verzeichnis ist nicht beschreibbar. Setze BACKUP_DIR auf einen beschreibbaren, eingehängten Pfad (in Docker: /backups) und prüfe die Besitzrechte des Host-Ordners.",
         "backupWebdavTitle": "WebDAV-Backup-Ziel",
         "backupWebdavHint": "Backups automatisch auf einen WebDAV-Server hochladen (Nextcloud, ownCloud, Hetzner Storage Box, Infomaniak kDrive usw.).",
         "backupWebdavEnabled": "WebDAV-Backups aktivieren",

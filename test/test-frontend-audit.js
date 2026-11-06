@@ -22093,6 +22093,12 @@ function countErrorMessageReads(source) {
   return [...code.matchAll(/\b(?:err|error|e|ex|reason)\s*(?:\?\.|\.)\s*message\b/g)].length;
 }
 
+const ERROR_MESSAGE_OPEN = [
+  'pages/settings.js',
+  'pages/contacts.js',
+  'settings/pages/admin-backup.js',
+];
+
 const ERROR_MESSAGE_CLEAN = [
   'pages/health.js',
   'pages/health-fasting.js',

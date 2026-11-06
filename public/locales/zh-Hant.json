@@ -3315,7 +3315,9 @@
         "weatherPlaceUnavailable": "地點搜尋暫時無法使用。請稍後重試，或手動輸入座標。",
         "weatherManualTitle": "手動輸入座標",
         "backupDropzoneTitleTouch": "點選以選擇備份檔案",
-        "installModuleDropzoneTitleTouch": "點選以選擇 ZIP 檔案"
+        "installModuleDropzoneTitleTouch": "點選以選擇 ZIP 檔案",
+        "backupSchedulerLastError": "上次錯誤",
+        "backupSchedulerReasonDirNotWritable": "備份目錄不可寫入。請將 BACKUP_DIR 設為可寫入的掛載路徑 (在 Docker 中: /backups) 並驗證主機資料夾的擁有權。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

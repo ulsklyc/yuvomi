@@ -3537,7 +3537,9 @@
         "weatherPlaceUnavailable": "Wyszukiwanie miejsc jest teraz niedostępne. Spróbuj ponownie za chwilę albo wpisz współrzędne ręcznie.",
         "weatherManualTitle": "Współrzędne ręcznie",
         "backupDropzoneTitleTouch": "Dotknij, aby wybrać plik kopii zapasowej",
-        "installModuleDropzoneTitleTouch": "Dotknij, aby wybrać plik ZIP"
+        "installModuleDropzoneTitleTouch": "Dotknij, aby wybrać plik ZIP",
+        "backupSchedulerLastError": "Ostatni błąd",
+        "backupSchedulerReasonDirNotWritable": "Katalog kopii zapasowych nie jest do zapisu. Ustaw BACKUP_DIR na ścieżkę zamontowaną i do zapisu (w Docker: /backups) i sprawdź uprawnienia folderu hosta."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

@@ -3333,7 +3333,9 @@
         "weatherPlaceUnavailable": "جست‌وجوی مکان اکنون در دسترس نیست. کمی بعد دوباره امتحان کن یا مختصات را دستی وارد کن.",
         "weatherManualTitle": "مختصات به‌صورت دستی",
         "backupDropzoneTitleTouch": "برای انتخاب فایل پشتیبان ضربه بزنید",
-        "installModuleDropzoneTitleTouch": "برای انتخاب فایل ZIP ضربه بزنید"
+        "installModuleDropzoneTitleTouch": "برای انتخاب فایل ZIP ضربه بزنید",
+        "backupSchedulerLastError": "آخرین خطا",
+        "backupSchedulerReasonDirNotWritable": "دایرکتوری پشتیبان‌گیری قابل نوشتن نیست. BACKUP_DIR را روی یک مسیر قابل نوشتن و ماونت شده (در Docker: /backups) تنظیم کنید و مالکیت پوشه هاست را بررسی کنید."
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",

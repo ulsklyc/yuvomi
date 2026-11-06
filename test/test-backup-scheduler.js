@@ -6,7 +6,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { withoutCommentsKeepingLines } from './source-text.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -109,6 +110,10 @@ describe('Backup Scheduler', () => {
     assert.ok(status.lastBackup.timestamp, 'Last backup should have timestamp');
     assert.strictEqual(status.lastBackup.success, true, 'Last backup should be successful');
     assert.ok(status.lastBackup.file, 'Last backup should have filename');
+    // Ein erfolgreicher Lauf LOESCHT den letzten Fehler: sonst zeigte die
+    // Backup-Karte den Grund eines Fehlschlags weiter, obwohl seither ein
+    // Backup gelaufen ist (#2525).
+    assert.strictEqual(status.lastError, null, 'a successful run clears lastError');
   });
 
   it('createLocalBackup() should create a fresh, uniquely named file each call', async () => {
@@ -171,6 +176,17 @@ describe('Backup Scheduler', () => {
       );
       assert.match(result.error, /BACKUP_DIR/, 'error must point at the BACKUP_DIR setting');
       assert.match(result.error, /EACCES|EPERM|EROFS/, 'error must keep the original errno');
+
+      // DER GRUND MUSS AUS DEM STATUS ZU LESEN SEIN (#2525). `lastBackup`
+      // sagt nur "fehlgeschlagen" samt Zeitpunkt; was zu tun ist - volle
+      // Platte, unschreibbares BACKUP_DIR - steht allein in `lastError`.
+      const status = backupScheduler.getStatus();
+      assert.ok(status.lastError, 'a failed run must leave lastError in getStatus()');
+      assert.ok(status.lastError.timestamp, 'lastError carries the time of the failure');
+      assert.strictEqual(status.lastError.message, result.error,
+        'lastError.message is the same sentence the failed run reported');
+      assert.strictEqual(status.lastError.reason, 'backup_dir_not_writable',
+        'lastError.reason classifies the failure for the UI');
     } finally {
       await fs.chmod(TEST_BACKUP_ROOT, 0o755);
     }
@@ -178,5 +194,48 @@ describe('Backup Scheduler', () => {
 
   it('should cleanup test directory', async () => {
     await fs.rm(TEST_BACKUP_ROOT, { recursive: true, force: true });
+  });
+});
+
+// WARUM EIN QUELLTEXT-GUARD UND KEIN DOM-TEST: der Fehler, den #2525 meldet,
+// war genau diese Luecke - der Scheduler fuehrte `lastError` mit, die Route
+// gab ihn mit heraus, und die Karte las ihn nie. Ein Test, der nur den Status
+// prueft, bleibt dabei gruen. Die Zeile laeuft in `load()` hinter `api.get()`,
+// also liest der Guard die Quelle, mit Kommentaren heraus (ein Kommentar, der
+// den Schluessel nennt, darf nicht als Umsetzung zaehlen).
+describe('Backup-Karte: der Grund des letzten Fehlschlags (#2525)', () => {
+  const source = withoutCommentsKeepingLines(
+    readFileSync(new URL('../public/settings/pages/admin-backup.js', import.meta.url), 'utf8')
+  );
+
+  it('liest lastError aus dem Scheduler-Status und zeichnet ihn als Fehler aus', () => {
+    // lastError direkt entnommen (kein Alias-Rename mehr):
+    assert.match(source, /\{[^{}]*\blastError\b[^{}]*\}\s*=\s*scheduler/,
+      'admin-backup.js muss lastError aus dem Scheduler-Status lesen');
+
+    // createInfoRow mit Label settings.backupSchedulerLastError AND tone 'danger':
+    // beide muessen im selben Aufruf stehen, damit das Entfernen einer der beiden
+    // Zeilen den Guard rot macht.
+    const aufruf = source
+      .split(/(?=createInfoRow)/)
+      .find((s) => s.includes('settings.backupSchedulerLastError'));
+    assert.ok(aufruf, 'kein createInfoRow mit dem Label settings.backupSchedulerLastError');
+    assert.match(aufruf, /tone:\s*'danger'/, 'der Grund eines Fehlschlags ist als Fehler ausgezeichnet');
+
+    // Die rohe Nachricht muss als technisches Detail erscheinen (lastError.message):
+    assert.match(source, /lastError\s*\.\s*message/, 'lastError.message erscheint als technisches Detail');
+  });
+
+  it('jede Locale kennt das Label und den uebersetzten Grund', () => {
+    const dir = new URL('../public/locales/', import.meta.url);
+    const fehltLabel = [];
+    const fehltGrund = [];
+    for (const file of readdirSync(dir).filter((n) => n.endsWith('.json'))) {
+      const json = JSON.parse(readFileSync(new URL(file, dir), 'utf8'));
+      if (!json.settings?.backupSchedulerLastError) fehltLabel.push(file);
+      if (!json.settings?.backupSchedulerReasonDirNotWritable) fehltGrund.push(file);
+    }
+    assert.deepEqual(fehltLabel, [], `backupSchedulerLastError fehlt in: ${fehltLabel.join(', ')}`);
+    assert.deepEqual(fehltGrund, [], `backupSchedulerReasonDirNotWritable fehlt in: ${fehltGrund.join(', ')}`);
   });
 });

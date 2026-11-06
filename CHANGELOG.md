@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **A failed scheduled backup now says why.** The backup card showed the time of the last run and
+  "(failed)", but never the reason, so a full disk and an unwritable `BACKUP_DIR` looked the same -
+  and both need something different done about them. The card now adds a "Last error" row with the
+  message of the last failed run, in red, and the row disappears by itself as soon as a run
+  succeeds again. The scheduler already tracked it and `GET /api/v1/backup/status` already returned
+  it as `scheduler.lastError` (`{ timestamp, message, reason }`, `null` after a success); only the card
+  never read it, which is now covered by a test. (#2525)
 - **A CalDAV rate limit or outage no longer attempts more than one shopping move per sync pass
   (#2143).** When a target calendar responds with 429 or 5xx while a shopping item is being moved
   there, all remaining items waiting for that same list are now skipped for the rest of the sync
