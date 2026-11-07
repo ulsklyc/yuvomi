@@ -261,6 +261,15 @@ test('PUT /:id: ohne assigned_to bleibt die erste Person die Hauptzuweisung (#25
   assert.equal(again.body.data.assigned_to, BOB, 'auch nach einem zweiten Teil-Update');
 });
 
+test('PUT /:id: ein ausdrueckliches assigned_to ersetzt die Hauptzuweisung weiterhin (#2569)', async () => {
+  const created = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Haupt-Zuweisung ersetzt', assigned_to: [BOB, ALICE] } });
+  const id = created.body.data.id;
+  const r = await call('PUT', `/${id}`, { as: { id: ALICE, role: 'admin' }, body: { assigned_to: [ALICE] } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.assigned_to, ALICE);
+  assert.equal(r.body.data.assigned_users.length, 1);
+});
+
 test('PUT /:id: unbekannte ID → 404, ungültiger Status → 400', async () => {
   const missing = await call('PUT', '/999999', { as: { id: ALICE, role: 'admin' }, body: { title: 'X' } });
   assert.equal(missing.status, 404);
