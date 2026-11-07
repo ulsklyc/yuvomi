@@ -844,7 +844,13 @@
             "waited": "\"{{item}}\" was not moved to \"{{target}}\": syncing for \"{{back}}\" has been off for over a week. The item will show up on \"{{back}}\" again once that list is switched on."
         },
         "moreDetailsHint": "Price, store, link, note",
-        "toPantryAllToPlaceholder": "Choose a place …"
+        "toPantryAllToPlaceholder": "Choose a place …",
+        "summaryRemaining": "To buy",
+        "summaryPurchased": "In cart",
+        "summaryTotal": "Estimated total",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "about {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingredient",

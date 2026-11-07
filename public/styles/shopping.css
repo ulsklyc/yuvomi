@@ -1226,3 +1226,71 @@
  * umverteilt statt es aufzulösen, ist genau die Sorte Regel, die die nächste
  * Änderung teuer macht.
  * -------------------------------------------------------- */
+
+/* --------------------------------------------------------
+ * Summenzeile: Ausstehend, Gekauft und Gesamt (#1003)
+ * Ruhige Einzelzeile am Ende der Artikelliste
+ * -------------------------------------------------------- */
+.shopping-price-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  width: 100%;
+  margin-block: var(--space-4) var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.shopping-price-summary__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.shopping-price-summary__label {
+  color: var(--color-text-tertiary);
+}
+
+.shopping-price-summary__value {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium, 500);
+}
+
+.shopping-price-summary__dot {
+  opacity: 0.6;
+  user-select: none;
+}
+
+.shopping-item__subtotal-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+  order: 1;
+}
+
+.shopping-item__dot {
+  opacity: 0.6;
+  user-select: none;
+  font-weight: var(--font-weight-regular);
+}
+
+.shopping-item__quantity,
+.shopping-item__price {
+  font-size: inherit;
+  color: inherit;
+  line-height: 1;
+}
+
+.shopping-item__price--estimated {
+  font-style: italic;
+  color: var(--color-text-tertiary);
+}

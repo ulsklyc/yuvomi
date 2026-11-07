@@ -844,7 +844,13 @@
             "waited": "”{{item}}” flyttades inte till ”{{target}}”: synkroniseringen av ”{{back}}” har varit avstängd i över en vecka. Varan dyker upp på ”{{back}}” igen när listan slås på."
         },
         "moreDetailsHint": "Pris, butik, länk, anteckning",
-        "toPantryAllToPlaceholder": "Välj en plats …"
+        "toPantryAllToPlaceholder": "Välj en plats …",
+        "summaryRemaining": "Att köpa",
+        "summaryPurchased": "I varukorgen",
+        "summaryTotal": "Uppskattad summa",
+        "estimatedPrice": "~ {{price}}",
+        "estimatedPriceAria": "cirka {{price}}",
+        "metaSeparator": " · "
     },
     "meals": {
         "ingredientCount_one": "{{count}} ingrediens",

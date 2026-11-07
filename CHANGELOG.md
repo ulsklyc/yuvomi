@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.86.0] - 2026-11-07
 
 ### Added
+- **Shopping: price estimation and cost calculator** (part 2 of #1003). Open items inherit
+  price estimates based on previous purchases of the same item name. A subtle summary bar
+  above the shopping list calculates remaining, purchased, and total estimated expenses,
+  updating dynamically as items are ticked off or priced.
 - **Late completion decay (opt-in).** Households can have late completions pay less: administrators
   switch it on in the rewards settings, off by default. A task ticked off after its due day earns one
   point less for each day it is past due, and always at least one point - finishing still pays. What a

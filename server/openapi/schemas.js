@@ -1512,6 +1512,7 @@ export const schemas = {
             notes: { type: ['string', 'null'] },
             url: { type: ['string', 'null'] },
             price_cents: { type: ['integer', 'null'], description: 'What was paid, in whole cents.' },
+            estimated_price_cents: { type: ['integer', 'null'], description: 'Estimated price based on the most recent purchase of an item with the same name, in cents.' },
             store_id: { type: ['integer', 'null'] },
             sort_order: { type: 'integer', description: 'Rank within the category of this list.' },
             added_from_meal: { type: ['integer', 'null'], description: 'The meal the item was transferred from.' },
@@ -1530,7 +1531,7 @@ export const schemas = {
             seen_on_server: { type: 'integer' },
           },
           required: [
-            'id', 'list_id', 'name', 'quantity', 'category', 'is_checked', 'notes', 'url', 'price_cents', 'store_id',
+            'id', 'list_id', 'name', 'quantity', 'category', 'is_checked', 'notes', 'url', 'price_cents', 'estimated_price_cents', 'store_id',
             'sort_order', 'added_from_meal', 'created_at', 'updated_at',
           ],
         },
