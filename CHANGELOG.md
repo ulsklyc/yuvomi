@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **Tasks: `updated_at` moves again when a task is actually changed.** Every database from
+  migration v4 on had silently lost the trigger that keeps `tasks.updated_at` current: the table
+  rebuilds (v4, v25, v114) dropped the table together with its triggers, and the last rebuild
+  re-created the search triggers but missed this one. Editing a task kept `updated_at` frozen at
+  the creation time, while calendar events advanced correctly. A new migration restores the
+  trigger; existing values stay as they are, only further updates advance the timestamp.
 - **Backup, system and API settings say what went wrong in your language** (#1909). Restoring an
   empty file, a database that is not from Yuvomi or a backup from a newer version showed the
   server's English text; it now says what to do next. Creating an API token with a past expiry
