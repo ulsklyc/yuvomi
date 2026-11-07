@@ -41,7 +41,7 @@ import { todayKey } from '/utils/date.js';
 import { DEFAULT_CATEGORY_NAME, categoryLabel } from '/utils/shopping-categories.js';
 import { locationLabel } from '/utils/pantry-locations.js';
 import { setBulkPill, clearBulkPill } from '/utils/bulk-pill.js';
-import { PANTRY_UNITS, normalizePantryQuantity, pantryUnitStep, pantryQuantityLabel } from '/utils/pantry-units.js';
+import { PANTRY_UNITS, DEFAULT_PANTRY_UNIT, normalizePantryQuantity, pantryUnitStep, pantryQuantityLabel } from '/utils/pantry-units.js';
 import {
   PANTRY_FILTERS,
   daysUntil,
@@ -2053,9 +2053,10 @@ function openItemModal(mode, item = null) {
   const locations = state.locations;
   const categories = state.categories;
 
-  const unitOptions = PANTRY_UNITS
-    .map((unit) => `<option value="${esc(unit)}">${esc(unitLabel(unit))}</option>`)
-    .join('');
+  const unitOptions = [
+    ...PANTRY_UNITS.map((unit) => `<option value="${esc(unit)}">${esc(unitLabel(unit))}</option>`),
+    `<option value="__custom__">${esc(t('pantry.unitCustom'))}</option>`,
+  ].join('');
   const locationOptions = [
     `<option value="">${esc(t('pantry.unlocated'))}</option>`,
     ...locations.map((loc) => `<option value="${loc.id}">${esc(locationLabel(loc.name))}</option>`),
@@ -2084,6 +2085,9 @@ function openItemModal(mode, item = null) {
         <div class="form-group">
           <label class="form-label" for="pantry-unit">${esc(t('pantry.unitLabel'))}</label>
           <select id="pantry-unit" class="form-input">${unitOptions}</select>
+          <input id="pantry-unit-custom" class="form-input" type="text"
+                 placeholder="${esc(t('pantry.unitCustomPlaceholder'))}"
+                 style="display:none" maxlength="40">
         </div>
       </div>
       <div class="form-pair">
@@ -2123,7 +2127,20 @@ function openItemModal(mode, item = null) {
     onSave(panel) {
       panel.querySelector('#pantry-name').value = isEdit ? item.name : '';
       panel.querySelector('#pantry-quantity').value = isEdit ? String(item.quantity) : '1';
-      panel.querySelector('#pantry-unit').value = isEdit ? item.unit : 'pcs';
+      const isCustomUnit = isEdit && !PANTRY_UNITS.includes(item.unit);
+      panel.querySelector('#pantry-unit').value = isEdit
+        ? (isCustomUnit ? '__custom__' : item.unit) : 'pcs';
+      if (isCustomUnit) {
+        const customInput = panel.querySelector('#pantry-unit-custom');
+        customInput.style.display = '';
+        customInput.value = item.unit;
+      }
+      panel.querySelector('#pantry-unit').addEventListener('change', (e) => {
+        const customInput = panel.querySelector('#pantry-unit-custom');
+        const isCustom = e.target.value === '__custom__';
+        customInput.style.display = isCustom ? '' : 'none';
+        if (isCustom) customInput.focus();
+      });
       panel.querySelector('#pantry-location').value = isEdit && item.location_id ? String(item.location_id) : '';
       panel.querySelector('#pantry-category').value = isEdit
         ? item.category
@@ -2165,7 +2182,12 @@ async function saveItem(panel, mode, item) {
   const payload = {
     name,
     quantity: normalizePantryQuantity(panel.querySelector('#pantry-quantity').value, { fallback: 1 }),
-    unit: panel.querySelector('#pantry-unit').value,
+    unit: (() => {
+      const sel = panel.querySelector('#pantry-unit');
+      return sel.value === '__custom__'
+        ? (panel.querySelector('#pantry-unit-custom').value.trim() || DEFAULT_PANTRY_UNIT)
+        : sel.value;
+    })(),
     location_id: panel.querySelector('#pantry-location').value || null,
     category: panel.querySelector('#pantry-category').value,
     expires_on: panel.querySelector('#pantry-expires').value || null,
