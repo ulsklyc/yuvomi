@@ -321,12 +321,15 @@ test('keine ausgeschriebene Lebensdauer neben der Konstante', () => {
       if (start !== -1) { code = code.slice(0, start); imBlock = true; }
       code = code.replace(/\/\/.*$/, '');
       if (!/\bmaxAge\b/.test(code)) return;
-      if (/\bmaxAge\s*[:=?]/.test(code) && !code.includes('SESSION_MAX_AGE_MS')) {
+      // Anonymous passkey ceremonies deliberately use their challenge lifetime.
+      // test:passkeys checks short anonymous sessions and normal sessions after proof.
+      const anonymousPasskeyTTL = datei === 'server/auth.js' && code.includes('passkeys.CHALLENGE_TTL_MS');
+      if (/\bmaxAge\s*[:=?]/.test(code) && !code.includes('SESSION_MAX_AGE_MS') && !anonymousPasskeyTTL) {
         abweichungen.push(`${datei}:${i + 1}: ${zeile.trim()}`);
       }
     });
   }
-  assert.deepEqual(abweichungen, [], 'jede maxAge-Zuweisung nennt SESSION_MAX_AGE_MS');
+  assert.deepEqual(abweichungen, [], 'session maxAge uses the normal lifetime or the named anonymous passkey lifetime');
 });
 
 // Der Offline-Abzug der Sitzung (#2293, public/sw.js) endet, wo die Sitzung

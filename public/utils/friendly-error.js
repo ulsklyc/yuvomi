@@ -22,6 +22,9 @@ import { t } from '/i18n.js';
  * sich dort einordnen.
  */
 export const REFUSAL_MESSAGES = new Map([
+  ['passkey_failed', 'passkeys.failed'],
+  ['passkey_reauth_required', 'passkeys.reauthenticate'],
+  ['passkey_policy', 'passkeys.policy'],
   ['module_access_denied', 'common.errorModuleNoAccess'],
   ['module_read_only', 'settings.permReadOnlyBanner'],
   ['task_locked', 'tasks.errorLocked'],

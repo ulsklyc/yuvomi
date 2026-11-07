@@ -4,7 +4,8 @@
  * Abhängigkeiten: /api.js
  */
 
-import { auth } from '/api.js';
+import { api, auth } from '/api.js';
+import { usePasskey, passkeyErrorText, passkeysSupported } from '/utils/passkeys.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { authHeroHtml, authErrorHtml, wirePasswordToggle, showAuthError } from '/utils/auth-ui.js';
@@ -109,6 +110,10 @@ export async function render(container) {
             <a href="/forgot-password" data-link>${esc(t('login.forgotPassword'))}</a>
           </p>
         </form>
+        ${passkeysSupported() ? `<div class="auth-form auth-passkeys--pending" id="passkey-login-slot">
+          <button type="button" class="btn btn--secondary auth-form__submit" id="passkey-login" disabled>${esc(t('passkeys.signIn'))}</button>
+          ${authErrorHtml('passkey-login-error')}
+        </div>` : ''}
       </div>
       <p class="auth-version" id="auth-version"></p>
     </main>
@@ -312,6 +317,33 @@ export async function render(container) {
     e.currentTarget.closest('.form-group').classList.remove('form-group--error');
     e.currentTarget.removeAttribute('aria-invalid');
   });
+
+  // Separate from the password form: username-less sign-in never validates its fields.
+  if (passkeysSupported()) void (async () => {
+    try {
+      const { data: state } = await api.get('/auth/passkeys/config');
+      if (!form.isConnected) return;
+      if (state?.enabled && state?.login_enabled) {
+        const slot = container.querySelector('#passkey-login-slot');
+        const button = slot.querySelector('#passkey-login');
+        button.addEventListener('click', async () => {
+          const error = slot.querySelector('#passkey-login-error');
+          error.hidden = true; button.disabled = true;
+          try {
+            const { data: options } = await api.post('/auth/passkeys/login/options', {});
+            const credential = await usePasskey(options);
+            const result = await auth.loginWithPasskey(credential);
+            if (result.twoFactorRequired) renderSecondFactor(container, { recoveryAvailable: result.recoveryAvailable === true });
+            else window.yuvomi.navigate('/', result.user);
+          } catch (failure) { showAuthError(error, passkeyErrorText(failure)); }
+          finally { button.disabled = false; }
+        });
+        button.disabled = false;
+        slot.classList.remove('auth-passkeys--pending');
+      }
+    } catch { /* Password and SSO remain usable if the capability request fails. */ }
+  })();
+
 }
 
 /**

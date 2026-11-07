@@ -1682,7 +1682,9 @@ test('personal account leaf preserves self-profile, password, and logout contrac
   assert.match(source, /id: 'profile-birth-date',[\s\S]{0,200}describedBy: 'profile-error'/);
   const birthDateSrc = readFileSync(new URL('../public/utils/birth-date.js', import.meta.url), 'utf8');
   assert.match(birthDateSrc, /<yuvomi-datepicker id="\$\{esc\(id\)\}"[^>]*\$\{described\}/);
-  assert.match(source, /id="current-password"[^>]*aria-describedby="password-error"/);
+  const passwordDescriptions = source.match(/id="current-password"[^>]*aria-describedby="([^"]*)"/)?.[1]?.split(/\s+/) ?? [];
+  assert.ok(passwordDescriptions.includes('password-error'), 'the password field keeps its error association');
+  assert.ok(passwordDescriptions.includes('password-passkeys-hint'), 'the password field announces passkey revocation');
   assert.match(source, /id="new-password"[^>]*aria-describedby="password-error"/);
   assert.match(source, /id="confirm-password"[^>]*aria-describedby="password-error"/);
   assert.match(source, /role="alert"[^>]*>\$\{t\('settings\.loadError'\)\}/);
@@ -23232,6 +23234,7 @@ test('Zugangsdaten fremder Dienste bekommen kein Anmelde-Autofill', () => {
     'pages/login.js', 'pages/setup.js', 'pages/join.js', 'pages/reset-password.js',
     'pages/forgot-password.js', 'pages/split-expenses.js',
     'settings/pages/personal-account.js', 'settings/pages/admin-family.js',
+    'settings/passkeys.js', // Current Yuvomi password for inline reauthentication.
   ]);
   const root = fileURLToPath(new URL('../public/', import.meta.url));
   const offenders = [];
