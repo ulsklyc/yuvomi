@@ -1,12 +1,12 @@
-<!-- version: 2.85.0 -->
-This update lets recurring tasks rotate through the household, reads stock per product and closes a gap in the guest access for shared expenses.
+<!-- version: 2.86.0 -->
+This update remembers what you paid when shopping, lets households make late chores pay less, and gives each wall tablet its own night hours.
 
-A recurring task like taking out the bin can now hand itself to the next person in a fixed order with every new occurrence. In Stock, the minimum belongs to the product, so running low is read over all its batches together and the shopping list gets the real shortfall. The Overview can have its own tile arrangement on the phone, and Settings, Account lists the phones signed in with the native app and pairs a new one with a short code or QR code.
+Ticking off a shopping item with a price now records the purchase, and the item sheet shows what you paid last time. Households that use rewards can switch on late completion decay: a task finished after its due day earns one point less per day, never below one. Administrators set night hours, idle delay, clock and photo fill per wall tablet under Settings, Wall tablets. On phones, the kitchen search moves into the tab bar.
 
-The weather tile no longer shows your coordinates when no place name is set, deleting the first occurrence of a recurring event also stops its reminder, and renaming a shopping category now carries over to recipes, meals and stock. A birthday keeps the color you give it in the calendar. Page titles stand in full next to search and the month on narrow phones, and stopping the app no longer waits for a hard kill.
+Calendar and reminder sync got several fixes. A new event in a synced calendar is uploaded when you save it, an event the provider cancels stops reminding, repeating reminders from iOS Reminders or Tasks.org arrive as a series and keep running there when ticked off here, and contacts from CardDAV no longer merge into one. Date pickers follow the household week start, CardDAV accepts long app passwords, and many settings pages now explain errors in your language instead of showing English server text.
 
-A guest invited to shared expenses could read the household's account list; guests now reach only shared expenses and their own account.
+Every backup is now checked right after it is written, so a damaged one is discarded instead of handed out. Backup downloads are limited to ten per hour for each administrator.
 
 This update changes the database. The changes are applied automatically on the first start and need no action from you; as always, a backup before updating is a good idea.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.85.0
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.86.0

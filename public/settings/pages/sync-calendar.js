@@ -721,7 +721,7 @@ function bindCalDAVAddButton(container, user) {
             formRowHtml({
               label: t('settings.caldavPasswordLabel'), labelFor: 'caldav-password', labelExtra: REQUIRED_MARK, field: true,
               description: t('settings.caldavPasswordHint'), descriptionId: 'caldav-password-hint',
-              control: '<input class="form-input" type="password" id="caldav-password" required autocomplete="new-password" aria-describedby="caldav-password-hint" />',
+              control: '<input class="form-input" type="password" id="caldav-password" required maxlength="4096" autocomplete="new-password" aria-describedby="caldav-password-hint" />',
             }),
           ])}
           <div id="caldav-add-error" class="form-error" role="alert" hidden></div>
@@ -1755,7 +1755,7 @@ function buildAppleConnectForm() {
       ${settingRowHtml({
         label: t('settings.applePasswordLabel'), labelFor: 'apple-password', labelExtra: REQUIRED_MARK,
         description: t('settings.applePasswordHint'), descriptionId: 'apple-password-hint',
-        control: '<input class="form-input" type="password" id="apple-password" autocomplete="new-password" aria-describedby="apple-password-hint" required />',
+        control: '<input class="form-input" type="password" id="apple-password" maxlength="4096" autocomplete="new-password" aria-describedby="apple-password-hint" required />',
       })}
     </div>
     <div id="apple-connect-error" class="form-error" role="alert" hidden></div>

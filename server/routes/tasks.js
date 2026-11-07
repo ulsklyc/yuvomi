@@ -209,11 +209,13 @@ function countRebasableTasks(points) {
 // Hilfsfunktionen
 // --------------------------------------------------------
 
+// Primaerperson (`assigned_to`) zuerst, dann in Eintragungsreihenfolge: so
+// sagt es der API-Vertrag (#2569). Dieselbe Form steht in dashboard.js.
 const ASSIGNED_USERS_SQL = `(
   SELECT json_group_array(json_object(
     'id', u.id, 'display_name', u.display_name, 'color', u.avatar_color,
     'avatar_data', ${personAvatarUrlSql('u')}
-  ))
+  ) ORDER BY ta.user_id IS NOT t.assigned_to, ta.rowid)
   FROM task_assignments ta JOIN users u ON u.id = ta.user_id
   WHERE ta.task_id = t.id
 ) AS assigned_users_json`;
@@ -1507,16 +1509,17 @@ router.put('/:id', (req, res) => {
       return res.status(403).json({ error: 'Permission denied.', code: 403 });
     }
 
-    const assignedBefore = db.get().prepare('SELECT user_id FROM task_assignments WHERE task_id = ?')
-      .all(task.id).map((r) => r.user_id);
-    // Ohne assigned_to bleibt die Hauptzuweisung, wie sie ist (#2569): die Zeilen
-    // kommen nach Schluessel sortiert, also steht sonst die kleinste ID vorn.
-    const keptAssignees = assignedBefore.includes(task.assigned_to)
-      ? [task.assigned_to, ...assignedBefore.filter((id) => id !== task.assigned_to)]
-      : assignedBefore;
+    // Primaerperson zuerst, dann in Eintragungsreihenfolge (#2569). Ohne
+    // ORDER BY liefert der Primaerschluessel (task_id, user_id) nach user_id,
+    // und ein PUT ohne `assigned_to` machte so die niedrigste ID zur
+    // Primaerperson. Nicht mitgeschickt heisst nicht angefasst, wie bei Terminen.
+    const assignedBefore = db.get().prepare(`
+      SELECT user_id FROM task_assignments WHERE task_id = ?
+      ORDER BY user_id IS NOT ?, rowid
+    `).all(task.id, task.assigned_to).map((r) => r.user_id);
     const userIds  = req.body.assigned_to !== undefined
       ? parseAssignedTo(req.body.assigned_to)
-      : keptAssignees;
+      : assignedBefore;
     const firstUid = userIds[0] ?? null;
     // Neu nur Haushaltsmitglieder (#1207). Wer schon zugewiesen ist, bleibt
     // es - auch eine Haushaltskraft an einer aelteren Aufgabe.

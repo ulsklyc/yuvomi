@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
+import { resolveDbPath } from '../server/utils/db-path.js';
 import { ENV_SCHEMA } from '../tools/installer/env-schema.js';
 
 const ORIGINAL_KEYS = [
@@ -655,6 +657,24 @@ test('Jedes Container-Deployment schreibt Backups nach /backups (issue #579)', (
   assert.ok(backupVar, 'Unraid deklariert BACKUP_DIR nicht');
   assert.match(backupVar[0], /Default="\/backups"/, 'Unraid BACKUP_DIR muss /backups defaulten');
   assert.match(unraid, /Target="\/backups"[^>]+Type="Path"/, 'Unraid mountet kein /backups');
+});
+
+test('Das Image legt die Datenbank ohne DB_PATH auf das /data-Volume', () => {
+  // Ohne DB_PATH fiele die App auf ihren Bare-Metal-Default zurueck: yuvomi.db im
+  // Projektverzeichnis, also /app im Container. Dort darf der node-User nichts
+  // anlegen; die automatisch erzeugten Secrets (.secrets neben der Datenbank)
+  // scheitern mit EACCES und der Container beendet sich. Ein schlichtes
+  // `docker run -v daten:/data` muss trotzdem starten und auf dem Volume schreiben.
+  const dockerfile = readFileSync(new URL('../Dockerfile', import.meta.url), 'utf8');
+  assert.match(
+    dockerfile,
+    /^ENV DB_PATH=\/data\/yuvomi\.db$/m,
+    'Dockerfile muss DB_PATH=/data/yuvomi.db als Image-Default setzen'
+  );
+  const imageDefault = dockerfile.match(/^ENV DB_PATH=(.+)$/m)[1];
+  const { dbPath } = resolveDbPath({ DB_PATH: imageDefault });
+  assert.equal(path.dirname(dbPath), '/data', 'Image-Default muss auf dem /data-Volume landen');
+  assert.match(dockerfile, /mkdir -p \/data /, 'Dockerfile legt /data nicht an');
 });
 
 test('Wer die .env in den Container laedt, pinnt MODULES_DIR auf /app/modules', () => {

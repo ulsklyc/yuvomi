@@ -8,6 +8,7 @@ import express from 'express';
 import * as caldavSync from '../../services/caldav-sync.js';
 import * as caldavReminders from '../../services/caldav-reminders-sync.js';
 import { requireAdmin } from '../../auth.js';
+import { secret } from '../../middleware/validate.js';
 import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 import * as db from '../../db.js';
 import { readDefaultAssignees, validateAssigneeIds } from '../../services/default-assignees.js';
@@ -28,6 +29,9 @@ router.post('/caldav/accounts', requireAdmin, async (req, res) => {
     if (!name || !caldavUrl || !username || !password) {
       return res.status(400).json({ error: 'Missing required fields.', code: 400 });
     }
+    // Passwort ungetrimmt und mit derselben Grenze wie CardDAV und Apple (#2575).
+    const vPassword = secret(password, 'Password');
+    if (vPassword.error) return res.status(400).json({ error: vPassword.error, code: 400 });
 
     const result = await caldavSync.addAccount(name, caldavUrl, username, password);
     res.json({ data: result });
@@ -59,6 +63,9 @@ router.put('/caldav/accounts/:id', requireAdmin, async (req, res) => {
   try {
     const accountId = parseInt(req.params.id, 10);
     const { name, caldavUrl, username, password } = req.body;
+    // Leer heisst "bestehendes behalten" (siehe updateAccount).
+    const vPassword = secret(password, 'Password', { required: false });
+    if (vPassword.error) return res.status(400).json({ error: vPassword.error, code: 400 });
 
     const result = await caldavSync.updateAccount(accountId, { name, caldavUrl, username, password });
     res.json({ data: result });
