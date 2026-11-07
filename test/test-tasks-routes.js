@@ -281,6 +281,31 @@ test('PUT /:id: unbekannte ID → 404, ungültiger Status → 400', async () => 
   assert.equal(bad.status, 400);
 });
 
+test('Schema: trg_tasks_updated_at existiert in der Migration-Kette (nicht nur im Testspiegel)', () => {
+  // Migration 1 legt den Trigger an; die Tabelle-Rebuilds (v4/v25/v114)
+  // droppten ihn mit, weil `DROP TABLE` die daran hängenden Trigger mitnimmt,
+  // und Migration 283 stellt ihn wieder her. Die Prüfung läuft gegen die echte
+  // Migration-Kette - der Testspiegel (db-schema-test.js) hatte den Trigger
+  // weiter, was den Verlust deshalb unentdeckt ließ.
+  const trigger = db.prepare(
+    "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_tasks_updated_at'"
+  ).get();
+  assert.ok(trigger, 'Trigger in migrierter Datenbank vorhanden');
+});
+
+test('PUT /:id: updated_at rückt bei echter Änderung vor', async () => {
+  const created = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Zeitstempel-Vor' } });
+  const id = created.body.data.id;
+  const before = db.prepare('SELECT updated_at FROM tasks WHERE id = ?').get(id).updated_at;
+  // Die Spalte hat Sekunden-Präzision - nur ein Zeitfenster macht den Vorrücken sichtbar.
+  await new Promise((r) => setTimeout(r, 1100));
+  const r = await call('PUT', `/${id}`, { as: { id: ALICE, role: 'admin' }, body: { title: 'Zeitstempel-Nach' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.title, 'Zeitstempel-Nach');
+  const after = db.prepare('SELECT updated_at FROM tasks WHERE id = ?').get(id).updated_at;
+  assert.notEqual(after, before, 'updated_at rückt beim Update vor');
+});
+
 // --------------------------------------------------------
 // PATCH /:id/status, DELETE /:id
 // --------------------------------------------------------
