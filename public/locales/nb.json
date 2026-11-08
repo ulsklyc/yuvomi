@@ -2561,6 +2561,8 @@
         "backupWebdavTestSuccess": "Tilkobling vellykket - {{files}} sikkerhetskopi(er) funnet.",
         "backupWebdavTestFailed": "Tilkobling feilet: {{error}}",
         "backupWebdavPasswordRequired": "En annen server eller et annet brukernavn krever passordet på nytt.",
+        "backupWebdavConfigIncomplete": "Skriv inn adressen, brukernavnet og passordet til WebDAV-serveren.",
+        "backupLocalFailed": "Sikkerhetskopien kunne ikke leses eller skrives på denne serveren. Detaljene står i serverloggen.",
         "backupWebdavLastUpload": "Siste opplasting",
         "backupWebdavLastError": "Siste feil",
         "backupWebdavNeverUploaded": "Ingen opplasting ennå",
@@ -3550,7 +3552,11 @@
         "apiTokenErrorExpiryPast": "Utløpsdatoen er passert. Velg et senere tidspunkt.",
         "apiTokenErrorSubjectDeactivated": "Denne kontoen er deaktivert og kan ikke få et token. Velg en annen person.",
         "dmsErrorUrlInvalid": "Server-URL-en må begynne med http:// eller https://.",
-        "dmsErrorAccountExists": "Et DMS er allerede koblet til med denne server-URL-en."
+        "dmsErrorAccountExists": "Et DMS er allerede koblet til med denne server-URL-en.",
+        "remoteErrorAuthFailed": "Serveren avviste påloggingen. Sjekk brukernavn og passord.",
+        "remoteErrorStatus": "Serveren svarte med status {{status}}.",
+        "remoteErrorUnreachable": "Serveren kan ikke nås. Sjekk adressen og om serveren kjører.",
+        "remoteErrorFailed": "Forespørselen til serveren mislyktes."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",

@@ -25,6 +25,7 @@ import {
   parseMovedCursor,
 } from '../../services/sync-assignment.js';
 import { getUserId } from './helpers.js';
+import { remoteFailure } from '../../utils/http.js';
 
 const log = createLogger('Calendar');
 
@@ -43,7 +44,15 @@ function sendGoogleError(res, err) {
     });
   }
   log.error('', err);
-  return res.status(500).json({ error: err.message, code: 500 });
+  // Phase 0 section H: an own case by its code, a refusal of Google as its
+  // class (502, `reason` + `detail`), never the text of googleapis - it names
+  // request URLs and the household's calendar ids.
+  if (err?.code === 'google_not_configured') {
+    return res.status(409).json({ error: 'Google Calendar is not connected.', code: 409, reason: 'google_not_configured' });
+  }
+  const failure = remoteFailure(err);
+  if (failure) return res.status(502).json({ error: 'Google refused the request or could not be reached.', code: 502, ...failure });
+  return res.status(500).json({ error: 'Internal server error.', code: 500 });
 }
 const router = express.Router();
 
@@ -63,7 +72,7 @@ router.get('/google/auth', requireAdmin, refuseWhileRestoring, (req, res) => {
     res.redirect(url);
   } catch (err) {
     log.error('', err);
-    res.status(503).json({ error: err.message, code: 503 });
+    res.status(503).json({ error: 'Google sign-in could not be started.', code: 503 });
   }
 });
 
@@ -496,7 +505,7 @@ router.put('/google/readonly', requireAdmin, (req, res) => {
     res.json({ data: { readonly } });
   } catch (err) {
     log.error('', err);
-    res.status(500).json({ error: err.message, code: 500 });
+    res.status(500).json({ error: 'The read-only mode could not be saved.', code: 500 });
   }
 });
 

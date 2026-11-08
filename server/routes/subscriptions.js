@@ -24,6 +24,7 @@ import { findLogoOptions } from '../services/subscription-logo.js';
 import { normalizeObjectVisibility, budgetVisibilityWhere, budgetDetailsVisibleWhere, canEditEntry, resolveBudgetMode } from '../services/budget-visibility.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import { budgetFilter, budgetAccountCurrency, listAccounts, validateAccountRef } from './budget/helpers.js';
+import { remoteFailure } from '../utils/http.js';
 
 const log = createLogger('Subscriptions');
 const router = express.Router();
@@ -871,7 +872,12 @@ router.post('/logo-search', async (req, res) => {
       error: logoSearchLogError(err),
       diagnostics,
     });
-    res.status(400).json({ error: err.message || 'Logo could not be found.', code: 400 });
+    // Phase 0 section H: an own refusal of the logo search keeps its sentence;
+    // DNS, TLS and socket errors name hosts and go out as their class.
+    if (err?.code === 'logo_search_refused') return res.status(400).json({ error: err.message, code: 400 });
+    const failure = remoteFailure(err);
+    if (failure) return res.status(502).json({ error: 'The website could not be reached.', code: 502, ...failure });
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
 

@@ -108,7 +108,9 @@ test('testConnection: Netzwerkfehler → ok=false, status=0, error gesetzt', asy
   const out = await adapter.testConnection();
   assert.equal(out.ok, false);
   assert.equal(out.status, 0);
-  assert.match(out.error, /ECONNREFUSED/);
+  // Phase 0, Abschnitt H: der Fall, nie der Text des Netzes (Adresse, Port).
+  assert.equal(out.error, 'The recipe provider could not be reached.');
+  assert.equal(out.reason, 'recipe_providers_sync_unreachable');
 });
 
 test('listRecipeSummaries: paginiert bis total_pages erreicht ist', async () => {

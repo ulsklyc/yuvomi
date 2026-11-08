@@ -2649,6 +2649,8 @@
         "backupWebdavTestSuccess": "З'єднання успішне - знайдено {{files}} копію(й).",
         "backupWebdavTestFailed": "З'єднання невдале: {{error}}",
         "backupWebdavPasswordRequired": "Для іншого сервера або імені користувача введіть пароль ще раз.",
+        "backupWebdavConfigIncomplete": "Введи адресу, ім'я користувача та пароль сервера WebDAV.",
+        "backupLocalFailed": "Не вдалося прочитати або записати резервну копію на цьому сервері. Подробиці в журналі сервера.",
         "backupWebdavLastUpload": "Останнє завантаження",
         "backupWebdavLastError": "Остання помилка",
         "backupWebdavNeverUploaded": "Ще не завантажено",
@@ -3776,7 +3778,11 @@
         "apiTokenErrorExpiryPast": "Термін дії вже минув. Вибери пізніший час.",
         "apiTokenErrorSubjectDeactivated": "Цей обліковий запис деактивовано, і він не може отримати токен. Вибери іншу особу.",
         "dmsErrorUrlInvalid": "URL сервера має починатися з http:// або https://.",
-        "dmsErrorAccountExists": "З цим URL сервера вже підключено DMS."
+        "dmsErrorAccountExists": "З цим URL сервера вже підключено DMS.",
+        "remoteErrorAuthFailed": "Сервер відхилив вхід. Перевірте ім’я користувача та пароль.",
+        "remoteErrorStatus": "Сервер відповів зі статусом {{status}}.",
+        "remoteErrorUnreachable": "Сервер недоступний. Перевірте адресу та чи працює сервер.",
+        "remoteErrorFailed": "Запит до сервера не вдався."
     },
     "login": {
         "tagline": "З поверненням. Ваш дім - в одному місці.",

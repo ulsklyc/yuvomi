@@ -479,6 +479,17 @@ export const CASE_MESSAGES = new Map([
   ['immich_api_key_rejected', 'settings.immichErrorApiKeyRejected'],
   ['immich_http_status', 'settings.immichErrorStatus'],
   ['immich_unreachable', 'settings.immichErrorUnreachable'],
+  // Ein fremder Server (CalDAV, CardDAV, iCloud, WebDAV, Google, Outlook) hat
+  // abgelehnt oder war nicht erreichbar (Phase 0, Abschnitt H): der Server
+  // schickt die Klasse statt des Rohtexts. An den Stellen mit Angabe
+  // (errorSentenceWithDetail) steht `detail` im Rahmen, sonst dieser Satz.
+  ['remote_auth_failed', 'settings.remoteErrorAuthFailed'],
+  ['remote_http_status', 'settings.remoteErrorStatus'],
+  ['remote_unreachable', 'settings.remoteErrorUnreachable'],
+  ['remote_failed', 'settings.remoteErrorFailed'],
+  // A WebDAV backup route failed on this server - the local file or the
+  // database, not the WebDAV server (#2622).
+  ['backup_local_failed', 'settings.backupLocalFailed'],
 ]);
 
 /**
@@ -521,12 +532,17 @@ export const CASE_PARAMS = new Map([
   ['immich_http_status', ['status']],
   ['calendar_ics_http_status', ['status']],
   ['calendar_ics_too_large', ['limit_mb']],
+  ['remote_http_status', ['status']],
 ]);
 
 const PARAM_MAX = 1_000_000_000;
 
 // Die feste Antwort eines gefangenen 500: sagt dem Admin nichts.
 const NO_DETAIL = 'Internal server error.';
+
+// Die Klasse eines Fehlers bei einem fremden Dienst (`detail`, Phase 0 H): ein
+// Statuscode, ein Netzcode oder `timeout`/`blocked`, nie freier Text.
+const REMOTE_DETAIL = /^(?:HTTP [1-5]\d\d|[A-Z][A-Z0-9_]{2,47}|timeout|blocked)$/;
 
 /**
  * Die erlaubten Zahlen aus `params`, oder null, wenn eine fehlt oder keine ist.
@@ -750,9 +766,13 @@ export function errorSentence(err, fallbackKey = 'common.errorGeneric', params =
  * DIE AUSNAHME VON errorSentence (#1909): der Satz fuer den Admin, wenn ein
  * FREMDER Dienst etwas abgelehnt hat - WebDAV, CalDAV, CardDAV, Outlook, iCloud,
  * Google Drive. Die App kennt dessen Faelle nicht, und der Allgemeinsatz nimmt
- * dem Admin genau die Angabe, mit der er den Fehler findet. Der Text des Servers
- * steht deshalb in einem uebersetzten Rahmen (`{{error}}` in `frameKey`), wie
- * `bad_manifest` beim Modul-Laden.
+ * dem Admin genau die Angabe, mit der er den Fehler findet. Die Angabe steht
+ * deshalb in einem uebersetzten Rahmen (`{{error}}` in `frameKey`), wie
+ * `bad_manifest` beim Modul-Laden: seit Phase 0 (Abschnitt H) die Klasse aus
+ * `detail` (`HTTP 401`, `ECONNREFUSED`), nicht mehr der Rohtext des Dienstes -
+ * der nannte Hosts, Ports und Pfade. Wo der Server ohne bekannten Fall einen
+ * eigenen Satz in `error` schickt, steht dieser im Rahmen; ein bekannter Fall
+ * ohne Klasse sagt seinen Satz (#2622).
  *
  * Nur fuer solche Stellen: test:frontend-audit fuehrt jede mit ihrem Grund in
  * TECHNICAL_DETAIL_SITES. Alles andere nimmt errorSentence.
@@ -770,6 +790,17 @@ export function errorSentenceWithDetail(err, frameKey, fallbackKey = 'common.err
   if (isServiceWorkerOffline(err)) return t('common.errorOffline');
   const known = knownSentence(err);
   if (known && !CASE_MESSAGES.has(err?.data?.reason)) return known;
+  // Seit Phase 0 (Abschnitt H) schickt der Server bei einem fremden Dienst die
+  // Klasse in `detail` (`HTTP 401`, `ECONNREFUSED`, `timeout`) und einen festen
+  // englischen Satz in `error`. Die Klasse kommt in den Rahmen; ohne sie sagt
+  // ein `remote_*`-Grund seinen Satz, nie den englischen.
+  const remote = typeof err?.data?.detail === 'string' ? err.data.detail.trim() : '';
+  if (REMOTE_DETAIL.test(remote)) return t(frameKey, { error: remote });
+  // Without a class a case the app knows says its own sentence (#2622): the
+  // server's `error` is a fixed English sentence there ("WebDAV upload
+  // failed."), never something to frame. A case whose numbers are missing
+  // says the sentence of the place.
+  if (CASE_MESSAGES.has(err?.data?.reason)) return known ?? t(fallbackKey);
   const detail = typeof err?.data?.error === 'string' ? err.data.error.trim() : '';
   if (detail && detail !== NO_DETAIL) return t(frameKey, { error: detail });
   return known ?? t(fallbackKey);

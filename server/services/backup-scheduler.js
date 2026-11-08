@@ -11,6 +11,7 @@ import path from 'node:path';
 import { backupToFile } from '../db.js';
 import { createLogger } from '../logger.js';
 import * as webdav from './backup-webdav.js';
+import { remoteFailure } from '../utils/http.js';
 
 const log = createLogger('BackupScheduler');
 
@@ -169,7 +170,9 @@ async function performBackup() {
         lastBackup.webdav = { success: true, timestamp: new Date().toISOString() };
       } catch (webdavErr) {
         log.error('WebDAV upload failed (local backup is still intact):', webdavErr);
-        lastBackup.webdav = { success: false, error: webdavErr.message };
+        // Shown on the backup page: the class of the WebDAV failure, never the
+        // server's or fetch's text with its URL (Phase 0 section H).
+        lastBackup.webdav = { success: false, error: remoteFailure(webdavErr)?.detail ?? 'WebDAV upload failed.' };
       }
     }
   } catch (err) {

@@ -2745,6 +2745,8 @@
         "backupWebdavTestSuccess": "نجح الاتصال - تم العثور على {{files}} نسخة احتياطية.",
         "backupWebdavTestFailed": "فشل الاتصال: {{error}}",
         "backupWebdavPasswordRequired": "يتطلب خادم أو اسم مستخدم مختلف إدخال كلمة المرور مرة أخرى.",
+        "backupWebdavConfigIncomplete": "أدخل عنوان خادم WebDAV واسم المستخدم وكلمة المرور.",
+        "backupLocalFailed": "تعذّرت قراءة النسخة الاحتياطية أو كتابتها على هذا الخادم. التفاصيل في سجل الخادم.",
         "backupWebdavLastUpload": "آخر رفع",
         "backupWebdavLastError": "آخر خطأ",
         "backupWebdavNeverUploaded": "لا يوجد رفع بعد",
@@ -3890,7 +3892,11 @@
         "apiTokenErrorExpiryPast": "تاريخ الانتهاء في الماضي. اختر وقتًا لاحقًا.",
         "apiTokenErrorSubjectDeactivated": "هذا الحساب معطّل ولا يمكن أن يحصل على رمز. اختر شخصًا آخر.",
         "dmsErrorUrlInvalid": "يجب أن يبدأ رابط الخادم بـ http:// أو https://.",
-        "dmsErrorAccountExists": "يوجد بالفعل نظام DMS متصل بعنوان URL هذا للخادم."
+        "dmsErrorAccountExists": "يوجد بالفعل نظام DMS متصل بعنوان URL هذا للخادم.",
+        "remoteErrorAuthFailed": "رفض الخادم تسجيل الدخول. تحقق من اسم المستخدم وكلمة المرور.",
+        "remoteErrorStatus": "أجاب الخادم بالحالة {{status}}.",
+        "remoteErrorUnreachable": "تعذر الوصول إلى الخادم. تحقق من العنوان ومن أن الخادم يعمل.",
+        "remoteErrorFailed": "فشل الطلب إلى الخادم."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",

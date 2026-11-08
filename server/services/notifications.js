@@ -13,6 +13,7 @@ import { ntfyProvider } from './notification-providers/ntfy.js';
 import { webhookProvider } from './notification-providers/webhook.js';
 import { emailProvider } from './notification-providers/email.js';
 import { guardedFetch } from './notification-providers/guarded-fetch.js';
+import { NotificationProviderError } from './notification-providers/provider-error.js';
 import { syncAllBirthdayReminders } from './birthdays.js';
 import { resolveHouseholdFormats, formatDateKey, translate } from '../utils/i18n.js';
 import { moveNoticeFields } from './shopping-move-notices.js';
@@ -425,7 +426,7 @@ async function withTimeout(fn, timeoutMs = PROVIDER_TIMEOUT_MS) {
 export function createNotificationService({ providers = defaultProviders, channelStore } = {}) {
   async function testChannel({ channel, payload, fetchImpl = guardedFetch } = {}) {
     const provider = providers[channel?.provider];
-    if (!provider) throw new Error('Unknown notification provider.');
+    if (!provider) throw new NotificationProviderError('Unknown notification provider.');
     return withTimeout((signal) => provider.send({ channel, payload, fetchImpl, signal }));
   }
 
@@ -764,7 +765,7 @@ export async function processDueNotifications({
           }
         } else {
           const provider = providers[target.provider];
-          if (!provider) throw new Error('Unknown notification provider.');
+          if (!provider) throw new NotificationProviderError('Unknown notification provider.');
           await withTimeout((signal) => provider.send({ channel: target.channel, payload, fetchImpl, signal }));
           markSent(activeDb, delivery.id, nowIso);
           counters.sent += 1;

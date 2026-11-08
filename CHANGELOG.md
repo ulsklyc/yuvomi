@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Storage and backup errors in settings say what happened, in your language** (#2622). When
+  document storage or a WebDAV backup failed without a technical class to show, settings put an
+  English server sentence ("WebDAV upload failed.") into the translated message instead of the
+  app's own sentence. A connection test without URL, username or password now says so. A backup
+  that fails on this server, for example because the local file is missing, is no longer
+  reported as a refusal of the WebDAV server. The technical class of a storage failure is shown
+  only to the administrator in the storage settings, not to members uploading or opening a
+  document. A malformed notification channel form answers with a general error instead of an
+  engine message.
+
 ### Security
+- **Two administrators demoting each other no longer leave the household without one** (#2612).
+  When two administrators removed each other's admin role at the same moment and each also set a
+  new password, both changes could pass the "at least one administrator must remain" check and
+  both went through, so nobody could open the administration any more. The check and the change
+  now happen in one step: one of the two demotions is refused, and one administrator stays.
 - **A demoted administrator loses admin rights on every device** (#2611). The role of a signed-in
   browser was taken from the stored session, and a demotion only updated the sessions that existed
   at that moment. A sign-in that was still checking the password, or a request starting the SSO
@@ -31,6 +47,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   logged), and a dose goes out only by push and to channels the recipient owns, whatever the
   medication's visibility - like every other health reminder, as SECURITY.md promises. Reading
   access and administrators are unaffected.
+- **Error texts of CalDAV, CardDAV and iCloud servers no longer reach the browser.** When a
+  calendar or contacts server refused a connection test, a sync or a calendar listing, the answer
+  carried the raw text of the server or the DAV library, with its address, port and path. The
+  answer now names the kind of failure instead: rejected sign-in, an HTTP status, or an
+  unreachable server with its network code. Settings show that class to the administrator in
+  their own language.
+- **Google, Outlook, feed imports, holiday sync and the logo search no longer pass foreign error
+  texts to the browser.** Missing configuration answered with the names of server variables, a
+  failed Google or Microsoft request with the text of their libraries, and an unreachable feed,
+  website or waste collection source with the network error naming host and port. These answers
+  now carry a fixed sentence with the kind of failure (`reason`, and the class such as
+  `HTTP 503` or `ECONNREFUSED` in `detail`); missing configuration and an expired Outlook sign-in
+  are cases of their own.
+- **Database, filesystem and WebDAV texts no longer reach the browser from backups, documents,
+  modules, shared expenses, notification channels and shopping-list mail.** A failed WebDAV
+  backup test repeated the server's status line with its internal host and path, a broken
+  module folder answered with the absolute path on the server, and a database error while saving
+  a shared expense or a notification channel went out as a 400 with SQL text. Own input errors
+  keep their sentence; everything else now answers with a fixed sentence (500), and a refusing
+  WebDAV or document storage server with its class (`HTTP 507`, `ECONNREFUSED`) in `detail`.
+- **Connection tests and stored error messages no longer carry foreign error texts.** The
+  connection test of a DMS or recipe provider, the SMTP test, a failed waste source refresh, the
+  last WebDAV backup and document storage error, a notification channel's last test and a module
+  that fails to load returned or stored the raw text of the network stack, the mail library or the
+  filesystem, with hosts, ports and server paths. They now carry a fixed sentence or the class of
+  the failure (`HTTP 507`, `ECONNREFUSED`); the app's own sentences, such as a provider's refused
+  status or a manifest check, stay.
 
 ### Fixed
 - **Status bar no longer blurs beside the Dynamic Island on iOS 26 (PWA).** (#2390)

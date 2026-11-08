@@ -2470,7 +2470,7 @@ test('ein unveraenderter, inzwischen geloeschter Kategorie-Schluessel bricht das
 // 400 carrying SQL text. A trigger that writes into a missing table breaks the
 // insert the way a damaged schema would; the answer must be a 500 with a fixed
 // sentence, never a 400 and never the table name.
-test('POST expense: a database error is a 500 with a fixed sentence, never a 400 with SQL text', { todo: 'fix pending, Phase 0 section H PR 3' }, async () => {
+test('POST expense: a database error is a 500 with a fixed sentence, never a 400 with SQL text', async () => {
   db.exec(`CREATE TRIGGER h_guard_broken AFTER INSERT ON expenses
     BEGIN INSERT INTO h_guard_missing_table (x) VALUES (1); END`);
   try {

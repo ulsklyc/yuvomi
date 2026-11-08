@@ -2776,6 +2776,8 @@
         "backupWebdavTestBtn": "Kiểm tra kết nối",
         "backupWebdavTestFailed": "Kết nối thất bại: {{error}}",
         "backupWebdavPasswordRequired": "Máy chủ hoặc tên người dùng khác cần nhập lại mật khẩu.",
+        "backupWebdavConfigIncomplete": "Nhập địa chỉ, tên người dùng và mật khẩu của máy chủ WebDAV.",
+        "backupLocalFailed": "Không thể đọc hoặc ghi bản sao lưu trên máy chủ này. Chi tiết có trong nhật ký máy chủ.",
         "backupWebdavTestSuccess": "Kết nối thành công - tìm thấy {{files}} bản sao lưu.",
         "backupWebdavTitle": "Đích sao lưu WebDAV",
         "backupWebdavTriggerBtn": "Tải lên ngay",
@@ -3550,7 +3552,11 @@
         "apiTokenErrorExpiryPast": "Ngày hết hạn đã qua. Hãy chọn thời điểm muộn hơn.",
         "apiTokenErrorSubjectDeactivated": "Tài khoản này đã bị vô hiệu hóa và không thể nhận token. Hãy chọn người khác.",
         "dmsErrorUrlInvalid": "URL máy chủ phải bắt đầu bằng http:// hoặc https://.",
-        "dmsErrorAccountExists": "Đã có một DMS được kết nối với URL máy chủ này."
+        "dmsErrorAccountExists": "Đã có một DMS được kết nối với URL máy chủ này.",
+        "remoteErrorAuthFailed": "Máy chủ đã từ chối đăng nhập. Hãy kiểm tra tên người dùng và mật khẩu.",
+        "remoteErrorStatus": "Máy chủ đã trả lời với trạng thái {{status}}.",
+        "remoteErrorUnreachable": "Không thể kết nối tới máy chủ. Hãy kiểm tra địa chỉ và máy chủ có đang chạy không.",
+        "remoteErrorFailed": "Yêu cầu tới máy chủ đã thất bại."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",
