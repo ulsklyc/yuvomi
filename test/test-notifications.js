@@ -1630,3 +1630,25 @@ test('ein haengender SMTP-Server blockiert den Erinnerungslauf nicht (#944)', { 
   controller.abort();
   await assert.rejects(() => pending, /timed out/i);
 });
+
+// Phase 0, Abschnitt H: Pruefung und Datenbank teilten einen catch, der jede
+// Meldung als 400 schickte - auch den Text von SQLite. Die Pruefung behaelt
+// ihren Satz, ein Fehler der Datenbank wird ein fester 500.
+test('Kanal anlegen: Pruefung bleibt 400 mit Satz, ein Datenbankfehler wird 500 ohne SQL-Text', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = channelRouteHarness(store, db, buildRouter);
+
+  const invalid = await call(app, 'POST', '/notifications/channels', { ...NTFY_CHANNEL, config: { baseUrl: 'https://ntfy.test', topic: '' } });
+  assert.equal(invalid.status, 400);
+  assert.equal(invalid.json.error, 'ntfy topic is required.');
+
+  db.exec(`CREATE TRIGGER h_guard_channels AFTER INSERT ON notification_channels
+    BEGIN INSERT INTO h_guard_missing_channels (x) VALUES (1); END`);
+  const broken = await call(app, 'POST', '/notifications/channels', NTFY_CHANNEL);
+  assert.equal(broken.status, 500, JSON.stringify(broken.json));
+  assert.equal(broken.json.error, 'Internal error.');
+  assert.doesNotMatch(JSON.stringify(broken.json), /h_guard_missing_channels|no such table/);
+});

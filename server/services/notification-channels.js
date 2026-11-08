@@ -298,6 +298,23 @@ export function publicChannel(channel) {
   return safe;
 }
 
+/**
+ * Runs the input checks of a channel and marks what they throw with
+ * `code: 'notification_channel_invalid'` (Phase 0 section H): those sentences
+ * are the app's own and the route may send them as a 400. Anything thrown
+ * later - the database - stays unmarked and goes out as a fixed 500.
+ */
+function checkedInput(input, existing = null) {
+  try {
+    const normalized = normalizeChannelInput(input, existing);
+    if (!normalized.name) throw new Error('Notification channel name is required.');
+    return normalized;
+  } catch (err) {
+    if (err instanceof Error && err.code === undefined) err.code = 'notification_channel_invalid';
+    throw err;
+  }
+}
+
 export function createNotificationChannelStore({ db } = {}) {
   const getDb = () => (db || dbModule.get());
 
@@ -319,8 +336,7 @@ export function createNotificationChannelStore({ db } = {}) {
   }
 
   function createChannel(input) {
-    const normalized = normalizeChannelInput(input);
-    if (!normalized.name) throw new Error('Notification channel name is required.');
+    const normalized = checkedInput(input);
     const now = new Date().toISOString();
     const result = getDb().prepare(`
       INSERT INTO notification_channels
@@ -343,8 +359,7 @@ export function createNotificationChannelStore({ db } = {}) {
   function updateChannel(id, input) {
     const existing = getInternalChannel(id);
     if (!existing) return null;
-    const normalized = normalizeChannelInput(input, existing);
-    if (!normalized.name) throw new Error('Notification channel name is required.');
+    const normalized = checkedInput(input, existing);
     const now = new Date().toISOString();
     getDb().prepare(`
       UPDATE notification_channels

@@ -28,6 +28,18 @@ function householdChannelInput(body) {
   return { provider, name, enabled, config, secrets, clearSecrets };
 }
 
+/**
+ * Validation and the database used to share one catch that sent every message
+ * as a 400 - SQLite's included (Phase 0 section H). The channel checks mark
+ * their own sentences (`notification_channel_invalid`); everything else is a
+ * fixed 500 and goes into the log.
+ */
+function sendChannelWriteFailure(res, err) {
+  if (err?.code === 'notification_channel_invalid') return res.status(400).json({ error: err.message, code: 400 });
+  log.error('Error writing notification channel:', err);
+  return res.status(500).json({ error: 'Internal error.', code: 500 });
+}
+
 export function buildRouter({
   database,
   channelStore,
@@ -88,7 +100,7 @@ export function buildRouter({
       const channel = store.createChannel(householdChannelInput(req.body));
       res.status(201).json({ data: channel });
     } catch (err) {
-      res.status(400).json({ error: err.message || 'Invalid notification channel.', code: 400 });
+      sendChannelWriteFailure(res, err);
     }
   });
 
@@ -106,7 +118,7 @@ export function buildRouter({
       const channel = store.updateChannel(id, householdChannelInput(req.body));
       res.json({ data: channel });
     } catch (err) {
-      res.status(400).json({ error: err.message || 'Invalid notification channel.', code: 400 });
+      sendChannelWriteFailure(res, err);
     }
   });
 
