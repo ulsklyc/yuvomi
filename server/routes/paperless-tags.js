@@ -1,14 +1,16 @@
 /** Live Paperless tags, scoped to a visible link or current saved-view member. */
 import express from 'express';
 import * as db from '../db.js';
+import { createLogger } from '../logger.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { mayWriteModule } from '../permissions.js';
-import { documentVisibleSql } from '../services/document-access.js';
+import { documentVisibleSql, paperlessFolderVisibleSql } from '../services/document-access.js';
 import { getAdapter } from '../services/dms/index.js';
 import { positiveId } from '../services/dms/paperless-views.js';
 
 const router = express.Router();
+const log = createLogger('PaperlessTags');
 let adapterFactory = getAdapter;
 export function _setAdapterFactory(fn) { adapterFactory = fn || getAdapter; }
 const actor = (req) => req.authUserId || req.session?.userId;
@@ -27,6 +29,7 @@ function account(id) {
 async function remote(promise) {
   try { return await promise; }
   catch (err) {
+    if (Number.isInteger(err.status)) log.warn(`Paperless tags upstream request failed (status ${err.status}).`);
     if (err.status === 403) throw problem(403, 'Permission denied.');
     if (err.status === 404) throw problem(404, 'paperless_document_not_found');
     if (err.status === 400) throw problem(400, 'paperless_tags_invalid');
@@ -34,6 +37,7 @@ async function remote(promise) {
   }
 }
 function fail(res, err) {
+  log.warn(`Paperless tag operation failed (status ${err.httpStatus || 500}).`);
   if (err.httpStatus === 403) return res.status(403).json({ error: 'Permission denied.', code: 403 });
   const status = err.httpStatus || 500;
   const reason = status === 500 ? 'internal_error' : err.reason;
@@ -49,8 +53,8 @@ function resolve(req) {
   if (req.params.documentId !== undefined) {
     documentId = positiveId(req.params.documentId);
     if (!documentId) throw problem(404, 'paperless_document_not_found');
-    row = db.get().prepare(`SELECT * FROM paperless_view_folders WHERE id = ?
-      AND (visibility = 'family' OR created_by = ?)`).get(req.params.id, actor(req));
+    row = db.get().prepare(`SELECT f.* FROM paperless_view_folders f WHERE f.id = @id
+      AND ${paperlessFolderVisibleSql()}`).get({ id: req.params.id, userId: actor(req) });
     if (!row) throw problem(404, 'paperless_folder_not_found');
     canEdit = writable(req) && row.created_by === actor(req);
     identity = [row.account_id, row.view_id, row.created_by, row.visibility];
@@ -105,16 +109,13 @@ async function readTags(req, res) {
       const document = await remote(adapter.getDocument(context.documentId));
       const tagIds = ids(document.tags);
       // Only names of tags actually assigned to the delegated document are shared.
-      const tags = [];
-      for (const id of tagIds) {
-        try { tags.push(await remote(adapter.getTag(id))); }
-        catch (err) {
-          // Object permissions may hide a tag while leaving its ID on the document.
-          if (![403, 404].includes(err.httpStatus)) throw err;
-          tags.push({ id, name: `#${id}` });
-        }
+      let named = [];
+      try { named = await remote(adapter.getTags(tagIds)); }
+      catch (err) {
+        if (![403, 404].includes(err.httpStatus)) throw err;
       }
-      await inView(adapter, context);
+      const names = new Map(named.map((tag) => [tag.id, tag.name]));
+      const tags = tagIds.map((id) => ({ id, name: names.get(id) ?? `#${id}` }));
       recheck(req, context);
       res.json({ data: { tags, tag_ids: tagIds, can_edit: context.canEdit,
         ...(context.canEdit ? { account_id: context.source.id } : {}) } });

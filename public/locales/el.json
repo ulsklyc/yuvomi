@@ -3917,7 +3917,7 @@
             "visibility": "Ποιος μπορεί να δει αυτόν τον φάκελο;",
             "private": "Μόνο εγώ",
             "shared": "Οικογένεια",
-            "shareConsent": "Επιτρέπω σε όλους όσοι έχουν πρόσβαση στα Έγγραφα να διαβάζουν και να κατεβάζουν όλα τα τρέχοντα και μελλοντικά έγγραφα αυτής της προβολής.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Οι αλλαγές στην προβολή Paperless αλλάζουν και αυτόν τον φάκελο. Τα αρχεία παραμένουν στο Paperless. Χωρίς φίλτρα περιλαμβάνονται όλα τα έγγραφα που μπορεί να διαβάσει η σύνδεση.",
             "readOnly": "Τα έγγραφα και τα φίλτρα παραμένουν στο Paperless. Εξουσιοδοτημένοι διαχειριστές μπορούν να αλλάζουν ετικέτες εδώ.",
             "refresh": "Ανανέωση",
@@ -3934,11 +3934,11 @@
             "remove": "Αποσύνδεση φακέλου",
             "removeConfirm": "Αποσύνδεση του «{{name}}»; Τα έγγραφα στο Paperless θα διατηρηθούν.",
             "errors": {
-                "unsupported": "Μη υποστηριζόμενα ή μη έγκυρα φίλτρα. Ενημερώστε την ενσωμάτωση ή επιλέξτε άλλη προβολή.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Δεν ήταν δυνατή η ανάγνωση της προβολής Paperless. Ελέγξτε τη σύνδεση και δοκιμάστε ξανά.",
                 "gone": "Ο φάκελος ή το έγγραφο δεν είναι πλέον διαθέσιμο. Ανανεώστε τη λίστα.",
                 "changed": "Ο φάκελος άλλαξε κατά τη φόρτωση. Ανανεώστε τον.",
-                "share": "Επιβεβαιώστε την κοινή χρήση των τρεχόντων και μελλοντικών εγγράφων με την οικογένεια.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Ελέγξτε το όνομα φακέλου, τη σύνδεση και την προβολή.",
                 "forbidden": "Δεν έχετε άδεια για αυτήν την ενέργεια.",
                 "preview": "Δεν υπάρχει προεπισκόπηση αυτού του τύπου αρχείου. Κατεβάστε το έγγραφο."

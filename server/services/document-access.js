@@ -20,12 +20,21 @@
  * @returns {string}
  */
 export function documentVisibleSql(alias = 'd', param = 'userId') {
+  return visibleSql(alias, param, 'family_document_access', 'document_id');
+}
+
+/** Saved views delegate the same audiences as individual Documents links. */
+export function paperlessFolderVisibleSql(alias = 'f', param = 'userId') {
+  return visibleSql(alias, param, 'paperless_view_folder_access', 'folder_id');
+}
+
+function visibleSql(alias, param, accessTable, foreignKey) {
   return `(
     ${alias}.created_by = @${param}
     OR ${alias}.visibility = 'family'
     OR EXISTS (
-      SELECT 1 FROM family_document_access a
-      WHERE a.document_id = ${alias}.id AND a.user_id = @${param}
+      SELECT 1 FROM ${accessTable} a
+      WHERE a.${foreignKey} = ${alias}.id AND a.user_id = @${param}
     )
   )`;
 }

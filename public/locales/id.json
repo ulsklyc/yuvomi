@@ -3979,7 +3979,7 @@
             "visibility": "Siapa yang dapat melihat folder ini?",
             "private": "Hanya saya",
             "shared": "Keluarga",
-            "shareConsent": "Saya mengizinkan semua orang yang memiliki akses Dokumen untuk membaca dan mengunduh semua dokumen saat ini dan mendatang dalam tampilan ini.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Perubahan tampilan di Paperless juga mengubah folder ini. Berkas tetap di Paperless. Tanpa filter, semua dokumen yang dapat dibaca koneksi akan disertakan.",
             "readOnly": "Dokumen dan filter tetap berada di Paperless. Administrator berwenang dapat mengubah tag di sini.",
             "refresh": "Perbarui",
@@ -3996,11 +3996,11 @@
             "remove": "Putuskan folder",
             "removeConfirm": "Putuskan “{{name}}”? Dokumen di Paperless akan tetap disimpan.",
             "errors": {
-                "unsupported": "Filter tidak didukung atau tidak valid. Perbarui integrasi atau pilih tampilan lain.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Tampilan Paperless tidak dapat dibaca. Periksa koneksi dan coba lagi.",
                 "gone": "Folder atau dokumen ini tidak lagi tersedia. Segarkan daftar.",
                 "changed": "Folder berubah saat dimuat. Segarkan folder.",
-                "share": "Konfirmasikan berbagi dokumen saat ini dan mendatang dengan keluarga.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Periksa nama folder, koneksi, dan tampilan.",
                 "forbidden": "Anda tidak memiliki izin untuk tindakan ini.",
                 "preview": "Jenis berkas ini tidak dapat dipratinjau. Unduh dokumennya."

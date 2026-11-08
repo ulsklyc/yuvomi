@@ -3979,7 +3979,7 @@
             "visibility": "Hvem kan se denne mappen?",
             "private": "Bare meg",
             "shared": "Familie",
-            "shareConsent": "Jeg gir alle med tilgang til Dokumenter tillatelse til å lese og laste ned alle nåværende og fremtidige dokumenter i denne visningen.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Endringer i Paperless-visningen endrer også denne mappen. Filene forblir i Paperless. Uten filtre tas alle dokumenter tilkoblingen kan lese med.",
             "readOnly": "Dokumenter og filtre blir i Paperless. Autoriserte administratorer kan endre etiketter her.",
             "refresh": "Oppdater",
@@ -3996,11 +3996,11 @@
             "remove": "Koble fra mappe",
             "removeConfirm": "Koble fra «{{name}}»? Dokumentene i Paperless beholdes.",
             "errors": {
-                "unsupported": "Filtre støttes ikke eller er ugyldige. Oppdater integrasjonen eller velg en annen visning.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Paperless-visningen kunne ikke leses. Kontroller tilkoblingen og prøv igjen.",
                 "gone": "Mappen eller dokumentet er ikke lenger tilgjengelig. Oppdater listen.",
                 "changed": "Mappen ble endret under lasting. Oppdater den.",
-                "share": "Bekreft deling med familien av alle nåværende og fremtidige dokumenter i visningen.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Kontroller mappenavn, tilkobling og visning.",
                 "forbidden": "Du har ikke tillatelse til denne handlingen.",
                 "preview": "Ingen forhåndsvisning for denne filtypen. Last ned dokumentet."

@@ -3917,7 +3917,7 @@
             "visibility": "Bu klasörü kim görebilir?",
             "private": "Yalnızca ben",
             "shared": "Aile",
-            "shareConsent": "Belgelere erişimi olan herkesin bu görünümdeki tüm mevcut ve gelecekteki belgeleri okumasına ve indirmesine izin veriyorum.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Paperless görünümündeki değişiklikler bu klasörü de değiştirir. Dosyalar Paperless’ta kalır. Filtre yoksa bağlantının okuyabildiği tüm belgeler dahil edilir.",
             "readOnly": "Belgeler ve filtreler Paperless içinde kalır. Yetkili yöneticiler etiketleri burada değiştirebilir.",
             "refresh": "Yenile",
@@ -3934,11 +3934,11 @@
             "remove": "Klasör bağlantısını kaldır",
             "removeConfirm": "“{{name}}” bağlantısı kaldırılsın mı? Paperless’taki belgeler korunur.",
             "errors": {
-                "unsupported": "Desteklenmeyen veya geçersiz filtreler. Entegrasyonu güncelleyin veya başka bir görünüm seçin.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Paperless görünümü okunamadı. Bağlantıyı kontrol edip tekrar deneyin.",
                 "gone": "Bu klasör veya belge artık erişilebilir değil. Listeyi yenileyin.",
                 "changed": "Klasör yüklenirken değişti. Yenileyin.",
-                "share": "Bu görünümdeki mevcut ve gelecekteki belgelerin aileyle paylaşılmasını onaylayın.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Klasör adını, bağlantıyı ve görünümü kontrol edin.",
                 "forbidden": "Bu işlem için izniniz yok.",
                 "preview": "Bu dosya türü önizlenemez. Belgeyi indirin."

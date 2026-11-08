@@ -105,7 +105,9 @@ test('unknown, malformed and conflicting rules fail closed', () => {
   }
 });
 
-test('adapter loads fresh filters for page two, preserves sorting and never follows absolute next links', async () => {
+test('adapter refreshes expired definitions, preserves sorting and never follows absolute next links', async (t) => {
+  let clock = 10000;
+  t.mock.method(Date, 'now', () => clock);
   const calls = [];
   let tag = '7';
   globalThis.fetch = async (url, options) => {
@@ -119,14 +121,17 @@ test('adapter loads fresh filters for page two, preserves sorting and never foll
   const source = new PaperlessAdapter({ base_url: 'http://127.0.0.1:1234/paperless', api_token: 'token' });
   const first = await source.listViewDocuments(5, { page: 1 });
   tag = '12';
+  await source.listViewDocuments(5, { documentId: 99 });
+  assert.equal(calls.length, 3, 'membership remains live while definition is cached');
+  clock += 5001;
   const second = await source.listViewDocuments(5, { page: 2, documentId: 99 });
   assert.equal(first.has_more, true);
   assert.equal(second.results[0].id, '99');
-  assert.equal(calls.length, 4);
-  assert.equal(calls[3].u.searchParams.get('tags__id__all'), '12');
-  assert.equal(calls[3].u.searchParams.get('page'), '2');
-  assert.equal(calls[3].u.searchParams.get('id'), '99');
-  assert.equal(calls[3].u.searchParams.get('ordering'), 'title');
+  assert.equal(calls.length, 5);
+  assert.equal(calls[4].u.searchParams.get('tags__id__all'), '12');
+  assert.equal(calls[4].u.searchParams.get('page'), '2');
+  assert.equal(calls[4].u.searchParams.get('id'), '99');
+  assert.equal(calls[4].u.searchParams.get('ordering'), 'title');
   for (const call of calls) {
     assert.equal(call.u.origin, 'http://127.0.0.1:1234');
     assert.equal(call.options.headers.Authorization, 'Token token');
@@ -342,4 +347,62 @@ test('a local write failure is 500, not a Paperless connection failure', async (
     assert.equal(response.body.error, 'Internal server error.');
     assert.equal(response.body.reason, undefined);
   } finally { database.pragma('query_only = OFF'); }
+});
+
+
+test('restricted folders use selected-member access for listing and media; widening needs consent', async () => {
+  const folder = await create();
+  const body = { name: 'Selected', visibility: 'restricted', allowed_member_ids: [memberId] };
+  assert.equal((await call('PUT', `/folders/${folder.id}`, body)).status, 400);
+  assert.equal((await call('PUT', `/folders/${folder.id}`, { ...body, confirm_share: true })).status, 200);
+  identity = { id: otherId, role: 'admin' };
+  assert.deepEqual((await call('GET', '/folders')).body.data, []);
+  for (const path of ['/documents', '/documents/99/preview', '/documents/99/download', '/documents/99/thumbnail']) {
+    assert.equal((await call('GET', `/folders/${folder.id}${path}`)).status, 404);
+  }
+  member();
+  assert.equal((await call('GET', '/folders')).body.data.length, 1);
+  assert.equal((await call('GET', `/folders/${folder.id}/documents/99/download`)).status, 200);
+  admin();
+  assert.equal((await call('PUT', `/folders/${folder.id}`, body)).status, 200, 'same audience needs no new consent');
+  assert.equal((await call('PUT', `/folders/${folder.id}`, { ...body, allowed_member_ids: [memberId, otherId] })).status, 400);
+  assert.equal((await call('PUT', `/folders/${folder.id}`, { name: 'Private', visibility: 'private' })).status, 200);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folder_access').get().n, 0);
+  member();
+  assert.equal((await call('GET', `/folders/${folder.id}/documents/99/download`)).status, 404);
+});
+
+test('revoking a selected member during media fetch prevents disclosure', async () => {
+  const folder = await create();
+  await call('PUT', `/folders/${folder.id}`, { name: 'Selected', visibility: 'restricted', allowed_member_ids: [memberId], confirm_share: true });
+  adapter.fetchContent = async () => {
+    database.prepare('DELETE FROM paperless_view_folder_access WHERE folder_id = ?').run(folder.id);
+    return { buffer: Buffer.from('SECRET'), mime: 'text/plain' };
+  };
+  member();
+  const result = await call('GET', `/folders/${folder.id}/documents/99/download`);
+  assert.equal(result.status, 404);
+  assert.ok(!JSON.stringify(result.body).includes('SECRET'));
+});
+
+test('family-to-restricted narrowing needs no consent and rejects nonexistent recipients', async () => {
+  const folder = await create('family');
+  assert.equal((await call('PUT', `/folders/${folder.id}`, { name: 'Selected', visibility: 'restricted', allowed_member_ids: [memberId] })).status, 200);
+  assert.equal((await call('PUT', `/folders/${folder.id}`, { name: 'Invalid', visibility: 'restricted', allowed_member_ids: [999999], confirm_share: true })).status, 400);
+});
+
+test('definition cache survives adapter recreation but isolates changed credentials and base URLs', async () => {
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, token: options.headers.Authorization });
+    return new Response(JSON.stringify(url.includes('saved_views')
+      ? { id: 5, filter_rules: [] } : { count: 0, results: [], next: null }));
+  };
+  const account = { base_url: 'http://127.0.0.1:1234/cache-isolation', api_token: 'first' };
+  await new PaperlessAdapter(account).listViewDocuments(5);
+  await new PaperlessAdapter(account).listViewDocuments(5);
+  await new PaperlessAdapter({ ...account, api_token: 'second' }).listViewDocuments(5);
+  await new PaperlessAdapter({ ...account, base_url: `${account.base_url}/other` }).listViewDocuments(5);
+  assert.equal(calls.filter((call) => call.url.includes('saved_views')).length, 3);
+  assert.equal(calls.filter((call) => call.url.includes('/api/documents/')).length, 4);
 });

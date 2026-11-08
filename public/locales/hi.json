@@ -3917,7 +3917,7 @@
             "visibility": "यह फ़ोल्डर कौन देख सकता है?",
             "private": "केवल मैं",
             "shared": "परिवार",
-            "shareConsent": "मैं दस्तावेज़ों तक पहुँच रखने वाले सभी लोगों को इस दृश्य के सभी मौजूदा और भविष्य के दस्तावेज़ पढ़ने और डाउनलोड करने की अनुमति देता हूँ।",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Paperless में दृश्य बदलने से यह फ़ोल्डर भी बदलता है। फ़ाइलें Paperless में रहती हैं। फ़िल्टर न होने पर कनेक्शन द्वारा पढ़े जा सकने वाले सभी दस्तावेज़ शामिल होते हैं।",
             "readOnly": "दस्तावेज़ और फ़िल्टर Paperless में रहते हैं। अधिकृत प्रशासक यहाँ टैग बदल सकते हैं।",
             "refresh": "अपडेट",
@@ -3934,11 +3934,11 @@
             "remove": "फ़ोल्डर का कनेक्शन हटाएँ",
             "removeConfirm": "“{{name}}” का कनेक्शन हटाएँ? Paperless के दस्तावेज़ सुरक्षित रहेंगे।",
             "errors": {
-                "unsupported": "असमर्थित या अमान्य फ़िल्टर हैं। एकीकरण अपडेट करें या दूसरा दृश्य चुनें।",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Paperless दृश्य पढ़ा नहीं जा सका। कनेक्शन जाँचें और फिर प्रयास करें।",
                 "gone": "यह फ़ोल्डर या दस्तावेज़ अब उपलब्ध नहीं है। सूची रीफ़्रेश करें।",
                 "changed": "लोड होते समय फ़ोल्डर बदल गया। इसे रीफ़्रेश करें।",
-                "share": "इस दृश्य के मौजूदा और भविष्य के दस्तावेज़ परिवार के साथ साझा करने की पुष्टि करें।",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "फ़ोल्डर का नाम, कनेक्शन और दृश्य जाँचें।",
                 "forbidden": "आपको यह कार्रवाई करने की अनुमति नहीं है।",
                 "preview": "इस फ़ाइल प्रकार का पूर्वावलोकन उपलब्ध नहीं है। दस्तावेज़ डाउनलोड करें।"

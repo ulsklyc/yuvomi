@@ -12,6 +12,11 @@ import { assertDmsTargetAllowed } from './guard.js';
 import { savedViewParams, positiveId, PaperlessViewError } from './paperless-views.js';
 
 const REQUEST_TIMEOUT_MS = 8000;
+// Cache only definitions, never document membership. Account credentials form
+// part of the key so replacing a token cannot reuse its predecessor's view.
+const VIEW_CACHE_MS = 5000;
+const viewCache = new Map();
+
 // Paperless-ngx handelt seine REST-API über einen versionierten Accept-Header aus.
 // Fehlt die Version, antworten manche Instanzen/Reverse-Proxies mit 406 Not
 // Acceptable (Issue #438). Wir fordern daher explizit eine breit unterstützte
@@ -106,7 +111,16 @@ export class PaperlessAdapter {
   }
 
   async listViewDocuments(viewId, { page = 1, pageSize = 50, documentId = null } = {}) {
-    const view = await this.getSavedView(viewId);
+    const cacheKey = JSON.stringify([this.base, this.token, positiveId(viewId)]);
+    let cached = viewCache.get(cacheKey);
+    if (!cached || cached.expires <= Date.now()) {
+      viewCache.delete(cacheKey);
+      const view = await this.getSavedView(viewId);
+      cached = { view, expires: Date.now() + VIEW_CACHE_MS };
+      if (viewCache.size >= 128) viewCache.delete(viewCache.keys().next().value);
+      viewCache.set(cacheKey, cached);
+    }
+    const view = cached.view;
     const params = savedViewParams(view);
     params.set('page', String(positiveId(page) || 1));
     params.set('page_size', String(Math.min(100, positiveId(pageSize) || 50)));
@@ -205,10 +219,18 @@ export class PaperlessAdapter {
       .map(({ id, name }) => ({ id: Number(id), name: String(name ?? `#${id}`) })) };
   }
 
-  async getTag(id) {
-    if (!positiveId(id)) throw new PaperlessViewError('Invalid tag ID.');
-    const tag = await (await this.#request(`/api/tags/${encodeURIComponent(id)}/`)).json();
-    return { id: Number(id), name: String(tag.name ?? `#${id}`) };
+  async getTags(ids) {
+    if (!Array.isArray(ids) || ids.length > 1000 || ids.some((id) => !positiveId(id))) {
+      throw new PaperlessViewError('Invalid tag IDs.');
+    }
+    const wanted = [...new Set(ids.map(Number))];
+    if (!wanted.length) return [];
+    const result = await this.#viewPage(`/api/tags/?id__in=${wanted.join(',')}&page_size=${wanted.length}`);
+    const allowed = new Set(wanted);
+    // Missing/object-protected names fall back to #ID in the route. Never
+    // expose unassigned names even if an upstream ignores the filter.
+    return result.results.filter((tag) => allowed.has(Number(tag.id)))
+      .map(({ id, name }) => ({ id: Number(id), name: String(name ?? `#${id}`) }));
   }
 
   async setDocumentTags(id, tags) {

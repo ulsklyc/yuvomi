@@ -3917,7 +3917,7 @@
             "visibility": "Chi può vedere questa cartella?",
             "private": "Solo io",
             "shared": "Famiglia",
-            "shareConsent": "Autorizzo tutte le persone con accesso a Documenti a leggere e scaricare i documenti attuali e futuri di questa vista.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Le modifiche alla vista Paperless cambiano anche questa cartella. I file restano in Paperless. Senza filtri sono inclusi tutti i documenti leggibili dalla connessione.",
             "readOnly": "Documenti e filtri restano in Paperless. Gli amministratori autorizzati possono modificare i tag qui.",
             "refresh": "Aggiorna",
@@ -3934,11 +3934,11 @@
             "remove": "Scollega cartella",
             "removeConfirm": "Scollegare «{{name}}»? I documenti in Paperless saranno conservati.",
             "errors": {
-                "unsupported": "Filtri non supportati o non validi. Aggiorna l’integrazione o scegli un’altra vista.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Impossibile leggere la vista Paperless. Controlla la connessione e riprova.",
                 "gone": "Cartella o documento non più disponibile. Aggiorna l’elenco.",
                 "changed": "La cartella è cambiata durante il caricamento. Aggiornala.",
-                "share": "Conferma la condivisione in famiglia dei documenti attuali e futuri di questa vista.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Controlla nome della cartella, connessione e vista.",
                 "forbidden": "Non hai il permesso per questa azione.",
                 "preview": "Anteprima non disponibile per questo tipo di file. Scarica il documento."

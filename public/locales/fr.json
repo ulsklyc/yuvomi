@@ -3917,7 +3917,7 @@
             "visibility": "Qui peut voir ce dossier ?",
             "private": "Moi uniquement",
             "shared": "Famille",
-            "shareConsent": "J’autorise toutes les personnes ayant accès aux Documents à lire et télécharger les documents actuels et futurs de cette vue.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Les changements de la vue Paperless modifient aussi ce dossier. Les fichiers restent dans Paperless. Sans filtre, tous les documents lisibles par la connexion sont inclus.",
             "readOnly": "Les documents et filtres restent dans Paperless. Les administrateurs autorisés peuvent modifier les étiquettes ici.",
             "refresh": "Actualiser",
@@ -3934,11 +3934,11 @@
             "remove": "Dissocier le dossier",
             "removeConfirm": "Dissocier « {{name}} » ? Les documents Paperless seront conservés.",
             "errors": {
-                "unsupported": "Filtres non pris en charge ou invalides. Mettez à jour l’intégration ou choisissez une autre vue.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Impossible de lire la vue Paperless. Vérifiez la connexion et réessayez.",
                 "gone": "Ce dossier ou document n’est plus accessible. Actualisez la liste.",
                 "changed": "Le dossier a changé pendant le chargement. Actualisez-le.",
-                "share": "Confirmez le partage familial des documents actuels et futurs de cette vue.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Vérifiez le nom du dossier, la connexion et la vue.",
                 "forbidden": "Vous n’avez pas l’autorisation d’effectuer cette action.",
                 "preview": "Aucun aperçu pour ce type de fichier. Téléchargez le document."

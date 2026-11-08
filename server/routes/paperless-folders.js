@@ -5,6 +5,7 @@ import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { refuseWhileRestoring } from '../middleware/restore-gate.js';
+import { paperlessFolderVisibleSql } from '../services/document-access.js';
 import { getAdapter } from '../services/dms/index.js';
 import { PaperlessViewError, positiveId } from '../services/dms/paperless-views.js';
 
@@ -26,21 +27,21 @@ function problem(status, reason) {
 }
 
 function fail(res, err) {
+  log.warn(`Paperless folder operation failed (status ${err.httpStatus || (err instanceof PaperlessViewError ? 422 : 500)}).`);
   if (err.httpStatus === 403) return res.status(403).json({ error: 'Permission denied.', code: 403 });
   const status = err.httpStatus || (err instanceof PaperlessViewError ? 422 : 500);
   if (status === 500) {
-    log.warn('Paperless folder operation failed locally.');
     return res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
   const reason = err.reason || (err instanceof PaperlessViewError ? 'paperless_view_unsupported' : 'paperless_unavailable');
   // Never send upstream response bodies, URLs or credentials to the browser.
-  if (status === 502) log.warn('Paperless folder request failed.');
   return res.status(status).json({ error: reason, code: status, reason });
 }
 
 async function remote(promise) {
   try { return await promise; }
   catch (err) {
+    if (Number.isInteger(err.status)) log.warn(`Paperless folders upstream request failed (status ${err.status}).`);
     if (err instanceof PaperlessViewError) throw err;
     throw problem(502, 'paperless_unavailable');
   }
@@ -48,16 +49,30 @@ async function remote(promise) {
 
 function visibleFolder(req, id) {
   if (!positiveId(id)) throw problem(404, 'paperless_folder_not_found');
-  const row = db.get().prepare(`SELECT ${COLUMNS} FROM paperless_view_folders
-    WHERE id = ? AND (visibility = 'family' OR created_by = ?)`).get(id, actor(req));
+  const row = db.get().prepare(`SELECT ${COLUMNS} FROM paperless_view_folders f
+    WHERE id = @id AND ${paperlessFolderVisibleSql()}`).get({ id, userId: actor(req) });
   if (!row) throw problem(404, 'paperless_folder_not_found');
-  return row;
+  return withAccess(row);
+}
+
+function withAccess(row) {
+  return { ...row, allowed_member_ids: db.get().prepare(
+    'SELECT user_id FROM paperless_view_folder_access WHERE folder_id = ? ORDER BY user_id'
+  ).all(row.id).map((entry) => entry.user_id) };
+}
+
+function replaceAccess(id, memberIds) {
+  const database = db.get();
+  database.prepare('DELETE FROM paperless_view_folder_access WHERE folder_id = ?').run(id);
+  const insert = database.prepare('INSERT INTO paperless_view_folder_access (folder_id, user_id) VALUES (?, ?)');
+  for (const memberId of memberIds) insert.run(id, memberId);
 }
 
 function unchangedFolder(req, before) {
   const now = visibleFolder(req, before.id);
   if (now.account_id !== before.account_id || now.view_id !== before.view_id
-    || now.visibility !== before.visibility || now.created_by !== before.created_by) {
+    || now.visibility !== before.visibility || now.created_by !== before.created_by
+    || JSON.stringify(now.allowed_member_ids) !== JSON.stringify(before.allowed_member_ids)) {
     throw problem(409, 'paperless_folder_changed');
   }
   return now;
@@ -75,16 +90,27 @@ function admin(req) {
 
 function fields(body) {
   if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 200
-    || !['private', 'family'].includes(body.visibility)) {
+    || !['private', 'restricted', 'family'].includes(body.visibility)) {
     throw problem(400, 'paperless_folder_invalid');
   }
-  return { name: body.name.trim(), visibility: body.visibility };
+  const allowed = body.visibility === 'restricted' ? body.allowed_member_ids : [];
+  if (!Array.isArray(allowed) || allowed.length > 1000 || allowed.some((id) => !positiveId(id))) {
+    throw problem(400, 'paperless_folder_invalid');
+  }
+  const memberIds = [...new Set(allowed.map(Number))].sort((a, b) => a - b);
+  for (const id of memberIds) {
+    if (!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(id)) throw problem(400, 'paperless_folder_invalid');
+  }
+  return { name: body.name.trim(), visibility: body.visibility, allowed_member_ids: memberIds };
 }
 
-function shareConsent(body, previous = 'private') {
-  if (previous !== 'family' && body.visibility === 'family' && body.confirm_share !== true) {
-    throw problem(400, 'paperless_share_confirmation');
-  }
+function shareConsent(body, before = null) {
+  const wider = before?.visibility !== 'family' && (
+    body.visibility === 'family' || (body.visibility === 'restricted'
+      && body.allowed_member_ids.some((id) => id !== before?.created_by
+        && !before?.allowed_member_ids.includes(id)))
+  );
+  if (wider && body.confirm_share !== true) throw problem(400, 'paperless_share_confirmation');
 }
 
 router.use((_req, res, next) => {
@@ -108,9 +134,9 @@ router.get('/saved-views', refuseWhileRestoring, async (req, res) => {
 
 router.get('/folders', (req, res) => {
   try {
-    const rows = db.get().prepare(`SELECT ${COLUMNS} FROM paperless_view_folders
-      WHERE visibility = 'family' OR created_by = ? ORDER BY name COLLATE NOCASE, id`).all(actor(req));
-    res.json({ data: rows.map((row) => ({ ...row, can_manage: isAdminRequest(req) && row.created_by === actor(req) })) });
+    const rows = db.get().prepare(`SELECT ${COLUMNS} FROM paperless_view_folders f
+      WHERE ${paperlessFolderVisibleSql()} ORDER BY name COLLATE NOCASE, id`).all({ userId: actor(req) });
+    res.json({ data: rows.map((row) => ({ ...withAccess(row), can_manage: isAdminRequest(req) && row.created_by === actor(req) })) });
   } catch (err) { fail(res, err); }
 });
 
@@ -119,16 +145,20 @@ router.post('/folders', async (req, res) => {
     admin(req);
     const body = req.body || {};
     const values = fields({ visibility: 'private', ...body });
-    shareConsent({ ...body, ...values });
+    shareConsent({ ...body, ...values }, { visibility: 'private', created_by: actor(req), allowed_member_ids: [] });
     const accountId = positiveId(body.account_id);
     const viewId = positiveId(body.view_id);
     if (!accountId || !viewId) throw problem(400, 'paperless_folder_invalid');
     const account = accountFor(accountId);
     await remote(adapterFactory(account).getSavedView(viewId));
     accountFor(accountId);
-    const result = db.get().prepare(`INSERT INTO paperless_view_folders
+    const result = db.get().transaction(() => {
+      const result = db.get().prepare(`INSERT INTO paperless_view_folders
       (name, account_id, view_id, visibility, created_by) VALUES (?, ?, ?, ?, ?)`)
       .run(values.name, accountId, viewId, values.visibility, actor(req));
+      replaceAccess(result.lastInsertRowid, values.allowed_member_ids);
+      return result;
+    })();
     res.status(201).json({ data: visibleFolder(req, result.lastInsertRowid) });
   } catch (err) { fail(res, err); }
 });
@@ -139,14 +169,17 @@ router.put('/folders/:id', (req, res) => {
     const before = visibleFolder(req, req.params.id);
     if (before.created_by !== actor(req)) throw problem(403, 'Permission denied.');
     const values = fields(req.body || {});
-    shareConsent({ ...req.body, ...values }, before.visibility);
+    shareConsent({ ...req.body, ...values }, before);
     // Account and view are immutable. A different view is a new delegation.
     if (req.body.account_id !== undefined || req.body.view_id !== undefined) {
       throw problem(400, 'paperless_folder_invalid');
     }
-    db.get().prepare(`UPDATE paperless_view_folders SET name = ?, visibility = ?,
+    db.get().transaction(() => {
+      db.get().prepare(`UPDATE paperless_view_folders SET name = ?, visibility = ?,
       updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ?`)
       .run(values.name, values.visibility, before.id);
+      replaceAccess(before.id, values.allowed_member_ids);
+    })();
     res.json({ data: visibleFolder(req, before.id) });
   } catch (err) { fail(res, err); }
 });

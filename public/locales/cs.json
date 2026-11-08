@@ -4245,7 +4245,7 @@
             "visibility": "Kdo může tuto složku vidět?",
             "private": "Pouze já",
             "shared": "Rodina",
-            "shareConsent": "Povoluji všem s přístupem k Dokumentům číst a stahovat všechny současné i budoucí dokumenty tohoto pohledu.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Změny pohledu v Paperless změní i tuto složku. Soubory zůstávají v Paperless. Bez filtrů jsou zahrnuty všechny dokumenty čitelné tímto připojením.",
             "readOnly": "Dokumenty a filtry zůstávají v Paperless. Oprávnění správci zde mohou měnit štítky.",
             "refresh": "Aktualizovat",
@@ -4262,11 +4262,11 @@
             "remove": "Odpojit složku",
             "removeConfirm": "Odpojit „{{name}}“? Dokumenty v Paperless zůstanou zachovány.",
             "errors": {
-                "unsupported": "Nepodporované nebo neplatné filtry. Aktualizujte integraci nebo vyberte jiný pohled.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Pohled Paperless nelze načíst. Zkontrolujte připojení a zkuste to znovu.",
                 "gone": "Složka nebo dokument již není dostupný. Obnovte seznam.",
                 "changed": "Složka se během načítání změnila. Obnovte ji.",
-                "share": "Potvrďte sdílení současných i budoucích dokumentů pohledu s rodinou.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Zkontrolujte název složky, připojení a pohled.",
                 "forbidden": "K této akci nemáte oprávnění.",
                 "preview": "Tento typ souboru nemá náhled. Stáhněte dokument."

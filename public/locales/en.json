@@ -3979,7 +3979,7 @@
             "visibility": "Who can see this folder?",
             "private": "Only me",
             "shared": "Family",
-            "shareConsent": "I grant everyone with Documents access permission to read and download all current and future documents in this view.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Changes to this saved view in Paperless also change this folder. Files remain in Paperless. An empty filter includes every document the connection can read.",
             "readOnly": "Documents and filters stay in Paperless. Authorized administrators can change tags here.",
             "refresh": "Refresh",
@@ -3996,11 +3996,11 @@
             "remove": "Disconnect folder",
             "removeConfirm": "Disconnect “{{name}}”? Documents in Paperless will be kept.",
             "errors": {
-                "unsupported": "This Paperless view contains unsupported or invalid filters. Update the integration or choose another view.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Paperless could not be reached or the view could not be read. Check the connection and try again.",
                 "gone": "This folder or document is no longer available to you. Refresh the folder list.",
                 "changed": "This folder changed during loading. Refresh it to continue.",
-                "share": "Confirm that all current and future documents in this view may be shared with the family.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Check the folder name, connection and view.",
                 "forbidden": "You do not have permission for this action.",
                 "preview": "This file type cannot be previewed. Download the document instead."

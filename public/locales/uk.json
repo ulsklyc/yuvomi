@@ -4149,7 +4149,7 @@
             "visibility": "Хто може бачити цю папку?",
             "private": "Лише я",
             "shared": "Сім'я",
-            "shareConsent": "Я дозволяю всім із доступом до Документів читати й завантажувати всі поточні та майбутні документи цього подання.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Зміни подання в Paperless змінюють і цю папку. Файли залишаються в Paperless. Без фільтрів включаються всі документи, доступні підключенню.",
             "readOnly": "Документи й фільтри залишаються в Paperless. Уповноважені адміністратори можуть змінювати теги тут.",
             "refresh": "Оновити",
@@ -4166,11 +4166,11 @@
             "remove": "Від’єднати папку",
             "removeConfirm": "Від’єднати «{{name}}»? Документи в Paperless буде збережено.",
             "errors": {
-                "unsupported": "Непідтримувані або некоректні фільтри. Оновіть інтеграцію чи виберіть інше подання.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Не вдалося прочитати подання Paperless. Перевірте підключення та повторіть спробу.",
                 "gone": "Папка або документ більше недоступні. Оновіть список.",
                 "changed": "Папка змінилася під час завантаження. Оновіть її.",
-                "share": "Підтвердьте сімейний доступ до всіх поточних і майбутніх документів подання.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Перевірте назву папки, підключення й подання.",
                 "forbidden": "У вас немає дозволу на цю дію.",
                 "preview": "Перегляд цього типу файлів недоступний. Завантажте документ."

@@ -404,9 +404,9 @@ export async function render(container, context = {}) {
       <a class="sr-only documents-skip" href="#documents-list" data-documents-skip>${t('documents.skipToDocuments')}</a>
       <div class="page-toolbar page-toolbar--wrap page-toolbar--title-tools page-toolbar--fold-search documents-toolbar">
         <h1 class="page-toolbar__title">${t('documents.title')}</h1>
-        ${renderPageSearch({ id: 'documents-search', label: t('documents.searchPlaceholder'), placeholder: t('documents.searchPlaceholder'), value: state.query, clearLabel: t('common.searchClear'), className: 'documents-toolbar__search page-toolbar__center' })}
+        ${renderPageSearch({ id: 'documents-search', label: t('documents.searchPlaceholder'), placeholder: t('documents.searchPlaceholder'), value: state.query, clearLabel: t('common.searchClear'), className: 'documents-local-only documents-toolbar__search page-toolbar__center' })}
         <div class="page-toolbar__actions">
-          <button class="btn btn--secondary documents-dms-link-btn" id="documents-dms-link-btn" type="button"
+          <button class="documents-local-only btn btn--secondary documents-dms-link-btn" id="documents-dms-link-btn" type="button"
                   title="${t('documents.linkFromDms')}" aria-label="${t('documents.linkFromDms')}" hidden>
             <i data-lucide="link" class="icon-md" aria-hidden="true"></i>
             <span class="documents-dms-link-btn__label">${t('documents.linkFromDms')}</span>
@@ -414,7 +414,7 @@ export async function render(container, context = {}) {
           ${/* DIE ANSICHTSWAHL IST DAS KANON-SEGMENT (D1, Critique 2026-10-16):
                 `.segmented` in der Icon-Variante statt einer runden Eigen-Pille
                 - dieselbe Form wie Aufgaben und Kalender. */ ''}
-          <div class="segmented segmented--icons documents-view-toggle" role="group" aria-label="${t('documents.viewToggle')}">
+          <div class="documents-local-only segmented segmented--icons documents-view-toggle" role="group" aria-label="${t('documents.viewToggle')}">
             <button type="button" class="segmented__item documents-view-toggle__btn${state.view === 'grid' ? ' is-active' : ''}" data-view="grid" aria-label="${t('documents.gridView')}" title="${t('documents.gridView')}" aria-pressed="${state.view === 'grid'}">
               <i data-lucide="layout-grid" class="icon-md" aria-hidden="true"></i>
             </button>
@@ -433,7 +433,7 @@ export async function render(container, context = {}) {
            lagen sie bei x=1020 und x=1203 auf einer 375px-Zeile. Was hier
            seitlich scrollt, ist allein die Chip-Spur. */ ''}
       <div class="documents-filters">
-        <div class="segmented documents-status" id="documents-status" role="radiogroup" aria-label="${t('documents.statusLabel')}">
+        <div class="documents-local-only segmented documents-status" id="documents-status" role="radiogroup" aria-label="${t('documents.statusLabel')}">
           ${[['active', 'documents.statusActive'], ['archived', 'documents.statusArchived']].map(([id, key]) => {
             const on = state.status === id;
             return `<button type="button" class="segmented__item${on ? ' is-active' : ''}"
@@ -461,9 +461,9 @@ export async function render(container, context = {}) {
             <span class="documents-folder-chip__facet" id="documents-folder-chip-facet"></span>
             <i data-lucide="chevron-down" aria-hidden="true" class="icon-sm documents-folder-browser__chevron"></i>
           </button>
-          <div class="documents-filter-chips documents-filter-chips--person" id="documents-person-filter"></div>
-          <div class="documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterGroupLabel')}"></div>
-          <div class="documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryFilterLabel')}"></div>
+          <div class="documents-local-only documents-filter-chips documents-filter-chips--person" id="documents-person-filter"></div>
+          <div class="documents-local-only documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterGroupLabel')}"></div>
+          <div class="documents-local-only documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryFilterLabel')}"></div>
         </div>
       </div>
       <div class="documents-browser-layout">
@@ -484,7 +484,7 @@ export async function render(container, context = {}) {
                 damit der Knopf nie namenlos ist - `renderFolderBrowser` schreibt
                 sie danach bei jedem Rendern fort. */ ''}
             ${readOnly() ? '' : `
-            <button class="documents-folder-browser__add" id="documents-folder-add" type="button" aria-label="${t('documents.addFolderButton')}" title="${t('documents.addFolderButton')}">
+            <button class="documents-local-only documents-folder-browser__add" id="documents-folder-add" type="button" aria-label="${t('documents.addFolderButton')}" title="${t('documents.addFolderButton')}">
               <i data-lucide="folder-plus" aria-hidden="true"></i>
             </button>`}
           </div>
@@ -499,8 +499,8 @@ export async function render(container, context = {}) {
                Dateien-App; die Chips weichen dort. Beide Ordnungen bleiben
                (D7), nur die Zeile ordnet sich. Ab 768px steht alles wie
                vorher (documents.css). */ ''}
-          <h2 class="documents-folder-browser__title documents-category-browser__title" id="documents-category-browser-title">${t('documents.categoryLabel')}</h2>
-          <ul class="documents-folder-browser__list documents-category-browser row-carrier" id="documents-category-browser" aria-labelledby="documents-category-browser-title"></ul>
+          <h2 class="documents-local-only documents-folder-browser__title documents-category-browser__title" id="documents-category-browser-title">${t('documents.categoryLabel')}</h2>
+          <ul class="documents-local-only documents-folder-browser__list documents-category-browser row-carrier" id="documents-category-browser" aria-labelledby="documents-category-browser-title"></ul>
         </aside>
         <div class="documents-browser-main">
           ${/* Der Pfad, in dem man steht (#785). Er steht ueber der Liste und
@@ -510,7 +510,7 @@ export async function render(container, context = {}) {
                ist die Leiste ohnehin zugeklappt. Leer, solange kein Ordner
                gewaehlt ist: ein Pfad auf "alle Dokumente" waere eine Zeile
                ohne Aussage. */''}
-          <nav class="documents-breadcrumb" id="documents-breadcrumb" aria-label="${t('documents.folderPathLabel')}" hidden></nav>
+          <nav class="documents-local-only documents-breadcrumb" id="documents-breadcrumb" aria-label="${t('documents.folderPathLabel')}" hidden></nav>
           <div id="documents-list" class="${listClasses()}" aria-busy="true">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
           <section id="paperless-folder-content" class="paperless-folder" hidden></section>
         </div>
@@ -540,11 +540,14 @@ export async function render(container, context = {}) {
   renderFolderBrowser();
   renderCategoryBrowser();
   renderDocuments();
+  openLinkedDocument();
   const paperlessFolders = await mountPaperlessFolders({
     sidebar: container.querySelector('#paperless-folder-nav'),
     content: container.querySelector('#paperless-folder-content'),
     accounts: state.dmsAccounts.filter((a) => a.provider === 'paperless'),
     canManage: state.isAdmin && !readOnly(),
+    members: state.members,
+    userId: state.currentUserId,
     signal: _pageController.signal,
     onActiveChange(active, folder) {
       if (!stillShown(container)) return;
@@ -567,7 +570,6 @@ export async function render(container, context = {}) {
     },
   });
   if (stillShown(container)) _paperlessFolders = paperlessFolders;
-  openLinkedDocument();
 }
 
 /**
@@ -808,7 +810,7 @@ function documentsToolsMenuHtml() {
     ['desc', t('documents.sortDescending'), 'arrow-down-wide-narrow'],
   ];
   return `
-    <button type="button" class="btn btn--secondary btn--icon page-tools-btn documents-tools-btn popover-menu__trigger"
+    <button type="button" class="documents-local-only btn btn--secondary btn--icon page-tools-btn documents-tools-btn popover-menu__trigger"
             popovertarget="documents-tools-menu" aria-haspopup="menu" aria-expanded="false"
             aria-label="${esc(label)}" title="${esc(label)}">
       ${/* EIN ZEICHEN FUER DAS MENUE DES KOPFS (R24, G4-Quer-P2-1): die
@@ -1216,6 +1218,7 @@ function filteredDocuments() {
 function listClasses() {
   return [
     'documents-list',
+    'documents-local-only',
     `documents-list--${state.view}`,
     state.view === 'list' ? 'row-carrier' : '',
     state.selectMode ? 'documents-list--selecting' : '',

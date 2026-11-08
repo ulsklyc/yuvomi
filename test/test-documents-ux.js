@@ -778,7 +778,7 @@ test('die Filterzeile traegt keine Werkzeuge mehr - Sortierung und Auswahl stehe
 
 test('Aktiv/Archiviert ist ein Segment, und "Alle Kategorien" zeigt die Auswahl wie jede Chipreihe der App', () => {
   const row = filterRowMarkup();
-  assert.match(row, /class="segmented documents-status" id="documents-status" role="radiogroup"/);
+  assert.match(row, /class="documents-local-only segmented documents-status" id="documents-status" role="radiogroup"/);
   assert.match(row, /class="segmented__item\$\{on \? ' is-active' : ''\}"[\s\S]{0,120}role="radio"/);
   assert.doesNotMatch(row, /data-status="[^"]*"[^>]*filter-chip|filter-chip[^>]*data-status=/, 'der Status ist kein Chip mehr');
   assert.match(page, /wireTablist\(_container\.querySelector\('#documents-status'\), \{[\s\S]{0,200}mode: 'select'/);
@@ -1267,7 +1267,7 @@ test('der Ansichtsumschalter ist das Kanon-Segment (D1) und so hoch wie Suche un
   // Variante; die Kopfhoehe rechnet panel.css fuer jedes Kopf-Segment (Naht +
   // Rand von --target-base bzw. --target-md abgezogen), nicht dieses Modul.
   const page = readFileSync(new URL('../public/pages/documents.js', import.meta.url), 'utf8');
-  assert.match(page, /<div class="segmented segmented--icons documents-view-toggle" role="group"/, 'das Segment der Shell');
+  assert.match(page, /<div class="documents-local-only segmented segmented--icons documents-view-toggle" role="group"/, 'das Segment der Shell');
   assert.match(page, /class="segmented__item documents-view-toggle__btn\$\{state\.view === 'grid' \? ' is-active' : ''\}"/, 'Eintraege der Shell, aktiv per is-active');
   const own = [...eachRule(css)].filter((rule) => /\.documents-view-toggle(?:__btn(?:--active)?)?$/.test(rule.selector.trim())
     && /(?:^|[;{\s])(?:background|box-shadow|border-radius|padding|width|height)\s*:/.test(rule.body));
@@ -1534,7 +1534,7 @@ test('Fristen: der Ablauf-Chip steht VOR den Kategorien, abgesetzt, und heisst n
   const categories = track.indexOf('id="documents-category"');
   assert.ok(deadlines > 0 && categories > 0, 'beide Gruppen stehen in der Spur');
   assert.ok(deadlines < categories, 'Fristen vor den Kategorien');
-  assert.match(track, /<div class="documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="\$\{t\('documents\.expiringFilterGroupLabel'\)\}"><\/div>/);
+  assert.match(track, /<div class="documents-local-only documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="\$\{t\('documents\.expiringFilterGroupLabel'\)\}"><\/div>/);
   // Abgesetzt mit derselben Haarlinie wie Segment und Spur - kein neuer Ton -
   // und nur, wenn der Chip steht (die leere Gruppe ist display: none).
   const sep = topRules(css).find((rule) => rule.selector === '.documents-filter-chips--deadlines:not(:empty)');
@@ -2043,7 +2043,7 @@ test('Dokumente mobil: der Ordner-Umschalter ist der erste Chip der Filterzeile 
 // die Chips weichen dort, der Chip nennt die gewaehlte Kategorie.
 test('R21 S9b: am Telefon stehen die Kategorien in der Auswahl des Ordner-Chips', () => {
   const aside = page.slice(page.indexOf('<aside class="documents-folder-browser"'), page.indexOf('</aside>'));
-  assert.match(aside, /<ul class="documents-folder-browser__list documents-category-browser row-carrier" id="documents-category-browser" aria-labelledby="documents-category-browser-title"><\/ul>/,
+  assert.match(aside, /<ul class="documents-local-only documents-folder-browser__list documents-category-browser row-carrier" id="documents-category-browser" aria-labelledby="documents-category-browser-title"><\/ul>/,
     'die Kategorie-Gruppe steht in der Auswahl, unter den Ordnern');
   assert.ok(aside.indexOf('id="documents-folder-browser"') < aside.indexOf('id="documents-category-browser"'), 'Ordner zuerst, dann Kategorien');
   assert.match(page, /aria-controls="documents-folder-browser documents-category-browser"/, 'der Chip klappt beide Gruppen auf');

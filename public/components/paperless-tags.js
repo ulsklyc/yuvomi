@@ -1,8 +1,9 @@
 /** Tag names and assignment stay live in Paperless, never in a local snapshot. */
+import { reloadAfterSave } from '/utils/reload-after-save.js';
 import { api } from '/api.js';
 import { t } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { openModal, closeModal, captureModalContext, isModalContextCurrent } from '/components/modal.js';
+import { openModal, closeModal, refocusAfterRender, captureModalContext, isModalContextCurrent } from '/components/modal.js';
 
 const ROOT = '/documents/dms/paperless';
 const key = (name) => `documents.paperless.tags.${name}`;
@@ -63,7 +64,8 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
       function draw() {
         const query = search.value.trim().toLocaleLowerCase();
         const rows = [...tags.values()].filter((tag) => String(tag.name).toLocaleLowerCase().includes(query));
-        list.innerHTML = rows.map((tag) => `<label class="paperless-tags__choice"><input type="checkbox" value="${esc(tag.id)}" ${selected.has(tag.id) ? 'checked' : ''}> <span>${esc(tag.name)}</span></label>`).join('');
+        list.replaceChildren();
+        list.insertAdjacentHTML('beforeend', rows.map((tag) => `<label class="paperless-tags__choice"><input type="checkbox" value="${esc(tag.id)}" ${selected.has(tag.id) ? 'checked' : ''}> <span>${esc(tag.name)}</span></label>`).join(''));
         status.textContent = t(key(selected.size ? 'selection' : 'empty'), { count: selected.size });
       }
       async function catalogue() {
@@ -122,7 +124,12 @@ export function openPaperlessTags({ path, title, signal, onSaved = () => {} }) {
           await api.put(path, { tags: [...selected], expected_tags: expected });
           if (!current()) return;
           await closeModal({ force: true, context });
-          if (!signal?.aborted) await onSaved();
+          if (!signal?.aborted) {
+            await reloadAfterSave(async () => {
+              await onSaved();
+              refocusAfterRender();
+            });
+          }
         } catch (err) {
           if (current()) {
             showError(err);

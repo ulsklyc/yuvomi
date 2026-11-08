@@ -3917,7 +3917,7 @@
             "visibility": "¿Quién puede ver esta carpeta?",
             "private": "Solo yo",
             "shared": "Familia",
-            "shareConsent": "Autorizo a todas las personas con acceso a Documentos a leer y descargar los documentos actuales y futuros de esta vista.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Los cambios de la vista en Paperless también cambian esta carpeta. Los archivos permanecen en Paperless. Sin filtros, se incluyen todos los documentos accesibles para la conexión.",
             "readOnly": "Los documentos y filtros permanecen en Paperless. Los administradores autorizados pueden cambiar etiquetas aquí.",
             "refresh": "Actualizar",
@@ -3934,11 +3934,11 @@
             "remove": "Desconectar carpeta",
             "removeConfirm": "¿Desconectar «{{name}}»? Se conservarán los documentos en Paperless.",
             "errors": {
-                "unsupported": "Filtros no compatibles o inválidos. Actualiza la integración o elige otra vista.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "No se pudo leer la vista de Paperless. Revisa la conexión e inténtalo de nuevo.",
                 "gone": "Esta carpeta o documento ya no está disponible. Actualiza la lista.",
                 "changed": "La carpeta cambió durante la carga. Actualízala.",
-                "share": "Confirma que los documentos actuales y futuros de esta vista pueden compartirse con la familia.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Revisa el nombre de la carpeta, la conexión y la vista.",
                 "forbidden": "No tienes permiso para esta acción.",
                 "preview": "Este tipo de archivo no admite vista previa. Descarga el documento."

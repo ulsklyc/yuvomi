@@ -3979,7 +3979,7 @@
             "visibility": "Wer darf den Ordner sehen?",
             "private": "Nur ich",
             "shared": "Familie",
-            "shareConsent": "Ich erlaube allen Personen mit Zugriff auf Dokumente, alle jetzigen und zukünftigen Dokumente dieser Ansicht zu lesen und herunterzuladen.",
+            "shareConsent": "Ich erlaube dem gewählten Personenkreis, alle aktuellen und zukünftigen Dokumente dieser Ansicht zu lesen und herunterzuladen.",
             "viewHint": "Änderungen an der gespeicherten Ansicht in Paperless ändern auch diesen Ordner. Die Dateien bleiben in Paperless. Ein leerer Filter umfasst alle für die Verbindung lesbaren Dokumente.",
             "readOnly": "Dokumente und Filter bleiben in Paperless. Berechtigte Administratoren können hier Tags ändern.",
             "refresh": "Aktualisieren",
@@ -3996,11 +3996,11 @@
             "remove": "Ordnerverbindung entfernen",
             "removeConfirm": "Verbindung zu „{{name}}“ entfernen? Die Dokumente in Paperless bleiben erhalten.",
             "errors": {
-                "unsupported": "Diese Paperless-Ansicht enthält nicht unterstützte oder ungültige Filter. Aktualisiere die Anbindung oder wähle eine andere Ansicht.",
+                "unsupported": "Diese Paperless-Ansicht enthält nicht unterstützte oder ungültige Filter. Entferne die Ordnerverbindung und verbinde eine unterstützte Ansicht erneut.",
                 "unavailable": "Paperless ist nicht erreichbar oder die Ansicht kann nicht gelesen werden. Prüfe die Verbindung und versuche es erneut.",
                 "gone": "Dieser Ordner oder dieses Dokument ist für dich nicht mehr verfügbar. Aktualisiere die Ordnerliste.",
                 "changed": "Der Ordner wurde während des Ladens geändert. Aktualisiere ihn erneut.",
-                "share": "Bestätige, dass alle jetzigen und zukünftigen Dokumente dieser Ansicht für die Familie freigegeben werden dürfen.",
+                "share": "Bestätige die Freigabe aller aktuellen und zukünftigen Dokumente dieser Ansicht für den gewählten Personenkreis.",
                 "invalid": "Prüfe Ordnername, Verbindung und Ansicht.",
                 "forbidden": "Du hast keine Berechtigung für diese Aktion.",
                 "preview": "Für diesen Dateityp gibt es keine Vorschau. Lade das Dokument stattdessen herunter."

@@ -4,6 +4,8 @@ import { openPaperlessTags } from '/components/paperless-tags.js';
 import { t } from '/i18n.js';
 import { esc, REQUIRED_MARK } from '/utils/html.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
+import { renderUserMultiSelect, bindUserMultiSelect, getSelectedUserIds } from '/components/user-multi-select.js';
 import { rowActionHtml } from '/utils/row-action.js';
 import { openModal, closeModal, confirmOverModal, captureModalContext, isModalContextCurrent, reportFieldErrors, constraintErrors } from '/components/modal.js';
 
@@ -26,8 +28,8 @@ export function paperlessMediaPath(folderId, documentId, action) {
   return `/api/v1${ROOT}/folders/${encodeURIComponent(folderId)}/documents/${encodeURIComponent(documentId)}/${action}`;
 }
 
-/** The same browser component can also be hosted by a module page. */
-export async function mountPaperlessFolders({ sidebar, content, accounts = [], canManage = false,
+/** Mount the Documents saved-view browser. */
+export async function mountPaperlessFolders({ sidebar, content, accounts = [], canManage = false, members = [], userId = null,
   signal, onActiveChange = () => {} }) {
   let folders = [];
   let active = null;
@@ -101,7 +103,7 @@ export async function mountPaperlessFolders({ sidebar, content, accounts = [], c
           <button class="btn btn--secondary btn--sm" type="button" data-pl-refresh>${esc(t(key('refresh')))}</button>
         </div>
         <p class="form-hint">${esc(t(key('readOnly')))}</p>
-        <p class="form-hint">${esc(t(key(folder.visibility === 'family' ? 'shared' : 'private')))}</p>
+        <p class="form-hint">${esc(t(`documents.visibility.${folder.visibility}`))}</p>
         <div class="row-carrier paperless-folder__documents">
           ${(result.data || []).map((doc) => {
             const external = /^https?:\/\//i.test(doc.url || '') ? doc.url : null;
@@ -109,10 +111,12 @@ export async function mountPaperlessFolders({ sidebar, content, accounts = [], c
               <i data-lucide="file-text" aria-hidden="true"></i>
               <span class="list-row__name">${esc(doc.title)}</span>
               <div class="paperless-folder__actions">
-                <button class="btn btn--secondary btn--sm" type="button" data-pl-tags="${esc(doc.id)}" data-pl-title="${esc(doc.title)}">${esc(t(key('tags.action')))}</button>
                 <a class="btn btn--secondary btn--sm" target="_blank" rel="noopener noreferrer" href="${esc(paperlessMediaPath(folder.id, doc.id, 'preview'))}">${esc(t(key('preview')))}</a>
-                <a class="btn btn--ghost btn--sm" href="${esc(paperlessMediaPath(folder.id, doc.id, 'download'))}">${esc(t(key('download')))}</a>
-                ${external ? `<a class="btn btn--ghost btn--sm" target="_blank" rel="noopener noreferrer" href="${esc(external)}">${esc(t(key('openExternal')))}</a>` : ''}
+                ${popoverMenuHtml({ id: `pl-actions-${folder.id}-${doc.id}`, label: t('common.moreActions'), items: [
+                  { action: 'pl-tags', label: t(key('tags.action')), icon: 'tags', attrs: { 'data-pl-tags': doc.id, 'data-pl-title': doc.title } },
+                  { action: 'pl-download', label: t(key('download')), icon: 'download', attrs: { 'data-pl-download': paperlessMediaPath(folder.id, doc.id, 'download') } },
+                  ...(external ? [{ action: 'pl-external', label: t(key('openExternal')), icon: 'external-link', attrs: { 'data-pl-external': external } }] : []),
+                ] })}
               </div>
             </article>`;
           }).join('')}
@@ -140,8 +144,9 @@ export async function mountPaperlessFolders({ sidebar, content, accounts = [], c
         <div class="form-group"><label class="form-label" for="pl-name">${esc(t(key('name')))}${REQUIRED_MARK}</label><input class="form-input" id="pl-name" required maxlength="200" value="${esc(folder?.name || '')}"></div>
         ${!folder ? `<div class="form-group"><label class="form-label" for="pl-account">${esc(t(key('account')))}</label><select class="form-input" id="pl-account">${accounts.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></div>
           <div class="form-group"><label class="form-label" for="pl-view">${esc(t(key('view')))}${REQUIRED_MARK}</label><select class="form-input" id="pl-view" required disabled></select><button class="btn btn--ghost btn--sm" type="button" data-pl-more-views hidden>${esc(t(key('moreViews')))}</button></div>` : ''}
-        <div class="form-group"><label class="form-label" for="pl-visibility">${esc(t(key('visibility')))}</label><select class="form-input" id="pl-visibility"><option value="private" ${folder?.visibility !== 'family' ? 'selected' : ''}>${esc(t(key('private')))}</option><option value="family" ${folder?.visibility === 'family' ? 'selected' : ''}>${esc(t(key('shared')))}</option></select></div>
-        <label class="form-hint"><input type="checkbox" id="pl-confirm"> ${esc(t(key('shareConsent')))}</label>
+        <div class="form-group"><label class="form-label" for="pl-visibility">${esc(t(key('visibility')))}</label><select class="form-input" id="pl-visibility">${['private', 'restricted', 'family'].map((visibility) => `<option value="${visibility}" ${(folder?.visibility || 'private') === visibility ? 'selected' : ''}>${esc(t(`documents.visibility.${visibility}`))}</option>`).join('')}</select></div>
+        <div id="pl-members" hidden>${renderUserMultiSelect(members, folder?.allowed_member_ids || [], 'pl-members', 'documents.allowedMembersLabel')}</div>
+        <label class="form-hint" id="pl-consent" hidden><input type="checkbox" id="pl-confirm"> ${esc(t(key('shareConsent')))}</label>
         <p class="form-hint">${esc(t(key('viewHint')))}</p>
         <p class="form-error" id="pl-error" role="alert" hidden></p>
         <div class="modal-panel__footer">
@@ -155,6 +160,23 @@ export async function mountPaperlessFolders({ sidebar, content, accounts = [], c
         const current = () => alive() && isModalContextCurrent(modalContext);
         const error = panel.querySelector('#pl-error');
         const submit = panel.querySelector('[type="submit"]');
+        bindUserMultiSelect(panel, 'pl-members');
+        const visibility = panel.querySelector('#pl-visibility');
+        const consent = panel.querySelector('#pl-consent');
+        const confirm = panel.querySelector('#pl-confirm');
+        const updateAudience = () => {
+          const selected = getSelectedUserIds(panel, 'pl-members');
+          const wider = folder?.visibility !== 'family' && (visibility.value === 'family'
+            || (visibility.value === 'restricted' && selected.some((id) => id !== userId
+              && !folder?.allowed_member_ids?.includes(id))));
+          panel.querySelector('#pl-members').hidden = visibility.value !== 'restricted';
+          consent.hidden = !wider;
+          confirm.checked = false;
+          confirm.required = wider;
+        };
+        visibility.addEventListener('change', updateAudience, options);
+        panel.querySelector('#pl-members').addEventListener('change', updateAudience, options);
+        updateAudience();
         const showError = (err) => { error.textContent = sentence(err); error.hidden = false; };
         let viewsPage = 0;
         let viewsSerial = 0;
@@ -224,6 +246,7 @@ export async function mountPaperlessFolders({ sidebar, content, accounts = [], c
             name: panel.querySelector('#pl-name').value.trim(),
             visibility: panel.querySelector('#pl-visibility').value,
             confirm_share: panel.querySelector('#pl-confirm').checked,
+            allowed_member_ids: getSelectedUserIds(panel, 'pl-members'),
           };
           if (!folder) {
             body.account_id = Number(panel.querySelector('#pl-account').value);
@@ -252,8 +275,13 @@ export async function mountPaperlessFolders({ sidebar, content, accounts = [], c
     else if (event.target.closest('[data-pl-add]')) edit();
     else if (event.target.closest('[data-pl-retry]')) refresh();
   }, options);
+  installPopoverMenus(content);
   content.addEventListener('click', (event) => {
     if (!active) return;
+    const download = event.target.closest('[data-pl-download]');
+    const external = event.target.closest('[data-pl-external]');
+    if (download) { window.location.assign(download.dataset.plDownload); return; }
+    if (external) { window.open(external.dataset.plExternal, '_blank', 'noopener,noreferrer'); return; }
     const tags = event.target.closest('[data-pl-tags]');
     if (tags) {
       const folder = active;

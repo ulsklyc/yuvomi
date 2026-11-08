@@ -3979,7 +3979,7 @@
             "visibility": "Wie mag deze map zien?",
             "private": "Alleen ik",
             "shared": "Gezin",
-            "shareConsent": "Ik geef iedereen met toegang tot Documenten toestemming om alle huidige en toekomstige documenten in deze weergave te lezen en te downloaden.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Wijzigingen aan de Paperless-weergave wijzigen ook deze map. Bestanden blijven in Paperless. Zonder filters worden alle voor de verbinding leesbare documenten opgenomen.",
             "readOnly": "Documenten en filters blijven in Paperless. Bevoegde beheerders kunnen hier tags wijzigen.",
             "refresh": "Vernieuwen",
@@ -3996,11 +3996,11 @@
             "remove": "Map ontkoppelen",
             "removeConfirm": "‘{{name}}’ ontkoppelen? De documenten in Paperless blijven bewaard.",
             "errors": {
-                "unsupported": "Niet-ondersteunde of ongeldige filters. Werk de integratie bij of kies een andere weergave.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "De Paperless-weergave kan niet worden gelezen. Controleer de verbinding en probeer opnieuw.",
                 "gone": "Deze map of dit document is niet meer beschikbaar. Vernieuw de lijst.",
                 "changed": "De map is tijdens het laden gewijzigd. Vernieuw de map.",
-                "share": "Bevestig dat alle huidige en toekomstige documenten met het gezin mogen worden gedeeld.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Controleer de mapnaam, verbinding en weergave.",
                 "forbidden": "Je hebt geen toestemming voor deze actie.",
                 "preview": "Geen voorbeeld voor dit bestandstype. Download het document."

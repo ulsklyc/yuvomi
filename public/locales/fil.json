@@ -3979,7 +3979,7 @@
             "visibility": "Sino ang makakakita sa folder na ito?",
             "private": "Ako lamang",
             "shared": "Pamilya",
-            "shareConsent": "Pinapahintulutan ko ang lahat ng may access sa Mga Dokumento na basahin at i-download ang lahat ng kasalukuyan at susunod na dokumento sa view na ito.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Ang pagbabago ng view sa Paperless ay magbabago rin sa folder na ito. Mananatili sa Paperless ang mga file. Kapag walang filter, kasama ang lahat ng dokumentong mababasa ng koneksyon.",
             "readOnly": "Nananatili sa Paperless ang mga dokumento at filter. Maaaring baguhin dito ng awtorisadong administrator ang mga tag.",
             "refresh": "I-refresh",
@@ -3996,11 +3996,11 @@
             "remove": "Idiskonekta ang folder",
             "removeConfirm": "Idiskonekta ang “{{name}}”? Mananatili ang mga dokumento sa Paperless.",
             "errors": {
-                "unsupported": "Hindi suportado o hindi wasto ang mga filter. I-update ang integrasyon o pumili ng ibang view.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Hindi mabasa ang view sa Paperless. Suriin ang koneksyon at subukang muli.",
                 "gone": "Hindi na available ang folder o dokumento. I-refresh ang listahan.",
                 "changed": "Nagbago ang folder habang naglo-load. I-refresh ito.",
-                "share": "Kumpirmahing maibabahagi sa pamilya ang kasalukuyan at susunod na mga dokumento sa view.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Suriin ang pangalan ng folder, koneksyon at view.",
                 "forbidden": "Wala kang pahintulot para sa aksyong ito.",
                 "preview": "Walang preview para sa uri ng file na ito. I-download ang dokumento."

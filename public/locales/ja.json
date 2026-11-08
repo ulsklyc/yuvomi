@@ -3917,7 +3917,7 @@
             "visibility": "このフォルダーを表示できる人",
             "private": "自分のみ",
             "shared": "家族",
-            "shareConsent": "ドキュメントへのアクセス権を持つ全員に、このビュー内の現在および今後のすべての文書の閲覧とダウンロードを許可します。",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Paperlessのビューを変更すると、このフォルダーも変わります。ファイルはPaperlessに残ります。フィルターが空の場合、接続先のアカウントで閲覧できる全書類が含まれます。",
             "readOnly": "文書とフィルターはPaperlessで管理されます。権限のある管理者はここでタグを変更できます。",
             "refresh": "更新",
@@ -3934,11 +3934,11 @@
             "remove": "フォルダーの接続を解除",
             "removeConfirm": "「{{name}}」の接続を解除しますか？Paperless内の文書は保持されます。",
             "errors": {
-                "unsupported": "未対応または無効なフィルターです。連携を更新するか、別のビューを選んでください。",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Paperlessのビューを読み取れません。接続を確認して再試行してください。",
                 "gone": "このフォルダーまたは文書は利用できなくなりました。一覧を更新してください。",
                 "changed": "読み込み中にフォルダーが変更されました。更新してください。",
-                "share": "このビューの現在および今後の文書を家族と共有することを確認してください。",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "フォルダー名、接続、ビューを確認してください。",
                 "forbidden": "この操作を行う権限がありません。",
                 "preview": "この形式のファイルはプレビューできません。文書をダウンロードしてください。"

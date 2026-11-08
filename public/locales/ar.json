@@ -4266,7 +4266,7 @@
             "visibility": "من يمكنه رؤية هذا المجلد؟",
             "private": "أنا فقط",
             "shared": "العائلة",
-            "shareConsent": "أسمح لكل من لديه صلاحية الوصول إلى المستندات بقراءة وتنزيل جميع المستندات الحالية والمستقبلية في هذا العرض.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "تغييرات العرض في Paperless تغيّر هذا المجلد أيضًا. تبقى الملفات في Paperless. عند عدم وجود مرشحات، تُضمّن جميع المستندات التي يمكن للاتصال قراءتها.",
             "readOnly": "تبقى المستندات والفلاتر في Paperless. يمكن للمسؤولين المخولين تعديل الوسوم هنا.",
             "refresh": "تحديث",
@@ -4283,11 +4283,11 @@
             "remove": "فصل المجلد",
             "removeConfirm": "هل تريد فصل «{{name}}»؟ ستبقى المستندات في Paperless.",
             "errors": {
-                "unsupported": "مرشحات غير مدعومة أو غير صالحة. حدّث التكامل أو اختر عرضًا آخر.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "تعذرت قراءة عرض Paperless. تحقق من الاتصال وحاول مجددًا.",
                 "gone": "لم يعد هذا المجلد أو المستند متاحًا. حدّث القائمة.",
                 "changed": "تغيّر المجلد أثناء التحميل. حدّثه.",
-                "share": "أكد مشاركة المستندات الحالية والمستقبلية في هذا العرض مع العائلة.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "تحقق من اسم المجلد والاتصال والعرض.",
                 "forbidden": "ليست لديك صلاحية لتنفيذ هذا الإجراء.",
                 "preview": "لا يمكن معاينة هذا النوع من الملفات. نزّل المستند."

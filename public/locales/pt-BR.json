@@ -3917,7 +3917,7 @@
             "visibility": "Quem pode ver esta pasta?",
             "private": "Apenas eu",
             "shared": "Família",
-            "shareConsent": "Autorizo todas as pessoas com acesso a Documentos a ler e baixar os documentos atuais e futuros desta visualização.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Alterações na visualização do Paperless também alteram esta pasta. Os arquivos permanecem no Paperless. Sem filtros, todos os documentos acessíveis pela conexão são incluídos.",
             "readOnly": "Os documentos e filtros permanecem no Paperless. Administradores autorizados podem alterar etiquetas aqui.",
             "refresh": "Atualizar",
@@ -3934,11 +3934,11 @@
             "remove": "Desconectar pasta",
             "removeConfirm": "Desconectar “{{name}}”? Os documentos no Paperless serão mantidos.",
             "errors": {
-                "unsupported": "Filtros incompatíveis ou inválidos. Atualize a integração ou escolha outra visualização.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Não foi possível ler a visualização do Paperless. Verifique a conexão e tente novamente.",
                 "gone": "Esta pasta ou documento não está mais disponível. Atualize a lista.",
                 "changed": "A pasta mudou durante o carregamento. Atualize-a.",
-                "share": "Confirme o compartilhamento familiar dos documentos atuais e futuros desta visualização.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Verifique o nome da pasta, a conexão e a visualização.",
                 "forbidden": "Você não tem permissão para esta ação.",
                 "preview": "Este tipo de arquivo não permite prévia. Baixe o documento."

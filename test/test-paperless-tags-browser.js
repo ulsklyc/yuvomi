@@ -19,10 +19,13 @@ test('tags can be viewed and edited in folders and linked documents on desktop a
     writes.push(req.body); assigned = req.body.tags; res.json(document());
   });
   source.get('/api/documents/99/download/', (_req, res) => res.type('text/plain').send('Receipt'));
-  source.get('/api/tags/', (req, res) => res.json({ results: Number(req.query.page) === 2
+  source.get('/api/tags/', (req, res) => {
+    if (req.query.id__in) return res.json({ results: req.query.id__in.split(',').map(Number).map((id) => ({ id, name: id === 7 ? 'House' : 'Second page tag' })), count: 2, next: null });
+    return res.json({ results: Number(req.query.page) === 2
     ? [{ id: 150, name: 'Second page tag' }, { id: 151, name: 'Another tag' }]
     : [{ id: 7, name: 'House' }, { id: 8, name: '<img src=x onerror=alert(1)>' }],
-  count: 4, next: Number(req.query.page) === 2 ? null : 'https://evil.example/ignored' }));
+  count: 4, next: Number(req.query.page) === 2 ? null : 'https://evil.example/ignored' });
+  });
   source.get('/api/tags/:id/', (req, res) => res.json({ id: Number(req.params.id), name: req.params.id === '7' ? 'House' : 'Second page tag' }));
   const sourceServer = source.listen(0, '127.0.0.1');
   await new Promise((resolve) => sourceServer.once('listening', resolve));
@@ -56,7 +59,8 @@ test('tags can be viewed and edited in folders and linked documents on desktop a
     await gotoRoute(page, '/documents');
     await page.waitForSelector('[data-pl-folder]');
     await page.click('[data-pl-folder]');
-    await page.waitForSelector('[data-pl-tags]');
+    await page.waitForSelector('.paperless-folder__actions [popovertarget]');
+    await page.click('.paperless-folder__actions [popovertarget]');
     await page.click('[data-pl-tags]');
     await page.waitForFunction(() => document.querySelector('.modal-panel [type="submit"]')?.disabled === false).catch(async (err) => { console.error('tag-test modal:', await page.$eval('.modal-panel', (el) => el.textContent).catch(() => 'missing')); throw err; });
     assert.equal(await page.$eval('[data-pl-tag-list] input[value="150"]', (el) => el.checked), true);

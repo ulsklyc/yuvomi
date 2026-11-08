@@ -3917,7 +3917,7 @@
             "visibility": "Quem pode ver esta pasta?",
             "private": "Apenas eu",
             "shared": "Família",
-            "shareConsent": "Autorizo todas as pessoas com acesso a Documentos a ler e descarregar os documentos atuais e futuros desta vista.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "As alterações à vista no Paperless também alteram esta pasta. Os ficheiros permanecem no Paperless. Sem filtros, são incluídos todos os documentos acessíveis pela ligação.",
             "readOnly": "Os documentos e filtros permanecem no Paperless. Os administradores autorizados podem alterar etiquetas aqui.",
             "refresh": "Atualizar",
@@ -3934,11 +3934,11 @@
             "remove": "Desligar pasta",
             "removeConfirm": "Desligar «{{name}}»? Os documentos no Paperless serão mantidos.",
             "errors": {
-                "unsupported": "Filtros não suportados ou inválidos. Atualize a integração ou escolha outra vista.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Não foi possível ler a vista do Paperless. Verifique a ligação e tente novamente.",
                 "gone": "Esta pasta ou documento já não está disponível. Atualize a lista.",
                 "changed": "A pasta mudou durante o carregamento. Atualize-a.",
-                "share": "Confirme a partilha familiar dos documentos atuais e futuros desta vista.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Verifique o nome da pasta, a ligação e a vista.",
                 "forbidden": "Não tem permissão para esta ação.",
                 "preview": "Este tipo de ficheiro não permite pré-visualização. Descarregue o documento."

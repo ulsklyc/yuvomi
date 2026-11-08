@@ -3979,7 +3979,7 @@
             "visibility": "چه کسانی این پوشه را می‌بینند؟",
             "private": "فقط من",
             "shared": "خانواده",
-            "shareConsent": "به همهٔ افرادی که به اسناد دسترسی دارند اجازه می‌دهم همهٔ اسناد فعلی و آیندهٔ این نما را بخوانند و دریافت کنند.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "تغییر نمای Paperless این پوشه را هم تغییر می‌دهد. فایل‌ها در Paperless می‌مانند. بدون فیلتر، همهٔ اسناد قابل خواندن برای این اتصال نمایش داده می‌شوند.",
             "readOnly": "اسناد و فیلترها در Paperless می‌مانند. مدیران مجاز می‌توانند اینجا برچسب‌ها را تغییر دهند.",
             "refresh": "به‌روزرسانی",
@@ -3996,11 +3996,11 @@
             "remove": "قطع اتصال پوشه",
             "removeConfirm": "اتصال «{{name}}» قطع شود؟ اسناد در Paperless باقی می‌مانند.",
             "errors": {
-                "unsupported": "فیلترها پشتیبانی نمی‌شوند یا نامعتبرند. یکپارچه‌سازی را به‌روز کنید یا نمای دیگری برگزینید.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "خواندن نمای Paperless ممکن نبود. اتصال را بررسی و دوباره تلاش کنید.",
                 "gone": "این پوشه یا سند دیگر در دسترس نیست. فهرست را تازه کنید.",
                 "changed": "پوشه هنگام بارگیری تغییر کرد. آن را تازه کنید.",
-                "share": "اشتراک اسناد فعلی و آیندهٔ این نما با خانواده را تأیید کنید.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "نام پوشه، اتصال و نما را بررسی کنید.",
                 "forbidden": "اجازهٔ انجام این کار را ندارید.",
                 "preview": "پیش‌نمایش این نوع فایل ممکن نیست. سند را دریافت کنید."

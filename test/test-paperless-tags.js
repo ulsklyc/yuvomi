@@ -49,7 +49,7 @@ beforeEach(() => {
   assigned = [7, 150]; writes = []; inView = true;
   adapter = {
     async getDocument() { return { tags: [...assigned] }; },
-    async getTag(id) { return { id, name: id === 7 ? 'House' : 'Off-page tag' }; },
+    async getTags(ids) { return ids.map((id) => ({ id, name: id === 7 ? 'House' : 'Off-page tag' })); },
     async listTags({ page }) { return { results: [{ id: page === 1 ? 7 : 150, name: 'Tag' }], count: 101, has_more: page === 1 }; },
     async listViewDocuments() { return { results: inView ? [{ id: '99' }] : [] }; },
     async setDocumentTags(id, tags) { writes.push({ id, tags }); assigned = tags; return { tags }; },
@@ -132,7 +132,7 @@ test('revocation or account change during reads prevents writes and disclosure',
   assert.equal((await call('GET', linkPath())).status, 409);
 });
 test('upstream permission and availability failures are sanitized; hidden tag IDs are preserved', async () => {
-  adapter.getTag = async () => { throw Object.assign(new Error('SECRET'), { status: 403 }); };
+  adapter.getTags = async () => { throw Object.assign(new Error('SECRET'), { status: 403 }); };
   assert.equal((await call('GET', linkPath())).body.data.tags[0].name, '#7');
   adapter.setDocumentTags = async () => { throw Object.assign(new Error('SECRET'), { status: 403 }); };
   const denied = await call('PUT', linkPath(), { tags: [], expected_tags: assigned });
@@ -150,11 +150,67 @@ test('adapter uses guarded paginated tag paths and PATCH changes tags alone', as
   };
   const adapter = new PaperlessAdapter({ base_url: 'http://127.0.0.1:1234/paperless', api_token: 'test' });
   assert.equal((await adapter.listTags({ page: 2 })).has_more, true);
-  assert.deepEqual(await adapter.getTag(7), { id: 7, name: 'House' });
+  assert.deepEqual(await adapter.getTags([7]), [{ id: 7, name: 'House' }]);
   await adapter.setDocumentTags(99, [7]);
   assert.equal(calls.length, 3);
   assert.ok(calls[0].url.includes('page=2'));
   assert.equal(calls[2].options.method, 'PATCH');
   assert.deepEqual(JSON.parse(calls[2].options.body), { tags: [7] });
   for (const call of calls) assert.ok(call.url.startsWith('http://127.0.0.1:1234/paperless/api/'));
+});
+
+
+test('tag reads use one membership query and one batched name lookup', async () => {
+  let memberships = 0, nameCalls = 0;
+  adapter.listViewDocuments = async () => { memberships++; return { results: [{ id: '99' }] }; };
+  adapter.getTags = async (ids) => { nameCalls++; assert.deepEqual(ids, [7, 150]); return [{ id: 7, name: 'House' }]; };
+  const result = await call('GET', folderPath());
+  assert.equal(result.status, 200);
+  assert.equal(memberships, 1);
+  assert.equal(nameCalls, 1);
+  assert.deepEqual(result.body.data.tags, [{ id: 7, name: 'House' }, { id: 150, name: '#150' }]);
+});
+
+test('selected folder members can read tags, other readers cannot, and revocation takes effect during reads', async () => {
+  database.prepare("UPDATE paperless_view_folders SET visibility = 'restricted'").run();
+  database.prepare('INSERT INTO paperless_view_folder_access (folder_id, user_id) VALUES (?, ?)').run(folderId, member);
+  identity = { id: other, role: 'admin' };
+  assert.equal((await call('GET', folderPath())).status, 404);
+  identity = { id: member, role: 'member' };
+  assert.equal((await call('GET', folderPath())).status, 200);
+  adapter.getTags = async () => {
+    database.prepare('DELETE FROM paperless_view_folder_access WHERE folder_id = ?').run(folderId);
+    return [{ id: 7, name: 'Private' }];
+  };
+  const revoked = await call('GET', folderPath());
+  assert.equal(revoked.status, 404);
+  assert.ok(!JSON.stringify(revoked.body).includes('Private'));
+});
+
+test('batched tag lookup ignores unassigned names and skips empty assignments', async () => {
+  let calls = 0;
+  globalThis.fetch = async (url) => {
+    calls++;
+    assert.equal(new URL(url).searchParams.get('id__in'), '7,150');
+    return new Response(JSON.stringify({ results: [{ id: 7, name: 'House' }, { id: 900, name: 'Secret' }], count: 2, next: null }));
+  };
+  const source = new PaperlessAdapter({ base_url: 'http://127.0.0.1:1234/batch', api_token: 'test' });
+  assert.deepEqual(await source.getTags([]), []);
+  assert.equal(calls, 0);
+  assert.deepEqual(await source.getTags([7, 150]), [{ id: 7, name: 'House' }]);
+  assert.equal(calls, 1);
+});
+
+test('operator logs contain response and upstream status codes without upstream messages or URLs', async (t) => {
+  const logs = [];
+  t.mock.method(console, 'warn', (...args) => logs.push(args.join(' ')));
+  adapter.getDocument = async () => { throw Object.assign(new Error('SECRET http://private.invalid'), { status: 503 }); };
+  assert.equal((await call('GET', linkPath())).status, 502);
+  adapter.getDocument = async () => ({ tags: assigned });
+  adapter.getTags = async () => null; // Local processing failure, not a source HTTP response.
+  assert.equal((await call('GET', linkPath())).status, 500);
+  assert.ok(logs.some((line) => line.includes('503')));
+  assert.ok(logs.some((line) => line.includes('502')));
+  assert.ok(logs.some((line) => line.includes('500')));
+  assert.ok(logs.every((line) => !/SECRET|private.invalid|http:/.test(line)));
 });

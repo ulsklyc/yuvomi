@@ -3979,7 +3979,7 @@
             "visibility": "누가 이 폴더를 볼 수 있나요?",
             "private": "나만",
             "shared": "가족",
-            "shareConsent": "문서에 접근할 수 있는 모든 사람이 이 보기의 현재 및 향후 모든 문서를 읽고 다운로드하도록 허용합니다.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Paperless의 보기를 변경하면 이 폴더도 바뀝니다. 파일은 Paperless에 남습니다. 필터가 없으면 연결된 계정이 읽을 수 있는 모든 문서가 포함됩니다.",
             "readOnly": "문서와 필터는 Paperless에 유지됩니다. 권한이 있는 관리자는 여기서 태그를 변경할 수 있습니다.",
             "refresh": "새로고침",
@@ -3996,11 +3996,11 @@
             "remove": "폴더 연결 해제",
             "removeConfirm": "‘{{name}}’의 연결을 해제할까요? Paperless의 문서는 유지됩니다.",
             "errors": {
-                "unsupported": "지원하지 않거나 잘못된 필터입니다. 연동을 업데이트하거나 다른 보기를 선택하세요.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Paperless 보기를 읽을 수 없습니다. 연결을 확인하고 다시 시도하세요.",
                 "gone": "이 폴더 또는 문서를 더 이상 이용할 수 없습니다. 목록을 새로 고치세요.",
                 "changed": "불러오는 동안 폴더가 변경되었습니다. 새로 고치세요.",
-                "share": "이 보기의 현재 및 향후 문서를 가족과 공유하는 데 동의해 주세요.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "폴더 이름, 연결 및 보기를 확인하세요.",
                 "forbidden": "이 작업을 수행할 권한이 없습니다.",
                 "preview": "이 파일 형식은 미리 볼 수 없습니다. 문서를 다운로드하세요."

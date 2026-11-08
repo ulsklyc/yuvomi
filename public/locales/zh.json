@@ -3917,7 +3917,7 @@
             "visibility": "谁可以查看此文件夹？",
             "private": "仅自己",
             "shared": "家庭",
-            "shareConsent": "我允许所有有权访问“文档”的人阅读和下载此视图中当前及今后的所有文档。",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "在 Paperless 中修改此视图也会更改此文件夹。文件保留在 Paperless 中。没有筛选条件时，将包含此连接可读取的所有文档。",
             "readOnly": "文档和筛选条件保留在 Paperless。获授权的管理员可以在此更改标签。",
             "refresh": "刷新",
@@ -3934,11 +3934,11 @@
             "remove": "解除文件夹关联",
             "removeConfirm": "要解除“{{name}}”的关联吗？Paperless 中的文档将会保留。",
             "errors": {
-                "unsupported": "此视图包含不支持或无效的筛选条件。请更新集成或选择其他视图。",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "无法读取 Paperless 视图。请检查连接后重试。",
                 "gone": "此文件夹或文档已不可用。请刷新列表。",
                 "changed": "文件夹在加载过程中发生变化。请刷新。",
-                "share": "请确认允许与家人共享此视图中当前及今后的所有文档。",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "请检查文件夹名称、连接和视图。",
                 "forbidden": "你无权执行此操作。",
                 "preview": "此文件类型无法预览。请下载文档。"

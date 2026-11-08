@@ -1600,18 +1600,23 @@ const MIGRATIONS_SQL = {
   278: `ALTER TABLE display_accounts ADD COLUMN device_settings TEXT CHECK(device_settings IS NULL OR json_valid(device_settings));`,
   279: `ALTER TABLE tasks ADD COLUMN external_rrule TEXT;`,
   281: `ALTER TABLE calendar_events ADD COLUMN provider_status TEXT CHECK(provider_status IS NULL OR provider_status IN ('TENTATIVE', 'CONFIRMED', 'CANCELLED'));`,
-  282: `
-      CREATE TABLE IF NOT EXISTS paperless_view_folders (
+  283: `
+      CREATE TABLE paperless_view_folders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL CHECK(length(name) BETWEEN 1 AND 200),
         account_id INTEGER NOT NULL REFERENCES dms_accounts(id) ON DELETE CASCADE,
         view_id INTEGER NOT NULL CHECK(view_id > 0),
-        visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('private', 'family')),
+        visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('private', 'restricted', 'family')),
         created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
         updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
       );
-      CREATE INDEX IF NOT EXISTS idx_paperless_view_folders_account ON paperless_view_folders(account_id);
+      CREATE INDEX idx_paperless_view_folders_account ON paperless_view_folders(account_id);
+      CREATE TABLE paperless_view_folder_access (
+        folder_id INTEGER NOT NULL REFERENCES paperless_view_folders(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (folder_id, user_id)
+      );
   `,
 };
 

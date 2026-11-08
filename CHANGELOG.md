@@ -28,9 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 - **Saved Paperless views can be opened as live document folders.** Connect a
   view in Documents, keep it private or explicitly share its current and future
-  matches with the family. Source filters, ordering and pagination are read on
+  matches with selected members or the family. Source filters, ordering and pagination are read on
   demand; preview and download recheck membership. Disconnecting only removes
-  the binding. An optional module adds a separate Paperless navigation page.
+  the binding. Migration 283 adds the folder and member-access tables.
 - **Paperless document tags are visible and editable.** Administrators with Documents write access can assign existing tags on linked documents and saved-view members, with stale-edit detection and paginated tag selection. Family readers can view assigned tags.
 
 ### Fixed
@@ -104,11 +104,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The app added to the iPhone Home Screen reaches the bottom edge again** (refs #2417). On iOS 27
   the installed app ended a status bar's height above the bottom of the screen, with an empty strip
   below the tab bar. It now takes the full screen height; Yuvomi in a Safari tab is unchanged.
-- **The Paperless fork upgrades to Yuvomi 2.85.0 without losing folder bindings.**
-  Migration 282 preserves existing view folders and repairs the overlapping
-  migration 276 marker from the published 2.84 fork, including the pantry
-  product minimum backfill. Upstream migrations remain unchanged.
-
 ### Security
 - **Database backup downloads are limited to ten per hour for each administrator** (#2524). Every
   download builds a full copy of the database on the server, so a hijacked admin session could

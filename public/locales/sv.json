@@ -3917,7 +3917,7 @@
             "visibility": "Vem får se den här mappen?",
             "private": "Endast jag",
             "shared": "Familj",
-            "shareConsent": "Jag tillåter alla med åtkomst till Dokument att läsa och ladda ned alla nuvarande och framtida dokument i den här vyn.",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "Ändringar i Paperless-vyn ändrar även den här mappen. Filerna stannar i Paperless. Utan filter ingår alla dokument som anslutningen kan läsa.",
             "readOnly": "Dokument och filter finns kvar i Paperless. Behöriga administratörer kan ändra taggar här.",
             "refresh": "Uppdatera",
@@ -3934,11 +3934,11 @@
             "remove": "Koppla från mapp",
             "removeConfirm": "Koppla från ”{{name}}”? Dokumenten i Paperless behålls.",
             "errors": {
-                "unsupported": "Filter stöds inte eller är ogiltiga. Uppdatera integrationen eller välj en annan vy.",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "Paperless-vyn kunde inte läsas. Kontrollera anslutningen och försök igen.",
                 "gone": "Mappen eller dokumentet är inte längre tillgängligt. Uppdatera listan.",
                 "changed": "Mappen ändrades under inläsningen. Uppdatera den.",
-                "share": "Bekräfta delning med familjen av alla nuvarande och framtida dokument i vyn.",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "Kontrollera mappnamn, anslutning och vy.",
                 "forbidden": "Du har inte behörighet för den här åtgärden.",
                 "preview": "Ingen förhandsvisning för den här filtypen. Ladda ned dokumentet."

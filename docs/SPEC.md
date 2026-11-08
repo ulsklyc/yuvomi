@@ -3213,18 +3213,18 @@ as a series (RRULE reduced to the locally supported subset), and the source UID 
 ### Family Documents
 Upload and manage family files with per-document access control.
 
-- **Paperless view folders (migration 282):** a separate `paperless_view_folders`
+- **Paperless view folders (migration 283):** a separate `paperless_view_folders`
   binding connects an existing DMS account and saved-view ID. Creating admins
   alone can manage their bindings. Private folders are visible only to the
-  creator; family sharing explicitly delegates read/download of all current and
-  future matches to users who can read Documents. These are root-level virtual
+  creator; restricted folders add explicitly selected members, and family sharing
+  delegates read/download of all current and future matches to Documents readers. These are root-level virtual
   folders, separate from the local folder tree, without local document rows.
-  Filters and ordering are loaded per page (50 entries), unknown rules fail
+  Definitions are cached for five seconds; document pages stay live (50 entries). Unknown rules fail
   closed, and media intersects the current filters with the requested document
   ID before fetching bytes. Visibility is rechecked after remote requests. No
   Paperless credentials or response bodies are returned to clients. Responses
   are `no-store`. Local archive/category/search filters do not apply. See
-  [Paperless view folders](PAPERLESS-VIEW-FOLDERS.md) for installation and limits.
+  [Paperless view folders](#paperless-saved-view-folders) for installation and limits.
 
 
 | Column | Type | Constraint |
@@ -3429,6 +3429,131 @@ private one does not pass. This is a pre-flight check of the configured URL, not
 anti-rebinding lookup `server/utils/http.js` provides: the adapters need `FormData` and `res.json()`,
 which `safeRequest()` does not offer, and global `fetch()` has no per-connection `lookup`. That
 residual gap is documented in the module header.
+
+### Paperless saved-view folders
+
+Documents can connect a saved Paperless view as a live folder with read access
+and administrator-controlled tag assignment.
+Nothing is copied into `family_documents`, and a document can appear in several
+views. This is a core extension, not a scheduled import.
+
+#### Use
+
+1. Configure Paperless under Settings -> Documents -> Document management, using
+   the server root URL and an API token. The Paperless user must be able to
+   read saved views and the documents in them.
+2. Create and save the desired view in Paperless.
+3. In Documents, use the plus button beside Paperless views. Pick the
+   connection, saved view and local name.
+4. Keep the default Only me, select individual members, or select Family.
+   Confirm when widening who can read current and future matches.
+5. Open the folder. Refresh or reopen it to get the current document matches; use Next
+   for further pages. Preview opens a new tab; Download keeps the file's name.
+6. Use **Tags** on a document to see its live Paperless tags. The creating
+   administrator can select existing tags and save them directly to Paperless.
+   Individually linked Paperless documents offer the same **Tags** action in
+   their viewer (on mobile, in the actions menu).
+
+#### Document tags
+
+The Paperless token needs read permission for documents and tags, and change
+permission for documents to save assignments. No new tags are created.
+Family readers can see names of the document's assigned tags; they cannot
+browse the account-wide tag catalogue or change assignments. Unreadable tag
+names appear as `#ID` and their assignment is preserved. Mutations require a
+Yuvomi administrator and Documents write access. For view folders, only the
+folder's creating administrator may mutate tags. For individually linked
+documents, an administrator must be able to see the local document.
+
+The editor loads existing assignments before enabling Save. The catalogue is
+paginated in batches of 100; **Load more tags** fetches subsequent pages.
+Search filters the loaded catalogue. Assigned tags on unloaded pages remain
+selected; unchecking every assigned tag explicitly removes all assignments.
+Cancel does not write. No file is copied and no database migration is needed.
+
+Tag names are fetched with one `tags/?id__in=` request; omitted names fall
+back to `#ID`. Reads check source membership once and recheck local visibility
+after remote operations.
+
+Before saving, Yuvomi rechecks visibility, account identity, current view
+membership and the previously loaded tag IDs. An intervening source change
+returns a conflict and requires Refresh. Paperless does not provide an atomic
+compare-and-swap through this implementation: another writer could still
+change tags between that check and the PATCH. Only the `tags` field is sent.
+After saving, the view is refreshed; a document may disappear if its new tags
+no longer match the saved filters. Errors keep the editor open and preserve
+the selection. All tag responses use `Cache-Control: no-store`.
+
+Endpoints below `/api/v1/documents/dms/paperless`:
+
+- `GET /tags?account_id=…&page=…`: administrator-only tag catalogue.
+- `GET|PUT /folders/:id/documents/:documentId/tags`: current view member.
+- `GET|PUT /documents/:id/tags`: visible individually linked local document ID.
+- PUT body: `{ "tags": [7, 12], "expected_tags": [7] }` (both arrays required).
+
+Automated validation: `npm run test:paperless-tags` (adapter and route tests),
+`npm run test:paperless-tags-browser` (full app and loopback Paperless API).
+These tests do not replace an acceptance check against your actual Paperless
+instance and its object permissions.
+
+Sharing delegates permission to read/download **all current and future
+matches** to the selected audience, subject to Documents module access.
+Folders use the same family, restricted-to-selected-members and private
+visibility rule as individual links, through `document-access.js`. This uses the
+configured Paperless account, not the visitor's own Paperless identity. A view
+with no filters delegates the account's complete readable archive. Later
+changes to the source view can expand or narrow that delegation. Only the
+creating administrator can rename, share or disconnect their folder. Revoking
+sharing takes effect on the next request; already downloaded files cannot be
+recalled. Removing the DMS connection also removes its view-folder bindings.
+
+#### Design
+
+- Migration 283 adds `paperless_view_folders` and `paperless_view_folder_access`; shipped migrations stay intact.
+- `server/services/dms/paperless-views.js` translates persisted Paperless rule
+  IDs. Unknown or malformed rules fail closed with 422.
+- `PaperlessAdapter` caches validated `/api/saved_views/{id}/` definitions for
+  five seconds in a bounded process cache keyed by connection URL and token,
+  then calls `/api/documents/` with the filters, ordering and page parameters.
+  It uses the existing token, request timeout, target guard and API v9 header.
+- Page size is 50; no first-page/20-result truncation. Absolute `next` URLs are
+  not followed with credentials.
+- `/api/v1/documents/dms/paperless` uses core authentication, Documents module
+  permissions, token scopes and CSRF middleware. Configuration needs an admin.
+- Media routes intersect current view filters with the requested document ID
+  before fetching content, and recheck local sharing after remote awaits.
+- Responses are `no-store`, upstream errors are sanitized and previews allow
+  only PDF, PNG, JPEG, WebP, GIF and plain text. Other types are download-only.
+- An account or view cannot be retargeted in-place. Create a new binding for a
+  different source to make the new delegation explicit.
+
+Supported rule IDs 0-50 follow Paperless's persisted filter definitions:
+text/title/content, ASN, correspondents, types, storage paths, tags (all/any/not),
+dates, owners, sharing, custom fields and MIME filters. Legacy API v9 filter
+parameters remain in use for legacy rules. A new upstream rule requires a
+mapping and tests before it can be used. The actual installed Paperless release
+still needs an integration check, especially for newer rule types.
+
+#### Limits
+
+These are root-level virtual folders displayed alongside local folders. They
+are not nested in the local tree, included in All documents or global search,
+archived locally, linked automatically to tasks/budgets, or stored offline.
+Local category/archive/search controls are hidden while a source folder is
+open. Paperless's source ordering is preserved. This first version shows a
+list; source thumbnails have an endpoint but are not downloaded for every row.
+Preview opens separately and is not Yuvomi's editable local-document viewer.
+
+A source filter change becomes effective within five seconds; document
+membership is always queried live even while the definition is cached.
+There is no push subscription or background poll. Reopening, refreshing or
+changing page reads the source again. A changing source can move documents
+between pages, as with Paperless's ordinary paginated API. Folder authorization
+is checked around remote operations; view membership and fetching content are
+separate Paperless requests and cannot form one cross-server transaction.
+The existing DMS adapter's target-guard and DNS/redirect limitations are not
+changed by this feature.
+
 
 ### Budget Loans
 Instalment-based loans with per-payment tracking. Active loans show remaining balance and due months; paid-off loans are automatically closed. **Interest phases (migration v100, #569):** a loan is optionally modelled as a German-style annuity — from the `principal`, nominal `fixed_rate` and `initial_repayment_rate` the server derives the constant monthly payment and, from that, the term and total cost, storing them in `total_amount`/`installment_count` so the existing instalment/status logic is unchanged. With `interest_mode = 'fixed_then_variable'` a forecast `followup_rate` applies after the `fixed_period_months` fixed period (a longer follow-up rate lengthens the term). `interest_mode = 'variable'` (migration v101, #569) covers a loan with **no fixed-interest period at all**: it is computed single-phase exactly like `fixed`, but `fixed_rate` is treated as the current rate rather than a commitment, so `fixed_period_months`/`followup_rate` stay NULL and the UI labels payment and term as a snapshot of that rate. `interest_mode = 'none'` keeps the prior behaviour (manual `total_amount` + `installment_count`).

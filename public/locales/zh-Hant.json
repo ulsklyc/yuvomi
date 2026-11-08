@@ -3917,7 +3917,7 @@
             "visibility": "誰可以查看此資料夾？",
             "private": "僅自己",
             "shared": "家庭",
-            "shareConsent": "我允許所有有權存取「文件」的人閱讀及下載此檢視中目前及未來的所有文件。",
+            "shareConsent": "I grant the selected audience permission to read and download all current and future documents in this view.",
             "viewHint": "在 Paperless 中修改此檢視也會變更此資料夾。檔案保留在 Paperless 中。沒有篩選條件時，將包含此連線可讀取的所有文件。",
             "readOnly": "文件和篩選條件保留在 Paperless。獲授權的管理員可以在此變更標籤。",
             "refresh": "重新整理",
@@ -3934,11 +3934,11 @@
             "remove": "解除資料夾連結",
             "removeConfirm": "要解除「{{name}}」的連結嗎？Paperless 中的文件將會保留。",
             "errors": {
-                "unsupported": "此檢視包含不支援或無效的篩選條件。請更新整合或選擇其他檢視。",
+                "unsupported": "This Paperless view contains unsupported or invalid filters. Remove the folder connection and reconnect a supported view.",
                 "unavailable": "無法讀取 Paperless 檢視。請檢查連線後重試。",
                 "gone": "此資料夾或文件已無法使用。請重新整理清單。",
                 "changed": "資料夾在載入時有所變更。請重新整理。",
-                "share": "請確認允許與家人共用此檢視中目前及未來的所有文件。",
+                "share": "Confirm sharing all current and future documents in this view with the selected audience.",
                 "invalid": "請檢查資料夾名稱、連線及檢視。",
                 "forbidden": "你無權執行此操作。",
                 "preview": "此檔案類型無法預覽。請下載文件。"

@@ -11988,44 +11988,6 @@ const MIGRATIONS = [
   },
   {
     version: 282,
-    description: 'Documents: read-only Paperless saved-view folders',
-    up: `
-      CREATE TABLE IF NOT EXISTS paperless_view_folders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL CHECK(length(name) BETWEEN 1 AND 200),
-        account_id INTEGER NOT NULL REFERENCES dms_accounts(id) ON DELETE CASCADE,
-        view_id INTEGER NOT NULL CHECK(view_id > 0),
-        visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('private', 'family')),
-        created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-      );
-      CREATE INDEX IF NOT EXISTS idx_paperless_view_folders_account ON paperless_view_folders(account_id);
-    `,
-    // The published 2.84 fork already recorded its folder table as v276.
-    // Upstream now owns that number for pantry minimums. Repair precisely
-    // that legacy marker inside this migration's transaction, without
-    // changing any upstream migration or replacing saved folder bindings.
-    afterUp(database) {
-      // Schema-only builders have no migration ledger and no legacy marker to repair.
-      if (!database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'").get()) return;
-      // The published 2.85 compatibility fork used 278 before upstream did.
-      // Repair only that exact marker, within this migration's transaction.
-      const oldFolders = database.prepare('SELECT description FROM schema_migrations WHERE version = 278').get();
-      if (oldFolders?.description === 'Documents: read-only Paperless saved-view folders') {
-        const display = MIGRATIONS.find((migration) => migration.version === 278);
-        const displayColumns = database.prepare('PRAGMA table_info(display_accounts)').all();
-        if (!displayColumns.some((column) => column.name === 'device_settings')) database.exec(display.up);
-        database.prepare('UPDATE schema_migrations SET description = ? WHERE version = 278').run(display.description);
-      }
-      const legacy = database.prepare('SELECT description FROM schema_migrations WHERE version = 276').get();
-      if (legacy?.description !== 'Documents: read-only Paperless saved-view folders') return;
-      const pantry = MIGRATIONS.find((migration) => migration.version === 276);
-      const columns = database.prepare('PRAGMA table_info(pantry_products)').all();
-      if (!columns.some((column) => column.name === 'min_quantity')) {
-        database.exec(pantry.up);
-      }
-      database.prepare('UPDATE schema_migrations SET description = ? WHERE version = 276').run(pantry.description);
     description: 'rewards: late completion decay audit fields',
     // Spaeterledigung mit Punkteabzug (Haushalt opt-in): ist
     // `tasks_late_decay_enabled` auf '1', verbucht awardForCompletion() pro
@@ -12044,6 +12006,28 @@ const MIGRATIONS = [
         database.exec('ALTER TABLE reward_ledger ADD COLUMN base_points INTEGER');
       }
     },
+  },
+  {
+    version: 283,
+    description: 'Documents: Paperless saved-view folders with member access',
+    up: `
+      CREATE TABLE paperless_view_folders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL CHECK(length(name) BETWEEN 1 AND 200),
+        account_id INTEGER NOT NULL REFERENCES dms_accounts(id) ON DELETE CASCADE,
+        view_id INTEGER NOT NULL CHECK(view_id > 0),
+        visibility TEXT NOT NULL DEFAULT 'private' CHECK(visibility IN ('private', 'restricted', 'family')),
+        created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+      );
+      CREATE INDEX idx_paperless_view_folders_account ON paperless_view_folders(account_id);
+      CREATE TABLE paperless_view_folder_access (
+        folder_id INTEGER NOT NULL REFERENCES paperless_view_folders(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (folder_id, user_id)
+      );
+    `,
   },
 ];
 
