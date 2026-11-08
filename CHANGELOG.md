@@ -20,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every household event in their calendar app, other members' private ones included. Such a feed
   now stays empty instead. The subscription itself stays valid and fills again once access is given
   back; "read only" keeps delivering, and administrators are not affected.
+- **Medication reminders reach only members who may see Health, and never a household
+  notification channel** (#2602, #2598). The medication scheduler sends on its own instead of
+  going through the regular reminder delivery, and checked neither filter that path has. A
+  member whose Health permission was set to none still got "Ibuprofen" by push and on their
+  channels, and a caregiver kept getting another person's doses ("Anna: Ibuprofen") after their
+  access to Health was taken away. And every dose went to the household's shared channels (ntfy,
+  Gotify, webhook or e-mail), private medications included, plus one copy per caregiver with the
+  person's name in front. Now a recipient with Health set to none is skipped (the dose is still
+  logged), and a dose goes out only by push and to channels the recipient owns, whatever the
+  medication's visibility - like every other health reminder, as SECURITY.md promises. Reading
+  access and administrators are unaffected.
 
 ## [2.86.0] - 2026-11-07
 
