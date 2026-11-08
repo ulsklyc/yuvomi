@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   logged), and a dose goes out only by push and to channels the recipient owns, whatever the
   medication's visibility - like every other health reminder, as SECURITY.md promises. Reading
   access and administrators are unaffected.
+- **Error texts of CalDAV, CardDAV and iCloud servers no longer reach the browser.** When a
+  calendar or contacts server refused a connection test, a sync or a calendar listing, the answer
+  carried the raw text of the server or the DAV library, with its address, port and path. The
+  answer now names the kind of failure instead: rejected sign-in, an HTTP status, or an
+  unreachable server with its network code. Settings show that class to the administrator in
+  their own language.
 
 ## [2.86.0] - 2026-11-07
 

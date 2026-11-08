@@ -3550,7 +3550,11 @@
         "apiTokenErrorExpiryPast": "A data de expiração está no passado. Escolhe um momento posterior.",
         "apiTokenErrorSubjectDeactivated": "Esta conta está desativada e não pode receber um token. Escolhe outra pessoa.",
         "dmsErrorUrlInvalid": "O URL do servidor tem de começar por http:// ou https://.",
-        "dmsErrorAccountExists": "Já existe um DMS ligado com este URL do servidor."
+        "dmsErrorAccountExists": "Já existe um DMS ligado com este URL do servidor.",
+        "remoteErrorAuthFailed": "O servidor recusou o início de sessão. Verifique o nome de utilizador e a palavra-passe.",
+        "remoteErrorStatus": "O servidor respondeu com o estado {{status}}.",
+        "remoteErrorUnreachable": "Não é possível aceder ao servidor. Verifique o endereço e se o servidor está em funcionamento.",
+        "remoteErrorFailed": "O pedido ao servidor falhou."
     },
     "login": {
         "tagline": "Bem-vindo de volta. A tua casa num só lugar.",

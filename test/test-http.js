@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import zlib from 'node:zlib';
 
-import { safeRequest, resolveRedirect, headersForRedirect } from '../server/utils/http.js';
+import { safeRequest, resolveRedirect, headersForRedirect, remoteFailure } from '../server/utils/http.js';
 
 function startServer(handler) {
   const server = http.createServer(handler);
@@ -509,4 +509,34 @@ test('Ohne lookup bleibt ein IP-Literal unveraendert erreichbar', async () => {
   } finally {
     await close();
   }
+});
+
+// ── remoteFailure: the class of a failed request, never its text (Phase 0 H) ──
+
+test('remoteFailure: judged by status, network code and type, never by the message', () => {
+  const withStatus = (status, message = 'x') => Object.assign(new Error(message), { status });
+  const withCode = (code) => Object.assign(new Error(`connect ${code} 10.0.0.5:8443`), { code });
+  assert.deepEqual(remoteFailure(withStatus(401)), { reason: 'remote_auth_failed', detail: 'HTTP 401' });
+  assert.deepEqual(remoteFailure(withStatus(403)), { reason: 'remote_auth_failed', detail: 'HTTP 403' });
+  assert.deepEqual(remoteFailure(withStatus(503)), { reason: 'remote_http_status', detail: 'HTTP 503', params: { status: 503 } });
+  assert.deepEqual(remoteFailure({ statusCode: 404 }), { reason: 'remote_http_status', detail: 'HTTP 404', params: { status: 404 } });
+  assert.deepEqual(remoteFailure({ response: { status: 500 } }), { reason: 'remote_http_status', detail: 'HTTP 500', params: { status: 500 } });
+  assert.deepEqual(remoteFailure(withCode('ECONNREFUSED')), { reason: 'remote_unreachable', detail: 'ECONNREFUSED' });
+  assert.deepEqual(remoteFailure(withCode('CERT_HAS_EXPIRED')), { reason: 'remote_unreachable', detail: 'CERT_HAS_EXPIRED' });
+  // Native fetch: TypeError "fetch failed" with the network error as its cause.
+  const fetchFailed = new TypeError('fetch failed', { cause: withCode('ENOTFOUND') });
+  assert.deepEqual(remoteFailure(fetchFailed), { reason: 'remote_unreachable', detail: 'ENOTFOUND' });
+  // A wrapper keeps the original as cause (caldav-sync, cardav-sync).
+  const wrapped = new Error('CalDAV connection failed: Invalid credentials', { cause: withStatus(401) });
+  assert.deepEqual(remoteFailure(wrapped), { reason: 'remote_auth_failed', detail: 'HTTP 401' });
+  const timeout = Object.assign(new Error('aborted'), { name: 'AbortError', cause: Object.assign(new Error('t'), { name: 'TimeoutError' }) });
+  assert.deepEqual(remoteFailure(timeout), { reason: 'remote_unreachable', detail: 'timeout' });
+  assert.deepEqual(remoteFailure(Object.assign(new Error('10.0.0.1 is private'), { name: 'BlockedAddressError' })), { reason: 'remote_unreachable', detail: 'blocked' });
+  // The wording decides nothing: a message that names 401 is still unclassified.
+  assert.deepEqual(remoteFailure(new Error('PROPFIND https://dav.lan/ returned 401 Unauthorized')), { reason: 'remote_failed' });
+  // An own code in lower case is not a network code.
+  assert.deepEqual(remoteFailure(Object.assign(new Error('x'), { code: 'caldav_no_calendars' })), { reason: 'remote_failed' });
+  // A database error in the same catch is not a remote failure: the route answers 500.
+  assert.equal(remoteFailure(Object.assign(new Error('no such table: x'), { code: 'SQLITE_ERROR' })), null);
+  assert.equal(remoteFailure(new Error('w', { cause: Object.assign(new Error('d'), { code: 'ERR_SQLITE_ERROR' }) })), null);
 });

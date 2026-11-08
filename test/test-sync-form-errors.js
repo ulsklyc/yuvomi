@@ -100,14 +100,33 @@ test('CalDAV: dasselbe Konto ein zweites Mal ist ein eigener Fall', async () => 
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM caldav_accounts').get().n, 1);
 });
 
-test('CalDAV: eine Absage des fremden Servers bleibt seine Angabe, ohne Grund', async () => {
+// Phase 0, Abschnitt H: die Absage kommt als Klasse (`detail`), die die Seite
+// dem Admin im Rahmen zeigt - nie der Text des Servers oder von tsdav, der
+// Adresse und Pfad nennt ("PROPFIND <url> returned 401"). Die 401 kommt hier
+// schon bei der Kontosuche von tsdav, die ihren Status nur im Text traegt:
+// gemessen wird also auch, dass caldav-client ihn an der Anfrage mitschreibt.
+test('CalDAV: eine Absage des fremden Servers kommt als ihre Klasse, nie als ihr Text', async () => {
   dav.reset();
   dav.refuse({ method: 'PROPFIND', status: 401 });
   try {
     const res = await caldav({ caldavUrl: dav.url, username: 'other' });
-    assert.equal(res.status, 500);
-    assert.equal(res.body.reason, undefined, 'die Seite zeigt den Text des fremden Servers');
-    assert.match(res.body.error, /^CalDAV connection failed/);
+    assert.equal(res.status, 502, JSON.stringify(res.body));
+    assert.equal(res.body.reason, 'remote_auth_failed');
+    assert.equal(res.body.detail, 'HTTP 401');
+    assert.ok(!JSON.stringify(res.body).includes(dav.url), 'die Antwort nennt die Adresse nicht');
+    assert.ok(!/PROPFIND|Invalid credentials/.test(res.body.error), 'kein Text von tsdav');
+  } finally { dav.allowAll(); }
+});
+
+test('Apple: eine Absage von iCloud kommt als ihre Klasse, nie als ihr Text', async () => {
+  dav.reset();
+  dav.refuse({ method: 'PROPFIND', status: 401 });
+  try {
+    const res = await admin('POST', '/calendar/apple/connect', { url: dav.url, username: 'a@b.c', password: 'p' });
+    assert.equal(res.status, 502, JSON.stringify(res.body));
+    assert.equal(res.body.reason, 'remote_auth_failed');
+    assert.equal(res.body.detail, 'HTTP 401');
+    assert.ok(!JSON.stringify(res.body).includes(dav.url), 'die Antwort nennt die Adresse nicht');
   } finally { dav.allowAll(); }
 });
 

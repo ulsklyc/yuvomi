@@ -3550,7 +3550,11 @@
         "apiTokenErrorExpiryPast": "समाप्ति तिथि बीत चुकी है। कोई बाद का समय चुनें।",
         "apiTokenErrorSubjectDeactivated": "यह खाता निष्क्रिय है और इसे टोकन नहीं मिल सकता। किसी दूसरे व्यक्ति को चुनें।",
         "dmsErrorUrlInvalid": "सर्वर URL http:// या https:// से शुरू होना चाहिए।",
-        "dmsErrorAccountExists": "इस सर्वर URL से एक DMS पहले से जुड़ा है।"
+        "dmsErrorAccountExists": "इस सर्वर URL से एक DMS पहले से जुड़ा है।",
+        "remoteErrorAuthFailed": "सर्वर ने साइन-इन अस्वीकार कर दिया। उपयोगकर्ता नाम और पासवर्ड जाँचें।",
+        "remoteErrorStatus": "सर्वर ने स्थिति {{status}} के साथ उत्तर दिया।",
+        "remoteErrorUnreachable": "सर्वर तक नहीं पहुँचा जा सकता। पता जाँचें और देखें कि सर्वर चल रहा है।",
+        "remoteErrorFailed": "सर्वर को भेजा गया अनुरोध विफल रहा।"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",

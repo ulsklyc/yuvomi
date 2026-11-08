@@ -56,7 +56,24 @@
  *          err.message }`) and a route that hands that object on is not seen;
  *          neither is text stored in a `last_error` column and sent by a later
  *          status GET. An alias more than three lines above the call is not
- *          followed. The follow-up PRs fix the known indirect ways by hand.
+ *          followed. The known indirect ways, measured on 08.11.2026, are
+ *          fixed by hand in the follow-up PRs of Phase 0 section H:
+ *            - routes/dms.js POST /accounts/:id/test <- dms/paperless.js,
+ *              dms/papra.js (`error: err.message` in the probe result)
+ *            - routes/recipe-providers.js (probe.error) <- recipe-providers/
+ *              mealie.js, tandoor.js
+ *            - services/email.js (SMTP test result), services/waste-url-source.js
+ *              (`errorMessage` of a refresh)
+ *            - services/modules.js (`error` of a module that fails to load,
+ *              shown in the admin module list: fs/JSON text with paths)
+ *            - stored text sent by a status GET: backup-webdav.js
+ *              (`webdav_backup_last_error`), backup-scheduler.js
+ *              (lastBackup.webdav.error), document-storage.js (`last_error`),
+ *              routes/notifications.js (markChannelTestResult)
+ *
+ *          The three behaviour tests carry the todo marker TODO_MARKER while
+ *          their BASELINE key is open; the last test below couples the two, so
+ *          a fix cannot leave a silently passing `# TODO` behind.
  *
  * Run: npm run test:client-error-text-guard
  */
@@ -90,9 +107,9 @@ const ALLOWED = new Map([
   ['server/routes/calendar/crud.js -> sendNonMemberAssignment', [1, 'every caller gates on instanceof NonMemberAssignmentError']],
   ['server/routes/calendar/outlook.js -> PUT /outlook/accounts/:id', [2, 'gated on err.code not_household_member / outlook_auto_sync_overrides, thrown by outlook-calendar.js']],
   ['server/routes/calendar/outlook.js -> PATCH /outlook/accounts/:id/calendars', [1, 'gated on err.code === outlook_auto_sync_overrides']],
-  ['server/routes/calendar/subscriptions.js -> POST /subscriptions', [2, 'only behind icsFetchCase(): a named fetch case whose text the service wrote']],
-  ['server/routes/calendar/subscriptions.js -> POST /subscriptions/:id/sync', [1, 'only behind icsFetchCase(): a named fetch case whose text the service wrote']],
-  ['server/routes/calendar/subscriptions.js -> POST /import', [1, 'only behind icsFetchCase(): a named fetch case whose text the service wrote']],
+  ['server/routes/calendar/subscriptions.js -> POST /subscriptions', [2, "only behind icsFetchCase(): a named fetch case (own sentence, Node's `Invalid URL`); accepted: a BlockedAddressError names the private address the member's own URL resolved to"]],
+  ['server/routes/calendar/subscriptions.js -> POST /subscriptions/:id/sync', [1, "only behind icsFetchCase(): a named fetch case (own sentence, Node's `Invalid URL`); accepted: a BlockedAddressError names the private address the member's own URL resolved to"]],
+  ['server/routes/calendar/subscriptions.js -> POST /import', [1, "only behind icsFetchCase(): a named fetch case (own sentence, Node's `Invalid URL`); accepted: a BlockedAddressError names the private address the member's own URL resolved to"]],
   ['server/routes/health/fasting.js -> sendError', [1, 'instanceof FastingError, everything else gets a fixed sentence']],
   ['server/routes/health/visibility-defaults.js -> allowFastingMutation', [1, 'instanceof FastingError, everything else is rethrown']],
   ['server/routes/modules.js -> sendInstallError', [1, 'callers gate on instanceof InstallError (reason + status set by module-install.js)']],
@@ -105,6 +122,7 @@ const ALLOWED = new Map([
   ['server/routes/schedule.js -> fail', [1, '`error` is the route\'s own sentence passed as a parameter; String(error) only picks the range reason']],
   ['server/routes/split-expenses.js -> sendRefusal', [1, 'callers gate on instanceof Refusal, the route\'s own refusal class']],
   ['server/routes/waste/helpers.js -> wasteErrorResponse', [2, 'instanceof WasteConflictError / WasteNotFoundError']],
+  ['server/routes/waste/sources.js -> emptyFeedResponse', [1, 'emptyFeedAsFetchFailure() only returns its own fixed WasteFetchError behind instanceof WasteValidationError + reason']],
   ['server/services/document-deletion-lock.js -> sendDocumentDeletionConflict', [1, 'instanceof DocumentDeletionInProgressError']],
   ['server/services/document-links.js -> sendDocumentLinkRefusal', [1, 'instanceof DocumentLinkRefusedError']],
 ]);
@@ -118,15 +136,6 @@ const BASELINE = new Map([
   ['server/routes/backup.js -> POST /webdav/test', 1],
   ['server/routes/backup.js -> GET /webdav/files', 1],
   ['server/routes/backup.js -> POST /webdav/trigger', 1],
-  ['server/routes/calendar/apple.js -> POST /apple/sync', 1],
-  ['server/routes/calendar/apple.js -> POST /apple/connect', 1],
-  ['server/routes/calendar/caldav.js -> POST /caldav/accounts', 1],
-  ['server/routes/calendar/caldav.js -> PUT /caldav/accounts/:id', 1],
-  ['server/routes/calendar/caldav.js -> DELETE /caldav/accounts/:id', 1],
-  ['server/routes/calendar/caldav.js -> GET /caldav/accounts/:id/calendars', 1],
-  ['server/routes/calendar/caldav.js -> PATCH /caldav/accounts/:id/calendars', 1],
-  ['server/routes/calendar/caldav.js -> GET /caldav/accounts/:id/reminder-lists', 1],
-  ['server/routes/calendar/caldav.js -> PATCH /caldav/accounts/:id/reminder-lists', 1],
   ['server/routes/calendar/google.js -> sendGoogleError', 1],
   ['server/routes/calendar/google.js -> GET /google/auth', 1],
   ['server/routes/calendar/google.js -> PUT /google/readonly', 1],
@@ -137,11 +146,9 @@ const BASELINE = new Map([
   ['server/routes/calendar/outlook.js -> GET /outlook/accounts/:id/calendars', 1],
   ['server/routes/calendar/outlook.js -> PATCH /outlook/accounts/:id/calendars', 1],
   ['server/routes/calendar/outlook.js -> POST /outlook/sync', 1],
-  ['server/routes/cardav.js -> failIfConnection', 1],
   ['server/routes/preferences.js -> POST /holidays/sync', 1],
   ['server/routes/subscriptions.js -> POST /logo-search', 1],
   ['server/routes/waste/sources.js -> icsTextForReimport', 1],
-  ['server/routes/waste/sources.js -> emptyFeedResponse', 1],
   // Class C: our own refusal and foreign text in the same catch.
   ['server/routes/calendar/subscriptions.js -> POST /import', 1],
   ['server/routes/document-storage-google-drive.js -> sendStorageError', 1],
@@ -418,5 +425,24 @@ test('every ALLOWED entry says why the text is our own', () => {
   for (const [key, [count, reason]] of ALLOWED) {
     assert.ok(Number.isInteger(count) && count > 0, `${key}: count`);
     assert.ok(typeof reason === 'string' && reason.length >= 20, `${key}: reason`);
+  }
+});
+
+// The behaviour tests of the three blind spots carry this todo marker while
+// their place is in BASELINE, and lose it with the fix (review of #2618).
+const TODO_MARKER = 'fix pending, Phase 0 section H PR 3';
+const BLIND_SPOTS = [
+  ['server/routes/modules.js -> GET /assets/:id/{*assetPath}', 'test/test-module-install.js'],
+  ['server/routes/split-expenses.js -> POST /groups/:id/expenses', 'test/test-split-expenses-routes.js'],
+  ['server/routes/backup.js -> POST /webdav/test', 'test/test-backup-routes.js'],
+];
+
+test('a blind-spot test is todo exactly while its place is open', () => {
+  for (const [key, file] of BLIND_SPOTS) {
+    const marked = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').includes(TODO_MARKER);
+    assert.equal(marked, BASELINE.has(key),
+      BASELINE.has(key)
+        ? `${file}: the test of ${key} must stay marked todo ('${TODO_MARKER}') while the place is in BASELINE`
+        : `${file}: ${key} is fixed - remove the todo marker so the test runs for real`);
   }
 });

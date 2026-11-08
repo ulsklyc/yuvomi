@@ -3550,7 +3550,11 @@
         "apiTokenErrorExpiryPast": "Utgångsdatumet har redan passerat. Välj en senare tidpunkt.",
         "apiTokenErrorSubjectDeactivated": "Det här kontot är inaktiverat och kan inte få en token. Välj en annan person.",
         "dmsErrorUrlInvalid": "Server-URL:en måste börja med http:// eller https://.",
-        "dmsErrorAccountExists": "Ett DMS är redan anslutet med den här server-URL:en."
+        "dmsErrorAccountExists": "Ett DMS är redan anslutet med den här server-URL:en.",
+        "remoteErrorAuthFailed": "Servern avvisade inloggningen. Kontrollera användarnamn och lösenord.",
+        "remoteErrorStatus": "Servern svarade med status {{status}}.",
+        "remoteErrorUnreachable": "Servern kan inte nås. Kontrollera adressen och att servern är igång.",
+        "remoteErrorFailed": "Begäran till servern misslyckades."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",

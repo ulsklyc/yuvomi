@@ -257,3 +257,81 @@ export function safeRequest(rawUrl, {
     }, reject);
   });
 }
+
+// ── A failed request to a foreign server, as its class ──────────────────────
+// Phase 0 section H (roadmap decision 19, E4 of 08.11.2026): an admin's
+// connection test or sync answers with a fixed sentence, a `reason` and the
+// error class in `detail` - never the message of the library or the network
+// stack, which names hosts, ports and paths. Judged by the class of the error
+// (HTTP status, network code, error type), never by its wording, the same rule
+// as classifyProviderFailure (server/services/recipe-providers/failure.js).
+
+// No machine at this address, or it does not answer; TLS refused the peer.
+const REMOTE_NETWORK_CODES = new Set([
+  'ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ECONNABORTED', 'EHOSTUNREACH',
+  'EHOSTDOWN', 'ENETUNREACH', 'ENETDOWN', 'EPIPE', 'EPROTO', 'ETIMEDOUT', 'ESOCKETTIMEDOUT',
+  'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT', 'UND_ERR_SOCKET',
+  'DEPTH_ZERO_SELF_SIGNED_CERT', 'SELF_SIGNED_CERT_IN_CHAIN', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'UNABLE_TO_GET_ISSUER_CERT', 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY', 'CERT_HAS_EXPIRED',
+  'CERT_NOT_YET_VALID', 'CERT_UNTRUSTED', 'CERT_REJECTED', 'ERR_TLS_CERT_ALTNAME_INVALID',
+]);
+
+// The server does not know the credentials (401) or does not let them read (403).
+const REMOTE_AUTH_STATUSES = new Set([401, 403]);
+
+/** The error and its causes, nearest first (a wrapper keeps the original as `cause`). */
+function* errorChain(err) {
+  let current = err;
+  for (let depth = 0; depth < 6 && current && typeof current === 'object'; depth += 1) {
+    yield current;
+    current = current.cause;
+  }
+}
+
+function httpStatusOf(err) {
+  for (const e of errorChain(err)) {
+    const status = e.status ?? e.statusCode ?? e.response?.status;
+    if (Number.isInteger(status) && status >= 100 && status <= 599) return status;
+  }
+  return null;
+}
+
+function isTimeout(err) {
+  for (const e of errorChain(err)) {
+    if (e.name === 'TimeoutError') return true;
+    if (e.name === 'AbortError' && e.cause?.name === 'TimeoutError') return true;
+  }
+  return false;
+}
+
+/**
+ * The class of a failed request to a foreign server, or null when the error is
+ * not one (a database error in the same catch): the route then answers with
+ * its fixed 500.
+ *
+ *   HTTP 401/403                     -> remote_auth_failed, detail `HTTP 401`
+ *   any other HTTP status            -> remote_http_status, detail `HTTP 503`, params.status
+ *   timeout                          -> remote_unreachable, detail `timeout`
+ *   private address refused (SSRF)   -> remote_unreachable, detail `blocked`
+ *   network or TLS code              -> remote_unreachable, detail the code (`ECONNREFUSED`)
+ *   anything else                    -> remote_failed, no detail
+ *
+ * @param {unknown} err
+ * @returns {{ reason: string, detail?: string, params?: { status: number } } | null}
+ */
+export function remoteFailure(err) {
+  for (const e of errorChain(err)) {
+    if (typeof e.code === 'string' && /^(SQLITE_|ERR_SQLITE)/.test(e.code)) return null;
+  }
+  const status = httpStatusOf(err);
+  if (REMOTE_AUTH_STATUSES.has(status)) return { reason: 'remote_auth_failed', detail: `HTTP ${status}` };
+  if (status !== null && (status < 200 || status >= 300)) {
+    return { reason: 'remote_http_status', detail: `HTTP ${status}`, params: { status } };
+  }
+  if (isTimeout(err)) return { reason: 'remote_unreachable', detail: 'timeout' };
+  for (const e of errorChain(err)) {
+    if (e.name === 'BlockedAddressError') return { reason: 'remote_unreachable', detail: 'blocked' };
+    if (typeof e.code === 'string' && REMOTE_NETWORK_CODES.has(e.code)) return { reason: 'remote_unreachable', detail: e.code };
+  }
+  return { reason: 'remote_failed' };
+}

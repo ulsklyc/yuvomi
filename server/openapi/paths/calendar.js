@@ -549,16 +549,23 @@ const ICS_FETCH = '`calendar_ics_private_address` (400, the address resolves to 
   + '`calendar_ics_too_large` (400, the feed is larger than the limit; `params.limit_mb`)';
 const ICS_NAME = '`calendar_subscription_name_invalid` (400, `name` is empty or longer than 100 characters)';
 
+// A refusal of the foreign server comes as its class, never its text (Phase 0
+// section H, remoteFailure in server/utils/http.js).
+const REMOTE_FAILURE = 'a refusal of the server answers 502 with `remote_auth_failed` (HTTP 401/403), '
+  + '`remote_http_status` (another HTTP status, `params.status`), `remote_unreachable` (network, TLS or timeout) '
+  + 'or `remote_failed`, the class in `detail` (`HTTP 401`, `ECONNREFUSED`, `timeout`), never the server\'s text';
+
 const CASE_REASONS = {
   '/api/v1/calendar/caldav/accounts': {
     post: '`caldav_account_exists` (409, an account with this URL and username is already connected), '
-      + '`caldav_no_calendars` (400, the server answered, but the account has no calendars); '
-      + 'any other failure of the CalDAV server answers 500 without `reason`, its text in `error`',
+      + `\`caldav_no_calendars\` (400, the server answered, but the account has no calendars); ${REMOTE_FAILURE}`,
   },
   '/api/v1/calendar/apple/connect': {
     post: '`apple_url_invalid` (400, `url` does not start with http(s)), '
-      + '`apple_no_calendars` (400, connected, but the account has no calendars); '
-      + 'any other failure of iCloud answers 400 without `reason`, its text in `error`',
+      + `\`apple_no_calendars\` (400, connected, but the account has no calendars); ${REMOTE_FAILURE}`,
+  },
+  '/api/v1/calendar/apple/sync': {
+    post: `\`apple_not_configured\` (409, no Apple calendar is connected); ${REMOTE_FAILURE}`,
   },
   '/api/v1/calendar/calendars': { post: CALENDAR_WRITE_REQUIRED },
   '/api/v1/calendar/calendars/reorder': { patch: CALENDAR_WRITE_REQUIRED },

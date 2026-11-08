@@ -442,7 +442,8 @@ async function sync({ makeClient } = {}) {
 async function runSync({ makeClient } = {}) {
   const creds = uploadsLocalEvents() ? getCredentials() : null;
   if (!creds) {
-    throw new Error('[Apple] No credentials configured (neither in DB nor in .env).');
+    // `code`: the route answers this own case with its sentence (Phase 0 H).
+    throw Object.assign(new Error('[Apple] No credentials configured (neither in DB nor in .env).'), { code: 'apple_not_configured' });
   }
 
   const client = await (makeClient || createClient)(creds);

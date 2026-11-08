@@ -12,8 +12,24 @@ import { secret } from '../../middleware/validate.js';
 import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 import * as db from '../../db.js';
 import { readDefaultAssignees, validateAssigneeIds } from '../../services/default-assignees.js';
+import { remoteFailure } from '../../utils/http.js';
 
 const log = createLogger('Calendar');
+
+/**
+ * The answer of a route that asks the CalDAV server, once its own named cases
+ * are handled (Phase 0 section H): a failure of the server as its class (502,
+ * `reason` + `detail` such as `HTTP 401` or `ECONNREFUSED`, which the settings
+ * page shows the admin), anything local as a fixed 500. Never the text of the
+ * server or of tsdav - it names hosts, ports and paths.
+ */
+function sendCaldavFailure(res, err, sentence) {
+  const failure = remoteFailure(err);
+  if (failure) {
+    return res.status(502).json({ error: 'The CalDAV server refused the request or could not be reached.', code: 502, ...failure });
+  }
+  return res.status(500).json({ error: sentence, code: 500 });
+}
 const router = express.Router();
 
 // --------------------------------------------------------
@@ -36,8 +52,8 @@ router.post('/caldav/accounts', requireAdmin, async (req, res) => {
     const result = await caldavSync.addAccount(name, caldavUrl, username, password);
     res.json({ data: result });
   } catch (err) {
-    // Die zwei Faelle, die die App selbst kennt (#1909). Alles andere ist die
-    // Antwort des fremden Servers: die Seite zeigt sie dem Admin als Angabe.
+    // Die zwei Faelle, die die App selbst kennt (#1909). Alles andere ist eine
+    // Absage des fremden Servers: die Seite zeigt dem Admin ihre Klasse.
     if (err.code === 'caldav_account_exists') {
       return res.status(409).json({ error: err.message, code: 409, reason: 'caldav_account_exists' });
     }
@@ -45,7 +61,7 @@ router.post('/caldav/accounts', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: err.message, code: 400, reason: 'caldav_no_calendars' });
     }
     log.error('CalDAV account creation failed:', err);
-    res.status(500).json({ error: err.message || 'Failed to create CalDAV account.', code: 500 });
+    sendCaldavFailure(res, err, 'Failed to create CalDAV account.');
   }
 });
 
@@ -76,7 +92,7 @@ router.put('/caldav/accounts/:id', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: err.message, errorCode: 'password_required', code: 400 });
     }
     log.error('CalDAV account update failed:', err);
-    res.status(500).json({ error: err.message || 'Failed to update CalDAV account.', code: 500 });
+    sendCaldavFailure(res, err, 'Failed to update CalDAV account.');
   }
 });
 
@@ -90,7 +106,7 @@ router.delete('/caldav/accounts/:id', requireAdmin, (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('CalDAV account deletion failed:', err);
-    res.status(500).json({ error: err.message || 'Failed to delete CalDAV account.', code: 500 });
+    res.status(500).json({ error: 'Failed to delete CalDAV account.', code: 500 });
   }
 });
 
@@ -107,7 +123,7 @@ router.get('/caldav/accounts/:id/calendars', requireAdmin, refuseWhileRestoring,
     res.json({ data: calendars });
   } catch (err) {
     log.error('CalDAV calendars fetch failed:', err);
-    res.status(500).json({ error: err.message || 'Failed to fetch calendars.', code: 500 });
+    sendCaldavFailure(res, err, 'Failed to fetch calendars.');
   }
 });
 
@@ -129,7 +145,7 @@ router.patch('/caldav/accounts/:id/calendars', requireAdmin, (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('CalDAV calendar selection update failed:', err);
-    res.status(500).json({ error: err.message || 'Failed to update calendar selection.', code: 500 });
+    res.status(500).json({ error: 'Failed to update calendar selection.', code: 500 });
   }
 });
 
@@ -183,7 +199,7 @@ router.get('/caldav/accounts/:id/reminder-lists', requireAdmin, refuseWhileResto
     res.json({ data: lists });
   } catch (err) {
     log.error('CalDAV reminder lists fetch failed:', err);
-    res.status(500).json({ error: err.message || 'Failed to fetch reminder lists.', code: 500 });
+    sendCaldavFailure(res, err, 'Failed to fetch reminder lists.');
   }
 });
 
@@ -220,7 +236,7 @@ router.patch('/caldav/accounts/:id/reminder-lists', requireAdmin, (req, res) => 
       return res.status(400).json({ error: err.message, code: 400, reason: 'reminder_list_assignee_not_tasks' });
     }
     log.error('CalDAV reminder selection update failed:', err);
-    res.status(500).json({ error: err.message || 'Failed to update reminder selection.', code: 500 });
+    res.status(500).json({ error: 'Failed to update reminder selection.', code: 500 });
   }
 });
 
