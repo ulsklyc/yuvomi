@@ -90,7 +90,8 @@ export function renderHtml({ listName, senderName, groups, sentAt }) {
  */
 export function buildShoppingListMail({ list, items, categories, senderName, sentAt }) {
   const openCount = countOpenItems(items);
-  if (openCount === 0) throw new Error('This shopping list has no open items to send.');
+  // `code`: the route answers this own case with its sentence (Phase 0 H).
+  if (openCount === 0) throw Object.assign(new Error('This shopping list has no open items to send.'), { code: 'nothing_open' });
   const groups = groupOpenItems(items, categories);
   const context = { listName: list?.name ?? '', senderName, groups, sentAt };
   return {
