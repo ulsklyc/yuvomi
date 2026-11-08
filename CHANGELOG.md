@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- **Two administrators demoting each other no longer leave the household without one** (#2612).
+  When two administrators removed each other's admin role at the same moment and each also set a
+  new password, both changes could pass the "at least one administrator must remain" check and
+  both went through, so nobody could open the administration any more. The check and the change
+  now happen in one step: one of the two demotions is refused, and one administrator stays.
 - **A demoted administrator loses admin rights on every device** (#2611). The role of a signed-in
   browser was taken from the stored session, and a demotion only updated the sessions that existed
   at that moment. A sign-in that was still checking the password, or a request starting the SSO
