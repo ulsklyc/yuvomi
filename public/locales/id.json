@@ -3568,7 +3568,11 @@
         "apiTokenErrorExpiryPast": "Tanggal kedaluwarsa sudah lewat. Pilih waktu yang lebih lambat.",
         "apiTokenErrorSubjectDeactivated": "Akun ini dinonaktifkan dan tidak bisa mendapat token. Pilih orang lain.",
         "dmsErrorUrlInvalid": "URL Server harus diawali http:// atau https://.",
-        "dmsErrorAccountExists": "Sudah ada DMS yang terhubung dengan URL server ini."
+        "dmsErrorAccountExists": "Sudah ada DMS yang terhubung dengan URL server ini.",
+        "remoteErrorAuthFailed": "Server menolak proses masuk. Periksa nama pengguna dan kata sandi.",
+        "remoteErrorStatus": "Server menjawab dengan status {{status}}.",
+        "remoteErrorUnreachable": "Server tidak dapat dijangkau. Periksa alamat dan apakah server sedang berjalan.",
+        "remoteErrorFailed": "Permintaan ke server gagal."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

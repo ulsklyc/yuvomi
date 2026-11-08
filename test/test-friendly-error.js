@@ -293,6 +293,10 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // Kategorien des Budgets im Kategorie-Verwalter (#1909); die echte Antwort
     // misst test:budget-categories-routes.
     '../server/routes/budget/categories.js',
+    // Ein fremder Server hat abgelehnt oder war nicht erreichbar (Phase 0,
+    // Abschnitt H): die Klasse bestimmt remoteFailure, je Klasse misst sie
+    // test:http, die echte Antwort test:caldav-http-refusals.
+    '../server/utils/http.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'");
   const routes = `${read('../server/routes/shopping.js')}\n${healthServer}\n${documentsServer}\n${recipesServer}\n${subscriptionsServer}\n${restServer}\n${wasteServer.replace(/,\s*'([a-z_]+)'\s*[),]/g, ", reason: '$1')")}\n${importCodes}`;
   return load().then(({ CASE_MESSAGES, REFUSAL_MESSAGES }) => {
@@ -586,6 +590,36 @@ test('errorSentenceWithDetail: der Text des Servers nur im Rahmen, und nur als A
   assert.equal(errorSentenceWithDetail(answer(429, 'Too many requests.'), FRAME), 'common.errorRateLimited');
   assert.equal(errorSentenceWithDetail(Object.assign(new Error('x'), { status: 0 }), FRAME), 'common.errorOfflineMutation');
   assert.equal(errorSentenceWithDetail({ status: 503, data: { error: 'offline' } }, FRAME), 'common.errorOffline');
+});
+
+// Phase 0, Abschnitt H: ein fremder Dienst kommt als Klasse (`detail`) und mit
+// einem festen englischen Satz in `error`. Im Rahmen steht die Klasse, nie der
+// englische Satz; ohne Klasse sagt der `remote_*`-Grund seinen eigenen Satz.
+test('errorSentenceWithDetail: die Klasse eines fremden Dienstes im Rahmen, nie der englische Satz', async () => {
+  const { errorSentenceWithDetail, errorSentence } = await load();
+  const FRAME = 'settings.connectionFailedDetail';
+  const ENGLISH = 'The CalDAV server refused the request or could not be reached.';
+  const remote = (reason, detail, params) => Object.assign(answer(502, ENGLISH, reason), {}, {
+    data: { error: ENGLISH, code: 502, reason, ...(detail === undefined ? {} : { detail }), ...(params ? { params } : {}) },
+  });
+  for (const [reason, detail] of [
+    ['remote_auth_failed', 'HTTP 401'], ['remote_unreachable', 'ECONNREFUSED'], ['remote_unreachable', 'timeout'],
+    ['remote_unreachable', 'blocked'], ['remote_http_status', 'HTTP 503'],
+  ]) {
+    const sentence = errorSentenceWithDetail(remote(reason, detail, reason === 'remote_http_status' ? { status: 503 } : undefined), FRAME);
+    assert.match(sentence, /^settings\.connectionFailedDetail/, `${reason}: im Rahmen`);
+    assert.ok(sentence.includes(detail), `${reason}: die Klasse steht drin`);
+    assert.ok(!sentence.includes('CalDAV server'), `${reason}: nie der englische Satz`);
+  }
+  // Ohne Klasse: der Satz des Grundes, nie der englische Satz im Rahmen.
+  assert.equal(errorSentenceWithDetail(remote('remote_failed'), FRAME), 'settings.remoteErrorFailed');
+  assert.equal(errorSentenceWithDetail(remote('remote_auth_failed'), FRAME), 'settings.remoteErrorAuthFailed');
+  // Freier Text in `detail` ist keine Klasse und kommt nicht in den Rahmen.
+  const smuggled = remote('remote_unreachable', 'connect ECONNREFUSED 10.0.0.5:8443');
+  assert.equal(errorSentenceWithDetail(smuggled, FRAME), 'settings.remoteErrorUnreachable');
+  // Die Stellen ohne Angabe sagen den Satz des Grundes, der Status als Zahl.
+  assert.match(errorSentence(remote('remote_http_status', 'HTTP 503', { status: 503 })), /^settings\.remoteErrorStatus/);
+  assert.equal(errorSentence(remote('remote_unreachable', 'ECONNREFUSED')), 'settings.remoteErrorUnreachable');
 });
 
 test('die Faelle der Einstellungen haben ihren Satz, und die Toasts sagen ihn (#1909)', async () => {

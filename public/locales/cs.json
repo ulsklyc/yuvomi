@@ -3668,7 +3668,11 @@
         "apiTokenErrorExpiryPast": "Datum vypršení je v minulosti. Vyber pozdější čas.",
         "apiTokenErrorSubjectDeactivated": "Tento účet je deaktivovaný a nemůže dostat token. Vyber jinou osobu.",
         "dmsErrorUrlInvalid": "URL serveru musí začínat http:// nebo https://.",
-        "dmsErrorAccountExists": "S touto URL serveru je už připojen DMS."
+        "dmsErrorAccountExists": "S touto URL serveru je už připojen DMS.",
+        "remoteErrorAuthFailed": "Server odmítl přihlášení. Zkontrolujte uživatelské jméno a heslo.",
+        "remoteErrorStatus": "Server odpověděl stavem {{status}}.",
+        "remoteErrorUnreachable": "Server není dostupný. Zkontrolujte adresu a zda server běží.",
+        "remoteErrorFailed": "Požadavek na server selhal."
     },
     "login": {
         "tagline": "Vítejte zpět. Váš domov na jednom místě.",

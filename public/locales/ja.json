@@ -3550,7 +3550,11 @@
         "apiTokenErrorExpiryPast": "有効期限が過去になっています。もっと後の日時を選んでください。",
         "apiTokenErrorSubjectDeactivated": "このアカウントは無効化されているため、トークンを発行できません。別の人を選んでください。",
         "dmsErrorUrlInvalid": "サーバーURLは http:// または https:// で始める必要があります。",
-        "dmsErrorAccountExists": "このサーバーURLの DMS はすでに接続されています。"
+        "dmsErrorAccountExists": "このサーバーURLの DMS はすでに接続されています。",
+        "remoteErrorAuthFailed": "サーバーがサインインを拒否しました。ユーザー名とパスワードを確認してください。",
+        "remoteErrorStatus": "サーバーはステータス {{status}} で応答しました。",
+        "remoteErrorUnreachable": "サーバーに接続できません。アドレスとサーバーが稼働しているかを確認してください。",
+        "remoteErrorFailed": "サーバーへのリクエストに失敗しました。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

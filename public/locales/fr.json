@@ -3550,7 +3550,11 @@
         "apiTokenErrorExpiryPast": "La date d’expiration est dans le passé. Choisis un moment ultérieur.",
         "apiTokenErrorSubjectDeactivated": "Ce compte est désactivé et ne peut pas recevoir de jeton. Choisis une autre personne.",
         "dmsErrorUrlInvalid": "L’URL du serveur doit commencer par http:// ou https://.",
-        "dmsErrorAccountExists": "Un DMS est déjà connecté avec cette URL du serveur."
+        "dmsErrorAccountExists": "Un DMS est déjà connecté avec cette URL du serveur.",
+        "remoteErrorAuthFailed": "Le serveur a refusé la connexion. Vérifiez le nom d’utilisateur et le mot de passe.",
+        "remoteErrorStatus": "Le serveur a répondu avec le statut {{status}}.",
+        "remoteErrorUnreachable": "Le serveur est injoignable. Vérifiez l’adresse et que le serveur est en marche.",
+        "remoteErrorFailed": "La requête vers le serveur a échoué."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

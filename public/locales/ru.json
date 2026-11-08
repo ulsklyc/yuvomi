@@ -3776,7 +3776,11 @@
         "apiTokenErrorExpiryPast": "Срок действия уже прошёл. Выбери более позднее время.",
         "apiTokenErrorSubjectDeactivated": "Этот аккаунт деактивирован и не может получить токен. Выбери другого человека.",
         "dmsErrorUrlInvalid": "URL сервера должен начинаться с http:// или https://.",
-        "dmsErrorAccountExists": "С этим URL сервера уже подключена DMS."
+        "dmsErrorAccountExists": "С этим URL сервера уже подключена DMS.",
+        "remoteErrorAuthFailed": "Сервер отклонил вход. Проверьте имя пользователя и пароль.",
+        "remoteErrorStatus": "Сервер ответил со статусом {{status}}.",
+        "remoteErrorUnreachable": "Сервер недоступен. Проверьте адрес и работает ли сервер.",
+        "remoteErrorFailed": "Запрос к серверу не удался."
     },
     "login": {
         "tagline": "С возвращением. Ваш дом - в одном месте.",

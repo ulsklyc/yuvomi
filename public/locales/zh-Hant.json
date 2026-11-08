@@ -3550,7 +3550,11 @@
         "apiTokenErrorExpiryPast": "到期日已經過去。請選擇較晚的時間。",
         "apiTokenErrorSubjectDeactivated": "此帳號已停用，無法取得權杖。請選擇其他人。",
         "dmsErrorUrlInvalid": "伺服器網址必須以 http:// 或 https:// 開頭。",
-        "dmsErrorAccountExists": "已有 DMS 以此伺服器網址連線。"
+        "dmsErrorAccountExists": "已有 DMS 以此伺服器網址連線。",
+        "remoteErrorAuthFailed": "伺服器拒絕了登入。請檢查使用者名稱和密碼。",
+        "remoteErrorStatus": "伺服器回應的狀態為 {{status}}。",
+        "remoteErrorUnreachable": "無法連線到伺服器。請檢查位址以及伺服器是否正在執行。",
+        "remoteErrorFailed": "對伺服器的請求失敗。"
     },
     "login": {
         "tagline": "歡迎回來。你的家，盡在一處。",

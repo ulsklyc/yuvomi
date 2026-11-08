@@ -3568,7 +3568,11 @@
         "apiTokenErrorExpiryPast": "Nasa nakaraan ang petsa ng pag-expire. Pumili ng mas huling oras.",
         "apiTokenErrorSubjectDeactivated": "Naka-deactivate ang account na ito at hindi mabibigyan ng token. Pumili ng ibang tao.",
         "dmsErrorUrlInvalid": "Dapat magsimula ang URL ng Server sa http:// o https://.",
-        "dmsErrorAccountExists": "May DMS nang nakakonekta sa URL ng server na ito."
+        "dmsErrorAccountExists": "May DMS nang nakakonekta sa URL ng server na ito.",
+        "remoteErrorAuthFailed": "Tinanggihan ng server ang pag-sign in. Suriin ang username at password.",
+        "remoteErrorStatus": "Sumagot ang server ng status na {{status}}.",
+        "remoteErrorUnreachable": "Hindi maabot ang server. Suriin ang address at kung tumatakbo ang server.",
+        "remoteErrorFailed": "Nabigo ang kahilingan sa server."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

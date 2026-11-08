@@ -3550,7 +3550,11 @@
         "apiTokenErrorExpiryPast": "De vervaldatum ligt in het verleden. Kies een later tijdstip.",
         "apiTokenErrorSubjectDeactivated": "Dit account is gedeactiveerd en kan geen token krijgen. Kies een andere persoon.",
         "dmsErrorUrlInvalid": "De server-URL moet beginnen met http:// of https://.",
-        "dmsErrorAccountExists": "Met deze server-URL is al een DMS verbonden."
+        "dmsErrorAccountExists": "Met deze server-URL is al een DMS verbonden.",
+        "remoteErrorAuthFailed": "De server heeft de aanmelding geweigerd. Controleer gebruikersnaam en wachtwoord.",
+        "remoteErrorStatus": "De server antwoordde met status {{status}}.",
+        "remoteErrorUnreachable": "De server is niet bereikbaar. Controleer het adres en of de server draait.",
+        "remoteErrorFailed": "Het verzoek aan de server is mislukt."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",
