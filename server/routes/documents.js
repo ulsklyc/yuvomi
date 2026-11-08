@@ -376,7 +376,7 @@ function sendThumbnail(res, thumb) {
   res.end(thumb.buffer);
 }
 
-function sendStorageError(res, error, fallbackMessage, { configText = false } = {}) {
+function sendStorageError(res, error, fallbackMessage, { configText = false, adminDetail = false } = {}) {
   if (!(error instanceof StorageError)) return false;
   const status = error.storageCode === 'DOCUMENT_STORAGE_CONFIG_PROTECTED'
     ? 409
@@ -391,7 +391,10 @@ function sendStorageError(res, error, fallbackMessage, { configText = false } = 
   // store itself (502) never carries its text - the WebDAV test wrote the
   // server's or fetch's message into it, with URL and status line - but its
   // class in `detail`, which the settings page shows the admin.
-  const detail = status === 502 ? remoteFailure(error)?.detail : undefined;
+  // Only where the admin reads the answer (`adminDetail`: storage config and
+  // connection test, #2622); a member uploading, previewing or deleting gets
+  // the case without the class.
+  const detail = status === 502 && adminDetail ? remoteFailure(error)?.detail : undefined;
   res.status(status).json({
     error: configText && status !== 502 ? error.message : fallbackMessage,
     code: status,
@@ -461,7 +464,7 @@ router.get('/storage/config', (req, res) => {
     res.json({ data: storageConfigStatus() });
   } catch (err) {
     log.error('GET /storage/config error:', err);
-    if (sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true })) return;
+    if (sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true, adminDetail: true })) return;
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
@@ -599,7 +602,7 @@ router.put('/storage/config', async (req, res) => {
     res.json({ data: storageConfigStatus() });
   } catch (err) {
     log.error('PUT /storage/config error:', err);
-    if (sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true })) return;
+    if (sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true, adminDetail: true })) return;
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
@@ -614,7 +617,7 @@ router.post('/storage/test', async (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('POST /storage/test error:', err);
-    if (sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true })) return;
+    if (sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true, adminDetail: true })) return;
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

@@ -252,6 +252,10 @@ test('POST /webdav/test: unkonfiguriert → 400 (URL/Benutzer/Passwort fehlen)',
   const r = await call('POST', '/webdav/test', { actor: ADM, body: {} });
   assert.equal(r.status, 400);
   assert.match(r.body.error, /required/i);
+  // #2622: the route names its own cases in ONE field, `errorCode`, like
+  // password_required and url_invalid - not a second one in `reason`.
+  assert.equal(r.body.errorCode, 'config_incomplete', JSON.stringify(r.body));
+  assert.equal(r.body.reason, undefined, JSON.stringify(r.body));
 });
 
 // ── WebDAV-Konfig: valide Persistenz + Maskierung ───────────────────────────────
@@ -650,4 +654,54 @@ test('POST /webdav/test: a failing server answers with reason and class, never i
   assert.equal(r.body.reason, 'remote_http_status');
   assert.equal(r.body.detail, 'HTTP 500');
   assert.equal(typeof r.body.error, 'string');
+});
+
+// ── #2622: a local failure is not the WebDAV server's ──────────────────────────
+// sendWebdavFailure counted every error that was not SQLite's as the remote
+// side: a local file that vanished before the upload answered 502
+// `remote_failed`, which sends the admin to check the WebDAV server. A stub
+// that removes the fresh local backup while it answers PROPFIND makes
+// uploadBackup's readFile fail with ENOENT.
+const vanishingServer = http.createServer((req, res) => {
+  req.resume();
+  req.on('end', () => {
+    if (req.method === 'PROPFIND') {
+      for (const name of fs.readdirSync(BACKUP_DIR)) fs.rmSync(path.join(BACKUP_DIR, name), { force: true });
+      res.writeHead(207, { 'Content-Type': 'application/xml; charset=utf-8' });
+      res.end('<?xml version="1.0"?><D:multistatus xmlns:D="DAV:"></D:multistatus>');
+      return;
+    }
+    res.writeHead(201); res.end();
+  });
+});
+const vanishingBase = await new Promise((r) => vanishingServer.listen(0, '127.0.0.1', () => {
+  r(`http://127.0.0.1:${vanishingServer.address().port}`);
+}));
+test.after(() => vanishingServer.close());
+
+test('POST /webdav/trigger: a local file error is a 500 of this server, not the WebDAV server (#2622)', async () => {
+  const put = await call('PUT', '/webdav/config', {
+    actor: ADM,
+    body: { enabled: true, url: vanishingBase, username: 'dav', password: 'x', remotePath: '/backups/', keep: 7 },
+  });
+  assert.equal(put.status, 200);
+  const r = await call('POST', '/webdav/trigger', { actor: ADM });
+  const text = JSON.stringify(r.body);
+  assert.equal(r.status, 500, text);
+  assert.equal(r.body.reason, 'backup_local_failed', text);
+  assert.equal(r.body.detail, undefined, text);
+  assert.ok(!text.includes(BACKUP_DIR) && !/ENOENT|no such file/.test(text), `no path or engine text: ${text}`);
+});
+
+test('localFailure: a system or crypto error without an HTTP status is local, a network code is not (#2622)', async () => {
+  const { isLocalFailure } = await import('../server/utils/http.js');
+  const enoent = Object.assign(new Error("ENOENT: no such file or directory, open '/data/backups/x.db'"), { errno: -2, code: 'ENOENT', syscall: 'open' });
+  assert.equal(isLocalFailure(enoent), true);
+  assert.equal(isLocalFailure(Object.assign(new Error('bad decrypt'), { code: 'ERR_OSSL_BAD_DECRYPT' })), true);
+  // undici wraps the socket error: syscall `connect`, but a network code.
+  const refused = new TypeError('fetch failed', { cause: Object.assign(new Error('connect ECONNREFUSED'), { errno: -61, code: 'ECONNREFUSED', syscall: 'connect' }) });
+  assert.equal(isLocalFailure(refused), false);
+  assert.equal(isLocalFailure(new TypeError('fetch failed', { cause: Object.assign(new Error('connect EADDRNOTAVAIL'), { errno: -49, code: 'EADDRNOTAVAIL', syscall: 'connect' }) })), false);
+  assert.equal(isLocalFailure(Object.assign(new Error('PUT failed'), { status: 507, errno: -2, syscall: 'open' })), false);
+  assert.equal(isLocalFailure(new Error('something else')), false);
 });

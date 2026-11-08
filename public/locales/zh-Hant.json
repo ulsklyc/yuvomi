@@ -2459,6 +2459,8 @@
         "backupWebdavTestSuccess": "連線成功 - 找到 {{files}} 個備份。",
         "backupWebdavTestFailed": "連線失敗：{{error}}",
         "backupWebdavPasswordRequired": "更換伺服器或使用者名稱後，需要重新輸入密碼。",
+        "backupWebdavConfigIncomplete": "請輸入 WebDAV 伺服器的位址、使用者名稱和密碼。",
+        "backupLocalFailed": "無法在此伺服器上讀取或寫入備份。詳細資訊請見伺服器記錄。",
         "backupWebdavLastUpload": "上次上傳",
         "backupWebdavLastError": "上次錯誤",
         "backupWebdavNeverUploaded": "尚未上傳",

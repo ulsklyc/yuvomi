@@ -487,6 +487,9 @@ export const CASE_MESSAGES = new Map([
   ['remote_http_status', 'settings.remoteErrorStatus'],
   ['remote_unreachable', 'settings.remoteErrorUnreachable'],
   ['remote_failed', 'settings.remoteErrorFailed'],
+  // A WebDAV backup route failed on this server - the local file or the
+  // database, not the WebDAV server (#2622).
+  ['backup_local_failed', 'settings.backupLocalFailed'],
 ]);
 
 /**
@@ -767,8 +770,9 @@ export function errorSentence(err, fallbackKey = 'common.errorGeneric', params =
  * deshalb in einem uebersetzten Rahmen (`{{error}}` in `frameKey`), wie
  * `bad_manifest` beim Modul-Laden: seit Phase 0 (Abschnitt H) die Klasse aus
  * `detail` (`HTTP 401`, `ECONNREFUSED`), nicht mehr der Rohtext des Dienstes -
- * der nannte Hosts, Ports und Pfade. Wo der Server noch einen eigenen Satz in
- * `error` schickt, steht dieser im Rahmen.
+ * der nannte Hosts, Ports und Pfade. Wo der Server ohne bekannten Fall einen
+ * eigenen Satz in `error` schickt, steht dieser im Rahmen; ein bekannter Fall
+ * ohne Klasse sagt seinen Satz (#2622).
  *
  * Nur fuer solche Stellen: test:frontend-audit fuehrt jede mit ihrem Grund in
  * TECHNICAL_DETAIL_SITES. Alles andere nimmt errorSentence.
@@ -792,7 +796,11 @@ export function errorSentenceWithDetail(err, frameKey, fallbackKey = 'common.err
   // ein `remote_*`-Grund seinen Satz, nie den englischen.
   const remote = typeof err?.data?.detail === 'string' ? err.data.detail.trim() : '';
   if (REMOTE_DETAIL.test(remote)) return t(frameKey, { error: remote });
-  if (String(err?.data?.reason ?? '').startsWith('remote_')) return known ?? t(fallbackKey);
+  // Without a class a case the app knows says its own sentence (#2622): the
+  // server's `error` is a fixed English sentence there ("WebDAV upload
+  // failed."), never something to frame. A case whose numbers are missing
+  // says the sentence of the place.
+  if (CASE_MESSAGES.has(err?.data?.reason)) return known ?? t(fallbackKey);
   const detail = typeof err?.data?.error === 'string' ? err.data.error.trim() : '';
   if (detail && detail !== NO_DETAIL) return t(frameKey, { error: detail });
   return known ?? t(fallbackKey);

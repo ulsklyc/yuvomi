@@ -2470,6 +2470,8 @@
         "backupWebdavTestSuccess": "Conexão bem-sucedida - {{files}} backup(s) encontrado(s).",
         "backupWebdavTestFailed": "Falha na conexão: {{error}}",
         "backupWebdavPasswordRequired": "Para outro servidor ou nome de usuário, digite a senha novamente.",
+        "backupWebdavConfigIncomplete": "Informe o endereço, o usuário e a senha do servidor WebDAV.",
+        "backupLocalFailed": "Não foi possível ler ou gravar o backup neste servidor. Os detalhes estão no log do servidor.",
         "backupWebdavLastUpload": "Último envio",
         "backupWebdavLastError": "Último erro",
         "backupWebdavNeverUploaded": "Nenhum envio ainda",

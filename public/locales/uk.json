@@ -2649,6 +2649,8 @@
         "backupWebdavTestSuccess": "З'єднання успішне - знайдено {{files}} копію(й).",
         "backupWebdavTestFailed": "З'єднання невдале: {{error}}",
         "backupWebdavPasswordRequired": "Для іншого сервера або імені користувача введіть пароль ще раз.",
+        "backupWebdavConfigIncomplete": "Введи адресу, ім'я користувача та пароль сервера WebDAV.",
+        "backupLocalFailed": "Не вдалося прочитати або записати резервну копію на цьому сервері. Подробиці в журналі сервера.",
         "backupWebdavLastUpload": "Останнє завантаження",
         "backupWebdavLastError": "Остання помилка",
         "backupWebdavNeverUploaded": "Ще не завантажено",

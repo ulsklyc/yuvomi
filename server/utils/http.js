@@ -340,3 +340,32 @@ export function remoteFailure(err) {
   }
   return { reason: 'remote_failed' };
 }
+
+/**
+ * Whether a failure happened on this server rather than at the foreign one
+ * (#2622): a system error of the filesystem or the OS (`errno`/`syscall`, such
+ * as ENOENT from reading the backup file) or a crypto error (`ERR_OSSL_*`,
+ * `ERR_CRYPTO_*`), with no HTTP status anywhere in the chain. A socket error
+ * carries `syscall` too (`connect`), but its code is a network code and stays
+ * remote. A route answers a local failure with its own 500, never as the
+ * foreign server's (`remote_failed`).
+ *
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+export function isLocalFailure(err) {
+  if (httpStatusOf(err) !== null) return false;
+  for (const e of errorChain(err)) {
+    const code = typeof e.code === 'string' ? e.code : '';
+    if (REMOTE_NETWORK_CODES.has(code)) return false;
+    if (typeof e.originalCode === 'string' && REMOTE_NETWORK_CODES.has(e.originalCode)) return false;
+    // A socket or name lookup with a code the list above does not know.
+    if (e.syscall === 'connect' || e.syscall === 'getaddrinfo') return false;
+  }
+  for (const e of errorChain(err)) {
+    const code = typeof e.code === 'string' ? e.code : '';
+    if (typeof e.syscall === 'string' || Number.isInteger(e.errno)) return true;
+    if (/^ERR_(?:OSSL|CRYPTO)_/.test(code)) return true;
+  }
+  return false;
+}

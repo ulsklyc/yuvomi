@@ -16,7 +16,7 @@ import { createLogger } from '../logger.js';
 import { secretOrigin, storedSecretPath } from '../utils/auto-secrets.js';
 import { createLocalBackup, getStatus as getSchedulerStatus, triggerBackup } from '../services/backup-scheduler.js';
 import * as webdavBackup from '../services/backup-webdav.js';
-import { remoteFailure } from '../utils/http.js';
+import { isLocalFailure, remoteFailure } from '../utils/http.js';
 
 const router = express.Router();
 const log = createLogger('Backup');
@@ -250,7 +250,9 @@ router.post('/trigger', requireAdmin, async (req, res) => {
 
 /**
  * Neuer Server oder Benutzer ohne neues Passwort - eine fehlende Eingabe, keine
- * Stoerung. `errorCode` uebersetzt der Client (admin-backup.js).
+ * Stoerung. `errorCode` uebersetzt der Client (admin-backup.js). The WebDAV
+ * routes name their own cases in this one field (`password_required`,
+ * `url_invalid`, `config_incomplete`, #2622).
  */
 function passwordRequiredResponse(res) {
   return res.status(400).json({
@@ -306,17 +308,19 @@ router.put('/webdav/config', requireAdmin, async (req, res) => {
 /**
  * The answer of a WebDAV route once its own cases are handled (Phase 0 section
  * H): a refusal of the server as its class (502, `reason` + `detail` such as
- * `HTTP 401` or `ECONNREFUSED`, which the backup page shows the admin), a
- * database error as a fixed 500. Any other error counts as the remote side
+ * `HTTP 401` or `ECONNREFUSED`, which the backup page shows the admin). A
+ * failure on this server - the database, or a filesystem or crypto error
+ * without an HTTP status (isLocalFailure, #2622) - is a fixed 500 with
+ * `backup_local_failed`. Any other error counts as the remote side
  * (`remote_failed`, no `detail`). Never the text of the server, of fetch or of
  * the filesystem - it names URLs, status lines and absolute paths.
  */
 function sendWebdavFailure(res, err, sentence) {
-  const failure = remoteFailure(err);
+  const failure = isLocalFailure(err) ? null : remoteFailure(err);
   if (failure) {
     return res.status(502).json({ error: 'The WebDAV server refused the request or could not be reached.', code: 502, ...failure });
   }
-  return res.status(500).json({ error: sentence, code: 500 });
+  return res.status(500).json({ error: sentence, code: 500, reason: 'backup_local_failed' });
 }
 
 /**
@@ -342,7 +346,7 @@ router.post('/webdav/test', requireAdmin, async (req, res) => {
   } catch (err) {
     log.error('WebDAV connection test failed:', err);
     if (err.code === 'webdav_config_incomplete') {
-      return res.status(400).json({ error: err.message, code: 400, reason: 'webdav_config_incomplete' });
+      return res.status(400).json({ error: 'URL, username and password are required.', code: 400, errorCode: 'config_incomplete' });
     }
     sendWebdavFailure(res, err, 'Connection test failed.');
   }
@@ -377,7 +381,7 @@ router.post('/webdav/trigger', requireAdmin, async (req, res) => {
       filePath = await createLocalBackup();
     } catch (err) {
       log.error('WebDAV manual upload: local snapshot failed:', err);
-      return res.status(500).json({ error: 'The local backup could not be created.', code: 500 });
+      return res.status(500).json({ error: 'The local backup could not be created.', code: 500, reason: 'backup_local_failed' });
     }
     await webdavBackup.uploadBackup(filePath);
     res.json({ data: { file: path.basename(filePath), timestamp: new Date().toISOString() } });

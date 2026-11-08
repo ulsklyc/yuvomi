@@ -2776,6 +2776,8 @@
         "backupWebdavTestBtn": "Kiểm tra kết nối",
         "backupWebdavTestFailed": "Kết nối thất bại: {{error}}",
         "backupWebdavPasswordRequired": "Máy chủ hoặc tên người dùng khác cần nhập lại mật khẩu.",
+        "backupWebdavConfigIncomplete": "Nhập địa chỉ, tên người dùng và mật khẩu của máy chủ WebDAV.",
+        "backupLocalFailed": "Không thể đọc hoặc ghi bản sao lưu trên máy chủ này. Chi tiết có trong nhật ký máy chủ.",
         "backupWebdavTestSuccess": "Kết nối thành công - tìm thấy {{files}} bản sao lưu.",
         "backupWebdavTitle": "Đích sao lưu WebDAV",
         "backupWebdavTriggerBtn": "Tải lên ngay",

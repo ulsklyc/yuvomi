@@ -2459,6 +2459,8 @@
         "backupWebdavTestSuccess": "Bağlantı başarılı - {{files}} yedek bulundu.",
         "backupWebdavTestFailed": "Bağlantı başarısız: {{error}}",
         "backupWebdavPasswordRequired": "Farklı bir sunucu veya kullanıcı adı için parolayı yeniden gir.",
+        "backupWebdavConfigIncomplete": "WebDAV sunucusunun adresini, kullanıcı adını ve parolasını gir.",
+        "backupLocalFailed": "Yedek bu sunucuda okunamadı veya yazılamadı. Ayrıntılar sunucu günlüğünde.",
         "backupWebdavLastUpload": "Son yükleme",
         "backupWebdavLastError": "Son hata",
         "backupWebdavNeverUploaded": "Henüz yükleme yapılmadı",

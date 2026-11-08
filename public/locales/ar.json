@@ -2745,6 +2745,8 @@
         "backupWebdavTestSuccess": "نجح الاتصال - تم العثور على {{files}} نسخة احتياطية.",
         "backupWebdavTestFailed": "فشل الاتصال: {{error}}",
         "backupWebdavPasswordRequired": "يتطلب خادم أو اسم مستخدم مختلف إدخال كلمة المرور مرة أخرى.",
+        "backupWebdavConfigIncomplete": "أدخل عنوان خادم WebDAV واسم المستخدم وكلمة المرور.",
+        "backupLocalFailed": "تعذّرت قراءة النسخة الاحتياطية أو كتابتها على هذا الخادم. التفاصيل في سجل الخادم.",
         "backupWebdavLastUpload": "آخر رفع",
         "backupWebdavLastError": "آخر خطأ",
         "backupWebdavNeverUploaded": "لا يوجد رفع بعد",

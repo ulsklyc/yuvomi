@@ -1718,3 +1718,45 @@ test('Kanaltest: die Anbieter werfen ihre eigenen Saetze als NotificationProvide
     NotificationProviderError,
   );
 });
+
+// #2622: checkedInput marked EVERY error without `code` as invalid input, so a
+// TypeError from a malformed body went out as a 400 with the engine's text.
+// Only the channel checks' own errors are a 400; the rest is a fixed 500.
+test('Kanal anlegen: ein kaputter Rumpf ist kein 400 mit Engine-Text, sondern ein fester 500 (#2622)', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = channelRouteHarness(store, db, buildRouter);
+
+  const broken = await call(app, 'POST', '/notifications/channels', { ...NTFY_CHANNEL, clearSecrets: 5 });
+  assert.equal(broken.status, 500, JSON.stringify(broken.json));
+  assert.equal(broken.json.error, 'Internal error.');
+  assert.doesNotMatch(JSON.stringify(broken.json), /iterable|TypeError/);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM notification_channels').get().c, 0);
+});
+
+// #2622, test gap: PUT runs through the same sendChannelWriteFailure as POST.
+test('Kanal aendern: Pruefung bleibt 400 mit Satz, Datenbank und kaputter Rumpf werden 500 (#2622)', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = channelRouteHarness(store, db, buildRouter);
+  const channel = store.createChannel(NTFY_CHANNEL);
+
+  const invalid = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { config: { topic: '' } });
+  assert.equal(invalid.status, 400, JSON.stringify(invalid.json));
+  assert.equal(invalid.json.error, 'ntfy topic is required.');
+
+  const malformed = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { clearSecrets: 5 });
+  assert.equal(malformed.status, 500, JSON.stringify(malformed.json));
+  assert.equal(malformed.json.error, 'Internal error.');
+
+  db.exec(`CREATE TRIGGER h_guard_channels_update AFTER UPDATE ON notification_channels
+    BEGIN INSERT INTO h_guard_missing_update (x) VALUES (1); END`);
+  const failing = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { name: 'Neu' });
+  assert.equal(failing.status, 500, JSON.stringify(failing.json));
+  assert.equal(failing.json.error, 'Internal error.');
+  assert.doesNotMatch(JSON.stringify(failing.json), /h_guard_missing_update|no such table/);
+});
