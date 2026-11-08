@@ -123,6 +123,7 @@ export function backupPaths() {
         summary: 'List remote WebDAV backup files',
         tag: 'Backup',
         admin: true,
+        description: 'A refusal of the server answers 502 with `remote_auth_failed`, `remote_http_status`, `remote_unreachable` or `remote_failed` and the class in `detail` (`HTTP 401`, `ECONNREFUSED`), never the server\'s text.',
       }),
     },
     '/api/v1/backup/webdav/trigger': {
@@ -130,6 +131,7 @@ export function backupPaths() {
         summary: 'Create and upload a WebDAV backup',
         tag: 'Backup',
         admin: true,
+        description: 'A failed local snapshot answers 500. A refused upload answers 502 with `remote_auth_failed`, `remote_http_status`, `remote_unreachable` or `remote_failed` and the class in `detail` (`HTTP 507`, `ECONNREFUSED`), never the server\'s text.',
         stateChanging: true,
       }),
     },

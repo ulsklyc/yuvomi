@@ -543,7 +543,7 @@ const FOLDER_GONE = '`documents_folder_not_found` (404, the folder does not exis
 const SELECTED_FOLDER_GONE = '`documents_selected_folder_not_found` (400, the chosen parent or target folder does not exist)';
 const FOLDER_TREE = '`documents_folder_exists` (409, a sibling has this name), `documents_folder_too_deep` (400, `params.limit` is the maximum depth)';
 const DOCUMENT_GONE = '`documents_document_not_found` (404, the document does not exist or is not visible to the caller)';
-const STORAGE_FAILED = '`documents_storage_failed` (502, the storage backend failed)';
+const STORAGE_FAILED = '`documents_storage_failed` (502, the storage backend failed; a refused or unreachable WebDAV store adds its class in `detail`, such as `HTTP 401` or `ECONNREFUSED`, never its text)';
 const FILE_CASES = '`documents_file_type_not_allowed`, `documents_file_content_mismatch`, `documents_file_empty` (400), `documents_storage_failed` (502, the storage backend failed)';
 const CASE_REASONS = {
   '/api/v1/documents/folders': { post: `${SELECTED_FOLDER_GONE}, ${FOLDER_TREE}` },

@@ -306,9 +306,10 @@ router.put('/webdav/config', requireAdmin, async (req, res) => {
 /**
  * The answer of a WebDAV route once its own cases are handled (Phase 0 section
  * H): a refusal of the server as its class (502, `reason` + `detail` such as
- * `HTTP 401` or `ECONNREFUSED`, which the backup page shows the admin), anything
- * local as a fixed 500. Never the text of the server, of fetch or of the
- * filesystem - it names URLs, status lines and absolute paths.
+ * `HTTP 401` or `ECONNREFUSED`, which the backup page shows the admin), a
+ * database error as a fixed 500. Any other error counts as the remote side
+ * (`remote_failed`, no `detail`). Never the text of the server, of fetch or of
+ * the filesystem - it names URLs, status lines and absolute paths.
  */
 function sendWebdavFailure(res, err, sentence) {
   const failure = remoteFailure(err);
