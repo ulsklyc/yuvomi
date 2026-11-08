@@ -4071,6 +4071,19 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     const userId = parseInt(req.params.id, 10);
     if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid user ID.', code: 400 });
 
+    // HASH FIRST, THEN NOTHING ELSE AWAITS (#2612). `hashPassword` is the only
+    // `await` in this handler. It used to sit between the last-admin check and
+    // the write of `role`: two admins demoting each other with a password
+    // change both passed the check while the other still counted, both writes
+    // landed, and the household had no administrator left. Hashing here, before
+    // anything is read, leaves the rest of the handler synchronous, so the
+    // checks and the write below see the same `users` table. The length rule
+    // is still enforced further down; a too-short password is never hashed.
+    const newPassword = req.body.password !== undefined ? String(req.body.password) : '';
+    const hashedNewPassword = newPassword && normalizePassword(newPassword).length >= 8
+      ? await hashPassword(newPassword)
+      : null;
+
     const existing = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(userId);
     if (!existing) return res.status(404).json({ error: 'User not found.', code: 404, reason: 'members_member_not_found' });
     // EIN DISPLAY IST KEIN MITGLIED, ALSO AUCH HIER NICHT (#1208). Die Liste
@@ -4119,7 +4132,6 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       return res.status(400).json({ error: memberFields.errors.join(' '), code: 400 });
     }
 
-    const newPassword = req.body.password !== undefined ? String(req.body.password) : '';
     if (newPassword && normalizePassword(newPassword).length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters long.', code: 400 });
     }
@@ -4157,16 +4169,6 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
       });
     }
 
-    // Dieselben Gruende wie beim Entfernen (#1909): die Verwaltung sagt den
-    // Satz dazu, auch wenn ein Admin sich selbst herabstuft.
-    const adminError = assertAdminWouldRemain(userId, nextRole);
-    if (adminError) return res.status(400).json({ error: adminError, code: 400, reason: 'last_admin' });
-
-    // Dieselbe Frage fuer den SSO-Zustand: eine Herabstufung darf den Riegel
-    // des Haushalts nicht nebenbei aufmachen (#847).
-    const ssoAdminError = assertSsoAdminWouldRemain(userId, nextRole);
-    if (ssoAdminError) return res.status(400).json({ error: ssoAdminError, code: 400, reason: 'last_sso_admin' });
-
     // Nur ein echter UEBERGANG schreibt und meldet ab. Die Verwaltung schickt
     // den Umschalter bei JEDER Speicherung mit, also auch beim Aendern des
     // Namens oder der Farbe eines laengst SSO-gefuehrten Kontos - der Zweig
@@ -4176,9 +4178,22 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
     const alreadySsoOnly = isSsoOnlyAccount(existingHash);
     const newPasswordHash = (ssoOnly === true && !alreadySsoOnly)
       ? OIDC_PASSWORD_SENTINEL
-      : (newPassword ? await hashPassword(newPassword) : null);
+      : hashedNewPassword;
 
-    db.transaction(() => {
+    // The last-admin checks run inside the same transaction as the write
+    // (#2612). A better-sqlite3 transaction is synchronous and cannot hold an
+    // `await`, so check and write can never be split again by a yield point.
+    const refusal = db.transaction(() => {
+      // Dieselben Gruende wie beim Entfernen (#1909): die Verwaltung sagt den
+      // Satz dazu, auch wenn ein Admin sich selbst herabstuft.
+      const adminError = assertAdminWouldRemain(userId, nextRole);
+      if (adminError) return { error: adminError, code: 400, reason: 'last_admin' };
+
+      // Dieselbe Frage fuer den SSO-Zustand: eine Herabstufung darf den Riegel
+      // des Haushalts nicht nebenbei aufmachen (#847).
+      const ssoAdminError = assertSsoAdminWouldRemain(userId, nextRole);
+      if (ssoAdminError) return { error: ssoAdminError, code: 400, reason: 'last_sso_admin' };
+
       db.get().prepare(`
         UPDATE users
         SET username = ?, display_name = ?, avatar_color = ?, avatar_data = ?, role = ?, family_role = ?
@@ -4204,7 +4219,9 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
         // aufgaben dieses Kontos gelten neu (services/payment-task-audience.js).
         revokePaymentTasksForUsers(db.get(), [userId]);
       }
+      return null;
     });
+    if (refusal) return res.status(400).json(refusal);
 
     if (newPasswordHash) {
       invalidateUserSessions(userId, req.sessionID);
