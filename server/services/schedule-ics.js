@@ -12,7 +12,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { createLogger } from '../logger.js';
-import { escapeICSText, foldLine, resolveFeedZone, stampProp } from './ics-export.js';
+import { escapeICSText, foldLine, emptyFeed, resolveFeedZone, stampProp } from './ics-export.js';
 import { scheduleData } from './schedule.js';
 import { activeAccountSql } from './account-state.js';
 import { todayKey, shiftDateKey, householdTimeZone } from '../utils/timezone.js';
@@ -104,6 +104,9 @@ function shiftDateKeyUTC(dateKey, days) {
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
 }
 
+const PRODID = '-//Yuvomi//Schedule Feed//DE';
+const SCHEDULE_CALENDAR_NAME = 'Yuvomi Schedule';
+
 function buildScheduleFeed(conn, userId, now = new Date()) {
   const today = todayKey(conn);
   const from = shiftDateKey(today, -FEED_PAST_DAYS);
@@ -119,10 +122,10 @@ function buildScheduleFeed(conn, userId, now = new Date()) {
   const out = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Yuvomi//Schedule Feed//DE',
+    `PRODID:${PRODID}`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'X-WR-CALNAME:Yuvomi Schedule',
+    `X-WR-CALNAME:${SCHEDULE_CALENDAR_NAME}`,
   ];
   if (feedZone) out.push(`X-WR-TIMEZONE:${feedZone}`);
   // Genau ein VTIMEZONE fuer die Feed-Zone (RFC 5545: vor den VEVENTs), nur
@@ -164,7 +167,16 @@ function findUserIdByFeedToken(conn, token) {
   return row?.id ?? null;
 }
 
+/** The schedule feed without its events, for a subscriber without `schedule` (#2615). */
+function buildEmptyScheduleFeed(conn) {
+  return emptyFeed({
+    prodId: PRODID,
+    calendarName: SCHEDULE_CALENDAR_NAME,
+    timeZone: resolveFeedZone(householdTimeZone(conn)),
+  });
+}
+
 export {
-  buildScheduleFeed,
+  buildScheduleFeed, buildEmptyScheduleFeed,
   getFeedToken, regenerateFeedToken, clearFeedToken, findUserIdByFeedToken,
 };

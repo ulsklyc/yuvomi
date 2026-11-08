@@ -44,6 +44,25 @@ export const ORIGIN_MODULE = Object.freeze({
   shopping_move_returned: 'shopping',
 });
 
+/* THE SAME QUESTION FOR THE SUBSCRIPTION ADDRESSES (#2615).
+ *
+ * Each `/feed/<name>/:token.ics` route in server/index.js belongs to one
+ * permission module. A member for whom that module is `none` gets an empty
+ * calendar (see `recipientDeniedModules()` below); the household switch stays
+ * deliberately open for feeds (docs/DECISIONS.md). Birthdays follow
+ * `calendar`, as in the delivery: `birthdays` is a nav id under it, not a
+ * permission module of its own. A local calendar's feed is not here - its token
+ * belongs to the calendar, not to a member.
+ * test/test-denied-module-feeds.js holds every value against PERMISSION_MODULES. */
+export const FEED_MODULE = Object.freeze({
+  calendar:              'calendar',
+  birthdays:             'calendar',
+  'inventory-deadlines': 'inventory',
+  cycle:                 'health',
+  schedule:              'schedule',
+  waste:                 'waste',
+});
+
 /**
  * Gehoert dieser Termin einem Geburtstag? Geburtstage schreiben ihre
  * Erinnerungen als `event` an den Kalendertermin, den sie selbst anlegen
@@ -112,8 +131,19 @@ export function withoutSwitchedOffModules(database, rows) {
  * Ohne Konto gibt es niemanden, dem die Meldung gehoert. `created_by` ist zwar
  * NOT NULL mit Fremdschluessel auf `users` - aber genau darauf zu bauen hiesse,
  * die Antwort von einem PRAGMA abhaengig zu machen.
+ *
+ * EXPORTED AS AN INTERIM STEP UNTIL PHASE 2 of the architecture roadmap, where
+ * it moves into `authorize()`; until then no further module should grow its
+ * own permission predicate next to it. Callers: the delivery
+ * (`withoutModulesDeniedToRecipient()` below, for notifications.js), the
+ * medication scheduler (#2602, which sends without `reminders` rows), and
+ * the calendar feeds (#2615, server/index.js).
+ *
+ * @param {object} database
+ * @param {number} userId
+ * @returns {Set<string>|null}
  */
-function recipientDeniedModules(database, userId) {
+export function recipientDeniedModules(database, userId) {
   const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
   if (!user) return null;
   return deniedModules(buildSessionModuleAccess(resolvePermissions(database, user)));
