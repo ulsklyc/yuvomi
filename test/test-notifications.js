@@ -1652,3 +1652,28 @@ test('Kanal anlegen: Pruefung bleibt 400 mit Satz, ein Datenbankfehler wird 500 
   assert.equal(broken.json.error, 'Internal error.');
   assert.doesNotMatch(JSON.stringify(broken.json), /h_guard_missing_channels|no such table/);
 });
+
+// Phase 0, Abschnitt H: der Fehler eines Kanaltests wird gespeichert und mit
+// dem Kanal gelistet. Eigene Saetze der Anbieter bleiben, ein Netzfehler wird
+// als sein Code gespeichert - der Text von Node nennt Adresse und Port.
+test('Kanaltest: ein Netzfehler wird als Code gespeichert, ein eigener Satz bleibt', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  let thrown;
+  const router = buildRouter({ database: db, channelStore: store, notificationService: { providers: {}, testChannel: async () => { throw thrown; } } });
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
+  app.use('/notifications', router);
+  const channel = store.createChannel(NTFY_CHANNEL);
+
+  thrown = new TypeError('fetch failed', { cause: Object.assign(new Error('connect ECONNREFUSED 10.0.0.9:8080'), { code: 'ECONNREFUSED' }) });
+  assert.equal((await call(app, 'POST', `/notifications/channels/${channel.id}/test`)).status, 500);
+  assert.equal(db.prepare('SELECT last_error FROM notification_channels WHERE id = ?').get(channel.id).last_error, 'ECONNREFUSED');
+
+  thrown = new Error('Webhook authentication failed.');
+  await call(app, 'POST', `/notifications/channels/${channel.id}/test`);
+  assert.equal(db.prepare('SELECT last_error FROM notification_channels WHERE id = ?').get(channel.id).last_error, 'Webhook authentication failed.');
+});

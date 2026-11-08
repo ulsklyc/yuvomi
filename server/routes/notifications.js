@@ -9,6 +9,7 @@ import { createLogger } from '../logger.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { createNotificationChannelStore, NOTIFICATION_PROVIDERS } from '../services/notification-channels.js';
 import { notificationService as defaultNotificationService } from '../services/notifications.js';
+import { remoteFailure } from '../utils/http.js';
 
 const log = createLogger('NotificationRoutes');
 
@@ -154,7 +155,12 @@ export function buildRouter({
     } catch (err) {
       log.error('Error testing notification channel:', err.message);
       const id = parseId(req.params.id);
-      if (id) store.markChannelTestResult(id, { ok: false, error: err.message });
+      // Stored as the channel's `last_error` and listed to the admin. The
+      // providers' own sentences ("Webhook authentication failed.") stay; a
+      // network error is Node's text with host and port and is stored as its
+      // code instead (Phase 0 section H).
+      const failure = remoteFailure(err);
+      if (id) store.markChannelTestResult(id, { ok: false, error: failure?.reason === 'remote_unreachable' ? failure.detail : err.message });
       res.status(500).json({ error: 'Internal error.', code: 500 });
     }
   });
