@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   link, could save the session again with the old administrator role and keep it for up to 90
   days, past module rights as well. The role now comes from the account on every request, so a
   demotion applies to every session at once.
+- **A calendar feed no longer serves a member whose module was taken away** (#2615). The six
+  subscription links (calendar, birthdays, inventory deadlines, cycle, schedule, waste) never asked
+  the member's module permission, so somebody set to "no access" for the calendar kept receiving
+  every household event in their calendar app, other members' private ones included. Such a feed
+  now stays empty instead. The subscription itself stays valid and fills again once access is given
+  back; "read only" keeps delivering, and administrators are not affected.
 - **Medication reminders reach only members who may see Health, and never a household
   notification channel** (#2602, #2598). The medication scheduler sends on its own instead of
   going through the regular reminder delivery, and checked neither filter that path has. A

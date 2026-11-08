@@ -22,7 +22,7 @@
 import { randomBytes } from 'node:crypto';
 import { createLogger } from '../logger.js';
 import { resolveHouseholdFormats, translate } from '../utils/i18n.js';
-import { escapeICSText, foldLine } from './ics-export.js';
+import { escapeICSText, foldLine, emptyFeed } from './ics-export.js';
 import { warrantyEndDate } from './inventory-deadlines.js';
 import { activeAccountSql } from './account-state.js';
 
@@ -72,6 +72,8 @@ function buildTrackedDateVEvent(row, dtstamp, locale) {
   return lines.map(foldLine);
 }
 
+const PRODID = '-//Yuvomi//Inventory Deadlines Feed//DE';
+
 function buildInventoryDeadlinesFeed(conn, now = new Date()) {
   const rows = conn.prepare(`
     SELECT id, name, purchase_date, warranty_months
@@ -97,7 +99,7 @@ function buildInventoryDeadlinesFeed(conn, now = new Date()) {
   const out = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Yuvomi//Inventory Deadlines Feed//DE',
+    `PRODID:${PRODID}`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeICSText(translate(locale, 'inventory.icsCalendarName'))}`,
@@ -155,7 +157,13 @@ function findUserIdByFeedToken(conn, token) {
   return row?.id ?? null;
 }
 
+/** The inventory deadlines feed without its events, for a subscriber without `inventory` (#2615). */
+function buildEmptyInventoryDeadlinesFeed(conn) {
+  const { locale } = resolveHouseholdFormats(conn);
+  return emptyFeed({ prodId: PRODID, calendarName: translate(locale, 'inventory.icsCalendarName') });
+}
+
 export {
-  buildInventoryDeadlinesFeed,
+  buildInventoryDeadlinesFeed, buildEmptyInventoryDeadlinesFeed,
   getFeedToken, regenerateFeedToken, clearFeedToken, findUserIdByFeedToken,
 };
