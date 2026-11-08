@@ -7,8 +7,13 @@ name: Release Assets
 # GitHub's generated source tarball (phase 1a, section A of the roadmap).
 #
 # THE RELEASE STAYS A DRAFT UNTIL THE ASSET IS ON IT. release-prep creates the
-# release with `--draft` and then starts this workflow:
-#   gh workflow run release-assets.yml --ref main -f tag=vX.Y.Z
+# release with `--draft` and then starts this workflow AT THE TAG:
+#   gh workflow run release-assets.yml --ref vX.Y.Z -f tag=vX.Y.Z
+# The run must sit on the tag, not on main: the attestation takes its source
+# (repository, ref, commit) from the run's OIDC token, so a run on main would
+# sign "built from main@<sha>" for a tarball of the tag, and
+# `gh attestation verify --source-ref refs/tags/vX.Y.Z` would fail. The first
+# step refuses any other ref.
 # It builds, attests, uploads and only then publishes the release. Drafts are
 # invisible to `releases/latest`, to the YunoHost autoupdater
 # (`latest_github_release`) and to Proxmox (`check_for_gh_release`), so there
@@ -34,10 +39,13 @@ name: Release Assets
 # token never start other workflows (except workflow_dispatch and
 # repository_dispatch), so `umbrel-publish.yml`, which listens to
 # `release: published`, would not run for a release this job publishes. The
-# last step therefore dispatches it explicitly, on EVERY successful run: a
-# rerun after a failure past the publish step sees the release already public
-# and must still hand over, and the Umbrel workflow updates its PR in place, so
-# a second run for the same version changes nothing. It is dispatched at the
+# last step therefore dispatches it explicitly, on every successful run for
+# the NEWEST release: a rerun after a failure past the publish step sees the
+# release already public and must still hand over, and the Umbrel workflow
+# updates its PR in place, so a second run for the same version changes
+# nothing. A run for an older tag hands over nothing: umbrel-publish refuses to
+# walk the store backwards only for its `release` event, while a dispatch is
+# its deliberate rollback path. It is dispatched at the
 # TAG, not at main: umbrel-publish reads `.github/umbrel-release-notes.md` from
 # its checkout, and the notes for this version are committed before the tag -
 # on main they may already belong to the next release, or (patch release from
@@ -81,6 +89,10 @@ jobs:
           set -euo pipefail
           if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "::error::Tag '$TAG' is not of the form vX.Y.Z"
+            exit 1
+          fi
+          if [ "$GITHUB_REF" != "refs/tags/$TAG" ]; then
+            echo "::error::Run this workflow at the tag, so the attestation names it: gh workflow run release-assets.yml --ref $TAG -f tag=$TAG (this run is on $GITHUB_REF)"
             exit 1
           fi
           VERSION="${TAG#v}"
@@ -134,7 +146,23 @@ jobs:
           TARBALL: ${{ steps.version.outputs.tarball }}
         run: |
           set -euo pipefail
-          gh release upload "$TAG" "$TARBALL" SHA256SUMS --clobber
+          # Replace only on a draft. `--clobber` deletes an existing asset
+          # before uploading the new one, so on a PUBLIC release (a rerun after
+          # a failure past the publish step) a failed upload would leave the
+          # release without its file. There, add only what is missing; the
+          # pack is deterministic, so a present file is the same bytes.
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = "true" ]; then
+            gh release upload "$TAG" "$TARBALL" SHA256SUMS --clobber
+          else
+            HAVE="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+            for NAME in "$TARBALL" SHA256SUMS; do
+              if printf '%s\n' "$HAVE" | grep -qxF "$NAME"; then
+                echo "$TAG is public and already has $NAME - kept"
+              else
+                gh release upload "$TAG" "$NAME"
+              fi
+            done
+          fi
 
       - name: Publish the release
         run: |
@@ -164,4 +192,10 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
+          NEWEST="$(gh release list --exclude-drafts --limit 100 --json tagName --jq '.[].tagName' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
+          if [ "$NEWEST" != "$TAG" ]; then
+            echo "::notice::$TAG is not the newest release ($NEWEST); the Umbrel store is not moved back. A deliberate rollback is a manual dispatch of umbrel-publish.yml."
+            exit 0
+          fi
           gh workflow run umbrel-publish.yml --ref "$TAG" -f version="$VERSION"

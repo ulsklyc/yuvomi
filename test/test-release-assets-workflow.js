@@ -75,6 +75,16 @@ test('starts only by dispatch with a tag, never on a release event', () => {
   assert.match(workflow, /^ {6}TAG: \$\{\{ inputs\.tag \}\}$/m, 'TAG comes from the input alone');
 });
 
+test('refuses to run anywhere but at the tag it packs', () => {
+  // The attestation takes repository, ref and commit from the run's OIDC
+  // token, not from the checkout. A run on main would sign "built from main"
+  // for a tarball of the tag, and `--source-ref refs/tags/v...` would fail.
+  const resolve = allSteps[0].text;
+  const refCheck = resolve.search(/if \[ "\$GITHUB_REF" != "refs\/tags\/\$TAG" \]; then\n.*\n {12}exit 1/);
+  assert.notEqual(refCheck, -1, 'the first step exits unless GITHUB_REF is refs/tags/$TAG');
+  assert.ok(refCheck < resolve.indexOf('gh release'), 'before it touches the release');
+});
+
 test('asks for exactly the permissions it uses, at workflow level only', () => {
   const perms = topLevelBlock(workflow, 'permissions')
     .map((l) => l.trim())
@@ -142,7 +152,18 @@ test('attests the tarball and SHA256SUMS before anything is uploaded', () => {
 
 test('uploads both files, publishes last, then checks the result', () => {
   const upload = indexOf(/gh release upload "\$TAG" "\$TARBALL" SHA256SUMS --clobber/);
-  assert.notEqual(upload, -1, 'upload both files; --clobber makes a rerun replace them');
+  assert.notEqual(upload, -1, 'upload both files; --clobber makes a rerun on a draft replace them');
+  // `--clobber` deletes before it uploads: on a public release a failed
+  // upload would leave it without its file. So replace only on a draft, and
+  // on a public release add only what is missing.
+  const uploadText = allSteps[upload].text;
+  const [draftBranch, publicBranch] = uploadText.split(/^ {10}else$/m);
+  assert.ok(publicBranch, 'the upload step has a draft branch and a public branch');
+  assert.match(draftBranch, /--json isDraft --jq \.isDraft\)" = "true" \]; then\n {12}gh release upload "\$TAG" "\$TARBALL" SHA256SUMS --clobber/,
+    '--clobber sits inside the isDraft == true branch');
+  assert.doesNotMatch(publicBranch, /--clobber/, 'a public release never loses an asset');
+  assert.match(publicBranch, /grep -qxF "\$NAME"[\s\S]*gh release upload "\$TAG" "\$NAME"$/m,
+    'on a public release only a missing file is uploaded');
   const publish = indexOf(/gh release edit "\$TAG" --draft=false/);
   assert.ok(publish > upload, 'the release leaves draft only after the upload');
 
@@ -173,6 +194,14 @@ test('hands over to the Umbrel publish on every successful run, at the tag', () 
   // release already public and must still hand over. umbrel-publish updates
   // its PR in place and refuses older versions itself.
   assert.doesNotMatch(allSteps[dispatch].text, /^ {8}if:/m, 'the handover runs on every successful run');
+  // ... for the NEWEST release only: umbrel-publish's own "refuse to walk the
+  // store backwards" runs for its release event, not for a dispatch.
+  const text = allSteps[dispatch].text;
+  const newest = text.search(/gh release list --exclude-drafts .*--json tagName/);
+  assert.notEqual(newest, -1, 'it reads the published releases');
+  assert.match(text, /sort -V \| tail -1\)"/, 'and takes the highest version');
+  assert.match(text, /if \[ "\$NEWEST" != "\$TAG" \]; then\n(?:.*\n)*? {12}exit 0\n {10}fi\n {10}gh workflow run umbrel-publish/,
+    'an older tag stops before the dispatch');
   assert.match(umbrel, /^ {2}workflow_dispatch:\n {4}inputs:\n {6}version:/m,
     'umbrel-publish.yml still takes the version input this step passes');
 });

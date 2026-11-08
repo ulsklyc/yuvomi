@@ -18,7 +18,7 @@ A release is a tag `vX.Y.Z` on this repository. Everything downstream hangs on t
   attestation, uploads them and only then publishes the release. YunoHost and the Proxmox script
   install from that asset, and neither sees a draft, so no channel ever sees a release without
   its tarball. If the job fails or was never started, the release stays a draft; start it with
-  `gh workflow run release-assets.yml --ref main -f tag=vX.Y.Z`.
+  `gh workflow run release-assets.yml --ref vX.Y.Z -f tag=vX.Y.Z`.
 - `umbrel-publish.yml` runs when the GitHub release is published and opens, or renames, the
   store PR against `getumbrel/umbrel-apps`. A release that `release-assets.yml` publishes with
   the workflow token fires no `published` run of its own, so that job starts this one explicitly.
@@ -109,8 +109,13 @@ the last tag is an interface release.
     ```bash
     gh release create vX.Y.Z --repo ulsklyc/yuvomi --title "vX.Y.Z" --notes-file <file> --draft
     gh release view vX.Y.Z --repo ulsklyc/yuvomi --json body --jq .body
-    gh workflow run release-assets.yml --repo ulsklyc/yuvomi --ref main -f tag=vX.Y.Z
+    gh workflow run release-assets.yml --repo ulsklyc/yuvomi --ref vX.Y.Z -f tag=vX.Y.Z
     ```
+
+    The job runs **at the tag** (`--ref vX.Y.Z`), not at `main`, and refuses any other ref: the
+    attestation names the ref and commit the run sits on, and an operator checking
+    `--source-ref refs/tags/vX.Y.Z` must find the tag there. A patch release from a branch
+    works the same way, as long as its tag contains `release-assets.yml`.
 
     Wait for the job and check that the release came out of draft with both files on it:
 
