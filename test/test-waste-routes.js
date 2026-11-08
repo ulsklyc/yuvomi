@@ -1127,7 +1127,11 @@ test('reasons of a failed fetch: one per class - the status of the other side, t
     // Nothing answers: a refused connection, and a connection cut mid-answer.
     standIn.handler = (req) => { req.socket.destroy(); };
     await expectFetchFailure(refresh(), 200, 'waste_source_fetch_unreachable', undefined);
-    await expectReason(reimport('preview'), 502, 'waste_source_fetch_unreachable');
+    const cut = await reimport('preview');
+    await expectReason(cut, 502, 'waste_source_fetch_unreachable');
+    // Phase 0, section H: an unreachable source is Node's text (socket, host,
+    // port); the answer carries the fixed sentence, the text stays in the log.
+    assert.equal(cut.body.error, 'Fetching the source URL failed.', JSON.stringify(cut.body));
     const dead = `http://127.0.0.1:${await closedPort()}/cal.ics`;
     const unreachable = await expectFetchFailure(
       withPrivateNetwork(() => call('POST', '/waste/sources', { body: { name: 'Dead', url: dead } })),

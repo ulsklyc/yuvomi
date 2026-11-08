@@ -208,9 +208,18 @@ async function icsTextForReimport(source, req, res) {
       }
       return fetched;
     } catch (err) {
-      // The class of the failure as `reason` (and its number as `params`), next
-      // to the sentence that carries the cause for logs and API consumers (#1909).
-      res.status(502).json({ error: `Fetching the source URL failed: ${err.message}`, code: 502, ...classifyFetchFailure(err) });
+      // The class of the failure as `reason` (and its number as `params`, #1909)
+      // next to the sentence for API consumers. That sentence keeps the cause
+      // only where the source wrote it (a status, too large, a blocked
+      // address); an unreachable address is Node's text with host and port and
+      // stays in the log (Phase 0 section H).
+      const failure = classifyFetchFailure(err);
+      if (failure.reason === 'waste_source_fetch_unreachable') {
+        log.warn('Fetching the waste source URL failed:', err);
+        res.status(502).json({ error: 'Fetching the source URL failed.', code: 502, ...failure });
+      } else {
+        res.status(502).json({ error: `Fetching the source URL failed: ${err.message}`, code: 502, ...failure });
+      }
       return null;
     }
   }
