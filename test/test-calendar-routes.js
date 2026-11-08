@@ -463,6 +463,31 @@ test('GET /google/status — nennt fehlende Variablen, nie ihre Werte (#2221)', 
   }
 });
 
+// Phase 0, Abschnitt H: fehlende Konfiguration ist ein eigener Fall mit festem
+// Satz - nicht der Text des Dienstes, der Variablen und Pfade nennt.
+test('Outlook und Google ohne Konfiguration: eigener Fall, fester Satz, kein Rohtext', async () => {
+  const keys = ['MS_CLIENT_ID', 'MS_CLIENT_SECRET', 'MS_REDIRECT_URI'];
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  try {
+    for (const k of keys) delete process.env[k];
+    for (const [method, path] of [['GET', '/outlook/accounts'], ['POST', '/outlook/sync'], ['GET', '/outlook/accounts/1/calendars']]) {
+      const res = await call(method, path, { actor: ADMIN });
+      assert.equal(res.status, 503, `${method} ${path}: ${JSON.stringify(res.body)}`);
+      assert.equal(res.body.reason, 'outlook_not_configured', `${method} ${path}`);
+      assert.doesNotMatch(JSON.stringify(res.body), /MS_CLIENT|\[Outlook\]/, `${method} ${path}: kein Text des Dienstes`);
+    }
+  } finally {
+    for (const k of keys) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  }
+  const google = await call('GET', '/google/calendars', { actor: ADMIN });
+  assert.equal(google.status, 409, JSON.stringify(google.body));
+  assert.equal(google.body.reason, 'google_not_configured');
+  assert.doesNotMatch(JSON.stringify(google.body), /GOOGLE_|\[Google\]/);
+});
+
 test('GET /apple/status — configured:false ohne Config', async () => {
   const res = await call('GET', '/apple/status', { actor: MARIA });
   assert.equal(res.status, 200);
