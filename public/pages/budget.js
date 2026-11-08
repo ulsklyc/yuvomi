@@ -4356,6 +4356,9 @@ function openCategoryManager() {
         // Kategorien mit 409 ab.
         deleteDetailKey: 'budget.categoryDeleteConfirmDetail',
         subDeleteDetailKey: 'budget.subcategoryDeleteConfirmDetail',
+        // Eine Kategorie, die jemand anderes schon geloescht hat, ist ein
+        // Erfolg (#1909); eine verschwundene Unterkategorie meldet ihr Satz.
+        alreadyDeletedReason: 'budget_category_not_found',
       });
     },
     // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem

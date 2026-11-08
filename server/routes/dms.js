@@ -73,8 +73,18 @@ router.post('/accounts', (req, res) => {
     const vUrl = str(req.body.base_url, 'Base URL', { max: 500 });
     const vToken = str(req.body.api_token, 'API token', { max: 500 });
     const vOrgId = provider === 'papra' ? str(req.body.org_id, 'Organization ID', { max: 200 }) : { value: '', error: null };
-    for (const v of [vName, vUrl, vToken, vOrgId]) if (v.error) return res.status(400).json({ error: v.error, code: 400 });
-    if (!/^https?:\/\//i.test(vUrl.value)) return res.status(400).json({ error: 'Base URL must start with http(s)://', code: 400 });
+    // #1909: das Formular der Einstellungen prueft selbst nichts. Ein leeres
+    // Pflichtfeld und eine Adresse ohne Schema nennen ihren Fall; ein zu langer
+    // Wert bleibt ohne Grund (das Formular begrenzt Name und Organisation).
+    const required = [req.body.name, req.body.base_url, req.body.api_token];
+    if (provider === 'papra') required.push(req.body.org_id);
+    const missing = required.some((value) => String(value ?? '').trim() === '');
+    for (const v of [vName, vUrl, vToken, vOrgId]) {
+      if (v.error) return res.status(400).json({ error: v.error, code: 400, ...(missing ? { reason: 'dms_field_required' } : {}) });
+    }
+    if (!/^https?:\/\//i.test(vUrl.value)) {
+      return res.status(400).json({ error: 'Base URL must start with http(s)://', code: 400, reason: 'dms_url_invalid' });
+    }
 
     const result = db.get().prepare(`
       INSERT INTO dms_accounts (provider, name, base_url, org_id, api_token) VALUES (?, ?, ?, ?, ?)
@@ -82,7 +92,7 @@ router.post('/accounts', (req, res) => {
     res.status(201).json({ data: publicAccount(getAccount(result.lastInsertRowid)) });
   } catch (err) {
     if (err.message?.includes('UNIQUE constraint')) {
-      return res.status(409).json({ error: 'A DMS account with this URL already exists.', code: 409 });
+      return res.status(409).json({ error: 'A DMS account with this URL already exists.', code: 409, reason: 'dms_account_exists' });
     }
     log.error('POST /accounts error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });

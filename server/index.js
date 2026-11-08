@@ -110,6 +110,7 @@ import schedulePreferencesRouter from './routes/schedule-preferences.js';
 import scheduleExtrasRouter from './routes/schedule-extras.js';
 import { sessionModuleAccessRequirement, tokenAccessRequirement, tokenAllows } from './scopes.js';
 import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './permissions.js';
+import { FEED_MODULE, recipientDeniedModules } from './services/reminder-origins.js';
 import { BODY_LIMIT, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './utils/upload-limit.js';
 import { createServiceWorkerResponseLoader } from './utils/service-worker.js';
 import { createStaticAssets } from './utils/static-assets.js';
@@ -533,14 +534,31 @@ const feedLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// A member's feed follows the member's module permission (#2615). The feeds sit
+// outside `/api/v1`, so the module gate there never reached them, and revoking
+// a permission leaves the feed tokens in place. On `none` - and for an owner
+// that no longer resolves - the feed answers 200 with an EMPTY calendar under
+// the same headers instead of 404: the subscription stays in the calendar app
+// and fills again once the permission is given back (skip, do not delete, as
+// the delivery of reminders since #1289). `read` keeps delivering, an admin is
+// never affected. The household module switch stays deliberately open for
+// feeds (docs/DECISIONS.md).
+function feedModuleDenied(userId, feed) {
+  const denied = recipientDeniedModules(db.get(), userId);
+  return !denied || denied.has(FEED_MODULE[feed]);
+}
+
 app.get('/feed/calendar/:token.ics', feedLimiter, (req, res) => {
   try {
     const userId = icsExport.findUserIdByFeedToken(db.get(), 'calendar_feed_token', req.params.token);
     const localCalendar = userId ? null : findCalendarByFeedToken(db.get(), req.params.token);
     if (!userId && !localCalendar) return res.status(404).type('text/plain').send('Not found');
-    const ics = userId
-      ? icsExport.buildFeed(db.get(), userId)
-      : icsExport.buildCalendarFeed(db.get(), localCalendar.id);
+    // A local calendar's token belongs to the calendar, not to a member: no gate.
+    const ics = !userId
+      ? icsExport.buildCalendarFeed(db.get(), localCalendar.id)
+      : feedModuleDenied(userId, 'calendar')
+        ? icsExport.buildEmptyFeed(db.get())
+        : icsExport.buildFeed(db.get(), userId);
     res.set('Cache-Control', 'private, no-store');
     res.set('Content-Disposition', `inline; filename="${localCalendar ? `yuvomi-${localCalendar.id}.ics` : 'yuvomi.ics'}"`);
     res.type('text/calendar; charset=utf-8').send(ics);
@@ -552,12 +570,14 @@ app.get('/feed/calendar/:token.ics', feedLimiter, (req, res) => {
 
 app.get('/feed/birthdays/:token.ics', feedLimiter, (req, res) => {
   try {
-    if (!birthdayIcs.findUserIdByFeedToken(db.get(), req.params.token)) {
-      return res.status(404).type('text/plain').send('Not found');
-    }
+    const userId = birthdayIcs.findUserIdByFeedToken(db.get(), req.params.token);
+    if (!userId) return res.status(404).type('text/plain').send('Not found');
+    const ics = feedModuleDenied(userId, 'birthdays')
+      ? birthdayIcs.buildEmptyBirthdayFeed(db.get())
+      : birthdayIcs.buildBirthdayFeed(db.get());
     res.set('Cache-Control', 'private, no-store');
     res.set('Content-Disposition', 'inline; filename="yuvomi-birthdays.ics"');
-    res.type('text/calendar; charset=utf-8').send(birthdayIcs.buildBirthdayFeed(db.get()));
+    res.type('text/calendar; charset=utf-8').send(ics);
   } catch (err) {
     log.error('Birthday feed', err);
     res.status(500).type('text/plain').send('Internal error');
@@ -571,9 +591,12 @@ app.get('/feed/inventory-deadlines/:token.ics', feedLimiter, (req, res) => {
     // Auflösen statt nur prüfen, wie beim Kalender-Feed oben: das Token gehört
     // einem Nutzer, damit es einzeln zurückziehbar ist. In den Feed-Inhalt geht
     // die Id nicht ein - Inventar ist Haushaltseigentum ohne Sichtbarkeitsachse.
+    // The id decides only whether the owner still has the module (#2615).
     const userId = inventoryDeadlinesIcs.findUserIdByFeedToken(db.get(), req.params.token);
     if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = inventoryDeadlinesIcs.buildInventoryDeadlinesFeed(db.get());
+    const ics = feedModuleDenied(userId, 'inventory-deadlines')
+      ? inventoryDeadlinesIcs.buildEmptyInventoryDeadlinesFeed(db.get())
+      : inventoryDeadlinesIcs.buildInventoryDeadlinesFeed(db.get());
     res.set('Cache-Control', 'private, no-store');
     res.set('Content-Disposition', 'inline; filename="yuvomi-inventory-deadlines.ics"');
     res.type('text/calendar; charset=utf-8').send(ics);
@@ -587,20 +610,21 @@ app.get('/feed/inventory-deadlines/:token.ics', feedLimiter, (req, res) => {
 // oben ist der INHALT hier schon personengebunden (cycle_periods.user_id),
 // nicht nur das Token; siehe server/services/cycle-ics.js.
 //
-// BEWUSST UNGEGATET GEGEN DEN ZYKLUS-TAB/HEALTH-MODUL: server/services/
-// cycle-reminders.js stellt den Erinnerungs-Sync ein, sobald das Health-Modul
-// 'none' ist oder der Zyklus-Tab gesperrt wurde (Haushalt oder persönlich,
-// healthCycleViews()) - dieser Feed lässt sich davon nicht abschalten. Kein
-// Leck: der Inhalt bleibt der des Token-Besitzers selbst, kein Dritter sieht
-// je etwas Fremdes. Gleiche Lücke wie beim Inventar-Feed oben, dieselbe
-// Antwort - ein bestehendes Abo (Kalender-App auf einem anderen Gerät) soll
-// nicht stillschweigend leerlaufen, nur weil die Ansicht in der App gerade
-// gesperrt ist; Abschalten bleibt "Feed deaktivieren" in den Einstellungen.
+// THE VIEW LOCK DOES NOT GATE THIS FEED, THE REVOKED MODULE DOES (#2615).
+// server/services/cycle-reminders.js stops the reminder sync once the cycle
+// tab is locked (household or personal, healthCycleViews()); this feed keeps
+// delivering then - the content is the token owner's own, and an existing
+// subscription on another device should not run empty just because the view
+// is locked in the app; switching it off stays "disable feed" in the settings.
+// `health: none` is a different thing: an administrative decision about the
+// member, and it empties the feed like every other one (feedModuleDenied()).
 app.get('/feed/cycle/:token.ics', feedLimiter, (req, res) => {
   try {
     const userId = cycleIcs.findUserIdByFeedToken(db.get(), req.params.token);
     if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = cycleIcs.buildCycleFeed(db.get(), userId);
+    const ics = feedModuleDenied(userId, 'cycle')
+      ? cycleIcs.buildEmptyCycleFeed(db.get())
+      : cycleIcs.buildCycleFeed(db.get(), userId);
     res.set('Cache-Control', 'private, no-store');
     res.set('Content-Disposition', 'inline; filename="yuvomi-cycle.ics"');
     res.type('text/calendar; charset=utf-8').send(ics);
@@ -618,7 +642,9 @@ app.get('/feed/schedule/:token.ics', feedLimiter, (req, res) => {
   try {
     const userId = scheduleIcs.findUserIdByFeedToken(db.get(), req.params.token);
     if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = scheduleIcs.buildScheduleFeed(db.get(), userId);
+    const ics = feedModuleDenied(userId, 'schedule')
+      ? scheduleIcs.buildEmptyScheduleFeed(db.get())
+      : scheduleIcs.buildScheduleFeed(db.get(), userId);
     res.set('Cache-Control', 'private, no-store');
     res.set('Content-Disposition', 'inline; filename="yuvomi-schedule.ics"');
     res.type('text/calendar; charset=utf-8').send(ics);
@@ -636,7 +662,9 @@ app.get('/feed/waste/:token.ics', feedLimiter, (req, res) => {
   try {
     const userId = wasteIcs.findUserIdByFeedToken(db.get(), req.params.token);
     if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = wasteIcs.buildWasteFeed(db.get(), userId);
+    const ics = feedModuleDenied(userId, 'waste')
+      ? wasteIcs.buildEmptyWasteFeed(db.get())
+      : wasteIcs.buildWasteFeed(db.get(), userId);
     res.set('Cache-Control', 'private, no-store');
     res.set('Content-Disposition', 'inline; filename="yuvomi-waste.ics"');
     res.type('text/calendar; charset=utf-8').send(ics);

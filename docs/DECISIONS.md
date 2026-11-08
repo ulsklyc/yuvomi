@@ -73,7 +73,9 @@ One rule, one place, so a future change cannot be forgotten in a copy:
   three branches - creator, family visibility, explicit share - and no admin branch. Every
   path that hands out documents goes through it, including the modules that only link them.
 - **Tasks and events:** `visibilityWhere()` in `server/services/visibility.js`, enforced on
-  the server and without an admin bypass (#474).
+  the server and without an admin bypass (#474); the one deliberate exception is the personal ICS
+  feed, an export of the household calendar that only drops other members' unshared ICS
+  subscriptions (`icsSubscriptionVisibleWhere()`, SPEC "deliberately not filtered").
 - **Health:** `server/routes/health/caregivers.js`. Grants are per person, managed by admins,
   and every member can read their own.
 - **Invitations:** `INVITE_PRESETS` in `server/permissions.js`, default `restricted`, and the
@@ -1190,3 +1192,55 @@ A need that cannot be met through `/api/v1` at all. A hosted push relay does not
 it is a decision about running a service, and it is made in its own thread. Admin features in a
 native client do not reopen it either: each one opens with a fresh sign-in, not by widening what a
 device can do on its own.
+
+---
+
+## 19. A revoked module goes quiet, it is not cleared away
+
+**When a member's permission for a module is `none`, nothing the server sends or serves without
+being asked in that moment reaches them from that module: no push, no channel message, no feed
+content. What is held back is skipped, never deleted, and arrives again once the permission is
+given back. `read` is not a lock, and an admin is never affected.**
+
+A member permission is an administrative decision about one person, and it can be reversed. The
+route gate in `server/index.js` covers everything a request asks for under `/api/v1`, but not what
+the server does on its own or what sits outside that path, and revoking a right leaves reminder rows
+and feed tokens in place. Deleting them on revoke would only hold at the write side, a role profile
+hits many members at once, and giving the right back would restore nothing. A feed answers 200 with
+an empty calendar rather than 404, because calendar apps report a failing subscription or drop it.
+
+The same line was reached three times:
+
+- **Delivery, #1289.** Web Push and the channels never asked the recipient's permissions; a member
+  with `tasks: none` lost the toast but kept the task title on their phone. The rows now stay
+  pending and go out after the permission is back.
+- **Medication scheduler, #2602.** It sends without `reminders` rows and asks the same recipient
+  verdict.
+- **ICS feeds, #2615.** A member with `calendar: none` kept every household event in their personal
+  feed, other members' private ones included. All six user feeds now answer an empty calendar under
+  the same headers.
+
+This is the member axis only. The household switch (entry 11) stays open for each module's own
+feed, and token scopes belong to a request, which a delivery run or a feed poll is not. A member
+handing somebody a snapshot - the shopping list by mail (#944) - is that member's act, not the
+server's, and the recipient's own permission is not asked there.
+
+### Where the rule lives
+
+- `recipientDeniedModules()` in `server/services/reminder-origins.js`: `resolvePermissions()` ->
+  `buildSessionModuleAccess()` -> `deniedModules()`, the same resolution `req.sessionModuleAccess`
+  takes, and `null` for an owner that does not resolve. Exported as an interim step until
+  `authorize()` in phase 2 of the architecture roadmap.
+- `ORIGIN_MODULE` and `FEED_MODULE` next to it, the one map per kind of output;
+  `withoutModulesDeniedToRecipient()` for the delivery in `server/services/notifications.js`,
+  `feedModuleDenied()` for the feeds in `server/index.js`, `emptyFeed()` in
+  `server/services/ics-export.js` for the empty answer.
+- `npm run test:denied-module-reminders` and `npm run test:denied-module-feeds`, each with the
+  counter cases `read`, admin and role profile, and a guard that every map value is a key of
+  `PERMISSION_MODULES`.
+
+### What would reopen it
+
+A permission model with a per-row axis for feeds (a member allowed some calendars and not others),
+which would make "empty" too coarse. Not a request to clear feed tokens on revoke: that is the write
+side again.

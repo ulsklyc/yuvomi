@@ -45,7 +45,7 @@ import { esc } from '/utils/html.js';
 import { confirmModal } from '/components/modal.js';
 import { createInlineError, settingSwitchRowHtml, toggleRowHtml } from '/settings/components.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
-import { errorSentence } from '/utils/friendly-error.js';
+import { errorSentence, loadErrorSentence } from '/utils/friendly-error.js';
 
 function showToast(message, tone = 'default') {
   window.yuvomi?.showToast(message, tone);
@@ -256,7 +256,7 @@ async function loadFeed(host, part) {
     types = typesRes?.data ?? [];
   } catch (err) {
     host.replaceChildren();
-    host.appendChild(createInlineError(err.message || t('common.errorGeneric')));
+    host.appendChild(createInlineError(loadErrorSentence(err) ?? t('common.errorGeneric')));
     return;
   }
 

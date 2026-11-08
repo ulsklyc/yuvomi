@@ -7,6 +7,7 @@ import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
 import * as appleCalendar from '../../services/apple-calendar.js';
 import { requireAdmin } from '../../auth.js';
+import { secret } from '../../middleware/validate.js';
 
 const log = createLogger('Calendar');
 const router = express.Router();
@@ -68,6 +69,9 @@ router.post('/apple/connect', requireAdmin, async (req, res) => {
   if (!password || typeof password !== 'string' || password.length < 1) {
     return res.status(400).json({ error: 'password is missing.', code: 400 });
   }
+  // Dieselbe Grenze wie CardDAV und CalDAV, ungetrimmt (#2575).
+  const vPassword = secret(password, 'password');
+  if (vPassword.error) return res.status(400).json({ error: vPassword.error, code: 400 });
 
   try {
     // Zuerst temporär setzen, damit testConnection() sie findet

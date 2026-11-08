@@ -3888,7 +3888,9 @@
         "backupRestoreErrorTooLarge": "الملف أكبر من حد الرفع في هذا التثبيت ({{limit}}). ارفع قيمة BACKUP_UPLOAD_LIMIT وأعد تشغيل Yuvomi ثم استعد النسخة مرة أخرى. لم يتغير شيء هنا.",
         "apiTokenErrorNameTooLong": "يجب ألا يزيد الاسم عن 100 حرف.",
         "apiTokenErrorExpiryPast": "تاريخ الانتهاء في الماضي. اختر وقتًا لاحقًا.",
-        "apiTokenErrorSubjectDeactivated": "هذا الحساب معطّل ولا يمكن أن يحصل على رمز. اختر شخصًا آخر."
+        "apiTokenErrorSubjectDeactivated": "هذا الحساب معطّل ولا يمكن أن يحصل على رمز. اختر شخصًا آخر.",
+        "dmsErrorUrlInvalid": "يجب أن يبدأ رابط الخادم بـ http:// أو https://.",
+        "dmsErrorAccountExists": "يوجد بالفعل نظام DMS متصل بعنوان URL هذا للخادم."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",
@@ -5154,7 +5156,9 @@
         "colorTeal": "فيروزي",
         "colorOrange": "برتقالي",
         "colorRed": "أحمر",
-        "colorGrey": "رمادي"
+        "colorGrey": "رمادي",
+        "errorGone": "لم تعد هذه الفئة موجودة.",
+        "errorSubGone": "لم تعد هذه الفئة الفرعية موجودة."
     },
     "subscriptions": {
         "tabLabel": "الاشتراكات",
@@ -6884,7 +6888,10 @@
             "bag_many": "كيس",
             "bag_other": "كيس"
         },
-        "moreDetailsHint": "الحد الأدنى للمخزون، ملاحظات"
+        "moreDetailsHint": "الحد الأدنى للمخزون، ملاحظات",
+        "errorLocationGone": "لم يعد مكان التخزين هذا موجودًا.",
+        "errorLocationExists": "مكان التخزين هذا موجود بالفعل. اختر اسمًا آخر.",
+        "errorLocationLast": "لا يمكن حذف آخر مكان تخزين. أضف مكانًا آخر أولًا."
     },
     "inventory": {
         "title": "المقتنيات",

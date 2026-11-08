@@ -1,13 +1,15 @@
 /** Independent birthday subscriptions; reminders do not control this export. */
 import { randomBytes } from 'node:crypto';
-import { escapeICSText, foldLine, findUserIdByFeedToken as sharedFindUserIdByFeedToken } from './ics-export.js';
+import { escapeICSText, foldLine, emptyFeed, findUserIdByFeedToken as sharedFindUserIdByFeedToken } from './ics-export.js';
 import { eventTitle, nameDayEventTitle } from './birthdays.js';
 import { resolveHouseholdFormats, translate } from '../utils/i18n.js';
+
+const PRODID = '-//Yuvomi//Birthdays//EN';
 
 export function buildBirthdayFeed(database, now = new Date()) {
   const { locale } = resolveHouseholdFormats(database);
   const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Yuvomi//Birthdays//EN',
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:${PRODID}`,
     'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeICSText(translate(locale, 'nav.birthdays'))}`];
   for (const birthday of database.prepare('SELECT id, name, birth_date, name_day FROM birthdays ORDER BY id').all()) {
@@ -32,6 +34,12 @@ export function buildBirthdayFeed(database, now = new Date()) {
   }
   lines.push('END:VCALENDAR');
   return lines.map(foldLine).join('\r\n') + '\r\n';
+}
+
+/** The birthday feed without its events, for a subscriber without `calendar` (#2615). */
+export function buildEmptyBirthdayFeed(database) {
+  const { locale } = resolveHouseholdFormats(database);
+  return emptyFeed({ prodId: PRODID, calendarName: translate(locale, 'nav.birthdays') });
 }
 
 export function getFeedToken(database, userId) {

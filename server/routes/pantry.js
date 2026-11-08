@@ -237,7 +237,7 @@ router.post('/locations', (req, res) => {
     const existing = db.get()
       .prepare('SELECT id FROM pantry_locations WHERE name = ? COLLATE NOCASE')
       .get(vName.value);
-    if (existing) return res.status(409).json({ error: 'Storage location already exists.', code: 409 });
+    if (existing) return res.status(409).json({ error: 'Storage location already exists.', code: 409, reason: 'pantry_location_exists' });
 
     const vIcon = str(req.body.icon, 'icon', { max: MAX_SHORT, required: false });
     if (vIcon.error) return res.status(400).json({ error: vIcon.error, code: 400 });
@@ -293,7 +293,7 @@ router.put('/locations/:locId', (req, res) => {
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
     const loc = db.get().prepare('SELECT * FROM pantry_locations WHERE id = ?').get(vId.value);
-    if (!loc) return res.status(404).json({ error: 'Storage location not found.', code: 404 });
+    if (!loc) return res.status(404).json({ error: 'Storage location not found.', code: 404, reason: 'pantry_location_not_found' });
 
     const vName = str(req.body.name, 'name', { max: MAX_SHORT });
     const vIcon = str(req.body.icon, 'icon', { max: MAX_SHORT, required: false });
@@ -303,7 +303,7 @@ router.put('/locations/:locId', (req, res) => {
     const conflict = db.get()
       .prepare('SELECT id FROM pantry_locations WHERE name = ? COLLATE NOCASE AND id != ?')
       .get(vName.value, loc.id);
-    if (conflict) return res.status(409).json({ error: 'Storage location already exists.', code: 409 });
+    if (conflict) return res.status(409).json({ error: 'Storage location already exists.', code: 409, reason: 'pantry_location_exists' });
 
     db.get()
       .prepare('UPDATE pantry_locations SET name = ?, icon = ? WHERE id = ?')
@@ -328,10 +328,10 @@ router.delete('/locations/:locId', (req, res) => {
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
     const loc = db.get().prepare('SELECT * FROM pantry_locations WHERE id = ?').get(vId.value);
-    if (!loc) return res.status(404).json({ error: 'Storage location not found.', code: 404 });
+    if (!loc) return res.status(404).json({ error: 'Storage location not found.', code: 404, reason: 'pantry_location_not_found' });
 
     const total = db.get().prepare('SELECT COUNT(*) AS c FROM pantry_locations').get().c;
-    if (total <= 1) return res.status(400).json({ error: 'The last storage location cannot be deleted.', code: 400 });
+    if (total <= 1) return res.status(400).json({ error: 'The last storage location cannot be deleted.', code: 400, reason: 'pantry_location_last' });
 
     const orphaned = db.get()
       .prepare('SELECT COUNT(*) AS c FROM pantry_items WHERE location_id = ?')

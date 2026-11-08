@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **A demoted administrator loses admin rights on every device** (#2611). The role of a signed-in
+  browser was taken from the stored session, and a demotion only updated the sessions that existed
+  at that moment. A sign-in that was still checking the password, or a request starting the SSO
+  link, could save the session again with the old administrator role and keep it for up to 90
+  days, past module rights as well. The role now comes from the account on every request, so a
+  demotion applies to every session at once.
+- **A calendar feed no longer serves a member whose module was taken away** (#2615). The six
+  subscription links (calendar, birthdays, inventory deadlines, cycle, schedule, waste) never asked
+  the member's module permission, so somebody set to "no access" for the calendar kept receiving
+  every household event in their calendar app, other members' private ones included. Such a feed
+  now stays empty instead. The subscription itself stays valid and fills again once access is given
+  back; "read only" keeps delivering, and administrators are not affected.
+- **Medication reminders reach only members who may see Health, and never a household
+  notification channel** (#2602, #2598). The medication scheduler sends on its own instead of
+  going through the regular reminder delivery, and checked neither filter that path has. A
+  member whose Health permission was set to none still got "Ibuprofen" by push and on their
+  channels, and a caregiver kept getting another person's doses ("Anna: Ibuprofen") after their
+  access to Health was taken away. And every dose went to the household's shared channels (ntfy,
+  Gotify, webhook or e-mail), private medications included, plus one copy per caregiver with the
+  person's name in front. Now a recipient with Health set to none is skipped (the dose is still
+  logged), and a dose goes out only by push and to channels the recipient owns, whatever the
+  medication's visibility - like every other health reminder, as SECURITY.md promises. Reading
+  access and administrators are unaffected.
+
+## [2.86.0] - 2026-11-07
+
 ### Added
 - **Late completion decay (opt-in).** Households can have late completions pay less: administrators
   switch it on in the rewards settings, off by default. A task ticked off after its due day earns one
@@ -28,6 +55,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not record purchases immediately, but clearing checked items records them dated at the clean-up.
 
 ### Fixed
+- **The container image starts with just a `/data` volume.** Started without `DB_PATH`, for
+  example with a plain `docker run -v yuvomi:/data`, the container stopped right away: the
+  database and the secrets generated on first start would have gone under `/app`, where the app
+  may not write. The image now defaults to `/data/yuvomi.db`. Setups that set `DB_PATH`
+  themselves, such as the compose files and the app catalogs, are unchanged.
+- **CardDAV accepts long app passwords and tokens** (#2575). Saving a CardDAV account refused
+  any password over 200 characters, and the password field cut longer input off without a word, so
+  app tokens such as JWTs could not be used. Passwords for CardDAV, CalDAV and Apple Calendar now
+  share one limit of 4096 characters and are kept exactly as typed, including spaces at the start
+  or end.
+- **Editing a task through the API keeps its primary assignee (#2569).** A `PUT /api/v1/tasks/:id`
+  that left out `assigned_to` made the person with the lowest user id the primary assignee. It now
+  stays who it was, as it already did for calendar events. `assigned_users` lists the primary
+  assignee first, as the API reference says, in task lists, details and the dashboard.
+- **The last settings and managers that showed server text speak your language** (#1909). Managing
+  the categories of budget, tasks, contacts and notes, or the storage locations of the pantry,
+  showed English server text when someone else had deleted the entry meanwhile, when a storage
+  location name was taken or when you tried to delete the last one; each case now has its own
+  sentence, and deleting an entry that is already gone simply counts as done. Connecting a DMS
+  explains an empty field, an address without http:// or https:// and an address that is
+  already connected. Load errors on the DMS, document storage, module install and calendar feed
+  pages, a failed app install on the device page and failed steps of a folder upload say what
+  happened in your language. API clients get the cases as `reason`.
+- **Chinese and Japanese questions end in the full-width question mark.** Confirmations such as
+  signing out other devices or replacing a link used the narrow "?", which ran straight into the next
+  sentence.
+- **A damaged backup is no longer handed out as a good one (#2520).** Every backup is now checked
+  for integrity right after it is written. One that fails is discarded: the download answers with
+  an error instead of the file, a scheduled backup is reported as failed and does not push the
+  oldest good backup out of rotation, and nothing is uploaded to WebDAV. Before, a damaged backup
+  only showed up when you tried to restore it.
+- **Mirrored Mealie recipes show their preparation steps as readable text (#2558).** A step with
+  an inserted image showed the raw `<img>` tag, and formatting or HTML entities appeared as
+  symbols. Steps now arrive as plain text with their lists and links; images in steps are left
+  out, because they live on the Mealie server. Recipes mirrored from Mealie or Tandoor also bring
+  their serving count, so the servings stepper starts from the right base (#2355). Already
+  mirrored recipes are corrected on the next sync.
+- **A new event in a synced calendar reaches CalDAV, iCloud and Google when you save it (#2565).**
+  Edits, moves and deletions were sent right away, but a newly created event waited for the next
+  sync run, up to `SYNC_INTERVAL_MINUTES` later, although the documentation promised an attempt on
+  save. Creating an event with a sync target, or giving an existing local event one, now tries the
+  upload immediately. If the server cannot be reached the event is still saved and the next sync
+  run uploads it, as before.
 - **A calendar subscription that does not deliver says so** (#2566). Adding a subscription whose
   address answered with an error (not found, too large, a private address) reported "Subscription
   added", and the refresh button reported "Subscription synced", while no event ever arrived. Adding
@@ -111,6 +181,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   download builds a full copy of the database on the server, so a hijacked admin session could
   keep it busy by requesting one after another. Further downloads in the same hour are refused;
   other administrators are not affected, and members still get no download at all.
+
+### Changed
+- **The app stores and catalogs no longer ask for a session secret.** Since 2.85.0 a new
+  installation generates `SESSION_SECRET` and `DB_ENCRYPTION_KEY` on its first start, but four
+  deploy descriptors still demanded one: the Portainer stack stopped the deploy outright
+  (`${SESSION_SECRET:?...}`), the Portainer app template and the Unraid template labelled the
+  field "required", and the TrueNAS form refused to install without it. All four now offer both
+  secrets as optional fields with an empty default, and say that Yuvomi generates them and keeps
+  them in `.secrets/` next to the database; setting your own still wins. A Portainer stack, an
+  Unraid container and a TrueNAS app can therefore be installed without running `openssl` first,
+  which is what the 2.85.0 note already promised. Umbrel keeps `${APP_SEED}` for both: it asks
+  nobody for anything, and an existing database is encrypted with that value
+  (`deploy/umbrel/README.md` records the decision). The TrueNAS change needs a pull request
+  upstream before it reaches the catalog (`deploy/truenas/MAINTAINING.md`). (#2507)
 
 ## [2.85.0] - 2026-11-04
 

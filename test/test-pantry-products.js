@@ -63,8 +63,18 @@ app.use('/pantry', pantryRouter);
 app.use('/shopping', shoppingRouter);
 app.use('/kitchen', kitchenRouter);
 const server = app.listen(0, '127.0.0.1');
+// No idle timeout on the keep-alive sockets: the demo seed (spawnSync) and the
+// synchronous migration tests block this process, server and fetch alike, for
+// seconds. Past the default 5 s the server's timeout and the next request
+// fall due in the same turn of the event loop, the request is written to a
+// socket the server then closes, and fetch fails with ECONNRESET. With 0 the
+// server never closes an idle socket; `after` closes them all.
+server.keepAliveTimeout = 0;
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
-test.after(() => server.close());
+test.after(() => {
+  server.closeAllConnections();
+  server.close();
+});
 
 async function call(method, path, body) {
   const res = await fetch(`${baseUrl}${path}`, {

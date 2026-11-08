@@ -970,6 +970,11 @@ function assertSsoAdminWouldRemain(targetUserId, nextRole) {
     + 'login back on for the whole household. Link another administrator first.';
 }
 
+// Keeps the stored sessions in step with `users.role`. No permission decision
+// depends on it any more - `requireAuth` reads the role from `users` per
+// request (#2611). It stays so a stored session does not contradict the
+// account it belongs to; it cannot reach a session saved after it ran, which
+// is why it is not the guard.
 function updateUserRoleSessions(userId, role) {
   const allSessions = db.get().prepare('SELECT sid, sess FROM sessions').all();
   const updateSession = db.get().prepare('UPDATE sessions SET sess = ? WHERE sid = ?');
@@ -1103,6 +1108,9 @@ function applyRoleModuleAccess(req) {
   // Admins: null = Vollzugriff. Token-Scopes bleiben eine zusätzliche
   // Least-Privilege-Grenze und können diese Rechte niemals erweitern.
   req.sessionModuleAccess = null;
+  // Safe to skip the lookup: for every path `authRole` comes from the database
+  // or is fixed to `member` (session and token read `users`, devices and
+  // displays are members), never from a stored session (#2611).
   if (req.authRole === 'admin') return;
   try {
     const user = db.get()
@@ -1211,20 +1219,31 @@ function requireAuth(req, res, next) {
   // noch gibt - und waere bis zu ihrem Ablauf ein Zugang. Deshalb die eine
   // Abfrage je Request, auf dem Primaerschluessel.
   //
-  // UND DIE SITZUNG EINES GELOESCHTEN KONTOS GILT EBENSO WENIG. "Zeigt ins
-  // Leere" stimmt nur fuer Routen, die die Zeile nachschlagen: die Sitzung
-  // traegt Konto-Id UND Rolle, und `requireAdmin` liest die Rolle aus ihr. Die
-  // zurueckgeschriebene Sitzung eines geloeschten Administrators kaeme sonst
-  // weiter an jede Admin-Route. Gefragt wird deshalb "ist dieses Konto aktiv",
-  // nicht "ist es deaktiviert" - ein Konto, das es nicht gibt, ist es nicht.
-  if (req.session && req.session.userId && !isActiveAccount(req.session.userId, { db: db.get() })) {
+  // A DELETED ACCOUNT'S SESSION DOES NOT COUNT EITHER. The question is "is this
+  // account active", not "is it deactivated": an account that does not exist
+  // is not active.
+  //
+  // THE ROLE COMES FROM `users`, NOT FROM THE SESSION (#2611). A demotion
+  // rewrites the session rows that exist at that moment
+  // (`updateUserRoleSessions`), but a row can still carry `role: 'admin'`
+  // afterwards: a login whose `await verifyPassword` spans the demotion writes
+  // the role of the user row it loaded before, and `POST /auth/oidc/link/start`
+  // saves the whole session back via `INSERT OR REPLACE` after its own
+  // `await`. So the one lookup per request, on the primary key, returns the
+  // role as well - the same query as the active-account check, not a second
+  // one. `req.authRole` stays the one address every role check reads;
+  // `req.session.role` is still written, but no permission decision reads it.
+  const sessionAccount = req.session && req.session.userId
+    ? db.get().prepare(`SELECT u.role FROM users u WHERE u.id = ? AND ${activeAccountSql('u')}`).get(req.session.userId)
+    : null;
+  if (req.session && req.session.userId && !sessionAccount) {
     return res.status(401).json({ error: 'Not authenticated.', code: 401 });
   }
 
-  if (req.session && req.session.userId) {
+  if (sessionAccount) {
     req.authMethod = 'session';
     req.authUserId = req.session.userId;
-    req.authRole = req.session.role;
+    req.authRole = sessionAccount.role;
     // Interaktive Sessions kennen kein Token-Scoping.
     req.authScopes = null;
     refreshSessionCookieIfDue(req, res);

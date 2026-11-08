@@ -3548,7 +3548,9 @@
         "backupRestoreErrorTooLarge": "O ficheiro é maior do que o limite de envio desta instalação ({{limit}}). Aumente BACKUP_UPLOAD_LIMIT, reinicie o Yuvomi e restaure novamente. Nada foi alterado aqui.",
         "apiTokenErrorNameTooLong": "O nome pode ter no máximo 100 caracteres.",
         "apiTokenErrorExpiryPast": "A data de expiração está no passado. Escolhe um momento posterior.",
-        "apiTokenErrorSubjectDeactivated": "Esta conta está desativada e não pode receber um token. Escolhe outra pessoa."
+        "apiTokenErrorSubjectDeactivated": "Esta conta está desativada e não pode receber um token. Escolhe outra pessoa.",
+        "dmsErrorUrlInvalid": "O URL do servidor tem de começar por http:// ou https://.",
+        "dmsErrorAccountExists": "Já existe um DMS ligado com este URL do servidor."
     },
     "login": {
         "tagline": "Bem-vindo de volta. A tua casa num só lugar.",
@@ -4763,7 +4765,9 @@
         "colorTeal": "Verde-azulado",
         "colorOrange": "Laranja",
         "colorRed": "Vermelho",
-        "colorGrey": "Cinza"
+        "colorGrey": "Cinza",
+        "errorGone": "Esta categoria já não existe.",
+        "errorSubGone": "Esta subcategoria já não existe."
     },
     "subscriptions": {
         "tabLabel": "Assinaturas",
@@ -6399,7 +6403,10 @@
             "bag_one": "saco",
             "bag_other": "sacos"
         },
-        "moreDetailsHint": "Stock mínimo, notas"
+        "moreDetailsHint": "Stock mínimo, notas",
+        "errorLocationGone": "Este local de armazenamento já não existe.",
+        "errorLocationExists": "Este local de armazenamento já existe. Escolha outro nome.",
+        "errorLocationLast": "O último local de armazenamento não pode ser eliminado. Adicione outro primeiro."
     },
     "inventory": {
         "title": "Inventário",

@@ -669,6 +669,8 @@ function openContactCategoryManager() {
         hintKey: 'category.manageHint',
         deleteDetailKey: 'category.deleteConfirmDetail',
         colors: state.categoryColors,
+        // Schon geloescht ist ein Erfolg (#1909).
+        alreadyDeletedReason: 'contacts_category_not_found',
       });
     },
     // Bewusst KEIN onClose, das den Listener abmeldet - es liefe vor dem

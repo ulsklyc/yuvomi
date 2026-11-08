@@ -1680,6 +1680,8 @@ function openNoteCategoryManager() {
         rowIconResolver: (item) => item.scope === 'personal' ? 'user' : 'home',
         addScopeLabelKey: 'noteCategories.scopeLabel',
         addScopeHelpKey: 'noteCategories.scopeHelp',
+        // Schon geloescht ist ein Erfolg (#1909).
+        alreadyDeletedReason: 'notes_category_not_found',
       });
     },
   });

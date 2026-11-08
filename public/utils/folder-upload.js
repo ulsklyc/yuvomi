@@ -51,6 +51,15 @@ export function folderUploadOutcome(result = {}) {
   return { heading: 'completed', toast: 'uploadedToast', tone: 'success' };
 }
 
+/**
+ * Der Code eines gescheiterten Schritts, nie der Text des Fehlers (#1909): der
+ * traegt den Satz des Servers oder eine Entwicklermeldung. Den Satz sagt die
+ * Seite aus dem `error`, der neben dem Code mitreist.
+ */
+function failureReason(error) {
+  return error?.status === 429 ? 'rate-limited' : 'request-failed';
+}
+
 function refForFolderId(value) {
   const id = Number(value);
   return Number.isInteger(id) && id > 0 ? `id:${id}` : 'root';
@@ -425,9 +434,7 @@ export async function executeFolderUploadPlan(plan, {
         return result;
       }
       failedRefs.add(folder.targetRef);
-      const reason = error?.status === 429 ? 'rate-limited' : (error?.message || String(error));
-      // `error` mit, damit die Seite den Satz der App sagt (#1909): `reason`
-      // traegt sonst den Text des Servers oder eine Entwicklermeldung.
+      const reason = failureReason(error);
       result.failed.push({ kind: 'folder', item: folder, reason, error });
       onProgress({ phase: 'folder', status: 'failed', item: folder, reason });
     }
@@ -470,9 +477,7 @@ export async function executeFolderUploadPlan(plan, {
         result.folderGone = { ref: item.targetRef, error };
         return result;
       }
-      const reason = error?.status === 429 ? 'rate-limited' : (error?.message || String(error));
-      // `error` mit, damit die Seite den Satz der App sagt (#1909): `reason`
-      // traegt sonst den Text des Servers oder eine Entwicklermeldung.
+      const reason = failureReason(error);
       result.failed.push({ kind: 'file', item, reason, error });
       onProgress({ phase: 'file', status: 'failed', item, reason });
     }
