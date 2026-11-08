@@ -51,6 +51,7 @@ import {
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../utils/upload-limit.js';
 import { contentMatchesMime } from '../utils/file-signature.js';
 import { todayKey } from '../utils/timezone.js';
+import { remoteFailure } from '../utils/http.js';
 
 let dmsAdapterFactory = defaultGetDmsAdapter;
 export function _setDmsAdapterFactory(fn) { dmsAdapterFactory = fn || defaultGetDmsAdapter; }
@@ -375,7 +376,7 @@ function sendThumbnail(res, thumb) {
   res.end(thumb.buffer);
 }
 
-function sendStorageError(res, error, fallbackMessage) {
+function sendStorageError(res, error, fallbackMessage, { configText = false } = {}) {
   if (!(error instanceof StorageError)) return false;
   const status = error.storageCode === 'DOCUMENT_STORAGE_CONFIG_PROTECTED'
     ? 409
@@ -385,14 +386,21 @@ function sendStorageError(res, error, fallbackMessage) {
       )
       ? 400
       : 502;
+  // Phase 0 section H: the storage settings may show the service's own
+  // sentence for a misconfiguration (400/409, `configText`). A failure of the
+  // store itself (502) never carries its text - the WebDAV test wrote the
+  // server's or fetch's message into it, with URL and status line - but its
+  // class in `detail`, which the settings page shows the admin.
+  const detail = status === 502 ? remoteFailure(error)?.detail : undefined;
   res.status(status).json({
-    error: fallbackMessage,
+    error: configText && status !== 502 ? error.message : fallbackMessage,
     code: status,
     storage_code: error.storageCode,
     // Der Speicher hat nicht mitgespielt (#1909): ein Fall, den jeder Nutzer
     // beim Hochladen oder Loeschen erreicht, wenn WebDAV, Google Drive oder
     // der Mount ausfallen. Eine Fehlkonfiguration (400/409) bleibt ohne Grund.
     ...(status === 502 ? { reason: 'documents_storage_failed' } : {}),
+    ...(detail ? { detail } : {}),
   });
   return true;
 }
@@ -453,7 +461,7 @@ router.get('/storage/config', (req, res) => {
     res.json({ data: storageConfigStatus() });
   } catch (err) {
     log.error('GET /storage/config error:', err);
-    if (sendStorageError(res, err, err.message)) return;
+    if (sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true })) return;
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
@@ -591,7 +599,7 @@ router.put('/storage/config', async (req, res) => {
     res.json({ data: storageConfigStatus() });
   } catch (err) {
     log.error('PUT /storage/config error:', err);
-    if (sendStorageError(res, err, err.message)) return;
+    if (sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true })) return;
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
@@ -606,7 +614,7 @@ router.post('/storage/test', async (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('POST /storage/test error:', err);
-    if (sendStorageError(res, err, err.message)) return;
+    if (sendStorageError(res, err, 'The document storage refused the request or could not be reached.', { configText: true })) return;
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

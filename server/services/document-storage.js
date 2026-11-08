@@ -1145,7 +1145,7 @@ export async function testConnection(overrides = {}) {
       headers: { 'Content-Type': 'application/octet-stream' },
     });
     if (!putResponse.ok) {
-      throw new Error(`PUT failed with status ${putResponse.status}.`);
+      throw Object.assign(new Error(`PUT failed with status ${putResponse.status}.`), { status: putResponse.status });
     }
 
     const getResponse = await davFetch(config, 'GET', [
@@ -1153,7 +1153,7 @@ export async function testConnection(overrides = {}) {
       testKey,
     ]);
     if (!getResponse.ok) {
-      throw new Error(`GET failed with status ${getResponse.status}.`);
+      throw Object.assign(new Error(`GET failed with status ${getResponse.status}.`), { status: getResponse.status });
     }
     const actual = await readResponseBuffer(getResponse);
     if (!actual.equals(expected)) {
@@ -1169,7 +1169,7 @@ export async function testConnection(overrides = {}) {
           testKey,
         ]);
         if (!response.ok && response.status !== 404) {
-          throw new Error(`DELETE failed with status ${response.status}.`);
+          throw Object.assign(new Error(`DELETE failed with status ${response.status}.`), { status: response.status });
         }
       } catch (error) {
         primaryError ||= error;

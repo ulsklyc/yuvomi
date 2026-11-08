@@ -2567,6 +2567,34 @@ test('connection test uses hybrid overrides without persisting connection fields
   assert.match(config.lastTest, /^\d{4}-\d{2}-\d{2}T/);
 });
 
+// Phase 0, section H: the connection test wrote the server's answer into its
+// message ("WebDAV connection test failed: PUT failed with status 507 ...") and
+// the route sent that text. Now the answer carries the class in `detail`.
+test('connection test: a refusing server answers with its class, never its text', async (t) => {
+  clearWebdavDocuments();
+  const webdav = await createWebdavServer(t, {
+    handler: async (req, res) => {
+      if (req.method !== 'PUT') return false;
+      res.writeHead(507, 'Quota exceeded on dav-internal.lan:8443 for /srv/dav/documents');
+      res.end();
+      return true;
+    },
+  });
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const result = await routeCall(harness, 'POST', '/storage/test', {
+    url: webdav.url, username: 'alice', password: 'secret', path: 'test/documents',
+  });
+
+  assert.equal(result.response.status, 502, JSON.stringify(result.body));
+  assert.equal(result.body.reason, 'documents_storage_failed');
+  assert.equal(result.body.detail, 'HTTP 507');
+  assert.doesNotMatch(JSON.stringify(result.body), /dav-internal|\/srv\/dav|Quota|PUT failed/);
+  assert.ok(!JSON.stringify(result.body).includes(webdav.url), 'the answer does not repeat the address');
+});
+
 test('connection test returns stable storage codes for invalid overrides', async (t) => {
   clearWebdavDocuments();
   const userId = createRouteUser();
