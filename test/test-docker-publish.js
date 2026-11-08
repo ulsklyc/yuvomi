@@ -125,3 +125,12 @@ test('the installation guide verifies against this workflow identity', () => {
   assert.match(block[0], /--certificate-identity-regexp '\^https:\/\/github\.com\/ulsklyc\/yuvomi\/\.github\/workflows\/docker-publish\.yml@refs\/tags\/v'/);
   assert.match(workflow, /^name: Docker Publish$/m);
 });
+
+test('the image workflow keeps read-only repository contents', () => {
+  // Writing to releases belongs to release-assets.yml alone (phase 1a, A1):
+  // that workflow uploads the tarball and publishes the release. The image
+  // build runs on every push to main and needs packages, not the repository.
+  const permissions = workflow.slice(workflow.indexOf('\npermissions:'), workflow.indexOf('\nenv:'));
+  assert.match(permissions, /^ {2}contents: read$/m, 'docker-publish.yml must keep contents: read');
+  assert.doesNotMatch(workflow, /^\s+contents: write$/m, 'no contents: write anywhere in docker-publish.yml');
+});
