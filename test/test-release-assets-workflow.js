@@ -161,13 +161,18 @@ test('uploads both files, publishes last, then checks the result', () => {
   assert.ok((check.match(/exit 1/g) || []).length >= 2, 'both conditions end the job red');
 });
 
-test('starts the Umbrel publish itself when it published the release', () => {
-  // A release published with GITHUB_TOKEN fires no `release: published` run.
-  const dispatch = indexOf(/gh workflow run umbrel-publish\.yml --ref main -f version="\$VERSION"/);
+test('hands over to the Umbrel publish on every successful run, at the tag', () => {
+  // A release published with GITHUB_TOKEN fires no `release: published` run,
+  // so this job starts umbrel-publish.yml itself.
+  const dispatch = indexOf(/gh workflow run umbrel-publish\.yml --ref "\$TAG" -f version="\$VERSION"/);
+  assert.notEqual(dispatch, -1,
+    'dispatched at the TAG: umbrel-publish reads the release notes from its checkout, and the '
+    + 'notes for this version live at the tag (on main they may belong to the next release)');
   assert.ok(dispatch > indexOf(/--json assets,isDraft/), 'only after the check passed');
-  assert.match(allSteps[dispatch].text, /if: steps\.version\.outputs\.was-draft == 'true'/,
-    'a release created non-draft by hand already fired "published" with a person\'s token');
-  assert.match(allSteps[0].text, /was-draft=\$WAS_DRAFT/);
+  // No condition: a rerun after a failure past the publish step finds the
+  // release already public and must still hand over. umbrel-publish updates
+  // its PR in place and refuses older versions itself.
+  assert.doesNotMatch(allSteps[dispatch].text, /^ {8}if:/m, 'the handover runs on every successful run');
   assert.match(umbrel, /^ {2}workflow_dispatch:\n {4}inputs:\n {6}version:/m,
     'umbrel-publish.yml still takes the version input this step passes');
 });

@@ -34,9 +34,14 @@ name: Release Assets
 # token never start other workflows (except workflow_dispatch and
 # repository_dispatch), so `umbrel-publish.yml`, which listens to
 # `release: published`, would not run for a release this job publishes. The
-# last step therefore dispatches it explicitly - only when this run took the
-# release out of draft; a release that was already public (a rerun after a
-# publish by hand) fired `published` with the person's token.
+# last step therefore dispatches it explicitly, on EVERY successful run: a
+# rerun after a failure past the publish step sees the release already public
+# and must still hand over, and the Umbrel workflow updates its PR in place, so
+# a second run for the same version changes nothing. It is dispatched at the
+# TAG, not at main: umbrel-publish reads `.github/umbrel-release-notes.md` from
+# its checkout, and the notes for this version are committed before the tag -
+# on main they may already belong to the next release, or (patch release from
+# a branch) never have been there.
 
 on:
   workflow_dispatch:
@@ -79,11 +84,11 @@ jobs:
             exit 1
           fi
           VERSION="${TAG#v}"
-          WAS_DRAFT="$(gh release view "$TAG" --json isDraft --jq .isDraft)"
+          # Fails here, before any work, when there is no release for the tag.
+          gh release view "$TAG" --json isDraft --jq '"draft: \(.isDraft)"'
           {
             echo "version=$VERSION"
             echo "tarball=yuvomi-$VERSION-dist.tar.gz"
-            echo "was-draft=$WAS_DRAFT"
           } >> "$GITHUB_OUTPUT"
 
       - name: Check out the tag
@@ -155,9 +160,8 @@ jobs:
           done
 
       - name: Start the Umbrel catalog publish
-        if: steps.version.outputs.was-draft == 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          gh workflow run umbrel-publish.yml --ref main -f version="$VERSION"
+          gh workflow run umbrel-publish.yml --ref "$TAG" -f version="$VERSION"
