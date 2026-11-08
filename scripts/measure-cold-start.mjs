@@ -20,6 +20,8 @@
  *   - every run starts its own server: `node server/index.js` with
  *     NODE_ENV=production, DB_PATH on the copy, bound to 127.0.0.1, plain HTTP
  *     (Node's http server speaks HTTP/1.1 only, no proxy in between)
+ *   - session cookies are not `Secure` (SESSION_SECURE=false), whatever the
+ *     calling shell exports: the server speaks plain HTTP
  *   - the database stays unencrypted (DB_ENCRYPTION_KEY removed from the
  *     environment, DB_ENCRYPTION_AUTO_KEY=false) and no `.env` is read: the
  *     seed runs with the temp directory as working directory, the server is
@@ -148,6 +150,9 @@ async function startServer({ dbPath, port, sessionSecret }) {
       DB_PATH: dbPath,
       DB_ENCRYPTION_AUTO_KEY: 'false',
       SESSION_SECRET: sessionSecret,
+      // Plain HTTP: a secure cookie from an exported SESSION_SECURE=true
+      // would never come back, and the run would end on the login page.
+      SESSION_SECURE: 'false',
       PORT: String(port),
       BIND_ADDRESS: '127.0.0.1',
       NODE_NO_WARNINGS: '1',
