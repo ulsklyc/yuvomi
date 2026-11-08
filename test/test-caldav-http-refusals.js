@@ -2310,7 +2310,11 @@ test('CardDAV-Konto anlegen: eine Absage des Servers kommt als Meldung an, nicht
     const body = await res.json();
     assert.equal(res.status, 502);
     assert.equal(body.errorCode, 'connection_failed');
-    assert.match(body.error, /refused to list the address books \(HTTP 403/);
+    // Die Klasse der Absage, nie der Text des Servers oder von tsdav (Phase 0,
+    // Abschnitt H): der nannte Adresse und Pfad.
+    assert.equal(body.reason, 'remote_auth_failed');
+    assert.equal(body.detail, 'HTTP 403');
+    assert.ok(!JSON.stringify(body).includes(dav.url), 'die Antwort nennt die Adresse nicht');
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM carddav_accounts').get().n, 0);
   } finally {
     server.closeAllConnections?.();
