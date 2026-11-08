@@ -590,3 +590,33 @@ test('GET /database und POST /webdav/trigger: ein Backup ohne bestandene Integri
   assert.deepEqual(fs.readdirSync(BACKUP_DIR).filter((f) => !f.endsWith('.db')), [],
     'keine Begleitdateien der Pruefung im Backup-Ordner');
 });
+
+// ── Phase 0 section H: a foreign server's text stays out of the answer ────────
+// test:client-error-text-guard reads the routes; this runs one as a program. A
+// WebDAV server answers the connection test with a status line that names its
+// internal host and path - exactly what a misconfigured reverse proxy sends.
+// Decision E4 (08.11.2026): the admin gets a fixed sentence, a `reason` and the
+// error class in `detail` (here the HTTP status), never the raw text.
+const LEAKY_STATUS_TEXT = 'Backend dav-internal.lan:8443 failed for /srv/dav/private-backups';
+const leakyServer = http.createServer((req, res) => {
+  req.resume();
+  req.on('end', () => { res.writeHead(500, LEAKY_STATUS_TEXT); res.end(); });
+});
+const leakyBase = await new Promise((r) => leakyServer.listen(0, '127.0.0.1', () => {
+  r(`http://127.0.0.1:${leakyServer.address().port}`);
+}));
+test.after(() => leakyServer.close());
+
+test('POST /webdav/test: a failing server answers with reason and class, never its own text', { todo: 'fix pending, Phase 0 section H PR 3' }, async () => {
+  const r = await call('POST', '/webdav/test', {
+    actor: ADM,
+    body: { url: leakyBase, username: 'dav', password: 'other-secret', remotePath: '/backups/' },
+  });
+  const text = JSON.stringify(r.body);
+  assert.ok(!/dav-internal|\/srv\/dav|private-backups|Backend/.test(text), `no foreign text in the answer: ${text}`);
+  assert.ok(!text.includes(leakyBase), `the answer does not repeat the address: ${text}`);
+  assert.equal(r.status, 502);
+  assert.equal(r.body.reason, 'remote_http_status');
+  assert.equal(r.body.detail, 'HTTP 500');
+  assert.equal(typeof r.body.error, 'string');
+});
