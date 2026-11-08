@@ -14,10 +14,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tempDir } from './tmp-dir.js';
 
 const SCRIPT = fileURLToPath(new URL('../scripts/check-release-cadence.mjs', import.meta.url));
 const OLD_DATE = '2026-01-07T12:00:00+0100';
@@ -28,8 +28,8 @@ for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR
   delete env[key];
 }
 
-const repo = mkdtempSync(join(tmpdir(), 'yuvomi-cadence-'));
-test.after(() => rmSync(repo, { recursive: true, force: true }));
+// Removed on process exit by tempDir(), also when a case throws.
+const repo = tempDir('yuvomi-cadence-');
 
 function git(args, extraEnv = {}) {
   return execFileSync('git', [
