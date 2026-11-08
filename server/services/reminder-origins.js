@@ -45,6 +45,25 @@ export const ORIGIN_MODULE = Object.freeze({
   shopping_move_returned: 'shopping',
 });
 
+/* THE SAME QUESTION FOR THE SUBSCRIPTION ADDRESSES (#2615).
+ *
+ * Each `/feed/<name>/:token.ics` route in server/index.js belongs to one
+ * permission module. A member for whom that module is `none` gets an empty
+ * calendar (see `recipientDeniedModules()` below); the household switch stays
+ * deliberately open for feeds (docs/DECISIONS.md). Birthdays follow
+ * `calendar`, as in the delivery: `birthdays` is a nav id under it, not a
+ * permission module of its own. A local calendar's feed is not here - its token
+ * belongs to the calendar, not to a member.
+ * test/test-denied-module-feeds.js holds every value against PERMISSION_MODULES. */
+export const FEED_MODULE = Object.freeze({
+  calendar:              'calendar',
+  birthdays:             'calendar',
+  'inventory-deadlines': 'inventory',
+  cycle:                 'health',
+  schedule:              'schedule',
+  waste:                 'waste',
+});
+
 /**
  * Does this event belong to a birthday? Birthdays write their reminders as
  * `event` on the calendar event they create themselves
@@ -118,7 +137,7 @@ export function withoutSwitchedOffModules(database, rows) {
  * own permission predicate next to it. Callers: the delivery
  * (`withoutModulesDeniedToRecipient()` below, for notifications.js), the
  * medication scheduler (#2602, which sends without `reminders` rows), and
- * later the calendar feeds.
+ * the calendar feeds (#2615, server/index.js).
  *
  * @param {object} database
  * @param {number} userId

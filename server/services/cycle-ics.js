@@ -23,7 +23,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { resolveHouseholdFormats, translate } from '../utils/i18n.js';
-import { escapeICSText, foldLine } from './ics-export.js';
+import { escapeICSText, foldLine, emptyFeed } from './ics-export.js';
 import { activeAccountSql } from './account-state.js';
 import { projectFutureCycles, suppressesFertility } from '../../public/utils/health-cycle.js';
 import { todayKey } from '../utils/timezone.js';
@@ -65,6 +65,8 @@ function buildDayVEvent({ uid, date, summary }, dtstamp) {
   return buildSpanVEvent({ uid, start: date, end: date, summary }, dtstamp);
 }
 
+const PRODID = '-//Yuvomi//Cycle Feed//DE';
+
 /**
  * Baut den VCALENDAR-Text für einen Nutzer: alle geloggten Perioden (echte
  * Zeilen, stabile UID über die DB-Id) plus - sofern nicht schwanger und genug
@@ -94,7 +96,7 @@ function buildCycleFeed(conn, userId, now = new Date()) {
   const out = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Yuvomi//Cycle Feed//DE',
+    `PRODID:${PRODID}`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeICSText(translate(locale, 'health.cycle.ics.calendarName'))}`,
@@ -168,7 +170,13 @@ function findUserIdByFeedToken(conn, token) {
   return row?.id ?? null;
 }
 
+/** The cycle feed without its events, for a subscriber without `health` (#2615). */
+function buildEmptyCycleFeed(conn) {
+  const { locale } = resolveHouseholdFormats(conn);
+  return emptyFeed({ prodId: PRODID, calendarName: translate(locale, 'health.cycle.ics.calendarName') });
+}
+
 export {
-  buildCycleFeed,
+  buildCycleFeed, buildEmptyCycleFeed,
   getFeedToken, regenerateFeedToken, clearFeedToken, findUserIdByFeedToken,
 };
